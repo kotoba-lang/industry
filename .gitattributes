@@ -1,0 +1,6 @@
+* !text !filter !merge !diff
+*.tsv filter=lfs diff=lfs merge=lfs -text
+*.vcf.gz filter=lfs diff=lfs merge=lfs -text
+*.png !text !filter !merge !diff
+*.csv !text !filter !merge !diff
+*.pdf !text !filter !merge !diff
