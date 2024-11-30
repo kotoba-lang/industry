@@ -15,40 +15,7 @@ export const metadata: Metadata = {
   openGraph: {
     images: [HOME_OG_IMAGE_URL],
   },
-  icons: {
-    icon: [
-      { url: '/favicon/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
-      { url: '/favicon/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
-    ],
-    shortcut: ['/favicon/favicon.ico'],
-    apple: [
-      { url: '/favicon/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
-    ],
-    other: [
-      {
-        rel: 'mask-icon',
-        url: '/favicon/safari-pinned-tab.svg',
-        color: '#000000',
-      },
-    ],
-  },
-  manifest: '/favicon/site.webmanifest',
-  themeColor: '#000',
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'default',
-  },
-  alternates: {
-    types: {
-      'application/rss+xml': '/feed.xml',
-    },
-  },
-  other: {
-    'msapplication-TileColor': '#000000',
-    'msapplication-config': '/favicon/browserconfig.xml',
-    copyright: 'cc-by-nd-sa',
-  },
-}
+};
 
 export default function RootLayout({
   children,
@@ -57,7 +24,43 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={cn(inter.className, "dark:bg-slate-900 dark:text-slate-400")}>
+      <head>
+        <link
+          rel="apple-touch-icon"
+          sizes="180x180"
+          href="/favicon/apple-touch-icon.png"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="32x32"
+          href="/favicon/favicon-32x32.png"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="16x16"
+          href="/favicon/favicon-16x16.png"
+        />
+        <link rel="manifest" href="/favicon/site.webmanifest" />
+        <link
+          rel="mask-icon"
+          href="/favicon/safari-pinned-tab.svg"
+          color="#000000"
+        />
+        <link rel="shortcut icon" href="/favicon/favicon.ico" />
+        <meta name="msapplication-TileColor" content="#000000" />
+        <meta
+          name="msapplication-config"
+          content="/favicon/browserconfig.xml"
+        />
+        <meta name="theme-color" content="#000" />
+        <link rel="alternate" type="application/rss+xml" href="/feed.xml" />
+        <meta name="copyright" content="cc-by-nd-sa" />
+      </head>
+      <body
+        className={cn(inter.className, "dark:bg-slate-900 dark:text-slate-400")}
+      >
         <ThemeSwitcher />
         <div className="min-h-screen">{children}</div>
         <Footer />
