@@ -5,18 +5,18 @@ import { motion } from 'framer-motion';
 const careerData = [
   {
     period: "2024 - Present",
-    company: "Graduate School of Medical and Dental Sciences, Niigata University / 新潟大学大学院 医歯学総合研究科 生体機能調節医学専攻 システム脳病態学",
-    description: "Medical Doctoral Course / 博士課程",
+    company: "Niigata University Graduate School of Medical and Dental Sciences Department of Biofunction Regulation and Systems Brain Pathology",
+    description: "Medical Doctoral Course",
   },
   {
     period: "2017 - 2022",
-    company: "Kyoto - Enryaku-ji / 天台宗 比叡山延暦寺 眞那宗 大宗寺",
-    description: "Monk / 僧侶",
+    company: "Kyoto - Tendai, Enryakuji Temple on Mount Hiei, Mana, Daishuji Temple",
+    description: "Monk",
   },
   {
     period: "2012 - 2014",
-    company: "Keio University / 慶應義塾大学",
-    description: "Philosophy / 文学部哲学科 科学哲学専攻",
+    company: "Keio University",
+    description: "Faculty of Letters, Department of Philosophy, Philosophy of Science",
   }
 ];
 
