@@ -11,7 +11,7 @@ const careerData = [
   {
     period: "2017 - 2022",
     company: "Kyoto - Tendai, Enryakuji Temple on Mount Hiei, Mana, Daishuji Temple",
-    description: "Monk",
+    description: "Buddhist Scholar",
   },
   {
     period: "2012 - 2014",
