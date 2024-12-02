@@ -51,7 +51,7 @@ const OrbitalType: React.FC<OrbitalType & { x: number; y: number }> = ({ name, x
 
 const Orbital: React.FC<ElectronConfig> = ({ radius, strokeWidth, color, rotationSpeed, electrons, shellLabel, orbitalTypes }) => {
   const [rotation, setRotation] = useState(0)
-  const requestRef = useRef<number>()
+  const requestRef = useRef<number | null>(null)
 
   const animate = () => {
     setRotation((prevRotation) => (prevRotation + rotationSpeed) % 360)
