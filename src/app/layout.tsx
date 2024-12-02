@@ -11,7 +11,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: `Jun Kawasaki - ${CMS_NAME}`,
-  description: `Jun Kawasaki - ${CMS_NAME}.`,
+  description: `Proverbs 1:7 The fear of Jehovah is the beginning of knowledge; But the foolish despise wisdom and instruction.`,
   openGraph: {
     images: [HOME_OG_IMAGE_URL],
   },
