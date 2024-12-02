@@ -1,22 +1,45 @@
-import { useRef, useEffect } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Text, Environment } from '@react-three/drei';
-import * as THREE from 'three';
-import { Vector } from '../types/correlation';
+"use client";
+
+import { useRef, useEffect } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+
+import { OrbitControls, Text, Environment, Line } from "@react-three/drei";
+
+import { Vector } from "@/types/correlation";
+
+import * as THREE from "three";
+
+import {
+  Group,
+  Mesh,
+  SphereGeometry,
+  MeshStandardMaterial,
+  BufferGeometry,
+  BufferAttribute,
+  LineBasicMaterial,
+  AmbientLight,
+  PointLight,
+} from "three";
 
 type VectorVisualizationProps = {
   vectors: Vector[];
 };
 
-const elements = ['りんご', 'みかん', 'バナナ', '河崎純真'];
+const elements = ["りんご", "みかん", "バナナ", "河崎純真"];
 
-function Element({ position, label }: { position: [number, number, number]; label: string }) {
+function Element({
+  position,
+  label,
+}: {
+  position: [number, number, number];
+  label: string;
+}) {
   return (
-    <group position={position}>
-      <mesh>
-        <sphereGeometry args={[0.1, 32, 32]} />
-        <meshStandardMaterial color="blue" />
-      </mesh>
+    <Group position={position}>
+      <Mesh>
+        <SphereGeometry args={[0.1, 32, 32]} />
+        <MeshStandardMaterial color="blue" />
+      </Mesh>
       <Text
         position={[0, 0.2, 0]}
         fontSize={0.2}
@@ -27,13 +50,13 @@ function Element({ position, label }: { position: [number, number, number]; labe
       >
         {label}
       </Text>
-    </group>
+    </Group>
   );
 }
 
 function Scene({ vectors }: VectorVisualizationProps) {
   const { camera } = useThree();
-  const groupRef = useRef<THREE.Group>(null);
+  const groupRef = useRef<any>(null);
 
   useEffect(() => {
     if (groupRef.current) {
@@ -62,7 +85,7 @@ function Scene({ vectors }: VectorVisualizationProps) {
   });
 
   return (
-    <group ref={groupRef}>
+    <Group ref={groupRef}>
       {vectors.map((vector, index) => (
         <Element
           key={index}
@@ -73,34 +96,38 @@ function Scene({ vectors }: VectorVisualizationProps) {
       {/* Add lines between elements */}
       {vectors.flatMap((v1, i) =>
         vectors.slice(i + 1).map((v2, j) => (
-          <line key={`${i}-${j}`}>
-            <bufferGeometry attach="geometry">
-              <bufferAttribute
-                attachObject={['attributes', 'position']}
+          <Line key={`${i}-${j}`}>
+            <BufferGeometry attach="geometry">
+              <BufferAttribute
+                attachObject={["attributes", "position"]}
                 count={2}
                 array={new Float32Array([...v1, ...v2])}
                 itemSize={3}
               />
-            </bufferGeometry>
-            <lineBasicMaterial attach="material" color="white" opacity={0.5} transparent />
-          </line>
+            </BufferGeometry>
+            <LineBasicMaterial
+              attach="material"
+              color="white"
+              opacity={0.5}
+              transparent
+            />
+          </Line>
         ))
       )}
-    </group>
+    </Group>
   );
 }
 
-export default function VectorVisualization({ vectors }: VectorVisualizationProps) {
+export default function VectorVisualization({
+  vectors,
+}: VectorVisualizationProps) {
   return (
-    <div style={{ width: '100%', height: '400px' }}>
-      <Canvas>
-        <ambientLight intensity={0.5} />
-        <pointLight position={[10, 10, 10]} />
-        <Scene vectors={vectors} />
-        <OrbitControls />
-        <Environment preset="studio" />
-      </Canvas>
-    </div>
+    <Canvas>
+      <AmbientLight intensity={0.5} />
+      <PointLight position={[10, 10, 10]} />
+      <Scene vectors={vectors} />
+      <OrbitControls />
+      <Environment preset="studio" />
+    </Canvas>
   );
 }
-

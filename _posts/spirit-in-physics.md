@@ -1,5 +1,5 @@
 ---
-title: "Research Paper / Spirits in Physics"
+title: "Research Paper / Spirit in Physics"
 excerpt: "Measuring and quantifying the structure of spirituality using physical methods / Kawasaki Model"
 coverImage: "/assets/blog/dynamic-routing/cover.jpg"
 date: "2024-11-30T05:35:07.322Z"
@@ -13,8 +13,7 @@ ogImage:
 ## Spirits in Physics
 
 What are the characteristics that distinguish humans from other animals?
-In Japanese, humans are referred to as primates, and spirituality has been regarded as having specific qualities.
-However, spirituality has not been measured or quantified as a physical science.
+In Japanese, humans are referred to as primates, and spirituality has been regarded as having specific qualities. However, spirituality has not been measured or quantified as a physical science.
 
 This research refers to the following paper and proposes to measure and quantify the structure of spirituality using physical methods as the Kawasaki Model.
 
