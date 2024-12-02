@@ -21,18 +21,20 @@ const TearableItems = () => {
       <div className="relative w-full max-w-2xl">
         <div className="flex justify-between items-center">
           <motion.div 
-            className="bg-white p-6 rounded-lg shadow-lg w-64"
             animate={isTorn ? shakeAnimation : {}}
           >
-            <h2 className="text-xl font-bold mb-2">河崎純真</h2>
-            <p>ここに項目1の内容を記述します。</p>
+            <div className="bg-white p-6 rounded-lg shadow-lg w-64">
+              <h2 className="text-xl font-bold mb-2">河崎純真</h2>
+              <p>ここに項目1の内容を記述します。</p>
+            </div>
           </motion.div>
           <motion.div 
-            className="bg-white p-6 rounded-lg shadow-lg w-64"
             animate={isTorn ? shakeAnimation : {}}
           >
-            <h2 className="text-xl font-bold mb-2">Apple Vi</h2>
-            <p>ここに項目2の内容を記述します。</p>
+            <div className="bg-white p-6 rounded-lg shadow-lg w-64">
+              <h2 className="text-xl font-bold mb-2">Apple Vi</h2>
+              <p>ここに項目2の内容を記述します。</p>
+            </div>
           </motion.div>
         </div>
         <AnimatePresence>
@@ -69,15 +71,16 @@ const TearableItems = () => {
         <AnimatePresence>
           {isTorn && (
             <motion.div
-              className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              {[...Array(10)].map((_, i) => (
-                <motion.div
+              <div 
+                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32"
+              >
+                {[...Array(10)].map((_, i) => (
+                  <motion.div
                   key={i}
-                  className="absolute w-1 h-1 bg-gray-400"
                   initial={{ 
                     x: 50, 
                     y: 50, 
@@ -93,8 +96,11 @@ const TearableItems = () => {
                     duration: 0.5 + Math.random() * 0.5, 
                     ease: "easeOut" 
                   }}
-                />
-              ))}
+                  >
+                    <div className="absolute w-1 h-1 bg-gray-400" />
+                  </motion.div>
+                ))}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
