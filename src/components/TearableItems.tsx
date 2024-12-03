@@ -5,9 +5,16 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 const TearableItems = () => {
   const [isTorn, setIsTorn] = useState(false)
+  const [isHammering, setIsHammering] = useState(false)
 
   const toggleTear = () => {
-    setIsTorn(!isTorn)
+    setIsHammering(true)
+    setTimeout(() => {
+      setIsTorn((prev) => !prev)
+    }, 250)
+    setTimeout(() => {
+      setIsHammering(false)
+    }, 500)
   }
 
   const shakeAnimation = {
@@ -16,23 +23,32 @@ const TearableItems = () => {
     transition: { duration: 0.3, ease: "easeInOut" }
   }
 
+  const hammerAnimation = {
+    rotate: [0, 45, 0],
+    x: [0, 10, 0],
+    y: [0, 10, 0],
+    transition: { duration: 0.5, ease: "easeInOut" }
+  }
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
       <div className="relative w-full max-w-2xl">
         <div className="flex justify-between items-center">
           <motion.div 
+            className="bg-white p-6 rounded-lg shadow-lg w-64"
             animate={isTorn ? shakeAnimation : {}}
           >
-            <div className="bg-white p-6 rounded-lg shadow-lg w-64">
-              <h2 className="text-xl font-bold mb-2">河崎純真</h2>
-            </div>
+            <h2 className="text-xl font-bold mb-2">Self
+            </h2>
           </motion.div>
           <motion.div 
+            className="bg-white p-6 rounded-lg shadow-lg w-64"
             animate={isTorn ? shakeAnimation : {}}
           >
-            <div className="bg-white p-6 rounded-lg shadow-lg w-64">
-              <h2 className="text-xl font-bold mb-2">Apple Vi</h2>
-            </div>
+            <h2 className="text-xl font-bold mb-2">Partner
+            
+            
+            </h2>
           </motion.div>
         </div>
         <AnimatePresence>
@@ -43,7 +59,6 @@ const TearableItems = () => {
               initial={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              onClick={toggleTear}
             >
               <motion.path
                 d="M0,50 C25,50 75,50 100,50"
@@ -69,16 +84,15 @@ const TearableItems = () => {
         <AnimatePresence>
           {isTorn && (
             <motion.div
+              className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              <div 
-                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32"
-              >
-                {[...Array(10)].map((_, i) => (
-                  <motion.div
+              {[...Array(10)].map((_, i) => (
+                <motion.div
                   key={i}
+                  className="absolute w-1 h-1 bg-gray-400"
                   initial={{ 
                     x: 50, 
                     y: 50, 
@@ -94,14 +108,80 @@ const TearableItems = () => {
                     duration: 0.5 + Math.random() * 0.5, 
                     ease: "easeOut" 
                   }}
-                  >
-                    <div className="absolute w-1 h-1 bg-gray-400" />
-                  </motion.div>
-                ))}
-              </div>
+                />
+              ))}
             </motion.div>
           )}
         </AnimatePresence>
+        <motion.svg
+          className="absolute top-0 right-0 transform translate-x-1/2 -translate-y-1/2 w-32 h-32"
+          viewBox="0 0 100 100"
+          animate={isHammering ? hammerAnimation : {}}
+          style={{ originX: 0.8, originY: 0.9 }}
+        >
+          {/* Hammer head */}
+          <g>
+            {/* Main head */}
+            <path
+              d="M60,15 L80,15 L80,25 L60,25 Z"
+              fill="#B8B8B8"
+              stroke="#666"
+              strokeWidth="1"
+            />
+            {/* Claw */}
+            <path
+              d="M80,15 Q85,15 85,20 L85,25 Q85,30 80,25 Z"
+              fill="#B8B8B8"
+              stroke="#666"
+              strokeWidth="1"
+            />
+            {/* Face */}
+            <path
+              d="M55,15 L60,15 L60,25 L55,25 Q50,20 55,15 Z"
+              fill="#B8B8B8"
+              stroke="#666"
+              strokeWidth="1"
+            />
+            {/* Metallic effect */}
+            <path
+              d="M62,17 L78,17"
+              stroke="#999"
+              strokeWidth="0.5"
+              opacity="0.5"
+            />
+            <path
+              d="M62,20 L78,20"
+              stroke="#999"
+              strokeWidth="0.5"
+              opacity="0.5"
+            />
+            <path
+              d="M62,23 L78,23"
+              stroke="#999"
+              strokeWidth="0.5"
+              opacity="0.5"
+            />
+          </g>
+          {/* Handle */}
+          <g>
+            {/* Main handle */}
+            <path
+              d="M67.5,25 L72.5,25 L75,90 L65,90 Z"
+              fill="#333"
+            />
+            {/* Grip texture */}
+            {[...Array(8)].map((_, i) => (
+              <path
+                key={i}
+                d="M65,90 L75,90"
+                stroke="#222"
+                strokeWidth="0.5"
+                opacity="0.3"
+                transform={`translate(0, ${-i * 8})`}
+              />
+            ))}
+          </g>
+        </motion.svg>
       </div>
       <button
         className={`mt-8 px-4 py-2 text-white rounded transition-colors ${
@@ -110,8 +190,9 @@ const TearableItems = () => {
             : 'bg-red-500 hover:bg-red-600'
         }`}
         onClick={toggleTear}
+        disabled={isHammering}
       >
-        {isTorn ? '繋げる' : 'ビリビリ切る'}
+        {isTorn ? '繋げなおす' : 'ハンマーで叩く'}
       </button>
     </div>
   )

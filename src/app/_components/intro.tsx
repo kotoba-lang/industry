@@ -7,7 +7,7 @@ export function Intro() {
         Jun Kawasaki.
       </h1>
       <h4 className="text-center md:text-left text-lg mt-5 md:pl-8">
-        Good vibes for the next.
+        Good Vibes For Children.
       </h4>
     </section>
   );
