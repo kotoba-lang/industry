@@ -1,13 +1,13 @@
 ---
 title: "Research Paper / Spirits in Physics"
 excerpt: "スピリットを計測、可視化する / Kawasaki Model "
-coverImage: "/assets/blog/dynamic-routing/cover.jpg"
+coverImage: "/assets/posts/spirit-in-physics/cover.jpg"
 date: "2024-11-30T05:35:07.322Z"
 author:
   name: Jun Kawasaki
-  picture: "/assets/blog/authors/jk.jpg"
+  picture: "/assets/posts/authors/jk.jpg"
 ogImage:
-  url: "/assets/blog/dynamic-routing/cover.jpg"
+  url: "/assets/posts/dynamic-routing/cover.jpg"
 ---
 
 ## Spirits in Physics
@@ -17,7 +17,7 @@ ogImage:
 しかし霊性については物理科学として計測し、計量することが行われてこなかった。
 
 本研究は以下の論文を参照し、
-物理学手法を用いて霊性の構造を計測し、計量することをKawasaki Modelとして提案する。
+物理学手法を用いて霊性の構造を計測し、計量することを Kawasaki Model として提案する。
 
 - Senna, I., Maravita, A., Bolognini, N., & Parise, C. V. (2014). [The Marble-Hand Illusion](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0091688).
 
@@ -26,7 +26,7 @@ ogImage:
 ## 霊性の構造（Sprits in Physics : Kawasaki Model）
 
 モデルの骨子は Spirits is Vector である。
-Spiritsをベクトルで表現することで人の意識及び無意識を計測し、その変容を行うことが可能である。
+Spirits をベクトルで表現することで人の意識及び無意識を計測し、その変容を行うことが可能である。
 
 これらは伝統的に日本仏教では曼荼羅として扱われてきた。
 
@@ -37,7 +37,7 @@ Spiritsをベクトルで表現することで人の意識及び無意識を計�
 霊性の動的構造：ボーアの原子模型と同様とする  
 霊性の相互作用：分子の相互作用と同様とする  
 霊性の特徴：霊性は身体性に作用する  
-霊性のエネルギー量：情報はエネルギーを持つことが証明されてる。  
+霊性のエネルギー量：情報はエネルギーを持つことが証明されてる。
 
 - Toyabe, S., Sagawa, T., Ueda, M., Muneyuki, E., & Sano, M. (2010). [Experimental demonstration of information-to-energy conversion and validation of the generalized Jarzynski equality](https://www.nature.com/articles/nphys1821).
 
@@ -102,7 +102,7 @@ Spiritsをベクトルで表現することで人の意識及び無意識を計�
 自己拡張性により肉体が影響を受けることがわかった。
 自己拡張性により精神が影響を受けることがわかった。
 自己拡張性により社会が形成されていることがわかった。
-自己拡張性はVector DBで表現可能であることがわかった。
+自己拡張性は Vector DB で表現可能であることがわかった。
 
 ## 応用研究
 
@@ -125,17 +125,17 @@ Spiritsをベクトルで表現することで人の意識及び無意識を計�
 
 [x] 実証実験：物質的なラバーハンドの作用によって皮膚電位の変化を見る -> ラバーハンドをたたくと反応する
 [ ] 実証実験：デジタル的に表現されたラバーハンドの作用（身体性）によって皮膚電位の変化を見る -> 先行研究なし
-[ ] 実証実験：デジタル的に表現された概念の作用によって皮膚電位の変化を見る ->  先行研究なし
-[ ] 実証実験：概念の作用範囲を皮膚電位で計測することで、概念の作用範囲を探る->  先行研究なし
-[ ] 実証実験：概念の作用範囲を可視化することで、自己拡張（霊性）の範囲を探る->  先行研究なし
-[ ] 実証実験：概念の作用範囲に対して作用を行うことで自己概念の変容（霊性）を行う->  先行研究なし
-
+[ ] 実証実験：デジタル的に表現された概念の作用によって皮膚電位の変化を見る -> 先行研究なし
+[ ] 実証実験：概念の作用範囲を皮膚電位で計測することで、概念の作用範囲を探る-> 先行研究なし
+[ ] 実証実験：概念の作用範囲を可視化することで、自己拡張（霊性）の範囲を探る-> 先行研究なし
+[ ] 実証実験：概念の作用範囲に対して作用を行うことで自己概念の変容（霊性）を行う-> 先行研究なし
 
 ## 引用文献
 
-発表年,論文タイトル,著者名,ジャーナル名,インパクトファクター（IF）,i10指数
+発表年,論文タイトル,著者名,ジャーナル名,インパクトファクター（IF）,i10 指数
 
 ## Reference
+
 - Senna, I., Maravita, A., Bolognini, N., & Parise, C. V. (2014). [The Marble-Hand Illusion](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0091688).
 
 - Toyabe, S., Sagawa, T., Ueda, M., Muneyuki, E., & Sano, M. (2010). [Experimental demonstration of information-to-energy conversion and validation of the generalized Jarzynski equality](https://www.nature.com/articles/nphys1821).
@@ -147,4 +147,5 @@ Spiritsをベクトルで表現することで人の意識及び無意識を計�
 - 2015,Skin Conductance Responses to Emotional Stimuli: A Review of the Literature,Boucsein, W.,International Journal of Psychophysiology,2.882,80+
 
 ## Version
+
 2024/11/30 : 0.1.0
