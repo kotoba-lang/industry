@@ -1,5 +1,5 @@
 ---
-title: "Research Paper / Spirit in Physics"
+title: "Empirical Research / Spirit in Physics"
 excerpt: "Measuring and quantifying the structure of spirituality using physical methods / Kawasaki Model"
 coverImage: "/assets/blog/dynamic-routing/cover.jpg"
 date: "2024-11-30T05:35:07.322Z"

@@ -15,7 +15,7 @@ const careerData = [
     description: "Buddhist Scholar",
   },
   {
-    period: "2012 - 2014",
+    period: "2010 - 2014",
     company: "Keio University",
     description: "Faculty of Letters, Department of Philosophy, Philosophy of Science",
   }

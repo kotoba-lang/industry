@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+// import { Canvas, useFrame, useThree } from "@react-three/fiber";
 
 import { OrbitControls, Text, Environment, Line } from "@react-three/drei";
 
@@ -56,7 +56,7 @@ function Element({
 
 function Scene({ vectors }: VectorVisualizationProps) {
   const { camera } = useThree();
-  const groupRef = useRef<any>(null);
+  const groupRef = useRef<THREE.Group>(null);
 
   useEffect(() => {
     if (groupRef.current) {
