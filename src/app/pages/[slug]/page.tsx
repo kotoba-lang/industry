@@ -214,12 +214,6 @@ export default async function Page() {
                 Changes in skin potential during these actions are measured.
               </p>
               <p>The measurement of skin potential uses SKINPRO.</p>
-              <Image
-                src="/assets/posts/spirit-in-physics/skinpro.png"
-                alt="SKINPRO"
-                width={500}
-                height={500}
-              />
               <p>
                 Concept measurements are timestamped, and aligned with the
                 timestamps of the skin potential measurement device, analyzing
@@ -227,16 +221,22 @@ export default async function Page() {
                 separation and integration of concepts.
               </p>
               <p>
-                In the Mar hand illusion, skin potential changed as shown in the
-                graphs.
+                In the Rubber hand illusion, skin potential changed as shown in
+                the graphs.
               </p>
+              <TearableItems />
               <p>
                 Similar results were obtained in the analysis of the structure
                 of spirituality through concept measurement (currently a
                 hypothesis).
               </p>
-              <TearableItems />
 
+              <Image
+                src="/assets/posts/spirit-in-physics/241203-1.png"
+                alt="SKINPRO"
+                width={500}
+                height={500}
+              />
               <h3>
                 Measurement Using Emotion Analysis (Quantitative Research)
               </h3>
@@ -265,7 +265,13 @@ export default async function Page() {
                 hypothesis).
               </p>
               <h3>Measurement Results</h3>
-              <p>Measurement results will be added (2024/11/30)</p>
+              <p>Experimental results - n+1 (2024/12/03)</p>
+              <Image
+                src="/assets/posts/spirit-in-physics/241203-2.png"
+                alt="SKINPRO"
+                width={500}
+                height={500}
+              />
               <h3>Conclusion</h3>
               <p>
                 The research demonstrated that it is possible to measure and
