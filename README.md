@@ -1,4 +1,10 @@
+[ ] 曼荼羅を作成
+[ ] 研究同意書を作成
+[ ]
 [ ] darkモードでfooterの文字色が変わらない
+[ ] contentlayerを使う
+[ ] オリーブと鳩を散りばめる
+[ ] 羊と狼, sheep, wolves
 
 # A statically generated blog example using Next.js, Markdown, and TypeScript
 
