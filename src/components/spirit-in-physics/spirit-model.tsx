@@ -230,10 +230,10 @@ const maxElectrons: { [key: string]: number } = {
   s: 2, p: 6, d: 10, f: 14
 }
 
-export function AufbauElectronModel_3d() {
-  const [electronCount, setElectronCount] = useState(1)
-  const [protonCount, setProtonCount] = useState(1)
-  const [neutronCount, setNeutronCount] = useState(0)
+export function SpiritModel() {
+  const [electronCount, setElectronCount] = useState(8)
+  const [protonCount, setProtonCount] = useState(8)
+  const [neutronCount, setNeutronCount] = useState(8)
 
   const getElectronConfig = (count: number): ElectronConfig[] => {
     let remaining = count
@@ -339,3 +339,4 @@ export function AufbauElectronModel_3d() {
     </div>
   )
 }
+

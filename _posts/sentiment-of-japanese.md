@@ -1,6 +1,6 @@
 ---
-title: "日本の情緒 / 正しい日本"
-excerpt: "芭蕉の俳句を見ればよくわかる。芭蕉の俳句は、真の自分は死なないし、自分と一人とは心が通じ合い、自分と自然とも心が通い会うと思っているらしい。これは芭蕉の俳句を見ればよくわかる。仏教の言葉でいえば、真我的なひとである。- 岡潔"
+title: "Sentiment of Japanese"
+excerpt: "You can understand Japanese sentiment by looking at Basho's haiku. Basho's haiku seem to believe that the true self does not die, that one's heart communicates with others, and that one's heart communicates with nature. This can be understood by looking at Basho's haiku. In Buddhist terms, he is a person of true self. - Kiyoshi Oka"
 coverImage: "/assets/blog/hello-world/cover.jpg"
 date: "2024-11-23T00:00:00Z"
 author:
@@ -10,6 +10,4 @@ ogImage:
   url: "/assets/blog/hello-world/cover.jpg"
 ---
 
-日本の情緒は、芭蕉の俳句を見ればよくわかる。芭蕉の俳句は、真の自分は死なないし、自分と一人とは心が通じ合い、自分と自然とも心が通い会うと思っているらしい。これは芭蕉の俳句を見ればよくわかる。仏教の言葉でいえば、真我的なひとである。
-
-
+You can understand Japanese sentiment by looking at Basho's haiku. Basho's haiku seem to believe that the true self does not die, that one's heart communicates with others, and that one's heart communicates with nature. This can be understood by looking at Basho's haiku. In Buddhist terms, he is a person of true self. - Kiyoshi Oka

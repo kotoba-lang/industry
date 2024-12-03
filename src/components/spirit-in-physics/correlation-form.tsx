@@ -8,7 +8,8 @@ import {
   CorrelationInput,
 } from "@/types/correlation";
 
-const elements = ["りんご", "みかん", "バナナ", "河崎純真"];
+const elements = ["私", "父", "母", "兄弟", "姉妹", "友人", "同僚", "祖父祖母", "子供"];
+
 const correlationLevels: CorrelationLevel[] = [
   "とても近い",
   "近い",
