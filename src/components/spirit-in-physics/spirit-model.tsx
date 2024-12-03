@@ -1,30 +1,36 @@
-'use client'
+"use client";
 
-import React, { useState, useEffect, useRef } from 'react'
-import { Button } from "@/components/ui/button"
+import React, { useState, useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
 
 const generateColor = (index: number, total: number, hue: number) => {
-  return `hsl(${hue + (index / total) * 60}, 70%, 50%)`
-}
+  return `hsl(${hue + (index / total) * 60}, 70%, 50%)`;
+};
 
 type OrbitalType = {
-  name: string
-  color: string
-  electrons: number
-  maxElectrons: number
-}
+  name: string;
+  color: string;
+  electrons: number;
+  maxElectrons: number;
+};
 
 type ElectronConfig = {
-  color: string
-  radius: number
-  electrons: { angle: number }[]
-  rotationSpeed: number
-  strokeWidth: number
-  shellLabel: string
-  orbitalTypes: OrbitalType[]
-}
+  color: string;
+  radius: number;
+  electrons: { angle: number }[];
+  rotationSpeed: number;
+  strokeWidth: number;
+  shellLabel: string;
+  orbitalTypes: OrbitalType[];
+};
 
-const OrbitalType: React.FC<OrbitalType & { x: number; y: number }> = ({ name, x, y, color, electrons }) => (
+const OrbitalType: React.FC<OrbitalType & { x: number; y: number }> = ({
+  name,
+  x,
+  y,
+  color,
+  electrons,
+}) => (
   <g>
     <rect
       x={x}
@@ -47,37 +53,91 @@ const OrbitalType: React.FC<OrbitalType & { x: number; y: number }> = ({ name, x
       {electrons}
     </text>
   </g>
-)
+);
 
-const Orbital: React.FC<ElectronConfig> = ({ radius, strokeWidth, color, rotationSpeed, electrons, shellLabel, orbitalTypes }) => {
-  const [rotation, setRotation] = useState(0)
-  const requestRef = useRef<number | null>(null)
+const Orbital: React.FC<ElectronConfig> = ({
+  radius,
+  strokeWidth,
+  color,
+  rotationSpeed,
+  electrons,
+  shellLabel,
+  orbitalTypes,
+}) => {
+  const [rotation, setRotation] = useState(0);
+  const requestRef = useRef<number | null>(null);
 
   const animate = () => {
-    setRotation((prevRotation) => (prevRotation + rotationSpeed) % 360)
-    requestRef.current = requestAnimationFrame(animate)
-  }
+    setRotation((prevRotation) => (prevRotation + rotationSpeed) % 360);
+    requestRef.current = requestAnimationFrame(animate);
+  };
 
   useEffect(() => {
-    requestRef.current = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(requestRef.current!)
-  }, [])
+    requestRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(requestRef.current!);
+  }, []);
 
-  const orbitalColors = orbitalTypes.map((_, index) => generateColor(index, orbitalTypes.length, 0))
+  const orbitalColors = orbitalTypes.map((_, index) =>
+    generateColor(index, orbitalTypes.length, 0)
+  );
 
-  const createOrbitalPath = (r: number, type: string, index: number, orbitalColor: string) => {
+  const createOrbitalPath = (
+    r: number,
+    type: string,
+    index: number,
+    orbitalColor: string
+  ) => {
     switch (type) {
-      case 's':
-        return <circle cx="0" cy="0" r={r} fill="none" stroke={orbitalColor} strokeWidth={strokeWidth} opacity="0.5" />
-      case 'p':
+      case "s":
+        return (
+          <circle
+            cx="0"
+            cy="0"
+            r={r}
+            fill="none"
+            stroke={orbitalColor}
+            strokeWidth={strokeWidth}
+            opacity="0.5"
+          />
+        );
+      case "p":
         return (
           <g>
-            <ellipse cx="0" cy="0" rx={r} ry={r * 0.5} fill="none" stroke={orbitalColor} strokeWidth={strokeWidth} opacity="0.5" />
-            <ellipse cx="0" cy="0" rx={r} ry={r * 0.5} fill="none" stroke={orbitalColor} strokeWidth={strokeWidth} opacity="0.5" transform={`rotate(90)`} />
-            <ellipse cx="0" cy="0" rx={r} ry={r * 0.5} fill="none" stroke={orbitalColor} strokeWidth={strokeWidth} opacity="0.5" transform={`rotate(90) skewX(45)`} />
+            <ellipse
+              cx="0"
+              cy="0"
+              rx={r}
+              ry={r * 0.5}
+              fill="none"
+              stroke={orbitalColor}
+              strokeWidth={strokeWidth}
+              opacity="0.5"
+            />
+            <ellipse
+              cx="0"
+              cy="0"
+              rx={r}
+              ry={r * 0.5}
+              fill="none"
+              stroke={orbitalColor}
+              strokeWidth={strokeWidth}
+              opacity="0.5"
+              transform={`rotate(90)`}
+            />
+            <ellipse
+              cx="0"
+              cy="0"
+              rx={r}
+              ry={r * 0.5}
+              fill="none"
+              stroke={orbitalColor}
+              strokeWidth={strokeWidth}
+              opacity="0.5"
+              transform={`rotate(90) skewX(45)`}
+            />
           </g>
-        )
-      case 'd':
+        );
+      case "d":
         return (
           <g>
             {[0, 45, 90, 135].map((angle) => (
@@ -95,8 +155,8 @@ const Orbital: React.FC<ElectronConfig> = ({ radius, strokeWidth, color, rotatio
               />
             ))}
           </g>
-        )
-      case 'f':
+        );
+      case "f":
         return (
           <g>
             {[0, 30, 60, 90, 120, 150].map((angle) => (
@@ -114,23 +174,28 @@ const Orbital: React.FC<ElectronConfig> = ({ radius, strokeWidth, color, rotatio
               />
             ))}
           </g>
-        )
+        );
       default:
-        return null
+        return null;
     }
-  }
+  };
 
   return (
     <>
       <g transform={`rotate(${rotation})`}>
         {orbitalTypes.map((type, index) => (
           <g key={index}>
-            {createOrbitalPath(radius + index * 30, type.name[1], index, orbitalColors[index])}
+            {createOrbitalPath(
+              radius + index * 30,
+              type.name[1],
+              index,
+              orbitalColors[index]
+            )}
           </g>
         ))}
         {electrons.map((electron, index) => {
-          const r = radius + Math.floor(index / 2) * 30
-          const angle = (electron.angle * Math.PI) / 180
+          const r = radius + Math.floor(index / 2) * 30;
+          const angle = (electron.angle * Math.PI) / 180;
           return (
             <circle
               key={index}
@@ -140,7 +205,7 @@ const Orbital: React.FC<ElectronConfig> = ({ radius, strokeWidth, color, rotatio
               fill="#61DAFB"
               filter="url(#glow)"
             />
-          )
+          );
         })}
       </g>
       <text
@@ -179,22 +244,25 @@ const Orbital: React.FC<ElectronConfig> = ({ radius, strokeWidth, color, rotatio
         ))}
       </g>
     </>
-  )
-}
+  );
+};
 
-const Nucleus: React.FC<{ protons: number; neutrons: number }> = ({ protons, neutrons }) => {
-  const totalParticles = protons + neutrons
-  const radius = 20 + Math.sqrt(totalParticles) * 2
+const Nucleus: React.FC<{ protons: number; neutrons: number }> = ({
+  protons,
+  neutrons,
+}) => {
+  const totalParticles = protons + neutrons;
+  const radius = 20 + Math.sqrt(totalParticles) * 2;
 
   return (
     <g>
       <circle cx={0} cy={0} r={radius} fill="#2C3E50" filter="url(#glow)" />
       {Array.from({ length: totalParticles }).map((_, index) => {
-        const angle = (index / totalParticles) * Math.PI * 2
-        const particleRadius = radius * 0.8
-        const x = Math.cos(angle) * particleRadius
-        const y = Math.sin(angle) * particleRadius
-        const isProton = index < protons
+        const angle = (index / totalParticles) * Math.PI * 2;
+        const particleRadius = radius * 0.8;
+        const x = Math.cos(angle) * particleRadius;
+        const y = Math.sin(angle) * particleRadius;
+        const isProton = index < protons;
 
         return (
           <circle
@@ -205,7 +273,7 @@ const Nucleus: React.FC<{ protons: number; neutrons: number }> = ({ protons, neu
             fill={isProton ? "#FFA500" : "#3498DB"}
             filter="url(#glow)"
           />
-        )
+        );
       })}
       <text
         x={0}
@@ -219,36 +287,58 @@ const Nucleus: React.FC<{ protons: number; neutrons: number }> = ({ protons, neu
         {protons}p {neutrons}n
       </text>
     </g>
-  )
-}
+  );
+};
 
 const orbitalOrder = [
-  '1s', '2s', '2p', '3s', '3p', '4s', '3d', '4p', '5s', '4d', '5p', '6s', '4f', '5d', '6p', '7s', '5f'
-]
+  "1s",
+  "2s",
+  "2p",
+  "3s",
+  "3p",
+  "4s",
+  "3d",
+  "4p",
+  "5s",
+  "4d",
+  "5p",
+  "6s",
+  "4f",
+  "5d",
+  "6p",
+  "7s",
+  "5f",
+];
 
 const maxElectrons: { [key: string]: number } = {
-  s: 2, p: 6, d: 10, f: 14
-}
+  s: 2,
+  p: 6,
+  d: 10,
+  f: 14,
+};
 
 export function SpiritModel() {
-  const [electronCount, setElectronCount] = useState(8)
-  const [protonCount, setProtonCount] = useState(8)
-  const [neutronCount, setNeutronCount] = useState(8)
+  const [electronCount, setElectronCount] = useState(8);
+  const [protonCount, setProtonCount] = useState(8);
+  const [neutronCount, setNeutronCount] = useState(8);
 
   const getElectronConfig = (count: number): ElectronConfig[] => {
-    let remaining = count
-    const config: ElectronConfig[] = []
-    let shellIndex = 0
-    const shells = ['K', 'L', 'M', 'N']
+    let remaining = count;
+    const config: ElectronConfig[] = [];
+    let shellIndex = 0;
+    const shells = ["K", "L", "M", "N"];
 
     for (const orbital of orbitalOrder) {
-      const shell = orbital[0]
-      const type = orbital[1]
-      const max = maxElectrons[type]
-      const electrons = Math.min(remaining, max)
-      remaining -= electrons
+      const shell = orbital[0];
+      const type = orbital[1];
+      const max = maxElectrons[type];
+      const electrons = Math.min(remaining, max);
+      remaining -= electrons;
 
-      if (config.length === 0 || config[config.length - 1].shellLabel !== shells[parseInt(shell) - 1]) {
+      if (
+        config.length === 0 ||
+        config[config.length - 1].shellLabel !== shells[parseInt(shell) - 1]
+      ) {
         config.push({
           color: generateColor(shellIndex, shells.length, 180),
           radius: 50 + shellIndex * 50,
@@ -256,35 +346,39 @@ export function SpiritModel() {
           rotationSpeed: 1 / (shellIndex + 1),
           strokeWidth: 2,
           shellLabel: shells[parseInt(shell) - 1],
-          orbitalTypes: []
-        })
-        shellIndex++
+          orbitalTypes: [],
+        });
+        shellIndex++;
       }
 
       config[config.length - 1].orbitalTypes.push({
         name: orbital,
-        color: generateColor(config[config.length - 1].orbitalTypes.length, 4, 0),
+        color: generateColor(
+          config[config.length - 1].orbitalTypes.length,
+          4,
+          0
+        ),
         electrons: electrons,
-        maxElectrons: max
-      })
+        maxElectrons: max,
+      });
 
       for (let i = 0; i < electrons; i++) {
         config[config.length - 1].electrons.push({
-          angle: (i / max) * 360
-        })
+          angle: (i / max) * 360,
+        });
       }
 
-      if (remaining === 0) break
+      if (remaining === 0) break;
     }
 
-    return config
-  }
+    return config;
+  };
 
-  const electronConfig = getElectronConfig(electronCount)
+  const electronConfig = getElectronConfig(electronCount);
 
   return (
     <div className="w-full h-screen bg-gray-900 flex flex-col items-center justify-center">
-      <div className="mb-4 flex space-x-4">
+      {/* <div className="mb-4 flex space-x-4">
         <Button onClick={() => setElectronCount(Math.max(1, electronCount - 1))}>
           Remove Electron
         </Button>
@@ -306,22 +400,35 @@ export function SpiritModel() {
       </div>
       <div className="text-white mb-4">
         Electrons: {electronCount}, Protons: {protonCount}, Neutrons: {neutronCount}
-      </div>
+      </div> */}
       <svg width="800" height="800" viewBox="-400 -400 800 800">
         <defs>
           <filter id="glow">
-            <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
+            <feGaussianBlur stdDeviation="3.5" result="coloredBlur" />
             <feMerge>
-              <feMergeNode in="coloredBlur"/>
-              <feMergeNode in="SourceGraphic"/>
+              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
-          <radialGradient id="bg-gradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+          <radialGradient
+            id="bg-gradient"
+            cx="50%"
+            cy="50%"
+            r="50%"
+            fx="50%"
+            fy="50%"
+          >
             <stop offset="0%" stopColor="#1a202c" />
             <stop offset="100%" stopColor="#2d3748" />
           </radialGradient>
         </defs>
-        <rect x="-400" y="-400" width="800" height="800" fill="url(#bg-gradient)" />
+        <rect
+          x="-400"
+          y="-400"
+          width="800"
+          height="800"
+          fill="url(#bg-gradient)"
+        />
         <Nucleus protons={protonCount} neutrons={neutronCount} />
         {electronConfig.map((config, index) => (
           <Orbital
@@ -337,6 +444,5 @@ export function SpiritModel() {
         ))}
       </svg>
     </div>
-  )
+  );
 }
-
