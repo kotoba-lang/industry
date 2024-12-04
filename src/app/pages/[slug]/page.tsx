@@ -180,7 +180,7 @@ export default async function Page() {
 
               <p>Basic structure of spirituality: Similar to vector spaces</p>
               <div className="w-full overflow-hidden">
-                <SpiritModel data={mandalaData} />
+                <SpiritModel />
               </div>
               <p>
                 Individuals judge the commonality between concepts presented on
@@ -411,4 +411,8 @@ export default async function Page() {
       </Container>
     </main>
   );
+}
+
+export async function generateStaticParams() {
+  return [{ slug: "spirit-in-physics" }];
 }
