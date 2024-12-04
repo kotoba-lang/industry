@@ -17,6 +17,7 @@ import Alert from "@/app/_components/alert";
 import Header from "@/app/_components/header";
 import { PostHeader } from "@/app/_components/post-header";
 import Mandala from "@/components/spirit-in-physics/Mandala";
+
 export default async function Page() {
   const dimvs = Array(8).fill("");
   const [mandalaData, setMandalaData] = useState(null); // State to hold Mandala data
@@ -411,8 +412,4 @@ export default async function Page() {
       </Container>
     </main>
   );
-}
-
-export async function generateStaticParams() {
-  return [{ slug: "spirit-in-physics" }];
 }
