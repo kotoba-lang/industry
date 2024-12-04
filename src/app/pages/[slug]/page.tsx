@@ -33,7 +33,7 @@ export default async function Page() {
             coverImage={"/assets/posts/spirit-in-physics/cover.jpg"}
             date={"2024-11-30"}
             author={{
-              name: "Jun Kawasaki, Tinaka Kazuki, Takeuchi Tomonori",
+              name: "Jun Kawasaki, Kazuki Tinaka, Takeuchi Tomonori",
               picture: "/assets/posts/authors/jk.jpg",
             }}
           />
