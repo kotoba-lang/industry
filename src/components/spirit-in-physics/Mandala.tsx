@@ -29,56 +29,60 @@ const Mandala: React.FC<{ onDataChange: (data: any) => void }> = ({
       initial={{ opacity: 0, scale: 0.5 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5 }}
-      className="w-full max-w-md mx-auto p-4"
     >
-      <h1 className="text-2xl font-bold text-center mb-6">MANDALA</h1>
-      <p className="text-center mb-6">
-        Place your name in the center. Then, write down the concepts that have
-        the most influence on your current life around you.
-      </p>
-      <div className="grid grid-cols-3 gap-4">
-        {[0, 1, 2, 3, null, 4, 5, 6, 7].map((index, position) => (
-          <motion.div
-            key={position}
-            className={`bg-white rounded-lg shadow-md overflow-hidden ${
-              index === null ? "col-start-2" : ""
-            }`}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            {index === null ? (
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => handleNameChange(e.target.value)}
-                className="w-full h-full p-4 text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Your Name"
-              />
-            ) : (
-              <AnimatePresence>
-                {name && (
-                  <motion.div
-                    variants={dimensionVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="hidden"
-                    transition={{ duration: 0.3 }}
-                  >
-                    <input
-                      type="text"
-                      value={dimensions[index]}
-                      onChange={(e) =>
-                        handleDimensionChange(index, e.target.value)
-                      }
-                      className="w-full h-full p-4 text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder={`dimV ${index + 1}`}
-                    />
-                  </motion.div>
+      <div className="w-full max-w-md mx-auto p-4">
+        <h1 className="text-2xl font-bold text-center mb-6">MANDALA</h1>
+        <p className="text-center mb-6">
+          Place your name in the center. Then, write down the concepts that have
+          the most influence on your current life around you.
+        </p>
+        <div className="grid grid-cols-3 gap-4">
+          {[0, 1, 2, 3, null, 4, 5, 6, 7].map((index, position) => (
+            <motion.div
+              key={position}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <div
+                className={`bg-white rounded-lg shadow-md overflow-hidden ${
+                  index === null ? "col-start-2" : ""
+                }`}
+              >
+                {index === null ? (
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => handleNameChange(e.target.value)}
+                    className="w-full h-full p-4 text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Your Name"
+                  />
+                ) : (
+                  <AnimatePresence>
+                    {name && (
+                      <motion.div
+                        variants={dimensionVariants}
+                        initial="hidden"
+                        animate="visible"
+                        exit="hidden"
+                        transition={{ duration: 0.3 }}
+                      >
+                        <input
+                          type="text"
+                          value={dimensions[index]}
+                          onChange={(e) =>
+                            handleDimensionChange(index, e.target.value)
+                          }
+                          className="w-full h-full p-4 text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder={`dimV ${index + 1}`}
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 )}
-              </AnimatePresence>
-            )}
-          </motion.div>
-        ))}
+              </div>
+            </motion.div>
+          ))}
+        </div>
       </div>
     </motion.div>
   );
