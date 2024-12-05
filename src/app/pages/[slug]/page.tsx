@@ -42,15 +42,15 @@ export default async function Page() {
               <h1 className="text-2xl font-bold">Spirit in Physics</h1>
               <h2>Abstract</h2>
               <p>
-                Spirituality, a concept deeply rooted in human consciousness,
-                has been traditionally unquantifiable in physical sciences. This
-                study introduces the Kawasaki Model, which conceptualizes
-                spirituality as a vector space, allowing for its measurement and
-                structuring analysis through physics empirical methods.
+                Spirit, a concept deeply rooted in human consciousness, has been
+                traditionally unquantifiable in physical sciences. This study
+                introduces the Kawasaki Model, which conceptualizes spirit as a
+                vector space, allowing for its measurement and structuring
+                analysis through physics empirical methods.
               </p>
               <p>
                 The research employs skin potential measurements and emotion
-                analysis to investigate spirituality's physics structure and
+                analysis to investigate Spirit's physics structure and dynamics.
                 dynamics. Inspired by the Rubber-Hand, Marble-Hand illusions and
                 Traditional Buddhism Mandala Method. Participants are
                 vectorizing conceptual structures using the Mandala method. They
@@ -62,21 +62,21 @@ export default async function Page() {
                 physicality and cognition.
               </p>
               <p>
-                Results demonstrate that spirituality can be quantitatively
-                measured and represented as vectors in an information space. The
-                study finds that self-expansiveness influences individual
-                behavior, societal structures, and even physiological states,
-                acting as energy and mass in physical terms.
+                Results demonstrate that spirit can be quantitatively measured
+                and represented as vectors in an information space. The study
+                finds that self-expansiveness influences individual behavior,
+                societal structures, and even physiological states, acting as
+                energy and mass in physical terms.
               </p>
               <p>
-                This novel approach provides a foundation for integrating
-                spirituality into physical sciences, with potential applications
-                in understanding mental health, social dynamics, and personal
+                This novel approach provides a foundation for integrating spirit
+                into physical sciences, with potential applications in
+                understanding mental health, social dynamics, and personal
                 growth. Future work will validate and expand these findings to
                 ensure reproducibility and broader applicability.
               </p>
               <p>
-                Keywords: spirituality, Kawasaki Model, vector space,
+                Keywords: spirit, Kawasaki Model, vector space,
                 self-expansiveness, skin potential, emotion analysis, well-being
               </p>
               <h2>Introduction</h2>
@@ -85,15 +85,14 @@ export default async function Page() {
                 animals?
               </p>
               <p>
-                In Japanese, humans are referred to as primates, and
-                spirituality has been regarded as having specific qualities.
-                However, spirituality has not been measured or quantified as a
-                physical science.
+                In Japanese, humans are referred to as primates, and spirit has
+                been regarded as having specific qualities. However, spirit has
+                not been measured or quantified as a physical science.
               </p>
               <p>
                 This research refers to the following paper and proposes to
-                measure and quantify the structure of spirituality using
-                physical methods as the Kawasaki Model.
+                measure and quantify the structure of spirit using physical
+                methods as the Kawasaki Model.
               </p>
               <Link
                 href="https://www.nature.com/articles/35784"
@@ -123,16 +122,13 @@ export default async function Page() {
                 The Marble-Hand Illusion
               </Link>
               <p>
-                This model allows for the observation and measurement of
-                spirituality, which has not been addressed in physical science
-                until now.
+                This model allows for the observation and measurement of spirit,
+                which has not been addressed in physical science until now.
               </p>
-              <h2>
-                Structure of Spirituality (Spirits in Physics: Kawasaki Model)
-              </h2>
+              <h2>Structure of Spirit (Spirit in Physics: Kawasaki Model)</h2>
               <p>The core of the model is that Spirits are Vectors.</p>
               <p>
-                By representing Spirits as vectors, it becomes possible to
+                By representing spirit as vectors, it becomes possible to
                 measure human consciousness and unconsciousness and to
                 facilitate their transformation.
               </p>
@@ -140,37 +136,30 @@ export default async function Page() {
                 These have traditionally been treated as mandala methods in
                 Japanese Buddhism.
               </p>
-              <h3>Physical Definition of Spirituality</h3>
-              <p>Basic structure of spirituality: Similar to vector spaces</p>
-              <p>Basic properties of spirituality: Similar to information</p>
+              <h3>Physical Definition of Spirit</h3>
+              <p>Basic structure of spirit: Similar to vector spaces</p>
+              <p>Basic properties of spirit: Similar to information</p>
+              <p>Dynamic structure of spirit: Similar to Bohr's atomic model</p>
+              <p>Interactions of spirit: Similar to molecular interactions</p>
+              <p>Characteristics of spirit: Spirit acts on physicality</p>
               <p>
-                Dynamic structure of spirituality: Similar to Bohr's atomic
-                model
+                Energy quantity of spirit: It has been proven that information
+                possesses energy.
               </p>
-              <p>
-                Interactions of spirituality: Similar to molecular interactions
-              </p>
-              <p>
-                Characteristics of spirituality: Spirituality acts on
-                physicality
-              </p>
-              <p>
-                Energy quantity of spirituality: It has been proven that
-                information possesses energy.
-              </p>
+              <p>Spirituality meaning is understand spirit.</p>
               <Link href="https://www.nature.com/articles/nphys1821">
                 - Toyabe, S., Sagawa, T., Ueda, M., Muneyuki, E., & Sano, M.
                 (2010). [Experimental demonstration of information-to-energy
                 conversion and validation of the generalized Jarzynski
                 equality](https://www.nature.com/articles/nphys1821).
               </Link>
-              <h3>Experimental Methods for Measuring Spirituality</h3>
+              <h3>Experimental Methods for Measuring Spirit</h3>
               <p>
-                To measure spirituality, the information space of individuals is
+                To measure spirit, the information space of individuals is
                 vectorized.
               </p>
 
-              <h3>Structuring Spirituality</h3>
+              <h3>Structuring Spirit</h3>
               <p>
                 Using the Mandala method, the information space of individuals
                 is vectorized.
@@ -179,7 +168,7 @@ export default async function Page() {
                 <Mandala onDataChange={setMandalaData} />
               </main>
 
-              <p>Basic structure of spirituality: Similar to vector spaces</p>
+              <p>Basic structure of spirit: Similar to vector spaces</p>
               <div className="w-full overflow-hidden">
                 <SpiritModel />
               </div>
@@ -191,7 +180,7 @@ export default async function Page() {
                 Based on the response results, a vector space coordinate is
                 created for the concepts between individuals.
               </p>
-              <h3>Measuring Spirituality</h3>
+              <h3>Measuring Spirit</h3>
               <p>
                 The vectorized concepts are presented on the screen, and visual
                 effects are used to separate them.
@@ -201,7 +190,7 @@ export default async function Page() {
               </p>
               <p>
                 By measuring the range of effects of the concepts, the range of
-                effects of spirituality can be measured.
+                effects of spirit can be measured.
               </p>
               <CorrelationFormWrapper />
               <h3>Measurement Using Skin Potential (Qualitative Research)</h3>
@@ -228,8 +217,7 @@ export default async function Page() {
               <TearableItems />
               <p>
                 Similar results were obtained in the analysis of the structure
-                of spirituality through concept measurement (currently a
-                hypothesis).
+                of spirit through concept measurement (currently a hypothesis).
               </p>
 
               <Image
@@ -262,8 +250,7 @@ export default async function Page() {
               </p>
               <p>
                 Similar results were obtained in the analysis of the structure
-                of spirituality through concept measurement (currently a
-                hypothesis).
+                of spirit through concept measurement (currently a hypothesis).
               </p>
               <h3>Measurement Results</h3>
               <p>Experimental results - n+1 (2024/12/03)</p>
@@ -276,11 +263,10 @@ export default async function Page() {
               <h3>Conclusion</h3>
               <p>
                 The research demonstrated that it is possible to measure and
-                quantify the structure of human spirituality using physical
-                methods.
+                quantify the structure of human spirit using physical methods.
               </p>
               <p>
-                From these results, it was found that spirituality is
+                From these results, it was found that spirit is
                 self-expansiveness.
               </p>
               <p>It was found that self-expansiveness changes.</p>
@@ -304,17 +290,17 @@ export default async function Page() {
               </p>
               <p>Realizing the self based on self-expansiveness</p>
               <p>
-                This research has shown that spirituality can be structured,
-                measured, and quantified.
+                This research has shown that spirit can be structured, measured,
+                and quantified.
               </p>
               <p>
-                It has also been shown that individual spirituality can be
-                represented in vector space based on measurements.
+                It has also been shown that individual spirit can be represented
+                in vector space based on measurements.
               </p>
               <p>
-                Spirituality interacts as a vector of information space in
-                physical space, and information acts as mass and energy in
-                physical space, affecting the physicality of individuals.
+                Spirit interacts as a vector of information space in physical
+                space, and information acts as mass and energy in physical
+                space, affecting the physicality of individuals.
               </p>
               <p>
                 Using Buddhist terminology, this is non-separation of self and
@@ -322,7 +308,7 @@ export default async function Page() {
               </p>
               <p>
                 This research conducts measurements and quantifications of human
-                spirituality based on the Mar hand illusion experiment.
+                spirit based on the Mar hand illusion experiment.
               </p>
               <h3>Consciousness and unconsciousness (conscious)</h3>
               <h3>Ensuring Reproducibility</h3>
