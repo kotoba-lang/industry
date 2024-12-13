@@ -317,10 +317,26 @@ const maxElectrons: { [key: string]: number } = {
   f: 14,
 };
 
-export function SpiritModel() {
-  const [electronCount, setElectronCount] = useState(8);
-  const [protonCount, setProtonCount] = useState(8);
-  const [neutronCount, setNeutronCount] = useState(8);
+export function SpiritModel({
+  electron,
+  proton,
+  neutron,
+  handleAtomData,
+}: {
+  electron: number;
+  proton: number;
+  neutron: number;
+  handleAtomData: (atomData: any) => void;
+}) {
+  const [electronCount, setElectronCount] = useState(electron);
+  const [protonCount, setProtonCount] = useState(proton);
+  const [neutronCount, setNeutronCount] = useState(neutron);
+
+  useEffect(() => {
+    setElectronCount(electron);
+    setProtonCount(proton);
+    setNeutronCount(neutron);
+  }, [electron, proton, neutron]);
 
   const getElectronConfig = (count: number): ElectronConfig[] => {
     let remaining = count;
