@@ -1,6 +1,6 @@
 "use client";
+import dynamic from "next/dynamic";
 
-import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
@@ -18,9 +18,26 @@ import Header from "@/app/_components/header";
 import { PostHeader } from "@/app/_components/post-header";
 import Mandala from "@/components/spirit-in-physics/Mandala";
 
-export default async function Page() {
-  const dimvs = Array(8).fill("");
-  const [mandalaData, setMandalaData] = useState(null); // State to hold Mandala data
+export default function Page() {
+  const dimvs = Array(0).fill("");
+  const [mandalaData, setMandalaData] = useState(dimvs); // State to hold Mandala data
+  const [electron, setElectron] = useState(1);
+  const [proton, setProton] = useState(1);
+  const [neutron, setNeutron] = useState(1);
+
+  const handleMandalaData = (mandalaData: any) => {
+    let count = 0;
+    for (let i = 0; i < mandalaData.length; i++) {
+      if (mandalaData[i] !== "") {
+        count++;
+      }
+    }
+    console.log(count);
+    setMandalaData(mandalaData);
+    setElectron(count);
+    setProton(count);
+    setNeutron(count);
+  };
 
   return (
     <main>
@@ -43,10 +60,10 @@ export default async function Page() {
               <h2>Abstract</h2>
               <p>
                 Spirit, a concept deeply rooted in human consciousness, has been
-                traditionally unquantifiable in physical sciences. This study
-                introduces the Kawasaki Model, which conceptualizes spirit as a
-                vector space, allowing for its measurement and structuring
-                analysis through physics empirical methods.
+                traditionally unquantifiable in classical physical sciences.
+                This study introduces the Kawasaki Model, which conceptualizes
+                spirit as a vector space, allowing for its measurement and
+                structuring analysis through physics empirical methods.
               </p>
               <p>
                 The research employs skin potential measurements and emotion
@@ -165,12 +182,16 @@ export default async function Page() {
                 is vectorized.
               </p>
               <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gradient-to-r from-blue-100 to-purple-100">
-                <Mandala onDataChange={setMandalaData} />
+                <Mandala handleMandalaData={handleMandalaData} />
               </main>
 
               <p>Basic structure of spirit: Similar to vector spaces</p>
               <div className="w-full overflow-hidden">
-                <SpiritModel />
+                <SpiritModel
+                  electron={electron}
+                  proton={proton}
+                  neutron={neutron}
+                />
               </div>
               <p>
                 Individuals judge the commonality between concepts presented on
