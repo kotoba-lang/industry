@@ -3,20 +3,22 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const Mandala: React.FC<{ onDataChange: (data: any) => void }> = ({
-  onDataChange,
+const Mandala: React.FC<{ handleMandalaData: (data: any) => void }> = ({
+  handleMandalaData,
 }) => {
   const [name, setName] = useState("");
   const [dimensions, setDimensions] = useState(Array(8).fill(""));
 
   const handleNameChange = (value: string) => {
     setName(value);
+    handleMandalaData(value);
   };
 
   const handleDimensionChange = (index: number, value: string) => {
     const newDimensions = [...dimensions];
     newDimensions[index] = value;
     setDimensions(newDimensions);
+    handleMandalaData(newDimensions);
   };
 
   const dimensionVariants = {
@@ -31,12 +33,14 @@ const Mandala: React.FC<{ onDataChange: (data: any) => void }> = ({
       transition={{ duration: 0.5 }}
     >
       <div className="w-full max-w-md mx-auto p-4">
-        <h1 className="text-2xl font-bold text-center mb-6">MANDALA</h1>
-        <p className="text-center mb-6">
+        <h1 className="text-2xl font-bold text-center mb-6 text-black">
+          MANDALA
+        </h1>
+        <p className="text-center mb-6 text-black">
           Place your name in the center. Then, write down the concepts that have
           the most influence on your current life around you.
         </p>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-4 text-black">
           {[0, 1, 2, 3, null, 4, 5, 6, 7].map((index, position) => (
             <motion.div
               key={position}

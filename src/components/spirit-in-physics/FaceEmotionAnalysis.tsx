@@ -10,54 +10,54 @@ const FaceEmotionAnalysis: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [emotion, setEmotion] = useState<string>("");
 
-  useEffect(() => {
-    const loadModels = async () => {
-      const MODEL_URL = "/models";
-      await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-        faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
-      ]);
-    };
+  // useEffect(() => {
+  //   const loadModels = async () => {
+  //     const MODEL_URL = "/models";
+  //     await Promise.all([
+  //       faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+  //       faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+  //       faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+  //       faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
+  //     ]);
+  //   };
 
-    loadModels();
-  }, []);
+  //   loadModels();
+  // }, []);
 
-  useEffect(() => {
-    const runFaceDetection = async () => {
-      if (webcamRef.current && canvasRef.current) {
-        const video = webcamRef.current.video as HTMLVideoElement;
-        const canvas = canvasRef.current;
+  // useEffect(() => {
+  //   const runFaceDetection = async () => {
+  //     if (webcamRef.current && canvasRef.current) {
+  //       const video = webcamRef.current.video as HTMLVideoElement;
+  //       const canvas = canvasRef.current;
 
-        const displaySize = { width: video.width, height: video.height };
-        faceapi.matchDimensions(canvas, displaySize);
+  //       const displaySize = { width: video.width, height: video.height };
+  //       faceapi.matchDimensions(canvas, displaySize);
 
-        setInterval(async () => {
-          const detections = await faceapi
-            .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
-            .withFaceLandmarks()
-            .withFaceExpressions();
+  //       setInterval(async () => {
+  //         const detections = await faceapi
+  //           .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+  //           .withFaceLandmarks()
+  //           .withFaceExpressions();
 
-          const resizedDetections = faceapi.resizeResults(
-            detections,
-            displaySize
-          );
-          canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
-          faceapi.draw.drawDetections(canvas, resizedDetections);
-          faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
-          faceapi.draw.drawFaceExpressions(canvas, resizedDetections);
+  //         const resizedDetections = faceapi.resizeResults(
+  //           detections,
+  //           displaySize
+  //         );
+  //         canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+  //         faceapi.draw.drawDetections(canvas, resizedDetections);
+  //         faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
+  //         faceapi.draw.drawFaceExpressions(canvas, resizedDetections);
 
-          if (resizedDetections.length > 0) {
-            const expressions = resizedDetections[0].expressions;
-            const dominantEmotion = Object.entries(expressions).reduce((a, b) =>
-              a[1] > b[1] ? a : b
-            )[0];
-            setEmotion(dominantEmotion);
-          }
-        }, 100);
-      }
-    };
+  //         if (resizedDetections.length > 0) {
+  //           const expressions = resizedDetections[0].expressions;
+  //           const dominantEmotion = Object.entries(expressions).reduce((a, b) =>
+  //             a[1] > b[1] ? a : b
+  //           )[0];
+  //           setEmotion(dominantEmotion);
+  //         }
+  //       }, 100);
+  //     }
+  //   };
 
     runFaceDetection();
   }, []);
