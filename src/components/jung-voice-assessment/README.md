@@ -22,7 +22,7 @@ export default function MyPage() {
       <JungVoiceAssessment 
         apiKey={process.env.NEXT_PUBLIC_HUME_API_KEY}
         numberOfWords={50} // テストする単語数（最大100）
-        speechRecognitionLang="ja-JP" // 日本語で音声認識
+        speechRecognitionLang="en-US" // 日本語で音声認識
       />
     </div>
   );
@@ -42,7 +42,7 @@ export default function MyPage() {
 | apiKey | string | process.env.NEXT_PUBLIC_HUME_API_KEY | Hume AI APIキー |
 | generationId | string | '795c949a-1510-4a80-9646-7d0863b023ab' | 音声生成ID |
 | voiceName | string | 'David Hume' | 使用する音声の名前 |
-| speechRecognitionLang | string | 'ja-JP' | 音声認識の言語 |
+| speechRecognitionLang | string | 'en-US' | 音声認識の言語 |
 | onTestComplete | function | - | テスト完了時のコールバック関数 |
 | className | string | '' | 追加のCSSクラス名 |
 
