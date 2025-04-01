@@ -1,6 +1,7 @@
 /**
  * Hume AIのAPIを利用して感情認識を行うサービス
  */
+"use server"; // Enable Server Actions
 
 // Humeの感情認識APIのレスポンス型
 export interface HumeFaceEmotion {
@@ -32,6 +33,130 @@ export interface HumeVoiceResponse {
     speaking_rate?: number;
     pause_count?: number;
   };
+}
+
+// Server Actions for batch processing
+export async function analyzeFace(
+  imageBlob: Blob,
+  apiKey: string
+): Promise<HumeFaceResponse> {
+  try {
+    const formData = new FormData();
+    formData.append('file', imageBlob, 'image.jpg');
+    formData.append('json', JSON.stringify({
+      models: {
+        face: {}
+      }
+    }));
+    
+    const response = await fetch('https://api.hume.ai/v0/batch/jobs', {
+      method: 'POST',
+      headers: {
+        'X-Hume-Api-Key': apiKey
+      },
+      body: formData
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const jobResponse = await response.json();
+    const jobId = jobResponse.job_id;
+    
+    // ジョブが完了するまで待機
+    return await pollJobResults(jobId, apiKey);
+  } catch (error) {
+    console.error('Error analyzing face:', error);
+    throw error;
+  }
+}
+
+export async function analyzeVoice(
+  audioBlob: Blob,
+  apiKey: string
+): Promise<HumeVoiceResponse> {
+  try {
+    const formData = new FormData();
+    formData.append('file', audioBlob, 'audio.wav');
+    formData.append('json', JSON.stringify({
+      models: {
+        prosody: {}
+      }
+    }));
+    
+    const response = await fetch('https://api.hume.ai/v0/batch/jobs', {
+      method: 'POST',
+      headers: {
+        'X-Hume-Api-Key': apiKey
+      },
+      body: formData
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const jobResponse = await response.json();
+    const jobId = jobResponse.job_id;
+    
+    // ジョブが完了するまで待機
+    return await pollJobResults(jobId, apiKey);
+  } catch (error) {
+    console.error('Error analyzing voice:', error);
+    throw error;
+  }
+}
+
+// Helper function for polling job results
+async function pollJobResults(jobId: string, apiKey: string): Promise<any> {
+  const maxAttempts = 30;
+  const delayMs = 1000;
+  
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const response = await fetch(`https://api.hume.ai/v0/batch/jobs/${jobId}`, {
+        method: 'GET',
+        headers: {
+          'X-Hume-Api-Key': apiKey
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
+      
+      const jobStatus = await response.json();
+      
+      if (jobStatus.status === 'COMPLETED') {
+        // 結果を取得
+        const predictionsResponse = await fetch(`https://api.hume.ai/v0/batch/jobs/${jobId}/predictions`, {
+          method: 'GET',
+          headers: {
+            'X-Hume-Api-Key': apiKey,
+            'accept': 'application/json; charset=utf-8'
+          }
+        });
+        
+        if (!predictionsResponse.ok) {
+          throw new Error(`API error: ${predictionsResponse.status} ${predictionsResponse.statusText}`);
+        }
+        
+        const predictions = await predictionsResponse.json();
+        return predictions;
+      } else if (jobStatus.status === 'FAILED') {
+        throw new Error('Job failed');
+      }
+      
+      // 一定時間待機
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    } catch (error) {
+      console.error('Error polling job results:', error);
+      throw error;
+    }
+  }
+  
+  throw new Error('Max polling attempts reached');
 }
 
 // WebSocketを使用したリアルタイム感情認識
@@ -171,133 +296,5 @@ export class HumeRealtimeEmotionService {
       this.socket.close();
       this.socket = null;
     }
-  }
-}
-
-// REST APIを使用したバッチ処理感情認識
-export class HumeBatchEmotionService {
-  private apiKey: string;
-  
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
-  }
-  
-  // 画像を解析
-  public async analyzeFace(imageBlob: Blob): Promise<HumeFaceResponse> {
-    try {
-      const formData = new FormData();
-      formData.append('file', imageBlob, 'image.jpg');
-      formData.append('json', JSON.stringify({
-        models: {
-          face: {}
-        }
-      }));
-      
-      const response = await fetch('https://api.hume.ai/v0/batch/jobs', {
-        method: 'POST',
-        headers: {
-          'X-Hume-Api-Key': this.apiKey
-        },
-        body: formData
-      });
-      
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status} ${response.statusText}`);
-      }
-      
-      const jobResponse = await response.json();
-      const jobId = jobResponse.job_id;
-      
-      // ジョブが完了するまで待機
-      return await this.pollJobResults(jobId);
-    } catch (error) {
-      console.error('Error analyzing face:', error);
-      throw error;
-    }
-  }
-  
-  // 音声を解析
-  public async analyzeVoice(audioBlob: Blob): Promise<HumeVoiceResponse> {
-    try {
-      const formData = new FormData();
-      formData.append('file', audioBlob, 'audio.wav');
-      formData.append('json', JSON.stringify({
-        models: {
-          prosody: {}
-        }
-      }));
-      
-      const response = await fetch('https://api.hume.ai/v0/batch/jobs', {
-        method: 'POST',
-        headers: {
-          'X-Hume-Api-Key': this.apiKey
-        },
-        body: formData
-      });
-      
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status} ${response.statusText}`);
-      }
-      
-      const jobResponse = await response.json();
-      const jobId = jobResponse.job_id;
-      
-      // ジョブが完了するまで待機
-      return await this.pollJobResults(jobId);
-    } catch (error) {
-      console.error('Error analyzing voice:', error);
-      throw error;
-    }
-  }
-  
-  // ジョブ結果を取得するためのポーリング
-  private async pollJobResults(jobId: string): Promise<any> {
-    const maxAttempts = 30;
-    const delayMs = 1000;
-    
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      try {
-        const response = await fetch(`https://api.hume.ai/v0/batch/jobs/${jobId}`, {
-          method: 'GET',
-          headers: {
-            'X-Hume-Api-Key': this.apiKey
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status} ${response.statusText}`);
-        }
-        
-        const jobStatus = await response.json();
-        
-        if (jobStatus.status === 'COMPLETED') {
-          // 結果を取得
-          const predictionsResponse = await fetch(`https://api.hume.ai/v0/batch/jobs/${jobId}/predictions`, {
-            method: 'GET',
-            headers: {
-              'X-Hume-Api-Key': this.apiKey,
-              'accept': 'application/json; charset=utf-8'
-            }
-          });
-          
-          if (!predictionsResponse.ok) {
-            throw new Error(`API error: ${predictionsResponse.status} ${predictionsResponse.statusText}`);
-          }
-          
-          const predictions = await predictionsResponse.json();
-          return predictions;
-        } else if (jobStatus.status === 'FAILED') {
-          throw new Error('Job failed');
-        }
-        
-        // 一定時間待機
-        await new Promise(resolve => setTimeout(resolve, delayMs));
-      } catch (error) {
-        console.error('Error polling job results:', error);
-        throw error;
-      }
-    }
-    
-    throw new Error('Max polling attempts reached');
   }
 } 
