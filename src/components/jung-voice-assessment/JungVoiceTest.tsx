@@ -8,6 +8,15 @@ import { JungVoiceTestProps, WordResponse, TestResults, Message } from './types'
 import { JungVoiceAssessmentPropsSchema, WordResponseSchema, TestResultsSchema } from './schema';
 import { getAudioFromCache, saveAudioToCache, getAudioCacheSize } from './utils/audioCache';
 import AudioCacheManager from './utils/cacheManager';
+import { 
+  getCombinedCacheStats, 
+  getAudioFromCombinedCache, 
+  saveAudioToCombinedCache,
+  CacheSettings,
+  CacheType,
+  CacheStats
+} from './utils/combinedAudioCache';
+import CombinedCacheManager from './utils/combinedCacheManager';
 
 // ヒューム音声生成のインターフェース定義
 interface SpeechRecognition extends EventTarget {
@@ -98,8 +107,12 @@ export default function JungVoiceTest({
   const isMountedRef = useRef<boolean>(true);
 
   // 新しい状態変数
-  const [isCacheEnabled, setIsCacheEnabled] = useState<boolean>(true);
-  const [cacheStats, setCacheStats] = useState<{ count: number, sizeBytes: number } | null>(null);
+  const [cacheSettings, setCacheSettings] = useState<CacheSettings>({
+    clientEnabled: true,
+    serverEnabled: true,
+    preferServer: true
+  });
+  const [cacheStats, setCacheStats] = useState<CacheStats | null>(null);
   const [showCacheManager, setShowCacheManager] = useState<boolean>(false);
 
   // コンポーネントのマウント状態を追跡
@@ -222,14 +235,14 @@ export default function JungVoiceTest({
     try {
       setIsLoading(true);
       
-      // キャッシュから音声を取得を試みる
-      if (isCacheEnabled) {
-        const cachedAudio = await getAudioFromCache(text, voiceName);
+      // 統合キャッシュから音声を取得
+      if (cacheSettings.clientEnabled || cacheSettings.serverEnabled) {
+        const cacheResult = await getAudioFromCombinedCache(text, voiceName, cacheSettings);
         
-        if (cachedAudio) {
-          // キャッシュから音声を再生
-          console.log(`Cache hit for text: "${text}"`);
-          const url = URL.createObjectURL(cachedAudio);
+        if (cacheResult.blob) {
+          // キャッシュから取得した音声を再生
+          console.log(`Cache hit for text: "${text}" from ${cacheResult.source}`);
+          const url = URL.createObjectURL(cacheResult.blob);
           audioUrlsRef.current.push(url);
           setAudioUrl(url);
           
@@ -247,7 +260,7 @@ export default function JungVoiceTest({
           }
           
           // キャッシュ統計を更新
-          getAudioCacheSize().then(stats => {
+          getCombinedCacheStats().then(stats => {
             setCacheStats(stats);
           }).catch(err => {
             console.error('Failed to update cache stats after cache hit:', err);
@@ -320,14 +333,18 @@ export default function JungVoiceTest({
           
           const blob = new Blob([bytes], { type: 'audio/mp3' });
           
-          // キャッシュに保存（非同期で、続行を待たない）
-          if (isCacheEnabled) {
-            saveAudioToCache(text, voiceName, blob)
-              .then(async success => {
-                if (success) {
-                  console.log(`Cached audio for: "${text}"`);
+          // 統合キャッシュに保存（非同期で、続行を待たない）
+          if (cacheSettings.clientEnabled || cacheSettings.serverEnabled) {
+            saveAudioToCombinedCache(text, voiceName, blob, cacheSettings)
+              .then(result => {
+                if (result.success) {
+                  console.log(`Cached audio for: "${text}" to ${result.savedTo}`);
                   // キャッシュ統計を更新
-                  const stats = await getAudioCacheSize();
+                  return getCombinedCacheStats();
+                }
+              })
+              .then(stats => {
+                if (stats) {
                   setCacheStats(stats);
                 }
               })
@@ -374,7 +391,7 @@ export default function JungVoiceTest({
         setIsLoading(false);
       }
     }
-  }, [apiKey, isApiAvailable, voiceName, isCacheEnabled]);
+  }, [apiKey, isApiAvailable, voiceName, cacheSettings]);
 
   // 音声再生の共通処理を分離
   const playAudio = useCallback((url: string, onAudioEnd?: () => void) => {
@@ -587,11 +604,16 @@ export default function JungVoiceTest({
     }
   };
 
-  // 初期ロード時にキャッシュ統計を取得
+  // キャッシュ設定を更新するコールバック
+  const handleCacheSettingsChange = useCallback((newSettings: CacheSettings) => {
+    setCacheSettings(newSettings);
+  }, []);
+
+  // 初期ロード時に統合キャッシュの統計を取得
   useEffect(() => {
     const loadCacheStats = async () => {
       try {
-        const stats = await getAudioCacheSize();
+        const stats = await getCombinedCacheStats();
         setCacheStats(stats);
       } catch (err) {
         console.error('Failed to load cache stats:', err);
@@ -611,24 +633,17 @@ export default function JungVoiceTest({
           onClick={() => setShowCacheManager(!showCacheManager)}
           className="text-xs text-blue-500 hover:underline focus:outline-none"
         >
-          {cacheStats ? `キャッシュ: ${cacheStats.count}件` : 'キャッシュ管理'}
+          {cacheStats ? `キャッシュ: ${cacheStats.total.count}件` : 'キャッシュ管理'}
         </button>
-        
-        <label className="flex items-center text-xs text-gray-500 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={isCacheEnabled}
-            onChange={(e) => setIsCacheEnabled(e.target.checked)}
-            className="mr-1 h-3 w-3"
-          />
-          音声キャッシュを使用する
-        </label>
       </div>
       
-      {/* キャッシュ管理UI */}
+      {/* 統合キャッシュ管理UI */}
       {showCacheManager && (
         <div className="mb-4">
-          <AudioCacheManager />
+          <CombinedCacheManager 
+            initialSettings={cacheSettings}
+            onSettingsChange={handleCacheSettingsChange}
+          />
         </div>
       )}
       
