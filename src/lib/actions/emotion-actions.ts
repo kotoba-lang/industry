@@ -27,38 +27,44 @@ const GetEmotionDataSchema = z.object({
 export async function saveEmotionData(formData: FormData | any) {
   try {
     // Parse and validate the data
-    let data;
+    let processedData: any;
     
     if (formData instanceof FormData) {
-      // Handle FormData
-      const rawData = Object.fromEntries(formData.entries());
+      // Handle FormData by creating a new object
+      const entries = Object.fromEntries(formData.entries());
       
-      // Convert string numbers to actual numbers
-      if (typeof rawData.reactionTimeMs === 'string') {
-        rawData.reactionTimeMs = parseInt(rawData.reactionTimeMs, 10);
-      }
+      processedData = {
+        userId: entries.userId as string,
+        assessmentId: entries.assessmentId as string,
+        stimulusWord: entries.stimulusWord as string,
+        responseWord: entries.responseWord as string,
+        reactionTimeMs: typeof entries.reactionTimeMs === 'string' 
+          ? parseInt(entries.reactionTimeMs, 10) 
+          : (entries.reactionTimeMs instanceof File ? 0 : Number(entries.reactionTimeMs)),
+        timestamp: typeof entries.timestamp === 'string' 
+          ? parseInt(entries.timestamp, 10) 
+          : (entries.timestamp instanceof File ? Date.now() : Number(entries.timestamp) || Date.now())
+      };
       
       // Parse JSON strings if they exist
-      if (typeof rawData.faceEmotions === 'string') {
-        rawData.faceEmotions = JSON.parse(rawData.faceEmotions);
+      if (entries.faceEmotions) {
+        processedData.faceEmotions = typeof entries.faceEmotions === 'string'
+          ? JSON.parse(entries.faceEmotions)
+          : entries.faceEmotions;
       }
       
-      if (typeof rawData.voiceEmotions === 'string') {
-        rawData.voiceEmotions = JSON.parse(rawData.voiceEmotions);
+      if (entries.voiceEmotions) {
+        processedData.voiceEmotions = typeof entries.voiceEmotions === 'string'
+          ? JSON.parse(entries.voiceEmotions)
+          : entries.voiceEmotions;
       }
-      
-      if (typeof rawData.timestamp === 'string') {
-        rawData.timestamp = parseInt(rawData.timestamp, 10);
-      }
-      
-      data = rawData;
     } else {
       // Handle JSON/object data
-      data = formData;
+      processedData = formData;
     }
     
     // Validate data
-    const validatedData = SaveEmotionDataSchema.parse(data);
+    const validatedData = SaveEmotionDataSchema.parse(processedData);
     
     // Save emotion data to database
     const client = await createServerClient();
