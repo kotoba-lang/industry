@@ -19,7 +19,6 @@ import {
 import CombinedCacheManager from './utils/combinedCacheManager';
 import WebcamComponent from '../webcam/WebcamComponent';
 import { HumeFaceResponse } from '@/lib/services/hume-service';
-import { EmotionDataService } from '@/lib/services/emotion-data-service';
 import { useHumeEmotion } from '@/providers/HumeEmotionProvider';
 import { z } from 'zod';
 import { WordResponseWithExtras, withExtras } from './WordResponse';
