@@ -154,8 +154,8 @@ export default function Page() {
               </div>
               
               <p>
-                The facial recognition system defines an emotion score F(w_I, w_O)
-                obtained from the subject's facial expression.
+                The facial and voice recognition system defines an emotion score F(w_I, w_O)
+                obtained from the subject's facial expression and voice.
                 This score is treated as an integrated index of the intensity of each
                 emotion, such as "happiness," "sadness," and "surprise."
               </p>
