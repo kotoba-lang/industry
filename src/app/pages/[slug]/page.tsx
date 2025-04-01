@@ -75,7 +75,7 @@ export default function Page() {
                 with conceptual separations and integrations, observing changes
                 in skin potential and facial expressions. These responses are
                 timestamped and analyzed, revealing the impact of
-                self-expansiveness—spirituality’s core property—on both
+                self-expansiveness—spirituality's core property—on both
                 physicality and cognition.
               </p>
               <p>
@@ -116,7 +116,7 @@ export default function Page() {
                 className="underline text-block"
                 target="_blank"
               >
-                Matthew Botvinick & Jonathan Cohen (1998). Rubber hands ‘feel’
+                Matthew Botvinick & Jonathan Cohen (1998). Rubber hands 'feel'
                 touch that eyes see
               </Link>
               <p></p>
@@ -191,6 +191,7 @@ export default function Page() {
                   electron={electron}
                   proton={proton}
                   neutron={neutron}
+                  handleAtomData={(atomData) => console.log(atomData)}
                 />
               </div>
               <p>
