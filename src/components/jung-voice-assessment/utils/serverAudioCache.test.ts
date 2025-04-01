@@ -1,6 +1,7 @@
 /**
- * @jest-environment jsdom
+ * Tests for serverAudioCache.ts
  */
+import { vi, describe, test, expect, beforeEach } from 'vitest';
 import { 
   getAudioFromServerCache, 
   saveAudioToServerCache, 
@@ -8,12 +9,13 @@ import {
   getServerAudioCacheSize 
 } from './serverAudioCache';
 
-// Mock fetch
-global.fetch = jest.fn();
+// Setup mock for global fetch
+const mockFetch = vi.fn();
+vi.stubGlobal('fetch', mockFetch);
 
 describe('serverAudioCache.ts', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   describe('getAudioFromServerCache', () => {
@@ -22,14 +24,14 @@ describe('serverAudioCache.ts', () => {
       const mockResponse = {
         ok: true,
         status: 200,
-        blob: jest.fn().mockResolvedValue(mockBlob)
+        blob: vi.fn().mockResolvedValue(mockBlob)
       };
       
-      global.fetch.mockResolvedValue(mockResponse);
+      mockFetch.mockResolvedValue(mockResponse);
       
       const result = await getAudioFromServerCache('hello', 'test-voice');
       
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         '/api/audio-cache?text=hello&voice=test-voice',
         expect.objectContaining({
           method: 'GET',
@@ -48,7 +50,7 @@ describe('serverAudioCache.ts', () => {
         status: 404
       };
       
-      global.fetch.mockResolvedValue(mockResponse);
+      mockFetch.mockResolvedValue(mockResponse);
       
       const result = await getAudioFromServerCache('nonexistent', 'test-voice');
       
@@ -61,7 +63,7 @@ describe('serverAudioCache.ts', () => {
         status: 500
       };
       
-      global.fetch.mockResolvedValue(mockResponse);
+      mockFetch.mockResolvedValue(mockResponse);
       
       const result = await getAudioFromServerCache('hello', 'test-voice');
       
@@ -69,7 +71,7 @@ describe('serverAudioCache.ts', () => {
     });
     
     test('ネットワークエラー発生時にnullを返す 重要度:3', async () => {
-      global.fetch.mockRejectedValue(new Error('Network error'));
+      mockFetch.mockRejectedValue(new Error('Network error'));
       
       const result = await getAudioFromServerCache('hello', 'test-voice');
       
@@ -83,15 +85,15 @@ describe('serverAudioCache.ts', () => {
       const mockResponse = {
         ok: true,
         status: 200,
-        json: jest.fn().mockResolvedValue({ success: true })
+        json: vi.fn().mockResolvedValue({ success: true })
       };
       
-      global.fetch.mockResolvedValue(mockResponse);
+      mockFetch.mockResolvedValue(mockResponse);
       
       const result = await saveAudioToServerCache('hello', 'test-voice', mockBlob);
       
       // Check that fetch was called with FormData
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         '/api/audio-cache',
         expect.objectContaining({
           method: 'POST',
@@ -100,7 +102,7 @@ describe('serverAudioCache.ts', () => {
       );
       
       // Get the FormData that was passed
-      const fetchCallArg = global.fetch.mock.calls[0][1];
+      const fetchCallArg = mockFetch.mock.calls[0][1];
       const formData = fetchCallArg.body;
       
       // Check formData contains the expected values
@@ -118,7 +120,7 @@ describe('serverAudioCache.ts', () => {
         status: 500
       };
       
-      global.fetch.mockResolvedValue(mockResponse);
+      mockFetch.mockResolvedValue(mockResponse);
       
       const result = await saveAudioToServerCache('hello', 'test-voice', mockBlob);
       
@@ -130,10 +132,10 @@ describe('serverAudioCache.ts', () => {
       const mockResponse = {
         ok: true,
         status: 200,
-        json: jest.fn().mockResolvedValue({ success: false })
+        json: vi.fn().mockResolvedValue({ success: false })
       };
       
-      global.fetch.mockResolvedValue(mockResponse);
+      mockFetch.mockResolvedValue(mockResponse);
       
       const result = await saveAudioToServerCache('hello', 'test-voice', mockBlob);
       
@@ -143,7 +145,7 @@ describe('serverAudioCache.ts', () => {
     test('ネットワークエラー発生時にfalseを返す 重要度:3', async () => {
       const mockBlob = new Blob(['test audio data'], { type: 'audio/mp3' });
       
-      global.fetch.mockRejectedValue(new Error('Network error'));
+      mockFetch.mockRejectedValue(new Error('Network error'));
       
       const result = await saveAudioToServerCache('hello', 'test-voice', mockBlob);
       
@@ -156,14 +158,14 @@ describe('serverAudioCache.ts', () => {
       const mockResponse = {
         ok: true,
         status: 200,
-        json: jest.fn().mockResolvedValue({ success: true, deletedCount: 10 })
+        json: vi.fn().mockResolvedValue({ success: true, deletedCount: 10 })
       };
       
-      global.fetch.mockResolvedValue(mockResponse);
+      mockFetch.mockResolvedValue(mockResponse);
       
       const result = await clearServerAudioCache();
       
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         '/api/audio-cache',
         expect.objectContaining({
           method: 'DELETE'
@@ -178,14 +180,14 @@ describe('serverAudioCache.ts', () => {
       const mockResponse = {
         ok: true,
         status: 200,
-        json: jest.fn().mockResolvedValue({ success: true, deletedCount: 5 })
+        json: vi.fn().mockResolvedValue({ success: true, deletedCount: 5 })
       };
       
-      global.fetch.mockResolvedValue(mockResponse);
+      mockFetch.mockResolvedValue(mockResponse);
       
       const result = await clearServerAudioCache(olderThanDays);
       
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         `/api/audio-cache?olderThanDays=${olderThanDays}`,
         expect.objectContaining({
           method: 'DELETE'
@@ -201,7 +203,7 @@ describe('serverAudioCache.ts', () => {
         status: 500
       };
       
-      global.fetch.mockResolvedValue(mockResponse);
+      mockFetch.mockResolvedValue(mockResponse);
       
       const result = await clearServerAudioCache();
       
@@ -209,7 +211,7 @@ describe('serverAudioCache.ts', () => {
     });
     
     test('ネットワークエラー発生時にfalseを返す 重要度:3', async () => {
-      global.fetch.mockRejectedValue(new Error('Network error'));
+      mockFetch.mockRejectedValue(new Error('Network error'));
       
       const result = await clearServerAudioCache();
       
@@ -222,14 +224,14 @@ describe('serverAudioCache.ts', () => {
       const mockResponse = {
         ok: true,
         status: 200,
-        json: jest.fn().mockResolvedValue({ count: 10, sizeBytes: 1024000 })
+        json: vi.fn().mockResolvedValue({ count: 10, sizeBytes: 1024000 })
       };
       
-      global.fetch.mockResolvedValue(mockResponse);
+      mockFetch.mockResolvedValue(mockResponse);
       
       const result = await getServerAudioCacheSize();
       
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         '/api/audio-cache',
         expect.objectContaining({
           method: 'PATCH'
@@ -245,7 +247,7 @@ describe('serverAudioCache.ts', () => {
         status: 500
       };
       
-      global.fetch.mockResolvedValue(mockResponse);
+      mockFetch.mockResolvedValue(mockResponse);
       
       const result = await getServerAudioCacheSize();
       
@@ -253,7 +255,7 @@ describe('serverAudioCache.ts', () => {
     });
     
     test('ネットワークエラー発生時にゼロ値を返す 重要度:2', async () => {
-      global.fetch.mockRejectedValue(new Error('Network error'));
+      mockFetch.mockRejectedValue(new Error('Network error'));
       
       const result = await getServerAudioCacheSize();
       

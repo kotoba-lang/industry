@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from 'zod';
+import { createServerClient } from '@/lib/supabase/server';
 
 // Input validation schema for saving emotion data
 const SaveEmotionDataSchema = z.object({
@@ -59,14 +60,24 @@ export async function saveEmotionData(formData: FormData | any) {
     // Validate data
     const validatedData = SaveEmotionDataSchema.parse(data);
     
-    // Save emotion data
-    const result = await saveEmotionData({
-      ...validatedData,
-      timestamp: validatedData.timestamp || Date.now()
+    // Save emotion data to database
+    const client = await createServerClient();
+    const { error } = await client.from('emotion_data').insert({
+      user_id: validatedData.userId,
+      assessment_id: validatedData.assessmentId,
+      stimulus_word: validatedData.stimulusWord,
+      response_word: validatedData.responseWord,
+      reaction_time_ms: validatedData.reactionTimeMs,
+      face_emotions: validatedData.faceEmotions,
+      voice_emotions: validatedData.voiceEmotions,
+      timestamp: new Date(validatedData.timestamp || Date.now()).toISOString()
     });
     
-    if (!result.success) {
-      throw new Error('Failed to save emotion data');
+    if (error) {
+      return {
+        success: false,
+        error: error.message
+      };
     }
     
     return { success: true };
@@ -83,7 +94,48 @@ export async function saveEmotionData(formData: FormData | any) {
     
     return {
       success: false,
-      error: 'Internal server error'
+      error: 'Failed to save emotion data'
+    };
+  }
+}
+
+/**
+ * Save facial emotion data
+ */
+export async function saveFacialEmotionData(
+  userId: string,
+  assessmentId: string,
+  stimulusWord: string,
+  responseWord: string,
+  reactionTimeMs: number,
+  emotionData: { emotions: Record<string, number>, timestamp: number }
+) {
+  try {
+    // Save emotion data to database
+    const client = await createServerClient();
+    const { error } = await client.from('face_emotion_data').insert({
+      user_id: userId,
+      assessment_id: assessmentId,
+      stimulus_word: stimulusWord,
+      response_word: responseWord,
+      reaction_time_ms: reactionTimeMs,
+      emotions: emotionData.emotions,
+      timestamp: new Date(emotionData.timestamp).toISOString()
+    });
+    
+    if (error) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error in saveFacialEmotionData:', error);
+    return {
+      success: false,
+      error: 'Failed to save facial emotion data'
     };
   }
 }
@@ -124,6 +176,38 @@ export async function getEmotionData(userId: string, assessmentId: string) {
     return {
       success: false,
       error: 'Internal server error'
+    };
+  }
+}
+
+/**
+ * Get emotion data by assessment ID from database
+ */
+export async function getEmotionDataByAssessment(userId: string, assessmentId: string) {
+  try {
+    const client = await createServerClient();
+    const { data, error } = await client
+      .from('emotion_data')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('assessment_id', assessmentId);
+    
+    if (error) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+    
+    return {
+      success: true,
+      data: data || []
+    };
+  } catch (error) {
+    console.error('Error in getEmotionDataByAssessment:', error);
+    return {
+      success: false,
+      error: 'Failed to get emotion data'
     };
   }
 } 
