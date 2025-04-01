@@ -31,6 +31,21 @@ interface IntegratedJungAssessmentProps {
   setVoiceTestResults?: (results: VoiceTestResults | null) => void;
 }
 
+// Create an adapter function to convert voice test results to the expected format
+const adaptVoiceTestResults = (results) => {
+  return {
+    responses: results.responses.map(r => ({
+      stimulus: r.stimulusWord,
+      response: r.responseWord,
+      reactionTimeMs: r.reactionTimeMs,
+      isDelayed: r.reactionTimeMs > 2000 // Assuming 2s threshold
+    })),
+    averageReactionTimeMs: results.averageReactionTimeMs,
+    delayedResponseCount: results.delayedResponsesCount,
+    completedAt: new Date()
+  };
+};
+
 export default function IntegratedJungAssessment({ 
   numberOfWords = 30,
   apiKey = process.env.NEXT_PUBLIC_HUME_API_KEY || '',
@@ -257,7 +272,7 @@ export default function IntegratedJungAssessment({
           {voiceTestResults && (
             <div className="mb-8">
               <h3 className="text-xl font-bold mb-4">Voice Association Results</h3>
-              <ResultAnalysis results={voiceTestResults} />
+              <ResultAnalysis results={adaptVoiceTestResults(voiceTestResults)} />
             </div>
           )}
           
