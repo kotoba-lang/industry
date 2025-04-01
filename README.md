@@ -81,6 +81,27 @@ Deploy it to the cloud with [Vercel](https://vercel.com/new?utm_source=github&ut
 
 # 環境構築と初期設定
 
+## 環境変数の設定
+
+このプロジェクトでは以下の環境変数を使用しています：
+
+1. `.env.example` ファイルを参考に、`.env` ファイルを作成します。
+2. 以下の環境変数を設定してください：
+
+```
+# Hume AI API Key
+NEXT_PUBLIC_HUME_API_KEY=your_hume_api_key_here
+
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url_here
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+
+# Database Connection
+DATABASE_URL=your_database_url_here
+```
+
+> **重要**: `.env` ファイルは `.gitignore` に含まれており、バージョン管理されません。これは API キーなどの機密情報を保護するためです。
+
 ## データベース設定
 
 このプロジェクトは以下の構成でデータベース管理を行っています:
