@@ -68,6 +68,9 @@ export function generateGraphDataFromWordAssessment(
       x,
       y,
       z,
+      color: 'white',
+      darkColor: '#ffffff',
+      lightColor: '#333333',
     });
 
     // Create link between field and word node
