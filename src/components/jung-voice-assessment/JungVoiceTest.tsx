@@ -92,6 +92,16 @@ export default function JungVoiceTest({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const humeClientRef = useRef<HumeClient | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const audioUrlsRef = useRef<string[]>([]);
+  const isMountedRef = useRef<boolean>(true);
+
+  // コンポーネントのマウント状態を追跡
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // 音声認識がサポートされているか確認
   useEffect(() => {
@@ -122,7 +132,7 @@ export default function JungVoiceTest({
         recognitionRef.current.onend = () => {
           setIsListening(false);
           // 音声認識が終了したら自動的に応答を記録
-          if (userResponse.trim() !== '' && currentWordIndex >= 0) {
+          if (userResponse.trim() !== '' && currentWordIndex >= 0 && isMountedRef.current) {
             recordResponse();
           }
         };
@@ -159,12 +169,45 @@ export default function JungVoiceTest({
       setError('Failed to initialize Hume client. Speech functionality disabled.');
       setIsApiAvailable(false);
     }
+
+    // クリーンアップ：音声リソースを解放
+    return () => {
+      cleanupAudioResources();
+    };
   }, [apiKey]);
+
+  // 音声URLをクリーンアップする関数
+  const cleanupAudioResources = useCallback(() => {
+    // 現在再生中の音声を停止
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+    }
+    
+    // 保存されているすべてのオブジェクトURLを解放
+    audioUrlsRef.current.forEach(url => {
+      try {
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error('Error revoking object URL:', err);
+      }
+    });
+    
+    // リストをクリア
+    audioUrlsRef.current = [];
+  }, []);
+
+  // コンポーネントのアンマウント時にクリーンアップ
+  useEffect(() => {
+    return () => {
+      cleanupAudioResources();
+    };
+  }, [cleanupAudioResources]);
 
   // 音声を生成して再生
   const generateAndPlaySpeech = useCallback(async (text: string, onAudioEnd?: () => void): Promise<void> => {
-    if (!isApiAvailable || !apiKey) {
-      console.warn('Speech generation skipped: API disabled or no API key');
+    if (!isApiAvailable || !apiKey || !isMountedRef.current) {
+      console.warn('Speech generation skipped: API disabled, no API key, or component unmounted');
       if (onAudioEnd) onAudioEnd();
       return;
     }
@@ -198,12 +241,24 @@ export default function JungVoiceTest({
         body: JSON.stringify(requestData)
       });
       
+      // コンポーネントがアンマウントされていたら処理を中止
+      if (!isMountedRef.current) {
+        if (onAudioEnd) onAudioEnd();
+        return;
+      }
+      
       if (!fetchResponse.ok) {
         const errorText = await fetchResponse.text();
         throw new Error(`HTTP error! status: ${fetchResponse.status}, message: ${errorText}`);
       }
       
       const response = await fetchResponse.json();
+      
+      // コンポーネントがアンマウントされていたら処理を中止
+      if (!isMountedRef.current) {
+        if (onAudioEnd) onAudioEnd();
+        return;
+      }
       
       // APIはbase64形式の音声データを含む生成の配列を返す
       if (response && response.generations && response.generations.length > 0) {
@@ -223,33 +278,85 @@ export default function JungVoiceTest({
           const blob = new Blob([bytes], { type: 'audio/mp3' });
           const url = URL.createObjectURL(blob);
           
+          // URL をリストに追加（後でクリーンアップするため）
+          audioUrlsRef.current.push(url);
           setAudioUrl(url);
+          
+          // コンポーネントがアンマウントされていたら処理を中止
+          if (!isMountedRef.current) {
+            URL.revokeObjectURL(url);
+            if (onAudioEnd) onAudioEnd();
+            return;
+          }
           
           // 音声を再生
           if (audioRef.current) {
+            const audio = audioRef.current;
+            
+            // すべてのイベントリスナーをクリア
+            const clonedAudio = audio.cloneNode(true) as HTMLAudioElement;
+            if (audio.parentNode) {
+              audio.parentNode.replaceChild(clonedAudio, audio);
+              audioRef.current = clonedAudio;
+            }
+            
             // 再生終了イベントにコールバックを設定
             if (onAudioEnd) {
-              audioRef.current.onended = onAudioEnd;
+              const handleEnded = () => {
+                if (isMountedRef.current) {
+                  onAudioEnd();
+                }
+                clonedAudio.removeEventListener('ended', handleEnded);
+              };
+              
+              clonedAudio.addEventListener('ended', handleEnded);
             }
-            audioRef.current.src = url;
-            audioRef.current.play();
-          } else if (onAudioEnd) {
+            
+            // エラーハンドリング
+            const handleError = (e: Event) => {
+              console.error('Audio playback error:', e);
+              if (onAudioEnd && isMountedRef.current) onAudioEnd();
+              clonedAudio.removeEventListener('error', handleError);
+            };
+            
+            clonedAudio.addEventListener('error', handleError);
+            
+            // 音声ファイルを設定して再生
+            clonedAudio.src = url;
+            
+            try {
+              const playPromise = clonedAudio.play();
+              if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                  console.error('Audio play error:', error);
+                  if (onAudioEnd && isMountedRef.current) onAudioEnd();
+                });
+              }
+            } catch (err) {
+              console.error('Error playing audio:', err);
+              if (onAudioEnd && isMountedRef.current) onAudioEnd();
+            }
+          } else if (onAudioEnd && isMountedRef.current) {
             // audioRefがない場合は即時コールバック
             onAudioEnd();
           }
-        } else if (onAudioEnd) {
+        } else if (onAudioEnd && isMountedRef.current) {
           onAudioEnd();
         }
-      } else if (onAudioEnd) {
+      } else if (onAudioEnd && isMountedRef.current) {
         onAudioEnd();
       }
     } catch (err: any) {
       const errorMessage = err?.message || 'Unknown error';
       console.error('Text-to-speech error:', errorMessage);
-      setError(`Failed to generate speech: ${errorMessage}`);
-      if (onAudioEnd) onAudioEnd();
+      if (isMountedRef.current) {
+        setError(`Failed to generate speech: ${errorMessage}`);
+      }
+      if (onAudioEnd && isMountedRef.current) onAudioEnd();
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [apiKey, isApiAvailable, voiceName]);
 
@@ -277,13 +384,18 @@ export default function JungVoiceTest({
     
     // 音声が終了したら音声認識を開始
     await generateAndPlaySpeech(firstWordPrompt, () => {
-      setStartTime(Date.now());
-      startListening();
+      if (isMountedRef.current) {
+        setStartTime(Date.now());
+        startListening();
+      }
     });
   };
 
   // テストリセット
   const resetTest = () => {
+    // 音声リソースをクリーンアップ
+    cleanupAudioResources();
+    
     setCurrentWordIndex(-1);
     setUserResponse('');
     setResponses([]);
@@ -300,7 +412,7 @@ export default function JungVoiceTest({
 
   // 応答を記録して次の単語へ
   const recordResponse = async () => {
-    if (startTime === null || currentWordIndex < 0 || currentWordIndex >= stimulusWords.length) {
+    if (startTime === null || currentWordIndex < 0 || currentWordIndex >= stimulusWords.length || !isMountedRef.current) {
       return;
     }
 
@@ -335,8 +447,10 @@ export default function JungVoiceTest({
       
       // 次の単語の音声を直接再生
       await generateAndPlaySpeech(nextWordPrompt, () => {
-        setStartTime(Date.now());
-        startListening();
+        if (isMountedRef.current) {
+          setStartTime(Date.now());
+          startListening();
+        }
       });
     } else {
       // テスト完了
@@ -360,6 +474,8 @@ export default function JungVoiceTest({
 
   // テスト完了
   const completeTest = async (finalResponses: WordResponse[]) => {
+    if (!isMountedRef.current) return;
+    
     const totalReactionTime = finalResponses.reduce((sum, r) => sum + r.reactionTimeMs, 0);
     const avgReactionTime = Math.round(totalReactionTime / finalResponses.length);
     const delayedCount = finalResponses.filter(r => r.isDelayed).length;
@@ -380,14 +496,14 @@ export default function JungVoiceTest({
       completedAt: new Date(),
     };
 
-    if (onTestComplete) {
+    if (onTestComplete && isMountedRef.current) {
       onTestComplete(results);
     }
   };
 
   // 音声認識開始
   const startListening = () => {
-    if (recognitionRef.current && isSpeechSupported && !isListening) {
+    if (recognitionRef.current && isSpeechSupported && !isListening && isMountedRef.current) {
       recognitionRef.current.start();
       setIsListening(true);
     }
