@@ -1035,7 +1035,8 @@ export default function JungVoiceTest({
       
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <div className="mb-6">
-          <h2 className="text-2xl font-bold mb-2 text-gray-800 dark:text-white">Jung's Word Association Test</h2>
+          <h2 className="text-2xl font-bold mb-2 text-gray-800 dark:text-white">
+            Spirt in Physics (Jung's Word Association Test Embedding Model)</h2>
           <p className="text-gray-600 dark:text-gray-300">
             This test explores your immediate mental associations. I'll present words, and you respond with the first word that comes to mind.
           </p>
@@ -1226,4 +1227,33 @@ export default function JungVoiceTest({
       </div>
     </div>
   );
-} 
+}
+
+// Example implementation for the service
+export const EmotionDataService = {
+  saveEmotionData: async (data: {
+    userId: string;
+    assessmentId: string;
+    stimulusWord: string;
+    responseWord: string;
+    reactionTimeMs: number;
+    faceEmotions: Record<string, number>;
+    timestamp: number;
+  }) => {
+    // Implementation
+  },
+  
+  saveFacialEmotionData: async (
+    userId: string,
+    assessmentId: string,
+    stimulusWord: string,
+    responseWord: string,
+    reactionTimeMs: number,
+    emotionData: {
+      emotions: Record<string, number>;
+      timestamp: number;
+    }
+  ) => {
+    // Implementation
+  }
+}; 
