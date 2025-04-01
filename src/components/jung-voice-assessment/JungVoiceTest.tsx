@@ -665,8 +665,8 @@ export default function JungVoiceTest({
   }, []);
 
   return (
-    <div className={`max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-md ${className}`}>
-      <h2 className="text-2xl font-bold mb-6 text-center">Jung's Word Association Test (AI Guided)</h2>
+    <div className={`max-w-2xl mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md ${className}`}>
+      <h2 className="text-2xl font-bold mb-6 text-center text-gray-800 dark:text-white">Jung's Word Association Test (AI Guided)</h2>
       
       {/* キャッシュのオン/オフトグル */}
       <div className="flex justify-between items-center mb-2">
@@ -738,8 +738,8 @@ export default function JungVoiceTest({
       {currentWordIndex >= 0 && currentWordIndex < stimulusWords.length && (
         <div className="text-center">
           <div className="mb-8">
-            <p className="text-sm text-gray-500 mb-1">Word {currentWordIndex + 1} / {stimulusWords.length}</p>
-            <h3 className="text-3xl font-bold">{stimulusWords[currentWordIndex]}</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">Word {currentWordIndex + 1} / {stimulusWords.length}</p>
+            <h3 className="text-3xl font-bold text-gray-800 dark:text-white">{stimulusWords[currentWordIndex]}</h3>
           </div>
           
           {/* 音声再生ボタン */}
@@ -763,8 +763,8 @@ export default function JungVoiceTest({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                   </svg>
                 </div>
-                <p className="text-sm">Listening...</p>
-                <p className="mt-2 text-lg">{userResponse}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-300">Listening...</p>
+                <p className="mt-2 text-lg text-gray-800 dark:text-white">{userResponse}</p>
                 <Button
                   onClick={stopListening}
                   className="mt-4 bg-red-600 hover:bg-red-700"
@@ -783,7 +783,7 @@ export default function JungVoiceTest({
                 </Button>
                 {userResponse && (
                   <div className="mt-4">
-                    <p className="mb-2 text-lg">{userResponse}</p>
+                    <p className="mb-2 text-lg text-gray-800 dark:text-white">{userResponse}</p>
                     
                     {isResponseCorrect === null ? (
                       <div className="flex gap-2 justify-center">
@@ -791,7 +791,7 @@ export default function JungVoiceTest({
                           variant="outline"
                           onClick={() => validateResponse(false)}
                           disabled={!userResponse.trim() || isLoading}
-                          className="border-red-500 text-red-500 hover:bg-red-50"
+                          className="border-red-500 text-red-500 hover:bg-red-50 dark:border-red-400 dark:text-red-400"
                         >
                           Incorrect
                         </Button>
@@ -816,8 +816,8 @@ export default function JungVoiceTest({
             )}
           </div>
           
-          <div className="bg-gray-50 p-4 rounded-md">
-            <h4 className="font-medium mb-2">Conversation Log</h4>
+          <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md">
+            <h4 className="font-medium mb-2 text-gray-800 dark:text-white">Conversation Log</h4>
             <div className="max-h-48 overflow-y-auto">
               {messages.map((msg) => (
                 <div 
@@ -826,8 +826,8 @@ export default function JungVoiceTest({
                     msg.sender === 'assistant' ? 'bg-blue-100 text-left' : 'bg-green-100 text-right'
                   }`}
                 >
-                  <p>{msg.content}</p>
-                  <small className="text-xs text-gray-500">
+                  <p className="text-gray-800 dark:text-white">{msg.content}</p>
+                  <small className="text-xs text-gray-600 dark:text-gray-300">
                     {msg.timestamp.toLocaleTimeString()}
                   </small>
                 </div>
@@ -840,33 +840,33 @@ export default function JungVoiceTest({
       {/* テスト完了 */}
       {testComplete && (
         <div className="text-center">
-          <h3 className="text-xl font-semibold mb-4">Test Complete</h3>
+          <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Test Complete</h3>
           
-          <div className="bg-gray-100 p-4 rounded-md mb-6">
+          <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-md mb-6">
             <p className="mb-2">
-              <span className="font-medium">Average reaction time:</span> {averageReactionTime} ms
+              <span className="font-medium text-gray-800 dark:text-white">Average reaction time:</span> {averageReactionTime} ms
             </p>
             <p>
-              <span className="font-medium">Delayed responses:</span> {delayedResponses} / {responses.length}
+              <span className="font-medium text-gray-800 dark:text-white">Delayed responses:</span> {delayedResponses} / {responses.length}
             </p>
           </div>
           
-          <h4 className="text-lg font-medium mb-3">Your Responses</h4>
+          <h4 className="text-lg font-medium mb-3 text-gray-800 dark:text-white">Your Responses</h4>
           <div className="max-h-80 overflow-y-auto mb-6">
             <table className="w-full border-collapse">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">Stimulus</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">Response</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">Time (ms)</th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-800 dark:text-white">Stimulus</th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-800 dark:text-white">Response</th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-800 dark:text-white">Time (ms)</th>
                 </tr>
               </thead>
               <tbody>
                 {responses.map((resp, index) => (
-                  <tr key={index} className={resp.isDelayed ? "bg-yellow-50" : (index % 2 === 0 ? "bg-white" : "bg-gray-50")}>
-                    <td className="px-4 py-2 text-sm">{resp.stimulus}</td>
-                    <td className="px-4 py-2 text-sm">{resp.response}</td>
-                    <td className={`px-4 py-2 text-sm ${resp.isDelayed ? "text-red-600 font-medium" : ""}`}>
+                  <tr key={index} className={resp.isDelayed ? "bg-yellow-50 dark:bg-yellow-700" : (index % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-gray-50 dark:bg-gray-700")}>
+                    <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.stimulus}</td>
+                    <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.response}</td>
+                    <td className={`px-4 py-2 text-sm ${resp.isDelayed ? "text-red-600 font-medium" : ""} text-gray-800 dark:text-white`}>
                       {resp.reactionTimeMs}
                     </td>
                   </tr>
@@ -875,7 +875,7 @@ export default function JungVoiceTest({
             </table>
           </div>
           
-          <p className="mb-6 text-sm text-gray-600">
+          <p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
             Note: Highlighted rows indicate delayed responses (&gt; 2 seconds), which Jung considered
             potentially significant and might indicate emotional complexes.
           </p>

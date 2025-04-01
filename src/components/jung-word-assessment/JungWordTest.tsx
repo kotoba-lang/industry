@@ -150,15 +150,15 @@ export default function JungWordTest({
 
   return (
     <div className="max-w-2xl mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">Jung's Word Association Test (1910)</h2>
+      <h2 className="text-2xl font-bold mb-6 text-center text-gray-800 dark:text-white">Jung's Word Association Test (1910)</h2>
       
       {currentWordIndex === -1 && !testComplete && (
         <div className="text-center">
-          <p className="mb-4 text-gray-800">
+          <p className="mb-4 text-gray-800 dark:text-white">
             This test presents {numberOfWords} words one at a time. For each word, type the first word that
             comes to your mind as quickly as possible.
           </p>
-          <p className="mb-6 text-gray-800">
+          <p className="mb-6 text-gray-800 dark:text-white">
             The test measures your reaction time and looks for patterns in your responses.
           </p>
           <Button onClick={startTest} className="px-6 py-2">
@@ -170,8 +170,8 @@ export default function JungWordTest({
       {currentWordIndex >= 0 && currentWordIndex < stimulusWords.length && (
         <div className="text-center">
           <div className="mb-8">
-            <p className="text-sm text-gray-500 mb-1 text-gray-800">Word {currentWordIndex + 1} of {stimulusWords.length}</p>
-            <h3 className="text-3xl font-bold text-gray-800">{stimulusWords[currentWordIndex]}</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-300 mb-1">Word {currentWordIndex + 1} of {stimulusWords.length}</p>
+            <h3 className="text-3xl font-bold text-gray-800 dark:text-white">{stimulusWords[currentWordIndex]}</h3>
           </div>
           
           <div className="flex items-center justify-center mb-4">
@@ -194,7 +194,7 @@ export default function JungWordTest({
             </Button>
           </div>
           
-          <p className="text-sm text-gray-500 text-gray-800">
+          <p className="text-sm text-gray-500 dark:text-gray-300">
             Press Enter after typing your response
           </p>
         </div>
@@ -202,33 +202,37 @@ export default function JungWordTest({
 
       {testComplete && (
         <div className="text-center">
-          <h3 className="text-xl font-semibold mb-4 text-gray-800">Test Complete</h3>
+          <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Test Complete</h3>
           
-          <div className="bg-gray-100 p-4 rounded-md mb-6 text-gray-800">
-            <p className="mb-2">
-              <span className="font-medium text-gray-800">Average reaction time:</span> {averageReactionTime} ms
+          <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-md mb-6">
+            <p className="mb-2 dark:text-white">
+              <span className="font-medium text-gray-800 dark:text-white">Average reaction time:</span> {averageReactionTime} ms
             </p>
-            <p>
-              <span className="font-medium text-gray-800">Delayed responses:</span> {delayedResponses} out of {responses.length}
+            <p className="dark:text-white">
+              <span className="font-medium text-gray-800 dark:text-white">Delayed responses:</span> {delayedResponses} out of {responses.length}
             </p>
           </div>
           
-          <h4 className="text-lg font-medium mb-3 text-gray-800">Your Responses</h4>
-          <div className="max-h-80 overflow-y-auto mb-6 text-gray-800">
+          <h4 className="text-lg font-medium mb-3 text-gray-800 dark:text-white">Your Responses</h4>
+          <div className="max-h-80 overflow-y-auto mb-6">
             <table className="w-full border-collapse">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">Stimulus</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">Response</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">Time (ms)</th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-300">Stimulus</th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-300">Response</th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-300">Time (ms)</th>
                 </tr>
               </thead>
               <tbody>
                 {responses.map((resp, index) => (
-                  <tr key={index} className={resp.isDelayed ? "bg-yellow-50" : (index % 2 === 0 ? "bg-white" : "bg-gray-50")}>
-                    <td className="px-4 py-2 text-sm text-gray-800">{resp.stimulus}</td>
-                    <td className="px-4 py-2 text-sm text-gray-800">{resp.response}</td>
-                    <td className={`px-4 py-2 text-sm ${resp.isDelayed ? "text-red-600 font-medium" : ""} text-gray-800`}>
+                  <tr key={index} className={resp.isDelayed 
+                    ? "bg-yellow-50 dark:bg-yellow-900" 
+                    : (index % 2 === 0 
+                      ? "bg-white dark:bg-gray-800" 
+                      : "bg-gray-50 dark:bg-gray-700")}>
+                    <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.stimulus}</td>
+                    <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.response}</td>
+                    <td className={`px-4 py-2 text-sm ${resp.isDelayed ? "text-red-600 dark:text-red-400 font-medium" : ""} text-gray-800 dark:text-white`}>
                       {resp.reactionTimeMs}
                     </td>
                   </tr>
@@ -237,7 +241,7 @@ export default function JungWordTest({
             </table>
           </div>
           
-          <p className="mb-6 text-sm text-gray-600 text-gray-800">
+          <p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
             Note: Highlighted rows indicate delayed responses (&gt; 2 seconds), which Jung considered
             potentially significant and might indicate emotional complexes.
           </p>
