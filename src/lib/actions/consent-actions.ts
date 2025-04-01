@@ -3,7 +3,6 @@
 import { v4 as uuidv4 } from "uuid";
 import { ConsentRecord } from "../db/schema/consent";
 import { DemographicData } from "../db/schema/demographic";
-
 import { createSupabaseServerClient } from "../supabase/server";
 
 /*
