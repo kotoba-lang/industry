@@ -582,13 +582,22 @@ export default function JungVoiceTest({
       
       // 感情データをDBに保存（テスト中のみ実行）
       if (userId && assessmentIdRef.current) {
+        // 配列形式の感情データをオブジェクト形式に変換
+        const emotionsRecord: Record<string, number> = {};
+        data.emotions.forEach(emotion => {
+          emotionsRecord[emotion.name] = emotion.score;
+        });
+        
         EmotionDataService.saveFacialEmotionData(
           userId,
           assessmentIdRef.current,
           currentWord,
           userResponse,
           startTime ? Date.now() - startTime : 0,
-          data
+          { 
+            emotions: emotionsRecord, 
+            timestamp: Date.now() 
+          }
         ).catch(err => {
           console.error('Failed to save facial emotion data:', err);
         });
@@ -801,7 +810,7 @@ export default function JungVoiceTest({
       // 平均反応時間と遅延応答数を計算
       const totalReactionTime = finalResponses.reduce((sum, response) => sum + response.reactionTimeMs, 0);
       const avgReactionTime = Math.round(totalReactionTime / finalResponses.length);
-      const delayedCount = finalResponses.filter(response => response.isDelayed).length;
+      const delayedCount = finalResponses.filter(response => response.isDelayed as boolean).length;
       
       setAverageReactionTime(avgReactionTime);
       setDelayedResponses(delayedCount);
@@ -1144,7 +1153,7 @@ export default function JungVoiceTest({
                         </div>
                       ) : (
                         <Button
-                          onClick={recordResponse}
+                          onClick={() => recordResponse(userResponse)}
                           disabled={!userResponse.trim() || isLoading}
                         >
                           Next
@@ -1184,7 +1193,7 @@ export default function JungVoiceTest({
                 <span className="font-medium text-gray-800 dark:text-white">Average reaction time:</span> {averageReactionTime} ms
               </p>
               <p>
-                <span className="font-medium text-gray-800 dark:text-white">Delayed responses:</span> {delayedResponses} / {responses.length}
+                <span className="font-medium text-gray-800 dark:text-white">Delayed responses:</span> {delayedResponses} / {userResponses.length}
               </p>
             </div>
             
@@ -1199,11 +1208,11 @@ export default function JungVoiceTest({
                   </tr>
                 </thead>
                 <tbody>
-                  {responses.map((resp, index) => (
-                    <tr key={index} className={resp.isDelayed ? "bg-yellow-50 dark:bg-yellow-700" : (index % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-gray-50 dark:bg-gray-700")}>
+                  {userResponses.map((resp: WordResponse, index: number) => (
+                    <tr key={index} className={(resp.isDelayed as boolean) ? "bg-yellow-50 dark:bg-yellow-700" : (index % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-gray-50 dark:bg-gray-700")}>
                       <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.stimulusWord}</td>
                       <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.responseWord}</td>
-                      <td className={`px-4 py-2 text-sm ${resp.isDelayed ? "text-red-600 font-medium" : ""} text-gray-800 dark:text-white`}>
+                      <td className={`px-4 py-2 text-sm ${(resp.isDelayed as boolean) ? "text-red-600 font-medium" : ""} text-gray-800 dark:text-white`}>
                         {resp.reactionTimeMs}
                       </td>
                     </tr>

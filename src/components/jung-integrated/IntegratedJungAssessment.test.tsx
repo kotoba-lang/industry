@@ -207,10 +207,12 @@ describe('IntegratedJungAssessment', () => {
     
     const mockVoiceResults: VoiceTestResults = {
       responses: [
-        { stimulusWord: 'voice', responseWord: 'sound', reactionTimeMs: 1200 }
+        { stimulusWord: 'water', responseWord: 'drink', reactionTimeMs: 900 },
+        { stimulusWord: 'fire', responseWord: 'hot', reactionTimeMs: 1100 }
       ],
-      averageReactionTimeMs: 1200,
-      delayedResponsesCount: 0
+      averageReactionTimeMs: 1000,
+      delayedResponsesCount: 0,
+      totalWords: 2
     };
     
     const mockSetWordResults = vi.fn();

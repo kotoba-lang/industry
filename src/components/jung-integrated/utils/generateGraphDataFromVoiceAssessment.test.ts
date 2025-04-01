@@ -25,14 +25,12 @@ describe('generateGraphDataFromVoiceAssessment', () => {
     // Setup mock test results for voice assessment
     mockTestResults = {
       responses: [
-        { stimulusWord: 'water', responseWord: 'ocean', reactionTimeMs: 800 },
-        { stimulusWord: 'fire', responseWord: 'hot', reactionTimeMs: 600 },
-        { stimulusWord: 'mother', responseWord: 'care', reactionTimeMs: 2500 },
-        { stimulusWord: 'father', responseWord: 'strict', reactionTimeMs: 900 },
-        { stimulusWord: 'water', responseWord: 'river', reactionTimeMs: 750 }
+        { stimulusWord: 'test', responseWord: 'reply', reactionTimeMs: 1000 },
+        { stimulusWord: 'water', responseWord: 'drink', reactionTimeMs: 2500 }
       ],
-      averageReactionTimeMs: 1110,
-      delayedResponsesCount: 1
+      averageReactionTimeMs: 1750,
+      delayedResponsesCount: 1,
+      totalWords: 2
     };
     
     // Reset Math.random to make tests deterministic
@@ -77,11 +75,13 @@ describe('generateGraphDataFromVoiceAssessment', () => {
     // Create test results with only reaction time differences
     const testResults: TestResults = {
       responses: [
-        { stimulusWord: 'test1', responseWord: 'fast', reactionTimeMs: 500 },
-        { stimulusWord: 'test2', responseWord: 'slow', reactionTimeMs: 1500 }
+        { stimulusWord: 'fire', responseWord: 'hot', reactionTimeMs: 1200 },
+        { stimulusWord: 'cold', responseWord: 'ice', reactionTimeMs: 800 },
+        { stimulusWord: 'time', responseWord: 'clock', reactionTimeMs: 1500 }
       ],
-      averageReactionTimeMs: 1000,
-      delayedResponsesCount: 0
+      averageReactionTimeMs: 1166,
+      delayedResponsesCount: 0,
+      totalWords: 3
     };
     
     const result = generateGraphDataFromVoiceAssessment(testResults, mockTransitionState, 0);
@@ -90,15 +90,15 @@ describe('generateGraphDataFromVoiceAssessment', () => {
     const fastLink = result.links.find(link => {
       const sourceNode = result.nodes.find(n => n.id === link.source);
       const targetNode = result.nodes.find(n => n.id === link.target);
-      return (sourceNode?.name === 'test1' && targetNode?.name === 'fast') ||
-             (sourceNode?.name === 'fast' && targetNode?.name === 'test1');
+      return (sourceNode?.name === 'fire' && targetNode?.name === 'hot') ||
+             (sourceNode?.name === 'hot' && targetNode?.name === 'fire');
     });
     
     const slowLink = result.links.find(link => {
       const sourceNode = result.nodes.find(n => n.id === link.source);
       const targetNode = result.nodes.find(n => n.id === link.target);
-      return (sourceNode?.name === 'test2' && targetNode?.name === 'slow') ||
-             (sourceNode?.name === 'slow' && targetNode?.name === 'test2');
+      return (sourceNode?.name === 'cold' && targetNode?.name === 'ice') ||
+             (sourceNode?.name === 'ice' && targetNode?.name === 'cold');
     });
     
     // Faster reaction time should result in stronger connection
