@@ -6,8 +6,10 @@ import { Checkbox } from '../ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Label } from '../ui/label';
+import { saveConsentAndDemographicData } from '@/lib/db/utils';
 
-interface DemographicData {
+// 型定義
+export interface DemographicData {
   ageGroup: string;
   gender: string;
   ethnicity: string;
@@ -16,11 +18,18 @@ interface DemographicData {
 
 interface ConsentFormProps {
   onConsent: (demographicData: DemographicData) => void;
+  consentVersion?: string;
+  studyId?: string;
 }
 
-export default function ConsentForm({ onConsent }: ConsentFormProps) {
+export default function ConsentForm({ 
+  onConsent, 
+  consentVersion = "1.0",
+  studyId = "SPIRIT-IN-PHYSICS-2025"
+}: ConsentFormProps) {
   const [consented, setConsented] = useState(false);
   const [showFullConsent, setShowFullConsent] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [demographicData, setDemographicData] = useState<DemographicData>({
     ageGroup: "",
     gender: "",
@@ -35,13 +44,39 @@ export default function ConsentForm({ onConsent }: ConsentFormProps) {
     }));
   };
 
-  const handleSubmit = () => {
-    onConsent(demographicData);
+  const handleSubmit = async () => {
+    try {
+      setIsSubmitting(true);
+
+      // データベースに保存
+      if (typeof window !== 'undefined') {
+        await saveConsentAndDemographicData(
+          demographicData,
+          {
+            consentGiven: consented,
+            consentVersion,
+            consentText: "Research Participation Consent for Spirit in Physics (Jung's Word Association Embedding Test)"
+          },
+          {
+            userAgent: window.navigator.userAgent,
+            studyId
+          }
+        );
+      }
+
+      // UIのコールバックを呼び出し
+      onConsent(demographicData);
+    } catch (error) {
+      console.error('Error saving consent data:', error);
+      // エラー処理（必要に応じてUIにエラーメッセージを表示）
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
   return (
     <div className="max-w-3xl mx-auto p-6 bg-white rounded-lg shadow-md border border-gray-200">
-      <h2 className="text-2xl font-bold mb-4">Research Participation Consent</h2>
+      <h2 className="text-2xl font-bold mb-4 text-black">Research Participation Consent</h2>
       
       <div className="mb-6">
         <p className="mb-4">This Spirit in Physics (Jung's Word Association Embedding Test) is conducted for research purposes. Please read the following consent information before proceeding.</p>
@@ -109,7 +144,7 @@ export default function ConsentForm({ onConsent }: ConsentFormProps) {
             <Label htmlFor="ageGroup" className="block mb-2">Age Group</Label>
             <Select 
               value={demographicData.ageGroup} 
-              onValueChange={(value) => handleDemographicChange("ageGroup", value)}
+              onValueChange={(value: string) => handleDemographicChange("ageGroup", value)}
             >
               <SelectTrigger id="ageGroup" className="w-full">
                 <SelectValue placeholder="Select age group" />
@@ -130,7 +165,7 @@ export default function ConsentForm({ onConsent }: ConsentFormProps) {
             <Label className="block mb-2">Gender</Label>
             <RadioGroup 
               value={demographicData.gender} 
-              onValueChange={(value) => handleDemographicChange("gender", value)}
+              onValueChange={(value: string) => handleDemographicChange("gender", value)}
               className="flex flex-col space-y-2"
             >
               <div className="flex items-center space-x-2">
@@ -156,7 +191,7 @@ export default function ConsentForm({ onConsent }: ConsentFormProps) {
             <Label htmlFor="ethnicity" className="block mb-2">Race/Ethnicity</Label>
             <Select 
               value={demographicData.ethnicity} 
-              onValueChange={(value) => handleDemographicChange("ethnicity", value)}
+              onValueChange={(value: string) => handleDemographicChange("ethnicity", value)}
             >
               <SelectTrigger id="ethnicity" className="w-full">
                 <SelectValue placeholder="Select ethnicity" />
@@ -179,7 +214,7 @@ export default function ConsentForm({ onConsent }: ConsentFormProps) {
             <Label htmlFor="income" className="block mb-2">Annual Income</Label>
             <Select 
               value={demographicData.income} 
-              onValueChange={(value) => handleDemographicChange("income", value)}
+              onValueChange={(value: string) => handleDemographicChange("income", value)}
             >
               <SelectTrigger id="income" className="w-full">
                 <SelectValue placeholder="Select income range" />
@@ -203,7 +238,7 @@ export default function ConsentForm({ onConsent }: ConsentFormProps) {
           <Checkbox 
             id="consent1" 
             checked={consented} 
-            onCheckedChange={(checked: boolean) => setConsented(checked)} 
+            onCheckedChange={(checked: boolean) => setConsented(checked === true)} 
             className="mt-1"
           />
           <label htmlFor="consent1" className="ml-2 text-sm">
@@ -215,10 +250,10 @@ export default function ConsentForm({ onConsent }: ConsentFormProps) {
       <div className="flex justify-end">
         <Button 
           onClick={handleSubmit} 
-          disabled={!consented}
+          disabled={!consented || isSubmitting}
           className="px-6"
         >
-          Consent and Continue
+          {isSubmitting ? 'Processing...' : 'Consent and Continue'}
         </Button>
       </div>
       
