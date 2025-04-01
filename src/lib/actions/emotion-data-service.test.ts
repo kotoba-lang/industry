@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { EmotionDataService } from './emotion-data-service';
+import { saveEmotionData, getEmotionData, saveFacialEmotionData } from './emotion-actions';
 import { createServerClient } from '@/lib/supabase/server';
 
 // Mock the Supabase client
@@ -38,7 +38,7 @@ describe('感情データサービス機能 (優先度: 5)', () => {
       mockSupabaseClient.insert.mockResolvedValue({ error: null });
 
       // Call the service
-      const result = await EmotionDataService.saveEmotionData(emotionData);
+      const result = await saveEmotionData(emotionData);
 
       // Verify Supabase was called correctly
       expect(createServerClient).toHaveBeenCalled();
@@ -73,7 +73,7 @@ describe('感情データサービス機能 (優先度: 5)', () => {
       mockSupabaseClient.insert.mockResolvedValue({ error: { message: 'Database error' } });
 
       // Call the service
-      const result = await EmotionDataService.saveEmotionData(emotionData);
+      const result = await saveEmotionData(emotionData);
 
       // Verify the error result
       expect(result).toEqual({
@@ -97,7 +97,7 @@ describe('感情データサービス機能 (優先度: 5)', () => {
       mockSupabaseClient.insert.mockRejectedValue(new Error('Network error'));
 
       // Call the service
-      const result = await EmotionDataService.saveEmotionData(emotionData);
+      const result = await saveEmotionData(emotionData);
 
       // Verify the error result
       expect(result).toEqual({
@@ -124,7 +124,7 @@ describe('感情データサービス機能 (優先度: 5)', () => {
       mockSupabaseClient.insert.mockResolvedValue({ error: null });
 
       // Call the service
-      const result = await EmotionDataService.saveFacialEmotionData(
+      const result = await saveFacialEmotionData(
         userId,
         assessmentId,
         stimulusWord,
