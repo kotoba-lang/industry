@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { vi } from 'vitest';
+import { beforeEach, expect, vi } from 'vitest';
 import IntegratedJungAssessment from './IntegratedJungAssessment';
 import JungWordTest from '@/components/jung-word-assessment/JungWordTest';
 import JungVoiceTest from '@/components/jung-voice-assessment/JungVoiceTest';

@@ -84,18 +84,44 @@ Deploy it to the cloud with [Vercel](https://vercel.com/new?utm_source=github&ut
 
 # 環境構築と初期設定
 
-## Supabase セットアップ
+## データベース設定
 
-このプロジェクトは [Supabase](https://supabase.com) をデータベースとして使用しています。以下の手順でセットアップしてください。
+このプロジェクトは以下の構成でデータベース管理を行っています:
+
+- **スキーマ定義とマイグレーション**: [Drizzle ORM](https://orm.drizzle.team)
+- **データベースクライアント**: [Supabase](https://supabase.com)
+
+### セットアップ手順
 
 1. [Supabase](https://database.new) にアクセスし、新しいプロジェクトを作成します。
-2. プロジェクト作成後、SQL エディタで `supabase/migrations/20240602000000_create_consent_tables.sql` の内容を実行します。
-3. プロジェクト設定から API キーを取得します。
-4. `.env.local` ファイルを作成し、以下の環境変数を設定します：
+2. プロジェクト作成後、API キーを取得します。
+3. `.env.local` ファイルを作成し、以下の環境変数を設定します：
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+DATABASE_URL=postgres://postgres:[PASSWORD]@db.[YOUR-PROJECT-ID].supabase.co:5432/postgres
+```
+
+### マイグレーション管理
+
+Drizzle を使用してデータベースのスキーマとマイグレーションを管理します：
+
+```bash
+# マイグレーションを生成
+pnpm db:generate
+
+# マイグレーションを適用
+pnpm db:migrate
+
+# 開発環境での直接スキーマ更新（本番環境では使用しないこと）
+pnpm db:push
+
+# データベースからスキーマを取得
+pnpm db:pull
+
+# Drizzle Studio でデータを確認・編集
+pnpm db:studio
 ```
 
 ## 開発環境の起動
