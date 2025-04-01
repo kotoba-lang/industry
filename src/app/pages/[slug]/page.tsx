@@ -54,7 +54,7 @@ export default function Page() {
             coverImage={"/assets/posts/spirit-in-physics/cover.jpg"}
             date={"2024-11-30"}
             author={{
-              name: <>Jun Kawasaki(<a href="mailto:root@junkawasaki.com">root@junkawasaki.com</a>), Kazuki Tainaka, Tomonori Takeuchi</>,
+              name: "Jun Kawasaki(root@junkawasaki.com), Kazuki Tainaka, Tomonori Takeuchi",
               picture: "/assets/posts/authors/jk.jpg",
             }}
           />
@@ -101,11 +101,20 @@ export default function Page() {
                 <BlockMath math="\psi(S) = \frac{\delta E(S)}{\delta S}." />
               </div>
               <p>(Bérut et al., 2012)</p>
-
-              <div className="w-full sticky left-0 right-0">
-                <KawasakiModel />
-              </div>
-
+            </div>
+          </div>
+        </article>
+      </Container>
+      
+      {/* KawasakiModel - Full width outside of container */}
+      <div className="w-full h-[80vh] mb-8">
+        <KawasakiModel />
+      </div>
+      
+      <Container>
+        <article className="mb-32">
+          <div className="max-w-2xl mx-auto">
+            <div className={styles["markdown"]}>
               <h2>Vectorization Spirit Using the Word Association Experiment (Jung, 1910)</h2>
               <div className={styles.mathBlock}>
                 <BlockMath math="P(w_O | w_I) = \frac{\exp(\vec{w_I} \cdot \vec{w_O}) \cdot [r(w_I, w_O)]^{\alpha} \cdot \exp(\gamma \frac{\Delta SP(w_I,w_O)}{\lambda}) \cdot \exp(\eta F(w_I, w_O))}{\sum_{j} \exp(\vec{w_I} \cdot \vec{w_j}) \cdot [r(w_I, w_j)]^{\alpha} \cdot \exp(\gamma \frac{\Delta SP(w_I,w_j)}{\lambda}) \cdot \exp(\eta F(w_I, w_j))}" />
