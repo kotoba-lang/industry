@@ -44,7 +44,7 @@ export default function JungWordAssessmentPage() {
         </div>
         
         <div className="bg-white rounded-lg shadow-lg">
-          <JungWordAssessment numberOfWords={30} />
+          <JungWordAssessment numberOfWords={10} />
         </div>
         
         <div className="mt-12 text-center text-sm text-gray-500">
