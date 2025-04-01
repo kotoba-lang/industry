@@ -11,47 +11,6 @@ import axios from 'axios';
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
-// モック HTMLCanvasElement getContext
-jest.mock('./HumeEmotionProvider', () => {
-  const originalModule = jest.requireActual('./HumeEmotionProvider');
-  
-  return {
-    ...originalModule,
-    HumeEmotionProvider: ({ children, apiKey, captureInterval }) => {
-      const mockEmotionData: EmotionData = {
-        emotions: { 'Joy': 0.8, 'Sadness': 0.2 },
-        dominantEmotion: 'Joy',
-        timestamp: Date.now()
-      };
-      
-      // Override the original implementation to bypass canvas operations
-      const origProvider = originalModule.HumeEmotionProvider({
-        children,
-        apiKey,
-        captureInterval
-      });
-      
-      // Patch the captureEmotion function to avoid canvas operations
-      const origType = origProvider.type;
-      origProvider.type = (props) => {
-        const comp = origType(props);
-        
-        // Override the captureEmotion function implementation
-        const origCaptureEmotion = comp.props.value.captureEmotion;
-        comp.props.value.captureEmotion = jest.fn().mockImplementation(() => {
-          comp.props.value.setCurrentEmotion(mockEmotionData);
-          comp.props.value.setEmotionHistory(prev => [...prev, mockEmotionData]);
-          return Promise.resolve(mockEmotionData);
-        });
-        
-        return comp;
-      };
-      
-      return origProvider;
-    }
-  };
-});
-
 // テスト用のコンポーネント
 const TestComponent = () => {
   const {
