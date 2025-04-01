@@ -60,29 +60,21 @@ const PhysicsGraph: React.FC<PhysicsGraphProps> = ({
       const context = canvas.getContext("2d")
 
       if (context) {
-        // Create a subtle gradient from top to bottom - different for dark mode
+        // Create a subtle gradient from top to bottom - always light regardless of theme
         const gradient = context.createLinearGradient(0, 0, 0, canvas.height)
-        
-        if (isDarkMode) {
-          gradient.addColorStop(0, "#121212") // Very dark gray at top for dark mode
-          gradient.addColorStop(1, "#1e1e1e") // Slightly lighter at bottom for dark mode
-        } else {
-          gradient.addColorStop(0, "#f5f5f5") // Very light gray at top for light mode
-          gradient.addColorStop(1, "#e8e8e8") // Slightly darker at bottom for light mode
-        }
+        gradient.addColorStop(0, "#f5f5f5") // Very light gray at top for both modes
+        gradient.addColorStop(1, "#e8e8e8") // Slightly darker at bottom for both modes
 
         context.fillStyle = gradient
         context.fillRect(0, 0, canvas.width, canvas.height)
 
-        // Add subtle texture like washi paper - subtler in dark mode
-        context.globalAlpha = isDarkMode ? 0.02 : 0.03
+        // Add subtle texture like washi paper
+        context.globalAlpha = 0.03
         for (let i = 0; i < 20000; i++) {
           const x = Math.random() * canvas.width
           const y = Math.random() * canvas.height
           const size = Math.random() * 2
-          context.fillStyle = isDarkMode 
-            ? (Math.random() > 0.5 ? "#555" : "#777") 
-            : (Math.random() > 0.5 ? "#000" : "#555")
+          context.fillStyle = Math.random() > 0.5 ? "#000" : "#555"
           context.fillRect(x, y, size, size)
         }
       }
@@ -253,32 +245,19 @@ const PhysicsGraph: React.FC<PhysicsGraphProps> = ({
 
   // Zen-inspired link colors - subtle, ink-like gradations
   const getLinkColor = (strength: number) => {
-    if (isDarkMode) {
-      // Dark mode links - brighter for better visibility against dark background
-      if (strength <= 0.5) {
-        return `rgba(180, 180, 180, ${0.1 + strength * 0.1})`;
-      } else if (strength <= 1) {
-        return `rgba(200, 200, 200, ${0.15 + strength * 0.15})`;
-      } else if (strength <= 2) {
-        return `rgba(220, 220, 220, ${0.2 + strength * 0.2})`;
-      } else {
-        return `rgba(240, 240, 240, ${0.25 + strength * 0.25})`;
-      }
+    // Light mode links - always use these colors
+    if (strength <= 0.5) {
+      // Very faint, like diluted ink
+      return `rgba(45, 45, 45, ${0.05 + strength * 0.05})`;
+    } else if (strength <= 1) {
+      // Medium tone, like light sumi-e brush stroke
+      return `rgba(40, 40, 40, ${0.1 + strength * 0.1})`;
+    } else if (strength <= 2) {
+      // Darker tone, more defined brush stroke
+      return `rgba(35, 35, 35, ${0.15 + strength * 0.15})`;
     } else {
-      // Light mode links - darker for contrast against light background
-      if (strength <= 0.5) {
-        // Very faint, like diluted ink
-        return `rgba(45, 45, 45, ${0.05 + strength * 0.05})`;
-      } else if (strength <= 1) {
-        // Medium tone, like light sumi-e brush stroke
-        return `rgba(40, 40, 40, ${0.1 + strength * 0.1})`;
-      } else if (strength <= 2) {
-        // Darker tone, more defined brush stroke
-        return `rgba(35, 35, 35, ${0.15 + strength * 0.15})`;
-      } else {
-        // Darkest, like concentrated ink
-        return `rgba(30, 30, 30, ${0.2 + strength * 0.2})`;
-      }
+      // Darkest, like concentrated ink
+      return `rgba(30, 30, 30, ${0.2 + strength * 0.2})`;
     }
   }
 
@@ -341,16 +320,14 @@ const PhysicsGraph: React.FC<PhysicsGraphProps> = ({
     let geometry
     let material
 
-    // ダークモードに基づいた色の選択
-    const nodeColor = isDarkMode 
-      ? (node.darkColor || (isSelected ? 0xffffff : 0xcccccc))
-      : (node.lightColor || (isSelected ? 0x8c4a3a : 0x8c6a5a));
+    // 常にライトモード用の色を使用
+    const nodeColor = isSelected ? 0x8c4a3a : 0x8c6a5a;
 
     if (isField) {
       // Field node as a simple sphere - represents emptiness/wholeness
       geometry = new THREE.SphereGeometry(size, 32, 32)
       material = new THREE.MeshPhongMaterial({
-        color: isDarkMode ? 0x444444 : 0x2c2c2c,
+        color: 0x2c2c2c,
         transparent: true,
         opacity: 0.9,
         shininess: 30,
@@ -478,7 +455,7 @@ const PhysicsGraph: React.FC<PhysicsGraphProps> = ({
         linkColor={(link: any) => getLinkColor(link.strength)}
         linkOpacity={0.7}
         nodeRelSize={3.5}
-        backgroundColor={isDarkMode ? "#121212" : "#f5f5f5"} // Background color based on theme
+        backgroundColor="#f5f5f5" // Always light background like washi paper
         enableNodeDrag={false}
         enableNavigationControls={true}
         showNavInfo={false} // Hide navigation info for cleaner look
