@@ -547,7 +547,7 @@ export default function JungVoiceTest({
   }, []);
 
   // メッセージを追加
-  const addMessage = (text, role) => {
+  const addMessage = (text: string, role: string) => {
     setMessages([...messages, { text, role }]);
   };
 
@@ -562,12 +562,6 @@ export default function JungVoiceTest({
     }
     
     setUserId(newUserId);
-
-    // スキーマが存在することを確認
-    EmotionDataService.ensureSchemaExists()
-      .catch(err => {
-        console.error('Failed to ensure schema exists:', err);
-      });
   }, []);
 
   // 顔の感情データを処理するコールバック
