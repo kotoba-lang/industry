@@ -1,9 +1,10 @@
-import { db } from '@/db';
+import { db } from '@/lib/db';
 import { 
   facialEmotionRecords, 
   voiceEmotionRecords,
   emotionAssessments
-} from '@/db/schema/spirit-in-physics';
+} from '@/lib/db/schema/spirit_in_physics';
+
 import { HumeFaceResponse, HumeVoiceResponse } from './hume-service';
 import { v4 as uuidv4 } from 'uuid';
 
