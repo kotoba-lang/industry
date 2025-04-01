@@ -11,6 +11,9 @@ importers:
       '@libsql/client':
         specifier: ^0.15.2
         version: 0.15.2(bufferutil@4.0.8)(utf-8-validate@6.0.4)
+      '@neondatabase/serverless':
+        specifier: ^1.0.0
+        version: 1.0.0
       '@playwright/test':
         specifier: ^1.51.1
         version: 1.51.1
@@ -85,7 +88,7 @@ importers:
         version: 16.4.7
       drizzle-orm:
         specifier: ^0.41.0
-        version: 0.41.0(@libsql/client@0.15.2(bufferutil@4.0.8)(utf-8-validate@6.0.4))(@neondatabase/serverless@0.10.0)(@opentelemetry/api@1.9.0)(@planetscale/database@1.19.0)(@prisma/client@5.22.0(prisma@5.22.0))(@types/pg@8.11.11)(@vercel/postgres@0.10.0(utf-8-validate@6.0.4))(gel@2.0.1)(mysql2@3.11.3)(pg@8.14.1)(postgres@3.3.5)(prisma@5.22.0)
+        version: 0.41.0(@libsql/client@0.15.2(bufferutil@4.0.8)(utf-8-validate@6.0.4))(@neondatabase/serverless@1.0.0)(@opentelemetry/api@1.9.0)(@planetscale/database@1.19.0)(@prisma/client@5.22.0(prisma@5.22.0))(@types/pg@8.11.11)(@vercel/postgres@0.10.0(utf-8-validate@6.0.4))(gel@2.0.1)(mysql2@3.11.3)(pg@8.14.1)(postgres@3.3.5)(prisma@5.22.0)
       face-api.js:
         specifier: ^0.22.2
         version: 0.22.2
@@ -3312,6 +3315,10 @@ packages:
   '@neondatabase/serverless@0.9.5':
     resolution: {integrity: sha512-siFas6gItqv6wD/pZnvdu34wEqgG3nSE6zWZdq5j2DEsa+VvX8i/5HXJOo06qrw5axPXn+lGCxeR+NLaSPIXug==}
 
+  '@neondatabase/serverless@1.0.0':
+    resolution: {integrity: sha512-XWmEeWpBXIoksZSDN74kftfTnXFEGZ3iX8jbANWBc+ag6dsiQuvuR4LgB0WdCOKMb5AQgjqgufc0TgAsZubUYw==}
+    engines: {node: '>=19.0.0'}
+
   '@netlify/functions@2.8.2':
     resolution: {integrity: sha512-DeoAQh8LuNPvBE4qsKlezjKj0PyXDryOFJfJKo3Z1qZLKzQ21sT314KQKPVjfvw6knqijj+IO+0kHXy/TJiqNA==}
     engines: {node: '>=14.0.0'}
@@ -5430,6 +5437,9 @@ packages:
 
   '@types/node@20.17.7':
     resolution: {integrity: sha512-sZXXnpBFMKbao30dUAvzKbdwA2JM1fwUtVEq/kxKuPI5mMwZiRElCpTXb0Biq/LMEVpXDZL5G5V0RPnxKeyaYg==}
+
+  '@types/node@22.13.17':
+    resolution: {integrity: sha512-nAJuQXoyPj04uLgu+obZcSmsfOenUg6DxPKogeUy6yNCFwWaj5sBF8/G/pNo8EtBJjAfSVgfIlugR/BCOleO+g==}
 
   '@types/node@22.7.5':
     resolution: {integrity: sha512-jML7s2NAzMWc//QSJ1a3prpk78cOPchGvXJsC3C6R6PSMoooztvRVQEz89gmBTBY1SPMaqo5teB4uNHPdetShQ==}
@@ -11638,6 +11648,9 @@ packages:
   undici-types@6.19.8:
     resolution: {integrity: sha512-ve2KP6f/JnbPBFyobGHuerC9g1FYGn/F8n1LWTwNxCEzd6IfqTwUQcNXgEtmmQ6DlRrC1hrSrBnCZPokRrDHjw==}
 
+  undici-types@6.20.0:
+    resolution: {integrity: sha512-Ny6QZ2Nju20vw1SRHe3d9jVu6gJ+4e3+MMpqu7pqE5HT6WsTSlce++GQmK5UXS8mzV8DSYHrQH+Xrf2jVcuKNg==}
+
   undici@6.20.0:
     resolution: {integrity: sha512-AITZfPuxubm31Sx0vr8bteSalEbs9wQb/BOBi9FPlD9Qpd6HxZ4Q0+hI742jBhkPb4RT2v5MQzaW5VhRVyj+9A==}
     engines: {node: '>=18.17'}
@@ -14756,6 +14769,11 @@ snapshots:
     dependencies:
       '@types/pg': 8.11.6
 
+  '@neondatabase/serverless@1.0.0':
+    dependencies:
+      '@types/node': 22.13.17
+      '@types/pg': 8.11.11
+
   '@netlify/functions@2.8.2':
     dependencies:
       '@netlify/serverless-functions-api': 1.26.1
@@ -17518,6 +17536,10 @@ snapshots:
     dependencies:
       undici-types: 6.19.8
 
+  '@types/node@22.13.17':
+    dependencies:
+      undici-types: 6.20.0
+
   '@types/node@22.7.5':
     dependencies:
       undici-types: 6.19.8
@@ -19207,10 +19229,10 @@ snapshots:
       prisma: 5.22.0
       react: 18.3.1
 
-  drizzle-orm@0.41.0(@libsql/client@0.15.2(bufferutil@4.0.8)(utf-8-validate@6.0.4))(@neondatabase/serverless@0.10.0)(@opentelemetry/api@1.9.0)(@planetscale/database@1.19.0)(@prisma/client@5.22.0(prisma@5.22.0))(@types/pg@8.11.11)(@vercel/postgres@0.10.0(utf-8-validate@6.0.4))(gel@2.0.1)(mysql2@3.11.3)(pg@8.14.1)(postgres@3.3.5)(prisma@5.22.0):
+  drizzle-orm@0.41.0(@libsql/client@0.15.2(bufferutil@4.0.8)(utf-8-validate@6.0.4))(@neondatabase/serverless@1.0.0)(@opentelemetry/api@1.9.0)(@planetscale/database@1.19.0)(@prisma/client@5.22.0(prisma@5.22.0))(@types/pg@8.11.11)(@vercel/postgres@0.10.0(utf-8-validate@6.0.4))(gel@2.0.1)(mysql2@3.11.3)(pg@8.14.1)(postgres@3.3.5)(prisma@5.22.0):
     optionalDependencies:
       '@libsql/client': 0.15.2(bufferutil@4.0.8)(utf-8-validate@6.0.4)
-      '@neondatabase/serverless': 0.10.0
+      '@neondatabase/serverless': 1.0.0
       '@opentelemetry/api': 1.9.0
       '@planetscale/database': 1.19.0
       '@prisma/client': 5.22.0(prisma@5.22.0)
@@ -25256,6 +25278,8 @@ snapshots:
       - webpack-sources
 
   undici-types@6.19.8: {}
+
+  undici-types@6.20.0: {}
 
   undici@6.20.0: {}
 

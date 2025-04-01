@@ -1,12 +1,10 @@
-import { db } from '@/lib/db';
-import { 
-  facialEmotions,
-  emotionRecords,
-  emotionAssessments
-} from '@/lib/db/schema';
-
 import { HumeFaceResponse, HumeVoiceResponse } from '@/lib/services/hume-service';
 import { v4 as uuidv4 } from 'uuid';
+import postgres from 'postgres';
+
+// Get the database client directly - need to recreate it to avoid the drizzle ORM conflict
+const connectionString = process.env.DATABASE_URL || '';
+const client = postgres(connectionString, { prepare: false });
 
 export interface EmotionData {
   emotions?: Record<string, number>;
@@ -30,47 +28,34 @@ export class EmotionDataService {
    */
   static async saveEmotionData(data: EmotionSaveParams) {
     try {
+      const timestamp = new Date(data.timestamp);
+      
       // まず、アセスメント情報を保存/更新
-      await db.insert(emotionAssessments) 
-        .values({
-          id: data.assessmentId,
-          userId: data.userId,
-          createdAt: new Date(data.timestamp),
-          updatedAt: new Date(data.timestamp),
-        })
-        .onConflictDoUpdate({
-          target: emotionAssessments.id,
-          set: {
-            updatedAt: new Date(data.timestamp),
-          }
-        });
+      await client`
+        INSERT INTO spirit_in_physics.emotion_assessments (id, user_id, created_at, updated_at)
+        VALUES (${data.assessmentId}, ${data.userId}, ${timestamp}, ${timestamp})
+        ON CONFLICT (id) DO UPDATE
+        SET updated_at = ${timestamp}
+      `;
         
       // 顔の感情データがある場合は保存
       if (data.faceEmotions && Object.keys(data.faceEmotions).length > 0) {
-        await db.insert(facialEmotions)
-          .values({
-            id: uuidv4(),
-            assessmentId: data.assessmentId,
-            stimulusWord: data.stimulusWord,
-            responseWord: data.responseWord,
-            reactionTimeMs: data.reactionTimeMs,
-            emotions: data.faceEmotions,
-            createdAt: new Date(data.timestamp),
-          });
+        await client`
+          INSERT INTO spirit_in_physics.facial_emotions
+          (id, assessment_id, stimulus_word, response_word, reaction_time_ms, emotions, created_at)
+          VALUES (${uuidv4()}, ${data.assessmentId}, ${data.stimulusWord}, ${data.responseWord}, 
+                  ${data.reactionTimeMs}, ${JSON.stringify(data.faceEmotions)}, ${timestamp})
+        `;
       }
         
       // 音声の感情データがある場合は保存
       if (data.voiceEmotions && Object.keys(data.voiceEmotions).length > 0) {
-          await db.insert(emotionRecords)
-          .values({
-            id: uuidv4(),
-            assessmentId: data.assessmentId,
-            stimulusWord: data.stimulusWord,
-            responseWord: data.responseWord,
-            reactionTimeMs: data.reactionTimeMs,
-            emotions: data.voiceEmotions,
-            createdAt: new Date(data.timestamp),
-          });
+        await client`
+          INSERT INTO spirit_in_physics.emotion_records
+          (id, assessment_id, stimulus_word, response_word, reaction_time_ms, emotions, created_at)
+          VALUES (${uuidv4()}, ${data.assessmentId}, ${data.stimulusWord}, ${data.responseWord}, 
+                  ${data.reactionTimeMs}, ${JSON.stringify(data.voiceEmotions)}, ${timestamp})
+        `;
       }
       
       return { success: true };
@@ -139,28 +124,30 @@ export class EmotionDataService {
   static async getEmotionDataByAssessment(userId: string, assessmentId: string) {
     try {
       // アセスメント情報の取得
-      const assessment = await db.query.emotionAssessments.findFirst({
-        where: (fields, { eq, and }) => and(
-          eq(fields.id, assessmentId),
-          eq(fields.userId, userId)
-        ),
-      });
+      const assessmentResults = await client`
+        SELECT * FROM spirit_in_physics.emotion_assessments
+        WHERE id = ${assessmentId} AND user_id = ${userId}
+      `;
+      
+      const assessment = assessmentResults[0];
       
       if (!assessment) {
         return { success: false, error: 'Assessment not found' };
       }
       
       // 顔の感情データの取得
-      const facialEmotions = await db.query.facialEmotions.findMany({
-        where: (fields, { eq }) => eq(fields.assessmentId, assessmentId),
-        orderBy: (fields, { asc }) => [asc(fields.createdAt)],
-      });
+      const facialEmotions = await client`
+        SELECT * FROM spirit_in_physics.facial_emotions
+        WHERE assessment_id = ${assessmentId}
+        ORDER BY created_at ASC
+      `;
       
       // 音声の感情データの取得
-      const voiceEmotions = await db.query.voiceEmotions.findMany({
-        where: (fields, { eq }) => eq(fields.assessmentId, assessmentId),
-        orderBy: (fields, { asc }) => [asc(fields.createdAt)],
-      });
+      const voiceEmotions = await client`
+        SELECT * FROM spirit_in_physics.emotion_records
+        WHERE assessment_id = ${assessmentId}
+        ORDER BY created_at ASC
+      `;
       
       return { 
         success: true,
