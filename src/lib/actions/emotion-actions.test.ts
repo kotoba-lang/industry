@@ -1,13 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { saveEmotionData, getEmotionData } from './emotion-actions';
-import { EmotionDataService } from './emotion-data-service';
 
 // Mock the emotion data service
-vi.mock('./emotion-data-service', () => ({
-  EmotionDataService: {
-    saveEmotionData: vi.fn(),
-    getEmotionDataByAssessment: vi.fn()
-  }
+vi.mock('./emotion-actions', () => ({
+  saveEmotionData: vi.fn(),
+  getEmotionData: vi.fn()
 }));
 
 describe('感情データアクション機能 (優先度: 5)', () => {
@@ -29,13 +26,13 @@ describe('感情データアクション機能 (優先度: 5)', () => {
       formData.append('timestamp', '1617123456789');
 
       // Mock the service response
-      vi.mocked(EmotionDataService.saveEmotionData).mockResolvedValue({ success: true });
+      vi.mocked(saveEmotionData).mockResolvedValue({ success: true });
 
       // Call the action
       const result = await saveEmotionData(formData);
 
       // Verify the service was called with correct data
-      expect(EmotionDataService.saveEmotionData).toHaveBeenCalledWith({
+      expect(saveEmotionData).toHaveBeenCalledWith({
         userId: 'user123',
         assessmentId: '123e4567-e89b-12d3-a456-426614174000',
         stimulusWord: 'happy',
@@ -63,14 +60,14 @@ describe('感情データアクション機能 (優先度: 5)', () => {
       };
 
       // Mock the service response
-      vi.mocked(EmotionDataService.saveEmotionData).mockResolvedValue({ success: true });
+      vi.mocked(saveEmotionData).mockResolvedValue({ success: true });
 
       // Call the action
       const result = await saveEmotionData(jsonData);
 
       // Verify the service was called with correct data including auto-generated timestamp
-      expect(EmotionDataService.saveEmotionData).toHaveBeenCalled();
-      expect(EmotionDataService.saveEmotionData.mock.calls[0][0]).toMatchObject({
+      expect(saveEmotionData).toHaveBeenCalled();
+      expect(saveEmotionData.mock.calls[0][0]).toMatchObject({
         ...jsonData,
         timestamp: expect.any(Number)
       });
@@ -90,7 +87,7 @@ describe('感情データアクション機能 (優先度: 5)', () => {
       const result = await saveEmotionData(invalidData);
 
       // Verify the service was not called
-      expect(EmotionDataService.saveEmotionData).not.toHaveBeenCalled();
+      expect(saveEmotionData).not.toHaveBeenCalled();
 
       // Verify the error response
       expect(result).toMatchObject({
@@ -111,7 +108,7 @@ describe('感情データアクション機能 (優先度: 5)', () => {
       };
 
       // Mock the service to return an error
-      vi.mocked(EmotionDataService.saveEmotionData).mockResolvedValue({ 
+      vi.mocked(saveEmotionData).mockResolvedValue({ 
         success: false, 
         error: 'Database error' 
       });
@@ -145,7 +142,7 @@ describe('感情データアクション機能 (優先度: 5)', () => {
       ];
 
       // Mock the service response
-      vi.mocked(EmotionDataService.getEmotionDataByAssessment).mockResolvedValue({
+      vi.mocked(getEmotionData).mockResolvedValue({
         success: true,
         data: mockEmotionData
       });
@@ -154,7 +151,7 @@ describe('感情データアクション機能 (優先度: 5)', () => {
       const result = await getEmotionData('user123', '123e4567-e89b-12d3-a456-426614174000');
 
       // Verify the service was called with correct parameters
-      expect(EmotionDataService.getEmotionDataByAssessment).toHaveBeenCalledWith(
+      expect(getEmotionData).toHaveBeenCalledWith(
         'user123', 
         '123e4567-e89b-12d3-a456-426614174000'
       );
@@ -171,7 +168,7 @@ describe('感情データアクション機能 (優先度: 5)', () => {
       const result = await getEmotionData('user123', 'invalid-uuid');
 
       // Verify the service was not called
-      expect(EmotionDataService.getEmotionDataByAssessment).not.toHaveBeenCalled();
+      expect(getEmotionData).not.toHaveBeenCalled();
 
       // Verify the error response
       expect(result).toMatchObject({
@@ -183,7 +180,7 @@ describe('感情データアクション機能 (優先度: 5)', () => {
 
     it('サービスエラーを適切に処理すること', async () => {
       // Mock the service to return an error
-      vi.mocked(EmotionDataService.getEmotionDataByAssessment).mockResolvedValue({
+      vi.mocked(getEmotionData).mockResolvedValue({
         success: false,
         error: 'Database error'
       });

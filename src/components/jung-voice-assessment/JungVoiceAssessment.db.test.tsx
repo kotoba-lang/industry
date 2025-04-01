@@ -6,11 +6,11 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import JungVoiceAssessment from './JungVoiceAssessment';
-import { EmotionDataService } from '@/lib/actions/emotion-data-service';
+import { saveEmotionData, getEmotionData } from '@/lib/actions/emotion-actions';
 
 // EmotionDataServiceのモック
-jest.mock('@/lib/services/emotion-data-service', () => ({
-  EmotionDataService: {
+jest.mock('@/lib/actions/emotion-actions', () => ({
+  EmotionDataActions: {
     saveEmotionData: jest.fn().mockResolvedValue({ success: true }),
     saveFacialEmotionData: jest.fn().mockResolvedValue({ success: true }),
     getEmotionDataByAssessment: jest.fn().mockResolvedValue({ 
@@ -227,7 +227,7 @@ describe('重要度: 5 - JungVoiceAssessment コンポーネントのデータ�
     
     // EmotionDataServiceが呼び出されたことを確認
     await waitFor(() => {
-      expect(EmotionDataService.saveEmotionData).toHaveBeenCalledWith(
+      expect(saveEmotionData).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: mockUserId,
           assessmentId: expect.any(String),
@@ -292,7 +292,7 @@ describe('重要度: 5 - JungVoiceAssessment コンポーネントのデータ�
 
   test('重要度: 4 - データベースエラー時にも処理が継続すること', async () => {
     // データベースエラーをシミュレート
-    (EmotionDataService.saveEmotionData as jest.Mock).mockRejectedValueOnce(new Error('データベースエラー'));
+    (saveEmotionData as jest.Mock).mockRejectedValueOnce(new Error('データベースエラー'));
     
     const mockUserId = '12345678-1234-1234-1234-123456789012';
     (window.localStorage.getItem as jest.Mock).mockReturnValue(mockUserId);
@@ -324,7 +324,7 @@ describe('重要度: 5 - JungVoiceAssessment コンポーネントのデータ�
     
     // エラーがコンソールに記録されるが、処理は継続すること
     await waitFor(() => {
-      expect(EmotionDataService.saveEmotionData).toHaveBeenCalled();
+      expect(saveEmotionData).toHaveBeenCalled();
       // コンポーネントがクラッシュせずに表示され続けていることを確認
       expect(screen.getByText(/Spirit in Physics/i)).toBeInTheDocument();
     });

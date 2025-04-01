@@ -19,7 +19,7 @@ import {
 import CombinedCacheManager from './utils/combinedCacheManager';
 import WebcamComponent from '../webcam/WebcamComponent';
 import { HumeFaceResponse } from '@/lib/actions/hume-service';
-import { EmotionDataService } from '@/lib/actions/emotion-data-service';
+import { saveEmotionData, getEmotionData } from '@/lib/actions/emotion-actions';
 import { useHumeEmotion } from '@/providers/HumeEmotionProvider';
 import { z } from 'zod';
 import { WordResponseWithExtras, withExtras } from './WordResponse';
@@ -582,7 +582,7 @@ export default function JungVoiceTest({
           emotionsRecord[emotion.name] = emotion.score;
         });
         
-        EmotionDataService.saveFacialEmotionData(
+        saveFacialEmotionData(
           userId,
           assessmentIdRef.current,
           currentWord,
@@ -732,7 +732,7 @@ export default function JungVoiceTest({
     if (currentFaceData && userId && assessmentIdRef.current) {
       // EmotionDataServiceを使用して感情データを保存
       try {
-        await EmotionDataService.saveEmotionData({
+        await saveEmotionData({
           userId,
           assessmentId: assessmentIdRef.current,
           stimulusWord: currentWord,
