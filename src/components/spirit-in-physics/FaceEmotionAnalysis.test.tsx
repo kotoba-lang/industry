@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import FaceEmotionAnalysis from './FaceEmotionAnalysis';
 import { HumeRealtimeEmotionService } from '@/lib/client/hume-realtime';
@@ -73,6 +73,7 @@ describe('FaceEmotionAnalysis コンポーネント (優先度: 5)', () => {
   
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
   
   it('正しく表示されること', () => {
@@ -96,14 +97,14 @@ describe('FaceEmotionAnalysis コンポーネント (優先度: 5)', () => {
       audio: false
     });
     
-    await waitFor(() => {
-      expect(mockHumeService.initWebSocket).toHaveBeenCalledWith(['face']);
-    });
+    // Resolve all promises
+    await vi.runAllTimersAsync();
+    
+    // Check if initWebSocket was called
+    expect(mockHumeService.initWebSocket).toHaveBeenCalledWith(['face']);
     
     // ボタンが「カメラを停止」に変わることを確認
-    await waitFor(() => {
-      expect(screen.getByText('カメラを停止')).toBeInTheDocument();
-    });
+    expect(screen.getByText('カメラを停止')).toBeInTheDocument();
   });
   
   it('カメラ停止ボタンがクリックされたときにカメラを停止すること', async () => {
@@ -112,9 +113,8 @@ describe('FaceEmotionAnalysis コンポーネント (優先度: 5)', () => {
     // カメラを開始
     fireEvent.click(screen.getByText('カメラを開始'));
     
-    await waitFor(() => {
-      expect(screen.getByText('カメラを停止')).toBeInTheDocument();
-    });
+    // Resolve all promises
+    await vi.runAllTimersAsync();
     
     // カメラを停止
     fireEvent.click(screen.getByText('カメラを停止'));
@@ -123,9 +123,7 @@ describe('FaceEmotionAnalysis コンポーネント (優先度: 5)', () => {
     expect(mockHumeService.closeConnection).toHaveBeenCalled();
     
     // ボタンが「カメラを開始」に戻ることを確認
-    await waitFor(() => {
-      expect(screen.getByText('カメラを開始')).toBeInTheDocument();
-    });
+    expect(screen.getByText('カメラを開始')).toBeInTheDocument();
   });
   
   it('感情データを受信すると表示を更新すること', async () => {
@@ -134,9 +132,8 @@ describe('FaceEmotionAnalysis コンポーネント (優先度: 5)', () => {
     // カメラを開始
     fireEvent.click(screen.getByText('カメラを開始'));
     
-    await waitFor(() => {
-      expect(mockHumeService.initWebSocket).toHaveBeenCalled();
-    });
+    // Resolve all promises
+    await vi.runAllTimersAsync();
     
     // 感情データをシミュレート
     act(() => {
@@ -149,12 +146,10 @@ describe('FaceEmotionAnalysis コンポーネント (優先度: 5)', () => {
     });
     
     // 表示が更新されることを確認
-    await waitFor(() => {
-      expect(screen.getByText('happiness')).toBeInTheDocument();
-      expect(screen.getByText('80%')).toBeInTheDocument();
-      expect(screen.getByText('sadness')).toBeInTheDocument();
-      expect(screen.getByText('20%')).toBeInTheDocument();
-    });
+    expect(screen.getByText('happiness')).toBeInTheDocument();
+    expect(screen.getByText('80%')).toBeInTheDocument();
+    expect(screen.getByText('sadness')).toBeInTheDocument();
+    expect(screen.getByText('20%')).toBeInTheDocument();
   });
   
   it('getUserMediaが失敗したらエラーを表示すること', async () => {
@@ -168,10 +163,11 @@ describe('FaceEmotionAnalysis コンポーネント (優先度: 5)', () => {
     // カメラ開始ボタンをクリック
     fireEvent.click(screen.getByText('カメラを開始'));
     
+    // Resolve all promises
+    await vi.runAllTimersAsync();
+    
     // エラーメッセージが表示されることを確認
-    await waitFor(() => {
-      expect(screen.getByText('カメラへのアクセスが許可されていません')).toBeInTheDocument();
-    });
+    expect(screen.getByText('カメラへのアクセスが許可されていません')).toBeInTheDocument();
   });
   
   it('Hume APIキーが設定されていない場合はエラーを表示すること', async () => {
@@ -182,8 +178,6 @@ describe('FaceEmotionAnalysis コンポーネント (優先度: 5)', () => {
     render(<FaceEmotionAnalysis />);
     
     // エラーメッセージが表示されることを確認
-    await waitFor(() => {
-      expect(screen.getByText('Hume API キーが設定されていません')).toBeInTheDocument();
-    });
+    expect(screen.getByText('Hume API キーが設定されていません')).toBeInTheDocument();
   });
 }); 
