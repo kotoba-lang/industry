@@ -1,3 +1,5 @@
+'use client'
+
 import { HumeFaceResponse, HumeVoiceResponse } from '../actions/hume-service';
 
 // WebSocketを使用したリアルタイム感情認識
