@@ -81,7 +81,7 @@ export default function ConsentForm({
   };
   
   return (
-    <div className="w-full max-w-3xl mx-auto p-4 sm:p-5 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+    <form className="w-full max-w-3xl mx-auto p-4 sm:p-5 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700" onSubmit={handleSubmit}>
       <h2 className="text-xl sm:text-2xl font-bold mb-3 text-black dark:text-white">Research Participation Consent</h2>
       
       <div className="mb-4 sm:mb-5">
@@ -271,6 +271,6 @@ export default function ConsentForm({
         <p>This consent process complies with ICH-GCP (International Conference on Harmonisation - Good Clinical Practice) standards.</p>
         <p>Approval number: Niigata University 2025-03 | Approval date: Marth 1, 2025</p>
       </div>
-    </div>
+    </form>
   );
 } 
