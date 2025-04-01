@@ -47,4 +47,13 @@ export const complexCategories: ComplexCategory[] = [
     description: 'Issues related to self-image and identity',
     relatedWords: ['to choose', 'pride', 'head', 'finger', 'clean', 'sick', 'new', 'to fall']
   }
-]; 
+];
+
+export interface NodeAttributes {
+  color?: string;
+  darkColor?: string;
+  lightColor?: string;
+  x?: number;
+  y?: number;
+  z?: number;
+} 
