@@ -1,13 +1,16 @@
 import { pgTable, text, timestamp, uuid, boolean } from 'drizzle-orm/pg-core';
 import { v4 as uuidv4 } from 'uuid';
 
+// スキーマを定義
+const schema = 'spirit_in_physics';
+
 /**
  * 研究参加の同意記録テーブル
  * ICH-GCPに準拠した同意プロセスの記録を保存
  */
 export const consentRecords = pgTable('consent_records', {
   // 主キー
-  id: uuid('id').primaryKey().defaultFn(() => uuidv4()),
+  id: uuid('id').primaryKey().default(uuidv4()),
   
   // 基本情報
   userId: uuid('user_id').notNull(), // ユーザーの識別子
@@ -25,6 +28,11 @@ export const consentRecords = pgTable('consent_records', {
   // 研究関連のメタデータ
   studyId: text('study_id'), // 研究ID
   researcherNote: text('researcher_note'), // 研究者のメモ
+}, (table) => {
+  return {
+    ...table,
+    schema,
+  };
 });
 
 // スキーマの型定義をエクスポート
