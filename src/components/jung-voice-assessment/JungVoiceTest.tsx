@@ -51,7 +51,7 @@ export default function JungVoiceTest({
   apiKey = process.env.NEXT_PUBLIC_HUME_API_KEY || '',
   generationId = '795c949a-1510-4a80-9646-7d0863b023ab',
   voiceName = 'David Hume',
-  speechRecognitionLang = 'ja-JP',
+  speechRecognitionLang = 'en-US',
   onTestComplete,
   className = '',
 }: JungVoiceTestProps) {

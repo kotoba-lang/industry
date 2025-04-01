@@ -91,7 +91,7 @@ const VoiceConversation: React.FC<VoiceConversationProps> = (props) => {
     voiceName = 'David Hume',
     initialMessage = 'Hello! How can I assist you today?',
     placeholder = 'Type your message here...',
-    speechRecognitionLang = 'ja-JP',
+    speechRecognitionLang = 'en-US',
     onMessageSent,
     onMessageReceived,
     className = '',
