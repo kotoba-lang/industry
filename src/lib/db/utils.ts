@@ -1,8 +1,7 @@
 'use server'
 
-import { db } from './index';
-import { demographicData, consentRecords, NewDemographicData, NewConsentRecord } from './schema';
-import { v4 as uuidv4 } from 'uuid';
+import { createServerClient } from '@/lib/supabase/server'
+import { v4 as uuidv4 } from 'uuid'
 
 /**
  * 同意フォームからの人口統計データと同意情報を保存
@@ -26,53 +25,73 @@ export async function saveConsentAndDemographicData(
   }
 ) {
   try {
+    const supabase = await createServerClient()
+    
     // ユーザーIDを生成（セッションIDや認証済みユーザーIDがあればそれを使用）
-    const userId = uuidv4();
+    const userId = uuidv4()
     
     // 同意記録を保存
-    const consentData: NewConsentRecord = {
-      userId,
-      consentGiven: consentInfo.consentGiven,
-      consentVersion: consentInfo.consentVersion || '1.0',
-      consentText: consentInfo.consentText,
-      ipAddress: contextInfo?.ipAddress,
-      userAgent: contextInfo?.userAgent,
-      studyId: contextInfo?.studyId,
-    };
+    const consentData = {
+      user_id: userId,
+      consent_given: consentInfo.consentGiven,
+      consent_version: consentInfo.consentVersion || '1.0',
+      consent_text: consentInfo.consentText,
+      ip_address: contextInfo?.ipAddress,
+      user_agent: contextInfo?.userAgent,
+      study_id: contextInfo?.studyId,
+    }
     
-    const consentResult = await db.insert(consentRecords).values(consentData).returning();
+    const { data: consentResult, error: consentError } = await supabase
+      .from('consent_records')
+      .insert(consentData)
+      .select()
+      .single()
+    
+    if (consentError) {
+      console.error('Error saving consent data:', consentError)
+      throw consentError
+    }
     
     // 同意が得られた場合のみ人口統計データを保存
     if (consentInfo.consentGiven) {
-      const demographicRecord: NewDemographicData = {
-        userId,
-        ageGroup: demographicInfo.ageGroup || 'prefer-not-to-say',
+      const demographicRecord = {
+        user_id: userId,
+        age_group: demographicInfo.ageGroup || 'prefer-not-to-say',
         gender: demographicInfo.gender || 'prefer-not-to-say',
         ethnicity: demographicInfo.ethnicity || 'prefer-not-to-say',
         income: demographicInfo.income || 'prefer-not-to-say',
-        ipAddress: contextInfo?.ipAddress,
-        userAgent: contextInfo?.userAgent,
-        studyId: contextInfo?.studyId,
-        consentVersion: consentInfo.consentVersion || '1.0',
-      };
+        ip_address: contextInfo?.ipAddress,
+        user_agent: contextInfo?.userAgent,
+        study_id: contextInfo?.studyId,
+        consent_version: consentInfo.consentVersion || '1.0',
+      }
       
-      const demographicResult = await db.insert(demographicData).values(demographicRecord).returning();
+      const { data: demographicResult, error: demographicError } = await supabase
+        .from('demographic_data')
+        .insert(demographicRecord)
+        .select()
+        .single()
+      
+      if (demographicError) {
+        console.error('Error saving demographic data:', demographicError)
+        throw demographicError
+      }
       
       return {
         success: true,
         userId,
-        consent: consentResult[0],
-        demographic: demographicResult[0]
-      };
+        consent: consentResult,
+        demographic: demographicResult
+      }
     }
     
     return {
       success: consentInfo.consentGiven,
       userId,
-      consent: consentResult[0]
-    };
+      consent: consentResult
+    }
   } catch (error) {
-    console.error('Error saving consent and demographic data:', error);
-    throw error;
+    console.error('Error saving consent and demographic data:', error)
+    throw error
   }
 } 
