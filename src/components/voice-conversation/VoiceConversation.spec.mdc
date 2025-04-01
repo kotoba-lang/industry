@@ -1,0 +1,109 @@
+# Voice Conversation Component Specification
+
+## 概要
+
+HumeのText-to-Speech API を使った音声会話コンポーネント。テキストを入力し、サーバーからの応答をテキストと音声で受け取ることができる。
+
+## 技術スタック
+
+- React (Next.js)
+- TypeScript
+- Hume API (TTS)
+- Zod (バリデーション)
+- Tailwind CSS (スタイリング)
+
+## コンポーネント構造
+
+```
+voice-conversation/
+├── VoiceConversation.tsx   # メインコンポーネント
+├── types.ts                # 型定義
+├── schema.ts               # Zodスキーマ
+├── index.ts                # エクスポート
+└── VoiceConversation.test.tsx  # テスト
+```
+
+## Props
+
+| プロパティ名 | 型 | 必須 | デフォルト値 | 説明 |
+|------------|----|----|-----------|------|
+| apiKey | string | ✓ | 'YOUR_API_KEY' | Hume APIキー |
+| generationId | string | ✗ | '795c949a-1510-4a80-9646-7d0863b023ab' | 音声生成ID |
+| voiceName | string | ✗ | 'David Hume' | 使用する音声の名前 |
+| initialMessage | string | ✗ | 'Hello! How can I assist you today?' | 初期メッセージ |
+| placeholder | string | ✗ | 'Type your message here...' | 入力フィールドのプレースホルダー |
+| onMessageSent | (message: string) => void | ✗ | - | メッセージ送信時のコールバック |
+| onMessageReceived | (message: string) => void | ✗ | - | メッセージ受信時のコールバック |
+| className | string | ✗ | '' | 追加のCSSクラス |
+
+## セキュリティ考慮事項
+
+1. APIキーの保護:
+   - 環境変数 `NEXT_PUBLIC_HUME_API_KEY` 経由で提供
+   - 本番環境では環境変数をサーバーサイドで管理し、クライアントに露出しないことを推奨
+   - フロントエンドでの使用は開発環境のみ
+
+2. 入力バリデーション:
+   - すべての入力はZodスキーマでバリデーション
+   - ユーザー入力のサニタイジング
+
+3. エラーハンドリング:
+   - すべてのAPIコールでエラー処理
+   - ユーザーへの適切なフィードバック
+
+## 使用例
+
+```tsx
+// 基本的な使用法 - 環境変数から自動的にAPIキーを取得
+<VoiceConversation />
+
+// APIキーを明示的に提供
+<VoiceConversation 
+  apiKey={process.env.NEXT_PUBLIC_HUME_API_KEY} 
+/>
+
+// コールバック付き
+<VoiceConversation 
+  onMessageSent={(message) => console.log('送信:', message)}
+  onMessageReceived={(message) => console.log('受信:', message)}
+/>
+
+// カスタマイズ
+<VoiceConversation 
+  apiKey={process.env.NEXT_PUBLIC_HUME_API_KEY}
+  voiceName="Custom Voice"
+  initialMessage="いらっしゃいませ！"
+  placeholder="メッセージを入力してください..."
+  className="my-custom-class"
+/>
+```
+
+## テスト戦略
+
+| テスト | 重要度 | 説明 |
+|-------|--------|------|
+| 初期メッセージの表示 | 5 | 初期メッセージが正しく表示されること |
+| メッセージ送信 | 5 | ユーザーがメッセージを入力して送信できること |
+| APIエラー処理 | 4 | API呼び出しエラー時の適切なエラー表示 |
+| UIカスタマイズ | 3 | プレースホルダーなどのUIカスタマイズが正しく動作すること |
+
+## 将来の拡張
+
+1. 実際のAI応答統合 (例: OpenAI API)
+2. 音声認識機能の追加 (Speech-to-Text)
+3. 複数の音声オプションとプリセット
+4. 会話履歴の保存と取得
+5. アクセシビリティの向上 
+
+## 環境変数の設定
+
+Next.jsアプリケーションでは、環境変数を以下のように設定します：
+
+1. プロジェクトルートに `.env` ファイルを作成
+2. クライアントサイドで使用する場合は `NEXT_PUBLIC_` プレフィックスを付ける
+
+```
+NEXT_PUBLIC_HUME_API_KEY=あなたのAPIキーをここに設定
+```
+
+> 注意: 実際の本番環境では、APIキーなどの機密情報はサーバーサイドでのみ使用し、クライアントに公開しないことをお勧めします。 
