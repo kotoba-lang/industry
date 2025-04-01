@@ -5,6 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import styles from "@/app/_components/markdown-styles.module.css";
+import 'katex/dist/katex.min.css';
+import { InlineMath, BlockMath } from 'react-katex';
 
 import VectorVisualization from "@/components/spirit-in-physics/vector-visualization";
 import CorrelationForm from "@/components/spirit-in-physics/correlation-form";
@@ -188,14 +190,29 @@ export default function Page() {
                 Conventional Word2Vec: Quantify the strength of association using the inner product of word vectors.
               </p>
               <p>
-                Jung's association method element: Introduce a factor that is the inverse of reaction time.
+                Jung&apos;s association method element: Introduce a factor that is the inverse of reaction time.
               </p>
               <p>
-                Integrated model: Adjust the reaction speed factor with the hyperparameter \(\alpha\) and 
-                define a modified probability function.
+                Integrated model: Adjust the reaction speed factor with the hyperparameter α and 
+                define a modified probability function as follows:
+              </p>
+              <div className={styles.mathBlock}>
+                <BlockMath math="P(w_O|w_I) = \frac{\exp(\vec{w_I} \cdot \vec{w_O} + \alpha \cdot \frac{1}{RT})}{\sum_{j} \exp(\vec{w_I} \cdot \vec{w_j} + \alpha \cdot \frac{1}{RT_j})}" />
+              </div>
+              <p>
+                Where:
               </p>
               <p>
-                \(\lambda\): Scale adjustment constant
+                <InlineMath math="\vec{w_I}" /> and <InlineMath math="\vec{w_O}" /> represent the input and output word vectors
+              </p>
+              <p>
+                <InlineMath math="RT" /> is the reaction time
+              </p>
+              <p>
+                <InlineMath math="\alpha" /> is the hyperparameter controlling the weight of reaction time
+              </p>
+              <p>
+                <InlineMath math="\lambda" />: Scale adjustment constant
               </p>
               <h3>Experimental Methods for Measuring Spirit</h3>
               <p>
@@ -271,9 +288,24 @@ export default function Page() {
               <h3>Measurement Using Emotion Analysis (Quantitative Research)</h3>
               <p>Facial expressions are measured using a camera.</p>
               <p>
-                The facial recognition system defines an emotion score F(w_I, w_O) obtained from 
-                the subject's facial expression. This score is treated as an integrated index 
+                The facial recognition system defines an emotion score <InlineMath math="F(w_I, w_O)" /> obtained from 
+                the subject&apos;s facial expression. This score is treated as an integrated index 
                 of the intensity of each emotion, such as "happiness," "sadness," and "surprise."
+              </p>
+              <div className={styles.mathBlock}>
+                <BlockMath math="F(w_I, w_O) = \lambda \cdot \sum_{e \in E} w_e \cdot I_e" />
+              </div>
+              <p>
+                Where:
+              </p>
+              <p>
+                <InlineMath math="E" /> is the set of emotions being measured
+              </p>
+              <p>
+                <InlineMath math="w_e" /> is the weight assigned to emotion <InlineMath math="e" />
+              </p>
+              <p>
+                <InlineMath math="I_e" /> is the intensity of emotion <InlineMath math="e" />
               </p>
               <p>
                 While presenting the separation and integration of concepts on

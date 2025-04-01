@@ -50,6 +50,9 @@ importers:
       hume:
         specifier: ^0.9.15
         version: 0.9.15(bufferutil@4.0.8)(utf-8-validate@6.0.4)
+      katex:
+        specifier: ^0.16.21
+        version: 0.16.21
       lucide-react:
         specifier: ^0.460.0
         version: 0.460.0(react@19.0.0-rc-02c0e824-20241028)
@@ -65,6 +68,9 @@ importers:
       react-force-graph-3d:
         specifier: ^1.26.1
         version: 1.26.1(react@19.0.0-rc-02c0e824-20241028)
+      react-katex:
+        specifier: ^3.0.1
+        version: 3.0.1(prop-types@15.8.1)(react@19.0.0-rc-02c0e824-20241028)
       react-webcam:
         specifier: ^7.2.0
         version: 7.2.0(react-dom@19.0.0-rc-02c0e824-20241028(react@19.0.0-rc-02c0e824-20241028))(react@19.0.0-rc-02c0e824-20241028)
@@ -108,6 +114,9 @@ importers:
       '@types/react-dom':
         specifier: npm:types-react-dom@19.0.0-rc.1
         version: types-react-dom@19.0.0-rc.1
+      '@types/react-katex':
+        specifier: ^3.0.4
+        version: 3.0.4
       autoprefixer:
         specifier: ^10.4.19
         version: 10.4.20(postcss@8.4.49)
@@ -4901,6 +4910,9 @@ packages:
     peerDependencies:
       '@types/react': ^19.0.0
 
+  '@types/react-katex@3.0.4':
+    resolution: {integrity: sha512-aLkykKzSKLpXI6REJ3uClao6P47HAFfR1gcHOZwDeTuALsyjgMhz+oynLV4gX0kiJVnvHrBKF/TLXqyNTpHDUg==}
+
   '@types/react-reconciler@0.26.7':
     resolution: {integrity: sha512-mBDYl8x+oyPX/VBb3E638N0B7xG+SPk/EAMcVPeexqus/5aTpTphQi0curhhshOqRrc9t6OPoJfEUkbymse/lQ==}
 
@@ -5773,6 +5785,10 @@ packages:
   commander@7.2.0:
     resolution: {integrity: sha512-QrWXB+ZQSVPmIWIhtEO9H+gwHaMGYiF5ChvoJ+K9ZGHG/sVsa6yiesAD1GC/x46sET00Xlwo1u49RVVVzvcSkw==}
     engines: {node: '>= 10'}
+
+  commander@8.3.0:
+    resolution: {integrity: sha512-OkTL9umf+He2DZkUq8f8J9of7yL6RJKI24dVITBmNfZBmri9zYZQrKkuXiKhyfPSu8tUhnVBB1iKXevvnlR4Ww==}
+    engines: {node: '>= 12'}
 
   commander@9.5.0:
     resolution: {integrity: sha512-KRs7WVDKg86PWiuAqhDrAQnTXZKraVcCc6vFdL14qrZ/DcWwuRo7VoiYXalXO7S5GKpqYiVEwCbgFDfxNHKJBQ==}
@@ -7980,6 +7996,10 @@ packages:
     resolution: {integrity: sha512-4+5mNNf4vZDSwPhKprKwz3330iisPrb08JyMgbsdFrimBCKNHecua/WBwvVg3n7vwx0C1ARjfhwIpbrbd9n5wg==}
     engines: {node: '>=12'}
 
+  katex@0.16.21:
+    resolution: {integrity: sha512-XvqR7FgOHtWupfMiigNzmh+MgUVmDGU2kXZm899ZkPfcuoPuFxyHmXsgATDpFZDAXCI8tvinaVcDo8PIIJSo4A==}
+    hasBin: true
+
   keyv@4.5.4:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
 
@@ -9476,6 +9496,12 @@ packages:
     engines: {node: '>=12'}
     peerDependencies:
       react: '>=16.13.1'
+
+  react-katex@3.0.1:
+    resolution: {integrity: sha512-wIUW1fU5dHlkKvq4POfDkHruQsYp3fM8xNb/jnc8dnQ+nNCnaj0sx5pw7E6UyuEdLRyFKK0HZjmXBo+AtXXy0A==}
+    peerDependencies:
+      prop-types: ^15.8.1
+      react: '>=15.3.2 <=18'
 
   react-native-css-interop@0.0.36:
     resolution: {integrity: sha512-ZWoKQlq6XrI5DB4BdPk5ABvJQsX7zls1SQYWuYXOQB8u5QE0KH3OfOGAGRZPekTjgkhjqGO4Bf8G2JTSWAYMSg==}
@@ -16029,6 +16055,10 @@ snapshots:
     dependencies:
       '@types/react': 19.0.5
 
+  '@types/react-katex@3.0.4':
+    dependencies:
+      '@types/react': 19.0.5
+
   '@types/react-reconciler@0.26.7':
     dependencies:
       '@types/react': 19.0.5
@@ -17092,6 +17122,8 @@ snapshots:
   commander@4.1.1: {}
 
   commander@7.2.0: {}
+
+  commander@8.3.0: {}
 
   commander@9.5.0: {}
 
@@ -19934,6 +19966,10 @@ snapshots:
     dependencies:
       lodash-es: 4.17.21
 
+  katex@0.16.21:
+    dependencies:
+      commander: 8.3.0
+
   keyv@4.5.4:
     dependencies:
       json-buffer: 3.0.1
@@ -21709,6 +21745,12 @@ snapshots:
   react-kapsule@2.5.7(react@19.0.0-rc-02c0e824-20241028):
     dependencies:
       jerrypick: 1.1.1
+      react: 19.0.0-rc-02c0e824-20241028
+
+  react-katex@3.0.1(prop-types@15.8.1)(react@19.0.0-rc-02c0e824-20241028):
+    dependencies:
+      katex: 0.16.21
+      prop-types: 15.8.1
       react: 19.0.0-rc-02c0e824-20241028
 
   react-native-css-interop@0.0.36(@babel/core@7.26.0)(react-native-reanimated@3.15.5(@babel/core@7.26.0)(react-native@0.74.6(@babel/core@7.26.0)(@babel/preset-env@7.26.0(@babel/core@7.26.0))(@types/react@18.3.11)(bufferutil@4.0.8)(react@18.3.1))(react@18.3.1))(react-native-safe-area-context@4.11.1(react-native@0.74.6(@babel/core@7.26.0)(@babel/preset-env@7.26.0(@babel/core@7.26.0))(@types/react@18.3.11)(bufferutil@4.0.8)(react@18.3.1))(react@18.3.1))(react-native@0.74.6(@babel/core@7.26.0)(@babel/preset-env@7.26.0(@babel/core@7.26.0))(@types/react@18.3.11)(bufferutil@4.0.8)(react@18.3.1))(react@18.3.1)(tailwindcss@3.4.14(ts-node@10.9.2(@types/node@22.7.5)(typescript@5.6.3))):
