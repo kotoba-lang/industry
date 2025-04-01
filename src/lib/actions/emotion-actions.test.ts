@@ -8,13 +8,15 @@ vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: vi.fn(),
 }));
 
-// Create a spy on the actual functions we're testing rather than mocking them
-const saveEmotionDataSpy = vi.spyOn(emotionActions, "saveEmotionData");
-const getEmotionDataSpy = vi.spyOn(emotionActions, "getEmotionData");
-const getEmotionDataByAssessmentSpy = vi.spyOn(
-  emotionActions,
-  "getEmotionDataByAssessment",
-);
+// Create a specific mock for getEmotionDataByAssessment
+vi.mock("./emotion-actions", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    // Keep getEmotionDataByAssessment as an auto-mock but let the real functions call it
+    getEmotionDataByAssessment: vi.fn(),
+  };
+});
 
 describe("感情データアクション機能 (優先度: 5)", () => {
   beforeEach(() => {
@@ -83,7 +85,6 @@ describe("感情データアクション機能 (優先度: 5)", () => {
 
     it("バリデーションエラーを適切に処理すること", async () => {
       // Mock Zod.parse to throw an error
-      const parseOriginal = z.object({}).parse;
       const mockParse = vi.fn().mockImplementation(() => {
         throw new z.ZodError([{
           code: "invalid_type",
@@ -160,12 +161,12 @@ describe("感情データアクション機能 (優先度: 5)", () => {
         },
       ];
 
-      // Mock the getEmotionDataByAssessment function
-      const spy = vi.spyOn(emotionActions, "getEmotionDataByAssessment");
-      spy.mockResolvedValueOnce({
-        success: true,
-        data: mockEmotionData,
-      });
+      // Set up the mock for getEmotionDataByAssessment
+      vi.mocked(emotionActions.getEmotionDataByAssessment)
+        .mockResolvedValueOnce({
+          success: true,
+          data: mockEmotionData,
+        });
 
       // Call the function
       const result = await emotionActions.getEmotionData(
@@ -205,12 +206,12 @@ describe("感情データアクション機能 (優先度: 5)", () => {
     });
 
     it("サービスエラーを適切に処理すること", async () => {
-      // Mock the getEmotionDataByAssessment function to return an error
-      const spy = vi.spyOn(emotionActions, "getEmotionDataByAssessment");
-      spy.mockResolvedValueOnce({
-        success: false,
-        error: "Database error",
-      });
+      // Set up the mock for getEmotionDataByAssessment to return an error
+      vi.mocked(emotionActions.getEmotionDataByAssessment)
+        .mockResolvedValueOnce({
+          success: false,
+          error: "Database error",
+        });
 
       // Call the function
       const result = await emotionActions.getEmotionData(

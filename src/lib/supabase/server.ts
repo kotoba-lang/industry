@@ -2,7 +2,6 @@
 
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { CookieOptions } from "next/headers";
 
 export const createSupabaseServerClient = async () => {
   const cookieStore = await cookies();
@@ -12,13 +11,13 @@ export const createSupabaseServerClient = async () => {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
+        get(name) {
           return cookieStore.get(name)?.value;
         },
-        set(name: string, value: string, options: CookieOptions) {
+        set(name, value, options) {
           cookieStore.set({ name, value, ...options });
         },
-        remove(name: string, options: CookieOptions) {
+        remove(name, options) {
           cookieStore.set({ name, value: "", ...options });
         },
       },
