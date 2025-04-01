@@ -350,7 +350,7 @@ export default function IntegratedJungAssessment({
                   <div>
                     <p className="text-xs font-medium">Voice Test:</p>
                     <p className="text-xs">Average response time: <span className="font-semibold">{voiceTestResults.averageReactionTimeMs} ms</span></p>
-                    <p className="text-xs">Delayed responses: <span className="font-semibold">{voiceTestResults.delayedResponseCount} / {voiceTestResults.responses.length}</span></p>
+                    <p className="text-xs">Delayed responses: <span className="font-semibold">{voiceTestResults.delayedResponsesCount} / {voiceTestResults.responses.length}</span></p>
                   </div>
                 )}
               </div>

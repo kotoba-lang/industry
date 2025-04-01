@@ -280,7 +280,7 @@ export default function JungVoiceTest({
       }
       
       // 初期AIメッセージを追加
-      addMessage(AI_GUIDE_MESSAGES.introduction, 'assistant');
+      addMessage([{ text: AI_GUIDE_MESSAGES.introduction, role: 'assistant' }], setMessages);
       
       // 初期メッセージを音声で読み上げ
       generateAndPlaySpeech(AI_GUIDE_MESSAGES.introduction);
@@ -547,7 +547,7 @@ export default function JungVoiceTest({
   }, []);
 
   // メッセージを追加
-  const addMessage = (messages, setMessages) => (text, role) => {
+  const addMessage = (messages: Message[], setMessages: (messages: Message[]) => void) => (text: string, role: string) => {
     setMessages([...messages, { text, role }]);
   };
 
