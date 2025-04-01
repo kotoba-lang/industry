@@ -125,10 +125,21 @@ export default function JungVoiceTest({
 
   // 音声認識がサポートされているか確認
   useEffect(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    setIsSpeechSupported(!!SpeechRecognition);
+    const SpeechRecognition = (window as any).SpeechRecognition || 
+                              (window as any).webkitSpeechRecognition || 
+                              (window as any).mozSpeechRecognition || 
+                              (window as any).msSpeechRecognition;
     
-    if (SpeechRecognition) {
+    const isSpeechRecognitionSupported = !!SpeechRecognition;
+    setIsSpeechSupported(isSpeechRecognitionSupported);
+    
+    if (!isSpeechRecognitionSupported) {
+      console.warn('Speech recognition is not supported in this browser');
+      setError('Speech recognition is not supported in this browser. Please try using Chrome, Edge, or Safari.');
+      return;
+    }
+    
+    try {
       recognitionRef.current = new SpeechRecognition();
       if (recognitionRef.current) {
         recognitionRef.current.continuous = false;
@@ -145,8 +156,39 @@ export default function JungVoiceTest({
         };
         
         recognitionRef.current.onerror = (event) => {
-          console.error('Speech recognition error', event);
+          // Extract error details if available
+          const errorType = event.error || 'unknown';
+          const errorMessage = event.message || 'No additional details';
+          
+          console.error(`Speech recognition error: ${errorType}`, {
+            type: errorType,
+            message: errorMessage,
+            details: event
+          });
+          
+          // Handle specific error types
+          if (errorType === 'no-speech') {
+            // No speech detected, could retry
+            console.warn('No speech detected. You may need to speak louder or check your microphone.');
+          } else if (errorType === 'not-allowed' || errorType === 'permission-denied') {
+            // Permission issues
+            setError('Microphone access denied. Please grant permission to use speech recognition.');
+          } else if (errorType === 'network') {
+            // Network issues
+            setError('Network error occurred. Please check your connection and try again.');
+          }
+          
           setIsListening(false);
+          
+          // Try to recover if appropriate
+          if (['no-speech', 'aborted', 'audio-capture'].includes(errorType)) {
+            // These errors can potentially be recovered from
+            setTimeout(() => {
+              if (isMountedRef.current && currentWordIndex >= 0) {
+                startListening();
+              }
+            }, 1000);
+          }
         };
         
         recognitionRef.current.onend = () => {
@@ -157,6 +199,10 @@ export default function JungVoiceTest({
           }
         };
       }
+    } catch (error) {
+      console.error('Failed to initialize speech recognition:', error);
+      setError('Failed to initialize speech recognition. Please reload the page or try a different browser.');
+      setIsSpeechSupported(false);
     }
     
     return () => {
@@ -603,44 +649,161 @@ export default function JungVoiceTest({
 
   // 音声認識開始
   const startListening = () => {
-    if (recognitionRef.current && isSpeechSupported && !isListening && isMountedRef.current) {
-      try {
-        recognitionRef.current.start();
-        setIsListening(true);
-      } catch (error) {
-        // Handle the case where recognition has already started
-        console.warn('SpeechRecognition error:', error);
-        // Make sure isListening state matches actual state
-        setIsListening(true);
-        
-        // If recognition is already running, stop it first and then restart
-        if (error instanceof DOMException && error.name === 'InvalidStateError') {
+    if (!recognitionRef.current || !isSpeechSupported || isListening || !isMountedRef.current) {
+      return;
+    }
+    
+    // Clear any previous errors
+    if (error) setError(null);
+    
+    try {
+      // Some browsers might throw if recognition is already started or in invalid state
+      recognitionRef.current.start();
+      setIsListening(true);
+    } catch (error) {
+      console.warn('Speech recognition start error:', error);
+      
+      // Handle the case where recognition has already started
+      if (error instanceof DOMException) {
+        // Different browsers may use different error names
+        if (error.name === 'InvalidStateError' || error.name === 'NotAllowedError') {
+          // Try to reset the recognizer by stopping first
           try {
             recognitionRef.current.stop();
-            // Short timeout to ensure stop completes before starting again
+            setIsListening(false);
+            
+            // Add a small delay before restarting
             setTimeout(() => {
               if (recognitionRef.current && isMountedRef.current) {
-                recognitionRef.current.start();
+                try {
+                  recognitionRef.current.start();
+                  setIsListening(true);
+                } catch (startError) {
+                  console.error('Failed to restart speech recognition:', startError);
+                  setError('Failed to start speech recognition. Please try again or reload the page.');
+                  setIsListening(false);
+                }
               }
-            }, 100);
+            }, 300);
           } catch (stopError) {
             console.error('Error stopping speech recognition:', stopError);
             setIsListening(false);
+            
+            // If completely failed, show error and try to recreate the recognition object
+            setError('Speech recognition encountered an error. Please try again.');
+            reinitializeSpeechRecognition();
           }
+        } else {
+          setIsListening(false);
+          setError(`Speech recognition error: ${error.message || error.name}`);
         }
+      } else {
+        setIsListening(false);
+        setError('Failed to start speech recognition. Please try again.');
       }
     }
   };
+  
+  // Add a function to recreate the speech recognition object
+  const reinitializeSpeechRecognition = useCallback(() => {
+    if (!isMountedRef.current) return;
+    
+    try {
+      // Cleanup existing instance
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.onresult = () => {};
+          recognitionRef.current.onerror = () => {};
+          recognitionRef.current.onend = () => {};
+          recognitionRef.current.abort();
+        } catch (e) {
+          console.warn('Error cleaning up speech recognition:', e);
+        }
+      }
+      
+      // Create new instance
+      const SpeechRecognition = (window as any).SpeechRecognition || 
+                                (window as any).webkitSpeechRecognition || 
+                                (window as any).mozSpeechRecognition || 
+                                (window as any).msSpeechRecognition;
+      
+      if (!SpeechRecognition) {
+        setIsSpeechSupported(false);
+        return;
+      }
+      
+      recognitionRef.current = new SpeechRecognition();
+      
+      if (recognitionRef.current) {
+        recognitionRef.current.continuous = false;
+        recognitionRef.current.interimResults = true;
+        recognitionRef.current.lang = speechRecognitionLang;
+        
+        recognitionRef.current.onresult = (event) => {
+          const transcript = Array.from(event.results)
+            .map((result: any) => result[0])
+            .map((result: any) => result.transcript)
+            .join('');
+          
+          setUserResponse(transcript);
+        };
+        
+        // Re-add existing onerror and onend handlers
+        recognitionRef.current.onerror = (event) => {
+          const errorType = event.error || 'unknown';
+          const errorMessage = event.message || 'No additional details';
+          
+          console.error(`Speech recognition error: ${errorType}`, {
+            type: errorType,
+            message: errorMessage,
+            details: event
+          });
+          
+          // Error handling as before...
+          setIsListening(false);
+        };
+        
+        recognitionRef.current.onend = () => {
+          setIsListening(false);
+          if (userResponse.trim() !== '' && currentWordIndex >= 0 && isMountedRef.current) {
+            recordResponse();
+          }
+        };
+        
+        setIsSpeechSupported(true);
+        console.log('Speech recognition reinitialized');
+      } else {
+        throw new Error('Failed to create SpeechRecognition instance');
+      }
+    } catch (error) {
+      console.error('Failed to reinitialize speech recognition:', error);
+      setIsSpeechSupported(false);
+      setError('Failed to initialize speech recognition after error. Please reload the page.');
+    }
+  }, [speechRecognitionLang, userResponse, currentWordIndex]);
 
   // 音声認識停止
   const stopListening = () => {
-    if (recognitionRef.current && isListening) {
-      try {
-        recognitionRef.current.stop();
-      } catch (error) {
-        console.warn('Error stopping speech recognition:', error);
-      } finally {
-        setIsListening(false);
+    if (!recognitionRef.current || !isListening) {
+      // Already stopped or not initialized
+      setIsListening(false);
+      return;
+    }
+    
+    try {
+      recognitionRef.current.stop();
+      // Don't update state here, let the onend handler do it
+    } catch (error) {
+      console.warn('Error stopping speech recognition:', error);
+      setIsListening(false);
+      
+      // If error is serious, may need to reinitialize
+      if (error instanceof DOMException && 
+          (error.name === 'InvalidStateError' || error.name === 'NotAllowedError')) {
+        console.warn('Recognition in invalid state, attempting to reinitialize');
+        setTimeout(() => {
+          reinitializeSpeechRecognition();
+        }, 500);
       }
     }
   };
@@ -666,7 +829,7 @@ export default function JungVoiceTest({
 
   return (
     <div className={`max-w-2xl mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md ${className}`}>
-      <h2 className="text-2xl font-bold mb-6 text-center text-gray-800 dark:text-white">Jung's Word Association Test (AI Guided)</h2>
+      <h2 className="text-2xl font-bold mb-6 text-center text-gray-800 dark:text-white">Spirit in Physics (Jung's Word Association Test Embedding Model) - AI Guided</h2>
       
       {/* キャッシュのオン/オフトグル */}
       <div className="flex justify-between items-center mb-2">
@@ -693,8 +856,32 @@ export default function JungVoiceTest({
       
       {/* エラー表示 */}
       {error && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
-          <p>{error}</p>
+        <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-md">
+          <div className="flex items-center space-x-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <p>{error}</p>
+          </div>
+          {error.includes('Speech recognition') && (
+            <div className="mt-2 text-sm">
+              <p>This may be due to:</p>
+              <ul className="list-disc pl-5 mt-1">
+                <li>Microphone not available or permission denied</li>
+                <li>Browser compatibility issues (try Chrome, Edge, or Safari)</li>
+                <li>Network connectivity problems</li>
+              </ul>
+              <div className="mt-2">
+                <Button 
+                  onClick={reinitializeSpeechRecognition}
+                  variant="outline"
+                  className="text-xs py-1"
+                >
+                  Try Again
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
       
