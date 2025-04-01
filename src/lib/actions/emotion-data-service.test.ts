@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { saveEmotionData, getEmotionData, saveFacialEmotionData, getEmotionDataByAssessment } from './emotion-actions';
-import { createServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 // Mock the Supabase client
 vi.mock('@/lib/supabase/server', () => ({
-  createServerClient: vi.fn()
+  createSupabaseServerClient: vi.fn()
 }));
 
 describe('感情データサービス機能 (優先度: 5)', () => {
@@ -17,7 +17,7 @@ describe('感情データサービス機能 (優先度: 5)', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(createServerClient).mockResolvedValue(mockSupabaseClient as any);
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabaseClient as any);
   });
 
   describe('saveEmotionData', () => {
@@ -41,7 +41,7 @@ describe('感情データサービス機能 (優先度: 5)', () => {
       const result = await saveEmotionData(emotionData);
 
       // Verify Supabase was called correctly
-      expect(createServerClient).toHaveBeenCalled();
+      expect(createSupabaseServerClient).toHaveBeenCalled();
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('emotion_data');
       expect(mockSupabaseClient.insert).toHaveBeenCalledWith({
         user_id: 'user123',
@@ -134,7 +134,7 @@ describe('感情データサービス機能 (優先度: 5)', () => {
       );
 
       // Verify Supabase was called correctly
-      expect(createServerClient).toHaveBeenCalled();
+      expect(createSupabaseServerClient).toHaveBeenCalled();
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('face_emotion_data');
       expect(mockSupabaseClient.insert).toHaveBeenCalledWith({
         user_id: 'user123',
@@ -209,7 +209,7 @@ describe('感情データサービス機能 (優先度: 5)', () => {
       const result = await getEmotionDataByAssessment(userId, assessmentId);
 
       // Verify Supabase was called correctly
-      expect(createServerClient).toHaveBeenCalled();
+      expect(createSupabaseServerClient).toHaveBeenCalled();
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('emotion_data');
       expect(mockSupabaseClient.select).toHaveBeenCalledWith('*');
       expect(mockSupabaseClient.eq).toHaveBeenCalledWith('user_id', 'user123');
