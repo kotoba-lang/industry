@@ -6,7 +6,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import JungVoiceAssessment from './JungVoiceAssessment';
-import { EmotionDataService } from '@/lib/services/emotion-data-service';
+import { EmotionDataService } from '@/lib/actions/emotion-data-service';
 
 // EmotionDataServiceのモック
 jest.mock('@/lib/services/emotion-data-service', () => ({
@@ -40,7 +40,18 @@ jest.mock('@/lib/supabase/server', () => ({
 }));
 
 // Web Speech API のモック
-const mockSpeechRecognition = {
+interface MockSpeechRecognition {
+  start: jest.Mock;
+  stop: jest.Mock;
+  abort: jest.Mock;
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult?: (event: any) => void;
+  onend?: () => void;
+}
+
+const mockSpeechRecognition: MockSpeechRecognition = {
   start: jest.fn(),
   stop: jest.fn(),
   abort: jest.fn(),
@@ -100,13 +111,32 @@ jest.mock('@/providers/HumeEmotionProvider', () => ({
     },
     emotionHistory: []
   }),
-  HumeEmotionProvider: ({ children }) => <div>{children}</div>,
+  HumeEmotionProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
+
+// Add type to global namespace
+declare global {
+  interface Window {
+    localStorage: {
+      getItem: jest.Mock;
+      setItem: jest.Mock;
+      removeItem: jest.Mock;
+      clear: jest.Mock;
+    };
+  }
+  
+  namespace NodeJS {
+    interface Global {
+      SpeechRecognition: jest.Mock;
+      fetch: jest.Mock;
+    }
+  }
+}
 
 describe('重要度: 5 - JungVoiceAssessment コンポーネントのデータベース永続化', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    window.localStorage.getItem.mockReturnValue(null);
+    (window.localStorage.getItem as jest.Mock).mockReturnValue(null);
   });
 
   test('重要度: 5 - ユーザーIDが生成されてlocalStorageに保存されること', async () => {
@@ -123,7 +153,7 @@ describe('重要度: 5 - JungVoiceAssessment コンポーネントのデータ�
   test('重要度: 5 - 既存のユーザーIDがlocalStorageから取得されること', async () => {
     // ユーザーIDが既に存在する場合
     const mockUserId = '12345678-1234-1234-1234-123456789012';
-    window.localStorage.getItem.mockReturnValue(mockUserId);
+    (window.localStorage.getItem as jest.Mock).mockReturnValue(mockUserId);
     
     render(<JungVoiceAssessment apiKey="test-key" />);
     
@@ -158,11 +188,11 @@ describe('重要度: 5 - JungVoiceAssessment コンポーネントのデータ�
     // モック値を準備
     const mockResponseHandler = jest.fn();
     const mockUserId = '12345678-1234-1234-1234-123456789012';
-    window.localStorage.getItem.mockReturnValue(mockUserId);
+    (window.localStorage.getItem as jest.Mock).mockReturnValue(mockUserId);
     
     // SpeechRecognitionのモックが応答を返すよう設定
-    mockSpeechRecognition.onresult = null;
-    mockSpeechRecognition.onend = null;
+    mockSpeechRecognition.onresult = undefined;
+    mockSpeechRecognition.onend = undefined;
     
     // コンポーネントをレンダリング
     const { getByText } = render(
@@ -184,7 +214,7 @@ describe('重要度: 5 - JungVoiceAssessment コンポーネントのデータ�
     });
     
     // WebSpeechAPIの応答をシミュレート
-    const speechRecognitionInstance = global.SpeechRecognition.mock.instances[0];
+    const speechRecognitionInstance = (global as any).SpeechRecognition.mock.instances[0];
     if (speechRecognitionInstance.onresult) {
       speechRecognitionInstance.onresult({
         results: [[{ transcript: 'テスト応答' }]]
@@ -211,7 +241,7 @@ describe('重要度: 5 - JungVoiceAssessment コンポーネントのデータ�
     // テスト完了コールバックをモック
     const mockTestComplete = jest.fn();
     const mockUserId = '12345678-1234-1234-1234-123456789012';
-    window.localStorage.getItem.mockReturnValue(mockUserId);
+    (window.localStorage.getItem as jest.Mock).mockReturnValue(mockUserId);
     
     // コンポーネントをレンダリング
     render(
@@ -233,7 +263,7 @@ describe('重要度: 5 - JungVoiceAssessment コンポーネントのデータ�
     });
     
     // 単語応答をシミュレート
-    const speechRecognitionInstance = global.SpeechRecognition.mock.instances[0];
+    const speechRecognitionInstance = (global as any).SpeechRecognition.mock.instances[0];
     if (speechRecognitionInstance.onresult) {
       speechRecognitionInstance.onresult({
         results: [[{ transcript: 'テスト応答' }]]
@@ -262,10 +292,10 @@ describe('重要度: 5 - JungVoiceAssessment コンポーネントのデータ�
 
   test('重要度: 4 - データベースエラー時にも処理が継続すること', async () => {
     // データベースエラーをシミュレート
-    EmotionDataService.saveEmotionData.mockRejectedValueOnce(new Error('データベースエラー'));
+    (EmotionDataService.saveEmotionData as jest.Mock).mockRejectedValueOnce(new Error('データベースエラー'));
     
     const mockUserId = '12345678-1234-1234-1234-123456789012';
-    window.localStorage.getItem.mockReturnValue(mockUserId);
+    (window.localStorage.getItem as jest.Mock).mockReturnValue(mockUserId);
     
     // コンポーネントをレンダリング
     render(<JungVoiceAssessment apiKey="test-key" />);
@@ -281,7 +311,7 @@ describe('重要度: 5 - JungVoiceAssessment コンポーネントのデータ�
     });
     
     // 単語応答をシミュレート
-    const speechRecognitionInstance = global.SpeechRecognition.mock.instances[0];
+    const speechRecognitionInstance = (global as any).SpeechRecognition.mock.instances[0];
     if (speechRecognitionInstance.onresult) {
       speechRecognitionInstance.onresult({
         results: [[{ transcript: 'テスト応答' }]]

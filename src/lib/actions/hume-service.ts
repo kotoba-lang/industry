@@ -3,6 +3,8 @@
  */
 "use server"; // Enable Server Actions
 
+import { createServerClient } from '@/lib/supabase/server';
+
 // Humeの感情認識APIのレスポンス型
 export interface HumeFaceEmotion {
   name: string;
@@ -35,7 +37,9 @@ export interface HumeVoiceResponse {
   };
 }
 
-// Server Actions for batch processing
+/**
+ * 顔画像から感情を分析するサーバーアクション
+ */
 export async function analyzeFace(
   imageBlob: Blob,
   apiKey: string
@@ -72,6 +76,9 @@ export async function analyzeFace(
   }
 }
 
+/**
+ * 音声から感情を分析するサーバーアクション
+ */
 export async function analyzeVoice(
   audioBlob: Blob,
   apiKey: string
@@ -105,6 +112,66 @@ export async function analyzeVoice(
   } catch (error) {
     console.error('Error analyzing voice:', error);
     throw error;
+  }
+}
+
+/**
+ * 感情分析結果をデータベースに保存するサーバーアクション
+ */
+export async function saveEmotionAnalysis(data: {
+  userId: string;
+  assessmentId: string;
+  faceEmotions?: Record<string, number>;
+  voiceEmotions?: Record<string, number>;
+  timestamp: number;
+}) {
+  try {
+    const supabase = await createServerClient();
+    
+    const { error } = await supabase
+      .from('emotion_analysis')
+      .insert({
+        user_id: data.userId,
+        assessment_id: data.assessmentId,
+        face_emotions: data.faceEmotions,
+        voice_emotions: data.voiceEmotions,
+        timestamp: data.timestamp
+      });
+    
+    if (error) {
+      console.error('Error saving emotion analysis:', error);
+      return { success: false, error: error.message };
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error saving emotion analysis:', error);
+    return { success: false, error: 'Failed to save emotion analysis' };
+  }
+}
+
+/**
+ * 感情分析結果を取得するサーバーアクション
+ */
+export async function getEmotionAnalysis(userId: string, assessmentId: string) {
+  try {
+    const supabase = await createServerClient();
+    
+    const { data, error } = await supabase
+      .from('emotion_analysis')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('assessment_id', assessmentId);
+    
+    if (error) {
+      console.error('Error retrieving emotion analysis:', error);
+      return { success: false, error: error.message };
+    }
+    
+    return { success: true, data: data || [] };
+  } catch (error) {
+    console.error('Error retrieving emotion analysis:', error);
+    return { success: false, error: 'Failed to retrieve emotion analysis' };
   }
 }
 
@@ -297,4 +364,4 @@ export class HumeRealtimeEmotionService {
       this.socket = null;
     }
   }
-} 
+}

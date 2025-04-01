@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSpiritInPhysicsSchema } from '@/lib/db/migrations/create-schema';
+import { createSpiritInPhysicsSchema } from '@/lib/services/db/migrations/create-schema';
 
 export async function POST(request: NextRequest) {
   try {
