@@ -8,6 +8,7 @@ import { JungVoiceAssessmentPropsSchema } from './schema';
 import { HumeEmotionProvider } from '@/providers/HumeEmotionProvider';
 import EmotionAnalysis from './EmotionAnalysis';
 import { v4 as uuidv4 } from 'uuid';
+import { useKawasakiStore } from '@/store/kawasakiStore';
 
 export default function JungVoiceAssessment({ 
   numberOfWords = 100,
@@ -35,6 +36,9 @@ export default function JungVoiceAssessment({
   const [assessmentId] = useState<string>(uuidv4());
   const [userId, setUserId] = useState<string>('');
 
+  // Kawasaki Model ストアから更新関数を取得
+  const updateVoiceAssessment = useKawasakiStore(state => state.updateVoiceAssessment);
+
   // ユーザーIDの初期化 - useEffect で実行してSSRに対応
   useEffect(() => {
     // Only run in browser environment
@@ -54,6 +58,19 @@ export default function JungVoiceAssessment({
   const handleTestComplete = (results: TestResults) => {
     setTestResults(results);
     setShowAnalysis(true);
+    
+    // Kawasaki Model ストアに結果を反映
+    try {
+      updateVoiceAssessment({
+        userId,
+        assessmentId,
+        results,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('Failed to update Kawasaki Model with voice assessment results:', error);
+      // エラーハンドリングを追加（必要に応じて）
+    }
     
     if (onTestComplete) {
       onTestComplete(results);
