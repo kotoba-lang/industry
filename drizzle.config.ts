@@ -16,7 +16,7 @@ export default {
   out: './drizzle',
   driver: 'pg',
   dbCredentials: {
-    connectionString,
+    url: connectionString,
   },
   // Use Supabase schema namespace
   schemaFilter: ['spirit_in_physics'],
