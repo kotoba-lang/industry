@@ -9,7 +9,7 @@ export default function TestPage() {
       
       <div className="max-w-4xl mx-auto">
         <JungVoiceAssessment 
-          numberOfWords={10} // Setting a low word count for testing
+          numberOfWords={3} // Setting a low word count for testing
           speechRecognitionLang="en-US" // Changed to English
         />
       </div>
