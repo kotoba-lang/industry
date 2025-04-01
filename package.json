@@ -13,8 +13,10 @@
     "test:e2e": "playwright test",
     "test:jung": "node scripts/test-jung-word.js",
     "db:generate": "drizzle-kit generate",
-    "db:push": "supabase db push",
-    "db:pull": "supabase db pull"
+    "db:migrate": "tsx src/lib/db/migrate.ts",
+    "db:push": "drizzle-kit push:pg",
+    "db:pull": "drizzle-kit introspect:pg",
+    "db:studio": "drizzle-kit studio"
   },
   "engines": {
     "node": "20.14.0"
@@ -54,7 +56,6 @@
     "katex": "^0.16.21",
     "lucide-react": "^0.460.0",
     "next": "^15.1.0",
-    "pg": "^8.14.1",
     "postcss": "^8.4.38",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -79,6 +80,8 @@
     "drizzle-kit": "^0.30.6",
     "drizzle-orm": "^0.41.0",
     "jsdom": "^26.0.0",
+    "pg": "^8.14.1",
+    "tsx": "^4.19.3",
     "vite": "^6.2.4",
     "vitest": "^3.1.1"
   }
