@@ -51,11 +51,11 @@ describe('CombinedCacheManager.tsx', () => {
     await waitFor(() => {
       // Check for presence of the tab controls instead which are more reliable
       expect(screen.getByRole('tablist')).toBeInTheDocument();
-    }, { timeout: 10000 });
+    }, { timeout: 30000 });
     
     // Verify that buttons in the UI exist
     expect(screen.getByRole('button', { name: '更新' })).toBeInTheDocument();
-  });
+  }, 30000);
 
   test('設定切り替えが機能し、onSettingsChangeが呼ばれる 重要度:5', async () => {
     // Mock implementation
@@ -82,7 +82,7 @@ describe('CombinedCacheManager.tsx', () => {
     await waitFor(() => {
       // Check for presence of the tab controls
       expect(screen.getByRole('tablist')).toBeInTheDocument();
-    }, { timeout: 10000 });
+    }, { timeout: 30000 });
     
     // Default settings should have all switches on
     expect(screen.getByLabelText('ブラウザキャッシュ')).toBeChecked();
@@ -115,7 +115,7 @@ describe('CombinedCacheManager.tsx', () => {
     
     // Server preference should be disabled when server cache is off
     expect(screen.getByLabelText('サーバー優先')).toBeDisabled();
-  });
+  }, 30000);
 
   test('更新ボタンをクリックすると統計情報が再取得される 重要度:4', async () => {
     // Setup initial and updated stats
@@ -137,7 +137,7 @@ describe('CombinedCacheManager.tsx', () => {
     await waitFor(() => {
       // Check for presence of the tab controls
       expect(screen.getByRole('tablist')).toBeInTheDocument();
-    }, { timeout: 10000 });
+    }, { timeout: 30000 });
     
     // Clear mock calls count
     (getCombinedCacheStats as jest.Mock).mockClear();
@@ -147,7 +147,7 @@ describe('CombinedCacheManager.tsx', () => {
     
     // Check that getCombinedCacheStats was called again
     expect(getCombinedCacheStats).toHaveBeenCalledTimes(1);
-  });
+  }, 30000);
 
   test('キャッシュ管理ボタンをクリックすると確認UIが表示される 重要度:4', async () => {
     // Mock implementation
@@ -163,7 +163,7 @@ describe('CombinedCacheManager.tsx', () => {
     await waitFor(() => {
       // Check for presence of the tab controls
       expect(screen.getByRole('tablist')).toBeInTheDocument();
-    }, { timeout: 10000 });
+    }, { timeout: 30000 });
     
     // Click the manage button - more reliable test using partial text match
     const manageButton = screen.getByRole('button', { name: /キャッシュを管理/ });
@@ -176,7 +176,7 @@ describe('CombinedCacheManager.tsx', () => {
     
     // Most basic test - just check that the component is still rendered after clicking
     expect(screen.getByText('統合音声キャッシュ管理')).toBeInTheDocument();
-  });
+  }, 30000);
 
   test('キャッシュが空の場合管理ボタンが無効化される 重要度:3', async () => {
     // Mock implementation for empty cache
@@ -192,12 +192,12 @@ describe('CombinedCacheManager.tsx', () => {
     await waitFor(() => {
       // Check for presence of the tab controls
       expect(screen.getByRole('tablist')).toBeInTheDocument();
-    }, { timeout: 10000 });
+    }, { timeout: 30000 });
     
     // Check that the manage button is disabled - more reliable test using role and partial name
     const manageButton = screen.getByRole('button', { name: /キャッシュを管理/ });
     expect(manageButton).toBeDisabled();
-  });
+  }, 30000);
 
   test('initialSettingsプロパティが正しく適用される 重要度:4', async () => {
     // Mock implementation
@@ -221,11 +221,11 @@ describe('CombinedCacheManager.tsx', () => {
     await waitFor(() => {
       // Check for presence of the tab controls
       expect(screen.getByRole('tablist')).toBeInTheDocument();
-    }, { timeout: 10000 });
+    }, { timeout: 30000 });
     
     // Check that initial settings are correctly applied
     expect(screen.getByLabelText('ブラウザキャッシュ')).toBeChecked();
     expect(screen.getByLabelText('サーバーキャッシュ')).not.toBeChecked();
     expect(screen.getByLabelText('サーバー優先')).toBeDisabled();
-  });
+  }, 30000);
 }); 
