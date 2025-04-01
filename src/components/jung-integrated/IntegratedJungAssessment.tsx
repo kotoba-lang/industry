@@ -31,18 +31,18 @@ interface IntegratedJungAssessmentProps {
   setVoiceTestResults?: (results: VoiceTestResults | null) => void;
 }
 
-// Create an adapter function to convert voice test results to the expected format
-const adaptVoiceTestResults = (results) => {
+// Adapts voice test results to a common format
+const adaptVoiceTestResults = (results: any) => {
   return {
-    responses: results.responses.map(r => ({
+    type: 'voice',
+    responses: results.responses.map((r: any) => ({
       stimulus: r.stimulusWord,
       response: r.responseWord,
-      reactionTimeMs: r.reactionTimeMs,
-      isDelayed: r.reactionTimeMs > 2000 // Assuming 2s threshold
+      reactionTime: r.reactionTimeMs
     })),
-    averageReactionTimeMs: results.averageReactionTimeMs,
+    averageReactionTime: results.averageReactionTimeMs,
     delayedResponseCount: results.delayedResponsesCount,
-    completedAt: new Date()
+    timestamp: results.completedAt ? new Date(results.completedAt).getTime() : Date.now()
   };
 };
 

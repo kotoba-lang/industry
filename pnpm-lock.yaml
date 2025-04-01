@@ -174,6 +174,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.11
         version: 8.11.11
+      '@types/testing-library__dom':
+        specifier: ^7.5.0
+        version: 7.5.0
       '@vitejs/plugin-react':
         specifier: ^4.3.4
         version: 4.3.4(vite@6.2.4(@types/node@20.17.7)(jiti@2.4.0)(lightningcss@1.22.0)(terser@5.36.0)(tsx@4.19.3)(yaml@2.6.0))
@@ -5517,6 +5520,10 @@ packages:
 
   '@types/stats.js@0.17.3':
     resolution: {integrity: sha512-pXNfAD3KHOdif9EQXZ9deK82HVNaXP5ZIF5RP2QG6OQFNTaY2YIetfrE9t528vEreGQvEPRDDc8muaoYeK0SxQ==}
+
+  '@types/testing-library__dom@7.5.0':
+    resolution: {integrity: sha512-mj1aH4cj3XUpMEgVpognma5kHVtbm6U6cHZmEFzCRiXPvKkuHrFr3+yXdGLXvfFRBaQIVshPGHI+hGTOJlhS/g==}
+    deprecated: This is a stub types definition. testing-library__dom provides its own type definitions, so you do not need this installed.
 
   '@types/three@0.170.0':
     resolution: {integrity: sha512-CUm2uckq+zkCY7ZbFpviRttY+6f9fvwm6YqSqPfA5K22s9w7R4VnA3rzJse8kHVvuzLcTx+CjNCs2NYe0QFAyg==}
@@ -17646,6 +17653,10 @@ snapshots:
   '@types/stack-utils@2.0.3': {}
 
   '@types/stats.js@0.17.3': {}
+
+  '@types/testing-library__dom@7.5.0':
+    dependencies:
+      '@testing-library/dom': 10.4.0
 
   '@types/three@0.170.0':
     dependencies:
