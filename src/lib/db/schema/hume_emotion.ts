@@ -59,6 +59,14 @@ export const voiceRecognition = spiritSchema.table('voice_recognition', {
   rawData: json('raw_data'), // Humeからの生のレスポンス
 });
 
+// Add this table definition
+export const emotionAssessments = spiritSchema.table('emotion_assessments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // リレーションの定義
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const emotionRecordsRelations = relations(emotionRecords as any, ({ many }) => ({

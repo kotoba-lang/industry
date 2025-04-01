@@ -36,5 +36,14 @@ export const consentRecords = pgTable('consent_records', {
 });
 
 // スキーマの型定義をエクスポート
-export type ConsentRecord = typeof consentRecords.$inferSelect;
-export type NewConsentRecord = typeof consentRecords.$inferInsert; 
+export type ConsentRecord = {
+  id: string;
+  userId: string;
+  consentGiven: boolean;
+  consentDate: Date;
+  consentVersion: string;
+  researcherNote: string | null;
+  // Add other fields as needed
+};
+
+export type NewConsentRecord = Omit<ConsentRecord, 'id'> & { id?: string }; 

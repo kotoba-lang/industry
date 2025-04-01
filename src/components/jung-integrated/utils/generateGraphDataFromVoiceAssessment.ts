@@ -39,7 +39,7 @@ export function generateGraphDataFromVoiceAssessment(
   
   // First, collect all unique words
   results.responses.forEach(response => {
-    uniqueWords.add(response.word);
+    uniqueWords.add(response.stimulusWord);
   });
   
   // Create node array with positions calculated based on word vectors
@@ -83,10 +83,11 @@ export function generateGraphDataFromVoiceAssessment(
 
   // Create links between stimulus and response words
   results.responses.forEach(response => {
-    const { word, isDelayed } = response;
+    const { stimulusWord, reactionTimeMs } = response;
+    const isDelayed = reactionTimeMs > 2000;
     
     // Calculate link strength based on reaction time
-    const baseStrength = getStrengthFromReactionTime(response.reactionTimeMs);
+    const baseStrength = getStrengthFromReactionTime(reactionTimeMs);
     const stateStrength = getStrengthBasedOnState(effectiveState, "word-word");
     let strength = baseStrength * stateStrength;
     
@@ -97,10 +98,10 @@ export function generateGraphDataFromVoiceAssessment(
     
     // Connect stimulus to response
     links.push({
-      source: `voice_${word}`,
-      target: `voice_${word}`,
+      source: `voice_${stimulusWord}`,
+      target: `voice_${stimulusWord}`,
       strength,
-      name: `Voice: ${word} → ${word} (${response.reactionTimeMs}ms)${isDelayed ? ' [DELAYED]' : ''}`,
+      name: `Voice: ${stimulusWord} → ${stimulusWord} (${reactionTimeMs}ms)${isDelayed ? ' [DELAYED]' : ''}`,
     });
   });
 
@@ -111,7 +112,7 @@ export function generateGraphDataFromVoiceAssessment(
 
 // Check if a word appears frequently in responses
 function isFrequentWord(word: string, responses: WordResponse[]): boolean {
-  const wordCount = responses.filter(r => r.word === word).length;
+  const wordCount = responses.filter(r => r.stimulusWord === word).length;
   return wordCount > 1;
 }
 
