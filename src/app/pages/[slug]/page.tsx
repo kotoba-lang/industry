@@ -112,31 +112,13 @@ export default function Page() {
               </div>
 
               <p><strong>Elements: (50)</strong></p>
-              <table>
-                <tbody>
-                  <tr>
-                    <td>Word Asso...</td>
-                    <td>head</td>
-                  </tr>
-                  <tr>
-                    <td>green</td>
-                    <td>water</td>
-                  </tr>
-                  <tr>
-                    <td>to sing</td>
-                    <td>dead</td>
-                  </tr>
-                  <tr>
-                    <td>long</td>
-                    <td>ship</td>
-                  </tr>
-                  <tr>
-                    <td>to pay</td>
-                    <td>window</td>
-                  </tr>
-                </tbody>
-              </table>
-              <p>...and 41 more</p>
+              <p className="word-list">
+                Word Association, head, green, water, to sing, dead, long, ship, to pay, window
+                and 41 more words including: tree, lamp, bread, flower, mountain, house, needle, 
+                swim, blue, friendly, cook, cold, stem, dance, village, lake, sick, pride, table, 
+                ink, angry, carpet, girl, high, salt, new, custom, pray, money, stupid, stork, 
+                false, rich, family, frog, part, hunger, white, child, attention, pencil
+              </p>
 
               <p>
                 <strong>Conventional Word2Vec:</strong> Quantify the strength of association using the
