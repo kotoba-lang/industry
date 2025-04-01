@@ -113,10 +113,10 @@ describe('ModelParamsControl', () => {
     // プログレスバーを取得
     const progressBars = document.querySelectorAll('.absolute.top-0.left-0.h-full.bg-gray-800')
     
-    // プログレスバーの幅が正しいことを確認
-    expect(progressBars[0].style.width).toBe('50%') // alpha
-    expect(progressBars[1].style.width).toBe('10%') // gamma
-    expect(progressBars[2].style.width).toBe('100%') // eta
-    expect(progressBars[3].style.width).toBe('30%') // lambda
+    // Check progress bar widths
+    expect(progressBars[0]?.style?.width).toBe('50%') // alpha
+    expect(progressBars[1]?.style?.width).toBe('10%') // gamma
+    expect(progressBars[2]?.style?.width).toBe('100%') // eta
+    expect(progressBars[3]?.style?.width).toBe('30%') // lambda
   })
 }) 

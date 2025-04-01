@@ -67,11 +67,11 @@ describe('PhysicsStateMachine', () => {
     expect(screen.getByText(/Stimulus Words → Response Categories \(50%\)/i)).toBeInTheDocument()
     
     // プログレスバーが存在することを確認
-    const progressBar = document.querySelector('.bg-gray-700')
+    const progressBar = document.querySelector('.h-full.bg-gray-600')
     expect(progressBar).toBeInTheDocument()
     
     // プログレスバーの幅が正しいことを確認
-    expect(progressBar?.style.width).toBe('50%')
+    expect(progressBar?.style?.width).toBe('50%')
   })
   
   it('現在の状態に基づいて正しいボタンが無効化されることを確認する', () => {

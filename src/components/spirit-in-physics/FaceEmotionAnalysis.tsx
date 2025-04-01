@@ -62,7 +62,12 @@ export default function FaceEmotionAnalysis() {
           if (detections.length > 0) {
             // Get expressions from first detected face
             const expressions = detections[0].expressions;
-            setEmotionData(expressions);
+            // Convert FaceExpressions to Record<string, number>
+            const expressionsAsRecord: Record<string, number> = {};
+            Object.entries(expressions).forEach(([key, value]) => {
+              expressionsAsRecord[key] = value as number;
+            });
+            setEmotionData(expressionsAsRecord);
             
             // Draw face detection results
             faceapi.draw.drawDetections(canvas, detections);
