@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { analyzeFace, analyzeVoice, HumeFaceResponse, HumeVoiceResponse } from '@/lib/services/hume-service';
+import { analyzeFace, analyzeVoice, HumeFaceResponse, HumeVoiceResponse } from '@/lib/actions/hume-service';
 import { HumeRealtimeEmotionService } from '@/lib/client/hume-realtime';
 
 export default function EmotionAnalysisPage() {

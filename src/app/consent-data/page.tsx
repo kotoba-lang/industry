@@ -1,4 +1,4 @@
-import { getConsentRecords, getDemographicData } from '@/lib/db/queries'
+import { getConsentRecords, getDemographicData } from '@/lib/services/db/queries'
 
 // Define interfaces for the data (should match the ones in queries.ts)
 interface ConsentRecord {
