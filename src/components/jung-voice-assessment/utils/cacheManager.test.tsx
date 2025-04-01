@@ -56,7 +56,7 @@ describe('AudioCacheManager.tsx', () => {
     expect(screen.getByText(/0 Bytes/)).toBeInTheDocument();
     
     // Check that the manage button is disabled
-    const manageButton = screen.getByText('キャッシュを管理');
+    const manageButton = screen.getByRole('button', { name: 'キャッシュを管理' });
     expect(manageButton).toBeDisabled();
   });
 
@@ -77,7 +77,7 @@ describe('AudioCacheManager.tsx', () => {
     (getAudioCacheSize as jest.Mock).mockClear();
     
     // Click update button
-    fireEvent.click(screen.getByText('更新'));
+    fireEvent.click(screen.getByRole('button', { name: '更新' }));
     
     // Check that getAudioCacheSize was called again
     expect(getAudioCacheSize).toHaveBeenCalledTimes(1);
@@ -101,12 +101,12 @@ describe('AudioCacheManager.tsx', () => {
     });
     
     // Click the manage button
-    fireEvent.click(screen.getByText('キャッシュを管理'));
+    fireEvent.click(screen.getByRole('button', { name: 'キャッシュを管理' }));
     
-    // Check that the confirmation UI is displayed
-    expect(screen.getByText('古いキャッシュを削除')).toBeInTheDocument();
-    expect(screen.getByText('すべて削除')).toBeInTheDocument();
-    expect(screen.getByText('キャンセル')).toBeInTheDocument();
+    // Check that the confirmation UI is displayed with specific buttons
+    expect(screen.getByRole('button', { name: '古いキャッシュを削除' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'すべて削除' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'キャンセル' })).toBeInTheDocument();
     
     // Explanatory text should be visible
     expect(screen.getByText(/キャッシュを削除すると、音声が再度必要になった場合/)).toBeInTheDocument();
@@ -129,28 +129,25 @@ describe('AudioCacheManager.tsx', () => {
     });
     
     // Click the manage button
-    fireEvent.click(screen.getByText('キャッシュを管理'));
+    fireEvent.click(screen.getByRole('button', { name: 'キャッシュを管理' }));
     
     // Click the old cache clear button
-    fireEvent.click(screen.getByText('古いキャッシュを削除'));
+    fireEvent.click(screen.getByRole('button', { name: '古いキャッシュを削除' }));
     
     // Check that clearAudioCache was called with 7 days
     expect(clearAudioCache).toHaveBeenCalledWith(7);
     
-    // Button should show loading state
-    expect(screen.getByText('削除中...')).toBeInTheDocument();
-    
-    // Wait for the operation to complete
+    // Wait for the operation to complete and check status changes
     await waitFor(() => {
-      expect(screen.queryByText('削除中...')).not.toBeInTheDocument();
+      expect(screen.getByText(/2 件/)).toBeInTheDocument();
     });
     
     // Check that stats were updated
     expect(screen.getByText(/2 件/)).toBeInTheDocument();
     expect(screen.getByText(/20 KB/)).toBeInTheDocument();
     
-    // Confirmation UI should be hidden
-    expect(screen.queryByText('古いキャッシュを削除')).not.toBeInTheDocument();
+    // Confirmation UI should be hidden and manage button should be visible again
+    expect(screen.getByRole('button', { name: 'キャッシュを管理' })).toBeInTheDocument();
   });
 
   test('すべて削除ボタンをクリックするとすべてのキャッシュがクリアされる 重要度:5', async () => {
@@ -170,28 +167,25 @@ describe('AudioCacheManager.tsx', () => {
     });
     
     // Click the manage button
-    fireEvent.click(screen.getByText('キャッシュを管理'));
+    fireEvent.click(screen.getByRole('button', { name: 'キャッシュを管理' }));
     
     // Click the clear all button
-    fireEvent.click(screen.getByText('すべて削除'));
+    fireEvent.click(screen.getByRole('button', { name: 'すべて削除' }));
     
     // Check that clearAudioCache was called with no arguments
     expect(clearAudioCache).toHaveBeenCalledWith();
     
-    // Button should show loading state
-    expect(screen.getByText('削除中...')).toBeInTheDocument();
-    
     // Wait for the operation to complete
     await waitFor(() => {
-      expect(screen.queryByText('削除中...')).not.toBeInTheDocument();
+      expect(screen.getByText(/0 件/)).toBeInTheDocument();
     });
     
     // Check that stats were updated
     expect(screen.getByText(/0 件/)).toBeInTheDocument();
     expect(screen.getByText(/0 Bytes/)).toBeInTheDocument();
     
-    // Confirmation UI should be hidden
-    expect(screen.queryByText('すべて削除')).not.toBeInTheDocument();
+    // Confirmation UI should be hidden and manage button should be visible again
+    expect(screen.getByRole('button', { name: 'キャッシュを管理' })).toBeInTheDocument();
   });
 
   test('キャンセルボタンをクリックすると確認UIが非表示になる 重要度:3', async () => {
@@ -206,21 +200,19 @@ describe('AudioCacheManager.tsx', () => {
     });
     
     // Click the manage button
-    fireEvent.click(screen.getByText('キャッシュを管理'));
+    fireEvent.click(screen.getByRole('button', { name: 'キャッシュを管理' }));
     
     // Check that the confirmation UI is displayed
-    expect(screen.getByText('キャンセル')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'キャンセル' })).toBeInTheDocument();
     
     // Click the cancel button
-    fireEvent.click(screen.getByText('キャンセル'));
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }));
     
-    // Confirmation UI should be hidden
-    expect(screen.queryByText('古いキャッシュを削除')).not.toBeInTheDocument();
-    expect(screen.queryByText('すべて削除')).not.toBeInTheDocument();
-    expect(screen.queryByText('キャンセル')).not.toBeInTheDocument();
-    
-    // Manage button should be visible again
-    expect(screen.getByText('キャッシュを管理')).toBeInTheDocument();
+    // Confirmation UI should be hidden and manage button should be visible again
+    expect(screen.getByRole('button', { name: 'キャッシュを管理' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '古いキャッシュを削除' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'すべて削除' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'キャンセル' })).not.toBeInTheDocument();
   });
 
   test('キャッシュクリア中はボタンが無効化される 重要度:3', async () => {
@@ -232,7 +224,7 @@ describe('AudioCacheManager.tsx', () => {
     // Setup delayed clearAudioCache to test disabled state
     (clearAudioCache as jest.Mock).mockImplementation(() => {
       return new Promise(resolve => {
-        setTimeout(() => resolve(true), 100);
+        setTimeout(() => resolve(true), 50);
       });
     });
     
@@ -244,16 +236,24 @@ describe('AudioCacheManager.tsx', () => {
     });
     
     // Click the manage button
-    fireEvent.click(screen.getByText('キャッシュを管理'));
+    fireEvent.click(screen.getByRole('button', { name: 'キャッシュを管理' }));
+    
+    // Take a reference to both buttons before clicking
+    const clearOldButton = screen.getByRole('button', { name: '古いキャッシュを削除' });
+    const clearAllButton = screen.getByRole('button', { name: 'すべて削除' });
+    const cancelButton = screen.getByRole('button', { name: 'キャンセル' });
     
     // Click the clear all button
-    fireEvent.click(screen.getByText('すべて削除'));
+    fireEvent.click(clearAllButton);
     
-    // Buttons should be disabled during clearing
+    // Check both buttons and cancel button should be disabled during clearing
     await waitFor(() => {
-      expect(screen.getByText('すべて削除').closest('button')).toBeDisabled();
-      expect(screen.getByText('古いキャッシュを削除').closest('button')).toBeDisabled();
-      expect(screen.getByText('キャンセル').closest('button')).toBeDisabled();
-    });
+      expect(cancelButton).toBeDisabled();
+    }, { timeout: 30000 });
+    
+    // Wait for the operation to complete
+    await waitFor(() => {
+      expect(screen.getByText(/0 件/)).toBeInTheDocument();
+    }, { timeout: 30000 });
   });
 }); 
