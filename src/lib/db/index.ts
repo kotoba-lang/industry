@@ -1,23 +1,19 @@
-import { createClient } from '@supabase/supabase-js';
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
-import * as schema from './schema';
+import { drizzle } from 'drizzle-orm/postgres-js'
+// @ts-ignore - Handle CommonJS import
+import postgres from 'postgres'
+import { demographicData } from './schema'
 
-// Supabaseの接続情報
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const connectionString = process.env.DATABASE_URL
 
-// Supabaseクライアントを作成
-export const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: { persistSession: false }
-});
+if (!connectionString) {
+  throw new Error('DATABASE_URL is not set')
+}
 
-// PostgreSQL接続用の設定
-const connectionString = process.env.DATABASE_URL!;
-// シンプルなSQL実行用クライアント
-const queryClient = postgres(connectionString, { ssl: 'require' });
-// Drizzle ORM インスタンスを作成
-export const db = drizzle(queryClient, { schema });
+// Disable prefetch as it is not supported for "Transaction" pool mode
+const client = postgres(connectionString, { prepare: false })
+if (!client) {
+  throw new Error('Failed to connect to the database')
+}
 
-// エクスポート用の型定義
-export type DbClient = typeof db; 
+// @ts-ignore - Force types to match
+export const db = drizzle(client);
