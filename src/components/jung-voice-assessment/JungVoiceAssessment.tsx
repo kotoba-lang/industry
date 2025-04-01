@@ -71,11 +71,13 @@ export default function JungVoiceAssessment({
 
   return (
     <HumeEmotionProvider apiKey={validatedProps.apiKey}>
-      <div className={`py-8 ${className}`}>
+      <div className={`px-4 sm:px-6 md:px-8 pt-4 pb-6 ${className}`}>
         {!hasConsented ? (
-          <ConsentForm onConsent={handleConsent} />
+          <div className="max-w-4xl mx-auto">
+            <ConsentForm onConsent={handleConsent} />
+          </div>
         ) : (
-          <>
+          <div className="max-w-4xl mx-auto space-y-6">
             <JungVoiceTest 
               numberOfWords={validatedProps.numberOfWords} 
               apiKey={validatedProps.apiKey}
@@ -87,19 +89,19 @@ export default function JungVoiceAssessment({
             />
             
             {showAnalysis && testResults && (
-              <div className="mt-10">
-                <h2 className="text-2xl font-bold mb-4 text-center">感情分析</h2>
-                <p className="text-center mb-6 text-gray-600">
+              <div className="mt-6">
+                <h2 className="text-2xl font-bold mb-3 text-center">感情分析</h2>
+                <p className="text-center mb-4 text-gray-600 dark:text-gray-300">
                   テスト中の顔の表情と声のトーンから感情を分析しました
                 </p>
                 <EmotionAnalysis 
                   userId={userId}
                   assessmentId={assessmentId}
-                  className="mt-4"
+                  className="mt-3"
                 />
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </HumeEmotionProvider>
