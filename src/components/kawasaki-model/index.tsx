@@ -42,22 +42,22 @@ export default function Home() {
   }
 
   return (
-    <main className="flex flex-col h-[calc(100vh-2rem)] w-full p-0 bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 text-gray-800 dark:text-gray-200 overflow-hidden">
-      <div className="px-4 py-3 bg-white/80 dark:bg-black/40 backdrop-blur-sm">
-        <h1 className="text-xl font-bold text-gray-800 dark:text-gray-200 tracking-wide">
+    <main className="flex flex-col h-[calc(100vh-2rem)] w-full p-0 bg-gradient-to-b from-gray-50 to-gray-100 text-gray-800 overflow-hidden">
+      <div className="px-4 py-3 bg-white/80 backdrop-blur-sm">
+        <h1 className="text-xl font-bold text-gray-800 tracking-wide">
           Spirit in Physics ( Jung's Word Association Test Embedding Model )
         </h1>
       </div>
 
       <div className="grid grid-cols-12 gap-0 h-full">
         {/* Left sidebar with controls */}
-        <div className="col-span-12 md:col-span-3 lg:col-span-2 flex flex-col space-y-2 p-3 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm z-10">
+        <div className="col-span-12 md:col-span-3 lg:col-span-2 flex flex-col space-y-2 p-3 bg-white/70 backdrop-blur-sm z-10">
           <PhysicsStateMachine transitionState={transitionState} onStateChange={handleStateChange} />
           <ModelParamsControl params={modelParams} onChange={setModelParams} />
 
           {/* Model explanation */}
-          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm p-3 rounded-md shadow-sm border border-gray-200 dark:border-gray-700 text-xs overflow-auto flex-grow">
-            <h3 className="font-bold mb-2 text-gray-800 dark:text-gray-200">About the Integrated Model</h3>
+          <div className="bg-white/80 backdrop-blur-sm p-3 rounded-md shadow-sm border border-gray-200 text-xs overflow-auto flex-grow">
+            <h3 className="font-bold mb-2 text-gray-800">About the Integrated Model</h3>
             <p className="mb-2 leading-relaxed">
               This model integrates multiple factors from Jung's word association test:
             </p>
@@ -87,7 +87,7 @@ export default function Home() {
         </div>
 
         {/* Main visualization area */}
-        <div className="col-span-12 md:col-span-9 lg:col-span-10 border-0 md:border-l border-gray-200 dark:border-gray-700 overflow-hidden bg-gradient-to-br from-white/80 to-gray-100/80 dark:from-gray-800/80 dark:to-gray-900/80 backdrop-blur-sm">
+        <div className="col-span-12 md:col-span-9 lg:col-span-10 border-0 md:border-l border-gray-200 overflow-hidden bg-gradient-to-br from-white/80 to-gray-100/80 backdrop-blur-sm">
           <PhysicsGraph
             data={graphData}
             frameRate={frameRate}
