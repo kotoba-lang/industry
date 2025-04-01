@@ -31,10 +31,10 @@ class MockSpeechRecognition {
   interimResults = false;
   lang = '';
   maxAlternatives = 1;
-  onresult = null;
-  onend = null;
-  onerror = null;
-  onstart = null;
+  onresult: ((event: any) => void) | null = null;
+  onend: ((event: any) => void) | null = null;
+  onerror: ((event: any) => void) | null = null;
+  onstart: ((event: any) => void) | null = null;
   grammars = null;
   start = jest.fn();
   stop = jest.fn();
@@ -50,8 +50,9 @@ const mockEmotionAPI = {
   }),
 };
 
-global.SpeechRecognition = MockSpeechRecognition;
-global.webkitSpeechRecognition = MockSpeechRecognition;
+// Add to global window object
+(window as any).SpeechRecognition = MockSpeechRecognition;
+(window as any).webkitSpeechRecognition = MockSpeechRecognition;
 
 // Mock IndexedDB storage
 const mockIDBStore = {
@@ -179,10 +180,10 @@ describe('VoiceConversation コンポーネント', () => {
     fireEvent.click(micButton);
     
     // SpeechRecognitionがスタートしたことを確認
-    expect(MockSpeechRecognition.prototype.start).toHaveBeenCalled();
+    const speechInstance = new MockSpeechRecognition();
+    expect(speechInstance.start).toHaveBeenCalled();
     
     // 音声認識の結果をシミュレート
-    const speechInstance = MockSpeechRecognition.prototype;
     const resultEvent = {
       results: [
         [
@@ -195,14 +196,14 @@ describe('VoiceConversation コンポーネント', () => {
       resultIndex: 0,
     };
     
-    // 音声認識の結果をシミュレート
-    if (speechInstance.onresult) {
-      speechInstance.onresult(resultEvent as any);
+    // 音声認識のコールバックが設定されていれば実行
+    if (typeof speechInstance.onresult === 'function') {
+      speechInstance.onresult(resultEvent);
     }
     
     // 音声認識の終了をシミュレート
-    if (speechInstance.onend) {
-      speechInstance.onend({} as any);
+    if (typeof speechInstance.onend === 'function') {
+      speechInstance.onend({});
     }
     
     await waitFor(() => {
