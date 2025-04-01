@@ -1,14 +1,13 @@
 /// <reference types="vitest" />
 
-// Mock next/dynamic to use the actual component instead of dynamic loading
+// Now vi is properly typed
 vi.mock('next/dynamic', () => ({
-  __esModule: true,
-  default: (fn: () => Promise<any>) => {
-    const Component = vi.fn()
-    Component.displayName = 'MockedDynamicComponent'
-    return Component
-  },
-}))
+  default: (callback: () => Promise<any>) => {
+    // Simple mock for next/dynamic
+    const Component = vi.fn();
+    return Component;
+  }
+}));
 
 // Mock next/navigation functions
 vi.mock('next/navigation', () => ({
@@ -21,7 +20,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
-// Mock window.matchMedia for dark mode detection
+// Mock window.matchMedia for tests
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: vi.fn().mockImplementation(query => ({

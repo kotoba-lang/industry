@@ -32,17 +32,17 @@ interface IntegratedJungAssessmentProps {
 }
 
 // Adapts voice test results to a common format
-const adaptVoiceTestResults = (results: any) => {
+const adaptVoiceTestResults = (results: any): any => {
   return {
-    type: 'voice',
     responses: results.responses.map((r: any) => ({
       stimulus: r.stimulusWord,
       response: r.responseWord,
-      reactionTime: r.reactionTimeMs
+      reactionTimeMs: r.reactionTimeMs,
+      isDelayed: r.reactionTimeMs > 2000 // Assuming 2s threshold
     })),
-    averageReactionTime: results.averageReactionTimeMs,
+    averageReactionTimeMs: results.averageReactionTimeMs,
     delayedResponseCount: results.delayedResponsesCount,
-    timestamp: results.completedAt ? new Date(results.completedAt).getTime() : Date.now()
+    completedAt: results.completedAt || new Date()
   };
 };
 
