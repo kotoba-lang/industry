@@ -13,7 +13,7 @@ if (!connectionString) {
 
 export default {
   schema: './src/lib/db/schema/*',
-  out: './drizzle',
+  out: './supabase/migrations',
   dialect: 'postgresql',
   dbCredentials: {
     url: connectionString,
