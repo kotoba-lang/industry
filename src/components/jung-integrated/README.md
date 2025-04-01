@@ -25,7 +25,7 @@ export default function AssessmentPage() {
       <IntegratedJungAssessment 
         numberOfWords={30}
         apiKey={process.env.NEXT_PUBLIC_HUME_API_KEY}
-        speechRecognitionLang="ja-JP"
+        speechRecognitionLang="en-US"
       />
     </div>
   );
@@ -50,7 +50,7 @@ export default function AssessmentPage() {
       <IntegratedJungAssessment 
         numberOfWords={30}
         apiKey={process.env.NEXT_PUBLIC_HUME_API_KEY}
-        speechRecognitionLang="ja-JP"
+        speechRecognitionLang="en-US"
         wordTestResults={wordTestResults}
         voiceTestResults={voiceTestResults}
         setWordTestResults={setWordTestResults}

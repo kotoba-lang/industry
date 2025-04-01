@@ -44,9 +44,9 @@ export default function JungIntegratedDemo() {
       
       {useExternalState ? (
         <IntegratedJungAssessment 
-          numberOfWords={10} // デモ用に少なめの単語数
+          numberOfWords={1} // デモ用に少なめの単語数
           apiKey={process.env.NEXT_PUBLIC_HUME_API_KEY}
-          speechRecognitionLang="ja-JP"
+          speechRecognitionLang="en-US"
           wordTestResults={wordTestResults}
           voiceTestResults={voiceTestResults}
           setWordTestResults={setWordTestResults}
@@ -56,7 +56,7 @@ export default function JungIntegratedDemo() {
         <IntegratedJungAssessment 
           numberOfWords={10} // デモ用に少なめの単語数
           apiKey={process.env.NEXT_PUBLIC_HUME_API_KEY}
-          speechRecognitionLang="ja-JP"
+          speechRecognitionLang="en-US"
         />
       )}
       

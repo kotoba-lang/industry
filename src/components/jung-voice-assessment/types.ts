@@ -49,7 +49,7 @@ export interface JungVoiceAssessmentProps {
   
   /**
    * 音声認識の言語
-   * デフォルト: 'ja-JP'
+   * デフォルト: 'en-US'
    */
   speechRecognitionLang?: string;
   

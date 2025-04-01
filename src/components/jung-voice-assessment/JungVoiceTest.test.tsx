@@ -24,7 +24,7 @@ const mockSpeechRecognition = {
   abort: jest.fn(),
   continuous: false,
   interimResults: true,
-  lang: 'ja-JP',
+  lang: 'en-US',
 };
 
 Object.defineProperty(global, 'SpeechRecognition', {
