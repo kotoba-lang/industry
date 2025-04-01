@@ -1,6 +1,6 @@
 import Footer from "@/app/_components/footer";
 import { CMS_NAME, HOME_OG_IMAGE_URL } from "@/lib/constants";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import cn from "classnames";
 import { ThemeSwitcher } from "./_components/theme-switcher";
@@ -8,6 +8,10 @@ import { ThemeSwitcher } from "./_components/theme-switcher";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
+
+export const viewport: Viewport = {
+  themeColor: '#000',
+};
 
 export const metadata: Metadata = {
   title: `Jun Kawasaki - ${CMS_NAME}`,
@@ -45,7 +49,6 @@ export const metadata: Metadata = {
     'msapplication-config': '/favicon/browserconfig.xml',
     'copyright': 'cc-by-nd-sa',
   },
-  themeColor: '#000',
 };
 
 export default function RootLayout({
