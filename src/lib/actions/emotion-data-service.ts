@@ -15,7 +15,8 @@ export const EmotionDataService = {
     stimulusWord: string;
     responseWord: string;
     reactionTimeMs: number;
-    faceEmotions: Record<string, number>;
+    faceEmotions?: Record<string, number>;
+    voiceEmotions?: Record<string, number>;
     timestamp: number;
   }) => {
     try {
@@ -29,7 +30,8 @@ export const EmotionDataService = {
           stimulus_word: data.stimulusWord,
           response_word: data.responseWord,
           reaction_time_ms: data.reactionTimeMs,
-          face_emotions: data.faceEmotions,
+          face_emotions: data.faceEmotions || {},
+          voice_emotions: data.voiceEmotions || {},
           timestamp: new Date(data.timestamp).toISOString()
         });
       
