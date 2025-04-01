@@ -1,12 +1,10 @@
 [ ] junonlyにアクセスできるのは認証済みのユーザーのみにする
 
-[ ] Voice Assessmentが終わったら、Kawasaki Modelに反映する ( zustand )
 
 [ ] People Table - 連絡先をくれた人のデータを保存する
 [ ] Communication Table - 連絡先をくれた人との連絡情報を保存する
 [ ] CommunicationChannel Table - 連絡先をくれた人との連絡情報を保存する
  
-[x] 研究協力アンケートを入れる  
 [ ] 回答した言葉の内容と音声は保存しません.
 
 一連の@JungVoiceAssessment.tsx @index.tsx で利用する個々人のデータもDBに保存します。まず必要なスキーマを定義して、それぞれのコンポーネントで適切にデータが保存されるようにしてください。IPデータも保存してください。
@@ -145,3 +143,5 @@ pnpm test
 Spirit in Physics は、ユングの言語連想テストとAIを組み合わせた研究プロジェクトです。
 [x] 曼荼羅を作成
 [x] 研究同意書を作成
+[x] Voice Assessmentが終わったら、Kawasaki Modelに反映する ( zustand )
+[x] 研究協力アンケートを入れる  
