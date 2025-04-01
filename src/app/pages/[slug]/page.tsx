@@ -10,10 +10,6 @@ import { InlineMath, BlockMath } from 'react-katex';
 import { JUNG_STIMULUS_WORDS } from "@/components/jung-word-assessment/JungWordTest";
 
 import VectorVisualization from "@/components/spirit-in-physics/vector-visualization";
-import CorrelationForm from "@/components/spirit-in-physics/correlation-form";
-import { SpiritModel } from "@/components/spirit-in-physics/spirit-model";
-import CorrelationFormWrapper from "@/components/spirit-in-physics/correlation-form-wrapper";
-import TearableItems from "@/components/spirit-in-physics/TearableItems";
 import FaceAnalysis from "@/components/spirit-in-physics/FaceEmotionAnalysis";
 import Container from "@/app/_components/container";
 import Alert from "@/app/_components/alert";
@@ -175,7 +171,7 @@ export default function Page() {
                 structured, measured, and quantified as dynamic physical information.
               </p>
 
-              <div className={styles.mathIn}>
+              <div className={styles.mathInline}>
                 <BlockMath math="P(w_O | w_I) = \frac{\exp(\vec{w_I} \cdot \vec{w_O}) \cdot [r(w_I, w_O)]^{\alpha} \cdot \exp(\gamma \frac{\Delta SP(w_I,w_O)}{\lambda}) \cdot \exp(\eta F(w_I, w_O))}{\sum_{j} \exp(\vec{w_I} \cdot \vec{w_j}) \cdot [r(w_I, w_j)]^{\alpha} \cdot \exp(\gamma \frac{\Delta SP(w_I,w_j)}{\lambda}) \cdot \exp(\eta F(w_I, w_j))}" />
               </div>
 

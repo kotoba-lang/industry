@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import JungVoiceTest from './JungVoiceTest';
 import ConsentForm from '../consent/ConsentForm';
 import { JungVoiceAssessmentProps, TestResults } from './types';
@@ -35,18 +35,21 @@ export default function JungVoiceAssessment({
   const [assessmentId] = useState<string>(uuidv4());
   const [userId, setUserId] = useState<string>('');
 
-  // ユーザーIDの初期化
-  useState(() => {
-    // ユーザーIDをローカルストレージから取得または生成
-    const existingUserId = localStorage.getItem('jung_test_user_id');
-    const newUserId = existingUserId || uuidv4();
-    
-    if (!existingUserId) {
-      localStorage.setItem('jung_test_user_id', newUserId);
+  // ユーザーIDの初期化 - useEffect で実行してSSRに対応
+  useEffect(() => {
+    // Only run in browser environment
+    if (typeof window !== 'undefined') {
+      // ユーザーIDをローカルストレージから取得または生成
+      const existingUserId = localStorage.getItem('jung_test_user_id');
+      const newUserId = existingUserId || uuidv4();
+      
+      if (!existingUserId) {
+        localStorage.setItem('jung_test_user_id', newUserId);
+      }
+      
+      setUserId(newUserId);
     }
-    
-    setUserId(newUserId);
-  });
+  }, []);
 
   const handleTestComplete = (results: TestResults) => {
     setTestResults(results);

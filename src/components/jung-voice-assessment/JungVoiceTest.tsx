@@ -816,7 +816,6 @@ export default function JungVoiceTest({
         averageReactionTimeMs: avgReactionTime,
         delayedResponsesCount: delayedCount,
         totalWords: stimulusWords.length,
-        completedAt: new Date()
       };
       
       // テスト結果をバリデーション
