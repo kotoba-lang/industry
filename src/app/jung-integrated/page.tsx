@@ -12,7 +12,7 @@ export default function JungIntegratedPage() {
   return (
     <main className="container mx-auto px-4 py-12">
       <div className="mb-8 text-center">
-        <h1 className="text-4xl font-bold mb-4">Jung's Integrated Word Association Model</h1>
+        <h1 className="text-4xl font-bold mb-4">Spirit in Physics (Jung's Word Association Test Embedding Model)</h1>
         <p className="text-xl text-gray-600">
           Explore your subconscious through word associations and vector visualization
         </p>

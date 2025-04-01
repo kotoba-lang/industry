@@ -1,7 +1,7 @@
 import JungWordAssessment from '@/components/jung-word-assessment/JungWordAssessment';
 
 export const metadata = {
-  title: "Jung's Word Association Test | 1910",
+  title: "Spirit in Physics (Jung's Word Association Test Embedding Model)",
   description: "Take Carl Jung's original 1910 word association test to explore your subconscious mind",
 };
 
@@ -10,7 +10,7 @@ export default function JungWordAssessmentPage() {
     <main className="container mx-auto px-4 py-12">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold mb-4">Jung's Word Association Test (1910)</h1>
+          <h1 className="text-4xl font-bold mb-4">Spirit in Physics (Jung's Word Association Test Embedding Model)</h1>
           <p className="text-xl text-gray-600">
             Explore your subconscious mind through word associations
           </p>
