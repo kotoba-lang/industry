@@ -1,9 +1,9 @@
 import { db } from '@/lib/db';
 import { 
-  facialEmotionRecords, 
-  voiceEmotionRecords,
+  facialEmotions,
+  emotionRecords,
   emotionAssessments
-} from '@/lib/db/schema/spirit_in_physics';
+} from '@/lib/db/schema';
 
 import { HumeFaceResponse, HumeVoiceResponse } from './hume-service';
 import { v4 as uuidv4 } from 'uuid';
@@ -47,7 +47,7 @@ export class EmotionDataService {
         
       // 顔の感情データがある場合は保存
       if (data.faceEmotions && Object.keys(data.faceEmotions).length > 0) {
-        await db.insert(facialEmotionRecords)
+        await db.insert(facialEmotions)
           .values({
             id: uuidv4(),
             assessmentId: data.assessmentId,
@@ -61,7 +61,7 @@ export class EmotionDataService {
         
       // 音声の感情データがある場合は保存
       if (data.voiceEmotions && Object.keys(data.voiceEmotions).length > 0) {
-        await db.insert(voiceEmotionRecords)
+          await db.insert(emotionRecords)
           .values({
             id: uuidv4(),
             assessmentId: data.assessmentId,
@@ -151,13 +151,13 @@ export class EmotionDataService {
       }
       
       // 顔の感情データの取得
-      const facialEmotions = await db.query.facialEmotionRecords.findMany({
+      const facialEmotions = await db.query.facialEmotions.findMany({
         where: (fields, { eq }) => eq(fields.assessmentId, assessmentId),
         orderBy: (fields, { asc }) => [asc(fields.createdAt)],
       });
       
       // 音声の感情データの取得
-      const voiceEmotions = await db.query.voiceEmotionRecords.findMany({
+      const voiceEmotions = await db.query.voiceEmotions.findMany({
         where: (fields, { eq }) => eq(fields.assessmentId, assessmentId),
         orderBy: (fields, { asc }) => [asc(fields.createdAt)],
       });

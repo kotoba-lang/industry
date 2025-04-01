@@ -1,3 +1,5 @@
+'use server'
+
 import { db } from './index';
 import { demographicData, consentRecords, NewDemographicData, NewConsentRecord } from './schema';
 import { v4 as uuidv4 } from 'uuid';

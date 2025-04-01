@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { EmotionDataService } from '@/lib/services/emotion-data-service';
-import { createSpiritInPhysicsSchema } from '@/db/migrations/create-spirit-in-physics-schema';
 import { z } from 'zod';
+import { createSpiritInPhysicsSchema } from '@/lib/db/migrations/create-schema';
 
 // Input validation schema for saving emotion data
 const SaveEmotionDataSchema = z.object({
