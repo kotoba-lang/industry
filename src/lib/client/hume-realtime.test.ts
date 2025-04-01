@@ -9,12 +9,9 @@ class MockWebSocket {
   onerror: ((event: any) => void) | null = null;
   onclose: (() => void) | null = null;
   readyState = WebSocket.OPEN;
+  send: (data: string) => void = vi.fn();
 
   constructor(public url: string) {}
-
-  send(data: string): void {
-    // Mock implementation
-  }
 
   close(): void {
     this.readyState = WebSocket.CLOSED;
@@ -28,9 +25,8 @@ class MockFileReader {
   result: string = "data:image/jpeg;base64,mockBase64Data";
 
   readAsDataURL(blob: Blob): void {
-    setTimeout(() => {
-      if (this.onloadend) this.onloadend();
-    }, 0);
+    // Immediately trigger onloadend in tests
+    if (this.onloadend) this.onloadend();
   }
 }
 
@@ -41,6 +37,7 @@ describe("HumeRealtimeEmotionService テスト (優先度: 5)", () => {
   let mockErrorCallback: (error: Event) => void;
   let originalWebSocket: typeof WebSocket;
   let originalFileReader: typeof FileReader;
+  let mockWs: MockWebSocket;
 
   beforeEach(() => {
     // Setup mock callbacks
@@ -52,8 +49,11 @@ describe("HumeRealtimeEmotionService テスト (優先度: 5)", () => {
     originalWebSocket = global.WebSocket;
     originalFileReader = global.FileReader;
 
-    // Mock WebSocket
-    global.WebSocket = MockWebSocket as any;
+    // Create a mock WebSocket instance
+    mockWs = new MockWebSocket("wss://api.hume.ai/v0/stream/models");
+
+    // Mock WebSocket constructor
+    global.WebSocket = vi.fn().mockImplementation(() => mockWs) as any;
 
     // Mock FileReader
     global.FileReader = MockFileReader as any;
@@ -65,48 +65,30 @@ describe("HumeRealtimeEmotionService テスト (優先度: 5)", () => {
       mockVoiceCallback,
       mockErrorCallback,
     );
-
-    // Use fake timers
-    vi.useFakeTimers();
   });
 
   afterEach(() => {
     // Restore original globals
     global.WebSocket = originalWebSocket;
     global.FileReader = originalFileReader;
-    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
   describe("initWebSocket", () => {
     it("WebSocketを初期化して設定できること", async () => {
-      // Spy on WebSocket constructor
-      const webSocketSpy = vi.spyOn(global, "WebSocket");
-
-      // Spy on send method
-      const sendSpy = vi.fn();
-      webSocketSpy.mockImplementation(() => {
-        const ws = new MockWebSocket("wss://api.hume.ai/v0/stream/models");
-        ws.send = sendSpy;
-        return ws as any;
-      });
-
       // Call initWebSocket
       await service.initWebSocket(["face", "prosody"]);
 
       // Check WebSocket was created with correct URL
-      expect(webSocketSpy).toHaveBeenCalledWith(
+      expect(global.WebSocket).toHaveBeenCalledWith(
         "wss://api.hume.ai/v0/stream/models",
       );
 
-      // Get the created websocket instance
-      const wsInstance = webSocketSpy.mock.results[0].value;
-
       // Trigger onopen
-      wsInstance.onopen!();
+      mockWs.onopen!();
 
       // Verify configuration message was sent
-      expect(sendSpy).toHaveBeenCalledWith(JSON.stringify({
+      expect(mockWs.send).toHaveBeenCalledWith(JSON.stringify({
         type: "configuration",
         apiKey: "test-api-key",
         models: {
@@ -119,9 +101,6 @@ describe("HumeRealtimeEmotionService テスト (優先度: 5)", () => {
     it("WebSocketメッセージを正しく処理できること", async () => {
       // Initialize WebSocket
       await service.initWebSocket();
-
-      // Get WebSocket instance
-      const ws = (global.WebSocket as any).mock.instances[0];
 
       // Create mock face prediction data
       const faceData = {
@@ -138,9 +117,7 @@ describe("HumeRealtimeEmotionService テスト (優先度: 5)", () => {
       };
 
       // Trigger onmessage with face data
-      if (ws.onmessage) {
-        ws.onmessage({ data: JSON.stringify(faceData) });
-      }
+      mockWs.onmessage!({ data: JSON.stringify(faceData) });
 
       // Verify face callback was called with correct data
       expect(mockFaceCallback).toHaveBeenCalledWith(faceData.models.face);
@@ -163,9 +140,7 @@ describe("HumeRealtimeEmotionService テスト (優先度: 5)", () => {
       };
 
       // Trigger onmessage with voice data
-      if (ws.onmessage) {
-        ws.onmessage({ data: JSON.stringify(voiceData) });
-      }
+      mockWs.onmessage!({ data: JSON.stringify(voiceData) });
 
       // Verify voice callback was called with correct data
       expect(mockVoiceCallback).toHaveBeenCalledWith(voiceData.models.prosody);
@@ -175,16 +150,11 @@ describe("HumeRealtimeEmotionService テスト (優先度: 5)", () => {
       // Initialize WebSocket
       await service.initWebSocket();
 
-      // Get WebSocket instance
-      const ws = (global.WebSocket as any).mock.instances[0];
-
       // Create mock error
       const mockError = new Event("error");
 
       // Trigger onerror
-      if (ws.onerror) {
-        ws.onerror(mockError);
-      }
+      mockWs.onerror!(mockError);
 
       // Verify error callback was called
       expect(mockErrorCallback).toHaveBeenCalledWith(mockError);
@@ -195,10 +165,7 @@ describe("HumeRealtimeEmotionService テスト (優先度: 5)", () => {
     it("画像データを正しく送信できること", async () => {
       // Initialize WebSocket
       await service.initWebSocket();
-
-      // Get WebSocket instance and spy on send method
-      const ws = (global.WebSocket as any).mock.instances[0];
-      const sendSpy = vi.spyOn(ws, "send");
+      mockWs.onopen!(); // Ensure WebSocket is open
 
       // Create mock blob
       const imageBlob = new Blob(["mock image data"], { type: "image/jpeg" });
@@ -206,11 +173,8 @@ describe("HumeRealtimeEmotionService テスト (優先度: 5)", () => {
       // Call sendImageData
       await service.sendImageData(imageBlob);
 
-      // Advance timers to trigger FileReader onloadend
-      vi.advanceTimersByTime(10);
-
       // Verify WebSocket.send was called with correct data
-      expect(sendSpy).toHaveBeenCalledWith(JSON.stringify({
+      expect(mockWs.send).toHaveBeenCalledWith(JSON.stringify({
         type: "frame",
         format: "image/jpeg;base64",
         data: "mockBase64Data",
@@ -239,10 +203,7 @@ describe("HumeRealtimeEmotionService テスト (優先度: 5)", () => {
     it("音声データを正しく送信できること", async () => {
       // Initialize WebSocket
       await service.initWebSocket();
-
-      // Get WebSocket instance and spy on send method
-      const ws = (global.WebSocket as any).mock.instances[0];
-      const sendSpy = vi.spyOn(ws, "send");
+      mockWs.onopen!(); // Ensure WebSocket is open
 
       // Create mock blob
       const audioBlob = new Blob(["mock audio data"], { type: "audio/wav" });
@@ -250,11 +211,8 @@ describe("HumeRealtimeEmotionService テスト (優先度: 5)", () => {
       // Call sendAudioData
       await service.sendAudioData(audioBlob);
 
-      // Advance timers to trigger FileReader onloadend
-      vi.advanceTimersByTime(10);
-
       // Verify WebSocket.send was called with correct data
-      expect(sendSpy).toHaveBeenCalledWith(JSON.stringify({
+      expect(mockWs.send).toHaveBeenCalledWith(JSON.stringify({
         type: "audio",
         format: "audio/wav;base64",
         data: "mockBase64Data",
@@ -267,9 +225,8 @@ describe("HumeRealtimeEmotionService テスト (優先度: 5)", () => {
       // Initialize WebSocket
       await service.initWebSocket();
 
-      // Get WebSocket instance and spy on close method
-      const ws = (global.WebSocket as any).mock.instances[0];
-      const closeSpy = vi.spyOn(ws, "close");
+      // Spy on close method
+      const closeSpy = vi.spyOn(mockWs, "close");
 
       // Call closeConnection
       service.closeConnection();

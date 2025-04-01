@@ -8,16 +8,6 @@ vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: vi.fn(),
 }));
 
-// Create a specific mock for getEmotionDataByAssessment
-vi.mock("./emotion-actions", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    // Keep getEmotionDataByAssessment as an auto-mock but let the real functions call it
-    getEmotionDataByAssessment: vi.fn(),
-  };
-});
-
 describe("感情データアクション機能 (優先度: 5)", () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -161,12 +151,20 @@ describe("感情データアクション機能 (優先度: 5)", () => {
         },
       ];
 
-      // Set up the mock for getEmotionDataByAssessment
-      vi.mocked(emotionActions.getEmotionDataByAssessment)
+      // Mock Supabase to return the emotion data
+      vi.mocked(supabaseServer.createSupabaseServerClient)
         .mockResolvedValueOnce({
-          success: true,
-          data: mockEmotionData,
-        });
+          from: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  data: mockEmotionData,
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        } as any);
 
       // Call the function
       const result = await emotionActions.getEmotionData(
@@ -206,12 +204,20 @@ describe("感情データアクション機能 (優先度: 5)", () => {
     });
 
     it("サービスエラーを適切に処理すること", async () => {
-      // Set up the mock for getEmotionDataByAssessment to return an error
-      vi.mocked(emotionActions.getEmotionDataByAssessment)
+      // Mock Supabase to return an error
+      vi.mocked(supabaseServer.createSupabaseServerClient)
         .mockResolvedValueOnce({
-          success: false,
-          error: "Database error",
-        });
+          from: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  data: null,
+                  error: { message: "Database error" },
+                }),
+              }),
+            }),
+          }),
+        } as any);
 
       // Call the function
       const result = await emotionActions.getEmotionData(
