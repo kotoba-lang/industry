@@ -68,9 +68,9 @@ export function generateGraphDataFromWordAssessment(
       x,
       y,
       z,
-      color: word.length % 2 === 0 ? '#ffffff' : '#e0e0e0',
-      darkColor: word.length % 2 === 0 ? '#ffffff' : '#e0e0e0',
-      lightColor: word.length % 2 === 0 ? '#333333' : '#555555',
+      ...(word.length % 2 === 0 
+        ? { color: '#ffffff', darkColor: '#ffffff', lightColor: '#333333' } 
+        : { color: '#e0e0e0', darkColor: '#e0e0e0', lightColor: '#555555' }),
     });
 
     // Create link between field and word node
