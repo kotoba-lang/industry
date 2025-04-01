@@ -118,11 +118,13 @@ export default function IntegratedJungAssessment({
     setAssessmentType('word');
     setShowTestSelection(false);
     setShowWordTest(true);
+    setShowVoiceTest(false);
   };
   
   const handleSelectVoiceTest = () => {
     setAssessmentType('voice');
     setShowTestSelection(false);
+    setShowWordTest(false);
     setShowVoiceTest(true);
   };
   
@@ -130,6 +132,7 @@ export default function IntegratedJungAssessment({
     setAssessmentType('both');
     setShowTestSelection(false);
     setShowWordTest(true);
+    setShowVoiceTest(false);
   };
 
   // Test completion handlers
@@ -139,7 +142,10 @@ export default function IntegratedJungAssessment({
     if (assessmentType === 'both' && !voiceTestResults) {
       // Switch to voice test if doing both
       setShowWordTest(false);
-      setShowVoiceTest(true);
+      
+      setTimeout(() => {
+        setShowVoiceTest(true);
+      }, 500);
     } else {
       // Just completed word test only, or already have voice results
       setShowWordTest(false);
@@ -150,7 +156,10 @@ export default function IntegratedJungAssessment({
   const handleVoiceTestComplete = (results: VoiceTestResults) => {
     safeSetVoiceResults(results);
     setShowVoiceTest(false);
-    setShowAnalysis(true);
+    
+    setTimeout(() => {
+      setShowAnalysis(true);
+    }, 500);
   };
 
   // Navigation handlers
@@ -162,11 +171,15 @@ export default function IntegratedJungAssessment({
   const handleRetakeTest = () => {
     safeSetWordResults(null);
     safeSetVoiceResults(null);
-    setShowTestSelection(true);
+    
     setShowWordTest(false);
     setShowVoiceTest(false);
     setShowAnalysis(false);
     setShowModel(false);
+    
+    setTimeout(() => {
+      setShowTestSelection(true);
+    }, 500);
   };
 
   // Configuration handlers
