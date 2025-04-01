@@ -95,6 +95,11 @@ export async function saveConsentAndDemographicData(
     };
   } catch (error) {
     console.error("Error saving consent and demographic data:", error);
-    throw error;
+    return {
+      success: false,
+      userId: "",
+      consent: null,
+      demographic: null,
+    };
   }
 }
