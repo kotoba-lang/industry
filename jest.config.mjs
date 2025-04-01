@@ -15,8 +15,12 @@ const customJestConfig = {
   preset: 'ts-jest',
   testEnvironment: 'jest-environment-jsdom',
   moduleNameMapper: {
-    // Handle module aliases (this will be automatically configured for you soon)
+    // Handle module aliases
     '^@/(.*)$': '<rootDir>/src/$1',
+    // Handle CSS imports
+    '^.+\\.(css|less|scss|sass)$': 'identity-obj-proxy',
+    // Handle image imports
+    '^.+\\.(jpg|jpeg|png|gif|webp|svg)$': '<rootDir>/__mocks__/fileMock.js'
   },
   transformIgnorePatterns: [
     // Exclude node_modules except those that require transformation
@@ -34,19 +38,8 @@ const customJestConfig = {
     }],
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-  // Mock modules as needed
-  moduleNameMapper: {
-    // Handle module aliases
-    '^@/(.*)$': '<rootDir>/src/$1',
-    // Handle CSS imports
-    '^.+\\.(css|less|scss|sass)$': 'identity-obj-proxy',
-    // Handle image imports
-    '^.+\\.(jpg|jpeg|png|gif|webp|svg)$': '<rootDir>/__mocks__/fileMock.js'
-  },
   // Automatically clear mock calls and instances between every test
   clearMocks: true,
-  // Indicate which environment global variables to set up
-  testEnvironment: 'jsdom'
 };
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
