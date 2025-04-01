@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { HumeClient } from 'hume';
+import { Hume, HumeClient } from 'hume';
 import { VoiceConversationProps, Message } from './types';
 import { VoiceConversationPropsSchema } from './schema';
 import { v4 as uuidv4 } from 'uuid';
@@ -38,7 +38,12 @@ const VoiceConversation: React.FC<VoiceConversationProps> = (props) => {
         setIsApiAvailable(false);
         setError('API key not provided. Speech functionality disabled.');
       } else {
-        humeClientRef.current = new HumeClient({ apiKey });
+        // Initialize client based on the documentation
+        humeClientRef.current = new HumeClient({ 
+          apiKey
+          // Note: secretKey is optional and not needed for TTS
+        });
+        
         console.log('Hume client initialized successfully');
         
         // Log structure of the Hume client to help debug available methods
@@ -92,7 +97,7 @@ const VoiceConversation: React.FC<VoiceConversationProps> = (props) => {
     }
   }, [apiKey, initialMessage]);
 
-  // Function to generate TTS audio
+  // Function to generate TTS audio using correct API format
   const generateSpeech = useCallback(async (text: string): Promise<string | null> => {
     if (!humeClientRef.current || !isApiAvailable) {
       console.warn('Speech generation skipped: Client not available or API disabled');
@@ -102,88 +107,63 @@ const VoiceConversation: React.FC<VoiceConversationProps> = (props) => {
     try {
       setIsLoading(true);
       
-      // Create the voice if it doesn't exist (in a real app, you would check if it exists first)
-      try {
-        console.log('Attempting to create voice with name:', voiceName);
-        await humeClientRef.current.tts.voices.create({
-          generationId,
-          name: voiceName,
-        });
-        console.log('Voice created or already exists');
-      } catch (error: any) {
-        // Voice might already exist, continue
-        console.log('Voice creation error (might already exist):', error?.message || error);
-      }
-      
-      // Generate speech from text
       console.log('Attempting to generate speech for text:', text);
       
-      // Check for available methods and call the correct one
+      // Using the TTS API directly according to the documentation
+      // https://dev.hume.ai/reference/text-to-speech-tts/synthesize-json
       let response;
-      console.log('Available TTS methods:', Object.keys(humeClientRef.current.tts));
       
-      if (typeof humeClientRef.current.tts.synthesize === 'function') {
-        console.log('Using tts.synthesize method');
-        response = await humeClientRef.current.tts.synthesize({
-          text,
-          voice: voiceName,
+      try {
+        response = await humeClientRef.current.tts({
+          utterances: [
+            {
+              text: text,
+              description: voiceName // Use voiceName as description
+            }
+          ],
+          format: {
+            type: "mp3"
+          },
+          num_generations: 1
         });
-      } else if (typeof humeClientRef.current.tts.generate === 'function') {
-        console.log('Using tts.generate method');
-        response = await humeClientRef.current.tts.generate({
-          text,
-          voice: voiceName,
-        });
-      } else if (typeof humeClientRef.current.tts.streamTts === 'function') {
-        console.log('Using tts.streamTts method');
-        response = await humeClientRef.current.tts.streamTts({
-          text,
-          voice: voiceName,
-        });
-      } else {
-        // Try to find any method in the TTS object that might be for text-to-speech
-        const potentialTtsMethods = Object.keys(humeClientRef.current.tts).filter(
-          method => 
-            typeof humeClientRef.current.tts[method] === 'function' && 
-            !['voices', 'list', 'get', 'delete', 'create', 'update'].includes(method)
-        );
         
-        console.log('Potential TTS methods found:', potentialTtsMethods);
+        console.log('TTS API call successful');
+      } catch (err) {
+        console.error('Error calling TTS API directly:', err);
+        throw err;
+      }
+      
+      console.log('Speech generated successfully, response:', response);
+      
+      // The API returns a generations array with audio data in base64 format
+      if (response && response.generations && response.generations.length > 0) {
+        const generation = response.generations[0];
+        console.log('Generation data:', generation);
         
-        if (potentialTtsMethods.length > 0) {
-          // Try the first potential method
-          const methodToTry = potentialTtsMethods[0];
-          console.log(`Trying potential TTS method: ${methodToTry}`);
+        // Check if the response has audio property (base64 encoded)
+        if (generation.audio) {
+          // Convert base64 to blob
+          const binaryString = atob(generation.audio);
+          const len = binaryString.length;
+          const bytes = new Uint8Array(len);
           
-          response = await humeClientRef.current.tts[methodToTry]({
-            text,
-            voice: voiceName,
-          });
+          for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          
+          const blob = new Blob([bytes], { type: 'audio/mp3' });
+          const url = URL.createObjectURL(blob);
+          
+          console.log('Audio URL created successfully');
+          return url;
         } else {
-          throw new Error('No compatible TTS method found in Hume API client');
+          console.error('No audio data in generation:', generation);
+          throw new Error('No audio data in TTS response');
         }
-      }
-      
-      console.log('Speech generated successfully, creating audio URL');
-      // Convert the audio response to a URL
-      let blob;
-      
-      // Check if response has arrayBuffer method
-      if (response && typeof response.arrayBuffer === 'function') {
-        blob = new Blob([await response.arrayBuffer()], { type: 'audio/mpeg' });
-      } else if (response && response.audio) {
-        // Some APIs might return audio data directly
-        blob = new Blob([response.audio], { type: 'audio/mpeg' });
-      } else if (response && typeof response === 'object') {
-        // Log available properties to help debug
-        console.log('Response properties:', Object.keys(response));
-        throw new Error('Unsupported response format from TTS API');
       } else {
-        throw new Error('Invalid response from TTS API');
+        console.error('Invalid TTS response structure:', response);
+        throw new Error('Invalid TTS response structure');
       }
-      
-      const url = URL.createObjectURL(blob);
-      return url;
     } catch (err: any) {
       const errorMessage = err?.message || 'Unknown error';
       console.error('Text-to-speech detailed error:', errorMessage);
@@ -193,7 +173,7 @@ const VoiceConversation: React.FC<VoiceConversationProps> = (props) => {
     } finally {
       setIsLoading(false);
     }
-  }, [generationId, voiceName, isApiAvailable]);
+  }, [voiceName, isApiAvailable]);
 
   // Handle sending a new message
   const handleSendMessage = async () => {
