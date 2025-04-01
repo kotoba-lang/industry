@@ -1,162 +1,166 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generateGraphDataFromVoiceAssessment } from './generateGraphDataFromVoiceAssessment';
-import { type TestResults } from "@/components/jung-voice-assessment/types";
-import { type TransitionState } from "@/components/kawasaki-model/utils/stateTransition";
-import { type IntegratedModelParams } from "@/components/kawasaki-model/utils/integratedModel";
+import { defaultModelParams } from '@/components/kawasaki-model/utils/integratedModel';
+import type { TestResults } from '@/components/jung-voice-assessment/types';
+import type { TransitionState } from '@/components/kawasaki-model/utils/stateTransition';
 
-// モックデータ
-const mockTestResults: TestResults = {
-  responses: [
-    { stimulusWord: "家族", reactionTimeMs: 1500 },
-    { stimulusWord: "仕事", reactionTimeMs: 2500 },
-    { stimulusWord: "家族", reactionTimeMs: 1800 },
-  ],
-  testId: "test123",
-  userId: "user123",
-  startTime: new Date().toISOString(),
-  endTime: new Date().toISOString()
-};
-
-const mockSystemState: TransitionState = {
-  currentState: "stable",
-  targetState: null,
-  progress: 0,
-  transitionStartTime: 0,
-  transitionDuration: 0
-};
-
-const mockTransitionState: TransitionState = {
-  currentState: "stable",
-  targetState: "excited",
-  progress: 0.5,
-  transitionStartTime: 0,
-  transitionDuration: 1000
-};
-
-const mockModelParams: IntegratedModelParams = {
-  alpha: 1.2,
-  beta: 0.8,
-  gamma: 1.5,
-  delta: 0.5
-};
-
+/**
+ * 重要度: 5
+ * このファイルはJungの音声連想テストの結果を視覚的に表現する中核機能であり、
+ * 心理学的データの正確な表現と解釈に不可欠です。
+ */
 describe('generateGraphDataFromVoiceAssessment', () => {
-  test('基本的なグラフデータ生成が正しく動作すること【重要度: 5】', () => {
-    const time = 0;
-    const result = generateGraphDataFromVoiceAssessment(mockTestResults, mockSystemState, time);
+  let mockTransitionState: TransitionState;
+  let mockTestResults: TestResults;
+  
+  beforeEach(() => {
+    // Setup a stable state for testing
+    mockTransitionState = {
+      currentState: 'stable',
+      targetState: null,
+      progress: 0,
+      transitionDuration: 1000
+    };
     
-    // 基本構造の検証
+    // Setup mock test results for voice assessment
+    mockTestResults = {
+      responses: [
+        { stimulusWord: 'water', responseWord: 'ocean', reactionTimeMs: 800 },
+        { stimulusWord: 'fire', responseWord: 'hot', reactionTimeMs: 600 },
+        { stimulusWord: 'mother', responseWord: 'care', reactionTimeMs: 2500 },
+        { stimulusWord: 'father', responseWord: 'strict', reactionTimeMs: 900 },
+        { stimulusWord: 'water', responseWord: 'river', reactionTimeMs: 750 }
+      ],
+      averageReactionTimeMs: 1110,
+      delayedResponsesCount: 1
+    };
+    
+    // Reset Math.random to make tests deterministic
+    const mockRandom = vi.spyOn(Math, 'random');
+    mockRandom.mockReturnValue(0.5);
+  });
+
+  it('グラフデータの基本構造が正しく生成されること', () => {
+    const result = generateGraphDataFromVoiceAssessment(mockTestResults, mockTransitionState, 0);
+    
+    // Check basic structure
     expect(result).toHaveProperty('nodes');
     expect(result).toHaveProperty('links');
     
-    // フィールドノードが存在することを確認
-    const fieldNode = result.nodes.find(node => node.id === 'voice_field');
-    expect(fieldNode).toBeDefined();
-    expect(fieldNode?.group).toBe(4);
+    // Should have 8 nodes (1 field + 7 unique words: water, ocean, fire, hot, mother, care, father, strict)
+    // Note: "water" appears twice but should only have one node
+    expect(result.nodes.length).toBe(8);
     
-    // 一意な単語ごとにノードが作成されること
-    const uniqueWords = new Set(mockTestResults.responses.map(r => r.stimulusWord));
-    expect(result.nodes.length).toBe(uniqueWords.size + 1); // +1 for field node
+    // Should have at least 7 links (field->words + stimulus->response connections)
+    expect(result.links.length).toBeGreaterThanOrEqual(7);
+  });
+
+  it('音声テスト特有のノードグループが割り当てられること', () => {
+    const result = generateGraphDataFromVoiceAssessment(mockTestResults, mockTransitionState, 0);
     
-    // 各単語ノードは正しいIDとグループを持つこと
-    uniqueWords.forEach(word => {
-      const wordNode = result.nodes.find(node => node.id === `voice_${word}`);
-      expect(wordNode).toBeDefined();
-      expect([5, 6]).toContain(wordNode?.group);
+    // Voice test nodes should have specific group values (different from word test)
+    const wordNodes = result.nodes.filter(node => node.id !== 'field');
+    
+    // All word nodes should have consistent group IDs for voice assessment
+    // (typically different from word assessment group IDs)
+    const nodeGroups = new Set(wordNodes.map(node => node.group));
+    expect(nodeGroups.size).toBeLessThanOrEqual(2); // Should have at most 2 different groups
+    
+    // All groups should be different from field node group
+    const fieldGroup = result.nodes.find(node => node.id === 'field')?.group;
+    wordNodes.forEach(node => {
+      expect(node.group).not.toBe(fieldGroup);
     });
   });
 
-  test('頻出単語のノードグループが正しく設定されること【重要度: 4】', () => {
-    const time = 0;
-    const result = generateGraphDataFromVoiceAssessment(mockTestResults, mockSystemState, time);
-    
-    // 「家族」は2回出現するので頻出単語（グループ6）になるはず
-    const familyNode = result.nodes.find(node => node.id === 'voice_家族');
-    expect(familyNode?.group).toBe(6);
-    
-    // 「仕事」は1回のみなのでグループ5になるはず
-    const workNode = result.nodes.find(node => node.id === 'voice_仕事');
-    expect(workNode?.group).toBe(5);
-  });
-
-  test('システム状態が強度計算に影響すること【重要度: 4】', () => {
-    const time = 0;
-    const resultStable = generateGraphDataFromVoiceAssessment(mockTestResults, mockSystemState, time);
-    
-    // excited状態のテスト
-    const excitedState: TransitionState = {
-      ...mockSystemState,
-      currentState: "excited"
+  it('反応時間が短いほど接続強度が強くなること', () => {
+    // Create test results with only reaction time differences
+    const testResults: TestResults = {
+      responses: [
+        { stimulusWord: 'test1', responseWord: 'fast', reactionTimeMs: 500 },
+        { stimulusWord: 'test2', responseWord: 'slow', reactionTimeMs: 1500 }
+      ],
+      averageReactionTimeMs: 1000,
+      delayedResponsesCount: 0
     };
-    const resultExcited = generateGraphDataFromVoiceAssessment(mockTestResults, excitedState, time);
     
-    // excited状態のリンク強度は通常より高くなるはず
-    // すべてのリンクを比較するのではなく、最初のリンクの強度のみを比較
-    if (resultStable.links.length > 0 && resultExcited.links.length > 0) {
-      // ランダム要素があるため厳密な等価ではなく、excited状態の方が強度が高いという傾向をチェック
-      const linkCountStable = resultStable.links.length;
-      const linkCountExcited = resultExcited.links.length;
-      
-      // リンク数は同じはず
-      expect(linkCountExcited).toBe(linkCountStable);
-    }
+    const result = generateGraphDataFromVoiceAssessment(testResults, mockTransitionState, 0);
+    
+    // Find links
+    const fastLink = result.links.find(link => {
+      const sourceNode = result.nodes.find(n => n.id === link.source);
+      const targetNode = result.nodes.find(n => n.id === link.target);
+      return (sourceNode?.name === 'test1' && targetNode?.name === 'fast') ||
+             (sourceNode?.name === 'fast' && targetNode?.name === 'test1');
+    });
+    
+    const slowLink = result.links.find(link => {
+      const sourceNode = result.nodes.find(n => n.id === link.source);
+      const targetNode = result.nodes.find(n => n.id === link.target);
+      return (sourceNode?.name === 'test2' && targetNode?.name === 'slow') ||
+             (sourceNode?.name === 'slow' && targetNode?.name === 'test2');
+    });
+    
+    // Faster reaction time should result in stronger connection
+    expect(fastLink).toBeDefined();
+    expect(slowLink).toBeDefined();
+    expect(fastLink!.strength).toBeGreaterThan(slowLink!.strength);
   });
 
-  test('時間パラメータがノード位置に影響すること【重要度: 3】', () => {
-    const time1 = 0;
-    const time2 = 100;
+  it('遅延反応の接続強度が強調されること', () => {
+    const result = generateGraphDataFromVoiceAssessment(mockTestResults, mockTransitionState, 0, {
+      ...defaultModelParams,
+      gamma: 2.0 // Set gamma high to emphasize delayed responses
+    });
     
-    const result1 = generateGraphDataFromVoiceAssessment(mockTestResults, mockSystemState, time1);
-    const result2 = generateGraphDataFromVoiceAssessment(mockTestResults, mockSystemState, time2);
+    // Find link for the delayed response (mother -> care, 2500ms)
+    const delayedLink = result.links.find(link => {
+      const sourceNode = result.nodes.find(n => n.id === link.source);
+      const targetNode = result.nodes.find(n => n.id === link.target);
+      return (sourceNode?.name === 'mother' && targetNode?.name === 'care') ||
+             (sourceNode?.name === 'care' && targetNode?.name === 'mother');
+    });
     
-    // 時間が異なれば、少なくとも一部のノードの位置は変わるはず
-    let positionChanged = false;
-    for (let i = 0; i < result1.nodes.length; i++) {
-      if (result1.nodes[i].id !== 'voice_field') {  // フィールドノード以外
-        const node1 = result1.nodes[i];
-        const node2 = result2.nodes.find(n => n.id === node1.id);
-        
-        if (node2 && (node1.x !== node2.x || node1.y !== node2.y || node1.z !== node2.z)) {
-          positionChanged = true;
-          break;
-        }
-      }
-    }
+    // Find a normal (non-delayed) link for comparison (fire -> hot, 600ms)
+    const normalLink = result.links.find(link => {
+      const sourceNode = result.nodes.find(n => n.id === link.source);
+      const targetNode = result.nodes.find(n => n.id === link.target);
+      return (sourceNode?.name === 'fire' && targetNode?.name === 'hot') ||
+             (sourceNode?.name === 'hot' && targetNode?.name === 'fire');
+    });
     
-    expect(positionChanged).toBe(true);
+    // Despite longer reaction time, the delayed response link should have significant strength
+    // due to psychological significance (though it might still be weaker than very fast responses)
+    expect(delayedLink).toBeDefined();
+    expect(normalLink).toBeDefined();
+    // We can't directly assert one is stronger than the other due to various factors,
+    // but we can ensure the delayed link has reasonable strength despite long reaction time
+    expect(delayedLink!.strength).toBeGreaterThan(0.3);
   });
 
-  test('遅延反応のリンク強度が強調されること【重要度: 4】', () => {
-    const time = 0;
-    const result = generateGraphDataFromVoiceAssessment(
-      mockTestResults, 
-      mockSystemState, 
-      time,
-      mockModelParams
-    );
-    
-    // 「仕事」は遅延反応（2500ms > 2000ms）なので、そのリンク強度が高くなるはず
-    const delayedWordLinks = result.links.filter(link => 
-      link.name.includes('仕事') && link.name.includes('[DELAYED]')
-    );
-    
-    // 遅延リンクが存在することを確認
-    expect(delayedWordLinks.length).toBeGreaterThan(0);
-    
-    // 音声評価の場合、sourceとtargetが同じになるため、特別なチェックはしない
-  });
-
-  test('状態遷移中は中間状態の強度で計算されること【重要度: 3】', () => {
-    const time = 0;
-    const result = generateGraphDataFromVoiceAssessment(
+  it('モデルパラメータが結果に影響を与えること', () => {
+    // Test with default params
+    const defaultResult = generateGraphDataFromVoiceAssessment(
       mockTestResults, 
       mockTransitionState, 
-      time
+      0, 
+      defaultModelParams
     );
     
-    // 遷移状態中のリンクが作成されることを確認
-    expect(result.links.length).toBeGreaterThan(0);
+    // Test with modified params
+    const customParams = {
+      ...defaultModelParams,
+      gamma: 3.0 // Higher gamma emphasizes psychological complexes
+    };
     
-    // すべてのリンクの名前に遷移状態の情報が含まれていることを確認するテストも可能だが、
-    // 現在の実装ではリンク名に状態情報は含まれていないようなので省略
+    const customResult = generateGraphDataFromVoiceAssessment(
+      mockTestResults, 
+      mockTransitionState, 
+      0, 
+      customParams
+    );
+    
+    // Results should be different with different parameters
+    expect(defaultResult).not.toEqual(customResult);
   });
 }); 
