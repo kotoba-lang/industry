@@ -6,7 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { saveConsentAndDemographicData } from '@/lib/db/utils';
+import { saveConsentData } from '@/lib/actions/consent-actions';
 
 // 型定義
 export interface DemographicData {
@@ -50,7 +50,7 @@ export default function ConsentForm({
 
       // データベースに保存
       if (typeof window !== 'undefined') {
-        await saveConsentAndDemographicData(
+        await saveConsentData(
           demographicData,
           {
             consentGiven: consented,
