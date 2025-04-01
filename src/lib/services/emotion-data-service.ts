@@ -1,8 +1,6 @@
 "use server";
 
-import { db } from '@/lib/db';
-import { emotionData, faceEmotionData } from '@/lib/db/schema';
-import { sql } from 'drizzle-orm';
+import { createServerClient } from '@/lib/supabase/server';
 
 /**
  * Service for handling emotion data operations
@@ -21,15 +19,24 @@ export const EmotionDataService = {
     timestamp: number;
   }) => {
     try {
-      await db.insert(emotionData).values({
-        userId: data.userId,
-        assessmentId: data.assessmentId,
-        stimulusWord: data.stimulusWord,
-        responseWord: data.responseWord,
-        reactionTimeMs: data.reactionTimeMs,
-        faceEmotions: data.faceEmotions,
-        timestamp: new Date(data.timestamp)
-      });
+      const supabase = await createServerClient();
+      
+      const { error } = await supabase
+        .from('emotion_data')
+        .insert({
+          user_id: data.userId,
+          assessment_id: data.assessmentId,
+          stimulus_word: data.stimulusWord,
+          response_word: data.responseWord,
+          reaction_time_ms: data.reactionTimeMs,
+          face_emotions: data.faceEmotions,
+          timestamp: new Date(data.timestamp).toISOString()
+        });
+      
+      if (error) {
+        console.error('Error saving emotion data:', error);
+        return { success: false, error: error.message };
+      }
       
       return { success: true };
     } catch (error) {
@@ -53,15 +60,24 @@ export const EmotionDataService = {
     }
   ) => {
     try {
-      await db.insert(faceEmotionData).values({
-        userId,
-        assessmentId,
-        stimulusWord,
-        responseWord,
-        reactionTimeMs,
-        emotions: emotionData.emotions,
-        timestamp: new Date(emotionData.timestamp)
-      });
+      const supabase = await createServerClient();
+      
+      const { error } = await supabase
+        .from('face_emotion_data')
+        .insert({
+          user_id: userId,
+          assessment_id: assessmentId,
+          stimulus_word: stimulusWord,
+          response_word: responseWord,
+          reaction_time_ms: reactionTimeMs,
+          emotions: emotionData.emotions,
+          timestamp: new Date(emotionData.timestamp).toISOString()
+        });
+      
+      if (error) {
+        console.error('Error saving facial emotion data:', error);
+        return { success: false, error: error.message };
+      }
       
       return { success: true };
     } catch (error) {
@@ -75,11 +91,20 @@ export const EmotionDataService = {
    */
   getEmotionDataByAssessment: async (userId: string, assessmentId: string) => {
     try {
-      const result = await db.query.emotionData.findMany({
-        where: sql`user_id = ${userId} AND assessment_id = ${assessmentId}`
-      });
+      const supabase = await createServerClient();
       
-      return { success: true, data: result };
+      const { data, error } = await supabase
+        .from('emotion_data')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('assessment_id', assessmentId);
+      
+      if (error) {
+        console.error('Error retrieving emotion data:', error);
+        return { success: false, error: error.message };
+      }
+      
+      return { success: true, data: data || [] };
     } catch (error) {
       console.error('Error retrieving emotion data:', error);
       return { success: false, error: 'Failed to retrieve emotion data' };
