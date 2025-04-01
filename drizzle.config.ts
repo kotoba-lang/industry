@@ -7,7 +7,6 @@ export default {
   out: './drizzle',
   dialect: 'postgresql',
   dbCredentials: {
-    connectionString: process.env.DATABASE_URL!,
-    ssl: true,
+    url: process.env.DATABASE_URL!,
   },
 } satisfies Config; 
