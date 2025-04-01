@@ -20,7 +20,7 @@
 .markdown .math-formula {
   font-family: 'Times New Roman', serif;
   font-style: italic;
-  background-color: #f5f5f5;
+  @apply bg-gray-100 dark:bg-gray-800 dark:text-white;
   padding: 1rem;
   margin: 1rem 0;
   border-radius: 0.25rem;
@@ -33,7 +33,7 @@
 .markdown .mathBlock {
   margin: 2rem 0;
   padding: 1rem;
-  background-color: #f8f9fa;
+  @apply bg-gray-100 dark:bg-gray-800;
   border-radius: 0.5rem;
   overflow-x: auto;
   text-align: center;
@@ -41,4 +41,58 @@
 
 .markdown .katex-display {
   margin: 0;
+}
+
+/* KaTeXのダークモード対応 */
+:global(.dark) .katex {
+  color: white;
+}
+
+:global(.dark) .katex-html {
+  color: #ccc;
+}
+
+:global(.dark) .katex .mord {
+  color: white;
+}
+
+:global(.dark) .katex .mbin {
+  color: white;
+}
+
+:global(.dark) .katex .mrel {
+  color: white;
+}
+
+:global(.dark) .katex .mopen, 
+:global(.dark) .katex .mclose {
+  color: white;
+}
+
+:global(.dark) .katex .mfrac {
+  color: white;
+}
+
+:global(.dark) .katex .minner {
+  color: white;
+}
+
+:global(.dark) .katex .mop {
+  color: white;
+}
+
+:global(.dark) .katex .msupsub {
+  color: white;
+}
+
+:global(.dark) .katex .vlist {
+  color: white;
+}
+
+:global(.dark) .katex .overline .overline-line {
+  border-top-color: white;
+}
+
+:global(.dark) .katex .underline .underline-line {
+  border-bottom-color: white;
 }

@@ -25,8 +25,13 @@ export function generateGraphDataFromWordAssessment(
 
   // Create field node (central node)
   const fieldName = "Jung Word Association Field";
-  const nodes = [{ id: "field", group: 1, name: fieldName }];
-  const links = [];
+  const nodes = [{ id: "field", group: 1, name: fieldName, x: 0, y: 0, z: 0 }];
+  const links: {
+    source: string;
+    target: string;
+    strength: number;
+    name: string;
+  }[] = [];
 
   // Create nodes for each unique word (both stimulus and response)
   const uniqueWords = new Set<string>();
