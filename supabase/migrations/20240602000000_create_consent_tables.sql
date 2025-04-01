@@ -15,6 +15,10 @@ CREATE TABLE IF NOT EXISTS spirit_in_physics.consent_records (
   researcher_note TEXT
 );
 
+-- Add unique constraint to consent_records.user_id
+ALTER TABLE spirit_in_physics.consent_records
+  ADD CONSTRAINT consent_records_user_id_key UNIQUE (user_id);
+
 -- Create demographic data table
 CREATE TABLE IF NOT EXISTS spirit_in_physics.demographic_data (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
