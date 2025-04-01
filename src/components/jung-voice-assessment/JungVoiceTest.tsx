@@ -50,7 +50,7 @@ const DELAYED_REACTION_THRESHOLD_MS = 2000;
 
 // AIガイドメッセージ
 const AI_GUIDE_MESSAGES = {
-  introduction: "Welcome to Jung's Word Association Test. I'll present a series of words to you. For each word, please respond verbally with the first word that comes to mind. I'll analyze your reaction times and response patterns. When you're ready, say 'begin' or click the start button.",
+  introduction: "Welcome to Spirit in Physics (Jung's Word Association Test Embedding Model). I'll present a series of words to you. For each word, please respond verbally with the first word that comes to mind. I'll analyze your reaction times and response patterns. When you're ready, say 'begin' or click the start button.",
   nextWord: "Next word:",
   testComplete: "The test is now complete. Thank you for your responses. I'm analyzing your results.",
   delayed: "Next word:",
