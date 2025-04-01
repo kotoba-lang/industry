@@ -1,0 +1,72 @@
+# Database Migration and Schema Management Rule
+
+## Purpose
+This rule defines how to handle database schema changes and migrations in the project. We use Drizzle for database schema definitions and migrations while using Supabase as the client for querying the database.
+
+## Rules
+
+### 1. Schema Definitions
+- All database table schemas must be defined in the `src/lib/db/schema` directory
+- Each table should have its own file with a clear name (e.g., `user.ts`, `post.ts`)
+- All schema files must export types for both select and insert operations
+- Schema definitions must use `pgTable` from Drizzle
+- Table and column names in the schema should use camelCase for variable names and snake_case for database fields
+
+### 2. Schema Changes
+- When modifying an existing schema:
+  1. Update the schema definition in the appropriate file
+  2. Run `pnpm db:generate` to generate migration SQL
+  3. Review the generated migrations before applying
+
+### 3. Migrations
+- All migrations should be automatically generated using Drizzle Kit
+- Never manually edit migration files unless absolutely necessary
+- To apply migrations, use `pnpm db:migrate`
+- Migration commands:
+  - `pnpm db:generate`: Generate migrations
+  - `pnpm db:migrate`: Apply migrations
+  - `pnpm db:push`: Push schema changes directly (development only)
+  - `pnpm db:pull`: Pull and introspect schema from the database
+  - `pnpm db:studio`: Open Drizzle Studio to view/edit data
+
+### 4. Database Access Pattern
+- Use Supabase client for database operations
+- Define types from Drizzle schema to use with Supabase client
+- All database access functions should be in server components or server actions
+- Handle errors consistently for all database operations
+
+## Example Schema Definition
+
+```typescript
+import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+
+export const SCHEMA = 'your_schema_name';
+
+export const users = pgTable('users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: text('email').notNull().unique(),
+  name: text('name'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => {
+  return {
+    ...table,
+    schema: SCHEMA,
+  };
+});
+
+// Export types
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+```
+
+## Example Migration Command
+
+Generate migrations:
+```bash
+pnpm db:generate
+```
+
+Apply migrations:
+```bash
+pnpm db:migrate
+``` 
