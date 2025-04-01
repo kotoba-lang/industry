@@ -16,8 +16,8 @@ export default function ConsentForm({ onConsent }: ConsentFormProps) {
     <div className="max-w-3xl mx-auto p-6 bg-white rounded-lg shadow-md border border-gray-200">
       <h2 className="text-2xl font-bold mb-4">Research Participation Consent</h2>
       
-      <div className="mb-6">
-        <p className="mb-4">This Jung's Word Association Test is conducted for research purposes. Please read the following consent information before proceeding.</p>
+      <div className="mb-6">z
+        <p className="mb-4">This Spirit in Physics (Jung's Word Association Embedding Test) is conducted for research purposes. Please read the following consent information before proceeding.</p>
         
         <button 
           onClick={() => setShowFullConsent(!showFullConsent)}
@@ -30,7 +30,7 @@ export default function ConsentForm({ onConsent }: ConsentFormProps) {
           <div className="p-4 bg-gray-50 rounded-md mb-4 max-h-96 overflow-y-auto text-sm">
             <h3 className="font-bold mb-2">Research Purpose</h3>
             <p className="mb-4">
-              This research aims to investigate the relationship between language responses and psychological processes using Jung's Word Association Test.
+              This research aims to investigate the relationship between language responses and psychological processes using Spirit in Physics (Jung's Word Association Embedding Test).
               In this test, we record your immediate reactions to stimulus words.
             </p>
             
@@ -78,7 +78,7 @@ export default function ConsentForm({ onConsent }: ConsentFormProps) {
           <Checkbox 
             id="consent1" 
             checked={consented} 
-            onCheckedChange={(checked) => setConsented(checked as boolean)} 
+            onCheckedChange={(checked: boolean) => setConsented(checked)} 
             className="mt-1"
           />
           <label htmlFor="consent1" className="ml-2 text-sm">
