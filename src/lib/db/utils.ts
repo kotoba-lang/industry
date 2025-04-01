@@ -3,6 +3,34 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { v4 as uuidv4 } from 'uuid'
 
+// Define the same types as in queries.ts for consistency
+interface ConsentRecord {
+  id: string
+  user_id: string
+  created_at: string
+  consent_given: boolean
+  consent_version: string
+  consent_text?: string
+  ip_address?: string
+  user_agent?: string
+  study_id?: string
+  researcher_note?: string
+}
+
+interface DemographicData {
+  id: string
+  user_id: string
+  created_at: string
+  age_group: string
+  gender: string
+  ethnicity: string
+  income: string
+  ip_address?: string
+  user_agent?: string
+  study_id?: string
+  consent_version?: string
+}
+
 /**
  * 同意フォームからの人口統計データと同意情報を保存
  */
@@ -23,7 +51,12 @@ export async function saveConsentAndDemographicData(
     userAgent?: string;
     studyId?: string;
   }
-) {
+): Promise<{
+  success: boolean;
+  userId: string;
+  consent: ConsentRecord | null;
+  demographic?: DemographicData | null;
+}> {
   try {
     const supabase = await createServerClient()
     

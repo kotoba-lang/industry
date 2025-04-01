@@ -1,11 +1,39 @@
 import { getConsentRecords, getDemographicData } from '@/lib/db/queries'
 
+// Define interfaces for the data (should match the ones in queries.ts)
+interface ConsentRecord {
+  id: string
+  user_id: string
+  created_at: string
+  consent_given: boolean
+  consent_version: string
+  consent_text?: string
+  ip_address?: string
+  user_agent?: string
+  study_id?: string
+  researcher_note?: string
+}
+
+interface DemographicData {
+  id: string
+  user_id: string
+  created_at: string
+  age_group: string
+  gender: string
+  ethnicity: string
+  income: string
+  ip_address?: string
+  user_agent?: string
+  study_id?: string
+  consent_version?: string
+}
+
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export default async function ConsentDataPage() {
-  let consentData = []
-  let demographicData = []
+  let consentData: ConsentRecord[] = []
+  let demographicData: DemographicData[] = []
   let error = null
 
   try {
@@ -42,7 +70,7 @@ export default async function ConsentDataPage() {
                 </tr>
               </thead>
               <tbody>
-                {consentData.map((record: any) => (
+                {consentData.map((record) => (
                   <tr key={record.id} className="hover:bg-gray-50">
                     <td className="py-2 px-4 border">{record.user_id}</td>
                     <td className="py-2 px-4 border">{record.consent_given ? '同意' : '不同意'}</td>
@@ -75,7 +103,7 @@ export default async function ConsentDataPage() {
                 </tr>
               </thead>
               <tbody>
-                {demographicData.map((record: any) => (
+                {demographicData.map((record) => (
                   <tr key={record.id} className="hover:bg-gray-50">
                     <td className="py-2 px-4 border">{record.user_id}</td>
                     <td className="py-2 px-4 border">{record.age_group}</td>
