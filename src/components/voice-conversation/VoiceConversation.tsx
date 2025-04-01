@@ -6,23 +6,80 @@ import { VoiceConversationProps, Message } from './types';
 import { VoiceConversationPropsSchema } from './schema';
 import { v4 as uuidv4 } from 'uuid';
 
-// Interface for the Web Speech API (not fully defined in TypeScript)
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-  onresult: (event: any) => void;
-  onerror: (event: any) => void;
-  onend: () => void;
+// Interface for Hume Emotion Recognition response
+interface HumeEmotionResponse {
+  results: {
+    models: {
+      prosody: {
+        predictions: Array<{
+          name: string;
+          score: number;
+        }>;
+      };
+    };
+  }[];
 }
 
-interface Window {
-  SpeechRecognition: new () => SpeechRecognition;
-  webkitSpeechRecognition: new () => SpeechRecognition;
+// Interface for Hume Speech Recognition response
+interface HumeSpeechRecognitionResponse {
+  transcription: string;
+  confidence: number;
 }
+
+// Interface for emotion data
+interface EmotionData {
+  name: string;
+  score: number;
+  description?: string;
+}
+
+// Emotion descriptions mapping
+const emotionDescriptions: Record<string, string> = {
+  "Admiration": "Respect or praise toward someone",
+  "Adoration": "Deep love and respect",
+  "Aesthetic Appreciation": "Appreciation for beauty or art",
+  "Amusement": "Finding something funny or entertaining",
+  "Anger": "Strong feeling of displeasure or hostility",
+  "Anxiety": "Feeling of worry or nervousness",
+  "Awe": "Feeling of wonder or amazement",
+  "Awkwardness": "Feeling uncomfortable or embarrassed",
+  "Boredom": "State of being uninterested or weary",
+  "Calmness": "State of being peaceful and tranquil",
+  "Concentration": "Deep mental focus or attention",
+  "Confusion": "State of being uncertain or puzzled",
+  "Contempt": "Feeling that someone is worthless or beneath consideration",
+  "Contentment": "State of peaceful satisfaction",
+  "Desire": "Strong feeling of wanting something",
+  "Disappointment": "Sadness from unfulfilled expectations",
+  "Disgust": "Strong aversion or repulsion",
+  "Distress": "Extreme anxiety, sorrow, or pain",
+  "Doubt": "Feeling of uncertainty or lack of conviction",
+  "Ecstasy": "Overwhelming feeling of joy or delight",
+  "Embarrassment": "Self-conscious discomfort or shame",
+  "Empathic Pain": "Feeling pain in response to another's suffering",
+  "Entrancement": "State of being captivated or spellbound",
+  "Excitement": "Feeling of enthusiasm and eagerness",
+  "Fear": "Feeling of being afraid or threatened",
+  "Gratitude": "Feeling of thankfulness or appreciation",
+  "Guilt": "Feeling of responsibility for wrongdoing",
+  "Horror": "Intense feeling of fear, shock, or disgust",
+  "Interest": "Feeling of curiosity or engagement",
+  "Joy": "Feeling of great happiness",
+  "Love": "Deep affection or attachment",
+  "Nostalgia": "Sentimental longing for the past",
+  "Pain": "Physical or emotional suffering",
+  "Pride": "Feeling of satisfaction from achievement",
+  "Realization": "Moment of sudden understanding",
+  "Relief": "Feeling of reassurance after anxiety or distress",
+  "Romance": "Feeling of excitement about love",
+  "Sadness": "Feeling of sorrow or unhappiness",
+  "Satisfaction": "Fulfillment of a need or desire",
+  "Shame": "Painful feeling from consciousness of wrongdoing",
+  "Surprise": "Feeling caused by something unexpected",
+  "Sympathy": "Feelings of pity or sorrow for someone else",
+  "Tiredness": "State of needing rest or sleep",
+  "Triumph": "Joy or satisfaction from victory or success"
+};
 
 const VoiceConversation: React.FC<VoiceConversationProps> = (props) => {
   // Validate input props with Zod
@@ -49,49 +106,16 @@ const VoiceConversation: React.FC<VoiceConversationProps> = (props) => {
   const humeClientRef = useRef<HumeClient | null>(null);
   const [isApiAvailable, setIsApiAvailable] = useState<boolean>(true);
   
-  // Speech recognition states
+  // States for speech recognition and emotion detection
   const [isListening, setIsListening] = useState(false);
-  const [isSpeechSupported, setIsSpeechSupported] = useState(false);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-
-  // Check if speech recognition is supported
-  useEffect(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    setIsSpeechSupported(!!SpeechRecognition);
-    
-    if (SpeechRecognition) {
-      recognitionRef.current = new SpeechRecognition();
-      if (recognitionRef.current) {
-        recognitionRef.current.continuous = false;
-        recognitionRef.current.interimResults = true;
-        recognitionRef.current.lang = speechRecognitionLang;
-        
-        recognitionRef.current.onresult = (event) => {
-          const transcript = Array.from(event.results)
-            .map((result: any) => result[0])
-            .map((result: any) => result.transcript)
-            .join('');
-          
-          setInputValue(transcript);
-        };
-        
-        recognitionRef.current.onerror = (event) => {
-          console.error('Speech recognition error', event);
-          setIsListening(false);
-        };
-        
-        recognitionRef.current.onend = () => {
-          setIsListening(false);
-        };
-      }
-    }
-    
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.abort();
-      }
-    };
-  }, [speechRecognitionLang]);
+  const [emotions, setEmotions] = useState<EmotionData[]>([]);
+  const [isProcessingEmotion, setIsProcessingEmotion] = useState(false);
+  const [isProcessingSpeech, setIsProcessingSpeech] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const [showAllEmotions, setShowAllEmotions] = useState(false);
+  const [detectionTimestamp, setDetectionTimestamp] = useState<Date | null>(null);
+  const [transcriptionConfidence, setTranscriptionConfidence] = useState<number | null>(null);
 
   // Initialize the Hume client
   useEffect(() => {
@@ -252,6 +276,188 @@ const VoiceConversation: React.FC<VoiceConversationProps> = (props) => {
     }
   }, [apiKey, voiceName, isApiAvailable]);
 
+  // Setup audio recording
+  const setupAudioRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+      
+      mediaRecorderRef.current.onstop = () => {
+        // Process audio when recording stops
+        processRecordedAudio();
+      };
+      
+      return true;
+    } catch (error) {
+      console.error('Error accessing microphone:', error);
+      return false;
+    }
+  };
+
+  // Process recorded audio for both speech recognition and emotion detection
+  const processRecordedAudio = async () => {
+    if (audioChunksRef.current.length === 0) return;
+    
+    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+    
+    // Process speech recognition and emotion detection in parallel
+    setIsProcessingSpeech(true);
+    setIsProcessingEmotion(true);
+    
+    try {
+      // Start both API calls concurrently
+      const [speechResult] = await Promise.all([
+        processSpeechRecognition(audioBlob),
+        processEmotionRecognition(audioBlob)
+      ]);
+      
+      // Speech recognition result processing
+      if (speechResult) {
+        setInputValue(speechResult.transcription);
+        setTranscriptionConfidence(speechResult.confidence);
+      }
+    } catch (error) {
+      console.error('Error processing audio:', error);
+      setError('Failed to process audio recording');
+    } finally {
+      setIsProcessingSpeech(false);
+      // Note: isProcessingEmotion is set to false in the emotion recognition function
+      // because it takes longer to complete
+      
+      // Clear the audio chunks for the next recording
+      audioChunksRef.current = [];
+    }
+  };
+
+  // Process speech recognition using Hume API
+  const processSpeechRecognition = async (audioBlob: Blob): Promise<HumeSpeechRecognitionResponse | null> => {
+    if (!isApiAvailable || !apiKey) {
+      console.warn('Speech recognition skipped: API disabled or no API key');
+      return null;
+    }
+    
+    try {
+      // Create form data for API request
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'speech.webm');
+      formData.append('language', speechRecognitionLang.split('-')[0]);
+      
+      // Make API request to Hume for speech recognition
+      const response = await fetch('https://api.hume.ai/v0/speech/transcriptions', {
+        method: 'POST',
+        headers: {
+          'X-Hume-Api-Key': apiKey,
+        },
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Hume API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data && data.transcription) {
+        return {
+          transcription: data.transcription,
+          confidence: data.confidence || 0.0
+        };
+      } else {
+        console.error('Invalid speech recognition response:', data);
+        return null;
+      }
+    } catch (error) {
+      console.error('Error processing speech recognition:', error);
+      return null;
+    }
+  };
+
+  // Process emotion recognition using Hume API
+  const processEmotionRecognition = async (audioBlob: Blob): Promise<void> => {
+    if (!isApiAvailable || !apiKey) {
+      console.warn('Emotion recognition skipped: API disabled or no API key');
+      setIsProcessingEmotion(false);
+      return;
+    }
+    
+    try {
+      // Create form data for API request
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'speech.webm');
+      formData.append('models', 'prosody');
+      
+      // Make API request to Hume for emotion recognition
+      const response = await fetch('https://api.hume.ai/v0/batch/jobs', {
+        method: 'POST',
+        headers: {
+          'X-Hume-Api-Key': apiKey,
+        },
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Hume API error: ${response.status}`);
+      }
+      
+      const jobData = await response.json();
+      const jobId = jobData.job_id;
+      
+      // Poll for job completion
+      let jobComplete = false;
+      let emotionResult: HumeEmotionResponse | null = null;
+      
+      while (!jobComplete) {
+        // Wait 1 second between polling
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const statusResponse = await fetch(`https://api.hume.ai/v0/batch/jobs/${jobId}`, {
+          headers: {
+            'X-Hume-Api-Key': apiKey,
+          },
+        });
+        
+        if (!statusResponse.ok) {
+          throw new Error(`Hume API status error: ${statusResponse.status}`);
+        }
+        
+        const statusData = await statusResponse.json();
+        
+        if (statusData.state === 'completed') {
+          jobComplete = true;
+          emotionResult = statusData.result;
+        } else if (statusData.state === 'failed') {
+          throw new Error('Hume API job failed');
+        }
+      }
+      
+      // Extract emotion data
+      if (emotionResult && emotionResult.results && emotionResult.results.length > 0) {
+        const prosodyPredictions = emotionResult.results[0].models.prosody.predictions;
+        
+        // Add descriptions to emotions and sort by score
+        const emotionsWithDescriptions = prosodyPredictions
+          .map(emotion => ({
+            ...emotion,
+            description: emotionDescriptions[emotion.name] || `Description for ${emotion.name}`
+          }))
+          .sort((a, b) => b.score - a.score);
+        
+        setEmotions(emotionsWithDescriptions);
+        setDetectionTimestamp(new Date());
+      }
+    } catch (error) {
+      console.error('Error processing emotion:', error);
+    } finally {
+      setIsProcessingEmotion(false);
+    }
+  };
+
   // Handle sending a new message
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
@@ -331,16 +537,32 @@ const VoiceConversation: React.FC<VoiceConversationProps> = (props) => {
   };
 
   // Toggle speech recognition
-  const toggleListening = () => {
-    if (!recognitionRef.current) return;
-    
+  const toggleListening = async () => {
     if (isListening) {
-      recognitionRef.current.stop();
+      // Stop recording
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
       setIsListening(false);
     } else {
+      // Setup audio recording if not already done
+      if (!mediaRecorderRef.current) {
+        const success = await setupAudioRecording();
+        if (!success) {
+          console.error('Failed to setup audio recording');
+          return;
+        }
+      }
+      
+      // Clear previous recording and input
+      audioChunksRef.current = [];
       setInputValue('');
-      recognitionRef.current.start();
-      setIsListening(true);
+      
+      // Start recording
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.start();
+        setIsListening(true);
+      }
     }
   };
 
@@ -350,8 +572,21 @@ const VoiceConversation: React.FC<VoiceConversationProps> = (props) => {
       if (audioUrl) {
         URL.revokeObjectURL(audioUrl);
       }
+      
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
     };
   }, [audioUrl]);
+
+  // Calculate emotion visualization data for radar chart
+  const getTopEmotionsForRadarChart = () => {
+    if (emotions.length === 0) return [];
+    return emotions.slice(0, 5).map(emotion => ({
+      name: emotion.name,
+      value: emotion.score * 100
+    }));
+  };
 
   return (
     <div className={`flex flex-col w-full max-w-md mx-auto bg-white rounded-lg shadow-md overflow-hidden ${className}`}>
@@ -395,6 +630,79 @@ const VoiceConversation: React.FC<VoiceConversationProps> = (props) => {
         )}
       </div>
 
+      {/* Emotion Recognition Display */}
+      {emotions.length > 0 && (
+        <div className="p-3 border-t border-gray-200">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-sm font-semibold">Detected Emotions:</h3>
+            {detectionTimestamp && (
+              <span className="text-xs text-gray-500">
+                {detectionTimestamp.toLocaleTimeString()}
+              </span>
+            )}
+            <button 
+              onClick={() => setShowAllEmotions(!showAllEmotions)}
+              className="text-xs text-blue-500 hover:text-blue-700"
+            >
+              {showAllEmotions ? 'Show Top 5' : 'Show All'}
+            </button>
+          </div>
+          
+          <div className="space-y-3 max-h-60 overflow-y-auto">
+            {(showAllEmotions ? emotions : emotions.slice(0, 5)).map((emotion, index) => (
+              <div key={index} className="bg-blue-50 rounded-md p-2">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-medium text-sm">{emotion.name}</span>
+                  <span className="text-xs font-semibold">{(emotion.score * 100).toFixed(1)}%</span>
+                </div>
+                
+                {/* Bar chart for emotion score */}
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div 
+                    className="bg-blue-600 h-2.5 rounded-full" 
+                    style={{ width: `${emotion.score * 100}%` }}
+                  ></div>
+                </div>
+                
+                {/* Emotion description */}
+                <p className="text-xs text-gray-600 mt-1">{emotion.description}</p>
+              </div>
+            ))}
+          </div>
+          
+          {/* Summary of dominant emotions */}
+          {emotions.length > 0 && (
+            <div className="mt-3 p-2 bg-gray-50 rounded-md text-xs">
+              <p className="font-semibold">Emotion Analysis Summary:</p>
+              <p className="mt-1">
+                Primary emotion is <span className="font-medium">{emotions[0].name}</span> ({(emotions[0].score * 100).toFixed(1)}%),
+                {emotions[1] && <span> followed by <span className="font-medium">{emotions[1].name}</span> ({(emotions[1].score * 100).toFixed(1)}%)</span>}
+                {emotions[2] && <span> and <span className="font-medium">{emotions[2].name}</span> ({(emotions[2].score * 100).toFixed(1)}%)</span>}.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Speech recognition confidence display */}
+      {transcriptionConfidence !== null && (
+        <div className="px-3 py-2 border-t border-gray-200">
+          <div className="flex items-center text-xs text-gray-600">
+            <span className="mr-2">Speech Recognition Confidence:</span>
+            <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+              <div 
+                className={`h-1.5 rounded-full ${
+                  transcriptionConfidence > 0.8 ? 'bg-green-500' : 
+                  transcriptionConfidence > 0.5 ? 'bg-yellow-500' : 'bg-red-500'
+                }`}
+                style={{ width: `${transcriptionConfidence * 100}%` }}
+              ></div>
+            </div>
+            <span className="ml-2 font-medium">{(transcriptionConfidence * 100).toFixed(0)}%</span>
+          </div>
+        </div>
+      )}
+
       {/* Input form with voice input button */}
       <form onSubmit={handleSubmit} className="border-t p-4">
         <div className="flex">
@@ -403,24 +711,34 @@ const VoiceConversation: React.FC<VoiceConversationProps> = (props) => {
             value={inputValue}
             onChange={handleInputChange}
             placeholder={isListening ? '🎤 Listening...' : placeholder}
-            disabled={isLoading}
+            disabled={isLoading || isProcessingEmotion || isProcessingSpeech}
             className="flex-1 border rounded-l-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          {isSpeechSupported && (
-            <button
-              type="button"
-              onClick={toggleListening}
-              disabled={isLoading}
-              className={`px-3 border-t border-b ${
-                isListening 
-                  ? 'bg-red-500 text-white border-red-500' 
-                  : 'bg-gray-100 text-gray-700 border-gray-300'
-              }`}
-              title={isListening ? 'Stop listening' : 'Start voice input'}
-            >
-              🎤
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={toggleListening}
+            disabled={isLoading || isProcessingEmotion || isProcessingSpeech || !isApiAvailable}
+            className={`px-3 border-t border-b ${
+              isListening 
+                ? 'bg-red-500 text-white border-red-500' 
+                : isProcessingEmotion || isProcessingSpeech
+                  ? 'bg-yellow-100 text-yellow-700 border-yellow-300'
+                  : !isApiAvailable
+                    ? 'bg-gray-300 text-gray-500 border-gray-300'
+                    : 'bg-gray-100 text-gray-700 border-gray-300'
+            }`}
+            title={
+              isListening 
+                ? 'Stop listening' 
+                : isProcessingEmotion || isProcessingSpeech
+                  ? 'Processing audio...' 
+                  : !isApiAvailable
+                    ? 'API not available'
+                    : 'Start voice input'
+            }
+          >
+            {isProcessingEmotion || isProcessingSpeech ? '⏳' : '🎤'}
+          </button>
           <button
             type="submit"
             disabled={isLoading || !inputValue.trim()}
@@ -439,7 +757,8 @@ const VoiceConversation: React.FC<VoiceConversationProps> = (props) => {
         Status: {isApiAvailable ? 
           'API Connected - Voice enabled' : 
           'API Not Available - Text only mode'}
-        {isSpeechSupported && ' | Speech Recognition Available'}
+        {isProcessingSpeech && ' | Processing Speech...'}
+        {isProcessingEmotion && ' | Processing Emotions...'}
       </div>
     </div>
   );

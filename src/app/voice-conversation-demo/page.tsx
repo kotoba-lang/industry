@@ -77,9 +77,35 @@ export default function VoiceConversationDemo() {
           
           <div className="p-2 bg-purple-50 text-purple-800 rounded-md mb-4 text-xs">
             <p className="font-semibold">Speech Recognition:</p>
-            <p>This demo now includes speech recognition functionality using the Web Speech API. Click the microphone button to start speaking, and your words will be transcribed into the input field.</p>
-            <p className="mt-1">Currently configured for Japanese language (ja-JP).</p>
-            <p className="mt-1 text-xs text-gray-600">Note: Speech recognition requires browser permission to access your microphone.</p>
+            <p>This demo now includes speech recognition functionality using Hume AI's Speech-to-Text API. Click the microphone button to start speaking, and your words will be transcribed into the input field.</p>
+            <p className="mt-1">Speech recognition confidence level is displayed with a colored progress bar.</p>
+            <p className="mt-1 text-xs text-gray-600">Note: Speech recognition requires browser permission to access your microphone and an active Hume API key.</p>
+          </div>
+          
+          <div className="p-2 bg-pink-50 text-pink-800 rounded-md mb-4 text-xs">
+            <p className="font-semibold">Emotion Recognition:</p>
+            <p>This demo includes emotion recognition using Hume AI's Prosody API. After you speak, your audio is analyzed to detect emotional qualities in your voice.</p>
+            <p className="mt-1">New enhanced UI features:</p>
+            <ul className="list-disc list-inside mt-1 ml-2 space-y-1">
+              <li>Visual bar charts showing emotion intensity</li>
+              <li>Detailed descriptions for each detected emotion</li>
+              <li>Toggle between top 5 emotions or view all detected emotions</li>
+              <li>Emotion analysis summary highlighting primary emotions</li>
+              <li>Timestamp showing when emotions were detected</li>
+            </ul>
+            <p className="mt-2 text-xs text-gray-600">Note: Processing may take a few seconds after you finish speaking. The API requires an active Hume API key to function.</p>
+          </div>
+          
+          <div className="p-2 bg-indigo-50 text-indigo-800 rounded-md mb-4 text-xs">
+            <p className="font-semibold">How To Use:</p>
+            <ol className="list-decimal list-inside mt-1 ml-2 space-y-1">
+              <li>Click the "Start Demo" button below</li>
+              <li>Click the microphone icon to start voice recognition</li>
+              <li>Speak clearly into your microphone</li>
+              <li>Click the microphone again or wait for automatic stop</li>
+              <li>Watch as your speech is transcribed and emotions are analyzed</li>
+              <li>Review the emotion analysis displayed below the conversation</li>
+            </ol>
           </div>
           
           <button
