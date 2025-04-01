@@ -1,6 +1,6 @@
 "use server";
 
-import { createServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { z } from 'zod';
 
 // Define schemas for input validation
@@ -35,7 +35,7 @@ export async function saveEmotionData(data: z.infer<typeof EmotionDataSchema>) {
     // Validate input data
     const validatedData = EmotionDataSchema.parse(data);
     
-    const supabase = await createServerClient();
+    const supabase = await createSupabaseServerClient();
     
     const { error } = await supabase
       .from('emotion_data')
@@ -73,7 +73,7 @@ export async function saveFacialEmotionData(params: z.infer<typeof FacialEmotion
     // Validate input data
     const validatedData = FacialEmotionDataSchema.parse(params);
     
-    const supabase = await createServerClient();
+    const supabase = await createSupabaseServerClient();
     
     const { error } = await supabase
       .from('face_emotion_data')
@@ -111,7 +111,7 @@ export async function getEmotionDataByAssessment(userId: string, assessmentId: s
       return { success: false, error: 'User ID and assessment ID are required' };
     }
     
-    const supabase = await createServerClient();
+    const supabase = await createSupabaseServerClient();
     
     const { data, error } = await supabase
       .from('emotion_data')

@@ -1,4 +1,4 @@
-import { createServerClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 // Define interfaces for the data (should match the ones in queries.ts)
 interface ConsentRecord {
@@ -37,7 +37,7 @@ export default async function ConsentDataPage() {
   let error = null
 
   try {
-    const supabase = await createServerClient();
+    const supabase = await createSupabaseServerClient();
     const { data: consentData, error: consentError } = await supabase
       .from('consent_records')
       .select('*')

@@ -1,6 +1,6 @@
 'use server'
 
-import { createServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 /**
  * 同意データと人口統計データを保存する関数
@@ -28,7 +28,7 @@ export async function saveConsentAndDemographicData(
   }
 ) {
   try {
-    const supabase = await createServerClient();
+    const supabase = await createSupabaseServerClient();
     
     // ユーザーIDを生成（本番では認証システムからユーザーIDを取得）
     const userId = `user_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
