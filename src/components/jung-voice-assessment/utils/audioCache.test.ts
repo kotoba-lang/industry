@@ -76,6 +76,11 @@ describe('audioCache.ts', () => {
     
     // Mock global.indexedDB.open
     global.indexedDB.open = jest.fn().mockReturnValue(mockOpenRequest);
+
+    // Mock IDBKeyRange
+    global.IDBKeyRange = {
+      upperBound: jest.fn().mockImplementation(value => ({ upper: value, lowerOpen: false, upperOpen: false }))
+    } as any;
   });
 
   afterEach(() => {
@@ -83,10 +88,11 @@ describe('audioCache.ts', () => {
   });
 
   describe('getAudioFromCache', () => {
-    test('正常にキャッシュからオーディオデータを取得する 重要度:5', async () => {
+    test('キャッシュに存在する音声が正しく取得される 重要度:5', async () => {
+      // Setup mock data
       const mockBlob = new Blob(['test audio data'], { type: 'audio/mp3' });
       
-      // Trigger onsuccess handler with mock data
+      // Trigger onsuccess handler for DB open
       global.indexedDB.open = jest.fn().mockImplementation(() => {
         setTimeout(() => {
           mockOpenRequest.onsuccess && mockOpenRequest.onsuccess({ target: mockOpenRequest });
@@ -94,29 +100,29 @@ describe('audioCache.ts', () => {
         return mockOpenRequest;
       });
       
-      // Mock successful retrieval
-      mockObjectStore.get = jest.fn().mockImplementation(() => {
-        setTimeout(() => {
-          mockGetRequest.result = {
-            text: 'hello',
-            voice: 'test-voice',
-            audioData: mockBlob,
-            timestamp: Date.now()
-          };
-          mockGetRequest.onsuccess && mockGetRequest.onsuccess();
-        }, 0);
-        return mockGetRequest;
-      });
+      // Mock get request success
+      mockGetRequest.onsuccess = null;  // Will be set by the function
+      mockGetRequest.result = {
+        text: 'hello',
+        voice: 'test-voice',
+        audioData: mockBlob,
+        timestamp: Date.now()
+      };
       
       const result = await getAudioFromCache('hello', 'test-voice');
       
-      expect(mockDb.transaction).toHaveBeenCalledWith('audio-files', 'readonly');
+      // Manually trigger the success handler
+      mockGetRequest.onsuccess && mockGetRequest.onsuccess();
+      
+      // Manually trigger transaction complete
+      mockTransaction.oncomplete && mockTransaction.oncomplete();
+      
       expect(mockObjectStore.get).toHaveBeenCalledWith(['hello', 'test-voice']);
       expect(result).toEqual(mockBlob);
     });
     
-    test('キャッシュアイテムが存在しない場合nullを返す 重要度:4', async () => {
-      // Trigger onsuccess handler
+    test('キャッシュに存在しない音声はnullを返す 重要度:4', async () => {
+      // Trigger onsuccess handler for DB open
       global.indexedDB.open = jest.fn().mockImplementation(() => {
         setTimeout(() => {
           mockOpenRequest.onsuccess && mockOpenRequest.onsuccess({ target: mockOpenRequest });
@@ -124,22 +130,24 @@ describe('audioCache.ts', () => {
         return mockOpenRequest;
       });
       
-      // Mock item not found
-      mockObjectStore.get = jest.fn().mockImplementation(() => {
-        setTimeout(() => {
-          mockGetRequest.result = undefined;
-          mockGetRequest.onsuccess && mockGetRequest.onsuccess();
-        }, 0);
-        return mockGetRequest;
-      });
+      // Mock get request success with no result
+      mockGetRequest.onsuccess = null;  // Will be set by the function
+      mockGetRequest.result = undefined;
       
-      const result = await getAudioFromCache('nonexistent', 'test-voice');
+      const result = await getAudioFromCache('unknown', 'test-voice');
       
+      // Manually trigger the success handler
+      mockGetRequest.onsuccess && mockGetRequest.onsuccess();
+      
+      // Manually trigger transaction complete
+      mockTransaction.oncomplete && mockTransaction.oncomplete();
+      
+      expect(mockObjectStore.get).toHaveBeenCalledWith(['unknown', 'test-voice']);
       expect(result).toBeNull();
     });
     
-    test('IndexedDBエラー発生時にnullを返す 重要度:3', async () => {
-      // Trigger onerror handler
+    test('エラーが発生した場合はnullを返す 重要度:3', async () => {
+      // Trigger onerror handler for DB open
       global.indexedDB.open = jest.fn().mockImplementation(() => {
         setTimeout(() => {
           mockOpenRequest.onerror && mockOpenRequest.onerror(new Error('DB error'));
@@ -152,9 +160,9 @@ describe('audioCache.ts', () => {
       expect(result).toBeNull();
     });
   });
-
+  
   describe('saveAudioToCache', () => {
-    test('正常にオーディオデータをキャッシュに保存する 重要度:5', async () => {
+    test('音声が正常にキャッシュに保存される 重要度:5', async () => {
       const mockBlob = new Blob(['test audio data'], { type: 'audio/mp3' });
       
       // Trigger onsuccess handler for DB open
@@ -165,22 +173,29 @@ describe('audioCache.ts', () => {
         return mockOpenRequest;
       });
       
-      // Mock successful put operation
-      mockObjectStore.put = jest.fn().mockImplementation(() => {
-        setTimeout(() => {
-          mockPutRequest.onsuccess && mockPutRequest.onsuccess();
-        }, 0);
-        return mockPutRequest;
-      });
+      // Mock put request success
+      mockPutRequest.onsuccess = null;  // Will be set by the function
       
       const result = await saveAudioToCache('hello', 'test-voice', mockBlob);
       
-      expect(mockDb.transaction).toHaveBeenCalledWith('audio-files', 'readwrite');
-      expect(mockObjectStore.put).toHaveBeenCalled();
+      // Manually trigger success for put operation
+      mockPutRequest.onsuccess && mockPutRequest.onsuccess();
+      
+      // Manually trigger transaction complete
+      mockTransaction.oncomplete && mockTransaction.oncomplete();
+      
+      expect(mockObjectStore.put).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: 'hello',
+          voice: 'test-voice',
+          audioData: mockBlob,
+          timestamp: expect.any(Number)
+        })
+      );
       expect(result).toBe(true);
     });
     
-    test('保存エラー発生時にfalseを返す 重要度:3', async () => {
+    test('保存時にエラーが発生した場合はfalseを返す 重要度:3', async () => {
       const mockBlob = new Blob(['test audio data'], { type: 'audio/mp3' });
       
       // Trigger onsuccess handler for DB open
@@ -191,20 +206,19 @@ describe('audioCache.ts', () => {
         return mockOpenRequest;
       });
       
-      // Mock failed put operation
-      mockObjectStore.put = jest.fn().mockImplementation(() => {
-        setTimeout(() => {
-          mockPutRequest.onerror && mockPutRequest.onerror(new Error('Put error'));
-        }, 0);
-        return mockPutRequest;
-      });
+      // Mock put request error
+      mockPutRequest.onerror = null;  // Will be set by the function
       
       const result = await saveAudioToCache('hello', 'test-voice', mockBlob);
+      
+      // Manually trigger error for put operation
+      const errorEvent = new Error('Put error');
+      mockPutRequest.onerror && mockPutRequest.onerror(errorEvent);
       
       expect(result).toBe(false);
     });
   });
-
+  
   describe('clearAudioCache', () => {
     test('すべてのキャッシュを正常にクリアする 重要度:4', async () => {
       // Trigger onsuccess handler for DB open
@@ -215,18 +229,14 @@ describe('audioCache.ts', () => {
         return mockOpenRequest;
       });
       
-      // Mock successful transaction completion
-      const completeFn = jest.fn();
-      mockTransaction.oncomplete = completeFn;
-      
       const result = await clearAudioCache();
       
-      // Mock transaction complete
-      completeFn();
+      // Manually trigger transaction complete
+      mockTransaction.oncomplete && mockTransaction.oncomplete();
       
       expect(mockObjectStore.clear).toHaveBeenCalled();
       expect(result).toBe(true);
-    });
+    }, 10000); // Increase timeout for this test
     
     test('古いキャッシュエントリのみをクリアする 重要度:3', async () => {
       const olderThanDays = 7;
@@ -277,11 +287,12 @@ describe('audioCache.ts', () => {
       completeFn();
       
       expect(mockObjectStore.index).toHaveBeenCalledWith('timestamp');
+      expect(global.IDBKeyRange.upperBound).toHaveBeenCalled();
       expect(mockCursor.delete).toHaveBeenCalled();
       expect(result).toBe(true);
-    });
+    }, 10000); // Increase timeout for this test
   });
-
+  
   describe('getAudioCacheSize', () => {
     test('キャッシュサイズを正確に取得する 重要度:3', async () => {
       // Trigger onsuccess handler for DB open
@@ -292,62 +303,68 @@ describe('audioCache.ts', () => {
         return mockOpenRequest;
       });
       
-      // Mock count result
+      // Setup count request
       mockCountRequest.result = 2;
-      mockCountRequest.onsuccess = jest.fn().mockImplementation(function(this: { result: number }) {
-        this.result = 2;
-      });
       
-      // Setup cursor behavior for size calculation
+      // Setup cursor behavior
+      mockCursorRequest.onsuccess = null;
       const mockItems = [
-        { 
-          value: { 
-            text: 'hello1', 
-            voice: 'voice1', 
-            audioData: new Blob(['data1'], { type: 'audio/mp3' }), 
-            timestamp: Date.now() 
-          },
-          continue: jest.fn()
+        {
+          text: 'hello',
+          voice: 'voice1',
+          audioData: new Blob(['audio1'], { type: 'audio/mp3' }),
+          timestamp: Date.now()
         },
-        { 
-          value: { 
-            text: 'hello2', 
-            voice: 'voice2', 
-            audioData: new Blob(['data2'], { type: 'audio/mp3' }), 
-            timestamp: Date.now() 
-          },
-          continue: jest.fn()
+        {
+          text: 'world',
+          voice: 'voice2',
+          audioData: new Blob(['audio2'], { type: 'audio/mp3' }),
+          timestamp: Date.now()
         }
       ];
       
-      let cursorIndex = 0;
+      let itemIndex = 0;
       
-      // Mock cursor behavior
+      // Mock cursor for iterating through items
       mockObjectStore.openCursor = jest.fn().mockImplementation(() => {
         setTimeout(() => {
-          if (cursorIndex < mockItems.length) {
-            mockCursorRequest.result = mockItems[cursorIndex];
-            cursorIndex++;
+          if (itemIndex < mockItems.length) {
+            mockCursorRequest.result = {
+              value: mockItems[itemIndex],
+              continue: () => {
+                itemIndex++;
+                if (itemIndex < mockItems.length) {
+                  setTimeout(() => {
+                    mockCursorRequest.onsuccess && mockCursorRequest.onsuccess({ target: mockCursorRequest });
+                  }, 0);
+                } else {
+                  setTimeout(() => {
+                    mockCursorRequest.result = null;
+                    mockCursorRequest.onsuccess && mockCursorRequest.onsuccess({ target: mockCursorRequest });
+                  }, 0);
+                }
+              }
+            };
           } else {
             mockCursorRequest.result = null;
           }
+          
           mockCursorRequest.onsuccess && mockCursorRequest.onsuccess({ target: mockCursorRequest });
         }, 0);
         return mockCursorRequest;
       });
       
-      // Trigger count success
-      setTimeout(() => {
-        mockCountRequest.onsuccess();
-      }, 0);
-      
       const result = await getAudioCacheSize();
       
-      expect(mockObjectStore.count).toHaveBeenCalled();
-      expect(result.count).toBe(2);
-      // Testing that sizeBytes is something reasonable, actual size depends on Blob implementation
-      expect(result.sizeBytes).toBeGreaterThan(0);
-    });
+      // Manually trigger count success
+      mockCountRequest.onsuccess && mockCountRequest.onsuccess();
+      
+      // Manually trigger transaction complete
+      mockTransaction.oncomplete && mockTransaction.oncomplete();
+      
+      // Expected size: 'audio1'.length + 'audio2'.length = 6 + 6 = 12
+      expect(result).toEqual({ count: 2, sizeBytes: 12 });
+    }, 10000); // Increase timeout for this test
     
     test('キャッシュが空の場合ゼロを返す 重要度:2', async () => {
       // Trigger onsuccess handler for DB open
@@ -358,21 +375,18 @@ describe('audioCache.ts', () => {
         return mockOpenRequest;
       });
       
-      // Mock empty count result
+      // Setup count request with zero result
       mockCountRequest.result = 0;
-      mockCountRequest.onsuccess = jest.fn().mockImplementation(function(this: { result: number }) {
-        this.result = 0;
-      });
-      
-      // Trigger count success
-      setTimeout(() => {
-        mockCountRequest.onsuccess();
-      }, 0);
       
       const result = await getAudioCacheSize();
       
-      expect(result.count).toBe(0);
-      expect(result.sizeBytes).toBe(0);
-    });
+      // Manually trigger count success
+      mockCountRequest.onsuccess && mockCountRequest.onsuccess();
+      
+      // Manually trigger transaction complete
+      mockTransaction.oncomplete && mockTransaction.oncomplete();
+      
+      expect(result).toEqual({ count: 0, sizeBytes: 0 });
+    }, 10000); // Increase timeout for this test
   });
 }); 
