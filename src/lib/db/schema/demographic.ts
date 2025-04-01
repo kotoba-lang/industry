@@ -29,7 +29,7 @@ export const demographicData = pgTable('demographic_data', {
   // 研究関連のメタデータ
   studyId: text('study_id'), // 研究ID
   consentVersion: text('consent_version'), // 同意書バージョン
-}, (table) => {
+}, (table: any) => {
   return {
     ...table,
     schema,
