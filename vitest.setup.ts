@@ -1,3 +1,5 @@
+/// <reference types="vitest" />
+
 // Mock next/dynamic to use the actual component instead of dynamic loading
 vi.mock('next/dynamic', () => ({
   __esModule: true,
