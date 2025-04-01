@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import type { TransitionState } from "../utils/stateTransition"
+import type { TransitionState } from "./utils/stateTransition"
 
 interface PhysicsStateMachineProps {
   transitionState: TransitionState

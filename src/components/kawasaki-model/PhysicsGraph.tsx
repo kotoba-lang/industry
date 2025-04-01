@@ -25,7 +25,8 @@ const PhysicsGraph: React.FC<PhysicsGraphProps> = ({
   selectedElement,
   setSelectedElement,
 }) => {
-  const fgRef = useRef<any>()
+  const containerRef = useRef<HTMLDivElement>(null)
+  const fgRef = useRef<any>(null)
   const lastRenderTime = useRef<number>(0)
   const [showAllLinks, setShowAllLinks] = useState<boolean>(false)
 

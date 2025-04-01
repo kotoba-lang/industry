@@ -41,8 +41,8 @@ export default function JungIntegratedPage() {
       <div className="bg-white rounded-lg shadow-lg">
         <IntegratedJungAssessment 
           numberOfWords={3} 
-          testResults={testResults}
-          setTestResults={setTestResults}
+          wordTestResults={testResults}
+          setWordTestResults={setTestResults}
         />
       </div>
       

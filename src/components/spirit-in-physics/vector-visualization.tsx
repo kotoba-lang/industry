@@ -1,5 +1,5 @@
-"use client";
 // @ts-nocheck
+"use client";
 import React, { useRef, useEffect } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Text, Environment, Line } from "@react-three/drei";
@@ -16,20 +16,6 @@ import {
   AmbientLight,
   PointLight,
 } from "three";
-
-// Workaround: Type definition for Three.js elements
-// eslint-disable-next-line @typescript-eslint/no-namespace
-declare namespace JSX {
-  interface IntrinsicElements {
-    mesh: any;
-    sphereGeometry: any;
-    meshStandardMaterial: any;
-    bufferGeometry: any;
-    bufferAttribute: any;
-    lineBasicMaterial: any;
-    line: any;
-  }
-}
 
 type VectorVisualizationProps = {
   vectors: Vector[];
