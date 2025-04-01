@@ -95,6 +95,12 @@ export default function JungVoiceAssessment({
           </div>
         ) : (
           <div className="max-w-4xl mx-auto space-y-6">
+            <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg mb-4 text-sm text-blue-800 dark:text-blue-200">
+              <p className="text-center">
+                <span className="font-medium">Note:</span> Your spoken words and voice recordings are not stored.
+              </p>
+            </div>
+            
             <JungVoiceTest 
               numberOfWords={validatedProps.numberOfWords} 
               apiKey={validatedProps.apiKey}
@@ -107,9 +113,12 @@ export default function JungVoiceAssessment({
             
             {showAnalysis && testResults && (
               <div className="mt-6">
-                <h2 className="text-2xl font-bold mb-3 text-center">感情分析</h2>
+                <h2 className="text-2xl font-bold mb-3 text-center">Emotion Analysis</h2>
                 <p className="text-center mb-4 text-gray-600 dark:text-gray-300">
-                  テスト中の顔の表情と声のトーンから感情を分析しました
+                  Analysis of emotions based on facial expressions and voice tone during the test
+                </p>
+                <p className="text-center text-xs text-gray-500 dark:text-gray-400 mb-3">
+                  *For privacy protection, speech recognition content is not displayed
                 </p>
                 <EmotionAnalysis 
                   userId={userId}
