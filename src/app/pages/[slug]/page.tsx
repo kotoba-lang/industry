@@ -16,8 +16,8 @@ import Container from "@/app/_components/container";
 import Alert from "@/app/_components/alert";
 import Header from "@/app/_components/header";
 import { PostHeader } from "@/app/_components/post-header";
-import Mandala from "@/components/spirit-in-physics/Mandala";
-
+import KawasakiModel from "@/components/kawasaki-model";
+import JungWordTest from "@/components/jung-word-assessment/JungWordTest";
 export default function Page() {
   const dimvs = Array(0).fill("");
   const [mandalaData, setMandalaData] = useState(dimvs); // State to hold Mandala data
@@ -50,7 +50,7 @@ export default function Page() {
             coverImage={"/assets/posts/spirit-in-physics/cover.jpg"}
             date={"2024-11-30"}
             author={{
-              name: "Jun Kawasaki, Kazuki Tinaka, Takeuchi Tomonori",
+              name: "Jun Kawasaki, Kazuki Tainaka, Takeuchi Tomonori",
               picture: "/assets/posts/authors/jk.jpg",
             }}
           />
@@ -67,11 +67,11 @@ export default function Page() {
               </p>
               <p>
                 The research employs skin potential measurements and emotion
-                analysis to investigate Spirit's physics structure and dynamics.
-                dynamics. Inspired by the Rubber-Hand, Marble-Hand illusions and
+                analysis to investigate Spirit's physics structure and dynamics,
+                inspired by the Rubber-Hand, Marble-Hand illusions and
                 Traditional Buddhism Mandala Method. Participants are
-                vectorizing conceptual structures using the Mandala method. They
-                are exposed to physical and digital stimuli as they interact
+                vectorizing conceptual structures using word association experiments based on Jung's methods (1910).
+                They are exposed to physical and digital stimuli as they interact
                 with conceptual separations and integrations, observing changes
                 in skin potential and facial expressions. These responses are
                 timestamped and analyzed, revealing the impact of
@@ -105,6 +105,12 @@ export default function Page() {
                 In Japanese, humans are referred to as primates, and spirit has
                 been regarded as having specific qualities. However, spirit has
                 not been measured or quantified as a physical science.
+              </p>
+              <p>
+                Information is inherently physical—it obeys the laws of thermodynamics and 
+                directly influences energy exchange. Experimental validations of Landauer's 
+                principle (Bérut et al., 2012) reinforce that computation and energy are 
+                fundamentally intertwined.
               </p>
               <p>
                 This research refers to the following paper and proposes to
@@ -164,12 +170,33 @@ export default function Page() {
                 possesses energy.
               </p>
               <p>Spirituality meaning is understand spirit.</p>
+              <p>
+                Based on the rubber hand illusion (Botvinick & Cohen, 1998), self-boundaries 
+                are not fixed but can extend to incorporate external objects. We assume that 
+                the neural mechanisms underlying multisensory integration—demonstrated by the 
+                rubber hand illusion—provide a measurable basis for transforming physical 
+                self-perception into an expansive, information-rich state that underpins Spirit.
+              </p>
               <Link href="https://www.nature.com/articles/nphys1821">
                 - Toyabe, S., Sagawa, T., Ueda, M., Muneyuki, E., & Sano, M.
                 (2010). [Experimental demonstration of information-to-energy
                 conversion and validation of the generalized Jarzynski
                 equality](https://www.nature.com/articles/nphys1821).
               </Link>
+              <h3>Mathematical Model</h3>
+              <p>
+                Conventional Word2Vec: Quantify the strength of association using the inner product of word vectors.
+              </p>
+              <p>
+                Jung's association method element: Introduce a factor that is the inverse of reaction time.
+              </p>
+              <p>
+                Integrated model: Adjust the reaction speed factor with the hyperparameter \(\alpha\) and 
+                define a modified probability function.
+              </p>
+              <p>
+                \(\lambda\): Scale adjustment constant
+              </p>
               <h3>Experimental Methods for Measuring Spirit</h3>
               <p>
                 To measure spirit, the information space of individuals is
@@ -178,21 +205,16 @@ export default function Page() {
 
               <h3>Structuring Spirit</h3>
               <p>
-                Using the Mandala method, the information space of individuals
-                is vectorized.
+                Using the Mandala method and Word Association Experiment (Jung, 1910), 
+                the information space of individuals is vectorized.
               </p>
               <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gradient-to-r from-blue-100 to-purple-100">
-                <Mandala handleMandalaData={handleMandalaData} />
+                <JungWordTest />
               </main>
 
               <p>Basic structure of spirit: Similar to vector spaces</p>
               <div className="w-full overflow-hidden">
-                <SpiritModel
-                  electron={electron}
-                  proton={proton}
-                  neutron={neutron}
-                  handleAtomData={(atomData) => console.log(atomData)}
-                />
+                <KawasakiModel />
               </div>
               <p>
                 Individuals judge the commonality between concepts presented on
@@ -214,7 +236,6 @@ export default function Page() {
                 By measuring the range of effects of the concepts, the range of
                 effects of spirit can be measured.
               </p>
-              <CorrelationFormWrapper />
               <h3>Measurement Using Skin Potential (Qualitative Research)</h3>
               <p>Measurement is conducted using skin potential.</p>
               <p>
@@ -236,7 +257,6 @@ export default function Page() {
                 In the Rubber hand illusion, skin potential changed as shown in
                 the graphs.
               </p>
-              <TearableItems />
               <p>
                 Similar results were obtained in the analysis of the structure
                 of spirit through concept measurement (currently a hypothesis).
@@ -248,10 +268,13 @@ export default function Page() {
                 width={500}
                 height={500}
               />
-              <h3>
-                Measurement Using Emotion Analysis (Quantitative Research)
-              </h3>
+              <h3>Measurement Using Emotion Analysis (Quantitative Research)</h3>
               <p>Facial expressions are measured using a camera.</p>
+              <p>
+                The facial recognition system defines an emotion score F(w_I, w_O) obtained from 
+                the subject's facial expression. This score is treated as an integrated index 
+                of the intensity of each emotion, such as "happiness," "sadness," and "surprise."
+              </p>
               <p>
                 While presenting the separation and integration of concepts on
                 the screen, participants are shown expressions of separation or
@@ -286,6 +309,14 @@ export default function Page() {
               <p>
                 The research demonstrated that it is possible to measure and
                 quantify the structure of human spirit using physical methods.
+              </p>
+              <p>
+                Self‑expansiveness is Spirit: Self‑expansiveness plays a key role in shaping 
+                personal, physiological, and societal phenomena.
+              </p>
+              <p>
+                Spirit Transformer Model: The Kawasaki Model proves that the spirit can be 
+                structured, measured, and quantified as dynamic physical information.
               </p>
               <p>
                 From these results, it was found that spirit is
@@ -332,6 +363,18 @@ export default function Page() {
                 This research conducts measurements and quantifications of human
                 spirit based on the Mar hand illusion experiment.
               </p>
+              <h3>Another Research / High-IQ Japanese GWAS</h3>
+              <p>
+                Leveraging Japan's unique genetics, a GWAS targeting individuals with IQ ≥140 
+                will compare genetic and cognitive data to identify SNPs linked to intelligence. 
+                The study begins in 2024 with results slated for publication.
+              </p>
+              <p>
+                Dataset: 92 people / CAMS IQ140 sd15 - IQ180t / SNPs.
+              </p>
+              <p>
+                Reference: Jonathan R. I. Coleman et al, Mol Psychiatry 24, 182–197 (2019)
+              </p>
               <h3>Consciousness and unconsciousness (conscious)</h3>
               <h3>Ensuring Reproducibility</h3>
               <p>
@@ -363,57 +406,74 @@ export default function Page() {
                 (spirituality) by acting on the range of effects of concepts =
                 No prior research
               </p>
-              <h3>References</h3>
+              <h3>You Can Try Now</h3>
               <p>
-                Year of publication, Title of the paper, Author names, Journal
-                name, Impact Factor (IF), i10 index
+                Spirit in Physics (Emotional Analytics)
               </p>
-              <h2>Reference</h2>
               <p>
-                Senna, I., Maravita, A., Bolognini, N., & Parise, C. V. (2014).
+                Niigata Univ IRB
+                Approved at 2025/03
+              </p>
+              <h2>References</h2>
+              <p>
+                1. Landauer, R. (1991). Information is physical. Physics Today, 44(5), 23–29.
+              </p>
+              <p>
+                2. Bérut, A., Arakelyan, A., Petrosyan, A., Ciliberto, S., Dillenschneider, R., & Lutz, E. (2012). 
+                   Experimental verification of Landauer's principle linking information and thermodynamics. 
+                   Nature, 483(7388), 187–189.
+              </p>
+              <p>
+                3. Botvinick, M., & Cohen, J. (1998). Rubber-hand illusion. Nature, 391, 756.
+              </p>
+              <p>
+                4. Toyabe, S., Sagawa, T., Ueda, M., Muneyuki, E., & Sano, M. (2010). 
+                   Experimental demonstration of information-to-energy conversion and validation 
+                   of the generalized Jarzynski equality. Nature Physics, 6, 988–992.
+              </p>
+              <p>
+                5. Senna, I., Maravita, A., Bolognini, N., & Parise, C. V. (2014).
                 [The Marble-Hand
                 Illusion](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0091688).
               </p>
               <p>
-                Tsakiris, M., & Haggard, P. (2005). The Rubber Hand Illusion
+                6. Tsakiris, M., & Haggard, P. (2005). The Rubber Hand Illusion
                 Revisited: Visuotactile Integration and Self-Attribution.
                 Journal of Experimental Psychology: Human Perception and
                 Performance, 31(1), 80–91.
                 https://psycnet.apa.org/doiLanding?doi=10.1037%2F0096-1523.31.1.80
               </p>
               <p>
-                Toyabe, S., Sagawa, T., Ueda, M., Muneyuki, E., & Sano, M.
-                (2010). [Experimental demonstration of information-to-energy
-                conversion and validation of the generalized Jarzynski
-                equality](https://www.nature.com/articles/nphys1821).
+                7. Jonathan R. I. Coleman et al, Mol Psychiatry 24, 182–197 (2019)
               </p>
               <p>
-                1994, Skin Conductance and Skin Potential Responses to
+                8. 1994, Skin Conductance and Skin Potential Responses to
                 Emotion-Inducing Pictures, Cacioppo, J.T., Psychophysiology,
                 3.286, 100+
               </p>
               <p>
-                2000, The Psychophysiology of Emotion: The Role of the Skin
+                9. 2000, The Psychophysiology of Emotion: The Role of the Skin
                 Conductance Response, Critchley, H.D., Neuroscience and
                 Biobehavioral Reviews, 8.802, 200+
               </p>
               <p>
-                2005, Emotion Regulation and the Skin Conductance Response: The
+                10. 2005, Emotion Regulation and the Skin Conductance Response: The
                 Role of Cognitive Reappraisal, Gross, J.J., Journal of
                 Personality and Social Psychology, 7.673, 150+
               </p>
               <p>
-                2010, The Impact of Emotion on Skin Conductance Response: A
+                11. 2010, The Impact of Emotion on Skin Conductance Response: A
                 Meta-Analysis, Kreibig, S.D., Biological Psychology, 4.152, 120+
               </p>
               <p>
-                2015, Skin Conductance Responses to Emotional Stimuli: A Review
+                12. 2015, Skin Conductance Responses to Emotional Stimuli: A Review
                 of the Literature, Boucsein, W., International Journal of
                 Psychophysiology, 2.882, 80+
               </p>
               <h2>Version</h2>
               <p>2024/11/30 : 0.1.0</p>
               <p>2024/12/03 : 0.2.0</p>
+              <p>2024/12/10 : 0.3.0</p>
             </div>
           </div>
         </article>

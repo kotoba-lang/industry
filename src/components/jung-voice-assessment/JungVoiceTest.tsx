@@ -161,7 +161,21 @@ export default function JungVoiceTest({
     
     return () => {
       if (recognitionRef.current) {
-        recognitionRef.current.abort();
+        try {
+          // リスナーを全て削除 - 空の関数を割り当てることでクリア
+          recognitionRef.current.onresult = () => {};
+          recognitionRef.current.onerror = () => {};
+          recognitionRef.current.onend = () => {};
+          
+          // 実行中なら停止
+          if (isListening) {
+            recognitionRef.current.stop();
+          }
+          
+          recognitionRef.current.abort();
+        } catch (error) {
+          console.warn('Error during speech recognition cleanup:', error);
+        }
       }
     };
   }, [speechRecognitionLang]);
@@ -591,16 +605,44 @@ export default function JungVoiceTest({
   // 音声認識開始
   const startListening = () => {
     if (recognitionRef.current && isSpeechSupported && !isListening && isMountedRef.current) {
-      recognitionRef.current.start();
-      setIsListening(true);
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (error) {
+        // Handle the case where recognition has already started
+        console.warn('SpeechRecognition error:', error);
+        // Make sure isListening state matches actual state
+        setIsListening(true);
+        
+        // If recognition is already running, stop it first and then restart
+        if (error instanceof DOMException && error.name === 'InvalidStateError') {
+          try {
+            recognitionRef.current.stop();
+            // Short timeout to ensure stop completes before starting again
+            setTimeout(() => {
+              if (recognitionRef.current && isMountedRef.current) {
+                recognitionRef.current.start();
+              }
+            }, 100);
+          } catch (stopError) {
+            console.error('Error stopping speech recognition:', stopError);
+            setIsListening(false);
+          }
+        }
+      }
     }
   };
 
   // 音声認識停止
   const stopListening = () => {
     if (recognitionRef.current && isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
+      try {
+        recognitionRef.current.stop();
+      } catch (error) {
+        console.warn('Error stopping speech recognition:', error);
+      } finally {
+        setIsListening(false);
+      }
     }
   };
 
