@@ -280,7 +280,7 @@ export default function JungVoiceTest({
       }
       
       // 初期AIメッセージを追加
-      addMessage([{ text: AI_GUIDE_MESSAGES.introduction, role: 'assistant' }], setMessages);
+      addMessage([{ text: AI_GUIDE_MESSAGES.introduction, role: 'assistant' }]);
       
       // 初期メッセージを音声で読み上げ
       generateAndPlaySpeech(AI_GUIDE_MESSAGES.introduction);
@@ -547,7 +547,7 @@ export default function JungVoiceTest({
   }, []);
 
   // メッセージを追加
-  const addMessage = (messages: Message[], setMessages: (messages: Message[]) => void) => (text: string, role: string) => {
+  const addMessage = (text, role) => {
     setMessages([...messages, { text, role }]);
   };
 
@@ -623,7 +623,7 @@ export default function JungVoiceTest({
       await speakNextWord(AI_GUIDE_MESSAGES.introduction);
       
       // メッセージの記録
-      addMessage(AI_GUIDE_MESSAGES.introduction, 'assistant');
+      addMessage([{ text: AI_GUIDE_MESSAGES.introduction, role: 'assistant' }]);
       
       setCurrentWordIndex(0);
       setIsLoading(false);
@@ -761,7 +761,7 @@ export default function JungVoiceTest({
         }
       });
       
-      addMessage(`${nextMessage} ${stimulusWords[currentWordIndex + 1]}`, 'assistant');
+      addMessage([{ text: `${nextMessage} ${stimulusWords[currentWordIndex + 1]}`, role: 'assistant' }]);
     }
   };
 
@@ -794,7 +794,7 @@ export default function JungVoiceTest({
       });
       
       // メッセージを記録
-      addMessage(AI_GUIDE_MESSAGES.testComplete, 'assistant');
+      addMessage([{ text: AI_GUIDE_MESSAGES.testComplete, role: 'assistant' }]);
       
       // 平均反応時間と遅延応答数を計算
       const totalReactionTime = finalResponses.reduce((sum, response) => sum + response.reactionTimeMs, 0);

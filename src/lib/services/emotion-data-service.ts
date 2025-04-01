@@ -31,7 +31,7 @@ export class EmotionDataService {
   static async saveEmotionData(data: EmotionSaveParams) {
     try {
       // まず、アセスメント情報を保存/更新
-      await db.insert(emotionAssessments)
+      await db.insert(emotionAssessments) 
         .values({
           id: data.assessmentId,
           userId: data.userId,
