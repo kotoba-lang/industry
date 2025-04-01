@@ -147,7 +147,7 @@ export default function FaceEmotionAnalysis() {
   
   return (
     <div className="flex flex-col items-center">
-      <div className="relative w-full max-w-2xl">
+      <div className="relative w-full max-w-2xl px-2 sm:px-4">
         <video
           ref={videoRef}
           autoPlay
@@ -193,7 +193,7 @@ export default function FaceEmotionAnalysis() {
         </div>
       )}
       
-      <div className="mt-8 w-full max-w-2xl">
+      <div className="mt-6 w-full max-w-2xl px-2 sm:px-4">
         <h2 className="text-xl font-semibold mb-4">リアルタイム感情分析</h2>
         
         {emotions.length > 0 ? (
