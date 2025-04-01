@@ -20,6 +20,8 @@ import Header from "@/app/_components/header";
 import { PostHeader } from "@/app/_components/post-header";
 import KawasakiModel from "@/components/kawasaki-model";
 import JungWordTest from "@/components/jung-word-assessment/JungWordTest";
+import { JungVoiceAssessment } from "@/components/jung-voice-assessment";
+
 export default function Page() {
   const dimvs = Array(0).fill("");
   const [mandalaData, setMandalaData] = useState(dimvs); // State to hold Mandala data
@@ -151,7 +153,7 @@ export default function Page() {
               </p>
 
               <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gradient-to-r from-blue-100 to-purple-100">
-                <JungWordTest />
+                <JungVoiceAssessment numberOfWords={10} />
               </main>
 
               <h2>Measurement via Emotion Analytics (Quantitative Analysis)</h2>
