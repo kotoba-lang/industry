@@ -70,8 +70,9 @@ export default function Page() {
               </p>
 
               <h2>Introduction: Structuring and Quantifying Human Spirit Using the Informational Vector Space</h2>
+              
+              <h3>Hypothesis 1</h3>
               <p>
-                <h3>Hypothesis 1</h3>
                 <strong>Information is Physics:</strong> Information is inherently physical—it obeys
                 the laws of thermodynamics and directly influences energy
                 exchange. Experimental validations of Landauer's principle (Bérut et
@@ -79,8 +80,8 @@ export default function Page() {
                 intertwined.
               </p>
 
+              <h3>Hypothesis 2</h3>
               <p>
-                <h3>Hypothesis 2</h3>
                 <strong>Self-expansiveness into information space:</strong> Based on the rubber
                 hand illusion (Botvinick & Cohen, 1998), self-boundaries are not
                 fixed but can extend to incorporate external objects. We assume
@@ -110,12 +111,12 @@ export default function Page() {
       </Container>
       
       {/* KawasakiModel - Full width outside of container */}
-      <div className="w-full h-[80vh] mb-8">
+      <div className="w-full h-[80vh]">
         <KawasakiModel />
       </div>
       
       <Container>
-        <article className="mb-32">
+        <article className="pt-48 mb-32">
           <div className="max-w-2xl mx-auto">
             <div className={styles["markdown"]}>
               <h2>Vectorization Spirit Using the Word Association Experiment (Jung, 1910)</h2>
@@ -164,9 +165,6 @@ export default function Page() {
                 <BlockMath math="s(w_I, w_O) = \exp\left(\frac{\Delta SP(w_I, w_O)}{\lambda}\right)" />
               </div>
               
-              <p>\lambda : Scale adjustment constant</p>
-              <p>Niigata Univ IRB<br />Approved at 2025/03</p>
-
               <h2>Conclusion</h2>
               <p>
                 <strong>Self-expansiveness is Spirit:</strong> Self-expansiveness plays a key role in shaping
