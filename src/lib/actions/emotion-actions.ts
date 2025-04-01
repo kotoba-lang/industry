@@ -1,6 +1,5 @@
 "use server";
 
-import { EmotionDataService } from './emotion-data-service';
 import { z } from 'zod';
 
 // Input validation schema for saving emotion data
@@ -61,7 +60,7 @@ export async function saveEmotionData(formData: FormData | any) {
     const validatedData = SaveEmotionDataSchema.parse(data);
     
     // Save emotion data
-    const result = await EmotionDataService.saveEmotionData({
+    const result = await saveEmotionData({
       ...validatedData,
       timestamp: validatedData.timestamp || Date.now()
     });
@@ -98,7 +97,7 @@ export async function getEmotionData(userId: string, assessmentId: string) {
     GetEmotionDataSchema.parse({ userId, assessmentId });
     
     // Get emotion data
-    const result = await EmotionDataService.getEmotionDataByAssessment(userId, assessmentId);
+    const result = await getEmotionDataByAssessment(userId, assessmentId);
     
     if (!result.success) {
       return {
