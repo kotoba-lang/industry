@@ -217,6 +217,26 @@ export default function JungVoiceTest({
           } else if (errorType === 'network') {
             // Network issues
             setError('Network error occurred. Please check your connection and try again.');
+          } else if (errorType === 'language-not-supported') {
+            // Language not supported error
+            console.warn(`Language ${speechRecognitionLang} not supported, falling back to en-US`);
+            setError(`Language "${speechRecognitionLang}" is not supported by your browser. Falling back to English (US).`);
+            
+            // Try to fall back to English
+            if (recognitionRef.current) {
+              recognitionRef.current.lang = 'en-US';
+              
+              // Restart recognition if it was active
+              setTimeout(() => {
+                if (recognitionRef.current && isMountedRef.current) {
+                  try {
+                    recognitionRef.current.start();
+                  } catch (e) {
+                    console.error('Error restarting recognition with fallback language:', e);
+                  }
+                }
+              }, 300);
+            }
           }
           
           setIsListening(false);
@@ -582,17 +602,15 @@ export default function JungVoiceTest({
           emotionsRecord[emotion.name] = emotion.score;
         });
         
-        saveFacialEmotionData(
+        saveEmotionData({
           userId,
-          assessmentIdRef.current,
-          currentWord,
-          userResponse,
-          startTime ? Date.now() - startTime : 0,
-          { 
-            emotions: emotionsRecord, 
-            timestamp: Date.now() 
-          }
-        ).catch(err => {
+          assessmentId: assessmentIdRef.current,
+          stimulusWord: currentWord,
+          responseWord: userResponse,
+          reactionTimeMs: startTime ? Date.now() - startTime : 0,
+          faceEmotions: emotionsRecord,
+          timestamp: Date.now()
+        }).catch((err: Error) => {
           console.error('Failed to save facial emotion data:', err);
         });
       }
@@ -1019,6 +1037,33 @@ export default function JungVoiceTest({
     
     loadCacheStats();
   }, []);
+
+  useEffect(() => {
+    // Track facial emotions if we have a user response
+    if (currentWordIndex >= 0 && currentEmotion && userId && assessmentIdRef.current) {
+      const currentWord = stimulusWords[currentWordIndex];
+      
+      if (userResponse && currentEmotion.emotions && currentEmotion.emotions.length > 0) {
+        // Convert emotions array to record/object for storage
+        const emotionsRecord: Record<string, number> = {};
+        currentEmotion.emotions.forEach((emotion: { name: string; score: number }) => {
+          emotionsRecord[emotion.name] = emotion.score;
+        });
+        
+        saveEmotionData({
+          userId,
+          assessmentId: assessmentIdRef.current,
+          stimulusWord: currentWord,
+          responseWord: userResponse,
+          reactionTimeMs: startTime ? Date.now() - startTime : 0,
+          faceEmotions: emotionsRecord,
+          timestamp: Date.now()
+        }).catch((err: Error) => {
+          console.error('Failed to save facial emotion data:', err);
+        });
+      }
+    }
+  }, [currentWordIndex, stimulusWords, userResponse, startTime, userId, assessmentIdRef.current, currentEmotion]);
 
   return (
     <div className={`max-w-3xl mx-auto ${className}`}>
