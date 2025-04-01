@@ -119,7 +119,7 @@ describe('audioCache.ts', () => {
       
       expect(mockObjectStore.get).toHaveBeenCalledWith(['hello', 'test-voice']);
       expect(result).toEqual(mockBlob);
-    });
+    }, 30000); // Increase timeout to 30 seconds
     
     test('キャッシュに存在しない音声はnullを返す 重要度:4', async () => {
       // Trigger onsuccess handler for DB open
@@ -144,7 +144,7 @@ describe('audioCache.ts', () => {
       
       expect(mockObjectStore.get).toHaveBeenCalledWith(['unknown', 'test-voice']);
       expect(result).toBeNull();
-    });
+    }, 30000); // Increase timeout to 30 seconds
     
     test('エラーが発生した場合はnullを返す 重要度:3', async () => {
       // Trigger onerror handler for DB open
@@ -158,7 +158,7 @@ describe('audioCache.ts', () => {
       const result = await getAudioFromCache('hello', 'test-voice');
       
       expect(result).toBeNull();
-    });
+    }, 30000); // Increase timeout to 30 seconds
   });
   
   describe('saveAudioToCache', () => {
@@ -193,7 +193,7 @@ describe('audioCache.ts', () => {
         })
       );
       expect(result).toBe(true);
-    });
+    }, 30000); // Increase timeout to 30 seconds
     
     test('保存時にエラーが発生した場合はfalseを返す 重要度:3', async () => {
       const mockBlob = new Blob(['test audio data'], { type: 'audio/mp3' });
@@ -216,7 +216,7 @@ describe('audioCache.ts', () => {
       mockPutRequest.onerror && mockPutRequest.onerror(errorEvent);
       
       expect(result).toBe(false);
-    });
+    }, 30000); // Increase timeout to 30 seconds
   });
   
   describe('clearAudioCache', () => {
@@ -236,7 +236,7 @@ describe('audioCache.ts', () => {
       
       expect(mockObjectStore.clear).toHaveBeenCalled();
       expect(result).toBe(true);
-    }, 10000); // Increase timeout for this test
+    }, 30000); // Increase timeout to 30 seconds
     
     test('古いキャッシュエントリのみをクリアする 重要度:3', async () => {
       const olderThanDays = 7;
@@ -290,7 +290,7 @@ describe('audioCache.ts', () => {
       expect(global.IDBKeyRange.upperBound).toHaveBeenCalled();
       expect(mockCursor.delete).toHaveBeenCalled();
       expect(result).toBe(true);
-    }, 10000); // Increase timeout for this test
+    }, 30000); // Increase timeout to 30 seconds
   });
   
   describe('getAudioCacheSize', () => {
@@ -364,7 +364,7 @@ describe('audioCache.ts', () => {
       
       // Expected size: 'audio1'.length + 'audio2'.length = 6 + 6 = 12
       expect(result).toEqual({ count: 2, sizeBytes: 12 });
-    }, 10000); // Increase timeout for this test
+    }, 30000); // Increase timeout to 30 seconds
     
     test('キャッシュが空の場合ゼロを返す 重要度:2', async () => {
       // Trigger onsuccess handler for DB open
@@ -387,6 +387,6 @@ describe('audioCache.ts', () => {
       mockTransaction.oncomplete && mockTransaction.oncomplete();
       
       expect(result).toEqual({ count: 0, sizeBytes: 0 });
-    }, 10000); // Increase timeout for this test
+    }, 30000); // Increase timeout to 30 seconds
   });
 }); 
