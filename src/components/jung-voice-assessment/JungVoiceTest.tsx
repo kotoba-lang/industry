@@ -116,7 +116,6 @@ export default function JungVoiceTest({
   
   // 音声認識の状態
   const [isSpeechSupported, setIsSpeechSupported] = useState<boolean>(false);
-  const [isResponseCorrect, setIsResponseCorrect] = useState<boolean | null>(null);
   
   // Refs
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -717,7 +716,6 @@ export default function JungVoiceTest({
     }
     
     setUserResponse('');
-    setIsResponseCorrect(null);
     
     // すべての単語が完了したかチェック
     if (currentWordIndex + 1 >= stimulusWords.length) {
@@ -737,20 +735,6 @@ export default function JungVoiceTest({
       });
       
       addMessage([{ text: `${nextMessage} ${stimulusWords[currentWordIndex + 1]}`, role: 'assistant' }]);
-    }
-  };
-
-  // レスポンスの正誤評価
-  const validateResponse = (isCorrect: boolean) => {
-    setIsResponseCorrect(isCorrect);
-    
-    if (isCorrect) {
-      // 正解の場合は次に進む
-      recordResponse(userResponse);
-    } else {
-      // 不正解の場合は同じ単語をやり直す
-      setUserResponse('');
-      startListening();
     }
   };
 
@@ -1098,31 +1082,12 @@ export default function JungVoiceTest({
                     <div className="mt-4">
                       <p className="mb-2 text-lg text-gray-800 dark:text-white">{userResponse}</p>
                       
-                      {isResponseCorrect === null ? (
-                        <div className="flex gap-2 justify-center">
-                          <Button
-                            variant="outline"
-                            onClick={() => validateResponse(false)}
-                            disabled={!userResponse.trim() || isLoading}
-                            className="border-red-500 text-red-500 hover:bg-red-50 dark:border-red-400 dark:text-red-400"
-                          >
-                            Incorrect
-                          </Button>
-                          <Button
-                            onClick={() => validateResponse(true)}
-                            disabled={!userResponse.trim() || isLoading}
-                          >
-                            Correct
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button
-                          onClick={() => recordResponse(userResponse)}
-                          disabled={!userResponse.trim() || isLoading}
-                        >
-                          Next
-                        </Button>
-                      )}
+                      <Button
+                        onClick={() => recordResponse(userResponse)}
+                        disabled={!userResponse.trim() || isLoading}
+                      >
+                        Next
+                      </Button>
                     </div>
                   )}
                 </div>
