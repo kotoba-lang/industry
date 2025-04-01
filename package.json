@@ -3,7 +3,10 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "jest",
+    "test:e2e": "playwright test",
+    "test:jung": "node scripts/test-jung-word.js"
   },
   "engines": {
     "node": "20.14.0"
@@ -35,6 +38,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.42.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
     "@types/node": "^20.14.8",
