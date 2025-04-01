@@ -23,6 +23,7 @@ import { saveEmotionData, getEmotionData } from '@/lib/actions/emotion-actions';
 import { useHumeEmotion } from '@/providers/HumeEmotionProvider';
 import { z } from 'zod';
 import { WordResponseWithExtras, withExtras } from './WordResponse';
+import { HumeFaceEmotion } from '@/lib/actions/hume-service';
 
 // Create a Zod schema for WordResponse
 const WordResponseSchema = z.object({
@@ -586,37 +587,6 @@ export default function JungVoiceTest({
     setUserId(newUserId);
   }, []);
 
-  // 顔の感情データを処理するコールバック
-  const handleFaceData = useCallback((data: HumeFaceResponse) => {
-    setCurrentFaceData(data);
-    
-    // テスト実行中かつ現在の単語インデックスが有効な場合のみ処理
-    if (currentWordIndex >= 0 && currentWordIndex < stimulusWords.length) {
-      const currentWord = stimulusWords[currentWordIndex];
-      
-      // 感情データをDBに保存（テスト中のみ実行）
-      if (userId && assessmentIdRef.current) {
-        // 配列形式の感情データをオブジェクト形式に変換
-        const emotionsRecord: Record<string, number> = {};
-        data.emotions.forEach(emotion => {
-          emotionsRecord[emotion.name] = emotion.score;
-        });
-        
-        saveEmotionData({
-          userId,
-          assessmentId: assessmentIdRef.current,
-          stimulusWord: currentWord,
-          responseWord: userResponse,
-          reactionTimeMs: startTime ? Date.now() - startTime : 0,
-          faceEmotions: emotionsRecord,
-          timestamp: Date.now()
-        }).catch((err: Error) => {
-          console.error('Failed to save facial emotion data:', err);
-        });
-      }
-    }
-  }, [currentWordIndex, stimulusWords, userResponse, startTime, userId, assessmentIdRef.current]);
-
   // テスト開始
   const startTest = async () => {
     setIsLoading(true);
@@ -1037,33 +1007,6 @@ export default function JungVoiceTest({
     
     loadCacheStats();
   }, []);
-
-  useEffect(() => {
-    // Track facial emotions if we have a user response
-    if (currentWordIndex >= 0 && currentEmotion && userId && assessmentIdRef.current) {
-      const currentWord = stimulusWords[currentWordIndex];
-      
-      if (userResponse && currentEmotion.emotions && currentEmotion.emotions.length > 0) {
-        // Convert emotions array to record/object for storage
-        const emotionsRecord: Record<string, number> = {};
-        currentEmotion.emotions.forEach((emotion: { name: string; score: number }) => {
-          emotionsRecord[emotion.name] = emotion.score;
-        });
-        
-        saveEmotionData({
-          userId,
-          assessmentId: assessmentIdRef.current,
-          stimulusWord: currentWord,
-          responseWord: userResponse,
-          reactionTimeMs: startTime ? Date.now() - startTime : 0,
-          faceEmotions: emotionsRecord,
-          timestamp: Date.now()
-        }).catch((err: Error) => {
-          console.error('Failed to save facial emotion data:', err);
-        });
-      }
-    }
-  }, [currentWordIndex, stimulusWords, userResponse, startTime, userId, assessmentIdRef.current, currentEmotion]);
 
   return (
     <div className={`max-w-3xl mx-auto ${className}`}>
