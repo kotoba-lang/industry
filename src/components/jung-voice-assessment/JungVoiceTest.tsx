@@ -6,6 +6,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { Button } from '../ui/button';
 import { JungVoiceTestProps, WordResponse, TestResults, Message } from './types';
 import { JungVoiceAssessmentPropsSchema, WordResponseSchema, TestResultsSchema } from './schema';
+import { getAudioFromCache, saveAudioToCache, getAudioCacheSize } from './utils/audioCache';
+import AudioCacheManager from './utils/cacheManager';
 
 // ヒューム音声生成のインターフェース定義
 interface SpeechRecognition extends EventTarget {
@@ -94,6 +96,11 @@ export default function JungVoiceTest({
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const audioUrlsRef = useRef<string[]>([]);
   const isMountedRef = useRef<boolean>(true);
+
+  // 新しい状態変数
+  const [isCacheEnabled, setIsCacheEnabled] = useState<boolean>(true);
+  const [cacheStats, setCacheStats] = useState<{ count: number, sizeBytes: number } | null>(null);
+  const [showCacheManager, setShowCacheManager] = useState<boolean>(false);
 
   // コンポーネントのマウント状態を追跡
   useEffect(() => {
@@ -215,6 +222,42 @@ export default function JungVoiceTest({
     try {
       setIsLoading(true);
       
+      // キャッシュから音声を取得を試みる
+      if (isCacheEnabled) {
+        const cachedAudio = await getAudioFromCache(text, voiceName);
+        
+        if (cachedAudio) {
+          // キャッシュから音声を再生
+          console.log(`Cache hit for text: "${text}"`);
+          const url = URL.createObjectURL(cachedAudio);
+          audioUrlsRef.current.push(url);
+          setAudioUrl(url);
+          
+          // コンポーネントがアンマウントされていたら処理を中止
+          if (!isMountedRef.current) {
+            URL.revokeObjectURL(url);
+            if (onAudioEnd) onAudioEnd();
+            return;
+          }
+          
+          if (audioRef.current) {
+            playAudio(url, onAudioEnd);
+          } else if (onAudioEnd && isMountedRef.current) {
+            onAudioEnd();
+          }
+          
+          // キャッシュ統計を更新
+          getAudioCacheSize().then(stats => {
+            setCacheStats(stats);
+          }).catch(err => {
+            console.error('Failed to update cache stats after cache hit:', err);
+          });
+          
+          return;
+        }
+      }
+      
+      // キャッシュになければAPIから取得
       // 直接Hume AI TTSエンドポイントを呼び出す
       const apiUrl = 'https://api.hume.ai/v0/tts';
       const headers = {
@@ -276,6 +319,23 @@ export default function JungVoiceTest({
           }
           
           const blob = new Blob([bytes], { type: 'audio/mp3' });
+          
+          // キャッシュに保存（非同期で、続行を待たない）
+          if (isCacheEnabled) {
+            saveAudioToCache(text, voiceName, blob)
+              .then(async success => {
+                if (success) {
+                  console.log(`Cached audio for: "${text}"`);
+                  // キャッシュ統計を更新
+                  const stats = await getAudioCacheSize();
+                  setCacheStats(stats);
+                }
+              })
+              .catch(err => {
+                console.error('Failed to cache audio:', err);
+              });
+          }
+          
           const url = URL.createObjectURL(blob);
           
           // URL をリストに追加（後でクリーンアップするため）
@@ -291,51 +351,7 @@ export default function JungVoiceTest({
           
           // 音声を再生
           if (audioRef.current) {
-            const audio = audioRef.current;
-            
-            // すべてのイベントリスナーをクリア
-            const clonedAudio = audio.cloneNode(true) as HTMLAudioElement;
-            if (audio.parentNode) {
-              audio.parentNode.replaceChild(clonedAudio, audio);
-              audioRef.current = clonedAudio;
-            }
-            
-            // 再生終了イベントにコールバックを設定
-            if (onAudioEnd) {
-              const handleEnded = () => {
-                if (isMountedRef.current) {
-                  onAudioEnd();
-                }
-                clonedAudio.removeEventListener('ended', handleEnded);
-              };
-              
-              clonedAudio.addEventListener('ended', handleEnded);
-            }
-            
-            // エラーハンドリング
-            const handleError = (e: Event) => {
-              console.error('Audio playback error:', e);
-              if (onAudioEnd && isMountedRef.current) onAudioEnd();
-              clonedAudio.removeEventListener('error', handleError);
-            };
-            
-            clonedAudio.addEventListener('error', handleError);
-            
-            // 音声ファイルを設定して再生
-            clonedAudio.src = url;
-            
-            try {
-              const playPromise = clonedAudio.play();
-              if (playPromise !== undefined) {
-                playPromise.catch(error => {
-                  console.error('Audio play error:', error);
-                  if (onAudioEnd && isMountedRef.current) onAudioEnd();
-                });
-              }
-            } catch (err) {
-              console.error('Error playing audio:', err);
-              if (onAudioEnd && isMountedRef.current) onAudioEnd();
-            }
+            playAudio(url, onAudioEnd);
           } else if (onAudioEnd && isMountedRef.current) {
             // audioRefがない場合は即時コールバック
             onAudioEnd();
@@ -358,7 +374,61 @@ export default function JungVoiceTest({
         setIsLoading(false);
       }
     }
-  }, [apiKey, isApiAvailable, voiceName]);
+  }, [apiKey, isApiAvailable, voiceName, isCacheEnabled]);
+
+  // 音声再生の共通処理を分離
+  const playAudio = useCallback((url: string, onAudioEnd?: () => void) => {
+    if (!audioRef.current || !isMountedRef.current) {
+      if (onAudioEnd && isMountedRef.current) onAudioEnd();
+      return;
+    }
+    
+    const audio = audioRef.current;
+    
+    // すべてのイベントリスナーをクリア
+    const clonedAudio = audio.cloneNode(true) as HTMLAudioElement;
+    if (audio.parentNode) {
+      audio.parentNode.replaceChild(clonedAudio, audio);
+      audioRef.current = clonedAudio;
+    }
+    
+    // 再生終了イベントにコールバックを設定
+    if (onAudioEnd) {
+      const handleEnded = () => {
+        if (isMountedRef.current) {
+          onAudioEnd();
+        }
+        clonedAudio.removeEventListener('ended', handleEnded);
+      };
+      
+      clonedAudio.addEventListener('ended', handleEnded);
+    }
+    
+    // エラーハンドリング
+    const handleError = (e: Event) => {
+      console.error('Audio playback error:', e);
+      if (onAudioEnd && isMountedRef.current) onAudioEnd();
+      clonedAudio.removeEventListener('error', handleError);
+    };
+    
+    clonedAudio.addEventListener('error', handleError);
+    
+    // 音声ファイルを設定して再生
+    clonedAudio.src = url;
+    
+    try {
+      const playPromise = clonedAudio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.error('Audio play error:', error);
+          if (onAudioEnd && isMountedRef.current) onAudioEnd();
+        });
+      }
+    } catch (err) {
+      console.error('Error playing audio:', err);
+      if (onAudioEnd && isMountedRef.current) onAudioEnd();
+    }
+  }, []);
 
   // メッセージを追加
   const addMessage = (content: string, sender: 'user' | 'assistant') => {
@@ -517,9 +587,50 @@ export default function JungVoiceTest({
     }
   };
 
+  // 初期ロード時にキャッシュ統計を取得
+  useEffect(() => {
+    const loadCacheStats = async () => {
+      try {
+        const stats = await getAudioCacheSize();
+        setCacheStats(stats);
+      } catch (err) {
+        console.error('Failed to load cache stats:', err);
+      }
+    };
+    
+    loadCacheStats();
+  }, []);
+
   return (
     <div className={`max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-md ${className}`}>
       <h2 className="text-2xl font-bold mb-6 text-center">Jung's Word Association Test (AI Guided)</h2>
+      
+      {/* キャッシュのオン/オフトグル */}
+      <div className="flex justify-between items-center mb-2">
+        <button
+          onClick={() => setShowCacheManager(!showCacheManager)}
+          className="text-xs text-blue-500 hover:underline focus:outline-none"
+        >
+          {cacheStats ? `キャッシュ: ${cacheStats.count}件` : 'キャッシュ管理'}
+        </button>
+        
+        <label className="flex items-center text-xs text-gray-500 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isCacheEnabled}
+            onChange={(e) => setIsCacheEnabled(e.target.checked)}
+            className="mr-1 h-3 w-3"
+          />
+          音声キャッシュを使用する
+        </label>
+      </div>
+      
+      {/* キャッシュ管理UI */}
+      {showCacheManager && (
+        <div className="mb-4">
+          <AudioCacheManager />
+        </div>
+      )}
       
       {/* 音声再生用の隠し要素 */}
       <audio ref={audioRef} className="hidden" controls />
