@@ -28,7 +28,7 @@ export const consentRecords = pgTable('consent_records', {
   // 研究関連のメタデータ
   studyId: text('study_id'), // 研究ID
   researcherNote: text('researcher_note'), // 研究者のメモ
-}, (table) => {
+}, (table: any) => {
   return {
     ...table,
     schema,
@@ -36,14 +36,5 @@ export const consentRecords = pgTable('consent_records', {
 });
 
 // スキーマの型定義をエクスポート
-export type ConsentRecord = {
-  id: string;
-  userId: string;
-  consentGiven: boolean;
-  consentDate: Date;
-  consentVersion: string;
-  researcherNote: string | null;
-  // Add other fields as needed
-};
-
-export type NewConsentRecord = Omit<ConsentRecord, 'id'> & { id?: string }; 
+export type ConsentRecord = typeof consentRecords.$inferSelect;
+export type NewConsentRecord = typeof consentRecords.$inferInsert; 
