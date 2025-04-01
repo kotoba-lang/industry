@@ -2,6 +2,7 @@ export interface TransitionState {
   currentState: string
   targetState: string | null
   progress: number // 0から1の間の値（0: 開始、1: 完了）
+  transitionDuration?: number
 }
 
 export function getTransitionProgress(state: TransitionState, deltaTime: number, transitionSpeed = 1): TransitionState {
