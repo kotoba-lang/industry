@@ -6,7 +6,12 @@ import { saveConsentAndDemographicData } from '@/lib/actions/consent-actions';
 
 // Mock the server action
 vi.mock('@/lib/actions/consent-actions', () => ({
-  saveConsentAndDemographicData: vi.fn().mockResolvedValue({ success: true }),
+  saveConsentAndDemographicData: vi.fn().mockResolvedValue({ 
+    success: true,
+    userId: 'test-user-id',
+    consent: {},
+    demographic: {}
+  }),
 }));
 
 /**
@@ -49,23 +54,29 @@ describe('ConsentForm', () => {
     expect(screen.getByText('Confidentiality')).toBeInTheDocument();
   });
   
-  it('デモグラフィック情報を選択できること', () => {
+  it('デモグラフィック情報を選択できること', async () => {
     render(<ConsentForm onConsent={mockOnConsent} />);
     
     // Set age group
     fireEvent.click(screen.getByRole('combobox', { name: /age group/i }));
-    fireEvent.click(screen.getByText('25-34'));
+    await waitFor(() => {
+      fireEvent.click(screen.getByText('25-34'));
+    });
     
     // Set gender
     fireEvent.click(screen.getByLabelText('Male'));
     
     // Set ethnicity
     fireEvent.click(screen.getByRole('combobox', { name: /race\/ethnicity/i }));
-    fireEvent.click(screen.getByText('Prefer not to say')); 
+    await waitFor(() => {
+      fireEvent.click(screen.getByText('Prefer not to say'));
+    });
     
     // Set income
     fireEvent.click(screen.getByRole('combobox', { name: /annual income/i }));
-    fireEvent.click(screen.getByText('$25,000 - $50,000')); 
+    await waitFor(() => {
+      fireEvent.click(screen.getByText('$25,000 - $50,000'));
+    });
     
     // Toggle consent checkbox
     fireEvent.click(screen.getByText(/I have read and understood the above information/i)); 
@@ -80,15 +91,21 @@ describe('ConsentForm', () => {
     
     // Fill form data
     fireEvent.click(screen.getByRole('combobox', { name: /age group/i }));
-    fireEvent.click(screen.getByText('25-34'));
+    await waitFor(() => {
+      fireEvent.click(screen.getByText('25-34'));
+    });
     
     fireEvent.click(screen.getByLabelText('Female'));
     
     fireEvent.click(screen.getByRole('combobox', { name: /race\/ethnicity/i }));
-    fireEvent.click(screen.getByText('White'));
+    await waitFor(() => {
+      fireEvent.click(screen.getByText('White'));
+    });
     
     fireEvent.click(screen.getByRole('combobox', { name: /annual income/i }));
-    fireEvent.click(screen.getByText('Prefer not to say'));
+    await waitFor(() => {
+      fireEvent.click(screen.getByText('Prefer not to say'));
+    });
     
     fireEvent.click(screen.getByText(/I have read and understood the above information/i));
     
@@ -123,15 +140,24 @@ describe('ConsentForm', () => {
   
   it('送信中は送信ボタンが無効化されること', async () => {
     // Make saveConsentAndDemographicData slow to resolve
-    (saveConsentAndDemographicData as any).mockImplementation(() => new Promise(resolve => {
-      setTimeout(() => resolve({ success: true }), 100);
-    }));
+    vi.mocked(saveConsentAndDemographicData).mockImplementationOnce(() => 
+      new Promise(resolve => {
+        setTimeout(() => resolve({ 
+          success: true,
+          userId: 'test-user-id',
+          consent: {},
+          demographic: {}
+        }), 100);
+      })
+    );
     
     render(<ConsentForm onConsent={mockOnConsent} />);
     
     // Fill required fields and submit
     fireEvent.click(screen.getByRole('combobox', { name: /age group/i }));
-    fireEvent.click(screen.getByText('25-34'));
+    await waitFor(() => {
+      fireEvent.click(screen.getByText('25-34'));
+    });
     
     fireEvent.click(screen.getByLabelText('Female'));
     
