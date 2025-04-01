@@ -12,9 +12,9 @@ if (!connectionString) {
 }
 
 export default {
-  schema: './src/lib/db/schema/index.ts',
+  schema: './src/lib/db/schema/*',
   out: './drizzle',
-  driver: 'pg',
+  dialect: 'postgresql',
   dbCredentials: {
     url: connectionString,
   },
