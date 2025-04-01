@@ -79,7 +79,7 @@ export default function ConsentForm({
       <h2 className="text-2xl font-bold mb-4 text-black">Research Participation Consent</h2>
       
       <div className="mb-6">
-        <p className="mb-4">This Spirit in Physics (Jung's Word Association Embedding Test) is conducted for research purposes. Please read the following consent information before proceeding.</p>
+        <p className="mb-4 text-gray-800">This Spirit in Physics (Jung's Word Association Embedding Test) is conducted for research purposes. Please read the following consent information before proceeding.</p>
         
         <button 
           onClick={() => setShowFullConsent(!showFullConsent)}
@@ -90,44 +90,44 @@ export default function ConsentForm({
         
         {showFullConsent && (
           <div className="p-4 bg-gray-50 rounded-md mb-4 max-h-96 overflow-y-auto text-sm">
-            <h3 className="font-bold mb-2">Research Purpose</h3>
-            <p className="mb-4">
+            <h3 className="font-bold mb-2 text-gray-900">Research Purpose</h3>
+            <p className="mb-4 text-gray-800">
               This research aims to investigate the relationship between language responses and psychological processes using Spirit in Physics (Jung's Word Association Embedding Test).
               In this test, we record your immediate reactions to stimulus words.
             </p>
             
-            <h3 className="font-bold mb-2">Research Procedure</h3>
-            <p className="mb-4">
+            <h3 className="font-bold mb-2 text-gray-900">Research Procedure</h3>
+            <p className="mb-4 text-gray-800">
               In this research, a series of words will be presented, and you will be asked to respond with the first word that comes to mind for each.
               Reaction times will also be recorded. The test takes approximately 15-20 minutes to complete.
             </p>
             
-            <h3 className="font-bold mb-2">Potential Risks and Discomfort</h3>
-            <p className="mb-4">
+            <h3 className="font-bold mb-2 text-gray-900">Potential Risks and Discomfort</h3>
+            <p className="mb-4 text-gray-800">
               There are no physical risks associated with participating in this research. However, some stimulus words may evoke personal emotions or memories.
               If you feel uncomfortable, you may discontinue the test at any time.
             </p>
             
-            <h3 className="font-bold mb-2">Benefits</h3>
-            <p className="mb-4">
+            <h3 className="font-bold mb-2 text-gray-900">Benefits</h3>
+            <p className="mb-4 text-gray-800">
               There may be no direct benefits from participating in this research, but the test results may help deepen your self-understanding.
               Additionally, you will be contributing to the advancement of psychological research.
             </p>
             
-            <h3 className="font-bold mb-2">Confidentiality</h3>
-            <p className="mb-4">
+            <h3 className="font-bold mb-2 text-gray-900">Confidentiality</h3>
+            <p className="mb-4 text-gray-800">
               All data collected will be anonymized and strictly protected. Your personal information will not be identified when the research results are published.
               Data will be stored on secure servers and will not be used for purposes other than research.
             </p>
             
-            <h3 className="font-bold mb-2">Voluntary Participation</h3>
-            <p className="mb-4">
+            <h3 className="font-bold mb-2 text-gray-900">Voluntary Participation</h3>
+            <p className="mb-4 text-gray-800">
               Participation in this research is completely voluntary. You may withdraw at any time without explaining your reasons.
               Refusing or discontinuing participation will not result in any disadvantages.
             </p>
             
-            <h3 className="font-bold mb-2">Contact Information</h3>
-            <p className="mb-4">
+            <h3 className="font-bold mb-2 text-gray-900">Contact Information</h3>
+            <p className="mb-4 text-gray-800">
               If you have questions or concerns about this research, please contact the research supervisor (contact@research-example.com).
               For questions about your rights as a research participant, you may contact the ethics committee (ethics@research-example.com).
             </p>
@@ -136,12 +136,12 @@ export default function ConsentForm({
       </div>
       
       <div className="mb-6 p-4 bg-gray-50 rounded-md">
-        <h3 className="font-bold mb-4">Demographic Information (CDISC Standards)</h3>
-        <p className="text-sm mb-4">This information helps us understand our research participants better. All responses are anonymous and optional.</p>
+        <h3 className="font-bold mb-4 text-gray-900">Demographic Information (CDISC Standards)</h3>
+        <p className="text-sm mb-4 text-gray-800">This information helps us understand our research participants better. All responses are anonymous and optional.</p>
         
         <div className="space-y-6">
           <div>
-            <Label htmlFor="ageGroup" className="block mb-2">Age Group</Label>
+            <Label htmlFor="ageGroup" className="block mb-2 text-gray-800">Age Group</Label>
             <Select 
               value={demographicData.ageGroup} 
               onValueChange={(value: string) => handleDemographicChange("ageGroup", value)}
@@ -162,7 +162,7 @@ export default function ConsentForm({
           </div>
           
           <div>
-            <Label className="block mb-2">Gender</Label>
+            <Label className="block mb-2 text-gray-800">Gender</Label>
             <RadioGroup 
               value={demographicData.gender} 
               onValueChange={(value: string) => handleDemographicChange("gender", value)}
@@ -170,25 +170,25 @@ export default function ConsentForm({
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="male" id="gender-male" />
-                <Label htmlFor="gender-male">Male</Label>
+                <Label htmlFor="gender-male" className="text-gray-800">Male</Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="female" id="gender-female" />
-                <Label htmlFor="gender-female">Female</Label>
+                <Label htmlFor="gender-female" className="text-gray-800">Female</Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="non-binary" id="gender-non-binary" />
-                <Label htmlFor="gender-non-binary">Non-binary</Label>
+                <Label htmlFor="gender-non-binary" className="text-gray-800">Non-binary</Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="prefer-not-to-say" id="gender-not-say" />
-                <Label htmlFor="gender-not-say">Prefer not to say</Label>
+                <Label htmlFor="gender-not-say" className="text-gray-800">Prefer not to say</Label>
               </div>
             </RadioGroup>
           </div>
           
           <div>
-            <Label htmlFor="ethnicity" className="block mb-2">Race/Ethnicity</Label>
+            <Label htmlFor="ethnicity" className="block mb-2 text-gray-800">Race/Ethnicity</Label>
             <Select 
               value={demographicData.ethnicity} 
               onValueChange={(value: string) => handleDemographicChange("ethnicity", value)}
@@ -211,7 +211,7 @@ export default function ConsentForm({
           </div>
           
           <div>
-            <Label htmlFor="income" className="block mb-2">Annual Income</Label>
+            <Label htmlFor="income" className="block mb-2 text-gray-800">Annual Income</Label>
             <Select 
               value={demographicData.income} 
               onValueChange={(value: string) => handleDemographicChange("income", value)}
@@ -241,7 +241,7 @@ export default function ConsentForm({
             onCheckedChange={(checked: boolean) => setConsented(checked === true)} 
             className="mt-1"
           />
-          <label htmlFor="consent1" className="ml-2 text-sm">
+          <label htmlFor="consent1" className="ml-2 text-sm text-gray-800">
             I have read and understood the above information. I have had the opportunity to ask questions and have received satisfactory answers to my questions. I voluntarily agree to participate in this research. I understand that I have the right to withdraw at any time.
           </label>
         </div>
