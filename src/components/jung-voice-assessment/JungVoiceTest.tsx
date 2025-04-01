@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Hume, HumeClient } from 'hume';
 import { v4 as uuidv4 } from 'uuid';
 import { Button } from '../ui/button';
@@ -77,8 +77,11 @@ export default function JungVoiceTest({
     className
   });
 
-  // 使用する刺激語の数を制限
-  const stimulusWords = JUNG_STIMULUS_WORDS.slice(0, validatedProps.numberOfWords || 100);
+  // 使用する刺激語の数を制限し、ランダムに選択する
+  const stimulusWords = useMemo(() => {
+    const shuffled = [...JUNG_STIMULUS_WORDS].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, validatedProps.numberOfWords || 100);
+  }, [validatedProps.numberOfWords]);
 
   // 状態管理
   const [currentWordIndex, setCurrentWordIndex] = useState<number>(-1); // -1はテスト未開始
