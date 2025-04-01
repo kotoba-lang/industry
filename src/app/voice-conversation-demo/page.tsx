@@ -1,12 +1,19 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { VoiceConversation } from '@/components/voice-conversation';
 
 export default function VoiceConversationDemo() {
   const [isConfigured, setIsConfigured] = useState<boolean>(false);
   const [lastMessageSent, setLastMessageSent] = useState<string>('');
   const [lastMessageReceived, setLastMessageReceived] = useState<string>('');
+  const [apiStatus, setApiStatus] = useState<string>('Waiting...');
+
+  useEffect(() => {
+    // Check if API key exists
+    const hasApiKey = !!process.env.NEXT_PUBLIC_HUME_API_KEY;
+    setApiStatus(hasApiKey ? 'API Key Found' : 'API Key Missing');
+  }, []);
 
   const handleStart = () => {
     setIsConfigured(true);
@@ -45,6 +52,25 @@ export default function VoiceConversationDemo() {
             </div>
           )}
           
+          <div className="p-2 bg-blue-50 text-blue-800 rounded-md mb-4 text-xs">
+            <p className="font-semibold">Technical Note:</p>
+            <p>This component uses Hume AI's TTS API directly with the following request format:</p>
+            <pre className="mt-1 p-2 bg-gray-50 text-gray-700 overflow-auto text-xs rounded">
+{`{
+  "utterances": [
+    {
+      "text": "Your message text",
+      "description": "David Hume"
+    }
+  ],
+  "format": {
+    "type": "mp3"
+  },
+  "num_generations": 1
+}`}
+            </pre>
+          </div>
+          
           <button
             onClick={handleStart}
             className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -76,6 +102,12 @@ export default function VoiceConversationDemo() {
                   {lastMessageReceived || "No messages received yet"}
                 </p>
               </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-700">API Status:</h3>
+                <p className="mt-1 p-2 bg-gray-50 rounded-md">
+                  {apiStatus}
+                </p>
+              </div>
             </div>
           </div>
           
@@ -94,10 +126,8 @@ export default function VoiceConversationDemo() {
         <p>
           Using Hume TTS API with environment variable: NEXT_PUBLIC_HUME_API_KEY
           <br />
-          <a href="https://hume.ai/docs/api-reference" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">
-            Hume API Documentation
-          </a> | <a href="https://github.com/tts/voices" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">
-            Voice Models
+          <a href="https://dev.hume.ai/reference/text-to-speech-tts/synthesize-json" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">
+            Hume TTS API Documentation
           </a>
         </p>
       </div>
