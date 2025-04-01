@@ -174,7 +174,8 @@ export default function Page() {
                 <strong>Spirit Transformer Model:</strong> The Kawasaki Model proves that the spirit can be
                 structured, measured, and quantified as dynamic physical information.
               </p>
-              <div className={styles.mathBlock}>
+
+              <div className={styles.mathIn}>
                 <BlockMath math="P(w_O | w_I) = \frac{\exp(\vec{w_I} \cdot \vec{w_O}) \cdot [r(w_I, w_O)]^{\alpha} \cdot \exp(\gamma \frac{\Delta SP(w_I,w_O)}{\lambda}) \cdot \exp(\eta F(w_I, w_O))}{\sum_{j} \exp(\vec{w_I} \cdot \vec{w_j}) \cdot [r(w_I, w_j)]^{\alpha} \cdot \exp(\gamma \frac{\Delta SP(w_I,w_j)}{\lambda}) \cdot \exp(\eta F(w_I, w_j))}" />
               </div>
 

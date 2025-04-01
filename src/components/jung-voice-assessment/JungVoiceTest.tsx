@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Hume, HumeClient } from 'hume';
+import axios from 'axios'; // Use axios for API calls instead of Hume SDK
 import { v4 as uuidv4 } from 'uuid';
 import { Button } from '../ui/button';
-import { JungVoiceTestProps, WordResponse, TestResults, Message } from './types';
-import { JungVoiceAssessmentPropsSchema, WordResponseSchema, TestResultsSchema } from './schema';
+import { JungVoiceTestProps, TestResults, Message } from './types';
+import { JungVoiceAssessmentPropsSchema, TestResultsSchema } from './schema';
 import { getAudioFromCache, saveAudioToCache, getAudioCacheSize } from './utils/audioCache';
 import AudioCacheManager from './utils/cacheManager';
 import { 
@@ -20,6 +20,22 @@ import CombinedCacheManager from './utils/combinedCacheManager';
 import WebcamComponent from '../webcam/WebcamComponent';
 import { HumeFaceResponse } from '@/lib/services/hume-service';
 import { EmotionDataService } from '@/lib/services/emotion-data-service';
+import { useHumeEmotion } from '@/providers/HumeEmotionProvider';
+import { z } from 'zod';
+
+// Define WordResponse interface
+interface WordResponse {
+  stimulusWord: string;
+  responseWord: string;
+  reactionTimeMs: number;
+}
+
+// Create a Zod schema for WordResponse
+const WordResponseSchema = z.object({
+  stimulusWord: z.string(),
+  responseWord: z.string(),
+  reactionTimeMs: z.number()
+});
 
 // ヒューム音声生成のインターフェース定義
 interface SpeechRecognition extends EventTarget {
@@ -87,27 +103,35 @@ export default function JungVoiceTest({
   }, [validatedProps.numberOfWords]);
 
   // 状態管理
-  const [currentWordIndex, setCurrentWordIndex] = useState<number>(-1); // -1はテスト未開始
+  const [currentWordIndex, setCurrentWordIndex] = useState<number>(-1);
   const [userResponse, setUserResponse] = useState<string>('');
-  const [responses, setResponses] = useState<WordResponse[]>([]);
-  const [startTime, setStartTime] = useState<number | null>(null);
-  const [testComplete, setTestComplete] = useState<boolean>(false);
-  const [averageReactionTime, setAverageReactionTime] = useState<number>(0);
-  const [delayedResponses, setDelayedResponses] = useState<number>(0);
+  const [userResponses, setUserResponses] = useState<WordResponse[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isListening, setIsListening] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [isApiAvailable, setIsApiAvailable] = useState<boolean>(true);
+  const [startTime, setStartTime] = useState<number>(0);
+  const [testComplete, setTestComplete] = useState<boolean>(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isWebcamActive, setIsWebcamActive] = useState(false);
+  const [emotionTrackingError, setEmotionTrackingError] = useState<string | null>(null);
+  const [isApiAvailable, setIsApiAvailable] = useState(true);
+  const userIdRef = useRef<string>('');
+  const assessmentIdRef = useRef<string>(uuidv4());
   
   // 音声認識の状態
-  const [isListening, setIsListening] = useState<boolean>(false);
   const [isSpeechSupported, setIsSpeechSupported] = useState<boolean>(false);
   const [isResponseCorrect, setIsResponseCorrect] = useState<boolean | null>(null);
   
   // Refs
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const humeClientRef = useRef<HumeClient | null>(null);
+  const axiosInstance = useRef(axios.create({
+    baseURL: 'https://api.hume.ai',
+    headers: {
+      'X-Hume-Api-Key': apiKey,
+      'Content-Type': 'application/json'
+    }
+  }));
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const audioUrlsRef = useRef<string[]>([]);
   const isMountedRef = useRef<boolean>(true);
@@ -123,9 +147,16 @@ export default function JungVoiceTest({
 
   // 新しい状態変数 - 感情認識用
   const [currentFaceData, setCurrentFaceData] = useState<HumeFaceResponse | null>(null);
-  const [isWebcamActive, setIsWebcamActive] = useState<boolean>(false);
-  const [assessmentId] = useState<string>(uuidv4()); // テストセッション用ユニークID
   const [userId, setUserId] = useState<string>('');
+
+  // Get emotion tracking context
+  const { 
+    enableTracking, 
+    disableTracking, 
+    isTracking,
+    currentEmotion, 
+    emotionHistory 
+  } = useHumeEmotion();
 
   // コンポーネントのマウント状態を追跡
   useEffect(() => {
@@ -207,7 +238,7 @@ export default function JungVoiceTest({
           setIsListening(false);
           // 音声認識が終了したら自動的に応答を記録
           if (userResponse.trim() !== '' && currentWordIndex >= 0 && isMountedRef.current) {
-            recordResponse();
+            recordResponse(userResponse);
           }
         };
       }
@@ -243,11 +274,9 @@ export default function JungVoiceTest({
     try {
       if (!apiKey) {
         console.warn('No API key provided. Speech generation will be disabled.');
-        setIsApiAvailable(false);
         setError('API key not provided. Speech functionality disabled.');
       } else {
-        humeClientRef.current = new HumeClient({ apiKey });
-        setIsApiAvailable(true);
+        setError(null);
       }
       
       // 初期AIメッセージを追加
@@ -259,7 +288,6 @@ export default function JungVoiceTest({
     } catch (err) {
       console.error('Hume client initialization error:', err);
       setError('Failed to initialize Hume client. Speech functionality disabled.');
-      setIsApiAvailable(false);
     }
 
     // クリーンアップ：音声リソースを解放
@@ -519,15 +547,8 @@ export default function JungVoiceTest({
   }, []);
 
   // メッセージを追加
-  const addMessage = (content: string, sender: 'user' | 'assistant') => {
-    const newMessage: Message = {
-      id: uuidv4(),
-      content,
-      sender,
-      timestamp: new Date()
-    };
-    
-    setMessages(prev => [...prev, newMessage]);
+  const addMessage = (messages, setMessages) => (text, role) => {
+    setMessages([...messages, { text, role }]);
   };
 
   // コンポーネントマウント時にユーザーIDを生成
@@ -558,10 +579,10 @@ export default function JungVoiceTest({
       const currentWord = stimulusWords[currentWordIndex];
       
       // 感情データをDBに保存（テスト中のみ実行）
-      if (userId && assessmentId) {
+      if (userId && assessmentIdRef.current) {
         EmotionDataService.saveFacialEmotionData(
           userId,
-          assessmentId,
+          assessmentIdRef.current,
           currentWord,
           userResponse,
           startTime ? Date.now() - startTime : 0,
@@ -571,29 +592,35 @@ export default function JungVoiceTest({
         });
       }
     }
-  }, [currentWordIndex, stimulusWords, userResponse, startTime, userId, assessmentId]);
+  }, [currentWordIndex, stimulusWords, userResponse, startTime, userId, assessmentIdRef.current]);
 
   // テスト開始
   const startTest = async () => {
     setIsLoading(true);
     setIsWebcamActive(true);
     
-    // 既存のコード...
     try {
-      // Hume AI クライアントの初期化
-      if (!humeClientRef.current) {
-        humeClientRef.current = new Hume({
-          apiKey: validatedProps.apiKey
+      // Enable emotion tracking
+      try {
+        await enableTracking();
+      } catch (err) {
+        console.error('Failed to enable emotion tracking:', err);
+        setEmotionTrackingError('感情トラッキングの有効化に失敗しました。');
+      }
+      
+      // Check API availability with a simple request
+      try {
+        await axiosInstance.current.get('/v0/batch/jobs', {
+          params: { limit: 1 }
         });
+        setIsApiAvailable(true);
+      } catch (err) {
+        console.warn('Hume API may not be available:', err);
+        setIsApiAvailable(false);
       }
       
       // 初回メッセージの再生
-      await generateAndPlaySpeech(AI_GUIDE_MESSAGES.introduction, () => {
-        if (isMountedRef.current) {
-          setStartTime(Date.now());
-          startListening();
-        }
-      });
+      await speakNextWord(AI_GUIDE_MESSAGES.introduction);
       
       // メッセージの記録
       addMessage(AI_GUIDE_MESSAGES.introduction, 'assistant');
@@ -607,35 +634,65 @@ export default function JungVoiceTest({
     }
   };
 
+  // Function to generate speech
+  const speakNextWord = async (text: string) => {
+    if (!isApiAvailable) {
+      console.warn('Hume API is not available, using browser TTS instead');
+      // Fallback to browser TTS
+      const utterance = new SpeechSynthesisUtterance(text);
+      window.speechSynthesis.speak(utterance);
+      return;
+    }
+    
+    try {
+      // Use Hume TTS API directly
+      const response = await axiosInstance.current.post('/v0/tts/generate', {
+        text,
+        voice_id: generationId,
+        voice_name: voiceName
+      });
+      
+      // Handle the response and play audio
+      // This is a simplified example and would need to be adapted to the actual API response
+      if (response.data && response.data.audio_url) {
+        const audioElement = new Audio(response.data.audio_url);
+        audioElement.play();
+      }
+    } catch (err) {
+      console.error('Error generating speech:', err);
+      // Fallback to browser TTS
+      const utterance = new SpeechSynthesisUtterance(text);
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
   // テストリセット
   const resetTest = () => {
-    setCurrentWordIndex(-1);
-    setUserResponse('');
-    setResponses([]);
-    setStartTime(null);
-    setTestComplete(false);
-    setAverageReactionTime(0);
-    setDelayedResponses(0);
-    setMessages([]);
-    setAudioUrl(null);
-    setError(null);
-    setIsListening(false);
-    setIsResponseCorrect(null);
+    // Disable emotion tracking when test is reset
+    disableTracking();
     setIsWebcamActive(false);
     
-    // Cleanup audio URLs
-    audioUrlsRef.current.forEach(url => {
-      if (url.startsWith('blob:')) {
-        URL.revokeObjectURL(url);
-      }
-    });
-    audioUrlsRef.current = [];
+    // Reset state variables
+    setCurrentWordIndex(-1);
+    setUserResponse('');
+    setUserResponses([]);
+    setMessages([]);
+    setIsListening(false);
+    setStartTime(0);
+    setTestComplete(false);
+    setIsLoading(false);
+    setAudioUrl(null);
+    setError(null);
+    setEmotionTrackingError(null);
+    
+    // Generate a new assessment ID for the next test
+    assessmentIdRef.current = uuidv4();
   };
 
   // 応答記録時に感情データも合わせて保存
-  const recordResponse = async () => {
+  const recordResponse = async (userInput: string) => {
     const currentWord = stimulusWords[currentWordIndex];
-    const normalizedResponse = userResponse.trim().toLowerCase();
+    const normalizedResponse = userInput.trim().toLowerCase();
     
     if (!normalizedResponse) {
       return;
@@ -646,16 +703,16 @@ export default function JungVoiceTest({
     const isDelayed = reactionTimeMs > DELAYED_REACTION_THRESHOLD_MS;
     
     // 新しい応答を作成
-    const newResponse: WordResponse = {
-      stimulus: currentWord,
-      response: normalizedResponse,
+    const response: WordResponse = {
+      stimulusWord: currentWord,
+      responseWord: normalizedResponse,
       reactionTimeMs,
       isDelayed
     };
     
     // 応答をバリデーション
     try {
-      WordResponseSchema.parse(newResponse);
+      WordResponseSchema.parse(response);
     } catch (error) {
       console.error('Invalid response data:', error);
       setError('Invalid response data. Please try again.');
@@ -663,23 +720,24 @@ export default function JungVoiceTest({
     }
     
     // 応答を記録
-    const updatedResponses = [...responses, newResponse];
-    setResponses(updatedResponses);
+    const updatedResponses = [...userResponses, response];
+    setUserResponses(updatedResponses);
     
     // 音声データを保存
-    if (currentFaceData && userId && assessmentId) {
+    if (currentFaceData && userId && assessmentIdRef.current) {
       // EmotionDataServiceを使用して感情データを保存
       try {
-        await EmotionDataService.saveFacialEmotionData(
+        await EmotionDataService.saveEmotionData({
           userId,
-          assessmentId,
-          currentWord,
-          normalizedResponse,
+          assessmentId: assessmentIdRef.current,
+          stimulusWord: currentWord,
+          responseWord: normalizedResponse,
           reactionTimeMs,
-          currentFaceData
-        );
+          faceEmotions: currentEmotion?.emotions || {},
+          timestamp: Date.now()
+        });
       } catch (err) {
-        console.error('Failed to save facial emotion data in recordResponse:', err);
+        console.error('Failed to save emotion data:', err);
       }
     }
     
@@ -965,6 +1023,12 @@ export default function JungVoiceTest({
         </div>
       )}
       
+      {emotionTrackingError && (
+        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-md">
+          <p>感情認識エラー: {emotionTrackingError}</p>
+        </div>
+      )}
+      
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <div className="mb-6">
           <h2 className="text-2xl font-bold mb-2 text-gray-800 dark:text-white">Jung's Word Association Test</h2>
@@ -973,23 +1037,23 @@ export default function JungVoiceTest({
           </p>
         </div>
         
-        {/* Webcam component for emotion recognition */}
-        {isWebcamActive && (
+        {/* Webcam component for facial emotion tracking */}
+        {isTracking && currentWordIndex >= 0 && !testComplete && (
           <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-white">Facial Expression Analysis</h3>
+            <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-white">
+              表情分析
+            </h3>
             <WebcamComponent 
-              apiKey={apiKey}
-              onFaceData={handleFaceData}
-              isActive={isWebcamActive}
+              isActive={isTracking}
+              showLabels={true}
               width={320}
               height={240}
-              captureInterval={500} // 500ms間隔でキャプチャ
-              className="mx-auto mb-4"
             />
+            <p className="text-sm text-gray-500 text-center mt-2">
+              あなたの表情から感情を分析しています
+            </p>
           </div>
         )}
-        
-        {/* Rest of the component remains the same */}
         
         {currentWordIndex < 0 ? (
           <div className="flex flex-col items-center">
@@ -1134,8 +1198,8 @@ export default function JungVoiceTest({
                 <tbody>
                   {responses.map((resp, index) => (
                     <tr key={index} className={resp.isDelayed ? "bg-yellow-50 dark:bg-yellow-700" : (index % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-gray-50 dark:bg-gray-700")}>
-                      <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.stimulus}</td>
-                      <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.response}</td>
+                      <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.stimulusWord}</td>
+                      <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.responseWord}</td>
                       <td className={`px-4 py-2 text-sm ${resp.isDelayed ? "text-red-600 font-medium" : ""} text-gray-800 dark:text-white`}>
                         {resp.reactionTimeMs}
                       </td>

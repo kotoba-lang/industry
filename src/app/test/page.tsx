@@ -5,7 +5,10 @@ import { JungVoiceAssessment } from '@/components/jung-voice-assessment';
 export default function TestPage() {
   return (
     <div className="container mx-auto py-8 px-4">
-      <h1 className="text-3xl font-bold text-center mb-8">Spirit in Physics (Jung's Word Association Test Embedding Model) - AI Guided</h1>
+      <h1 className="text-3xl font-bold text-center mb-8
+      sm:text-xl
+      
+      ">Spirit in Physics (Jung's Word Association Test Embedding Model) - AI Guided</h1>
       
       <div className="max-w-4xl mx-auto">
         <JungVoiceAssessment 

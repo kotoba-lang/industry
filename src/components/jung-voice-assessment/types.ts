@@ -2,26 +2,23 @@ import { z } from 'zod';
 
 // 単一の単語応答の型
 export interface WordResponse {
-  stimulus: string;
-  response: string;
+  stimulusWord: string;
+  responseWord: string;
   reactionTimeMs: number;
-  isDelayed: boolean;
 }
 
 // テスト結果の型
 export interface TestResults {
-  responses: WordResponse[];
+  totalWords: number;
   averageReactionTimeMs: number;
-  delayedResponseCount: number;
-  completedAt: Date;
+  delayedResponsesCount: number;
+  responses: WordResponse[];
 }
 
 // メッセージの型
 export interface Message {
-  id: string;
-  content: string;
-  sender: 'user' | 'assistant';
-  timestamp: Date;
+  text: string;
+  role: 'user' | 'assistant';
 }
 
 // JungVoiceAssessment コンポーネントのプロップスの型
