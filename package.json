@@ -15,9 +15,8 @@
     "test:jung": "node scripts/test-jung-word.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/lib/db/migrate.ts",
-    "db:push": "drizzle-kit push:pg",
-    "db:pull": "drizzle-kit introspect:pg",
-    "db:studio": "drizzle-kit studio"
+    "db:push": "supabase db push",
+    "db:pull": "supabase db pull"
   },
   "engines": {
     "node": "20.14.0"

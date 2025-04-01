@@ -19,6 +19,7 @@ import {
 import CombinedCacheManager from './utils/combinedCacheManager';
 import WebcamComponent from '../webcam/WebcamComponent';
 import { HumeFaceResponse } from '@/lib/services/hume-service';
+import { EmotionDataService } from '@/lib/services/emotion-data-service';
 import { useHumeEmotion } from '@/providers/HumeEmotionProvider';
 import { z } from 'zod';
 import { WordResponseWithExtras, withExtras } from './WordResponse';
@@ -1227,33 +1228,4 @@ export default function JungVoiceTest({
       </div>
     </div>
   );
-}
-
-// Example implementation for the service
-export const EmotionDataService = {
-  saveEmotionData: async (data: {
-    userId: string;
-    assessmentId: string;
-    stimulusWord: string;
-    responseWord: string;
-    reactionTimeMs: number;
-    faceEmotions: Record<string, number>;
-    timestamp: number;
-  }) => {
-    // Implementation
-  },
-  
-  saveFacialEmotionData: async (
-    userId: string,
-    assessmentId: string,
-    stimulusWord: string,
-    responseWord: string,
-    reactionTimeMs: number,
-    emotionData: {
-      emotions: Record<string, number>;
-      timestamp: number;
-    }
-  ) => {
-    // Implementation
-  }
-}; 
+} 
