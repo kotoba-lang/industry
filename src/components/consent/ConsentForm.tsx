@@ -6,16 +6,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { saveConsentData } from '@/lib/actions/consent-actions';
-
-// 型定義
-export interface DemographicData {
-  ageGroup: string;
-  gender: string;
-  ethnicity: string;
-  income: string;
-}
-
+import { saveConsentAndDemographicData } from '@/lib/actions/consent-actions';
+import { DemographicData } from '@/lib/db/schema/demographic';
 interface ConsentFormProps {
   onConsent: (demographicData: DemographicData) => void;
   consentVersion?: string;
@@ -31,10 +23,17 @@ export default function ConsentForm({
   const [showFullConsent, setShowFullConsent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [demographicData, setDemographicData] = useState<DemographicData>({
-    ageGroup: "",
-    gender: "",
-    ethnicity: "",
-    income: ""
+    ageGroup: "prefer-not-to-say",
+    gender: "prefer-not-to-say",
+    ethnicity: "prefer-not-to-say",
+    income: "prefer-not-to-say",
+    id: "",
+    userId: "",
+    createdAt: new Date(),
+    ipAddress: null,
+    userAgent: null,
+    studyId: studyId,
+    consentVersion: consentVersion,
   });
   
   const handleDemographicChange = (field: keyof DemographicData, value: string) => {
@@ -50,12 +49,19 @@ export default function ConsentForm({
 
       // データベースに保存
       if (typeof window !== 'undefined') {
-        await saveConsentData(
+        await saveConsentAndDemographicData(
           demographicData,
           {
+            id: "", 
+            userId: "",
+            createdAt: new Date(),
+            ipAddress: null,
+            userAgent: null,
+            studyId: studyId,
+            consentVersion: consentVersion,
             consentGiven: consented,
-            consentVersion,
-            consentText: "Research Participation Consent for Spirit in Physics (Jung's Word Association Embedding Test)"
+            consentText: "Research Participation Consent for Spirit in Physics (Jung's Word Association Embedding Test)",
+            researcherNote: null
           },
           {
             userAgent: window.navigator.userAgent,
