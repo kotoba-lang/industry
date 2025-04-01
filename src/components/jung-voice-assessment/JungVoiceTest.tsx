@@ -629,7 +629,7 @@ export default function JungVoiceTest({
 
   // Function to generate speech
   const speakNextWord = async (text: string) => {
-    if (!isApiAvailable) {
+    if (!isApiAvailable || !apiKey) {
       console.warn('Hume API is not available, using browser TTS instead');
       // Fallback to browser TTS
       const utterance = new SpeechSynthesisUtterance(text);
@@ -637,26 +637,8 @@ export default function JungVoiceTest({
       return;
     }
     
-    try {
-      // Use Hume TTS API directly
-      const response = await axiosInstance.current.post('/v0/tts/generate', {
-        text,
-        voice_id: generationId,
-        voice_name: voiceName
-      });
-      
-      // Handle the response and play audio
-      // This is a simplified example and would need to be adapted to the actual API response
-      if (response.data && response.data.audio_url) {
-        const audioElement = new Audio(response.data.audio_url);
-        audioElement.play();
-      }
-    } catch (err) {
-      console.error('Error generating speech:', err);
-      // Fallback to browser TTS
-      const utterance = new SpeechSynthesisUtterance(text);
-      window.speechSynthesis.speak(utterance);
-    }
+    // Use the existing generateAndPlaySpeech function
+    await generateAndPlaySpeech(text);
   };
 
   // テストリセット
@@ -1074,7 +1056,7 @@ export default function JungVoiceTest({
             </div>
             
             {/* 音声再生ボタン */}
-            {audioUrl && (
+            {/* {audioUrl && (
               <Button 
                 onClick={() => audioRef.current?.play()}
                 className="mb-4 flex items-center gap-2"
@@ -1084,7 +1066,7 @@ export default function JungVoiceTest({
                 </svg>
                 Play Word
               </Button>
-            )}
+            )} */}
             
             <div className="mb-6">
               {isListening ? (
