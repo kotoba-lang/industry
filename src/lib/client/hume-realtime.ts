@@ -1,4 +1,4 @@
-import { HumeFaceResponse, HumeVoiceResponse } from '../services/hume-service';
+import { HumeFaceResponse, HumeVoiceResponse } from '../actions/hume-service';
 
 // WebSocketを使用したリアルタイム感情認識
 export class HumeRealtimeEmotionService {
