@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { VoiceConversation } from './index';
 import { HumeClient } from 'hume';
+import { EmotionData } from './types';
 
 // Mock the HumeClient
 jest.mock('hume', () => {
@@ -22,6 +23,44 @@ jest.mock('hume', () => {
 // Mock UUID generation
 jest.mock('uuid', () => ({
   v4: jest.fn().mockReturnValue('mocked-uuid'),
+}));
+
+// Mock SpeechRecognition API
+class MockSpeechRecognition {
+  continuous = false;
+  interimResults = false;
+  lang = '';
+  maxAlternatives = 1;
+  onresult = null;
+  onend = null;
+  onerror = null;
+  onstart = null;
+  grammars = null;
+  start = jest.fn();
+  stop = jest.fn();
+  abort = jest.fn();
+}
+
+// Mock emotion recognition API
+const mockEmotionAPI = {
+  analyzeEmotion: jest.fn().mockResolvedValue({
+    primary: 'happy',
+    confidence: 0.87,
+    timestamp: new Date()
+  }),
+};
+
+global.SpeechRecognition = MockSpeechRecognition;
+global.webkitSpeechRecognition = MockSpeechRecognition;
+
+// Mock IndexedDB storage
+const mockIDBStore = {
+  saveMessage: jest.fn().mockResolvedValue({ success: true, messageId: 'db-id-123' }),
+  getConversation: jest.fn().mockResolvedValue([]),
+};
+
+jest.mock('../../utils/storage', () => ({
+  createConversationStore: jest.fn().mockReturnValue(mockIDBStore),
 }));
 
 // Mock HTMLMediaElement
@@ -86,5 +125,153 @@ describe('VoiceConversation コンポーネント', () => {
     const customPlaceholder = 'カスタムプレースホルダー';
     render(<VoiceConversation placeholder={customPlaceholder} />);
     expect(screen.getByPlaceholderText(customPlaceholder)).toBeInTheDocument();
+  });
+
+  // 重要度: 5
+  test('DBに会話を保存できる', async () => {
+    const { getByPlaceholderText, getByText } = render(
+      <VoiceConversation storageEnabled={true} />
+    );
+    
+    const input = getByPlaceholderText('Type your message here...');
+    const sendButton = getByText('Send');
+    
+    fireEvent.change(input, { target: { value: '保存されるメッセージ' } });
+    fireEvent.click(sendButton);
+    
+    await waitFor(() => {
+      expect(mockIDBStore.saveMessage).toHaveBeenCalledTimes(1);
+      const savedMessage = mockIDBStore.saveMessage.mock.calls[0][0];
+      expect(savedMessage.content).toBe('保存されるメッセージ');
+      expect(savedMessage.sender).toBe('user');
+    });
+  });
+
+  // 重要度: 5
+  test('カスタムストレージハンドラを使用できる', async () => {
+    const mockStorageHandler = jest.fn().mockResolvedValue(true);
+    const { getByPlaceholderText, getByText } = render(
+      <VoiceConversation 
+        storageEnabled={true}
+        storageHandler={mockStorageHandler}
+      />
+    );
+    
+    const input = getByPlaceholderText('Type your message here...');
+    const sendButton = getByText('Send');
+    
+    fireEvent.change(input, { target: { value: 'カスタム保存テスト' } });
+    fireEvent.click(sendButton);
+    
+    await waitFor(() => {
+      expect(mockStorageHandler).toHaveBeenCalledTimes(1);
+      const savedMessage = mockStorageHandler.mock.calls[0][0];
+      expect(savedMessage.content).toBe('カスタム保存テスト');
+    });
+  });
+
+  // 重要度: 4
+  test('音声認識を使用してメッセージを送信できる', async () => {
+    const { getByLabelText } = render(<VoiceConversation />);
+    
+    // 音声認識ボタンをクリック
+    const micButton = getByLabelText('音声入力');
+    fireEvent.click(micButton);
+    
+    // SpeechRecognitionがスタートしたことを確認
+    expect(MockSpeechRecognition.prototype.start).toHaveBeenCalled();
+    
+    // 音声認識の結果をシミュレート
+    const speechInstance = MockSpeechRecognition.prototype;
+    const resultEvent = {
+      results: [
+        [
+          {
+            transcript: '音声で入力されたメッセージ',
+            confidence: 0.9,
+          },
+        ],
+      ],
+      resultIndex: 0,
+    };
+    
+    // 音声認識の結果をシミュレート
+    if (speechInstance.onresult) {
+      speechInstance.onresult(resultEvent as any);
+    }
+    
+    // 音声認識の終了をシミュレート
+    if (speechInstance.onend) {
+      speechInstance.onend({} as any);
+    }
+    
+    await waitFor(() => {
+      expect(screen.getByText('音声で入力されたメッセージ')).toBeInTheDocument();
+    });
+  });
+
+  // 重要度: 4
+  test('感情認識が有効な場合は感情を分析する', async () => {
+    const onEmotionDetected = jest.fn();
+    render(
+      <VoiceConversation 
+        emotionRecognition={true}
+        onEmotionDetected={onEmotionDetected}
+      />
+    );
+    
+    // メッセージを送信
+    const input = screen.getByPlaceholderText('Type your message here...');
+    const sendButton = screen.getByText('Send');
+    
+    fireEvent.change(input, { target: { value: '感情分析テスト' } });
+    fireEvent.click(sendButton);
+    
+    // 感情分析API呼び出しのモック
+    jest.spyOn(global, 'fetch').mockImplementationOnce(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          emotion: {
+            primary: 'happy',
+            confidence: 0.87,
+            timestamp: new Date().toISOString()
+          }
+        }),
+      } as Response)
+    );
+    
+    await waitFor(() => {
+      expect(onEmotionDetected).toHaveBeenCalledWith(expect.objectContaining({
+        primary: 'happy',
+        confidence: expect.any(Number)
+      }));
+    });
+  });
+
+  // 重要度: 3
+  test('感情認識エラー時には適切に処理される', async () => {
+    const mockConsoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    
+    render(<VoiceConversation emotionRecognition={true} />);
+    
+    // メッセージを送信
+    const input = screen.getByPlaceholderText('Type your message here...');
+    const sendButton = screen.getByText('Send');
+    
+    fireEvent.change(input, { target: { value: '感情分析エラーテスト' } });
+    fireEvent.click(sendButton);
+    
+    // 感情分析API呼び出しのモック（エラー）
+    jest.spyOn(global, 'fetch').mockImplementationOnce(() =>
+      Promise.reject(new Error('感情分析APIエラー'))
+    );
+    
+    await waitFor(() => {
+      // エラーがコンソールに出力されることを確認
+      expect(mockConsoleError).toHaveBeenCalled();
+    });
+    
+    mockConsoleError.mockRestore();
   });
 }); 

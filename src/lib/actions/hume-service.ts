@@ -3,7 +3,7 @@
  */
 "use server"; // Enable Server Actions
 
-import { createServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 // Humeの感情認識APIのレスポンス型
 export interface HumeFaceEmotion {
@@ -126,7 +126,7 @@ export async function saveEmotionAnalysis(data: {
   timestamp: number;
 }) {
   try {
-    const supabase = await createServerClient();
+    const supabase = await createSupabaseServerClient();
     
     const { error } = await supabase
       .from('emotion_analysis')
@@ -155,7 +155,7 @@ export async function saveEmotionAnalysis(data: {
  */
 export async function getEmotionAnalysis(userId: string, assessmentId: string) {
   try {
-    const supabase = await createServerClient();
+    const supabase = await createSupabaseServerClient();
     
     const { data, error } = await supabase
       .from('emotion_analysis')

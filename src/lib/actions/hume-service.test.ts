@@ -6,11 +6,11 @@ import {
   getEmotionAnalysis,
   HumeRealtimeEmotionService
 } from './hume-service';
-import { createServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
-// Mock fetch and createServerClient
+// Mock fetch and createSupabaseServerClient
 vi.mock('@/lib/supabase/server', () => ({
-  createServerClient: vi.fn()
+  createSupabaseServerClient: vi.fn()
 }));
 
 // Mock the global fetch function
@@ -169,7 +169,7 @@ describe('Hume感情分析サービス機能 (優先度: 5)', () => {
         insert: vi.fn().mockResolvedValue({ error: null })
       };
       
-      vi.mocked(createServerClient).mockResolvedValue(mockSupabaseClient as any);
+      vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabaseClient as any);
       
       // Test data
       const testData = {
@@ -184,7 +184,7 @@ describe('Hume感情分析サービス機能 (優先度: 5)', () => {
       const result = await saveEmotionAnalysis(testData);
       
       // Verify Supabase client was called correctly
-      expect(createServerClient).toHaveBeenCalled();
+      expect(createSupabaseServerClient).toHaveBeenCalled();
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('emotion_analysis');
       expect(mockSupabaseClient.insert).toHaveBeenCalledWith({
         user_id: 'user123',
@@ -205,7 +205,7 @@ describe('Hume感情分析サービス機能 (優先度: 5)', () => {
         insert: vi.fn().mockResolvedValue({ error: { message: 'Database error' } })
       };
       
-      vi.mocked(createServerClient).mockResolvedValue(mockSupabaseClient as any);
+      vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabaseClient as any);
       
       // Test data
       const testData = {
@@ -253,13 +253,13 @@ describe('Hume感情分析サービス機能 (優先度: 5)', () => {
         error: null 
       });
       
-      vi.mocked(createServerClient).mockResolvedValue(mockSupabaseClient as any);
+      vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabaseClient as any);
       
       // Call the function
       const result = await getEmotionAnalysis('user123', '123e4567-e89b-12d3-a456-426614174000');
       
       // Verify Supabase client was called correctly
-      expect(createServerClient).toHaveBeenCalled();
+      expect(createSupabaseServerClient).toHaveBeenCalled();
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('emotion_analysis');
       expect(mockSupabaseClient.select).toHaveBeenCalledWith('*');
       expect(mockSupabaseClient.eq).toHaveBeenCalledWith('user_id', 'user123');

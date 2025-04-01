@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { saveConsentAndDemographicData } from './utils';
-import { createServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 // Mock dependencies
 vi.mock('@/lib/supabase/server', () => ({
-  createServerClient: vi.fn()
+  createSupabaseServerClient: vi.fn()
 }));
 
 describe('データベースユーティリティ機能 (優先度: 5)', () => {
@@ -24,7 +24,7 @@ describe('データベースユーティリティ機能 (優先度: 5)', () => {
       insert: vi.fn().mockResolvedValue({ error: null })
     };
     
-    vi.mocked(createServerClient).mockResolvedValue(mockSupabaseClient as any);
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabaseClient as any);
   });
   
   afterEach(() => {
@@ -54,7 +54,7 @@ describe('データベースユーティリティ機能 (優先度: 5)', () => {
       };
       
       // Get Supabase client
-      const supabase = await createServerClient();
+      const supabase = await createSupabaseServerClient();
       
       // Call function
       const result = await saveConsentAndDemographicData(
@@ -109,7 +109,7 @@ describe('データベースユーティリティ機能 (優先度: 5)', () => {
           .mockResolvedValueOnce({ error: { message: 'Database error' } })
       };
       
-      vi.mocked(createServerClient).mockResolvedValue(mockSupabaseClient as any);
+      vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabaseClient as any);
       
       // Mock data
       const demographicInfo = {
@@ -145,7 +145,7 @@ describe('データベースユーティリティ機能 (優先度: 5)', () => {
           .mockResolvedValueOnce({ error: { message: 'Database error' } })
       };
       
-      vi.mocked(createServerClient).mockResolvedValue(mockSupabaseClient as any);
+      vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabaseClient as any);
       
       // Mock data
       const demographicInfo = {

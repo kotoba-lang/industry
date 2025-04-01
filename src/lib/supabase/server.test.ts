@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createServerClient } from './server';
+import { createSupabaseServerClient } from './server';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
@@ -54,8 +54,8 @@ describe('Supabaseサーバークライアント機能 (優先度: 5)', () => {
   });
 
   it('適切な環境変数とセッションオプションでサーバークライアントが作成されること', async () => {
-    // Call createServerClient
-    const client = await createServerClient();
+    // Call createSupabaseServerClient
+    const client = await createSupabaseServerClient();
     
     // Verify cookies was called
     expect(cookies).toHaveBeenCalled();
@@ -79,7 +79,7 @@ describe('Supabaseサーバークライアント機能 (優先度: 5)', () => {
     // Clear environment variables
     vi.unstubAllEnvs();
     
-    // Expect error when calling createServerClient
-    await expect(createServerClient()).rejects.toThrow('Missing Supabase environment variables');
+    // Expect error when calling createSupabaseServerClient
+    await expect(createSupabaseServerClient()).rejects.toThrow('Missing Supabase environment variables');
   });
 }); 

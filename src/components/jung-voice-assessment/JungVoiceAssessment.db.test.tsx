@@ -22,7 +22,7 @@ jest.mock('@/lib/actions/emotion-actions', () => ({
 
 // Supabaseクライアントのモック
 jest.mock('@/lib/supabase/server', () => ({
-  createServerClient: jest.fn().mockResolvedValue({
+  createSupabaseServerClient: jest.fn().mockResolvedValue({
     from: jest.fn().mockReturnValue({
       insert: jest.fn().mockReturnValue({
         error: null

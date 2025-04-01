@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from 'zod';
-import { createServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 // Input validation schema for saving emotion data
 const SaveEmotionDataSchema = z.object({
@@ -67,7 +67,7 @@ export async function saveEmotionData(formData: FormData | any) {
     const validatedData = SaveEmotionDataSchema.parse(processedData);
     
     // Save emotion data to database
-    const client = await createServerClient();
+    const client = await createSupabaseServerClient();
     const { error } = await client.from('emotion_data').insert({
       user_id: validatedData.userId,
       assessment_id: validatedData.assessmentId,
@@ -118,7 +118,7 @@ export async function saveFacialEmotionData(
 ) {
   try {
     // Save emotion data to database
-    const client = await createServerClient();
+    const client = await createSupabaseServerClient();
     const { error } = await client.from('face_emotion_data').insert({
       user_id: userId,
       assessment_id: assessmentId,
@@ -191,7 +191,7 @@ export async function getEmotionData(userId: string, assessmentId: string) {
  */
 export async function getEmotionDataByAssessment(userId: string, assessmentId: string) {
   try {
-    const client = await createServerClient();
+    const client = await createSupabaseServerClient();
     const { data, error } = await client
       .from('emotion_data')
       .select('*')
