@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { saveEmotionData, getEmotionData, saveFacialEmotionData } from './emotion-actions';
+import { saveEmotionData, getEmotionData, saveFacialEmotionData, getEmotionDataByAssessment } from './emotion-actions';
 import { createServerClient } from '@/lib/supabase/server';
 
 // Mock the Supabase client
@@ -166,7 +166,7 @@ describe('感情データサービス機能 (優先度: 5)', () => {
       mockSupabaseClient.insert.mockResolvedValue({ error: { message: 'Database error' } });
 
       // Call the service
-      const result = await EmotionDataService.saveFacialEmotionData(
+      const result = await saveFacialEmotionData(
         userId,
         assessmentId,
         stimulusWord,
@@ -206,7 +206,7 @@ describe('感情データサービス機能 (優先度: 5)', () => {
       mockSupabaseClient.eq.mockResolvedValue({ data: mockEmotionData, error: null });
 
       // Call the service
-      const result = await EmotionDataService.getEmotionDataByAssessment(userId, assessmentId);
+      const result = await getEmotionDataByAssessment(userId, assessmentId);
 
       // Verify Supabase was called correctly
       expect(createServerClient).toHaveBeenCalled();
@@ -231,7 +231,7 @@ describe('感情データサービス機能 (優先度: 5)', () => {
       mockSupabaseClient.eq.mockResolvedValue({ data: null, error: null });
 
       // Call the service
-      const result = await EmotionDataService.getEmotionDataByAssessment(userId, assessmentId);
+      const result = await getEmotionDataByAssessment(userId, assessmentId);
 
       // Verify the result
       expect(result).toEqual({
@@ -249,7 +249,7 @@ describe('感情データサービス機能 (優先度: 5)', () => {
       mockSupabaseClient.eq.mockResolvedValue({ data: null, error: { message: 'Database error' } });
 
       // Call the service
-      const result = await EmotionDataService.getEmotionDataByAssessment(userId, assessmentId);
+      const result = await getEmotionDataByAssessment(userId, assessmentId);
 
       // Verify the error result
       expect(result).toEqual({

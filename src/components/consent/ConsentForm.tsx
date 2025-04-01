@@ -166,24 +166,28 @@ export default function ConsentForm({
             <RadioGroup 
               value={demographicData.gender} 
               onValueChange={(value: string) => handleDemographicChange("gender", value)}
-              className="flex flex-col space-y-2"
+              className="flex flex-col space-y-3"
             >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="male" id="gender-male" />
-                <Label htmlFor="gender-male" className="text-gray-800">Male</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="female" id="gender-female" />
-                <Label htmlFor="gender-female" className="text-gray-800">Female</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="non-binary" id="gender-non-binary" />
-                <Label htmlFor="gender-non-binary" className="text-gray-800">Non-binary</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="prefer-not-to-say" id="gender-not-say" />
-                <Label htmlFor="gender-not-say" className="text-gray-800">Prefer not to say</Label>
-              </div>
+              {[
+                { value: "male", label: "Male" },
+                { value: "female", label: "Female" }, 
+                { value: "non-binary", label: "Non-binary" },
+                { value: "prefer-not-to-say", label: "Prefer not to say" }
+              ].map((option) => (
+                <div key={option.value} className={`
+                  border rounded-md p-3 cursor-pointer transition-all
+                  ${demographicData.gender === option.value 
+                    ? 'bg-blue-50 border-blue-500 shadow-sm' 
+                    : 'hover:bg-gray-50 border-gray-200'}
+                `} onClick={() => handleDemographicChange("gender", option.value)}>
+                  <div className="flex items-center gap-3">
+                    <RadioGroupItem value={option.value} id={`gender-${option.value}`} className="h-5 w-5" />
+                    <Label htmlFor={`gender-${option.value}`} className="text-gray-800 cursor-pointer flex-1">
+                      {option.label}
+                    </Label>
+                  </div>
+                </div>
+              ))}
             </RadioGroup>
           </div>
           
