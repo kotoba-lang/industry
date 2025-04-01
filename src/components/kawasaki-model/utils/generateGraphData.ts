@@ -83,15 +83,6 @@ export function generateGraphData(
       y,
       z,
     })
-
-    // Link between field and particle
-    const strength = getStrengthBasedOnState(effectiveState, "field-particle")
-    links.push({
-      source: "field",
-      target: `particle${i}`,
-      strength,
-      name: getInteractionName(fieldName, particleName, strength),
-    })
   }
 
   // Calculate connection strength between particles using the integrated model
