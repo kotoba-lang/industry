@@ -121,7 +121,14 @@ const PhysicsGraph: React.FC<PhysicsGraphProps> = ({
 
       // Render when target frame interval is reached
       if (elapsed >= targetFrameInterval) {
-        originalAnimationLoop(timestamp)
+        // Call the original animation cycle in the context of fg
+        if (typeof originalAnimationLoop === 'function') {
+          originalAnimationLoop.call(fg, timestamp)
+        } else {
+          // Fallback rendering - use the ForceGraph's render method
+          fg.frameId = requestAnimationFrame(fg._animationCycle);
+          fg.renderer().render(fg.scene(), fg.camera());
+        }
         lastFrameTime = timestamp
       }
 
