@@ -40,7 +40,7 @@ export async function saveConsentAndDemographicData(
       studyId: contextInfo?.studyId,
     };
     
-    const [consentResult] = await db.insert(consentRecords).values(consentData).returning();
+    const consentResult = await db.insert(consentRecords).values(consentData).returning();
     
     // 同意が得られた場合のみ人口統計データを保存
     if (consentInfo.consentGiven) {
@@ -56,20 +56,20 @@ export async function saveConsentAndDemographicData(
         consentVersion: consentInfo.consentVersion || '1.0',
       };
       
-      const [demographicResult] = await db.insert(demographicData).values(demographicRecord).returning();
+      const demographicResult = await db.insert(demographicData).values(demographicRecord).returning();
       
       return {
         success: true,
         userId,
-        consent: consentResult,
-        demographic: demographicResult
+        consent: consentResult[0],
+        demographic: demographicResult[0]
       };
     }
     
     return {
       success: consentInfo.consentGiven,
       userId,
-      consent: consentResult
+      consent: consentResult[0]
     };
   } catch (error) {
     console.error('Error saving consent and demographic data:', error);
