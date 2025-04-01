@@ -5,7 +5,7 @@ import {
   emotionAssessments
 } from '@/lib/db/schema';
 
-import { HumeFaceResponse, HumeVoiceResponse } from './hume-service';
+import { HumeFaceResponse, HumeVoiceResponse } from '@/lib/services/hume-service';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface EmotionData {

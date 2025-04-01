@@ -1,6 +1,6 @@
 'use server'
 
-import { saveConsentAndDemographicData } from '../db/utils';
+import { saveConsentAndDemographicData } from '@/lib/db/utils';
 
 // Server action for saving consent data
 export async function saveConsentData(
