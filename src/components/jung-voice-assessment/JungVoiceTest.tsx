@@ -447,17 +447,16 @@ export default function JungVoiceTest({
     // 音声ファイルを設定して再生
     clonedAudio.src = url;
     
-    try {
-      const playPromise = clonedAudio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.error('Audio play error:', error);
-          if (onAudioEnd && isMountedRef.current) onAudioEnd();
-        });
+    // 音声再生ボタンを表示して、ユーザーに再生を促す
+    if (isMountedRef.current) {
+      setAudioUrl(url);
+      // 自動再生せずにユーザーインタラクションを待つ
+      if (onAudioEnd) {
+        // 自動再生に失敗した場合は次のステップに進むことを許可
+        setTimeout(() => {
+          if (isMountedRef.current) onAudioEnd();
+        }, 500);
       }
-    } catch (err) {
-      console.error('Error playing audio:', err);
-      if (onAudioEnd && isMountedRef.current) onAudioEnd();
     }
   }, []);
 
@@ -709,6 +708,20 @@ export default function JungVoiceTest({
               <div className="mb-6 p-4 bg-blue-50 rounded-md">
                 <p className="text-lg">{messages.length > 0 ? messages[messages.length - 1].content : ''}</p>
               </div>
+              
+              {/* 音声再生ボタンを追加 */}
+              {audioUrl && (
+                <Button
+                  onClick={() => audioRef.current?.play()}
+                  className="mb-4 flex items-center gap-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                  </svg>
+                  Play Instructions
+                </Button>
+              )}
+              
               <Button 
                 onClick={startTest} 
                 className="px-6 py-2"
@@ -728,6 +741,19 @@ export default function JungVoiceTest({
             <p className="text-sm text-gray-500 mb-1">Word {currentWordIndex + 1} / {stimulusWords.length}</p>
             <h3 className="text-3xl font-bold">{stimulusWords[currentWordIndex]}</h3>
           </div>
+          
+          {/* 音声再生ボタン */}
+          {audioUrl && (
+            <Button 
+              onClick={() => audioRef.current?.play()}
+              className="mb-4 flex items-center gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+              </svg>
+              Play Word
+            </Button>
+          )}
           
           <div className="mb-6">
             {isListening ? (

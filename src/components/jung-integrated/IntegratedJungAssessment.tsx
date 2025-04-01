@@ -196,33 +196,33 @@ export default function IntegratedJungAssessment({
       {showTestSelection && (
         <div className="p-4 max-w-2xl mx-auto">
           <h2 className="text-2xl font-bold mb-6 text-center">Jung's Association Tests</h2>
-          <p className="mb-6 text-center text-gray-700">
+          <p className="mb-6 text-center text-gray-700 dark:text-gray-200">
             Select the type of assessment you'd like to take:
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <button
               onClick={handleSelectWordTest}
-              className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-blue-50 transition-colors"
+              className="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:bg-blue-50 transition-colors"
             >
               <h3 className="font-bold mb-2">Word Association Test</h3>
-              <p className="text-sm text-gray-600">Type responses to stimulus words</p>
+              <p className="text-sm text-gray-700 dark:text-gray-200">Type responses to stimulus words</p>
             </button>
             
             <button
               onClick={handleSelectVoiceTest}
-              className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-blue-50 transition-colors"
+              className="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:bg-blue-50 transition-colors"
             >
               <h3 className="font-bold mb-2">Voice Association Test</h3>
-              <p className="text-sm text-gray-600">Speak responses to spoken stimulus words</p>
+              <p className="text-sm text-gray-700 dark:text-gray-200">Speak responses to spoken stimulus words</p>
             </button>
             
             <button
               onClick={handleSelectBothTests}
-              className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-blue-50 transition-colors"
+              className="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:bg-blue-50 transition-colors"
             >
               <h3 className="font-bold mb-2">Complete Assessment</h3>
-              <p className="text-sm text-gray-600">Take both tests for a comprehensive analysis</p>
+              <p className="text-sm text-gray-700 dark:text-gray-200">Take both tests for a comprehensive analysis</p>
             </button>
           </div>
         </div>
@@ -302,7 +302,7 @@ export default function IntegratedJungAssessment({
               <PhysicsStateMachine transitionState={transitionState} onStateChange={handleStateChange} />
               <ModelParamsControl params={modelParams} onChange={setModelParams} />
               
-              <div className="bg-white/80 backdrop-blur-sm p-3 rounded-md shadow-sm border border-gray-200 text-xs overflow-auto flex-grow">
+              <div className="bg-white/80 backdrop-blur-sm p-3 rounded-md shadow-sm border border-gray-200 dark:border-gray-700 text-xs overflow-auto flex-grow">
                 <h3 className="font-bold mb-2 text-gray-800">About Your Results Visualization</h3>
                 <p className="mb-2 leading-relaxed">
                   This visualization shows the relationships between your word associations:
@@ -337,7 +337,7 @@ export default function IntegratedJungAssessment({
                 )}
               </div>
               
-              <div className="bg-white/80 backdrop-blur-sm p-3 rounded-md shadow-sm border border-gray-200 overflow-auto">
+              <div className="bg-white/80 backdrop-blur-sm p-3 rounded-md shadow-sm border border-gray-200 dark:border-gray-700 overflow-auto">
                 <h3 className="font-bold mb-2 text-gray-800 text-xs">Test Summary</h3>
                 {wordTestResults && (
                   <div className="mb-2">
@@ -357,7 +357,7 @@ export default function IntegratedJungAssessment({
             </div>
             
             {/* Main visualization area */}
-            <div className="w-3/4 border border-gray-200 rounded-md shadow-sm overflow-hidden bg-white/50 h-full">
+            <div className="w-3/4 border border-gray-200 dark:border-gray-700 rounded-md shadow-sm overflow-hidden bg-white/50 h-full">
               <PhysicsGraph
                 data={graphData}
                 frameRate={frameRate}

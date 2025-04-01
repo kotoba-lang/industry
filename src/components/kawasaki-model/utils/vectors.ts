@@ -24,13 +24,76 @@ export function generateWordVector(word: string): number[] {
 const wordVectors: Record<string, number[]> = {};
 
 /**
- * Get or generate a word vector
+ * A utility for generating word vectors for the Jung word association tests.
+ * This uses a simple deterministic approach to generate vectors based on word characteristics.
+ */
+
+const VECTOR_DIMENSION = 5;
+
+/**
+ * Generate a pseudo-semantic vector for a word.
+ * This is a simple deterministic implementation to create reproducible vectors.
+ * In a production environment, this should be replaced with actual word embeddings.
  */
 export function getWordVector(word: string): number[] {
-  if (!wordVectors[word]) {
-    wordVectors[word] = generateWordVector(word);
+  if (!word) return Array(VECTOR_DIMENSION).fill(0);
+  
+  // Create a simple but consistent vector based on the word
+  const vector = Array(VECTOR_DIMENSION).fill(0);
+  
+  // Use character codes to generate vector components
+  for (let i = 0; i < word.length; i++) {
+    const charCode = word.charCodeAt(i);
+    const vectorIndex = i % VECTOR_DIMENSION;
+    vector[vectorIndex] += charCode / 100; // Scale down to have reasonable values
   }
-  return wordVectors[word];
+  
+  // Normalize the vector
+  const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
+  return vector.map(val => magnitude ? val / magnitude : 0);
+}
+
+/**
+ * Calculate cosine similarity between two word vectors.
+ */
+export function calculateSimilarity(vector1: number[], vector2: number[]): number {
+  if (vector1.length !== vector2.length) {
+    throw new Error('Vectors must have the same dimensions');
+  }
+  
+  // Calculate dot product
+  const dotProduct = vector1.reduce((sum, val, i) => sum + val * vector2[i], 0);
+  
+  // Calculate magnitudes
+  const magnitude1 = Math.sqrt(vector1.reduce((sum, val) => sum + val * val, 0));
+  const magnitude2 = Math.sqrt(vector2.reduce((sum, val) => sum + val * val, 0));
+  
+  // Avoid division by zero
+  if (magnitude1 === 0 || magnitude2 === 0) return 0;
+  
+  // Return cosine similarity
+  return dotProduct / (magnitude1 * magnitude2);
+}
+
+/**
+ * Find the closest word from a list by vector similarity.
+ */
+export function findClosestWord(targetWord: string, wordList: string[]): string {
+  if (wordList.length === 0) return '';
+  
+  const targetVector = getWordVector(targetWord);
+  let maxSimilarity = -1;
+  let closestWord = '';
+  
+  for (const word of wordList) {
+    const similarity = calculateSimilarity(targetVector, getWordVector(word));
+    if (similarity > maxSimilarity) {
+      maxSimilarity = similarity;
+      closestWord = word;
+    }
+  }
+  
+  return closestWord;
 }
 
 /**
