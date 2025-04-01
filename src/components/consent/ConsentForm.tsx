@@ -3,14 +3,41 @@
 import React, { useState } from 'react';
 import { Button } from '../ui/button';
 import { Checkbox } from '../ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Label } from '../ui/label';
+
+interface DemographicData {
+  ageGroup: string;
+  gender: string;
+  ethnicity: string;
+  income: string;
+}
 
 interface ConsentFormProps {
-  onConsent: () => void;
+  onConsent: (demographicData: DemographicData) => void;
 }
 
 export default function ConsentForm({ onConsent }: ConsentFormProps) {
   const [consented, setConsented] = useState(false);
   const [showFullConsent, setShowFullConsent] = useState(false);
+  const [demographicData, setDemographicData] = useState<DemographicData>({
+    ageGroup: "",
+    gender: "",
+    ethnicity: "",
+    income: ""
+  });
+  
+  const handleDemographicChange = (field: keyof DemographicData, value: string) => {
+    setDemographicData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleSubmit = () => {
+    onConsent(demographicData);
+  };
   
   return (
     <div className="max-w-3xl mx-auto p-6 bg-white rounded-lg shadow-md border border-gray-200">
@@ -73,6 +100,104 @@ export default function ConsentForm({ onConsent }: ConsentFormProps) {
         )}
       </div>
       
+      <div className="mb-6 p-4 bg-gray-50 rounded-md">
+        <h3 className="font-bold mb-4">Demographic Information (CDISC Standards)</h3>
+        <p className="text-sm mb-4">This information helps us understand our research participants better. All responses are anonymous and optional.</p>
+        
+        <div className="space-y-6">
+          <div>
+            <Label htmlFor="ageGroup" className="block mb-2">Age Group</Label>
+            <Select 
+              value={demographicData.ageGroup} 
+              onValueChange={(value) => handleDemographicChange("ageGroup", value)}
+            >
+              <SelectTrigger id="ageGroup" className="w-full">
+                <SelectValue placeholder="Select age group" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
+                <SelectItem value="18-24">18-24</SelectItem>
+                <SelectItem value="25-34">25-34</SelectItem>
+                <SelectItem value="35-44">35-44</SelectItem>
+                <SelectItem value="45-54">45-54</SelectItem>
+                <SelectItem value="55-64">55-64</SelectItem>
+                <SelectItem value="65+">65+</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div>
+            <Label className="block mb-2">Gender</Label>
+            <RadioGroup 
+              value={demographicData.gender} 
+              onValueChange={(value) => handleDemographicChange("gender", value)}
+              className="flex flex-col space-y-2"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="male" id="gender-male" />
+                <Label htmlFor="gender-male">Male</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="female" id="gender-female" />
+                <Label htmlFor="gender-female">Female</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="non-binary" id="gender-non-binary" />
+                <Label htmlFor="gender-non-binary">Non-binary</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="prefer-not-to-say" id="gender-not-say" />
+                <Label htmlFor="gender-not-say">Prefer not to say</Label>
+              </div>
+            </RadioGroup>
+          </div>
+          
+          <div>
+            <Label htmlFor="ethnicity" className="block mb-2">Race/Ethnicity</Label>
+            <Select 
+              value={demographicData.ethnicity} 
+              onValueChange={(value) => handleDemographicChange("ethnicity", value)}
+            >
+              <SelectTrigger id="ethnicity" className="w-full">
+                <SelectValue placeholder="Select ethnicity" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
+                <SelectItem value="asian">Asian</SelectItem>
+                <SelectItem value="black">Black or African American</SelectItem>
+                <SelectItem value="hispanic">Hispanic or Latino</SelectItem>
+                <SelectItem value="native">Native American or Alaska Native</SelectItem>
+                <SelectItem value="pacific">Native Hawaiian or Pacific Islander</SelectItem>
+                <SelectItem value="white">White</SelectItem>
+                <SelectItem value="multiple">Multiple ethnicities</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div>
+            <Label htmlFor="income" className="block mb-2">Annual Income</Label>
+            <Select 
+              value={demographicData.income} 
+              onValueChange={(value) => handleDemographicChange("income", value)}
+            >
+              <SelectTrigger id="income" className="w-full">
+                <SelectValue placeholder="Select income range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
+                <SelectItem value="under-25k">Under $25,000</SelectItem>
+                <SelectItem value="25k-50k">$25,000 - $50,000</SelectItem>
+                <SelectItem value="50k-75k">$50,000 - $75,000</SelectItem>
+                <SelectItem value="75k-100k">$75,000 - $100,000</SelectItem>
+                <SelectItem value="100k-150k">$100,000 - $150,000</SelectItem>
+                <SelectItem value="over-150k">Over $150,000</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+      
       <div className="space-y-4 mb-6">
         <div className="flex items-start">
           <Checkbox 
@@ -89,7 +214,7 @@ export default function ConsentForm({ onConsent }: ConsentFormProps) {
       
       <div className="flex justify-end">
         <Button 
-          onClick={onConsent} 
+          onClick={handleSubmit} 
           disabled={!consented}
           className="px-6"
         >
