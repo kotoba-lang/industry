@@ -1,3 +1,5 @@
+[ ] Voice Assessmentが終わったら、Kawasaki Modelに反映する ( zustand )
+
 [ ] People Table - 連絡先をくれた人のデータを保存する
 [ ] Communication Table - 連絡先をくれた人との連絡情報を保存する
 [ ] CommunicationChannel Table - 連絡先をくれた人との連絡情報を保存する
