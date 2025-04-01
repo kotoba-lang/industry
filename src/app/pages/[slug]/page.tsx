@@ -7,6 +7,7 @@ import { useState } from "react";
 import styles from "@/app/_components/markdown-styles.module.css";
 import 'katex/dist/katex.min.css';
 import { InlineMath, BlockMath } from 'react-katex';
+import { JUNG_STIMULUS_WORDS } from "@/components/jung-word-assessment/JungWordTest";
 
 import VectorVisualization from "@/components/spirit-in-physics/vector-visualization";
 import CorrelationForm from "@/components/spirit-in-physics/correlation-form";
@@ -120,32 +121,13 @@ export default function Page() {
                 <BlockMath math="P(w_O | w_I) = \frac{\exp(\vec{w_I} \cdot \vec{w_O}) \cdot [r(w_I, w_O)]^{\alpha} \cdot \exp(\gamma \frac{\Delta SP(w_I,w_O)}{\lambda}) \cdot \exp(\eta F(w_I, w_O))}{\sum_{j} \exp(\vec{w_I} \cdot \vec{w_j}) \cdot [r(w_I, w_j)]^{\alpha} \cdot \exp(\gamma \frac{\Delta SP(w_I,w_j)}{\lambda}) \cdot \exp(\eta F(w_I, w_j))}" />
               </div>
 
-              <p><strong>Elements: (50)</strong></p>
-              <div className="w-full overflow-x-auto -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8">
-                <table className="min-w-full divide-y divide-gray-200 border-collapse">
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    <tr className="bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Word Asso...</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">head</td>
-                    </tr>
-                    <tr>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">green</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">water</td>
-                    </tr>
-                    <tr className="bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">to sing</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">dead</td>
-                    </tr>
-                    <tr>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">long</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">ship</td>
-                    </tr>
-                    <tr className="bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">to pay</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">window</td>
-                    </tr>
-                  </tbody>
-                </table>
+              <p><strong>Elements: (100)</strong></p>
+              <div className="flex flex-wrap gap-2">
+                {JUNG_STIMULUS_WORDS.map((word, index) => (
+                  <span key={index} className="bg-gray-100 px-2 py-1 rounded-md">
+                    {word}
+                  </span>
+                ))}
               </div>
 
               <p>
