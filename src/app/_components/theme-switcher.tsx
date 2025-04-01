@@ -1,139 +1,124 @@
 "use client";
 
 import styles from "./switch.module.css";
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect } from "react";
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 declare global {
   var updateDOM: () => void;
 }
 
+// テーマの型定義
 type ColorSchemePreference = "system" | "dark" | "light";
 
-const STORAGE_KEY = "nextjs-blog-starter-theme";
-const modes: ColorSchemePreference[] = ["system", "dark", "light"];
+// テーマストアの状態と操作を定義
+interface ThemeStore {
+  mode: ColorSchemePreference;
+  setMode: (mode: ColorSchemePreference) => void;
+  toggleMode: () => void;
+}
 
-/** to reuse updateDOM function defined inside injected script */
+// Zustandストアの作成（persistでlocalStorageに保存）
+const useThemeStore = create<ThemeStore>()(
+  persist(
+    (set) => ({
+      mode: "system",
+      setMode: (mode) => set({ mode }),
+      toggleMode: () => 
+        set((state) => {
+          const modes: ColorSchemePreference[] = ["system", "dark", "light"];
+          const index = modes.indexOf(state.mode);
+          return { mode: modes[(index + 1) % modes.length] };
+        }),
+    }),
+    {
+      name: "theme-store", // localStorageのキー名
+    }
+  )
+);
 
-/** function to be injected in script tag for avoiding FOUC (Flash of Unstyled Content) */
-export const NoFOUCScript = (storageKey: string) => {
-  /* can not use outside constants or function as this script will be injected in a different context */
-  const [SYSTEM, DARK, LIGHT] = ["system", "dark", "light"];
-  
-  // Safety check - ensure this only runs in browser
+// DOMを更新する関数
+const updateDOM = (mode: ColorSchemePreference) => {
+  // FoUCを防ぐためのトランジション制御
+  const modifyTransition = () => {
+    const css = document.createElement("style");
+    css.textContent = "*,*:after,*:before{transition:none !important;}";
+    document.head.appendChild(css);
+
+    return () => {
+      /* Force restyle */
+      getComputedStyle(document.body);
+      /* Wait for next tick before removing */
+      setTimeout(() => document.head.removeChild(css), 1);
+    };
+  };
+
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+
   try {
-    if (typeof window === "undefined" || typeof document === "undefined") return;
-
-    /** Modify transition globally to avoid patched transitions */
-    const modifyTransition = () => {
-      const css = document.createElement("style");
-      css.textContent = "*,*:after,*:before{transition:none !important;}";
-      document.head.appendChild(css);
-
-      return () => {
-        /* Force restyle */
-        getComputedStyle(document.body);
-        /* Wait for next tick before removing */
-        setTimeout(() => document.head.removeChild(css), 1);
-      };
-    };
-
-    const media = matchMedia(`(prefers-color-scheme: ${DARK})`);
-
-    /** function to add remove dark class */
-    window.updateDOM = () => {
-      const restoreTransitions = modifyTransition();
-      const mode = localStorage.getItem(storageKey) ?? SYSTEM;
-      const systemMode = media.matches ? DARK : LIGHT;
-      const resolvedMode = mode === SYSTEM ? systemMode : mode;
-      const classList = document.documentElement.classList;
-      if (resolvedMode === DARK) classList.add(DARK);
-      else classList.remove(DARK);
-      document.documentElement.setAttribute("data-mode", mode);
-      restoreTransitions();
-    };
-    window.updateDOM();
-    media.addEventListener("change", window.updateDOM);
+    const restoreTransitions = modifyTransition();
+    const systemMode = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    const resolvedMode = mode === "system" ? systemMode : mode;
+    
+    const classList = document.documentElement.classList;
+    if (resolvedMode === "dark") classList.add("dark");
+    else classList.remove("dark");
+    
+    document.documentElement.setAttribute("data-mode", mode);
+    restoreTransitions();
   } catch (e) {
-    console.error("Error in theme script:", e);
+    console.error("Error updating DOM:", e);
   }
 };
 
-let updateDOM: () => void;
-
 /**
- * Switch button to quickly toggle user preference.
+ * Theme initialization component - client only
  */
-const Switch = () => {
-  const [mode, setMode] = useState<ColorSchemePreference>(
-    () =>
-      ((typeof window !== "undefined" &&
-        localStorage.getItem(STORAGE_KEY)) ??
-        "system") as ColorSchemePreference,
-  );
-
+const ThemeInitializer = memo(() => {
+  const mode = useThemeStore((state) => state.mode);
+  
+  // システムの色スキーム変更を検知
   useEffect(() => {
-    // Initialize state from localStorage on the client side
-    const storedMode = localStorage.getItem(STORAGE_KEY) as ColorSchemePreference || "system";
-    setMode(storedMode);
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = () => updateDOM(mode);
     
-    // store global functions to local variables to avoid any interference
-    if (typeof window !== "undefined" && window.updateDOM) {
-      updateDOM = window.updateDOM;
-    }
-    /** Sync the tabs */
-    addEventListener("storage", (e: StorageEvent): void => {
-      e.key === STORAGE_KEY && setMode(e.newValue as ColorSchemePreference);
-    });
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, mode);
-    if (typeof updateDOM === "function") {
-      updateDOM();
-    } else if (typeof window !== "undefined" && typeof window.updateDOM === "function") {
-      window.updateDOM();
-    }
+    // 初期化
+    updateDOM(mode);
+    
+    // 色スキーム変更を監視
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
   }, [mode]);
-
-  /** toggle mode */
-  const handleModeSwitch = () => {
-    const index = modes.indexOf(mode);
-    setMode(modes[(index + 1) % modes.length]);
-  };
-  return (
-    <button
-      suppressHydrationWarning
-      aria-label="Toggle dark mode"
-      title="Toggle dark mode"
-      className={styles.switch}
-      onClick={handleModeSwitch}
-    />
-  );
-};
-
-const Script = memo(() => {
-  useEffect(() => {
-    // Only inject the script on the client
-    const scriptEl = document.createElement('script');
-    scriptEl.text = `(${NoFOUCScript.toString()})('${STORAGE_KEY}')`;
-    document.head.appendChild(scriptEl);
-    
-    return () => {
-      document.head.removeChild(scriptEl);
-    };
-  }, []);
   
   return null;
 });
 
 /**
- * This component wich applies classes and transitions.
+ * テーマ切替ボタン
+ */
+const ThemeToggle = () => {
+  const toggleMode = useThemeStore((state) => state.toggleMode);
+  
+  return (
+    <button
+      suppressHydrationWarning
+      aria-label="テーマの切り替え"
+      title="テーマの切り替え"
+      className={styles.switch}
+      onClick={toggleMode}
+    />
+  );
+};
+
+/**
+ * テーマ切替コンポーネント
  */
 export const ThemeSwitcher = () => {
   return (
     <div suppressHydrationWarning>
-      <Script />
-      <Switch />
+      <ThemeInitializer />
+      <ThemeToggle />
     </div>
   );
 };
