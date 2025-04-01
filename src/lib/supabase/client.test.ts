@@ -1,20 +1,34 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+/**
+ * @jest-environment node
+ */
+
 import { supabase } from './client';
 import { createClient } from '@supabase/supabase-js';
 
 // Mock createClient from supabase-js
-vi.mock('@supabase/supabase-js', () => ({
-  createClient: vi.fn()
+jest.mock('@supabase/supabase-js', () => ({
+  createClient: jest.fn()
 }));
 
-// Mock process.env
-vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://test-supabase-url.com');
-vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'test-anon-key');
+// Store original env values
+const originalEnv = process.env;
 
 describe('Supabaseクライアント機能 (優先度: 5)', () => {
   beforeEach(() => {
-    vi.resetAllMocks();
-    vi.resetModules();
+    jest.resetAllMocks();
+    jest.resetModules();
+    
+    // Setup test environment variables
+    process.env = { 
+      ...originalEnv,
+      NEXT_PUBLIC_SUPABASE_URL: 'https://test-supabase-url.com',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'test-anon-key'
+    };
+  });
+  
+  afterEach(() => {
+    // Restore original env
+    process.env = originalEnv;
   });
 
   it('適切な環境変数でSupabaseクライアントが初期化されること', () => {
@@ -35,11 +49,12 @@ describe('Supabaseクライアント機能 (優先度: 5)', () => {
 
   it('環境変数が欠落している場合エラーがスローされること', () => {
     // Clear environment variables
-    vi.unstubAllEnvs();
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     
     // Expect error when importing the module
     expect(() => {
-      vi.resetModules();
+      jest.resetModules();
       require('./client');
     }).toThrow('Missing Supabase environment variables');
   });
