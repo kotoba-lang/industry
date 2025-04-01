@@ -10,6 +10,9 @@ export interface GraphData {
     x: number
     y: number
     z: number
+    color?: string
+    darkColor?: string
+    lightColor?: string
   }[]
   links: {
     source: string

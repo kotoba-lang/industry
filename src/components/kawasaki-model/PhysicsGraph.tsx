@@ -30,6 +30,25 @@ const PhysicsGraph: React.FC<PhysicsGraphProps> = ({
   const lastRenderTime = useRef<number>(0)
   const [showAllLinks, setShowAllLinks] = useState<boolean>(false)
 
+  // DOMからダークモードを検出する、よりロバストな方法
+  const detectDarkMode = () => {
+    // 1. html要素にdarkクラスがあるかチェック
+    if (typeof document !== 'undefined') {
+      if (document.documentElement.classList.contains('dark')) {
+        return true;
+      }
+    }
+    
+    // 2. バックアップとしてprefers-color-schemeを使用
+    if (typeof window !== 'undefined') {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    
+    return false;
+  };
+
+  const isDarkMode = detectDarkMode();
+
   // Create a scene background with subtle Zen-inspired gradient
   useEffect(() => {
     const fg = fgRef.current
@@ -300,11 +319,16 @@ const PhysicsGraph: React.FC<PhysicsGraphProps> = ({
     let geometry
     let material
 
+    // ダークモードに基づいた色の選択
+    const nodeColor = isDarkMode 
+      ? (node.darkColor || (isSelected ? 0xffffff : 0xcccccc))
+      : (node.lightColor || (isSelected ? 0x8c4a3a : 0x8c6a5a));
+
     if (isField) {
       // Field node as a simple sphere - represents emptiness/wholeness
       geometry = new THREE.SphereGeometry(size, 32, 32)
       material = new THREE.MeshPhongMaterial({
-        color: 0x2c2c2c,
+        color: isDarkMode ? 0x444444 : 0x2c2c2c,
         transparent: true,
         opacity: 0.9,
         shininess: 30,
@@ -313,7 +337,7 @@ const PhysicsGraph: React.FC<PhysicsGraphProps> = ({
       // Special nodes as octahedrons - represents crystalline structure
       geometry = new THREE.OctahedronGeometry(size, 0)
       material = new THREE.MeshPhongMaterial({
-        color: isSelected ? 0x8c4a3a : 0x8c6a5a,
+        color: nodeColor,
         transparent: true,
         opacity: 0.85,
         shininess: 50,
@@ -322,7 +346,7 @@ const PhysicsGraph: React.FC<PhysicsGraphProps> = ({
       // Regular nodes as dodecahedrons - represents natural forms
       geometry = new THREE.DodecahedronGeometry(size, 0)
       material = new THREE.MeshPhongMaterial({
-        color: isSelected ? 0x3a4a5a : 0x5a6a7a,
+        color: nodeColor,
         transparent: true,
         opacity: 0.8,
         shininess: 40,

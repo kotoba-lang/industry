@@ -44,55 +44,78 @@
 }
 
 /* KaTeXのダークモード対応 */
-:global(.dark) .katex {
-  color: white;
+:global(.dark) .katex,
+:global(.dark) .katex .katex-html,
+:global(.dark) .katex .katex-mathml {
+  color: white !important;
 }
 
 :global(.dark) .katex-html {
-  color: #ccc;
+  color: #ccc !important;
 }
 
-:global(.dark) .katex .mord {
-  color: white;
+:global(.dark) .katex .mord,
+:global(.dark) .katex .mord .textsf,
+:global(.dark) .katex .mord .textrm,
+:global(.dark) .katex .mord .texttt,
+:global(.dark) .katex .mord .textbf,
+:global(.dark) .katex .mord .mathit,
+:global(.dark) .katex .mord .textit,
+:global(.dark) .katex .mord .mathdefault {
+  color: white !important;
 }
 
 :global(.dark) .katex .mbin {
-  color: white;
+  color: white !important;
 }
 
 :global(.dark) .katex .mrel {
-  color: white;
+  color: white !important;
 }
 
 :global(.dark) .katex .mopen, 
 :global(.dark) .katex .mclose {
-  color: white;
+  color: white !important;
 }
 
 :global(.dark) .katex .mfrac {
-  color: white;
+  color: white !important;
+}
+
+:global(.dark) .katex .mfrac .frac-line {
+  border-bottom-color: white !important;
 }
 
 :global(.dark) .katex .minner {
-  color: white;
+  color: white !important;
 }
 
 :global(.dark) .katex .mop {
-  color: white;
+  color: white !important;
 }
 
 :global(.dark) .katex .msupsub {
-  color: white;
+  color: white !important;
 }
 
 :global(.dark) .katex .vlist {
-  color: white;
+  color: white !important;
 }
 
 :global(.dark) .katex .overline .overline-line {
-  border-top-color: white;
+  border-top-color: white !important;
 }
 
 :global(.dark) .katex .underline .underline-line {
-  border-bottom-color: white;
+  border-bottom-color: white !important;
+}
+
+/* Additional fixes for dark mode */
+:global(.dark) .mathBlock {
+  background-color: #1f2937 !important;
+}
+
+:global(.dark) .math-formula {
+  background-color: #1f2937 !important;
+  color: white !important;
 }
