@@ -16,7 +16,7 @@ export default function ConsentForm({ onConsent }: ConsentFormProps) {
     <div className="max-w-3xl mx-auto p-6 bg-white rounded-lg shadow-md border border-gray-200">
       <h2 className="text-2xl font-bold mb-4">Research Participation Consent</h2>
       
-      <div className="mb-6">z
+      <div className="mb-6">
         <p className="mb-4">This Spirit in Physics (Jung's Word Association Embedding Test) is conducted for research purposes. Please read the following consent information before proceeding.</p>
         
         <button 
@@ -99,7 +99,7 @@ export default function ConsentForm({ onConsent }: ConsentFormProps) {
       
       <div className="mt-4 text-xs text-gray-500">
         <p>This consent process complies with ICH-GCP (International Conference on Harmonisation - Good Clinical Practice) standards.</p>
-        <p>Approval number: STUDY-2023-001 | Approval date: January 15, 2023</p>
+        <p>Approval number: Niigata University 2025-03 | Approval date: Marth 1, 2025</p>
       </div>
     </div>
   );
