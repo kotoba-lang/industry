@@ -18,6 +18,7 @@ const nextConfig = {
         dns: false,
         os: false,
         'pg-hstore': false,
+        'perf_hooks': false,
       };
     }
     return config;
