@@ -24,7 +24,7 @@ type WordResponse = z.infer<typeof WordResponseSchema>;
 type TestResults = z.infer<typeof TestResultsSchema>;
 
 // Jung's original 100 stimulus words from his 1910 paper
-const JUNG_STIMULUS_WORDS = [
+export const JUNG_STIMULUS_WORDS = [
   'head', 'green', 'water', 'to sing', 'dead', 'long', 'ship', 'to pay', 'window', 'friendly',
   'to cook', 'to ask', 'cold', 'stem', 'to dance', 'village', 'lake', 'sick', 'pride', 'to cook',
   'ink', 'angry', 'needle', 'to swim', 'voyage', 'blue', 'lamp', 'to sin', 'bread', 'rich',

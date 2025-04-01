@@ -69,8 +69,9 @@ export default function Page() {
                 Department of Biomedicine, Aarhus University, Denmark
               </p>
 
-              <h2>Structuring and Quantifying Human Spirit Using the Informational Vector Space</h2>
+              <h2>Introduction: Structuring and Quantifying Human Spirit Using the Informational Vector Space</h2>
               <p>
+                <h3>Hypothesis 1</h3>
                 <strong>Information is Physics:</strong> Information is inherently physical—it obeys
                 the laws of thermodynamics and directly influences energy
                 exchange. Experimental validations of Landauer's principle (Bérut et
@@ -79,6 +80,7 @@ export default function Page() {
               </p>
 
               <p>
+                <h3>Hypothesis 2</h3>
                 <strong>Self-expansiveness into information space:</strong> Based on the rubber
                 hand illusion (Botvinick & Cohen, 1998), self-boundaries are not
                 fixed but can extend to incorporate external objects. We assume
@@ -121,13 +123,9 @@ export default function Page() {
                 <BlockMath math="P(w_O | w_I) = \frac{\exp(\vec{w_I} \cdot \vec{w_O}) \cdot [r(w_I, w_O)]^{\alpha} \cdot \exp(\gamma \frac{\Delta SP(w_I,w_O)}{\lambda}) \cdot \exp(\eta F(w_I, w_O))}{\sum_{j} \exp(\vec{w_I} \cdot \vec{w_j}) \cdot [r(w_I, w_j)]^{\alpha} \cdot \exp(\gamma \frac{\Delta SP(w_I,w_j)}{\lambda}) \cdot \exp(\eta F(w_I, w_j))}" />
               </div>
 
-              <p><strong>Elements: (100)</strong></p>
+              <p><strong>Words(100):</strong></p>
               <div className="flex flex-wrap gap-2">
-                {JUNG_STIMULUS_WORDS.map((word, index) => (
-                  <span key={index} className="bg-gray-100 px-2 py-1 rounded-md">
-                    {word}
-                  </span>
-                ))}
+                {JUNG_STIMULUS_WORDS.join(", ")}
               </div>
 
               <p>

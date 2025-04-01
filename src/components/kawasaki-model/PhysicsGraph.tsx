@@ -94,80 +94,80 @@ const PhysicsGraph: React.FC<PhysicsGraphProps> = ({
   }, [])
 
   // Add Cartesian coordinate grid
-  useEffect(() => {
-    const fg = fgRef.current
-    if (fg && fg.scene()) {
-      // Define grid size and dimensions
-      const gridSize = 200
-      const gridDivisions = 10
-      const gridColor = isDarkMode ? 0x333333 : 0xcccccc
-      const gridOpacity = isDarkMode ? 0.15 : 0.1
+  // useEffect(() => {
+  //   const fg = fgRef.current
+  //   if (fg && fg.scene()) {
+  //     // Define grid size and dimensions
+  //     const gridSize = 200
+  //     const gridDivisions = 10
+  //     const gridColor = isDarkMode ? 0x333333 : 0xcccccc
+  //     const gridOpacity = isDarkMode ? 0.15 : 0.1
 
-      // Create X-Y plane grid (horizontal)
-      const gridXY = new THREE.GridHelper(gridSize, gridDivisions, gridColor, gridColor)
-      gridXY.material.transparent = true
-      gridXY.material.opacity = gridOpacity
-      fg.scene().add(gridXY)
+  //     // Create X-Y plane grid (horizontal)
+  //     const gridXY = new THREE.GridHelper(gridSize, gridDivisions, gridColor, gridColor)
+  //     gridXY.material.transparent = true
+  //     gridXY.material.opacity = gridOpacity
+  //     fg.scene().add(gridXY)
 
-      // Create X-Z plane grid (vertical along Y)
-      const gridXZ = new THREE.GridHelper(gridSize, gridDivisions, gridColor, gridColor)
-      gridXZ.material.transparent = true
-      gridXZ.material.opacity = gridOpacity
-      gridXZ.rotation.x = Math.PI / 2
-      fg.scene().add(gridXZ)
+  //     // Create X-Z plane grid (vertical along Y)
+  //     const gridXZ = new THREE.GridHelper(gridSize, gridDivisions, gridColor, gridColor)
+  //     gridXZ.material.transparent = true
+  //     gridXZ.material.opacity = gridOpacity
+  //     gridXZ.rotation.x = Math.PI / 2
+  //     fg.scene().add(gridXZ)
 
-      // Create Y-Z plane grid (vertical along X)
-      const gridYZ = new THREE.GridHelper(gridSize, gridDivisions, gridColor, gridColor)
-      gridYZ.material.transparent = true
-      gridYZ.material.opacity = gridOpacity
-      gridYZ.rotation.z = Math.PI / 2
-      fg.scene().add(gridYZ)
+  //     // Create Y-Z plane grid (vertical along X)
+  //     const gridYZ = new THREE.GridHelper(gridSize, gridDivisions, gridColor, gridColor)
+  //     gridYZ.material.transparent = true
+  //     gridYZ.material.opacity = gridOpacity
+  //     gridYZ.rotation.z = Math.PI / 2
+  //     fg.scene().add(gridYZ)
 
-      // Add subtle coordinate axes
-      const axesHelper = new THREE.AxesHelper(gridSize / 2)
-      // Make the axes very subtle
-      if (axesHelper.material instanceof THREE.Material) {
-        axesHelper.material.transparent = true
-        axesHelper.material.opacity = 0.3
-      }
-      fg.scene().add(axesHelper)
+  //     // Add subtle coordinate axes
+  //     const axesHelper = new THREE.AxesHelper(gridSize / 2)
+  //     // Make the axes very subtle
+  //     if (axesHelper.material instanceof THREE.Material) {
+  //       axesHelper.material.transparent = true
+  //       axesHelper.material.opacity = 0.3
+  //     }
+  //     fg.scene().add(axesHelper)
 
-      // Add axes labels
-      const createAxisLabel = (text: string, position: [number, number, number], color: number) => {
-        const canvas = document.createElement("canvas")
-        canvas.width = 64
-        canvas.height = 32
-        const ctx = canvas.getContext("2d")
-        if (ctx) {
-          ctx.fillStyle = `#${color.toString(16).padStart(6, '0')}`
-          ctx.font = "24px Arial"
-          ctx.textAlign = "center"
-          ctx.textBaseline = "middle"
-          ctx.fillText(text, canvas.width / 2, canvas.height / 2)
+  //     // Add axes labels
+  //     const createAxisLabel = (text: string, position: [number, number, number], color: number) => {
+  //       const canvas = document.createElement("canvas")
+  //       canvas.width = 64
+  //       canvas.height = 32
+  //       const ctx = canvas.getContext("2d")
+  //       if (ctx) {
+  //         ctx.fillStyle = `#${color.toString(16).padStart(6, '0')}`
+  //         ctx.font = "24px Arial"
+  //         ctx.textAlign = "center"
+  //         ctx.textBaseline = "middle"
+  //         ctx.fillText(text, canvas.width / 2, canvas.height / 2)
           
-          const texture = new THREE.CanvasTexture(canvas)
-          const material = new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: 0.3 })
-          const sprite = new THREE.Sprite(material)
-          sprite.position.set(...position)
-          sprite.scale.set(10, 5, 1)
-          fg.scene().add(sprite)
-        }
-      }
+  //         const texture = new THREE.CanvasTexture(canvas)
+  //         const material = new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: 0.3 })
+  //         const sprite = new THREE.Sprite(material)
+  //         sprite.position.set(...position)
+  //         sprite.scale.set(10, 5, 1)
+  //         fg.scene().add(sprite)
+  //       }
+  //     }
       
-      // Add axis labels
-      createAxisLabel("X", [gridSize / 2 + 10, 0, 0], 0xff0000)
-      createAxisLabel("Y", [0, gridSize / 2 + 10, 0], 0x00ff00)
-      createAxisLabel("Z", [0, 0, gridSize / 2 + 10], 0x0000ff)
+  //     // Add axis labels
+  //     createAxisLabel("X", [gridSize / 2 + 10, 0, 0], 0xff0000)
+  //     createAxisLabel("Y", [0, gridSize / 2 + 10, 0], 0x00ff00)
+  //     createAxisLabel("Z", [0, 0, gridSize / 2 + 10], 0x0000ff)
 
-      // Cleanup function to remove grids when component unmounts
-      return () => {
-        fg.scene().remove(gridXY)
-        fg.scene().remove(gridXZ)
-        fg.scene().remove(gridYZ)
-        fg.scene().remove(axesHelper)
-      }
-    }
-  }, [])
+  //     // Cleanup function to remove grids when component unmounts
+  //     return () => {
+  //       fg.scene().remove(gridXY)
+  //       fg.scene().remove(gridXZ)
+  //       fg.scene().remove(gridYZ)
+  //       fg.scene().remove(axesHelper)
+  //     }
+  //   }
+  // }, [])
 
   // Initialize and update graph
   useEffect(() => {
