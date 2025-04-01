@@ -5,6 +5,7 @@ export interface WordResponse {
   stimulusWord: string;
   responseWord: string;
   reactionTimeMs: number;
+  isDelayed?: boolean;
 }
 
 // テスト結果の型
@@ -13,6 +14,7 @@ export interface TestResults {
   averageReactionTimeMs: number;
   delayedResponsesCount: number;
   responses: WordResponse[];
+  completedAt?: Date;
 }
 
 // メッセージの型
