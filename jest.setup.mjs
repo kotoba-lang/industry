@@ -40,16 +40,25 @@ Object.defineProperty(window, 'matchMedia', {
 
 // Mock IntersectionObserver
 global.IntersectionObserver = class IntersectionObserver {
-  constructor(callback) {
-    this.callback = callback;
+  constructor() {
+    this.root = null;
+    this.rootMargin = '';
+    this.thresholds = [];
+    this.callback = () => {};
   }
+
   observe() {
+    // Implementation not needed for this mock
     return null;
   }
+
   unobserve() {
+    // Implementation not needed for this mock
     return null;
   }
+
   disconnect() {
+    // Implementation not needed for this mock
     return null;
   }
 }; 
