@@ -17,6 +17,9 @@ import {
   CacheStats
 } from './utils/combinedAudioCache';
 import CombinedCacheManager from './utils/combinedCacheManager';
+import WebcamComponent from '../webcam/WebcamComponent';
+import { HumeFaceResponse } from '@/lib/services/hume-service';
+import { EmotionDataService } from '@/lib/services/emotion-data-service';
 
 // ヒューム音声生成のインターフェース定義
 interface SpeechRecognition extends EventTarget {
@@ -117,6 +120,12 @@ export default function JungVoiceTest({
   });
   const [cacheStats, setCacheStats] = useState<CacheStats | null>(null);
   const [showCacheManager, setShowCacheManager] = useState<boolean>(false);
+
+  // 新しい状態変数 - 感情認識用
+  const [currentFaceData, setCurrentFaceData] = useState<HumeFaceResponse | null>(null);
+  const [isWebcamActive, setIsWebcamActive] = useState<boolean>(false);
+  const [assessmentId] = useState<string>(uuidv4()); // テストセッション用ユニークID
+  const [userId, setUserId] = useState<string>('');
 
   // コンポーネントのマウント状態を追跡
   useEffect(() => {
@@ -521,89 +530,180 @@ export default function JungVoiceTest({
     setMessages(prev => [...prev, newMessage]);
   };
 
+  // コンポーネントマウント時にユーザーIDを生成
+  useEffect(() => {
+    // 既存のユーザーIDを取得するか、新しく生成
+    const existingUserId = localStorage.getItem('jung_test_user_id');
+    const newUserId = existingUserId || uuidv4();
+    
+    if (!existingUserId) {
+      localStorage.setItem('jung_test_user_id', newUserId);
+    }
+    
+    setUserId(newUserId);
+
+    // スキーマが存在することを確認
+    EmotionDataService.ensureSchemaExists()
+      .catch(err => {
+        console.error('Failed to ensure schema exists:', err);
+      });
+  }, []);
+
+  // 顔の感情データを処理するコールバック
+  const handleFaceData = useCallback((data: HumeFaceResponse) => {
+    setCurrentFaceData(data);
+    
+    // テスト実行中かつ現在の単語インデックスが有効な場合のみ処理
+    if (currentWordIndex >= 0 && currentWordIndex < stimulusWords.length) {
+      const currentWord = stimulusWords[currentWordIndex];
+      
+      // 感情データをDBに保存（テスト中のみ実行）
+      if (userId && assessmentId) {
+        EmotionDataService.saveFacialEmotionData(
+          userId,
+          assessmentId,
+          currentWord,
+          userResponse,
+          startTime ? Date.now() - startTime : 0,
+          data
+        ).catch(err => {
+          console.error('Failed to save facial emotion data:', err);
+        });
+      }
+    }
+  }, [currentWordIndex, stimulusWords, userResponse, startTime, userId, assessmentId]);
+
   // テスト開始
   const startTest = async () => {
-    setCurrentWordIndex(0);
-    setResponses([]);
-    setTestComplete(false);
+    setIsLoading(true);
+    setIsWebcamActive(true);
     
-    // 最初の単語を提示
-    const firstWordPrompt = `${AI_GUIDE_MESSAGES.nextWord} "${stimulusWords[0]}"`;
-    addMessage(firstWordPrompt, 'assistant');
-    
-    // 音声が終了したら音声認識を開始
-    await generateAndPlaySpeech(firstWordPrompt, () => {
-      if (isMountedRef.current) {
-        setStartTime(Date.now());
-        startListening();
+    // 既存のコード...
+    try {
+      // Hume AI クライアントの初期化
+      if (!humeClientRef.current) {
+        humeClientRef.current = new Hume({
+          apiKey: validatedProps.apiKey
+        });
       }
-    });
-  };
-
-  // テストリセット
-  const resetTest = () => {
-    // 音声リソースをクリーンアップ
-    cleanupAudioResources();
-    
-    setCurrentWordIndex(-1);
-    setUserResponse('');
-    setResponses([]);
-    setTestComplete(false);
-    setStartTime(null);
-    setAverageReactionTime(0);
-    setDelayedResponses(0);
-    
-    // 初期メッセージを追加
-    setMessages([]);
-    addMessage(AI_GUIDE_MESSAGES.introduction, 'assistant');
-    generateAndPlaySpeech(AI_GUIDE_MESSAGES.introduction);
-  };
-
-  // 応答を記録して次の単語へ
-  const recordResponse = async () => {
-    if (startTime === null || currentWordIndex < 0 || currentWordIndex >= stimulusWords.length || !isMountedRef.current) {
-      return;
-    }
-
-    const endTime = Date.now();
-    const reactionTimeMs = endTime - startTime;
-    const isDelayed = reactionTimeMs > DELAYED_REACTION_THRESHOLD_MS;
-
-    const response: WordResponse = {
-      stimulus: stimulusWords[currentWordIndex],
-      response: userResponse.trim(),
-      reactionTimeMs,
-      isDelayed,
-    };
-
-    // ユーザーの回答をメッセージとして追加
-    addMessage(userResponse.trim(), 'user');
-
-    const updatedResponses = [...responses, response];
-    setResponses(updatedResponses);
-    setUserResponse('');
-    setIsResponseCorrect(null);
-
-    // フィードバック後の処理
-    if (currentWordIndex < stimulusWords.length - 1) {
-      // 次の単語に進む
-      const nextIndex = currentWordIndex + 1;
-      setCurrentWordIndex(nextIndex);
       
-      // 次の単語を読み上げ
-      const nextWordPrompt = `${AI_GUIDE_MESSAGES.nextWord} "${stimulusWords[nextIndex]}"`;
-      addMessage(nextWordPrompt, 'assistant');
-      
-      // 次の単語の音声を直接再生
-      await generateAndPlaySpeech(nextWordPrompt, () => {
+      // 初回メッセージの再生
+      await generateAndPlaySpeech(AI_GUIDE_MESSAGES.introduction, () => {
         if (isMountedRef.current) {
           setStartTime(Date.now());
           startListening();
         }
       });
+      
+      // メッセージの記録
+      addMessage(AI_GUIDE_MESSAGES.introduction, 'assistant');
+      
+      setCurrentWordIndex(0);
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error starting test:', error);
+      setError('Failed to connect to Hume AI service. Please check your internet connection and try again.');
+      setIsLoading(false);
+    }
+  };
+
+  // テストリセット
+  const resetTest = () => {
+    setCurrentWordIndex(-1);
+    setUserResponse('');
+    setResponses([]);
+    setStartTime(null);
+    setTestComplete(false);
+    setAverageReactionTime(0);
+    setDelayedResponses(0);
+    setMessages([]);
+    setAudioUrl(null);
+    setError(null);
+    setIsListening(false);
+    setIsResponseCorrect(null);
+    setIsWebcamActive(false);
+    
+    // Cleanup audio URLs
+    audioUrlsRef.current.forEach(url => {
+      if (url.startsWith('blob:')) {
+        URL.revokeObjectURL(url);
+      }
+    });
+    audioUrlsRef.current = [];
+  };
+
+  // 応答記録時に感情データも合わせて保存
+  const recordResponse = async () => {
+    const currentWord = stimulusWords[currentWordIndex];
+    const normalizedResponse = userResponse.trim().toLowerCase();
+    
+    if (!normalizedResponse) {
+      return;
+    }
+    
+    // 反応時間の計算
+    const reactionTimeMs = startTime ? Date.now() - startTime : 0;
+    const isDelayed = reactionTimeMs > DELAYED_REACTION_THRESHOLD_MS;
+    
+    // 新しい応答を作成
+    const newResponse: WordResponse = {
+      stimulus: currentWord,
+      response: normalizedResponse,
+      reactionTimeMs,
+      isDelayed
+    };
+    
+    // 応答をバリデーション
+    try {
+      WordResponseSchema.parse(newResponse);
+    } catch (error) {
+      console.error('Invalid response data:', error);
+      setError('Invalid response data. Please try again.');
+      return;
+    }
+    
+    // 応答を記録
+    const updatedResponses = [...responses, newResponse];
+    setResponses(updatedResponses);
+    
+    // 音声データを保存
+    if (currentFaceData && userId && assessmentId) {
+      // EmotionDataServiceを使用して感情データを保存
+      try {
+        await EmotionDataService.saveFacialEmotionData(
+          userId,
+          assessmentId,
+          currentWord,
+          normalizedResponse,
+          reactionTimeMs,
+          currentFaceData
+        );
+      } catch (err) {
+        console.error('Failed to save facial emotion data in recordResponse:', err);
+      }
+    }
+    
+    setUserResponse('');
+    setIsResponseCorrect(null);
+    
+    // すべての単語が完了したかチェック
+    if (currentWordIndex + 1 >= stimulusWords.length) {
+      await completeTest(updatedResponses);
     } else {
-      // テスト完了
-      completeTest(updatedResponses);
+      // 次の単語へ
+      setCurrentWordIndex(currentWordIndex + 1);
+      setStartTime(Date.now());
+      
+      // 適切なメッセージを選択
+      const nextMessage = isDelayed ? AI_GUIDE_MESSAGES.delayed : AI_GUIDE_MESSAGES.normal;
+      await generateAndPlaySpeech(`${nextMessage} ${stimulusWords[currentWordIndex + 1]}`, () => {
+        if (isMountedRef.current) {
+          setStartTime(Date.now());
+          startListening();
+        }
+      });
+      
+      addMessage(`${nextMessage} ${stimulusWords[currentWordIndex + 1]}`, 'assistant');
     }
   };
 
@@ -623,30 +723,57 @@ export default function JungVoiceTest({
 
   // テスト完了
   const completeTest = async (finalResponses: WordResponse[]) => {
-    if (!isMountedRef.current) return;
+    setIsLoading(true);
+    setIsWebcamActive(false);
     
-    const totalReactionTime = finalResponses.reduce((sum, r) => sum + r.reactionTimeMs, 0);
-    const avgReactionTime = Math.round(totalReactionTime / finalResponses.length);
-    const delayedCount = finalResponses.filter(r => r.isDelayed).length;
-
-    setAverageReactionTime(avgReactionTime);
-    setDelayedResponses(delayedCount);
-    setTestComplete(true);
-    setCurrentWordIndex(-1);
-
-    // 完了メッセージ
-    addMessage(AI_GUIDE_MESSAGES.testComplete, 'assistant');
-    await generateAndPlaySpeech(AI_GUIDE_MESSAGES.testComplete);
-
-    const results: TestResults = {
-      responses: finalResponses,
-      averageReactionTimeMs: avgReactionTime,
-      delayedResponseCount: delayedCount,
-      completedAt: new Date(),
-    };
-
-    if (onTestComplete && isMountedRef.current) {
-      onTestComplete(results);
+    try {
+      // 次の単語を再生
+      await generateAndPlaySpeech(AI_GUIDE_MESSAGES.testComplete, () => {
+        if (isMountedRef.current) {
+          setStartTime(Date.now());
+          startListening();
+        }
+      });
+      
+      // メッセージを記録
+      addMessage(AI_GUIDE_MESSAGES.testComplete, 'assistant');
+      
+      // 平均反応時間と遅延応答数を計算
+      const totalReactionTime = finalResponses.reduce((sum, response) => sum + response.reactionTimeMs, 0);
+      const avgReactionTime = Math.round(totalReactionTime / finalResponses.length);
+      const delayedCount = finalResponses.filter(response => response.isDelayed).length;
+      
+      setAverageReactionTime(avgReactionTime);
+      setDelayedResponses(delayedCount);
+      setTestComplete(true);
+      
+      // テスト結果を作成
+      const testResults: TestResults = {
+        responses: finalResponses,
+        averageReactionTimeMs: avgReactionTime,
+        delayedResponseCount: delayedCount,
+        completedAt: new Date()
+      };
+      
+      // テスト結果をバリデーション
+      try {
+        TestResultsSchema.parse(testResults);
+      } catch (error) {
+        console.error('Invalid test results:', error);
+        setError('Invalid test results. Please try again.');
+        setIsLoading(false);
+        return;
+      }
+      
+      // コールバックがあれば実行
+      if (onTestComplete) {
+        onTestComplete(testResults);
+      }
+    } catch (error) {
+      console.error('Error completing test:', error);
+      setError('Error completing test. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -831,250 +958,204 @@ export default function JungVoiceTest({
   }, []);
 
   return (
-    <div className={`max-w-2xl mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md ${className}`}>
-      <h2 className="text-2xl font-bold mb-6 text-center text-gray-800 dark:text-white">Spirit in Physics (Jung's Word Association Test Embedding Model) - AI Guided</h2>
-      
-      {/* キャッシュのオン/オフトグル */}
-      <div className="flex justify-between items-center mb-2">
-        <button
-          onClick={() => setShowCacheManager(!showCacheManager)}
-          className="text-xs text-blue-500 hover:underline focus:outline-none"
-        >
-          {cacheStats ? `キャッシュ: ${cacheStats.total.count}件` : 'キャッシュ管理'}
-        </button>
-      </div>
-      
-      {/* 統合キャッシュ管理UI */}
-      {showCacheManager && (
-        <div className="mb-4">
-          <CombinedCacheManager 
-            initialSettings={cacheSettings}
-            onSettingsChange={handleCacheSettingsChange}
-          />
-        </div>
-      )}
-      
-      {/* 音声再生用の隠し要素 */}
-      <audio ref={audioRef} className="hidden" controls />
-      
-      {/* エラー表示 */}
+    <div className={`max-w-3xl mx-auto ${className}`}>
       {error && (
-        <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-md">
-          <div className="flex items-center space-x-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            <p>{error}</p>
-          </div>
-          {error.includes('Speech recognition') && (
-            <div className="mt-2 text-sm">
-              <p>This may be due to:</p>
-              <ul className="list-disc pl-5 mt-1">
-                <li>Microphone not available or permission denied</li>
-                <li>Browser compatibility issues (try Chrome, Edge, or Safari)</li>
-                <li>Network connectivity problems</li>
-              </ul>
-              <div className="mt-2">
-                <Button 
-                  onClick={reinitializeSpeechRecognition}
-                  variant="outline"
-                  className="text-xs py-1"
-                >
-                  Try Again
-                </Button>
-              </div>
-            </div>
-          )}
+        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-md">
+          <p>{error}</p>
         </div>
       )}
       
-      {/* テスト前の説明 */}
-      {currentWordIndex === -1 && !testComplete && (
-        <div className="text-center">
-          {isLoading ? (
-            <p className="mb-4">Loading audio...</p>
-          ) : (
-            <>
-              <div className="mb-6 p-4 bg-blue-50 rounded-md">
-                <p className="text-lg">{messages.length > 0 ? messages[messages.length - 1].content : ''}</p>
-              </div>
-              
-              {/* 音声再生ボタンを追加 */}
-              {audioUrl && (
-                <Button
-                  onClick={() => audioRef.current?.play()}
-                  className="mb-4 flex items-center gap-2"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                  </svg>
-                  Play Instructions
-                </Button>
-              )}
-              
-              <Button 
-                onClick={startTest} 
-                className="px-6 py-2"
-                disabled={isLoading}
-              >
-                Start Test
-              </Button>
-            </>
-          )}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold mb-2 text-gray-800 dark:text-white">Jung's Word Association Test</h2>
+          <p className="text-gray-600 dark:text-gray-300">
+            This test explores your immediate mental associations. I'll present words, and you respond with the first word that comes to mind.
+          </p>
         </div>
-      )}
-
-      {/* テスト進行中 */}
-      {currentWordIndex >= 0 && currentWordIndex < stimulusWords.length && (
-        <div className="text-center">
-          <div className="mb-8">
-            <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">Word {currentWordIndex + 1} / {stimulusWords.length}</p>
-            <h3 className="text-3xl font-bold text-gray-800 dark:text-white">{stimulusWords[currentWordIndex]}</h3>
-          </div>
-          
-          {/* 音声再生ボタン */}
-          {audioUrl && (
-            <Button 
-              onClick={() => audioRef.current?.play()}
-              className="mb-4 flex items-center gap-2"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-              </svg>
-              Play Word
-            </Button>
-          )}
-          
+        
+        {/* Webcam component for emotion recognition */}
+        {isWebcamActive && (
           <div className="mb-6">
-            {isListening ? (
-              <div className="flex flex-col items-center">
-                <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mb-2 animate-pulse">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                  </svg>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-300">Listening...</p>
-                <p className="mt-2 text-lg text-gray-800 dark:text-white">{userResponse}</p>
-                <Button
-                  onClick={stopListening}
-                  className="mt-4 bg-red-600 hover:bg-red-700"
-                >
-                  Stop
-                </Button>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center">
-                <Button
-                  onClick={startListening}
-                  className="mt-2"
-                  disabled={!isSpeechSupported || isLoading}
-                >
-                  Respond by Voice
-                </Button>
-                {userResponse && (
-                  <div className="mt-4">
-                    <p className="mb-2 text-lg text-gray-800 dark:text-white">{userResponse}</p>
-                    
-                    {isResponseCorrect === null ? (
-                      <div className="flex gap-2 justify-center">
-                        <Button
-                          variant="outline"
-                          onClick={() => validateResponse(false)}
-                          disabled={!userResponse.trim() || isLoading}
-                          className="border-red-500 text-red-500 hover:bg-red-50 dark:border-red-400 dark:text-red-400"
-                        >
-                          Incorrect
-                        </Button>
-                        <Button
-                          onClick={() => validateResponse(true)}
-                          disabled={!userResponse.trim() || isLoading}
-                        >
-                          Correct
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        onClick={recordResponse}
-                        disabled={!userResponse.trim() || isLoading}
-                      >
-                        Next
-                      </Button>
-                    )}
-                  </div>
-                )}
+            <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-white">Facial Expression Analysis</h3>
+            <WebcamComponent 
+              apiKey={apiKey}
+              onFaceData={handleFaceData}
+              isActive={isWebcamActive}
+              width={320}
+              height={240}
+              captureInterval={500} // 500ms間隔でキャプチャ
+              className="mx-auto mb-4"
+            />
+          </div>
+        )}
+        
+        {/* Rest of the component remains the same */}
+        
+        {currentWordIndex < 0 ? (
+          <div className="flex flex-col items-center">
+            <Button 
+              onClick={startTest} 
+              disabled={isLoading}
+              className="mt-4"
+            >
+              {isLoading ? 'Connecting...' : 'Start Test'}
+            </Button>
+            
+            {isLoading && (
+              <div className="mt-4 flex items-center">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-800 dark:border-white"></div>
+                <span className="ml-2 text-gray-700 dark:text-gray-300">Connecting to Hume AI...</span>
               </div>
             )}
           </div>
-          
-          <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md">
-            <h4 className="font-medium mb-2 text-gray-800 dark:text-white">Conversation Log</h4>
-            <div className="max-h-48 overflow-y-auto">
-              {messages.map((msg) => (
-                <div 
-                  key={msg.id}
-                  className={`mb-2 p-2 rounded-md ${
-                    msg.sender === 'assistant' ? 'bg-blue-100 text-left' : 'bg-green-100 text-right'
-                  }`}
-                >
-                  <p className="text-gray-800 dark:text-white">{msg.content}</p>
-                  <small className="text-xs text-gray-600 dark:text-gray-300">
-                    {msg.timestamp.toLocaleTimeString()}
-                  </small>
+        ) : !testComplete ? (
+          <div className="text-center">
+            <div className="mb-8">
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">Word {currentWordIndex + 1} / {stimulusWords.length}</p>
+              <h3 className="text-3xl font-bold text-gray-800 dark:text-white">{stimulusWords[currentWordIndex]}</h3>
+            </div>
+            
+            {/* 音声再生ボタン */}
+            {audioUrl && (
+              <Button 
+                onClick={() => audioRef.current?.play()}
+                className="mb-4 flex items-center gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                </svg>
+                Play Word
+              </Button>
+            )}
+            
+            <div className="mb-6">
+              {isListening ? (
+                <div className="flex flex-col items-center">
+                  <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mb-2 animate-pulse">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">Listening...</p>
+                  <p className="mt-2 text-lg text-gray-800 dark:text-white">{userResponse}</p>
+                  <Button
+                    onClick={stopListening}
+                    className="mt-4 bg-red-600 hover:bg-red-700"
+                  >
+                    Stop
+                  </Button>
                 </div>
-              ))}
+              ) : (
+                <div className="flex flex-col items-center">
+                  <Button
+                    onClick={startListening}
+                    className="mt-2"
+                    disabled={!isSpeechSupported || isLoading}
+                  >
+                    Respond by Voice
+                  </Button>
+                  {userResponse && (
+                    <div className="mt-4">
+                      <p className="mb-2 text-lg text-gray-800 dark:text-white">{userResponse}</p>
+                      
+                      {isResponseCorrect === null ? (
+                        <div className="flex gap-2 justify-center">
+                          <Button
+                            variant="outline"
+                            onClick={() => validateResponse(false)}
+                            disabled={!userResponse.trim() || isLoading}
+                            className="border-red-500 text-red-500 hover:bg-red-50 dark:border-red-400 dark:text-red-400"
+                          >
+                            Incorrect
+                          </Button>
+                          <Button
+                            onClick={() => validateResponse(true)}
+                            disabled={!userResponse.trim() || isLoading}
+                          >
+                            Correct
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          onClick={recordResponse}
+                          disabled={!userResponse.trim() || isLoading}
+                        >
+                          Next
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md">
+              <h4 className="font-medium mb-2 text-gray-800 dark:text-white">Conversation Log</h4>
+              <div className="max-h-48 overflow-y-auto">
+                {messages.map((msg) => (
+                  <div 
+                    key={msg.id}
+                    className={`mb-2 p-2 rounded-md ${
+                      msg.sender === 'assistant' ? 'bg-blue-100 text-left' : 'bg-green-100 text-right'
+                    }`}
+                  >
+                    <p className="text-gray-800 dark:text-white">{msg.content}</p>
+                    <small className="text-xs text-gray-600 dark:text-gray-300">
+                      {msg.timestamp.toLocaleTimeString()}
+                    </small>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* テスト完了 */}
-      {testComplete && (
-        <div className="text-center">
-          <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Test Complete</h3>
-          
-          <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-md mb-6">
-            <p className="mb-2">
-              <span className="font-medium text-gray-800 dark:text-white">Average reaction time:</span> {averageReactionTime} ms
-            </p>
-            <p>
-              <span className="font-medium text-gray-800 dark:text-white">Delayed responses:</span> {delayedResponses} / {responses.length}
-            </p>
-          </div>
-          
-          <h4 className="text-lg font-medium mb-3 text-gray-800 dark:text-white">Your Responses</h4>
-          <div className="max-h-80 overflow-y-auto mb-6">
-            <table className="w-full border-collapse">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-800 dark:text-white">Stimulus</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-800 dark:text-white">Response</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-800 dark:text-white">Time (ms)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {responses.map((resp, index) => (
-                  <tr key={index} className={resp.isDelayed ? "bg-yellow-50 dark:bg-yellow-700" : (index % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-gray-50 dark:bg-gray-700")}>
-                    <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.stimulus}</td>
-                    <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.response}</td>
-                    <td className={`px-4 py-2 text-sm ${resp.isDelayed ? "text-red-600 font-medium" : ""} text-gray-800 dark:text-white`}>
-                      {resp.reactionTimeMs}
-                    </td>
+        ) : (
+          <div className="text-center">
+            <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Test Complete</h3>
+            
+            <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-md mb-6">
+              <p className="mb-2">
+                <span className="font-medium text-gray-800 dark:text-white">Average reaction time:</span> {averageReactionTime} ms
+              </p>
+              <p>
+                <span className="font-medium text-gray-800 dark:text-white">Delayed responses:</span> {delayedResponses} / {responses.length}
+              </p>
+            </div>
+            
+            <h4 className="text-lg font-medium mb-3 text-gray-800 dark:text-white">Your Responses</h4>
+            <div className="max-h-80 overflow-y-auto mb-6">
+              <table className="w-full border-collapse">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-800 dark:text-white">Stimulus</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-800 dark:text-white">Response</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-800 dark:text-white">Time (ms)</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {responses.map((resp, index) => (
+                    <tr key={index} className={resp.isDelayed ? "bg-yellow-50 dark:bg-yellow-700" : (index % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-gray-50 dark:bg-gray-700")}>
+                      <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.stimulus}</td>
+                      <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.response}</td>
+                      <td className={`px-4 py-2 text-sm ${resp.isDelayed ? "text-red-600 font-medium" : ""} text-gray-800 dark:text-white`}>
+                        {resp.reactionTimeMs}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            <p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
+              Note: Highlighted rows indicate delayed responses (&gt; 2 seconds), which Jung considered
+              potentially significant and might indicate emotional complexes.
+            </p>
+            
+            <Button onClick={resetTest} className="px-6 py-2">
+              Take Test Again
+            </Button>
           </div>
-          
-          <p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
-            Note: Highlighted rows indicate delayed responses (&gt; 2 seconds), which Jung considered
-            potentially significant and might indicate emotional complexes.
-          </p>
-          
-          <Button onClick={resetTest} className="px-6 py-2">
-            Take Test Again
-          </Button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 } 
