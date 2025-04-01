@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import JungVoiceTest from './JungVoiceTest';
+import ConsentForm from '../consent/ConsentForm';
 import { JungVoiceAssessmentProps, TestResults } from './types';
 import { JungVoiceAssessmentPropsSchema } from './schema';
 
@@ -14,7 +15,7 @@ export default function JungVoiceAssessment({
   onTestComplete,
   className = '',
 }: JungVoiceAssessmentProps) {
-  // プロップスのバリデーション
+  // Props validation
   const validatedProps = JungVoiceAssessmentPropsSchema.parse({
     numberOfWords,
     apiKey,
@@ -27,6 +28,7 @@ export default function JungVoiceAssessment({
 
   const [testResults, setTestResults] = useState<TestResults | null>(null);
   const [showAnalysis, setShowAnalysis] = useState<boolean>(false);
+  const [hasConsented, setHasConsented] = useState<boolean>(false);
 
   const handleTestComplete = (results: TestResults) => {
     setTestResults(results);
@@ -42,17 +44,25 @@ export default function JungVoiceAssessment({
     setShowAnalysis(false);
   };
 
+  const handleConsent = () => {
+    setHasConsented(true);
+  };
+
   return (
     <div className={`py-8 ${className}`}>
-      <JungVoiceTest 
-        numberOfWords={validatedProps.numberOfWords} 
-        apiKey={validatedProps.apiKey}
-        generationId={validatedProps.generationId}
-        voiceName={validatedProps.voiceName}
-        speechRecognitionLang={validatedProps.speechRecognitionLang}
-        onTestComplete={handleTestComplete}
-        className={className}
-      />
+      {!hasConsented ? (
+        <ConsentForm onConsent={handleConsent} />
+      ) : (
+        <JungVoiceTest 
+          numberOfWords={validatedProps.numberOfWords} 
+          apiKey={validatedProps.apiKey}
+          generationId={validatedProps.generationId}
+          voiceName={validatedProps.voiceName}
+          speechRecognitionLang={validatedProps.speechRecognitionLang}
+          onTestComplete={handleTestComplete}
+          className={className}
+        />
+      )}
     </div>
   );
 } 
