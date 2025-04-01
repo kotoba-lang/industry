@@ -2,18 +2,17 @@ import { z } from 'zod';
 
 // 単一の単語応答のスキーマ
 export const WordResponseSchema = z.object({
-  stimulus: z.string(),
-  response: z.string(),
-  reactionTimeMs: z.number(),
-  isDelayed: z.boolean(),
+  stimulusWord: z.string(),
+  responseWord: z.string(),
+  reactionTimeMs: z.number().int().nonnegative()
 });
 
 // テスト結果のスキーマ
 export const TestResultsSchema = z.object({
-  responses: z.array(WordResponseSchema),
-  averageReactionTimeMs: z.number(),
-  delayedResponseCount: z.number(),
-  completedAt: z.date(),
+  totalWords: z.number().int().positive(),
+  averageReactionTimeMs: z.number().nonnegative(),
+  delayedResponsesCount: z.number().int().nonnegative(),
+  responses: z.array(WordResponseSchema)
 });
 
 // メッセージのスキーマ
@@ -26,13 +25,11 @@ export const MessageSchema = z.object({
 
 // JungVoiceAssessment コンポーネントのプロップスのスキーマ
 export const JungVoiceAssessmentPropsSchema = z.object({
-  numberOfWords: z.number().int().positive().max(100).optional(),
-  apiKey: z.string().optional(),
+  numberOfWords: z.number().int().min(1).max(1000).optional().default(100),
+  apiKey: z.string().min(1).optional(),
   generationId: z.string().optional(),
   voiceName: z.string().optional(),
-  speechRecognitionLang: z.string().optional(),
-  onTestComplete: z.function().args(z.any()).returns(z.void()).optional(),
-  className: z.string().optional()
+  speechRecognitionLang: z.string().optional()
 });
 
 // AI ガイドメッセージのスキーマ

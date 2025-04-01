@@ -1,30 +1,86 @@
-import { db } from '../db';
+import { db } from '@/db';
 import { 
-  emotionRecords, 
-  facialEmotions, 
-  facialRecognition, 
-  voiceEmotions, 
-  voiceRecognition 
-} from '../db/schema/hume_emotion';
-import { 
-  HumeFaceResponse, 
-  HumeVoiceResponse 
-} from './hume-service';
+  facialEmotionRecords, 
+  voiceEmotionRecords,
+  emotionAssessments
+} from '@/db/schema/spirit-in-physics';
+import { HumeFaceResponse, HumeVoiceResponse } from './hume-service';
 import { v4 as uuidv4 } from 'uuid';
-import { createSpiritInPhysicsSchema } from '../db/migrations/create-schema';
 
-// 感情データを保存するサービス
+export interface EmotionData {
+  emotions?: Record<string, number>;
+  timestamp: number;
+}
+
+export interface EmotionSaveParams {
+  userId: string;
+  assessmentId: string;
+  stimulusWord: string;
+  responseWord: string;
+  reactionTimeMs: number;
+  faceEmotions?: Record<string, number>;
+  voiceEmotions?: Record<string, number>;
+  timestamp: number;
+}
+
 export class EmotionDataService {
+  /**
+   * 新しい感情データの保存
+   */
+  static async saveEmotionData(data: EmotionSaveParams) {
+    try {
+      // まず、アセスメント情報を保存/更新
+      await db.insert(emotionAssessments)
+        .values({
+          id: data.assessmentId,
+          userId: data.userId,
+          createdAt: new Date(data.timestamp),
+          updatedAt: new Date(data.timestamp),
+        })
+        .onConflictDoUpdate({
+          target: emotionAssessments.id,
+          set: {
+            updatedAt: new Date(data.timestamp),
+          }
+        });
+        
+      // 顔の感情データがある場合は保存
+      if (data.faceEmotions && Object.keys(data.faceEmotions).length > 0) {
+        await db.insert(facialEmotionRecords)
+          .values({
+            id: uuidv4(),
+            assessmentId: data.assessmentId,
+            stimulusWord: data.stimulusWord,
+            responseWord: data.responseWord,
+            reactionTimeMs: data.reactionTimeMs,
+            emotions: data.faceEmotions,
+            createdAt: new Date(data.timestamp),
+          });
+      }
+        
+      // 音声の感情データがある場合は保存
+      if (data.voiceEmotions && Object.keys(data.voiceEmotions).length > 0) {
+        await db.insert(voiceEmotionRecords)
+          .values({
+            id: uuidv4(),
+            assessmentId: data.assessmentId,
+            stimulusWord: data.stimulusWord,
+            responseWord: data.responseWord,
+            reactionTimeMs: data.reactionTimeMs,
+            emotions: data.voiceEmotions,
+            createdAt: new Date(data.timestamp),
+          });
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error saving emotion data:', error);
+      return { success: false, error };
+    }
+  }
 
   /**
-   * スキーマが存在することを確認する
-   */
-  static async ensureSchemaExists(): Promise<void> {
-    await createSpiritInPhysicsSchema();
-  }
-  
-  /**
-   * 顔の感情データを保存する
+   * 顔の感情データの保存（従来メソッド - 互換性のために残す）
    */
   static async saveFacialEmotionData(
     userId: string,
@@ -32,67 +88,21 @@ export class EmotionDataService {
     stimulusWord: string,
     responseWord: string,
     reactionTimeMs: number,
-    faceData: HumeFaceResponse
-  ): Promise<string> {
-    try {
-      // スキーマを確認
-      await this.ensureSchemaExists();
-
-      // emotionRecordsにレコードを挿入
-      const [record] = await db.insert(emotionRecords)
-        .values({
-          id: uuidv4(),
-          userId,
-          assessmentId,
-          testType: 'voice',
-          stimulusWord,
-          responseWord,
-          reactionTimeMs,
-          recordedAt: new Date()
-        })
-        .returning({ id: emotionRecords.id });
-
-      if (!record || !record.id) {
-        throw new Error('Failed to insert emotion record');
-      }
-
-      const emotionRecordId = record.id;
-
-      // 顔の感情データを挿入
-      if (faceData.emotions?.length > 0) {
-        const emotionValues = faceData.emotions.map(emotion => ({
-          id: uuidv4(),
-          emotionRecordId,
-          emotionName: emotion.name,
-          score: emotion.score
-        }));
-
-        await db.insert(facialEmotions).values(emotionValues);
-      }
-
-      // 顔認識の追加メタデータを挿入
-      if (faceData) {
-        await db.insert(facialRecognition).values({
-          id: uuidv4(),
-          emotionRecordId,
-          bboxX: faceData.bbox?.x,
-          bboxY: faceData.bbox?.y,
-          bboxWidth: faceData.bbox?.w,
-          bboxHeight: faceData.bbox?.h,
-          confidence: faceData.confidence,
-          rawData: faceData as any
-        });
-      }
-
-      return emotionRecordId;
-    } catch (error) {
-      console.error('Error saving facial emotion data:', error);
-      throw error;
-    }
+    faceData: EmotionData
+  ) {
+    return this.saveEmotionData({
+      userId,
+      assessmentId,
+      stimulusWord,
+      responseWord,
+      reactionTimeMs,
+      faceEmotions: faceData.emotions,
+      timestamp: faceData.timestamp
+    });
   }
 
   /**
-   * 音声の感情データを保存する
+   * 音声の感情データの保存（従来メソッド - 互換性のために残す）
    */
   static async saveVoiceEmotionData(
     userId: string,
@@ -101,135 +111,67 @@ export class EmotionDataService {
     responseWord: string,
     reactionTimeMs: number,
     voiceData: HumeVoiceResponse
-  ): Promise<string> {
-    try {
-      // スキーマを確認
-      await this.ensureSchemaExists();
-      
-      // emotionRecordsにレコードを挿入
-      const [record] = await db.insert(emotionRecords)
-        .values({
-          id: uuidv4(),
-          userId,
-          assessmentId,
-          testType: 'voice',
-          stimulusWord,
-          responseWord,
-          reactionTimeMs,
-          recordedAt: new Date()
-        })
-        .returning({ id: emotionRecords.id });
-
-      if (!record || !record.id) {
-        throw new Error('Failed to insert emotion record');
-      }
-
-      const emotionRecordId = record.id;
-
-      // 音声の感情データを挿入
-      if (voiceData.emotions?.length > 0) {
-        const emotionValues = voiceData.emotions.map(emotion => ({
-          id: uuidv4(),
-          emotionRecordId,
-          emotionName: emotion.name,
-          score: emotion.score
-        }));
-
-        await db.insert(voiceEmotions).values(emotionValues);
-      }
-
-      // 音声認識の追加メタデータを挿入
-      await db.insert(voiceRecognition).values({
-        id: uuidv4(),
-        emotionRecordId,
-        speechDurationMs: voiceData.metadata?.duration_ms,
-        speakingRate: voiceData.metadata?.speaking_rate,
-        pauseCount: voiceData.metadata?.pause_count,
-        confidence: voiceData.confidence,
-        rawData: voiceData as any
+  ) {
+    // 音声感情データを適切な形式に変換
+    const emotions: Record<string, number> = {};
+    
+    if (voiceData && voiceData.emotions) {
+      voiceData.emotions.forEach(emotion => {
+        emotions[emotion.name] = emotion.score;
       });
-
-      return emotionRecordId;
-    } catch (error) {
-      console.error('Error saving voice emotion data:', error);
-      throw error;
     }
+    
+    return this.saveEmotionData({
+      userId,
+      assessmentId,
+      stimulusWord,
+      responseWord,
+      reactionTimeMs,
+      voiceEmotions: emotions,
+      timestamp: Date.now()
+    });
   }
 
   /**
-   * 特定のユーザーの顔の感情データを取得する
+   * ユーザーIDとアセスメントIDに基づく感情データの取得
    */
-  static async getFacialEmotionsByUserId(userId: string) {
+  static async getEmotionDataByAssessment(userId: string, assessmentId: string) {
     try {
-      // スキーマを確認
-      await this.ensureSchemaExists();
-      
-      const records = await db.query.emotionRecords.findMany({
-        where: (records, { eq, and }) => and(
-          eq(records.userId, userId),
-          eq(records.testType, 'voice')
+      // アセスメント情報の取得
+      const assessment = await db.query.emotionAssessments.findFirst({
+        where: (fields, { eq, and }) => and(
+          eq(fields.id, assessmentId),
+          eq(fields.userId, userId)
         ),
-        with: {
-          facialEmotions: true,
-          facialRecognition: true
-        }
       });
-
-      return records;
-    } catch (error) {
-      console.error('Error retrieving facial emotion data:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * 特定のユーザーの音声の感情データを取得する
-   */
-  static async getVoiceEmotionsByUserId(userId: string) {
-    try {
-      // スキーマを確認
-      await this.ensureSchemaExists();
       
-      const records = await db.query.emotionRecords.findMany({
-        where: (records, { eq, and }) => and(
-          eq(records.userId, userId),
-          eq(records.testType, 'voice')
-        ),
-        with: {
-          voiceEmotions: true,
-          voiceRecognition: true
-        }
-      });
-
-      return records;
-    } catch (error) {
-      console.error('Error retrieving voice emotion data:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * 特定の評価セッションの感情データを取得する
-   */
-  static async getEmotionsByAssessmentId(assessmentId: string) {
-    try {
-      // スキーマを確認
-      await this.ensureSchemaExists();
+      if (!assessment) {
+        return { success: false, error: 'Assessment not found' };
+      }
       
-      const records = await db.query.emotionRecords.findMany({
-        where: (records, { eq }) => eq(records.assessmentId, assessmentId),
-        with: {
-          facialEmotions: true,
-          facialRecognition: true,
-          voiceEmotions: true,
-          voiceRecognition: true
-        }
+      // 顔の感情データの取得
+      const facialEmotions = await db.query.facialEmotionRecords.findMany({
+        where: (fields, { eq }) => eq(fields.assessmentId, assessmentId),
+        orderBy: (fields, { asc }) => [asc(fields.createdAt)],
       });
-
-      return records;
+      
+      // 音声の感情データの取得
+      const voiceEmotions = await db.query.voiceEmotionRecords.findMany({
+        where: (fields, { eq }) => eq(fields.assessmentId, assessmentId),
+        orderBy: (fields, { asc }) => [asc(fields.createdAt)],
+      });
+      
+      return { 
+        success: true,
+        data: {
+          assessment,
+          facialEmotions,
+          voiceEmotions
+        }
+      };
     } catch (error) {
-      console.error('Error retrieving emotion data by assessment ID:', error);
-      throw error;
+      console.error('Error retrieving emotion data:', error);
+      return { success: false, error };
     }
   }
 } 
