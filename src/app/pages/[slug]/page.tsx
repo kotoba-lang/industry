@@ -102,7 +102,7 @@ export default function Page() {
               </div>
               <p>(Bérut et al., 2012)</p>
 
-              <div className="w-full overflow-hidden">
+              <div className="w-full sticky left-0 right-0">
                 <KawasakiModel />
               </div>
 
@@ -112,13 +112,32 @@ export default function Page() {
               </div>
 
               <p><strong>Elements: (50)</strong></p>
-              <p className="word-list">
-                Word Association, head, green, water, to sing, dead, long, ship, to pay, window
-                and 41 more words including: tree, lamp, bread, flower, mountain, house, needle, 
-                swim, blue, friendly, cook, cold, stem, dance, village, lake, sick, pride, table, 
-                ink, angry, carpet, girl, high, salt, new, custom, pray, money, stupid, stork, 
-                false, rich, family, frog, part, hunger, white, child, attention, pencil
-              </p>
+              <div className="w-full overflow-x-auto -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8">
+                <table className="min-w-full divide-y divide-gray-200 border-collapse">
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    <tr className="bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Word Asso...</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">head</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">green</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">water</td>
+                    </tr>
+                    <tr className="bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">to sing</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">dead</td>
+                    </tr>
+                    <tr>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">long</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">ship</td>
+                    </tr>
+                    <tr className="bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">to pay</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">window</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
 
               <p>
                 <strong>Conventional Word2Vec:</strong> Quantify the strength of association using the
@@ -133,6 +152,7 @@ export default function Page() {
                 hyperparameter \alpha and define a modified probability function as
                 follows:
               </p>
+
 
               <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gradient-to-r from-blue-100 to-purple-100">
                 <JungVoiceAssessment numberOfWords={10} />
