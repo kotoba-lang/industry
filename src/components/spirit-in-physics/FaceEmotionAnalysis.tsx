@@ -59,8 +59,14 @@ const FaceEmotionAnalysis: React.FC = () => {
   //     }
   //   };
 
-    runFaceDetection();
-  }, []);
+    useEffect(() => {
+      const runFaceDetection = async () => {
+        // 実装がコメントアウトされています
+        console.log("Face detection would run here");
+      };
+
+      runFaceDetection();
+    }, []);
 
   return (
     <div className="relative w-full max-w-md mx-auto">
