@@ -158,6 +158,10 @@ export default function JungVoiceTest({
     emotionHistory 
   } = useHumeEmotion();
 
+  // Add missing state setters
+  const [averageReactionTime, setAverageReactionTime] = useState<number>(0);
+  const [delayedResponses, setDelayedResponses] = useState<number>(0);
+
   // コンポーネントのマウント状態を追跡
   useEffect(() => {
     isMountedRef.current = true;
@@ -547,8 +551,12 @@ export default function JungVoiceTest({
   }, []);
 
   // メッセージを追加
-  const addMessage = (text: string, role: string) => {
-    setMessages([...messages, { text, role }]);
+  const addMessage = (messages: Message | Message[]) => {
+    if (Array.isArray(messages)) {
+      setMessages(prev => [...prev, ...messages]);
+    } else {
+      setMessages(prev => [...prev, messages]);
+    }
   };
 
   // コンポーネントマウント時にユーザーIDを生成
@@ -765,7 +773,7 @@ export default function JungVoiceTest({
     
     if (isCorrect) {
       // 正解の場合は次に進む
-      recordResponse();
+      recordResponse(userResponse);
     } else {
       // 不正解の場合は同じ単語をやり直す
       setUserResponse('');
@@ -803,7 +811,8 @@ export default function JungVoiceTest({
       const testResults: TestResults = {
         responses: finalResponses,
         averageReactionTimeMs: avgReactionTime,
-        delayedResponseCount: delayedCount,
+        delayedResponsesCount: delayedCount,
+        totalWords: stimulusWords.length,
         completedAt: new Date()
       };
       
@@ -948,7 +957,7 @@ export default function JungVoiceTest({
         recognitionRef.current.onend = () => {
           setIsListening(false);
           if (userResponse.trim() !== '' && currentWordIndex >= 0 && isMountedRef.current) {
-            recordResponse();
+            recordResponse(userResponse);
           }
         };
         
@@ -1150,16 +1159,16 @@ export default function JungVoiceTest({
             <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md">
               <h4 className="font-medium mb-2 text-gray-800 dark:text-white">Conversation Log</h4>
               <div className="max-h-48 overflow-y-auto">
-                {messages.map((msg) => (
-                  <div 
-                    key={msg.id}
+                {messages.map((msg, index) => (
+                  <div
+                    key={index}
                     className={`mb-2 p-2 rounded-md ${
-                      msg.sender === 'assistant' ? 'bg-blue-100 text-left' : 'bg-green-100 text-right'
+                      msg.role === 'assistant' ? 'bg-blue-100 text-left' : 'bg-green-100 text-right'
                     }`}
                   >
-                    <p className="text-gray-800 dark:text-white">{msg.content}</p>
+                    <p className="text-gray-800 dark:text-white">{msg.text}</p>
                     <small className="text-xs text-gray-600 dark:text-gray-300">
-                      {msg.timestamp.toLocaleTimeString()}
+                      {new Date().toLocaleTimeString()}
                     </small>
                   </div>
                 ))}
