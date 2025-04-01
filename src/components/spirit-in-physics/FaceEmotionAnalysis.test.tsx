@@ -22,8 +22,11 @@ const mockCanvasContext = {
   drawImage: vi.fn()
 };
 
+// Mock canvas methods
 HTMLCanvasElement.prototype.getContext = vi.fn(() => mockCanvasContext as any);
-HTMLCanvasElement.prototype.toBlob = vi.fn((callback) => callback(new Blob(['mock data'], { type: 'image/jpeg' })));
+HTMLCanvasElement.prototype.toBlob = vi.fn((callback) => {
+  callback(new Blob(['mock data'], { type: 'image/jpeg' }));
+});
 
 describe('FaceEmotionAnalysis コンポーネント (優先度: 5)', () => {
   let mockHumeService: {
@@ -32,8 +35,20 @@ describe('FaceEmotionAnalysis コンポーネント (優先度: 5)', () => {
     closeConnection: vi.Mock;
   };
   
+  // Mock track stop function
+  const mockTrackStop = vi.fn();
+  
+  // Mock requestAnimationFrame and setTimeout
+  let requestAnimationFrameCallback: ((time: number) => void) | null = null;
+  let originalRequestAnimationFrame: typeof window.requestAnimationFrame;
+  let originalSetTimeout: typeof window.setTimeout;
+  
   beforeEach(() => {
     vi.resetAllMocks();
+    
+    // Save original functions
+    originalRequestAnimationFrame = window.requestAnimationFrame;
+    originalSetTimeout = window.setTimeout;
     
     // Mock environment variables
     vi.stubEnv('NEXT_PUBLIC_HUME_API_KEY', 'test-api-key');
@@ -58,21 +73,28 @@ describe('FaceEmotionAnalysis コンポーネント (優先度: 5)', () => {
     
     // Mock getUserMedia
     vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValue({
-      getTracks: () => [{ stop: vi.fn() }],
+      getTracks: () => [{ stop: mockTrackStop }],
     } as any);
     
-    // Mock window.requestAnimationFrame
-    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
-      cb(0);
-      return 0;
+    // Mock requestAnimationFrame to capture the callback
+    window.requestAnimationFrame = vi.fn((callback) => {
+      requestAnimationFrameCallback = callback;
+      return 1;
     });
     
-    // Mock setTimeout
-    vi.useFakeTimers();
+    // Mock setTimeout to execute callback immediately
+    window.setTimeout = vi.fn((callback: Function) => {
+      if (typeof callback === 'function') {
+        callback();
+      }
+      return 1 as any;
+    });
   });
   
   afterEach(() => {
-    vi.useRealTimers();
+    // Restore original functions
+    window.requestAnimationFrame = originalRequestAnimationFrame;
+    window.setTimeout = originalSetTimeout;
     vi.restoreAllMocks();
   });
   
@@ -91,20 +113,29 @@ describe('FaceEmotionAnalysis コンポーネント (優先度: 5)', () => {
     // カメラ開始ボタンをクリック
     fireEvent.click(screen.getByText('カメラを開始'));
     
-    // getUserMedia, initWebSocket が呼ばれたことを確認
+    // getUserMedia が呼ばれたことを確認
     expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({
       video: { width: 640, height: 480 },
       audio: false
     });
     
-    // Resolve all promises
-    await vi.runAllTimersAsync();
-    
-    // Check if initWebSocket was called
-    expect(mockHumeService.initWebSocket).toHaveBeenCalledWith(['face']);
+    // Wait for async operations to complete
+    await waitFor(() => {
+      expect(mockHumeService.initWebSocket).toHaveBeenCalledWith(['face']);
+    });
     
     // ボタンが「カメラを停止」に変わることを確認
     expect(screen.getByText('カメラを停止')).toBeInTheDocument();
+    
+    // Trigger the requestAnimationFrame callback to simulate frame processing
+    if (requestAnimationFrameCallback) {
+      act(() => {
+        requestAnimationFrameCallback(0);
+      });
+    }
+    
+    // Verify sendImageData was called
+    expect(mockHumeService.sendImageData).toHaveBeenCalled();
   });
   
   it('カメラ停止ボタンがクリックされたときにカメラを停止すること', async () => {
@@ -113,14 +144,19 @@ describe('FaceEmotionAnalysis コンポーネント (優先度: 5)', () => {
     // カメラを開始
     fireEvent.click(screen.getByText('カメラを開始'));
     
-    // Resolve all promises
-    await vi.runAllTimersAsync();
+    // Wait for async operations to complete
+    await waitFor(() => {
+      expect(screen.getByText('カメラを停止')).toBeInTheDocument();
+    });
     
     // カメラを停止
     fireEvent.click(screen.getByText('カメラを停止'));
     
     // closeConnection が呼ばれたことを確認
     expect(mockHumeService.closeConnection).toHaveBeenCalled();
+    
+    // Track.stop が呼ばれたことを確認
+    expect(mockTrackStop).toHaveBeenCalled();
     
     // ボタンが「カメラを開始」に戻ることを確認
     expect(screen.getByText('カメラを開始')).toBeInTheDocument();
@@ -132,8 +168,10 @@ describe('FaceEmotionAnalysis コンポーネント (優先度: 5)', () => {
     // カメラを開始
     fireEvent.click(screen.getByText('カメラを開始'));
     
-    // Resolve all promises
-    await vi.runAllTimersAsync();
+    // Wait for async operations to complete
+    await waitFor(() => {
+      expect(screen.getByText('カメラを停止')).toBeInTheDocument();
+    });
     
     // 感情データをシミュレート
     act(() => {
@@ -154,7 +192,7 @@ describe('FaceEmotionAnalysis コンポーネント (優先度: 5)', () => {
   
   it('getUserMediaが失敗したらエラーを表示すること', async () => {
     // getUserMediaを失敗するようにモック
-    vi.mocked(navigator.mediaDevices.getUserMedia).mockRejectedValue(
+    vi.mocked(navigator.mediaDevices.getUserMedia).mockRejectedValueOnce(
       new Error('カメラへのアクセスが拒否されました')
     );
     
@@ -163,11 +201,10 @@ describe('FaceEmotionAnalysis コンポーネント (優先度: 5)', () => {
     // カメラ開始ボタンをクリック
     fireEvent.click(screen.getByText('カメラを開始'));
     
-    // Resolve all promises
-    await vi.runAllTimersAsync();
-    
-    // エラーメッセージが表示されることを確認
-    expect(screen.getByText('カメラへのアクセスが許可されていません')).toBeInTheDocument();
+    // Wait for error message to appear
+    await waitFor(() => {
+      expect(screen.getByText('カメラへのアクセスが許可されていません')).toBeInTheDocument();
+    });
   });
   
   it('Hume APIキーが設定されていない場合はエラーを表示すること', async () => {

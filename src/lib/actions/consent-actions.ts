@@ -22,6 +22,10 @@ export async function saveConsentAndDemographicData(
   consent: ConsentRecord | null;
   demographic?: DemographicData | null;
 }> {
+  console.log("saveConsentAndDemographicData");
+  console.log(demographicInfo);
+  console.log(consentInfo);
+  console.log(contextInfo);
   try {
     const supabase = await createSupabaseServerClient();
 
