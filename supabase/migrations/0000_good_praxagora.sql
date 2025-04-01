@@ -1,4 +1,4 @@
-CREATE TABLE "consent_records" (
+CREATE TABLE IF NOT EXISTS "consent_records" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
@@ -11,7 +11,7 @@ CREATE TABLE "consent_records" (
 	"researcher_note" text
 );
 --> statement-breakpoint
-CREATE TABLE "demographic_data" (
+CREATE TABLE IF NOT EXISTS "demographic_data" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
@@ -25,7 +25,7 @@ CREATE TABLE "demographic_data" (
 	"consent_version" text
 );
 --> statement-breakpoint
-CREATE TABLE "emotion_data" (
+CREATE TABLE IF NOT EXISTS "emotion_data" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
 	"assessment_id" uuid NOT NULL,
@@ -38,7 +38,7 @@ CREATE TABLE "emotion_data" (
 	"timestamp" timestamp NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "face_emotion_data" (
+CREATE TABLE IF NOT EXISTS "face_emotion_data" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
 	"assessment_id" uuid NOT NULL,
