@@ -1,13 +1,16 @@
 import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { v4 as uuidv4 } from 'uuid';
 
+// スキーマを定義
+const schema = 'spirit_in_physics';
+
 /**
  * 人口統計データテーブル
  * CDISCに基づいて収集された人口統計情報を保存
  */
 export const demographicData = pgTable('demographic_data', {
   // 主キー
-  id: uuid('id').primaryKey().defaultFn(() => uuidv4()),
+  id: uuid('id').primaryKey().default(uuidv4()),
   
   // 基本情報
   userId: uuid('user_id').notNull(), // ユーザーの識別子
@@ -26,6 +29,11 @@ export const demographicData = pgTable('demographic_data', {
   // 研究関連のメタデータ
   studyId: text('study_id'), // 研究ID
   consentVersion: text('consent_version'), // 同意書バージョン
+}, (table) => {
+  return {
+    ...table,
+    schema,
+  };
 });
 
 // スキーマの型定義をエクスポート
