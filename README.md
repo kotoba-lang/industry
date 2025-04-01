@@ -81,3 +81,40 @@ Deploy it to the cloud with [Vercel](https://vercel.com/new?utm_source=github&ut
 # Notes
 
 `blog-starter` uses [Tailwind CSS](https://tailwindcss.com) [(v3.0)](https://tailwindcss.com/blog/tailwindcss-v3).
+
+# 環境構築と初期設定
+
+## Supabase セットアップ
+
+このプロジェクトは [Supabase](https://supabase.com) をデータベースとして使用しています。以下の手順でセットアップしてください。
+
+1. [Supabase](https://database.new) にアクセスし、新しいプロジェクトを作成します。
+2. プロジェクト作成後、SQL エディタで `supabase/migrations/20240602000000_create_consent_tables.sql` の内容を実行します。
+3. プロジェクト設定から API キーを取得します。
+4. `.env.local` ファイルを作成し、以下の環境変数を設定します：
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
+
+## 開発環境の起動
+
+```bash
+# 依存関係のインストール
+pnpm install
+
+# 開発サーバーの起動
+pnpm dev
+```
+
+## テスト
+
+```bash
+# テストの実行
+pnpm test
+```
+
+# プロジェクトについて
+
+Spirit in Physics は、ユングの言語連想テストとAIを組み合わせた研究プロジェクトです。
