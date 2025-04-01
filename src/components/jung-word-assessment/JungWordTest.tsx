@@ -150,7 +150,7 @@ export default function JungWordTest({
 
   return (
     <div className="max-w-2xl mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold mb-6 text-center text-gray-800 dark:text-white">Jung's Word Association Test (1910)</h2>
+      <h2 className="text-2xl font-bold mb-6 text-center text-gray-800 dark:text-white"> Spirit in Physics (Jung's Word Association Test Embedding Model)</h2>
       
       {currentWordIndex === -1 && !testComplete && (
         <div className="text-center">
