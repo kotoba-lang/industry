@@ -26,8 +26,13 @@ export function generateGraphDataFromVoiceAssessment(
 
   // Create field node (central node)
   const fieldName = "Jung Voice Association Field";
-  const nodes = [{ id: "voice_field", group: 4, name: fieldName }];
-  const links = [];
+  const nodes = [{ id: "voice_field", group: 4, name: fieldName, x: 0, y: 0, z: 0 }];
+  const links: {
+    source: string;
+    target: string;
+    strength: number;
+    name: string;
+  }[] = [];
 
   // Create nodes for each unique word (both stimulus and response)
   const uniqueWords = new Set<string>();

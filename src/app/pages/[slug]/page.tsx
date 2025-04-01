@@ -54,7 +54,7 @@ export default function Page() {
             coverImage={"/assets/posts/spirit-in-physics/cover.jpg"}
             date={"2024-11-30"}
             author={{
-              name: "Jun Kawasaki(root@junkawasaki.com), Kazuki Tainaka, Tomonori Takeuchi",
+              name: <>Jun Kawasaki(<a href="mailto:root@junkawasaki.com">root@junkawasaki.com</a>), Kazuki Tainaka, Tomonori Takeuchi</>,
               picture: "/assets/posts/authors/jk.jpg",
             }}
           />
@@ -207,8 +207,6 @@ export default function Page() {
                 4. Toyabe, S., Sagawa, T., Ueda, M., Muneyuki, E., & Sano, M. (2010). Experimental demonstration of information-to-energy conversion and validation of the generalized Jarzynski equality. Nature Physics, 6, 988–992.
               </p>
 
-              <h3>You Can Try Now</h3>
-              <p>Spirit in Physics(Emotional Anasytics)</p>
 
               <h3>Another Research / High-IQ Japanese GWAS: Explore IQ Genes</h3>
               <p>

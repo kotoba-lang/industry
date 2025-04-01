@@ -7,9 +7,9 @@ export interface GraphData {
     id: string
     group: number
     name: string
-    x?: number
-    y?: number
-    z?: number
+    x: number
+    y: number
+    z: number
   }[]
   links: {
     source: string
@@ -45,7 +45,7 @@ export function generateGraphData(
 
   // Create field node
   const fieldName = getFieldName(effectiveState.split("->")[0])
-  const nodes = [{ id: "field", group: 1, name: fieldName }]
+  const nodes = [{ id: "field", group: 1, name: fieldName, x: 0, y: 0, z: 0 }]
   const links = []
 
   // Generate particle name list
