@@ -1,4 +1,4 @@
-import { getConsentRecords, getDemographicData } from '@/lib/services/db/queries'
+import { createServerClient } from '@/lib/supabase/server'
 
 // Define interfaces for the data (should match the ones in queries.ts)
 interface ConsentRecord {
@@ -37,8 +37,24 @@ export default async function ConsentDataPage() {
   let error = null
 
   try {
-    consentData = await getConsentRecords()
-    demographicData = await getDemographicData()
+    const supabase = await createServerClient();
+    const { data: consentData, error: consentError } = await supabase
+      .from('consent_records')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (consentError) {
+      throw consentError;
+    }
+
+    const { data: demographicData, error: demographicError } = await supabase
+      .from('demographic_data')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (demographicError) {
+      throw demographicError;
+    }
   } catch (err) {
     console.error('Error fetching data:', err)
     error = err instanceof Error ? err.message : 'Unknown error occurred'
