@@ -18,6 +18,7 @@ import { PostHeader } from "@/app/_components/post-header";
 import KawasakiModel from "@/components/kawasaki-model";
 import JungWordTest from "@/components/jung-word-assessment/JungWordTest";
 import { JungVoiceAssessment } from "@/components/jung-voice-assessment";
+import JungIntegratedAssessment from "@/components/jung-integrated";
 
 export default function Page() {
   const dimvs = Array(0).fill("");
@@ -142,6 +143,7 @@ export default function Page() {
 
               <main className="flex min-h-screen flex-col items-center justify-center lg:p-12 sm:p-4 bg-gradient-to-r from-blue-100 to-purple-100">
                 <JungVoiceAssessment numberOfWords={10} />
+                <JungIntegratedAssessment numberOfWords={10} />
               </main>
 
               <h2>Measurement via Emotion Analytics (Quantitative Analysis)</h2>

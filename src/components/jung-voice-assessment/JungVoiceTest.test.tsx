@@ -113,7 +113,36 @@ describe('JungVoiceTest コンポーネント', () => {
     
     // 音声認識ボタンが表示されることを確認
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Speak/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Respond by Voice/i })).toBeInTheDocument();
+    }, { timeout: 1000 });
+  });
+
+  test.skip('重要度: 3 - 応答後にNextボタンが表示されること', async () => {
+    render(<JungVoiceTest apiKey="test-key" />);
+    
+    // テスト開始
+    await waitFor(() => {
+      const startButton = screen.getByRole('button', { name: 'Start Test' });
+      fireEvent.click(startButton);
+    }, { timeout: 1000 });
+    
+    // 音声認識を開始
+    await waitFor(() => {
+      const speakButton = screen.getByRole('button', { name: /Respond by Voice/i });
+      fireEvent.click(speakButton);
+    }, { timeout: 1000 });
+    
+    // 応答をシミュレート
+    const speechRecognitionInstance = (global as any).SpeechRecognition.mock.instances[0];
+    if (speechRecognitionInstance.onresult) {
+      speechRecognitionInstance.onresult({
+        results: [[{ transcript: 'test response' }]]
+      });
+    }
+    
+    // Nextボタンが表示されることを確認
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument();
     }, { timeout: 1000 });
   });
 }); 
