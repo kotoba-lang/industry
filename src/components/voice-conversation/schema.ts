@@ -13,8 +13,9 @@ export const VoiceConversationPropsSchema = z.object({
   voiceName: z.string().optional(),
   initialMessage: z.string().optional(),
   placeholder: z.string().optional(),
-  onMessageSent: z.function().args(z.string()).optional(),
-  onMessageReceived: z.function().args(z.string()).optional(),
+  speechRecognitionLang: z.string().optional(),
+  onMessageSent: z.function().args(z.string()).returns(z.void()).optional(),
+  onMessageReceived: z.function().args(z.string()).returns(z.void()).optional(),
   className: z.string().optional()
 });
 

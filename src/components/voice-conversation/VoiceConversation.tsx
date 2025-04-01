@@ -6,6 +6,24 @@ import { VoiceConversationProps, Message } from './types';
 import { VoiceConversationPropsSchema } from './schema';
 import { v4 as uuidv4 } from 'uuid';
 
+// Interface for the Web Speech API (not fully defined in TypeScript)
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+  onresult: (event: any) => void;
+  onerror: (event: any) => void;
+  onend: () => void;
+}
+
+interface Window {
+  SpeechRecognition: new () => SpeechRecognition;
+  webkitSpeechRecognition: new () => SpeechRecognition;
+}
+
 const VoiceConversation: React.FC<VoiceConversationProps> = (props) => {
   // Validate input props with Zod
   const validatedProps = VoiceConversationPropsSchema.parse(props);
@@ -16,6 +34,7 @@ const VoiceConversation: React.FC<VoiceConversationProps> = (props) => {
     voiceName = 'David Hume',
     initialMessage = 'Hello! How can I assist you today?',
     placeholder = 'Type your message here...',
+    speechRecognitionLang = 'ja-JP',
     onMessageSent,
     onMessageReceived,
     className = '',
@@ -29,6 +48,50 @@ const VoiceConversation: React.FC<VoiceConversationProps> = (props) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const humeClientRef = useRef<HumeClient | null>(null);
   const [isApiAvailable, setIsApiAvailable] = useState<boolean>(true);
+  
+  // Speech recognition states
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeechSupported, setIsSpeechSupported] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  // Check if speech recognition is supported
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    setIsSpeechSupported(!!SpeechRecognition);
+    
+    if (SpeechRecognition) {
+      recognitionRef.current = new SpeechRecognition();
+      if (recognitionRef.current) {
+        recognitionRef.current.continuous = false;
+        recognitionRef.current.interimResults = true;
+        recognitionRef.current.lang = speechRecognitionLang;
+        
+        recognitionRef.current.onresult = (event) => {
+          const transcript = Array.from(event.results)
+            .map((result: any) => result[0])
+            .map((result: any) => result.transcript)
+            .join('');
+          
+          setInputValue(transcript);
+        };
+        
+        recognitionRef.current.onerror = (event) => {
+          console.error('Speech recognition error', event);
+          setIsListening(false);
+        };
+        
+        recognitionRef.current.onend = () => {
+          setIsListening(false);
+        };
+      }
+    }
+    
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
+    };
+  }, [speechRecognitionLang]);
 
   // Initialize the Hume client
   useEffect(() => {
@@ -99,8 +162,8 @@ const VoiceConversation: React.FC<VoiceConversationProps> = (props) => {
 
   // Function to generate TTS audio using correct API format
   const generateSpeech = useCallback(async (text: string): Promise<string | null> => {
-    if (!humeClientRef.current || !isApiAvailable) {
-      console.warn('Speech generation skipped: Client not available or API disabled');
+    if (!isApiAvailable || !apiKey) {
+      console.warn('Speech generation skipped: API disabled or no API key');
       return null;
     }
     
@@ -109,36 +172,50 @@ const VoiceConversation: React.FC<VoiceConversationProps> = (props) => {
       
       console.log('Attempting to generate speech for text:', text);
       
-      // Using the TTS API directly according to the documentation
-      // https://dev.hume.ai/reference/text-to-speech-tts/synthesize-json
-      let response;
+      // Use direct fetch API call to Hume AI TTS endpoint
+      const apiUrl = 'https://api.hume.ai/v0/tts';
+      const headers = {
+        'X-Hume-Api-Key': apiKey,
+        'Content-Type': 'application/json'
+      };
       
-      try {
-        response = await humeClientRef.current.tts({
-          utterances: [
-            {
-              text: text,
-              description: voiceName // Use voiceName as description
-            }
-          ],
-          format: {
-            type: "mp3"
-          },
-          num_generations: 1
-        });
-        
-        console.log('TTS API call successful');
-      } catch (err) {
-        console.error('Error calling TTS API directly:', err);
-        throw err;
+      const requestData = {
+        utterances: [
+          {
+            text: text,
+            description: voiceName
+          }
+        ],
+        format: {
+          type: "mp3"
+        },
+        num_generations: 1
+      };
+      
+      console.log('Sending TTS request:', JSON.stringify(requestData));
+      
+      const fetchResponse = await fetch(apiUrl, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(requestData)
+      });
+      
+      if (!fetchResponse.ok) {
+        const errorText = await fetchResponse.text();
+        throw new Error(`HTTP error! status: ${fetchResponse.status}, message: ${errorText}`);
       }
       
-      console.log('Speech generated successfully, response:', response);
+      const response = await fetchResponse.json();
+      console.log('TTS API call successful');
       
       // The API returns a generations array with audio data in base64 format
       if (response && response.generations && response.generations.length > 0) {
         const generation = response.generations[0];
-        console.log('Generation data:', generation);
+        console.log('Generation info:', {
+          duration: generation.duration,
+          encoding: generation.encoding,
+          file_size: generation.file_size
+        });
         
         // Check if the response has audio property (base64 encoded)
         if (generation.audio) {
@@ -173,7 +250,7 @@ const VoiceConversation: React.FC<VoiceConversationProps> = (props) => {
     } finally {
       setIsLoading(false);
     }
-  }, [voiceName, isApiAvailable]);
+  }, [apiKey, voiceName, isApiAvailable]);
 
   // Handle sending a new message
   const handleSendMessage = async () => {
@@ -253,6 +330,20 @@ const VoiceConversation: React.FC<VoiceConversationProps> = (props) => {
     handleSendMessage();
   };
 
+  // Toggle speech recognition
+  const toggleListening = () => {
+    if (!recognitionRef.current) return;
+    
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      setInputValue('');
+      recognitionRef.current.start();
+      setIsListening(true);
+    }
+  };
+
   // Clean up audio URL objects when component unmounts
   useEffect(() => {
     return () => {
@@ -304,17 +395,32 @@ const VoiceConversation: React.FC<VoiceConversationProps> = (props) => {
         )}
       </div>
 
-      {/* Input form */}
+      {/* Input form with voice input button */}
       <form onSubmit={handleSubmit} className="border-t p-4">
         <div className="flex">
           <input
             type="text"
             value={inputValue}
             onChange={handleInputChange}
-            placeholder={placeholder}
+            placeholder={isListening ? '🎤 Listening...' : placeholder}
             disabled={isLoading}
             className="flex-1 border rounded-l-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          {isSpeechSupported && (
+            <button
+              type="button"
+              onClick={toggleListening}
+              disabled={isLoading}
+              className={`px-3 border-t border-b ${
+                isListening 
+                  ? 'bg-red-500 text-white border-red-500' 
+                  : 'bg-gray-100 text-gray-700 border-gray-300'
+              }`}
+              title={isListening ? 'Stop listening' : 'Start voice input'}
+            >
+              🎤
+            </button>
+          )}
           <button
             type="submit"
             disabled={isLoading || !inputValue.trim()}
@@ -333,6 +439,7 @@ const VoiceConversation: React.FC<VoiceConversationProps> = (props) => {
         Status: {isApiAvailable ? 
           'API Connected - Voice enabled' : 
           'API Not Available - Text only mode'}
+        {isSpeechSupported && ' | Speech Recognition Available'}
       </div>
     </div>
   );

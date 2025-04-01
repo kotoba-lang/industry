@@ -54,9 +54,10 @@ export default function VoiceConversationDemo() {
           
           <div className="p-2 bg-blue-50 text-blue-800 rounded-md mb-4 text-xs">
             <p className="font-semibold">Technical Note:</p>
-            <p>This component uses Hume AI's TTS API directly with the following request format:</p>
+            <p>This component uses Hume AI's REST API directly instead of the SDK methods due to type compatibility issues. Request format:</p>
             <pre className="mt-1 p-2 bg-gray-50 text-gray-700 overflow-auto text-xs rounded">
-{`{
+{`// POST to https://api.hume.ai/v0/tts
+{
   "utterances": [
     {
       "text": "Your message text",
@@ -69,6 +70,16 @@ export default function VoiceConversationDemo() {
   "num_generations": 1
 }`}
             </pre>
+            <p className="mt-2">
+              See <a href="https://dev.hume.ai/reference/text-to-speech-tts/synthesize-json" className="underline" target="_blank" rel="noopener noreferrer">official documentation</a> for more options.
+            </p>
+          </div>
+          
+          <div className="p-2 bg-purple-50 text-purple-800 rounded-md mb-4 text-xs">
+            <p className="font-semibold">Speech Recognition:</p>
+            <p>This demo now includes speech recognition functionality using the Web Speech API. Click the microphone button to start speaking, and your words will be transcribed into the input field.</p>
+            <p className="mt-1">Currently configured for Japanese language (ja-JP).</p>
+            <p className="mt-1 text-xs text-gray-600">Note: Speech recognition requires browser permission to access your microphone.</p>
           </div>
           
           <button
