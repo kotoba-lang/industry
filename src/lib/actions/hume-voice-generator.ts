@@ -24,6 +24,7 @@ export interface GenerateVoiceResponse {
     audioUrl?: string;
     filePath?: string;
     error?: string;
+    fileExists?: boolean;
 }
 
 /**
@@ -35,6 +36,50 @@ export async function generateAndSaveVoice(
     try {
         // バリデーション
         const validatedInput = GenerateVoiceInputSchema.parse(input);
+
+        // ファイル名を作成（指定されていなければテキストに基づいて生成）
+        const fileName = validatedInput.fileName ||
+            `${
+                validatedInput.text.substring(0, 20).replace(
+                    /[^a-z0-9]/gi,
+                    "_",
+                )
+            }_${uuidv4().substring(0, 8)}.mp3`;
+
+        // 保存先ディレクトリを確認し、存在しなければ作成
+        const audioDir = path.join(process.cwd(), "public", "audio");
+        if (!fs.existsSync(audioDir)) {
+            fs.mkdirSync(audioDir, { recursive: true });
+        }
+
+        // 既存のファイルをチェック - 同じテキストコンテンツを持つファイルがあるか確認
+        const existingFiles = fs.readdirSync(audioDir).filter((file) =>
+            file.endsWith(".mp3")
+        );
+
+        // 同じテキストで始まるファイル名を探す（ファイル名は「テキスト_UUID.mp3」の形式）
+        const textPrefix = validatedInput.text.substring(0, 20).replace(
+            /[^a-z0-9]/gi,
+            "_",
+        );
+        const matchingFile = existingFiles.find((file) =>
+            file.startsWith(textPrefix + "_") ||
+            file === validatedInput.fileName
+        );
+
+        // 同じ内容のファイルが既に存在する場合は、それを返す
+        if (matchingFile) {
+            const audioUrl = `/audio/${matchingFile}`;
+            const filePath = path.join(audioDir, matchingFile);
+
+            return {
+                success: true,
+                audioUrl,
+                filePath,
+                // 新規生成ではなく既存ファイルを使用したことを示す
+                fileExists: true,
+            };
+        }
 
         // Hume AIのTTSエンドポイントを呼び出す
         const apiUrl = "https://api.hume.ai/v0/tts";
@@ -86,21 +131,6 @@ export async function generateAndSaveVoice(
 
                 for (let i = 0; i < len; i++) {
                     bytes[i] = binaryString.charCodeAt(i);
-                }
-
-                // ファイル名を作成（指定されていなければテキストに基づいて生成）
-                const fileName = validatedInput.fileName ||
-                    `${
-                        validatedInput.text.substring(0, 20).replace(
-                            /[^a-z0-9]/gi,
-                            "_",
-                        )
-                    }_${uuidv4().substring(0, 8)}.mp3`;
-
-                // 保存先ディレクトリを確認し、存在しなければ作成
-                const audioDir = path.join(process.cwd(), "public", "audio");
-                if (!fs.existsSync(audioDir)) {
-                    fs.mkdirSync(audioDir, { recursive: true });
                 }
 
                 // 音声ファイルを保存
