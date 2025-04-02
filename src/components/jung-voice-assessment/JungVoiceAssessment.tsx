@@ -35,6 +35,7 @@ export default function JungVoiceAssessment({
   const [hasConsented, setHasConsented] = useState<boolean>(false);
   const [assessmentId] = useState<string>(uuidv4());
   const [userId, setUserId] = useState<string>('');
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
 
   // Kawasaki Model ストアから更新関数を取得
   const updateVoiceAssessment = useKawasakiStore(state => state.updateVoiceAssessment);
@@ -58,6 +59,7 @@ export default function JungVoiceAssessment({
   const handleTestComplete = (results: TestResults) => {
     setTestResults(results);
     setShowAnalysis(true);
+    setIsAnalyzing(false);
     
     // Kawasaki Model ストアに結果を反映
     try {
@@ -80,10 +82,12 @@ export default function JungVoiceAssessment({
   const handleRetakeTest = () => {
     setTestResults(null);
     setShowAnalysis(false);
+    setIsAnalyzing(false);
   };
 
   const handleConsent = () => {
     setHasConsented(true);
+    setIsAnalyzing(true);
   };
 
   return (
@@ -106,11 +110,11 @@ export default function JungVoiceAssessment({
               className={className}
             />
             
-            {showAnalysis && testResults && (
+            {(isAnalyzing || showAnalysis) && (
               <div className="mt-6">
                 <h2 className="text-2xl font-bold mb-3 text-center">Emotion Analysis</h2>
                 <p className="text-center mb-4 text-gray-600 dark:text-gray-300">
-                  Analysis of emotions based on facial expressions and voice tone during the test
+                  {isAnalyzing && !showAnalysis ? "Analyzing emotions in real-time based on facial expressions and voice tone" : "Analysis of emotions based on facial expressions and voice tone during the test"}
                 </p>
                 <EmotionAnalysis 
                   userId={userId}
