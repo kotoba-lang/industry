@@ -269,7 +269,7 @@ export default function ConsentForm({
       
       <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
         <p>This consent process complies with ICH-GCP (International Conference on Harmonisation - Good Clinical Practice) standards.</p>
-        <p>Approval number: Niigata University 2025-03 | Approval date: Marth 1, 2025</p>
+        <p>IRB Approval number: Niigata University 2024-0269 | Approval date: Marth 1, 2025</p>
       </div>
     </form>
   );
