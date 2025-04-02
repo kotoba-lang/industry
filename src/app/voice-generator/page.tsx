@@ -347,7 +347,7 @@ export default function VoiceGeneratorPage() {
                 id="apiKey"
                 type="password"
                 value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setApiKey(e.target.value)}
                 placeholder="sk_..."
                 className="font-mono"
               />
@@ -399,7 +399,7 @@ export default function VoiceGeneratorPage() {
                   <Input
                     id="singleText"
                     value={text}
-                    onChange={(e) => setText(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setText(e.target.value)}
                     placeholder="生成する単語やフレーズを入力..."
                   />
                 </div>
@@ -432,7 +432,7 @@ export default function VoiceGeneratorPage() {
                   <Textarea
                     id="multiText"
                     value={multilineText}
-                    onChange={(e) => setMultilineText(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setMultilineText(e.target.value)}
                     placeholder="生成する単語やフレーズを1行に1つずつ入力..."
                     rows={8}
                   />
