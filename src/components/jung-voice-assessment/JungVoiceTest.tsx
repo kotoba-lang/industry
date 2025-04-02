@@ -344,6 +344,34 @@ export default function JungVoiceTest({
 
   // 音声を生成して再生
   const generateAndPlaySpeech = useCallback(async (text: string, onAudioEnd?: () => void): Promise<void> => {
+    // Check if the text is a Jung stimulus word (needs audio file)
+    const isJungWord = JUNG_STIMULUS_WORDS.includes(text.toLowerCase());
+    
+    // If it's a Jung word, use the pre-recorded audio file
+    if (isJungWord) {
+      try {
+        const audioPath = `/audio/jung_${text.toLowerCase()}.mp3`;
+        console.log(`Using pre-recorded audio file: ${audioPath}`);
+        
+        // Create audio URL
+        const url = audioPath;
+        setAudioUrl(url);
+        
+        // Play audio
+        if (audioRef.current) {
+          playAudio(url, onAudioEnd);
+        } else if (onAudioEnd && isMountedRef.current) {
+          onAudioEnd();
+        }
+        
+        return;
+      } catch (err) {
+        console.error(`Error playing pre-recorded audio for "${text}":`, err);
+        // Fall back to API if there's an error with the audio file
+      }
+    }
+    
+    // For non-Jung words or if audio file playback failed, continue with API generation
     if (!isApiAvailable || !apiKey || !isMountedRef.current) {
       console.warn('Speech generation skipped: API disabled, no API key, or component unmounted');
       if (onAudioEnd) onAudioEnd();
@@ -628,6 +656,10 @@ export default function JungVoiceTest({
 
   // Function to generate speech
   const speakNextWord = async (text: string) => {
+    // For Jung stimulus words, modify the text parameter to just use the word itself
+    // This ensures we can match with the existing audio files
+    const wordOnly = JUNG_STIMULUS_WORDS.includes(text.toLowerCase()) ? text.toLowerCase() : text;
+    
     if (!isApiAvailable || !apiKey) {
       console.warn('Hume API is not available, using browser TTS instead');
       // Fallback to browser TTS
@@ -637,7 +669,7 @@ export default function JungVoiceTest({
     }
     
     // Use the existing generateAndPlaySpeech function
-    await generateAndPlaySpeech(text);
+    await generateAndPlaySpeech(wordOnly);
   };
 
   // テストリセット
@@ -727,7 +759,8 @@ export default function JungVoiceTest({
       
       // 適切なメッセージを選択
       const nextMessage = isDelayed ? AI_GUIDE_MESSAGES.delayed : AI_GUIDE_MESSAGES.normal;
-      await generateAndPlaySpeech(`${nextMessage} ${stimulusWords[currentWordIndex + 1]}`, () => {
+      // 次の単語のみを渡して音声を再生（nextMessage部分は含めない）
+      await generateAndPlaySpeech(stimulusWords[currentWordIndex + 1], () => {
         if (isMountedRef.current) {
           setStartTime(Date.now());
           startListening();

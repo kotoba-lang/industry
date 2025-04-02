@@ -88,7 +88,11 @@ export default function VoiceGeneratorPage() {
       });
 
       if (result.success && result.audioUrl) {
-        setSuccess(`音声が正常に生成されました: ${result.audioUrl}`);
+        if (result.fileExists) {
+          setSuccess(`同じ内容の音声ファイルが既に存在します: ${result.audioUrl}`);
+        } else {
+          setSuccess(`音声が正常に生成されました: ${result.audioUrl}`);
+        }
         setText('');
         fetchAudioFiles();
       } else {
@@ -126,6 +130,7 @@ export default function VoiceGeneratorPage() {
 
       let successCount = 0;
       let errorCount = 0;
+      let existingCount = 0;
 
       // 各行を順番に処理
       for (const line of lines) {
@@ -136,16 +141,31 @@ export default function VoiceGeneratorPage() {
         });
 
         if (result.success) {
-          successCount++;
+          if (result.fileExists) {
+            existingCount++;
+          } else {
+            successCount++;
+          }
         } else {
           errorCount++;
           console.error(`Failed to generate voice for text: "${line}"`, result.error);
         }
       }
 
-      if (successCount > 0) {
-        setSuccess(`${successCount}個の音声が正常に生成されました。${errorCount > 0 ? `${errorCount}個の音声生成に失敗しました。` : ''}`);
-        if (successCount === lines.length) {
+      if (successCount > 0 || existingCount > 0) {
+        let message = '';
+        if (successCount > 0) {
+          message += `${successCount}個の音声が正常に生成されました。`;
+        }
+        if (existingCount > 0) {
+          message += `${existingCount}個は既に存在していました。`;
+        }
+        if (errorCount > 0) {
+          message += `${errorCount}個の音声生成に失敗しました。`;
+        }
+        
+        setSuccess(message);
+        if (successCount + existingCount === lines.length) {
           setMultilineText('');
         }
         fetchAudioFiles();
@@ -174,6 +194,7 @@ export default function VoiceGeneratorPage() {
     try {
       let successCount = 0;
       let errorCount = 0;
+      let existingCount = 0;
 
       // 各刺激語を処理
       for (const word of JUNG_STIMULUS_WORDS) {
@@ -185,15 +206,30 @@ export default function VoiceGeneratorPage() {
         });
 
         if (result.success) {
-          successCount++;
+          if (result.fileExists) {
+            existingCount++;
+          } else {
+            successCount++;
+          }
         } else {
           errorCount++;
           console.error(`Failed to generate voice for Jung word: "${word}"`, result.error);
         }
       }
 
+      let message = '';
       if (successCount > 0) {
-        setSuccess(`${successCount}個のユング刺激語の音声が正常に生成されました。${errorCount > 0 ? `${errorCount}個の音声生成に失敗しました。` : ''}`);
+        message += `${successCount}個のユング刺激語の音声が新規生成されました。`;
+      }
+      if (existingCount > 0) {
+        message += `${existingCount}個は既に存在していました。`;
+      }
+      if (errorCount > 0) {
+        message += `${errorCount}個の音声生成に失敗しました。`;
+      }
+
+      if (successCount > 0 || existingCount > 0) {
+        setSuccess(message);
         setUploadedJungWords(true);
         fetchAudioFiles();
       } else {
