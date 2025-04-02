@@ -46,7 +46,7 @@ interface SpeechRecognition extends EventTarget {
 }
 
 // ユングの100の刺激語（1910年の論文より）
-const JUNG_STIMULUS_WORDS = [
+export const JUNG_STIMULUS_WORDS = [
   'head', 'green', 'water', 'to sing', 'dead', 'long', 'ship', 'to pay', 'window', 'friendly',
   'to cook', 'to ask', 'cold', 'stem', 'to dance', 'village', 'lake', 'sick', 'pride', 'to cook',
   'ink', 'angry', 'needle', 'to swim', 'voyage', 'blue', 'lamp', 'to sin', 'bread', 'rich',
