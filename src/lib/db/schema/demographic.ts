@@ -31,7 +31,7 @@ export const demographicData = pgTable("demographic_data", {
     ...table,
     schema: SCHEMA,
   };
-});
+}).enableRLS();
 
 // スキーマの型定義をエクスポート
 export type DemographicData = typeof demographicData.$inferSelect;

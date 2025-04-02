@@ -30,7 +30,7 @@ export const emotionData = pgTable("emotion_data", {
     ...table,
     schema: SCHEMA,
   };
-});
+}).enableRLS();
 
 /**
  * 顔の感情データテーブル
@@ -60,7 +60,7 @@ export const faceEmotionData = pgTable("face_emotion_data", {
     ...table,
     schema: SCHEMA,
   };
-});
+}).enableRLS();
 
 // スキーマの型定義をエクスポート
 export type EmotionData = typeof emotionData.$inferSelect;
