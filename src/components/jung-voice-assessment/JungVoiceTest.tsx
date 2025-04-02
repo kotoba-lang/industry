@@ -344,6 +344,43 @@ export default function JungVoiceTest({
 
   // 音声を生成して再生
   const generateAndPlaySpeech = useCallback(async (text: string, onAudioEnd?: () => void): Promise<void> => {
+    // Check if the text matches one of the AI guide messages
+    let audioPath = '';
+    
+    // Map the guide messages to their audio files
+    if (text === AI_GUIDE_MESSAGES.introduction) {
+      audioPath = '/audio/Welcome_to_Spirit_in_e4385e4e.mp3';
+    } else if (text === AI_GUIDE_MESSAGES.nextWord || 
+               text === AI_GUIDE_MESSAGES.delayed || 
+               text === AI_GUIDE_MESSAGES.normal) {
+      audioPath = '/audio/Next_word__b88adeeb.mp3';
+    } else if (text === AI_GUIDE_MESSAGES.testComplete) {
+      audioPath = '/audio/The_test_is_now_comp_279d0df1.mp3';
+    }
+    
+    // If we have a matching audio file for the guide message
+    if (audioPath) {
+      try {
+        console.log(`Using pre-recorded audio file for guide message: ${audioPath}`);
+        
+        // Create audio URL
+        const url = audioPath;
+        setAudioUrl(url);
+        
+        // Play audio
+        if (audioRef.current) {
+          playAudio(url, onAudioEnd);
+        } else if (onAudioEnd && isMountedRef.current) {
+          onAudioEnd();
+        }
+        
+        return;
+      } catch (err) {
+        console.error(`Error playing pre-recorded audio for guide message:`, err);
+        // Fall back to API if there's an error with the audio file
+      }
+    }
+    
     // Check if the text is a Jung stimulus word (needs audio file)
     const isJungWord = JUNG_STIMULUS_WORDS.includes(text.toLowerCase());
     
@@ -656,6 +693,9 @@ export default function JungVoiceTest({
 
   // Function to generate speech
   const speakNextWord = async (text: string) => {
+    // Check if the text matches one of the AI guide messages
+    const isGuideMessage = Object.values(AI_GUIDE_MESSAGES).includes(text);
+    
     // For Jung stimulus words, modify the text parameter to just use the word itself
     // This ensures we can match with the existing audio files
     const wordOnly = JUNG_STIMULUS_WORDS.includes(text.toLowerCase()) ? text.toLowerCase() : text;
