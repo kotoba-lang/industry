@@ -137,7 +137,7 @@ export default function FaceEmotionAnalysisRest() {
       const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8);
       
       // Update debug info
-      setDebugInfo(prev => `${prev}\n画像を取得しました。Hume APIに送信中...`);
+      setDebugInfo(`画像を取得しました。Hume APIに送信中... (${new Date().toLocaleTimeString()})`);
       
       // Send to Hume API
       const result = await analyzeFaceEmotion(imageDataUrl, apiKey);
@@ -155,8 +155,12 @@ export default function FaceEmotionAnalysisRest() {
         if (result.emotions) {
           setEmotions(result.emotions.sort((a, b) => b.score - a.score));
           setDebugInfo(`最終更新: ${new Date().toLocaleTimeString()}\n感情分析が完了しました`);
+        } else if (result.predictions && result.predictions.emotions) {
+          // Handle alternative response structure
+          setEmotions(result.predictions.emotions.sort((a, b) => b.score - a.score));
+          setDebugInfo(`最終更新: ${new Date().toLocaleTimeString()}\n感情分析が完了しました (新フォーマット)`);
         } else {
-          setDebugInfo(prev => `${prev}\n感情データがレスポンスに含まれていません`);
+          setDebugInfo(prev => `${prev}\n感情データがレスポンスに含まれていません\n受信データ: ${JSON.stringify(result).substring(0, 100)}...`);
         }
       }
     } catch (err) {
@@ -187,6 +191,16 @@ export default function FaceEmotionAnalysisRest() {
   
   return (
     <div className="flex flex-col items-center">
+      {/* API Information Alert */}
+      <div className="mb-6 p-3 bg-blue-100 text-blue-800 rounded-md w-full max-w-2xl">
+        <h3 className="font-bold mb-1">Hume API 情報</h3>
+        <p className="text-sm">
+          Hume の REST API はバッチ処理方式で、結果を取得するには複数回のリクエストが必要です。
+          このデモでは、画像の送信と処理リクエストの開始のみを行います。
+          実際のアプリケーションでは、ジョブの状態をポーリングして結果を取得する必要があります。
+        </p>
+      </div>
+      
       <div className="relative w-full max-w-2xl px-2 sm:px-4">
         <video
           ref={videoRef}
@@ -259,7 +273,14 @@ export default function FaceEmotionAnalysisRest() {
       
       {error && (
         <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-md w-full max-w-2xl">
-          {error}
+          <h3 className="font-bold mb-1">エラー</h3>
+          <p>{error}</p>
+          {error.includes && error.includes('batch API') && (
+            <p className="mt-2 text-sm">
+              これはエラーではなく、Hume API の仕様によるものです。
+              詳細はサーバーログを確認してください。
+            </p>
+          )}
         </div>
       )}
       

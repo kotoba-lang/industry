@@ -8,7 +8,7 @@ import { HumeFaceResponse, HumeVoiceResponse } from "./hume-service";
  */
 
 // The Hume API endpoint for face emotion analysis
-const HUME_FACE_API_URL = "https://api.hume.ai/v0/models/face";
+const HUME_API_ENDPOINT = "https://api.hume.ai/v0/batch/jobs";
 
 // Error response type from Hume API
 interface HumeErrorResponse {
@@ -19,7 +19,7 @@ interface HumeErrorResponse {
 }
 
 /**
- * Send an image to Hume API for face emotion analysis
+ * Send an image to Hume API for face emotion analysis via the REST API
  * @param imageData Base64 encoded image data (without data:image/jpeg;base64, prefix)
  * @param apiKey Hume API key
  * @returns Face emotion analysis result or error
@@ -41,18 +41,22 @@ export async function analyzeFaceEmotion(
             imageData = base64Content;
         }
 
-        // API request options
-        const response = await fetch(HUME_FACE_API_URL, {
+        console.log(
+            "Sending request to Hume API using the batch/jobs endpoint...",
+        );
+
+        // API request options based on Hume documentation
+        const response = await fetch(HUME_API_ENDPOINT, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "X-API-Key": apiKey,
+                "X-Hume-Api-Key": apiKey,
             },
             body: JSON.stringify({
-                data: imageData,
                 models: {
                     face: {},
                 },
+                data: imageData,
             }),
         });
 
@@ -63,7 +67,7 @@ export async function analyzeFaceEmotion(
                 const errorData = (await response.json()) as HumeErrorResponse;
                 return {
                     error: `Hume API error (${response.status}): ${
-                        errorData.error.message || "Unknown API error"
+                        errorData.error?.message || "Unknown API error"
                     }`,
                 };
             } catch (e) {
@@ -75,15 +79,22 @@ export async function analyzeFaceEmotion(
         }
 
         // Parse the response
-        const data = await response.json();
+        const jobData = await response.json();
+        console.log("Hume API job creation response:", jobData);
 
-        // Check if the response is valid
-        if (!data || !data.face) {
-            return { error: "Invalid response from Hume API" };
+        // For the batch API, we need to check the job status until it's complete
+        if (!jobData.job_id) {
+            return {
+                error: "Invalid response from Hume API - no job ID returned",
+            };
         }
 
-        // Return the face emotion data
-        return data.face as HumeFaceResponse;
+        // This is an asynchronous API, we would need to poll for results
+        // For this demo, we'll return a message explaining the situation
+        return {
+            error:
+                "The Hume batch API requires polling for results. This implementation only shows how to submit jobs. Please check server logs for the job ID and use the Hume dashboard to view results.",
+        };
     } catch (error) {
         console.error("Error analyzing face emotion:", error);
         return {
