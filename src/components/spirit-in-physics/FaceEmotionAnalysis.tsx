@@ -26,8 +26,32 @@ export default function FaceEmotionAnalysis() {
     if (!apiKey) {
       setError('Hume API キーが設定されていません。.env.local ファイルに NEXT_PUBLIC_HUME_API_KEY を追加してください。');
       console.warn('Missing Hume API key in environment variables');
+      setDebugInfo('エラー: Hume API キーが環境変数に設定されていません');
       return;
     }
+    
+    // Add more detailed API key validation
+    if (apiKey.length < 20) {
+      setError(`Hume API キーが短すぎます (${apiKey.length} 文字)。正しいAPIキーを設定してください。`);
+      console.warn(`API key is too short: ${apiKey.length} characters`);
+      setDebugInfo(`エラー: API キーの長さが不十分です (${apiKey.length} 文字)`);
+      return;
+    }
+    
+    if (!apiKey.match(/^[a-zA-Z0-9_\-]+$/)) {
+      setError('Hume API キーの形式が正しくありません。正しいAPIキーを設定してください。');
+      console.warn('API key has invalid format');
+      setDebugInfo('エラー: API キーの形式が無効です');
+      return;
+    }
+    
+    // Log the environment variables status (without revealing the actual key)
+    console.log('Environment variables check:', { 
+      apiKeyPresent: !!apiKey,
+      apiKeyLength: apiKey.length, 
+      apiKeyFormatValid: !!apiKey.match(/^[a-zA-Z0-9_\-]+$/),
+      nextPublicVars: Object.keys(process.env).filter(key => key.startsWith('NEXT_PUBLIC_')).length
+    });
     
     // セキュリティチェック: APIキーが一般公開されていないことを確認
     if (typeof window !== 'undefined') {
@@ -64,6 +88,23 @@ export default function FaceEmotionAnalysis() {
       } else if (error instanceof Event) {
         console.error('Hume API WebSocket event error:', { type: error.type, target: error.target });
         setError('Hume API WebSocketとの接続中にエラーが発生しました');
+      } else if (error && typeof error === 'object' && 'type' in error && error.type === 'WebSocketError') {
+        // Handle custom WebSocket error object
+        console.error('Hume API WebSocket custom error:', error);
+        const errorObj = error as any;
+        const networkStatus = errorObj.networkStatus || {};
+        
+        let errorMessage = 'WebSocket接続エラー';
+        if (errorObj.message) {
+          errorMessage += `: ${errorObj.message}`;
+        }
+        
+        // Add network information to help debugging
+        if (networkStatus.online === false) {
+          errorMessage += ' - インターネット接続がオフラインです';
+        }
+        
+        setError(errorMessage);
       } else {
         // Handle empty or unknown error object
         console.error('Hume API unknown error:', error || 'Empty error object');
