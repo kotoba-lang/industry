@@ -2,8 +2,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev",
+    "dev:turbo": "next dev --turbopack",
     "dev:secure": "node server.js",
+    "secure": "pnpm dev:secure",
     "check": "tsc --noEmit",
     "check:watch": "tsc --noEmit --watch",
     "build": "next build",
