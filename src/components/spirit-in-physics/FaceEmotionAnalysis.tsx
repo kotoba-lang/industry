@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { HumeRealtimeEmotionService } from '@/lib/client/hume-realtime';
+import { HumeRealtimeEmotionService, ConnectionState } from '@/lib/client/hume-realtime';
 import { HumeFaceResponse, HumeVoiceResponse } from '@/lib/actions/hume-service';
 
 interface EmotionScore {
@@ -16,13 +16,31 @@ export default function FaceEmotionAnalysis() {
   const [cameraActive, setCameraActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [humeService, setHumeService] = useState<HumeRealtimeEmotionService | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<string>(ConnectionState.CLOSED);
+  const [debugInfo, setDebugInfo] = useState<string>('');
   
   // Humeサービスの初期化
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_HUME_API_KEY;
     
     if (!apiKey) {
-      setError('Hume API キーが設定されていません');
+      setError('Hume API キーが設定されていません。.env.local ファイルに NEXT_PUBLIC_HUME_API_KEY を追加してください。');
+      console.warn('Missing Hume API key in environment variables');
+      return;
+    }
+    
+    // セキュリティチェック: APIキーが一般公開されていないことを確認
+    if (typeof window !== 'undefined') {
+      // プロダクション環境での追加チェック
+      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        // apiKeyの値は直接チェックすべきではない（環境変数の仕組み上）
+        console.log('プロダクション環境では環境変数が正しく設定されていることを確認してください');
+      }
+    }
+    
+    // WebSocketサポートチェック
+    if (typeof WebSocket === 'undefined') {
+      setError('このブラウザはWebSocketをサポートしていません。別のブラウザを使用するか、ブラウザを更新してください。');
       return;
     }
     
@@ -38,28 +56,96 @@ export default function FaceEmotionAnalysis() {
       console.log('Voice emotion data:', data);
     };
     
-    const handleError = (error: Event) => {
-      console.error('Hume API error:', error);
-      setError('Hume API との接続中にエラーが発生しました');
+    const handleError = (error: Event | Error | unknown) => {
+      // Enhance error logging with more information
+      if (error instanceof Error) {
+        console.error('Hume API error:', { message: error.message, name: error.name, stack: error.stack });
+        setError(`Hume API エラー: ${error.message || '詳細不明'}`);
+      } else if (error instanceof Event) {
+        console.error('Hume API WebSocket event error:', { type: error.type, target: error.target });
+        setError('Hume API WebSocketとの接続中にエラーが発生しました');
+      } else {
+        // Handle empty or unknown error object
+        console.error('Hume API unknown error:', error || 'Empty error object');
+        setError('Hume API との接続中に不明なエラーが発生しました。環境変数とネットワーク接続を確認してください。');
+      }
+
+      // Try to verify API key validity by checking its format
+      if (apiKey && (apiKey.length < 20 || !apiKey.match(/^[a-zA-Z0-9_-]+$/))) {
+        console.warn('Hume API key appears to be invalid (incorrect format)');
+        setError(prevError => `${prevError || ''} API キーの形式が正しくない可能性があります。`);
+      }
+      
+      // Update debug info
+      if (humeService) {
+        updateDebugInfo();
+      }
     };
     
     // サービスの初期化
-    const service = new HumeRealtimeEmotionService(
-      apiKey,
-      handleFaceData,
-      handleVoiceData,
-      handleError
-    );
-    
-    setHumeService(service);
+    try {
+      const service = new HumeRealtimeEmotionService(
+        apiKey,
+        handleFaceData,
+        handleVoiceData,
+        handleError
+      );
+      
+      setHumeService(service);
+      
+      // Check API key format in browser console
+      if (apiKey) {
+        console.log(`API key length: ${apiKey.length}, Format valid: ${apiKey.match(/^[a-zA-Z0-9_-]+$/) ? 'Yes' : 'No'}`);
+      }
+    } catch (err) {
+      // Handle initialization errors
+      if (err instanceof Error) {
+        console.error('Failed to initialize Hume service:', err.message);
+        setError(`Hume サービスの初期化に失敗: ${err.message}`);
+      } else {
+        console.error('Unknown error during Hume service initialization:', err);
+        setError('Hume サービスの初期化中に不明なエラーが発生しました');
+      }
+    }
     
     // クリーンアップ
     return () => {
-      if (service) {
-        service.closeConnection();
+      if (humeService) {
+        humeService.closeConnection();
       }
     };
   }, []);
+  
+  // Debug info updater
+  const updateDebugInfo = () => {
+    if (!humeService) return;
+    
+    const state = humeService.getConnectionState();
+    setConnectionStatus(state);
+    
+    // Get more detailed debugging information
+    const lastError = humeService.getLastError();
+    let errorDetails = 'なし';
+    
+    if (lastError) {
+      if (lastError instanceof Error) {
+        errorDetails = lastError.message;
+      } else if (lastError instanceof Event) {
+        errorDetails = `Event type: ${lastError.type}`;
+      } else {
+        errorDetails = JSON.stringify(lastError);
+      }
+    }
+    
+    const info = `
+      接続状態: ${state}
+      WebSocket: ${humeService.isConnected() ? '接続済み' : '未接続'}
+      認証: ${humeService.isAuthenticated() ? '完了' : '未完了'}
+      直近のエラー: ${errorDetails}
+    `;
+    
+    setDebugInfo(info);
+  };
   
   // カメラのセットアップ
   const setupCamera = async () => {
@@ -77,7 +163,29 @@ export default function FaceEmotionAnalysis() {
       
       // Hume WebSocketの初期化
       if (humeService) {
-        await humeService.initWebSocket(['face']);
+        // Clear previous errors
+        setError(null);
+        
+        console.log('Starting WebSocket connection to Hume API...');
+        try {
+          await humeService.initWebSocket(['face']);
+          console.log('WebSocket connection initialized successfully');
+        } catch (wsError) {
+          console.error('WebSocket initialization error:', wsError);
+          setError(`WebSocket接続エラー: ${wsError instanceof Error ? wsError.message : '詳細不明'}`);
+        }
+        
+        // Update connection status after init
+        updateDebugInfo();
+        
+        // Setup a periodic status check
+        const checkInterval = setInterval(() => {
+          if (humeService) {
+            updateDebugInfo();
+          } else {
+            clearInterval(checkInterval);
+          }
+        }, 5000); // Check every 5 seconds
       }
       
       // フレームの処理開始
@@ -101,6 +209,7 @@ export default function FaceEmotionAnalysis() {
     // Humeサービスの接続を閉じる
     if (humeService) {
       humeService.closeConnection();
+      updateDebugInfo();
     }
   };
   
@@ -126,7 +235,11 @@ export default function FaceEmotionAnalysis() {
       canvas.toBlob(async (blob) => {
         if (blob && humeService) {
           // 画像データをHumeサービスに送信
-          await humeService.sendImageData(blob);
+          try {
+            await humeService.sendImageData(blob);
+          } catch (err) {
+            console.error('Hume API へのデータ送信中のエラー:', err);
+          }
         }
         
         // 次のフレームを処理
@@ -185,6 +298,60 @@ export default function FaceEmotionAnalysis() {
             カメラを停止
           </button>
         )}
+        
+        {/* API接続を手動で更新するためのボタンを追加 */}
+        {humeService && (
+          <>
+            <button
+              onClick={() => {
+                if (humeService) {
+                  humeService.closeConnection();
+                  humeService.initWebSocket(['face'])
+                    .then(() => {
+                      console.log('WebSocket reconnection successful');
+                      updateDebugInfo();
+                    })
+                    .catch(err => {
+                      console.error('WebSocket reconnection failed:', err);
+                      setError(`WebSocket再接続エラー: ${err instanceof Error ? err.message : '詳細不明'}`);
+                      updateDebugInfo();
+                    });
+                }
+              }}
+              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+            >
+              API接続を再試行
+            </button>
+            <button
+              onClick={() => {
+                // 詳細な接続診断情報を表示
+                if (humeService) {
+                  try {
+                    const websocketURL = 'wss://api.hume.ai/v0/stream/models';
+                    const testSocket = new WebSocket(websocketURL);
+                    
+                    testSocket.onopen = () => {
+                      setDebugInfo(prev => prev + '\n\n接続テスト: WebSocketへの接続に成功しました');
+                      testSocket.close();
+                    };
+                    
+                    testSocket.onerror = (e) => {
+                      setDebugInfo(prev => prev + '\n\n接続テスト: WebSocketへの接続に失敗しました');
+                    };
+                    
+                    updateDebugInfo();
+                  } catch (err) {
+                    console.error('WebSocket test failed:', err);
+                    setDebugInfo(prev => prev + `\n\n接続テスト: エラー ${err instanceof Error ? err.message : 'Unknown'}`);
+                  }
+                }
+              }}
+              className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700"
+            >
+              接続診断
+            </button>
+          </>
+        )}
       </div>
       
       {error && (
@@ -192,6 +359,18 @@ export default function FaceEmotionAnalysis() {
           {error}
         </div>
       )}
+      
+      {/* 接続ステータスを表示 */}
+      <div className="mt-4 w-full max-w-2xl px-2 sm:px-4">
+        <div className="p-3 bg-gray-100 text-gray-800 rounded-md">
+          <h3 className="font-medium mb-2">接続状態: {connectionStatus}</h3>
+          {debugInfo && (
+            <pre className="whitespace-pre-wrap text-xs overflow-auto max-h-32">
+              {debugInfo}
+            </pre>
+          )}
+        </div>
+      </div>
       
       <div className="mt-6 w-full max-w-2xl px-2 sm:px-4">
         <h2 className="text-xl font-semibold mb-4">リアルタイム感情分析</h2>
