@@ -68,7 +68,7 @@ export default function Page() {
 
               <h2>Introduction: Structuring and Quantifying Human Spirit Using the Informational Vector Space</h2>
               
-              <h3>Hypothesis 1</h3>
+              <h3 className="text-sm">Hypothesis 1</h3>
               <p>
                 <strong>Information is Physics:</strong> Information is inherently physical—it obeys
                 the laws of thermodynamics and directly influences energy

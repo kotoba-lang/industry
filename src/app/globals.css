@@ -2,88 +2,100 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Tailwindのディレクティブをインポート - ベーススタイル、コンポーネント、ユーティリティクラスを使用可能にする */
+
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem
-  ;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%}
-  .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%
-  ;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%}
-}
-@layer base {
-  * {
-    @apply border-border;
+    /* ライトモードのデフォルトカラーテーマ変数 */
+    --background: 0 0% 100%;        /* 背景色: 白 */
+    --foreground: 0 0% 3.9%;        /* 前景色: ほぼ黒 */
+    --card: 0 0% 100%;              /* カード背景: 白 */
+    --card-foreground: 0 0% 3.9%;   /* カード前景: ほぼ黒 */
+    --popover: 0 0% 100%;           /* ポップオーバー背景: 白 */
+    --popover-foreground: 0 0% 3.9%; /* ポップオーバー前景: ほぼ黒 */
+    --primary: 0 0% 9%;             /* プライマリー色: 暗めのグレー */
+    --primary-foreground: 0 0% 98%; /* プライマリー前景: ほぼ白 */
+    --secondary: 0 0% 96.1%;        /* セカンダリー色: 薄いグレー */
+    --secondary-foreground: 0 0% 9%; /* セカンダリー前景: 暗めのグレー */
+    --muted: 0 0% 96.1%;            /* ミュート色: 薄いグレー */
+    --muted-foreground: 0 0% 45.1%; /* ミュート前景: 中間グレー */
+    --accent: 0 0% 96.1%;           /* アクセント色: 薄いグレー */
+    --accent-foreground: 0 0% 9%;   /* アクセント前景: 暗めのグレー */
+    --destructive: 0 84.2% 60.2%;   /* 破壊的アクション色: 赤 */
+    --destructive-foreground: 0 0% 98%; /* 破壊的アクション前景: ほぼ白 */
+    --border: 0 0% 89.8%;           /* ボーダー色: 薄いグレー */
+    --input: 0 0% 89.8%;            /* 入力要素色: 薄いグレー */
+    --ring: 0 0% 3.9%;              /* フォーカスリング色: ほぼ黒 */
+    --chart-1: 12 76% 61%;          /* チャート色1: オレンジ系 */
+    --chart-2: 173 58% 39%;         /* チャート色2: ティール系 */
+    --chart-3: 197 37% 24%;         /* チャート色3: 暗い青緑系 */
+    --chart-4: 43 74% 66%;          /* チャート色4: 黄色系 */
+    --chart-5: 27 87% 67%;          /* チャート色5: オレンジ系 */
+    --radius: 0.5rem;               /* 角丸の半径 */
+    
+    /* サイドバー専用のカラー変数 */
+    --sidebar-background: 0 0% 98%;  /* サイドバー背景: ほぼ白 */
+    --sidebar-foreground: 240 5.3% 26.1%; /* サイドバー前景: 暗いグレー */
+    --sidebar-primary: 240 5.9% 10%; /* サイドバープライマリー: 非常に暗いグレー */
+    --sidebar-primary-foreground: 0 0% 98%; /* サイドバープライマリー前景: ほぼ白 */
+    --sidebar-accent: 240 4.8% 95.9%; /* サイドバーアクセント: 薄いグレー */
+    --sidebar-accent-foreground: 240 5.9% 10%; /* サイドバーアクセント前景: 非常に暗いグレー */
+    --sidebar-border: 220 13% 91%;   /* サイドバーボーダー: 薄いグレー */
+    --sidebar-ring: 217.2 91.2% 59.8%; /* サイドバーリング: 青系 */
   }
-  body {
-    @apply bg-background text-foreground;
+  
+  .dark {
+    /* ダークモードのカラーテーマ変数 */
+    --background: 0 0% 3.9%;        /* 背景色: ほぼ黒 */
+    --foreground: 0 0% 98%;         /* 前景色: ほぼ白 */
+    --card: 0 0% 3.9%;              /* カード背景: ほぼ黒 */
+    --card-foreground: 0 0% 98%;    /* カード前景: ほぼ白 */
+    --popover: 0 0% 3.9%;           /* ポップオーバー背景: ほぼ黒 */
+    --popover-foreground: 0 0% 98%; /* ポップオーバー前景: ほぼ白 */
+    --primary: 0 0% 98%;            /* プライマリー色: ほぼ白 */
+    --primary-foreground: 0 0% 9%;  /* プライマリー前景: 暗めのグレー */
+    --secondary: 0 0% 14.9%;        /* セカンダリー色: 暗いグレー */
+    --secondary-foreground: 0 0% 98%; /* セカンダリー前景: ほぼ白 */
+    --muted: 0 0% 14.9%;            /* ミュート色: 暗いグレー */
+    --muted-foreground: 0 0% 63.9%; /* ミュート前景: 明るめのグレー */
+    --accent: 0 0% 14.9%;           /* アクセント色: 暗いグレー */
+    --accent-foreground: 0 0% 98%;  /* アクセント前景: ほぼ白 */
+    --destructive: 0 62.8% 30.6%;   /* 破壊的アクション色: 暗い赤 */
+    --destructive-foreground: 0 0% 98%; /* 破壊的アクション前景: ほぼ白 */
+    --border: 0 0% 14.9%;           /* ボーダー色: 暗いグレー */
+    --input: 0 0% 14.9%;            /* 入力要素色: 暗いグレー */
+    --ring: 0 0% 83.1%;             /* フォーカスリング色: 明るいグレー */
+    --chart-1: 220 70% 50%;         /* チャート色1: 青系 */
+    --chart-2: 160 60% 45%;         /* チャート色2: 緑系 */
+    --chart-3: 30 80% 55%;          /* チャート色3: オレンジ系 */
+    --chart-4: 280 65% 60%;         /* チャート色4: 紫系 */
+    --chart-5: 340 75% 55%;         /* チャート色5: ピンク系 */
+    
+    /* ダークモードのサイドバー専用カラー変数 */
+    --sidebar-background: 240 5.9% 10%; /* サイドバー背景: 非常に暗いグレー */
+    --sidebar-foreground: 240 4.8% 95.9%; /* サイドバー前景: 薄いグレー */
+    --sidebar-primary: 224.3 76.3% 48%; /* サイドバープライマリー: 青系 */
+    --sidebar-primary-foreground: 0 0% 100%; /* サイドバープライマリー前景: 純白 */
+    --sidebar-accent: 240 3.7% 15.9%; /* サイドバーアクセント: 暗いグレー */
+    --sidebar-accent-foreground: 240 4.8% 95.9%; /* サイドバーアクセント前景: 薄いグレー */
+    --sidebar-border: 240 3.7% 15.9%; /* サイドバーボーダー: 暗いグレー */
+    --sidebar-ring: 217.2 91.2% 59.8%; /* サイドバーリング: 青系 */
   }
 }
 
+@layer base {
+  /* 基本スタイルの定義 */
+  * {
+    @apply border-border; /* すべての要素のボーダーカラーをデフォルト変数に設定 */
+  }
+  body {
+    @apply bg-background text-foreground; /* ボディの背景色と文字色をデフォルト変数に設定 */
+  }
+}
+
+/* コンテナクラスのカスタマイズ */
 .container {
-  @apply px-3 sm:px-4 md:px-6;
+  @apply px-3 sm:px-4 md:px-6; /* レスポンシブなパディング設定 */
   width: 100%;
   margin-left: auto;
 }

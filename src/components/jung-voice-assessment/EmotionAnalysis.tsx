@@ -51,55 +51,66 @@ export default function EmotionAnalysis({
       setError(null);
 
       try {
-        const url = assessmentId
-          ? `/api/jung-voice-ai/emotion-data?assessmentId=${assessmentId}`
-          : `/api/jung-voice-ai/emotion-data?userId=${userId}`;
+        // IndexedDBからデータを取得
+        const dbName = 'jungVoiceAssessment';
+        const dbVersion = 1;
+        const request = indexedDB.open(dbName, dbVersion);
 
-        const response = await fetch(url);
+        request.onerror = (event) => {
+          console.error('IndexedDB error:', event);
+          setError('感情データの取得に失敗しました。');
+          setIsLoading(false);
+        };
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch emotion data');
-        }
-
-        const data = await response.json();
-
-        if (!data.success) {
-          throw new Error(data.error || 'Failed to fetch emotion data');
-        }
-
-        // データを処理
-        if (data.records) {
-          const processedData = processEmotionData(data.records);
-          setFacialData(processedData.facialData);
-          setVoiceData(processedData.voiceData);
+        request.onsuccess = (event) => {
+          const db = request.result;
+          const transaction = db.transaction(['emotionData'], 'readonly');
+          const store = transaction.objectStore('emotionData');
           
-          // 感情オプションを設定
-          if (processedData.facialData.length > 0 && processedData.facialData[0].emotions.length > 0) {
-            const emotionNames = processedData.facialData[0].emotions.map(e => e.name);
-            setEmotionOptions(emotionNames);
-            setSelectedEmotion(emotionNames[0]);
-          }
-        } else {
-          if (data.facialRecords) {
-            const processedFacialData = processEmotionData(data.facialRecords).facialData;
-            setFacialData(processedFacialData);
-            
-            // 感情オプションを設定
-            if (processedFacialData.length > 0 && processedFacialData[0].emotions.length > 0) {
-              const emotionNames = processedFacialData[0].emotions.map(e => e.name);
-              setEmotionOptions(emotionNames);
-              setSelectedEmotion(emotionNames[0]);
+          // assessmentIdまたはuserIdでデータを検索
+          const query = assessmentId 
+            ? store.index('assessmentId').getAll(assessmentId)
+            : store.index('userId').getAll(userId);
+
+          query.onsuccess = (event) => {
+            const records = query.result;
+            if (records && records.length > 0) {
+              const processedData = processEmotionData(records);
+              setFacialData(processedData.facialData);
+              setVoiceData(processedData.voiceData);
+              
+              // 感情オプションを設定
+              if (processedData.facialData.length > 0 && processedData.facialData[0].emotions.length > 0) {
+                const emotionNames = processedData.facialData[0].emotions.map(e => e.name);
+                setEmotionOptions(emotionNames);
+                setSelectedEmotion(emotionNames[0]);
+              }
+            } else {
+              // データが見つからない場合
+              console.log('No emotion data found in IndexedDB');
             }
+            setIsLoading(false);
+          };
+
+          query.onerror = (event) => {
+            console.error('Error fetching data from IndexedDB:', event);
+            setError('感情データの取得に失敗しました。');
+            setIsLoading(false);
+          };
+        };
+
+        request.onupgradeneeded = (event) => {
+          // データベースが存在しない場合は作成
+          const db = request.result;
+          if (!db.objectStoreNames.contains('emotionData')) {
+            const store = db.createObjectStore('emotionData', { keyPath: 'id', autoIncrement: true });
+            store.createIndex('userId', 'userId', { unique: false });
+            store.createIndex('assessmentId', 'assessmentId', { unique: false });
           }
-          
-          if (data.voiceRecords) {
-            setVoiceData(processEmotionData(data.voiceRecords).voiceData);
-          }
-        }
+        };
       } catch (err) {
         console.error('Error fetching emotion data:', err);
         setError('感情データの取得に失敗しました。');
-      } finally {
         setIsLoading(false);
       }
     };
