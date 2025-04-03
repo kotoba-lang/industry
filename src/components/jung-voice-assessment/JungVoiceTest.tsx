@@ -201,41 +201,51 @@ export default function JungVoiceTest({
           const errorType = event.error || 'unknown';
           const errorMessage = event.message || 'No additional details';
           
-          console.error(`Speech recognition error: ${errorType}`, {
-            type: errorType,
-            message: errorMessage,
-            details: event
-          });
-          
-          // Handle specific error types
+          // Handle specific error types differently
           if (errorType === 'no-speech') {
-            // No speech detected, could retry
-            console.warn('No speech detected. You may need to speak louder or check your microphone.');
-          } else if (errorType === 'not-allowed' || errorType === 'permission-denied') {
-            // Permission issues
-            setError('Microphone access denied. Please grant permission to use speech recognition.');
-          } else if (errorType === 'network') {
-            // Network issues
-            setError('Network error occurred. Please check your connection and try again.');
-          } else if (errorType === 'language-not-supported') {
-            // Language not supported error
-            console.warn(`Language ${speechRecognitionLang} not supported, falling back to en-US`);
-            setError(`Language "${speechRecognitionLang}" is not supported by your browser. Falling back to English (US).`);
+            // No speech detected - handle as a warning instead of an error
+            console.warn('No speech detected:', {
+              type: errorType,
+              message: errorMessage,
+              details: event
+            });
+            // Show a user-friendly message
+            setError('No speech detected. Please speak louder or check your microphone.');
+          } else {
+            // Log all other errors normally
+            console.error(`Speech recognition error: ${errorType}`, {
+              type: errorType,
+              message: errorMessage,
+              details: event
+            });
             
-            // Try to fall back to English
-            if (recognitionRef.current) {
-              recognitionRef.current.lang = 'en-US';
+            // Handle other specific error types
+            if (errorType === 'not-allowed' || errorType === 'permission-denied') {
+              // Permission issues
+              setError('Microphone access denied. Please grant permission to use speech recognition.');
+            } else if (errorType === 'network') {
+              // Network issues
+              setError('Network error occurred. Please check your connection and try again.');
+            } else if (errorType === 'language-not-supported') {
+              // Language not supported error
+              console.warn(`Language ${speechRecognitionLang} not supported, falling back to en-US`);
+              setError(`Language "${speechRecognitionLang}" is not supported by your browser. Falling back to English (US).`);
               
-              // Restart recognition if it was active
-              setTimeout(() => {
-                if (recognitionRef.current && isMountedRef.current) {
-                  try {
-                    recognitionRef.current.start();
-                  } catch (e) {
-                    console.error('Error restarting recognition with fallback language:', e);
+              // Try to fall back to English
+              if (recognitionRef.current) {
+                recognitionRef.current.lang = 'en-US';
+                
+                // Restart recognition if it was active
+                setTimeout(() => {
+                  if (recognitionRef.current && isMountedRef.current) {
+                    try {
+                      recognitionRef.current.start();
+                    } catch (e) {
+                      console.error('Error restarting recognition with fallback language:', e);
+                    }
                   }
-                }
-              }, 300);
+                }, 300);
+              }
             }
           }
           
