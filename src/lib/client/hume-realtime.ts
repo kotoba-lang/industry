@@ -63,7 +63,6 @@ export class HumeRealtimeEmotionService {
       this.connectionState = ConnectionState.CONNECTING;
       console.log("Initializing WebSocket connection to Hume API...");
 
-      // WebSocket接続を開始
       // プロトコルを自動検出して適切なWebSocketプロトコルを使用
       const isSecure = typeof window !== "undefined" &&
         window.location.protocol === "https:";
@@ -77,6 +76,8 @@ export class HumeRealtimeEmotionService {
       );
       console.log(`WebSocketプロトコル: ${wsProtocol}`);
 
+      // Hume APIはSSL接続のみを許可しているため、常にwssを使用
+      // ローカル開発環境では、wssを使用すると Mixed Content エラーが発生する可能性があるため注意
       this.socket = new WebSocket("wss://api.hume.ai/v0/stream/models");
 
       this.socket.onopen = () => {
