@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// Import server initialization to ensure environment variables are validated
-import "./lib/server-init";
-
+// Import server initialization to ensure environment variables are valid
 export function middleware(request: NextRequest) {
     // This middleware doesn't modify the request or response
     // It just ensures that server-init.ts is imported and executed

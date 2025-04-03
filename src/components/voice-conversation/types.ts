@@ -1,78 +1,107 @@
+/**
+ * Message sender types
+ */
+export type MessageSender = "user" | "bot";
+
+/**
+ * Emotion data structure
+ */
+export interface EmotionData {
+  primary: string;
+  confidence: number;
+  timestamp: Date | string;
+}
+
+/**
+ * Conversation message structure
+ */
+export interface ConversationMessage {
+  id: string;
+  content: string;
+  sender: MessageSender;
+  timestamp: Date | string;
+  emotion?: EmotionData;
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Voice conversation component props
+ */
 export interface VoiceConversationProps {
   /**
    * Hume AI API key for TTS
    */
   apiKey?: string;
-  
+
   /**
    * Generation ID for TTS
    */
   generationId?: string;
-  
+
   /**
    * Name of the voice to use
    */
   voiceName?: string;
-  
+
   /**
    * Initial message from the assistant
    */
   initialMessage?: string;
-  
+
   /**
    * Placeholder text for the input field
    */
   placeholder?: string;
-  
+
   /**
    * Language for speech recognition
    * Default: 'en-US'
    */
   speechRecognitionLang?: string;
-  
+
   /**
    * Callback when user sends a message
    */
   onMessageSent?: (message: string) => void;
-  
+
   /**
    * Callback when assistant message is received
    */
-  onMessageReceived?: (message: string) => void;
-  
+  onResponseReceived?: (response: string) => void;
+
   /**
    * Additional CSS classes
    */
   className?: string;
-  
+
   /**
    * Enable emotion recognition
    * Default: false
    */
   emotionRecognition?: boolean;
-  
+
   /**
    * Callback when emotions are detected
    */
   onEmotionDetected?: (emotion: EmotionData) => void;
-  
+
   /**
    * Enable database storage of conversations
    * Default: false
    */
   storageEnabled?: boolean;
-  
+
   /**
    * Custom storage handler for conversations
    * If provided, overrides the default storage mechanism
    */
-  storageHandler?: (message: Message) => Promise<boolean>;
+  storageHandler?: (message: ConversationMessage) => Promise<boolean>;
 }
 
 export interface Message {
   id: string;
   content: string;
-  sender: 'user' | 'assistant';
+  sender: "user" | "assistant";
   timestamp: Date;
   emotion?: EmotionData;
 }
@@ -84,7 +113,7 @@ export interface VoiceConversationState {
   inputValue: string;
   isRecording: boolean;
   currentEmotion: EmotionData | null;
-  storageStatus: 'idle' | 'saving' | 'success' | 'error';
+  storageStatus: "idle" | "saving" | "success" | "error";
 }
 
 export interface HumeVoice {
@@ -93,21 +122,14 @@ export interface HumeVoice {
   isDefault: boolean;
 }
 
-export interface EmotionData {
-  primary: EmotionType;
-  confidence: number;
-  secondary?: EmotionType;
-  timestamp: Date;
-}
-
-export type EmotionType = 
-  | 'neutral'
-  | 'happy'
-  | 'sad'
-  | 'angry'
-  | 'fearful'
-  | 'disgusted'
-  | 'surprised';
+export type EmotionType =
+  | "neutral"
+  | "happy"
+  | "sad"
+  | "angry"
+  | "fearful"
+  | "disgusted"
+  | "surprised";
 
 export interface SpeechRecognitionResult {
   transcript: string;
@@ -119,4 +141,4 @@ export interface StorageResponse {
   success: boolean;
   messageId?: string;
   error?: string;
-} 
+}
