@@ -5,7 +5,7 @@ import { analyzeFace, analyzeVoice, HumeFaceResponse, HumeVoiceResponse } from '
 import { HumeRealtimeEmotionService } from '@/lib/client/hume-realtime';
 
 export default function EmotionAnalysisPage() {
-  const [apiKey, setApiKey] = useState('your-api-key');
+  const [apiKey, setApiKey] = useState(process.env.NEXT_PUBLIC_HUME_API_KEY || '');
   const [faceResult, setFaceResult] = useState<HumeFaceResponse | null>(null);
   const [voiceResult, setVoiceResult] = useState<HumeVoiceResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -85,35 +85,47 @@ export default function EmotionAnalysisPage() {
       <h1 className="text-2xl font-bold mb-4">Emotion Analysis</h1>
       
       <div className="mb-4">
-        <label className="block mb-2">API Key:</label>
+        <label htmlFor="api-key" className="block mb-2">API Key:</label>
         <input
+          id="api-key"
           type="text"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
           className="border p-2 w-full"
+          placeholder="Enter your Hume API key"
+          aria-describedby="api-key-help"
         />
+        <p id="api-key-help" className="text-sm text-gray-600 mt-1">
+          {process.env.NEXT_PUBLIC_HUME_API_KEY ? 'Using API key from environment variable' : 'Please enter your Hume API key'}
+        </p>
       </div>
       
       <div className="mb-4">
         <h2 className="text-xl mb-2">Batch Analysis</h2>
         <div className="flex gap-4">
           <div>
-            <label className="block mb-2">Upload Image:</label>
+            <label htmlFor="image-upload" className="block mb-2">Upload Image:</label>
             <input 
+              id="image-upload"
               type="file" 
               accept="image/*" 
               onChange={handleImageUpload}
               className="mb-2"
+              aria-describedby="image-upload-help"
             />
+            <p id="image-upload-help" className="text-sm text-gray-600">Upload an image for facial emotion analysis</p>
           </div>
           <div>
-            <label className="block mb-2">Upload Audio:</label>
+            <label htmlFor="audio-upload" className="block mb-2">Upload Audio:</label>
             <input 
+              id="audio-upload"
               type="file" 
               accept="audio/*" 
               onChange={handleAudioUpload}
               className="mb-2"
+              aria-describedby="audio-upload-help"
             />
+            <p id="audio-upload-help" className="text-sm text-gray-600">Upload an audio file for voice emotion analysis</p>
           </div>
         </div>
       </div>
@@ -123,6 +135,7 @@ export default function EmotionAnalysisPage() {
         <button 
           onClick={initRealtime}
           className="bg-blue-500 text-white p-2 rounded"
+          aria-label="Start realtime emotion analysis"
         >
           Start Realtime Analysis
         </button>
