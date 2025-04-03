@@ -19,22 +19,29 @@ const httpsOptions = {
 };
 
 app.prepare().then(() => {
-  // Create HTTPS Server
-  https.createServer(httpsOptions, (req, res) => {
+  console.log('Next.js app prepared');
+  
+  // HTTPSサーバーの作成
+  const httpsServer = https.createServer(httpsOptions, (req, res) => {
     const parsedUrl = parse(req.url, true);
     handle(req, res, parsedUrl);
-  }).listen(3001, (err) => {
+  });
+  
+  httpsServer.listen(3001, (err) => {
     if (err) throw err;
     console.log('> HTTPS Ready on https://localhost:3001');
   });
 
-  // HTTP Server (Optional: for redirecting to HTTPS)
-  http.createServer((req, res) => {
-    const host = req.headers.host;
-    // Redirect to HTTPS
-    res.writeHead(301, { Location: `https://${host.replace(/:\d+/, ':3001')}${req.url}` });
+  // HTTPサーバー（リダイレクト用）
+  const httpServer = http.createServer((req, res) => {
+    const host = req.headers.host || 'localhost:3000';
+    const httpsUrl = `https://${host.replace(/:\d+/, ':3001')}${req.url}`;
+    console.log(`Redirecting to: ${httpsUrl}`);
+    res.writeHead(301, { Location: httpsUrl });
     res.end();
-  }).listen(3000, (err) => {
+  });
+  
+  httpServer.listen(3000, (err) => {
     if (err) throw err;
     console.log('> HTTP Redirect ready on http://localhost:3000');
   });
