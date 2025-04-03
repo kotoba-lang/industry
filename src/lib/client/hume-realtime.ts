@@ -17,7 +17,7 @@ export class HumeRealtimeEmotionService {
   private apiKey: string;
   private onFaceData: (data: HumeFaceResponse) => void;
   private onVoiceData: (data: HumeVoiceResponse) => void;
-  private onError: (error: Event | Error) => void;
+  private onError: (error: Event | Error | unknown) => void;
   private connectionState: ConnectionState = ConnectionState.CLOSED;
   private authenticationSent: boolean = false;
   private lastError: any = null;
@@ -26,7 +26,7 @@ export class HumeRealtimeEmotionService {
     apiKey: string,
     onFaceData: (data: HumeFaceResponse) => void,
     onVoiceData: (data: HumeVoiceResponse) => void,
-    onError: (error: Event | Error) => void,
+    onError: (error: Event | Error | unknown) => void,
   ) {
     this.apiKey = apiKey;
     this.onFaceData = onFaceData;
@@ -55,6 +55,39 @@ export class HumeRealtimeEmotionService {
     }
 
     try {
+      // Check internet connectivity first
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        throw new Error(
+          "Internet connection appears to be offline. Please check your network connection and try again.",
+        );
+      }
+
+      // Validate API key again
+      if (!this.apiKey || this.apiKey.trim() === "") {
+        throw new Error(
+          "API key is empty or invalid. Please check your environment variables.",
+        );
+      }
+
+      // Check for mixed content issues
+      if (
+        typeof window !== "undefined" && window.location.protocol === "https:"
+      ) {
+        console.log("Using HTTPS protocol - ensuring WebSocket uses wss://");
+      }
+
+      // Display debug information about the environment
+      console.log("Environment details:", {
+        protocol: typeof window !== "undefined"
+          ? window.location.protocol
+          : "unknown",
+        hostname: typeof window !== "undefined"
+          ? window.location.hostname
+          : "unknown",
+        apiKeyLength: this.apiKey ? this.apiKey.length : 0,
+        online: typeof navigator !== "undefined" ? navigator.onLine : "unknown",
+      });
+
       const modelConfig: Record<string, Record<string, never>> = {};
       models.forEach((model) => {
         modelConfig[model] = {};
@@ -76,11 +109,56 @@ export class HumeRealtimeEmotionService {
       );
       console.log(`WebSocketプロトコル: ${wsProtocol}`);
 
+      // Time out the connection attempt after 10 seconds
+      const connectionTimeout = setTimeout(() => {
+        if (this.connectionState === ConnectionState.CONNECTING) {
+          this.handleError(
+            new Error("WebSocket connection timed out after 10 seconds"),
+          );
+          if (this.socket) {
+            this.socket.close();
+          }
+        }
+      }, 10000);
+
+      // Add a global error handler for debugging
+      const originalErrorHandler = window.onerror;
+      window.onerror = (message, source, lineno, colno, error) => {
+        if (
+          String(message).includes("WebSocket") ||
+          String(message).includes("wss:")
+        ) {
+          console.error("WebSocket related global error:", {
+            message,
+            source,
+            lineno,
+            colno,
+          });
+          this.handleError(new Error(`Global error: ${message}`));
+        }
+        // Call the original handler if there was one
+        if (typeof originalErrorHandler === "function") {
+          return originalErrorHandler(message, source, lineno, colno, error);
+        }
+        return false;
+      };
+
       // Hume APIはSSL接続のみを許可しているため、常にwssを使用
       // ローカル開発環境では、wssを使用すると Mixed Content エラーが発生する可能性があるため注意
-      this.socket = new WebSocket("wss://api.hume.ai/v0/stream/models");
+      try {
+        this.socket = new WebSocket("wss://api.hume.ai/v0/stream/models");
+        console.log("WebSocket object created successfully");
+      } catch (wsCreateError) {
+        console.error("Error creating WebSocket object:", wsCreateError);
+        this.handleError(
+          new Error(`Failed to create WebSocket: ${wsCreateError}`),
+        );
+        clearTimeout(connectionTimeout);
+        return;
+      }
 
       this.socket.onopen = () => {
+        clearTimeout(connectionTimeout);
         if (this.socket) {
           this.connectionState = ConnectionState.OPEN;
           console.log(
@@ -166,11 +244,10 @@ export class HumeRealtimeEmotionService {
         });
 
         this.handleError({
-          ...event,
-          additionalInfo: {
-            message: errorInfo,
-            networkStatus: networkInfo,
-          },
+          message: errorInfo,
+          type: "WebSocketError",
+          networkStatus: networkInfo,
+          readyState: this.socket ? this.socket.readyState : "no socket",
         });
       };
 
