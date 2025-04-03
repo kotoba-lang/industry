@@ -64,6 +64,19 @@ export class HumeRealtimeEmotionService {
       console.log("Initializing WebSocket connection to Hume API...");
 
       // WebSocket接続を開始
+      // プロトコルを自動検出して適切なWebSocketプロトコルを使用
+      const isSecure = typeof window !== "undefined" &&
+        window.location.protocol === "https:";
+      const wsProtocol = isSecure ? "wss:" : "ws:";
+
+      // デバッグ用にプロトコル情報を表示
+      console.log(
+        `現在のプロトコル: ${
+          typeof window !== "undefined" ? window.location.protocol : "unknown"
+        }`,
+      );
+      console.log(`WebSocketプロトコル: ${wsProtocol}`);
+
       this.socket = new WebSocket("wss://api.hume.ai/v0/stream/models");
 
       this.socket.onopen = () => {
