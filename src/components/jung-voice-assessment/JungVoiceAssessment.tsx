@@ -6,7 +6,7 @@ import ConsentForm from '../consent/ConsentForm';
 import { JungVoiceAssessmentProps, TestResults } from './types';
 import { JungVoiceAssessmentPropsSchema } from './schema';
 import { HumeEmotionProvider } from '@/providers/HumeEmotionProvider';
-import EmotionAnalysis from './EmotionAnalysis';
+import FaceEmotionAnalysis from '@/app/hume-websocket/components/FaceEmotionAnalysis';
 import { v4 as uuidv4 } from 'uuid';
 import { useKawasakiStore } from '@/store/kawasakiStore';
 
@@ -110,19 +110,15 @@ export default function JungVoiceAssessment({
               className={className}
             />
             
-            {(isAnalyzing || showAnalysis) && (
+            {/* {(isAnalyzing || showAnalysis) && (
               <div className="mt-6">
                 <h2 className="text-2xl font-bold mb-3 text-center">Emotion Analysis</h2>
                 <p className="text-center mb-4 text-gray-600 dark:text-gray-300">
                   {isAnalyzing && !showAnalysis ? "Analyzing emotions in real-time based on facial expressions and voice tone" : "Analysis of emotions based on facial expressions and voice tone during the test"}
                 </p>
-                <EmotionAnalysis 
-                  userId={userId}
-                  assessmentId={assessmentId}
-                  className="mt-3"
-                />
+                <FaceEmotionAnalysis />
               </div>
-            )}
+            )} */}
           </div>
         )}
       </div>
