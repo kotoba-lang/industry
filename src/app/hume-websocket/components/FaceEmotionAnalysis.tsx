@@ -30,6 +30,7 @@ export default function FaceEmotionAnalysis() {
   const [emotionResults, setEmotionResults] = useState<FaceResult[]>([]);
   const [isCapturing, setIsCapturing] = useState<boolean>(false);
   const [captureInterval, setCaptureInterval] = useState<NodeJS.Timeout | null>(null);
+  const [connectionAttempts, setConnectionAttempts] = useState<number>(0);
   
   const socketRef = useRef<WebSocket | null>(null);
   const webcamRef = useRef<Webcam | null>(null);
@@ -46,22 +47,46 @@ export default function FaceEmotionAnalysis() {
     };
   }, [captureInterval]);
 
-  const connectWebSocket = () => {
+  const connectWebSocket = (retry = false) => {
+    if (retry) {
+      // 最大3回まで再試行
+      if (connectionAttempts >= 3) {
+        setError("WebSocket接続の再試行回数が上限に達しました。後ほど再度お試しください。");
+        setIsLoading(false);
+        return;
+      }
+      setConnectionAttempts(prev => prev + 1);
+    } else {
+      setConnectionAttempts(1);
+    }
+    
     setIsLoading(true);
     setError(null);
 
-    // デバッグ用にAPIキーを確認
+    // APIキーの確認
     const apiKey = process.env.NEXT_PUBLIC_HUME_API_KEY;
+    if (!apiKey) {
+      setError("APIキーが設定されていません。.env.localファイルにNEXT_PUBLIC_HUME_API_KEYを正しく設定してください。");
+      setIsLoading(false);
+      return;
+    }
+    
     console.log("APIキー存在チェック:", apiKey ? "キーあり" : "キーなし");
     
-    // 接続URLを作成して確認
-    const wsUrl = `wss://api.hume.ai/v0/expression-measurement/ws?apiKey=${apiKey}`;
-    console.log("顔分析 - 接続URL:", wsUrl);
+    // 接続URLを修正 - Hume APIの最新の仕様に合わせる
+    const wsUrl = `wss://api.hume.ai/v0/stream/models?apiKey=${encodeURIComponent(apiKey)}`;
+    console.log("顔分析 - 接続URL構築:", wsUrl.substring(0, wsUrl.indexOf('?') + 8) + "***");
 
     try {
+      // WebSocket接続を作成する前に既存の接続をクリア
+      if (socketRef.current) {
+        socketRef.current.close();
+        socketRef.current = null;
+      }
+      
       // WebSocket接続
       const socket = new WebSocket(wsUrl);
-
+      
       socket.onopen = () => {
         console.log("WebSocket connected");
         setIsConnected(true);
@@ -85,10 +110,17 @@ export default function FaceEmotionAnalysis() {
       };
 
       socket.onerror = (err) => {
+        // WebSocket エラーオブジェクトには詳細が含まれていないことがあるためエラーハンドリングを改善
         console.error("WebSocket error:", err);
-        setError("WebSocket接続エラーが発生しました。詳細はコンソールを確認してください。");
+        setError("WebSocket接続エラーが発生しました。APIキーが正しいか確認してください。");
         setIsLoading(false);
         setIsConnected(false);
+        
+        // 再接続を試みるかユーザーに通知
+        if (socketRef.current) {
+          socketRef.current.close();
+          socketRef.current = null;
+        }
       };
 
       socket.onclose = (event) => {
@@ -133,7 +165,7 @@ export default function FaceEmotionAnalysis() {
     // Base64形式の画像データを抽出 (data:image/jpeg;base64,を削除)
     const base64Image = imageSrc.split(',')[1];
 
-    // JSONメッセージの作成
+    // JSONメッセージの作成 - シンプルな形式に変更（type, configフィールドを削除）
     const message = {
       models: {
         face: {}
@@ -193,6 +225,11 @@ export default function FaceEmotionAnalysis() {
     return emotionColors[emotion] || "bg-gray-500";
   };
 
+  // リトライボタン用のハンドラー
+  const handleRetryConnection = () => {
+    connectWebSocket(true);
+  };
+
   return (
     <div className="space-y-6">
       <div className="space-y-4">
@@ -228,7 +265,7 @@ export default function FaceEmotionAnalysis() {
           )}
 
           {isCameraActive && !isConnected && (
-            <Button onClick={connectWebSocket} disabled={isLoading}>
+            <Button onClick={() => connectWebSocket()} disabled={isLoading}>
               {isLoading ? "接続中..." : "WebSocket接続"}
             </Button>
           )}
@@ -251,7 +288,32 @@ export default function FaceEmotionAnalysis() {
             </Button>
           )}
         </div>
-        {error && <p className="text-red-500 text-sm">{error}</p>}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-md p-4 my-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-700">{error}</p>
+                {connectionAttempts > 0 && connectionAttempts < 3 && (
+                  <div className="mt-2">
+                    <Button 
+                      onClick={() => handleRetryConnection()} 
+                      size="sm" 
+                      variant="outline" 
+                      className="text-red-700 bg-red-50 hover:bg-red-100"
+                    >
+                      接続を再試行
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <Separator />
