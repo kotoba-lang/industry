@@ -3,7 +3,7 @@ import dynamic from "next/dynamic";
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import styles from "@/app/_components/markdown-styles.module.css";
 import 'katex/dist/katex.min.css';
 import { InlineMath, BlockMath } from 'react-katex';
@@ -19,6 +19,7 @@ import KawasakiModel from "@/components/kawasaki-model";
 import JungWordTest from "@/components/jung-word-assessment/JungWordTest";
 import { JungVoiceAssessment } from "@/components/jung-voice-assessment";
 import JungIntegratedAssessment from "@/components/jung-integrated";
+import { useKawasakiStore } from "@/store/kawasakiStore";
 
 export default function Page() {
   const dimvs = Array(0).fill("");
@@ -26,6 +27,15 @@ export default function Page() {
   const [electron, setElectron] = useState(1);
   const [proton, setProton] = useState(1);
   const [neutron, setNeutron] = useState(1);
+
+  // Get voice assessment data from store
+  const voiceAssessments = useKawasakiStore((state) => state.voiceAssessments);
+  const [hasVoiceData, setHasVoiceData] = useState(false);
+
+  useEffect(() => {
+    // Check if there's voice assessment data available
+    setHasVoiceData(voiceAssessments.length > 0);
+  }, [voiceAssessments]);
 
   const handleMandalaData = (mandalaData: any) => {
     let count = 0;
@@ -39,6 +49,11 @@ export default function Page() {
     setElectron(count);
     setProton(count);
     setNeutron(count);
+  };
+
+  const handleVoiceTestComplete = (results: any) => {
+    console.log("Voice test completed with results:", results);
+    // The results are automatically saved to the Zustand store by the JungVoiceAssessment component
   };
 
   return (
@@ -142,7 +157,20 @@ export default function Page() {
 
 
               <main className="flex min-h-screen flex-col items-center justify-center lg:p-12 sm:p-4 bg-gradient-to-r from-blue-100 to-purple-100">
-                <JungVoiceAssessment numberOfWords={2} />
+                <JungVoiceAssessment 
+                  numberOfWords={2} 
+                  onTestComplete={handleVoiceTestComplete}
+                />
+                {hasVoiceData && (
+                  <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg shadow-sm">
+                    <p className="text-green-800 font-semibold">
+                      Voice assessment data has been collected and integrated into the Kawasaki Model
+                    </p>
+                    <p className="text-green-600 text-sm mt-1">
+                      The model visualization above has been updated with your voice assessment data
+                    </p>
+                  </div>
+                )}
               </main>
 
               <h2>Measurement via Emotion Analytics (Quantitative Analysis)</h2>
