@@ -862,13 +862,40 @@ export default function JungVoiceTest({
       addMessage([{ text: AI_GUIDE_MESSAGES.introduction, role: 'assistant' }]);
       
       console.log('Starting test, setting current word index to 0');
+      
+      // 最初の単語を表示する前に、その単語に対するタイマーをリセット
+      delete wordStartTimesRef.current[0];
+      setStartTime(0);
+      
       setCurrentWordIndex(0);
+      currentWordIndexRef.current = 0;
       setIsLoading(false);
       
-      // Start listening only after we've set the current word index
+      // 最初の単語の読み上げと音声認識開始
       setTimeout(() => {
         if (isMountedRef.current) {
-          startListening();
+          // 最初の単語を読み上げる
+          const firstWord = stimulusWords[0];
+          if (firstWord) {
+            console.log(`Playing first word: "${firstWord}"`);
+            generateAndPlaySpeech(firstWord, () => {
+              if (!isMountedRef.current) return;
+              
+              console.log(`First word audio complete, preparing to listen`);
+              
+              // 音声読み上げ完了時にタイマーを設定（正確な反応時間計測のため）
+              const now = Date.now();
+              wordStartTimesRef.current[0] = now;
+              console.log(`[TIMER] First word (${firstWord}) start time set: ${now}`);
+              setStartTime(now);
+              
+              // 音声認識開始
+              startListening();
+            });
+          } else {
+            // 単語が取得できない場合でも音声認識は開始
+            startListening();
+          }
         }
       }, 500);
     } catch (error) {
