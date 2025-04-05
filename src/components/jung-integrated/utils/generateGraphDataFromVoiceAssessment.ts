@@ -62,34 +62,36 @@ export function generateGraphDataFromVoiceAssessment(
   const wordReactionTimes = new Map<string, number[]>();
 
   // First, collect all unique words and their reaction times
-  results.responses.forEach((response) => {
-    const { stimulusWord, responseWord, reactionTimeMs } = response;
+  if (results && results.responses) {
+    results.responses.forEach((response) => {
+      const { stimulusWord, responseWord, reactionTimeMs } = response;
 
-    // Ensure we only use valid reaction times
-    const validReactionTime = reactionTimeMs < MIN_REACTION_TIME_MS
-      ? MIN_REACTION_TIME_MS
-      : reactionTimeMs;
+      // Ensure we only use valid reaction times
+      const validReactionTime = reactionTimeMs < MIN_REACTION_TIME_MS
+        ? MIN_REACTION_TIME_MS
+        : reactionTimeMs;
 
-    // Add both stimulus and response words to our sets
-    uniqueWords.add(stimulusWord);
-    if (responseWord && responseWord !== stimulusWord) {
-      uniqueWords.add(responseWord);
-    }
-
-    // Store reaction times for positioning
-    if (!wordReactionTimes.has(stimulusWord)) {
-      wordReactionTimes.set(stimulusWord, []);
-    }
-    wordReactionTimes.get(stimulusWord)?.push(validReactionTime);
-
-    // Also store reaction times for response words
-    if (responseWord && responseWord !== stimulusWord) {
-      if (!wordReactionTimes.has(responseWord)) {
-        wordReactionTimes.set(responseWord, []);
+      // Add both stimulus and response words to our sets
+      uniqueWords.add(stimulusWord);
+      if (responseWord && responseWord !== stimulusWord) {
+        uniqueWords.add(responseWord);
       }
-      wordReactionTimes.get(responseWord)?.push(validReactionTime);
-    }
-  });
+
+      // Store reaction times for positioning
+      if (!wordReactionTimes.has(stimulusWord)) {
+        wordReactionTimes.set(stimulusWord, []);
+      }
+      wordReactionTimes.get(stimulusWord)?.push(validReactionTime);
+
+      // Also store reaction times for response words
+      if (responseWord && responseWord !== stimulusWord) {
+        if (!wordReactionTimes.has(responseWord)) {
+          wordReactionTimes.set(responseWord, []);
+        }
+        wordReactionTimes.get(responseWord)?.push(validReactionTime);
+      }
+    });
+  }
 
   // Create node array with positions calculated based on word vectors and reaction times
   Array.from(uniqueWords).forEach((word, index) => {
@@ -157,39 +159,45 @@ export function generateGraphDataFromVoiceAssessment(
   });
 
   // Create links between stimulus and response words
-  results.responses.forEach((response) => {
-    const { stimulusWord, responseWord, reactionTimeMs } = response;
+  if (results && results.responses) {
+    results.responses.forEach((response) => {
+      const { stimulusWord, responseWord, reactionTimeMs } = response;
 
-    // Skip if response word is empty or same as stimulus
-    if (!responseWord || responseWord === stimulusWord) return;
+      // Skip if response word is empty or same as stimulus
+      if (!responseWord || responseWord === stimulusWord) return;
 
-    // Ensure we only use valid reaction times
-    const validReactionTime = reactionTimeMs < MIN_REACTION_TIME_MS
-      ? MIN_REACTION_TIME_MS
-      : reactionTimeMs;
-    const isDelayed = validReactionTime > DELAYED_REACTION_THRESHOLD_MS;
+      // Ensure we only use valid reaction times
+      const validReactionTime = reactionTimeMs < MIN_REACTION_TIME_MS
+        ? MIN_REACTION_TIME_MS
+        : reactionTimeMs;
+      const isDelayed = validReactionTime > DELAYED_REACTION_THRESHOLD_MS;
 
-    // Calculate link strength based on reaction time - now longer time means stronger connection
-    const baseStrength = getStrengthFromReactionTime(validReactionTime);
-    const stateStrength = getStrengthBasedOnState(effectiveState, "word-word");
-    let strength = baseStrength * stateStrength;
+      // Calculate link strength based on reaction time - now longer time means stronger connection
+      const baseStrength = getStrengthFromReactionTime(validReactionTime);
+      const stateStrength = getStrengthBasedOnState(
+        effectiveState,
+        "word-word",
+      );
+      let strength = baseStrength * stateStrength;
 
-    // Emphasize delayed responses (potential complexes)
-    if (isDelayed) {
-      strength *= modelParams.gamma; // Amplify by gamma parameter
-    }
+      // Emphasize delayed responses (potential complexes)
+      if (isDelayed) {
+        strength *= modelParams.gamma; // Amplify by gamma parameter
+      }
 
-    // Connect stimulus to response
-    links.push({
-      source: `voice_${stimulusWord}`,
-      target: `voice_${responseWord}`,
-      strength,
-      name: `Voice: ${stimulusWord} → ${responseWord} (${validReactionTime}ms)${
-        isDelayed ? " [DELAYED]" : ""
-      }`,
-      latencyMs: validReactionTime,
+      // Connect stimulus to response
+      links.push({
+        source: `voice_${stimulusWord}`,
+        target: `voice_${responseWord}`,
+        strength,
+        name:
+          `Voice: ${stimulusWord} → ${responseWord} (${validReactionTime}ms)${
+            isDelayed ? " [DELAYED]" : ""
+          }`,
+        latencyMs: validReactionTime,
+      });
     });
-  });
+  }
 
   return { nodes, links };
 }
@@ -198,6 +206,8 @@ export function generateGraphDataFromVoiceAssessment(
 
 // Check if a word appears frequently in responses
 function isFrequentWord(word: string, responses: WordResponse[]): boolean {
+  if (!responses) return false;
+
   const wordCount =
     responses.filter((r) => r.stimulusWord === word || r.responseWord === word)
       .length;
