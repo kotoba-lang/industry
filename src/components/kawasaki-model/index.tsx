@@ -47,12 +47,14 @@ export default function Home() {
       // Use the most recent voice assessment
       const latestAssessment = voiceAssessments[voiceAssessments.length - 1]
       
-      return generateGraphDataFromVoiceAssessment(
-        latestAssessment.results,
-        transitionState,
-        time,
-        modelParams
-      )
+      if (latestAssessment && latestAssessment.results) {
+        return generateGraphDataFromVoiceAssessment(
+          latestAssessment.results,
+          transitionState,
+          time,
+          modelParams
+        )
+      }
     }
     return { nodes: [], links: [] }
   }, [voiceAssessments, transitionState, time, modelParams])
