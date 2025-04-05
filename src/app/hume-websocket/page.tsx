@@ -1,17 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AlertCircle } from "lucide-react";
-import TextEmotionAnalysis from "./components/TextEmotionAnalysis";
 import FaceEmotionAnalysis from "./components/FaceEmotionAnalysis";
-import VoiceEmotionAnalysis from "./components/VoiceEmotionAnalysis";
 
 export default function HumeWebsocketPage() {
-  const [activeTab, setActiveTab] = useState<string>("text");
   const [isDebugOpen, setIsDebugOpen] = useState<boolean>(false);
   const [apiKeyInfo, setApiKeyInfo] = useState<string>("Loading...");
 
@@ -25,9 +21,9 @@ export default function HumeWebsocketPage() {
 
   return (
     <div className="container mx-auto py-10">
-      <h1 className="text-3xl font-bold mb-6">Hume AI 感情分析 WebSocket デモ</h1>
+      <h1 className="text-3xl font-bold mb-6">Hume AI 顔表情分析 WebSocket デモ</h1>
       <p className="mb-8 text-lg">
-        Hume AI のWebSocketを使ったリアルタイム感情分析デモです。テキスト、顔、音声の感情分析が可能です。
+        Hume AI のWebSocketを使ったリアルタイム顔表情分析デモです。カメラを起動して表情を分析できます。
       </p>
 
       {/* デバッグ情報 */}
@@ -72,49 +68,15 @@ export default function HumeWebsocketPage() {
         </CollapsibleContent>
       </Collapsible>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="w-full mb-6">
-          <TabsTrigger value="text" className="flex-1">テキスト感情分析</TabsTrigger>
-          <TabsTrigger value="face" className="flex-1">顔表情分析</TabsTrigger>
-          <TabsTrigger value="voice" className="flex-1">音声感情分析</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="text">
-          <Card>
-            <CardHeader>
-              <CardTitle>テキスト感情分析</CardTitle>
-              <CardDescription>テキストからリアルタイムに感情を分析します</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <TextEmotionAnalysis />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="face">
-          <Card>
-            <CardHeader>
-              <CardTitle>顔表情分析</CardTitle>
-              <CardDescription>カメラを使ってリアルタイムに表情を分析します</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <FaceEmotionAnalysis />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="voice">
-          <Card>
-            <CardHeader>
-              <CardTitle>音声感情分析</CardTitle>
-              <CardDescription>マイクを使ってリアルタイムに声の感情を分析します</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <VoiceEmotionAnalysis />
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      <Card>
+        <CardHeader>
+          <CardTitle>顔表情分析</CardTitle>
+          <CardDescription>カメラを使ってリアルタイムに表情を分析します</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <FaceEmotionAnalysis />
+        </CardContent>
+      </Card>
     </div>
   );
 } 
