@@ -158,7 +158,7 @@ export default function Page() {
 
               <main className="flex min-h-screen flex-col items-center justify-center lg:p-12 sm:p-4 bg-gradient-to-r from-blue-100 to-purple-100">
                 <JungVoiceAssessment 
-                  numberOfWords={6} 
+                  numberOfWords={10} 
                   onTestComplete={handleVoiceTestComplete}
                 />
                 {hasVoiceData && (
