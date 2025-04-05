@@ -520,7 +520,8 @@ export default function JungVoiceTest({
         return;
       } catch (err) {
         console.error(`Error playing pre-recorded audio for guide message:`, err);
-        // Fall back to API if there's an error with the audio file
+        if (onAudioEnd && isMountedRef.current) onAudioEnd();
+        return;
       }
     }
     
@@ -547,177 +548,28 @@ export default function JungVoiceTest({
         return;
       } catch (err) {
         console.error(`Error playing pre-recorded audio for "${text}":`, err);
-        // Fall back to API if there's an error with the audio file
+        if (onAudioEnd && isMountedRef.current) onAudioEnd();
+        return;
       }
     }
     
-    // For non-Jung words or if audio file playback failed, continue with API generation
-    if (!isApiAvailable || !apiKey || !isMountedRef.current) {
-      console.warn('Speech generation skipped: API disabled, no API key, or component unmounted');
-      if (onAudioEnd) onAudioEnd();
-      return;
-    }
-    
+    // For non-Jung words, use the "next word" audio instead of API generation
+    console.log('Using "Next word" audio instead of generating speech for non-Jung word');
+    const nextWordAudioPath = '/audio/Next_word__b88adeeb.mp3';
     try {
-      setIsLoading(true);
-      
-      // 統合キャッシュから音声を取得
-      if (cacheSettings.clientEnabled || cacheSettings.serverEnabled) {
-        const cacheResult = await getAudioFromCombinedCache(text, voiceName, cacheSettings);
-        
-        if (cacheResult.blob) {
-          // キャッシュから取得した音声を再生
-          console.log(`Cache hit for text: "${text}" from ${cacheResult.source}`);
-          const url = URL.createObjectURL(cacheResult.blob);
-          audioUrlsRef.current.push(url);
-          setAudioUrl(url);
-          
-          // コンポーネントがアンマウントされていたら処理を中止
-          if (!isMountedRef.current) {
-            URL.revokeObjectURL(url);
-            if (onAudioEnd) onAudioEnd();
-            return;
-          }
-          
-          if (audioRef.current) {
-            playAudio(url, onAudioEnd);
-          } else if (onAudioEnd && isMountedRef.current) {
-            onAudioEnd();
-          }
-          
-          // キャッシュ統計を更新
-          getCombinedCacheStats().then(stats => {
-            setCacheStats(stats);
-          }).catch(err => {
-            console.error('Failed to update cache stats after cache hit:', err);
-          });
-          
-          return;
-        }
-      }
-      
-      // キャッシュになければAPIから取得
-      // 直接Hume AI TTSエンドポイントを呼び出す
-      const apiUrl = 'https://api.hume.ai/v0/tts';
-      const headers = {
-        'X-Hume-Api-Key': apiKey,
-        'Content-Type': 'application/json'
-      };
-      
-      const requestData = {
-        utterances: [
-          {
-            text: text,
-            description: voiceName
-          }
-        ],
-        format: {
-          type: "mp3"
-        },
-        num_generations: 1
-      };
-      
-      const fetchResponse = await fetch(apiUrl, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(requestData)
-      });
-      
-      // コンポーネントがアンマウントされていたら処理を中止
-      if (!isMountedRef.current) {
-        if (onAudioEnd) onAudioEnd();
-        return;
-      }
-      
-      if (!fetchResponse.ok) {
-        const errorText = await fetchResponse.text();
-        throw new Error(`HTTP error! status: ${fetchResponse.status}, message: ${errorText}`);
-      }
-      
-      const response = await fetchResponse.json();
-      
-      // コンポーネントがアンマウントされていたら処理を中止
-      if (!isMountedRef.current) {
-        if (onAudioEnd) onAudioEnd();
-        return;
-      }
-      
-      // APIはbase64形式の音声データを含む生成の配列を返す
-      if (response && response.generations && response.generations.length > 0) {
-        const generation = response.generations[0];
-        
-        // 応答にaudioプロパティ（base64エンコード）があるか確認
-        if (generation.audio) {
-          // base64をblobに変換
-          const binaryString = atob(generation.audio);
-          const len = binaryString.length;
-          const bytes = new Uint8Array(len);
-          
-          for (let i = 0; i < len; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-          }
-          
-          const blob = new Blob([bytes], { type: 'audio/mp3' });
-          
-          // 統合キャッシュに保存（非同期で、続行を待たない）
-          if (cacheSettings.clientEnabled || cacheSettings.serverEnabled) {
-            saveAudioToCombinedCache(text, voiceName, blob, cacheSettings)
-              .then(result => {
-                if (result.success) {
-                  console.log(`Cached audio for: "${text}" to ${result.savedTo}`);
-                  // キャッシュ統計を更新
-                  return getCombinedCacheStats();
-                }
-              })
-              .then(stats => {
-                if (stats) {
-                  setCacheStats(stats);
-                }
-              })
-              .catch(err => {
-                console.error('Failed to cache audio:', err);
-              });
-          }
-          
-          const url = URL.createObjectURL(blob);
-          
-          // URL をリストに追加（後でクリーンアップするため）
-          audioUrlsRef.current.push(url);
-          setAudioUrl(url);
-          
-          // コンポーネントがアンマウントされていたら処理を中止
-          if (!isMountedRef.current) {
-            URL.revokeObjectURL(url);
-            if (onAudioEnd) onAudioEnd();
-            return;
-          }
-          
-          // 音声を再生
-          if (audioRef.current) {
-            playAudio(url, onAudioEnd);
-          } else if (onAudioEnd && isMountedRef.current) {
-            // audioRefがない場合は即時コールバック
-            onAudioEnd();
-          }
-        } else if (onAudioEnd && isMountedRef.current) {
-          onAudioEnd();
-        }
+      setAudioUrl(nextWordAudioPath);
+      if (audioRef.current) {
+        playAudio(nextWordAudioPath, onAudioEnd);
       } else if (onAudioEnd && isMountedRef.current) {
         onAudioEnd();
       }
-    } catch (err: any) {
-      const errorMessage = err?.message || 'Unknown error';
-      console.error('Text-to-speech error:', errorMessage);
-      if (isMountedRef.current) {
-        setError(`Failed to generate speech: ${errorMessage}`);
-      }
+    } catch (err) {
+      console.error('Error playing fallback next word audio:', err);
       if (onAudioEnd && isMountedRef.current) onAudioEnd();
-    } finally {
-      if (isMountedRef.current) {
-        setIsLoading(false);
-      }
     }
-  }, [apiKey, isApiAvailable, voiceName, cacheSettings]);
+    
+    // API生成部分を削除（すべてサーバー上のMP3を使用する）
+  }, []);
 
   // 音声再生の共通処理を分離
   const playAudio = useCallback((url: string, onAudioEnd?: () => void) => {
@@ -844,22 +696,11 @@ export default function JungVoiceTest({
         setEmotionTrackingError('感情トラッキングの有効化に失敗しました。');
       }
       
-      // Check API availability with a simple request
-      try {
-        await axiosInstance.current.get('/v0/batch/jobs', {
-          params: { limit: 1 }
-        });
-        setIsApiAvailable(true);
-      } catch (err) {
-        console.warn('Hume API may not be available:', err);
-        setIsApiAvailable(false);
-      }
+      // 余分なイントロの再生を削除（すでに初期化時に再生されている）
+      // await speakNextWord(AI_GUIDE_MESSAGES.introduction);
       
-      // 初回メッセージの再生
-      await speakNextWord(AI_GUIDE_MESSAGES.introduction);
-      
-      // メッセージの記録
-      addMessage([{ text: AI_GUIDE_MESSAGES.introduction, role: 'assistant' }]);
+      // メッセージの記録（すでに記録されているためコメントアウト）
+      // addMessage([{ text: AI_GUIDE_MESSAGES.introduction, role: 'assistant' }]);
       
       console.log('Starting test, setting current word index to 0');
       
@@ -1660,225 +1501,232 @@ export default function JungVoiceTest({
   };
 
   return (
-    <div className={`max-w-3xl mx-auto ${className}`}>
-      {error && (
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-md">
-          <p>{error}</p>
-        </div>
-      )}
+    <div 
+      className={`min-h-[50vh] flex items-center justify-center bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md ${className}`}
+    >
+      {/* Add audio element here */}
+      <audio ref={audioRef} className="hidden" controls />
       
-      {emotionTrackingError && (
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-md">
-          <p>感情認識エラー: {emotionTrackingError}</p>
-        </div>
-      )}
-      
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold mb-2 text-gray-800 dark:text-white">
-            Spirt in Physics (Jung's Word Association Test Embedding Model)</h2>
-          <p className="text-gray-600 dark:text-gray-300">
-            This test explores your immediate mental associations. I'll present words, and you respond with the first word that comes to mind.
-          </p>
-        </div>
-        
-        {/* Webcam component for facial emotion tracking */}
-        {isTracking && currentWordIndex >= 0 && !testComplete && (
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-white">
-              表情分析
-            </h3>
-            <WebcamComponent 
-              isActive={isTracking}
-              showLabels={true}
-              width={320}
-              height={240}
-            />
-            <p className="text-sm text-gray-500 text-center mt-2">
-              あなたの表情から感情を分析しています
-            </p>
+      <div className="w-full max-w-2xl">
+        {error && (
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-md">
+            <p>{error}</p>
           </div>
         )}
         
-        {currentWordIndex < 0 ? (
-          <div className="flex flex-col items-center">
-            <Button 
-              onClick={startTest} 
-              disabled={isLoading}
-              className="mt-4"
-            >
-              {isLoading ? 'Connecting...' : 'Start Test'}
-            </Button>
-            
-            {/* Add auto-advance toggle */}
-            <div className="mt-4 flex items-center">
-              <input
-                type="checkbox"
-                id="autoAdvance"
-                checked={autoAdvanceRef.current}
-                onChange={(e) => {
-                  autoAdvanceRef.current = e.target.checked;
-                }}
-                className="mr-2"
-              />
-              <label htmlFor="autoAdvance" className="text-gray-700 dark:text-gray-300">
-                Auto-advance to next word
-              </label>
-            </div>
-            
-            {isLoading && (
-              <div className="mt-4 flex items-center">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-800 dark:border-white"></div>
-                <span className="ml-2 text-gray-700 dark:text-gray-300">Connecting to Hume AI...</span>
-              </div>
-            )}
+        {emotionTrackingError && (
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-md">
+            <p>感情認識エラー: {emotionTrackingError}</p>
           </div>
-        ) : !testComplete ? (
-          <div className="text-center">
-            <div className="mb-8">
-              <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">Word {currentWordIndex + 1} / {stimulusWords.length}</p>
-              <h3 className="text-3xl font-bold text-gray-800 dark:text-white">{stimulusWords[currentWordIndex]}</h3>
-            </div>
-            
-            {/* 音声再生ボタン */}
-            {/* {audioUrl && (
-              <Button 
-                onClick={() => audioRef.current?.play()}
-                className="mb-4 flex items-center gap-2"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                </svg>
-                Play Word
-              </Button>
-            )} */}
-            
+        )}
+        
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold mb-2 text-gray-800 dark:text-white">
+              Spirt in Physics (Jung's Word Association Test Embedding Model)</h2>
+            <p className="text-gray-600 dark:text-gray-300">
+              This test explores your immediate mental associations. I'll present words, and you respond with the first word that comes to mind.
+            </p>
+          </div>
+          
+          {/* Webcam component for facial emotion tracking */}
+          {isTracking && currentWordIndex >= 0 && !testComplete && (
             <div className="mb-6">
-              {isListening ? (
-                <div className="flex flex-col items-center">
-                  <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mb-2 animate-pulse">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                    </svg>
-                  </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">Listening...</p>
-                  <p className="mt-2 text-lg text-gray-800 dark:text-white">{userResponse}</p>
-                  <Button
-                    onClick={stopListening}
-                    className="mt-4 bg-red-600 hover:bg-red-700"
-                  >
-                    Stop
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center">
-                  <Button
-                    onClick={startListening}
-                    className="mt-2"
-                    disabled={!isSpeechSupported || isLoading}
-                  >
-                    Respond by Voice
-                  </Button>
-                  
-                  {/* Only show manual controls when auto-advance is disabled */}
-                  {!autoAdvanceRef.current && userResponse && (
-                    <div className="mt-4">
-                      <p className="mb-2 text-lg text-gray-800 dark:text-white">{userResponse}</p>
-                      
-                      <Button
-                        onClick={() => recordResponseSafely(userResponse)}
-                        disabled={!userResponse.trim() || isLoading}
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  )}
-                  
-                  {/* Add toggle for auto-advance mode during the test */}
-                  <div className="mt-4 flex items-center">
-                    <input
-                      type="checkbox"
-                      id="autoAdvanceRunning"
-                      checked={autoAdvanceRef.current}
-                      onChange={(e) => {
-                        autoAdvanceRef.current = e.target.checked;
-                      }}
-                      className="mr-2"
-                    />
-                    <label htmlFor="autoAdvanceRunning" className="text-gray-700 dark:text-gray-300">
-                      Auto-advance to next word
-                    </label>
-                  </div>
+              <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-white">
+                表情分析
+              </h3>
+              <WebcamComponent 
+                isActive={isTracking}
+                showLabels={true}
+                width={320}
+                height={240}
+              />
+              <p className="text-sm text-gray-500 text-center mt-2">
+                あなたの表情から感情を分析しています
+              </p>
+            </div>
+          )}
+          
+          {currentWordIndex < 0 ? (
+            <div className="flex flex-col items-center">
+              <Button 
+                onClick={startTest} 
+                disabled={isLoading}
+                className="mt-4"
+              >
+                {isLoading ? 'Connecting...' : 'Start Test'}
+              </Button>
+              
+              {/* Add auto-advance toggle */}
+              <div className="mt-4 flex items-center">
+                <input
+                  type="checkbox"
+                  id="autoAdvance"
+                  checked={autoAdvanceRef.current}
+                  onChange={(e) => {
+                    autoAdvanceRef.current = e.target.checked;
+                  }}
+                  className="mr-2"
+                />
+                <label htmlFor="autoAdvance" className="text-gray-700 dark:text-gray-300">
+                  Auto-advance to next word
+                </label>
+              </div>
+              
+              {isLoading && (
+                <div className="mt-4 flex items-center">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-800 dark:border-white"></div>
+                  <span className="ml-2 text-gray-700 dark:text-gray-300">Connecting to Hume AI...</span>
                 </div>
               )}
             </div>
-            
-            <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md">
-              <h4 className="font-medium mb-2 text-gray-800 dark:text-white">Conversation Log</h4>
-              <div className="max-h-48 overflow-y-auto">
-                {messages.map((msg, index) => (
-                  <div
-                    key={index}
-                    className={`mb-2 p-2 rounded-md ${
-                      msg.role === 'assistant' ? 'bg-blue-100 text-left' : 'bg-green-100 text-right'
-                    }`}
-                  >
-                    <p className="text-gray-800 dark:text-white">{msg.text}</p>
-                    <small className="text-xs text-gray-600 dark:text-gray-300">
-                      {new Date().toLocaleTimeString()}
-                    </small>
+          ) : !testComplete ? (
+            <div className="text-center">
+              <div className="mb-8">
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">Word {currentWordIndex + 1} / {stimulusWords.length}</p>
+                <h3 className="text-3xl font-bold text-gray-800 dark:text-white">{stimulusWords[currentWordIndex]}</h3>
+              </div>
+              
+              {/* 音声再生ボタン */}
+              {audioUrl && (
+                <Button 
+                  onClick={() => audioRef.current?.play()}
+                  className="mb-4 flex items-center gap-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                  </svg>
+                  Play Word
+                </Button>
+              )}
+              
+              <div className="mb-6">
+                {isListening ? (
+                  <div className="flex flex-col items-center">
+                    <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mb-2 animate-pulse">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                      </svg>
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">Listening...</p>
+                    <p className="mt-2 text-lg text-gray-800 dark:text-white">{userResponse}</p>
+                    <Button
+                      onClick={stopListening}
+                      className="mt-4 bg-red-600 hover:bg-red-700"
+                    >
+                      Stop
+                    </Button>
                   </div>
-                ))}
+                ) : (
+                  <div className="flex flex-col items-center">
+                    <Button
+                      onClick={startListening}
+                      className="mt-2"
+                      disabled={!isSpeechSupported || isLoading}
+                    >
+                      Respond by Voice
+                    </Button>
+                    
+                    {/* Only show manual controls when auto-advance is disabled */}
+                    {!autoAdvanceRef.current && userResponse && (
+                      <div className="mt-4">
+                        <p className="mb-2 text-lg text-gray-800 dark:text-white">{userResponse}</p>
+                        
+                        <Button
+                          onClick={() => recordResponseSafely(userResponse)}
+                          disabled={!userResponse.trim() || isLoading}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    )}
+                    
+                    {/* Add toggle for auto-advance mode during the test */}
+                    <div className="mt-4 flex items-center">
+                      <input
+                        type="checkbox"
+                        id="autoAdvanceRunning"
+                        checked={autoAdvanceRef.current}
+                        onChange={(e) => {
+                          autoAdvanceRef.current = e.target.checked;
+                        }}
+                        className="mr-2"
+                      />
+                      <label htmlFor="autoAdvanceRunning" className="text-gray-700 dark:text-gray-300">
+                        Auto-advance to next word
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md">
+                <h4 className="font-medium mb-2 text-gray-800 dark:text-white">Conversation Log</h4>
+                <div className="max-h-48 overflow-y-auto">
+                  {messages.map((msg, index) => (
+                    <div
+                      key={index}
+                      className={`mb-2 p-2 rounded-md ${
+                        msg.role === 'assistant' ? 'bg-blue-100 text-left' : 'bg-green-100 text-right'
+                      }`}
+                    >
+                      <p className="text-gray-800 dark:text-white">{msg.text}</p>
+                      <small className="text-xs text-gray-600 dark:text-gray-300">
+                        {new Date().toLocaleTimeString()}
+                      </small>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="text-center">
-            <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Test Complete</h3>
-            
-            <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-md mb-6">
-              <p className="mb-2">
-                <span className="font-medium text-gray-800 dark:text-white">Average reaction time:</span> <span className="text-gray-800 dark:text-blue-300">{averageReactionTime} ms</span>
-              </p>
-              <p>
-                <span className="font-medium text-gray-800 dark:text-white">Delayed responses:</span> <span className="text-gray-800 dark:text-blue-300">{delayedResponses} / {userResponses.length}</span>
-              </p>
-            </div>
-            
-            <h4 className="text-lg font-medium mb-3 text-gray-800 dark:text-white">Your Responses</h4>
-            <div className="max-h-80 overflow-y-auto mb-6">
-              <table className="w-full border-collapse">
-                <thead className="bg-gray-50 dark:bg-gray-700">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-800 dark:text-white">Stimulus</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-800 dark:text-white">Response</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-800 dark:text-white">Time (ms)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {userResponses.map((resp, index) => (
-                    <tr key={index} className={withExtras(resp).isDelayed ? "bg-yellow-50 dark:bg-yellow-700" : (index % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-gray-50 dark:bg-gray-700")}>
-                      <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.stimulusWord}</td>
-                      <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.responseWord}</td>
-                      <td className={`px-4 py-2 text-sm ${withExtras(resp).isDelayed ? "text-red-600 dark:text-red-400 font-medium" : "text-gray-800 dark:text-blue-300"}`}>
-                        {resp.reactionTimeMs}
-                      </td>
+          ) : (
+            <div className="text-center">
+              <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Test Complete</h3>
+              
+              <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-md mb-6">
+                <p className="mb-2">
+                  <span className="font-medium text-gray-800 dark:text-white">Average reaction time:</span> <span className="text-gray-800 dark:text-blue-300">{averageReactionTime} ms</span>
+                </p>
+                <p>
+                  <span className="font-medium text-gray-800 dark:text-white">Delayed responses:</span> <span className="text-gray-800 dark:text-blue-300">{delayedResponses} / {userResponses.length}</span>
+                </p>
+              </div>
+              
+              <h4 className="text-lg font-medium mb-3 text-gray-800 dark:text-white">Your Responses</h4>
+              <div className="max-h-80 overflow-y-auto mb-6">
+                <table className="w-full border-collapse">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-800 dark:text-white">Stimulus</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-800 dark:text-white">Response</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-800 dark:text-white">Time (ms)</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {userResponses.map((resp, index) => (
+                      <tr key={index} className={withExtras(resp).isDelayed ? "bg-yellow-50 dark:bg-yellow-700" : (index % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-gray-50 dark:bg-gray-700")}>
+                        <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.stimulusWord}</td>
+                        <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.responseWord}</td>
+                        <td className={`px-4 py-2 text-sm ${withExtras(resp).isDelayed ? "text-red-600 dark:text-red-400 font-medium" : "text-gray-800 dark:text-blue-300"}`}>
+                          {resp.reactionTimeMs}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              <p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
+                Note: Highlighted rows indicate delayed responses (&gt; 2 seconds), which Jung considered
+                potentially significant and might indicate emotional complexes.
+              </p>
+              
+              <Button onClick={resetTest} className="px-6 py-2">
+                Take Test Again
+              </Button>
             </div>
-            
-            <p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
-              Note: Highlighted rows indicate delayed responses (&gt; 2 seconds), which Jung considered
-              potentially significant and might indicate emotional complexes.
-            </p>
-            
-            <Button onClick={resetTest} className="px-6 py-2">
-              Take Test Again
-            </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
