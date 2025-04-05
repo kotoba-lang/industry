@@ -45,6 +45,55 @@ interface SpeechRecognition extends EventTarget {
   onend: () => void;
 }
 
+// IPアドレスに基づく言語設定のマッピング
+const IP_LANGUAGE_MAPPING: {[key: string]: string} = {
+  // アジア地域
+  '124.': 'ja-JP', // 日本
+  '203.': 'ja-JP', // 日本の別の範囲
+  '211.': 'ko-KR', // 韓国
+  '58.': 'zh-CN', // 中国
+  '59.': 'zh-CN', // 中国
+  '60.': 'zh-CN', // 中国
+  '61.': 'zh-CN', // 中国
+  '219.': 'zh-CN', // 中国
+  '220.': 'zh-CN', // 中国
+  '221.': 'zh-CN', // 中国
+  // 欧州地域
+  '91.': 'en-GB', // イギリス
+  '81.': 'de-DE', // ドイツ
+  '82.': 'fr-FR', // フランス
+  '79.': 'es-ES', // スペイン
+  '83.': 'it-IT', // イタリア
+  // 北米
+  '64.': 'en-US', // アメリカ
+  '65.': 'en-US', // アメリカ
+  '66.': 'en-US', // アメリカ
+  '67.': 'en-US', // アメリカ
+  '68.': 'en-US', // アメリカ
+  '69.': 'en-US', // アメリカ
+  '70.': 'en-US', // アメリカ
+  '71.': 'en-US', // アメリカ
+  '72.': 'en-US', // アメリカ
+  '24.': 'en-CA', // カナダ
+};
+
+// IPアドレスプレフィックスに基づいて言語を取得
+const getLanguageFromIP = (ipAddress: string): string => {
+  // デフォルト言語（IP情報がない場合）
+  const defaultLang = 'en-US';
+  
+  if (!ipAddress) return defaultLang;
+  
+  // IPアドレスのプレフィックスを確認
+  for (const prefix in IP_LANGUAGE_MAPPING) {
+    if (ipAddress.startsWith(prefix)) {
+      return IP_LANGUAGE_MAPPING[prefix];
+    }
+  }
+  
+  return defaultLang;
+};
+
 // ユングの100の刺激語（1910年の論文より）
 export const JUNG_STIMULUS_WORDS = [
   'head', 'green', 'water', 'to sing', 'dead', 'long', 'ship', 'to pay', 'window', 'friendly',
@@ -77,20 +126,46 @@ export default function JungVoiceTest({
   apiKey = process.env.NEXT_PUBLIC_HUME_API_KEY || '',
   generationId = '795c949a-1510-4a80-9646-7d0863b023ab',
   voiceName = 'David Hume',
-  speechRecognitionLang = 'en-US',
+  speechRecognitionLang,
   onTestComplete,
   className = '',
 }: JungVoiceTestProps) {
-  // プロップスのバリデーション
+  // IPアドレスの状態
+  const [ipAddress, setIpAddress] = useState<string>('');
+  
+  // IPアドレスに基づいた言語設定
+  const detectedLanguage = useMemo(() => getLanguageFromIP(ipAddress), [ipAddress]);
+  
+  // speechRecognitionLangが明示的に指定されていない場合、IPアドレスに基づいて設定
+  const effectiveSpeechRecognitionLang = speechRecognitionLang || detectedLanguage || 'en-US';
+  
+  // プロップスのバリデーション (修正された言語設定を使用)
   const validatedProps = JungVoiceAssessmentPropsSchema.parse({
     numberOfWords,
     apiKey,
     generationId,
     voiceName,
-    speechRecognitionLang,
+    speechRecognitionLang: effectiveSpeechRecognitionLang,
     onTestComplete,
     className
   });
+
+  // IPアドレスを取得
+  useEffect(() => {
+    const fetchIPAddress = async () => {
+      try {
+        const response = await axios.get('https://api.ipify.org?format=json');
+        if (response.data && response.data.ip) {
+          setIpAddress(response.data.ip);
+          console.log(`IP address detected: ${response.data.ip}, Setting language to: ${getLanguageFromIP(response.data.ip)}`);
+        }
+      } catch (error) {
+        console.error('Failed to fetch IP address:', error);
+      }
+    };
+    
+    fetchIPAddress();
+  }, []);
 
   // 使用する刺激語の数を制限し、ランダムに選択する
   const stimulusWords = useMemo(() => {
@@ -130,6 +205,9 @@ export default function JungVoiceTest({
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const audioUrlsRef = useRef<string[]>([]);
   const isMountedRef = useRef<boolean>(true);
+
+  // 各単語ごとの開始時間を保存するための参照を追加
+  const wordStartTimesRef = useRef<Record<number, number>>({});
 
   // 新しい状態変数
   const [cacheSettings, setCacheSettings] = useState<CacheSettings>({
@@ -204,7 +282,7 @@ export default function JungVoiceTest({
       if (recognitionRef.current) {
         recognitionRef.current.continuous = false;
         recognitionRef.current.interimResults = true;
-        recognitionRef.current.lang = speechRecognitionLang;
+        recognitionRef.current.lang = effectiveSpeechRecognitionLang;
         
         recognitionRef.current.onresult = (event) => {
           const transcript = Array.from(event.results)
@@ -276,8 +354,8 @@ export default function JungVoiceTest({
               setError('Network error occurred. Please check your connection and try again.');
             } else if (errorType === 'language-not-supported') {
               // Language not supported error
-              console.warn(`Language ${speechRecognitionLang} not supported, falling back to en-US`);
-              setError(`Language "${speechRecognitionLang}" is not supported by your browser. Falling back to English (US).`);
+              console.warn(`Language ${effectiveSpeechRecognitionLang} not supported, falling back to en-US`);
+              setError(`Language "${effectiveSpeechRecognitionLang}" is not supported by your browser. Falling back to English (US).`);
               
               // Try to fall back to English
               if (recognitionRef.current) {
@@ -350,7 +428,7 @@ export default function JungVoiceTest({
         }
       }
     };
-  }, [speechRecognitionLang, currentWordIndex]);
+  }, [effectiveSpeechRecognitionLang, currentWordIndex]);
 
   // Hume クライアントの初期化
   useEffect(() => {
@@ -881,8 +959,18 @@ export default function JungVoiceTest({
       }
     }, 10000); // 10 seconds max per word
     
-    // Set the start time right before we start listening
-    setStartTime(Date.now());
+    // 現在のタイムスタンプを取得
+    const now = Date.now();
+    
+    // 現在の単語インデックスとタイムスタンプを保存
+    if (currentWordIndex >= 0) {
+      wordStartTimesRef.current[currentWordIndex] = now;
+      console.log(`[TIMER] Word ${currentWordIndex} (${stimulusWords[currentWordIndex]}) start time set: ${now}`);
+    }
+    
+    // グローバルのstartTimeも設定（互換性のため）
+    setStartTime(now);
+    console.log('Setting start time:', now);
     
     try {
       console.log('Starting speech recognition for word:', stimulusWords[currentWordIndex]);
@@ -911,6 +999,15 @@ export default function JungVoiceTest({
                 try {
                   // Only start if not already listening (check state again)
                   if (!isListening) {
+                    // Reset start time again before actual restart
+                    const newNow = Date.now();
+                    if (currentWordIndex >= 0) {
+                      wordStartTimesRef.current[currentWordIndex] = newNow;
+                      console.log(`[TIMER] Word ${currentWordIndex} (${stimulusWords[currentWordIndex]}) restart time set: ${newNow}`);
+                    }
+                    setStartTime(newNow);
+                    console.log('Resetting start time on restart:', newNow);
+                    
                     recognitionRef.current.start();
                     setIsListening(true);
                   }
@@ -1003,7 +1100,7 @@ export default function JungVoiceTest({
         if (recognitionRef.current) {
           recognitionRef.current.continuous = false;
           recognitionRef.current.interimResults = true;
-          recognitionRef.current.lang = speechRecognitionLang;
+          recognitionRef.current.lang = effectiveSpeechRecognitionLang;
           
           recognitionRef.current.onresult = (event) => {
             const transcript = Array.from(event.results)
@@ -1084,7 +1181,7 @@ export default function JungVoiceTest({
       setIsSpeechSupported(false);
       setError('Failed to initialize speech recognition after error. Please reload the page.');
     }
-  }, [speechRecognitionLang, userResponse, currentWordIndex, isListening]);
+  }, [effectiveSpeechRecognitionLang, userResponse, currentWordIndex, isListening]);
 
   // 音声認識停止
   const stopListening = () => {
@@ -1237,17 +1334,39 @@ export default function JungVoiceTest({
       const MIN_REACTION_TIME = 100;
       
       // 反応時間の計算
-      let reactionTimeMs = startTime ? Date.now() - startTime : MIN_REACTION_TIME;
+      const currentTime = Date.now();
+      
+      // 単語ごとのタイムスタンプをまず確認
+      const wordStartTime = wordStartTimesRef.current[currentWordIndex];
+      console.log(`[TIMER] Word ${currentWordIndex} (${currentWord}) has start time: ${wordStartTime}`);
+      
+      // グローバルのstartTimeも確認
+      console.log(`[TIMER] Global start time: ${startTime}`);
+      
+      // 開始時間が0または未設定の場合のチェック
+      if (!wordStartTime && !startTime) {
+        console.warn('Both word-specific and global start times were not set, using fallback minimum reaction time');
+      }
+      
+      // 単語ごとのタイムスタンプを優先し、バックアップとしてグローバルのstartTimeを使用
+      let reactionTimeMs = wordStartTime && wordStartTime > 0 
+          ? currentTime - wordStartTime 
+          : (startTime && startTime > 0 ? currentTime - startTime : MIN_REACTION_TIME);
+      
+      console.log(`[TIMER] Raw reaction time calculation: ${currentTime} - ${wordStartTime || startTime} = ${reactionTimeMs}ms`);
       
       // 反応時間が異常に短い場合は最小値に設定
       if (reactionTimeMs < MIN_REACTION_TIME) {
-        console.log(`Normalizing too short reaction time from ${reactionTimeMs}ms to ${MIN_REACTION_TIME}ms`);
+        console.log(`[TIMER] Reaction time too short: ${reactionTimeMs}ms, normalizing to ${MIN_REACTION_TIME}ms`);
+        reactionTimeMs = MIN_REACTION_TIME;
+      } else if (reactionTimeMs > 30000) { // 30秒以上も不自然
+        console.log(`[TIMER] Reaction time too long: ${reactionTimeMs}ms, normalizing to ${MIN_REACTION_TIME}ms`);
         reactionTimeMs = MIN_REACTION_TIME;
       }
       
       const isDelayed = reactionTimeMs > DELAYED_REACTION_THRESHOLD_MS;
       
-      console.log(`Response time: ${reactionTimeMs}ms, isDelayed: ${isDelayed}`);
+      console.log(`[TIMER] Final response time: ${reactionTimeMs}ms, isDelayed: ${isDelayed}`);
       
       // 新しい応答を作成
       const response: WordResponseWithExtras = {
@@ -1275,6 +1394,9 @@ export default function JungVoiceTest({
       // 現在の単語インデックスを確保（状態更新の非同期性に対応するため）
       const currentIndex = currentWordIndex;
       console.log(`Recording response for word index ${currentIndex}, is last word: ${currentIndex + 1 >= stimulusWords.length}`);
+      
+      // タイムスタンプを明示的にクリア（この単語の計測は完了したため）
+      delete wordStartTimesRef.current[currentIndex];
       
       // 応答を記録
       setUserResponses(prevResponses => {
@@ -1445,6 +1567,11 @@ export default function JungVoiceTest({
       
       console.log(`Playing audio for word: "${targetWord}"`);
       
+      // タイマーを明示的にリセット（確実に新しい測定を開始するため）
+      // 単語ごとのタイムスタンプを明示的に削除（新しい単語の測定のため）
+      delete wordStartTimesRef.current[indexToMoveTo];
+      setStartTime(0);
+      
       // 音声が終了した後に呼び出されるコールバック
       const audioCallback = () => {
         if (!isMountedRef.current) return;
@@ -1463,6 +1590,16 @@ export default function JungVoiceTest({
               setCurrentWordIndex(indexToMoveTo);
             }
             
+            // 音声再生完了時にタイマーをリセット - ユーザーが単語を聞いてから応答するまでの時間を正確に測定
+            const now = Date.now();
+            
+            // 単語ごとのタイムスタンプも設定
+            wordStartTimesRef.current[indexToMoveTo] = now;
+            console.log(`[TIMER] Word ${indexToMoveTo} (${targetWord}) callback time set: ${now}`);
+            
+            setStartTime(now);
+            console.log('Setting start time in audioCallback:', now);
+            
             startListening();
           }
         }, 300);
@@ -1478,6 +1615,17 @@ export default function JungVoiceTest({
       // Try to recover
       setTimeout(() => {
         if (isMountedRef.current && !testComplete) {
+          // タイマーをリセットしてからリスニングを開始
+          const now = Date.now();
+          
+          // 単語ごとのタイムスタンプも設定
+          if (indexToMoveTo >= 0) {
+            wordStartTimesRef.current[indexToMoveTo] = now;
+            console.log(`[TIMER] Word ${indexToMoveTo} (${stimulusWords[indexToMoveTo]}) error recovery time set: ${now}`);
+          }
+          
+          setStartTime(now);
+          console.log('Setting start time in error recovery:', now);
           startListening();
         }
       }, 500);
@@ -1663,10 +1811,10 @@ export default function JungVoiceTest({
             
             <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-md mb-6">
               <p className="mb-2">
-                <span className="font-medium text-gray-800 dark:text-white">Average reaction time:</span> {averageReactionTime} ms
+                <span className="font-medium text-gray-800 dark:text-white">Average reaction time:</span> <span className="text-gray-800 dark:text-blue-300">{averageReactionTime} ms</span>
               </p>
               <p>
-                <span className="font-medium text-gray-800 dark:text-white">Delayed responses:</span> {delayedResponses} / {userResponses.length}
+                <span className="font-medium text-gray-800 dark:text-white">Delayed responses:</span> <span className="text-gray-800 dark:text-blue-300">{delayedResponses} / {userResponses.length}</span>
               </p>
             </div>
             
@@ -1685,7 +1833,7 @@ export default function JungVoiceTest({
                     <tr key={index} className={withExtras(resp).isDelayed ? "bg-yellow-50 dark:bg-yellow-700" : (index % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-gray-50 dark:bg-gray-700")}>
                       <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.stimulusWord}</td>
                       <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.responseWord}</td>
-                      <td className={`px-4 py-2 text-sm ${withExtras(resp).isDelayed ? "text-red-600 font-medium" : ""} text-gray-800 dark:text-white`}>
+                      <td className={`px-4 py-2 text-sm ${withExtras(resp).isDelayed ? "text-red-600 dark:text-red-400 font-medium" : "text-gray-800 dark:text-blue-300"}`}>
                         {resp.reactionTimeMs}
                       </td>
                     </tr>
