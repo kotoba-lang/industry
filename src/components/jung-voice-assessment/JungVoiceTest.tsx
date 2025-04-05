@@ -78,7 +78,7 @@ export default function JungVoiceTest({
   generationId = '795c949a-1510-4a80-9646-7d0863b023ab',
   voiceName = 'David Hume',
   speechRecognitionLang = 'en-US',
-  onComplete,
+  onTestComplete,
   className = '',
 }: JungVoiceTestProps) {
   // プロップスのバリデーション
@@ -88,7 +88,7 @@ export default function JungVoiceTest({
     generationId,
     voiceName,
     speechRecognitionLang,
-    onComplete,
+    onTestComplete,
     className
   });
 
@@ -1156,14 +1156,14 @@ export default function JungVoiceTest({
       }
       
       // 応答記録処理を実行
-      recordResponse(userInput);
+      await recordResponse(userInput);
     } catch (error) {
       console.error('Error in recordResponseSafely:', error);
       // エラーからの回復を試みる
       isProcessingResponseRef.current = false;
     }
   };
-  
+
   // 応答記録時に感情データも合わせて保存
   const recordResponse = async (userInput: string) => {
     console.log(`Recording response: "${userInput.trim()}" for word index: ${currentWordIndex}`);
@@ -1233,8 +1233,18 @@ export default function JungVoiceTest({
     }
     
     try {
+      // 最小反応時間を100msに設定
+      const MIN_REACTION_TIME = 100;
+      
       // 反応時間の計算
-      const reactionTimeMs = startTime ? Date.now() - startTime : 0;
+      let reactionTimeMs = startTime ? Date.now() - startTime : MIN_REACTION_TIME;
+      
+      // 反応時間が異常に短い場合は最小値に設定
+      if (reactionTimeMs < MIN_REACTION_TIME) {
+        console.log(`Normalizing too short reaction time from ${reactionTimeMs}ms to ${MIN_REACTION_TIME}ms`);
+        reactionTimeMs = MIN_REACTION_TIME;
+      }
+      
       const isDelayed = reactionTimeMs > DELAYED_REACTION_THRESHOLD_MS;
       
       console.log(`Response time: ${reactionTimeMs}ms, isDelayed: ${isDelayed}`);
@@ -1325,58 +1335,82 @@ export default function JungVoiceTest({
       }, 500);
     }
   };
-  
+
   // テストを安全に完了させる関数
   const completeTestSafely = () => {
-    try {
-      if (testComplete) {
-        console.log('Test already marked as complete');
-        return;
+    // テスト完了フラグを設定
+    setTestComplete(true);
+    setIsLoading(false);
+    
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        console.warn('Error stopping recognition in completeTestSafely:', e);
       }
-      
-      setTestComplete(true);
-      isProcessingResponseRef.current = false;
-      
-      // Stop any ongoing recognition
-      if (recognitionRef.current && isListening) {
-        try {
-          recognitionRef.current.stop();
-        } catch (e) {
-          console.warn('Error stopping recognition during test completion:', e);
-        }
-        setIsListening(false);
+    }
+    
+    // 遅延応答の数をカウント
+    let delayedCount = 0;
+    let totalReactionTime = 0;
+    
+    // ユーザー応答を取得
+    const finalResponses = userResponses;
+    
+    // 結果をフォーマット
+    finalResponses.forEach(response => {
+      if (response.isDelayed) {
+        delayedCount++;
       }
-      
-      console.log('Completing test with responses:', userResponses);
-      
-      // 平均反応時間と遅延応答数を計算
-      const totalReactionTime = userResponses.reduce((sum, response) => sum + response.reactionTimeMs, 0);
-      const avgReactionTime = userResponses.length > 0 ? Math.round(totalReactionTime / userResponses.length) : 0;
-      const delayedCount = userResponses.filter(response => response.isDelayed).length;
+      totalReactionTime += response.reactionTimeMs;
+    });
+    
+    // 平均反応時間を計算
+    const avgReactionTime = finalResponses.length > 0 
+      ? Math.round(totalReactionTime / finalResponses.length) 
+      : 0;
+    
+    // 結果を保存
+    setAverageReactionTime(avgReactionTime);
+    setDelayedResponses(delayedCount);
+    
+    // データ収集にスリープを入れて処理を確実に完了させる
+    setTimeout(() => {
+      if (!isMountedRef.current) return;
       
       // テスト結果を作成
       const testResults: TestResults = {
-        responses: userResponses,
+        totalWords: finalResponses.length,
         averageReactionTimeMs: avgReactionTime,
         delayedResponsesCount: delayedCount,
-        totalWords: stimulusWords.length,
+        responses: finalResponses,
+        completedAt: new Date()
       };
       
-      // Call the onComplete callback with the final results
-      if (onComplete && typeof onComplete === 'function') {
-        onComplete(testResults);
+      // コールバックが定義されていれば、結果を渡す
+      if (onTestComplete) {
+        onTestComplete(testResults);
       }
       
-      // Final message
-      addMessage([{ 
-        text: AI_GUIDE_MESSAGES.complete, 
-        role: 'assistant' 
-      }]);
+      // 音声認識・音声再生のリソースをクリーンアップ
+      cleanupAudioResources();
       
-    } catch (error) {
-      console.error('Error completing test:', error);
-      setError('An error occurred while completing the test.');
-    }
+      // 音声認識を停止
+      if (recognitionRef.current) {
+        try {
+          // リスナーを全て削除
+          recognitionRef.current.onresult = () => {};
+          recognitionRef.current.onerror = () => {};
+          recognitionRef.current.onend = () => {};
+          
+          recognitionRef.current.abort();
+        } catch (e) {
+          console.warn('Error cleaning up speech recognition:', e);
+        }
+      }
+      
+      console.log('Test completed successfully with results:', testResults);
+    }, 500);
   };
   
   // 特定の単語インデックスに移動する安全な関数
