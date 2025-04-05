@@ -185,7 +185,7 @@ export default function ConsentForm({
                   ${demographicData.gender === option.value 
                     ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-500 shadow-sm' 
                     : 'hover:bg-gray-50 dark:hover:bg-gray-700 border-gray-200 dark:border-gray-600'}
-                `} onClick={() => handleDemographicChange("gender", option.value)}>
+                `}>
                   <div className="flex items-center gap-2">
                     <RadioGroupItem value={option.value} id={`gender-${option.value}`} className="h-4 w-4" />
                     <Label htmlFor={`gender-${option.value}`} className="text-xs sm:text-sm text-gray-800 dark:text-gray-200 cursor-pointer flex-1">
