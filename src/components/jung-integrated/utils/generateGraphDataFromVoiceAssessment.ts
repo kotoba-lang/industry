@@ -135,14 +135,37 @@ export function generateGraphDataFromVoiceAssessment(
       ? 7
       : (isFrequentWord(word, results.responses) ? 6 : 5);
 
-    nodes.push({
-      id: `voice_${word}`,
-      group: nodeGroup,
-      name: `${word} (${Math.round(avgReactionTime)}ms)`,
-      x,
-      y,
-      z,
-    });
+    // Note: In a real implementation, actual skin conductance (GSR) data would be collected
+    // For visualization purposes only: flag words with long reaction times as potential
+    // indicators of emotional complexes (Jung's theory)
+    const hasEmotionalComplex = avgReactionTime > DELAYED_REACTION_THRESHOLD_MS;
+
+    // Calculate emotion intensity factor based solely on word vector properties
+    // In a real implementation, this would come from facial emotion analysis
+    const vectorMagnitude = Math.sqrt(
+      wordVector.reduce((sum, component) => sum + component * component, 0),
+    );
+    const emotionIntensity = Math.min(
+      1.0,
+      vectorMagnitude * modelParams.eta * 0.2,
+    );
+
+    nodes.push(
+      {
+        id: `voice_${word}`,
+        group: nodeGroup,
+        name: `${word} (${Math.round(avgReactionTime)}ms)`,
+        x,
+        y,
+        z,
+        // Add properties for parameter impact visualization
+        reactionTime: avgReactionTime,
+        // We don't collect skin potential data from voice assessment
+        // Instead use reaction time threshold to indicate potential complexes
+        hasEmotionalComplex,
+        emotionIntensity: emotionIntensity,
+      } as GraphData["nodes"][0],
+    );
 
     // Create link between field and word node
     const strength = getStrengthBasedOnState(effectiveState, "field-word") *
