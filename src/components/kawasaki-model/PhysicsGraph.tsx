@@ -14,6 +14,7 @@ interface PhysicsGraphProps {
   speed: number
   selectedElement: string | null
   setSelectedElement: (name: string | null) => void
+  lastAdjustedParam?: string | null
 }
 
 const PhysicsGraph: React.FC<PhysicsGraphProps> = ({
@@ -24,6 +25,7 @@ const PhysicsGraph: React.FC<PhysicsGraphProps> = ({
   speed,
   selectedElement,
   setSelectedElement,
+  lastAdjustedParam,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const fgRef = useRef<any>(null)
@@ -310,18 +312,31 @@ const PhysicsGraph: React.FC<PhysicsGraphProps> = ({
   // Create node object function with Zen-inspired aesthetics
   const createNodeObject = (node: any) => {
     const group = new THREE.Group()
-    const isField = node.id === "field"
+    const isField = node.id === "field" || node.id === "voice_field"
     const isSelected = node.name === selectedElement
+    const isHighlighted = node.highlighted
 
-    // Node size - field is larger, selected nodes are slightly larger
-    const size = isField ? 12 : isSelected ? 5 : 3.5
+    // Node size - field is larger, selected nodes are slightly larger, highlighted nodes also larger
+    const size = isField ? 12 : isSelected ? 5 : isHighlighted ? 4.5 : 3.5
 
     // Create geometry based on node type for visual variety
     let geometry
     let material
 
-    // 常にライトモード用の色を使用
-    const nodeColor = isSelected ? 0x8c4a3a : 0x8c6a5a;
+    // Select color based on node properties
+    let nodeColor = isSelected ? 0x8c4a3a : 0x8c6a5a;
+
+    // Parameter impact coloring (when parameter is adjusted)
+    if (isHighlighted && lastAdjustedParam) {
+      // Different colors for different parameters
+      if (lastAdjustedParam === 'alpha') {
+        nodeColor = 0x6a5aec; // Blue-purple for reaction speed
+      } else if (lastAdjustedParam === 'gamma' || lastAdjustedParam === 'lambda') {
+        nodeColor = 0x5aec6a; // Green for skin potential/emotional response
+      } else if (lastAdjustedParam === 'eta') {
+        nodeColor = 0xec6a5a; // Red-orange for facial emotion
+      }
+    }
 
     if (isField) {
       // Field node as a simple sphere - represents emptiness/wholeness
@@ -354,8 +369,8 @@ const PhysicsGraph: React.FC<PhysicsGraphProps> = ({
 
     const mesh = new THREE.Mesh(geometry, material)
 
-    // Add subtle animation for selected nodes
-    if (isSelected) {
+    // Add subtle animation for selected or highlighted nodes
+    if (isSelected || isHighlighted) {
       const pulseAnimation = () => {
         const scale = 1 + Math.sin(Date.now() * 0.003) * 0.1
         mesh.scale.set(scale, scale, scale)
@@ -367,10 +382,70 @@ const PhysicsGraph: React.FC<PhysicsGraphProps> = ({
     group.add(mesh)
 
     // Create text sprite
-    const textSprite = createTextSprite(node.name, isField ? 1.8 : 1.2, isSelected)
+    const textSprite = createTextSprite(node.name, isField ? 1.8 : 1.2, isSelected || isHighlighted)
     if (textSprite) {
       textSprite.position.set(0, size + 8, 0)
       group.add(textSprite)
+    }
+
+    // Add parameter indicators for affected nodes (small spheres around the node)
+    if (node.affectedByAlpha || node.affectedByGamma || node.affectedByLambda || node.affectedByEta) {
+      const indicatorSize = size * 0.3
+      const indicatorDistance = size * 1.2
+      
+      // Position indicators in a circle around the node
+      let indicators = 0
+      let angle = 0
+      
+      if (node.affectedByAlpha) {
+        const indicator = new THREE.Mesh(
+          new THREE.SphereGeometry(indicatorSize, 8, 8),
+          new THREE.MeshPhongMaterial({ color: 0x6a5aec }) // Blue-purple
+        )
+        const x = Math.cos(angle) * indicatorDistance
+        const y = Math.sin(angle) * indicatorDistance
+        indicator.position.set(x, y, size)
+        group.add(indicator)
+        indicators++
+        angle += Math.PI * 2 / 4
+      }
+      
+      if (node.affectedByGamma) {
+        const indicator = new THREE.Mesh(
+          new THREE.SphereGeometry(indicatorSize, 8, 8),
+          new THREE.MeshPhongMaterial({ color: 0x5aec6a }) // Green
+        )
+        const x = Math.cos(angle) * indicatorDistance
+        const y = Math.sin(angle) * indicatorDistance
+        indicator.position.set(x, y, size)
+        group.add(indicator)
+        indicators++
+        angle += Math.PI * 2 / 4
+      }
+      
+      if (node.affectedByLambda) {
+        const indicator = new THREE.Mesh(
+          new THREE.SphereGeometry(indicatorSize, 8, 8),
+          new THREE.MeshPhongMaterial({ color: 0xdaec5a }) // Yellow
+        )
+        const x = Math.cos(angle) * indicatorDistance
+        const y = Math.sin(angle) * indicatorDistance
+        indicator.position.set(x, y, size)
+        group.add(indicator)
+        indicators++
+        angle += Math.PI * 2 / 4
+      }
+      
+      if (node.affectedByEta) {
+        const indicator = new THREE.Mesh(
+          new THREE.SphereGeometry(indicatorSize, 8, 8),
+          new THREE.MeshPhongMaterial({ color: 0xec6a5a }) // Red-orange
+        )
+        const x = Math.cos(angle) * indicatorDistance
+        const y = Math.sin(angle) * indicatorDistance
+        indicator.position.set(x, y, size)
+        group.add(indicator)
+      }
     }
 
     return group
