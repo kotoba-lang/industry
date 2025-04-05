@@ -1,13 +1,15 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { generateGraphData } from "@/components/kawasaki-model/utils/generateGraphData"
 import dynamic from "next/dynamic"
 import PhysicsStateMachine from "@/components/kawasaki-model/PhysicsStateMachine"
 import ModelParamsControl from "@/components/kawasaki-model/ModelParamsControl"
 import { useAnimation } from "@/components/kawasaki-model/hooks/useAnimation"
 import { defaultModelParams, type IntegratedModelParams } from "@/components/kawasaki-model/utils/integratedModel"
+import { useKawasakiStore } from "@/store/kawasakiStore"
+import { generateGraphDataFromVoiceAssessment } from "@/components/jung-integrated/utils/generateGraphDataFromVoiceAssessment"
 
 const PhysicsGraph = dynamic(() => import("@/components/kawasaki-model/PhysicsGraph"), { ssr: false })
 
@@ -27,11 +29,39 @@ export default function Home() {
   const [selectedElement, setSelectedElement] = useState<string | null>(null)
   const [modelParams, setModelParams] = useState<IntegratedModelParams>(defaultModelParams)
 
+  // Get voice assessment data from Zustand store
+  const voiceAssessments = useKawasakiStore((state) => state.voiceAssessments)
+
   // Set particle count to 50 (half of Jung's 100 words for performance)
   const particleCount = 50
 
   // Generate graph data (pass integrated model parameters)
-  const graphData = generateGraphData(particleCount, transitionState, time, modelParams)
+  const baseGraphData = useMemo(() => 
+    generateGraphData(particleCount, transitionState, time, modelParams),
+    [particleCount, transitionState, time, modelParams]
+  )
+  
+  // Generate voice assessment graph data
+  const voiceGraphData = useMemo(() => {
+    if (voiceAssessments && voiceAssessments.length > 0) {
+      // Use the most recent voice assessment
+      const latestAssessment = voiceAssessments[voiceAssessments.length - 1]
+      
+      return generateGraphDataFromVoiceAssessment(
+        latestAssessment.results,
+        transitionState,
+        time,
+        modelParams
+      )
+    }
+    return { nodes: [], links: [] }
+  }, [voiceAssessments, transitionState, time, modelParams])
+  
+  // Combine graph data
+  const combinedGraphData = useMemo(() => ({
+    nodes: [...baseGraphData.nodes, ...voiceGraphData.nodes],
+    links: [...baseGraphData.links, ...voiceGraphData.links]
+  }), [baseGraphData, voiceGraphData])
 
   const handleFrameRateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setFrameRate(Number(event.target.value))
@@ -47,6 +77,13 @@ export default function Home() {
         <h1 className="text-xl font-bold text-gray-800 tracking-wide">
           Spirit in Physics ( Jung's Word Association Test Embedding Model )
         </h1>
+        {voiceAssessments.length > 0 && (
+          <p className="text-sm text-gray-600">
+            Voice assessment data included ({voiceAssessments.length} test{voiceAssessments.length !== 1 ? 's' : ''})
+            {voiceGraphData.nodes.length > 0 && 
+              ` - ${voiceGraphData.nodes.length - 1} words with latency reflected in distance`}
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-12 gap-0 h-full">
@@ -79,6 +116,14 @@ export default function Home() {
                 <span>Facial emotion analysis (η parameter)</span>
               </li>
             </ul>
+            {voiceGraphData.nodes.length > 0 && (
+              <>
+                <h4 className="font-semibold mt-3 mb-1 text-gray-800">Voice Assessment Data</h4>
+                <p className="leading-relaxed">
+                  Words with longer reaction times appear closer to the center, following Jung's theory of complexes.
+                </p>
+              </>
+            )}
             <p className="mt-2 leading-relaxed">
               Adjust parameters to visualize how different psychological factors influence word associations in the
               Zen-inspired space.
@@ -89,7 +134,7 @@ export default function Home() {
         {/* Main visualization area */}
         <div className="col-span-12 md:col-span-9 lg:col-span-10 border-0 md:border-l border-gray-200 overflow-hidden bg-gradient-to-br from-white/80 to-gray-100/80 backdrop-blur-sm">
           <PhysicsGraph
-            data={graphData}
+            data={combinedGraphData}
             frameRate={frameRate}
             time={time}
             isPlaying={isPlaying}
