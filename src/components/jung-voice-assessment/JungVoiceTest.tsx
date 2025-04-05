@@ -6,17 +6,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { Button } from '../ui/button';
 import { JungVoiceTestProps, TestResults, Message } from './types';
 import { JungVoiceAssessmentPropsSchema, TestResultsSchema } from './schema';
-import { getAudioFromCache, saveAudioToCache, getAudioCacheSize } from './utils/audioCache';
-import AudioCacheManager from './utils/cacheManager';
-import { 
-  getCombinedCacheStats, 
-  getAudioFromCombinedCache, 
-  saveAudioToCombinedCache,
-  CacheSettings,
-  CacheType,
-  CacheStats
-} from './utils/combinedAudioCache';
-import CombinedCacheManager from './utils/combinedCacheManager';
 import WebcamComponent from '../webcam/WebcamComponent';
 import { HumeFaceResponse } from '@/lib/actions/hume-service';
 import { saveEmotionData, getEmotionData } from '@/lib/actions/emotion-actions';
@@ -113,13 +102,16 @@ const DELAYED_REACTION_THRESHOLD_MS = 2000;
 
 // AIガイドメッセージ
 const AI_GUIDE_MESSAGES = {
-  introduction: "Welcome to Spirit in Physics (Jung's Word Association Test Embedding Model). I'll present a series of words to you. For each word, please respond verbally with the first word that comes to mind. I'll analyze your reaction times and response patterns. When you're ready, say 'begin' or click the start button.",
+  // introduction: "Welcome to Spirit in Physics (Jung's Word Association Test Embedding Model). I'll present a series of words to you. For each word, please respond verbally with the first word that comes to mind. I'll analyze your reaction times and response patterns. When you're ready, say 'begin' or click the start button.",
   nextWord: "Next word:",
   testComplete: "The test is now complete. Thank you for your responses. I'm analyzing your results.",
   delayed: "Next word:",
   normal: "Next word:",
   complete: "Test complete. Thank you for your responses."
 };
+
+// 定数として初期メッセージを定義
+const INTRODUCTION_MESSAGE = "Welcome to Spirit in Physics (Jung's Word Association Test Embedding Model). I'll present a series of words to you. For each word, please respond verbally with the first word that comes to mind. I'll analyze your reaction times and response patterns. When you're ready, say 'begin' or click the start button.";
 
 export default function JungVoiceTest({
   numberOfWords = 100,
@@ -208,15 +200,6 @@ export default function JungVoiceTest({
 
   // 各単語ごとの開始時間を保存するための参照を追加
   const wordStartTimesRef = useRef<Record<number, number>>({});
-
-  // 新しい状態変数
-  const [cacheSettings, setCacheSettings] = useState<CacheSettings>({
-    clientEnabled: true,
-    serverEnabled: true,
-    preferServer: true
-  });
-  const [cacheStats, setCacheStats] = useState<CacheStats | null>(null);
-  const [showCacheManager, setShowCacheManager] = useState<boolean>(false);
 
   // 新しい状態変数 - 感情認識用
   const [currentFaceData, setCurrentFaceData] = useState<HumeFaceResponse | null>(null);
@@ -439,12 +422,12 @@ export default function JungVoiceTest({
       } else {
         setError(null);
       }
-      
+
       // 初期AIメッセージを追加
-      addMessage([{ text: AI_GUIDE_MESSAGES.introduction, role: 'assistant' }]);
+      addMessage([{ text: INTRODUCTION_MESSAGE, role: 'assistant' }]);
       
       // 初期メッセージを音声で読み上げ
-      generateAndPlaySpeech(AI_GUIDE_MESSAGES.introduction);
+      generateAndPlaySpeech(INTRODUCTION_MESSAGE);
       
     } catch (err) {
       console.error('Hume client initialization error:', err);
@@ -491,7 +474,7 @@ export default function JungVoiceTest({
     let audioPath = '';
     
     // Map the guide messages to their audio files
-    if (text === AI_GUIDE_MESSAGES.introduction) {
+    if (text === INTRODUCTION_MESSAGE) {
       audioPath = '/audio/Welcome_to_Spirit_in_e4385e4e.mp3';
     } else if (text === AI_GUIDE_MESSAGES.nextWord || 
                text === AI_GUIDE_MESSAGES.delayed || 
@@ -567,8 +550,6 @@ export default function JungVoiceTest({
       console.error('Error playing fallback next word audio:', err);
       if (onAudioEnd && isMountedRef.current) onAudioEnd();
     }
-    
-    // API生成部分を削除（すべてサーバー上のMP3を使用する）
   }, []);
 
   // 音声再生の共通処理を分離
@@ -1083,25 +1064,6 @@ export default function JungVoiceTest({
     }
   };
 
-  // キャッシュ設定を更新するコールバック
-  const handleCacheSettingsChange = useCallback((newSettings: CacheSettings) => {
-    setCacheSettings(newSettings);
-  }, []);
-
-  // 初期ロード時に統合キャッシュの統計を取得
-  useEffect(() => {
-    const loadCacheStats = async () => {
-      try {
-        const stats = await getCombinedCacheStats();
-        setCacheStats(stats);
-      } catch (err) {
-        console.error('Failed to load cache stats:', err);
-      }
-    };
-    
-    loadCacheStats();
-  }, []);
-
   // Clean up timeouts when component unmounts
   useEffect(() => {
     return () => {
@@ -1609,7 +1571,7 @@ export default function JungVoiceTest({
                       </svg>
                     </div>
                     <p className="text-sm text-gray-600 dark:text-gray-300">Listening...</p>
-                    <p className="mt-2 text-lg text-gray-800 dark:text-white">{userResponse}</p>
+                    {/* <p className="mt-2 text-lg text-gray-800 dark:text-white">{userResponse}</p> */}
                     <Button
                       onClick={stopListening}
                       className="mt-4 bg-red-600 hover:bg-red-700"
@@ -1698,7 +1660,7 @@ export default function JungVoiceTest({
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
                       <th className="px-4 py-2 text-left text-sm font-medium text-gray-800 dark:text-white">Stimulus</th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-800 dark:text-white">Response</th>
+                      {/* <th className="px-4 py-2 text-left text-sm font-medium text-gray-800 dark:text-white">Response</th> */}
                       <th className="px-4 py-2 text-left text-sm font-medium text-gray-800 dark:text-white">Time (ms)</th>
                     </tr>
                   </thead>
@@ -1706,7 +1668,7 @@ export default function JungVoiceTest({
                     {userResponses.map((resp, index) => (
                       <tr key={index} className={withExtras(resp).isDelayed ? "bg-yellow-50 dark:bg-yellow-700" : (index % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-gray-50 dark:bg-gray-700")}>
                         <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.stimulusWord}</td>
-                        <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.responseWord}</td>
+                        {/* <td className="px-4 py-2 text-sm text-gray-800 dark:text-white">{resp.responseWord}</td> */}
                         <td className={`px-4 py-2 text-sm ${withExtras(resp).isDelayed ? "text-red-600 dark:text-red-400 font-medium" : "text-gray-800 dark:text-blue-300"}`}>
                           {resp.reactionTimeMs}
                         </td>
