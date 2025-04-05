@@ -96,10 +96,13 @@ export default function FaceEmotionAnalysis() {
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log("顔分析 - 受信データ:", data);
+          console.log("受信データ:", data);
+          
+          // 顔分析結果の処理
           if (data.face && data.face.predictions) {
             setEmotionResults(data.face.predictions);
-          } else if (data.error) {
+          } 
+          else if (data.error) {
             // エラーレスポンスの処理
             console.error("API Error:", data.error);
             setError(`API エラー: ${data.error.message || data.error}`);
@@ -272,13 +275,13 @@ export default function FaceEmotionAnalysis() {
 
           {isCameraActive && isConnected && !isCapturing && (
             <Button onClick={startCapturing}>
-              感情分析を開始
+              顔分析を開始
             </Button>
           )}
 
           {isCapturing && (
             <Button onClick={stopCapturing} variant="secondary">
-              感情分析を停止
+              顔分析を停止
             </Button>
           )}
 
@@ -344,9 +347,17 @@ export default function FaceEmotionAnalysis() {
           </div>
         ) : (
           <p className="text-gray-500">
-            {isCapturing ? "分析結果を待っています..." : "カメラを起動して感情分析を開始してください。"}
+            {isCapturing ? "表情分析結果を待っています..." : "カメラを起動して顔分析を開始してください。"}
           </p>
         )}
+      </div>
+
+      <div className="mt-8 p-4 border rounded-md bg-yellow-50">
+        <h3 className="text-lg font-medium text-yellow-800">音声分析について</h3>
+        <p className="text-sm text-yellow-700 mt-2">
+          現在、音声分析機能は一時的に無効化されています。Hume APIとの互換性の問題を解決中です。
+          しかし、顔分析機能は通常通りご利用いただけます。
+        </p>
       </div>
     </div>
   );
