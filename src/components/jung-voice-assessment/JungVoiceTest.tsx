@@ -68,7 +68,8 @@ const AI_GUIDE_MESSAGES = {
   nextWord: "Next word:",
   testComplete: "The test is now complete. Thank you for your responses. I'm analyzing your results.",
   delayed: "Next word:",
-  normal: "Next word:"
+  normal: "Next word:",
+  complete: "Test complete. Thank you for your responses."
 };
 
 export default function JungVoiceTest({
@@ -77,7 +78,7 @@ export default function JungVoiceTest({
   generationId = '795c949a-1510-4a80-9646-7d0863b023ab',
   voiceName = 'David Hume',
   speechRecognitionLang = 'en-US',
-  onTestComplete,
+  onComplete,
   className = '',
 }: JungVoiceTestProps) {
   // プロップスのバリデーション
@@ -87,7 +88,7 @@ export default function JungVoiceTest({
     generationId,
     voiceName,
     speechRecognitionLang,
-    onTestComplete,
+    onComplete,
     className
   });
 
@@ -156,6 +157,24 @@ export default function JungVoiceTest({
   const [averageReactionTime, setAverageReactionTime] = useState<number>(0);
   const [delayedResponses, setDelayedResponses] = useState<number>(0);
 
+  // Add a new ref to track if we're in auto-advance mode
+  const autoAdvanceRef = useRef<boolean>(true);
+
+  // Add a ref to track if we're currently processing a response to avoid duplicates
+  const isProcessingResponseRef = useRef<boolean>(false);
+
+  // Add a timeout ref to force advance if speech recognition gets stuck
+  const advanceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 現在の単語インデックスを参照として保持して直接アクセスできるようにする
+  const currentWordIndexRef = useRef<number>(-1);
+  
+  // currentWordIndexが変更されたら参照も更新するeffect
+  useEffect(() => {
+    currentWordIndexRef.current = currentWordIndex;
+    console.log(`Current word index updated to: ${currentWordIndex}`);
+  }, [currentWordIndex]);
+
   // コンポーネントのマウント状態を追跡
   useEffect(() => {
     isMountedRef.current = true;
@@ -193,7 +212,36 @@ export default function JungVoiceTest({
             .map((result: any) => result.transcript)
             .join('');
           
+          console.log(`Speech recognized: "${transcript}"`, { 
+            isFinal: event.results[0]?.isFinal, 
+            confidence: event.results[0]?.[0]?.confidence 
+          });
+          
+          // Only process responses when the test is actually running
+          if (currentWordIndex < 0) {
+            console.log('Test not started yet, ignoring speech input');
+            return;
+          }
+          
           setUserResponse(transcript);
+          
+          // For final results or if transcript is non-empty after some delay, auto-advance if enabled
+          if ((event.results[0]?.isFinal || transcript.trim().length > 0) && autoAdvanceRef.current) {
+            // Don't just stop - directly record the response if it's not empty
+            if (transcript.trim() !== '' && currentWordIndex >= 0) {
+              console.log('Valid response detected, preparing to advance to next word');
+              
+              // We need to stop first to prevent double recording
+              try {
+                recognitionRef.current?.stop();
+              } catch (e) {
+                console.warn('Error stopping recognition:', e);
+              }
+              
+              // Process immediately - no extra type check needed since this is directly in the effect
+              recordResponseSafely(transcript);
+            }
+          }
         };
         
         recognitionRef.current.onerror = (event) => {
@@ -264,9 +312,16 @@ export default function JungVoiceTest({
         
         recognitionRef.current.onend = () => {
           setIsListening(false);
-          // 音声認識が終了したら自動的に応答を記録
-          if (userResponse.trim() !== '' && currentWordIndex >= 0 && isMountedRef.current) {
-            recordResponse(userResponse);
+          
+          // Only auto-record when not already handled by the onresult handler
+          // This serves as a backup in case the final event doesn't trigger
+          const currentResponse = userResponse.trim();
+          if (currentResponse !== '' && 
+              currentWordIndex >= 0 && 
+              isMountedRef.current && 
+              autoAdvanceRef.current &&
+              !isProcessingResponseRef.current) {
+            recordResponseSafely(currentResponse);
           }
         };
       }
@@ -295,7 +350,7 @@ export default function JungVoiceTest({
         }
       }
     };
-  }, [speechRecognitionLang]);
+  }, [speechRecognitionLang, currentWordIndex]);
 
   // Hume クライアントの初期化
   useEffect(() => {
@@ -606,6 +661,7 @@ export default function JungVoiceTest({
     if (onAudioEnd) {
       const handleEnded = () => {
         if (isMountedRef.current) {
+          console.log('Audio playback ended, executing callback');
           onAudioEnd();
         }
         clonedAudio.removeEventListener('ended', handleEnded);
@@ -626,16 +682,41 @@ export default function JungVoiceTest({
     // 音声ファイルを設定して再生
     clonedAudio.src = url;
     
-    // 音声再生ボタンを表示して、ユーザーに再生を促す
-    if (isMountedRef.current) {
-      setAudioUrl(url);
-      // 自動再生せずにユーザーインタラクションを待つ
-      if (onAudioEnd) {
-        // 自動再生に失敗した場合は次のステップに進むことを許可
+    // 積極的に再生を試みる
+    try {
+      const playPromise = clonedAudio.play();
+      
+      // 自動再生ポリシーに対応
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('Audio playback started successfully');
+          })
+          .catch(error => {
+            console.warn('Auto-play prevented by browser:', error);
+            // 自動再生に失敗した場合は次のステップに進むことを許可
+            if (onAudioEnd && isMountedRef.current) {
+              setTimeout(() => {
+                if (isMountedRef.current) {
+                  console.log('Auto-play failed, proceeding with callback');
+                  onAudioEnd();
+                }
+              }, 500);
+            }
+          });
+      }
+    } catch (e) {
+      console.error('Error during audio play attempt:', e);
+      if (onAudioEnd && isMountedRef.current) {
         setTimeout(() => {
           if (isMountedRef.current) onAudioEnd();
         }, 500);
       }
+    }
+    
+    // 音声再生ボタンを表示して、ユーザーに再生を促す
+    if (isMountedRef.current) {
+      setAudioUrl(url);
     }
   }, []);
 
@@ -667,6 +748,16 @@ export default function JungVoiceTest({
     setIsWebcamActive(true);
     
     try {
+      // Reset speech recognition if it's already running
+      if (isListening && recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {
+          console.warn('Error stopping recognition before test start:', e);
+        }
+        setIsListening(false);
+      }
+      
       // Enable emotion tracking
       try {
         await enableTracking();
@@ -692,8 +783,16 @@ export default function JungVoiceTest({
       // メッセージの記録
       addMessage([{ text: AI_GUIDE_MESSAGES.introduction, role: 'assistant' }]);
       
+      console.log('Starting test, setting current word index to 0');
       setCurrentWordIndex(0);
       setIsLoading(false);
+      
+      // Start listening only after we've set the current word index
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          startListening();
+        }
+      }, 500);
     } catch (error) {
       console.error('Error starting test:', error);
       setError('Failed to connect to Hume AI service. Please check your internet connection and try again.');
@@ -745,148 +844,48 @@ export default function JungVoiceTest({
     assessmentIdRef.current = uuidv4();
   };
 
-  // 応答記録時に感情データも合わせて保存
-  const recordResponse = async (userInput: string) => {
-    const currentWord = stimulusWords[currentWordIndex];
-    const normalizedResponse = userInput.trim().toLowerCase();
-    
-    if (!normalizedResponse) {
-      return;
-    }
-    
-    // 反応時間の計算
-    const reactionTimeMs = startTime ? Date.now() - startTime : 0;
-    const isDelayed = reactionTimeMs > DELAYED_REACTION_THRESHOLD_MS;
-    
-    // 新しい応答を作成
-    const response: WordResponseWithExtras = {
-      stimulusWord: currentWord,
-      responseWord: normalizedResponse,
-      reactionTimeMs,
-      isDelayed
-    };
-    
-    // 応答をバリデーション
-    try {
-      WordResponseSchema.parse(response);
-    } catch (error) {
-      console.error('Invalid response data:', error);
-      setError('Invalid response data. Please try again.');
-      return;
-    }
-    
-    // 応答を記録
-    const updatedResponses = [...userResponses, response];
-    setUserResponses(updatedResponses);
-    
-    // 音声データを保存
-    if (currentFaceData && userId && assessmentIdRef.current) {
-      // EmotionDataServiceを使用して感情データを保存
-      try {
-        await saveEmotionData({
-          userId,
-          assessmentId: assessmentIdRef.current,
-          stimulusWord: currentWord,
-          responseWord: normalizedResponse,
-          reactionTimeMs,
-          faceEmotions: currentEmotion?.emotions || {},
-          timestamp: Date.now()
-        });
-      } catch (err) {
-        console.error('Failed to save emotion data:', err);
-      }
-    }
-    
-    setUserResponse('');
-    
-    // すべての単語が完了したかチェック
-    if (currentWordIndex + 1 >= stimulusWords.length) {
-      await completeTest(updatedResponses);
-    } else {
-      // 次の単語へ
-      setCurrentWordIndex(currentWordIndex + 1);
-      setStartTime(Date.now());
-      
-      // 適切なメッセージを選択
-      const nextMessage = isDelayed ? AI_GUIDE_MESSAGES.delayed : AI_GUIDE_MESSAGES.normal;
-      // 次の単語のみを渡して音声を再生（nextMessage部分は含めない）
-      await generateAndPlaySpeech(stimulusWords[currentWordIndex + 1], () => {
-        if (isMountedRef.current) {
-          setStartTime(Date.now());
-          startListening();
-        }
-      });
-      
-      addMessage([{ text: `${nextMessage} ${stimulusWords[currentWordIndex + 1]}`, role: 'assistant' }]);
-    }
-  };
-
-  // テスト完了
-  const completeTest = async (finalResponses: WordResponseWithExtras[]) => {
-    setIsLoading(true);
-    setIsWebcamActive(false);
-    
-    try {
-      // 次の単語を再生
-      await generateAndPlaySpeech(AI_GUIDE_MESSAGES.testComplete, () => {
-        if (isMountedRef.current) {
-          setStartTime(Date.now());
-          startListening();
-        }
-      });
-      
-      // メッセージを記録
-      addMessage([{ text: AI_GUIDE_MESSAGES.testComplete, role: 'assistant' }]);
-      
-      // 平均反応時間と遅延応答数を計算
-      const totalReactionTime = finalResponses.reduce((sum, response) => sum + response.reactionTimeMs, 0);
-      const avgReactionTime = Math.round(totalReactionTime / finalResponses.length);
-      const delayedCount = finalResponses.filter(response => withExtras(response).isDelayed).length;
-      
-      setAverageReactionTime(avgReactionTime);
-      setDelayedResponses(delayedCount);
-      setTestComplete(true);
-      
-      // テスト結果を作成
-      const testResults: TestResults = {
-        responses: finalResponses,
-        averageReactionTimeMs: avgReactionTime,
-        delayedResponsesCount: delayedCount,
-        totalWords: stimulusWords.length,
-      };
-      
-      // テスト結果をバリデーション
-      try {
-        TestResultsSchema.parse(testResults);
-      } catch (error) {
-        console.error('Invalid test results:', error);
-        setError('Invalid test results. Please try again.');
-        setIsLoading(false);
-        return;
-      }
-      
-      // コールバックがあれば実行
-      if (onTestComplete) {
-        onTestComplete(testResults);
-      }
-    } catch (error) {
-      console.error('Error completing test:', error);
-      setError('Error completing test. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // 音声認識開始
   const startListening = () => {
-    if (!recognitionRef.current || !isSpeechSupported || isListening || !isMountedRef.current) {
+    if (!recognitionRef.current || !isSpeechSupported || !isMountedRef.current) {
+      return;
+    }
+    
+    // Already listening - don't try to start again
+    if (isListening) {
+      console.log('Speech recognition already active, not starting again');
       return;
     }
     
     // Clear any previous errors
     if (error) setError(null);
     
+    // Clear any existing advance timeout
+    if (advanceTimeoutRef.current) {
+      clearTimeout(advanceTimeoutRef.current);
+      advanceTimeoutRef.current = null;
+    }
+    
+    // Set a safety timeout to force advance after 10 seconds if no response
+    advanceTimeoutRef.current = setTimeout(() => {
+      console.log('Safety timeout triggered - forcing advance');
+      if (isMountedRef.current && isListening && currentWordIndex >= 0) {
+        const currentResponse = userResponse.trim() || '(timeout)';
+        try {
+          if (recognitionRef.current) {
+            recognitionRef.current.stop();
+          }
+        } catch (e) {
+          console.warn('Error stopping recognition in timeout:', e);
+        }
+        recordResponseSafely(currentResponse);
+      }
+    }, 10000); // 10 seconds max per word
+    
+    // Set the start time right before we start listening
+    setStartTime(Date.now());
+    
     try {
+      console.log('Starting speech recognition for word:', stimulusWords[currentWordIndex]);
       // Some browsers might throw if recognition is already started or in invalid state
       recognitionRef.current.start();
       setIsListening(true);
@@ -897,31 +896,45 @@ export default function JungVoiceTest({
       if (error instanceof DOMException) {
         // Different browsers may use different error names
         if (error.name === 'InvalidStateError' || error.name === 'NotAllowedError') {
+          console.log('Recognition already started or in invalid state, trying to reset');
+          
           // Try to reset the recognizer by stopping first
           try {
-            recognitionRef.current.stop();
-            setIsListening(false);
+            // Set isListening to true immediately to prevent duplicate start attempts
+            setIsListening(true);
             
-            // Add a small delay before restarting
+            recognitionRef.current.stop();
+            
+            // Add a longer delay before restarting to ensure complete cleanup
             setTimeout(() => {
               if (recognitionRef.current && isMountedRef.current) {
                 try {
-                  recognitionRef.current.start();
-                  setIsListening(true);
+                  // Only start if not already listening (check state again)
+                  if (!isListening) {
+                    recognitionRef.current.start();
+                    setIsListening(true);
+                  }
                 } catch (startError) {
                   console.error('Failed to restart speech recognition:', startError);
                   setError('Failed to start speech recognition. Please try again or reload the page.');
                   setIsListening(false);
+                  
+                  // If still failing, completely recreate the recognition object
+                  reinitializeSpeechRecognition();
                 }
               }
-            }, 300);
+            }, 500);
           } catch (stopError) {
             console.error('Error stopping speech recognition:', stopError);
             setIsListening(false);
             
             // If completely failed, show error and try to recreate the recognition object
             setError('Speech recognition encountered an error. Please try again.');
-            reinitializeSpeechRecognition();
+            
+            // Use a timeout before reinitializing to ensure proper cleanup
+            setTimeout(() => {
+              reinitializeSpeechRecognition();
+            }, 500);
           }
         } else {
           setIsListening(false);
@@ -938,13 +951,30 @@ export default function JungVoiceTest({
   const reinitializeSpeechRecognition = useCallback(() => {
     if (!isMountedRef.current) return;
     
+    // Make sure we're not trying to reinitialize when already listening
+    // This might create race conditions
+    if (isListening) {
+      console.warn('Trying to reinitialize while already listening, delaying...');
+      setTimeout(() => {
+        if (isMountedRef.current && !isListening) {
+          reinitializeSpeechRecognition();
+        }
+      }, 1000);
+      return;
+    }
+    
+    console.log('Reinitializing speech recognition');
+    
     try {
       // Cleanup existing instance
       if (recognitionRef.current) {
         try {
+          // Set handlers to no-op functions first
           recognitionRef.current.onresult = () => {};
           recognitionRef.current.onerror = () => {};
           recognitionRef.current.onend = () => {};
+          
+          // Then try to abort
           recognitionRef.current.abort();
         } catch (e) {
           console.warn('Error cleaning up speech recognition:', e);
@@ -962,65 +992,115 @@ export default function JungVoiceTest({
         return;
       }
       
-      recognitionRef.current = new SpeechRecognition();
+      // Ensure we're not in listening state before creating a new instance
+      setIsListening(false);
       
-      if (recognitionRef.current) {
-        recognitionRef.current.continuous = false;
-        recognitionRef.current.interimResults = true;
-        recognitionRef.current.lang = speechRecognitionLang;
+      // Short timeout to ensure UI state is updated
+      setTimeout(() => {
+        // Create a new instance
+        recognitionRef.current = new SpeechRecognition();
         
-        recognitionRef.current.onresult = (event) => {
-          const transcript = Array.from(event.results)
-            .map((result: any) => result[0])
-            .map((result: any) => result.transcript)
-            .join('');
+        if (recognitionRef.current) {
+          recognitionRef.current.continuous = false;
+          recognitionRef.current.interimResults = true;
+          recognitionRef.current.lang = speechRecognitionLang;
           
-          setUserResponse(transcript);
-        };
-        
-        // Re-add existing onerror and onend handlers
-        recognitionRef.current.onerror = (event) => {
-          const errorType = event.error || 'unknown';
-          const errorMessage = event.message || 'No additional details';
+          recognitionRef.current.onresult = (event) => {
+            const transcript = Array.from(event.results)
+              .map((result: any) => result[0])
+              .map((result: any) => result.transcript)
+              .join('');
+            
+            // Only process responses when the test is actually running
+            if (currentWordIndex < 0) {
+              console.log('Test not started yet, ignoring speech input');
+              return;
+            }
+            
+            console.log(`Speech recognized: "${transcript}"`, { 
+              isFinal: event.results[0]?.isFinal, 
+              confidence: event.results[0]?.[0]?.confidence 
+            });
+            
+            setUserResponse(transcript);
+            
+            // For final results or if transcript is non-empty after some delay, auto-advance if enabled
+            if ((event.results[0]?.isFinal || transcript.trim().length > 0) && autoAdvanceRef.current) {
+              // Don't just stop - directly record the response if it's not empty
+              if (transcript.trim() !== '' && currentWordIndex >= 0) {
+                console.log('Valid response detected, preparing to advance to next word');
+                
+                // We need to stop first to prevent double recording
+                try {
+                  recognitionRef.current?.stop();
+                } catch (e) {
+                  console.warn('Error stopping recognition:', e);
+                }
+                
+                // Process immediately - no extra type check needed since this is directly in the effect
+                recordResponseSafely(transcript);
+              }
+            }
+          };
           
-          console.error(`Speech recognition error: ${errorType}`, {
-            type: errorType,
-            message: errorMessage,
-            details: event
-          });
+          // Re-add existing onerror and onend handlers
+          recognitionRef.current.onerror = (event) => {
+            const errorType = event.error || 'unknown';
+            const errorMessage = event.message || 'No additional details';
+            
+            console.error(`Speech recognition error: ${errorType}`, {
+              type: errorType,
+              message: errorMessage,
+              details: event
+            });
+            
+            // Error handling as before...
+            setIsListening(false);
+          };
           
-          // Error handling as before...
-          setIsListening(false);
-        };
-        
-        recognitionRef.current.onend = () => {
-          setIsListening(false);
-          if (userResponse.trim() !== '' && currentWordIndex >= 0 && isMountedRef.current) {
-            recordResponse(userResponse);
-          }
-        };
-        
-        setIsSpeechSupported(true);
-        console.log('Speech recognition reinitialized');
-      } else {
-        throw new Error('Failed to create SpeechRecognition instance');
-      }
+          recognitionRef.current.onend = () => {
+            setIsListening(false);
+            
+            // Only auto-record when not already handled by the onresult handler
+            // This serves as a backup in case the final event doesn't trigger
+            const currentResponse = userResponse.trim();
+            if (currentResponse !== '' && 
+                currentWordIndex >= 0 && 
+                isMountedRef.current && 
+                autoAdvanceRef.current &&
+                !isProcessingResponseRef.current) {
+              recordResponseSafely(currentResponse);
+            }
+          };
+          
+          setIsSpeechSupported(true);
+          console.log('Speech recognition reinitialized');
+        } else {
+          throw new Error('Failed to create SpeechRecognition instance');
+        }
+      }, 300);
     } catch (error) {
       console.error('Failed to reinitialize speech recognition:', error);
       setIsSpeechSupported(false);
       setError('Failed to initialize speech recognition after error. Please reload the page.');
     }
-  }, [speechRecognitionLang, userResponse, currentWordIndex]);
+  }, [speechRecognitionLang, userResponse, currentWordIndex, isListening]);
 
   // 音声認識停止
   const stopListening = () => {
-    if (!recognitionRef.current || !isListening) {
-      // Already stopped or not initialized
+    if (!recognitionRef.current) {
+      // No recognition reference
       setIsListening(false);
       return;
     }
     
+    if (!isListening) {
+      // Already stopped
+      return;
+    }
+    
     try {
+      console.log('Stopping speech recognition');
       recognitionRef.current.stop();
       // Don't update state here, let the onend handler do it
     } catch (error) {
@@ -1056,6 +1136,319 @@ export default function JungVoiceTest({
     
     loadCacheStats();
   }, []);
+
+  // Clean up timeouts when component unmounts
+  useEffect(() => {
+    return () => {
+      if (advanceTimeoutRef.current) {
+        clearTimeout(advanceTimeoutRef.current);
+      }
+    };
+  }, []);
+  
+  // 応答記録時に感情データも合わせて保存
+  const recordResponseSafely = async (userInput: string) => {
+    try {
+      // すでに進行中の処理があれば早期リターン
+      if (isProcessingResponseRef.current || testComplete) {
+        console.log('Already processing or test complete, ignoring response');
+        return;
+      }
+      
+      // 応答記録処理を実行
+      recordResponse(userInput);
+    } catch (error) {
+      console.error('Error in recordResponseSafely:', error);
+      // エラーからの回復を試みる
+      isProcessingResponseRef.current = false;
+    }
+  };
+  
+  // 応答記録時に感情データも合わせて保存
+  const recordResponse = async (userInput: string) => {
+    console.log(`Recording response: "${userInput.trim()}" for word index: ${currentWordIndex}`);
+    
+    // Don't record responses if test is already complete
+    if (testComplete) {
+      console.log('Test already complete, ignoring response');
+      return;
+    }
+    
+    // Clear any existing advance timeout
+    if (advanceTimeoutRef.current) {
+      clearTimeout(advanceTimeoutRef.current);
+      advanceTimeoutRef.current = null;
+    }
+    
+    // Prevent duplicate recordings
+    if (isProcessingResponseRef.current) {
+      console.log('Already processing a response, ignoring duplicate call');
+      return;
+    }
+    
+    // 処理中フラグを設定
+    isProcessingResponseRef.current = true;
+    
+    // Check if currentWordIndex is valid
+    if (currentWordIndex < 0 || currentWordIndex >= stimulusWords.length) {
+      console.error(`Invalid currentWordIndex: ${currentWordIndex}, stimulusWords length: ${stimulusWords.length}`);
+      setError('Invalid word index. Please restart the test.');
+      isProcessingResponseRef.current = false;
+      return;
+    }
+    
+    // Stop listening if still active
+    if (isListening && recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        console.warn('Error stopping recognition in recordResponse:', e);
+      }
+      setIsListening(false);
+    }
+    
+    const currentWord = stimulusWords[currentWordIndex];
+    
+    // Verify the current word exists
+    if (!currentWord) {
+      console.error(`Current word is undefined at index ${currentWordIndex}`);
+      setError('Current word is undefined. Please restart the test.');
+      isProcessingResponseRef.current = false;
+      return;
+    }
+    
+    console.log(`Current stimulus word: "${currentWord}"`);
+    const normalizedResponse = userInput.trim().toLowerCase();
+    
+    if (!normalizedResponse) {
+      console.warn('Empty response received, not recording');
+      isProcessingResponseRef.current = false;
+      // Restart listening if response was empty
+      setTimeout(() => {
+        if (isMountedRef.current && currentWordIndex >= 0 && !testComplete) {
+          startListening();
+        }
+      }, 500);
+      return;
+    }
+    
+    try {
+      // 反応時間の計算
+      const reactionTimeMs = startTime ? Date.now() - startTime : 0;
+      const isDelayed = reactionTimeMs > DELAYED_REACTION_THRESHOLD_MS;
+      
+      console.log(`Response time: ${reactionTimeMs}ms, isDelayed: ${isDelayed}`);
+      
+      // 新しい応答を作成
+      const response: WordResponseWithExtras = {
+        stimulusWord: currentWord,
+        responseWord: normalizedResponse,
+        reactionTimeMs,
+        isDelayed
+      };
+      
+      // Double-check response data is valid before validation
+      if (!response.stimulusWord || !response.responseWord) {
+        throw new Error(`Invalid response data: stimulusWord=${response.stimulusWord}, responseWord=${response.responseWord}`);
+      }
+      
+      // 応答をバリデーション
+      try {
+        WordResponseSchema.parse(response);
+      } catch (error) {
+        console.error('Invalid response data:', error);
+        setError('Invalid response data. Please try again.');
+        isProcessingResponseRef.current = false;
+        return;
+      }
+      
+      // 現在の単語インデックスを確保（状態更新の非同期性に対応するため）
+      const currentIndex = currentWordIndex;
+      console.log(`Recording response for word index ${currentIndex}, is last word: ${currentIndex + 1 >= stimulusWords.length}`);
+      
+      // 応答を記録
+      setUserResponses(prevResponses => {
+        const updatedResponses = [...prevResponses, response];
+        return updatedResponses;
+      });
+      
+      // 音声データを保存 - これは並行して実行
+      if (currentFaceData && userId && assessmentIdRef.current) {
+        // EmotionDataServiceを使用して感情データを保存
+        try {
+          await saveEmotionData({
+            userId,
+            assessmentId: assessmentIdRef.current,
+            stimulusWord: currentWord,
+            responseWord: normalizedResponse,
+            reactionTimeMs,
+            faceEmotions: currentEmotion?.emotions || {},
+            timestamp: Date.now()
+          });
+        } catch (err) {
+          console.error('Failed to save emotion data:', err);
+        }
+      }
+      
+      // 入力フィールドをリセット
+      setUserResponse('');
+      
+      // 次の単語に進むか、テストを完了する
+      setTimeout(() => {
+        if (!isMountedRef.current) return;
+        
+        // このインデックスでの処理を完了し、次に進む
+        const nextIndex = currentIndex + 1;
+        console.log(`Word ${currentIndex} processing complete, preparing for next step. Next index: ${nextIndex}`);
+        
+        // Check if this is the last word
+        if (nextIndex >= stimulusWords.length) {
+          // Get the latest user responses to ensure we have all data
+          console.log('Last word processed, completing test');
+          completeTestSafely();
+        } else {
+          // First update the index, then proceed with audio
+          console.log(`Advancing to next word: ${nextIndex}`);
+          moveToWordIndex(nextIndex, isDelayed);
+        }
+      }, 500);
+      
+    } catch (error) {
+      console.error('Error processing response:', error);
+      isProcessingResponseRef.current = false;
+      
+      // Restart listening if there was an error processing the response
+      setTimeout(() => {
+        if (isMountedRef.current && currentWordIndex >= 0 && !testComplete) {
+          startListening();
+        }
+      }, 500);
+    }
+  };
+  
+  // テストを安全に完了させる関数
+  const completeTestSafely = () => {
+    try {
+      if (testComplete) {
+        console.log('Test already marked as complete');
+        return;
+      }
+      
+      setTestComplete(true);
+      isProcessingResponseRef.current = false;
+      
+      // Stop any ongoing recognition
+      if (recognitionRef.current && isListening) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {
+          console.warn('Error stopping recognition during test completion:', e);
+        }
+        setIsListening(false);
+      }
+      
+      console.log('Completing test with responses:', userResponses);
+      
+      // 平均反応時間と遅延応答数を計算
+      const totalReactionTime = userResponses.reduce((sum, response) => sum + response.reactionTimeMs, 0);
+      const avgReactionTime = userResponses.length > 0 ? Math.round(totalReactionTime / userResponses.length) : 0;
+      const delayedCount = userResponses.filter(response => response.isDelayed).length;
+      
+      // テスト結果を作成
+      const testResults: TestResults = {
+        responses: userResponses,
+        averageReactionTimeMs: avgReactionTime,
+        delayedResponsesCount: delayedCount,
+        totalWords: stimulusWords.length,
+      };
+      
+      // Call the onComplete callback with the final results
+      if (onComplete && typeof onComplete === 'function') {
+        onComplete(testResults);
+      }
+      
+      // Final message
+      addMessage([{ 
+        text: AI_GUIDE_MESSAGES.complete, 
+        role: 'assistant' 
+      }]);
+      
+    } catch (error) {
+      console.error('Error completing test:', error);
+      setError('An error occurred while completing the test.');
+    }
+  };
+  
+  // 特定の単語インデックスに移動する安全な関数
+  const moveToWordIndex = async (indexToMoveTo: number, isDelayed: boolean = false) => {
+    if (!isMountedRef.current || testComplete) return;
+    
+    try {
+      // バウンダリチェック
+      if (indexToMoveTo < 0 || indexToMoveTo >= stimulusWords.length) {
+        console.error(`Invalid target index: ${indexToMoveTo}`);
+        return;
+      }
+      
+      // 状態更新をバッチに含める
+      console.log(`Moving to word index: ${indexToMoveTo}`);
+      
+      // インデックスを直接更新
+      currentWordIndexRef.current = indexToMoveTo; // 参照を直接更新
+      setCurrentWordIndex(indexToMoveTo); // 状態も更新
+      
+      const targetWord = stimulusWords[indexToMoveTo];
+      if (!targetWord) {
+        console.error(`Target word is undefined at index ${indexToMoveTo}`);
+        return;
+      }
+      
+      // 適切なメッセージを選択
+      const nextMessage = isDelayed ? AI_GUIDE_MESSAGES.delayed : AI_GUIDE_MESSAGES.normal;
+      
+      // メッセージを記録
+      addMessage([{ text: `${nextMessage} ${targetWord}`, role: 'assistant' }]);
+      
+      console.log(`Playing audio for word: "${targetWord}"`);
+      
+      // 音声が終了した後に呼び出されるコールバック
+      const audioCallback = () => {
+        if (!isMountedRef.current) return;
+        
+        console.log(`Audio finished for word: "${targetWord}", preparing to listen`);
+        isProcessingResponseRef.current = false; // 処理完了を示す
+        
+        // 音声認識開始
+        setTimeout(() => {
+          if (isMountedRef.current && !testComplete) {
+            // Double check the index is still what we expect
+            if (currentWordIndexRef.current !== indexToMoveTo) {
+              console.warn(`Index changed during audio playback: ${currentWordIndexRef.current} vs expected ${indexToMoveTo}`);
+              // Try to correct
+              currentWordIndexRef.current = indexToMoveTo;
+              setCurrentWordIndex(indexToMoveTo);
+            }
+            
+            startListening();
+          }
+        }, 300);
+      };
+      
+      // 音声を再生
+      await generateAndPlaySpeech(targetWord, audioCallback);
+      
+    } catch (error) {
+      console.error('Error moving to word index:', error);
+      isProcessingResponseRef.current = false;
+      
+      // Try to recover
+      setTimeout(() => {
+        if (isMountedRef.current && !testComplete) {
+          startListening();
+        }
+      }, 500);
+    }
+  };
 
   return (
     <div className={`max-w-3xl mx-auto ${className}`}>
@@ -1107,6 +1500,22 @@ export default function JungVoiceTest({
             >
               {isLoading ? 'Connecting...' : 'Start Test'}
             </Button>
+            
+            {/* Add auto-advance toggle */}
+            <div className="mt-4 flex items-center">
+              <input
+                type="checkbox"
+                id="autoAdvance"
+                checked={autoAdvanceRef.current}
+                onChange={(e) => {
+                  autoAdvanceRef.current = e.target.checked;
+                }}
+                className="mr-2"
+              />
+              <label htmlFor="autoAdvance" className="text-gray-700 dark:text-gray-300">
+                Auto-advance to next word
+              </label>
+            </div>
             
             {isLoading && (
               <div className="mt-4 flex items-center">
@@ -1161,18 +1570,36 @@ export default function JungVoiceTest({
                   >
                     Respond by Voice
                   </Button>
-                  {userResponse && (
+                  
+                  {/* Only show manual controls when auto-advance is disabled */}
+                  {!autoAdvanceRef.current && userResponse && (
                     <div className="mt-4">
                       <p className="mb-2 text-lg text-gray-800 dark:text-white">{userResponse}</p>
                       
                       <Button
-                        onClick={() => recordResponse(userResponse)}
+                        onClick={() => recordResponseSafely(userResponse)}
                         disabled={!userResponse.trim() || isLoading}
                       >
                         Next
                       </Button>
                     </div>
                   )}
+                  
+                  {/* Add toggle for auto-advance mode during the test */}
+                  <div className="mt-4 flex items-center">
+                    <input
+                      type="checkbox"
+                      id="autoAdvanceRunning"
+                      checked={autoAdvanceRef.current}
+                      onChange={(e) => {
+                        autoAdvanceRef.current = e.target.checked;
+                      }}
+                      className="mr-2"
+                    />
+                    <label htmlFor="autoAdvanceRunning" className="text-gray-700 dark:text-gray-300">
+                      Auto-advance to next word
+                    </label>
+                  </div>
                 </div>
               )}
             </div>
