@@ -6,7 +6,7 @@ import ConsentForm from '../consent/ConsentForm';
 import { JungVoiceAssessmentProps, TestResults } from './types';
 import { JungVoiceAssessmentPropsSchema } from './schema';
 import { HumeEmotionProvider } from '@/providers/HumeEmotionProvider';
-import FaceEmotionAnalysis from '@/app/hume-websocket/components/FaceEmotionAnalysis';
+import FaceEmotionAnalysis from '@/app/(junonly)/hume-websocket/components/FaceEmotionAnalysis';
 import { v4 as uuidv4 } from 'uuid';
 import { useKawasakiStore } from '@/store/kawasakiStore';
 
