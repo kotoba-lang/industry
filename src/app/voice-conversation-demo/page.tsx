@@ -1,7 +1,16 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { VoiceConversation } from '@/components/voice-conversation';
+import dynamic from 'next/dynamic';
+
+// Dynamically import the VoiceConversation component to reduce initial bundle size
+const VoiceConversation = dynamic(
+  () => import('@/components/voice-conversation').then(mod => ({ default: mod.VoiceConversation })),
+  { 
+    loading: () => <div className="p-4 text-center">Loading voice conversation...</div>,
+    ssr: false 
+  }
+);
 
 export default function VoiceConversationDemo() {
   const [isConfigured, setIsConfigured] = useState<boolean>(false);
@@ -46,67 +55,9 @@ export default function VoiceConversationDemo() {
             </div>
           ) : (
             <div className="p-2 bg-yellow-100 text-yellow-800 rounded-md mb-4 text-sm">
-              ⚠️ No API key detected. Demo will run in text-only mode without voice capabilities.
-              <br />
-              To enable voice, add NEXT_PUBLIC_HUME_API_KEY to your .env file.
+              ⚠️ No API key detected. Demo will run in text-only mode.
             </div>
           )}
-          
-          <div className="p-2 bg-blue-50 text-blue-800 rounded-md mb-4 text-xs">
-            <p className="font-semibold">Technical Note:</p>
-            <p>This component uses Hume AI's REST API directly instead of the SDK methods due to type compatibility issues. Request format:</p>
-            <pre className="mt-1 p-2 bg-gray-50 text-gray-700 overflow-auto text-xs rounded">
-{`// POST to https://api.hume.ai/v0/tts
-{
-  "utterances": [
-    {
-      "text": "Your message text",
-      "description": "David Hume"
-    }
-  ],
-  "format": {
-    "type": "mp3"
-  },
-  "num_generations": 1
-}`}
-            </pre>
-            <p className="mt-2">
-              See <a href="https://dev.hume.ai/reference/text-to-speech-tts/synthesize-json" className="underline" target="_blank" rel="noopener noreferrer">official documentation</a> for more options.
-            </p>
-          </div>
-          
-          <div className="p-2 bg-purple-50 text-purple-800 rounded-md mb-4 text-xs">
-            <p className="font-semibold">Speech Recognition:</p>
-            <p>This demo now includes speech recognition functionality using Hume AI's Speech-to-Text API. Click the microphone button to start speaking, and your words will be transcribed into the input field.</p>
-            <p className="mt-1">Speech recognition confidence level is displayed with a colored progress bar.</p>
-            <p className="mt-1 text-xs text-gray-600">Note: Speech recognition requires browser permission to access your microphone and an active Hume API key.</p>
-          </div>
-          
-          <div className="p-2 bg-pink-50 text-pink-800 rounded-md mb-4 text-xs">
-            <p className="font-semibold">Emotion Recognition:</p>
-            <p>This demo includes emotion recognition using Hume AI's Prosody API. After you speak, your audio is analyzed to detect emotional qualities in your voice.</p>
-            <p className="mt-1">New enhanced UI features:</p>
-            <ul className="list-disc list-inside mt-1 ml-2 space-y-1">
-              <li>Visual bar charts showing emotion intensity</li>
-              <li>Detailed descriptions for each detected emotion</li>
-              <li>Toggle between top 5 emotions or view all detected emotions</li>
-              <li>Emotion analysis summary highlighting primary emotions</li>
-              <li>Timestamp showing when emotions were detected</li>
-            </ul>
-            <p className="mt-2 text-xs text-gray-600">Note: Processing may take a few seconds after you finish speaking. The API requires an active Hume API key to function.</p>
-          </div>
-          
-          <div className="p-2 bg-indigo-50 text-indigo-800 rounded-md mb-4 text-xs">
-            <p className="font-semibold">How To Use:</p>
-            <ol className="list-decimal list-inside mt-1 ml-2 space-y-1">
-              <li>Click the "Start Demo" button below</li>
-              <li>Click the microphone icon to start voice recognition</li>
-              <li>Speak clearly into your microphone</li>
-              <li>Click the microphone again or wait for automatic stop</li>
-              <li>Watch as your speech is transcribed and emotions are analyzed</li>
-              <li>Review the emotion analysis displayed below the conversation</li>
-            </ol>
-          </div>
           
           <button
             onClick={handleStart}
@@ -120,7 +71,6 @@ export default function VoiceConversationDemo() {
           <div className="mb-8">
             <VoiceConversation
               onMessageSent={handleMessageSent}
-              onMessageReceived={handleMessageReceived}
             />
           </div>
           
@@ -131,12 +81,6 @@ export default function VoiceConversationDemo() {
                 <h3 className="text-sm font-medium text-gray-700">Last Message Sent:</h3>
                 <p className="mt-1 p-2 bg-gray-50 rounded-md">
                   {lastMessageSent || "No messages sent yet"}
-                </p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-700">Last Message Received:</h3>
-                <p className="mt-1 p-2 bg-gray-50 rounded-md">
-                  {lastMessageReceived || "No messages received yet"}
                 </p>
               </div>
               <div>
@@ -158,16 +102,6 @@ export default function VoiceConversationDemo() {
           </div>
         </>
       )}
-      
-      <div className="mt-10 border-t pt-6 text-center text-sm text-gray-500">
-        <p>
-          Using Hume TTS API with environment variable: NEXT_PUBLIC_HUME_API_KEY
-          <br />
-          <a href="https://dev.hume.ai/reference/text-to-speech-tts/synthesize-json" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">
-            Hume TTS API Documentation
-          </a>
-        </p>
-      </div>
     </div>
   );
 } 

@@ -1,12 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    unoptimized: true,
+    unoptimized: false,
+    domains: ['oyeffdwlmepeeatdupwj.supabase.co'],
   },
   typescript: {
     // ⚠️ Type checking is temporarily disabled to bypass build errors
     ignoreBuildErrors: true,
   },
+  // Updated configuration for Next.js 15
+  serverExternalPackages: ['pg', 'drizzle-orm'],
   webpack: (config, { isServer }) => {
     if (!isServer) {
       // Don't resolve 'fs' module on the client to prevent this error
@@ -23,6 +26,8 @@ const nextConfig = {
     }
     return config;
   },
+  // Add output configuration for better bundling
+  output: 'standalone',
 };
 
 export default nextConfig;

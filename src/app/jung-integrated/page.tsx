@@ -1,57 +1,19 @@
-"use client"
-
-import { useState } from "react"
-import dynamic from "next/dynamic"
-import { TestResults } from "@/components/jung-word-assessment/types"
-import IntegratedJungAssessment from "@/components/jung-integrated/IntegratedJungAssessment"
-
-
+/**
+ * Jung統合アセスメントページ（一時的に簡略化）
+ */
 export default function JungIntegratedPage() {
-  const [testResults, setTestResults] = useState<TestResults | null>(null)
-  
   return (
-    <main className="container mx-auto px-4 py-12">
-      <div className="mb-8 text-center">
-        <h1 className="text-4xl font-bold mb-4">Spirit in Physics (Jung's Word Association Test Embedding Model)</h1>
-        <p className="text-xl text-gray-600">
-          Explore your subconscious through word associations and vector visualization
+    <div className="container mx-auto py-8 px-4">
+      <h1 className="text-3xl font-bold mb-6">Jung Integrated Assessment</h1>
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <h2 className="text-xl font-semibold mb-4">Optimization in Progress</h2>
+        <p className="text-gray-700 mb-4">
+          The Jung Integrated Assessment is temporarily under optimization to improve performance.
+        </p>
+        <p className="text-gray-600 text-sm">
+          This feature will be available again soon. Thank you for your patience.
         </p>
       </div>
-      
-      <div className="prose max-w-none mb-12">
-        <h2>About This Integration</h2>
-        <p>
-          This tool combines Carl Jung's word association test with a sophisticated vector embedding model
-          to visualize your responses in a dynamic physics-based environment.
-        </p>
-        <p>
-          First, you'll complete the word association test, then your responses will be processed and
-          visualized in the model. The visualization represents:
-        </p>
-        <ul>
-          <li>The semantic relationships between your responses</li>
-          <li>Reaction time patterns that may indicate emotional complexes</li>
-          <li>Associations that deviate from typical patterns</li>
-        </ul>
-        <p>
-          Watch how your mental associations form clusters and interact in the model's environment.
-        </p>
-      </div>
-      
-      <div className="bg-white rounded-lg shadow-lg">
-        <IntegratedJungAssessment 
-          numberOfWords={3} 
-          wordTestResults={testResults}
-          setWordTestResults={setTestResults}
-        />
-      </div>
-      
-      <div className="mt-12 text-center text-sm text-gray-500">
-        <p>
-          Based on Carl Jung's word association theories and modern vector embedding techniques.
-          For educational and exploration purposes only.
-        </p>
-      </div>
-    </main>
-  )
+    </div>
+  );
 } 
