@@ -22,9 +22,6 @@
     "db:push": "npx supabase@2.20.5 db push",
     "db:pull": "npx supabase@2.20.5 db pull"
   },
-  "engines": {
-    "node": ">=20.14.0"
-  },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
     "@libsql/client": "^0.15.2",
@@ -126,19 +123,5 @@
     "tsx": "^4.19.3",
     "vite": "^6.2.4",
     "vitest": "^3.1.1"
-  },
-  "pnpm": {
-    "allowBuild": [
-      "supabase"
-    ],
-    "ignoredBuiltDependencies": [
-      "@prisma/client",
-      "@prisma/engines",
-      "bufferutil",
-      "esbuild",
-      "prisma",
-      "sharp",
-      "utf-8-validate"
-    ]
   }
 }
