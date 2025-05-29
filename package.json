@@ -8,7 +8,7 @@
     "secure": "pnpm dev:secure",
     "check": "tsc --noEmit",
     "check:watch": "tsc --noEmit --watch",
-    "build": "next build",
+    "build": "NODE_OPTIONS='--max-old-space-size=6144' next build",
     "start": "next start",
     "test": "jest",
     "test:specific": "jest src/components/jung-voice-assessment/JungVoiceTest.test.tsx",
