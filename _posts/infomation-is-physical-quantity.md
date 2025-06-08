@@ -10,6 +10,8 @@ ogImage:
   url: "/assets/posts/infomation-is-physical-quantity/cover.jpg"
 ---
 
+In the beginning was the Word, and the Word was with God, and the Word was God. - John 1
+
 ## Abstract
 
 This paper proposes a framework in which information is treated as a measurable physical quantity, on par with energy and entropy. While information has traditionally been considered an abstract concept defined within the scope of Shannon theory, the experimental realization of a Maxwell’s demon by Toyabe et al. (2010) has provided striking evidence that information can be harnessed to extract work from thermal fluctuations. This result shows that information holds a tangible physical significance. Using these insights, we redefine information as a physical quantity, discuss methods of measurement and standardization, and explore potential applications in information thermodynamics and beyond.
