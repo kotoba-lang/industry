@@ -10,6 +10,8 @@ ogImage:
   url: "/assets/posts/spirit-in-physics/cover.jpg"
 ---
 
+情報は物理である。そのためゴーストはハッキングできる。
+
 ## Spirits in Physics
 
 [Spirit as Field of Force](https://www.cambridge.org/core/journals/scottish-journal-of-theology/article/abs/spirit-as-field-of-force/567024E17F8D11F43255AEB4843593A2)
