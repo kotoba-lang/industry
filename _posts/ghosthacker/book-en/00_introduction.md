@@ -1,6 +1,6 @@
 ## Introduction: Ghosts Can Be Hacked
 
-Human "Spirit" or "Soul" — the Ghost. It is the most complex and mysterious system humanity has ever attempted to explore. But is it truly an inscrutable kind of magic?
+Human "spirit" or "soul" — the Ghost. It is the most complex and mysterious system humanity has ever attempted to explore. But is it truly an inscrutable kind of magic?
 
 No.
 
