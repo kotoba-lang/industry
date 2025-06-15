@@ -52,28 +52,7 @@ ChatGPT, Geminiなどで用いられている大規模言語モデルのヴェ�
 ### ユングの言語連想検査に用いる単語リスト
 本研究では、ユングの言語連想検査で用いられる以下の100単語を日本語で使用します。英語話者の被験者には英単語を提示します。
 
-| 日本語 | English | 日本語 | English | 日本語 | English | 日本語 | English | 日本語 | English |
-|:---|:---|:---|:---|:---|:---|:---|:---|:---|:---|
-| 頭 | head | 緑 | green | 水 | water | 歌う | to sing | 死んだ | dead |
-| 長い | long | 船 | ship | 支払う | to pay | 窓 | window | 親切な | friendly |
-| 料理する | to cook | 尋ねる | to ask | 冷たい | cold | 茎 | stem | 踊る | to dance |
-| 村 | village | 湖 | lake | 病気の | sick | 誇り | pride | 料理する | to cook |
-| インク | ink | 怒って | angry | 針 | needle | 泳ぐ | to swim | 航海 | voyage |
-| 青 | blue | ランプ | lamp | 罪を犯す | to sin | パン | bread | 裕福な | rich |
-| 木 | tree | 刺す | to prick | 哀れみ | pity | 黄色 | yellow | 山 | mountain |
-| 死ぬ | to die | 塩 | salt | 新しい | new | 習慣 | custom | 祈る | to pray |
-| お金 | money | 愚かな | foolish | パンフレット | pamphlet | 軽蔑する | despise | 指 | finger |
-| 高価な | expensive | 鳥 | bird | 落ちる | to fall | 本 | book | 不公平な | unjust |
-| カエル | frog | 別れる | to part | 空腹 | hunger | 白 | white | 子供 | child |
-| 世話をする | to take care| 鉛筆 | pencil | 悲しい | sad | プラム | plum | 結婚する | to marry |
-| 家 | house | 親愛な | dear | ガラス | glass | 口論する | to quarrel | 毛皮 | fur |
-| 偉大な | great | カブ | turnip | 持つ | to hold | 三角形 | triangle | 恐れる | to fear |
-| 心配して | anxious | キスする | to kiss | 燃える | burn | きれいな | clean | ドア | door |
-| 選ぶ | to choose | 干し草 | hay | 満足して | contented | あざ笑う | ridicule | 眠る | to sleep |
-| 月 | month | 素敵な | nice | 女性 | woman | 虐待する | to abuse | 黄色 | yellow |
-| 来る | to come | ストーブ | stove | 悲しい | sad | 茎 | stem | 踊る | to dance |
-| 海 | sea | 愛らしい | lovely | 年 | year | 黒 | black | パン | bread |
-| 家族 | family | 洗う | to wash | 牛 | cow | 友達 | friend | 幸福 | happiness |
+単語リスト(100): 頭 (head), 緑 (green), 水 (water), 歌う (to sing), 死んだ (dead), 長い (long), 船 (ship), 支払う (to pay), 窓 (window), 親切な (friendly), 料理する (to cook), 尋ねる (to ask), 冷たい (cold), 茎 (stem), 踊る (to dance), 村 (village), 湖 (lake), 病気の (sick), 誇り (pride), 料理する (to cook), インク (ink), 怒って (angry), 針 (needle), 泳ぐ (to swim), 航海 (voyage), 青 (blue), ランプ (lamp), 罪を犯す (to sin), パン (bread), 裕福な (rich), 木 (tree), 刺す (to prick), 哀れみ (pity), 黄色 (yellow), 山 (mountain), 死ぬ (to die), 塩 (salt), 新しい (new), 習慣 (custom), 祈る (to pray), お金 (money), 愚かな (foolish), パンフレット (pamphlet), 軽蔑する (despise), 指 (finger), 高価な (expensive), 鳥 (bird), 落ちる (to fall), 本 (book), 不公平な (unjust), カエル (frog), 別れる (to part), 空腹 (hunger), 白 (white), 子供 (child), 世話をする (to take care), 鉛筆 (pencil), 悲しい (sad), プラム (plum), 結婚する (to marry), 家 (house), 親愛な (dear), ガラス (glass), 口論する (to quarrel), 毛皮 (fur), 偉大な (great), カブ (turnip), 持つ (to hold), 三角形 (triangle), 恐れる (to fear), 心配して (anxious), キスする (to kiss), 燃える (burn), きれいな (clean), ドア (door), 選ぶ (to choose), 干し草 (hay), 満足して (contented), あざ笑う (ridicule), 眠る (to sleep), 月 (month), 素敵な (nice), 女性 (woman), 虐待する (to abuse), 黄色 (yellow), 来る (to come), ストーブ (stove), 悲しい (sad), 茎 (stem), 踊る (to dance), 海 (sea), 愛らしい (lovely), 年 (year), 黒 (black), パン (bread), 家族 (family), 洗う (to wash), 牛 (cow), 友達 (friend), 幸福 (happiness)
 
 ### 実験計画
 - **（実験① 質的研究）**: 被験者に対して言語連想検査による拡張ラバーハンド実験を実施し、皮膚電位（SKINPRO）を用いて皮膚電位を測定する。
@@ -248,7 +227,7 @@ ChatGPT, Geminiなどで用いられている大規模言語モデルのヴェ�
 - [ ] 該当
 - [x] 非該当
 
-### 17. インフォームド・アセントを得る場合
+### 17. インフォームアセントを得る場合
 - [ ] 該当
 - [x] 非該当
 
@@ -289,3 +268,5 @@ ChatGPT, Geminiなどで用いられている大規模言語モデルのヴェ�
 
 本研究は心理学的な錯覚現象の解明と計算科学的モデル化を目的とする基礎研究であり、精神的または身体的な治療や介入を伴うものではないため、モニタリングおよび監査を実施しない。
 
+---
+</rewritten_file> 
