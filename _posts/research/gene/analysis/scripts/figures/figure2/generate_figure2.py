@@ -14,16 +14,16 @@ Date: 2024
 
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../../..'))
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
-from config.colors import COLORS
-from config.styles import setup_publication_style, get_figure_size, save_figure
-from utils.data_loader import GWASDataLoader, create_comparison_data
-from utils.statistics import calculate_heterogeneity, calculate_effect_correlation
+from analysis.config.colors import COLORS
+from analysis.config.styles import setup_publication_style, get_figure_size, save_figure
+from analysis.utils.data_loader import GWASDataLoader, create_comparison_data
+from analysis.utils.statistics import calculate_heterogeneity, calculate_effect_correlation
 
 class Figure2Generator:
     """Generate Figure 2: Cross-population comparison"""

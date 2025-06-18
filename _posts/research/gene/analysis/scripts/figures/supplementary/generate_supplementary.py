@@ -5,7 +5,7 @@ Supplementary Figure: Pathway Enrichment Analysis
 
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../../..'))
 
 import pandas as pd
 import numpy as np
@@ -15,8 +15,8 @@ from scipy import stats
 
 # Import config
 try:
-    from config.colors import COLORS
-    from config.styles import setup_publication_style, save_figure
+    from analysis.config.colors import COLORS
+    from analysis.config.styles import setup_publication_style, save_figure
 except ImportError:
     print("Warning: Using fallback imports")
     COLORS = {'japanese': '#2E86AB', 'european': '#A23B72', 'convergent': '#F18F01'}
