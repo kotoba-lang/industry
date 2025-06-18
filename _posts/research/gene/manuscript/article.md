@@ -152,7 +152,7 @@ The final analytical dataset comprised 91 cases (85 males, 6 females) and 41,528
 3.2. Genome-Wide Association Analysis Results
 The GWAS analysis identified several variants with suggestive associations (P < 1×10⁻⁶) but no variants reaching genome-wide significance (P < 5×10⁻⁸) (Figure 1A). The quantile-quantile plot demonstrated appropriate test statistics distribution with minimal genomic inflation (λ = 1.02) (Figure 1B), indicating well-controlled population stratification and appropriate statistical modeling.
 
-![Figure 1: Manhattan Plot and QQ Plot](../../output/Figure1_Manhattan_QQ.png)
+![Figure 1: Manhattan Plot and QQ Plot](figures/Figure1_Manhattan_QQ.png)
 **Figure 1: Genome-wide association analysis results.** (A) Manhattan plot showing -log₁₀(P-values) across chromosomes. The red dashed line indicates genome-wide significance (P < 5×10⁻⁸), and the orange dashed line indicates suggestive significance (P < 1×10⁻⁶). (B) Quantile-quantile plot comparing observed versus expected P-values, with genomic inflation factor (λ) = 1.02.
 
 Table 1 presents the top-associated variants (P < 1×10⁻⁵). The strongest associations were observed for rs146572333 on chromosome 19 (P = 1.17×10⁻⁸, OR = 5.30, 95% CI: 3.03-9.27), rs139129152 on chromosome 16 (P = 8.86×10⁻⁸, OR = 4.58, 95% CI: 2.62-8.01), and rs78137899 on chromosome 7 (P = 1.55×10⁻⁷, OR = 4.18, 95% CI: 2.44-7.16). Notably, these top variants were rare (MAF < 0.025) and showed large effect sizes (OR > 4.0), consistent with the extreme phenotype study design.
@@ -176,7 +176,7 @@ Table 1 presents the top-associated variants (P < 1×10⁻⁵). The strongest as
 3.3. Cross-Population Genetic Architecture Comparison
 Systematic comparison with European GWAS data (Coleman et al., 2019) revealed substantial population-specific genetic heterogeneity (Figure 2). Of the top 50 Japanese-associated variants (P < 1×10⁻⁴), only 12 (24%) showed nominal associations (P < 0.05) in European populations, with significantly attenuated effect sizes (mean |β| reduction = 68.2%, P = 2.3×10⁻⁶).
 
-![Figure 2: Cross-Population Comparison](../../output/Figure2_Cross_Population.png)
+![Figure 2: Cross-Population Comparison](figures/Figure2_Cross_Population.png)
 **Figure 2: Cross-population genetic architecture comparison.** (A) P-value correlation between Japanese and European populations showing limited concordance (r = -0.007). (B) Effect size correlation demonstrating weak transferability (r = 0.153). (C) Heterogeneity distribution showing substantial between-population differences. (D) Variant classification revealing population-specific genetic architectures with 57 Japanese-specific variants and 40 European-specific variants.
 
 Conversely, established European intelligence variants showed markedly reduced associations in our Japanese cohort. Among the top 100 European-associated variants, only 18 (18%) demonstrated nominal significance in Japanese individuals (P < 0.05), with an average effect size reduction of 73.5%. Heterogeneity analysis revealed significant between-population differences for 87% of tested variants (I² > 50%, P < 0.05).
@@ -188,7 +188,7 @@ Notable examples of population-specific effects include:
 3.4. Gene-Set Enrichment Analysis
 MAGMA gene-set enrichment analysis identified significant enrichment in multiple biologically relevant pathways (Supplementary Figure 1). The strongest enrichments were observed for:
 
-![Supplementary Figure 1: Pathway Enrichment Analysis](../../output/Supplementary_Pathway_Enrichment.png)
+![Supplementary Figure 1: Pathway Enrichment Analysis](figures/Supplementary_Pathway_Enrichment.png)
 **Supplementary Figure 1: Pathway enrichment analysis.** (A) Volcano plot showing pathway-level enrichments with fold-change between populations. (B) Heatmap of top enriched pathways comparing Japanese and European populations. (C) Correlation between gene count and enrichment magnitude. (D) Convergence analysis showing shared and population-specific pathway enrichments.
 
 1. **Synaptic transmission** (GO:0007268): P = 8.7×10⁻⁶, involving 147 genes
@@ -201,7 +201,7 @@ Custom gene sets derived from Coleman et al. (2019) showed significant enrichmen
 3.5. Cell-Type-Specific Expression Analysis
 CELLECT analysis revealed significant enrichment in specific neuronal populations (Figure 4), consistent with previous European findings but with population-specific patterns:
 
-![Figure 4: Cell-Type Enrichment Analysis](../../output/Figure4_CellType_Enrichment.png)
+![Figure 4: Cell-Type Enrichment Analysis](figures/Figure4_CellType_Enrichment.png)
 **Figure 4: Cell-type specific enrichment analysis.** (A) Enrichment heatmap comparing Japanese and European populations across major brain cell types. (B) Statistical significance of cell-type enrichments in Japanese population, with significance thresholds indicated. (C) Cross-population correlation of cell-type enrichments (r = 0.916). (D) Top enriched cell types showing predominant enrichment in cortical pyramidal neurons and hippocampal CA1 neurons.
 
 **Significantly enriched cell types (P < 2.1×10⁻³, Bonferroni-corrected):**
@@ -218,7 +218,7 @@ Notably, midbrain GABAergic neurons, which showed strong enrichment in European 
 3.6. Polygenic Score Performance
 Polygenic scores derived from European GWAS showed significantly reduced predictive accuracy in the Japanese population (Figure 5). The best-performing PGS (P-threshold = 0.1) achieved:
 
-![Figure 5: Polygenic Score Analysis](../../output/Figure5_Polygenic_Score.png)
+![Figure 5: Polygenic Score Analysis](figures/Figure5_Polygenic_Score.png)
 **Figure 5: Polygenic score analysis and cross-population transferability.** (A) ROC curves comparing PGS performance between Japanese (AUC = 0.547) and European populations (AUC = 0.658). (B) PGS distribution in Japanese sample showing separation between high-IQ cases and controls (Cohen's d = 0.244). (C) R² comparison across P-value thresholds demonstrating reduced predictive accuracy in Japanese population. (D) Cross-population transferability analysis showing limited performance across non-European populations.
 
 - **Japanese population**: R² = 0.024, AUC = 0.547 (95% CI: 0.521-0.653)
@@ -270,12 +270,12 @@ Future large-scale collaborative efforts incorporating diverse populations will 
 ## Supplementary Materials
 
 **Generated Figure and Table Files:**
-- [Figure 1: Manhattan Plot and QQ Plot (PNG)](../../output/Figure1_Manhattan_QQ.png) | [PDF](../../output/Figure1_Manhattan_QQ.pdf)
-- [Figure 2: Cross-Population Comparison (PNG)](../../output/Figure2_Cross_Population.png) | [PDF](../../output/Figure2_Cross_Population.pdf)
-- [Figure 4: Cell-Type Enrichment Analysis (PNG)](../../output/Figure4_CellType_Enrichment.png) | [PDF](../../output/Figure4_CellType_Enrichment.pdf)
-- [Figure 5: Polygenic Score Analysis (PNG)](../../output/Figure5_Polygenic_Score.png) | [PDF](../../output/Figure5_Polygenic_Score.pdf)
-- [Supplementary Figure 1: Pathway Enrichment (PNG)](../../output/Supplementary_Pathway_Enrichment.png) | [PDF](../../output/Supplementary_Pathway_Enrichment.pdf)
-- [Table 1: Top Variants (CSV)](../../output/Table1_Top_Variants.csv) | [HTML](../../output/Table1_Top_Variants.html)
+- [Figure 1: Manhattan Plot and QQ Plot (PNG)](figures/Figure1_Manhattan_QQ.png) | [PDF](figures/Figure1_Manhattan_QQ.pdf)
+- [Figure 2: Cross-Population Comparison (PNG)](figures/Figure2_Cross_Population.png) | [PDF](figures/Figure2_Cross_Population.pdf)
+- [Figure 4: Cell-Type Enrichment Analysis (PNG)](figures/Figure4_CellType_Enrichment.png) | [PDF](figures/Figure4_CellType_Enrichment.pdf)
+- [Figure 5: Polygenic Score Analysis (PNG)](figures/Figure5_Polygenic_Score.png) | [PDF](figures/Figure5_Polygenic_Score.pdf)
+- [Supplementary Figure 1: Pathway Enrichment (PNG)](figures/Supplementary_Pathway_Enrichment.png) | [PDF](figures/Supplementary_Pathway_Enrichment.pdf)
+- [Table 1: Top Variants (CSV)](figures/Table1_Top_Variants.csv) | [HTML](figures/Table1_Top_Variants.html)
 
 **Data and Code Availability:**
 All figure generation scripts, data preprocessing code, and statistical analysis tools are available in the `/figures/`, `/tables/`, `/config/`, and `/utils/` directories. The complete analysis pipeline can be reproduced using the `run_all_figures.py` orchestration script.

@@ -13,15 +13,15 @@ Date: 2024
 
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../../..'))
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from config.colors import COLORS, get_chromosome_color, get_significance_color
-from config.styles import setup_publication_style, get_figure_size, add_significance_line, save_figure
-from utils.data_loader import GWASDataLoader
-from utils.statistics import calculate_lambda_gc, calculate_qq_expected
+from analysis.config.colors import COLORS, get_chromosome_color, get_significance_color
+from analysis.config.styles import setup_publication_style, get_figure_size, add_significance_line, save_figure
+from analysis.utils.data_loader import GWASDataLoader
+from analysis.utils.statistics import calculate_lambda_gc, calculate_qq_expected
 
 class Figure1Generator:
     """Generate Figure 1: Manhattan and QQ plots"""
