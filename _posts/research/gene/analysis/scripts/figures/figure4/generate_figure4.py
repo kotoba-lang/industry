@@ -14,23 +14,23 @@ Date: 2024
 
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../../..'))
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
-from config.colors import COLORS, get_cell_type_color
-from config.styles import setup_publication_style, get_figure_size, save_figure
-from utils.data_loader import GWASDataLoader
-from utils.statistics import calculate_enrichment_score, fdr_correction
+from analysis.config.colors import COLORS, get_cell_type_color
+from analysis.config.styles import setup_publication_style, get_figure_size, save_figure
+from analysis.utils.data_loader import GWASDataLoader
+from analysis.utils.statistics import calculate_enrichment_score, fdr_correction
 
 # Import config and utils
 try:
-    from config.colors import COLORS, get_cell_type_color
-    from config.styles import setup_publication_style, get_figure_size, save_figure
-    from utils.data_loader import GWASDataLoader
+    from analysis.config.colors import COLORS, get_cell_type_color
+    from analysis.config.styles import setup_publication_style, get_figure_size, save_figure
+    from analysis.utils.data_loader import GWASDataLoader
 except ImportError:
     print("Warning: Using fallback imports")
     COLORS = {'japanese': '#2E86AB', 'european': '#A23B72', 'neural': '#4A90E2'}

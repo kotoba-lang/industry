@@ -5,7 +5,7 @@ Figure 5: Polygenic Score Analysis and Cross-Population Transferability
 
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../../..'))
 
 import pandas as pd
 import numpy as np
@@ -16,10 +16,10 @@ from scipy import stats
 
 # Import config and utils
 try:
-    from config.colors import COLORS
-    from config.styles import setup_publication_style, get_figure_size, save_figure
-    from utils.data_loader import GWASDataLoader
-    from utils.statistics import calculate_polygenic_score_r2
+    from analysis.config.colors import COLORS
+    from analysis.config.styles import setup_publication_style, get_figure_size, save_figure
+    from analysis.utils.data_loader import GWASDataLoader
+    from analysis.utils.statistics import calculate_polygenic_score_r2
 except ImportError:
     print("Warning: Using fallback imports")
     COLORS = {'japanese': '#2E86AB', 'european': '#A23B72'}

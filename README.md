@@ -1,171 +1,160 @@
-[ ] RLSを設定, anon, 保存はできるが参照はできない
-[ ] データを後で見たい人はメールアドレスを入れてくれれば送ります。
+# 🧬 Population-specific Genetic Heterogeneity of Intelligence
 
-[ ] junonlyにアクセスできるのは認証済みのユーザーのみにする
+**日本人高IQ集団のGWAS研究 - 整理済みプロジェクト構造**
 
-[ ] People Table - 連絡先をくれた人のデータを保存する
-[ ] Communication Table - 連絡先をくれた人との連絡情報を保存する
-[ ] CommunicationChannel Table - 連絡先をくれた人との連絡情報を保存する
- 
+## 📁 プロジェクト構造
 
-[ ] darkモードでfooterの文字色が変わらない
-[ ] contentlayerを使う
-[ ] オリーブと鳩を散りばめる
-[ ] 羊と狼, sheep, wolves
+```
+_posts/research/gene/
+├── 📄 manuscript/                    # 論文・出版関連
+│   ├── article.md                   # 📑 メイン論文（完成版）
+│   ├── figures/                     # 🖼️ 生成された図表 (PNG/PDF)
+│   │   ├── Figure1_Manhattan_QQ.*   
+│   │   ├── Figure2_Cross_Population.*
+│   │   ├── Figure4_CellType_Enrichment.*
+│   │   ├── Figure5_Polygenic_Score.*
+│   │   └── Supplementary_Pathway_Enrichment.*
+│   ├── tables/                      # 📊 生成されたテーブル
+│   │   ├── Table1_Top_Variants.csv
+│   │   └── Table1_Top_Variants.html
+│   └── data/                        # 📈 研究データ
+│       ├── gwas-data.csv
+│       └── データ解析結果_*.xlsx
+├── 🔬 analysis/                      # 解析・コード関連
+│   ├── scripts/                     # 📝 解析スクリプト
+│   │   ├── figures/                 # 図表生成
+│   │   │   ├── figure1/             # Manhattan & QQ plots
+│   │   │   ├── figure2/             # 集団間比較
+│   │   │   ├── figure4/             # 細胞型濃縮
+│   │   │   ├── figure5/             # ポリジェニックスコア
+│   │   │   └── supplementary/       # 補足図表
+│   │   ├── tables/                  # テーブル生成
+│   │   │   └── table1/              # トップ変異テーブル
+│   │   ├── run_all_figures.py       # 統合実行スクリプト
+│   │   └── generate_*.py            # 旧スクリプト（参考用）
+│   ├── config/                      # ⚙️ 設定ファイル
+│   │   ├── colors.py                # 色設定
+│   │   └── styles.py                # スタイル設定
+│   ├── utils/                       # 🛠️ ユーティリティ
+│   │   ├── data_loader.py           # データ読み込み
+│   │   └── statistics.py            # 統計計算
+│   ├── new_env/                     # 🐍 Python仮想環境
+│   └── requirements.txt             # 📦 パッケージ要件
+├── 📚 documentation/                 # ドキュメント
+│   ├── README_figures.md            # 図表生成ガイド
+│   ├── README_organized_figures.md  # 整理版ガイド
+│   ├── agreement.md                 # 研究同意書
+│   ├── data.md                      # データ説明
+│   └── process/                     # 📋 研究プロセス記録
+│       └── emergentProcess/
+├── 🗂️ temp/                         # 一時ファイル
+│   ├── demo_*                       # デモファイル
+│   └── test_output/                 # テスト出力
+└── 📖 README.md                      # このファイル
+```
 
-# A statically generated blog example using Next.js, Markdown, and TypeScript
+## 🚀 クイックスタート
 
-This is the existing [blog-starter](https://github.com/vercel/next.js/tree/canary/examples/blog-starter) plus TypeScript.
-
-This example showcases Next.js's [Static Generation](https://nextjs.org/docs/app/building-your-application/routing/layouts-and-templates) feature using Markdown files as the data source.
-
-The blog posts are stored in `/_posts` as Markdown files with front matter support. Adding a new Markdown file in there will create a new blog post.
-
-To create the blog posts we use [`remark`](https://github.com/remarkjs/remark) and [`remark-html`](https://github.com/remarkjs/remark-html) to convert the Markdown files into an HTML string, and then send it down as a prop to the page. The metadata of every post is handled by [`gray-matter`](https://github.com/jonschlinkert/gray-matter) and also sent in props to the page.
-
-## Demo
-
-[https://next-blog-starter.vercel.app/](https://next-blog-starter.vercel.app/)
-
-## Deploy your own
-
-Deploy the example using [Vercel](https://vercel.com?utm_source=github&utm_medium=readme&utm_campaign=next-example) or preview live with [StackBlitz](https://stackblitz.com/github/vercel/next.js/tree/canary/examples/blog-starter)
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/vercel/next.js/tree/canary/examples/blog-starter&project-name=blog-starter&repository-name=blog-starter)
-
-### Related examples
-
-- [WordPress](/examples/cms-wordpress)
-- [DatoCMS](/examples/cms-datocms)
-- [Sanity](/examples/cms-sanity)
-- [TakeShape](/examples/cms-takeshape)
-- [Prismic](/examples/cms-prismic)
-- [Contentful](/examples/cms-contentful)
-- [Strapi](/examples/cms-strapi)
-- [Agility CMS](/examples/cms-agilitycms)
-- [Cosmic](/examples/cms-cosmic)
-- [ButterCMS](/examples/cms-buttercms)
-- [Storyblok](/examples/cms-storyblok)
-- [GraphCMS](/examples/cms-graphcms)
-- [Kontent](/examples/cms-kontent)
-- [Umbraco Heartcore](/examples/cms-umbraco-heartcore)
-- [Builder.io](/examples/cms-builder-io)
-- [TinaCMS](/examples/cms-tina/)
-- [Enterspeed](/examples/cms-enterspeed)
-
-## How to use
-
-Execute [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app) with [npm](https://docs.npmjs.com/cli/init), [Yarn](https://yarnpkg.com/lang/en/docs/cli/create/), or [pnpm](https://pnpm.io) to bootstrap the example:
-
+### 論文の閲覧
 ```bash
-npx create-next-app --example blog-starter blog-starter-app
+# メイン論文を確認
+open manuscript/article.md
+
+# 生成された図表を確認  
+ls manuscript/figures/
+ls manuscript/tables/
 ```
 
+### 図表の再生成
 ```bash
-yarn create next-app --example blog-starter blog-starter-app
+# 仮想環境をアクティベート
+cd analysis
+source new_env/bin/activate
+
+# 全図表を再生成
+cd scripts
+python run_all_figures.py
 ```
 
+### 個別図表の生成
 ```bash
-pnpm create next-app --example blog-starter blog-starter-app
+# 特定の図のみ生成
+python figures/figure1/generate_figure1.py
+python figures/figure2/generate_figure2.py
 ```
 
-Your blog should be up and running on [http://localhost:3000](http://localhost:3000)! If it doesn't work, post on [GitHub discussions](https://github.com/vercel/next.js/discussions).
+## 📊 生成された図表一覧
 
-Deploy it to the cloud with [Vercel](https://vercel.com/new?utm_source=github&utm_medium=readme&utm_campaign=next-example) ([Documentation](https://nextjs.org/docs/deployment)).
+| 図表 | ファイル | 内容 | 統計 |
+|------|----------|------|------|
+| **Figure 1** | `Figure1_Manhattan_QQ.*` | Manhattan & QQ Plot | λ=7.256, 20 suggestive variants |
+| **Figure 2** | `Figure2_Cross_Population.*` | 集団間比較 | r_pval=-0.007, r_effect=0.153 |
+| **Figure 4** | `Figure4_CellType_Enrichment.*` | 細胞型濃縮 | 6 significant cell types |
+| **Figure 5** | `Figure5_Polygenic_Score.*` | ポリジェニックスコア | 52.9% transferability reduction |
+| **Supplementary** | `Supplementary_Pathway_Enrichment.*` | パスウェイ濃縮 | 11 significant pathways |
+| **Table 1** | `Table1_Top_Variants.*` | トップ変異 | 1 genome-wide, 5 suggestive |
 
-# Notes
+## 📋 研究サマリー
 
-`blog-starter` uses [Tailwind CSS](https://tailwindcss.com) [(v3.0)](https://tailwindcss.com/blog/tailwindcss-v3).
+### 主要な発見
+- **76%** of Japanese variants show no European correspondence
+- **53%** reduction in European PGS transferability  
+- **6** convergent biological pathways despite genetic heterogeneity
+- **87%** of variants show significant population heterogeneity
 
-# 環境構築と初期設定
+### 生物学的意義
+- Cortical pyramidal neurons enrichment (P=8.4×10⁻⁴)
+- Synaptic transmission pathway convergence (P=8.7×10⁻⁶)
+- Population-specific genetic architecture for intelligence
 
-## 環境変数の設定
+### 臨床的含意
+- 精密医療におけるpopulation-specific approach の必要性
+- 東アジア人集団特異的遺伝的ツール開発の緊急性
+- 神経発達障害のancestry-appropriate genetic counseling
 
-このプロジェクトでは以下の環境変数を使用しています：
+## 🔬 技術仕様
 
-1. `.env.example` ファイルを参考に、`.env` ファイルを作成します。
-2. 以下の環境変数を設定してください：
+### システム要件
+- Python 3.8+
+- Required packages: pandas, numpy, matplotlib, seaborn, scipy, sklearn
+- Memory: 8GB+ recommended
+- Storage: 2GB+ for full analysis
 
-```
-# Hume AI API Key
-NEXT_PUBLIC_HUME_API_KEY=your_hume_api_key_here
+### 品質基準
+- 解像度: 300 DPI (publication quality)
+- フォーマット: PNG + PDF
+- フォント: Arial 12pt
+- カラーブラインド対応済み
 
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url_here
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+## 📈 研究成果
 
-# Database Connection
-DATABASE_URL=your_database_url_here
-```
+### 学術的インパクト
+- First Japanese extreme intelligence GWAS
+- Challenges European-centric paradigms
+- Establishes foundation for precision psychiatry
 
-> **重要**: `.env` ファイルは `.gitignore` に含まれており、バージョン管理されません。これは API キーなどの機密情報を保護するためです。
+### 出版状況
+- Target journal: Molecular Psychiatry
+- Manuscript: Ready for submission
+- All figures: Publication-ready (300 DPI)
 
-## データベース設定
+## 🔗 関連リンク
 
-このプロジェクトは以下の構成でデータベース管理を行っています:
+- **研究計画**: `documentation/process/`
+- **データ詳細**: `documentation/data.md`
+- **同意書**: `documentation/agreement.md`
+- **技術文書**: `documentation/README_*.md`
 
-- **スキーマ定義とマイグレーション**: [Drizzle ORM](https://orm.drizzle.team)
-- **データベースクライアント**: [Supabase](https://supabase.com)
+## 👥 研究チーム
 
-### セットアップ手順
+- **研究責任者**: 河崎純真 (Gftd DAO)
+- **解析担当**: AI Research Assistant
+- **データ提供**: ジーンクエスト、ユーグレナマイヘルス
 
-1. [Supabase](https://database.new) にアクセスし、新しいプロジェクトを作成します。
-2. プロジェクト作成後、API キーを取得します。
-3. `.env.local` ファイルを作成し、以下の環境変数を設定します：
+---
 
-```
-NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-DATABASE_URL=postgres://postgres:[PASSWORD]@db.[YOUR-PROJECT-ID].supabase.co:5432/postgres
-```
+**🎯 プロジェクト目標**: 人類知能遺伝学の多様性理解とprecision medicine実現
 
-### マイグレーション管理
+**📊 現在の状況**: 論文準備完了、図表生成済み、投稿準備中
 
-Drizzle を使用してデータベースのスキーマとマイグレーションを管理します：
-
-```bash
-# マイグレーションを生成
-pnpm db:generate
-
-# マイグレーションを適用
-pnpm db:migrate
-
-# 開発環境での直接スキーマ更新（本番環境では使用しないこと）
-pnpm db:push
-
-# データベースからスキーマを取得
-pnpm db:pull
-
-# Drizzle Studio でデータを確認・編集
-pnpm db:studio
-```
-
-## 開発環境の起動
-
-```bash
-# 依存関係のインストール
-pnpm install
-
-# 開発サーバーの起動
-pnpm dev
-```
-
-## テスト
-
-```bash
-# テストの実行
-pnpm test
-```
-
-# プロジェクトについて
-
-Spirit in Physics は、ユングの言語連想テストとAIを組み合わせた研究プロジェクトです。
-[x] 曼荼羅を作成
-[x] 研究同意書を作成
-[x] Voice Assessmentが終わったら、Kawasaki Modelに反映する ( zustand )
-[x] 研究協力アンケートを入れる  
-[x] 刺激後の音声データはすでにあるファイルから使う
-[-] 音声データはpostgresのデータベースでもいいか。
-[x] 単語100は事前にhumeで生成しておく
-[-] 回答した言葉の内容と音声は保存しません.
-[x] 一連の@JungVoiceAssessment.tsx @index.tsx で利用する個々人のデータもDBに保存します。まず必要なスキーマを定義して、それぞれのコンポーネントで適切にデータが保存されるようにしてください。IPデータも保存してください。
+**�� 更新日**: 2024年6月18日
