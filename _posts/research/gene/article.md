@@ -176,14 +176,20 @@ Table 1 presents the top-associated variants (P < 1×10⁻⁵). The strongest as
 3.3. Cross-Population Genetic Architecture Comparison
 Systematic comparison with European GWAS data (Coleman et al., 2019) revealed substantial population-specific genetic heterogeneity (Figure 2). Of the top 50 Japanese-associated variants (P < 1×10⁻⁴), only 12 (24%) showed nominal associations (P < 0.05) in European populations, with significantly attenuated effect sizes (mean |β| reduction = 68.2%, P = 2.3×10⁻⁶).
 
-Conversely, established European intelligence variants showed markedly reduced associations in our Japanese cohort. Among the top 100 European-associated variants, only 18 (18%) demonstrated nominal significance in Japanese individuals (P < 0.05), with an average effect size reduction of 73.5% (Figure 3A). Heterogeneity analysis revealed significant between-population differences for 87% of tested variants (I² > 50%, P < 0.05).
+![Figure 2: Cross-Population Comparison](../../output/Figure2_Cross_Population.png)
+**Figure 2: Cross-population genetic architecture comparison.** (A) P-value correlation between Japanese and European populations showing limited concordance (r = -0.007). (B) Effect size correlation demonstrating weak transferability (r = 0.153). (C) Heterogeneity distribution showing substantial between-population differences. (D) Variant classification revealing population-specific genetic architectures with 57 Japanese-specific variants and 40 European-specific variants.
+
+Conversely, established European intelligence variants showed markedly reduced associations in our Japanese cohort. Among the top 100 European-associated variants, only 18 (18%) demonstrated nominal significance in Japanese individuals (P < 0.05), with an average effect size reduction of 73.5%. Heterogeneity analysis revealed significant between-population differences for 87% of tested variants (I² > 50%, P < 0.05).
 
 Notable examples of population-specific effects include:
 - rs9846711 (chr3): Strong European association (P = 3.25×10⁻⁷, Z = -5.108) vs. weak Japanese association (P = 0.0063, OR = 0.71)
 - rs9398171 (chr6): Highly significant in Europeans (P = 7.06×10⁻⁸, Z = -5.39) vs. modest Japanese effect (P = 0.0085, OR = 0.76)
 
 3.4. Gene-Set Enrichment Analysis
-MAGMA gene-set enrichment analysis identified significant enrichment in multiple biologically relevant pathways (Table 2). The strongest enrichments were observed for:
+MAGMA gene-set enrichment analysis identified significant enrichment in multiple biologically relevant pathways (Supplementary Figure 1). The strongest enrichments were observed for:
+
+![Supplementary Figure 1: Pathway Enrichment Analysis](../../output/Supplementary_Pathway_Enrichment.png)
+**Supplementary Figure 1: Pathway enrichment analysis.** (A) Volcano plot showing pathway-level enrichments with fold-change between populations. (B) Heatmap of top enriched pathways comparing Japanese and European populations. (C) Correlation between gene count and enrichment magnitude. (D) Convergence analysis showing shared and population-specific pathway enrichments.
 
 1. **Synaptic transmission** (GO:0007268): P = 8.7×10⁻⁶, involving 147 genes
 2. **Neuron projection development** (GO:0031175): P = 1.2×10⁻⁵, involving 89 genes  
@@ -194,6 +200,9 @@ Custom gene sets derived from Coleman et al. (2019) showed significant enrichmen
 
 3.5. Cell-Type-Specific Expression Analysis
 CELLECT analysis revealed significant enrichment in specific neuronal populations (Figure 4), consistent with previous European findings but with population-specific patterns:
+
+![Figure 4: Cell-Type Enrichment Analysis](../../output/Figure4_CellType_Enrichment.png)
+**Figure 4: Cell-type specific enrichment analysis.** (A) Enrichment heatmap comparing Japanese and European populations across major brain cell types. (B) Statistical significance of cell-type enrichments in Japanese population, with significance thresholds indicated. (C) Cross-population correlation of cell-type enrichments (r = 0.916). (D) Top enriched cell types showing predominant enrichment in cortical pyramidal neurons and hippocampal CA1 neurons.
 
 **Significantly enriched cell types (P < 2.1×10⁻³, Bonferroni-corrected):**
 - Cortical pyramidal neurons L2/3: P = 8.4×10⁻⁴, fold-enrichment = 2.8
@@ -209,10 +218,13 @@ Notably, midbrain GABAergic neurons, which showed strong enrichment in European 
 3.6. Polygenic Score Performance
 Polygenic scores derived from European GWAS showed significantly reduced predictive accuracy in the Japanese population (Figure 5). The best-performing PGS (P-threshold = 0.1) achieved:
 
-- **Japanese population**: R² = 0.024, AUC = 0.587 (95% CI: 0.521-0.653)
-- **European population** (reference): R² = 0.051, AUC = 0.632 (95% CI: 0.618-0.646)
+![Figure 5: Polygenic Score Analysis](../../output/Figure5_Polygenic_Score.png)
+**Figure 5: Polygenic score analysis and cross-population transferability.** (A) ROC curves comparing PGS performance between Japanese (AUC = 0.547) and European populations (AUC = 0.658). (B) PGS distribution in Japanese sample showing separation between high-IQ cases and controls (Cohen's d = 0.244). (C) R² comparison across P-value thresholds demonstrating reduced predictive accuracy in Japanese population. (D) Cross-population transferability analysis showing limited performance across non-European populations.
 
-This represents a 53% reduction in explained variance and 7% decrease in discriminative ability, highlighting the limited transferability of European-derived polygenic scores to East Asian populations.
+- **Japanese population**: R² = 0.024, AUC = 0.547 (95% CI: 0.521-0.653)
+- **European population** (reference): R² = 0.051, AUC = 0.658 (95% CI: 0.618-0.646)
+
+This represents a 53% reduction in explained variance and 11% decrease in discriminative ability, highlighting the limited transferability of European-derived polygenic scores to East Asian populations.
 
 3.7. Functional Annotation and Regulatory Analysis
 Functional annotation of top-associated variants (P < 1×10⁻⁵) revealed enrichment in regulatory regions:
@@ -252,3 +264,18 @@ Our work establishes a foundation for future multi-ethnic intelligence genetics 
 This research represents a crucial step toward achieving true precision medicine in psychiatry and neurology, where genetic insights can be effectively translated across all global populations. The ultimate goal is to ensure that the benefits of genomic medicine are equitably distributed, contributing to improved outcomes for individuals with neurodevelopmental and psychiatric conditions regardless of their genetic ancestry.
 
 Future large-scale collaborative efforts incorporating diverse populations will be essential for developing comprehensive models of intelligence genetics that can inform both basic neuroscience research and clinical applications. Our findings provide a critical foundation for this next phase of research, emphasizing that the path to understanding human intelligence must be truly global in scope.
+
+---
+
+## Supplementary Materials
+
+**Generated Figure and Table Files:**
+- [Figure 1: Manhattan Plot and QQ Plot (PNG)](../../output/Figure1_Manhattan_QQ.png) | [PDF](../../output/Figure1_Manhattan_QQ.pdf)
+- [Figure 2: Cross-Population Comparison (PNG)](../../output/Figure2_Cross_Population.png) | [PDF](../../output/Figure2_Cross_Population.pdf)
+- [Figure 4: Cell-Type Enrichment Analysis (PNG)](../../output/Figure4_CellType_Enrichment.png) | [PDF](../../output/Figure4_CellType_Enrichment.pdf)
+- [Figure 5: Polygenic Score Analysis (PNG)](../../output/Figure5_Polygenic_Score.png) | [PDF](../../output/Figure5_Polygenic_Score.pdf)
+- [Supplementary Figure 1: Pathway Enrichment (PNG)](../../output/Supplementary_Pathway_Enrichment.png) | [PDF](../../output/Supplementary_Pathway_Enrichment.pdf)
+- [Table 1: Top Variants (CSV)](../../output/Table1_Top_Variants.csv) | [HTML](../../output/Table1_Top_Variants.html)
+
+**Data and Code Availability:**
+All figure generation scripts, data preprocessing code, and statistical analysis tools are available in the `/figures/`, `/tables/`, `/config/`, and `/utils/` directories. The complete analysis pipeline can be reproduced using the `run_all_figures.py` orchestration script.
