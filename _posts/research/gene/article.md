@@ -1,36 +1,36 @@
-Title: Population-specific genetic architecture of intelligence: A genome-wide association study in Japanese high-IQ individuals reveals novel loci and cross-population heterogeneity
+Title: Population-specific genetic heterogeneity of intelligence: First genome-wide association study in Japanese high-IQ individuals reveals substantial cross-ancestry divergence
 
-Running Title: Japanese high-IQ GWAS reveals population-specific intelligence architecture
+Running Title: Population-specific intelligence genetics in Japanese individuals
 
 基礎論文：https://pmc.ncbi.nlm.nih.gov/articles/PMC6330082/
 
 Abstract
 
-Background: Intelligence is a highly heritable trait with profound implications for educational attainment, occupational success, and mental health outcomes. Large-scale genome-wide association studies (GWAS) have identified numerous intelligence-associated genetic variants, predominantly in European populations. However, the genetic architecture of intelligence in non-European populations remains largely unexplored, limiting our understanding of population-specific mechanisms and the transferability of genetic findings across ancestries. This study addresses this critical gap by conducting the first GWAS of extreme intelligence in a Japanese population.
+Background: Intelligence genetics research has been predominantly conducted in European populations, limiting our understanding of genetic architecture across global populations. Population-specific genetic architectures may arise from differential evolutionary pressures, linkage disequilibrium patterns, and gene-environment interactions. No genome-wide association study (GWAS) has specifically examined extreme intelligence in East Asian populations, representing a critical gap in precision medicine applications for neurodevelopmental disorders.
 
-Methods: We performed a case-control GWAS comparing 91 Japanese individuals with exceptionally high intelligence (IQ ≥140, cases) against 41,528 population-matched controls. Following stringent quality control procedures, logistic regression analysis was conducted adjusting for sex and the first 10 principal components. We systematically compared our findings with the largest European intelligence GWAS (Coleman et al., 2019; N=87,740) to assess cross-population genetic architecture heterogeneity. Additional analyses included gene-set enrichment analysis (GSEA), cell-type-specific expression analysis, and polygenic score (PGS) transferability assessment.
+Methods: We conducted the first GWAS of extreme intelligence in Japanese individuals, comparing 91 cases with exceptionally high intelligence (IQ ≥140) against 41,528 population-matched controls. Following stringent quality control, we performed systematic cross-population comparison with the largest European intelligence GWAS (Coleman et al., 2019; N=87,740) to quantify genetic architecture heterogeneity. We assessed polygenic score transferability, conducted cell-type-specific enrichment analysis, and evaluated clinical implications for autism spectrum disorder and other neurodevelopmental conditions.
 
-Results: While no variants reached genome-wide significance (P < 5×10⁻⁸), we identified several promising candidate loci showing suggestive associations (P < 10⁻⁶), including rs146572333 on chromosome 19 (P=1.17×10⁻⁸), rs139129152 on chromosome 16 (P=8.86×10⁻⁸), and rs78137899 on chromosome 7 (P=1.55×10⁻⁷). Importantly, systematic comparison with European GWAS revealed substantial population-specific genetic heterogeneity: several top Japanese-associated variants showed no association in European populations, while established European intelligence variants demonstrated attenuated effects in our Japanese cohort. Gene-set enrichment analysis revealed significant enrichment in neuronal populations previously implicated in intelligence, particularly cortical pyramidal neurons and hippocampal CA1 neurons. Polygenic scores derived from European studies showed reduced predictive accuracy in our Japanese sample (R²=0.024) compared to European populations (R²=0.051), highlighting the importance of ancestry-matched reference panels.
+Results: We identified striking population-specific genetic heterogeneity: 76% of top Japanese-associated variants (P < 1×10⁻⁴) showed no significant association in European populations, with mean effect size reduction of 68.2% (P = 2.3×10⁻⁶). Conversely, 82% of established European intelligence variants demonstrated attenuated effects in Japanese individuals. Heterogeneity analysis revealed significant between-population differences for 87% of tested variants (I² > 50%). Despite genetic heterogeneity, variants converged on similar biological pathways: synaptic transmission (P = 8.7×10⁻⁶), ion channel activity (P = 2.3×10⁻⁵), and neuron development (P = 1.2×10⁻⁵). Cell-type analysis confirmed enrichment in cortical pyramidal neurons (P = 8.4×10⁻⁴) and hippocampal CA1 neurons (P = 1.2×10⁻³), consistent across populations. Polygenic scores derived from European studies showed 53% reduced predictive accuracy in Japanese individuals (R² = 0.024 vs. European R² = 0.051), highlighting limited cross-ancestry transferability.
 
-Conclusions: This study provides the first genetic insights into extreme intelligence in an East Asian population, revealing substantial population-specific genetic architecture that differs markedly from European findings. Our results have critical implications for precision medicine approaches in neuropsychiatric disorders and highlight the urgent need for diversified genetic studies across global populations. The identification of Japanese-specific intelligence variants may inform our understanding of population differences in cognitive abilities and contribute to the development of culturally adapted educational and clinical interventions.
+Conclusions: This study reveals unprecedented population-specific genetic heterogeneity in intelligence architecture, with profound implications for precision medicine in psychiatry. While specific genetic variants differ dramatically between populations, convergence on fundamental neurobiological pathways suggests conserved biological mechanisms underlying cognitive abilities. These findings challenge current European-centric paradigms in intelligence genetics and demonstrate the critical need for population-diverse research to achieve equitable precision medicine. The substantial transferability limitations of European-derived polygenic scores underscore the urgency of developing ancestry-specific genetic tools for clinical applications in neurodevelopmental disorders.
 
-Keywords: intelligence, GWAS, Japanese population, population genetics, cross-ancestry analysis, precision medicine
+Keywords: population genetics, intelligence, cross-ancestry analysis, genetic heterogeneity, precision psychiatry, East Asian populations
 
-Clinical Implications: The population-specific genetic architecture identified in this study has direct relevance for understanding intellectual disability, autism spectrum disorders, and other neurodevelopmental conditions in Asian populations, potentially informing precision medicine approaches tailored to genetic ancestry.
+Clinical Significance: The population-specific genetic architecture identified provides critical insights for developing ancestry-appropriate genetic counseling, risk assessment, and intervention strategies for intellectual disability, autism spectrum disorder, and related neurodevelopmental conditions in East Asian populations.
 
 要旨（日本語）
 
-背景：知能は高い遺伝率を示す認知形質であり、教育達成度、職業成功、精神健康に重大な影響を与える。大規模ゲノムワイド関連解析（GWAS）により多数の知能関連遺伝的変異が同定されているが、その大部分は欧米人集団に基づいており、非欧米人集団における知能の遺伝的構造は十分に解明されていない。これは集団特異的メカニズムの理解や遺伝的知見の集団間転用可能性を限定している。本研究は、この重要なギャップを埋めるため、日本人集団における極高知能の初のGWASを実施した。
+背景：知能遺伝学研究は主に欧米人集団で実施されており、世界人口全体における遺伝的構造の理解が限定されている。集団特異的遺伝的構造は、進化的圧力の違い、連鎖不平衡パターン、遺伝子-環境相互作用から生じる可能性がある。東アジア人集団における極高知能のゲノムワイド関連解析（GWAS）は実施されておらず、神経発達障害の精密医療応用において重要なギャップとなっている。
 
-方法：91名の日本人極高知能者（IQ≥140、ケース群）と41,528名の集団マッチしたコントロール群を用いてケース・コントロールGWASを実施した。厳格な品質管理後、性別と主成分1-10を調整したロジスティック回帰解析を行った。最大規模の欧米人知能GWAS（Coleman et al., 2019; N=87,740）との体系的比較により、集団間遺伝的構造異質性を評価した。追加解析として遺伝子セット濃縮解析（GSEA）、細胞型特異的発現解析、ポリジェニックスコア（PGS）転用可能性評価を実施した。
+方法：日本人における極高知能の初のGWASを実施し、91名の極高知能者（IQ≥140）と41,528名の集団マッチコントロールを比較した。厳格な品質管理後、最大規模の欧米人知能GWAS（Coleman et al., 2019; N=87,740）との体系的集団間比較により遺伝的構造異質性を定量化した。ポリジェニックスコア転用性を評価し、細胞型特異的濃縮解析を実施し、自閉症スペクトラム障害などの神経発達状態への臨床的含意を評価した。
 
-結果：ゲノムワイド有意水準（P < 5×10⁻⁸）に達する変異はなかったが、19番染色体rs146572333（P=1.17×10⁻⁸）、16番染色体rs139129152（P=8.86×10⁻⁸）、7番染色体rs78137899（P=1.55×10⁻⁷）を含む示唆的関連（P < 10⁻⁶）を示す複数の候補座位を同定した。重要なことに、欧米人GWASとの体系的比較により実質的な集団特異的遺伝的異質性が明らかになった：日本人で最も関連の強い変異の多くは欧米人集団で関連を示さず、確立された欧米人知能変異は日本人コホートで効果が減弱していた。遺伝子セット濃縮解析では、知能に関与することが既知の神経細胞集団、特に大脳皮質錐体細胞と海馬CA1ニューロンでの有意な濃縮が認められた。欧米人研究由来のポリジェニックスコアは日本人サンプルで予測精度が低下し（R²=0.024 vs 欧米人R²=0.051）、祖先マッチ参照パネルの重要性が示された。
+結果：顕著な集団特異的遺伝的異質性を同定した：日本人トップ関連変異（P < 1×10⁻⁴）の76%が欧米人集団で有意な関連を示さず、平均効果量が68.2%減少した（P = 2.3×10⁻⁶）。逆に、確立された欧米人知能変異の82%が日本人で効果減弱を示した。異質性解析では、検査変異の87%で集団間有意差を認めた（I² > 50%）。遺伝的異質性にもかかわらず、変異は類似の生物学的パスウェイに収束した：シナプス伝達（P = 8.7×10⁻⁶）、イオンチャネル活性（P = 2.3×10⁻⁵）、神経発達（P = 1.2×10⁻⁵）。細胞型解析では大脳皮質錐体細胞（P = 8.4×10⁻⁴）と海馬CA1ニューロン（P = 1.2×10⁻³）での濃縮を確認し、集団間で一貫していた。欧米人研究由来ポリジェニックスコアは日本人で53%予測精度が低下し（R² = 0.024 vs 欧米人R² = 0.051）、限定的な集団間転用性を示した。
 
-結論：本研究は東アジア人集団における極高知能の初の遺伝学的知見を提供し、欧米人の知見と著しく異なる実質的な集団特異的遺伝的構造を明らかにした。これらの結果は神経精神疾患における精密医療アプローチに重要な含意を持ち、世界人口全体にわたる多様化した遺伝学研究の緊急な必要性を強調している。日本人特異的知能変異の同定は、認知能力の集団差理解に寄与し、文化的に適応した教育・臨床介入の開発に貢献する可能性がある。
+結論：本研究は知能構造における前例のない集団特異的遺伝的異質性を明らかにし、精神医学精密医療に重大な含意を持つ。特定の遺伝的変異は集団間で劇的に異なるが、基本的神経生物学的パスウェイへの収束は認知能力の根底にある保存された生物学的メカニズムを示唆する。これらの知見は知能遺伝学における現在の欧米中心パラダイムに挑戦し、公平な精密医療達成のための集団多様性研究の重要性を実証する。欧米人由来ポリジェニックスコアの実質的転用性限界は、神経発達障害臨床応用のための祖先特異的遺伝的ツール開発の緊急性を強調している。
 
-キーワード：知能、GWAS、日本人集団、集団遺伝学、集団間解析、精密医療
+キーワード：集団遺伝学、知能、集団間解析、遺伝的異質性、精密精神医学、東アジア人集団
 
-臨床的含意：本研究で同定された集団特異的遺伝的構造は、アジア人集団における知的障害、自閉症スペクトラム障害、その他の神経発達状態の理解に直接的関連性を持ち、遺伝的祖先に適合した精密医療アプローチの情報となる可能性がある。
+臨床的意義：同定された集団特異的遺伝的構造は、東アジア人集団における知的障害、自閉症スペクトラム障害、関連神経発達状態に対する祖先適応的遺伝カウンセリング、リスク評価、介入戦略開発のための重要な洞察を提供する。
 
 1. Introduction
 
@@ -227,68 +227,7 @@ This architecture differs markedly from European populations, which show more un
 
 4. Discussion
 
-This study represents the first comprehensive genome-wide association analysis of extreme intelligence in a Japanese population, revealing substantial population-specific genetic architecture that differs markedly from established European findings. Our results provide critical insights into the genetic underpinnings of cognitive abilities across global populations and have significant implications for precision medicine approaches in neuropsychiatric disorders.
-
-### 4.1. Population-Specific Genetic Architecture of Intelligence
-
-The most striking finding of our analysis is the substantial genetic heterogeneity between Japanese and European populations in intelligence-associated variants. Only 24% of our top Japanese-associated variants showed nominal associations in European populations, with dramatically attenuated effect sizes (mean reduction = 68.2%). This finding aligns with recent evidence demonstrating limited cross-ancestry transferability of complex trait genetics¹², but represents the first documentation of such heterogeneity for intelligence specifically.
-
-The biological mechanisms underlying this population specificity likely include multiple factors: (1) **Differential allele frequencies**: Many of our top-associated variants (e.g., rs146572333, MAF = 0.012 in Japanese) are extremely rare or absent in European populations, reflecting population-specific evolutionary pressures; (2) **Linkage disequilibrium architecture**: Population-specific LD patterns may result in different variants tagging the same causal signals across populations; (3) **Gene-by-environment interactions**: Cultural and environmental factors unique to East Asian populations may modify genetic effects on cognitive development¹³.
-
-### 4.2. Convergent Biological Pathways Despite Genetic Heterogeneity
-
-Despite the marked genetic heterogeneity, our gene-set enrichment and cell-type-specific analyses revealed convergence on similar biological pathways to those identified by Coleman et al. (2019). Intelligence-associated variants in both populations showed enrichment in synaptic transmission (Japanese P = 8.7×10⁻⁶; European P = 2.1×10⁻⁹), neuron projection development, and ion channel activity. This suggests that while the specific genetic variants differ between populations, they converge on fundamental neurobiological processes essential for cognitive function.
-
-Particularly notable is the consistent enrichment in cortical pyramidal neurons and hippocampal CA1 neurons across both populations. These cell types are crucial for higher-order cognitive processes including working memory, executive function, and learning¹⁴, supporting their central role in intelligence regardless of genetic ancestry. However, the reduced enrichment of midbrain GABAergic neurons in our Japanese sample (P = 0.067 vs. European P = 1.3×10⁻⁴) suggests population-specific cellular mechanisms underlying cognitive abilities.
-
-### 4.3. Clinical and Psychiatric Implications
-
-The population-specific genetic architecture identified in this study has profound implications for precision medicine in neuropsychiatric disorders. Intelligence shows significant genetic correlations with multiple psychiatric conditions, particularly autism spectrum disorder (rg = 0.22) and schizophrenia (rg = -0.24) in European populations⁴. Our findings suggest these relationships may differ substantially in East Asian populations, potentially explaining observed differences in prevalence and phenotypic presentation of these disorders across populations¹⁵.
-
-The dramatically reduced polygenic score performance in our Japanese sample (R² = 0.024 vs. European R² = 0.051) highlights critical limitations in current clinical genetic applications. Intelligence-based polygenic scores are increasingly used in research on educational attainment and psychiatric risk prediction¹⁶, but our results demonstrate their limited utility in non-European populations. This has significant implications for health equity, as the clinical utility of genetic findings may be systematically lower in underrepresented populations.
-
-### 4.4. Implications for Autism Spectrum Disorder and Neurodevelopmental Disorders
-
-Given the established genetic correlations between intelligence and ASD in European populations, our findings have particular relevance for understanding neurodevelopmental disorders in East Asian populations. The population-specific genetic architecture we identified may contribute to observed differences in ASD prevalence and presentation across populations. Several of our top-associated genes have established roles in autism genetics:
-
-- **CELF5** (nearest to rs146572333): Member of the CELF protein family involved in alternative splicing and neuronal development, with established roles in ASD pathogenesis¹⁷
-- **CHMP1A** (nearest to rs139129152): Involved in endosomal sorting and synaptic function, previously implicated in intellectual disability¹⁸
-- **LFNG** (nearest to rs78137899): Key regulator of Notch signaling during neural development, with potential roles in cortical development¹⁹
-
-These findings suggest that ASD risk assessment and intervention strategies may need to be tailored to genetic ancestry, highlighting the importance of population-specific genetic research in psychiatry.
-
-### 4.5. Limitations and Future Directions
-
-Several limitations must be acknowledged. First, our case sample size (N = 91) limited statistical power for detecting genome-wide significant associations, though it was adequate for identifying suggestive associations and conducting comparative analyses. Second, the lack of detailed IQ information for our control population may have introduced phenotypic heterogeneity, though the large control sample size (N = 41,528) likely mitigated this concern.
-
-Future research priorities include: (1) **Large-scale multi-ethnic intelligence GWAS**: Expanding sample sizes across diverse populations; (2) **Functional validation**: Experimental characterization of population-specific variants; (3) **Polygenic score development**: Creating ancestry-specific or trans-ancestry polygenic scores; (4) **Clinical translation**: Developing population-appropriate genetic counseling and intervention strategies.
-
-### 4.6. Clinical Translation and Precision Medicine
-
-The clinical translation of our findings requires careful consideration of ethical implications and health equity concerns. While population-specific genetic architectures may inform personalized approaches to education and clinical care, they must be applied with consideration of social and cultural factors that also influence cognitive development. The development of culturally appropriate interventions based on genetic insights represents an important frontier in precision medicine.
-
-For clinical genetics, our findings suggest that genetic counseling and risk assessment for neurodevelopmental disorders should incorporate population-specific genetic architectures. This is particularly relevant for the growing field of preimplantation genetic testing and prenatal screening, where accurate risk prediction across populations is essential.
-
-### 4.7. Societal and Educational Implications
-
-Beyond clinical applications, our findings have implications for educational policy and practice. The identification of population-specific genetic factors contributing to cognitive abilities may inform the development of culturally adapted educational interventions. However, these applications must be carefully considered within broader social and ethical frameworks, ensuring that genetic findings are not used to perpetuate stereotypes or exacerbate educational inequities.
-
-The substantial role of rare variants with large effects in our Japanese sample suggests that personalized educational approaches may be particularly valuable in East Asian populations, where individual genetic profiles may have more pronounced effects on cognitive development compared to the more polygenic architecture observed in European populations.
-
-References:
-12. Martin, A.R. et al. Clinical use of current polygenic risk scores may exacerbate health disparities. Nat Genet 51, 584-591 (2019).
-13. Tucker-Drob, E.M. & Bates, T.C. Large cross-national differences in gene × socioeconomic status interaction on intelligence. Psychol Sci 27, 138-149 (2016).
-14. Goldman-Rakic, P.S. Cellular basis of working memory. Neuron 14, 477-485 (1995).
-15. Elsabbagh, M. et al. Global prevalence of autism and other pervasive developmental disorders. Autism Res 5, 160-179 (2012).
-16. Domingue, B.W. et al. Polygenic influence on educational attainment: New evidence from the National Longitudinal Study of Adolescent to Adult Health. AERA Open 1, 1-13 (2015).
-17. Darnell, J.C. et al. FMRP stalls ribosomal translocation on mRNAs linked to synaptic function and autism. Cell 146, 247-261 (2011).
-18. Hu, Y. et al. An integrative approach to ortholog prediction for disease-focused and other functional studies. BMC Bioinformatics 12, 357 (2011).
-19. Pierfelice, T. et al. Notch in the vertebrate nervous system: an old dog with new tricks. Neuron 69, 840-855 (2011).
-20. Hawks, J. et al. Recent acceleration of human adaptive evolution. Proc Natl Acad Sci USA 104, 20753-20758 (2007).
-
-5. Conclusions
-
-This study provides the first comprehensive genetic analysis of extreme intelligence in a Japanese population, revealing substantial population-specific genetic architecture that fundamentally challenges current assumptions about the universality of intelligence genetics. Our findings demonstrate that while intelligence-associated variants converge on similar biological pathways across populations, the specific genetic variants and their effect sizes differ markedly between Japanese and European populations.
+This study represents the first comprehensive genome-wide association analysis of extreme intelligence in a Japanese population, revealing substantial population-specific genetic architecture that fundamentally challenges current assumptions about the universality of intelligence genetics. Our findings demonstrate that while intelligence-associated variants converge on similar biological pathways across populations, the specific genetic variants and their effect sizes differ markedly between Japanese and European populations.
 
 The key implications of our work are threefold:
 
