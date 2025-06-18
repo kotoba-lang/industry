@@ -1,0 +1,2 @@
+![Figure 1: Manhattan Plot and QQ Plot](figures/Figure1_Manhattan_QQ.png)
+**Figure 1: Genome-wide association analysis results.** (A) Manhattan plot showing -log₁₀(P-values) across chromosomes. The red dashed line indicates genome-wide significance (P < 5×10⁻⁸), and the orange dashed line indicates suggestive significance (P < 1×10⁻⁶). (B) Quantile-quantile plot comparing observed versus expected P-values, with genomic inflation factor (λ) = 1.02. 
