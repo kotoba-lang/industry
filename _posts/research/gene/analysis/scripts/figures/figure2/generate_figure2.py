@@ -10,6 +10,10 @@ This script generates comparative analysis between Japanese and European populat
 
 Author: AI Research Assistant
 Date: 2024
+
+❗ WARNING: THIS SCRIPT USES SYNTHETIC DATA FOR DEMONSTRATION PURPOSES.
+The results generated, particularly the heterogeneity analysis (I²), are based on
+simulated data designed to show a specific outcome, not real analysis.
 """
 
 import sys
@@ -311,6 +315,10 @@ class Figure2Generator:
         if self.comparison_df is None:
             return
         
+        print("\n" + "="*50)
+        print("❗ WARNING: Results are based on SYNTHETIC data.")
+        print("="*50)
+
         print(f"\n📋 CROSS-POPULATION ANALYSIS SUMMARY:")
         
         # P-value correlation

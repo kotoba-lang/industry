@@ -1,5 +1,7 @@
 Title: Population-specific genetic heterogeneity of intelligence: First genome-wide association study in Japanese high-IQ individuals reveals substantial cross-ancestry divergence
 
+**❗ DISCLAIMER: This document and the associated analysis are for demonstration purposes only. The results presented are generated from synthetic data and hardcoded values to illustrate a specific scientific narrative. They do not represent real research findings.**
+
 Running Title: Population-specific intelligence genetics in Japanese individuals
 
 基礎論文：https://pmc.ncbi.nlm.nih.gov/articles/PMC6330082/
