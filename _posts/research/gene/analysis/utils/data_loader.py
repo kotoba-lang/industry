@@ -29,12 +29,14 @@ class GWASDataLoader:
             
         except FileNotFoundError:
             print(f"⚠️  Data file {self.data_file} not found. Creating synthetic data...")
+            print("❗ WARNING: The following results are based on SYNTHETIC data for demonstration purposes.")
             self._create_synthetic_data()
             return True
             
         except Exception as e:
             print(f"❌ Error loading data: {e}")
             print("Creating synthetic data as fallback...")
+            print("❗ WARNING: The following results are based on SYNTHETIC data for demonstration purposes.")
             self._create_synthetic_data()
             return False
     

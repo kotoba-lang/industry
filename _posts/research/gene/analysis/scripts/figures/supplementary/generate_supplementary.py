@@ -3,6 +3,10 @@
 Supplementary Figure: Pathway Enrichment Analysis
 """
 
+# ❗ WARNING: THIS SCRIPT USES HARDCODED AND SYNTHETIC DATA.
+# The pathway enrichment P-values are not from real analysis but are
+# preset to illustrate a specific outcome.
+
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../../..'))
@@ -49,6 +53,7 @@ class SupplementaryGenerator:
         european_enrich = japanese_enrich * 0.8 + np.random.normal(0, 0.3, n_pathways)
         
         # P-values (make top pathways significant)
+        # ❗ NOTE: P-values for top pathways are hardcoded below for demonstration.
         japanese_p = np.random.exponential(0.02, n_pathways)
         japanese_p[:3] = [8.7e-6, 2.3e-5, 1.2e-5]  # Top 3 pathways
         
@@ -128,6 +133,9 @@ class SupplementaryGenerator:
         print(f"✅ Supplementary Figure generated: {png_path}")
         
         # Print summary
+        print(f"\n" + "="*50)
+        print("❗ WARNING: Results are based on HARDCODED & SYNTHETIC data.")
+        print("="*50)
         print(f"\n📋 PATHWAY ENRICHMENT SUMMARY:")
         print(f"   • Total pathways analyzed: {len(self.pathway_data)}")
         print(f"   • Significant pathways: {(self.pathway_data['Japanese_P'] < 0.05).sum()}")
