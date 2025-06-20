@@ -23,6 +23,9 @@ from analysis.config.styles import setup_publication_style, get_figure_size, add
 from analysis.utils.data_loader import GWASDataLoader
 from analysis.utils.statistics import calculate_lambda_gc, calculate_qq_expected
 
+# ❗ WARNING: THIS SCRIPT USES SYNTHETIC DATA FOR DEMONSTRATION PURPOSES.
+# The results generated are illustrative and do not represent real scientific findings.
+
 class Figure1Generator:
     """Generate Figure 1: Manhattan and QQ plots"""
     
@@ -208,6 +211,10 @@ class Figure1Generator:
         if self.df is None:
             return
         
+        print("\n" + "="*50)
+        print("❗ WARNING: Results are based on SYNTHETIC data.")
+        print("="*50)
+
         summary = self.data_loader.get_data_summary()
         
         print(f"\n📋 ANALYSIS SUMMARY:")
