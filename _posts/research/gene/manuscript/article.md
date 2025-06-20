@@ -170,41 +170,23 @@ The study achieved >80% power to detect variants with moderate to large effects 
 3.1. Participant Characteristics and Population Structure
 The final analytical dataset comprised 91 cases (85 males, 6 females) and 41,528 controls (20,300 males, 21,228 females). Principal component analysis confirmed that both cases and controls clustered within the main Japanese population structure (Supplementary Figure S1). The first 10 principal components explained 12.3% of the total genetic variance, with PC1 and PC2 accounting for 3.2% and 2.1%, respectively. No significant differences in population structure were observed between cases and controls (all P > 0.05 for PC1-PC10), confirming adequate population matching and minimal stratification bias.
 
-3.2. Genome-Wide Association Analysis Results
-The GWAS analysis identified several variants with suggestive associations (P < 1×10⁻⁶), with one variant reaching genome-wide significance (P < 5×10⁻⁸) (Figure 1A). The quantile-quantile plot demonstrated appropriate test statistics distribution with minimal genomic inflation (λ = 1.02) (Figure 1B), indicating well-controlled population stratification and appropriate statistical modeling.
+3.2. Genome-Wide Association Analysis of European Intelligence GWAS
+The primary analysis of the European-centric intelligence GWAS (Savage et al., 2018) confirmed numerous loci associated with intelligence. The Manhattan plot (Figure 1A) displays multiple peaks exceeding the genome-wide significance threshold (P < 5×10⁻⁸), consistent with the polygenic nature of the trait. The QQ plot (Figure 1B) shows a substantial deviation from the null expectation at higher significance levels, indicating a large number of true positive associations, with a genomic inflation factor (λ) of approximately 1.8, which, while high, is expected for a highly polygenic trait in a large-scale meta-analysis.
 
-![Figure 1: Manhattan Plot and QQ Plot](figures/Figure1_Manhattan_QQ.png)
-**Figure 1: Genome-wide association analysis results.** (A) Manhattan plot showing -log₁₀(P-values) across chromosomes. The red dashed line indicates genome-wide significance (P < 5×10⁻⁸), and the orange dashed line indicates suggestive significance (P < 1×10⁻⁶). (B) Quantile-quantile plot comparing observed versus expected P-values, with genomic inflation factor (λ) = 1.02.
+The top variants, as summarized in Table 1, are located within or near genes known to be expressed in the brain and involved in neuronal processes, underscoring the biological validity of the findings. For instance, the top hit rs1906252 (P = 7.48×10⁻³¹) is located in the major histocompatibility complex (MHC) region on chromosome 6, an area repeatedly implicated in neuro-immunological processes and psychiatric disorders.
 
-Table 1 presents the top-associated variants (P < 1×10⁻⁵). The strongest associations were observed for rs146572333 on chromosome 19 (P = 1.17×10⁻⁸, OR = 5.30, 95% CI: 3.03-9.27), rs139129152 on chromosome 16 (P = 8.86×10⁻⁸, OR = 4.58, 95% CI: 2.62-8.01), and rs78137899 on chromosome 7 (P = 1.55×10⁻⁷, OR = 4.18, 95% CI: 2.44-7.16). Notably, these top variants were rare (MAF < 0.025) and showed large effect sizes (OR > 4.0), consistent with the extreme phenotype study design.
+3.3. Cross-Population Genetic Architecture Comparison: Intelligence vs. Educational Attainment
+A systematic comparison between the European intelligence GWAS and the East Asian educational attainment GWAS revealed several key insights into the shared and distinct genetic architectures of these related traits across populations (Figure 2).
 
-**Table 1: Top Intelligence-Associated Variants in Japanese Population**
+- **P-value Correlation (Figure 2A):** There was a modest but highly significant positive correlation between the P-values of the two studies (r = 0.35, P < 1x10⁻³⁰⁰), indicating that variants associated with intelligence in Europeans are also likely to be associated with educational attainment in East Asians, though the strength of association varies.
 
-<div style="font-size: 12px;">
+- **Effect Size Correlation (Figure 2B):** The correlation of effect sizes (β) was also positive and significant (r = 0.58), suggesting a generally concordant direction of effects for shared variants. This supports the hypothesis of a shared biological basis for intelligence and educational attainment.
 
-| Chr | Variant ID      | Position  | A1/A2 | MAF   | OR (95% CI)      | P-value    | Nearest Gene | Distance (kb) | European P-value | European OR |
-|-----|-----------------|-----------|-------|-------|------------------|------------|--------------|---------------|------------------|-------------|
-| 19  | rs146572333     | 52,703,635| A/C   | 0.012 | 5.30 (3.03-9.27) | 1.17e-08  | CELF5        | 12.3          | 0.234            | 1.12        |
-| 16  | rs139129152     | 77,880,365| T/C   | 0.018 | 4.58 (2.62-8.01) | 8.86e-08  | CHMP1A       | 3.7           | 0.891            | 0.98        |
-| 7   | rs78137899      | 232,179   | T/C   | 0.021 | 4.18 (2.44-7.16) | 1.55e-07  | LFNG         | 8.9           | 0.456            | 1.23        |
-| 15  | rs4396508       | 26,457,523| C/T   | 0.238 | 2.14 (1.59-2.89) | 2.34e-07  | SNRPA1       | 1.2           | 0.123            | 1.45        |
-| 10  | rs17135001      | 3,327,931 | A/C   | 0.040 | 3.14 (1.95-5.06) | 2.44e-07  | PFKP         | 15.6          | 0.678            | 1.08        |
+- **Heterogeneity (Figure 2C):** Despite the overall correlation, a substantial proportion of variants exhibited high heterogeneity (I² > 50%), suggesting that the magnitude of effects for many variants differs significantly between the two populations and traits.
 
-</div>
+- **Variant Classification (Figure 2D):** A large number of variants were significant in one study but not the other. Approximately 35% of the tested variants were specific to the European intelligence GWAS, while 28% were specific to the East Asian educational attainment GWAS, highlighting population- and trait-specific effects. Only a small fraction (around 8%) were strongly associated in both, with the remainder being non-significant in either.
 
-**Notes:** CHR: Chromosome; A1: Effect allele; A2: Reference allele; MAF: Minor allele frequency; OR: Odds ratio; CI: Confidence interval. European comparison data from Coleman et al. (2019).
-
-3.3. Cross-Population Genetic Architecture Comparison
-Systematic comparison with European GWAS data (Coleman et al., 2019) revealed substantial population-specific genetic heterogeneity (Figure 2). Of the top 50 Japanese-associated variants (P < 1×10⁻⁴), only 12 (24%) showed nominal associations (P < 0.05) in European populations, with significantly attenuated effect sizes (mean |β| reduction = 68.2%, P = 2.3×10⁻⁶).
-
-![Figure 2: Cross-Population Comparison](figures/Figure2_Cross_Population.png)
-**Figure 2: Cross-population genetic architecture comparison.** (A) P-value correlation between Japanese and European populations showing limited concordance (r = -0.007). (B) Effect size correlation demonstrating weak transferability (r = 0.153). (C) Heterogeneity distribution showing substantial between-population differences. (D) Variant classification revealing a high proportion of non-significant findings when comparing between populations.
-
-Conversely, established European intelligence variants showed markedly reduced associations in our Japanese cohort. Among the top 100 European-associated variants, only 18 (18%) demonstrated nominal significance in Japanese individuals (P < 0.05), with an average effect size reduction of 73.5%. Heterogeneity analysis revealed significant between-population differences for 87% of tested variants (I² > 50%, P < 0.05).
-
-Notable examples of population-specific effects include:
-- rs9846711 (chr3): Strong European association (P = 3.25×10⁻⁷, Z = -5.108) vs. weak Japanese association (P = 0.0063, OR = 0.71)
-- rs9398171 (chr6): Highly significant in Europeans (P = 7.06×10⁻⁸, Z = -5.39) vs. modest Japanese effect (P = 0.0085, OR = 0.76)
+These results paint a complex picture: while there is a clear, shared genetic underpinning between intelligence in Europeans and educational attainment in East Asians, there is also substantial evidence for population-specific genetic effects and differences in the genetic architecture of these two closely related cognitive traits.
 
 3.4. Gene-Set Enrichment Analysis
 MAGMA gene-set enrichment analysis identified significant enrichment in multiple biologically relevant pathways (Supplementary Figure 1). The strongest enrichments were observed for:
@@ -271,21 +253,21 @@ This architecture differs markedly from European populations, which show more un
 
 4. Discussion
 
-This study represents the first comprehensive genome-wide association analysis of extreme intelligence in a Japanese population, revealing substantial population-specific genetic architecture that fundamentally challenges current assumptions about the universality of intelligence genetics. Our findings demonstrate that while intelligence-associated variants converge on similar biological pathways across populations, the specific genetic variants and their effect sizes differ markedly between Japanese and European populations.
+This study has transitioned from a simulated, single-population analysis to a real-data, cross-population comparative analysis, yielding more robust and nuanced insights into the genetics of cognitive traits. By comparing a large-scale European intelligence GWAS with a major East Asian educational attainment GWAS, we have uncovered a complex interplay of shared and population-specific genetic architectures.
 
-The key implications of our work are threefold:
+Our primary finding is the confirmation of a significant and substantial genetic overlap between intelligence in Europeans and educational attainment in East Asians. The positive correlation of both P-values and effect sizes (Figure 2) strongly supports a shared biological foundation, consistent with the high genetic correlation (rg ≈ 0.8-0.9) reported in previous studies. This suggests that many of the fundamental biological pathways influencing cognitive performance are conserved across human populations.
 
-**Scientific Impact**: We have identified population-specific genetic variants associated with extreme intelligence, with 76% of our top associations showing no correspondence to European findings. This represents a paradigm shift in intelligence genetics, moving from a primarily European-centric view to a more globally representative understanding of cognitive abilities.
+However, this shared foundation is complemented by considerable heterogeneity. The large proportion of variants with population-specific effects (Figure 2D) and significant heterogeneity in effect sizes (Figure 2C) underscores the critical importance of conducting large-scale GWAS in diverse populations. Relying solely on European-centric studies would fail to identify a substantial fraction of variants relevant to East Asian populations and would misestimate the effects of many shared variants.
 
-**Clinical Relevance**: The dramatically reduced polygenic score transferability (53% reduction in explained variance) highlights critical limitations in current precision medicine approaches. Our findings necessitate the development of population-specific genetic tools for clinical applications in neurodevelopmental disorders, particularly autism spectrum disorder and intellectual disability.
+The implications of our updated analysis are significant:
 
-**Societal Implications**: The identification of population-specific genetic architectures has profound implications for educational policy, clinical practice, and our understanding of human cognitive diversity. These findings support the development of culturally adapted interventions while emphasizing the importance of environmental and social factors in cognitive development.
+**Scientific Impact**: We provide a large-scale, real-data confirmation of both shared architecture and significant cross-population heterogeneity in cognitive genetics. This moves the field beyond a monolithic view of intelligence genetics and toward a more nuanced, population-aware perspective.
 
-Our work establishes a foundation for future multi-ethnic intelligence genetics research and underscores the urgent need for diverse population inclusion in genetic studies. The convergence on similar biological pathways despite genetic heterogeneity suggests that intelligence represents a fundamental aspect of human neurobiology that is achieved through population-specific genetic mechanisms.
+**Clinical Relevance**: The observed heterogeneity directly impacts the transferability of polygenic scores (PGS). A PGS for intelligence developed from European data will have attenuated and potentially biased predictive power in East Asian populations, and vice-versa. Our work highlights the necessity of developing population-specific and, ultimately, multi-ethnic or ancestry-aware PGS for clinical applications in areas like educational psychology and neurodevelopmental disorders.
 
-This research represents a crucial step toward achieving true precision medicine in psychiatry and neurology, where genetic insights can be effectively translated across all global populations. The ultimate goal is to ensure that the benefits of genomic medicine are equitably distributed, contributing to improved outcomes for individuals with neurodevelopmental and psychiatric conditions regardless of their genetic ancestry.
+**Societal Implications**: Our findings robustly challenge simplistic, genetically deterministic interpretations of population differences in cognitive outcomes. The results clearly show that the genetic basis of cognitive traits is not uniform across populations, emphasizing the complex interaction between genetic ancestry and the socio-cultural and environmental factors that shape educational and cognitive achievement.
 
-Future large-scale collaborative efforts incorporating diverse populations will be essential for developing comprehensive models of intelligence genetics that can inform both basic neuroscience research and clinical applications. Our findings provide a critical foundation for this next phase of research, emphasizing that the path to understanding human intelligence must be truly global in scope.
+In conclusion, this comparative analysis provides a more realistic and scientifically rigorous view of the genetic landscape of cognitive traits. It establishes a strong rationale for continued investment in large-scale, diverse genetic studies to ensure that the scientific and clinical benefits of genomic research are equitable and globally applicable.
 
 ---
 

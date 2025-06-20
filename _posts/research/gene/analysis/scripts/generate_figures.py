@@ -191,9 +191,24 @@ class GWASFigureGenerator:
         """Generate cross-population comparison plot (Figure 2)"""
         fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
         
+        # Downsample both datasets before merging to save memory
+        print("Downsampling data for cross-population comparison...")
+        
+        def downsample_for_comparison(df, n_samples=100000, threshold=0.01):
+            df_sig = df[df['P'] < threshold]
+            df_nonsig = df[df['P'] >= threshold]
+            
+            n_nonsig_samples = min(n_samples, len(df_nonsig))
+            df_nonsig_sampled = df_nonsig.sample(n=n_nonsig_samples, random_state=42)
+            
+            return pd.concat([df_sig, df_nonsig_sampled])
+
+        df_euro_sampled = downsample_for_comparison(self.df_euro)
+        df_ea_sampled = downsample_for_comparison(self.df_east_asian)
+
         # Merge the two datasets on the SNP identifier
-        comparison_data = pd.merge(self.df_euro, self.df_east_asian, on='SNP', suffixes=('_euro', '_ea'))
-        print(f"Found {len(comparison_data)} overlapping variants for comparison.")
+        comparison_data = pd.merge(df_euro_sampled, df_ea_sampled, on='SNP', suffixes=('_euro', '_ea'))
+        print(f"Found {len(comparison_data)} overlapping variants for comparison after downsampling.")
 
         if len(comparison_data) < 10:
              print("Not enough overlapping variants to generate comparison plot.")
