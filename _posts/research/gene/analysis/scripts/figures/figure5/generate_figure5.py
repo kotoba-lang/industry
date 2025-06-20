@@ -3,6 +3,10 @@
 Figure 5: Polygenic Score Analysis and Cross-Population Transferability
 """
 
+# ❗ WARNING: THIS SCRIPT USES HARDCODED AND SYNTHETIC DATA.
+# The R² values and polygenic scores are not from real analysis but are
+# preset to illustrate a specific outcome (reduced transferability).
+
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../../..'))
@@ -60,6 +64,7 @@ class Figure5Generator:
         self.eu_labels = np.concatenate([np.ones(eu_cases), np.zeros(eu_controls)])
         
         # P-value thresholds for PGS construction
+        # ❗ NOTE: R² values are hardcoded below for demonstration.
         self.p_thresholds = ['5e-8', '1e-6', '1e-4', '0.001', '0.01', '0.05', '0.1', '0.5', '1.0']
         self.jp_r2_values = [0.001, 0.003, 0.008, 0.012, 0.018, 0.022, 0.024, 0.023, 0.020]
         self.eu_r2_values = [0.005, 0.012, 0.025, 0.032, 0.041, 0.048, 0.051, 0.049, 0.045]
@@ -258,6 +263,10 @@ class Figure5Generator:
     
     def print_summary(self):
         """Print analysis summary"""
+        print("\n" + "="*50)
+        print("❗ WARNING: Results are based on HARDCODED & SYNTHETIC data.")
+        print("="*50)
+
         print(f"\n📋 POLYGENIC SCORE ANALYSIS SUMMARY:")
         
         # Calculate AUC values

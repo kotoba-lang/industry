@@ -26,6 +26,10 @@ from analysis.config.styles import setup_publication_style, get_figure_size, sav
 from analysis.utils.data_loader import GWASDataLoader
 from analysis.utils.statistics import calculate_enrichment_score, fdr_correction
 
+# ❗ WARNING: THIS SCRIPT USES HARDCODED AND SYNTHETIC DATA.
+# The results, especially the cell-type enrichment P-values, are not from
+# real analysis but are preset to illustrate a specific outcome.
+
 # Import config and utils
 try:
     from analysis.config.colors import COLORS, get_cell_type_color
@@ -74,6 +78,7 @@ class Figure4Generator:
         
         # P-values (make neural types significant)
         japanese_p = np.random.exponential(0.05, n_cells)
+        # ❗ NOTE: P-values for top cell types are hardcoded below for demonstration.
         japanese_p[:3] = [8.4e-4, 1.7e-3, 1.2e-3]  # Make neural types significant
         
         self.enrichment_data = pd.DataFrame({
@@ -273,6 +278,10 @@ class Figure4Generator:
         if self.enrichment_data is None:
             return
         
+        print("\n" + "="*50)
+        print("❗ WARNING: Results are based on HARDCODED & SYNTHETIC data.")
+        print("="*50)
+
         print(f"\n📋 CELL-TYPE ENRICHMENT ANALYSIS SUMMARY:")
         
         # Count significant cell types
