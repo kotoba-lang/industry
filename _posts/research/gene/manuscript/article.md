@@ -98,10 +98,29 @@ Where Y represents case status (high intelligence), SNP represents the additive 
 2.4. Population Structure Analysis
 Principal component analysis (PCA) was conducted using PLINK v1.9 to assess population structure and identify potential stratification. Analysis was performed on a pruned set of independent variants (r² < 0.2) after excluding regions of high linkage disequilibrium. The first 10 principal components were calculated and their distributions compared between cases and controls using t-tests.
 
-2.5. Cross-Population Comparison with European GWAS
-Systematic comparison with the Coleman et al. (2019) European intelligence GWAS was performed using available summary statistics. For overlapping variants, effect sizes (beta coefficients) and P-values were directly compared. Heterogeneity analysis was conducted using Cochran's Q statistic, with I² values calculated to quantify between-population heterogeneity.
+2.5. Cross-Population Comparison Datasets
+To contextualize our findings from the primary Japanese high-IQ GWAS, we performed systematic comparisons against two large-scale, publicly available GWAS summary statistics datasets.
 
-2.6. Gene-Set Enrichment Analysis (GSEA)
+**1. European Intelligence GWAS (Savage et al., 2018):**
+- **Publication:** Savage, J. E. et al. (2018). Genome-wide association meta-analysis in 269,867 individuals identifies new genetic and functional links to intelligence. *Nature Genetics*.
+- **Dataset ID:** `ebi-a-GCST006250`
+- **Sample Size:** 269,867 individuals of European ancestry.
+- **Phenotype:** Intelligence.
+- **Data Source:** IEU OpenGWAS project.
+
+**2. East Asian Educational Attainment GWAS (Chen et al., 2024):**
+- **Publication:** Chen, T. T. et al. (2024). Shared genetic architectures of educational attainment in East Asian and European populations. *Nature Human Behaviour*.
+- **Dataset ID:** `GCST90296498`
+- **Sample Size:** 176,400 individuals of East Asian ancestry.
+- **Phenotype:** Educational Attainment.
+- **Data Source:** GWAS Catalog.
+
+These datasets were selected based on their large sample sizes and the high genetic correlation between intelligence and educational attainment (rg ≈ 0.8-0.9), allowing for a robust comparative analysis of genetic architecture across populations and related cognitive traits.
+
+2.6. Cross-Population Comparison Analysis
+Systematic comparison with the European intelligence GWAS (Savage et al., 2018) and the East Asian educational attainment GWAS (Chen et al., 2024) was performed using the downloaded summary statistics. For overlapping variants, effect sizes (beta coefficients) and P-values were directly compared. Heterogeneity analysis was conducted using Cochran's Q statistic, with I² values calculated to quantify between-population heterogeneity.
+
+2.7. Gene-Set Enrichment Analysis (GSEA)
 Gene-set enrichment analysis was performed using MAGMA v1.10 to identify biological pathways and gene sets enriched among intelligence-associated variants. Analysis included:
 - Gene Ontology (GO) biological processes
 - KEGG pathways
@@ -110,7 +129,7 @@ Gene-set enrichment analysis was performed using MAGMA v1.10 to identify biologi
 
 Gene-based P-values were calculated using the top 1% of variants per gene, with multiple testing correction using the Bonferroni method.
 
-2.7. Cell-Type-Specific Expression Analysis
+2.8. Cell-Type-Specific Expression Analysis
 Cell-type-specific expression analysis was conducted using CELLECT v1.3.0 with single-cell RNA-sequencing data from the mouse brain atlas (Zeisel et al., 2015). Analysis focused on 24 major brain cell types, including:
 - Cortical pyramidal neurons (layers 2/3, 4, 5, 6)
 - Hippocampal CA1 pyramidal neurons
@@ -119,7 +138,7 @@ Cell-type-specific expression analysis was conducted using CELLECT v1.3.0 with s
 
 Cell-type-specific enrichment was assessed using the top 10% of variants by P-value, with significance defined as P < 0.05/24 (Bonferroni correction).
 
-2.8. Polygenic Score Analysis
+2.9. Polygenic Score Analysis
 Polygenic scores (PGS) were calculated using summary statistics from the Coleman et al. (2019) European GWAS. PGS construction employed the P+T (pruning and thresholding) method implemented in PRSice v2.3.3, with the following parameters:
 - P-value thresholds: 5×10⁻⁸, 1×10⁻⁶, 1×10⁻⁴, 0.001, 0.01, 0.05, 0.1, 0.2, 0.5, 1.0
 - Linkage disequilibrium pruning: r² < 0.1 within 250kb windows
@@ -127,17 +146,17 @@ Polygenic scores (PGS) were calculated using summary statistics from the Coleman
 
 PGS performance was evaluated using Nagelkerke's R² and area under the receiver operating characteristic curve (AUC). Results were compared to published European population performance metrics.
 
-2.9. Functional Annotation
+2.10. Functional Annotation
 Top-associated variants (P < 1×10⁻⁵) were functionally annotated using:
 - Variant Effect Predictor (VEP) for consequence prediction
 - RegulomeDB for regulatory potential scoring
 - GTEx v8 for expression quantitative trait loci (eQTL) analysis
 - FUMA for comprehensive functional mapping
 
-2.10. Statistical Analysis
+2.11. Statistical Analysis
 All statistical analyses were performed in R v4.3.0. Multiple testing correction was applied using the Benjamini-Hochberg false discovery rate (FDR) method where appropriate. Effect sizes are reported as odds ratios (OR) with 95% confidence intervals. Statistical significance was defined as P < 0.05 unless otherwise specified.
 
-2.11. Power Analysis
+2.12. Power Analysis
 Statistical power was calculated using the Genetic Power Calculator, assuming:
 - Disease prevalence: 2.3% (approximate frequency of IQ ≥ 140)
 - Genotype relative risk: 1.5-3.0
