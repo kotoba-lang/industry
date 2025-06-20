@@ -39,82 +39,51 @@ plt.rcParams.update({
 class GWASFigureGenerator:
     """Generate publication-quality figures for GWAS paper"""
     
-    def __init__(self, data_file='gwas-data.csv'):
+    def __init__(self, euro_data_file, east_asian_data_file):
         """Initialize with GWAS data"""
-        self.load_data(data_file)
+        self.df_euro = self.load_data(euro_data_file, "European")
+        self.df_east_asian = self.load_data(east_asian_data_file, "East Asian")
         self.setup_colors()
         
-    def load_data(self, data_file):
+    def load_data(self, data_file, population_name):
         """Load and preprocess GWAS data"""
         try:
             # Load the CSV data
-            self.df = pd.read_csv(data_file)
-            print(f"Loaded {len(self.df)} variants from {data_file}")
+            df = pd.read_csv(data_file)
+            print(f"Loaded {len(df)} variants from {data_file} for {population_name} population")
             
             # Clean column names
-            self.df.columns = self.df.columns.str.strip()
+            df.columns = df.columns.str.strip()
             
             # Convert P-values to numeric, handling scientific notation
-            self.df['P'] = pd.to_numeric(self.df['P'], errors='coerce')
-            self.df['Z'] = pd.to_numeric(self.df['Z'], errors='coerce')
-            self.df['P_Euro'] = pd.to_numeric(self.df['P'], errors='coerce')
+            df['P'] = pd.to_numeric(df['P'], errors='coerce')
             
             # Calculate -log10(P) for plotting
-            self.df['neglog10p'] = -np.log10(self.df['P'].replace(0, 1e-100))
+            df['neglog10p'] = -np.log10(df['P'].replace(0, 1e-300))
             
             # Add cumulative position for Manhattan plot
-            self.df['CHR'] = pd.to_numeric(self.df['CHR'], errors='coerce')
-            self.df['BP'] = pd.to_numeric(self.df['BP'], errors='coerce')
+            df['CHR'] = pd.to_numeric(df['CHR'], errors='coerce')
+            df.dropna(subset=['CHR', 'BP'], inplace=True)
+            df['BP'] = pd.to_numeric(df['BP'], errors='coerce')
             
+            # Handle non-numeric chromosomes like 'X'
+            df['CHR_num'] = pd.to_numeric(df['CHR'], errors='coerce')
+            df = df.dropna(subset=['CHR_num'])
+            df['CHR_num'] = df['CHR_num'].astype(int)
+
             # Calculate cumulative positions
-            chr_lengths = self.df.groupby('CHR')['BP'].max().fillna(0)
+            df = df.sort_values(['CHR_num', 'BP'])
+            chr_lengths = df.groupby('CHR_num')['BP'].max()
             chr_starts = chr_lengths.cumsum() - chr_lengths
-            self.df['pos_cum'] = self.df.apply(
-                lambda x: chr_starts[x['CHR']] + x['BP'] if pd.notna(x['CHR']) else 0, 
+            df['pos_cum'] = df.apply(
+                lambda x: chr_starts.get(x['CHR_num'], 0) + x['BP'], 
                 axis=1
             )
+            return df
             
         except Exception as e:
-            print(f"Error loading data: {e}")
-            # Create dummy data for demonstration
-            self.create_dummy_data()
-    
-    def create_dummy_data(self):
-        """Create dummy GWAS data for demonstration"""
-        print("Creating dummy data for demonstration...")
-        np.random.seed(42)
-        
-        n_snps = 500
-        chromosomes = np.random.choice(range(1, 23), n_snps)
-        positions = np.random.randint(1000000, 200000000, n_snps)
-        
-        # Generate realistic P-values with some significant hits
-        p_values = np.random.exponential(0.1, n_snps)
-        p_values = np.minimum(p_values, 1.0)
-        
-        # Add some highly significant variants
-        top_indices = np.random.choice(n_snps, 10, replace=False)
-        p_values[top_indices] = np.random.uniform(1e-8, 1e-6, 10)
-        
-        self.df = pd.DataFrame({
-            'CHR': chromosomes,
-            'SNP': [f'rs{i}' for i in range(n_snps)],
-            'BP': positions,
-            'P': p_values,
-            'BETA': np.random.normal(0, 0.5, n_snps),
-            'SE': np.random.uniform(0.1, 0.3, n_snps),
-            'Z': np.random.normal(0, 2, n_snps),
-            'P_Euro': np.random.exponential(0.1, n_snps)
-        })
-        
-        self.df['neglog10p'] = -np.log10(self.df['P'])
-        
-        # Calculate cumulative positions
-        chr_lengths = self.df.groupby('CHR')['BP'].max()
-        chr_starts = chr_lengths.cumsum() - chr_lengths
-        self.df['pos_cum'] = self.df.apply(
-            lambda x: chr_starts[x['CHR']] + x['BP'], axis=1
-        )
+            print(f"Error loading data for {population_name} from {data_file}: {e}")
+            return pd.DataFrame() # Return empty dataframe on error
     
     def setup_colors(self):
         """Setup color schemes for plots"""
@@ -132,12 +101,23 @@ class GWASFigureGenerator:
         """Generate combined Manhattan and QQ plot (Figure 1)"""
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
         
-        # Manhattan plot
-        chromosomes = self.df['CHR'].unique()
+        # Manhattan plot of the European data
+        df_plot = self.df_euro
+        if len(df_plot) > 500000:
+            print("Downsampling European data for Manhattan plot...")
+            significant_thresh = 1e-5
+            df_sig = df_plot[df_plot['P'] < significant_thresh]
+            df_nonsig = df_plot[df_plot['P'] >= significant_thresh]
+            n_samples = min(200000, len(df_nonsig))
+            df_nonsig_sampled = df_nonsig.sample(n=n_samples, random_state=42)
+            df_plot = pd.concat([df_sig, df_nonsig_sampled]).sort_values('pos_cum')
+            print(f"Plotting {len(df_plot)} points for European data.")
+        
+        chromosomes = df_plot['CHR_num'].unique()
         chromosomes = sorted([c for c in chromosomes if pd.notna(c)])
         
         for i, chrom in enumerate(chromosomes):
-            chr_data = self.df[self.df['CHR'] == chrom]
+            chr_data = df_plot[df_plot['CHR_num'] == chrom]
             color = self.colors['chr_even'] if chrom % 2 == 0 else self.colors['chr_odd']
             
             ax1.scatter(chr_data['pos_cum'], chr_data['neglog10p'], 
@@ -151,22 +131,30 @@ class GWASFigureGenerator:
         
         ax1.set_xlabel('Chromosome')
         ax1.set_ylabel('-log₁₀(P-value)')
-        ax1.set_title('A. Manhattan Plot: Japanese High-IQ GWAS', fontweight='bold', fontsize=14)
+        ax1.set_title('A. Manhattan Plot: European Intelligence GWAS (Savage et al. 2018)', fontweight='bold', fontsize=14)
         ax1.legend()
         ax1.grid(True, alpha=0.3)
         
-        # Set chromosome labels
+        # Set chromosome labels using the full dataset's properties
+        full_df_chroms = self.df_euro['CHR_num'].unique()
+        full_df_chroms = sorted([c for c in full_df_chroms if pd.notna(c)])
         chr_centers = []
-        for chrom in chromosomes:
-            chr_data = self.df[self.df['CHR'] == chrom]
+        for chrom in full_df_chroms:
+            chr_data = self.df_euro[self.df_euro['CHR_num'] == chrom]
             if len(chr_data) > 0:
                 chr_centers.append(chr_data['pos_cum'].median())
         
         ax1.set_xticks(chr_centers)
-        ax1.set_xticklabels([str(c) for c in chromosomes])
+        ax1.set_xticklabels([str(c) for c in full_df_chroms])
         
-        # QQ plot
-        observed_p = self.df['P'].dropna().sort_values()
+        # QQ plot (downsample for performance if needed)
+        observed_p_full = self.df_euro['P'].dropna()
+        if len(observed_p_full) > 500000:
+            print(f"Downsampling for QQ plot from {len(observed_p_full)} to 500,000 points.")
+            observed_p = observed_p_full.sample(n=500000, random_state=42).sort_values()
+        else:
+            observed_p = observed_p_full.sort_values()
+
         expected_p = np.linspace(1/len(observed_p), 1, len(observed_p))
         
         observed_log = -np.log10(observed_p)
@@ -179,23 +167,23 @@ class GWASFigureGenerator:
         max_val = max(expected_log.max(), observed_log.max())
         ax2.plot([0, max_val], [0, max_val], 'r--', alpha=0.8, label='Expected')
         
-        # Calculate lambda (genomic inflation factor)
-        chi2_stats = stats.chi2.ppf(1 - observed_p, df=1)
-        lambda_gc = np.median(chi2_stats) / stats.chi2.ppf(0.5, df=1)
+        # Calculate lambda (genomic inflation factor) using the full dataset for accuracy
+        chi2_stats_full = stats.chi2.ppf(1 - observed_p_full, df=1)
+        lambda_gc = np.median(chi2_stats_full) / stats.chi2.ppf(0.5, df=1)
         
         ax2.text(0.05, 0.95, f'λ = {lambda_gc:.3f}', transform=ax2.transAxes, 
                 fontsize=12, bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
         
         ax2.set_xlabel('Expected -log₁₀(P-value)')
         ax2.set_ylabel('Observed -log₁₀(P-value)')
-        ax2.set_title('B. QQ Plot: P-value Distribution', fontweight='bold', fontsize=14)
+        ax2.set_title('B. QQ Plot: European GWAS P-value Distribution', fontweight='bold', fontsize=14)
         ax2.legend()
         ax2.grid(True, alpha=0.3)
         
         plt.tight_layout()
         plt.savefig('Figure1_Manhattan_QQ.png', dpi=300, bbox_inches='tight')
         plt.savefig('Figure1_Manhattan_QQ.pdf', bbox_inches='tight')
-        plt.show()
+        # plt.show()
         
         return fig
     
@@ -203,28 +191,25 @@ class GWASFigureGenerator:
         """Generate cross-population comparison plot (Figure 2)"""
         fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
         
-        # Filter data with both Japanese and European P-values
-        comparison_data = self.df.dropna(subset=['P', 'Z']).copy()
-        
-        if len(comparison_data) == 0:
-            # Create synthetic comparison data
-            n_variants = 200
-            comparison_data = pd.DataFrame({
-                'P_Japanese': np.random.exponential(0.1, n_variants),
-                'P_European': np.random.exponential(0.1, n_variants),
-                'BETA_Japanese': np.random.normal(0, 0.5, n_variants),
-                'BETA_European': np.random.normal(0, 0.5, n_variants),
-                'SNP': [f'rs{i}' for i in range(n_variants)]
-            })
-        else:
-            comparison_data['P_Japanese'] = comparison_data['P']
-            comparison_data['P_European'] = np.random.exponential(0.1, len(comparison_data))
-            comparison_data['BETA_Japanese'] = comparison_data['BETA']
-            comparison_data['BETA_European'] = np.random.normal(0, 0.5, len(comparison_data))
+        # Merge the two datasets on the SNP identifier
+        comparison_data = pd.merge(self.df_euro, self.df_east_asian, on='SNP', suffixes=('_euro', '_ea'))
+        print(f"Found {len(comparison_data)} overlapping variants for comparison.")
+
+        if len(comparison_data) < 10:
+             print("Not enough overlapping variants to generate comparison plot.")
+             # Create synthetic comparison data
+             n_variants = 200
+             comparison_data = pd.DataFrame({
+                 'P_euro': np.random.exponential(0.1, n_variants),
+                 'P_ea': np.random.exponential(0.1, n_variants),
+                 'BETA_euro': np.random.normal(0, 0.5, n_variants),
+                 'BETA_ea': np.random.normal(0, 0.5, n_variants),
+                 'SNP': [f'rs{i}' for i in range(n_variants)]
+             })
         
         # A. P-value correlation
-        jp_log = -np.log10(comparison_data['P_Japanese'].replace(0, 1e-100))
-        eu_log = -np.log10(comparison_data['P_European'].replace(0, 1e-100))
+        jp_log = -np.log10(comparison_data['P_ea'].replace(0, 1e-300))
+        eu_log = -np.log10(comparison_data['P_euro'].replace(0, 1e-300))
         
         ax1.scatter(eu_log, jp_log, alpha=0.6, s=30, color=self.colors['japanese'], edgecolors='none')
         ax1.plot([0, max(eu_log.max(), jp_log.max())], [0, max(eu_log.max(), jp_log.max())], 
@@ -234,23 +219,23 @@ class GWASFigureGenerator:
         ax1.text(0.05, 0.95, f'r = {correlation:.3f}', transform=ax1.transAxes, 
                 fontsize=12, bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
         
-        ax1.set_xlabel('European -log₁₀(P-value)')
-        ax1.set_ylabel('Japanese -log₁₀(P-value)')
-        ax1.set_title('A. P-value Correlation', fontweight='bold')
+        ax1.set_xlabel('European Intelligence -log₁₀(P-value)')
+        ax1.set_ylabel('East Asian Edu. Attain. -log₁₀(P-value)')
+        ax1.set_title('A. P-value Correlation (Intel. vs Edu. Attain.)', fontweight='bold')
         ax1.legend()
         ax1.grid(True, alpha=0.3)
         
         # B. Effect size correlation
-        ax2.scatter(comparison_data['BETA_European'], comparison_data['BETA_Japanese'], 
+        ax2.scatter(comparison_data['BETA_euro'], comparison_data['BETA_ea'], 
                    alpha=0.6, s=30, color=self.colors['european'], edgecolors='none')
         
-        beta_corr = stats.pearsonr(comparison_data['BETA_European'], 
-                                  comparison_data['BETA_Japanese'])[0]
+        beta_corr = stats.pearsonr(comparison_data['BETA_euro'], 
+                                  comparison_data['BETA_ea'])[0]
         ax2.text(0.05, 0.95, f'r = {beta_corr:.3f}', transform=ax2.transAxes, 
                 fontsize=12, bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
         
         ax2.set_xlabel('European Effect Size (β)')
-        ax2.set_ylabel('Japanese Effect Size (β)')
+        ax2.set_ylabel('East Asian Effect Size (β)')
         ax2.set_title('B. Effect Size Correlation', fontweight='bold')
         ax2.grid(True, alpha=0.3)
         
@@ -270,11 +255,11 @@ class GWASFigureGenerator:
         # Define categories based on significance
         categories = []
         for _, row in comparison_data.iterrows():
-            if row['P_Japanese'] < 1e-4 and row['P_European'] > 0.05:
-                categories.append('Japanese-specific')
-            elif row['P_European'] < 1e-4 and row['P_Japanese'] > 0.05:
+            if row['P_ea'] < 1e-4 and row['P_euro'] > 0.05:
+                categories.append('East Asian-specific')
+            elif row['P_euro'] < 1e-4 and row['P_ea'] > 0.05:
                 categories.append('European-specific')
-            elif row['P_Japanese'] < 1e-4 and row['P_European'] < 1e-4:
+            elif row['P_ea'] < 1e-4 and row['P_euro'] < 1e-4:
                 categories.append('Shared')
             else:
                 categories.append('Non-significant')
@@ -290,7 +275,7 @@ class GWASFigureGenerator:
         plt.tight_layout()
         plt.savefig('Figure2_Cross_Population.png', dpi=300, bbox_inches='tight')
         plt.savefig('Figure2_Cross_Population.pdf', bbox_inches='tight')
-        plt.show()
+        # plt.show()
         
         return fig
     
@@ -305,7 +290,7 @@ class GWASFigureGenerator:
             eu_se = 0.2
             
             # Calculate Q statistic (simplified)
-            effect_diff = (row['BETA_Japanese'] - row['BETA_European']) ** 2
+            effect_diff = (row['BETA_ea'] - row['BETA_euro']) ** 2
             var_sum = jp_se**2 + eu_se**2
             q_stat = effect_diff / var_sum if var_sum > 0 else 0
             
@@ -316,8 +301,11 @@ class GWASFigureGenerator:
         return pd.DataFrame({'I2': i2_values})
 
 if __name__ == "__main__":
-    # Initialize figure generator
-    generator = GWASFigureGenerator('gwas-data.csv')
+    # Initialize figure generator with both datasets
+    generator = GWASFigureGenerator(
+        'manuscript/data/gwas_summary_stats.csv',
+        'manuscript/data/gwas_summary_stats_chen2024.csv'
+    )
     
     print("Generating Figure 1: Manhattan and QQ plots...")
     generator.generate_manhattan_qq_plot()

@@ -172,7 +172,7 @@ class AdvancedFigureGenerator:
         plt.tight_layout()
         plt.savefig('Figure4_CellType_Enrichment.png', dpi=300, bbox_inches='tight')
         plt.savefig('Figure4_CellType_Enrichment.pdf', bbox_inches='tight')
-        plt.show()
+        # plt.show()
         
         return fig
     
@@ -272,7 +272,7 @@ class AdvancedFigureGenerator:
         plt.tight_layout()
         plt.savefig('Figure5_Polygenic_Score.png', dpi=300, bbox_inches='tight')
         plt.savefig('Figure5_Polygenic_Score.pdf', bbox_inches='tight')
-        plt.show()
+        # plt.show()
         
         return fig
     
@@ -332,7 +332,7 @@ class AdvancedFigureGenerator:
         plt.tight_layout()
         plt.savefig('Supplementary_Figure_Pathways.png', dpi=300, bbox_inches='tight')
         plt.savefig('Supplementary_Figure_Pathways.pdf', bbox_inches='tight')
-        plt.show()
+        # plt.show()
         
         return fig
 
