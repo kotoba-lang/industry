@@ -37,6 +37,7 @@ class PaperAnalysis:
         """Initialize analysis"""
         self.output_dir = Path("figures_output")
         self.output_dir.mkdir(exist_ok=True)
+        self.df_euro = None # To hold the loaded european gwas data
         
         print("="*60)
         print("MOLECULAR PSYCHIATRY PAPER FIGURE GENERATION")
@@ -92,6 +93,7 @@ class PaperAnalysis:
             'manuscript/data/gwas_summary_stats.csv',
             'manuscript/data/gwas_summary_stats_chen2024.csv'
         )
+        self.df_euro = gwas_gen.df_euro # Store dataframe for later use
         
         # Generate Figure 1: Manhattan and QQ plots
         print("\n📊 Generating Figure 1: Manhattan and QQ plots...")
@@ -115,8 +117,8 @@ class PaperAnalysis:
         print("GENERATING ADVANCED FIGURES")
         print("="*50)
         
-        # Initialize advanced figure generator
-        adv_gen = AdvancedFigureGenerator()
+        # Initialize advanced figure generator with european data
+        adv_gen = AdvancedFigureGenerator(gwas_df=self.df_euro)
         
         # Generate Figure 4: Cell-type enrichment
         print("\n🧬 Generating Figure 4: Cell-type enrichment analysis...")
