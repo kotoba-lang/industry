@@ -33,9 +33,8 @@ except ImportError as e:
 class PaperAnalysis:
     """Complete analysis pipeline for the paper"""
     
-    def __init__(self, data_file='gwas-data.csv'):
-        """Initialize analysis with data file"""
-        self.data_file = data_file
+    def __init__(self):
+        """Initialize analysis"""
         self.output_dir = Path("figures_output")
         self.output_dir.mkdir(exist_ok=True)
         
@@ -68,19 +67,19 @@ class PaperAnalysis:
         return True
     
     def check_data(self):
-        """Check if data file exists and is readable"""
-        if not os.path.exists(self.data_file):
-            print(f"Warning: Data file {self.data_file} not found.")
-            print("Will generate synthetic data for demonstration.")
-            return False
-        
-        try:
-            df = pd.read_csv(self.data_file)
-            print(f"✓ Data file loaded successfully: {len(df)} variants")
-            return True
-        except Exception as e:
-            print(f"Error reading data file: {e}")
-            return False
+        """Check if data files exist and are readable"""
+        files_to_check = [
+            'manuscript/data/gwas_summary_stats.csv',
+            'manuscript/data/gwas_summary_stats_chen2024.csv'
+        ]
+        all_found = True
+        for f in files_to_check:
+            if not os.path.exists(f):
+                print(f"Error: Data file {f} not found.")
+                all_found = False
+            else:
+                print(f"✓ Found data file: {f}")
+        return all_found
     
     def generate_main_figures(self):
         """Generate main manuscript figures"""
@@ -88,8 +87,11 @@ class PaperAnalysis:
         print("GENERATING MAIN FIGURES")
         print("="*50)
         
-        # Initialize GWAS figure generator
-        gwas_gen = GWASFigureGenerator(self.data_file)
+        # Initialize GWAS figure generator with both datasets
+        gwas_gen = GWASFigureGenerator(
+            'manuscript/data/gwas_summary_stats.csv',
+            'manuscript/data/gwas_summary_stats_chen2024.csv'
+        )
         
         # Generate Figure 1: Manhattan and QQ plots
         print("\n📊 Generating Figure 1: Manhattan and QQ plots...")
@@ -148,40 +150,36 @@ class PaperAnalysis:
         
         try:
             # Load actual GWAS data if available
-            if os.path.exists(self.data_file):
-                df = pd.read_csv(self.data_file)
-                
-                # Clean column names
-                df.columns = df.columns.str.strip()
-                
-                # Convert P-values to numeric
-                df['P'] = pd.to_numeric(df['P'], errors='coerce')
-                
-                # Get top variants
-                top_variants = df.nsmallest(20, 'P')
-                
-                # Create summary table
-                summary_table = top_variants[['CHR', 'SNP', 'BP', 'A1', 'A2', 'P', 'BETA', 'SE']].copy()
-                summary_table['OR'] = np.exp(summary_table['BETA'].fillna(0))
-                summary_table['95%_CI_Lower'] = np.exp(summary_table['BETA'] - 1.96 * summary_table['SE'])
-                summary_table['95%_CI_Upper'] = np.exp(summary_table['BETA'] + 1.96 * summary_table['SE'])
-                
-                # Format P-values in scientific notation
-                summary_table['P_formatted'] = summary_table['P'].apply(
-                    lambda x: f"{x:.2e}" if pd.notna(x) else "NA"
-                )
-                
-                # Save table
-                summary_table.to_csv('Table1_Top_Variants.csv', index=False)
-                print("✓ Table 1: Top variants saved as Table1_Top_Variants.csv")
-                
-                # Display preview
-                print("\nTop 10 variants preview:")
-                print(summary_table.head(10)[['CHR', 'SNP', 'P_formatted', 'OR']].to_string(index=False))
-                
-            else:
-                print("⚠️  No data file available for table generation")
-                
+            df = pd.read_csv('manuscript/data/gwas_summary_stats.csv')
+            
+            # Clean column names
+            df.columns = df.columns.str.strip()
+            
+            # Convert P-values to numeric
+            df['P'] = pd.to_numeric(df['P'], errors='coerce')
+            
+            # Get top variants
+            top_variants = df.nsmallest(20, 'P')
+            
+            # Create summary table
+            summary_table = top_variants[['CHR', 'SNP', 'BP', 'A1', 'A2', 'P', 'BETA', 'SE']].copy()
+            summary_table['OR'] = np.exp(summary_table['BETA'].fillna(0))
+            summary_table['95%_CI_Lower'] = np.exp(summary_table['BETA'] - 1.96 * summary_table['SE'])
+            summary_table['95%_CI_Upper'] = np.exp(summary_table['BETA'] + 1.96 * summary_table['SE'])
+            
+            # Format P-values in scientific notation
+            summary_table['P_formatted'] = summary_table['P'].apply(
+                lambda x: f"{x:.2e}" if pd.notna(x) else "NA"
+            )
+            
+            # Save table
+            summary_table.to_csv('Table1_Top_Variants.csv', index=False)
+            print("✓ Table 1: Top variants saved as Table1_Top_Variants.csv")
+            
+            # Display preview
+            print("\nTop 10 variants preview:")
+            print(summary_table.head(10)[['CHR', 'SNP', 'P_formatted', 'OR']].to_string(index=False))
+            
         except Exception as e:
             print(f"❌ Error generating summary table: {e}")
     
@@ -254,8 +252,7 @@ Summary of variants with P < 1×10⁻⁵ showing chromosome (CHR), variant ident
 
 def main():
     """Main function"""
-    # Initialize analysis
-    analysis = PaperAnalysis('manuscript/data/gwas_summary_stats.csv')
+    analysis = PaperAnalysis()
     
     # Run complete analysis
     success = analysis.run_complete_analysis()
