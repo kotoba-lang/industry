@@ -255,7 +255,7 @@ Summary of variants with P < 1×10⁻⁵ showing chromosome (CHR), variant ident
 def main():
     """Main function"""
     # Initialize analysis
-    analysis = PaperAnalysis('gwas-data.csv')
+    analysis = PaperAnalysis('manuscript/data/gwas_summary_stats.csv')
     
     # Run complete analysis
     success = analysis.run_complete_analysis()
