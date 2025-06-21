@@ -18,12 +18,19 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 
+# Change CWD to project root to ensure all relative paths work
+script_path = os.path.abspath(__file__)
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(script_path)))
+os.chdir(project_root)
+print(f"Changed current working directory to: {os.getcwd()}")
+
 # Add current directory to Python path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.join(project_root, 'analysis', 'scripts'))
 
 try:
     from generate_figures import GWASFigureGenerator
     from generate_advanced_figures import AdvancedFigureGenerator
+    from run_gsea import run_enrichment_analysis
 except ImportError as e:
     print(f"Error importing modules: {e}")
     print("Please ensure all required packages are installed:")
@@ -35,7 +42,7 @@ class PaperAnalysis:
     
     def __init__(self):
         """Initialize analysis"""
-        self.output_dir = Path("figures_output")
+        self.output_dir = Path("analysis/output")
         self.output_dir.mkdir(exist_ok=True)
         self.df_euro = None # To hold the loaded european gwas data
         
@@ -216,6 +223,21 @@ Summary of variants with P < 1×10⁻⁵ showing chromosome (CHR), variant ident
         
         print("✓ Figure legends saved as Figure_Legends.md")
     
+    def run_pathway_analysis(self):
+        """Run the GSEApy pathway analysis"""
+        print("\n" + "="*50)
+        print("RUNNING PATHWAY ENRICHMENT ANALYSIS (GSEApy)")
+        print("="*50)
+        
+        gwas_file = 'manuscript/data/gwas_summary_stats.csv'
+        output_dir = 'analysis/output'
+        
+        try:
+            run_enrichment_analysis(gwas_file, output_dir)
+            print("✓ Pathway analysis complete.")
+        except Exception as e:
+            print(f"❌ Error running pathway analysis: {e}")
+
     def run_complete_analysis(self):
         """Run the complete analysis pipeline"""
         print(f"Starting analysis in directory: {os.getcwd()}")
@@ -235,6 +257,9 @@ Summary of variants with P < 1×10⁻⁵ showing chromosome (CHR), variant ident
         # Generate tables and documentation
         self.generate_summary_table()
         self.generate_figure_legends()
+
+        # Run pathway analysis
+        self.run_pathway_analysis()
         
         # Print completion summary
         print("\n" + "="*60)
