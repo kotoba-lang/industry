@@ -10,6 +10,115 @@
 
 This repository contains the **world's first genome-wide association study (GWAS) of high intelligence in a Japanese population**, powered by a revolutionary **DuckDB-based high-performance analysis system**. Our findings demonstrate 100% population specificity for intelligence-associated variants, representing the most extreme case of cross-population genetic heterogeneity reported for any complex trait.
 
+## 📁 **Data Sources and Setup**
+
+### **🚨 Important Notice: Data Files Excluded from Repository**
+
+Due to GitHub size limitations and Git LFS constraints, large dataset files are excluded from this repository. All external datasets must be downloaded manually using the URLs below.
+
+### **📊 Required GWAS Summary Statistics**
+
+**Primary Data Source**: GWAS Catalog and UK Biobank
+- **Base URL**: https://www.ebi.ac.uk/gwas/downloads/summary-statistics
+- **Total Size**: ~3.2GB (176 GWAS traits)
+- **Format**: Tab-separated values (.sumstats.gz)
+
+**Download Instructions**:
+```bash
+# Create dataset directory
+mkdir -p dataset/sumstats/
+
+# Download core intelligence GWAS data
+cd dataset/sumstats/
+wget https://www.ebi.ac.uk/gwas/api/search/downloads/studies/GCST006250/harmonised/PASS_Intelligence_SavageJansen2018.sumstats.gz
+
+# Download additional comparison traits (examples)
+wget https://www.ebi.ac.uk/gwas/api/search/downloads/studies/GCST005839/harmonised/PASS_Height1.sumstats.gz
+wget https://www.ebi.ac.uk/gwas/api/search/downloads/studies/GCST005843/harmonised/PASS_BMI1.sumstats.gz
+wget https://www.ebi.ac.uk/gwas/api/search/downloads/studies/GCST002025/harmonised/PASS_Schizophrenia.sumstats.gz
+
+# For complete 176-trait analysis, see scripts/download_all_gwas.sh
+```
+
+### **🗄️ DuckDB Database File**
+
+After downloading summary statistics, regenerate the DuckDB database:
+```bash
+# Build high-performance database from downloaded files
+cd analysis/utils/
+python3 -c "
+from duckdb_manager import GWASDuckDBManager
+manager = GWASDuckDBManager('../../dataset/')
+manager.build_database_from_sumstats()
+print('Database created: dataset/gwas_data.duckdb')
+"
+```
+
+### **📊 Reference Data (LDSC/MAGMA)**
+
+**LD Score Regression Reference Data**:
+```bash
+# Download LD reference panels
+cd dataset/
+wget https://data.broadinstitute.org/alkesgroup/LDSCORE/1000G_Phase3_baseline_v1.2_ldscores.tgz
+wget https://data.broadinstitute.org/alkesgroup/LDSCORE/1000G_Phase3_EAS_baseline_v1.2_ldscores.tgz
+
+# Extract reference data
+tar -xzf 1000G_Phase3_baseline_v1.2_ldscores.tgz
+tar -xzf 1000G_Phase3_EAS_baseline_v1.2_ldscores.tgz
+```
+
+### **🧬 1000 Genomes Reference Files**:
+```bash
+# Download plink-formatted reference genomes
+wget https://data.broadinstitute.org/alkesgroup/LDSCORE/1000G_Phase3_plinkfiles.tgz
+wget https://data.broadinstitute.org/alkesgroup/LDSCORE/1000G_Phase3_EAS_plinkfiles.tgz
+
+# Extract files
+tar -xzf 1000G_Phase3_plinkfiles.tgz
+tar -xzf 1000G_Phase3_EAS_plinkfiles.tgz
+```
+
+### **⚡ Quick Setup Script**
+
+For automated data download, use the provided setup script:
+```bash
+# Run complete data setup (requires ~3.2GB disk space)
+bash scripts/setup_datasets.sh
+
+# Verify installation
+python3 analysis/scripts/run_analysis.py --test
+```
+
+### **💾 Local File Structure After Setup**
+
+```
+📁 dataset/
+├── gwas_data.duckdb                    # High-performance database (906MB)
+├── gwas_data_metadata.json             # Database metadata  
+├── sumstats/                          # GWAS summary statistics (3.2GB)
+│   ├── PASS_Intelligence_SavageJansen2018.sumstats.gz
+│   ├── PASS_Height1.sumstats.gz
+│   ├── PASS_BMI1.sumstats.gz
+│   └── [173 additional GWAS files...]
+├── baseline_v1.2/                     # LD Score reference (European)
+├── 1000G_Phase3_EAS_baseline_v1.2/     # LD Score reference (East Asian)
+└── reference_data/                     # Plink reference files
+    ├── g1000_eur.{bed,bim,fam}
+    └── g1000_eas.{bed,bim,fam}
+```
+
+### **🔧 Alternative: Sample Data Mode**
+
+For testing without full dataset download:
+```bash
+# Generate synthetic data for testing
+python3 analysis/scripts/generate_sample_data.py
+
+# Run analysis with sample data
+python3 analysis/scripts/run_analysis.py --sample-mode
+```
+
 ### **🔬 Key Scientific Discoveries**
 
 - **🌏 World-First**: First high-IQ GWAS in East Asian populations
