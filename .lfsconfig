@@ -1,22 +1,23 @@
-[lfs]
-	url = https://pxsuqemlayhnmcxuiigk.supabase.co/storage/v1/object/lfs-storage
+# Git LFS Configuration
+# Using GitHub's standard LFS service
 
-# Supabase Storage configuration for Git LFS
-# Project: pxsuqemlayhnmcxuiigk
-# Storage endpoint: https://pxsuqemlayhnmcxuiigk.supabase.co/storage/v1/object/lfs-storage
-# Using Supabase Storage REST API for LFS storage
+# Standard GitHub LFS configuration
+# No custom URL needed - uses GitHub's default LFS service
+
+# Manual Supabase Storage configuration (commented out for now)
+# [lfs]
+# 	url = https://pxsuqemlayhnmcxuiigk.supabase.co/storage/v1/object/lfs-storage
 # 
-# Required environment variables:
-# - SUPABASE_SERVICE_ROLE_KEY: Service role key for authentication
-# - SUPABASE_ANON_KEY: Anonymous key (fallback)
-# - SUPABASE_URL: Project URL
-#
-# Required Supabase Storage bucket: lfs-storage
-# Bucket must be created in Supabase Dashboard with public access disabled
-# 
+# # Required environment variables for Supabase:
+# # - SUPABASE_SERVICE_ROLE_KEY: Service role key for authentication
+# # - SUPABASE_ANON_KEY: Anonymous key (fallback)
+# # - SUPABASE_URL: Project URL
+# #
+# # Required Supabase Storage bucket: lfs-storage
+# # Bucket must be created in Supabase Dashboard with public access disabled
+
 # Usage:
-# 1. Create 'lfs-storage' bucket in Supabase Dashboard
-# 2. Set environment variables in your shell or .env.local
-# 3. Run: git lfs install
-# 4. Run: git lfs track "*.large-file-extension"
-# 5. Add and commit files normally 
+# 1. Run: git lfs install
+# 2. Run: git lfs track "*.large-file-extension"
+# 3. Add and commit files normally
+# 4. Files will be stored in GitHub LFS by default 
