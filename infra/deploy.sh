@@ -26,11 +26,11 @@ flyctl postgres attach my-gitea-db --app my-gitea
 
 # 5. Tigiris オブジェクトストレージを設定
 echo "📦 Tigirisオブジェクトストレージを設定中..."
-flyctl storage create --name gitea-storage --app my-gitea
-flyctl storage create --name gitea-lfs --app my-gitea
-flyctl storage create --name gitea-avatars --app my-gitea
-flyctl storage create --name gitea-attachments --app my-gitea
-flyctl storage create --name gitea-repo-avatars --app my-gitea
+flyctl storage create --name gitea-storage-2024 --app my-gitea
+flyctl storage create --name gitea-lfs-2024 --app my-gitea
+flyctl storage create --name gitea-avatars-2024 --app my-gitea
+flyctl storage create --name gitea-attachments-2024 --app my-gitea
+flyctl storage create --name gitea-repo-avatars-2024 --app my-gitea
 
 # 6. ボリュームを作成
 echo "💾 データボリュームを作成中..."
