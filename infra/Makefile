@@ -46,13 +46,12 @@ clean: ## リソースを削除
 
 setup-tigris: ## Tigirisバケットを作成
 	@echo "📦 Tigirisバケットを作成中..."
-	@echo "以下のバケットを手動で作成してください:"
-	@echo "  - gitea-storage"
-	@echo "  - gitea-lfs"
-	@echo "  - gitea-avatars"
-	@echo "  - gitea-attachments"
-	@echo "  - gitea-repo-avatars"
-	@echo "Tigirisコンソール: https://console.tigris.dev/"
+	@flyctl storage create --name gitea-storage --app my-gitea
+	@flyctl storage create --name gitea-lfs --app my-gitea
+	@flyctl storage create --name gitea-avatars --app my-gitea
+	@flyctl storage create --name gitea-attachments --app my-gitea
+	@flyctl storage create --name gitea-repo-avatars --app my-gitea
+	@echo "✅ 全てのTigirisバケットを作成完了"
 
 secrets: ## 環境変数とシークレットを設定
 	@echo "🔐 シークレットを設定中..."
@@ -60,8 +59,9 @@ secrets: ## 環境変数とシークレットを設定
 		GITEA__security__SECRET_KEY="$$(openssl rand -base64 64)" \
 		GITEA__security__INTERNAL_TOKEN="$$(openssl rand -base64 64)" \
 		--app my-gitea
-	@echo "⚠️  Tigirisのアクセス認証情報を手動で設定してください:"
-	@echo "flyctl secrets set TIGRIS_ACCESS_KEY_ID='your_key' TIGRIS_SECRET_ACCESS_KEY='your_secret' --app my-gitea"
+	@echo "📦 Tigiris認証情報を確認中..."
+	@flyctl storage info --app my-gitea
+	@echo "✅ Tigiris認証情報は自動的に設定されます"
 
 scale-up: ## リソースをスケールアップ
 	@echo "📈 リソースをスケールアップ中..."

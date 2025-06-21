@@ -69,6 +69,10 @@ flyctl postgres attach my-gitea-db --app my-gitea
 #### ステップ3: Tigirisストレージ設定
 ```bash
 flyctl storage create --name gitea-storage --app my-gitea
+flyctl storage create --name gitea-lfs --app my-gitea
+flyctl storage create --name gitea-avatars --app my-gitea
+flyctl storage create --name gitea-attachments --app my-gitea
+flyctl storage create --name gitea-repo-avatars --app my-gitea
 ```
 
 #### ステップ4: ボリューム作成
@@ -82,9 +86,10 @@ flyctl secrets set \
   GITEA__database__PASSWD="YOUR_DB_PASSWORD" \
   GITEA__security__SECRET_KEY="$(openssl rand -base64 64)" \
   GITEA__security__INTERNAL_TOKEN="$(openssl rand -base64 64)" \
-  TIGRIS_ACCESS_KEY_ID="YOUR_TIGRIS_ACCESS_KEY" \
-  TIGRIS_SECRET_ACCESS_KEY="YOUR_TIGRIS_SECRET_KEY" \
   --app my-gitea
+
+# Tigiris認証情報確認
+flyctl storage info --app my-gitea
 ```
 
 #### ステップ6: デプロイ実行
@@ -94,25 +99,30 @@ flyctl deploy --app my-gitea
 
 ## Tigirisオブジェクトストレージ設定
 
-### 1. Tigirisバケット作成
+### 1. Fly.io経由でTigirisストレージ作成
 
-Tigirisコンソールで以下のバケットを作成:
-- `gitea-storage` (メインストレージ)
-- `gitea-lfs` (Git LFS)
-- `gitea-avatars` (アバター画像)
-- `gitea-attachments` (添付ファイル)
-- `gitea-repo-avatars` (リポジトリアバター)
-
-### 2. アクセス認証情報
-
-Tigirisコンソールでアクセスキーペアを生成し、環境変数で設定:
+Fly.io CLIを使用してTigirisストレージを自動作成:
 
 ```bash
-flyctl secrets set \
-  TIGRIS_ACCESS_KEY_ID="your_access_key" \
-  TIGRIS_SECRET_ACCESS_KEY="your_secret_key" \
-  --app my-gitea
+flyctl storage create --name gitea-storage --app my-gitea
+flyctl storage create --name gitea-lfs --app my-gitea
+flyctl storage create --name gitea-avatars --app my-gitea
+flyctl storage create --name gitea-attachments --app my-gitea
+flyctl storage create --name gitea-repo-avatars --app my-gitea
 ```
+
+### 2. アクセス認証情報の確認
+
+Fly.ioがTigiris認証情報を自動設定。確認コマンド:
+
+```bash
+flyctl storage info --app my-gitea
+```
+
+認証情報は環境変数として自動的にアプリに注入されます:
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `FLY_STORAGE_ENDPOINT`
 
 ## 初期設定
 
@@ -172,9 +182,14 @@ flyctl postgres connect --app my-gitea-db
 ```
 
 ### Tigirisアクセスエラー
-- アクセスキーの確認
-- バケット権限の確認
-- エンドポイントURLの確認
+```bash
+# ストレージ情報確認
+flyctl storage info --app my-gitea
+
+# ストレージ再作成
+flyctl storage destroy --name gitea-storage --app my-gitea
+flyctl storage create --name gitea-storage --app my-gitea
+```
 
 ## コスト見積もり
 
