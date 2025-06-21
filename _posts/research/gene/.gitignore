@@ -1,1 +1,17 @@
 node_modules
+
+# Large dataset files (Git LFS causes push issues)
+dataset/sumstats/
+dataset/*.duckdb
+dataset/*.gz
+dataset/*.tgz
+dataset/*.zip
+
+# Large output files
+*.pdf
+*.png
+temp/
+figures_output/
+
+# Analysis outputs that can be regenerated
+analysis/scripts/output/
