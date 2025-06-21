@@ -8,11 +8,11 @@ Abstract
 
 Background: Genome-wide association studies (GWAS) of intelligence have been conducted predominantly in European populations, leaving a critical gap in our understanding of cognitive genetics across diverse ancestries. The transferability of polygenic scores (PGS) between populations and the extent of population-specific genetic architecture for intelligence remain largely unknown, particularly for East Asian populations. This represents a significant limitation for precision medicine applications and global equity in genomic medicine.
 
-Methods: We conducted the world's first genome-wide association study of high intelligence in a Japanese population, comparing 91 individuals with exceptionally high cognitive abilities (cases) against 41,528 population controls. Quality control included standard variant and sample filtering (MAF > 1%, call rate > 95%, HWE P > 1×10⁻⁶). We systematically compared genetic architectures with European intelligence GWAS data to quantify population-specific genetic variants and assess cross-population transferability of genetic discoveries.
+Methods: We conducted the world's first genome-wide association study of high intelligence in a Japanese population, comparing 91 individuals with exceptionally high cognitive abilities (cases) against 41,528 population controls. Quality control included standard variant and sample filtering (MAF > 1%, call rate > 95%, HWE P > 1×10⁻⁶). We systematically compared genetic architectures with European intelligence GWAS data to assess cross-population transferability of genetic discoveries, acknowledging the limitations of available comparative data.
 
-Results: Our analysis of 200 high-quality variants revealed striking population-specific genetic architecture. We identified one genome-wide significant association (P < 5×10⁻⁸) and 27 suggestive associations (P < 1×10⁻⁵) for high intelligence in the Japanese population. Critically, population specificity analysis revealed that 100% of intelligence-associated variants identified in Japanese individuals showed no significant association in European populations (16/16 variants were population-specific). This complete population specificity demonstrates profound cross-population heterogeneity in the genetic basis of intelligence, with effect size correlations approaching zero between populations.
+Results: Our analysis of 200 high-quality variants revealed evidence of population-specific genetic architecture for intelligence. We identified one genome-wide significant association (P < 5×10⁻⁸) and 27 suggestive associations (P < 1×10⁻⁵) for high intelligence in the Japanese population. Cross-population comparison analysis, limited by data availability, showed that among Japanese intelligence-associated variants with available European comparison data (59.3% coverage for variants with P < 1×10⁻⁵), none showed significant association in European populations at conventional thresholds. However, this finding is constrained by incomplete data coverage, particularly for the most significant variants, and requires validation with more comprehensive cross-population datasets.
 
-Conclusions: This study reveals complete population-specific genetic architecture for intelligence between Japanese and European populations, representing the most extreme case of cross-population heterogeneity reported for any complex trait. These findings have profound implications for precision medicine, highlighting that intelligence-associated genetic variants and polygenic scores derived from European populations are not transferable to East Asian populations. Our results emphasize the critical need for ancestry-diverse genetic studies and population-specific genetic architectures in precision medicine applications for cognitive traits.
+Conclusions: This study provides the first systematic investigation of intelligence genetics in East Asian populations, revealing potential population-specific genetic architecture. However, our cross-population comparisons are limited by incomplete European GWAS data coverage, particularly for the most significant Japanese-associated variants. While our findings suggest substantial population specificity, more comprehensive cross-population studies are needed to definitively characterize the genetic architecture of intelligence across ancestries. These preliminary results highlight the importance of ancestry-diverse genetic research for advancing precision medicine applications.
 
 Keywords: intelligence, Japanese population, genetic architecture, population specificity, precision medicine, polygenic scores, cross-population heterogeneity
 
@@ -83,26 +83,32 @@ Our genome-wide association study identified significant genetic associations wi
 
 The top associated variant (rs146572333) on chromosome 19 showed a large effect size (OR = 5.29) and represents the strongest genetic association with high intelligence identified in East Asian populations.
 
-3.2. Complete Population-Specific Genetic Architecture
-The most striking finding of our study was the complete population specificity of intelligence-associated genetic variants between Japanese and European populations:
+3.2. Population-Specific Genetic Architecture with Data Limitations
+Our cross-population comparison analysis revealed important limitations that must be acknowledged:
 
-**Population Specificity Analysis:**
-- Japanese-specific variants: 16/16 (100%)
-- European-specific variants: 173
-- Shared significant variants: 0/16 (0%)
-- Cross-population effect size correlation: r ≈ 0
+**Data Coverage Limitations:**
+- European GWAS comparison data was available for 189/200 variants (94.5% overall coverage)
+- However, coverage was reduced to 59.3% (16/27) for variants showing suggestive significance (P < 1×10⁻⁵) in Japanese populations
+- The most genome-wide significant variants lacked European comparison data
 
-This represents the most extreme case of population-specific genetic architecture reported for any complex trait. Every intelligence-associated variant identified in our Japanese cohort showed no significant association in European populations, indicating complete genetic heterogeneity between populations.
+**Limited Cross-Population Analysis:**
+- Among the 16 Japanese-significant variants with available European data, none showed significant association (P < 0.05) in European populations
+- This represents 100% apparent specificity within the available data subset
+- Effect direction concordance was 55.6% (not statistically significant, P = 0.1455), suggesting limited shared genetic architecture
+- When expanding to P < 0.01 threshold (18 variants with European data), 2 variants showed European significance, yielding 88.9% specificity
 
-3.3. Implications for Polygenic Score Transferability
-The complete population specificity observed in our study has profound implications for polygenic score applications:
+**Statistical Considerations:**
+- Cross-population effect size correlation was weak (r = 0.114)
+- The apparent complete specificity may reflect data limitations rather than true biological differences
+- Sample size constraints limit definitive conclusions about cross-population transferability
 
-**PGS Transferability Analysis:**
-- European-derived intelligence PGS performance in Japanese populations: R² ≈ 0
-- Population-specific PGS required for accurate prediction
-- No transferable genetic variants at any significance threshold
+3.3. Implications for Polygenic Score Transferability (Data-Limited Analysis)
+The limited cross-population data available suggests potential challenges for polygenic score transferability:
 
-These findings demonstrate that intelligence polygenic scores derived from European populations are completely non-transferable to Japanese populations, representing a critical limitation for precision medicine applications.
+**Preliminary PGS Transferability Assessment:**
+- Within available data constraints, European-derived intelligence-associated variants showed minimal replication in Japanese populations
+- This suggests potential limitations for European PGS applications in East Asian populations
+- However, comprehensive transferability assessment requires more complete cross-population datasets
 
 3.4. Biological Implications
 The complete population specificity of intelligence genetics between Japanese and European populations suggests:
@@ -114,57 +120,72 @@ The complete population specificity of intelligence genetics between Japanese an
 
 4. Discussion
 
-Our study presents the first genome-wide association study of high intelligence in a Japanese population and reveals an unprecedented level of population-specific genetic architecture. The finding that 100% of intelligence-associated variants are population-specific represents the most extreme case of cross-population genetic heterogeneity reported for any complex trait.
+Our study presents the first genome-wide association study of high intelligence in a Japanese population and provides preliminary evidence for population-specific genetic architecture. However, our findings must be interpreted within the context of significant data limitations that constrain cross-population comparisons.
 
-### Clinical and Precision Medicine Implications
+### Data Limitations and Interpretative Cautions
 
-These findings have profound implications for precision medicine and global health equity:
+**Critical Data Constraints:**
+1. **Incomplete European Comparison Data**: While overall data coverage was 94.5%, coverage dropped to 59.3% for the most significant Japanese variants, limiting our ability to make definitive cross-population comparisons.
 
-1. **Polygenic Score Limitations**: Intelligence PGS derived from European populations are completely non-transferable to East Asian populations, limiting their clinical utility.
+2. **Apparent vs. True Specificity**: The observed complete specificity (100%) among variants with available data may reflect data limitations rather than true biological differences.
 
-2. **Population-Specific Research Imperative**: Our results emphasize the critical need for ancestry-diverse genetic studies to ensure equitable precision medicine applications.
+3. **Sample Size Limitations**: Our Japanese high-IQ sample (n=91) is modest compared to large European GWAS, potentially limiting power for detecting shared effects.
 
-3. **Genetic Architecture Diversity**: The complete population specificity suggests fundamentally different biological pathways underlying intelligence across populations.
+### Preliminary Insights with Acknowledged Limitations
 
-4. **Global Health Equity**: The Eurocentric bias in genetic research has created significant disparities in genetic knowledge and precision medicine applications.
+Despite these constraints, our analysis provides several important preliminary insights:
 
-### Evolutionary and Biological Perspectives
+**Evidence for Population Differences:**
+- Weak cross-population effect size correlation (r = 0.114) suggests limited shared genetic architecture
+- Effect direction concordance (55.6%) was not significantly different from random chance
+- Pattern of apparent specificity, while potentially influenced by data limitations, is consistent with population-specific genetic architecture
 
-The complete genetic heterogeneity observed between populations suggests several important biological insights:
+**Methodological Considerations:**
+- Future studies require more comprehensive cross-population datasets
+- Standardized variant identification and effect size estimation across populations
+- Larger Japanese sample sizes for more robust comparisons
 
-**Independent Evolution**: Different populations may have evolved distinct genetic mechanisms for cognitive abilities, reflecting adaptation to different environmental pressures.
+### Clinical and Precision Medicine Implications (Preliminary)
 
-**Pathway Diversity**: The same phenotype (high intelligence) may be achieved through completely different biological pathways in different populations.
+While definitive conclusions await more comprehensive data, our preliminary findings suggest:
 
-**Genetic Complexity**: Intelligence represents a highly complex phenotype with population-specific genetic underpinnings that require dedicated research in each population.
+1. **Potential PGS Limitations**: Intelligence PGS derived from European populations may have limited transferability to East Asian populations, though this requires validation with complete datasets.
+
+2. **Research Priority**: The apparent population specificity, even if partially due to data limitations, emphasizes the critical need for ancestry-diverse genetic studies.
+
+3. **Precision Medicine Considerations**: Current European-centric genetic knowledge may inadequately represent the genetic architecture of intelligence in non-European populations.
 
 ### Limitations and Future Directions
 
-While our study provides critical insights into population-specific intelligence genetics, several limitations should be noted:
+**Study Limitations:**
+1. **Data Coverage**: Incomplete European comparison data, particularly for top Japanese associations
+2. **Sample Size**: Modest Japanese high-IQ sample size compared to European studies
+3. **Population Scope**: Single East Asian population examined
+4. **Phenotype Definition**: Focus on high intelligence; generalizability to normal-range cognitive variation unknown
 
-1. **Sample Size**: Our case sample (n=91) is relatively small compared to European GWAS, though it represents the largest high-IQ study in East Asian populations to date.
-
-2. **Single Population**: Our study focuses on Japanese populations; replication in other East Asian populations is needed.
-
-3. **Phenotype Definition**: Our study examined high intelligence; the generalizability to normal-range cognitive variation requires investigation.
-
-Future research should focus on:
+**Future Research Priorities:**
 - Larger-scale GWAS in diverse East Asian populations
+- Comprehensive cross-population variant matching and comparison
 - Functional characterization of population-specific variants
-- Development of population-specific polygenic scores
-- Investigation of biological pathways underlying population differences
+- Development and validation of population-specific polygenic scores
+- Investigation of biological pathways underlying potential population differences
 
 ### Global Health Equity Implications
 
-Our findings highlight a critical issue in genomic medicine: the vast majority of genetic research has been conducted in European populations, creating significant knowledge gaps for the majority of the world's population. The complete population specificity observed for intelligence genetics demonstrates that this bias has real consequences for precision medicine applications.
+Our findings, while preliminary, highlight critical issues in genomic medicine equity:
 
-To achieve global health equity in the genomic era, the scientific community must prioritize:
-1. Ancestry-diverse genetic research
-2. Population-specific genetic architecture studies  
-3. Equitable resource allocation for non-European genetic research
-4. Collaborative international research initiatives
+**Current State:**
+- Genetic research remains predominantly European-focused
+- Knowledge gaps exist for the majority of the world's population
+- Potential disparities in precision medicine applications
 
-In conclusion, our study reveals complete population-specific genetic architecture for intelligence between Japanese and European populations, demonstrating the critical importance of ancestry-diverse genetic research for advancing precision medicine and achieving global health equity.
+**Research Imperatives:**
+- Ancestry-diverse genetic research as a scientific and ethical priority
+- International collaborative research initiatives
+- Equitable resource allocation for non-European genetic research
+- Population-specific genetic architecture studies
+
+In conclusion, while our study provides important preliminary insights into intelligence genetics in East Asian populations, the apparent population specificity observed must be interpreted cautiously due to data limitations. Definitive characterization of cross-population genetic architecture requires more comprehensive datasets and larger sample sizes. Nevertheless, our findings underscore the critical importance of ancestry-diverse genetic research for advancing scientific understanding and achieving equity in precision medicine.
 
 ---
 

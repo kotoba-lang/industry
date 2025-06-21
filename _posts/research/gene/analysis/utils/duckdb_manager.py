@@ -304,6 +304,118 @@ class GWASDuckDBManager:
         # データベース最適化
         self._optimize_database()
     
+    def bulk_import_all_traits(self, batch_size: int = 10):
+        """
+        全形質を安全にバッチインポート
+        
+        Args:
+            batch_size: バッチサイズ (メモリ制限対応)
+        """
+        if not self.conn:
+            self.logger.error("❌ DuckDB not available")
+            return
+            
+        available_traits = self.scan_available_traits()
+        
+        # 既存形質確認
+        existing_traits = self.conn.execute('SELECT trait_id FROM gwas_metadata').fetchall()
+        existing_trait_ids = [t[0] for t in existing_traits]
+        
+        # 未インポート形質のリスト
+        remaining_traits = [t for t in available_traits if t not in existing_trait_ids]
+        
+        if not remaining_traits:
+            self.logger.info("✅ All traits already imported")
+            return
+            
+        self.logger.info(f"📦 Bulk importing {len(remaining_traits)} remaining traits in batches of {batch_size}...")
+        
+        success_count = 0
+        error_count = 0
+        
+        # バッチ処理
+        for i in range(0, len(remaining_traits), batch_size):
+            batch = remaining_traits[i:i+batch_size]
+            batch_num = (i // batch_size) + 1
+            total_batches = (len(remaining_traits) + batch_size - 1) // batch_size
+            
+            self.logger.info(f"🔄 Processing batch {batch_num}/{total_batches} ({len(batch)} traits)")
+            
+            for j, trait in enumerate(batch):
+                try:
+                    self.logger.info(f"📥 [{batch_num}/{total_batches}] [{j+1}/{len(batch)}] Importing {trait}...")
+                    
+                    if self.import_trait_data(trait):
+                        success_count += 1
+                        self.logger.info(f"✅ {trait} imported successfully ({success_count}/{len(remaining_traits)})")
+                    else:
+                        error_count += 1
+                        self.logger.error(f"❌ Failed to import {trait}")
+                        
+                except Exception as e:
+                    error_count += 1
+                    self.logger.error(f"❌ Error importing {trait}: {e}")
+            
+            # バッチ完了後に最適化
+            if batch_num % 5 == 0:  # 5バッチごとに最適化
+                self.logger.info("🔧 Optimizing database...")
+                self._optimize_database()
+                
+                # 現在のサイズ確認
+                db_info = self.get_database_info()
+                self.logger.info(f"📊 Current DB size: {db_info['database_size_mb']:.1f}MB, Total SNPs: {db_info['total_snps']:,}")
+        
+        # 最終最適化
+        self.logger.info("🔧 Final database optimization...")
+        self._optimize_database()
+        
+        # 結果サマリー
+        final_info = self.get_database_info()
+        self.logger.info(f"✅ Bulk import completed!")
+        self.logger.info(f"📊 Successfully imported: {success_count} traits")
+        self.logger.info(f"❌ Failed imports: {error_count} traits")
+        self.logger.info(f"💾 Final database size: {final_info['database_size_mb']:.1f}MB")
+        self.logger.info(f"🧬 Total SNPs in database: {final_info['total_snps']:,}")
+
+    def get_import_status(self) -> Dict:
+        """インポート状況の詳細レポート"""
+        if not self.conn:
+            return {"status": "unavailable"}
+            
+        try:
+            available_traits = self.scan_available_traits()
+            
+            # データベース内の形質情報
+            db_traits = self.conn.execute("""
+                SELECT trait_id, snp_count, compressed_size_mb, is_high_priority
+                FROM gwas_metadata
+                ORDER BY imported_at DESC
+            """).fetchall()
+            
+            db_trait_ids = [t[0] for t in db_traits]
+            missing_traits = [t for t in available_traits if t not in db_trait_ids]
+            
+            # 統計情報
+            total_snps = sum(t[1] for t in db_traits if t[1])
+            total_size_mb = sum(t[2] for t in db_traits if t[2])
+            high_priority_count = sum(1 for t in db_traits if t[3])
+            
+            return {
+                "status": "ready",
+                "total_available": len(available_traits),
+                "imported_count": len(db_trait_ids),
+                "missing_count": len(missing_traits),
+                "high_priority_imported": high_priority_count,
+                "total_snps": total_snps,
+                "database_size_mb": total_size_mb,
+                "completion_rate": len(db_trait_ids) / len(available_traits) * 100,
+                "missing_traits": missing_traits[:10] if missing_traits else [],  # 最初の10個
+                "recently_imported": [t[0] for t in db_traits[:5]]  # 最近の5個
+            }
+            
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+    
     def query_gwas_data(self, query: str) -> pd.DataFrame:
         """
         SQL クエリ実行
