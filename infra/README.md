@@ -42,7 +42,13 @@ infra/
    flyctl auth login
    ```
 
-3. **Tigris アカウント**: オブジェクトストレージ用
+3. **jq**: JSON処理用（Tigiris認証情報取得に使用）
+   ```bash
+   # macOS
+   brew install jq
+   # Ubuntu/Debian
+   sudo apt install jq
+   ```
 
 ## デプロイメント手順
 
@@ -200,6 +206,24 @@ flyctl storage create --name gitea-storage --app my-gitea
 
 合計: 約 $7-15/月 (使用量による)
 
+## 次のステップ
+
+1. **デプロイ実行**:
+   ```bash
+   make setup
+   make deploy
+   ```
+
+2. **初期設定**:
+   - https://my-gitea.fly.dev にアクセス
+   - 管理者アカウント作成
+   - SSH鍵の登録
+
+3. **カスタマイズ**:
+   - テーマの変更
+   - 組織・チーム設定
+   - ワークフロー設定
+
 ## ライセンス
 
 MIT License
@@ -208,4 +232,5 @@ MIT License
 
 - [Fly.io ドキュメント](https://fly.io/docs/)
 - [Gitea ドキュメント](https://docs.gitea.io/)
-- [Tigris ドキュメント](https://docs.tigris.dev/) 
+- [Tigris ドキュメント](https://docs.tigris.dev/)
+- [Fly.io Storage](https://fly.io/docs/reference/tigris/) 
