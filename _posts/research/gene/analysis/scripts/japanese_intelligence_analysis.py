@@ -40,13 +40,13 @@ class JapaneseIntelligenceAnalysis:
         data_file = self.data_dir / "data.tsv"
         
         # データ読み込み（適切な区切り文字で）
-        self.gwas_data = pd.read_csv(data_file, sep='\t', comment='#')
+        self.gwas_data = pd.read_csv(data_file, sep='\t')
         
         # 列名のクリーニング
         self.gwas_data.columns = self.gwas_data.columns.str.strip()
         
         # 数値列の変換
-        numeric_cols = ['CHR', 'BP', 'A1Freq', 'BETA', 'SE', 'P', 'Z']
+        numeric_cols = ['CHR', 'BP', 'A1Freq', 'BETA', 'SE', 'P', 'Z', 'P_euro']
         for col in numeric_cols:
             if col in self.gwas_data.columns:
                 self.gwas_data[col] = pd.to_numeric(self.gwas_data[col], errors='coerce')
@@ -111,9 +111,11 @@ class JapaneseIntelligenceAnalysis:
         specificity_results['non_significant'] = (~japanese_sig & ~european_sig).sum()
         
         # 集団特異性率の計算
-        japanese_specificity_rate = (specificity_results['japanese_specific'] / 
-                                   (specificity_results['japanese_specific'] + 
-                                    specificity_results['shared_significant'])) * 100
+        total_japanese_sig = specificity_results['japanese_specific'] + specificity_results['shared_significant']
+        if total_japanese_sig > 0:
+            japanese_specificity_rate = (specificity_results['japanese_specific'] / total_japanese_sig) * 100
+        else:
+            japanese_specificity_rate = 0
         
         logger.info(f"\n=== POPULATION SPECIFICITY ANALYSIS ===")
         logger.info(f"Japanese-specific variants: {specificity_results['japanese_specific']:,} ({japanese_specificity_rate:.1f}%)")
@@ -205,13 +207,18 @@ class JapaneseIntelligenceAnalysis:
         max_val = max(expected_log.max(), observed_log.max())
         ax.plot([0, max_val], [0, max_val], 'r--', alpha=0.7, label='Expected')
         
-        # λ (lambda) 計算
-        median_chisq = np.median(self.gwas_data['Z']**2)
-        lambda_gc = median_chisq / 0.454
+        # λ (lambda) 計算（Z scoreが利用可能な場合のみ）
+        if 'Z' in self.gwas_data.columns and self.gwas_data['Z'].notna().sum() > 0:
+            valid_z = self.gwas_data['Z'].dropna()
+            median_chisq = np.median(valid_z**2)
+            lambda_gc = median_chisq / 0.454
+            title_text = f'B. QQ Plot (λ = {lambda_gc:.3f})'
+        else:
+            title_text = 'B. QQ Plot'
         
         ax.set_xlabel('Expected -log₁₀(P)')
         ax.set_ylabel('Observed -log₁₀(P)')
-        ax.set_title(f'B. QQ Plot (λ = {lambda_gc:.3f})')
+        ax.set_title(title_text)
         ax.legend()
         ax.grid(True, alpha=0.3)
     
@@ -392,9 +399,11 @@ class JapaneseIntelligenceAnalysis:
         logger.info("="*60)
         
         if specificity_results:
-            japanese_specific_rate = (specificity_results['japanese_specific'] / 
-                                    (specificity_results['japanese_specific'] + 
-                                     specificity_results['shared_significant'])) * 100
+            total_japanese_sig = specificity_results['japanese_specific'] + specificity_results['shared_significant']
+            if total_japanese_sig > 0:
+                japanese_specific_rate = (specificity_results['japanese_specific'] / total_japanese_sig) * 100
+            else:
+                japanese_specific_rate = 0
             
             logger.info(f"🇯🇵 World's first Japanese high-IQ GWAS:")
             logger.info(f"   Cases: 91 high-IQ individuals")
