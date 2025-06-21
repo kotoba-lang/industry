@@ -665,3 +665,8 @@ We thank:
 **🎯 Strategic Outcome**: This research represents a paradigm shift toward high-performance, population-specific genetic architecture research. The revolutionary DuckDB analysis system (300-600x speedup) combined with unprecedented population specificity findings positions this work for high-impact publication in Molecular Psychiatry with 90%+ success probability while democratizing access to advanced genetic analysis worldwide.
 
 **✨ Status**: ✅ **PRODUCTION READY** - Revolutionary analysis system operational with dramatic performance improvements and complete scientific validation. 
+
+
+Data
+
+curl -O https://broad-alkesgroup-ukbb-ld.s3.amazonaws.com/UKBB_LD/baselineLF_v2.2.UKB.tar.gz

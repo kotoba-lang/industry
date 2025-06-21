@@ -3,6 +3,7 @@ app = "my-gitea"
 primary_region = "nrt"
 
 [build]
+  image = "gitea/gitea:1.21.3"
 
 [deploy]
   strategy = "rolling"
@@ -17,10 +18,12 @@ primary_region = "nrt"
   GITEA__server__DOMAIN = "my-gitea.fly.dev"
   GITEA__server__SSH_DOMAIN = "my-gitea.fly.dev"
   GITEA__server__ROOT_URL = "https://my-gitea.fly.dev/"
+  GITEA__server__SSH_PORT = "22"
+  GITEA__server__HTTP_PORT = "3000"
   GITEA__storage__SERVE_DIRECT = "true"
   GITEA__storage__STORAGE_TYPE = "minio"
   GITEA__log__LEVEL = "Info"
-  GITEA__security__INSTALL_LOCK = "true"
+  GITEA__security__INSTALL_LOCK = "false"
 
 [http_service]
   internal_port = 3000
