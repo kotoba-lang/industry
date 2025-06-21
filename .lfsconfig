@@ -1,0 +1,26 @@
+[lfs]
+	url = https://pxsuqemlayhnmcxuiigk.supabase.co/storage/v1/s3
+	access = basic
+	
+[lfs "https://pxsuqemlayhnmcxuiigk.supabase.co/storage/v1/s3"]
+	access = basic
+	
+# Supabase Storage configuration for Git LFS
+# Project: pxsuqemlayhnmcxuiigk
+# Storage endpoint: https://pxsuqemlayhnmcxuiigk.supabase.co/storage/v1/s3
+# Using S3-compatible API for LFS storage
+# 
+# Required environment variables:
+# - SUPABASE_SERVICE_ROLE_KEY: Service role key for authentication
+# - SUPABASE_ANON_KEY: Anonymous key (fallback)
+# - SUPABASE_URL: Project URL
+#
+# Required Supabase Storage bucket: lfs-storage
+# Bucket must be created in Supabase Dashboard with public access disabled
+# 
+# Usage:
+# 1. Create 'lfs-storage' bucket in Supabase Dashboard
+# 2. Set environment variables in your shell or .env.local
+# 3. Run: git lfs install
+# 4. Run: git lfs track "*.large-file-extension"
+# 5. Add and commit files normally 
