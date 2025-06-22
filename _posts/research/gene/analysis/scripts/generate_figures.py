@@ -12,7 +12,14 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 from pathlib import Path
-from scipy.stats import chi2_contingency
+from scipy.stats import chi2_contingency, chi2
+
+def calculate_lambda_gc(p_values: pd.Series) -> float:
+    """Calculates the genomic inflation factor (lambda GC)."""
+    if p_values.empty:
+        return np.nan
+    chisq = chi2.ppf(1 - p_values, 1)
+    return np.median(chisq) / chi2.ppf(0.5, 1)
 
 # スタイル設定
 plt.style.use('seaborn-v0_8')
@@ -151,9 +158,7 @@ class GWASFigureGenerator:
             ax.plot([0, max_val], [0, max_val], 'r--', alpha=0.8)
             
             # λGC計算
-            from scipy.stats import chi2
-            chisq_stats = chi2.ppf(1 - p_values, df=1)
-            lambda_gc = np.median(chisq_stats) / chi2.ppf(0.5, df=1)
+            lambda_gc = calculate_lambda_gc(p_values)
             
             ax.set_xlabel('Expected -log₁₀(P)')
             ax.set_ylabel('Observed -log₁₀(P)')
