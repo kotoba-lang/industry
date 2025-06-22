@@ -85,8 +85,8 @@ def load_european_data(path: Path) -> pd.DataFrame:
 
 def create_unified_dataset(base_dir: Path):
     """Main function to orchestrate data loading and unification."""
-    jp_path = base_dir / 'manuscript/data/data.tsv'
-    eu_path = base_dir / 'reference_data/Savage2018_Intelligence_GWAS_European_OpenGWAS.vcf.gz'
+    jp_path = base_dir / 'dataset/Japanese_HighIQ_GWAS_2024.tsv'
+    eu_path = base_dir / 'dataset/Savage2018_Intelligence_GWAS_European_OpenGWAS.vcf.gz'
     output_dir = base_dir / "analysis/output"
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / "unified_gwas_summary.parquet"
@@ -105,7 +105,7 @@ def create_unified_dataset(base_dir: Path):
     return output_path
 
 # Execute the data unification process
-# Assuming the script is run from the project root
+# Assuming the script is run from the `analysis` directory
 unified_file_path = create_unified_dataset(Path('..'))
 
 # %% [markdown]
