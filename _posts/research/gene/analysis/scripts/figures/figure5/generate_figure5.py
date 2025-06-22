@@ -37,7 +37,8 @@ class Figure5Generator:
     """Generate Figure 5: Polygenic score analysis"""
     
     def __init__(self, data_file='../../../../manuscript/data/data.tsv'):
-        self.data_file = data_file
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        self.data_file = os.path.join(script_dir, data_file)
         setup_publication_style()
         self.setup_pgs_data()
         

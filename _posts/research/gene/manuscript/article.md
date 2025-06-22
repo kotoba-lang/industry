@@ -194,6 +194,8 @@ In conclusion, while our study provides important preliminary insights into inte
 **Real Japanese High-IQ GWAS Results:**
 - [Figure 1: Japanese High-IQ Manhattan & QQ Plots (PNG)](../analysis/scripts/output/Figure1_Japanese_Manhattan_QQ.png) | [PDF](../analysis/scripts/output/Figure1_Japanese_Manhattan_QQ.pdf)
 - [Figure 2: Cross-Population Genetic Architecture (PNG)](../analysis/scripts/output/Figure2_Population_Comparison.png) | [PDF](../analysis/scripts/output/Figure2_Population_Comparison.pdf)
+- [Figure 4: Chromosome Enrichment Analysis (PNG)](../analysis/scripts/output/Figure4_Chromosome_Enrichment.png) | [PDF](../analysis/scripts/output/Figure4_Chromosome_Enrichment.pdf)
+- [Figure 5: Real Polygenic Score Analysis (PNG)](../analysis/scripts/output/Figure5_Real_Polygenic_Score.png) | [PDF](../analysis/scripts/output/Figure5_Real_Polygenic_Score.pdf)
 - [Table 1: Top Japanese Intelligence-Associated Variants (CSV)](../analysis/scripts/output/Table1_Japanese_Top_Variants.csv) | [HTML](../analysis/scripts/output/Table1_Japanese_Top_Variants.html)
 
 **Study Characteristics:**
