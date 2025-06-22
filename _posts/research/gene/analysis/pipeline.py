@@ -181,17 +181,19 @@ for fig_name, fig_path in results.items():
 # %% [markdown]
 # ## 4. Advanced Analysis and Figure Generation
 # 
-# This section runs the advanced analyses, such as pathway and polygenic score analysis, and generates the corresponding figures.
+# This section runs the advanced analyses using DuckDB for efficient data processing.
 
 # %%
-print("\\n🔬 Running Advanced Analyses...")
+print("\n🔬 Running Advanced Analyses with DuckDB...")
+duckdb_path = Path('../dataset/gwas_data.duckdb')
 adv_fig_generator = AdvancedFigureGenerator(
-    gwas_summary_path=unified_file_path,
+    duckdb_path=duckdb_path,
     output_dir=output_dir
 )
-adv_fig_generator.run_pathway_analysis()
-adv_fig_generator.run_pgs_analysis()
+results = adv_fig_generator.run_all_analyses()
 print("✅ Advanced analyses complete.")
+print(f"📊 Pathway results: {len(results['pathway_results'])} pathways analyzed")
+print(f"📈 PGS results: {len(results['pgs_results'])} metrics calculated")
 
 # %% [markdown]
 # ## 5. Summary Table Generation
