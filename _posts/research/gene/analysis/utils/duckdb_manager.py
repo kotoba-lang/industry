@@ -60,6 +60,7 @@ class GWASDuckDBManager:
         
         # 高頻度アクセス形質リスト
         self.high_priority_traits = [
+            'Japanese_HighIQ_GWAS_2024',
             'EastAsian_EducationalAttainment_GWAS_Chen2024',
             'Savage2018_Intelligence_GWAS_European_OpenGWAS',
             'PASS_Height1', 'PASS_BMI1', 'PASS_Schizophrenia',
