@@ -1,11 +1,11 @@
 # GWAS Analysis Report
-## Generated on: 2025-06-22 17:24:15
+## Generated on: 2025-06-22 17:42:03
 ## Primary Trait: Japanese_HighIQ_GWAS_2024
 
 ## Database Information
-- Database size: 14402.0 MB
-- Stored traits: 2
-- Total SNPs: 4,590,077
+- Database size: 15558.5 MB
+- Stored traits: 3
+- Total SNPs: 13,851,060
 
 ## Analysis Results Summary
 - primary_analysis: ✅ Completed
@@ -13,8 +13,8 @@
 - comprehensive_summary: ✅ Completed
 - cross_trait: ✅ Completed
 - summary_table: ✅ Completed
-- figures: ✅ Completed
+- figures: ❌ Failed
 
 ## Quality Control Results
-- Lambda GC: 48.536
+- Lambda GC: 1.414
 - Extreme Z-scores (>10): 0
