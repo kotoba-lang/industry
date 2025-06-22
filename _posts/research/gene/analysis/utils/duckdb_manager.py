@@ -44,7 +44,7 @@ class GWASDuckDBManager:
             db_path: DuckDBファイルパス (None の場合は自動生成)
         """
         self.dataset_path = Path(dataset_path)
-        self.sumstats_path = self.dataset_path / "sumstats"
+        self.sumstats_path = self.dataset_path.parent / "reference_data"
         
         # LDSC参照データパス
         self.ldsc_reference_path = self.dataset_path.parent / "analysis" / "reference_data" / "ldsc_reference"
@@ -627,10 +627,11 @@ class GWASDuckDBManager:
 
     def scan_available_traits(self) -> List[str]:
         """利用可能な形質リストを取得"""
-        trait_files = list(self.sumstats_path.glob("*.sumstats.gz"))
-        traits = [f.stem.replace(".sumstats", "") for f in trait_files]
+        # .tsv ファイルをスキャン対象に追加
+        trait_files = list(self.sumstats_path.glob("*.tsv")) + list(self.sumstats_path.glob("*.sumstats.gz"))
+        traits = [f.stem.replace(".sumstats", "").replace(".vcf", "") for f in trait_files]
         
-        self.logger.info(f"📊 Found {len(traits)} available traits")
+        self.logger.info(f"📊 Found {len(traits)} available traits in {self.sumstats_path}")
         return sorted(traits)
     
     def get_database_info(self) -> Dict:
