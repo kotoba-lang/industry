@@ -22,6 +22,7 @@ primary_region = "nrt"
   GITEA__server__SSH_PORT = "22"
   GITEA__server__HTTP_PORT = "3000"
   GITEA__server__HTTP_ADDR = "0.0.0.0"
+  GITEA__server__DISABLE_SSH = "true"
   GITEA__storage__SERVE_DIRECT = "true"
   GITEA__storage__STORAGE_TYPE = "minio"
   GITEA__log__LEVEL = "Info"
@@ -36,13 +37,6 @@ primary_region = "nrt"
   auto_start_machines = true
   min_machines_running = 0
   processes = ["app"]
-
-[[services]]
-  protocol = "tcp"
-  internal_port = 22
-  ports = [
-    { port = 22, handlers = ["tls"] }
-  ]
 
 [mounts]
   source = "gitea_data"
