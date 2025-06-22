@@ -3,6 +3,7 @@
 DuckDB ベース GWAS データベース管理システム
 
 GitHub LFS対応の軽量・高速分析特化データベース
+LDSC参照データ統合対応版
 """
 
 import pandas as pd
@@ -24,13 +25,14 @@ except ImportError:
 
 class GWASDuckDBManager:
     """
-    DuckDB ベース GWAS データ管理システム
+    DuckDB ベース GWAS データ管理システム (LDSC統合版)
     
     特徴:
     - GitHub LFS対応の軽量DBファイル
     - 分析特化の高速クエリ
     - SQL互換でpandas連携
     - 自動圧縮・最適化
+    - LDSC参照データ統合対応
     """
     
     def __init__(self, dataset_path: Path, db_path: Optional[Path] = None):
@@ -43,6 +45,10 @@ class GWASDuckDBManager:
         """
         self.dataset_path = Path(dataset_path)
         self.sumstats_path = self.dataset_path / "sumstats"
+        
+        # LDSC参照データパス
+        self.ldsc_reference_path = self.dataset_path.parent / "analysis" / "reference_data" / "ldsc_reference"
+        self.baseline_path = self.ldsc_reference_path / "baselineLF_v2.2.UKB"
         
         # DuckDBファイルパス設定
         if db_path is None:
@@ -93,10 +99,20 @@ class GWASDuckDBManager:
             self.conn = None
     
     def _create_schema(self):
-        """データベーススキーマ作成"""
+        """データベーススキーマ作成（LDSC対応版）"""
         if not self.conn:
             return
             
+        # 既存のGWASテーブル作成
+        self._create_gwas_schema()
+        
+        # LDSC参照データテーブル作成
+        self._create_ldsc_schema()
+        
+        self.logger.info("📋 DuckDB schema created/verified (LDSC integrated)")
+    
+    def _create_gwas_schema(self):
+        """GWAS関連テーブル作成"""
         # メタデータテーブル
         self.conn.execute("""
             CREATE TABLE IF NOT EXISTS gwas_metadata (
@@ -145,9 +161,470 @@ class GWASDuckDBManager:
             CREATE INDEX IF NOT EXISTS idx_gwas_zscore 
             ON gwas_associations (trait_id, z_score DESC)
         """)
+
+    def _create_ldsc_schema(self):
+        """LDSC参照データ用テーブル作成"""
         
-        self.logger.info("📋 DuckDB schema created/verified")
-    
+        # LDSC メタデータテーブル
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS ldsc_metadata (
+                dataset_name VARCHAR PRIMARY KEY,
+                version VARCHAR,
+                population VARCHAR,
+                n_chromosomes INTEGER,
+                n_annotations INTEGER,
+                total_snps BIGINT,
+                imported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                data_path VARCHAR
+            )
+        """)
+        
+        # LD Score データテーブル
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS ldsc_scores (
+                dataset_name VARCHAR,
+                chromosome INTEGER,
+                snp_id VARCHAR,
+                bp BIGINT,
+                cm DOUBLE,
+                maf DOUBLE,
+                annotation_scores TEXT,  -- JSON形式でアノテーションスコア格納
+                PRIMARY KEY (dataset_name, chromosome, snp_id)
+            )
+        """)
+        
+        # アノテーションデータテーブル
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS ldsc_annotations (
+                dataset_name VARCHAR,
+                chromosome INTEGER,
+                snp_id VARCHAR,
+                bp BIGINT,
+                cm DOUBLE,
+                annotation_values TEXT,  -- JSON形式でアノテーション値格納
+                PRIMARY KEY (dataset_name, chromosome, snp_id)
+            )
+        """)
+        
+        # M ファイル（SNP数）データテーブル
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS ldsc_m_files (
+                dataset_name VARCHAR,
+                chromosome INTEGER,
+                annotation_name VARCHAR,
+                m_5_50 DOUBLE,
+                m_all DOUBLE,
+                PRIMARY KEY (dataset_name, chromosome, annotation_name)
+            )
+        """)
+        
+        # 重みファイルデータテーブル
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS ldsc_weights (
+                dataset_name VARCHAR,
+                chromosome INTEGER,
+                snp_id VARCHAR,
+                bp BIGINT,
+                weight_score DOUBLE,
+                PRIMARY KEY (dataset_name, chromosome, snp_id)
+            )
+        """)
+        
+        # LDSC用インデックス
+        self.conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_ldsc_scores_chr_snp 
+            ON ldsc_scores (chromosome, snp_id)
+        """)
+        
+        self.conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_ldsc_annotations_chr_snp 
+            ON ldsc_annotations (chromosome, snp_id)
+        """)
+        
+        self.conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_ldsc_weights_chr_snp 
+            ON ldsc_weights (chromosome, snp_id)
+        """)
+
+    def _import_ldscore_file(self, dataset_name: str, chr_num: int, file_path: Path) -> int:
+        """LD Scoreファイルをインポート（最適化版）"""
+        try:
+            self.logger.info(f"📊 Reading LD Score file: {file_path.name}")
+            
+            # ファイル読み込み（チャンク処理で メモリ効率化）
+            chunk_size = 10000  # 1万行ずつ処理
+            total_rows = 0
+            processed_snps = set()  # 重複チェック用
+            
+            # ファイルのチャンク読み込み
+            for chunk_idx, df_chunk in enumerate(pd.read_csv(file_path, sep='\t', compression='gzip', chunksize=chunk_size)):
+                
+                # 基本カラム確認
+                required_cols = ['CHR', 'SNP', 'BP']
+                if not all(col in df_chunk.columns for col in required_cols):
+                    self.logger.warning(f"⚠️ Missing required columns in {file_path}")
+                    return 0
+                
+                # 重複SNP除去
+                df_chunk = df_chunk.drop_duplicates(subset=['SNP'])
+                df_chunk = df_chunk[~df_chunk['SNP'].isin(processed_snps)]
+                processed_snps.update(df_chunk['SNP'])
+                
+                if len(df_chunk) == 0:
+                    continue
+                
+                # オプショナルカラム確認
+                cm_col = 'CM' if 'CM' in df_chunk.columns else None
+                maf_col = 'MAF' if 'MAF' in df_chunk.columns else None
+                
+                # アノテーションスコアカラムを特定
+                score_cols = [col for col in df_chunk.columns if col not in ['CHR', 'SNP', 'BP', 'CM', 'MAF']]
+                
+                # アノテーションスコアをJSON形式で格納
+                annotation_scores = []
+                for _, row in df_chunk.iterrows():
+                    scores = {col: float(row[col]) if pd.notna(row[col]) else 0.0 for col in score_cols}
+                    annotation_scores.append(json.dumps(scores))
+                
+                # データフレーム準備
+                import_df = pd.DataFrame({
+                    'dataset_name': dataset_name,
+                    'chromosome': chr_num,
+                    'snp_id': df_chunk['SNP'],
+                    'bp': df_chunk['BP'],
+                    'cm': df_chunk[cm_col] if cm_col else None,
+                    'maf': df_chunk[maf_col] if maf_col else None,
+                    'annotation_scores': annotation_scores
+                })
+                
+                # DuckDBに挿入（ON CONFLICT IGNORE for duplicates）
+                self.conn.register('temp_ldsc_scores', import_df)
+                self.conn.execute("""
+                    INSERT OR IGNORE INTO ldsc_scores 
+                    (dataset_name, chromosome, snp_id, bp, cm, maf, annotation_scores)
+                    SELECT dataset_name, chromosome, snp_id, bp, cm, maf, annotation_scores
+                    FROM temp_ldsc_scores
+                """)
+                
+                total_rows += len(df_chunk)
+                
+                # 進捗表示
+                if chunk_idx % 10 == 0:
+                    self.logger.info(f"📊 Chr{chr_num} LD scores: {total_rows:,} processed...")
+            
+            annotation_count = len(score_cols) if 'score_cols' in locals() else 0
+            self.logger.info(f"✅ Chr{chr_num} LD scores completed: {total_rows:,} SNPs ({annotation_count} annotations)")
+            return total_rows
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to import LD scores for chr{chr_num}: {e}")
+            return 0
+
+    def _import_annotation_file(self, dataset_name: str, chr_num: int, file_path: Path) -> int:
+        """アノテーションファイルをインポート（最適化版）"""
+        try:
+            self.logger.info(f"📋 Reading annotation file: {file_path.name}")
+            
+            # ファイル読み込み（チャンク処理）
+            chunk_size = 10000
+            total_rows = 0
+            processed_snps = set()  # 重複チェック用
+            
+            # ファイルのチャンク読み込み
+            for chunk_idx, df_chunk in enumerate(pd.read_csv(file_path, sep='\t', compression='gzip', chunksize=chunk_size)):
+                
+                # 基本カラム
+                base_cols = ['CHR', 'SNP', 'BP']
+                optional_cols = ['CM']
+                
+                if not all(col in df_chunk.columns for col in base_cols):
+                    self.logger.warning(f"⚠️ Missing base columns in {file_path}")
+                    return 0
+                
+                # 重複SNP除去
+                df_chunk = df_chunk.drop_duplicates(subset=['SNP'])
+                df_chunk = df_chunk[~df_chunk['SNP'].isin(processed_snps)]
+                processed_snps.update(df_chunk['SNP'])
+                
+                if len(df_chunk) == 0:
+                    continue
+                
+                # アノテーションカラムを特定
+                all_base_cols = base_cols + [col for col in optional_cols if col in df_chunk.columns]
+                annot_cols = [col for col in df_chunk.columns if col not in all_base_cols]
+                
+                # アノテーション値をJSON形式で格納（高速化）
+                annotation_values = []
+                for _, row in df_chunk.iterrows():
+                    values = {}
+                    for col in annot_cols:
+                        try:
+                            val = row[col]
+                            if pd.notna(val):
+                                # 高速数値変換
+                                values[col] = float(val) if '.' in str(val) else int(float(val))
+                            else:
+                                values[col] = 0
+                        except (ValueError, TypeError):
+                            values[col] = 0
+                            
+                    annotation_values.append(json.dumps(values))
+                
+                # データフレーム準備
+                import_df = pd.DataFrame({
+                    'dataset_name': dataset_name,
+                    'chromosome': chr_num,
+                    'snp_id': df_chunk['SNP'],
+                    'bp': df_chunk['BP'],
+                    'cm': df_chunk['CM'] if 'CM' in df_chunk.columns else None,
+                    'annotation_values': annotation_values
+                })
+                
+                # DuckDBに挿入（ON CONFLICT IGNORE for duplicates）
+                self.conn.register('temp_ldsc_annotations', import_df)
+                self.conn.execute("""
+                    INSERT OR IGNORE INTO ldsc_annotations 
+                    (dataset_name, chromosome, snp_id, bp, cm, annotation_values)
+                    SELECT dataset_name, chromosome, snp_id, bp, cm, annotation_values
+                    FROM temp_ldsc_annotations
+                """)
+                
+                total_rows += len(df_chunk)
+                
+                # 進捗表示
+                if chunk_idx % 10 == 0:
+                    self.logger.info(f"📋 Chr{chr_num} annotations: {total_rows:,} processed...")
+            
+            annotation_count = len(annot_cols) if 'annot_cols' in locals() else 0
+            self.logger.info(f"✅ Chr{chr_num} annotations completed: {total_rows:,} SNPs ({annotation_count} types)")
+            return total_rows
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to import annotations for chr{chr_num}: {e}")
+            return 0
+
+    def import_baseline_ldsc_data(self, dataset_name: str = "baselineLF_v2.2_UKB") -> bool:
+        """
+        baselineLF v2.2 UKBデータセットをDuckDBに統合（最適化版）
+        
+        Args:
+            dataset_name: データセット識別名
+            
+        Returns:
+            インポート成功フラグ
+        """
+        if not self.conn:
+            self.logger.error("❌ DuckDB not available")
+            return False
+            
+        if not self.baseline_path.exists():
+            self.logger.error(f"❌ Baseline path not found: {self.baseline_path}")
+            return False
+            
+        self.logger.info(f"🧬 Starting LDSC baseline data import: {dataset_name}")
+        self.logger.info(f"⚙️ Using optimized batch processing for large files")
+        
+        try:
+            # 既存データクリア
+            self._clear_ldsc_dataset(dataset_name)
+            
+            # 各染色体のデータをインポート
+            chromosomes = range(1, 23)  # 1-22
+            total_snps = 0
+            annotation_count = 0
+            
+            for chr_num in chromosomes:
+                self.logger.info(f"🧬 Processing chromosome {chr_num}/22...")
+                
+                # LD Scoreファイル
+                ldscore_file = self.baseline_path / f"baselineLF2.2.UKB.{chr_num}.l2.ldscore.gz"
+                # アノテーションファイル  
+                annot_file = self.baseline_path / f"baselineLF2.2.UKB.{chr_num}.annot.gz"
+                # Mファイル
+                m_file = self.baseline_path / f"baselineLF2.2.UKB.{chr_num}.l2.M"
+                m_5_50_file = self.baseline_path / f"baselineLF2.2.UKB.{chr_num}.l2.M_5_50"
+                # 重みファイル
+                weight_file = self.baseline_path / f"weights.UKB.{chr_num}.l2.ldscore.gz"
+                
+                # LD Score データインポート（優先）
+                if ldscore_file.exists():
+                    chr_snps = self._import_ldscore_file(dataset_name, chr_num, ldscore_file)
+                    total_snps += chr_snps
+                    
+                # アノテーションデータインポート（優先）
+                if annot_file.exists():
+                    self._import_annotation_file(dataset_name, chr_num, annot_file)
+                    
+                # Mファイルインポート（軽量）
+                if m_file.exists() and m_5_50_file.exists():
+                    annotation_count = self._import_m_files(dataset_name, chr_num, m_file, m_5_50_file)
+                    
+                # 重みファイルインポート（軽量）
+                if weight_file.exists():
+                    self._import_weight_file(dataset_name, chr_num, weight_file)
+                
+                # 中間最適化（3染色体ごと）
+                if chr_num % 3 == 0:
+                    self.logger.info(f"🔧 Intermediate optimization after chr{chr_num}...")
+                    self.conn.execute("PRAGMA optimize")
+            
+            # メタデータ登録
+            self.conn.execute("""
+                INSERT INTO ldsc_metadata 
+                (dataset_name, version, population, n_chromosomes, n_annotations, total_snps, data_path)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, [dataset_name, "v2.2", "UKB", 22, annotation_count, total_snps, str(self.baseline_path)])
+            
+            self.logger.info(f"✅ LDSC baseline data import completed!")
+            self.logger.info(f"📊 Dataset: {dataset_name}")
+            self.logger.info(f"🧬 Total SNPs: {total_snps:,}")
+            self.logger.info(f"📋 Annotations: {annotation_count}")
+            
+            # データベース最適化
+            self.logger.info("🔧 Final database optimization...")
+            self._optimize_database()
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ LDSC baseline import failed: {e}")
+            return False
+
+    def _clear_ldsc_dataset(self, dataset_name: str):
+        """指定データセットのLDSCデータを削除"""
+        tables = ['ldsc_scores', 'ldsc_annotations', 'ldsc_m_files', 'ldsc_weights', 'ldsc_metadata']
+        
+        for table in tables:
+            self.conn.execute(f"DELETE FROM {table} WHERE dataset_name = ?", [dataset_name])
+        
+        self.logger.info(f"🗑️ Cleared existing data for dataset: {dataset_name}")
+
+    def _import_m_files(self, dataset_name: str, chr_num: int, m_file: Path, m_5_50_file: Path) -> int:
+        """Mファイル（SNP数情報）をインポート"""
+        try:
+            # M (全体) ファイル読み込み
+            with open(m_file, 'r') as f:
+                m_all_data = f.read().strip().split('\n')
+            
+            # M_5_50 ファイル読み込み  
+            with open(m_5_50_file, 'r') as f:
+                m_5_50_data = f.read().strip().split('\n')
+            
+            if len(m_all_data) != len(m_5_50_data):
+                self.logger.warning(f"⚠️ M file length mismatch for chr{chr_num}")
+                return 0
+            
+            # アノテーション名を推定（実際のファイルから取得する場合は別途実装）
+            annotation_count = len(m_all_data)
+            
+            # データ挿入
+            for i, (m_all_val, m_5_50_val) in enumerate(zip(m_all_data, m_5_50_data)):
+                annotation_name = f"annotation_{i+1}"  # 仮のアノテーション名
+                
+                self.conn.execute("""
+                    INSERT INTO ldsc_m_files 
+                    (dataset_name, chromosome, annotation_name, m_5_50, m_all)
+                    VALUES (?, ?, ?, ?, ?)
+                """, [dataset_name, chr_num, annotation_name, float(m_5_50_val), float(m_all_val)])
+            
+            self.logger.info(f"📊 Imported {annotation_count} M values for chr{chr_num}")
+            return annotation_count
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to import M files for chr{chr_num}: {e}")
+            return 0
+
+    def _import_weight_file(self, dataset_name: str, chr_num: int, file_path: Path) -> int:
+        """重みファイルをインポート"""
+        try:
+            # ファイル読み込み
+            df = pd.read_csv(file_path, sep='\t', compression='gzip')
+            
+            # 必要カラム確認
+            if 'SNP' not in df.columns or 'BP' not in df.columns:
+                self.logger.warning(f"⚠️ Missing required columns in weight file {file_path}")
+                return 0
+            
+            # 重みスコアカラムを特定（通常は最後のカラム）
+            weight_col = df.columns[-1]
+            
+            # データフレーム準備
+            import_df = pd.DataFrame({
+                'dataset_name': dataset_name,
+                'chromosome': chr_num,
+                'snp_id': df['SNP'],
+                'bp': df['BP'],
+                'weight_score': df[weight_col]
+            })
+            
+            # DuckDBに挿入
+            self.conn.register('temp_ldsc_weights', import_df)
+            self.conn.execute("""
+                INSERT INTO ldsc_weights 
+                (dataset_name, chromosome, snp_id, bp, weight_score)
+                SELECT dataset_name, chromosome, snp_id, bp, weight_score
+                FROM temp_ldsc_weights
+            """)
+            
+            snp_count = len(df)
+            self.logger.info(f"⚖️ Imported {snp_count:,} weights for chr{chr_num}")
+            return snp_count
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to import weights for chr{chr_num}: {e}")
+            return 0
+
+    def get_ldsc_dataset_info(self, dataset_name: str = "baselineLF_v2.2_UKB") -> Dict:
+        """LDSC データセット情報を取得"""
+        if not self.conn:
+            return {"status": "unavailable"}
+            
+        try:
+            # メタデータ取得
+            metadata = self.conn.execute("""
+                SELECT * FROM ldsc_metadata WHERE dataset_name = ?
+            """, [dataset_name]).fetchone()
+            
+            if not metadata:
+                return {"status": "not_found", "dataset_name": dataset_name}
+            
+            # 各テーブルのSNP数確認
+            scores_count = self.conn.execute("""
+                SELECT COUNT(*) FROM ldsc_scores WHERE dataset_name = ?
+            """, [dataset_name]).fetchone()[0]
+            
+            annotations_count = self.conn.execute("""
+                SELECT COUNT(*) FROM ldsc_annotations WHERE dataset_name = ?
+            """, [dataset_name]).fetchone()[0]
+            
+            weights_count = self.conn.execute("""
+                SELECT COUNT(*) FROM ldsc_weights WHERE dataset_name = ?
+            """, [dataset_name]).fetchone()[0]
+            
+            m_entries_count = self.conn.execute("""
+                SELECT COUNT(*) FROM ldsc_m_files WHERE dataset_name = ?
+            """, [dataset_name]).fetchone()[0]
+            
+            return {
+                "status": "ready",
+                "dataset_name": metadata[0],
+                "version": metadata[1],
+                "population": metadata[2],
+                "n_chromosomes": metadata[3],
+                "n_annotations": metadata[4],
+                "total_snps": metadata[5],
+                "imported_at": metadata[6],
+                "data_path": metadata[7],
+                "scores_count": scores_count,
+                "annotations_count": annotations_count,
+                "weights_count": weights_count,
+                "m_entries_count": m_entries_count,
+                "integration_complete": scores_count > 0 and annotations_count > 0
+            }
+            
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
     def scan_available_traits(self) -> List[str]:
         """利用可能な形質リストを取得"""
         trait_files = list(self.sumstats_path.glob("*.sumstats.gz"))
