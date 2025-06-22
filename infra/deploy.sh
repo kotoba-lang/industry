@@ -33,7 +33,7 @@ flyctl postgres attach "$DB_NAME" -a "$APP_NAME"
 
 # 5. Tigris オブジェクトストレージを設定
 echo "📦 Tigrisオブジェクトストレージを設定中..."
-flyctl tigris create "$STORAGE_NAME" --org "$ORG_SLUG" || echo "ストレージは既に存在します"
+flyctl tigris create --name "$STORAGE_NAME" --org "$ORG_SLUG" || echo "ストレージは既に存在します"
 
 # 6. ボリュームを作成
 echo "💾 データボリュームを作成中..."

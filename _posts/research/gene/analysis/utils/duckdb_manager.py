@@ -629,8 +629,12 @@ class GWASDuckDBManager:
 
     def scan_available_traits(self) -> List[str]:
         """利用可能な形質リストを取得"""
-        # .tsv ファイルをスキャン対象に追加
-        trait_files = list(self.sumstats_path.glob("*.tsv")) + list(self.sumstats_path.glob("*.sumstats.gz"))
+        # .tsv, .sumstats.gz, .vcf.gz ファイルをスキャン対象に追加
+        trait_files = (
+            list(self.sumstats_path.glob("*.tsv")) +
+            list(self.sumstats_path.glob("*.sumstats.gz")) +
+            list(self.sumstats_path.glob("*.vcf.gz"))
+        )
         traits = [f.stem.replace(".sumstats", "").replace(".vcf", "") for f in trait_files]
         
         self.logger.info(f"📊 Found {len(traits)} available traits in {self.sumstats_path}")
@@ -699,13 +703,17 @@ class GWASDuckDBManager:
         # ファイル検索ロジックを柔軟化
         file_path_gz = self.sumstats_path / f"{trait_id}.sumstats.gz"
         file_path_tsv = self.sumstats_path / f"{trait_id}.tsv"
+        file_path_vcf = self.sumstats_path / f"{trait_id}.vcf.gz"
         
         if file_path_gz.exists():
             file_path = file_path_gz
-            compression = 'gzip'
+            file_type = 'sumstats'
         elif file_path_tsv.exists():
             file_path = file_path_tsv
-            compression = None
+            file_type = 'tsv'
+        elif file_path_vcf.exists():
+            file_path = file_path_vcf
+            file_type = 'vcf'
         else:
             self.logger.error(f"❌ File not found for trait {trait_id} in {self.sumstats_path}")
             return False
@@ -715,25 +723,50 @@ class GWASDuckDBManager:
             
             # ファイルサイズ情報
             compressed_size_mb = file_path.stat().st_size / (1024 * 1024)
-            
+
             # データ読み込み
-            df = pd.read_csv(file_path, sep='\\t', compression=compression, engine='python', on_bad_lines='warn')
-            
+            if file_type == 'vcf':
+                with gzip.open(file_path, 'rt') as f:
+                    lines = [l for l in f if not l.startswith('##')]
+                # VCFはタブ区切りだが、ヘッダー行が特殊
+                df = pd.read_csv(
+                    pd.io.common.StringIO(''.join(lines)),
+                    sep='\\t'
+                ).rename(columns={'#CHROM': 'CHR'})
+                # VCFのINFO列からBETAとSEを抽出
+                if 'INFO' in df.columns:
+                    info_df = df['INFO'].str.extract(r'ES=([^;]+);SE=([^;]+)')
+                    info_df.columns = ['beta', 'se']
+                    df['beta'] = pd.to_numeric(info_df['beta'], errors='coerce')
+                    df['se'] = pd.to_numeric(info_df['se'], errors='coerce')
+            else:
+                df = pd.read_csv(file_path, sep='\\t', compression='gzip' if file_type == 'sumstats' else None, engine='python', on_bad_lines='warn')
+
             # カラム名標準化（柔軟なマッピング）
             column_mapping = {
-                # Standard
-                'SNP': 'snp_id', 'A1': 'a1', 'A2': 'a2', 'N': 'n',
-                'CHISQ': 'chisq', 'Z': 'z_score', 'P': 'p_value',
-                'CHR': 'chromosome', 'BP': 'position', 'BETA': 'beta', 'SE': 'se',
+                # Standard & VCF
+                'SNP': 'snp_id', 'ID': 'snp_id', 'A1': 'a1', 'ALT': 'a1', 'A2': 'a2', 'REF': 'a2',
+                'N': 'n', 'CHISQ': 'chisq', 'Z': 'z_score', 'P': 'p_value',
+                'CHR': 'chromosome', 'BP': 'position', 'POS': 'position',
+                'BETA': 'beta', 'SE': 'se',
                 # Variations
                 'variant_id': 'snp_id', 'effect_allele': 'a1', 'other_allele': 'a2',
                 'p_value': 'p_value', 'beta': 'beta', 'standard_error': 'se',
                 'chromosome': 'chromosome', 'base_pair_location': 'position',
-                'ID': 'snp_id', 'P-value': 'p_value', 'Effect': 'beta'
+                'Effect': 'beta'
             }
             
             # マッピングを適用
             df = df.rename(columns=lambda c: column_mapping.get(c, c))
+
+            # 染色体カラムを数値に変換（X, Y, MTなどを処理）
+            if 'chromosome' in df.columns:
+                df['chromosome'] = pd.to_numeric(
+                    df['chromosome'].replace({'X': 23, 'Y': 24, 'MT': 25}),
+                    errors='coerce'  # 変換できない値はNaT（欠損値）にする
+                )
+                df.dropna(subset=['chromosome'], inplace=True) # 欠損値のある行を削除
+                df['chromosome'] = df['chromosome'].astype(int)
 
             # 不足している必須カラムを計算で補完
             if 'z_score' not in df.columns and 'beta' in df.columns and 'se' in df.columns:

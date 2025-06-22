@@ -410,14 +410,26 @@ class PaperAnalysis:
             print(f"🎯 Primary trait: {primary_trait}")
             print(f"🎯 Comparison trait: {comparison_trait}")
             
-            # 図表生成
-            generator = GWASFigureGenerator(
-                dataset_path=str(self.dataset_path),
-                primary_trait=primary_trait,
-                comparison_trait=comparison_trait
-            )
+            # データローダーを再利用して、必要なデータをロード・前処理
+            loader = GWASDataLoader(self.dataset_path)
             
-            results = generator.generate_all_figures(str(self.output_dir))
+            primary_df = loader.load_and_process(self.primary_trait)
+            comparison_df = loader.load_and_process(self.comparison_trait)
+
+            if primary_df is not None and not primary_df.empty and \
+               comparison_df is not None and not comparison_df.empty:
+                
+                fig_generator = GWASFigureGenerator(
+                    primary_df=primary_df,
+                    comparison_df=comparison_df,
+                    primary_trait_name=self.primary_trait,
+                    comparison_trait_name=self.comparison_trait
+                )
+                figure_results = fig_generator.generate_all_figures(self.output_dir)
+                results['figures'] = figure_results is not None
+            else:
+                print("❌ Skipping figure generation due to missing data.")
+                results['figures'] = False
             
             return results
             
@@ -511,11 +523,12 @@ class PaperAnalysis:
             
             # 5. クロス形質解析
             print("\n5️⃣ Cross-trait Analysis")
-            available_traits = self.manager.scan_available_traits()
-            if len(available_traits) >= 2:
-                trait2 = 'PASS_Height1' if 'PASS_Height1' in available_traits else available_traits[1]
-                cross_results = self.perform_cross_trait_analysis(self.primary_trait, trait2)
+            if self.comparison_trait and self.comparison_trait in self.available_traits:
+                cross_results = self.perform_cross_trait_analysis(self.primary_trait, self.comparison_trait)
                 results['cross_trait'] = cross_results is not None
+            else:
+                print(f"⚠️ Comparison trait '{self.comparison_trait}' not available for cross-trait analysis.")
+                results['cross_trait'] = False
             
             # 6. サマリーテーブル
             print("\n6️⃣ Summary Table Generation")
@@ -524,8 +537,26 @@ class PaperAnalysis:
             
             # 7. 図表生成
             print("\n7️⃣ Publication Figures")
-            figure_results = self.generate_publication_figures()
-            results['figures'] = figure_results is not None
+            # データローダーを再利用して、必要なデータをロード・前処理
+            loader = GWASDataLoader(self.dataset_path)
+            
+            primary_df = loader.load_and_process(self.primary_trait)
+            comparison_df = loader.load_and_process(self.comparison_trait)
+
+            if primary_df is not None and not primary_df.empty and \
+               comparison_df is not None and not comparison_df.empty:
+                
+                fig_generator = GWASFigureGenerator(
+                    primary_df=primary_df,
+                    comparison_df=comparison_df,
+                    primary_trait_name=self.primary_trait,
+                    comparison_trait_name=self.comparison_trait
+                )
+                figure_results = fig_generator.generate_all_figures(self.output_dir)
+                results['figures'] = figure_results is not None
+            else:
+                print("❌ Skipping figure generation due to missing data.")
+                results['figures'] = False
             
             # 8. 最終レポート
             print("\n8️⃣ Final Report")

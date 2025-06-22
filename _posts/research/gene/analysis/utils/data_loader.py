@@ -93,11 +93,11 @@ class GWASDataLoader:
             # DuckDBから高速読み込み
             query = f"""
             SELECT snp_id as SNP, a1 as A1, a2 as A2, 
-                   n as N, chisq as CHISQ, z_score as Z,
-                   chromosome as CHR, position as BP
+                   n as N, z_score as Z,
+                   chromosome as CHR, position as BP,
+                   beta as BETA, se as SE, p_value as P
             FROM gwas_associations 
             WHERE trait_id = '{trait_id}'
-            ORDER BY ABS(z_score) DESC
             """
             
             self.df = self.manager.query_gwas_data(query)
@@ -108,17 +108,14 @@ class GWASDataLoader:
                 self._show_available_traits()
                 return False
             
-            # P値を計算 (Z-scoreから)
-            from scipy.stats import norm
-            self.df['P'] = 2 * (1 - norm.cdf(np.abs(self.df['Z'])))
-            
-            # BETAとSEを推定 (必要に応じて)
-            if 'BETA' not in self.df.columns and 'SE' not in self.df.columns:
-                # Z-score から概算BETA/SE を推定
-                # 仮定: SE ≈ 1/sqrt(N) * adjustment_factor
-                se_estimate = 1.0 / np.sqrt(self.df['N'].fillna(self.df['N'].median()))
-                self.df['SE'] = se_estimate
-                self.df['BETA'] = self.df['Z'] * se_estimate
+            # P値、BETA、SEがDBにない場合のフォールバック計算
+            if 'P' not in self.df.columns or self.df['P'].isnull().all():
+                from scipy.stats import norm
+                self.df['P'] = 2 * (1 - norm.cdf(np.abs(self.df['Z'])))
+
+            if 'BETA' not in self.df.columns or self.df['BETA'].isnull().all():
+                if 'SE' in self.df.columns and self.df['SE'].notnull().any():
+                     self.df['BETA'] = self.df['Z'] * self.df['SE']
             
             self.trait_id = trait_id
             print(f"✅ Loaded {len(self.df)} variants for {trait_id}")
