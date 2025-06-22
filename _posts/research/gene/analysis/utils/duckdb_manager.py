@@ -60,7 +60,8 @@ class GWASDuckDBManager:
         
         # 高頻度アクセス形質リスト
         self.high_priority_traits = [
-            'PASS_Intelligence_SavageJansen2018',
+            'EastAsian_EducationalAttainment_GWAS_Chen2024',
+            'Savage2018_Intelligence_GWAS_European_OpenGWAS',
             'PASS_Height1', 'PASS_BMI1', 'PASS_Schizophrenia',
             'PASS_Type_2_Diabetes', 'PASS_Coronary_Artery_Disease',
             'PASS_Neuroticism', 'PASS_HDL', 'PASS_LDL'
@@ -694,59 +695,87 @@ class GWASDuckDBManager:
                 self.logger.info(f"✅ {trait_id} already imported (use force_reimport=True to override)")
                 return True
         
-        # ファイル読み込み
-        file_path = self.sumstats_path / f"{trait_id}.sumstats.gz"
-        if not file_path.exists():
-            self.logger.error(f"❌ File not found: {file_path}")
+        # ファイル検索ロジックを柔軟化
+        file_path_gz = self.sumstats_path / f"{trait_id}.sumstats.gz"
+        file_path_tsv = self.sumstats_path / f"{trait_id}.tsv"
+        
+        if file_path_gz.exists():
+            file_path = file_path_gz
+            compression = 'gzip'
+        elif file_path_tsv.exists():
+            file_path = file_path_tsv
+            compression = None
+        else:
+            self.logger.error(f"❌ File not found for trait {trait_id} in {self.sumstats_path}")
             return False
         
         try:
-            self.logger.info(f"📥 Importing {trait_id}...")
+            self.logger.info(f"📥 Importing {trait_id} from {file_path.name}...")
             
             # ファイルサイズ情報
             compressed_size_mb = file_path.stat().st_size / (1024 * 1024)
             
             # データ読み込み
-            df = pd.read_csv(file_path, sep='\t', compression='gzip')
+            df = pd.read_csv(file_path, sep='\\t', compression=compression, engine='python', on_bad_lines='warn')
             
-            # カラム名標準化
+            # カラム名標準化（柔軟なマッピング）
             column_mapping = {
-                'SNP': 'snp_id',
-                'A1': 'a1', 
-                'A2': 'a2',
-                'N': 'n',
-                'CHISQ': 'chisq',
-                'Z': 'z_score'
+                # Standard
+                'SNP': 'snp_id', 'A1': 'a1', 'A2': 'a2', 'N': 'n',
+                'CHISQ': 'chisq', 'Z': 'z_score', 'P': 'p_value',
+                'CHR': 'chromosome', 'BP': 'position', 'BETA': 'beta', 'SE': 'se',
+                # Variations
+                'variant_id': 'snp_id', 'effect_allele': 'a1', 'other_allele': 'a2',
+                'p_value': 'p_value', 'beta': 'beta', 'standard_error': 'se',
+                'chromosome': 'chromosome', 'base_pair_location': 'position',
+                'ID': 'snp_id', 'P-value': 'p_value', 'Effect': 'beta'
             }
-            df = df.rename(columns=column_mapping)
+            
+            # マッピングを適用
+            df = df.rename(columns=lambda c: column_mapping.get(c, c))
+
+            # 不足している必須カラムを計算で補完
+            if 'z_score' not in df.columns and 'beta' in df.columns and 'se' in df.columns:
+                 # Z-scoreを計算
+                df['beta'] = pd.to_numeric(df['beta'], errors='coerce')
+                df['se'] = pd.to_numeric(df['se'], errors='coerce')
+                df['z_score'] = df['beta'] / df['se']
+                self.logger.info("📈 Calculated z_score from beta and se")
             
             # 必要なカラムを追加
             df['trait_id'] = trait_id
             
+            # DuckDBのスキーマに存在するカラムのみを選択
+            schema_cols = ['trait_id', 'snp_id', 'chromosome', 'position', 'a1', 'a2', 'n', 'chisq', 'z_score', 'p_value', 'beta', 'se']
+            final_cols = [col for col in schema_cols if col in df.columns]
+            
+            if 'snp_id' not in final_cols:
+                self.logger.error(f"❌ Critical column 'snp_id' not found after mapping for {trait_id}")
+                return False
+                
+            insert_df = df[final_cols]
+
             # DuckDBに高速インサート
             if force_reimport:
-                self.conn.execute(
-                    "DELETE FROM gwas_associations WHERE trait_id = ?",
-                    [trait_id]
-                )
-                self.conn.execute(
-                    "DELETE FROM gwas_metadata WHERE trait_id = ?",
-                    [trait_id]
-                )
+                self.conn.execute("DELETE FROM gwas_associations WHERE trait_id = ?", [trait_id])
+                self.conn.execute("DELETE FROM gwas_metadata WHERE trait_id = ?", [trait_id])
             
             # データ挿入
-            self.conn.register('temp_gwas_data', df)
-            self.conn.execute("""
-                INSERT INTO gwas_associations 
-                (trait_id, snp_id, a1, a2, n, chisq, z_score)
-                SELECT trait_id, snp_id, a1, a2, n, chisq, z_score 
+            self.conn.register('temp_gwas_data', insert_df)
+            
+            insert_cols_str = ', '.join(final_cols)
+            select_cols_str = ', '.join([f'"{c}"' for c in final_cols]) # カラム名を引用符で囲む
+            
+            self.conn.execute(f"""
+                INSERT INTO gwas_associations ({insert_cols_str})
+                SELECT {select_cols_str}
                 FROM temp_gwas_data
             """)
             
             # メタデータ更新
             is_high_priority = trait_id in self.high_priority_traits
             self.conn.execute("""
-                INSERT INTO gwas_metadata 
+                INSERT OR REPLACE INTO gwas_metadata 
                 (trait_id, file_path, compressed_size_mb, snp_count, is_high_priority)
                 VALUES (?, ?, ?, ?, ?)
             """, [trait_id, str(file_path), compressed_size_mb, len(df), is_high_priority])
@@ -756,6 +785,8 @@ class GWASDuckDBManager:
             
         except Exception as e:
             self.logger.error(f"❌ Import failed for {trait_id}: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def bulk_import_high_priority_traits(self):
