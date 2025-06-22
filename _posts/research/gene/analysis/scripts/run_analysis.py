@@ -36,34 +36,82 @@ except ImportError as e:
 
 # 図表生成をインポート
 try:
+    # パスを追加してモジュールを見つけられるようにする
+    import sys
+    sys.path.append(os.path.abspath(os.path.dirname(__file__)))
     from generate_figures import GWASFigureGenerator
 except ImportError:
-    print("⚠️ Figure generator not available. Will skip figure generation.")
+    print("⚠️ Warning: GWASFigureGenerator could not be imported. Figure generation will be skipped.")
     GWASFigureGenerator = None
+
+# ../utils/をパスに追加
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'utils')))
+from duckdb_manager import GWASDuckDBManager
+from data_loader import GWASDataLoader
+
+def calculate_lambda_gc(p_values):
+    """ゲノムインフレーション係数 (λGC) を計算"""
+    from scipy.stats import chi2
+    chisq_stats = chi2.ppf(1 - p_values, df=1)
+    return np.median(chisq_stats) / chi2.ppf(0.5, df=1)
 
 class PaperAnalysis:
     """DuckDB-based comprehensive GWAS analysis pipeline"""
     
-    def __init__(self, dataset_path='../../dataset/', primary_trait='PASS_Intelligence_SavageJansen2018'):
+    def __init__(self, dataset_path='../../dataset/'):
         """
         Initialize DuckDB-based analysis pipeline
         
         Args:
             dataset_path: Path to DuckDB dataset
-            primary_trait: Primary trait for analysis
         """
         print("🧬 Initializing DuckDB-based GWAS Analysis Pipeline...")
         
         self.dataset_path = Path(dataset_path)
-        self.primary_trait = primary_trait
         
         # DuckDBマネージャー初期化
         self.manager = GWASDuckDBManager(self.dataset_path)
         
         # データローダー初期化
-        self.loader = GWASDataLoader(self.dataset_path, trait_id=primary_trait)
+        self.loader = GWASDataLoader(self.dataset_path)
         
-        # データベース状態確認
+        # 利用可能な形質を取得
+        self.available_traits = self.manager.scan_available_traits()
+        
+        # プライマリ形質とセカンダリ形質を動的に設定
+        self.primary_trait = None
+        self.comparison_trait = None
+
+        if self.available_traits:
+            # 高優先度リストに存在するものを優先
+            high_priority_available = [t for t in self.manager.high_priority_traits if t in self.available_traits]
+            if high_priority_available:
+                self.primary_trait = high_priority_available[0]
+                if len(high_priority_available) > 1:
+                    self.comparison_trait = high_priority_available[1]
+                elif len(self.available_traits) > 1:
+                    # 比較対象として他の利用可能な形質を探す
+                    other_traits = [t for t in self.available_traits if t != self.primary_trait]
+                    self.comparison_trait = other_traits[0]
+            else:
+                # 高優先度がなければ利用可能なリストから設定
+                self.primary_trait = self.available_traits[0]
+                if len(self.available_traits) > 1:
+                    self.comparison_trait = self.available_traits[1]
+        
+        # 比較形質がなければプライマリ形質と同じにする
+        if self.comparison_trait is None:
+            self.comparison_trait = self.primary_trait
+
+        if self.primary_trait:
+            print(f"🎯 Primary trait set to: {self.primary_trait}")
+        else:
+            print("⚠️ No traits available for analysis.")
+            
+        if self.comparison_trait:
+             print(f"🔄 Comparison trait set to: {self.comparison_trait}")
+
+        # 初期データベース状態確認
         self.check_database_status()
         
         # デフォルト設定
@@ -346,7 +394,7 @@ class PaperAnalysis:
             available_traits = self.manager.scan_available_traits()
             
             primary_trait = self.primary_trait
-            comparison_trait = 'PASS_Height1'
+            comparison_trait = self.comparison_trait
             
             # 利用可能な形質から選択
             if primary_trait not in available_traits:
@@ -552,10 +600,9 @@ def main():
     try:
         # デフォルト設定
         dataset_path = '../../dataset/'
-        primary_trait = 'PASS_Intelligence_SavageJansen2018'
         
-        # 解析パイプライン初期化
-        analysis = PaperAnalysis(dataset_path, primary_trait)
+        # 解析パイプライン初期化（形質は自動検出）
+        analysis = PaperAnalysis(dataset_path)
         
         # 完全解析実行
         results = analysis.run_complete_analysis()

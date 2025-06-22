@@ -45,6 +45,11 @@ flyctl secrets set \
   "GITEA__security__SECRET_KEY=$(openssl rand -hex 32)" \
   "GITEA__security__INTERNAL_TOKEN=$(openssl rand -hex 32)" \
   "GITEA__security__ADMIN_PASSWORD=$(openssl rand -base64 24)" \
+  "GITEA__storage__MINIO_ENDPOINT=$(flyctl storage info --app "$APP_NAME" --json | jq -r .endpoint)" \
+  "GITEA__storage__MINIO_ACCESS_KEY_ID=$(flyctl storage info --app "$APP_NAME" --json | jq -r .access_key_id)" \
+  "GITEA__storage__MINIO_SECRET_ACCESS_KEY=$(flyctl storage info --app "$APP_NAME" --json | jq -r .secret_access_key)" \
+  "GITEA__storage__MINIO_BUCKET=$(flyctl storage info --app "$APP_NAME" --json | jq -r .bucket)" \
+  "GITEA__storage__MINIO_USE_SSL=true" \
   --app "$APP_NAME"
 
 # 8. デプロイ実行
