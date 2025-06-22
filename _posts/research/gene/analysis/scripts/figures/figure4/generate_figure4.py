@@ -50,7 +50,8 @@ class Figure4Generator:
     
     def __init__(self, data_file='../../../../manuscript/data/data.tsv'):
         """Initialize with GWAS data"""
-        self.data_file = data_file
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        self.data_file = os.path.join(script_dir, data_file)
         # self.data_loader = GWASDataLoader(data_file)
         self.df = None
         self.enrichment_data = None
