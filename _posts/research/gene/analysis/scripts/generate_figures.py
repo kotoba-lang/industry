@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 from pathlib import Path
+from scipy.stats import chi2_contingency
 
 # スタイル設定
 plt.style.use('seaborn-v0_8')
@@ -235,6 +236,139 @@ class GWASFigureGenerator:
             print(f"❌ Cross-trait analysis error: {e}")
             return None
 
+    def generate_effect_size_plot(self, output_dir='analysis/scripts/output'):
+        """Generate effect size distribution plot (Figure 3)"""
+        print("📊 Generating effect size distribution plot (Figure 3)...")
+        
+        if self.df_primary is None or len(self.df_primary) == 0:
+            print("❌ No primary data available for effect size plot")
+            return None
+        
+        try:
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+            
+            # Z-score分布
+            z_scores = self.df_primary['Z'].dropna()
+            sns.histplot(z_scores, bins=50, ax=ax1, color=self.colors['primary'], kde=True)
+            ax1.set_xlabel('Z-score')
+            ax1.set_ylabel('Frequency')
+            ax1.set_title(f'Z-score Distribution ({self.primary_trait})')
+            ax1.grid(True, alpha=0.3)
+            
+            # P値分布
+            p_values = self.df_primary['P'].dropna()
+            sns.histplot(p_values, bins=50, ax=ax2, color=self.colors['comparison'])
+            ax2.set_xlabel('P-value')
+            ax2.set_ylabel('Frequency')
+            ax2.set_title(f'P-value Distribution ({self.primary_trait})')
+            ax2.grid(True, alpha=0.3)
+            
+            plt.tight_layout()
+            output_file = Path(output_dir) / 'Figure3_Effect_Sizes.png'
+            plt.savefig(output_file, dpi=300)
+            plt.close(fig)
+            print(f"✅ Effect size plot saved: {output_file}")
+            return output_file
+        except Exception as e:
+            print(f"❌ Effect size plot error: {e}")
+            return None
+
+    def generate_chromosome_enrichment_plot(self, output_dir='analysis/scripts/output'):
+        """Generate chromosome enrichment analysis plot (Figure 4)"""
+        print("🧬 Generating chromosome enrichment plot (Figure 4)...")
+
+        if self.df_primary is None or len(self.df_primary) == 0:
+            print("❌ No primary data available for enrichment plot")
+            return None
+            
+        try:
+            df = self.df_primary.copy()
+            significant_threshold = 1e-5
+            df['is_significant'] = df['P'] < significant_threshold
+
+            # 染色体ごとの観測された有意SNP数
+            observed_counts = df[df['is_significant']].groupby('CHR').size()
+            
+            # 全体のSNP数と有意SNP数
+            total_snps = len(df)
+            total_significant_snps = df['is_significant'].sum()
+            
+            # 染色体ごとの期待される有意SNP数
+            snps_per_chrom = df.groupby('CHR').size()
+            expected_counts = (total_significant_snps / total_snps) * snps_per_chrom
+            
+            enrichment_ratio = (observed_counts / expected_counts).fillna(0)
+            
+            fig, ax = plt.subplots(figsize=(14, 7))
+            enrichment_ratio.plot(kind='bar', ax=ax, color=self.colors['primary'], alpha=0.8)
+            ax.axhline(1, ls='--', color='grey', label='Expected Ratio (1.0)')
+            
+            ax.set_title('Chromosome Enrichment for Significant SNPs (P < 1e-5)')
+            ax.set_xlabel('Chromosome')
+            ax.set_ylabel('Observed / Expected Ratio')
+            ax.legend()
+            plt.tight_layout()
+
+            output_file = Path(output_dir) / 'Figure4_Chromosome_Enrichment.png'
+            plt.savefig(output_file, dpi=300)
+            plt.close(fig)
+            print(f"✅ Chromosome enrichment plot saved: {output_file}")
+            return output_file
+        except Exception as e:
+            print(f"❌ Chromosome enrichment plot error: {e}")
+            return None
+
+    def generate_replication_plot(self, output_dir='analysis/scripts/output'):
+        """Generate replication analysis plot (Figure 5)"""
+        print("🔄 Generating replication plot (Figure 5)...")
+
+        if self.df_primary is None or len(self.df_primary) == 0 or \
+           self.df_comparison is None or len(self.df_comparison) == 0:
+            print("❌ Insufficient data for replication analysis")
+            return None
+
+        try:
+            # 欧州人データで最も有意なSNPを50個選択
+            top_eu_snps = self.df_comparison.nsmallest(50, 'P')
+            
+            # それらのSNPを日本人データとマージ
+            replication_df = pd.merge(top_eu_snps, self.df_primary, on='SNP', suffixes=('_eu', '_jp'))
+
+            if len(replication_df) == 0:
+                print("⚠️ No overlapping top SNPs found for replication plot.")
+                return None
+
+            replication_df = replication_df.sort_values('P_eu')
+            
+            fig, ax = plt.subplots(figsize=(14, 7))
+            
+            # Zスコアを比較する棒グラフ
+            index = np.arange(len(replication_df))
+            bar_width = 0.35
+            
+            ax.bar(index - bar_width/2, replication_df['Z_eu'], bar_width, 
+                   label=f'{self.comparison_trait} Z-score', color=self.colors['comparison'])
+            ax.bar(index + bar_width/2, replication_df['Z_jp'], bar_width, 
+                   label=f'{self.primary_trait} Z-score', color=self.colors['primary'])
+            
+            ax.set_xlabel('Top 50 SNPs from European GWAS')
+            ax.set_ylabel('Z-score')
+            ax.set_title('Replication of Top European Hits in Japanese Population')
+            ax.set_xticks(index)
+            ax.set_xticklabels(replication_df['SNP'], rotation=90, size='small')
+            ax.legend()
+            ax.grid(True, axis='y', alpha=0.3)
+            
+            plt.tight_layout()
+            output_file = Path(output_dir) / 'Figure5_Replication_Analysis.png'
+            plt.savefig(output_file, dpi=300)
+            plt.close(fig)
+            print(f"✅ Replication plot saved: {output_file}")
+            return output_file
+        except Exception as e:
+            print(f"❌ Replication plot error: {e}")
+            return None
+
     def generate_all_figures(self, output_dir='analysis/scripts/output'):
         """Generate all figures for the analysis"""
         print("🎨 Generating all publication figures...")
@@ -248,6 +382,15 @@ class GWASFigureGenerator:
             
             # Figure 2: Cross-trait comparison  
             results['figure2'] = self.generate_cross_population_plot(output_dir)
+            
+            # Figure 3: Effect size distributions
+            results['figure3'] = self.generate_effect_size_plot(output_dir)
+
+            # Figure 4: Chromosome Enrichment
+            results['figure4'] = self.generate_chromosome_enrichment_plot(output_dir)
+            
+            # Figure 5: Replication Analysis
+            results['figure5'] = self.generate_replication_plot(output_dir)
             
             # 他の図生成関数も必要に応じて呼び出す
             
