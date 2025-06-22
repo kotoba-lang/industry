@@ -1,5 +1,5 @@
 # GWAS Analysis Report
-## Generated on: 2025-06-22 17:42:03
+## Generated on: 2025-06-22 17:43:50
 ## Primary Trait: Japanese_HighIQ_GWAS_2024
 
 ## Database Information

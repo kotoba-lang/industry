@@ -104,18 +104,31 @@ class GWASDataLoader:
             
             if len(self.df) == 0:
                 print(f"⚠️ No data found for trait: {trait_id}")
-                print("Available traits:")
                 self._show_available_traits()
                 return False
             
-            # P値、BETA、SEがDBにない場合のフォールバック計算
+            # Ensure Z-score exists, calculating from BETA/SE if necessary
+            if 'Z' not in self.df.columns or self.df['Z'].isnull().all():
+                if 'BETA' in self.df.columns and 'SE' in self.df.columns and \
+                   self.df['BETA'].notnull().any() and self.df['SE'].notnull().any():
+                    # Z = BETA / SE
+                    self.df['BETA'] = pd.to_numeric(self.df['BETA'], errors='coerce')
+                    self.df['SE'] = pd.to_numeric(self.df['SE'], errors='coerce')
+                    
+                    valid_mask = (self.df['SE'] != 0) & self.df['BETA'].notna() & self.df['SE'].notna()
+                    
+                    self.df['Z'] = np.nan
+                    self.df.loc[valid_mask, 'Z'] = self.df.loc[valid_mask, 'BETA'] / self.df.loc[valid_mask, 'SE']
+                    print(f"📈 Calculated Z-scores for {self.df['Z'].notnull().sum()} variants.")
+                else:
+                    print(f"❌ Cannot calculate Z-score for {trait_id} due to missing BETA or SE columns.")
+            
+            # Ensure P-value exists
             if 'P' not in self.df.columns or self.df['P'].isnull().all():
-                from scipy.stats import norm
-                self.df['P'] = 2 * (1 - norm.cdf(np.abs(self.df['Z'])))
-
-            if 'BETA' not in self.df.columns or self.df['BETA'].isnull().all():
-                if 'SE' in self.df.columns and self.df['SE'].notnull().any():
-                     self.df['BETA'] = self.df['Z'] * self.df['SE']
+                if 'Z' in self.df.columns and self.df['Z'].notnull().any():
+                    from scipy.stats import norm
+                    self.df['P'] = 2 * (1 - norm.cdf(np.abs(self.df['Z'])))
+                    print(f"📈 Calculated P-values for {self.df['P'].notnull().sum()} variants.")
             
             self.trait_id = trait_id
             print(f"✅ Loaded {len(self.df)} variants for {trait_id}")
