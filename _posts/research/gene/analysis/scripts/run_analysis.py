@@ -79,16 +79,24 @@ class PaperAnalysis:
         try:
             status = self.manager.get_import_status()
             
-            print(f"  • Total traits available: {status['total_available']}")
-            print(f"  • Imported to database: {status['imported_count']}")
-            print(f"  • Missing traits: {status['missing_count']}")
-            print(f"  • Completion rate: {status['completion_rate']:.1f}%")
+            # Safe access to status dictionary
+            if 'total_available' in status:
+                print(f"  • Total traits available: {status['total_available']}")
+                print(f"  • Imported to database: {status['imported_count']}")
+                print(f"  • Missing traits: {status['missing_count']}")
+                print(f"  • Completion rate: {status['completion_rate']:.1f}%")
+            else:
+                print(f"  • Status: {status.get('status', 'unknown')}")
+                available_traits = self.manager.scan_available_traits()
+                print(f"  • Available traits: {len(available_traits)}")
             
-            if status['imported_count'] == 0:
-                print("❌ No traits imported yet. Database import may still be running.")
+            imported_count = status.get('imported_count', 0)
+            if imported_count == 0:
+                print("⚠️ No GWAS traits imported yet. Using LDSC-only mode.")
+                print("💡 To import GWAS data, run: manager.bulk_import_high_priority_traits()")
                 return False
             
-            if status['recently_imported']:
+            if status.get('recently_imported'):
                 print(f"\n🆕 Recently imported traits:")
                 for trait in status['recently_imported'][:5]:
                     print(f"    • {trait}")
