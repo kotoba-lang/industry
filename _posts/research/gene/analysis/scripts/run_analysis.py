@@ -79,29 +79,29 @@ class PaperAnalysis:
         self.available_traits = self.manager.scan_available_traits()
         
         # プライマリ形質とセカンダリ形質を動的に設定
-        self.primary_trait = None
-        self.comparison_trait = None
+        self.primary_trait = 'Japanese_HighIQ_GWAS_2024'
+        self.comparison_trait = 'Savage2018_Intelligence_GWAS_European_OpenGWAS'
 
-        if self.available_traits:
-            # 高優先度リストに存在するものを優先
-            high_priority_available = [t for t in self.manager.high_priority_traits if t in self.available_traits]
-            if high_priority_available:
-                self.primary_trait = high_priority_available[0]
-                if len(high_priority_available) > 1:
-                    self.comparison_trait = high_priority_available[1]
-                elif len(self.available_traits) > 1:
-                    # 比較対象として他の利用可能な形質を探す
-                    other_traits = [t for t in self.available_traits if t != self.primary_trait]
-                    self.comparison_trait = other_traits[0]
-            else:
-                # 高優先度がなければ利用可能なリストから設定
-                self.primary_trait = self.available_traits[0]
-                if len(self.available_traits) > 1:
-                    self.comparison_trait = self.available_traits[1]
+        # if self.available_traits:
+        #     # 高優先度リストに存在するものを優先
+        #     high_priority_available = [t for t in self.manager.high_priority_traits if t in self.available_traits]
+        #     if high_priority_available:
+        #         self.primary_trait = high_priority_available[0]
+        #         if len(high_priority_available) > 1:
+        #             self.comparison_trait = high_priority_available[1]
+        #         elif len(self.available_traits) > 1:
+        #             # 比較対象として他の利用可能な形質を探す
+        #             other_traits = [t for t in self.available_traits if t != self.primary_trait]
+        #             self.comparison_trait = other_traits[0]
+        #     else:
+        #         # 高優先度がなければ利用可能なリストから設定
+        #         self.primary_trait = self.available_traits[0]
+        #         if len(self.available_traits) > 1:
+        #             self.comparison_trait = self.available_traits[1]
         
-        # 比較形質がなければプライマリ形質と同じにする
-        if self.comparison_trait is None:
-            self.comparison_trait = self.primary_trait
+        # # 比較形質がなければプライマリ形質と同じにする
+        # if self.comparison_trait is None:
+        #     self.comparison_trait = self.primary_trait
 
         if self.primary_trait:
             print(f"🎯 Primary trait set to: {self.primary_trait}")
