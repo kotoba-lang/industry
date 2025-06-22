@@ -22,11 +22,11 @@ except ImportError:
         from duckdb_manager import GWASDuckDBManager
 
 class GWASDataLoader:
-    """DuckDB-based GWAS data loader for high-performance analysis"""
+    """DuckDB-based GWAS data loader for high-performance analysis with LDSC integration"""
     
     def __init__(self, dataset_path='../../dataset/', trait_id=None):
         """
-        Initialize DuckDB-based data loader
+        Initialize DuckDB-based data loader with LDSC integration
         
         Args:
             dataset_path: Path to dataset directory containing DuckDB
@@ -41,6 +41,9 @@ class GWASDataLoader:
         # 利用可能な形質を確認
         self.available_traits = self.manager.scan_available_traits()
         
+        # LDSC統合状況確認
+        self.ldsc_available = self._check_ldsc_integration()
+        
         print(f"🗄️ DuckDB GWAS Data Loader initialized")
         print(f"📊 Database: {self.manager.db_path}")
         
@@ -50,6 +53,22 @@ class GWASDataLoader:
             print(f"🧬 Stored traits: {db_info['traits_stored']}")
             print(f"📈 Total SNPs: {db_info['total_snps']:,}")
         
+        if self.ldsc_available:
+            ldsc_info = self.manager.get_ldsc_dataset_info()
+            print(f"🧬 LDSC Integration: ✅ Ready")
+            print(f"📋 LD Scores: {ldsc_info.get('scores_count', 0):,}")
+            print(f"🏷️ Annotations: {ldsc_info.get('annotations_count', 0):,}")
+        else:
+            print(f"🧬 LDSC Integration: ❌ Not available")
+        
+    def _check_ldsc_integration(self) -> bool:
+        """LDSC統合状況をチェック"""
+        try:
+            ldsc_info = self.manager.get_ldsc_dataset_info()
+            return ldsc_info.get('integration_complete', False)
+        except:
+            return False
+    
     def load_trait_data(self, trait_id: str = None):
         """
         Load GWAS data for specific trait from DuckDB
@@ -426,6 +445,450 @@ class GWASDataLoader:
         except Exception as e:
             print(f"❌ Error listing traits: {e}")
             return []
+
+    def get_ld_scores(self, snp_list: list, dataset_name: str = "baselineLF_v2.2_UKB") -> pd.DataFrame:
+        """
+        指定SNPのLDスコアを取得
+        
+        Args:
+            snp_list: SNP ID のリスト
+            dataset_name: LDSCデータセット名
+            
+        Returns:
+            LDスコア情報のDataFrame
+        """
+        if not self.ldsc_available:
+            print("❌ LDSC integration not available")
+            return pd.DataFrame()
+        
+        try:
+            # SNPリストをクエリ用に変換
+            snp_list_str = "', '".join(snp_list)
+            
+            query = f"""
+            SELECT snp_id, chromosome, bp, annotation_scores
+            FROM ldsc_scores 
+            WHERE dataset_name = '{dataset_name}' 
+              AND snp_id IN ('{snp_list_str}')
+            ORDER BY chromosome, bp
+            """
+            
+            result = self.manager.query_gwas_data(query)
+            
+            if len(result) > 0:
+                print(f"📊 Found LD scores for {len(result)}/{len(snp_list)} SNPs")
+                
+                # JSON形式のアノテーションスコアを展開
+                import json
+                expanded_scores = []
+                for _, row in result.iterrows():
+                    try:
+                        scores = json.loads(row['annotation_scores'])
+                        scores.update({
+                            'snp_id': row['snp_id'],
+                            'chromosome': row['chromosome'],
+                            'bp': row['bp']
+                        })
+                        expanded_scores.append(scores)
+                    except:
+                        continue
+                
+                if expanded_scores:
+                    return pd.DataFrame(expanded_scores)
+            
+            print(f"⚠️ No LD scores found for provided SNPs")
+            return pd.DataFrame()
+            
+        except Exception as e:
+            print(f"❌ Error retrieving LD scores: {e}")
+            return pd.DataFrame()
+
+    def get_functional_annotations(self, snp_list: list, dataset_name: str = "baselineLF_v2.2_UKB") -> pd.DataFrame:
+        """
+        指定SNPの機能的アノテーション情報を取得
+        
+        Args:
+            snp_list: SNP ID のリスト
+            dataset_name: LDSCデータセット名
+            
+        Returns:
+            機能的アノテーション情報のDataFrame
+        """
+        if not self.ldsc_available:
+            print("❌ LDSC integration not available")
+            return pd.DataFrame()
+        
+        try:
+            snp_list_str = "', '".join(snp_list)
+            
+            query = f"""
+            SELECT snp_id, chromosome, bp, annotation_values
+            FROM ldsc_annotations 
+            WHERE dataset_name = '{dataset_name}' 
+              AND snp_id IN ('{snp_list_str}')
+            ORDER BY chromosome, bp
+            """
+            
+            result = self.manager.query_gwas_data(query)
+            
+            if len(result) > 0:
+                print(f"📋 Found annotations for {len(result)}/{len(snp_list)} SNPs")
+                
+                # JSON形式のアノテーション値を展開
+                import json
+                expanded_annotations = []
+                for _, row in result.iterrows():
+                    try:
+                        annotations = json.loads(row['annotation_values'])
+                        annotations.update({
+                            'snp_id': row['snp_id'],
+                            'chromosome': row['chromosome'],
+                            'bp': row['bp']
+                        })
+                        expanded_annotations.append(annotations)
+                    except:
+                        continue
+                
+                if expanded_annotations:
+                    return pd.DataFrame(expanded_annotations)
+            
+            print(f"⚠️ No annotations found for provided SNPs")
+            return pd.DataFrame()
+            
+        except Exception as e:
+            print(f"❌ Error retrieving annotations: {e}")
+            return pd.DataFrame()
+
+    def calculate_polygenic_score(self, effect_sizes: dict, 
+                                 use_ld_weights: bool = True,
+                                 dataset_name: str = "baselineLF_v2.2_UKB") -> dict:
+        """
+        ポリジェニックスコアをLD重みつきで計算
+        
+        Args:
+            effect_sizes: {snp_id: effect_size} の辞書
+            use_ld_weights: LD重みを使用するかどうか
+            dataset_name: LDSCデータセット名
+            
+        Returns:
+            ポリジェニックスコア計算結果
+        """
+        if not self.ldsc_available or not use_ld_weights:
+            # 単純な合計スコア
+            total_score = sum(effect_sizes.values())
+            return {
+                'polygenic_score': total_score,
+                'snp_count': len(effect_sizes),
+                'method': 'simple_sum'
+            }
+        
+        try:
+            snp_list = list(effect_sizes.keys())
+            snp_list_str = "', '".join(snp_list)
+            
+            # LD重みを取得
+            query = f"""
+            SELECT snp_id, weight_score
+            FROM ldsc_weights 
+            WHERE dataset_name = '{dataset_name}' 
+              AND snp_id IN ('{snp_list_str}')
+            """
+            
+            weights = self.manager.query_gwas_data(query)
+            
+            if len(weights) == 0:
+                print("⚠️ No LD weights found, using simple sum")
+                total_score = sum(effect_sizes.values())
+                return {
+                    'polygenic_score': total_score,
+                    'snp_count': len(effect_sizes),
+                    'method': 'simple_sum'
+                }
+            
+            # LD重みつきスコア計算
+            weighted_score = 0.0
+            weighted_count = 0
+            
+            for _, row in weights.iterrows():
+                snp_id = row['snp_id']
+                if snp_id in effect_sizes:
+                    weight = row['weight_score']
+                    effect = effect_sizes[snp_id]
+                    weighted_score += effect * weight
+                    weighted_count += 1
+            
+            print(f"📊 Calculated polygenic score using {weighted_count}/{len(effect_sizes)} LD-weighted SNPs")
+            
+            return {
+                'polygenic_score': weighted_score,
+                'snp_count': len(effect_sizes),
+                'ld_weighted_count': weighted_count,
+                'method': 'ld_weighted'
+            }
+            
+        except Exception as e:
+            print(f"❌ Error calculating polygenic score: {e}")
+            # フォールバック
+            total_score = sum(effect_sizes.values())
+            return {
+                'polygenic_score': total_score,
+                'snp_count': len(effect_sizes),
+                'method': 'simple_sum_fallback'
+            }
+
+    def analyze_top_variants_with_annotations(self, n: int = 20):
+        """
+        トップ変異に機能的アノテーション情報を付加して分析
+        
+        Args:
+            n: 分析するトップ変異数
+            
+        Returns:
+            アノテーション付きトップ変異のDataFrame
+        """
+        if not self.processed:
+            print("❌ Data not preprocessed. Call preprocess_data() first.")
+            return None
+        
+        try:
+            # トップ変異を取得
+            top_variants = self.get_top_variants(n)
+            
+            if len(top_variants) == 0:
+                print("⚠️ No top variants found")
+                return None
+            
+            snp_list = top_variants['SNP'].tolist()
+            
+            # 機能的アノテーションを取得
+            if self.ldsc_available:
+                annotations = self.get_functional_annotations(snp_list)
+                
+                if len(annotations) > 0:
+                    # アノテーション情報をマージ
+                    enhanced_variants = top_variants.merge(
+                        annotations, 
+                        left_on='SNP', 
+                        right_on='snp_id', 
+                        how='left'
+                    )
+                    
+                    # 主要な機能的アノテーション列を選択
+                    functional_cols = [col for col in annotations.columns 
+                                     if any(keyword in col.lower() for keyword in 
+                                           ['coding', 'promoter', 'enhancer', 'conserved', 'regulatory'])]
+                    
+                    if functional_cols:
+                        print(f"📋 Added {len(functional_cols)} functional annotations")
+                        return enhanced_variants
+            
+            print("⚠️ LDSC annotations not available, returning basic top variants")
+            return top_variants
+            
+        except Exception as e:
+            print(f"❌ Error analyzing top variants with annotations: {e}")
+            return top_variants
+
+    def estimate_heritability_ldsc(self, trait_id: str = None, 
+                                  dataset_name: str = "baselineLF_v2.2_UKB") -> dict:
+        """
+        LDSC方法による遺伝率推定（簡易版）
+        
+        Args:
+            trait_id: 形質ID
+            dataset_name: LDSCデータセット名
+            
+        Returns:
+            遺伝率推定結果
+        """
+        if trait_id is None:
+            trait_id = self.trait_id
+            
+        if not self.ldsc_available or trait_id is None:
+            print("❌ LDSC integration or trait data not available")
+            return {}
+        
+        try:
+            print(f"🧬 Estimating heritability for {trait_id} using LDSC approach...")
+            
+            # 形質のZ-scoreを取得
+            query = f"""
+            SELECT g.snp_id, g.z_score, g.n, l.weight_score
+            FROM gwas_associations g
+            JOIN ldsc_weights l ON g.snp_id = l.snp_id
+            WHERE g.trait_id = '{trait_id}' 
+              AND l.dataset_name = '{dataset_name}'
+              AND ABS(g.z_score) < 30  -- 極端な値を除外
+            """
+            
+            data = self.manager.query_gwas_data(query)
+            
+            if len(data) < 1000:
+                print(f"⚠️ Insufficient overlapping SNPs for reliable heritability estimation: {len(data)}")
+                return {}
+            
+            # 簡易LDSC回帰 (Chi-square vs LD Score)
+            z_squared = data['z_score'] ** 2
+            weights = data['weight_score']
+            sample_size = data['n'].median()
+            
+            # 重み付き線形回帰
+            from sklearn.linear_model import LinearRegression
+            import numpy as np
+            
+            # 重みを正規化
+            normalized_weights = weights / weights.mean()
+            
+            # 回帰: z^2 = intercept + slope * LD_score
+            X = normalized_weights.values.reshape(-1, 1)
+            y = z_squared.values
+            
+            reg = LinearRegression().fit(X, y)
+            intercept = reg.intercept_
+            slope = reg.coef_[0]
+            
+            # 遺伝率推定 (簡易版)
+            # h2 = slope * M / N (Mは有効SNP数、Nはサンプルサイズ)
+            M_eff = len(data)  # 簡易的に利用可能SNP数
+            h2_estimate = slope * M_eff / sample_size if sample_size > 0 else 0
+            
+            # λGC (genomic inflation factor)
+            lambda_gc = np.median(z_squared) / 0.4549
+            
+            print(f"📊 Heritability estimation completed:")
+            print(f"   SNPs used: {len(data):,}")
+            print(f"   h² estimate: {h2_estimate:.4f}")
+            print(f"   λGC: {lambda_gc:.3f}")
+            
+            return {
+                'trait_id': trait_id,
+                'h2_estimate': h2_estimate,
+                'lambda_gc': lambda_gc,
+                'intercept': intercept,
+                'slope': slope,
+                'snp_count': len(data),
+                'sample_size': sample_size,
+                'method': 'simple_ldsc'
+            }
+            
+        except Exception as e:
+            print(f"❌ Error estimating heritability: {e}")
+            return {}
+
+    def cross_trait_ldsc_analysis(self, trait1: str, trait2: str,
+                                 dataset_name: str = "baselineLF_v2.2_UKB") -> dict:
+        """
+        LD Score回帰による形質間相関分析
+        
+        Args:
+            trait1, trait2: 比較する形質ID
+            dataset_name: LDSCデータセット名
+            
+        Returns:
+            形質間相関分析結果
+        """
+        if not self.ldsc_available:
+            print("❌ LDSC integration not available")
+            return {}
+        
+        try:
+            print(f"🔬 LDSC cross-trait analysis: {trait1} vs {trait2}")
+            
+            # 両形質の共通SNPを取得
+            query = f"""
+            SELECT g1.snp_id, g1.z_score as z1, g2.z_score as z2,
+                   g1.n as n1, g2.n as n2, l.weight_score
+            FROM gwas_associations g1
+            JOIN gwas_associations g2 ON g1.snp_id = g2.snp_id
+            JOIN ldsc_weights l ON g1.snp_id = l.snp_id
+            WHERE g1.trait_id = '{trait1}' 
+              AND g2.trait_id = '{trait2}'
+              AND l.dataset_name = '{dataset_name}'
+              AND ABS(g1.z_score) < 30 AND ABS(g2.z_score) < 30
+            """
+            
+            data = self.manager.query_gwas_data(query)
+            
+            if len(data) < 1000:
+                print(f"⚠️ Insufficient overlapping SNPs: {len(data)}")
+                return {}
+            
+            # 遺伝相関の簡易推定
+            z1z2_product = data['z1'] * data['z2']
+            weights = data['weight_score']
+            
+            # LD Score回帰アプローチ
+            from sklearn.linear_model import LinearRegression
+            import numpy as np
+            
+            normalized_weights = weights / weights.mean()
+            X = normalized_weights.values.reshape(-1, 1)
+            y = z1z2_product.values
+            
+            reg = LinearRegression().fit(X, y)
+            intercept = reg.intercept_
+            slope = reg.coef_[0]
+            
+            # 遺伝相関推定 (簡易版)
+            sqrt_n1n2 = np.sqrt(data['n1'].median() * data['n2'].median())
+            M_eff = len(data)
+            rg_estimate = slope * M_eff / sqrt_n1n2 if sqrt_n1n2 > 0 else 0
+            
+            # 相関係数
+            z_correlation = np.corrcoef(data['z1'], data['z2'])[0, 1]
+            
+            print(f"📊 Cross-trait analysis completed:")
+            print(f"   Shared SNPs: {len(data):,}")
+            print(f"   Genetic correlation: {rg_estimate:.4f}")
+            print(f"   Z-score correlation: {z_correlation:.4f}")
+            
+            return {
+                'trait1': trait1,
+                'trait2': trait2,
+                'genetic_correlation': rg_estimate,
+                'z_correlation': z_correlation,
+                'intercept': intercept,
+                'slope': slope,
+                'shared_snps': len(data),
+                'method': 'simple_ldsc_cross_trait'
+            }
+            
+        except Exception as e:
+            print(f"❌ Error in cross-trait LDSC analysis: {e}")
+            return {}
+
+    def get_ldsc_summary(self) -> dict:
+        """LDSC統合状況のサマリーを取得"""
+        if not self.ldsc_available:
+            return {'status': 'not_available', 'message': 'LDSC integration not found'}
+        
+        try:
+            ldsc_info = self.manager.get_ldsc_dataset_info()
+            
+            # アノテーション種類の分析
+            query = """
+            SELECT COUNT(DISTINCT chromosome) as chromosomes,
+                   COUNT(*) as total_entries
+            FROM ldsc_scores 
+            WHERE dataset_name = 'baselineLF_v2.2_UKB'
+            """
+            
+            stats = self.manager.query_gwas_data(query)
+            
+            return {
+                'status': 'available',
+                'dataset_name': ldsc_info.get('dataset_name'),
+                'version': ldsc_info.get('version'),
+                'total_snps': ldsc_info.get('total_snps'),
+                'ld_scores_count': ldsc_info.get('scores_count'),
+                'annotations_count': ldsc_info.get('annotations_count'),
+                'weights_count': ldsc_info.get('weights_count'),
+                'chromosomes_covered': stats.iloc[0]['chromosomes'] if len(stats) > 0 else 0,
+                'integration_complete': ldsc_info.get('integration_complete', False)
+            }
+            
+        except Exception as e:
+            return {'status': 'error', 'error': str(e)}
 
 # Legacy compatibility functions
 def load_gwas_data(data_file=None, trait_id=None):
