@@ -23,6 +23,7 @@ warnings.filterwarnings('ignore', category=pd.errors.ParserWarning)
 
 # Ensure the figure generation script is importable
 from generate_figures import GWASFigureGenerator
+from generate_advanced_figures import AdvancedFigureGenerator
 
 print("Libraries imported successfully.")
 
@@ -178,7 +179,22 @@ for fig_name, fig_path in results.items():
         display(Image(filename=fig_path))
 
 # %% [markdown]
-# ## 4. Summary Table Generation
+# ## 4. Advanced Analysis and Figure Generation
+# 
+# This section runs the advanced analyses, such as pathway and polygenic score analysis, and generates the corresponding figures.
+
+# %%
+print("\\n🔬 Running Advanced Analyses...")
+adv_fig_generator = AdvancedFigureGenerator(
+    gwas_summary_path=unified_file_path,
+    output_dir=output_dir
+)
+adv_fig_generator.run_pathway_analysis()
+adv_fig_generator.run_pgs_analysis()
+print("✅ Advanced analyses complete.")
+
+# %% [markdown]
+# ## 5. Summary Table Generation
 
 # %%
 print("📋 Generating Top Variants Summary Table...")
@@ -190,6 +206,6 @@ print("Displaying top 10 variants:")
 display(top_variants.head(10))
 
 # %% [markdown]
-# ## 5. Conclusion
+# ## 6. Conclusion
 # 
 # The analysis is complete. All data processing, analysis, and figure generation steps have been consolidated into this single notebook-style script, running from a unified, reliable Parquet file. This ensures maximum reproducibility and transparency. 
