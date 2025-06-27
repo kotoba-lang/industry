@@ -18,6 +18,8 @@ Ongstrom -
 Echo - 反響
 Resonanse - 共鳴
 Prehender - 
+Fluent
+Stream
 Vibes - 
 God - 
 YHWH - I am, that I am. 
