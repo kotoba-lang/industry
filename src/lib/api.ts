@@ -6,7 +6,8 @@ import { join } from "path";
 const postsDirectory = join(process.cwd(), "_posts");
 
 export function getPostSlugs() {
-  return fs.readdirSync(postsDirectory);
+  const allFiles = fs.readdirSync(postsDirectory);
+  return allFiles.filter((file) => file.endsWith(".md"));
 }
 
 export function getPostBySlug(slug: string) {
@@ -21,7 +22,10 @@ export function getPostBySlug(slug: string) {
 export function getAllPosts(): Post[] {
   const slugs = getPostSlugs();
   const posts = slugs
-    .map((slug) => getPostBySlug(slug))
+    .map((slug) => {
+      console.log(`Processing slug: ${slug}`);
+      return getPostBySlug(slug);
+    })
     // sort posts by date in descending order
     .sort((post1, post2) => (post1.date > post2.date ? -1 : 1));
   return posts;
