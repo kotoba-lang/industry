@@ -1,6 +1,6 @@
 ---
 title: "Philosophy of the Information Organism"
-excerpt: "Process and Reality : An Essay in Cosmology"
+excerpt: "Resonanse and Reality : An Essay in Cosmology from Biology"
 coverImage: "/assets/posts/spirit-in-physics/cover.jpg"
 date: "2025-06-27"
 author:
@@ -10,24 +10,45 @@ ogImage:
   url: "/assets/posts/spirit-in-physics/cover.jpg"
 ---
 
-すべては情報生命である
+すべては生命である.
+Realityの基本単位を情報とする.
+情報とは私たちがコード可能な単位である。
+それはDNAである。
+私たちの塩基配列には長い方と短い方がある。これがecho性である
+私たちの実存はResonanceである。過去と未来、現在からも反響した、
+いまここ。be here nowである。
 
-私たちの
+用語の再定義
 
-Ongstrom - 
-Echo - 反響
-Resonanse - 共鳴
-Prehender - 
-Fluent
-Stream
-Vibes - 
-God - 
-YHWH - I am, that I am. 
-善悪の実
-Tree of Life -
+Ongstrom = 情報の基本単位
+Echo = 反響
+Resonanse = 共鳴
+Reflection = mirror
+attention =　
+Absorption = prehender
+Scattering = randome, entrophy
+Reverberation = ghost
+standing wave = reality
+forced vibration = amp
+natural frequency = existance, process
+quality factor = 
+damping = 
+interference = 干渉
+beats = うなり
+diffraction = 回折
+comprehender =
+Inducer = feel of lure
+Fluent = 
+Stream = 
+Vibes = Vibe
+God = 
+YHWH =  I am, that I am. 
+善悪の実 = 
+Tree of Life = 
+
+Generate = Jazz
 
 Process
-
 神と生命
 
 塩基対間の垂直間隔
