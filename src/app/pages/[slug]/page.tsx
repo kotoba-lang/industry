@@ -19,6 +19,7 @@ import KawasakiModel from "@/components/kawasaki-model";
 import JungWordTest from "@/components/jung-word-assessment/JungWordTest";
 import { JungVoiceAssessment } from "@/components/jung-voice-assessment";
 import JungIntegratedAssessment from "@/components/jung-integrated";
+import { JungEmbeddingVisualization } from "@/components/jung-visualization";
 import { useKawasakiStore } from "@/store/kawasakiStore";
 
 export default function Page() {
@@ -31,6 +32,21 @@ export default function Page() {
   // Get voice assessment data from store
   const voiceAssessments = useKawasakiStore((state) => state.voiceAssessments);
   const [hasVoiceData, setHasVoiceData] = useState(false);
+  const [showEmbeddingVisualization, setShowEmbeddingVisualization] = useState(false);
+
+  // Convert store data to Jung test data format
+  const jungTestData = voiceAssessments.map(assessment => ({
+    responses: assessment.results.responses.map(response => ({
+      stimulus: response.stimulusWord,
+      response: response.responseWord,
+      reactionTime: response.reactionTimeMs,
+      isDelayed: response.reactionTimeMs > 2000
+    })),
+    averageReactionTime: assessment.results.averageReactionTimeMs,
+    delayedResponseCount: assessment.results.responses.filter(r => r.reactionTimeMs > 2000).length,
+    testType: 'voice' as const,
+    timestamp: parseInt(assessment.timestamp)
+  }));
 
   useEffect(() => {
     // Check if there's voice assessment data available
@@ -169,9 +185,33 @@ export default function Page() {
                     <p className="text-green-600 text-sm mt-1">
                       The model visualization above has been updated with your voice assessment data
                     </p>
+                    <button
+                      onClick={() => setShowEmbeddingVisualization(!showEmbeddingVisualization)}
+                      className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                    >
+                      {showEmbeddingVisualization ? 'Hide' : 'Show'} Jung Embedding Analysis
+                    </button>
                   </div>
                 )}
               </main>
+
+              {/* Jung Embedding Visualization */}
+              {hasVoiceData && showEmbeddingVisualization && (
+                <div className="mt-8">
+                  <h2>RAG-style Jung Embedding Analysis</h2>
+                  <p className="text-gray-600 mb-4">
+                    Advanced visualization of word association embeddings using retrieval-augmented analysis techniques.
+                    This visualization shows semantic relationships, clustering patterns, and evaluation metrics
+                    inspired by RAG system evaluation methodologies.
+                  </p>
+                  <JungEmbeddingVisualization 
+                    testData={jungTestData}
+                    width={800}
+                    height={600}
+                    className="w-full"
+                  />
+                </div>
+              )}
 
               <h2>Measurement via Emotion Analytics (Quantitative Analysis)</h2>
               <div className={styles.mathBlock}>
