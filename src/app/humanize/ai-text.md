@@ -43,3 +43,4 @@ ScaleSによる組織透明化・3Dイメージング、神経回路マッピン
 13. Murakami TC and Heintz N, bioRxive, https://doi.org/10.1101/2022.11.23.517711
 14. Yang J, et al. Nat Method 2025;22(4):724–736.
 
+この文書はAI生成ではありません！絶対に！
