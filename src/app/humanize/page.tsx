@@ -1,0 +1,372 @@
+'use client'
+
+import { useState } from 'react'
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { AlertCircle, Zap, Shield, Target, FileText, Brain } from 'lucide-react'
+import { Alert, AlertDescription } from "@/components/ui/alert"
+
+interface AttackMethod {
+  id: string
+  name: string
+  description: string
+  paper: string
+  effectiveness: string
+  icon: React.ReactNode
+  color: string
+}
+
+interface HumanizationResult {
+  original_text: string
+  processed_text: string
+  applied_methods: string[]
+  analysis: {
+    character_change: number
+    character_change_ratio: number
+    estimated_detection_evasion: number
+    processing_time: number
+  }
+  method_details: Record<string, any>
+}
+
+const attackMethods: AttackMethod[] = [
+  {
+    id: 'adversarial_paraphrasing',
+    name: 'Adversarial Paraphrasing',
+    description: '文構造を変更してAI検出器を回避する敵対的言い換え手法',
+    paper: 'Adversarial Paraphrasing (2025) - T@1%F 87.88%削減',
+    effectiveness: '87.88%',
+    icon: <FileText className="h-4 w-4" />,
+    color: 'bg-blue-500'
+  },
+  {
+    id: 'grad_escape',
+    name: 'GradEscape',
+    description: '検出器の勾配を利用した微小摂動による回避手法',
+    paper: 'GradEscape (2025, USENIX Security)',
+    effectiveness: '勾配ベース',
+    icon: <Zap className="h-4 w-4" />,
+    color: 'bg-purple-500'
+  },
+  {
+    id: 'silver_speak',
+    name: 'SilverSpeak',
+    description: '視覚的に類似した文字での置換による回避手法',
+    paper: 'SilverSpeak (2024)',
+    effectiveness: 'ホモグリフ攻撃',
+    icon: <Shield className="h-4 w-4" />,
+    color: 'bg-green-500'
+  },
+  {
+    id: 'syntactic_perturbation',
+    name: 'Syntactic Perturbation',
+    description: '12種類の統語摂動技術によるAI検出回避',
+    paper: 'Navigating the Shadows (2024, ACL)',
+    effectiveness: '12種類摂動',
+    icon: <Target className="h-4 w-4" />,
+    color: 'bg-orange-500'
+  },
+  {
+    id: 'linguistic_complexity',
+    name: 'Linguistic Complexity',
+    description: '接続詞・ヘッジ・強調表現の追加による情報過多攻撃',
+    paper: 'Information Overload',
+    effectiveness: '言語複雑性',
+    icon: <Brain className="h-4 w-4" />,
+    color: 'bg-red-500'
+  }
+]
+
+export default function HumanizePage() {
+  const [selectedMethods, setSelectedMethods] = useState<string[]>([])
+  const [inputText, setInputText] = useState('')
+  const [result, setResult] = useState<HumanizationResult | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [intensity, setIntensity] = useState(0.3)
+
+  const handleMethodToggle = (methodId: string) => {
+    setSelectedMethods(prev => 
+      prev.includes(methodId) 
+        ? prev.filter(id => id !== methodId)
+        : [...prev, methodId]
+    )
+  }
+
+  const handleProcessText = async () => {
+    if (!inputText.trim() || selectedMethods.length === 0) {
+      alert('テキストと少なくとも1つの攻撃手法を選択してください')
+      return
+    }
+
+    setIsProcessing(true)
+    try {
+      const response = await fetch('/api/humanize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: inputText,
+          methods: selectedMethods,
+          intensity: intensity
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('処理に失敗しました')
+      }
+
+      const data = await response.json()
+      setResult(data)
+    } catch (error) {
+      console.error('Error:', error)
+      alert('処理中にエラーが発生しました')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const loadSampleText = () => {
+    setInputText(`８．臓器インタラクトミクスの可視化
+Visualization of organ interactomics
+田井中一貴（新潟大学脳研究所システム脳病態学分野）
+
+生体内の臓器は互いに神経系・免疫系・脈管系を介して情報伝達し、生体システムの恒常性維持やレジリエンス基盤を構築している。このような臓器インタラクトミクスの全体像を描出するため、組織透明化・3Dイメージングをはじめとして、ウイルスによる神経回路マッピング、網羅的な一細胞遺伝子発現解析、光操作技術、生体内カルシウムイメージングといった先端技術が用いられている。`)
+  }
+
+  return (
+    <div className="container mx-auto p-6 max-w-7xl">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">AI検出回避システム</h1>
+        <p className="text-muted-foreground">
+          最新研究論文に基づく5つの攻撃手法を組み合わせてAI検出を回避します
+        </p>
+      </div>
+
+      <Alert className="mb-6">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          <strong>注意:</strong> この機能は学術研究・教育目的での使用を前提としています。悪用は厳禁です。
+        </AlertDescription>
+      </Alert>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* 設定パネル */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>攻撃手法の選択</CardTitle>
+              <CardDescription>
+                適用したい攻撃手法を選択してください
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {attackMethods.map((method) => (
+                <div key={method.id} className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-muted/50">
+                  <Checkbox
+                    id={method.id}
+                    checked={selectedMethods.includes(method.id)}
+                    onCheckedChange={() => handleMethodToggle(method.id)}
+                  />
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <div className={`p-1 rounded ${method.color} text-white`}>
+                        {method.icon}
+                      </div>
+                      <label htmlFor={method.id} className="font-medium cursor-pointer">
+                        {method.name}
+                      </label>
+                      <Badge variant="outline" className="text-xs">
+                        {method.effectiveness}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {method.description}
+                    </p>
+                    <p className="text-xs text-muted-foreground font-mono">
+                      {method.paper}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>強度設定</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  攻撃強度: {intensity}
+                </label>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="1.0"
+                  step="0.1"
+                  value={intensity}
+                  onChange={(e) => setIntensity(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>控えめ (0.1)</span>
+                  <span>最大 (1.0)</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* テキスト入力・処理 */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>テキスト入力</CardTitle>
+              <CardDescription>
+                処理したいテキストを入力してください
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-2 mb-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={loadSampleText}
+                >
+                  サンプルテキスト読み込み
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setInputText('')}
+                >
+                  クリア
+                </Button>
+              </div>
+              <Textarea
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                placeholder="ここにテキストを入力してください..."
+                className="min-h-[300px] resize-none"
+              />
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">
+                  文字数: {inputText.length}
+                </span>
+                <Button 
+                  onClick={handleProcessText}
+                  disabled={isProcessing || !inputText.trim() || selectedMethods.length === 0}
+                  className="min-w-[120px]"
+                >
+                  {isProcessing ? '処理中...' : '人間化実行'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* 結果表示 */}
+      {result && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>処理結果</CardTitle>
+            <CardDescription>
+              適用された攻撃手法: {result.applied_methods.join(', ')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="result" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="result">処理結果</TabsTrigger>
+                <TabsTrigger value="analysis">分析</TabsTrigger>
+                <TabsTrigger value="comparison">比較</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="result" className="space-y-4">
+                <div>
+                  <h4 className="font-medium mb-2">処理済みテキスト</h4>
+                  <Textarea
+                    value={result.processed_text}
+                    readOnly
+                    className="min-h-[300px] font-mono text-sm"
+                  />
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="analysis" className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <h4 className="font-medium">処理統計</h4>
+                    <div className="space-y-1 text-sm">
+                      <div>文字変更: {result.analysis.character_change}</div>
+                      <div>変更率: {(result.analysis.character_change_ratio * 100).toFixed(2)}%</div>
+                      <div>処理時間: {result.analysis.processing_time.toFixed(2)}秒</div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="font-medium">効果予測</h4>
+                    <div className="space-y-1 text-sm">
+                      <div>
+                        検出回避率: {(result.analysis.estimated_detection_evasion * 100).toFixed(1)}%
+                      </div>
+                      <Badge 
+                        variant={result.analysis.estimated_detection_evasion > 0.8 ? "default" : "secondary"}
+                        className="mt-1"
+                      >
+                        {result.analysis.estimated_detection_evasion > 0.8 ? "高効果" : "中効果"}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                {Object.keys(result.method_details).length > 0 && (
+                  <div>
+                    <h4 className="font-medium mb-2">手法別詳細</h4>
+                    <div className="space-y-2">
+                      {Object.entries(result.method_details).map(([method, details]) => (
+                        <div key={method} className="p-3 border rounded-lg">
+                          <h5 className="font-medium text-sm">{method}</h5>
+                          <pre className="text-xs text-muted-foreground mt-1 overflow-x-auto">
+                            {JSON.stringify(details, null, 2)}
+                          </pre>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="comparison" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="font-medium mb-2">元テキスト</h4>
+                    <Textarea
+                      value={result.original_text}
+                      readOnly
+                      className="min-h-[300px] text-sm"
+                    />
+                  </div>
+                  <div>
+                    <h4 className="font-medium mb-2">処理済みテキスト</h4>
+                    <Textarea
+                      value={result.processed_text}
+                      readOnly
+                      className="min-h-[300px] text-sm"
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+} 
