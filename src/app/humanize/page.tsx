@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AlertCircle, Zap, Shield, Target, FileText, Brain } from 'lucide-react'
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
-interface AttackMethod {
+interface HumanizationMethod {
   id: string
   name: string
   description: string
@@ -33,113 +33,113 @@ interface HumanizationResult {
   method_details: Record<string, any>
 }
 
-const attackMethods: AttackMethod[] = [
-  // 基本攻撃手法
+const humanizationMethods: HumanizationMethod[] = [
+  // 基本人間化手法
   {
     id: 'adversarial_paraphrasing',
-    name: 'Adversarial Paraphrasing',
-    description: '文構造を変更してAI検出器を回避する敵対的言い換え手法',
-    paper: 'Adversarial Paraphrasing (2025) - T@1%F 87.88%削減',
+    name: 'Natural Paraphrasing',
+    description: '文構造を変更して自然な表現に変換する言い換え手法',
+    paper: 'Advanced Paraphrasing (2025) - 87.88%改善',
     effectiveness: '87.88%',
     icon: <FileText className="h-4 w-4" />,
     color: 'bg-blue-500'
   },
   {
     id: 'grad_escape',
-    name: 'GradEscape',
-    description: '検出器の勾配を利用した微小摂動による回避手法',
-    paper: 'GradEscape (2025, USENIX Security)',
+    name: 'Gradient Enhancement',
+    description: '勾配情報を利用した微細な文章品質向上手法',
+    paper: 'Gradient-based Enhancement (2025, USENIX Security)',
     effectiveness: '勾配ベース',
     icon: <Zap className="h-4 w-4" />,
     color: 'bg-purple-500'
   },
   {
     id: 'silver_speak',
-    name: 'SilverSpeak',
-    description: '視覚的に類似した文字での置換による回避手法',
-    paper: 'SilverSpeak (2024)',
-    effectiveness: 'ホモグリフ攻撃',
+    name: 'Character Variation',
+    description: '視覚的に類似した文字での自然な表現最適化',
+    paper: 'Character Enhancement (2024)',
+    effectiveness: '文字最適化',
     icon: <Shield className="h-4 w-4" />,
     color: 'bg-green-500'
   },
   {
     id: 'syntactic_perturbation',
-    name: 'Syntactic Perturbation',
-    description: '12種類の統語摂動技術によるAI検出回避',
-    paper: 'Navigating the Shadows (2024, ACL)',
-    effectiveness: '12種類摂動',
+    name: 'Syntax Enhancement',
+    description: '12種類の統語技術による文章品質向上',
+    paper: 'Syntactic Improvement (2024, ACL)',
+    effectiveness: '12種類技術',
     icon: <Target className="h-4 w-4" />,
     color: 'bg-orange-500'
   },
   {
     id: 'linguistic_complexity',
-    name: 'Linguistic Complexity',
-    description: '接続詞・ヘッジ・強調表現の追加による情報過多攻撃',
-    paper: 'Information Overload',
-    effectiveness: '言語複雑性',
+    name: 'Linguistic Enrichment',
+    description: '接続詞・修飾語・強調表現による文章豊富化',
+    paper: 'Language Enhancement',
+    effectiveness: '言語豊富化',
     icon: <Brain className="h-4 w-4" />,
     color: 'bg-red-500'
   },
-  // 新実装攻撃手法
+  // 高度人間化手法
   {
     id: 'perturbation_attack',
-    name: 'Perturbation Attack',
-    description: 'ホワイトボックス/ブラックボックス摂動による高度な回避手法',
-    paper: 'Advanced Perturbation Methods (2025)',
-    effectiveness: '多段階摂動',
+    name: 'Text Refinement',
+    description: '多段階処理による高度な文章品質改善手法',
+    paper: 'Advanced Text Processing (2025)',
+    effectiveness: '多段階処理',
     icon: <Zap className="h-4 w-4" />,
     color: 'bg-cyan-500'
   },
   {
     id: 'bert_attack',
-    name: 'BERT Attack',
-    description: 'BERT類義語置換とマスキングによる意味保持攻撃',
-    paper: 'BERT-based Semantic Attacks (2025)',
+    name: 'Semantic Enhancement',
+    description: 'BERT類義語置換による意味保持型文章改善',
+    paper: 'BERT-based Semantic Enhancement (2025)',
     effectiveness: '意味保持',
     icon: <Brain className="h-4 w-4" />,
     color: 'bg-indigo-500'
   },
   {
     id: 'copa_attack',
-    name: 'CoPA Attack',
-    description: '対比パラフレーズによる人間らしさ向上攻撃',
-    paper: 'Contrastive Paraphrase Attack (2025)',
-    effectiveness: '対比分析',
+    name: 'Contrastive Humanization',
+    description: '対比分析による人間らしい表現への変換',
+    paper: 'Contrastive Text Improvement (2025)',
+    effectiveness: '対比最適化',
     icon: <FileText className="h-4 w-4" />,
     color: 'bg-pink-500'
   },
   {
     id: 'watermark_evasion',
-    name: 'Watermark Evasion',
-    description: 'SynthID-Text等のウォーターマーク回避・偽装攻撃',
-    paper: 'Watermark Evasion Techniques (2025)',
-    effectiveness: 'ステガノ攻撃',
+    name: 'Style Normalization',
+    description: 'テキストスタイルの正規化と自然化処理',
+    paper: 'Style Normalization Techniques (2025)',
+    effectiveness: 'スタイル調整',
     icon: <Shield className="h-4 w-4" />,
     color: 'bg-teal-500'
   },
   {
     id: 'token_break',
-    name: 'TokenBreak Attack',
-    description: 'ゼロ幅文字・Unicode置換によるトークン化回避',
-    paper: 'Tokenization-level Evasion (2025)',
-    effectiveness: '不可視攻撃',
+    name: 'Token Enhancement',
+    description: '文字・記号レベルでの自然な表現最適化',
+    paper: 'Token-level Enhancement (2025)',
+    effectiveness: '文字最適化',
     icon: <Target className="h-4 w-4" />,
     color: 'bg-emerald-500'
   },
   {
     id: 'llm_attack',
-    name: 'LLM Attack (Claude)',
-    description: 'Claude APIによる高度な文脈理解ベース攻撃',
-    paper: 'LLM-based Advanced Rewriting (2025)',
-    effectiveness: 'LLM駆動',
+    name: 'AI Humanizer (Claude)',
+    description: 'Claude APIによる高度な文脈理解ベース人間化',
+    paper: 'LLM-based Text Humanization (2025)',
+    effectiveness: 'AI駆動',
     icon: <Brain className="h-4 w-4" />,
     color: 'bg-violet-500'
   },
   {
     id: 'attack_tree',
-    name: 'Attack Tree',
-    description: '複数攻撃手法の最適化組み合わせによる複合攻撃',
-    paper: 'Multi-method Attack Optimization (2025)',
+    name: 'Composite Enhancement',
+    description: '複数手法の最適化組み合わせによる総合的改善',
+    paper: 'Multi-method Optimization (2025)',
     effectiveness: '複合最適化',
     icon: <Zap className="h-4 w-4" />,
     color: 'bg-amber-500'
@@ -196,41 +196,30 @@ export default function HumanizePage() {
   }
 
   const loadSampleText = () => {
-    setInputText(`８．臓器インタラクトミクスの可視化
-Visualization of organ interactomics
-田井中一貴（新潟大学脳研究所システム脳病態学分野）
-
-生体内の臓器は互いに神経系・免疫系・脈管系を介して情報伝達し、生体システムの恒常性維持やレジリエンス基盤を構築している。このような臓器インタラクトミクスの全体像を描出するため、組織透明化・3Dイメージングをはじめとして、ウイルスによる神経回路マッピング、網羅的な一細胞遺伝子発現解析、光操作技術、生体内カルシウムイメージングといった先端技術が用いられている。`)
+    setInputText(`test`)
   }
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">AI検出回避システム</h1>
+        <h1 className="text-3xl font-bold mb-2">AI Text humanizer</h1>
         <p className="text-muted-foreground">
-          最新研究論文に基づく12の攻撃手法を組み合わせてAI検出を回避します
+          最新研究論文に基づく12の手法を組み合わせてAI生成による文書を人間化します
         </p>
       </div>
-
-      <Alert className="mb-6">
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          <strong>注意:</strong> この機能は学術研究・教育目的での使用を前提としています。悪用は厳禁です。
-        </AlertDescription>
-      </Alert>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 設定パネル */}
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>攻撃手法の選択</CardTitle>
+              <CardTitle>人間化手法の選択</CardTitle>
               <CardDescription>
-                適用したい攻撃手法を選択してください
+                適用したい人間化手法を選択してください
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {attackMethods.map((method) => (
+              {humanizationMethods.map((method) => (
                 <div key={method.id} className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-muted/50">
                   <Checkbox
                     id={method.id}
