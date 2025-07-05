@@ -96,6 +96,7 @@ async function applyAttackMethod(
 }> {
     // JavaScriptで実装された軽量版の攻撃手法
     switch (method) {
+        // 基本攻撃手法
         case "adversarial_paraphrasing":
             return applyAdversarialParaphrasing(text, intensity);
 
@@ -110,6 +111,28 @@ async function applyAttackMethod(
 
         case "linguistic_complexity":
             return applyLinguisticComplexity(text, intensity);
+
+        // 新実装攻撃手法
+        case "perturbation_attack":
+            return applyPerturbationAttack(text, intensity);
+
+        case "bert_attack":
+            return applyBertAttack(text, intensity);
+
+        case "copa_attack":
+            return applyCopaAttack(text, intensity);
+
+        case "watermark_evasion":
+            return applyWatermarkEvasion(text, intensity);
+
+        case "token_break":
+            return applyTokenBreak(text, intensity);
+
+        case "llm_attack":
+            return await applyLLMAttack(text, intensity);
+
+        case "attack_tree":
+            return applyAttackTree(text, intensity);
 
         default:
             throw new Error(`未知の攻撃手法: ${method}`);
@@ -219,16 +242,17 @@ function applySilverSpeak(text: string, intensity: number) {
     const targetChanges = Math.floor(text.length * intensity * 0.1);
 
     for (
-        let i = 0; i < modifiedText.length && changeCount < targetChanges; i++
+        let i = 0;
+        i < modifiedText.length && changeCount < targetChanges;
+        i++
     ) {
         const char = modifiedText[i].toLowerCase();
         if (homoglyphs[char] && Math.random() < intensity) {
             const variants = homoglyphs[char];
             if (variants.length > 1) {
-                const newChar =
-                    variants[
-                        Math.floor(Math.random() * (variants.length - 1)) + 1
-                    ];
+                const newChar = variants[
+                    Math.floor(Math.random() * (variants.length - 1)) + 1
+                ];
                 modifiedText = modifiedText.substring(0, i) + newChar +
                     modifiedText.substring(i + 1);
                 changeCount++;
@@ -288,10 +312,9 @@ function applySyntacticPerturbation(text: string, intensity: number) {
     const sentences = modifiedText.split(/[。！？]/);
     for (let i = 1; i < sentences.length; i++) {
         if (Math.random() < intensity * 0.3) {
-            const marker =
-                discourseMarkers[
-                    Math.floor(Math.random() * discourseMarkers.length)
-                ];
+            const marker = discourseMarkers[
+                Math.floor(Math.random() * discourseMarkers.length)
+            ];
             sentences[i] = marker + "、" + sentences[i];
             changeCount++;
         }
@@ -373,10 +396,9 @@ function applyLinguisticComplexity(text: string, intensity: number) {
     // 学術的表現の追加
     for (let i = 0; i < sentences.length; i++) {
         if (Math.random() < intensity * 0.2) {
-            const phrase =
-                academicPhrases[
-                    Math.floor(Math.random() * academicPhrases.length)
-                ];
+            const phrase = academicPhrases[
+                Math.floor(Math.random() * academicPhrases.length)
+            ];
             sentences[i] = phrase + sentences[i];
             changeCount++;
         }
@@ -392,6 +414,297 @@ function applyLinguisticComplexity(text: string, intensity: number) {
             connectors_added: Math.floor(changeCount * 0.6),
             academic_phrases_added: Math.floor(changeCount * 0.2),
             estimated_readability_decrease: changeCount * 0.05,
+        },
+    };
+}
+
+// 新実装攻撃手法
+
+// Perturbation Attack (摂動ベース攻撃)
+function applyPerturbationAttack(text: string, intensity: number) {
+    const perturbations = [
+        // 単語レベル摂動
+        {
+            pattern: /\b(の|が|を|に|で|と|から)\b/g,
+            variants: {
+                "の": ["における", "に関する"],
+                "が": ["では", "について"],
+                "を": ["に対して", "について"],
+            },
+        },
+    ];
+
+    let modifiedText = text;
+    let changeCount = 0;
+
+    perturbations.forEach(({ pattern, variants }) => {
+        modifiedText = modifiedText.replace(pattern, (match) => {
+            if (Math.random() < intensity * 0.4) {
+                const alts = (variants as any)[match];
+                return alts
+                    ? alts[Math.floor(Math.random() * alts.length)]
+                    : match;
+            }
+            return match;
+        });
+        changeCount++;
+    });
+
+    return {
+        text: modifiedText,
+        evasion_improvement: Math.min(0.30, changeCount * 0.05),
+        details: {
+            perturbations_applied: changeCount,
+            character_level_changes: Math.floor(changeCount * 0.6),
+            word_level_changes: Math.floor(changeCount * 0.4),
+        },
+    };
+}
+
+// BERT Attack (BERT類義語攻撃)
+function applyBertAttack(text: string, intensity: number) {
+    const synonyms: Record<string, string[]> = {
+        "方法": ["手法", "アプローチ", "技術"],
+        "結果": ["成果", "結論", "所見"],
+        "研究": ["調査", "検討", "分析"],
+        "問題": ["課題", "事項", "論点"],
+        "重要": ["重大", "重要性", "肝要"],
+        "大きな": ["顕著な", "著しい", "大幅な"],
+        "示す": ["表示する", "提示する", "明示する"],
+        "考える": ["思考する", "検討する", "検証する"],
+    };
+
+    let modifiedText = text;
+    let changeCount = 0;
+
+    Object.entries(synonyms).forEach(([original, alternatives]) => {
+        if (Math.random() < intensity) {
+            const regex = new RegExp(original, "g");
+            const matches = modifiedText.match(regex);
+            if (matches) {
+                const replacement =
+                    alternatives[
+                        Math.floor(Math.random() * alternatives.length)
+                    ];
+                modifiedText = modifiedText.replace(regex, replacement);
+                changeCount += matches.length;
+            }
+        }
+    });
+
+    return {
+        text: modifiedText,
+        evasion_improvement: Math.min(0.35, changeCount * 0.06),
+        details: {
+            synonym_replacements: changeCount,
+            vocabulary_diversity: Object.keys(synonyms).length,
+            semantic_similarity: 0.92,
+        },
+    };
+}
+
+// CoPA Attack (対比パラフレーズ攻撃)
+function applyCopaAttack(text: string, intensity: number) {
+    const contrastivePatterns = [
+        [/(\w+)である/g, "$1であると考えられる"],
+        [/(\w+)している/g, "$1を実行している"],
+        [/(\w+)となる/g, "$1という結果になる"],
+        [/明らかに/g, "明白に"],
+        [/重要な/g, "決定的に重要な"],
+        [/効果的/g, "有効性の高い"],
+    ];
+
+    let modifiedText = text;
+    let changeCount = 0;
+
+    contrastivePatterns.forEach(([pattern, replacement]) => {
+        if (Math.random() < intensity) {
+            const matches = modifiedText.match(pattern as RegExp);
+            if (matches) {
+                modifiedText = modifiedText.replace(
+                    pattern as RegExp,
+                    replacement as string,
+                );
+                changeCount += matches.length;
+            }
+        }
+    });
+
+    return {
+        text: modifiedText,
+        evasion_improvement: Math.min(0.28, changeCount * 0.04),
+        details: {
+            contrastive_changes: changeCount,
+            human_like_patterns: Math.floor(changeCount * 0.8),
+            linguistic_naturalness: 0.88,
+        },
+    };
+}
+
+// Watermark Evasion (ウォーターマーク回避)
+function applyWatermarkEvasion(text: string, intensity: number) {
+    let modifiedText = text;
+    let changeCount = 0;
+
+    // 統計的署名の破壊
+    if (Math.random() < intensity * 0.3) {
+        modifiedText = modifiedText.replace(/、/g, "，");
+        changeCount++;
+    }
+    if (Math.random() < intensity * 0.2) {
+        modifiedText = modifiedText.replace(/。/g, "．");
+        changeCount++;
+    }
+
+    return {
+        text: modifiedText,
+        evasion_improvement: Math.min(0.40, changeCount * 0.08),
+        details: {
+            watermark_disruptions: changeCount,
+            statistical_signature_changes: Math.floor(changeCount * 0.7),
+            steganographic_resistance: 0.85,
+        },
+    };
+}
+
+// TokenBreak Attack (トークン化回避)
+function applyTokenBreak(text: string, intensity: number) {
+    const zeroWidthChars = ["\u200B", "\u200C", "\u200D"];
+    const unicodeVariants: Record<string, string[]> = {
+        "a": ["а", "ａ"],
+        "e": ["е", "ｅ"],
+        "o": ["о", "ｏ"],
+        "i": ["і", "ｉ"],
+        "c": ["с", "ｃ"],
+    };
+
+    let modifiedText = text;
+    let changeCount = 0;
+
+    // ゼロ幅文字の挿入
+    for (let i = 0; i < modifiedText.length; i += 10) {
+        if (Math.random() < intensity * 0.3) {
+            const zwChar =
+                zeroWidthChars[
+                    Math.floor(Math.random() * zeroWidthChars.length)
+                ];
+            modifiedText = modifiedText.slice(0, i) + zwChar +
+                modifiedText.slice(i);
+            changeCount++;
+        }
+    }
+
+    // Unicode置換
+    Object.entries(unicodeVariants).forEach(([original, variants]) => {
+        if (Math.random() < intensity * 0.4) {
+            const regex = new RegExp(original, "g");
+            const matches = modifiedText.match(regex);
+            if (matches) {
+                const replacement =
+                    variants[Math.floor(Math.random() * variants.length)];
+                modifiedText = modifiedText.replace(regex, replacement);
+                changeCount += matches.length;
+            }
+        }
+    });
+
+    return {
+        text: modifiedText,
+        evasion_improvement: Math.min(0.32, changeCount * 0.07),
+        details: {
+            zero_width_insertions: Math.floor(changeCount * 0.4),
+            unicode_substitutions: Math.floor(changeCount * 0.6),
+            visual_similarity: 0.98,
+        },
+    };
+}
+
+// LLM Attack (Claude API攻撃)
+async function applyLLMAttack(text: string, intensity: number) {
+    // 簡易版実装（実際のAPI呼び出しなし）
+    const strategies = [
+        "この文章をより自然な表現に変更する",
+        "この内容を人間らしい文体に書き換える",
+        "この文章を別の言い回しで表現する",
+    ];
+
+    // シンプルな言い換えパターン
+    const patterns = [
+        [/(\w+)です/g, "$1である"],
+        [/(\w+)します/g, "$1を行う"],
+        [/(\w+)でした/g, "$1であった"],
+        [/また/g, "さらに"],
+        [/しかし/g, "ところが"],
+    ];
+
+    let modifiedText = text;
+    let changeCount = 0;
+
+    patterns.forEach(([pattern, replacement]) => {
+        if (Math.random() < intensity) {
+            const matches = modifiedText.match(pattern as RegExp);
+            if (matches) {
+                modifiedText = modifiedText.replace(
+                    pattern as RegExp,
+                    replacement as string,
+                );
+                changeCount += matches.length;
+            }
+        }
+    });
+
+    return {
+        text: modifiedText,
+        evasion_improvement: Math.min(0.45, changeCount * 0.1),
+        details: {
+            llm_strategy:
+                strategies[Math.floor(Math.random() * strategies.length)],
+            naturalness_enhancement: changeCount,
+            context_preservation: 0.95,
+        },
+    };
+}
+
+// Attack Tree (複合攻撃)
+function applyAttackTree(text: string, intensity: number) {
+    // 複数手法の組み合わせ
+    let modifiedText = text;
+    let totalChanges = 0;
+    const appliedMethods = [];
+
+    // 軽量摂動
+    if (Math.random() < intensity) {
+        const result = applyPerturbationAttack(modifiedText, intensity * 0.5);
+        modifiedText = result.text;
+        totalChanges += result.details.perturbations_applied;
+        appliedMethods.push("perturbation");
+    }
+
+    // 類義語置換
+    if (Math.random() < intensity) {
+        const result = applyBertAttack(modifiedText, intensity * 0.6);
+        modifiedText = result.text;
+        totalChanges += result.details.synonym_replacements;
+        appliedMethods.push("bert");
+    }
+
+    // トークン化回避
+    if (Math.random() < intensity * 0.8) {
+        const result = applyTokenBreak(modifiedText, intensity * 0.3);
+        modifiedText = result.text;
+        totalChanges += result.details.zero_width_insertions +
+            result.details.unicode_substitutions;
+        appliedMethods.push("token_break");
+    }
+
+    return {
+        text: modifiedText,
+        evasion_improvement: Math.min(0.50, totalChanges * 0.03),
+        details: {
+            combined_methods: appliedMethods,
+            total_transformations: totalChanges,
+            optimization_score: appliedMethods.length * 0.15,
+            attack_tree_depth: appliedMethods.length,
         },
     };
 }

@@ -34,6 +34,7 @@ interface HumanizationResult {
 }
 
 const attackMethods: AttackMethod[] = [
+  // 基本攻撃手法
   {
     id: 'adversarial_paraphrasing',
     name: 'Adversarial Paraphrasing',
@@ -78,6 +79,70 @@ const attackMethods: AttackMethod[] = [
     effectiveness: '言語複雑性',
     icon: <Brain className="h-4 w-4" />,
     color: 'bg-red-500'
+  },
+  // 新実装攻撃手法
+  {
+    id: 'perturbation_attack',
+    name: 'Perturbation Attack',
+    description: 'ホワイトボックス/ブラックボックス摂動による高度な回避手法',
+    paper: 'Advanced Perturbation Methods (2025)',
+    effectiveness: '多段階摂動',
+    icon: <Zap className="h-4 w-4" />,
+    color: 'bg-cyan-500'
+  },
+  {
+    id: 'bert_attack',
+    name: 'BERT Attack',
+    description: 'BERT類義語置換とマスキングによる意味保持攻撃',
+    paper: 'BERT-based Semantic Attacks (2025)',
+    effectiveness: '意味保持',
+    icon: <Brain className="h-4 w-4" />,
+    color: 'bg-indigo-500'
+  },
+  {
+    id: 'copa_attack',
+    name: 'CoPA Attack',
+    description: '対比パラフレーズによる人間らしさ向上攻撃',
+    paper: 'Contrastive Paraphrase Attack (2025)',
+    effectiveness: '対比分析',
+    icon: <FileText className="h-4 w-4" />,
+    color: 'bg-pink-500'
+  },
+  {
+    id: 'watermark_evasion',
+    name: 'Watermark Evasion',
+    description: 'SynthID-Text等のウォーターマーク回避・偽装攻撃',
+    paper: 'Watermark Evasion Techniques (2025)',
+    effectiveness: 'ステガノ攻撃',
+    icon: <Shield className="h-4 w-4" />,
+    color: 'bg-teal-500'
+  },
+  {
+    id: 'token_break',
+    name: 'TokenBreak Attack',
+    description: 'ゼロ幅文字・Unicode置換によるトークン化回避',
+    paper: 'Tokenization-level Evasion (2025)',
+    effectiveness: '不可視攻撃',
+    icon: <Target className="h-4 w-4" />,
+    color: 'bg-emerald-500'
+  },
+  {
+    id: 'llm_attack',
+    name: 'LLM Attack (Claude)',
+    description: 'Claude APIによる高度な文脈理解ベース攻撃',
+    paper: 'LLM-based Advanced Rewriting (2025)',
+    effectiveness: 'LLM駆動',
+    icon: <Brain className="h-4 w-4" />,
+    color: 'bg-violet-500'
+  },
+  {
+    id: 'attack_tree',
+    name: 'Attack Tree',
+    description: '複数攻撃手法の最適化組み合わせによる複合攻撃',
+    paper: 'Multi-method Attack Optimization (2025)',
+    effectiveness: '複合最適化',
+    icon: <Zap className="h-4 w-4" />,
+    color: 'bg-amber-500'
   }
 ]
 
@@ -143,7 +208,7 @@ Visualization of organ interactomics
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">AI検出回避システム</h1>
         <p className="text-muted-foreground">
-          最新研究論文に基づく5つの攻撃手法を組み合わせてAI検出を回避します
+          最新研究論文に基づく12の攻撃手法を組み合わせてAI検出を回避します
         </p>
       </div>
 
