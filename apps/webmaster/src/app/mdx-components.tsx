@@ -1,10 +1,5 @@
 import type { MDXComponents } from 'mdx/types';
 import Image from 'next/image';
-import { InlineMath, BlockMath } from 'react-katex';
-import 'katex/dist/katex.min.css';
-import { JUNG_STIMULUS_WORDS } from '@/components/jung-word-assessment/JungWordTest';
-import KawasakiModel from '@/components/kawasaki-model';
-import SpiritInPhysicsInteractive from '@/components/spirit-in-physics/SpiritInPhysicsInteractive';
 
 /**
  * MDXファイルで使用するカスタムコンポーネントを定義
@@ -61,18 +56,6 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
     ),
     em: (props: React.ComponentProps<'em'>) => (
       <em className="italic text-gray-700 dark:text-gray-300" {...props} />
-    ),
-    // Spirit in Physics specific components
-    Image,
-    InlineMath,
-    BlockMath,
-    KawasakiModel,
-    SpiritInPhysicsInteractive,
-    // Special component to display Jung stimulus words
-    JungWords: () => (
-      <div className="flex flex-wrap gap-2 text-sm">
-        {JUNG_STIMULUS_WORDS.join(", ")}
-      </div>
     ),
     // ここにカスタムコンポーネントを追加可能
     ...components,
