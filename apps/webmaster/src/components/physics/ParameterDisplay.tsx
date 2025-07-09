@@ -20,7 +20,7 @@ export function ParameterDisplay({ phase }: ParameterDisplayProps) {
   const parameters = [
     {
       key: 'infoDensity',
-      label: '情報密度',
+      label: 'Information Density',
       value: phase.infoDensity,
       unit: 'bits/m³',
       icon: Database,
@@ -29,7 +29,7 @@ export function ParameterDisplay({ phase }: ParameterDisplayProps) {
     },
     {
       key: 'complexity',
-      label: '計算複雑性',
+      label: 'Computational Complexity',
       value: phase.complexity,
       unit: 'ops/s',
       icon: TrendingUp,
@@ -38,7 +38,7 @@ export function ParameterDisplay({ phase }: ParameterDisplayProps) {
     },
     {
       key: 'genRate',
-      label: '情報生成率',
+      label: 'Information Generation Rate',
       value: phase.genRate,
       unit: 'bits/s',
       icon: Activity,
@@ -47,7 +47,7 @@ export function ParameterDisplay({ phase }: ParameterDisplayProps) {
     },
     {
       key: 'decayRate',
-      label: '情報崩壊率',
+      label: 'Information Decay Rate',
       value: phase.decayRate,
       unit: 'bits/s',
       icon: TrendingUp,
@@ -56,7 +56,7 @@ export function ParameterDisplay({ phase }: ParameterDisplayProps) {
     },
     {
       key: 'entanglement',
-      label: '量子もつれ度',
+      label: 'Quantum Entanglement',
       value: phase.entanglement,
       unit: '',
       icon: Atom,
@@ -65,7 +65,7 @@ export function ParameterDisplay({ phase }: ParameterDisplayProps) {
     },
     {
       key: 'consciousness',
-      label: '意識指数',
+      label: 'Consciousness Index',
       value: phase.consciousness,
       unit: '',
       icon: Brain,
@@ -128,9 +128,9 @@ export function ParameterDisplay({ phase }: ParameterDisplayProps) {
       transition={{ duration: 0.6, delay: 0.6 }}
     >
       <div className="mb-6">
-        <h3 className="text-2xl font-bold text-white mb-2">物理パラメータ</h3>
+        <h3 className="text-2xl font-bold text-white mb-2">Physics Parameters</h3>
         <p className="text-gray-400 text-sm">
-          {phase.name}における情報処理と量子状態の特性値
+          Information processing and quantum state characteristics in {phase.name}
         </p>
       </div>
 
@@ -200,12 +200,12 @@ export function ParameterDisplay({ phase }: ParameterDisplayProps) {
                 />
               </div>
 
-              {/* 変化率インジケーター */}
+              {/* Change rate indicator */}
               {index < parameters.length - 1 && (
                 <div className="mt-2 flex items-center gap-1 text-xs">
                   <Zap size={12} className="text-yellow-400" />
                   <span className="text-gray-400">
-                    変化率: {getChangeRate(param.key, phase.id)}
+                    Change rate: {getChangeRate(param.key, phase.id)}
                   </span>
                 </div>
               )}
@@ -214,7 +214,7 @@ export function ParameterDisplay({ phase }: ParameterDisplayProps) {
         })}
       </div>
 
-      {/* 段階固有のメトリクス */}
+      {/* Phase-specific metrics */}
       <motion.div 
         className="mt-6 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 rounded-xl p-4 border border-indigo-500/20"
         initial={{ opacity: 0, y: 10 }}
@@ -222,32 +222,32 @@ export function ParameterDisplay({ phase }: ParameterDisplayProps) {
         transition={{ duration: 0.5, delay: 0.8 }}
       >
         <h4 className="text-lg font-semibold text-indigo-300 mb-2">
-          📊 {phase.name}の特徴的メトリクス
+          📊 {phase.name} Characteristic Metrics
         </h4>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <div className="text-center">
             <div className="text-cyan-300 font-bold text-lg">
               {((phase.genRate - phase.decayRate) / phase.genRate * 100).toFixed(1)}%
             </div>
-            <div className="text-gray-400">情報純増率</div>
+            <div className="text-gray-400">Net Information Rate</div>
           </div>
           <div className="text-center">
             <div className="text-purple-300 font-bold text-lg">
               {(Math.log(phase.complexity) / Math.log(1e100) * 100).toFixed(1)}%
             </div>
-            <div className="text-gray-400">複雑性率</div>
+            <div className="text-gray-400">Complexity Ratio</div>
           </div>
           <div className="text-center">
             <div className="text-green-300 font-bold text-lg">
               {(phase.entanglement * phase.consciousness * 100).toFixed(1)}%
             </div>
-            <div className="text-gray-400">統合度</div>
+            <div className="text-gray-400">Integration Level</div>
           </div>
           <div className="text-center">
             <div className="text-orange-300 font-bold text-lg">
               {(Math.log(phase.infoDensity) / 120).toFixed(2)}
             </div>
-            <div className="text-gray-400">情報効率</div>
+            <div className="text-gray-400">Information Efficiency</div>
           </div>
         </div>
       </motion.div>
