@@ -19,7 +19,7 @@ export function ComplexityMeter({ phase, totalPhases }: ComplexityMeterProps) {
 
   const meters = [
     {
-      label: '計算複雑性',
+      label: 'Computational Complexity',
       value: complexityPercentage,
       color: '#8b5cf6',
       glowColor: 'rgba(139, 92, 246, 0.5)',
@@ -29,7 +29,7 @@ export function ComplexityMeter({ phase, totalPhases }: ComplexityMeterProps) {
       radius: 90
     },
     {
-      label: '情報密度',
+      label: 'Information Density',
       value: infoPercentage,
       color: '#06b6d4',
       glowColor: 'rgba(6, 182, 212, 0.5)',
@@ -39,7 +39,7 @@ export function ComplexityMeter({ phase, totalPhases }: ComplexityMeterProps) {
       radius: 70
     },
     {
-      label: '意識指数',
+      label: 'Consciousness Index',
       value: consciousnessPercentage,
       color: '#f59e0b',
       glowColor: 'rgba(245, 158, 11, 0.5)',
@@ -49,7 +49,7 @@ export function ComplexityMeter({ phase, totalPhases }: ComplexityMeterProps) {
       radius: 50
     },
     {
-      label: '量子もつれ',
+      label: 'Quantum Entanglement',
       value: entanglementPercentage,
       color: '#10b981',
       glowColor: 'rgba(16, 185, 129, 0.5)',
@@ -68,7 +68,7 @@ export function ComplexityMeter({ phase, totalPhases }: ComplexityMeterProps) {
       transition={{ duration: 0.6, delay: 0.8 }}
     >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* 複雑性メーター */}
+        {/* Complexity meter */}
         <div className="relative flex items-center justify-center">
           <div className="relative">
             <svg className="w-64 h-64 transform -rotate-90" viewBox="0 0 200 200">
@@ -124,7 +124,7 @@ export function ComplexityMeter({ phase, totalPhases }: ComplexityMeterProps) {
                 className="fill-gray-400 text-sm transform rotate-90"
                 style={{ transformOrigin: '100px 115px' }}
               >
-                複雑性
+                Complexity
               </text>
             </svg>
             
@@ -147,16 +147,16 @@ export function ComplexityMeter({ phase, totalPhases }: ComplexityMeterProps) {
           </div>
         </div>
 
-        {/* 詳細情報 */}
+        {/* Detailed information */}
         <div className="space-y-4">
           <div className="mb-6">
-            <h3 className="text-2xl font-bold text-white mb-2">宇宙の情報処理能力</h3>
+            <h3 className="text-2xl font-bold text-white mb-2">Universal Information Processing Capacity</h3>
             <p className="text-gray-400 text-sm">
-              {phase.name}における計算複雑性と情報処理の統合指標
+              Integrated indicators of computational complexity and information processing in {phase.name}
             </p>
           </div>
 
-          {/* 個別メーター */}
+          {/* Individual meters */}
           {meters.map((meter, index) => {
             const Icon = meter.icon
             return (
@@ -200,7 +200,7 @@ export function ComplexityMeter({ phase, totalPhases }: ComplexityMeterProps) {
             )
           })}
 
-          {/* 総合スコア */}
+          {/* Overall score */}
           <motion.div 
             className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-xl p-4 border border-purple-500/20 mt-6"
             initial={{ opacity: 0, y: 10 }}
@@ -211,11 +211,11 @@ export function ComplexityMeter({ phase, totalPhases }: ComplexityMeterProps) {
               <div className="text-3xl font-bold text-purple-300 mb-1">
                 {((complexityPercentage + infoPercentage + consciousnessPercentage + entanglementPercentage) / 4).toFixed(1)}%
               </div>
-              <div className="text-sm text-gray-400">統合情報処理指数</div>
+              <div className="text-sm text-gray-400">Integrated Information Processing Index</div>
             </div>
           </motion.div>
 
-          {/* 段階進行度 */}
+          {/* Phase progression */}
           <motion.div 
             className="bg-black/30 rounded-xl p-4 border border-white/5"
             initial={{ opacity: 0, y: 10 }}
@@ -223,7 +223,7 @@ export function ComplexityMeter({ phase, totalPhases }: ComplexityMeterProps) {
             transition={{ duration: 0.5, delay: 1.2 }}
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-white font-semibold">宇宙進化進行度</span>
+              <span className="text-white font-semibold">Cosmic Evolution Progress</span>
               <span className="text-gray-300 font-mono">
                 {phase.id + 1}/{totalPhases}
               </span>
