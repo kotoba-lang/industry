@@ -1,6 +1,7 @@
 """
 Axion Dark Matter研究システム (Axion Dark Matter Research System)
 QCD axionの宇宙論的役割と検出可能性の理論計算
+Generative Information Physics Framework との統合解析
 
 Author: Jun Kawasaki
 Date: 2025/01/22
@@ -13,6 +14,7 @@ License: MIT
 - 観測戦略の策定
 - 構造形成への影響分析
 - 実験との比較検証
+- Generative Information Physics との情報理論的統合
 """
 
 import numpy as np
@@ -97,7 +99,7 @@ class QCDAxionTheory:
         self.k_B = 1.381e-23  # J/K
         self.eV_to_J = 1.602e-19  # eV to Joule
         
-        logger.info("QCD Axion theory initialized")
+        logger.info("QCD Axion theory initialized for Generative Information Physics framework")
     
     def calculate_axion_mass(self, fa: float) -> float:
         """Axion質量の計算"""
@@ -609,7 +611,13 @@ class AxionObservationStrategy:
         return best_experiment
 
 class AxionResearchSystem:
-    """Axion研究システム統合"""
+    """Axion研究システム統合
+    
+    Generative Information Physics Framework との統合:
+    - Axionを宇宙的情報ストレージ媒体として理解
+    - 情報密度とaxion場の相互作用を解析
+    - 宇宙の情報処理プロセスにおけるaxionの役割を評価
+    """
     
     def __init__(self, config: AxionConfig):
         self.config = config
@@ -623,7 +631,7 @@ class AxionResearchSystem:
         # 結果保存
         self.results = {}
         
-        logger.info("Axion research system initialized")
+        logger.info("Axion research system initialized for Generative Information Physics")
     
     def run_comprehensive_analysis(self, fa_values: np.ndarray) -> Dict[str, Any]:
         """包括的解析の実行"""
