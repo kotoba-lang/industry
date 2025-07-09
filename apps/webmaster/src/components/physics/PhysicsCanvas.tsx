@@ -66,7 +66,7 @@ export function PhysicsCanvas({ phase, quantumMode, isPlaying }: PhysicsCanvasPr
     const width = 800
     const height = 600
 
-    // 情報場の初期化
+    // Information field initialization
     const newInformationField: InformationField[] = []
     for (let i = 0; i < 50; i++) {
       for (let j = 0; j < 40; j++) {
@@ -126,7 +126,7 @@ export function PhysicsCanvas({ phase, quantumMode, isPlaying }: PhysicsCanvasPr
     // 背景グラデーション
     drawBackground(ctx, canvas.width, canvas.height)
 
-    // 情報場の描画
+            // Information field rendering
     drawInformationField(ctx)
 
     // 量子状態の描画（量子モード時）
@@ -140,7 +140,7 @@ export function PhysicsCanvas({ phase, quantumMode, isPlaying }: PhysicsCanvasPr
     // 宇宙論的進化の描画
     drawCosmologicalEvolution(ctx, canvas.width, canvas.height)
 
-    // 意識の創発（後期段階）
+            // Consciousness emergence (late stages)
     if (phase.consciousness > 0.1) {
       drawConsciousnessEmergence(ctx, canvas.width, canvas.height)
     }
@@ -211,7 +211,7 @@ export function PhysicsCanvas({ phase, quantumMode, isPlaying }: PhysicsCanvasPr
         ctx.arc(state.x, state.y, 3 + waveFunction * 8, 0, Math.PI * 2)
         ctx.fill()
 
-        // 量子もつれの線
+        // Quantum entanglement lines
         if (Math.random() < 0.1 && entanglementEffect > 0.8) {
           const nearbyState = quantumStates[Math.floor(Math.random() * quantumStates.length)]
           ctx.strokeStyle = `rgba(147, 51, 234, ${alpha * 0.3})`
@@ -299,7 +299,7 @@ export function PhysicsCanvas({ phase, quantumMode, isPlaying }: PhysicsCanvasPr
     ctx.arc(centerX, centerY, radius, 0, Math.PI * 2)
     ctx.fill()
 
-    // 意識のネットワーク
+          // Consciousness network
     if (phase.consciousness > 0.5) {
       for (let i = 0; i < 10; i++) {
         const angle = (i / 10) * Math.PI * 2 + time * 0.1
@@ -325,7 +325,7 @@ export function PhysicsCanvas({ phase, quantumMode, isPlaying }: PhysicsCanvasPr
   }
 
   const updatePhysicsStates = () => {
-    // 情報場の更新
+          // Information field update
     setInformationField(prev => prev.map(field => ({
       ...field,
       phase: field.phase + field.frequency * 0.1,
@@ -347,7 +347,7 @@ export function PhysicsCanvas({ phase, quantumMode, isPlaying }: PhysicsCanvasPr
 
     // 時空メトリックの更新
     setSpaceTimeMetric(prev => prev.map(metric => {
-      // 近くの情報場の密度に基づいて曲率を計算
+              // Calculate curvature based on nearby information field density
       let totalDensity = 0
       let count = 0
 
@@ -375,7 +375,7 @@ export function PhysicsCanvas({ phase, quantumMode, isPlaying }: PhysicsCanvasPr
         className="w-full h-full object-contain"
       />
       
-      {/* 段階情報のオーバーレイ */}
+              {/* Phase information overlay */}
       <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm rounded-lg p-3 text-white text-sm">
         <div className="flex items-center gap-2 mb-1">
           <div 

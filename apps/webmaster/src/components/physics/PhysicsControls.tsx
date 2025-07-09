@@ -36,7 +36,7 @@ export function PhysicsControls({
       transition={{ duration: 0.6, delay: 0.2 }}
     >
       <div className="flex flex-wrap items-center justify-center gap-4">
-        {/* 再生コントロール */}
+        {/* Play Controls */}
         <div className="flex items-center gap-2">
           <motion.button
             onClick={onPlayPause}
@@ -49,7 +49,7 @@ export function PhysicsControls({
             whileTap={{ scale: 0.95 }}
           >
             {isPlaying ? <Pause size={20} /> : <Play size={20} />}
-            {isPlaying ? '停止' : '開始'}
+            {isPlaying ? 'Stop' : 'Start'}
           </motion.button>
 
           <motion.button
@@ -59,13 +59,13 @@ export function PhysicsControls({
             whileTap={{ scale: 0.95 }}
           >
             <RotateCcw size={20} />
-            リセット
+            Reset
           </motion.button>
         </div>
 
-        {/* 速度調整 */}
+        {/* Speed Control */}
         <div className="flex items-center gap-2">
-          <span className="text-white text-sm font-medium">速度:</span>
+          <span className="text-white text-sm font-medium">Speed:</span>
           <div className="flex gap-1">
             {speedOptions.map((speedOption) => (
               <motion.button
@@ -85,7 +85,7 @@ export function PhysicsControls({
           </div>
         </div>
 
-        {/* 量子モード */}
+        {/* Quantum Mode */}
         <motion.button
           onClick={onQuantumModeToggle}
           className={`flex items-center gap-2 px-4 py-3 rounded-xl font-semibold transition-all duration-300 ${
@@ -97,10 +97,10 @@ export function PhysicsControls({
           whileTap={{ scale: 0.95 }}
         >
           <Zap size={20} />
-          量子モード
+          Quantum Mode
         </motion.button>
 
-        {/* パラメータ表示切り替え */}
+        {/* Parameters Toggle */}
         <motion.button
           onClick={onParametersToggle}
           className={`flex items-center gap-2 px-4 py-3 rounded-xl font-semibold transition-all duration-300 ${
@@ -112,23 +112,23 @@ export function PhysicsControls({
           whileTap={{ scale: 0.95 }}
         >
           {showParameters ? <Eye size={20} /> : <EyeOff size={20} />}
-          パラメータ
+          Parameters
         </motion.button>
 
-        {/* 設定 */}
+        {/* Settings */}
         <motion.button
           className="flex items-center gap-2 px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-gray-300 transition-all duration-300"
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
           <Settings size={20} />
-          設定
+          Settings
         </motion.button>
       </div>
 
-      {/* ヘルプテキスト */}
+      {/* Help Text */}
       <div className="mt-4 text-center text-sm text-gray-400">
-        <p>各段階をクリックするか、再生ボタンで宇宙の進化を観察してください</p>
+        <p>Click on each stage or use the play button to observe the evolution of the universe</p>
       </div>
     </motion.div>
   )
