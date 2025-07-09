@@ -557,6 +557,9 @@ class PathIntegralResolution:
         
         integrated_norm = integrated_normalization_constant()
         
+        # 4次元に最も近い値を選択（可視化用）
+        dim_4_approx = min(dimensional_results.keys(), key=lambda x: abs(x - 4))
+        
         # 可視化
         fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
         
@@ -609,7 +612,7 @@ class PathIntegralResolution:
         print(f"✅ 正規化問題の解決完了")
         print(f"📊 正規化解析結果:")
         print(f"  - ζ(2) = {zeta_results[2]:.6f}")
-        print(f"  - 4次元体積因子 = {dimensional_results[4]['volume_factor']:.6f}")
+        print(f"  - 4次元体積因子 = {dimensional_results[dim_4_approx]['volume_factor']:.6f}")
         print(f"  - 統合正規化定数 = {integrated_norm:.6e}")
         
         return zeta_results, dimensional_results, thermal_results
