@@ -12,12 +12,12 @@ export const meta = {
   }
 };
 
-import Image from "next/image";
-import { InlineMath, BlockMath } from 'react-katex';
-import 'katex/dist/katex.min.css';
-import { JUNG_STIMULUS_WORDS } from "@/components/jung-word-assessment/JungWordTest";
-import KawasakiModel from "@/components/kawasaki-model";
-import SpiritInPhysicsInteractive from "@/components/spirit-in-physics/SpiritInPhysicsInteractive";
+import Image from "next/image"
+import { InlineMath, BlockMath } from 'react-katex'
+import 'katex/dist/katex.min.css'
+import { JUNG_STIMULUS_WORDS } from "@/components/jung-word-assessment/JungWordTest"
+import KawasakiModel from "@/components/kawasaki-model"
+import SpiritInPhysicsInteractive from "@/components/spirit-in-physics/SpiritInPhysicsInteractive"
 
 # Spirit in Physics
 
@@ -48,7 +48,6 @@ import SpiritInPhysicsInteractive from "@/components/spirit-in-physics/SpiritInP
 
 (Bérut et al., 2012)
 
-{/* KawasakiModel - Interactive 3D visualization */}
 <div className="w-full h-[80vh] my-8">
   <KawasakiModel />
 </div>
@@ -69,7 +68,6 @@ import SpiritInPhysicsInteractive from "@/components/spirit-in-physics/SpiritInP
 
 **Integrated model:** Adjust the reaction speed factor with the hyperparameter α and define a modified probability function as follows:
 
-{/* Interactive components with state management */}
 <SpiritInPhysicsInteractive />
 
 ## Measurement via Emotion Analytics (Quantitative Analysis)

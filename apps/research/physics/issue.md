@@ -63,7 +63,13 @@
    - 階層問題の幾何学的解決メカニズム
    - KK dark matter 候補の遺存量計算
    - 観測制約との詳細比較・検証
-Modified gravity theories: f(R), scalar-tensor theories との統合
+✅ Modified gravity theories: f(R), scalar-tensor theories との統合 **【完了 2025/01】**
+   - f(R) gravity models (Starobinsky, Hu-Sawicki) の詳細実装
+   - Scalar-tensor theories (Brans-Dicke, Horndeski) の宇宙論的進化
+   - Screening mechanisms (Chameleon, Vainshtein) の厳密解析
+   - GW170817制約による理論選別 (c_gw = c 要求)
+   - 構造形成での修正重力効果の定量評価
+   - Dark energy代替説明としての幾何学的起源
 🔬 中優先課題（2年以内）
 5. 計算革命の導入
 AI/ML integration: 深層学習による高速宇宙論シミュレーション
