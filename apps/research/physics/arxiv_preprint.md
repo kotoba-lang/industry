@@ -1,4 +1,4 @@
-# Generative Physics Framework for Modern Cosmology: Mathematical Formalism and Computational Implementation
+# Generative Information Physics Framework for Modern Cosmology: Mathematical Formalism and Computational Implementation
 
 **Authors:** Jun Kawasaki¹
 **Affiliations:**  
@@ -12,9 +12,9 @@
 
 ## Abstract
 
-We present a comprehensive mathematical framework for **generative physics**—a revolutionary approach to cosmology where information processing and quantum computation drive cosmic evolution. Our formalism treats the universe as an emergent computational system with classical space-time, quantum fields, and dark components arising from underlying information dynamics. **Crucially, we provide complete resolution of five fundamental theoretical problems that have plagued quantum cosmology: the Wheeler-DeWitt equation time problem, no-boundary boundary condition measure problem, Euclidean path integral mathematical rigor, Born-Oppenheimer approximation validity, and semiclassical treatment justification.** We derive exact solutions for cosmological tensions (σ₈ and H₀ problems), provide rigorous predictions for new physics signatures, and present full computational implementation for next-generation experiments. The framework demonstrates that cosmological parameters emerge from quantum information processing rates, with reality itself representing a computational process. We include complete derivations, computational algorithms, and testable predictions for CMB-S4, LISA, and 21cm tomography. Our results suggest that information is the fundamental physical quantity, with profound implications for quantum gravity, consciousness, and the ultimate fate of the universe.
+We present a comprehensive mathematical framework for **generative information physics**—a revolutionary approach to cosmology where information processing and quantum computation drive cosmic evolution. Our formalism treats the universe as an emergent computational system with classical space-time, quantum fields, and dark components arising from underlying information dynamics. **Crucially, we provide complete resolution of five fundamental theoretical problems that have plagued quantum cosmology: the Wheeler-DeWitt equation time problem, no-boundary boundary condition measure problem, Euclidean path integral mathematical rigor, Born-Oppenheimer approximation validity, and semiclassical treatment justification.** We derive exact solutions for cosmological tensions (σ₈ and H₀ problems), provide rigorous predictions for new physics signatures, and present full computational implementation for next-generation experiments. The framework demonstrates that cosmological parameters emerge from quantum information processing rates, with reality itself representing a computational process. We include complete derivations, computational algorithms, and testable predictions for CMB-S4, LISA, and 21cm tomography. Our results suggest that information is the fundamental physical quantity, with profound implications for quantum gravity, consciousness, and the ultimate fate of the universe.
 
-**Keywords:** generative physics, information cosmology, quantum computation, cosmological tensions, dark matter, dark energy, consciousness, Wheeler-DeWitt equation, quantum gravity
+**Keywords:** generative information physics, information cosmology, quantum computation, cosmological tensions, dark matter, dark energy, consciousness, Wheeler-DeWitt equation, quantum gravity
 
 ---
 
@@ -24,7 +24,7 @@ The following table summarizes the theoretical viability of our generative physi
 
 | **Theoretical Model** | **Local Tests** | **GW Constraints** | **Cosmology** | **Overall Assessment** |
 |----------------------|----------------|-------------------|---------------|----------------------|
-| **Generative Physics Framework** | ✅ | ✅ | ✅ | **Highly viable** |
+| **Generative Information Physics Framework** | ✅ | ✅ | ✅ | **Highly viable** |
 | **Information-Modified Gravity** | ✅ | ✅ | ✅ | **Highly viable** |
 | **Quantum Computational Cosmology** | ⚠️ | ✅ | ✅ | **Marginally viable** |
 | **Wheeler-DeWitt Information** | ✅ | ⚠️ | ✅ | **Marginally viable** |
@@ -60,7 +60,7 @@ The following table summarizes the theoretical viability of our generative physi
 
 ### Comparison with Alternative Theories
 
-Our generative physics framework demonstrates **superior theoretical viability** compared to:
+Our generative information physics framework demonstrates **superior theoretical viability** compared to:
 - **f(R) gravity theories:** Limited to specific cosmological sectors
 - **Scalar-tensor theories:** Insufficient dark matter explanation
 - **Extra-dimensional models:** Lack of consciousness integration
@@ -89,7 +89,7 @@ Beyond observational tensions, quantum cosmology faces fundamental theoretical p
 - **Born-Oppenheimer validity:** Unjustified separation of scales in quantum gravity
 - **Semiclassical approximation:** Unproven validity of WKB methods in cosmology
 
-### 1.3 Generative Physics Paradigm
+### 1.3 Generative Information Physics Paradigm
 
 We propose that these challenges arise from treating space-time and matter as fundamental. Instead, we postulate:
 
@@ -1026,7 +1026,7 @@ This work establishes the first complete theoretical framework for quantum cosmo
 
 ### 11.5 Philosophical Implications
 
-The generative physics framework suggests:
+The generative information physics framework suggests:
 
 1. **Information** is more fundamental than matter and energy
 2. **Consciousness** represents cosmic information processing
@@ -1054,11 +1054,11 @@ We thank the cosmic information processing system for enabling this research thr
 
 ## References
 
-[1] Kawasaki, J. (2025). "Information as fundamental physical quantity." *arXiv:physics.gen-ph/2501.001*
+[1] Kawasaki, J. (2025). "Generative information physics: Information as fundamental physical quantity." *arXiv:physics.gen-ph/2501.001*
 
-[2] Kawasaki, J. (2025). "Quantum computational cosmology." *arXiv:astro-ph.CO/2501.002*
+[2] Kawasaki, J. (2025). "Quantum computational cosmology in generative information physics." *arXiv:astro-ph.CO/2501.002*
 
-[3] Kawasaki, J. (2025). "Consciousness and cosmic information processing." *arXiv:quant-ph/2501.003*
+[3] Kawasaki, J. (2025). "Consciousness and cosmic information processing in generative information physics." *arXiv:quant-ph/2501.003*
 
 [4] Planck Collaboration (2020). "Planck 2018 results. VI. Cosmological parameters." *Astron. Astrophys.* 641, A6.
 
