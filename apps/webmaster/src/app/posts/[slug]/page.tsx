@@ -1,5 +1,3 @@
-"use client";
-
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getAllPosts, getPostBySlug } from "@/lib/api";
@@ -11,58 +9,40 @@ import Header from "@/app/_components/header";
 import { PostBody } from "@/app/_components/post-body";
 import { PostHeader } from "@/app/_components/post-header";
 import PostContent from "./PostContent";
-import { MDXRemote } from 'next-mdx-remote/rsc';
+import { MDXClientWrapper } from "./MDXClientWrapper";
 import { promises as fs } from 'fs';
 import path from 'path';
-import Image from "next/image";
-import { InlineMath, BlockMath } from 'react-katex';
-import 'katex/dist/katex.min.css';
-import { JUNG_STIMULUS_WORDS } from "@/components/jung-word-assessment/JungWordTest";
-import KawasakiModel from "@/components/kawasaki-model";
-import SpiritInPhysicsInteractive from "@/components/spirit-in-physics/SpiritInPhysicsInteractive";
 
-// MDX コンポーネントの定義
-const mdxComponents = {
-  Image,
-  InlineMath,
-  BlockMath,
-  KawasakiModel,
-  SpiritInPhysicsInteractive,
-  // Jung stimulus words component
-  JungWords: () => (
-    <div className="flex flex-wrap gap-2 text-sm">
-      {JUNG_STIMULUS_WORDS.join(", ")}
-    </div>
-  ),
-};
+// MDXファイルのリスト
+const mdxFiles = [
+  '01', 'agent-noun', 'infomation-is-physical-quantity', 
+  'love-is-self', 'sentiment-of-japanese', 'spirit-in-physics'
+];
 
-// MDXファイルが存在するかチェックし、内容を読み込む
-async function getMDXContent(slug: string) {
+// MDXファイルからメタデータを抽出する関数
+async function extractMDXMetadata(slug: string) {
   try {
     const mdxPath = path.join(process.cwd(), '_posts', `${slug}.mdx`);
     const source = await fs.readFile(mdxPath, 'utf-8');
     
-    // メタデータを抽出（export const meta = {...}; の部分）
+    // export const meta = ({...}) の部分を抽出
     const metaMatch = source.match(/export const meta = ({[\s\S]*?});/);
-    let meta = null;
-    let content = source;
     
     if (metaMatch) {
       try {
-        // メタデータを安全に抽出
+        // メタデータを安全に評価
         const metaString = metaMatch[1];
-        meta = eval(`(${metaString})`);
-        // import文とexport文を除去してコンテンツを取得
-        content = source
-          .replace(/^import.*$/gm, '')
-          .replace(/export const meta = {[\s\S]*?};/, '')
-          .trim();
+        // evalの代わりにFunctionコンストラクタを使用してより安全に評価
+        const metaFunction = new Function('return ' + metaString);
+        const meta = metaFunction();
+        return meta;
       } catch (e) {
         console.warn('Failed to parse meta from MDX:', e);
+        return null;
       }
     }
     
-    return { source: content, meta };
+    return null;
   } catch (error) {
     return null;
   }
@@ -72,24 +52,34 @@ export default async function Post(props: { params: Promise<{ slug: string }> })
   const params = await props.params;
   const { slug } = params;
 
-  // まずMDXファイルの存在をチェック
-  const mdxContent = await getMDXContent(slug);
-  
-  if (mdxContent) {
-    // MDXファイルが存在する場合
+  // MDXファイルの処理
+  if (mdxFiles.includes(slug)) {
+    // MDXファイルからメタデータを取得
+    const mdxMeta = await extractMDXMetadata(slug);
+    
     return (
       <main>
         <Container>
           <Header />
-          <PostContent>
-            <MDXRemote source={mdxContent.source} components={mdxComponents} />
-          </PostContent>
+          <article className="mb-32">
+            {mdxMeta && (
+              <PostHeader
+                title={mdxMeta.title}
+                coverImage={mdxMeta.coverImage}
+                date={mdxMeta.date}
+                author={mdxMeta.author}
+              />
+            )}
+            <PostContent>
+              <MDXClientWrapper slug={slug} />
+            </PostContent>
+          </article>
         </Container>
       </main>
     );
   }
 
-  // MDXファイルが存在しない場合は通常のMarkdown処理
+  // 通常のMarkdownファイルの処理
   const post = getPostBySlug(slug);
 
   if (!post) {
@@ -126,17 +116,20 @@ type Params = {
 export async function generateMetadata(props: Params): Promise<Metadata> {
   const params = await props.params;
   
-  // MDXファイルからメタデータを取得を試行
-  const mdxContent = await getMDXContent(params.slug);
-  if (mdxContent?.meta) {
-    const title = `${mdxContent.meta.title} | Next.js Blog Example with ${CMS_NAME}`;
-    return {
-      title,
-      openGraph: {
+  // MDXファイルの場合、動的にメタデータを取得
+  if (mdxFiles.includes(params.slug)) {
+    const mdxMeta = await extractMDXMetadata(params.slug);
+    
+    if (mdxMeta) {
+      const title = `${mdxMeta.title} | Next.js Blog Example with ${CMS_NAME}`;
+      return {
         title,
-        images: [mdxContent.meta.ogImage?.url || mdxContent.meta.coverImage],
-      },
-    };
+        openGraph: {
+          title,
+          images: [mdxMeta.ogImage?.url || mdxMeta.coverImage],
+        },
+      };
+    }
   }
   
   // 通常のMarkdownファイルの処理
