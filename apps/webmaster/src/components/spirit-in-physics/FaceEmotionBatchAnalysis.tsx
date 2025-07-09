@@ -152,12 +152,12 @@ export default function FaceEmotionAnalysisRest() {
         setError(null);
         
         // Update emotions if they exist in the response
-        if (result.emotions) {
+        if (result.emotions && Array.isArray(result.emotions)) {
           setEmotions(result.emotions.sort((a, b) => b.score - a.score));
           setDebugInfo(`最終更新: ${new Date().toLocaleTimeString()}\n感情分析が完了しました`);
-        } else if (result.predictions && result.predictions.emotions) {
+        } else if ((result as any).predictions && (result as any).predictions.emotions) {
           // Handle alternative response structure
-          setEmotions(result.predictions.emotions.sort((a, b) => b.score - a.score));
+          setEmotions((result as any).predictions.emotions.sort((a: any, b: any) => b.score - a.score));
           setDebugInfo(`最終更新: ${new Date().toLocaleTimeString()}\n感情分析が完了しました (新フォーマット)`);
         } else {
           setDebugInfo(prev => `${prev}\n感情データがレスポンスに含まれていません\n受信データ: ${JSON.stringify(result).substring(0, 100)}...`);
