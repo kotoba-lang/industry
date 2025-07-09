@@ -71,7 +71,9 @@ async function processTextWithMethods(
             methodDetails[method] = result.details;
         } catch (error) {
             console.error(`手法 ${method} でエラー:`, error);
-            methodDetails[method] = { error: error.message };
+            methodDetails[method] = {
+                error: error instanceof Error ? error.message : String(error),
+            };
         }
     }
 
@@ -141,7 +143,7 @@ async function applyAttackMethod(
 
 // Adversarial Paraphrasing (敵対的言い換え)
 function applyAdversarialParaphrasing(text: string, intensity: number) {
-    const patterns = [
+    const patterns: [RegExp, string][] = [
         [/(\w+)している/g, "$1を行っている"],
         [/(\w+)する/g, "$1を実施する"],
         [/(\w+)した/g, "$1を行った"],
@@ -220,7 +222,7 @@ function applyGradEscape(text: string, intensity: number) {
 
 // SilverSpeak (同形異義文字攻撃)
 function applySilverSpeak(text: string, intensity: number) {
-    const homoglyphs = {
+    const homoglyphs: Record<string, string[]> = {
         "a": ["a", "а", "ɑ", "α"],
         "o": ["o", "о", "ο", "օ"],
         "e": ["e", "е", "ε"],
@@ -273,7 +275,7 @@ function applySilverSpeak(text: string, intensity: number) {
 
 // Syntactic Perturbation (統語的摂動)
 function applySyntacticPerturbation(text: string, intensity: number) {
-    const syntacticPatterns = [
+    const syntacticPatterns: [RegExp, string][] = [
         [/(\w+)のため、(\w+)/g, "$1により、$2"],
         [/(\w+)によって(\w+)/g, "$2は$1を原因として"],
         [/その後、(\w+)/g, "続いて、$1"],
@@ -344,7 +346,7 @@ function applySyntacticPerturbation(text: string, intensity: number) {
 
 // Linguistic Complexity (言語複雑性攻撃)
 function applyLinguisticComplexity(text: string, intensity: number) {
-    const complexifiers = [
+    const complexifiers: [RegExp, string][] = [
         [/(\w+である)/g, "$1と考えられる"],
         [/(\w+している)/g, "$1と思われる"],
         [/(\w+)。/g, "$1と報告されている。"],
@@ -482,10 +484,9 @@ function applyBertAttack(text: string, intensity: number) {
             const regex = new RegExp(original, "g");
             const matches = modifiedText.match(regex);
             if (matches) {
-                const replacement =
-                    alternatives[
-                        Math.floor(Math.random() * alternatives.length)
-                    ];
+                const replacement = alternatives[
+                    Math.floor(Math.random() * alternatives.length)
+                ];
                 modifiedText = modifiedText.replace(regex, replacement);
                 changeCount += matches.length;
             }
@@ -584,10 +585,9 @@ function applyTokenBreak(text: string, intensity: number) {
     // ゼロ幅文字の挿入
     for (let i = 0; i < modifiedText.length; i += 10) {
         if (Math.random() < intensity * 0.3) {
-            const zwChar =
-                zeroWidthChars[
-                    Math.floor(Math.random() * zeroWidthChars.length)
-                ];
+            const zwChar = zeroWidthChars[
+                Math.floor(Math.random() * zeroWidthChars.length)
+            ];
             modifiedText = modifiedText.slice(0, i) + zwChar +
                 modifiedText.slice(i);
             changeCount++;
