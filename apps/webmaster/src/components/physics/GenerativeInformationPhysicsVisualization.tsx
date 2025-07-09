@@ -27,7 +27,7 @@ export interface PhysicsPhase {
 const physicsPhases: PhysicsPhase[] = [
   {
     id: 0,
-    name: "BigBang",
+    name: "Big Bang",
     time: "t = 0",
     infoDensity: 1e120,
     complexity: 1e100,
@@ -36,12 +36,12 @@ const physicsPhases: PhysicsPhase[] = [
     entanglement: 1.0,
     consciousness: 0.0,
     equation: "H = √(8πGρ/3) → ∞",
-    description: "特異点における無限の情報密度と計算複雑性。宇宙の初期条件として全ての情報が凝縮。",
+    description: "Infinite information density and computational complexity at the singularity. All information condensed as the universe's initial condition.",
     color: "#ff6b6b"
   },
   {
     id: 1,
-    name: "インフレーション",
+    name: "Inflation",
     time: "t = 10⁻³²s",
     infoDensity: 1e80,
     complexity: 1e60,
@@ -50,12 +50,12 @@ const physicsPhases: PhysicsPhase[] = [
     entanglement: 0.99,
     consciousness: 0.01,
     equation: "a(t) = a₀ e^(Ht)",
-    description: "指数的膨張により情報が希釈されるが、量子揺らぎが新しい情報を生成。計算複雑性は急速に増大。",
+    description: "Exponential expansion dilutes information, but quantum fluctuations generate new information. Computational complexity increases rapidly.",
     color: "#4ecdc4"
   },
   {
     id: 2,
-    name: "クォーク閉じ込め",
+    name: "Quark Confinement",
     time: "t = 10⁻⁶s",
     infoDensity: 1e70,
     complexity: 1e50,
@@ -64,12 +64,12 @@ const physicsPhases: PhysicsPhase[] = [
     entanglement: 0.95,
     consciousness: 0.05,
     equation: "QCD: g²/(12π) → 0",
-    description: "強い相互作用により陽子・中性子が形成。量子色力学による情報処理の新しい階層が出現。",
+    description: "Strong interactions form protons and neutrons. New hierarchy of information processing emerges through quantum chromodynamics.",
     color: "#45b7d1"
   },
   {
     id: 3,
-    name: "原始核合成",
+    name: "Primordial Nucleosynthesis",
     time: "t = 10²s",
     infoDensity: 1e65,
     complexity: 1e45,
@@ -78,13 +78,13 @@ const physicsPhases: PhysicsPhase[] = [
     entanglement: 0.90,
     consciousness: 0.10,
     equation: "⁴He + ²H → ⁶Li + γ",
-    description: "軽元素合成により核構造の情報が固定化。元素存在比が情報処理の基盤を提供。",
+    description: "Light element synthesis fixes nuclear structure information. Element abundance ratios provide foundation for information processing.",
     color: "#96ceb4"
   },
   {
     id: 4,
-    name: "再結合",
-    time: "t = 3.8×10⁵年",
+    name: "Recombination",
+    time: "t = 3.8×10⁵ years",
     infoDensity: 1e60,
     complexity: 1e40,
     genRate: 1e30,
@@ -92,13 +92,13 @@ const physicsPhases: PhysicsPhase[] = [
     entanglement: 0.80,
     consciousness: 0.20,
     equation: "p + e⁻ → H + γ",
-    description: "水素原子の形成により光子が自由に伝播。宇宙背景放射として情報が保存される。",
+    description: "Hydrogen atom formation allows photons to travel freely. Information preserved as cosmic microwave background radiation.",
     color: "#ffeaa7"
   },
   {
     id: 5,
-    name: "最初の星",
-    time: "t = 10⁸年",
+    name: "First Stars",
+    time: "t = 10⁸ years",
     infoDensity: 1e55,
     complexity: 1e35,
     genRate: 1e25,
@@ -106,13 +106,13 @@ const physicsPhases: PhysicsPhase[] = [
     entanglement: 0.70,
     consciousness: 0.30,
     equation: "M_Jeans = (kT/Gm)^(3/2) ρ^(-1/2)",
-    description: "重力収縮により最初の星が誕生。核融合により重元素が生成され、化学的複雑性が出現。",
+    description: "Gravitational collapse births first stars. Nuclear fusion generates heavy elements, enabling chemical complexity.",
     color: "#fd79a8"
   },
   {
     id: 6,
-    name: "銀河形成",
-    time: "t = 10⁹年",
+    name: "Galaxy Formation",
+    time: "t = 10⁹ years",
     infoDensity: 1e50,
     complexity: 1e30,
     genRate: 1e20,
@@ -120,13 +120,13 @@ const physicsPhases: PhysicsPhase[] = [
     entanglement: 0.60,
     consciousness: 0.50,
     equation: "t_ff = √(3π/32Gρ)",
-    description: "銀河スケールの構造形成。恒星系の形成により惑星環境が整備され、複雑な化学進化が可能に。",
+    description: "Galaxy-scale structure formation. Stellar system formation establishes planetary environments, enabling complex chemical evolution.",
     color: "#a29bfe"
   },
   {
     id: 7,
-    name: "現在",
-    time: "t = 13.8×10⁹年",
+    name: "Present",
+    time: "t = 13.8×10⁹ years",
     infoDensity: 1e45,
     complexity: 1e25,
     genRate: 1e15,
@@ -134,7 +134,7 @@ const physicsPhases: PhysicsPhase[] = [
     entanglement: 0.50,
     consciousness: 0.80,
     equation: "Φ = ∫ φ(x) log φ(x) dx",
-    description: "生命と意識の出現。情報処理能力が生物学的進化を通じて飛躍的に向上。意識による宇宙の自己認識。",
+    description: "Life and consciousness emerge. Information processing capabilities improve dramatically through biological evolution. Conscious self-recognition of the universe.",
     color: "#6c5ce7"
   }
 ]
@@ -149,7 +149,7 @@ export function GenerativeInformationPhysicsVisualization() {
 
   const currentPhaseData = physicsPhases[currentPhase]
 
-  // 自動進行アニメーション
+  // Auto-progression animation
   useEffect(() => {
     if (isPlaying) {
       animationRef.current = setInterval(() => {
@@ -193,7 +193,7 @@ export function GenerativeInformationPhysicsVisualization() {
     <div className="w-full max-w-7xl mx-auto space-y-6">
 
 
-      {/* 制御パネル */}
+      {/* Control panel */}
       <PhysicsControls
         isPlaying={isPlaying}
         quantumMode={quantumMode}
@@ -206,21 +206,21 @@ export function GenerativeInformationPhysicsVisualization() {
         onParametersToggle={() => setShowParameters(!showParameters)}
       />
       
-      {/* メインビジュアライゼーション */}
+      {/* Main visualization */}
       <motion.div 
         className="relative bg-black/30 backdrop-blur-sm rounded-3xl border border-white/10 overflow-hidden"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8 }}
       >
-        {/* タイムライン */}
+        {/* Timeline */}
         <TimelineSelector
           phases={physicsPhases}
           currentPhase={currentPhase}
           onPhaseSelect={handlePhaseChange}
         />
         
-        {/* キャンバス */}
+        {/* Canvas */}
         <div className="relative">
           <PhysicsCanvas
             phase={currentPhaseData}
@@ -228,7 +228,7 @@ export function GenerativeInformationPhysicsVisualization() {
             isPlaying={isPlaying}
           />
           
-          {/* フェーズインジケーター */}
+          {/* Phase indicator */}
           <motion.div 
             className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm rounded-xl px-4 py-2 text-white"
             key={currentPhase}
@@ -243,14 +243,14 @@ export function GenerativeInformationPhysicsVisualization() {
       </motion.div>
 
 
-      {/* 方程式表示 */}
+      {/* Equation display */}
       <EquationDisplay
         equation={currentPhaseData.equation}
         description={currentPhaseData.description}
         phase={currentPhaseData}
       />
 
-      {/* パラメータ表示 */}
+      {/* Parameter display */}
       <AnimatePresence>
         {showParameters && (
           <motion.div
@@ -264,7 +264,7 @@ export function GenerativeInformationPhysicsVisualization() {
         )}
       </AnimatePresence>
 
-      {/* 複雑性メーター */}
+      {/* Complexity meter */}
       <ComplexityMeter 
         phase={currentPhaseData}
         totalPhases={physicsPhases.length}
