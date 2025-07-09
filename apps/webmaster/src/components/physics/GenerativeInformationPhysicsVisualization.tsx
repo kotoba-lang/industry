@@ -139,7 +139,7 @@ const physicsPhases: PhysicsPhase[] = [
   }
 ]
 
-export function GenerativePhysicsVisualization() {
+export function GenerativeInformationPhysicsVisualization() {
   const [currentPhase, setCurrentPhase] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [quantumMode, setQuantumMode] = useState(false)

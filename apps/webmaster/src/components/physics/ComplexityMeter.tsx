@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { PhysicsPhase } from './GenerativePhysicsVisualization'
+import { PhysicsPhase } from './GenerativeInformationPhysicsVisualization'
 import { Cpu, Zap, Brain, Atom, Sparkles } from 'lucide-react'
 
 interface ComplexityMeterProps {

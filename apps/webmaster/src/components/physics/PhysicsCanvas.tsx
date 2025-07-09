@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { PhysicsPhase } from './GenerativePhysicsVisualization'
+import { PhysicsPhase } from './GenerativeInformationPhysicsVisualization'
 
 interface PhysicsCanvasProps {
   phase: PhysicsPhase
