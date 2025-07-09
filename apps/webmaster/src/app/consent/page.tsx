@@ -1,7 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import ConsentForm, { DemographicData } from '@/components/consent/ConsentForm';
+import ConsentForm from '@/components/consent/ConsentForm';
+import { DemographicData } from '@/lib/db/schema/demographic';
 
 export default function ConsentPage() {
   const router = useRouter();

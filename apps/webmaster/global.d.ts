@@ -12,4 +12,10 @@ declare global {
   }
 }
 
+// MDXファイルの型宣言
+declare module '*.mdx' {
+  import { MDXProps } from 'mdx/types'
+  export default function MDXComponent(props: MDXProps): JSX.Element
+}
+
 export {}; 

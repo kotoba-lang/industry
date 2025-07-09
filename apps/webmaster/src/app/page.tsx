@@ -4,6 +4,7 @@ import { Intro } from "@/app/_components/intro";
 import { MoreStories } from "@/app/_components/more-stories";
 import { getAllPosts } from "@/lib/api";
 import { Career } from "@/app/_components/career";
+
 export default function Index() {
   const allPosts = getAllPosts();
 
