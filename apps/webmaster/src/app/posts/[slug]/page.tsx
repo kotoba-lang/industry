@@ -9,18 +9,12 @@ import Header from "@/app/_components/header";
 import { PostBody } from "@/app/_components/post-body";
 import { PostHeader } from "@/app/_components/post-header";
 
-import SpiritInPhisics from "@/app/pages/[slug]/page"
-
 export default async function Post(props: Params) {
   const params = await props.params;
   const post = getPostBySlug(params.slug);
 
   if (!post) {
     return notFound();
-  }
-
-  if (params.slug == "spirit-in-physics") {
-    return (<SpiritInPhisics />)
   }
 
   const content = await markdownToHtml(post.content || "");

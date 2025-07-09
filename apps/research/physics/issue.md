@@ -56,7 +56,13 @@
    - D-brane inflation の観測整合性確認
    - Flux compactification の数学的構築
    - 10次元 → 4次元有効理論の厳密導出
-Extra dimensions effect: Kaluza-Klein modes の宇宙論的帰結
+✅ Extra dimensions effect: Kaluza-Klein modes の宇宙論的帰結 **【完了 2025/01】**
+   - ADD Model (Large Extra Dimensions) の重力希釈効果
+   - Randall-Sundrum Model のワープ余剰次元
+   - Universal Extra Dimensions の KK tower
+   - 階層問題の幾何学的解決メカニズム
+   - KK dark matter 候補の遺存量計算
+   - 観測制約との詳細比較・検証
 Modified gravity theories: f(R), scalar-tensor theories との統合
 🔬 中優先課題（2年以内）
 5. 計算革命の導入
