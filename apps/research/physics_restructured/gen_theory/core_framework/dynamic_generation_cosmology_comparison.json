@@ -1,0 +1,121 @@
+{
+  "chi2_results": {
+    "components": {
+      "H0": {
+        "chi2": 0.09700920568833414,
+        "dof": 1,
+        "predicted": 67.5281900246112,
+        "planck_tension": 0.3114630085392712,
+        "SH0ES_tension": 5.299817284027692
+      },
+      "sigma_8": {
+        "chi2": 14.522038553783753,
+        "dof": 1,
+        "predicted": 0.8390263644196001,
+        "planck_tension": 4.6543940699333435,
+        "KiDS_tension": 3.8107792580761948
+      },
+      "dark_energy_eos": {
+        "chi2": 1.5287598485506044,
+        "dof": 3,
+        "predicted": [
+          -0.9872039514056975,
+          -0.9879940020033898,
+          -0.9889154266685246
+        ],
+        "observed": [
+          -1.01,
+          -1.01,
+          -1.01
+        ],
+        "average_w": -0.9880377933592039
+      },
+      "JWST_high_z": {
+        "chi2": 24.889695991418947,
+        "dof": 1,
+        "predicted": 0.005521297373991179,
+        "observed": 2.5
+      }
+    },
+    "total_chi2": 41.037503599441635,
+    "total_dof": 6,
+    "reduced_chi2": 6.839583933240273,
+    "p_value": 2.846822239055413e-07,
+    "goodness_of_fit": "poor"
+  },
+  "information_criteria": {
+    "AIC": 51.037503599441635,
+    "BIC": 55.48936238892246,
+    "AICc": 56.037503599441635,
+    "log_likelihood": -20.518751799720818,
+    "n_parameters": 5,
+    "n_data_points": 18
+  },
+  "model_comparison": {
+    "LCDM_predictions": {
+      "H0": 67.36,
+      "sigma_8": 0.8111,
+      "w": -1.0,
+      "JWST_excess": 1.0
+    },
+    "DGT_predictions": {
+      "H0": 67.5281900246112,
+      "sigma_8": 0.8390263644196001,
+      "w": -0.9879940020033898,
+      "JWST_excess": 0.005521297373991179
+    },
+    "observations": {
+      "H0_planck": 67.36,
+      "H0_SH0ES": 73.04,
+      "sigma_8_planck": 0.8111,
+      "sigma_8_KiDS": 0.759,
+      "w_pantheon": -1.01,
+      "JWST_excess_obs": 2.5
+    },
+    "LCDM_tensions": {
+      "H0_tension": 5.461538461538468,
+      "sigma_8_tension": 2.4809523809523824,
+      "JWST_tension": 3.0
+    },
+    "DGT_tensions": {
+      "H0_tension": 0.3114630085392712,
+      "sigma_8_tension": 3.8107792580761948,
+      "JWST_tension": 4.988957405252018
+    },
+    "improvements_percent": {
+      "H0_tension": 94.29715618167532,
+      "sigma_8_tension": -53.60146721612292,
+      "JWST_tension": -66.29858017506726
+    },
+    "overall_improvement": -8.534297069838287
+  },
+  "future_predictions": {
+    "CMB_S4_mu_distortion": {
+      "predicted_enhancement": 0.015,
+      "detection_significance": "3.2σ",
+      "expected_signal": "0.015 × standard prediction"
+    },
+    "LISA_GW_enhancement": {
+      "strain_enhancement_factor": 1.004,
+      "frequency_range": "10^-4 to 10^-1 Hz",
+      "detection_confidence": "95%"
+    },
+    "Euclid_weak_lensing": {
+      "power_spectrum_enhancement": 0.002,
+      "l_range": "100 to 5000",
+      "statistical_precision": "1% measurement precision"
+    },
+    "SKA_21cm": {
+      "signal_modification_factor": 1.0036,
+      "redshift_range": "6 to 20",
+      "detection_method": "power spectrum and global signal"
+    },
+    "JWST_extended": {
+      "z_15_galaxy_excess": 1.8,
+      "stellar_mass_function_deviation": "20% from ΛCDM",
+      "cosmic_dawn_signature": "enhanced star formation efficiency"
+    }
+  },
+  "overall_score": 0,
+  "verdict": "要改良 - 大幅な理論的改善が必要"
+}
