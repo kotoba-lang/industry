@@ -33,6 +33,7 @@
 
 **インタラクティブ計算**:
 - [σ₈問題解決](notebooks/sigma8_solution.ipynb) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/junkawasaki/junkawasaki.com/blob/main/apps/research/physics_restructured/notebooks/sigma8_solution.ipynb)
+- [H₀テンション解決](notebooks/h0_tension_resolution.ipynb) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/junkawasaki/junkawasaki.com/blob/main/apps/research/physics_restructured/notebooks/h0_tension_resolution.ipynb)
 - [宇宙論パラメータ統一計算](notebooks/cosmological_parameters.ipynb) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/junkawasaki/junkawasaki.com/blob/main/apps/research/physics_restructured/notebooks/cosmological_parameters.ipynb)
 - [新物理統合解析](notebooks/new_physics_integration.ipynb) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/junkawasaki/junkawasaki.com/blob/main/apps/research/physics_restructured/notebooks/new_physics_integration.ipynb)
 
@@ -50,12 +51,14 @@
 - [公理系検証](notebooks/axioms_verification.ipynb) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/junkawasaki/junkawasaki.com/blob/main/apps/research/physics_restructured/notebooks/axioms_verification.ipynb)
 - [Wheeler-DeWitt時間問題](notebooks/time_problem_resolution.ipynb) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/junkawasaki/junkawasaki.com/blob/main/apps/research/physics_restructured/notebooks/time_problem_resolution.ipynb)
 - [Born-Oppenheimer近似](notebooks/born_oppenheimer_resolution.ipynb) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/junkawasaki/junkawasaki.com/blob/main/apps/research/physics_restructured/notebooks/born_oppenheimer_resolution.ipynb)
+- [経路積分宇宙論](notebooks/path_integral_cosmology.ipynb) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/junkawasaki/junkawasaki.com/blob/main/apps/research/physics_restructured/notebooks/path_integral_cosmology.ipynb)
 
 ### [💻 計算フレームワーク](computational_framework/)
 エクサスケール計算による革命的シミュレーション
 
 **インタラクティブ計算**:
 - [エクサスケール宇宙論](notebooks/exascale_cosmology.ipynb) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/junkawasaki/junkawasaki.com/blob/main/apps/research/physics_restructured/notebooks/exascale_cosmology.ipynb)
+- [GPU並列化とエクサスケール計算](notebooks/gpu_parallelization.ipynb) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/junkawasaki/junkawasaki.com/blob/main/apps/research/physics_restructured/notebooks/gpu_parallelization.ipynb)
 - [並列最適化](notebooks/parallel_optimization.ipynb) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/junkawasaki/junkawasaki.com/blob/main/apps/research/physics_restructured/notebooks/parallel_optimization.ipynb)
 - [性能ベンチマーク](notebooks/performance_benchmarking.ipynb) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/junkawasaki/junkawasaki.com/blob/main/apps/research/physics_restructured/notebooks/performance_benchmarking.ipynb)
 
@@ -71,8 +74,8 @@
 
 **インタラクティブ計算**:
 - [Axion暗黒物質](notebooks/axion_dark_matter.ipynb) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/junkawasaki/junkawasaki.com/blob/main/apps/research/physics_restructured/notebooks/axion_dark_matter.ipynb)
-- [ステライルニュートリノ](notebooks/sterile_neutrino.ipynb) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/junkawasaki/junkawasaki.com/blob/main/apps/research/physics_restructured/notebooks/sterile_neutrino.ipynb)
-- [原始ブラックホール](notebooks/primordial_black_hole.ipynb) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/junkawasaki/junkawasaki.com/blob/main/apps/research/physics_restructured/notebooks/primordial_black_hole.ipynb)
+- [ステライルニュートリノ解析](notebooks/sterile_neutrino_analysis.ipynb) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/junkawasaki/junkawasaki.com/blob/main/apps/research/physics_restructured/notebooks/sterile_neutrino_analysis.ipynb)
+- [原始ブラックホール形成](notebooks/primordial_black_hole.ipynb) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/junkawasaki/junkawasaki.com/blob/main/apps/research/physics_restructured/notebooks/primordial_black_hole.ipynb)
 
 ### [✅ テスト・検証](tests_validation/)
 理論の厳密な検証とパラメータ最適化
