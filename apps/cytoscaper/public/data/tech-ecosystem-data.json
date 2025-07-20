@@ -263,6 +263,90 @@
         "details": "量子ビット、量子もつれ、量子アルゴリズム",
         "mathConnection": ["quantum_mechanics", "linear_algebra", "complex_analysis"]
       }
+    },
+    {
+      "data": { 
+        "id": "postgresql", 
+        "label": "PostgreSQL\n(遺伝子ライブラリ)", 
+        "type": "genetic_library",
+        "category": "Data Storage",
+        "level": 6,
+        "description": "ACID特性とSQL標準準拠の高性能データベース。構造化された遺伝情報を保存・検索する遺伝子ライブラリ。",
+        "details": "JSONB、全文検索、拡張性、トランザクション制御",
+        "mathConnection": ["set_theory", "relational_algebra", "formal_logic"]
+      }
+    },
+    {
+      "data": { 
+        "id": "rest_api", 
+        "label": "REST API\n(細胞膜受容体)", 
+        "type": "membrane_receptor",
+        "category": "Communication Layer",
+        "level": 5,
+        "description": "RESTful設計原則に基づくAPI。外部からの情報を受容し、内部システムに伝達する細胞膜受容体。",
+        "details": "HTTP動詞、ステートレス、統一インターフェース、キャッシュ可能",
+        "mathConnection": ["graph_theory", "information_theory"]
+      }
+    },
+    {
+      "data": { 
+        "id": "json_rpc", 
+        "label": "JSON-RPC\n(神経信号)", 
+        "type": "neural_signal",
+        "category": "Communication Layer",
+        "level": 5,
+        "description": "リモートプロシージャコール。システム間で関数呼び出しを伝達する神経信号システム。",
+        "details": "メソッド呼び出し、パラメータ渡し、結果返却、エラーハンドリング",
+        "mathConnection": ["functional_programming", "message_passing"]
+      }
+    },
+    {
+      "data": { 
+        "id": "model_context_protocol", 
+        "label": "Model Context Protocol\n(知識共有網)", 
+        "type": "knowledge_network",
+        "category": "AI Communication",
+        "level": 9,
+        "description": "AIモデル間のコンテキスト共有プロトコル。知識を効率的に共有する高度な知識共有ネットワーク。",
+        "details": "コンテキスト転送、モデル間通信、知識蒸留、プロンプト最適化",
+        "mathConnection": ["information_theory", "machine_learning", "optimization_theory"]
+      }
+    },
+    {
+      "data": { 
+        "id": "a2a_integration", 
+        "label": "A2A統合\n(共生ネットワーク)", 
+        "type": "symbiotic_network",
+        "category": "Integration Layer",
+        "level": 6,
+        "description": "Application-to-Application統合。異なるアプリケーション間の密接な共生関係を実現。",
+        "details": "データ変換、メッセージルーティング、プロトコル変換、エラー処理",
+        "mathConnection": ["graph_theory", "network_theory"]
+      }
+    },
+    {
+      "data": { 
+        "id": "camunda", 
+        "label": "Camunda\n(代謝経路調整者)", 
+        "type": "metabolic_regulator",
+        "category": "Workflow Engine",
+        "level": 7,
+        "description": "BPMN対応ワークフローエンジン。複雑なビジネスプロセスを調整する代謝経路調整者。",
+        "details": "BPMN、DMN、プロセス自動化、タスク管理、監視・最適化",
+        "mathConnection": ["process_algebra", "petri_nets", "graph_theory"]
+      }
+    },
+    {
+      "data": { 
+        "id": "event_sourcing", 
+        "label": "Event Sourcing\n(記憶形成システム)", 
+        "type": "memory_formation",
+        "category": "Architecture Pattern",
+        "level": 8,
+        "description": "イベント駆動アーキテクチャ。すべての変更を記録し、状態を再構築する記憶形成システム。",
+        "details": "イベントストア、スナップショット、CQRS、時系列データ",
+        "mathConnection": ["temporal_logic", "sequence_analysis", "state_machines"]
+      }
     }
   ],
   "edges": [
@@ -306,7 +390,22 @@
     { "data": { "source": "graph_databases", "target": "ml_libraries", "type": "data_synergy", "label": "グラフML" } },
     
     { "data": { "source": "security_tools", "target": "cloud_platforms", "type": "security_layer", "label": "クラウドセキュリティ" } },
-    { "data": { "source": "monitoring_observability", "target": "ai_ml_platforms", "type": "intelligent_ops", "label": "AIOps" } }
+    { "data": { "source": "monitoring_observability", "target": "ai_ml_platforms", "type": "intelligent_ops", "label": "AIOps" } },
+    
+    { "data": { "source": "databases", "target": "postgresql", "type": "specialization", "label": "高性能DB特化" } },
+    { "data": { "source": "postgresql", "target": "a2a_integration", "type": "data_source", "label": "データソース提供" } },
+    { "data": { "source": "backend_frameworks", "target": "rest_api", "type": "api_layer", "label": "API層実装" } },
+    { "data": { "source": "backend_frameworks", "target": "json_rpc", "type": "rpc_layer", "label": "RPC実装" } },
+    { "data": { "source": "rest_api", "target": "a2a_integration", "type": "integration_method", "label": "統合手段" } },
+    { "data": { "source": "json_rpc", "target": "a2a_integration", "type": "integration_method", "label": "統合手段" } },
+    { "data": { "source": "a2a_integration", "target": "camunda", "type": "workflow_trigger", "label": "ワークフロー起動" } },
+    { "data": { "source": "camunda", "target": "event_sourcing", "type": "process_recording", "label": "プロセス記録" } },
+    { "data": { "source": "event_sourcing", "target": "postgresql", "type": "event_storage", "label": "イベント保存" } },
+    { "data": { "source": "ai_ml_platforms", "target": "model_context_protocol", "type": "ai_communication", "label": "AI間通信" } },
+    { "data": { "source": "model_context_protocol", "target": "rest_api", "type": "protocol_implementation", "label": "プロトコル実装" } },
+    { "data": { "source": "devops_tools", "target": "camunda", "type": "automation_orchestration", "label": "自動化連携" } },
+    { "data": { "source": "cloud_platforms", "target": "rest_api", "type": "service_exposure", "label": "サービス公開" } },
+    { "data": { "source": "monitoring_observability", "target": "event_sourcing", "type": "audit_trail", "label": "監査証跡" } }
   ],
   "mathConnections": [
     { "data": { "source": "linear_algebra", "target": "ml_libraries", "type": "math_implementation", "label": "行列演算実装", "category": "mathematical_bridge" } },
@@ -349,6 +448,18 @@
     { "data": { "source": "topology", "target": "graph_databases", "type": "math_application", "label": "ネットワーク位相", "category": "mathematical_bridge" } },
     
     { "data": { "source": "combinatorics", "target": "network_protocols", "type": "math_application", "label": "組合せ最適化", "category": "mathematical_bridge" } },
-    { "data": { "source": "data_science_ai", "target": "ai_ml_platforms", "type": "math_evolution", "label": "AI/ML統合", "category": "mathematical_bridge" } }
+    { "data": { "source": "data_science_ai", "target": "ai_ml_platforms", "type": "math_evolution", "label": "AI/ML統合", "category": "mathematical_bridge" } },
+    
+    { "data": { "source": "set_theory", "target": "postgresql", "type": "math_foundation", "label": "関係代数・集合操作", "category": "mathematical_bridge" } },
+    { "data": { "source": "mathematical_logic", "target": "postgresql", "type": "math_foundation", "label": "論理制約・推論", "category": "mathematical_bridge" } },
+    { "data": { "source": "graph_theory", "target": "rest_api", "type": "math_application", "label": "APIネットワーク構造", "category": "mathematical_bridge" } },
+    { "data": { "source": "category_theory", "target": "json_rpc", "type": "math_influence", "label": "関数合成・射", "category": "mathematical_bridge" } },
+    { "data": { "source": "data_science_ai", "target": "model_context_protocol", "type": "math_implementation", "label": "情報エントロピー最適化", "category": "mathematical_bridge" } },
+    { "data": { "source": "optimization_theory", "target": "model_context_protocol", "type": "math_implementation", "label": "コンテキスト最適化", "category": "mathematical_bridge" } },
+    { "data": { "source": "graph_theory", "target": "a2a_integration", "type": "math_application", "label": "統合ネットワーク設計", "category": "mathematical_bridge" } },
+    { "data": { "source": "algebra", "target": "camunda", "type": "math_application", "label": "プロセス代数", "category": "mathematical_bridge" } },
+    { "data": { "source": "combinatorics", "target": "camunda", "type": "math_application", "label": "ワークフロー最適化", "category": "mathematical_bridge" } },
+    { "data": { "source": "mathematical_logic", "target": "event_sourcing", "type": "math_foundation", "label": "時相論理・状態遷移", "category": "mathematical_bridge" } },
+    { "data": { "source": "probability_statistics", "target": "event_sourcing", "type": "math_implementation", "label": "イベント系列解析", "category": "mathematical_bridge" } }
   ]
 } 
