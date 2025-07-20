@@ -1896,14 +1896,14 @@ export default function CytoscapeVisualization() {
 
   // ビューモード変更時のデータ更新
   useEffect(() => {
-    if (cyRef.current && (mathData || techData || orgData)) {
+    if (cyRef.current && (mathData || techData || orgData || gftdData)) {
       const currentData = getCurrentData();
       cyRef.current.elements().remove();
       cyRef.current.add([...currentData.nodes, ...currentData.edges]);
       cyRef.current.layout({ name: currentLayout }).run();
       updateAvailableNodes(cyRef.current);
     }
-  }, [viewMode, getCurrentData, currentLayout, updateAvailableNodes, mathData, techData, orgData, gftdData, userEdits]);
+  }, [viewMode, currentLayout, mathData, techData, orgData, gftdData, userEdits]);
 
   // コントロール関数
   const resetView = useCallback(() => {
