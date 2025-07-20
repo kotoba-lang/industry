@@ -51,9 +51,12 @@ export default function CytoscapeVisualization() {
   const [nodeFormData, setNodeFormData] = useState<Partial<NodeData>>({});
   const [edgeFormData, setEdgeFormData] = useState<Partial<EdgeData>>({});
   const [availableNodes, setAvailableNodes] = useState<Array<{id: string, label: string}>>([]);
-  const [viewMode, setViewMode] = useState<'math' | 'tech' | 'integrated'>('integrated');
+  const [viewMode, setViewMode] = useState<'math' | 'tech' | 'org' | 'integrated'>('integrated');
   const [mathData, setMathData] = useState<TheoryData | null>(null);
   const [techData, setTechData] = useState<TheoryData | null>(null);
+  const [orgData, setOrgData] = useState<TheoryData | null>(null);
+  const [userEdits, setUserEdits] = useState<{nodes: any[], edges: any[]}>({nodes: [], edges: []});
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // JSONデータの読み込み
   const loadMathData = useCallback(async (): Promise<TheoryData> => {
@@ -99,25 +102,66 @@ export default function CytoscapeVisualization() {
     }
   }, []);
 
+  const loadOrgData = useCallback(async (): Promise<TheoryData> => {
+    try {
+      console.log('Loading organization data...');
+      const response = await fetch('/data/organization-ecosystem-data.json');
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Organization data loaded successfully');
+      console.log('Org Nodes:', data.nodes.length);
+      console.log('Org Edges:', data.edges.length);
+      console.log('Math Connections:', data.mathConnections?.length || 0);
+      
+      return data;
+    } catch (error) {
+      console.error('Error loading organization data:', error);
+      throw error;
+    }
+  }, []);
+
   const getIntegratedData = useCallback((): TheoryData => {
-    if (!mathData || !techData) {
-      return { nodes: [], edges: [] };
+    const allNodes = [];
+    const allEdges = [];
+    const allMathConnections = [];
+
+    if (mathData) {
+      allNodes.push(...mathData.nodes);
+      allEdges.push(...mathData.edges);
+    }
+    
+    if (techData) {
+      allNodes.push(...techData.nodes);
+      allEdges.push(...techData.edges);
+      if (techData.mathConnections) {
+        allMathConnections.push(...techData.mathConnections);
+        allEdges.push(...techData.mathConnections);
+      }
+    }
+    
+    if (orgData) {
+      allNodes.push(...orgData.nodes);
+      allEdges.push(...orgData.edges);
+      if (orgData.mathConnections) {
+        allMathConnections.push(...orgData.mathConnections);
+        allEdges.push(...orgData.mathConnections);
+      }
     }
 
-    const allNodes = [...mathData.nodes, ...techData.nodes];
-    const allEdges = [...mathData.edges, ...techData.edges];
-    
-    // 数学理論とIT技術の連携エッジを追加
-    if (techData.mathConnections) {
-      allEdges.push(...techData.mathConnections);
-    }
+    // ユーザー編集データを追加
+    allNodes.push(...userEdits.nodes);
+    allEdges.push(...userEdits.edges);
 
     return {
       nodes: allNodes,
       edges: allEdges,
-      mathConnections: techData.mathConnections
+      mathConnections: allMathConnections
     };
-  }, [mathData, techData]);
+  }, [mathData, techData, orgData, userEdits]);
 
   const getCurrentData = useCallback((): TheoryData => {
     switch (viewMode) {
@@ -125,12 +169,102 @@ export default function CytoscapeVisualization() {
         return mathData || { nodes: [], edges: [] };
       case 'tech':
         return techData || { nodes: [], edges: [] };
+      case 'org':
+        return orgData || { nodes: [], edges: [] };
       case 'integrated':
         return getIntegratedData();
       default:
         return { nodes: [], edges: [] };
     }
-  }, [viewMode, mathData, techData, getIntegratedData]);
+  }, [viewMode, mathData, techData, orgData, getIntegratedData]);
+
+  // ローカルストレージ機能
+  const saveToLocalStorage = useCallback(() => {
+    try {
+      const saveData = {
+        userEdits,
+        timestamp: new Date().toISOString(),
+        version: '1.0'
+      };
+      localStorage.setItem('cytoscapeUserEdits', JSON.stringify(saveData));
+      setHasUnsavedChanges(false);
+      console.log('User edits saved to localStorage');
+      return true;
+    } catch (error) {
+      console.error('Error saving to localStorage:', error);
+      return false;
+    }
+  }, [userEdits]);
+
+  const loadFromLocalStorage = useCallback(() => {
+    try {
+      const saved = localStorage.getItem('cytoscapeUserEdits');
+      if (saved) {
+        const saveData = JSON.parse(saved);
+        setUserEdits(saveData.userEdits || {nodes: [], edges: []});
+        setHasUnsavedChanges(false);
+        console.log('User edits loaded from localStorage');
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error loading from localStorage:', error);
+      return false;
+    }
+  }, []);
+
+  const clearLocalStorage = useCallback(() => {
+    try {
+      localStorage.removeItem('cytoscapeUserEdits');
+      setUserEdits({nodes: [], edges: []});
+      setHasUnsavedChanges(false);
+      console.log('LocalStorage cleared');
+      return true;
+    } catch (error) {
+      console.error('Error clearing localStorage:', error);
+      return false;
+    }
+  }, []);
+
+  // ユーザー編集の追跡
+  const trackUserEdit = useCallback((type: 'node' | 'edge', action: 'add' | 'update' | 'delete', data: any) => {
+    setUserEdits(prev => {
+      const newUserEdits = { ...prev };
+      
+      if (type === 'node') {
+        if (action === 'add') {
+          newUserEdits.nodes = [...prev.nodes, { data }];
+        } else if (action === 'update') {
+          const index = prev.nodes.findIndex(n => n.data.id === data.id);
+          if (index >= 0) {
+            newUserEdits.nodes = [...prev.nodes];
+            newUserEdits.nodes[index] = { data };
+          } else {
+            newUserEdits.nodes = [...prev.nodes, { data }];
+          }
+        } else if (action === 'delete') {
+          newUserEdits.nodes = prev.nodes.filter(n => n.data.id !== data.id);
+        }
+      } else if (type === 'edge') {
+        if (action === 'add') {
+          newUserEdits.edges = [...prev.edges, { data }];
+        } else if (action === 'update') {
+          const index = prev.edges.findIndex(e => e.data.source === data.source && e.data.target === data.target);
+          if (index >= 0) {
+            newUserEdits.edges = [...prev.edges];
+            newUserEdits.edges[index] = { data };
+          } else {
+            newUserEdits.edges = [...prev.edges, { data }];
+          }
+        } else if (action === 'delete') {
+          newUserEdits.edges = prev.edges.filter(e => !(e.data.source === data.source && e.data.target === data.target));
+        }
+      }
+      
+      return newUserEdits;
+    });
+    setHasUnsavedChanges(true);
+  }, []);
 
   // イベントハンドラーの設定
   const setupEventHandlers = useCallback((cy: Core) => {
@@ -257,14 +391,19 @@ export default function CytoscapeVisualization() {
       if (!containerRef.current) return;
 
       try {
-        // 両方のデータを並行して読み込み
-        const [mathTheoryData, techTheoryData] = await Promise.all([
+        // 全データを並行して読み込み
+        const [mathTheoryData, techTheoryData, organizationData] = await Promise.all([
           loadMathData(),
-          loadTechData()
+          loadTechData(),
+          loadOrgData()
         ]);
         
         setMathData(mathTheoryData);
         setTechData(techTheoryData);
+        setOrgData(organizationData);
+        
+        // ローカルストレージからユーザー編集データを読み込み
+        loadFromLocalStorage();
         
         const currentData = viewMode === 'math' ? mathTheoryData : 
                            viewMode === 'tech' ? techTheoryData :
@@ -697,6 +836,202 @@ export default function CytoscapeVisualization() {
               }
             },
 
+            // 会社組織系ノードスタイル
+            {
+              selector: 'node[type="energy_source"]',
+              style: {
+                'background-color': '#FFD700',
+                'shape': 'star',
+                'width': 110,
+                'height': 110,
+                'border-color': '#FFF8DC',
+                'color': '#8B4513',
+                'text-shadow': '0 0 4px rgba(255, 255, 255, 0.9)',
+                'box-shadow': '0 0 35px rgba(255, 215, 0, 1.0)',
+                'font-size': '12px'
+              }
+            },
+            {
+              selector: 'node[type="protective_layer"]',
+              style: {
+                'background-color': '#4169E1',
+                'shape': 'round-octagon',
+                'width': 100,
+                'height': 80,
+                'border-color': '#87CEEB',
+                'box-shadow': '0 0 25px rgba(65, 105, 225, 0.8)',
+                'font-size': '11px'
+              }
+            },
+            {
+              selector: 'node[type="canopy_layer"]',
+              style: {
+                'background-color': '#228B22',
+                'shape': 'round-hexagon',
+                'width': 95,
+                'height': 95,
+                'border-color': '#90EE90',
+                'box-shadow': '0 0 25px rgba(34, 139, 34, 0.8)',
+                'font-size': '11px'
+              }
+            },
+            {
+              selector: 'node[type="management_trunk"]',
+              style: {
+                'background-color': '#8B4513',
+                'shape': 'round-rectangle',
+                'width': 90,
+                'height': 75,
+                'border-color': '#DEB887',
+                'box-shadow': '0 0 22px rgba(139, 69, 19, 0.8)',
+                'font-size': '10px'
+              }
+            },
+            {
+              selector: 'node[type="photosynthetic_organ"]',
+              style: {
+                'background-color': '#32CD32',
+                'shape': 'round-diamond',
+                'width': 85,
+                'height': 85,
+                'border-color': '#98FB98',
+                'box-shadow': '0 0 20px rgba(50, 205, 50, 0.8)',
+                'font-size': '10px'
+              }
+            },
+            {
+              selector: 'node[type="reproductive_organ"]',
+              style: {
+                'background-color': '#FF69B4',
+                'shape': 'round-pentagon',
+                'width': 80,
+                'height': 80,
+                'border-color': '#FFB6C1',
+                'box-shadow': '0 0 20px rgba(255, 105, 180, 0.8)',
+                'font-size': '10px'
+              }
+            },
+            {
+              selector: 'node[type="seed_dispersal_organ"]',
+              style: {
+                'background-color': '#FF8C00',
+                'shape': 'round-triangle',
+                'width': 75,
+                'height': 75,
+                'border-color': '#FFE4B5',
+                'box-shadow': '0 0 18px rgba(255, 140, 0, 0.8)',
+                'font-size': '9px'
+              }
+            },
+            {
+              selector: 'node[type="pollination_organ"]',
+              style: {
+                'background-color': '#DA70D6',
+                'shape': 'round-diamond',
+                'width': 80,
+                'height': 65,
+                'border-color': '#DDA0DD',
+                'box-shadow': '0 0 20px rgba(218, 112, 214, 0.8)',
+                'font-size': '9px'
+              }
+            },
+            {
+              selector: 'node[type="root_system"]',
+              style: {
+                'background-color': '#A0522D',
+                'shape': 'round-octagon',
+                'width': 85,
+                'height': 65,
+                'border-color': '#D2691E',
+                'box-shadow': '0 0 18px rgba(160, 82, 45, 0.8)',
+                'font-size': '9px'
+              }
+            },
+            {
+              selector: 'node[type="vascular_system"]',
+              style: {
+                'background-color': '#DC143C',
+                'shape': 'round-rectangle',
+                'width': 85,
+                'height': 60,
+                'border-color': '#F08080',
+                'box-shadow': '0 0 18px rgba(220, 20, 60, 0.8)',
+                'font-size': '9px'
+              }
+            },
+            {
+              selector: 'node[type="metabolic_system"]',
+              style: {
+                'background-color': '#4682B4',
+                'shape': 'ellipse',
+                'width': 80,
+                'height': 60,
+                'border-color': '#87CEEB',
+                'box-shadow': '0 0 18px rgba(70, 130, 180, 0.8)',
+                'font-size': '9px'
+              }
+            },
+            {
+              selector: 'node[type="growth_apex"]',
+              style: {
+                'background-color': '#9370DB',
+                'shape': 'round-triangle',
+                'width': 70,
+                'height': 80,
+                'border-color': '#DDA0DD',
+                'box-shadow': '0 0 20px rgba(147, 112, 219, 0.8)',
+                'font-size': '9px'
+              }
+            },
+            {
+              selector: 'node[type="antibody_system"]',
+              style: {
+                'background-color': '#B22222',
+                'shape': 'round-hexagon',
+                'width': 75,
+                'height': 75,
+                'border-color': '#FF6347',
+                'box-shadow': '0 0 20px rgba(178, 34, 34, 0.8)',
+                'font-size': '9px'
+              }
+            },
+            {
+              selector: 'node[type="cell_division"]',
+              style: {
+                'background-color': '#20B2AA',
+                'shape': 'round-diamond',
+                'width': 70,
+                'height': 70,
+                'border-color': '#AFEEEE',
+                'box-shadow': '0 0 18px rgba(32, 178, 170, 0.8)',
+                'font-size': '9px'
+              }
+            },
+            {
+              selector: 'node[type="metabolic_pathway"]',
+              style: {
+                'background-color': '#8A2BE2',
+                'shape': 'ellipse',
+                'width': 85,
+                'height': 50,
+                'border-color': '#DDA0DD',
+                'box-shadow': '0 0 18px rgba(138, 43, 226, 0.7)',
+                'font-size': '9px'
+              }
+            },
+            {
+              selector: 'node[type="symbiotic_environment"]',
+              style: {
+                'background-color': '#2E8B57',
+                'shape': 'round-octagon',
+                'width': 100,
+                'height': 100,
+                'border-color': '#98FB98',
+                'box-shadow': '0 0 30px rgba(46, 139, 87, 0.9)',
+                'font-size': '11px'
+              }
+            },
+
             // 新しい技術系ノードスタイル
             {
               selector: 'node[type="genetic_library"]',
@@ -965,6 +1300,99 @@ export default function CytoscapeVisualization() {
               }
             },
 
+            // 組織系エッジスタイル
+            {
+              selector: 'edge[type="energy_governance"], edge[type="strategic_direction"]',
+              style: {
+                'line-color': '#FFD700',
+                'target-arrow-color': '#FFD700',
+                'width': 3,
+                'line-style': 'solid',
+                'opacity': 0.9
+              }
+            },
+            {
+              selector: 'edge[type="execution_flow"], edge[type="resource_allocation"]',
+              style: {
+                'line-color': '#8B4513',
+                'target-arrow-color': '#8B4513',
+                'width': 2.5,
+                'line-style': 'solid',
+                'opacity': 0.8
+              }
+            },
+            {
+              selector: 'edge[type="collaboration"], edge[type="talent_supply"]',
+              style: {
+                'line-color': '#32CD32',
+                'target-arrow-color': '#32CD32',
+                'width': 2,
+                'line-style': 'solid',
+                'opacity': 0.8
+              }
+            },
+            {
+              selector: 'edge[type="financial_control"], edge[type="process_optimization"]',
+              style: {
+                'line-color': '#DC143C',
+                'target-arrow-color': '#DC143C',
+                'width': 2,
+                'line-style': 'solid',
+                'opacity': 0.7
+              }
+            },
+            {
+              selector: 'edge[type="compliance_oversight"], edge[type="security_integration"]',
+              style: {
+                'line-color': '#B22222',
+                'target-arrow-color': '#B22222',
+                'width': 2,
+                'line-style': 'dashed',
+                'opacity': 0.7
+              }
+            },
+            {
+              selector: 'edge[type="research_collaboration"], edge[type="insights_delivery"]',
+              style: {
+                'line-color': '#9370DB',
+                'target-arrow-color': '#9370DB',
+                'width': 2,
+                'line-style': 'dotted',
+                'opacity': 0.8
+              }
+            },
+            {
+              selector: 'edge[type="team_formation"], edge[type="project_execution"]',
+              style: {
+                'line-color': '#20B2AA',
+                'target-arrow-color': '#20B2AA',
+                'width': 2.5,
+                'line-style': 'solid',
+                'opacity': 0.8
+              }
+            },
+            {
+              selector: 'edge[type="knowledge_capture"], edge[type="knowledge_transfer"], edge[type="knowledge_sharing"]',
+              style: {
+                'line-color': '#4682B4',
+                'target-arrow-color': '#4682B4',
+                'width': 2,
+                'line-style': 'dotted',
+                'opacity': 0.7
+              }
+            },
+            {
+              selector: 'edge[type="customer_interaction"], edge[type="feedback_loop"], edge[type="market_insights"]',
+              style: {
+                'line-color': '#2E8B57',
+                'target-arrow-color': '#2E8B57',
+                'width': 2.5,
+                'line-style': 'solid',
+                'curve-style': 'unbundled-bezier',
+                'opacity': 0.8
+              }
+            },
+
             // 数学-IT連携エッジスタイル
             {
               selector: 'edge[category="mathematical_bridge"]',
@@ -1056,18 +1484,18 @@ export default function CytoscapeVisualization() {
         cyRef.current.destroy();
       }
     };
-  }, [loadMathData, loadTechData, viewMode, setupEventHandlers, updateAvailableNodes]);
+  }, [loadMathData, loadTechData, loadOrgData, loadFromLocalStorage, viewMode, setupEventHandlers, updateAvailableNodes]);
 
   // ビューモード変更時のデータ更新
   useEffect(() => {
-    if (cyRef.current && mathData && techData) {
+    if (cyRef.current && (mathData || techData || orgData)) {
       const currentData = getCurrentData();
       cyRef.current.elements().remove();
       cyRef.current.add([...currentData.nodes, ...currentData.edges]);
       cyRef.current.layout({ name: currentLayout }).run();
       updateAvailableNodes(cyRef.current);
     }
-  }, [viewMode, getCurrentData, currentLayout, updateAvailableNodes]);
+  }, [viewMode, getCurrentData, currentLayout, updateAvailableNodes, mathData, techData, orgData, userEdits]);
 
   // コントロール関数
   const resetView = useCallback(() => {
@@ -1159,26 +1587,35 @@ export default function CytoscapeVisualization() {
     
     if (existingNode.length > 0) {
       existingNode.data(nodeFormData);
+      trackUserEdit('node', 'update', nodeFormData);
     } else {
       cyRef.current.add({ data: nodeFormData });
+      trackUserEdit('node', 'add', nodeFormData);
     }
     
     setShowNodeModal(false);
     updateAvailableNodes(cyRef.current);
     cyRef.current.layout({ name: currentLayout }).run();
-  }, [nodeFormData, currentLayout, updateAvailableNodes]);
+  }, [nodeFormData, currentLayout, updateAvailableNodes, trackUserEdit]);
 
   const saveEdge = useCallback(() => {
     if (!cyRef.current || !edgeFormData.source || !edgeFormData.target) return;
     
     cyRef.current.add({ data: edgeFormData });
+    trackUserEdit('edge', 'add', edgeFormData);
     setShowEdgeModal(false);
     cyRef.current.layout({ name: currentLayout }).run();
-  }, [edgeFormData, currentLayout]);
+  }, [edgeFormData, currentLayout, trackUserEdit]);
 
   const deleteSelected = useCallback(() => {
     if (selectedElement && cyRef.current) {
       if (confirm('選択された要素を削除しますか？')) {
+        const data = selectedElement.data();
+        if (selectedElement.isNode && selectedElement.isNode()) {
+          trackUserEdit('node', 'delete', data);
+        } else if (selectedElement.isEdge && selectedElement.isEdge()) {
+          trackUserEdit('edge', 'delete', data);
+        }
         selectedElement.remove();
         setSelectedElement(null);
         updateAvailableNodes(cyRef.current);
@@ -1187,7 +1624,7 @@ export default function CytoscapeVisualization() {
     } else {
       alert('削除する要素を選択してください。');
     }
-  }, [selectedElement, updateAvailableNodes]);
+  }, [selectedElement, updateAvailableNodes, trackUserEdit]);
 
   const exportData = useCallback(() => {
     if (!cyRef.current) return;
@@ -1247,7 +1684,8 @@ export default function CytoscapeVisualization() {
             <p className="text-sm text-cyan-300 mt-1">
               {viewMode === 'math' && '数学理論の生物的表現'}
               {viewMode === 'tech' && 'IT技術の生態系'}
-              {viewMode === 'integrated' && '数学理論とIT技術の統合生態系'}
+              {viewMode === 'org' && '会社組織の生態系'}
+              {viewMode === 'integrated' && '数学理論×IT技術×組織の統合生態系'}
             </p>
           </div>
           
@@ -1273,6 +1711,16 @@ export default function CytoscapeVisualization() {
                 }`}
               >
                 IT技術
+              </button>
+              <button
+                onClick={() => setViewMode('org')}
+                className={`px-3 py-1 rounded-full text-xs transition-all duration-300 ${
+                  viewMode === 'org'
+                    ? 'bg-orange-500 text-white'
+                    : 'text-orange-400 hover:bg-orange-500/20'
+                }`}
+              >
+                組織
               </button>
               <button
                 onClick={() => setViewMode('integrated')}
@@ -1336,6 +1784,32 @@ export default function CytoscapeVisualization() {
                 className="px-3 py-2 bg-red-500/20 border border-red-400 rounded-full text-red-400 hover:bg-red-500/40 transition-all duration-300 text-xs"
               >
                 削除
+              </button>
+            </div>
+            
+            {/* ローカル保存機能 */}
+            <div className="flex gap-2">
+              <button
+                onClick={saveToLocalStorage}
+                className={`px-3 py-2 border rounded-full transition-all duration-300 text-xs ${
+                  hasUnsavedChanges
+                    ? 'bg-red-500/20 border-red-400 text-red-400 hover:bg-red-500/40'
+                    : 'bg-green-500/20 border-green-400 text-green-400 hover:bg-green-500/40'
+                }`}
+              >
+                {hasUnsavedChanges ? '保存' : '保存済み'}
+              </button>
+              <button
+                onClick={loadFromLocalStorage}
+                className="px-3 py-2 bg-blue-500/20 border border-blue-400 rounded-full text-blue-400 hover:bg-blue-500/40 transition-all duration-300 text-xs"
+              >
+                復元
+              </button>
+              <button
+                onClick={clearLocalStorage}
+                className="px-3 py-2 bg-orange-500/20 border border-orange-400 rounded-full text-orange-400 hover:bg-orange-500/40 transition-all duration-300 text-xs"
+              >
+                クリア
               </button>
             </div>
             
@@ -1445,12 +1919,42 @@ export default function CytoscapeVisualization() {
               </>
             )}
             
+            {(viewMode === 'org' || viewMode === 'integrated') && (
+              <>
+                <div className="text-orange-400 font-semibold mb-1 mt-3">会社組織</div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-yellow-500 border border-white/30" />
+                  <span className="text-white">経営陣（太陽）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-blue-600 border border-white/30" />
+                  <span className="text-white">取締役会（大気圏）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-green-600 border border-white/30" />
+                  <span className="text-white">執行役員（樹冠層）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-amber-800 border border-white/30" />
+                  <span className="text-white">管理職（幹）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-lime-500 border border-white/30" />
+                  <span className="text-white">各部門（器官）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-teal-600 border border-white/30" />
+                  <span className="text-white">チーム・プロジェクト</span>
+                </div>
+              </>
+            )}
+            
             {viewMode === 'integrated' && (
               <>
-                <div className="text-purple-400 font-semibold mb-1 mt-3">数学-IT連携</div>
+                <div className="text-purple-400 font-semibold mb-1 mt-3">統合連携</div>
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-1 bg-purple-300 border border-white/30 opacity-80" style={{borderStyle: 'dotted'}} />
-                  <span className="text-white">理論-実装橋渡し</span>
+                  <span className="text-white">理論-実装-組織橋渡し</span>
                 </div>
               </>
             )}
@@ -1572,6 +2076,24 @@ export default function CytoscapeVisualization() {
                     <option value="symbiotic_network">A2A（共生ネットワーク）</option>
                     <option value="metabolic_regulator">Camunda（代謝調整者）</option>
                     <option value="memory_formation">Event Sourcing（記憶形成）</option>
+                  </optgroup>
+                  <optgroup label="会社組織">
+                    <option value="energy_source">経営陣（太陽）</option>
+                    <option value="protective_layer">取締役会（大気圏）</option>
+                    <option value="canopy_layer">執行役員（樹冠層）</option>
+                    <option value="management_trunk">管理職（幹）</option>
+                    <option value="photosynthetic_organ">エンジニアリング部（光合成器官）</option>
+                    <option value="reproductive_organ">プロダクト部（花器官）</option>
+                    <option value="seed_dispersal_organ">営業部（種子散布器官）</option>
+                    <option value="pollination_organ">マーケティング部（受粉器官）</option>
+                    <option value="root_system">人事部（根系）</option>
+                    <option value="vascular_system">財務部（維管束）</option>
+                    <option value="metabolic_system">オペレーション部（代謝系）</option>
+                    <option value="growth_apex">イノベーション研究所（成長点）</option>
+                    <option value="antibody_system">セキュリティチーム（抗体システム）</option>
+                    <option value="cell_division">アジャイルチーム（細胞分裂）</option>
+                    <option value="metabolic_pathway">プロジェクト（代謝経路）</option>
+                    <option value="symbiotic_environment">顧客エコシステム（共生環境）</option>
                   </optgroup>
                 </select>
               </div>
@@ -1702,6 +2224,28 @@ export default function CytoscapeVisualization() {
                     <option value="automation_orchestration">自動化連携</option>
                     <option value="service_exposure">サービス公開</option>
                     <option value="audit_trail">監査証跡</option>
+                  </optgroup>
+                  <optgroup label="会社組織">
+                    <option value="energy_governance">統治エネルギー</option>
+                    <option value="strategic_direction">戦略方向</option>
+                    <option value="execution_flow">実行フロー</option>
+                    <option value="resource_allocation">リソース配分</option>
+                    <option value="collaboration">連携</option>
+                    <option value="talent_supply">人材供給</option>
+                    <option value="financial_control">財務管理</option>
+                    <option value="process_optimization">プロセス最適化</option>
+                    <option value="compliance_oversight">法務審査</option>
+                    <option value="research_collaboration">研究連携</option>
+                    <option value="insights_delivery">インサイト提供</option>
+                    <option value="security_integration">セキュリティ統合</option>
+                    <option value="team_formation">チーム編成</option>
+                    <option value="project_execution">プロジェクト実行</option>
+                    <option value="knowledge_capture">ナレッジ蓄積</option>
+                    <option value="knowledge_transfer">知識移転</option>
+                    <option value="knowledge_sharing">知識共有</option>
+                    <option value="customer_interaction">顧客接点</option>
+                    <option value="feedback_loop">フィードバックループ</option>
+                    <option value="market_insights">市場インサイト</option>
                   </optgroup>
                   <optgroup label="数学-IT連携">
                     <option value="math_implementation">数学実装</option>
