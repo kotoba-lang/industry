@@ -1,0 +1,354 @@
+{
+  "nodes": [
+    {
+      "data": { 
+        "id": "computing_infrastructure", 
+        "label": "計算基盤\n(土壌)", 
+        "type": "soil",
+        "category": "Computing Infrastructure",
+        "level": 0,
+        "description": "すべてのIT技術を支える基盤。ハードウェア、OS、ネットワークが形成する豊かな土壌。",
+        "details": "CPU、メモリ、ストレージ、ネットワーク機器",
+        "mathConnection": ["numerical_computation", "optimization_theory"]
+      }
+    },
+    {
+      "data": { 
+        "id": "hardware_layer", 
+        "label": "ハードウェア層\n(鉱物基質)", 
+        "type": "mineral",
+        "category": "Computing Infrastructure",
+        "level": 1,
+        "description": "CPU、GPU、メモリ。計算の物理的基盤となる鉱物層。",
+        "details": "プロセッサーアーキテクチャ、並列処理、メモリ階層",
+        "mathConnection": ["linear_algebra", "fourier_analysis"]
+      }
+    },
+    {
+      "data": { 
+        "id": "operating_systems", 
+        "label": "オペレーティングシステム\n(土壌微生物)", 
+        "type": "microbe",
+        "category": "Computing Infrastructure",
+        "level": 1,
+        "description": "Linux、Windows、macOS。リソースを管理し、上位層に栄養を供給する微生物群。",
+        "details": "カーネル、プロセス管理、メモリ管理、ファイルシステム",
+        "mathConnection": ["graph_theory", "probability_statistics"]
+      }
+    },
+    {
+      "data": { 
+        "id": "network_protocols", 
+        "label": "ネットワークプロトコル\n(菌糸ネットワーク)", 
+        "type": "mycelium",
+        "category": "Computing Infrastructure",
+        "level": 1,
+        "description": "TCP/IP、HTTP、WebSocket。システム間を結ぶ菌糸のような通信網。",
+        "details": "プロトコルスタック、ルーティング、セキュリティ",
+        "mathConnection": ["graph_theory", "combinatorics"]
+      }
+    },
+    {
+      "data": { 
+        "id": "low_level_languages", 
+        "label": "低レベル言語\n(分解者)", 
+        "type": "decomposer",
+        "category": "Core Languages",
+        "level": 2,
+        "description": "Assembly、C。ハードウェアリソースを直接制御する分解者群。",
+        "details": "メモリ管理、ポインタ、システムコール",
+        "mathConnection": ["computational_theory", "number_theory"]
+      }
+    },
+    {
+      "data": { 
+        "id": "systems_languages", 
+        "label": "システム言語\n(菌類)", 
+        "type": "fungi",
+        "category": "Core Languages",
+        "level": 3,
+        "description": "C++、Rust、Go。システムレベルの機能を提供する強力な菌類。",
+        "details": "メモリ安全性、並行性、パフォーマンス最適化",
+        "mathConnection": ["abstract_algebra", "category_theory"]
+      }
+    },
+    {
+      "data": { 
+        "id": "interpreted_languages", 
+        "label": "インタープリタ言語\n(草本植物)", 
+        "type": "herbaceous",
+        "category": "Application Languages",
+        "level": 4,
+        "description": "Python、JavaScript、Ruby。柔軟で成長が早い草本植物群。",
+        "details": "動的型付け、REPL、プロトタイピング",
+        "mathConnection": ["data_science_ai", "probability_statistics"]
+      }
+    },
+    {
+      "data": { 
+        "id": "compiled_languages", 
+        "label": "コンパイル言語\n(木本植物)", 
+        "type": "woody",
+        "category": "Application Languages",
+        "level": 4,
+        "description": "Java、C#、Kotlin。堅牢で安定した木本植物群。",
+        "details": "静的型付け、JIT最適化、企業システム",
+        "mathConnection": ["abstract_algebra", "formal_methods"]
+      }
+    },
+    {
+      "data": { 
+        "id": "functional_languages", 
+        "label": "関数型言語\n(針葉樹)", 
+        "type": "conifer",
+        "category": "Application Languages",
+        "level": 4,
+        "description": "Haskell、Scala、F#。数学的純粋性を持つ針葉樹群。",
+        "details": "純粋関数、イミュータブル、モナド",
+        "mathConnection": ["category_theory", "mathematical_logic"]
+      }
+    },
+    {
+      "data": { 
+        "id": "web_frameworks", 
+        "label": "Webフレームワーク\n(着生植物)", 
+        "type": "epiphyte",
+        "category": "Frameworks & Libraries",
+        "level": 5,
+        "description": "React、Vue、Angular。他の言語に着生して豊かな機能を提供。",
+        "details": "コンポーネント、状態管理、仮想DOM",
+        "mathConnection": ["graph_theory", "reactive_systems"]
+      }
+    },
+    {
+      "data": { 
+        "id": "backend_frameworks", 
+        "label": "バックエンドフレームワーク\n(支持構造)", 
+        "type": "support_structure",
+        "category": "Frameworks & Libraries",
+        "level": 5,
+        "description": "Django、Spring、Express。アプリケーションを支える強固な支持構造。",
+        "details": "MVC、ORM、ミドルウェア、認証",
+        "mathConnection": ["optimization_theory", "security_theory"]
+      }
+    },
+    {
+      "data": { 
+        "id": "ml_libraries", 
+        "label": "機械学習ライブラリ\n(花粉媒介者)", 
+        "type": "pollinator",
+        "category": "Frameworks & Libraries",
+        "level": 5,
+        "description": "TensorFlow、PyTorch、scikit-learn。数学と実装を結ぶ花粉媒介者。",
+        "details": "ニューラルネットワーク、最適化、自動微分",
+        "mathConnection": ["linear_algebra", "optimization_theory", "probability_statistics"]
+      }
+    },
+    {
+      "data": { 
+        "id": "scientific_libraries", 
+        "label": "科学計算ライブラリ\n(栄養循環者)", 
+        "type": "nutrient_cycler",
+        "category": "Frameworks & Libraries",
+        "level": 5,
+        "description": "NumPy、SciPy、Pandas。数学理論を実計算に循環させる。",
+        "details": "線型代数、数値解析、データ操作",
+        "mathConnection": ["numerical_computation", "real_analysis", "linear_algebra"]
+      }
+    },
+    {
+      "data": { 
+        "id": "databases", 
+        "label": "データベース\n(栄養貯蔵庫)", 
+        "type": "storage_organ",
+        "category": "Data Storage",
+        "level": 6,
+        "description": "PostgreSQL、MongoDB、Redis。情報を蓄積・保存する栄養貯蔵庫。",
+        "details": "ACID特性、クエリ最適化、分散処理",
+        "mathConnection": ["set_theory", "relational_algebra"]
+      }
+    },
+    {
+      "data": { 
+        "id": "graph_databases", 
+        "label": "グラフデータベース\n(神経網)", 
+        "type": "neural_network",
+        "category": "Data Storage",
+        "level": 6,
+        "description": "Neo4j、ArangoDB。関係性を重視する神経網様構造。",
+        "details": "グラフクエリ、パスファインディング、ネットワーク分析",
+        "mathConnection": ["graph_theory", "topology"]
+      }
+    },
+    {
+      "data": { 
+        "id": "cloud_platforms", 
+        "label": "クラウドプラットフォーム\n(生態系拡張)", 
+        "type": "ecosystem_expansion",
+        "category": "Cloud & Distribution",
+        "level": 7,
+        "description": "AWS、GCP、Azure。生態系を広域に拡張する雲の森。",
+        "details": "スケーラビリティ、高可用性、地理的分散",
+        "mathConnection": ["distributed_systems", "reliability_theory"]
+      }
+    },
+    {
+      "data": { 
+        "id": "containerization", 
+        "label": "コンテナ化\n(種子散布)", 
+        "type": "seed_dispersal",
+        "category": "Cloud & Distribution",
+        "level": 7,
+        "description": "Docker、Kubernetes。アプリケーションを種子として効率的に散布。",
+        "details": "隔離、オーケストレーション、リソース管理",
+        "mathConnection": ["resource_optimization", "graph_theory"]
+      }
+    },
+    {
+      "data": { 
+        "id": "devops_tools", 
+        "label": "DevOpsツール\n(生態系管理)", 
+        "type": "ecosystem_management",
+        "category": "Development Tools",
+        "level": 8,
+        "description": "Git、Jenkins、Ansible。生態系全体の健康を管理する園芸師。",
+        "details": "バージョン管理、自動化、監視",
+        "mathConnection": ["process_theory", "automation_theory"]
+      }
+    },
+    {
+      "data": { 
+        "id": "security_tools", 
+        "label": "セキュリティツール\n(免疫系)", 
+        "type": "immune_system",
+        "category": "Development Tools",
+        "level": 8,
+        "description": "OpenSSL、OAuth、PKI。脅威から生態系を守る免疫システム。",
+        "details": "暗号化、認証、認可、脅威検出",
+        "mathConnection": ["cryptography", "number_theory"]
+      }
+    },
+    {
+      "data": { 
+        "id": "monitoring_observability", 
+        "label": "監視・可観測性\n(感覚器官)", 
+        "type": "sensory_system",
+        "category": "Development Tools",
+        "level": 8,
+        "description": "Prometheus、Grafana、ELK Stack。システムの状態を感知する感覚器官。",
+        "details": "メトリクス、ログ、トレーシング、アラート",
+        "mathConnection": ["signal_processing", "time_series_analysis"]
+      }
+    },
+    {
+      "data": { 
+        "id": "ai_ml_platforms", 
+        "label": "AI/MLプラットフォーム\n(進化の種)", 
+        "type": "evolution_seed",
+        "category": "Emerging Tech",
+        "level": 9,
+        "description": "MLOps、AutoML、Neural Architecture Search。次世代の進化を促す種。",
+        "details": "自動機械学習、モデル管理、継続学習",
+        "mathConnection": ["data_science_ai", "optimization_theory", "statistical_learning"]
+      }
+    },
+    {
+      "data": { 
+        "id": "quantum_computing", 
+        "label": "量子コンピューティング\n(新生態系)", 
+        "type": "new_ecosystem",
+        "category": "Emerging Tech",
+        "level": 9,
+        "description": "Qiskit、Cirq。全く新しい計算原理に基づく新生態系。",
+        "details": "量子ビット、量子もつれ、量子アルゴリズム",
+        "mathConnection": ["quantum_mechanics", "linear_algebra", "complex_analysis"]
+      }
+    }
+  ],
+  "edges": [
+    { "data": { "source": "hardware_layer", "target": "computing_infrastructure", "type": "foundation_support", "label": "物理基盤" } },
+    { "data": { "source": "operating_systems", "target": "computing_infrastructure", "type": "foundation_support", "label": "OS基盤" } },
+    { "data": { "source": "network_protocols", "target": "computing_infrastructure", "type": "foundation_support", "label": "通信基盤" } },
+    
+    { "data": { "source": "computing_infrastructure", "target": "low_level_languages", "type": "nutrient_supply", "label": "リソース供給" } },
+    { "data": { "source": "low_level_languages", "target": "systems_languages", "type": "evolution_flow", "label": "言語進化" } },
+    
+    { "data": { "source": "systems_languages", "target": "interpreted_languages", "type": "platform_support", "label": "ランタイム支援" } },
+    { "data": { "source": "systems_languages", "target": "compiled_languages", "type": "platform_support", "label": "コンパイラ支援" } },
+    { "data": { "source": "systems_languages", "target": "functional_languages", "type": "platform_support", "label": "基盤提供" } },
+    
+    { "data": { "source": "interpreted_languages", "target": "web_frameworks", "type": "framework_growth", "label": "フレームワーク成長" } },
+    { "data": { "source": "interpreted_languages", "target": "ml_libraries", "type": "framework_growth", "label": "ライブラリ発展" } },
+    { "data": { "source": "interpreted_languages", "target": "scientific_libraries", "type": "framework_growth", "label": "科学計算発展" } },
+    
+    { "data": { "source": "compiled_languages", "target": "backend_frameworks", "type": "framework_growth", "label": "企業システム" } },
+    { "data": { "source": "functional_languages", "target": "backend_frameworks", "type": "paradigm_influence", "label": "関数型影響" } },
+    
+    { "data": { "source": "web_frameworks", "target": "databases", "type": "data_flow", "label": "データ管理" } },
+    { "data": { "source": "backend_frameworks", "target": "databases", "type": "data_flow", "label": "永続化" } },
+    { "data": { "source": "databases", "target": "graph_databases", "type": "specialization", "label": "特化発展" } },
+    
+    { "data": { "source": "ml_libraries", "target": "cloud_platforms", "type": "scaling_need", "label": "スケール要求" } },
+    { "data": { "source": "backend_frameworks", "target": "cloud_platforms", "type": "scaling_need", "label": "分散展開" } },
+    { "data": { "source": "databases", "target": "cloud_platforms", "type": "scaling_need", "label": "データ分散" } },
+    
+    { "data": { "source": "cloud_platforms", "target": "containerization", "type": "deployment_evolution", "label": "デプロイ進化" } },
+    { "data": { "source": "containerization", "target": "devops_tools", "type": "operational_need", "label": "運用管理" } },
+    
+    { "data": { "source": "devops_tools", "target": "security_tools", "type": "security_integration", "label": "セキュリティ統合" } },
+    { "data": { "source": "devops_tools", "target": "monitoring_observability", "type": "operational_visibility", "label": "可視化" } },
+    
+    { "data": { "source": "ml_libraries", "target": "ai_ml_platforms", "type": "platform_evolution", "label": "プラットフォーム化" } },
+    { "data": { "source": "scientific_libraries", "target": "quantum_computing", "type": "paradigm_shift", "label": "計算パラダイム転換" } },
+    
+    { "data": { "source": "web_frameworks", "target": "backend_frameworks", "type": "collaboration", "label": "フロント/バック連携" } },
+    { "data": { "source": "scientific_libraries", "target": "ml_libraries", "type": "foundation_support", "label": "数学基盤" } },
+    { "data": { "source": "graph_databases", "target": "ml_libraries", "type": "data_synergy", "label": "グラフML" } },
+    
+    { "data": { "source": "security_tools", "target": "cloud_platforms", "type": "security_layer", "label": "クラウドセキュリティ" } },
+    { "data": { "source": "monitoring_observability", "target": "ai_ml_platforms", "type": "intelligent_ops", "label": "AIOps" } }
+  ],
+  "mathConnections": [
+    { "data": { "source": "linear_algebra", "target": "ml_libraries", "type": "math_implementation", "label": "行列演算実装", "category": "mathematical_bridge" } },
+    { "data": { "source": "linear_algebra", "target": "scientific_libraries", "type": "math_implementation", "label": "数値線形代数", "category": "mathematical_bridge" } },
+    { "data": { "source": "linear_algebra", "target": "hardware_layer", "type": "math_optimization", "label": "GPU並列処理", "category": "mathematical_bridge" } },
+    
+    { "data": { "source": "probability_statistics", "target": "ml_libraries", "type": "math_implementation", "label": "統計的学習", "category": "mathematical_bridge" } },
+    { "data": { "source": "probability_statistics", "target": "operating_systems", "type": "math_application", "label": "確率的スケジューリング", "category": "mathematical_bridge" } },
+    { "data": { "source": "probability_statistics", "target": "interpreted_languages", "type": "math_application", "label": "データ分析", "category": "mathematical_bridge" } },
+    
+    { "data": { "source": "graph_theory", "target": "graph_databases", "type": "math_implementation", "label": "グラフアルゴリズム", "category": "mathematical_bridge" } },
+    { "data": { "source": "graph_theory", "target": "network_protocols", "type": "math_application", "label": "ルーティング最適化", "category": "mathematical_bridge" } },
+    { "data": { "source": "graph_theory", "target": "web_frameworks", "type": "math_application", "label": "仮想DOM", "category": "mathematical_bridge" } },
+    { "data": { "source": "graph_theory", "target": "containerization", "type": "math_application", "label": "リソースグラフ", "category": "mathematical_bridge" } },
+    
+    { "data": { "source": "optimization_theory", "target": "ml_libraries", "type": "math_implementation", "label": "最適化アルゴリズム", "category": "mathematical_bridge" } },
+    { "data": { "source": "optimization_theory", "target": "backend_frameworks", "type": "math_application", "label": "パフォーマンス最適化", "category": "mathematical_bridge" } },
+    { "data": { "source": "optimization_theory", "target": "computing_infrastructure", "type": "math_application", "label": "リソース最適化", "category": "mathematical_bridge" } },
+    
+    { "data": { "source": "numerical_computation", "target": "scientific_libraries", "type": "math_implementation", "label": "数値計算実装", "category": "mathematical_bridge" } },
+    { "data": { "source": "numerical_computation", "target": "computing_infrastructure", "type": "math_application", "label": "計算効率", "category": "mathematical_bridge" } },
+    
+    { "data": { "source": "category_theory", "target": "functional_languages", "type": "math_implementation", "label": "モナド・ファンクター", "category": "mathematical_bridge" } },
+    { "data": { "source": "category_theory", "target": "systems_languages", "type": "math_influence", "label": "型システム", "category": "mathematical_bridge" } },
+    
+    { "data": { "source": "mathematical_logic", "target": "functional_languages", "type": "math_implementation", "label": "型理論", "category": "mathematical_bridge" } },
+    { "data": { "source": "computational_theory", "target": "low_level_languages", "type": "math_foundation", "label": "計算理論基盤", "category": "mathematical_bridge" } },
+    
+    { "data": { "source": "set_theory", "target": "databases", "type": "math_foundation", "label": "関係代数", "category": "mathematical_bridge" } },
+    { "data": { "source": "abstract_algebra", "target": "compiled_languages", "type": "math_influence", "label": "代数的データ型", "category": "mathematical_bridge" } },
+    { "data": { "source": "abstract_algebra", "target": "systems_languages", "type": "math_influence", "label": "型システム設計", "category": "mathematical_bridge" } },
+    
+    { "data": { "source": "number_theory", "target": "security_tools", "type": "math_implementation", "label": "暗号学的素数", "category": "mathematical_bridge" } },
+    { "data": { "source": "number_theory", "target": "low_level_languages", "type": "math_application", "label": "暗号実装", "category": "mathematical_bridge" } },
+    
+    { "data": { "source": "fourier_analysis", "target": "hardware_layer", "type": "math_application", "label": "信号処理", "category": "mathematical_bridge" } },
+    { "data": { "source": "real_analysis", "target": "scientific_libraries", "type": "math_implementation", "label": "連続性・極限", "category": "mathematical_bridge" } },
+    
+    { "data": { "source": "complex_analysis", "target": "quantum_computing", "type": "math_foundation", "label": "複素振幅", "category": "mathematical_bridge" } },
+    { "data": { "source": "topology", "target": "graph_databases", "type": "math_application", "label": "ネットワーク位相", "category": "mathematical_bridge" } },
+    
+    { "data": { "source": "combinatorics", "target": "network_protocols", "type": "math_application", "label": "組合せ最適化", "category": "mathematical_bridge" } },
+    { "data": { "source": "data_science_ai", "target": "ai_ml_platforms", "type": "math_evolution", "label": "AI/ML統合", "category": "mathematical_bridge" } }
+  ]
+} 
