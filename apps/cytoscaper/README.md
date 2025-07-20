@@ -1,106 +1,36 @@
-# 数学理論生物体系図 (Mathematical Theory Organism)
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-Cytoscapeを使って数学の主要理論を生物学的メタファーで可視化するインタラクティブなWebアプリケーションです。
+## Getting Started
 
-## 🌱 概要
-
-このプロジェクトは、数学の各分野を生物の器官や組織に見立てて表現し、その相互依存関係を視覚的に理解できるようにします。
-
-### 生物学的メタファー
-
-- **基礎論（根系）**: 数理論理学、集合論、圏論 - 数学全体を支える根のシステム
-- **純粋数学（幹・枝）**: 代数学、幾何学、解析学、数論、組合せ論 - 理論の中核となる幹と枝
-- **応用数学（葉・花）**: 確率論、最適化、偏微分方程式、計算科学 - 実用的な光合成を行う葉
-- **学際領域（果実・種）**: 数理物理学、数理生物学、データサイエンス - 新たな知識を生み出す果実
-
-## 🚀 セットアップ
-
-### 前提条件
-
-- Node.js (v16以上)
-- pnpm
-
-### インストール
+First, run the development server:
 
 ```bash
-# 依存関係のインストール
-pnpm install
-
-# 開発サーバーの起動
+npm run dev
+# or
+yarn dev
+# or
 pnpm dev
+# or
+bun dev
 ```
 
-アプリケーションは `http://localhost:3000` で起動します。
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-## 🎯 機能
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-- **インタラクティブな可視化**: ノードをクリックして詳細情報を表示
-- **生物学的デザイン**: 各数学分野を生物の器官として視覚化
-- **複数のレイアウト**: Dagre、Cose-Bilkent、Circle、Gridレイアウト対応
-- **関係性の可視化**: 数学分野間の依存関係を栄養の流れとして表現
-- **レスポンシブデザイン**: 様々な画面サイズに対応
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## 🎨 デザインコンセプト
+## Learn More
 
-### 色彩設計
-- **茶色系**: 基礎論（土壌・根系）
-- **緑色系**: 純粋数学（幹・枝）
-- **黄色系**: 応用数学（葉・花）
-- **赤色系**: 学際領域（果実・種）
+To learn more about Next.js, take a look at the following resources:
 
-### エッジの意味
-- **栄養供給フロー**: 基礎論から純粋数学への基盤提供
-- **成長フロー**: 純粋数学内での発展
-- **相互作用**: 分野間の理論的交流
-- **応用フロー**: 理論から実用への展開
-- **統合フロー**: 複数分野の融合
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-## 🛠️ 技術スタック
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-- **フロントエンド**: HTML5, CSS3, JavaScript (ES6+)
-- **可視化ライブラリ**: Cytoscape.js
-- **レイアウトエンジン**: Dagre, Cose-Bilkent
-- **開発サーバー**: Live Server
+## Deploy on Vercel
 
-## 📁 プロジェクト構造
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-```
-cytoscaper/
-├── index.html          # メインHTMLファイル
-├── app.js             # メインJavaScriptアプリケーション
-├── package.json       # プロジェクト設定
-└── README.md         # このファイル
-```
-
-## 🎮 使い方
-
-1. **ノード選択**: 任意のノード（数学分野）をクリック
-2. **詳細表示**: 右側のパネルに分野の詳細情報が表示
-3. **関係性表示**: 選択されたノードの関連分野がハイライト
-4. **レイアウト変更**: 「レイアウト変更」ボタンで表示形式を切り替え
-5. **ビュー操作**: マウスホイールでズーム、ドラッグでパン
-
-## 🌿 教育的価値
-
-このアプリケーションは以下の教育効果を提供します：
-
-- **体系的理解**: 数学の各分野がどのように関連しているかの直感的把握
-- **生物学的類推**: 抽象的な数学概念の具体的なイメージ化
-- **視覚的学習**: グラフィカルな表現による記憶定着の促進
-- **探索的学習**: インタラクティブな操作による能動的な学習体験
-
-## 🔬 今後の拡張
-
-- [ ] アニメーション効果の追加（成長の様子を時系列で表現）
-- [ ] 検索機能の実装
-- [ ] より詳細な分野情報の追加
-- [ ] 3D表示モードの実装
-- [ ] 教育向けガイドモードの追加
-
-## 📄 ライセンス
-
-MIT License
-
-## 🤝 貢献
-
-プロジェクトへの貢献を歓迎します。Issue や Pull Request をお気軽にお送りください。 
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

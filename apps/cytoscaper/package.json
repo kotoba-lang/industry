@@ -1,22 +1,33 @@
 {
-  "name": "math-theory-organism",
-  "version": "1.0.0",
-  "description": "数学理論を生物学的に表現するCytoscapeアプリケーション",
-  "main": "index.html",
+  "name": "cytoscaper",
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
-    "dev": "live-server --port=3000",
-    "build": "echo 'Build completed'",
-    "test": "echo 'No tests yet'"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
   },
-  "keywords": ["cytoscape", "mathematics", "visualization", "biology"],
-  "author": "junkawasaki",
-  "license": "MIT",
   "dependencies": {
-    "cytoscape": "^3.26.0",
+    "@types/cytoscape": "^3.21.9",
+    "@types/dagre": "^0.7.53",
+    "cytoscape": "^3.32.1",
+    "cytoscape-cose-bilkent": "^4.1.0",
     "cytoscape-dagre": "^2.5.0",
-    "cytoscape-cose-bilkent": "^4.1.0"
+    "dagre": "^0.8.5",
+    "next": "15.4.2",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
   },
   "devDependencies": {
-    "live-server": "^1.2.2"
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "15.4.2",
+    "tailwindcss": "^4",
+    "typescript": "^5"
   }
-} 
+}
