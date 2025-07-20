@@ -5,7 +5,7 @@
 
 // グローバル変数
 let cy;
-let currentLayout = 'dagre';
+let currentLayout = 'grid';
 
 /**
  * 数学理論の階層とノードデータ定義
@@ -263,8 +263,18 @@ const mathTheoryData = {
  * Cytoscapeインスタンスの初期化
  */
 function initializeCytoscape() {
+  console.log('Initializing Cytoscape...');
+  console.log('Node count:', mathTheoryData.nodes.length);
+  console.log('Edge count:', mathTheoryData.edges.length);
+  
+  const container = document.getElementById('cy');
+  if (!container) {
+    console.error('Container element not found!');
+    return;
+  }
+  
   cy = cytoscape({
-    container: document.getElementById('cy'),
+    container: container,
     
     elements: [...mathTheoryData.nodes, ...mathTheoryData.edges],
     
@@ -273,15 +283,15 @@ function initializeCytoscape() {
       {
         selector: 'node',
         style: {
-          'background-color': 'data(color)',
+          'background-color': '#555555',
           'label': 'data(label)',
-          'width': 'mapData(degree, 0, 10, 40, 100)',
-          'height': 'mapData(degree, 0, 10, 40, 100)',
+          'width': 60,
+          'height': 60,
           'text-valign': 'center',
           'text-halign': 'center',
           'color': '#ffffff',
           'text-shadow': '0 0 4px rgba(0, 0, 0, 0.8)',
-          'font-size': '12px',
+          'font-size': '10px',
           'font-weight': 'bold',
           'border-width': 2,
           'border-color': '#ffffff',
@@ -458,16 +468,19 @@ function initializeCytoscape() {
     ],
     
     layout: {
-      name: 'dagre',
-      rankDir: 'TB',
-      spacingFactor: 1.5,
-      nodeDimensionsIncludeLabels: true,
+      name: 'grid',
+      rows: 4,
+      cols: 5,
       animate: true,
       animationDuration: 1000,
       fit: true,
       padding: 50
     }
   });
+  
+  console.log('Cytoscape initialized successfully');
+  console.log('Number of nodes:', cy.nodes().length);
+  console.log('Number of edges:', cy.edges().length);
   
   setupEventHandlers();
 }
@@ -623,7 +636,37 @@ function toggleLayout() {
  * ページ読み込み時の初期化
  */
 document.addEventListener('DOMContentLoaded', function() {
-  initializeCytoscape();
+  console.log('DOM Content Loaded');
+  console.log('Cytoscape available:', typeof cytoscape !== 'undefined');
+  console.log('Dagre extension available:', typeof cytoscape('core', 'layout').dagre !== 'undefined');
+  console.log('Cose-bilkent extension available:', typeof cytoscape('core', 'layout').coseBilkent !== 'undefined');
+  
+  // レイアウト拡張の登録
+  if (typeof cytoscape !== 'undefined' && typeof dagre !== 'undefined') {
+    console.log('Registering dagre extension...');
+    try {
+      cytoscape.use(dagre);
+      console.log('Dagre extension registered successfully');
+    } catch (e) {
+      console.error('Error registering dagre:', e);
+    }
+  }
+  
+  if (typeof cytoscape !== 'undefined' && typeof coseBilkent !== 'undefined') {
+    console.log('Registering cose-bilkent extension...');
+    try {
+      cytoscape.use(coseBilkent);
+      console.log('Cose-bilkent extension registered successfully');
+    } catch (e) {
+      console.error('Error registering cose-bilkent:', e);
+    }
+  }
+  
+  try {
+    initializeCytoscape();
+  } catch (error) {
+    console.error('Error initializing Cytoscape:', error);
+  }
   
   // アニメーション効果の追加
   setTimeout(() => {
