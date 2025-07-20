@@ -1,16 +1,23 @@
-# 数学理論生物体系図 - Next.js版
+# 数学理論×技術エコシステム生物体系図 - Next.js版
 
-**Mathematical Theory Organism Visualization - Next.js Edition**
+**Mathematical Theory × Technology Ecosystem Organism Visualization - Next.js Edition**
 
-数学理論の相互関係を生物学的メタファーで可視化し、編集可能なインタラクティブな図表として実装したNext.jsアプリケーションです。
+数学理論、IT技術、会社組織、そしてgftd.aiエコシステムの相互関係を生物学的メタファーで可視化し、編集可能なインタラクティブな図表として実装したNext.jsアプリケーションです。
 
 ## 🌟 特徴
 
-### 🧬 生物学的メタファー
-- **🌱 基礎論（根系）**: 数学の土台となる理論群
-- **🌳 純粋数学（幹・枝）**: 数学の主要分野とその発展
-- **🍃 応用数学（葉・花）**: 実用的な数学分野
-- **🍎 学際領域（果実・種）**: 数学と他分野の融合
+### 🧬 統合エコシステム
+- **🔬 数学理論**: 基礎論（根系）、純粋数学（幹・枝）、応用数学（葉・花）、学際領域（果実・種）
+- **💻 IT技術**: 計算基盤（土壌）、プログラミング言語（植物群）、フレームワーク（共生）、クラウド（生態系拡張）
+- **🏢 会社組織**: 経営陣（太陽）、管理職（幹）、各部門（器官）、チーム（細胞分裂）
+- **🚀 gftd.aiエコシステム**: Hickory DNS（神経伝達物質）、api.gftd.ai（内分泌系）、actor.gftd.ai（神経ネットワーク）
+
+### 🌐 表示モード
+- **数学理論モード**: 数学分野の生物的表現
+- **IT技術モード**: 技術スタックの生態系
+- **組織モード**: 会社組織の生命体構図
+- **gftd.aiモード**: gftd.ai技術スタックの生命体表現
+- **統合モード**: 全エコシステムの複合的可視化
 
 ### ✨ インタラクティブ機能
 - **リアルタイム編集**: ノードとエッジの追加・編集・削除
@@ -109,8 +116,10 @@ cytoscaper/
 │       └── CytoscapeVisualization.tsx  # メイン可視化コンポーネント
 ├── public/
 │   └── data/
-│       ├── complete-theory-data.json   # 完全版データ
-│       └── detailed-theory-data.json   # 詳細版データ
+│       ├── complete-theory-data.json   # 数学理論データ
+│       ├── tech-ecosystem-data.json    # IT技術エコシステムデータ
+│       ├── organization-ecosystem-data.json  # 会社組織データ
+│       └── gftd-ai-ecosystem-data.json # gftd.aiエコシステムデータ
 ├── backup/                       # バックアップファイル
 ├── package.json
 ├── tsconfig.json
@@ -184,6 +193,30 @@ interface EdgeData {
 }
 ```
 
+## 🚀 gftd.aiエコシステム詳細
+
+### ドメイン構造
+- **gftd.ai**: 主要ドメイン（中枢神経系）
+- **api.gftd.ai**: OpenAI API統合・AI機能配信（内分泌系）
+- **actor.gftd.ai**: Actor Network Theory基盤プラットフォーム（神経ネットワーク）
+
+### 技術スタック
+- **DNS**: Hickory DNS (hickory-server/hickory-client)
+- **ホスティング**: Fly.io（循環系）、Vercel（表皮系）
+- **フレームワーク**: Next.js（骨格系）
+- **プロトコル**: Model Context Protocol（シナプス）
+- **データ**: Confluent（リンパ系）、ksqlDB（代謝酵素）
+- **開発**: GitHub（DNA保存庫）、GitLab（RNA合成工場）
+
+### 生命体アナロジー
+各技術コンポーネントを生物学的機能として表現：
+- **中枢神経系**: 全システムの統制・意思決定
+- **内分泌系**: AI機能のホルモン的配信
+- **循環系**: グローバルアプリケーション配信
+- **表皮系**: ユーザーインターフェース保護
+- **骨格系**: アプリケーション構造の支持
+- **免疫系**: セキュリティメッシュによる保護
+
 ## 🎯 今後の拡張予定
 
 - [ ] 3D可視化対応
@@ -193,6 +226,8 @@ interface EdgeData {
 - [ ] リアルタイム共同編集
 - [ ] モバイル最適化
 - [ ] PWA対応
+- [ ] gftd.aiとの実際のAPI連携
+- [ ] Actor Networkのリアルタイム可視化
 
 ## 🤝 コントリビューション
 
@@ -214,4 +249,4 @@ interface EdgeData {
 
 ---
 
-**🌟 数学の美しい関係性を生物学的な視点で探索しましょう！**
+**🌟 数学理論、IT技術、組織構造、そしてgftd.aiエコシステムの美しい関係性を生物学的な視点で探索しましょう！**
