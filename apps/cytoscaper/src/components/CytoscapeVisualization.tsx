@@ -51,10 +51,11 @@ export default function CytoscapeVisualization() {
   const [nodeFormData, setNodeFormData] = useState<Partial<NodeData>>({});
   const [edgeFormData, setEdgeFormData] = useState<Partial<EdgeData>>({});
   const [availableNodes, setAvailableNodes] = useState<Array<{id: string, label: string}>>([]);
-  const [viewMode, setViewMode] = useState<'math' | 'tech' | 'org' | 'integrated'>('integrated');
+  const [viewMode, setViewMode] = useState<'math' | 'tech' | 'org' | 'gftd' | 'integrated'>('integrated');
   const [mathData, setMathData] = useState<TheoryData | null>(null);
   const [techData, setTechData] = useState<TheoryData | null>(null);
   const [orgData, setOrgData] = useState<TheoryData | null>(null);
+  const [gftdData, setGftdData] = useState<TheoryData | null>(null);
   const [userEdits, setUserEdits] = useState<{nodes: any[], edges: any[]}>({nodes: [], edges: []});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -124,6 +125,28 @@ export default function CytoscapeVisualization() {
     }
   }, []);
 
+  const loadGftdData = useCallback(async (): Promise<TheoryData> => {
+    try {
+      console.log('Loading gftd.ai ecosystem data...');
+      const response = await fetch('/data/gftd-ai-ecosystem-data.json');
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('gftd.ai ecosystem data loaded successfully');
+      console.log('GFTD Nodes:', data.nodes.length);
+      console.log('GFTD Edges:', data.edges.length);
+      console.log('Math Connections:', data.mathConnections?.length || 0);
+      
+      return data;
+    } catch (error) {
+      console.error('Error loading gftd.ai ecosystem data:', error);
+      throw error;
+    }
+  }, []);
+
   const getIntegratedData = useCallback((): TheoryData => {
     const allNodes = [];
     const allEdges = [];
@@ -152,6 +175,15 @@ export default function CytoscapeVisualization() {
       }
     }
 
+    if (gftdData) {
+      allNodes.push(...gftdData.nodes);
+      allEdges.push(...gftdData.edges);
+      if (gftdData.mathConnections) {
+        allMathConnections.push(...gftdData.mathConnections);
+        allEdges.push(...gftdData.mathConnections);
+      }
+    }
+
     // ユーザー編集データを追加
     allNodes.push(...userEdits.nodes);
     allEdges.push(...userEdits.edges);
@@ -161,7 +193,7 @@ export default function CytoscapeVisualization() {
       edges: allEdges,
       mathConnections: allMathConnections
     };
-  }, [mathData, techData, orgData, userEdits]);
+  }, [mathData, techData, orgData, gftdData, userEdits]);
 
   const getCurrentData = useCallback((): TheoryData => {
     switch (viewMode) {
@@ -171,12 +203,14 @@ export default function CytoscapeVisualization() {
         return techData || { nodes: [], edges: [] };
       case 'org':
         return orgData || { nodes: [], edges: [] };
+      case 'gftd':
+        return gftdData || { nodes: [], edges: [] };
       case 'integrated':
         return getIntegratedData();
       default:
         return { nodes: [], edges: [] };
     }
-  }, [viewMode, mathData, techData, orgData, getIntegratedData]);
+  }, [viewMode, mathData, techData, orgData, gftdData, getIntegratedData]);
 
   // ローカルストレージ機能
   const saveToLocalStorage = useCallback(() => {
@@ -392,15 +426,17 @@ export default function CytoscapeVisualization() {
 
       try {
         // 全データを並行して読み込み
-        const [mathTheoryData, techTheoryData, organizationData] = await Promise.all([
+        const [mathTheoryData, techTheoryData, organizationData, gftdTheoryData] = await Promise.all([
           loadMathData(),
           loadTechData(),
-          loadOrgData()
+          loadOrgData(),
+          loadGftdData()
         ]);
         
         setMathData(mathTheoryData);
         setTechData(techTheoryData);
         setOrgData(organizationData);
+        setGftdData(gftdTheoryData);
         
         // ローカルストレージからユーザー編集データを読み込み
         loadFromLocalStorage();
@@ -1045,6 +1081,184 @@ export default function CytoscapeVisualization() {
                 'font-size': '10px'
               }
             },
+
+            // gftd.ai エコシステム専用ノードスタイル
+            {
+              selector: 'node[type="central_nervous_system"]',
+              style: {
+                'background-color': '#1A237E',
+                'shape': 'star',
+                'width': 120,
+                'height': 120,
+                'border-color': '#3F51B5',
+                'color': '#E8EAF6',
+                'text-shadow': '0 0 4px rgba(0, 0, 0, 0.9)',
+                'box-shadow': '0 0 40px rgba(26, 35, 126, 1.0)',
+                'font-size': '12px'
+              }
+            },
+            {
+              selector: 'node[type="neurotransmitter"]',
+              style: {
+                'background-color': '#0D47A1',
+                'shape': 'round-hexagon',
+                'width': 90,
+                'height': 90,
+                'border-color': '#2196F3',
+                'box-shadow': '0 0 25px rgba(13, 71, 161, 0.9)',
+                'font-size': '10px'
+              }
+            },
+            {
+              selector: 'node[type="endocrine_system"]',
+              style: {
+                'background-color': '#4A148C',
+                'shape': 'round-octagon',
+                'width': 100,
+                'height': 85,
+                'border-color': '#7B1FA2',
+                'box-shadow': '0 0 30px rgba(74, 20, 140, 0.9)',
+                'font-size': '11px'
+              }
+            },
+            {
+              selector: 'node[type="neural_network_platform"]',
+              style: {
+                'background-color': '#880E4F',
+                'shape': 'round-diamond',
+                'width': 105,
+                'height': 105,
+                'border-color': '#E91E63',
+                'box-shadow': '0 0 35px rgba(136, 14, 79, 1.0)',
+                'font-size': '11px'
+              }
+            },
+            {
+              selector: 'node[type="circulatory_system"]',
+              style: {
+                'background-color': '#B71C1C',
+                'shape': 'round-rectangle',
+                'width': 95,
+                'height': 80,
+                'border-color': '#F44336',
+                'box-shadow': '0 0 28px rgba(183, 28, 28, 0.9)',
+                'font-size': '10px'
+              }
+            },
+            {
+              selector: 'node[type="integumentary_system"]',
+              style: {
+                'background-color': '#E65100',
+                'shape': 'round-triangle',
+                'width': 90,
+                'height': 85,
+                'border-color': '#FF9800',
+                'box-shadow': '0 0 25px rgba(230, 81, 0, 0.8)',
+                'font-size': '10px'
+              }
+            },
+            {
+              selector: 'node[type="skeletal_system"]',
+              style: {
+                'background-color': '#5D4037',
+                'shape': 'round-rectangle',
+                'width': 100,
+                'height': 75,
+                'border-color': '#8D6E63',
+                'box-shadow': '0 0 22px rgba(93, 64, 55, 0.8)',
+                'font-size': '10px'
+              }
+            },
+            {
+              selector: 'node[type="synaptic_connection"]',
+              style: {
+                'background-color': '#00695C',
+                'shape': 'ellipse',
+                'width': 85,
+                'height': 60,
+                'border-color': '#009688',
+                'box-shadow': '0 0 20px rgba(0, 105, 92, 0.8)',
+                'font-size': '9px'
+              }
+            },
+            {
+              selector: 'node[type="lymphatic_system"]',
+              style: {
+                'background-color': '#1B5E20',
+                'shape': 'round-pentagon',
+                'width': 85,
+                'height': 85,
+                'border-color': '#4CAF50',
+                'box-shadow': '0 0 22px rgba(27, 94, 32, 0.8)',
+                'font-size': '10px'
+              }
+            },
+            {
+              selector: 'node[type="metabolic_enzyme"]',
+              style: {
+                'background-color': '#F57F17',
+                'shape': 'round-triangle',
+                'width': 75,
+                'height': 75,
+                'border-color': '#FFEB3B',
+                'color': '#1A1A1A',
+                'text-shadow': '0 0 3px rgba(255, 255, 255, 0.8)',
+                'box-shadow': '0 0 20px rgba(245, 127, 23, 0.8)',
+                'font-size': '9px'
+              }
+            },
+            {
+              selector: 'node[type="dna_repository"]',
+              style: {
+                'background-color': '#37474F',
+                'shape': 'round-hexagon',
+                'width': 90,
+                'height': 90,
+                'border-color': '#78909C',
+                'box-shadow': '0 0 25px rgba(55, 71, 79, 0.8)',
+                'font-size': '10px'
+              }
+            },
+            {
+              selector: 'node[type="rna_synthesis_factory"]',
+              style: {
+                'background-color': '#FF6F00',
+                'shape': 'round-octagon',
+                'width': 85,
+                'height': 85,
+                'border-color': '#FFC107',
+                'color': '#1A1A1A',
+                'text-shadow': '0 0 3px rgba(255, 255, 255, 0.8)',
+                'box-shadow': '0 0 22px rgba(255, 111, 0, 0.8)',
+                'font-size': '10px'
+              }
+            },
+            {
+              selector: 'node[type="cerebral_cortex"]',
+              style: {
+                'background-color': '#6A1B9A',
+                'shape': 'star',
+                'width': 110,
+                'height': 110,
+                'border-color': '#9C27B0',
+                'box-shadow': '0 0 35px rgba(106, 27, 154, 1.0)',
+                'font-size': '11px'
+              }
+            },
+            {
+              selector: 'node[type="sensory_organs"]',
+              style: {
+                'background-color': '#827717',
+                'shape': 'ellipse',
+                'width': 85,
+                'height': 65,
+                'border-color': '#CDDC39',
+                'color': '#1A1A1A',
+                'text-shadow': '0 0 3px rgba(255, 255, 255, 0.8)',
+                'box-shadow': '0 0 20px rgba(130, 119, 23, 0.8)',
+                'font-size': '9px'
+              }
+            },
             {
               selector: 'node[type="membrane_receptor"]',
               style: {
@@ -1300,6 +1514,200 @@ export default function CytoscapeVisualization() {
               }
             },
 
+            // gftd.ai エコシステム専用エッジスタイル
+            {
+              selector: 'edge[type="neural_control"], edge[type="neural_coordination"]',
+              style: {
+                'line-color': '#3F51B5',
+                'target-arrow-color': '#3F51B5',
+                'width': 3,
+                'line-style': 'solid',
+                'opacity': 0.9,
+                'curve-style': 'bezier'
+              }
+            },
+            {
+              selector: 'edge[type="endocrine_regulation"], edge[type="hormone_secretion"]',
+              style: {
+                'line-color': '#9C27B0',
+                'target-arrow-color': '#9C27B0',
+                'width': 2.5,
+                'line-style': 'dotted',
+                'opacity': 0.8,
+                'curve-style': 'bezier'
+              }
+            },
+            {
+              selector: 'edge[type="service_discovery"]',
+              style: {
+                'line-color': '#2196F3',
+                'target-arrow-color': '#2196F3',
+                'width': 2,
+                'line-style': 'dashed',
+                'opacity': 0.8
+              }
+            },
+            {
+              selector: 'edge[type="deployment_platform"], edge[type="runtime_environment"]',
+              style: {
+                'line-color': '#F44336',
+                'target-arrow-color': '#F44336',
+                'width': 2.5,
+                'line-style': 'solid',
+                'opacity': 0.8
+              }
+            },
+            {
+              selector: 'edge[type="optimized_deployment"]',
+              style: {
+                'line-color': '#FF9800',
+                'target-arrow-color': '#FF9800',
+                'width': 2.5,
+                'line-style': 'solid',
+                'opacity': 0.8
+              }
+            },
+            {
+              selector: 'edge[type="api_integration"], edge[type="client_integration"]',
+              style: {
+                'line-color': '#7B1FA2',
+                'target-arrow-color': '#7B1FA2',
+                'width': 2,
+                'line-style': 'solid',
+                'opacity': 0.8
+              }
+            },
+            {
+              selector: 'edge[type="protocol_implementation"]',
+              style: {
+                'line-color': '#009688',
+                'target-arrow-color': '#009688',
+                'width': 2.5,
+                'line-style': 'dotted',
+                'opacity': 0.8
+              }
+            },
+            {
+              selector: 'edge[type="message_passing"]',
+              style: {
+                'line-color': '#E91E63',
+                'target-arrow-color': '#E91E63',
+                'width': 2.5,
+                'line-style': 'dashed',
+                'opacity': 0.8
+              }
+            },
+            {
+              selector: 'edge[type="stream_processing"]',
+              style: {
+                'line-color': '#4CAF50',
+                'target-arrow-color': '#4CAF50',
+                'width': 2.5,
+                'line-style': 'solid',
+                'opacity': 0.8
+              }
+            },
+            {
+              selector: 'edge[type="data_pipeline"]',
+              style: {
+                'line-color': '#4CAF50',
+                'target-arrow-color': '#4CAF50',
+                'width': 3,
+                'line-style': 'solid',
+                'opacity': 0.9
+              }
+            },
+            {
+              selector: 'edge[type="real_time_analytics"]',
+              style: {
+                'line-color': '#FFEB3B',
+                'target-arrow-color': '#FFEB3B',
+                'width': 2,
+                'line-style': 'dotted',
+                'opacity': 0.8
+              }
+            },
+            {
+              selector: 'edge[type="code_synchronization"], edge[type="source_management"]',
+              style: {
+                'line-color': '#78909C',
+                'target-arrow-color': '#78909C',
+                'width': 2,
+                'line-style': 'solid',
+                'opacity': 0.7
+              }
+            },
+            {
+              selector: 'edge[type="ci_cd_integration"], edge[type="deployment_trigger"]',
+              style: {
+                'line-color': '#78909C',
+                'target-arrow-color': '#78909C',
+                'width': 2.5,
+                'line-style': 'dashed',
+                'opacity': 0.8
+              }
+            },
+            {
+              selector: 'edge[type="devops_pipeline"]',
+              style: {
+                'line-color': '#FFC107',
+                'target-arrow-color': '#FFC107',
+                'width': 3,
+                'line-style': 'solid',
+                'opacity': 0.9
+              }
+            },
+            {
+              selector: 'edge[type="intelligent_service"]',
+              style: {
+                'line-color': '#9C27B0',
+                'target-arrow-color': '#9C27B0',
+                'width': 3,
+                'line-style': 'solid',
+                'opacity': 0.9
+              }
+            },
+            {
+              selector: 'edge[type="authentication"], edge[type="authorization"]',
+              style: {
+                'line-color': '#B71C1C',
+                'target-arrow-color': '#B71C1C',
+                'width': 2,
+                'line-style': 'dashed',
+                'opacity': 0.8
+              }
+            },
+            {
+              selector: 'edge[type="data_encryption"]',
+              style: {
+                'line-color': '#B71C1C',
+                'target-arrow-color': '#B71C1C',
+                'width': 2.5,
+                'line-style': 'dotted',
+                'opacity': 0.8
+              }
+            },
+            {
+              selector: 'edge[type="infrastructure_monitoring"], edge[type="performance_monitoring"], edge[type="ai_monitoring"]',
+              style: {
+                'line-color': '#CDDC39',
+                'target-arrow-color': '#CDDC39',
+                'width': 2,
+                'line-style': 'dotted',
+                'opacity': 0.7
+              }
+            },
+            {
+              selector: 'edge[type="api_consumption"]',
+              style: {
+                'line-color': '#009688',
+                'target-arrow-color': '#009688',
+                'width': 2.5,
+                'line-style': 'solid',
+                'opacity': 0.8
+              }
+            },
+
             // 組織系エッジスタイル
             {
               selector: 'edge[type="energy_governance"], edge[type="strategic_direction"]',
@@ -1484,7 +1892,7 @@ export default function CytoscapeVisualization() {
         cyRef.current.destroy();
       }
     };
-  }, [loadMathData, loadTechData, loadOrgData, loadFromLocalStorage, viewMode, setupEventHandlers, updateAvailableNodes]);
+      }, [loadMathData, loadTechData, loadOrgData, loadGftdData, loadFromLocalStorage, viewMode, setupEventHandlers, updateAvailableNodes]);
 
   // ビューモード変更時のデータ更新
   useEffect(() => {
@@ -1495,7 +1903,7 @@ export default function CytoscapeVisualization() {
       cyRef.current.layout({ name: currentLayout }).run();
       updateAvailableNodes(cyRef.current);
     }
-  }, [viewMode, getCurrentData, currentLayout, updateAvailableNodes, mathData, techData, orgData, userEdits]);
+  }, [viewMode, getCurrentData, currentLayout, updateAvailableNodes, mathData, techData, orgData, gftdData, userEdits]);
 
   // コントロール関数
   const resetView = useCallback(() => {
@@ -1685,7 +2093,8 @@ export default function CytoscapeVisualization() {
               {viewMode === 'math' && '数学理論の生物的表現'}
               {viewMode === 'tech' && 'IT技術の生態系'}
               {viewMode === 'org' && '会社組織の生態系'}
-              {viewMode === 'integrated' && '数学理論×IT技術×組織の統合生態系'}
+              {viewMode === 'gftd' && 'gftd.ai技術スタックの生命体構図'}
+              {viewMode === 'integrated' && '数学理論×IT技術×組織×gftd.aiの統合生態系'}
             </p>
           </div>
           
@@ -1721,6 +2130,16 @@ export default function CytoscapeVisualization() {
                 }`}
               >
                 組織
+              </button>
+              <button
+                onClick={() => setViewMode('gftd')}
+                className={`px-3 py-1 rounded-full text-xs transition-all duration-300 ${
+                  viewMode === 'gftd'
+                    ? 'bg-cyan-500 text-white'
+                    : 'text-cyan-400 hover:bg-cyan-500/20'
+                }`}
+              >
+                gftd.ai
               </button>
               <button
                 onClick={() => setViewMode('integrated')}
@@ -1945,6 +2364,60 @@ export default function CytoscapeVisualization() {
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-teal-600 border border-white/30" />
                   <span className="text-white">チーム・プロジェクト</span>
+                </div>
+              </>
+            )}
+
+            {(viewMode === 'gftd' || viewMode === 'integrated') && (
+              <>
+                <div className="text-cyan-400 font-semibold mb-1 mt-3">gftd.ai エコシステム</div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-indigo-800 border border-white/30" />
+                  <span className="text-white">gftd.ai（中枢神経系）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-blue-700 border border-white/30" />
+                  <span className="text-white">Hickory DNS（神経伝達物質）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-purple-700 border border-white/30" />
+                  <span className="text-white">api.gftd.ai（内分泌系）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-pink-700 border border-white/30" />
+                  <span className="text-white">actor.gftd.ai（神経ネットワーク）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-700 border border-white/30" />
+                  <span className="text-white">Fly.io（循環系）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-orange-600 border border-white/30" />
+                  <span className="text-white">Vercel（表皮系）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-amber-800 border border-white/30" />
+                  <span className="text-white">Next.js（骨格系）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-teal-700 border border-white/30" />
+                  <span className="text-white">MCP（シナプス）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-green-700 border border-white/30" />
+                  <span className="text-white">Confluent（リンパ系）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-yellow-600 border border-white/30" />
+                  <span className="text-white">ksqlDB（代謝酵素）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gray-600 border border-white/30" />
+                  <span className="text-white">GitHub/GitLab（DNA/RNA）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-purple-600 border border-white/30" />
+                  <span className="text-white">AI統合層（大脳皮質）</span>
                 </div>
               </>
             )}
