@@ -696,6 +696,92 @@ export default function CytoscapeVisualization() {
                 'font-size': '11px'
               }
             },
+
+            // 新しい技術系ノードスタイル
+            {
+              selector: 'node[type="genetic_library"]',
+              style: {
+                'background-color': '#2C5530',
+                'shape': 'round-rectangle',
+                'width': 95,
+                'height': 70,
+                'border-color': '#66BB6A',
+                'box-shadow': '0 0 25px rgba(44, 85, 48, 0.9)',
+                'font-size': '10px'
+              }
+            },
+            {
+              selector: 'node[type="membrane_receptor"]',
+              style: {
+                'background-color': '#4A148C',
+                'shape': 'round-diamond',
+                'width': 80,
+                'height': 60,
+                'border-color': '#9C27B0',
+                'box-shadow': '0 0 20px rgba(74, 20, 140, 0.8)',
+                'font-size': '9px'
+              }
+            },
+            {
+              selector: 'node[type="neural_signal"]',
+              style: {
+                'background-color': '#FF6F00',
+                'shape': 'round-triangle',
+                'width': 70,
+                'height': 70,
+                'border-color': '#FFB74D',
+                'box-shadow': '0 0 18px rgba(255, 111, 0, 0.8)',
+                'font-size': '9px'
+              }
+            },
+            {
+              selector: 'node[type="knowledge_network"]',
+              style: {
+                'background-color': '#6A1B9A',
+                'shape': 'star',
+                'width': 90,
+                'height': 90,
+                'border-color': '#E1BEE7',
+                'box-shadow': '0 0 25px rgba(106, 27, 154, 0.9)',
+                'font-size': '10px'
+              }
+            },
+            {
+              selector: 'node[type="symbiotic_network"]',
+              style: {
+                'background-color': '#00695C',
+                'shape': 'round-hexagon',
+                'width': 85,
+                'height': 85,
+                'border-color': '#26A69A',
+                'box-shadow': '0 0 22px rgba(0, 105, 92, 0.8)',
+                'font-size': '10px'
+              }
+            },
+            {
+              selector: 'node[type="metabolic_regulator"]',
+              style: {
+                'background-color': '#E65100',
+                'shape': 'round-octagon',
+                'width': 90,
+                'height': 90,
+                'border-color': '#FF8A65',
+                'box-shadow': '0 0 25px rgba(230, 81, 0, 0.9)',
+                'font-size': '10px'
+              }
+            },
+            {
+              selector: 'node[type="memory_formation"]',
+              style: {
+                'background-color': '#3E2723',
+                'shape': 'round-diamond',
+                'width': 85,
+                'height': 70,
+                'border-color': '#8D6E63',
+                'box-shadow': '0 0 20px rgba(62, 39, 35, 0.8)',
+                'font-size': '9px'
+              }
+            },
             
             // エッジスタイル
             {
@@ -803,6 +889,79 @@ export default function CytoscapeVisualization() {
                 'width': 2,
                 'line-style': 'dashed',
                 'opacity': 0.7
+              }
+            },
+
+            // 新しい技術系エッジスタイル
+            {
+              selector: 'edge[type="data_source"], edge[type="event_storage"]',
+              style: {
+                'line-color': '#2E7D32',
+                'target-arrow-color': '#2E7D32',
+                'width': 2.5,
+                'line-style': 'solid',
+                'opacity': 0.8
+              }
+            },
+            {
+              selector: 'edge[type="api_layer"], edge[type="rpc_layer"]',
+              style: {
+                'line-color': '#7B1FA2',
+                'target-arrow-color': '#7B1FA2',
+                'width': 2,
+                'line-style': 'solid',
+                'opacity': 0.8
+              }
+            },
+            {
+              selector: 'edge[type="integration_method"]',
+              style: {
+                'line-color': '#00ACC1',
+                'target-arrow-color': '#00ACC1',
+                'width': 2.5,
+                'line-style': 'solid',
+                'opacity': 0.8
+              }
+            },
+            {
+              selector: 'edge[type="workflow_trigger"], edge[type="process_recording"]',
+              style: {
+                'line-color': '#FF9800',
+                'target-arrow-color': '#FF9800',
+                'width': 2,
+                'line-style': 'solid',
+                'opacity': 0.8
+              }
+            },
+            {
+              selector: 'edge[type="ai_communication"], edge[type="protocol_implementation"]',
+              style: {
+                'line-color': '#9C27B0',
+                'target-arrow-color': '#9C27B0',
+                'width': 3,
+                'line-style': 'dotted',
+                'opacity': 0.9
+              }
+            },
+            {
+              selector: 'edge[type="automation_orchestration"], edge[type="service_exposure"]',
+              style: {
+                'line-color': '#3F51B5',
+                'target-arrow-color': '#3F51B5',
+                'width': 2,
+                'line-style': 'dashed',
+                'opacity': 0.7
+              }
+            },
+            {
+              selector: 'edge[type="audit_trail"]',
+              style: {
+                'line-color': '#795548',
+                'target-arrow-color': '#795548',
+                'width': 2,
+                'line-style': 'dashed',
+                'curve-style': 'unbundled-bezier',
+                'opacity': 0.6
               }
             },
 
@@ -1267,6 +1426,22 @@ export default function CytoscapeVisualization() {
                   <div className="w-3 h-3 rounded-full bg-blue-700 border border-white/30" />
                   <span className="text-white">クラウド（生態系拡張）</span>
                 </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-green-800 border border-white/30" />
+                  <span className="text-white">データベース特化（遺伝子）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-purple-700 border border-white/30" />
+                  <span className="text-white">API/通信（受容体・信号）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-orange-700 border border-white/30" />
+                  <span className="text-white">ワークフロー（代謝調整）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-indigo-700 border border-white/30" />
+                  <span className="text-white">AI通信（知識共有）</span>
+                </div>
               </>
             )}
             
@@ -1390,6 +1565,13 @@ export default function CytoscapeVisualization() {
                     <option value="sensory_system">監視（感覚器官）</option>
                     <option value="evolution_seed">AI/ML（進化の種）</option>
                     <option value="new_ecosystem">量子（新生態系）</option>
+                    <option value="genetic_library">PostgreSQL（遺伝子ライブラリ）</option>
+                    <option value="membrane_receptor">REST API（細胞膜受容体）</option>
+                    <option value="neural_signal">JSON-RPC（神経信号）</option>
+                    <option value="knowledge_network">MCP（知識共有網）</option>
+                    <option value="symbiotic_network">A2A（共生ネットワーク）</option>
+                    <option value="metabolic_regulator">Camunda（代謝調整者）</option>
+                    <option value="memory_formation">Event Sourcing（記憶形成）</option>
                   </optgroup>
                 </select>
               </div>
@@ -1508,6 +1690,18 @@ export default function CytoscapeVisualization() {
                     <option value="data_synergy">データシナジー</option>
                     <option value="security_layer">セキュリティ層</option>
                     <option value="intelligent_ops">インテリジェント運用</option>
+                    <option value="data_source">データソース提供</option>
+                    <option value="api_layer">API層実装</option>
+                    <option value="rpc_layer">RPC実装</option>
+                    <option value="integration_method">統合手段</option>
+                    <option value="workflow_trigger">ワークフロー起動</option>
+                    <option value="process_recording">プロセス記録</option>
+                    <option value="event_storage">イベント保存</option>
+                    <option value="ai_communication">AI間通信</option>
+                    <option value="protocol_implementation">プロトコル実装</option>
+                    <option value="automation_orchestration">自動化連携</option>
+                    <option value="service_exposure">サービス公開</option>
+                    <option value="audit_trail">監査証跡</option>
                   </optgroup>
                   <optgroup label="数学-IT連携">
                     <option value="math_implementation">数学実装</option>
