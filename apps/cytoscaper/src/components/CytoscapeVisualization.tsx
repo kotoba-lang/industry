@@ -6,6 +6,8 @@ import cytoscape, { Core, NodeSingular, EdgeSingular } from 'cytoscape';
 import dagre from 'cytoscape-dagre';
 // @ts-ignore
 import coseBilkent from 'cytoscape-cose-bilkent';
+import Hammer from 'hammerjs';
+import TrackpadControls from './TrackpadControls';
 
 // Cytoscapeの拡張を登録
 if (typeof window !== 'undefined') {
@@ -56,6 +58,7 @@ export default function CytoscapeVisualization() {
   const [techData, setTechData] = useState<TheoryData | null>(null);
   const [orgData, setOrgData] = useState<TheoryData | null>(null);
   const [gftdData, setGftdData] = useState<TheoryData | null>(null);
+  const [showTrackpadHelp, setShowTrackpadHelp] = useState(true);
   const [userEdits, setUserEdits] = useState<{nodes: any[], edges: any[]}>({nodes: [], edges: []});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -300,6 +303,148 @@ export default function CytoscapeVisualization() {
     setHasUnsavedChanges(true);
   }, []);
 
+  // Mac trackpad用ジェスチャーサポート
+  const setupTrackpadGestures = useCallback((cy: Core) => {
+    const container = cy.container();
+    if (!container) return;
+
+    // Natural Scrollingに対応したホイールイベント
+    let lastWheelDelta = 0;
+    let wheelTimeout: NodeJS.Timeout | null = null;
+    
+    container.addEventListener('wheel', (e: WheelEvent) => {
+      e.preventDefault();
+      
+      const zoom = cy.zoom();
+      const deltaY = e.deltaY;
+      
+      // macOSのNatural Scrollingを検出（Magic MouseとTrackpadで異なる）
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const scrollDirection = isMac ? -deltaY : deltaY;
+      
+      // ピンチズームの検出（ctrlキーまたはmetaキーが押されている場合）
+      if (e.ctrlKey || e.metaKey) {
+        const zoomFactor = scrollDirection > 0 ? 0.9 : 1.1;
+        const newZoom = Math.max(0.1, Math.min(3, zoom * zoomFactor));
+        
+        cy.animate({
+          zoom: {
+            level: newZoom,
+            position: { x: e.clientX, y: e.clientY }
+          }
+        }, {
+          duration: 150,
+          easing: 'ease-out'
+        });
+      } else {
+        // パンスクロール
+        const pan = cy.pan();
+        const panSpeed = 2;
+        
+        cy.animate({
+          pan: {
+            x: pan.x - (e.deltaX * panSpeed),
+            y: pan.y - (scrollDirection * panSpeed)
+          }
+        }, {
+          duration: 100,
+          easing: 'ease-out'
+        });
+      }
+      
+      // 慣性スクロールのシミュレーション
+      lastWheelDelta = scrollDirection;
+      if (wheelTimeout) clearTimeout(wheelTimeout);
+      wheelTimeout = setTimeout(() => {
+        lastWheelDelta = 0;
+      }, 200);
+    }, { passive: false });
+
+    // タッチジェスチャー（ピンチ、パン）
+    const hammer = new Hammer.Manager(container);
+    
+    // ピンチジェスチャー
+    const pinch = new Hammer.Pinch({
+      threshold: 0.1
+    });
+    hammer.add(pinch);
+    
+    // パンジェスチャー
+    const pan = new Hammer.Pan({
+      direction: Hammer.DIRECTION_ALL,
+      threshold: 10
+    });
+    hammer.add(pan);
+    
+    // タップジェスチャー
+    const tap = new Hammer.Tap({
+      taps: 1
+    });
+    hammer.add(tap);
+    
+    // ダブルタップジェスチャー
+    const doubleTap = new Hammer.Tap({
+      taps: 2
+    });
+    hammer.add(doubleTap);
+    
+    let initialZoom = 1;
+    let initialPan = { x: 0, y: 0 };
+    
+    // ピンチズーム
+    hammer.on('pinchstart', (e) => {
+      initialZoom = cy.zoom();
+      initialPan = cy.pan();
+    });
+    
+    hammer.on('pinchmove', (e) => {
+      const newZoom = Math.max(0.1, Math.min(3, initialZoom * e.scale));
+      cy.zoom({
+        level: newZoom,
+        position: { x: e.center.x, y: e.center.y }
+      });
+    });
+    
+    // パンジェスチャー
+    hammer.on('panstart', (e) => {
+      initialPan = cy.pan();
+    });
+    
+    hammer.on('panmove', (e) => {
+      cy.pan({
+        x: initialPan.x + e.deltaX,
+        y: initialPan.y + e.deltaY
+      });
+    });
+    
+    // ダブルタップでフィット
+    hammer.on('doubletap', (e) => {
+      e.preventDefault();
+      cy.animate({
+        fit: {
+          eles: cy.elements(),
+          padding: 50
+        }
+      }, {
+        duration: 300,
+        easing: 'ease-in-out'
+      });
+    });
+
+    // スムーズなアニメーション用のeasingオプション
+    cy.style()
+      .selector('node')
+      .style({
+        'transition-property': 'background-color, border-color, opacity',
+        'transition-duration': 300
+      })
+      .selector('edge')
+      .style({
+        'transition-property': 'line-color, opacity',
+        'transition-duration': 300
+      });
+  }, []);
+
   // イベントハンドラーの設定
   const setupEventHandlers = useCallback((cy: Core) => {
     // ノードクリック
@@ -401,6 +546,9 @@ export default function CytoscapeVisualization() {
         });
       }
     });
+
+    // Mac trackpad用ジェスチャーサポート
+    setupTrackpadGestures(cy);
   }, [editMode]);
 
   // 関連ノードのハイライト
@@ -2172,6 +2320,16 @@ export default function CytoscapeVisualization() {
               >
                 レイアウト変更
               </button>
+              <button
+                onClick={() => setShowTrackpadHelp(!showTrackpadHelp)}
+                className={`px-4 py-2 border rounded-full transition-all duration-300 text-sm ${
+                  showTrackpadHelp
+                    ? 'bg-purple-500/60 border-purple-400 text-purple-100'
+                    : 'bg-purple-500/20 border-purple-400 text-purple-400 hover:bg-purple-500/40'
+                }`}
+              >
+                🖱️ Trackpad操作
+              </button>
             </div>
             
             {/* 編集コントロール */}
@@ -2759,6 +2917,11 @@ export default function CytoscapeVisualization() {
             </div>
           </div>
         </div>
+      )}
+      
+      {/* Mac Trackpad操作ガイド */}
+      {showTrackpadHelp && (
+        <TrackpadControls onClose={() => setShowTrackpadHelp(false)} />
       )}
     </div>
   );
