@@ -308,96 +308,108 @@ export default function CytoscapeVisualization() {
     const container = cy.container();
     if (!container) return;
 
-    // Natural Scrollingに対応したホイールイベント
-    let lastWheelDelta = 0;
+    // デバウンス用の変数
+    let isAnimating = false;
     let wheelTimeout: NodeJS.Timeout | null = null;
+    let lastWheelTime = 0;
+    let accumulatedDelta = { x: 0, y: 0 };
+    
+    // スムーズなパン・ズーム処理
+    const smoothUpdate = () => {
+      if (isAnimating) return;
+      isAnimating = true;
+      
+      requestAnimationFrame(() => {
+        isAnimating = false;
+      });
+    };
     
     container.addEventListener('wheel', (e: WheelEvent) => {
       e.preventDefault();
+      e.stopPropagation();
+      
+      const now = Date.now();
+      const timeDelta = now - lastWheelTime;
+      lastWheelTime = now;
+      
+      // 高頻度イベントの間引き
+      if (timeDelta < 16 && isAnimating) {
+        return;
+      }
       
       const zoom = cy.zoom();
       const deltaY = e.deltaY;
+      const deltaX = e.deltaX;
       
-      // macOSのNatural Scrollingを検出（Magic MouseとTrackpadで異なる）
+      // macOSのNatural Scrollingを検出
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      const scrollDirection = isMac ? -deltaY : deltaY;
+      const scrollDirectionY = isMac ? -deltaY : deltaY;
+      const scrollDirectionX = isMac ? -deltaX : deltaX;
       
       // ピンチズームの検出（ctrlキーまたはmetaキーが押されている場合）
       if (e.ctrlKey || e.metaKey) {
-        const zoomFactor = scrollDirection > 0 ? 0.9 : 1.1;
+        const zoomFactor = scrollDirectionY > 0 ? 0.95 : 1.05;
         const newZoom = Math.max(0.1, Math.min(3, zoom * zoomFactor));
         
-        cy.animate({
-          zoom: {
-            level: newZoom,
-            position: { x: e.clientX, y: e.clientY }
-          }
-        }, {
-          duration: 150,
-          easing: 'ease-out'
+        // アニメーションなしで即座にズーム
+        cy.zoom({
+          level: newZoom,
+          position: { x: e.clientX, y: e.clientY }
         });
       } else {
-        // パンスクロール
+        // パンスクロール - アニメーションなしで即座に移動
         const pan = cy.pan();
-        const panSpeed = 2;
+        const panSpeed = 1.5;
         
-        cy.animate({
-          pan: {
-            x: pan.x - (e.deltaX * panSpeed),
-            y: pan.y - (scrollDirection * panSpeed)
-          }
-        }, {
-          duration: 100,
-          easing: 'ease-out'
-        });
+        // デルタを蓄積して滑らかに
+        accumulatedDelta.x += scrollDirectionX * panSpeed;
+        accumulatedDelta.y += scrollDirectionY * panSpeed;
+        
+        // 小さな移動は無視してちらつきを防止
+        if (Math.abs(accumulatedDelta.x) > 2 || Math.abs(accumulatedDelta.y) > 2) {
+          cy.pan({
+            x: pan.x - accumulatedDelta.x,
+            y: pan.y - accumulatedDelta.y
+          });
+          accumulatedDelta = { x: 0, y: 0 };
+        }
       }
       
-      // 慣性スクロールのシミュレーション
-      lastWheelDelta = scrollDirection;
+      // デバウンス処理
       if (wheelTimeout) clearTimeout(wheelTimeout);
       wheelTimeout = setTimeout(() => {
-        lastWheelDelta = 0;
-      }, 200);
+        accumulatedDelta = { x: 0, y: 0 };
+      }, 100);
+      
+      smoothUpdate();
     }, { passive: false });
 
     // タッチジェスチャー（ピンチ、パン）
-    const hammer = new Hammer.Manager(container);
-    
-    // ピンチジェスチャー
-    const pinch = new Hammer.Pinch({
-      threshold: 0.1
+    const hammer = new Hammer.Manager(container, {
+      recognizers: [
+        [Hammer.Pinch, { enable: true }],
+        [Hammer.Pan, { direction: Hammer.DIRECTION_ALL, threshold: 5 }],
+        [Hammer.Tap, { taps: 1 }],
+        [Hammer.Tap, { taps: 2 }, ['tap']]
+      ]
     });
-    hammer.add(pinch);
-    
-    // パンジェスチャー
-    const pan = new Hammer.Pan({
-      direction: Hammer.DIRECTION_ALL,
-      threshold: 10
-    });
-    hammer.add(pan);
-    
-    // タップジェスチャー
-    const tap = new Hammer.Tap({
-      taps: 1
-    });
-    hammer.add(tap);
-    
-    // ダブルタップジェスチャー
-    const doubleTap = new Hammer.Tap({
-      taps: 2
-    });
-    hammer.add(doubleTap);
     
     let initialZoom = 1;
     let initialPan = { x: 0, y: 0 };
+    let gestureActive = false;
     
-    // ピンチズーム
+    // ピンチズーム - 最適化
     hammer.on('pinchstart', (e) => {
+      gestureActive = true;
       initialZoom = cy.zoom();
       initialPan = cy.pan();
+      e.preventDefault();
     });
     
     hammer.on('pinchmove', (e) => {
+      if (!gestureActive) return;
+      e.preventDefault();
+      
       const newZoom = Math.max(0.1, Math.min(3, initialZoom * e.scale));
       cy.zoom({
         level: newZoom,
@@ -405,30 +417,37 @@ export default function CytoscapeVisualization() {
       });
     });
     
-    // パンジェスチャー
+    hammer.on('pinchend', () => {
+      gestureActive = false;
+    });
+    
+    // パンジェスチャー - 最適化
     hammer.on('panstart', (e) => {
+      if (gestureActive) return;
+      gestureActive = true;
       initialPan = cy.pan();
+      e.preventDefault();
     });
     
     hammer.on('panmove', (e) => {
+      if (!gestureActive) return;
+      e.preventDefault();
+      
+      // スムーズなパン処理
       cy.pan({
         x: initialPan.x + e.deltaX,
         y: initialPan.y + e.deltaY
       });
     });
     
-    // ダブルタップでフィット
+    hammer.on('panend', () => {
+      gestureActive = false;
+    });
+    
+    // ダブルタップでフィット - アニメーション削除
     hammer.on('doubletap', (e) => {
       e.preventDefault();
-      cy.animate({
-        fit: {
-          eles: cy.elements(),
-          padding: 50
-        }
-      }, {
-        duration: 300,
-        easing: 'ease-in-out'
-      });
+      cy.fit(cy.elements(), 50);
     });
 
     // スムーズなアニメーション用のeasingオプション
