@@ -41,7 +41,7 @@ export default function TrackpadControls({ onClose }: TrackpadControlsProps) {
           <div className="text-blue-400 mt-0.5">🤏</div>
           <div>
             <div className="font-medium">パン移動</div>
-            <div className="text-gray-300">2本指スクロール / ドラッグ</div>
+            <div className="text-gray-300">2本指スクロール（滑らか最適化済み）</div>
           </div>
         </div>
         
@@ -49,7 +49,7 @@ export default function TrackpadControls({ onClose }: TrackpadControlsProps) {
           <div className="text-purple-400 mt-0.5">🎯</div>
           <div>
             <div className="font-medium">全体表示</div>
-            <div className="text-gray-300">ダブルタップ</div>
+            <div className="text-gray-300">ダブルタップ（瞬間フィット）</div>
           </div>
         </div>
         
@@ -57,15 +57,15 @@ export default function TrackpadControls({ onClose }: TrackpadControlsProps) {
           <div className="text-orange-400 mt-0.5">👆</div>
           <div>
             <div className="font-medium">ノード選択</div>
-            <div className="text-gray-300">シングルタップ</div>
+            <div className="text-gray-300">シングルタップ / クリック</div>
           </div>
         </div>
         
         <div className="flex items-start gap-3">
-          <div className="text-yellow-400 mt-0.5">✨</div>
+          <div className="text-yellow-400 mt-0.5">⚡</div>
           <div>
-            <div className="font-medium">慣性スクロール</div>
-            <div className="text-gray-300">Natural Scrolling対応</div>
+            <div className="font-medium">高速描画</div>
+            <div className="text-gray-300">アニメーション最適化・ちらつき防止</div>
           </div>
         </div>
       </div>
