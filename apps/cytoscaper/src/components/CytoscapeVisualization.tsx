@@ -60,7 +60,7 @@ export default function CytoscapeVisualization() {
   const cyRef = useRef<Core | null>(null);
   
   // View state
-  const [viewMode, setViewMode] = useState<'math' | 'tech' | 'org' | 'gftd' | 'integrated'>('integrated');
+  const [viewMode, setViewMode] = useState<'math' | 'tech' | 'org' | 'gftd' | 'integrated' | 'ai-ml' | 'foundation-tech' | 'math-bridge' | 'org-alignment'>('integrated');
   const [currentLayout, setCurrentLayout] = useState<'dagre' | 'cose-bilkent' | 'grid' | 'circle'>('cose-bilkent');
   const [editMode, setEditMode] = useState(false);
   
@@ -69,6 +69,13 @@ export default function CytoscapeVisualization() {
   const [techData, setTechData] = useState<TheoryData | null>(null);
   const [orgData, setOrgData] = useState<TheoryData | null>(null);
   const [gftdData, setGftdData] = useState<TheoryData | null>(null);
+  
+  // Subnet data state
+  const [aiMlSubnetData, setAiMlSubnetData] = useState<TheoryData | null>(null);
+  const [foundationTechSubnetData, setFoundationTechSubnetData] = useState<TheoryData | null>(null);
+  const [mathBridgeSubnetData, setMathBridgeSubnetData] = useState<TheoryData | null>(null);
+  const [orgAlignmentSubnetData, setOrgAlignmentSubnetData] = useState<TheoryData | null>(null);
+  
   const [userEdits, setUserEdits] = useState<{nodes: any[], edges: any[]}>({nodes: [], edges: []});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -162,6 +169,71 @@ export default function CytoscapeVisualization() {
     }
   }, []);
 
+  // Subnet data loading functions
+  const loadAiMlSubnetData = useCallback(async (): Promise<TheoryData> => {
+    try {
+      console.log('Loading AI/ML subnet data...');
+      const response = await fetch('/data/ai-ml-subnet.json');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch AI/ML subnet data: ${response.status}`);
+      }
+      const data = await response.json();
+      console.log('AI/ML subnet data loaded:', data);
+      return data;
+    } catch (error) {
+      console.error('Error loading AI/ML subnet data:', error);
+      throw error;
+    }
+  }, []);
+
+  const loadFoundationTechSubnetData = useCallback(async (): Promise<TheoryData> => {
+    try {
+      console.log('Loading Foundation Tech subnet data...');
+      const response = await fetch('/data/foundation-tech-subnet.json');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch Foundation Tech subnet data: ${response.status}`);
+      }
+      const data = await response.json();
+      console.log('Foundation Tech subnet data loaded:', data);
+      return data;
+    } catch (error) {
+      console.error('Error loading Foundation Tech subnet data:', error);
+      throw error;
+    }
+  }, []);
+
+  const loadMathBridgeSubnetData = useCallback(async (): Promise<TheoryData> => {
+    try {
+      console.log('Loading Math Bridge subnet data...');
+      const response = await fetch('/data/math-bridge-subnet.json');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch Math Bridge subnet data: ${response.status}`);
+      }
+      const data = await response.json();
+      console.log('Math Bridge subnet data loaded:', data);
+      return data;
+    } catch (error) {
+      console.error('Error loading Math Bridge subnet data:', error);
+      throw error;
+    }
+  }, []);
+
+  const loadOrgAlignmentSubnetData = useCallback(async (): Promise<TheoryData> => {
+    try {
+      console.log('Loading Organizational Alignment subnet data...');
+      const response = await fetch('/data/organizational-alignment-subnet.json');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch Organizational Alignment subnet data: ${response.status}`);
+      }
+      const data = await response.json();
+      console.log('Organizational Alignment subnet data loaded:', data);
+      return data;
+    } catch (error) {
+      console.error('Error loading Organizational Alignment subnet data:', error);
+      throw error;
+    }
+  }, []);
+
   // 統合データの取得
   const getIntegratedData = useCallback((): TheoryData => {
     if (!mathData || !techData || !orgData || !gftdData) {
@@ -188,6 +260,14 @@ export default function CytoscapeVisualization() {
           return gftdData || { nodes: [], edges: [] };
         case 'integrated':
           return getIntegratedData();
+        case 'ai-ml':
+          return aiMlSubnetData || { nodes: [], edges: [] };
+        case 'foundation-tech':
+          return foundationTechSubnetData || { nodes: [], edges: [] };
+        case 'math-bridge':
+          return mathBridgeSubnetData || { nodes: [], edges: [] };
+        case 'org-alignment':
+          return orgAlignmentSubnetData || { nodes: [], edges: [] };
         default:
           return { nodes: [], edges: [] };
       }
@@ -209,7 +289,7 @@ export default function CytoscapeVisualization() {
     ));
 
     return { nodes: updatedNodes, edges: updatedEdges };
-  }, [viewMode, mathData, techData, orgData, gftdData, getIntegratedData, userEdits]);
+  }, [viewMode, mathData, techData, orgData, gftdData, aiMlSubnetData, foundationTechSubnetData, mathBridgeSubnetData, orgAlignmentSubnetData, getIntegratedData, userEdits]);
 
   // ユーザー編集の追跡
   const trackUserEdit = useCallback((type: 'node' | 'edge', action: 'add' | 'update' | 'delete', data: any) => {
@@ -687,9 +767,14 @@ export default function CytoscapeVisualization() {
       loadMathData().then(setMathData),
       loadTechData().then(setTechData),
       loadOrgData().then(setOrgData),
-      loadGftdData().then(setGftdData)
+      loadGftdData().then(setGftdData),
+      // サブネットデータも並行読み込み
+      loadAiMlSubnetData().then(setAiMlSubnetData),
+      loadFoundationTechSubnetData().then(setFoundationTechSubnetData),
+      loadMathBridgeSubnetData().then(setMathBridgeSubnetData),
+      loadOrgAlignmentSubnetData().then(setOrgAlignmentSubnetData)
     ]).then(() => {
-      console.log('All data loaded successfully');
+      console.log('All data (including subnets) loaded successfully');
     }).catch(error => {
       console.error('Error loading data:', error);
     });
@@ -921,6 +1006,55 @@ export default function CytoscapeVisualization() {
               >
                 統合
               </button>
+            </div>
+            
+            {/* サブネット選択 */}
+            <div className="glass-dark p-4 rounded-lg">
+              <h3 className="text-xs font-semibold text-cyan-400 mb-3 uppercase tracking-wide">
+                🕸️ サブネット
+              </h3>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setViewMode('ai-ml')}
+                  className={`px-3 py-2 rounded-lg text-xs transition-all duration-300 ${
+                    viewMode === 'ai-ml'
+                      ? 'bg-green-500 text-white shadow-lg'
+                      : 'text-green-400 hover:bg-green-500/20 border border-green-500/30'
+                  }`}
+                >
+                  🤖 AI/ML
+                </button>
+                <button
+                  onClick={() => setViewMode('foundation-tech')}
+                  className={`px-3 py-2 rounded-lg text-xs transition-all duration-300 ${
+                    viewMode === 'foundation-tech'
+                      ? 'bg-orange-500 text-white shadow-lg'
+                      : 'text-orange-400 hover:bg-orange-500/20 border border-orange-500/30'
+                  }`}
+                >
+                  🏗️ 基盤技術
+                </button>
+                <button
+                  onClick={() => setViewMode('math-bridge')}
+                  className={`px-3 py-2 rounded-lg text-xs transition-all duration-300 ${
+                    viewMode === 'math-bridge'
+                      ? 'bg-purple-500 text-white shadow-lg'
+                      : 'text-purple-400 hover:bg-purple-500/20 border border-purple-500/30'
+                  }`}
+                >
+                  🌉 数学ブリッジ
+                </button>
+                <button
+                  onClick={() => setViewMode('org-alignment')}
+                  className={`px-3 py-2 rounded-lg text-xs transition-all duration-300 ${
+                    viewMode === 'org-alignment'
+                      ? 'bg-blue-500 text-white shadow-lg'
+                      : 'text-blue-400 hover:bg-blue-500/20 border border-blue-500/30'
+                  }`}
+                >
+                  🏢 組織整合
+                </button>
+              </div>
             </div>
           </div>
         </div>
