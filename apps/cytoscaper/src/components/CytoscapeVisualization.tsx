@@ -918,17 +918,21 @@ export default function CytoscapeVisualization() {
     return () => {
       cy.destroy();
     };
-  }, [loadMathData, loadTechData, loadOrgData, loadGftdData, selectItemInLeftPanel, edgeSelectionMode, toggleEdgeSelection, selectedEdges]);
+  }, [loadMathData, loadTechData, loadOrgData, loadGftdData, loadAiMlSubnetData, loadFoundationTechSubnetData, loadMathBridgeSubnetData, loadOrgAlignmentSubnetData, selectItemInLeftPanel, edgeSelectionMode, toggleEdgeSelection, selectedEdges]);
 
   // データが変更されたときにCytoscapeを更新
   useEffect(() => {
-    if (cyRef.current && (mathData || techData || orgData || gftdData)) {
+    if (cyRef.current && (mathData || techData || orgData || gftdData || aiMlSubnetData || foundationTechSubnetData || mathBridgeSubnetData || orgAlignmentSubnetData)) {
       const currentData = getCurrentData();
+      console.log(`Updating Cytoscape for viewMode: ${viewMode}`, {
+        nodes: currentData.nodes.length,
+        edges: currentData.edges.length
+      });
       cyRef.current.elements().remove();
       cyRef.current.add([...currentData.nodes, ...currentData.edges]);
       cyRef.current.layout({ name: currentLayout }).run();
     }
-  }, [viewMode, currentLayout, mathData, techData, orgData, gftdData, userEdits, getCurrentData]);
+  }, [viewMode, currentLayout, mathData, techData, orgData, gftdData, aiMlSubnetData, foundationTechSubnetData, mathBridgeSubnetData, orgAlignmentSubnetData, userEdits, getCurrentData]);
 
   // サブネットワーク適用
   useEffect(() => {
