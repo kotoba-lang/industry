@@ -1,0 +1,356 @@
+{
+  "nodes": [
+    {
+      "data": { 
+        "id": "mathematical_foundations", 
+        "label": "数学基盤\n(理論世界)", 
+        "type": "mathematical_realm",
+        "category": "Mathematical Theory",
+        "level": 0,
+        "description": "すべての技術実装を支える数学的基盤。純粋数学から応用数学まで、理論の源泉。",
+        "details": "代数学、解析学、幾何学、数論、組合せ論、確率論、最適化理論",
+        "sourceDataset": "complete-theory-data",
+        "bridgeRole": "理論基盤提供"
+      }
+    },
+    {
+      "data": { 
+        "id": "linear_algebra", 
+        "label": "線型代数学\n(行列の世界)", 
+        "type": "math_foundation",
+        "category": "Mathematical Theory",
+        "level": 1,
+        "description": "ベクトル空間、行列、固有値問題。AI・グラフィックス・科学計算の数学的基盤。",
+        "details": "行列理論、固有値・固有ベクトル、線型変換",
+        "sourceDataset": "complete-theory-data",
+        "bridgeRole": "行列計算基盤",
+        "implementationTargets": ["ml_libraries", "scientific_libraries", "hardware_layer"]
+      }
+    },
+    {
+      "data": { 
+        "id": "probability_statistics", 
+        "label": "確率論・統計学\n(不確実性の理論)", 
+        "type": "math_foundation",
+        "category": "Mathematical Theory",
+        "level": 1,
+        "description": "不確実性とデータの科学。AI・機械学習・データ分析の理論的基盤。",
+        "details": "ランダム現象の数学的記述とデータ分析の理論",
+        "sourceDataset": "complete-theory-data",
+        "bridgeRole": "統計的推論基盤",
+        "implementationTargets": ["ml_libraries", "data_analytics", "interpreted_languages"]
+      }
+    },
+    {
+      "data": { 
+        "id": "optimization_theory", 
+        "label": "最適化理論\n(効率の数学)", 
+        "type": "math_foundation",
+        "category": "Mathematical Theory",
+        "level": 1,
+        "description": "制約条件下での最適解探索。AI・ML・システム設計の効率化基盤。",
+        "details": "制約条件下での最適解を求める数学的手法",
+        "sourceDataset": "complete-theory-data",
+        "bridgeRole": "最適化基盤",
+        "implementationTargets": ["ml_libraries", "cloud_platforms", "backend_frameworks"]
+      }
+    },
+    {
+      "data": { 
+        "id": "graph_theory", 
+        "label": "グラフ理論\n(ネットワークの数学)", 
+        "type": "math_foundation",
+        "category": "Mathematical Theory",
+        "level": 1,
+        "description": "点と線からなるネットワーク構造の数学。システム設計・データ構造の基盤。",
+        "details": "グラフアルゴリズム、ネットワーク理論、スペクトラルグラフ理論",
+        "sourceDataset": "complete-theory-data",
+        "bridgeRole": "ネットワーク構造基盤",
+        "implementationTargets": ["graph_databases", "network_protocols", "web_frameworks", "containerization"]
+      }
+    },
+    {
+      "data": { 
+        "id": "number_theory", 
+        "label": "数論\n(整数の世界)", 
+        "type": "math_foundation",
+        "category": "Mathematical Theory",
+        "level": 1,
+        "description": "整数の深遠な性質。暗号学・セキュリティの数学的基盤。",
+        "details": "素数、暗号理論、整数論",
+        "sourceDataset": "complete-theory-data",
+        "bridgeRole": "暗号学基盤",
+        "implementationTargets": ["security_tools", "low_level_languages"]
+      }
+    },
+    {
+      "data": { 
+        "id": "computational_theory", 
+        "label": "計算理論\n(アルゴリズムの原理)", 
+        "type": "math_foundation",
+        "category": "Mathematical Theory",
+        "level": 1,
+        "description": "計算可能性と複雑性の基礎理論。プログラミング言語・アルゴリズムの基盤。",
+        "details": "チューリング機械、計算複雑性、アルゴリズム解析",
+        "sourceDataset": "complete-theory-data",
+        "bridgeRole": "計算論的基盤",
+        "implementationTargets": ["low_level_languages", "compiled_languages"]
+      }
+    },
+    {
+      "data": { 
+        "id": "mathematical_logic", 
+        "label": "数理論理学\n(論理の体系)", 
+        "type": "math_foundation",
+        "category": "Mathematical Theory",
+        "level": 1,
+        "description": "数学的推論の形式化と証明の構造。型システム・形式検証の基盤。",
+        "details": "数学的推論の形式化と証明の構造を研究する分野",
+        "sourceDataset": "complete-theory-data",
+        "bridgeRole": "論理的基盤",
+        "implementationTargets": ["functional_languages", "postgresql"]
+      }
+    },
+    {
+      "data": { 
+        "id": "bridge_layer", 
+        "label": "数学-技術ブリッジ層\n(変換器)", 
+        "type": "bridge_interface",
+        "category": "Bridge Layer",
+        "level": 2,
+        "description": "数学理論を技術実装に変換する中間層。アルゴリズム・ライブラリ・プロトコルとして具現化。",
+        "details": "数学的概念の計算機科学的実装",
+        "sourceDataset": "bridge-analysis",
+        "bridgeRole": "理論-実装変換"
+      }
+    },
+    {
+      "data": { 
+        "id": "ml_libraries", 
+        "label": "機械学習ライブラリ\n(数学実装層)", 
+        "type": "implementation_library",
+        "category": "Technology Implementation",
+        "level": 3,
+        "description": "TensorFlow、PyTorch、scikit-learn。線型代数・確率論・最適化理論の技術実装。",
+        "details": "ニューラルネットワーク、最適化、自動微分",
+        "sourceDataset": "tech-ecosystem-data",
+        "bridgeRole": "AI数学実装",
+        "mathBasis": ["linear_algebra", "optimization_theory", "probability_statistics"]
+      }
+    },
+    {
+      "data": { 
+        "id": "scientific_libraries", 
+        "label": "科学計算ライブラリ\n(数値実装層)", 
+        "type": "implementation_library",
+        "category": "Technology Implementation",
+        "level": 3,
+        "description": "NumPy、SciPy、Pandas。線型代数・数値解析の効率的実装。",
+        "details": "線型代数、数値解析、データ操作",
+        "sourceDataset": "tech-ecosystem-data",
+        "bridgeRole": "数値計算実装",
+        "mathBasis": ["linear_algebra", "numerical_computation"]
+      }
+    },
+    {
+      "data": { 
+        "id": "graph_databases", 
+        "label": "グラフデータベース\n(グラフ理論実装)", 
+        "type": "implementation_database",
+        "category": "Technology Implementation",
+        "level": 3,
+        "description": "Neo4j、ArangoDB。グラフ理論の実用的データベース実装。",
+        "details": "グラフクエリ、パスファインディング、ネットワーク分析",
+        "sourceDataset": "tech-ecosystem-data",
+        "bridgeRole": "グラフ構造実装",
+        "mathBasis": ["graph_theory", "topology"]
+      }
+    },
+    {
+      "data": { 
+        "id": "security_tools", 
+        "label": "セキュリティツール\n(暗号実装層)", 
+        "type": "implementation_security",
+        "category": "Technology Implementation",
+        "level": 3,
+        "description": "OpenSSL、OAuth、PKI。数論・暗号理論の実用的セキュリティ実装。",
+        "details": "暗号化、認証、認可、脅威検出",
+        "sourceDataset": "tech-ecosystem-data",
+        "bridgeRole": "暗号学実装",
+        "mathBasis": ["number_theory", "mathematical_logic"]
+      }
+    },
+    {
+      "data": { 
+        "id": "functional_languages", 
+        "label": "関数型言語\n(数学的言語)", 
+        "type": "implementation_language",
+        "category": "Technology Implementation",
+        "level": 3,
+        "description": "Haskell、Scala、F#。圏論・数理論理学の言語実装。",
+        "details": "純粋関数、イミュータブル、モナド",
+        "sourceDataset": "tech-ecosystem-data",
+        "bridgeRole": "数学的プログラミング",
+        "mathBasis": ["category_theory", "mathematical_logic"]
+      }
+    },
+    {
+      "data": { 
+        "id": "optimization_engines", 
+        "label": "最適化エンジン\n(最適化実装)", 
+        "type": "implementation_optimizer",
+        "category": "Technology Implementation",
+        "level": 3,
+        "description": "最適化理論のアルゴリズム実装。ML訓練・システム効率化・リソース管理。",
+        "details": "線型計画法、非線型最適化、制約満足",
+        "sourceDataset": "bridge-analysis",
+        "bridgeRole": "最適化実装",
+        "mathBasis": ["optimization_theory", "linear_algebra"]
+      }
+    },
+    {
+      "data": { 
+        "id": "network_protocols", 
+        "label": "ネットワークプロトコル\n(グラフ実装)", 
+        "type": "implementation_protocol",
+        "category": "Technology Implementation",
+        "level": 3,
+        "description": "TCP/IP、HTTP。グラフ理論・組合せ論のネットワーク実装。",
+        "details": "プロトコルスタック、ルーティング、セキュリティ",
+        "sourceDataset": "tech-ecosystem-data",
+        "bridgeRole": "ネットワーク実装",
+        "mathBasis": ["graph_theory", "combinatorics"]
+      }
+    },
+    {
+      "data": { 
+        "id": "application_layer", 
+        "label": "アプリケーション層\n(統合実装)", 
+        "type": "application_integration",
+        "category": "Application Layer",
+        "level": 4,
+        "description": "数学理論が統合されたアプリケーション。複数の数学分野を組み合わせた高次実装。",
+        "details": "AI アプリケーション、科学計算システム、最適化ソリューション",
+        "sourceDataset": "application-synthesis",
+        "bridgeRole": "統合実装"
+      }
+    }
+  ],
+  "edges": [
+    { "data": { "source": "linear_algebra", "target": "mathematical_foundations", "type": "mathematical_foundation", "label": "線型代数基盤" } },
+    { "data": { "source": "probability_statistics", "target": "mathematical_foundations", "type": "mathematical_foundation", "label": "確率統計基盤" } },
+    { "data": { "source": "optimization_theory", "target": "mathematical_foundations", "type": "mathematical_foundation", "label": "最適化基盤" } },
+    { "data": { "source": "graph_theory", "target": "mathematical_foundations", "type": "mathematical_foundation", "label": "グラフ理論基盤" } },
+    { "data": { "source": "number_theory", "target": "mathematical_foundations", "type": "mathematical_foundation", "label": "数論基盤" } },
+    { "data": { "source": "computational_theory", "target": "mathematical_foundations", "type": "mathematical_foundation", "label": "計算理論基盤" } },
+    { "data": { "source": "mathematical_logic", "target": "mathematical_foundations", "type": "mathematical_foundation", "label": "数理論理基盤" } },
+    
+    { "data": { "source": "mathematical_foundations", "target": "bridge_layer", "type": "theory_to_bridge", "label": "理論→ブリッジ" } },
+    
+    { "data": { "source": "linear_algebra", "target": "bridge_layer", "type": "direct_bridge", "label": "線型代数変換" } },
+    { "data": { "source": "probability_statistics", "target": "bridge_layer", "type": "direct_bridge", "label": "統計変換" } },
+    { "data": { "source": "optimization_theory", "target": "bridge_layer", "type": "direct_bridge", "label": "最適化変換" } },
+    { "data": { "source": "graph_theory", "target": "bridge_layer", "type": "direct_bridge", "label": "グラフ変換" } },
+    
+    { "data": { "source": "bridge_layer", "target": "ml_libraries", "type": "implementation_bridge", "label": "ML実装" } },
+    { "data": { "source": "bridge_layer", "target": "scientific_libraries", "type": "implementation_bridge", "label": "科学計算実装" } },
+    { "data": { "source": "bridge_layer", "target": "graph_databases", "type": "implementation_bridge", "label": "グラフDB実装" } },
+    { "data": { "source": "bridge_layer", "target": "security_tools", "type": "implementation_bridge", "label": "セキュリティ実装" } },
+    { "data": { "source": "bridge_layer", "target": "functional_languages", "type": "implementation_bridge", "label": "関数型実装" } },
+    { "data": { "source": "bridge_layer", "target": "optimization_engines", "type": "implementation_bridge", "label": "最適化実装" } },
+    { "data": { "source": "bridge_layer", "target": "network_protocols", "type": "implementation_bridge", "label": "ネットワーク実装" } },
+    
+    { "data": { "source": "linear_algebra", "target": "ml_libraries", "type": "direct_implementation", "label": "行列演算実装" } },
+    { "data": { "source": "probability_statistics", "target": "ml_libraries", "type": "direct_implementation", "label": "統計的学習実装" } },
+    { "data": { "source": "optimization_theory", "target": "ml_libraries", "type": "direct_implementation", "label": "最適化アルゴリズム実装" } },
+    
+    { "data": { "source": "linear_algebra", "target": "scientific_libraries", "type": "direct_implementation", "label": "数値線型代数実装" } },
+    { "data": { "source": "graph_theory", "target": "graph_databases", "type": "direct_implementation", "label": "グラフアルゴリズム実装" } },
+    { "data": { "source": "number_theory", "target": "security_tools", "type": "direct_implementation", "label": "暗号理論実装" } },
+    { "data": { "source": "mathematical_logic", "target": "functional_languages", "type": "direct_implementation", "label": "型理論実装" } },
+    { "data": { "source": "optimization_theory", "target": "optimization_engines", "type": "direct_implementation", "label": "最適化アルゴリズム実装" } },
+    { "data": { "source": "graph_theory", "target": "network_protocols", "type": "direct_implementation", "label": "ルーティング最適化実装" } },
+    
+    { "data": { "source": "ml_libraries", "target": "application_layer", "type": "technology_integration", "label": "AI統合" } },
+    { "data": { "source": "scientific_libraries", "target": "application_layer", "type": "technology_integration", "label": "科学計算統合" } },
+    { "data": { "source": "graph_databases", "target": "application_layer", "type": "technology_integration", "label": "グラフ統合" } },
+    { "data": { "source": "security_tools", "target": "application_layer", "type": "technology_integration", "label": "セキュリティ統合" } },
+    { "data": { "source": "functional_languages", "target": "application_layer", "type": "technology_integration", "label": "関数型統合" } },
+    { "data": { "source": "optimization_engines", "target": "application_layer", "type": "technology_integration", "label": "最適化統合" } },
+    { "data": { "source": "network_protocols", "target": "application_layer", "type": "technology_integration", "label": "ネットワーク統合" } },
+    
+    { "data": { "source": "scientific_libraries", "target": "ml_libraries", "type": "foundation_support", "label": "数学基盤提供" } },
+    { "data": { "source": "optimization_engines", "target": "ml_libraries", "type": "algorithm_support", "label": "最適化アルゴリズム提供" } },
+    { "data": { "source": "graph_databases", "target": "network_protocols", "type": "data_structure_support", "label": "グラフ構造提供" } },
+    { "data": { "source": "security_tools", "target": "network_protocols", "type": "security_layer", "label": "セキュリティ層提供" } }
+  ],
+  "mathImplementationMap": {
+    "linear_algebra": {
+      "primaryImplementations": ["ml_libraries", "scientific_libraries"],
+      "secondaryImplementations": ["optimization_engines"],
+      "applications": ["機械学習", "科学計算", "グラフィックス", "物理シミュレーション"],
+      "algorithms": ["行列乗算", "固有値分解", "特異値分解", "線型方程式求解"]
+    },
+    "probability_statistics": {
+      "primaryImplementations": ["ml_libraries"],
+      "secondaryImplementations": ["scientific_libraries"],
+      "applications": ["機械学習", "データ分析", "統計的推論", "不確実性定量化"],
+      "algorithms": ["ベイズ推論", "統計的学習", "確率分布", "仮説検定"]
+    },
+    "optimization_theory": {
+      "primaryImplementations": ["optimization_engines", "ml_libraries"],
+      "secondaryImplementations": ["network_protocols"],
+      "applications": ["機械学習訓練", "リソース最適化", "ルーティング最適化", "制約満足"],
+      "algorithms": ["勾配降下法", "線型計画法", "制約最適化", "進化的アルゴリズム"]
+    },
+    "graph_theory": {
+      "primaryImplementations": ["graph_databases", "network_protocols"],
+      "secondaryImplementations": ["ml_libraries"],
+      "applications": ["ネットワーク解析", "ソーシャルグラフ", "経路探索", "グラフニューラルネット"],
+      "algorithms": ["最短経路", "グラフ探索", "クラスタリング", "中心性解析"]
+    },
+    "number_theory": {
+      "primaryImplementations": ["security_tools"],
+      "secondaryImplementations": [],
+      "applications": ["暗号化", "デジタル署名", "鍵交換", "ハッシュ関数"],
+      "algorithms": ["RSA暗号", "楕円曲線暗号", "離散対数問題", "素数生成"]
+    },
+    "mathematical_logic": {
+      "primaryImplementations": ["functional_languages"],
+      "secondaryImplementations": ["security_tools"],
+      "applications": ["型システム", "形式検証", "定理証明", "プログラム解析"],
+      "algorithms": ["型推論", "プログラム検証", "モデルチェッキング", "SAT求解"]
+    }
+  },
+  "subnetMetadata": {
+    "name": "Mathematics-Technology Bridge Subnet",
+    "description": "数学理論と技術実装を繋ぐブリッジネットワーク。理論の計算機科学的実装と応用を可視化。",
+    "sourceDatasets": [
+      "complete-theory-data",
+      "tech-ecosystem-data",
+      "bridge-analysis"
+    ],
+    "focusAreas": [
+      "Mathematical theory foundations",
+      "Algorithm implementations",
+      "Library and framework mappings", 
+      "Application layer integrations",
+      "Cross-domain mathematical applications"
+    ],
+    "bridgeConnections": [
+      "線型代数 → 機械学習・科学計算",
+      "確率統計 → データサイエンス・AI",
+      "最適化理論 → ML訓練・システム効率化",
+      "グラフ理論 → ネットワーク・データベース",
+      "数論 → 暗号学・セキュリティ",
+      "数理論理学 → 型システム・検証"
+    ],
+    "levels": {
+      "0": "Mathematical Foundations - 数学基盤",
+      "1": "Core Mathematical Theories - 基幹数学理論",
+      "2": "Bridge Layer - 理論-実装ブリッジ",
+      "3": "Technology Implementation - 技術実装",
+      "4": "Application Layer - アプリケーション層"
+    }
+  }
+} 
