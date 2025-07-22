@@ -40,6 +40,19 @@ interface EdgeData {
   category?: string;
 }
 
+/**
+ * サブネットワーク情報のインターフェース
+ */
+interface SubNetwork {
+  id: string;
+  name: string;
+  description: string;
+  edgeTypes: string[];
+  color: string;
+  visible: boolean;
+  created: string;
+}
+
 export default function CytoscapeVisualization() {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
@@ -61,6 +74,15 @@ export default function CytoscapeVisualization() {
   const [showTrackpadHelp, setShowTrackpadHelp] = useState(true);
   const [userEdits, setUserEdits] = useState<{nodes: any[], edges: any[]}>({nodes: [], edges: []});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // サブネットワーク関連の状態
+  const [subNetworks, setSubNetworks] = useState<SubNetwork[]>([]);
+  const [selectedEdges, setSelectedEdges] = useState<string[]>([]);
+  const [showSubNetworkPanel, setShowSubNetworkPanel] = useState(false);
+  const [showSubNetworkModal, setShowSubNetworkModal] = useState(false);
+  const [subNetworkFormData, setSubNetworkFormData] = useState<Partial<SubNetwork>>({});
+  const [activeSubNetworks, setActiveSubNetworks] = useState<string[]>([]);
+  const [edgeSelectionMode, setEdgeSelectionMode] = useState(false);
 
   // JSONデータの読み込み
   const loadMathData = useCallback(async (): Promise<TheoryData> => {
@@ -303,6 +325,231 @@ export default function CytoscapeVisualization() {
     setHasUnsavedChanges(true);
   }, []);
 
+  // サブネットワーク管理機能
+  /**
+   * 利用可能なエッジタイプを取得
+   */
+  const getAvailableEdgeTypes = useCallback((): string[] => {
+    if (!cyRef.current) return [];
+    
+    const edgeTypes = new Set<string>();
+    cyRef.current.edges().forEach(edge => {
+      const type = edge.data('type');
+      if (type) edgeTypes.add(type);
+    });
+    
+    return Array.from(edgeTypes).sort();
+  }, []);
+
+  /**
+   * エッジ選択状態を切り替え
+   */
+  const toggleEdgeSelection = useCallback((edgeId: string) => {
+    setSelectedEdges(prev => {
+      if (prev.includes(edgeId)) {
+        return prev.filter(id => id !== edgeId);
+      } else {
+        return [...prev, edgeId];
+      }
+    });
+  }, []);
+
+  /**
+   * エッジタイプ別にエッジを選択
+   */
+  const selectEdgesByType = useCallback((edgeType: string) => {
+    if (!cyRef.current) return;
+    
+    const edgesOfType = cyRef.current.edges(`[type="${edgeType}"]`);
+    const edgeIds = edgesOfType.map(edge => edge.id());
+    
+    setSelectedEdges(prev => {
+      const newSelection = new Set(prev);
+      edgeIds.forEach(id => newSelection.add(id));
+      return Array.from(newSelection);
+    });
+  }, []);
+
+  /**
+   * すべてのエッジ選択をクリア
+   */
+  const clearEdgeSelection = useCallback(() => {
+    setSelectedEdges([]);
+  }, []);
+
+  /**
+   * サブネットワークを作成
+   */
+  const createSubNetwork = useCallback(() => {
+    if (selectedEdges.length === 0) {
+      alert('エッジを選択してからサブネットワークを作成してください。');
+      return;
+    }
+
+    // 選択されたエッジのタイプを取得
+    const edgeTypes = new Set<string>();
+    if (cyRef.current) {
+      selectedEdges.forEach(edgeId => {
+        const edge = cyRef.current!.getElementById(edgeId);
+        const type = edge.data('type');
+        if (type) edgeTypes.add(type);
+      });
+    }
+
+    setSubNetworkFormData({
+      id: `subnet_${Date.now()}`,
+      name: '',
+      description: '',
+      edgeTypes: Array.from(edgeTypes),
+      color: '#' + Math.floor(Math.random()*16777215).toString(16),
+      visible: true,
+      created: new Date().toISOString()
+    });
+    setShowSubNetworkModal(true);
+  }, [selectedEdges]);
+
+  /**
+   * サブネットワークを保存
+   */
+  const saveSubNetwork = useCallback(() => {
+    if (!subNetworkFormData.name || !subNetworkFormData.id) {
+      alert('サブネットワーク名を入力してください。');
+      return;
+    }
+
+    const newSubNetwork: SubNetwork = {
+      id: subNetworkFormData.id!,
+      name: subNetworkFormData.name,
+      description: subNetworkFormData.description || '',
+      edgeTypes: subNetworkFormData.edgeTypes || [],
+      color: subNetworkFormData.color || '#666666',
+      visible: true,
+      created: subNetworkFormData.created || new Date().toISOString()
+    };
+
+    setSubNetworks(prev => {
+      const existing = prev.find(sn => sn.id === newSubNetwork.id);
+      if (existing) {
+        return prev.map(sn => sn.id === newSubNetwork.id ? newSubNetwork : sn);
+      } else {
+        return [...prev, newSubNetwork];
+      }
+    });
+
+    setActiveSubNetworks(prev => [...prev, newSubNetwork.id]);
+    setShowSubNetworkModal(false);
+    setSelectedEdges([]);
+    applySubNetworkFilters();
+  }, [subNetworkFormData]);
+
+  /**
+   * サブネットワークの表示/非表示を切り替え
+   */
+  const toggleSubNetworkVisibility = useCallback((subNetworkId: string) => {
+    setActiveSubNetworks(prev => {
+      if (prev.includes(subNetworkId)) {
+        return prev.filter(id => id !== subNetworkId);
+      } else {
+        return [...prev, subNetworkId];
+      }
+    });
+  }, []);
+
+  /**
+   * サブネットワークフィルターを適用
+   */
+  const applySubNetworkFilters = useCallback(() => {
+    if (!cyRef.current) return;
+
+    const cy = cyRef.current;
+    
+    if (activeSubNetworks.length === 0) {
+      // すべて表示
+      cy.elements().style('display', 'element');
+      cy.elements().removeClass('subnet-filtered');
+      return;
+    }
+
+    // アクティブなサブネットワークのエッジタイプを取得
+    const activeEdgeTypes = new Set<string>();
+    activeSubNetworks.forEach(subNetId => {
+      const subnet = subNetworks.find(sn => sn.id === subNetId);
+      if (subnet) {
+        subnet.edgeTypes.forEach(type => activeEdgeTypes.add(type));
+      }
+    });
+
+    // エッジのフィルタリング
+    cy.edges().forEach(edge => {
+      const edgeType = edge.data('type');
+      if (activeEdgeTypes.has(edgeType)) {
+        edge.style('display', 'element');
+        edge.removeClass('subnet-filtered');
+        
+        // サブネットワークの色を適用
+        const subnet = subNetworks.find(sn => 
+          activeSubNetworks.includes(sn.id) && sn.edgeTypes.includes(edgeType)
+        );
+        if (subnet) {
+          edge.style({
+            'line-color': subnet.color,
+            'target-arrow-color': subnet.color
+          });
+        }
+      } else {
+        edge.style('display', 'none');
+        edge.addClass('subnet-filtered');
+      }
+    });
+
+    // 関連するノードのフィルタリング
+    const visibleEdges = cy.edges(':visible');
+    const connectedNodeIds = new Set<string>();
+    
+    visibleEdges.forEach(edge => {
+      connectedNodeIds.add(edge.source().id());
+      connectedNodeIds.add(edge.target().id());
+    });
+
+    cy.nodes().forEach(node => {
+      if (connectedNodeIds.has(node.id())) {
+        node.style('display', 'element');
+        node.removeClass('subnet-filtered');
+      } else {
+        node.style('display', 'none');
+        node.addClass('subnet-filtered');
+      }
+    });
+
+  }, [activeSubNetworks, subNetworks]);
+
+  /**
+   * すべてのサブネットワークをクリア
+   */
+  const clearAllSubNetworks = useCallback(() => {
+    setActiveSubNetworks([]);
+    if (cyRef.current) {
+      cyRef.current.elements().style('display', 'element');
+      cyRef.current.elements().removeClass('subnet-filtered');
+      // エッジの色をデフォルトに戻す
+      cyRef.current.edges().style({
+        'line-color': '#607D8B',
+        'target-arrow-color': '#607D8B'
+      });
+    }
+  }, []);
+
+  /**
+   * サブネットワークを削除
+   */
+  const deleteSubNetwork = useCallback((subNetworkId: string) => {
+    if (confirm('このサブネットワークを削除しますか？')) {
+      setSubNetworks(prev => prev.filter(sn => sn.id !== subNetworkId));
+      setActiveSubNetworks(prev => prev.filter(id => id !== subNetworkId));
+      applySubNetworkFilters();
+    }
+  }, [applySubNetworkFilters]);
+
   // Mac trackpad用ジェスチャーサポート
   const setupTrackpadGestures = useCallback((cy: Core) => {
     const container = cy.container();
@@ -341,10 +588,10 @@ export default function CytoscapeVisualization() {
       const deltaY = e.deltaY;
       const deltaX = e.deltaX;
       
-      // macOSのNatural Scrollingを検出
+      // trackpadスワイプ方向を逆に設定
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      const scrollDirectionY = isMac ? -deltaY : deltaY;
-      const scrollDirectionX = isMac ? -deltaX : deltaX;
+      const scrollDirectionY = isMac ? deltaY : -deltaY;
+      const scrollDirectionX = isMac ? deltaX : -deltaX;
       
       // ピンチズームの検出（ctrlキーまたはmetaキーが押されている場合）
       if (e.ctrlKey || e.metaKey) {
@@ -488,6 +735,31 @@ export default function CytoscapeVisualization() {
     cy.on('tap', 'edge', function(evt) {
       const edge = evt.target;
       const data = edge.data();
+      
+      // エッジ選択モードの場合
+      if (edgeSelectionMode) {
+        toggleEdgeSelection(edge.id());
+        
+        // 選択状態の視覚的フィードバック
+        if (selectedEdges.includes(edge.id())) {
+          edge.style({
+            'line-color': '#00BCD4',
+            'target-arrow-color': '#00BCD4',
+            'width': 4,
+            'opacity': 1
+          });
+        } else {
+          // デフォルトスタイルに戻す
+          edge.style({
+            'line-color': '#607D8B',
+            'target-arrow-color': '#607D8B',
+            'width': 1.5,
+            'opacity': 0.7
+          });
+        }
+        return;
+      }
+      
       setSelectedElement(edge);
       
       setInfoData({
@@ -568,7 +840,7 @@ export default function CytoscapeVisualization() {
 
     // Mac trackpad用ジェスチャーサポート
     setupTrackpadGestures(cy);
-  }, [editMode]);
+  }, [editMode, edgeSelectionMode, selectedEdges, toggleEdgeSelection]);
 
   // 関連ノードのハイライト
   const highlightConnectedNodes = useCallback((cy: Core, selectedNode: NodeSingular) => {
@@ -2072,6 +2344,37 @@ export default function CytoscapeVisualization() {
     }
   }, [viewMode, currentLayout, mathData, techData, orgData, gftdData, userEdits]);
 
+  // サブネットワークフィルター適用
+  useEffect(() => {
+    applySubNetworkFilters();
+  }, [activeSubNetworks, subNetworks, applySubNetworkFilters]);
+
+  // エッジ選択の視覚的更新
+  useEffect(() => {
+    if (!cyRef.current) return;
+    
+    // すべてのエッジのスタイルをリセット
+    cyRef.current.edges().style({
+      'line-color': '#607D8B',
+      'target-arrow-color': '#607D8B',
+      'width': 1.5,
+      'opacity': 0.7
+    });
+
+    // 選択されたエッジをハイライト
+    selectedEdges.forEach(edgeId => {
+      const edge = cyRef.current!.getElementById(edgeId);
+      if (edge.length > 0) {
+        edge.style({
+          'line-color': '#00BCD4',
+          'target-arrow-color': '#00BCD4',
+          'width': 4,
+          'opacity': 1
+        });
+      }
+    });
+  }, [selectedEdges]);
+
   // コントロール関数
   const resetView = useCallback(() => {
     if (cyRef.current) {
@@ -2382,6 +2685,54 @@ export default function CytoscapeVisualization() {
                 削除
               </button>
             </div>
+
+            {/* サブネットワーク コントロール */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowSubNetworkPanel(!showSubNetworkPanel)}
+                className={`px-4 py-2 border rounded-full transition-all duration-300 text-sm ${
+                  showSubNetworkPanel
+                    ? 'bg-purple-500/60 border-purple-400 text-purple-100'
+                    : 'bg-purple-500/20 border-purple-400 text-purple-400 hover:bg-purple-500/40'
+                }`}
+              >
+                🕸️ サブネット
+              </button>
+              <button
+                onClick={() => setEdgeSelectionMode(!edgeSelectionMode)}
+                className={`px-3 py-2 border rounded-full transition-all duration-300 text-xs ${
+                  edgeSelectionMode
+                    ? 'bg-cyan-500/60 border-cyan-400 text-cyan-100'
+                    : 'bg-cyan-500/20 border-cyan-400 text-cyan-400 hover:bg-cyan-500/40'
+                }`}
+              >
+                {edgeSelectionMode ? 'エッジ選択中' : 'エッジ選択'}
+              </button>
+              {selectedEdges.length > 0 && (
+                <>
+                  <button
+                    onClick={createSubNetwork}
+                    className="px-3 py-2 bg-green-500/20 border border-green-400 rounded-full text-green-400 hover:bg-green-500/40 transition-all duration-300 text-xs"
+                  >
+                    作成 ({selectedEdges.length})
+                  </button>
+                  <button
+                    onClick={clearEdgeSelection}
+                    className="px-3 py-2 bg-gray-500/20 border border-gray-400 rounded-full text-gray-400 hover:bg-gray-500/40 transition-all duration-300 text-xs"
+                  >
+                    クリア
+                  </button>
+                </>
+              )}
+              {activeSubNetworks.length > 0 && (
+                <button
+                  onClick={clearAllSubNetworks}
+                  className="px-3 py-2 bg-orange-500/20 border border-orange-400 rounded-full text-orange-400 hover:bg-orange-500/40 transition-all duration-300 text-xs"
+                >
+                  全クリア
+                </button>
+              )}
+            </div>
             
             {/* ローカル保存機能 */}
             <div className="flex gap-2">
@@ -2434,6 +2785,14 @@ export default function CytoscapeVisualization() {
         {editMode && (
           <div className="mt-2 inline-block bg-yellow-500/90 text-black px-4 py-2 rounded-full font-bold text-sm">
             📝 編集モード: ノードをダブルクリックで編集、右クリックで削除
+          </div>
+        )}
+        
+        {/* エッジ選択モードインジケーター */}
+        {edgeSelectionMode && (
+          <div className="mt-2 ml-4 inline-block bg-cyan-500/90 text-black px-4 py-2 rounded-full font-bold text-sm">
+            🔗 エッジ選択モード: エッジをクリックしてサブネットワークを作成
+            {selectedEdges.length > 0 && ` (${selectedEdges.length}個選択中)`}
           </div>
         )}
       </div>
@@ -2611,6 +2970,113 @@ export default function CytoscapeVisualization() {
           </div>
         </div>
         
+        {/* サブネットワーク管理パネル */}
+        {showSubNetworkPanel && (
+          <div className="absolute top-4 left-4 w-80 bg-black/90 backdrop-blur-lg rounded-lg p-4 border border-white/10 max-h-96 overflow-y-auto">
+            <div className="flex justify-between items-start mb-3">
+              <h3 className="text-purple-400 font-bold text-lg">🕸️ サブネットワーク</h3>
+              <button
+                onClick={() => setShowSubNetworkPanel(false)}
+                className="text-gray-400 hover:text-white text-xl"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* エッジタイプ選択 */}
+            <div className="mb-4">
+              <h4 className="text-cyan-400 font-semibold text-sm mb-2">エッジタイプで選択:</h4>
+              <div className="max-h-24 overflow-y-auto">
+                {getAvailableEdgeTypes().map(type => (
+                  <button
+                    key={type}
+                    onClick={() => selectEdgesByType(type)}
+                    className="block w-full text-left px-2 py-1 text-xs text-gray-300 hover:bg-white/10 rounded mb-1"
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 既存のサブネットワーク */}
+            <div className="mb-4">
+              <h4 className="text-cyan-400 font-semibold text-sm mb-2">
+                サブネットワーク一覧 ({subNetworks.length}):
+              </h4>
+              {subNetworks.length === 0 ? (
+                <p className="text-gray-400 text-xs">サブネットワークがありません</p>
+              ) : (
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {subNetworks.map(subnet => (
+                    <div
+                      key={subnet.id}
+                      className="bg-white/5 rounded p-2 border border-white/10"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: subnet.color }}
+                          />
+                          <span className="text-white text-sm font-medium">
+                            {subnet.name}
+                          </span>
+                        </div>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => toggleSubNetworkVisibility(subnet.id)}
+                            className={`text-xs px-2 py-1 rounded ${
+                              activeSubNetworks.includes(subnet.id)
+                                ? 'bg-green-500/30 text-green-300'
+                                : 'bg-gray-500/30 text-gray-300'
+                            }`}
+                          >
+                            {activeSubNetworks.includes(subnet.id) ? '表示中' : '非表示'}
+                          </button>
+                          <button
+                            onClick={() => deleteSubNetwork(subnet.id)}
+                            className="text-xs px-2 py-1 rounded bg-red-500/30 text-red-300 hover:bg-red-500/50"
+                          >
+                            削除
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-gray-400 text-xs">{subnet.description}</p>
+                      <div className="text-xs text-gray-500 mt-1">
+                        エッジタイプ: {subnet.edgeTypes.join(', ')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 選択状態 */}
+            {selectedEdges.length > 0 && (
+              <div className="bg-cyan-500/20 rounded p-2 border border-cyan-400/30">
+                <p className="text-cyan-300 text-sm font-medium">
+                  {selectedEdges.length}個のエッジを選択中
+                </p>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={createSubNetwork}
+                    className="px-3 py-1 bg-green-500/30 text-green-300 rounded text-xs hover:bg-green-500/50"
+                  >
+                    サブネット作成
+                  </button>
+                  <button
+                    onClick={clearEdgeSelection}
+                    className="px-3 py-1 bg-gray-500/30 text-gray-300 rounded text-xs hover:bg-gray-500/50"
+                  >
+                    選択クリア
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* 情報パネル */}
         {showInfoPanel && infoData && (
           <div className="absolute top-4 right-4 w-80 bg-black/90 backdrop-blur-lg rounded-lg p-4 border border-white/10 max-h-96 overflow-y-auto">
@@ -2931,6 +3397,92 @@ export default function CytoscapeVisualization() {
                   className="px-4 py-2 bg-cyan-500 border border-cyan-400 rounded text-white hover:bg-cyan-600 transition-all duration-300"
                 >
                   保存
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* サブネットワーク作成モーダル */}
+      {showSubNetworkModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-gradient-to-br from-slate-800 to-purple-900 rounded-lg p-6 w-96 max-w-full border border-white/20">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-purple-400 font-bold text-lg">🕸️ サブネットワーク作成</h3>
+              <button
+                onClick={() => setShowSubNetworkModal(false)}
+                className="text-gray-400 hover:text-white text-xl"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-purple-400 text-sm font-medium mb-1">名前:</label>
+                <input
+                  type="text"
+                  value={subNetworkFormData.name || ''}
+                  onChange={(e) => setSubNetworkFormData(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full p-2 bg-white/10 border border-white/30 rounded text-white placeholder-gray-400"
+                  placeholder="サブネットワーク名を入力"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-purple-400 text-sm font-medium mb-1">説明:</label>
+                <textarea
+                  value={subNetworkFormData.description || ''}
+                  onChange={(e) => setSubNetworkFormData(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full p-2 bg-white/10 border border-white/30 rounded text-white placeholder-gray-400 h-20 resize-none"
+                  placeholder="サブネットワークの説明を入力してください"
+                />
+              </div>
+
+              <div>
+                <label className="block text-purple-400 text-sm font-medium mb-1">色:</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={subNetworkFormData.color || '#666666'}
+                    onChange={(e) => setSubNetworkFormData(prev => ({ ...prev, color: e.target.value }))}
+                    className="w-12 h-8 border border-white/30 rounded cursor-pointer"
+                    aria-label="サブネットワークの色を選択"
+                  />
+                  <input
+                    type="text"
+                    value={subNetworkFormData.color || '#666666'}
+                    onChange={(e) => setSubNetworkFormData(prev => ({ ...prev, color: e.target.value }))}
+                    className="flex-1 p-2 bg-white/10 border border-white/30 rounded text-white placeholder-gray-400"
+                    placeholder="#666666"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-purple-400 text-sm font-medium mb-1">含まれるエッジタイプ:</label>
+                <div className="bg-white/5 p-2 rounded border border-white/10 max-h-24 overflow-y-auto">
+                  {subNetworkFormData.edgeTypes?.map((type, index) => (
+                    <div key={index} className="text-gray-300 text-xs py-1">
+                      • {type}
+                    </div>
+                  )) || <div className="text-gray-400 text-xs">エッジタイプがありません</div>}
+                </div>
+              </div>
+              
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setShowSubNetworkModal(false)}
+                  className="px-4 py-2 bg-gray-500/20 border border-gray-400 rounded text-gray-400 hover:bg-gray-500/40 transition-all duration-300"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={saveSubNetwork}
+                  className="px-4 py-2 bg-purple-500 border border-purple-400 rounded text-white hover:bg-purple-600 transition-all duration-300"
+                >
+                  作成
                 </button>
               </div>
             </div>
