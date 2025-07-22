@@ -550,6 +550,182 @@ export default function CytoscapeVisualization() {
     }
   }, [applySubNetworkFilters]);
 
+  /**
+   * プリセットサブネットワークの定義
+   */
+  const getPresetSubNetworks = useCallback((): SubNetwork[] => {
+    return [
+      {
+        id: 'math_foundation',
+        name: '数学基盤ネットワーク',
+        description: '数学理論の基礎的な栄養供給と成長フローを表示',
+        edgeTypes: ['nutrient_flow', 'foundation_to_pure', 'growth_flow', 'deep_root_support'],
+        color: '#2E7D32',
+        visible: true,
+        created: new Date().toISOString()
+      },
+      {
+        id: 'math_development',
+        name: '数学発展ネットワーク',
+        description: '数学理論の発展と応用への分岐を表示',
+        edgeTypes: ['sub_branch_growth', 'application_flow', 'specialization', 'synthesis_flow'],
+        color: '#FF9800',
+        visible: true,
+        created: new Date().toISOString()
+      },
+      {
+        id: 'math_collaboration',
+        name: '数学協働ネットワーク',
+        description: '数学分野間の交流と学際的な結実を表示',
+        edgeTypes: ['cross_pollination', 'fruition', 'seed_formation', 'direct_application'],
+        color: '#9C27B0',
+        visible: true,
+        created: new Date().toISOString()
+      },
+      {
+        id: 'tech_infrastructure',
+        name: 'IT基盤ネットワーク',
+        description: 'IT技術の基盤となるインフラと支援システムを表示',
+        edgeTypes: ['foundation_support', 'nutrient_supply', 'platform_support', 'deployment_platform'],
+        color: '#1976D2',
+        visible: true,
+        created: new Date().toISOString()
+      },
+      {
+        id: 'tech_development',
+        name: 'IT開発ネットワーク',
+        description: '開発・デプロイ・スケーリングのフローを表示',
+        edgeTypes: ['framework_growth', 'evolution_flow', 'scaling_need', 'deployment_evolution'],
+        color: '#00ACC1',
+        visible: true,
+        created: new Date().toISOString()
+      },
+      {
+        id: 'data_integration',
+        name: 'データ統合ネットワーク',
+        description: 'データフロー・API・統合関連の接続を表示',
+        edgeTypes: ['data_flow', 'data_source', 'api_layer', 'rpc_layer', 'integration_method'],
+        color: '#4CAF50',
+        visible: true,
+        created: new Date().toISOString()
+      },
+      {
+        id: 'ai_communication',
+        name: 'AI通信ネットワーク',
+        description: 'AI間通信・プロトコル・自動化の連携を表示',
+        edgeTypes: ['ai_communication', 'protocol_implementation', 'automation_orchestration', 'message_passing'],
+        color: '#E91E63',
+        visible: true,
+        created: new Date().toISOString()
+      },
+      {
+        id: 'workflow_automation',
+        name: 'ワークフロー自動化ネットワーク',
+        description: 'ワークフロー・プロセス・イベント処理を表示',
+        edgeTypes: ['workflow_trigger', 'process_recording', 'event_storage', 'stream_processing'],
+        color: '#FF5722',
+        visible: true,
+        created: new Date().toISOString()
+      },
+      {
+        id: 'organizational_governance',
+        name: '組織ガバナンスネットワーク',
+        description: '組織の統治・戦略・リソース配分を表示',
+        edgeTypes: ['energy_governance', 'strategic_direction', 'execution_flow', 'resource_allocation'],
+        color: '#FFD700',
+        visible: true,
+        created: new Date().toISOString()
+      },
+      {
+        id: 'organizational_operations',
+        name: '組織運営ネットワーク',
+        description: '日常運営・プロセス・コンプライアンスを表示',
+        edgeTypes: ['financial_control', 'process_optimization', 'compliance_oversight', 'team_formation'],
+        color: '#9E9E9E',
+        visible: true,
+        created: new Date().toISOString()
+      },
+      {
+        id: 'knowledge_collaboration',
+        name: '知識協働ネットワーク',
+        description: 'チーム連携・知識共有・顧客とのやり取りを表示',
+        edgeTypes: ['collaboration', 'talent_supply', 'knowledge_sharing', 'customer_interaction', 'research_collaboration'],
+        color: '#8BC34A',
+        visible: true,
+        created: new Date().toISOString()
+      },
+      {
+        id: 'gftd_neural_system',
+        name: 'gftd.ai神経系ネットワーク',
+        description: 'gftd.aiの中枢制御と神経伝達システムを表示',
+        edgeTypes: ['neural_control', 'neural_coordination', 'endocrine_regulation', 'hormone_secretion'],
+        color: '#3F51B5',
+        visible: true,
+        created: new Date().toISOString()
+      },
+      {
+        id: 'gftd_service_platform',
+        name: 'gftd.aiサービスプラットフォーム',
+        description: 'サービス発見・デプロイ・API統合を表示',
+        edgeTypes: ['service_discovery', 'api_integration', 'client_integration', 'optimized_deployment'],
+        color: '#673AB7',
+        visible: true,
+        created: new Date().toISOString()
+      },
+      {
+        id: 'gftd_data_pipeline',
+        name: 'gftd.aiデータパイプライン',
+        description: 'データパイプライン・解析・監視システムを表示',
+        edgeTypes: ['data_pipeline', 'real_time_analytics', 'infrastructure_monitoring', 'performance_monitoring'],
+        color: '#795548',
+        visible: true,
+        created: new Date().toISOString()
+      },
+      {
+        id: 'security_compliance',
+        name: 'セキュリティ・コンプライアンス',
+        description: '認証・暗号化・監査証跡を表示',
+        edgeTypes: ['authentication', 'authorization', 'data_encryption', 'audit_trail', 'security_integration'],
+        color: '#F44336',
+        visible: true,
+        created: new Date().toISOString()
+      },
+      {
+        id: 'devops_cicd',
+        name: 'DevOps・CI/CDネットワーク',
+        description: 'DevOpsパイプライン・コード管理・デプロイを表示',
+        edgeTypes: ['devops_pipeline', 'ci_cd_integration', 'code_synchronization', 'source_management', 'deployment_trigger'],
+        color: '#607D8B',
+        visible: true,
+        created: new Date().toISOString()
+      }
+    ];
+  }, []);
+
+  /**
+   * プリセットサブネットワークを適用
+   */
+  const applyPresetSubNetworks = useCallback(() => {
+    const presets = getPresetSubNetworks();
+    setSubNetworks(presets);
+    // デフォルトでは何も表示しない（ユーザーが選択する）
+    setActiveSubNetworks([]);
+  }, [getPresetSubNetworks]);
+
+  /**
+   * おすすめサブネットワーク組み合わせを適用
+   */
+  const applyRecommendedView = useCallback((viewType: 'foundation' | 'development' | 'integration' | 'governance') => {
+    const recommendations = {
+      foundation: ['math_foundation', 'tech_infrastructure', 'organizational_governance'],
+      development: ['math_development', 'tech_development', 'ai_communication'],
+      integration: ['data_integration', 'workflow_automation', 'gftd_service_platform'],
+      governance: ['organizational_governance', 'organizational_operations', 'security_compliance']
+    };
+    
+    setActiveSubNetworks(recommendations[viewType]);
+  }, []);
+
   // Mac trackpad用ジェスチャーサポート
   const setupTrackpadGestures = useCallback((cy: Core) => {
     const container = cy.container();
