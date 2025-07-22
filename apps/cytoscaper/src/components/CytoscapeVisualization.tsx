@@ -1056,6 +1056,10 @@ export default function CytoscapeVisualization() {
         // ローカルストレージからユーザー編集データを読み込み
         loadFromLocalStorage();
         
+        // プリセットサブネットワークを初期化
+        const presets = getPresetSubNetworks();
+        setSubNetworks(presets);
+        
         const currentData = viewMode === 'math' ? mathTheoryData : 
                            viewMode === 'tech' ? techTheoryData :
                            { 
@@ -3159,6 +3163,45 @@ export default function CytoscapeVisualization() {
               </button>
             </div>
 
+            {/* プリセットとおすすめビュー */}
+            <div className="mb-4">
+              <h4 className="text-cyan-400 font-semibold text-sm mb-2">プリセット & おすすめビュー:</h4>
+              <div className="space-y-2">
+                <button
+                  onClick={applyPresetSubNetworks}
+                  className="w-full px-3 py-2 bg-purple-500/30 border border-purple-400/50 rounded text-purple-300 hover:bg-purple-500/50 transition-all text-xs"
+                >
+                  🎯 プリセットサブネット適用
+                </button>
+                <div className="grid grid-cols-2 gap-1">
+                  <button
+                    onClick={() => applyRecommendedView('foundation')}
+                    className="px-2 py-1 bg-green-500/20 border border-green-400/30 rounded text-green-300 hover:bg-green-500/40 transition-all text-xs"
+                  >
+                    🏗️ 基盤
+                  </button>
+                  <button
+                    onClick={() => applyRecommendedView('development')}
+                    className="px-2 py-1 bg-blue-500/20 border border-blue-400/30 rounded text-blue-300 hover:bg-blue-500/40 transition-all text-xs"
+                  >
+                    🚀 開発
+                  </button>
+                  <button
+                    onClick={() => applyRecommendedView('integration')}
+                    className="px-2 py-1 bg-yellow-500/20 border border-yellow-400/30 rounded text-yellow-300 hover:bg-yellow-500/40 transition-all text-xs"
+                  >
+                    🔗 統合
+                  </button>
+                  <button
+                    onClick={() => applyRecommendedView('governance')}
+                    className="px-2 py-1 bg-red-500/20 border border-red-400/30 rounded text-red-300 hover:bg-red-500/40 transition-all text-xs"
+                  >
+                    🏛️ 統治
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* エッジタイプ選択 */}
             <div className="mb-4">
               <h4 className="text-cyan-400 font-semibold text-sm mb-2">エッジタイプで選択:</h4>
@@ -3177,22 +3220,44 @@ export default function CytoscapeVisualization() {
 
             {/* 既存のサブネットワーク */}
             <div className="mb-4">
-              <h4 className="text-cyan-400 font-semibold text-sm mb-2">
-                サブネットワーク一覧 ({subNetworks.length}):
-              </h4>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-cyan-400 font-semibold text-sm">
+                  サブネットワーク一覧 ({subNetworks.length}):
+                </h4>
+                {subNetworks.length > 0 && (
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setActiveSubNetworks(subNetworks.map(sn => sn.id))}
+                      className="text-xs px-2 py-1 bg-green-500/20 border border-green-400/30 rounded text-green-300 hover:bg-green-500/40"
+                    >
+                      全表示
+                    </button>
+                    <button
+                      onClick={() => setActiveSubNetworks([])}
+                      className="text-xs px-2 py-1 bg-gray-500/20 border border-gray-400/30 rounded text-gray-300 hover:bg-gray-500/40"
+                    >
+                      全非表示
+                    </button>
+                  </div>
+                )}
+              </div>
               {subNetworks.length === 0 ? (
                 <p className="text-gray-400 text-xs">サブネットワークがありません</p>
               ) : (
-                <div className="space-y-2 max-h-40 overflow-y-auto">
+                <div className="space-y-2 max-h-48 overflow-y-auto">
                   {subNetworks.map(subnet => (
                     <div
                       key={subnet.id}
-                      className="bg-white/5 rounded p-2 border border-white/10"
+                      className={`bg-white/5 rounded p-2 border transition-all ${
+                        activeSubNetworks.includes(subnet.id)
+                          ? 'border-white/20 bg-white/10'
+                          : 'border-white/10'
+                      }`}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
                           <div
-                            className="w-3 h-3 rounded-full"
+                            className="w-3 h-3 rounded-full border border-white/30"
                             style={{ backgroundColor: subnet.color }}
                           />
                           <span className="text-white text-sm font-medium">
@@ -3202,25 +3267,37 @@ export default function CytoscapeVisualization() {
                         <div className="flex gap-1">
                           <button
                             onClick={() => toggleSubNetworkVisibility(subnet.id)}
-                            className={`text-xs px-2 py-1 rounded ${
+                            className={`text-xs px-2 py-1 rounded transition-all ${
                               activeSubNetworks.includes(subnet.id)
-                                ? 'bg-green-500/30 text-green-300'
-                                : 'bg-gray-500/30 text-gray-300'
+                                ? 'bg-green-500/40 text-green-200 border border-green-400/50'
+                                : 'bg-gray-500/30 text-gray-300 border border-gray-400/30 hover:bg-gray-500/50'
                             }`}
                           >
                             {activeSubNetworks.includes(subnet.id) ? '表示中' : '非表示'}
                           </button>
                           <button
                             onClick={() => deleteSubNetwork(subnet.id)}
-                            className="text-xs px-2 py-1 rounded bg-red-500/30 text-red-300 hover:bg-red-500/50"
+                            className="text-xs px-2 py-1 rounded bg-red-500/30 text-red-300 hover:bg-red-500/50 border border-red-400/30"
                           >
                             削除
                           </button>
                         </div>
                       </div>
-                      <p className="text-gray-400 text-xs">{subnet.description}</p>
-                      <div className="text-xs text-gray-500 mt-1">
-                        エッジタイプ: {subnet.edgeTypes.join(', ')}
+                      <p className="text-gray-400 text-xs leading-relaxed mb-1">{subnet.description}</p>
+                      <div className="text-xs text-gray-500">
+                        <span className="text-gray-400">エッジタイプ ({subnet.edgeTypes.length}):</span>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {subnet.edgeTypes.slice(0, 3).map((type, index) => (
+                            <span key={index} className="bg-gray-700/50 px-1 py-0.5 rounded text-xs">
+                              {type}
+                            </span>
+                          ))}
+                          {subnet.edgeTypes.length > 3 && (
+                            <span className="text-gray-500 text-xs">
+                              +{subnet.edgeTypes.length - 3}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -3230,7 +3307,7 @@ export default function CytoscapeVisualization() {
 
             {/* 選択状態 */}
             {selectedEdges.length > 0 && (
-              <div className="bg-cyan-500/20 rounded p-2 border border-cyan-400/30">
+              <div className="bg-cyan-500/20 rounded p-2 border border-cyan-400/30 mb-4">
                 <p className="text-cyan-300 text-sm font-medium">
                   {selectedEdges.length}個のエッジを選択中
                 </p>
@@ -3250,6 +3327,24 @@ export default function CytoscapeVisualization() {
                 </div>
               </div>
             )}
+
+            {/* クイック情報 */}
+            <div className="bg-indigo-500/10 rounded p-2 border border-indigo-400/20">
+              <h5 className="text-indigo-300 font-medium text-xs mb-1">💡 クイックガイド</h5>
+              <div className="text-xs text-gray-400 space-y-1">
+                <p>• <span className="text-purple-300">プリセット適用</span>でサブネット一覧を作成</p>
+                <p>• <span className="text-green-300">おすすめビュー</span>で目的別表示</p>
+                <p>• <span className="text-cyan-300">エッジ選択モード</span>で手動選択</p>
+                <p>• 複数サブネット同時表示可能</p>
+              </div>
+              {activeSubNetworks.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-indigo-400/20">
+                  <p className="text-indigo-300 text-xs">
+                    現在 <span className="font-bold">{activeSubNetworks.length}</span> 個のサブネットを表示中
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
