@@ -851,15 +851,15 @@ export default function CytoscapeVisualization() {
   }, [activeSubNetworks, applySubNetworkFilters]);
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900">
-      {/* ヘッダー（シンプル化） */}
-      <div className="bg-black/30 backdrop-blur-lg border-b border-white/10 p-4">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 animate-fadeIn">
+      {/* ヘッダー */}
+      <div className="glass-dark border-b border-white/10 p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-cyan-400 drop-shadow-lg">
+            <h1 className="text-3xl font-bold text-gradient-primary drop-shadow-lg">
               数学理論×IT技術 統合生態系
             </h1>
-            <p className="text-sm text-cyan-300 mt-1">
+            <p className="text-sm text-gray-300 mt-1">
               {viewMode === 'math' && '数学理論の生物的表現'}
               {viewMode === 'tech' && 'IT技術の生態系'}
               {viewMode === 'org' && '会社組織の生態系'}
@@ -870,12 +870,12 @@ export default function CytoscapeVisualization() {
           
           <div className="flex items-center gap-4">
             {/* ビューモード切り替え */}
-            <div className="flex gap-1 bg-black/30 rounded-full p-1">
+            <div className="flex gap-1 glass rounded-full p-1">
               <button
                 onClick={() => setViewMode('math')}
-                className={`px-3 py-1 rounded-full text-xs transition-all duration-300 ${
+                className={`px-4 py-2 rounded-full text-sm transition-all duration-300 ${
                   viewMode === 'math'
-                    ? 'bg-green-500 text-white'
+                    ? 'gradient-success text-white shadow-neon-green'
                     : 'text-green-400 hover:bg-green-500/20'
                 }`}
               >
@@ -883,9 +883,9 @@ export default function CytoscapeVisualization() {
               </button>
               <button
                 onClick={() => setViewMode('tech')}
-                className={`px-3 py-1 rounded-full text-xs transition-all duration-300 ${
+                className={`px-4 py-2 rounded-full text-sm transition-all duration-300 ${
                   viewMode === 'tech'
-                    ? 'bg-blue-500 text-white'
+                    ? 'bg-blue-500 text-white shadow-neon'
                     : 'text-blue-400 hover:bg-blue-500/20'
                 }`}
               >
@@ -893,9 +893,9 @@ export default function CytoscapeVisualization() {
               </button>
               <button
                 onClick={() => setViewMode('org')}
-                className={`px-3 py-1 rounded-full text-xs transition-all duration-300 ${
+                className={`px-4 py-2 rounded-full text-sm transition-all duration-300 ${
                   viewMode === 'org'
-                    ? 'bg-orange-500 text-white'
+                    ? 'gradient-warning text-white'
                     : 'text-orange-400 hover:bg-orange-500/20'
                 }`}
               >
@@ -903,9 +903,9 @@ export default function CytoscapeVisualization() {
               </button>
               <button
                 onClick={() => setViewMode('gftd')}
-                className={`px-3 py-1 rounded-full text-xs transition-all duration-300 ${
+                className={`px-4 py-2 rounded-full text-sm transition-all duration-300 ${
                   viewMode === 'gftd'
-                    ? 'bg-cyan-500 text-white'
+                    ? 'bg-cyan-500 text-white shadow-neon'
                     : 'text-cyan-400 hover:bg-cyan-500/20'
                 }`}
               >
@@ -913,9 +913,9 @@ export default function CytoscapeVisualization() {
               </button>
               <button
                 onClick={() => setViewMode('integrated')}
-                className={`px-3 py-1 rounded-full text-xs transition-all duration-300 ${
+                className={`px-4 py-2 rounded-full text-sm transition-all duration-300 ${
                   viewMode === 'integrated'
-                    ? 'bg-purple-500 text-white'
+                    ? 'bg-purple-500 text-white shadow-neon-purple'
                     : 'text-purple-400 hover:bg-purple-500/20'
                 }`}
               >
@@ -929,38 +929,47 @@ export default function CytoscapeVisualization() {
       {/* 3ペイン構成のメインコンテンツ */}
       <div className="flex flex-1 overflow-hidden">
         {/* 左ペイン: データエディタ */}
-        <div className="w-1/4 bg-black/20 backdrop-blur-lg border-r border-white/10 flex flex-col">
+        <div className="w-1/4 glass-dark border-r border-white/10 flex flex-col animate-slideInLeft">
           {/* タブ切り替え */}
           <div className="flex border-b border-white/10">
             <button
               onClick={() => setLeftPanelTab('nodes')}
               className={`flex-1 px-4 py-3 text-sm font-medium transition-all duration-300 ${
-                leftPanelTab === 'nodes'
-                  ? 'bg-cyan-500/20 text-cyan-400 border-b-2 border-cyan-400'
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+                leftPanelTab === 'nodes' ? 'tab-active' : 'tab-inactive'
               }`}
             >
-              ノード ({cyRef.current?.nodes().length || 0})
+              <span className="flex items-center justify-center gap-2">
+                🔸 ノード 
+                <span className="badge badge-primary">
+                  {cyRef.current?.nodes().length || 0}
+                </span>
+              </span>
             </button>
             <button
               onClick={() => setLeftPanelTab('edges')}
               className={`flex-1 px-4 py-3 text-sm font-medium transition-all duration-300 ${
-                leftPanelTab === 'edges'
-                  ? 'bg-cyan-500/20 text-cyan-400 border-b-2 border-cyan-400'
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+                leftPanelTab === 'edges' ? 'tab-active' : 'tab-inactive'
               }`}
             >
-              エッジ ({cyRef.current?.edges().length || 0})
+              <span className="flex items-center justify-center gap-2">
+                🔗 エッジ 
+                <span className="badge badge-primary">
+                  {cyRef.current?.edges().length || 0}
+                </span>
+              </span>
             </button>
             <button
               onClick={() => setLeftPanelTab('subnets')}
               className={`flex-1 px-4 py-3 text-sm font-medium transition-all duration-300 ${
-                leftPanelTab === 'subnets'
-                  ? 'bg-cyan-500/20 text-cyan-400 border-b-2 border-cyan-400'
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+                leftPanelTab === 'subnets' ? 'tab-active' : 'tab-inactive'
               }`}
             >
-              サブネット ({subNetworks.length})
+              <span className="flex items-center justify-center gap-2">
+                🕸️ サブネット 
+                <span className="badge badge-primary">
+                  {subNetworks.length}
+                </span>
+              </span>
             </button>
           </div>
           
@@ -968,7 +977,7 @@ export default function CytoscapeVisualization() {
           <div className="flex-1 overflow-hidden flex flex-col p-4">
             {leftPanelTab === 'nodes' && (
               <div className="flex flex-col h-full">
-                <h3 className="text-cyan-400 font-semibold text-sm mb-3">ノード一覧</h3>
+                <h3 className="panel-title mb-3">ノード一覧</h3>
                 <div className="flex-1 overflow-y-auto space-y-2">
                   {cyRef.current?.nodes().map((node: any) => {
                     const data = node.data();
@@ -976,10 +985,8 @@ export default function CytoscapeVisualization() {
                     return (
                       <div
                         key={data.id}
-                        className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 ${
-                          isSelected
-                            ? 'bg-cyan-500/20 border-cyan-400'
-                            : 'bg-white/5 border-white/10 hover:bg-white/10'
+                        className={`list-item hover-lift ${
+                          isSelected ? 'list-item-selected' : 'list-item-default'
                         }`}
                         onClick={() => selectItemInLeftPanel('node', data.id)}
                       >
@@ -988,8 +995,9 @@ export default function CytoscapeVisualization() {
                             <div className="text-sm font-medium text-white truncate">
                               {data.label || data.id}
                             </div>
-                            <div className="text-xs text-gray-400 truncate">
-                              {data.type} • {data.category}
+                            <div className="text-xs text-gray-400 truncate flex gap-2 mt-1">
+                              <span className="badge badge-success">{data.type}</span>
+                              <span className="badge badge-warning">{data.category}</span>
                             </div>
                           </div>
                           <button
@@ -997,7 +1005,7 @@ export default function CytoscapeVisualization() {
                               e.stopPropagation();
                               editItemInLeftPanel('node', data.id);
                             }}
-                            className="ml-2 text-gray-400 hover:text-cyan-400 text-xs"
+                            className="ml-2 btn-ghost px-2 py-1 text-xs"
                           >
                             編集
                           </button>
@@ -1011,7 +1019,7 @@ export default function CytoscapeVisualization() {
             
             {leftPanelTab === 'edges' && (
               <div className="flex flex-col h-full">
-                <h3 className="text-cyan-400 font-semibold text-sm mb-3">エッジ一覧</h3>
+                <h3 className="panel-title mb-3">エッジ一覧</h3>
                 <div className="flex-1 overflow-y-auto space-y-2">
                   {cyRef.current?.edges().map((edge: any) => {
                     const data = edge.data();
@@ -1019,10 +1027,8 @@ export default function CytoscapeVisualization() {
                     return (
                       <div
                         key={data.id}
-                        className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 ${
-                          isSelected
-                            ? 'bg-cyan-500/20 border-cyan-400'
-                            : 'bg-white/5 border-white/10 hover:bg-white/10'
+                        className={`list-item hover-lift ${
+                          isSelected ? 'list-item-selected' : 'list-item-default'
                         }`}
                         onClick={() => selectItemInLeftPanel('edge', data.id)}
                       >
@@ -1031,8 +1037,9 @@ export default function CytoscapeVisualization() {
                             <div className="text-sm font-medium text-white truncate">
                               {data.source} → {data.target}
                             </div>
-                            <div className="text-xs text-gray-400 truncate">
-                              {data.type} • {data.label || 'エッジ'}
+                            <div className="text-xs text-gray-400 truncate flex gap-2 mt-1">
+                              <span className="badge badge-primary">{data.type}</span>
+                              <span className="text-gray-500">{data.label || 'エッジ'}</span>
                             </div>
                           </div>
                           <button
@@ -1040,7 +1047,7 @@ export default function CytoscapeVisualization() {
                               e.stopPropagation();
                               editItemInLeftPanel('edge', data.id);
                             }}
-                            className="ml-2 text-gray-400 hover:text-cyan-400 text-xs"
+                            className="ml-2 btn-ghost px-2 py-1 text-xs"
                           >
                             編集
                           </button>
@@ -1054,37 +1061,38 @@ export default function CytoscapeVisualization() {
             
             {leftPanelTab === 'subnets' && (
               <div className="flex flex-col h-full">
-                <h3 className="text-cyan-400 font-semibold text-sm mb-3">サブネットワーク</h3>
+                <h3 className="panel-title mb-3">サブネットワーク</h3>
                 <div className="flex-1 overflow-y-auto space-y-2">
                   {subNetworks.map(subnet => (
                     <div
                       key={subnet.id}
-                      className="p-3 rounded-lg bg-white/5 border border-white/10"
+                      className="card hover-lift"
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <div
-                            className="w-3 h-3 rounded-full"
+                            className="w-4 h-4 rounded-full shadow-lg"
                             style={{ backgroundColor: subnet.color }}
                           />
                           <span className="text-sm font-medium text-white">
                             {subnet.name}
                           </span>
                         </div>
-                        <label className="flex items-center">
+                        <label className="flex items-center cursor-pointer">
                           <input
                             type="checkbox"
                             checked={activeSubNetworks.includes(subnet.id)}
                             onChange={() => toggleSubNetwork(subnet.id)}
                             className="sr-only"
+                            aria-label={`${subnet.name}を切り替え`}
                           />
-                          <div className={`w-4 h-4 rounded border-2 transition-all duration-200 ${
+                          <div className={`w-5 h-5 rounded border-2 transition-all duration-200 ${
                             activeSubNetworks.includes(subnet.id)
-                              ? 'bg-cyan-500 border-cyan-500'
-                              : 'border-gray-400'
+                              ? 'bg-cyan-500 border-cyan-500 shadow-neon'
+                              : 'border-gray-400 hover:border-cyan-400'
                           }`}>
                             {activeSubNetworks.includes(subnet.id) && (
-                              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                               </svg>
                             )}
@@ -1094,8 +1102,10 @@ export default function CytoscapeVisualization() {
                       <div className="text-xs text-gray-400 mb-2">
                         {subnet.description}
                       </div>
-                      <div className="text-xs text-gray-500">
-                        {subnet.edgeIds.length}個のエッジ
+                      <div className="flex justify-between items-center">
+                        <span className="badge badge-primary">
+                          {subnet.edgeIds.length}個のエッジ
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -1106,106 +1116,87 @@ export default function CytoscapeVisualization() {
         </div>
         
         {/* 中央ペイン: Cytoscapeビューアー */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative bg-gradient-to-br from-black/20 to-transparent">
           <div 
             ref={containerRef} 
-            className="w-full h-full bg-gradient-to-br from-black/20 to-transparent"
+            className="w-full h-full"
           />
           
           {/* オーバーレイコントロール */}
-          <div className="absolute top-4 left-4 flex gap-2">
-            <button
-              onClick={resetView}
-              className="px-3 py-2 bg-black/70 backdrop-blur-sm border border-white/20 rounded-lg text-cyan-400 hover:bg-black/80 transition-all duration-300 text-sm"
-            >
-              リセット
+          <div className="absolute top-4 left-4 flex gap-2 animate-slideInUp">
+            <button onClick={resetView} className="btn-secondary text-sm">
+              🔄 リセット
             </button>
-            <button
-              onClick={fitToView}
-              className="px-3 py-2 bg-black/70 backdrop-blur-sm border border-white/20 rounded-lg text-cyan-400 hover:bg-black/80 transition-all duration-300 text-sm"
-            >
-              全体表示
+            <button onClick={fitToView} className="btn-secondary text-sm">
+              🎯 全体表示
             </button>
-            <button
-              onClick={toggleLayout}
-              className="px-3 py-2 bg-black/70 backdrop-blur-sm border border-white/20 rounded-lg text-cyan-400 hover:bg-black/80 transition-all duration-300 text-sm"
-            >
-              レイアウト: {currentLayout}
+            <button onClick={toggleLayout} className="btn-secondary text-sm">
+              📐 {currentLayout}
             </button>
           </div>
         </div>
         
         {/* 右ペイン: コンテクストメニュー・情報 */}
-        <div className="w-1/4 bg-black/20 backdrop-blur-lg border-l border-white/10 flex flex-col overflow-hidden">
+        <div className="w-1/4 glass-dark border-l border-white/10 flex flex-col overflow-hidden animate-slideInRight">
           {/* 編集・操作コントロール */}
           <div className="p-4 border-b border-white/10">
-            <h3 className="text-cyan-400 font-semibold text-sm mb-3">操作・編集</h3>
-            <div className="space-y-2">
+            <h3 className="panel-title mb-4">🎮 操作・編集</h3>
+            <div className="space-y-3">
               <button
                 onClick={() => setEditMode(!editMode)}
-                className={`w-full px-4 py-2 border rounded-lg transition-all duration-300 text-sm ${
-                  editMode
-                    ? 'bg-yellow-500/60 border-yellow-400 text-yellow-100'
-                    : 'bg-yellow-500/20 border-yellow-400 text-yellow-400 hover:bg-yellow-500/40'
-                }`}
+                className={editMode ? 'btn-warning w-full' : 'btn-secondary w-full'}
               >
-                {editMode ? '編集中' : '編集モード'}
+                {editMode ? '📝 編集中' : '✏️ 編集モード'}
               </button>
               
-              <div className="flex gap-2">
-                <button
-                  onClick={addNode}
-                  className="flex-1 px-3 py-2 bg-green-500/20 border border-green-400 rounded-lg text-green-400 hover:bg-green-500/40 transition-all duration-300 text-xs"
-                >
-                  ノード追加
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={addNode} className="btn-success text-sm">
+                  ➕ ノード
                 </button>
-                <button
-                  onClick={addEdge}
-                  className="flex-1 px-3 py-2 bg-blue-500/20 border border-blue-400 rounded-lg text-blue-400 hover:bg-blue-500/40 transition-all duration-300 text-xs"
-                >
-                  エッジ追加
+                <button onClick={addEdge} className="btn-primary text-sm">
+                  🔗 エッジ
                 </button>
               </div>
               
               <button
                 onClick={() => setEdgeSelectionMode(!edgeSelectionMode)}
-                className={`w-full px-4 py-2 border rounded-lg transition-all duration-300 text-sm ${
-                  edgeSelectionMode
-                    ? 'bg-cyan-500/60 border-cyan-400 text-cyan-100'
-                    : 'bg-cyan-500/20 border-cyan-400 text-cyan-400 hover:bg-cyan-500/40'
-                }`}
+                className={edgeSelectionMode ? 'btn-primary w-full' : 'btn-secondary w-full'}
               >
-                {edgeSelectionMode ? 'エッジ選択中' : 'エッジ選択'}
+                {edgeSelectionMode ? '🎯 選択中' : '🔍 エッジ選択'}
               </button>
               
               <button
                 onClick={() => setShowSubNetworkModal(true)}
-                className="w-full px-4 py-2 bg-purple-500/20 border border-purple-400 rounded-lg text-purple-400 hover:bg-purple-500/40 transition-all duration-300 text-sm"
+                className="btn-secondary w-full"
                 disabled={selectedEdges.length === 0}
               >
-                サブネット作成 {selectedEdges.length > 0 && `(${selectedEdges.length})`}
+                🕸️ サブネット作成 
+                {selectedEdges.length > 0 && (
+                  <span className="badge badge-success ml-2">
+                    {selectedEdges.length}
+                  </span>
+                )}
               </button>
             </div>
             
-            {/* エクスポート・インポート */}
-            <div className="mt-4 pt-4 border-t border-white/10">
-              <h4 className="text-cyan-400 font-semibold text-xs mb-2">データ管理</h4>
-              <div className="flex gap-2">
-                <button
-                  onClick={exportData}
-                  className="flex-1 px-3 py-2 bg-orange-500/20 border border-orange-400 rounded-lg text-orange-400 hover:bg-orange-500/40 transition-all duration-300 text-xs"
-                >
-                  エクスポート
+            {/* データ管理 */}
+            <div className="mt-6 pt-4 border-t border-white/10">
+              <h4 className="panel-subtitle mb-3">💾 データ管理</h4>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={exportData} className="btn-warning text-sm">
+                  📤 Export
                 </button>
-                <label className="flex-1">
+                <label className="cursor-pointer">
                   <input
                     type="file"
                     accept=".json"
                     onChange={importData}
                     className="hidden"
+                    aria-label="JSONファイルをインポート"
+                    title="JSONファイルをインポート"
                   />
-                  <span className="block px-3 py-2 bg-teal-500/20 border border-teal-400 rounded-lg text-teal-400 hover:bg-teal-500/40 transition-all duration-300 text-xs text-center cursor-pointer">
-                    インポート
+                  <span className="btn-primary text-sm block text-center">
+                    📥 Import
                   </span>
                 </label>
               </div>
@@ -1215,73 +1206,88 @@ export default function CytoscapeVisualization() {
           {/* 情報パネル */}
           <div className="flex-1 overflow-hidden flex flex-col">
             {showInfoPanel && infoData ? (
-              <div className="p-4 border-b border-white/10">
-                <div className="flex justify-between items-start mb-3">
-                  <h3 className="text-cyan-400 font-bold text-lg">{infoData.title}</h3>
+              <div className="p-4 border-b border-white/10 animate-scaleIn">
+                <div className="panel-header">
+                  <h3 className="text-lg font-bold text-cyan-400">{infoData.title}</h3>
                   <button
                     onClick={() => setShowInfoPanel(false)}
-                    className="text-gray-400 hover:text-white text-xl"
+                    className="btn-ghost text-lg px-2 py-1"
                   >
-                    ×
+                    ✕
                   </button>
                 </div>
                 <p className="text-gray-300 text-sm leading-relaxed mb-3">{infoData.description}</p>
                 {infoData.details && (
-                  <div className="text-xs text-gray-400 space-y-1">
-                    <div>カテゴリ: {infoData.details.category}</div>
-                    <div>タイプ: {infoData.details.type}</div>
-                    {infoData.details.level && <div>レベル: {infoData.details.level}</div>}
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <span className="badge badge-warning">カテゴリ</span>
+                      <span className="text-sm text-gray-300">{infoData.details.category}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <span className="badge badge-success">タイプ</span>
+                      <span className="text-sm text-gray-300">{infoData.details.type}</span>
+                    </div>
+                    {infoData.details.level && (
+                      <div className="flex gap-2">
+                        <span className="badge badge-primary">レベル</span>
+                        <span className="text-sm text-gray-300">{infoData.details.level}</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             ) : (
-              <div className="p-4 text-center text-gray-500">
+              <div className="p-6 text-center text-gray-500">
+                <div className="text-4xl mb-3 opacity-50">🎯</div>
                 <p className="text-sm">ノードまたはエッジを選択してください</p>
               </div>
             )}
             
             {/* アイテム編集フォーム */}
             {editingItem && (
-              <div className="p-4 border-b border-white/10 bg-black/30">
-                <h3 className="text-purple-400 font-semibold text-sm mb-3">
-                  {editingItem.type === 'node' ? 'ノード編集' : 'エッジ編集'}
+              <div className="p-4 border-b border-white/10 glass animate-scaleIn">
+                <h3 className="panel-title mb-4">
+                  {editingItem.type === 'node' ? '🔸 ノード編集' : '🔗 エッジ編集'}
                 </h3>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div>
-                    <label className="block text-gray-400 text-xs mb-1">ラベル:</label>
+                    <label className="form-label">ラベル:</label>
                     <input
                       type="text"
                       value={editingItem.data.label || ''}
                       onChange={(e) => setEditingItem(prev => 
                         prev ? {...prev, data: {...prev.data, label: e.target.value}} : null
                       )}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded text-white text-sm"
+                      className="form-input"
+                      placeholder="ラベルを入力"
                     />
                   </div>
                   
                   {editingItem.type === 'node' && (
                     <>
                       <div>
-                        <label className="block text-gray-400 text-xs mb-1">説明:</label>
+                        <label className="form-label">説明:</label>
                         <textarea
                           value={editingItem.data.description || ''}
                           onChange={(e) => setEditingItem(prev => 
                             prev ? {...prev, data: {...prev.data, description: e.target.value}} : null
                           )}
-                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded text-white text-sm"
+                          className="form-textarea"
                           rows={3}
+                          placeholder="説明を入力"
                         />
                       </div>
                       
                       <div>
-                        <label className="block text-gray-400 text-xs mb-1">カテゴリ:</label>
+                        <label className="form-label">カテゴリ:</label>
                         <input
                           type="text"
                           value={editingItem.data.category || ''}
                           onChange={(e) => setEditingItem(prev => 
                             prev ? {...prev, data: {...prev.data, category: e.target.value}} : null
                           )}
-                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded text-white text-sm"
+                          className="form-input"
+                          placeholder="カテゴリを入力"
                         />
                       </div>
                     </>
@@ -1289,30 +1295,25 @@ export default function CytoscapeVisualization() {
                   
                   {editingItem.type === 'edge' && (
                     <div>
-                      <label className="block text-gray-400 text-xs mb-1">タイプ:</label>
+                      <label className="form-label">タイプ:</label>
                       <input
                         type="text"
                         value={editingItem.data.type || ''}
                         onChange={(e) => setEditingItem(prev => 
                           prev ? {...prev, data: {...prev.data, type: e.target.value}} : null
                         )}
-                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded text-white text-sm"
+                        className="form-input"
+                        placeholder="タイプを入力"
                       />
                     </div>
                   )}
                   
                   <div className="flex gap-2">
-                    <button
-                      onClick={saveItemEdit}
-                      className="flex-1 px-3 py-2 bg-green-500/30 text-green-300 rounded text-xs hover:bg-green-500/50"
-                    >
-                      保存
+                    <button onClick={saveItemEdit} className="btn-success flex-1">
+                      💾 保存
                     </button>
-                    <button
-                      onClick={() => setEditingItem(null)}
-                      className="flex-1 px-3 py-2 bg-gray-500/30 text-gray-300 rounded text-xs hover:bg-gray-500/50"
-                    >
-                      キャンセル
+                    <button onClick={() => setEditingItem(null)} className="btn-secondary flex-1">
+                      ❌ キャンセル
                     </button>
                   </div>
                 </div>
@@ -1325,67 +1326,65 @@ export default function CytoscapeVisualization() {
       {/* モーダル群 */}
       {/* サブネットワーク作成モーダル */}
       {showSubNetworkModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-gradient-to-br from-slate-800 to-purple-900 rounded-lg p-6 w-96 max-w-full border border-white/20">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-purple-400 font-bold text-lg">🕸️ サブネットワーク作成</h3>
+        <div className="modal-backdrop animate-fadeIn">
+          <div className="modal-content animate-scaleIn">
+            <div className="panel-header">
+              <h3 className="panel-title">🕸️ サブネットワーク作成</h3>
               <button
                 onClick={() => setShowSubNetworkModal(false)}
-                className="text-gray-400 hover:text-white text-xl"
+                className="btn-ghost text-xl px-2 py-1"
               >
-                ×
+                ✕
               </button>
             </div>
             
             <div className="space-y-4">
               <div>
-                <label className="block text-purple-400 text-sm font-medium mb-1">名前:</label>
+                <label className="form-label">名前:</label>
                 <input
                   type="text"
                   value={subNetworkFormData.name || ''}
                   onChange={(e) => setSubNetworkFormData(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full p-2 bg-white/10 border border-white/30 rounded text-white placeholder-gray-400"
+                  className="form-input"
                   placeholder="サブネットワークの名前を入力してください"
                 />
               </div>
               
               <div>
-                <label className="block text-purple-400 text-sm font-medium mb-1">説明:</label>
+                <label className="form-label">説明:</label>
                 <textarea
                   value={subNetworkFormData.description || ''}
                   onChange={(e) => setSubNetworkFormData(prev => ({ ...prev, description: e.target.value }))}
-                  className="w-full p-2 bg-white/10 border border-white/30 rounded text-white placeholder-gray-400"
+                  className="form-textarea"
                   placeholder="サブネットワークの説明を入力してください"
                   rows={3}
                 />
               </div>
               
               <div>
-                <label className="block text-purple-400 text-sm font-medium mb-1">色:</label>
-                <div className="flex items-center gap-2">
+                <label className="form-label">色:</label>
+                <div className="flex items-center gap-3">
                   <input
                     type="color"
                     value={subNetworkFormData.color || '#666666'}
                     onChange={(e) => setSubNetworkFormData(prev => ({ ...prev, color: e.target.value }))}
-                    className="w-12 h-8 border border-white/30 rounded cursor-pointer"
+                    className="w-12 h-10 border border-white/30 rounded-lg cursor-pointer"
+                    title="サブネットワークの色を選択"
                     aria-label="サブネットワークの色を選択"
                   />
                   <span className="text-gray-300 text-sm">エッジの色を選択</span>
                 </div>
               </div>
               
-              <div className="flex gap-2 justify-end">
+              <div className="flex gap-3 justify-end pt-4">
                 <button
                   onClick={() => setShowSubNetworkModal(false)}
-                  className="px-4 py-2 bg-gray-500/20 border border-gray-400 rounded text-gray-400 hover:bg-gray-500/40 transition-all duration-300"
+                  className="btn-secondary"
                 >
                   キャンセル
                 </button>
-                <button
-                  onClick={saveSubNetwork}
-                  className="px-4 py-2 bg-purple-500/30 border border-purple-400 rounded text-purple-300 hover:bg-purple-500/50 transition-all duration-300"
-                >
-                  作成
+                <button onClick={saveSubNetwork} className="btn-primary">
+                  🚀 作成
                 </button>
               </div>
             </div>
@@ -1395,36 +1394,36 @@ export default function CytoscapeVisualization() {
 
       {/* ノード追加モーダル */}
       {showNodeModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-gradient-to-br from-slate-800 to-green-900 rounded-lg p-6 w-96 max-w-full border border-white/20">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-green-400 font-bold text-lg">🔸 ノード追加</h3>
+        <div className="modal-backdrop animate-fadeIn">
+          <div className="modal-content animate-scaleIn">
+            <div className="panel-header">
+              <h3 className="panel-title">🔸 ノード追加</h3>
               <button
                 onClick={() => setShowNodeModal(false)}
-                className="text-gray-400 hover:text-white text-xl"
+                className="btn-ghost text-xl px-2 py-1"
               >
-                ×
+                ✕
               </button>
             </div>
             
             <div className="space-y-4">
               <div>
-                <label className="block text-green-400 text-sm font-medium mb-1">ラベル:</label>
+                <label className="form-label">ラベル:</label>
                 <input
                   type="text"
                   value={nodeFormData.label || ''}
                   onChange={(e) => setNodeFormData(prev => ({ ...prev, label: e.target.value }))}
-                  className="w-full p-2 bg-white/10 border border-white/30 rounded text-white placeholder-gray-400"
+                  className="form-input"
                   placeholder="ノードのラベルを入力してください"
                 />
               </div>
               
               <div>
-                <label className="block text-green-400 text-sm font-medium mb-1">説明:</label>
+                <label className="form-label">説明:</label>
                 <textarea
                   value={nodeFormData.description || ''}
                   onChange={(e) => setNodeFormData(prev => ({ ...prev, description: e.target.value }))}
-                  className="w-full p-2 bg-white/10 border border-white/30 rounded text-white placeholder-gray-400"
+                  className="form-textarea"
                   placeholder="ノードの説明を入力してください"
                   rows={3}
                 />
@@ -1432,32 +1431,32 @@ export default function CytoscapeVisualization() {
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-green-400 text-sm font-medium mb-1">タイプ:</label>
+                  <label className="form-label">タイプ:</label>
                   <input
                     type="text"
                     value={nodeFormData.type || ''}
                     onChange={(e) => setNodeFormData(prev => ({ ...prev, type: e.target.value }))}
-                    className="w-full p-2 bg-white/10 border border-white/30 rounded text-white placeholder-gray-400"
+                    className="form-input"
                     placeholder="theory, application等"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-green-400 text-sm font-medium mb-1">カテゴリ:</label>
+                  <label className="form-label">カテゴリ:</label>
                   <input
                     type="text"
                     value={nodeFormData.category || ''}
                     onChange={(e) => setNodeFormData(prev => ({ ...prev, category: e.target.value }))}
-                    className="w-full p-2 bg-white/10 border border-white/30 rounded text-white placeholder-gray-400"
+                    className="form-input"
                     placeholder="math, tech等"
                   />
                 </div>
               </div>
               
-              <div className="flex gap-2 justify-end">
+              <div className="flex gap-3 justify-end pt-4">
                 <button
                   onClick={() => setShowNodeModal(false)}
-                  className="px-4 py-2 bg-gray-500/20 border border-gray-400 rounded text-gray-400 hover:bg-gray-500/40 transition-all duration-300"
+                  className="btn-secondary"
                 >
                   キャンセル
                 </button>
@@ -1474,9 +1473,9 @@ export default function CytoscapeVisualization() {
                       setNodeFormData({});
                     }
                   }}
-                  className="px-4 py-2 bg-green-500/30 border border-green-400 rounded text-green-300 hover:bg-green-500/50 transition-all duration-300"
+                  className="btn-success"
                 >
-                  追加
+                  ➕ 追加
                 </button>
               </div>
             </div>
@@ -1486,69 +1485,69 @@ export default function CytoscapeVisualization() {
 
       {/* エッジ追加モーダル */}
       {showEdgeModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg p-6 w-96 max-w-full border border-white/20">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-blue-400 font-bold text-lg">🔗 エッジ追加</h3>
+        <div className="modal-backdrop animate-fadeIn">
+          <div className="modal-content animate-scaleIn">
+            <div className="panel-header">
+              <h3 className="panel-title">🔗 エッジ追加</h3>
               <button
                 onClick={() => setShowEdgeModal(false)}
-                className="text-gray-400 hover:text-white text-xl"
+                className="btn-ghost text-xl px-2 py-1"
               >
-                ×
+                ✕
               </button>
             </div>
             
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-blue-400 text-sm font-medium mb-1">ソース:</label>
+                  <label className="form-label">ソース:</label>
                   <input
                     type="text"
                     value={edgeFormData.source || ''}
                     onChange={(e) => setEdgeFormData(prev => ({ ...prev, source: e.target.value }))}
-                    className="w-full p-2 bg-white/10 border border-white/30 rounded text-white placeholder-gray-400"
+                    className="form-input"
                     placeholder="ソースノードID"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-blue-400 text-sm font-medium mb-1">ターゲット:</label>
+                  <label className="form-label">ターゲット:</label>
                   <input
                     type="text"
                     value={edgeFormData.target || ''}
                     onChange={(e) => setEdgeFormData(prev => ({ ...prev, target: e.target.value }))}
-                    className="w-full p-2 bg-white/10 border border-white/30 rounded text-white placeholder-gray-400"
+                    className="form-input"
                     placeholder="ターゲットノードID"
                   />
                 </div>
               </div>
               
               <div>
-                <label className="block text-blue-400 text-sm font-medium mb-1">タイプ:</label>
+                <label className="form-label">タイプ:</label>
                 <input
                   type="text"
                   value={edgeFormData.type || ''}
                   onChange={(e) => setEdgeFormData(prev => ({ ...prev, type: e.target.value }))}
-                  className="w-full p-2 bg-white/10 border border-white/30 rounded text-white placeholder-gray-400"
+                  className="form-input"
                   placeholder="関係のタイプを入力してください"
                 />
               </div>
               
               <div>
-                <label className="block text-blue-400 text-sm font-medium mb-1">ラベル:</label>
+                <label className="form-label">ラベル:</label>
                 <input
                   type="text"
                   value={edgeFormData.label || ''}
                   onChange={(e) => setEdgeFormData(prev => ({ ...prev, label: e.target.value }))}
-                  className="w-full p-2 bg-white/10 border border-white/30 rounded text-white placeholder-gray-400"
+                  className="form-input"
                   placeholder="エッジのラベルを入力してください"
                 />
               </div>
               
-              <div className="flex gap-2 justify-end">
+              <div className="flex gap-3 justify-end pt-4">
                 <button
                   onClick={() => setShowEdgeModal(false)}
-                  className="px-4 py-2 bg-gray-500/20 border border-gray-400 rounded text-gray-400 hover:bg-gray-500/40 transition-all duration-300"
+                  className="btn-secondary"
                 >
                   キャンセル
                 </button>
@@ -1565,9 +1564,9 @@ export default function CytoscapeVisualization() {
                       setEdgeFormData({});
                     }
                   }}
-                  className="px-4 py-2 bg-blue-500/30 border border-blue-400 rounded text-blue-300 hover:bg-blue-500/50 transition-all duration-300"
+                  className="btn-primary"
                 >
-                  追加
+                  🔗 追加
                 </button>
               </div>
             </div>
