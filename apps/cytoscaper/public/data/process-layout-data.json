@@ -1,0 +1,256 @@
+{
+  "metadata": {
+    "title": "プロセスレイアウトパターン",
+    "description": "画像の項目を縦軸とした階層的なプロセスフロー",
+    "version": "1.0.0",
+    "created": "2024-01-01",
+    "author": "Cytoscape Visualization System"
+  },
+  "layers": [
+    {
+      "id": "layer",
+      "name": "Layer (層)",
+      "description": "システム全体の層構造を定義する最上位レイヤー",
+      "color": "#e74c3c",
+      "level": 0,
+      "category": "Architecture"
+    },
+    {
+      "id": "existing_model",
+      "name": "既存モデル",
+      "description": "既存のビジネスモデルとデータモデル",
+      "color": "#f39c12",
+      "level": 1,
+      "category": "Business"
+    },
+    {
+      "id": "existing_function",
+      "name": "既存機能",
+      "description": "現在実装されている機能とサービス",
+      "color": "#f1c40f",
+      "level": 2,
+      "category": "Service"
+    },
+    {
+      "id": "ism_lts",
+      "name": "ISM: LTSから",
+      "description": "Long Term Supportからの統合サービス管理",
+      "color": "#27ae60",
+      "level": 3,
+      "category": "Integration"
+    },
+    {
+      "id": "web_server",
+      "name": "Web Server",
+      "description": "Webアプリケーションサーバーとフロントエンド",
+      "color": "#3498db",
+      "level": 4,
+      "category": "Infrastructure"
+    },
+    {
+      "id": "api_gateway",
+      "name": "API Gateway/LB/Auth",
+      "description": "API Gateway、Load Balancer、認証システム",
+      "color": "#9b59b6",
+      "level": 5,
+      "category": "Security"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "layer",
+      "label": "Layer (層)",
+      "layer": "layer",
+      "description": "システム全体の層構造を定義",
+      "type": "layer",
+      "category": "Architecture",
+      "details": {
+        "responsibilities": [
+          "システム全体の層構造を定義",
+          "アーキテクチャパターンの決定",
+          "技術スタックの選択"
+        ],
+        "technologies": [
+          "アーキテクチャフレームワーク",
+          "設計パターン",
+          "技術標準"
+        ]
+      }
+    },
+    {
+      "id": "existing_model",
+      "label": "既存モデル",
+      "layer": "existing_model",
+      "description": "既存のビジネスモデルとデータモデル",
+      "type": "model",
+      "category": "Business",
+      "details": {
+        "responsibilities": [
+          "ビジネスモデルの定義",
+          "データモデルの設計",
+          "ドメインロジックの実装"
+        ],
+        "technologies": ["UML", "ER図", "ドメイン駆動設計"]
+      }
+    },
+    {
+      "id": "existing_function",
+      "label": "既存機能",
+      "layer": "existing_function",
+      "description": "現在実装されている機能とサービス",
+      "type": "function",
+      "category": "Service",
+      "details": {
+        "responsibilities": [
+          "ビジネス機能の実装",
+          "サービスの提供",
+          "ユーザーインターフェース"
+        ],
+        "technologies": ["React", "Node.js", "REST API"]
+      }
+    },
+    {
+      "id": "ism_lts",
+      "label": "ISM: LTSから",
+      "layer": "ism_lts",
+      "description": "Long Term Supportからの統合サービス管理",
+      "type": "management",
+      "category": "Integration",
+      "details": {
+        "responsibilities": [
+          "統合サービス管理",
+          "長期サポート",
+          "システム統合"
+        ],
+        "technologies": ["ITIL", "サービス管理", "統合プラットフォーム"]
+      }
+    },
+    {
+      "id": "web_server",
+      "label": "Web Server",
+      "layer": "web_server",
+      "description": "Webアプリケーションサーバーとフロントエンド",
+      "type": "server",
+      "category": "Infrastructure",
+      "details": {
+        "responsibilities": [
+          "Webアプリケーションの配信",
+          "フロントエンドの提供",
+          "サーバーサイド処理"
+        ],
+        "technologies": ["Next.js", "Express.js", "Nginx"]
+      }
+    },
+    {
+      "id": "api_gateway",
+      "label": "API Gateway\nLB\nAuth",
+      "layer": "api_gateway",
+      "description": "API Gateway、Load Balancer、認証システム",
+      "type": "gateway",
+      "category": "Security",
+      "details": {
+        "responsibilities": ["API Gateway機能", "負荷分散", "認証・認可"],
+        "technologies": ["Kong", "OAuth2", "JWT"]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "layer_to_model",
+      "source": "layer",
+      "target": "existing_model",
+      "label": "定義",
+      "type": "definition",
+      "description": "層から既存モデルへの定義プロセス",
+      "details": {
+        "process": "アーキテクチャ定義からモデル設計への変換",
+        "artifacts": ["アーキテクチャ文書", "モデル設計書", "技術仕様書"]
+      }
+    },
+    {
+      "id": "model_to_function",
+      "source": "existing_model",
+      "target": "existing_function",
+      "label": "実装",
+      "type": "implementation",
+      "description": "既存モデルから既存機能への実装プロセス",
+      "details": {
+        "process": "モデル設計から機能実装への変換",
+        "artifacts": ["実装コード", "テストケース", "ドキュメント"]
+      }
+    },
+    {
+      "id": "function_to_ism",
+      "source": "existing_function",
+      "target": "ism_lts",
+      "label": "統合",
+      "type": "integration",
+      "description": "既存機能からISMへの統合プロセス",
+      "details": {
+        "process": "機能から統合サービスへの変換",
+        "artifacts": ["統合仕様書", "API仕様", "サービスカタログ"]
+      }
+    },
+    {
+      "id": "ism_to_webserver",
+      "source": "ism_lts",
+      "target": "web_server",
+      "label": "配信",
+      "type": "delivery",
+      "description": "ISMからWeb Serverへの配信プロセス",
+      "details": {
+        "process": "統合サービスからWeb配信への変換",
+        "artifacts": ["デプロイメント設定", "配信パイプライン", "監視設定"]
+      }
+    },
+    {
+      "id": "webserver_to_gateway",
+      "source": "web_server",
+      "target": "api_gateway",
+      "label": "保護",
+      "type": "security",
+      "description": "Web ServerからAPI Gatewayへの保護プロセス",
+      "details": {
+        "process": "Webサービスからセキュアゲートウェイへの変換",
+        "artifacts": ["セキュリティ設定", "認証設定", "アクセス制御"]
+      }
+    }
+  ],
+  "processes": [
+    {
+      "id": "definition_process",
+      "name": "定義プロセス",
+      "description": "アーキテクチャからモデルへの定義",
+      "steps": ["アーキテクチャ分析", "モデル設計", "技術選択", "実装計画"]
+    },
+    {
+      "id": "implementation_process",
+      "name": "実装プロセス",
+      "description": "モデルから機能への実装",
+      "steps": ["コーディング", "テスト", "レビュー", "デプロイ"]
+    },
+    {
+      "id": "integration_process",
+      "name": "統合プロセス",
+      "description": "機能からサービスへの統合",
+      "steps": ["サービス設計", "API開発", "統合テスト", "サービス登録"]
+    },
+    {
+      "id": "delivery_process",
+      "name": "配信プロセス",
+      "description": "サービスからWeb配信への変換",
+      "steps": ["配信設定", "パフォーマンス最適化", "監視設定", "運用開始"]
+    },
+    {
+      "id": "security_process",
+      "name": "保護プロセス",
+      "description": "Webサービスからセキュアゲートウェイへの変換",
+      "steps": [
+        "セキュリティ設計",
+        "認証実装",
+        "アクセス制御",
+        "セキュリティテスト"
+      ]
+    }
+  ]
+}
