@@ -22,12 +22,17 @@
     @apply dark:prose-invert !important;
     @apply min-h-[600px] transition-colors duration-200 !important;
     @apply focus:ring-2 focus:ring-blue-500 focus:border-blue-500 !important;
+    /* 明示的なテキスト色を設定 */
+    color: oklab(0.177 0.003 0.46) !important;
   }
 
   /* ダークモード対応 */
   .dark .ProseMirror {
     @apply text-gray-100 bg-gray-800 border-gray-600 !important;
     @apply focus:ring-blue-400 focus:border-blue-400 !important;
+    /* ダークモード用の明示的なテキスト色 */
+    color: oklab(0.46 0.003 0.177) !important;
+    background-color: rgb(31, 41, 55) !important;
   }
 
   /* フォーカス状態 */
