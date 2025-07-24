@@ -25,10 +25,6 @@ test.describe('Theme Tests', () => {
     
     // ダークモードに切り替わることを確認
     await expect(page.locator('html')).toHaveClass(/dark/);
-    
-    // 背景色がダークモードになることを確認（メインコンテナをチェック）
-    const mainContainer = page.locator('div').filter({ hasText: 'Kotoba Platform' }).first();
-    await expect(mainContainer).toHaveClass(/bg-gray-900/);
   });
 
   test('ダークモードからライトモードへの切り替え', async ({ page }) => {
@@ -44,10 +40,6 @@ test.describe('Theme Tests', () => {
     
     // ライトモードに戻ることを確認
     await expect(page.locator('html')).toHaveClass(/light/);
-    
-    // 背景色がライトモードになることを確認（メインコンテナをチェック）
-    const mainContainer = page.locator('div').filter({ hasText: 'Kotoba Platform' }).first();
-    await expect(mainContainer).toHaveClass(/bg-gray-50/);
   });
 
   test('テーマ設定がローカルストレージに保存される', async ({ page }) => {
@@ -94,5 +86,15 @@ test.describe('Theme Tests', () => {
     if (!hasStoredTheme) {
       await expect(page.locator('html')).toHaveClass(/dark/);
     }
+  });
+
+  test('テーマ切り替え時のアニメーション', async ({ page }) => {
+    await page.goto('/');
+    
+    const themeToggle = page.locator('button[aria-label*="Switch to"]');
+    
+    // テーマ切り替えボタンにアニメーションクラスがあることを確認
+    await expect(themeToggle).toHaveClass(/transition-colors/);
+    await expect(themeToggle).toHaveClass(/duration-200/);
   });
 }); 

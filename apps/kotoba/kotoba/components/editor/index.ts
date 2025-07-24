@@ -1,2 +1,2 @@
-export { Editor } from './editor.js';
-export type { EditorProps } from './editor.js';
+export { Editor } from './editor';
+export type { EditorProps } from './editor';
