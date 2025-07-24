@@ -50,11 +50,15 @@
    * main configuration for component dependency resolution.
    **/
   "teambit.dependencies/dependency-resolver": {
-    "rootComponents": true,
     "policy": {
-      "dependencies": {},
+      "dependencies": {
+        "@tailwindcss/typography": "^0.5.16",
+        "@vitejs/plugin-react": "^4.7.0"
+      },
       "peerDependencies": {}
-    }
+    },
+    "linkCoreAspects": true,
+    "rootComponents": true
   },
   "teambit.workspace/workspace-config-files": {
     "enableWorkspaceConfigWrite": true
