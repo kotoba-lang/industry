@@ -1,3 +1,300 @@
 @tailwind base;
 @tailwind components;
-@tailwind utilities; 
+@tailwind utilities;
+
+/* ProseMirror Editor Styles */
+@layer components {
+  /* エディターコンテナ */
+  .prosemirror-editor {
+    @apply relative w-full;
+  }
+
+  .prosemirror-editor-container {
+    @apply relative w-full min-h-[600px] p-6;
+  }
+
+  /* エディターのメインエリア */
+  .ProseMirror {
+    @apply outline-none min-h-[400px] p-4 text-gray-900 bg-white;
+    @apply border border-gray-300 rounded-md;
+    @apply focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
+    @apply transition-colors duration-200;
+  }
+
+  /* ダークモード対応 */
+  .dark .ProseMirror {
+    @apply text-gray-100 bg-gray-800 border-gray-600;
+    @apply focus:ring-blue-400 focus:border-blue-400;
+  }
+
+  /* 段落 */
+  .ProseMirror p {
+    @apply mb-4 leading-relaxed;
+  }
+
+  .ProseMirror p:last-child {
+    @apply mb-0;
+  }
+
+  /* 見出し */
+  .ProseMirror h1 {
+    @apply text-3xl font-bold text-gray-900 mb-6 mt-8;
+  }
+
+  .ProseMirror h2 {
+    @apply text-2xl font-bold text-gray-900 mb-4 mt-6;
+  }
+
+  .ProseMirror h3 {
+    @apply text-xl font-bold text-gray-900 mb-3 mt-5;
+  }
+
+  .ProseMirror h4 {
+    @apply text-lg font-bold text-gray-900 mb-2 mt-4;
+  }
+
+  .ProseMirror h5 {
+    @apply text-base font-bold text-gray-900 mb-2 mt-3;
+  }
+
+  .ProseMirror h6 {
+    @apply text-sm font-bold text-gray-900 mb-1 mt-2;
+  }
+
+  /* ダークモードでの見出し */
+  .dark .ProseMirror h1,
+  .dark .ProseMirror h2,
+  .dark .ProseMirror h3,
+  .dark .ProseMirror h4,
+  .dark .ProseMirror h5,
+  .dark .ProseMirror h6 {
+    @apply text-gray-100;
+  }
+
+  /* リスト */
+  .ProseMirror ul,
+  .ProseMirror ol {
+    @apply mb-4 pl-6;
+  }
+
+  .ProseMirror ul {
+    @apply list-disc;
+  }
+
+  .ProseMirror ol {
+    @apply list-decimal;
+  }
+
+  .ProseMirror li {
+    @apply mb-1;
+  }
+
+  .ProseMirror li:last-child {
+    @apply mb-0;
+  }
+
+  /* コードブロック */
+  .ProseMirror pre {
+    @apply bg-gray-100 text-gray-800 p-4 rounded-md mb-4 overflow-x-auto;
+    @apply font-mono text-sm;
+  }
+
+  .dark .ProseMirror pre {
+    @apply bg-gray-700 text-gray-200;
+  }
+
+  /* インラインコード */
+  .ProseMirror code {
+    @apply bg-gray-100 text-gray-800 px-1 py-0.5 rounded text-sm font-mono;
+  }
+
+  .dark .ProseMirror code {
+    @apply bg-gray-700 text-gray-200;
+  }
+
+  /* ブロッククォート */
+  .ProseMirror blockquote {
+    @apply border-l-4 border-gray-300 pl-4 py-2 mb-4 italic text-gray-700;
+  }
+
+  .dark .ProseMirror blockquote {
+    @apply border-gray-600 text-gray-300;
+  }
+
+  /* 水平線 */
+  .ProseMirror hr {
+    @apply border-gray-300 my-6;
+  }
+
+  .dark .ProseMirror hr {
+    @apply border-gray-600;
+  }
+
+  /* リンク */
+  .ProseMirror a {
+    @apply text-blue-600 hover:text-blue-800 underline;
+  }
+
+  .dark .ProseMirror a {
+    @apply text-blue-400 hover:text-blue-300;
+  }
+
+  /* 強調 */
+  .ProseMirror strong {
+    @apply font-bold;
+  }
+
+  .ProseMirror em {
+    @apply italic;
+  }
+
+  /* 選択状態 */
+  .ProseMirror .selected {
+    @apply bg-blue-100;
+  }
+
+  .dark .ProseMirror .selected {
+    @apply bg-blue-900;
+  }
+
+  /* プレースホルダー */
+  .ProseMirror .is-empty::before {
+    @apply text-gray-400 float-left h-0 pointer-events-none;
+    content: attr(data-placeholder);
+  }
+
+  /* ツールバー */
+  .prosemirror-toolbar {
+    @apply flex flex-wrap items-center gap-1 p-2 bg-gray-50 border-b border-gray-200;
+    @apply sticky top-0 z-10;
+  }
+
+  .dark .prosemirror-toolbar {
+    @apply bg-gray-800 border-gray-600;
+  }
+
+  .prosemirror-toolbar button {
+    @apply p-2 rounded hover:bg-gray-200 transition-colors duration-150;
+    @apply text-gray-700 hover:text-gray-900;
+    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1;
+  }
+
+  .dark .prosemirror-toolbar button {
+    @apply text-gray-300 hover:text-gray-100 hover:bg-gray-700;
+  }
+
+  .prosemirror-toolbar button.is-active {
+    @apply bg-blue-100 text-blue-700;
+  }
+
+  .dark .prosemirror-toolbar button.is-active {
+    @apply bg-blue-900 text-blue-300;
+  }
+
+  .prosemirror-toolbar button:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+
+  /* ツールバーの区切り線 */
+  .prosemirror-toolbar .separator {
+    @apply w-px h-6 bg-gray-300 mx-2;
+  }
+
+  .dark .prosemirror-toolbar .separator {
+    @apply bg-gray-600;
+  }
+
+  /* ドロップダウンメニュー */
+  .prosemirror-dropdown {
+    @apply relative inline-block;
+  }
+
+  .prosemirror-dropdown-content {
+    @apply absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-20;
+    @apply border border-gray-200;
+  }
+
+  .dark .prosemirror-dropdown-content {
+    @apply bg-gray-800 border-gray-600;
+  }
+
+  .prosemirror-dropdown-item {
+    @apply block w-full text-left px-4 py-2 text-sm text-gray-700;
+    @apply hover:bg-gray-100 transition-colors duration-150;
+  }
+
+  .dark .prosemirror-dropdown-item {
+    @apply text-gray-300 hover:bg-gray-700;
+  }
+
+  /* テーブル */
+  .ProseMirror table {
+    @apply w-full border-collapse border border-gray-300 mb-4;
+  }
+
+  .dark .ProseMirror table {
+    @apply border-gray-600;
+  }
+
+  .ProseMirror th,
+  .ProseMirror td {
+    @apply border border-gray-300 px-3 py-2 text-left;
+  }
+
+  .dark .ProseMirror th,
+  .dark .ProseMirror td {
+    @apply border-gray-600;
+  }
+
+  .ProseMirror th {
+    @apply bg-gray-50 font-semibold;
+  }
+
+  .dark .ProseMirror th {
+    @apply bg-gray-700;
+  }
+
+  /* 画像 */
+  .ProseMirror img {
+    @apply max-w-full h-auto rounded-md;
+  }
+
+  /* フォーカス状態 */
+  .ProseMirror:focus {
+    @apply ring-2 ring-blue-500 ring-opacity-50;
+  }
+
+  /* スクロールバー */
+  .ProseMirror::-webkit-scrollbar {
+    @apply w-2;
+  }
+
+  .ProseMirror::-webkit-scrollbar-track {
+    @apply bg-gray-100 rounded;
+  }
+
+  .ProseMirror::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded hover:bg-gray-400;
+  }
+
+  .dark .ProseMirror::-webkit-scrollbar-track {
+    @apply bg-gray-700;
+  }
+
+  .dark .ProseMirror::-webkit-scrollbar-thumb {
+    @apply bg-gray-600 hover:bg-gray-500;
+  }
+}
+
+/* ProseMirrorのデフォルトスタイルをリセット */
+@layer base {
+  .ProseMirror {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+  }
+
+  .ProseMirror * {
+    box-sizing: border-box;
+  }
+} 
