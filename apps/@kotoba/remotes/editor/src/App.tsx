@@ -5,7 +5,6 @@ import { Schema, DOMParser } from 'prosemirror-model'
 import { schema } from 'prosemirror-schema-basic'
 import { addListNodes } from 'prosemirror-schema-list'
 import { exampleSetup } from 'prosemirror-example-setup'
-import './App.css'
 
 // 拡張されたスキーマ（リスト機能付き）
 const mySchema = new Schema({
@@ -14,24 +13,12 @@ const mySchema = new Schema({
 })
 
 /**
- * ASTノードの型定義
- */
-interface ASTNode {
-  id: string
-  type: string
-  content: string
-  children: ASTNode[]
-  level: number
-}
-
-/**
  * プロセミラーエディターコンポーネント
  * Module Federationでホストアプリケーションから利用される
  */
 function App() {
   const [fileName, setFileName] = useState('untitled.md')
   const [isModified, setIsModified] = useState(false)
-  const [astData, setAstData] = useState<{ nodes: any[], edges: any[] }>({ nodes: [], edges: [] })
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
 
@@ -39,66 +26,59 @@ function App() {
     console.log('Remote Editor: App component mounted.')
     
     if (editorRef.current && !viewRef.current) {
-      // 初期コンテンツ
-      const initialContent = `
-# Kotoba Editor
+      // 初期コンテンツを設定
+      const initialContent = `# Kotoba Editor
 
-This is a **ProseMirror**-based text editor with AST visualization.
+This is a ProseMirror-based rich text editor with AST generation capabilities.
 
 ## Features
+
 - Rich text editing
 - Markdown support
 - AST generation
-- Graph visualization
+- Real-time updates
 
-### Lists
+## Lists
+
 - Item 1
 - Item 2
   - Sub-item 2.1
   - Sub-item 2.2
 
-### Code Blocks
+## Code Blocks
+
 \`\`\`javascript
 function hello() {
   console.log("Hello, World!");
 }
 \`\`\`
 
-Start editing to see the AST structure!
-      `.trim()
+Start editing to see the AST in the graph viewer!`
 
-      // DOMパーサーを作成
-      const parser = DOMParser.fromSchema(mySchema)
-      
-      // 初期HTMLを作成
+      // DOMから初期コンテンツを作成
       const tempDiv = document.createElement('div')
       tempDiv.innerHTML = initialContent
       
-      // EditorStateを作成
+      // ProseMirrorのドキュメントを作成
+      const doc = DOMParser.fromSchema(mySchema).parse(tempDiv)
+      
+      // エディター状態を作成
       const state = EditorState.create({
-        doc: parser.parse(tempDiv),
+        doc,
         plugins: exampleSetup({ schema: mySchema })
       })
 
-      // EditorViewを作成
+      // エディタービューを作成
       const view = new EditorView(editorRef.current, {
         state,
         dispatchTransaction(transaction) {
           const newState = view.state.apply(transaction)
           view.updateState(newState)
-          
-          if (transaction.docChanged) {
-            setIsModified(true)
-            // ASTを生成
-            generateAST(newState.doc)
-          }
+          setIsModified(true)
         }
       })
 
       viewRef.current = view
-      
-      // 初期ASTを生成
-      generateAST(state.doc)
     }
 
     return () => {
@@ -110,74 +90,10 @@ Start editing to see the AST structure!
   }, [])
 
   /**
-   * ProseMirrorドキュメントからASTを生成
+   * ファイル名を変更
    */
-  const generateAST = (doc: any) => {
-    const nodes: any[] = []
-    const edges: any[] = []
-    let nodeId = 0
-
-    const processNode = (node: any, parentId: string | null = null, level: number = 0) => {
-      const currentNodeId = `node_${nodeId++}`
-      
-      // ノード情報を抽出
-      let content = ''
-      let nodeType = node.type.name
-      
-      if (node.isText) {
-        content = node.text || ''
-        nodeType = 'text'
-      } else if (node.type.name === 'heading') {
-        content = node.textContent || ''
-        nodeType = `heading_${node.attrs.level}`
-      } else if (node.type.name === 'paragraph') {
-        content = node.textContent || ''
-      } else if (node.type.name === 'list_item') {
-        content = node.textContent || ''
-      } else if (node.type.name === 'code_block') {
-        content = node.textContent || ''
-      }
-
-      // ノードを追加
-      nodes.push({
-        id: currentNodeId,
-        label: content.length > 20 ? content.substring(0, 20) + '...' : content || nodeType,
-        type: nodeType,
-        group: getNodeGroup(nodeType),
-        level: level
-      })
-
-      // 親子関係のエッジを追加
-      if (parentId) {
-        edges.push({
-          source: parentId,
-          target: currentNodeId,
-          weight: 1
-        })
-      }
-
-      // 子ノードを処理
-      node.forEach((child: any, offset: number) => {
-        processNode(child, currentNodeId, level + 1)
-      })
-    }
-
-    // ドキュメントのルートノードから処理開始
-    processNode(doc)
-
-    setAstData({ nodes, edges })
-  }
-
-  /**
-   * ノードタイプに基づいてグループを決定
-   */
-  const getNodeGroup = (nodeType: string): string => {
-    if (nodeType.startsWith('heading_')) return 'A'
-    if (nodeType === 'paragraph') return 'B'
-    if (nodeType === 'list_item') return 'C'
-    if (nodeType === 'code_block') return 'D'
-    if (nodeType === 'text') return 'E'
-    return 'F'
+  const handleFileNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFileName(e.target.value)
   }
 
   /**
@@ -186,7 +102,13 @@ Start editing to see the AST structure!
   const handleSave = () => {
     if (viewRef.current) {
       const content = viewRef.current.state.doc.textContent
-      console.log('Saving content:', content)
+      const blob = new Blob([content], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName
+      a.click()
+      URL.revokeObjectURL(url)
       setIsModified(false)
     }
   }
@@ -196,69 +118,219 @@ Start editing to see the AST structure!
    */
   const handleNewFile = () => {
     if (viewRef.current) {
-      const parser = DOMParser.fromSchema(mySchema)
-      const tempDiv = document.createElement('div')
-      tempDiv.innerHTML = '<p>New document</p>'
-      
+      const emptyDoc = mySchema.node('doc', null, [
+        mySchema.node('paragraph', null, [])
+      ])
       const newState = EditorState.create({
-        doc: parser.parse(tempDiv),
+        doc: emptyDoc,
         plugins: exampleSetup({ schema: mySchema })
       })
-      
       viewRef.current.updateState(newState)
-      setIsModified(false)
-      generateAST(newState.doc)
+      setFileName('untitled.md')
+      setIsModified(true)
     }
   }
 
   /**
-   * ファイル名を変更
+   * ProseMirrorドキュメントからASTを生成
    */
-  const handleFileNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFileName(e.target.value)
+  const generateAST = (): { nodes: any[], edges: any[] } => {
+    if (!viewRef.current) return { nodes: [], edges: [] }
+
+    const doc = viewRef.current.state.doc
+    const nodes: any[] = []
+    const edges: any[] = []
+    let nodeId = 0
+
+    // ルートノードを追加
+    const rootNode = {
+      id: 'doc',
+      label: 'Document',
+      type: 'doc',
+      group: 'A',
+      level: 0
+    }
+    nodes.push(rootNode)
+
+    /**
+     * ノードを再帰的に処理してASTを構築
+     */
+    const processNode = (node: any, parentId: string, level: number) => {
+      const currentNodeId = `node_${nodeId++}`
+      
+      // ノードタイプに基づいてグループを決定
+      let group = 'E' // デフォルト
+      let label = node.type.name
+      
+      switch (node.type.name) {
+        case 'heading':
+          group = 'A'
+          label = `Heading ${node.attrs.level}`
+          break
+        case 'paragraph':
+          group = 'B'
+          label = node.textContent.slice(0, 30) + (node.textContent.length > 30 ? '...' : '')
+          break
+        case 'bullet_list':
+        case 'ordered_list':
+          group = 'C'
+          label = node.type.name === 'bullet_list' ? 'Bullet List' : 'Ordered List'
+          break
+        case 'list_item':
+          group = 'C'
+          label = node.textContent.slice(0, 20) + (node.textContent.length > 20 ? '...' : '')
+          break
+        case 'code_block':
+          group = 'D'
+          label = 'Code Block'
+          break
+        case 'text':
+          group = 'E'
+          label = node.text.slice(0, 15) + (node.text.length > 15 ? '...' : '')
+          break
+      }
+
+      const astNode = {
+        id: currentNodeId,
+        label,
+        type: node.type.name,
+        group,
+        level
+      }
+      nodes.push(astNode)
+
+      // 親ノードとのエッジを作成
+      if (parentId !== 'doc') {
+        edges.push({
+          source: parentId,
+          target: currentNodeId,
+          weight: 1
+        })
+      } else {
+        edges.push({
+          source: 'doc',
+          target: currentNodeId,
+          weight: 1
+        })
+      }
+
+      // 子ノードを処理
+      node.forEach((child: any) => {
+        processNode(child, currentNodeId, level + 1)
+      })
+    }
+
+    // ドキュメントの子ノードを処理
+    doc.forEach((child: any) => {
+      processNode(child, 'doc', 1)
+    })
+
+    return { nodes, edges }
   }
 
   /**
    * ASTデータをエクスポート
    */
   const exportAST = () => {
-    const astDataStr = JSON.stringify(astData, null, 2)
-    const blob = new Blob([astDataStr], { type: 'application/json' })
+    const astData = generateAST()
+    console.log('Generated AST:', astData)
+
+    // ホストアプリケーションにASTデータを送信
+    if ((window as any).updateASTData) {
+      (window as any).updateASTData(astData)
+      console.log('AST data sent to host application')
+    } else {
+      console.log('Host application not available, showing AST in console')
+    }
+
+    // ASTデータをJSONファイルとしてダウンロード
+    const blob = new Blob([JSON.stringify(astData, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${fileName.replace('.md', '')}_ast.json`
+    a.download = `${fileName.replace(/\.[^/.]+$/, '')}_ast.json`
     a.click()
     URL.revokeObjectURL(url)
   }
 
   return (
-    <div className="editor-container">
-      <div className="editor-header">
-        <input 
-          type="text" 
-          value={fileName} 
-          onChange={handleFileNameChange} 
-          className="file-name-input" 
-          placeholder="Enter file name..." 
-        />
-        <div className="editor-actions">
-          <button onClick={handleNewFile} className="btn btn-secondary">New</button>
-          <button onClick={handleSave} className="btn btn-primary" disabled={!isModified}>
-            {isModified ? 'Save*' : 'Saved'}
-          </button>
-          <button onClick={exportAST} className="btn btn-export">Export AST</button>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center space-x-4">
+              <h1 className="text-xl font-semibold text-gray-900">Kotoba Editor</h1>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="text"
+                  value={fileName}
+                  onChange={handleFileNameChange}
+                  className="block w-64 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  placeholder="Enter file name..."
+                />
+                {isModified && (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                    Modified
+                  </span>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={handleNewFile}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                <svg className="-ml-0.5 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                New
+              </button>
+              
+              <button
+                onClick={handleSave}
+                disabled={!isModified}
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg className="-ml-0.5 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                </svg>
+                {isModified ? 'Save*' : 'Saved'}
+              </button>
+              
+              <button
+                onClick={exportAST}
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              >
+                <svg className="-ml-0.5 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                Export AST
+              </button>
+            </div>
+          </div>
         </div>
       </div>
-      
-      <div className="editor-content">
-        <div ref={editorRef} className="prosemirror-editor" />
+
+      {/* Editor Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="bg-white shadow-sm rounded-lg border border-gray-200">
+          <div 
+            ref={editorRef} 
+            className="prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none p-6 min-h-[600px]"
+          />
+        </div>
       </div>
-      
-      <div className="editor-footer">
-        <span className="status-text">
-          {isModified ? 'Modified' : 'Saved'} • {astData.nodes.length} AST nodes • {astData.edges.length} connections
-        </span>
+
+      {/* Footer */}
+      <div className="bg-white border-t border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex items-center justify-between text-sm text-gray-500">
+            <span>ProseMirror Editor • AST Export Ready</span>
+            <span>{isModified ? 'Modified' : 'Saved'}</span>
+          </div>
+        </div>
       </div>
     </div>
   )
