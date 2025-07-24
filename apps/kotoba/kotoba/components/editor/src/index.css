@@ -39,72 +39,90 @@
     @apply ring-blue-400 ring-opacity-50;
   }
 
-  /* ツールバー */
-  .prosemirror-toolbar {
+  /* ProseMirrorメニューバー - Tailwindクラスベース */
+  .ProseMirror-menubar {
     @apply flex flex-wrap items-center gap-1 p-2;
     @apply bg-gray-50 border-b border-gray-200;
     @apply sticky top-0 z-10;
+    @apply dark:bg-gray-800 dark:border-gray-600;
   }
 
-  .dark .prosemirror-toolbar {
-    @apply bg-gray-800 border-gray-600;
-  }
-
-  .prosemirror-toolbar button {
-    @apply p-2 rounded hover:bg-gray-200;
+  /* メニューアイテム */
+  .ProseMirror-menuitem {
+    @apply inline-flex items-center;
+    @apply p-1 rounded;
     @apply text-gray-700 hover:text-gray-900;
+    @apply hover:bg-gray-200;
     @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1;
     @apply transition-colors duration-150;
+    @apply dark:text-gray-300 dark:hover:text-gray-100 dark:hover:bg-gray-700;
   }
 
-  .dark .prosemirror-toolbar button {
-    @apply text-gray-300 hover:text-gray-100 hover:bg-gray-700;
-  }
-
-  .prosemirror-toolbar button.is-active {
+  /* メニューアイテム - アクティブ状態 */
+  .ProseMirror-menuitem.ProseMirror-menu-active {
     @apply bg-blue-100 text-blue-700;
+    @apply dark:bg-blue-900 dark:text-blue-300;
   }
 
-  .dark .prosemirror-toolbar button.is-active {
-    @apply bg-blue-900 text-blue-300;
-  }
-
-  .prosemirror-toolbar button:disabled {
+  /* メニューアイテム - 無効状態 */
+  .ProseMirror-menuitem.ProseMirror-menu-disabled {
     @apply opacity-50 cursor-not-allowed;
+    @apply hover:bg-transparent;
   }
 
-  /* ツールバーの区切り線 */
-  .prosemirror-toolbar .separator {
+  /* メニューアイコン */
+  .ProseMirror-icon {
+    @apply flex items-center justify-center;
+    @apply w-6 h-6;
+    @apply text-gray-600;
+    @apply dark:text-gray-400;
+  }
+
+  .ProseMirror-menuitem:hover .ProseMirror-icon {
+    @apply text-gray-900;
+    @apply dark:text-gray-100;
+  }
+
+  .ProseMirror-menuitem.ProseMirror-menu-active .ProseMirror-icon {
+    @apply text-blue-700;
+    @apply dark:text-blue-300;
+  }
+
+  /* メニュー区切り線 */
+  .ProseMirror-menuseparator {
     @apply w-px h-6 bg-gray-300 mx-2;
-  }
-
-  .dark .prosemirror-toolbar .separator {
-    @apply bg-gray-600;
+    @apply dark:bg-gray-600;
   }
 
   /* ドロップダウンメニュー */
-  .prosemirror-dropdown {
+  .ProseMirror-menu-dropdown-wrap {
     @apply relative inline-block;
   }
 
-  .prosemirror-dropdown-content {
+  .ProseMirror-menu-dropdown {
+    @apply px-2 py-1 text-sm;
+    @apply text-gray-700;
+    @apply dark:text-gray-300;
+  }
+
+  .ProseMirror-menuitem:hover .ProseMirror-menu-dropdown {
+    @apply text-gray-900;
+    @apply dark:text-gray-100;
+  }
+
+  /* ドロップダウンコンテンツ */
+  .ProseMirror-menu-dropdown-menu {
     @apply absolute right-0 mt-2 w-48;
     @apply bg-white rounded-md shadow-lg z-20;
     @apply border border-gray-200;
+    @apply dark:bg-gray-800 dark:border-gray-600;
   }
 
-  .dark .prosemirror-dropdown-content {
-    @apply bg-gray-800 border-gray-600;
-  }
-
-  .prosemirror-dropdown-item {
+  .ProseMirror-menu-dropdown-item {
     @apply block w-full text-left px-4 py-2 text-sm;
     @apply text-gray-700 hover:bg-gray-100;
     @apply transition-colors duration-150;
-  }
-
-  .dark .prosemirror-dropdown-item {
-    @apply text-gray-300 hover:bg-gray-700;
+    @apply dark:text-gray-300 dark:hover:bg-gray-700;
   }
 
   /* スクロールバー */
@@ -139,5 +157,19 @@
 
   .ProseMirror * {
     box-sizing: border-box;
+  }
+
+  /* メニューバーのデフォルトスタイルをリセット */
+  .ProseMirror-menubar {
+    min-height: auto !important;
+  }
+
+  .ProseMirror-menuitem {
+    display: inline-flex !important;
+  }
+
+  .ProseMirror-icon svg {
+    width: 1em !important;
+    height: 1em !important;
   }
 } 
