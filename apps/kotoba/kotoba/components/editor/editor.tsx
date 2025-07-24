@@ -90,6 +90,12 @@ Start editing to see the AST in the graph viewer!`,
         }
       })
 
+      // ProseMirrorエディターにTailwindクラスを適用
+      if (editorRef.current.firstChild) {
+        const proseMirrorElement = editorRef.current.firstChild as HTMLElement
+        proseMirrorElement.className = 'ProseMirror prose prose-sm sm:prose lg:prose-lg focus:outline-none p-4 border border-gray-300 rounded-lg bg-white dark:bg-gray-800 dark:border-gray-600 dark:prose-invert min-h-[600px] transition-colors duration-200'
+      }
+
       viewRef.current = view
     }
 
