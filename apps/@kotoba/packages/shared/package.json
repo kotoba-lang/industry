@@ -1,16 +1,19 @@
 {
   "name": "@kotoba/shared",
   "version": "1.0.0",
-  "description": "",
+  "description": "Shared utilities and styles for Kotoba Platform",
   "main": "index.ts",
   "types": "index.ts",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "exports": {
+    ".": "./index.ts",
+    "./styles": "./styles/index.css",
+    "./tailwind": "./tailwind.config.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
-    "xstate": "^5.15.0"
+    "tailwindcss": "^4.1.11",
+    "@tailwindcss/typography": "^0.5.16"
+  },
+  "devDependencies": {
+    "@types/node": "^22.16.5"
   }
 }
