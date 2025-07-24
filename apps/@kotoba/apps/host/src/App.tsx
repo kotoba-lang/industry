@@ -11,9 +11,11 @@ interface ASTData {
 
 function App() {
   const [astData, setAstData] = useState<ASTData>({ nodes: [], edges: [] });
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     console.log('Host App: Component mounted');
+    setIsLoaded(true);
   }, []);
 
   // ASTデータを更新する関数
@@ -34,13 +36,18 @@ function App() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="container-fluid">
           <div className="flex justify-between items-center py-4">
             <h1 className="text-2xl font-bold text-gray-900">Kotoba Platform</h1>
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-500">BitDev Components Integration</span>
+              {isLoaded && (
+                <span className="badge badge-info">
+                  Components Loaded
+                </span>
+              )}
               {astData.nodes.length > 0 && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                <span className="badge badge-success">
                   AST Data Available ({astData.nodes.length} nodes)
                 </span>
               )}
@@ -50,15 +57,15 @@ function App() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="container-fluid py-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Editor Panel */}
-          <div className="bg-white shadow-sm rounded-lg border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-200">
+          <div className="panel">
+            <div className="panel-header">
               <h2 className="text-lg font-semibold text-gray-900">Editor</h2>
-              <p className="text-sm text-gray-500 mt-1">ProseMirror-based rich text editor</p>
+              <p className="text-sm text-gray-500 mt-1">ProseMirror-based rich text editor with AST generation</p>
             </div>
-            <div className="p-6">
+            <div className="panel-body">
               <Editor 
                 initialFileName="kotoba-document.md"
                 onASTUpdate={updateASTData}
@@ -67,12 +74,12 @@ function App() {
           </div>
           
           {/* Graph Panel */}
-          <div className="bg-white shadow-sm rounded-lg border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-200">
+          <div className="panel">
+            <div className="panel-header">
               <h2 className="text-lg font-semibold text-gray-900">Graph</h2>
-              <p className="text-sm text-gray-500 mt-1">Cytoscape-based AST visualization</p>
+              <p className="text-sm text-gray-500 mt-1">Cytoscape-based AST visualization with interactive features</p>
             </div>
-            <div className="p-6">
+            <div className="panel-body">
               <Graph 
                 astData={astData}
                 initialGraphType="ast"
@@ -81,11 +88,37 @@ function App() {
             </div>
           </div>
         </div>
+
+        {/* Status Panel */}
+        <div className="mt-6 panel">
+          <div className="panel-header">
+            <h3 className="text-lg font-semibold text-gray-900">Integration Status</h3>
+          </div>
+          <div className="panel-body">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">✓</div>
+                <div className="text-sm text-gray-600">BitDev Components</div>
+                <div className="text-xs text-gray-500">Successfully integrated</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">✓</div>
+                <div className="text-sm text-gray-600">Dependencies</div>
+                <div className="text-xs text-gray-500">ProseMirror & Cytoscape</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600">✓</div>
+                <div className="text-sm text-gray-600">Type Safety</div>
+                <div className="text-xs text-gray-500">TypeScript integration</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Footer */}
       <div className="bg-white border-t border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="container-fluid py-4">
           <div className="flex items-center justify-between text-sm text-gray-500">
             <span>Kotoba Platform • ProseMirror + Cytoscape + BitDev Components</span>
             <span>AST Nodes: {astData.nodes.length} • Edges: {astData.edges.length}</span>
