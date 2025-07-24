@@ -4,6 +4,7 @@
 \usepackage{amssymb}
 \usepackage{graphicx}
 \usepackage{CJKutf8}
+\usepackage{url}
 
 \title{Attempto Controlled Japanese (ACJ) \\ \large A Case Study with the \texttt{yamato-ll1} Parser}
 \author{J. Kawasaki}
@@ -15,7 +16,7 @@
 \maketitle
 
 \begin{abstract}
-This paper introduces Attempto Controlled Japanese (ACJ), a subset of modern Japanese with a precisely defined and computable syntax. Drawing inspiration from Attempto Controlled English (ACE), ACJ is designed to be unambiguous and directly mappable to a formal representation. We present the complete lexical and syntactic specification of ACJ, which covers a range of fundamental sentence structures. We also describe the implementation of our recursive-descent LL(1) parser, \texttt{yamato-ll1}, in Go that translates ACJ sentences into an Abstract Syntax Tree (AST). This work represents a foundational step towards a formally verifiable and machine-processable subset of the Japanese language.
+This paper introduces Attempto Controlled Japanese (ACJ), a subset of modern Japanese with a precisely defined and computable syntax. Drawing inspiration from Attempto Controlled English (ACE), ACJ is designed to be unambiguous and directly mappable to a formal representation. We present the complete lexical and syntactic specification of ACJ, which covers a range of fundamental sentence structures. We also describe the implementation of our recursive-descent LL(1) parser, \texttt{yamato-ll1}, in Go that translates ACJ sentences into an Abstract Syntax Tree (AST). This work represents a foundational step towards a formally verifiable and machine-processable subset of the Japanese language. The source code is available at \url{https://github.com/jun784/researches}.
 \end{abstract}
 
 \section{Introduction}
