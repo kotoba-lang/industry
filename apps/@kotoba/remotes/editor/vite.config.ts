@@ -7,7 +7,8 @@ export default defineConfig({
   appType: 'mpa',
   server: {
     port: 5001,
-    cors: true
+    cors: true,
+    origin: 'http://localhost:5001'
   },
   plugins: [
     react(),
