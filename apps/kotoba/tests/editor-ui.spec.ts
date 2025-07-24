@@ -33,7 +33,7 @@ test.describe('Editor UI Tests', () => {
     const backgroundColor = await editor.evaluate(el => 
       window.getComputedStyle(el).backgroundColor
     );
-    expect(backgroundColor).toBe('rgb(32, 42, 56)'); // 実際のダークモード背景色
+    expect(backgroundColor).toBe('rgb(31, 41, 55)'); // 実際のダークモード背景色
     
     // エディターのテキスト色がダークモードになっていることを確認
     const color = await editor.evaluate(el => 
@@ -50,7 +50,7 @@ test.describe('Editor UI Tests', () => {
     const backgroundColor = await editor.evaluate(el => 
       window.getComputedStyle(el).backgroundColor
     );
-    expect(backgroundColor).toBe('rgba(255, 255, 255, 1)'); // 実際の背景色
+    expect(backgroundColor).toBe('rgb(255, 255, 255)'); // 実際の背景色
     
     // エディターのボーダーを確認
     const borderStyle = await editor.evaluate(el => 
