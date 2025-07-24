@@ -1,125 +1,235 @@
-/* エディターコンテナ */
+/* Editor Styles */
 .editor-container {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  background: #1e1e1e;
-  color: #d4d4d4;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  border-radius: 8px;
-  overflow: hidden;
+  height: 100vh;
+  background: #f8f9fa;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
 }
 
-/* エディターヘッダー */
 .editor-header {
-  display: flex;
-  align-items: center;
-  padding: 12px 16px;
-  background: #2d2d30;
-  border-bottom: 1px solid #3e3e42;
-  gap: 12px;
+  background: #fff;
+  border-bottom: 1px solid #e9ecef;
+  padding: 15px 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .file-name-input {
-  flex: 1;
-  background: #3c3c3c;
-  border: 1px solid #5a5a5a;
-  border-radius: 4px;
-  padding: 6px 12px;
-  color: #d4d4d4;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
   font-size: 14px;
-  font-family: inherit;
+  margin-bottom: 10px;
+  background: #fff;
 }
 
 .file-name-input:focus {
   outline: none;
-  border-color: #007acc;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
 }
 
 .editor-actions {
   display: flex;
-  gap: 8px;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .btn {
-  padding: 6px 12px;
+  padding: 8px 16px;
   border: none;
-  border-radius: 4px;
-  font-size: 12px;
+  border-radius: 6px;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 80px;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .btn-primary {
-  background: #007acc;
+  background: #007bff;
   color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #005a9e;
-}
-
-.btn-primary:disabled {
-  background: #5a5a5a;
-  cursor: not-allowed;
+  background: #0056b3;
+  transform: translateY(-1px);
 }
 
 .btn-secondary {
-  background: #3c3c3c;
-  color: #d4d4d4;
-  border: 1px solid #5a5a5a;
+  background: #6c757d;
+  color: white;
 }
 
-.btn-secondary:hover {
-  background: #4c4c4c;
+.btn-secondary:hover:not(:disabled) {
+  background: #545b62;
+  transform: translateY(-1px);
 }
 
-/* エディターコンテンツ */
+.btn-export {
+  background: #28a745;
+  color: white;
+}
+
+.btn-export:hover:not(:disabled) {
+  background: #1e7e34;
+  transform: translateY(-1px);
+}
+
 .editor-content {
   flex: 1;
-  position: relative;
+  padding: 20px;
+  overflow: hidden;
 }
 
-.editor-textarea {
-  width: 100%;
+.prosemirror-editor {
   height: 100%;
-  background: #1e1e1e;
-  border: none;
-  color: #d4d4d4;
-  font-family: inherit;
+  background: #fff;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  overflow: auto;
+  padding: 20px;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
   font-size: 14px;
-  line-height: 1.5;
-  padding: 16px;
-  resize: none;
+  line-height: 1.6;
+}
+
+/* ProseMirror エディターのスタイル */
+.prosemirror-editor .ProseMirror {
   outline: none;
+  min-height: 100%;
 }
 
-.editor-textarea::placeholder {
-  color: #6a6a6a;
+.prosemirror-editor h1 {
+  font-size: 2em;
+  font-weight: bold;
+  margin: 1em 0 0.5em 0;
+  color: #2c3e50;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 0.3em;
 }
 
-/* エディターフッター */
+.prosemirror-editor h2 {
+  font-size: 1.5em;
+  font-weight: bold;
+  margin: 1em 0 0.5em 0;
+  color: #34495e;
+  border-bottom: 1px solid #bdc3c7;
+  padding-bottom: 0.2em;
+}
+
+.prosemirror-editor h3 {
+  font-size: 1.25em;
+  font-weight: bold;
+  margin: 1em 0 0.5em 0;
+  color: #34495e;
+}
+
+.prosemirror-editor p {
+  margin: 0.5em 0;
+  line-height: 1.6;
+}
+
+.prosemirror-editor ul, .prosemirror-editor ol {
+  margin: 0.5em 0;
+  padding-left: 2em;
+}
+
+.prosemirror-editor li {
+  margin: 0.25em 0;
+}
+
+.prosemirror-editor code {
+  background: #f8f9fa;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-size: 0.9em;
+  color: #e83e8c;
+}
+
+.prosemirror-editor pre {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 1em;
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+.prosemirror-editor pre code {
+  background: none;
+  padding: 0;
+  color: #333;
+}
+
+.prosemirror-editor strong {
+  font-weight: bold;
+  color: #2c3e50;
+}
+
+.prosemirror-editor em {
+  font-style: italic;
+  color: #7f8c8d;
+}
+
+.prosemirror-editor blockquote {
+  border-left: 4px solid #3498db;
+  margin: 1em 0;
+  padding-left: 1em;
+  color: #7f8c8d;
+  font-style: italic;
+}
+
 .editor-footer {
-  padding: 8px 16px;
-  background: #2d2d30;
-  border-top: 1px solid #3e3e42;
+  background: #fff;
+  border-top: 1px solid #e9ecef;
+  padding: 10px 20px;
+  font-size: 12px;
+  color: #6c757d;
 }
 
 .status-text {
-  font-size: 12px;
-  color: #8a8a8a;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
 }
 
 /* レスポンシブ対応 */
 @media (max-width: 768px) {
+  .editor-container {
+    height: 100vh;
+  }
+  
   .editor-header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
+    padding: 10px 15px;
   }
   
   .editor-actions {
-    justify-content: flex-end;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .btn {
+    width: 100%;
+    margin-bottom: 5px;
+  }
+  
+  .editor-content {
+    padding: 15px;
+  }
+  
+  .prosemirror-editor {
+    padding: 15px;
+    font-size: 13px;
   }
 }
