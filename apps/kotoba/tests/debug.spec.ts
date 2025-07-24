@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
  */
 test.describe('Debug Tests', () => {
   test('ホストアプリケーションの詳細デバッグ', async ({ page }) => {
-    await page.goto('http://localhost:5173/');
+    await page.goto('http://localhost:5174/');
     
     console.log('\n=== デバッグ情報 ===');
     console.log('URL:', page.url());
@@ -54,7 +54,7 @@ test.describe('Debug Tests', () => {
   });
 
   test('エディターのダークモード色デバッグ', async ({ page }) => {
-    await page.goto('http://localhost:5173/');
+    await page.goto('http://localhost:5174/');
     
     // エディターが読み込まれるまで待機
     await page.waitForSelector('[data-testid="editor"]');
