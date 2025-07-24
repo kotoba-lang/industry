@@ -72,64 +72,45 @@ export type HostProps = {
    * レイアウトタイプ
    */
   layout?: 'grid' | 'vertical' | 'horizontal';
+  /**
+   * 開発モードフラグ
+   */
+  isDevelopment?: boolean;
 };
 
 export function Host({ 
   EditorComponent,
   GraphComponent,
   title = "Kotoba Platform",
-  layout = "grid"
+  layout = "grid",
+  isDevelopment = true
 }: HostProps) {
   const [editorError, setEditorError] = useState(false);
   const [graphError, setGraphError] = useState(false);
   const [astData, setAstData] = useState<ASTData>({ nodes: [], edges: [] });
 
-  // Module Federationのリモートコンポーネントを動的インポート
-  const Editor = React.lazy(() => {
-    console.log('Host: Attempting to load Editor...');
-    return import('editor/Editor').catch(error => {
-      console.error('Host: Failed to load Editor:', error);
-      throw error;
-    });
-  });
+  // 開発モードではフォールバックコンポーネントを使用
+  const Editor = isDevelopment ? EditorFallback : (EditorComponent || EditorFallback);
+  const Graph = isDevelopment ? GraphFallback : (GraphComponent || GraphFallback);
 
-  const Graph = React.lazy(() => {
-    console.log('Host: Attempting to load Graph...');
-    return import('graph/Graph').catch(error => {
-      console.error('Host: Failed to load Graph:', error);
-      throw error;
-    });
-  });
-
+  // グローバル関数としてAST更新関数を公開
   useEffect(() => {
-    console.log('Host Component: Component mounted');
-  }, []);
+    (window as any).updateASTData = (newData: ASTData) => {
+      console.log('Host: Received AST data:', newData);
+      setAstData(newData);
+    };
 
-  // ASTデータを更新する関数
-  const updateASTData = (newData: ASTData) => {
-    console.log('Host Component: AST data updated', newData);
-    setAstData(newData);
-  };
-
-  // グローバルウィンドウオブジェクトにAST更新関数を公開
-  useEffect(() => {
-    (window as any).updateASTData = updateASTData;
     return () => {
       delete (window as any).updateASTData;
     };
   }, []);
 
-  // 使用するコンポーネントを決定
-  const EditorToUse = EditorComponent || Editor;
-  const GraphToUse = GraphComponent || Graph;
-
-  // レイアウトクラスを決定
   const getLayoutClass = () => {
     switch (layout) {
       case 'vertical':
-        return 'grid grid-cols-1 gap-6';
+        return 'flex flex-col space-y-4';
       case 'horizontal':
-        return 'grid grid-cols-2 gap-6';
+        return 'flex flex-row space-x-4';
       case 'grid':
       default:
         return 'grid grid-cols-1 lg:grid-cols-2 gap-6';
@@ -138,88 +119,94 @@ export function Host({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
+      {/* ヘッダー */}
+      <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-            <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-500">Module Federation Demo</span>
-              {astData.nodes.length > 0 && (
+            <div className="flex items-center space-x-3">
+              <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+              <div className="flex space-x-2">
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  AST Data Available
+                  Editor: {editorError ? 'Error' : 'Ready'}
                 </span>
-              )}
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  Graph: {graphError ? 'Error' : 'Ready'}
+                </span>
+              </div>
+            </div>
+            <div className="text-sm text-gray-500">
+              {isDevelopment ? 'Development Mode' : 'Production Mode'}
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      {/* メインコンテンツ */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className={getLayoutClass()}>
-          {/* Editor Panel */}
-          <div className="bg-white shadow-sm rounded-lg border border-gray-200">
+          {/* Editor セクション */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
             <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Editor</h2>
+              <h2 className="text-lg font-medium text-gray-900">Text Editor</h2>
+              <p className="text-sm text-gray-500">ProseMirror-based rich text editor with AST generation</p>
             </div>
             <div className="p-6">
-              {editorError ? (
-                <EditorFallback />
-              ) : (
+              <ErrorBoundary onError={() => setEditorError(true)}>
                 <Suspense fallback={
                   <div className="flex items-center justify-center p-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                    <span className="ml-3 text-gray-600">Loading Editor...</span>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <span className="ml-2 text-gray-600">Loading Editor...</span>
                   </div>
                 }>
-                  <ErrorBoundary onError={() => setEditorError(true)}>
-                    <EditorToUse onASTUpdate={updateASTData} />
-                  </ErrorBoundary>
+                  <Editor />
                 </Suspense>
-              )}
+              </ErrorBoundary>
             </div>
           </div>
-          
-          {/* Graph Panel */}
-          <div className="bg-white shadow-sm rounded-lg border border-gray-200">
+
+          {/* Graph セクション */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
             <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Graph</h2>
+              <h2 className="text-lg font-medium text-gray-900">Graph Viewer</h2>
+              <p className="text-sm text-gray-500">Cytoscape-based interactive graph visualization</p>
             </div>
             <div className="p-6">
-              {graphError ? (
-                <GraphFallback />
-              ) : (
+              <ErrorBoundary onError={() => setGraphError(true)}>
                 <Suspense fallback={
                   <div className="flex items-center justify-center p-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
-                    <span className="ml-3 text-gray-600">Loading Graph...</span>
+                    <span className="ml-2 text-gray-600">Loading Graph...</span>
                   </div>
                 }>
-                  <ErrorBoundary onError={() => setGraphError(true)}>
-                    <GraphToUse astData={astData} />
-                  </ErrorBoundary>
+                  <Graph astData={astData} />
                 </Suspense>
-              )}
+              </ErrorBoundary>
             </div>
           </div>
         </div>
-      </div>
+      </main>
 
-      {/* Footer */}
-      <div className="bg-white border-t border-gray-200">
+      {/* フッター */}
+      <footer className="bg-white border-t border-gray-200 mt-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between text-sm text-gray-500">
-            <span>Kotoba Platform • ProseMirror + Cytoscape + Module Federation</span>
-            <span>AST Nodes: {astData.nodes.length} • Edges: {astData.edges.length}</span>
+          <div className="flex justify-between items-center text-sm text-gray-500">
+            <div>
+              <span className="font-medium">AST Data:</span>
+              <span className="ml-2">{astData.nodes.length} nodes, {astData.edges.length} edges</span>
+            </div>
+            <div>
+              <span className="font-medium">WebFederator Platform</span>
+              <span className="ml-2">•</span>
+              <span className="ml-2">Module Federation Demo</span>
+            </div>
           </div>
         </div>
-      </div>
+      </footer>
     </div>
   );
 }
 
-// シンプルなエラーバウンダリーコンポーネント
+// エラーバウンダリーコンポーネント
 class ErrorBoundary extends React.Component<{ children: React.ReactNode; onError: () => void }, { hasError: boolean }> {
   constructor(props: { children: React.ReactNode; onError: () => void }) {
     super(props);
@@ -231,7 +218,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode; onError
   }
 
   componentDidCatch(error: any, errorInfo: any) {
-    console.error('Error caught by boundary:', error, errorInfo);
+    console.error('ErrorBoundary caught an error:', error, errorInfo);
     this.props.onError();
   }
 
@@ -240,8 +227,14 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode; onError
       return (
         <div className="flex flex-col items-center justify-center p-8 text-center">
           <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
-            <h3 className="text-lg font-semibold text-red-900 mb-2">エラーが発生しました</h3>
-            <p className="text-red-700">コンポーネントの読み込みに失敗しました</p>
+            <h3 className="text-lg font-semibold text-red-900 mb-2">Component Error</h3>
+            <p className="text-red-700 mb-4">コンポーネントの読み込み中にエラーが発生しました</p>
+            <button
+              onClick={() => this.setState({ hasError: false })}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+            >
+              再試行
+            </button>
           </div>
         </div>
       );
