@@ -29,6 +29,9 @@ importers:
       '@playwright/test':
         specifier: ^1.54.1
         version: 1.54.1
+      '@tailwindcss/typography':
+        specifier: ^0.5.16
+        version: 0.5.16(tailwindcss@4.1.11)
       '@teambit/mdx.ui.mdx-scope-context':
         specifier: 1.0.7
         version: 1.0.7(@types/react@19.0.2)(react@19.0.0)
@@ -65,6 +68,9 @@ importers:
       '@typescript-eslint/parser':
         specifier: 6.19.1
         version: 6.19.1(eslint@8.56.0)(typescript@5.8.3)
+      '@vitejs/plugin-react':
+        specifier: ^4.7.0
+        version: 4.7.0(vite@5.4.19(@types/node@22.16.5)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))
       '@vitest/coverage-istanbul':
         specifier: ^3.1.1
         version: 3.2.4(vitest@3.2.4(@types/node@22.16.5)(jsdom@24.1.3)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))
@@ -181,13 +187,13 @@ importers:
         version: 4.1.11(@babel/traverse@7.28.0)(@swc/core@1.13.2)(@vitest/coverage-v8@3.2.4(vitest@3.2.4(@types/node@20.12.10)(jsdom@24.1.3)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1)))(html-webpack-plugin@5.6.3(webpack@5.99.6(@swc/core@1.13.2)))(jest@29.7.0(@types/node@20.12.10)(ts-node@10.9.2(@swc/core@1.13.2)(@types/node@20.12.10)(typescript@5.8.3)))(less@4.4.0)(lightningcss@1.30.1)(terser@5.43.1)(type-fest@4.41.0)
       '@jun784/webfederator.components.editor':
         specifier: workspace:*
-        version: file:webfederator/components/editor(@swc/core@1.13.2)(@testing-library/react@16.3.0(@testing-library/dom@10.4.0)(@types/react-dom@19.0.2(@types/react@19.0.2))(@types/react@19.0.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(jest@29.7.0(@types/node@20.12.10)(ts-node@10.9.2(@swc/core@1.13.2)(@types/node@20.12.10)(typescript@5.8.3)))(less@4.4.0)(lightningcss@1.30.1)(react@19.0.0)(terser@5.43.1)(typescript@5.8.3)
+        version: file:webfederator/components/editor(@swc/core@1.13.2)(@testing-library/react@16.3.0(@testing-library/dom@10.4.0)(@types/react-dom@19.0.2(@types/react@19.0.2))(@types/react@19.0.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(jest@29.7.0(@types/node@20.12.10)(ts-node@10.9.2(@swc/core@1.13.2)(@types/node@20.12.10)(typescript@5.8.3)))(less@4.4.0)(lightningcss@1.30.1)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(tailwindcss@4.1.11)(terser@5.43.1)(typescript@5.8.3)(vite@5.4.19(@types/node@20.12.10)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))
       '@jun784/webfederator.components.graph':
         specifier: workspace:*
-        version: file:webfederator/components/graph(@swc/core@1.13.2)(@testing-library/react@16.3.0(@testing-library/dom@10.4.0)(@types/react-dom@19.0.2(@types/react@19.0.2))(@types/react@19.0.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(jest@29.7.0(@types/node@20.12.10)(ts-node@10.9.2(@swc/core@1.13.2)(@types/node@20.12.10)(typescript@5.8.3)))(less@4.4.0)(lightningcss@1.30.1)(react@19.0.0)(terser@5.43.1)(typescript@5.8.3)
+        version: file:webfederator/components/graph(@swc/core@1.13.2)(@testing-library/react@16.3.0(@testing-library/dom@10.4.0)(@types/react-dom@19.0.2(@types/react@19.0.2))(@types/react@19.0.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(jest@29.7.0(@types/node@20.12.10)(ts-node@10.9.2(@swc/core@1.13.2)(@types/node@20.12.10)(typescript@5.8.3)))(less@4.4.0)(lightningcss@1.30.1)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(terser@5.43.1)(typescript@5.8.3)(vite@5.4.19(@types/node@20.12.10)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))
       '@jun784/webfederator.components.host':
         specifier: workspace:*
-        version: file:webfederator/components/host(@swc/core@1.13.2)(@testing-library/react@16.3.0(@testing-library/dom@10.4.0)(@types/react-dom@19.0.2(@types/react@19.0.2))(@types/react@19.0.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(jest@29.7.0(@types/node@20.12.10)(ts-node@10.9.2(@swc/core@1.13.2)(@types/node@20.12.10)(typescript@5.8.3)))(less@4.4.0)(lightningcss@1.30.1)(react@19.0.0)(terser@5.43.1)(typescript@5.8.3)
+        version: file:webfederator/components/host(@swc/core@1.13.2)(@testing-library/react@16.3.0(@testing-library/dom@10.4.0)(@types/react-dom@19.0.2(@types/react@19.0.2))(@types/react@19.0.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(jest@29.7.0(@types/node@20.12.10)(ts-node@10.9.2(@swc/core@1.13.2)(@types/node@20.12.10)(typescript@5.8.3)))(less@4.4.0)(lightningcss@1.30.1)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(terser@5.43.1)(typescript@5.8.3)(vite@5.4.19(@types/node@20.12.10)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))
       '@mdx-js/mdx':
         specifier: 1.6.22
         version: 1.6.22
@@ -318,6 +324,9 @@ importers:
       '@mdx-js/react':
         specifier: 1.6.22
         version: 1.6.22(react@19.0.0)
+      '@tailwindcss/typography':
+        specifier: ^0.5.16
+        version: 0.5.16(tailwindcss@4.1.11)
       '@teambit/mdx.ui.mdx-scope-context':
         specifier: 1.0.7
         version: 1.0.7(@types/react@19.0.2)(react@19.0.0)
@@ -354,6 +363,9 @@ importers:
       '@typescript-eslint/parser':
         specifier: 6.19.1
         version: 6.19.1(eslint@8.56.0)(typescript@5.8.3)
+      '@vitejs/plugin-react':
+        specifier: ^4.7.0
+        version: 4.7.0(vite@5.4.19(@types/node@20.12.10)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))
       '@vitest/coverage-istanbul':
         specifier: ^3.1.1
         version: 3.2.4(vitest@3.2.4(@types/node@20.12.10)(jsdom@24.1.3)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))
@@ -493,6 +505,9 @@ importers:
       '@typescript-eslint/parser':
         specifier: 6.19.1
         version: 6.19.1(eslint@8.56.0)(typescript@5.8.3)
+      '@vitejs/plugin-react':
+        specifier: ^4.7.0
+        version: 4.7.0(vite@5.4.19(@types/node@20.12.10)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))
       '@vitest/coverage-istanbul':
         specifier: ^3.1.1
         version: 3.2.4(vitest@3.2.4(@types/node@20.12.10)(jsdom@24.1.3)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))
@@ -620,6 +635,9 @@ importers:
       '@typescript-eslint/parser':
         specifier: 6.19.1
         version: 6.19.1(eslint@8.56.0)(typescript@5.8.3)
+      '@vitejs/plugin-react':
+        specifier: ^4.7.0
+        version: 4.7.0(vite@5.4.19(@types/node@20.12.10)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))
       '@vitest/coverage-istanbul':
         specifier: ^3.1.1
         version: 3.2.4(vitest@3.2.4(@types/node@20.12.10)(jsdom@24.1.3)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))
@@ -742,6 +760,10 @@ packages:
 
   '@babel/core@7.26.9':
     resolution: {integrity: sha512-lWBYIrF7qK5+GjY5Uy+/hEgp8OJWOD/rpy74GplYRhEauvbHDeFB8t5hPOZxCZ0Oxf4Cc36tK51/l3ymJysrKw==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/core@7.28.0':
+    resolution: {integrity: sha512-UlLAnTPrFdNGoFtbSXwcGFQBtQZJCNjaN6hQNP3UPvuNXT1i82N26KL3dZeIpNalWywr9IuQuncaAfUaS1g6sQ==}
     engines: {node: '>=6.9.0'}
 
   '@babel/generator@7.28.0':
@@ -1284,6 +1306,18 @@ packages:
 
   '@babel/plugin-transform-react-jsx-development@7.27.1':
     resolution: {integrity: sha512-ykDdF5yI4f1WrAolLqeF3hmYU12j9ntLQl/AOG1HAS21jxyg1Q0/J/tpREuYLfatGdGmXp/3yS0ZA76kOlVq9Q==}
+    engines: {node: '>=6.9.0'}
+    peerDependencies:
+      '@babel/core': ^7.0.0-0
+
+  '@babel/plugin-transform-react-jsx-self@7.27.1':
+    resolution: {integrity: sha512-6UzkCs+ejGdZ5mFFC/OCUrv028ab2fp1znZmCZjAOBKiBK2jXD1O+BPSfX8X2qjJ75fZBMSnQn3Rq2mrBJK2mw==}
+    engines: {node: '>=6.9.0'}
+    peerDependencies:
+      '@babel/core': ^7.0.0-0
+
+  '@babel/plugin-transform-react-jsx-source@7.27.1':
+    resolution: {integrity: sha512-zbwoTsBruTeKB9hSq73ha66iFeJHuaFkUbwvqElnygoNbj/jHRsSeokowZFN3CZ64IvEqcmmkVe89OPXc7ldAw==}
     engines: {node: '>=6.9.0'}
     peerDependencies:
       '@babel/core': ^7.0.0-0
@@ -1884,18 +1918,24 @@ packages:
     peerDependencies:
       '@testing-library/react': ^16.0.0
       react: ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^17.0.0 || ^18.0.0 || ^19.0.0
+      vite: ^5.3.5
 
   '@jun784/webfederator.components.graph@file:webfederator/components/graph':
     resolution: {directory: webfederator/components/graph, type: directory}
     peerDependencies:
       '@testing-library/react': ^16.0.0
       react: ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^17.0.0 || ^18.0.0 || ^19.0.0
+      vite: ^5.3.5
 
   '@jun784/webfederator.components.host@file:webfederator/components/host':
     resolution: {directory: webfederator/components/host, type: directory}
     peerDependencies:
       '@testing-library/react': ^16.0.0
       react: ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^17.0.0 || ^18.0.0 || ^19.0.0
+      vite: ^5.3.5
 
   '@leichtgewicht/ip-codec@2.0.5':
     resolution: {integrity: sha512-Vo+PSpZG2/fmgmiNzYK9qWRh8h/CHrwD0mo1h1DzL4yzHNSfWYujGTYsWGreD000gcgmZ7K4Ys6Tx9TxtsKdDw==}
@@ -2056,6 +2096,9 @@ packages:
   '@remix-run/router@1.23.0':
     resolution: {integrity: sha512-O3rHJzAQKamUz1fvE0Qaw0xSFqsA/yafi2iqeE0pvdFtCO1viYx8QL6f3Ln/aCCTLxs68SLf0KPM9eSeM8yBnA==}
     engines: {node: '>=14.0.0'}
+
+  '@rolldown/pluginutils@1.0.0-beta.27':
+    resolution: {integrity: sha512-+d0F4MKMCbeVUJwG96uQ4SgAznZNSq93I3V+9NHA4OpvqG8mRCpGdKmK8l/dl02h2CCDHwW2FqilnTyDcAnqjA==}
 
   '@rollup/rollup-android-arm-eabi@4.22.0':
     resolution: {integrity: sha512-/IZQvg6ZR0tAkEi4tdXOraQoWeJy9gbQ/cx4I7k9dJaCk9qrXEcdouxRVz5kZXt5C2bQ9pILoAA+KB4C/d3pfw==}
@@ -2380,6 +2423,11 @@ packages:
 
   '@swc/types@0.1.23':
     resolution: {integrity: sha512-u1iIVZV9Q0jxY+yM2vw/hZGDNudsN85bBpTqzAQ9rzkxW9D+e3aEM4Han+ow518gSewkXgjmEK0BD79ZcNVgPw==}
+
+  '@tailwindcss/typography@0.5.16':
+    resolution: {integrity: sha512-0wDLwCVF5V3x3b1SGXPCDcdsbDHMBe+lkFzBRaHeLvNi+nrrnZ1lA18u+OTWO8iSWU2GxUOCvlXtDuqftc1oiA==}
+    peerDependencies:
+      tailwindcss: '>=3.0.0 || insiders || >=4.0.0-alpha.20 || >=4.0.0-beta.1'
 
   '@teambit/base-react.navigation.link@2.0.31':
     resolution: {integrity: sha512-XyW1orRKYcvaVw7M7orP0KolI7iilLuz4ebnLf7VPGkaDdv7GR4ghgVIx4rRTScZPGOfCq5/h6hKST6hz95sLw==}
@@ -3578,6 +3626,12 @@ packages:
 
   '@ungap/structured-clone@1.3.0':
     resolution: {integrity: sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g==}
+
+  '@vitejs/plugin-react@4.7.0':
+    resolution: {integrity: sha512-gUu9hwfWvvEDBBmgtAowQCojwZmJ5mcLn3aufeCsitijs3+f2NsrPtlAWIR6OPiqljl96GVCUbLe0HyqIpVaoA==}
+    engines: {node: ^14.18.0 || >=16.0.0}
+    peerDependencies:
+      vite: ^4.2.0 || ^5.0.0 || ^6.0.0 || ^7.0.0
 
   '@vitest/coverage-istanbul@3.2.4':
     resolution: {integrity: sha512-IDlpuFJiWU9rhcKLkpzj8mFu/lpe64gVgnV15ZOrYx1iFzxxrxCzbExiUEKtwwXRvEiEMUS6iZeYgnMxgbqbxQ==}
@@ -6520,11 +6574,17 @@ packages:
     resolution: {integrity: sha512-iPZK6eYjbxRu3uB4/WZ3EsEIMJFMqAoopl3R+zuq0UjcAm/MO6KCweDgPfP3elTztoKP3KtnVHxTn2NHBSDVUw==}
     engines: {node: '>=10'}
 
+  lodash.castarray@4.4.0:
+    resolution: {integrity: sha512-aVx8ztPv7/2ULbArGJ2Y42bG1mEQ5mGjpdvrbJcJFU3TbYybe+QlLS4pst9zV52ymy2in1KpFPiZnAOATxD4+Q==}
+
   lodash.compact@3.0.1:
     resolution: {integrity: sha512-2ozeiPi+5eBXW1CLtzjk8XQFhQOEMwwfxblqeq6EGyTxZJ1bPATqilY0e6g2SLQpP4KuMeuioBhEnWz5Pr7ICQ==}
 
   lodash.debounce@4.0.8:
     resolution: {integrity: sha512-FT1yDzDYEoYWhnSGnpE/4Kj1fLZkDFyqRb7fNt6FdYOSxlUWAtp42Eh6Wb0rGIv/m9Bgo7x4GhQbm5Ys4SG5ow==}
+
+  lodash.isplainobject@4.0.6:
+    resolution: {integrity: sha512-oSXzaWypCMHkPC3NvBEaPHf0KsA5mvPrOPgQWDsbg8n7orZ290M0BmC/jgRZ4vcJ6DTAhjrsSYgdsW/F+MFOBA==}
 
   lodash.memoize@4.1.2:
     resolution: {integrity: sha512-t7j+NzmgnQzTAYXcsHYLgimltOV1MXHtlOWf6GjL9Kj8GK5FInw5JotxvbOs+IvV1/Dzo04/fCGfLVs7aXb4Ag==}
@@ -7466,6 +7526,10 @@ packages:
     peerDependencies:
       postcss: ^8.2
 
+  postcss-selector-parser@6.0.10:
+    resolution: {integrity: sha512-IQ7TZdoaqbT+LCpShg46jnZVlhWD2w6iQYAcYXfHARZ7X1t/UGhhceQDs5X0cGqKvYlHNOuv7Oa1xmb0oQuA3w==}
+    engines: {node: '>=4'}
+
   postcss-selector-parser@6.1.2:
     resolution: {integrity: sha512-Q8qQfPiZ+THO/3ZrOrO0cJJKfpYCagtMUkXbnEfmgUjwXg6z/WBeOyS9APBBPCTSiDV+s4SwQGu8yFsiMRIudg==}
     engines: {node: '>=4'}
@@ -7721,6 +7785,10 @@ packages:
 
   react-refresh@0.14.0:
     resolution: {integrity: sha512-wViHqhAd8OHeLS/IRMJjTSDHF3U9eWi62F/MledQGPdJGDhodXJ9PBLNGr6WWL7qlH12Mt3TyTpbS+hGXMjCzQ==}
+    engines: {node: '>=0.10.0'}
+
+  react-refresh@0.17.0:
+    resolution: {integrity: sha512-z6F7K9bV85EfseRCp2bzrpyQ0Gkw1uLoCel9XBVWPg/TjRj94SkJzUTGfOa4bs7iJvBWtQG0Wq7wnI0syw3EBQ==}
     engines: {node: '>=0.10.0'}
 
   react-router-dom@6.30.1:
@@ -8382,6 +8450,9 @@ packages:
   synckit@0.4.1:
     resolution: {integrity: sha512-ngUh0+s+DOqEc0sGnrLaeNjbXp0CWHjSGFBqPlQmQ+oN/OfoDoYDBXPh+b4qs1M5QTk5nuQ3AmVz9+2xiY/ldw==}
     engines: {node: '>=12'}
+
+  tailwindcss@4.1.11:
+    resolution: {integrity: sha512-2E9TBm6MDD/xKYe+dvJZAmg3yxIEDNRc0jwlNyDg/4Fil2QcSLjFKGVff0lAf1jjeaArlG/M75Ey/EYr/OJtBA==}
 
   tapable@1.1.3:
     resolution: {integrity: sha512-4WK/bYZmj8xLr+HUCODHGF1ZFzsYffasLUgEiMBY4fgtltdO6B4WJtlSbPaDTLpYTcGVwM2qLnFTICEcNxs3kA==}
@@ -9233,6 +9304,26 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@babel/core@7.28.0':
+    dependencies:
+      '@ampproject/remapping': 2.3.0
+      '@babel/code-frame': 7.27.1
+      '@babel/generator': 7.28.0
+      '@babel/helper-compilation-targets': 7.27.2
+      '@babel/helper-module-transforms': 7.27.3(@babel/core@7.28.0)
+      '@babel/helpers': 7.27.6
+      '@babel/parser': 7.28.0
+      '@babel/template': 7.27.2
+      '@babel/traverse': 7.28.0
+      '@babel/types': 7.28.1
+      convert-source-map: 2.0.0
+      debug: 4.4.1
+      gensync: 1.0.0-beta.2
+      json5: 2.2.3
+      semver: 6.3.1
+    transitivePeerDependencies:
+      - supports-color
+
   '@babel/generator@7.28.0':
     dependencies:
       '@babel/parser': 7.28.0
@@ -9343,6 +9434,15 @@ snapshots:
   '@babel/helper-module-transforms@7.27.3(@babel/core@7.26.9)':
     dependencies:
       '@babel/core': 7.26.9
+      '@babel/helper-module-imports': 7.27.1
+      '@babel/helper-validator-identifier': 7.27.1
+      '@babel/traverse': 7.28.0
+    transitivePeerDependencies:
+      - supports-color
+
+  '@babel/helper-module-transforms@7.27.3(@babel/core@7.28.0)':
+    dependencies:
+      '@babel/core': 7.28.0
       '@babel/helper-module-imports': 7.27.1
       '@babel/helper-validator-identifier': 7.27.1
       '@babel/traverse': 7.28.0
@@ -9890,6 +9990,16 @@ snapshots:
       '@babel/plugin-transform-react-jsx': 7.27.1(@babel/core@7.26.9)
     transitivePeerDependencies:
       - supports-color
+
+  '@babel/plugin-transform-react-jsx-self@7.27.1(@babel/core@7.28.0)':
+    dependencies:
+      '@babel/core': 7.28.0
+      '@babel/helper-plugin-utils': 7.27.1
+
+  '@babel/plugin-transform-react-jsx-source@7.27.1(@babel/core@7.28.0)':
+    dependencies:
+      '@babel/core': 7.28.0
+      '@babel/helper-plugin-utils': 7.27.1
 
   '@babel/plugin-transform-react-jsx@7.27.1(@babel/core@7.26.9)':
     dependencies:
@@ -11024,13 +11134,14 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.5.4
     optional: true
 
-  '@jun784/webfederator.components.editor@file:webfederator/components/editor(@swc/core@1.13.2)(@testing-library/react@16.3.0(@testing-library/dom@10.4.0)(@types/react-dom@19.0.2(@types/react@19.0.2))(@types/react@19.0.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(jest@29.7.0(@types/node@20.12.10)(ts-node@10.9.2(@swc/core@1.13.2)(@types/node@20.12.10)(typescript@5.8.3)))(less@4.4.0)(lightningcss@1.30.1)(react@19.0.0)(terser@5.43.1)(typescript@5.8.3)':
+  '@jun784/webfederator.components.editor@file:webfederator/components/editor(@swc/core@1.13.2)(@testing-library/react@16.3.0(@testing-library/dom@10.4.0)(@types/react-dom@19.0.2(@types/react@19.0.2))(@types/react@19.0.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(jest@29.7.0(@types/node@20.12.10)(ts-node@10.9.2(@swc/core@1.13.2)(@types/node@20.12.10)(typescript@5.8.3)))(less@4.4.0)(lightningcss@1.30.1)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(tailwindcss@4.1.11)(terser@5.43.1)(typescript@5.8.3)(vite@5.4.19(@types/node@20.12.10)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))':
     dependencies:
       '@apollo/client': 3.13.8(@types/react@19.0.2)(graphql@16.11.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       '@babel/core': 7.26.9
       '@bitdev/react.preview.react-docs-app': 0.0.5(@mdx-js/react@1.6.22(react@19.0.0))(@testing-library/react@16.3.0(@testing-library/dom@10.4.0)(@types/react-dom@19.0.2(@types/react@19.0.2))(@types/react@19.0.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(@types/react-dom@19.0.2(@types/react@19.0.2))(@types/react@19.0.2)(graphql@16.11.0)(typescript@5.8.3)
       '@mdx-js/mdx': 1.6.22
       '@mdx-js/react': 1.6.22(react@19.0.0)
+      '@tailwindcss/typography': 0.5.16(tailwindcss@4.1.11)
       '@teambit/mdx.ui.mdx-scope-context': 1.0.7(@types/react@19.0.2)(react@19.0.0)
       '@testing-library/dom': 10.4.0
       '@testing-library/jest-dom': 6.4.8
@@ -11043,6 +11154,7 @@ snapshots:
       '@types/react-dom': 19.0.2(@types/react@19.0.2)
       '@typescript-eslint/eslint-plugin': 6.19.1(@typescript-eslint/parser@6.19.1(eslint@8.56.0)(typescript@5.8.3))(eslint@8.56.0)(typescript@5.8.3)
       '@typescript-eslint/parser': 6.19.1(eslint@8.56.0)(typescript@5.8.3)
+      '@vitejs/plugin-react': 4.7.0(vite@5.4.19(@types/node@20.12.10)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))
       '@vitest/coverage-istanbul': 3.2.4(vitest@3.2.4(@types/node@20.12.10)(jsdom@24.1.3)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))
       browserslist: 4.23.0
       eslint: 8.56.0
@@ -11093,13 +11205,14 @@ snapshots:
       - subscriptions-transport-ws
       - sugarss
       - supports-color
+      - tailwindcss
       - terser
       - typescript
       - uglify-js
       - utf-8-validate
       - webpack-cli
 
-  '@jun784/webfederator.components.graph@file:webfederator/components/graph(@swc/core@1.13.2)(@testing-library/react@16.3.0(@testing-library/dom@10.4.0)(@types/react-dom@19.0.2(@types/react@19.0.2))(@types/react@19.0.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(jest@29.7.0(@types/node@20.12.10)(ts-node@10.9.2(@swc/core@1.13.2)(@types/node@20.12.10)(typescript@5.8.3)))(less@4.4.0)(lightningcss@1.30.1)(react@19.0.0)(terser@5.43.1)(typescript@5.8.3)':
+  '@jun784/webfederator.components.graph@file:webfederator/components/graph(@swc/core@1.13.2)(@testing-library/react@16.3.0(@testing-library/dom@10.4.0)(@types/react-dom@19.0.2(@types/react@19.0.2))(@types/react@19.0.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(jest@29.7.0(@types/node@20.12.10)(ts-node@10.9.2(@swc/core@1.13.2)(@types/node@20.12.10)(typescript@5.8.3)))(less@4.4.0)(lightningcss@1.30.1)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(terser@5.43.1)(typescript@5.8.3)(vite@5.4.19(@types/node@20.12.10)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))':
     dependencies:
       '@apollo/client': 3.13.8(@types/react@19.0.2)(graphql@16.11.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       '@babel/core': 7.26.9
@@ -11118,6 +11231,7 @@ snapshots:
       '@types/react-dom': 19.0.2(@types/react@19.0.2)
       '@typescript-eslint/eslint-plugin': 6.19.1(@typescript-eslint/parser@6.19.1(eslint@8.56.0)(typescript@5.8.3))(eslint@8.56.0)(typescript@5.8.3)
       '@typescript-eslint/parser': 6.19.1(eslint@8.56.0)(typescript@5.8.3)
+      '@vitejs/plugin-react': 4.7.0(vite@5.4.19(@types/node@20.12.10)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))
       '@vitest/coverage-istanbul': 3.2.4(vitest@3.2.4(@types/node@20.12.10)(jsdom@24.1.3)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))
       browserslist: 4.23.0
       cytoscape: 3.32.1
@@ -11170,7 +11284,7 @@ snapshots:
       - utf-8-validate
       - webpack-cli
 
-  '@jun784/webfederator.components.host@file:webfederator/components/host(@swc/core@1.13.2)(@testing-library/react@16.3.0(@testing-library/dom@10.4.0)(@types/react-dom@19.0.2(@types/react@19.0.2))(@types/react@19.0.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(jest@29.7.0(@types/node@20.12.10)(ts-node@10.9.2(@swc/core@1.13.2)(@types/node@20.12.10)(typescript@5.8.3)))(less@4.4.0)(lightningcss@1.30.1)(react@19.0.0)(terser@5.43.1)(typescript@5.8.3)':
+  '@jun784/webfederator.components.host@file:webfederator/components/host(@swc/core@1.13.2)(@testing-library/react@16.3.0(@testing-library/dom@10.4.0)(@types/react-dom@19.0.2(@types/react@19.0.2))(@types/react@19.0.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(jest@29.7.0(@types/node@20.12.10)(ts-node@10.9.2(@swc/core@1.13.2)(@types/node@20.12.10)(typescript@5.8.3)))(less@4.4.0)(lightningcss@1.30.1)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(terser@5.43.1)(typescript@5.8.3)(vite@5.4.19(@types/node@20.12.10)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))':
     dependencies:
       '@apollo/client': 3.13.8(@types/react@19.0.2)(graphql@16.11.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       '@babel/core': 7.26.9
@@ -11189,6 +11303,7 @@ snapshots:
       '@types/react-dom': 19.0.2(@types/react@19.0.2)
       '@typescript-eslint/eslint-plugin': 6.19.1(@typescript-eslint/parser@6.19.1(eslint@8.56.0)(typescript@5.8.3))(eslint@8.56.0)(typescript@5.8.3)
       '@typescript-eslint/parser': 6.19.1(eslint@8.56.0)(typescript@5.8.3)
+      '@vitejs/plugin-react': 4.7.0(vite@5.4.19(@types/node@20.12.10)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))
       '@vitest/coverage-istanbul': 3.2.4(vitest@3.2.4(@types/node@20.12.10)(jsdom@24.1.3)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))
       browserslist: 4.23.0
       editor: 1.0.0
@@ -11401,6 +11516,8 @@ snapshots:
   '@popperjs/core@2.11.8': {}
 
   '@remix-run/router@1.23.0': {}
+
+  '@rolldown/pluginutils@1.0.0-beta.27': {}
 
   '@rollup/rollup-android-arm-eabi@4.22.0':
     optional: true
@@ -11662,6 +11779,14 @@ snapshots:
     dependencies:
       '@swc/counter': 0.1.3
     optional: true
+
+  '@tailwindcss/typography@0.5.16(tailwindcss@4.1.11)':
+    dependencies:
+      lodash.castarray: 4.4.0
+      lodash.isplainobject: 4.0.6
+      lodash.merge: 4.6.2
+      postcss-selector-parser: 6.0.10
+      tailwindcss: 4.1.11
 
   '@teambit/base-react.navigation.link@2.0.31(@testing-library/react@16.3.0(@testing-library/dom@10.4.0)(@types/react-dom@19.0.2(@types/react@19.0.2))(@types/react@19.0.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(@types/react@19.0.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)':
     dependencies:
@@ -13678,6 +13803,30 @@ snapshots:
       eslint-visitor-keys: 3.4.3
 
   '@ungap/structured-clone@1.3.0': {}
+
+  '@vitejs/plugin-react@4.7.0(vite@5.4.19(@types/node@20.12.10)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))':
+    dependencies:
+      '@babel/core': 7.28.0
+      '@babel/plugin-transform-react-jsx-self': 7.27.1(@babel/core@7.28.0)
+      '@babel/plugin-transform-react-jsx-source': 7.27.1(@babel/core@7.28.0)
+      '@rolldown/pluginutils': 1.0.0-beta.27
+      '@types/babel__core': 7.20.5
+      react-refresh: 0.17.0
+      vite: 5.4.19(@types/node@20.12.10)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1)
+    transitivePeerDependencies:
+      - supports-color
+
+  '@vitejs/plugin-react@4.7.0(vite@5.4.19(@types/node@22.16.5)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))':
+    dependencies:
+      '@babel/core': 7.28.0
+      '@babel/plugin-transform-react-jsx-self': 7.27.1(@babel/core@7.28.0)
+      '@babel/plugin-transform-react-jsx-source': 7.27.1(@babel/core@7.28.0)
+      '@rolldown/pluginutils': 1.0.0-beta.27
+      '@types/babel__core': 7.20.5
+      react-refresh: 0.17.0
+      vite: 5.4.19(@types/node@22.16.5)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1)
+    transitivePeerDependencies:
+      - supports-color
 
   '@vitest/coverage-istanbul@3.2.4(vitest@3.2.4(@types/node@20.12.10)(jsdom@24.1.3)(less@4.4.0)(lightningcss@1.30.1)(sass@1.89.2)(terser@5.43.1))':
     dependencies:
@@ -17432,9 +17581,13 @@ snapshots:
     dependencies:
       p-locate: 5.0.0
 
+  lodash.castarray@4.4.0: {}
+
   lodash.compact@3.0.1: {}
 
   lodash.debounce@4.0.8: {}
+
+  lodash.isplainobject@4.0.6: {}
 
   lodash.memoize@4.1.2: {}
 
@@ -18384,6 +18537,11 @@ snapshots:
       postcss: 8.4.19
       postcss-selector-parser: 6.1.2
 
+  postcss-selector-parser@6.0.10:
+    dependencies:
+      cssesc: 3.0.0
+      util-deprecate: 1.0.2
+
   postcss-selector-parser@6.1.2:
     dependencies:
       cssesc: 3.0.0
@@ -18719,6 +18877,8 @@ snapshots:
       use-editable: 2.3.3(react@19.0.0)
 
   react-refresh@0.14.0: {}
+
+  react-refresh@0.17.0: {}
 
   react-router-dom@6.30.1(react-dom@19.0.0(react@19.0.0))(react@19.0.0):
     dependencies:
@@ -19539,6 +19699,8 @@ snapshots:
     dependencies:
       tslib: 2.8.1
       uuid: 8.3.2
+
+  tailwindcss@4.1.11: {}
 
   tapable@1.1.3: {}
 
