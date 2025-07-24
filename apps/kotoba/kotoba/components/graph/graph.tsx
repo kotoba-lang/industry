@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import cytoscape from 'cytoscape'
 import dagre from 'cytoscape-dagre'
 
@@ -38,15 +38,28 @@ export type GraphProps = {
    * グラフの高さ
    */
   height?: string
+  /**
+   * 編集モード
+   */
+  editMode?: boolean
+  /**
+   * グラフデータ更新コールバック
+   */
+  onGraphUpdate?: (graphData: { nodes: ASTNode[], edges: ASTEdge[] }) => void
 };
 
 export function Graph({ 
   astData: externalASTData,
   initialGraphType = 'ast',
-  height = '600px'
+  height = '600px',
+  editMode = false,
+  onGraphUpdate
 }: GraphProps) {
   const [graphType, setGraphType] = useState<'ast' | 'network' | 'hierarchy' | 'circular'>(initialGraphType)
   const [astData, setAstData] = useState<{ nodes: ASTNode[], edges: ASTEdge[] }>({ nodes: [], edges: [] })
+  const [isModified, setIsModified] = useState(false)
+  const [selectedNode, setSelectedNode] = useState<ASTNode | null>(null)
+  const [editingNode, setEditingNode] = useState<ASTNode | null>(null)
   const sampleData = {
     nodes: [
       { id: '1', label: 'Node 1', type: 'node', group: 'A', level: 0 },
