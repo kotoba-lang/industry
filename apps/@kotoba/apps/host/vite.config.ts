@@ -9,8 +9,8 @@ export default defineConfig({
     federation({
       name: 'host',
       remotes: {
-        editor: 'http://localhost:5001/assets/remoteEntry.js',
-        graph: 'http://localhost:5002/assets/remoteEntry.js',
+        editor: 'http://localhost:5001/remoteEntry.js',
+        graph: 'http://localhost:5002/remoteEntry.js',
       },
       shared: ['react', 'react-dom']
     })
