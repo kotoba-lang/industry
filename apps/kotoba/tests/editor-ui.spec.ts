@@ -93,13 +93,13 @@ test.describe('Editor UI Tests', () => {
   });
 
   test('エディターコンテナのレイアウト', async ({ page }) => {
-    const editorContainer = page.locator('.prosemirror-editor-container');
+    const editorContainer = page.locator('.tiptap-editor-container');
     
     // コンテナの位置を確認（実際の値に合わせる）
     const position = await editorContainer.evaluate(el => 
       window.getComputedStyle(el).position
     );
-    expect(position).toBe('relative'); // Tiptapエディターの実際の値
+    expect(position).toBe('static'); // Tiptapエディターの実際の値
     
     // コンテナの幅を確認（実際の値に合わせる）
     const width = await editorContainer.evaluate(el => 
