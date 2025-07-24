@@ -1,19 +1,105 @@
 ---
-description: A Host component.
+description: 'A Module Federation host component for integrating Editor and Graph components'
+labels: ['react', 'host', 'module-federation', 'integration']
 ---
 
 import { Host } from './host';
 
-## Basic usage
+# Kotoba Host Component
 
-Use the host component:
+A Module Federation host component that integrates the Editor and Graph components, providing a complete platform for document editing and AST visualization.
 
-```js
-<Host />
+## Features
+
+- **Module Federation**: Dynamic loading of remote components
+- **AST Data Flow**: Seamless data transfer between Editor and Graph
+- **Error Handling**: Robust error boundaries and fallback components
+- **Flexible Layout**: Multiple layout options (grid, vertical, horizontal)
+- **Responsive Design**: Adapts to different screen sizes
+- **Tailwind UI**: Modern, clean interface
+
+## Usage
+
+```tsx
+import { Host } from '@junkawasaki/webfederator.components.host';
+
+function MyApp() {
+  return (
+    <Host 
+      title="My Document Platform"
+      layout="grid"
+    />
+  );
+}
 ```
 
-### Display the text
+## Props
 
-```js live
-<Host>Hello world!</Host>
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `EditorComponent` | `React.ComponentType<any>` | `undefined` | Custom editor component to use |
+| `GraphComponent` | `React.ComponentType<any>` | `undefined` | Custom graph component to use |
+| `title` | `string` | `'Kotoba Platform'` | Application title |
+| `layout` | `'grid' \| 'vertical' \| 'horizontal'` | `'grid'` | Layout type for components |
+
+## Layout Types
+
+- **Grid**: Responsive 2-column layout (default)
+- **Vertical**: Single column, stacked layout
+- **Horizontal**: Fixed 2-column layout
+
+## Module Federation
+
+The host component automatically loads remote components:
+
+- **Editor**: Loads from `editor/Editor` remote
+- **Graph**: Loads from `graph/Graph` remote
+
+## AST Data Flow
+
+1. **Editor** generates AST data from document content
+2. **Host** receives AST data via callback or global window object
+3. **Graph** receives AST data as props and visualizes it
+
+## Error Handling
+
+- **Loading States**: Spinner animations during component loading
+- **Error Boundaries**: Graceful error handling with fallback UI
+- **Fallback Components**: Links to independent component URLs
+
+## Example
+
+<Host 
+  title="Document Editor & Visualizer"
+  layout="grid"
+/>
+
+## Integration with Custom Components
+
+```tsx
+import { Host } from '@junkawasaki/webfederator.components.host';
+import { MyCustomEditor } from './MyCustomEditor';
+import { MyCustomGraph } from './MyCustomGraph';
+
+function MyApp() {
+  return (
+    <Host 
+      EditorComponent={MyCustomEditor}
+      GraphComponent={MyCustomGraph}
+      title="Custom Platform"
+      layout="vertical"
+    />
+  );
+}
 ```
+
+## Development Mode
+
+In development mode, components may not load due to Module Federation limitations. The host provides fallback components with links to independent URLs:
+
+- Editor: `http://localhost:5001`
+- Graph: `http://localhost:5002`
+
+## Production Mode
+
+In production mode, all components should load seamlessly through Module Federation, providing a unified experience.
