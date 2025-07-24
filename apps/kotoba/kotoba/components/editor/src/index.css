@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ProseMirror Editor Styles - High Priority */
+/* ProseMirror Editor Styles with Typography Plugin */
 @layer components {
   /* エディターコンテナ */
   .prosemirror-editor {
@@ -10,157 +10,33 @@
   }
 
   .prosemirror-editor-container {
-    @apply relative w-full min-h-[600px] p-6;
+    @apply relative w-full;
   }
 
-  /* エディターのメインエリア - 高優先度でスタイルを適用 */
+  /* ProseMirrorエディター - Typographyプラグインを使用 */
   .ProseMirror {
-    @apply outline-none min-h-[400px] p-4 text-gray-900 bg-white !important;
-    @apply border border-gray-300 rounded-md !important;
+    @apply outline-none !important;
+    @apply prose prose-sm sm:prose lg:prose-lg !important;
+    @apply p-4 border border-gray-300 rounded-lg !important;
+    @apply bg-white dark:bg-gray-800 dark:border-gray-600 !important;
+    @apply dark:prose-invert !important;
+    @apply min-h-[600px] transition-colors duration-200 !important;
     @apply focus:ring-2 focus:ring-blue-500 focus:border-blue-500 !important;
-    @apply transition-colors duration-200 !important;
   }
 
-  /* ダークモード対応 - 高優先度 */
+  /* ダークモード対応 */
   .dark .ProseMirror {
     @apply text-gray-100 bg-gray-800 border-gray-600 !important;
     @apply focus:ring-blue-400 focus:border-blue-400 !important;
   }
 
-  /* 段落 */
-  .ProseMirror p {
-    @apply mb-4 leading-relaxed !important;
+  /* フォーカス状態 */
+  .ProseMirror:focus {
+    @apply ring-2 ring-blue-500 ring-opacity-50 !important;
   }
 
-  .ProseMirror p:last-child {
-    @apply mb-0 !important;
-  }
-
-  /* 見出し */
-  .ProseMirror h1 {
-    @apply text-3xl font-bold text-gray-900 mb-6 mt-8 !important;
-  }
-
-  .ProseMirror h2 {
-    @apply text-2xl font-bold text-gray-900 mb-4 mt-6 !important;
-  }
-
-  .ProseMirror h3 {
-    @apply text-xl font-bold text-gray-900 mb-3 mt-5 !important;
-  }
-
-  .ProseMirror h4 {
-    @apply text-lg font-bold text-gray-900 mb-2 mt-4 !important;
-  }
-
-  .ProseMirror h5 {
-    @apply text-base font-bold text-gray-900 mb-2 mt-3 !important;
-  }
-
-  .ProseMirror h6 {
-    @apply text-sm font-bold text-gray-900 mb-1 mt-2 !important;
-  }
-
-  /* ダークモードでの見出し */
-  .dark .ProseMirror h1,
-  .dark .ProseMirror h2,
-  .dark .ProseMirror h3,
-  .dark .ProseMirror h4,
-  .dark .ProseMirror h5,
-  .dark .ProseMirror h6 {
-    @apply text-gray-100 !important;
-  }
-
-  /* リスト */
-  .ProseMirror ul,
-  .ProseMirror ol {
-    @apply mb-4 pl-6 !important;
-  }
-
-  .ProseMirror ul {
-    @apply list-disc !important;
-  }
-
-  .ProseMirror ol {
-    @apply list-decimal !important;
-  }
-
-  .ProseMirror li {
-    @apply mb-1 !important;
-  }
-
-  .ProseMirror li:last-child {
-    @apply mb-0 !important;
-  }
-
-  /* コードブロック */
-  .ProseMirror pre {
-    @apply bg-gray-100 text-gray-800 p-4 rounded-md mb-4 overflow-x-auto !important;
-    @apply font-mono text-sm !important;
-  }
-
-  .dark .ProseMirror pre {
-    @apply bg-gray-700 text-gray-200 !important;
-  }
-
-  /* インラインコード */
-  .ProseMirror code {
-    @apply bg-gray-100 text-gray-800 px-1 py-0.5 rounded text-sm font-mono !important;
-  }
-
-  .dark .ProseMirror code {
-    @apply bg-gray-700 text-gray-200 !important;
-  }
-
-  /* ブロッククォート */
-  .ProseMirror blockquote {
-    @apply border-l-4 border-gray-300 pl-4 py-2 mb-4 italic text-gray-700 !important;
-  }
-
-  .dark .ProseMirror blockquote {
-    @apply border-gray-600 text-gray-300 !important;
-  }
-
-  /* 水平線 */
-  .ProseMirror hr {
-    @apply border-gray-300 my-6 !important;
-  }
-
-  .dark .ProseMirror hr {
-    @apply border-gray-600 !important;
-  }
-
-  /* リンク */
-  .ProseMirror a {
-    @apply text-blue-600 hover:text-blue-800 underline !important;
-  }
-
-  .dark .ProseMirror a {
-    @apply text-blue-400 hover:text-blue-300 !important;
-  }
-
-  /* 強調 */
-  .ProseMirror strong {
-    @apply font-bold !important;
-  }
-
-  .ProseMirror em {
-    @apply italic !important;
-  }
-
-  /* 選択状態 */
-  .ProseMirror .selected {
-    @apply bg-blue-100 !important;
-  }
-
-  .dark .ProseMirror .selected {
-    @apply bg-blue-900 !important;
-  }
-
-  /* プレースホルダー */
-  .ProseMirror .is-empty::before {
-    @apply text-gray-400 float-left h-0 pointer-events-none !important;
-    content: attr(data-placeholder);
+  .dark .ProseMirror:focus {
+    @apply ring-blue-400 ring-opacity-50 !important;
   }
 
   /* ツールバー */
@@ -227,43 +103,6 @@
     @apply text-gray-300 hover:bg-gray-700 !important;
   }
 
-  /* テーブル */
-  .ProseMirror table {
-    @apply w-full border-collapse border border-gray-300 mb-4 !important;
-  }
-
-  .dark .ProseMirror table {
-    @apply border-gray-600 !important;
-  }
-
-  .ProseMirror th,
-  .ProseMirror td {
-    @apply border border-gray-300 px-3 py-2 text-left !important;
-  }
-
-  .dark .ProseMirror th,
-  .dark .ProseMirror td {
-    @apply border-gray-600 !important;
-  }
-
-  .ProseMirror th {
-    @apply bg-gray-50 font-semibold !important;
-  }
-
-  .dark .ProseMirror th {
-    @apply bg-gray-700 !important;
-  }
-
-  /* 画像 */
-  .ProseMirror img {
-    @apply max-w-full h-auto rounded-md !important;
-  }
-
-  /* フォーカス状態 */
-  .ProseMirror:focus {
-    @apply ring-2 ring-blue-500 ring-opacity-50 !important;
-  }
-
   /* スクロールバー */
   .ProseMirror::-webkit-scrollbar {
     @apply w-2 !important;
@@ -286,7 +125,7 @@
   }
 }
 
-/* ProseMirrorのデフォルトスタイルをリセット - 高優先度 */
+/* ProseMirrorのデフォルトスタイルをリセット */
 @layer base {
   .ProseMirror {
     font-family: inherit !important;
@@ -297,40 +136,4 @@
   .ProseMirror * {
     box-sizing: border-box !important;
   }
-}
-
-/* 追加の高優先度スタイル */
-.prosemirror-editor-container {
-  position: relative !important;
-  width: 100% !important;
-  min-height: 600px !important;
-  padding: 1.5rem !important;
-}
-
-.ProseMirror {
-  outline: none !important;
-  min-height: 400px !important;
-  padding: 1rem !important;
-  color: #111827 !important;
-  background-color: #ffffff !important;
-  border: 1px solid #d1d5db !important;
-  border-radius: 0.375rem !important;
-  transition: all 0.2s ease-in-out !important;
-}
-
-.ProseMirror:focus {
-  border-color: #3b82f6 !important;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5) !important;
-}
-
-/* ダークモード */
-.dark .ProseMirror {
-  color: #f3f4f6 !important;
-  background-color: #1f2937 !important;
-  border-color: #4b5563 !important;
-}
-
-.dark .ProseMirror:focus {
-  border-color: #60a5fa !important;
-  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.5) !important;
 } 
