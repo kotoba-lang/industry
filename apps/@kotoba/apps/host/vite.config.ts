@@ -14,6 +14,9 @@ export default defineConfig({
   plugins: [
     react()
   ],
+  css: {
+    postcss: './postcss.config.js'
+  },
   resolve: {
     alias: {
       '@kotoba/components': path.resolve(__dirname, '../../kotoba/components')
