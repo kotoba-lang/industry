@@ -1,17 +1,16 @@
-%!TEX program = xelatex
 \documentclass{article}
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{graphicx}
-\usepackage{zxjatype}
-\setjamainfont{Hiragino Mincho ProN} % Or your preferred Japanese font
+\usepackage{CJKutf8}
 
 \title{Attempto Controlled Japanese (ACJ) \\ \large A Case Study with the \texttt{yamato-ll1} Parser}
 \author{J. Kawasaki}
 \date{\today}
 
 \begin{document}
+\begin{CJK}{UTF8}{min}
 
 \maketitle
 
@@ -57,4 +56,5 @@ We have defined Attempto Controlled Japanese (ACJ), a machine-processable subset
 
 Future work will focus on expanding the grammatical coverage of ACJ and, crucially, defining a direct mapping from ACJ's ASTs to a formal logic representation, such as First-Order Logic, similar to the approach taken by ACE.
 
+\end{CJK}
 \end{document} 
