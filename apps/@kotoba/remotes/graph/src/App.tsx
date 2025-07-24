@@ -7,124 +7,215 @@ import './App.css'
 cytoscape.use(dagre as any)
 
 /**
+ * ASTノードの型定義
+ */
+interface ASTNode {
+  id: string
+  label: string
+  type: string
+  group: string
+  level: number
+}
+
+/**
+ * ASTエッジの型定義
+ */
+interface ASTEdge {
+  source: string
+  target: string
+  weight: number
+}
+
+/**
+ * GraphコンポーネントのProps
+ */
+interface GraphProps {
+  astData?: { nodes: ASTNode[], edges: ASTEdge[] }
+}
+
+/**
  * グラフ表示コンポーネント（cytoscape使用）
  * Module Federationでホストアプリケーションから利用される
  */
-function App() {
-  const [graphType, setGraphType] = useState<'network' | 'hierarchy' | 'circular'>('network')
-  const [nodes, setNodes] = useState([
-    { id: '1', label: 'Node 1', group: 'A' },
-    { id: '2', label: 'Node 2', group: 'A' },
-    { id: '3', label: 'Node 3', group: 'B' },
-    { id: '4', label: 'Node 4', group: 'B' },
-    { id: '5', label: 'Node 5', group: 'C' }
-  ])
-  const [edges, setEdges] = useState([
-    { source: '1', target: '2', weight: 1 },
-    { source: '2', target: '3', weight: 2 },
-    { source: '3', target: '4', weight: 1 },
-    { source: '4', target: '5', weight: 3 },
-    { source: '1', target: '5', weight: 2 }
-  ])
-  const containerRef = useRef<HTMLDivElement>(null)
+function App({ astData: externalASTData }: GraphProps) {
+  const [graphType, setGraphType] = useState<'ast' | 'network' | 'hierarchy' | 'circular'>('ast')
+  const [astData, setAstData] = useState<{ nodes: ASTNode[], edges: ASTEdge[] }>({ nodes: [], edges: [] })
+  const sampleData = {
+    nodes: [
+      { id: '1', label: 'Node 1', type: 'node', group: 'A', level: 0 },
+      { id: '2', label: 'Node 2', type: 'node', group: 'A', level: 1 },
+      { id: '3', label: 'Node 3', type: 'node', group: 'B', level: 1 },
+      { id: '4', label: 'Node 4', type: 'node', group: 'B', level: 2 },
+      { id: '5', label: 'Node 5', type: 'node', group: 'C', level: 2 }
+    ],
+    edges: [
+      { source: '1', target: '2', weight: 1 },
+      { source: '2', target: '3', weight: 2 },
+      { source: '3', target: '4', weight: 1 },
+      { source: '4', target: '5', weight: 3 },
+      { source: '1', target: '5', weight: 2 }
+    ]
+  }
   const cyRef = useRef<cytoscape.Core | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    console.log('Remote Graph: App component mounted.');
-    initializeGraph()
+    console.log('Remote Graph: App component mounted.')
+    
+    // サンプルASTデータを設定
+    const sampleASTData = {
+      nodes: [
+        { id: 'doc', label: 'Document', type: 'doc', group: 'A', level: 0 },
+        { id: 'h1', label: 'Kotoba Editor', type: 'heading_1', group: 'A', level: 1 },
+        { id: 'p1', label: 'This is a ProseMirror-based...', type: 'paragraph', group: 'B', level: 1 },
+        { id: 'h2', label: 'Features', type: 'heading_2', group: 'A', level: 1 },
+        { id: 'ul1', label: 'List', type: 'bullet_list', group: 'C', level: 1 },
+        { id: 'li1', label: 'Rich text editing', type: 'list_item', group: 'C', level: 2 },
+        { id: 'li2', label: 'Markdown support', type: 'list_item', group: 'C', level: 2 },
+        { id: 'li3', label: 'AST generation', type: 'list_item', group: 'C', level: 2 },
+        { id: 'h3', label: 'Lists', type: 'heading_3', group: 'A', level: 1 },
+        { id: 'ul2', label: 'Nested List', type: 'bullet_list', group: 'C', level: 1 },
+        { id: 'li4', label: 'Item 1', type: 'list_item', group: 'C', level: 2 },
+        { id: 'li5', label: 'Item 2', type: 'list_item', group: 'C', level: 2 },
+        { id: 'ul3', label: 'Sub List', type: 'bullet_list', group: 'C', level: 2 },
+        { id: 'li6', label: 'Sub-item 2.1', type: 'list_item', group: 'C', level: 3 },
+        { id: 'li7', label: 'Sub-item 2.2', type: 'list_item', group: 'C', level: 3 }
+      ],
+      edges: [
+        { source: 'doc', target: 'h1', weight: 1 },
+        { source: 'doc', target: 'p1', weight: 1 },
+        { source: 'doc', target: 'h2', weight: 1 },
+        { source: 'doc', target: 'ul1', weight: 1 },
+        { source: 'ul1', target: 'li1', weight: 1 },
+        { source: 'ul1', target: 'li2', weight: 1 },
+        { source: 'ul1', target: 'li3', weight: 1 },
+        { source: 'doc', target: 'h3', weight: 1 },
+        { source: 'doc', target: 'ul2', weight: 1 },
+        { source: 'ul2', target: 'li4', weight: 1 },
+        { source: 'ul2', target: 'li5', weight: 1 },
+        { source: 'li5', target: 'ul3', weight: 1 },
+        { source: 'ul3', target: 'li6', weight: 1 },
+        { source: 'ul3', target: 'li7', weight: 1 }
+      ]
+    }
+    
+    setAstData(sampleASTData)
+    initializeGraph(sampleASTData)
   }, [])
 
+  // 外部からASTデータが渡された場合の処理
   useEffect(() => {
-    if (cyRef.current) {
-      updateGraphLayout()
+    if (externalASTData && externalASTData.nodes.length > 0) {
+      console.log('Graph: Received external AST data', externalASTData)
+      setAstData(externalASTData)
+      initializeGraph(externalASTData)
     }
-  }, [graphType])
-
-  useEffect(() => {
-    if (cyRef.current) {
-      updateGraphData()
-    }
-  }, [nodes, edges])
+  }, [externalASTData])
 
   /**
    * cytoscapeグラフを初期化
    */
-  const initializeGraph = () => {
+  const initializeGraph = (data: { nodes: ASTNode[], edges: ASTEdge[] }) => {
     if (!containerRef.current) return
 
-    // 既存のグラフがあれば削除
+    // 既存のグラフを破棄
     if (cyRef.current) {
       cyRef.current.destroy()
+    }
+
+    // cytoscapeの要素を作成
+    const elements = {
+      nodes: data.nodes.map(node => ({
+        group: 'nodes' as const,
+        data: {
+          id: node.id,
+          label: node.label,
+          type: node.type,
+          group: node.group,
+          level: node.level
+        }
+      })),
+      edges: data.edges.map(edge => ({
+        group: 'edges' as const,
+        data: {
+          id: `${edge.source}-${edge.target}`,
+          source: edge.source,
+          target: edge.target,
+          weight: edge.weight
+        }
+      }))
     }
 
     // cytoscapeインスタンスを作成
     cyRef.current = cytoscape({
       container: containerRef.current,
-      elements: {
-        nodes: nodes.map(node => ({
-          group: 'nodes' as const,
-          data: {
-            id: node.id,
-            label: node.label,
-            group: node.group
-          }
-        })),
-        edges: edges.map(edge => ({
-          group: 'edges' as const,
-          data: {
-            id: `${edge.source}-${edge.target}`,
-            source: edge.source,
-            target: edge.target,
-            weight: edge.weight
-          }
-        }))
-      },
+      elements: elements,
       style: [
         {
           selector: 'node',
           style: {
-            'background-color': '#666',
+            'background-color': (ele: any) => {
+              const group = ele.data('group')
+              switch (group) {
+                case 'A': return '#2ecc71' // 緑 - 見出し
+                case 'B': return '#3498db' // 青 - 段落
+                case 'C': return '#e67e22' // オレンジ - リスト
+                case 'D': return '#9b59b6' // 紫 - コードブロック
+                case 'E': return '#95a5a6' // グレー - テキスト
+                default: return '#34495e'
+              }
+            },
             'label': 'data(label)',
             'color': '#fff',
+            'font-size': '12px',
+            'font-weight': 'bold',
+            'text-wrap': 'wrap',
+            'text-max-width': '120px',
             'text-valign': 'center',
             'text-halign': 'center',
-            'width': 30,
-            'height': 30,
-            'font-size': '10px',
+            'width': (ele: any) => {
+              const level = ele.data('level')
+              return Math.max(60, 80 - level * 5)
+            },
+            'height': (ele: any) => {
+              const level = ele.data('level')
+              return Math.max(40, 50 - level * 3)
+            },
             'border-width': 2,
-            'border-color': '#333'
-          }
-        },
-        {
-          selector: 'node[group="A"]',
-          style: {
-            'background-color': '#4CAF50'
-          }
-        },
-        {
-          selector: 'node[group="B"]',
-          style: {
-            'background-color': '#2196F3'
-          }
-        },
-        {
-          selector: 'node[group="C"]',
-          style: {
-            'background-color': '#FF9800'
+            'border-color': '#2c3e50',
+            'border-opacity': 0.8
           }
         },
         {
           selector: 'edge',
           style: {
             'width': 'data(weight)',
-            'line-color': '#ccc',
-            'target-arrow-color': '#ccc',
+            'line-color': '#7f8c8d',
+            'target-arrow-color': '#7f8c8d',
             'target-arrow-shape': 'triangle',
-            'curve-style': 'bezier'
+            'curve-style': 'bezier',
+            'opacity': 0.8
+          }
+        },
+        {
+          selector: 'node:selected',
+          style: {
+            'border-width': 4,
+            'border-color': '#e74c3c',
+            'border-opacity': 1
+          }
+        },
+        {
+          selector: 'edge:selected',
+          style: {
+            'width': 'data(weight)',
+            'line-color': '#e74c3c',
+            'target-arrow-color': '#e74c3c',
+            'opacity': 1
           }
         }
       ],
-      layout: getLayoutConfig()
+      layout: getLayoutConfig(graphType)
     })
 
     // イベントリスナーを追加
@@ -137,17 +228,30 @@ function App() {
       const edge = evt.target
       console.log('Edge clicked:', edge.data())
     })
+
+    // グラフをフィット
+    cyRef.current.fit()
   }
 
   /**
    * レイアウト設定を取得
    */
-  const getLayoutConfig = () => {
-    switch (graphType) {
-      case 'hierarchy':
+  const getLayoutConfig = (type: string) => {
+    switch (type) {
+      case 'ast':
         return {
           name: 'dagre',
           rankDir: 'TB',
+          nodeDimensionsIncludeLabels: true,
+          padding: 50,
+          animate: true,
+          animationDuration: 1000
+        }
+      case 'hierarchy':
+        return {
+          name: 'dagre',
+          rankDir: 'LR',
+          nodeDimensionsIncludeLabels: true,
           padding: 50,
           animate: true,
           animationDuration: 1000
@@ -159,166 +263,102 @@ function App() {
           animate: true,
           animationDuration: 1000
         }
+      case 'network':
       default:
         return {
           name: 'cose',
           padding: 50,
           animate: true,
-          animationDuration: 1000
+          animationDuration: 1000,
+          nodeDimensionsIncludeLabels: true
         }
     }
   }
 
   /**
-   * グラフレイアウトを更新
+   * グラフタイプを変更
    */
-  const updateGraphLayout = () => {
-    if (!cyRef.current) return
-
-    const layout = cyRef.current.layout(getLayoutConfig())
-    layout.run()
-  }
-
-  /**
-   * グラフデータを更新
-   */
-  const updateGraphData = () => {
-    if (!cyRef.current) return
-
-    // 既存の要素を削除
-    cyRef.current.elements().remove()
-
-    // 新しい要素を追加
-    const newElements = [
-      ...nodes.map(node => ({
-        group: 'nodes' as const,
-        data: {
-          id: node.id,
-          label: node.label,
-          group: node.group
-        }
-      })),
-      ...edges.map(edge => ({
-        group: 'edges' as const,
-        data: {
-          id: `${edge.source}-${edge.target}`,
-          source: edge.source,
-          target: edge.target,
-          weight: edge.weight
-        }
-      }))
-    ]
-
-    cyRef.current.add(newElements)
-    updateGraphLayout()
-  }
-
-  /**
-   * 新しいノードを追加
-   */
-  const addNode = () => {
-    const newNodeId = (nodes.length + 1).toString()
-    const groups = ['A', 'B', 'C']
-    const randomGroup = groups[Math.floor(Math.random() * groups.length)]
-    
-    const newNode = {
-      id: newNodeId,
-      label: `Node ${newNodeId}`,
-      group: randomGroup
-    }
-
-    setNodes(prev => [...prev, newNode])
-
-    // 既存のノードの1つに接続
-    if (nodes.length > 0) {
-      const randomNode = nodes[Math.floor(Math.random() * nodes.length)]
-      const newEdge = {
-        source: randomNode.id,
-        target: newNodeId,
-        weight: Math.floor(Math.random() * 3) + 1
-      }
-      setEdges(prev => [...prev, newEdge])
+  const handleGraphTypeChange = (newType: 'ast' | 'network' | 'hierarchy' | 'circular') => {
+    setGraphType(newType)
+    if (cyRef.current) {
+      const layout = cyRef.current.layout(getLayoutConfig(newType))
+      layout.run()
     }
   }
 
   /**
-   * ランダムなエッジを追加
+   * サンプルデータを表示
    */
-  const addEdge = () => {
-    if (nodes.length < 2) return
-
-    const sourceNode = nodes[Math.floor(Math.random() * nodes.length)]
-    const targetNode = nodes[Math.floor(Math.random() * nodes.length)]
-    
-    if (sourceNode.id === targetNode.id) return
-
-    const newEdge = {
-      source: sourceNode.id,
-      target: targetNode.id,
-      weight: Math.floor(Math.random() * 3) + 1
-    }
-
-    setEdges(prev => [...prev, newEdge])
+  const showSampleData = () => {
+    setAstData(sampleData)
+    initializeGraph(sampleData)
   }
 
   /**
-   * 最後のノードを削除
+   * ASTデータを表示
    */
-  const removeNode = () => {
-    if (nodes.length <= 1) return
-
-    const lastNodeId = nodes[nodes.length - 1].id
-    
-    setNodes(prev => prev.slice(0, -1))
-    setEdges(prev => prev.filter(edge => edge.source !== lastNodeId && edge.target !== lastNodeId))
+  const showASTData = () => {
+    // 現在のASTデータを再表示
+    initializeGraph(astData)
   }
 
   /**
    * グラフをリセット
    */
   const resetGraph = () => {
-    setNodes([
-      { id: '1', label: 'Node 1', group: 'A' },
-      { id: '2', label: 'Node 2', group: 'A' },
-      { id: '3', label: 'Node 3', group: 'B' },
-      { id: '4', label: 'Node 4', group: 'B' },
-      { id: '5', label: 'Node 5', group: 'C' }
-    ])
-    setEdges([
-      { source: '1', target: '2', weight: 1 },
-      { source: '2', target: '3', weight: 2 },
-      { source: '3', target: '4', weight: 1 },
-      { source: '4', target: '5', weight: 3 },
-      { source: '1', target: '5', weight: 2 }
-    ])
+    if (cyRef.current) {
+      cyRef.current.fit()
+    }
+  }
+
+  /**
+   * グラフをエクスポート
+   */
+  const exportGraph = () => {
+    if (cyRef.current) {
+      const png = cyRef.current.png({
+        full: true,
+        output: 'blob'
+      })
+      
+      const url = URL.createObjectURL(png)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `graph_${graphType}_${new Date().toISOString().slice(0, 10)}.png`
+      a.click()
+      URL.revokeObjectURL(url)
+    }
   }
 
   return (
     <div className="graph-container">
       <div className="graph-header">
-        <h3>Kotoba Graph Viewer (Cytoscape)</h3>
+        <h3>Kotoba Graph Viewer (AST)</h3>
         <div className="graph-controls">
           <select 
             value={graphType} 
-            onChange={(e) => setGraphType(e.target.value as 'network' | 'hierarchy' | 'circular')} 
+            onChange={(e) => handleGraphTypeChange(e.target.value as 'ast' | 'network' | 'hierarchy' | 'circular')} 
             className="graph-type-select"
           >
-            <option value="network">Network Layout</option>
-            <option value="hierarchy">Hierarchy Layout</option>
-            <option value="circular">Circular Layout</option>
+            <option value="ast">AST Tree</option>
+            <option value="hierarchy">Hierarchy</option>
+            <option value="circular">Circular</option>
+            <option value="network">Network</option>
           </select>
-          <button onClick={addNode} className="btn btn-primary">Add Node</button>
-          <button onClick={addEdge} className="btn btn-secondary">Add Edge</button>
-          <button onClick={removeNode} className="btn btn-danger" disabled={nodes.length <= 1}>Remove Node</button>
-          <button onClick={resetGraph} className="btn btn-warning">Reset</button>
+          <button onClick={showASTData} className="btn btn-primary">Show AST</button>
+          <button onClick={showSampleData} className="btn btn-secondary">Sample Data</button>
+          <button onClick={resetGraph} className="btn btn-reset">Reset View</button>
+          <button onClick={exportGraph} className="btn btn-export">Export PNG</button>
         </div>
       </div>
+      
       <div className="graph-content">
         <div ref={containerRef} className="graph-canvas" />
       </div>
+      
       <div className="graph-footer">
         <span className="status-text">
-          {graphType} layout • {nodes.length} nodes • {edges.length} edges
+          {graphType} layout • {astData.nodes.length} nodes • {astData.edges.length} edges
         </span>
       </div>
     </div>
