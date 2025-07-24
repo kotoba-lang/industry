@@ -1,206 +1,316 @@
 import { useState, useEffect, useRef } from 'react'
+import cytoscape from 'cytoscape'
 import './App.css'
 
 /**
- * グラフ表示コンポーネント
+ * グラフ表示コンポーネント（cytoscape使用）
  * Module Federationでホストアプリケーションから利用される
  */
 function App() {
-  const [graphType, setGraphType] = useState<'bar' | 'line' | 'pie'>('bar')
-  const [data, setData] = useState([
-    { label: 'Jan', value: 65 },
-    { label: 'Feb', value: 59 },
-    { label: 'Mar', value: 80 },
-    { label: 'Apr', value: 81 },
-    { label: 'May', value: 56 },
-    { label: 'Jun', value: 55 }
+  const [graphType, setGraphType] = useState<'network' | 'hierarchy' | 'circular'>('network')
+  const [nodes, setNodes] = useState([
+    { id: '1', label: 'Node 1', group: 'A' },
+    { id: '2', label: 'Node 2', group: 'A' },
+    { id: '3', label: 'Node 3', group: 'B' },
+    { id: '4', label: 'Node 4', group: 'B' },
+    { id: '5', label: 'Node 5', group: 'C' }
   ])
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [edges, setEdges] = useState([
+    { source: '1', target: '2', weight: 1 },
+    { source: '2', target: '3', weight: 2 },
+    { source: '3', target: '4', weight: 1 },
+    { source: '4', target: '5', weight: 3 },
+    { source: '1', target: '5', weight: 2 }
+  ])
+  const containerRef = useRef<HTMLDivElement>(null)
+  const cyRef = useRef<cytoscape.Core | null>(null)
 
   useEffect(() => {
     console.log('Remote Graph: App component mounted.');
-    drawGraph()
-  }, [graphType, data])
+    initializeGraph()
+  }, [])
 
-  const drawGraph = () => {
-    const canvas = canvasRef.current
-    if (!canvas) return
+  useEffect(() => {
+    if (cyRef.current) {
+      updateGraphLayout()
+    }
+  }, [graphType])
 
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
+  useEffect(() => {
+    if (cyRef.current) {
+      updateGraphData()
+    }
+  }, [nodes, edges])
 
-    // キャンバスをクリア
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
+  /**
+   * cytoscapeグラフを初期化
+   */
+  const initializeGraph = () => {
+    if (!containerRef.current) return
 
-    const width = canvas.width
-    const height = canvas.height
-    const padding = 40
-    const chartWidth = width - 2 * padding
-    const chartHeight = height - 2 * padding
-
-    // データの最大値を取得
-    const maxValue = Math.max(...data.map(d => d.value))
-
-    // 背景を描画
-    ctx.fillStyle = '#f8f9fa'
-    ctx.fillRect(0, 0, width, height)
-
-    // グリッドを描画
-    ctx.strokeStyle = '#e9ecef'
-    ctx.lineWidth = 1
-    for (let i = 0; i <= 5; i++) {
-      const y = padding + (chartHeight / 5) * i
-      ctx.beginPath()
-      ctx.moveTo(padding, y)
-      ctx.lineTo(width - padding, y)
-      ctx.stroke()
+    // 既存のグラフがあれば削除
+    if (cyRef.current) {
+      cyRef.current.destroy()
     }
 
-    if (graphType === 'bar') {
-      drawBarChart(ctx, padding, chartWidth, chartHeight, maxValue)
-    } else if (graphType === 'line') {
-      drawLineChart(ctx, padding, chartWidth, chartHeight, maxValue)
-    } else if (graphType === 'pie') {
-      drawPieChart(ctx, width / 2, height / 2, Math.min(chartWidth, chartHeight) / 2)
-    }
-  }
+    // cytoscapeインスタンスを作成
+    cyRef.current = cytoscape({
+      container: containerRef.current,
+      elements: {
+        nodes: nodes.map(node => ({
+          group: 'nodes' as const,
+          data: {
+            id: node.id,
+            label: node.label,
+            group: node.group
+          }
+        })),
+        edges: edges.map(edge => ({
+          group: 'edges' as const,
+          data: {
+            id: `${edge.source}-${edge.target}`,
+            source: edge.source,
+            target: edge.target,
+            weight: edge.weight
+          }
+        }))
+      },
+      style: [
+        {
+          selector: 'node',
+          style: {
+            'background-color': '#666',
+            'label': 'data(label)',
+            'color': '#fff',
+            'text-valign': 'center',
+            'text-halign': 'center',
+            'width': 30,
+            'height': 30,
+            'font-size': '10px',
+            'border-width': 2,
+            'border-color': '#333'
+          }
+        },
+        {
+          selector: 'node[group="A"]',
+          style: {
+            'background-color': '#4CAF50'
+          }
+        },
+        {
+          selector: 'node[group="B"]',
+          style: {
+            'background-color': '#2196F3'
+          }
+        },
+        {
+          selector: 'node[group="C"]',
+          style: {
+            'background-color': '#FF9800'
+          }
+        },
+        {
+          selector: 'edge',
+          style: {
+            'width': 'data(weight)',
+            'line-color': '#ccc',
+            'target-arrow-color': '#ccc',
+            'target-arrow-shape': 'triangle',
+            'curve-style': 'bezier'
+          }
+        }
+      ],
+      layout: getLayoutConfig()
+    })
 
-  const drawBarChart = (ctx: CanvasRenderingContext2D, padding: number, chartWidth: number, chartHeight: number, maxValue: number) => {
-    const barWidth = chartWidth / data.length * 0.8
-    const barSpacing = chartWidth / data.length * 0.2
+    // イベントリスナーを追加
+    cyRef.current.on('tap', 'node', function(evt) {
+      const node = evt.target
+      console.log('Node clicked:', node.data())
+    })
 
-    data.forEach((item, index) => {
-      const x = padding + index * (barWidth + barSpacing) + barSpacing / 2
-      const barHeight = (item.value / maxValue) * chartHeight
-      const y = padding + chartHeight - barHeight
-
-      // バーを描画
-      ctx.fillStyle = '#007bff'
-      ctx.fillRect(x, y, barWidth, barHeight)
-
-      // ラベルを描画
-      ctx.fillStyle = '#495057'
-      ctx.font = '12px Arial'
-      ctx.textAlign = 'center'
-      ctx.fillText(item.label, x + barWidth / 2, padding + chartHeight + 20)
-      ctx.fillText(item.value.toString(), x + barWidth / 2, y - 5)
+    cyRef.current.on('tap', 'edge', function(evt) {
+      const edge = evt.target
+      console.log('Edge clicked:', edge.data())
     })
   }
 
-  const drawLineChart = (ctx: CanvasRenderingContext2D, padding: number, chartWidth: number, chartHeight: number, maxValue: number) => {
-    ctx.strokeStyle = '#007bff'
-    ctx.lineWidth = 3
-    ctx.beginPath()
+  /**
+   * レイアウト設定を取得
+   */
+  const getLayoutConfig = () => {
+    switch (graphType) {
+      case 'hierarchy':
+        return {
+          name: 'dagre',
+          rankDir: 'TB',
+          padding: 50
+        }
+      case 'circular':
+        return {
+          name: 'circle',
+          padding: 50
+        }
+      default:
+        return {
+          name: 'cose',
+          padding: 50,
+          animate: true,
+          animationDuration: 1000
+        }
+    }
+  }
 
-    data.forEach((item, index) => {
-      const x = padding + (index / (data.length - 1)) * chartWidth
-      const y = padding + chartHeight - (item.value / maxValue) * chartHeight
+  /**
+   * グラフレイアウトを更新
+   */
+  const updateGraphLayout = () => {
+    if (!cyRef.current) return
 
-      if (index === 0) {
-        ctx.moveTo(x, y)
-      } else {
-        ctx.lineTo(x, y)
+    const layout = cyRef.current.layout(getLayoutConfig())
+    layout.run()
+  }
+
+  /**
+   * グラフデータを更新
+   */
+  const updateGraphData = () => {
+    if (!cyRef.current) return
+
+    // 既存の要素を削除
+    cyRef.current.elements().remove()
+
+    // 新しい要素を追加
+    const newElements = [
+      ...nodes.map(node => ({
+        group: 'nodes' as const,
+        data: {
+          id: node.id,
+          label: node.label,
+          group: node.group
+        }
+      })),
+      ...edges.map(edge => ({
+        group: 'edges' as const,
+        data: {
+          id: `${edge.source}-${edge.target}`,
+          source: edge.source,
+          target: edge.target,
+          weight: edge.weight
+        }
+      }))
+    ]
+
+    cyRef.current.add(newElements)
+    updateGraphLayout()
+  }
+
+  /**
+   * 新しいノードを追加
+   */
+  const addNode = () => {
+    const newNodeId = (nodes.length + 1).toString()
+    const groups = ['A', 'B', 'C']
+    const randomGroup = groups[Math.floor(Math.random() * groups.length)]
+    
+    const newNode = {
+      id: newNodeId,
+      label: `Node ${newNodeId}`,
+      group: randomGroup
+    }
+
+    setNodes(prev => [...prev, newNode])
+
+    // 既存のノードの1つに接続
+    if (nodes.length > 0) {
+      const randomNode = nodes[Math.floor(Math.random() * nodes.length)]
+      const newEdge = {
+        source: randomNode.id,
+        target: newNodeId,
+        weight: Math.floor(Math.random() * 3) + 1
       }
-    })
-
-    ctx.stroke()
-
-    // ポイントを描画
-    data.forEach((item, index) => {
-      const x = padding + (index / (data.length - 1)) * chartWidth
-      const y = padding + chartHeight - (item.value / maxValue) * chartHeight
-
-      ctx.fillStyle = '#007bff'
-      ctx.beginPath()
-      ctx.arc(x, y, 4, 0, 2 * Math.PI)
-      ctx.fill()
-
-      // ラベルを描画
-      ctx.fillStyle = '#495057'
-      ctx.font = '12px Arial'
-      ctx.textAlign = 'center'
-      ctx.fillText(item.label, x, padding + chartHeight + 20)
-    })
-  }
-
-  const drawPieChart = (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, radius: number) => {
-    const total = data.reduce((sum, item) => sum + item.value, 0)
-    const colors = ['#007bff', '#28a745', '#ffc107', '#dc3545', '#6f42c1', '#fd7e14']
-
-    let currentAngle = 0
-    data.forEach((item, index) => {
-      const sliceAngle = (item.value / total) * 2 * Math.PI
-
-      ctx.fillStyle = colors[index % colors.length]
-      ctx.beginPath()
-      ctx.moveTo(centerX, centerY)
-      ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle)
-      ctx.closePath()
-      ctx.fill()
-
-      // ラベルを描画
-      const labelAngle = currentAngle + sliceAngle / 2
-      const labelRadius = radius * 0.7
-      const labelX = centerX + Math.cos(labelAngle) * labelRadius
-      const labelY = centerY + Math.sin(labelAngle) * labelRadius
-
-      ctx.fillStyle = '#fff'
-      ctx.font = '12px Arial'
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText(item.label, labelX, labelY)
-
-      currentAngle += sliceAngle
-    })
-  }
-
-  const addDataPoint = () => {
-    const newLabel = String.fromCharCode(65 + data.length) // A, B, C, ...
-    const newValue = Math.floor(Math.random() * 100) + 20
-    setData([...data, { label: newLabel, value: newValue }])
-  }
-
-  const removeDataPoint = () => {
-    if (data.length > 1) {
-      setData(data.slice(0, -1))
+      setEdges(prev => [...prev, newEdge])
     }
+  }
+
+  /**
+   * ランダムなエッジを追加
+   */
+  const addEdge = () => {
+    if (nodes.length < 2) return
+
+    const sourceNode = nodes[Math.floor(Math.random() * nodes.length)]
+    const targetNode = nodes[Math.floor(Math.random() * nodes.length)]
+    
+    if (sourceNode.id === targetNode.id) return
+
+    const newEdge = {
+      source: sourceNode.id,
+      target: targetNode.id,
+      weight: Math.floor(Math.random() * 3) + 1
+    }
+
+    setEdges(prev => [...prev, newEdge])
+  }
+
+  /**
+   * 最後のノードを削除
+   */
+  const removeNode = () => {
+    if (nodes.length <= 1) return
+
+    const lastNodeId = nodes[nodes.length - 1].id
+    
+    setNodes(prev => prev.slice(0, -1))
+    setEdges(prev => prev.filter(edge => edge.source !== lastNodeId && edge.target !== lastNodeId))
+  }
+
+  /**
+   * グラフをリセット
+   */
+  const resetGraph = () => {
+    setNodes([
+      { id: '1', label: 'Node 1', group: 'A' },
+      { id: '2', label: 'Node 2', group: 'A' },
+      { id: '3', label: 'Node 3', group: 'B' },
+      { id: '4', label: 'Node 4', group: 'B' },
+      { id: '5', label: 'Node 5', group: 'C' }
+    ])
+    setEdges([
+      { source: '1', target: '2', weight: 1 },
+      { source: '2', target: '3', weight: 2 },
+      { source: '3', target: '4', weight: 1 },
+      { source: '4', target: '5', weight: 3 },
+      { source: '1', target: '5', weight: 2 }
+    ])
   }
 
   return (
     <div className="graph-container">
       <div className="graph-header">
-        <h3>Kotoba Graph Viewer</h3>
+        <h3>Kotoba Graph Viewer (Cytoscape)</h3>
         <div className="graph-controls">
           <select 
             value={graphType} 
-            onChange={(e) => setGraphType(e.target.value as 'bar' | 'line' | 'pie')}
+            onChange={(e) => setGraphType(e.target.value as 'network' | 'hierarchy' | 'circular')} 
             className="graph-type-select"
           >
-            <option value="bar">Bar Chart</option>
-            <option value="line">Line Chart</option>
-            <option value="pie">Pie Chart</option>
+            <option value="network">Network Layout</option>
+            <option value="hierarchy">Hierarchy Layout</option>
+            <option value="circular">Circular Layout</option>
           </select>
-          <button onClick={addDataPoint} className="btn btn-primary">
-            Add Data
-          </button>
-          <button onClick={removeDataPoint} className="btn btn-secondary" disabled={data.length <= 1}>
-            Remove
-          </button>
+          <button onClick={addNode} className="btn btn-primary">Add Node</button>
+          <button onClick={addEdge} className="btn btn-secondary">Add Edge</button>
+          <button onClick={removeNode} className="btn btn-danger" disabled={nodes.length <= 1}>Remove Node</button>
+          <button onClick={resetGraph} className="btn btn-warning">Reset</button>
         </div>
       </div>
-      
       <div className="graph-content">
-        <canvas
-          ref={canvasRef}
-          width={400}
-          height={300}
-          className="graph-canvas"
-        />
+        <div ref={containerRef} className="graph-canvas" />
       </div>
-      
       <div className="graph-footer">
         <span className="status-text">
-          {graphType} chart • {data.length} data points
+          {graphType} layout • {nodes.length} nodes • {edges.length} edges
         </span>
       </div>
     </div>
