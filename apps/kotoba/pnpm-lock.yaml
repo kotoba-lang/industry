@@ -134,6 +134,9 @@ importers:
       cytoscape-dagre:
         specifier: ^2.5.0
         version: 2.5.0(cytoscape@3.32.1)
+      cytoscape-edgehandles:
+        specifier: ^4.0.1
+        version: 4.0.1(cytoscape@3.32.1)
       prosemirror-example-setup:
         specifier: ^1.2.3
         version: 1.2.3
@@ -159,6 +162,12 @@ importers:
       '@tailwindcss/typography':
         specifier: ^0.5.16
         version: 0.5.16(tailwindcss@3.4.17(ts-node@10.9.2(@swc/core@1.13.2)(@types/node@22.16.5)(typescript@5.8.3)))
+      '@types/cytoscape-dagre':
+        specifier: ^2.3.3
+        version: 2.3.3
+      '@types/cytoscape-edgehandles':
+        specifier: ^4.0.4
+        version: 4.0.4
       '@types/node':
         specifier: ^22.16.5
         version: 22.16.5
@@ -271,6 +280,12 @@ importers:
 
   apps/host:
     dependencies:
+      cytoscape:
+        specifier: ^3.28.1
+        version: 3.32.1
+      cytoscape-dagre:
+        specifier: ^2.5.0
+        version: 2.5.0(cytoscape@3.32.1)
       react:
         specifier: ^19.1.0
         version: 19.1.0
@@ -1746,6 +1761,15 @@ packages:
   '@types/cookiejar@2.1.5':
     resolution: {integrity: sha512-he+DHOWReW0nghN24E1WUqM0efK4kI9oTqDm6XmK8ZPe2djZ90BSNdGnIyCLzCPw7/pogPlGbzI2wHGGmi4O/Q==}
 
+  '@types/cytoscape-dagre@2.3.3':
+    resolution: {integrity: sha512-FJBsNMbBZpqNwT6rp5leVYMevWUjnyD1QS8erNMAMWoBifvaVUklXIjE+bllLDSowjM3abXuRvljliSXUU+d1A==}
+
+  '@types/cytoscape-edgehandles@4.0.4':
+    resolution: {integrity: sha512-e88HA5fpRxISQ/x8MbRDIDcTc0fLfFZSF0NmHHsTdtCWscWbv+Ty9oYizVXGDqpkKCx2FUdEK60WTf6eauSkMg==}
+
+  '@types/cytoscape@3.21.9':
+    resolution: {integrity: sha512-JyrG4tllI6jvuISPjHK9j2Xv/LTbnLekLke5otGStjFluIyA9JjgnvgZrSBsp8cEDpiTjwgZUZwpPv8TSBcoLw==}
+
   '@types/eslint-scope@3.7.7':
     resolution: {integrity: sha512-MzMFlSLBqNF2gcHWO0G1vP/YQyfvrxZ0bF+u7mzUdZ1/xK4A4sru+nraZz5i3iEIk1l1uyicaDVTB4QbbEkAYg==}
 
@@ -2427,6 +2451,11 @@ packages:
     resolution: {integrity: sha512-VG2Knemmshop4kh5fpLO27rYcyUaaDkRw+6PiX4bstpB+QFt0p2oauMrsjVbUamGWQ6YNavh7x2em2uZlzV44g==}
     peerDependencies:
       cytoscape: ^3.2.22
+
+  cytoscape-edgehandles@4.0.1:
+    resolution: {integrity: sha512-uSYshkqRZ4luCxK295bEVTg46q4ZW+fwJhcIzMrtfNR7zeAnJ38Z48kUGeu5ibtXkgLbcZAg0YE4ED2dRuaePg==}
+    peerDependencies:
+      cytoscape: ^3.2.0
 
   cytoscape@3.32.1:
     resolution: {integrity: sha512-dbeqFTLYEwlFg7UGtcZhCCG/2WayX72zK3Sq323CEX29CY81tYfVhw1MIdduCtpstB0cTOhJswWlM/OEB3Xp+Q==}
@@ -3367,6 +3396,9 @@ packages:
 
   lodash.merge@4.6.2:
     resolution: {integrity: sha512-0KpjqXRVvrYyCsX1swR/XTK0va6VQkQM6MNo7PqW77ByjAhoARA8EfrP1N4+KlKj8YS0ZUCtRT/YUuhyYDujIQ==}
+
+  lodash.throttle@4.1.1:
+    resolution: {integrity: sha512-wIkUCfVKpVsWo3JSZlc+8MB5it+2AN5W8J7YVMST30UrvcQNZ1Okbj+rbVniijTWE6FGYy4XJq/rHkas8qJMLQ==}
 
   lodash@4.17.21:
     resolution: {integrity: sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==}
@@ -6048,6 +6080,16 @@ snapshots:
 
   '@types/cookiejar@2.1.5': {}
 
+  '@types/cytoscape-dagre@2.3.3':
+    dependencies:
+      '@types/cytoscape': 3.21.9
+
+  '@types/cytoscape-edgehandles@4.0.4':
+    dependencies:
+      '@types/cytoscape': 3.21.9
+
+  '@types/cytoscape@3.21.9': {}
+
   '@types/eslint-scope@3.7.7':
     dependencies:
       '@types/eslint': 9.6.1
@@ -6869,6 +6911,12 @@ snapshots:
     dependencies:
       cytoscape: 3.32.1
       dagre: 0.8.5
+
+  cytoscape-edgehandles@4.0.1(cytoscape@3.32.1):
+    dependencies:
+      cytoscape: 3.32.1
+      lodash.memoize: 4.1.2
+      lodash.throttle: 4.1.1
 
   cytoscape@3.32.1: {}
 
@@ -8013,6 +8061,8 @@ snapshots:
   lodash.memoize@4.1.2: {}
 
   lodash.merge@4.6.2: {}
+
+  lodash.throttle@4.1.1: {}
 
   lodash@4.17.21: {}
 
