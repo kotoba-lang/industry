@@ -149,3 +149,92 @@ WS
 	•	options { k=1; }：LL(1) であることを明示。
 
 この文法なら、トークン先読み1で常に適用すべき規則が一意に決まり、手書き再帰下降パーサ／ANTLR 等でそのまま実装できます。
+
+---
+
+5. 現代日本語への拡張
+
+古典日本語パーサーをベースに、以下の現代日本語の要素を扱えるよう文法を拡張する。
+
+-   **助詞**: 主題「は」、所有「の」
+-   **丁寧形**: 助動詞「ます」、コピュラ「です」
+-   **時制**: 過去形助動詞「た」
+
+拡張後のLL(1)文法は以下の通り。
+
+```antlr
+grammar ModernJapanese;
+
+options { k=1; }
+
+// --- トップレベル ---
+sentence
+  : clause+ EOF
+  ;
+
+// --- 節・句構造 ---
+clause
+  : np vp
+  ;
+
+np
+  : baseNP npTail
+  ;
+
+npTail
+  : relClause npTail
+  | /* ε */
+  ;
+
+baseNP
+  : NOUN caseParticle?
+  ;
+
+relClause
+  : adjPhrase
+  | clause
+  ;
+
+// --- 動詞句・助動詞列 ---
+vp
+  : (np)? (verbPhrase | copulaPhrase)
+  ;
+
+verbPhrase
+  : VERB auxList
+  ;
+
+copulaPhrase
+  : (NOUN | ADJ) COPULA
+  ;
+
+auxList
+  : AUX auxList
+  | /* ε */
+  ;
+
+// --- 形容詞句 ---
+adjPhrase
+  : ADJ
+  ;
+
+// --- 形態素 ---
+caseParticle
+  : 'が' | 'を' | 'に' | 'は' | 'の'
+  ;
+
+AUX
+  : 'き' | 'む' | 'ず' // 古典
+  | 'ます' | 'た'      // 現代
+  ;
+
+COPULA
+  : 'です'
+  ;
+
+NOUN      : [ぁ-ん一-龥]+ ;
+VERB      : [ぁ-ん一-龥]+ ;
+ADJ       : [ぁ-ん一-龥]+ ;
+```
+
+この文法に基づき、レキサー、AST、パーサーを段階的に拡張していく。
