@@ -1,12 +1,20 @@
 import React, { Suspense, useEffect } from 'react';
 
+// より詳細なエラーハンドリングを追加
 const Editor = React.lazy(() => {
   console.log('Host: Attempting to load Editor...');
-  return import('editor/Editor');
+  return import('editor/Editor').catch(error => {
+    console.error('Host: Failed to load Editor:', error);
+    throw error;
+  });
 });
+
 const Graph = React.lazy(() => {
   console.log('Host: Attempting to load Graph...');
-  return import('graph/Graph');
+  return import('graph/Graph').catch(error => {
+    console.error('Host: Failed to load Graph:', error);
+    throw error;
+  });
 });
 
 function App() {
