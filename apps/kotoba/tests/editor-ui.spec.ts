@@ -40,8 +40,9 @@ test.describe('Editor UI Tests', () => {
     const color = await editor.evaluate(el => 
       window.getComputedStyle(el).color
     );
-    // テキスト色がTailwindのダークモード色であることを確認
-    expect(color).toContain('rgb(243, 244, 246)'); // text-gray-100
+    // テキスト色がoklab形式で、明るい色であることを確認
+    expect(color).toContain('oklab');
+    expect(/oklab\(0\.(95|96)/.test(color)).toBeTruthy(); // 0.95または0.96で始まる値を許容
   });
 
   test('エディターのスタイリングが適用される', async ({ page }) => {

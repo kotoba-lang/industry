@@ -19,7 +19,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@kotoba/components': path.resolve(__dirname, '../../kotoba/components')
+      '@kotoba/components': path.resolve(__dirname, '../../kotoba/components'),
+      '@kotoba/shared': path.resolve(__dirname, '../../packages/shared')
     }
   },
   optimizeDeps: {
