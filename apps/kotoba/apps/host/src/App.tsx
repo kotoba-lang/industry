@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Editor } from '@kotoba/components/editor';
 import { Graph } from '@kotoba/components/graph';
 import type { ASTNode, ASTEdge } from '@kotoba/components/graph';
+import { GraphEditor } from './components/GraphEditor';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { ThemeToggle } from './components/ThemeToggle';
 
@@ -14,6 +15,7 @@ interface ASTData {
 function AppContent() {
   const [astData, setAstData] = useState<ASTData>({ nodes: [], edges: [] });
   const [isLoaded, setIsLoaded] = useState(false);
+  const [activeTab, setActiveTab] = useState<'editor' | 'graph'>('editor');
   const { theme } = useTheme();
 
   useEffect(() => {
@@ -84,36 +86,97 @@ function AppContent() {
         </div>
       </div>
 
+      {/* Tab Navigation */}
+      <div className={`border-b transition-colors duration-200 ${
+        theme === 'dark' 
+          ? 'border-gray-700' 
+          : 'border-gray-200'
+      }`}>
+        <div className="container-fluid">
+          <nav className="flex space-x-8">
+            <button
+              onClick={() => setActiveTab('editor')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                activeTab === 'editor'
+                  ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
+            >
+              Text Editor
+            </button>
+            <button
+              onClick={() => setActiveTab('graph')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                activeTab === 'graph'
+                  ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
+            >
+              Graph Editor
+            </button>
+          </nav>
+        </div>
+      </div>
+
       {/* Main Content */}
       <div className="container-fluid py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Editor Panel */}
-          <div className={`panel transition-colors duration-200 ${
-            theme === 'dark' 
-              ? 'bg-gray-800 border-gray-700' 
-              : 'bg-white border-gray-200'
-          }`}>
-            <div className="panel-header">
-              <h2 className={`text-lg font-semibold transition-colors duration-200 ${
-                theme === 'dark' ? 'text-gray-100' : 'text-gray-900'
-              }`}>
-                Editor
-              </h2>
-              <p className={`text-sm mt-1 transition-colors duration-200 ${
-                theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-              }`}>
-                ProseMirror-based rich text editor with AST generation
-              </p>
+        {activeTab === 'editor' ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Editor Panel */}
+            <div className={`panel transition-colors duration-200 ${
+              theme === 'dark' 
+                ? 'bg-gray-800 border-gray-700' 
+                : 'bg-white border-gray-200'
+            }`}>
+              <div className="panel-header">
+                <h2 className={`text-lg font-semibold transition-colors duration-200 ${
+                  theme === 'dark' ? 'text-gray-100' : 'text-gray-900'
+                }`}>
+                  Editor
+                </h2>
+                <p className={`text-sm mt-1 transition-colors duration-200 ${
+                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                }`}>
+                  ProseMirror-based rich text editor with AST generation
+                </p>
+              </div>
+              <div className="panel-body">
+                <Editor 
+                  initialFileName="kotoba-document.md"
+                  onASTUpdate={updateASTData}
+                />
+              </div>
             </div>
-            <div className="panel-body">
-              <Editor 
-                initialFileName="kotoba-document.md"
-                onASTUpdate={updateASTData}
-              />
+            
+            {/* Graph Panel */}
+            <div className={`panel transition-colors duration-200 ${
+              theme === 'dark' 
+                ? 'bg-gray-800 border-gray-700' 
+                : 'bg-white border-gray-200'
+            }`}>
+              <div className="panel-header">
+                <h2 className={`text-lg font-semibold transition-colors duration-200 ${
+                  theme === 'dark' ? 'text-gray-100' : 'text-gray-900'
+                }`}>
+                  Graph Viewer
+                </h2>
+                <p className={`text-sm mt-1 transition-colors duration-200 ${
+                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                }`}>
+                  Cytoscape-based AST visualization with interactive features
+                </p>
+              </div>
+              <div className="panel-body">
+                <Graph 
+                  astData={astData}
+                  initialGraphType="ast"
+                  height="500px"
+                />
+              </div>
             </div>
           </div>
-          
-          {/* Graph Panel */}
+        ) : (
+          /* Graph Editor Panel */
           <div className={`panel transition-colors duration-200 ${
             theme === 'dark' 
               ? 'bg-gray-800 border-gray-700' 
@@ -123,23 +186,23 @@ function AppContent() {
               <h2 className={`text-lg font-semibold transition-colors duration-200 ${
                 theme === 'dark' ? 'text-gray-100' : 'text-gray-900'
               }`}>
-                Graph
+                Graph Editor
               </h2>
               <p className={`text-sm mt-1 transition-colors duration-200 ${
                 theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
               }`}>
-                Cytoscape-based AST visualization with interactive features
+                Interactive graph editor with node and edge management
               </p>
             </div>
             <div className="panel-body">
-              <Graph 
+              <GraphEditor 
                 astData={astData}
-                initialGraphType="ast"
-                height="500px"
+                onGraphUpdate={updateASTData}
+                height="600px"
               />
             </div>
           </div>
-        </div>
+        )}
 
         {/* Status Panel */}
         <div className={`mt-6 panel transition-colors duration-200 ${
