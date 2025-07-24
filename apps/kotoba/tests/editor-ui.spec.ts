@@ -24,8 +24,8 @@ test.describe('Editor UI Tests', () => {
     const prosemirrorEditor = page.locator('.ProseMirror');
     await expect(prosemirrorEditor).toBeVisible();
     
-    // 初期コンテンツが表示されることを確認
-    const initialContent = page.locator('text=Kotoba Editor');
+    // 初期コンテンツが表示されることを確認（より具体的なセレクターを使用）
+    const initialContent = page.locator('.ProseMirror p').filter({ hasText: 'Kotoba Editor' });
     await expect(initialContent).toBeVisible();
   });
 
@@ -51,12 +51,20 @@ test.describe('Editor UI Tests', () => {
     const themeToggle = page.locator('button[aria-label*="Switch to"]');
     await themeToggle.click();
     
-    // エディターがダークモードで表示されることを確認
+    // エディターがダークモードで表示されることを確認（実際のスタイルをチェック）
     const editor = page.locator('.ProseMirror');
-    await expect(editor).toHaveClass(/bg-gray-800/);
     
-    // エディターのテキストがダークモードで表示されることを確認
-    await expect(editor).toHaveClass(/text-gray-100/);
+    // エディターの背景色がダークモードになっていることを確認
+    const backgroundColor = await editor.evaluate(el => 
+      window.getComputedStyle(el).backgroundColor
+    );
+    expect(backgroundColor).toBe('rgb(31, 41, 55)'); // bg-gray-800
+    
+    // エディターのテキスト色がダークモードになっていることを確認
+    const color = await editor.evaluate(el => 
+      window.getComputedStyle(el).color
+    );
+    expect(color).toBe('rgb(243, 244, 246)'); // text-gray-100
   });
 
   test('エディターのスタイリングが適用される', async ({ page }) => {
@@ -64,10 +72,21 @@ test.describe('Editor UI Tests', () => {
     
     const editor = page.locator('.ProseMirror');
     
-    // エディターに適切なスタイルが適用されていることを確認
-    await expect(editor).toHaveClass(/border/);
-    await expect(editor).toHaveClass(/rounded-md/);
-    await expect(editor).toHaveClass(/min-h-\[400px\]/);
+    // エディターに適切なスタイルが適用されていることを確認（実際のCSSプロパティをチェック）
+    const borderStyle = await editor.evaluate(el => 
+      window.getComputedStyle(el).border
+    );
+    expect(borderStyle).toContain('1px solid');
+    
+    const borderRadius = await editor.evaluate(el => 
+      window.getComputedStyle(el).borderRadius
+    );
+    expect(borderRadius).toBe('0.375rem'); // rounded-md
+    
+    const minHeight = await editor.evaluate(el => 
+      window.getComputedStyle(el).minHeight
+    );
+    expect(minHeight).toBe('400px'); // min-h-[400px]
   });
 
   test('エディターのフォーカス状態', async ({ page }) => {
@@ -78,9 +97,11 @@ test.describe('Editor UI Tests', () => {
     // エディターをクリックしてフォーカスを設定
     await editor.click();
     
-    // フォーカス状態のスタイルが適用されることを確認
-    await expect(editor).toHaveClass(/ring-2/);
-    await expect(editor).toHaveClass(/ring-blue-500/);
+    // フォーカス状態のスタイルが適用されることを確認（実際のCSSプロパティをチェック）
+    const boxShadow = await editor.evaluate(el => 
+      window.getComputedStyle(el).boxShadow
+    );
+    expect(boxShadow).toContain('rgba(59, 130, 246, 0.5)'); // ring-blue-500
   });
 
   test('エディターコンテナのレイアウト', async ({ page }) => {
@@ -90,8 +111,15 @@ test.describe('Editor UI Tests', () => {
     const editorContainer = page.locator('.prosemirror-editor-container');
     await expect(editorContainer).toBeVisible();
     
-    // エディターコンテナに適切なスタイルが適用されていることを確認
-    await expect(editorContainer).toHaveClass(/min-h-\[600px\]/);
-    await expect(editorContainer).toHaveClass(/p-6/);
+    // エディターコンテナに適切なスタイルが適用されていることを確認（実際のCSSプロパティをチェック）
+    const minHeight = await editorContainer.evaluate(el => 
+      window.getComputedStyle(el).minHeight
+    );
+    expect(minHeight).toBe('600px'); // min-h-[600px]
+    
+    const padding = await editorContainer.evaluate(el => 
+      window.getComputedStyle(el).padding
+    );
+    expect(padding).toBe('1.5rem'); // p-6
   });
 }); 
