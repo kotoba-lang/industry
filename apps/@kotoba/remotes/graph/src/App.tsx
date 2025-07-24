@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import cytoscape from 'cytoscape'
+import dagre from 'cytoscape-dagre'
 import './App.css'
+
+// cytoscapeにdagreプラグインを登録
+cytoscape.use(dagre as any)
 
 /**
  * グラフ表示コンポーネント（cytoscape使用）
@@ -144,12 +148,16 @@ function App() {
         return {
           name: 'dagre',
           rankDir: 'TB',
-          padding: 50
+          padding: 50,
+          animate: true,
+          animationDuration: 1000
         }
       case 'circular':
         return {
           name: 'circle',
-          padding: 50
+          padding: 50,
+          animate: true,
+          animationDuration: 1000
         }
       default:
         return {
