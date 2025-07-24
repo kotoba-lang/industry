@@ -96,6 +96,12 @@ Start editing to see the AST in the graph viewer!`,
         // Tailwindクラスベースのスタイリング
         proseMirrorElement.className = 'ProseMirror prose prose-sm sm:prose lg:prose-lg focus:outline-none p-4 border border-gray-300 rounded-lg bg-white dark:bg-gray-800 dark:border-gray-600 dark:prose-invert min-h-[600px] transition-colors duration-200 text-gray-900 dark:text-gray-100'
         
+        // メニューバーにTailwindクラスを適用
+        const menubar = proseMirrorElement.querySelector('.ProseMirror-menubar')
+        if (menubar) {
+          menubar.classList.add('ProseMirror-menubar')
+        }
+        
         // ダークモードの検出とクラス適用
         const isDarkMode = document.documentElement.classList.contains('dark')
         if (isDarkMode) {
@@ -126,6 +132,16 @@ Start editing to see the AST in the graph viewer!`,
               proseMirrorElement.classList.add('dark')
             } else {
               proseMirrorElement.classList.remove('dark')
+            }
+            
+            // メニューバーのスタイリングも更新
+            const menubar = proseMirrorElement.querySelector('.ProseMirror-menubar')
+            if (menubar) {
+              if (isDarkMode) {
+                menubar.classList.add('dark')
+              } else {
+                menubar.classList.remove('dark')
+              }
             }
           }
         }
