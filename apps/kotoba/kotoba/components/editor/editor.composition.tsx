@@ -1,4 +1,5 @@
-import { Editor } from './editor.js';
+import React from 'react';
+import { Editor } from './editor';
 
 export const BasicEditor = () => {
   return (
