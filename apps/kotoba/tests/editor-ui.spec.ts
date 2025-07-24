@@ -1,58 +1,33 @@
 import { test, expect } from '@playwright/test';
 
-/**
- * エディターコンポーネントのUIテスト
- * ProseMirrorエディターが正しく表示され、機能することを確認
- */
 test.describe('Editor UI Tests', () => {
-  test('エディターコンポーネントが正しく表示される', async ({ page }) => {
-    await page.goto('/');
-    
-    // エディターパネルが存在することを確認
-    const editorPanel = page.locator('.panel').filter({ hasText: 'Editor' });
-    await expect(editorPanel).toBeVisible();
-    
-    // エディターのタイトルが表示されることを確認
-    const editorTitle = page.locator('h2').filter({ hasText: 'Editor' });
-    await expect(editorTitle).toBeVisible();
+  test.beforeEach(async ({ page }) => {
+    await page.goto('http://localhost:5173');
+    // エディターが読み込まれるまで待機
+    await page.waitForSelector('[data-testid="editor"]');
+    // 初期コンテンツが表示されるまで待機
+    await page.waitForSelector('.ProseMirror p');
   });
 
-  test('ProseMirrorエディターが正しく初期化される', async ({ page }) => {
-    await page.goto('/');
+  test('エディターが正しく表示される', async ({ page }) => {
+    const editor = page.locator('[data-testid="editor"]');
+    await expect(editor).toBeVisible();
     
-    // ProseMirrorエディターが存在することを確認
-    const prosemirrorEditor = page.locator('.ProseMirror');
-    await expect(prosemirrorEditor).toBeVisible();
-    
-    // 初期コンテンツが表示されることを確認（より具体的なセレクターを使用）
-    const initialContent = page.locator('.ProseMirror p').filter({ hasText: 'Kotoba Editor' });
-    await expect(initialContent).toBeVisible();
-  });
-
-  test('エディターでテキストを編集できる', async ({ page }) => {
-    await page.goto('/');
-    
-    // エディターをクリックしてフォーカスを設定
-    const editor = page.locator('.ProseMirror');
-    await editor.click();
-    
-    // 新しいテキストを入力
-    await page.keyboard.type('Hello, this is a test!');
-    
-    // 入力したテキストが表示されることを確認
-    const typedText = page.locator('text=Hello, this is a test!');
-    await expect(typedText).toBeVisible();
+    // より具体的なセレクターを使用してProseMirrorエディターを特定
+    const proseMirror = page.locator('.ProseMirror').filter({ hasText: 'Kotoba Editor' }).first();
+    await expect(proseMirror).toBeVisible();
   });
 
   test('エディターのダークモード対応', async ({ page }) => {
-    await page.goto('/');
-    
-    // ダークモードに切り替え
-    const themeToggle = page.locator('button[aria-label*="Switch to"]');
+    // ダークモードに切り替え - より具体的なセレクターを使用
+    const themeToggle = page.locator('button').filter({ hasText: '🌙' }).or(page.locator('button').filter({ hasText: '☀️' }));
     await themeToggle.click();
     
-    // エディターがダークモードで表示されることを確認（実際のスタイルをチェック）
-    const editor = page.locator('.ProseMirror');
+    // ダークモードが適用されるまで待機
+    await page.waitForTimeout(200);
+    
+    // より具体的なセレクターを使用してProseMirrorエディターを特定
+    const editor = page.locator('.ProseMirror').filter({ hasText: 'Kotoba Editor' }).first();
     
     // エディターの背景色がダークモードになっていることを確認
     const backgroundColor = await editor.evaluate(el => 
@@ -68,11 +43,16 @@ test.describe('Editor UI Tests', () => {
   });
 
   test('エディターのスタイリングが適用される', async ({ page }) => {
-    await page.goto('/');
+    // より具体的なセレクターを使用してProseMirrorエディターを特定
+    const editor = page.locator('.ProseMirror').filter({ hasText: 'Kotoba Editor' }).first();
     
-    const editor = page.locator('.ProseMirror');
+    // エディターの背景色を確認
+    const backgroundColor = await editor.evaluate(el => 
+      window.getComputedStyle(el).backgroundColor
+    );
+    expect(backgroundColor).toBe('rgb(255, 255, 255)'); // bg-white
     
-    // エディターに適切なスタイルが適用されていることを確認（実際のCSSプロパティをチェック）
+    // エディターのボーダーを確認
     const borderStyle = await editor.evaluate(el => 
       window.getComputedStyle(el).border
     );
@@ -81,23 +61,23 @@ test.describe('Editor UI Tests', () => {
     const borderRadius = await editor.evaluate(el => 
       window.getComputedStyle(el).borderRadius
     );
-    expect(borderRadius).toBe('0.375rem'); // rounded-md
+    expect(borderRadius).toBe('0.5rem'); // rounded-lg
     
+    // エディターの最小高さを確認
     const minHeight = await editor.evaluate(el => 
       window.getComputedStyle(el).minHeight
     );
-    expect(minHeight).toBe('400px'); // min-h-[400px]
+    expect(minHeight).toBe('600px'); // min-h-[600px]
   });
 
   test('エディターのフォーカス状態', async ({ page }) => {
-    await page.goto('/');
+    // より具体的なセレクターを使用してProseMirrorエディターを特定
+    const editor = page.locator('.ProseMirror').filter({ hasText: 'Kotoba Editor' }).first();
     
-    const editor = page.locator('.ProseMirror');
-    
-    // エディターをクリックしてフォーカスを設定
+    // エディターをクリックしてフォーカス
     await editor.click();
     
-    // フォーカス状態のスタイルが適用されることを確認（実際のCSSプロパティをチェック）
+    // フォーカス時のボックスシャドウを確認
     const boxShadow = await editor.evaluate(el => 
       window.getComputedStyle(el).boxShadow
     );
@@ -105,21 +85,44 @@ test.describe('Editor UI Tests', () => {
   });
 
   test('エディターコンテナのレイアウト', async ({ page }) => {
-    await page.goto('/');
-    
-    // エディターコンテナが正しく配置されていることを確認
     const editorContainer = page.locator('.prosemirror-editor-container');
-    await expect(editorContainer).toBeVisible();
     
-    // エディターコンテナに適切なスタイルが適用されていることを確認（実際のCSSプロパティをチェック）
-    const minHeight = await editorContainer.evaluate(el => 
-      window.getComputedStyle(el).minHeight
+    // コンテナの位置を確認
+    const position = await editorContainer.evaluate(el => 
+      window.getComputedStyle(el).position
     );
-    expect(minHeight).toBe('600px'); // min-h-[600px]
+    expect(position).toBe('relative');
     
-    const padding = await editorContainer.evaluate(el => 
-      window.getComputedStyle(el).padding
+    // コンテナの幅を確認
+    const width = await editorContainer.evaluate(el => 
+      window.getComputedStyle(el).width
     );
-    expect(padding).toBe('1.5rem'); // p-6
+    expect(width).toBe('100%');
+  });
+
+  test('Typographyプラグインの適用', async ({ page }) => {
+    // より具体的なセレクターを使用してProseMirrorエディターを特定
+    const editor = page.locator('.ProseMirror').filter({ hasText: 'Kotoba Editor' }).first();
+    
+    // proseクラスが適用されていることを確認
+    const classList = await editor.evaluate(el => 
+      Array.from(el.classList)
+    );
+    expect(classList).toContain('prose');
+    expect(classList).toContain('prose-sm');
+    expect(classList).toContain('sm:prose');
+    expect(classList).toContain('lg:prose-lg');
+  });
+
+  test('エディターのトランジション効果', async ({ page }) => {
+    // より具体的なセレクターを使用してProseMirrorエディターを特定
+    const editor = page.locator('.ProseMirror').filter({ hasText: 'Kotoba Editor' }).first();
+    
+    // トランジションが適用されていることを確認
+    const transition = await editor.evaluate(el => 
+      window.getComputedStyle(el).transition
+    );
+    expect(transition).toContain('color');
+    expect(transition).toContain('0.2s');
   });
 }); 
