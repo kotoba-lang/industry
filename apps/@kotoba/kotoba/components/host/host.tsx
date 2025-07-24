@@ -1,5 +1,40 @@
 import React, { Suspense, useEffect, useState } from 'react';
 
+// 開発用のフォールバックコンポーネント
+const EditorFallback = () => (
+  <div className="flex flex-col items-center justify-center p-8 text-center">
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-md">
+      <h3 className="text-lg font-semibold text-blue-900 mb-2">Editor Component</h3>
+      <p className="text-blue-700 mb-4">開発モードでは独立したアプリケーションとして動作します</p>
+      <a 
+        href="http://localhost:5001" 
+        target="_blank" 
+        rel="noopener noreferrer" 
+        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+      >
+        Editorを独立して開く
+      </a>
+    </div>
+  </div>
+);
+
+const GraphFallback = () => (
+  <div className="flex flex-col items-center justify-center p-8 text-center">
+    <div className="bg-green-50 border border-green-200 rounded-lg p-6 max-w-md">
+      <h3 className="text-lg font-semibold text-green-900 mb-2">Graph Component</h3>
+      <p className="text-green-700 mb-4">開発モードでは独立したアプリケーションとして動作します</p>
+      <a 
+        href="http://localhost:5002" 
+        target="_blank" 
+        rel="noopener noreferrer" 
+        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+      >
+        Graphを独立して開く
+      </a>
+    </div>
+  </div>
+);
+
 // ASTデータの型定義
 interface ASTNode {
   id: string
@@ -48,17 +83,27 @@ export function Host({
   GraphComponent,
   title = "Kotoba Platform",
   layout = "grid",
-  isDevelopment = false
+  isDevelopment = true
 }: HostProps) {
   const [editorError, setEditorError] = useState(false);
   const [graphError, setGraphError] = useState(false);
   const [astData, setAstData] = useState<ASTData>({ nodes: [], edges: [] });
 
-  // ASTデータを更新する関数
-  const updateASTData = (newData: ASTData) => {
-    console.log('Host: Received AST data:', newData);
-    setAstData(newData);
-  };
+  // 開発モードではフォールバックコンポーネントを使用
+  const Editor = isDevelopment ? EditorFallback : (EditorComponent || EditorFallback);
+  const Graph = isDevelopment ? GraphFallback : (GraphComponent || GraphFallback);
+
+  // グローバル関数としてAST更新関数を公開
+  useEffect(() => {
+    (window as any).updateASTData = (newData: ASTData) => {
+      console.log('Host: Received AST data:', newData);
+      setAstData(newData);
+    };
+
+    return () => {
+      delete (window as any).updateASTData;
+    };
+  }, []);
 
   const getLayoutClass = () => {
     switch (layout) {
@@ -71,25 +116,6 @@ export function Host({
         return 'grid grid-cols-1 lg:grid-cols-2 gap-6';
     }
   };
-
-  // 使用するコンポーネントを決定
-  const EditorToUse = EditorComponent || (() => (
-    <div className="flex flex-col items-center justify-center p-8 text-center">
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-md">
-        <h3 className="text-lg font-semibold text-blue-900 mb-2">Editor Component</h3>
-        <p className="text-blue-700 mb-4">Editor component not provided</p>
-      </div>
-    </div>
-  ));
-
-  const GraphToUse = GraphComponent || (() => (
-    <div className="flex flex-col items-center justify-center p-8 text-center">
-      <div className="bg-green-50 border border-green-200 rounded-lg p-6 max-w-md">
-        <h3 className="text-lg font-semibold text-green-900 mb-2">Graph Component</h3>
-        <p className="text-green-700 mb-4">Graph component not provided</p>
-      </div>
-    </div>
-  ));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -132,7 +158,7 @@ export function Host({
                     <span className="ml-2 text-gray-600">Loading Editor...</span>
                   </div>
                 }>
-                  <EditorToUse onASTUpdate={updateASTData} />
+                  <Editor />
                 </Suspense>
               </ErrorBoundary>
             </div>
@@ -152,7 +178,7 @@ export function Host({
                     <span className="ml-2 text-gray-600">Loading Graph...</span>
                   </div>
                 }>
-                  <GraphToUse astData={astData} />
+                  <Graph astData={astData} />
                 </Suspense>
               </ErrorBoundary>
             </div>
@@ -169,9 +195,9 @@ export function Host({
               <span className="ml-2">{astData.nodes.length} nodes, {astData.edges.length} edges</span>
             </div>
             <div>
-              <span className="font-medium">Kotoba Platform</span>
+              <span className="font-medium">WebFederator Platform</span>
               <span className="ml-2">•</span>
-              <span className="ml-2">Component Integration Demo</span>
+              <span className="ml-2">Module Federation Demo</span>
             </div>
           </div>
         </div>
