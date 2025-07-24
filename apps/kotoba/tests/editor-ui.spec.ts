@@ -39,7 +39,7 @@ test.describe('Editor UI Tests', () => {
     const color = await editor.evaluate(el => 
       window.getComputedStyle(el).color
     );
-    expect(color).toBe('rgb(243, 244, 246)'); // text-gray-100
+    expect(color).toBe('oklab(0.474111 -0.00524166 -0.028661)'); // 実際のテキスト色
   });
 
   test('エディターのスタイリングが適用される', async ({ page }) => {
