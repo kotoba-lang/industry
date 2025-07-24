@@ -12,16 +12,13 @@ export default defineConfig({
     federation({
       name: 'host',
       remotes: {
-        editor: `http://localhost:5001/remoteEntry.js`,
-        graph: `http://localhost:5002/remoteEntry.js`,
+        editor: 'http://localhost:5001/remoteEntry.js',
+        graph: 'http://localhost:5002/remoteEntry.js',
       },
       shared: ['react', 'react-dom']
     })
   ],
   build: {
-    modulePreload: false,
-    target: 'esnext',
-    minify: false,
-    cssCodeSplit: false
+    target: 'esnext'
   }
 })
