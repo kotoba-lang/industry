@@ -3,7 +3,7 @@
 ```yaml
 - heading "Kotoba Platform" [level=1]
 - text: BitDev Components Integration
-- button "Switch to dark mode":
+- button "Switch to light mode":
   - text: Toggle theme
   - img
   - img
