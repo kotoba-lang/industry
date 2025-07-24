@@ -3,7 +3,11 @@
   "private": true,
   "scripts": {
     "build": "pnpm --filter \"./apps/*\" build",
+    "build:all": "pnpm --filter \"./apps/*\" --filter \"./remotes/*\" build",
     "dev": "pnpm --filter \"./apps/*\" --parallel dev",
+    "dev:all": "pnpm --filter \"./apps/*\" --filter \"./remotes/*\" --parallel dev",
+    "preview": "pnpm --filter \"./apps/*\" preview",
+    "preview:all": "pnpm --filter \"./apps/*\" --filter \"./remotes/*\" preview",
     "test": "playwright test",
     "test:debug": "playwright test --debug",
     "test:ui": "playwright test --ui",
