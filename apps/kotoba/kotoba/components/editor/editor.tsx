@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { EditorState } from 'prosemirror-state'
 import { EditorView } from 'prosemirror-view'
 import { Schema, DOMParser } from 'prosemirror-model'
@@ -90,10 +90,17 @@ Start editing to see the AST in the graph viewer!`,
         }
       })
 
-      // ProseMirrorエディターにTailwindクラスを適用
+      // ProseMirrorエディターにスタイルを適用
       if (editorRef.current.firstChild) {
         const proseMirrorElement = editorRef.current.firstChild as HTMLElement
+        // 基本クラスを適用
         proseMirrorElement.className = 'ProseMirror prose prose-sm sm:prose lg:prose-lg focus:outline-none p-4 border border-gray-300 rounded-lg bg-white dark:bg-gray-800 dark:border-gray-600 dark:prose-invert min-h-[600px] transition-colors duration-200'
+        
+        // ダークモードの検出とクラス適用
+        const isDarkMode = document.documentElement.classList.contains('dark')
+        if (isDarkMode) {
+          proseMirrorElement.classList.add('dark')
+        }
       }
 
       viewRef.current = view
@@ -106,6 +113,32 @@ Start editing to see the AST in the graph viewer!`,
       }
     }
   }, [initialContent])
+
+  // ダークモード変更を監視
+  useEffect(() => {
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+          const isDarkMode = document.documentElement.classList.contains('dark')
+          if (viewRef.current && editorRef.current?.firstChild) {
+            const proseMirrorElement = editorRef.current.firstChild as HTMLElement
+            if (isDarkMode) {
+              proseMirrorElement.classList.add('dark')
+            } else {
+              proseMirrorElement.classList.remove('dark')
+            }
+          }
+        }
+      })
+    })
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    })
+
+    return () => observer.disconnect()
+  }, [])
 
   /**
    * ファイル名を変更
