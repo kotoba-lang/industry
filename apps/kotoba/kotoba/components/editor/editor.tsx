@@ -2,40 +2,6 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import Highlight from '@tiptap/extension-highlight'
-import Link from '@tiptap/extension-link'
-import Image from '@tiptap/extension-image'
-import { Table } from '@tiptap/extension-table'
-import TaskList from '@tiptap/extension-task-list'
-import Underline from '@tiptap/extension-underline'
-import TextAlign from '@tiptap/extension-text-align'
-import Color from '@tiptap/extension-color'
-import { TextStyle } from '@tiptap/extension-text-style'
-import FontFamily from '@tiptap/extension-font-family'
-import FontSize from '@tiptap/extension-font-size'
-import Subscript from '@tiptap/extension-subscript'
-import Superscript from '@tiptap/extension-superscript'
-import Strike from '@tiptap/extension-strike'
-import Code from '@tiptap/extension-code'
-import CodeBlock from '@tiptap/extension-code-block'
-import Paragraph from '@tiptap/extension-paragraph'
-import Heading from '@tiptap/extension-heading'
-import Bold from '@tiptap/extension-bold'
-import Italic from '@tiptap/extension-italic'
-import BulletList from '@tiptap/extension-bullet-list'
-import OrderedList from '@tiptap/extension-ordered-list'
-import ListItem from '@tiptap/extension-list-item'
-import Blockquote from '@tiptap/extension-blockquote'
-import HorizontalRule from '@tiptap/extension-horizontal-rule'
-import HardBreak from '@tiptap/extension-hard-break'
-import Dropcursor from '@tiptap/extension-dropcursor'
-import Gapcursor from '@tiptap/extension-gapcursor'
-import History from '@tiptap/extension-history'
-import Collaboration from '@tiptap/extension-collaboration'
-import CollaborationCursor from '@tiptap/extension-collaboration-cursor'
-import Mention from '@tiptap/extension-mention'
-import Emoji from '@tiptap/extension-emoji'
-import Typography from '@tiptap/extension-typography'
 
 export type EditorProps = {
   /**
@@ -93,46 +59,6 @@ Start editing to see the AST in the graph viewer!`,
       Placeholder.configure({
         placeholder: 'Start writing...',
       }),
-      Highlight,
-      Link.configure({
-        openOnClick: false,
-      }),
-      Image,
-      Table.configure({
-        resizable: true,
-      }),
-      TaskList,
-      Underline,
-      TextAlign.configure({
-        types: ['heading', 'paragraph'],
-      }),
-      Color,
-      TextStyle,
-      FontFamily,
-      FontSize,
-      Subscript,
-      Superscript,
-      Strike,
-      Code,
-      CodeBlock,
-      Paragraph,
-      Heading,
-      Bold,
-      Italic,
-      BulletList,
-      OrderedList,
-      ListItem,
-      Blockquote,
-      HorizontalRule,
-      HardBreak,
-      Dropcursor,
-      Gapcursor,
-      History,
-      Collaboration,
-      CollaborationCursor,
-      Mention,
-      Emoji,
-      Typography,
     ],
     content: initialContent,
     onUpdate: ({ editor }) => {
