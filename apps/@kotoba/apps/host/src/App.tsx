@@ -1,9 +1,19 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect } from 'react';
 
-const Editor = React.lazy(() => import('editor/Editor'));
-const Graph = React.lazy(() => import('graph/Graph'));
+const Editor = React.lazy(() => {
+  console.log('Host: Attempting to load Editor...');
+  return import('editor/Editor');
+});
+const Graph = React.lazy(() => {
+  console.log('Host: Attempting to load Graph...');
+  return import('graph/Graph');
+});
 
 function App() {
+  useEffect(() => {
+    console.log('Host: App component mounted.');
+  }, []);
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', padding: '20px', height: '100vh' }}>
       <div style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '10px' }}>
