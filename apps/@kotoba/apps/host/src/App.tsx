@@ -1,35 +1,25 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React, { Suspense } from 'react';
+
+const Editor = React.lazy(() => import('editor/Editor'));
+const Graph = React.lazy(() => import('graph/Graph'));
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', padding: '20px', height: '100vh' }}>
+      <div style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '10px' }}>
+        <h2>Editor</h2>
+        <Suspense fallback={<div>Loading Editor...</div>}>
+          <Editor />
+        </Suspense>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
+      <div style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '10px' }}>
+        <h2>Graph</h2>
+        <Suspense fallback={<div>Loading Graph...</div>}>
+          <Graph />
+        </Suspense>
       </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    </div>
+  );
 }
 
-export default App
+export default App;
