@@ -21,6 +21,7 @@ const (
 	// 助詞・助動詞
 	CASE_PARTICLE = "CASE_PARTICLE" // 格助詞
 	AUX           = "AUX"           // 助動詞
+	COPULA        = "COPULA"        // コピュラ
 
 	// 区切り文字など
 	GA = "が"
@@ -29,13 +30,24 @@ const (
 	KI = "き"
 	MU = "む"
 	ZU = "ず"
+	// 現代日本語拡張
+	HA   = "は"
+	NO   = "の"
+	DESU = "です"
+	MASU = "ます"
+	TA   = "た"
 )
 
 var keywords = map[string]TokenType{
-	"が": CASE_PARTICLE,
-	"を": CASE_PARTICLE,
-	"に": CASE_PARTICLE,
-	"き": AUX,
-	"む": AUX,
-	"ず": AUX,
-} 
+	"が":  CASE_PARTICLE,
+	"を":  CASE_PARTICLE,
+	"に":  CASE_PARTICLE,
+	"は":  CASE_PARTICLE,
+	"の":  CASE_PARTICLE,
+	"き":  AUX,
+	"む":  AUX,
+	"ず":  AUX,
+	"ます": AUX,
+	"た":  AUX,
+	"です": COPULA,
+}
