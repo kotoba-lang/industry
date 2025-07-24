@@ -9,26 +9,128 @@
  */
 
 {
-    "components/editor": {
+    "jun784.webfederator/components/editor": {
         "name": "components/editor",
         "scope": "jun784.webfederator",
         "version": "0.0.2",
         "mainFile": "index.ts",
-        "rootDir": "webfederator/components/editor"
+        "rootDir": "webfederator/components/editor",
+        "config": {
+            "teambit.component/remove": {
+                "removed": true,
+                "removeOnMain": true
+            }
+        }
     },
-    "components/graph": {
+    "jun784.webfederator/components/graph": {
         "name": "components/graph",
         "scope": "jun784.webfederator",
         "version": "0.0.2",
         "mainFile": "index.ts",
-        "rootDir": "webfederator/components/graph"
+        "rootDir": "webfederator/components/graph",
+        "config": {
+            "teambit.component/remove": {
+                "removed": true,
+                "removeOnMain": true
+            }
+        }
     },
-    "components/host": {
+    "jun784.webfederator/components/host": {
         "name": "components/host",
         "scope": "jun784.webfederator",
         "version": "0.0.2",
         "mainFile": "index.ts",
-        "rootDir": "webfederator/components/host"
+        "rootDir": "webfederator/components/host",
+        "config": {
+            "teambit.component/remove": {
+                "removed": true,
+                "removeOnMain": true
+            }
+        }
+    },
+    "junkawasaki.kotoba/components/editor": {
+        "name": "components/editor",
+        "scope": "",
+        "version": "",
+        "defaultScope": "junkawasaki.kotoba",
+        "mainFile": "index.ts",
+        "rootDir": "kotoba/components/editor",
+        "config": {
+            "bitdev.react/react-env@4.1.11": {},
+            "teambit.envs/envs": {
+                "env": "bitdev.react/react-env"
+            },
+            "teambit.dependencies/dependency-resolver": {},
+            "teambit.component/dev-files": {},
+            "teambit.semantics/schema": {},
+            "teambit.preview/preview": {},
+            "teambit.compositions/compositions": {},
+            "teambit.docs/docs": {},
+            "teambit.harmony/application": {},
+            "teambit.component/renaming": {
+                "renamedFrom": {
+                    "scope": "jun784.webfederator",
+                    "name": "components/editor",
+                    "version": "0.0.2"
+                }
+            }
+        }
+    },
+    "junkawasaki.kotoba/components/graph": {
+        "name": "components/graph",
+        "scope": "",
+        "version": "",
+        "defaultScope": "junkawasaki.kotoba",
+        "mainFile": "index.ts",
+        "rootDir": "kotoba/components/graph",
+        "config": {
+            "bitdev.react/react-env@4.1.11": {},
+            "teambit.envs/envs": {
+                "env": "bitdev.react/react-env"
+            },
+            "teambit.dependencies/dependency-resolver": {},
+            "teambit.component/dev-files": {},
+            "teambit.semantics/schema": {},
+            "teambit.preview/preview": {},
+            "teambit.compositions/compositions": {},
+            "teambit.docs/docs": {},
+            "teambit.harmony/application": {},
+            "teambit.component/renaming": {
+                "renamedFrom": {
+                    "scope": "jun784.webfederator",
+                    "name": "components/graph",
+                    "version": "0.0.2"
+                }
+            }
+        }
+    },
+    "junkawasaki.kotoba/components/host": {
+        "name": "components/host",
+        "scope": "",
+        "version": "",
+        "defaultScope": "junkawasaki.kotoba",
+        "mainFile": "index.ts",
+        "rootDir": "kotoba/components/host",
+        "config": {
+            "bitdev.react/react-env@4.1.11": {},
+            "teambit.envs/envs": {
+                "env": "bitdev.react/react-env"
+            },
+            "teambit.dependencies/dependency-resolver": {},
+            "teambit.component/dev-files": {},
+            "teambit.semantics/schema": {},
+            "teambit.preview/preview": {},
+            "teambit.compositions/compositions": {},
+            "teambit.docs/docs": {},
+            "teambit.harmony/application": {},
+            "teambit.component/renaming": {
+                "renamedFrom": {
+                    "scope": "jun784.webfederator",
+                    "name": "components/host",
+                    "version": "0.0.2"
+                }
+            }
+        }
     },
     "$schema-version": "17.0.0"
 }

@@ -1,0 +1,88 @@
+---
+description: 'A ProseMirror-based rich text editor with AST generation capabilities'
+labels: ['react', 'editor', 'prosemirror', 'ast']
+---
+
+import { Editor } from './editor';
+
+# Kotoba Editor Component
+
+A powerful rich text editor built with ProseMirror that can generate Abstract Syntax Trees (AST) from document content.
+
+## Features
+
+- **Rich Text Editing**: Full-featured text editor with formatting options
+- **Markdown Support**: Write and edit markdown content
+- **AST Generation**: Generate Abstract Syntax Trees from document structure
+- **Real-time Updates**: Live preview and AST generation
+- **File Management**: Save and load documents
+- **Tailwind UI**: Modern, responsive design
+
+## Usage
+
+```tsx
+import { Editor } from '@junkawasaki/webfederator.components.editor';
+
+function MyApp() {
+  const handleASTUpdate = (astData) => {
+    console.log('AST data updated:', astData);
+  };
+
+  return (
+    <Editor 
+      initialFileName="my-document.md"
+      initialContent="# My Document\n\nStart writing here..."
+      onASTUpdate={handleASTUpdate}
+    />
+  );
+}
+```
+
+## Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `initialFileName` | `string` | `'untitled.md'` | Initial file name for the document |
+| `initialContent` | `string` | Sample markdown content | Initial content to load in the editor |
+| `onASTUpdate` | `(astData: any) => void` | `undefined` | Callback function called when AST is generated |
+
+## AST Data Structure
+
+The generated AST contains nodes and edges representing the document structure:
+
+```typescript
+interface ASTNode {
+  id: string;
+  label: string;
+  type: string;
+  group: string;
+  level: number;
+}
+
+interface ASTEdge {
+  source: string;
+  target: string;
+  weight: number;
+}
+
+interface ASTData {
+  nodes: ASTNode[];
+  edges: ASTEdge[];
+}
+```
+
+## Node Types
+
+- **A (Green)**: Headings (h1, h2, h3, etc.)
+- **B (Blue)**: Paragraphs
+- **C (Orange)**: Lists (bullet lists, ordered lists, list items)
+- **D (Purple)**: Code blocks
+- **E (Gray)**: Text content
+
+## Example
+
+<Editor 
+  initialFileName="example.md"
+  initialContent="# Welcome to Kotoba Editor\n\nThis is a **rich text editor** with AST generation.\n\n## Features\n\n- Rich editing\n- AST generation\n- Modern UI"
+  onASTUpdate={(data) => console.log('AST:', data)}
+/>
