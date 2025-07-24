@@ -4,8 +4,10 @@ import federation from '@originjs/vite-plugin-federation'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  appType: 'mpa',
   server: {
-    port: 5001
+    port: 5001,
+    cors: true
   },
   plugins: [
     react(),
@@ -19,6 +21,9 @@ export default defineConfig({
     })
   ],
   build: {
-    target: 'esnext'
+    modulePreload: false,
+    target: 'esnext',
+    minify: false,
+    cssCodeSplit: false
   }
 })
