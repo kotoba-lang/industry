@@ -1,9 +1,10 @@
 package parser
 
 import (
+	"testing"
+
 	"github.com/junkawasaki/yamato-ll1/internal/ast"
 	"github.com/junkawasaki/yamato-ll1/internal/lexer"
-	"testing"
 )
 
 func TestParseSentence(t *testing.T) {
@@ -39,8 +40,14 @@ func TestParseSentence(t *testing.T) {
 	if !ok {
 		t.Fatalf("stmt.VP is not *ast.VP. got=%T", stmt.VP)
 	}
-	if vp.Verb.TokenLiteral() != "見" {
-		t.Errorf("vp.Verb.TokenLiteral() not '見'. got=%s", vp.Verb.TokenLiteral())
+
+	verbP, ok := vp.VerbPhrase.(*ast.VerbPhrase)
+	if !ok {
+		t.Fatalf("vp.VerbPhrase not *ast.VerbPhrase. got=%T", vp.VerbPhrase)
+	}
+
+	if verbP.Verb.TokenLiteral() != "見" {
+		t.Errorf("verbP.Verb.TokenLiteral() not '見'. got=%s", verbP.Verb.TokenLiteral())
 	}
 }
 
@@ -55,4 +62,56 @@ func checkParserErrors(t *testing.T, p *Parser) {
 		t.Errorf("parser error: %q", msg)
 	}
 	t.FailNow()
-} 
+}
+
+func TestModernJapaneseParse(t *testing.T) {
+	tests := []struct {
+		input             string
+		expectedVPSubject string
+		expectedVerb      string
+		isCopula          bool
+	}{
+		{"私 は 学生 です", "学生", "です", true},
+		{"彼 が ご飯 を 食べ ます", "ご飯", "食べ", false},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		sentence := p.ParseSentence()
+		checkParserErrors(t, p)
+
+		if len(sentence.Clauses) != 1 {
+			t.Fatalf("len(Clauses) not 1. got=%d", len(sentence.Clauses))
+		}
+
+		clause, ok := sentence.Clauses[0].(*ast.Clause)
+		if !ok {
+			t.Fatalf("Clauses[0] not *ast.Clause.")
+		}
+
+		vp, ok := clause.VP.(*ast.VP)
+		if !ok {
+			t.Fatalf("clause.VP not *ast.VP.")
+		}
+
+		if tt.isCopula {
+			cp, ok := vp.VerbPhrase.(*ast.CopulaPhrase)
+			if !ok {
+				t.Fatalf("vp.VerbPhrase not *ast.CopulaPhrase.")
+			}
+			if cp.Subject.String() != tt.expectedVPSubject {
+				t.Errorf("cp.Subject wrong. want=%q, got=%q", tt.expectedVPSubject, cp.Subject.String())
+			}
+		} else {
+			// verb phrase test
+			verbP, ok := vp.VerbPhrase.(*ast.VerbPhrase)
+			if !ok {
+				t.Fatalf("vp.VerbPhrase not *ast.VerbPhrase.")
+			}
+			if verbP.Verb.String() != tt.expectedVerb {
+				t.Errorf("verbP.Verb.String() wrong. want=%q, got=%q", tt.expectedVerb, verbP.Verb.String())
+			}
+		}
+	}
+}

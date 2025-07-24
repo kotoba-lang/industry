@@ -126,35 +126,54 @@ func (p *Parser) parseAdjPhrase() ast.Expression {
 func (p *Parser) parseVP() ast.Expression {
 	vp := &ast.VP{Token: p.curToken}
 
-	// VPの先頭がNPの場合 (e.g., 馬を)
+	// Optional object NP
 	if p.curTokenIs(lexer.NOUN) && p.peekTokenIs(lexer.CASE_PARTICLE) {
-		// NPを解析してObjectにセット
 		vp.Object = p.parseNP().(*ast.NP)
-		p.nextToken() // 動詞に進む
-	}
-
-	// 動詞の解析
-	if !p.curTokenIs(lexer.NOUN) { // 動詞はNOUNとして字句解析される
-		p.errors = append(p.errors, fmt.Sprintf("expected verb but got %s", p.curToken.Literal))
-		return nil
-	}
-	vp.Verb = &ast.Verb{Token: p.curToken, Value: p.curToken.Literal}
-
-	// auxList : AUX auxList | ε
-	for p.peekTokenIs(lexer.AUX) {
 		p.nextToken()
-		aux := &ast.Aux{Token: p.curToken, Value: p.curToken.Literal}
-		vp.Auxiliaries = append(vp.Auxiliaries, aux)
 	}
 
-	// 末尾の caseParticle
-	if p.peekTokenIs(lexer.CASE_PARTICLE) {
-		p.nextToken()
-		particle := &ast.CaseParticle{Token: p.curToken, Value: p.curToken.Literal}
-		vp.Particle = particle
+	// verbPhrase or copulaPhrase
+	if p.peekTokenIs(lexer.COPULA) {
+		vp.VerbPhrase = p.parseCopulaPhrase()
+	} else {
+		vp.VerbPhrase = p.parseVerbPhrase()
 	}
 
 	return vp
+}
+
+func (p *Parser) parseVerbPhrase() ast.Expression {
+	phrase := &ast.VerbPhrase{Token: p.curToken}
+
+	if !p.curTokenIs(lexer.NOUN) { // Verbs are tokenized as NOUNs
+		return nil
+	}
+	phrase.Verb = &ast.Verb{Token: p.curToken, Value: p.curToken.Literal}
+
+	for p.peekTokenIs(lexer.AUX) {
+		p.nextToken()
+		aux := &ast.Aux{Token: p.curToken, Value: p.curToken.Literal}
+		phrase.Auxiliaries = append(phrase.Auxiliaries, aux)
+	}
+	return phrase
+}
+
+func (p *Parser) parseCopulaPhrase() ast.Expression {
+	phrase := &ast.CopulaPhrase{Token: p.curToken}
+
+	if !(p.curTokenIs(lexer.NOUN) || p.curTokenIs(lexer.ADJ)) {
+		return nil
+	}
+	phrase.Subject = &ast.Noun{Token: p.curToken, Value: p.curToken.Literal} // Simplified
+
+	p.nextToken() // move to COPULA
+	if !p.curTokenIs(lexer.COPULA) {
+		return nil
+	}
+	copulaToken := p.curToken
+	phrase.Copula = &copulaToken
+
+	return phrase
 }
 
 func (p *Parser) curTokenIs(t lexer.TokenType) bool {
