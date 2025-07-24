@@ -90,11 +90,11 @@ Start editing to see the AST in the graph viewer!`,
         }
       })
 
-      // ProseMirrorエディターにスタイルを適用
+      // ProseMirrorエディターにTailwindクラスを適用
       if (editorRef.current.firstChild) {
         const proseMirrorElement = editorRef.current.firstChild as HTMLElement
-        // 基本クラスを適用
-        proseMirrorElement.className = 'ProseMirror prose prose-sm sm:prose lg:prose-lg focus:outline-none p-4 border border-gray-300 rounded-lg bg-white dark:bg-gray-800 dark:border-gray-600 dark:prose-invert min-h-[600px] transition-colors duration-200'
+        // Tailwindクラスベースのスタイリング
+        proseMirrorElement.className = 'ProseMirror prose prose-sm sm:prose lg:prose-lg focus:outline-none p-4 border border-gray-300 rounded-lg bg-white dark:bg-gray-800 dark:border-gray-600 dark:prose-invert min-h-[600px] transition-colors duration-200 text-gray-900 dark:text-gray-100'
         
         // ダークモードの検出とクラス適用
         const isDarkMode = document.documentElement.classList.contains('dark')
