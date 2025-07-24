@@ -7,7 +7,7 @@ const EditorFallback = () => (
     <p>開発モードでは独立したアプリケーションとして動作します</p>
     <a href="http://localhost:5001" target="_blank" rel="noopener noreferrer" 
        style={{ color: '#007bff', textDecoration: 'none' }}>
-      Editor App を開く →
+      Editorを独立して開く
     </a>
   </div>
 );
@@ -18,71 +18,104 @@ const GraphFallback = () => (
     <p>開発モードでは独立したアプリケーションとして動作します</p>
     <a href="http://localhost:5002" target="_blank" rel="noopener noreferrer" 
        style={{ color: '#007bff', textDecoration: 'none' }}>
-      Graph App を開く →
+      Graphを独立して開く
     </a>
   </div>
 );
 
-// Module Federation コンポーネント（本番環境用）
-const Editor = React.lazy(() => {
-  console.log('Host: Attempting to load Editor...');
-  return import('editor/Editor').catch(error => {
-    console.error('Host: Failed to load Editor:', error);
-    throw error;
-  });
-});
+// ASTデータの型定義
+interface ASTNode {
+  id: string
+  label: string
+  type: string
+  group: string
+  level: number
+}
 
-const Graph = React.lazy(() => {
-  console.log('Host: Attempting to load Graph...');
-  return import('graph/Graph').catch(error => {
-    console.error('Host: Failed to load Graph:', error);
-    throw error;
-  });
-});
+interface ASTEdge {
+  source: string
+  target: string
+  weight: number
+}
+
+interface ASTData {
+  nodes: ASTNode[]
+  edges: ASTEdge[]
+}
 
 function App() {
   const [editorError, setEditorError] = useState(false);
   const [graphError, setGraphError] = useState(false);
+  const [astData, setAstData] = useState<ASTData>({ nodes: [], edges: [] });
+
+  // Module Federationのリモートコンポーネントを動的インポート
+  const Editor = React.lazy(() => {
+    console.log('Host: Attempting to load Editor...');
+    return import('editor/Editor').catch(error => {
+      console.error('Host: Failed to load Editor:', error);
+      throw error;
+    });
+  });
+
+  const Graph = React.lazy(() => {
+    console.log('Host: Attempting to load Graph...');
+    return import('graph/Graph').catch(error => {
+      console.error('Host: Failed to load Graph:', error);
+      throw error;
+    });
+  });
 
   useEffect(() => {
-    console.log('Host: App component mounted.');
+    console.log('Host App: Component mounted');
+  }, []);
+
+  // ASTデータを更新する関数
+  const updateASTData = (newData: ASTData) => {
+    console.log('Host App: AST data updated', newData);
+    setAstData(newData);
+  };
+
+  // グローバルウィンドウオブジェクトにAST更新関数を公開
+  useEffect(() => {
+    (window as any).updateASTData = updateASTData;
+    return () => {
+      delete (window as any).updateASTData;
+    };
   }, []);
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', padding: '20px', height: '100vh' }}>
       <div style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '10px' }}>
         <h2>Editor</h2>
-        <Suspense fallback={<div>Loading Editor...</div>}>
-          {editorError ? (
-            <EditorFallback />
-          ) : (
+        {editorError ? (
+          <EditorFallback />
+        ) : (
+          <Suspense fallback={<div>Loading Editor...</div>}>
             <ErrorBoundary onError={() => setEditorError(true)}>
               <Editor />
             </ErrorBoundary>
-          )}
-        </Suspense>
+          </Suspense>
+        )}
       </div>
+      
       <div style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '10px' }}>
         <h2>Graph</h2>
-        <Suspense fallback={<div>Loading Graph...</div>}>
-          {graphError ? (
-            <GraphFallback />
-          ) : (
+        {graphError ? (
+          <GraphFallback />
+        ) : (
+          <Suspense fallback={<div>Loading Graph...</div>}>
             <ErrorBoundary onError={() => setGraphError(true)}>
-              <Graph />
+              <Graph astData={astData} />
             </ErrorBoundary>
-          )}
-        </Suspense>
+          </Suspense>
+        )}
       </div>
     </div>
   );
 }
 
-// エラーバウンダリーコンポーネント
-class ErrorBoundary extends React.Component<
-  { children: React.ReactNode; onError: () => void },
-  { hasError: boolean }
-> {
+// シンプルなエラーバウンダリーコンポーネント
+class ErrorBoundary extends React.Component<{ children: React.ReactNode; onError: () => void }, { hasError: boolean }> {
   constructor(props: { children: React.ReactNode; onError: () => void }) {
     super(props);
     this.state = { hasError: false };
@@ -92,14 +125,20 @@ class ErrorBoundary extends React.Component<
     return { hasError: true };
   }
 
-  componentDidCatch() {
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error('Error caught by boundary:', error, errorInfo);
     this.props.onError();
   }
 
   render() {
     if (this.state.hasError) {
-      return null; // フォールバックコンポーネントが表示される
+      return (
+        <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+          <p>コンポーネントの読み込みに失敗しました</p>
+        </div>
+      );
     }
+
     return this.props.children;
   }
 }
