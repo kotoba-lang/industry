@@ -1,4 +1,4 @@
-export { Graph } from './graph.js';
-export type { GraphProps } from './graph.js';
-export { GraphEditor } from './graph-editor.js';
-export type { GraphEditorProps } from './graph-editor.js';
+export { Graph } from './graph'
+export type { GraphProps } from './graph'
+export { GraphEditor } from './graph-editor'
+export type { GraphEditorProps } from './graph-editor'
