@@ -7,7 +7,7 @@
 \usepackage{fontspec}
 \setmainfont{Takao PMincho} % Or your preferred Japanese font
 
-\title{A LL(1) Parser for a Fragment of Classical Japanese}
+\title{A Formal Grammar and Parser for a Controlled Fragment of Japanese}
 \author{J. Kawasaki}
 \date{\today}
 
@@ -16,86 +16,45 @@
 \maketitle
 
 \begin{abstract}
-This paper presents the design and implementation of a parser for a defined fragment of Classical Japanese. We formulate an LL(1) grammar that covers basic sentence structures, including subordinate clauses, and implement a corresponding recursive-descent parser in the Go programming language. The parser constructs an Abstract Syntax Tree (AST), providing a structured representation of the input text suitable for further linguistic analysis or processing. This work serves as a practical, end-to-end example of applying compiler construction techniques to a natural language, offering a clear and reproducible case study.
+This paper introduces Attempto Controlled Japanese (ACJ), a subset of modern Japanese with a precisely defined and computable syntax. Drawing inspiration from Attempto Controlled English (ACE), ACJ is designed to be unambiguous and directly mappable to a formal representation. We present the complete lexical and syntactic specification of ACJ, which covers a range of fundamental sentence structures. We also describe the implementation of a recursive-descent LL(1) parser in Go that translates ACJ sentences into an Abstract Syntax Tree (AST). This work represents a foundational step towards a formally verifiable and machine-processable subset of the Japanese language.
 \end{abstract}
 
 \section{Introduction}
-The formal analysis of natural language syntax has long benefited from the tools and methodologies of computer science, particularly from the theory of formal languages and compilers. This paper details a project to build a parser for a limited subset of Classical Japanese (Yamato-kotoba). The primary goal is pedagogical: to provide a concrete example of how a formal grammar can be defined for a natural language fragment and how a corresponding parser can be implemented from scratch.
+Controlled Natural Languages (CNLs) are subsets of natural languages that are restricted in a systematic way to reduce ambiguity and complexity. Projects like Attempto Controlled English (ACE) have demonstrated that CNLs can serve as a bridge between human language and formal logic, enabling precise and verifiable specifications.
 
-This paper is structured as follows: Section 2 details the LL(1) grammar. Section 3 describes the implementation of the lexer and the recursive-descent parser in Go. Finally, Section 4 concludes and suggests directions for future work.
+This paper presents a similar effort for the Japanese language. We define a subset of Japanese, which we call Attempto Controlled Japanese (ACJ), and provide a formal grammar for it. The main contribution of this work is to define a machine-executable grammar and provide a reference implementation of a parser, which translates ACJ text into an unambiguous Abstract Syntax Tree (AST).
 
-\section{Grammar}
-The grammar was initially designed for a fragment of Classical Japanese and subsequently extended to handle basic modern structures.
+\section{The Attempto Controlled Japanese (ACJ) Language}
+ACJ is defined by a lexicon and a set of construction rules.
 
-\subsection{Initial Grammar (Classical Japanese)}
+\subsection{Lexicon}
+The lexicon of ACJ consists of predefined tokens for particles, auxiliaries, and a copula, as well as user-defined content words (nouns, verbs, adjectives).
+
+\begin{itemize}
+  \item \textbf{Nouns, Verbs, Adjectives}: Word stems (e.g., "学生", "食べ").
+  \item \textbf{Case Particles}: が, を, に, は, の.
+  \item \textbf{Auxiliary Verbs (AUX)}: ます, た.
+  \item \textbf{Copula (COPULA)}: です.
+\end{itemize}
+
+\subsection{Syntactic Rules}
+The grammar is specified in an ANTLR-like notation and is designed to be LL(1).
 \begin{verbatim}
-grammar ClassicalJapanese;
-
-// --- Top Level ---
-sentence: clause+ EOF;
-
-// --- Clause and Phrase Structure ---
+sentence: clause+;
 clause: np vp;
-
-np: baseNP npTail;
-npTail: relClause npTail | /* epsilon */;
-baseNP: NOUN caseParticle?;
-
-relClause: adjPhrase | clause;
-
-// --- Verb Phrase and Auxiliaries ---
-vp: (np)? VERB auxList caseParticle?;
-auxList: AUX auxList | /* epsilon */;
-
-// --- Adjective Phrase ---
-adjPhrase: ADJ AUX?;
-
-// --- Morphemes ---
-caseParticle: 'が' | 'を' | 'に';
-AUX: 'き' | 'む' | 'ず';
-
-NOUN: [word];
-VERB: [word];
-ADJ: [word];
-\end{verbatim}
-
-\subsection{Extended Grammar (Modern Japanese)}
-To parse modern Japanese sentences, we extended the grammar to include common particles ('は', 'の'), polite forms ('です', 'ます'), and basic tense ('た').
-
-\begin{verbatim}
-grammar ModernJapanese;
-
+np: NOUN caseParticle?;
 vp: (np)? (verbPhrase | copulaPhrase);
 verbPhrase: VERB auxList;
 copulaPhrase: (NOUN | ADJ) COPULA;
-
-caseParticle: 'が' | 'を' | 'に' | 'は' | 'の';
-AUX: 'ます' | 'た' | ... ;
-COPULA: 'です';
+auxList: AUX auxList | /* epsilon */;
 \end{verbatim}
 
-\subsection{Lexical Tokens}
-% ...
+\section{Parser Implementation}
+We implemented a recursive-descent parser for ACJ in the Go programming language. The parser takes a string of ACJ text and, if the string conforms to the grammar, returns an Abstract Syntax Tree (AST). The main components are a lexer that performs tokenization and a parser that builds the AST according to the syntactic rules.
 
-\subsection{Syntactic Rules}
-% ...
+\section{Conclusion and Future Work}
+We have defined Attempto Controlled Japanese (ACJ), a machine-processable subset of Japanese, and provided a reference parser. The resulting ASTs provide a solid foundation for further formal processing.
 
-\section{Implementation}
-The parser is implemented in Go, following a standard recursive-descent approach. The implementation is divided into three main components: the lexer, the parser, and the Abstract Syntax Tree (AST) definitions.
-
-\subsection{Lexer}
-The lexer (or tokenizer) processes the input string, a sequence of characters, and converts it into a sequence of tokens. It handles multi-byte UTF-8 characters, correctly identifying Japanese words as well as single-character particles and auxiliaries. Keywords such as 'が' or 'き' are identified as distinct token types, while other word-like sequences are initially classified as generic nouns.
-
-\subsection{Parser and AST}
-The parser is a top-down, recursive-descent parser. It takes the token stream from the lexer and attempts to build a valid parse tree according to the grammar. For each non-terminal symbol in the grammar (e.g., \texttt{clause}, \texttt{np}, \texttt{vp}), there is a corresponding function in the parser.
-
-The result of a successful parse is an Abstract Syntax Tree (AST). The AST is a tree representation of the abstract syntactic structure of the source code. Each node of the tree denotes a construct occurring in the source code. The AST nodes are defined as Go structs that correspond to the grammar's rules, such as \texttt{Clause}, \texttt{NP}, and \texttt{VP}. This tree can then be used by subsequent phases, such as an interpreter or code generator.
-
-The AST was extended with nodes like \texttt{CopulaPhrase} and \texttt{VerbPhrase} to represent these new structures. The parser was updated to distinguish between these phrases based on lookahead.
-
-\section{Conclusion}
-We have successfully designed and implemented an LL(1) parser for a small but non-trivial fragment of Classical Japanese. The project demonstrates the viability of using standard parsing techniques to analyze the structure of a natural language, producing a well-defined Abstract Syntax Tree.
-
-We successfully extended the parser to cover basic modern Japanese sentences, including polite forms. This demonstrates the extensibility of the architecture. Further work can incorporate more complex structures like passive and causative verbs.
+Future work will focus on expanding the grammatical coverage of ACJ and, crucially, defining a direct mapping from ACJ's ASTs to a formal logic representation, such as First-Order Logic, similar to the approach taken by ACE.
 
 \end{document} 
