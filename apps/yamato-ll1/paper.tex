@@ -7,7 +7,7 @@
 \usepackage{fontspec}
 \setmainfont{Takao PMincho} % Or your preferred Japanese font
 
-\title{A Formal Grammar and Parser for a Controlled Fragment of Japanese}
+\title{Attempto Controlled Japanese (ACJ) \\ \large A Case Study with the \texttt{yamato-ll1} Parser}
 \author{J. Kawasaki}
 \date{\today}
 
@@ -16,7 +16,7 @@
 \maketitle
 
 \begin{abstract}
-This paper introduces Attempto Controlled Japanese (ACJ), a subset of modern Japanese with a precisely defined and computable syntax. Drawing inspiration from Attempto Controlled English (ACE), ACJ is designed to be unambiguous and directly mappable to a formal representation. We present the complete lexical and syntactic specification of ACJ, which covers a range of fundamental sentence structures. We also describe the implementation of a recursive-descent LL(1) parser in Go that translates ACJ sentences into an Abstract Syntax Tree (AST). This work represents a foundational step towards a formally verifiable and machine-processable subset of the Japanese language.
+This paper introduces Attempto Controlled Japanese (ACJ), a subset of modern Japanese with a precisely defined and computable syntax. Drawing inspiration from Attempto Controlled English (ACE), ACJ is designed to be unambiguous and directly mappable to a formal representation. We present the complete lexical and syntactic specification of ACJ, which covers a range of fundamental sentence structures. We also describe the implementation of our recursive-descent LL(1) parser, \texttt{yamato-ll1}, in Go that translates ACJ sentences into an Abstract Syntax Tree (AST). This work represents a foundational step towards a formally verifiable and machine-processable subset of the Japanese language.
 \end{abstract}
 
 \section{Introduction}
@@ -50,7 +50,7 @@ auxList: AUX auxList | /* epsilon */;
 \end{verbatim}
 
 \section{Parser Implementation}
-We implemented a recursive-descent parser for ACJ in the Go programming language. The parser takes a string of ACJ text and, if the string conforms to the grammar, returns an Abstract Syntax Tree (AST). The main components are a lexer that performs tokenization and a parser that builds the AST according to the syntactic rules.
+We implemented a recursive-descent parser for ACJ in the Go programming language. The parser, named \texttt{yamato-ll1}, takes a string of ACJ text and, if the string conforms to the grammar, returns an Abstract Syntax Tree (AST). The main components are a lexer that performs tokenization and a parser that builds the AST according to the syntactic rules.
 
 \section{Conclusion and Future Work}
 We have defined Attempto Controlled Japanese (ACJ), a machine-processable subset of Japanese, and provided a reference parser. The resulting ASTs provide a solid foundation for further formal processing.
