@@ -25,8 +25,9 @@ The formal analysis of natural language syntax has long benefited from the tools
 This paper is structured as follows: Section 2 details the LL(1) grammar. Section 3 describes the implementation of the lexer and the recursive-descent parser in Go. Finally, Section 4 concludes and suggests directions for future work.
 
 \section{Grammar}
-The grammar for the fragment of Classical Japanese is designed to be LL(1), enabling parsing with a single token of lookahead. It is presented below in an ANTLR-like syntax.
+The grammar was initially designed for a fragment of Classical Japanese and subsequently extended to handle basic modern structures.
 
+\subsection{Initial Grammar (Classical Japanese)}
 \begin{verbatim}
 grammar ClassicalJapanese;
 
@@ -58,6 +59,21 @@ VERB: [word];
 ADJ: [word];
 \end{verbatim}
 
+\subsection{Extended Grammar (Modern Japanese)}
+To parse modern Japanese sentences, we extended the grammar to include common particles ('は', 'の'), polite forms ('です', 'ます'), and basic tense ('た').
+
+\begin{verbatim}
+grammar ModernJapanese;
+
+vp: (np)? (verbPhrase | copulaPhrase);
+verbPhrase: VERB auxList;
+copulaPhrase: (NOUN | ADJ) COPULA;
+
+caseParticle: 'が' | 'を' | 'に' | 'は' | 'の';
+AUX: 'ます' | 'た' | ... ;
+COPULA: 'です';
+\end{verbatim}
+
 \subsection{Lexical Tokens}
 % ...
 
@@ -75,9 +91,11 @@ The parser is a top-down, recursive-descent parser. It takes the token stream fr
 
 The result of a successful parse is an Abstract Syntax Tree (AST). The AST is a tree representation of the abstract syntactic structure of the source code. Each node of the tree denotes a construct occurring in the source code. The AST nodes are defined as Go structs that correspond to the grammar's rules, such as \texttt{Clause}, \texttt{NP}, and \texttt{VP}. This tree can then be used by subsequent phases, such as an interpreter or code generator.
 
+The AST was extended with nodes like \texttt{CopulaPhrase} and \texttt{VerbPhrase} to represent these new structures. The parser was updated to distinguish between these phrases based on lookahead.
+
 \section{Conclusion}
 We have successfully designed and implemented an LL(1) parser for a small but non-trivial fragment of Classical Japanese. The project demonstrates the viability of using standard parsing techniques to analyze the structure of a natural language, producing a well-defined Abstract Syntax Tree.
 
-The current parser is a proof of concept. Future work could extend the grammar to incorporate a wider range of linguistic features, such as more complex verb conjugations, different types of clauses, and a more sophisticated handling of lexical categories. The modular design of the lexer and parser facilitates such extensions.
+We successfully extended the parser to cover basic modern Japanese sentences, including polite forms. This demonstrates the extensibility of the architecture. Further work can incorporate more complex structures like passive and causative verbs.
 
 \end{document} 

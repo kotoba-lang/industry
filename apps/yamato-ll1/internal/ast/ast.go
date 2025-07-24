@@ -134,11 +134,9 @@ func (np *NP) String() string {
 
 // VP は動詞句(Verb Phrase)を表します。
 type VP struct {
-	Token       lexer.Token // 動詞句の最初のトークン (the verb or noun)
-	Object      *NP         // 目的語などのNP (optional)
-	Verb        Expression
-	Auxiliaries []Expression  // 助動詞のリスト
-	Particle    *CaseParticle // 末尾の格助詞 (optional)
+	Token      lexer.Token
+	Object     *NP
+	VerbPhrase Expression // verbPhrase or copulaPhrase
 }
 
 func (vp *VP) expressionNode()      {}
@@ -149,15 +147,40 @@ func (vp *VP) String() string {
 	if vp.Object != nil {
 		out.WriteString(vp.Object.String() + " ")
 	}
+	out.WriteString(vp.VerbPhrase.String())
+	out.WriteString(")")
+	return out.String()
+}
+
+// VerbPhrase は動詞とその助動詞列を表します。
+type VerbPhrase struct {
+	Token       lexer.Token // The verb
+	Verb        Expression
+	Auxiliaries []Expression
+}
+
+func (vp *VerbPhrase) expressionNode()      {}
+func (vp *VerbPhrase) TokenLiteral() string { return vp.Token.Literal }
+func (vp *VerbPhrase) String() string {
+	var out bytes.Buffer
 	out.WriteString(vp.Verb.String())
 	for _, aux := range vp.Auxiliaries {
 		out.WriteString(" " + aux.String())
 	}
-	if vp.Particle != nil {
-		out.WriteString(" " + vp.Particle.String())
-	}
-	out.WriteString(")")
 	return out.String()
+}
+
+// CopulaPhrase は名詞/形容詞とコピュラ（です）の組み合わせを表します。
+type CopulaPhrase struct {
+	Token   lexer.Token // The noun or adjective
+	Subject Expression
+	Copula  *lexer.Token
+}
+
+func (cp *CopulaPhrase) expressionNode()      {}
+func (cp *CopulaPhrase) TokenLiteral() string { return cp.Token.Literal }
+func (cp *CopulaPhrase) String() string {
+	return cp.Subject.String() + " " + cp.Copula.Literal
 }
 
 // AdjPhrase は形容詞句を表します。
