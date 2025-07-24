@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ProseMirror Editor Styles with Typography Plugin */
+/* ProseMirror Editor Styles - Tailwindクラスベース */
 @layer components {
   /* エディターコンテナ */
   .prosemirror-editor {
@@ -13,132 +13,131 @@
     @apply relative w-full;
   }
 
-  /* ProseMirrorエディター - Typographyプラグインを使用 */
+  /* ProseMirrorエディター - Tailwindクラスベース */
   .ProseMirror {
-    @apply outline-none !important;
-    @apply prose prose-sm sm:prose lg:prose-lg !important;
-    @apply p-4 border border-gray-300 rounded-lg !important;
-    @apply bg-white dark:bg-gray-800 dark:border-gray-600 !important;
-    @apply dark:prose-invert !important;
-    @apply min-h-[600px] transition-colors duration-200 !important;
-    @apply focus:ring-2 focus:ring-blue-500 focus:border-blue-500 !important;
-    /* 明示的なテキスト色を設定 */
-    color: oklab(0.177 0.003 0.46) !important;
+    @apply outline-none prose prose-sm sm:prose lg:prose-lg;
+    @apply p-4 border border-gray-300 rounded-lg;
+    @apply bg-white dark:bg-gray-800 dark:border-gray-600;
+    @apply dark:prose-invert min-h-[600px];
+    @apply transition-colors duration-200;
+    @apply text-gray-900 dark:text-gray-100;
+    @apply focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
   }
 
   /* ダークモード対応 */
   .dark .ProseMirror {
-    @apply text-gray-100 bg-gray-800 border-gray-600 !important;
-    @apply focus:ring-blue-400 focus:border-blue-400 !important;
-    /* ダークモード用の明示的なテキスト色 */
-    color: oklab(0.46 0.003 0.177) !important;
-    background-color: rgb(31, 41, 55) !important;
+    @apply text-gray-100 bg-gray-800 border-gray-600;
+    @apply focus:ring-blue-400 focus:border-blue-400;
   }
 
   /* フォーカス状態 */
   .ProseMirror:focus {
-    @apply ring-2 ring-blue-500 ring-opacity-50 !important;
+    @apply ring-2 ring-blue-500 ring-opacity-50;
   }
 
   .dark .ProseMirror:focus {
-    @apply ring-blue-400 ring-opacity-50 !important;
+    @apply ring-blue-400 ring-opacity-50;
   }
 
   /* ツールバー */
   .prosemirror-toolbar {
-    @apply flex flex-wrap items-center gap-1 p-2 bg-gray-50 border-b border-gray-200 !important;
-    @apply sticky top-0 z-10 !important;
+    @apply flex flex-wrap items-center gap-1 p-2;
+    @apply bg-gray-50 border-b border-gray-200;
+    @apply sticky top-0 z-10;
   }
 
   .dark .prosemirror-toolbar {
-    @apply bg-gray-800 border-gray-600 !important;
+    @apply bg-gray-800 border-gray-600;
   }
 
   .prosemirror-toolbar button {
-    @apply p-2 rounded hover:bg-gray-200 transition-colors duration-150 !important;
-    @apply text-gray-700 hover:text-gray-900 !important;
-    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 !important;
+    @apply p-2 rounded hover:bg-gray-200;
+    @apply text-gray-700 hover:text-gray-900;
+    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1;
+    @apply transition-colors duration-150;
   }
 
   .dark .prosemirror-toolbar button {
-    @apply text-gray-300 hover:text-gray-100 hover:bg-gray-700 !important;
+    @apply text-gray-300 hover:text-gray-100 hover:bg-gray-700;
   }
 
   .prosemirror-toolbar button.is-active {
-    @apply bg-blue-100 text-blue-700 !important;
+    @apply bg-blue-100 text-blue-700;
   }
 
   .dark .prosemirror-toolbar button.is-active {
-    @apply bg-blue-900 text-blue-300 !important;
+    @apply bg-blue-900 text-blue-300;
   }
 
   .prosemirror-toolbar button:disabled {
-    @apply opacity-50 cursor-not-allowed !important;
+    @apply opacity-50 cursor-not-allowed;
   }
 
   /* ツールバーの区切り線 */
   .prosemirror-toolbar .separator {
-    @apply w-px h-6 bg-gray-300 mx-2 !important;
+    @apply w-px h-6 bg-gray-300 mx-2;
   }
 
   .dark .prosemirror-toolbar .separator {
-    @apply bg-gray-600 !important;
+    @apply bg-gray-600;
   }
 
   /* ドロップダウンメニュー */
   .prosemirror-dropdown {
-    @apply relative inline-block !important;
+    @apply relative inline-block;
   }
 
   .prosemirror-dropdown-content {
-    @apply absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-20 !important;
-    @apply border border-gray-200 !important;
+    @apply absolute right-0 mt-2 w-48;
+    @apply bg-white rounded-md shadow-lg z-20;
+    @apply border border-gray-200;
   }
 
   .dark .prosemirror-dropdown-content {
-    @apply bg-gray-800 border-gray-600 !important;
+    @apply bg-gray-800 border-gray-600;
   }
 
   .prosemirror-dropdown-item {
-    @apply block w-full text-left px-4 py-2 text-sm text-gray-700 !important;
-    @apply hover:bg-gray-100 transition-colors duration-150 !important;
+    @apply block w-full text-left px-4 py-2 text-sm;
+    @apply text-gray-700 hover:bg-gray-100;
+    @apply transition-colors duration-150;
   }
 
   .dark .prosemirror-dropdown-item {
-    @apply text-gray-300 hover:bg-gray-700 !important;
+    @apply text-gray-300 hover:bg-gray-700;
   }
 
   /* スクロールバー */
   .ProseMirror::-webkit-scrollbar {
-    @apply w-2 !important;
+    @apply w-2;
   }
 
   .ProseMirror::-webkit-scrollbar-track {
-    @apply bg-gray-100 rounded !important;
+    @apply bg-gray-100 rounded;
   }
 
   .ProseMirror::-webkit-scrollbar-thumb {
-    @apply bg-gray-300 rounded hover:bg-gray-400 !important;
+    @apply bg-gray-300 rounded hover:bg-gray-400;
   }
 
   .dark .ProseMirror::-webkit-scrollbar-track {
-    @apply bg-gray-700 !important;
+    @apply bg-gray-700;
   }
 
   .dark .ProseMirror::-webkit-scrollbar-thumb {
-    @apply bg-gray-600 hover:bg-gray-500 !important;
+    @apply bg-gray-600 hover:bg-gray-500;
   }
 }
 
 /* ProseMirrorのデフォルトスタイルをリセット */
 @layer base {
   .ProseMirror {
-    font-family: inherit !important;
-    font-size: inherit !important;
-    line-height: inherit !important;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
   }
 
   .ProseMirror * {
-    box-sizing: border-box !important;
+    box-sizing: border-box;
   }
 } 
