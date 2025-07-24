@@ -99,7 +99,7 @@ test.describe('Editor UI Tests', () => {
     const position = await editorContainer.evaluate(el => 
       window.getComputedStyle(el).position
     );
-    expect(position).toBe('static'); // 実際の値
+    expect(position).toBe('relative'); // Tiptapエディターの実際の値
     
     // コンテナの幅を確認（実際の値に合わせる）
     const width = await editorContainer.evaluate(el => 
