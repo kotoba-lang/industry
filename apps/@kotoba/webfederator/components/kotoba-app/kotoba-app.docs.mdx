@@ -1,0 +1,74 @@
+---
+description: 'Kotoba Platform統合アプリケーション'
+labels: ['react', 'typescript', 'tailwind', 'integration']
+---
+
+import { KotobaApp } from './kotoba-app';
+
+# KotobaApp
+
+Kotoba Platformの統合アプリケーションコンポーネントです。Editor、Graph、Hostコンポーネントを統合して、完全なアプリケーションを提供します。
+
+## 機能
+
+- **統合インターフェース**: EditorとGraphコンポーネントを統合
+- **ASTデータフロー**: EditorからGraphへのデータ連携
+- **レスポンシブレイアウト**: 複数のレイアウトオプション
+- **エラーハンドリング**: コンポーネントエラーの適切な処理
+
+## 使用方法
+
+```tsx
+import { KotobaApp } from '@junkawasaki/kotoba/components/kotoba-app';
+
+function App() {
+  return (
+    <KotobaApp 
+      title="My Kotoba App"
+      layout="grid"
+    />
+  );
+}
+```
+
+## Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `title` | `string` | `"Kotoba Platform"` | アプリケーションタイトル |
+| `layout` | `'grid' \| 'vertical' \| 'horizontal'` | `'grid'` | レイアウトタイプ |
+
+## レイアウトタイプ
+
+- **grid**: グリッドレイアウト（デフォルト）
+- **vertical**: 縦並びレイアウト
+- **horizontal**: 横並びレイアウト
+
+## 例
+
+### グリッドレイアウト
+```tsx
+<KotobaApp layout="grid" />
+```
+
+### 縦並びレイアウト
+```tsx
+<KotobaApp layout="vertical" />
+```
+
+### 横並びレイアウト
+```tsx
+<KotobaApp layout="horizontal" />
+```
+
+## データフロー
+
+1. **Editor**: ProseMirrorベースのテキストエディターでASTを生成
+2. **Host**: ASTデータを受け取り、Graphコンポーネントに渡す
+3. **Graph**: CytoscapeベースのグラフビューアーでASTを可視化
+
+## 依存関係
+
+- `@junkawasaki/kotoba/components/host`
+- `@junkawasaki/kotoba/components/editor`
+- `@junkawasaki/kotoba/components/graph` 
