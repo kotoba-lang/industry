@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import cytoscape from 'cytoscape'
 import dagre from 'cytoscape-dagre'
-import './App.css'
 
 // cytoscapeにdagreプラグインを登録
 cytoscape.use(dagre as any)
@@ -157,16 +156,16 @@ function App({ astData: externalASTData }: GraphProps) {
             'background-color': (ele: any) => {
               const group = ele.data('group')
               switch (group) {
-                case 'A': return '#2ecc71' // 緑 - 見出し
-                case 'B': return '#3498db' // 青 - 段落
-                case 'C': return '#e67e22' // オレンジ - リスト
-                case 'D': return '#9b59b6' // 紫 - コードブロック
-                case 'E': return '#95a5a6' // グレー - テキスト
-                default: return '#34495e'
+                case 'A': return '#10b981' // 緑 - 見出し
+                case 'B': return '#3b82f6' // 青 - 段落
+                case 'C': return '#f59e0b' // オレンジ - リスト
+                case 'D': return '#8b5cf6' // 紫 - コードブロック
+                case 'E': return '#6b7280' // グレー - テキスト
+                default: return '#374151'
               }
             },
             'label': 'data(label)',
-            'color': '#fff',
+            'color': '#ffffff',
             'font-size': '12px',
             'font-weight': 'bold',
             'text-wrap': 'wrap',
@@ -182,7 +181,7 @@ function App({ astData: externalASTData }: GraphProps) {
               return Math.max(40, 50 - level * 3)
             },
             'border-width': 2,
-            'border-color': '#2c3e50',
+            'border-color': '#1f2937',
             'border-opacity': 0.8
           }
         },
@@ -190,8 +189,8 @@ function App({ astData: externalASTData }: GraphProps) {
           selector: 'edge',
           style: {
             'width': 'data(weight)',
-            'line-color': '#7f8c8d',
-            'target-arrow-color': '#7f8c8d',
+            'line-color': '#6b7280',
+            'target-arrow-color': '#6b7280',
             'target-arrow-shape': 'triangle',
             'curve-style': 'bezier',
             'opacity': 0.8
@@ -201,7 +200,7 @@ function App({ astData: externalASTData }: GraphProps) {
           selector: 'node:selected',
           style: {
             'border-width': 4,
-            'border-color': '#e74c3c',
+            'border-color': '#ef4444',
             'border-opacity': 1
           }
         },
@@ -209,8 +208,8 @@ function App({ astData: externalASTData }: GraphProps) {
           selector: 'edge:selected',
           style: {
             'width': 'data(weight)',
-            'line-color': '#e74c3c',
-            'target-arrow-color': '#e74c3c',
+            'line-color': '#ef4444',
+            'target-arrow-color': '#ef4444',
             'opacity': 1
           }
         }
@@ -331,35 +330,90 @@ function App({ astData: externalASTData }: GraphProps) {
   }
 
   return (
-    <div className="graph-container">
-      <div className="graph-header">
-        <h3>Kotoba Graph Viewer (AST)</h3>
-        <div className="graph-controls">
-          <select 
-            value={graphType} 
-            onChange={(e) => handleGraphTypeChange(e.target.value as 'ast' | 'network' | 'hierarchy' | 'circular')} 
-            className="graph-type-select"
-          >
-            <option value="ast">AST Tree</option>
-            <option value="hierarchy">Hierarchy</option>
-            <option value="circular">Circular</option>
-            <option value="network">Network</option>
-          </select>
-          <button onClick={showASTData} className="btn btn-primary">Show AST</button>
-          <button onClick={showSampleData} className="btn btn-secondary">Sample Data</button>
-          <button onClick={resetGraph} className="btn btn-reset">Reset View</button>
-          <button onClick={exportGraph} className="btn btn-export">Export PNG</button>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center space-x-4">
+              <h1 className="text-xl font-semibold text-gray-900">Kotoba Graph Viewer</h1>
+              <div className="flex items-center space-x-2">
+                <select 
+                  value={graphType} 
+                  onChange={(e) => handleGraphTypeChange(e.target.value as 'ast' | 'network' | 'hierarchy' | 'circular')} 
+                  className="block w-48 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                >
+                  <option value="ast">AST Tree</option>
+                  <option value="hierarchy">Hierarchy</option>
+                  <option value="circular">Circular</option>
+                  <option value="network">Network</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={showASTData}
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                <svg className="-ml-0.5 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                Show AST
+              </button>
+              
+              <button
+                onClick={showSampleData}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                <svg className="-ml-0.5 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                </svg>
+                Sample Data
+              </button>
+              
+              <button
+                onClick={resetGraph}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                <svg className="-ml-0.5 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Reset View
+              </button>
+              
+              <button
+                onClick={exportGraph}
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              >
+                <svg className="-ml-0.5 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Export PNG
+              </button>
+            </div>
+          </div>
         </div>
       </div>
-      
-      <div className="graph-content">
-        <div ref={containerRef} className="graph-canvas" />
+
+      {/* Graph Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="bg-white shadow-sm rounded-lg border border-gray-200">
+          <div 
+            ref={containerRef} 
+            className="w-full h-[600px] rounded-lg"
+          />
+        </div>
       </div>
-      
-      <div className="graph-footer">
-        <span className="status-text">
-          {graphType} layout • {astData.nodes.length} nodes • {astData.edges.length} edges
-        </span>
+
+      {/* Footer */}
+      <div className="bg-white border-t border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex items-center justify-between text-sm text-gray-500">
+            <span>AST Graph Viewer • Cytoscape.js</span>
+            <span>{graphType} layout • {astData.nodes.length} nodes • {astData.edges.length} edges</span>
+          </div>
+        </div>
       </div>
     </div>
   )
