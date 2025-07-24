@@ -2,18 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ProseMirror Editor Styles - Tailwindクラスベース */
+/* Tiptap Editor Styles - Tailwindクラスベース */
 @layer components {
   /* エディターコンテナ */
-  .prosemirror-editor {
+  .tiptap-editor {
     @apply relative w-full;
   }
 
-  .prosemirror-editor-container {
+  .tiptap-editor-container {
     @apply relative w-full;
   }
 
-  /* ProseMirrorエディター - Tailwindクラスベース */
+  /* Tiptapエディター - Tailwindクラスベース */
   .ProseMirror {
     @apply outline-none prose prose-sm sm:prose lg:prose-lg;
     @apply p-4 border border-gray-300 rounded-lg;
@@ -39,12 +39,36 @@
     @apply ring-blue-400 ring-opacity-50;
   }
 
-  /* ProseMirrorメニューバー - Tailwindクラスベース */
+  /* Tiptapメニューバー - Tailwindクラスベース */
   .ProseMirror-menubar {
     @apply flex flex-wrap items-center gap-1 p-2;
     @apply bg-gray-50 border-b border-gray-200;
     @apply sticky top-0 z-10;
     @apply dark:bg-gray-800 dark:border-gray-600;
+  }
+
+  /* Tiptapツールバー */
+  .tiptap-toolbar {
+    @apply flex flex-wrap items-center gap-1 p-2;
+    @apply bg-gray-50 border-b border-gray-200;
+    @apply sticky top-0 z-10;
+    @apply dark:bg-gray-800 dark:border-gray-600;
+  }
+
+  /* Tiptapボタン */
+  .tiptap-button {
+    @apply inline-flex items-center justify-center;
+    @apply p-2 rounded text-sm font-medium;
+    @apply text-gray-700 hover:text-gray-900;
+    @apply hover:bg-gray-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1;
+    @apply transition-colors duration-150;
+    @apply dark:text-gray-300 dark:hover:text-gray-100 dark:hover:bg-gray-700;
+  }
+
+  .tiptap-button.is-active {
+    @apply bg-blue-100 text-blue-700;
+    @apply dark:bg-blue-900 dark:text-blue-300;
   }
 
   /* メニューアイテム */

@@ -7,7 +7,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Basic Tests', () => {
   test('ホストアプリケーションの基本動作', async ({ page }) => {
     // ホストアプリケーションにアクセス
-    await page.goto('http://localhost:5173');
+    await page.goto('http://localhost:5174');
     
     // ページが読み込まれるまで待機
     await page.waitForLoadState('networkidle');
@@ -22,7 +22,7 @@ test.describe('Basic Tests', () => {
 
   test('Bitコンポーネントの統合確認', async ({ page }) => {
     // ホストアプリケーションにアクセス
-    await page.goto('http://localhost:5173');
+    await page.goto('http://localhost:5174');
     
     // ページが読み込まれるまで待機
     await page.waitForLoadState('networkidle');
