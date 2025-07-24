@@ -1,19 +1,123 @@
 ---
-description: A Graph component.
+description: 'A Cytoscape-based graph viewer for visualizing AST data'
+labels: ['react', 'graph', 'cytoscape', 'ast', 'visualization']
 ---
 
 import { Graph } from './graph';
 
-## Basic usage
+# Kotoba Graph Viewer Component
 
-Use the graph component:
+A powerful graph visualization component built with Cytoscape.js that can display Abstract Syntax Trees (AST) and other graph data structures.
 
-```js
-<Graph />
+## Features
+
+- **Multiple Layouts**: AST Tree, Hierarchy, Circular, and Network layouts
+- **Interactive Visualization**: Zoom, pan, and select nodes/edges
+- **AST Data Support**: Visualize document structure as graphs
+- **Export Capabilities**: Export graphs as PNG images
+- **Responsive Design**: Adapts to different screen sizes
+- **Tailwind UI**: Modern, clean interface
+
+## Usage
+
+```tsx
+import { Graph } from '@junkawasaki/webfederator.components.graph';
+
+function MyApp() {
+  const astData = {
+    nodes: [
+      { id: 'doc', label: 'Document', type: 'doc', group: 'A', level: 0 },
+      { id: 'h1', label: 'Heading 1', type: 'heading', group: 'A', level: 1 },
+      { id: 'p1', label: 'Paragraph', type: 'paragraph', group: 'B', level: 1 }
+    ],
+    edges: [
+      { source: 'doc', target: 'h1', weight: 1 },
+      { source: 'doc', target: 'p1', weight: 1 }
+    ]
+  };
+
+  return (
+    <Graph 
+      astData={astData}
+      initialGraphType="ast"
+      height="600px"
+    />
+  );
+}
 ```
 
-### Display the text
+## Props
 
-```js live
-<Graph>Hello world!</Graph>
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `astData` | `{ nodes: ASTNode[], edges: ASTEdge[] }` | `undefined` | AST data to visualize |
+| `initialGraphType` | `'ast' \| 'network' \| 'hierarchy' \| 'circular'` | `'ast'` | Initial layout type |
+| `height` | `string` | `'600px'` | Height of the graph container |
+
+## Data Structure
+
+```typescript
+interface ASTNode {
+  id: string;
+  label: string;
+  type: string;
+  group: string;
+  level: number;
+}
+
+interface ASTEdge {
+  source: string;
+  target: string;
+  weight: number;
+}
 ```
+
+## Layout Types
+
+- **AST Tree**: Top-to-bottom hierarchical layout (default)
+- **Hierarchy**: Left-to-right hierarchical layout
+- **Circular**: Circular arrangement of nodes
+- **Network**: Force-directed network layout
+
+## Node Groups
+
+Nodes are color-coded based on their group:
+
+- **A (Green)**: Headings and document structure
+- **B (Blue)**: Paragraphs and text content
+- **C (Orange)**: Lists and list items
+- **D (Purple)**: Code blocks and special content
+- **E (Gray)**: Text and inline content
+
+## Controls
+
+- **Show AST**: Display the current AST data
+- **Sample Data**: Show sample graph data
+- **Reset View**: Reset zoom and pan
+- **Export PNG**: Download graph as PNG image
+
+## Example
+
+<Graph 
+  initialGraphType="ast"
+  height="400px"
+  astData={{
+    nodes: [
+      { id: 'doc', label: 'Document', type: 'doc', group: 'A', level: 0 },
+      { id: 'h1', label: 'Main Title', type: 'heading', group: 'A', level: 1 },
+      { id: 'p1', label: 'Introduction paragraph...', type: 'paragraph', group: 'B', level: 1 },
+      { id: 'h2', label: 'Section', type: 'heading', group: 'A', level: 1 },
+      { id: 'ul1', label: 'List', type: 'list', group: 'C', level: 1 },
+      { id: 'li1', label: 'Item 1', type: 'list-item', group: 'C', level: 2 },
+      { id: 'li2', label: 'Item 2', type: 'list-item', group: 'C', level: 2 }
+    ],
+    edges: [
+      { source: 'doc', target: 'h1', weight: 1 },
+      { source: 'doc', target: 'p1', weight: 1 },
+      { source: 'doc', target: 'h2', weight: 1 },
+      { source: 'doc', target: 'ul1', weight: 1 },
+      { source: 'ul1', target: 'li1', weight: 1 },
+      { source: 'ul1', target: 'li2', weight: 1 }
+    ]
+  }}
+/>
