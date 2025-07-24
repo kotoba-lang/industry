@@ -30,7 +30,7 @@ test.describe('BitDev Integration Tests', () => {
     await expect(page.locator('h2:has-text("Editor")')).toBeVisible();
     
     // Editorの説明文が表示されることを確認（より具体的なセレクター）
-    await expect(page.locator('p:has-text("ProseMirror-based rich text editor with AST generation")')).toBeVisible();
+    await expect(page.locator('p.text-sm.text-gray-500:has-text("ProseMirror-based rich text editor with AST generation")')).toBeVisible();
     
     // Editorコンポーネントが読み込まれることを確認
     await expect(page.locator('[data-testid="editor"]')).toBeVisible({ timeout: 10000 });
@@ -44,7 +44,7 @@ test.describe('BitDev Integration Tests', () => {
     await expect(page.locator('h2:has-text("Graph")')).toBeVisible();
     
     // Graphの説明文が表示されることを確認
-    await expect(page.locator('p:has-text("Cytoscape-based AST visualization with interactive features")')).toBeVisible();
+    await expect(page.locator('p.text-sm.text-gray-500:has-text("Cytoscape-based AST visualization with interactive features")')).toBeVisible();
     
     // Graphコンポーネントが読み込まれることを確認
     await expect(page.locator('[data-testid="graph"]')).toBeVisible({ timeout: 10000 });
@@ -58,9 +58,9 @@ test.describe('BitDev Integration Tests', () => {
     await expect(page.locator('h3:has-text("Integration Status")')).toBeVisible();
     
     // 各ステータス項目が表示されることを確認（より具体的なセレクター）
-    await expect(page.locator('div:has-text("BitDev Components"):has-text("Successfully integrated")')).toBeVisible();
-    await expect(page.locator('div:has-text("Dependencies"):has-text("ProseMirror & Cytoscape")')).toBeVisible();
-    await expect(page.locator('div:has-text("Type Safety"):has-text("TypeScript integration")')).toBeVisible();
+    await expect(page.locator('div.text-center:has-text("BitDev Components"):has-text("Successfully integrated")')).toBeVisible();
+    await expect(page.locator('div.text-center:has-text("Dependencies"):has-text("ProseMirror & Cytoscape")')).toBeVisible();
+    await expect(page.locator('div.text-center:has-text("Type Safety"):has-text("TypeScript integration")')).toBeVisible();
     
     // 成功マークが表示されることを確認
     await expect(page.locator('text=✓')).toHaveCount(3);
