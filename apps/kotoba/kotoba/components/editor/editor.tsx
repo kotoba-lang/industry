@@ -1,16 +1,41 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { EditorState } from 'prosemirror-state'
-import { EditorView } from 'prosemirror-view'
-import { Schema, DOMParser } from 'prosemirror-model'
-import { schema } from 'prosemirror-schema-basic'
-import { addListNodes } from 'prosemirror-schema-list'
-import { exampleSetup } from 'prosemirror-example-setup'
-
-// 拡張されたスキーマ（リスト機能付き）
-const mySchema = new Schema({
-  nodes: addListNodes(schema.spec.nodes, 'paragraph block*', 'block'),
-  marks: schema.spec.marks
-})
+import { useEditor, EditorContent } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import Placeholder from '@tiptap/extension-placeholder'
+import Highlight from '@tiptap/extension-highlight'
+import Link from '@tiptap/extension-link'
+import Image from '@tiptap/extension-image'
+import { Table } from '@tiptap/extension-table'
+import TaskList from '@tiptap/extension-task-list'
+import Underline from '@tiptap/extension-underline'
+import TextAlign from '@tiptap/extension-text-align'
+import Color from '@tiptap/extension-color'
+import { TextStyle } from '@tiptap/extension-text-style'
+import FontFamily from '@tiptap/extension-font-family'
+import FontSize from '@tiptap/extension-font-size'
+import Subscript from '@tiptap/extension-subscript'
+import Superscript from '@tiptap/extension-superscript'
+import Strike from '@tiptap/extension-strike'
+import Code from '@tiptap/extension-code'
+import CodeBlock from '@tiptap/extension-code-block'
+import Paragraph from '@tiptap/extension-paragraph'
+import Heading from '@tiptap/extension-heading'
+import Bold from '@tiptap/extension-bold'
+import Italic from '@tiptap/extension-italic'
+import BulletList from '@tiptap/extension-bullet-list'
+import OrderedList from '@tiptap/extension-ordered-list'
+import ListItem from '@tiptap/extension-list-item'
+import Blockquote from '@tiptap/extension-blockquote'
+import HorizontalRule from '@tiptap/extension-horizontal-rule'
+import HardBreak from '@tiptap/extension-hard-break'
+import Dropcursor from '@tiptap/extension-dropcursor'
+import Gapcursor from '@tiptap/extension-gapcursor'
+import History from '@tiptap/extension-history'
+import Collaboration from '@tiptap/extension-collaboration'
+import CollaborationCursor from '@tiptap/extension-collaboration-cursor'
+import Mention from '@tiptap/extension-mention'
+import Emoji from '@tiptap/extension-emoji'
+import Typography from '@tiptap/extension-typography'
 
 export type EditorProps = {
   /**
@@ -31,7 +56,7 @@ export function Editor({
   initialFileName = 'untitled.md',
   initialContent = `# Kotoba Editor
 
-This is a ProseMirror-based rich text editor with AST generation capabilities.
+This is a Tiptap-based rich text editor with AST generation capabilities.
 
 ## Features
 
@@ -61,64 +86,69 @@ Start editing to see the AST in the graph viewer!`,
   const [fileName, setFileName] = useState(initialFileName)
   const [isModified, setIsModified] = useState(false)
   const editorRef = useRef<HTMLDivElement>(null)
-  const viewRef = useRef<EditorView | null>(null)
 
-  useEffect(() => {
-    console.log('Editor Component: Component mounted.')
-    
-    if (editorRef.current && !viewRef.current) {
-      // DOMから初期コンテンツを作成
-      const tempDiv = document.createElement('div')
-      tempDiv.innerHTML = initialContent
-      
-      // ProseMirrorのドキュメントを作成
-      const doc = DOMParser.fromSchema(mySchema).parse(tempDiv)
-      
-      // エディター状態を作成
-      const state = EditorState.create({
-        doc,
-        plugins: exampleSetup({ schema: mySchema })
-      })
-
-      // エディタービューを作成
-      const view = new EditorView(editorRef.current, {
-        state,
-        dispatchTransaction(transaction) {
-          const newState = view.state.apply(transaction)
-          view.updateState(newState)
-          setIsModified(true)
-        }
-      })
-
-      // ProseMirrorエディターにTailwindクラスを適用
-      if (editorRef.current.firstChild) {
-        const proseMirrorElement = editorRef.current.firstChild as HTMLElement
-        // Tailwindクラスベースのスタイリング
-        proseMirrorElement.className = 'ProseMirror prose prose-sm sm:prose lg:prose-lg focus:outline-none p-4 border border-gray-300 rounded-lg bg-white dark:bg-gray-800 dark:border-gray-600 dark:prose-invert min-h-[600px] transition-colors duration-200 text-gray-900 dark:text-gray-100'
-        
-        // メニューバーにTailwindクラスを適用
-        const menubar = proseMirrorElement.querySelector('.ProseMirror-menubar')
-        if (menubar) {
-          menubar.classList.add('ProseMirror-menubar')
-        }
-        
-        // ダークモードの検出とクラス適用
-        const isDarkMode = document.documentElement.classList.contains('dark')
-        if (isDarkMode) {
-          proseMirrorElement.classList.add('dark')
-        }
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Placeholder.configure({
+        placeholder: 'Start writing...',
+      }),
+      Highlight,
+      Link.configure({
+        openOnClick: false,
+      }),
+      Image,
+      Table.configure({
+        resizable: true,
+      }),
+      TaskList,
+      Underline,
+      TextAlign.configure({
+        types: ['heading', 'paragraph'],
+      }),
+      Color,
+      TextStyle,
+      FontFamily,
+      FontSize,
+      Subscript,
+      Superscript,
+      Strike,
+      Code,
+      CodeBlock,
+      Paragraph,
+      Heading,
+      Bold,
+      Italic,
+      BulletList,
+      OrderedList,
+      ListItem,
+      Blockquote,
+      HorizontalRule,
+      HardBreak,
+      Dropcursor,
+      Gapcursor,
+      History,
+      Collaboration,
+      CollaborationCursor,
+      Mention,
+      Emoji,
+      Typography,
+    ],
+    content: initialContent,
+    onUpdate: ({ editor }) => {
+      setIsModified(true)
+      // AST生成とコールバック呼び出し
+      const astData = generateAST(editor)
+      if (onASTUpdate) {
+        onASTUpdate(astData)
       }
-
-      viewRef.current = view
-    }
-
-    return () => {
-      if (viewRef.current) {
-        viewRef.current.destroy()
-        viewRef.current = null
-      }
-    }
-  }, [initialContent])
+    },
+    editorProps: {
+      attributes: {
+        class: 'prose prose-sm sm:prose lg:prose-lg focus:outline-none p-4 border border-gray-300 rounded-lg bg-white dark:bg-gray-800 dark:border-gray-600 dark:prose-invert min-h-[600px] transition-colors duration-200 text-gray-900 dark:text-gray-100',
+      },
+    },
+  })
 
   // ダークモード変更を監視
   useEffect(() => {
@@ -126,21 +156,13 @@ Start editing to see the AST in the graph viewer!`,
       mutations.forEach((mutation) => {
         if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
           const isDarkMode = document.documentElement.classList.contains('dark')
-          if (viewRef.current && editorRef.current?.firstChild) {
-            const proseMirrorElement = editorRef.current.firstChild as HTMLElement
-            if (isDarkMode) {
-              proseMirrorElement.classList.add('dark')
-            } else {
-              proseMirrorElement.classList.remove('dark')
-            }
-            
-            // メニューバーのスタイリングも更新
-            const menubar = proseMirrorElement.querySelector('.ProseMirror-menubar')
-            if (menubar) {
+          if (editor && editorRef.current) {
+            const editorElement = editorRef.current.querySelector('.ProseMirror')
+            if (editorElement) {
               if (isDarkMode) {
-                menubar.classList.add('dark')
+                editorElement.classList.add('dark')
               } else {
-                menubar.classList.remove('dark')
+                editorElement.classList.remove('dark')
               }
             }
           }
@@ -154,7 +176,7 @@ Start editing to see the AST in the graph viewer!`,
     })
 
     return () => observer.disconnect()
-  }, [])
+  }, [editor])
 
   /**
    * ファイル名を変更
@@ -167,9 +189,9 @@ Start editing to see the AST in the graph viewer!`,
    * ファイルを保存
    */
   const handleSave = () => {
-    if (viewRef.current) {
-      const content = viewRef.current.state.doc.textContent
-      const blob = new Blob([content], { type: 'text/plain' })
+    if (editor) {
+      const content = editor.getHTML()
+      const blob = new Blob([content], { type: 'text/html' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -184,27 +206,20 @@ Start editing to see the AST in the graph viewer!`,
    * 新しいファイルを作成
    */
   const handleNewFile = () => {
-    if (viewRef.current) {
-      const emptyDoc = mySchema.node('doc', null, [
-        mySchema.node('paragraph', null, [])
-      ])
-      const newState = EditorState.create({
-        doc: emptyDoc,
-        plugins: exampleSetup({ schema: mySchema })
-      })
-      viewRef.current.updateState(newState)
+    if (editor) {
+      editor.commands.setContent('<p></p>')
       setFileName('untitled.md')
       setIsModified(true)
     }
   }
 
   /**
-   * ProseMirrorドキュメントからASTを生成
+   * TiptapエディターからASTを生成
    */
-  const generateAST = (): { nodes: any[], edges: any[] } => {
-    if (!viewRef.current) return { nodes: [], edges: [] }
+  const generateAST = (editorInstance: any): { nodes: any[], edges: any[] } => {
+    if (!editorInstance) return { nodes: [], edges: [] }
 
-    const doc = viewRef.current.state.doc
+    const doc = editorInstance.state.doc
     const nodes: any[] = []
     const edges: any[] = []
     let nodeId = 0
@@ -299,7 +314,9 @@ Start editing to see the AST in the graph viewer!`,
    * ASTデータをエクスポート
    */
   const exportAST = () => {
-    const astData = generateAST()
+    if (!editor) return
+    
+    const astData = generateAST(editor)
     console.log('Generated AST:', astData)
 
     // コールバック関数を呼び出し
@@ -325,7 +342,7 @@ Start editing to see the AST in the graph viewer!`,
   }
 
   return (
-    <div className="prosemirror-editor" data-testid="editor">
+    <div className="tiptap-editor" data-testid="editor">
       {/* Header */}
       <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -389,8 +406,75 @@ Start editing to see the AST in the graph viewer!`,
         <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg border border-gray-200 dark:border-gray-700">
           <div 
             ref={editorRef} 
-            className="prosemirror-editor-container"
-          />
+            className="tiptap-editor-container"
+          >
+            {/* Tiptap Toolbar */}
+            {editor && (
+              <div className="tiptap-toolbar">
+                <button
+                  onClick={() => editor.chain().focus().toggleBold().run()}
+                  className={`tiptap-button ${editor.isActive('bold') ? 'is-active' : ''}`}
+                >
+                  Bold
+                </button>
+                <button
+                  onClick={() => editor.chain().focus().toggleItalic().run()}
+                  className={`tiptap-button ${editor.isActive('italic') ? 'is-active' : ''}`}
+                >
+                  Italic
+                </button>
+                <button
+                  onClick={() => editor.chain().focus().toggleStrike().run()}
+                  className={`tiptap-button ${editor.isActive('strike') ? 'is-active' : ''}`}
+                >
+                  Strike
+                </button>
+                <button
+                  onClick={() => editor.chain().focus().toggleCode().run()}
+                  className={`tiptap-button ${editor.isActive('code') ? 'is-active' : ''}`}
+                >
+                  Code
+                </button>
+                <button
+                  onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+                  className={`tiptap-button ${editor.isActive('heading', { level: 1 }) ? 'is-active' : ''}`}
+                >
+                  H1
+                </button>
+                <button
+                  onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+                  className={`tiptap-button ${editor.isActive('heading', { level: 2 }) ? 'is-active' : ''}`}
+                >
+                  H2
+                </button>
+                <button
+                  onClick={() => editor.chain().focus().toggleBulletList().run()}
+                  className={`tiptap-button ${editor.isActive('bulletList') ? 'is-active' : ''}`}
+                >
+                  Bullet List
+                </button>
+                <button
+                  onClick={() => editor.chain().focus().toggleOrderedList().run()}
+                  className={`tiptap-button ${editor.isActive('orderedList') ? 'is-active' : ''}`}
+                >
+                  Ordered List
+                </button>
+                <button
+                  onClick={() => editor.chain().focus().toggleBlockquote().run()}
+                  className={`tiptap-button ${editor.isActive('blockquote') ? 'is-active' : ''}`}
+                >
+                  Quote
+                </button>
+                <button
+                  onClick={() => editor.chain().focus().setHorizontalRule().run()}
+                  className="tiptap-button"
+                >
+                  Horizontal Rule
+                </button>
+              </div>
+            )}
+            <EditorContent editor={editor} />
+          </div>
         </div>
       </div>
 
@@ -398,7 +482,7 @@ Start editing to see the AST in the graph viewer!`,
       <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
-            <span>ProseMirror Editor • AST Export Ready</span>
+            <span>Tiptap Editor • AST Export Ready</span>
             <span>{isModified ? 'Modified' : 'Saved'}</span>
           </div>
         </div>
