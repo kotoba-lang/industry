@@ -78,11 +78,10 @@ pnpm dev
 │   │   └── ...
 │   └── api/                  # NestJS API
 ├── kotoba/
-│   ├── components/
-│   │   ├── editor/           # ProseMirrorエディターコンポーネント
-│   │   ├── graph/            # Cytoscapeグラフコンポーネント
-│   │   └── host/             # ホストコンポーネント
-│   └── kotoba-app/           # 統合アプリケーション
+│   └── components/
+│       ├── editor/           # ProseMirrorエディターコンポーネント
+│       ├── graph/            # Cytoscapeグラフコンポーネント
+│       └── host/             # ホストコンポーネント
 ├── packages/
 │   └── shared/               # 共有ライブラリ (Tailwind設定含む)
 └── workspace.jsonc           # BitDevワークスペース設定
@@ -99,61 +98,80 @@ pnpm dev
 
 ### データフロー
 
-1. Editorコンポーネントでテキストを編集
-2. ASTデータが生成され、Graphコンポーネントに送信
-3. GraphコンポーネントでASTを可視化
+1. **Editor Component**: ユーザーがテキストを編集
+2. **AST Generation**: 編集内容からASTデータを生成
+3. **Data Transfer**: ASTデータをGraph Componentに送信
+4. **Visualization**: Graph ComponentでASTを可視化
 
-## テーマシステム
+## テスト
 
-### 使用方法
-
-1. **テーマ切り替え**: ヘッダー右上のテーマトグルボタンをクリック
-2. **自動検出**: 初回アクセス時にシステムテーマを自動検出
-3. **設定保存**: テーマ設定はローカルストレージに自動保存
-
-### 技術実装
-
-- **ThemeContext**: React Contextを使用したテーマ状態管理
-- **Tailwind CSS**: `darkMode: 'class'`設定によるクラスベースのダークモード
-- **CSS Transitions**: スムーズなテーマ切り替えアニメーション
-
-## 開発
-
-### コンポーネント開発
-
-```bash
-# エディターコンポーネントの開発
-cd kotoba/components/editor
-pnpm dev
-
-# グラフコンポーネントの開発
-cd kotoba/components/graph
-pnpm dev
-```
-
-### テスト
+### テストの実行
 
 ```bash
 # 全テストの実行
 pnpm test
 
-# テーマ機能のテスト
+# 特定のテストファイルの実行
 pnpm test tests/theme.spec.ts
+pnpm test tests/editor-ui.spec.ts
+pnpm test tests/basic.spec.ts
 
-# Playwrightテスト
-pnpm test:headed
+# デバッグモードでのテスト実行
+pnpm test:debug
+
+# UIモードでのテスト実行
+pnpm test:ui
 ```
 
-## デプロイ
+### テストカバレッジ
+
+- **Theme Tests**: ダークモード/ライトモードの切り替え機能
+- **Editor UI Tests**: ProseMirrorエディターのUIとスタイリング
+- **Basic Tests**: 基本的なアプリケーション動作
+
+## ビルドとデプロイ
+
+### ビルド
 
 ```bash
-# ビルド
+# 本番用ビルド
 pnpm build
 
 # プレビュー
 pnpm preview
 ```
 
+### デプロイ
+
+Vercelを使用したデプロイが設定されています：
+
+```bash
+# Vercelへのデプロイ
+vercel --prod
+```
+
+## テーマシステム
+
+### 使用方法
+
+1. **テーマ切り替え**: ヘッダーのテーマトグルボタンをクリック
+2. **システムテーマ**: OSの設定に基づいて自動でテーマが設定されます
+3. **永続化**: 選択したテーマはローカルストレージに保存されます
+
+### 技術実装
+
+- **React Context**: テーマ状態の管理
+- **Tailwind CSS**: `darkMode: 'class'`を使用したクラスベースのダークモード
+- **CSS Transitions**: スムーズなテーマ切り替えアニメーション
+
+## 貢献
+
+1. このリポジトリをフォーク
+2. 機能ブランチを作成 (`git checkout -b feature/amazing-feature`)
+3. 変更をコミット (`git commit -m 'Add some amazing feature'`)
+4. ブランチにプッシュ (`git push origin feature/amazing-feature`)
+5. プルリクエストを作成
+
 ## ライセンス
 
-MIT License
+このプロジェクトはMITライセンスの下で公開されています。
