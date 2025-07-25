@@ -1,3 +1,134 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities; 
+
+/* Graph Grid Pattern */
+.graph-grid-pattern {
+  background-image: 
+    radial-gradient(circle, #6b7280 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-position: 0 0, 10px 10px;
+}
+
+.dark .graph-grid-pattern {
+  background-image: 
+    radial-gradient(circle, #4b5563 1px, transparent 1px);
+}
+
+/* Graph Editor Styles */
+.graph-editor {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Cytoscape Container */
+.graph-editor .cytoscape-container {
+  width: 100%;
+  height: 100%;
+}
+
+/* Floating Toolbar */
+.floating-toolbar {
+  position: absolute;
+  background: rgba(17, 24, 39, 0.95);
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  gap: 4px;
+  z-index: 1000;
+  backdrop-filter: blur(8px);
+}
+
+.floating-toolbar button {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #d1d5db;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.floating-toolbar button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.floating-toolbar button:active {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Context Menu */
+.context-menu {
+  position: absolute;
+  background: rgba(17, 24, 39, 0.95);
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 4px 0;
+  min-width: 160px;
+  z-index: 1000;
+  backdrop-filter: blur(8px);
+}
+
+.context-menu-item {
+  padding: 8px 16px;
+  color: #d1d5db;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.context-menu-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.context-menu-separator {
+  height: 1px;
+  background: #374151;
+  margin: 4px 0;
+}
+
+/* Node Selection */
+.node-selected {
+  border: 3px solid #8b5cf6 !important;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.3);
+}
+
+/* Edge Selection */
+.edge-selected {
+  stroke-width: 3px !important;
+  stroke: #ef4444 !important;
+}
+
+/* Drag Preview */
+.drag-preview {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Connection Line */
+.connection-line {
+  stroke: #6b7280;
+  stroke-width: 2px;
+  stroke-dasharray: 5,5;
+  pointer-events: none;
+}
+
+/* Snap Indicators */
+.snap-indicator {
+  stroke: #10b981;
+  stroke-width: 2px;
+  fill: none;
+  stroke-dasharray: 3,3;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+} 
