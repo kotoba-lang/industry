@@ -5,10 +5,10 @@
   "$schema": "https://static.bit.dev/teambit/schemas/schema.json",
   "teambit.workspace/workspace": {
     "name": "kotoba-platform",
-    "defaultScope": "kotoba.platform"
+    "defaultScope": "junkawasaki.kotoba"
   },
   "teambit.workspace/variants": {
-    "kotoba/components/editor": {
+    "junkawasaki.kotoba/components/editor": {
       "teambit.react/react": {},
       "teambit.defender/eslint": {
         "eslintConfig": {
@@ -26,7 +26,7 @@
         }
       }
     },
-    "kotoba/components/graph": {
+    "junkawasaki.kotoba/components/graph": {
       "teambit.react/react": {},
       "teambit.defender/eslint": {
         "eslintConfig": {
@@ -44,7 +44,7 @@
         }
       }
     },
-    "kotoba/components/host": {
+    "junkawasaki.kotoba/components/host": {
       "teambit.react/react": {},
       "teambit.defender/eslint": {
         "eslintConfig": {
@@ -62,7 +62,43 @@
         }
       }
     },
-    "kotoba/kotoba-app": {
+    "junkawasaki.kotoba/kotoba-app": {
+      "teambit.react/react": {},
+      "teambit.defender/eslint": {
+        "eslintConfig": {
+          "extends": ["@teambit/react.react-env/eslint-config"]
+        }
+      },
+      "teambit.defender/prettier": {
+        "prettierConfig": {
+          "printWidth": 80,
+          "tabWidth": 2,
+          "useTabs": false,
+          "semi": true,
+          "singleQuote": true,
+          "trailingComma": "es5"
+        }
+      }
+    },
+    "junkawasaki.kotoba/kotoba-api": {
+      "teambit.node/node": {},
+      "teambit.defender/eslint": {
+        "eslintConfig": {
+          "extends": ["@teambit/node.node-env/eslint-config"]
+        }
+      },
+      "teambit.defender/prettier": {
+        "prettierConfig": {
+          "printWidth": 80,
+          "tabWidth": 2,
+          "useTabs": false,
+          "semi": true,
+          "singleQuote": true,
+          "trailingComma": "es5"
+        }
+      }
+    },
+    "junkawasaki.kotoba/features/ast-processing": {
       "teambit.react/react": {},
       "teambit.defender/eslint": {
         "eslintConfig": {
@@ -82,7 +118,7 @@
     }
   },
   "teambit.dependencies/dependency-resolver": {
-    "packageManager": "npm",
+    "packageManager": "pnpm",
     "policy": {
       "dependencies": {
         "react": "19.0.0",
