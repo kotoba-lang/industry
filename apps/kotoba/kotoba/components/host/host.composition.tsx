@@ -1,4 +1,4 @@
-import { Host } from './host.js';
+import { Host } from './host';
 
 export const BasicHost = () => {
   return (

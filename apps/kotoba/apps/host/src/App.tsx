@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
-import { Editor } from '@kotoba/components/editor'
-import { Graph, GraphEditor } from '@kotoba/components/graph'
+import { Editor } from '@junkawasaki/kotoba.components.editor'
+import { Graph, GraphEditor } from '@junkawasaki/kotoba.components.graph'
 import { ThemeProvider } from './contexts/ThemeContext'
 import './App.css'
 

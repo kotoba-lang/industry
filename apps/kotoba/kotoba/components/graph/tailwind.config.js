@@ -1,11 +1,11 @@
-import sharedConfig from '@junkawasaki/kotoba.shared/tailwind.config.js';
+import { tailwindConfig } from '@junkawasaki/kotoba.shared';
 
 /** @type {import('tailwindcss').Config} */
 export default {
-  ...sharedConfig,
+  ...tailwindConfig,
   content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
     "./**/*.{js,ts,jsx,tsx}",
+    "../../packages/shared/**/*.{js,ts,jsx,tsx}",
+    "../editor/**/*.{js,ts,jsx,tsx}",
   ],
 } 

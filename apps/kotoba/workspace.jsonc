@@ -8,6 +8,13 @@
     "defaultScope": "junkawasaki.kotoba"
   },
   "teambit.workspace/variants": {
+    "*": {
+      "teambit.react/react": {
+        // "jestConfig": {
+        //   "setupFilesAfterEnv": ["jest-canvas-mock"]
+        // }
+      }
+    },
     "junkawasaki.kotoba/components/editor": {
       "teambit.react/react": {},
       "teambit.defender/eslint": {
@@ -27,7 +34,11 @@
       }
     },
     "junkawasaki.kotoba/components/graph": {
-      "teambit.react/react": {},
+      "teambit.react/react": {
+        // "jestConfig": {
+        //   "setupFilesAfterEnv": ["jest-canvas-mock"]
+        // }
+      },
       "teambit.defender/eslint": {
         "eslintConfig": {
           "extends": ["@teambit/react.react-env/eslint-config"]
