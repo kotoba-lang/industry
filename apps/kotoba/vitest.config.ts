@@ -8,7 +8,8 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./vitest-setup.ts'],
-    include: ['**/*.spec.tsx'],
+    include: ['**/*.spec.tsx', '**/apps/api/**/*.spec.ts'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/tests/**'],
     deps: {
       inline: ['vitest-canvas-mock'],
     },
