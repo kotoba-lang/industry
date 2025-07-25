@@ -424,6 +424,7 @@ export function Graph({
             ref={containerRef} 
             className="w-full rounded-lg"
             style={{ height }}
+            data-testid="graph-container"
           />
         </div>
       </div>

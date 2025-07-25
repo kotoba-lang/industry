@@ -1,1 +1,4 @@
-import '@testing-library/jest-dom/vitest'; 
+import { vi } from 'vitest';
+import '@testing-library/jest-dom/vitest';
+
+global.jest = vi; 
