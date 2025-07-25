@@ -1,9 +1,10 @@
-import React from 'react';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { BasicGraph } from './graph.composition';
 
-it('should render the correct text', () => {
-  const { getByText } = render(<BasicGraph />);
-  const rendered = getByText('hello world!');
-  expect(rendered).toBeTruthy();
+describe('Graph component', () => {
+  it('should render the graph container', () => {
+    render(<BasicGraph />);
+    const rendered = screen.getByTestId('graph-container');
+    expect(rendered).toBeInTheDocument();
+  });
 });
