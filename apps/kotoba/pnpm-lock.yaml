@@ -210,9 +210,6 @@ importers:
       core-js:
         specifier: ^3.44.0
         version: 3.44.0
-      jest-canvas-mock:
-        specifier: ^2.5.2
-        version: 2.5.2
       jsdom:
         specifier: ^26.1.0
         version: 26.1.0
@@ -231,6 +228,9 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@22.16.5)(@vitest/ui@3.2.4)(jiti@1.21.7)(jsdom@26.1.0)(terser@5.43.1)(yaml@2.8.0)
+      vitest-canvas-mock:
+        specifier: ^0.3.3
+        version: 0.3.3(vitest@3.2.4)
 
   apps/api:
     dependencies:
@@ -4898,6 +4898,11 @@ packages:
         optional: true
       yaml:
         optional: true
+
+  vitest-canvas-mock@0.3.3:
+    resolution: {integrity: sha512-3P968tYBpqYyzzOaVtqnmYjqbe13576/fkjbDEJSfQAkHtC5/UjuRHOhFEN/ZV5HVZIkaROBUWgazDKJ+Ibw+Q==}
+    peerDependencies:
+      vitest: '*'
 
   vitest@3.2.4:
     resolution: {integrity: sha512-LUCP5ev3GURDysTWiP47wRRUpLKMOfPh+yKTx3kVIEiu5KOMeqzpnYNsKyOoVrULivR8tLcks4+lga33Whn90A==}
@@ -9993,6 +9998,11 @@ snapshots:
       jiti: 1.21.7
       terser: 5.43.1
       yaml: 2.8.0
+
+  vitest-canvas-mock@0.3.3(vitest@3.2.4):
+    dependencies:
+      jest-canvas-mock: 2.5.2
+      vitest: 3.2.4(@types/node@22.16.5)(@vitest/ui@3.2.4)(jiti@1.21.7)(jsdom@26.1.0)(terser@5.43.1)(yaml@2.8.0)
 
   vitest@3.2.4(@types/node@22.16.5)(@vitest/ui@3.2.4)(jiti@1.21.7)(jsdom@26.1.0)(terser@5.43.1)(yaml@2.8.0):
     dependencies:
