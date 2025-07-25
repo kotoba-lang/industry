@@ -1,0 +1,29 @@
+{
+  "$schema": "https://static.bit.dev/teambit/schemas/schema.json",
+  "teambit.harmony/aspect": {
+    "name": "junkawasaki.kotoba/kotoba-app"
+  },
+  "teambit.react/react": {},
+  "teambit.defender/eslint": {
+    "eslintConfig": {
+      "extends": ["@teambit/react.react-env/eslint-config"]
+    }
+  },
+  "teambit.defender/prettier": {
+    "prettierConfig": {
+      "printWidth": 80,
+      "tabWidth": 2,
+      "useTabs": false,
+      "semi": true,
+      "singleQuote": true,
+      "trailingComma": "es5"
+    }
+  },
+  "teambit.generator/generator": {
+    "aspects": [
+      "teambit.react/react-env",
+      "teambit.defender/eslint",
+      "teambit.defender/prettier"
+    ]
+  }
+} 
