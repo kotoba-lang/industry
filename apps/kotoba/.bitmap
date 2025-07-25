@@ -14,21 +14,39 @@
         "scope": "junkawasaki.kotoba",
         "version": "0.0.1",
         "mainFile": "index.ts",
-        "rootDir": "kotoba/components/editor"
+        "rootDir": "kotoba/components/editor",
+        "config": {
+            "teambit.react/react": {},
+            "teambit.envs/envs": {
+                "env": "teambit.react/react"
+            }
+        }
     },
     "components/graph": {
         "name": "components/graph",
         "scope": "junkawasaki.kotoba",
         "version": "0.0.1",
         "mainFile": "index.ts",
-        "rootDir": "kotoba/components/graph"
+        "rootDir": "kotoba/components/graph",
+        "config": {
+            "teambit.react/react": {},
+            "teambit.envs/envs": {
+                "env": "teambit.react/react"
+            }
+        }
     },
     "components/host": {
         "name": "components/host",
         "scope": "junkawasaki.kotoba",
         "version": "0.0.1",
         "mainFile": "index.ts",
-        "rootDir": "kotoba/components/host"
+        "rootDir": "kotoba/components/host",
+        "config": {
+            "teambit.react/react": {},
+            "teambit.envs/envs": {
+                "env": "teambit.react/react"
+            }
+        }
     },
     "features/ast-processing": {
         "name": "features/ast-processing",
@@ -36,7 +54,13 @@
         "version": "",
         "defaultScope": "junkawasaki.kotoba",
         "mainFile": "index.ts",
-        "rootDir": "kotoba/features/ast-processing"
+        "rootDir": "kotoba/features/ast-processing",
+        "config": {
+            "teambit.react/react": {},
+            "teambit.envs/envs": {
+                "env": "teambit.react/react"
+            }
+        }
     },
     "kotoba-api": {
         "name": "kotoba-api",
@@ -44,14 +68,40 @@
         "version": "",
         "defaultScope": "junkawasaki.kotoba",
         "mainFile": "index.ts",
-        "rootDir": "apps/api"
+        "rootDir": "apps/api",
+        "config": {
+            "teambit.node/node@1.1.2": {},
+            "teambit.envs/envs": {
+                "env": "teambit.node/node"
+            }
+        }
     },
     "kotoba-app": {
         "name": "kotoba-app",
         "scope": "junkawasaki.kotoba",
         "version": "0.0.1",
         "mainFile": "index.ts",
-        "rootDir": "apps/host"
+        "rootDir": "apps/host",
+        "config": {
+            "teambit.react/react": {},
+            "teambit.envs/envs": {
+                "env": "teambit.react/react"
+            }
+        }
+    },
+    "shared": {
+        "name": "shared",
+        "scope": "",
+        "version": "",
+        "defaultScope": "junkawasaki.kotoba",
+        "mainFile": "index.ts",
+        "rootDir": "packages/shared",
+        "config": {
+            "teambit.harmony/node": {},
+            "teambit.envs/envs": {
+                "env": "teambit.harmony/node"
+            }
+        }
     },
     "$schema-version": "17.0.0"
 }
