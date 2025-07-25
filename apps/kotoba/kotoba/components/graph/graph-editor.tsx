@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react'
 import cytoscape from 'cytoscape'
 import dagre from 'cytoscape-dagre'
 import edgehandles from 'cytoscape-edgehandles'
+import { FloatingToolbar } from './components/FloatingToolbar'
+import { ContextMenu } from './components/ContextMenu'
 
 // cytoscapeにプラグインを登録
 cytoscape.use(dagre as any)
@@ -68,6 +70,13 @@ export function GraphEditor({
   const [selectedEdge, setSelectedEdge] = useState<any>(null)
   const [showEdgeEditor, setShowEdgeEditor] = useState(false)
   const [edgeWeight, setEdgeWeight] = useState(1)
+  
+  // フローティングツールバーとコンテキストメニューの状態
+  const [showFloatingToolbar, setShowFloatingToolbar] = useState(false)
+  const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 0 })
+  const [showContextMenu, setShowContextMenu] = useState(false)
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 })
+  const [selectedElement, setSelectedElement] = useState<any>(null)
   
   const sampleData = {
     nodes: [
@@ -261,6 +270,8 @@ export function GraphEditor({
     cyRef.current.on('tap', 'node', (evt: any) => {
       const node = evt.target
       const nodeData = node.data()
+      const position = node.renderedPosition()
+      
       setSelectedNode({
         id: nodeData.id,
         label: nodeData.label,
@@ -270,15 +281,29 @@ export function GraphEditor({
       })
       setSelectedEdge(null)
       setShowEdgeEditor(false)
+      
+      // フローティングツールバーを表示
+      setSelectedElement(node)
+      setToolbarPosition({ x: position.x, y: position.y })
+      setShowFloatingToolbar(true)
+      setShowContextMenu(false)
     })
 
     // エッジクリックイベント
     cyRef.current.on('tap', 'edge', (evt: any) => {
       const edge = evt.target
+      const position = edge.renderedMidpoint()
+      
       setSelectedEdge(edge)
       setSelectedNode(null)
       setShowEdgeEditor(true)
       setEdgeWeight(edge.data('weight'))
+      
+      // フローティングツールバーを表示
+      setSelectedElement(edge)
+      setToolbarPosition({ x: position.x, y: position.y })
+      setShowFloatingToolbar(true)
+      setShowContextMenu(false)
     })
 
     // 背景クリックイベント
@@ -287,7 +312,17 @@ export function GraphEditor({
         setSelectedNode(null)
         setSelectedEdge(null)
         setShowEdgeEditor(false)
+        setShowFloatingToolbar(false)
+        setShowContextMenu(false)
       }
+    })
+
+    // 右クリックイベント（コンテキストメニュー）
+    cyRef.current.on('cxttap', (evt: any) => {
+      const position = evt.renderedPosition || evt.cyRenderedPosition
+      setContextMenuPosition({ x: position.x, y: position.y })
+      setShowContextMenu(true)
+      setShowFloatingToolbar(false)
     })
 
     // EdgeHandlesプラグインを初期化
@@ -702,8 +737,11 @@ export function GraphEditor({
         <div className="flex-1 relative">
           <div 
             ref={containerRef} 
-            style={{ height, width: '100%' }}
-            className="bg-gray-50 dark:bg-gray-900"
+            style={{ 
+              height, 
+              width: '100%'
+            }}
+            className="bg-gray-50 dark:bg-gray-900 graph-grid-pattern"
           />
           
           {/* エッジ作成モードのインジケーター */}
@@ -716,6 +754,98 @@ export function GraphEditor({
                 <span className="text-sm font-medium">Edge Creation Mode - Click and drag from one node to another</span>
               </div>
             </div>
+          )}
+
+          {/* フローティングツールバー */}
+          {showFloatingToolbar && selectedElement && (
+            <FloatingToolbar
+              x={toolbarPosition.x}
+              y={toolbarPosition.y}
+              type={selectedElement.isNode() ? 'node' : 'edge'}
+              onDelete={() => {
+                if (selectedElement.isNode()) {
+                  deleteNode()
+                } else {
+                  deleteEdge()
+                }
+                setShowFloatingToolbar(false)
+              }}
+              onEdit={() => {
+                if (selectedElement.isNode()) {
+                  setEditingNode(selectedNode)
+                  setShowNodeEditor(true)
+                }
+                setShowFloatingToolbar(false)
+              }}
+              onDuplicate={() => {
+                if (selectedElement.isNode()) {
+                  // ノード複製機能を実装
+                  console.log('Duplicate node:', selectedElement.id())
+                }
+                setShowFloatingToolbar(false)
+              }}
+              onColorChange={() => {
+                // 色変更機能を実装
+                console.log('Change color for:', selectedElement.id())
+                setShowFloatingToolbar(false)
+              }}
+              onZoomTo={() => {
+                cyRef.current?.fit(selectedElement)
+                setShowFloatingToolbar(false)
+              }}
+              onExpand={() => {
+                // 展開機能を実装
+                console.log('Expand:', selectedElement.id())
+                setShowFloatingToolbar(false)
+              }}
+            />
+          )}
+
+          {/* コンテキストメニュー */}
+          {showContextMenu && (
+            <ContextMenu
+              x={contextMenuPosition.x}
+              y={contextMenuPosition.y}
+              onAddNode={() => {
+                // 指定位置にノードを追加
+                console.log('Add node at:', contextMenuPosition)
+                setShowContextMenu(false)
+              }}
+              onAddEdge={() => {
+                setEdgeMode('create')
+                setShowContextMenu(false)
+              }}
+              onPaste={() => {
+                // ペースト機能を実装
+                console.log('Paste')
+                setShowContextMenu(false)
+              }}
+              onSelectAll={() => {
+                cyRef.current?.elements().select()
+                setShowContextMenu(false)
+              }}
+              onClearSelection={() => {
+                cyRef.current?.elements().unselect()
+                setShowContextMenu(false)
+              }}
+              onZoomIn={() => {
+                cyRef.current?.zoom({ level: cyRef.current.zoom() * 1.2 })
+                setShowContextMenu(false)
+              }}
+              onZoomOut={() => {
+                cyRef.current?.zoom({ level: cyRef.current.zoom() * 0.8 })
+                setShowContextMenu(false)
+              }}
+              onFitToView={() => {
+                cyRef.current?.fit()
+                setShowContextMenu(false)
+              }}
+              onResetView={() => {
+                cyRef.current?.reset()
+                setShowContextMenu(false)
+              }}
+              onClose={() => setShowContextMenu(false)}
+            />
           )}
         </div>
 
