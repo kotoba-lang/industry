@@ -1,128 +1,97 @@
-# `kotoba`言語 設計仕様書 (v0.4)
+# `kotoba`言語 設計仕様書 (v0.5)
 
 このドキュメントは、`kotoba`言語の技術的な設計仕様と、その根底にある哲学を定義します。
 
-## 1. 思想: HoTTと日本の哲学
+## 1. 思想: 計算する空間、検証する魂
 
-`kotoba`は、**ホモトピー型理論（HoTT）**の「型は空間である」という思想と、**日本の哲学（空即是色など）**を、ミニマルなアルファベットのキーワードで表現する言語です。
+`kotoba`は、**立方体型理論 (Cubical Type Theory)** の思想に立脚するプログラミング言語です。ホモトピー型理論 (HoTT) の「型は空間である」という直観を、公理ではなく**計算可能な構成物**として捉え直します。
 
-プログラミングとは、**`ku` (`空`) によって`ba` (`場`) を立ち上げ、それに`shiki` (`式`) の名と形を与え、`en` (`縁`) で繋ぐ**という、構成的な証明プロセスそのものです。
+これにより、`kotoba`は「プログラムを記述する」言語から、「**性質を記述し、その正しさを数学的に検証する**」ための形式的体系へと昇華します。プログラミングとは、魂の構造 (`kami`) を高次帰納型として定義し、その振る舞いが論理的に一貫していることを、立方体の操作 (`en`, `tsunagu`) を通じて**構成的に証明する**営みそのものです。
 
-### 1.1. 目指すもの: チューリング完全性と形式手法
+### 1.1. 目指すもの: 計算的HoTTと検証エンジン
 
-`kotoba`は単なる表現言語に留まりません。**チューリング完全な計算能力**と、HoTTに基づく**形式手法の厳密性**を両立することを目指します。これにより、開発者は「魂や関係性」といった抽象的な概念を記述しつつ、そのプログラムが数学的に正しいことを証明できる体系を構築します。
+-   **計算的HoTT (Computational HoTT)**: HoTTの核心である**同値性の公理 (Univalence)** を、公理として天下り的に与えるのではなく、立方体の `tsunagu` (Glue) 型を用いた**定理 `tsunagari` (Univalence as a Theorem)** として、計算的に導出します。
+-   **検証エンジン (Verification Engine)**: `kotoba`コンパイラは、単なるトランスパイラではなく、コードの正しさを型レベルで検証するエンジンとして機能します。プログラムは、まず検証可能な中間表現 (VIR) へと変換され、その健全性が証明された上で初めて実行可能コードが生成されます。
 
--   **チューリング完全性**: 再帰 (`meguri`)、条件分岐 (`wakare`, `ou`)、状態の保持 (`shiki`) を通じて、あらゆる計算を可能にします。
--   **形式手法**: 依存型 (`nagare`, `musubi`) や帰納的定義 (`umare`) を導入し、プログラムがそのまま証明となるような Curry-Howard 同型対応を体現します。
+## 2. 言語仕様: 二層のキーワード体系
 
-## 2. 言語仕様: 魂を記述するキーワード
+`kotoba`は、立方体型理論の原始的な「計算層」と、それによって構成されるHoTTの「抽象層」から成ります。
 
-| 役割 (Role) | キーワード (Keyword) | 思想 (Philosophy) | 形式意味論上の対応 (Formal Semantics) |
+### 2.1. 計算層 (Cubical Layer): 世界の根源的操作
+
+| キーワード | 思想 | 形式意味論上の対応 | 説明 |
 | :--- | :--- | :--- | :--- |
-| **空間・型 (Space/Type)** | `ba` | `場` | Type |
-| **パス・射・等価 (Path/Morphism/Equality)** | `en` | `縁` | Path / Identity Type |
-| **ユニット型 (Unit Type)** | `ma` | `間` | Unit Type / Terminal Object |
-| **宇宙 (Universe)** | `sora` | `宙` | Universe |
-| **宣言 (Declaration)** | `ku` | `空` | Declaration / Introduction |
-| **束縛 (Binding)** | `shiki` | `式` | let / Definition |
-| **関数 (Function)** | `kan` | `観` | Lambda Abstraction (non-dependent) |
-| **依存関数 (Dependent Function)** | `nagare`| `流` | Π-type / Dependent Function |
-| **依存ペア (Dependent Pair)** | `musubi`| `結` | Σ-type / Dependent Pair |
-| **条件分岐 (Conditional)** | `wakare`| `分` | if / then / else |
-| **パターン照合 (Pattern Match)** | `ou` | `応` | Induction / Case Analysis |
-| **帰納型定義 (Inductive Definition)** | `umare` | `生` | Inductive Type Definition |
-| **再帰・不動点 (Recursion/Fixpoint)** | `meguri`| `巡` | Fixpoint Combinator / Recursion |
-| **高次帰納型 (Higher Inductive Type)** | `kami` | `神` | Higher Inductive Type (HIT) |
+| `toki` | `時` | Interval `I` | すべての計算の基準となる一次元の「時間」を表す型。 |
+| `hira` | `面` | Faces `i0`, `i1` | `toki`の両端。`i0`は「始点」、`i1`は「終点」。 |
+| `en` | `縁` | Path `_≡_` | `a`と`b`の間の繋がり（等価性）を表す、`toki`上の関数。 |
+| `tsunagu` | `繋ぐ`| Glue Type | 型と型を、`en`（パス）に沿って「接着」する操作。 |
 
-### 2.1. 構文例
+### 2.2. 抽象層 (HoTT Layer): 構成される世界
 
-#### 基本的なパイプライン
+| キーワード | 思想 | 形式意味論上の対応 | 説明 |
+| :--- | :--- | :--- | :--- |
+| `ba`, `ma`, `sora` | `場`,`間`,`宙` | Type, Unit, Universe | 空間、静寂、そして空間の属する宇宙。 |
+| `ku`, `shiki` | `空`,`式` | Introduction, let | 空間の立ち上げと、項への名前の束縛。 |
+| `kan`, `nagare`, `musubi`| `観`,`流`,`結` | λ, Π-type, Σ-type | 関数、依存関数、そして依存ペア。 |
+| `wakare`, `ou` | `分`,`応` | Conditional, Match | 条件分岐とパターン照合。 |
+| `umare` | `生` | Inductive Type | 帰納的に定義される型 (例: 自然数)。 |
+| `meguri` | `巡` | Recursion / Fixpoint | 帰納型の上での再帰計算。 |
+| `kami` | `神` | Higher Inductive Type | 点だけでなくパスもコンストラクタに持つ高次帰納型。 |
+| `tsunagari`| `繋がり`| Univalence | `tsunagu`から導出される定理。同型な型は等しい。 |
+
+### 2.3. 構文例: `tsunagari` (Univalence) の証明スケッチ
 ```kotoba
-// 'timer'という名の`ba`を`ku`より立ち上げ、
-// 'timer_ba'という`shiki`でその形を定義する。
-shiki timer_ba: ba = ku "system/timer/1s"
+// is_equiv(f) は f が同型写像であるという性質を表す ba とする
+shiki is_equiv (f: en<A, B>): ba = ...
 
-// timer_baから、「ma」に触れて「i64」を生み出す`en`を取り出す。
-shiki ticks: en<ma, i64> = timer_ba.as_en()
+// Univalence定理の表明
+// 「AとBの間の同型写像」という ba と、「AとBが等しい」という ba は、それ自体が同型である。
+shiki univalence: ba =
+  nagare (A: sora) =>
+  nagare (B: sora) =>
+    is_equiv(en_to_equiv(en<A, B>))
 
-// 「数を二倍で観る」という`en`を定義する。
-shiki doubler: en<i64, i64> = kan(x: i64) => x * 2
-
-// enとenを接続し、新しい`en`を定義する。
-shiki pipeline: en<ma, i64> = ticks |> doubler
+// ここでの en_to_equiv は、パスを同型写像に変換する関数であり、
+// その実体は立方体の `tsunagu` 操作によって構成的に定義される。
 ```
 
-#### 帰納・再帰・分岐 (`umare`, `meguri`, `ou`)
-```kotoba
-// 「自然数」という`ba`を`umare`で帰納的に定義する。
-shiki Nat: ba = umare {
-    zero: Nat,
-    succ(prev: Nat): Nat
-}
+## 3. 検証エンジンとしてのコンパイラ設計
 
-// `Nat`上の加算を`meguri` (再帰) を使って定義する。
-shiki add: en<Nat, en<Nat, Nat>> =
-    meguri self(a: Nat, b: Nat): Nat =>
-        ou a {
-            zero => b,
-            succ(prev_a) => Nat.succ(self(prev_a, b))
-        }
-
-// `wakare` (もし) を使った分岐
-shiki is_zero: en<Nat, bool> = kan(n: Nat) =>
-    wakare n ou {
-        zero => true,
-        _ => false
-    }
-```
-
-## 3. コンパイラ設計
-
-`kotoba`コンパイラは、`kotoba`コードを最適化されたRustコードへ変換する**トランスパイラ**として実装されます。
-
-### 3.1. コンパイルパイプライン
-
-1.  **構文解析 (Parser)**: `kotoba-parser`が、上記のキーワード体系に基づくLL(1)再帰下降パーサとしてソースをASTに変換。
-2.  **意味解析・型チェック**: `kotoba-compiler`がASTの型整合性を検証。
-3.  **Rustコード生成**: `kotoba-compiler`がASTから等価なRustコードを生成。
+1.  **構文解析 (Parser)**: `kotoba-parser`がソースをASTに変換。
+2.  **検証・中間表現生成 (Verifier & VIR Generation)**: `kotoba-compiler`がASTを検証し、計算可能な**検証中間表現 (Verifiable IR)** に変換する。このステップで、型の整合性だけでなく、証明の正しさも検証される。
+3.  **Rustコード生成 (Code Generation)**: `kotoba-compiler`がVIRから等価なRustコードを生成。
 4.  **最終コンパイル**: `rustc`がネイティブバイナリを生成。
 
-### 3.2. プロジェクト構造 (Cargo Workspace)
-
+### 3.1. プロジェクト構造 (Cargo Workspace)
 -   `crates/`
-    -   `kotoba-core`: `Ba` (`ba`に対応) など、言語のコアとなるデータ構造の定義。
+    -   `kotoba-core`: `toki`, `en`など、言語のコアとなる立方体データ構造の定義。
     -   `kotoba-parser`: パーサーとASTの定義。
-    -   `kotoba-compiler`: 意味解析、型チェック、コード生成器。
+    -   `kotoba-compiler`: **検証エンジン**。意味解析、型チェック、VIR生成、コード生成。
     -   `kotoba-cli`: CLIツール。
-    -   `kotoba-std`: 標準ライブラリ。
 
 ---
 
 ## 4. 開発ロードマップ
 
-### v0.3 (完了)
+### v0.4 (完了)
+-   [x] 基本的なキーワード (`shiki`, `kan`, `ou`) の実装。
+-   [x] **設計思想の転換**: 立方体型理論への立脚を決定。
 
--   [x] **言語哲学の最終決定**: アルファベットベースのキーワード体系 (`ba`, `en`, `ku`, `shiki`等) を最終決定。
--   [x] `kan`による関数定義（クロージャ）のサポート。
--   [x] `ou`による基本的なパターンマッチ。
--   [x] `kotoba-std`クレートの導入準備。
+### v0.5 (計画中): 計算層 (Cubical Layer) の構築
+-   [ ] **`kotoba-core`の再設計**:
+    -   [ ] `toki` (Interval `I`) とその演算 (`∧`, `∨`, `~`) の実装。
+    -   [ ] `en` (Path) 型 `a ≡ b` の実装。
+    -   [ ] `PathP` (依存パス) の実装。
+-   [ ] **パーサとコンパイラの対応**:
+    -   [ ] `toki`, `hira`, `en` に対応する構文とASTを追加。
+    -   [ ] パスを操作する基本的な式の型チェックを実装。
+-   [ ] **標準ライブラリ**: `en`に関する基本的な定理 (結合、逆など) を`kotoba`で記述。
 
-### v0.4 (計画中)
+### v0.6 (展望): 検証エンジンの基礎
+-   [ ] `tsunagu` (Glue) 型と、それに対応するコンパイラサポートの実装。
+-   [ ] **定理の証明**: `tsunagari` (Univalence) を `kotoba` 自身で記述し、検証エンジンがそれを証明できることを目指す。
+-   [ ] `umare` (帰納型) と `meguri` (再帰) の立方体的実装。
 
--   [ ] **チューリング完全性のための基礎実装**
-    -   [ ] `umare`: 帰納データ型（代数的データ型）の定義機能。
-    -   [ ] `ou`: 完全なパターンマッチ（ネスト、ガード含む）。
-    -   [ ] `meguri`: `kan`内での自己再帰呼び出しのサポート。
-    -   [ ] `wakare`: `if/then/else` 形式の条件分岐。
--   [ ] **パーサの拡張**: 上記キーワードに対応するASTノードの定義と構文解析ルールの実装。
--   [ ] **コンパイラの拡張**: 新しいASTノードに対する型チェックとRustコード生成ロジックの実装。
-
-### v0.5 (展望)
-
--   [ ] **形式手法のための依存型**
-    -   [ ] `nagare` (Π-type), `musubi` (Σ-type) の実装。
-    -   [ ] 型が項に依存できる、完全な依存型システムへの拡張。
--   [ ] **高度な型機能**
-    -   [ ] `sora` (Universe): 型の階層を扱うための宇宙。
-    -   [ ] `kami` (Higher Inductive Types): HoTTの真価を発揮する高次帰納型の導入。
--   [ ] **証明支援**: 対話的な証明記述や検証をサポートする機能。
+### v0.7 (未来): 魂の記述
+-   [ ] `kami` (高次帰納型) の完全なサポート。円、トーラスなどを自由に定義可能にする。
+-   [ ] 対話的な証明支援機能の統合。
