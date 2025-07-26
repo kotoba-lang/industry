@@ -1,14 +1,26 @@
-use kotoba_parser::{Expression, OuArm, Parameter, Pattern, Statement, Type};
+use kotoba_parser::{Expression, OuArm, Pattern, Statement, Type};
 
 pub struct Compiler;
 
 fn type_to_string(t: &Type) -> String {
     match t {
-        Type::Simple(name) => name.clone(),
-        Type::Generic(name, params) => {
-            let params_str: Vec<String> = params.iter().map(type_to_string).collect();
-            format!("{}<{}>", name, params_str.join(", "))
+        Type::Ku => "kotoba_core::Interval".to_string(),
+        Type::Ze(t1, _t2) => {
+            // This is a placeholder. A real implementation would need to handle
+            // the fact that Path is generic over a single type, but the
+            // ze type represents equality between two values *of the same type*.
+            // For now, we just represent the type of the path's content.
+            format!("kotoba_core::Path<{}>", type_to_string(t1))
         }
+        Type::En(t1, t2) => {
+            // Placeholder for Glue type compilation
+            format!(
+                "kotoba_core::Glue<{}, kotoba_core::Path<{}>>",
+                type_to_string(t1),
+                type_to_string(t2)
+            )
+        }
+        Type::Simple(name) => name.clone(),
     }
 }
 
@@ -49,6 +61,11 @@ impl Compiler {
         match expression {
             Expression::Ku { id } => Ok(format!("kotoba_core::Ba::new(\"{}\")", id)),
             Expression::Identifier(name) => Ok(name),
+            Expression::Zo(val) => match val.as_str() {
+                "i0" => Ok("kotoba_core::Interval::I0".to_string()),
+                "i1" => Ok("kotoba_core::Interval::I1".to_string()),
+                _ => Err("Invalid interval literal".to_string()),
+            },
             Expression::MethodCall { variable, method } => {
                 let var_code = self.compile_expression(*variable)?;
                 Ok(format!("{}.{}()", var_code, method))
@@ -75,7 +92,7 @@ impl Compiler {
                 for arm in arms {
                     arms_code.push_str(&self.compile_ou_arm(arm)?);
                 }
-                Ok(format!("match {} {{\n{}\n}}", expr_code, arms_code))
+                Ok(format!("match {} {{\n{}}}", expr_code, arms_code))
             }
         }
     }
@@ -86,7 +103,7 @@ impl Compiler {
             Pattern::Wildcard => "_".to_string(),
         };
         let body_code = self.compile_expression(arm.body)?;
-        Ok(format!("        {} => {{ {} }},\n", pattern_code, body_code))
+        Ok(format!("    {} => {{ {} }},\n", pattern_code, body_code))
     }
 }
 
@@ -97,13 +114,13 @@ mod tests {
     use kotoba_parser::parse_statement;
 
     #[test]
-    fn test_compile_shiki_ku() {
-        let input = "shiki timer_ba: ba = ku \"system/timer\"";
+    fn test_compile_shiki_ku_and_zo() {
+        let input = "shiki my_time: ku = i0";
         let (_, statement) = parse_statement(input).unwrap();
         let compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         let expected_code =
-            "use kotoba_core::Ba;\n\nlet timer_ba: ba = kotoba_core::Ba::new(\"system/timer\");\n";
+            "use kotoba_core::Ba;\n\nlet my_time: kotoba_core::Interval = kotoba_core::Interval::I0;\n";
         assert_eq!(result, Ok(expected_code.to_string()));
     }
 
@@ -113,7 +130,7 @@ mod tests {
         let (_, statement) = parse_statement(input).unwrap();
         let compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
-        let expected_code = "use kotoba_core::Ba;\n\nlet ticks: en<ma, i64> = timer_ba.as_en();\n";
+        let expected_code = "use kotoba_core::Ba;\n\nlet ticks: kotoba_core::Glue<ma, kotoba_core::Path<i64>> = timer_ba.as_en();\n";
         assert_eq!(result, Ok(expected_code.to_string()));
     }
 
@@ -124,7 +141,7 @@ mod tests {
         let compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         let expected_code =
-            "use kotoba_core::Ba;\n\nlet pipeline: en<ma, i64> = pipe(ticks, doubler);\n";
+            "use kotoba_core::Ba;\n\nlet pipeline: kotoba_core::Glue<ma, kotoba_core::Path<i64>> = pipe(ticks, doubler);\n";
         assert_eq!(result, Ok(expected_code.to_string()));
     }
 
@@ -135,7 +152,7 @@ mod tests {
         let compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         let expected_code =
-            "use kotoba_core::Ba;\n\nlet doubler: en<i64, i64> = |x: i64| { x };\n";
+            "use kotoba_core::Ba;\n\nlet doubler: kotoba_core::Glue<i64, kotoba_core::Path<i64>> = |x: i64| { x };\n";
         assert_eq!(result, Ok(expected_code.to_string()));
     }
 
@@ -145,7 +162,7 @@ mod tests {
         let (_, expression) = parse_expression(input).unwrap();
         let compiler = Compiler::new();
         let result = compiler.compile_expression(expression);
-        let expected_code = "match x {\n        0 => { kotoba_core::Ba::new(\"zero\") },\n        _ => { kotoba_core::Ba::new(\"other\") },\n}";
+        let expected_code = "match x {\n    0 => { kotoba_core::Ba::new(\"zero\") },\n    _ => { kotoba_core::Ba::new(\"other\") },\n}";
         assert_eq!(result, Ok(expected_code.to_string()));
     }
 }
