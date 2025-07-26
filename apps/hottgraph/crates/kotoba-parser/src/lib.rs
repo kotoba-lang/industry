@@ -11,9 +11,12 @@ use nom::{
 /// 型を表すAST
 #[derive(Debug, PartialEq, Clone)]
 pub enum Type {
-    /// `ba`, `en`, `ma`, `i64` などのシンプルな型
+    /// The interval type, `toki`.
+    Toki,
+    /// A simple, named type like `ma` or `i64`.
     Simple(String),
-    /// `en<T1, T2>` のようなジェネリック型
+    /// A generic type like `en<A, B>`.
+    /// In the future, this might be split into `Path(T, T)` and other constructs.
     Generic(String, Vec<Type>),
 }
 
@@ -64,6 +67,8 @@ pub enum Expression {
         expression: Box<Expression>,
         arms: Vec<OuArm>,
     },
+    /// An interval literal, `i0` or `i1`.
+    IntervalLiteral(String),
 }
 
 /// 文を表すAST
@@ -90,9 +95,12 @@ fn parse_identifier(input: &str) -> IResult<&str, &str> {
     let (next, ident) = parse_identifier_str(input)?;
     // キーワードと一致する場合はエラー
     match ident {
-        "shiki" | "kan" | "ku" | "ou" | "ba" | "en" | "ma" => Err(nom::Err::Error(
-            nom::error::Error::new(input, nom::error::ErrorKind::Tag),
-        )),
+        "shiki" | "kan" | "ku" | "ou" | "ba" | "en" | "ma" | "toki" | "i0" | "i1" => {
+            Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )))
+        }
         _ => Ok((next, ident)),
     }
 }
@@ -115,6 +123,11 @@ fn parse_type_name(input: &str) -> IResult<&str, &str> {
 fn parse_type(input: &str) -> IResult<&str, Type> {
     let (input, name) = parse_type_name(input)?;
     let (input, _) = multispace0(input)?;
+
+    // `toki` type
+    if name == "toki" {
+        return Ok((input, Type::Toki));
+    }
 
     if !input.starts_with('<') {
         return Ok((input, Type::Simple(name.to_string())));
@@ -167,6 +180,10 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
         |id| Expression::Ku { id },
     );
 
+    let interval_parser = map(alt((tag("i0"), tag("i1"))), |s: &str| {
+        Expression::IntervalLiteral(s.to_string())
+    });
+
     let kan_parser = map(
         tuple((
             tag("kan"),
@@ -209,8 +226,13 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
         Expression::Identifier(name.to_string())
     });
 
-    let (mut remaining, mut expr) =
-        alt((ku_parser, kan_parser, ou_parser, ident_expr_parser))(input)?;
+    let (mut remaining, mut expr) = alt((
+        ku_parser,
+        kan_parser,
+        ou_parser,
+        interval_parser,
+        ident_expr_parser,
+    ))(input)?;
 
     loop {
         let (next_remaining, method_call) = opt(preceded(
@@ -295,6 +317,23 @@ mod tests {
                     value: Expression::Ku {
                         id: "system/timer".to_string()
                     }
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn test_parse_toki_type() {
+        let input = "shiki my_time: toki = i0";
+        let result = parse_statement(input);
+        assert_eq!(
+            result,
+            Ok((
+                "",
+                Statement::Shiki {
+                    variable_name: "my_time".to_string(),
+                    type_annotation: Type::Toki,
+                    value: Expression::IntervalLiteral("i0".to_string())
                 }
             ))
         );
