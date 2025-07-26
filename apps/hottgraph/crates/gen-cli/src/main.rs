@@ -62,7 +62,7 @@ fn main() {
                     println!("    {}", line);
                 }
             }
-            
+
             println!("}}");
         }
         Err(e) => {
