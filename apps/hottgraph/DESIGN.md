@@ -29,10 +29,10 @@
 | `ju`    | 受  | `Application`                  | 構造への接触。関数適用。触れた瞬間。       |
 | `ken`   | 見  | `Evaluation`                   | 接触から得られる照見。意味を評価し理解する。   |
 | `ou`    | 応  | `Match`, `if`                  | 状況への応答。条件と形に応じて変化する。     |
-| `sho`   | 生  | `Inductive Type`               | 世界の生成。構造を生み出す帰納的な力。      |
+| `gyo`   | 行  | `Inductive Type`               | 世界の生成。構造を生み出す帰納的な力。      |
 | `rin`   | 輪  | `Recursion / Fixpoint`         | 行の巡りと流転。自己参照的な再帰。        |
 | `myo`   | 妙  | `Higher Inductive Type`        | 神秘的な生成。点やパスも同時に創り出す。     |
-| `zo`    | 即  | `Univalence`                   | 等価なものは等しい。瞬間的に一致する世界観。   |
+| `zo`    | 即  | `Univalence`           Z        | 等価なものは等しい。瞬間的に一致する世界観。   |
 | `ze`    | 是  | `Path equality (≡)`            | 2つの存在が「同じ」であると判断し構成する。   |
 | `mu`    | 無  | `Empty Type`, `¬`              | 否定。存在しないこと。空性。無明。        |
 | `en`    | 縁  | `Path`, `Morphism`             | 存在と存在を結ぶ縁。関係性・接続。        |
