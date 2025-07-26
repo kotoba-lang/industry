@@ -17,6 +17,12 @@ pub enum Type {
     Generic(String, Vec<Type>),
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct Parameter {
+    pub name: String,
+    pub type_annotation: Type,
+}
+
 /// 式を表すAST
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
@@ -33,6 +39,11 @@ pub enum Expression {
     Pipe {
         lhs: Box<Expression>,
         rhs: Box<Expression>,
+    },
+    /// `かん(<params>) => <body>`
+    Kan {
+        params: Vec<Parameter>,
+        body: Box<Expression>,
     },
 }
 
@@ -88,11 +99,43 @@ fn parse_type(input: &str) -> IResult<&str, Type> {
     ))
 }
 
+fn parse_parameter(input: &str) -> IResult<&str, Parameter> {
+    map(
+        tuple((
+            parse_identifier,
+            delimited(multispace0, char(':'), multispace0),
+            parse_type,
+        )),
+        |(name, _, type_annotation)| Parameter {
+            name: name.to_string(),
+            type_annotation,
+        },
+    )(input)
+}
+
 fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
     // `く` 式
     let ku_parser = map(
         preceded(tuple((tag("く"), multispace1)), parse_quoted_string),
         |id| Expression::Ku { id },
+    );
+
+    // `かん` 式
+    let kan_parser = map(
+        tuple((
+            tag("かん"),
+            delimited(
+                char('('),
+                separated_list1(delimited(multispace0, char(','), multispace0), parse_parameter),
+                char(')'),
+            ),
+            delimited(multispace0, tag("=>"), multispace0),
+            parse_expression, // 本体は再帰的に式をパース
+        )),
+        |(_, params, _, body)| Expression::Kan {
+            params,
+            body: Box::new(body),
+        },
     );
 
     // 変数 or メソッド呼び出し
@@ -101,7 +144,7 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
     });
 
     // まずは変数としてパースを試みる
-    let (mut remaining, mut expr) = alt((ku_parser, ident_parser))(input)?;
+    let (mut remaining, mut expr) = alt((ku_parser, kan_parser, ident_parser))(input)?;
 
     // 後続の `.method()` をループでパース
     loop {
@@ -239,6 +282,35 @@ mod tests {
                     value: Expression::Pipe {
                         lhs: Box::new(Expression::Identifier("ticks".to_string())),
                         rhs: Box::new(Expression::Identifier("doubler".to_string()))
+                    }
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn test_parse_shiki_kan() {
+        let input = "しき doubler: 縁<i64, i64> = かん(x: i64) => x"; // bodyは簡単のためただの変数
+        let result = parse_statement(input);
+        assert_eq!(
+            result,
+            Ok((
+                "",
+                Statement::Shiki {
+                    variable_name: "doubler".to_string(),
+                    type_annotation: Type::Generic(
+                        "縁".to_string(),
+                        vec![
+                            Type::Simple("i64".to_string()),
+                            Type::Simple("i64".to_string())
+                        ]
+                    ),
+                    value: Expression::Kan {
+                        params: vec![Parameter {
+                            name: "x".to_string(),
+                            type_annotation: Type::Simple("i64".to_string())
+                        }],
+                        body: Box::new(Expression::Identifier("x".to_string()))
                     }
                 }
             ))
