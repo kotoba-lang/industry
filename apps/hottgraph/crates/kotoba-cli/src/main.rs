@@ -51,11 +51,16 @@ fn main() {
             println!("type i64 = i64;");
             println!("trait AsEn {{ fn as_en(&self) -> Self; }}");
             println!("impl AsEn for kotoba_core::Ba {{ fn as_en(&self) -> Self {{ self.clone() }} }}");
-            println!("struct 縁<I, O>(std::marker::PhantomData<(I, O)>);");
+            println!("#[derive(Clone)] struct 縁<I, O>(std::marker::PhantomData<(I, O)>);");
+            println!("fn pipe<T, U, V>(_: T, _: U) -> V {{ panic!() }}");
             println!("");
             // --- ここまで ---
 
             println!("fn main() {{");
+            println!("    // ダミーの変数定義");
+            println!("    let ticks: 縁<間, i64> = unimplemented!();");
+            println!("    let doubler: 縁<i64, i64> = unimplemented!();");
+            println!("");
 
             for line in rust_code.lines() {
                 if !line.trim().is_empty() {
