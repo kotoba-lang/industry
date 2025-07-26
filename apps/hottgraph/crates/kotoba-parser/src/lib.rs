@@ -90,27 +90,24 @@ fn parse_quoted_string(input: &str) -> IResult<&str, String> {
 }
 
 fn parse_type_name(input: &str) -> IResult<&str, &str> {
-    alpha1(input)
+    parse_identifier_str(input) // alpha1ではi64などをパースできないため修正
 }
 
 fn parse_type(input: &str) -> IResult<&str, Type> {
     let (input, name) = parse_type_name(input)?;
-    let (input, generics) = opt(delimited(
-        char('<'),
-        separated_list1(
-            delimited(multispace0, char(','), multispace0),
-            parse_type,
-        ),
-        char('>'),
-    ))(input)?;
+    let (input, _) = multispace0(input)?;
 
-    Ok((
-        input,
-        match generics {
-            Some(types) => Type::Generic(name.to_string(), types),
-            None => Type::Simple(name.to_string()),
-        },
-    ))
+    if !input.starts_with('<') {
+        return Ok((input, Type::Simple(name.to_string())));
+    }
+
+    let (input, generics) = delimited(
+        char('<'),
+        separated_list1(delimited(multispace0, char(','), multispace0), parse_type),
+        char('>'),
+    )(input)?;
+
+    Ok((input, Type::Generic(name.to_string(), generics)))
 }
 
 fn parse_parameter(input: &str) -> IResult<&str, Parameter> {
@@ -138,7 +135,10 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
             tag("kan"),
             delimited(
                 char('('),
-                separated_list1(delimited(multispace0, char(','), multispace0), parse_parameter),
+                separated_list1(
+                    delimited(multispace0, char(','), multispace0),
+                    parse_parameter,
+                ),
                 char(')'),
             ),
             delimited(multispace0, tag("=>"), multispace0),
@@ -159,10 +159,9 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
     loop {
         let (next_remaining, method_call) = opt(preceded(
             char('.'),
-            map(
-                tuple((parse_identifier_str, tag("()"))),
-                |(method, _)| method.to_string(),
-            ),
+            map(tuple((parse_identifier_str, tag("()"))), |(method, _)| {
+                method.to_string()
+            }),
         ))(&remaining)?;
 
         if let Some(method) = method_call {
