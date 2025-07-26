@@ -1,11 +1,11 @@
 use nom::{
+    IResult,
     branch::alt,
-    bytes::complete::tag,
+    bytes::complete::{tag, take_while1},
     character::complete::{alpha1, char, multispace0, multispace1},
     combinator::{map, opt, recognize},
     multi::separated_list1,
     sequence::{delimited, pair, preceded, tuple},
-    IResult,
 };
 
 /// 型を表すAST
@@ -53,7 +53,11 @@ fn parse_identifier(input: &str) -> IResult<&str, &str> {
 
 fn parse_quoted_string(input: &str) -> IResult<&str, String> {
     map(
-        delimited(char('"'), nom::bytes::complete::take_while(|c: char| c != '"'), char('"')),
+        delimited(
+            char('"'),
+            nom::bytes::complete::take_while(|c: char| c != '"'),
+            char('"'),
+        ),
         |s: &str| s.to_string(),
     )(input)
 }
@@ -62,15 +66,11 @@ fn parse_type_name(input: &str) -> IResult<&str, &str> {
     take_while1(|c: char| !"<>,".contains(c) && !c.is_whitespace() && c != ':')(input)
 }
 
-
 fn parse_type(input: &str) -> IResult<&str, Type> {
     let (input, name) = parse_type_name(input)?;
     let (input, generics) = opt(delimited(
         char('<'),
-        separated_list1(
-            delimited(multispace0, char(','), multispace0),
-            parse_type,
-        ),
+        separated_list1(delimited(multispace0, char(','), multispace0), parse_type),
         char('>'),
     ))(input)?;
 
@@ -102,10 +102,9 @@ fn parse_expression(input: &str) -> IResult<&str, Expression> {
     loop {
         let (next_remaining, method_call) = opt(preceded(
             char('.'),
-            map(
-                tuple((parse_identifier, tag("()"))),
-                |(method, _)| method.to_string(),
-            ),
+            map(tuple((parse_identifier, tag("()"))), |(method, _)| {
+                method.to_string()
+            }),
         ))(&remaining)?;
 
         if let Some(method) = method_call {
@@ -140,7 +139,6 @@ pub fn parse_statement(input: &str) -> IResult<&str, Statement> {
         },
     ))
 }
-
 
 #[cfg(test)]
 mod tests {
