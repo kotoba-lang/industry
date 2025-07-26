@@ -2,7 +2,7 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_while1},
     character::complete::{alpha1, char, multispace0, multispace1},
-    combinator::{map, opt, recognize},
+    combinator::{cut, map, opt, recognize, verify},
     multi::separated_list1,
     sequence::{delimited, pair, preceded, tuple},
     IResult,
@@ -11,13 +11,14 @@ use nom::{
 /// 型を表すAST
 #[derive(Debug, PartialEq, Clone)]
 pub enum Type {
-    /// The interval type, `toki`.
-    Toki,
+    /// The interval type, `ku`.
+    Ku,
+    /// A path type `ze(T, U)`, representing `T ≡ U`.
+    Ze(Box<Type>, Box<Type>),
     /// A simple, named type like `ma` or `i64`.
     Simple(String),
-    /// A generic type like `en<A, B>`.
-    /// In the future, this might be split into `Path(T, T)` and other constructs.
-    Generic(String, Vec<Type>),
+    /// A glued type `en<A, B>`.
+    En(Box<Type>, Box<Type>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -67,8 +68,8 @@ pub enum Expression {
         expression: Box<Expression>,
         arms: Vec<OuArm>,
     },
-    /// An interval literal, `i0` or `i1`.
-    IntervalLiteral(String),
+    /// An interval literal, `zo` (`i0` or `i1`).
+    Zo(String),
 }
 
 /// 文を表すAST
@@ -92,17 +93,12 @@ fn parse_identifier_str(input: &str) -> IResult<&str, &str> {
 }
 
 fn parse_identifier(input: &str) -> IResult<&str, &str> {
-    let (next, ident) = parse_identifier_str(input)?;
-    // キーワードと一致する場合はエラー
-    match ident {
-        "shiki" | "kan" | "ku" | "ou" | "ba" | "en" | "ma" | "toki" | "i0" | "i1" => {
-            Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Tag,
-            )))
-        }
-        _ => Ok((next, ident)),
-    }
+    verify(parse_identifier_str, |s: &str| {
+        !matches!(
+            s,
+            "shiki" | "kan" | "ku" | "ou" | "ba" | "en" | "ma" | "ze" | "i0" | "i1"
+        )
+    })(input)
 }
 
 fn parse_quoted_string(input: &str) -> IResult<&str, String> {
@@ -124,22 +120,45 @@ fn parse_type(input: &str) -> IResult<&str, Type> {
     let (input, name) = parse_type_name(input)?;
     let (input, _) = multispace0(input)?;
 
-    // `toki` type
-    if name == "toki" {
-        return Ok((input, Type::Toki));
+    // `ku` type
+    if name == "ku" {
+        return Ok((input, Type::Ku));
     }
 
-    if !input.starts_with('<') {
-        return Ok((input, Type::Simple(name.to_string())));
+    // `ze` or `en` type
+    if name == "ze" || name == "en" {
+        let (input, generics) = delimited(
+            char('<'),
+            separated_list1(delimited(multispace0, char(','), multispace0), parse_type),
+            char('>'),
+        )(input)?;
+
+        if generics.len() != 2 {
+            // ze and en must have exactly two type parameters.
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Verify,
+            )));
+        }
+
+        let mut iter = generics.into_iter();
+        let type1 = iter.next().unwrap();
+        let type2 = iter.next().unwrap();
+
+        if name == "ze" {
+            return Ok((
+                input,
+                Type::Ze(Box::new(type1), Box::new(type2)),
+            ));
+        } else {
+            return Ok((
+                input,
+                Type::En(Box::new(type1), Box::new(type2)),
+            ));
+        }
     }
 
-    let (input, generics) = delimited(
-        char('<'),
-        separated_list1(delimited(multispace0, char(','), multispace0), parse_type),
-        char('>'),
-    )(input)?;
-
-    Ok((input, Type::Generic(name.to_string(), generics)))
+    Ok((input, Type::Simple(name.to_string())))
 }
 
 fn parse_parameter(input: &str) -> IResult<&str, Parameter> {
@@ -180,8 +199,8 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
         |id| Expression::Ku { id },
     );
 
-    let interval_parser = map(alt((tag("i0"), tag("i1"))), |s: &str| {
-        Expression::IntervalLiteral(s.to_string())
+    let zo_parser = map(alt((tag("i0"), tag("i1"))), |s: &str| {
+        Expression::Zo(s.to_string())
     });
 
     let kan_parser = map(
@@ -204,24 +223,6 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
         },
     );
 
-    let ou_parser = map(
-        tuple((
-            tag("ou"),
-            multispace1,
-            parse_primary_expression, // 左再帰を避けるため primary_expression をパース
-            multispace0,
-            delimited(
-                char('{'),
-                separated_list1(delimited(multispace0, char(','), multispace0), parse_ou_arm),
-                char('}'),
-            ),
-        )),
-        |(_, _, expression, _, arms)| Expression::Ou {
-            expression: Box::new(expression),
-            arms,
-        },
-    );
-
     let ident_expr_parser = map(parse_identifier, |name| {
         Expression::Identifier(name.to_string())
     });
@@ -229,8 +230,7 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
     let (mut remaining, mut expr) = alt((
         ku_parser,
         kan_parser,
-        ou_parser,
-        interval_parser,
+        zo_parser,
         ident_expr_parser,
     ))(input)?;
 
@@ -258,26 +258,56 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
 
 
 pub fn parse_expression(input: &str) -> IResult<&str, Expression> {
-    let (mut remaining, mut lhs) = parse_primary_expression(input)?;
+    // First, try to parse a complete `ou` expression, as it's a compound form.
+    let ou_parser = map(
+        preceded(
+            tag("ou"),
+            cut(preceded(
+                multispace1,
+                tuple((
+                    parse_primary_expression, // The expression to be matched
+                    multispace0,
+                    delimited(
+                        char('{'),
+                        separated_list1(
+                            delimited(multispace0, char(','), multispace0),
+                            parse_ou_arm,
+                        ),
+                        char('}'),
+                    ),
+                )),
+            )),
+        ),
+        |(expression, _, arms)| Expression::Ou {
+            expression: Box::new(expression),
+            arms,
+        },
+    );
 
-    loop {
-        let (next_remaining, pipe) = opt(preceded(
-            delimited(multispace0, tag("|>"), multispace0),
-            parse_primary_expression,
-        ))(&remaining)?;
+    alt((ou_parser, |i| {
+        // The original pipe-aware parser
+        let (mut remaining, mut lhs) = parse_primary_expression(i)?;
 
-        if let Some(rhs) = pipe {
-            lhs = Expression::Pipe {
-                lhs: Box::new(lhs),
-                rhs: Box::new(rhs),
-            };
-            remaining = next_remaining;
-        } else {
-            break;
+            loop {
+                let (next_remaining, pipe) = opt(preceded(
+                    delimited(multispace0, tag("|>"), multispace0),
+                    parse_primary_expression,
+                ))(&remaining)?;
+
+                if let Some(rhs) = pipe {
+                    lhs = Expression::Pipe {
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                    };
+                    remaining = next_remaining;
+                } else {
+                    break;
+                }
+            }
+
+            Ok((remaining, lhs))
         }
-    }
-
-    Ok((remaining, lhs))
+    ))(input)
 }
 
 pub fn parse_statement(input: &str) -> IResult<&str, Statement> {
@@ -324,7 +354,7 @@ mod tests {
 
     #[test]
     fn test_parse_toki_type() {
-        let input = "shiki my_time: toki = i0";
+        let input = "shiki my_time: ku = i0";
         let result = parse_statement(input);
         assert_eq!(
             result,
@@ -332,8 +362,8 @@ mod tests {
                 "",
                 Statement::Shiki {
                     variable_name: "my_time".to_string(),
-                    type_annotation: Type::Toki,
-                    value: Expression::IntervalLiteral("i0".to_string())
+                    type_annotation: Type::Ku,
+                    value: Expression::Zo("i0".to_string())
                 }
             ))
         );
@@ -349,12 +379,9 @@ mod tests {
                 "",
                 Statement::Shiki {
                     variable_name: "ticks".to_string(),
-                    type_annotation: Type::Generic(
-                        "en".to_string(),
-                        vec![
-                            Type::Simple("ma".to_string()),
-                            Type::Simple("i64".to_string())
-                        ]
+                    type_annotation: Type::En(
+                        Box::new(Type::Simple("ma".to_string())),
+                        Box::new(Type::Simple("i64".to_string()))
                     ),
                     value: Expression::MethodCall {
                         variable: Box::new(Expression::Identifier("timer_ba".to_string())),
@@ -375,12 +402,9 @@ mod tests {
                 "",
                 Statement::Shiki {
                     variable_name: "pipeline".to_string(),
-                    type_annotation: Type::Generic(
-                        "en".to_string(),
-                        vec![
-                            Type::Simple("ma".to_string()),
-                            Type::Simple("i64".to_string())
-                        ]
+                    type_annotation: Type::En(
+                        Box::new(Type::Simple("ma".to_string())),
+                        Box::new(Type::Simple("i64".to_string()))
                     ),
                     value: Expression::Pipe {
                         lhs: Box::new(Expression::Identifier("ticks".to_string())),
@@ -401,12 +425,9 @@ mod tests {
                 "",
                 Statement::Shiki {
                     variable_name: "doubler".to_string(),
-                    type_annotation: Type::Generic(
-                        "en".to_string(),
-                        vec![
-                            Type::Simple("i64".to_string()),
-                            Type::Simple("i64".to_string())
-                        ]
+                    type_annotation: Type::En(
+                        Box::new(Type::Simple("i64".to_string())),
+                        Box::new(Type::Simple("i64".to_string()))
                     ),
                     value: Expression::Kan {
                         params: vec![Parameter {
@@ -415,6 +436,26 @@ mod tests {
                         }],
                         body: Box::new(Expression::Identifier("x".to_string()))
                     }
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn test_parse_ze_type() {
+        let input = "shiki my_path: ze<i64, i64> = some_path";
+        let result = parse_statement(input);
+        assert_eq!(
+            result,
+            Ok((
+                "",
+                Statement::Shiki {
+                    variable_name: "my_path".to_string(),
+                    type_annotation: Type::Ze(
+                        Box::new(Type::Simple("i64".to_string())),
+                        Box::new(Type::Simple("i64".to_string()))
+                    ),
+                    value: Expression::Identifier("some_path".to_string())
                 }
             ))
         );
