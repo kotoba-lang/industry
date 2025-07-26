@@ -1,20 +1,22 @@
-//! `gen-core`クレートは、`gen`言語のコアとなるデータ構造を定義します。
+//! `kotoba-core`クレートは、`kotoba`言語のコアとなるデータ構造を定義します。
 //!
-//! ここには、HoTTにおける型/空間に対応する`Ba`(`場`)などの中心的な型が含まれます。
+//! ここには、HoTTにおける型/空間に対応する`Ba`(`ba`/場)などの中心的な型が含まれます。
 
-/// `場` (ba) - HoTTにおける型/空間 (Type/Space)。
+/// `ba` (場) - HoTTにおける型/空間 (Type/Space)。
 ///
 /// すべての項（値）が存在するためのコンテキストです。
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Ba {
-    /// `場`を一位に識別するためのID
+    /// `ba`を一位に識別するためのID
     pub id: String,
 }
 
 impl Ba {
     /// 新しい`Ba`インスタンスを生成します。
     pub fn new(id: &str) -> Self {
-        Self { id: id.to_string() }
+        Self {
+            id: id.to_string(),
+        }
     }
 }
 
