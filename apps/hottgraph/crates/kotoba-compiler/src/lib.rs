@@ -1,4 +1,4 @@
-use kotoba_parser::{Expression, Statement, Type};
+use kotoba_parser::{Expression, OuArm, Parameter, Pattern, Statement, Type};
 
 pub struct Compiler;
 
@@ -69,13 +69,31 @@ impl Compiler {
 
                 Ok(format!("|{}| {{ {} }}", params_str, body_code))
             }
+            Expression::Ou { expression, arms } => {
+                let expr_code = self.compile_expression(*expression)?;
+                let mut arms_code = String::new();
+                for arm in arms {
+                    arms_code.push_str(&self.compile_ou_arm(arm)?);
+                }
+                Ok(format!("match {} {{\n{}\n}}", expr_code, arms_code))
+            }
         }
+    }
+
+    fn compile_ou_arm(&self, arm: OuArm) -> Result<String, String> {
+        let pattern_code = match arm.pattern {
+            Pattern::IntegerLiteral(i) => i.to_string(),
+            Pattern::Wildcard => "_".to_string(),
+        };
+        let body_code = self.compile_expression(arm.body)?;
+        Ok(format!("        {} => {{ {} }},\n", pattern_code, body_code))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use kotoba_parser::parse_expression;
     use kotoba_parser::parse_statement;
 
     #[test]
@@ -116,7 +134,18 @@ mod tests {
         let (_, statement) = parse_statement(input).unwrap();
         let compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
-        let expected_code = "use kotoba_core::Ba;\n\nlet doubler: en<i64, i64> = |x: i64| { x };\n";
+        let expected_code =
+            "use kotoba_core::Ba;\n\nlet doubler: en<i64, i64> = |x: i64| { x };\n";
+        assert_eq!(result, Ok(expected_code.to_string()));
+    }
+
+    #[test]
+    fn test_compile_ou_expression() {
+        let input = "ou x { 0 => ku \"zero\", _ => ku \"other\" }";
+        let (_, expression) = parse_expression(input).unwrap();
+        let compiler = Compiler::new();
+        let result = compiler.compile_expression(expression);
+        let expected_code = "match x {\n        0 => { kotoba_core::Ba::new(\"zero\") },\n        _ => { kotoba_core::Ba::new(\"other\") },\n}";
         assert_eq!(result, Ok(expected_code.to_string()));
     }
 }
