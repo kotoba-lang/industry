@@ -1,4 +1,4 @@
-use gen_parser::{Statement, Expression};
+use gen_parser::{Expression, Statement};
 
 pub struct Compiler;
 
@@ -18,18 +18,23 @@ impl Compiler {
 
     fn compile_statement(&self, statement: Statement) -> Result<String, String> {
         match statement {
-            Statement::Let { variable_name, type_name, value } => {
+            Statement::Let {
+                variable_name,
+                type_name,
+                value,
+            } => {
                 let expr_code = self.compile_expression(value)?;
-                Ok(format!("let {}: {} = {};", variable_name, type_name, expr_code))
+                Ok(format!(
+                    "let {}: {} = {};",
+                    variable_name, type_name, expr_code
+                ))
             }
         }
     }
 
     fn compile_expression(&self, expression: Expression) -> Result<String, String> {
         match expression {
-            Expression::NodeCreation { id } => {
-                Ok(format!("gen_core::Node::new(\"{}\")", id))
-            }
+            Expression::NodeCreation { id } => Ok(format!("gen_core::Node::new(\"{}\")", id)),
         }
     }
 }
@@ -43,7 +48,7 @@ mod tests {
     fn test_compile_let_node_creation() {
         let input = "let my_node: Node = create \"system/timer\"";
         let (_, statement) = parse_statement(input).unwrap();
-        
+
         let compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
 

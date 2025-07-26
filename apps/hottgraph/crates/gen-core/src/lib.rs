@@ -14,12 +14,9 @@ pub struct Node {
 impl Node {
     /// 新しい`Node`インスタンスを生成します。
     pub fn new(id: &str) -> Self {
-        Self {
-            id: id.to_string(),
-        }
+        Self { id: id.to_string() }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
