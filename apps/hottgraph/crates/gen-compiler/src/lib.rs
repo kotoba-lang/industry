@@ -34,7 +34,9 @@ impl Compiler {
 
     fn compile_expression(&self, expression: Expression) -> Result<String, String> {
         match expression {
-            Expression::NodeCreation { id } => Ok(format!("gen_core::Node::new(\"{}\")", id)),
+            Expression::InCreation { id } => {
+                Ok(format!("gen_core::In::new(\"{}\")", id))
+            }
         }
     }
 }
@@ -45,14 +47,14 @@ mod tests {
     use gen_parser::parse_statement;
 
     #[test]
-    fn test_compile_let_node_creation() {
-        let input = "let my_node: Node = create \"system/timer\"";
+    fn test_compile_let_in_creation() {
+        let input = "let my_in: In = create \"system/timer\"";
         let (_, statement) = parse_statement(input).unwrap();
-
+        
         let compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
 
-        let expected_code = "let my_node: Node = gen_core::Node::new(\"system/timer\");\n";
+        let expected_code = "let my_in: In = gen_core::In::new(\"system/timer\");\n";
         assert_eq!(result, Ok(expected_code.to_string()));
     }
 }
