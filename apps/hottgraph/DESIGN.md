@@ -31,15 +31,15 @@
 | キーワード | 思想 | 形式意味論上の対応 | 説明 |
 | :--- | :--- | :--- | :--- |
 | `ba` | `場` | Type, Unit, Universe | 空間、静寂、そして空間の属する宇宙。 |
-| `shiki` | `式` | Introduction, let | 空間の立ち上げと、項への名前の束縛。 |
-| `kan` | `観` | λ, Π-type, Σ-type | 関数、依存関数、そして依存ペア。 |
+| `mei` | `名` | Introduction, let | 空間の立ち上げと、項への名前の束縛。 |
+| `kan` | `観` | λ, Π-type, Σ-type | 視点の構造（関数、依存関数、依存ペア）を定義する。 |
+| `ken` | `見` | Application, eval | `kan`で定義された構造を通じて、対象を観測（評価）する。 |
 | `ou` | `応` | Conditional, Match | 条件分岐とパターン照合。 |
-| `umare` | `生` | Inductive Type | 帰納的に定義される型 (例: 自然数)。 |
+| `gyo` | `生` | Inductive Type | 帰納的に定義される型 (例: 自然数)。 |
 | `gyo` | `行` | Recursion / Fixpoint | 帰納型の上での再帰計算。 |
 | `myo` | `妙` | Higher Inductive Type | 点だけでなくパスもコンストラクタに持つ高次帰納型。 |
-| `tsunagari`| `繋がり`| Univalence | `tsunagu`から導出される定理。同型な型は等しい。 |
+| `zo`| `即`| Univalence | `en`から導出される定理。同型な型は等しい。 |
 
-抽象層も計算層に合わせて見直して
 ### 2.3. 構文例: `tsunagari` (Univalence) の証明スケッチ
 ```kotoba
 // is_equiv(f) は f が同型写像であるという性質を表す ba とする
@@ -78,7 +78,9 @@ shiki univalence: ba =
 -   [x] 基本的なキーワード (`shiki`, `kan`, `ou`) の実装。
 -   [x] **設計思想の転換**: 立方体型理論への立脚を決定。
 
-### v0.5 (計画中): 計算層 (Cubical Layer) の構築
+### v0.5 (計画中): 計算層と抽象層の再設計
+-   [ ] **抽象層のキーワード再定義**:
+    -   [x] `kan` (観) を構造の定義(Π-type)、`ken` (見) を評価の適用に分離。
 -   [ ] **`kotoba-core`の再設計**:
     -   [ ] `toki` (Interval `I`) とその演算 (`∧`, `∨`, `~`) の実装。
     -   [ ] `en` (Path) 型 `a ≡ b` の実装。
