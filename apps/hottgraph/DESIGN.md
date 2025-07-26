@@ -1,10 +1,10 @@
 # `gen`言語 設計仕様書 (v0.1)
 
-このドキュメントは、生成中心言語 `gen` の技術的な設計仕様と実装計画を定義します。
+このドキュメントは、プロセスグラフ言語 `gen` の技術的な設計仕様と実装計画を定義します。
 
 ## 1. 思想と目標
 
-`gen`は、**「生成（Generation）」**を第一級の概念とするプログラミング言語です。静的なデータ構造ではなく、動的な**プロセス**そのものを記述し、組み合わせ、操作することに焦点を当てます。
+`gen`は、システムの構成要素を**ノード（`Node`）**として定義し、それらの間を流れる値のストリームを**フロー（`Flow`）**として記述するプログラミング言語です。この`Node`と`Flow`の組み合わせによって、非同期処理や複雑なイベント駆動システムを、宣言的かつ視覚的に構築することを目的としています。
 
 -   **目標**:
     -   複雑なシステムの動的な振る舞いを、宣言的かつ直感的に記述できる構文を提供する。
@@ -21,7 +21,7 @@
 ### 2.1. 字句構造
 
 -   **識別子**: `[a-zA-Z_][a-zA-Z0-9_]*`
--   **キーワード**: `gen`, `soul`, `being`, `fn`, `let`, `create`, `flow`, `match`
+-   **キーワード**: `node`, `flow`, `fn`, `let`, `create`, `match`
 -   **コメント**: `//` から行末まで
 
 ### 2.2. 型システム
@@ -30,8 +30,7 @@
 
 #### 2.2.1. プリミティブ型
 
--   `Gen`: 全ての生成プロセスの源となる、最も基本的な型。
--   `Soul`: `Gen`から派生する、状態を持つエンティティの軌跡を表す型。内部的にはベクトルやより複雑なデータ構造を持つ。
+-   `Node`: 計算や状態の基本単位。プロセスグラフにおける「頂点」。
 -   `String`: 文字列リテラル。
 -   `f64`: 64ビット浮動小数点数。
 -   `i64`: 64ビット整数。
@@ -42,7 +41,7 @@
 -   **タプル**: `(T1, T2, ...)`
 -   **構造体**: `struct Point { x: f64, y: f64 }` (Rustのstructに類似)
 -   **フロー (Flow)**: `flow<In, Out>`
-    -   `gen`言語の中核をなす概念で、非同期的な値のストリームを表します。
+    -   `gen`言語の中核をなす概念で、`Node`間を流れる非同期的な値のストリームを表します。
     -   `In` 型の値を受け取り、`Out` 型の値を非同期に生成するプロセスです。
     -   Rustの `async Stream` やリアクティブプログラミングの `Observable` に相当します。
 
@@ -52,17 +51,16 @@
 
 ```gen
 // let <variable_name>: <type> = <expression>;
-let g: Gen = create "faith";
 let p: Point = Point { x: 1.0, y: 2.0 };
 ```
 
-#### 2.3.2. Genの生成
+#### 2.3.2. Nodeの生成
 
-`create` キーワードを用いて `Gen` 型のインスタンスを生成します。
+`create` キーワードを用いて `Node` 型のインスタンスを生成します。
 
 ```gen
 // create "<name>";
-let g: Gen = create "unique_identifier_for_gen";
+let web_endpoint: Node = create "api/v1/users";
 ```
 
 #### 2.3.3. フローの定義と操作
@@ -71,7 +69,8 @@ let g: Gen = create "unique_identifier_for_gen";
 
 ```gen
 // 'ticks' は1秒ごとにi64を生成するフロー
-let ticks: flow<(), i64> = system.timer(1s);
+let timer_node: Node = create "system/timer/1s";
+let ticks: flow<(), i64> = timer_node.as_flow();
 
 // 'doubler' は受け取ったi64を2倍にするフロー
 let doubler: flow<i64, i64> = fn(x: i64) => x * 2;
@@ -96,7 +95,8 @@ pipeline.subscribe(fn(val: i64) => {
 1.  **字句解析・構文解析 (Parser)**
     -   `gen-parser`クレートが担当。
     -   ソースコードをトークン列に変換し、AST（抽象構文木）を構築する。
-    -   使用ライブラリ: `nom`
+    -   **設計方針**: LL(1)文法に基づく再帰下降パーサとして実装する。これにより、効率的で予測可能な構文解析を実現する。
+    -   **使用ライブラリ**: `nom`。パーサコンビネータは再帰下降のロジックを自然に表現できるため採用。
 2.  **意味解析・型チェック (Semantic Analyzer)**
     -   `gen-compiler`クレートが担当。
     -   ASTを巡回し、変数名の解決、型の一貫性を検証する。
@@ -111,7 +111,7 @@ pipeline.subscribe(fn(val: i64) => {
 ### 3.2. プロジェクト構造 (Cargo Workspace)
 
 -   `crates/`
-    -   `gen-core`: `Gen`, `Soul` など、言語のコアとなるデータ構造のRustにおける定義。
+    -   `gen-core`: `Node` など、言語のコアとなるデータ構造のRustにおける定義。
     -   `gen-parser`: パーサーとASTの定義。
     -   `gen-compiler`: 意味解析、型チェック、コード生成器。
     -   `gen-cli`: コンパイラのフロントエンドとなるCLIツール。
@@ -124,8 +124,8 @@ pipeline.subscribe(fn(val: i64) => {
 ### v0.1 (進行中)
 
 -   [x] プロジェクト初期セットアップ
--   [x] `gen-core`に`Gen`, `Soul`の基本構造を定義
--   [x] `gen-parser`で `let g: Gen = create "name"` の構文解析を実装
+-   [x] `gen-core`に`Node`の基本構造を定義
+-   [x] `gen-parser`で `let n: Node = create "name"` の構文解析を実装
 -   [ ] **(次)** `gen-compiler`で、上記構文をRustの変数束縛に変換するコード生成器を実装
 -   [ ] `gen-cli`からコンパイラを呼び出し、Rustコードをファイルに出力する機能
 

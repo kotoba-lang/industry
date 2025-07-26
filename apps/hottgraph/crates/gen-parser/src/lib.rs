@@ -1,7 +1,9 @@
 use nom::{
-    bytes::complete::tag,
+    branch::alt,
+    bytes::complete::{tag, take_while, take_while1},
     character::complete::{alpha1, alphanumeric1, char, multispace0, multispace1},
-    sequence::delimited,
+    combinator::recognize,
+    sequence::{delimited, pair},
     IResult,
 };
 
@@ -19,16 +21,23 @@ pub enum Statement {
 /// `gen`言語の式を表すAST
 #[derive(Debug, PartialEq)]
 pub enum Expression {
-    /// `create "<name>"`
-    GenCreation {
-        name: String,
+    /// `create "<id>"`
+    NodeCreation {
+        id: String,
     },
+}
+
+fn parse_identifier(input: &str) -> IResult<&str, &str> {
+    recognize(pair(
+        alt((alpha1, tag("_"))),
+        take_while1(|c: char| c.is_alphanumeric() || c == '_'),
+    ))(input)
 }
 
 fn parse_quoted_string(input: &str) -> IResult<&str, &str> {
     delimited(
         char('"'),
-        alphanumeric1,
+        take_while(|c: char| c != '"'),
         char('"')
     )(input)
 }
@@ -36,7 +45,7 @@ fn parse_quoted_string(input: &str) -> IResult<&str, &str> {
 pub fn parse_statement(input: &str) -> IResult<&str, Statement> {
     let (input, _) = tag("let")(input)?;
     let (input, _) = multispace1(input)?;
-    let (input, variable_name) = alpha1(input)?;
+    let (input, variable_name) = parse_identifier(input)?;
     let (input, _) = delimited(multispace0, char(':'), multispace0)(input)?;
     let (input, type_name) = alpha1(input)?;
     let (input, _) = delimited(multispace0, char('='), multispace0)(input)?;
@@ -52,8 +61,8 @@ pub fn parse_statement(input: &str) -> IResult<&str, Statement> {
 pub fn parse_expression(input: &str) -> IResult<&str, Expression> {
     let (input, _) = tag("create")(input)?;
     let (input, _) = multispace1(input)?;
-    let (input, name) = parse_quoted_string(input)?;
-    Ok((input, Expression::GenCreation{ name: name.to_string() }))
+    let (input, id) = parse_quoted_string(input)?;
+    Ok((input, Expression::NodeCreation{ id: id.to_string() }))
 }
 
 #[cfg(test)]
@@ -62,15 +71,15 @@ mod tests {
 
     #[test]
     fn test_parse_let_statement() {
-        let input = "let g: Gen = create \"faith\"";
+        let input = "let my_node: Node = create \"system/timer\"";
         let result = parse_statement(input);
         assert_eq!(
             result,
             Ok(("", Statement::Let {
-                variable_name: "g".to_string(),
-                type_name: "Gen".to_string(),
-                value: Expression::GenCreation {
-                    name: "faith".to_string(),
+                variable_name: "my_node".to_string(),
+                type_name: "Node".to_string(),
+                value: Expression::NodeCreation {
+                    id: "system/timer".to_string(),
                 }
             }))
         );
