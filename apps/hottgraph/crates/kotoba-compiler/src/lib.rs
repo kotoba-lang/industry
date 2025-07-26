@@ -19,7 +19,6 @@ impl Compiler {
 
     pub fn compile(&self, program: Vec<Statement>) -> Result<String, String> {
         let mut rust_code = String::new();
-        // use文などをここに追加する余地
         rust_code.push_str("use kotoba_core::Ba;\n\n");
 
         for statement in program {
@@ -65,7 +64,7 @@ impl Compiler {
                     .map(|p| format!("{}: {}", p.name, type_to_string(&p.type_annotation)))
                     .collect::<Vec<String>>()
                     .join(", ");
-                
+
                 let body_code = self.compile_expression(*body)?;
 
                 Ok(format!("|{}| {{ {} }}", params_str, body_code))
@@ -81,43 +80,44 @@ mod tests {
 
     #[test]
     fn test_compile_shiki_ku() {
-        let input = "しき timer_ba: 場 = く \"system/timer\"";
+        let input = "shiki timer_ba: ba = ku \"system/timer\"";
         let (_, statement) = parse_statement(input).unwrap();
         let compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
-        let expected_code = "use kotoba_core::Ba;\n\nlet timer_ba: 場 = kotoba_core::Ba::new(\"system/timer\");\n";
+        let expected_code =
+            "use kotoba_core::Ba;\n\nlet timer_ba: ba = kotoba_core::Ba::new(\"system/timer\");\n";
         assert_eq!(result, Ok(expected_code.to_string()));
     }
 
     #[test]
     fn test_compile_shiki_method_call() {
-        let input = "しき ticks: 縁<間, i64> = timer_ba.as_en()";
+        let input = "shiki ticks: en<ma, i64> = timer_ba.as_en()";
         let (_, statement) = parse_statement(input).unwrap();
         let compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
-        let expected_code = "use kotoba_core::Ba;\n\nlet ticks: 縁<間, i64> = timer_ba.as_en();\n";
+        let expected_code = "use kotoba_core::Ba;\n\nlet ticks: en<ma, i64> = timer_ba.as_en();\n";
         assert_eq!(result, Ok(expected_code.to_string()));
     }
 
     #[test]
     fn test_compile_shiki_pipe() {
-        let input = "しき pipeline: 縁<間, i64> = ticks |> doubler";
+        let input = "shiki pipeline: en<ma, i64> = ticks |> doubler";
         let (_, statement) = parse_statement(input).unwrap();
         let compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         let expected_code =
-            "use kotoba_core::Ba;\n\nlet pipeline: 縁<間, i64> = pipe(ticks, doubler);\n";
+            "use kotoba_core::Ba;\n\nlet pipeline: en<ma, i64> = pipe(ticks, doubler);\n";
         assert_eq!(result, Ok(expected_code.to_string()));
     }
 
     #[test]
     fn test_compile_shiki_kan() {
-        let input = "しき doubler: 縁<i64, i64> = かん(x: i64) => x";
+        let input = "shiki doubler: en<i64, i64> = kan(x: i64) => x";
         let (_, statement) = parse_statement(input).unwrap();
         let compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         let expected_code =
-            "use kotoba_core::Ba;\n\nlet doubler: 縁<i64, i64> = |x: i64| { x };\n";
+            "use kotoba_core::Ba;\n\nlet doubler: en<i64, i64> = |x: i64| { x };\n";
         assert_eq!(result, Ok(expected_code.to_string()));
     }
 }

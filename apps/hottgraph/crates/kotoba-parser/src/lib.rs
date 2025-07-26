@@ -2,7 +2,7 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_while1},
     character::complete::{alpha1, char, multispace0, multispace1},
-    combinator::{map, not, opt, peek, recognize},
+    combinator::{map, opt, recognize},
     multi::separated_list1,
     sequence::{delimited, pair, preceded, tuple},
     IResult,
@@ -11,9 +11,9 @@ use nom::{
 /// 型を表すAST
 #[derive(Debug, PartialEq, Clone)]
 pub enum Type {
-    /// `場`, `縁`, `間`, `i64` などのシンプルな型
+    /// `ba`, `en`, `ma`, `i64` などのシンプルな型
     Simple(String),
-    /// `縁<T1, T2>` のようなジェネリック型
+    /// `en<T1, T2>` のようなジェネリック型
     Generic(String, Vec<Type>),
 }
 
@@ -26,8 +26,13 @@ pub struct Parameter {
 /// 式を表すAST
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
-    /// `く "<id>"`
+    /// `ku "<id>"`
     Ku { id: String },
+    /// `kan(<params>) => <body>`
+    Kan {
+        params: Vec<Parameter>,
+        body: Box<Expression>,
+    },
     /// 変数名
     Identifier(String),
     /// `var.method()`
@@ -40,17 +45,12 @@ pub enum Expression {
         lhs: Box<Expression>,
         rhs: Box<Expression>,
     },
-    /// `かん(<params>) => <body>`
-    Kan {
-        params: Vec<Parameter>,
-        body: Box<Expression>,
-    },
 }
 
 /// 文を表すAST
 #[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
-    /// `しき <variable>: <type> = <expression>`
+    /// `shiki <variable>: <type> = <expression>`
     Shiki {
         variable_name: String,
         type_annotation: Type,
@@ -61,17 +61,19 @@ pub enum Statement {
 // --- Parsers ---
 
 fn parse_identifier_str(input: &str) -> IResult<&str, &str> {
-    take_while1(|c: char| c.is_alphabetic() || c == '_')(input)
+    recognize(pair(
+        alt((alpha1, tag("_"))),
+        opt(take_while1(|c: char| c.is_alphanumeric() || c == '_')),
+    ))(input)
 }
 
 fn parse_identifier(input: &str) -> IResult<&str, &str> {
     let (next, ident) = parse_identifier_str(input)?;
     // キーワードと一致する場合はエラー
     match ident {
-        "しき" | "かん" | "く" | "おう" | "場" | "縁" | "間" => Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        ))),
+        "shiki" | "kan" | "ku" | "ou" | "ba" | "en" | "ma" => Err(nom::Err::Error(
+            nom::error::Error::new(input, nom::error::ErrorKind::Tag),
+        )),
         _ => Ok((next, ident)),
     }
 }
@@ -88,14 +90,17 @@ fn parse_quoted_string(input: &str) -> IResult<&str, String> {
 }
 
 fn parse_type_name(input: &str) -> IResult<&str, &str> {
-    take_while1(|c: char| !"<>,".contains(c) && !c.is_whitespace() && c != ':')(input)
+    alpha1(input)
 }
 
 fn parse_type(input: &str) -> IResult<&str, Type> {
     let (input, name) = parse_type_name(input)?;
     let (input, generics) = opt(delimited(
         char('<'),
-        separated_list1(delimited(multispace0, char(','), multispace0), parse_type),
+        separated_list1(
+            delimited(multispace0, char(','), multispace0),
+            parse_type,
+        ),
         char('>'),
     ))(input)?;
 
@@ -123,23 +128,21 @@ fn parse_parameter(input: &str) -> IResult<&str, Parameter> {
 }
 
 fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
-    // `く` 式
     let ku_parser = map(
-        preceded(tuple((tag("く"), multispace1)), parse_quoted_string),
+        preceded(tuple((tag("ku"), multispace1)), parse_quoted_string),
         |id| Expression::Ku { id },
     );
 
-    // `かん` 式
     let kan_parser = map(
         tuple((
-            tag("かん"),
+            tag("kan"),
             delimited(
                 char('('),
                 separated_list1(delimited(multispace0, char(','), multispace0), parse_parameter),
                 char(')'),
             ),
             delimited(multispace0, tag("=>"), multispace0),
-            parse_primary_expression, // 左再帰を避けるため、primary_expression をパース
+            parse_primary_expression, // 左再帰を避ける
         )),
         |(_, params, _, body)| Expression::Kan {
             params,
@@ -147,19 +150,17 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
         },
     );
 
-    // 変数 or メソッド呼び出し
     let ident_expr_parser = map(parse_identifier, |name| {
         Expression::Identifier(name.to_string())
     });
 
     let (mut remaining, mut expr) = alt((ku_parser, kan_parser, ident_expr_parser))(input)?;
 
-    // 後続の `.method()` をループでパース
     loop {
         let (next_remaining, method_call) = opt(preceded(
             char('.'),
             map(
-                tuple((parse_identifier, tag("()"))),
+                tuple((parse_identifier_str, tag("()"))),
                 |(method, _)| method.to_string(),
             ),
         ))(&remaining)?;
@@ -177,7 +178,6 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
 
     Ok((remaining, expr))
 }
-
 
 fn parse_expression(input: &str) -> IResult<&str, Expression> {
     let (mut remaining, mut lhs) = parse_primary_expression(input)?;
@@ -203,12 +203,12 @@ fn parse_expression(input: &str) -> IResult<&str, Expression> {
 }
 
 pub fn parse_statement(input: &str) -> IResult<&str, Statement> {
-    let (input, _) = tag("しき")(input)?;
+    let (input, _) = tag("shiki")(input)?;
     let (input, _) = multispace1(input)?;
     let (input, variable_name) = parse_identifier(input)?;
-    let (input, _) = nom::sequence::delimited(multispace0, char(':'), multispace0)(input)?;
+    let (input, _) = delimited(multispace0, char(':'), multispace0)(input)?;
     let (input, type_annotation) = parse_type(input)?;
-    let (input, _) = nom::sequence::delimited(multispace0, char('='), multispace0)(input)?;
+    let (input, _) = delimited(multispace0, char('='), multispace0)(input)?;
     let (input, value) = parse_expression(input)?;
 
     Ok((
@@ -227,7 +227,7 @@ mod tests {
 
     #[test]
     fn test_parse_shiki_ku() {
-        let input = "しき timer_ba: 場 = く \"system/timer\"";
+        let input = "shiki timer_ba: ba = ku \"system/timer\"";
         let result = parse_statement(input);
         assert_eq!(
             result,
@@ -235,7 +235,7 @@ mod tests {
                 "",
                 Statement::Shiki {
                     variable_name: "timer_ba".to_string(),
-                    type_annotation: Type::Simple("場".to_string()),
+                    type_annotation: Type::Simple("ba".to_string()),
                     value: Expression::Ku {
                         id: "system/timer".to_string()
                     }
@@ -246,7 +246,7 @@ mod tests {
 
     #[test]
     fn test_parse_shiki_method_call() {
-        let input = "しき ticks: 縁<間, i64> = timer_ba.as_en()";
+        let input = "shiki ticks: en<ma, i64> = timer_ba.as_en()";
         let result = parse_statement(input);
         assert_eq!(
             result,
@@ -255,9 +255,9 @@ mod tests {
                 Statement::Shiki {
                     variable_name: "ticks".to_string(),
                     type_annotation: Type::Generic(
-                        "縁".to_string(),
+                        "en".to_string(),
                         vec![
-                            Type::Simple("間".to_string()),
+                            Type::Simple("ma".to_string()),
                             Type::Simple("i64".to_string())
                         ]
                     ),
@@ -272,7 +272,7 @@ mod tests {
 
     #[test]
     fn test_parse_shiki_pipe() {
-        let input = "しき pipeline: 縁<間, i64> = ticks |> doubler";
+        let input = "shiki pipeline: en<ma, i64> = ticks |> doubler";
         let result = parse_statement(input);
         assert_eq!(
             result,
@@ -281,9 +281,9 @@ mod tests {
                 Statement::Shiki {
                     variable_name: "pipeline".to_string(),
                     type_annotation: Type::Generic(
-                        "縁".to_string(),
+                        "en".to_string(),
                         vec![
-                            Type::Simple("間".to_string()),
+                            Type::Simple("ma".to_string()),
                             Type::Simple("i64".to_string())
                         ]
                     ),
@@ -298,7 +298,7 @@ mod tests {
 
     #[test]
     fn test_parse_shiki_kan() {
-        let input = "しき doubler: 縁<i64, i64> = かん(x: i64) => x"; // bodyは簡単のためただの変数
+        let input = "shiki doubler: en<i64, i64> = kan(x: i64) => x";
         let result = parse_statement(input);
         assert_eq!(
             result,
@@ -307,7 +307,7 @@ mod tests {
                 Statement::Shiki {
                     variable_name: "doubler".to_string(),
                     type_annotation: Type::Generic(
-                        "縁".to_string(),
+                        "en".to_string(),
                         vec![
                             Type::Simple("i64".to_string()),
                             Type::Simple("i64".to_string())
