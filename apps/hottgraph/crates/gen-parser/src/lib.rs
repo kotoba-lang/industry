@@ -58,8 +58,13 @@ fn parse_quoted_string(input: &str) -> IResult<&str, String> {
     )(input)
 }
 
+fn parse_type_name(input: &str) -> IResult<&str, &str> {
+    take_while1(|c: char| !"<>,".contains(c) && !c.is_whitespace() && c != ':')(input)
+}
+
+
 fn parse_type(input: &str) -> IResult<&str, Type> {
-    let (input, name) = alpha1(input)?;
+    let (input, name) = parse_type_name(input)?;
     let (input, generics) = opt(delimited(
         char('<'),
         separated_list1(
