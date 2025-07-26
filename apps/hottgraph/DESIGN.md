@@ -36,7 +36,7 @@
 | `ju`, `ken` | `受`, `見` | Application, eval | kan を通じて現象を観測する。 |
 | `ou` | `応` | Match, if | 条件と構造への応答。 |
 | `gyo` | `行` | Inductive Type | 生成される世界の構造。 |
-| `rinne` | `輪廻` | Recursion | 行の流転・生成の循環。 |
+| `rin` | `輪` | Recursion | 行の流転・生成の循環。 |
 | `myo` | `妙` | Higher Inductive | 不可視の生成・空の表出。 |
 | `zo` | `即` | Univalence | 等価なものは等しい。瞬間的一致。 |
 | `ze` | `是` | ≡（Path equality） | 判断と等価性の構成。 |
