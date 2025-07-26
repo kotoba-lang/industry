@@ -44,8 +44,8 @@
 | `zai`   | 在  | `Context (Γ)`                  | 判断や生成が行われる文脈・座。          |
 | `nehan` | 涅槃 | Higher path / Unseen Structure | 高次の縁・見えざる生成原理。すべてを貫く超パス。 |
 | `ren`   | 連  | Graph connection / Composition | 複数の縁・関係の連鎖・束。ネットワーク。     |
-| `hitsuyou` | 必要 | `Modality (Necessity, □)` | ある命題が全ての可能な状況で真であることを示す様相。必然の理。 |
-| `kanou`    | 可能 | `Modality (Possibility, ◊)` | ある命題が少なくとも一つの可能な状況で真であることを示す様相。うつろいの兆し。 |
+| `hi`    | 必 | `Modality (Necessity, □)` | ある命題が全ての可能な状況で真であることを示す様相。必然の理。 |
+| `ka`    | 可 | `Modality (Possibility, ◊)` | ある命題が少なくとも一つの可能な状況で真であることを示す様相。うつろいの兆し。 |
 | `fun`      | 函   | `Functor`                 | 構造（圏）から別の構造への写像。かたちを保ったまま世界を渡る。 |
 | `ten`      | 転   | `Natural Transformation`  | 二つの函手の間の変換。移ろう写像たちの間にある、自然な関係性。 |
 | `shuku`    | 宿   | `Sheaf`                   | 空間上の局所的なデータを矛盾なく貼り合わせ、大域的な構造を織りなす。 |
