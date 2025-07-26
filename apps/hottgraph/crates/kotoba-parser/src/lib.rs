@@ -33,12 +33,22 @@ pub enum Pattern {
     IntegerLiteral(i64),
     /// ワイルドカード (`_`)
     Wildcard,
+    /// 識別子 (`x`)
+    Identifier(String),
+    /// コンストラクタ (`Succ(n)`)
+    Constructor(String, Vec<Pattern>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct OuArm {
     pub pattern: Pattern,
     pub body: Expression,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Constructor {
+    pub name: String,
+    pub fields: Vec<Type>,
 }
 
 /// 式を表すAST
@@ -81,6 +91,18 @@ pub enum Statement {
         type_annotation: Type,
         value: Expression,
     },
+    /// `gyo <TypeName> = { <constructors> }`
+    Gyo {
+        name: String,
+        constructors: Vec<Constructor>,
+    },
+    /// `rin <function_name>(<params>): <return_type> = <body>`
+    Rin {
+        name: String,
+        params: Vec<Parameter>,
+        return_type: Type,
+        body: Expression,
+    },
 }
 
 // --- Parsers ---
@@ -96,7 +118,7 @@ fn parse_identifier(input: &str) -> IResult<&str, &str> {
     verify(parse_identifier_str, |s: &str| {
         !matches!(
             s,
-            "shiki" | "kan" | "ku" | "ou" | "ba" | "en" | "ma" | "ze" | "i0" | "i1"
+            "shiki" | "kan" | "ku" | "ou" | "ba" | "en" | "ma" | "ze" | "i0" | "i1" | "gyo" | "rin"
         )
     })(input)
 }
@@ -176,9 +198,27 @@ fn parse_parameter(input: &str) -> IResult<&str, Parameter> {
 }
 
 fn parse_pattern(input: &str) -> IResult<&str, Pattern> {
+    // Tries to parse a constructor pattern like `Succ(n)` or `Cons(h, t)`.
+    // If that fails, it tries the other, simpler patterns.
+    let constructor_parser = map(
+        pair(
+            parse_identifier,
+            opt(delimited(
+                char('('),
+                separated_list1(delimited(multispace0, char(','), multispace0), parse_pattern),
+                char(')'),
+            )),
+        ),
+        |(name, opt_patterns)| {
+            Pattern::Constructor(name.to_string(), opt_patterns.unwrap_or_default())
+        },
+    );
+
     alt((
-        map(tag("_"), |_| Pattern::Wildcard),
         map(nom::character::complete::i64, Pattern::IntegerLiteral),
+        map(tag("_"), |_| Pattern::Wildcard),
+        constructor_parser, // must come before general identifier
+        map(parse_identifier, |s| Pattern::Identifier(s.to_string())), // Fallback to a simple identifier
     ))(input)
 }
 
@@ -259,6 +299,23 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
     Ok((remaining, expr))
 }
 
+fn parse_constructor(input: &str) -> IResult<&str, Constructor> {
+    map(
+        pair(
+            parse_identifier,
+            opt(preceded(
+                delimited(multispace0, char(':'), multispace0),
+                // This part is simplified for now. A full implementation would
+                // parse a list of types for the constructor fields.
+                parse_type,
+            )),
+        ),
+        |(name, opt_type)| Constructor {
+            name: name.to_string(),
+            fields: opt_type.map_or(vec![], |t| vec![t]),
+        },
+    )(input)
+}
 
 pub fn parse_expression(input: &str) -> IResult<&str, Expression> {
     // First, try to parse a complete `ou` expression, as it's a compound form.
@@ -314,22 +371,68 @@ pub fn parse_expression(input: &str) -> IResult<&str, Expression> {
 }
 
 pub fn parse_statement(input: &str) -> IResult<&str, Statement> {
-    let (input, _) = tag("shiki")(input)?;
-    let (input, _) = multispace1(input)?;
-    let (input, variable_name) = parse_identifier(input)?;
-    let (input, _) = delimited(multispace0, char(':'), multispace0)(input)?;
-    let (input, type_annotation) = parse_type(input)?;
-    let (input, _) = delimited(multispace0, char('='), multispace0)(input)?;
-    let (input, value) = parse_expression(input)?;
-
-    Ok((
-        input,
-        Statement::Shiki {
+    let shiki_parser = map(
+        tuple((
+            tag("shiki"),
+            multispace1,
+            parse_identifier,
+            delimited(multispace0, char(':'), multispace0),
+            parse_type,
+            delimited(multispace0, char('='), multispace0),
+            parse_expression,
+        )),
+        |(_, _, variable_name, _, type_annotation, _, value)| Statement::Shiki {
             variable_name: variable_name.to_string(),
             type_annotation,
             value,
         },
-    ))
+    );
+
+    let gyo_parser = map(
+        tuple((
+            tag("gyo"),
+            multispace1,
+            parse_type_name,
+            delimited(multispace0, char('='), multispace0),
+            delimited(
+                char('{'),
+                terminated(
+                    separated_list1(char(','), preceded(multispace0, parse_constructor)),
+                    opt(preceded(multispace0, char(','))),
+                ),
+                preceded(multispace0, char('}')),
+            ),
+        )),
+        |(_, _, name, _, constructors)| Statement::Gyo {
+            name: name.to_string(),
+            constructors,
+        },
+    );
+
+    let rin_parser = map(
+        tuple((
+            tag("rin"),
+            multispace1,
+            parse_identifier, // function name
+            delimited(
+                char('('),
+                separated_list1(delimited(multispace0, char(','), multispace0), parse_parameter),
+                char(')'),
+            ),
+            delimited(multispace0, char(':'), multispace0),
+            parse_type, // return type
+            delimited(multispace0, char('='), multispace0),
+            parse_expression, // body
+        )),
+        |(_, _, name, params, _, return_type, _, body)| Statement::Rin {
+            name: name.to_string(),
+            params,
+            return_type,
+            body,
+        },
+    );
+
+    alt((shiki_parser, gyo_parser, rin_parser))(input)
 }
 
 #[cfg(test)]
@@ -491,5 +594,79 @@ mod tests {
                 }
             ))
         );
+    }
+
+    #[test]
+    fn test_parse_gyo_statement() {
+        let input = "gyo N = { zero: N, succ: en<N, N> }";
+        let result = parse_statement(input);
+        assert!(result.is_ok());
+        let (remaining, statement) = result.unwrap();
+        assert_eq!(remaining, "");
+        if let Statement::Gyo { name, constructors } = statement {
+            assert_eq!(name, "N");
+            assert_eq!(constructors.len(), 2);
+            assert_eq!(constructors[0].name, "zero");
+            assert_eq!(constructors[0].fields.len(), 1);
+            assert_eq!(
+                constructors[1].name,
+                "succ"
+            );
+            assert_eq!(constructors[1].fields.len(), 1);
+        } else {
+            panic!("Expected Gyo statement");
+        }
+    }
+
+    #[test]
+    fn test_parse_rin_statement() {
+        let input = "rin add(a: N, b: N): N = ou a { zero => b }";
+        let result = parse_statement(input);
+        assert!(result.is_ok());
+        let (remaining, statement) = result.unwrap();
+        assert_eq!(remaining, "");
+        if let Statement::Rin {
+            name,
+            params,
+            return_type,
+            ..
+        } = statement
+        {
+            assert_eq!(name, "add");
+            assert_eq!(params.len(), 2);
+            assert_eq!(params[0].name, "a");
+            if let Type::Simple(type_name) = &params[0].type_annotation {
+                assert_eq!(type_name, "N");
+            } else {
+                panic!("Expected simple type for param a");
+            }
+            if let Type::Simple(type_name) = &return_type {
+                assert_eq!(type_name, "N");
+            } else {
+                panic!("Expected simple type for return type");
+            }
+        } else {
+            panic!("Expected Rin statement");
+        }
+    }
+
+    #[test]
+    fn test_parse_constructor_pattern() {
+        let input = "Succ(n)";
+        let result = parse_pattern(input);
+        assert!(result.is_ok());
+        let (remaining, pattern) = result.unwrap();
+        assert_eq!(remaining, "");
+        if let Pattern::Constructor(name, patterns) = pattern {
+            assert_eq!(name, "Succ");
+            assert_eq!(patterns.len(), 1);
+            if let Pattern::Constructor(inner_name, ..) = &patterns[0] {
+                assert_eq!(inner_name, "n");
+            } else {
+                panic!("Expected inner pattern to be a constructor (identifier)");
+            }
+        } else {
+            panic!("Expected Constructor pattern");
+        }
     }
 }
