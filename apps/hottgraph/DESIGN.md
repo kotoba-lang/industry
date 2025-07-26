@@ -28,19 +28,22 @@
 
 ### 2.2. 抽象層 (HoTT Layer): 構成される世界
 
-| キーワード | 思想 | 形式意味論上の対応 | 説明 |
+| キーワード | 思想 | 形式意味論 | 説明 |
 | :--- | :--- | :--- | :--- |
-| `ba` | `場` | Type, Unit, Universe | 空間、静寂、そして空間の属する宇宙。 |
-| `mei` | `名` | Introduction, let | 空間の立ち上げと、項への名前の束縛。 |
-| `kan` | `観` | λ, Π-type, Σ-type | 視点の構造（関数、依存関数、依存ペア）を定義する。 |
-| `ken` | `見` | Application, eval | `kan`で定義された構造を通じて、対象を観測（評価）する。 |
-| `ou` | `応` | Conditional, Match | 条件分岐とパターン照合。 |
-| `gyo` | `生` | Inductive Type | 帰納的に定義される型 (例: 自然数)。 |
-| `gyo` | `行` | Recursion / Fixpoint | 帰納型の上での再帰計算。 |
-| `myo` | `妙` | Higher Inductive Type | 点だけでなくパスもコンストラクタに持つ高次帰納型。 |
-| `zo`| `即`| Univalence | `en`から導出される定理。同型な型は等しい。 |
+| `ba` | `場` | Type, Universe | 空間と宇宙。すべての存在の場。 |
+| `mei` | `名` | Introduction, let | 空間への命名と存在の定義。 |
+| `kan` | `観` | λ, Π, Σ | 構造を定義する視点の枠組み。 |
+| `ju`, `ken` | `受`, `見` | Application, eval | kan を通じて現象を観測する。 |
+| `ou` | `応` | Match, if | 条件と構造への応答。 |
+| `gyo` | `行` | Inductive Type | 生成される世界の構造。 |
+| `rinne` | `輪廻` | Recursion | 行の流転・生成の循環。 |
+| `myo` | `妙` | Higher Inductive | 不可視の生成・空の表出。 |
+| `zo` | `即` | Univalence | 等価なものは等しい。瞬間的一致。 |
+| `ze` | `是` | ≡（Path equality） | 判断と等価性の構成。 |
+| `mu` | `無` | Empty Type / ¬ | 否定・存在しないこと。 |
+| `en` | `縁` | Path / Morphism | 型間の関係性・流れの接続。GraphとHoTTの橋渡し |
 
-### 2.3. 構文例: `tsunagari` (Univalence) の証明スケッチ
+### 2.3. 構文例: `zo` (Univalence) の証明スケッチ
 ```kotoba
 // is_equiv(f) は f が同型写像であるという性質を表す ba とする
 shiki is_equiv (f: en<A, B>): ba = ...
