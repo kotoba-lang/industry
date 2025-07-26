@@ -1,11 +1,11 @@
 use nom::{
-    IResult,
     branch::alt,
     bytes::complete::{tag, take_while1},
     character::complete::{alpha1, char, multispace0, multispace1},
     combinator::{map, opt, recognize},
     multi::separated_list1,
     sequence::{delimited, pair, preceded, tuple},
+    IResult,
 };
 
 /// 型を表すAST
@@ -28,6 +28,11 @@ pub enum Expression {
     MethodCall {
         variable: Box<Expression>,
         method: String,
+    },
+    /// `lhs |> rhs`
+    Pipe {
+        lhs: Box<Expression>,
+        rhs: Box<Expression>,
     },
 }
 
@@ -83,7 +88,7 @@ fn parse_type(input: &str) -> IResult<&str, Type> {
     ))
 }
 
-fn parse_expression(input: &str) -> IResult<&str, Expression> {
+fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
     // `く` 式
     let ku_parser = map(
         preceded(tuple((tag("く"), multispace1)), parse_quoted_string),
@@ -102,9 +107,10 @@ fn parse_expression(input: &str) -> IResult<&str, Expression> {
     loop {
         let (next_remaining, method_call) = opt(preceded(
             char('.'),
-            map(tuple((parse_identifier, tag("()"))), |(method, _)| {
-                method.to_string()
-            }),
+            map(
+                tuple((parse_identifier, tag("()"))),
+                |(method, _)| method.to_string(),
+            ),
         ))(&remaining)?;
 
         if let Some(method) = method_call {
@@ -119,6 +125,30 @@ fn parse_expression(input: &str) -> IResult<&str, Expression> {
     }
 
     Ok((remaining, expr))
+}
+
+
+fn parse_expression(input: &str) -> IResult<&str, Expression> {
+    let (mut remaining, mut lhs) = parse_primary_expression(input)?;
+
+    loop {
+        let (next_remaining, pipe) = opt(preceded(
+            delimited(multispace0, tag("|>"), multispace0),
+            parse_primary_expression,
+        ))(&remaining)?;
+
+        if let Some(rhs) = pipe {
+            lhs = Expression::Pipe {
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+            };
+            remaining = next_remaining;
+        } else {
+            break;
+        }
+    }
+
+    Ok((remaining, lhs))
 }
 
 pub fn parse_statement(input: &str) -> IResult<&str, Statement> {
@@ -183,6 +213,32 @@ mod tests {
                     value: Expression::MethodCall {
                         variable: Box::new(Expression::Identifier("timer_ba".to_string())),
                         method: "as_en".to_string()
+                    }
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn test_parse_shiki_pipe() {
+        let input = "しき pipeline: 縁<間, i64> = ticks |> doubler";
+        let result = parse_statement(input);
+        assert_eq!(
+            result,
+            Ok((
+                "",
+                Statement::Shiki {
+                    variable_name: "pipeline".to_string(),
+                    type_annotation: Type::Generic(
+                        "縁".to_string(),
+                        vec![
+                            Type::Simple("間".to_string()),
+                            Type::Simple("i64".to_string())
+                        ]
+                    ),
+                    value: Expression::Pipe {
+                        lhs: Box::new(Expression::Identifier("ticks".to_string())),
+                        rhs: Box::new(Expression::Identifier("doubler".to_string()))
                     }
                 }
             ))
