@@ -50,7 +50,9 @@ fn main() {
             println!("type ma = ();");
             println!("type i64 = i64;");
             println!("trait AsEn {{ fn as_en(&self) -> Self; }}");
-            println!("impl AsEn for kotoba_core::Ba {{ fn as_en(&self) -> Self {{ self.clone() }} }}");
+            println!(
+                "impl AsEn for kotoba_core::Ba {{ fn as_en(&self) -> Self {{ self.clone() }} }}"
+            );
             println!("#[derive(Clone)] struct en<I, O>(std::marker::PhantomData<(I, O)>);");
             println!("fn pipe<T, U, V>(_: T, _: U) -> V {{ panic!() }}");
             println!("");

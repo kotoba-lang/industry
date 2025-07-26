@@ -1,4 +1,4 @@
-use kotoba_parser::{Expression, Parameter, Statement, Type};
+use kotoba_parser::{Expression, Statement, Type};
 
 pub struct Compiler;
 
@@ -116,8 +116,7 @@ mod tests {
         let (_, statement) = parse_statement(input).unwrap();
         let compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
-        let expected_code =
-            "use kotoba_core::Ba;\n\nlet doubler: en<i64, i64> = |x: i64| { x };\n";
+        let expected_code = "use kotoba_core::Ba;\n\nlet doubler: en<i64, i64> = |x: i64| { x };\n";
         assert_eq!(result, Ok(expected_code.to_string()));
     }
 }
