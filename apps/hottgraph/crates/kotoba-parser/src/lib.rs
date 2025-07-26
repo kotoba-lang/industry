@@ -61,10 +61,7 @@ pub enum Statement {
 // --- Parsers ---
 
 fn parse_identifier_str(input: &str) -> IResult<&str, &str> {
-    recognize(pair(
-        alt((alpha1, tag("_"))),
-        opt(take_while1(|c: char| c.is_alphanumeric() || c == '_')),
-    ))(input)
+    take_while1(|c: char| c.is_alphabetic() || c == '_')(input)
 }
 
 fn parse_identifier(input: &str) -> IResult<&str, &str> {
@@ -142,7 +139,7 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
                 char(')'),
             ),
             delimited(multispace0, tag("=>"), multispace0),
-            parse_expression, // 本体は再帰的に式をパース
+            parse_primary_expression, // 左再帰を避けるため、primary_expression をパース
         )),
         |(_, params, _, body)| Expression::Kan {
             params,
