@@ -1,9 +1,9 @@
 use clap::Parser;
-use gen_compiler::Compiler;
-use gen_parser::parse_statement;
+use kotoba_compiler::Compiler;
+use kotoba_parser::parse_statement;
 use std::fs;
 
-/// `gen`言語のコンパイラ
+/// `kotoba`言語のコンパイラ
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
@@ -46,11 +46,11 @@ fn main() {
             println!("// このコードはプロトタイプであり、まだ完全ではありません。\n");
 
             // --- ダミーの型定義 ---
-            println!("// ダミーの型定義: 本来は`gen-std`のような標準ライブラリで提供される");
+            println!("// ダミーの型定義: 本来は`kotoba-std`のような標準ライブラリで提供される");
             println!("type 間 = ();");
             println!("type i64 = i64;");
             println!("trait AsEn {{ fn as_en(&self) -> Self; }}");
-            println!("impl AsEn for gen_core::Ba {{ fn as_en(&self) -> Self {{ self.clone() }} }}");
+            println!("impl AsEn for kotoba_core::Ba {{ fn as_en(&self) -> Self {{ self.clone() }} }}");
             println!("struct 縁<I, O>(std::marker::PhantomData<(I, O)>);");
             println!("");
             // --- ここまで ---
