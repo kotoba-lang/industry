@@ -1,4 +1,4 @@
-use gen_parser::{Expression, Statement, Type};
+use kotoba_parser::{Expression, Statement, Type};
 
 pub struct Compiler;
 
@@ -20,7 +20,7 @@ impl Compiler {
     pub fn compile(&self, program: Vec<Statement>) -> Result<String, String> {
         let mut rust_code = String::new();
         // use文などをここに追加する余地
-        rust_code.push_str("use gen_core::Ba;\n\n");
+        rust_code.push_str("use kotoba_core::Ba;\n\n");
 
         for statement in program {
             rust_code.push_str(&self.compile_statement(statement)?);
@@ -48,7 +48,7 @@ impl Compiler {
 
     fn compile_expression(&self, expression: Expression) -> Result<String, String> {
         match expression {
-            Expression::Ku { id } => Ok(format!("Ba::new(\"{}\")", id)),
+            Expression::Ku { id } => Ok(format!("kotoba_core::Ba::new(\"{}\")", id)),
             Expression::Identifier(name) => Ok(name),
             Expression::MethodCall { variable, method } => {
                 let var_code = self.compile_expression(*variable)?;
@@ -61,7 +61,7 @@ impl Compiler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gen_parser::parse_statement;
+    use kotoba_parser::parse_statement;
 
     #[test]
     fn test_compile_shiki_ku() {
@@ -69,7 +69,7 @@ mod tests {
         let (_, statement) = parse_statement(input).unwrap();
         let compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
-        let expected_code = "use gen_core::Ba;\n\nlet timer_ba: 場 = Ba::new(\"system/timer\");\n";
+        let expected_code = "use kotoba_core::Ba;\n\nlet timer_ba: 場 = kotoba_core::Ba::new(\"system/timer\");\n";
         assert_eq!(result, Ok(expected_code.to_string()));
     }
 
@@ -79,7 +79,7 @@ mod tests {
         let (_, statement) = parse_statement(input).unwrap();
         let compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
-        let expected_code = "use gen_core::Ba;\n\nlet ticks: 縁<間, i64> = timer_ba.as_en();\n";
+        let expected_code = "use kotoba_core::Ba;\n\nlet ticks: 縁<間, i64> = timer_ba.as_en();\n";
         assert_eq!(result, Ok(expected_code.to_string()));
     }
 }
