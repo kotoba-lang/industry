@@ -42,6 +42,9 @@
 | `ze` | `是` | ≡（Path equality） | 判断と等価性の構成。 |
 | `mu` | `無` | Empty Type / ¬ | 否定・存在しないこと。 |
 | `en` | `縁` | Path / Morphism | 型間の関係性・流れの接続。GraphとHoTTの橋渡し |
+| `mugen` | `無限` | Coinduction, Stream | 無限の巡り。無限列や永続構造の表現（可能なら）。 |
+| `kai` | `界` | Truncation, Modalities | 世界の境界。層の制限、因果の断絶、終結的構造。 |
+| `ketsu` | `結` | Termination, Halting | 結末・停止。Fixpointにおける収束の意味づけ。 |
 
 ### 2.3. 構文例: `zo` (Univalence) の証明スケッチ
 ```kotoba
