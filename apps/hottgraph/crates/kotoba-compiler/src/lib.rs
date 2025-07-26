@@ -54,6 +54,11 @@ impl Compiler {
                 let var_code = self.compile_expression(*variable)?;
                 Ok(format!("{}.{}()", var_code, method))
             }
+            Expression::Pipe { lhs, rhs } => {
+                let lhs_code = self.compile_expression(*lhs)?;
+                let rhs_code = self.compile_expression(*rhs)?;
+                Ok(format!("pipe({}, {})", lhs_code, rhs_code))
+            }
         }
     }
 }
@@ -80,6 +85,17 @@ mod tests {
         let compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         let expected_code = "use kotoba_core::Ba;\n\nlet ticks: 縁<間, i64> = timer_ba.as_en();\n";
+        assert_eq!(result, Ok(expected_code.to_string()));
+    }
+
+    #[test]
+    fn test_compile_shiki_pipe() {
+        let input = "しき pipeline: 縁<間, i64> = ticks |> doubler";
+        let (_, statement) = parse_statement(input).unwrap();
+        let compiler = Compiler::new();
+        let result = compiler.compile(vec![statement]);
+        let expected_code =
+            "use kotoba_core::Ba;\n\nlet pipeline: 縁<間, i64> = pipe(ticks, doubler);\n";
         assert_eq!(result, Ok(expected_code.to_string()));
     }
 }
