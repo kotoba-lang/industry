@@ -14,6 +14,18 @@ pub struct Gen {
     pub energy: f64,
 }
 
+impl Gen {
+    /// 新しい`Gen`インスタンスを生成します。
+    ///
+    /// エネルギー量は現時点ではデフォルト値（1.0）とします。
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            energy: 1.0,
+        }
+    }
+}
+
 /// 魂を表すベクトル空間上の軌跡です。
 ///
 /// `Soul`は、特定の`Gen`から生成された存在の特性や状態を、
@@ -32,10 +44,7 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let faith_gen = Gen {
-            name: "faith".to_string(),
-            energy: 1.0,
-        };
+        let faith_gen = Gen::new("faith");
 
         let soul_of_hope = Soul {
             origin: faith_gen.clone(),
