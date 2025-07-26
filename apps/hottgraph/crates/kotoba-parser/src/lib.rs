@@ -4,7 +4,7 @@ use nom::{
     character::complete::{alpha1, char, multispace0, multispace1},
     combinator::{cut, map, opt, recognize, verify},
     multi::separated_list1,
-    sequence::{delimited, pair, preceded, tuple},
+    sequence::{delimited, pair, preceded, terminated, tuple},
     IResult,
 };
 
@@ -184,11 +184,14 @@ fn parse_pattern(input: &str) -> IResult<&str, Pattern> {
 
 fn parse_ou_arm(input: &str) -> IResult<&str, OuArm> {
     map(
-        tuple((
-            parse_pattern,
-            delimited(multispace0, tag("=>"), multispace0),
-            parse_expression,
-        )),
+        preceded(
+            multispace0,
+            tuple((
+                parse_pattern,
+                delimited(multispace0, tag("=>"), multispace0),
+                parse_expression,
+            )),
+        ),
         |(pattern, _, body)| OuArm { pattern, body },
     )(input)
 }
@@ -269,11 +272,11 @@ pub fn parse_expression(input: &str) -> IResult<&str, Expression> {
                     multispace0,
                     delimited(
                         char('{'),
-                        separated_list1(
-                            delimited(multispace0, char(','), multispace0),
-                            parse_ou_arm,
+                        terminated(
+                            separated_list1(char(','), parse_ou_arm),
+                            opt(preceded(multispace0, char(','))), // Allow optional trailing comma
                         ),
-                        char('}'),
+                        preceded(multispace0, char('}')),
                     ),
                 )),
             )),
