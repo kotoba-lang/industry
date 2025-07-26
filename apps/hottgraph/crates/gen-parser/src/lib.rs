@@ -22,7 +22,9 @@ pub enum Statement {
 #[derive(Debug, PartialEq)]
 pub enum Expression {
     /// `create "<id>"`
-    NodeCreation { id: String },
+    InCreation {
+        id: String,
+    },
 }
 
 fn parse_identifier(input: &str) -> IResult<&str, &str> {
@@ -59,7 +61,7 @@ pub fn parse_expression(input: &str) -> IResult<&str, Expression> {
     let (input, _) = tag("create")(input)?;
     let (input, _) = multispace1(input)?;
     let (input, id) = parse_quoted_string(input)?;
-    Ok((input, Expression::NodeCreation { id: id.to_string() }))
+    Ok((input, Expression::InCreation{ id: id.to_string() }))
 }
 
 #[cfg(test)]
@@ -68,20 +70,17 @@ mod tests {
 
     #[test]
     fn test_parse_let_statement() {
-        let input = "let my_node: Node = create \"system/timer\"";
+        let input = "let my_in: In = create \"system/timer\"";
         let result = parse_statement(input);
         assert_eq!(
             result,
-            Ok((
-                "",
-                Statement::Let {
-                    variable_name: "my_node".to_string(),
-                    type_name: "Node".to_string(),
-                    value: Expression::NodeCreation {
-                        id: "system/timer".to_string(),
-                    }
+            Ok(("", Statement::Let {
+                variable_name: "my_in".to_string(),
+                type_name: "In".to_string(),
+                value: Expression::InCreation {
+                    id: "system/timer".to_string(),
                 }
-            ))
+            }))
         );
     }
 }
