@@ -23,6 +23,20 @@ pub struct Parameter {
     pub type_annotation: Type,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum Pattern {
+    /// 整数リテラル (`123`)
+    IntegerLiteral(i64),
+    /// ワイルドカード (`_`)
+    Wildcard,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct OuArm {
+    pub pattern: Pattern,
+    pub body: Expression,
+}
+
 /// 式を表すAST
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
@@ -44,6 +58,11 @@ pub enum Expression {
     Pipe {
         lhs: Box<Expression>,
         rhs: Box<Expression>,
+    },
+    /// `ou <expr> { <arms> }`
+    Ou {
+        expression: Box<Expression>,
+        arms: Vec<OuArm>,
     },
 }
 
