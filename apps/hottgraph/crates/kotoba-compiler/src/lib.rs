@@ -1,4 +1,4 @@
-use kotoba_parser::{Expression, Statement, Type};
+use kotoba_parser::{Expression, Parameter, Statement, Type};
 
 pub struct Compiler;
 
@@ -59,6 +59,17 @@ impl Compiler {
                 let rhs_code = self.compile_expression(*rhs)?;
                 Ok(format!("pipe({}, {})", lhs_code, rhs_code))
             }
+            Expression::Kan { params, body } => {
+                let params_str = params
+                    .iter()
+                    .map(|p| format!("{}: {}", p.name, type_to_string(&p.type_annotation)))
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                
+                let body_code = self.compile_expression(*body)?;
+
+                Ok(format!("|{}| {{ {} }}", params_str, body_code))
+            }
         }
     }
 }
@@ -96,6 +107,17 @@ mod tests {
         let result = compiler.compile(vec![statement]);
         let expected_code =
             "use kotoba_core::Ba;\n\nlet pipeline: 縁<間, i64> = pipe(ticks, doubler);\n";
+        assert_eq!(result, Ok(expected_code.to_string()));
+    }
+
+    #[test]
+    fn test_compile_shiki_kan() {
+        let input = "しき doubler: 縁<i64, i64> = かん(x: i64) => x";
+        let (_, statement) = parse_statement(input).unwrap();
+        let compiler = Compiler::new();
+        let result = compiler.compile(vec![statement]);
+        let expected_code =
+            "use kotoba_core::Ba;\n\nlet doubler: 縁<i64, i64> = |x: i64| { x };\n";
         assert_eq!(result, Ok(expected_code.to_string()));
     }
 }
