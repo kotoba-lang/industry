@@ -30,15 +30,16 @@
 
 | キーワード | 思想 | 形式意味論上の対応 | 説明 |
 | :--- | :--- | :--- | :--- |
-| `ba`, `ma`, `ku` | `場`,`間`,`宙` | Type, Unit, Universe | 空間、静寂、そして空間の属する宇宙。 |
-| `ku`, `shiki` | `空`,`式` | Introduction, let | 空間の立ち上げと、項への名前の束縛。 |
-| `kan`, `nagare`, `musubi`| `観`,`流`,`結` | λ, Π-type, Σ-type | 関数、依存関数、そして依存ペア。 |
-| `wakare`, `ou` | `分`,`応` | Conditional, Match | 条件分岐とパターン照合。 |
+| `ba` | `場` | Type, Unit, Universe | 空間、静寂、そして空間の属する宇宙。 |
+| `shiki` | `式` | Introduction, let | 空間の立ち上げと、項への名前の束縛。 |
+| `kan` | `観` | λ, Π-type, Σ-type | 関数、依存関数、そして依存ペア。 |
+| `ou` | `応` | Conditional, Match | 条件分岐とパターン照合。 |
 | `umare` | `生` | Inductive Type | 帰納的に定義される型 (例: 自然数)。 |
-| `meguri` | `巡` | Recursion / Fixpoint | 帰納型の上での再帰計算。 |
-| `kami` | `神` | Higher Inductive Type | 点だけでなくパスもコンストラクタに持つ高次帰納型。 |
+| `gyo` | `行` | Recursion / Fixpoint | 帰納型の上での再帰計算。 |
+| `myo` | `妙` | Higher Inductive Type | 点だけでなくパスもコンストラクタに持つ高次帰納型。 |
 | `tsunagari`| `繋がり`| Univalence | `tsunagu`から導出される定理。同型な型は等しい。 |
 
+抽象層も計算層に合わせて見直して
 ### 2.3. 構文例: `tsunagari` (Univalence) の証明スケッチ
 ```kotoba
 // is_equiv(f) は f が同型写像であるという性質を表す ba とする
