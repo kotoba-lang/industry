@@ -14,9 +14,7 @@ pub struct Ba {
 impl Ba {
     /// 新しい`Ba`インスタンスを生成します。
     pub fn new(id: &str) -> Self {
-        Self {
-            id: id.to_string(),
-        }
+        Self { id: id.to_string() }
     }
 }
 
