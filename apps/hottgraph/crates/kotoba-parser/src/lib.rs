@@ -143,6 +143,24 @@ fn parse_parameter(input: &str) -> IResult<&str, Parameter> {
     )(input)
 }
 
+fn parse_pattern(input: &str) -> IResult<&str, Pattern> {
+    alt((
+        map(tag("_"), |_| Pattern::Wildcard),
+        map(nom::character::complete::i64, Pattern::IntegerLiteral),
+    ))(input)
+}
+
+fn parse_ou_arm(input: &str) -> IResult<&str, OuArm> {
+    map(
+        tuple((
+            parse_pattern,
+            delimited(multispace0, tag("=>"), multispace0),
+            parse_expression,
+        )),
+        |(pattern, _, body)| OuArm { pattern, body },
+    )(input)
+}
+
 fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
     let ku_parser = map(
         preceded(tuple((tag("ku"), multispace1)), parse_quoted_string),
@@ -169,11 +187,30 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
         },
     );
 
+    let ou_parser = map(
+        tuple((
+            tag("ou"),
+            multispace1,
+            parse_primary_expression, // 左再帰を避けるため primary_expression をパース
+            multispace0,
+            delimited(
+                char('{'),
+                separated_list1(delimited(multispace0, char(','), multispace0), parse_ou_arm),
+                char('}'),
+            ),
+        )),
+        |(_, _, expression, _, arms)| Expression::Ou {
+            expression: Box::new(expression),
+            arms,
+        },
+    );
+
     let ident_expr_parser = map(parse_identifier, |name| {
         Expression::Identifier(name.to_string())
     });
 
-    let (mut remaining, mut expr) = alt((ku_parser, kan_parser, ident_expr_parser))(input)?;
+    let (mut remaining, mut expr) =
+        alt((ku_parser, kan_parser, ou_parser, ident_expr_parser))(input)?;
 
     loop {
         let (next_remaining, method_call) = opt(preceded(
@@ -197,7 +234,8 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
     Ok((remaining, expr))
 }
 
-fn parse_expression(input: &str) -> IResult<&str, Expression> {
+
+pub fn parse_expression(input: &str) -> IResult<&str, Expression> {
     let (mut remaining, mut lhs) = parse_primary_expression(input)?;
 
     loop {
@@ -338,6 +376,35 @@ mod tests {
                         }],
                         body: Box::new(Expression::Identifier("x".to_string()))
                     }
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn test_parse_ou_expression() {
+        let input = "ou x { 0 => ku \"zero\", _ => ku \"other\" }";
+        let result = parse_expression(input); // 式として直接パース
+        assert_eq!(
+            result,
+            Ok((
+                "",
+                Expression::Ou {
+                    expression: Box::new(Expression::Identifier("x".to_string())),
+                    arms: vec![
+                        OuArm {
+                            pattern: Pattern::IntegerLiteral(0),
+                            body: Expression::Ku {
+                                id: "zero".to_string()
+                            }
+                        },
+                        OuArm {
+                            pattern: Pattern::Wildcard,
+                            body: Expression::Ku {
+                                id: "other".to_string()
+                            }
+                        }
+                    ]
                 }
             ))
         );
