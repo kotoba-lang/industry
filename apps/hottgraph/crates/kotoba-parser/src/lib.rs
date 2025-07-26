@@ -200,25 +200,24 @@ fn parse_parameter(input: &str) -> IResult<&str, Parameter> {
 fn parse_pattern(input: &str) -> IResult<&str, Pattern> {
     // Tries to parse a constructor pattern like `Succ(n)` or `Cons(h, t)`.
     // If that fails, it tries the other, simpler patterns.
-    let constructor_parser = map(
+    let constructor_with_args_parser = map(
         pair(
             parse_identifier,
-            opt(delimited(
+            delimited(
                 char('('),
                 separated_list1(delimited(multispace0, char(','), multispace0), parse_pattern),
                 char(')'),
-            )),
+            ),
         ),
-        |(name, opt_patterns)| {
-            Pattern::Constructor(name.to_string(), opt_patterns.unwrap_or_default())
-        },
+        |(name, patterns)| Pattern::Constructor(name.to_string(), patterns),
     );
 
     alt((
         map(nom::character::complete::i64, Pattern::IntegerLiteral),
         map(tag("_"), |_| Pattern::Wildcard),
-        constructor_parser, // must come before general identifier
-        map(parse_identifier, |s| Pattern::Identifier(s.to_string())), // Fallback to a simple identifier
+        constructor_with_args_parser,
+        // An identifier can be a variable or a constructor with no arguments.
+        map(parse_identifier, |s| Pattern::Identifier(s.to_string())),
     ))(input)
 }
 
@@ -660,10 +659,10 @@ mod tests {
         if let Pattern::Constructor(name, patterns) = pattern {
             assert_eq!(name, "Succ");
             assert_eq!(patterns.len(), 1);
-            if let Pattern::Constructor(inner_name, ..) = &patterns[0] {
+            if let Pattern::Identifier(inner_name) = &patterns[0] {
                 assert_eq!(inner_name, "n");
             } else {
-                panic!("Expected inner pattern to be a constructor (identifier)");
+                panic!("Expected inner pattern to be an identifier");
             }
         } else {
             panic!("Expected Constructor pattern");
