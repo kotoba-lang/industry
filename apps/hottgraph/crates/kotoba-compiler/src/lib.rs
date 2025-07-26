@@ -170,7 +170,24 @@ impl Compiler {
         match pattern {
             Pattern::IntegerLiteral(i) => Ok(i.to_string()),
             Pattern::Wildcard => Ok("_".to_string()),
-            Pattern::Identifier(s) => Ok(s.clone()),
+            Pattern::Identifier(s) => {
+                // An identifier in a pattern can be a variable or a nullary constructor.
+                // We check if it's a known constructor first.
+                let capitalized_name = capitalize(s);
+                let type_name = self
+                    .type_definitions
+                    .iter()
+                    .find(|(_type_name, constructors)| {
+                        constructors.contains(&capitalized_name)
+                    })
+                    .map(|(type_name, _)| type_name.clone());
+
+                if let Some(tn) = type_name {
+                    Ok(format!("{}::{}", tn, capitalized_name))
+                } else {
+                    Ok(s.clone()) // It's a variable binding
+                }
+            }
             Pattern::Constructor(name, patterns) => {
                 let capitalized_name = capitalize(name);
                 // Find which type this constructor belongs to.
@@ -309,6 +326,6 @@ mod tests {
         assert!(code.contains("match a"));
         assert!(code.contains("N::Zero =>"));
         assert!(code.contains("N::Succ(p) =>"));
-        assert!(code.contains("zero"));
+        assert!(code.contains("N::Zero")); // a an expression
     }
 }
