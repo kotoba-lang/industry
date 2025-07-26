@@ -2,7 +2,7 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_while1},
     character::complete::{alpha1, char, multispace0, multispace1},
-    combinator::{map, opt, recognize},
+    combinator::{map, not, opt, peek, recognize},
     multi::separated_list1,
     sequence::{delimited, pair, preceded, tuple},
     IResult,
@@ -60,11 +60,23 @@ pub enum Statement {
 
 // --- Parsers ---
 
-fn parse_identifier(input: &str) -> IResult<&str, &str> {
+fn parse_identifier_str(input: &str) -> IResult<&str, &str> {
     recognize(pair(
         alt((alpha1, tag("_"))),
-        nom::bytes::complete::take_while(|c: char| c.is_alphanumeric() || c == '_'),
+        opt(take_while1(|c: char| c.is_alphanumeric() || c == '_')),
     ))(input)
+}
+
+fn parse_identifier(input: &str) -> IResult<&str, &str> {
+    let (next, ident) = parse_identifier_str(input)?;
+    // キーワードと一致する場合はエラー
+    match ident {
+        "しき" | "かん" | "く" | "おう" | "場" | "縁" | "間" => Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        ))),
+        _ => Ok((next, ident)),
+    }
 }
 
 fn parse_quoted_string(input: &str) -> IResult<&str, String> {
@@ -139,12 +151,11 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
     );
 
     // 変数 or メソッド呼び出し
-    let ident_parser = map(parse_identifier, |name| {
+    let ident_expr_parser = map(parse_identifier, |name| {
         Expression::Identifier(name.to_string())
     });
 
-    // まずは変数としてパースを試みる
-    let (mut remaining, mut expr) = alt((ku_parser, kan_parser, ident_parser))(input)?;
+    let (mut remaining, mut expr) = alt((ku_parser, kan_parser, ident_expr_parser))(input)?;
 
     // 後続の `.method()` をループでパース
     loop {
