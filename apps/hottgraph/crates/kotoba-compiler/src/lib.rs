@@ -646,11 +646,11 @@ mod tests {
 
     #[test]
     fn test_compile_ou_expression() {
-        let input = "ou x { 0 => i0, _ => i1 }";
+        let input = "ou i { i0 => i0, _ => i1 }";
         let (_, expression) = parse_expression(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile_expression(expression);
-        let expected_code = "match x {\n    kotoba_core::Interval::I0 => { kotoba_core::Interval::I0 },\n    _ => { kotoba_core::Interval::I1 },\n}";
+        let expected_code = "match i {\n    kotoba_core::Interval::I0 => { kotoba_core::Interval::I0 },\n    _ => { kotoba_core::Interval::I1 },\n}";
         assert_eq!(result, Ok(expected_code.to_string()));
     }
 
