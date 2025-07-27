@@ -67,29 +67,32 @@ pub struct Path<T: ?Sized + 'static> {
     f: Arc<dyn Fn(Interval) -> T + Send + Sync>,
 }
 
-impl<T: ?Sized> Path<T> {
-    /// Creates a new path `ze`.
-    pub fn new(f: impl Fn(Interval) -> T + Send + Sync + 'static) -> Self {
+impl<T> Path<T> {
+    /// Creates a new path from a function.
+    pub fn new<F>(f: F) -> Self
+    where
+        F: Fn(Interval) -> T + Send + Sync + 'static,
+    {
         Self { f: Arc::new(f) }
     }
 
-    /// Evaluates the path at a given point in the interval `ku`.
+    /// Evaluates the path at a given interval `i`.
     pub fn at(&self, i: Interval) -> T {
         (self.f)(i)
     }
 
-    /// Gets the starting point of the path (`i0`).
+    /// Gets the start point of the path (equivalent to `at(I0)`).
     pub fn start(&self) -> T {
         self.at(Interval::I0)
     }
 
-    /// Gets the ending point of the path (`i1`).
+    /// Gets the end point of the path (equivalent to `at(I1)`).
     pub fn end(&self) -> T {
         self.at(Interval::I1)
     }
 
-    /// `sym` (Symmetry): Inverts the path.
-    /// The new path goes from `end` to `start`.
+    /// Returns the reverse of the path.
+    /// The new path goes from `end()` to `start()`.
     pub fn sym(&self) -> Self {
         let f_orig = self.f.clone();
         Self::new(move |i| f_orig(i.rev()))
