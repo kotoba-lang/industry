@@ -211,37 +211,55 @@ impl Compiler {
         constructors: &[ConstructorDef],
     ) -> Result<String, String> {
         let mut enum_variants = String::new();
+        let mut impl_methods = String::new();
+
         for c in constructors {
-            if let ConstructorDef::Point {
-                name: constr_name,
-                fields,
-            } = c
-            {
-                let variant_name = capitalize(constr_name);
-                if fields.is_empty() {
-                    enum_variants.push_str(&format!("    {},\n", variant_name));
-                } else {
-                    let fields_str = fields
-                        .iter()
-                        .map(|f| {
-                            let type_str = type_to_string(f);
-                            if type_str == name {
-                                format!("Box<{}>", name)
-                            } else {
-                                type_str
-                            }
-                        })
-                        .collect::<Vec<_>>()
-                        .join(", ");
-                    enum_variants.push_str(&format!("    {}({}),\n", variant_name, fields_str));
+            match c {
+                ConstructorDef::Point {
+                    name: constr_name,
+                    fields,
+                } => {
+                    let variant_name = capitalize(constr_name);
+                    if fields.is_empty() {
+                        enum_variants.push_str(&format!("    {},\n", variant_name));
+                    } else {
+                        let fields_str = fields
+                            .iter()
+                            .map(|f| {
+                                let type_str = type_to_string(f);
+                                // Recursive type definitions need to be boxed.
+                                if type_str == name {
+                                    format!("Box<{}>", name)
+                                } else {
+                                    type_str
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        enum_variants.push_str(&format!("    {}({}),\n", variant_name, fields_str));
+                    }
+                }
+                ConstructorDef::Path { name: path_name, path_type } => {
+                    let path_type_str = type_to_string(path_type);
+                    impl_methods.push_str(&format!(
+                        "    pub fn {}(&self) -> {} {{\n        unimplemented!(\"Path constructor compilation is not fully supported yet.\")\n    }}\n",
+                        path_name,
+                        path_type_str
+                    ));
                 }
             }
         }
 
-        Ok(format!(
+        let enum_def = format!(
             "#[derive(Debug, Clone)]\nenum {} {{\n{}}}",
             name, enum_variants
-        ))
+        );
+
+        if impl_methods.is_empty() {
+            Ok(enum_def)
+        } else {
+            Ok(format!("{}\n\nimpl {} {{\n{}}}", enum_def, name, impl_methods))
+        }
     }
 
     fn compile_expression(&mut self, expression: Expression) -> Result<String, String> {
@@ -326,7 +344,7 @@ impl Compiler {
             Expression::Pipe { lhs, rhs } => {
                 let lhs_code = self.compile_expression(*lhs)?;
                 let rhs_code = self.compile_expression(*rhs)?;
-                Ok(format!("pipe({}, {})", lhs_code, rhs_code))
+                Ok(format!("{}({})", rhs_code, lhs_code))
             }
             Expression::Kan { params, body } => {
                 self.context.enter_scope();
@@ -629,7 +647,7 @@ mod tests {
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         let expected_code =
-            "let pipeline: kotoba_core::Glue<ma, i64, id> = pipe(ticks, doubler);\n";
+            "let pipeline: kotoba_core::Glue<ma, i64, id> = doubler(ticks);\n";
         assert_eq!(result.unwrap().contains(expected_code), true);
     }
 
@@ -660,7 +678,16 @@ mod tests {
         let (_, statement) = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
-        let expected_code = "#[derive(Debug, Clone)]\nenum S1 {\n    Base,\n}\n";
-        assert_eq!(result.unwrap().contains(expected_code), true);
+        let expected_enum = "#[derive(Debug, Clone)]\nenum S1 {\n    Base,\n}";
+        let expected_impl = "impl S1 {\n    pub fn loop(&self) -> kotoba_core::Path<base> {\n        unimplemented!(\"Path constructor compilation is not fully supported yet.\")\n    }\n}";
+        let compiled_code = result.unwrap();
+        assert!(
+            compiled_code.contains(expected_enum),
+            "Enum definition missing or incorrect."
+        );
+        assert!(
+            compiled_code.contains(expected_impl),
+            "Impl block for path constructor missing or incorrect."
+        );
     }
 }
