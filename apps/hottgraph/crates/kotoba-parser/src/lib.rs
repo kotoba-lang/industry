@@ -3,7 +3,7 @@ use nom::{
     bytes::complete::{tag, take_while1},
     character::complete::{alpha1, char, multispace0, multispace1},
     combinator::{cut, map, opt, recognize, verify},
-    multi::separated_list1,
+    multi::{separated_list0, separated_list1},
     sequence::{delimited, pair, preceded, terminated, tuple},
     IResult,
 };
@@ -31,6 +31,8 @@ pub struct Parameter {
 pub enum Pattern {
     /// 整数リテラル (`123`)
     IntegerLiteral(i64),
+    /// `i0` または `i1`
+    IntervalLiteral(String),
     /// ワイルドカード (`_`)
     Wildcard,
     /// 識別子 (`x`)
@@ -61,10 +63,13 @@ pub enum Expression {
     },
     /// 変数名
     Identifier(String),
-    /// `var.method()`
+    /// 整数リテラル
+    IntegerLiteral(i64),
+    /// `var.method(args)`
     MethodCall {
         variable: Box<Expression>,
         method: String,
+        args: Vec<Expression>,
     },
     /// `lhs |> rhs`
     Pipe {
@@ -201,6 +206,9 @@ fn parse_pattern(input: &str) -> IResult<&str, Pattern> {
 
     alt((
         map(nom::character::complete::i64, Pattern::IntegerLiteral),
+        map(alt((tag("i0"), tag("i1"))), |s: &str| {
+            Pattern::IntervalLiteral(s.to_string())
+        }),
         map(tag("_"), |_| Pattern::Wildcard),
         constructor_with_args_parser,
         // An identifier can be a variable or a constructor with no arguments.
@@ -227,48 +235,41 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
         Expression::Zo(s.to_string())
     });
 
-    let kan_parser = map(
-        tuple((
-            tag("kan"),
-            delimited(
-                char('('),
-                separated_list1(
-                    delimited(multispace0, char(','), multispace0),
-                    parse_parameter,
-                ),
-                char(')'),
-            ),
-            delimited(multispace0, tag("=>"), multispace0),
-            parse_primary_expression, // 左再帰を避ける
-        )),
-        |(_, params, _, body)| Expression::Kan {
-            params,
-            body: Box::new(body),
-        },
-    );
-
     let ident_expr_parser = map(parse_identifier, |name| {
         Expression::Identifier(name.to_string())
     });
 
-    let (mut remaining, mut expr) = alt((
-        kan_parser,
-        zo_parser,
-        ident_expr_parser,
-    ))(input)?;
+    let integer_literal_parser = map(nom::character::complete::i64, |n| {
+        Expression::IntegerLiteral(n)
+    });
+
+    let (mut remaining, mut expr) =
+        alt((zo_parser, ident_expr_parser, integer_literal_parser))(input)?;
 
     loop {
         let (next_remaining, method_call) = opt(preceded(
             char('.'),
-            map(tuple((parse_identifier_str, tag("()"))), |(method, _)| {
-                method.to_string()
-            }),
-        ))(&remaining)?;
+            map(
+                tuple((
+                    parse_identifier_str,
+                    delimited(
+                        char('('),
+                        separated_list0(
+                            delimited(multispace0, char(','), multispace0),
+                            parse_expression,
+                        ),
+                        char(')'),
+                    ),
+                )),
+                |(method, args)| (method.to_string(), args),
+            ),
+        ))(remaining)?;
 
-        if let Some(method) = method_call {
+        if let Some((method, args)) = method_call {
             expr = Expression::MethodCall {
                 variable: Box::new(expr),
                 method,
+                args,
             };
             remaining = next_remaining;
         } else {
@@ -324,7 +325,27 @@ pub fn parse_expression(input: &str) -> IResult<&str, Expression> {
         },
     );
 
-    alt((ou_parser, |i| {
+    let kan_parser = map(
+        tuple((
+            tag("kan"),
+            delimited(
+                char('('),
+                separated_list1(
+                    delimited(multispace0, char(','), multispace0),
+                    parse_parameter,
+                ),
+                char(')'),
+            ),
+            delimited(multispace0, tag("=>"), multispace0),
+            parse_expression, // 左再帰を避ける -> より一般的な式を許可
+        )),
+        |(_, params, _, body)| Expression::Kan {
+            params,
+            body: Box::new(body),
+        },
+    );
+
+    alt((ou_parser, kan_parser, |i| {
         // The original pipe-aware parser
         let (mut remaining, mut lhs) = parse_primary_expression(i)?;
 
@@ -452,7 +473,56 @@ mod tests {
                     ),
                     value: Expression::MethodCall {
                         variable: Box::new(Expression::Identifier("timer_ba".to_string())),
-                        method: "as_en".to_string()
+                        method: "as_en".to_string(),
+                        args: vec![]
+                    }
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn test_parse_shiki_method_call_with_args() {
+        let input = "shiki p2: ze<i64, i64> = p1.compose(q1)";
+        let result = parse_statement(input);
+        assert_eq!(
+            result,
+            Ok((
+                "",
+                Statement::Shiki {
+                    variable_name: "p2".to_string(),
+                    type_annotation: Type::Ze(
+                        Box::new(Type::Simple("i64".to_string())),
+                        Box::new(Type::Simple("i64".to_string()))
+                    ),
+                    value: Expression::MethodCall {
+                        variable: Box::new(Expression::Identifier("p1".to_string())),
+                        method: "compose".to_string(),
+                        args: vec![Expression::Identifier("q1".to_string())]
+                    }
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn test_parse_shiki_method_call_sym() {
+        let input = "shiki p_sym: ze<i64, i64> = p.sym()";
+        let result = parse_statement(input);
+        assert_eq!(
+            result,
+            Ok((
+                "",
+                Statement::Shiki {
+                    variable_name: "p_sym".to_string(),
+                    type_annotation: Type::Ze(
+                        Box::new(Type::Simple("i64".to_string())),
+                        Box::new(Type::Simple("i64".to_string()))
+                    ),
+                    value: Expression::MethodCall {
+                        variable: Box::new(Expression::Identifier("p".to_string())),
+                        method: "sym".to_string(),
+                        args: vec![]
                     }
                 }
             ))
