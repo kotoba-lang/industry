@@ -14,4 +14,11 @@ shiki p1_sym: ze<i64, i64> = p1.sym()
 
 shiki p_composed: ze<i64, i64> = p1.compose(p2)
 
-shiki p_over_p_refl: ze<ze<i64, i64>, ze<i64, i64>> = refl(p1) 
+shiki p_over_p_refl: ze<ze<i64, i64>, ze<i64, i64>> = refl(p1)
+
+gyo Bool = { true, false }
+
+shiki path_to_false: ze<Bool, Bool> = kan(i: ku) => ou i {
+    i0 => true,
+    i1 => false
+} 

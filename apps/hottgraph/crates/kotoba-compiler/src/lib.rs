@@ -141,7 +141,22 @@ impl Compiler {
         context_type: &Type,
     ) -> Result<String, String> {
         match expression {
-            Expression::Identifier(name) => Ok(name),
+            Expression::Identifier(name) => {
+                // An identifier in an expression can be a variable or a nullary constructor.
+                // We check if it's a known constructor first.
+                let capitalized_name = capitalize(&name);
+                if let Some(type_name) = self.type_definitions.iter().find_map(|(tn, constrs)| {
+                    if constrs.contains(&capitalized_name) {
+                        Some(tn)
+                    } else {
+                        None
+                    }
+                }) {
+                    Ok(format!("{}::{}", type_name, capitalized_name))
+                } else {
+                    Ok(name) // It's a variable
+                }
+            }
             Expression::IntegerLiteral(n) => Ok(n.to_string()),
             Expression::Refl(expr) => {
                 let expr_code = self.compile_expression(*expr)?;
@@ -349,6 +364,24 @@ mod tests {
         let result_unglue = compiler.compile(vec![statement_unglue]);
         let expected_unglue = "let v: i64 = kotoba_core::unglue(g);\n";
         assert_eq!(result_unglue.unwrap().contains(expected_unglue), true);
+    }
+
+    #[test]
+    fn test_compile_path_with_inductive_type() {
+        let program = vec![
+            parse_statement("gyo Bool = { true, false }").unwrap().1,
+            parse_statement("shiki path_to_false: ze<Bool, Bool> = kan(i: ku) => ou i { i0 => true, i1 => false }").unwrap().1,
+        ];
+        let mut compiler = Compiler::new();
+        let result = compiler.compile(program);
+        let compiled_code = result.unwrap();
+
+        assert!(compiled_code.contains("enum Bool"));
+        assert!(compiled_code.contains("True"));
+        assert!(compiled_code.contains("False"));
+        assert!(compiled_code.contains("let path_to_false: kotoba_core::Path<Bool>"));
+        assert!(compiled_code.contains("Bool::True"));
+        assert!(compiled_code.contains("Bool::False"));
     }
 
     #[test]
