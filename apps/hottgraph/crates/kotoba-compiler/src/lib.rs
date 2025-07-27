@@ -264,115 +264,139 @@ impl Compiler {
 
     fn compile_expression(&mut self, expression: Expression) -> Result<String, String> {
         match expression {
-            Expression::Identifier(name) => {
-                if let Some(type_name) = self.context.find_constructor_type(&name) {
-                    Ok(format!("{}::{}", type_name, capitalize(&name)))
-                } else {
-                    Ok(name)
-                }
-            }
+            Expression::Identifier(name) => self.compile_identifier_expression(&name),
             Expression::IntegerLiteral(n) => Ok(n.to_string()),
-            Expression::Refl(expr) => {
-                let expr_code = self.compile_expression(*expr)?;
-                Ok(format!("kotoba_core::Path::new(|_| {})", expr_code))
-            }
-            Expression::Glue { .. } => {
-                // This is handled specially in `compile_statement` and should not be reached directly here
-                // without a `shiki` context.
-                Err("`glue` must be used directly in a `shiki` statement with a type annotation.".to_string())
-            }
-            Expression::Unglue { value } => {
-                let value_code = self.compile_expression(*value)?;
-                Ok(format!("kotoba_core::unglue({})", value_code))
-            }
-            Expression::Let {
-                name,
-                type_annotation,
-                value,
-                body,
-            } => {
-                let value_code = self.compile_expression(*value)?;
-                self.context.enter_scope();
-                // Define the variable with its type (if annotated) for the body to use.
-                // A real type checker would infer the type if not present.
-                if let Some(ty) = type_annotation.clone() {
-                    self.context.define_var(name.clone(), ty);
-                }
-                let body_code = self.compile_expression(*body)?;
-                self.context.exit_scope();
-
-                let let_statement = if let Some(ty) = type_annotation {
-                    format!(
-                        "let {}: {} = {};",
-                        name,
-                        type_to_string(&ty),
-                        value_code
-                    )
-                } else {
-                    format!("let {} = {};", name, value_code)
-                };
-                Ok(format!("{{\n    {}\n    {}\n}}", let_statement, body_code))
-            }
-            Expression::Zo(val) => match val.as_str() {
-                "i0" => Ok("kotoba_core::Interval::I0".to_string()),
-                "i1" => Ok("kotoba_core::Interval::I1".to_string()),
-                _ => Err("Invalid interval literal".to_string()),
-            },
-            Expression::MethodCall {
-                variable,
-                method,
-                args,
-            } => {
-                let var_code = self.compile_expression(*variable)?;
-                let args_code: Vec<String> = args
-                    .into_iter()
-                    .map(|arg| self.compile_expression(arg))
-                    .collect::<Result<_, _>>()?;
-
-                let formatted_args = if method == "compose" {
-                    args_code
-                        .iter()
-                        .map(|arg| format!("&{}", arg))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                } else {
-                    args_code.join(", ")
-                };
-
-                Ok(format!("{}.{}({})", var_code, method, formatted_args))
-            }
-            Expression::Pipe { lhs, rhs } => {
-                let lhs_code = self.compile_expression(*lhs)?;
-                let rhs_code = self.compile_expression(*rhs)?;
-                Ok(format!("{}({})", rhs_code, lhs_code))
-            }
-            Expression::Kan { params, body } => {
-                self.context.enter_scope();
-                for p in &params {
-                    self.context
-                        .define_var(p.name.clone(), p.type_annotation.clone());
-                }
-
-                let params_str = params
-                    .iter()
-                    .map(|p| format!("{}: {}", p.name, type_to_string(&p.type_annotation)))
-                    .collect::<Vec<String>>()
-                    .join(", ");
-
-                let body_code = self.compile_expression(*body)?;
-                self.context.exit_scope();
-
-                Ok(format!("|{}| {{ {} }}", params_str, body_code))
-            }
-            Expression::Ou { expression, arms } => {
-                let expr_code = self.compile_expression(*expression)?;
-                let mut arms_code = String::new();
-                for arm in arms {
-                    arms_code.push_str(&self.compile_ou_arm(arm)?);
-                }
-                Ok(format!("match {} {{\n{}}}", expr_code, arms_code))
-            }
+            Expression::Refl(expr) => self.compile_refl_expression(*expr),
+            Expression::Glue { .. } => Err("`glue` must be used directly in a `shiki` statement with a type annotation.".to_string()),
+            Expression::Unglue { value } => self.compile_unglue_expression(*value),
+            Expression::Let { name, type_annotation, value, body } => self.compile_let_expression(name, type_annotation, *value, *body),
+            Expression::Zo(val) => self.compile_zo_expression(&val),
+            Expression::MethodCall { variable, method, args } => self.compile_method_call_expression(*variable, method, args),
+            Expression::Pipe { lhs, rhs } => self.compile_pipe_expression(*lhs, *rhs),
+            Expression::Kan { params, body } => self.compile_kan_expression(params, *body),
+            Expression::Ou { expression, arms } => self.compile_ou_expression(*expression, arms),
         }
+    }
+
+    fn compile_identifier_expression(&self, name: &str) -> Result<String, String> {
+        if let Some(type_name) = self.context.find_constructor_type(name) {
+            Ok(format!("{}::{}", type_name, capitalize(name)))
+        } else {
+            Ok(name.to_string())
+        }
+    }
+
+    fn compile_refl_expression(&mut self, expr: Expression) -> Result<String, String> {
+        let expr_code = self.compile_expression(expr)?;
+        Ok(format!("kotoba_core::Path::new(|_| {})", expr_code))
+    }
+
+    fn compile_unglue_expression(&mut self, value: Expression) -> Result<String, String> {
+        let value_code = self.compile_expression(value)?;
+        Ok(format!("kotoba_core::unglue({})", value_code))
+    }
+
+    fn compile_let_expression(
+        &mut self,
+        name: String,
+        type_annotation: Option<Type>,
+        value: Expression,
+        body: Expression,
+    ) -> Result<String, String> {
+        let value_code = self.compile_expression(value)?;
+        self.context.enter_scope();
+        if let Some(ty) = type_annotation.clone() {
+            self.context.define_var(name.clone(), ty);
+        }
+        let body_code = self.compile_expression(body)?;
+        self.context.exit_scope();
+
+        let let_statement = if let Some(ty) = type_annotation {
+            format!(
+                "let {}: {} = {};",
+                name,
+                type_to_string(&ty),
+                value_code
+            )
+        } else {
+            format!("let {} = {};", name, value_code)
+        };
+        Ok(format!("{{\n    {}\n    {}\n}}", let_statement, body_code))
+    }
+
+    fn compile_zo_expression(&self, val: &str) -> Result<String, String> {
+        match val {
+            "i0" => Ok("kotoba_core::Interval::I0".to_string()),
+            "i1" => Ok("kotoba_core::Interval::I1".to_string()),
+            _ => Err("Invalid interval literal".to_string()),
+        }
+    }
+
+    fn compile_method_call_expression(
+        &mut self,
+        variable: Expression,
+        method: String,
+        args: Vec<Expression>,
+    ) -> Result<String, String> {
+        let var_code = self.compile_expression(variable)?;
+        let args_code: Vec<String> = args
+            .into_iter()
+            .map(|arg| self.compile_expression(arg))
+            .collect::<Result<_, _>>()?;
+
+        let formatted_args = if method == "compose" {
+            args_code
+                .iter()
+                .map(|arg| format!("&{}", arg))
+                .collect::<Vec<_>>()
+                .join(", ")
+        } else {
+            args_code.join(", ")
+        };
+
+        Ok(format!("{}.{}({})", var_code, method, formatted_args))
+    }
+
+    fn compile_pipe_expression(&mut self, lhs: Expression, rhs: Expression) -> Result<String, String> {
+        let lhs_code = self.compile_expression(lhs)?;
+        let rhs_code = self.compile_expression(rhs)?;
+        Ok(format!("{}({})", rhs_code, lhs_code))
+    }
+
+    fn compile_kan_expression(
+        &mut self,
+        params: Vec<kotoba_parser::Parameter>,
+        body: Expression,
+    ) -> Result<String, String> {
+        self.context.enter_scope();
+        for p in &params {
+            self.context
+                .define_var(p.name.clone(), p.type_annotation.clone());
+        }
+
+        let params_str = params
+            .iter()
+            .map(|p| format!("{}: {}", p.name, type_to_string(&p.type_annotation)))
+            .collect::<Vec<String>>()
+            .join(", ");
+
+        let body_code = self.compile_expression(body)?;
+        self.context.exit_scope();
+
+        Ok(format!("|{}| {{ {} }}", params_str, body_code))
+    }
+
+    fn compile_ou_expression(
+        &mut self,
+        expression: Expression,
+        arms: Vec<OuArm>,
+    ) -> Result<String, String> {
+        let expr_code = self.compile_expression(expression)?;
+        let mut arms_code = String::new();
+        for arm in arms {
+            arms_code.push_str(&self.compile_ou_arm(arm)?);
+        }
+        Ok(format!("match {} {{\n{}}}", expr_code, arms_code))
     }
 
     fn compile_ou_arm(&mut self, arm: OuArm) -> Result<String, String> {
