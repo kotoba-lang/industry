@@ -17,8 +17,10 @@ pub enum Type {
     Ze(Box<Type>, Box<Type>),
     /// A simple, named type like `ma` or `i64`.
     Simple(String),
-    /// A glued type `en<A, B>`.
-    En(Box<Type>, Box<Type>),
+    /// A glued type `en<A, T, E>`.
+    En(Box<Type>, Box<Type>, Box<Type>),
+    /// The unit type `()`.
+    Unit,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -63,6 +65,10 @@ pub enum Expression {
     },
     /// `refl(<expr>)`
     Refl(Box<Expression>),
+    /// `glue(<expr>)`
+    Glue { value: Box<Expression> },
+    /// `unglue(<expr>)`
+    Unglue { value: Box<Expression> },
     /// 変数名
     Identifier(String),
     /// 整数リテラル
@@ -135,6 +141,10 @@ fn parse_type_name(input: &str) -> IResult<&str, &str> {
 }
 
 fn parse_type(input: &str) -> IResult<&str, Type> {
+    if input.starts_with("()") {
+        return Ok((&input[2..], Type::Unit));
+    }
+
     let (input, name) = parse_type_name(input)?;
     let (input, _) = multispace0(input)?;
 
@@ -152,27 +162,32 @@ fn parse_type(input: &str) -> IResult<&str, Type> {
         )
         .parse(input)?;
 
-        if generics.len() != 2 {
-            // ze and en must have exactly two type parameters.
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Verify,
-            )));
-        }
-
-        let mut iter = generics.into_iter();
-        let type1 = iter.next().unwrap();
-        let type2 = iter.next().unwrap();
-
         if name == "ze" {
-            return Ok((
-                input,
-                Type::Ze(Box::new(type1), Box::new(type2)),
-            ));
+            if generics.len() != 2 {
+                return Err(nom::Err::Error(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::Verify,
+                )));
+            }
+            let mut iter = generics.into_iter();
+            let type1 = iter.next().unwrap();
+            let type2 = iter.next().unwrap();
+            return Ok((input, Type::Ze(Box::new(type1), Box::new(type2))));
         } else {
+            // 'en'
+            if generics.len() != 3 {
+                return Err(nom::Err::Error(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::Verify,
+                )));
+            }
+            let mut iter = generics.into_iter();
+            let type1 = iter.next().unwrap();
+            let type2 = iter.next().unwrap();
+            let type3 = iter.next().unwrap();
             return Ok((
                 input,
-                Type::En(Box::new(type1), Box::new(type2)),
+                Type::En(Box::new(type1), Box::new(type2), Box::new(type3)),
             ));
         }
     }
@@ -247,6 +262,26 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
         |expr| Expression::Refl(Box::new(expr)),
     );
 
+    let glue_parser = map(
+        preceded(
+            tag("glue"),
+            delimited(char('('), parse_expression, char(')')),
+        ),
+        |value| Expression::Glue {
+            value: Box::new(value),
+        },
+    );
+
+    let unglue_parser = map(
+        preceded(
+            tag("unglue"),
+            delimited(char('('), parse_expression, char(')')),
+        ),
+        |value| Expression::Unglue {
+            value: Box::new(value),
+        },
+    );
+
     let zo_parser = map(alt((tag("i0"), tag("i1"))), |s: &str| {
         Expression::Zo(s.to_string())
     });
@@ -259,8 +294,15 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
         Expression::IntegerLiteral(n)
     });
 
-    let (mut remaining, mut expr) =
-        alt((zo_parser, refl_parser, ident_expr_parser, integer_literal_parser)).parse(input)?;
+    let (mut remaining, mut expr) = alt((
+        zo_parser,
+        refl_parser,
+        glue_parser,
+        unglue_parser,
+        ident_expr_parser,
+        integer_literal_parser,
+    ))
+    .parse(input)?;
 
     loop {
         let (next_remaining, method_call) = opt(preceded(
@@ -478,7 +520,7 @@ mod tests {
 
     #[test]
     fn test_parse_shiki_method_call() {
-        let input = "shiki ticks: en<ma, i64> = timer_ba.as_en()";
+        let input = "shiki ticks: en<ma, i64, some_eq> = timer_ba.as_en()";
         let result = parse_statement(input);
         assert_eq!(
             result,
@@ -488,7 +530,8 @@ mod tests {
                     variable_name: "ticks".to_string(),
                     type_annotation: Type::En(
                         Box::new(Type::Simple("ma".to_string())),
-                        Box::new(Type::Simple("i64".to_string()))
+                        Box::new(Type::Simple("i64".to_string())),
+                        Box::new(Type::Simple("some_eq".to_string()))
                     ),
                     value: Expression::MethodCall {
                         variable: Box::new(Expression::Identifier("timer_ba".to_string())),
@@ -550,7 +593,7 @@ mod tests {
 
     #[test]
     fn test_parse_shiki_pipe() {
-        let input = "shiki pipeline: en<ma, i64> = ticks |> doubler";
+        let input = "shiki pipeline: en<ma, i64, id> = ticks |> doubler";
         let result = parse_statement(input);
         assert_eq!(
             result,
@@ -560,7 +603,8 @@ mod tests {
                     variable_name: "pipeline".to_string(),
                     type_annotation: Type::En(
                         Box::new(Type::Simple("ma".to_string())),
-                        Box::new(Type::Simple("i64".to_string()))
+                        Box::new(Type::Simple("i64".to_string())),
+                        Box::new(Type::Simple("id".to_string()))
                     ),
                     value: Expression::Pipe {
                         lhs: Box::new(Expression::Identifier("ticks".to_string())),
@@ -573,7 +617,7 @@ mod tests {
 
     #[test]
     fn test_parse_shiki_kan() {
-        let input = "shiki doubler: en<i64, i64> = kan(x: i64) => x";
+        let input = "shiki doubler: en<i64, i64, N> = kan(x: i64) => x";
         let result = parse_statement(input);
         assert_eq!(
             result,
@@ -583,7 +627,8 @@ mod tests {
                     variable_name: "doubler".to_string(),
                     type_annotation: Type::En(
                         Box::new(Type::Simple("i64".to_string())),
-                        Box::new(Type::Simple("i64".to_string()))
+                        Box::new(Type::Simple("i64".to_string())),
+                        Box::new(Type::Simple("N".to_string()))
                     ),
                     value: Expression::Kan {
                         params: vec![Parameter {
@@ -618,6 +663,32 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_higher_order_path_type() {
+        let input = "shiki p_over_p: ze<ze<i64, i64>, ze<i64, i64>> = some_path";
+        let result = parse_statement(input);
+        assert_eq!(
+            result,
+            Ok((
+                "",
+                Statement::Shiki {
+                    variable_name: "p_over_p".to_string(),
+                    type_annotation: Type::Ze(
+                        Box::new(Type::Ze(
+                            Box::new(Type::Simple("i64".to_string())),
+                            Box::new(Type::Simple("i64".to_string()))
+                        )),
+                        Box::new(Type::Ze(
+                            Box::new(Type::Simple("i64".to_string())),
+                            Box::new(Type::Simple("i64".to_string()))
+                        ))
+                    ),
+                    value: Expression::Identifier("some_path".to_string())
+                }
+            ))
+        );
+    }
+
+    #[test]
     fn test_parse_ou_expression() {
         let input = "ou x { 0 => i0, _ => i1 }";
         let result = parse_expression(input); // 式として直接パース
@@ -644,7 +715,7 @@ mod tests {
 
     #[test]
     fn test_parse_gyo_statement() {
-        let input = "gyo N = { zero: N, succ: en<N, N> }";
+        let input = "gyo N = { zero: N, succ: en<N, N, N> }";
         let result = parse_statement(input);
         assert!(result.is_ok());
         let (remaining, statement) = result.unwrap();
@@ -654,11 +725,15 @@ mod tests {
             assert_eq!(constructors.len(), 2);
             assert_eq!(constructors[0].name, "zero");
             assert_eq!(constructors[0].fields.len(), 1);
-            assert_eq!(
-                constructors[1].name,
-                "succ"
-            );
+            assert_eq!(constructors[1].name, "succ");
             assert_eq!(constructors[1].fields.len(), 1);
+            if let Type::En(t1, t2, t3) = &constructors[1].fields[0] {
+                assert_eq!(**t1, Type::Simple("N".to_string()));
+                assert_eq!(**t2, Type::Simple("N".to_string()));
+                assert_eq!(**t3, Type::Simple("N".to_string()));
+            } else {
+                panic!("Expected en type for succ constructor");
+            }
         } else {
             panic!("Expected Gyo statement");
         }
@@ -714,6 +789,40 @@ mod tests {
         } else {
             panic!("Expected Constructor pattern");
         }
+    }
+
+    #[test]
+    fn test_parse_unit_type() {
+        let input = "()";
+        let result = parse_type(input);
+        assert_eq!(result, Ok(("", Type::Unit)));
+    }
+
+    #[test]
+    fn test_parse_glue_unglue() {
+        let input = "glue(10)";
+        let result = parse_expression(input);
+        assert_eq!(
+            result,
+            Ok((
+                "",
+                Expression::Glue {
+                    value: Box::new(Expression::IntegerLiteral(10))
+                }
+            ))
+        );
+
+        let input = "unglue(x)";
+        let result = parse_expression(input);
+        assert_eq!(
+            result,
+            Ok((
+                "",
+                Expression::Unglue {
+                    value: Box::new(Expression::Identifier("x".to_string()))
+                }
+            ))
+        );
     }
 
     #[test]

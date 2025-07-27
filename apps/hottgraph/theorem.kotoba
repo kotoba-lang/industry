@@ -12,4 +12,6 @@ shiki p_refl: ze<i64, i64> = refl(10)
 
 shiki p1_sym: ze<i64, i64> = p1.sym()
 
-shiki p_composed: ze<i64, i64> = p1.compose(p2) 
+shiki p_composed: ze<i64, i64> = p1.compose(p2)
+
+shiki p_over_p_refl: ze<ze<i64, i64>, ze<i64, i64>> = refl(p1) 

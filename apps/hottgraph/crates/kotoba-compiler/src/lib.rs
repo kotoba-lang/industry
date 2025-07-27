@@ -19,14 +19,16 @@ fn type_to_string(t: &Type) -> String {
             // For now, we just represent the type of the path's content.
             format!("kotoba_core::Path<{}>", type_to_string(t1))
         }
-        Type::En(t1, t2) => {
+        Type::En(t1, t2, t3) => {
             // Placeholder for Glue type compilation
             format!(
-                "kotoba_core::Glue<{}, kotoba_core::Path<{}>>",
+                "kotoba_core::Glue<{}, {}, {}>",
                 type_to_string(t1),
-                type_to_string(t2)
+                type_to_string(t2),
+                type_to_string(t3)
             )
         }
+        Type::Unit => "()".to_string(),
         Type::Simple(name) => name.clone(),
     }
 }
@@ -66,17 +68,20 @@ impl Compiler {
                 value,
             } => {
                 let type_str = type_to_string(&type_annotation);
-                let mut expr_code = self.compile_expression(value.clone())?;
+                let expr_code = self.compile_expression_with_context(value.clone(), &type_annotation)?;
 
                 // Type-directed compilation: if the type is a path (`ze`) and the expression
                 // is a lambda (`kan`), wrap the lambda in `Path::new`.
-                if let (Type::Ze(_, _), Expression::Kan { .. }) = (&type_annotation, &value) {
-                    expr_code = format!("kotoba_core::Path::new({})", expr_code);
-                }
+                let final_expr_code =
+                    if let (Type::Ze(_, _), Expression::Kan { .. }) = (&type_annotation, &value) {
+                        format!("kotoba_core::Path::new({})", expr_code)
+                    } else {
+                        expr_code
+                    };
 
                 Ok(format!(
                     "let {}: {} = {};",
-                    variable_name, type_str, expr_code
+                    variable_name, type_str, final_expr_code
                 ))
             }
             Statement::Gyo { name, constructors } => self.compile_gyo_statement(name, constructors),
@@ -127,12 +132,39 @@ impl Compiler {
     }
 
     fn compile_expression(&mut self, expression: Expression) -> Result<String, String> {
+        self.compile_expression_with_context(expression, &Type::Simple("()".to_string())) // Provide a dummy context
+    }
+
+    fn compile_expression_with_context(
+        &mut self,
+        expression: Expression,
+        context_type: &Type,
+    ) -> Result<String, String> {
         match expression {
             Expression::Identifier(name) => Ok(name),
             Expression::IntegerLiteral(n) => Ok(n.to_string()),
             Expression::Refl(expr) => {
                 let expr_code = self.compile_expression(*expr)?;
                 Ok(format!("kotoba_core::Path::new(|_| {})", expr_code))
+            }
+            Expression::Glue { value } => {
+                let value_code = self.compile_expression(*value)?;
+                if let Type::En(t1, t2, t3) = context_type {
+                    Ok(format!(
+                        "kotoba_core::glue::<{}, {}, {}>({})",
+                        type_to_string(t1),
+                        type_to_string(t2),
+                        type_to_string(t3),
+                        value_code
+                    ))
+                } else {
+                    // Cannot infer types for `glue` without a type annotation context.
+                    Err("`glue` requires a type annotation.".to_string())
+                }
+            }
+            Expression::Unglue { value } => {
+                let value_code = self.compile_expression(*value)?;
+                Ok(format!("kotoba_core::unglue({})", value_code))
             }
             Expression::Zo(val) => match val.as_str() {
                 "i0" => Ok("kotoba_core::Interval::I0".to_string()),
@@ -274,11 +306,11 @@ mod tests {
 
     #[test]
     fn test_compile_shiki_method_call() {
-        let input = "shiki ticks: en<ma, i64> = timer_ba.as_en()";
+        let input = "shiki ticks: en<ma, i64, some_eq> = timer_ba.as_en()";
         let (_, statement) = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
-        let expected_code = "let ticks: kotoba_core::Glue<ma, kotoba_core::Path<i64>> = timer_ba.as_en();\n";
+        let expected_code = "let ticks: kotoba_core::Glue<ma, i64, some_eq> = timer_ba.as_en();\n";
         assert_eq!(result.unwrap().contains(expected_code), true);
     }
 
@@ -299,6 +331,34 @@ mod tests {
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         let expected_code = "let p_sym: kotoba_core::Path<i64> = p.sym();\n";
+        assert_eq!(result.unwrap().contains(expected_code), true);
+    }
+
+    #[test]
+    fn test_compile_glue_unglue() {
+        let input_glue = "shiki g: en<i64, (), ()> = glue(10)";
+        let (_, statement_glue) = parse_statement(input_glue).unwrap();
+
+        let mut compiler = Compiler::new();
+        let result_glue = compiler.compile(vec![statement_glue]);
+        let expected_glue = "let g: kotoba_core::Glue<i64, (), ()> = kotoba_core::glue::<i64, (), ()>(10);\n";
+        assert_eq!(result_glue.unwrap().contains(expected_glue), true);
+
+        let input_unglue = "shiki v: i64 = unglue(g)";
+        let (_, statement_unglue) = parse_statement(input_unglue).unwrap();
+        let result_unglue = compiler.compile(vec![statement_unglue]);
+        let expected_unglue = "let v: i64 = kotoba_core::unglue(g);\n";
+        assert_eq!(result_unglue.unwrap().contains(expected_unglue), true);
+    }
+
+    #[test]
+    fn test_compile_higher_order_path() {
+        let input = "shiki p_over_p: ze<ze<i64, i64>, ze<i64, i64>> = some_path";
+        let (_, statement) = parse_statement(input).unwrap();
+        let mut compiler = Compiler::new();
+        let result = compiler.compile(vec![statement]);
+        let expected_code =
+            "let p_over_p: kotoba_core::Path<kotoba_core::Path<i64>> = some_path;\n";
         assert_eq!(result.unwrap().contains(expected_code), true);
     }
 
@@ -330,23 +390,23 @@ mod tests {
 
     #[test]
     fn test_compile_shiki_pipe() {
-        let input = "shiki pipeline: en<ma, i64> = ticks |> doubler";
+        let input = "shiki pipeline: en<ma, i64, id> = ticks |> doubler";
         let (_, statement) = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         let expected_code =
-            "let pipeline: kotoba_core::Glue<ma, kotoba_core::Path<i64>> = pipe(ticks, doubler);\n";
+            "let pipeline: kotoba_core::Glue<ma, i64, id> = pipe(ticks, doubler);\n";
         assert_eq!(result.unwrap().contains(expected_code), true);
     }
 
     #[test]
     fn test_compile_shiki_kan() {
-        let input = "shiki doubler: en<i64, i64> = kan(x: i64) => x";
+        let input = "shiki doubler: en<i64, i64, N> = kan(x: i64) => x";
         let (_, statement) = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         let expected_code =
-            "let doubler: kotoba_core::Glue<i64, kotoba_core::Path<i64>> = |x: i64| { x };\n";
+            "let doubler: kotoba_core::Glue<i64, i64, N> = |x: i64| { x };\n";
         assert_eq!(result.unwrap().contains(expected_code), true);
     }
 
@@ -362,7 +422,7 @@ mod tests {
 
     #[test]
     fn test_compile_gyo_statement() {
-        let input = "gyo N = { zero, succ: N }";
+        let input = "gyo N = { zero, succ: en<N, N, N> }";
         let (_, statement) = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
