@@ -126,15 +126,24 @@ impl Compiler {
     ) -> Result<String, String> {
         let mut enum_variants = String::new();
         for c in constructors {
-            // NOTE: This is a massive simplification.
-            // A real compiler would need to handle types properly.
-            // Here, we just capitalize the constructor name.
             let variant_name = capitalize(&c.name);
             if c.fields.is_empty() {
                 enum_variants.push_str(&format!("    {},\n", variant_name));
             } else {
-                // Again, simplifying types to Box<Self> for recursion
-                enum_variants.push_str(&format!("    {}(Box<Self>),\n", variant_name));
+                let fields_str = c
+                    .fields
+                    .iter()
+                    .map(|f| {
+                        // Handle recursive types by boxing them.
+                        if type_to_string(f) == name {
+                            format!("Box<{}>", name)
+                        } else {
+                            type_to_string(f)
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                enum_variants.push_str(&format!("    {}({}),\n", variant_name, fields_str));
             }
         }
 
@@ -390,6 +399,38 @@ mod tests {
     }
 
     #[test]
+    fn test_compile_rin_statement() {
+        let input = "rin add(a: N, b: N): N = ou a { zero => b }";
+        let (_, statement) = parse_statement(input).unwrap();
+        let mut compiler = Compiler::new();
+        let result = compiler.compile(vec![statement]);
+        // Note: The compiled `match` is incomplete due to placeholder `compile_ou_arm`.
+        // This test just checks the function signature.
+        let compiled_code = result.unwrap();
+        assert!(compiled_code.contains("fn add(a: N, b: N) -> N"));
+        assert!(compiled_code.contains("match a"));
+    }
+
+    #[test]
+    fn test_compile_rin_statement_with_constructor() {
+        let program = vec![
+            parse_statement("gyo N = { zero, succ(N) }").unwrap().1,
+            parse_statement("rin to_zero(a: N): N = ou a { zero => zero, succ(p) => zero }")
+                .unwrap()
+                .1,
+        ];
+        let mut compiler = Compiler::new();
+        let result = compiler.compile(program);
+        assert!(result.is_ok());
+        let code = result.unwrap();
+        assert!(code.contains("fn to_zero(a: N) -> N"));
+        assert!(code.contains("match a"));
+        assert!(code.contains("N::Zero =>"));
+        assert!(code.contains("N::Succ(p) =>"));
+        assert!(code.contains("N::Zero")); // a an expression
+    }
+
+    #[test]
     fn test_compile_path_with_inductive_type() {
         let program = vec![
             parse_statement("gyo Bool = { true, false }").unwrap().1,
@@ -489,43 +530,11 @@ mod tests {
 
     #[test]
     fn test_compile_gyo_statement() {
-        let input = "gyo N = { zero, succ: en<N, N, N> }";
+        let input = "gyo N = { zero, succ(N) }";
         let (_, statement) = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
-        let expected_code = "#[derive(Debug, Clone)]\nenum N {\n    Zero,\n    Succ(Box<Self>),\n}\n";
+        let expected_code = "#[derive(Debug, Clone)]\nenum N {\n    Zero,\n    Succ(Box<N>),\n}\n";
         assert_eq!(result.unwrap().contains(expected_code), true);
-    }
-
-    #[test]
-    fn test_compile_rin_statement() {
-        let input = "rin add(a: N, b: N): N = ou a { zero => b }";
-        let (_, statement) = parse_statement(input).unwrap();
-        let mut compiler = Compiler::new();
-        let result = compiler.compile(vec![statement]);
-        // Note: The compiled `match` is incomplete due to placeholder `compile_ou_arm`.
-        // This test just checks the function signature.
-        let compiled_code = result.unwrap();
-        assert!(compiled_code.contains("fn add(a: N, b: N) -> N"));
-        assert!(compiled_code.contains("match a"));
-    }
-
-    #[test]
-    fn test_compile_rin_statement_with_constructor() {
-        let program = vec![
-            parse_statement("gyo N = { zero, succ: N }").unwrap().1,
-            parse_statement("rin to_zero(a: N): N = ou a { zero => zero, succ(p) => zero }")
-                .unwrap()
-                .1,
-        ];
-        let mut compiler = Compiler::new();
-        let result = compiler.compile(program);
-        assert!(result.is_ok());
-        let code = result.unwrap();
-        assert!(code.contains("fn to_zero(a: N) -> N"));
-        assert!(code.contains("match a"));
-        assert!(code.contains("N::Zero =>"));
-        assert!(code.contains("N::Succ(p) =>"));
-        assert!(code.contains("N::Zero")); // a an expression
     }
 }
