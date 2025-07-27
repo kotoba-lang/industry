@@ -94,10 +94,16 @@ impl Compiler {
             Statement::Gyo { name, constructors } => self.compile_gyo_statement(name, constructors),
             Statement::Rin {
                 name,
+                generics,
                 params,
                 return_type,
                 body,
             } => {
+                let generics_str = if generics.is_empty() {
+                    String::new()
+                } else {
+                    format!("<{}>", generics.join(", "))
+                };
                 let params_str = params
                     .iter()
                     .map(|p| format!("{}: {}", p.name, type_to_string(&p.type_annotation)))
@@ -106,8 +112,8 @@ impl Compiler {
                 let return_type_str = type_to_string(&return_type);
                 let body_str = self.compile_expression(body)?;
                 Ok(format!(
-                    "fn {}({}) -> {} {{\n    {}\n}}",
-                    name, params_str, return_type_str, body_str
+                    "fn {}{}({}) -> {} {{\n    {}\n}}",
+                    name, generics_str, params_str, return_type_str, body_str
                 ))
             }
         }
@@ -371,6 +377,16 @@ mod tests {
         let result_unglue = compiler.compile(vec![statement_unglue]);
         let expected_unglue = "let v: i64 = kotoba_core::unglue(g);\n";
         assert_eq!(result_unglue.unwrap().contains(expected_unglue), true);
+    }
+
+    #[test]
+    fn test_compile_rin_with_generics() {
+        let input = "rin id<T>(x: T): T = x";
+        let (_, statement) = parse_statement(input).unwrap();
+        let mut compiler = Compiler::new();
+        let result = compiler.compile(vec![statement]);
+        let expected_code = "fn id<T>(x: T) -> T {\n    x\n}\n";
+        assert_eq!(result.unwrap().contains(expected_code), true);
     }
 
     #[test]
