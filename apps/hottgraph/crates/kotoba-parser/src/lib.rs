@@ -447,6 +447,19 @@ fn parse_constructor(input: &str) -> ParseResult<ConstructorDef> {
     alt((path_parser, point_parser)).parse(input)
 }
 
+fn parse_gyo_body(input: &str) -> ParseResult<Vec<ConstructorDef>> {
+    delimited(
+        char('{'),
+        terminated(
+            separated_list1(char(','), preceded(sp, parse_constructor)),
+            opt(preceded(sp, char(','))),
+        ),
+        preceded(sp, char('}')),
+    )
+    .parse(input)
+}
+
+
 pub fn parse_expression(input: &str) -> ParseResult<Expression> {
     alt((
         parse_ou_expression,
@@ -676,48 +689,40 @@ pub fn parse_statement(input: &str) -> ParseResult<Statement> {
         },
     );
 
-    let gyo_parser = |input| {
-        let mut gyo_body_parser = delimited(
-            char('{'),
-            terminated(separated_list1(char(','), preceded(sp, parse_constructor)), opt(preceded(sp, char(',')))),
-            preceded(sp, char('}')),
-        );
+    let gyo_with_params = map(
+        tuple((
+            tag("gyo"),
+            multispace1,
+            parse_type_name,
+            delimited(
+                char('('),
+                cut(separated_list1(delimited(sp, char(','), sp), parse_parameter)),
+                char(')'),
+            ),
+            preceded(delimited(sp, char('='), sp), parse_gyo_body),
+        )),
+        |(_, _, name, params, constructors)| Statement::Gyo {
+            name: name.to_string(),
+            params,
+            constructors,
+        },
+    );
 
-        let gyo_with_params = map(
-            tuple((
-                tag("gyo"),
-                multispace1,
-                parse_type_name,
-                delimited(
-                    char('('),
-                    cut(separated_list1(delimited(sp, char(','), sp), parse_parameter)),
-                    char(')'),
-                ),
-                preceded(delimited(sp, char('='), sp), &mut gyo_body_parser),
-            )),
-            |(_, _, name, params, constructors)| Statement::Gyo {
-                name: name.to_string(),
-                params,
-                constructors,
-            },
-        );
+    let gyo_without_params = map(
+        tuple((
+            tag("gyo"),
+            multispace1,
+            parse_type_name,
+            preceded(delimited(sp, char('='), sp), parse_gyo_body),
+        )),
+        |(_, _, name, constructors)| Statement::Gyo {
+            name: name.to_string(),
+            params: vec![],
+            constructors,
+        },
+    );
 
-        let gyo_without_params = map(
-            tuple((
-                tag("gyo"),
-                multispace1,
-                parse_type_name,
-                preceded(delimited(sp, char('='), sp), gyo_body_parser),
-            )),
-            |(_, _, name, constructors)| Statement::Gyo {
-                name: name.to_string(),
-                params: vec![],
-                constructors,
-            },
-        );
-
-        alt((gyo_with_params, gyo_without_params)).parse(input)
-    };
+    let gyo_parser = alt((gyo_with_params, gyo_without_params));
 
 
     let rin_parser = map(
