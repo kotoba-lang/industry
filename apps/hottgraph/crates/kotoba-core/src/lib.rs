@@ -246,4 +246,23 @@ mod tests {
         // Ungluing gives us back the original point.
         assert_eq!(unglue(glued_point), (5, 5));
     }
+
+    #[test]
+    fn test_higher_order_path() {
+        // p is a path from 10 to 20
+        let p = Path::new(|i| if i == Interval::I0 { 10 } else { 20 });
+
+        // p_over_p is a constant path from `p` to `p`.
+        let p_over_p = Path::new(move |_| p.clone());
+
+        // The start and end points of this higher-order path are paths themselves.
+        let start_path = p_over_p.start();
+        let end_path = p_over_p.end();
+
+        // Check the endpoints of the inner paths.
+        assert_eq!(start_path.start(), 10);
+        assert_eq!(start_path.end(), 20);
+        assert_eq!(end_path.start(), 10);
+        assert_eq!(end_path.end(), 20);
+    }
 }
