@@ -363,16 +363,15 @@ fn parse_constructor(input: &str) -> ParseResult<Constructor> {
     map(
         pair(
             parse_identifier,
-            opt(preceded(
-                delimited(multispace0, char(':'), multispace0),
-                // This part is simplified for now. A full implementation would
-                // parse a list of types for the constructor fields.
-                parse_type,
+            opt(delimited(
+                char('('),
+                separated_list1(delimited(multispace0, char(','), multispace0), parse_type),
+                char(')'),
             )),
         ),
-        |(name, opt_type)| Constructor {
+        |(name, fields)| Constructor {
             name: name.to_string(),
-            fields: opt_type.map_or(vec![], |t| vec![t]),
+            fields: fields.unwrap_or_default(),
         },
     )
     .parse(input)
@@ -800,7 +799,7 @@ mod tests {
 
     #[test]
     fn test_parse_gyo_statement() {
-        let input = "gyo N = { zero: N, succ: en<N, N, N> }";
+        let input = "gyo N = { zero, succ(N) }";
         let result = parse_statement(input);
         assert!(result.is_ok());
         let (remaining, statement) = result.unwrap();
@@ -809,16 +808,10 @@ mod tests {
             assert_eq!(name, "N");
             assert_eq!(constructors.len(), 2);
             assert_eq!(constructors[0].name, "zero");
-            assert_eq!(constructors[0].fields.len(), 1);
+            assert_eq!(constructors[0].fields.len(), 0);
             assert_eq!(constructors[1].name, "succ");
             assert_eq!(constructors[1].fields.len(), 1);
-            if let Type::En(t1, t2, t3) = &constructors[1].fields[0] {
-                assert_eq!(**t1, Type::Simple("N".to_string()));
-                assert_eq!(**t2, Type::Simple("N".to_string()));
-                assert_eq!(**t3, Type::Simple("N".to_string()));
-            } else {
-                panic!("Expected en type for succ constructor");
-            }
+            assert_eq!(constructors[1].fields[0], Type::Simple("N".to_string()));
         } else {
             panic!("Expected Gyo statement");
         }
