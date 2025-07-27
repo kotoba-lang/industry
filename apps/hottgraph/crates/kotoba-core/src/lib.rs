@@ -61,13 +61,13 @@ impl Interval {
 /// A path is fundamentally a function from the Interval `I` (`ku`) to a type `T`.
 /// `path(i0)` is the starting point, and `path(i1)` is the ending point.
 #[derive(Clone)]
-pub struct Path<T: 'static> {
+pub struct Path<T: ?Sized + 'static> {
     /// The underlying function from the interval `ku` to a type.
     /// We use an Arc to allow paths to be cloned cheaply.
     f: Arc<dyn Fn(Interval) -> T + Send + Sync>,
 }
 
-impl<T> Path<T> {
+impl<T: ?Sized> Path<T> {
     /// Creates a new path `ze`.
     pub fn new(f: impl Fn(Interval) -> T + Send + Sync + 'static) -> Self {
         Self { f: Arc::new(f) }
@@ -245,6 +245,23 @@ mod tests {
 
         // Ungluing gives us back the original point.
         assert_eq!(unglue(glued_point), (5, 5));
+    }
+
+    #[test]
+    fn test_path_over_types() {
+        // A path in the universe of types, from `i32` to `()`.
+        // This is a foundational concept for implementing Glue.
+        // We use string representations for simplicity here.
+        let type_path: Path<String> = Path::new(|i| {
+            if i == Interval::I0 {
+                "i32".to_string()
+            } else {
+                "()".to_string()
+            }
+        });
+
+        assert_eq!(type_path.start(), "i32");
+        assert_eq!(type_path.end(), "()");
     }
 
     #[test]
