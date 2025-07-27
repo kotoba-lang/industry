@@ -1,9 +1,9 @@
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take_while1},
+    bytes::complete::{is_not, tag, take_while1},
     character::complete::{alpha1, char, multispace0, multispace1},
-    combinator::{cut, map, opt, recognize, verify},
-    multi::{separated_list0, separated_list1},
+    combinator::{cut, map, opt, recognize, value, verify},
+    multi::{many0, many1, separated_list0, separated_list1},
     sequence::{delimited, pair, preceded, terminated},
     IResult, Parser,
 };
@@ -73,6 +73,13 @@ pub enum Expression {
     Glue { value: Box<Expression> },
     /// `unglue(<expr>)`
     Unglue { value: Box<Expression> },
+    /// `let <name>: <type> = <value> in <body>`
+    Let {
+        name: String,
+        type_annotation: Option<Type>,
+        value: Box<Expression>,
+        body: Box<Expression>,
+    },
     /// 変数名
     Identifier(String),
     /// 整数リテラル
@@ -121,6 +128,15 @@ pub enum Statement {
     },
 }
 
+/// Consumes whitespace and line comments.
+fn sp(input: &str) -> ParseResult<&str> {
+    recognize(many0(alt((
+        value((), multispace1),
+        value((), pair(tag("//"), is_not("\n\r"))),
+    ))))
+    .parse(input)
+}
+
 // --- Parsers ---
 
 fn parse_identifier_str(input: &str) -> ParseResult<&str> {
@@ -166,7 +182,7 @@ fn parse_atomic_type(input: &str) -> ParseResult<Type> {
     }
 
     let (input, name) = parse_type_name(input)?;
-    let (input, _) = multispace0(input)?;
+    let (input, _) = sp(input)?;
 
     // `ku` type
     if name == "ku" {
@@ -177,7 +193,10 @@ fn parse_atomic_type(input: &str) -> ParseResult<Type> {
     if name == "ze" || name == "en" {
         let (input, generics) = delimited(
             char('<'),
-            separated_list1(delimited(multispace0, char(','), multispace0), parse_type),
+            separated_list1(
+                delimited(sp, char(','), sp),
+                parse_type,
+            ),
             char('>'),
         )
         .parse(input)?;
@@ -219,7 +238,7 @@ fn parse_parameter(input: &str) -> ParseResult<Parameter> {
     map(
         (
             parse_identifier,
-            delimited(multispace0, char(':'), multispace0),
+            delimited(sp, char(':'), sp),
             parse_type,
         ),
         |(name, _, type_annotation)| Parameter {
@@ -238,7 +257,10 @@ fn parse_pattern(input: &str) -> ParseResult<Pattern> {
             parse_identifier,
             delimited(
                 char('('),
-                separated_list1(delimited(multispace0, char(','), multispace0), parse_pattern),
+                separated_list1(
+                    delimited(sp, char(','), sp),
+                    parse_pattern,
+                ),
                 char(')'),
             ),
         ),
@@ -261,10 +283,10 @@ fn parse_pattern(input: &str) -> ParseResult<Pattern> {
 fn parse_ou_arm(input: &str) -> ParseResult<OuArm> {
     map(
         preceded(
-            multispace0,
+            sp,
             (
                 parse_pattern,
-                delimited(multispace0, tag("=>"), multispace0),
+                delimited(sp, tag("=>"), sp),
                 parse_expression,
             ),
         ),
@@ -333,7 +355,7 @@ fn parse_primary_expression(input: &str) -> ParseResult<Expression> {
                     delimited(
                         char('('),
                         separated_list0(
-                            delimited(multispace0, char(','), multispace0),
+                            delimited(sp, char(','), sp),
                             parse_expression,
                         ),
                         char(')'),
@@ -365,7 +387,10 @@ fn parse_constructor(input: &str) -> ParseResult<Constructor> {
             parse_identifier,
             opt(delimited(
                 char('('),
-                separated_list1(delimited(multispace0, char(','), multispace0), parse_type),
+                separated_list1(
+                    delimited(sp, char(','), sp),
+                    parse_type,
+                ),
                 char(')'),
             )),
         ),
@@ -404,6 +429,27 @@ pub fn parse_expression(input: &str) -> ParseResult<Expression> {
         },
     );
 
+    let let_parser = map(
+        (
+            preceded(tag("let"), multispace1),
+            parse_identifier,
+            opt(preceded(
+                delimited(multispace0, char(':'), multispace0),
+                parse_type,
+            )),
+            delimited(multispace0, char('='), multispace0),
+            parse_expression,
+            delimited(multispace0, tag("in"), multispace1),
+            parse_expression,
+        ),
+        |(_, name, type_annotation, _, value, _, body)| Expression::Let {
+            name: name.to_string(),
+            type_annotation,
+            value: Box::new(value),
+            body: Box::new(body),
+        },
+    );
+
     let kan_parser = map(
         (
             tag("kan"),
@@ -424,7 +470,7 @@ pub fn parse_expression(input: &str) -> ParseResult<Expression> {
         },
     );
 
-    alt((ou_parser, kan_parser, |i| {
+    alt((ou_parser, kan_parser, let_parser, |i| {
         // The original pipe-aware parser
         let (mut remaining, mut lhs) = parse_primary_expression.parse(i)?;
 
@@ -457,9 +503,9 @@ pub fn parse_statement(input: &str) -> ParseResult<Statement> {
             tag("shiki"),
             multispace1,
             parse_identifier,
-            delimited(multispace0, char(':'), multispace0),
+            delimited(sp, char(':'), sp),
             parse_type,
-            delimited(multispace0, char('='), multispace0),
+            delimited(sp, char('='), sp),
             parse_expression,
         ),
         |(_, _, variable_name, _, type_annotation, _, value)| Statement::Shiki {
@@ -474,14 +520,17 @@ pub fn parse_statement(input: &str) -> ParseResult<Statement> {
             tag("gyo"),
             multispace1,
             parse_type_name,
-            delimited(multispace0, char('='), multispace0),
+            delimited(sp, char('='), sp),
             delimited(
                 char('{'),
                 terminated(
-                    separated_list1(char(','), preceded(multispace0, parse_constructor)),
-                    opt(preceded(multispace0, char(','))),
+                    separated_list1(
+                        char(','),
+                        preceded(sp, parse_constructor),
+                    ),
+                    opt(preceded(sp, char(','))),
                 ),
-                preceded(multispace0, char('}')),
+                preceded(sp, char('}')),
             ),
         ),
         |(_, _, name, _, constructors)| Statement::Gyo {
@@ -497,17 +546,23 @@ pub fn parse_statement(input: &str) -> ParseResult<Statement> {
             parse_identifier, // function name
             opt(delimited(
                 char('<'),
-                separated_list1(delimited(multispace0, char(','), multispace0), parse_type_name),
+                separated_list1(
+                    delimited(sp, char(','), sp),
+                    parse_type_name,
+                ),
                 char('>'),
             )),
             delimited(
                 char('('),
-                separated_list1(delimited(multispace0, char(','), multispace0), parse_parameter),
+                separated_list1(
+                    delimited(sp, char(','), sp),
+                    parse_parameter,
+                ),
                 char(')'),
             ),
-            delimited(multispace0, char(':'), multispace0),
+            delimited(sp, char(':'), sp),
             parse_type, // return type
-            delimited(multispace0, char('='), multispace0),
+            delimited(sp, char('='), sp),
             parse_expression, // body
         ),
         |(_, _, name, generics, params, _, return_type, _, body)| Statement::Rin {
@@ -520,6 +575,14 @@ pub fn parse_statement(input: &str) -> ParseResult<Statement> {
     );
 
     alt((shiki_parser, gyo_parser, rin_parser)).parse(input)
+}
+
+pub fn parse_program(input: &str) -> ParseResult<Vec<Statement>> {
+    terminated(
+        many1(preceded(sp, parse_statement)),
+        sp,
+    )
+    .parse(input)
 }
 
 #[cfg(test)]
@@ -904,6 +967,39 @@ mod tests {
                         Box::new(Type::Simple("C".to_string()))
                     ))
                 )
+            ))
+        );
+    }
+
+    #[test]
+    fn test_parse_let_in() {
+        let input_with_type = "let x: i64 = 10 in x";
+        let result_with_type = parse_expression(input_with_type);
+        assert_eq!(
+            result_with_type,
+            Ok((
+                "",
+                Expression::Let {
+                    name: "x".to_string(),
+                    type_annotation: Some(Type::Simple("i64".to_string())),
+                    value: Box::new(Expression::IntegerLiteral(10)),
+                    body: Box::new(Expression::Identifier("x".to_string()))
+                }
+            ))
+        );
+
+        let input_without_type = "let y = true in y";
+        let result_without_type = parse_expression(input_without_type);
+        assert_eq!(
+            result_without_type,
+            Ok((
+                "",
+                Expression::Let {
+                    name: "y".to_string(),
+                    type_annotation: None,
+                    value: Box::new(Expression::Identifier("true".to_string())),
+                    body: Box::new(Expression::Identifier("y".to_string()))
+                }
             ))
         );
     }
