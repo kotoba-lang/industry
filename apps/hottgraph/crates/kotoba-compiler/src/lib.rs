@@ -130,6 +130,10 @@ impl Compiler {
         match expression {
             Expression::Identifier(name) => Ok(name),
             Expression::IntegerLiteral(n) => Ok(n.to_string()),
+            Expression::Refl(expr) => {
+                let expr_code = self.compile_expression(*expr)?;
+                Ok(format!("kotoba_core::Path::new(|_| {})", expr_code))
+            }
             Expression::Zo(val) => match val.as_str() {
                 "i0" => Ok("kotoba_core::Interval::I0".to_string()),
                 "i1" => Ok("kotoba_core::Interval::I1".to_string()),
@@ -187,6 +191,11 @@ impl Compiler {
     fn compile_pattern(&mut self, pattern: &Pattern) -> Result<String, String> {
         match pattern {
             Pattern::IntegerLiteral(i) => Ok(i.to_string()),
+            Pattern::IntervalLiteral(s) => match s.as_str() {
+                "i0" => Ok("kotoba_core::Interval::I0".to_string()),
+                "i1" => Ok("kotoba_core::Interval::I1".to_string()),
+                _ => Err("Invalid interval literal in pattern".to_string()),
+            },
             Pattern::Wildcard => Ok("_".to_string()),
             Pattern::Identifier(s) => {
                 // An identifier in a pattern can be a variable or a nullary constructor.
@@ -290,6 +299,16 @@ mod tests {
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         let expected_code = "let p_sym: kotoba_core::Path<i64> = p.sym();\n";
+        assert_eq!(result.unwrap().contains(expected_code), true);
+    }
+
+    #[test]
+    fn test_compile_refl() {
+        let input = "shiki id_path: ze<i64, i64> = refl(10)";
+        let (_, statement) = parse_statement(input).unwrap();
+        let mut compiler = Compiler::new();
+        let result = compiler.compile(vec![statement]);
+        let expected_code = "let id_path: kotoba_core::Path<i64> = kotoba_core::Path::new(|_| 10);\n";
         assert_eq!(result.unwrap().contains(expected_code), true);
     }
 
