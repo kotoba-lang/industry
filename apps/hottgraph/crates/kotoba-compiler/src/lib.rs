@@ -66,7 +66,14 @@ impl Compiler {
                 value,
             } => {
                 let type_str = type_to_string(&type_annotation);
-                let expr_code = self.compile_expression(value)?;
+                let mut expr_code = self.compile_expression(value.clone())?;
+
+                // Type-directed compilation: if the type is a path (`ze`) and the expression
+                // is a lambda (`kan`), wrap the lambda in `Path::new`.
+                if let (Type::Ze(_, _), Expression::Kan { .. }) = (&type_annotation, &value) {
+                    expr_code = format!("kotoba_core::Path::new({})", expr_code);
+                }
+
                 Ok(format!(
                     "let {}: {} = {};",
                     variable_name, type_str, expr_code
@@ -122,14 +129,27 @@ impl Compiler {
     fn compile_expression(&mut self, expression: Expression) -> Result<String, String> {
         match expression {
             Expression::Identifier(name) => Ok(name),
+            Expression::IntegerLiteral(n) => Ok(n.to_string()),
             Expression::Zo(val) => match val.as_str() {
                 "i0" => Ok("kotoba_core::Interval::I0".to_string()),
                 "i1" => Ok("kotoba_core::Interval::I1".to_string()),
                 _ => Err("Invalid interval literal".to_string()),
             },
-            Expression::MethodCall { variable, method } => {
+            Expression::MethodCall { variable, method, args } => {
                 let var_code = self.compile_expression(*variable)?;
-                Ok(format!("{}.{}()", var_code, method))
+                let args_code: Vec<String> = args
+                    .into_iter()
+                    .map(|arg| self.compile_expression(arg))
+                    .collect::<Result<_, _>>()?;
+
+                // Special handling for methods that take references.
+                let formatted_args = if method == "compose" {
+                    args_code.iter().map(|arg| format!("&{}", arg)).collect::<Vec<_>>().join(", ")
+                } else {
+                    args_code.join(", ")
+                };
+
+                Ok(format!("{}.{}({})", var_code, method, formatted_args))
             }
             Expression::Pipe { lhs, rhs } => {
                 let lhs_code = self.compile_expression(*lhs)?;
@@ -251,6 +271,46 @@ mod tests {
         let result = compiler.compile(vec![statement]);
         let expected_code = "let ticks: kotoba_core::Glue<ma, kotoba_core::Path<i64>> = timer_ba.as_en();\n";
         assert_eq!(result.unwrap().contains(expected_code), true);
+    }
+
+    #[test]
+    fn test_compile_shiki_method_call_with_args() {
+        let input = "shiki p2: ze<i64, i64> = p1.compose(q1)";
+        let (_, statement) = parse_statement(input).unwrap();
+        let mut compiler = Compiler::new();
+        let result = compiler.compile(vec![statement]);
+        let expected_code = "let p2: kotoba_core::Path<i64> = p1.compose(&q1);\n";
+        assert_eq!(result.unwrap().contains(expected_code), true);
+    }
+
+    #[test]
+    fn test_compile_shiki_method_call_sym() {
+        let input = "shiki p_sym: ze<i64, i64> = p.sym()";
+        let (_, statement) = parse_statement(input).unwrap();
+        let mut compiler = Compiler::new();
+        let result = compiler.compile(vec![statement]);
+        let expected_code = "let p_sym: kotoba_core::Path<i64> = p.sym();\n";
+        assert_eq!(result.unwrap().contains(expected_code), true);
+    }
+
+    #[test]
+    fn test_compile_path_constructor() {
+        let input = "shiki my_path: ze<i64, i64> = kan(i: ku) => ou i { i0 => 10, i1 => 20 }";
+        let (_, statement) = parse_statement(input).unwrap();
+        let mut compiler = Compiler::new();
+        let result = compiler.compile(vec![statement]);
+        let expected_code = "let my_path: kotoba_core::Path<i64> = kotoba_core::Path::new(|i: kotoba_core::Interval| { match i {
+    kotoba_core::Interval::I0 => { 10 },
+    kotoba_core::Interval::I1 => { 20 },
+} });\n";
+        // The compiled `match` formatting can be tricky, so we check for key parts.
+        let compiled_code = result.unwrap();
+        assert!(compiled_code.contains("let my_path: kotoba_core::Path<i64>"));
+        assert!(compiled_code.contains("= kotoba_core::Path::new("));
+        assert!(compiled_code.contains("|i: kotoba_core::Interval|"));
+        assert!(compiled_code.contains("match i"));
+        assert!(compiled_code.contains("10"));
+        assert!(compiled_code.contains("20"));
     }
 
     #[test]
