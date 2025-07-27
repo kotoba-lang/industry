@@ -21,6 +21,8 @@ pub enum Type {
     Ident(String),
     /// A type application like `Vec A n`.
     App(Box<Type>, Vec<Type>),
+    /// A hack to allow expressions as type arguments.
+    Expr(Box<Expression>),
     /// A glued type `en<A, T, E>`.
     En(Box<Type>, Box<Type>, Box<Type>),
     /// The unit type `()`.
@@ -92,7 +94,7 @@ pub enum Expression {
     /// `let <name>: <type> = <value> in <body>`
     Let {
         name: String,
-        type_annotation: Option<Type>,
+        type_annotation: Option<Box<Type>>,
         value: Box<Expression>,
         body: Box<Expression>,
     },
@@ -233,16 +235,40 @@ pub fn parse_type(input: &str) -> ParseResult<Type> {
 
 /// Parses non-function types (atomic types in the context of function type parsing).
 fn parse_atomic_type(input: &str) -> ParseResult<Type> {
+    let (mut input, mut ty) = parse_single_atomic_type(input)?;
+
+    // After parsing one atomic type, check for subsequent arguments for application.
+    loop {
+        let (next_input, arg) = preceded(sp, opt(parse_single_atomic_type)).parse(input)?;
+        if let Some(arg) = arg {
+            match ty {
+                Type::App(head, mut args) => {
+                    args.push(arg);
+                    ty = Type::App(head, args);
+                }
+                _ => {
+                    ty = Type::App(Box::new(ty), vec![arg]);
+                }
+            }
+            input = next_input;
+        } else {
+            break;
+        }
+    }
+    Ok((input, ty))
+}
+
+/// Parses a single, non-application atomic type.
+fn parse_single_atomic_type(input: &str) -> ParseResult<Type> {
     alt((
         map(tag("()"), |_| Type::Unit),
-        // IMPORTANT: A parenthesized type must be tried before named types
-        // to correctly handle expressions like `(A -> B)`.
         delimited(char('('), parse_type, char(')')),
         map(tag("ku"), |_| Type::Ku),
-        parse_ze_or_en_type, // This is your existing helper for ze<...> and en<...>
+        parse_ze_or_en_type,
+        // An expression can be a type argument, wrapped in parens
+        map(delimited(char('('), parse_expression, char(')')), |expr| Type::Expr(Box::new(expr))),
         map(parse_identifier_str, |s| Type::Ident(s.to_string())),
-    ))
-    .parse(input)
+    )).parse(input)
 }
 
 fn parse_ze_or_en_type(input: &str) -> ParseResult<Type> {
@@ -538,7 +564,7 @@ fn parse_let_expression(input: &str) -> ParseResult<Expression> {
         ),
         |(_, name, type_annotation, _, value, _, body)| Expression::Let {
             name: name.to_string(),
-            type_annotation,
+            type_annotation: type_annotation.map(Box::new),
             value: Box::new(value),
             body: Box::new(body),
         },
@@ -697,11 +723,11 @@ pub fn parse_statement(input: &str) -> ParseResult<Statement> {
             tag("gyo"),
             multispace1,
             parse_type_name,
-            opt(delimited(
+            opt(cut(delimited(
                 char('('),
                 separated_list1(delimited(sp, char(','), sp), parse_parameter),
                 char(')'),
-            )),
+            ))),
             delimited(sp, char('='), sp),
             delimited(
                 char('{'),
@@ -800,9 +826,9 @@ mod tests {
                 Statement::Shiki {
                     variable_name: "ticks".to_string(),
                     type_annotation: Type::En(
-                        Box::new(Type::Simple("ma".to_string())),
-                        Box::new(Type::Simple("i64".to_string())),
-                        Box::new(Type::Simple("some_eq".to_string()))
+                        Box::new(Type::Ident("ma".to_string())),
+                        Box::new(Type::Ident("i64".to_string())),
+                        Box::new(Type::Ident("some_eq".to_string()))
                     ),
                     value: Expression::MethodCall {
                         variable: Box::new(Expression::Identifier("timer_ba".to_string())),
@@ -825,8 +851,8 @@ mod tests {
                 Statement::Shiki {
                     variable_name: "p2".to_string(),
                     type_annotation: Type::Ze(
-                        Box::new(Type::Simple("i64".to_string())),
-                        Box::new(Type::Simple("i64".to_string()))
+                        Box::new(Type::Ident("i64".to_string())),
+                        Box::new(Type::Ident("i64".to_string()))
                     ),
                     value: Expression::MethodCall {
                         variable: Box::new(Expression::Identifier("p1".to_string())),
@@ -849,8 +875,8 @@ mod tests {
                 Statement::Shiki {
                     variable_name: "p_sym".to_string(),
                     type_annotation: Type::Ze(
-                        Box::new(Type::Simple("i64".to_string())),
-                        Box::new(Type::Simple("i64".to_string()))
+                        Box::new(Type::Ident("i64".to_string())),
+                        Box::new(Type::Ident("i64".to_string()))
                     ),
                     value: Expression::MethodCall {
                         variable: Box::new(Expression::Identifier("p".to_string())),
@@ -873,9 +899,9 @@ mod tests {
                 Statement::Shiki {
                     variable_name: "pipeline".to_string(),
                     type_annotation: Type::En(
-                        Box::new(Type::Simple("ma".to_string())),
-                        Box::new(Type::Simple("i64".to_string())),
-                        Box::new(Type::Simple("id".to_string()))
+                        Box::new(Type::Ident("ma".to_string())),
+                        Box::new(Type::Ident("i64".to_string())),
+                        Box::new(Type::Ident("id".to_string()))
                     ),
                     value: Expression::Pipe {
                         lhs: Box::new(Expression::Identifier("ticks".to_string())),
@@ -897,14 +923,14 @@ mod tests {
                 Statement::Shiki {
                     variable_name: "doubler".to_string(),
                     type_annotation: Type::En(
-                        Box::new(Type::Simple("i64".to_string())),
-                        Box::new(Type::Simple("i64".to_string())),
-                        Box::new(Type::Simple("N".to_string()))
+                        Box::new(Type::Ident("i64".to_string())),
+                        Box::new(Type::Ident("i64".to_string())),
+                        Box::new(Type::Ident("N".to_string()))
                     ),
                     value: Expression::Kan {
                         params: vec![Parameter {
                             name: "x".to_string(),
-                            type_annotation: Type::Simple("i64".to_string())
+                            type_annotation: Type::Ident("i64".to_string())
                         }],
                         body: Box::new(Expression::Identifier("x".to_string()))
                     }
@@ -932,12 +958,12 @@ mod tests {
             assert_eq!(generics, vec!["T"]);
             assert_eq!(params.len(), 1);
             assert_eq!(params[0].name, "x");
-            if let Type::Simple(type_name) = &params[0].type_annotation {
+            if let Type::Ident(type_name) = &params[0].type_annotation {
                 assert_eq!(type_name, "T");
             } else {
                 panic!("Expected simple type for param x");
             }
-            if let Type::Simple(type_name) = &return_type {
+            if let Type::Ident(type_name) = &return_type {
                 assert_eq!(type_name, "T");
             } else {
                 panic!("Expected simple type for return type");
@@ -958,12 +984,12 @@ mod tests {
                 Expression::Kan {
                     params: vec![Parameter {
                         name: "a".to_string(),
-                        type_annotation: Type::Simple("A".to_string())
+                        type_annotation: Type::Ident("A".to_string())
                     }],
                     body: Box::new(Expression::Kan {
                         params: vec![Parameter {
                             name: "b".to_string(),
-                            type_annotation: Type::Simple("B".to_string())
+                            type_annotation: Type::Ident("B".to_string())
                         }],
                         body: Box::new(Expression::Identifier("c".to_string()))
                     })
@@ -983,8 +1009,8 @@ mod tests {
                 Statement::Shiki {
                     variable_name: "my_path".to_string(),
                     type_annotation: Type::Ze(
-                        Box::new(Type::Simple("i64".to_string())),
-                        Box::new(Type::Simple("i64".to_string()))
+                        Box::new(Type::Ident("i64".to_string())),
+                        Box::new(Type::Ident("i64".to_string()))
                     ),
                     value: Expression::Identifier("some_path".to_string())
                 }
@@ -1004,12 +1030,12 @@ mod tests {
                     variable_name: "p_over_p".to_string(),
                     type_annotation: Type::Ze(
                         Box::new(Type::Ze(
-                            Box::new(Type::Simple("i64".to_string())),
-                            Box::new(Type::Simple("i64".to_string()))
+                            Box::new(Type::Ident("i64".to_string())),
+                            Box::new(Type::Ident("i64".to_string()))
                         )),
                         Box::new(Type::Ze(
-                            Box::new(Type::Simple("i64".to_string())),
-                            Box::new(Type::Simple("i64".to_string()))
+                            Box::new(Type::Ident("i64".to_string())),
+                            Box::new(Type::Ident("i64".to_string()))
                         ))
                     ),
                     value: Expression::Identifier("some_path".to_string())
@@ -1050,7 +1076,7 @@ mod tests {
         assert!(result.is_ok());
         let (remaining, statement) = result.unwrap();
         assert_eq!(remaining, "");
-        if let Statement::Gyo { name, constructors } = statement {
+        if let Statement::Gyo { name, constructors, .. } = statement {
             assert_eq!(name, "N");
             assert_eq!(constructors.len(), 2);
             assert_eq!(
@@ -1064,7 +1090,7 @@ mod tests {
                 constructors[1],
                 ConstructorDef::Point {
                     name: "succ".to_string(),
-                    fields: vec![Type::Simple("N".to_string())]
+                    fields: vec![Type::Ident("N".to_string())]
                 }
             );
         } else {
@@ -1079,7 +1105,7 @@ mod tests {
         assert!(result.is_ok());
         let (remaining, statement) = result.unwrap();
         assert_eq!(remaining, "");
-        if let Statement::Gyo { name, constructors } = statement {
+        if let Statement::Gyo { name, constructors, .. } = statement {
             assert_eq!(name, "S1");
             assert_eq!(constructors.len(), 2);
             assert_eq!(
@@ -1094,8 +1120,8 @@ mod tests {
                 ConstructorDef::Path {
                     name: "loop".to_string(),
                     path_type: Type::Ze(
-                        Box::new(Type::Simple("base".to_string())),
-                        Box::new(Type::Simple("base".to_string()))
+                        Box::new(Type::Ident("base".to_string())),
+                        Box::new(Type::Ident("base".to_string()))
                     )
                 }
             );
@@ -1121,12 +1147,12 @@ mod tests {
             assert_eq!(name, "add");
             assert_eq!(params.len(), 2);
             assert_eq!(params[0].name, "a");
-            if let Type::Simple(type_name) = &params[0].type_annotation {
+            if let Type::Ident(type_name) = &params[0].type_annotation {
                 assert_eq!(type_name, "N");
             } else {
                 panic!("Expected simple type for param a");
             }
-            if let Type::Simple(type_name) = &return_type {
+            if let Type::Ident(type_name) = &return_type {
                 assert_eq!(type_name, "N");
             } else {
                 panic!("Expected simple type for return type");
@@ -1172,8 +1198,8 @@ mod tests {
             Ok((
                 "",
                 Type::Func(
-                    Box::new(Type::Simple("i64".to_string())),
-                    Box::new(Type::Simple("i64".to_string()))
+                    Box::new(Type::Ident("i64".to_string())),
+                    Box::new(Type::Ident("i64".to_string()))
                 )
             ))
         );
@@ -1185,10 +1211,10 @@ mod tests {
             Ok((
                 "",
                 Type::Func(
-                    Box::new(Type::Simple("A".to_string())),
+                    Box::new(Type::Ident("A".to_string())),
                     Box::new(Type::Func(
-                        Box::new(Type::Simple("B".to_string())),
-                        Box::new(Type::Simple("C".to_string()))
+                        Box::new(Type::Ident("B".to_string())),
+                        Box::new(Type::Ident("C".to_string()))
                     ))
                 )
             ))
@@ -1205,7 +1231,7 @@ mod tests {
                 "",
                 Expression::Let {
                     name: "x".to_string(),
-                    type_annotation: Some(Type::Simple("i64".to_string())),
+                    type_annotation: Some(Box::new(Type::Ident("i64".to_string()))),
                     value: Box::new(Expression::IntegerLiteral(10)),
                     body: Box::new(Expression::Identifier("x".to_string()))
                 }
@@ -1238,7 +1264,7 @@ mod tests {
                 "",
                 Statement::Shiki {
                     variable_name: "my_bool".to_string(),
-                    type_annotation: Type::Simple("Bool".to_string()),
+                    type_annotation: Type::Ident("Bool".to_string()),
                     value: Expression::Identifier("true".to_string())
                 }
             ))
@@ -1390,8 +1416,8 @@ mod tests {
                 "",
                 Type::Pi {
                     binder_name: "x".to_string(),
-                    binder_type: Box::new(Type::Simple("i64".to_string())),
-                    return_type: Box::new(Type::Simple("i64".to_string())),
+                    binder_type: Box::new(Type::Ident("i64".to_string())),
+                    return_type: Box::new(Type::Ident("i64".to_string())),
                 }
             ))
         );
@@ -1405,10 +1431,10 @@ mod tests {
                 "",
                 Type::Func(
                     Box::new(Type::Func(
-                        Box::new(Type::Simple("A".to_string())),
-                        Box::new(Type::Simple("B".to_string()))
+                        Box::new(Type::Ident("A".to_string())),
+                        Box::new(Type::Ident("B".to_string()))
                     )),
-                    Box::new(Type::Simple("C".to_string()))
+                    Box::new(Type::Ident("C".to_string()))
                 )
             ))
         );
