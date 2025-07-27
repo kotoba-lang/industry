@@ -1,12 +1,5 @@
 use clap::Parser as ClapParser;
 use kotoba_compiler::Compiler;
-use kotoba_parser::{parse_statement, Statement};
-use nom::{
-    character::complete::multispace0,
-    multi::many1,
-    sequence::{preceded, terminated},
-    IResult, Parser,
-};
 use std::fs;
 
 /// `kotoba`言語のコンパイラ
@@ -16,10 +9,6 @@ struct Args {
     /// コンパイル対象の`.kotoba`ファイル
     #[arg(required = true)]
     input_file: String,
-}
-
-fn parse_program(input: &str) -> IResult<&str, Vec<Statement>> {
-    terminated(many1(preceded(multispace0, parse_statement)), multispace0).parse(input)
 }
 
 fn main() {
@@ -33,7 +22,7 @@ fn main() {
         }
     };
 
-    let program = match parse_program(&source_code) {
+    let program = match kotoba_parser::parse_program(&source_code) {
         Ok((remaining, statements)) => {
             if !remaining.trim().is_empty() {
                 eprintln!(
