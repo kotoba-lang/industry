@@ -25,6 +25,12 @@ pub enum Type {
     Unit,
     /// A function type `A -> B`.
     Func(Box<Type>, Box<Type>),
+    /// A dependent function type (Pi-type) `(x: A) -> B`.
+    Pi {
+        binder_name: String,
+        binder_type: Box<Type>,
+        return_type: Box<Type>,
+    },
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -193,10 +199,38 @@ fn parse_type_name(input: &str) -> ParseResult<&str> {
 pub fn parse_type(input: &str) -> ParseResult<Type> {
     let (input, lhs) = parse_atomic_type(input)?;
 
-    let (input, arrow) = opt(delimited(multispace0, tag("->"), multispace0)).parse(input)?;
+    if let Ok((input, _)) = delimited(sp, tag("->"), sp).parse(input) {
+        // After seeing `->`, we must parse the rest of the type.
+        let (input, rhs) = cut(parse_type).parse(input)?;
 
-    if arrow.is_some() {
-        let (input, rhs) = parse_type(input)?;
+        // Now, try to interpret `lhs` as a binder `(x: T)` for a Pi type.
+        // This is a bit of a hack: `parse_atomic_type` returns a Simple type
+        // containing the string `(x: T)`, which we re-parse here.
+        if let Type::Simple(s) = &lhs {
+            if let Ok((rest, (name, ty))) = delimited(
+                char('('),
+                pair(
+                    map(parse_identifier, |s| s.to_string()),
+                    preceded(delimited(sp, char(':'), sp), parse_type),
+                ),
+                char(')'),
+            )
+            .parse(s)
+            {
+                // Ensure the binder string was fully consumed.
+                if rest.is_empty() {
+                    return Ok((
+                        input,
+                        Type::Pi {
+                            binder_name: name,
+                            binder_type: Box::new(ty),
+                            return_type: Box::new(rhs),
+                        },
+                    ));
+                }
+            }
+        }
+        // If it's not a valid binder, it's a regular function type.
         Ok((input, Type::Func(Box::new(lhs), Box::new(rhs))))
     } else {
         Ok((input, lhs))
@@ -205,61 +239,68 @@ pub fn parse_type(input: &str) -> ParseResult<Type> {
 
 /// Parses non-function types (atomic types in the context of function type parsing).
 fn parse_atomic_type(input: &str) -> ParseResult<Type> {
-    if input.starts_with("()") {
-        return Ok((&input[2..], Type::Unit));
-    }
+    alt((
+        map(tag("()"), |_| Type::Unit),
+        // A binder `(x: T)` is parsed as a "simple" type containing its own source string.
+        // This is a hack to be resolved by `parse_type`.
+        map(
+            recognize(delimited(
+                char('('),
+                pair(
+                    parse_identifier,
+                    preceded(delimited(sp, char(':'), sp), parse_type),
+                ),
+                char(')'),
+            )),
+            |s: &str| Type::Simple(s.to_string()),
+        ),
+        // A regular parenthesized type `(T)`. This must come after the binder parser.
+        delimited(char('('), parse_type, char(')')),
+        map(tag("ku"), |_| Type::Ku),
+        parse_ze_or_en_type,
+        map(parse_identifier, |s| Type::Simple(s.to_string())),
+    ))
+    .parse(input)
+}
 
-    let (input, name) = parse_type_name(input)?;
+fn parse_ze_or_en_type(input: &str) -> ParseResult<Type> {
+    let (input, name) = alt((tag("ze"), tag("en"))).parse(input)?;
     let (input, _) = sp(input)?;
+    let (input, generics) = delimited(
+        char('<'),
+        separated_list1(delimited(sp, char(','), sp), parse_type),
+        char('>'),
+    )
+    .parse(input)?;
 
-    // `ku` type
-    if name == "ku" {
-        return Ok((input, Type::Ku));
-    }
-
-    // `ze` or `en` type
-    if name == "ze" || name == "en" {
-        let (input, generics) = delimited(
-            char('<'),
-            separated_list1(
-                delimited(sp, char(','), sp),
-                parse_type,
-            ),
-            char('>'),
-        )
-        .parse(input)?;
-
-        if name == "ze" {
-            if generics.len() != 2 {
-                return Err(nom::Err::Error(nom::error::Error::new(
-                    input,
-                    nom::error::ErrorKind::Verify,
-                )));
-            }
-            let mut iter = generics.into_iter();
-            let type1 = iter.next().unwrap();
-            let type2 = iter.next().unwrap();
-            return Ok((input, Type::Ze(Box::new(type1), Box::new(type2))));
-        } else {
-            // 'en'
-            if generics.len() != 3 {
-                return Err(nom::Err::Error(nom::error::Error::new(
-                    input,
-                    nom::error::ErrorKind::Verify,
-                )));
-            }
-            let mut iter = generics.into_iter();
-            let type1 = iter.next().unwrap();
-            let type2 = iter.next().unwrap();
-            let type3 = iter.next().unwrap();
-            return Ok((
+    if name == "ze" {
+        if generics.len() != 2 {
+            return Err(nom::Err::Error(nom::error::Error::new(
                 input,
-                Type::En(Box::new(type1), Box::new(type2), Box::new(type3)),
-            ));
+                nom::error::ErrorKind::Verify,
+            )));
         }
+        let mut iter = generics.into_iter();
+        let type1 = iter.next().unwrap();
+        let type2 = iter.next().unwrap();
+        Ok((input, Type::Ze(Box::new(type1), Box::new(type2))))
+    } else {
+        // 'en'
+        if generics.len() != 3 {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Verify,
+            )));
+        }
+        let mut iter = generics.into_iter();
+        let type1 = iter.next().unwrap();
+        let type2 = iter.next().unwrap();
+        let type3 = iter.next().unwrap();
+        Ok((
+            input,
+            Type::En(Box::new(type1), Box::new(type2), Box::new(type3)),
+        ))
     }
-
-    Ok((input, Type::Simple(name.to_string())))
 }
 
 fn parse_parameter(input: &str) -> ParseResult<Parameter> {
@@ -1353,5 +1394,54 @@ mod tests {
         let input_nested = "if a > b then (if c then d else e) else f";
         let result_nested = parse_expression(input_nested);
         assert!(result_nested.is_ok());
+    }
+
+    #[test]
+    fn test_parse_pi_type() {
+        // Dependent function type
+        let input_pi = "(x: i64) -> i64";
+        let result_pi = parse_type(input_pi);
+        assert_eq!(
+            result_pi,
+            Ok((
+                "",
+                Type::Pi {
+                    binder_name: "x".to_string(),
+                    binder_type: Box::new(Type::Simple("i64".to_string())),
+                    return_type: Box::new(Type::Simple("i64".to_string())),
+                }
+            ))
+        );
+
+        // Parenthesized function type
+        let input_paren = "(A -> B) -> C";
+        let result_paren = parse_type(input_paren);
+        assert_eq!(
+            result_paren,
+            Ok((
+                "",
+                Type::Func(
+                    Box::new(Type::Func(
+                        Box::new(Type::Simple("A".to_string())),
+                        Box::new(Type::Simple("B".to_string()))
+                    )),
+                    Box::new(Type::Simple("C".to_string()))
+                )
+            ))
+        );
+
+        // Simple function type (no parens)
+        let input_simple = "A -> B";
+        let result_simple = parse_type(input_simple);
+        assert_eq!(
+            result_simple,
+            Ok((
+                "",
+                Type::Func(
+                    Box::new(Type::Simple("A".to_string())),
+                    Box::new(Type::Simple("B".to_string()))
+                )
+            ))
+        );
     }
 }
