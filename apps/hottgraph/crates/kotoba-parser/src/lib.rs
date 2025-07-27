@@ -21,6 +21,8 @@ pub enum Type {
     En(Box<Type>, Box<Type>, Box<Type>),
     /// The unit type `()`.
     Unit,
+    /// A function type `A -> B`.
+    Func(Box<Type>, Box<Type>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -140,7 +142,25 @@ fn parse_type_name(input: &str) -> IResult<&str, &str> {
     parse_identifier_str(input) // alpha1ではi64などをパースできないため修正
 }
 
-fn parse_type(input: &str) -> IResult<&str, Type> {
+/// Parses a type, handling right-associative function types `A -> B -> C`.
+pub fn parse_type(input: &str) -> IResult<&str, Type> {
+    let (input, mut ty) = parse_atomic_type(input)?;
+
+    if let Ok((input, _)) =
+        delimited(multispace0, tag("->"), multispace0).parse::<&str, _, nom::error::Error<&str>>(
+            input,
+        )
+    {
+        let (input, rhs) = parse_type(input)?;
+        ty = Type::Func(Box::new(ty), Box::new(rhs));
+        Ok((input, ty))
+    } else {
+        Ok((input, ty))
+    }
+}
+
+/// Parses non-function types (atomic types in the context of function type parsing).
+fn parse_atomic_type(input: &str) -> IResult<&str, Type> {
     if input.starts_with("()") {
         return Ok((&input[2..], Type::Unit));
     }
@@ -637,6 +657,31 @@ mod tests {
                         }],
                         body: Box::new(Expression::Identifier("x".to_string()))
                     }
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn test_parse_nested_kan() {
+        let input = "kan(a: A) => kan(b: B) => c";
+        let result = parse_expression(input);
+        assert_eq!(
+            result,
+            Ok((
+                "",
+                Expression::Kan {
+                    params: vec![Parameter {
+                        name: "a".to_string(),
+                        type_annotation: Type::Simple("A".to_string())
+                    }],
+                    body: Box::new(Expression::Kan {
+                        params: vec![Parameter {
+                            name: "b".to_string(),
+                            type_annotation: Type::Simple("B".to_string())
+                        }],
+                        body: Box::new(Expression::Identifier("c".to_string()))
+                    })
                 }
             ))
         );
