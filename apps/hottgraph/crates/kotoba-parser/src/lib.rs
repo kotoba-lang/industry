@@ -18,7 +18,9 @@ pub enum Type {
     /// A path type `ze(T, U)`, representing `T ≡ U`.
     Ze(Box<Type>, Box<Type>),
     /// A simple, named type like `ma` or `i64`.
-    Simple(String),
+    Ident(String),
+    /// A type application like `Vec A n`.
+    App(Box<Type>, Vec<Type>),
     /// A glued type `en<A, T, E>`.
     En(Box<Type>, Box<Type>, Box<Type>),
     /// The unit type `()`.
@@ -147,9 +149,10 @@ pub enum Statement {
         type_annotation: Type,
         value: Expression,
     },
-    /// `gyo <TypeName> = { <constructors> }`
+    /// `gyo <TypeName>(<params>) = { <constructors> }`
     Gyo {
         name: String,
+        params: Vec<Parameter>,
         constructors: Vec<ConstructorDef>,
     },
     /// `rin <function_name><<generics>>(params): <return_type> = <body>`
@@ -237,7 +240,7 @@ fn parse_atomic_type(input: &str) -> ParseResult<Type> {
         delimited(char('('), parse_type, char(')')),
         map(tag("ku"), |_| Type::Ku),
         parse_ze_or_en_type, // This is your existing helper for ze<...> and en<...>
-        map(parse_identifier_str, |s| Type::Simple(s.to_string())),
+        map(parse_identifier_str, |s| Type::Ident(s.to_string())),
     ))
     .parse(input)
 }
@@ -694,6 +697,11 @@ pub fn parse_statement(input: &str) -> ParseResult<Statement> {
             tag("gyo"),
             multispace1,
             parse_type_name,
+            opt(delimited(
+                char('('),
+                separated_list1(delimited(sp, char(','), sp), parse_parameter),
+                char(')'),
+            )),
             delimited(sp, char('='), sp),
             delimited(
                 char('{'),
@@ -707,8 +715,9 @@ pub fn parse_statement(input: &str) -> ParseResult<Statement> {
                 preceded(sp, char('}')),
             ),
         ),
-        |(_, _, name, _, constructors)| Statement::Gyo {
+        |(_, _, name, params, _, constructors)| Statement::Gyo {
             name: name.to_string(),
+            params: params.unwrap_or_default(),
             constructors,
         },
     );
