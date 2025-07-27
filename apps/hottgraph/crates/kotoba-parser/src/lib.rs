@@ -69,6 +69,12 @@ pub enum Expression {
         params: Vec<Parameter>,
         body: Box<Expression>,
     },
+    /// A binary operation like `a + b`
+    BinaryOp {
+        op: Operator,
+        lhs: Box<Expression>,
+        rhs: Box<Expression>,
+    },
     /// `refl(<expr>)`
     Refl(Box<Expression>),
     /// `glue(<expr>)`
@@ -104,6 +110,14 @@ pub enum Expression {
     },
     /// An interval literal, `zo` (`i0` or `i1`).
     Zo(String),
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum Operator {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
 }
 
 /// 文を表すAST
@@ -416,8 +430,17 @@ fn parse_constructor(input: &str) -> ParseResult<ConstructorDef> {
 }
 
 pub fn parse_expression(input: &str) -> ParseResult<Expression> {
-    // First, try to parse a complete `ou` expression, as it's a compound form.
-    let ou_parser = map(
+    alt((
+        parse_ou_expression,
+        parse_kan_expression,
+        parse_let_expression,
+        parse_additive_expression,
+    ))
+    .parse(input)
+}
+
+fn parse_ou_expression(input: &str) -> ParseResult<Expression> {
+    map(
         preceded(
             tag("ou"),
             cut(preceded(
@@ -440,9 +463,12 @@ pub fn parse_expression(input: &str) -> ParseResult<Expression> {
             expression: Box::new(expression),
             arms,
         },
-    );
+    )
+    .parse(input)
+}
 
-    let let_parser = map(
+fn parse_let_expression(input: &str) -> ParseResult<Expression> {
+    map(
         (
             preceded(tag("let"), multispace1),
             parse_identifier,
@@ -461,9 +487,12 @@ pub fn parse_expression(input: &str) -> ParseResult<Expression> {
             value: Box::new(value),
             body: Box::new(body),
         },
-    );
+    )
+    .parse(input)
+}
 
-    let kan_parser = map(
+fn parse_kan_expression(input: &str) -> ParseResult<Expression> {
+    map(
         (
             tag("kan"),
             delimited(
@@ -481,33 +510,86 @@ pub fn parse_expression(input: &str) -> ParseResult<Expression> {
             params,
             body: Box::new(body),
         },
-    );
-
-    alt((ou_parser, kan_parser, let_parser, |i| {
-        // The original pipe-aware parser
-        let (mut remaining, mut lhs) = parse_primary_expression.parse(i)?;
-
-        loop {
-            let (next_remaining, pipe) = opt(preceded(
-                delimited(multispace0, tag("|>"), multispace0),
-                parse_primary_expression,
-            ))
-            .parse(remaining)?;
-
-            if let Some(rhs) = pipe {
-                lhs = Expression::Pipe {
-                    lhs: Box::new(lhs),
-                    rhs: Box::new(rhs),
-                };
-                remaining = next_remaining;
-            } else {
-                break;
-            }
-        }
-
-        Ok((remaining, lhs))
-    }))
+    )
     .parse(input)
+}
+
+fn parse_additive_expression(input: &str) -> ParseResult<Expression> {
+    let (mut input, mut lhs) = parse_multiplicative_expression(input)?;
+    loop {
+        let (next_input, op) = opt(delimited(
+            sp,
+            alt((
+                value(Operator::Add, char('+')),
+                value(Operator::Subtract, char('-')),
+            )),
+            sp,
+        ))
+        .parse(input)?;
+
+        if let Some(op) = op {
+            let (next_input, rhs) = parse_multiplicative_expression(next_input)?;
+            lhs = Expression::BinaryOp {
+                op,
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+            };
+            input = next_input;
+        } else {
+            break;
+        }
+    }
+    Ok((input, lhs))
+}
+
+fn parse_multiplicative_expression(input: &str) -> ParseResult<Expression> {
+    let (mut input, mut lhs) = parse_pipe_expression(input)?;
+    loop {
+        let (next_input, op) = opt(delimited(
+            sp,
+            alt((
+                value(Operator::Multiply, char('*')),
+                value(Operator::Divide, char('/')),
+            )),
+            sp,
+        ))
+        .parse(input)?;
+
+        if let Some(op) = op {
+            let (next_input, rhs) = parse_pipe_expression(next_input)?;
+            lhs = Expression::BinaryOp {
+                op,
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+            };
+            input = next_input;
+        } else {
+            break;
+        }
+    }
+    Ok((input, lhs))
+}
+
+fn parse_pipe_expression(input: &str) -> ParseResult<Expression> {
+    let (mut remaining, mut lhs) = parse_primary_expression(input)?;
+    loop {
+        let (next_remaining, pipe) = opt(preceded(
+            delimited(multispace0, tag("|>"), multispace0),
+            parse_primary_expression,
+        ))
+        .parse(remaining)?;
+
+        if let Some(rhs) = pipe {
+            lhs = Expression::Pipe {
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+            };
+            remaining = next_remaining;
+        } else {
+            break;
+        }
+    }
+    Ok((remaining, lhs))
 }
 
 pub fn parse_statement(input: &str) -> ParseResult<Statement> {
@@ -1111,6 +1193,43 @@ mod tests {
             Ok((
                 "",
                 Expression::Refl(Box::new(Expression::IntegerLiteral(10)))
+            ))
+        );
+    }
+
+    #[test]
+    fn test_parse_binary_operations() {
+        // Simple addition
+        let input_add = "1 + 2";
+        let result_add = parse_expression(input_add);
+        assert_eq!(
+            result_add,
+            Ok((
+                "",
+                Expression::BinaryOp {
+                    op: Operator::Add,
+                    lhs: Box::new(Expression::IntegerLiteral(1)),
+                    rhs: Box::new(Expression::IntegerLiteral(2)),
+                }
+            ))
+        );
+
+        // Operator precedence
+        let input_prec = "1 + 2 * 3";
+        let result_prec = parse_expression(input_prec);
+        assert_eq!(
+            result_prec,
+            Ok((
+                "",
+                Expression::BinaryOp {
+                    op: Operator::Add,
+                    lhs: Box::new(Expression::IntegerLiteral(1)),
+                    rhs: Box::new(Expression::BinaryOp {
+                        op: Operator::Multiply,
+                        lhs: Box::new(Expression::IntegerLiteral(2)),
+                        rhs: Box::new(Expression::IntegerLiteral(3)),
+                    }),
+                }
             ))
         );
     }
