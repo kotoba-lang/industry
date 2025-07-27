@@ -1,0 +1,15 @@
+shiki p1: ze<i64, i64> = kan(i: ku) => ou i {
+    i0 => 10,
+    i1 => 20
+}
+
+shiki p2: ze<i64, i64> = kan(i: ku) => ou i {
+    i0 => 20,
+    i1 => 30
+}
+
+shiki p_refl: ze<i64, i64> = refl(10)
+
+shiki p1_sym: ze<i64, i64> = p1.sym()
+
+shiki p_composed: ze<i64, i64> = p1.compose(p2) 
