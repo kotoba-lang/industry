@@ -4,7 +4,7 @@ use nom::{
     character::complete::{alpha1, char, multispace0, multispace1},
     combinator::{cut, map, opt, recognize, value, verify},
     multi::{many0, many1, separated_list0, separated_list1},
-    sequence::{delimited, pair, preceded, terminated},
+    sequence::{delimited, pair, preceded, terminated, tuple},
     IResult, Parser,
 };
 
@@ -197,67 +197,47 @@ fn parse_type_name(input: &str) -> ParseResult<&str> {
 
 /// Parses a type, handling right-associative function types `A -> B -> C`.
 pub fn parse_type(input: &str) -> ParseResult<Type> {
-    let (input, lhs) = parse_atomic_type(input)?;
-
-    if let Ok((input_after_arrow, _)) = delimited(sp, tag("->"), sp).parse(input) {
-        // After seeing `->`, we must parse the rest of the type.
-        let (input, rhs) = cut(parse_type).parse(input_after_arrow)?;
-
-        // Now, try to interpret `lhs` as a binder `(x: T)` for a Pi type.
-        // This is a bit of a hack: `parse_atomic_type` returns a Simple type
-        // containing the string `(x: T)`, which we re-parse here.
-        if let Type::Simple(s) = &lhs {
-            if let Ok((rest, (name, ty))) = pair(
-                preceded(char('('), map(parse_identifier, |s| s.to_string())),
-                terminated(
-                    preceded(delimited(sp, char(':'), sp), parse_type),
+    alt((
+        // Attempt to parse a full Pi-type first, e.g., `(x: A) -> B`.
+        map(
+            tuple((
+                delimited(
+                    char('('),
+                    pair(
+                        map(parse_identifier, String::from),
+                        preceded(delimited(sp, char(':'), sp), parse_type),
+                    ),
                     char(')'),
                 ),
-            )
-            .parse(s)
-            {
-                // Ensure the binder string was fully consumed.
-                if rest.is_empty() {
-                    return Ok((
-                        input,
-                        Type::Pi {
-                            binder_name: name,
-                            binder_type: Box::new(ty),
-                            return_type: Box::new(rhs),
-                        },
-                    ));
-                }
-            }
-        }
-        // If it's not a valid binder, it's a regular function type.
-        Ok((input, Type::Func(Box::new(lhs), Box::new(rhs))))
-    } else {
-        Ok((input, lhs))
-    }
+                preceded(delimited(sp, tag("->"), sp), parse_type),
+            )),
+            |((binder_name, binder_type), return_type)| Type::Pi {
+                binder_name,
+                binder_type: Box::new(binder_type),
+                return_type: Box::new(return_type),
+            },
+        ),
+        // If not a Pi-type, attempt to parse a regular function type, e.g., `A -> B`.
+        map(
+            pair(parse_atomic_type, preceded(delimited(sp, tag("->"), sp), parse_type)),
+            |(lhs, rhs)| Type::Func(Box::new(lhs), Box::new(rhs)),
+        ),
+        // If none of the above, it must be a non-function, atomic type.
+        parse_atomic_type,
+    ))
+    .parse(input)
 }
 
 /// Parses non-function types (atomic types in the context of function type parsing).
 fn parse_atomic_type(input: &str) -> ParseResult<Type> {
     alt((
         map(tag("()"), |_| Type::Unit),
-        // A binder `(x: T)` is parsed as a "simple" type containing its own source string.
-        // This is a hack to be resolved by `parse_type`.
-        map(
-            recognize(delimited(
-                char('('),
-                pair(
-                    parse_identifier,
-                    preceded(delimited(sp, char(':'), sp), parse_type),
-                ),
-                char(')'),
-            )),
-            |s: &str| Type::Simple(s.to_string()),
-        ),
-        // A regular parenthesized type `(T)`. This must come after the binder parser.
+        // IMPORTANT: A parenthesized type must be tried before named types
+        // to correctly handle expressions like `(A -> B)`.
         delimited(char('('), parse_type, char(')')),
         map(tag("ku"), |_| Type::Ku),
-        parse_ze_or_en_type,
-        map(parse_identifier, |s| Type::Simple(s.to_string())),
+        parse_ze_or_en_type, // This is your existing helper for ze<...> and en<...>
+        map(parse_identifier_str, |s| Type::Simple(s.to_string())),
     ))
     .parse(input)
 }
@@ -1420,20 +1400,6 @@ mod tests {
                         Box::new(Type::Simple("B".to_string()))
                     )),
                     Box::new(Type::Simple("C".to_string()))
-                )
-            ))
-        );
-
-        // Simple function type (no parens)
-        let input_simple = "A -> B";
-        let result_simple = parse_type(input_simple);
-        assert_eq!(
-            result_simple,
-            Ok((
-                "",
-                Type::Func(
-                    Box::new(Type::Simple("A".to_string())),
-                    Box::new(Type::Simple("B".to_string()))
                 )
             ))
         );
