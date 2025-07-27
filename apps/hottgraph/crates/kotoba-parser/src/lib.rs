@@ -111,9 +111,10 @@ pub enum Statement {
         name: String,
         constructors: Vec<Constructor>,
     },
-    /// `rin <function_name>(<params>): <return_type> = <body>`
+    /// `rin <function_name><<generics>>(params): <return_type> = <body>`
     Rin {
         name: String,
+        generics: Vec<String>,
         params: Vec<Parameter>,
         return_type: Type,
         body: Expression,
@@ -495,6 +496,11 @@ pub fn parse_statement(input: &str) -> ParseResult<Statement> {
             tag("rin"),
             multispace1,
             parse_identifier, // function name
+            opt(delimited(
+                char('<'),
+                separated_list1(delimited(multispace0, char(','), multispace0), parse_type_name),
+                char('>'),
+            )),
             delimited(
                 char('('),
                 separated_list1(delimited(multispace0, char(','), multispace0), parse_parameter),
@@ -505,8 +511,9 @@ pub fn parse_statement(input: &str) -> ParseResult<Statement> {
             delimited(multispace0, char('='), multispace0),
             parse_expression, // body
         ),
-        |(_, _, name, params, _, return_type, _, body)| Statement::Rin {
+        |(_, _, name, generics, params, _, return_type, _, body)| Statement::Rin {
             name: name.to_string(),
+            generics: generics.unwrap_or_default().into_iter().map(String::from).collect(),
             params,
             return_type,
             body,
@@ -659,6 +666,40 @@ mod tests {
                 }
             ))
         );
+    }
+
+    #[test]
+    fn test_parse_rin_statement_with_generics() {
+        let input = "rin id<T>(x: T): T = x";
+        let result = parse_statement(input);
+        assert!(result.is_ok());
+        let (remaining, statement) = result.unwrap();
+        assert_eq!(remaining, "");
+        if let Statement::Rin {
+            name,
+            generics,
+            params,
+            return_type,
+            ..
+        } = statement
+        {
+            assert_eq!(name, "id");
+            assert_eq!(generics, vec!["T"]);
+            assert_eq!(params.len(), 1);
+            assert_eq!(params[0].name, "x");
+            if let Type::Simple(type_name) = &params[0].type_annotation {
+                assert_eq!(type_name, "T");
+            } else {
+                panic!("Expected simple type for param x");
+            }
+            if let Type::Simple(type_name) = &return_type {
+                assert_eq!(type_name, "T");
+            } else {
+                panic!("Expected simple type for return type");
+            }
+        } else {
+            panic!("Expected Rin statement");
+        }
     }
 
     #[test]
