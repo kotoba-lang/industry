@@ -270,10 +270,10 @@ fn parse_pattern(input: &str) -> ParseResult<Pattern> {
     );
 
     alt((
-        map(nom::character::complete::i64, Pattern::IntegerLiteral),
         map(alt((tag("i0"), tag("i1"))), |s: &str| {
             Pattern::IntervalLiteral(s.to_string())
         }),
+        map(nom::character::complete::i64, Pattern::IntegerLiteral),
         map(tag("_"), |_| Pattern::Wildcard),
         constructor_with_args_parser,
         // An identifier can be a variable or a constructor with no arguments.
