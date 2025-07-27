@@ -21,4 +21,6 @@ gyo Bool = { true, false }
 shiki path_to_false: ze<Bool, Bool> = kan(i: ku) => ou i {
     i0 => true,
     i1 => false
-} 
+}
+
+shiki add_curried: i64 -> i64 -> i64 = kan(a: i64) => kan(b: i64) => a 
