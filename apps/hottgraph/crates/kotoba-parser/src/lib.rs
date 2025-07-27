@@ -723,11 +723,11 @@ pub fn parse_statement(input: &str) -> ParseResult<Statement> {
             tag("gyo"),
             multispace1,
             parse_type_name,
-            opt(cut(delimited(
+            opt(delimited(
                 char('('),
-                separated_list1(delimited(sp, char(','), sp), parse_parameter),
+                cut(separated_list1(delimited(sp, char(','), sp), parse_parameter)),
                 char(')'),
-            ))),
+            )),
             delimited(sp, char('='), sp),
             delimited(
                 char('{'),
