@@ -61,6 +61,8 @@ pub enum Expression {
         params: Vec<Parameter>,
         body: Box<Expression>,
     },
+    /// `refl(<expr>)`
+    Refl(Box<Expression>),
     /// 変数名
     Identifier(String),
     /// 整数リテラル
@@ -235,6 +237,14 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
         Expression::Zo(s.to_string())
     });
 
+    let refl_parser = map(
+        preceded(
+            tag("refl"),
+            delimited(char('('), parse_expression, char(')')),
+        ),
+        |expr| Expression::Refl(Box::new(expr)),
+    );
+
     let ident_expr_parser = map(parse_identifier, |name| {
         Expression::Identifier(name.to_string())
     });
@@ -244,7 +254,7 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
     });
 
     let (mut remaining, mut expr) =
-        alt((zo_parser, ident_expr_parser, integer_literal_parser))(input)?;
+        alt((zo_parser, refl_parser, ident_expr_parser, integer_literal_parser))(input)?;
 
     loop {
         let (next_remaining, method_call) = opt(preceded(
@@ -695,5 +705,18 @@ mod tests {
         } else {
             panic!("Expected Constructor pattern");
         }
+    }
+
+    #[test]
+    fn test_parse_refl() {
+        let input = "refl(10)";
+        let result = parse_expression(input);
+        assert_eq!(
+            result,
+            Ok((
+                "",
+                Expression::Refl(Box::new(Expression::IntegerLiteral(10)))
+            ))
+        );
     }
 }
