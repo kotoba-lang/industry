@@ -341,20 +341,34 @@ impl Compiler {
                 self.context.exit_scope();
                 Ok(body_type)
             }
-            Expression::BinaryOp { lhs, rhs, .. } => {
+            Expression::BinaryOp { lhs, rhs, op } => {
                 let lhs_type = self.type_check_expression(lhs, Some(&Type::Simple("i64".to_string())))?;
                 let rhs_type = self.type_check_expression(rhs, Some(&Type::Simple("i64".to_string())))?;
 
                 if !self.are_types_equal(&lhs_type, &Type::Simple("i64".to_string()))
                     || !self.are_types_equal(&rhs_type, &Type::Simple("i64".to_string()))
                 {
-                    // For now, we'll be a bit generic.
                     return Err(TypeError::TypeMismatch {
                         expected: Type::Simple("i64".to_string()),
-                        found: lhs_type, // Or rhs_type, could be either
+                        found: lhs_type,
                     });
                 }
-                Ok(Type::Simple("i64".to_string()))
+
+                // Determine the result type based on the operator.
+                match op {
+                    kotoba_parser::Operator::Add
+                    | kotoba_parser::Operator::Subtract
+                    | kotoba_parser::Operator::Multiply
+                    | kotoba_parser::Operator::Divide => Ok(Type::Simple("i64".to_string())),
+                    kotoba_parser::Operator::Equals
+                    | kotoba_parser::Operator::NotEquals
+                    | kotoba_parser::Operator::LessThan
+                    | kotoba_parser::Operator::GreaterThan
+                    | kotoba_parser::Operator::LessThanOrEqual
+                    | kotoba_parser::Operator::GreaterThanOrEqual => {
+                        Ok(Type::Simple("bool".to_string()))
+                    }
+                }
             }
             Expression::Kan { params, body } => {
                 if let Some(expected) = expected_type {
@@ -630,6 +644,12 @@ impl Compiler {
             kotoba_parser::Operator::Subtract => "-",
             kotoba_parser::Operator::Multiply => "*",
             kotoba_parser::Operator::Divide => "/",
+            kotoba_parser::Operator::Equals => "==",
+            kotoba_parser::Operator::NotEquals => "!=",
+            kotoba_parser::Operator::LessThan => "<",
+            kotoba_parser::Operator::GreaterThan => ">",
+            kotoba_parser::Operator::LessThanOrEqual => "<=",
+            kotoba_parser::Operator::GreaterThanOrEqual => ">=",
         };
         Ok(format!("({} {} {})", lhs_code, op_str, rhs_code))
     }
@@ -1198,6 +1218,21 @@ mod tests {
         assert!(
             compiled_code.contains("let result: i64 = (1 + 2);"),
             "Did not find expected binary operation compilation in: {}",
+            compiled_code
+        );
+    }
+
+    #[test]
+    fn test_compile_shiki_comparison_op() {
+        let input = "shiki result: bool = 1 < 2";
+        let (_, statement) = parse_statement(input).unwrap();
+        let mut compiler = Compiler::new();
+        let result = compiler.compile(vec![statement]);
+        assert!(result.is_ok(), "Compilation failed: {:?}", result.err());
+        let compiled_code = result.unwrap();
+        assert!(
+            compiled_code.contains("let result: bool = (1 < 2);"),
+            "Did not find expected comparison operation compilation in: {}",
             compiled_code
         );
     }
