@@ -265,4 +265,22 @@ mod tests {
         assert_eq!(end_path.start(), 10);
         assert_eq!(end_path.end(), 20);
     }
+
+    #[test]
+    fn test_path_with_enum() {
+        #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+        enum Bool {
+            True,
+            False,
+        }
+
+        // A path from True to False.
+        let not_path = Path::new(|i| match i {
+            Interval::I0 => Bool::True,
+            Interval::I1 => Bool::False,
+        });
+
+        assert_eq!(not_path.start(), Bool::True);
+        assert_eq!(not_path.end(), Bool::False);
+    }
 }
