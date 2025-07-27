@@ -341,6 +341,31 @@ impl Compiler {
                 self.context.exit_scope();
                 Ok(body_type)
             }
+            Expression::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                let condition_type =
+                    self.type_check_expression(condition, Some(&Type::Simple("bool".to_string())))?;
+                if !self.are_types_equal(&condition_type, &Type::Simple("bool".to_string())) {
+                    return Err(TypeError::TypeMismatch {
+                        expected: Type::Simple("bool".to_string()),
+                        found: condition_type,
+                    });
+                }
+
+                let then_type = self.type_check_expression(then_branch, expected_type)?;
+                let else_type = self.type_check_expression(else_branch, expected_type)?;
+
+                if !self.are_types_equal(&then_type, &else_type) {
+                    return Err(TypeError::TypeMismatch {
+                        expected: then_type,
+                        found: else_type,
+                    });
+                }
+                Ok(then_type)
+            }
             Expression::BinaryOp { lhs, rhs, op } => {
                 let lhs_type = self.type_check_expression(lhs, Some(&Type::Simple("i64".to_string())))?;
                 let rhs_type = self.type_check_expression(rhs, Some(&Type::Simple("i64".to_string())))?;
@@ -658,6 +683,19 @@ impl Compiler {
         match expression {
             Expression::Identifier(name) => self.compile_identifier_expression(&name),
             Expression::IntegerLiteral(n) => Ok(n.to_string()),
+            Expression::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                let cond_code = self.compile_expression(*condition)?;
+                let then_code = self.compile_expression(*then_branch)?;
+                let else_code = self.compile_expression(*else_branch)?;
+                Ok(format!(
+                    "if {} {{ {} }} else {{ {} }}",
+                    cond_code, then_code, else_code
+                ))
+            }
             Expression::BinaryOp { op, lhs, rhs } => {
                 self.compile_binary_op_expression(op, *lhs, *rhs)
             }
@@ -1233,6 +1271,21 @@ mod tests {
         assert!(
             compiled_code.contains("let result: bool = (1 < 2);"),
             "Did not find expected comparison operation compilation in: {}",
+            compiled_code
+        );
+    }
+
+    #[test]
+    fn test_compile_shiki_if_expression() {
+        let input = "shiki result: i64 = if 1 < 2 then 10 else 20";
+        let (_, statement) = parse_statement(input).unwrap();
+        let mut compiler = Compiler::new();
+        let result = compiler.compile(vec![statement]);
+        assert!(result.is_ok(), "Compilation failed: {:?}", result.err());
+        let compiled_code = result.unwrap();
+        assert!(
+            compiled_code.contains("let result: i64 = if (1 < 2) { 10 } else { 20 };"),
+            "Did not find expected if expression compilation in: {}",
             compiled_code
         );
     }
