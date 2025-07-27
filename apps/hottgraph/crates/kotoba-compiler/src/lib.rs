@@ -3,10 +3,64 @@ use kotoba_parser::{
 };
 use std::collections::HashMap;
 
+/// Stores information about types and variables in the current scope.
+#[derive(Debug, Clone)]
+pub struct Context {
+    /// Type definitions from `gyo` statements.
+    /// Maps a type name (e.g., "N") to its constructor definitions.
+    type_definitions: HashMap<String, Vec<ConstructorDef>>,
+    /// Scoped variables. Each element in the vector represents a new scope.
+    scopes: Vec<HashMap<String, Type>>,
+}
+
+impl Context {
+    fn new() -> Self {
+        Context {
+            type_definitions: HashMap::new(),
+            scopes: vec![HashMap::new()], // Start with a global scope
+        }
+    }
+
+    /// Enters a new scope.
+    fn enter_scope(&mut self) {
+        self.scopes.push(HashMap::new());
+    }
+
+    /// Exits the current scope.
+    fn exit_scope(&mut self) {
+        self.scopes.pop();
+    }
+
+    /// Defines a new variable in the current scope.
+    fn define_var(&mut self, name: String, ty: Type) {
+        self.scopes.last_mut().unwrap().insert(name, ty);
+    }
+
+    /// Finds a variable's type, searching from the innermost scope outwards.
+    fn find_var(&self, name: &str) -> Option<&Type> {
+        self.scopes.iter().rev().find_map(|scope| scope.get(name))
+    }
+
+    /// Finds which type a given constructor name belongs to.
+    fn find_constructor_type(&self, constructor_name: &str) -> Option<&String> {
+        let capitalized_name = capitalize(constructor_name);
+        self.type_definitions
+            .iter()
+            .find_map(|(type_name, constructors)| {
+                if constructors.iter().any(|c| match c {
+                    ConstructorDef::Point { name, .. } => capitalize(name) == capitalized_name,
+                    ConstructorDef::Path { name, .. } => capitalize(name) == capitalized_name,
+                }) {
+                    Some(type_name)
+                } else {
+                    None
+                }
+            })
+    }
+}
+
 pub struct Compiler {
-    /// Stores constructors for each defined inductive type.
-    /// e.g., "N" -> ["Zero", "Succ"]
-    type_definitions: HashMap<String, Vec<String>>,
+    context: Context,
 }
 
 fn type_to_string(t: &Type) -> String {
@@ -30,11 +84,10 @@ fn type_to_string(t: &Type) -> String {
         }
         Type::Unit => "()".to_string(),
         Type::Func(from, to) => {
-            format!(
-                "Box<dyn Fn({}) -> {}>",
-                type_to_string(from),
-                type_to_string(to)
-            )
+            // To avoid infinite recursion for function types in closures,
+            // we represent them as a generic closure trait object.
+            // A full implementation might need more nuanced handling.
+            format!("Box<dyn Fn({}) -> {}>", type_to_string(from), type_to_string(to))
         }
         Type::Simple(name) => name.clone(),
     }
@@ -43,7 +96,7 @@ fn type_to_string(t: &Type) -> String {
 impl Compiler {
     pub fn new() -> Self {
         Compiler {
-            type_definitions: HashMap::new(),
+            context: Context::new(),
         }
     }
 
@@ -51,15 +104,9 @@ impl Compiler {
         // 1st Pass: Register all type definitions from `gyo` statements.
         for statement in &program {
             if let Statement::Gyo { name, constructors } = statement {
-                let constructor_names = constructors
-                    .iter()
-                    .filter_map(|c| match c {
-                        ConstructorDef::Point { name, .. } => Some(capitalize(name)),
-                        ConstructorDef::Path { .. } => None,
-                    })
-                    .collect();
-                self.type_definitions
-                    .insert(name.clone(), constructor_names);
+                self.context
+                    .type_definitions
+                    .insert(name.clone(), constructors.clone());
             }
         }
 
@@ -73,7 +120,10 @@ impl Compiler {
         Ok(rust_code)
     }
 
-    fn compile_statement(&mut self, statement: Statement) -> Result<String, String> {
+    fn compile_statement(
+        &mut self,
+        statement: Statement,
+    ) -> Result<String, String> {
         match statement {
             Statement::Shiki {
                 variable_name,
@@ -81,15 +131,34 @@ impl Compiler {
                 value,
             } => {
                 let type_str = type_to_string(&type_annotation);
-                let expr_code = self.compile_expression_with_context(value.clone(), &type_annotation)?;
+                // Define the variable in the context before compiling the expression
+                // to allow for recursion (though not fully supported yet).
+                self.context
+                    .define_var(variable_name.clone(), type_annotation.clone());
 
-                // Type-directed compilation: if the type is a path (`ze`) and the expression
-                // is a lambda (`kan`), wrap the lambda in `Path::new`.
+                let value_expr = if let Expression::Glue { ref value } = value {
+                    // Special handling for `glue` expression to pass type context.
+                    if let Type::En(t1, t2, t3) = &type_annotation {
+                        let value_code = self.compile_expression(*value.clone())?;
+                        format!(
+                            "kotoba_core::glue::<{}, {}, {}>({})",
+                            type_to_string(t1),
+                            type_to_string(t2),
+                            type_to_string(t3),
+                            value_code
+                        )
+                    } else {
+                        return Err("`glue` requires an `en` type annotation.".to_string());
+                    }
+                } else {
+                    self.compile_expression(value.clone())?
+                };
+
                 let final_expr_code =
                     if let (Type::Ze(_, _), Expression::Kan { .. }) = (&type_annotation, &value) {
-                        format!("kotoba_core::Path::new({})", expr_code)
+                        format!("kotoba_core::Path::new({})", value_expr)
                     } else {
-                        expr_code
+                        value_expr
                     };
 
                 Ok(format!(
@@ -97,7 +166,9 @@ impl Compiler {
                     variable_name, type_str, final_expr_code
                 ))
             }
-            Statement::Gyo { name, constructors } => self.compile_gyo_statement(name, constructors),
+            Statement::Gyo { name, constructors } => {
+                self.compile_gyo_statement(&name, &constructors)
+            }
             Statement::Rin {
                 name,
                 generics,
@@ -105,6 +176,12 @@ impl Compiler {
                 return_type,
                 body,
             } => {
+                self.context.enter_scope();
+                for p in &params {
+                    self.context
+                        .define_var(p.name.clone(), p.type_annotation.clone());
+                }
+
                 let generics_str = if generics.is_empty() {
                     String::new()
                 } else {
@@ -117,6 +194,9 @@ impl Compiler {
                     .join(", ");
                 let return_type_str = type_to_string(&return_type);
                 let body_str = self.compile_expression(body)?;
+
+                self.context.exit_scope();
+
                 Ok(format!(
                     "fn {}{}({}) -> {} {{\n    {}\n}}",
                     name, generics_str, params_str, return_type_str, body_str
@@ -127,24 +207,28 @@ impl Compiler {
 
     fn compile_gyo_statement(
         &self,
-        name: String,
-        constructors: Vec<ConstructorDef>,
+        name: &str,
+        constructors: &[ConstructorDef],
     ) -> Result<String, String> {
         let mut enum_variants = String::new();
         for c in constructors {
-            if let ConstructorDef::Point { name, fields } = c {
-                let variant_name = capitalize(&name);
+            if let ConstructorDef::Point {
+                name: constr_name,
+                fields,
+            } = c
+            {
+                let variant_name = capitalize(constr_name);
                 if fields.is_empty() {
                     enum_variants.push_str(&format!("    {},\n", variant_name));
                 } else {
                     let fields_str = fields
                         .iter()
                         .map(|f| {
-                            // Handle recursive types by boxing them.
-                            if type_to_string(f) == name {
+                            let type_str = type_to_string(f);
+                            if type_str == name {
                                 format!("Box<{}>", name)
                             } else {
-                                type_to_string(f)
+                                type_str
                             }
                         })
                         .collect::<Vec<_>>()
@@ -152,7 +236,6 @@ impl Compiler {
                     enum_variants.push_str(&format!("    {}({}),\n", variant_name, fields_str));
                 }
             }
-            // Path constructors are ignored for Rust enum generation for now.
         }
 
         Ok(format!(
@@ -162,29 +245,12 @@ impl Compiler {
     }
 
     fn compile_expression(&mut self, expression: Expression) -> Result<String, String> {
-        self.compile_expression_with_context(expression, &Type::Simple("()".to_string())) // Provide a dummy context
-    }
-
-    fn compile_expression_with_context(
-        &mut self,
-        expression: Expression,
-        context_type: &Type,
-    ) -> Result<String, String> {
         match expression {
             Expression::Identifier(name) => {
-                // An identifier in an expression can be a variable or a nullary constructor.
-                // We check if it's a known constructor first.
-                let capitalized_name = capitalize(&name);
-                if let Some(type_name) = self.type_definitions.iter().find_map(|(tn, constrs)| {
-                    if constrs.contains(&capitalized_name) {
-                        Some(tn)
-                    } else {
-                        None
-                    }
-                }) {
-                    Ok(format!("{}::{}", type_name, capitalized_name))
+                if let Some(type_name) = self.context.find_constructor_type(&name) {
+                    Ok(format!("{}::{}", type_name, capitalize(&name)))
                 } else {
-                    Ok(name) // It's a variable
+                    Ok(name)
                 }
             }
             Expression::IntegerLiteral(n) => Ok(n.to_string()),
@@ -192,20 +258,10 @@ impl Compiler {
                 let expr_code = self.compile_expression(*expr)?;
                 Ok(format!("kotoba_core::Path::new(|_| {})", expr_code))
             }
-            Expression::Glue { value } => {
-                let value_code = self.compile_expression(*value)?;
-                if let Type::En(t1, t2, t3) = context_type {
-                    Ok(format!(
-                        "kotoba_core::glue::<{}, {}, {}>({})",
-                        type_to_string(t1),
-                        type_to_string(t2),
-                        type_to_string(t3),
-                        value_code
-                    ))
-                } else {
-                    // Cannot infer types for `glue` without a type annotation context.
-                    Err("`glue` requires a type annotation.".to_string())
-                }
+            Expression::Glue { .. } => {
+                // This is handled specially in `compile_statement` and should not be reached directly here
+                // without a `shiki` context.
+                Err("`glue` must be used directly in a `shiki` statement with a type annotation.".to_string())
             }
             Expression::Unglue { value } => {
                 let value_code = self.compile_expression(*value)?;
@@ -218,7 +274,15 @@ impl Compiler {
                 body,
             } => {
                 let value_code = self.compile_expression(*value)?;
+                self.context.enter_scope();
+                // Define the variable with its type (if annotated) for the body to use.
+                // A real type checker would infer the type if not present.
+                if let Some(ty) = type_annotation.clone() {
+                    self.context.define_var(name.clone(), ty);
+                }
                 let body_code = self.compile_expression(*body)?;
+                self.context.exit_scope();
+
                 let let_statement = if let Some(ty) = type_annotation {
                     format!(
                         "let {}: {} = {};",
@@ -236,16 +300,23 @@ impl Compiler {
                 "i1" => Ok("kotoba_core::Interval::I1".to_string()),
                 _ => Err("Invalid interval literal".to_string()),
             },
-            Expression::MethodCall { variable, method, args } => {
+            Expression::MethodCall {
+                variable,
+                method,
+                args,
+            } => {
                 let var_code = self.compile_expression(*variable)?;
                 let args_code: Vec<String> = args
                     .into_iter()
                     .map(|arg| self.compile_expression(arg))
                     .collect::<Result<_, _>>()?;
 
-                // Special handling for methods that take references.
                 let formatted_args = if method == "compose" {
-                    args_code.iter().map(|arg| format!("&{}", arg)).collect::<Vec<_>>().join(", ")
+                    args_code
+                        .iter()
+                        .map(|arg| format!("&{}", arg))
+                        .collect::<Vec<_>>()
+                        .join(", ")
                 } else {
                     args_code.join(", ")
                 };
@@ -258,6 +329,12 @@ impl Compiler {
                 Ok(format!("pipe({}, {})", lhs_code, rhs_code))
             }
             Expression::Kan { params, body } => {
+                self.context.enter_scope();
+                for p in &params {
+                    self.context
+                        .define_var(p.name.clone(), p.type_annotation.clone());
+                }
+
                 let params_str = params
                     .iter()
                     .map(|p| format!("{}: {}", p.name, type_to_string(&p.type_annotation)))
@@ -265,6 +342,7 @@ impl Compiler {
                     .join(", ");
 
                 let body_code = self.compile_expression(*body)?;
+                self.context.exit_scope();
 
                 Ok(format!("|{}| {{ {} }}", params_str, body_code))
             }
@@ -285,7 +363,7 @@ impl Compiler {
         Ok(format!("    {} => {{ {} }},\n", pattern_code, body_code))
     }
 
-    fn compile_pattern(&mut self, pattern: &Pattern) -> Result<String, String> {
+    fn compile_pattern(&self, pattern: &Pattern) -> Result<String, String> {
         match pattern {
             Pattern::IntegerLiteral(i) => Ok(i.to_string()),
             Pattern::IntervalLiteral(s) => match s.as_str() {
@@ -295,37 +373,19 @@ impl Compiler {
             },
             Pattern::Wildcard => Ok("_".to_string()),
             Pattern::Identifier(s) => {
-                // An identifier in a pattern can be a variable or a nullary constructor.
-                // We check if it's a known constructor first.
-                let capitalized_name = capitalize(s);
-                let type_name = self
-                    .type_definitions
-                    .iter()
-                    .find(|(_type_name, constructors)| {
-                        constructors.contains(&capitalized_name)
-                    })
-                    .map(|(type_name, _)| type_name.clone());
-
-                if let Some(tn) = type_name {
-                    Ok(format!("{}::{}", tn, capitalized_name))
+                if let Some(tn) = self.context.find_constructor_type(s) {
+                    Ok(format!("{}::{}", tn, capitalize(s)))
                 } else {
-                    Ok(s.clone()) // It's a variable binding
+                    Ok(s.clone())
                 }
             }
             Pattern::Constructor(name, patterns) => {
                 let capitalized_name = capitalize(name);
-                // Find which type this constructor belongs to.
-                let type_name = self
-                    .type_definitions
-                    .iter()
-                    .find(|(_type_name, constructors)| constructors.contains(&capitalized_name))
-                    .map(|(type_name, _)| type_name.clone());
+                let type_name = self.context.find_constructor_type(name);
 
                 let fq_name = if let Some(tn) = type_name {
                     format!("{}::{}", tn, capitalized_name)
                 } else {
-                    // If not found, just use the capitalized name.
-                    // This might happen for built-in types or errors.
                     capitalized_name
                 };
 
@@ -430,6 +490,7 @@ mod tests {
 
         let input_no_type = "let y = true in y";
         let (_, expr_no_type) = parse_expression(input_no_type).unwrap();
+        let mut compiler = Compiler::new();
         let result_no_type = compiler.compile_expression(expr_no_type);
         assert!(result_no_type.is_ok());
         let code_no_type = result_no_type.unwrap();
@@ -458,6 +519,22 @@ mod tests {
         let compiled_code = result.unwrap();
         assert!(compiled_code.contains("fn add(a: N, b: N) -> N"));
         assert!(compiled_code.contains("match a"));
+    }
+
+    #[test]
+    fn test_compile_gyo_statement() {
+        let input = "gyo N = { zero, succ(N) }";
+        let (_, statement) = parse_statement(input).unwrap();
+        let mut compiler = Compiler::new();
+        let result = compiler.compile(vec![statement]);
+        let expected_code = "#[derive(Debug, Clone)]\nenum N {\n    Zero,\n    Succ(Box<N>),\n}\n";
+        let actual_code = result.unwrap();
+        assert!(
+            actual_code.contains(expected_code),
+            "Expected:\n{}\n\nGot:\n{}",
+            expected_code,
+            actual_code
+        );
     }
 
     #[test]
@@ -573,18 +650,8 @@ mod tests {
         let (_, expression) = parse_expression(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile_expression(expression);
-        let expected_code = "match x {\n    0 => { kotoba_core::Interval::I0 },\n    _ => { kotoba_core::Interval::I1 },\n}";
+        let expected_code = "match x {\n    kotoba_core::Interval::I0 => { kotoba_core::Interval::I0 },\n    _ => { kotoba_core::Interval::I1 },\n}";
         assert_eq!(result, Ok(expected_code.to_string()));
-    }
-
-    #[test]
-    fn test_compile_gyo_statement() {
-        let input = "gyo N = { zero, succ(N) }";
-        let (_, statement) = parse_statement(input).unwrap();
-        let mut compiler = Compiler::new();
-        let result = compiler.compile(vec![statement]);
-        let expected_code = "#[derive(Debug, Clone)]\nenum N {\n    Zero,\n    Succ(Box<N>),\n}\n";
-        assert_eq!(result.unwrap().contains(expected_code), true);
     }
 
     #[test]
