@@ -4,8 +4,8 @@ use nom::{
     character::complete::{alpha1, char, multispace0, multispace1},
     combinator::{cut, map, opt, recognize, verify},
     multi::{separated_list0, separated_list1},
-    sequence::{delimited, pair, preceded, terminated, tuple},
-    IResult,
+    sequence::{delimited, pair, preceded, terminated},
+    IResult, Parser,
 };
 
 /// 型を表すAST
@@ -116,7 +116,8 @@ fn parse_identifier_str(input: &str) -> IResult<&str, &str> {
     recognize(pair(
         alt((alpha1, tag("_"))),
         opt(take_while1(|c: char| c.is_alphanumeric() || c == '_')),
-    ))(input)
+    ))
+    .parse(input)
 }
 
 fn parse_identifier(input: &str) -> IResult<&str, &str> {
@@ -125,7 +126,8 @@ fn parse_identifier(input: &str) -> IResult<&str, &str> {
             s,
             "shiki" | "kan" | "ku" | "ou" | "ba" | "en" | "ma" | "ze" | "i0" | "i1" | "gyo" | "rin"
         )
-    })(input)
+    })
+    .parse(input)
 }
 
 fn parse_type_name(input: &str) -> IResult<&str, &str> {
@@ -147,7 +149,8 @@ fn parse_type(input: &str) -> IResult<&str, Type> {
             char('<'),
             separated_list1(delimited(multispace0, char(','), multispace0), parse_type),
             char('>'),
-        )(input)?;
+        )
+        .parse(input)?;
 
         if generics.len() != 2 {
             // ze and en must have exactly two type parameters.
@@ -179,16 +182,17 @@ fn parse_type(input: &str) -> IResult<&str, Type> {
 
 fn parse_parameter(input: &str) -> IResult<&str, Parameter> {
     map(
-        tuple((
+        (
             parse_identifier,
             delimited(multispace0, char(':'), multispace0),
             parse_type,
-        )),
+        ),
         |(name, _, type_annotation)| Parameter {
             name: name.to_string(),
             type_annotation,
         },
-    )(input)
+    )
+    .parse(input)
 }
 
 fn parse_pattern(input: &str) -> IResult<&str, Pattern> {
@@ -215,28 +219,26 @@ fn parse_pattern(input: &str) -> IResult<&str, Pattern> {
         constructor_with_args_parser,
         // An identifier can be a variable or a constructor with no arguments.
         map(parse_identifier, |s| Pattern::Identifier(s.to_string())),
-    ))(input)
+    ))
+    .parse(input)
 }
 
 fn parse_ou_arm(input: &str) -> IResult<&str, OuArm> {
     map(
         preceded(
             multispace0,
-            tuple((
+            (
                 parse_pattern,
                 delimited(multispace0, tag("=>"), multispace0),
                 parse_expression,
-            )),
+            ),
         ),
         |(pattern, _, body)| OuArm { pattern, body },
-    )(input)
+    )
+    .parse(input)
 }
 
 fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
-    let zo_parser = map(alt((tag("i0"), tag("i1"))), |s: &str| {
-        Expression::Zo(s.to_string())
-    });
-
     let refl_parser = map(
         preceded(
             tag("refl"),
@@ -244,6 +246,10 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
         ),
         |expr| Expression::Refl(Box::new(expr)),
     );
+
+    let zo_parser = map(alt((tag("i0"), tag("i1"))), |s: &str| {
+        Expression::Zo(s.to_string())
+    });
 
     let ident_expr_parser = map(parse_identifier, |name| {
         Expression::Identifier(name.to_string())
@@ -254,13 +260,13 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
     });
 
     let (mut remaining, mut expr) =
-        alt((zo_parser, refl_parser, ident_expr_parser, integer_literal_parser))(input)?;
+        alt((zo_parser, refl_parser, ident_expr_parser, integer_literal_parser)).parse(input)?;
 
     loop {
         let (next_remaining, method_call) = opt(preceded(
             char('.'),
             map(
-                tuple((
+                (
                     parse_identifier_str,
                     delimited(
                         char('('),
@@ -270,10 +276,11 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
                         ),
                         char(')'),
                     ),
-                )),
+                ),
                 |(method, args)| (method.to_string(), args),
             ),
-        ))(remaining)?;
+        ))
+        .parse(remaining)?;
 
         if let Some((method, args)) = method_call {
             expr = Expression::MethodCall {
@@ -305,7 +312,8 @@ fn parse_constructor(input: &str) -> IResult<&str, Constructor> {
             name: name.to_string(),
             fields: opt_type.map_or(vec![], |t| vec![t]),
         },
-    )(input)
+    )
+    .parse(input)
 }
 
 pub fn parse_expression(input: &str) -> IResult<&str, Expression> {
@@ -315,7 +323,7 @@ pub fn parse_expression(input: &str) -> IResult<&str, Expression> {
             tag("ou"),
             cut(preceded(
                 multispace1,
-                tuple((
+                (
                     parse_primary_expression, // The expression to be matched
                     multispace0,
                     delimited(
@@ -326,7 +334,7 @@ pub fn parse_expression(input: &str) -> IResult<&str, Expression> {
                         ),
                         preceded(multispace0, char('}')),
                     ),
-                )),
+                ),
             )),
         ),
         |(expression, _, arms)| Expression::Ou {
@@ -336,7 +344,7 @@ pub fn parse_expression(input: &str) -> IResult<&str, Expression> {
     );
 
     let kan_parser = map(
-        tuple((
+        (
             tag("kan"),
             delimited(
                 char('('),
@@ -348,7 +356,7 @@ pub fn parse_expression(input: &str) -> IResult<&str, Expression> {
             ),
             delimited(multispace0, tag("=>"), multispace0),
             parse_expression, // 左再帰を避ける -> より一般的な式を許可
-        )),
+        ),
         |(_, params, _, body)| Expression::Kan {
             params,
             body: Box::new(body),
@@ -357,33 +365,34 @@ pub fn parse_expression(input: &str) -> IResult<&str, Expression> {
 
     alt((ou_parser, kan_parser, |i| {
         // The original pipe-aware parser
-        let (mut remaining, mut lhs) = parse_primary_expression(i)?;
+        let (mut remaining, mut lhs) = parse_primary_expression.parse(i)?;
 
-            loop {
-                let (next_remaining, pipe) = opt(preceded(
-                    delimited(multispace0, tag("|>"), multispace0),
-                    parse_primary_expression,
-                ))(&remaining)?;
+        loop {
+            let (next_remaining, pipe) = opt(preceded(
+                delimited(multispace0, tag("|>"), multispace0),
+                parse_primary_expression,
+            ))
+            .parse(remaining)?;
 
-                if let Some(rhs) = pipe {
-                    lhs = Expression::Pipe {
-                        lhs: Box::new(lhs),
-                        rhs: Box::new(rhs),
-                    };
-                    remaining = next_remaining;
-                } else {
-                    break;
-                }
+            if let Some(rhs) = pipe {
+                lhs = Expression::Pipe {
+                    lhs: Box::new(lhs),
+                    rhs: Box::new(rhs),
+                };
+                remaining = next_remaining;
+            } else {
+                break;
             }
-
-            Ok((remaining, lhs))
         }
-    ))(input)
+
+        Ok((remaining, lhs))
+    }))
+    .parse(input)
 }
 
 pub fn parse_statement(input: &str) -> IResult<&str, Statement> {
     let shiki_parser = map(
-        tuple((
+        (
             tag("shiki"),
             multispace1,
             parse_identifier,
@@ -391,7 +400,7 @@ pub fn parse_statement(input: &str) -> IResult<&str, Statement> {
             parse_type,
             delimited(multispace0, char('='), multispace0),
             parse_expression,
-        )),
+        ),
         |(_, _, variable_name, _, type_annotation, _, value)| Statement::Shiki {
             variable_name: variable_name.to_string(),
             type_annotation,
@@ -400,7 +409,7 @@ pub fn parse_statement(input: &str) -> IResult<&str, Statement> {
     );
 
     let gyo_parser = map(
-        tuple((
+        (
             tag("gyo"),
             multispace1,
             parse_type_name,
@@ -413,7 +422,7 @@ pub fn parse_statement(input: &str) -> IResult<&str, Statement> {
                 ),
                 preceded(multispace0, char('}')),
             ),
-        )),
+        ),
         |(_, _, name, _, constructors)| Statement::Gyo {
             name: name.to_string(),
             constructors,
@@ -421,7 +430,7 @@ pub fn parse_statement(input: &str) -> IResult<&str, Statement> {
     );
 
     let rin_parser = map(
-        tuple((
+        (
             tag("rin"),
             multispace1,
             parse_identifier, // function name
@@ -434,7 +443,7 @@ pub fn parse_statement(input: &str) -> IResult<&str, Statement> {
             parse_type, // return type
             delimited(multispace0, char('='), multispace0),
             parse_expression, // body
-        )),
+        ),
         |(_, _, name, params, _, return_type, _, body)| Statement::Rin {
             name: name.to_string(),
             params,
@@ -443,7 +452,7 @@ pub fn parse_statement(input: &str) -> IResult<&str, Statement> {
         },
     );
 
-    alt((shiki_parser, gyo_parser, rin_parser))(input)
+    alt((shiki_parser, gyo_parser, rin_parser)).parse(input)
 }
 
 #[cfg(test)]
