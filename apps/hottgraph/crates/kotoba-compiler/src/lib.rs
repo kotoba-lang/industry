@@ -29,6 +29,13 @@ fn type_to_string(t: &Type) -> String {
             )
         }
         Type::Unit => "()".to_string(),
+        Type::Func(from, to) => {
+            format!(
+                "Box<dyn Fn({}) -> {}>",
+                type_to_string(from),
+                type_to_string(to)
+            )
+        }
         Type::Simple(name) => name.clone(),
     }
 }
@@ -419,6 +426,17 @@ mod tests {
         assert!(compiled_code.contains("match i"));
         assert!(compiled_code.contains("10"));
         assert!(compiled_code.contains("20"));
+    }
+
+    #[test]
+    fn test_compile_nested_kan() {
+        let input = "shiki add_curried: i64 -> i64 -> i64 = kan(a: i64) => kan(b: i64) => a";
+        let (_, statement) = parse_statement(input).unwrap();
+        let mut compiler = Compiler::new();
+        let result = compiler.compile(vec![statement]);
+        let expected_code =
+            "let add_curried: Box<dyn Fn(i64) -> Box<dyn Fn(i64) -> i64>> = |a: i64| { |b: i64| { a } };\n";
+        assert_eq!(result.unwrap().contains(expected_code), true);
     }
 
     #[test]
