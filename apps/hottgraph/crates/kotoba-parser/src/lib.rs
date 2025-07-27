@@ -199,21 +199,20 @@ fn parse_type_name(input: &str) -> ParseResult<&str> {
 pub fn parse_type(input: &str) -> ParseResult<Type> {
     let (input, lhs) = parse_atomic_type(input)?;
 
-    if let Ok((input, _)) = delimited(sp, tag("->"), sp).parse(input) {
+    if let Ok((input_after_arrow, _)) = delimited(sp, tag("->"), sp).parse(input) {
         // After seeing `->`, we must parse the rest of the type.
-        let (input, rhs) = cut(parse_type).parse(input)?;
+        let (input, rhs) = cut(parse_type).parse(input_after_arrow)?;
 
         // Now, try to interpret `lhs` as a binder `(x: T)` for a Pi type.
         // This is a bit of a hack: `parse_atomic_type` returns a Simple type
         // containing the string `(x: T)`, which we re-parse here.
         if let Type::Simple(s) = &lhs {
-            if let Ok((rest, (name, ty))) = delimited(
-                char('('),
-                pair(
-                    map(parse_identifier, |s| s.to_string()),
+            if let Ok((rest, (name, ty))) = pair(
+                preceded(char('('), map(parse_identifier, |s| s.to_string())),
+                terminated(
                     preceded(delimited(sp, char(':'), sp), parse_type),
+                    char(')'),
                 ),
-                char(')'),
             )
             .parse(s)
             {
@@ -488,7 +487,7 @@ pub fn parse_expression(input: &str) -> ParseResult<Expression> {
         parse_kan_expression,
         parse_let_expression,
         parse_if_expression,
-        parse_comparison_expression,
+        parse_pipe_expression, // Pipe has the lowest precedence
     ))
     .parse(input)
 }
@@ -648,7 +647,7 @@ fn parse_additive_expression(input: &str) -> ParseResult<Expression> {
 }
 
 fn parse_multiplicative_expression(input: &str) -> ParseResult<Expression> {
-    let (mut input, mut lhs) = parse_pipe_expression(input)?;
+    let (mut input, mut lhs) = parse_primary_expression(input)?;
     loop {
         let (next_input, op) = opt(delimited(
             sp,
@@ -661,7 +660,7 @@ fn parse_multiplicative_expression(input: &str) -> ParseResult<Expression> {
         .parse(input)?;
 
         if let Some(op) = op {
-            let (next_input, rhs) = parse_pipe_expression(next_input)?;
+            let (next_input, rhs) = parse_primary_expression(next_input)?;
             lhs = Expression::BinaryOp {
                 op,
                 lhs: Box::new(lhs),
@@ -676,25 +675,20 @@ fn parse_multiplicative_expression(input: &str) -> ParseResult<Expression> {
 }
 
 fn parse_pipe_expression(input: &str) -> ParseResult<Expression> {
-    let (mut remaining, mut lhs) = parse_primary_expression(input)?;
+    let (mut input, mut lhs) = parse_comparison_expression(input)?;
     loop {
-        let (next_remaining, pipe) = opt(preceded(
-            delimited(multispace0, tag("|>"), multispace0),
-            parse_primary_expression,
-        ))
-        .parse(remaining)?;
-
-        if let Some(rhs) = pipe {
+        if let Ok((i, _)) = delimited(sp, tag("|>"), sp).parse(input) {
+            let (i, rhs) = parse_comparison_expression(i)?;
             lhs = Expression::Pipe {
                 lhs: Box::new(lhs),
                 rhs: Box::new(rhs),
             };
-            remaining = next_remaining;
+            input = i;
         } else {
             break;
         }
     }
-    Ok((remaining, lhs))
+    Ok((input, lhs))
 }
 
 pub fn parse_statement(input: &str) -> ParseResult<Statement> {
