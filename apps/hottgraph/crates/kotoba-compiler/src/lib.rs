@@ -59,6 +59,15 @@ impl Context {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum TypeError {
+    UndefinedVariable(String),
+    UndefinedType(String),
+    TypeMismatch { expected: Type, found: Type },
+    NotAFunction(Type),
+    NotImplemented(String),
+}
+
 pub struct Compiler {
     context: Context,
 }
@@ -135,6 +144,18 @@ impl Compiler {
                 // to allow for recursion (though not fully supported yet).
                 self.context
                     .define_var(variable_name.clone(), type_annotation.clone());
+                
+                // Type check the value against the annotation.
+                let found_type = self.type_check_expression(&value).map_err(|e| format!("{:?}", e))?;
+                if !self.are_types_equal(&found_type, &type_annotation) {
+                    return Err(format!(
+                        "{:?}",
+                        TypeError::TypeMismatch {
+                            expected: type_annotation,
+                            found: found_type
+                        }
+                    ));
+                }
 
                 let value_expr = if let Expression::Glue { ref value } = value {
                     // Special handling for `glue` expression to pass type context.
@@ -259,6 +280,65 @@ impl Compiler {
             Ok(enum_def)
         } else {
             Ok(format!("{}\n\nimpl {} {{\n{}}}", enum_def, name, impl_methods))
+        }
+    }
+
+    fn are_types_equal(&self, t1: &Type, t2: &Type) -> bool {
+        // This is a placeholder for a real type equality check.
+        // For now, we compare their string representations.
+        type_to_string(t1) == type_to_string(t2)
+    }
+
+    fn type_check_expression(&mut self, expression: &Expression) -> Result<Type, TypeError> {
+        match expression {
+            Expression::IntegerLiteral(_) => Ok(Type::Simple("i64".to_string())),
+            Expression::Zo(_) => Ok(Type::Ku),
+            Expression::Identifier(name) => self.type_check_identifier(name),
+            Expression::Let { name, type_annotation, value, body } => {
+                let value_type = self.type_check_expression(value)?;
+                if let Some(annotated_type) = type_annotation {
+                    if !self.are_types_equal(&value_type, annotated_type) {
+                        return Err(TypeError::TypeMismatch {
+                            expected: annotated_type.clone(),
+                            found: value_type,
+                        });
+                    }
+                }
+                self.context.enter_scope();
+                self.context.define_var(name.clone(), value_type);
+                let body_type = self.type_check_expression(body)?;
+                self.context.exit_scope();
+                Ok(body_type)
+            }
+            Expression::Pipe { lhs, rhs } => {
+                let lhs_type = self.type_check_expression(lhs)?;
+                let rhs_type = self.type_check_expression(rhs)?;
+
+                if let Type::Func(param_type, return_type) = rhs_type {
+                    if self.are_types_equal(&lhs_type, &param_type) {
+                        Ok(*return_type)
+                    } else {
+                        Err(TypeError::TypeMismatch {
+                            expected: *param_type,
+                            found: lhs_type,
+                        })
+                    }
+                } else {
+                    Err(TypeError::NotAFunction(rhs_type))
+                }
+            }
+            // Placeholder for other expression types
+            _ => Err(TypeError::NotImplemented(format!("{:?}", expression))),
+        }
+    }
+
+    fn type_check_identifier(&self, name: &str) -> Result<Type, TypeError> {
+        if let Some(ty) = self.context.find_var(name) {
+            Ok(ty.clone())
+        } else if let Some(type_name) = self.context.find_constructor_type(name) {
+            Ok(Type::Simple(type_name.clone()))
+        } else {
+            Err(TypeError::UndefinedVariable(name.to_string()))
         }
     }
 
@@ -538,6 +618,56 @@ mod tests {
         let code_no_type = result_no_type.unwrap();
         assert!(code_no_type.contains("let y = true;"));
         assert!(code_no_type.contains("y"));
+    }
+
+    #[test]
+    fn test_type_check_simple_vars() {
+        let mut compiler = Compiler::new();
+        compiler.context.define_var("x".to_string(), Type::Simple("i64".to_string()));
+        let expr = kotoba_parser::parse_expression("x").unwrap().1;
+        let result = compiler.type_check_expression(&expr);
+        assert_eq!(result, Ok(Type::Simple("i64".to_string())));
+
+        let expr_undef = kotoba_parser::parse_expression("y").unwrap().1;
+        let result_undef = compiler.type_check_expression(&expr_undef);
+        assert_eq!(result_undef, Err(TypeError::UndefinedVariable("y".to_string())));
+    }
+
+    #[test]
+    fn test_type_check_let() {
+        let mut compiler = Compiler::new();
+        let expr = kotoba_parser::parse_expression("let x: i64 = 10 in x").unwrap().1;
+        let result = compiler.type_check_expression(&expr);
+        assert_eq!(result, Ok(Type::Simple("i64".to_string())));
+
+        let expr_mismatch = kotoba_parser::parse_expression("let x: ku = 10 in x").unwrap().1;
+        let result_mismatch = compiler.type_check_expression(&expr_mismatch);
+        assert_eq!(
+            result_mismatch,
+            Err(TypeError::TypeMismatch {
+                expected: Type::Ku,
+                found: Type::Simple("i64".to_string())
+            })
+        );
+    }
+
+    #[test]
+    fn test_type_check_pipe() {
+        let mut compiler = Compiler::new();
+        let func_type = Type::Func(
+            Box::new(Type::Simple("i64".to_string())),
+            Box::new(Type::Simple("bool".to_string())),
+        );
+        compiler.context.define_var("is_positive".to_string(), func_type.clone());
+        compiler.context.define_var("n".to_string(), Type::Simple("i64".to_string()));
+
+        let expr = kotoba_parser::parse_expression("n |> is_positive").unwrap().1;
+        let result = compiler.type_check_expression(&expr);
+        assert_eq!(result, Ok(Type::Simple("bool".to_string())));
+
+        let expr_not_func = kotoba_parser::parse_expression("n |> n").unwrap().1;
+        let result_not_func = compiler.type_check_expression(&expr_not_func);
+        assert_eq!(result_not_func, Err(TypeError::NotAFunction(Type::Simple("i64".to_string()))));
     }
 
     #[test]
