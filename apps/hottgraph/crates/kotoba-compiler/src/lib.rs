@@ -59,6 +59,7 @@ impl Context {
     }
 }
 
+
 /// Represents a runtime value during type checking and interpretation.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -84,39 +85,6 @@ pub enum Value {
 }
 
 
-fn type_to_string(t: &Type) -> String {
-    match t {
-        Type::Ku => "kotoba_core::Interval".to_string(),
-        Type::Ze(t1, _t2) => {
-            // This is a placeholder. A real implementation would need to handle
-            // the fact that Path is generic over a single type, but the
-            // ze type represents equality between two values *of the same type*.
-            // For now, we just represent the type of the path's content.
-            format!("kotoba_core::Path<{}>", type_to_string(t1))
-        }
-        Type::En(t1, t2, t3) => {
-            // Placeholder for Glue type compilation
-            format!(
-                "kotoba_core::Glue<{}, {}, {}>",
-                type_to_string(t1),
-                type_to_string(t2),
-                type_to_string(t3)
-            )
-        }
-        Type::Unit => "()".to_string(),
-        Type::Func(from, to) => {
-            // To avoid infinite recursion for function types in closures,
-            // we represent them as a generic closure trait object.
-            // A full implementation might need more nuanced handling.
-            format!("Box<dyn Fn({}) -> {}>", type_to_string(from), type_to_string(to))
-        }
-        Type::Pi { binder_name, binder_type, return_type } => {
-            format!("(pi {}: {}) -> {}", binder_name, type_to_string(binder_type), type_to_string(return_type))
-        }
-        Type::Simple(name) => name.clone(),
-    }
-}
-
 #[derive(Debug, PartialEq)]
 pub enum TypeError {
     UndefinedVariable(String),
@@ -133,19 +101,45 @@ pub struct Compiler {
     context: Context,
 }
 
+fn type_to_string(t: &Type) -> String {
+    match t {
+        Type::Ku => "kotoba_core::Interval".to_string(),
+        Type::Ze(t1, _t2) => {
+            format!("kotoba_core::Path<{}>", type_to_string(t1))
+        }
+        Type::En(t1, t2, t3) => {
+            format!(
+                "kotoba_core::Glue<{}, {}, {}>",
+                type_to_string(t1),
+                type_to_string(t2),
+                type_to_string(t3)
+            )
+        }
+        Type::Unit => "()".to_string(),
+        Type::Func(from, to) => {
+            format!("Box<dyn Fn({}) -> {}>", type_to_string(from), type_to_string(to))
+        }
+        Type::Pi { binder_name, binder_type, return_type } => {
+            format!("(pi {}: {}) -> {}", binder_name, type_to_string(binder_type), type_to_string(return_type))
+        }
+        Type::Simple(name) => name.clone(),
+    }
+}
+
+
 impl Compiler {
     fn type_of(&mut self, value: &Value) -> Type {
         match value {
             Value::I64(_) => Type::Simple("i64".to_string()),
             Value::Bool(_) => Type::Simple("bool".to_string()),
             Value::Unit => Type::Unit,
-            Value::Type(t) => t.clone(), // This is a bit meta, a value that is a type
+            Value::Type(t) => t.clone(),
             Value::Pi { binder_name, binder_type, body, captured_context } => {
                 let mut temp_compiler = self.clone();
                 temp_compiler.context = captured_context.clone();
                 temp_compiler.context.enter_scope();
                 let binder_ty = temp_compiler.type_of(&*binder_type);
-                temp_compiler.context.define_var(binder_name.clone(), binder_ty.clone());
+                temp_compiler.context.define_var(binder_name.clone(), binder_ty);
                 let body_val = temp_compiler.type_check_expression(body, None);
 
                 Type::Pi {
@@ -154,7 +148,7 @@ impl Compiler {
                     return_type: Box::new(body_val.map(|v| temp_compiler.type_of(&v)).unwrap_or(Type::Simple("ERROR".to_string()))),
                 }
             },
-            Value::Constructor(name) => Type::Simple(name.clone()), // This is a simplification
+            Value::Constructor(name) => Type::Simple(name.clone()),
         }
     }
 
@@ -196,22 +190,16 @@ impl Compiler {
             } => {
                 let type_str = type_to_string(&type_annotation);
 
-                // The big change: type_check_expression now returns a Value.
                 let value_checked = self
                     .type_check_expression(&value, Some(&type_annotation))
                     .map_err(|e| format!("{:?}", e))?;
 
-                // We get the type *from* the value.
                 let found_type = self.type_of(&value_checked);
 
                 self.context
                     .define_var(variable_name.clone(), found_type.clone());
 
-                // Special case for path construction: `ze` type annotation on a `kan` expression.
                 let type_check_passed = if let (Type::Ze(..), Expression::Kan { .. }) = (&type_annotation, &value) {
-                    // When a `kan` is used to define a `ze` (path), we expect the `kan`'s type
-                    // to be a function from `ku` to the path's content type.
-                    // A full check would be more detailed, but for now we accept it.
                     true
                 } else {
                     self.are_types_equal(&found_type, &type_annotation)
@@ -317,7 +305,6 @@ impl Compiler {
                             .iter()
                             .map(|f| {
                                 let type_str = type_to_string(f);
-                                // Recursive type definitions need to be boxed.
                                 if type_str == name {
                                     format!("Box<{}>", name)
                                 } else {
@@ -353,9 +340,6 @@ impl Compiler {
     }
 
     fn are_types_equal(&self, t1: &Type, t2: &Type) -> bool {
-        // This is a placeholder for a real type equality check.
-        // For now, we compare their string representations, but we treat
-        // Pi and Func as equivalent for simplicity in this stage.
         match (t1, t2) {
             (Type::Pi { binder_type: bt1, return_type: rt1, .. }, Type::Func(p1, r1)) |
             (Type::Func(p1, r1), Type::Pi { binder_type: bt1, return_type: rt1, .. }) => {
@@ -365,12 +349,10 @@ impl Compiler {
         }
     }
 
-    // This function will be refactored to return a `Value` instead of a `Type`.
-    // The `type_of` helper will then be used to get the type from a value.
     fn type_check_expression(
         &mut self,
         expression: &Expression,
-        _expected_type: Option<&Type>,
+        expected_type: Option<&Type>,
     ) -> Result<Value, TypeError> {
         match expression {
             Expression::IntegerLiteral(n) => Ok(Value::I64(*n)),
@@ -378,6 +360,28 @@ impl Compiler {
             Expression::Identifier(name) => {
                 let ty = self.type_check_identifier(name)?;
                 Ok(Value::Type(ty))
+            }
+            Expression::Let {
+                name,
+                type_annotation,
+                value,
+                body,
+            } => {
+                let value_checked = self.type_check_expression(value, type_annotation.as_ref())?;
+                let value_type = self.type_of(&value_checked);
+                if let Some(annotated_type) = type_annotation {
+                    if !self.are_types_equal(&value_type, annotated_type) {
+                        return Err(TypeError::TypeMismatch {
+                            expected: type_to_string(annotated_type),
+                            found: type_to_string(&value_type),
+                        });
+                    }
+                }
+                self.context.enter_scope();
+                self.context.define_var(name.clone(), value_type);
+                let body_value = self.type_check_expression(body, expected_type)?;
+                self.context.exit_scope();
+                Ok(body_value)
             }
             Expression::If {
                 condition,
@@ -392,8 +396,8 @@ impl Compiler {
                     });
                 }
 
-                let then_value = self.type_check_expression(then_branch, _expected_type)?;
-                let else_value = self.type_check_expression(else_branch, _expected_type)?;
+                let then_value = self.type_check_expression(then_branch, expected_type)?;
+                let else_value = self.type_check_expression(else_branch, expected_type)?;
 
                 if self.type_of(&then_value) != self.type_of(&else_value) {
                     return Err(TypeError::TypeMismatch {
@@ -415,58 +419,22 @@ impl Compiler {
                         found: type_to_string(&self.type_of(&lhs_value)),
                     });
                 }
-
-                // This is a type check, not an evaluation, so we don't compute the result.
-                // We just return a value of the correct type.
+                
                 match op {
                     kotoba_parser::Operator::Add
                     | kotoba_parser::Operator::Subtract
                     | kotoba_parser::Operator::Multiply
-                    | kotoba_parser::Operator::Divide => Ok(Value::I64(0)), // Dummy value
-                    kotoba_parser::Operator::Equals
-                    | kotoba_parser::Operator::NotEquals
-                    | kotoba_parser::Operator::LessThan
-                    | kotoba_parser::Operator::GreaterThan
-                    | kotoba_parser::Operator::LessThanOrEqual
-                    | kotoba_parser::Operator::GreaterThanOrEqual => Ok(Value::Bool(true)), // Dummy value
+                    | kotoba_parser::Operator::Divide => Ok(Value::I64(0)),
+                    _ => Ok(Value::Bool(true)),
                 }
-            }
-            Expression::Let {
-                name,
-                type_annotation,
-                value,
-                body,
-            } => {
-                let value_checked = self.type_check_expression(value, type_annotation.as_ref())?;
-                let value_type = self.type_of(&value_checked);
-                if let Some(annotated_type) = type_annotation {
-                    if !self.are_types_equal(&value_type, annotated_type) {
-                        return Err(TypeError::TypeMismatch {
-                            expected: type_to_string(annotated_type),
-                            found: type_to_string(&value_type),
-                        });
-                    }
-                }
-                self.context.enter_scope();
-                self.context.define_var(name.clone(), value_type);
-                // The body's expected type is the same as the whole let expression's.
-                let body_value = self.type_check_expression(body, _expected_type)?;
-                self.context.exit_scope();
-                Ok(body_value)
             }
             Expression::Kan { params, body } => {
-                // This is a simplified check for now. A full implementation would
-                // handle multiple parameters and build a nested Pi type.
                 if params.len() != 1 {
                     return Err(TypeError::NotImplemented(
                         "Functions with multiple arguments".to_string(),
                     ));
                 }
                 let param = &params[0];
-
-                // The type of the parameter needs to be evaluated to a value.
-                // For now, we assume simple types like `i64` which become `Type(Type::Simple(...))`.
-                // A full implementation would handle `(x: A) -> B` where A is a complex type.
                 let binder_type_value = Value::Type(param.type_annotation.clone());
 
                 Ok(Value::Pi {
@@ -493,16 +461,12 @@ impl Compiler {
 
                         let mut application_context = captured_context;
                         application_context.enter_scope();
-                        // Bind the argument's *type* to the binder's name.
-                        // A full evaluator would bind the *value*.
-                        application_context.define_var(binder_name, actual_lhs_type.clone());
+                        application_context.define_var(binder_name, actual_lhs_type);
 
-                        // The expected type of the body is the expected type of the whole application.
-                        // We need to temporarily swap the context to check the body.
                         let original_context = self.context.clone();
                         self.context = application_context;
-                        let result_value = self.type_check_expression(&body, _expected_type)?;
-                        self.context = original_context; // Restore context
+                        let result_value = self.type_check_expression(&body, expected_type)?;
+                        self.context = original_context;
                         Ok(result_value)
                     }
                     Value::Type(Type::Func(param_type, return_type)) => {
@@ -538,7 +502,7 @@ impl Compiler {
                         self.context.define_var(name, ty);
                     }
 
-                    let arm_body_value = self.type_check_expression(&arm.body, _expected_type)?;
+                    let arm_body_value = self.type_check_expression(&arm.body, expected_type)?;
                     arm_values.push(arm_body_value);
 
                     self.context.exit_scope();
@@ -565,7 +529,7 @@ impl Compiler {
                 )))
             }
             Expression::Glue { value } => {
-                if let Some(Type::En(t, _, _)) = _expected_type {
+                if let Some(Type::En(t, _, _)) = expected_type {
                     let value_checked = self.type_check_expression(value, Some(t))?;
                     if self.type_of(&value_checked) != *t.clone() {
                         return Err(TypeError::TypeMismatch {
@@ -573,7 +537,7 @@ impl Compiler {
                             found: type_to_string(&self.type_of(&value_checked)),
                         });
                     }
-                    Ok(Value::Type(_expected_type.unwrap().clone()))
+                    Ok(Value::Type(expected_type.unwrap().clone()))
                 } else {
                     Err(TypeError::NotImplemented(
                         "Cannot infer type of `glue` without a type annotation.".to_string(),
@@ -618,7 +582,7 @@ impl Compiler {
                         }
                     }
                     (_, "as_en") => {
-                        if let Some(expected) = _expected_type {
+                        if let Some(expected) = expected_type {
                             Ok(Value::Type(expected.clone()))
                         } else {
                             Err(TypeError::NotImplemented(
@@ -652,11 +616,8 @@ impl Compiler {
     ) -> Result<HashMap<String, Type>, TypeError> {
         let mut bindings = HashMap::new();
         match pattern {
-            Pattern::Wildcard | Pattern::IntegerLiteral(_) | Pattern::IntervalLiteral(_) => {
-                // No bindings
-            }
+            Pattern::Wildcard | Pattern::IntegerLiteral(_) | Pattern::IntervalLiteral(_) => {}
             Pattern::Identifier(name) => {
-                // If the identifier is not a known constructor, it's a variable binding.
                 let is_constructor = self.context.find_constructor_type(name).is_some()
                     && name.chars().next().map_or(false, |c| c.is_uppercase());
                 if !is_constructor {
@@ -664,7 +625,6 @@ impl Compiler {
                 }
             }
             Pattern::Constructor(name, sub_patterns) => {
-                // Find the definition for this constructor
                 let type_name = self
                     .context
                     .find_constructor_type(name)
@@ -680,9 +640,9 @@ impl Compiler {
                     .iter()
                     .find(|c| match c {
                         ConstructorDef::Point { name: c_name, .. } => c_name == name,
-                        ConstructorDef::Path { .. } => false, // Paths in patterns not yet supported
+                        _ => false,
                     })
-                    .ok_or_else(|| TypeError::UndefinedType(name.clone()))?; // Should be a more specific error
+                    .ok_or_else(|| TypeError::UndefinedType(name.clone()))?;
 
                 if let ConstructorDef::Point { fields, .. } = constructor_def {
                     if fields.len() != sub_patterns.len() {
@@ -948,7 +908,6 @@ mod tests {
         let result = compiler.compile(vec![statement]);
         let expected_code =
             "let my_time: kotoba_core::Interval = kotoba_core::Interval::I0;\n";
-        // We remove the Ba import for now as it's not used.
         assert_eq!(result.unwrap().contains(expected_code), true);
     }
 
@@ -1031,7 +990,7 @@ mod tests {
         let mut compiler = Compiler::new();
         let expr = kotoba_parser::parse_expression("let x: i64 = 10 in x + 1").unwrap().1;
         let result = compiler.type_check_expression(&expr, Some(&Type::Simple("i64".to_string())));
-        assert_eq!(result, Ok(Value::I64(0))); // Dummy value
+        assert_eq!(result, Ok(Value::I64(0)));
 
         let expr_mismatch = kotoba_parser::parse_expression("let x: ku = 10 in x").unwrap().1;
         let result_mismatch = compiler.type_check_expression(&expr_mismatch, Some(&Type::Ku));
@@ -1067,6 +1026,47 @@ mod tests {
     }
 
     #[test]
+    fn test_type_check_ou() {
+        let mut compiler = Compiler::new();
+        let option_type_name = "Option".to_string();
+        let constructors = vec![
+            ConstructorDef::Point {
+                name: "some".to_string(),
+                fields: vec![Type::Simple("i64".to_string())],
+            },
+            ConstructorDef::Point {
+                name: "none".to_string(),
+                fields: vec![],
+            },
+        ];
+        compiler
+            .context
+            .type_definitions
+            .insert(option_type_name.clone(), constructors);
+
+        let option_value_type = Type::Simple(option_type_name);
+        compiler.context.define_var("opt".to_string(), option_value_type);
+
+        let expr_ok = parse_expression("ou opt { some(x) => x, none => 0 }")
+            .unwrap()
+            .1;
+        let result_ok = compiler.type_check_expression(&expr_ok, None);
+        assert_eq!(compiler.type_of(&result_ok.unwrap()), Type::Simple("i64".to_string()));
+
+        let expr_err = parse_expression("ou opt { some(x) => x, none => i0 }")
+            .unwrap()
+            .1;
+        let result_err = compiler.type_check_expression(&expr_err, None);
+        assert_eq!(
+            result_err,
+            Err(TypeError::TypeMismatch {
+                expected: "i64".to_string(),
+                found: type_to_string(&Type::Ku)
+            })
+        );
+    }
+
+    #[test]
     fn test_compile_rin_with_generics() {
         let input = "rin id<T>(x: T): T = x";
         let (_, statement) = parse_statement(input).unwrap();
@@ -1082,8 +1082,6 @@ mod tests {
         let (_, statement) = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
-        // Note: The compiled `match` is incomplete due to placeholder `compile_ou_arm`.
-        // This test just checks the function signature.
         let compiled_code = result.unwrap();
         assert!(compiled_code.contains("fn add(a: N, b: N) -> N"));
         assert!(compiled_code.contains("match a"));
@@ -1121,52 +1119,7 @@ mod tests {
         assert!(code.contains("match a"));
         assert!(code.contains("N::Zero =>"));
         assert!(code.contains("N::Succ(p) =>"));
-        assert!(code.contains("N::Zero")); // a an expression
-    }
-
-    #[test]
-    fn test_type_check_ou() {
-        let mut compiler = Compiler::new();
-        // gyo Option<T> = { some(T), none }
-        let option_type_name = "Option".to_string();
-        let constructors = vec![
-            ConstructorDef::Point {
-                name: "some".to_string(),
-                fields: vec![Type::Simple("i64".to_string())],
-            },
-            ConstructorDef::Point {
-                name: "none".to_string(),
-                fields: vec![],
-            },
-        ];
-        compiler
-            .context
-            .type_definitions
-            .insert(option_type_name.clone(), constructors);
-
-        // shiki opt: Option = some(10)
-        let option_value_type = Type::Simple(option_type_name);
-        compiler.context.define_var("opt".to_string(), option_value_type);
-
-        // Case 1: All arms return the same type (i64)
-        let expr_ok = parse_expression("ou opt { some(x) => x, none => 0 }")
-            .unwrap()
-            .1;
-        let result_ok = compiler.type_check_expression(&expr_ok, None);
-        assert_eq!(compiler.type_of(&result_ok.unwrap()), Type::Simple("i64".to_string()));
-
-        // Case 2: Arms return different types (i64 vs ku)
-        let expr_err = parse_expression("ou opt { some(x) => x, none => i0 }")
-            .unwrap()
-            .1;
-        let result_err = compiler.type_check_expression(&expr_err, None);
-        assert_eq!(
-            result_err,
-            Err(TypeError::TypeMismatch {
-                expected: "i64".to_string(),
-                found: type_to_string(&Type::Ku)
-            })
-        );
+        assert!(code.contains("N::Zero"));
     }
 
     #[test]
@@ -1180,8 +1133,6 @@ mod tests {
         let compiled_code = result.unwrap();
 
         assert!(compiled_code.contains("enum Bool"));
-        assert!(compiled_code.contains("True"));
-        assert!(compiled_code.contains("False"));
         assert!(compiled_code.contains("let path_to_false: kotoba_core::Path<Bool>"));
         assert!(compiled_code.contains("Bool::True"));
         assert!(compiled_code.contains("Bool::False"));
@@ -1192,7 +1143,6 @@ mod tests {
         let input = "shiki p_over_p: ze<ze<i64, i64>, ze<i64, i64>> = some_path";
         let (_, statement) = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
-        // Mock a definition for some_path
         let path_type = Type::Ze(
             Box::new(Type::Ze(
                 Box::new(Type::Simple("i64".to_string())),
@@ -1240,7 +1190,6 @@ mod tests {
         let (_, statement) = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
-        // The compiled `match` formatting can be tricky, so we check for key parts.
         let compiled_code = result.unwrap();
         assert!(compiled_code.contains("let my_path: kotoba_core::Path<i64>"));
         assert!(compiled_code.contains("= kotoba_core::Path::new("));
@@ -1266,7 +1215,6 @@ mod tests {
         let input = "shiki pipeline: en<ma, i64, id> = ticks |> doubler";
         let (_, statement) = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
-        // Mock definitions for ticks and doubler
         compiler.context.define_var(
             "ticks".to_string(),
             Type::En(
