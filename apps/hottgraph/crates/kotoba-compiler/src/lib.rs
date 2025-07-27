@@ -203,6 +203,26 @@ impl Compiler {
                 let value_code = self.compile_expression(*value)?;
                 Ok(format!("kotoba_core::unglue({})", value_code))
             }
+            Expression::Let {
+                name,
+                type_annotation,
+                value,
+                body,
+            } => {
+                let value_code = self.compile_expression(*value)?;
+                let body_code = self.compile_expression(*body)?;
+                let let_statement = if let Some(ty) = type_annotation {
+                    format!(
+                        "let {}: {} = {};",
+                        name,
+                        type_to_string(&ty),
+                        value_code
+                    )
+                } else {
+                    format!("let {} = {};", name, value_code)
+                };
+                Ok(format!("{{\n    {}\n    {}\n}}", let_statement, body_code))
+            }
             Expression::Zo(val) => match val.as_str() {
                 "i0" => Ok("kotoba_core::Interval::I0".to_string()),
                 "i1" => Ok("kotoba_core::Interval::I1".to_string()),
@@ -386,6 +406,27 @@ mod tests {
         let result_unglue = compiler.compile(vec![statement_unglue]);
         let expected_unglue = "let v: i64 = kotoba_core::unglue(g);\n";
         assert_eq!(result_unglue.unwrap().contains(expected_unglue), true);
+    }
+
+    #[test]
+    fn test_compile_let_in() {
+        let input = "let x: i64 = 10 in x";
+        let (_, expr) = parse_expression(input).unwrap();
+        let mut compiler = Compiler::new();
+        let result = compiler.compile_expression(expr);
+        // Note: The exact formatting with newlines might vary.
+        assert!(result.is_ok());
+        let code = result.unwrap();
+        assert!(code.contains("let x: i64 = 10;"));
+        assert!(code.contains("x"));
+
+        let input_no_type = "let y = true in y";
+        let (_, expr_no_type) = parse_expression(input_no_type).unwrap();
+        let result_no_type = compiler.compile_expression(expr_no_type);
+        assert!(result_no_type.is_ok());
+        let code_no_type = result_no_type.unwrap();
+        assert!(code_no_type.contains("let y = true;"));
+        assert!(code_no_type.contains("y"));
     }
 
     #[test]

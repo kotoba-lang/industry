@@ -30,4 +30,8 @@ rin id<T>(x: T): T = x
 gyo Nat = {
     zero,
     succ(Nat)
-} 
+}
+
+shiki p_composed_refl: ze<i64, i64> =
+    let p_comp = p1.compose(p2) in
+    refl(10) // Note: body doesn't use p_comp yet, just for syntax check 
