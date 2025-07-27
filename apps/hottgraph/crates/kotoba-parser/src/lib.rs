@@ -8,6 +8,8 @@ use nom::{
     IResult, Parser,
 };
 
+type ParseResult<'a, O> = IResult<&'a str, O, nom::error::Error<&'a str>>;
+
 /// 型を表すAST
 #[derive(Debug, PartialEq, Clone)]
 pub enum Type {
@@ -120,7 +122,7 @@ pub enum Statement {
 
 // --- Parsers ---
 
-fn parse_identifier_str(input: &str) -> IResult<&str, &str> {
+fn parse_identifier_str(input: &str) -> ParseResult<&str> {
     recognize(pair(
         alt((alpha1, tag("_"))),
         opt(take_while1(|c: char| c.is_alphanumeric() || c == '_')),
@@ -128,7 +130,7 @@ fn parse_identifier_str(input: &str) -> IResult<&str, &str> {
     .parse(input)
 }
 
-fn parse_identifier(input: &str) -> IResult<&str, &str> {
+fn parse_identifier(input: &str) -> ParseResult<&str> {
     verify(parse_identifier_str, |s: &str| {
         !matches!(
             s,
@@ -138,29 +140,26 @@ fn parse_identifier(input: &str) -> IResult<&str, &str> {
     .parse(input)
 }
 
-fn parse_type_name(input: &str) -> IResult<&str, &str> {
+fn parse_type_name(input: &str) -> ParseResult<&str> {
     parse_identifier_str(input) // alpha1ではi64などをパースできないため修正
 }
 
 /// Parses a type, handling right-associative function types `A -> B -> C`.
-pub fn parse_type(input: &str) -> IResult<&str, Type> {
-    let (input, mut ty) = parse_atomic_type(input)?;
+pub fn parse_type(input: &str) -> ParseResult<Type> {
+    let (input, lhs) = parse_atomic_type(input)?;
 
-    if let Ok((input, _)) =
-        delimited(multispace0, tag("->"), multispace0).parse::<&str, _, nom::error::Error<&str>>(
-            input,
-        )
-    {
+    let (input, arrow) = opt(delimited(multispace0, tag("->"), multispace0)).parse(input)?;
+
+    if arrow.is_some() {
         let (input, rhs) = parse_type(input)?;
-        ty = Type::Func(Box::new(ty), Box::new(rhs));
-        Ok((input, ty))
+        Ok((input, Type::Func(Box::new(lhs), Box::new(rhs))))
     } else {
-        Ok((input, ty))
+        Ok((input, lhs))
     }
 }
 
 /// Parses non-function types (atomic types in the context of function type parsing).
-fn parse_atomic_type(input: &str) -> IResult<&str, Type> {
+fn parse_atomic_type(input: &str) -> ParseResult<Type> {
     if input.starts_with("()") {
         return Ok((&input[2..], Type::Unit));
     }
@@ -215,7 +214,7 @@ fn parse_atomic_type(input: &str) -> IResult<&str, Type> {
     Ok((input, Type::Simple(name.to_string())))
 }
 
-fn parse_parameter(input: &str) -> IResult<&str, Parameter> {
+fn parse_parameter(input: &str) -> ParseResult<Parameter> {
     map(
         (
             parse_identifier,
@@ -230,7 +229,7 @@ fn parse_parameter(input: &str) -> IResult<&str, Parameter> {
     .parse(input)
 }
 
-fn parse_pattern(input: &str) -> IResult<&str, Pattern> {
+fn parse_pattern(input: &str) -> ParseResult<Pattern> {
     // Tries to parse a constructor pattern like `Succ(n)` or `Cons(h, t)`.
     // If that fails, it tries the other, simpler patterns.
     let constructor_with_args_parser = map(
@@ -258,7 +257,7 @@ fn parse_pattern(input: &str) -> IResult<&str, Pattern> {
     .parse(input)
 }
 
-fn parse_ou_arm(input: &str) -> IResult<&str, OuArm> {
+fn parse_ou_arm(input: &str) -> ParseResult<OuArm> {
     map(
         preceded(
             multispace0,
@@ -273,7 +272,7 @@ fn parse_ou_arm(input: &str) -> IResult<&str, OuArm> {
     .parse(input)
 }
 
-fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
+fn parse_primary_expression(input: &str) -> ParseResult<Expression> {
     let refl_parser = map(
         preceded(
             tag("refl"),
@@ -359,7 +358,7 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
     Ok((remaining, expr))
 }
 
-fn parse_constructor(input: &str) -> IResult<&str, Constructor> {
+fn parse_constructor(input: &str) -> ParseResult<Constructor> {
     map(
         pair(
             parse_identifier,
@@ -378,7 +377,7 @@ fn parse_constructor(input: &str) -> IResult<&str, Constructor> {
     .parse(input)
 }
 
-pub fn parse_expression(input: &str) -> IResult<&str, Expression> {
+pub fn parse_expression(input: &str) -> ParseResult<Expression> {
     // First, try to parse a complete `ou` expression, as it's a compound form.
     let ou_parser = map(
         preceded(
@@ -452,7 +451,7 @@ pub fn parse_expression(input: &str) -> IResult<&str, Expression> {
     .parse(input)
 }
 
-pub fn parse_statement(input: &str) -> IResult<&str, Statement> {
+pub fn parse_statement(input: &str) -> ParseResult<Statement> {
     let shiki_parser = map(
         (
             tag("shiki"),
@@ -841,6 +840,38 @@ mod tests {
         let input = "()";
         let result = parse_type(input);
         assert_eq!(result, Ok(("", Type::Unit)));
+    }
+
+    #[test]
+    fn test_parse_function_type() {
+        let input = "i64 -> i64";
+        let result = parse_type(input);
+        assert_eq!(
+            result,
+            Ok((
+                "",
+                Type::Func(
+                    Box::new(Type::Simple("i64".to_string())),
+                    Box::new(Type::Simple("i64".to_string()))
+                )
+            ))
+        );
+
+        let input_nested = "A -> B -> C";
+        let result_nested = parse_type(input_nested);
+        assert_eq!(
+            result_nested,
+            Ok((
+                "",
+                Type::Func(
+                    Box::new(Type::Simple("A".to_string())),
+                    Box::new(Type::Func(
+                        Box::new(Type::Simple("B".to_string())),
+                        Box::new(Type::Simple("C".to_string()))
+                    ))
+                )
+            ))
+        );
     }
 
     #[test]
