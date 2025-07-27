@@ -121,36 +121,40 @@ fn compose_helper<T: Clone + 'static>(p: Path<T>, q: Path<T>, i: Interval) -> T 
     }
 }
 
-/// `en` (縁): Represents a "glued" type.
+/// `en` (縁): Represents a "glued" type, a core concept in Cubical Type Theory.
 ///
-/// `Glue<T, P>` represents a value of type `T` that is "equivalent"
-/// to some other structure `A` along a path `p`. `P` itself is a path,
-/// linking the type `T` to `A` where a certain condition holds.
+/// It allows creating a new type by taking a base type `A` and specifying that
+/// on a certain part of `A` (a "boundary" defined by a path), it should be
+/// equivalent to another type `B`.
 ///
-/// This is a highly simplified placeholder for a full Glue Type. A real
-/// implementation requires dependent types and a way to model the equivalence `A`.
-/// For now, we represent the "equivalent structure" abstractly with another path.
-pub struct Glue<T, P> {
-    /// The base value of the original type `T`.
-    pub base: T,
-    /// A path that represents the "proof" or "reason" for the glue.
-    /// In a real system, this would be a path `p: A -> B` where `self.base`
-    /// corresponds to a point on that path under some equivalence.
-    pub path_over_base: P,
+/// `Glue<A, T, E>` can be read as: "A type that is mostly `A`, but on the
+/// boundary `T`, it is equivalent to `B` via the equivalence `E`."
+///
+/// This implementation is a placeholder. A full implementation requires:
+/// 1. Dependent types (to define `T` as a subtype of `A`).
+/// 2. A formal representation of equivalences (`E`).
+pub struct Glue<A, T, E> {
+    /// The base value, which belongs to the type `A`.
+    pub base: A,
+    /// A marker for the boundary type `T`.
+    _boundary: std::marker::PhantomData<T>,
+    /// A marker for the equivalence `E` over the boundary.
+    _equivalence: std::marker::PhantomData<E>,
 }
 
 /// `en` (縁): The act of gluing.
-/// Creates a `Glue`d value. This is a simplified placeholder.
-pub fn glue<T, P>(base: T, path_over_base: P) -> Glue<T, P> {
+/// This is a simplified placeholder.
+pub fn glue<A, T, E>(base: A) -> Glue<A, T, E> {
     Glue {
         base,
-        path_over_base,
+        _boundary: std::marker::PhantomData,
+        _equivalence: std::marker::PhantomData,
     }
 }
 
 /// The act of ungluing.
 /// Extracts the base value from a `Glue`d type.
-pub fn unglue<T, P>(glued_value: Glue<T, P>) -> T {
+pub fn unglue<A, T, E>(glued_value: Glue<A, T, E>) -> A {
     glued_value.base
 }
 
@@ -227,22 +231,17 @@ mod tests {
 
     #[test]
     fn test_glue_struct() {
-        // Imagine we have a base value, e.g., a point (5, 5)
-        let base_point = (5, 5);
+        // Imagine we have a base value, e.g., a point (5, 5) of type `A`
+        type A = (i32, i32);
+        let base_point: A = (5, 5);
 
-        // And a path representing some equivalence.
-        // For example, a path saying that for the point (5, 5), it is "equivalent"
-        // to being on a line from (0,0) to (10,10).
-        let path_proof = Path::new(|i| {
-            if i == Interval::I0 {
-                (0, 0)
-            } else {
-                (10, 10)
-            }
-        });
+        // And a boundary `T` (e.g., where x=5) and an equivalence `E`
+        // (e.g., mapping it to a line). These are abstract for now.
+        type T = ();
+        type E = ();
 
         // We "glue" this information together.
-        let glued_point = glue(base_point, path_proof);
+        let glued_point: Glue<A, T, E> = glue(base_point);
 
         // Ungluing gives us back the original point.
         assert_eq!(unglue(glued_point), (5, 5));

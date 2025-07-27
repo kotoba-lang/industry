@@ -318,10 +318,6 @@ mod tests {
         let (_, statement) = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
-        let expected_code = "let my_path: kotoba_core::Path<i64> = kotoba_core::Path::new(|i: kotoba_core::Interval| { match i {
-    kotoba_core::Interval::I0 => { 10 },
-    kotoba_core::Interval::I1 => { 20 },
-} });\n";
         // The compiled `match` formatting can be tricky, so we check for key parts.
         let compiled_code = result.unwrap();
         assert!(compiled_code.contains("let my_path: kotoba_core::Path<i64>"));
