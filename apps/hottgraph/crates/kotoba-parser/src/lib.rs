@@ -54,8 +54,6 @@ pub struct Constructor {
 /// 式を表すAST
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
-    /// `ku "<id>"`
-    Ku { id: String },
     /// `kan(<params>) => <body>`
     Kan {
         params: Vec<Parameter>,
@@ -121,17 +119,6 @@ fn parse_identifier(input: &str) -> IResult<&str, &str> {
             "shiki" | "kan" | "ku" | "ou" | "ba" | "en" | "ma" | "ze" | "i0" | "i1" | "gyo" | "rin"
         )
     })(input)
-}
-
-fn parse_quoted_string(input: &str) -> IResult<&str, String> {
-    map(
-        delimited(
-            char('"'),
-            nom::bytes::complete::take_while(|c: char| c != '"'),
-            char('"'),
-        ),
-        |s: &str| s.to_string(),
-    )(input)
 }
 
 fn parse_type_name(input: &str) -> IResult<&str, &str> {
@@ -236,11 +223,6 @@ fn parse_ou_arm(input: &str) -> IResult<&str, OuArm> {
 }
 
 fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
-    let ku_parser = map(
-        preceded(tuple((tag("ku"), multispace1)), parse_quoted_string),
-        |id| Expression::Ku { id },
-    );
-
     let zo_parser = map(alt((tag("i0"), tag("i1"))), |s: &str| {
         Expression::Zo(s.to_string())
     });
@@ -270,7 +252,6 @@ fn parse_primary_expression(input: &str) -> IResult<&str, Expression> {
     });
 
     let (mut remaining, mut expr) = alt((
-        ku_parser,
         kan_parser,
         zo_parser,
         ident_expr_parser,
@@ -439,25 +420,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_shiki_ku() {
-        let input = "shiki timer_ba: ba = ku \"system/timer\"";
-        let result = parse_statement(input);
-        assert_eq!(
-            result,
-            Ok((
-                "",
-                Statement::Shiki {
-                    variable_name: "timer_ba".to_string(),
-                    type_annotation: Type::Simple("ba".to_string()),
-                    value: Expression::Ku {
-                        id: "system/timer".to_string()
-                    }
-                }
-            ))
-        );
-    }
-
-    #[test]
     fn test_parse_toki_type() {
         let input = "shiki my_time: ku = i0";
         let result = parse_statement(input);
@@ -568,7 +530,7 @@ mod tests {
 
     #[test]
     fn test_parse_ou_expression() {
-        let input = "ou x { 0 => ku \"zero\", _ => ku \"other\" }";
+        let input = "ou x { 0 => i0, _ => i1 }";
         let result = parse_expression(input); // 式として直接パース
         assert_eq!(
             result,
@@ -579,15 +541,11 @@ mod tests {
                     arms: vec![
                         OuArm {
                             pattern: Pattern::IntegerLiteral(0),
-                            body: Expression::Ku {
-                                id: "zero".to_string()
-                            }
+                            body: Expression::Zo("i0".to_string())
                         },
                         OuArm {
                             pattern: Pattern::Wildcard,
-                            body: Expression::Ku {
-                                id: "other".to_string()
-                            }
+                            body: Expression::Zo("i1".to_string())
                         }
                     ]
                 }
