@@ -96,10 +96,17 @@ pub enum TypeError {
     NotImplemented(String),
 }
 
+#[derive(Debug, PartialEq)]
+pub enum EvalError {
+    UndefinedVariable(String),
+}
+
 #[derive(Debug, Clone)]
 pub struct Compiler {
     context: Context,
+    environment: Vec<HashMap<String, Value>>,
 }
+
 
 fn type_to_string(t: &Type) -> String {
     match t {
@@ -120,8 +127,6 @@ fn type_to_string(t: &Type) -> String {
             format!("Box<dyn Fn({}) -> {}>", type_to_string(from), type_to_string(to))
         }
         Type::Pi { binder_type, return_type, .. } => {
-            // For code generation, we currently treat Pi types as non-dependent function types.
-            // The binder name is erased in the type signature.
             format!("Box<dyn Fn({}) -> {}>", type_to_string(binder_type), type_to_string(return_type))
         }
         Type::Simple(name) => name.clone(),
@@ -130,6 +135,59 @@ fn type_to_string(t: &Type) -> String {
 
 
 impl Compiler {
+    fn env_enter_scope(&mut self) {
+        self.environment.push(HashMap::new());
+    }
+
+    fn env_exit_scope(&mut self) {
+        self.environment.pop();
+    }
+
+    fn env_define_var(&mut self, name: String, val: Value) {
+        self.environment.last_mut().unwrap().insert(name, val);
+    }
+
+    fn env_find_var(&self, name: &str) -> Option<&Value> {
+        self.environment.iter().rev().find_map(|scope| scope.get(name))
+    }
+
+    fn evaluate(&mut self, expr: &Expression) -> Result<Value, EvalError> {
+        match expr {
+            Expression::IntegerLiteral(n) => Ok(Value::I64(*n)),
+            Expression::Identifier(name) => self.env_find_var(name).cloned().ok_or_else(|| EvalError::UndefinedVariable(name.clone())),
+            Expression::Let { name, value, body, .. } => {
+                let val = self.evaluate(value)?;
+                self.env_enter_scope();
+                self.env_define_var(name.clone(), val);
+                let result = self.evaluate(body)?;
+                self.env_exit_scope();
+                Ok(result)
+            }
+            Expression::BinaryOp { lhs, rhs, op } => {
+                let lhs_val = self.evaluate(lhs)?;
+                let rhs_val = self.evaluate(rhs)?;
+                match (lhs_val, rhs_val) {
+                    (Value::I64(l), Value::I64(r)) => {
+                        match op {
+                            kotoba_parser::Operator::Add => Ok(Value::I64(l + r)),
+                            kotoba_parser::Operator::Subtract => Ok(Value::I64(l - r)),
+                            kotoba_parser::Operator::Multiply => Ok(Value::I64(l * r)),
+                            kotoba_parser::Operator::Divide => Ok(Value::I64(l / r)),
+                            kotoba_parser::Operator::Equals => Ok(Value::Bool(l == r)),
+                            kotoba_parser::Operator::NotEquals => Ok(Value::Bool(l != r)),
+                            kotoba_parser::Operator::LessThan => Ok(Value::Bool(l < r)),
+                            kotoba_parser::Operator::GreaterThan => Ok(Value::Bool(l > r)),
+                            kotoba_parser::Operator::LessThanOrEqual => Ok(Value::Bool(l <= r)),
+                            kotoba_parser::Operator::GreaterThanOrEqual => Ok(Value::Bool(l >= r)),
+                        }
+                    }
+                    _ => unimplemented!("Binary operations on non-integers are not supported yet."),
+                }
+            }
+            _ => unimplemented!("Evaluation for this expression is not yet implemented."),
+        }
+    }
+
     fn type_of(&mut self, value: &Value) -> Type {
         match value {
             Value::I64(_) => Type::Simple("i64".to_string()),
@@ -157,6 +215,7 @@ impl Compiler {
     pub fn new() -> Self {
         Compiler {
             context: Context::new(),
+            environment: vec![HashMap::new()],
         }
     }
 
@@ -1345,5 +1404,19 @@ mod tests {
             result.unwrap().contains(expected_code),
             "Generated code did not match expectation."
         );
+    }
+
+    #[test]
+    fn test_evaluator_variables_and_let() {
+        let input = "let x = 10 in let y = 20 in x + y";
+        let (_, expression) = parse_expression(input).unwrap();
+        let mut compiler = Compiler::new();
+        let result = compiler.evaluate(&expression);
+        assert_eq!(result, Ok(Value::I64(30)));
+
+        let input_undefined = "let x = 5 in y";
+        let (_, expression_undef) = parse_expression(input_undefined).unwrap();
+        let result_undef = compiler.evaluate(&expression_undef);
+        assert_eq!(result_undef, Err(EvalError::UndefinedVariable("y".to_string())));
     }
 }
