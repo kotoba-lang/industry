@@ -32,6 +32,12 @@ gyo Nat = {
     succ(Nat)
 }
 
+// Higher Inductive Type for the Circle S¹
+gyo S1 = {
+    base,
+    loop: ze<base, base>
+}
+
 shiki p_composed_refl: ze<i64, i64> =
     let p_comp = p1.compose(p2) in
     refl(10) // Note: body doesn't use p_comp yet, just for syntax check 
