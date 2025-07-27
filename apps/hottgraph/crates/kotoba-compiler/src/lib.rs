@@ -119,8 +119,10 @@ fn type_to_string(t: &Type) -> String {
         Type::Func(from, to) => {
             format!("Box<dyn Fn({}) -> {}>", type_to_string(from), type_to_string(to))
         }
-        Type::Pi { binder_name, binder_type, return_type } => {
-            format!("(pi {}: {}) -> {}", binder_name, type_to_string(binder_type), type_to_string(return_type))
+        Type::Pi { binder_type, return_type, .. } => {
+            // For code generation, we currently treat Pi types as non-dependent function types.
+            // The binder name is erased in the type signature.
+            format!("Box<dyn Fn({}) -> {}>", type_to_string(binder_type), type_to_string(return_type))
         }
         Type::Simple(name) => name.clone(),
     }
@@ -1327,6 +1329,21 @@ mod tests {
         assert!(
             compiled_code.contains(expected_impl),
             "Impl block for path constructor missing or incorrect."
+        );
+    }
+
+    #[test]
+    fn test_compile_shiki_pi_type() {
+        let input = "shiki id_func: (x: i64) -> i64 = kan(y: i64) => y";
+        let (_, statement) = parse_statement(input).unwrap();
+        let mut compiler = Compiler::new();
+        let result = compiler.compile(vec![statement]);
+        assert!(result.is_ok(), "Compilation failed: {:?}", result.err());
+        let expected_code =
+            "let id_func: Box<dyn Fn(i64) -> i64> = |y: i64| { y };\n";
+        assert!(
+            result.unwrap().contains(expected_code),
+            "Generated code did not match expectation."
         );
     }
 }
