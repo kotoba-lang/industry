@@ -1,5 +1,5 @@
 use kotoba_parser::{
-    ConstructorDef, Expression, OuArm, Pattern, Statement, Type,
+    ConstructorDef, Expression, OuArm, Pattern, Statement, Type, Parameter
 };
 use std::collections::HashMap;
 
@@ -112,8 +112,8 @@ pub struct Compiler {
 fn type_to_string(t: &Type) -> String {
     match t {
         Type::Ku => "kotoba_core::Interval".to_string(),
-        Type::Ze(t1, _t2) => {
-            format!("kotoba_core::Path<{}>", type_to_string(t1))
+        Type::Ze(t1, t2) => {
+            format!("kotoba_core::Path<{}>", type_to_string(t1)) // Simplified
         }
         Type::En(t1, t2, t3) => {
             format!(
@@ -130,7 +130,18 @@ fn type_to_string(t: &Type) -> String {
         Type::Pi { binder_type, return_type, .. } => {
             format!("Box<dyn Fn({}) -> {}>", type_to_string(binder_type), type_to_string(return_type))
         }
-        Type::Simple(name) => name.clone(),
+        Type::Ident(name) => name.clone(),
+        Type::App(head, args) => {
+            let head_str = type_to_string(head);
+            let args_str = args.iter().map(type_to_string).collect::<Vec<_>>().join(" ");
+            format!("{} {}", head_str, args_str)
+        }
+        Type::Expr(expr) => {
+            // This is tricky. For now, we'll try a best-effort string representation
+            // of the expression. A real compiler would need a pretty-printer.
+            // This is mainly for debugging and test error messages.
+            format!("{:?}", expr)
+        }
     }
 }
 
@@ -204,8 +215,8 @@ impl Compiler {
 
     fn type_of(&mut self, value: &Value) -> Type {
         match value {
-            Value::I64(_) => Type::Simple("i64".to_string()),
-            Value::Bool(_) => Type::Simple("bool".to_string()),
+            Value::I64(_) => Type::Ident("i64".to_string()),
+            Value::Bool(_) => Type::Ident("bool".to_string()),
             Value::Unit => Type::Unit,
             Value::Type(t) => t.clone(),
             Value::Pi { binder_name, binder_type, body, captured_context } => {
@@ -219,10 +230,10 @@ impl Compiler {
                 Type::Pi {
                     binder_name: binder_name.clone(),
                     binder_type: Box::new(self.type_of(&*binder_type)),
-                    return_type: Box::new(body_val.map(|v| temp_compiler.type_of(&v)).unwrap_or(Type::Simple("ERROR".to_string()))),
+                    return_type: Box::new(body_val.map(|v| temp_compiler.type_of(&v)).unwrap_or(Type::Ident("ERROR".to_string()))),
                 }
             },
-            Value::Constructor(name) => Type::Simple(name.clone()),
+            Value::Constructor(name) => Type::Ident(name.clone()),
         }
     }
 
@@ -371,7 +382,7 @@ impl Compiler {
         // Value parameters (`n: i64`) are ignored in this step.
         let generics: Vec<_> = params.iter()
             .filter_map(|p| {
-                if let Type::Simple(s) = &p.type_annotation {
+                if let Type::Ident(s) = &p.type_annotation {
                     if s == "Type" { // This is a convention for now.
                         return Some(p.name.clone());
                     }
@@ -435,34 +446,43 @@ impl Compiler {
         }
     }
 
-    fn are_types_equal(&self, t1: &Type, t2: &Type) -> bool {
+    fn are_types_equal(&mut self, t1: &Type, t2: &Type) -> bool {
         match (t1, t2) {
             (Type::Pi { binder_type: bt1, return_type: rt1, .. }, Type::Func(p1, r1)) |
             (Type::Func(p1, r1), Type::Pi { binder_type: bt1, return_type: rt1, .. }) => {
                 self.are_types_equal(bt1, p1) && self.are_types_equal(rt1, r1)
             }
-            _ => type_to_string(t1) == type_to_string(t2),
+            _ => {
+                let norm_t1 = self.normalize(t1).unwrap_or_else(|_| t1.clone());
+                let norm_t2 = self.normalize(t2).unwrap_or_else(|_| t2.clone());
+                type_to_string(&norm_t1) == type_to_string(&norm_t2)
+            }
         }
     }
 
     /// Evaluates expressions within a type to produce a normalized form.
     fn normalize(&mut self, ty: &Type) -> Result<Type, EvalError> {
         match ty {
-            // TODO: Implement normalization for all type variants.
-            // For now, we just handle Simple types as a proof of concept.
-            Type::Simple(name) => {
-                // This is a very basic implementation. A real one would need
-                // to parse the type string properly.
-                if name.starts_with("Vec") {
-                    // e.g., "Vec i64 (1 + 1)"
-                    // We need to find the expression part, parse it, and evaluate it.
-                    // This is complex, so we'll mock it for now.
-                    if name.contains("1 + 1") {
-                       return Ok(Type::Simple("Vec i64 2".to_string()));
-                    }
+            Type::App(head, args) => {
+                let norm_head = self.normalize(head)?;
+                let mut norm_args = Vec::new();
+                for arg in args {
+                    norm_args.push(self.normalize(arg)?);
                 }
-                Ok(ty.clone())
+                Ok(Type::App(Box::new(norm_head), norm_args))
             }
+            Type::Expr(expr) => {
+                let value = self.evaluate(expr)?;
+                // Convert the value back into a type-level representation.
+                // This is a crucial step for dependent types.
+                match value {
+                    Value::I64(n) => Ok(Type::Expr(Box::new(Expression::IntegerLiteral(n)))),
+                    Value::Bool(b) => Ok(Type::Expr(Box::new(Expression::Identifier(b.to_string())))),
+                    // For now, other values are returned as-is, wrapped in Type::Expr
+                    _ => Ok(Type::Expr(expr.clone())),
+                }
+            }
+            // Other types are returned as-is for now.
             _ => Ok(ty.clone()),
         }
     }
@@ -485,7 +505,7 @@ impl Compiler {
                 value,
                 body,
             } => {
-                let value_checked = self.type_check_expression(value, type_annotation.as_ref())?;
+                let value_checked = self.type_check_expression(value, type_annotation.as_deref())?;
                 let value_type = self.type_of(&value_checked);
                 if let Some(annotated_type) = type_annotation {
                     if !self.are_types_equal(&value_type, annotated_type) {
@@ -506,8 +526,8 @@ impl Compiler {
                 then_branch,
                 else_branch,
             } => {
-                let condition_value = self.type_check_expression(condition, Some(&Type::Simple("bool".to_string())))?;
-                if self.type_of(&condition_value) != Type::Simple("bool".to_string()) {
+                let condition_value = self.type_check_expression(condition, Some(&Type::Ident("bool".to_string())))?;
+                if self.type_of(&condition_value) != Type::Ident("bool".to_string()) {
                     return Err(TypeError::TypeMismatch {
                         expected: "bool".to_string(),
                         found: type_to_string(&self.type_of(&condition_value)),
@@ -526,11 +546,11 @@ impl Compiler {
                 Ok(then_value)
             }
             Expression::BinaryOp { lhs, rhs, op } => {
-                let lhs_value = self.type_check_expression(lhs, Some(&Type::Simple("i64".to_string())))?;
-                let rhs_value = self.type_check_expression(rhs, Some(&Type::Simple("i64".to_string())))?;
+                let lhs_value = self.type_check_expression(lhs, Some(&Type::Ident("i64".to_string())))?;
+                let rhs_value = self.type_check_expression(rhs, Some(&Type::Ident("i64".to_string())))?;
 
-                if self.type_of(&lhs_value) != Type::Simple("i64".to_string())
-                    || self.type_of(&rhs_value) != Type::Simple("i64".to_string())
+                if self.type_of(&lhs_value) != Type::Ident("i64".to_string())
+                    || self.type_of(&rhs_value) != Type::Ident("i64".to_string())
                 {
                     return Err(TypeError::TypeMismatch {
                         expected: "i64".to_string(),
@@ -721,7 +741,7 @@ impl Compiler {
         if let Some(ty) = self.context.find_var(name) {
             Ok(ty.clone())
         } else if let Some(type_name) = self.context.find_constructor_type(name) {
-            Ok(Type::Simple(type_name.clone()))
+            Ok(Type::Ident(type_name.clone()))
         } else {
             Err(TypeError::UndefinedVariable(name.to_string()))
         }
@@ -859,14 +879,14 @@ impl Compiler {
     fn compile_let_expression(
         &mut self,
         name: String,
-        type_annotation: Option<Type>,
+        type_annotation: Option<Box<Type>>,
         value: Expression,
         body: Expression,
     ) -> Result<String, String> {
         let value_code = self.compile_expression(value)?;
         self.context.enter_scope();
         if let Some(ty) = type_annotation.clone() {
-            self.context.define_var(name.clone(), ty);
+            self.context.define_var(name.clone(), *ty);
         }
         let body_code = self.compile_expression(body)?;
         self.context.exit_scope();
@@ -1036,8 +1056,8 @@ mod tests {
         let (_, statement) = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let path_type = Type::Ze(
-            Box::new(Type::Simple("i64".to_string())),
-            Box::new(Type::Simple("i64".to_string())),
+            Box::new(Type::Ident("i64".to_string())),
+            Box::new(Type::Ident("i64".to_string())),
         );
         compiler.context.define_var("p1".to_string(), path_type.clone());
         compiler.context.define_var("q1".to_string(), path_type);
@@ -1054,8 +1074,8 @@ mod tests {
         compiler.context.define_var(
             "p".to_string(),
             Type::Ze(
-                Box::new(Type::Simple("i64".to_string())),
-                Box::new(Type::Simple("i64".to_string())),
+                Box::new(Type::Ident("i64".to_string())),
+                Box::new(Type::Ident("i64".to_string())),
             ),
         );
         let result = compiler.compile(vec![statement]);
@@ -1094,10 +1114,10 @@ mod tests {
     #[test]
     fn test_type_check_simple_vars() {
         let mut compiler = Compiler::new();
-        compiler.context.define_var("x".to_string(), Type::Simple("i64".to_string()));
+        compiler.context.define_var("x".to_string(), Type::Ident("i64".to_string()));
         let expr = kotoba_parser::parse_expression("x").unwrap().1;
         let result = compiler.type_check_expression(&expr, None);
-        assert_eq!(result, Ok(Value::Type(Type::Simple("i64".to_string()))));
+        assert_eq!(result, Ok(Value::Type(Type::Ident("i64".to_string()))));
 
         let expr_undef = kotoba_parser::parse_expression("y").unwrap().1;
         let result_undef = compiler.type_check_expression(&expr_undef, None);
@@ -1108,7 +1128,7 @@ mod tests {
     fn test_type_check_let() {
         let mut compiler = Compiler::new();
         let expr = kotoba_parser::parse_expression("let x: i64 = 10 in x + 1").unwrap().1;
-        let result = compiler.type_check_expression(&expr, Some(&Type::Simple("i64".to_string())));
+        let result = compiler.type_check_expression(&expr, Some(&Type::Ident("i64".to_string())));
         assert_eq!(result, Ok(Value::I64(0)));
 
         let expr_mismatch = kotoba_parser::parse_expression("let x: ku = 10 in x").unwrap().1;
@@ -1117,7 +1137,7 @@ mod tests {
             result_mismatch,
             Err(TypeError::TypeMismatch {
                 expected: type_to_string(&Type::Ku),
-                found: type_to_string(&Type::Simple("i64".to_string()))
+                found: type_to_string(&Type::Ident("i64".to_string()))
             })
         );
     }
@@ -1126,20 +1146,20 @@ mod tests {
     fn test_type_check_pipe() {
         let mut compiler = Compiler::new();
         let func_type = Type::Func(
-            Box::new(Type::Simple("i64".to_string())),
-            Box::new(Type::Simple("bool".to_string())),
+            Box::new(Type::Ident("i64".to_string())),
+            Box::new(Type::Ident("bool".to_string())),
         );
         compiler.context.define_var("is_positive".to_string(), func_type.clone());
-        compiler.context.define_var("n".to_string(), Type::Simple("i64".to_string()));
+        compiler.context.define_var("n".to_string(), Type::Ident("i64".to_string()));
 
         let expr = kotoba_parser::parse_expression("n |> is_positive").unwrap().1;
         let result = compiler.type_check_expression(&expr, None);
         let result_type = compiler.type_of(&result.unwrap());
-        assert_eq!(result_type, Type::Simple("bool".to_string()));
+        assert_eq!(result_type, Type::Ident("bool".to_string()));
 
         let expr_not_func = kotoba_parser::parse_expression("n |> n").unwrap().1;
         let result_not_func = compiler.type_check_expression(&expr_not_func, None);
-        assert_eq!(result_not_func, Err(TypeError::NotAFunction(type_to_string(&Type::Simple(
+        assert_eq!(result_not_func, Err(TypeError::NotAFunction(type_to_string(&Type::Ident(
             "i64".to_string()
         )))));
     }
@@ -1151,7 +1171,7 @@ mod tests {
         let constructors = vec![
             ConstructorDef::Point {
                 name: "some".to_string(),
-                fields: vec![Type::Simple("i64".to_string())],
+                fields: vec![Type::Ident("i64".to_string())],
             },
             ConstructorDef::Point {
                 name: "none".to_string(),
@@ -1163,14 +1183,14 @@ mod tests {
             .type_definitions
             .insert(option_type_name.clone(), (vec![], constructors));
 
-        let option_value_type = Type::Simple(option_type_name);
+        let option_value_type = Type::Ident(option_type_name);
         compiler.context.define_var("opt".to_string(), option_value_type);
 
         let expr_ok = parse_expression("ou opt { some(x) => x, none => 0 }")
             .unwrap()
             .1;
         let result_ok = compiler.type_check_expression(&expr_ok, None);
-        assert_eq!(compiler.type_of(&result_ok.unwrap()), Type::Simple("i64".to_string()));
+        assert_eq!(compiler.type_of(&result_ok.unwrap()), Type::Ident("i64".to_string()));
 
         let expr_err = parse_expression("ou opt { some(x) => x, none => i0 }")
             .unwrap()
@@ -1264,12 +1284,12 @@ mod tests {
         let mut compiler = Compiler::new();
         let path_type = Type::Ze(
             Box::new(Type::Ze(
-                Box::new(Type::Simple("i64".to_string())),
-                Box::new(Type::Simple("i64".to_string())),
+                Box::new(Type::Ident("i64".to_string())),
+                Box::new(Type::Ident("i64".to_string())),
             )),
             Box::new(Type::Ze(
-                Box::new(Type::Simple("i64".to_string())),
-                Box::new(Type::Simple("i64".to_string())),
+                Box::new(Type::Ident("i64".to_string())),
+                Box::new(Type::Ident("i64".to_string())),
             )),
         );
         compiler.context.define_var("some_path".to_string(), path_type);
@@ -1286,7 +1306,7 @@ mod tests {
         let mut compiler = Compiler::new();
         compiler.context.define_var(
             "timer_ba".to_string(),
-            Type::Simple("some_type".to_string()),
+            Type::Ident("some_type".to_string()),
         );
         let result = compiler.compile(vec![statement]);
         let expected_code = "let ticks: kotoba_core::Glue<ma, i64, some_eq> = timer_ba.as_en();\n";
@@ -1337,23 +1357,23 @@ mod tests {
         compiler.context.define_var(
             "ticks".to_string(),
             Type::En(
-                Box::new(Type::Simple("ma".to_string())),
-                Box::new(Type::Simple("i64".to_string())),
-                Box::new(Type::Simple("id".to_string())),
+                Box::new(Type::Ident("ma".to_string())),
+                Box::new(Type::Ident("i64".to_string())),
+                Box::new(Type::Ident("id".to_string())),
             ),
         );
         compiler.context.define_var(
             "doubler".to_string(),
             Type::Func(
                 Box::new(Type::En(
-                    Box::new(Type::Simple("ma".to_string())),
-                    Box::new(Type::Simple("i64".to_string())),
-                    Box::new(Type::Simple("id".to_string())),
+                    Box::new(Type::Ident("ma".to_string())),
+                    Box::new(Type::Ident("i64".to_string())),
+                    Box::new(Type::Ident("id".to_string())),
                 )),
                 Box::new(Type::En(
-                    Box::new(Type::Simple("ma".to_string())),
-                    Box::new(Type::Simple("i64".to_string())),
-                    Box::new(Type::Simple("id".to_string())),
+                    Box::new(Type::Ident("ma".to_string())),
+                    Box::new(Type::Ident("i64".to_string())),
+                    Box::new(Type::Ident("id".to_string())),
                 )),
             ),
         );
@@ -1452,6 +1472,7 @@ mod tests {
     #[test]
     fn test_dependent_type_evaluation_in_type_checker() {
         let program = vec![
+            // The parser needs to be able to handle `Type` as a parameter type.
             parse_statement("gyo Vec (A: Type, n: i64) = { nil, cons(A, Vec A (n-1)) }").unwrap().1,
             parse_statement("shiki my_vec: Vec i64 (1 + 1) = cons(10, cons(20, nil))").unwrap().1,
         ];
@@ -1460,14 +1481,14 @@ mod tests {
         assert!(result.is_ok(), "Compilation failed: {:?}", result.err());
 
         // After compilation, the type of `my_vec` in the context should be `Vec i64 2`.
-        let my_vec_type = compiler.context.find_var("my_vec").unwrap();
+        let my_vec_type = compiler.context.find_var("my_vec").unwrap().clone();
         // This requires a way to represent evaluated types. For now, we'll check the string representation.
         // A real implementation would have a semantic equality check for types.
-        let expected_type_str = "Vec i64 2"; // This is a simplified string representation
-        let actual_type_str = type_to_string(my_vec_type);
+        let expected_type_str = "Vec i64 Expr(IntegerLiteral(2))"; // This is a simplified string representation
+        let actual_type_str = type_to_string(&compiler.normalize(&my_vec_type).unwrap());
 
         // TODO: This test will fail until the type checker evaluates expressions within types.
-        assert!(actual_type_str.contains(expected_type_str));
+        assert_eq!(actual_type_str, expected_type_str);
     }
 
     #[test]
