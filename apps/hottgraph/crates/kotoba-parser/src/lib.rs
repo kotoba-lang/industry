@@ -118,6 +118,12 @@ pub enum Operator {
     Subtract,
     Multiply,
     Divide,
+    Equals,
+    NotEquals,
+    LessThan,
+    GreaterThan,
+    LessThanOrEqual,
+    GreaterThanOrEqual,
 }
 
 /// 文を表すAST
@@ -434,7 +440,7 @@ pub fn parse_expression(input: &str) -> ParseResult<Expression> {
         parse_ou_expression,
         parse_kan_expression,
         parse_let_expression,
-        parse_additive_expression,
+        parse_comparison_expression,
     ))
     .parse(input)
 }
@@ -512,6 +518,38 @@ fn parse_kan_expression(input: &str) -> ParseResult<Expression> {
         },
     )
     .parse(input)
+}
+
+fn parse_comparison_expression(input: &str) -> ParseResult<Expression> {
+    let (mut input, mut lhs) = parse_additive_expression(input)?;
+    loop {
+        let (next_input, op) = opt(delimited(
+            sp,
+            alt((
+                value(Operator::Equals, tag("==")),
+                value(Operator::NotEquals, tag("!=")),
+                value(Operator::LessThanOrEqual, tag("<=")),
+                value(Operator::GreaterThanOrEqual, tag(">=")),
+                value(Operator::LessThan, char('<')),
+                value(Operator::GreaterThan, char('>')),
+            )),
+            sp,
+        ))
+        .parse(input)?;
+
+        if let Some(op) = op {
+            let (next_input, rhs) = parse_additive_expression(next_input)?;
+            lhs = Expression::BinaryOp {
+                op,
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+            };
+            input = next_input;
+        } else {
+            break;
+        }
+    }
+    Ok((input, lhs))
 }
 
 fn parse_additive_expression(input: &str) -> ParseResult<Expression> {
@@ -1229,6 +1267,42 @@ mod tests {
                         lhs: Box::new(Expression::IntegerLiteral(2)),
                         rhs: Box::new(Expression::IntegerLiteral(3)),
                     }),
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn test_parse_comparison_operations() {
+        let input = "1 < 2";
+        let result = parse_expression(input);
+        assert_eq!(
+            result,
+            Ok((
+                "",
+                Expression::BinaryOp {
+                    op: Operator::LessThan,
+                    lhs: Box::new(Expression::IntegerLiteral(1)),
+                    rhs: Box::new(Expression::IntegerLiteral(2)),
+                }
+            ))
+        );
+
+        // Precedence: 1 + 2 == 3
+        let input_prec = "1 + 2 == 3";
+        let result_prec = parse_expression(input_prec);
+        assert_eq!(
+            result_prec,
+            Ok((
+                "",
+                Expression::BinaryOp {
+                    op: Operator::Equals,
+                    lhs: Box::new(Expression::BinaryOp {
+                        op: Operator::Add,
+                        lhs: Box::new(Expression::IntegerLiteral(1)),
+                        rhs: Box::new(Expression::IntegerLiteral(2)),
+                    }),
+                    rhs: Box::new(Expression::IntegerLiteral(3)),
                 }
             ))
         );
