@@ -286,18 +286,51 @@ impl Compiler {
         params: &[Parameter],
         constructors: &[ConstructorDef],
     ) -> Result<String, String> {
-        let type_params: Vec<_> = params.iter()
+        let type_params: Vec<_> = params
+            .iter()
             .filter(|p| self.is_type_parameter(p))
             .map(|p| p.name.clone())
             .collect();
-        
+
         let generics_str = if type_params.is_empty() {
             String::new()
         } else {
             format!("<{}>", type_params.join(", "))
         };
 
-        let enum_def = format!("#[derive(Debug, Clone)]\npub enum {}{} {{}}", name, generics_str);
+        let mut constructor_strs = Vec::new();
+        for constructor in constructors {
+            let (con_name, fields_str) = match constructor {
+                ConstructorDef::Point { name: con_name, fields } => {
+                    let field_types: Vec<String> = fields
+                        .iter()
+                        .map(|t| self.type_to_rust_type_string(t, Some(name)))
+                        .collect();
+                    let fields_str = if field_types.is_empty() {
+                        String::new()
+                    } else {
+                        format!("({})", field_types.join(", "))
+                    };
+                    (capitalize(con_name), fields_str)
+                }
+                ConstructorDef::Path { name: path_name, path_type } => {
+                    // For now, path constructors are represented as points
+                    // This will need a more sophisticated handling later
+                    (
+                        capitalize(path_name),
+                        format!("({})", self.type_to_rust_type_string(path_type, Some(name))),
+                    )
+                }
+            };
+            constructor_strs.push(format!("    {}{}", con_name, fields_str));
+        }
+
+        let enum_def = format!(
+            "#[derive(Debug, Clone)]\npub enum {}{} {{\n{}\n}}",
+            name,
+            generics_str,
+            constructor_strs.join(",\n")
+        );
         Ok(enum_def)
     }
 
@@ -306,6 +339,59 @@ impl Compiler {
             name == "Type"
         } else {
             false
+        }
+    }
+
+    fn type_to_rust_type_string(&self, t: &Type, current_type_name: Option<&str>) -> String {
+        match t {
+            Type::Ku => "kotoba_core::Interval".to_string(),
+            Type::Ze(t1, t2) => format!(
+                "kotoba_core::Path<{}, {}>",
+                self.type_to_rust_type_string(t1, current_type_name),
+                self.type_to_rust_type_string(t2, current_type_name)
+            ),
+            Type::En(t1, t2, t3) => format!(
+                "kotoba_core::Glue<{}, {}, {}>",
+                self.type_to_rust_type_string(t1, current_type_name),
+                self.type_to_rust_type_string(t2, current_type_name),
+                self.type_to_rust_type_string(t3, current_type_name)
+            ),
+            Type::Unit => "()".to_string(),
+            Type::Func(from, to) => format!(
+                "Box<dyn Fn({}) -> {}>",
+                self.type_to_rust_type_string(from, current_type_name),
+                self.type_to_rust_type_string(to, current_type_name)
+            ),
+            Type::Pi {
+                binder_type,
+                return_type,
+                ..
+            } => format!(
+                "Box<dyn Fn({}) -> {}>",
+                self.type_to_rust_type_string(binder_type, current_type_name),
+                self.type_to_rust_type_string(return_type, current_type_name)
+            ),
+            Type::Ident(name) => {
+                if current_type_name.map_or(false, |n| n == name) {
+                    format!("Box<{}>", capitalize(name))
+                } else if name == "i64" {
+                    "i64".to_string()
+                } else if name == "bool" {
+                    "bool".to_string()
+                } else {
+                    capitalize(name)
+                }
+            }
+            Type::App(head, args) => {
+                let head_str = self.type_to_rust_type_string(head, current_type_name);
+                let args_str = args
+                    .iter()
+                    .map(|arg| self.type_to_rust_type_string(arg, current_type_name))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("{}<{}>", head_str, args_str)
+            }
+            Type::Expr(_) => "i64".to_string(), // Assume expressions in types evaluate to i64 for now
         }
     }
 
