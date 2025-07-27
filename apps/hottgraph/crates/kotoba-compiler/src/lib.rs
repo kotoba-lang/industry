@@ -1,5 +1,5 @@
 use kotoba_parser::{
-    Constructor, Expression, OuArm, Pattern, Statement, Type,
+    ConstructorDef, Expression, OuArm, Pattern, Statement, Type,
 };
 use std::collections::HashMap;
 
@@ -51,7 +51,13 @@ impl Compiler {
         // 1st Pass: Register all type definitions from `gyo` statements.
         for statement in &program {
             if let Statement::Gyo { name, constructors } = statement {
-                let constructor_names = constructors.iter().map(|c| capitalize(&c.name)).collect();
+                let constructor_names = constructors
+                    .iter()
+                    .filter_map(|c| match c {
+                        ConstructorDef::Point { name, .. } => Some(capitalize(name)),
+                        ConstructorDef::Path { .. } => None,
+                    })
+                    .collect();
                 self.type_definitions
                     .insert(name.clone(), constructor_names);
             }
@@ -122,29 +128,31 @@ impl Compiler {
     fn compile_gyo_statement(
         &self,
         name: String,
-        constructors: Vec<Constructor>,
+        constructors: Vec<ConstructorDef>,
     ) -> Result<String, String> {
         let mut enum_variants = String::new();
         for c in constructors {
-            let variant_name = capitalize(&c.name);
-            if c.fields.is_empty() {
-                enum_variants.push_str(&format!("    {},\n", variant_name));
-            } else {
-                let fields_str = c
-                    .fields
-                    .iter()
-                    .map(|f| {
-                        // Handle recursive types by boxing them.
-                        if type_to_string(f) == name {
-                            format!("Box<{}>", name)
-                        } else {
-                            type_to_string(f)
-                        }
-                    })
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                enum_variants.push_str(&format!("    {}({}),\n", variant_name, fields_str));
+            if let ConstructorDef::Point { name, fields } = c {
+                let variant_name = capitalize(&name);
+                if fields.is_empty() {
+                    enum_variants.push_str(&format!("    {},\n", variant_name));
+                } else {
+                    let fields_str = fields
+                        .iter()
+                        .map(|f| {
+                            // Handle recursive types by boxing them.
+                            if type_to_string(f) == name {
+                                format!("Box<{}>", name)
+                            } else {
+                                type_to_string(f)
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    enum_variants.push_str(&format!("    {}({}),\n", variant_name, fields_str));
+                }
             }
+            // Path constructors are ignored for Rust enum generation for now.
         }
 
         Ok(format!(
@@ -576,6 +584,16 @@ mod tests {
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         let expected_code = "#[derive(Debug, Clone)]\nenum N {\n    Zero,\n    Succ(Box<N>),\n}\n";
+        assert_eq!(result.unwrap().contains(expected_code), true);
+    }
+
+    #[test]
+    fn test_compile_gyo_statement_with_path() {
+        let input = "gyo S1 = { base, loop: ze<base, base> }";
+        let (_, statement) = parse_statement(input).unwrap();
+        let mut compiler = Compiler::new();
+        let result = compiler.compile(vec![statement]);
+        let expected_code = "#[derive(Debug, Clone)]\nenum S1 {\n    Base,\n}\n";
         assert_eq!(result.unwrap().contains(expected_code), true);
     }
 }

@@ -54,9 +54,11 @@ pub struct OuArm {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Constructor {
-    pub name: String,
-    pub fields: Vec<Type>,
+pub enum ConstructorDef {
+    /// A point constructor, like `true` or `succ(N)`.
+    Point { name: String, fields: Vec<Type> },
+    /// A path constructor, like `loop: ze<base, base>`.
+    Path { name: String, path_type: Type },
 }
 
 /// 式を表すAST
@@ -116,7 +118,7 @@ pub enum Statement {
     /// `gyo <TypeName> = { <constructors> }`
     Gyo {
         name: String,
-        constructors: Vec<Constructor>,
+        constructors: Vec<ConstructorDef>,
     },
     /// `rin <function_name><<generics>>(params): <return_type> = <body>`
     Rin {
@@ -381,25 +383,36 @@ fn parse_primary_expression(input: &str) -> ParseResult<Expression> {
     Ok((remaining, expr))
 }
 
-fn parse_constructor(input: &str) -> ParseResult<Constructor> {
-    map(
+fn parse_constructor(input: &str) -> ParseResult<ConstructorDef> {
+    // Tries to parse a path constructor like `loop: ze<base, base>` first.
+    let path_parser = map(
+        (
+            parse_identifier,
+            preceded(delimited(sp, char(':'), sp), parse_type),
+        ),
+        |(name, path_type)| ConstructorDef::Path {
+            name: name.to_string(),
+            path_type,
+        },
+    );
+
+    // Then tries to parse a point constructor like `succ(N)`.
+    let point_parser = map(
         pair(
             parse_identifier,
             opt(delimited(
                 char('('),
-                separated_list1(
-                    delimited(sp, char(','), sp),
-                    parse_type,
-                ),
+                separated_list1(delimited(sp, char(','), sp), parse_type),
                 char(')'),
             )),
         ),
-        |(name, fields)| Constructor {
+        |(name, fields)| ConstructorDef::Point {
             name: name.to_string(),
             fields: fields.unwrap_or_default(),
         },
-    )
-    .parse(input)
+    );
+
+    alt((path_parser, point_parser)).parse(input)
 }
 
 pub fn parse_expression(input: &str) -> ParseResult<Expression> {
@@ -870,11 +883,52 @@ mod tests {
         if let Statement::Gyo { name, constructors } = statement {
             assert_eq!(name, "N");
             assert_eq!(constructors.len(), 2);
-            assert_eq!(constructors[0].name, "zero");
-            assert_eq!(constructors[0].fields.len(), 0);
-            assert_eq!(constructors[1].name, "succ");
-            assert_eq!(constructors[1].fields.len(), 1);
-            assert_eq!(constructors[1].fields[0], Type::Simple("N".to_string()));
+            assert_eq!(
+                constructors[0],
+                ConstructorDef::Point {
+                    name: "zero".to_string(),
+                    fields: vec![]
+                }
+            );
+            assert_eq!(
+                constructors[1],
+                ConstructorDef::Point {
+                    name: "succ".to_string(),
+                    fields: vec![Type::Simple("N".to_string())]
+                }
+            );
+        } else {
+            panic!("Expected Gyo statement");
+        }
+    }
+
+    #[test]
+    fn test_parse_gyo_with_path_constructor() {
+        let input = "gyo S1 = { base, loop: ze<base, base> }";
+        let result = parse_statement(input);
+        assert!(result.is_ok());
+        let (remaining, statement) = result.unwrap();
+        assert_eq!(remaining, "");
+        if let Statement::Gyo { name, constructors } = statement {
+            assert_eq!(name, "S1");
+            assert_eq!(constructors.len(), 2);
+            assert_eq!(
+                constructors[0],
+                ConstructorDef::Point {
+                    name: "base".to_string(),
+                    fields: vec![]
+                }
+            );
+            assert_eq!(
+                constructors[1],
+                ConstructorDef::Path {
+                    name: "loop".to_string(),
+                    path_type: Type::Ze(
+                        Box::new(Type::Simple("base".to_string())),
+                        Box::new(Type::Simple("base".to_string()))
+                    )
+                }
+            );
         } else {
             panic!("Expected Gyo statement");
         }
