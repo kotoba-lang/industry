@@ -88,6 +88,12 @@ pub enum Expression {
         value: Box<Expression>,
         body: Box<Expression>,
     },
+    /// `if <condition> then <then_branch> else <else_branch>`
+    If {
+        condition: Box<Expression>,
+        then_branch: Box<Expression>,
+        else_branch: Box<Expression>,
+    },
     /// 変数名
     Identifier(String),
     /// 整数リテラル
@@ -440,8 +446,28 @@ pub fn parse_expression(input: &str) -> ParseResult<Expression> {
         parse_ou_expression,
         parse_kan_expression,
         parse_let_expression,
+        parse_if_expression,
         parse_comparison_expression,
     ))
+    .parse(input)
+}
+
+fn parse_if_expression(input: &str) -> ParseResult<Expression> {
+    map(
+        (
+            preceded(tag("if"), multispace1),
+            parse_expression,
+            delimited(multispace1, tag("then"), multispace1),
+            parse_expression,
+            delimited(multispace1, tag("else"), multispace1),
+            parse_expression,
+        ),
+        |(_, condition, _, then_branch, _, else_branch)| Expression::If {
+            condition: Box::new(condition),
+            then_branch: Box::new(then_branch),
+            else_branch: Box::new(else_branch),
+        },
+    )
     .parse(input)
 }
 
@@ -1306,5 +1332,26 @@ mod tests {
                 }
             ))
         );
+    }
+
+    #[test]
+    fn test_parse_if_expression() {
+        let input = "if true then 1 else 2";
+        let result = parse_expression(input);
+        assert_eq!(
+            result,
+            Ok((
+                "",
+                Expression::If {
+                    condition: Box::new(Expression::Identifier("true".to_string())),
+                    then_branch: Box::new(Expression::IntegerLiteral(1)),
+                    else_branch: Box::new(Expression::IntegerLiteral(2)),
+                }
+            ))
+        );
+
+        let input_nested = "if a > b then (if c then d else e) else f";
+        let result_nested = parse_expression(input_nested);
+        assert!(result_nested.is_ok());
     }
 }
