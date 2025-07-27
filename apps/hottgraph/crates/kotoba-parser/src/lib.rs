@@ -799,6 +799,23 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_inductive_type_expression() {
+        let input = "shiki my_bool: Bool = true";
+        let result = parse_statement(input);
+        assert_eq!(
+            result,
+            Ok((
+                "",
+                Statement::Shiki {
+                    variable_name: "my_bool".to_string(),
+                    type_annotation: Type::Simple("Bool".to_string()),
+                    value: Expression::Identifier("true".to_string())
+                }
+            ))
+        );
+    }
+
+    #[test]
     fn test_parse_glue_unglue() {
         let input = "glue(10)";
         let result = parse_expression(input);
