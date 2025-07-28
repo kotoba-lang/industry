@@ -1,0 +1,87 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# JungVoiceAssessment データベース永続化仕様
+
+JungVoiceAssessmentコンポーネントとそのサブコンポーネントは、テスト結果と感情データをSupabaseデータベースに保存する必要があります。
+
+## データフロー
+
+1. ユーザーがJungVoiceAssessmentを開始すると、固有のユーザーIDとテスト評価IDが生成されます
+2. ConsentFormでユーザーが同意を行うと、`consent_records`テーブルに記録されます
+3. テスト中の各言語連想応答が`emotion_data`テーブルに保存されます
+4. ユーザーの顔の感情分析データは`face_emotion_data`テーブルに保存されます
+5. テスト完了時、テスト結果が集計されオプションのコールバック関数に渡されます
+
+## データベーススキーマ
+
+データは以下のテーブルに格納されます:
+
+### consent_records
+
+- `id`: UUID (PK)
+- `user_id`: UUID - ユーザーの一意識別子
+- `created_at`: TIMESTAMP - 記録作成時間
+- `consent_given`: BOOLEAN - 同意が得られたか
+- `consent_version`: TEXT - 同意書のバージョン
+- `consent_text`: TEXT (任意) - 同意書全文
+- `ip_address`: TEXT (任意) - ユーザーのIPアドレス
+- `user_agent`: TEXT (任意) - ユーザーのブラウザ情報
+- `study_id`: TEXT (任意) - 研究ID
+- `researcher_note`: TEXT (任意) - 研究者のメモ
+
+### demographic_data
+
+- `id`: UUID (PK)
+- `user_id`: UUID - ユーザーの一意識別子 (FK→consent_records.user_id)
+- `created_at`: TIMESTAMP - 記録作成時間
+- `age_group`: TEXT - 年齢層
+- `gender`: TEXT - 性別
+- `ethnicity`: TEXT - 民族/人種
+- `income`: TEXT - 収入範囲
+- `ip_address`: TEXT (任意) - ユーザーのIPアドレス
+- `user_agent`: TEXT (任意) - ユーザーのブラウザ情報
+- `study_id`: TEXT (任意) - 研究ID
+- `consent_version`: TEXT (任意) - 同意書のバージョン
+
+### emotion_data
+
+- `id`: UUID (PK)
+- `user_id`: UUID - ユーザーの一意識別子
+- `assessment_id`: UUID - 評価セッションの一意識別子
+- `created_at`: TIMESTAMP - 記録作成時間
+- `stimulus_word`: TEXT - 刺激語
+- `response_word`: TEXT - 反応語
+- `reaction_time_ms`: TEXT - 反応時間（ミリ秒）
+- `face_emotions`: JSON - 顔の感情分析データ
+- `voice_emotions`: JSON - 声の感情分析データ
+- `timestamp`: TIMESTAMP - データ記録時間
+
+### face_emotion_data
+
+- `id`: UUID (PK)
+- `user_id`: UUID - ユーザーの一意識別子
+- `assessment_id`: UUID - 評価セッションの一意識別子
+- `created_at`: TIMESTAMP - 記録作成時間
+- `stimulus_word`: TEXT - 刺激語
+- `response_word`: TEXT - 反応語
+- `reaction_time_ms`: TEXT - 反応時間（ミリ秒）
+- `emotions`: JSON - 顔の感情分析データ
+- `timestamp`: TIMESTAMP - データ記録時間
+
+## サービス層
+
+データの保存と取得は`EmotionDataService`を通じて行われます:
+
+- `saveEmotionData`: 感情データを保存
+- `saveFacialEmotionData`: 顔の感情データを保存
+- `getEmotionDataByAssessment`: 評価IDごとに感情データを取得
+
+## テスト要件
+
+1. JungVoiceTestコンポーネントがユーザー応答を収集し、EmotionDataServiceを使用してデータベースに保存することを検証
+2. 適切なデータ構造で感情データが保存されることを検証
+3. データベースエラー発生時の適切なエラーハンドリングを検証
+4. ユーザーの同意がデータベースに正しく記録されることを検証 
