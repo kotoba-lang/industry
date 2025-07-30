@@ -1,0 +1,5 @@
+{"graph": "kotoba-core", "subgraphs": []}
+{"graph": "kotoba-parser", "subgraphs": ["kotoba-core"]}
+{"graph": "kotoba-compiler", "subgraphs": ["kotoba-core", "kotoba-parser"]}
+{"graph": "kotoba-cli", "subgraphs": ["kotoba-compiler", "kotoba-parser"]}
+{"graph": "kotoba-lsp", "subgraphs": ["kotoba-parser"]} 
