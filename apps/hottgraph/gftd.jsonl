@@ -7,4 +7,28 @@
 {"graph": "kotoba-parser", "nodes": ["Type", "Pattern", "Expression", "Statement", "parse_program", "parse_statement", "parse_expression"], "edges": [["Statement", "Expression"], ["Statement", "Type"], ["Expression", "Pattern"], ["Expression", "Type"], ["Pattern", "Type"]]}
 {"graph": "kotoba-compiler", "nodes": ["Compiler", "Context", "Value", "TypeError", "EvalError", "compile", "type_check_expression", "evaluate"], "edges": [["Compiler", "Context"], ["Compiler", "Value"], ["Compiler", "Statement"], ["Compiler", "Expression"], ["type_check_expression", "TypeError"], ["evaluate", "EvalError"]]}
 {"graph": "kotoba-cli", "nodes": ["main", "Args"], "edges": [["main", "Compiler"], ["main", "parse_program"]]}
-{"graph": "kotoba-lsp", "nodes": ["main", "Backend", "on_change"], "edges": [["Backend", "LanguageServer"], ["on_change", "parse_statement"]]} 
+{"graph": "kotoba-lsp", "nodes": ["main", "Backend", "on_change"], "edges": [["Backend", "LanguageServer"], ["on_change", "parse_statement"]]}
+{"id":"nix","label":"nix","type":"vertex","properties":{"type":"tool"}}
+{"id":"flakes","label":"flakes","type":"vertex","properties":{"type":"system"}}
+{"id":"flake.nix","label":"flake.nix","type":"vertex","properties":{"type":"file"}}
+{"id":"devShell","label":"devShell","type":"vertex","properties":{"type":"environment"}}
+{"id":"direnv","label":"direnv","type":"vertex","properties":{"type":"tool"}}
+{"id":".envrc","label":".envrc","type":"vertex","properties":{"type":"file"}}
+{"id":"agenix","label":"agenix","type":"vertex","properties":{"type":"tool"}}
+{"id":"age","label":"age","type":"vertex","properties":{"type":"crypto"}}
+{"id":"secrets.nix","label":"secrets.nix","type":"vertex","properties":{"type":"file"}}
+{"id":"secret.age","label":"secret.age","type":"vertex","properties":{"type":"secret"}}
+{"id":"user-env","label":"user-env","type":"vertex","properties":{"type":"runtime"}}
+{"id":"e1","label":"defines","type":"edge","outV":"flakes","inV":"flake.nix"}
+{"id":"e2","label":"outputs","type":"edge","outV":"flake.nix","inV":"devShell"}
+{"id":"e3","label":"builds","type":"edge","outV":"nix","inV":"devShell"}
+{"id":"e4","label":"activates","type":"edge","outV":"devShell","inV":"user-env"}
+{"id":"e5","label":"reads","type":"edge","outV":"direnv","inV":".envrc"}
+{"id":"e6","label":"loads","type":"edge","outV":".envrc","inV":"devShell"}
+{"id":"e7","label":"loads-secret","type":"edge","outV":".envrc","inV":"secret.age"}
+{"id":"e8","label":"reads","type":"edge","outV":"agenix","inV":"secrets.nix"}
+{"id":"e9","label":"defines","type":"edge","outV":"secrets.nix","inV":"secret.age"}
+{"id":"e10","label":"decrypts","type":"edge","outV":"agenix","inV":"secret.age"}
+{"id":"e11","label":"used-by","type":"edge","outV":"age","inV":"agenix"}
+{"id":"e12","label":"encrypts","type":"edge","outV":"age","inV":"secret.age"}
+{"id":"e13","label":"sources","type":"edge","outV":"user-env","inV":".envrc"} 
