@@ -2,4 +2,9 @@
 {"graph": "kotoba-parser", "subgraphs": ["kotoba-core"]}
 {"graph": "kotoba-compiler", "subgraphs": ["kotoba-core", "kotoba-parser"]}
 {"graph": "kotoba-cli", "subgraphs": ["kotoba-compiler", "kotoba-parser"]}
-{"graph": "kotoba-lsp", "subgraphs": ["kotoba-parser"]} 
+{"graph": "kotoba-lsp", "subgraphs": ["kotoba-parser"]}
+{"graph": "kotoba-core", "nodes": ["Interval", "Path", "Glue", "glue", "unglue"], "edges": [["Path", "Interval"], ["Glue", "Path"]]}
+{"graph": "kotoba-parser", "nodes": ["Type", "Pattern", "Expression", "Statement", "parse_program", "parse_statement", "parse_expression"], "edges": [["Statement", "Expression"], ["Statement", "Type"], ["Expression", "Pattern"], ["Expression", "Type"], ["Pattern", "Type"]]}
+{"graph": "kotoba-compiler", "nodes": ["Compiler", "Context", "Value", "TypeError", "EvalError", "compile", "type_check_expression", "evaluate"], "edges": [["Compiler", "Context"], ["Compiler", "Value"], ["Compiler", "Statement"], ["Compiler", "Expression"], ["type_check_expression", "TypeError"], ["evaluate", "EvalError"]]}
+{"graph": "kotoba-cli", "nodes": ["main", "Args"], "edges": [["main", "Compiler"], ["main", "parse_program"]]}
+{"graph": "kotoba-lsp", "nodes": ["main", "Backend", "on_change"], "edges": [["Backend", "LanguageServer"], ["on_change", "parse_statement"]]} 
