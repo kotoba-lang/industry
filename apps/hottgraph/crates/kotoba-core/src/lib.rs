@@ -139,19 +139,21 @@ fn compose_helper<T: Clone + 'static>(p: Path<T>, q: Path<T>, i: Interval) -> T 
 pub struct Glue<A, T, E> {
     /// The base value, which belongs to the type `A`.
     pub base: A,
-    /// A marker for the boundary type `T`.
-    _boundary: std::marker::PhantomData<T>,
-    /// A marker for the equivalence `E` over the boundary.
-    _equivalence: std::marker::PhantomData<E>,
+    /// A marker for the boundary type `T`. This will eventually be a value-level
+    /// representation of the boundary.
+    pub boundary: T,
+    /// A marker for the equivalence `E` over the boundary. This will eventually be
+    /// a path or a function representing the equivalence.
+    pub equivalence: E,
 }
 
 /// `en` (縁): The act of gluing.
 /// This is a simplified placeholder.
-pub fn glue<A, T, E>(base: A) -> Glue<A, T, E> {
+pub fn glue<A, T, E>(base: A, boundary: T, equivalence: E) -> Glue<A, T, E> {
     Glue {
         base,
-        _boundary: std::marker::PhantomData,
-        _equivalence: std::marker::PhantomData,
+        boundary,
+        equivalence,
     }
 }
 
@@ -238,13 +240,16 @@ mod tests {
         type A = (i32, i32);
         let base_point: A = (5, 5);
 
-        // And a boundary `T` (e.g., where x=5) and an equivalence `E`
-        // (e.g., mapping it to a line). These are abstract for now.
+        // And a boundary `T` (e.g., a type representing the condition `x=5`)
+        // and an equivalence `E` (e.g., mapping it to a line).
+        // For now, we use `()` as placeholders for their types and values.
         type T = ();
         type E = ();
+        let boundary_val: T = ();
+        let equivalence_val: E = ();
 
         // We "glue" this information together.
-        let glued_point: Glue<A, T, E> = glue(base_point);
+        let glued_point: Glue<A, T, E> = glue(base_point, boundary_val, equivalence_val);
 
         // Ungluing gives us back the original point.
         assert_eq!(unglue(glued_point), (5, 5));
