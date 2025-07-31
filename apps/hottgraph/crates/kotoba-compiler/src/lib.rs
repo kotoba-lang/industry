@@ -66,6 +66,11 @@ pub enum Value {
         captured_env: Vec<HashMap<String, Value>>,
     },
     Constructor(String),
+    Glue {
+        base: Box<Value>,
+        boundary: Box<Value>,
+        equivalence: Box<Value>,
+    },
 }
 
 #[derive(Debug, PartialEq)]
@@ -163,6 +168,7 @@ impl Compiler {
                 self.env_exit_scope();
                 Ok(result)
             }
+            Expression::Unit => Ok(Value::Unit),
             Expression::If {
                 condition,
                 then_branch,
@@ -222,8 +228,28 @@ impl Compiler {
                 unimplemented!("Non-exhaustive pattern match");
             }
             Expression::Refl(expr) => self.evaluate(expr),
-            Expression::Glue { value } => self.evaluate(value),
-            Expression::Unglue { value } => self.evaluate(value),
+            Expression::Glue {
+                base,
+                boundary,
+                equivalence,
+            } => {
+                let base_val = self.evaluate(base)?;
+                let boundary_val = self.evaluate(boundary)?;
+                let equivalence_val = self.evaluate(equivalence)?;
+                Ok(Value::Glue {
+                    base: Box::new(base_val),
+                    boundary: Box::new(boundary_val),
+                    equivalence: Box::new(equivalence_val),
+                })
+            }
+            Expression::Unglue { value } => {
+                let glued_val = self.evaluate(value)?;
+                if let Value::Glue { base, .. } = glued_val {
+                    Ok(*base)
+                } else {
+                    Err(EvalError::TypeMismatch)
+                }
+            }
             Expression::Zo(val) => {
                 if val == "i0" {
                     Ok(Value::I64(0)) // Representing intervals as integers for now
@@ -337,6 +363,20 @@ impl Compiler {
                 })
             }
             Value::Constructor(name) => Type::Ident(name.clone()),
+            Value::Glue {
+                base,
+                boundary,
+                equivalence,
+            } => {
+                let base_type = self.type_of(base);
+                let boundary_type = self.type_of(boundary);
+                let equivalence_type = self.type_of(equivalence);
+                Type::En(
+                    Box::new(base_type),
+                    Box::new(boundary_type),
+                    Box::new(equivalence_type),
+                )
+            }
         }
     }
 
@@ -773,6 +813,7 @@ impl Compiler {
     ) -> Result<Type, TypeError> {
         match expression {
             Expression::IntegerLiteral(_) => Ok(Type::Ident("i64".to_string())),
+            Expression::Unit => Ok(Type::Unit),
             Expression::Identifier(name) => {
                 if let Some(ty) = self.context.find_var(name) {
                     Ok(ty.clone())
@@ -898,12 +939,18 @@ impl Compiler {
                     Box::new(inner_type),
                 ))
             }
-            Expression::Glue { value } => {
-                let inner_type = self.type_check_expression(value, None)?;
+            Expression::Glue {
+                base,
+                boundary,
+                equivalence,
+            } => {
+                let base_type = self.type_check_expression(base, None)?;
+                let boundary_type = self.type_check_expression(boundary, None)?;
+                let equivalence_type = self.type_check_expression(equivalence, None)?;
                 Ok(Type::En(
-                    Box::new(inner_type),
-                    Box::new(Type::Unit), // Placeholder
-                    Box::new(Type::Unit), // Placeholder
+                    Box::new(base_type),
+                    Box::new(boundary_type),
+                    Box::new(equivalence_type),
                 ))
             }
             Expression::Unglue { value } => {
@@ -1125,6 +1172,7 @@ impl Compiler {
                     Ok("kotoba_core::Interval::I1".to_string())
                 }
             }
+            Expression::Unit => Ok("()".to_string()),
             Expression::Ou { expression, arms } => {
                 let match_expr_str = self.compile_expression(*expression)?;
                 let mut arm_strs = Vec::new();
@@ -1143,9 +1191,18 @@ impl Compiler {
                 let inner_expr_str = self.compile_expression(*expr)?;
                 Ok(format!("kotoba_core::Path::new(|_| {})", inner_expr_str))
             }
-            Expression::Glue { value } => {
-                let inner_expr_str = self.compile_expression(*value)?;
-                Ok(format!("kotoba_core::glue({})", inner_expr_str))
+            Expression::Glue {
+                base,
+                boundary,
+                equivalence,
+            } => {
+                let base_str = self.compile_expression(*base)?;
+                let boundary_str = self.compile_expression(*boundary)?;
+                let equivalence_str = self.compile_expression(*equivalence)?;
+                Ok(format!(
+                    "kotoba_core::glue({}, {}, {})",
+                    base_str, boundary_str, equivalence_str
+                ))
             }
             Expression::Unglue { value } => {
                 let inner_expr_str = self.compile_expression(*value)?;
@@ -1208,10 +1265,15 @@ impl Compiler {
                 let var_str = self.compile_expression(*variable)?;
                 let arg_strs: Result<Vec<_>, _> =
                     args.into_iter().map(|a| self.compile_expression(a)).collect();
-                if arg_strs.is_err() {
-                    return Err("Failed to compile arguments".to_string());
-                }
-                Ok(format!("{}.{}({})", var_str, method, arg_strs.unwrap().join(", ")))
+
+                let args_compiled = arg_strs.map_err(|e| e.to_string())?;
+
+                Ok(format!(
+                    "{}.{}({})",
+                    var_str,
+                    method,
+                    args_compiled.join(", ")
+                ))
             }
             Expression::Let { name, value, body, .. } => {
                 let val_str = self.compile_expression(*value)?;
@@ -1327,7 +1389,7 @@ mod tests {
 
     #[test]
     fn test_compile_glue_unglue() {
-        let input_glue = "shiki g: en<i64, (), ()> = glue(10)";
+        let input_glue = "shiki g: en<i64, (), ()> = glue(10, (), ())";
         let (_, statement_glue) = parse_statement(input_glue).unwrap();
         let input_unglue = "shiki v: i64 = unglue(g)";
         let (_, statement_unglue) = parse_statement(input_unglue).unwrap();
@@ -1339,7 +1401,7 @@ mod tests {
         let compiled_code = result.unwrap();
 
         assert!(
-            compiled_code.contains("let g: kotoba_core::Glue<i64, (), ()> = kotoba_core::glue(10)"),
+            compiled_code.contains("let g: kotoba_core::Glue<i64, (), ()> = kotoba_core::glue(10, (), ())"),
             "Did not find expected glue compilation in: {}",
             compiled_code
         );
