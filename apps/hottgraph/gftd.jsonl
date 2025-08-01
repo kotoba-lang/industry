@@ -31,4 +31,13 @@
 {"id":"e10","label":"decrypts","type":"edge","outV":"agenix","inV":"secret.age"}
 {"id":"e11","label":"used-by","type":"edge","outV":"age","inV":"agenix"}
 {"id":"e12","label":"encrypts","type":"edge","outV":"age","inV":"secret.age"}
-{"id":"e13","label":"sources","type":"edge","outV":"user-env","inV":".envrc"} 
+{"id":"e13","label":"sources","type":"edge","outV":"user-env","inV":".envrc"}
+{"id":"kotoba-cli","label":"kotoba-cli","type":"vertex","properties":{"type":"crate"}}
+{"id":"kotoba-compiler","label":"kotoba-compiler","type":"vertex","properties":{"type":"crate"}}
+{"id":"kotoba-parser","label":"kotoba-parser","type":"vertex","properties":{"type":"crate"}}
+{"id":"kotoba-lsp","label":"kotoba-lsp","type":"vertex","properties":{"type":"crate"}}
+{"id":"kotoba-core","label":"kotoba-core","type":"vertex","properties":{"type":"crate"}}
+{"id":"dep-cli-compiler","label":"depends_on","type":"edge","outV":"kotoba-cli","inV":"kotoba-compiler"}
+{"id":"dep-cli-parser","label":"depends_on","type":"edge","outV":"kotoba-cli","inV":"kotoba-parser"}
+{"id":"dep-compiler-parser","label":"depends_on","type":"edge","outV":"kotoba-compiler","inV":"kotoba-parser"}
+{"id":"dep-lsp-parser","label":"depends_on","type":"edge","outV":"kotoba-lsp","inV":"kotoba-parser"} 
