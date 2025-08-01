@@ -756,7 +756,7 @@ impl Compiler {
                 self.are_types_equal(&l1, &l2) && self.are_types_equal(&r1, &r2)
             }
             (Type::App(head, args), Type::En(t1, t2, t3)) | (Type::En(t1, t2, t3), Type::App(head, args)) => {
-                if let Type::Ident(name) = &**head {
+                if let Type::Ident(name) = &*head {
                     if name == "en" && args.len() == 3 {
                         return self.are_types_equal(&args[0], &*t1) &&
                                self.are_types_equal(&args[1], &*t2) &&
@@ -770,26 +770,15 @@ impl Compiler {
     }
 
     fn normalize_and_eval_type_expr(&mut self, ty: &Type) -> Result<Type, EvalError> {
+        // First, try to evaluate the type expression if it is one
         if let Type::Expr(expr) = ty {
-             let evaluated_value = self.evaluate(expr)?;
-             // Now, we need to convert this value back into a type.
-             // This is a simplification. A real system would have a more robust way
-             // of representing values as types (reification).
-             match evaluated_value {
-                 Value::Constructor(name) => {
-                    // This assumes the constructor name directly maps to a type name.
-                    // This might not be true for constructors with parameters.
-                    Ok(Type::Ident(self.context.find_constructor_type(&name).cloned().unwrap_or(name)))
-                 }
-                 Value::I64(_) => Ok(Type::Ident("i64".to_string())),
-                 Value::Bool(_) => Ok(Type::Ident("bool".to_string())),
-                 Value::Unit => Ok(Type::Unit),
-                 _ => Err(EvalError::TypeMismatch) // Or a more specific error
-             }
-        } else {
-            // If the type is not an expression, just normalize it without evaluation
-            self.normalize(ty)
+            // If evaluation succeeds and returns a type, we use that as the normalized form.
+            if let Ok(Value::Type(t)) = self.evaluate(expr) {
+                return Ok(t);
+            }
         }
+        // If the type is not an expression, just normalize it without evaluation
+        self.normalize(ty)
     }
 
     fn normalize(&mut self, ty: &Type) -> Result<Type, EvalError> {
@@ -1426,7 +1415,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_compile_glue_unglue() {
         let input_glue = "shiki g: en<i64, (), ()> = glue(10, (), ())";
         let statement_glue = parse_statement(input_glue).unwrap();
