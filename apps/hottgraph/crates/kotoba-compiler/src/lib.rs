@@ -1,3 +1,4 @@
+use kotoba_core::Path;
 use kotoba_parser::{
     ConstructorDef, Expression, Parameter, Pattern, Statement, Type,
 };
@@ -54,12 +55,13 @@ impl Context {
 }
 
 /// Represents a runtime value during type checking and interpretation.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Value {
     I64(i64),
     Bool(bool),
     Unit,
     Type(Type),
+    Path(Path<Box<Value>>),
     Closure {
         params: Vec<Parameter>,
         body: Box<Expression>,
@@ -71,6 +73,45 @@ pub enum Value {
         boundary: Box<Value>,
         equivalence: Box<Value>,
     },
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Value::I64(a), Value::I64(b)) => a == b,
+            (Value::Bool(a), Value::Bool(b)) => a == b,
+            (Value::Unit, Value::Unit) => true,
+            (Value::Type(a), Value::Type(b)) => a == b,
+            (Value::Path(_), Value::Path(_)) => {
+                // FIXME: Path comparison is not yet supported.
+                // This might be tricky because paths are functions.
+                // For now, we'll consider them unequal unless they are the same object in memory,
+                // which this comparison doesn't check.
+                false
+            }
+            (
+                Value::Closure { .. },
+                Value::Closure { .. },
+            ) => {
+                // Closure comparison is also tricky.
+                false
+            }
+            (Value::Constructor(a), Value::Constructor(b)) => a == b,
+            (
+                Value::Glue {
+                    base: b1,
+                    boundary: bd1,
+                    equivalence: e1,
+                },
+                Value::Glue {
+                    base: b2,
+                    boundary: bd2,
+                    equivalence: e2,
+                },
+            ) => b1 == b2 && bd1 == bd2 && e1 == e2,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -227,7 +268,10 @@ impl Compiler {
                 // This should ideally be an error for non-exhaustive patterns
                 unimplemented!("Non-exhaustive pattern match");
             }
-            Expression::Refl(expr) => self.evaluate(expr),
+            Expression::Refl(expr) => {
+                let val = self.evaluate(expr)?;
+                Ok(Value::Path(Path::new(move |_| Box::new(val.clone()))))
+            }
             Expression::Glue {
                 base,
                 boundary,
@@ -275,11 +319,30 @@ impl Compiler {
                         // This is a mock. It should construct a proper Glue/En value.
                         // For now, let's return a value that can be typed as the expected type.
                         // The actual type structure will be checked in `are_types_equal`.
-                        Ok(Value::Type(Type::En(
-                            Box::new(Type::Ident("ma".to_string())),
-                            Box::new(Type::Ident("i64".to_string())),
-                            Box::new(Type::Ident("some_eq".to_string())),
-                        )))
+                        Ok(Value::Glue {
+                            base: Box::new(Value::Unit),        // Dummy value
+                            boundary: Box::new(Value::Unit),    // Dummy value
+                            equivalence: Box::new(Value::Unit), // Dummy value
+                        })
+                    }
+                    "compose" => {
+                        if let Value::Path(p1) = var_val {
+                            if args.len() != 1 {
+                                return Err(EvalError::TypeMismatch); // Or a specific arity error
+                            }
+                            let arg_val = self.evaluate(&args[0])?;
+                            if let Value::Path(p2) = arg_val {
+                                // The values inside the path are Box<Value>.
+                                // `Value` is `Clone`, so the `T` in `Path<T>` where `T` is `Box<Value>`
+                                // should be clonable via `val.clone()`.
+                                let composed_path = p1.compose(&p2);
+                                Ok(Value::Path(composed_path))
+                            } else {
+                                Err(EvalError::TypeMismatch)
+                            }
+                        } else {
+                            Err(EvalError::TypeMismatch)
+                        }
                     }
                      // For other methods like .sym(), return the object itself.
                     _ => Ok(var_val),
@@ -331,6 +394,7 @@ impl Compiler {
             Value::Bool(_) => Type::Ident("bool".to_string()),
             Value::Unit => Type::Unit,
             Value::Type(t) => t.clone(),
+            Value::Path(_) => Type::Ident("GenericPath".to_string()), // Placeholder
             Value::Closure { params, body, .. } => {
                 let mut temp_compiler = self.clone();
                 temp_compiler.context.enter_scope();
@@ -1395,8 +1459,9 @@ mod tests {
             .context
             .define_var("p1".to_string(), path_type.clone());
         compiler.context.define_var("q1".to_string(), path_type);
-        compiler.env_define_var("p1".to_string(), Value::Unit); // Dummy value for evaluation
-        compiler.env_define_var("q1".to_string(), Value::Unit); // Dummy value for evaluation
+        let dummy_path = Value::Path(Path::new(|_| Box::new(Value::I64(0))));
+        compiler.env_define_var("p1".to_string(), dummy_path.clone());
+        compiler.env_define_var("q1".to_string(), dummy_path);
         let result = compiler.compile(vec![statement]);
         let expected_code = "let p2: kotoba_core::Path<i64> = p1.compose(&q1);";
         assert_eq!(result.unwrap().contains(expected_code), true);
