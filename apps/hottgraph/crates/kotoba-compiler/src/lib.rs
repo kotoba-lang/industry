@@ -1,6 +1,6 @@
 use kotoba_core::Path;
 use kotoba_parser::{
-    ConstructorDef, Expression, Parameter, Pattern, Statement, Type,
+    ConstructorDef, Expression, ExpressionKind, Parameter, Pattern, Statement, Type,
 };
 use std::collections::HashMap;
 
@@ -193,13 +193,13 @@ impl Compiler {
     }
 
     fn evaluate(&mut self, expr: &Expression) -> Result<Value, EvalError> {
-        match expr {
-            Expression::IntegerLiteral(n) => Ok(Value::I64(*n)),
-            Expression::Identifier(name) => self
+        match &expr.kind {
+            ExpressionKind::IntegerLiteral(n) => Ok(Value::I64(*n)),
+            ExpressionKind::Identifier(name) => self
                 .env_find_var(name)
                 .cloned()
                 .ok_or_else(|| EvalError::UndefinedVariable(name.clone())),
-            Expression::Let {
+            ExpressionKind::Let {
                 name, value, body, ..
             } => {
                 let val = self.evaluate(value)?;
@@ -209,8 +209,8 @@ impl Compiler {
                 self.env_exit_scope();
                 Ok(result)
             }
-            Expression::Unit => Ok(Value::Unit),
-            Expression::If {
+            ExpressionKind::Unit => Ok(Value::Unit),
+            ExpressionKind::If {
                 condition,
                 then_branch,
                 else_branch,
@@ -227,7 +227,7 @@ impl Compiler {
                     _ => Err(EvalError::TypeMismatch),
                 }
             }
-            Expression::BinaryOp { lhs, rhs, op } => {
+            ExpressionKind::BinaryOp { lhs, rhs, op } => {
                 let lhs_val = self.evaluate(lhs)?;
                 let rhs_val = self.evaluate(rhs)?;
                 match (lhs_val, rhs_val) {
@@ -248,17 +248,17 @@ impl Compiler {
                     }
                 }
             }
-            Expression::Kan { params, body } => Ok(Value::Closure {
+            ExpressionKind::Kan { params, body } => Ok(Value::Closure {
                 params: params.clone(),
                 body: body.clone(),
                 captured_env: self.environment.clone(),
             }),
-            Expression::Pipe { lhs, rhs } => {
+            ExpressionKind::Pipe { lhs, rhs } => {
                 let lhs_val = self.evaluate(lhs)?;
                 let rhs_expr = self.evaluate(rhs)?;
                 self.apply_closure(rhs_expr, vec![lhs_val])
             }
-            Expression::Ou { expression, arms } => {
+            ExpressionKind::Ou { expression, arms } => {
                 let value_to_match = self.evaluate(expression)?;
                 for arm in arms {
                     if self.pattern_match(&value_to_match, &arm.pattern) {
@@ -268,11 +268,11 @@ impl Compiler {
                 // This should ideally be an error for non-exhaustive patterns
                 unimplemented!("Non-exhaustive pattern match");
             }
-            Expression::Refl(expr) => {
+            ExpressionKind::Refl(expr) => {
                 let val = self.evaluate(expr)?;
                 Ok(Value::Path(Path::new(move |_| Box::new(val.clone()))))
             }
-            Expression::Glue {
+            ExpressionKind::Glue {
                 base,
                 boundary,
                 equivalence,
@@ -286,7 +286,7 @@ impl Compiler {
                     equivalence: Box::new(equivalence_val),
                 })
             }
-            Expression::Unglue { value } => {
+            ExpressionKind::Unglue { value } => {
                 let glued_val = self.evaluate(value)?;
                 if let Value::Glue { base, .. } = glued_val {
                     Ok(*base)
@@ -294,7 +294,7 @@ impl Compiler {
                     Err(EvalError::TypeMismatch)
                 }
             }
-            Expression::Zo(val) => {
+            ExpressionKind::Zo(val) => {
                 if val == "i0" {
                     Ok(Value::I64(0)) // Representing intervals as integers for now
                 } else if val == "i1" {
@@ -303,7 +303,7 @@ impl Compiler {
                     unimplemented!("Unsupported interval value");
                 }
             }
-            Expression::MethodCall {
+            ExpressionKind::MethodCall {
                 variable,
                 method,
                 args,
@@ -344,7 +344,7 @@ impl Compiler {
                             Err(EvalError::TypeMismatch)
                         }
                     }
-                     // For other methods like .sym(), return the object itself.
+                    // For other methods like .sym(), return the object itself.
                     _ => Ok(var_val),
                 }
             }
@@ -603,8 +603,8 @@ impl Compiler {
                     let path_type_str = self.type_to_rust_type_string(path_type, Some(name));
                     let body_expr_str = self.compile_expression(body.clone())?;
 
-                    let final_body_str = match body {
-                        Expression::Kan { .. } => {
+                    let final_body_str = match &body.kind {
+                        ExpressionKind::Kan { .. } => {
                             format!("kotoba_core::Path::new({})", body_expr_str)
                         }
                         _ => body_expr_str, // Assumes other expressions like Refl are already compiled correctly
@@ -685,12 +685,12 @@ impl Compiler {
         }
     }
 
-    fn type_to_rust_type_string(&self, t: &Type, current_type_name: Option<&str>) -> String {
+    fn type_to_rust_type_string(&mut self, t: &Type, current_type_name: Option<&str>) -> String {
         match t {
             Type::Ku => "kotoba_core::Interval".to_string(),
             Type::Ze(t1, t2) => {
-                let s1 = self.type_to_rust_type_string(t1, current_type_name);
-                let s2 = self.type_to_rust_type_string(t2, current_type_name);
+                let s1 = self.type_to_rust_type_string(t1, None);
+                let s2 = self.type_to_rust_type_string(t2, None);
                 if s1 == s2 {
                     format!("kotoba_core::Path<{}>", s1)
                 } else {
@@ -876,8 +876,14 @@ impl Compiler {
             Type::Expr(expr) => {
                 let value = self.evaluate(expr)?;
                 match value {
-                    Value::I64(n) => Ok(Type::Expr(Box::new(Expression::IntegerLiteral(n)))),
-                    Value::Bool(b) => Ok(Type::Expr(Box::new(Expression::Identifier(b.to_string())))),
+                    Value::I64(n) => Ok(Type::Expr(Box::new(Expression {
+                        kind: ExpressionKind::IntegerLiteral(n),
+                        span: expr.span,
+                    }))),
+                    Value::Bool(b) => Ok(Type::Expr(Box::new(Expression {
+                        kind: ExpressionKind::Identifier(b.to_string()),
+                        span: expr.span,
+                    }))),
                     Value::Type(t) => Ok(t),
                     _ => Ok(Type::Expr(expr.clone())),
                 }
@@ -891,10 +897,10 @@ impl Compiler {
         expression: &Expression,
         _expected_type: Option<&Type>,
     ) -> Result<Type, TypeError> {
-        match expression {
-            Expression::IntegerLiteral(_) => Ok(Type::Ident("i64".to_string())),
-            Expression::Unit => Ok(Type::Unit),
-            Expression::Identifier(name) => {
+        match &expression.kind {
+            ExpressionKind::IntegerLiteral(_) => Ok(Type::Ident("i64".to_string())),
+            ExpressionKind::Unit => Ok(Type::Unit),
+            ExpressionKind::Identifier(name) => {
                 if let Some(ty) = self.context.find_var(name) {
                     Ok(ty.clone())
                 } else if let Some(type_name) = self.context.find_constructor_type(name) {
@@ -1044,7 +1050,11 @@ impl Compiler {
                     })
                 }
             }
-            Expression::MethodCall { variable, method, args: _args } => {
+            Expression::MethodCall {
+                variable,
+                method,
+                args: _args,
+            } => {
                 let var_type = self.type_check_expression(variable, None)?;
                 match method.as_str() {
                     "as_en" => {
@@ -1058,7 +1068,7 @@ impl Compiler {
                     }
                     "sym" => {
                         if let Type::Ze(t1, t2) = var_type {
-                             // sym swaps the endpoints
+                            // sym swaps the endpoints
                             Ok(Type::Ze(t2, t1))
                         } else {
                             // Return the original type if it's not a path,
@@ -1069,7 +1079,9 @@ impl Compiler {
                     "compose" => {
                         if let Type::Ze(a, b) = var_type {
                             if _args.len() != 1 {
-                                return Err(TypeError::NotImplemented("compose expects one argument".to_string()));
+                                return Err(TypeError::NotImplemented(
+                                    "compose expects one argument".to_string(),
+                                ));
                             }
                             let arg_type = self.type_check_expression(&_args[0], None)?;
                             if let Type::Ze(b_prime, c) = arg_type {
@@ -1088,10 +1100,13 @@ impl Compiler {
                                 })
                             }
                         } else {
-                            Err(TypeError::NotAFunction(format!(".compose on non-ze type {}", type_to_string(&var_type))))
+                            Err(TypeError::NotAFunction(format!(
+                                ".compose on non-ze type {}",
+                                type_to_string(&var_type)
+                            )))
                         }
                     }
-                    _ => Ok(var_type)
+                    _ => Ok(var_type),
                 }
             }
             Expression::Kan { params, body } => {
@@ -1107,7 +1122,7 @@ impl Compiler {
                 let final_type = params.iter().rfold(body_type, |acc, p| {
                     // This logic decides if it's a non-dependent (Func) or dependent (Pi) type
                     if p.name == "_" {
-                         Type::Func(Box::new(p.type_annotation.clone()), Box::new(acc))
+                        Type::Func(Box::new(p.type_annotation.clone()), Box::new(acc))
                     } else {
                         Type::Pi {
                             binder_name: p.name.clone(),
@@ -1250,8 +1265,8 @@ impl Compiler {
     }
 
     fn compile_expression(&mut self, expression: Expression) -> Result<String, String> {
-        match expression {
-            Expression::Identifier(name) => {
+        match expression.kind {
+            ExpressionKind::Identifier(name) => {
                 if let Some(type_name) = self.context.find_constructor_type(&name) {
                     Ok(format!(
                         "{}::{}",
@@ -1262,16 +1277,16 @@ impl Compiler {
                     Ok(name)
                 }
             }
-            Expression::IntegerLiteral(n) => Ok(n.to_string()),
-            Expression::Zo(s) => {
+            ExpressionKind::IntegerLiteral(n) => Ok(n.to_string()),
+            ExpressionKind::Zo(s) => {
                 if s == "i0" {
                     Ok("kotoba_core::Interval::I0".to_string())
                 } else {
                     Ok("kotoba_core::Interval::I1".to_string())
                 }
             }
-            Expression::Unit => Ok("()".to_string()),
-            Expression::Ou { expression, arms } => {
+            ExpressionKind::Unit => Ok("()".to_string()),
+            ExpressionKind::Ou { expression, arms } => {
                 let match_expr_str = self.compile_expression(*expression)?;
                 let mut arm_strs = Vec::new();
                 for arm in arms {
@@ -1285,11 +1300,11 @@ impl Compiler {
                     arm_strs.join("\n")
                 ))
             }
-            Expression::Refl(expr) => {
+            ExpressionKind::Refl(expr) => {
                 let inner_expr_str = self.compile_expression(*expr)?;
                 Ok(format!("kotoba_core::Path::new(|_| {})", inner_expr_str))
             }
-            Expression::Glue {
+            ExpressionKind::Glue {
                 base,
                 boundary,
                 equivalence,
@@ -1302,11 +1317,11 @@ impl Compiler {
                     base_str, boundary_str, equivalence_str
                 ))
             }
-            Expression::Unglue { value } => {
+            ExpressionKind::Unglue { value } => {
                 let inner_expr_str = self.compile_expression(*value)?;
                 Ok(format!("kotoba_core::unglue({})", inner_expr_str))
             }
-            Expression::BinaryOp { lhs, rhs, op } => {
+            ExpressionKind::BinaryOp { lhs, rhs, op } => {
                 let lhs_str = self.compile_expression(*lhs)?;
                 let rhs_str = self.compile_expression(*rhs)?;
                 let op_str = match op {
@@ -1323,7 +1338,7 @@ impl Compiler {
                 };
                 Ok(format!("({} {} {})", lhs_str, op_str, rhs_str))
             }
-            Expression::If {
+            ExpressionKind::If {
                 condition,
                 then_branch,
                 else_branch,
@@ -1336,7 +1351,7 @@ impl Compiler {
                     cond_str, then_str, else_str
                 ))
             }
-            Expression::Kan { params, body } => {
+            ExpressionKind::Kan { params, body } => {
                 let param_strs: Vec<String> = params
                     .iter()
                     .map(|p| {
@@ -1350,12 +1365,12 @@ impl Compiler {
                 let body_str = self.compile_expression(*body)?;
                 Ok(format!("|{}| {{ {} }}", param_strs.join(", "), body_str))
             }
-            Expression::Pipe { lhs, rhs } => {
+            ExpressionKind::Pipe { lhs, rhs } => {
                 let lhs_str = self.compile_expression(*lhs)?;
                 let rhs_str = self.compile_expression(*rhs)?;
                 Ok(format!("{}({})", rhs_str, lhs_str))
             }
-            Expression::MethodCall {
+            ExpressionKind::MethodCall {
                 variable,
                 method,
                 args,
@@ -1381,7 +1396,9 @@ impl Compiler {
                     args_compiled.join(", ")
                 ))
             }
-            Expression::Let { name, value, body, .. } => {
+            ExpressionKind::Let {
+                name, value, body, ..
+            } => {
                 let val_str = self.compile_expression(*value)?;
                 let body_str = self.compile_expression(*body)?;
                 Ok(format!("let {} = {} in {}", name, val_str, body_str))
@@ -1541,13 +1558,13 @@ mod tests {
     #[test]
     fn test_type_check_let() {
         let mut compiler = Compiler::new();
-        let expr = kotoba_parser::parse_expression("let x: i64 = 10 in x + 1")
-            .unwrap();
-        let result = compiler.type_check_expression(&expr, Some(&Type::Ident("i64".to_string())));
+        let expr = kotoba_parser::parse_expression("let x: i64 = 10 in x + 1").unwrap();
+        let result =
+            compiler.type_check_expression(&expr, Some(&Type::Ident("i64".to_string())));
         assert_eq!(result, Ok(Type::Ident("i64".to_string())));
 
-        let expr_mismatch = kotoba_parser::parse_expression("let x: ku = 10 in x")
-            .unwrap();
+        let expr_mismatch =
+            kotoba_parser::parse_expression("let x: ku = 10 in x").unwrap();
         let result_mismatch = compiler.type_check_expression(&expr_mismatch, Some(&Type::Ku));
         assert_eq!(
             result_mismatch,
@@ -1833,7 +1850,10 @@ mod tests {
                     name: "x".to_string(),
                     type_annotation: Type::Unit,
                 }], // Simplified
-                body: Box::new(Expression::Identifier("x".to_string())),
+                body: Box::new(Expression {
+                    kind: ExpressionKind::Identifier("x".to_string()),
+                    span: Default::default(),
+                }),
                 captured_env: vec![],
             },
         );
@@ -1919,9 +1939,35 @@ mod tests {
         let input = "gyo S1 = { base, loop: ze<base, base> = refl(base) }";
         let statement = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
+        compiler.context.type_definitions.insert(
+            "S1".to_string(),
+            (
+                vec![],
+                vec![
+                    ConstructorDef::Point {
+                        name: "base".to_string(),
+                        fields: vec![],
+                    },
+                    ConstructorDef::Path {
+                        name: "loop".to_string(),
+                        path_type: Type::Ze(
+                            Box::new(Type::Ident("base".to_string())),
+                            Box::new(Type::Ident("base".to_string())),
+                        ),
+                        body: Expression {
+                            kind: ExpressionKind::Refl(Box::new(Expression {
+                                kind: ExpressionKind::Identifier("base".to_string()),
+                                span: Default::default(),
+                            })),
+                            span: Default::default(),
+                        },
+                    },
+                ],
+            ),
+        );
         let result = compiler.compile(vec![statement]);
         let expected_enum = "#[derive(Debug, Clone)]\npub enum S1 {\n    Base\n}";
-        let expected_impl = "impl S1 {\n    pub fn loop(&self) -> kotoba_core::Path<Base> {\n        unimplemented!(\"Path constructor compilation is not fully supported yet.\")\n    }\n}";
+        let expected_impl = "impl S1 {\n    pub fn loop(&self) -> kotoba_core::Path<Base> {\n        kotoba_core::Path::new(|_| S1::Base)\n    }\n}";
         let compiled_code = result.unwrap();
         assert!(
             compiled_code.contains(expected_enum),
@@ -1957,5 +2003,27 @@ mod tests {
         } else {
             panic!("Expected a shiki statement");
         }
+    }
+
+    #[test]
+    fn test_compile_gyo_with_kan_path() {
+        let input = "gyo Bool = { true, false, not: ze<Bool, Bool> = kan(i: ku) => ou i { i0 => true, i1 => false } }";
+        let statement = parse_statement(input).unwrap();
+        let mut compiler = Compiler::new();
+        let result = compiler.compile(vec![statement]);
+        assert!(result.is_ok(), "Compilation failed: {:?}", result.err());
+        let compiled_code = result.unwrap();
+
+        let expected_enum = "#[derive(Debug, Clone)]\npub enum Bool {\n    True,\n    False\n}";
+        assert!(compiled_code.contains(expected_enum));
+
+        let expected_impl = "impl Bool {";
+        assert!(compiled_code.contains(expected_impl));
+
+        let expected_method_sig = "pub fn not(&self) -> kotoba_core::Path<Bool>";
+        assert!(compiled_code.contains(expected_method_sig));
+
+        let expected_method_body = "kotoba_core::Path::new(|i: kotoba_core::Interval| { match i {";
+        assert!(compiled_code.contains(expected_method_body));
     }
 }
