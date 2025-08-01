@@ -217,8 +217,9 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_identifier(&mut self) -> ParseResult<String> {
+    fn parse_identifier(&mut self) -> ParseResult<(String, Span)> {
         self.consume_whitespace();
+        let start = self.current_location();
         let mut ident = String::new();
         while let Some(&c) = self.peek() {
             if c.is_alphanumeric() || c == '_' {
@@ -227,10 +228,11 @@ impl<'a> Parser<'a> {
                 break;
             }
         }
+        let end = self.current_location();
         if ident.is_empty() {
             Err("Expected an identifier".to_string())
         } else {
-            Ok(ident)
+            Ok((ident, Span { start, end }))
         }
     }
     
@@ -263,19 +265,17 @@ impl<'a> Parser<'a> {
         let next_char = self.peek().ok_or("Unexpected end of input")?;
 
         if next_char.is_alphabetic() {
-            let ident = self.parse_identifier()?;
-            let end = self.current_location();
-            let span = Span { start, end };
+            let (ident, span) = self.parse_identifier()?;
 
             return match ident.as_str() {
                 "i0" | "i1" => Ok(Expression {
                     kind: ExpressionKind::Zo(ident),
                     span,
                 }),
-                "refl" => self.parse_refl_expression(),
-                "glue" => self.parse_glue_expression(),
-                "unglue" => self.parse_unglue_expression(),
-                "kan" => self.parse_kan_expression(),
+                "refl" => self.parse_refl_expression(span.start),
+                "glue" => self.parse_glue_expression(span.start),
+                "unglue" => self.parse_unglue_expression(span.start),
+                "kan" => self.parse_kan_expression(span.start),
                 "ou" => self.parse_ou_expression(),
                 "let" => self.parse_let_expression(),
                 "if" => self.parse_if_expression(),
@@ -321,7 +321,7 @@ impl<'a> Parser<'a> {
             if self.peek() == Some(&'.') {
                 let start_span = expr.span;
                 self.next_char(); // consume '.'
-                let method = self.parse_identifier()?;
+                let (method, _) = self.parse_identifier()?;
                 self.expect_token('(')?;
                 let mut args = Vec::new();
                 self.consume_whitespace();
@@ -356,10 +356,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn parse_refl_expression(&mut self) -> ParseResult<Expression> {
-        // "refl" is consumed in primary, start should be passed in or recalculated.
-        // For now, let's make a rough approximation.
-        let start = self.current_location();
+    fn parse_refl_expression(&mut self, start: Location) -> ParseResult<Expression> {
         self.expect_token('(')?;
         let expr = self.parse_expression()?;
         self.expect_token(')')?;
@@ -370,8 +367,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_glue_expression(&mut self) -> ParseResult<Expression> {
-        let start = self.current_location();
+    fn parse_glue_expression(&mut self, start: Location) -> ParseResult<Expression> {
         self.expect_token('(')?;
         let base = self.parse_expression()?;
         self.expect_token(',')?;
@@ -389,8 +385,7 @@ impl<'a> Parser<'a> {
             span: Span { start, end },
         })
     }
-    fn parse_unglue_expression(&mut self) -> ParseResult<Expression> {
-        let start = self.current_location();
+    fn parse_unglue_expression(&mut self, start: Location) -> ParseResult<Expression> {
         self.expect_token('(')?;
         let value = self.parse_expression()?;
         self.expect_token(')')?;
@@ -402,8 +397,7 @@ impl<'a> Parser<'a> {
             span: Span { start, end },
         })
     }
-    fn parse_kan_expression(&mut self) -> ParseResult<Expression> {
-        let start = self.current_location();
+    fn parse_kan_expression(&mut self, start: Location) -> ParseResult<Expression> {
         self.expect_token('(')?;
         let mut params = Vec::new();
         if self.peek() != Some(&')') {
@@ -454,7 +448,7 @@ impl<'a> Parser<'a> {
     }
     fn parse_let_expression(&mut self) -> ParseResult<Expression> {
         let start = self.current_location();
-        let name = self.parse_identifier()?;
+        let (name, _) = self.parse_identifier()?;
         let mut type_annotation = None;
         self.consume_whitespace();
         if self.peek() == Some(&':') {
@@ -463,7 +457,8 @@ impl<'a> Parser<'a> {
         }
         self.expect_token('=')?;
         let value = self.parse_expression()?;
-        let in_kw = self.parse_identifier()?;
+        self.consume_whitespace();
+        let (in_kw, _) = self.parse_identifier()?;
         if in_kw != "in" {
             return Err("Expected 'in' keyword".to_string());
         }
@@ -489,10 +484,13 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_pattern(&mut self) -> ParseResult<Pattern> {
-        let ident = self.parse_identifier()?;
-        if ident == "_" {
+        self.consume_whitespace();
+        if self.peek() == Some(&'_') {
+            self.next_char();
             return Ok(Pattern::Wildcard);
         }
+
+        let (ident, _) = self.parse_identifier()?;
 
         self.consume_whitespace();
         if self.peek() == Some(&'(') {
@@ -511,18 +509,25 @@ impl<'a> Parser<'a> {
             return Ok(Pattern::Constructor(ident, args));
         }
 
+        if let Ok(num) = ident.parse::<i64>() {
+            return Ok(Pattern::IntegerLiteral(num));
+        }
+
+
         Ok(Pattern::Identifier(ident))
     }
 
     fn parse_if_expression(&mut self) -> ParseResult<Expression> {
         let start = self.current_location();
         let condition = self.parse_expression()?;
-        let then_kw = self.parse_identifier()?;
+        self.consume_whitespace();
+        let (then_kw, _) = self.parse_identifier()?;
         if then_kw != "then" {
             return Err("Expected 'then' keyword".to_string());
         }
         let then_branch = self.parse_expression()?;
-        let else_kw = self.parse_identifier()?;
+        self.consume_whitespace();
+        let (else_kw, _) = self.parse_identifier()?;
         if else_kw != "else" {
             return Err("Expected 'else' keyword".to_string());
         }
@@ -550,7 +555,7 @@ impl<'a> Parser<'a> {
             };
             self.next_char();
 
-            let rhs = self.parse_primary_expression()?;
+            let rhs = self.parse_postfix_expression()?;
             let span = Span {
                 start: lhs.span.start,
                 end: rhs.span.end,
@@ -737,11 +742,11 @@ impl<'a> Parser<'a> {
 
             // Lookahead for Pi-type like `(a: T) -> U`
             let mut snapshot = self.clone();
-            if let Ok(_ident) = snapshot.parse_identifier() {
+            if let Ok((_ident, _)) = snapshot.parse_identifier() {
                 snapshot.consume_whitespace();
                 if snapshot.peek() == Some(&':') {
                     // It's a Pi type. Let's parse it for real.
-                    let binder_name = self.parse_identifier()?;
+                    let (binder_name, _) = self.parse_identifier()?;
                     self.expect_token(':')?;
                     let binder_type = self.parse_type()?;
                     self.expect_token(')')?;
@@ -764,7 +769,7 @@ impl<'a> Parser<'a> {
             return Ok(inner_type);
         }
 
-        let ident = self.parse_identifier()?;
+        let (ident, _) = self.parse_identifier()?;
         self.consume_whitespace();
         if self.peek() == Some(&'<') {
             self.next_char(); // consume '<'
@@ -792,20 +797,20 @@ impl<'a> Parser<'a> {
 
         if ident == "ku" {
             Ok(Type::Ku)
-        } else if ident == "Unit" { // Assuming Unit is parsed as an identifier
+        } else if ident == "Unit" {
+            // Assuming Unit is parsed as an identifier
             Ok(Type::Unit)
-        }
-        else {
-             Ok(Type::Ident(ident))
+        } else {
+            Ok(Type::Ident(ident))
         }
     }
 
     // Placeholder for the statement parser
     pub fn parse_statement(&mut self) -> ParseResult<Statement> {
-        let ident = self.parse_identifier()?;
+        let (ident, _) = self.parse_identifier()?;
         match ident.as_str() {
             "shiki" => {
-                let var_name = self.parse_identifier()?;
+                let (var_name, _) = self.parse_identifier()?;
                 self.expect_token(':')?;
                 let type_ann = self.parse_type()?;
                 self.expect_token('=')?;
@@ -817,7 +822,7 @@ impl<'a> Parser<'a> {
                 })
             }
             "gyo" => {
-                let name = self.parse_identifier()?;
+                let (name, _) = self.parse_identifier()?;
                 self.expect_token('=')?;
                 self.expect_token('{')?;
                 
@@ -843,18 +848,18 @@ impl<'a> Parser<'a> {
                 })
             }
             "rin" => self.parse_rin_statement(),
-            _ => Err(format!("Unsupported statement type: {}", ident))
+            _ => Err(format!("Unsupported statement type: {}", ident)),
         }
     }
 
     fn parse_rin_statement(&mut self) -> ParseResult<Statement> {
-        let name = self.parse_identifier()?;
+        let (name, _) = self.parse_identifier()?;
         // Generics parsing (simplified)
         let generics = if self.peek() == Some(&'<') {
             self.next_char(); // consume '<'
             let mut g = Vec::new();
             loop {
-                g.push(self.parse_identifier()?);
+                g.push(self.parse_identifier()?.0);
                 if self.peek() == Some(&'>') {
                     self.next_char();
                     break;
@@ -894,14 +899,14 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_parameter(&mut self) -> ParseResult<Parameter> {
-        let name = self.parse_identifier()?;
+        let (name, _) = self.parse_identifier()?;
         self.expect_token(':')?;
         let type_annotation = self.parse_type()?;
         Ok(Parameter { name, type_annotation })
     }
 
     fn parse_constructor_def(&mut self) -> ParseResult<ConstructorDef> {
-        let name = self.parse_identifier()?;
+        let (name, _) = self.parse_identifier()?;
         self.consume_whitespace();
         if self.peek() == Some(&':') {
             // Path constructor: loop: ze<base, base>
@@ -917,7 +922,7 @@ impl<'a> Parser<'a> {
                 self.next_char(); // consume '('
                 self.consume_whitespace();
                 if self.peek() != Some(&')') {
-                     loop {
+                    loop {
                         fields.push(self.parse_type()?);
                         self.consume_whitespace();
                         if self.peek() == Some(&')') {
