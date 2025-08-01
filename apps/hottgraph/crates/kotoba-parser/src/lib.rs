@@ -234,7 +234,12 @@ impl<'a> Parser<'a> {
             }
             if *c == '(' {
                 self.next_char(); // Consume '('
-                let expr = self.parse_comparison()?; // Recursive call to the top-level expression parser
+                self.consume_whitespace();
+                if self.peek() == Some(&')') {
+                    self.next_char(); // consume ')'
+                    return Ok(Expression::Unit);
+                }
+                let expr = self.parse_expression()?; // Recursive call
                 self.consume_whitespace();
                 if self.next_char() == Some(')') {
                     return Ok(expr);
@@ -271,12 +276,144 @@ impl<'a> Parser<'a> {
         Ok(Expression::Refl(Box::new(expr)))
     }
 
-    fn parse_glue_expression(&mut self) -> ParseResult<Expression> { Ok(Expression::Unit) }
-    fn parse_unglue_expression(&mut self) -> ParseResult<Expression> { Ok(Expression::Unit) }
-    fn parse_kan_expression(&mut self) -> ParseResult<Expression> { Ok(Expression::Unit) }
-    fn parse_ou_expression(&mut self) -> ParseResult<Expression> { Ok(Expression::Unit) }
-    fn parse_let_expression(&mut self) -> ParseResult<Expression> { Ok(Expression::Unit) }
-    fn parse_if_expression(&mut self) -> ParseResult<Expression> { Ok(Expression::Unit) }
+    fn parse_glue_expression(&mut self) -> ParseResult<Expression> {
+        self.expect_token('(')?;
+        let base = self.parse_expression()?;
+        self.expect_token(',')?;
+        let boundary = self.parse_expression()?;
+        self.expect_token(',')?;
+        let equivalence = self.parse_expression()?;
+        self.expect_token(')')?;
+        Ok(Expression::Glue {
+            base: Box::new(base),
+            boundary: Box::new(boundary),
+            equivalence: Box::new(equivalence),
+        })
+    }
+    fn parse_unglue_expression(&mut self) -> ParseResult<Expression> {
+        self.expect_token('(')?;
+        let value = self.parse_expression()?;
+        self.expect_token(')')?;
+        Ok(Expression::Unglue {
+            value: Box::new(value),
+        })
+    }
+    fn parse_kan_expression(&mut self) -> ParseResult<Expression> {
+        self.expect_token('(')?;
+        let mut params = Vec::new();
+        if self.peek() != Some(&')') {
+            loop {
+                params.push(self.parse_parameter()?);
+                if self.peek() == Some(&')') {
+                    break;
+                }
+                self.expect_token(',')?;
+            }
+        }
+        self.expect_token(')')?;
+        self.expect_token('=')?;
+        self.expect_token('>')?;
+        let body = self.parse_expression()?;
+        Ok(Expression::Kan {
+            params,
+            body: Box::new(body),
+        })
+    }
+    fn parse_ou_expression(&mut self) -> ParseResult<Expression> {
+        let expression = self.parse_expression()?;
+        self.expect_token('{')?;
+        let mut arms = Vec::new();
+        if self.peek() != Some(&'}') {
+            loop {
+                arms.push(self.parse_ou_arm()?);
+                if self.peek() == Some(&'}') {
+                    break;
+                }
+                self.expect_token(',')?;
+            }
+        }
+        self.expect_token('}')?;
+        Ok(Expression::Ou {
+            expression: Box::new(expression),
+            arms,
+        })
+    }
+    fn parse_let_expression(&mut self) -> ParseResult<Expression> {
+        let name = self.parse_identifier()?;
+        let mut type_annotation = None;
+        self.consume_whitespace();
+        if self.peek() == Some(&':') {
+            self.next_char();
+            type_annotation = Some(Box::new(self.parse_type()?));
+        }
+        self.expect_token('=')?;
+        let value = self.parse_expression()?;
+        let in_kw = self.parse_identifier()?;
+        if in_kw != "in" {
+            return Err("Expected 'in' keyword".to_string());
+        }
+        let body = self.parse_expression()?;
+        Ok(Expression::Let {
+            name,
+            type_annotation,
+            value: Box::new(value),
+            body: Box::new(body),
+        })
+    }
+
+    fn parse_ou_arm(&mut self) -> ParseResult<OuArm> {
+        let pattern = self.parse_pattern()?;
+        self.expect_token('=')?;
+        self.expect_token('>')?;
+        let body = self.parse_expression()?;
+        Ok(OuArm { pattern, body })
+    }
+
+    fn parse_pattern(&mut self) -> ParseResult<Pattern> {
+        let ident = self.parse_identifier()?;
+        if ident == "_" {
+            return Ok(Pattern::Wildcard);
+        }
+
+        self.consume_whitespace();
+        if self.peek() == Some(&'(') {
+            self.next_char(); // consume '('
+            let mut args = Vec::new();
+            if self.peek() != Some(&')') {
+                loop {
+                    args.push(self.parse_pattern()?);
+                    if self.peek() == Some(&')') {
+                        break;
+                    }
+                    self.expect_token(',')?;
+                }
+            }
+            self.expect_token(')')?;
+            return Ok(Pattern::Constructor(ident, args));
+        }
+
+        Ok(Pattern::Identifier(ident))
+    }
+
+    fn parse_if_expression(&mut self) -> ParseResult<Expression> {
+        let condition = self.parse_expression()?;
+        let then_kw = self.parse_identifier()?;
+        if then_kw != "then" {
+            return Err("Expected 'then' keyword".to_string());
+        }
+        let then_branch = self.parse_expression()?;
+        let else_kw = self.parse_identifier()?;
+        if else_kw != "else" {
+            return Err("Expected 'else' keyword".to_string());
+        }
+        let else_branch = self.parse_expression()?;
+
+        Ok(Expression::If {
+            condition: Box::new(condition),
+            then_branch: Box::new(then_branch),
+            else_branch: Box::new(else_branch),
+        })
+    }
 
     fn parse_term(&mut self) -> ParseResult<Expression> {
         let mut lhs = self.parse_primary_expression()?;
@@ -337,9 +474,28 @@ impl<'a> Parser<'a> {
         Ok(lhs)
     }
 
+    fn parse_pipe(&mut self) -> ParseResult<Expression> {
+        let mut lhs = self.parse_comparison()?;
+        loop {
+            self.consume_whitespace();
+            if self.peek() == Some(&'|') {
+                self.next_char();
+                self.expect_token('>')?;
+                let rhs = self.parse_comparison()?;
+                lhs = Expression::Pipe {
+                    lhs: Box::new(lhs),
+                    rhs: Box::new(rhs),
+                };
+            } else {
+                break;
+            }
+        }
+        Ok(lhs)
+    }
+
     // Public entry point for parsing any expression
     pub fn parse_expression(&mut self) -> ParseResult<Expression> {
-        self.parse_comparison()
+        self.parse_pipe()
     }
 
     fn parse_comparison(&mut self) -> ParseResult<Expression> {
@@ -403,8 +559,50 @@ impl<'a> Parser<'a> {
         }
     }
 
-    // Placeholder
+    // This function will handle the full type grammar including function types.
     fn parse_type(&mut self) -> ParseResult<Type> {
+        let mut base_type = self.parse_app_type()?;
+        self.consume_whitespace();
+        if self.peek() == Some(&'-') {
+            self.next_char(); // consume '-'
+            self.expect_token('>')?; // consume '>'
+            let return_type = self.parse_type()?; // Right-recursive call
+            base_type = Type::Func(Box::new(base_type), Box::new(return_type));
+        }
+        Ok(base_type)
+    }
+    
+    // Parses type applications like `Vec i64`
+    fn parse_app_type(&mut self) -> ParseResult<Type> {
+        let mut head = self.parse_atomic_type()?;
+        loop {
+            self.consume_whitespace();
+            // Try to parse another atomic type, if it fails, we're done.
+            if let Ok(arg) = self.parse_atomic_type() {
+                 head = Type::App(Box::new(head), vec![arg]);
+            } else {
+                break;
+            }
+        }
+        Ok(head)
+    }
+
+    // Parses atomic types like identifiers, `ku`, `()`, or `(A -> B)`
+    fn parse_atomic_type(&mut self) -> ParseResult<Type> {
+        self.consume_whitespace();
+        if self.peek() == Some(&'(') {
+            self.next_char(); // consume '('
+            self.consume_whitespace();
+            if self.peek() == Some(&')') {
+                self.next_char(); // consume ')'
+                return Ok(Type::Unit);
+            }
+
+            let inner_type = self.parse_type()?;
+            self.expect_token(')')?;
+            return Ok(inner_type);
+        }
+
         let ident = self.parse_identifier()?;
         self.consume_whitespace();
         if self.peek() == Some(&'<') {
@@ -420,7 +618,6 @@ impl<'a> Parser<'a> {
                 self.expect_token(',')?;
             }
 
-            // Handle specific generic types like ze
             if ident == "ze" {
                 if args.len() == 2 {
                     return Ok(Type::Ze(Box::new(args[0].clone()), Box::new(args[1].clone())));
@@ -432,10 +629,12 @@ impl<'a> Parser<'a> {
             return Ok(Type::App(Box::new(Type::Ident(ident)), args));
         }
 
-
         if ident == "ku" {
             Ok(Type::Ku)
-        } else {
+        } else if ident == "Unit" { // Assuming Unit is parsed as an identifier
+            Ok(Type::Unit)
+        }
+        else {
              Ok(Type::Ident(ident))
         }
     }
@@ -457,9 +656,116 @@ impl<'a> Parser<'a> {
                 })
             }
             "gyo" => {
-                 Ok(Statement::Gyo{ name: "dummy".to_string(), params: vec![], constructors: vec![]})
+                let name = self.parse_identifier()?;
+                self.expect_token('=')?;
+                self.expect_token('{')?;
+                
+                let mut constructors = Vec::new();
+                self.consume_whitespace();
+                if self.peek() != Some(&'}') {
+                    loop {
+                        constructors.push(self.parse_constructor_def()?);
+                        self.consume_whitespace();
+                        if self.peek() == Some(&'}') {
+                            break;
+                        }
+                        self.expect_token(',')?;
+                    }
+                }
+
+                self.expect_token('}')?;
+
+                Ok(Statement::Gyo{ 
+                    name, 
+                    params: vec![], // simplified for now
+                    constructors,
+                })
             }
+            "rin" => self.parse_rin_statement(),
             _ => Err(format!("Unsupported statement type: {}", ident))
+        }
+    }
+
+    fn parse_rin_statement(&mut self) -> ParseResult<Statement> {
+        let name = self.parse_identifier()?;
+        // Generics parsing (simplified)
+        let generics = if self.peek() == Some(&'<') {
+            self.next_char(); // consume '<'
+            let mut g = Vec::new();
+            loop {
+                g.push(self.parse_identifier()?);
+                if self.peek() == Some(&'>') {
+                    self.next_char();
+                    break;
+                }
+                self.expect_token(',')?;
+            }
+            g
+        } else {
+            vec![]
+        };
+
+        self.expect_token('(')?;
+        // Params parsing (simplified)
+        let mut params = Vec::new();
+        if self.peek() != Some(&')') {
+            loop {
+                params.push(self.parse_parameter()?);
+                if self.peek() == Some(&')') {
+                    break;
+                }
+                self.expect_token(',')?;
+            }
+        }
+        self.expect_token(')')?;
+        self.expect_token(':')?;
+        let return_type = self.parse_type()?;
+        self.expect_token('=')?;
+        let body = self.parse_expression()?;
+
+        Ok(Statement::Rin {
+            name,
+            generics,
+            params,
+            return_type,
+            body,
+        })
+    }
+
+    fn parse_parameter(&mut self) -> ParseResult<Parameter> {
+        let name = self.parse_identifier()?;
+        self.expect_token(':')?;
+        let type_annotation = self.parse_type()?;
+        Ok(Parameter { name, type_annotation })
+    }
+
+    fn parse_constructor_def(&mut self) -> ParseResult<ConstructorDef> {
+        let name = self.parse_identifier()?;
+        self.consume_whitespace();
+        if self.peek() == Some(&':') {
+            // Path constructor: loop: ze<base, base>
+            self.next_char(); // consume ':'
+            let path_type = self.parse_type()?;
+            Ok(ConstructorDef::Path { name, path_type })
+        } else {
+            // Point constructor: base or succ(N)
+            let mut fields = Vec::new();
+            if self.peek() == Some(&'(') {
+                self.next_char(); // consume '('
+                self.consume_whitespace();
+                if self.peek() != Some(&')') {
+                     loop {
+                        fields.push(self.parse_type()?);
+                        self.consume_whitespace();
+                        if self.peek() == Some(&')') {
+                            break;
+                        }
+                        self.expect_token(',')?;
+                    }
+                }
+                self.expect_token(')')?;
+            }
+            Ok(ConstructorDef::Point { name, fields })
         }
     }
 
@@ -481,9 +787,9 @@ pub fn parse_program(input: &str) -> Result<Vec<Statement>, String> {
     Parser::new(input).parse_program()
 }
 
-// Main entry point for expressions is now parse_comparison
+// Main entry point for expressions is now parse_pipe
 pub fn parse_expression(input: &str) -> Result<Expression, String> {
-    Parser::new(input).parse_expression()
+    Parser::new(input).parse_pipe()
 }
 
 pub fn parse_statement(input: &str) -> Result<Statement, String> {
