@@ -2,58 +2,37 @@
   "graph": {
     "mode": "NORMAL",
     "vertices": [
-      {
-        "id": "task-complete-computation-layer-240730",
-        "label": "task",
-        "properties": { "name": "計算層を完成させる", "status": "in_progress", "phase": "1", "description": "`en` (Glue) 型の完全な実装を目指す。依存型、特にΠ型とΣ型の導入が前提となる。" }
-      },
-      {
-        "id": "task-implement-manual-parser-240730",
-        "label": "subtask",
-        "properties": { "name": "再帰下降パーサーの手書き実装", "status": "in_progress", "description": "`nom`への依存を止め、LL(1)の文法に基づいた手書きのパーサーを実装する。"}
-      },
-       {
-        "id": "subtask-pi-type-compiler-240730",
-        "label": "subtask",
-        "properties": { "name": "Π型: コンパイラ対応", "status": "pending", "description": "新しいパーサーを前提に、型チェッカーにΠ型を導入する。" }
-      },
-      {
-        "id": "subtask-sigma-type-240730",
-        "label": "subtask",
-        "properties": { "name": "Σ型（依存ペア型）の導入", "status": "pending", "description": "パーサー、AST、型チェッカーにΣ型を導入する。" }
-      },
-      {
-        "id": "subtask-glue-impl-240730",
-        "label": "subtask",
-        "properties": { "name": "`en` (Glue) 型の完全実装", "status": "pending", "description": "依存型を基盤に、`Glue`型とその計算規則を実装する。" }
-      },
-      { "id": "module-parser", "label": "module", "properties": {"name": "kotoba-parser"} },
-      { "id": "module-compiler", "label": "module", "properties": {"name": "kotoba-compiler"} },
-      { "id": "module-core", "label": "module", "properties": {"name": "kotoba-core"} }
+      { "id": "task_start", "label": "task", "properties": { "name": ["start"], "status": ["completed"] } },
+      { "id": "task_fix_compiler", "label": "task", "properties": { "name": ["Fix kotoba-compiler build"], "status": ["completed"] } },
+      { "id": "task_impl_method_args", "label": "task", "properties": { "name": ["Implement method call argument parser"], "status": ["completed"] } },
+      { "id": "task_impl_pipe_parser", "label": "task", "properties": { "name": ["Implement pipe operator parser"], "status": ["completed"] } },
+      { "id": "task_impl_glue_parser", "label": "task", "properties": { "name": ["Implement glue/unglue parser"], "status": ["completed"] } },
+      { "id": "task_all_tests_pass", "label": "task", "properties": { "name": ["All tests pass"], "status": ["completed"] } }
     ],
     "edges": [
-      { "id": "e1", "outV": "task-complete-computation-layer-240730", "inV": "task-implement-manual-parser-240730", "label": "has_subtask" },
-      { "id": "e2", "outV": "task-complete-computation-layer-240730", "inV": "subtask-pi-type-compiler-240730", "label": "has_subtask" },
-      { "id": "e3", "outV": "task-complete-computation-layer-240730", "inV": "subtask-sigma-type-240730", "label": "has_subtask" },
-      { "id": "e4", "outV": "task-complete-computation-layer-240730", "inV": "subtask-glue-impl-240730", "label": "has_subtask" },
-      { "id": "e5", "outV": "subtask-pi-type-compiler-240730", "inV": "task-implement-manual-parser-240730", "label": "depends_on" },
-      { "id": "e6", "outV": "subtask-sigma-type-240730", "inV": "subtask-pi-type-compiler-240730", "label": "depends_on" },
-      { "id": "e7", "outV": "subtask-glue-impl-240730", "inV": "subtask-sigma-type-240730", "label": "depends_on" },
-      { "id": "e8", "outV": "task-implement-manual-parser-240730", "inV": "module-parser", "label": "affects"},
-      { "id": "e9", "outV": "subtask-pi-type-compiler-240730", "inV": "module-compiler", "label": "affects"},
-      { "id": "e10", "outV": "subtask-glue-impl-240730", "inV": "module-core", "label": "affects"},
-      { "id": "e11", "outV": "subtask-glue-impl-240730", "inV": "module-compiler", "label": "affects"}
+      { "id": "edge1", "outV": "task_start", "inV": "task_fix_compiler", "label": "next" },
+      { "id": "edge_fix_to_args", "outV": "task_fix_compiler", "inV": "task_impl_method_args", "label": "next" },
+      { "id": "edge_args_to_pipe", "outV": "task_impl_method_args", "inV": "task_impl_pipe_parser", "label": "next" },
+      { "id": "edge_pipe_to_glue", "outV": "task_impl_pipe_parser", "inV": "task_impl_glue_parser", "label": "next" },
+      { "id": "edge_glue_to_pass", "outV": "task_impl_glue_parser", "inV": "task_all_tests_pass", "label": "next" }
     ]
   },
   "metadata": {
     "createdBy": "gemini-2.5-pro",
-    "createdAt": "2024-07-30T12:00:00Z",
-    "updatedAt": "2024-07-30T12:30:00Z"
+    "createdAt": "2024-07-29"
   },
   "traversals": [
     {
-      "name": "find_next_actionable_task",
-      "script": "g.V().hasLabel('subtask').has('status', 'in_progress')"
+      "name": "current_task",
+      "bytecode": {
+        "@type": "g:Bytecode",
+        "@value": {
+          "step": [
+            ["V"],
+            ["has", "status", "completed"]
+          ]
+        }
+      }
     }
   ]
 } 

@@ -145,6 +145,7 @@ pub enum Statement {
 // 2. Parser
 pub type ParseResult<T> = Result<T, String>;
 
+#[derive(Clone)]
 pub struct Parser<'a> {
     chars: std::iter::Peekable<std::str::Chars<'a>>,
 }
@@ -204,69 +205,82 @@ impl<'a> Parser<'a> {
         if num_str.is_empty() {
             Err("Expected an integer".to_string())
         } else {
-            num_str.parse::<i64>().map_err(|e| e.to_string())
+            num_str
+                .parse::<i64>()
+                .map_err(|_| "Invalid integer".to_string())
         }
     }
 
     fn parse_primary_expression(&mut self) -> ParseResult<Expression> {
         self.consume_whitespace();
-        if let Some(c) = self.peek() {
-            if c.is_digit(10) {
-                return self.parse_integer().map(Expression::IntegerLiteral);
-            }
-            if c.is_alphabetic() {
-                let ident = self.parse_identifier()?;
-                match ident.as_str() {
-                    "i0" | "i1" => return Ok(Expression::Zo(ident)),
-                    "refl" => return self.parse_refl_expression(),
-                    "glue" => return self.parse_glue_expression(),
-                    "unglue" => return self.parse_unglue_expression(),
-                    "kan" => return self.parse_kan_expression(),
-                    "ou" => return self.parse_ou_expression(),
-                    "let" => return self.parse_let_expression(),
-                    "if" => return self.parse_if_expression(),
-                    _ => {
-                        // It could be a variable, or it could be a type constructor in a type expression
-                        // We will need to handle method calls here too.
-                        return self.parse_identifier_or_method_call(ident);
-                    }
-                }
-            }
-            if *c == '(' {
-                self.next_char(); // Consume '('
-                self.consume_whitespace();
-                if self.peek() == Some(&')') {
-                    self.next_char(); // consume ')'
-                    return Ok(Expression::Unit);
-                }
-                let expr = self.parse_expression()?; // Recursive call
-                self.consume_whitespace();
-                if self.next_char() == Some(')') {
-                    return Ok(expr);
-                } else {
-                    return Err("Expected ')'".to_string());
-                }
-            }
+        let next_char = self.peek().ok_or("Unexpected end of input")?;
+
+        if next_char.is_alphabetic() {
+            let ident = self.parse_identifier()?;
+            return match ident.as_str() {
+                "i0" | "i1" => Ok(Expression::Zo(ident)),
+                "refl" => self.parse_refl_expression(),
+                "glue" => self.parse_glue_expression(),
+                "unglue" => self.parse_unglue_expression(),
+                "kan" => self.parse_kan_expression(),
+                "ou" => self.parse_ou_expression(),
+                "let" => self.parse_let_expression(),
+                "if" => self.parse_if_expression(),
+                _ => Ok(Expression::Identifier(ident)),
+            };
         }
-        Err("Unexpected token in expression".to_string())
+
+        if next_char.is_digit(10) {
+            return self.parse_integer().map(Expression::IntegerLiteral);
+        }
+
+        if *next_char == '(' {
+            self.next_char();
+            self.consume_whitespace();
+            if self.peek() == Some(&')') {
+                self.next_char();
+                return Ok(Expression::Unit);
+            }
+            let expr = self.parse_expression()?;
+            self.expect_token(')')?;
+            return Ok(expr);
+        }
+
+        Err(format!("Unexpected character: {}", next_char))
     }
 
-    fn parse_identifier_or_method_call(&mut self, ident: String) -> ParseResult<Expression> {
-        self.consume_whitespace();
-        if self.peek() == Some(&'.') {
-            self.next_char(); // consume '.'
-            let method = self.parse_identifier()?;
-            self.expect_token('(')?;
-            // For now, assume no arguments for simplicity
-            self.expect_token(')')?;
-            Ok(Expression::MethodCall {
-                variable: Box::new(Expression::Identifier(ident)),
-                method,
-                args: vec![],
-            })
-        } else {
-            Ok(Expression::Identifier(ident))
+    fn parse_postfix_expression(&mut self) -> ParseResult<Expression> {
+        let mut expr = self.parse_primary_expression()?;
+        loop {
+            self.consume_whitespace();
+            if self.peek() == Some(&'.') {
+                self.next_char(); // consume '.'
+                let method = self.parse_identifier()?;
+                self.expect_token('(')?;
+                let mut args = Vec::new();
+                self.consume_whitespace();
+                if self.peek() != Some(&')') {
+                    loop {
+                        let arg = self.parse_expression()?;
+                        args.push(arg);
+                        self.consume_whitespace();
+                        if self.peek() == Some(&')') {
+                            break;
+                        }
+                        self.expect_token(',')?;
+                    }
+                }
+                self.expect_token(')')?;
+                expr = Expression::MethodCall {
+                    variable: Box::new(expr),
+                    method,
+                    args,
+                };
+            } else {
+                break;
+            }
         }
+        Ok(expr)
     }
 
     fn parse_refl_expression(&mut self) -> ParseResult<Expression> {
@@ -416,7 +430,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_term(&mut self) -> ParseResult<Expression> {
-        let mut lhs = self.parse_primary_expression()?;
+        let mut lhs = self.parse_postfix_expression()?;
         loop {
             self.consume_whitespace();
             match self.peek() {
@@ -593,11 +607,36 @@ impl<'a> Parser<'a> {
         if self.peek() == Some(&'(') {
             self.next_char(); // consume '('
             self.consume_whitespace();
+
             if self.peek() == Some(&')') {
                 self.next_char(); // consume ')'
                 return Ok(Type::Unit);
             }
 
+            // Lookahead for Pi-type like `(a: T) -> U`
+            let mut snapshot = self.clone();
+            if let Ok(ident) = snapshot.parse_identifier() {
+                snapshot.consume_whitespace();
+                if snapshot.peek() == Some(&':') {
+                    // It's a Pi type. Let's parse it for real.
+                    let binder_name = self.parse_identifier()?;
+                    self.expect_token(':')?;
+                    let binder_type = self.parse_type()?;
+                    self.expect_token(')')?;
+                    self.consume_whitespace();
+                    self.expect_token('-')?;
+                    self.expect_token('>')?;
+                    let return_type = self.parse_type()?;
+
+                    return Ok(Type::Pi {
+                        binder_name,
+                        binder_type: Box::new(binder_type),
+                        return_type: Box::new(return_type),
+                    });
+                }
+            }
+
+            // If it wasn't a Pi-type, parse it as a grouped type
             let inner_type = self.parse_type()?;
             self.expect_token(')')?;
             return Ok(inner_type);
