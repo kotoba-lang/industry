@@ -48,7 +48,11 @@ pub enum ConstructorDef {
         name: String,
         fields: Vec<Type>,
     },
-    Path { name: String, path_type: Type },
+    Path {
+        name: String,
+        path_type: Type,
+        body: Expression,
+    },
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -785,7 +789,9 @@ impl<'a> Parser<'a> {
             // Path constructor: loop: ze<base, base>
             self.next_char(); // consume ':'
             let path_type = self.parse_type()?;
-            Ok(ConstructorDef::Path { name, path_type })
+            self.expect_token('=')?;
+            let body = self.parse_expression()?;
+            Ok(ConstructorDef::Path { name, path_type, body })
         } else {
             // Point constructor: base or succ(N)
             let mut fields = Vec::new();

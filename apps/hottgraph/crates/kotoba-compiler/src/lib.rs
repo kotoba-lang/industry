@@ -537,7 +537,7 @@ impl Compiler {
     }
 
     fn compile_gyo_statement(
-        &self,
+        &mut self,
         name: &str,
         params: &[Parameter],
         constructors: &[ConstructorDef],
@@ -597,13 +597,22 @@ impl Compiler {
                 if let ConstructorDef::Path {
                     name: path_name,
                     path_type,
+                    body,
                 } = constructor
                 {
                     let path_type_str = self.type_to_rust_type_string(path_type, Some(name));
+                    let body_expr_str = self.compile_expression(body.clone())?;
+
+                    let final_body_str = match body {
+                        Expression::Kan { .. } => {
+                            format!("kotoba_core::Path::new({})", body_expr_str)
+                        }
+                        _ => body_expr_str, // Assumes other expressions like Refl are already compiled correctly
+                    };
+
                     let method_str = format!(
-                        "    pub fn {}(&self) -> {} {{\n        unimplemented!(\"Path constructor compilation is not fully supported yet.\")\n    }}",
-                        path_name,
-                        path_type_str
+                        "    pub fn {}(&self) -> {} {{\n        {}\n    }}",
+                        path_name, path_type_str, final_body_str
                     );
                     method_strs.push(method_str);
                 }
@@ -1907,7 +1916,7 @@ mod tests {
 
     #[test]
     fn test_compile_gyo_statement_with_path() {
-        let input = "gyo S1 = { base, loop: ze<base, base> }";
+        let input = "gyo S1 = { base, loop: ze<base, base> = refl(base) }";
         let statement = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
