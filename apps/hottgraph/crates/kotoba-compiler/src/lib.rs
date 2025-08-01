@@ -993,6 +993,31 @@ impl Compiler {
                             Ok(var_type)
                         }
                     }
+                    "compose" => {
+                        if let Type::Ze(a, b) = var_type {
+                            if args.len() != 1 {
+                                return Err(TypeError::NotImplemented("compose expects one argument".to_string()));
+                            }
+                            let arg_type = self.type_check_expression(&args[0], None)?;
+                            if let Type::Ze(b_prime, c) = arg_type {
+                                if self.are_types_equal(&b, &b_prime) {
+                                    Ok(Type::Ze(a.clone(), c.clone()))
+                                } else {
+                                    Err(TypeError::TypeMismatch {
+                                        expected: type_to_string(&b),
+                                        found: type_to_string(&b_prime),
+                                    })
+                                }
+                            } else {
+                                Err(TypeError::TypeMismatch {
+                                    expected: "ze type".to_string(),
+                                    found: type_to_string(&arg_type),
+                                })
+                            }
+                        } else {
+                            Err(TypeError::NotAFunction(format!(".compose on non-ze type {}", type_to_string(&var_type))))
+                        }
+                    }
                     _ => Ok(var_type)
                 }
             }
@@ -1290,8 +1315,16 @@ impl Compiler {
                 args,
             } => {
                 let var_str = self.compile_expression(*variable)?;
-                let arg_strs: Result<Vec<_>, _> =
-                    args.into_iter().map(|a| self.compile_expression(a)).collect();
+                let arg_strs: Result<Vec<_>, _> = args
+                    .into_iter()
+                    .map(|a| {
+                        if method == "compose" {
+                            self.compile_expression(a).map(|s| format!("&{}", s))
+                        } else {
+                            self.compile_expression(a)
+                        }
+                    })
+                    .collect();
 
                 let args_compiled = arg_strs.map_err(|e| e.to_string())?;
 

@@ -2,19 +2,19 @@
   "graph": {
     "mode": "NORMAL",
     "vertices": [
-      { "id": "task_start", "label": "task", "properties": { "name": ["start"], "status": ["completed"] } },
-      { "id": "task_fix_compiler", "label": "task", "properties": { "name": ["Fix kotoba-compiler build"], "status": ["completed"] } },
-      { "id": "task_impl_method_args", "label": "task", "properties": { "name": ["Implement method call argument parser"], "status": ["completed"] } },
-      { "id": "task_impl_pipe_parser", "label": "task", "properties": { "name": ["Implement pipe operator parser"], "status": ["completed"] } },
-      { "id": "task_impl_glue_parser", "label": "task", "properties": { "name": ["Implement glue/unglue parser"], "status": ["completed"] } },
-      { "id": "task_all_tests_pass", "label": "task", "properties": { "name": ["All tests pass"], "status": ["completed"] } }
+      { "id": "task_implement_compiler_features", "label": "task", "properties": { "name": ["Implement compiler features"], "status": ["in_progress"] } },
+      { "id": "subtask_impl_compose_type_check", "label": "subtask", "properties": { "name": ["Implement type checking for .compose()"], "status": ["in_progress"] } },
+      { "id": "subtask_impl_compose_compile", "label": "subtask", "properties": { "name": ["Implement compilation for .compose()"], "status": ["pending"] } },
+      { "id": "subtask_enable_compose_test", "label": "subtask", "properties": { "name": ["Enable and pass .compose() test"], "status": ["pending"] } },
+      { "id": "task_cleanup_warnings", "label": "task", "properties": { "name": ["Cleanup compiler warnings"], "status": ["pending"] } }
     ],
     "edges": [
-      { "id": "edge1", "outV": "task_start", "inV": "task_fix_compiler", "label": "next" },
-      { "id": "edge_fix_to_args", "outV": "task_fix_compiler", "inV": "task_impl_method_args", "label": "next" },
-      { "id": "edge_args_to_pipe", "outV": "task_impl_method_args", "inV": "task_impl_pipe_parser", "label": "next" },
-      { "id": "edge_pipe_to_glue", "outV": "task_impl_pipe_parser", "inV": "task_impl_glue_parser", "label": "next" },
-      { "id": "edge_glue_to_pass", "outV": "task_impl_glue_parser", "inV": "task_all_tests_pass", "label": "next" }
+      { "id": "e1", "outV": "task_implement_compiler_features", "inV": "subtask_impl_compose_type_check", "label": "has_subtask" },
+      { "id": "e2", "outV": "task_implement_compiler_features", "inV": "subtask_impl_compose_compile", "label": "has_subtask" },
+      { "id": "e3", "outV": "task_implement_compiler_features", "inV": "subtask_enable_compose_test", "label": "has_subtask" },
+      { "id": "e4", "outV": "subtask_impl_compose_compile", "inV": "subtask_impl_compose_type_check", "label": "depends_on" },
+      { "id": "e5", "outV": "subtask_enable_compose_test", "inV": "subtask_impl_compose_compile", "label": "depends_on" },
+      { "id": "e6", "outV": "task_cleanup_warnings", "inV": "task_implement_compiler_features", "label": "depends_on" }
     ]
   },
   "metadata": {
@@ -29,7 +29,8 @@
         "@value": {
           "step": [
             ["V"],
-            ["has", "status", "completed"]
+            ["hasLabel", "subtask"],
+            ["has", "status", "in_progress"]
           ]
         }
       }
