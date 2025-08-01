@@ -23,15 +23,7 @@ fn main() {
     };
 
     let program = match kotoba_parser::parse_program(&source_code) {
-        Ok((remaining, statements)) => {
-            if !remaining.trim().is_empty() {
-                eprintln!(
-                    "警告: ファイルのすべてを解析できませんでした。未解析の残り: \n'{}'",
-                    remaining
-                );
-            }
-            statements
-        }
+        Ok(statements) => statements,
         Err(e) => {
             eprintln!("構文解析エラー: {:?}", e);
             return;
