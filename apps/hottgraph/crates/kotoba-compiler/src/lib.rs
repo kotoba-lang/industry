@@ -285,7 +285,6 @@ impl Compiler {
                     _ => Ok(var_val),
                 }
             }
-            _ => unimplemented!("Evaluation for this expression is not yet implemented."),
         }
     }
 
@@ -989,10 +988,30 @@ impl Compiler {
                     _ => Ok(var_type)
                 }
             }
-            Expression::Kan { .. } => self
-                .evaluate(expression)
-                .map(|v| self.type_of(&v))
-                .map_err(|e| TypeError::NotImplemented(format!("{:?}", e))),
+            Expression::Kan { params, body } => {
+                self.context.enter_scope();
+                for p in params {
+                    self.context
+                        .define_var(p.name.clone(), p.type_annotation.clone());
+                }
+                let body_type = self.type_check_expression(body, None)?;
+                self.context.exit_scope();
+
+                // Build the function/Pi type from the inside out
+                let final_type = params.iter().rfold(body_type, |acc, p| {
+                    // This logic decides if it's a non-dependent (Func) or dependent (Pi) type
+                    if p.name == "_" {
+                         Type::Func(Box::new(p.type_annotation.clone()), Box::new(acc))
+                    } else {
+                        Type::Pi {
+                            binder_name: p.name.clone(),
+                            binder_type: Box::new(p.type_annotation.clone()),
+                            return_type: Box::new(acc),
+                        }
+                    }
+                });
+                Ok(final_type)
+            }
             Expression::Zo(_) => Ok(Type::Ident("ku".to_string())),
             _ => self
                 .evaluate(expression)
@@ -1341,7 +1360,7 @@ mod tests {
     #[test]
     fn test_compile_shiki_zo() {
         let input = "shiki my_time: ku = i0";
-        let (_, statement) = parse_statement(input).unwrap();
+        let statement = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         assert!(result.is_ok());
@@ -1353,7 +1372,7 @@ mod tests {
     #[ignore] // Ignoring because `compose` method is not implemented in mock evaluator
     fn test_compile_shiki_method_call_with_args() {
         let input = "shiki p2: ze<i64, i64> = p1.compose(q1)";
-        let (_, statement) = parse_statement(input).unwrap();
+        let statement = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let path_type = Type::Ze(
             Box::new(Type::Ident("i64".to_string())),
@@ -1371,7 +1390,7 @@ mod tests {
     #[test]
     fn test_compile_shiki_method_call_sym() {
         let input = "shiki p_sym: ze<i64, i64> = p.sym()";
-        let (_, statement) = parse_statement(input).unwrap();
+        let statement = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let p_type = Type::Ze(
             Box::new(Type::Ident("i64".to_string())),
@@ -1390,9 +1409,9 @@ mod tests {
     #[test]
     fn test_compile_glue_unglue() {
         let input_glue = "shiki g: en<i64, (), ()> = glue(10, (), ())";
-        let (_, statement_glue) = parse_statement(input_glue).unwrap();
+        let statement_glue = parse_statement(input_glue).unwrap();
         let input_unglue = "shiki v: i64 = unglue(g)";
-        let (_, statement_unglue) = parse_statement(input_unglue).unwrap();
+        let statement_unglue = parse_statement(input_unglue).unwrap();
 
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement_glue, statement_unglue]);
@@ -1418,11 +1437,11 @@ mod tests {
         compiler
             .context
             .define_var("x".to_string(), Type::Ident("i64".to_string()));
-        let expr = kotoba_parser::parse_expression("x").unwrap().1;
+        let expr = kotoba_parser::parse_expression("x").unwrap();
         let result = compiler.type_check_expression(&expr, None);
         assert_eq!(result, Ok(Type::Ident("i64".to_string())));
 
-        let expr_undef = kotoba_parser::parse_expression("y").unwrap().1;
+        let expr_undef = kotoba_parser::parse_expression("y").unwrap();
         let result_undef = compiler.type_check_expression(&expr_undef, None);
         assert_eq!(
             result_undef,
@@ -1434,14 +1453,12 @@ mod tests {
     fn test_type_check_let() {
         let mut compiler = Compiler::new();
         let expr = kotoba_parser::parse_expression("let x: i64 = 10 in x + 1")
-            .unwrap()
-            .1;
+            .unwrap();
         let result = compiler.type_check_expression(&expr, Some(&Type::Ident("i64".to_string())));
         assert_eq!(result, Ok(Type::Ident("i64".to_string())));
 
         let expr_mismatch = kotoba_parser::parse_expression("let x: ku = 10 in x")
-            .unwrap()
-            .1;
+            .unwrap();
         let result_mismatch = compiler.type_check_expression(&expr_mismatch, Some(&Type::Ku));
         assert_eq!(
             result_mismatch,
@@ -1467,12 +1484,11 @@ mod tests {
             .define_var("n".to_string(), Type::Ident("i64".to_string()));
 
         let expr = kotoba_parser::parse_expression("n |> is_positive")
-            .unwrap()
-            .1;
+            .unwrap();
         let result = compiler.type_check_expression(&expr, None);
         assert_eq!(result, Ok(Type::Ident("bool".to_string())));
 
-        let expr_not_func = kotoba_parser::parse_expression("n |> n").unwrap().1;
+        let expr_not_func = kotoba_parser::parse_expression("n |> n").unwrap();
         let result_not_func = compiler.type_check_expression(&expr_not_func, None);
         assert_eq!(
             result_not_func,
@@ -1516,14 +1532,12 @@ mod tests {
             .define_var("opt".to_string(), option_value_type);
 
         let expr_ok = parse_expression("ou opt { some(x) => x, none => 0 }")
-            .unwrap()
-            .1;
+            .unwrap();
         let result_ok = compiler.type_check_expression(&expr_ok, None);
         assert_eq!(result_ok, Ok(Type::Ident("i64".to_string())));
 
         let expr_err = parse_expression("ou opt { some(x) => x, none => i0 }")
-            .unwrap()
-            .1;
+            .unwrap();
         let result_err = compiler.type_check_expression(&expr_err, None);
         assert_eq!(
             result_err,
@@ -1537,7 +1551,7 @@ mod tests {
     #[test]
     fn test_compile_rin_with_generics() {
         let input = "rin id<T>(x: T): T = x";
-        let (_, statement) = parse_statement(input).unwrap();
+        let statement = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         let expected_code = "fn id<T>(x: T) -> T {\n    x\n}";
@@ -1547,7 +1561,7 @@ mod tests {
     #[test]
     fn test_compile_rin_statement() {
         let input = "rin add(a: N, b: N): N = ou a { zero => b }";
-        let (_, statement) = parse_statement(input).unwrap();
+        let statement = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         compiler
             .context
@@ -1568,7 +1582,7 @@ mod tests {
     #[test]
     fn test_compile_gyo_statement() {
         let input = "gyo N = { zero, succ(N) }";
-        let (_, statement) = parse_statement(input).unwrap();
+        let statement = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         let expected_code =
@@ -1585,10 +1599,9 @@ mod tests {
     #[test]
     fn test_compile_rin_statement_with_constructor() {
         let program = vec![
-            parse_statement("gyo N = { zero, succ(N) }").unwrap().1,
+            parse_statement("gyo N = { zero, succ(N) }").unwrap(),
             parse_statement("rin to_zero(a: N): N = ou a { zero => zero, succ(p) => zero }")
-                .unwrap()
-                .1,
+                .unwrap(),
         ];
         let mut compiler = Compiler::new();
         let result = compiler.compile(program);
@@ -1604,12 +1617,11 @@ mod tests {
     #[test]
     fn test_compile_path_with_inductive_type() {
         let program = vec![
-            parse_statement("gyo Bool = { true, false }").unwrap().1,
+            parse_statement("gyo Bool = { true, false }").unwrap(),
             parse_statement(
                 "shiki path_to_false: ze<Bool, Bool> = kan(i: ku) => ou i { i0 => true, i1 => false }",
             )
-            .unwrap()
-            .1,
+            .unwrap(),
         ];
         let mut compiler = Compiler::new();
         let result = compiler.compile(program);
@@ -1624,7 +1636,7 @@ mod tests {
     #[test]
     fn test_compile_higher_order_path() {
         let input = "shiki p_over_p: ze<ze<i64, i64>, ze<i64, i64>> = some_path";
-        let (_, statement) = parse_statement(input).unwrap();
+        let statement = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let path_type = Type::Ze(
             Box::new(Type::Ze(
@@ -1647,7 +1659,7 @@ mod tests {
     #[test]
     fn test_compile_shiki_method_call() {
         let input = "shiki ticks: en<ma, i64, some_eq> = timer_ba.as_en()";
-        let (_, statement) = parse_statement(input).unwrap();
+        let statement = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         compiler.context.define_var(
             "timer_ba".to_string(),
@@ -1665,7 +1677,7 @@ mod tests {
     #[test]
     fn test_compile_refl() {
         let input = "shiki id_path: ze<i64, i64> = refl(10)";
-        let (_, statement) = parse_statement(input).unwrap();
+        let statement = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         let expected_code = "let id_path: kotoba_core::Path<i64> = kotoba_core::Path::new(|_| 10);";
@@ -1675,7 +1687,7 @@ mod tests {
     #[test]
     fn test_compile_path_constructor() {
         let input = "shiki my_path: ze<i64, i64> = kan(i: ku) => ou i { i0 => 10, i1 => 20 }";
-        let (_, statement) = parse_statement(input).unwrap();
+        let statement = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         assert!(result.is_ok(), "Compilation failed: {:?}", result.err());
@@ -1690,7 +1702,7 @@ mod tests {
     #[test]
     fn test_compile_nested_kan() {
         let input = "shiki add_curried: i64 -> i64 -> i64 = kan(a: i64) => kan(b: i64) => a";
-        let (_, statement) = parse_statement(input).unwrap();
+        let statement = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         let expected_code =
@@ -1701,7 +1713,7 @@ mod tests {
     #[test]
     fn test_compile_shiki_pipe() {
         let input = "shiki pipeline: en<ma, i64, id> = ticks |> doubler";
-        let (_, statement) = parse_statement(input).unwrap();
+        let statement = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let ticks_type = Type::En(
             Box::new(Type::Ident("ma".to_string())),
@@ -1747,7 +1759,7 @@ mod tests {
     #[test]
     fn test_compile_shiki_binary_op() {
         let input = "shiki result: i64 = 1 + 2";
-        let (_, statement) = parse_statement(input).unwrap();
+        let statement = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         assert!(result.is_ok(), "Compilation failed: {:?}", result.err());
@@ -1762,7 +1774,7 @@ mod tests {
     #[test]
     fn test_compile_shiki_comparison_op() {
         let input = "shiki result: bool = 1 < 2";
-        let (_, statement) = parse_statement(input).unwrap();
+        let statement = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         assert!(result.is_ok(), "Compilation failed: {:?}", result.err());
@@ -1777,7 +1789,7 @@ mod tests {
     #[test]
     fn test_compile_shiki_if_expression() {
         let input = "shiki result: i64 = if 1 < 2 then 10 else 20";
-        let (_, statement) = parse_statement(input).unwrap();
+        let statement = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         assert!(result.is_ok(), "Compilation failed: {:?}", result.err());
@@ -1792,7 +1804,7 @@ mod tests {
     #[test]
     fn test_compile_shiki_kan() {
         let input = "shiki doubler: i64 -> i64 = kan(x: i64) => x";
-        let (_, statement) = parse_statement(input).unwrap();
+        let statement = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         assert!(result.is_ok(), "Compilation failed: {:?}", result.err());
@@ -1803,7 +1815,7 @@ mod tests {
     #[test]
     fn test_compile_ou_expression() {
         let input = "ou i { i0 => i0, _ => i1 }";
-        let (_, expression) = parse_expression(input).unwrap();
+        let expression = parse_expression(input).unwrap();
         let mut compiler = Compiler::new();
         compiler
             .context
@@ -1816,7 +1828,7 @@ mod tests {
     #[test]
     fn test_compile_gyo_statement_with_path() {
         let input = "gyo S1 = { base, loop: ze<base, base> }";
-        let (_, statement) = parse_statement(input).unwrap();
+        let statement = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
         let expected_enum = "#[derive(Debug, Clone)]\npub enum S1 {\n    Base\n}";
@@ -1841,4 +1853,20 @@ mod tests {
         ];
     }
     */
+
+    #[test]
+    fn test_type_check_dependent_function() {
+        let input = "shiki id: (T: Type) -> T -> T = kan(T: Type) => kan(x: T) => x";
+        let statement = parse_statement(input).unwrap();
+        let mut compiler = Compiler::new();
+        compiler.context.define_var("Type".to_string(), Type::Ident("Type".to_string()));
+        if let Statement::Shiki { value, type_annotation, .. } = statement {
+            let result = compiler.type_check_expression(&value, Some(&type_annotation));
+            assert!(result.is_ok(), "Failed to type check dependent identity function: {:?}", result.err());
+            let inferred_type = result.unwrap();
+            assert!(compiler.are_types_equal(&inferred_type, &type_annotation));
+        } else {
+            panic!("Expected a shiki statement");
+        }
+    }
 }
