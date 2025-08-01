@@ -1,0 +1,48 @@
+{
+  "graph": {
+    "mode": "NORMAL",
+    "vertices": [
+      {"_id": "1", "_label": "task", "name": "Implement Kotoba Frontend Framework", "status": "in_progress"},
+      {"_id": "2", "_label": "task", "name": "Analyze existing Kotoba crates", "status": "pending"},
+      {"_id": "3", "_label": "task", "name": "Create kotoba-wasm-frontend crate", "status": "pending"},
+      {"_id": "4", "_label": "task", "name": "Configure Wasm build target", "status": "pending"},
+      {"_id": "5", "_label": "task", "name": "Implement simple component definition in Kotoba", "status": "pending"},
+      {"_id": "6", "_label": "task", "name": "Implement Wasm rendering logic", "status": "pending"},
+      {"_id": "7", "_label": "task", "name": "Generate TypeScript bindings", "status": "pending"},
+      {"_id": "8", "_label": "task", "name": "Create example web application", "status": "pending"},
+      {"_id": "9", "_label": "milestone", "name": "Proof of Concept: Render 'Hello World'", "status": "pending"}
+    ],
+    "edges": [
+      {"_outV": "1", "_inV": "2", "_label": "dependsOn"},
+      {"_outV": "2", "_inV": "3", "_label": "dependsOn"},
+      {"_outV": "3", "_inV": "4", "_label": "dependsOn"},
+      {"_outV": "4", "_inV": "5", "_label": "dependsOn"},
+      {"_outV": "5", "_inV": "6", "_label": "dependsOn"},
+      {"_outV": "6", "_inV": "7", "_label": "dependsOn"},
+      {"_outV": "7", "_inV": "8", "_label": "dependsOn"},
+      {"_outV": "8", "_inV": "9", "_label": "milestoneFor"}
+    ]
+  },
+  "metadata": {
+    "createdBy": "Gemini 2.5 Pro",
+    "createdAt": "2024-07-30T12:00:00Z"
+  },
+  "traversals": [
+    {
+      "name": "get_current_task",
+      "script": "g.V().has('status', 'in_progress')"
+    },
+    {
+      "name": "get_pending_tasks",
+      "bytecode": {
+        "@type": "g:Bytecode",
+        "@value": {
+          "step": [
+            ["V"],
+            ["has", "status", "pending"]
+          ]
+        }
+      }
+    }
+  ]
+}
