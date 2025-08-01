@@ -615,7 +615,7 @@ impl<'a> Parser<'a> {
 
             // Lookahead for Pi-type like `(a: T) -> U`
             let mut snapshot = self.clone();
-            if let Ok(ident) = snapshot.parse_identifier() {
+            if let Ok(_ident) = snapshot.parse_identifier() {
                 snapshot.consume_whitespace();
                 if snapshot.peek() == Some(&':') {
                     // It's a Pi type. Let's parse it for real.

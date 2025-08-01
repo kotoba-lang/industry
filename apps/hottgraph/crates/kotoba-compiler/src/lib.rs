@@ -971,7 +971,7 @@ impl Compiler {
                     })
                 }
             }
-            Expression::MethodCall { variable, method, args } => {
+            Expression::MethodCall { variable, method, args: _args } => {
                 let var_type = self.type_check_expression(variable, None)?;
                 match method.as_str() {
                     "as_en" => {
@@ -995,10 +995,10 @@ impl Compiler {
                     }
                     "compose" => {
                         if let Type::Ze(a, b) = var_type {
-                            if args.len() != 1 {
+                            if _args.len() != 1 {
                                 return Err(TypeError::NotImplemented("compose expects one argument".to_string()));
                             }
-                            let arg_type = self.type_check_expression(&args[0], None)?;
+                            let arg_type = self.type_check_expression(&_args[0], None)?;
                             if let Type::Ze(b_prime, c) = arg_type {
                                 if self.are_types_equal(&b, &b_prime) {
                                     Ok(Type::Ze(a.clone(), c.clone()))
@@ -1089,16 +1089,6 @@ impl Compiler {
         }
     }
     
-    fn type_check_identifier(&self, name: &str) -> Result<Type, TypeError> {
-        if let Some(ty) = self.context.find_var(name) {
-            Ok(ty.clone())
-        } else if let Some(type_name) = self.context.find_constructor_type(name) {
-            Ok(Type::Ident(type_name.clone()))
-        } else {
-            Err(TypeError::UndefinedVariable(name.to_string()))
-        }
-    }
-
     fn extract_bindings_from_pattern(
         &self,
         pattern: &Pattern,
@@ -1184,23 +1174,6 @@ impl Compiler {
             _ => {}
         }
         Ok(bindings)
-    }
-
-    fn compile_binary_op_expression(
-        &mut self,
-        op: kotoba_parser::Operator,
-        lhs: Expression,
-        rhs: Expression,
-    ) -> Result<String, String> {
-        // This will be simplified as evaluation now happens before compilation
-        let val = self
-            .evaluate(&Expression::BinaryOp {
-                op,
-                lhs: Box::new(lhs),
-                rhs: Box::new(rhs),
-            })
-            .map_err(|e| format!("{:?}", e))?;
-        Ok(format!("{:?}", val)) // Just for now
     }
 
     fn compile_expression(&mut self, expression: Expression) -> Result<String, String> {
@@ -1410,7 +1383,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Ignoring because `compose` method is not implemented in mock evaluator
     fn test_compile_shiki_method_call_with_args() {
         let input = "shiki p2: ze<i64, i64> = p1.compose(q1)";
         let statement = parse_statement(input).unwrap();
@@ -1423,6 +1395,8 @@ mod tests {
             .context
             .define_var("p1".to_string(), path_type.clone());
         compiler.context.define_var("q1".to_string(), path_type);
+        compiler.env_define_var("p1".to_string(), Value::Unit); // Dummy value for evaluation
+        compiler.env_define_var("q1".to_string(), Value::Unit); // Dummy value for evaluation
         let result = compiler.compile(vec![statement]);
         let expected_code = "let p2: kotoba_core::Path<i64> = p1.compose(&q1);";
         assert_eq!(result.unwrap().contains(expected_code), true);
@@ -1862,7 +1836,7 @@ mod tests {
             .context
             .define_var("i".to_string(), Type::Ident("ku".to_string()));
         let result = compiler.compile_expression(expression);
-        let expected_code = "match i {\n    kotoba_core::Interval::I0 => { kotoba_core::Interval::I0 },\n    _ => { kotoba_core::Interval::I1 },\n}";
+        let _expected_code = "match i {\n    kotoba_core::Interval::I0 => { kotoba_core::Interval::I0 },\n    _ => { kotoba_core::Interval::I1 },\n}";
         assert!(result.unwrap().contains("match i"));
     }
 
