@@ -921,7 +921,7 @@ impl Compiler {
                     Err(TypeError::UndefinedVariable(name.clone()))
                 }
             }
-            Expression::Let {
+            ExpressionKind::Let {
                 name,
                 type_annotation,
                 value,
@@ -942,7 +942,30 @@ impl Compiler {
                 self.context.exit_scope();
                 Ok(body_type)
             }
-            Expression::BinaryOp { lhs, rhs, op } => {
+            ExpressionKind::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                let cond_type = self.type_check_expression(condition, None)?;
+                let bool_type = Type::Ident("bool".to_string());
+                if !self.are_types_equal(&cond_type, &bool_type) {
+                    return Err(TypeError::TypeMismatch {
+                        expected: type_to_string(&bool_type),
+                        found: type_to_string(&cond_type),
+                    });
+                }
+                let then_type = self.type_check_expression(then_branch, None)?;
+                let else_type = self.type_check_expression(else_branch, None)?;
+                if !self.are_types_equal(&then_type, &else_type) {
+                    return Err(TypeError::TypeMismatch {
+                        expected: type_to_string(&then_type),
+                        found: type_to_string(&else_type),
+                    });
+                }
+                Ok(then_type)
+            }
+            ExpressionKind::BinaryOp { lhs, rhs, op } => {
                 self.type_check_expression(lhs, None)?;
                 self.type_check_expression(rhs, None)?;
                 match op {
@@ -960,7 +983,7 @@ impl Compiler {
                     }
                 }
             }
-            Expression::Pipe { lhs, rhs } => {
+            ExpressionKind::Pipe { lhs, rhs } => {
                 let lhs_type = self.type_check_expression(lhs, None)?;
                 let rhs_type = self.type_check_expression(rhs, None)?;
 
@@ -983,7 +1006,7 @@ impl Compiler {
                     _ => Err(TypeError::NotAFunction(type_to_string(&rhs_type))),
                 }
             }
-            Expression::Ou { expression, arms } => {
+            ExpressionKind::Ou { expression, arms } => {
                 let match_expr_type = self.type_check_expression(expression, None)?;
 
                 if arms.is_empty() {
@@ -1018,14 +1041,14 @@ impl Compiler {
 
                 first_arm_body_type.ok_or(TypeError::EmptyOuExpression)
             }
-            Expression::Refl(expr) => {
+            ExpressionKind::Refl(expr) => {
                 let inner_type = self.type_check_expression(expr, None)?;
                 Ok(Type::Ze(
                     Box::new(inner_type.clone()),
                     Box::new(inner_type),
                 ))
             }
-            Expression::Glue {
+            ExpressionKind::Glue {
                 base,
                 boundary,
                 equivalence,
@@ -1039,7 +1062,7 @@ impl Compiler {
                     Box::new(equivalence_type),
                 ))
             }
-            Expression::Unglue { value } => {
+            ExpressionKind::Unglue { value } => {
                 let inner_type = self.type_check_expression(value, None)?;
                 if let Type::En(t, _, _) = inner_type {
                     Ok(*t)
@@ -1050,7 +1073,7 @@ impl Compiler {
                     })
                 }
             }
-            Expression::MethodCall {
+            ExpressionKind::MethodCall {
                 variable,
                 method,
                 args: _args,
@@ -1109,7 +1132,7 @@ impl Compiler {
                     _ => Ok(var_type),
                 }
             }
-            Expression::Kan { params, body } => {
+            ExpressionKind::Kan { params, body } => {
                 self.context.enter_scope();
                 for p in params {
                     self.context
@@ -1133,11 +1156,7 @@ impl Compiler {
                 });
                 Ok(final_type)
             }
-            Expression::Zo(_) => Ok(Type::Ident("ku".to_string())),
-            _ => self
-                .evaluate(expression)
-                .map(|v| self.type_of(&v))
-                .map_err(|e| TypeError::NotImplemented(format!("{:?}", e))),
+            ExpressionKind::Zo(_) => Ok(Type::Ident("ku".to_string())),
         }
     }
 
