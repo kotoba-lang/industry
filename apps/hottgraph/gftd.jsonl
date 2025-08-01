@@ -2,11 +2,11 @@
   "graph": {
     "mode": "NORMAL",
     "vertices": [
-      { "id": "task_implement_compiler_features", "label": "task", "properties": { "name": ["Implement compiler features"], "status": ["in_progress"] } },
-      { "id": "subtask_impl_compose_type_check", "label": "subtask", "properties": { "name": ["Implement type checking for .compose()"], "status": ["in_progress"] } },
-      { "id": "subtask_impl_compose_compile", "label": "subtask", "properties": { "name": ["Implement compilation for .compose()"], "status": ["pending"] } },
-      { "id": "subtask_enable_compose_test", "label": "subtask", "properties": { "name": ["Enable and pass .compose() test"], "status": ["pending"] } },
-      { "id": "task_cleanup_warnings", "label": "task", "properties": { "name": ["Cleanup compiler warnings"], "status": ["pending"] } }
+      { "id": "task_implement_compiler_features", "label": "task", "properties": { "name": ["Implement compiler features"], "status": ["completed"] } },
+      { "id": "subtask_impl_compose_type_check", "label": "subtask", "properties": { "name": ["Implement type checking for .compose()"], "status": ["completed"] } },
+      { "id": "subtask_impl_compose_compile", "label": "subtask", "properties": { "name": ["Implement compilation for .compose()"], "status": ["completed"] } },
+      { "id": "subtask_enable_compose_test", "label": "subtask", "properties": { "name": ["Enable and pass .compose() test"], "status": ["completed"] } },
+      { "id": "task_cleanup_warnings", "label": "task", "properties": { "name": ["Cleanup compiler warnings"], "status": ["completed"] } }
     ],
     "edges": [
       { "id": "e1", "outV": "task_implement_compiler_features", "inV": "subtask_impl_compose_type_check", "label": "has_subtask" },
@@ -30,7 +30,7 @@
           "step": [
             ["V"],
             ["hasLabel", "subtask"],
-            ["has", "status", "in_progress"]
+            ["has", "status", "completed"]
           ]
         }
       }
