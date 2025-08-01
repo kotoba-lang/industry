@@ -311,6 +311,17 @@ fn parse_ou_arm(input: &str) -> ParseResult<OuArm> {
 
 // --- Expression Parsers (Corrected Hierarchy) ---
 
+// This is the main entry point for parsing any expression.
+pub fn parse_expression(input: &str) -> ParseResult<Expression> {
+    alt((
+        parse_let,
+        parse_if,
+        parse_kan,
+        parse_ou,
+        parse_pipe, // Fallback to operator precedence parsing
+    )).parse(input)
+}
+
 fn parse_primary(input: &str) -> ParseResult<Expression> {
     alt((
         map(nom_i64, Expression::IntegerLiteral),
@@ -318,13 +329,27 @@ fn parse_primary(input: &str) -> ParseResult<Expression> {
         map(tag("()"), |_| Expression::Unit),
         map(alt((tag("i0"), tag("i1"))), |s: &str| Expression::Zo(s.to_string())),
         delimited(char('('), parse_expression, char(')')),
-        // Simplified parsers for glue/refl for now
         map(preceded(tag("refl"), delimited(char('('), parse_expression, char(')'))), |e| Expression::Refl(Box::new(e))),
         map(
-            preceded(tag("glue"), delimited(char('('), tuple((parse_expression, preceded(tag(","), parse_expression), preceded(tag(","), parse_expression))), char(')'))),
-            |(base, boundary, equivalence)| Expression::Glue { base: Box::new(base), boundary: Box::new(boundary), equivalence: Box::new(equivalence) }
+            preceded(
+                tag("glue"),
+                delimited(
+                    char('('),
+                    tuple((
+                        parse_expression,
+                        preceded(delimited(sp, tag(","), sp), parse_expression),
+                        preceded(delimited(sp, tag(","), sp), parse_expression),
+                    )),
+                    char(')'),
+                ),
+            ),
+            |(base, boundary, equivalence)| Expression::Glue {
+                base: Box::new(base),
+                boundary: Box::new(boundary),
+                equivalence: Box::new(equivalence),
+            },
         ),
-         map(preceded(tag("unglue"), delimited(char('('), parse_expression, char(')'))), |e| Expression::Unglue { value: Box::new(e) }),
+        map(preceded(tag("unglue"), delimited(char('('), parse_expression, char(')'))), |e| Expression::Unglue { value: Box::new(e) }),
     )).parse(input)
 }
 
@@ -488,61 +513,10 @@ fn parse_ou(input: &str) -> ParseResult<Expression> {
     ).parse(input)
 }
 
-pub fn parse_expression(input: &str) -> ParseResult<Expression> {
-    alt((
-        parse_let,
-        parse_if,
-        parse_kan,
-        parse_ou,
-        parse_pipe,
-    )).parse(input)
-}
-
-// --- Statement Parsers ---
-pub fn parse_statement(input: &str) -> ParseResult<Statement> {
-    // Implementation from before, adapted for nom 7 if needed
-    let shiki_parser = map(
-        tuple((
-            preceded(tag("shiki"), multispace1),
-            map(parse_identifier, |s| s.to_string()),
-            preceded(delimited(sp, char(':'), sp), parse_type),
-            preceded(delimited(sp, char('='), sp), parse_expression),
-        )),
-        |(_, variable_name, type_annotation, value)| Statement::Shiki { variable_name, type_annotation, value },
-    );
-
-    let gyo_parser = map(
-        tuple((
-            preceded(tag("gyo"), multispace1),
-            map(parse_identifier, |s| s.to_string()),
-            preceded(delimited(sp, char('='), sp), delimited(
-                char('{'),
-                separated_list0(delimited(sp, char(','), sp), parse_constructor_def),
-                char('}'),
-            )),
-        )),
-        |(_, name, constructors)| Statement::Gyo { name, params: vec![], constructors }, // Simplified params for now
-    );
-    
-    let rin_parser = map(
-        tuple((
-            preceded(tag("rin"), multispace1),
-            map(parse_identifier, |s| s.to_string()),
-            opt(delimited(char('<'), separated_list1(delimited(sp, char(','), sp), map(parse_identifier, |s| s.to_string())), char('>'))),
-            delimited(char('('), separated_list0(delimited(sp, char(','), sp), parse_parameter), char(')')),
-            preceded(delimited(sp, char(':'), sp), parse_type),
-            preceded(delimited(sp, char('='), sp), parse_expression),
-        )),
-        |(_, name, generics, params, return_type, body)| Statement::Rin { name, generics: generics.unwrap_or_default(), params, return_type, body },
-    );
-
-    alt((shiki_parser, gyo_parser, rin_parser)).parse(input)
-}
-
 fn parse_constructor_def(input: &str) -> ParseResult<ConstructorDef> {
     let mut point_parser = map(
         pair(
-            map(parse_identifier, |s| s.to_string()),
+            map(parse_identifier_str, |s| s.to_string()),
             opt(delimited(char('('), separated_list1(delimited(sp, char(','), sp), parse_type), char(')'))),
         ),
         |(name, fields)| ConstructorDef::Point { name, fields: fields.unwrap_or_default() },
@@ -553,4 +527,69 @@ fn parse_constructor_def(input: &str) -> ParseResult<ConstructorDef> {
 
 pub fn parse_program(input: &str) -> ParseResult<Vec<Statement>> {
     many0(parse_statement).parse(input)
+} 
+
+pub fn parse_statement(input: &str) -> ParseResult<Statement> {
+    let shiki_parser = map(
+        tuple((
+            preceded(tag("shiki"), multispace1),
+            map(parse_identifier, |s| s.to_string()),
+            preceded(delimited(sp, char(':'), sp), parse_type),
+            preceded(delimited(sp, char('='), sp), parse_expression),
+        )),
+        |(_, variable_name, type_annotation, value)| Statement::Shiki {
+            variable_name,
+            type_annotation,
+            value,
+        },
+    );
+
+    let gyo_parser = map(
+        tuple((
+            preceded(tag("gyo"), multispace1),
+            map(parse_identifier_str, |s| s.to_string()),
+            delimited(sp, tag("="), sp), // Use sp around '='
+            delimited(
+                char('{'),
+                separated_list0(delimited(sp, char(','), sp), parse_constructor_def),
+                char('}'),
+            ),
+        )),
+        |(_, name, _, constructors)| Statement::Gyo {
+            name,
+            params: vec![],
+            constructors,
+        }, // Simplified params for now
+    );
+
+    let rin_parser = map(
+        tuple((
+            preceded(tag("rin"), multispace1),
+            map(parse_identifier_str, |s| s.to_string()),
+            opt(delimited(
+                char('<'),
+                separated_list1(
+                    delimited(sp, char(','), sp),
+                    map(parse_identifier_str, |s| s.to_string()),
+                ),
+                char('>'),
+            )),
+            delimited(
+                char('('),
+                separated_list0(delimited(sp, char(','), sp), parse_parameter),
+                char(')'),
+            ),
+            preceded(delimited(sp, char(':'), sp), parse_type),
+            preceded(delimited(sp, char('='), sp), parse_expression),
+        )),
+        |(_, name, generics, params, return_type, body)| Statement::Rin {
+            name,
+            generics: generics.unwrap_or_default(),
+            params,
+            return_type,
+            body,
+        },
+    );
+
+    alt((shiki_parser, gyo_parser, rin_parser)).parse(input)
 } 
