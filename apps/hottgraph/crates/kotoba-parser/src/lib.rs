@@ -234,8 +234,9 @@ impl<'a> Parser<'a> {
         }
     }
     
-    fn parse_integer(&mut self) -> ParseResult<i64> {
+    fn parse_integer(&mut self) -> ParseResult<(i64, Span)> {
         self.consume_whitespace();
+        let start = self.current_location();
         let mut num_str = String::new();
         while let Some(&c) = self.peek() {
             if c.is_digit(10) {
@@ -244,12 +245,14 @@ impl<'a> Parser<'a> {
                 break;
             }
         }
+        let end = self.current_location();
         if num_str.is_empty() {
             Err("Expected an integer".to_string())
         } else {
             num_str
                 .parse::<i64>()
                 .map_err(|_| "Invalid integer".to_string())
+                .map(|val| (val, Span { start, end }))
         }
     }
 
@@ -284,11 +287,10 @@ impl<'a> Parser<'a> {
         }
 
         if next_char.is_digit(10) {
-            return self.parse_integer().map(|lit| {
-                let end = self.current_location();
+            return self.parse_integer().map(|(lit, span)| {
                 Expression {
                     kind: ExpressionKind::IntegerLiteral(lit),
-                    span: Span { start, end },
+                    span,
                 }
             });
         }
