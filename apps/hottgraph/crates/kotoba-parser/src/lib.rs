@@ -309,7 +309,7 @@ fn parse_ou_arm(input: &str) -> ParseResult<OuArm> {
     .parse(input)
 }
 
-// --- Expression Parsers (Rewritten) ---
+// --- Expression Parsers (Corrected Hierarchy) ---
 
 fn parse_primary(input: &str) -> ParseResult<Expression> {
     alt((
@@ -427,11 +427,11 @@ fn parse_if(input: &str) -> ParseResult<Expression> {
     map(
         tuple((
             preceded(tag("if"), sp),
-            parse_expression,
+            parse_pipe, // Use lower precedence parser
             preceded(sp, tag("then")),
-            parse_expression,
+            parse_pipe, // Use lower precedence parser
             preceded(sp, tag("else")),
-            parse_expression,
+            parse_expression, // The branch can be any expression
         )),
         |(_, condition, _, then_branch, _, else_branch)| Expression::If {
             condition: Box::new(condition),
@@ -448,9 +448,9 @@ fn parse_let(input: &str) -> ParseResult<Expression> {
             map(parse_identifier, |s| s.to_string()),
             opt(preceded(delimited(sp, char(':'), sp), parse_type)),
             delimited(sp, char('='), sp),
-            parse_expression,
+            parse_pipe, // Use lower precedence parser
             delimited(sp, tag("in"), sp),
-            parse_expression,
+            parse_expression, // The body can be any expression
         )),
         |(_, name, type_annotation, _, value, _, body)| Expression::Let {
             name,
@@ -471,7 +471,7 @@ fn parse_kan(input: &str) -> ParseResult<Expression> {
                 char(')'),
             ),
             preceded(sp, tag("=>")),
-            cut(parse_expression),
+            cut(parse_expression), // The body can be any expression
         )),
         |(_, params, _, body)| Expression::Kan { params, body: Box::new(body) },
     ).parse(input)
@@ -489,7 +489,13 @@ fn parse_ou(input: &str) -> ParseResult<Expression> {
 }
 
 pub fn parse_expression(input: &str) -> ParseResult<Expression> {
-    alt((parse_if, parse_let, parse_kan, parse_ou, parse_pipe)).parse(input)
+    alt((
+        parse_let,
+        parse_if,
+        parse_kan,
+        parse_ou,
+        parse_pipe,
+    )).parse(input)
 }
 
 // --- Statement Parsers ---
