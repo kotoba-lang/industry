@@ -4,24 +4,6 @@
 // The AST definitions are kept as they are, as they correctly represent the language structure.
 // The main change is to replace the `nom` based parsing functions with a manual implementation.
 
-#[derive(Debug, PartialEq, Clone, Copy, Default)]
-pub struct Location {
-    pub line: usize,
-    pub column: usize,
-}
-
-#[derive(Debug, PartialEq, Clone, Copy, Default)]
-pub struct Span {
-    pub start: Location,
-    pub end: Location,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Expression {
-    pub kind: ExpressionKind,
-    pub span: Span,
-}
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum Type {
     Ku,
@@ -66,15 +48,11 @@ pub enum ConstructorDef {
         name: String,
         fields: Vec<Type>,
     },
-    Path {
-        name: String,
-        path_type: Type,
-        body: Expression,
-    },
+    Path { name: String, path_type: Type },
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum ExpressionKind {
+pub enum Expression {
     Kan {
         params: Vec<Parameter>,
         body: Box<Expression>,
@@ -170,41 +148,21 @@ pub type ParseResult<T> = Result<T, String>;
 #[derive(Clone)]
 pub struct Parser<'a> {
     chars: std::iter::Peekable<std::str::Chars<'a>>,
-    line: usize,
-    column: usize,
 }
 
 impl<'a> Parser<'a> {
     pub fn new(input: &'a str) -> Self {
         Parser {
             chars: input.chars().peekable(),
-            line: 1,
-            column: 1,
         }
     }
 
     fn next_char(&mut self) -> Option<char> {
-        let next = self.chars.next();
-        if let Some(c) = next {
-            if c == '\n' {
-                self.line += 1;
-                self.column = 1;
-            } else {
-                self.column += 1;
-            }
-        }
-        next
+        self.chars.next()
     }
 
     fn peek(&mut self) -> Option<&char> {
         self.chars.peek()
-    }
-
-    fn current_location(&self) -> Location {
-        Location {
-            line: self.line,
-            column: self.column,
-        }
     }
 
     fn consume_whitespace(&mut self) {
@@ -255,20 +213,12 @@ impl<'a> Parser<'a> {
 
     fn parse_primary_expression(&mut self) -> ParseResult<Expression> {
         self.consume_whitespace();
-        let start = self.current_location();
-
         let next_char = self.peek().ok_or("Unexpected end of input")?;
 
         if next_char.is_alphabetic() {
             let ident = self.parse_identifier()?;
-            let end = self.current_location();
-            let span = Span { start, end };
-
             return match ident.as_str() {
-                "i0" | "i1" => Ok(Expression {
-                    kind: ExpressionKind::Zo(ident),
-                    span,
-                }),
+                "i0" | "i1" => Ok(Expression::Zo(ident)),
                 "refl" => self.parse_refl_expression(),
                 "glue" => self.parse_glue_expression(),
                 "unglue" => self.parse_unglue_expression(),
@@ -276,21 +226,12 @@ impl<'a> Parser<'a> {
                 "ou" => self.parse_ou_expression(),
                 "let" => self.parse_let_expression(),
                 "if" => self.parse_if_expression(),
-                _ => Ok(Expression {
-                    kind: ExpressionKind::Identifier(ident),
-                    span,
-                }),
+                _ => Ok(Expression::Identifier(ident)),
             };
         }
 
         if next_char.is_digit(10) {
-            return self.parse_integer().map(|lit| {
-                let end = self.current_location();
-                Expression {
-                    kind: ExpressionKind::IntegerLiteral(lit),
-                    span: Span { start, end },
-                }
-            });
+            return self.parse_integer().map(Expression::IntegerLiteral);
         }
 
         if *next_char == '(' {
@@ -298,11 +239,7 @@ impl<'a> Parser<'a> {
             self.consume_whitespace();
             if self.peek() == Some(&')') {
                 self.next_char();
-                let end = self.current_location();
-                return Ok(Expression {
-                    kind: ExpressionKind::Unit,
-                    span: Span { start, end },
-                });
+                return Ok(Expression::Unit);
             }
             let expr = self.parse_expression()?;
             self.expect_token(')')?;
@@ -317,7 +254,6 @@ impl<'a> Parser<'a> {
         loop {
             self.consume_whitespace();
             if self.peek() == Some(&'.') {
-                let start_span = expr.span;
                 self.next_char(); // consume '.'
                 let method = self.parse_identifier()?;
                 self.expect_token('(')?;
@@ -335,17 +271,10 @@ impl<'a> Parser<'a> {
                     }
                 }
                 self.expect_token(')')?;
-                let end_location = self.current_location();
-                expr = Expression {
-                    kind: ExpressionKind::MethodCall {
-                        variable: Box::new(expr),
-                        method,
-                        args,
-                    },
-                    span: Span {
-                        start: start_span.start,
-                        end: end_location,
-                    },
+                expr = Expression::MethodCall {
+                    variable: Box::new(expr),
+                    method,
+                    args,
                 };
             } else {
                 break;
@@ -355,21 +284,13 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_refl_expression(&mut self) -> ParseResult<Expression> {
-        // "refl" is consumed in primary, start should be passed in or recalculated.
-        // For now, let's make a rough approximation.
-        let start = self.current_location();
         self.expect_token('(')?;
         let expr = self.parse_expression()?;
         self.expect_token(')')?;
-        let end = self.current_location();
-        Ok(Expression {
-            kind: ExpressionKind::Refl(Box::new(expr)),
-            span: Span { start, end },
-        })
+        Ok(Expression::Refl(Box::new(expr)))
     }
 
     fn parse_glue_expression(&mut self) -> ParseResult<Expression> {
-        let start = self.current_location();
         self.expect_token('(')?;
         let base = self.parse_expression()?;
         self.expect_token(',')?;
@@ -377,31 +298,21 @@ impl<'a> Parser<'a> {
         self.expect_token(',')?;
         let equivalence = self.parse_expression()?;
         self.expect_token(')')?;
-        let end = self.current_location();
-        Ok(Expression {
-            kind: ExpressionKind::Glue {
-                base: Box::new(base),
-                boundary: Box::new(boundary),
-                equivalence: Box::new(equivalence),
-            },
-            span: Span { start, end },
+        Ok(Expression::Glue {
+            base: Box::new(base),
+            boundary: Box::new(boundary),
+            equivalence: Box::new(equivalence),
         })
     }
     fn parse_unglue_expression(&mut self) -> ParseResult<Expression> {
-        let start = self.current_location();
         self.expect_token('(')?;
         let value = self.parse_expression()?;
         self.expect_token(')')?;
-        let end = self.current_location();
-        Ok(Expression {
-            kind: ExpressionKind::Unglue {
-                value: Box::new(value),
-            },
-            span: Span { start, end },
+        Ok(Expression::Unglue {
+            value: Box::new(value),
         })
     }
     fn parse_kan_expression(&mut self) -> ParseResult<Expression> {
-        let start = self.current_location();
         self.expect_token('(')?;
         let mut params = Vec::new();
         if self.peek() != Some(&')') {
@@ -417,17 +328,12 @@ impl<'a> Parser<'a> {
         self.expect_token('=')?;
         self.expect_token('>')?;
         let body = self.parse_expression()?;
-        let end = self.current_location();
-        Ok(Expression {
-            kind: ExpressionKind::Kan {
-                params,
-                body: Box::new(body),
-            },
-            span: Span { start, end },
+        Ok(Expression::Kan {
+            params,
+            body: Box::new(body),
         })
     }
     fn parse_ou_expression(&mut self) -> ParseResult<Expression> {
-        let start = self.current_location();
         let expression = self.parse_expression()?;
         self.expect_token('{')?;
         let mut arms = Vec::new();
@@ -441,17 +347,12 @@ impl<'a> Parser<'a> {
             }
         }
         self.expect_token('}')?;
-        let end = self.current_location();
-        Ok(Expression {
-            kind: ExpressionKind::Ou {
-                expression: Box::new(expression),
-                arms,
-            },
-            span: Span { start, end },
+        Ok(Expression::Ou {
+            expression: Box::new(expression),
+            arms,
         })
     }
     fn parse_let_expression(&mut self) -> ParseResult<Expression> {
-        let start = self.current_location();
         let name = self.parse_identifier()?;
         let mut type_annotation = None;
         self.consume_whitespace();
@@ -466,15 +367,11 @@ impl<'a> Parser<'a> {
             return Err("Expected 'in' keyword".to_string());
         }
         let body = self.parse_expression()?;
-        let end = self.current_location();
-        Ok(Expression {
-            kind: ExpressionKind::Let {
-                name,
-                type_annotation,
-                value: Box::new(value),
-                body: Box::new(body),
-            },
-            span: Span { start, end },
+        Ok(Expression::Let {
+            name,
+            type_annotation,
+            value: Box::new(value),
+            body: Box::new(body),
         })
     }
 
@@ -513,7 +410,6 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_if_expression(&mut self) -> ParseResult<Expression> {
-        let start = self.current_location();
         let condition = self.parse_expression()?;
         let then_kw = self.parse_identifier()?;
         if then_kw != "then" {
@@ -525,15 +421,11 @@ impl<'a> Parser<'a> {
             return Err("Expected 'else' keyword".to_string());
         }
         let else_branch = self.parse_expression()?;
-        let end = self.current_location();
 
-        Ok(Expression {
-            kind: ExpressionKind::If {
-                condition: Box::new(condition),
-                then_branch: Box::new(then_branch),
-                else_branch: Box::new(else_branch),
-            },
-            span: Span { start, end },
+        Ok(Expression::If {
+            condition: Box::new(condition),
+            then_branch: Box::new(then_branch),
+            else_branch: Box::new(else_branch),
         })
     }
 
@@ -541,26 +433,27 @@ impl<'a> Parser<'a> {
         let mut lhs = self.parse_postfix_expression()?;
         loop {
             self.consume_whitespace();
-            let op = match self.peek() {
-                Some('*') => Operator::Multiply,
-                Some('/') => Operator::Divide,
+            match self.peek() {
+                Some('*') => {
+                    self.next_char();
+                    let rhs = self.parse_primary_expression()?;
+                    lhs = Expression::BinaryOp {
+                        op: Operator::Multiply,
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                    };
+                }
+                Some('/') => {
+                    self.next_char();
+                    let rhs = self.parse_primary_expression()?;
+                    lhs = Expression::BinaryOp {
+                        op: Operator::Divide,
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                    };
+                }
                 _ => break,
-            };
-            self.next_char();
-
-            let rhs = self.parse_primary_expression()?;
-            let span = Span {
-                start: lhs.span.start,
-                end: rhs.span.end,
-            };
-            lhs = Expression {
-                kind: ExpressionKind::BinaryOp {
-                    op,
-                    lhs: Box::new(lhs),
-                    rhs: Box::new(rhs),
-                },
-                span,
-            };
+            }
         }
         Ok(lhs)
     }
@@ -570,26 +463,27 @@ impl<'a> Parser<'a> {
         let mut lhs = self.parse_term()?;
         loop {
             self.consume_whitespace();
-            let op = match self.peek() {
-                Some('+') => Operator::Add,
-                Some('-') => Operator::Subtract,
+            match self.peek() {
+                Some('+') => {
+                    self.next_char();
+                    let rhs = self.parse_term()?;
+                    lhs = Expression::BinaryOp {
+                        op: Operator::Add,
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                    };
+                }
+                Some('-') => {
+                    self.next_char();
+                    let rhs = self.parse_term()?;
+                    lhs = Expression::BinaryOp {
+                        op: Operator::Subtract,
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                    };
+                }
                 _ => break,
-            };
-            self.next_char();
-
-            let rhs = self.parse_term()?;
-            let span = Span {
-                start: lhs.span.start,
-                end: rhs.span.end,
-            };
-            lhs = Expression {
-                kind: ExpressionKind::BinaryOp {
-                    op,
-                    lhs: Box::new(lhs),
-                    rhs: Box::new(rhs),
-                },
-                span,
-            };
+            }
         }
         Ok(lhs)
     }
@@ -602,16 +496,9 @@ impl<'a> Parser<'a> {
                 self.next_char();
                 self.expect_token('>')?;
                 let rhs = self.parse_comparison()?;
-                let span = Span {
-                    start: lhs.span.start,
-                    end: rhs.span.end,
-                };
-                lhs = Expression {
-                    kind: ExpressionKind::Pipe {
-                        lhs: Box::new(lhs),
-                        rhs: Box::new(rhs),
-                    },
-                    span,
+                lhs = Expression::Pipe {
+                    lhs: Box::new(lhs),
+                    rhs: Box::new(rhs),
                 };
             } else {
                 break;
@@ -637,7 +524,7 @@ impl<'a> Parser<'a> {
                         Operator::Equals
                     } else {
                         // This case is tricky, might be single '=' assignment
-                        break;
+                        break; 
                     }
                 }
                 Some('!') => {
@@ -667,17 +554,10 @@ impl<'a> Parser<'a> {
             };
 
             let rhs = self.parse_additive_expression()?;
-            let span = Span {
-                start: lhs.span.start,
-                end: rhs.span.end,
-            };
-            lhs = Expression {
-                kind: ExpressionKind::BinaryOp {
-                    op,
-                    lhs: Box::new(lhs),
-                    rhs: Box::new(rhs),
-                },
-                span,
+            lhs = Expression::BinaryOp {
+                op,
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
             };
         }
         Ok(lhs)
@@ -905,9 +785,7 @@ impl<'a> Parser<'a> {
             // Path constructor: loop: ze<base, base>
             self.next_char(); // consume ':'
             let path_type = self.parse_type()?;
-            self.expect_token('=')?;
-            let body = self.parse_expression()?;
-            Ok(ConstructorDef::Path { name, path_type, body })
+            Ok(ConstructorDef::Path { name, path_type })
         } else {
             // Point constructor: base or succ(N)
             let mut fields = Vec::new();
