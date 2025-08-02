@@ -148,14 +148,16 @@ pub enum Statement {
         name: String,
         params: Vec<Parameter>,
         constructors: Vec<ConstructorDef>,
+        body: Option<Type>,
     },
     Rin {
         name: String,
-        generics: Vec<String>,
+        generics: Vec<Parameter>,
         params: Vec<Parameter>,
         return_type: Type,
         body: Expression,
     },
+    ExpressionStatement(Expression),
 }
 
 // ---- Hand-written Parser Implementation ----
@@ -172,6 +174,7 @@ pub struct Parser<'a> {
     chars: std::iter::Peekable<std::str::Chars<'a>>,
     line: usize,
     column: usize,
+    type_parameters: Vec<String>,
 }
 
 impl<'a> Parser<'a> {
@@ -180,6 +183,7 @@ impl<'a> Parser<'a> {
             chars: input.chars().peekable(),
             line: 1,
             column: 1,
+            type_parameters: Vec::new(),
         }
     }
 
@@ -211,6 +215,17 @@ impl<'a> Parser<'a> {
         while let Some(&c) = self.peek() {
             if c.is_whitespace() {
                 self.next_char();
+            } else if c == '/' && {
+                let mut temp_chars = self.chars.clone();
+                temp_chars.next(); // consume the first '/'
+                temp_chars.peek() == Some(&'/')
+            } {
+                // It's a line comment, consume until newline
+                while let Some(ch) = self.next_char() {
+                    if ch == '\n' {
+                        break;
+                    }
+                }
             } else {
                 break;
             }
@@ -792,6 +807,18 @@ impl<'a> Parser<'a> {
                 }
             }
 
+            if ident == "en" {
+                if args.len() == 3 {
+                    return Ok(Type::En(
+                        Box::new(args[0].clone()),
+                        Box::new(args[1].clone()),
+                        Box::new(args[2].clone()),
+                    ));
+                } else {
+                    return Err("en type constructor expects 3 arguments".to_string());
+                }
+            }
+
             return Ok(Type::App(Box::new(Type::Ident(ident)), args));
         }
 
@@ -800,92 +827,162 @@ impl<'a> Parser<'a> {
         } else if ident == "Unit" {
             // Assuming Unit is parsed as an identifier
             Ok(Type::Unit)
+        } else if self.type_parameters.contains(&ident) {
+            Ok(Type::Ident(ident))
         } else {
             Ok(Type::Ident(ident))
         }
     }
 
+    fn enter_type_param_scope(&mut self, params: &[Parameter]) {
+        for p in params {
+            self.type_parameters.push(p.name.clone());
+        }
+    }
+
+    fn exit_type_param_scope(&mut self, params: &[Parameter]) {
+        for _ in params {
+            self.type_parameters.pop();
+        }
+    }
+
     // Placeholder for the statement parser
     pub fn parse_statement(&mut self) -> ParseResult<Statement> {
-        let (ident, _) = self.parse_identifier()?;
-        match ident.as_str() {
-            "shiki" => {
-                let (var_name, _) = self.parse_identifier()?;
-                self.expect_token(':')?;
-                let type_ann = self.parse_type()?;
-                self.expect_token('=')?;
-                let value = self.parse_expression()?;
-                Ok(Statement::Shiki {
-                    variable_name: var_name,
-                    type_annotation: type_ann,
-                    value,
-                })
-            }
-            "gyo" => {
-                let (name, _) = self.parse_identifier()?;
-                self.expect_token('=')?;
-                self.expect_token('{')?;
-                
-                let mut constructors = Vec::new();
-                self.consume_whitespace();
-                if self.peek() != Some(&'}') {
-                    loop {
-                        constructors.push(self.parse_constructor_def()?);
-                        self.consume_whitespace();
-                        if self.peek() == Some(&'}') {
-                            break;
-                        }
-                        self.expect_token(',')?;
-                    }
+        let mut snapshot = self.clone();
+        if let Ok((ident, _)) = snapshot.parse_identifier() {
+            match ident.as_str() {
+                "shiki" => {
+                    self.parse_identifier()?; // consume "shiki"
+                    let (var_name, _) = self.parse_identifier()?;
+                    self.expect_token(':')?;
+                    let type_ann = self.parse_type()?;
+                    self.expect_token('=')?;
+                    let value = self.parse_expression()?;
+                    return Ok(Statement::Shiki {
+                        variable_name: var_name,
+                        type_annotation: type_ann,
+                        value,
+                    });
                 }
+                "gyo" => {
+                    self.parse_identifier()?; // consume "gyo"
+                    let name = self.parse_identifier()?.0;
+                    
+                    let mut params = Vec::new();
+                    if self.peek() == Some(&'<') {
+                        self.next_char();
+                        self.consume_whitespace();
+                        if self.peek() != Some(&'>') {
+                            loop {
+                                params.push(self.parse_parameter()?);
+                                self.consume_whitespace();
+                                if self.peek() == Some(&',') {
+                                    self.next_char();
+                                } else if self.peek() == Some(&'>') {
+                                    break;
+                                } else {
+                                    return Err("Expected ',' or '>' in generics list".to_string());
+                                }
+                            }
+                        }
+                        self.expect_token('>')?;
+                    }
 
-                self.expect_token('}')?;
+                    let mut constructors = Vec::new();
+                    let mut body = None;
 
-                Ok(Statement::Gyo{ 
-                    name, 
-                    params: vec![], // simplified for now
-                    constructors,
-                })
+                    self.consume_whitespace();
+                    if self.peek() == Some(&'=') {
+                        self.next_char(); // consume '='
+                        self.consume_whitespace();
+                        
+                        if self.peek() == Some(&'{') {
+                            self.next_char(); // consume '{'
+                            self.consume_whitespace();
+                            if self.peek() != Some(&'}') {
+                                loop {
+                                    constructors.push(self.parse_constructor_def()?);
+                                    self.consume_whitespace();
+                                    if self.peek() == Some(&',') {
+                                        self.next_char();
+                                        self.consume_whitespace();
+                                    } else if self.peek() == Some(&'}') {
+                                        break;
+                                    } else {
+                                        return Err("Expected ',' or '}' in constructor list".to_string());
+                                    }
+                                }
+                            }
+                            self.expect_token('}')?;
+                        } else {
+                            body = Some(self.parse_type()?);
+                        }
+                    }
+
+                    return Ok(Statement::Gyo {
+                        name,
+                        params,
+                        constructors,
+                        body,
+                    });
+                }
+                "rin" => {
+                    self.parse_identifier()?; // "rin" を消費
+                    return self.parse_rin_statement();
+                }
+                _ => {} // Fall through to expression parsing
             }
-            "rin" => self.parse_rin_statement(),
-            _ => Err(format!("Unsupported statement type: {}", ident)),
         }
+
+        // If it's not a known keyword, try to parse it as an expression statement
+        let expr = self.parse_expression()?;
+        Ok(Statement::ExpressionStatement(expr))
     }
 
     fn parse_rin_statement(&mut self) -> ParseResult<Statement> {
         let (name, _) = self.parse_identifier()?;
-        // Generics parsing (simplified)
-        let generics = if self.peek() == Some(&'<') {
-            self.next_char(); // consume '<'
-            let mut g = Vec::new();
-            loop {
-                g.push(self.parse_identifier()?.0);
-                if self.peek() == Some(&'>') {
-                    self.next_char();
-                    break;
+
+        let mut generics = Vec::new();
+        if self.peek() == Some(&'<') {
+            self.next_char();
+            self.consume_whitespace();
+            if self.peek() != Some(&'>') {
+                loop {
+                    generics.push(self.parse_parameter()?);
+                    self.consume_whitespace();
+                    if self.peek() == Some(&',') {
+                        self.next_char();
+                    } else if self.peek() == Some(&'>') {
+                        break;
+                    } else {
+                        return Err("Expected ',' or '>' in generics list".to_string());
+                    }
                 }
-                self.expect_token(',')?;
             }
-            g
-        } else {
-            vec![]
-        };
+            self.expect_token('>')?;
+        }
 
         self.expect_token('(')?;
-        // Params parsing (simplified)
         let mut params = Vec::new();
+        self.consume_whitespace();
         if self.peek() != Some(&')') {
             loop {
                 params.push(self.parse_parameter()?);
-                if self.peek() == Some(&')') {
+                self.consume_whitespace();
+                if self.peek() == Some(&',') {
+                    self.next_char();
+                } else if self.peek() == Some(&')') {
                     break;
+                } else {
+                    return Err("Expected ',' or ')' in parameter list".to_string());
                 }
-                self.expect_token(',')?;
             }
         }
         self.expect_token(')')?;
+
         self.expect_token(':')?;
         let return_type = self.parse_type()?;
+
         self.expect_token('=')?;
         let body = self.parse_expression()?;
 
@@ -962,4 +1059,109 @@ pub fn parse_expression(input: &str) -> Result<Expression, String> {
 
 pub fn parse_statement(input: &str) -> Result<Statement, String> {
     Parser::new(input).parse_statement()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_gyo_simple() {
+        let input = "gyo N = {}";
+        let result = parse_statement(input);
+        assert!(result.is_ok());
+        if let Ok(Statement::Gyo { name, params, constructors, body }) = result {
+            assert_eq!(name, "N");
+            assert!(params.is_empty());
+            assert!(constructors.is_empty());
+            assert!(body.is_none());
+        } else {
+            panic!("Expected Gyo statement");
+        }
+    }
+
+    #[test]
+    fn test_parse_gyo_with_constructors() {
+        let input = "gyo N = { zero, succ(N) }";
+        let result = parse_statement(input);
+        assert!(result.is_ok());
+        if let Ok(Statement::Gyo { name, constructors, .. }) = result {
+            assert_eq!(name, "N");
+            assert_eq!(constructors.len(), 2);
+            // Further assertions on constructor details can be added here
+        } else {
+            panic!("Expected Gyo statement");
+        }
+    }
+
+    #[test]
+    fn test_parse_gyo_with_generics() {
+        let input = "gyo Vec<A: Type> = {}";
+        let result = parse_statement(input);
+        assert!(result.is_ok());
+        if let Ok(Statement::Gyo { name, params, .. }) = result {
+            assert_eq!(name, "Vec");
+            assert_eq!(params.len(), 1);
+            assert_eq!(params[0].name, "A");
+            assert_eq!(params[0].type_annotation, Type::Ident("Type".to_string()));
+        } else {
+            panic!("Expected Gyo statement");
+        }
+    }
+
+    #[test]
+    fn test_parse_gyo_type_alias() {
+        let input = "gyo MyType = OtherType";
+        let result = parse_statement(input);
+        assert!(result.is_ok());
+        if let Ok(Statement::Gyo { name, body, .. }) = result {
+            assert_eq!(name, "MyType");
+            assert_eq!(body, Some(Type::Ident("OtherType".to_string())));
+        } else {
+            panic!("Expected Gyo statement");
+        }
+    }
+
+    #[test]
+    fn test_parse_rin_simple() {
+        let input = "rin main(): Unit = ()";
+        let result = parse_statement(input);
+        assert!(result.is_ok());
+        if let Ok(Statement::Rin { name, params, return_type, .. }) = result {
+            assert_eq!(name, "main");
+            assert!(params.is_empty());
+            assert_eq!(return_type, Type::Unit);
+        } else {
+            panic!("Expected Rin statement");
+        }
+    }
+
+    #[test]
+    fn test_parse_rin_with_params() {
+        let input = "rin add(a: i64, b: i64): i64 = a";
+        let result = parse_statement(input);
+        assert!(result.is_ok());
+        if let Ok(Statement::Rin { name, params, .. }) = result {
+            assert_eq!(name, "add");
+            assert_eq!(params.len(), 2);
+        } else {
+            panic!("Expected Rin statement");
+        }
+    }
+
+    #[test]
+    fn test_parse_rin_with_generics() {
+        let input = "rin id<T: Type>(x: T): T = x";
+        let result = parse_statement(input);
+        assert!(result.is_ok());
+        if let Ok(Statement::Rin { name, generics, params, .. }) = result {
+            assert_eq!(name, "id");
+            assert_eq!(generics.len(), 1);
+            assert_eq!(generics[0].name, "T");
+            assert_eq!(generics[0].type_annotation, Type::Ident("Type".to_string()));
+            assert_eq!(params.len(), 1);
+        } else {
+            panic!("Expected Rin statement");
+        }
+    }
 } 
