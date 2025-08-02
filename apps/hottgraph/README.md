@@ -130,9 +130,9 @@
 
 ## Roadmap
 
-- @todo [compiler] `gyo` で定義された型エイリアスをコンパイル時に展開できるようにする。
-- @todo [compiler] `rin` で定義されたジェネリクス関数を、Rustのジェネリクス関数に正しくコンパイルできるようにする。
+- @todo [compiler] `gyo` で定義された型エイリアスをコンパイル時に展開できるようにする。 (完了)
+- @todo [compiler] `rin` で定義されたジェネリクス関数を、Rustのジェネリクス関数に正しくコンパイルできるようにする。 (完了)
 - @todo [compiler] `kotoba-cli` が、コンパイル結果のRustコードを標準出力、またはファイルに出力する機能を追加する。
-- @todo [parser] 最近追加した `gyo` と `rin` の解析ロジックに対するユニットテストを追加する。
+- @todo [parser] 最近追加した `gyo` と `rin` の解析ロジックに対するユニットテストを追加する。 (完了)
 - @todo [parser] パースエラー時のエラーメッセージを、より分かりやすく詳細にする（例: `Unexpected token '=' at line 5, column 10`）。
 - @todo [docs] `README.md` に、`kotoba` の基本的な文法 (`shiki`, `gyo`, `rin`) の説明とサンプルコードを追加する。
