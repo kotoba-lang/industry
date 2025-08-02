@@ -757,8 +757,11 @@ impl<'a> Parser<'a> {
             }
         }
         self.expect_token(')')?;
+
+        dbg!(self.peek());
         self.expect_token(':')?;
         let return_type = self.parse_type()?;
+        dbg!(self.peek());
         self.expect_token('=')?;
         let body = self.parse_expression()?;
 

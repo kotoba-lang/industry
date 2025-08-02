@@ -1,0 +1,10 @@
+// `Equiv` type definition to represent type equivalence.
+// A type A is equivalent to a type B if there are functions
+// `to: A -> B` and `from: B -> A` which are inverses of each other.
+// For now, we omit the proofs that `to` and `from` are inverses.
+
+gyo Equiv<A: Type, B: Type> = {
+  equiv(to: A -> B, from: B -> A)
+}
+
+rin id<A, B>(eq: Equiv<A, B>): Type = eq 

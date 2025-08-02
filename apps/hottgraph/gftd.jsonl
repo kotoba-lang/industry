@@ -8,8 +8,9 @@
       { "id": "subtask_enable_compose_test", "label": "subtask", "properties": { "name": ["Enable and pass .compose() test"], "status": ["completed"] } },
       { "id": "task_cleanup_warnings", "label": "task", "properties": { "name": ["Cleanup compiler warnings"], "status": ["completed"] } },
       { "id": "task_v0.6", "label": "task", "properties": { "name": ["v0.6: Advanced Type Features and Standard Library"], "status": ["pending"] } },
-      { "id": "subtask_impl_glue_type", "label": "subtask", "properties": { "name": ["Full compiler support for `en` (Glue) type"], "status": ["pending"] } },
+      { "id": "subtask_impl_glue_type", "label": "subtask", "properties": { "name": ["Full compiler support for `en` (Glue) type"], "status": ["completed"] } },
       { "id": "subtask_impl_univalence", "label": "subtask", "properties": { "name": ["Describe and verify `ze` (Univalence)"], "status": ["pending"] } },
+      { "id": "subtask_define_equiv_type", "label": "subtask", "properties": { "name": ["Define `Equiv` type for type equivalence"], "status": ["in_progress"] } },
       { "id": "subtask_impl_stdlib", "label": "subtask", "properties": { "name": ["Implement standard library functions (`compose`, `sym`)"], "status": ["pending"] } },
       { "id": "subtask_impl_error_reporting", "label": "subtask", "properties": { "name": ["Improved error reporting"], "status": ["pending"] } }
     ],
@@ -24,7 +25,8 @@
       { "id": "e8", "outV": "task_v0.6", "inV": "subtask_impl_univalence", "label": "has_subtask" },
       { "id": "e9", "outV": "task_v0.6", "inV": "subtask_impl_stdlib", "label": "has_subtask" },
       { "id": "e10", "outV": "task_v0.6", "inV": "subtask_impl_error_reporting", "label": "has_subtask" },
-      { "id": "e11", "outV": "subtask_impl_univalence", "inV": "subtask_impl_glue_type", "label": "depends_on" }
+      { "id": "e11", "outV": "subtask_impl_univalence", "inV": "subtask_impl_glue_type", "label": "depends_on" },
+      { "id": "e12", "outV": "subtask_impl_univalence", "inV": "subtask_define_equiv_type", "label": "has_subtask" }
     ]
   },
   "metadata": {
@@ -40,7 +42,7 @@
           "step": [
             ["V"],
             ["hasLabel", "subtask"],
-            ["has", "status", "pending"]
+            ["has", "status", "in_progress"]
           ]
         }
       }

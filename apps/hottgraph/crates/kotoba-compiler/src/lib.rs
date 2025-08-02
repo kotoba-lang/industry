@@ -456,6 +456,7 @@ impl Compiler {
                 name,
                 params,
                 constructors,
+                ..
             } = statement
             {
                 self.context
@@ -524,6 +525,7 @@ impl Compiler {
                 name,
                 params,
                 constructors,
+                ..
             } => self.compile_gyo_statement(&name, &params, &constructors),
             Statement::Rin {
                 name,
@@ -533,6 +535,7 @@ impl Compiler {
                 body,
                 ..
             } => self.compile_rin_statement(&name, &generics, &params, &return_type, &body),
+            Statement::ExpressionStatement(expr) => self.compile_expression(expr),
         }
     }
 
@@ -828,6 +831,11 @@ impl Compiler {
             (Type::Ze(l1, r1), Type::Ze(l2, r2)) => {
                 self.are_types_equal(&l1, &l2) && self.are_types_equal(&r1, &r2)
             }
+            (Type::En(b1, bd1, e1), Type::En(b2, bd2, e2)) => {
+                self.are_types_equal(&b1, &b2)
+                    && self.are_types_equal(&bd1, &bd2)
+                    && self.are_types_equal(&e1, &e2)
+            }
             (Type::App(head, args), Type::En(t1, t2, t3)) | (Type::En(t1, t2, t3), Type::App(head, args)) => {
                 if let Type::Ident(name) = &*head {
                     if name == "en" && args.len() == 3 {
@@ -888,6 +896,11 @@ impl Compiler {
                     _ => Ok(Type::Expr(expr.clone())),
                 }
             }
+            Type::En(t1, t2, t3) => Ok(Type::En(
+                Box::new(self.normalize(t1)?),
+                Box::new(self.normalize(t2)?),
+                Box::new(self.normalize(t3)?),
+            )),
             _ => Ok(ty.clone()),
         }
     }
@@ -2044,5 +2057,18 @@ mod tests {
 
         let expected_method_body = "kotoba_core::Path::new(|i: kotoba_core::Interval| { match i {";
         assert!(compiled_code.contains(expected_method_body));
+    }
+
+    #[test]
+    fn test_type_check_glue() {
+        let mut compiler = Compiler::new();
+        let expr = parse_expression("glue(10, (), ())").unwrap();
+        let result = compiler.type_check_expression(&expr, None);
+        let expected_type = Type::En(
+            Box::new(Type::Ident("i64".to_string())),
+            Box::new(Type::Unit),
+            Box::new(Type::Unit),
+        );
+        assert_eq!(result, Ok(expected_type));
     }
 }
