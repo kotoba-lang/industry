@@ -136,6 +136,7 @@ pub enum EvalError {
 pub struct Compiler {
     context: Context,
     environment: Vec<HashMap<String, Value>>,
+    type_aliases: HashMap<String, Type>,
 }
 
 fn type_to_string(t: &Type) -> String {
@@ -447,6 +448,7 @@ impl Compiler {
         Compiler {
             context: Context::new(),
             environment: vec![HashMap::new()],
+            type_aliases: HashMap::new(),
         }
     }
 
@@ -456,12 +458,17 @@ impl Compiler {
                 name,
                 params,
                 constructors,
+                body,
                 ..
             } = statement
             {
-                self.context
-                    .type_definitions
-                    .insert(name.clone(), (params.clone(), constructors.clone()));
+                if let Some(body_type) = body {
+                    self.type_aliases.insert(name.clone(), body_type.clone());
+                } else {
+                    self.context
+                        .type_definitions
+                        .insert(name.clone(), (params.clone(), constructors.clone()));
+                }
             }
         }
 
@@ -634,7 +641,7 @@ impl Compiler {
     fn compile_rin_statement(
         &mut self,
         name: &str,
-        generics: &[String],
+        generics: &[Parameter],
         params: &[Parameter],
         return_type: &Type,
         body: &Expression,
@@ -642,7 +649,11 @@ impl Compiler {
         let generics_str = if generics.is_empty() {
             String::new()
         } else {
-            format!("<{}>", generics.join(", "))
+            let gen_params: Vec<String> = generics
+                .iter()
+                .map(|p| format!("{}: {}", p.name, self.type_to_rust_type_string(&p.type_annotation, None)))
+                .collect();
+            format!("<{}>", gen_params.join(", "))
         };
 
         let param_strs: Vec<String> = params
@@ -689,7 +700,8 @@ impl Compiler {
     }
 
     fn type_to_rust_type_string(&mut self, t: &Type, current_type_name: Option<&str>) -> String {
-        match t {
+        let resolved_type = self.resolve_type_alias(t);
+        match &resolved_type {
             Type::Ku => "kotoba_core::Interval".to_string(),
             Type::Ze(t1, t2) => {
                 let s1 = self.type_to_rust_type_string(t1, None);
@@ -730,6 +742,8 @@ impl Compiler {
                     "bool".to_string()
                 } else if name == "ku" {
                     "kotoba_core::Interval".to_string()
+                } else if name == "Type" {
+                    "Clone + std::fmt::Debug".to_string()
                 } else if name == "ma" || name == "some_eq" || name == "id" {
                     name.clone()
                 } else {
@@ -750,8 +764,11 @@ impl Compiler {
     }
 
     fn are_types_equal(&mut self, t1: &Type, t2: &Type) -> bool {
-        let norm_t1 = self.normalize(t1).unwrap_or_else(|_| t1.clone());
-        let norm_t2 = self.normalize(t2).unwrap_or_else(|_| t2.clone());
+        let resolved_t1 = self.resolve_type_alias(t1);
+        let resolved_t2 = self.resolve_type_alias(t2);
+
+        let norm_t1 = self.normalize(&resolved_t1).unwrap_or_else(|_| resolved_t1.clone());
+        let norm_t2 = self.normalize(&resolved_t2).unwrap_or_else(|_| resolved_t2.clone());
 
         match (norm_t1.clone(), norm_t2.clone()) {
             (
@@ -1250,8 +1267,8 @@ impl Compiler {
                                 substitution_map.insert(param.name.clone(), arg.clone());
                             }
 
-                            for (arg_pat, field_ty) in arg_patterns.iter().zip(fields) {
-                                let concrete_field_ty = self.substitute_type(field_ty, &substitution_map);
+                            for (arg_pat, field_param) in arg_patterns.iter().zip(fields) {
+                                let concrete_field_ty = self.substitute_type(&field_param.type_annotation, &substitution_map);
                                 let sub_bindings = self.extract_bindings_from_pattern(arg_pat, &concrete_field_ty)?;
                                 bindings.extend(sub_bindings);
                             }
@@ -1283,9 +1300,9 @@ impl Compiler {
                             });
                         }
 
-                        for (arg_pat, field_ty) in arg_patterns.iter().zip(fields) {
+                        for (arg_pat, field_param) in arg_patterns.iter().zip(fields) {
                             let sub_bindings =
-                                self.extract_bindings_from_pattern(arg_pat, field_ty)?;
+                                self.extract_bindings_from_pattern(arg_pat, &field_param.type_annotation)?;
                             bindings.extend(sub_bindings);
                         }
                     }
@@ -1476,6 +1493,15 @@ impl Compiler {
                 }
             }
         }
+    }
+
+    fn resolve_type_alias(&self, ty: &Type) -> Type {
+        if let Type::Ident(name) = ty {
+            if let Some(aliased_type) = self.type_aliases.get(name) {
+                return self.resolve_type_alias(aliased_type);
+            }
+        }
+        ty.clone()
     }
 }
 
@@ -1688,11 +1714,11 @@ mod tests {
 
     #[test]
     fn test_compile_rin_with_generics() {
-        let input = "rin id<T>(x: T): T = x";
+        let input = "rin id<T: Type>(x: T): T = x";
         let statement = parse_statement(input).unwrap();
         let mut compiler = Compiler::new();
         let result = compiler.compile(vec![statement]);
-        let expected_code = "fn id<T>(x: T) -> T {\n    x\n}";
+        let expected_code = "fn id<T: Clone + std::fmt::Debug>(x: T) -> T {\n    x\n}";
         assert_eq!(result.unwrap().contains(expected_code), true);
     }
 
@@ -2070,5 +2096,18 @@ mod tests {
             Box::new(Type::Unit),
         );
         assert_eq!(result, Ok(expected_type));
+    }
+
+    #[test]
+    fn test_compile_type_alias() {
+        let program = vec![
+            parse_statement("gyo Int = i64").unwrap(),
+            parse_statement("shiki x: Int = 10").unwrap(),
+        ];
+        let mut compiler = Compiler::new();
+        let result = compiler.compile(program);
+        assert!(result.is_ok());
+        let compiled_code = result.unwrap();
+        assert!(compiled_code.contains("let x: i64 = 10;"));
     }
 }
