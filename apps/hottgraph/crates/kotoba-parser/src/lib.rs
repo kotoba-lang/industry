@@ -64,7 +64,7 @@ pub struct OuArm {
 pub enum ConstructorDef {
     Point {
         name: String,
-        fields: Vec<Type>,
+        fields: Vec<Parameter>,
     },
     Path {
         name: String,
@@ -1020,7 +1020,7 @@ impl<'a> Parser<'a> {
                 self.consume_whitespace();
                 if self.peek() != Some(&')') {
                     loop {
-                        fields.push(self.parse_type()?);
+                        fields.push(self.parse_parameter()?);
                         self.consume_whitespace();
                         if self.peek() == Some(&')') {
                             break;
