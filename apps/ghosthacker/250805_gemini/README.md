@@ -7,8 +7,10 @@ theology
 Akito, Renの神との戦い。そして成長と理解.
 
 HoTT理論に基づきPathでつながる
-イベントソーシング理論
+イベントソーシング理論 = 型保証
 グラフ理論
+
+path/saga
 
 day/0 - whoami = E314 
 day/2190 - god is exist? =  [2190](/day/2190/godisexist.md)
