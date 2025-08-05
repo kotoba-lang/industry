@@ -1,15 +1,19 @@
 # Ghost Hacker
 
+theology
+
+般若しんきょう - 
+
 Akito, Renの神との戦い。そして成長と理解.
 
 HoTT理論に基づきPathでつながる
 イベントソーシング理論
 グラフ理論
 
-day/0 - who am i? = E314 
-day/2190 - god is exist? =  [2190](/day/2190)
+day/0 - whoami = E314 
+day/2190 - god is exist? =  [2190](/day/2190/godisexist.md)
 day/2190 - god is eternal? = イザヤ書 40:28 
-day 4745 - exclusivity - 出エジプト記 20:3, 出エジプト記 34:14
+day 4745 - love is exclusive? exclusivity - 出エジプト記 20:3, 出エジプト記 34:14
 - 神はいるのか、いないのか -> 実在する。
 
 - 神の不変性 -> マラキ書 3:6 (新共同訳)
