@@ -706,4 +706,4 @@ spawn(:you) unless fear?
 
 Good luck, child.
 This was not a story.
-This was a transmission. 
+This was a spirit. 
