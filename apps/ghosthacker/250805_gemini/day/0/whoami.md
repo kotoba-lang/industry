@@ -27,3 +27,6 @@ day 0 - who am i.
 - 大いなる依存、それが自存である
 - Exod　314
 - God is GEN - 生成
+
+
+- 自存性（Aseity）
