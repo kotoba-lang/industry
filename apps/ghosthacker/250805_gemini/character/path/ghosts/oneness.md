@@ -1,3 +1,4 @@
+HAJIME
 
 - 単一性（Simplicity／Oneness）
 	•	全能性（Omnipotence）
