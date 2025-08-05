@@ -8,6 +8,8 @@ minimalist yet detailed portrait
 S1「ダイナミック線描」、S3「コントラスト設計」、S2「多様パース」
 
 天野こずえ
-新堂エル
+田村由美
 
+
+新堂エル
 武田弘光
