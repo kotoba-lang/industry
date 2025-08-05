@@ -12,16 +12,12 @@ HoTT理論に基づきPathでつながる
 
 path/saga
 
-day/0 - whoami = E314 
+day/0 - whoami = [0](/day/0/whoami.md)
 day/2190 - god is exist? =  [2190](/day/2190/godisexist.md)
 day/2190 - god is eternal? = イザヤ書 40:28 
-day 4745 - love is exclusive? exclusivity - 出エジプト記 20:3, 出エジプト記 34:14
-- 神はいるのか、いないのか -> 実在する。
-
-- 神の不変性 -> マラキ書 3:6 (新共同訳)
-神は絶対なのか？解釈の違いは許されないのか.
-
-- 神の全知全能 -> 詩篇 139:1-2 Omniscient, Omnipotent, エレミヤ書 32:17
+day/4745 - love is exclusive? - [4745](/day/4745/exclude.md)
+day/4745 - god is immutable? - [4745](/day/4745/immutable.md)
+day/4745 - 神の全知全能 -> 詩篇 139:1-2 Omniscient, Omnipotent, エレミヤ書 32:17
 
 - 神は本当に善なのか? Holiness, Justice
 
