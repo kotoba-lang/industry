@@ -17,9 +17,9 @@ day/2190 - god is exist? =  [2190](/day/2190/godisexist.md)
 day/2190 - god is eternal? = イザヤ書 40:28 
 day/4745 - love is exclusive? - [4745](/day/4745/exclude.md)
 day/4745 - god is immutable? - [4745](/day/4745/immutable.md)
-day/4745 - 神の全知全能 -> 詩篇 139:1-2 Omniscient, Omnipotent, エレミヤ書 32:17
+day/4745 - god is omni? - [4745](/day/4745/omni.md)
+day/4745 - god is justice? - [4745](/day/4745/omni.md)
 
-- 神は本当に善なのか? Holiness, Justice
 
 - 私は Individual なのか -> 私は
 - 神への畏れ
