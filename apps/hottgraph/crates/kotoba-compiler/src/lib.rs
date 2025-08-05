@@ -582,7 +582,7 @@ impl Compiler {
             {
                 let field_types: Vec<String> = fields
                     .iter()
-                    .map(|t| self.type_to_rust_type_string(t, Some(name)))
+                    .map(|p| self.type_to_rust_type_string(&p.type_annotation, Some(name)))
                     .collect();
                 let fields_str = if field_types.is_empty() {
                     String::new()
