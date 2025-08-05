@@ -11,7 +11,9 @@
 #### **【0:00〜0:15】 イントロ：システムの探求**
 
 *   **カット1 (C1):** 薄暗い部屋。少年時代のアキトが、古いPCの画面をじっと見つめている。画面には `print "Hello, God"` の一行だけが光っている。背景にはキリスト教の象徴が影のように映り、重苦しい雰囲気。（*出典: 1. Fear as a Protocol*）
-*   **カット2 (C2):** 画面がノイズに覆われる。`<?php echo "Maybe it's not a variable, but noise.\n"; ?>` というコードがフラッシュし、「ノイズ」という単語が画面に大きく表示され、砂嵐のように消えていく。（*出典: 1. Fear as a Protocol*）
+
+*   **カット2 (C2):** 画面がゴーストに覆われる。`<?php echo "Maybe it's not a variable, but noise.\n"; ?>` というコードがフラッシュし、「ゴースト」という単語が画面に大きく表示され、砂嵐のように消えていく。（*出典: 1. Fear as a Protocol*）
+
 *   **カット3 (C3):** JSON形式の魂のデータ構造が、アキトの体を鎖のように縛り付けていくイメージ。`"memory": ["chapel_scenery", "mother's_cry"]` といった文字が彼を取り巻く。（*出典: 2. The Soul as a Data Structure*）
 
 ---
