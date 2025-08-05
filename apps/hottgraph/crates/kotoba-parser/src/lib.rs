@@ -26,6 +26,7 @@ pub struct Expression {
 pub enum Type {
     Ku,
     Ze(Box<Type>, Box<Type>),
+    Equiv(Box<Type>, Box<Type>),
     Ident(String),
     App(Box<Type>, Vec<Type>),
     Expr(Box<Expression>),
@@ -816,6 +817,17 @@ impl<'a> Parser<'a> {
                     ));
                 } else {
                     return Err("en type constructor expects 3 arguments".to_string());
+                }
+            }
+
+            if ident == "equiv" {
+                if args.len() == 2 {
+                    return Ok(Type::Equiv(
+                        Box::new(args[0].clone()),
+                        Box::new(args[1].clone()),
+                    ));
+                } else {
+                    return Err("equiv type constructor expects 2 arguments".to_string());
                 }
             }
 
