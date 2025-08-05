@@ -1,4 +1,4 @@
-
+ミトラ
 
 4. 契約性（Covenant-Keeping）
 	•	契約の神
