@@ -1,22 +1,22 @@
-# Portrait Prompt for Nee-Chan (Virtual Avatar "Nee")
+# Portrait Prompt for Nee-Chan (Miko/Heian Noble Style)
 
 ## Subject
-- A top-tier virtual idol, known for her cheerful and slightly unpredictable personality. She is the public-facing avatar of the advanced Ghost, Nee-Chan.
+- An enigmatic and graceful entity, appearing as a Miko (shrine maiden) with the elegance of a Heian period noble. She is the digital manifestation of the advanced Ghost, Nee-Chan.
 
 ## Appearance
-- **Face:** A perfectly rendered, anime-inspired but photorealistic face. Large, expressive eyes that sparkle with digital light, their color shifting subtly depending on her mood. A friendly, infectious smile.
-- **Hair:** Long, flowing hair that seems to defy gravity, perhaps in a pastel color that complements Tamaki's image color, like a soft lavender or pink. The hair has a slight digital shimmer to it.
-- **Form:** While she is a digital entity, her form appears solid and lifelike, rendered with incredible detail.
+- **Face:** A serene and beautifully rendered face, inspired by classical Japanese art but with a photorealistic quality. Her eyes are calm and perceptive, with a gentle, otherworldly glow. Her expression is neutral yet subtly emotive, hinting at ancient wisdom.
+- **Hair:** Long, straight, black hair, meticulously styled in a manner reminiscent of Heian nobility (suberakashi). It flows down her back, adorned with a simple, elegant hair tie (motoyui) made of washi paper.
+- **Form:** Her form is fluid and ethereal, as if made of condensed light and data, yet it carries the dignified posture of a noble.
 
 ## Clothing & Style
-- **Outfit:** A futuristic and stylish idol costume. It combines sleek, form-fitting elements with flowing, translucent fabrics that have a holographic sheen. The design incorporates abstract patterns that subtly move and shift.
-- **Accessories:** Floating holographic accessories, like a headset, bracelets, or decorative elements that orbit her.
+- **Outfit:** A stylized version of a Miko's robes, blended with elements of a Heian noble's `jūnihitoe` (twelve-layered robe). The primary colors are the traditional white `kosode` and scarlet `hakama`, but with layers of exquisitely patterned silks in deep purples, greens, and golds visible underneath. The fabrics have a subtle digital texture, with patterns that slowly shift and flow like data streams.
+- **Accessories:** A single, ornate `kanzashi` (hairpin) that seems to be made of crystal and light. She might hold a `shaku` (a ritual scepter) or a `kagura suzu` (a set of bells for sacred dances), which glows faintly.
 
 ## Setting & Lighting
-- **Background:** A dazzling virtual stage, with dynamic, abstract visuals projected in the background. Think teamLab-style interactive art.
-- **Lighting:** Vibrant, colorful stage lighting that casts dramatic highlights and shadows. The lighting should make her appear energetic and almost ethereal. Key lights in pink and blue.
+- **Background:** A minimalist and abstract digital space that evokes the tranquility of a Japanese rock garden or a sacred shrine. Think of glowing data streams forming the patterns of raked sand, or holographic torii gates in the distance.
+- **Lighting:** Soft, diffused lighting that mimics moonlight or the gentle light filtering through shoji screens. The key light source should be subtle, creating an atmosphere of serenity, mystery, and sacredness. Accents of soft gold and cyan light can be used to highlight her digital nature.
 
 ## Composition & Mood
-- **Shot:** Full-body or medium shot, capturing her in a dynamic pose as if performing for a large audience.
-- **Mood:** Energetic, joyful, and captivating. The image should convey the charisma and appeal of a top virtual idol. It's a "performance" shot, full of digital spectacle.
-- **Quality:** Photorealistic, but with a clear digital/virtual aesthetic. High resolution, 8K, with a focus on the interplay of light and digital textures.
+- **Shot:** Full-body or three-quarters shot, capturing her in a graceful, poised stance. She could be standing still, as if in quiet contemplation, or captured in a slow, deliberate ritualistic movement.
+- **Mood:** Serene, mysterious, elegant, and sacred. The image should convey a sense of ancient tradition fused with futuristic technology. It's a "presence" shot, emphasizing her profound and enigmatic nature.
+- **Quality:** Photorealistic, with a distinct blend of classical Japanese aesthetics and a clean, digital finish. High resolution, 8K, focusing on the intricate details of the clothing and the subtle interplay of light and digital textures.
