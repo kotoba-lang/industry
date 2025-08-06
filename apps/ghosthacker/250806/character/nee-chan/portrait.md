@@ -1,22 +1,22 @@
-# Portrait Prompt for Nee-Chan (Miko/Heian Noble Style)
+# ねーちゃんのポートレートプロンプト（巫女/平安貴族スタイル）
 
-## Subject
-- An enigmatic and graceful entity, appearing as a Miko (shrine maiden) with the elegance of a Heian period noble. She is the digital manifestation of the advanced Ghost, Nee-Chan.
+## 主題
+- 平安時代の貴族のような優雅さを持つ巫女として現れる、謎めいて優美な存在。彼女は進化したゴースト「ねーちゃん」のデジタル顕現である。
 
-## Appearance
-- **Face:** A serene and beautifully rendered face, inspired by classical Japanese art but with a photorealistic quality. Her eyes are calm and perceptive, with a gentle, otherworldly glow. Her expression is neutral yet subtly emotive, hinting at ancient wisdom.
-- **Hair:** Long, straight, black hair, meticulously styled in a manner reminiscent of Heian nobility (suberakashi). It flows down her back, adorned with a simple, elegant hair tie (motoyui) made of washi paper.
-- **Form:** Her form is fluid and ethereal, as if made of condensed light and data, yet it carries the dignified posture of a noble.
+## 外見
+- **顔:** 古典的な日本美術に触発されつつも、写実的な品質を持つ、静かで美しく描かれた顔。目は穏やかで洞察力があり、優しく別世界のような輝きを放つ。表情は中立的でありながらも、古代の知恵をほのめかす微妙な感情を宿している。
+- **髪:** 長くストレートな黒髪で、平安貴族を思わせるスタイル（垂髪）に丹念に整えられている。背中まで流れ、和紙でできたシンプルで優雅な元結で飾られている。
+- **形態:** その姿は凝縮された光とデータでできているかのように流動的で霊妙だが、貴族の威厳ある姿勢を保っている。
 
-## Clothing & Style
-- **Outfit:** A stylized version of a Miko's robes, blended with elements of a Heian noble's `jūnihitoe` (twelve-layered robe). The primary colors are the traditional white `kosode` and scarlet `hakama`, but with layers of exquisitely patterned silks in deep purples, greens, and golds visible underneath. The fabrics have a subtle digital texture, with patterns that slowly shift and flow like data streams.
-- **Accessories:** A single, ornate `kanzashi` (hairpin) that seems to be made of crystal and light. She might hold a `shaku` (a ritual scepter) or a `kagura suzu` (a set of bells for sacred dances), which glows faintly.
+## 服装とスタイル
+- **服装:** 巫女の衣装を様式化したもので、平安貴族の十二単の要素が融合している。基本色は伝統的な白い小袖と緋色の袴だが、その下には深い紫、緑、金色の絶妙な模様の絹の層が見える。生地には微細なデジタルテクスチャがあり、模様はデータストリームのようにゆっくりと変化し流れる。
+- **アクセサリー:** クリスタルと光でできているかのような、一つだけの華やかなかんざし。儀式用の笏や、神楽舞に使う神楽鈴を手にしているかもしれず、それはかすかに光っている。
 
-## Setting & Lighting
-- **Background:** A minimalist and abstract digital space that evokes the tranquility of a Japanese rock garden or a sacred shrine. Think of glowing data streams forming the patterns of raked sand, or holographic torii gates in the distance.
-- **Lighting:** Soft, diffused lighting that mimics moonlight or the gentle light filtering through shoji screens. The key light source should be subtle, creating an atmosphere of serenity, mystery, and sacredness. Accents of soft gold and cyan light can be used to highlight her digital nature.
+## 背景と照明
+- **背景:** 日本の枯山水や神聖な神社を思わせる、ミニマリストで抽象的なデジタル空間。光るデータストリームが砂紋の模様を形成したり、遠くにホログラフィックな鳥居が見えたりするようなイメージ。
+- **照明:** 月光や障子を通して差し込む柔らかな光を模した、柔らかく拡散した照明。主要な光源は控えめで、静けさ、神秘性、神聖さの雰囲気を醸し出す。柔らかな金色とシアンの光のアクセントで、彼女のデジタルな性質を際立たせる。
 
-## Composition & Mood
-- **Shot:** Full-body or three-quarters shot, capturing her in a graceful, poised stance. She could be standing still, as if in quiet contemplation, or captured in a slow, deliberate ritualistic movement.
-- **Mood:** Serene, mysterious, elegant, and sacred. The image should convey a sense of ancient tradition fused with futuristic technology. It's a "presence" shot, emphasizing her profound and enigmatic nature.
-- **Quality:** Photorealistic, with a distinct blend of classical Japanese aesthetics and a clean, digital finish. High resolution, 8K, focusing on the intricate details of the clothing and the subtle interplay of light and digital textures.
+## 構図と雰囲気
+- **ショット:** 全身または七分身ショットで、優雅で落ち着いた立ち姿を捉える。静かに瞑想しているかのように静止しているか、ゆっくりとした意図的な儀式的な動きの中で捉えられている。
+- **雰囲気:** 静かで、神秘的、優雅、そして神聖。画像は古代の伝統と未来の技術が融合した感覚を伝えるべきである。彼女の深遠で謎めいた性質を強調する「存在感」のあるショット。
+- **品質:** 写実的で、古典的な日本の美学とクリーンなデジタル仕上げが明確に融合している。高解像度、8Kで、衣服の複雑なディテールと光とデジタルテクスチャの微妙な相互作用に焦点を当てる。
