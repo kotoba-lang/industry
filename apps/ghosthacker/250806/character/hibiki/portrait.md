@@ -1,22 +1,22 @@
-# Portrait Prompt for Hibiki
+# 響のポートレートプロンプト
 
-## Subject
-- A 28-year-old Japanese-Brazilian DJ and shamanic Ghost Hacker. He is cheerful, charismatic, and spiritually attuned.
+## 主題
+- 28歳の日系ブラジル人DJであり、シャーマン的なゴーストハッカー。陽気でカリスマ性があり、精神的に同調している。
 
-## Appearance
-- **Face:** Warm, friendly, and open features. He has a constant, easy-going smile. His eyes are bright and full of life, conveying both mirth and a deep, intuitive wisdom.
-- **Hair:** Stylish, perhaps slightly long and wavy hair, reflecting his artistic and free-spirited nature.
-- **Build:** Lean and energetic.
+## 外見
+- **顔:** 温かく、フレンドリーで、オープンな顔立ち。常に気さくな笑顔を浮かべている。目は明るく生命力に満ちており、陽気さと深く直感的な知恵の両方を伝えている。
+- **髪:** スタイリッシュで、おそらく少し長めのウェーブのかかった髪。彼の芸術的で自由な精神を反映している。
+- **体格:** 引き締まっていてエネルギッシュ。
 
-## Clothing & Style
-- **Outfit:** Colorful and comfortable clothing with an ethnic or bohemian flair. A brightly colored (orange or deep green) patterned shirt, left partially unbuttoned, and relaxed-fit trousers or jeans.
-- **Accessories:** High-quality headphones are always around his neck. He wears several bracelets and a necklace made of natural materials like wood or stone.
+## 服装とスタイル
+- **服装:** エスニックまたはボヘミアンな雰囲気のある、カラフルで快適な服装。明るい色（オレンジや深緑）の柄物シャツを部分的に開襟し、リラックスフィットのズボンかジーンズを着用。
+- **アクセサリー:** 高品質のヘッドフォンが常に首にかかっている。木や石などの天然素材で作られたブレスレットやネックレスをいくつか身につけている。
 
-## Setting & Lighting
-- **Background:** A vibrant, sun-drenched outdoor setting, like a park in Tokyo (e.g., Yoyogi Park) during a weekend music event, or his own DJ booth filled with records and equipment, decorated with plants. The background is alive with color and movement.
-- **Lighting:** Warm, golden hour sunlight that gives the entire scene a beautiful, inviting glow. The light should feel natural and uplifting.
+## 背景と照明
+- **背景:** 週末の音楽イベントが開催されている東京の公園（例：代々木公園）のような、活気に満ちた太陽が降り注ぐ屋外の環境、またはレコードや機材で満たされ、植物で飾られた彼自身のDJブース。背景は色彩と動きに満ちている。
+- **照明:** シーン全体に美しく魅力的な輝きを与える、暖かいゴールデンアワーの日差し。光は自然で気分を高揚させる感じであるべき。
 
-## Composition & Mood
-- **Shot:** Medium shot. He is looking directly at the camera with a welcoming, infectious smile, maybe in the middle of a gesture, as if inviting you to join the good vibe.
-- **Mood:** Joyful, spiritual, and full of rhythm. The portrait should capture his philosophy of living in harmony with music and nature. He is a source of positive energy. "Tudo bem!"
-- **Quality:** Photorealistic, vibrant colors, 8K. The image should feel spontaneous and full of life, like a candid shot.
+## 構図と雰囲気
+- **ショット:** ミディアムショット。歓迎するような、伝染性のある笑顔でカメラをまっすぐ見ており、まるで良い雰囲気に誘うかのようなジェスチャーの途中かもしれない。
+- **ムード:** 楽しく、スピリチュアルで、リズムに満ちている。ポートレートは、音楽と自然と調和して生きるという彼の哲学を捉えるべき。彼はポジティブなエネルギーの源。「トゥード・ベン！」
+- **品質:** 写実的で、鮮やかな色彩、8K。スナップ写真のように、自然で生命力に満ちた画像にすべき。
