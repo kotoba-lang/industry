@@ -1,7 +1,7 @@
 # Portrait Prompt for Akito
 
 ## Subject
-- A man in his late 30s or early 40s, a legendary artist and co-founder of TOL, now living in self-imposed exile. He is haunted by his past and the loss of his brother, Ren.
+- A man in his late 60s, a legendary artist and co-founder of TOL, now living in self-imposed exile. He is haunted by his past and the loss of his brother, Ren.
 
 ## Appearance
 - **Face:** Handsome but weathered features. His face carries the weight of grief and regret. There are faint lines of a past life of passion and smiles, now overshadowed by a melancholic, cynical expression. His eyes are sharp but tired.
