@@ -20,10 +20,10 @@
 **Cut 3 (4秒):**
 - **映像:** オフィスのドアチャイムが鳴る。訪問者は黒いスーツのようなGhostで、その姿は葛藤から光が揺らぎ、明滅している（ミディアムショット）。
 - **音声:** チャイムの音。
-- **登場:** 青年のGhost
+- **登場:** Logos
 
 **Cut 4 (5秒):**
-- **映像:** Nee-Chanが相談のベクトルを読み取る。彼女は突然、ステンドグラスのように七色に分裂したものから受け取る顔の表情と奇妙なポーズをとる（クローズアップ）。
+- **映像:** Nee-Chanを相談のベクトルを読み取る。彼女は突然、ステンドグラスのように七色に分裂したものから受け取る顔の表情と奇妙なポーズをとる（クローズアップ）。
 - **Prompt:** Close-up on Nee-Chan, a mysterious girl, as she receives information. Her body fractures into seven colors like stained glass, and she strikes a bizarre, elegant pose. Mystical, colorful light, anime style, strange beauty.
 - **音声:** 不思議な効果音。
 - **登場:** Nee-Chan
@@ -33,21 +33,21 @@
 ### Scene 2: 相談 (約15秒)
 
 **Cut 5 (5秒):**
-- **映像:** 青年のGhostが語りだす。抑制的だが切実な表情（クローズアップ）。
+- **映像:** Logosが語りだす。抑制的だが切実な表情（クローズアップ）。
 - **Prompt:** A young man's Ghost, dressed in a dark suit, begins to speak. He has a restrained but earnest expression, his translucent form flickering slightly. Close-up, anime style, emotional, ethereal.
-- **音声:** (青年のGhost) 「私の主（マスター）が……神の声を遠ざけているのです。」
-- **登場:** 青年のGhost
+- **音声:** (Logos) 「私の主（マスター）が……神の声を遠ざけているのです。」
+- **登場:** Logos
 
 **Cut 6 (5秒):**
 - **映像:** 彼のスピリットを癒したいと語るGhost。
-- **音声:** (青年のGhost) 「彼は敬虔な信徒ですが、最近、何かをきっかけに自分自身と信仰の間に深い溝を感じるようになってしまった。」
-- **登場:** 青年のGhost
+- **音声:** (Logos) 「彼は敬虔な信徒ですが、最近、何かをきっかけに自分自身と信仰の間に深い溝を感じるようになってしまった。」
+- **登場:** Logos
 
 **Cut 7 (5秒):**
 - **映像:** Ghostが助けを求める。視線の先にはtamakiがいることを示唆する。
 - **Prompt:** A young man's ghost, glowing faintly, pleads in a modern office. Close-up on the ghost's desperate expression. Anime style, dramatic lighting.
-- **音声:** (青年のGhost) 「彼のスピリットを癒したい。まず、この私をハックして、彼の心に届くようにしてもらいたい」
-- **登場:** 青年のGhost
+- **音声:** (Logos) 「彼のスピリットを癒したい。まず、この私をハックして、彼の心に届くようにしてもらいたい」
+- **登場:** Logos
 
 ---
 
@@ -84,7 +84,7 @@
 - **映像:** フォトンがGhostの体に静かに浸透していく。Ghostの体が薄紫に輝く。
 - **Prompt:** The light particles gently seep into the Ghost's form, making his body glow with a faint purple light. Ethereal, mystical, anime style.
 - **音声:** (なし)
-- **登場:** 青年のGhost
+- **登場:** Logos
 
 **Cut 13 (5秒):**
 - **映像:** 視点が情報空間へ。巨大なゴシック様式の大聖堂。ステンドグラスは砕け、祭壇は崩れている。
@@ -119,8 +119,8 @@
 
 **Cut 18 (5秒):**
 - **映像:** Ghostの光の明滅が穏やかになる。
-- **音声:** (青年のGhost) 「なんだか軽くなった気がする……。砕けていたものが、あるべき場所に戻っていくような……。」
-- **登場:** 青年のGhost
+- **音声:** (Logos) 「なんだか軽くなった気がする……。砕けていたものが、あるべき場所に戻っていくような……。」
+- **登場:** Logos
 
 **Cut 19 (4秒):**
 - **映像:** 大聖堂に柔らかい光が満ちる。オフィスでは、Kaedeがモニターを見て小さく頷く。
@@ -137,8 +137,8 @@
 **Cut 21 (5秒):**
 - **映像:** Ghostが凛とした迷いのない光を放つ。静かな確信に満ちた表情（クローズアップ）。
 - **Prompt:** The Ghost emits a dignified, unwavering light. A close-up of his face, now filled with quiet conviction and peace. Translucent male ghost, serene expression, bright glowing aura, anime style.
-- **音声:** (青年のGhost) 「なんだか、もう独りじゃないって感じがします。私が彼の弱さを受け止めれば、彼はきっと、もう一度信じることができる」
-- **登場:** 青年のGhost
+- **音声:** (Logos) 「なんだか、もう独りじゃないって感じがします。私が彼の弱さを受け止めれば、彼はきっと、もう一度信じることができる」
+- **登場:** Logos
 
 ---
 
@@ -147,8 +147,8 @@
 **Cut 22 (5秒):**
 - **映像:** Ghostがtamakiのいた方向に深く一礼する。
 - **Prompt:** The now-radiant Ghost bows deeply in the modern office. A translucent figure showing profound gratitude. Emotional, respectful, anime style.
-- **音声:** (青年のGhost) 「本当にありがとう。彼と共に進み続けます」
-- **登場:** 青年のGhost
+- **音声:** (Logos) 「本当にありがとう。彼と共に進み続けます」
+- **登場:** Logos
 
 ---
 
