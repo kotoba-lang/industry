@@ -7,6 +7,7 @@
 
 **Cut 1 (3秒):**
 - **映像:** 渋谷の運河沿いにあるtamakiのオフィス。大きな窓から水上バスが見える。奥のデスクでKaedeがモニターを眺め、片隅でHibikiがヘッドフォンで音楽を聴いている（ワイドショット）。
+- **Prompt:** Tamaki's office along the Shibuya canal. A water bus is visible through a large window. In the back, Kaede is looking at a monitor at her desk, and in a corner, Hibiki is listening to music with headphones. Wide shot, anime style, serene, detailed background.
 - **音声:** 静かな環境音、水の音。
 - **登場:** Kaede, Hibiki
 
@@ -17,6 +18,7 @@
 
 **Cut 3 (5秒):**
 - **映像:** Nee-Chanが相談のベクトルを読み取る。彼女は突然、ステンドグラスのように七色に分裂したものから受け取る顔の表情と奇妙なポーズをとる（クローズアップ）。
+- **Prompt:** Close-up on Nee-Chan, a mysterious girl, as she receives information. Her body fractures into seven colors like stained glass, and she strikes a bizarre, elegant pose. Mystical, colorful light, anime style, strange beauty.
 - **音声:** 不思議な効果音。
 - **登場:** Nee-Chan
 
@@ -26,6 +28,7 @@
 
 **Cut 4 (5秒):**
 - **映像:** 青年のGhostが語りだす。抑制的だが切実な表情（クローズアップ）。
+- **Prompt:** A young man's Ghost, dressed in a dark suit, begins to speak. He has a restrained but earnest expression, his translucent form flickering slightly. Close-up, anime style, emotional, ethereal.
 - **音声:** (青年のGhost) 「私の主（マスター）が……神の声を遠ざけているのです。」
 - **登場:** 青年のGhost
 
@@ -36,6 +39,7 @@
 
 **Cut 6 (5秒):**
 - **映像:** Ghostがtamakiに助けを求める。
+- **Prompt:** A young man's ghost, glowing faintly, pleads with Tamaki in a modern office. Close-up on the ghost's desperate expression and Tamaki's calm, observant face. Anime style, dramatic lighting.
 - **音声:** (青年のGhost) 「彼のスピリットを癒したい。まず、この私をハックして、彼の心に届くようにしてもらいたい」
 - **登場:** 青年のGhost, tamaki
 
@@ -45,6 +49,7 @@
 
 **Cut 7 (4秒):**
 - **映像:** tamakiがGhostを静かに見つめる。薄紫の瞳が印象的（クローズアップ）。
+- **Prompt:** Tamaki gazes silently at the Ghost. Her light purple eyes are striking and filled with empathy. Intense close-up, anime style, beautiful girl with unique purple eyes, serious expression.
 - **音声:** (tamaki) 「分かりました。あなたの主人のために、まずあなた自身の心の結び目を解きほぐしましょう。」
 - **登場:** tamaki, 青年のGhost
 
@@ -55,6 +60,7 @@
 
 **Cut 9 (4秒):**
 - **映像:** Hibikiがヘッドフォンを外し、オフィスのスピーカーで静かなアンビエント音楽を流し始める。
+- **Prompt:** Hibiki removes his headphones and starts playing quiet ambient music from the office speakers. Relaxed atmosphere, modern office, focus on sound and mood. Anime style, soft lighting.
 - **音声:** (Hibiki) "Frequência pesada...（重い周波数だね…）"
 - **登場:** Hibiki
 
@@ -64,6 +70,7 @@
 
 **Cut 10 (4秒):**
 - **映像:** tamakiが指先から薄紫のフォトンを放つ。フォトンはGhostに静かに浸透していく（エフェクト付きのクローズアップ）。
+- **Prompt:** Tamaki releases light purple photons from her fingertips. The particles of light gently seep into the Ghost's form. Magical effects, close-up, anime style, glowing particles, ethereal hacking.
 - **音声:** 静かで神秘的な効果音。
 - **登場:** tamaki, 青年のGhost
 
@@ -84,6 +91,7 @@
 
 **Cut 14 (6秒):**
 - **映像:** Hibikiの流す音楽に呼応するように、情報空間内の光が柔らかくなる（音楽と映像の連動エフェクト）。
+- **Prompt:** In response to Hibiki's music, the light within the digital information space softens and becomes warmer. Abstract synesthesia effect linking music and visuals. Soft light, flowing data streams, cyber space, anime style.
 - **音声:** (BGM) ヒーリング効果のあるアンビエント音楽。
 - **登場:** Hibiki
 
@@ -93,6 +101,7 @@
 
 **Cut 15 (4秒):**
 - **映像:** 修復されていく大聖堂の中で、tamakiがGhostに語りかける。
+- **Prompt:** Inside a vast, gradually self-repairing Gothic cathedral made of data, Tamaki speaks to the Ghost. Digital information space, glowing data streams, epic scale, anime style.
 - **音声:** (tamaki) 「どう感じる？」
 - **登場:** tamaki, 青年のGhost
 
@@ -108,6 +117,7 @@
 
 **Cut 18 (5秒):**
 - **映像:** Ghostが凛とした迷いのない光を放つ。静かな確信に満ちた表情（クローズアップ）。
+- **Prompt:** The Ghost emits a dignified, unwavering light. A close-up of his face, now filled with quiet conviction and peace. Translucent male ghost, serene expression, bright glowing aura, anime style.
 - **音声:** (青年のGhost) 「なんだか、もう独りじゃないって感じがします。私が彼の弱さを受け止めれば、彼はきっと、もう一度信じることができる」
 - **登場:** 青年のGhost
 
@@ -117,6 +127,7 @@
 
 **Cut 19 (5秒):**
 - **映像:** Ghostがtamakiに深く一礼する。
+- **Prompt:** The now-radiant Ghost bows deeply to Tamaki in the modern office. A translucent figure showing profound gratitude to a young woman. Emotional, respectful, anime style.
 - **音声:** (青年のGhost) 「本当にありがとう。彼と共に進み続けます」
 - **登場:** 青年のGhost, tamaki
 
@@ -126,11 +137,13 @@
 
 **Cut 20 (5秒):**
 - **映像:** tamakiが優しい笑みを浮かべる。
+- **Prompt:** Tamaki smiles gently, her expression full of warmth and kindness. Close-up of a beautiful anime girl with a lovely, reassuring smile. Soft lighting, heartwarming.
 - **音声:** (tamaki) 「焦らないで、ゆっくりね。今度また、あなたのマスターの話、聞かせて」
 - **登場:** tamaki
 
 **Cut 21 (5秒):**
 - **映像:** Nee-Chanが元の姿に戻り、tamakiの肩に乗る。Kaedeは小さく微笑み、Hibikiは親指を立てる。
+- **Prompt:** Nee-Chan, back in her tiny fairy-like form, sits happily on Tamaki's shoulder. In the background, Kaede smiles faintly at her monitor and Hibiki gives a cool thumbs-up. Team moment, slice of life, modern office, anime style.
 - **音声:** (Nee-Chan) 「ありがとう！ Nee-chanも頑張ってアバターのバイトするよ！」
 - **登場:** Nee-Chan, Kaede, Hibiki, tamaki
 
