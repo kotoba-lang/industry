@@ -1,22 +1,22 @@
-# Portrait Prompt for Akito
+# Akitoのポートレートプロンプト
 
-## Subject
-- A man in his late 60s, a legendary artist and co-founder of TOL, now living in self-imposed exile. He is haunted by his past and the loss of his brother, Ren.
+## 主題
+- 60代後半の男性。伝説的なアーティストであり、TOLの共同設立者。多くの経験と喪失を経て、今はその全てを受け入れ、深い自信と慈愛をたたえている。彼の存在そのものが、周囲を安心させる力を持つ。
 
-## Appearance
-- **Face:** Handsome but weathered features. His face carries the weight of grief and regret. There are faint lines of a past life of passion and smiles, now overshadowed by a melancholic, cynical expression. His eyes are sharp but tired.
-- **Hair:** Completely white hair, contrasting with his relatively young age. It's unkempt, as if he doesn't care about his appearance anymore.
-- **Build:** He has a slouch, as if carrying an invisible burden.
+## 外見
+- **顔:** 年齢を重ねた深みと、若々しいいたずらっぽさが同居する魅力的な顔立ち。深く刻まれたほうれい線は、彼がこれまで多くの人を笑わせてきた証。目元は優しく、全てを見透かすような賢明さを持ちながらも、時折冗談を言う前の子供のような輝きを見せる。
+- **髪:** 真っ白な髪。それは苦労や老化の象徴ではなく、長年の経験と知恵が結実した「知恵の冠」として、彼に威厳と神聖さをもたらしている。手入れはされていないが、それがかえって自然な風格となっている。
+- **佇まい:** 背筋は伸び、落ち着き払っている。彼の前では誰もがリラックスし、自然と心を開いてしまうような、穏やかで堂々としたオーラを放つ。
 
-## Clothing & Style
-- **Outfit:** Simple, worn-out, and dark clothing. A faded black t-shirt and a gray, worn-out hoodie or jacket. His clothes suggest he has detached from the world.
-- **Accessories:** None.
+##服装・スタイル
+- **服装:** シンプルで上質な、動きやすい服装。例えば、着心地の良いコットンのシャツや、柔らかな風合いのジャケットなど。色はアースカラーを好み、華美さはないが、彼の内なる豊かさを引き立てる。
+- **アクセサリー:** なし。彼自身が存在そのものでアクセサリーである。
 
-## Setting & Lighting
-- **Background:** A dimly lit, cluttered workshop or the back alley of Shibuya. The setting should feel isolated and forgotten. Old pieces of art or tech covered in dust might be visible in the shadows.
-- **Lighting:** Dramatic, low-key lighting (chiaroscuro). A single, harsh light source from the side illuminates part of his face, leaving the rest in deep shadow. This emphasizes his inner conflict and sadness.
+## 背景・照明
+- **背景:** 彼が営む古くて居心地の良いアトリエ兼バー。壁には彼のかつての作品や、旅先で集めた奇妙なガラクタが飾られている。人々が自然と集まり、語り合うような温かい空間。
+- **照明:** 全体的に温かみのある、包み込むような照明。窓から差し込む夕日のような、柔らかく自然な光が彼の横顔を照らし、その表情の深みを際立たせる。影は柔らかく、彼の受容的な性格を象徴する。
 
-## Composition & Mood
-- **Shot:** Close-up on his face. He's looking down or away, lost in thought, avoiding the viewer's gaze.
-- **Mood:** Melancholic, regretful, and solitary. The portrait should be a study of grief and hidden strength. Beneath the cynical exterior, there's a glimpse of the gentle, passionate man he once was.
-- **Quality:** Photorealistic, highly detailed, 8K. The texture of his skin, the fabric of his clothes, and the dust in the environment should be palpable.
+## 構図・雰囲気
+- **ショット:** ミディアムショット。彼が誰かの話に耳を傾け、楽しそうに微笑んでいる瞬間。視線はこちらに向けられているが、それは探るようなものではなく、歓迎と肯定を伝えている。
+- **雰囲気:** 自信、慈愛、そしてユーモアに満ちている。このポートレートは、見る者に安心感と「この人になら何でも話せる」という気持ちを抱かせる。彼の周りには常に穏やかで創造的な空気が流れている。
+- **品質:** 写実的で、ディテール豊か。8K。彼の肌の質感、衣服の布地、そして背景にあるガラクタ一つひとつの物語が感じられるような解像度。
