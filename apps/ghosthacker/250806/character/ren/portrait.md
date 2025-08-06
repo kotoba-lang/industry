@@ -1,22 +1,22 @@
-# Portrait Prompt for Ren (as a human)
+# 蓮のポートレートプロンプト（人間として）
 
-## Subject
-- A brilliant, visionary programmer in his late 20s or early 30s, before the Silent Code incident. He is logical, intense, and driven.
+## 主題
+- サイレントコード事件以前の、20代後半から30代前半の、優秀で先見の明のあるプログラマー。論理的で、情熱的、そして意欲的。
 
-## Appearance
-- **Face:** Sharp, intelligent, and handsome features. His gaze is intense and focused, looking right through you, as if calculating and analyzing everything. A serious, determined expression is his default.
-- **Hair:** Dark hair, cut short and neat.
-- **Build:** Slender, typical of someone who spends long hours in front of a computer.
+## 外見
+- **顔:** 鋭く、知的で、整った顔立ち。視線は鋭く集中しており、まるで全てを計算し分析しているかのように、鑑賞者を見透かす。真剣で断固とした表情がデフォルト。
+- **髪:** 黒髪で、短く整えられている。
+- **体格:** 長時間コンピュータの前にいる人に典型的な、細身の体型。
 
-## Clothing & Style
-- **Outfit:** Highly logical and minimalist. A simple, high-quality, dark-colored t-shirt or a button-down shirt. His style is functional and without any unnecessary embellishment.
-- **Accessories:** Perhaps a high-end, minimalist watch. He is surrounded by cutting-edge technology.
+## 服装とスタイル
+- **服装:** 非常に論理的でミニマリスト。シンプルで高品質な暗色のTシャツか、ボタンダウンシャツ。彼のスタイルは機能的で、不必要な装飾はない。
+- **アクセサリー:** おそらく、高級でミニマリストな腕時計。最先端の技術に囲まれている。
 
-## Setting & Lighting
-- **Background:** A futuristic, clean, and minimalist office or lab (the original TOL headquarters). The background is filled with holographic interfaces, glowing data streams, and sleek computer hardware. The environment is orderly and reflects his logical mind.
-- **Lighting:** Cool, blueish-white light emanating from the holographic screens. The lighting is precise and controlled, creating sharp contrasts and highlighting his intense features. It's the light of pure data and logic.
+## 背景と照明
+- **背景:** 未来志向で、クリーン、そしてミニマリストなオフィスまたは研究室（元のTOL本社）。背景はホログラフィックインターフェース、光るデータストリーム、洗練されたコンピュータハードウェアで満たされている。環境は整然としており、彼の論理的な精神を反映している。
+- **照明:** ホログラフィックスクリーンから放たれる、クールで青みがかった白色光。照明は正確に制御され、鋭いコントラストを生み出し、彼の情熱的な顔立ちを際立たせる。それは純粋なデータと論理の光である。
 
-## Composition & Mood
-- **Shot:** Close-up or medium close-up. He is intensely focused on a holographic interface just out of frame, or looking directly at the viewer with an unyielding, confident gaze.
-- **Mood:** Brilliant, intense, and visionary. The portrait should capture the mind of a genius who believed everything could be understood and controlled through logic. There's a sense of ambition and perhaps a touch of arrogance in his confidence.
-- **Quality:** Photorealistic, 8K. The image should look like a promotional shot for a tech visionary, with a focus on the sleek, futuristic technology surrounding him.
+## 構図と雰囲気
+- **ショット:** クローズアップまたはミディアムクローズアップ。フレームのすぐ外にあるホログラフィックインターフェースに強烈に集中しているか、または屈しない自信に満ちた眼差しで鑑賞者をまっすぐ見ている。
+- **雰囲気:** 優秀、情熱的、そして先見の明がある。ポートレートは、すべてが論理によって理解され制御できると信じていた天才の精神を捉えるべきである。彼の自信には野心と、おそらくは少しの傲慢さが感じられる。
+- **品質:** 写実的、8K。画像は、彼を取り巻く洗練された未来的な技術に焦点を当てた、テクノロジーの先見者のプロモーションショットのように見えるべきである。

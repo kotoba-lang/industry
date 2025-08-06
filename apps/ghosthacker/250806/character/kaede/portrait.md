@@ -1,22 +1,22 @@
-# Portrait Prompt for Kaede
+# 楓のポートレートプロンプト
 
-## Subject
-- A 25-year-old, highly skilled Ghost Hacker. She is calm, composed, and analytical.
+## 主題
+- 30歳の、高度なスキルを持つゴーストハッカー。冷静沈着で分析的。
 
-## Appearance
-- **Face:** Sharp, intelligent features. Her eyes are focused and perceptive, conveying a sense of deep thought. She has a calm, neutral expression, but not unkind.
-- **Hair:** Dark, practical, and styled neatly, perhaps tied back in a bun or a simple ponytail to keep it out of her way.
-- **Build:** Slender and poised.
+## 外見
+- **顔:** 鋭く知的な顔立ち。目は集中力があり洞察力に優れ、深い思慮を漂わせる。穏やかで中立的な表情だが、不親切ではない。
+- **髪:** 黒髪で実用的なスタイル。邪魔にならないように、お団子かシンプルなポニーテールにきちんとまとめられている。
+- **体格:** 細身で落ち着いた立ち居振る舞い。
 
-## Clothing & Style
-- **Outfit:** Professional and functional, with a touch of elegance. A dark, well-fitted turtleneck sweater (in her image color of deep green) and dark trousers. Her clothing is simple and unadorned.
-- **Accessories:** She carries a high-end, slim tablet PC. Perhaps a simple, elegant watch. No other jewelry.
+## 服装とスタイル
+- **服装:** プロフェッショナルで機能的、かつ優雅さも兼ね備えている。濃い緑色（彼女のイメージカラー）の体にフィットしたタートルネックセーターと、黒いズボン。服装はシンプルで装飾がない。
+- **アクセサリー:** 高性能でスリムなタブレットPCを携帯。シンプルで上品な腕時計をしているかもしれない。その他のジュエリーは身につけていない。
 
-## Setting & Lighting
-- **Background:** The Ghost Hacker office, but a quieter, more organized corner of it. Bookshelves, servers with subtle blinking lights, and a clean desk are visible but out of focus.
-- **Lighting:** Cool, indirect lighting, perhaps from a screen or an overhead lamp. The lighting is controlled and focused, creating a serious and professional atmosphere. It should highlight her sharp features.
+## 背景と照明
+- **背景:** ゴーストハッカーのオフィスだが、その中でも静かで整理整頓された一角。本棚、かすかに点滅するライトが付いたサーバー、片付いた机が、焦点が合わないように見える。
+- **照明:** スクリーンや天井のランプからの、クールで間接的な照明。照明は制御され焦点が合っており、シリアスでプロフェッショナルな雰囲気を醸し出す。彼女のシャープな顔立ちを際立たせるべき。
 
-## Composition & Mood
-- **Shot:** Medium shot, showing her from the waist up. She might be looking slightly off-camera as if analyzing data, or directly at the viewer with a knowing, intelligent gaze.
-- **Mood:** Calm, intelligent, and authoritative. The portrait should capture her reliability and expertise. She is a pillar of strength and knowledge within the team.
-- **Quality:** Photorealistic, crisp detail, 8K. The focus is on her sharp intellect and the professional environment.
+## 構図と雰囲気
+- **ショット:** ミディアムショットで、腰から上を写す。データを分析しているかのようにカメラから少し視線を外しているか、あるいは知り尽くした知的な眼差しで鑑賞者をまっすぐ見つめている。
+- **雰囲気:** 穏やかで、知的、そして権威がある。ポートレートは彼女の信頼性と専門知識を捉えるべき。彼女はチーム内における強さと知識の柱である。
+- **品質:** 写実的で、鮮明なディテール、8K。彼女の鋭い知性とプロフェッショナルな環境に焦点を当てる。

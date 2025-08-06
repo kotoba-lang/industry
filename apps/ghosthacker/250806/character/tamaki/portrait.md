@@ -1,22 +1,22 @@
-# Portrait Prompt for Tamaki
+# 環のポートレートプロンプト
 
-## Subject
-- A 21-year-old university student of Japanese and Dutch descent. She has a "cute" and approachable look, but with a hint of a strong will in her eyes.
+## 主題
+- 日本とオランダの血を引く21歳の大学生。彼女は「キュート」で親しみやすい見た目だが、その目には強い意志が垣間見える。
 
-## Appearance
-- **Face:** Soft, youthful features. Bright, curious eyes of a distinct blueish hue.
-- **Hair:** Light black hair, styled in a casual but chic way, perhaps a slightly messy bob or shoulder-length cut that frames her face.
-- **Expression:** A friendly, slightly playful smile. Her expression is open and emotionally rich, capturing her empathetic personality.
+## 外見
+- **顔:** 柔らかく若々しい顔立ち。特徴的な青みがかった色合いの、明るく好奇心旺盛な目。
+- **髪:** 明るい黒髪で、カジュアルだがシックなスタイル。顔を縁取る、少し無造作なボブか肩までの長さのカットかもしれない。
+- **表情:** フレンドリーで少し遊び心のある笑顔。表情はオープンで感情豊かであり、彼女の共感的な性格を捉えている。
 
-## Clothing & Style
-- **Outfit:** She wears a fashionable and artistic mix of styles. A light purple, oversized button-up shirt made of a soft, flowing material, worn over a simple white t-shirt. This is paired with black, wide-leg trousers.
-- **Accessories:** Minimalist vintage accessories. A delicate silver necklace and a few subtle rings.
+## 服装とスタイル
+- **服装:** ファッショナブルで芸術的なスタイルのミックスを着用。柔らかく流れるような素材でできた薄紫色のオーバーサイズのボタンアップシャツを、シンプルな白いTシャツの上に着ている。これに黒のワイドレッグパンツを合わせる。
+- **アクセサリー:** ミニマリストなヴィンテージアクセサリー。繊細なシルバーのネックレスと、いくつかの控えめなリング。
 
-## Setting & Lighting
-- **Background:** A bright, modern-looking office space in Shibuya, with large windows letting in soft, natural daylight. The background is slightly out of focus.
-- **Lighting:** The scene is lit with natural, diffused sunlight that highlights the soft textures of her clothes and gives her skin a healthy glow. The lighting should feel warm and inviting.
+## 背景と照明
+- **背景:** 渋谷にある明るくモダンなオフィススペースで、大きな窓から柔らかく自然な昼光が差し込む。背景は少し焦点が合っていない。
+- **照明:** シーンは自然で拡散した太陽光で照らされ、彼女の服の柔らかな質感を際立たせ、肌に健康的な輝きを与える。照明は暖かく、招き入れるような感じであるべき。
 
-## Composition & Mood
-- **Shot:** Medium close-up, from the chest up, with her looking directly at the camera.
-- **Mood:** "いい感じ" (ii kanji - a good feeling). The portrait should feel optimistic, stylish, and full of life, capturing her essence as a sensitive and intuitive young woman living in Tokyo.
-- **Quality:** Photorealistic, high detail, 8K, resembling a photograph taken with a high-end DSLR camera (e.g., a Sony A7III with a 50mm f/1.4 lens).
+## 構図と雰囲気
+- **ショット:** ミディアムクローズアップで、胸から上を写し、彼女はカメラをまっすぐ見ている。
+- **ムード:** 「いい感じ」。ポートレートは、東京に住む感受性豊かで直感的な若い女性としての彼女の本質を捉え、楽観的で、スタイリッシュで、生命力に満ちていると感じさせるべき。
+- **品質:** 写実的、高精細、8K。ハイエンドのデジタル一眼レフカメラ（例：ソニーA7IIIに50mm f/1.4レンズ）で撮影した写真のように見えるべき。
