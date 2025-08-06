@@ -1,4 +1,4 @@
-# Ghost Hacker
+# Ghost Hacker - Comics
 
 theology
 
