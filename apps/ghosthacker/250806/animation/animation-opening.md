@@ -1,99 +1,101 @@
-# Ghost Hacker - Opening Animation Storyboard
+# fixed seed : 2617027065
 
-**Total Length:** 90 seconds
+# Ghost Hacker - オープニングアニメーション絵コンテ
 
-**Concept:** The opening blends the serene, "iyashikei" (healing) beauty of water-filled Tokyo with the chaotic, glitchy, yet beautiful digital world of Ghost Hacking. The visual style is an emotional, cinematic anime aesthetic, emphasizing dramatic, nostalgic lighting, a sense of airiness, detailed painterly backgrounds, and an expressive use of blues. A key focus is on **the expressive, detailed rendering of the characters' eyes,** which serve as windows to their inner worlds and emotions.
+**全長:** 90秒
 
-**Music Direction:**
-The music will be a 90-second piece that evolves through several stages:
-1.  **(0-15s) Ethereal & Calm:** Starts with a gentle, ambient synth pad and a simple piano melody, evoking the peaceful scenery of Tokyo's canals.
-2.  **(15-40s) Building Intrigue:** Adds a steady, minimalist electronic beat. Introduces character motifs. A sense of underlying tension grows.
-3.  **(40-65s) Glitch & Conflict:** The beat becomes more complex and aggressive. Glitchy electronic sounds, distorted samples, and a driving bassline take over as the visuals shift to the chaotic mental landscape.
-4.  **(65-80s) Psychedelic Catharsis:** The music explodes into a psychedelic, emotional crescendo. Lush, layered synths, a powerful beat, and soaring vocal chops create a feeling of both destruction and liberation, mirroring the "Ayahuasca" sequence.
-5.  **(80-90s) Serene Aftermath:** The music abruptly cuts to a quiet piano melody and the title card, leaving a lingering sense of questioning.
+**コンセプト:** 東京の静かで「癒し系（いやしけい）」の美しさと、混沌としていながらも美しいデジタル世界「ゴーストハッキング」が融合する。ビジュアルスタイルは感情豊かで映画的なアニメ美学を基調とし、ドラマチックでノスタルジックな光、空気感のある描写、緻密で絵画的な背景、そして青を印象的に使った表現が特徴。特に登場人物の瞳の緻密で感情豊かな描写に重点を置き、その瞳が彼らの内面世界や感情の窓となる。
 
----
-
-## **Scene Breakdown & Prompts**
-
-**Scene 1: Tokyo, City of Water (0-8s)**
-*   **Visual Prompt:** `masterpiece, emotional cinematic anime style, iyashikei aesthetic. A breathtaking panoramic shot of futuristic Tokyo, rendered with a detailed, painterly background. The city is crisscrossed by crystal-clear blue canals reflecting a vibrant morning sky. Dramatic lighting, god rays piercing through clouds, lens flare on the water. Sleek, silent water buses glide under skyscrapers that feel both grand and gentle. The camera slowly pans, emphasizing the sense of airiness and peace.`
-*   **Music Prompt:** `(0-8s) Ethereal, calm, ambient music. Begins with a warm, atmospheric synth pad and a simple, reverberating piano melody. Peaceful and slightly melancholic, like a beautiful memory. (BPM: 70)`
-
-**Scene 2: The Hacker's Gaze (8-13s)**
-*   **Visual Prompt:** `masterpiece, emotional and hyper-detailed anime style, cinematic. An emotional close-up on Tamaki's face, bathed in soft, natural light. The focus is on her eyes, which are rendered with incredible detail and depth, filled with a universe of quiet emotion. They reflect the sparkling blue water, conveying a sense of deep empathy and connection. A gentle breeze lifts a few strands of her hair. Abstract particles of purple light drift around her like fireflies.`
-*   **Music Prompt:** `(8-13s) The piano melody continues. A soft, subtle electronic arp begins to fade in, adding a layer of technology to the organic piano sound.`
-
-**Scene 3: The Team (13-20s)**
-*   **Visual Prompt:** `masterpiece, serene and gentle anime aesthetic, cinematic. Quick, character-focused cuts with soft lighting. Kaede, surrounded by beautiful, glowing holographic data that resembles constellations, her eyes sharp and focused. Hibiki, eyes closed in a warmly lit room, a blissful expression on his face. Nee-Chan, a tiny fairy of shimmering, colorful light, playfully pokes Tamaki's cheek, leaving a trail of sparkles.`
-*   **Music Prompt:** `(13-20s) A minimalist, clean electronic beat (like a soft kick and hi-hat) starts. Each character cut is punctuated by a unique, subtle synth sound effect that matches their action.`
-
-**Scene 4: The Lonely Thinker (20-28s)**
-*   **Visual Prompt:** `masterpiece, emotional cinematic anime style, dramatic lighting. Elias stands alone in a vast, beautiful library. A close-up on his face reveals sharp, intelligent eyes that hold a universe of loneliness. They are focused yet haunted, reflecting the flickering, complex holographic model of the universe before him. His expression is tinged with a deep, quiet sadness. The camera circles him slowly.`
-*   **Music Prompt:** `(20-28s) A low, brooding synth bassline enters, creating a sense of tension and intellectual weight. The main beat continues, but the mood shifts to something more serious and ominous.`
-
-**Scene 5: Worlds Collide (28-35s)**
-*   **Visual Prompt:** `masterpiece, dramatic anime animation, cinematic. A beautiful, dynamic split screen. Left: Tamaki reaches out, her eyes filled with determination. Right: Elias clenches his fist, his eyes shutting tight in anguish as the model behind him shatters into fragments of light and dark, glitching beautifully but violently.`
-*   **Music Prompt:** `(28-35s) The music builds. A riser synth swells in the background. The beat becomes slightly more insistent.`
-
-**Scene 6: Dive Into Corruption (35-42s)**
-*   **Visual Prompt:** `masterpiece, abstract animation, cinematic. The camera dives into Elias's closed eye, transitioning into his mental landscape. The beautiful library is now glitching and corrupting in an artistic, abstract way. Books dissolve into watercolor-like inkblots that stain the air. The architecture cracks, revealing static and chaotic digital noise underneath.`
-*   **Music Prompt:** `(35-42s) A sudden drop. The beat becomes more aggressive and syncopated. Introduce glitchy sound effects, digital stutters, and distorted synth textures. The feeling of order breaking down.`
-
-**Scene 7: The Shadow of Trauma (42-50s)**
-*   **Visual Prompt:** `masterpiece, emotional anime animation. A shadowy, semi-transparent figure of a young boy forms from the glitching data-rot. Its eyes are hollow voids, yet they convey profound loneliness and pain. It screams silently, unleashing a shockwave of black, crystalline structures that spread across the library like frost.`
-*   **Music Prompt:** `(42-50s) The driving glitch-hop beat intensifies. A distorted, menacing synth lead plays a dark, looping melody. The atmosphere is hostile and chaotic.`
-
-**Scene 8: Cracking Defenses (50-58s)**
-*   **Visual Prompt:** `masterpiece, cinematic anime action. Tamaki, in her flowing digital avatar, stands against the storm of black crystals. An emotional close-up on her face, showing sweat and tears. Her eyes, wide and unwavering, burn with fierce determination and a refusal to let go. The purple shield of light reflecting in them cracks under the assault.`
-*   **Music Prompt:** `(50-58s) The music is at a peak of aggression. The drums are heavy and distorted. A filtered vocal chop sample stutters in time with the beat, adding to the sense of struggle.`
-
-**Scene 9: The Last Resort (58-65s)**
-*   **Visual Prompt:** `masterpiece, dramatic anime close-up. A worried but resolute Kaede, her face illuminated by her console. Her eyes are sharp, filled with the pain of making a difficult choice. She makes the call. Quick cut to Hibiki, his eyes snapping open, revealing a vibrant, otherworldly glow within them as he activates the "Ayahuasca" rootkit.`
-*   **Music Prompt:** `(58-65s) The beat cuts out for a moment, replaced by a dramatic, reversed cymbal swell and the sound of a deep system boot-up. A powerful sub-bass drop hits at the end of the scene.`
-
-**Scene 10: Psychedelic Liberation (65-75s)**
-*   **Visual Prompt:** `masterpiece, psychedelic, abstract animation, with dramatic and beautiful lighting effects. A beautiful, overwhelming explosion of light and color. Elias's library dissolves into a stunning, abstract flow of watercolor textures, geometric light patterns, and sakuga-level animation of flowing energy. Tamaki and the shadow-boy are swept up, their forms and eyes merging into trails of light in a cosmic, river-like vortex.`
-*   **Music Prompt:** `(65-75s) The musical explosion. A powerful, euphoric trance/psytrance beat kicks in (BPM: 140). A soaring, emotional synth lead plays a cathartic melody over lush, wide pads. Female vocal chops are layered in, creating a heavenly, overwhelming wall of sound.`
-
-**Scene 11: Tree of Life (75-80s)**
-*   **Visual Prompt:** `masterpiece, ethereal anime aesthetic, cinematic. In the heart of the color vortex, a gigantic, luminous tree of life materializes. Its branches are made of pure, flowing light, pulsing with energy. Petals of light fall from its branches, each one a different color, bringing a gentle, beautiful order to the chaos.`
-*   **Music Prompt:** `(75-80s) The main euphoric melody reaches its peak. A choir-like synth pad swells, adding a sense of spiritual release and awe.`
-
-**Scene 12: The Aftermath (80-85s)**
-*   **Visual Prompt:** `masterpiece, hyper-detailed and emotional anime close-up. Abrupt cut to silence. A shot of Tamaki's face in the real world, lit by the soft afternoon sun. A single, perfectly rendered tear rolls down her cheek. Her eyes hold a complex universe of emotion—relief, profound empathy for the soul she touched, and the heavy weight of the choice she made. The shot lingers on her eyes before a soft focus transition.`
-*   **Music Prompt:** `(80-85s) Abrupt silence. Then, the simple, gentle piano melody from the beginning returns, played slowly and thoughtfully.`
-
-**Scene 13: Title (85-90s)**
-*   **Visual Prompt:** `masterpiece, serene and beautiful anime aesthetic, cinematic. The camera pulls back from the window Tamaki is looking through, revealing the breathtaking, peaceful cityscape of water-filled Tokyo once more. The sky is a beautiful, painterly blue. The title "Ghost Hacker" fades in, its font clean and elegant, over the serene view.`
-*   **Music Prompt:** `(85-90s) The solo piano plays its final, lingering notes, which fade out into silence as the title appears.`
+**音楽監督:**
+音楽は90秒の楽曲で、いくつかのステージを経て展開する：
+1.  **(0-15s) 幻想的 & 静寂:** 優しく、アンビエントなシンセパッドとシンプルなピアノのメロディで始まり、水の都・東京の穏やかな風景を呼び起こす。
+2.  **(15-40s) 緊張感の構築:** 安定したミニマルなエレクトロニックビートが加わる。キャラクターのモチーフが導入され、緊張感が徐々に高まる。
+3.  **(40-65s) グリッチ & 葛藤:** ビートはより複雑で攻撃的になる。グリッチノイズ、歪んだサンプル、ドライヴ感のあるベースラインが、混沌とした精神世界への移行を表現する。
+4.  **(65-80s) サイケデリックなカタルシス:** 音楽はサイケデリックで感情的なクレッシェンドに爆発する。豊かで重層的なシンセ、パワフルなビート、高揚感のあるボーカルチョップが、「アヤワスカ」の解放と破壊の感覚を創り出す。
+5.  **(80-90s) 静かな余韻:** 音楽は突然静かなピアノのメロディに戻り、タイトルカードと共に、問いかけるような余韻を残す。
 
 ---
 
-## **Suno.ai用 音楽生成プロンプト (Suno.ai Music Generation Prompt)**
+## **シーン詳細とプロンプト**
+
+**シーン1: 水の都・東京 (0-8s)**
+*   **映像プロンプト:** `傑作、感情的な映画的アニメスタイル、癒し系 aesthetic。未来的東京の息をのむようなパノラマショット、繊細な描き込みの背景。街は透き通った青い運河が交差し、鮮やかな朝の空を反射している。ドラマチックな光、雲を貫く光芒、水面のレンズフレア。優雅で静かな水上バスが、壮大かつ穏やかな超高層ビルの下を滑るように進む。カメラはゆっくりとパンし、空気感と平和を強調する。`
+*   **音楽プロンプト:** `(0-8s) 幻想的で穏やかなアンビエント音楽。温かいシンセパッドと、シンプルで反響するピアノのメロディで始まる。美しく、少しメランコリックな記憶のよう。 (BPM: 70)`
+
+**シーン2: ハッカーの眼差し (8-13s)**
+*   **映像プロンプト:** `傑作、感情的で超詳細なアニメスタイル、映画的。柔らかな自然光に照らされたタマキの顔の感情的なクローズアップ。彼女の瞳は驚くほど緻密に描かれ、静かな感情の宇宙が宿る。瞳には輝く青い水面が映り、深い共感と繋がりを伝える。優しい風が髪を数本揺らす。紫色の光の粒子（フォトン）が蛍のように彼女の周りを漂う。`
+*   **音楽プロンプト:** `(8-13s) ピアノのメロディが続く。柔らかく繊細なエレクトロニックアルペジオがフェードインし、有機的なピアノサウンドにテクノロジーの層を加える。`
+
+**シーン3: チーム (13-20s)**
+*   **映像プロンプト:** `傑作、穏やかで優しいアニメ aesthetic、映画的。柔らかな照明の下、キャラクターに焦点を当てた素早いカット。カエデは星座のような美しいホログラムデータに囲まれ、集中した微笑みでタイピングする。ヒビキは暖かく照らされた部屋で目を閉じ、光で作られた音符に囲まれている。小さく輝く妖精のネエチャンが、タマキの頬を遊び心でつつき、光の軌跡を残す。`
+*   **音楽プロンプト:** `(13-20s) ミニマルでクリーンなエレクトロニックビート（ソフトなキックとハイハット）が始まる。各キャラクターのカットは、彼らの行動に合わせたユニークで繊細なシンセサウンドで区切られる。`
+
+**シーン4: 孤独な思索者 (20-28s)**
+*   **映像プロンプト:** `傑作、感情的な映画的アニメスタイル、ドラマチックな光。エリアスが広大で美しい図書館に一人で立つ。彼の顔のクローズアップは、鋭く知性的でありながら、孤独の宇宙を宿した瞳を映す。その瞳は、彼の前で明滅する複雑な宇宙のホログラムモデルを反射し、深く静かな悲しみを帯びている。カメラはゆっくりと彼を周回する。`
+*   **音楽プロンプト:** `(20-28s) 低く、不穏なシンセベースラインが入り、緊張感と知的な重みを創り出す。メインビートは続くが、ムードはよりシリアスで不吉なものに変わる。`
+
+**シーン5: 世界の衝突 (28-35s)**
+*   **映像プロンプト:** `傑作、ドラマチックなアニメーション、映画的。美しくダイナミックな分割画面。左：タマキが決意に満ちた瞳で手を差し伸べる。右：エリアスが苦悩に顔を歪め、拳を握りしめると、背後のモデルが美しくも暴力的に光と闇の破片となって砕け散る。`
+*   **音楽プロンプト:** `(28-35s) 音楽がビルドアップする。ライザーシンセが背景で膨らみ、ビートが少しずつ強まる。`
+
+**シーン6: 汚染へのダイブ (35-42s)**
+*   **映像プロンプト:** `傑作、抽象アニメーション、映画的。カメラはエリアスの閉じた瞳にダイブし、彼の精神世界へ移行する。美しい図書館が、芸術的かつ抽象的にグリッチし、崩壊していく。本は水彩のようなインクの染みとなって空気に溶け、建築物はひび割れ、その下から静的で混沌としたデジタルノイズが覗く。`
+*   **音楽プロンプト:** `(35-42s) 突然のドロップ。ビートはより攻撃的でシンコペーションを刻む。グリッチノイズ、デジタルなスタッター、歪んだシンセの質感が秩序の崩壊を感じさせる。`
+
+**シーン7: トラウマの影 (42-50s)**
+*   **映像プロンプト:** `傑作、感情的なアニメーション。グリッチしたデータ汚染から、半透明な少年の影が形成される。その瞳は空虚だが、深い孤独と痛みを伝える。彼は声なく叫び、黒い結晶構造の衝撃波が霜のように図書館全体に広がる。`
+*   **音楽プロンプト:** `(42-50s) ドライヴ感のあるグリッチホップのビートが激化する。歪んだ、脅威的なシンセリードが暗くループするメロディを奏でる。敵対的で混沌とした雰囲気。`
+
+**シーン8: 砕ける防御 (50-58s)**
+*   **映像プロンプト:** `傑作、映画的なアニメアクション。流れるようなデジタルアバター姿のタマキが、黒い結晶の嵐に立ち向かう。彼女の瞳は決して揺るがず、強い決意と意志に燃えている。その瞳に反射する紫の光の盾が、攻撃を受けてガラスのようにひび割れていく。`
+*   **音楽プロンプト:** `(50-58s) 音楽は攻撃性のピークに達する。ドラムは重く歪んでいる。フィルターのかかったボーカルチョップのサンプルが、ビートに合わせて途切れ途切れに鳴り、闘争感を煽る。`
+
+**シーン9: 最後の手段 (58-65s)**
+*   **映像プロンプト:** `傑作、ドラマチックなアニメのクローズアップ。コンソールの光に照らされたカエデの、心配と決意に満ちた顔。彼女の瞳は鋭く、辛い選択の痛みを宿している。彼女が決断を下す。カットが切り替わり、ヒビキが目を見開く。その瞳の中に、鮮やかでこの世のものとは思えない光が宿り、「アヤワスカ」を起動する。`
+*   **音楽プロンプト:** `(58-65s) ビートが一瞬止まり、ドラマチックな逆再生シンバルのスウェルと、深いシステム起動音に置き換わる。シーンの終わりにパワフルなサブベースのドロップが響く。`
+
+**シーン10: サイケデリックな解放 (65-75s)**
+*   **映像プロンプト:** `傑作、サイケデリック、抽象アニメーション、ドラマチックで美しい光の演出。美しく、圧倒的な光と色の爆発。エリアスの図書館が、水彩のテクスチャ、幾何学的な光のパターン、そして作画レベルの流れるエネルギーのアニメーションとなって溶けていく。タマキと影の少年は渦に巻き込まれ、その姿と瞳は宇宙的な光の川の軌跡となる。`
+*   **音楽プロンプト:** `(65-75s) 音楽の爆発。パワフルで陶酔的なトランス/サイトランスのビートが140BPMでキックインする。高揚感のあるエモーショナルなシンセリードが、豊かでワイドなパッドの上でカタルシスのあるメロディを奏でる。天国のような女性ボーカルチョップが重ねられ、圧倒的な音の壁を創り出す。`
+
+**シーン11: 生命の樹 (75-80s)**
+*   **映像プロンプト:** `傑作、幻想的なアニメaesthetic、映画的。色彩の渦の中心に、巨大で光り輝く生命の樹が現れる。その枝は純粋な光の流れでできており、エネルギーで脈打っている。枝からは様々な色の光の花びらが舞い落ち、混沌に穏やかで美しい秩序をもたらす。`
+*   **音楽プロンプト:** `(75-80s) 主要な陶酔的メロディがピークに達する。聖歌隊のようなシンセパッドが膨らみ、精神的な解放と畏怖の念を加える。`
+
+**シーン12: 余波 (80-85s)**
+*   **映像プロンプト:** `傑作、超詳細で感情的なアニメのクローズアップ。突然の静寂。午後の柔らかな日差しに照らされた現実世界のタマキの顔。完璧に描かれた一筋の涙が頬を伝う。彼女の瞳には、安堵、触れた魂への深い共感、そして自らの選択の重さが複雑に混ざり合った宇宙が宿る。`
+*   **音楽プロンプト:** `(80-85s) 突然の静寂。その後、冒頭のシンプルで優しいピアノのメロディが、ゆっくりと思慮深く戻ってくる。`
+
+**シーン13: タイトル (85-90s)**
+*   **映像プロンプト:** `傑作、穏やかで美しいアニメaesthetic、映画的。カメラがタマキが見つめる窓から引き、息をのむほど平和な水の都・東京の全景が再び現れる。空は美しく、絵画のような青。その静かな景色の上に、「Ghost Hacker」のタイトルが、クリーンでエレガントなフォントで静かにフェードインする。`
+*   **音楽プロンプト:** `(85-90s) ソロピアノが最後の、余韻のある音を奏で、タイトルが現れると共に静寂に消えていく。`
+
+---
+
+## **Suno.ai用 音楽生成プロンプト**
 
 `[Style: Cinematic Anime Opening, Ethereal Ambient, Glitch Hop, Psytrance, Emotional] [Instrumental]`
 
 `[Intro]`
 `(0-15s)`
-`Starts with a warm, atmospheric synth pad and a simple, reverberating piano melody. Peaceful and slightly melancholic. A soft, subtle electronic arp fades in. BPM 70.`
+`温かい雰囲気のシンセパッドと、シンプルで反響するピアノのメロディで始まる。平和で少しメランコリック。柔らかく繊細な電子アルペジオがフェードイン。BPM 70。`
 
 `[Verse 1]`
 `(15-35s)`
-`A minimalist, clean electronic beat (soft kick, hi-hat) begins. A low, brooding synth bassline enters, creating a sense of tension and intellectual weight. The mood shifts to something more serious and ominous as a riser synth swells in the background.`
+`ミニマルでクリーンな電子ビート（ソフトなキック、ハイハット）が始まる。低く、不穏なシンセベースラインが入り、緊張感と知的な重みを創出。ライザーシンセが背景で膨らむにつれて、ムードはよりシリアスで不吉なものに変わる。`
 
 `[Verse 2]`
 `(35-58s)`
-`The beat suddenly drops, becoming more aggressive and syncopated. Glitchy sound effects, digital stutters, and distorted synth textures create a feeling of order breaking down. A distorted, menacing synth lead plays a dark, looping melody. The drums become heavy and distorted. A filtered vocal chop sample stutters in time with the beat.`
+`ビートが突然ドロップし、より攻撃的でシンコペーションが効いたものになる。グリッチノイズ、デジタルなスタッター、歪んだシンセの質感が秩序の崩壊を表現。歪んだ脅威的なシンセリードが暗くループするメロディを奏でる。ドラムは重く歪む。フィルターのかかったボーカルチョップサンプルがビートに合わせてスタッターする。`
 
 `[Bridge]`
 `(58-65s)`
-`The beat cuts out. A dramatic, reversed cymbal swells over the sound of a deep system boot-up, ending in a powerful sub-bass drop.`
+`ビートが途切れる。ドラマチックな逆再生シンバルのスウェルが、深いシステム起動音の上で鳴り響き、パワフルなサブベースのドロップで終わる。`
 
 `[Chorus / Drop]`
 `(65-80s)`
-`Musical explosion. A powerful, euphoric trance/psytrance beat kicks in at 140 BPM. A soaring, emotional synth lead plays a cathartic melody over lush, wide pads. Layered, heavenly female vocal chops create an overwhelming wall of sound. A choir-like synth pad swells, adding a sense of spiritual release and awe.`
+`音楽の爆発。パワフルで陶酔的なトランス/サイトランスのビートがBPM 140でキックイン。高揚感のあるエモーショナルなシンセリードが、豊かでワイドなパッドの上でカタルシスのあるメロディを奏でる。天国のような女性ボーカルチョップが重なり、圧倒的な音の壁を創り出す。聖歌隊のようなシンセパッドが膨らみ、精神的な解放と畏怖の念を加える。`
 
 `[Outro]`
 `(80-90s)`
-`Abrupt silence. Then, the simple, gentle piano melody from the beginning returns, played slowly and thoughtfully. The final, lingering notes fade out into silence.`
+`突然の静寂。その後、冒頭のシンプルで優しいピアノのメロディが、ゆっくりと思慮深く戻ってくる。最後の余韻のある音符が静寂の中に消えていく。`
