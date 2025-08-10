@@ -2,7 +2,7 @@
 
 **Total Length:** 90 seconds
 
-**Concept:** The opening contrasts the serene, beautiful "real world" of water-filled Tokyo with the chaotic, glitchy, yet beautiful digital world of Ghost Hacking. It introduces the main characters and their roles, focusing on the central conflict of Episode 1: Tamaki's attempt to "connect" versus Elias's "loneliness." The climax of the opening will be the psychedelic visual representation of the "Ayahuasca" rootkit, hinting at the story's depth and the moral ambiguity of their methods.
+**Concept:** The opening blends the serene, "iyashikei" (healing) beauty of water-filled Tokyo with the chaotic, glitchy, yet beautiful digital world of Ghost Hacking. The visual style is an emotional, cinematic anime aesthetic, emphasizing dramatic, nostalgic lighting, a sense of airiness, detailed painterly backgrounds, and an expressive use of blues. The overall feeling is one of beauty, tranquility, and underlying emotional depth.
 
 **Music Direction:**
 The music will be a 90-second piece that evolves through several stages:
@@ -17,55 +17,55 @@ The music will be a 90-second piece that evolves through several stages:
 ## **Scene Breakdown & Prompts**
 
 **Scene 1: Tokyo, City of Water (0-8s)**
-*   **Visual Prompt:** `masterpiece, anime key visual, cinematic, ultra-detailed. A breathtaking panoramic shot of a futuristic Tokyo, crisscrossed by crystal-clear blue canals. Sleek, silent water buses glide under crystalline skyscrapers. The morning sun reflects off the water, creating a dazzling, peaceful cityscape. The camera slowly pans across the scene.`
+*   **Visual Prompt:** `masterpiece, emotional cinematic anime style, iyashikei aesthetic. A breathtaking panoramic shot of futuristic Tokyo, rendered with a detailed, painterly background. The city is crisscrossed by crystal-clear blue canals reflecting a vibrant morning sky. Dramatic lighting, god rays piercing through clouds, lens flare on the water. Sleek, silent water buses glide under skyscrapers that feel both grand and gentle. The camera slowly pans, emphasizing the sense of airiness and peace.`
 *   **Music Prompt:** `(0-8s) Ethereal, calm, ambient music. Begins with a warm, atmospheric synth pad and a simple, reverberating piano melody. Peaceful and slightly melancholic, like a beautiful memory. (BPM: 70)`
 
 **Scene 2: The Hacker's Gaze (8-13s)**
-*   **Visual Prompt:** `masterpiece, anime key visual, cinematic. Close-up on Tamaki's face, her eyes reflecting the water outside her office window. She has a gentle, thoughtful expression. Her image is slightly superimposed with flowing, abstract lines of purple light (photons).`
+*   **Visual Prompt:** `masterpiece, emotional and hyper-detailed anime style, cinematic. An emotional close-up on Tamaki's face, bathed in soft, natural light from her office window. Her eyes, incredibly detailed, reflect the sparkling blue water. A gentle breeze lifts a few strands of her hair. Her expression is thoughtful and serene. Abstract particles of purple light (photons) drift around her like fireflies, blending seamlessly with the scene's soft focus.`
 *   **Music Prompt:** `(8-13s) The piano melody continues. A soft, subtle electronic arp begins to fade in, adding a layer of technology to the organic piano sound.`
 
 **Scene 3: The Team (13-20s)**
-*   **Visual Prompt:** `masterpiece, anime key visual, cinematic. Quick cuts of the supporting cast in their element. Kaede, surrounded by holographic data streams, types furiously. Hibiki, eyes closed, adjusts dials on his sound console, lost in the music. Nee-Chan, as a tiny fairy of light, flits around Tamaki's shoulder, winking at the camera.`
+*   **Visual Prompt:** `masterpiece, serene and gentle anime aesthetic, cinematic. Quick, character-focused cuts with soft lighting. Kaede, surrounded by beautiful, glowing holographic data that resembles constellations, types with a focused smile. Hibiki, eyes closed in a warmly lit room, is surrounded by floating musical notes made of light. Nee-Chan, a tiny fairy of shimmering, colorful light, playfully pokes Tamaki's cheek, leaving a trail of sparkles.`
 *   **Music Prompt:** `(13-20s) A minimalist, clean electronic beat (like a soft kick and hi-hat) starts. Each character cut is punctuated by a unique, subtle synth sound effect that matches their action.`
 
 **Scene 4: The Lonely Thinker (20-28s)**
-*   **Visual Prompt:** `masterpiece, anime key visual, cinematic. Introduce Elias. He stands alone in a vast, minimalist library/observatory, staring at a complex, flickering holographic model of the universe. His expression is intense, focused, and deeply isolated. The camera circles him slowly.`
+*   **Visual Prompt:** `masterpiece, emotional cinematic anime style, dramatic lighting. Elias stands alone in a vast, beautiful library, the scale emphasizing his isolation. Shafts of dusty light (god rays) pierce the gloom from high windows, illuminating a complex holographic model of the universe. His expression is sharp but tinged with a deep, quiet sadness. The camera circles him slowly, focusing on the contrast between the beautiful setting and his solitude.`
 *   **Music Prompt:** `(20-28s) A low, brooding synth bassline enters, creating a sense of tension and intellectual weight. The main beat continues, but the mood shifts to something more serious and ominous.`
 
 **Scene 5: Worlds Collide (28-35s)**
-*   **Visual Prompt:** `masterpiece, anime key visual, cinematic. Split screen. On the left, Tamaki reaches her hand out, purple photons swirling from her fingertips. On the right, Elias clenches his fist, the holographic model behind him glitching violently. Their actions are mirrored.`
+*   **Visual Prompt:** `masterpiece, dramatic anime animation, cinematic. A beautiful, dynamic split screen. Left: Tamaki reaches out, her hand surrounded by a gentle, swirling nebula of purple photons. Right: Elias clenches his fist, the holographic model behind him shattering into fragments of light and dark, glitching beautifully but violently. Their actions are mirrored, creating a powerful visual metaphor.`
 *   **Music Prompt:** `(28-35s) The music builds. A riser synth swells in the background. The beat becomes slightly more insistent.`
 
 **Scene 6: Dive Into Corruption (35-42s)**
-*   **Visual Prompt:** `masterpiece, anime key visual, cinematic. The camera dives into Elias's eye. Transition into his mental landscape: a massive, cathedral-like library with endless shelves. But it's glitching and corrupting. Books fly off shelves, pages turning into black, oily data-rot.`
+*   **Visual Prompt:** `masterpiece, abstract animation, cinematic. The camera dives into Elias's eye, transitioning into his mental landscape. The beautiful library from before is now glitching and corrupting, but in an artistic, abstract way. Books dissolve into watercolor-like inkblots that stain the air. The architecture cracks, revealing static and chaotic digital noise underneath, like a beautiful painting being torn apart.`
 *   **Music Prompt:** `(35-42s) A sudden drop. The beat becomes more aggressive and syncopated. Introduce glitchy sound effects, digital stutters, and distorted synth textures. The feeling of order breaking down.`
 
 **Scene 7: The Shadow of Trauma (42-50s)**
-*   **Visual Prompt:** `masterpiece, anime key visual, cinematic. A shadowy, distorted version of a young boy (Elias's trauma) flickers into existence in the center of the library, its form made of pure black, glitching code. It screams silently, unleashing a shockwave of data corruption.`
+*   **Visual Prompt:** `masterpiece, emotional anime animation. A shadowy, semi-transparent figure of a young boy forms from the glitching data-rot. It's not just a monster; its expression is one of profound loneliness and pain. It screams silently, unleashing a shockwave of black, crystalline structures that spread across the library like frost.`
 *   **Music Prompt:** `(42-50s) The driving glitch-hop beat intensifies. A distorted, menacing synth lead plays a dark, looping melody. The atmosphere is hostile and chaotic.`
 
 **Scene 8: Cracking Defenses (50-58s)**
-*   **Visual Prompt:** `masterpiece, anime key visual, cinematic. Tamaki, in her digital avatar, stands against the storm of corruption, her purple energy forming a fragile shield. The shield cracks under the pressure. Close up on her face, showing strain and determination.`
+*   **Visual Prompt:** `masterpiece, cinematic anime action. Tamaki, in her flowing digital avatar, stands against the storm of black crystals. Her shield of purple light is vibrant but translucent, cracking like glass under the assault. An emotional close-up on her face shows her gritting her teeth, sweat and tears mixing as she pushes back.`
 *   **Music Prompt:** `(50-58s) The music is at a peak of aggression. The drums are heavy and distorted. A filtered vocal chop sample stutters in time with the beat, adding to the sense of struggle.`
 
 **Scene 9: The Last Resort (58-65s)**
-*   **Visual Prompt:** `masterpiece, anime key visual, cinematic. Close-up on Kaede's worried face, then her hand slams a holographic button. Cut to Hibiki, eyes snapping open, as he activates the "Ayahuasca" rootkit. His console glows with intense, rainbow-colored light.`
+*   **Visual Prompt:** `masterpiece, dramatic anime close-up. A worried but resolute Kaede, her face illuminated by her console, makes the call. Quick cut to Hibiki, his eyes snapping open. A single tear escapes as he activates the "Ayahuasca" rootkit. His console explodes with a beautiful, overwhelming rainbow of light that floods the room.`
 *   **Music Prompt:** `(58-65s) The beat cuts out for a moment, replaced by a dramatic, reversed cymbal swell and the sound of a deep system boot-up. A powerful sub-bass drop hits at the end of the scene.`
 
 **Scene 10: Psychedelic Liberation (65-75s)**
-*   **Visual Prompt:** `masterpiece, anime key visual, psychedelic, cinematic. The screen explodes in a violent, beautiful torrent of psychedelic visuals. Elias's library dissolves into geometric patterns, rivers of light, and kaleidoscopic fractals. Tamaki and the shadow-boy are swept up in the vortex, their forms dissolving and merging with the light.`
+*   **Visual Prompt:** `masterpiece, psychedelic, abstract animation, with dramatic and beautiful lighting effects. A beautiful, overwhelming explosion of light and color. Elias's library dissolves into a stunning, abstract flow of watercolor textures, geometric light patterns, and sakuga-level animation of flowing energy. Tamaki and the shadow-boy are swept up, their forms becoming trails of light in a cosmic, river-like vortex.`
 *   **Music Prompt:** `(65-75s) The musical explosion. A powerful, euphoric trance/psytrance beat kicks in (BPM: 140). A soaring, emotional synth lead plays a cathartic melody over lush, wide pads. Female vocal chops are layered in, creating a heavenly, overwhelming wall of sound.`
 
 **Scene 11: Tree of Life (75-80s)**
-*   **Visual Prompt:** `masterpiece, anime key visual, cinematic. In the center of the psychedelic storm, a single, brilliant tree of light ("Tree of Life") forms. Its branches spread through the chaos, bringing a new, vibrant order.`
+*   **Visual Prompt:** `masterpiece, ethereal anime aesthetic, cinematic. In the heart of the color vortex, a gigantic, luminous tree of life materializes. Its branches are made of pure, flowing light, pulsing with energy. Petals of light fall from its branches, each one a different color, bringing a gentle, beautiful order to the chaos.`
 *   **Music Prompt:** `(75-80s) The main euphoric melody reaches its peak. A choir-like synth pad swells, adding a sense of spiritual release and awe.`
 
 **Scene 12: The Aftermath (80-85s)**
-*   **Visual Prompt:** `masterpiece, anime key visual, cinematic. Abrupt cut back to reality. Close-up on Tamaki's face, a single tear rolling down her cheek. Her expression is a mix of relief, sadness, and profound questioning.`
+*   **Visual Prompt:** `masterpiece, hyper-detailed and emotional anime close-up. Abrupt cut to silence and a shot of Tamaki's face in the real world, lit by the soft afternoon sun. A single, perfectly rendered tear rolls down her cheek. Her expression is complex—a mixture of relief, empathy, and the weight of her actions. Soft focus on the background.`
 *   **Music Prompt:** `(80-85s) Abrupt silence. Then, the simple, gentle piano melody from the beginning returns, played slowly and thoughtfully.`
 
 **Scene 13: Title (85-90s)**
-*   **Visual Prompt:** `masterpiece, anime key visual, cinematic. The camera pulls back to show the peaceful Tokyo cityscape again, as if nothing has happened. The title "Ghost Hacker" elegantly fades in over the center of the screen.`
+*   **Visual Prompt:** `masterpiece, serene and beautiful anime aesthetic, cinematic. The camera pulls back from the window Tamaki is looking through, revealing the breathtaking, peaceful cityscape of water-filled Tokyo once more. The sky is a beautiful, painterly blue. The title "Ghost Hacker" fades in, its font clean and elegant, over the serene view.`
 *   **Music Prompt:** `(85-90s) The solo piano plays its final, lingering notes, which fade out into silence as the title appears.`
 
 ---
