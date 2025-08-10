@@ -67,3 +67,33 @@ The music will be a 90-second piece that evolves through several stages:
 **Scene 13: Title (85-90s)**
 *   **Visual Prompt:** `masterpiece, anime key visual, cinematic. The camera pulls back to show the peaceful Tokyo cityscape again, as if nothing has happened. The title "Ghost Hacker" elegantly fades in over the center of the screen.`
 *   **Music Prompt:** `(85-90s) The solo piano plays its final, lingering notes, which fade out into silence as the title appears.`
+
+---
+
+## **Suno.ai用 音楽生成プロンプト (Suno.ai Music Generation Prompt)**
+
+`[Style: Cinematic Anime Opening, Ethereal Ambient, Glitch Hop, Psytrance, Emotional] [Instrumental]`
+
+`[Intro]`
+`(0-15s)`
+`Starts with a warm, atmospheric synth pad and a simple, reverberating piano melody. Peaceful and slightly melancholic. A soft, subtle electronic arp fades in. BPM 70.`
+
+`[Verse 1]`
+`(15-35s)`
+`A minimalist, clean electronic beat (soft kick, hi-hat) begins. A low, brooding synth bassline enters, creating a sense of tension and intellectual weight. The mood shifts to something more serious and ominous as a riser synth swells in the background.`
+
+`[Verse 2]`
+`(35-58s)`
+`The beat suddenly drops, becoming more aggressive and syncopated. Glitchy sound effects, digital stutters, and distorted synth textures create a feeling of order breaking down. A distorted, menacing synth lead plays a dark, looping melody. The drums become heavy and distorted. A filtered vocal chop sample stutters in time with the beat.`
+
+`[Bridge]`
+`(58-65s)`
+`The beat cuts out. A dramatic, reversed cymbal swells over the sound of a deep system boot-up, ending in a powerful sub-bass drop.`
+
+`[Chorus / Drop]`
+`(65-80s)`
+`Musical explosion. A powerful, euphoric trance/psytrance beat kicks in at 140 BPM. A soaring, emotional synth lead plays a cathartic melody over lush, wide pads. Layered, heavenly female vocal chops create an overwhelming wall of sound. A choir-like synth pad swells, adding a sense of spiritual release and awe.`
+
+`[Outro]`
+`(80-90s)`
+`Abrupt silence. Then, the simple, gentle piano melody from the beginning returns, played slowly and thoughtfully. The final, lingering notes fade out into silence.`
