@@ -1,0 +1,31 @@
+graph TD
+    subgraph Input Layer
+        A("GWAS Summary Statistics<br/>(e.g., sumstats.gz)")
+    end
+    subgraph Processing Layer
+        B("Standardize & Convert to Parquet")
+        C("Load into DuckDB")
+    end
+    subgraph Core Engine
+        D{{"DuckDB Instance<br/>(gwas.duckdb)"}}
+    end
+    subgraph Analysis & Output Layer
+        subgraph Interactive Analysis
+            E("SQL Queries")
+            F("Python/R Analysis<br/>(pandas, dplyr)")
+        end
+        subgraph Outputs
+            G("Tables & Results")
+            H("Figures & Plots")
+            I("Reports")
+        end
+    end
+    A --> B
+    B --> C
+    C --> D
+    D --"Fast SQL Queries"--> E
+    D --"Zero-Copy Integration"--> F
+    E --> G
+    F --> H
+    G & H --> I
+    style D fill:#f9f,stroke:#333,stroke-width:2px
