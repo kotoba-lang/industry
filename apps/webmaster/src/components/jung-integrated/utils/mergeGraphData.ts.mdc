@@ -1,0 +1,38 @@
+# mergeGraphData.ts Specification
+
+## Purpose
+The mergeGraphData module combines graph data from different assessment sources (word and voice) into a unified graph representation, enabling comprehensive visualization of psychological patterns from multiple test modalities.
+
+## Inputs
+- `graphData1`: First GraphData object (typically from word assessment)
+- `graphData2`: Second GraphData object (typically from voice assessment)
+
+## Outputs
+- Merged GraphData object containing combined nodes and links with proper handling of duplicates and special relationships
+
+## Requirements
+
+### Functional Requirements
+1. Merge node collections from both graph data sources
+2. Handle duplicate nodes intelligently (preserve unique IDs while combining attributes)
+3. Combine link collections with proper source/target relationships
+4. Preserve node metadata (colors, groups, etc.) during merging
+5. Add special connector links between related nodes from different data sources
+6. Apply weight factors to indicate source importance
+7. Handle empty or partial graph data gracefully
+
+### Non-Functional Requirements
+1. Performance: Efficient merging algorithm with O(n+m) complexity
+2. Robustness: Handle edge cases such as empty inputs or mismatched node references
+3. Maintainability: Clear logic for node merging and link creation
+
+## Functions
+
+### mergeGraphData
+Main function that combines two graph data objects into a single unified representation.
+
+### findCommonWords
+Helper function to identify words that appear in both data sets.
+
+### createInterSourceLinks
+Helper function to create connections between related nodes from different sources. 
