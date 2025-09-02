@@ -17,7 +17,6 @@ Kotoba Platformは、ProseMirrorベースのリッチテキストエディター
 - **Graph Visualization**: Cytoscape.js
 - **Component System**: BitDev
 - **Styling**: Tailwind CSS (with Dark Mode support)
-- **Package Manager**: pnpm
 
 ## 機能
 
