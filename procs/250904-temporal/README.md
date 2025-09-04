@@ -2,103 +2,91 @@
 
 このディレクトリには、Temporal ワークフローエンジンのローカル開発環境が含まれています。
 
+## 現在のセットアップ状況
+
+### 実行中のサービス
+- **Temporal Server**: ポート 7233 (gRPC), 7243 (HTTP) で実行中
+- **SQLite データベース**: ファイルベースで永続化
+
+### セットアップ方法
+ローカルバイナリを使用してセットアップ済みです。
+
+## 起動方法
+
+### 1. Temporal Server の起動
+
+```bash
+# 環境変数を使用して設定ディレクトリを指定
+TEMPORAL_CONFIG_DIR=./config ./temporal-server start
+```
+
+### 2. Temporal Web UI の起動
+
+```bash
+# npx を使用して Web UI を起動
+npx temporalio/web --port 8080 --temporal-address localhost:7233
+```
+
+### 3. Temporal CLI の使用
+
+```bash
+# ワークフロー一覧表示
+./temporal workflow list
+
+# 名前空間作成
+./temporal operator namespace create default
+```
+
+## アクセス URL
+
+- **Temporal Web UI**: http://localhost:8080 (準備中)
+- **Temporal Server gRPC**: localhost:7233
+- **Temporal Server HTTP**: localhost:7243
+
+## プロセス管理
+
+### 実行中のプロセス確認
+```bash
+ps aux | grep temporal
+```
+
+### プロセス停止
+```bash
+# Temporal Server 停止
+pkill -f temporal-server
+
+# Web UI 停止
+pkill -f "temporalio/web"
+```
+
 ## 構成要素
 
-- **Temporal Server**: ワークフロー実行エンジン (ポート 7233, 7234)
-- **Temporal Web UI**: 管理・監視用の Web インターフェース (ポート 8080)
-- **PostgreSQL**: 永続化データベース (ポート 5432)
-- **Temporal Admin Tools**: CLI 管理ツール
-
-## セットアップ手順
-
-### 1. Docker がインストールされていることを確認
-
-```bash
-docker --version
-docker-compose --version
-```
-
-### 2. Temporal サービスを起動
-
-```bash
-# 現在のディレクトリに移動
-cd /Users/junkawasaki/jun784/root/procs/250904-temporal
-
-# サービスを起動（バックグラウンドで実行）
-docker-compose up -d
-
-# ログを確認する場合
-docker-compose logs -f
-```
-
-### 3. サービスの確認
-
-起動後、以下の URL でアクセスできます：
-
-- **Temporal Web UI**: http://localhost:8080
-- **Temporal Server gRPC**: localhost:7233
-- **Temporal Server HTTP**: localhost:7234
-
-### 4. Admin Tools の使用
-
-Temporal Admin Tools を使用して、名前空間の管理などを行うことができます：
-
-```bash
-# Admin Tools コンテナに入る
-docker-compose exec temporal-admin-tools bash
-
-# 名前空間の一覧表示
-temporal operator namespace list
-
-# 新しい名前空間を作成
-temporal operator namespace create test-namespace
-```
-
-## 一般的なコマンド
-
-```bash
-# サービスを停止
-docker-compose down
-
-# サービスを停止してデータを削除
-docker-compose down -v
-
-# サービスを再構築
-docker-compose up --build -d
-
-# ログを表示
-docker-compose logs temporal
-docker-compose logs temporal-web
-docker-compose logs postgres
-```
+- **Temporal Server**: ワークフロー実行エンジン
+- **Temporal CLI**: コマンドライン管理ツール
+- **Temporal Web UI**: 管理・監視用の Web インターフェース
+- **SQLite**: 永続化データベース
 
 ## トラブルシューティング
 
-### ポートが使用中の場合
-
-他のサービスがポートを使用している場合は、docker-compose.yml のポートマッピングを変更してください。
-
-### データベース接続エラー
-
-PostgreSQL が起動していない場合、Temporal Server が起動に失敗することがあります。以下のコマンドで確認してください：
-
+### Web UI が起動しない場合
 ```bash
-docker-compose ps
-docker-compose logs postgres
+# 別の方法で Web UI を起動
+npx @temporalio/web@latest --port 8080 --temporal-address localhost:7233
 ```
 
-### メモリ不足
+### ポートが使用中の場合
+docker-compose.yml または npx コマンドのポート番号を変更してください。
 
-Docker Desktop のメモリ割り当てを増やすことを検討してください（最低 4GB 推奨）。
+### データベースの問題
+SQLite ファイルが破損した場合、config ディレクトリ内のデータベースファイルを削除して再起動してください。
 
 ## バージョン情報
 
-- Temporal Server: 1.25.0
-- Temporal Web UI: 2.28.0
-- PostgreSQL: 13
+- Temporal Server: 1.28.1
+- Temporal CLI: 1.4.1
+- SQLite: 組み込み
 
 ## 追加情報
 
 - [Temporal 公式ドキュメント](https://docs.temporal.io/)
-- [Temporal Web UI ガイド](https://docs.temporal.io/web-ui)
 - [Temporal CLI リファレンス](https://docs.temporal.io/cli)
