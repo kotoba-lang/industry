@@ -1,0 +1,33 @@
+# Configuration file for Video Emotion Analysis Workflow
+
+# HumeAI API Configuration
+humeai:
+  api_key: "your_hume_api_key_here"
+  base_url: "https://api.hume.ai"
+  timeout_seconds: 300
+
+# Temporal Configuration
+temporal:
+  address: "localhost:7233"
+  namespace: "default"
+  task_queue: "video-analysis-queue"
+
+# Analysis Configuration
+analysis:
+  max_concurrent_videos: 5
+  retry_attempts: 3
+  retry_initial_interval: "10s"
+  retry_max_interval: "60s"
+
+# Storage Configuration
+storage:
+  results_dir: "data/{session_id}/analysis_results"
+  summary_filename: "batch_analysis_summary_{timestamp}.json"
+  individual_filename: "{video_filename}_emotions_{timestamp}.json"
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  file: "logs/app.log"
+  max_file_size: "10 MB"
+  retention: 5
