@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Kawa WASM Test</title>
+</head>
+<body>
+    <script type="module">
+        import init, * as wasm from '/pkg/kawa_wasm.js';
+
+        async function run() {
+            try {
+                await init();
+                window.wasm = wasm;
+                console.log('Wasm module loaded and initialized.');
+
+                // Add a flag to indicate that tests can start
+                document.body.setAttribute('data-wasm-loaded', 'true');
+            } catch (e) {
+                console.error('Failed to load or initialize Wasm module:', e);
+                document.body.innerHTML = `<p>Failed to load or initialize Wasm module: ${e.message}</p>`;
+            }
+        }
+
+        run();
+    </script>
+</body>
+</html> 

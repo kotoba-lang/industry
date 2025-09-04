@@ -1,0 +1,15 @@
+[workspace]
+
+[package]
+name = "kawadb-storage"
+version = "0.1.2"
+edition = "2021"
+authors = ["Kawasaki"]
+description = "High-performance storage engine for Kawa message broker (alias for kawa-storage)"
+license = "KawaDB Community License"
+repository = "https://github.com/jun784/kawadb.com"
+keywords = ["storage", "database", "performance", "messaging"]
+categories = ["database", "concurrency"]
+
+[dependencies]
+kawa-storage = { path = "../../kawa-storage", version = "0.1.1" } 

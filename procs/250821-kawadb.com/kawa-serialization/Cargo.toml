@@ -1,0 +1,40 @@
+[package]
+name = "kawa-serialization"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Core dependencies
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+bytes = { workspace = true }
+chrono = { version = "0.4", features = ["serde"] }
+base64 = "0.21"
+uuid = { version = "1.8", features = ["v4", "serde"] }
+
+# Optional serialization formats
+apache-avro = { version = "0.16", optional = true }
+prost = { version = "0.12", optional = true }
+prost-types = { version = "0.12", optional = true }
+
+[build-dependencies]
+prost-build = "0.12"
+
+[features]
+default = ["json"]
+json = []
+avro = ["apache-avro"]
+protobuf = ["prost", "prost-types"]
+graphson = []
+all = ["json", "avro", "protobuf", "graphson"]
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.8"
+serde_json = { workspace = true }
+tracing-subscriber = "0.3" 

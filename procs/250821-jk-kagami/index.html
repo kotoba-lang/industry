@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kagami Editor - Demo</title>
+  <link rel="stylesheet" href="src/theme/theme.css">
+  <link rel="stylesheet" href="src/spreadsheet/spreadsheet.css">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      color: var(--kagami-text-primary);
+      border-bottom: 3px solid var(--kagami-accent-primary);
+      padding-bottom: 10px;
+      margin-bottom: 30px;
+    }
+    
+    .demo-section {
+      margin: 30px 0;
+      padding: 20px;
+      background: var(--kagami-bg-secondary);
+      border-radius: 8px;
+      border: 1px solid var(--kagami-border-primary);
+    }
+    
+    .demo-section h2 {
+      color: var(--kagami-text-primary);
+      margin-top: 0;
+    }
+    
+    .controls {
+      margin: 15px 0;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    
+    .controls button {
+      padding: 8px 16px;
+      background: var(--kagami-accent-primary);
+      color: var(--kagami-text-inverse);
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.2s;
+    }
+    
+    .controls button:hover {
+      background: var(--kagami-accent-primary-hover);
+    }
+    
+    .controls button:disabled {
+      background: var(--kagami-text-muted);
+      cursor: not-allowed;
+    }
+    
+    .controls input[type="text"], .controls input[type="file"] {
+      padding: 8px 12px;
+      border: 1px solid var(--kagami-border-primary);
+      border-radius: 4px;
+      background: var(--kagami-bg-primary);
+      color: var(--kagami-text-primary);
+    }
+    
+    .editor-container {
+      margin: 20px 0;
+      border: 1px solid var(--kagami-border-primary);
+      border-radius: 8px;
+      background: var(--kagami-bg-primary);
+      min-height: 200px;
+      padding: 20px;
+    }
+    
+    .status {
+      margin: 15px 0;
+      padding: 10px 15px;
+      background: var(--kagami-bg-info);
+      color: var(--kagami-text-info);
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    
+    .logs {
+      max-height: 300px;
+      overflow-y: auto;
+      background: var(--kagami-bg-tertiary);
+      border: 1px solid var(--kagami-border-primary);
+      border-radius: 4px;
+      padding: 10px;
+    }
+    
+    .log-entry {
+      margin: 5px 0;
+      padding: 5px 10px;
+      border-radius: 3px;
+      font-size: 13px;
+      font-family: monospace;
+    }
+    
+    .log-info {
+      background: var(--kagami-bg-info);
+      color: var(--kagami-text-info);
+    }
+    
+    .log-state {
+      background: var(--kagami-bg-success);
+      color: var(--kagami-text-success);
+    }
+    
+    .log-event {
+      background: var(--kagami-bg-warning);
+      color: var(--kagami-text-warning);
+    }
+    
+    .log-error {
+      background: var(--kagami-bg-error);
+      color: var(--kagami-text-error);
+    }
+    
+    .spreadsheet-demo {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    
+    .cell-input {
+      display: flex;
+      gap: 10px;
+      margin: 10px 0;
+    }
+    
+    .cell-input input {
+      flex: 1;
+    }
+    
+    .cell-display {
+      background: var(--kagami-bg-primary);
+      border: 1px solid var(--kagami-border-primary);
+      border-radius: 4px;
+      padding: 10px;
+      min-height: 120px;
+    }
+    
+    .cell-display table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    .cell-display th, .cell-display td {
+      border: 1px solid var(--kagami-border-primary);
+      padding: 8px;
+      text-align: center;
+    }
+    
+    .cell-display th {
+      background: var(--kagami-bg-secondary);
+      color: var(--kagami-text-tertiary);
+    }
+    
+    .footer {
+      margin-top: 50px;
+      padding-top: 20px;
+      border-top: 1px solid var(--kagami-border-primary);
+      text-align: center;
+      color: var(--kagami-text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <!-- テーマトグルボタン -->
+  <button id="theme-toggle" class="kagami-theme-toggle" aria-label="テーマを切り替える">
+    <div class="theme-icon">
+      <svg class="theme-icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="5" />
+        <line x1="12" y1="1" x2="12" y2="3" />
+        <line x1="12" y1="21" x2="12" y2="23" />
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+        <line x1="1" y1="12" x2="3" y2="12" />
+        <line x1="21" y1="12" x2="23" y2="12" />
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+      </svg>
+      <svg class="theme-icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+      </svg>
+    </div>
+  </button>
+
+  <div class="container">
+    <h1>🪞 Kagami Editor Demo</h1>
+    
+    <div class="demo-section">
+      <h2>リッチテキストエディタ (ProseMirror)</h2>
+      <div class="controls">
+        <button id="set-content">サンプルコンテンツを設定</button>
+        <button id="get-content">コンテンツを取得</button>
+        <button id="insert-text">テキストを挿入</button>
+        <button id="focus-editor">フォーカス</button>
+      </div>
+      
+      <div class="controls">
+        <button id="format-bold">太字</button>
+        <button id="format-italic">斜体</button>
+        <button id="format-code">コード</button>
+        <button id="heading-1">見出し1</button>
+        <button id="heading-2">見出し2</button>
+        <button id="heading-3">見出し3</button>
+      </div>
+      
+      <div id="editor-container" class="editor-container"></div>
+    </div>
+
+    <div class="demo-section">
+      <h2>表計算機能</h2>
+      <div class="spreadsheet-demo">
+        <div>
+          <h3>セル操作</h3>
+          <div class="cell-input">
+            <input type="text" id="cell-addr" placeholder="A1" value="A1">
+            <input type="text" id="cell-value" placeholder="値または数式">
+            <button id="set-cell">設定</button>
+          </div>
+          <div class="cell-input">
+            <input type="text" id="get-cell-addr" placeholder="A1" value="A1">
+            <button id="get-cell">取得</button>
+          </div>
+        </div>
+        <div>
+          <h3>セル表示</h3>
+          <div id="cell-display" class="cell-display">
+            セルの値がここに表示されます
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="demo-section">
+      <h2>📊 Excel インポート機能</h2>
+      <div class="controls">
+        <input type="file" id="excel-file" accept=".xlsx,.xls">
+        <button id="import-excel">Excelファイルをインポート</button>
+      </div>
+      <div class="controls">
+        <label>
+          <input type="checkbox" id="has-header" checked>
+          最初の行をヘッダーとして扱う
+        </label>
+        <label>
+          最大行数: 
+          <input type="number" id="max-rows" value="1000" min="1" max="10000">
+        </label>
+        <label>
+          最大列数: 
+          <input type="number" id="max-cols" value="100" min="1" max="1000">
+        </label>
+      </div>
+      <div id="excel-status" class="status" style="display: none;"></div>
+    </div>
+
+    <div class="demo-section">
+      <h2>状態監視</h2>
+      <div class="controls">
+        <button id="get-state">現在の状態を取得</button>
+        <button id="clear-logs">ログをクリア</button>
+      </div>
+      <div id="logs" class="logs">
+        <div class="log-entry log-info">[初期化] Kagami Editor Demo へようこそ</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>Kagami Editor - ProseMirror + Event Sourcing + Spreadsheet</p>
+      <p>右上のボタンでダークモード/ライトモードを切り替えできます</p>
+    </div>
+  </div>
+
+  <script type="module">
+    import { createDevKagamiEditor, getThemeManager } from './src/index.js'
+    
+    // テーマ管理の初期化
+    const themeManager = getThemeManager()
+    
+    // テーマトグルボタンの設定
+    const themeToggle = document.getElementById('theme-toggle')
+    themeToggle.addEventListener('click', () => {
+      themeManager.toggleTheme()
+    })
+    
+    // テーマ変更の監視
+    themeManager.addThemeChangeListener((event) => {
+      console.log('テーマが変更されました:', event.theme)
+    })
+    
+    // Kagami Editor の初期化
+    const editorContainer = document.getElementById('editor-container')
+    const kagamiEditor = createDevKagamiEditor(editorContainer, `
+      <h1>Kagami Editor へようこそ！</h1>
+      <p>このエディタは<strong>ProseMirror</strong> + イベントソーシング + 表計算機能を統合したリッチテキストエディタです。</p>
+      
+      <h2>主な機能</h2>
+      <ul>
+        <li><strong>リッチテキスト編集</strong>: 太字、斜体、見出しなど</li>
+        <li><em>構造化文書</em>: スキーマベースの文書モデル</li>
+        <li><code>イベントソーシング</code>: 全ての変更をイベントとして記録</li>
+        <li>表計算機能: HyperFormulaによる計算エンジン</li>
+      </ul>
+      
+      <h3>使い方</h3>
+      <p>上部のボタンを使って、テキストの装飾や見出しの設定ができます。</p>
+      <p>表計算機能も試してみてください！A1セルに数値を入力し、B1セルに =A1*2 と入力してみましょう。</p>
+    `)
+    
+    // ログ関数
+    const logs = document.getElementById('logs')
+    function addLog(message, type = 'info') {
+      const timestamp = new Date().toLocaleTimeString()
+      const logEntry = document.createElement('div')
+      logEntry.className = `log-entry log-${type}`
+      logEntry.textContent = `[${timestamp}] ${message}`
+      logs.appendChild(logEntry)
+      logs.scrollTop = logs.scrollHeight
+      console.log(`[Kagami] ${message}`)
+    }
+    
+    // 表計算のデモデータを設定
+    try {
+      kagamiEditor.setCellValue(0, 0, 100)  // A1 = 100
+      kagamiEditor.setCellValue(0, 1, 200)  // B1 = 200
+      kagamiEditor.setCellValue(0, 2, '=A1+B1')  // C1 = A1+B1
+      kagamiEditor.setCellValue(1, 0, '=A1*2')   // A2 = A1*2
+      
+      addLog('デモデータを設定しました', 'info')
+    } catch (error) {
+      addLog(`デモデータ設定エラー: ${error.message}`, 'error')
+    }
+    
+    // セル表示の更新
+    function updateCellDisplay() {
+      const cellDisplay = document.getElementById('cell-display')
+      
+      try {
+        let html = '<h4>セル値:</h4>'
+        html += '<table>'
+        html += '<tr><th></th><th>A</th><th>B</th><th>C</th></tr>'
+        
+        for (let row = 0; row < 3; row++) {
+          html += `<tr><th>${row + 1}</th>`
+          for (let col = 0; col < 3; col++) {
+            try {
+              const value = kagamiEditor.getCellValue(row, col)
+              html += `<td>${value?.value || ''}</td>`
+            } catch (e) {
+              html += '<td></td>'
+            }
+          }
+          html += '</tr>'
+        }
+        
+        html += '</table>'
+        cellDisplay.innerHTML = html
+      } catch (error) {
+        cellDisplay.innerHTML = `エラー: ${error.message}`
+      }
+    }
+    
+    // 初期表示
+    updateCellDisplay()
+    
+    // イベントリスナー
+    document.getElementById('set-content').addEventListener('click', () => {
+      const content = `<h1>サンプルドキュメント</h1>
+        <p>これは<strong>ProseMirror</strong>で作成された<em>リッチテキスト</em>ドキュメントです。</p>
+        
+        <h2>機能紹介</h2>
+        <ul>
+          <li><strong>太字テキスト</strong></li>
+          <li><em>イタリックテキスト</em></li>
+          <li><code>インラインコード</code></li>
+        </ul>
+        
+        <h3>使い方</h3>
+        <p>テキストを選択してから、上部のフォーマットボタンを使用してください。</p>
+        <p>見出しボタンを使って、段落を見出しに変換することもできます。</p>`
+      
+      kagamiEditor.setHTML(content)
+      addLog('サンプルコンテンツを設定しました', 'info')
+    })
+    
+    document.getElementById('get-content').addEventListener('click', () => {
+      const content = kagamiEditor.getContent()
+      addLog(`コンテンツを取得: ${content.length}文字`, 'info')
+      alert(`コンテンツ:\n${content.substring(0, 200)}${content.length > 200 ? '...' : ''}`)
+    })
+    
+    document.getElementById('insert-text').addEventListener('click', () => {
+      const text = prompt('挿入するテキストを入力してください:', '\n// 挿入されたテキスト\nconsole.log("Hello!");')
+      if (text !== null) {
+        kagamiEditor.insertText(text)
+        addLog(`テキストを挿入しました: "${text.substring(0, 20)}..."`, 'info')
+      }
+    })
+    
+    document.getElementById('focus-editor').addEventListener('click', () => {
+      kagamiEditor.focus()
+      addLog('エディタにフォーカスしました', 'info')
+    })
+    
+    // フォーマット機能
+    document.getElementById('format-bold').addEventListener('click', () => {
+      kagamiEditor.applyFormat('bold')
+      addLog('太字フォーマットを適用しました', 'info')
+    })
+    
+    document.getElementById('format-italic').addEventListener('click', () => {
+      kagamiEditor.applyFormat('italic')
+      addLog('斜体フォーマットを適用しました', 'info')
+    })
+    
+    document.getElementById('format-code').addEventListener('click', () => {
+      kagamiEditor.applyFormat('code')
+      addLog('コードフォーマットを適用しました', 'info')
+    })
+    
+    document.getElementById('heading-1').addEventListener('click', () => {
+      kagamiEditor.setHeading(1)
+      addLog('見出し1を設定しました', 'info')
+    })
+    
+    document.getElementById('heading-2').addEventListener('click', () => {
+      kagamiEditor.setHeading(2)
+      addLog('見出し2を設定しました', 'info')
+    })
+    
+    document.getElementById('heading-3').addEventListener('click', () => {
+      kagamiEditor.setHeading(3)
+      addLog('見出し3を設定しました', 'info')
+    })
+    
+    // セル操作
+    document.getElementById('set-cell').addEventListener('click', () => {
+      const addr = document.getElementById('cell-addr').value
+      const value = document.getElementById('cell-value').value
+      
+      if (!value) {
+        alert('値を入力してください')
+        return
+      }
+      
+      try {
+        const match = addr.match(/^([A-Z]+)(\d+)$/)
+        if (!match) {
+          throw new Error('無効なセルアドレス')
+        }
+        
+        const col = match[1].charCodeAt(0) - 65
+        const row = parseInt(match[2]) - 1
+        
+        kagamiEditor.setCellValue(row, col, value)
+        addLog(`セル ${addr} に値を設定: ${value}`, 'info')
+        
+        document.getElementById('cell-value').value = ''
+        updateCellDisplay()
+      } catch (error) {
+        addLog(`セル設定エラー: ${error.message}`, 'error')
+        alert(`エラー: ${error.message}`)
+      }
+    })
+    
+    document.getElementById('get-cell').addEventListener('click', () => {
+      const addr = document.getElementById('get-cell-addr').value
+      
+      try {
+        const match = addr.match(/^([A-Z]+)(\d+)$/)
+        if (!match) {
+          throw new Error('無効なセルアドレス')
+        }
+        
+        const col = match[1].charCodeAt(0) - 65
+        const row = parseInt(match[2]) - 1
+        
+        const cellValue = kagamiEditor.getCellValue(row, col)
+        addLog(`セル ${addr} の値: ${JSON.stringify(cellValue)}`, 'info')
+        alert(`セル ${addr}:\n値: ${cellValue.value}\n型: ${cellValue.type}${cellValue.formula ? `\n数式: ${cellValue.formula}` : ''}`)
+      } catch (error) {
+        addLog(`セル取得エラー: ${error.message}`, 'error')
+        alert(`エラー: ${error.message}`)
+      }
+    })
+    
+    // Excel インポート
+    document.getElementById('import-excel').addEventListener('click', async () => {
+      const fileInput = document.getElementById('excel-file')
+      const file = fileInput.files[0]
+      
+      if (!file) {
+        alert('まずExcelファイルを選択してください')
+        return
+      }
+      
+      try {
+        const statusDiv = document.getElementById('excel-status')
+        statusDiv.style.display = 'block'
+        statusDiv.textContent = 'Excelファイルを読み込んでいます...'
+        
+        const hasHeader = document.getElementById('has-header').checked
+        const maxRows = parseInt(document.getElementById('max-rows').value)
+        const maxCols = parseInt(document.getElementById('max-cols').value)
+        
+        const options = { hasHeader, maxRows, maxColumns: maxCols }
+        
+        addLog(`Excelファイルをインポート中: ${file.name}`, 'info')
+        
+        const result = await kagamiEditor.importExcelFile(file, options)
+        
+        addLog(`インポート完了: ${result.tables.length}個の表を作成`, 'info')
+        
+        statusDiv.innerHTML = `
+          <h4>インポート結果</h4>
+          <p><strong>作成された表:</strong> ${result.tables.length}個</p>
+          <p><strong>作成されたシート:</strong> ${result.sheets.length}個</p>
+          <div style="margin-top: 10px;">
+            <h5>表の詳細:</h5>
+            ${result.tables.map(table => `
+              <div style="margin: 5px 0; padding: 5px; border-left: 3px solid var(--kagami-accent-primary);">
+                <strong>${table.name}</strong> (${table.rows}行 × ${table.cols}列)
+              </div>
+            `).join('')}
+          </div>
+        `
+        
+        updateCellDisplay()
+        
+      } catch (error) {
+        addLog(`Excelインポートエラー: ${error.message}`, 'error')
+        document.getElementById('excel-status').textContent = `エラー: ${error.message}`
+        setTimeout(() => {
+          document.getElementById('excel-status').style.display = 'none'
+        }, 3000)
+      }
+    })
+    
+    // その他の機能
+    document.getElementById('get-state').addEventListener('click', () => {
+      const state = kagamiEditor.getState()
+      addLog('現在の状態を取得しました', 'state')
+      console.log('Kagami Editor State:', state)
+    })
+    
+    document.getElementById('clear-logs').addEventListener('click', () => {
+      logs.innerHTML = ''
+      addLog('ログをクリアしました', 'info')
+    })
+    
+    // 状態監視
+    try {
+      if (kagamiEditor.editorState$) {
+        kagamiEditor.editorState$.subscribe(state => {
+          addLog(`エディタ状態変更: 文字数 ${state.content?.length || 0}`, 'state')
+        })
+      }
+      
+      if (kagamiEditor.spreadsheetState$) {
+        kagamiEditor.spreadsheetState$.subscribe(state => {
+          addLog(`表計算状態変更: セル数 ${Object.keys(state.cells || {}).length}`, 'state')
+          updateCellDisplay()
+        })
+      }
+      
+      if (kagamiEditor.events$) {
+        kagamiEditor.events$.subscribe(event => {
+          addLog(`イベント: ${event.type} (ID: ${event.id?.substring(0, 8) || 'unknown'}...)`, 'event')
+        })
+      }
+      
+      addLog('Kagami Editor の初期化が完了しました', 'info')
+    } catch (error) {
+      addLog(`状態監視設定エラー: ${error.message}`, 'error')
+    }
+  </script>
+</body>
+</html> 
