@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KawaDB ORM - Web Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #007acc;
+            padding-bottom: 10px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #005a9e;
+        }
+        .output {
+            background: #f8f8f8;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 KawaDB ORM - Web Example</h1>
+        
+        <div class="section">
+            <h2>📊 データベース接続</h2>
+            <button id="connect-btn">接続</button>
+            <button id="disconnect-btn" disabled>切断</button>
+            <div id="connection-status" class="output">未接続</div>
+        </div>
+
+        <div class="section">
+            <h2>👤 ユーザー管理</h2>
+            <h3>新しいユーザーを追加</h3>
+            <input type="text" id="user-name" placeholder="名前">
+            <input type="email" id="user-email" placeholder="メールアドレス">
+            <input type="number" id="user-age" placeholder="年齢">
+            <button id="add-user-btn">ユーザー追加</button>
+            
+            <h3>ユーザー一覧</h3>
+            <button id="list-users-btn">ユーザー一覧取得</button>
+            <div id="users-output" class="output"></div>
+        </div>
+
+        <div class="section">
+            <h2>📈 KSQL ストリーミング</h2>
+            <h3>イベントを追加</h3>
+            <input type="text" id="event-topic" placeholder="トピック" value="user_events">
+            <textarea id="event-data" placeholder='{"user_id": "user123", "action": "login"}'>{"user_id": "user123", "action": "login"}</textarea>
+            <button id="add-event-btn">イベント追加</button>
+            
+            <h3>KSQL クエリ実行</h3>
+            <textarea id="ksql-query" placeholder="KSQL クエリを入力">SHOW STREAMS</textarea>
+            <button id="execute-ksql-btn">KSQL実行</button>
+            <div id="ksql-output" class="output"></div>
+        </div>
+
+        <div class="section">
+            <h2>📊 統計情報</h2>
+            <button id="stats-btn">統計取得</button>
+            <div id="stats-output" class="output"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // KawaDB ORM をインポート（実際のアプリでは npm install kawadb-orm を使用）
+        // import { KawaORM, Entity, Column, Table } from 'kawadb-orm';
+        
+        // デモ用のモック実装
+        class KawaORM {
+            constructor(config) {
+                this.config = config;
+                this.connected = false;
+                this.users = [];
+                this.events = [];
+            }
+            
+            async connect() {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                this.connected = true;
+                return this;
+            }
+            
+            async disconnect() {
+                this.connected = false;
+            }
+            
+            isConnected() {
+                return this.connected;
+            }
+            
+            getRepository(entity) {
+                return {
+                    save: async (user) => {
+                        user.id = Date.now();
+                        user.createdAt = new Date();
+                        this.users.push(user);
+                        return user;
+                    },
+                    find: async () => {
+                        return [...this.users];
+                    }
+                };
+            }
+            
+            getKsqlEngine() {
+                return {
+                    addStreamingData: async (topic, data) => {
+                        this.events.push({ topic, data, timestamp: new Date() });
+                    },
+                    executeKsql: async (ksql) => {
+                        if (ksql.toLowerCase().includes('show streams')) {
+                            return { success: true, data: [{ streams: ['user_events', 'purchases'] }] };
+                        }
+                        return { success: true, data: [{ message: 'Query executed' }] };
+                    }
+                };
+            }
+            
+            async getStats() {
+                return {
+                    totalUsers: this.users.length,
+                    totalEvents: this.events.length,
+                    memoryUsage: Math.floor(Math.random() * 1000000),
+                    uptime: Date.now() - 1000000
+                };
+            }
+        }
+        
+        class User {
+            constructor(name, email, age) {
+                this.name = name;
+                this.email = email;
+                this.age = age;
+            }
+        }
+
+        // アプリケーション初期化
+        let orm = null;
+        let userRepo = null;
+        let ksqlEngine = null;
+
+        // DOM要素
+        const connectBtn = document.getElementById('connect-btn');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        const connectionStatus = document.getElementById('connection-status');
+        const addUserBtn = document.getElementById('add-user-btn');
+        const listUsersBtn = document.getElementById('list-users-btn');
+        const usersOutput = document.getElementById('users-output');
+        const addEventBtn = document.getElementById('add-event-btn');
+        const executeKsqlBtn = document.getElementById('execute-ksql-btn');
+        const ksqlOutput = document.getElementById('ksql-output');
+        const statsBtn = document.getElementById('stats-btn');
+        const statsOutput = document.getElementById('stats-output');
+
+        // イベントリスナー
+        connectBtn.addEventListener('click', async () => {
+            try {
+                connectionStatus.innerHTML = '<span style="color: orange;">接続中...</span>';
+                
+                orm = new KawaORM({
+                    storage: 'localStorage',
+                    enableKSQL: true,
+                    debugMode: true
+                });
+                
+                await orm.connect();
+                userRepo = orm.getRepository(User);
+                ksqlEngine = orm.getKsqlEngine();
+                
+                connectionStatus.innerHTML = '<span class="success">✅ 接続済み</span>';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                
+            } catch (error) {
+                connectionStatus.innerHTML = `<span class="error">❌ 接続エラー: ${error.message}</span>`;
+            }
+        });
+
+        disconnectBtn.addEventListener('click', async () => {
+            try {
+                await orm.disconnect();
+                connectionStatus.innerHTML = '❌ 切断しました';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                orm = null;
+                userRepo = null;
+                ksqlEngine = null;
+            } catch (error) {
+                connectionStatus.innerHTML = `<span class="error">切断エラー: ${error.message}</span>`;
+            }
+        });
+
+        addUserBtn.addEventListener('click', async () => {
+            if (!userRepo) {
+                alert('まずデータベースに接続してください');
+                return;
+            }
+            
+            try {
+                const name = document.getElementById('user-name').value;
+                const email = document.getElementById('user-email').value;
+                const age = parseInt(document.getElementById('user-age').value);
+                
+                if (!name || !email || !age) {
+                    alert('全ての項目を入力してください');
+                    return;
+                }
+                
+                const user = new User(name, email, age);
+                const savedUser = await userRepo.save(user);
+                
+                usersOutput.innerHTML = `<span class="success">✅ ユーザーを追加しました: ${JSON.stringify(savedUser, null, 2)}</span>`;
+                
+                // フォームをクリア
+                document.getElementById('user-name').value = '';
+                document.getElementById('user-email').value = '';
+                document.getElementById('user-age').value = '';
+                
+            } catch (error) {
+                usersOutput.innerHTML = `<span class="error">❌ エラー: ${error.message}</span>`;
+            }
+        });
+
+        listUsersBtn.addEventListener('click', async () => {
+            if (!userRepo) {
+                alert('まずデータベースに接続してください');
+                return;
+            }
+            
+            try {
+                const users = await userRepo.find();
+                usersOutput.innerHTML = `<pre>${JSON.stringify(users, null, 2)}</pre>`;
+            } catch (error) {
+                usersOutput.innerHTML = `<span class="error">❌ エラー: ${error.message}</span>`;
+            }
+        });
+
+        addEventBtn.addEventListener('click', async () => {
+            if (!ksqlEngine) {
+                alert('まずデータベースに接続してください');
+                return;
+            }
+            
+            try {
+                const topic = document.getElementById('event-topic').value;
+                const data = JSON.parse(document.getElementById('event-data').value);
+                
+                await ksqlEngine.addStreamingData(topic, data);
+                ksqlOutput.innerHTML = `<span class="success">✅ イベントを追加しました: ${topic}</span>`;
+                
+            } catch (error) {
+                ksqlOutput.innerHTML = `<span class="error">❌ エラー: ${error.message}</span>`;
+            }
+        });
+
+        executeKsqlBtn.addEventListener('click', async () => {
+            if (!ksqlEngine) {
+                alert('まずデータベースに接続してください');
+                return;
+            }
+            
+            try {
+                const ksql = document.getElementById('ksql-query').value;
+                const result = await ksqlEngine.executeKsql(ksql);
+                
+                ksqlOutput.innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+                
+            } catch (error) {
+                ksqlOutput.innerHTML = `<span class="error">❌ エラー: ${error.message}</span>`;
+            }
+        });
+
+        statsBtn.addEventListener('click', async () => {
+            if (!orm) {
+                alert('まずデータベースに接続してください');
+                return;
+            }
+            
+            try {
+                const stats = await orm.getStats();
+                statsOutput.innerHTML = `<pre>${JSON.stringify(stats, null, 2)}</pre>`;
+            } catch (error) {
+                statsOutput.innerHTML = `<span class="error">❌ エラー: ${error.message}</span>`;
+            }
+        });
+
+        // 初期メッセージ
+        connectionStatus.innerHTML = '💡 「接続」ボタンをクリックしてKawaDBに接続してください';
+    </script>
+</body>
+</html> 

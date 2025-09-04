@@ -1,0 +1,21 @@
+[workspace]
+
+[package]
+name = "kawadb-cli"
+version = "0.1.0"
+edition = "2021"
+authors = ["Kawasaki"]
+description = "Command-line interface for Kawa message broker (alias for kawa-cli)"
+license = "KawaDB Community License"
+repository = "https://github.com/jun784/kawadb.com"
+keywords = ["cli", "kafka", "messaging", "broker"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "kawadb"
+path = "src/main.rs"
+
+[dependencies]
+kawa-cli = { path = "../../kawa-cli", version = "0.1.0" }
+anyhow = "1.0"
+tokio = { version = "1", features = ["full"] } 

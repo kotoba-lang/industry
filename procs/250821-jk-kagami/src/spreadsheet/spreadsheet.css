@@ -1,0 +1,453 @@
+/* Kagami Spreadsheet UI Styles */
+
+.kagami-spreadsheet-table {
+  margin: 20px 0;
+  border-radius: 8px;
+  box-shadow: var(--kagami-shadow-md);
+  background: var(--kagami-bg-primary);
+  overflow: hidden;
+}
+
+.kagami-table-header {
+  background: var(--kagami-gradient-primary);
+  color: var(--kagami-text-inverse);
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.kagami-table-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.kagami-table-info {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.kagami-spreadsheet-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 14px;
+}
+
+/* ヘッダー行・列 */
+.kagami-spreadsheet-grid thead th {
+  background: var(--kagami-bg-secondary);
+  border: 1px solid var(--kagami-border-primary);
+  padding: 8px 12px;
+  text-align: center;
+  font-weight: 600;
+  color: var(--kagami-text-tertiary);
+  font-size: 12px;
+}
+
+.kagami-cell-corner {
+  background: var(--kagami-bg-tertiary) !important;
+  width: 40px;
+  min-width: 40px;
+  max-width: 40px;
+}
+
+.kagami-column-header {
+  min-width: 80px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.kagami-row-header {
+  background: var(--kagami-bg-secondary) !important;
+  border: 1px solid var(--kagami-border-primary) !important;
+  padding: 8px 12px !important;
+  text-align: center !important;
+  font-weight: 600 !important;
+  color: var(--kagami-text-tertiary) !important;
+  font-size: 12px !important;
+  width: 40px;
+  min-width: 40px;
+  max-width: 40px;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+/* セルスタイル */
+.kagami-cell {
+  border: 1px solid var(--kagami-border-primary);
+  padding: 0;
+  position: relative;
+  min-width: 80px;
+  max-width: 200px;
+  height: 32px;
+  transition: all 0.2s ease;
+}
+
+.kagami-cell:hover {
+  background-color: var(--kagami-bg-hover);
+}
+
+.kagami-cell-selected {
+  background-color: var(--kagami-bg-selected) !important;
+  border-color: var(--kagami-border-focus) !important;
+  box-shadow: inset 0 0 0 2px var(--kagami-border-focus);
+}
+
+.kagami-cell-content {
+  width: 100%;
+  height: 100%;
+  padding: 8px 12px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  color: var(--kagami-text-primary);
+}
+
+.kagami-cell-content:focus {
+  background: var(--kagami-bg-primary);
+  box-shadow: inset 0 0 0 2px var(--kagami-border-focus);
+  border-radius: 2px;
+  white-space: pre-wrap;
+  overflow: visible;
+  text-overflow: initial;
+}
+
+/* セル型別スタイル */
+.kagami-cell-number .kagami-cell-content {
+  text-align: right;
+  color: var(--kagami-number-color);
+  font-weight: 500;
+}
+
+.kagami-cell-string .kagami-cell-content {
+  text-align: left;
+  color: var(--kagami-string-color);
+}
+
+.kagami-cell-boolean .kagami-cell-content {
+  text-align: center;
+  color: var(--kagami-boolean-color);
+  font-weight: 600;
+}
+
+.kagami-cell-date .kagami-cell-content {
+  text-align: center;
+  color: var(--kagami-date-color);
+}
+
+.kagami-cell-error .kagami-cell-content {
+  text-align: center;
+  color: var(--kagami-text-error);
+  font-weight: 600;
+  background-color: var(--kagami-bg-error);
+}
+
+.kagami-cell-empty .kagami-cell-content {
+  color: var(--kagami-text-muted);
+}
+
+/* 数式セル */
+.kagami-cell-formula {
+  background: var(--kagami-formula-bg);
+  position: relative;
+}
+
+.kagami-cell-formula::before {
+  content: 'ƒ';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  font-size: 10px;
+  color: var(--kagami-formula-color);
+  font-weight: bold;
+  z-index: 1;
+}
+
+.kagami-cell-formula .kagami-cell-content {
+  color: var(--kagami-formula-color);
+  font-weight: 500;
+}
+
+/* 計算済みセル */
+.kagami-cell-calculated {
+  border-left: 3px solid var(--kagami-accent-success);
+}
+
+.kagami-cell-calculated .kagami-cell-content {
+  font-weight: 600;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+  .kagami-spreadsheet-table {
+    margin: 10px 0;
+    box-shadow: var(--kagami-shadow-sm);
+  }
+  
+  .kagami-table-header {
+    padding: 12px 16px;
+  }
+  
+  .kagami-table-header h3 {
+    font-size: 16px;
+  }
+  
+  .kagami-spreadsheet-grid {
+    font-size: 12px;
+  }
+  
+  .kagami-cell {
+    min-width: 60px;
+    max-width: 150px;
+    height: 28px;
+  }
+  
+  .kagami-cell-content {
+    padding: 6px 8px;
+  }
+  
+  .kagami-column-header,
+  .kagami-row-header {
+    padding: 6px 8px !important;
+  }
+  
+  .kagami-cell-corner {
+    width: 30px !important;
+    min-width: 30px !important;
+    max-width: 30px !important;
+  }
+  
+  .kagami-row-header {
+    width: 30px !important;
+    min-width: 30px !important;
+    max-width: 30px !important;
+  }
+}
+
+/* アニメーション */
+@keyframes cellUpdate {
+  0% {
+    background-color: var(--kagami-bg-success);
+    transform: scale(1.05);
+  }
+  100% {
+    background-color: transparent;
+    transform: scale(1);
+  }
+}
+
+.kagami-cell-updated {
+  animation: cellUpdate 0.5s ease-out;
+}
+
+/* スクロールバーのスタイル */
+.kagami-spreadsheet-grid {
+  scrollbar-width: thin;
+  scrollbar-color: var(--kagami-scrollbar-thumb) var(--kagami-scrollbar-track);
+}
+
+.kagami-spreadsheet-grid::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.kagami-spreadsheet-grid::-webkit-scrollbar-track {
+  background: var(--kagami-scrollbar-track);
+}
+
+.kagami-spreadsheet-grid::-webkit-scrollbar-thumb {
+  background: var(--kagami-scrollbar-thumb);
+  border-radius: 4px;
+}
+
+.kagami-spreadsheet-grid::-webkit-scrollbar-thumb:hover {
+  background: var(--kagami-scrollbar-thumb-hover);
+}
+
+/* 選択範囲のスタイル */
+.kagami-cell-in-selection {
+  background-color: var(--kagami-bg-selected);
+  border-color: var(--kagami-border-focus);
+  opacity: 0.6;
+}
+
+/* フォーカス状態のスタイル */
+.kagami-cell-content:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--kagami-border-focus);
+  z-index: 10;
+  position: relative;
+}
+
+/* ツールチップ */
+.kagami-cell[data-tooltip] {
+  position: relative;
+}
+
+.kagami-cell[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--kagami-bg-tertiary);
+  color: var(--kagami-text-primary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 1000;
+  opacity: 0.95;
+  box-shadow: var(--kagami-shadow-md);
+  border: 1px solid var(--kagami-border-primary);
+}
+
+/* 印刷対応 */
+@media print {
+  .kagami-spreadsheet-table {
+    break-inside: avoid;
+    box-shadow: none;
+    border: 1px solid var(--kagami-border-primary);
+  }
+  
+  .kagami-table-header {
+    background: var(--kagami-bg-tertiary) !important;
+    color: var(--kagami-text-primary) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  .kagami-spreadsheet-grid {
+    font-size: 10px;
+  }
+  
+  .kagami-cell {
+    border: 1px solid var(--kagami-border-primary);
+  }
+  
+  .kagami-cell-content {
+    color: var(--kagami-text-primary) !important;
+  }
+  
+  .kagami-cell-formula {
+    background: var(--kagami-formula-bg) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* 高コントラスト対応 */
+@media (prefers-contrast: high) {
+  .kagami-cell {
+    border-width: 2px;
+  }
+  
+  .kagami-cell-selected {
+    box-shadow: inset 0 0 0 3px var(--kagami-border-focus);
+  }
+  
+  .kagami-cell-content:focus {
+    box-shadow: inset 0 0 0 3px var(--kagami-border-focus);
+  }
+}
+
+/* 縮小モーション設定の尊重 */
+@media (prefers-reduced-motion: reduce) {
+  .kagami-cell,
+  .kagami-cell-content,
+  .kagami-cell-updated {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* フォーカス表示の改善 */
+@media (prefers-reduced-motion: no-preference) {
+  .kagami-cell:focus-within {
+    transform: scale(1.02);
+    z-index: 5;
+  }
+}
+
+/* セルの状態インジケーター */
+.kagami-cell-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border: 2px solid var(--kagami-border-primary);
+  border-top: 2px solid var(--kagami-accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* エラー状態のセル */
+.kagami-cell-error {
+  position: relative;
+}
+
+.kagami-cell-error::before {
+  content: '⚠';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 10px;
+  color: var(--kagami-text-error);
+  z-index: 1;
+}
+
+/* 読み取り専用セル */
+.kagami-cell-readonly {
+  background-color: var(--kagami-bg-tertiary);
+  opacity: 0.7;
+}
+
+.kagami-cell-readonly .kagami-cell-content {
+  cursor: not-allowed;
+  user-select: none;
+}
+
+/* 検索ハイライト */
+.kagami-cell-search-highlight {
+  background-color: var(--kagami-bg-warning);
+  color: var(--kagami-text-warning);
+  font-weight: bold;
+}
+
+/* セルの編集状態 */
+.kagami-cell-editing {
+  z-index: 20;
+  position: relative;
+}
+
+.kagami-cell-editing .kagami-cell-content {
+  background: var(--kagami-bg-primary);
+  box-shadow: 0 0 0 2px var(--kagami-border-focus), var(--kagami-shadow-lg);
+  border-radius: 4px;
+  overflow: visible;
+  white-space: normal;
+  word-wrap: break-word;
+  resize: both;
+  min-height: 32px;
+  padding: 8px 12px;
+} 

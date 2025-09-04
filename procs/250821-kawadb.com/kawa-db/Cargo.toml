@@ -1,0 +1,53 @@
+[package]
+name = "kawa-db"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["tokio"]
+wasm = ["wasm-bindgen", "js-sys", "web-sys"]
+
+[dependencies]
+# Core async runtime (optional for WASM)
+tokio = { workspace = true, optional = true }
+
+# Core utilities
+anyhow.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+
+# SQL parsing and execution
+sqlparser.workspace = true
+datafusion.workspace = true
+arrow.workspace = true
+parquet.workspace = true
+
+# Storage integration
+kawa-storage = { path = "../kawa-storage" }
+
+# Serialization integration
+kawa-serialization = { path = "../kawa-serialization", features = ["all"] }
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# System info
+num_cpus = "1.0"
+
+# Async trait
+async-trait = "0.1"
+
+# WASM support (optional)
+wasm-bindgen = { workspace = true, optional = true }
+js-sys = { workspace = true, optional = true }
+web-sys = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.0"
+proptest.workspace = true 

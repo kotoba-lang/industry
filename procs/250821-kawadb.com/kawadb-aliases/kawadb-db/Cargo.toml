@@ -1,0 +1,15 @@
+[workspace]
+
+[package]
+name = "kawadb-db"
+version = "0.1.0"
+edition = "2021"
+authors = ["Kawasaki"]
+description = "Database engine for Kawa message broker (alias for kawa-db)"
+license = "KawaDB Community License"
+repository = "https://github.com/jun784/kawadb.com"
+keywords = ["database", "sql", "messaging", "storage"]
+categories = ["database"]
+
+[dependencies]
+kawa-db = { path = "../../kawa-db", version = "0.1.0" } 
