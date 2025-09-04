@@ -12,7 +12,7 @@ export default function SpiritInPhysicsVisualization() {
   const [analysisResult, setAnalysisResult] = useState<SpiritAnalysisResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'3d' | 'metrics' | 'timeseries' | 'math'>('3d');
+  const [activeTab, setActiveTab] = useState<'3d' | 'metrics' | 'timeseries' | 'math'>('math');
 
   useEffect(() => {
     async function loadData() {
@@ -60,6 +60,13 @@ export default function SpiritInPhysicsVisualization() {
 
     loadData();
   }, []);
+
+  // Switch to 3D tab when data is loaded
+  useEffect(() => {
+    if (analysisResult && activeTab === 'math') {
+      setActiveTab('3d');
+    }
+  }, [analysisResult, activeTab]);
 
   if (loading) {
     return (
@@ -110,7 +117,9 @@ export default function SpiritInPhysicsVisualization() {
             </div>
             <div className="text-right">
               <p className="text-sm text-gray-500">Participant</p>
-              <p className="font-mono text-gray-900">{analysisResult.metrics.participantId}</p>
+              <p className="font-mono text-gray-900">
+                {analysisResult?.metrics.participantId || 'Loading...'}
+              </p>
             </div>
           </div>
         </div>
@@ -121,17 +130,20 @@ export default function SpiritInPhysicsVisualization() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-8">
             {[
-              { id: '3d', label: '3D Visualization', icon: '🌌' },
-              { id: 'metrics', label: 'Spirit Metrics', icon: '📊' },
-              { id: 'timeseries', label: 'Time Series', icon: '📈' },
+              ...(analysisResult ? [{ id: '3d', label: '3D Visualization', icon: '🌌' }] : []),
+              ...(analysisResult ? [{ id: 'metrics', label: 'Spirit Metrics', icon: '📊' }] : []),
+              ...(analysisResult ? [{ id: 'timeseries', label: 'Time Series', icon: '📈' }] : []),
               { id: 'math', label: 'Kawasaki Model', icon: '⚛️' }
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
+                disabled={!analysisResult && tab.id !== 'math'}
                 className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm ${
                   activeTab === tab.id
                     ? 'border-blue-500 text-blue-600'
+                    : (!analysisResult && tab.id !== 'math')
+                    ? 'border-transparent text-gray-300 cursor-not-allowed'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
@@ -145,7 +157,7 @@ export default function SpiritInPhysicsVisualization() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === '3d' && (
+        {activeTab === '3d' && analysisResult && (
           <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-lg p-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">
@@ -156,7 +168,7 @@ export default function SpiritInPhysicsVisualization() {
                 Each point represents a word association with energy-based coloring and positioning.
               </p>
               <Spirit3DVisualization
-                vectors={analysisResult.kawasakiModelData.vectors}
+                vectors={analysisResult.kawasakiModelData?.vectors || []}
                 showLabels={true}
                 animate={true}
               />
@@ -164,7 +176,25 @@ export default function SpiritInPhysicsVisualization() {
           </div>
         )}
 
-        {activeTab === 'metrics' && (
+        {activeTab === '3d' && !analysisResult && !loading && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <div className="text-center py-12">
+                <div className="text-6xl mb-4">🌌</div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                  Spirit Data Loading...
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  We're analyzing the word association data to generate the 3D spirit visualization.
+                  This may take a moment as we process the session data.
+                </p>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'metrics' && analysisResult && (
           <div className="space-y-6">
             <SpiritMetrics
               metrics={analysisResult.metrics}
@@ -173,14 +203,46 @@ export default function SpiritInPhysicsVisualization() {
           </div>
         )}
 
-        {activeTab === 'timeseries' && (
+        {activeTab === 'metrics' && !analysisResult && !loading && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <div className="text-center py-12">
+                <div className="text-6xl mb-4">📊</div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                  Spirit Metrics Loading...
+                </h3>
+                <p className="text-gray-600">
+                  Analyzing participant metrics and consent data.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'timeseries' && analysisResult && (
           <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-lg">
               <SpiritTimeSeries
-                timeSeries={analysisResult.kawasakiModelData.timeSeries}
+                timeSeries={analysisResult.kawasakiModelData?.timeSeries || []}
                 width={800}
                 height={400}
               />
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'timeseries' && !analysisResult && !loading && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <div className="text-center py-12">
+                <div className="text-6xl mb-4">📈</div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                  Time Series Loading...
+                </h3>
+                <p className="text-gray-600">
+                  Generating energy and entropy time series from session data.
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -190,6 +252,7 @@ export default function SpiritInPhysicsVisualization() {
             <KawasakiModelMath />
           </div>
         )}
+
       </main>
 
       {/* Footer */}

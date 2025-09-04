@@ -4,11 +4,23 @@ import React from "react";
 import { SpiritMetrics, ConsentData } from "@/types/session";
 
 interface SpiritMetricsProps {
-  metrics: SpiritMetrics;
-  consent: ConsentData;
+  metrics?: SpiritMetrics;
+  consent?: ConsentData;
 }
 
 export default function SpiritMetrics({ metrics, consent }: SpiritMetricsProps) {
+  if (!metrics || !consent) {
+    return (
+      <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+        <div className="text-center">
+          <div className="text-4xl mb-4">📊</div>
+          <h3 className="text-lg font-semibold text-gray-700 mb-2">No Metrics Available</h3>
+          <p className="text-gray-500">Waiting for spirit analysis data...</p>
+        </div>
+      </div>
+    );
+  }
+
   const reactionTimeScore = metrics.averageReactionTime > 0
     ? Math.max(0, 100 - (metrics.averageReactionTime / 20)) // Lower reaction time = higher score
     : 0;

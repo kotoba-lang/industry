@@ -33,7 +33,10 @@ export function parseWordAssociations(
 
             if (recentDisplays.length > 0) {
                 const [, stimulus] = recentDisplays[0];
-                const reactionTime = Math.max(0, event.timestamp - stimulus.timestamp); // Ensure non-negative
+                const reactionTime = Math.max(
+                    0,
+                    event.timestamp - stimulus.timestamp,
+                ); // Ensure non-negative
 
                 associations.push({
                     stimulusWord: stimulus.word,
@@ -91,7 +94,9 @@ export function calculateSpiritMetrics(
  */
 export function generateKawasakiModelData(metrics: SpiritMetrics) {
     // Filter out associations without reaction time data
-    const validAssociations = metrics.wordAssociations.filter(assoc => assoc.reactionTimeMs !== undefined);
+    const validAssociations = metrics.wordAssociations.filter((assoc) =>
+        assoc.reactionTimeMs !== undefined
+    );
 
     if (validAssociations.length === 0) {
         // Return empty data if no valid associations
