@@ -2,14 +2,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "framework": "nextjs",
-  "functions": {
-    "src/pages/api/**/*.ts": {
-      "runtime": "@vercel/node"
-    }
-  },
-  "env": {
-    "BLOB_READ_WRITE_TOKEN": "@blob-spirit-physics-token"
-  },
   "regions": ["sin1"],
   "headers": [
     {

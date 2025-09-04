@@ -1,4 +1,4 @@
-import { WordResponse } from './types';
+import { WordResponse } from "./schema";
 
 // Extend the WordResponse interface with runtime-only properties
 export interface WordResponseWithExtras extends WordResponse {
@@ -10,4 +10,4 @@ export interface WordResponseWithExtras extends WordResponse {
  */
 export function withExtras(response: WordResponse): WordResponseWithExtras {
   return response as WordResponseWithExtras;
-} 
+}
