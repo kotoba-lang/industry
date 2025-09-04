@@ -9,7 +9,34 @@ import SpiritMetrics from "@/components/spirit-visualization/SpiritMetrics";
 import KawasakiModelMath from "@/components/spirit-visualization/KawasakiModelMath";
 
 export default function SpiritInPhysicsVisualization() {
-  const [analysisResult, setAnalysisResult] = useState<SpiritAnalysisResult | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<SpiritAnalysisResult | null>({
+    metrics: {
+      participantId: '',
+      totalResponses: 0,
+      averageReactionTime: 0,
+      delayedResponses: 0,
+      wordAssociations: [],
+      sessionStartTime: 0,
+      sessionEndTime: 0
+    },
+    emotions: [],
+    consent: {
+      participantId: '',
+      signature: '',
+      agreements: {
+        understand: false,
+        voluntary: false,
+        withdraw: false,
+        recording: false
+      },
+      agreedAt: ''
+    },
+    kawasakiModelData: {
+      energy: 0,
+      vectors: [],
+      timeSeries: []
+    }
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'3d' | 'metrics' | 'timeseries' | 'math'>('math');
@@ -49,6 +76,12 @@ export default function SpiritInPhysicsVisualization() {
 
         // Analyze the data
         const result = analyzeSessionData(sessionData, consentData);
+        console.log('Analysis result:', {
+          hasKawasakiModelData: !!result.kawasakiModelData,
+          vectorsCount: Array.isArray(result.kawasakiModelData?.vectors) ? result.kawasakiModelData.vectors.length : 'not array',
+          timeSeriesCount: Array.isArray(result.kawasakiModelData?.timeSeries) ? result.kawasakiModelData.timeSeries.length : 'not array',
+          metrics: result.metrics,
+        });
         setAnalysisResult(result);
       } catch (err) {
         console.error('Error loading data:', err);
@@ -63,7 +96,7 @@ export default function SpiritInPhysicsVisualization() {
 
   // Switch to 3D tab when data is loaded
   useEffect(() => {
-    if (analysisResult && activeTab === 'math') {
+    if (analysisResult?.kawasakiModelData && Array.isArray(analysisResult.kawasakiModelData.vectors) && activeTab === 'math') {
       setActiveTab('3d');
     }
   }, [analysisResult, activeTab]);
@@ -130,19 +163,26 @@ export default function SpiritInPhysicsVisualization() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-8">
             {[
-              ...(analysisResult ? [{ id: '3d', label: '3D Visualization', icon: '🌌' }] : []),
+              ...(analysisResult?.kawasakiModelData && Array.isArray(analysisResult.kawasakiModelData.vectors) ? [{ id: '3d', label: '3D Visualization', icon: '🌌' }] : []),
               ...(analysisResult ? [{ id: 'metrics', label: 'Spirit Metrics', icon: '📊' }] : []),
-              ...(analysisResult ? [{ id: 'timeseries', label: 'Time Series', icon: '📈' }] : []),
+              ...(analysisResult?.kawasakiModelData && Array.isArray(analysisResult.kawasakiModelData.timeSeries) ? [{ id: 'timeseries', label: 'Time Series', icon: '📈' }] : []),
               { id: 'math', label: 'Kawasaki Model', icon: '⚛️' }
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                disabled={!analysisResult && tab.id !== 'math'}
+                disabled={
+                  (tab.id === '3d') && (!analysisResult?.kawasakiModelData || !Array.isArray(analysisResult.kawasakiModelData.vectors)) ||
+                  (tab.id === 'metrics') && !analysisResult ||
+                  (tab.id === 'timeseries') && (!analysisResult?.kawasakiModelData || !Array.isArray(analysisResult.kawasakiModelData.timeSeries)) ||
+                  (tab.id === 'math') ? false : false
+                }
                 className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm ${
                   activeTab === tab.id
                     ? 'border-blue-500 text-blue-600'
-                    : (!analysisResult && tab.id !== 'math')
+                    : (tab.id === '3d') && (!analysisResult?.kawasakiModelData || !Array.isArray(analysisResult.kawasakiModelData.vectors)) ||
+                      (tab.id === 'metrics') && !analysisResult ||
+                      (tab.id === 'timeseries') && (!analysisResult?.kawasakiModelData || !Array.isArray(analysisResult.kawasakiModelData.timeSeries))
                     ? 'border-transparent text-gray-300 cursor-not-allowed'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
@@ -157,7 +197,7 @@ export default function SpiritInPhysicsVisualization() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === '3d' && analysisResult && (
+        {activeTab === '3d' && analysisResult?.kawasakiModelData && Array.isArray(analysisResult.kawasakiModelData.vectors) && (
           <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-lg p-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">
@@ -168,7 +208,7 @@ export default function SpiritInPhysicsVisualization() {
                 Each point represents a word association with energy-based coloring and positioning.
               </p>
               <Spirit3DVisualization
-                vectors={analysisResult.kawasakiModelData?.vectors || []}
+                vectors={analysisResult.kawasakiModelData.vectors}
                 showLabels={true}
                 animate={true}
               />
@@ -176,19 +216,21 @@ export default function SpiritInPhysicsVisualization() {
           </div>
         )}
 
-        {activeTab === '3d' && !analysisResult && !loading && (
+        {activeTab === '3d' && analysisResult && !analysisResult.kawasakiModelData && !loading && (
           <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-lg p-6">
               <div className="text-center py-12">
-                <div className="text-6xl mb-4">🌌</div>
+                <div className="text-6xl mb-4">⚠️</div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                  Spirit Data Loading...
+                  No Spirit Data Available
                 </h3>
                 <p className="text-gray-600 mb-6">
-                  We're analyzing the word association data to generate the 3D spirit visualization.
-                  This may take a moment as we process the session data.
+                  The session data was loaded successfully, but no valid word associations
+                  were found for 3D visualization. This might be due to missing reaction time data.
                 </p>
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="text-sm text-gray-500">
+                  Try checking the session data or contact support if this persists.
+                </p>
               </div>
             </div>
           </div>
@@ -203,46 +245,14 @@ export default function SpiritInPhysicsVisualization() {
           </div>
         )}
 
-        {activeTab === 'metrics' && !analysisResult && !loading && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <div className="text-center py-12">
-                <div className="text-6xl mb-4">📊</div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                  Spirit Metrics Loading...
-                </h3>
-                <p className="text-gray-600">
-                  Analyzing participant metrics and consent data.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'timeseries' && analysisResult && (
+        {activeTab === 'timeseries' && analysisResult?.kawasakiModelData && Array.isArray(analysisResult.kawasakiModelData.timeSeries) && (
           <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-lg">
               <SpiritTimeSeries
-                timeSeries={analysisResult.kawasakiModelData?.timeSeries || []}
+                timeSeries={analysisResult.kawasakiModelData.timeSeries}
                 width={800}
                 height={400}
               />
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'timeseries' && !analysisResult && !loading && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <div className="text-center py-12">
-                <div className="text-6xl mb-4">📈</div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                  Time Series Loading...
-                </h3>
-                <p className="text-gray-600">
-                  Generating energy and entropy time series from session data.
-                </p>
-              </div>
             </div>
           </div>
         )}

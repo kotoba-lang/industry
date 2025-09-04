@@ -140,10 +140,17 @@ export function generateKawasakiModelData(metrics: SpiritMetrics) {
         };
     });
 
+    // Ensure we return valid arrays
+    const validVectors = Array.isArray(vectors) ? vectors : [];
+    const validTimeSeries = Array.isArray(timeSeries) ? timeSeries : [];
+
     return {
-        energy: vectors.reduce((sum, v) => sum + v.energy, 0) / vectors.length,
-        vectors,
-        timeSeries,
+        energy: validVectors.length > 0
+            ? validVectors.reduce((sum, v) => sum + v.energy, 0) /
+                validVectors.length
+            : 0,
+        vectors: validVectors,
+        timeSeries: validTimeSeries,
     };
 }
 
@@ -158,10 +165,23 @@ export function analyzeSessionData(
     const metrics = calculateSpiritMetrics(sessionData, wordAssociations);
     const kawasakiModelData = generateKawasakiModelData(metrics);
 
+    // Ensure kawasakiModelData is properly structured
+    const safeKawasakiModelData = {
+        energy: typeof kawasakiModelData.energy === "number"
+            ? kawasakiModelData.energy
+            : 0,
+        vectors: Array.isArray(kawasakiModelData.vectors)
+            ? kawasakiModelData.vectors
+            : [],
+        timeSeries: Array.isArray(kawasakiModelData.timeSeries)
+            ? kawasakiModelData.timeSeries
+            : [],
+    };
+
     return {
         metrics,
         emotions: [], // Will be populated if emotion data is available
         consent: consentData,
-        kawasakiModelData,
+        kawasakiModelData: safeKawasakiModelData,
     };
 }
