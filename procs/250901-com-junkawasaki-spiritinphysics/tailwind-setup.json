@@ -1,0 +1,115 @@
+{
+  "graph": {
+    "mode": "NORMAL",
+    "vertices": [
+      {
+        "id": "process:debug_tailwind_setup",
+        "label": "process",
+        "name": "Debug and Fix Tailwind CSS & shadcn/ui Integration",
+        "status": "completed",
+        "summary": "A multi-step debugging process to resolve styling and build issues after integrating shadcn/ui with a Next.js project. The root cause was a version conflict with Tailwind CSS v4 and a series of configuration mismatches."
+      },
+      {
+        "id": "phase:initial_diagnosis",
+        "label": "phase",
+        "name": "Initial Diagnosis & First Fix Attempt"
+      },
+      {
+        "id": "phase:dependency_correction",
+        "label": "phase",
+        "name": "Dependency Analysis & Correction (Root Cause)"
+      },
+      {
+        "id": "phase:config_alignment",
+        "label": "phase",
+        "name": "Configuration File Alignment"
+      },
+      {
+        "id": "phase:resolution",
+        "label": "phase",
+        "name": "Final Resolution"
+      },
+      {
+        "id": "task:observe_ui_issue",
+        "label": "task",
+        "name": "Observe UI Styling Failure",
+        "details": "Initial observation that shadcn/ui component styles were not being applied."
+      },
+      {
+        "id": "task:analyze_dependencies",
+        "label": "task",
+        "name": "Analyze package.json",
+        "details": "Discovered usage of unstable Tailwind CSS v4 and the deprecated, conflicting '@tailwindcss/postcss' package."
+      },
+      {
+        "id": "task:downgrade_tailwind",
+        "label": "task",
+        "name": "Downgrade Tailwind CSS and Remove Conflict",
+        "details": "Removed '@tailwindcss/postcss' and downgraded 'tailwindcss' to v3.4.1 for stability."
+      },
+      {
+        "id": "task:fix_postcss_config",
+        "label": "task",
+        "name": "Correct postcss.config.mjs",
+        "details": "Updated postcss.config.mjs syntax from CommonJS ('module.exports') to ES Modules ('export default') to fix a build error, ensuring it was compatible with the .mjs extension and Tailwind CSS v3."
+      },
+      {
+        "id": "task:fix_tailwind_config",
+        "label": "task",
+        "name": "Update tailwind.config.ts",
+        "details": "Extended the theme in tailwind.config.ts to map CSS variables from globals.css (e.g., --border) to Tailwind classes (e.g., border-border), fixing the 'class does not exist' build error."
+      },
+      {
+        "id": "task:verify_fix",
+        "label": "task",
+        "name": "Verify UI and Build",
+        "details": "Confirmed that the build process completed successfully and all UI components rendered with the correct styles."
+      },
+      {
+        "id": "artifact:package.json",
+        "label": "artifact",
+        "path": "package.json"
+      },
+      {
+        "id": "artifact:postcss.config.mjs",
+        "label": "artifact",
+        "path": "postcss.config.mjs"
+      },
+      {
+        "id": "artifact:tailwind.config.ts",
+        "label": "artifact",
+        "path": "tailwind.config.ts"
+      }
+    ],
+    "edges": [
+      { "id": "e_p_ph1", "outV": "process:debug_tailwind_setup", "inV": "phase:initial_diagnosis", "label": "has_phase" },
+      { "id": "e_p_ph2", "outV": "process:debug_tailwind_setup", "inV": "phase:dependency_correction", "label": "has_phase" },
+      { "id": "e_p_ph3", "outV": "process:debug_tailwind_setup", "inV": "phase:config_alignment", "label": "has_phase" },
+      { "id": "e_p_ph4", "outV": "process:debug_tailwind_setup", "inV": "phase:resolution", "label": "has_phase" },
+      { "id": "e_s_1", "outV": "phase:initial_diagnosis", "inV": "phase:dependency_correction", "label": "precedes" },
+      { "id": "e_s_2", "outV": "phase:dependency_correction", "inV": "phase:config_alignment", "label": "precedes" },
+      { "id": "e_s_3", "outV": "phase:config_alignment", "inV": "phase:resolution", "label": "precedes" },
+      { "id": "e_t_1", "outV": "phase:initial_diagnosis", "inV": "task:observe_ui_issue", "label": "starts_with" },
+      { "id": "e_t_2", "outV": "task:observe_ui_issue", "inV": "task:analyze_dependencies", "label": "leads_to_investigation" },
+      { "id": "e_t_3", "outV": "phase:dependency_correction", "inV": "task:analyze_dependencies", "label": "has_task" },
+      { "id": "e_t_4", "outV": "task:analyze_dependencies", "inV": "task:downgrade_tailwind", "label": "leads_to_fix" },
+      { "id": "e_t_5", "outV": "phase:config_alignment", "inV": "task:fix_postcss_config", "label": "has_task" },
+      { "id": "e_t_6", "outV": "phase:config_alignment", "inV": "task:fix_tailwind_config", "label": "has_task" },
+      { "id": "e_t_7", "outV": "phase:resolution", "inV": "task:verify_fix", "label": "ends_with" },
+      { "id": "e_a_1", "outV": "task:downgrade_tailwind", "inV": "artifact:package.json", "label": "modifies" },
+      { "id": "e_a_2", "outV": "task:fix_postcss_config", "inV": "artifact:postcss.config.mjs", "label": "modifies" },
+      { "id": "e_a_3", "outV": "task:fix_tailwind_config", "inV": "artifact:tailwind.config.ts", "label": "modifies" }
+    ]
+  },
+  "metadata": {
+    "createdBy": "Gemini 2.5 Pro",
+    "createdAt": "2025-07-31",
+    "description": "A process graph detailing the debugging and resolution of Tailwind CSS and shadcn/ui integration issues."
+  },
+  "traversals": [
+    {
+      "name": "get_debugging_flow",
+      "script": "g.V('process:debug_tailwind_setup').out('has_phase').out('has_task')"
+    }
+  ]
+} 
