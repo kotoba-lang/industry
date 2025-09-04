@@ -119,6 +119,28 @@ junkawasaki.com/
 └── README.md
 ```
 
+## 🛡️ セキュリティ & コード品質
+
+### CodeQL セキュリティ分析
+
+このプロジェクトではGitHub CodeQLを使用してセキュリティ脆弱性とコード品質の問題を継続的に監視しています。
+
+#### サポートされている言語
+- **JavaScript/TypeScript** - Next.jsアプリケーション、Node.jsプロジェクト
+- **Python** - 研究プロジェクト、データ分析
+- **Go** - APIサーバー、ツール
+- **Rust** - システムプログラミング、高性能計算
+
+#### 分析の実行
+- **自動実行**: プッシュ時とプルリクエスト時に自動で実行
+- **定期実行**: 月曜日午前6時（UTC）に全プロジェクトの分析を実行
+- **手動実行**: GitHub Actionsタブから手動でトリガー可能
+
+#### 分析結果の確認
+- GitHub Securityタブで脆弱性レポートを確認
+- CodeQLアラートは自動的にissueとして作成されます
+- 詳細な分析レポートはActionsタブで確認できます
+
 ## 🛠️ 技術スタック
 
 ### フロントエンド
@@ -146,6 +168,7 @@ junkawasaki.com/
 - **ESLint/Prettier** - コード品質
 - **Jest/Playwright** - テスト
 - **Black/Flake8/MyPy** - Pythonコード品質
+- **CodeQL** - セキュリティ分析
 
 ## 🧪 テスト
 
