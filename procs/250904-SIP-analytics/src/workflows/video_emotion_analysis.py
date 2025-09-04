@@ -132,7 +132,6 @@ class BatchVideoAnalysisWorkflow:
 
 
 # Activity to discover video files
-@workflow.defn
 async def discover_video_files(session_id: str) -> List[str]:
     """Discover all webm video files for a given session"""
     try:

@@ -72,32 +72,55 @@ python src/worker.py
 
 ### ワークフローの実行
 
-#### 単一セッションの分析
+#### 単一動画ファイルの分析
 
 ```bash
-python src/client.py single {session_id}
+python src/client.py file {session_id} {video_filename}
 ```
 
 例:
 ```bash
-python src/client.py single 144b325f-5966-4d59-a629-f2ca421388cc
+python src/client.py file 144b325f-5966-4d59-a629-f2ca421388cc session-1-video.webm
 ```
 
-#### 複数セッションの一括分析
+#### 単一セッション内の全動画分析
 
 ```bash
-python src/client.py batch {session_id1} {session_id2} ...
+python src/client.py session {session_id}
 ```
 
 例:
 ```bash
-python src/client.py batch 144b325f-5966-4d59-a629-f2ca421388cc 15592cdb-86cf-4baf-86f5-66184169ee39
+python src/client.py session 144b325f-5966-4d59-a629-f2ca421388cc
+```
+
+#### 全動画ファイルの一括分析（順次実行）
+
+```bash
+python src/client.py batch-files
+```
+
+#### 指定セッションの一括分析
+
+```bash
+python src/client.py batch-sessions {session_id1} {session_id2} ...
+```
+
+例:
+```bash
+python src/client.py batch-sessions 144b325f-5966-4d59-a629-f2ca421388cc 15592cdb-86cf-4baf-86f5-66184169ee39
 ```
 
 #### 全セッションの一括分析
 
 ```bash
 python src/client.py batch-all
+```
+
+#### クイックスタート（全動画の一括分析）
+
+```bash
+python start_analysis.py
 ```
 
 ## 分析結果
@@ -154,15 +177,25 @@ data/{session_id}/analysis_results/
 
 ### VideoEmotionAnalysisWorkflow
 
-- 指定セッションの全WebMファイルを自動検出
-- 動画を並行して感情分析
-- 結果をJSONファイルとして保存
+- **単一動画ファイル**の感情分析
+- HumeAI APIを使用して感情データを抽出
+- 分析結果をJSONファイルとして保存
 - セッションメタデータを更新
+- 自動リトライとエラーハンドリング
 
-### BatchSessionAnalysisWorkflow
+### BatchVideoAnalysisWorkflow
 
-- 複数セッションの並行分析
-- 各セッションを独立した子ワークフローとして実行
+- **複数動画ファイルの順次分析**
+- 各動画ファイルを個別の子ワークフローとして順次実行
+- 処理の安定性とリソース管理を重視
+- 各ファイルの分析結果を個別に追跡
+
+### 実行パターン
+
+1. **単一ファイル**: 1つの動画ファイルのみ分析
+2. **セッション単位**: 1つのセッション内の全ファイルを順次分析
+3. **バッチファイル**: 全動画ファイルを順次分析
+4. **バッチセッション**: 指定セッション群の全ファイルを順次分析
 
 ## エラーハンドリング
 

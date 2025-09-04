@@ -11,7 +11,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from client import start_batch_session_analysis, discover_available_sessions
+from client import start_batch_file_analysis, discover_all_video_files
 
 
 async def main():
@@ -32,18 +32,30 @@ async def main():
         print("Please set your API key in config.yaml")
         return
 
-    # Discover sessions
-    print("🔍 Discovering available sessions...")
-    session_ids = await discover_available_sessions()
+    # Discover video files
+    print("🔍 Discovering available video files...")
+    video_files = await discover_all_video_files()
 
-    if not session_ids:
-        print("❌ No sessions found in data directory")
+    if not video_files:
+        print("❌ No video files found in data directory")
         return
 
-    print(f"📊 Found {len(session_ids)} sessions: {', '.join(session_ids[:5])}{'...' if len(session_ids) > 5 else ''}")
+    print(f"📊 Found {len(video_files)} video files")
+
+    # Group by session for display
+    session_groups = {}
+    for vf in video_files:
+        session_id = vf["session_id"]
+        if session_id not in session_groups:
+            session_groups[session_id] = []
+        session_groups[session_id].append(vf["video_filename"])
+
+    print("📂 Sessions and files:")
+    for session_id, files in session_groups.items():
+        print(f"  {session_id}: {len(files)} files")
 
     # Confirm execution
-    response = input(f"\n🚀 Start analysis for {len(session_ids)} sessions? (y/N): ")
+    response = input(f"\n🚀 Start analysis for {len(video_files)} video files? (y/N): ")
     if response.lower() not in ['y', 'yes']:
         print("❌ Analysis cancelled")
         return
@@ -51,22 +63,26 @@ async def main():
     # Start analysis
     print("\n⚡ Starting batch analysis...")
     try:
-        results = await start_batch_session_analysis(session_ids)
+        results = await start_batch_file_analysis(video_files)
 
         # Print results
         print("\n📈 Analysis Results:")
-        print("-" * 30)
+        print("-" * 50)
         successful = 0
-        total_videos = 0
+        failed = 0
 
         for result in results:
-            status_icon = "✅" if result.status == "COMPLETED" else "⚠️" if result.status == "PARTIALLY_COMPLETED" else "❌"
-            print(f"{status_icon} {result.session_id}: {result.status} ({len(result.results)} videos)")
-            if result.status in ["COMPLETED", "PARTIALLY_COMPLETED"]:
+            if result.status == "COMPLETED":
+                status_icon = "✅"
                 successful += 1
-            total_videos += len(result.results)
+            else:
+                status_icon = "❌"
+                failed += 1
 
-        print(f"\n🎉 Completed! {successful}/{len(session_ids)} sessions successful, {total_videos} videos analyzed")
+            video_filename = result.results[0].video_filename if result.results else "unknown"
+            print(f"{status_icon} {result.session_id}/{video_filename}: {result.status}")
+
+        print(f"\n🎉 Completed! {successful}/{len(video_files)} files successful, {failed} failed")
         print("📁 Results saved in data/{session_id}/analysis_results/")
 
     except Exception as e:
