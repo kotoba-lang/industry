@@ -5,7 +5,7 @@ from temporalio.worker import Worker
 from temporalio.runtime import Runtime
 from loguru import logger
 
-from src.workflows.video_emotion_analysis import VideoEmotionAnalysisWorkflow, BatchSessionAnalysisWorkflow
+from src.workflows.video_emotion_analysis import VideoEmotionAnalysisWorkflow, BatchVideoAnalysisWorkflow
 from src.activities.humeai_analyzer import analyze_video_emotions
 from src.activities.result_storage import save_emotion_analysis_result, save_batch_analysis_results, update_session_metadata
 
@@ -29,7 +29,7 @@ async def run_worker():
             task_queue="video-analysis-queue",
             workflows=[
                 VideoEmotionAnalysisWorkflow,
-                BatchSessionAnalysisWorkflow
+                BatchVideoAnalysisWorkflow
             ],
             activities=[
                 analyze_video_emotions,

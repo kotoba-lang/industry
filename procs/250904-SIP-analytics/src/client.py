@@ -162,6 +162,45 @@ async def discover_available_sessions() -> list:
         return []
 
 
+async def discover_video_files_in_session(session_id: str) -> list:
+    """Discover all video files in a specific session"""
+    try:
+        session_dir = Path(f"data/{session_id}")
+        if not session_dir.exists():
+            logger.error(f"Session directory not found: {session_dir}")
+            return []
+
+        video_files = [f.name for f in session_dir.glob("*.webm")]
+        logger.info(f"Found {len(video_files)} video files in session {session_id}")
+        return sorted(video_files)
+
+    except Exception as e:
+        logger.error(f"Failed to discover video files in session {session_id}: {str(e)}")
+        return []
+
+
+async def discover_all_video_files() -> list:
+    """Discover all video files across all sessions"""
+    try:
+        sessions = await discover_available_sessions()
+        all_files = []
+
+        for session_id in sessions:
+            video_files = await discover_video_files_in_session(session_id)
+            for video_filename in video_files:
+                all_files.append({
+                    "session_id": session_id,
+                    "video_filename": video_filename
+                })
+
+        logger.info(f"Found {len(all_files)} total video files across {len(sessions)} sessions")
+        return all_files
+
+    except Exception as e:
+        logger.error(f"Failed to discover all video files: {str(e)}")
+        return []
+
+
 async def main():
     """Main client function"""
     # Configure logging
@@ -169,15 +208,29 @@ async def main():
 
     if len(sys.argv) < 2:
         print("Usage:")
-        print("  python src/client.py single <session_id>")
-        print("  python src/client.py batch <session_id1> <session_id2> ...")
+        print("  python src/client.py file <session_id> <video_filename>")
+        print("  python src/client.py session <session_id>")
+        print("  python src/client.py batch-files")
+        print("  python src/client.py batch-sessions <session_id1> <session_id2> ...")
         print("  python src/client.py batch-all")
         return
 
     command = sys.argv[1]
 
     try:
-        if command == "single":
+        if command == "file":
+            if len(sys.argv) < 4:
+                print("Please provide session ID and video filename")
+                return
+
+            session_id = sys.argv[2]
+            video_filename = sys.argv[3]
+            result = await start_single_file_analysis(session_id, video_filename)
+            print(f"Analysis completed for {video_filename} in session {session_id}")
+            print(f"Status: {result.status}")
+            print(f"Results saved: {len(result.results)} emotion analysis")
+
+        elif command == "session":
             if len(sys.argv) < 3:
                 print("Please provide a session ID")
                 return
@@ -188,7 +241,23 @@ async def main():
             print(f"Status: {result.status}")
             print(f"Videos analyzed: {len(result.results)}")
 
-        elif command == "batch":
+        elif command == "batch-files":
+            video_files = await discover_all_video_files()
+            if not video_files:
+                print("No video files found in data directory")
+                return
+
+            print(f"Starting analysis for all {len(video_files)} video files")
+            results = await start_batch_file_analysis(video_files)
+
+            successful = sum(1 for r in results if r.status == "COMPLETED")
+            print(f"Batch analysis completed: {successful}/{len(results)} files successful")
+
+            for result in results:
+                status_icon = "✅" if result.status == "COMPLETED" else "❌"
+                print(f"  {status_icon} {result.session_id}/{result.results[0].video_filename if result.results else 'unknown'}: {result.status}")
+
+        elif command == "batch-sessions":
             if len(sys.argv) < 3:
                 print("Please provide session IDs")
                 return
@@ -196,9 +265,13 @@ async def main():
             session_ids = sys.argv[2:]
             results = await start_batch_session_analysis(session_ids)
 
-            print(f"Batch analysis completed for {len(results)} sessions")
+            successful = sum(1 for r in results if r.status == "COMPLETED")
+            print(f"Batch analysis completed for {len(results)} video files across {len(session_ids)} sessions")
+            print(f"Success rate: {successful}/{len(results)}")
+
             for result in results:
-                print(f"  Session {result.session_id}: {result.status} ({len(result.results)} videos)")
+                status_icon = "✅" if result.status == "COMPLETED" else "❌"
+                print(f"  {status_icon} {result.session_id}: {result.status}")
 
         elif command == "batch-all":
             session_ids = await discover_available_sessions()
@@ -209,13 +282,23 @@ async def main():
             print(f"Starting analysis for all {len(session_ids)} sessions: {', '.join(session_ids)}")
             results = await start_batch_session_analysis(session_ids)
 
-            print(f"Batch analysis completed for {len(results)} sessions")
+            successful = sum(1 for r in results if r.status == "COMPLETED")
+            total_files = sum(len(r.results) for r in results if r.results)
+            print(f"Batch analysis completed: {successful}/{len(results)} files successful")
+            print(f"Total videos analyzed: {total_files}")
+
             for result in results:
-                print(f"  Session {result.session_id}: {result.status} ({len(result.results)} videos)")
+                status_icon = "✅" if result.status == "COMPLETED" else "❌"
+                print(f"  {status_icon} {result.session_id}: {result.status} ({len(result.results)} videos)")
 
         else:
             print(f"Unknown command: {command}")
-            print("Available commands: single, batch, batch-all")
+            print("Available commands:")
+            print("  file <session_id> <video_filename>    - Analyze single video file")
+            print("  session <session_id>                  - Analyze all videos in session")
+            print("  batch-files                          - Analyze all video files sequentially")
+            print("  batch-sessions <session_id1> ...      - Analyze videos from specific sessions")
+            print("  batch-all                            - Analyze all videos from all sessions")
 
     except Exception as e:
         logger.error(f"Client execution failed: {str(e)}")
