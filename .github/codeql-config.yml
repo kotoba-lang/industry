@@ -1,0 +1,41 @@
+disable-default-queries: false
+
+queries:
+  - uses: security-and-quality
+  - uses: security-experimental
+  - uses: security-experimental-suggestions
+
+paths-ignore:
+  - node_modules
+  - target
+  - dist
+  - build
+  - .next
+  - out
+  - __pycache__
+  - "*.min.js"
+  - "*.min.css"
+  - "*.bundle.js"
+  - "*.bundle.css"
+  - "apps/*/node_modules"
+  - "apps/*/target"
+  - "apps/*/dist"
+  - "apps/*/.next"
+  - "apps/*/out"
+  - "apps/*/build"
+  - "emotion_env"
+  - "hottgraph/target"
+  - "crates/*/target"
+
+paths:
+  - apps/cytoscaper
+  - apps/kotoba
+  - apps/webmaster
+  - apps/research
+  - apps/spirit-in-physics
+  - apps/yamato-ll1
+  - apps/hottgraph
+  - hottgraph
+  - crates
+  - www
+  - extract_emotions.py
