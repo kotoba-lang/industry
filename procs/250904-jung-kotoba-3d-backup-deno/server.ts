@@ -8,7 +8,8 @@ serve(async (req) => {
   if (url.pathname === "/api/spirit-data") {
     try {
       // Load session data from the analytics project
-      const sessionPath = "/Users/junkawasaki/jun784/root/procs/250904-SIP-analytics/data/2a0d7a69-f953-4c29-87a5-8a8e4e8bd413/session_data.json";
+      const sessionPath =
+        "/Users/junkawasaki/jun784/root/procs/250904-SIP-analytics/data/2a0d7a69-f953-4c29-87a5-8a8e4e8bd413/session_data.json";
       const sessionData = JSON.parse(await Deno.readTextFile(sessionPath));
 
       // Process the session data to extract Spirit vectors
@@ -23,6 +24,21 @@ serve(async (req) => {
         status: 500,
         headers: { "Content-Type": "application/json" },
       });
+    }
+  }
+
+  // Handle static files with proper content types
+  if (url.pathname === "/app.js") {
+    try {
+      const jsContent = await Deno.readTextFile("public/app.js");
+      return new Response(jsContent, {
+        headers: {
+          "Content-Type": "application/javascript; charset=utf-8",
+          "Cache-Control": "no-cache",
+        },
+      });
+    } catch (error) {
+      return new Response("File not found", { status: 404 });
     }
   }
 
@@ -67,14 +83,18 @@ function processSessionData(sessionData: any) {
   }
 
   // Generate Spirit vectors based on the model
-  const words = Array.from(new Set([
-    ...Array.from(reactionTimes.keys()),
-    ...Array.from(wordAssociations.keys()).flatMap(k => k.split('->'))
-  ]));
+  const words = Array.from(
+    new Set([
+      ...Array.from(reactionTimes.keys()),
+      ...Array.from(wordAssociations.keys()).flatMap((k) => k.split("->")),
+    ]),
+  );
 
-  const vectors = words.map(word => {
+  const vectors = words.map((word) => {
     const times = reactionTimes.get(word) || [];
-    const avgReactionTime = times.length > 0 ? times.reduce((a, b) => a + b, 0) / times.length : 1000;
+    const avgReactionTime = times.length > 0
+      ? times.reduce((a, b) => a + b, 0) / times.length
+      : 1000;
 
     // Calculate Spirit vector components based on Kawasaki Model
     const energy = -Math.log(avgReactionTime / 1000 + 0.001); // E = -ln P
@@ -87,10 +107,10 @@ function processSessionData(sessionData: any) {
       vector: [
         Math.random() * 2 - 1, // x: semantic similarity proxy
         energy, // y: energy component
-        associations * 0.1 // z: association strength
+        associations * 0.1, // z: association strength
       ],
       reactionTime: avgReactionTime,
-      associationCount: associations
+      associationCount: associations,
     };
   });
 
