@@ -24,56 +24,66 @@ async function generateLlamaCompletions(prompt: string) {
   const modelPath = `${llamaPath}/models/tinyllama-1.1b-chat-v1.0.Q2_K.gguf`;
   const llamaCliPath = `${llamaPath}/build/bin/llama-cli`;
 
-  const cmd = new Deno.Command(llamaCliPath, {
-    args: [
-      "-m",
-      modelPath,
-      "-p",
-      prompt,
-      "-n",
-      "16", // number of tokens to generate
-      "--n-beams",
-      "5", // generate 5 alternative sequences
-      "--temp",
-      "0.7",
-    ],
-  });
+  const N_GENERATIONS = 5;
+  const tokensToGenerate = "16";
 
-  const { code, stdout, stderr } = await cmd.output();
-
-  if (code !== 0) {
-    console.error(new TextDecoder().decode(stderr));
-    throw new Error("Failed to run llama.cpp");
+  const generationPromises = [];
+  for (let i = 0; i < N_GENERATIONS; i++) {
+    const cmd = new Deno.Command(llamaCliPath, {
+      args: [
+        "-m",
+        modelPath,
+        "-p",
+        prompt,
+        "-n",
+        tokensToGenerate,
+        "--temp",
+        "0.9",
+        "-s",
+        Math.floor(Math.random() * 1000).toString(), // random seed
+      ],
+    });
+    generationPromises.push(cmd.output());
   }
 
-  const output = new TextDecoder().decode(stdout);
-
-  // NOTE: This parsing is a simplified example.
-  // llama.cpp with beam search outputs multiple sequences. We need to parse them.
-  // The actual output format needs to be checked to parse correctly.
-  // For this example, we'll simulate the tree structure from the output.
-
-  const lines = output.trim().split("\n").filter((line) => line.trim() !== "");
-  const generatedText = lines.join(" ").replace(prompt, "").trim();
-  const words = generatedText.split(/\s+/);
+  const results = await Promise.all(generationPromises);
 
   let idCounter = 0;
   function createNode(word: string, x: number, y: number, z: number) {
     return { id: idCounter++, word, x, y, z, children: [] };
   }
-
   const root = createNode(prompt, 0, 0, 0);
-  let currentNode = root;
 
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-    // Simple linear path for now
-    const x = currentNode.x + (Math.random() - 0.5) * 2;
-    const y = currentNode.y + (Math.random() - 0.5) * 2;
-    const z = currentNode.z - 2;
-    const childNode = createNode(word, x, y, z);
-    currentNode.children.push(childNode);
-    currentNode = childNode;
+  for (const result of results) {
+    if (result.code !== 0) {
+      console.error(new TextDecoder().decode(result.stderr));
+      continue; // Skip failed generations
+    }
+    const output = new TextDecoder().decode(result.stdout);
+    const lines = output.trim().split("\n").filter((line) =>
+      line.trim() !== "" && !line.startsWith("Log ")
+    );
+    const generatedText = lines.join(" ").replace(prompt, "").trim();
+    const words = generatedText.split(/\s+/).filter((w) => w);
+
+    let currentNode = root;
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i];
+      const z = currentNode.z - 2;
+
+      // Check if a child with the same word already exists
+      let childNode = currentNode.children.find((c) =>
+        c.word === word && c.z === z
+      );
+
+      if (!childNode) {
+        const x = currentNode.x + (Math.random() - 0.5) * 5;
+        const y = currentNode.y + (Math.random() - 0.5) * 5;
+        childNode = createNode(word, x, y, z);
+        currentNode.children.push(childNode);
+      }
+      currentNode = childNode;
+    }
   }
 
   return { prompt, tree: root };

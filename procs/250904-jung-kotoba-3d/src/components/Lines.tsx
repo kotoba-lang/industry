@@ -1,5 +1,5 @@
 import React from 'react';
-import { Vector, Association } from './SpiritVisualizer';
+import { Vector, Association } from './types';
 import * as THREE from 'three';
 
 interface LinesProps {
