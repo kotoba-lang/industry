@@ -19,18 +19,18 @@ export default function SpiritTimeSeries({
   const { energyPath, entropyPath, timeLabels } = useMemo(() => {
     if (safeTimeSeries.length === 0) return { energyPath: "", entropyPath: "", timeLabels: [] };
 
-    const startTime = timeSeries[0].timestamp;
-    const endTime = timeSeries[timeSeries.length - 1].timestamp;
+    const startTime = safeTimeSeries[0].timestamp;
+    const endTime = safeTimeSeries[safeTimeSeries.length - 1].timestamp;
     const timeRange = endTime - startTime;
 
-    const maxEnergy = Math.max(...timeSeries.map(p => p.energy));
-    const maxEntropy = Math.max(...timeSeries.map(p => p.entropy));
+    const maxEnergy = Math.max(...safeTimeSeries.map(p => p.energy));
+    const maxEntropy = Math.max(...safeTimeSeries.map(p => p.entropy));
 
     const energyPoints: string[] = [];
     const entropyPoints: string[] = [];
     const labels: string[] = [];
 
-    timeSeries.forEach((point, index) => {
+    safeTimeSeries.forEach((point, index) => {
       const x = (point.timestamp - startTime) / timeRange * width;
       const energyY = height - (point.energy / maxEnergy) * (height * 0.8);
       const entropyY = height - (point.entropy / maxEntropy) * (height * 0.8);
@@ -55,9 +55,9 @@ export default function SpiritTimeSeries({
       entropyPath: entropyPoints.join(' '),
       timeLabels: labels
     };
-  }, [timeSeries, width, height]);
+  }, [safeTimeSeries, width, height]);
 
-  if (timeSeries.length === 0) {
+  if (safeTimeSeries.length === 0) {
     return (
       <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center">
         <p className="text-gray-500">No time series data available</p>

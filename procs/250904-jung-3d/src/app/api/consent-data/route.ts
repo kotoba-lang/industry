@@ -22,7 +22,7 @@ export async function GET() {
         const consentData = JSON.parse(fileContents);
 
         // Validate the data structure
-        if (!consentData || typeof consentData !== 'object') {
+        if (!consentData || typeof consentData !== "object") {
             return NextResponse.json(
                 { error: "Invalid consent data format" },
                 { status: 400 },

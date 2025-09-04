@@ -22,7 +22,7 @@ export async function GET() {
         const sessionData = JSON.parse(fileContents);
 
         // Validate the data structure
-        if (!sessionData || typeof sessionData !== 'object') {
+        if (!sessionData || typeof sessionData !== "object") {
             return NextResponse.json(
                 { error: "Invalid session data format" },
                 { status: 400 },
