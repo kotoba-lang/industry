@@ -14,13 +14,31 @@ let wordMap = new Map();
 let selectedNode = null;
 let highlightedPath = [];
 
-// Global function for HTML button
+// Global functions for HTML buttons
 window.generateNewTree = async function() {
   const promptInput = document.getElementById('prompt-input');
   const prompt = promptInput.value.trim();
   if (prompt) {
     await generateTreeWithPrompt(prompt);
+    document.getElementById('highlight-controls').style.display = 'block';
   }
+};
+
+window.generateLanguageSpace = async function() {
+  await generateLanguageSpaceMap();
+  document.getElementById('highlight-controls').style.display = 'block';
+};
+
+window.highlightSubtree = async function() {
+  const wordInput = document.getElementById('highlight-word-input');
+  const word = wordInput.value.trim().toLowerCase();
+  if (word) {
+    highlightSubtreeFromWord(word);
+  }
+};
+
+window.clearHighlights = function() {
+  clearAllHighlights();
 };
 
 async function generateTreeWithPrompt(prompt) {
@@ -39,6 +57,151 @@ async function generateTreeWithPrompt(prompt) {
 
   } catch (error) {
     console.error('Error generating tree:', error);
+  }
+}
+
+async function generateLanguageSpaceMap() {
+  try {
+    // Clear existing scene
+    clearScene();
+
+    // Define multiple seed prompts for broader language space
+    const seedPrompts = [
+      "The", "A", "I", "You", "We", "They", "It", "This", "That", "Here", "There",
+      "What", "How", "Why", "When", "Where", "Who", "Which", "All", "Some", "One",
+      "Time", "Life", "World", "Day", "Night", "Light", "Dark", "Good", "Bad",
+      "Love", "Hate", "Think", "Know", "Feel", "See", "Hear", "Say", "Do", "Make"
+    ];
+
+    console.log('Generating language space from', seedPrompts.length, 'seed prompts...');
+
+    // Generate trees from multiple prompts
+    const allTrees = [];
+    const batchSize = 5; // Process in batches to avoid overwhelming the server
+
+    for (let i = 0; i < seedPrompts.length; i += batchSize) {
+      const batch = seedPrompts.slice(i, i + batchSize);
+      const batchPromises = batch.map(async (prompt) => {
+        try {
+          const response = await fetch(`/api/completions?prompt=${encodeURIComponent(prompt)}`);
+          const data = await response.json();
+          return data.tree;
+        } catch (error) {
+          console.error(`Error generating tree for "${prompt}":`, error);
+          return null;
+        }
+      });
+
+      const batchResults = await Promise.all(batchPromises);
+      allTrees.push(...batchResults.filter(tree => tree !== null));
+
+      // Small delay between batches
+      if (i + batchSize < seedPrompts.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+
+    console.log('Generated', allTrees.length, 'trees for language space');
+
+    // Merge all trees into a comprehensive language space
+    const mergedTree = mergeTreesIntoSpace(allTrees);
+    currentTreeData = mergedTree;
+
+    visualizeLanguageSpace(mergedTree);
+    buildWordMap(mergedTree);
+    updatePathDisplay([]);
+
+    console.log('Language space visualization complete');
+
+  } catch (error) {
+    console.error('Error generating language space:', error);
+  }
+}
+
+function mergeTreesIntoSpace(trees) {
+  // Create a root node for the language space
+  const spaceRoot = {
+    word: "Language",
+    x: 0,
+    y: 0,
+    z: 0,
+    children: []
+  };
+
+  // Collect all unique words and their relationships
+  const wordConnections = new Map();
+
+  trees.forEach(tree => {
+    collectWordConnections(tree, wordConnections);
+  });
+
+  // Build the merged tree structure
+  buildMergedTree(spaceRoot, wordConnections, new Set());
+
+  return spaceRoot;
+}
+
+function collectWordConnections(node, connections, path = []) {
+  const currentPath = [...path, node.word];
+
+  if (!connections.has(node.word)) {
+    connections.set(node.word, {
+      node: node,
+      parents: new Set(),
+      children: new Map()
+    });
+  }
+
+  // Add parent relationships
+  if (path.length > 0) {
+    const parentWord = path[path.length - 1];
+    connections.get(node.word).parents.add(parentWord);
+
+    // Add child relationships to parent
+    if (!connections.get(parentWord).children.has(node.word)) {
+      connections.get(parentWord).children.set(node.word, []);
+    }
+    connections.get(parentWord).children.get(node.word).push(node);
+  }
+
+  // Process children
+  node.children.forEach(child => {
+    collectWordConnections(child, connections, currentPath);
+  });
+}
+
+function buildMergedTree(root, connections, visited, maxDepth = 8) {
+  const queue = [{ node: root, depth: 0 }];
+  const processedNodes = new Map();
+
+  while (queue.length > 0) {
+    const { node, depth } = queue.shift();
+    const word = node.word;
+
+    if (depth >= maxDepth || visited.has(word)) continue;
+    visited.add(word);
+
+    if (connections.has(word)) {
+      const connectionData = connections.get(word);
+
+      // Add children from the merged connections
+      for (const [childWord, childNodes] of connectionData.children) {
+        if (!visited.has(childWord)) {
+          // Use the first occurrence of this child word
+          const childNode = { ...childNodes[0] };
+
+          // Position children in a more spread out manner for better visualization
+          const angle = Math.random() * Math.PI * 2;
+          const radius = 3 + depth * 2;
+          childNode.x = node.x + Math.cos(angle) * radius;
+          childNode.y = node.y + Math.sin(angle) * radius;
+          childNode.z = node.z - 1;
+
+          node.children.push(childNode);
+          queue.push({ node: childNode, depth: depth + 1 });
+        }
+      }
+    }
   }
 }
 
@@ -101,8 +264,9 @@ async function init() {
   camera.add(pointLight);
   scene.add(camera);
 
-  // Initial data fetching and visualization
-  await generateTreeWithPrompt('Intelligence');
+  // Initial language space generation
+  console.log('Initializing language space...');
+  await generateLanguageSpaceMap();
 
   window.addEventListener('resize', onWindowResize, false);
   document.addEventListener('mousemove', onMouseMove, false);
@@ -123,7 +287,8 @@ function visualizeTree(tree) {
     nodeMesh.userData = {
       word: node.word,
       path: currentPath,
-      nodeData: node
+      nodeData: node,
+      originalColor: 0x00ff00
     };
     scene.add(nodeMesh);
     nodes.push(nodeMesh);
@@ -139,6 +304,48 @@ function visualizeTree(tree) {
         color: 0xcccccc,
         transparent: true,
         opacity: 0.3
+      });
+      const line = new THREE.Line(lineGeometry, lineMaterial);
+      scene.add(line);
+      edges.push(line);
+    }
+
+    node.children.forEach(child => traverse(child, nodeMesh, currentPath));
+  }
+
+  traverse(tree, null, []);
+}
+
+function visualizeLanguageSpace(tree) {
+  const geometry = new THREE.SphereGeometry(0.1, 12, 12);
+  const baseMaterial = new THREE.MeshPhongMaterial({ color: 0x888888 }); // Gray for base language space
+
+  function traverse(node, parentMesh, path = []) {
+    const currentPath = [...path, node.word];
+
+    const nodeMesh = new THREE.Mesh(geometry, baseMaterial.clone());
+    nodeMesh.position.set(node.x, node.y, node.z);
+    nodeMesh.userData = {
+      word: node.word,
+      path: currentPath,
+      nodeData: node,
+      originalColor: 0x888888,
+      isHighlighted: false
+    };
+    scene.add(nodeMesh);
+    nodes.push(nodeMesh);
+
+    const nodeLabel = new CSS2DObject(createLabel(node.word));
+    nodeLabel.position.copy(nodeMesh.position);
+    nodeMesh.add(nodeLabel);
+
+    if (parentMesh) {
+      const points = [parentMesh.position, nodeMesh.position];
+      const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+      const lineMaterial = new THREE.LineBasicMaterial({
+        color: 0x666666,
+        transparent: true,
+        opacity: 0.2
       });
       const line = new THREE.Line(lineGeometry, lineMaterial);
       scene.add(line);
@@ -330,6 +537,103 @@ function clearPathHighlight() {
     edge.material.opacity = 0.3;
   });
   highlightedPath = [];
+}
+
+function highlightSubtreeFromWord(targetWord) {
+  console.log('Highlighting subtree from word:', targetWord);
+
+  // Clear any existing subtree highlights
+  clearAllHighlights();
+
+  // Find all nodes with the target word
+  const targetNodes = nodes.filter(node =>
+    node.userData.word.toLowerCase() === targetWord.toLowerCase()
+  );
+
+  if (targetNodes.length === 0) {
+    console.log('Word not found in the tree');
+    return;
+  }
+
+  console.log('Found', targetNodes.length, 'nodes with the target word');
+
+  // For each target node, highlight its subtree
+  targetNodes.forEach(targetNode => {
+    highlightSubtree(targetNode, 0xff4444); // Red for highlighted subtrees
+  });
+}
+
+function highlightSubtree(rootNode, highlightColor) {
+  const visited = new Set();
+  const queue = [rootNode];
+
+  while (queue.length > 0) {
+    const currentNode = queue.shift();
+    const nodeId = currentNode.id || currentNode.uuid;
+
+    if (visited.has(nodeId)) continue;
+    visited.add(nodeId);
+
+    // Highlight the node
+    currentNode.material.color.setHex(highlightColor);
+    currentNode.userData.isHighlighted = true;
+
+    // Find and highlight edges connected to this node
+    currentNode.userData.nodeData.children.forEach(childData => {
+      const childNode = nodes.find(node =>
+        node.userData.nodeData === childData
+      );
+
+      if (childNode) {
+        // Find the edge between current node and child
+        const edge = edges.find(edge => {
+          if (!edge.geometry.attributes.position) return false;
+          const positions = edge.geometry.attributes.position.array;
+          if (positions.length < 6) return false;
+
+          const startPos = new THREE.Vector3(positions[0], positions[1], positions[2]);
+          const endPos = new THREE.Vector3(positions[3], positions[4], positions[5]);
+
+          const startMatch = startPos.distanceTo(currentNode.position) < 0.1;
+          const endMatch = endPos.distanceTo(childNode.position) < 0.1;
+
+          return startMatch && endMatch;
+        });
+
+        if (edge) {
+          edge.material.color.setHex(highlightColor);
+          edge.material.opacity = 0.8;
+          highlightedPath.push(edge);
+        }
+
+        // Add child to queue for further processing
+        queue.push(childNode);
+      }
+    });
+  }
+}
+
+function clearAllHighlights() {
+  console.log('Clearing all highlights');
+
+  // Reset all node colors to their original colors
+  nodes.forEach(node => {
+    const originalColor = node.userData.originalColor || 0x888888;
+    node.material.color.setHex(originalColor);
+    node.userData.isHighlighted = false;
+  });
+
+  // Reset all edge colors
+  edges.forEach(edge => {
+    edge.material.color.setHex(0x666666);
+    edge.material.opacity = 0.2;
+  });
+
+  // Clear highlighted path array
+  highlightedPath = [];
+
+  // Clear path display
+  updatePathDisplay([]);
 }
 
 function onWindowResize() {

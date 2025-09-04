@@ -131,6 +131,46 @@
       .control-panel button:hover {
         background: #0056b3;
       }
+
+      .highlight-controls {
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #444;
+      }
+
+      .highlight-controls input {
+        width: 140px;
+        padding: 6px;
+        margin-right: 8px;
+        background: #2a2a2a;
+        border: 1px solid #444;
+        border-radius: 4px;
+        color: #ffffff;
+        font-size: 13px;
+      }
+
+      .highlight-controls button {
+        padding: 6px 12px;
+        margin-right: 5px;
+        background: #28a745;
+        border: none;
+        border-radius: 4px;
+        color: white;
+        cursor: pointer;
+        font-size: 13px;
+      }
+
+      .highlight-controls button:hover {
+        background: #1e7e34;
+      }
+
+      .highlight-controls button:last-child {
+        background: #dc3545;
+      }
+
+      .highlight-controls button:last-child:hover {
+        background: #bd2130;
+      }
     </style>
   </head>
   <body>
@@ -138,7 +178,13 @@
       <div class="tree-container">
         <div class="control-panel">
           <input type="text" id="prompt-input" placeholder="Enter prompt..." value="Intelligence">
-          <button onclick="generateNewTree()">Generate</button>
+          <button onclick="generateNewTree()">Generate Tree</button>
+          <button onclick="generateLanguageSpace()">Generate Language Space</button>
+          <div class="highlight-controls" id="highlight-controls" style="display: none;">
+            <input type="text" id="highlight-word-input" placeholder="Highlight word..." style="width: 150px; margin-top: 10px;">
+            <button onclick="highlightSubtree()">Highlight Subtree</button>
+            <button onclick="clearHighlights()">Clear</button>
+          </div>
         </div>
       </div>
       <div class="wordmap-container">
