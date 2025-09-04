@@ -1,5 +1,5 @@
 import React, { useMemo, useRef } from 'react';
-import { Vector } from './SpiritVisualizer';
+import { Vector } from './types';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 

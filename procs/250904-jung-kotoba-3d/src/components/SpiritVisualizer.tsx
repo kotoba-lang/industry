@@ -2,21 +2,9 @@ import React, { Suspense, useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Text, Html } from '@react-three/drei';
 import * as THREE from 'three';
+import { Vector, Association } from './types';
 import Points from './Points';
 import Lines from './Lines';
-
-interface Vector {
-  word: string;
-  vector: [number, number, number];
-  reactionTime: number;
-  associationCount: number;
-}
-
-interface Association {
-  source: string;
-  target: string;
-  strength: number;
-}
 
 // データ処理ロジック
 const processSessionData = (sessionData: any) => {
