@@ -37,6 +37,11 @@ export class BlobStorageService {
             `${this.ARTIFACTS_PREFIX}${metadata.participantId}/${metadata.type}/${id}-${metadata.filename}`;
 
         try {
+            // ファイルサイズを取得
+            const size = file instanceof Buffer
+                ? file.length
+                : (file as File).size;
+
             const blob = await put(key, file, {
                 access: "public",
                 contentType: this.getContentType(metadata.filename),
@@ -45,7 +50,7 @@ export class BlobStorageService {
             const artifactMetadata: ArtifactMetadata = {
                 id,
                 ...metadata,
-                size: blob.size,
+                size: size,
                 uploadedAt: new Date().toISOString(),
                 url: blob.url,
             };
@@ -140,7 +145,7 @@ export class BlobStorageService {
             participantId,
             type,
             filename,
-            size: blob.size,
+            size: blob.size || 0,
             uploadedAt: blob.uploadedAt,
             url: blob.url,
         };
