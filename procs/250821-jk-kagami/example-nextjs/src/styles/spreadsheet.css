@@ -1,0 +1,341 @@
+/* Kagami Spreadsheet UI Styles */
+
+.kagami-spreadsheet-table {
+  margin: 20px 0;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: white;
+  overflow: hidden;
+}
+
+.kagami-table-header {
+  background: linear-gradient(135deg, #007acc 0%, #005a9e 100%);
+  color: white;
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.kagami-table-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.kagami-table-info {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.kagami-spreadsheet-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 14px;
+}
+
+/* ヘッダー行・列 */
+.kagami-spreadsheet-grid thead th {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  padding: 8px 12px;
+  text-align: center;
+  font-weight: 600;
+  color: #495057;
+  font-size: 12px;
+}
+
+.kagami-cell-corner {
+  background: #e9ecef !important;
+  width: 40px;
+  min-width: 40px;
+  max-width: 40px;
+}
+
+.kagami-column-header {
+  min-width: 80px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.kagami-row-header {
+  background: #f8f9fa !important;
+  border: 1px solid #dee2e6 !important;
+  padding: 8px 12px !important;
+  text-align: center !important;
+  font-weight: 600 !important;
+  color: #495057 !important;
+  font-size: 12px !important;
+  width: 40px;
+  min-width: 40px;
+  max-width: 40px;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+/* セルスタイル */
+.kagami-cell {
+  border: 1px solid #dee2e6;
+  padding: 0;
+  position: relative;
+  min-width: 80px;
+  max-width: 200px;
+  height: 32px;
+  transition: all 0.2s ease;
+}
+
+.kagami-cell:hover {
+  background-color: #f8f9fa;
+}
+
+.kagami-cell-selected {
+  background-color: #e3f2fd !important;
+  border-color: #007acc !important;
+  box-shadow: inset 0 0 0 2px #007acc;
+}
+
+.kagami-cell-content {
+  width: 100%;
+  height: 100%;
+  padding: 8px 12px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+}
+
+.kagami-cell-content:focus {
+  background: white;
+  box-shadow: inset 0 0 0 2px #007acc;
+  border-radius: 2px;
+  white-space: pre-wrap;
+  overflow: visible;
+  text-overflow: initial;
+}
+
+/* セル型別スタイル */
+.kagami-cell-number .kagami-cell-content {
+  text-align: right;
+  color: #0066cc;
+  font-weight: 500;
+}
+
+.kagami-cell-string .kagami-cell-content {
+  text-align: left;
+  color: #333;
+}
+
+.kagami-cell-boolean .kagami-cell-content {
+  text-align: center;
+  color: #28a745;
+  font-weight: 600;
+}
+
+.kagami-cell-date .kagami-cell-content {
+  text-align: center;
+  color: #6f42c1;
+}
+
+.kagami-cell-error .kagami-cell-content {
+  text-align: center;
+  color: #dc3545;
+  font-weight: 600;
+  background-color: #f8d7da;
+}
+
+.kagami-cell-empty .kagami-cell-content {
+  color: #6c757d;
+}
+
+/* 数式セル */
+.kagami-cell-formula {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+  position: relative;
+}
+
+.kagami-cell-formula::before {
+  content: 'ƒ';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  font-size: 10px;
+  color: #856404;
+  font-weight: bold;
+  z-index: 1;
+}
+
+.kagami-cell-formula .kagami-cell-content {
+  color: #856404;
+  font-weight: 500;
+}
+
+/* 計算済みセル */
+.kagami-cell-calculated {
+  border-left: 3px solid #28a745;
+}
+
+.kagami-cell-calculated .kagami-cell-content {
+  font-weight: 600;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+  .kagami-spreadsheet-table {
+    margin: 10px 0;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .kagami-table-header {
+    padding: 12px 16px;
+  }
+  
+  .kagami-table-header h3 {
+    font-size: 16px;
+  }
+  
+  .kagami-spreadsheet-grid {
+    font-size: 12px;
+  }
+  
+  .kagami-cell {
+    min-width: 60px;
+    max-width: 150px;
+    height: 28px;
+  }
+  
+  .kagami-cell-content {
+    padding: 6px 8px;
+  }
+  
+  .kagami-column-header,
+  .kagami-row-header {
+    padding: 6px 8px !important;
+  }
+  
+  .kagami-cell-corner {
+    width: 30px !important;
+    min-width: 30px !important;
+    max-width: 30px !important;
+  }
+  
+  .kagami-row-header {
+    width: 30px !important;
+    min-width: 30px !important;
+    max-width: 30px !important;
+  }
+}
+
+/* アニメーション */
+@keyframes cellUpdate {
+  0% {
+    background-color: #d4edda;
+    transform: scale(1.05);
+  }
+  100% {
+    background-color: transparent;
+    transform: scale(1);
+  }
+}
+
+.kagami-cell-updated {
+  animation: cellUpdate 0.5s ease-out;
+}
+
+/* スクロールバーのスタイル */
+.kagami-spreadsheet-grid {
+  scrollbar-width: thin;
+  scrollbar-color: #007acc #f8f9fa;
+}
+
+.kagami-spreadsheet-grid::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.kagami-spreadsheet-grid::-webkit-scrollbar-track {
+  background: #f8f9fa;
+}
+
+.kagami-spreadsheet-grid::-webkit-scrollbar-thumb {
+  background: #007acc;
+  border-radius: 4px;
+}
+
+.kagami-spreadsheet-grid::-webkit-scrollbar-thumb:hover {
+  background: #005a9e;
+}
+
+/* 選択範囲のスタイル */
+.kagami-cell-in-selection {
+  background-color: rgba(0, 122, 204, 0.1);
+  border-color: #007acc;
+}
+
+/* フォーカス状態のスタイル */
+.kagami-cell-content:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px #007acc;
+  z-index: 10;
+  position: relative;
+}
+
+/* ツールチップ */
+.kagami-cell[data-tooltip] {
+  position: relative;
+}
+
+.kagami-cell[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 1000;
+  opacity: 0.9;
+}
+
+/* 印刷対応 */
+@media print {
+  .kagami-spreadsheet-table {
+    break-inside: avoid;
+    box-shadow: none;
+    border: 1px solid #000;
+  }
+  
+  .kagami-table-header {
+    background: #000 !important;
+    color: white !important;
+  }
+  
+  .kagami-spreadsheet-grid {
+    font-size: 10px;
+  }
+  
+  .kagami-cell {
+    border: 1px solid #000;
+  }
+  
+  .kagami-cell-content {
+    color: #000 !important;
+  }
+  
+  .kagami-cell-formula {
+    background: #f0f0f0 !important;
+  }
+} 

@@ -1,0 +1,18 @@
+[workspace]
+
+[package]
+name = "kawadb-wasm"
+version = "0.1.0"
+edition = "2021"
+authors = ["Kawasaki"]
+description = "WebAssembly bindings for Kawa message broker (alias for kawa-wasm)"
+license = "KawaDB Community License"
+repository = "https://github.com/jun784/kawadb.com"
+keywords = ["wasm", "webassembly", "messaging", "broker"]
+categories = ["web-programming", "wasm"]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+kawa-wasm = { path = "../../kawa-wasm", version = "0.1.0" } 

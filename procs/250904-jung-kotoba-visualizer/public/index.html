@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>LLM Path Visualization</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: #111111;
+        color: #ffffff;
+        overflow: hidden;
+      }
+
+      .container {
+        display: flex;
+        height: 100vh;
+      }
+
+      .tree-container {
+        flex: 1;
+        position: relative;
+      }
+
+      .wordmap-container {
+        width: 400px;
+        background: #1a1a1a;
+        border-left: 2px solid #333;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .wordmap-header {
+        padding: 15px;
+        background: #2a2a2a;
+        border-bottom: 1px solid #444;
+        font-size: 16px;
+        font-weight: bold;
+      }
+
+      .wordmap-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 15px;
+      }
+
+      .word-item {
+        padding: 8px 12px;
+        margin-bottom: 5px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 2px solid transparent;
+        font-size: 14px;
+      }
+
+      .word-item:hover {
+        background: rgba(255, 255, 255, 0.1);
+        transform: translateY(-1px);
+      }
+
+      .word-item.selected {
+        background: rgba(0, 123, 255, 0.2);
+        border-color: #007bff;
+      }
+
+      .word-item.highlighted {
+        background: rgba(255, 193, 7, 0.2);
+        border-color: #ffc107;
+      }
+
+      .path-display {
+        margin-top: 20px;
+        padding: 15px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 8px;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+
+      .path-title {
+        font-weight: bold;
+        margin-bottom: 8px;
+        color: #ffc107;
+      }
+
+      .path-text {
+        color: #cccccc;
+        font-family: monospace;
+      }
+
+      canvas {
+        display: block;
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+
+      .control-panel {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: rgba(0, 0, 0, 0.8);
+        padding: 15px;
+        border-radius: 8px;
+        z-index: 1000;
+      }
+
+      .control-panel input {
+        width: 200px;
+        padding: 8px;
+        margin-bottom: 10px;
+        background: #2a2a2a;
+        border: 1px solid #444;
+        border-radius: 4px;
+        color: #ffffff;
+        font-size: 14px;
+      }
+
+      .control-panel button {
+        padding: 8px 15px;
+        background: #007bff;
+        border: none;
+        border-radius: 4px;
+        color: white;
+        cursor: pointer;
+        font-size: 14px;
+      }
+
+      .control-panel button:hover {
+        background: #0056b3;
+      }
+
+      .highlight-controls {
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #444;
+      }
+
+      .highlight-controls input {
+        width: 140px;
+        padding: 6px;
+        margin-right: 8px;
+        background: #2a2a2a;
+        border: 1px solid #444;
+        border-radius: 4px;
+        color: #ffffff;
+        font-size: 13px;
+      }
+
+      .highlight-controls button {
+        padding: 6px 12px;
+        margin-right: 5px;
+        background: #28a745;
+        border: none;
+        border-radius: 4px;
+        color: white;
+        cursor: pointer;
+        font-size: 13px;
+      }
+
+      .highlight-controls button:hover {
+        background: #1e7e34;
+      }
+
+      .highlight-controls button:last-child {
+        background: #dc3545;
+      }
+
+      .highlight-controls button:last-child:hover {
+        background: #bd2130;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="tree-container">
+        <div class="control-panel">
+          <input type="text" id="prompt-input" placeholder="Enter prompt..." value="Intelligence">
+          <button onclick="generateNewTree()">Generate Tree</button>
+          <button onclick="generateLanguageSpace()">Generate Language Space</button>
+          <div class="highlight-controls" id="highlight-controls" style="display: none;">
+            <input type="text" id="highlight-word-input" placeholder="Highlight word..." style="width: 150px; margin-top: 10px;">
+            <button onclick="highlightSubtree()">Highlight Subtree</button>
+            <button onclick="clearHighlights()">Clear</button>
+          </div>
+        </div>
+      </div>
+      <div class="wordmap-container">
+        <div class="wordmap-header">Word Map</div>
+        <div class="wordmap-content" id="wordmap-content"></div>
+        <div class="path-display" id="path-display">
+          <div class="path-title">Current Path:</div>
+          <div class="path-text" id="path-text">Hover over nodes to see paths</div>
+        </div>
+      </div>
+    </div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.148.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.148.0/examples/jsm/"
+        }
+      }
+    </script>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
