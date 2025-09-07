@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宇宙進化の情報処理プロセス - インタラクティブ図表</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #000428 0%, #004e92 100%);
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+        
+        .main-container {
+            position: relative;
+            width: 100vw;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            text-align: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border-bottom: 2px solid #00d4ff;
+        }
+        
+        .header h1 {
+            font-size: 32px;
+            margin: 0;
+            color: #00d4ff;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+        }
+        
+        .header p {
+            font-size: 16px;
+            margin: 10px 0;
+            color: #bbbbbb;
+        }
+        
+        .timeline-container {
+            position: relative;
+            width: 100%;
+            height: 600px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid #00d4ff;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+        
+        .timeline {
+            position: absolute;
+            top: 50%;
+            left: 50px;
+            right: 50px;
+            height: 4px;
+            background: linear-gradient(to right, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #ffeaa7);
+            transform: translateY(-50%);
+            border-radius: 2px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+        }
+        
+        .timeline-marker {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #ffffff;
+            border: 3px solid #00d4ff;
+            border-radius: 50%;
+            top: -10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.5);
+        }
+        
+        .timeline-marker:hover {
+            transform: scale(1.5);
+            box-shadow: 0 0 25px rgba(0, 212, 255, 0.8);
+        }
+        
+        .timeline-marker.active {
+            transform: scale(1.8);
+            background: #00d4ff;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 15px rgba(0, 212, 255, 0.5); }
+            50% { box-shadow: 0 0 35px rgba(0, 212, 255, 1); }
+        }
+        
+        .info-processing-display {
+            display: flex;
+            height: 400px;
+            margin: 20px;
+            gap: 20px;
+        }
+        
+        .info-panel {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00d4ff;
+            border-radius: 10px;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .info-panel h3 {
+            color: #00d4ff;
+            margin-top: 0;
+            font-size: 20px;
+        }
+        
+        .visualization-panel {
+            flex: 2;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00d4ff;
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #visualization-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        .control-panel {
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-top: 2px solid #00d4ff;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .control-button {
+            background: linear-gradient(45deg, #00d4ff, #0099cc);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+        }
+        
+        .control-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 212, 255, 0.5);
+        }
+        
+        .control-button:active {
+            transform: translateY(0);
+        }
+        
+        .parameter-display {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #00d4ff;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .parameter-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #00d4ff;
+        }
+        
+        .parameter-item .label {
+            font-size: 14px;
+            color: #bbbbbb;
+            margin-bottom: 5px;
+        }
+        
+        .parameter-item .value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+        
+        .equation-display {
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #00d4ff;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .equation-display .equation {
+            font-size: 24px;
+            color: #00ff88;
+            margin: 10px 0;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+        
+        .equation-display .description {
+            font-size: 16px;
+            color: #cccccc;
+            margin-top: 15px;
+        }
+        
+        .complexity-meter {
+            width: 100%;
+            height: 30px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00d4ff;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 20px 0;
+            position: relative;
+        }
+        
+        .complexity-fill {
+            height: 100%;
+            background: linear-gradient(to right, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #ffeaa7);
+            transition: width 0.5s ease;
+            border-radius: 15px;
+        }
+        
+        .complexity-label {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-weight: bold;
+            color: #ffffff;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="header">
+            <h1>宇宙進化の情報処理プロセス</h1>
+            <p>BigBangから現在まで: 情報密度・計算複雑性・意識の創発</p>
+        </div>
+        
+        <div class="timeline-container">
+            <div class="timeline"></div>
+            <div class="timeline-marker" data-epoch="0" style="left: 5%;" title="BigBang (t=0)"></div>
+            <div class="timeline-marker" data-epoch="1" style="left: 15%;" title="インフレーション (t=10⁻³²s)"></div>
+            <div class="timeline-marker" data-epoch="2" style="left: 25%;" title="クォーク閉じ込め (t=10⁻⁶s)"></div>
+            <div class="timeline-marker" data-epoch="3" style="left: 35%;" title="核合成 (t=10²s)"></div>
+            <div class="timeline-marker" data-epoch="4" style="left: 50%;" title="再結合 (t=3.8×10⁵年)"></div>
+            <div class="timeline-marker" data-epoch="5" style="left: 65%;" title="最初の星 (t=10⁸年)"></div>
+            <div class="timeline-marker" data-epoch="6" style="left: 80%;" title="銀河形成 (t=10⁹年)"></div>
+            <div class="timeline-marker" data-epoch="7" style="left: 95%;" title="現在 (t=13.8×10⁹年)"></div>
+        </div>
+        
+        <div class="info-processing-display">
+            <div class="info-panel">
+                <h3>宇宙論的時代</h3>
+                <div id="epoch-info">
+                    <p>マーカーをクリックして各時代の情報処理プロセスを探索してください。</p>
+                </div>
+            </div>
+            
+            <div class="visualization-panel">
+                <canvas id="visualization-canvas"></canvas>
+            </div>
+        </div>
+        
+        <div class="equation-display">
+            <div class="equation" id="current-equation">
+                ∂ρ_I/∂t + ∇·(ρ_I v_I) = Γ_gen - Γ_decay
+            </div>
+            <div class="description" id="equation-description">
+                情報密度の保存則 - 宇宙の基本的な情報処理原理
+            </div>
+        </div>
+        
+        <div class="parameter-display">
+            <div class="parameter-item">
+                <div class="label">情報密度 (ρ_I)</div>
+                <div class="value" id="info-density">1.0 × 10⁶⁰ bits/m³</div>
+            </div>
+            <div class="parameter-item">
+                <div class="label">計算複雑性 (C)</div>
+                <div class="value" id="complexity">2.5 × 10⁴⁰ ops/s</div>
+            </div>
+            <div class="parameter-item">
+                <div class="label">情報生成率 (Γ_gen)</div>
+                <div class="value" id="gen-rate">1.2 × 10³⁰ bits/s</div>
+            </div>
+            <div class="parameter-item">
+                <div class="label">情報崩壊率 (Γ_decay)</div>
+                <div class="value" id="decay-rate">0.8 × 10³⁰ bits/s</div>
+            </div>
+            <div class="parameter-item">
+                <div class="label">量子もつれ度 (E)</div>
+                <div class="value" id="entanglement">0.85</div>
+            </div>
+            <div class="parameter-item">
+                <div class="label">意識指数 (Φ)</div>
+                <div class="value" id="consciousness">0.42</div>
+            </div>
+        </div>
+        
+        <div class="complexity-meter">
+            <div class="complexity-fill" id="complexity-fill" style="width: 30%;"></div>
+            <div class="complexity-label" id="complexity-label">計算複雑性: 30%</div>
+        </div>
+        
+        <div class="control-panel">
+            <button class="control-button" onclick="startEvolution()">進化開始</button>
+            <button class="control-button" onclick="pauseEvolution()">停止</button>
+            <button class="control-button" onclick="resetEvolution()">リセット</button>
+            <button class="control-button" onclick="toggleQuantumMode()">量子モード</button>
+            <button class="control-button" onclick="exportData()">データ出力</button>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentEpoch = 0;
+        let isEvolutionRunning = false;
+        let quantumMode = false;
+        let evolutionTimer;
+        let canvas, ctx;
+        let animationFrame = 0;
+        
+        // Cosmic epoch data
+        const epochs = [
+            {
+                name: "BigBang",
+                time: "t = 0",
+                infoDensity: 1e120,
+                complexity: 1e100,
+                genRate: 1e80,
+                decayRate: 0,
+                entanglement: 1.0,
+                consciousness: 0.0,
+                equation: "H = √(8πGρ/3) → ∞",
+                description: "特異点における無限の情報密度と計算複雑性。宇宙の初期条件として全ての情報が凝縮。"
+            },
+            {
+                name: "インフレーション",
+                time: "t = 10⁻³²s",
+                infoDensity: 1e80,
+                complexity: 1e60,
+                genRate: 1e50,
+                decayRate: 1e45,
+                entanglement: 0.99,
+                consciousness: 0.01,
+                equation: "a(t) = a₀ e^(Ht)",
+                description: "指数的膨張により情報が希釈されるが、量子揺らぎが新しい情報を生成。計算複雑性は急速に増大。"
+            },
+            {
+                name: "クォーク閉じ込め",
+                time: "t = 10⁻⁶s",
+                infoDensity: 1e70,
+                complexity: 1e50,
+                genRate: 1e40,
+                decayRate: 1e35,
+                entanglement: 0.95,
+                consciousness: 0.05,
+                equation: "QCD: g²/(12π) → 0",
+                description: "強い相互作用により陽子・中性子が形成。量子色力学による情報処理の新しい階層が出現。"
+            },
+            {
+                name: "原始核合成",
+                time: "t = 10²s",
+                infoDensity: 1e65,
+                complexity: 1e45,
+                genRate: 1e35,
+                decayRate: 1e30,
+                entanglement: 0.90,
+                consciousness: 0.10,
+                equation: "⁴He + ²H → ⁶Li + γ",
+                description: "軽元素合成により核構造の情報が固定化。元素存在比が情報処理の基盤を提供。"
+            },
+            {
+                name: "再結合",
+                time: "t = 3.8×10⁵年",
+                infoDensity: 1e60,
+                complexity: 1e40,
+                genRate: 1e30,
+                decayRate: 1e25,
+                entanglement: 0.80,
+                consciousness: 0.20,
+                equation: "p + e⁻ → H + γ",
+                description: "水素原子の形成により光子が自由に伝播。宇宙背景放射として情報が保存される。"
+            },
+            {
+                name: "最初の星",
+                time: "t = 10⁸年",
+                infoDensity: 1e55,
+                complexity: 1e35,
+                genRate: 1e25,
+                decayRate: 1e20,
+                entanglement: 0.70,
+                consciousness: 0.30,
+                equation: "M_Jeans = (kT/Gm)^(3/2) ρ^(-1/2)",
+                description: "重力収縮により最初の星が誕生。核融合により重元素が生成され、化学的複雑性が出現。"
+            },
+            {
+                name: "銀河形成",
+                time: "t = 10⁹年",
+                infoDensity: 1e50,
+                complexity: 1e30,
+                genRate: 1e20,
+                decayRate: 1e15,
+                entanglement: 0.60,
+                consciousness: 0.50,
+                equation: "t_ff = √(3π/32Gρ)",
+                description: "銀河スケールの構造形成。恒星系の形成により惑星環境が整備され、複雑な化学進化が可能に。"
+            },
+            {
+                name: "現在",
+                time: "t = 13.8×10⁹年",
+                infoDensity: 1e45,
+                complexity: 1e25,
+                genRate: 1e15,
+                decayRate: 1e10,
+                entanglement: 0.50,
+                consciousness: 0.80,
+                equation: "Φ = ∫ φ(x) log φ(x) dx",
+                description: "生命と意識の出現。情報処理能力が生物学的進化を通じて飛躍的に向上。意識による宇宙の自己認識。"
+            }
+        ];
+        
+        // Initialize
+        window.addEventListener('load', function() {
+            canvas = document.getElementById('visualization-canvas');
+            ctx = canvas.getContext('2d');
+            
+            // Set canvas size
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            // Add event listeners
+            document.querySelectorAll('.timeline-marker').forEach(marker => {
+                marker.addEventListener('click', function() {
+                    const epochIndex = parseInt(this.dataset.epoch);
+                    showEpoch(epochIndex);
+                });
+            });
+            
+            // Start with first epoch
+            showEpoch(0);
+            
+            // Start animation loop
+            animate();
+        });
+        
+        function showEpoch(epochIndex) {
+            if (epochIndex < 0 || epochIndex >= epochs.length) return;
+            
+            currentEpoch = epochIndex;
+            const epoch = epochs[epochIndex];
+            
+            // Update active marker
+            document.querySelectorAll('.timeline-marker').forEach(marker => {
+                marker.classList.remove('active');
+            });
+            document.querySelector(`[data-epoch="${epochIndex}"]`).classList.add('active');
+            
+            // Update info panel
+            document.getElementById('epoch-info').innerHTML = `
+                <h4>${epoch.name}</h4>
+                <p><strong>時間:</strong> ${epoch.time}</p>
+                <p><strong>主要プロセス:</strong> ${epoch.description}</p>
+                <p><strong>情報処理特性:</strong></p>
+                <ul>
+                    <li>情報密度: ${epoch.infoDensity.toExponential(2)} bits/m³</li>
+                    <li>計算複雑性: ${epoch.complexity.toExponential(2)} ops/s</li>
+                    <li>量子もつれ度: ${epoch.entanglement.toFixed(2)}</li>
+                    <li>意識指数: ${epoch.consciousness.toFixed(2)}</li>
+                </ul>
+            `;
+            
+            // Update equation display
+            document.getElementById('current-equation').textContent = epoch.equation;
+            document.getElementById('equation-description').textContent = epoch.description;
+            
+            // Update parameter display
+            document.getElementById('info-density').textContent = epoch.infoDensity.toExponential(2) + ' bits/m³';
+            document.getElementById('complexity').textContent = epoch.complexity.toExponential(2) + ' ops/s';
+            document.getElementById('gen-rate').textContent = epoch.genRate.toExponential(2) + ' bits/s';
+            document.getElementById('decay-rate').textContent = epoch.decayRate.toExponential(2) + ' bits/s';
+            document.getElementById('entanglement').textContent = epoch.entanglement.toFixed(2);
+            document.getElementById('consciousness').textContent = epoch.consciousness.toFixed(2);
+            
+            // Update complexity meter
+            const complexityPercent = (epochIndex / (epochs.length - 1)) * 100;
+            document.getElementById('complexity-fill').style.width = complexityPercent + '%';
+            document.getElementById('complexity-label').textContent = `計算複雑性: ${complexityPercent.toFixed(0)}%`;
+        }
+        
+        function animate() {
+            if (!ctx) return;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const epoch = epochs[currentEpoch];
+            const time = animationFrame * 0.05;
+            
+            // Draw information field
+            drawInformationField(epoch, time);
+            
+            // Draw quantum states (if quantum mode is enabled)
+            if (quantumMode) {
+                drawQuantumStates(epoch, time);
+            }
+            
+            // Draw complexity evolution
+            drawComplexityEvolution(epoch, time);
+            
+            // Draw consciousness emergence
+            drawConsciousnessEmergence(epoch, time);
+            
+            animationFrame++;
+            requestAnimationFrame(animate);
+        }
+        
+        function drawInformationField(epoch, time) {
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // Information density visualization
+            const gridSize = 20;
+            const cols = Math.floor(width / gridSize);
+            const rows = Math.floor(height / gridSize);
+            
+            for (let i = 0; i < cols; i++) {
+                for (let j = 0; j < rows; j++) {
+                    const x = i * gridSize;
+                    const y = j * gridSize;
+                    
+                    // Calculate information density at this point
+                    const density = epoch.infoDensity * (1 + 0.3 * Math.sin(time * 0.1 + i * 0.1 + j * 0.1));
+                    const normalizedDensity = Math.log(density) / Math.log(1e120);
+                    
+                    // Color based on density
+                    const hue = 240 - normalizedDensity * 240; // Blue to red
+                    const saturation = 70 + normalizedDensity * 30;
+                    const lightness = 20 + normalizedDensity * 60;
+                    
+                    ctx.fillStyle = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+                    ctx.fillRect(x, y, gridSize - 1, gridSize - 1);
+                }
+            }
+        }
+        
+        function drawQuantumStates(epoch, time) {
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // Quantum state visualization
+            ctx.globalAlpha = 0.7;
+            
+            const numStates = Math.floor(epoch.entanglement * 50);
+            for (let i = 0; i < numStates; i++) {
+                const x = (i / numStates) * width;
+                const y = height / 2 + 50 * Math.sin(time * 0.1 + i * 0.2);
+                
+                const waveFunction = Math.sin(time * 0.2 + i * 0.1);
+                const amplitude = Math.abs(waveFunction) * 20;
+                
+                ctx.fillStyle = waveFunction > 0 ? 'rgba(0, 255, 136, 0.8)' : 'rgba(255, 107, 107, 0.8)';
+                ctx.beginPath();
+                ctx.arc(x, y, amplitude, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            ctx.globalAlpha = 1.0;
+        }
+        
+        function drawComplexityEvolution(epoch, time) {
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // Complexity evolution curve
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            for (let x = 0; x < width; x += 5) {
+                const t = (x / width) * 13.8e9; // Time in years
+                const complexity = Math.log(epoch.complexity) * (1 + 0.1 * Math.sin(time * 0.05 + x * 0.01));
+                const y = height - (complexity / Math.log(1e100)) * height * 0.3;
+                
+                if (x === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            ctx.stroke();
+        }
+        
+        function drawConsciousnessEmergence(epoch, time) {
+            if (epoch.consciousness > 0.1) {
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                // Consciousness field
+                ctx.globalAlpha = epoch.consciousness * 0.5;
+                
+                const centerX = width / 2;
+                const centerY = height / 2;
+                const radius = epoch.consciousness * 100;
+                
+                const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+                gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+                gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.globalAlpha = 1.0;
+            }
+        }
+        
+        // Control functions
+        function startEvolution() {
+            if (isEvolutionRunning) return;
+            
+            isEvolutionRunning = true;
+            evolutionTimer = setInterval(() => {
+                currentEpoch = (currentEpoch + 1) % epochs.length;
+                showEpoch(currentEpoch);
+            }, 3000);
+        }
+        
+        function pauseEvolution() {
+            isEvolutionRunning = false;
+            if (evolutionTimer) {
+                clearInterval(evolutionTimer);
+            }
+        }
+        
+        function resetEvolution() {
+            pauseEvolution();
+            currentEpoch = 0;
+            showEpoch(0);
+            animationFrame = 0;
+        }
+        
+        function toggleQuantumMode() {
+            quantumMode = !quantumMode;
+            const button = event.target;
+            button.textContent = quantumMode ? '古典モード' : '量子モード';
+            button.style.background = quantumMode ? 
+                'linear-gradient(45deg, #ff6b6b, #ff8e8e)' : 
+                'linear-gradient(45deg, #00d4ff, #0099cc)';
+        }
+        
+        function exportData() {
+            const data = {
+                currentEpoch: currentEpoch,
+                epochData: epochs[currentEpoch],
+                timestamp: new Date().toISOString(),
+                quantumMode: quantumMode
+            };
+            
+            const dataStr = JSON.stringify(data, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `cosmic_evolution_data_${currentEpoch}.json`;
+            link.click();
+            
+            URL.revokeObjectURL(url);
+        }
+        
+        // Window resize handler
+        window.addEventListener('resize', function() {
+            if (canvas) {
+                canvas.width = canvas.offsetWidth;
+                canvas.height = canvas.offsetHeight;
+            }
+        });
+    </script>
+</body>
+</html> 

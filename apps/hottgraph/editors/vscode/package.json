@@ -1,0 +1,54 @@
+{
+    "name": "kotoba-language",
+    "displayName": "Kotoba Language Support",
+    "description": "Syntax highlighting for the Kotoba language.",
+    "version": "0.0.1",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/gftdcojp/hottgraph.git"
+    },
+    "engines": {
+        "vscode": "^1.88.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "kotoba",
+                "aliases": [
+                    "Kotoba",
+                    "kotoba"
+                ],
+                "extensions": [
+                    ".kotoba"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "kotoba",
+                "scopeName": "source.kotoba",
+                "path": "./syntaxes/kotoba.tmLanguage.json"
+            }
+        ]
+    },
+    "main": "./out/extension.js",
+    "activationEvents": [
+        "onLanguage:kotoba"
+    ],
+    "scripts": {
+        "vscode:prepublish": "pnpm run compile",
+        "compile": "tsc -p .",
+        "watch": "tsc -w -p ."
+    },
+    "devDependencies": {
+        "@types/node": "^24.1.0",
+        "@types/vscode": "^1.88.0",
+        "@vscode/vsce": "^3.6.0",
+        "typescript": "^5.8.3",
+        "vscode-languageclient": "^8.0.0"
+    }
+}
