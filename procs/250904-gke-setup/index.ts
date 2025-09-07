@@ -4,10 +4,11 @@ import * as k8s from "@pulumi/kubernetes";
 
 // Create a GKE cluster
 const cluster = new gcp.container.Cluster("temporal-cluster", {
-    initialNodeCount: 3,
+    initialNodeCount: 1,
     location: "asia-northeast1",
     nodeConfig: {
         machineType: "e2-medium",
+        diskSizeGb: 30, // Explicitly set a smaller disk size to fit within the quota
     },
 });
 
