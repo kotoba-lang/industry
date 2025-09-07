@@ -1,0 +1,96 @@
+export const meta = {
+  title: "Information is Physical Quantity",
+  date: "2024-12-01",
+  author: {
+    name: "Jun Kawasaki",
+    picture: "/assets/posts/authors/jk.jpg"
+  },
+  excerpt: "Exploring the physical nature of information and its implications",
+  coverImage: "/assets/posts/preview/cover.jpg",
+  ogImage: {
+    url: "/assets/posts/preview/cover.jpg"
+  }
+};
+
+# IN - Information is a physical quantity
+
+*Redefining Information as a Physical Quantity and Its Implications—Building on the Experimental Results of Toyabe et al. (2010).*
+
+In the beginning was the Word, and the Word was with God, and the Word was God. - John 1
+
+## Abstract
+
+This paper proposes a framework in which information is treated as a measurable physical quantity, on par with energy and entropy. While information has traditionally been considered an abstract concept defined within the scope of Shannon theory, the experimental realization of a Maxwell’s demon by Toyabe et al. (2010) has provided striking evidence that information can be harnessed to extract work from thermal fluctuations. This result shows that information holds a tangible physical significance. Using these insights, we redefine information as a physical quantity, discuss methods of measurement and standardization, and explore potential applications in information thermodynamics and beyond.
+
+### 1. Introduction
+
+Since Shannon’s seminal work (1948), information has been regarded primarily as a measure of uncertainty or the average length of coded messages, largely as an abstract, mathematical concept. Although this viewpoint has been indispensable for communication theory and computation, it has long remained separate from physical realizations of information.
+
+Landauer’s principle (Landauer, 1961), which states that erasing one bit of information necessarily dissipates at least k_B T ln(2) of energy, provides a deep connection between information and thermodynamics. Further progress in quantum information theory (Nielsen & Chuang, 2000) has given us a framework to link information directly to physical states.
+
+Most compellingly, the experimental demonstration by Toyabe et al. (2010) showed that by acquiring information on the position of a Brownian particle and applying feedback, one can extract work from thermal fluctuations. This experimental Maxwell’s demon validates the idea that information can function as a resource, much like energy. If information can be directly measured and converted to work, it must be regarded as a physically real quantity.
+
+In this paper, we build on these developments, particularly the work by Toyabe et al. (2010), to redefine information as a physical quantity. We explore how to measure and quantify information within a physical system, consider how it can be integrated into thermodynamic laws, and discuss its applications in fields ranging from information thermodynamics to quantum computation and fundamental physics.
+
+### 2. Theoretical Background
+
+#### 2.1 From Abstract Information to Physical Information
+
+Shannon information is defined as the uncertainty reduction in a probability distribution: H = -k_B Σ p_i ln p_i (with k_B introduced as a scaling factor). Although analogous to entropy in form, Shannon information has conventionally not been considered a physical quantity.
+
+#### 2.2 Landauer’s Principle and Quantum Information
+
+Landauer’s principle connects information processing—specifically the erasure of one bit—to a fundamental energy cost, thereby tying information to thermodynamic irreversibility. Quantum information theory takes this further by embedding information directly in the physical states of qubits, thus showing that the manipulation and measurement of information are inherently physical processes.
+
+#### 2.3 Significance of Toyabe et al. (2010)
+
+Toyabe and colleagues implemented a feedback control scheme that functioned as a Maxwell’s demon, extracting work from a colloidal particle immersed in a thermal bath by using the information obtained through measurement. This experiment directly demonstrated that information can be used as a resource to produce work, linking it inseparably to energy and entropy flows. Such experimental evidence strongly supports the notion that information is not merely an abstract concept but can be treated as a physically measurable quantity.
+
+### 3. Formulating Information as a Physical Quantity
+
+#### 3.1 Definition Based on State Space
+
+Consider a physical system described by a set of possible states with corresponding probabilities. Shannon information quantifies the uncertainty of these states. Toyabe et al.’s experiment shows that acquiring information about these states is not a passive, abstract act; rather, it is an active physical process that alters the system’s effective entropy and can yield work. Thus, information can be conceived as a property encoded in the statistical description of the system.
+
+#### 3.2 Information-Energy Interchangeability
+
+The core insight from Toyabe et al. (2010) is the demonstration that information can be converted into usable work. The obtained information allows for a non-equilibrium potential to be created from random thermal motion. Since extracting one bit of information can, in principle, provide around k_B T ln(2) of free energy, we have a direct exchange rate between information and energy.
+
+#### 3.3 Units and Standardization
+
+Information is traditionally measured in bits or nats. Landauer’s principle connects these units to an energy scale: one bit corresponds to k_B T ln(2) of dissipated energy under erasure operations. The Toyabe experiment confirms this principle from a practical standpoint, enabling the unification of information units with well-established physical energy units (such as Joules) through a thermodynamic relationship.
+
+### 4. Experimental Verification and Observability
+
+#### 4.1 Revisiting the Toyabe et al. (2010) Experiment
+
+In the experiment, the researchers observed a colloidal particle in a harmonic potential subjected to thermal fluctuations. By measuring the particle’s position and applying a feedback protocol to shift the potential, they extracted work from the system without adding external energy. This process effectively converted the acquired information into mechanical work, proving that information can be directly observed and harnessed as a tangible resource.
+
+#### 4.2 Extensions to Other Platforms
+
+The insights from Toyabe’s experiment can be applied to other systems, such as nano-scale heat engines, quantum dots, ion traps, and superconducting qubits. Verifying the interchangeability of information and energy across various physical platforms will further solidify the universality of information as a measurable physical quantity.
+
+### 5. Applications and Outlook
+
+#### 5.1 Advancement of Information Thermodynamics
+
+Treating information as a physical quantity opens the door to a richer field of information thermodynamics. Concepts like information engines, resource theories for error correction, and entropy management strategies become tangible engineering possibilities. By quantifying information and energy on the same footing, new principles for designing efficient information-to-work conversion devices emerge.
+
+#### 5.2 Quantum Computation and Resource Assessment
+
+In quantum computation, every logical operation, measurement, and error correction step has physical implications. Defining information as a physical quantity enables the evaluation of the fundamental resource costs and energetic limits of quantum algorithms, fault-tolerant codes, and quantum communication protocols.
+
+#### 5.3 Foundational Physics and Maxwell’s Demon
+
+The Maxwell’s demon paradox historically raised the question of how information acquisition could seemingly violate the second law of thermodynamics. By acknowledging information as a physical quantity, we reconcile this paradox. Information acquisition compensates for the extracted work via a corresponding entropy cost elsewhere in the total system, preserving the second law. This perspective may also offer new insights into black hole information puzzles and the role of information in cosmology.
+
+### 6. Conclusion
+
+This paper has presented a conceptual framework for redefining information as a physical quantity, guided by the experimental findings of Toyabe et al. (2010). Their demonstration that information can be converted into work from thermal noise directly supports the idea that information is as real and measurable as energy and entropy. Acknowledging this fact not only deepens our understanding of fundamental thermodynamics but also lays the groundwork for new research avenues in information thermodynamics, quantum computation, and fundamental physics.
+
+### References
+
+Y. Toyabe, T. Sagawa, M. Ueda, E. Muneyuki, M. Sano, "Experimental demonstration of information-to-energy conversion and validation of the generalized Jarzynski equality," Nature Physics, 6, 988–992 (2010). [https://www.nature.com/articles/nphys1821]  
+R. Landauer, "Irreversibility and Heat Generation in the Computing Process," IBM Journal of Research and Development, 5(3), 183–191 (1961).  
+C. E. Shannon, "A Mathematical Theory of Communication," Bell System Technical Journal, 27, 379–423, 623–656 (1948).  
+M. A. Nielsen and I. L. Chuang, Quantum Computation and Quantum Information, Cambridge University Press (2000).

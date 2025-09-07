@@ -1,0 +1,243 @@
+# Voice Conversation Component Specification
+
+## 概要
+
+HumeのText-to-Speech API を使った音声会話コンポーネント。テキストを入力し、サーバーからの応答をテキストと音声で受け取ることができる。また、音声認識、感情分析、会話履歴のデータベース保存機能を含む。
+
+## 技術スタック
+
+- React (Next.js)
+- TypeScript
+- Hume API (TTS)
+- Web Speech API (音声認識)
+- Emotion Recognition API
+- IndexedDB (クライアントサイドストレージ)
+- Zod (バリデーション)
+- Tailwind CSS (スタイリング)
+
+## コンポーネント構造
+
+```
+voice-conversation/
+├── VoiceConversation.tsx   # メインコンポーネント
+├── types.ts                # 型定義
+├── schema.ts               # Zodスキーマ
+├── index.ts                # エクスポート
+└── VoiceConversation.test.tsx  # テスト
+```
+
+## Props
+
+| プロパティ名 | 型 | 必須 | デフォルト値 | 説明 |
+|------------|----|----|-----------|------|
+| apiKey | string | ✓ | 'YOUR_API_KEY' | Hume APIキー |
+| generationId | string | ✗ | '795c949a-1510-4a80-9646-7d0863b023ab' | 音声生成ID |
+| voiceName | string | ✗ | 'David Hume' | 使用する音声の名前 |
+| initialMessage | string | ✗ | 'Hello! How can I assist you today?' | 初期メッセージ |
+| placeholder | string | ✗ | 'Type your message here...' | 入力フィールドのプレースホルダー |
+| speechRecognitionLang | string | ✗ | 'en-US' | 音声認識の言語 |
+| onMessageSent | (message: string) => void | ✗ | - | メッセージ送信時のコールバック |
+| onMessageReceived | (message: string) => void | ✗ | - | メッセージ受信時のコールバック |
+| className | string | ✗ | '' | 追加のCSSクラス |
+| emotionRecognition | boolean | ✗ | false | 感情認識機能を有効にするかどうか |
+| onEmotionDetected | (emotion: EmotionData) => void | ✗ | - | 感情検出時のコールバック |
+| storageEnabled | boolean | ✗ | false | 会話履歴のデータベース保存を有効にするかどうか |
+| storageHandler | (message: Message) => Promise<boolean> | ✗ | - | カスタムストレージハンドラ |
+
+## 型定義
+
+### Message型
+
+```typescript
+interface Message {
+  id: string;
+  content: string;
+  sender: 'user' | 'assistant';
+  timestamp: Date;
+  emotion?: EmotionData;
+}
+```
+
+### EmotionData型
+
+```typescript
+interface EmotionData {
+  primary: EmotionType;
+  confidence: number;
+  secondary?: EmotionType;
+  timestamp: Date;
+}
+
+type EmotionType = 
+  | 'neutral'
+  | 'happy'
+  | 'sad'
+  | 'angry'
+  | 'fearful'
+  | 'disgusted'
+  | 'surprised';
+```
+
+### SpeechRecognitionResult型
+
+```typescript
+interface SpeechRecognitionResult {
+  transcript: string;
+  confidence: number;
+  isFinal: boolean;
+}
+```
+
+### StorageResponse型
+
+```typescript
+interface StorageResponse {
+  success: boolean;
+  messageId?: string;
+  error?: string;
+}
+```
+
+## セキュリティ考慮事項
+
+1. APIキーの保護:
+   - 環境変数 `NEXT_PUBLIC_HUME_API_KEY` 経由で提供
+   - 本番環境では環境変数をサーバーサイドで管理し、クライアントに露出しないことを推奨
+   - フロントエンドでの使用は開発環境のみ
+
+2. 入力バリデーション:
+   - すべての入力はZodスキーマでバリデーション
+   - ユーザー入力のサニタイジング
+
+3. エラーハンドリング:
+   - すべてのAPIコールでエラー処理
+   - ユーザーへの適切なフィードバック
+
+4. データベース保存:
+   - IndexedDBへの保存は、ユーザーの明示的な承認後のみ行う
+   - センシティブな情報を含む会話は永続化しないオプションを提供
+   - カスタムストレージハンドラによる暗号化保存の選択肢
+
+5. 音声認識:
+   - マイクへのアクセス許可を適切に管理
+   - 認識結果の処理前にバリデーション
+
+## 機能
+
+### 基本機能
+- テキスト入力と送信
+- Hume APIによる音声合成
+- メッセージ履歴の表示
+
+### 音声認識機能
+- ブラウザのWeb Speech APIを使用した音声入力
+- 連続認識モードのサポート
+- 多言語対応（speechRecognitionLangプロパティで設定）
+
+### 感情認識機能
+- テキストからの感情分析
+- 主要感情と信頼度スコアの取得
+- 検出された感情に基づく応答の調整
+- UIでの感情表示
+
+### データベース保存機能
+- IndexedDBを使用したクライアントサイドでの会話履歴保存
+- カスタムストレージハンドラによる外部DBへの保存オプション
+- 保存状態の管理と表示
+
+## 使用例
+
+```tsx
+// 基本的な使用法 - 環境変数から自動的にAPIキーを取得
+<VoiceConversation />
+
+// APIキーを明示的に提供
+<VoiceConversation 
+  apiKey={process.env.NEXT_PUBLIC_HUME_API_KEY} 
+/>
+
+// 音声認識を日本語で
+<VoiceConversation
+  speechRecognitionLang="ja-JP"
+/>
+
+// 感情認識を有効化
+<VoiceConversation
+  emotionRecognition={true}
+  onEmotionDetected={(emotion) => console.log('検出された感情:', emotion)}
+/>
+
+// データベース保存を有効化
+<VoiceConversation
+  storageEnabled={true}
+/>
+
+// カスタムストレージハンドラの使用
+<VoiceConversation
+  storageEnabled={true}
+  storageHandler={async (message) => {
+    // カスタムAPIへのメッセージ保存処理
+    const response = await fetch('/api/conversations', {
+      method: 'POST',
+      body: JSON.stringify(message),
+    });
+    return response.ok;
+  }}
+/>
+
+// 総合的なカスタマイズ
+<VoiceConversation 
+  apiKey={process.env.NEXT_PUBLIC_HUME_API_KEY}
+  voiceName="Custom Voice"
+  initialMessage="いらっしゃいませ！"
+  placeholder="メッセージを入力してください..."
+  speechRecognitionLang="ja-JP"
+  emotionRecognition={true}
+  storageEnabled={true}
+  onEmotionDetected={(emotion) => console.log('感情:', emotion)}
+  className="my-custom-class"
+/>
+```
+
+## テスト戦略
+
+| テストカテゴリ | テスト | 重要度 | 説明 |
+|--------------|-------|--------|------|
+| 基本機能 | 初期メッセージの表示 | 5 | 初期メッセージが正しく表示されること |
+| 基本機能 | メッセージ送信 | 5 | ユーザーがメッセージを入力して送信できること |
+| 基本機能 | APIエラー処理 | 4 | API呼び出しエラー時の適切なエラー表示 |
+| 基本機能 | UIカスタマイズ | 3 | プレースホルダーなどのUIカスタマイズが正しく動作すること |
+| データベース | 会話の保存 | 5 | 会話がデータベースに正しく保存されること |
+| データベース | カスタムストレージハンドラ | 5 | カスタムストレージハンドラが正しく動作すること |
+| データベース | ストレージエラー処理 | 4 | ストレージエラー時の適切な処理 |
+| 音声認識 | 音声入力 | 4 | 音声入力がテキストに変換され送信されること |
+| 音声認識 | 多言語サポート | 3 | 異なる言語での音声認識が機能すること |
+| 音声認識 | 認識精度 | 3 | 一定の認識精度を確保できること |
+| 感情認識 | 感情検出 | 4 | テキストから感情が正しく検出されること |
+| 感情認識 | 感情に基づくUI更新 | 3 | 検出された感情に基づいてUIが適切に更新されること |
+| 感情認識 | 感情検出エラー処理 | 3 | 感情検出エラー時の適切な処理 |
+
+## 将来の拡張
+
+1. 実際のAI応答統合 (例: OpenAI API)
+2. 複数の音声オプションとプリセット
+3. 感情に応じた応答の調整
+4. 音声認識の精度向上
+5. 会話分析と統計
+6. エンドツーエンドの暗号化
+7. アクセシビリティの向上
+8. 多言語対応の拡充
+
+## 環境変数の設定
+
+Next.jsアプリケーションでは、環境変数を以下のように設定します：
+
+1. プロジェクトルートに `.env` ファイルを作成
+2. クライアントサイドで使用する場合は `NEXT_PUBLIC_` プレフィックスを付ける
+
+```
+NEXT_PUBLIC_HUME_API_KEY=あなたのAPIキーをここに設定
+NEXT_PUBLIC_EMOTION_API_ENDPOINT=感情分析APIのエンドポイント
+```
+
+> 注意: 実際の本番環境では、APIキーなどの機密情報はサーバーサイドでのみ使用し、クライアントに公開しないことをお勧めします。 

@@ -1,0 +1,33 @@
+# Requirements for Molecular Psychiatry Paper Figure Generation
+# Install with: pip install -r requirements.txt
+
+# Core data manipulation and analysis
+pandas>=1.5.0
+numpy>=1.20.0
+scipy>=1.8.0
+
+# Visualization
+matplotlib>=3.5.0
+seaborn>=0.11.0
+plotly>=5.0.0
+kaleido>=0.2.1
+
+# Machine learning (for ROC curves, etc.)
+scikit-learn==1.5.0
+statsmodels==0.14.2
+requests==2.31.0
+
+# Optional but recommended for better performance
+openpyxl>=3.0.0  # For Excel file support
+pillow>=8.0.0    # For image processing
+
+# Development and testing (optional)
+jupyter>=1.0.0
+ipython>=7.0.0
+
+# Added for markdown conversion and HTML styling
+markdown2
+beautifulsoup4
+
+# For Gene Set Enrichment Analysis
+gseapy>=1.0.0 

@@ -1,0 +1,415 @@
+{
+  "nodes": [
+    {
+      "data": { 
+        "id": "foundations", 
+        "label": "基礎論\n(根系)", 
+        "type": "foundation_root",
+        "category": "基礎論",
+        "level": 0,
+        "description": "数学全体の土台となる根系。すべての数学分野の正当性と定義を支える深い根のネットワーク。",
+        "details": "数理論理学、集合論、圏論から構成される数学の基盤理論"
+      }
+    },
+    {
+      "data": { 
+        "id": "mathematical_logic", 
+        "label": "数理論理学\n(主根)", 
+        "type": "foundation",
+        "category": "基礎論",
+        "level": 1,
+        "description": "命題論理、述語論理、モデル理論、証明論。他分野の正当性証明や形式化の基盤となる主根。",
+        "details": "数学的推論の形式化と証明の構造を研究する分野"
+      }
+    },
+    {
+      "data": { 
+        "id": "set_theory", 
+        "label": "集合論\n(栄養根)", 
+        "type": "foundation",
+        "category": "基礎論",
+        "level": 1,
+        "description": "公理的集合論、順序数・基数、連続体仮説。「数」「関数」「空間」を定義する栄養豊富な根。",
+        "details": "ZF公理系に基づく現代数学の基本概念の定義"
+      }
+    },
+    {
+      "data": { 
+        "id": "category_theory", 
+        "label": "圏論\n(結合根)", 
+        "type": "foundation",
+        "category": "基礎論",
+        "level": 1,
+        "description": "オブジェクトと射、極限・余極限、自然変換。代数・位相・論理を統一的に記述する根の結合組織。",
+        "details": "数学の諸分野を統一的に記述する抽象的言語"
+      }
+    },
+    {
+      "data": { 
+        "id": "pure_mathematics", 
+        "label": "純粋数学\n(主幹)", 
+        "type": "trunk",
+        "category": "純粋数学",
+        "level": 2,
+        "description": "基礎論から栄養を得て成長する主幹。理論的探究と美的追求を目的とする数学の中核。",
+        "details": "代数学、幾何学、解析学、数論、組合せ論の5つの主要分野から構成"
+      }
+    },
+    {
+      "data": { 
+        "id": "algebra", 
+        "label": "代数学\n(代数枝)", 
+        "type": "branch_algebra",
+        "category": "純粋数学",
+        "level": 3,
+        "description": "構造と対称性を研究する力強い代数の枝。抽象化と一般化の美学を追究。",
+        "details": "群論、環論、体論、線型代数学、表現論、ホモロジー代数"
+      }
+    },
+    {
+      "data": { 
+        "id": "abstract_algebra", 
+        "label": "抽象代数学\n(群・環・体)", 
+        "type": "sub_branch",
+        "category": "純粋数学",
+        "level": 4,
+        "description": "群論、環論、体論の三位一体。数学的構造の本質を抽象化した美しい理論。",
+        "details": "群の作用、環のイデアル、体の拡張理論"
+      }
+    },
+    {
+      "data": { 
+        "id": "linear_algebra", 
+        "label": "線型代数学\n(ベクトル空間)", 
+        "type": "sub_branch",
+        "category": "純粋数学",
+        "level": 4,
+        "description": "ベクトル空間、行列、固有値問題。線型変換の美しい対称性を探究。",
+        "details": "行列理論、固有値・固有ベクトル、線型変換"
+      }
+    },
+    {
+      "data": { 
+        "id": "representation_theory", 
+        "label": "表現論\n(対称性の結晶)", 
+        "type": "sub_branch",
+        "category": "純粋数学",
+        "level": 4,
+        "description": "群やリー代数の表現、モジュラー表現。抽象的対称性を具体的行列で表現する芸術。",
+        "details": "群表現、リー代数表現、モジュラー表現"
+      }
+    },
+    {
+      "data": { 
+        "id": "geometry_topology", 
+        "label": "幾何学・位相学\n(形の枝)", 
+        "type": "branch_geometry",
+        "category": "純粋数学",
+        "level": 3,
+        "description": "形と空間の本質を探究する優雅な枝。視覚的直感と抽象的思考の融合。",
+        "details": "ユークリッド幾何、微分幾何、位相空間論、代数幾何"
+      }
+    },
+    {
+      "data": { 
+        "id": "differential_geometry", 
+        "label": "微分幾何学\n(曲がりの美学)", 
+        "type": "sub_branch",
+        "category": "純粋数学",
+        "level": 4,
+        "description": "リーマン計量、接続・曲率。滑らかな多様体上の幾何学的構造の探究。",
+        "details": "リーマン幾何、微分形式、接続理論"
+      }
+    },
+    {
+      "data": { 
+        "id": "algebraic_geometry", 
+        "label": "代数幾何学\n(方程式の景観)", 
+        "type": "sub_branch",
+        "category": "純粋数学",
+        "level": 4,
+        "description": "多項式方程式の幾何学的解釈。代数と幾何の美しい融合。",
+        "details": "スキーム理論、層のコホモロジー、代数的サイクル"
+      }
+    },
+    {
+      "data": { 
+        "id": "topology", 
+        "label": "位相空間論\n(連続性の世界)", 
+        "type": "sub_branch",
+        "category": "純粋数学",
+        "level": 4,
+        "description": "開集合系、連結性、コンパクト性。連続変形で不変な性質を研究。",
+        "details": "点集合位相、代数的位相、微分位相"
+      }
+    },
+    {
+      "data": { 
+        "id": "analysis", 
+        "label": "解析学\n(連続の枝)", 
+        "type": "branch_analysis",
+        "category": "純粋数学",
+        "level": 3,
+        "description": "連続性と変化を捉えるしなやかな枝。極限と無限の深遠な理論。",
+        "details": "微分積分学、実解析、複素解析、フーリエ解析、数値解析"
+      }
+    },
+    {
+      "data": { 
+        "id": "real_analysis", 
+        "label": "実解析学\n(測度と積分)", 
+        "type": "sub_branch",
+        "category": "純粋数学",
+        "level": 4,
+        "description": "測度論、ルベーグ積分、関数空間。実数の連続性を厳密に扱う理論。",
+        "details": "ルベーグ測度、関数解析、バナッハ空間"
+      }
+    },
+    {
+      "data": { 
+        "id": "complex_analysis", 
+        "label": "複素解析学\n(正則関数の世界)", 
+        "type": "sub_branch",
+        "category": "純粋数学",
+        "level": 4,
+        "description": "正則関数、留数計算。複素平面上の美しい調和の世界。",
+        "details": "複素関数論、等角写像、リーマン面"
+      }
+    },
+    {
+      "data": { 
+        "id": "fourier_analysis", 
+        "label": "フーリエ解析\n(周波数の詩)", 
+        "type": "sub_branch",
+        "category": "純粋数学",
+        "level": 4,
+        "description": "関数の周波数分解。時間と周波数の双対性を探究する調和解析。",
+        "details": "フーリエ変換、ウェーブレット、調和解析"
+      }
+    },
+    {
+      "data": { 
+        "id": "number_theory", 
+        "label": "数論\n(整数の枝)", 
+        "type": "branch_number",
+        "category": "純粋数学",
+        "level": 3,
+        "description": "整数の深遠な性質を探究する神秘的な枝。「数学の女王」と呼ばれる美しい理論。",
+        "details": "初等数論、解析的数論、代数的数論、モジュラー形式"
+      }
+    },
+    {
+      "data": { 
+        "id": "analytic_number_theory", 
+        "label": "解析的数論\n(ゼータの調べ)", 
+        "type": "sub_branch",
+        "category": "純粋数学",
+        "level": 4,
+        "description": "ゼータ関数、素数分布。解析学の手法で整数の性質に迫る深遠な理論。",
+        "details": "リーマンゼータ関数、素数定理、L関数"
+      }
+    },
+    {
+      "data": { 
+        "id": "algebraic_number_theory", 
+        "label": "代数的数論\n(ガロアの遺産)", 
+        "type": "sub_branch",
+        "category": "純粋数学",
+        "level": 4,
+        "description": "ガロア群、イデアル論。代数的数の構造を探究する理論。",
+        "details": "ガロア理論、類体論、イワサワ理論"
+      }
+    },
+    {
+      "data": { 
+        "id": "combinatorics", 
+        "label": "組合せ論・離散数学\n(有限の枝)", 
+        "type": "branch_discrete",
+        "category": "純粋数学",
+        "level": 3,
+        "description": "離散構造を扱う複雑に分岐した枝。有限性の中に潜む美しいパターン。",
+        "details": "組合せ論、グラフ理論、計算理論、プロセス代数、暗号理論"
+      }
+    },
+    {
+      "data": { 
+        "id": "graph_theory", 
+        "label": "グラフ理論\n(ネットワークの科学)", 
+        "type": "sub_branch",
+        "category": "純粋数学",
+        "level": 4,
+        "description": "点と線からなるネットワーク構造の数学。現代社会の接続性を数学的に解析。",
+        "details": "グラフアルゴリズム、ネットワーク理論、スペクトラルグラフ理論"
+      }
+    },
+    {
+      "data": { 
+        "id": "computational_theory", 
+        "label": "計算理論\n(アルゴリズムの原理)", 
+        "type": "sub_branch",
+        "category": "純粋数学",
+        "level": 4,
+        "description": "オートマトン、言語理論。計算可能性と複雑性の基礎理論。",
+        "details": "チューリング機械、計算複雑性、アルゴリズム解析"
+      }
+    },
+    {
+      "data": { 
+        "id": "applied_mathematics", 
+        "label": "応用数学\n(実用の葉群)", 
+        "type": "leaf_cluster",
+        "category": "応用数学",
+        "level": 5,
+        "description": "純粋数学の成果を実際の問題に適用。理論と現実を結ぶ光合成を行う豊かな葉群。",
+        "details": "確率論・統計学、最適化理論、偏微分方程式、数値シミュレーション、金融数学"
+      }
+    },
+    {
+      "data": { 
+        "id": "probability_statistics", 
+        "label": "確率論・統計学\n(不確実性の葉)", 
+        "type": "leaf",
+        "category": "応用数学",
+        "level": 6,
+        "description": "不確実性とデータの科学。現代社会の意思決定を支える黄金に輝く葉。",
+        "details": "ランダム現象の数学的記述とデータ分析の理論"
+      }
+    },
+    {
+      "data": { 
+        "id": "optimization_theory", 
+        "label": "最適化理論\n(効率の葉)", 
+        "type": "leaf",
+        "category": "応用数学",
+        "level": 6,
+        "description": "線型・非線型計画法、整数計画法。最良解を求める効率性を追求する機能的な葉。",
+        "details": "制約条件下での最適解を求める数学的手法"
+      }
+    },
+    {
+      "data": { 
+        "id": "partial_differential_equations", 
+        "label": "偏微分方程式\n(変化の葉)", 
+        "type": "leaf",
+        "category": "応用数学",
+        "level": 6,
+        "description": "物理現象の数学的記述。自然界の動的変化を表現する生命力溢れる葉。",
+        "details": "多変数関数の微分方程式による自然現象のモデル化"
+      }
+    },
+    {
+      "data": { 
+        "id": "numerical_computation", 
+        "label": "数値計算・計算科学\n(技術の葉)", 
+        "type": "leaf",
+        "category": "応用数学",
+        "level": 6,
+        "description": "数値シミュレーション、アルゴリズム。計算技術と融合した現代的な葉。",
+        "details": "コンピュータを用いた数値的手法による問題解決"
+      }
+    },
+    {
+      "data": { 
+        "id": "financial_mathematics", 
+        "label": "金融数学・計量経済学\n(価値の葉)", 
+        "type": "leaf",
+        "category": "応用数学",
+        "level": 6,
+        "description": "金融市場のリスクと価値を数学的にモデル化。経済の変動を捉える専門的な葉。",
+        "details": "デリバティブ価格理論、リスク管理、計量経済モデル"
+      }
+    },
+    {
+      "data": { 
+        "id": "interdisciplinary", 
+        "label": "学際領域\n(果実の房)", 
+        "type": "fruit_cluster",
+        "category": "学際領域",
+        "level": 7,
+        "description": "複数分野を融合し新たな理論・手法を創出。次世代の数学を孕む豊かな果実群。",
+        "details": "数学と他分野の境界で生まれる新しい研究領域"
+      }
+    },
+    {
+      "data": { 
+        "id": "mathematical_physics", 
+        "label": "数理物理学\n(理論の果実)", 
+        "type": "fruit",
+        "category": "学際領域",
+        "level": 8,
+        "description": "量子場理論、弦理論の数学的定式化。物理と数学の深い結合から生まれる理論の果実。",
+        "details": "物理学の問題を数学的に厳密に定式化する分野"
+      }
+    },
+    {
+      "data": { 
+        "id": "mathematical_biology", 
+        "label": "数理生物学\n(生命の果実)", 
+        "type": "fruit",
+        "category": "学際領域",
+        "level": 8,
+        "description": "ダイナミカルシステム、ネットワークモデル。生命現象を数理的に解明する生命の果実。",
+        "details": "生物学的現象の数学的モデル化と解析"
+      }
+    },
+    {
+      "data": { 
+        "id": "data_science_ai", 
+        "label": "データサイエンス・AI\n(知識の種)", 
+        "type": "seed",
+        "category": "学際領域",
+        "level": 8,
+        "description": "統計学、最適化、線型代数の融合。未来の知識を育む新しい種。",
+        "details": "ビッグデータと機械学習による知識発見の科学"
+      }
+    }
+  ],
+  "edges": [
+    { "data": { "source": "mathematical_logic", "target": "foundations", "type": "nutrient_flow", "label": "論理的基盤" } },
+    { "data": { "source": "set_theory", "target": "foundations", "type": "nutrient_flow", "label": "集合的基盤" } },
+    { "data": { "source": "category_theory", "target": "foundations", "type": "nutrient_flow", "label": "圏論的基盤" } },
+    { "data": { "source": "foundations", "target": "pure_mathematics", "type": "foundation_to_pure", "label": "理論基盤" } },
+    { "data": { "source": "pure_mathematics", "target": "algebra", "type": "growth_flow", "label": "代数的成長" } },
+    { "data": { "source": "pure_mathematics", "target": "geometry_topology", "type": "growth_flow", "label": "幾何的成長" } },
+    { "data": { "source": "pure_mathematics", "target": "analysis", "type": "growth_flow", "label": "解析的成長" } },
+    { "data": { "source": "pure_mathematics", "target": "number_theory", "type": "growth_flow", "label": "数論的成長" } },
+    { "data": { "source": "pure_mathematics", "target": "combinatorics", "type": "growth_flow", "label": "組合せ的成長" } },
+    { "data": { "source": "algebra", "target": "abstract_algebra", "type": "sub_branch_growth", "label": "抽象化" } },
+    { "data": { "source": "algebra", "target": "linear_algebra", "type": "sub_branch_growth", "label": "線型化" } },
+    { "data": { "source": "algebra", "target": "representation_theory", "type": "sub_branch_growth", "label": "表現化" } },
+    { "data": { "source": "geometry_topology", "target": "differential_geometry", "type": "sub_branch_growth", "label": "微分化" } },
+    { "data": { "source": "geometry_topology", "target": "algebraic_geometry", "type": "sub_branch_growth", "label": "代数化" } },
+    { "data": { "source": "geometry_topology", "target": "topology", "type": "sub_branch_growth", "label": "位相化" } },
+    { "data": { "source": "analysis", "target": "real_analysis", "type": "sub_branch_growth", "label": "実数化" } },
+    { "data": { "source": "analysis", "target": "complex_analysis", "type": "sub_branch_growth", "label": "複素化" } },
+    { "data": { "source": "analysis", "target": "fourier_analysis", "type": "sub_branch_growth", "label": "調和化" } },
+    { "data": { "source": "number_theory", "target": "analytic_number_theory", "type": "sub_branch_growth", "label": "解析化" } },
+    { "data": { "source": "number_theory", "target": "algebraic_number_theory", "type": "sub_branch_growth", "label": "代数化" } },
+    { "data": { "source": "combinatorics", "target": "graph_theory", "type": "sub_branch_growth", "label": "ネットワーク化" } },
+    { "data": { "source": "combinatorics", "target": "computational_theory", "type": "sub_branch_growth", "label": "計算化" } },
+    { "data": { "source": "algebra", "target": "geometry_topology", "type": "cross_pollination", "label": "代数幾何" } },
+    { "data": { "source": "algebra", "target": "number_theory", "type": "cross_pollination", "label": "代数的数論" } },
+    { "data": { "source": "analysis", "target": "geometry_topology", "type": "cross_pollination", "label": "微分幾何" } },
+    { "data": { "source": "analysis", "target": "number_theory", "type": "cross_pollination", "label": "解析的数論" } },
+    { "data": { "source": "geometry_topology", "target": "combinatorics", "type": "cross_pollination", "label": "位相組合せ論" } },
+    { "data": { "source": "mathematical_logic", "target": "computational_theory", "type": "deep_root_support", "label": "論理的基盤" } },
+    { "data": { "source": "set_theory", "target": "real_analysis", "type": "deep_root_support", "label": "集合的基盤" } },
+    { "data": { "source": "category_theory", "target": "algebraic_geometry", "type": "deep_root_support", "label": "圏論的基盤" } },
+    { "data": { "source": "algebra", "target": "applied_mathematics", "type": "application_flow", "label": "代数的応用" } },
+    { "data": { "source": "analysis", "target": "applied_mathematics", "type": "application_flow", "label": "解析的応用" } },
+    { "data": { "source": "applied_mathematics", "target": "probability_statistics", "type": "specialization", "label": "確率統計" } },
+    { "data": { "source": "applied_mathematics", "target": "optimization_theory", "type": "specialization", "label": "最適化" } },
+    { "data": { "source": "applied_mathematics", "target": "partial_differential_equations", "type": "specialization", "label": "偏微分方程式" } },
+    { "data": { "source": "applied_mathematics", "target": "numerical_computation", "type": "specialization", "label": "数値計算" } },
+    { "data": { "source": "applied_mathematics", "target": "financial_mathematics", "type": "specialization", "label": "金融数学" } },
+    { "data": { "source": "applied_mathematics", "target": "interdisciplinary", "type": "synthesis_flow", "label": "応用統合" } },
+    { "data": { "source": "interdisciplinary", "target": "mathematical_physics", "type": "fruition", "label": "物理数学" } },
+    { "data": { "source": "interdisciplinary", "target": "mathematical_biology", "type": "fruition", "label": "生物数学" } },
+    { "data": { "source": "interdisciplinary", "target": "data_science_ai", "type": "seed_formation", "label": "データ科学" } },
+    { "data": { "source": "linear_algebra", "target": "numerical_computation", "type": "direct_application", "label": "数値線型代数" } },
+    { "data": { "source": "probability_statistics", "target": "data_science_ai", "type": "direct_application", "label": "統計的学習" } },
+    { "data": { "source": "optimization_theory", "target": "data_science_ai", "type": "direct_application", "label": "最適化学習" } },
+    { "data": { "source": "partial_differential_equations", "target": "mathematical_physics", "type": "direct_application", "label": "PDE物理" } },
+    { "data": { "source": "differential_geometry", "target": "mathematical_physics", "type": "direct_application", "label": "幾何物理" } }
+  ]
+} 

@@ -1,0 +1,90 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# ConsentForm Specification
+
+## Purpose
+The ConsentForm component provides a standardized interface for collecting user consent and demographic information before participation in research studies. It follows ethical research standards and provides clear information about the research purpose, procedure, risks, and data usage.
+
+## Inputs
+- `onConsent`: Callback function that receives demographic data when consent is given
+- `consentVersion` (optional): Version of the consent form, defaults to "1.0"
+- `studyId` (optional): Identifier for the research study, defaults to "SPIRIT-IN-PHYSICS-2025"
+
+## Outputs
+- UI form for consent collection
+- Demographic data structured according to CDISC standards
+- Consent data stored in the database
+
+## Requirements
+
+### Functional Requirements
+1. Display collapsible research consent information with details about:
+   - Research purpose
+   - Research procedure
+   - Potential risks and discomfort
+   - Benefits
+   - Confidentiality
+   - Voluntary participation
+   - Contact information
+
+2. Collect standardized demographic data:
+   - Age group
+   - Gender
+   - Ethnicity 
+   - Income level
+
+3. Save consent and demographic data to the database with metadata:
+   - Consent version
+   - Timestamp
+   - User agent information
+   - Study ID
+
+4. Provide clear feedback during submission process:
+   - Loading state during submission
+   - Error handling for failed submissions
+
+5. Execute callback function with demographic data upon successful consent
+
+### Non-Functional Requirements
+1. Accessibility: Form elements must be properly labeled and accessible
+2. Security: Ensure secure data transmission and storage
+3. Compliance: Follow research ethics guidelines and data protection regulations
+4. Responsiveness: Adapt to different screen sizes
+
+## Data Structure
+
+### DemographicData
+```typescript
+interface DemographicData {
+  ageGroup: string;
+  gender: string;
+  ethnicity: string;
+  income: string;
+}
+```
+
+### ConsentData
+```typescript
+interface ConsentData {
+  consentGiven: boolean;
+  consentVersion: string;
+  consentText: string;
+}
+```
+
+### MetaData
+```typescript
+interface MetaData {
+  userAgent: string;
+  studyId: string;
+}
+```
+
+## Components
+- Collapsible consent information section
+- Demographic form section with appropriate input controls
+- Submit button with loading state
+- Error message display (if needed) 
