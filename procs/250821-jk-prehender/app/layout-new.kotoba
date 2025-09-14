@@ -1,0 +1,533 @@
+// Prehender Root Layout - Kotoba Template
+// Modular layout using individual components
+
+metadata {
+    title "Prehender - Stream Management"
+    description "A powerful stream management and note-taking application"
+    styles [
+        "/globals.css"
+    ]
+}
+
+template {
+    html lang="en" {
+        head {
+            meta charset="UTF-8"
+            meta name="viewport" content="width=device-width, initial-scale=1.0"
+            title "{{title}}"
+            meta name="description" content="{{description}}"
+
+            // Styles
+            @each(styles as style) {
+                link rel="stylesheet" href="{{style}}"
+            }
+
+            // Additional head content
+            script src="https://cdn.tailwindcss.com"
+
+            // Load component templates
+            script type="text/template" id="header-template" {
+                {{{include('components/header.kotoba')}}}
+            }
+            script type="text/template" id="sidebar-template" {
+                {{{include('components/sidebar.kotoba')}}}
+            }
+            script type="text/template" id="stream-editor-template" {
+                {{{include('components/stream-editor.kotoba')}}}
+            }
+            script type="text/template" id="viewpoint-panel-template" {
+                {{{include('components/viewpoint-panel.kotoba')}}}
+            }
+        }
+
+        body class="min-h-screen bg-gray-50 font-sans" {
+            // Global state
+            div id="app-state" style="display: none;" {
+                script type="application/json" id="app-data" {
+                    {
+                        "notes": [],
+                        "selectedNoteId": null,
+                        "selectedViewpoint": "timeline",
+                        "currentView": "editor",
+                        "streamNetwork": {
+                            "streams": {},
+                            "references": {},
+                            "reverseReferences": {}
+                        }
+                    }
+                }
+            }
+
+            // Header Component
+            div id="header-container" {
+                // Header will be inserted here by JavaScript
+            }
+
+            // Main Content Area
+            main class="flex-1 flex overflow-hidden" {
+                // Sidebar Component
+                div id="sidebar-container" {
+                    // Sidebar will be inserted here by JavaScript
+                }
+
+                // Main Content Area
+                div class="flex-1 flex flex-col overflow-hidden" {
+                    // Content Container
+                    div id="content-container" class="flex-1 overflow-hidden" {
+                        // Default loading state
+                        div id="loading-state" class="flex items-center justify-center h-full" {
+                            div class="text-center" {
+                                div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" {}
+                                p class="text-gray-600" { "Loading Prehender..." }
+                            }
+                        }
+                    }
+
+                    // Status Bar
+                    div id="status-bar" class="border-t bg-gray-50 px-4 py-2 flex justify-between items-center" {
+                        div class="flex items-center space-x-4" {
+                            span id="stats-text" class="text-sm text-gray-600" { "Initializing..." }
+                            button id="refresh-btn" class="text-sm text-blue-600 hover:text-blue-800 underline" { "Refresh" }
+                        }
+                    }
+                }
+            }
+
+            // Application JavaScript
+            script {
+                // Main Application Controller
+                class PrehenderApp {
+                    constructor() {
+                        this.state = {
+                            notes: [],
+                            selectedNoteId: null,
+                            selectedViewpoint: 'timeline',
+                            currentView: 'editor',
+                            streamNetwork: {
+                                streams: new Map(),
+                                references: new Map(),
+                                reverseReferences: new Map()
+                            }
+                        }
+
+                        this.components = {}
+                        this.eventListeners = []
+                    }
+
+                    async init() {
+                        console.log('🚀 Initializing Prehender Application...')
+
+                        try {
+                            // Initialize components
+                            await this.initComponents()
+
+                            // Load initial data
+                            await this.loadStreams()
+
+                            // Setup global event listeners
+                            this.setupGlobalEvents()
+
+                            console.log('✅ Prehender Application initialized successfully!')
+                        } catch (error) {
+                            console.error('❌ Failed to initialize Prehender:', error)
+                            this.showError('Failed to initialize application')
+                        }
+                    }
+
+                    async initComponents() {
+                        // Initialize Header Component
+                        const headerContainer = document.getElementById('header-container')
+                        if (headerContainer) {
+                            headerContainer.innerHTML = this.getComponentTemplate('header-template')
+                            this.components.header = window.PrehenderHeader
+                        }
+
+                        // Initialize Sidebar Component
+                        const sidebarContainer = document.getElementById('sidebar-container')
+                        if (sidebarContainer) {
+                            sidebarContainer.innerHTML = this.getComponentTemplate('sidebar-template')
+                            this.components.sidebar = window.PrehenderSidebar
+                        }
+
+                        // Initialize content area
+                        this.updateContentArea()
+                    }
+
+                    getComponentTemplate(templateId) {
+                        const template = document.getElementById(templateId)
+                        return template ? template.innerHTML : ''
+                    }
+
+                    async loadStreams() {
+                        try {
+                            const response = await fetch('/api/streams')
+                            if (response.ok) {
+                                this.state.notes = await response.json()
+                                this.updateStreamNetwork()
+                                this.updateUI()
+                                this.updateStats()
+                            } else {
+                                throw new Error('Failed to load streams')
+                            }
+                        } catch (error) {
+                            console.error('Error loading streams:', error)
+                            this.showError('Failed to load streams: ' + error.message)
+                        }
+                    }
+
+                    updateStreamNetwork() {
+                        const network = this.state.streamNetwork
+                        network.streams.clear()
+                        network.references.clear()
+                        network.reverseReferences.clear()
+
+                        this.state.notes.forEach(note => {
+                            network.streams.set(note.streamId, note)
+                            network.references.set(note.streamId, note.references || [])
+
+                            // Build reverse references
+                            if (note.references) {
+                                note.references.forEach(ref => {
+                                    if (!network.reverseReferences.has(ref.targetStreamId)) {
+                                        network.reverseReferences.set(ref.targetStreamId, [])
+                                    }
+                                    network.reverseReferences.get(ref.targetStreamId).push(note.streamId)
+                                })
+                            }
+                        })
+                    }
+
+                    updateUI() {
+                        // Update sidebar
+                        if (this.components.sidebar?.updateNotes) {
+                            this.components.sidebar.updateNotes(this.state.notes)
+                        }
+
+                        // Update current content
+                        this.updateContentArea()
+                    }
+
+                    updateContentArea() {
+                        const container = document.getElementById('content-container')
+                        if (!container) return
+
+                        if (this.state.selectedNoteId) {
+                            const note = this.state.notes.find(n => n.id === this.state.selectedNoteId)
+                            if (note) {
+                                if (this.state.currentView === 'editor') {
+                                    this.renderStreamEditor(note)
+                                } else {
+                                    this.renderViewpointPanel(note)
+                                }
+                            }
+                        } else {
+                            this.renderWelcome()
+                        }
+                    }
+
+                    renderStreamEditor(note) {
+                        const container = document.getElementById('content-container')
+                        if (!container) return
+
+                        container.innerHTML = this.getComponentTemplate('stream-editor-template')
+
+                        // Initialize stream editor component
+                        if (window.PrehenderStreamEditor) {
+                            setTimeout(() => {
+                                if (window.PrehenderStreamEditor.updateNote) {
+                                    window.PrehenderStreamEditor.updateNote(note)
+                                }
+                                if (window.PrehenderStreamEditor.updateAllNotes) {
+                                    window.PrehenderStreamEditor.updateAllNotes(this.state.notes)
+                                }
+                            }, 100)
+                        }
+                    }
+
+                    renderViewpointPanel(note) {
+                        const container = document.getElementById('content-container')
+                        if (!container) return
+
+                        container.innerHTML = this.getComponentTemplate('viewpoint-panel-template')
+
+                        // Initialize viewpoint panel component
+                        if (window.PrehenderViewpointPanel) {
+                            setTimeout(() => {
+                                if (window.PrehenderViewpointPanel.updateNote) {
+                                    window.PrehenderViewpointPanel.updateNote(note)
+                                }
+                                if (window.PrehenderViewpointPanel.updateViewpoint) {
+                                    window.PrehenderViewpointPanel.updateViewpoint(this.state.selectedViewpoint)
+                                }
+                                if (window.PrehenderViewpointPanel.updateAllNotes) {
+                                    window.PrehenderViewpointPanel.updateAllNotes(this.state.notes)
+                                }
+                                if (window.PrehenderViewpointPanel.updateStreamNetwork) {
+                                    window.PrehenderViewpointPanel.updateStreamNetwork(this.state.streamNetwork)
+                                }
+                            }, 100)
+                        }
+                    }
+
+                    renderWelcome() {
+                        const container = document.getElementById('content-container')
+                        if (!container) return
+
+                        container.innerHTML = `
+                            <div class="flex items-center justify-center h-full">
+                                <div class="text-center max-w-md">
+                                    <div class="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                                        <span class="text-white text-3xl font-bold">P</span>
+                                    </div>
+                                    <h2 class="text-2xl font-bold text-gray-900 mb-3">Welcome to Prehender</h2>
+                                    <p class="text-gray-600 mb-8 leading-relaxed">
+                                        Your powerful stream management application. Create notes, build connections, and explore your ideas from different perspectives.
+                                    </p>
+                                    <div class="space-y-3">
+                                        <button id="create-first-stream-btn" class="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                                            + Create Your First Stream
+                                        </button>
+                                        <p class="text-sm text-gray-500">
+                                            or select a stream from the sidebar to get started
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        `
+
+                        // Add event listener for create button
+                        setTimeout(() => {
+                            const createBtn = document.getElementById('create-first-stream-btn')
+                            if (createBtn) {
+                                createBtn.addEventListener('click', () => this.createNewStream())
+                            }
+                        }, 100)
+                    }
+
+                    setupGlobalEvents() {
+                        // Component communication events
+                        document.addEventListener('noteSelect', (e) => {
+                            this.selectNote(e.detail.noteId)
+                        })
+
+                        document.addEventListener('createNewStream', () => {
+                            this.createNewStream()
+                        })
+
+                        document.addEventListener('updateNote', (e) => {
+                            this.updateNote(e.detail.noteId, e.detail.updates)
+                        })
+
+                        document.addEventListener('deleteNote', (e) => {
+                            this.deleteNote(e.detail.noteId)
+                        })
+
+                        document.addEventListener('duplicateNote', (e) => {
+                            this.duplicateNote(e.detail.noteId)
+                        })
+
+                        document.addEventListener('addStreamReference', (e) => {
+                            this.addStreamReference(e.detail.fromStreamId, e.detail.toStreamId, e.detail.referenceType)
+                        })
+
+                        document.addEventListener('removeStreamReference', (e) => {
+                            this.removeStreamReference(e.detail.fromStreamId, e.detail.referenceId)
+                        })
+
+                        document.addEventListener('viewpointChange', (e) => {
+                            this.changeViewpoint(e.detail.viewpoint)
+                        })
+
+                        document.addEventListener('findRelatedStreams', (e) => {
+                            this.findRelatedStreams(e.detail.streamId)
+                        })
+
+                        document.addEventListener('refreshNotes', () => {
+                            this.loadStreams()
+                        })
+
+                        // Keyboard shortcuts
+                        document.addEventListener('keydown', (e) => {
+                            if (e.key === 'n' && (e.ctrlKey || e.metaKey)) {
+                                e.preventDefault()
+                                this.createNewStream()
+                            }
+                        })
+                    }
+
+                    selectNote(noteId) {
+                        this.state.selectedNoteId = noteId
+                        this.state.currentView = 'editor'
+                        this.updateContentArea()
+
+                        // Update header to show viewpoint selector
+                        if (this.components.header?.setHasSelectedNote) {
+                            this.components.header.setHasSelectedNote(true)
+                        }
+                    }
+
+                    changeViewpoint(viewpoint) {
+                        this.state.selectedViewpoint = viewpoint
+                        if (this.state.selectedNoteId) {
+                            this.state.currentView = 'viewpoint'
+                            this.updateContentArea()
+                        }
+                    }
+
+                    async createNewStream(streamType = 'note') {
+                        try {
+                            const response = await fetch('/api/streams', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    title: 'New Stream',
+                                    content: '',
+                                    streamType,
+                                    tags: []
+                                })
+                            })
+
+                            if (response.ok) {
+                                const newStream = await response.json()
+                                this.state.notes.unshift(newStream)
+                                this.updateStreamNetwork()
+                                this.updateUI()
+                                this.updateStats()
+                                this.selectNote(newStream.id)
+                            }
+                        } catch (error) {
+                            console.error('Error creating stream:', error)
+                        }
+                    }
+
+                    async updateNote(noteId, updates) {
+                        try {
+                            const response = await fetch(`/api/streams/${noteId}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(updates)
+                            })
+
+                            if (response.ok) {
+                                const noteIndex = this.state.notes.findIndex(n => n.id === noteId)
+                                if (noteIndex !== -1) {
+                                    this.state.notes[noteIndex] = { ...this.state.notes[noteIndex], ...updates }
+                                    this.updateStreamNetwork()
+                                    this.updateStats()
+                                }
+                            }
+                        } catch (error) {
+                            console.error('Error updating note:', error)
+                        }
+                    }
+
+                    async deleteNote(noteId) {
+                        if (!confirm('Are you sure you want to delete this stream? This action cannot be undone.')) return
+
+                        try {
+                            const response = await fetch(`/api/streams/${noteId}`, {
+                                method: 'DELETE'
+                            })
+
+                            if (response.ok) {
+                                this.state.notes = this.state.notes.filter(n => n.id !== noteId)
+                                this.updateStreamNetwork()
+                                this.updateUI()
+                                this.updateStats()
+
+                                if (this.state.selectedNoteId === noteId) {
+                                    this.state.selectedNoteId = null
+                                    this.renderWelcome()
+                                }
+                            }
+                        } catch (error) {
+                            console.error('Error deleting note:', error)
+                        }
+                    }
+
+                    duplicateNote(noteId) {
+                        const originalNote = this.state.notes.find(n => n.id === noteId)
+                        if (!originalNote) return
+
+                        const duplicatedNote = {
+                            ...originalNote,
+                            id: `stream-${Date.now()}`,
+                            streamId: `stream-${Date.now()}`,
+                            title: `${originalNote.title} (Copy)`,
+                            createdAt: new Date().toISOString(),
+                            updatedAt: new Date().toISOString()
+                        }
+
+                        this.state.notes.unshift(duplicatedNote)
+                        this.updateStreamNetwork()
+                        this.updateUI()
+                        this.updateStats()
+                        this.selectNote(duplicatedNote.id)
+                    }
+
+                    async addStreamReference(fromStreamId, toStreamId, referenceType) {
+                        try {
+                            const response = await fetch(`/api/streams/${fromStreamId}/references`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    targetStreamId: toStreamId,
+                                    referenceType,
+                                    context: 'Added via UI'
+                                })
+                            })
+
+                            if (response.ok) {
+                                await this.loadStreams() // Refresh to get updated references
+                                this.updateUI()
+                            }
+                        } catch (error) {
+                            console.error('Error adding reference:', error)
+                        }
+                    }
+
+                    findRelatedStreams(streamId) {
+                        // Implementation for finding related streams
+                        console.log('Finding related streams for:', streamId)
+                        // This would be implemented to show related streams in a modal or panel
+                    }
+
+                    updateStats() {
+                        const statsText = document.getElementById('stats-text')
+                        if (statsText) {
+                            const totalStreams = this.state.notes.length
+                            const totalRefs = this.state.notes.reduce((sum, s) => sum + (s.references?.length || 0), 0)
+                            statsText.textContent = `${totalStreams} streams • ${totalRefs} references`
+                        }
+                    }
+
+                    showError(message) {
+                        const container = document.getElementById('content-container')
+                        if (container) {
+                            container.innerHTML = `
+                                <div class="flex items-center justify-center h-full">
+                                    <div class="text-center max-w-md">
+                                        <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <span class="text-2xl">❌</span>
+                                        </div>
+                                        <h2 class="text-xl font-semibold text-gray-900 mb-2">Error</h2>
+                                        <p class="text-gray-600 mb-6">${message}</p>
+                                        <button onclick="window.location.reload()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
+                                            Reload Application
+                                        </button>
+                                    </div>
+                                </div>
+                            `
+                        }
+                    }
+                }
+
+                // Initialize application
+                const prehenderApp = new PrehenderApp()
+                document.addEventListener('DOMContentLoaded', () => prehenderApp.init())
+
+                console.log('🚀 Prehender Application Framework loaded!')
+            }
+        }
+    }
+}

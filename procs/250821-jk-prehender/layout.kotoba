@@ -1,0 +1,663 @@
+// Prehender Root Layout - Kotoba Template
+// This is the main layout for the Prehender application
+
+metadata {
+    title "Prehender - Stream Management"
+    description "A powerful stream management and note-taking application"
+    styles [
+        "/globals.css"
+    ]
+}
+
+template {
+    html lang="en" {
+        head {
+            meta charset="UTF-8"
+            meta name="viewport" content="width=device-width, initial-scale=1.0"
+            title "{{title}}"
+            meta name="description" content="{{description}}"
+
+            // Styles
+            @each(styles as style) {
+                link rel="stylesheet" href="{{style}}"
+            }
+
+            // Additional head content
+            script src="https://cdn.tailwindcss.com"
+        }
+
+        body class="min-h-screen bg-gray-50 font-sans" {
+            // Header/Navigation
+            header class="bg-white shadow-sm border-b" {
+                nav class="container mx-auto px-4 py-4" {
+                    div class="flex items-center justify-between" {
+                        div class="flex items-center space-x-4" {
+                            h1 class="text-xl font-bold text-gray-900" { "🚀 Prehender" }
+                            span class="text-sm text-gray-500" { "Stream Management" }
+                        }
+
+                        div class="flex items-center space-x-4" {
+                            // New Stream Button
+                            button id="new-stream-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm" {
+                                "+ New Stream"
+                            }
+
+                            // Viewpoint Selector
+                            select id="viewpoint-selector" class="border border-gray-300 rounded-lg px-3 py-2 text-sm" {
+                                option value="" { "Select Viewpoint" }
+                                option value="timeline" { "Timeline" }
+                                option value="network" { "Network" }
+                                option value="kanban" { "Kanban" }
+                                option value="calendar" { "Calendar" }
+                            }
+
+                            // Refresh Button
+                            button id="refresh-btn" class="text-gray-600 hover:text-gray-800 p-2" {
+                                "↻"
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Main Content Area
+            main class="flex-1 flex overflow-hidden" {
+                // Sidebar
+                aside id="sidebar" class="w-80 bg-white border-r overflow-hidden flex flex-col" {
+                    // Sidebar Header
+                    div class="p-4 border-b bg-gray-50" {
+                        h2 class="text-lg font-semibold text-gray-900" { "Streams" }
+                        div class="flex items-center space-x-2 mt-2" {
+                            input id="search-input" type="text" placeholder="Search streams..." class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            button id="search-btn" class="text-gray-600 hover:text-gray-800 p-2" { "🔍" }
+                        }
+                    }
+
+                    // Stream List
+                    div id="stream-list" class="flex-1 overflow-y-auto" {
+                        div class="p-4 text-center text-gray-500" {
+                            "Loading streams..."
+                        }
+                    }
+                }
+
+                // Main Content
+                div class="flex-1 flex flex-col overflow-hidden" {
+                    // Content Area
+                    div id="main-content" class="flex-1 overflow-hidden" {
+                        // Default welcome content
+                        div class="flex items-center justify-center h-full" {
+                            div class="text-center max-w-md" {
+                                div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4" {
+                                    span class="text-2xl" { "📝" }
+                                }
+                                h2 class="text-xl font-semibold text-gray-900 mb-2" { "Welcome to Prehender" }
+                                p class="text-gray-600 mb-6" {
+                                    "Select a stream from the sidebar or create a new one to get started."
+                                }
+                                button id="create-first-stream-btn" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors" {
+                                    "Create Your First Stream"
+                                }
+                            }
+                        }
+                    }
+
+                    // Status Bar
+                    div id="status-bar" class="border-t bg-gray-50 px-4 py-2 flex justify-between items-center" {
+                        div class="flex items-center space-x-4" {
+                            span id="stats-text" class="text-sm text-gray-600" {
+                                "Loading..."
+                            }
+                            button id="refresh-status-btn" class="text-sm text-blue-600 hover:text-blue-800 underline" {
+                                "Refresh"
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Client-side JavaScript
+            script {
+                // Application state
+                let streams = []
+                let selectedStreamId = null
+                let selectedViewpoint = null
+                let streamNetwork = { streams: new Map(), references: new Map(), reverseReferences: new Map() }
+
+                // DOM elements
+                const sidebar = document.getElementById('sidebar')
+                const mainContent = document.getElementById('main-content')
+                const streamList = document.getElementById('stream-list')
+                const statusBar = document.getElementById('status-bar')
+                const statsText = document.getElementById('stats-text')
+
+                // Initialize application
+                async function init() {
+                    console.log('🚀 Initializing Prehender...')
+                    await loadStreams()
+                    setupEventListeners()
+                }
+
+                // Load streams from API
+                async function loadStreams() {
+                    try {
+                        const response = await fetch('/api/streams')
+                        if (response.ok) {
+                            streams = await response.json()
+                            updateStreamNetwork()
+                            renderStreamList()
+                            updateStats()
+                        } else {
+                            console.error('Failed to load streams')
+                            showError('Failed to load streams')
+                        }
+                    } catch (error) {
+                        console.error('Error loading streams:', error)
+                        showError('Error loading streams: ' + error.message)
+                    }
+                }
+
+                // Update stream network
+                function updateStreamNetwork() {
+                    streamNetwork.streams.clear()
+                    streamNetwork.references.clear()
+                    streamNetwork.reverseReferences.clear()
+
+                    streams.forEach(stream => {
+                        streamNetwork.streams.set(stream.streamId, stream)
+                        streamNetwork.references.set(stream.streamId, stream.references || [])
+
+                        // Build reverse references
+                        if (stream.references) {
+                            stream.references.forEach(ref => {
+                                if (!streamNetwork.reverseReferences.has(ref.targetStreamId)) {
+                                    streamNetwork.reverseReferences.set(ref.targetStreamId, [])
+                                }
+                                streamNetwork.reverseReferences.get(ref.targetStreamId).push(stream.streamId)
+                            })
+                        }
+                    })
+                }
+
+                // Render stream list
+                function renderStreamList() {
+                    if (streams.length === 0) {
+                        streamList.innerHTML = `
+                            <div class="p-4 text-center text-gray-500">
+                                <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                                    <span class="text-xl">📄</span>
+                                </div>
+                                <p class="text-sm">No streams yet</p>
+                                <p class="text-xs text-gray-400 mt-1">Create your first stream to get started</p>
+                            </div>
+                        `
+                        return
+                    }
+
+                    streamList.innerHTML = streams.map(stream => `
+                        <div class="stream-item p-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
+                             data-stream-id="${stream.id}"
+                             data-stream-type="${stream.streamType || 'note'}">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center space-x-2 mb-1">
+                                        <span class="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
+                                            ${getStreamTypeIcon(stream.streamType || 'note')}
+                                        </span>
+                                        <span class="text-xs text-gray-500">
+                                            ${new Date(stream.updatedAt).toLocaleDateString()}
+                                        </span>
+                                    </div>
+                                    <h3 class="font-medium text-gray-900 truncate text-sm">
+                                        ${stream.title || 'Untitled'}
+                                    </h3>
+                                    <p class="text-xs text-gray-600 mt-1 line-clamp-2">
+                                        ${stream.content ? stream.content.substring(0, 100) + (stream.content.length > 100 ? '...' : '') : ''}
+                                    </p>
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <span class="text-xs text-gray-500">
+                                            ${(stream.references || []).length} refs
+                                        </span>
+                                        <span class="text-xs text-gray-500">
+                                            ${(stream.subscribers || []).length} subs
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')
+
+                    // Add click handlers
+                    document.querySelectorAll('.stream-item').forEach(item => {
+                        item.addEventListener('click', () => {
+                            const streamId = item.dataset.streamId
+                            selectStream(streamId)
+                        })
+                    })
+                }
+
+                // Get stream type icon
+                function getStreamTypeIcon(type) {
+                    const icons = {
+                        note: '📝',
+                        idea: '💡',
+                        task: '✅',
+                        meeting: '👥',
+                        project: '📁',
+                        reference: '🔗',
+                        template: '📋'
+                    }
+                    return icons[type] || '📄'
+                }
+
+                // Select a stream
+                function selectStream(streamId) {
+                    selectedStreamId = streamId
+                    const stream = streams.find(s => s.id === streamId)
+
+                    // Update UI
+                    document.querySelectorAll('.stream-item').forEach(item => {
+                        item.classList.toggle('bg-blue-50', item.dataset.streamId === streamId)
+                    })
+
+                    if (stream) {
+                        renderStreamEditor(stream)
+                    }
+                }
+
+                // Render stream editor
+                function renderStreamEditor(stream) {
+                    mainContent.innerHTML = `
+                        <div class="h-full flex flex-col bg-white">
+                            <!-- Stream Header -->
+                            <div class="p-4 border-b bg-gray-50">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-3">
+                                        <span class="text-lg">${getStreamTypeIcon(stream.streamType || 'note')}</span>
+                                        <div>
+                                            <input id="stream-title" type="text" value="${stream.title || ''}"
+                                                   class="text-lg font-semibold bg-transparent border-none outline-none focus:ring-0 p-0"
+                                                   placeholder="Untitled">
+                                            <div class="flex items-center space-x-2 mt-1">
+                                                <span class="text-xs text-gray-500">Type: ${stream.streamType || 'note'}</span>
+                                                <span class="text-xs text-gray-500">•</span>
+                                                <span class="text-xs text-gray-500">Updated: ${new Date(stream.updatedAt).toLocaleString()}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <button id="delete-stream-btn" class="text-red-600 hover:text-red-800 p-2 text-sm" title="Delete Stream">
+                                            🗑️
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Stream Content -->
+                            <div class="flex-1 flex">
+                                <!-- Editor -->
+                                <div class="flex-1 flex flex-col">
+                                    <div class="p-4 border-b bg-gray-50">
+                                        <div class="flex items-center space-x-2">
+                                            <span class="text-sm font-medium text-gray-700">Content</span>
+                                            <div class="flex-1"></div>
+                                            <button id="save-stream-btn" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
+                                                Save
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1 p-4">
+                                        <textarea id="stream-content" class="w-full h-full border border-gray-300 rounded-lg p-3 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                  placeholder="Write your stream content here...">${stream.content || ''}</textarea>
+                                    </div>
+                                </div>
+
+                                <!-- Sidebar -->
+                                <div class="w-80 border-l bg-gray-50">
+                                    <!-- Tags -->
+                                    <div class="p-4 border-b">
+                                        <h4 class="text-sm font-medium text-gray-900 mb-2">Tags</h4>
+                                        <div id="tags-container" class="flex flex-wrap gap-2">
+                                            ${(stream.tags || []).map(tag => `
+                                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                                                    ${tag}
+                                                    <button class="ml-1 text-blue-600 hover:text-blue-800" onclick="removeTag('${tag}')">×</button>
+                                                </span>
+                                            `).join('')}
+                                        </div>
+                                        <div class="mt-2">
+                                            <input id="new-tag-input" type="text" placeholder="Add tag..." class="w-full px-2 py-1 border border-gray-300 rounded text-xs">
+                                        </div>
+                                    </div>
+
+                                    <!-- References -->
+                                    <div class="p-4 border-b">
+                                        <h4 class="text-sm font-medium text-gray-900 mb-2">References</h4>
+                                        <div id="references-list" class="space-y-2">
+                                            ${(stream.references || []).map(ref => `
+                                                <div class="flex items-center justify-between p-2 bg-white rounded text-xs">
+                                                    <span>${getStreamTypeIcon(ref.referenceType)} ${ref.context || 'Reference'}</span>
+                                                    <button class="text-red-600 hover:text-red-800" onclick="removeReference('${ref.id}')">×</button>
+                                                </div>
+                                            `).join('')}
+                                            ${(stream.references || []).length === 0 ? '<p class="text-xs text-gray-500">No references yet</p>' : ''}
+                                        </div>
+                                        <div class="mt-2">
+                                            <button id="add-reference-btn" class="w-full px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">
+                                                Add Reference
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Related Streams -->
+                                    <div class="p-4">
+                                        <h4 class="text-sm font-medium text-gray-900 mb-2">Related Streams</h4>
+                                        <div id="related-streams" class="space-y-1">
+                                            <!-- Related streams will be populated here -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `
+
+                    // Add event listeners for the editor
+                    setupEditorEventListeners(stream)
+                }
+
+                // Setup editor event listeners
+                function setupEditorEventListeners(stream) {
+                    const titleInput = document.getElementById('stream-title')
+                    const contentTextarea = document.getElementById('stream-content')
+                    const saveBtn = document.getElementById('save-stream-btn')
+                    const deleteBtn = document.getElementById('delete-stream-btn')
+                    const newTagInput = document.getElementById('new-tag-input')
+                    const addRefBtn = document.getElementById('add-reference-btn')
+
+                    if (titleInput) {
+                        titleInput.addEventListener('input', debounce(() => saveStream(), 500))
+                    }
+
+                    if (contentTextarea) {
+                        contentTextarea.addEventListener('input', debounce(() => saveStream(), 500))
+                    }
+
+                    if (saveBtn) {
+                        saveBtn.addEventListener('click', () => saveStream())
+                    }
+
+                    if (deleteBtn) {
+                        deleteBtn.addEventListener('click', () => deleteStream(stream.id))
+                    }
+
+                    if (newTagInput) {
+                        newTagInput.addEventListener('keydown', (e) => {
+                            if (e.key === 'Enter') {
+                                addTag(newTagInput.value.trim())
+                                newTagInput.value = ''
+                            }
+                        })
+                    }
+
+                    if (addRefBtn) {
+                        addRefBtn.addEventListener('click', () => showAddReferenceDialog())
+                    }
+                }
+
+                // Save stream
+                async function saveStream() {
+                    const titleInput = document.getElementById('stream-title')
+                    const contentTextarea = document.getElementById('stream-content')
+
+                    if (!titleInput || !contentTextarea) return
+
+                    const updates = {
+                        title: titleInput.value,
+                        content: contentTextarea.value,
+                        updatedAt: new Date().toISOString()
+                    }
+
+                    try {
+                        const response = await fetch(`/api/streams/${selectedStreamId}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(updates)
+                        })
+
+                        if (response.ok) {
+                            // Update local state
+                            const streamIndex = streams.findIndex(s => s.id === selectedStreamId)
+                            if (streamIndex !== -1) {
+                                streams[streamIndex] = { ...streams[streamIndex], ...updates }
+                                updateStreamNetwork()
+                                updateStats()
+                            }
+                            console.log('Stream saved successfully')
+                        } else {
+                            console.error('Failed to save stream')
+                        }
+                    } catch (error) {
+                        console.error('Error saving stream:', error)
+                    }
+                }
+
+                // Delete stream
+                async function deleteStream(streamId) {
+                    if (!confirm('Are you sure you want to delete this stream?')) return
+
+                    try {
+                        const response = await fetch(`/api/streams/${streamId}`, {
+                            method: 'DELETE'
+                        })
+
+                        if (response.ok) {
+                            streams = streams.filter(s => s.id !== streamId)
+                            updateStreamNetwork()
+                            renderStreamList()
+                            updateStats()
+
+                            // Clear main content
+                            mainContent.innerHTML = `
+                                <div class="flex items-center justify-center h-full">
+                                    <div class="text-center max-w-md">
+                                        <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <span class="text-2xl">✅</span>
+                                        </div>
+                                        <h2 class="text-xl font-semibold text-gray-900 mb-2">Stream Deleted</h2>
+                                        <p class="text-gray-600 mb-6">The stream has been successfully deleted.</p>
+                                        <button onclick="loadStreams()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
+                                            Refresh Streams
+                                        </button>
+                                    </div>
+                                </div>
+                            `
+                        } else {
+                            console.error('Failed to delete stream')
+                        }
+                    } catch (error) {
+                        console.error('Error deleting stream:', error)
+                    }
+                }
+
+                // Add tag
+                function addTag(tag) {
+                    if (!tag || !selectedStreamId) return
+
+                    const stream = streams.find(s => s.id === selectedStreamId)
+                    if (!stream) return
+
+                    const updatedTags = [...(stream.tags || []), tag]
+                    updateStreamTags(selectedStreamId, updatedTags)
+                }
+
+                // Remove tag
+                function removeTag(tag) {
+                    if (!selectedStreamId) return
+
+                    const stream = streams.find(s => s.id === selectedStreamId)
+                    if (!stream) return
+
+                    const updatedTags = (stream.tags || []).filter(t => t !== tag)
+                    updateStreamTags(selectedStreamId, updatedTags)
+                }
+
+                // Update stream tags
+                async function updateStreamTags(streamId, tags) {
+                    try {
+                        const response = await fetch(`/api/streams/${streamId}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ tags })
+                        })
+
+                        if (response.ok) {
+                            const streamIndex = streams.findIndex(s => s.id === streamId)
+                            if (streamIndex !== -1) {
+                                streams[streamIndex].tags = tags
+                            }
+                            renderStreamEditor(streams[streamIndex])
+                        }
+                    } catch (error) {
+                        console.error('Error updating tags:', error)
+                    }
+                }
+
+                // Show add reference dialog
+                function showAddReferenceDialog() {
+                    // Simple implementation - in a real app, this would be a modal
+                    const targetStreamId = prompt('Enter target stream ID:')
+                    if (targetStreamId) {
+                        addReference(targetStreamId, 'reference')
+                    }
+                }
+
+                // Add reference
+                async function addReference(targetStreamId, referenceType) {
+                    if (!selectedStreamId) return
+
+                    try {
+                        const response = await fetch(`/api/streams/${selectedStreamId}/references`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                targetStreamId,
+                                referenceType,
+                                context: 'Added via UI'
+                            })
+                        })
+
+                        if (response.ok) {
+                            await loadStreams() // Refresh to get updated references
+                            const stream = streams.find(s => s.id === selectedStreamId)
+                            if (stream) {
+                                renderStreamEditor(stream)
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error adding reference:', error)
+                    }
+                }
+
+                // Remove reference
+                function removeReference(referenceId) {
+                    // Implementation would call API to remove reference
+                    console.log('Remove reference:', referenceId)
+                }
+
+                // Update stats
+                function updateStats() {
+                    const totalStreams = streams.length
+                    const totalRefs = streams.reduce((sum, s) => sum + (s.references?.length || 0), 0)
+                    statsText.textContent = `${totalStreams} streams • ${totalRefs} references`
+                }
+
+                // Show error
+                function showError(message) {
+                    mainContent.innerHTML = `
+                        <div class="flex items-center justify-center h-full">
+                            <div class="text-center max-w-md">
+                                <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <span class="text-2xl">❌</span>
+                                </div>
+                                <h2 class="text-xl font-semibold text-gray-900 mb-2">Error</h2>
+                                <p class="text-gray-600 mb-6">${message}</p>
+                                <button onclick="init()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
+                                    Retry
+                                </button>
+                            </div>
+                        </div>
+                    `
+                }
+
+                // Debounce utility
+                function debounce(func, wait) {
+                    let timeout
+                    return function executedFunction(...args) {
+                        const later = () => {
+                            clearTimeout(timeout)
+                            func(...args)
+                        }
+                        clearTimeout(timeout)
+                        timeout = setTimeout(later, wait)
+                    }
+                }
+
+                // Setup event listeners
+                function setupEventListeners() {
+                    // New stream button
+                    document.getElementById('new-stream-btn')?.addEventListener('click', () => createNewStream())
+
+                    // Create first stream button
+                    document.getElementById('create-first-stream-btn')?.addEventListener('click', () => createNewStream())
+
+                    // Refresh button
+                    document.getElementById('refresh-btn')?.addEventListener('click', () => loadStreams())
+
+                    // Refresh status button
+                    document.getElementById('refresh-status-btn')?.addEventListener('click', () => loadStreams())
+
+                    // Viewpoint selector
+                    document.getElementById('viewpoint-selector')?.addEventListener('change', (e) => {
+                        selectedViewpoint = e.target.value
+                        console.log('Selected viewpoint:', selectedViewpoint)
+                        // TODO: Implement viewpoint switching
+                    })
+                }
+
+                // Create new stream
+                async function createNewStream() {
+                    try {
+                        const response = await fetch('/api/streams', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                title: 'New Stream',
+                                content: '',
+                                streamType: 'note',
+                                tags: []
+                            })
+                        })
+
+                        if (response.ok) {
+                            const newStream = await response.json()
+                            streams.unshift(newStream)
+                            updateStreamNetwork()
+                            renderStreamList()
+                            updateStats()
+                            selectStream(newStream.id)
+                        } else {
+                            console.error('Failed to create stream')
+                        }
+                    } catch (error) {
+                        console.error('Error creating stream:', error)
+                    }
+                }
+
+                // Initialize when DOM is loaded
+                document.addEventListener('DOMContentLoaded', init)
+
+                console.log('🚀 Prehender layout loaded!')
+            }
+        }
+    }
+}

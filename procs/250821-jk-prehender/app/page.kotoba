@@ -1,0 +1,19 @@
+// Prehender Main Page - Kotoba Template
+// This is the home page of the Prehender application
+
+metadata {
+    layout "layout"
+    title "Prehender - Stream Management"
+}
+
+template {
+    div class="min-h-screen" {
+        // The main content is handled by the layout template
+        // This page serves as the entry point for the application
+        {{{children}}}
+    }
+
+    script {
+        console.log('🏠 Prehender main page loaded!')
+    }
+}
