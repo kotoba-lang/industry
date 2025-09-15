@@ -98,11 +98,12 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json({
           success: true,
-            data: {
-              totalParticipants: participantIds.length,
-              totalAnalyses: globalResults.length,
-              statistics: globalStats
-            }
+          data: {
+            totalParticipants: participantIds.length,
+            totalAnalyses: globalResults.length,
+            statistics: globalStats,
+            dominantEmotions: globalStats?.dominantEmotions || []
+          }
         });
 
       default:

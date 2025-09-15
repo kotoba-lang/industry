@@ -12,8 +12,13 @@ import {
   Brain,
   Download,
   RefreshCw,
-  Activity
+  Activity,
+  ExternalLink,
+  Cloud,
+  Database,
+  FileText
 } from 'lucide-react';
+import Link from 'next/link';
 import { ParticipantOverview } from './components/ParticipantOverview';
 import { ExperimentAnalytics } from './components/ExperimentAnalytics';
 import { DataVisualization } from './components/DataVisualization';
@@ -76,13 +81,24 @@ export default function AdminPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              実験管理・分析ダッシュボード
+              クラウド統合実験管理ダッシュボード
             </h1>
             <p className="text-sm text-gray-600 mt-1">
-              Spirit-in-Physics 実験データの可視化と分析
+              Vercel Blob + Kuzu + ファイルシステム統合のSpirit-in-Physics実験データ管理
             </p>
           </div>
           <div className="flex items-center space-x-4">
+            <Link href="/admin/analytics">
+              <Button
+                variant="default"
+                size="sm"
+                className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+              >
+                <BarChart3 className="h-4 w-4" />
+                <span>統合分析</span>
+                <ExternalLink className="h-3 w-3" />
+              </Button>
+            </Link>
             <Button
               variant="outline"
               size="sm"
@@ -99,14 +115,31 @@ export default function AdminPage() {
         </div>
 
         {/* Data Source Info */}
-        <div className="bg-blue-50 border border-blue-200 px-4 py-3">
-          <div className="flex items-center space-x-2">
-            <div className="text-sm text-blue-800">
-              📁 データソース: <code className="bg-blue-100 px-2 py-1 rounded text-xs">.artifacts_cache</code>
+        <div className="bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-medium text-blue-800">🔗 統合データソース</span>
+              </div>
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-1">
+                  <Cloud className="h-3 w-3 text-blue-600" />
+                  <span className="text-xs text-blue-700">Vercel Blob</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <Database className="h-3 w-3 text-green-600" />
+                  <span className="text-xs text-green-700">Kuzu DB</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <FileText className="h-3 w-3 text-gray-600" />
+                  <span className="text-xs text-gray-700">File System</span>
+                </div>
+              </div>
             </div>
-            <div className="text-sm text-blue-600">
-              • {analyticsData?.totalParticipants || 0}人の参加者データ
-              • {analyticsData?.participantsWithVideo || 0}人のビデオデータ
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-blue-700 bg-blue-100 px-2 py-1 rounded">
+                リアルタイム同期
+              </span>
             </div>
           </div>
         </div>
