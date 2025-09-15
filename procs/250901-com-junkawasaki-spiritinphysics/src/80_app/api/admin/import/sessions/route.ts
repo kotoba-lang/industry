@@ -1,16 +1,32 @@
 // LLM-BOUNDARY: 80_app - app/(segments)/...（RSC & Client）
 
 import { NextRequest, NextResponse } from "next/server";
-import { loadAllSessionData } from "@/lib/data-loader";
-import { storageAdapter } from "@/50_adapters";
-import { ExperimentSupervisor } from "@/70_supervisors";
+import { getParticipantDirectories } from "@/lib/data-loader";
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
+import { kuzuManager } from "@/lib/database/kuzu-manager";
+
+const ARTIFACTS_CACHE_PATH = '/Users/junkawasaki/jun784/root/procs/250901-com-junkawasaki-spiritinphysics/.artifacts_cache';
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("Starting session data import...");
+    console.log("Starting session data import to Kuzu...");
 
     // ファイルシステムからセッションデータを取得
-    const sessionDataList = await loadAllSessionData();
+    const participantIds = getParticipantDirectories();
+    const sessionDataList = [];
+
+    for (const participantId of participantIds) {
+      const sessionDataPath = join(ARTIFACTS_CACHE_PATH, participantId, 'session_data.json');
+      if (existsSync(sessionDataPath)) {
+        try {
+          const sessionData = JSON.parse(readFileSync(sessionDataPath, 'utf-8'));
+          sessionDataList.push({ participantId, sessionData });
+        } catch (error) {
+          console.warn(`Failed to parse session data for ${participantId}:`, error);
+        }
+      }
+    }
 
     if (sessionDataList.length === 0) {
       return NextResponse.json({
@@ -22,28 +38,26 @@ export async function POST(request: NextRequest) {
 
     const results = [];
 
-    // 各セッションデータをKuzuとBlobにインポート
+    // 各セッションデータをKuzuにインポート
     for (const { participantId, sessionData } of sessionDataList) {
       try {
-        // Kuzuに保存
-        await storageAdapter.saveStructuredData({
-          type: "session-data",
-          data: {
-            participantId,
-            events: sessionData.events,
-            wordResponses: sessionData.wordResponses || []
-          }
+        // Kuzuに保存（一本化）
+        await kuzuManager.saveSession({
+          id: `${participantId}_session`,
+          participantId: participantId,
+          events: sessionData.events,
+          createdAt: sessionData.events[0]?.timestamp || new Date().toISOString()
         });
 
         results.push({
           participantId,
           status: "success",
-          message: "Successfully imported session data"
+          message: "Successfully imported session data to Kuzu"
         });
 
-        console.log(`Imported session data for participant ${participantId}`);
+        console.log(`Imported session data for participant ${participantId} to Kuzu`);
       } catch (error) {
-        console.error(`Failed to import session data for participant ${participantId}:`, error);
+        console.error(`Failed to import session data for participant ${participantId} to Kuzu:`, error);
         results.push({
           participantId,
           status: "error",
@@ -53,15 +67,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // インポート完了をスーパーバイザーに通知
-    await ExperimentSupervisor.startExperiment("bulk-import");
-
     const successCount = results.filter(r => r.status === "success").length;
     const errorCount = results.filter(r => r.status === "error").length;
 
     return NextResponse.json({
       success: true,
-      message: `Imported session data for ${successCount} participants successfully, ${errorCount} failed`,
+      message: `Imported session data for ${successCount} participants to Kuzu successfully, ${errorCount} failed`,
       results,
       summary: {
         total: sessionDataList.length,

@@ -243,52 +243,23 @@ export function loadParticipantData(participantId: string): Participant | null {
 // Load session data for a participant
 export async function loadSessionData(participantId: string): Promise<SessionData | null> {
   try {
-    // まずKuzuからデータを取得しようとする（優先順位1）
+    // Kuzuデータベースからセッションデータを取得（一本化）
     if (kuzuManager) {
       try {
-        // Kuzuからセッションデータを取得（仮実装 - 実際のクエリは要実装）
-        const kuzuResults = await kuzuManager.getAllParticipants();
-        // 実際のセッションデータ取得ロジックはここに実装する必要がある
-        // 現時点ではKuzuにセッションデータが保存されていないため、Blobへフォールバック
+        // Kuzuからセッションデータを取得
+        // 実際のクエリ実装はKuzuManagerで実装する必要がある
+        // 現時点では仮の実装
+        console.log(`Loading session data from Kuzu for ${participantId}`);
+        // TODO: KuzuManagerにgetSessionDataメソッドを実装
+        return null; // 仮実装
       } catch (kuzuError) {
-        console.warn('Failed to load from Kuzu:', kuzuError);
+        console.warn('Failed to load session data from Kuzu:', kuzuError);
+        return null;
       }
+    } else {
+      console.warn('Kuzu manager not available');
+      return null;
     }
-
-    // Fallback: Blobからデータを取得しようとする（優先順位2）
-    if (blobStorage) {
-      try {
-        const blobSessionData = await blobStorage.getSessionData(participantId);
-        if (blobSessionData) {
-          console.log(`Loaded session data from Vercel Blob for ${participantId}`);
-          return blobSessionData;
-        }
-      } catch (blobError) {
-        console.warn(`Failed to load session data from Blob for ${participantId}:`, blobError);
-      }
-    }
-
-    // 最終Fallback: ファイルシステムから取得し、Blobにインポート（優先順位3）
-    const sessionDataPath = join(ARTIFACTS_CACHE_PATH, participantId, 'session_data.json');
-
-    if (existsSync(sessionDataPath)) {
-      const sessionData = JSON.parse(readFileSync(sessionDataPath, 'utf-8'));
-      console.log(`Loaded session data from file system for ${participantId}`);
-
-      // ファイルから取得したデータをBlobに保存
-      if (blobStorage && sessionData) {
-        try {
-          await blobStorage.saveSessionData(participantId, sessionData);
-          console.log(`Imported session data from file system to Blob for ${participantId}`);
-        } catch (saveError) {
-          console.warn('Failed to save session data to Blob:', saveError);
-        }
-      }
-
-      return sessionData;
-    }
-
-    return null;
   } catch (error) {
     console.error(`Error loading session data for ${participantId}:`, error);
     return null;
@@ -350,118 +321,28 @@ export function parseWordResponsesFromEvents(events: SessionEvent[]): Array<{
 // Load all participants data
 export async function loadAllParticipants(): Promise<Participant[]> {
   try {
-    // まずKuzuからデータを取得しようとする（優先順位1）
+    // Kuzuデータベースから参加者データを取得（一本化）
     if (kuzuManager) {
       try {
         const kuzuParticipants = await kuzuManager.getAllParticipants();
-        if (kuzuParticipants.length > 0) {
-          console.log(`Loaded ${kuzuParticipants.length} participants from Kuzu`);
-          return kuzuParticipants.map(kp => ({
-            id: kp.id,
-            signature: kp.signature,
-            agreedAt: kp.agreedAt,
-            agreements: kp.agreements,
-            hasSessionData: false, // 後で更新
-            hasVideoFiles: false, // 後で更新
-            videoFiles: []
-          }));
-        }
+        console.log(`Loaded ${kuzuParticipants.length} participants from Kuzu`);
+        return kuzuParticipants.map(kp => ({
+          id: kp.id,
+          signature: kp.signature,
+          agreedAt: kp.agreedAt,
+          agreements: kp.agreements,
+          hasSessionData: false, // 後で更新
+          hasVideoFiles: false, // 後で更新
+          videoFiles: []
+        }));
       } catch (kuzuError) {
-        console.warn('Failed to load from Kuzu:', kuzuError);
+        console.warn('Failed to load participants from Kuzu:', kuzuError);
+        return [];
       }
+    } else {
+      console.warn('Kuzu manager not available');
+      return [];
     }
-
-    // Fallback: Blobからデータを取得しようとする（優先順位2）
-    if (blobStorage) {
-      try {
-        const participantIds = await blobStorage.getAllParticipants();
-        if (participantIds.length > 0) {
-          const participants: Participant[] = [];
-
-          for (const participantId of participantIds) {
-            try {
-              const exists = await blobStorage.participantExists(participantId);
-              if (!exists) {
-                console.warn(`Participant ${participantId} does not exist in Blob storage, skipping`);
-                continue;
-              }
-              const participantData = await blobStorage.getParticipantData(participantId);
-
-              // セッションとビデオファイルの情報を追加
-              let hasSessionData = false;
-              let hasVideoFiles = false;
-              const videoFiles: string[] = [];
-
-              try {
-                await blobStorage.getSessionData(participantId);
-                hasSessionData = true;
-              } catch (error) {
-                // セッションデータなし
-              }
-
-              try {
-                const videoFileUrls = await blobStorage.listFiles(`participants/${participantId}/videos/`);
-                hasVideoFiles = videoFileUrls.length > 0;
-                videoFiles.push(...videoFileUrls.map(url => url.split('/').pop() || ''));
-              } catch (error) {
-                // ビデオファイルなし
-              }
-
-              participants.push({
-                id: participantData.participantId,
-                signature: participantData.signature,
-                agreedAt: participantData.agreedAt,
-                agreements: participantData.agreements,
-                hasSessionData,
-                hasVideoFiles,
-                videoFiles
-              });
-            } catch (error) {
-              console.warn(`Failed to load participant ${participantId} from Blob:`, error);
-            }
-          }
-
-          if (participants.length > 0) {
-            console.log(`Loaded ${participants.length} participants from Vercel Blob`);
-            return participants;
-          }
-        }
-      } catch (blobError) {
-        console.warn('Failed to load from Vercel Blob:', blobError);
-      }
-    }
-
-    // 最終Fallback: ファイルシステムから取得し、Blobにインポート（優先順位3）
-    const participantIds = getParticipantDirectories();
-    let participants = participantIds
-      .map(id => loadParticipantData(id))
-      .filter((participant): participant is Participant => participant !== null);
-
-    if (participants.length > 0) {
-      console.log(`Loaded ${participants.length} participants from file system`);
-
-      // ファイルから取得したデータをBlobに保存
-      if (blobStorage) {
-        for (const participant of participants) {
-          try {
-            const consentData = {
-              participantId: participant.id,
-              signature: participant.signature,
-              agreedAt: participant.agreedAt,
-              agreements: participant.agreements
-            };
-            await blobStorage.saveParticipantData(participant.id, consentData);
-            console.log(`Imported participant ${participant.id} from file system to Blob`);
-          } catch (saveError) {
-            console.warn('Failed to save participant data to Blob:', saveError);
-          }
-        }
-      }
-
-      return participants;
-    }
-
-    return [];
   } catch (error) {
     console.error('Error loading all participants:', error);
     return [];

@@ -1,58 +1,74 @@
 // LLM-BOUNDARY: 80_app - app/(segments)/...（RSC & Client）
 
 import { NextRequest, NextResponse } from "next/server";
-import { loadAllParticipants } from "@/lib/data-loader";
-import { loadEmotionAnalysisResults } from "@/lib/emotion-analysis";
-import { storageAdapter } from "@/50_adapters";
-import { AdminSupervisor } from "@/70_supervisors";
+import { getParticipantDirectories } from "@/lib/data-loader";
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
+import { kuzuManager } from "@/lib/database/kuzu-manager";
+
+const ARTIFACTS_CACHE_PATH = '/Users/junkawasaki/jun784/root/procs/250901-com-junkawasaki-spiritinphysics/.artifacts_cache';
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("Starting emotion analysis data import...");
+    console.log("Starting emotion analysis data import to Kuzu...");
 
-    // 全参加者を取得
-    const participants = await loadAllParticipants();
+    // ファイルシステムから感情分析データを取得
+    const participantIds = getParticipantDirectories();
+    const emotionDataList = [];
 
-    if (participants.length === 0) {
+    for (const participantId of participantIds) {
+      const emotionDataPath = join(ARTIFACTS_CACHE_PATH, participantId, 'emotion_analysis.json');
+      if (existsSync(emotionDataPath)) {
+        try {
+          const emotionResults = JSON.parse(readFileSync(emotionDataPath, 'utf-8'));
+          if (Array.isArray(emotionResults)) {
+            emotionDataList.push({ participantId, emotionResults });
+          } else {
+            emotionDataList.push({ participantId, emotionResults: [emotionResults] });
+          }
+        } catch (error) {
+          console.warn(`Failed to parse emotion analysis data for ${participantId}:`, error);
+        }
+      }
+    }
+
+    if (emotionDataList.length === 0) {
       return NextResponse.json({
         success: false,
-        message: "No participants found",
+        message: "No emotion analysis data found in file system",
         results: []
       });
     }
 
     const results = [];
 
-    // 各参加者の感情分析データをインポート
-    for (const participant of participants) {
+    // 各参加者の感情分析データをKuzuにインポート
+    for (const { participantId, emotionResults } of emotionDataList) {
       try {
-        // 感情分析データをファイルシステムから取得
-        const emotionResults = await loadEmotionAnalysisResults(participant.id);
-
-        if (emotionResults.length > 0) {
-          // 各感情分析結果を保存
-          for (const emotionResult of emotionResults) {
-            await storageAdapter.saveEmotionAnalysis(participant.id, emotionResult);
-          }
-
-          results.push({
-            participantId: participant.id,
-            status: "success",
-            message: `Successfully imported ${emotionResults.length} emotion analysis results`
-          });
-
-          console.log(`Imported ${emotionResults.length} emotion analysis results for participant ${participant.id}`);
-        } else {
-          results.push({
-            participantId: participant.id,
-            status: "success",
-            message: "No emotion analysis data found for this participant"
+        // 各感情分析結果をKuzuに保存
+        for (const emotionResult of emotionResults) {
+          await kuzuManager.saveEmotionAnalysis({
+            id: `${participantId}_${emotionResult.videoFile}_${Date.now()}`,
+            participantId: participantId,
+            videoFileId: `${participantId}_${emotionResult.videoFile}`,
+            sessionType: emotionResult.sessionType,
+            timestamp: emotionResult.timestamp,
+            processingTime: emotionResult.processingTime,
+            emotions: emotionResult.emotions
           });
         }
-      } catch (error) {
-        console.error(`Failed to import emotion data for participant ${participant.id}:`, error);
+
         results.push({
-          participantId: participant.id,
+          participantId: participantId,
+          status: "success",
+          message: `Successfully imported ${emotionResults.length} emotion analysis results to Kuzu`
+        });
+
+        console.log(`Imported ${emotionResults.length} emotion analysis results for participant ${participantId} to Kuzu`);
+      } catch (error) {
+        console.error(`Failed to import emotion data for participant ${participantId} to Kuzu:`, error);
+        results.push({
+          participantId: participantId,
           status: "error",
           message: error instanceof Error ? error.message : "Unknown error",
           details: error
@@ -60,18 +76,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // インポート完了をスーパーバイザーに通知
-    await AdminSupervisor.updateAnalytics();
-
     const successCount = results.filter(r => r.status === "success").length;
     const errorCount = results.filter(r => r.status === "error").length;
 
     return NextResponse.json({
       success: true,
-      message: `Imported emotion analysis data for ${successCount} participants successfully, ${errorCount} failed`,
+      message: `Imported emotion analysis data for ${successCount} participants to Kuzu successfully, ${errorCount} failed`,
       results,
       summary: {
-        total: participants.length,
+        total: emotionDataList.length,
         successful: successCount,
         failed: errorCount
       }

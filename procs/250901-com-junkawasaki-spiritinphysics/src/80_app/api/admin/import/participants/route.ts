@@ -1,16 +1,18 @@
 // LLM-BOUNDARY: 80_app - app/(segments)/...（RSC & Client）
 
 import { NextRequest, NextResponse } from "next/server";
-import { loadAllParticipants } from "@/lib/data-loader";
-import { storageAdapter } from "@/50_adapters";
-import { ExperimentSupervisor } from "@/70_supervisors";
+import { getParticipantDirectories, loadParticipantData } from "@/lib/data-loader";
+import { kuzuManager } from "@/lib/database/kuzu-manager";
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("Starting participant data import...");
+    console.log("Starting participant data import to Kuzu...");
 
     // ファイルシステムから参加者データを取得
-    const participants = await loadAllParticipants();
+    const participantIds = getParticipantDirectories();
+    const participants = participantIds
+      .map(id => loadParticipantData(id))
+      .filter((participant): participant is any => participant !== null);
 
     if (participants.length === 0) {
       return NextResponse.json({
@@ -22,32 +24,26 @@ export async function POST(request: NextRequest) {
 
     const results = [];
 
-    // 各参加者をKuzuとBlobにインポート
+    // 各参加者をKuzuにインポート
     for (const participant of participants) {
       try {
-        // Kuzuに保存
-        await storageAdapter.saveStructuredData({
-          type: "participant",
-          data: {
-            participantId: participant.id,
-            signature: participant.signature,
-            agreements: participant.agreements,
-            agreedAt: participant.agreedAt
-          }
+        // Kuzuに保存（一本化）
+        await kuzuManager.saveParticipant({
+          id: participant.id,
+          signature: participant.signature,
+          agreedAt: participant.agreedAt,
+          agreements: participant.agreements
         });
-
-        // Blobに保存（冗長）
-        // Blob Storageは自動的に同期されるため、ここでは省略
 
         results.push({
           participantId: participant.id,
           status: "success",
-          message: "Successfully imported participant data"
+          message: "Successfully imported participant data to Kuzu"
         });
 
-        console.log(`Imported participant ${participant.id}`);
+        console.log(`Imported participant ${participant.id} to Kuzu`);
       } catch (error) {
-        console.error(`Failed to import participant ${participant.id}:`, error);
+        console.error(`Failed to import participant ${participant.id} to Kuzu:`, error);
         results.push({
           participantId: participant.id,
           status: "error",
@@ -57,15 +53,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // インポート完了をスーパーバイザーに通知
-    await ExperimentSupervisor.startExperiment("bulk-import");
-
     const successCount = results.filter(r => r.status === "success").length;
     const errorCount = results.filter(r => r.status === "error").length;
 
     return NextResponse.json({
       success: true,
-      message: `Imported ${successCount} participants successfully, ${errorCount} failed`,
+      message: `Imported ${successCount} participants to Kuzu successfully, ${errorCount} failed`,
       results,
       summary: {
         total: participants.length,

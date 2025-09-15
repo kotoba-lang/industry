@@ -202,57 +202,26 @@ export async function saveEmotionAnalysisResult(result: EmotionAnalysisResult): 
  */
 export async function loadEmotionAnalysisResults(participantId: string): Promise<EmotionAnalysisResult[]> {
   try {
-    // まずKuzuからデータを取得しようとする（優先順位1）
+    // Kuzuデータベースから感情分析データを取得（一本化）
     if (kuzuManager) {
       try {
         const kuzuResults = await kuzuManager.getEmotionAnalysis(participantId);
-        if (kuzuResults.length > 0) {
-          console.log(`Loaded emotion analysis results from Kuzu for ${participantId}`);
-          return kuzuResults.map(ka => ({
-            participantId: ka.participantId,
-            videoFile: ka.videoFileId.replace(`${ka.participantId}_`, ''),
-            sessionType: ka.sessionType,
-            emotions: ka.emotions,
-            timestamp: ka.timestamp,
-            processingTime: ka.processingTime
-          }));
-        }
+        console.log(`Loaded emotion analysis results from Kuzu for ${participantId}`);
+        return kuzuResults.map(ka => ({
+          participantId: ka.participantId,
+          videoFile: ka.videoFileId.replace(`${ka.participantId}_`, ''),
+          sessionType: ka.sessionType,
+          emotions: ka.emotions,
+          timestamp: ka.timestamp,
+          processingTime: ka.processingTime
+        }));
       } catch (kuzuError) {
-        console.warn('Failed to load from Kuzu:', kuzuError);
+        console.warn('Failed to load emotion analysis from Kuzu:', kuzuError);
+        return [];
       }
-    }
-
-    // Fallback: Blobからデータを取得しようとする（優先順位2）
-    if (blobStorage) {
-      try {
-        const blobResults = await blobStorage.getEmotionAnalysis(participantId);
-        if (blobResults) {
-          console.log(`Loaded emotion analysis results from Vercel Blob for ${participantId}`);
-          return [blobResults];
-        }
-      } catch (blobError) {
-        console.warn(`Failed to load emotion analysis from Blob for ${participantId}:`, blobError);
-      }
-    }
-
-    // 最終Fallback: ファイルシステムから取得し、Blobにインポート（優先順位3）
-    const resultPath = join(ARTIFACTS_CACHE_PATH, participantId, 'emotion_analysis.json');
-
-    if (existsSync(resultPath)) {
-      const fileResults = JSON.parse(readFileSync(resultPath, 'utf-8'));
-      console.log(`Loaded emotion analysis results from file system for ${participantId}`);
-
-      // ファイルから取得したデータをBlobに保存
-      if (blobStorage && Array.isArray(fileResults) && fileResults.length > 0) {
-        try {
-          await blobStorage.saveEmotionAnalysis(participantId, fileResults[0]);
-          console.log(`Imported emotion analysis from file system to Blob for ${participantId}`);
-        } catch (saveError) {
-          console.warn('Failed to save emotion analysis to Blob:', saveError);
-        }
-      }
-
-      return Array.isArray(fileResults) ? fileResults : [fileResults];
+    } else {
+      console.warn('Kuzu manager not available');
+      return [];
     }
   } catch (error) {
     console.error(`Error loading emotion analysis results for ${participantId}:`, error);
