@@ -7,3 +7,7 @@ export * from './emotion-analysis-adapter';
 export * from './media-adapter';
 export * from './event-bus-adapter';
 export * from './external-api-adapter';
+
+// lib/ から統合された機能
+export { inngest, events } from './event-bus-adapter';
+export type { VideoAnalysisEvent, BatchAnalysisEvent, AnalysisResultEvent, VideoAnalysisWorkflow, BatchAnalysisWorkflow } from './event-bus-adapter';

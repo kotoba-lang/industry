@@ -11,6 +11,16 @@ export const ParticipantSchema = z.object({
 });
 export type Participant = z.infer<typeof ParticipantSchema>;
 
+// ファイルシステムベースの参加者情報（拡張情報付き）
+export interface ParticipantWithFiles extends Participant {
+  signature: string;
+  agreedAt: string;
+  agreements: Record<string, any>;
+  hasSessionData: boolean;
+  hasVideoFiles: boolean;
+  videoFiles: string[];
+}
+
 const ExperimentSessionSchema = z.object({
   participantId: z.string().uuid(),
   sessionId: z.string().uuid(),
@@ -36,6 +46,7 @@ const SessionDataSchema = z.object({
   events: z.array(z.any()),
   wordResponses: z.array(WordResponseSchema),
 });
+export type SessionData = z.infer<typeof SessionDataSchema>;
 
 export const WordStimulusSchema = z.object({
   id: z.number().int(),

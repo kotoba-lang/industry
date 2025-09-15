@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  loadAllParticipants,
-  loadAllSessionData,
-  parseWordResponsesFromEvents,
-  getParticipantStatistics,
-  initializeKuzuDatabase
-} from "@/lib/data-loader";
-import { loadEmotionAnalysisResults, getEmotionStatisticsFromKuzu } from "@/lib/emotion-analysis";
+import { storageAdapter } from "@/50_adapters";
+import { emotionAnalysisAdapter } from "@/50_adapters";
+import { parseWordResponsesFromEvents, getParticipantStatistics } from "@/lib/data-loader";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -18,7 +13,7 @@ export async function GET(request: NextRequest) {
       case 'participants':
         // Kuzuデータベースの初期化
         await initializeKuzuDatabase();
-        const participants = await loadAllParticipants();
+        const participants = await storageAdapter.loadAllParticipants();
         const participantStats = getParticipantStatistics(participants);
 
         // Transform to match expected format
@@ -49,7 +44,7 @@ export async function GET(request: NextRequest) {
           }, { status: 400 });
         }
 
-        const participants_list = await loadAllParticipants();
+        const participants_list = await storageAdapter.loadAllParticipants();
         const participant = participants_list.find(p => p.id === participantId);
         if (!participant) {
           return NextResponse.json({
@@ -115,7 +110,7 @@ export async function GET(request: NextRequest) {
       case 'analytics':
         // Kuzuデータベースの初期化
         await initializeKuzuDatabase();
-        const participants_for_analytics = await loadAllParticipants();
+        const participants_for_analytics = await storageAdapter.loadAllParticipants();
         const stats = getParticipantStatistics(participants_for_analytics);
         const allSessions = await loadAllSessionData();
 
@@ -134,7 +129,7 @@ export async function GET(request: NextRequest) {
         const averageReactionTime = totalResponses > 0 ? totalReactionTime / totalResponses : 0;
 
         // Kuzuから感情統計を取得
-        const emotionStats = await getEmotionStatisticsFromKuzu();
+        const emotionStats = await emotionAnalysisAdapter.getEmotionStatistics();
         const emotionDistribution: Record<string, number> = {};
         emotionStats.dominantEmotions.forEach(item => {
           emotionDistribution[item.emotion] = item.count;
