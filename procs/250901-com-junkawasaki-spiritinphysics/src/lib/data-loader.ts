@@ -1,7 +1,33 @@
-import { readFileSync, readdirSync, existsSync } from 'fs';
+import { readFileSync, readdirSync, existsSync, statSync } from 'fs';
 import { join } from 'path';
 
+// サーバーサイドでのみKuzuをインポート
+let kuzuManager: any = null;
+let Participant: any, Session: any, VideoFile: any;
+
+if (typeof window === 'undefined') {
+  try {
+    const kuzuModule = require('./database/kuzu-manager');
+    kuzuManager = kuzuModule.kuzuManager;
+    Participant = kuzuModule.Participant;
+    Session = kuzuModule.Session;
+    VideoFile = kuzuModule.VideoFile;
+  } catch (error) {
+    console.warn('Kuzu manager not available:', error);
+  }
+}
+
 const ARTIFACTS_CACHE_PATH = '/Users/junkawasaki/jun784/root/procs/250901-com-junkawasaki-spiritinphysics/.artifacts_cache';
+
+// Kuzu初期化関数
+export async function initializeKuzuDatabase(): Promise<void> {
+  try {
+    await kuzuManager.initialize();
+    console.log('Kuzu database initialized successfully');
+  } catch (error) {
+    console.error('Failed to initialize Kuzu database:', error);
+  }
+}
 
 // Types based on actual data structure
 export interface ConsentData {
@@ -38,7 +64,7 @@ export interface Participant {
 }
 
 // Parse database.jsonl file
-export function loadConsentDataFromDatabase(): ConsentData[] {
+export async function loadConsentDataFromDatabase(): Promise<ConsentData[]> {
   try {
     const databasePath = join(ARTIFACTS_CACHE_PATH, 'database.jsonl');
     if (!existsSync(databasePath)) {
@@ -48,7 +74,7 @@ export function loadConsentDataFromDatabase(): ConsentData[] {
     const content = readFileSync(databasePath, 'utf-8');
     const lines = content.trim().split('\n');
 
-    return lines.map(line => {
+    const consentData = lines.map(line => {
       try {
         const record = JSON.parse(line);
         if (record.type === 'consent') {
@@ -59,6 +85,24 @@ export function loadConsentDataFromDatabase(): ConsentData[] {
       }
       return null;
     }).filter((data): data is ConsentData => data !== null);
+
+    // Kuzuに保存
+    for (const data of consentData) {
+      const participant: Participant = {
+        id: data.participantId,
+        signature: data.signature,
+        agreedAt: data.agreedAt || new Date().toISOString(),
+        agreements: data.agreements || {}
+      };
+
+      try {
+        await kuzuManager.saveParticipant(participant);
+      } catch (saveError) {
+        console.warn('Failed to save participant to Kuzu:', saveError);
+      }
+    }
+
+    return consentData;
   } catch (error) {
     console.error('Error loading consent data from database:', error);
     return [];
@@ -117,7 +161,7 @@ export function loadParticipantData(participantId: string): Participant | null {
 }
 
 // Load session data for a participant
-export function loadSessionData(participantId: string): SessionData | null {
+export async function loadSessionData(participantId: string): Promise<SessionData | null> {
   try {
     const sessionDataPath = join(ARTIFACTS_CACHE_PATH, participantId, 'session_data.json');
     if (!existsSync(sessionDataPath)) {
@@ -125,6 +169,52 @@ export function loadSessionData(participantId: string): SessionData | null {
     }
 
     const sessionData: SessionData = JSON.parse(readFileSync(sessionDataPath, 'utf-8'));
+
+    // Kuzuに保存
+    if (sessionData) {
+      const session: Session = {
+        id: `${participantId}_session`,
+        participantId: participantId,
+        events: sessionData.events,
+        createdAt: sessionData.events[0]?.timestamp || new Date().toISOString()
+      };
+
+      try {
+        await kuzuManager.saveSession(session);
+      } catch (saveError) {
+        console.warn('Failed to save session to Kuzu:', saveError);
+      }
+
+      // ビデオファイルも保存
+      const videoDir = join(ARTIFACTS_CACHE_PATH, participantId);
+      if (existsSync(videoDir)) {
+        const videoFiles = readdirSync(videoDir)
+          .filter(file => file.endsWith('.webm'));
+
+        for (const videoFile of videoFiles) {
+          const videoPath = join(videoDir, videoFile);
+          const stats = statSync(videoPath);
+          const sessionType = videoFile.includes('session-1') ? 'session-1' : 'session-2';
+
+          const videoFileData: VideoFile = {
+            id: `${participantId}_${videoFile}`,
+            participantId: participantId,
+            sessionId: session.id,
+            fileName: videoFile,
+            filePath: videoPath,
+            fileSize: stats.size,
+            createdAt: stats.mtime.toISOString()
+          };
+
+          try {
+            await kuzuManager.saveVideoFile(videoFileData);
+          } catch (saveError) {
+            console.warn('Failed to save video file to Kuzu:', saveError);
+          }
+        }
+      }
+    }
+
     return sessionData;
   } catch (error) {
     console.error(`Error loading session data for ${participantId}:`, error);
@@ -185,23 +275,74 @@ export function parseWordResponsesFromEvents(events: SessionEvent[]): Array<{
 }
 
 // Load all participants data
-export function loadAllParticipants(): Participant[] {
-  const participantIds = getParticipantDirectories();
-  return participantIds
-    .map(id => loadParticipantData(id))
-    .filter((participant): participant is Participant => participant !== null);
+export async function loadAllParticipants(): Promise<Participant[]> {
+  try {
+    // まずKuzuからデータを取得
+    const kuzuParticipants = await kuzuManager.getAllParticipants();
+    if (kuzuParticipants.length > 0) {
+      return kuzuParticipants.map(kp => ({
+        id: kp.id,
+        signature: kp.signature,
+        agreedAt: kp.agreedAt,
+        agreements: kp.agreements,
+        hasSessionData: false, // 後で更新
+        hasVideoFiles: false, // 後で更新
+        videoFiles: []
+      }));
+    }
+
+    // Kuzuにデータがない場合、ファイルから読み込んで保存
+    const participantIds = getParticipantDirectories();
+    const participants = participantIds
+      .map(id => loadParticipantData(id))
+      .filter((participant): participant is Participant => participant !== null);
+
+    // 参加者データをKuzuに保存
+    for (const participant of participants) {
+      const consentData = await loadConsentDataFromDatabase();
+      // 既存の保存処理はloadConsentDataFromDatabase内で実行される
+    }
+
+    return participants;
+  } catch (error) {
+    console.error('Error loading all participants:', error);
+    // Fallback to file-based loading
+    const participantIds = getParticipantDirectories();
+    return participantIds
+      .map(id => loadParticipantData(id))
+      .filter((participant): participant is Participant => participant !== null);
+  }
 }
 
 // Load all session data
-export function loadAllSessionData(): Array<{ participantId: string; sessionData: SessionData }> {
-  const participants = loadAllParticipants();
-  return participants
-    .filter(p => p.hasSessionData)
-    .map(participant => {
-      const sessionData = loadSessionData(participant.id);
-      return sessionData ? { participantId: participant.id, sessionData } : null;
-    })
-    .filter((data): data is { participantId: string; sessionData: SessionData } => data !== null);
+export async function loadAllSessionData(): Promise<Array<{ participantId: string; sessionData: SessionData }>> {
+  try {
+    const participants = await loadAllParticipants();
+    const sessionDataPromises = participants
+      .filter(p => p.hasSessionData)
+      .map(async participant => {
+        const sessionData = await loadSessionData(participant.id);
+        return sessionData ? { participantId: participant.id, sessionData } : null;
+      });
+
+    const results = await Promise.all(sessionDataPromises);
+    return results.filter((data): data is { participantId: string; sessionData: SessionData } => data !== null);
+  } catch (error) {
+    console.error('Error loading all session data:', error);
+    // Fallback to synchronous loading
+    const participantIds = getParticipantDirectories();
+    const participants = participantIds
+      .map(id => loadParticipantData(id))
+      .filter((participant): participant is Participant => participant !== null);
+
+    return participants
+      .filter(p => p.hasSessionData)
+      .map(participant => {
+        const sessionData = loadSessionData(participant.id);
+        return sessionData ? { participantId: participant.id, sessionData } : null;
+      })
+      .filter((data): data is { participantId: string; sessionData: SessionData } => data !== null);
+  }
 }
 
 // Get participant statistics

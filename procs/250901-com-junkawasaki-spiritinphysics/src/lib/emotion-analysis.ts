@@ -2,6 +2,20 @@ import { HumeClient } from 'hume';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
+// サーバーサイドでのみKuzuをインポート
+let kuzuManager: any = null;
+let EmotionAnalysis: any;
+
+if (typeof window === 'undefined') {
+  try {
+    const kuzuModule = require('./database/kuzu-manager');
+    kuzuManager = kuzuModule.kuzuManager;
+    EmotionAnalysis = kuzuModule.EmotionAnalysis;
+  } catch (error) {
+    console.warn('Kuzu manager not available:', error);
+  }
+}
+
 const ARTIFACTS_CACHE_PATH = '/Users/junkawasaki/jun784/root/procs/250901-com-junkawasaki-spiritinphysics/.artifacts_cache';
 
 interface EmotionAnalysisResult {
@@ -89,7 +103,7 @@ export async function analyzeVideoEmotions(
     };
 
     // 結果を保存
-    saveEmotionAnalysisResult(result);
+    await saveEmotionAnalysisResult(result);
 
     console.log(`Emotion analysis completed for ${participantId}/${videoFileName}`);
     return result;
@@ -125,17 +139,16 @@ function processHumePredictions(predictions: HumeEmotionResponse): Array<{
 /**
  * 感情分析結果をファイルに保存
  */
-function saveEmotionAnalysisResult(result: EmotionAnalysisResult): void {
+async function saveEmotionAnalysisResult(result: EmotionAnalysisResult): Promise<void> {
   try {
+    // ファイルに保存（既存の動作を維持）
     const resultPath = join(ARTIFACTS_CACHE_PATH, result.participantId, 'emotion_analysis.json');
 
-    // 既存の結果を読み込み（存在する場合）
     let existingResults: EmotionAnalysisResult[] = [];
     if (existsSync(resultPath)) {
       existingResults = JSON.parse(readFileSync(resultPath, 'utf-8'));
     }
 
-    // 新しい結果を追加または更新
     const existingIndex = existingResults.findIndex(
       r => r.videoFile === result.videoFile && r.sessionType === result.sessionType
     );
@@ -146,9 +159,28 @@ function saveEmotionAnalysisResult(result: EmotionAnalysisResult): void {
       existingResults.push(result);
     }
 
-    // 保存
     writeFileSync(resultPath, JSON.stringify(existingResults, null, 2));
-    console.log(`Emotion analysis result saved: ${resultPath}`);
+    console.log(`Emotion analysis result saved to file: ${resultPath}`);
+
+    // Kuzuにも保存（利用可能な場合）
+    if (kuzuManager) {
+      try {
+        const analysis: EmotionAnalysis = {
+          id: `${result.participantId}_${result.videoFile}_${Date.now()}`,
+          participantId: result.participantId,
+          videoFileId: `${result.participantId}_${result.videoFile}`,
+          sessionType: result.sessionType,
+          timestamp: result.timestamp,
+          processingTime: result.processingTime,
+          emotions: result.emotions
+        };
+
+        await kuzuManager.saveEmotionAnalysis(analysis);
+        console.log(`Emotion analysis result saved to Kuzu: ${analysis.id}`);
+      } catch (kuzuError) {
+        console.warn('Failed to save emotion analysis to Kuzu:', kuzuError);
+      }
+    }
 
   } catch (error) {
     console.error('Error saving emotion analysis result:', error);
@@ -158,8 +190,28 @@ function saveEmotionAnalysisResult(result: EmotionAnalysisResult): void {
 /**
  * 保存された感情分析結果を読み込み
  */
-export function loadEmotionAnalysisResults(participantId: string): EmotionAnalysisResult[] {
+export async function loadEmotionAnalysisResults(participantId: string): Promise<EmotionAnalysisResult[]> {
   try {
+    // Kuzuが利用可能な場合、まずKuzuからデータを取得
+    if (kuzuManager) {
+      try {
+        const kuzuResults = await kuzuManager.getEmotionAnalysis(participantId);
+        if (kuzuResults.length > 0) {
+          return kuzuResults.map(ka => ({
+            participantId: ka.participantId,
+            videoFile: ka.videoFileId.replace(`${ka.participantId}_`, ''),
+            sessionType: ka.sessionType,
+            emotions: ka.emotions,
+            timestamp: ka.timestamp,
+            processingTime: ka.processingTime
+          }));
+        }
+      } catch (kuzuError) {
+        console.warn('Failed to load from Kuzu:', kuzuError);
+      }
+    }
+
+    // Kuzuにデータがない場合または利用できない場合、ファイルから取得
     const resultPath = join(ARTIFACTS_CACHE_PATH, participantId, 'emotion_analysis.json');
 
     if (!existsSync(resultPath)) {
@@ -169,6 +221,15 @@ export function loadEmotionAnalysisResults(participantId: string): EmotionAnalys
     return JSON.parse(readFileSync(resultPath, 'utf-8'));
   } catch (error) {
     console.error(`Error loading emotion analysis results for ${participantId}:`, error);
+    // Fallback to file-based loading
+    try {
+      const resultPath = join(ARTIFACTS_CACHE_PATH, participantId, 'emotion_analysis.json');
+      if (existsSync(resultPath)) {
+        return JSON.parse(readFileSync(resultPath, 'utf-8'));
+      }
+    } catch (fallbackError) {
+      console.error('Fallback loading also failed:', fallbackError);
+    }
     return [];
   }
 }
@@ -212,7 +273,38 @@ export async function analyzeAllParticipantVideos(participantId: string): Promis
 }
 
 /**
- * 感情分析の統計情報を生成
+ * Kuzuから感情分析の統計情報を取得
+ */
+export async function getEmotionStatisticsFromKuzu(): Promise<{
+  totalAnalyses: number;
+  averageEmotions: Record<string, number>;
+  dominantEmotions: Array<{ emotion: string; count: number }>;
+  processingStats: {
+    averageTime: number;
+    totalTime: number;
+  };
+}> {
+  try {
+    if (kuzuManager) {
+      return await kuzuManager.getEmotionStatistics();
+    } else {
+      console.warn('Kuzu manager not available, returning empty stats');
+    }
+  } catch (error) {
+    console.error('Error getting emotion statistics from Kuzu:', error);
+  }
+
+  // Fallback to empty stats
+  return {
+    totalAnalyses: 0,
+    averageEmotions: {},
+    dominantEmotions: [],
+    processingStats: { averageTime: 0, totalTime: 0 }
+  };
+}
+
+/**
+ * 感情分析の統計情報を生成（従来の関数）
  */
 export function generateEmotionStatistics(results: EmotionAnalysisResult[]): {
   totalAnalyses: number;

@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
           }, { status: 400 });
         }
 
-        const savedResults = loadEmotionAnalysisResults(participantId);
+        const savedResults = await loadEmotionAnalysisResults(participantId);
         const stats = generateEmotionStatistics(savedResults);
 
         return NextResponse.json({
@@ -82,10 +82,16 @@ export async function GET(request: NextRequest) {
           "e41a9cd2-d803-49a8-9020-0260e55cd03e"
         ];
 
-        let globalResults: any[] = [];
-        participantIds.forEach(id => {
-          const results = loadEmotionAnalysisResults(id);
-          globalResults = globalResults.concat(results);
+        // Kuzuから感情統計を取得
+        const kuzuStats = await getEmotionStatisticsFromKuzu();
+        const globalResults: any[] = [];
+        const participantPromises = participantIds.map(async id => {
+          const results = await loadEmotionAnalysisResults(id);
+          return results;
+        });
+        const allParticipantResults = await Promise.all(participantPromises);
+        allParticipantResults.forEach(results => {
+          globalResults.push(...results);
         });
 
         const globalStats = generateEmotionStatistics(globalResults);

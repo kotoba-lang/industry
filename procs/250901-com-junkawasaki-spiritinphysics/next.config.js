@@ -4,7 +4,7 @@ const nextConfig = {
     appDir: true,
   },
   webpack: (config, { isServer }) => {
-    // Node.js ポリフィルの追加（Inngestで必要）
+    // Node.js ポリフィルの追加（InngestとKuzuで必要）
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -19,11 +19,20 @@ const nextConfig = {
         "https": false,
         "zlib": false,
         "querystring": false,
+        "kuzu": false, // ブラウザでは使用しない
       };
+    }
+
+    // サーバーサイドでのみKuzuを有効にする
+    if (isServer) {
+      config.externals = config.externals || [];
+      // 必要に応じてKuzuの外部モジュールを設定
     }
 
     return config;
   },
+  // サーバーサイドでのみKuzuを使用するための設定
+  serverComponentsExternalPackages: ['kuzu'],
 };
 
 module.exports = nextConfig;
