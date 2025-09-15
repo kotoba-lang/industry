@@ -58,7 +58,8 @@ export const videoAnalysisWorkflow = inngest.createFunction(
     });
 
     // ステップ3: Hume AI感情分析実行
-    const analysisResult = await step.run('analyze-emotions', async () => {
+    let emotionResult: EmotionAnalysisResult;
+    await step.run('analyze-emotions', async () => {
       logger.info(`Starting emotion analysis for ${participantId}/${videoFile}`);
 
       try {
@@ -67,6 +68,8 @@ export const videoAnalysisWorkflow = inngest.createFunction(
         if (!result) {
           throw new Error('Emotion analysis returned no result');
         }
+
+        emotionResult = result;
 
         logger.info(`Emotion analysis completed for ${participantId}/${videoFile}`, {
           emotionsDetected: result.emotions.length,
@@ -99,7 +102,6 @@ export const videoAnalysisWorkflow = inngest.createFunction(
     // ステップ4: 結果の永続化
     await step.run('persist-results', async () => {
       try {
-        const emotionResult: EmotionAnalysisResult = analysisResult as EmotionAnalysisResult;
         await storageAdapter.saveEmotionAnalysis(participantId, emotionResult);
 
         logger.info(`Analysis results persisted for ${participantId}/${videoFile}`, {
@@ -119,12 +121,12 @@ export const videoAnalysisWorkflow = inngest.createFunction(
       const completionEvent: AnalysisResultEvent = {
         participantId,
         videoFile,
-        results: analysisResult,
-        processingTime: analysisResult.processingTime,
+        results: emotionResult,
+        processingTime: emotionResult.processingTime,
         metadata: {
           sessionType,
-          emotionsDetected: analysisResult.emotions.length,
-          timestamp: analysisResult.timestamp,
+          emotionsDetected: emotionResult.emotions.length,
+          timestamp: emotionResult.timestamp,
         },
       };
 
@@ -142,8 +144,8 @@ export const videoAnalysisWorkflow = inngest.createFunction(
       participantId,
       videoFile,
       sessionType,
-      emotionsDetected: analysisResult.emotions.length,
-      processingTime: analysisResult.processingTime,
+      emotionsDetected: emotionResult.emotions.length,
+      processingTime: emotionResult.processingTime,
     };
   }
 );
