@@ -2,14 +2,14 @@
 let Database: any;
 let kuzuLoaded = false;
 
-try {
-  if (typeof window === 'undefined') {
+if (typeof window === 'undefined') {
+  try {
     const kuzu = require('kuzu');
     Database = kuzu.Database;
     kuzuLoaded = true;
+  } catch (error) {
+    console.warn('Kuzu not available:', error);
   }
-} catch (error) {
-  console.warn('Kuzu not available:', error);
 }
 
 import { join } from 'path';
@@ -234,6 +234,11 @@ export class KuzuManager {
    * セッションデータの保存
    */
   async saveSession(session: Session): Promise<void> {
+    if (!this.db) {
+      console.warn('Kuzu not available, skipping session save');
+      return;
+    }
+
     const conn = new this.db.Connection();
 
     try {
@@ -274,6 +279,11 @@ export class KuzuManager {
    * ビデオファイルの保存
    */
   async saveVideoFile(videoFile: VideoFile): Promise<void> {
+    if (!this.db) {
+      console.warn('Kuzu not available, skipping video file save');
+      return;
+    }
+
     const conn = new this.db.Connection();
 
     try {
@@ -320,6 +330,11 @@ export class KuzuManager {
    * 感情分析結果の保存
    */
   async saveEmotionAnalysis(analysis: EmotionAnalysis): Promise<void> {
+    if (!this.db) {
+      console.warn('Kuzu not available, skipping emotion analysis save');
+      return;
+    }
+
     const conn = new this.db.Connection();
 
     try {
@@ -473,6 +488,11 @@ export class KuzuManager {
    * 感情分析結果の取得
    */
   async getEmotionAnalysis(participantId: string): Promise<EmotionAnalysis[]> {
+    if (!this.db) {
+      console.warn('Kuzu not available, returning empty array');
+      return [];
+    }
+
     const conn = new this.db.Connection();
 
     try {
@@ -512,6 +532,16 @@ export class KuzuManager {
    * 感情統計の取得
    */
   async getEmotionStatistics(): Promise<any> {
+    if (!this.db) {
+      console.warn('Kuzu not available, returning empty stats');
+      return {
+        totalAnalyses: 0,
+        averageEmotions: {},
+        dominantEmotions: [],
+        processingStats: { averageTime: 0, totalTime: 0 }
+      };
+    }
+
     const conn = new this.db.Connection();
 
     try {
@@ -556,6 +586,10 @@ export class KuzuManager {
    * カスタムクエリの実行
    */
   async executeQuery(query: string, params: Record<string, any> = {}): Promise<any> {
+    if (!this.db) {
+      throw new Error('Kuzu database not available');
+    }
+
     const conn = new this.db.Connection();
 
     try {

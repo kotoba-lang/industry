@@ -139,7 +139,7 @@ function processHumePredictions(predictions: HumeEmotionResponse): Array<{
 /**
  * 感情分析結果をファイルに保存
  */
-async function saveEmotionAnalysisResult(result: EmotionAnalysisResult): Promise<void> {
+export async function saveEmotionAnalysisResult(result: EmotionAnalysisResult): Promise<void> {
   try {
     // ファイルに保存（既存の動作を維持）
     const resultPath = join(ARTIFACTS_CACHE_PATH, result.participantId, 'emotion_analysis.json');

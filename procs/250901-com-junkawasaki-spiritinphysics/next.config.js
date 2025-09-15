@@ -26,7 +26,9 @@ const nextConfig = {
     // サーバーサイドでのみKuzuを有効にする
     if (isServer) {
       config.externals = config.externals || [];
-      // 必要に応じてKuzuの外部モジュールを設定
+      config.externals.push({
+        'kuzu': 'commonjs kuzu'
+      });
     }
 
     return config;

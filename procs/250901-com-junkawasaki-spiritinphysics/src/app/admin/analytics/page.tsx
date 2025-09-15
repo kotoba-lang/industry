@@ -28,6 +28,7 @@ import {
   Radar,
   ComposedChart,
   Area,
+  AreaChart,
   Legend
 } from 'recharts';
 import {

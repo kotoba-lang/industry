@@ -27,6 +27,7 @@ export const WordResponseSchema = z.object({
   responseWord: z.string(),
   reactionTimeMs: z.number(),
   isDelayed: z.boolean().optional(),
+  audioBlob: z.any().optional(),
 });
 export type WordResponse = z.infer<typeof WordResponseSchema>;
 

@@ -3,7 +3,7 @@
 import { StoragePort } from '@/20_ports';
 import { ConsentData, SaveStructuredDataPayload, EmotionAnalysisResult } from '@/00_schema';
 import { blobStorage } from '@/lib/blob';
-import { databaseManager } from '@/lib/database/kuzu-manager';
+import { kuzuManager } from '@/lib/database/kuzu-manager';
 
 export class StorageAdapter implements StoragePort {
   async saveStructuredData(payload: SaveStructuredDataPayload): Promise<void> {
@@ -53,7 +53,7 @@ export class StorageAdapter implements StoragePort {
         emotions: result.emotions
       };
 
-      await databaseManager.saveEmotionAnalysis(analysis);
+      await kuzuManager.saveEmotionAnalysis(analysis);
     } catch (error) {
       console.warn('Failed to save emotion analysis to Kuzu:', error);
     }
@@ -72,7 +72,7 @@ export class StorageAdapter implements StoragePort {
 
     // Kuzuから読み込みを試行
     try {
-      const kuzuResults = await databaseManager.getEmotionAnalysis(participantId);
+      const kuzuResults = await kuzuManager.getEmotionAnalysis(participantId);
       if (kuzuResults.length > 0) {
         return kuzuResults.map(ka => ({
           participantId: ka.participantId,
@@ -91,11 +91,12 @@ export class StorageAdapter implements StoragePort {
   }
 
   async saveArtifact(participantId: string, type: string, filename: string, data: Buffer): Promise<string> {
-    return await blobStorage.uploadArtifact(data, {
+    const result = await blobStorage.uploadArtifact(data, {
       participantId,
-      type,
+      type: type as "consent" | "session_data" | "video" | "audio",
       filename,
     });
+    return result.url;
   }
 }
 

@@ -18,6 +18,8 @@ import {
   Line,
   PieChart,
   Pie,
+  AreaChart,
+  Area,
   Cell,
   ScatterChart,
   Scatter,
@@ -27,7 +29,6 @@ import {
   PolarRadiusAxis,
   Radar,
   ComposedChart,
-  Area,
   Legend
 } from 'recharts';
 import {

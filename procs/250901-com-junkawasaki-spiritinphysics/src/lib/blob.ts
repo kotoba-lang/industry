@@ -150,6 +150,22 @@ export class BlobStorageService {
             url: blob.url,
         };
     }
+
+    /**
+     * 感情分析結果をBlobに保存
+     */
+    async saveEmotionAnalysis(participantId: string, analysisData: any): Promise<string> {
+        const blobPath = `participants/${participantId}/emotion_analysis.json`;
+        return await this.uploadJson(analysisData, blobPath);
+    }
+
+    /**
+     * 感情分析結果をBlobから取得
+     */
+    async getEmotionAnalysis(participantId: string): Promise<any> {
+        const blobUrl = `${this.blobStoreUrl}/participants/${participantId}/emotion_analysis.json`;
+        return await this.downloadJson(blobUrl);
+    }
 }
 
 export const blobStorage = BlobStorageService.getInstance();

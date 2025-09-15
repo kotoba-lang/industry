@@ -8,11 +8,15 @@ let blobStorage: any = null;
 
 if (typeof window === 'undefined') {
   try {
-    const kuzuModule = require('./database/kuzu-manager');
-    kuzuManager = kuzuModule.kuzuManager;
-    Participant = kuzuModule.Participant;
-    Session = kuzuModule.Session;
-    VideoFile = kuzuModule.VideoFile;
+    // ビルド時のエラーを避けるために条件付きで import
+    const kuzuAvailable = process.env.KUZU_AVAILABLE === 'true';
+    if (kuzuAvailable) {
+      const kuzuModule = require('./database/kuzu-manager');
+      kuzuManager = new kuzuModule.KuzuManager();
+      Participant = kuzuModule.Participant;
+      Session = kuzuModule.Session;
+      VideoFile = kuzuModule.VideoFile;
+    }
   } catch (error) {
     console.warn('Kuzu manager not available:', error);
   }

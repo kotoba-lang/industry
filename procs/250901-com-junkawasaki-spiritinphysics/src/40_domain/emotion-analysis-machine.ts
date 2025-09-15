@@ -14,7 +14,7 @@ export interface EmotionAnalysisContext {
 
 // イベント型
 export type EmotionAnalysisEvent =
-  | { type: 'START_ANALYSIS'; participantId: string; videoFileName: string; sessionType: string }
+  | { type: 'START_ANALYSIS'; participantId: string; videoFileName?: string; sessionType?: string }
   | { type: 'ANALYSIS_COMPLETED'; result: EmotionAnalysisResult }
   | { type: 'ANALYSIS_FAILED'; error: string }
   | { type: 'LOAD_RESULTS'; participantId: string }
@@ -42,30 +42,33 @@ export const emotionAnalysisMachine = createMachine({
         START_ANALYSIS: {
           target: 'analyzing',
           actions: [
-            assign({
-              participantId: (_, event) => event.participantId,
+            // eslint-disable-next-line
+            assign((context: any, event: any) => ({
+              participantId: event.participantId,
               isAnalyzing: true,
               error: null
-            })
+            }))
           ]
         },
         LOAD_RESULTS: {
           target: 'loading',
           actions: [
-            assign({
-              participantId: (_, event) => event.participantId,
+            // eslint-disable-next-line
+            assign((context: any, event: any) => ({
+              participantId: event.participantId,
               error: null
-            })
+            }))
           ]
         },
         START_BATCH_ANALYSIS: {
           target: 'batchAnalyzing',
           actions: [
-            assign({
-              participantId: (_, event) => event.participantId,
+            // eslint-disable-next-line
+            assign((context: any, event: any) => ({
+              participantId: event.participantId,
               isAnalyzing: true,
               error: null
-            })
+            }))
           ]
         }
       }
@@ -76,21 +79,23 @@ export const emotionAnalysisMachine = createMachine({
         ANALYSIS_COMPLETED: {
           target: 'idle',
           actions: [
-            assign({
-              currentAnalysis: (_, event) => event.result,
-              analysisResults: (context, event) => [...context.analysisResults, event.result],
+            // eslint-disable-next-line
+            assign((context: any, event: any) => ({
+              currentAnalysis: event.result,
+              analysisResults: [...context.analysisResults, event.result],
               isAnalyzing: false
-            }),
+            })),
             'notifyAnalysisCompleted'
           ]
         },
         ANALYSIS_FAILED: {
           target: 'idle',
           actions: [
-            assign({
-              error: (_, event) => event.error,
+            // eslint-disable-next-line
+            assign((context: any, event: any) => ({
+              error: event.error,
               isAnalyzing: false
-            }),
+            })),
             'notifyAnalysisFailed'
           ]
         }
@@ -102,18 +107,20 @@ export const emotionAnalysisMachine = createMachine({
         RESULTS_LOADED: {
           target: 'idle',
           actions: [
-            assign({
-              analysisResults: (_, event) => event.results
-            }),
+            // eslint-disable-next-line
+            assign((context: any, event: any) => ({
+              analysisResults: event.results
+            })),
             'notifyResultsLoaded'
           ]
         },
         ANALYSIS_FAILED: {
           target: 'idle',
           actions: [
-            assign({
-              error: (_, event) => event.error
-            }),
+            // eslint-disable-next-line
+            assign((context: any, event: any) => ({
+              error: event.error
+            })),
             'notifyLoadFailed'
           ]
         }
@@ -125,20 +132,22 @@ export const emotionAnalysisMachine = createMachine({
         BATCH_COMPLETED: {
           target: 'idle',
           actions: [
-            assign({
-              analysisResults: (_, event) => event.results,
+            // eslint-disable-next-line
+            assign((context: any, event: any) => ({
+              analysisResults: event.results,
               isAnalyzing: false
-            }),
+            })),
             'notifyBatchCompleted'
           ]
         },
         ANALYSIS_FAILED: {
           target: 'idle',
           actions: [
-            assign({
-              error: (_, event) => event.error,
+            // eslint-disable-next-line
+            assign((context: any, event: any) => ({
+              error: event.error,
               isAnalyzing: false
-            }),
+            })),
             'notifyBatchFailed'
           ]
         }
