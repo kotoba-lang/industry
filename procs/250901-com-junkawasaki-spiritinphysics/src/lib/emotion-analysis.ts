@@ -162,6 +162,16 @@ async function saveEmotionAnalysisResult(result: EmotionAnalysisResult): Promise
     writeFileSync(resultPath, JSON.stringify(existingResults, null, 2));
     console.log(`Emotion analysis result saved to file: ${resultPath}`);
 
+    // Blobにも保存（利用可能な場合）
+    if (blobStorage) {
+      try {
+        await blobStorage.saveEmotionAnalysis(result.participantId, result);
+        console.log(`Emotion analysis result saved to Vercel Blob for ${result.participantId}`);
+      } catch (blobError) {
+        console.warn('Failed to save emotion analysis to Blob:', blobError);
+      }
+    }
+
     // Kuzuにも保存（利用可能な場合）
     if (kuzuManager) {
       try {
@@ -192,7 +202,40 @@ async function saveEmotionAnalysisResult(result: EmotionAnalysisResult): Promise
  */
 export async function loadEmotionAnalysisResults(participantId: string): Promise<EmotionAnalysisResult[]> {
   try {
-    // Kuzuが利用可能な場合、まずKuzuからデータを取得
+    // Blobが利用可能な場合、まずBlobからデータを取得
+    if (blobStorage) {
+      try {
+        const blobResults = await blobStorage.getEmotionAnalysis(participantId);
+        if (blobResults) {
+          console.log(`Loaded emotion analysis results from Vercel Blob for ${participantId}`);
+
+          // Kuzuにも保存
+          if (kuzuManager) {
+            const analysis: EmotionAnalysis = {
+              id: `${participantId}_analysis_${Date.now()}`,
+              participantId: participantId,
+              videoFileId: `${participantId}_analysis`,
+              sessionType: 'combined',
+              timestamp: blobResults.timestamp || new Date().toISOString(),
+              processingTime: blobResults.processingTime || 0,
+              emotions: blobResults.emotions || []
+            };
+
+            try {
+              await kuzuManager.saveEmotionAnalysis(analysis);
+            } catch (kuzuError) {
+              console.warn('Failed to save emotion analysis to Kuzu:', kuzuError);
+            }
+          }
+
+          return [blobResults];
+        }
+      } catch (blobError) {
+        console.warn(`Failed to load emotion analysis from Blob for ${participantId}:`, blobError);
+      }
+    }
+
+    // Kuzuが利用可能な場合、Kuzuからデータを取得
     if (kuzuManager) {
       try {
         const kuzuResults = await kuzuManager.getEmotionAnalysis(participantId);
@@ -211,14 +254,25 @@ export async function loadEmotionAnalysisResults(participantId: string): Promise
       }
     }
 
-    // Kuzuにデータがない場合または利用できない場合、ファイルから取得
+    // Fallback: ファイルシステムから読み込み
     const resultPath = join(ARTIFACTS_CACHE_PATH, participantId, 'emotion_analysis.json');
 
     if (!existsSync(resultPath)) {
       return [];
     }
 
-    return JSON.parse(readFileSync(resultPath, 'utf-8'));
+    const fileResults = JSON.parse(readFileSync(resultPath, 'utf-8'));
+
+    // 読み込んだデータをBlobに保存
+    if (blobStorage) {
+      try {
+        await blobStorage.saveEmotionAnalysis(participantId, fileResults[0] || fileResults);
+      } catch (saveError) {
+        console.warn('Failed to save emotion analysis to Blob:', saveError);
+      }
+    }
+
+    return fileResults;
   } catch (error) {
     console.error(`Error loading emotion analysis results for ${participantId}:`, error);
     // Fallback to file-based loading
