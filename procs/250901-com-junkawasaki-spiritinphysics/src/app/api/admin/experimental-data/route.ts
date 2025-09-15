@@ -1,100 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-
-// Mock data for demonstration - in production, this would come from a database
-const mockParticipants = [
-  {
-    id: "550e8400-e29b-41d4-a716-446655440000",
-    age: 25,
-    gender: "female",
-    handedness: "right",
-    createdAt: new Date("2024-09-15T10:00:00Z"),
-    sessionCount: 2,
-    lastActivity: new Date("2024-09-15T14:30:00Z"),
-    status: "completed"
-  },
-  {
-    id: "550e8400-e29b-41d4-a716-446655440001",
-    age: 32,
-    gender: "male",
-    handedness: "left",
-    createdAt: new Date("2024-09-14T09:15:00Z"),
-    sessionCount: 1,
-    lastActivity: new Date("2024-09-14T11:45:00Z"),
-    status: "in_progress"
-  },
-  {
-    id: "550e8400-e29b-41d4-a716-446655440002",
-    age: 28,
-    gender: "female",
-    handedness: "right",
-    createdAt: new Date("2024-09-13T16:20:00Z"),
-    sessionCount: 2,
-    lastActivity: new Date("2024-09-13T17:10:00Z"),
-    status: "completed"
-  }
-];
-
-const mockSessionData = [
-  {
-    participantId: "550e8400-e29b-41d4-a716-446655440000",
-    sessionId: "session-1",
-    sessionType: "session-1",
-    startTime: "2024-09-15T10:30:00Z",
-    endTime: "2024-09-15T11:15:00Z",
-    wordResponses: [
-      {
-        stimulusWord: { word: "愛", key: "ai" },
-        responseWord: "優しさ",
-        reactionTimeMs: 1250,
-        isDelayed: false
-      },
-      {
-        stimulusWord: { word: "力", key: "chikara" },
-        responseWord: "強さ",
-        reactionTimeMs: 980,
-        isDelayed: false
-      },
-      {
-        stimulusWord: { word: "光", key: "hikari" },
-        responseWord: "明るさ",
-        reactionTimeMs: 1450,
-        isDelayed: true
-      }
-    ],
-    averageReactionTime: 1226.67,
-    emotionData: [
-      { emotion: "joy", confidence: 0.85, timestamp: "2024-09-15T10:35:00Z" },
-      { emotion: "surprise", confidence: 0.72, timestamp: "2024-09-15T10:45:00Z" },
-      { emotion: "calm", confidence: 0.90, timestamp: "2024-09-15T11:00:00Z" }
-    ]
-  },
-  {
-    participantId: "550e8400-e29b-41d4-a716-446655440000",
-    sessionId: "session-2",
-    sessionType: "session-2",
-    startTime: "2024-09-15T14:00:00Z",
-    endTime: "2024-09-15T14:45:00Z",
-    wordResponses: [
-      {
-        stimulusWord: { word: "風", key: "kaze" },
-        responseWord: "自由",
-        reactionTimeMs: 1100,
-        isDelayed: false
-      },
-      {
-        stimulusWord: { word: "海", key: "umi" },
-        responseWord: "広大",
-        reactionTimeMs: 1350,
-        isDelayed: false
-      }
-    ],
-    averageReactionTime: 1225,
-    emotionData: [
-      { emotion: "wonder", confidence: 0.88, timestamp: "2024-09-15T14:10:00Z" },
-      { emotion: "peace", confidence: 0.76, timestamp: "2024-09-15T14:30:00Z" }
-    ]
-  }
-];
+import {
+  loadAllParticipants,
+  loadAllSessionData,
+  parseWordResponsesFromEvents,
+  getParticipantStatistics
+} from "@/lib/data-loader";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -104,10 +14,28 @@ export async function GET(request: NextRequest) {
   try {
     switch (type) {
       case 'participants':
+        const participants = loadAllParticipants();
+        const participantStats = getParticipantStatistics(participants);
+
+        // Transform to match expected format
+        const formattedParticipants = participants.map(p => ({
+          id: p.id,
+          age: null, // Age not available in current data
+          gender: null, // Gender not available in current data
+          handedness: null, // Handedness not available in current data
+          createdAt: p.agreedAt,
+          sessionCount: p.hasSessionData ? 1 : 0, // Simplified
+          lastActivity: p.agreedAt,
+          status: p.hasSessionData ? 'completed' : 'in_progress',
+          hasVideoFiles: p.hasVideoFiles,
+          videoFiles: p.videoFiles
+        }));
+
         return NextResponse.json({
           success: true,
-          data: mockParticipants,
-          total: mockParticipants.length
+          data: formattedParticipants,
+          total: formattedParticipants.length,
+          stats: participantStats
         });
 
       case 'participant':
@@ -117,7 +45,8 @@ export async function GET(request: NextRequest) {
           }, { status: 400 });
         }
 
-        const participant = mockParticipants.find(p => p.id === participantId);
+        const participants_list = loadAllParticipants();
+        const participant = participants_list.find(p => p.id === participantId);
         if (!participant) {
           return NextResponse.json({
             error: "Participant not found"
@@ -126,61 +55,107 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json({
           success: true,
-          data: participant
+          data: {
+            id: participant.id,
+            signature: participant.signature,
+            agreedAt: participant.agreedAt,
+            hasSessionData: participant.hasSessionData,
+            hasVideoFiles: participant.hasVideoFiles,
+            videoFiles: participant.videoFiles
+          }
         });
 
       case 'sessions':
+        const allSessionData = loadAllSessionData();
         const sessions = participantId
-          ? mockSessionData.filter(s => s.participantId === participantId)
-          : mockSessionData;
+          ? allSessionData.filter(s => s.participantId === participantId)
+          : allSessionData;
+
+        // Transform session data to match expected format
+        const formattedSessions = sessions.map(({ participantId, sessionData }) => {
+          const wordResponses = parseWordResponsesFromEvents(sessionData.events);
+
+          // Extract session start/end times from events
+          const sessionStartedEvent = sessionData.events.find(e => e.type === 'session_started');
+          const sessionStartTime = sessionStartedEvent
+            ? new Date(sessionStartedEvent.timestamp).toISOString()
+            : new Date().toISOString();
+
+          const sessionEndedEvent = sessionData.events
+            .filter(e => e.type === 'response_window_closed')
+            .pop();
+          const sessionEndTime = sessionEndedEvent
+            ? new Date(sessionEndedEvent.timestamp).toISOString()
+            : sessionStartTime;
+
+          return {
+            participantId,
+            sessionId: `session-${sessionStartedEvent?.payload?.session || 1}`,
+            sessionType: `session-${sessionStartedEvent?.payload?.session || 1}`,
+            startTime: sessionStartTime,
+            endTime: sessionEndTime,
+            wordResponses,
+            averageReactionTime: wordResponses.length > 0
+              ? wordResponses.reduce((acc, r) => acc + r.reactionTimeMs, 0) / wordResponses.length
+              : 0,
+            emotionData: [] // Emotion data not available in current structure
+          };
+        });
 
         return NextResponse.json({
           success: true,
-          data: sessions,
-          total: sessions.length
+          data: formattedSessions,
+          total: formattedSessions.length
         });
 
       case 'analytics':
-        // Aggregate analytics data
-        const totalParticipants = mockParticipants.length;
-        const completedSessions = mockParticipants.filter(p => p.status === 'completed').length;
-        const averageSessionDuration = 2700; // 45 minutes in seconds
-        const averageReactionTime = mockSessionData.reduce((acc, session) => {
-          return acc + session.averageReactionTime;
-        }, 0) / mockSessionData.length;
+        const participants_for_analytics = loadAllParticipants();
+        const stats = getParticipantStatistics(participants_for_analytics);
+        const allSessions = loadAllSessionData();
 
-        const emotionDistribution = mockSessionData
-          .flatMap(session => session.emotionData)
-          .reduce((acc, emotion) => {
-            acc[emotion.emotion] = (acc[emotion.emotion] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>);
+        // Calculate reaction time statistics
+        let totalReactionTime = 0;
+        let totalResponses = 0;
+
+        allSessions.forEach(({ sessionData }) => {
+          const wordResponses = parseWordResponsesFromEvents(sessionData.events);
+          wordResponses.forEach(response => {
+            totalReactionTime += response.reactionTimeMs;
+            totalResponses += 1;
+          });
+        });
+
+        const averageReactionTime = totalResponses > 0 ? totalReactionTime / totalResponses : 0;
 
         return NextResponse.json({
           success: true,
           data: {
-            totalParticipants,
-            completedSessions,
-            completionRate: (completedSessions / totalParticipants) * 100,
-            averageSessionDuration,
+            totalParticipants: stats.totalParticipants,
+            completedSessions: stats.participantsWithSessionData,
+            completionRate: stats.completionRate,
+            averageSessionDuration: 2700, // Estimated 45 minutes in seconds
             averageReactionTime,
-            emotionDistribution,
-            totalSessions: mockSessionData.length
+            emotionDistribution: {}, // Not available in current data
+            totalSessions: allSessions.length,
+            participantsWithVideo: stats.participantsWithVideo
           }
         });
 
       case 'reaction-times':
-        const reactionTimeData = mockSessionData.flatMap(session =>
-          session.wordResponses.map(response => ({
-            participantId: session.participantId,
-            sessionType: session.sessionType,
-            stimulusWord: response.stimulusWord.word,
+        const allSessionData_rt = loadAllSessionData();
+        const reactionTimeData = allSessionData_rt.flatMap(({ participantId, sessionData }) => {
+          const wordResponses = parseWordResponsesFromEvents(sessionData.events);
+
+          return wordResponses.map(response => ({
+            participantId,
+            sessionType: 'session-1', // Simplified
+            stimulusWord: response.stimulusWord,
             responseWord: response.responseWord,
             reactionTimeMs: response.reactionTimeMs,
             isDelayed: response.isDelayed,
-            timestamp: session.startTime
-          }))
-        );
+            timestamp: new Date(response.timestamp).toISOString()
+          }));
+        });
 
         return NextResponse.json({
           success: true,

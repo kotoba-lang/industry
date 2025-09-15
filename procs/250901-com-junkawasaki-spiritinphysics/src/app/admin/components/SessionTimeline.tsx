@@ -280,6 +280,23 @@ export function SessionTimeline() {
                           </div>
                         </div>
 
+                        {/* Video Files */}
+                        {participant?.hasVideoFiles && (
+                          <div className="mb-4">
+                            <h4 className="text-sm font-medium mb-2 flex items-center space-x-2">
+                              <Activity className="w-4 h-4" />
+                              <span>ビデオファイル ({participant.videoFiles.length}個)</span>
+                            </h4>
+                            <div className="flex flex-wrap gap-2">
+                              {participant.videoFiles.map((file, idx) => (
+                                <Badge key={idx} variant="outline" className="text-xs">
+                                  📹 {file}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                         {/* Emotion Data */}
                         {session.emotionData.length > 0 && (
                           <div>

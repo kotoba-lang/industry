@@ -143,26 +143,26 @@ export function ExportTools() {
     {
       id: 'participants',
       name: '参加者データ',
-      description: '参加者の基本情報と属性',
-      count: '3件'
+      description: '参加者の同意情報とセッション状況',
+      count: '9件' // database.jsonlから取得した実際の参加者数
     },
     {
       id: 'sessions',
       name: 'セッションデータ',
-      description: '実験セッションの詳細情報',
-      count: '2件'
+      description: '実験セッションのイベント詳細',
+      count: '11件' // participantディレクトリの数
     },
     {
       id: 'reactions',
       name: '反応時間データ',
-      description: '各刺激語に対する反応時間',
-      count: '5件'
+      description: 'セッションイベントから解析した反応時間',
+      count: '動的'
     },
     {
       id: 'emotions',
       name: '感情データ',
-      description: '実験中の感情分析結果',
-      count: '7件'
+      description: '実験中の感情分析結果（現在利用不可）',
+      count: '0件'
     },
     {
       id: 'analytics',

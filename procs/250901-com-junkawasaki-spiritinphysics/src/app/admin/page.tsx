@@ -97,6 +97,19 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
+
+        {/* Data Source Info */}
+        <div className="bg-blue-50 border border-blue-200 px-4 py-3">
+          <div className="flex items-center space-x-2">
+            <div className="text-sm text-blue-800">
+              📁 データソース: <code className="bg-blue-100 px-2 py-1 rounded text-xs">.artifacts_cache</code>
+            </div>
+            <div className="text-sm text-blue-600">
+              • {analyticsData?.totalParticipants || 0}人の参加者データ
+              • {analyticsData?.participantsWithVideo || 0}人のビデオデータ
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Quick Stats */}

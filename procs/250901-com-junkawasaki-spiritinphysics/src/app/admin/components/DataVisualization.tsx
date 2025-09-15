@@ -132,14 +132,6 @@ export function DataVisualization() {
       sessionType: item.sessionType
     }));
 
-  const emotionTimeSeries = sessionData.flatMap(session =>
-    session.emotionData.map((emotion) => ({
-      time: new Date(emotion.timestamp).getTime(),
-      emotion: emotion.emotion,
-      confidence: emotion.confidence,
-      sessionType: session.sessionType
-    }))
-  ).sort((a, b) => a.time - b.time);
 
   const renderVisualization = () => {
     switch (selectedVisualization) {
@@ -161,7 +153,7 @@ export function DataVisualization() {
                 label={{ value: '反応時間 (ms)', angle: -90, position: 'insideLeft' }}
               />
               <Tooltip
-                formatter={(value: number, name: string) => [
+                formatter={(value: number) => [
                   `${value}ms`,
                   '反応時間'
                 ]}

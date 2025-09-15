@@ -19,13 +19,15 @@ import {
 
 interface Participant {
   id: string;
-  age: number;
-  gender: string;
-  handedness: string;
+  age: number | null;
+  gender: string | null;
+  handedness: string | null;
   createdAt: Date;
   sessionCount: number;
   lastActivity: Date;
   status: string;
+  hasVideoFiles: boolean;
+  videoFiles: string[];
 }
 
 export function ParticipantOverview() {
@@ -34,15 +36,31 @@ export function ParticipantOverview() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [genderFilter, setGenderFilter] = useState('all');
+  const [genderFilter] = useState('all');
 
   const fetchParticipants = async () => {
     try {
       const response = await fetch('/api/admin/experimental-data?type=participants');
       const result = await response.json();
       if (result.success) {
-        setParticipants(result.data);
-        setFilteredParticipants(result.data);
+        const formattedParticipants = result.data.map((p: {
+          id: string;
+          age: number | null;
+          gender: string | null;
+          handedness: string | null;
+          createdAt: string;
+          sessionCount: number;
+          lastActivity: string;
+          status: string;
+          hasVideoFiles: boolean;
+          videoFiles: string[];
+        }) => ({
+          ...p,
+          createdAt: new Date(p.createdAt),
+          lastActivity: new Date(p.lastActivity)
+        }));
+        setParticipants(formattedParticipants);
+        setFilteredParticipants(formattedParticipants);
       }
     } catch (error) {
       console.error('Error fetching participants:', error);
@@ -62,8 +80,8 @@ export function ParticipantOverview() {
     if (searchTerm) {
       filtered = filtered.filter(participant =>
         participant.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        participant.age.toString().includes(searchTerm) ||
-        participant.gender.toLowerCase().includes(searchTerm.toLowerCase())
+        (participant.age && participant.age.toString().includes(searchTerm)) ||
+        (participant.gender && participant.gender.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
 
@@ -72,13 +90,13 @@ export function ParticipantOverview() {
       filtered = filtered.filter(participant => participant.status === statusFilter);
     }
 
-    // Gender filter
-    if (genderFilter !== 'all') {
-      filtered = filtered.filter(participant => participant.gender === genderFilter);
-    }
+    // Gender filter - disabled since gender data is not available
+    // if (genderFilter !== 'all') {
+    //   filtered = filtered.filter(participant => participant.gender === genderFilter);
+    // }
 
     setFilteredParticipants(filtered);
-  }, [participants, searchTerm, statusFilter, genderFilter]);
+  }, [participants, searchTerm, statusFilter]);
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
@@ -181,7 +199,7 @@ export function ParticipantOverview() {
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="参加者ID、年齢、性別で検索..."
+                  placeholder="参加者IDで検索..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-8"
@@ -199,7 +217,8 @@ export function ParticipantOverview() {
                 <SelectItem value="not_started">未開始</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={genderFilter} onValueChange={setGenderFilter}>
+            {/* Gender filter disabled - data not available */}
+            {/* <Select value={genderFilter} onValueChange={setGenderFilter}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="性別" />
               </SelectTrigger>
@@ -209,7 +228,7 @@ export function ParticipantOverview() {
                 <SelectItem value="female">女性</SelectItem>
                 <SelectItem value="other">その他</SelectItem>
               </SelectContent>
-            </Select>
+            </Select> */}
           </div>
         </CardContent>
       </Card>
@@ -227,11 +246,9 @@ export function ParticipantOverview() {
             <TableHeader>
               <TableRow>
                 <TableHead>参加者ID</TableHead>
-                <TableHead>年齢</TableHead>
-                <TableHead>性別</TableHead>
-                <TableHead>利き手</TableHead>
+                <TableHead>同意日時</TableHead>
                 <TableHead>セッション数</TableHead>
-                <TableHead>最終活動</TableHead>
+                <TableHead>ビデオファイル</TableHead>
                 <TableHead>ステータス</TableHead>
                 <TableHead>アクション</TableHead>
               </TableRow>
@@ -242,17 +259,25 @@ export function ParticipantOverview() {
                   <TableCell className="font-mono text-sm">
                     {participant.id.slice(0, 8)}...
                   </TableCell>
-                  <TableCell>{participant.age}</TableCell>
-                  <TableCell>{participant.gender}</TableCell>
-                  <TableCell>{participant.handedness}</TableCell>
-                  <TableCell>{participant.sessionCount}</TableCell>
                   <TableCell>
                     <div className="flex items-center space-x-1">
                       <Calendar className="h-3 w-3 text-muted-foreground" />
                       <span className="text-sm">
-                        {participant.lastActivity.toLocaleDateString('ja-JP')}
+                        {participant.createdAt.toLocaleDateString('ja-JP')}
                       </span>
                     </div>
+                  </TableCell>
+                  <TableCell>{participant.sessionCount}</TableCell>
+                  <TableCell>
+                    {participant.hasVideoFiles ? (
+                      <Badge variant="success" className="text-xs">
+                        {participant.videoFiles.length}個
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-xs">
+                        なし
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant={getStatusBadgeVariant(participant.status)}>
