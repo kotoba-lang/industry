@@ -17,14 +17,24 @@ import {
   Pie,
   Cell,
   LineChart,
-  Line
+  Line,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar
 } from 'recharts';
 import {
   Brain,
   Activity,
   Target,
-  Zap
+  Zap,
+  Smile,
+  Frown,
+  Meh,
+  Play
 } from 'lucide-react';
+import { EmotionAnalysisControls } from './EmotionAnalysisControls';
 
 interface AnalyticsData {
   totalParticipants: number;
@@ -46,20 +56,47 @@ interface ReactionTimeData {
   timestamp: string;
 }
 
+interface EmotionData {
+  participantId: string;
+  videoFile: string;
+  sessionType: string;
+  emotions: Array<{
+    name: string;
+    score: number;
+    confidence: number;
+  }>;
+  timestamp: string;
+  processingTime: number;
+}
+
+interface EmotionStatistics {
+  totalAnalyses: number;
+  averageEmotions: Record<string, number>;
+  dominantEmotions: Array<{ emotion: string; count: number }>;
+  processingStats: {
+    averageTime: number;
+    totalTime: number;
+  };
+}
+
 export function ExperimentAnalytics() {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [reactionTimeData, setReactionTimeData] = useState<ReactionTimeData[]>([]);
+  const [emotionData, setEmotionData] = useState<EmotionData[]>([]);
+  const [emotionStats, setEmotionStats] = useState<EmotionStatistics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchAnalytics = async () => {
     try {
-      const [analyticsResponse, reactionTimeResponse] = await Promise.all([
+      const [analyticsResponse, reactionTimeResponse, emotionResponse] = await Promise.all([
         fetch('/api/admin/experimental-data?type=analytics'),
-        fetch('/api/admin/experimental-data?type=reaction-times')
+        fetch('/api/admin/experimental-data?type=reaction-times'),
+        fetch('/api/admin/emotion-analysis?action=get-statistics')
       ]);
 
       const analyticsResult = await analyticsResponse.json();
       const reactionTimeResult = await reactionTimeResponse.json();
+      const emotionResult = await emotionResponse.json();
 
       if (analyticsResult.success) {
         setAnalyticsData(analyticsResult.data);
@@ -67,11 +104,21 @@ export function ExperimentAnalytics() {
       if (reactionTimeResult.success) {
         setReactionTimeData(reactionTimeResult.data);
       }
+      if (emotionResult.success) {
+        // emotionResult.data.data contains the array of emotion analysis results
+        setEmotionData(emotionResult.data.data || []);
+        setEmotionStats(emotionResult.data.statistics);
+      }
     } catch (error) {
       console.error('Error fetching analytics:', error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleAnalysisComplete = () => {
+    // 感情分析完了後にデータを再取得
+    fetchAnalytics();
   };
 
   useEffect(() => {
@@ -83,6 +130,19 @@ export function ExperimentAnalytics() {
     name: emotion.charAt(0).toUpperCase() + emotion.slice(1),
     value: count,
     percentage: ((count / Object.values(analyticsData.emotionDistribution).reduce((a, b) => a + b, 0)) * 100).toFixed(1)
+  })) : [];
+
+  // Prepare Hume emotion data for charts
+  const humeEmotionChartData = emotionStats ? Object.entries(emotionStats.averageEmotions).map(([emotion, score]) => ({
+    emotion: emotion.charAt(0).toUpperCase() + emotion.slice(1),
+    score: Math.round(score * 100) / 100,
+    fullMark: 1
+  })) : [];
+
+  const dominantEmotionChartData = emotionStats ? emotionStats.dominantEmotions.slice(0, 8).map(item => ({
+    name: item.emotion.charAt(0).toUpperCase() + item.emotion.slice(1),
+    value: item.count,
+    percentage: emotionStats.totalAnalyses > 0 ? ((item.count / emotionStats.totalAnalyses) * 100).toFixed(1) : '0'
   })) : [];
 
   const reactionTimeChartData = reactionTimeData.reduce((acc, item) => {
@@ -178,13 +238,13 @@ export function ExperimentAnalytics() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">感情タイプ数</CardTitle>
+            <CardTitle className="text-sm font-medium">感情分析数</CardTitle>
             <Brain className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{Object.keys(analyticsData.emotionDistribution).length}</div>
+            <div className="text-2xl font-bold">{emotionStats?.totalAnalyses || 0}</div>
             <p className="text-xs text-muted-foreground">
-              検出された感情の種類
+              Hume AIによる分析完了数
             </p>
           </CardContent>
         </Card>
@@ -269,6 +329,88 @@ export function ExperimentAnalytics() {
 
       {/* Charts Row 2 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Hume Emotion Radar Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Hume AI 感情分析結果</CardTitle>
+            <CardDescription>
+              ビデオ分析による平均感情スコア（レーダー図）
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {humeEmotionChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <RadarChart data={humeEmotionChartData}>
+                  <PolarGrid />
+                  <PolarAngleAxis dataKey="emotion" />
+                  <PolarRadiusAxis angle={90} domain={[0, 1]} />
+                  <Radar
+                    name="感情スコア"
+                    dataKey="score"
+                    stroke="#8884d8"
+                    fill="#8884d8"
+                    fillOpacity={0.3}
+                  />
+                  <Tooltip formatter={(value: number) => [`${value}`, 'スコア']} />
+                </RadarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-gray-500">
+                <div className="text-center">
+                  <Brain className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                  <p>感情分析データがありません</p>
+                  <p className="text-sm">ビデオファイルの分析を実行してください</p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Dominant Emotions Pie Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>主要感情分布</CardTitle>
+            <CardDescription>
+              最も頻出する感情の割合
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {dominantEmotionChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={dominantEmotionChartData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percentage }) => `${name}: ${percentage}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {dominantEmotionChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: number) => [`${value}件`, '出現回数']} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-gray-500">
+                <div className="text-center">
+                  <Meh className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                  <p>主要感情データがありません</p>
+                  <p className="text-sm">感情分析を実行してください</p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Emotion Analysis Summary */}
+      {emotionStats && emotionStats.totalAnalyses > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Session Performance */}
         <Card>
           <CardHeader>
@@ -353,6 +495,11 @@ export function ExperimentAnalytics() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Emotion Analysis Controls */}
+      <div className="grid grid-cols-1 gap-6">
+        <EmotionAnalysisControls onAnalysisComplete={handleAnalysisComplete} />
       </div>
     </div>
   );
