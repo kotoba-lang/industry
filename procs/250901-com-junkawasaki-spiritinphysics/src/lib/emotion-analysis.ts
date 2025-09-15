@@ -202,44 +202,12 @@ export async function saveEmotionAnalysisResult(result: EmotionAnalysisResult): 
  */
 export async function loadEmotionAnalysisResults(participantId: string): Promise<EmotionAnalysisResult[]> {
   try {
-    // Blobが利用可能な場合、まずBlobからデータを取得
-    if (blobStorage) {
-      try {
-        const blobResults = await blobStorage.getEmotionAnalysis(participantId);
-        if (blobResults) {
-          console.log(`Loaded emotion analysis results from Vercel Blob for ${participantId}`);
-
-          // Kuzuにも保存
-          if (kuzuManager) {
-            const analysis: EmotionAnalysis = {
-              id: `${participantId}_analysis_${Date.now()}`,
-              participantId: participantId,
-              videoFileId: `${participantId}_analysis`,
-              sessionType: 'combined',
-              timestamp: blobResults.timestamp || new Date().toISOString(),
-              processingTime: blobResults.processingTime || 0,
-              emotions: blobResults.emotions || []
-            };
-
-            try {
-              await kuzuManager.saveEmotionAnalysis(analysis);
-            } catch (kuzuError) {
-              console.warn('Failed to save emotion analysis to Kuzu:', kuzuError);
-            }
-          }
-
-          return [blobResults];
-        }
-      } catch (blobError) {
-        console.warn(`Failed to load emotion analysis from Blob for ${participantId}:`, blobError);
-      }
-    }
-
-    // Kuzuが利用可能な場合、Kuzuからデータを取得
+    // まずKuzuからデータを取得しようとする（優先順位1）
     if (kuzuManager) {
       try {
         const kuzuResults = await kuzuManager.getEmotionAnalysis(participantId);
         if (kuzuResults.length > 0) {
+          console.log(`Loaded emotion analysis results from Kuzu for ${participantId}`);
           return kuzuResults.map(ka => ({
             participantId: ka.participantId,
             videoFile: ka.videoFileId.replace(`${ka.participantId}_`, ''),
@@ -254,36 +222,40 @@ export async function loadEmotionAnalysisResults(participantId: string): Promise
       }
     }
 
-    // Fallback: ファイルシステムから読み込み
-    const resultPath = join(ARTIFACTS_CACHE_PATH, participantId, 'emotion_analysis.json');
-
-    if (!existsSync(resultPath)) {
-      return [];
-    }
-
-    const fileResults = JSON.parse(readFileSync(resultPath, 'utf-8'));
-
-    // 読み込んだデータをBlobに保存
+    // Fallback: Blobからデータを取得しようとする（優先順位2）
     if (blobStorage) {
       try {
-        await blobStorage.saveEmotionAnalysis(participantId, fileResults[0] || fileResults);
-      } catch (saveError) {
-        console.warn('Failed to save emotion analysis to Blob:', saveError);
+        const blobResults = await blobStorage.getEmotionAnalysis(participantId);
+        if (blobResults) {
+          console.log(`Loaded emotion analysis results from Vercel Blob for ${participantId}`);
+          return [blobResults];
+        }
+      } catch (blobError) {
+        console.warn(`Failed to load emotion analysis from Blob for ${participantId}:`, blobError);
       }
     }
 
-    return fileResults;
+    // 最終Fallback: ファイルシステムから取得し、Blobにインポート（優先順位3）
+    const resultPath = join(ARTIFACTS_CACHE_PATH, participantId, 'emotion_analysis.json');
+
+    if (existsSync(resultPath)) {
+      const fileResults = JSON.parse(readFileSync(resultPath, 'utf-8'));
+      console.log(`Loaded emotion analysis results from file system for ${participantId}`);
+
+      // ファイルから取得したデータをBlobに保存
+      if (blobStorage && Array.isArray(fileResults) && fileResults.length > 0) {
+        try {
+          await blobStorage.saveEmotionAnalysis(participantId, fileResults[0]);
+          console.log(`Imported emotion analysis from file system to Blob for ${participantId}`);
+        } catch (saveError) {
+          console.warn('Failed to save emotion analysis to Blob:', saveError);
+        }
+      }
+
+      return Array.isArray(fileResults) ? fileResults : [fileResults];
+    }
   } catch (error) {
     console.error(`Error loading emotion analysis results for ${participantId}:`, error);
-    // Fallback to file-based loading
-    try {
-      const resultPath = join(ARTIFACTS_CACHE_PATH, participantId, 'emotion_analysis.json');
-      if (existsSync(resultPath)) {
-        return JSON.parse(readFileSync(resultPath, 'utf-8'));
-      }
-    } catch (fallbackError) {
-      console.error('Fallback loading also failed:', fallbackError);
-    }
     return [];
   }
 }

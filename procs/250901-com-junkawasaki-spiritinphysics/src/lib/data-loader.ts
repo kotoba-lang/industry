@@ -34,8 +34,13 @@ const ARTIFACTS_CACHE_PATH = '/Users/junkawasaki/jun784/root/procs/250901-com-ju
 // Kuzu初期化関数
 export async function initializeKuzuDatabase(): Promise<void> {
   try {
-    await kuzuManager.initialize();
-    console.log('Kuzu database initialized successfully');
+    if (kuzuManager) {
+      // KuzuManagerはコンストラクタで既に初期化されているため、
+      // ここでは何もしないか、必要に応じて再初期化
+      console.log('Kuzu database manager is available');
+    } else {
+      console.warn('Kuzu database manager is not available');
+    }
   } catch (error) {
     console.error('Failed to initialize Kuzu database:', error);
   }
@@ -238,109 +243,52 @@ export function loadParticipantData(participantId: string): Participant | null {
 // Load session data for a participant
 export async function loadSessionData(participantId: string): Promise<SessionData | null> {
   try {
-    // まずBlobからデータを取得しようとする
+    // まずKuzuからデータを取得しようとする（優先順位1）
+    if (kuzuManager) {
+      try {
+        // Kuzuからセッションデータを取得（仮実装 - 実際のクエリは要実装）
+        const kuzuResults = await kuzuManager.getAllParticipants();
+        // 実際のセッションデータ取得ロジックはここに実装する必要がある
+        // 現時点ではKuzuにセッションデータが保存されていないため、Blobへフォールバック
+      } catch (kuzuError) {
+        console.warn('Failed to load from Kuzu:', kuzuError);
+      }
+    }
+
+    // Fallback: Blobからデータを取得しようとする（優先順位2）
     if (blobStorage) {
       try {
-        const sessionData = await blobStorage.getSessionData(participantId);
-        if (sessionData) {
+        const blobSessionData = await blobStorage.getSessionData(participantId);
+        if (blobSessionData) {
           console.log(`Loaded session data from Vercel Blob for ${participantId}`);
-
-          // Kuzuにも保存
-          if (kuzuManager) {
-            const session: Session = {
-              id: `${participantId}_session`,
-              participantId: participantId,
-              events: sessionData.events,
-              createdAt: sessionData.events[0]?.timestamp || new Date().toISOString()
-            };
-
-            try {
-              await kuzuManager.saveSession(session);
-            } catch (saveError) {
-              console.warn('Failed to save session to Kuzu:', saveError);
-            }
-          }
-
-          return sessionData;
+          return blobSessionData;
         }
       } catch (blobError) {
         console.warn(`Failed to load session data from Blob for ${participantId}:`, blobError);
       }
     }
 
-    // Fallback: ファイルシステムから読み込み
+    // 最終Fallback: ファイルシステムから取得し、Blobにインポート（優先順位3）
     const sessionDataPath = join(ARTIFACTS_CACHE_PATH, participantId, 'session_data.json');
-    if (!existsSync(sessionDataPath)) {
-      return null;
-    }
 
-    const sessionData: SessionData = JSON.parse(readFileSync(sessionDataPath, 'utf-8'));
+    if (existsSync(sessionDataPath)) {
+      const sessionData = JSON.parse(readFileSync(sessionDataPath, 'utf-8'));
+      console.log(`Loaded session data from file system for ${participantId}`);
 
-    // 読み込んだデータをBlobに保存
-    if (blobStorage) {
-      try {
-        await blobStorage.saveSessionData(participantId, sessionData);
-      } catch (saveError) {
-        console.warn('Failed to save session data to Blob:', saveError);
-      }
-    }
-
-    // Kuzuに保存
-    if (kuzuManager && sessionData) {
-      const session: Session = {
-        id: `${participantId}_session`,
-        participantId: participantId,
-        events: sessionData.events,
-        createdAt: sessionData.events[0]?.timestamp || new Date().toISOString()
-      };
-
-      try {
-        await kuzuManager.saveSession(session);
-      } catch (saveError) {
-        console.warn('Failed to save session to Kuzu:', saveError);
-      }
-
-      // ビデオファイルも保存
-      const videoDir = join(ARTIFACTS_CACHE_PATH, participantId);
-      if (existsSync(videoDir)) {
-        const videoFiles = readdirSync(videoDir)
-          .filter(file => file.endsWith('.webm'));
-
-        for (const videoFile of videoFiles) {
-          const videoPath = join(videoDir, videoFile);
-          const stats = statSync(videoPath);
-          const sessionType = videoFile.includes('session-1') ? 'session-1' : 'session-2';
-
-          // ビデオファイルをBlobにアップロード
-          if (blobStorage) {
-            try {
-              await blobStorage.saveVideoFile(participantId, videoPath, sessionType);
-            } catch (uploadError) {
-              console.warn('Failed to upload video file to Blob:', uploadError);
-            }
-          }
-
-          // Kuzuにも保存
-          const videoFileData: VideoFile = {
-            id: `${participantId}_${videoFile}`,
-            participantId: participantId,
-            sessionId: session.id,
-            fileName: videoFile,
-            filePath: videoPath,
-            fileSize: stats.size,
-            createdAt: stats.mtime.toISOString()
-          };
-
-          try {
-            await kuzuManager.saveVideoFile(videoFileData);
-          } catch (saveError) {
-            console.warn('Failed to save video file to Kuzu:', saveError);
-          }
+      // ファイルから取得したデータをBlobに保存
+      if (blobStorage && sessionData) {
+        try {
+          await blobStorage.saveSessionData(participantId, sessionData);
+          console.log(`Imported session data from file system to Blob for ${participantId}`);
+        } catch (saveError) {
+          console.warn('Failed to save session data to Blob:', saveError);
         }
       }
+
+      return sessionData;
     }
 
-    return sessionData;
+    return null;
   } catch (error) {
     console.error(`Error loading session data for ${participantId}:`, error);
     return null;
@@ -402,7 +350,28 @@ export function parseWordResponsesFromEvents(events: SessionEvent[]): Array<{
 // Load all participants data
 export async function loadAllParticipants(): Promise<Participant[]> {
   try {
-    // まずBlobからデータを取得しようとする
+    // まずKuzuからデータを取得しようとする（優先順位1）
+    if (kuzuManager) {
+      try {
+        const kuzuParticipants = await kuzuManager.getAllParticipants();
+        if (kuzuParticipants.length > 0) {
+          console.log(`Loaded ${kuzuParticipants.length} participants from Kuzu`);
+          return kuzuParticipants.map(kp => ({
+            id: kp.id,
+            signature: kp.signature,
+            agreedAt: kp.agreedAt,
+            agreements: kp.agreements,
+            hasSessionData: false, // 後で更新
+            hasVideoFiles: false, // 後で更新
+            videoFiles: []
+          }));
+        }
+      } catch (kuzuError) {
+        console.warn('Failed to load from Kuzu:', kuzuError);
+      }
+    }
+
+    // Fallback: Blobからデータを取得しようとする（優先順位2）
     if (blobStorage) {
       try {
         const participantIds = await blobStorage.getAllParticipants();
@@ -411,7 +380,6 @@ export async function loadAllParticipants(): Promise<Participant[]> {
 
           for (const participantId of participantIds) {
             try {
-              // Check if participant exists before attempting to download
               const exists = await blobStorage.participantExists(participantId);
               if (!exists) {
                 console.warn(`Participant ${participantId} does not exist in Blob storage, skipping`);
@@ -431,7 +399,6 @@ export async function loadAllParticipants(): Promise<Participant[]> {
                 // セッションデータなし
               }
 
-              // ビデオファイルのリストを取得
               try {
                 const videoFileUrls = await blobStorage.listFiles(`participants/${participantId}/videos/`);
                 hasVideoFiles = videoFileUrls.length > 0;
@@ -456,102 +423,48 @@ export async function loadAllParticipants(): Promise<Participant[]> {
 
           if (participants.length > 0) {
             console.log(`Loaded ${participants.length} participants from Vercel Blob`);
-
-            // Kuzuにも保存
-            if (kuzuManager) {
-              for (const participant of participants) {
-                const participantData: any = {
-                  id: participant.id,
-                  signature: participant.signature,
-                  agreedAt: participant.agreedAt,
-                  agreements: participant.agreements
-                };
-
-                try {
-                  await kuzuManager.saveParticipant(participantData);
-                } catch (saveError) {
-                  console.warn('Failed to save participant to Kuzu:', saveError);
-                }
-              }
-            }
-
             return participants;
           }
         }
       } catch (blobError) {
-        console.warn('Failed to load from Vercel Blob, falling back to other methods:', blobError);
+        console.warn('Failed to load from Vercel Blob:', blobError);
       }
     }
 
-    // Kuzuからデータを取得
-    if (kuzuManager) {
-      try {
-        const kuzuParticipants = await kuzuManager.getAllParticipants();
-        if (kuzuParticipants.length > 0) {
-          return kuzuParticipants.map(kp => ({
-            id: kp.id,
-            signature: kp.signature,
-            agreedAt: kp.agreedAt,
-            agreements: kp.agreements,
-            hasSessionData: false, // 後で更新
-            hasVideoFiles: false, // 後で更新
-            videoFiles: []
-          }));
-        }
-      } catch (kuzuError) {
-        console.warn('Failed to load from Kuzu:', kuzuError);
-      }
-    }
-
-    // Fallback: ファイルシステムから読み込み
+    // 最終Fallback: ファイルシステムから取得し、Blobにインポート（優先順位3）
     const participantIds = getParticipantDirectories();
-    const participants = participantIds
+    let participants = participantIds
       .map(id => loadParticipantData(id))
       .filter((participant): participant is Participant => participant !== null);
 
-    // 読み込んだデータをBlobに保存
-    if (blobStorage) {
-      for (const participant of participants) {
-        try {
-          const consentData = {
-            participantId: participant.id,
-            signature: participant.signature,
-            agreedAt: participant.agreedAt,
-            agreements: participant.agreements
-          };
-          await blobStorage.saveParticipantData(participant.id, consentData);
-        } catch (saveError) {
-          console.warn('Failed to save participant data to Blob:', saveError);
+    if (participants.length > 0) {
+      console.log(`Loaded ${participants.length} participants from file system`);
+
+      // ファイルから取得したデータをBlobに保存
+      if (blobStorage) {
+        for (const participant of participants) {
+          try {
+            const consentData = {
+              participantId: participant.id,
+              signature: participant.signature,
+              agreedAt: participant.agreedAt,
+              agreements: participant.agreements
+            };
+            await blobStorage.saveParticipantData(participant.id, consentData);
+            console.log(`Imported participant ${participant.id} from file system to Blob`);
+          } catch (saveError) {
+            console.warn('Failed to save participant data to Blob:', saveError);
+          }
         }
       }
+
+      return participants;
     }
 
-    // Kuzuにも保存
-    if (kuzuManager) {
-      for (const participant of participants) {
-        const participantData: any = {
-          id: participant.id,
-          signature: participant.signature,
-          agreedAt: participant.agreedAt,
-          agreements: participant.agreements
-        };
-
-        try {
-          await kuzuManager.saveParticipant(participantData);
-        } catch (saveError) {
-          console.warn('Failed to save participant to Kuzu:', saveError);
-        }
-      }
-    }
-
-    return participants;
+    return [];
   } catch (error) {
     console.error('Error loading all participants:', error);
-    // Fallback to file-based loading
-    const participantIds = getParticipantDirectories();
-    return participantIds
-      .map(id => loadParticipantData(id))
-      .filter((participant): participant is Participant => participant !== null);
+    return [];
   }
 }
 

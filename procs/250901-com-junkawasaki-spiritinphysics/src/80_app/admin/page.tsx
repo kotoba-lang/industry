@@ -219,7 +219,7 @@ export default function AdminPage() {
       {/* Main Content */}
       <div className="px-6 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview" className="flex items-center space-x-2">
               <Users className="h-4 w-4" />
               <span>参加者一覧</span>
@@ -235,6 +235,10 @@ export default function AdminPage() {
             <TabsTrigger value="timeline" className="flex items-center space-x-2">
               <Clock className="h-4 w-4" />
               <span>タイムライン</span>
+            </TabsTrigger>
+            <TabsTrigger value="import" className="flex items-center space-x-2">
+              <Database className="h-4 w-4" />
+              <span>インポート</span>
             </TabsTrigger>
             <TabsTrigger value="export" className="flex items-center space-x-2">
               <Download className="h-4 w-4" />
@@ -256,6 +260,24 @@ export default function AdminPage() {
 
           <TabsContent value="timeline" className="mt-6">
             <SessionTimeline />
+          </TabsContent>
+
+          <TabsContent value="import" className="mt-6">
+            <div className="text-center py-12">
+              <Database className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                データインポート
+              </h3>
+              <p className="text-gray-600 mb-6">
+                ファイルシステムからデータを手動でインポートします
+              </p>
+              <Link href="/admin/import">
+                <Button className="bg-blue-600 hover:bg-blue-700">
+                  <Database className="h-4 w-4 mr-2" />
+                  インポートページへ
+                </Button>
+              </Link>
+            </div>
           </TabsContent>
 
           <TabsContent value="export" className="mt-6">
