@@ -12,8 +12,10 @@ import {
   CheckCircle,
   AlertCircle,
   Video,
-  Users
+  Users,
+  Workflow
 } from 'lucide-react';
+// ワークフローサービスはAPI経由で使用するため、直接インポートしない
 
 interface EmotionAnalysisControlsProps {
   onAnalysisComplete?: () => void;
@@ -24,6 +26,7 @@ export function EmotionAnalysisControls({ onAnalysisComplete }: EmotionAnalysisC
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState('');
+  const [useWorkflow, setUseWorkflow] = useState(true); // デフォルトでワークフロー使用
 
   // 参加者リスト（実際のデータから取得する）
   const participants = [
@@ -53,32 +56,65 @@ export function EmotionAnalysisControls({ onAnalysisComplete }: EmotionAnalysisC
     setStatusMessage('');
 
     try {
-      // まず参加者のビデオファイルを取得
-      const response = await fetch(`/api/admin/experimental-data?type=participant&participantId=${selectedParticipant}`);
-      const result = await response.json();
+      if (useWorkflow) {
+        // ワークフローAPIを使用
+        setStatusMessage('ワークフロー分析を開始します...');
 
-      if (!result.success || !result.data.hasVideoFiles) {
-        throw new Error('この参加者にはビデオファイルがありません');
-      }
+        const response = await fetch('/api/admin/emotion-analysis', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'analyze-batch-workflow',
+            participantId: selectedParticipant,
+            priority: 'normal',
+          }),
+        });
 
-      // 感情分析を実行
-      const videoFiles = result.data.videoFiles;
-      const analysisPromises = videoFiles.map(async (videoFile: string) => {
-        const sessionType = videoFile.includes('session-1') ? 'session-1' : 'session-2';
-        const analysisResponse = await fetch(
-          `/api/admin/emotion-analysis?action=analyze-single&participantId=${selectedParticipant}&videoFile=${videoFile}&sessionType=${sessionType}`
-        );
-        return analysisResponse.json();
-      });
+        const result = await response.json();
 
-      const results = await Promise.all(analysisPromises);
-      const successCount = results.filter(r => r.success).length;
+        if (!result.success) {
+          throw new Error(result.error || 'ワークフロー開始に失敗しました');
+        }
 
-      setAnalysisStatus('success');
-      setStatusMessage(`${successCount}/${videoFiles.length}件のビデオ分析が完了しました`);
+        setAnalysisStatus('success');
+        setStatusMessage(`ワークフロー分析を開始しました (Batch ID: ${result.data?.batchId?.slice(0, 8)}...)`);
 
-      if (onAnalysisComplete) {
-        onAnalysisComplete();
+        // 定期的にステータスを確認
+        setTimeout(() => {
+          if (onAnalysisComplete) {
+            onAnalysisComplete();
+          }
+        }, 2000);
+
+      } else {
+        // 従来の同期分析（後方互換性のため維持）
+        const response = await fetch(`/api/admin/experimental-data?type=participant&participantId=${selectedParticipant}`);
+        const result = await response.json();
+
+        if (!result.success || !result.data.hasVideoFiles) {
+          throw new Error('この参加者にはビデオファイルがありません');
+        }
+
+        const videoFiles = result.data.videoFiles;
+        const analysisPromises = videoFiles.map(async (videoFile: string) => {
+          const sessionType = videoFile.includes('session-1') ? 'session-1' : 'session-2';
+          const analysisResponse = await fetch(
+            `/api/admin/emotion-analysis?action=analyze-single&participantId=${selectedParticipant}&videoFile=${videoFile}&sessionType=${sessionType}`
+          );
+          return analysisResponse.json();
+        });
+
+        const results = await Promise.all(analysisPromises);
+        const successCount = results.filter(r => r.success).length;
+
+        setAnalysisStatus('success');
+        setStatusMessage(`${successCount}/${videoFiles.length}件のビデオ分析が完了しました`);
+
+        if (onAnalysisComplete) {
+          onAnalysisComplete();
+        }
       }
 
     } catch (error) {
@@ -96,47 +132,81 @@ export function EmotionAnalysisControls({ onAnalysisComplete }: EmotionAnalysisC
     setStatusMessage('バッチ分析を開始します...');
 
     try {
-      const results = [];
+      if (useWorkflow) {
+        // ワークフローAPIを使用した全参加者分析
+        const response = await fetch('/api/admin/emotion-analysis', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'analyze-all-workflow',
+            priority: 'normal',
+          }),
+        });
 
-      for (const participantId of participants) {
-        try {
-          const response = await fetch('/api/admin/emotion-analysis', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              action: 'analyze-batch',
-              participantId
-            })
-          });
+        const result = await response.json();
 
-          const result = await response.json();
-          results.push(result);
-
-          // 進捗を表示
-          setStatusMessage(`${results.length}/${participants.length}人の分析が完了しました`);
-
-          // APIレート制限を考慮して少し待つ
-          await new Promise(resolve => setTimeout(resolve, 2000));
-
-        } catch (error) {
-          console.error(`Error analyzing participant ${participantId}:`, error);
+        if (!result.success) {
+          throw new Error(result.error || 'バッチワークフロー開始に失敗しました');
         }
-      }
 
-      const successCount = results.filter(r => r.success).length;
-      setAnalysisStatus('success');
-      setStatusMessage(`バッチ分析完了: ${successCount}/${participants.length}人の分析に成功しました`);
+        setAnalysisStatus('success');
+        setStatusMessage(`全参加者ワークフロー分析を開始しました (Batch ID: ${result.data?.batchId?.slice(0, 8)}...)`);
 
-      if (onAnalysisComplete) {
-        onAnalysisComplete();
+        // ワークフロー開始後にステータスを確認
+        setTimeout(() => {
+          if (onAnalysisComplete) {
+            onAnalysisComplete();
+          }
+        }, 3000);
+
+      } else {
+        // 従来の同期バッチ分析
+        const results = [];
+
+        for (let i = 0; i < participants.length; i++) {
+          const participantId = participants[i];
+
+          try {
+            const response = await fetch('/api/admin/emotion-analysis', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                action: 'analyze-batch',
+                participantId
+              })
+            });
+
+            const result = await response.json();
+            results.push(result);
+
+            // 進捗を表示
+            setStatusMessage(`${results.length}/${participants.length}人の分析が完了しました`);
+
+            // APIレート制限を考慮して少し待つ
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+          } catch (error) {
+            console.error(`Error analyzing participant ${participantId}:`, error);
+          }
+        }
+
+        const successCount = results.filter(r => r.success).length;
+        setAnalysisStatus('success');
+        setStatusMessage(`同期バッチ分析完了: ${successCount}/${participants.length}人の分析に成功しました`);
+
+        if (onAnalysisComplete) {
+          onAnalysisComplete();
+        }
       }
 
     } catch (error) {
       console.error('Batch analysis error:', error);
       setAnalysisStatus('error');
-      setStatusMessage('バッチ分析中にエラーが発生しました');
+      setStatusMessage(error instanceof Error ? error.message : 'バッチ分析中にエラーが発生しました');
     } finally {
       setIsAnalyzing(false);
     }
@@ -155,6 +225,25 @@ export function EmotionAnalysisControls({ onAnalysisComplete }: EmotionAnalysisC
             特定の参加者のビデオファイルを感情分析
           </CardDescription>
         </CardHeader>
+        <CardContent>
+          <div className="flex items-center space-x-3 mb-4">
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={useWorkflow}
+                onChange={(e) => setUseWorkflow(e.target.checked)}
+                className="rounded"
+              />
+              <span className="text-sm">
+                <Workflow className="h-4 w-4 inline mr-1" />
+                ワークフロー使用
+              </span>
+            </label>
+            <Badge variant={useWorkflow ? "default" : "secondary"} className="text-xs">
+              {useWorkflow ? "非同期" : "同期"}
+            </Badge>
+          </div>
+        </CardContent>
         <CardContent className="space-y-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
