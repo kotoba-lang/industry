@@ -483,24 +483,29 @@ export function ExperimentAnalytics() {
             <div className="pt-4 border-t">
               <h4 className="text-sm font-medium mb-2">感情分布トップ3</h4>
               <div className="space-y-2">
-              {emotionChartData.slice(0, 3).map((emotion) => (
-                <div key={emotion.name} className="flex items-center justify-between">
-                  <span className="text-sm">{emotion.name}</span>
-                  <Badge variant="secondary" className="text-xs">
-                    {emotion.percentage}%
-                  </Badge>
-                </div>
-              ))}
+                {emotionChartData && emotionChartData.length > 0 ? (
+                  emotionChartData.slice(0, 3).map((emotion) => (
+                    <div key={emotion.name} className="flex items-center justify-between">
+                      <span className="text-sm">{emotion.name}</span>
+                      <Badge variant="secondary" className="text-xs">
+                        {emotion.percentage}%
+                      </Badge>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500">感情データがありません</p>
+                )}
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
+    )}
 
-      {/* Emotion Analysis Controls */}
-      <div className="grid grid-cols-1 gap-6">
-        <EmotionAnalysisControls onAnalysisComplete={handleAnalysisComplete} />
-      </div>
+    {/* Emotion Analysis Controls - Always visible */}
+    <div className="grid grid-cols-1 gap-6">
+      <EmotionAnalysisControls onAnalysisComplete={handleAnalysisComplete} />
     </div>
+  </div>
   );
 }

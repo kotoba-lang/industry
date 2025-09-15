@@ -81,21 +81,21 @@ export async function GET(request: NextRequest) {
           "e41a9cd2-d803-49a8-9020-0260e55cd03e"
         ];
 
-        let allResults: any[] = [];
+        let globalResults: any[] = [];
         participantIds.forEach(id => {
           const results = loadEmotionAnalysisResults(id);
-          allResults = allResults.concat(results);
+          globalResults = globalResults.concat(results);
         });
 
-        const globalStats = generateEmotionStatistics(allResults);
+        const globalStats = generateEmotionStatistics(globalResults);
 
         return NextResponse.json({
           success: true,
-          data: {
-            totalParticipants: participantIds.length,
-            totalAnalyses: allResults.length,
-            statistics: globalStats
-          }
+            data: {
+              totalParticipants: participantIds.length,
+              totalAnalyses: globalResults.length,
+              statistics: globalStats
+            }
         });
 
       default:
@@ -124,13 +124,13 @@ export async function POST(request: NextRequest) {
       }
 
       console.log(`Starting batch emotion analysis for participant: ${participantId}`);
-      const results = await analyzeAllParticipantVideos(participantId);
+      const batchResults = await analyzeAllParticipantVideos(participantId);
 
       return NextResponse.json({
         success: true,
         message: `Batch analysis completed for ${participantId}`,
-        data: results,
-        count: results.length
+        data: batchResults,
+        count: batchResults.length
       });
     }
 
