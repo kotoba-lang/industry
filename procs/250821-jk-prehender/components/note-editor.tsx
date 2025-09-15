@@ -8,21 +8,8 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { Slider } from "@/components/ui/slider"
-import {
-  ImageIcon, Bold, Italic, List, Link, Hash, X, GitBranch, ArrowRight, ExternalLink, AtSign,
-  Type, Heading1, Heading2, Heading3, Quote, Code, Minus, Undo, Redo, Save, Eye,
-  Settings, Palette, Zap, Sparkles, FileText, Users, BookOpen, Lightbulb,
-  CheckSquare, Calendar, FolderOpen, Copy, Tag, Plus, Minus as MinusIcon
-} from "lucide-react"
+import { ImageIcon, Bold, Italic, List, Link, Hash, X, GitBranch, ArrowRight, ExternalLink, AtSign } from "lucide-react"
 import { extractTitleFromContent } from "@/lib/utils"
 import type { Note, ReferenceType, StreamReference } from "@/types/note"
 
@@ -433,262 +420,120 @@ export function NoteEditor({
 
   if (!note) {
     return (
-      <TooltipProvider>
-        <div className="flex-1 flex items-center justify-center bg-background/50">
-          <div className="text-center max-w-md">
-            <div className="w-20 h-20 bg-gradient-to-br from-primary/20 to-primary/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-primary/20">
-              <FileText className="w-10 h-10 text-primary" />
-            </div>
-            <h2 className="text-2xl font-bold text-foreground mb-3">No Stream Selected</h2>
-            <p className="text-muted-foreground mb-8 leading-relaxed">
-              Choose a stream from the sidebar or create a new one to start writing.
-            </p>
-            <div className="space-y-4">
-              <Button
-                onClick={onNewNote}
-                size="lg"
-                className="prehender-gradient hover:opacity-90 transition-all duration-200 transform hover:scale-105"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Create New Stream
-              </Button>
-              <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <kbd className="px-2 py-1 bg-muted rounded text-xs">⌘</kbd>
-                  <span>+</span>
-                  <kbd className="px-2 py-1 bg-muted rounded text-xs">N</kbd>
-                </div>
-                <span>to create quickly</span>
-              </div>
-            </div>
+      <div className="flex-1 flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+            <ImageIcon className="w-8 h-8 text-gray-400" />
           </div>
+          <h2 className="text-xl font-medium text-gray-900 mb-2">No stream selected</h2>
+          <p className="text-gray-600 mb-4">Select a stream from the sidebar or create a new one</p>
+          <Button onClick={onNewNote} className="bg-blue-600 hover:bg-blue-700 text-white">
+            Create New Stream
+          </Button>
         </div>
-      </TooltipProvider>
+      </div>
     )
   }
 
   return (
-    <TooltipProvider>
-      <div className="flex-1 flex flex-col bg-background">
-        {/* Hidden measuring element for cursor position calculation */}
-        <div
-          ref={measureRef}
-          className="absolute -top-1000 -left-1000 whitespace-pre-wrap text-base font-mono pointer-events-none"
-          style={{
-            font: 'inherit',
-            letterSpacing: 'inherit',
-            wordSpacing: 'inherit',
-          }}
-        />
+    <div className="flex-1 flex flex-col bg-white">
+      {/* Hidden measuring element for cursor position calculation */}
+      <div
+        ref={measureRef}
+        className="absolute -top-1000 -left-1000 whitespace-pre-wrap text-base font-mono pointer-events-none"
+        style={{ 
+          font: 'inherit',
+          letterSpacing: 'inherit',
+          wordSpacing: 'inherit',
+        }}
+      />
 
-        {/* Enhanced Editor Toolbar */}
-        <div className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="sm" onClick={() => insertFormatting("bold")}>
-                    <Bold className="w-4 h-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Bold (⌘B)</TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="sm" onClick={() => insertFormatting("italic")}>
-                    <Italic className="w-4 h-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Italic (⌘I)</TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="sm" onClick={() => insertFormatting("list")}>
-                    <List className="w-4 h-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>List</TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="sm" onClick={() => insertFormatting("link")}>
-                    <Link className="w-4 h-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Link</TooltipContent>
-              </Tooltip>
-
-              <Separator orientation="vertical" className="h-6 mx-2" />
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="sm" onClick={() => insertFormatting("stream-ref")}>
-                    <AtSign className="w-4 h-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Stream Reference</TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="sm" onClick={() => console.log("Insert Image clicked")}>
-                    <ImageIcon className="w-4 h-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Insert Image</TooltipContent>
-              </Tooltip>
-            </div>
-
-            {/* Enhanced Stream Info */}
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-xs">
-                  {(() => {
-                    const icons = {
-                      note: FileText,
-                      idea: Lightbulb,
-                      task: CheckSquare,
-                      meeting: Users,
-                      project: FolderOpen,
-                      reference: BookOpen,
-                      template: Copy
-                    }
-                    const Icon = icons[note.streamType as keyof typeof icons] || FileText
-                    return <Icon className="w-3 h-3 mr-1" />
-                  })()}
-                  {note.streamType}
-                </Badge>
-                <Badge
-                  variant={note.streamState === 'active' ? 'default' : 'secondary'}
-                  className="text-xs"
-                >
-                  {note.streamState}
-                </Badge>
-              </div>
-
-              <Separator orientation="vertical" className="h-6" />
-
-              <div className="flex items-center gap-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="sm">
-                      <Save className="w-4 h-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Save (⌘S)</TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="sm">
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Preview</TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="sm">
-                      <Settings className="w-4 h-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Settings</TooltipContent>
-                </Tooltip>
-              </div>
-            </div>
-          </div>
+      {/* Editor Toolbar */}
+      <div className="border-b border-gray-200 p-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => insertFormatting("bold")} title="Bold">
+            <Bold className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => insertFormatting("italic")} title="Italic">
+            <Italic className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => insertFormatting("list")} title="List">
+            <List className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => insertFormatting("link")} title="Link">
+            <Link className="w-4 h-4" />
+          </Button>
+          <div className="w-px h-6 bg-gray-300 mx-2" />
+          <Button variant="ghost" size="sm" onClick={() => insertFormatting("stream-ref")} title="Insert Stream Reference">
+            <AtSign className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="sm" title="Insert Image" onClick={() => console.log("Insert Image clicked")}>
+            <ImageIcon className="w-4 h-4" />
+          </Button>
         </div>
+        
+        {/* Stream Info */}
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-xs">
+            <GitBranch className="w-3 h-3 mr-1" />
+            {note.streamType}
+          </Badge>
+          <Badge variant="secondary" className="text-xs">
+            {note.streamState}
+          </Badge>
+        </div>
+      </div>
 
-        {/* Enhanced Note Content */}
-        <div className="flex-1 flex flex-col overflow-hidden relative">
-          <ScrollArea className="flex-1">
-            <div className="relative min-h-full">
-              <Textarea
-                ref={textareaRef}
-                value={content}
-                onChange={handleTextareaChange}
-                placeholder={`Stream Title
+      {/* Note Content */}
+      <div className="flex-1 flex flex-col p-6 overflow-hidden relative">
+        <div className="relative">
+          <Textarea
+            ref={textareaRef}
+            value={content}
+            onChange={handleTextareaChange}
+            placeholder="タイトルを最初の1行目に入力してください&#10;&#10;改行して本文を書き始めてください...&#10;&#10;ストリーム参照を埋め込むには @[参照タイプ:ストリーム名] の形式で入力してください&#10;例: @[関連:プロジェクトA] @[依存:タスクB]"
+            className="flex-1 border-none shadow-none p-0 resize-none focus-visible:ring-0 text-base leading-relaxed mb-6"
+          />
 
-Start writing your content here...
-
-💡 Tips:
-• Use @[type:name] to reference other streams
-• Examples: @[関連:Project A] @[依存:Task B]
-• Use **bold** and *italic* formatting
-• Press ⌘+K for quick search`}
-                className="min-h-[400px] border-none shadow-none p-6 resize-none focus-visible:ring-0 text-base leading-relaxed bg-transparent prose prose-gray dark:prose-invert max-w-none focus:outline-none"
-                style={{
-                  fontFamily: 'inherit',
-                  lineHeight: '1.7',
-                  caretColor: 'hsl(var(--primary))'
-                }}
-              />
-
-              {/* Enhanced Autocomplete Popup */}
-              {autocomplete.show && (
-                <div
-                  className="absolute z-50 bg-popover border border-border rounded-lg shadow-lg max-w-sm animate-in fade-in-0 zoom-in-95"
-                  style={{
-                    top: autocomplete.position.top,
-                    left: autocomplete.position.left
-                  }}
-                >
-                  <Command className="w-full">
-                    <CommandList>
-                      <CommandEmpty className="py-6 text-center text-sm">
-                        No matches found
-                      </CommandEmpty>
-                      <CommandGroup>
-                        {getAutocompleteSuggestions().slice(0, 8).map((suggestion, index) => (
-                          <CommandItem
-                            key={index}
-                            value={suggestion.value}
-                            onSelect={() => handleAutocompleteSelect(suggestion.value)}
-                            className="cursor-pointer flex items-center gap-3 px-3 py-2 hover:bg-accent focus:bg-accent"
-                          >
-                            {autocomplete.referenceType === null ? (
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline" className="text-xs font-medium">
-                                  {suggestion.label}
+          {/* Autocomplete Popup */}
+          {autocomplete.show && (
+            <div
+              className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg max-w-sm"
+              style={{
+                top: autocomplete.position.top,
+                left: autocomplete.position.left
+              }}
+            >
+              <Command className="w-full">
+                <CommandList>
+                  <CommandEmpty>候補が見つかりません</CommandEmpty>
+                  <CommandGroup>
+                    {getAutocompleteSuggestions().map((suggestion, index) => (
+                      <CommandItem
+                        key={index}
+                        value={suggestion.value}
+                        onSelect={() => handleAutocompleteSelect(suggestion.value)}
+                        className="cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          {autocomplete.referenceType === null ? (
+                            <Badge variant="outline" className="text-xs">
+                              {suggestion.label}
+                            </Badge>
+                          ) : (
+                            <>
+                              <span className="font-medium">{suggestion.label}</span>
+                              {'stream' in suggestion && (
+                                <Badge variant="outline" className="text-xs">
+                                  {suggestion.stream.streamType}
                                 </Badge>
-                                <span className="text-xs text-muted-foreground">
-                                  {REFERENCE_TYPE_LABELS[suggestion.label as ReferenceType]?.label}
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-3 flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-1 min-w-0">
-                                  {'stream' in suggestion && (
-                                    (() => {
-                                      const icons = {
-                                        note: FileText,
-                                        idea: Lightbulb,
-                                        task: CheckSquare,
-                                        meeting: Users,
-                                        project: FolderOpen,
-                                        reference: BookOpen,
-                                        template: Copy
-                                      }
-                                      const Icon = icons[suggestion.stream.streamType as keyof typeof icons] || FileText
-                                      return <Icon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                                    })()
-                                  )}
-                                  <span className="font-medium truncate">{suggestion.label}</span>
-                                </div>
-                                {'stream' in suggestion && (
-                                  <Badge variant="outline" className="text-xs flex-shrink-0">
-                                    {suggestion.stream.streamType}
-                                  </Badge>
-                                )}
-                              </div>
-                            )}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
                 </CommandList>
               </Command>
             </div>
@@ -746,53 +591,37 @@ Start writing your content here...
                 {note.references.filter(ref => !ref.context?.startsWith('embedded:')).map((ref) => {
                   const targetStream = allNotes.find(n => n.streamId === ref.targetStreamId)
                   const refInfo = REFERENCE_TYPE_LABELS[ref.referenceType]
-
+                  
                   return (
-                    <div key={ref.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-border/50 hover:bg-muted/70 transition-colors">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <Badge className={`text-xs font-medium ${refInfo.color} border-0`}>
+                    <div key={ref.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-2 flex-1">
+                        <Badge className={`text-xs ${refInfo.color}`}>
                           {refInfo.label}
                         </Badge>
-                        <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm font-medium block truncate">
-                            {targetStream ? extractTitleFromContent(targetStream.content) : 'Unknown Stream'}
-                          </span>
-                          {ref.context && !ref.context.startsWith('embedded:') && (
-                            <span className="text-xs text-muted-foreground block truncate mt-0.5">
-                              {ref.context}
-                            </span>
-                          )}
-                        </div>
+                        <ArrowRight className="w-3 h-3 text-gray-400" />
+                        <span className="text-sm font-medium">
+                          {targetStream ? extractTitleFromContent(targetStream.content) : 'Unknown Stream'}
+                        </span>
+                        {ref.context && !ref.context.startsWith('embedded:') && (
+                          <span className="text-xs text-gray-500">({ref.context})</span>
+                        )}
                       </div>
-                      <div className="flex items-center gap-1 ml-2">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0 hover:bg-accent"
-                              title="Open referenced stream"
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Open stream</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                              onClick={() => removeStreamReference(ref.id)}
-                              title="Remove reference"
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Remove reference</TooltipContent>
-                        </Tooltip>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          title="Open referenced stream"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                        </Button>
+                        <button 
+                          onClick={() => removeStreamReference(ref.id)} 
+                          className="text-gray-400 hover:text-red-500"
+                          title="Remove reference"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
                       </div>
                     </div>
                   )
@@ -801,185 +630,102 @@ Start writing your content here...
             </Card>
           )}
 
-          {/* Enhanced Add New Reference */}
-          <Card className="border-dashed border-2 hover:border-primary/50 transition-colors">
+          {/* Add New Reference */}
+          <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Plus className="w-4 h-4" />
-                Add Stream Reference
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">
-                💡 Pro tip: Type @[type:name] in your text to embed references inline
+              <CardTitle className="text-sm font-medium">Add Stream Reference</CardTitle>
+              <p className="text-xs text-gray-500">
+                ヒント: テキスト内で @[参照タイプ:ストリーム名] と入力することで直接埋め込むこともできます
               </p>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="reference-type" className="text-xs font-medium">
-                    Reference Type
-                  </Label>
-                  <Select value={newReferenceType} onValueChange={(value: ReferenceType) => setNewReferenceType(value)}>
-                    <SelectTrigger id="reference-type" className="h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(REFERENCE_TYPE_LABELS).map(([key, value]) => (
-                        <SelectItem key={key} value={key}>
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${value.color.split(' ')[0].replace('bg-', 'bg-')}`} />
-                            <span className="font-medium">{value.label}</span>
-                            <span className="text-xs text-muted-foreground ml-1">({value.shortCode})</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="reference-target" className="text-xs font-medium">
-                    Target Stream
-                  </Label>
-                  <Select value={newReferenceTarget} onValueChange={setNewReferenceTarget}>
-                    <SelectTrigger id="reference-target" className="h-9">
-                      <SelectValue placeholder="Choose a stream..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableStreams.map((stream) => (
-                        <SelectItem key={stream.streamId} value={stream.streamId}>
-                          <div className="flex items-center gap-2 w-full">
-                            {(() => {
-                              const icons = {
-                                note: FileText,
-                                idea: Lightbulb,
-                                task: CheckSquare,
-                                meeting: Users,
-                                project: FolderOpen,
-                                reference: BookOpen,
-                                template: Copy
-                              }
-                              const Icon = icons[stream.streamType as keyof typeof icons] || FileText
-                              return <Icon className="w-4 h-4 text-muted-foreground" />
-                            })()}
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium truncate">
-                                {extractTitleFromContent(stream.content)}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                {stream.streamType}
-                              </div>
-                            </div>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="reference-context" className="text-xs font-medium">
-                  Context (Optional)
-                </Label>
-                <Input
-                  id="reference-context"
-                  value={newReferenceContext}
-                  onChange={(e) => setNewReferenceContext(e.target.value)}
-                  placeholder="Why are you referencing this stream?"
-                  className="h-9"
-                />
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <Select value={newReferenceType} onValueChange={(value: ReferenceType) => setNewReferenceType(value)}>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(REFERENCE_TYPE_LABELS).map(([key, value]) => (
+                      <SelectItem key={key} value={key}>
+                        <span className={`inline-block w-2 h-2 rounded-full mr-2 ${value.color.split(' ')[0]}`}></span>
+                        {value.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <Select value={newReferenceTarget} onValueChange={setNewReferenceTarget}>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="Select stream..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableStreams.map((stream) => (
+                      <SelectItem key={stream.streamId} value={stream.streamId}>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">
+                            {stream.streamType}
+                          </Badge>
+                          {extractTitleFromContent(stream.content)}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               
-              <div className="flex gap-2">
-                <Button
-                  onClick={addStreamReference}
-                  size="sm"
-                  disabled={!newReferenceTarget}
-                  className="flex-1"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Reference
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setNewReferenceTarget("")
-                    setNewReferenceContext("")
-                  }}
-                >
-                  Clear
-                </Button>
-              </div>
+              <Input
+                value={newReferenceContext}
+                onChange={(e) => setNewReferenceContext(e.target.value)}
+                placeholder="Context (optional)..."
+                className="h-8 text-sm"
+              />
+              
+              <Button 
+                onClick={addStreamReference} 
+                size="sm" 
+                disabled={!newReferenceTarget}
+                className="w-full"
+              >
+                Add Reference
+              </Button>
             </CardContent>
           </Card>
 
-          {/* Enhanced Tags Section */}
+          {/* Tags Section */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Tag className="w-4 h-4" />
+                <Hash className="w-4 h-4" />
                 Tags
-                <Badge variant="secondary" className="text-xs">
-                  {note.tags.length}
-                </Badge>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Existing Tags */}
-              {note.tags.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {note.tags.map((tag) => (
-                    <Tooltip key={tag}>
-                      <TooltipTrigger asChild>
-                        <Badge variant="secondary" className="flex items-center gap-1 px-3 py-1 hover:bg-secondary/80 cursor-pointer group">
-                          <Hash className="w-3 h-3" />
-                          {tag}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-4 w-4 p-0 ml-1 hover:bg-destructive hover:text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => removeTag(tag)}
-                          >
-                            <X className="w-3 h-3" />
-                          </Button>
-                        </Badge>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        Click X to remove tag
-                      </TooltipContent>
-                    </Tooltip>
-                  ))}
-                </div>
-              )}
+            <CardContent className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {note.tags.map((tag) => (
+                  <Badge key={tag} variant="secondary" className="flex items-center gap-1">
+                    {tag}
+                    <button 
+                      onClick={() => removeTag(tag)} 
+                      className="ml-1 hover:text-red-500"
+                      title={`Remove ${tag} tag`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
 
-              {/* Add New Tag */}
-              <div className="space-y-2">
-                <Label htmlFor="new-tag" className="text-xs font-medium">
-                  Add New Tag
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="new-tag"
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    placeholder="Enter tag name..."
-                    className="flex-1 h-9"
-                    onKeyPress={(e) => e.key === "Enter" && addTag()}
-                  />
-                  <Button
-                    onClick={addTag}
-                    size="sm"
-                    disabled={!newTag.trim()}
-                    className="px-4"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Tag
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Tags help organize and find your streams. Press Enter or click Add to create.
-                </p>
+              <div className="flex gap-2">
+                <Input
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                  placeholder="Add tag..."
+                  className="flex-1 h-8 text-sm"
+                  onKeyPress={(e) => e.key === "Enter" && addTag()}
+                />
+                <Button onClick={addTag} size="sm" disabled={!newTag}>
+                  Add
+                </Button>
               </div>
             </CardContent>
           </Card>

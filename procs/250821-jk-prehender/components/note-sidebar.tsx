@@ -1,19 +1,12 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel } from "@/components/ui/dropdown-menu"
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import {
-  Search, MoreHorizontal, Trash2, FileText, Lightbulb, CheckSquare, Users, FolderOpen, BookOpen, Copy,
-  GitBranch, ArrowRight, Plus, Filter, SortAsc, SortDesc, Clock, Star, Eye, EyeOff, Pin, PinOff
-} from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Search, MoreHorizontal, Trash2, FileText, Lightbulb, CheckSquare, Users, FolderOpen, BookOpen, Copy, GitBranch, ArrowRight } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { extractTitleFromContent } from "@/lib/utils"
 import type { Note, StreamType } from "@/types/note"
@@ -38,42 +31,16 @@ const STREAM_TYPE_CONFIG = {
 export function NoteSidebar({ notes, selectedNoteId, onNoteSelect, onDeleteNote }: NoteSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [filterStreamType, setFilterStreamType] = useState<StreamType | 'all'>('all')
-  const [sortBy, setSortBy] = useState<'updated' | 'created' | 'title'>('updated')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [showFilters, setShowFilters] = useState(false)
 
-  const filteredAndSortedNotes = useMemo(() => {
-    // Filter notes
-    const filtered = notes.filter((note) => {
-      const title = extractTitleFromContent(note.content)
-      const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        note.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        note.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
-
-      const matchesType = filterStreamType === 'all' || note.streamType === filterStreamType
-
-      return matchesSearch && matchesType
-    })
-
-    // Sort notes
-    return filtered.sort((a, b) => {
-      let comparison = 0
-
-      switch (sortBy) {
-        case 'title':
-          comparison = extractTitleFromContent(a.content).localeCompare(extractTitleFromContent(b.content))
-          break
-        case 'created':
-          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-          break
-        case 'updated':
-          comparison = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
-          break
-      }
-
-      return sortOrder === 'asc' ? comparison : -comparison
-    })
-  }, [notes, searchQuery, filterStreamType, sortBy, sortOrder])
+  const filteredNotes = notes.filter((note) => {
+    const title = extractTitleFromContent(note.content)
+    const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      note.content.toLowerCase().includes(searchQuery.toLowerCase())
+    
+    const matchesType = filterStreamType === 'all' || note.streamType === filterStreamType
+    
+    return matchesSearch && matchesType
+  })
 
   const getPreviewText = (content: string) => {
     // 最初の1行目（タイトル）を除いた本文を取得
@@ -97,77 +64,35 @@ export function NoteSidebar({ notes, selectedNoteId, onNoteSelect, onDeleteNote 
   }, {} as Record<StreamType, number>)
 
   return (
-    <TooltipProvider>
-      <div className="w-80 border-r border-border bg-background/50 flex flex-col">
-        {/* Enhanced Header */}
-        <div className="p-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="space-y-3">
-            {/* Search with Command Palette */}
-            <Popover open={showFilters} onOpenChange={setShowFilters}>
-              <PopoverTrigger asChild>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                  <Input
-                    placeholder="Search streams, tags, content..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 h-9"
-                  />
-                  <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
-                    ⌘K
-                  </kbd>
-                </div>
-              </PopoverTrigger>
-              <PopoverContent className="w-80 p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Type to search..." />
-                  <CommandList>
-                    <CommandEmpty>No results found.</CommandEmpty>
-                    <CommandGroup heading="Stream Types">
-                      <CommandItem onSelect={() => setFilterStreamType('all')}>
-                        <GitBranch className="mr-2 h-4 w-4" />
-                        <span>All Streams</span>
-                        <span className="ml-auto text-xs text-muted-foreground">{notes.length}</span>
-                      </CommandItem>
-                      {Object.entries(STREAM_TYPE_CONFIG).map(([type, config]) => (
-                        <CommandItem key={type} onSelect={() => setFilterStreamType(type as StreamType)}>
-                          <config.icon className={`mr-2 h-4 w-4 ${config.color}`} />
-                          <span>{config.label}</span>
-                          <span className="ml-auto text-xs text-muted-foreground">
-                            {streamTypeCounts[type as StreamType] || 0}
-                          </span>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+    <div className="w-80 border-r border-gray-200 bg-gray-50 flex flex-col">
+      <div className="p-4 border-b border-gray-200 bg-white">
+        <div className="space-y-3">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              placeholder="Search streams..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 h-8 text-sm"
+            />
+          </div>
 
-            {/* Enhanced Filters and Sort */}
-            <div className="flex items-center gap-2">
-              {/* Stream Type Filter */}
-              <DropdownMenu>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="flex-1 justify-start h-8 text-sm">
-                        {filterStreamType === 'all' ? (
-                          <>
-                            <Filter className="w-3 h-3 mr-2" />
-                            <span>All Types</span>
-                          </>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            {getStreamIcon(filterStreamType)}
-                            <span>{STREAM_TYPE_CONFIG[filterStreamType].label}</span>
-                          </div>
-                        )}
-                      </Button>
-                    </DropdownMenuTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent>Filter by stream type</TooltipContent>
-                </Tooltip>
+          {/* Stream Type Filter */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="w-full justify-between h-8 text-sm">
+                {filterStreamType === 'all' ? (
+                  <span>All Types</span>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    {getStreamIcon(filterStreamType)}
+                    <span>{STREAM_TYPE_CONFIG[filterStreamType].label}</span>
+                  </div>
+                )}
+                <span className="text-xs text-gray-500">({filteredNotes.length})</span>
+              </Button>
+            </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56">
               <DropdownMenuItem onClick={() => setFilterStreamType('all')}>
                 <GitBranch className="w-4 h-4 mr-2 text-gray-500" />
@@ -196,7 +121,7 @@ export function NoteSidebar({ notes, selectedNoteId, onNoteSelect, onDeleteNote 
 
       <ScrollArea className="flex-1">
         <div className="p-2">
-          {filteredAndSortedNotes.length === 0 ? (
+          {filteredNotes.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm">No streams found</p>
@@ -205,7 +130,7 @@ export function NoteSidebar({ notes, selectedNoteId, onNoteSelect, onDeleteNote 
               )}
             </div>
           ) : (
-            filteredAndSortedNotes.map((note) => {
+            filteredNotes.map((note) => {
               const config = STREAM_TYPE_CONFIG[note.streamType]
               const Icon = config.icon
               
@@ -296,7 +221,6 @@ export function NoteSidebar({ notes, selectedNoteId, onNoteSelect, onDeleteNote 
           )}
         </div>
       </ScrollArea>
-      </div>
-    </TooltipProvider>
+    </div>
   )
 }
