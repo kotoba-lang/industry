@@ -90,7 +90,13 @@ export class KuzuManager {
       return;
     }
 
-    const conn = new this.db.Connection();
+    let conn: any;
+    try {
+      conn = new this.db.Connection();
+    } catch (error) {
+      console.error('Failed to create database connection:', error);
+      return;
+    }
 
     try {
       // 参加者ノード
@@ -192,7 +198,13 @@ export class KuzuManager {
       return;
     }
 
-    const conn = new this.db.Connection();
+    let conn: any;
+    try {
+      conn = new this.db.Connection();
+    } catch (error) {
+      console.error('Failed to create database connection:', error);
+      return;
+    }
 
     try {
       await conn.query(`
@@ -382,7 +394,18 @@ export class KuzuManager {
    * 参加者データの取得
    */
   async getParticipant(participantId: string): Promise<Participant | null> {
-    const conn = new this.db.Connection();
+    if (!this.db) {
+      console.warn('Kuzu not available, returning null');
+      return null;
+    }
+
+    let conn: any;
+    try {
+      conn = new this.db.Connection();
+    } catch (error) {
+      console.error('Failed to create database connection:', error);
+      return null;
+    }
 
     try {
       const result = await conn.query(`
@@ -413,7 +436,18 @@ export class KuzuManager {
    * 全参加者データの取得
    */
   async getAllParticipants(): Promise<Participant[]> {
-    const conn = new this.db.Connection();
+    if (!this.db) {
+      console.warn('Kuzu not available, returning empty array');
+      return [];
+    }
+
+    let conn: any;
+    try {
+      conn = new this.db.Connection();
+    } catch (error) {
+      console.error('Failed to create database connection:', error);
+      return [];
+    }
 
     try {
       const result = await conn.query(`

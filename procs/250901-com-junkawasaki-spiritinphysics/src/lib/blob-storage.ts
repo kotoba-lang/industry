@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 export class BlobStorage {
-  private static baseUrl = process.env.VERCEL_URL || 'https://kuzu-spirit-in-physics.vercel.app';
+  private static blobStoreUrl = 'https://kosv1afs1n9zpomr.public.blob.vercel-storage.com';
 
   /**
    * ファイルをVercel Blobにアップロード
@@ -36,6 +36,9 @@ export class BlobStorage {
     try {
       const response = await fetch(blobUrl);
       if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error(`File not found: ${blobUrl}`);
+        }
         throw new Error(`Failed to download file: ${response.status}`);
       }
       const arrayBuffer = await response.arrayBuffer();
@@ -179,7 +182,7 @@ export class BlobStorage {
    * 参加者データをBlobから取得
    */
   static async getParticipantData(participantId: string): Promise<any> {
-    const blobUrl = `${this.baseUrl}/participants/${participantId}/consent.json`;
+    const blobUrl = `${this.blobStoreUrl}/participants/${participantId}/consent.json`;
     return await this.downloadJson(blobUrl);
   }
 
@@ -187,7 +190,7 @@ export class BlobStorage {
    * セッションデータをBlobから取得
    */
   static async getSessionData(participantId: string): Promise<any> {
-    const blobUrl = `${this.baseUrl}/participants/${participantId}/session_data.json`;
+    const blobUrl = `${this.blobStoreUrl}/participants/${participantId}/session_data.json`;
     return await this.downloadJson(blobUrl);
   }
 
@@ -195,7 +198,7 @@ export class BlobStorage {
    * 感情分析結果をBlobから取得
    */
   static async getEmotionAnalysis(participantId: string): Promise<any> {
-    const blobUrl = `${this.baseUrl}/participants/${participantId}/emotion_analysis.json`;
+    const blobUrl = `${this.blobStoreUrl}/participants/${participantId}/emotion_analysis.json`;
     return await this.downloadJson(blobUrl);
   }
 
@@ -219,5 +222,13 @@ export class BlobStorage {
       console.error('Error getting all participants from Blob:', error);
       return [];
     }
+  }
+
+  /**
+   * 参加者データが存在するかチェック
+   */
+  static async participantExists(participantId: string): Promise<boolean> {
+    const blobUrl = `${this.blobStoreUrl}/participants/${participantId}/consent.json`;
+    return await this.fileExists(blobUrl);
   }
 }

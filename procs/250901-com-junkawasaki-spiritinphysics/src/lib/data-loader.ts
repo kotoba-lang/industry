@@ -82,6 +82,12 @@ export async function loadConsentDataFromDatabase(): Promise<ConsentData[]> {
 
         for (const participantId of participantIds) {
           try {
+            // Check if participant exists before attempting to download
+            const exists = await blobStorage.participantExists(participantId);
+            if (!exists) {
+              console.warn(`Participant ${participantId} does not exist in Blob storage, skipping`);
+              continue;
+            }
             const participantData = await blobStorage.getParticipantData(participantId);
             consentData.push(participantData);
           } catch (error) {
@@ -401,6 +407,12 @@ export async function loadAllParticipants(): Promise<Participant[]> {
 
           for (const participantId of participantIds) {
             try {
+              // Check if participant exists before attempting to download
+              const exists = await blobStorage.participantExists(participantId);
+              if (!exists) {
+                console.warn(`Participant ${participantId} does not exist in Blob storage, skipping`);
+                continue;
+              }
               const participantData = await blobStorage.getParticipantData(participantId);
 
               // セッションとビデオファイルの情報を追加
