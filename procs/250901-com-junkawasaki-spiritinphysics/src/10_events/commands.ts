@@ -1,0 +1,47 @@
+// LLM-BOUNDARY: 10_events - CMD_*/EV_* 列挙（有限語彙）
+
+// コマンド定義 - 書き込み操作
+export const CMD_INITIALIZE_PARTICIPANT = 'CMD_INITIALIZE_PARTICIPANT' as const;
+export const CMD_START_PREFLIGHT = 'CMD_START_PREFLIGHT' as const;
+export const CMD_START_SESSION = 'CMD_START_SESSION' as const;
+export const CMD_COMPLETE_SESSION = 'CMD_COMPLETE_SESSION' as const;
+export const CMD_ADVANCE_TO_NEXT_WORD = 'CMD_ADVANCE_TO_NEXT_WORD' as const;
+export const CMD_RECORD_WORD_RESPONSE = 'CMD_RECORD_WORD_RESPONSE' as const;
+export const CMD_SAVE_SESSION_DATA = 'CMD_SAVE_SESSION_DATA' as const;
+export const CMD_RESET_TEST = 'CMD_RESET_TEST' as const;
+export const CMD_SET_MEDIA_STATUS = 'CMD_SET_MEDIA_STATUS' as const;
+export const CMD_SET_DEVICE_STATUS = 'CMD_SET_DEVICE_STATUS' as const;
+export const CMD_SET_STREAM = 'CMD_SET_STREAM' as const;
+export const CMD_SET_ERROR = 'CMD_SET_ERROR' as const;
+export const CMD_LOG_EVENT = 'CMD_LOG_EVENT' as const;
+export const CMD_SAVE_SESSION_VIDEO = 'CMD_SAVE_SESSION_VIDEO' as const;
+
+// 感情分析コマンド
+export const CMD_ANALYZE_VIDEO_EMOTIONS = 'CMD_ANALYZE_VIDEO_EMOTIONS' as const;
+export const CMD_LOAD_EMOTION_ANALYSIS = 'CMD_LOAD_EMOTION_ANALYSIS' as const;
+export const CMD_GET_EMOTION_STATISTICS = 'CMD_GET_EMOTION_STATISTICS' as const;
+
+// データ保存コマンド
+export const CMD_SAVE_CONSENT_DATA = 'CMD_SAVE_CONSENT_DATA' as const;
+export const CMD_SAVE_EXPERIMENT_DATA = 'CMD_SAVE_EXPERIMENT_DATA' as const;
+
+export type CommandType =
+  | typeof CMD_INITIALIZE_PARTICIPANT
+  | typeof CMD_START_PREFLIGHT
+  | typeof CMD_START_SESSION
+  | typeof CMD_COMPLETE_SESSION
+  | typeof CMD_ADVANCE_TO_NEXT_WORD
+  | typeof CMD_RECORD_WORD_RESPONSE
+  | typeof CMD_SAVE_SESSION_DATA
+  | typeof CMD_RESET_TEST
+  | typeof CMD_SET_MEDIA_STATUS
+  | typeof CMD_SET_DEVICE_STATUS
+  | typeof CMD_SET_STREAM
+  | typeof CMD_SET_ERROR
+  | typeof CMD_LOG_EVENT
+  | typeof CMD_SAVE_SESSION_VIDEO
+  | typeof CMD_ANALYZE_VIDEO_EMOTIONS
+  | typeof CMD_LOAD_EMOTION_ANALYSIS
+  | typeof CMD_GET_EMOTION_STATISTICS
+  | typeof CMD_SAVE_CONSENT_DATA
+  | typeof CMD_SAVE_EXPERIMENT_DATA;

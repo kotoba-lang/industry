@@ -1,0 +1,96 @@
+{
+  "extends": ["next/core-web-vitals"],
+  "rules": {
+    "import/no-restricted-paths": [
+      "error",
+      {
+        "zones": [
+          {
+            "target": "src/00_schema/**",
+            "from": [
+              "src/10_events/**",
+              "src/20_ports/**",
+              "src/30_fold/**",
+              "src/40_domain/**",
+              "src/50_adapters/**",
+              "src/60_projection/**",
+              "src/70_supervisors/**",
+              "src/80_app/**"
+            ],
+            "message": "00_schema層は他の層からimportできません。上位層からのみimport可能です。"
+          },
+          {
+            "target": "src/10_events/**",
+            "from": [
+              "src/20_ports/**",
+              "src/30_fold/**",
+              "src/40_domain/**",
+              "src/50_adapters/**",
+              "src/60_projection/**",
+              "src/70_supervisors/**",
+              "src/80_app/**"
+            ],
+            "message": "10_events層は20_ports以下の層からimportできません。上位層からのみimport可能です。"
+          },
+          {
+            "target": "src/20_ports/**",
+            "from": [
+              "src/30_fold/**",
+              "src/40_domain/**",
+              "src/50_adapters/**",
+              "src/60_projection/**",
+              "src/70_supervisors/**",
+              "src/80_app/**"
+            ],
+            "message": "20_ports層は30_fold以下の層からimportできません。上位層からのみimport可能です。"
+          },
+          {
+            "target": "src/30_fold/**",
+            "from": [
+              "src/40_domain/**",
+              "src/50_adapters/**",
+              "src/60_projection/**",
+              "src/70_supervisors/**",
+              "src/80_app/**"
+            ],
+            "message": "30_fold層は40_domain以下の層からimportできません。上位層からのみimport可能です。"
+          },
+          {
+            "target": "src/40_domain/**",
+            "from": [
+              "src/50_adapters/**",
+              "src/60_projection/**",
+              "src/70_supervisors/**",
+              "src/80_app/**"
+            ],
+            "message": "40_domain層は50_adapters以下の層からimportできません。上位層からのみimport可能です。"
+          },
+          {
+            "target": "src/50_adapters/**",
+            "from": [
+              "src/60_projection/**",
+              "src/70_supervisors/**",
+              "src/80_app/**"
+            ],
+            "message": "50_adapters層は60_projection以下の層からimportできません。上位層からのみimport可能です。"
+          },
+          {
+            "target": "src/60_projection/**",
+            "from": [
+              "src/70_supervisors/**",
+              "src/80_app/**"
+            ],
+            "message": "60_projection層は70_supervisors以下の層からimportできません。上位層からのみimport可能です。"
+          },
+          {
+            "target": "src/70_supervisors/**",
+            "from": [
+              "src/80_app/**"
+            ],
+            "message": "70_supervisors層は80_app層からimportできません。上位層からのみimport可能です。"
+          }
+        ]
+      }
+    ]
+  }
+}

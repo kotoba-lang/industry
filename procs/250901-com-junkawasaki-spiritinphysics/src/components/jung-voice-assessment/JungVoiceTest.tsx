@@ -215,20 +215,30 @@ const SessionScreen = React.memo<{
                 };
                 speechSynthesis.speak(utterance);
             }
-
-            return () => {
-              // TODO: 認識結果を保存する
-                speechSynthesis.cancel();
-                if (audio) audio.pause();
-                if (recognitionStartTimer) clearTimeout(recognitionStartTimer);
-                if (recognitionRef.current && isListening) recognitionRef.current.stop();
-                if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") mediaRecorderRef.current.stop();
-                if (animationFrameId) cancelAnimationFrame(animationFrameId);
-                if (audioContext && audioContext.state === 'running') audioContext.close();
-                if (advanceOnSpeechTimerRef.current) clearTimeout(advanceOnSpeechTimerRef.current);
-            };
         }
-    }, [currentWordIndex, stimulusWords, onResponse, stream, isListening, logEvent]);
+
+        return () => {
+            // Cleanup function - capture current values at cleanup time
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+            const currentMediaRecorder = mediaRecorderRef.current;
+            const currentAnimationFrameId = animationFrameId;
+            const currentAudioContext = audioContext;
+            const currentAdvanceTimer = advanceOnSpeechTimerRef.current;
+            const currentRecognition = recognitionRef.current;
+            const currentIsListening = isListening;
+            const currentAudio = audio;
+            const currentRecognitionStartTimer = recognitionStartTimer;
+
+            speechSynthesis.cancel();
+            if (currentAudio) currentAudio.pause();
+            if (currentRecognitionStartTimer) clearTimeout(currentRecognitionStartTimer);
+            if (currentRecognition && currentIsListening) currentRecognition.stop();
+            if (currentMediaRecorder && currentMediaRecorder.state === "recording") currentMediaRecorder.stop();
+            if (currentAnimationFrameId) cancelAnimationFrame(currentAnimationFrameId);
+            if (currentAudioContext && currentAudioContext.state === 'running') currentAudioContext.close();
+            if (currentAdvanceTimer) clearTimeout(currentAdvanceTimer);
+        };
+    }, [currentWordIndex, stimulusWords, onResponse, stream, isListening, logEvent, currentSession]);
   
   if (currentWordIndex >= stimulusWords.length) {
     return <div>次の単語を読み込み中...</div>;
@@ -419,7 +429,7 @@ export default function JungVoiceTest({
         if (responseTimerRef.current) clearTimeout(responseTimerRef.current);
       }
     }
-  }, [currentWordIndex, testStatus, stimulusWords, advanceToNextWord, logEvent, setMediaStatus, completeSession]);
+  }, [currentWordIndex, testStatus, stimulusWords, advanceToNextWord, logEvent, setMediaStatus, completeSession, currentSession]);
   
   // Stop recording when a session or the test completes
   useEffect(() => {

@@ -1,0 +1,47 @@
+// LLM-BOUNDARY: 10_events - CMD_*/EV_* 列挙（有限語彙）
+
+// イベント定義 - 状態変更の通知
+export const EV_PARTICIPANT_INITIALIZED = 'EV_PARTICIPANT_INITIALIZED' as const;
+export const EV_PREFLIGHT_STARTED = 'EV_PREFLIGHT_STARTED' as const;
+export const EV_SESSION_STARTED = 'EV_SESSION_STARTED' as const;
+export const EV_SESSION_COMPLETED = 'EV_SESSION_COMPLETED' as const;
+export const EV_WORD_RESPONSE_RECORDED = 'EV_WORD_RESPONSE_RECORDED' as const;
+export const EV_SESSION_DATA_SAVED = 'EV_SESSION_DATA_SAVED' as const;
+export const EV_TEST_RESET = 'EV_TEST_RESET' as const;
+export const EV_SESSION_VIDEO_SAVED = 'EV_SESSION_VIDEO_SAVED' as const;
+export const EV_TEST_COMPLETED = 'EV_TEST_COMPLETED' as const;
+export const EV_DEVICE_STATUS_CHANGED = 'EV_DEVICE_STATUS_CHANGED' as const;
+export const EV_MEDIA_STATUS_CHANGED = 'EV_MEDIA_STATUS_CHANGED' as const;
+export const EV_STREAM_SET = 'EV_STREAM_SET' as const;
+export const EV_ERROR_OCCURRED = 'EV_ERROR_OCCURRED' as const;
+export const EV_EVENT_LOGGED = 'EV_EVENT_LOGGED' as const;
+
+// 感情分析イベント
+export const EV_VIDEO_EMOTION_ANALYZED = 'EV_VIDEO_EMOTION_ANALYZED' as const;
+export const EV_EMOTION_ANALYSIS_LOADED = 'EV_EMOTION_ANALYSIS_LOADED' as const;
+export const EV_EMOTION_STATISTICS_COMPUTED = 'EV_EMOTION_STATISTICS_COMPUTED' as const;
+
+// データ保存イベント
+export const EV_CONSENT_DATA_SAVED = 'EV_CONSENT_DATA_SAVED' as const;
+export const EV_EXPERIMENT_DATA_SAVED = 'EV_EXPERIMENT_DATA_SAVED' as const;
+
+export type EventType =
+  | typeof EV_PARTICIPANT_INITIALIZED
+  | typeof EV_PREFLIGHT_STARTED
+  | typeof EV_SESSION_STARTED
+  | typeof EV_SESSION_COMPLETED
+  | typeof EV_WORD_RESPONSE_RECORDED
+  | typeof EV_SESSION_DATA_SAVED
+  | typeof EV_TEST_RESET
+  | typeof EV_SESSION_VIDEO_SAVED
+  | typeof EV_TEST_COMPLETED
+  | typeof EV_DEVICE_STATUS_CHANGED
+  | typeof EV_MEDIA_STATUS_CHANGED
+  | typeof EV_STREAM_SET
+  | typeof EV_ERROR_OCCURRED
+  | typeof EV_EVENT_LOGGED
+  | typeof EV_VIDEO_EMOTION_ANALYZED
+  | typeof EV_EMOTION_ANALYSIS_LOADED
+  | typeof EV_EMOTION_STATISTICS_COMPUTED
+  | typeof EV_CONSENT_DATA_SAVED
+  | typeof EV_EXPERIMENT_DATA_SAVED;
