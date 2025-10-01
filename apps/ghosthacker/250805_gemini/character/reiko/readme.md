@@ -1,3 +1,0 @@
-Reiko,
-
-Akito,Renの母
