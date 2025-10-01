@@ -1,1 +1,0 @@
-# Video Emotion Analysis Package
