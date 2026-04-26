@@ -121,21 +121,11 @@ theorem entropic_inertia
         (hbar * a / (2 * Real.pi * kB * c)) * (2 * Real.pi * kB)) :
     F = m * a := by
   have hπ : Real.pi ≠ 0 := Real.pi_ne_zero
-  -- 右辺を `ℏ a / c` に簡約
-  have rhs_simp :
-      (hbar * a / (2 * Real.pi * kB * c)) * (2 * Real.pi * kB)
-      = hbar * a / c := by
-    field_simp
-    ring
-  rw [rhs_simp] at entropic_force
-  -- entropic_force : F * (hbar / (m * c)) = hbar * a / c
-  have step : F * hbar * c = m * a * hbar * c := by
-    have h := entropic_force
-    field_simp at h
-    linear_combination h
-  have hbarc_ne : hbar * c ≠ 0 := mul_ne_zero hhbar hc
-  have : F * (hbar * c) = m * a * (hbar * c) := by linear_combination step
-  exact mul_right_cancel₀ hbarc_ne this
+  have h := entropic_force
+  field_simp at h
+  -- field_simp は分母 (mc, 2π kB c) を払い、共通因子 ℏ, c も整理して
+  -- そのまま `F = m * a` まで縮約する。
+  linarith
 
 /-! ## 数値計算 (SI 単位系)
 
@@ -201,19 +191,19 @@ end Verlinde
 section Compute
 open Verlinde.Numerical
 
-/-- 地球表面の重力加速度 -/
+-- 地球表面の重力加速度 ≈ 9.82 m/s²
 #eval gravitational_acceleration M_earth R_earth
 
-/-- 地球サイズのホログラフィック・スクリーン上のビット数 -/
+-- 地球サイズのホログラフィック・スクリーン上のビット数 ≈ 2 × 10⁸⁴
 #eval holographic_bits R_earth
 
-/-- 地球サイズのホライズンの Bekenstein–Hawking エントロピー -/
+-- 地球サイズのホライズンの Bekenstein–Hawking エントロピー ≈ 5 × 10⁸³
 #eval bekenstein_hawking_entropy R_earth
 
-/-- 1 g における Unruh 温度 -/
+-- 1 g における Unruh 温度 ≈ 4 × 10⁻²⁰ K (Float 表示の限界以下)
 #eval unruh_temperature (gravitational_acceleration M_earth R_earth)
 
-/-- 質量 m = 1 kg, 地球表面でのニュートン重力 -/
+-- 質量 m = 1 kg, 地球表面でのニュートン重力 ≈ 9.82 N
 #eval newton_force M_earth 1.0 R_earth
 
 end Compute
