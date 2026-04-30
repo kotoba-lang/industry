@@ -12,4 +12,4 @@ require mathlib from git
 
 @[default_target]
 lean_lib «Verlinde» where
-  roots := #[`Verlinde]
+  roots := #[`Verlinde, `BlackHoleComputer, `GenerativeStructure]
