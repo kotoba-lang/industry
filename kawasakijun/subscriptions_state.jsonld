@@ -331,33 +331,45 @@
       "@id": "kj:cancel/picoma",
       "service": "ピッコマ",
       "decided_at": "2026-05-18",
-      "method": "Apple App 削除 + In-App Purchase 許可しない設定",
+      "method": "Apple App 削除 + In-App Purchase 許可しない設定 (iOS 設定アプリ内のみ完結)",
       "executed_by": "河崎純真",
-      "status": "decided (manual execution on iPhone)"
+      "status": "decided",
+      "note": "iOS App Store の In-App Purchase はメール解約不可。手動実行のみ.",
+      "next_step": "iPhone → 設定 → スクリーンタイム → コンテンツとプライバシーの制限 → App 内課金 → 許可しない"
     },
     {
       "@id": "kj:cancel/nord",
       "service": "Nord (NordVPN/NordPass/NordLocker)",
       "decided_at": "2026-05-18",
-      "method": "my.nordaccount.com → Cancel subscription (期限: 2026-05-27)",
-      "executed_by": "河崎純真",
-      "status": "decided (manual execution required, deadline 9 days)"
+      "method": "Email request to support@nordaccount.com + my.nordaccount.com dashboard",
+      "executed_by": "河崎純真 (orchestrator: kawasakijun)",
+      "status": "request_drafted",
+      "gmail_draft_id": "r7407729314367781831",
+      "to": "support@nordaccount.com",
+      "deadline": "2026-05-27",
+      "next_step": "Gmail Drafts を開き → 内容確認 → 送信"
     },
     {
       "@id": "kj:cancel/hafh",
       "service": "HafH",
       "decided_at": "2026-05-18",
-      "method": "HafH アプリ → プラン解約",
-      "executed_by": "河崎純真",
-      "status": "decided (manual execution on app)"
+      "method": "Email request to support@hafh.com / help@hafh.com + アプリ解約",
+      "executed_by": "河崎純真 (orchestrator: kawasakijun)",
+      "status": "request_drafted",
+      "gmail_draft_id": "r-2967624901687006478",
+      "to": "support@hafh.com (cc: help@hafh.com)",
+      "next_step": "Gmail Drafts を開き → 送信。並行でアプリでも解約処理"
     },
     {
       "@id": "kj:cancel/clerk",
       "service": "Clerk (auth)",
       "decided_at": "2026-05-18",
-      "method": "dashboard.clerk.com → Cancel plan; 代替: did:web:*",
-      "executed_by": "河崎純真",
-      "status": "decided (manual execution on dashboard)"
+      "method": "Email request to support@clerk.com / team@clerk.com + dashboard.clerk.com",
+      "executed_by": "河崎純真 (orchestrator: kawasakijun)",
+      "status": "request_drafted",
+      "gmail_draft_id": "r6918646141765559849",
+      "to": "support@clerk.com (cc: team@clerk.com)",
+      "next_step": "Gmail Drafts → 送信。並行で dashboard でアプリ削除/プラン変更"
     }
   ]
 }
