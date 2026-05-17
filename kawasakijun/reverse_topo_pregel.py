@@ -98,8 +98,9 @@ GOALS: dict[str, Goal] = {
         "year", "infra", 1.5, 0.30,
     ),
     "09_ghosthacker_scenarios": Goal(
-        "09_ghosthacker_scenarios", "Ghost Hacker 残巻シナリオ (3–8 巻)",
-        "year", "fiction", 2.0, 0.15,
+        "09_ghosthacker_scenarios",
+        "Ghost Hacker 残 6 巻完結 (Vol.2-5 既存スクリプト消化 + Vol.6-8 新規) — Phase 4.A",
+        "year", "fiction", 1.0, 0.20,
     ),
     "10_jk_holding_revenue": Goal(
         "10_jk_holding_revenue",
@@ -123,9 +124,9 @@ GOALS: dict[str, Goal] = {
     ),
     "14_loan_acceleration": Goal(
         "14_loan_acceleration",
-        "借入の法人債務化 + 個人保証解除 + JK→COMMONS 1.34億 回収 "
-        "(個人請求は反訴・起訴で消滅、法人継続返済へ)",
-        "year", "social", 2.0, 0.40,
+        "借入の法人債務化 + 個人保証解除 + JK→河崎 1.34億 回収 "
+        "(Phase 4.D の living system で自動化、4-5年で完済)",
+        "year", "social", 1.0, 0.40,
     ),
     "15_remarriage": Goal(
         "15_remarriage",
@@ -153,8 +154,9 @@ GOALS: dict[str, Goal] = {
         "month", "infra", 0.25, 0.35,
     ),
     "19_ghosthacker_film": Goal(
-        "19_ghosthacker_film", "Ghost Hacker 映像化",
-        "decade", "fiction", 5.0, 0.25,
+        "19_ghosthacker_film",
+        "Ghost Hacker 映像化 (シナリオ完成済 + animeka pipeline 連結で短縮)",
+        "year", "fiction", 3.0, 0.25,
         external_dependency="制作会社",
     ),
     "20_zen_oss": Goal(
