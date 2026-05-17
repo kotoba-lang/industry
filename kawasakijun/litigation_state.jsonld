@@ -70,11 +70,40 @@
 
     {
       "@id": "kj:lit/rokes-hec",
-      "name": "Rokes Exchange / HEC ハッキング被害",
-      "role_of_kawasaki": "被害者",
-      "perpetrator": "未特定 (Exchange へのハッキング)",
-      "facts": "HEC トークン (ERC-20 → BEP-2 移行) のハッキング被害。MetaX Pro 移行で 7名分のバランス対応 (CTO 仙立博己、本野航平 と協働)",
-      "status": "被害対応完了 / 法的措置の余地検討要"
+      "name": "Rokes Exchange / HEC ハッキング被害 → ハッカー追跡 + 同種被害者向けビジネス化",
+      "role_of_kawasaki": "被害者 → 自己実証主体 → 追跡サービス事業者",
+      "perpetrator": "未特定 (Exchange へのハッキング, 追跡中)",
+      "facts": "HEC (ERC-20 → BEP-2 移行) のハッキング。MetaX Pro 移行で 7名分対応 (CTO 仙立博己、本野航平 と協働)",
+      "status": "追跡フェーズ (Phase 2.5) — 河崎 CEH + サイバー経験 + lawfirm.gftd.ai (9-actor) で実証",
+      "next_strategy": {
+        "step1": "On-chain forensics: HEC → ETH → 他 chain への送金経路の特定",
+        "step2": "Exchange 協力要請 (KYC 紐付け、出口口座の凍結)",
+        "step3": "国際捜査協力 (FBI / Interpol / 警察庁サイバー犯罪)",
+        "step4": "民事保全 + 損害賠償請求",
+        "productize": "lawfirm.gftd.ai 内に `crypto-victim` actor を新設、SaaS + 成功報酬モデルで同種被害者向け展開"
+      }
+    },
+
+    {
+      "@id": "kj:lit/personal-debt-counter-claim",
+      "name": "個人請求への反訴・起訴戦略 (Phase 2.5)",
+      "role_of_kawasaki": "原告 (反訴側)",
+      "facts": "借入金・支払い系の個人請求は不適切 (本来 Gftd Japan / JK の法人債務)。Family Office 化 (ADR-2605111000) と連動して個人保証解除を主張。",
+      "status": "戦略策定中",
+      "counsel": ["ZeLo", "AMT 河合"],
+      "principle": "個人請求は不適切認識 → 全件反訴 + 場合により起訴",
+      "expected_impact": "借入返済の est_years を 7y → 2y へ圧縮 (法人債務として粛々返済)"
+    },
+
+    {
+      "@id": "kj:lit/crypto-victim-lawfirm-product",
+      "name": "Crypto 被害者向け追跡・回収 lawfirm product (新規事業)",
+      "role_of_kawasaki": "事業者 / lead architect",
+      "platform": "lawfirm.gftd.ai (既存 9-actor 法務クラスタに新 actor 追加)",
+      "model": "自己実証 (Rokes 自己ケース) → 同種被害者の SaaS + 成功報酬",
+      "tech_stack": "On-chain forensics (Chainalysis 競合) + W Protocol + 9-actor (judge/bengoshi/adr/legal-aid 連携)",
+      "target_market": "NEM 流出 / Mt.Gox / Liquid / Coincheck 被害者ら",
+      "expected_revenue": "成功報酬 5–20% × 被害総額 + 月額 SaaS"
     },
 
     {
@@ -94,9 +123,10 @@
   ],
 
   "kj:litigation_strategy_themes": [
-    "COMMONS 経理データ (MoneyForward 仕訳 + 220415 経費確認) の完全な開示と整合性検証",
+    "経理データ (MoneyForward 仕訳 + 220415 経費確認) の完全な開示と整合性検証",
     "アイシステム社送金履歴を共通証拠として複数係争に流用",
-    "Gftd Japan / COMMONS / JK株式会社 のレイヤー分離を法的・経理的に明確化",
-    "AMT + ZeLo + TOTAL (税理) の3者連携を継続"
+    "Gftd Japan (vendor) / JK株式会社 (private holding) のレイヤー分離を法的・経理的に明確化",
+    "AMT + ZeLo + TOTAL (税理) の3者連携を継続",
+    "**Phase 2.5 戦略転換**: 個人請求 = 不適切認識で全件反訴・起訴。被害者ポジションから反転、Rokes 自己実証ケースを crypto 被害者向け lawfirm product に転化"
   ]
 }

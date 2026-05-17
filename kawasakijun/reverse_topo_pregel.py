@@ -122,8 +122,10 @@ GOALS: dict[str, Goal] = {
         fallback="既存ネットワーク内の再評価",
     ),
     "14_loan_acceleration": Goal(
-        "14_loan_acceleration", "借入返済加速 + COMMONS 貸付段階的回収",
-        "decade", "social", 7.0, 0.40,
+        "14_loan_acceleration",
+        "借入の法人債務化 + 個人保証解除 + JK→COMMONS 1.34億 回収 "
+        "(個人請求は反訴・起訴で消滅、法人継続返済へ)",
+        "year", "social", 2.0, 0.40,
     ),
     "15_remarriage": Goal(
         "15_remarriage",
@@ -206,6 +208,32 @@ GOALS: dict[str, Goal] = {
         "Etzhayyim Magatama actor framework + Pregel SDK 公開 (20-actors/magatama/)",
         "year", "spirit", 1.0, 0.20,
     ),
+
+    # === Phase 2.5 追加: 被害者ポジションからの反転 ===
+    # 河崎氏の認識: 個人請求は不適切 → 反訴・起訴で消滅
+    "26_counter_litigation": Goal(
+        "26_counter_litigation",
+        "債権者・関係者への反訴・起訴戦略 (個人請求の不適切性主張、"
+        "Gftd Japan/JK の法人債務として整理) — ZeLo + AMT 主導",
+        "year", "social", 1.0, 0.35,
+    ),
+
+    # Rokes ハッカー追跡 → 自己実証 → 同種被害者向けビジネス化
+    "27_rokes_attacker_pursuit": Goal(
+        "27_rokes_attacker_pursuit",
+        "Rokes Exchange / HEC ハッカー追跡 (技術: on-chain forensics + "
+        "法的: 国際捜査協力 + 民事保全) — 河崎の CEH + サイバー経験を活用",
+        "year", "infra", 1.0, 0.25,
+    ),
+
+    # Crypto 被害者向け追跡 + 訴訟代行 + 回収 のビジネス化
+    # Gftd lawfirm.gftd.ai の新規 product line として実装
+    "28_crypto_victim_lawfirm": Goal(
+        "28_crypto_victim_lawfirm",
+        "Crypto 被害者向け追跡・回収 lawfirm product 立ち上げ "
+        "(lawfirm.gftd.ai の新 actor; 自己実証 → SaaS+成功報酬モデル)",
+        "year", "infra", 1.5, 0.40,
+    ),
 }
 
 
@@ -247,6 +275,18 @@ EDGES: list[tuple[str, str]] = [
     ("07_arxiv_submit", "20_zen_oss"),
     ("22_etzhayyim_ops", "20_zen_oss"),
     ("22_etzhayyim_ops", "25_magatama_sdk"),
+
+    # Phase 2.5: 被害者反転モデル
+    # 経理整合性証明 → 反訴 (LingLing 関連の準備が共通基盤)
+    ("04_accounting_proof", "26_counter_litigation"),
+    # 反訴で個人請求消滅 → 借入返済問題の前提が変わる
+    ("26_counter_litigation", "14_loan_acceleration"),
+    # Rokes ハッカー追跡 → 自己実証完了 → crypto 被害者 lawfirm product 立ち上げ
+    ("27_rokes_attacker_pursuit", "28_crypto_victim_lawfirm"),
+    # 法務クラスタに crypto-victim actor を追加する形で接続
+    ("21_gftd_lawfirm_vertical", "28_crypto_victim_lawfirm"),
+    # crypto-victim 事業が Gftd 売上に貢献
+    ("28_crypto_victim_lawfirm", "08_gftd_breakeven"),
 ]
 
 
