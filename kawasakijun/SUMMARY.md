@@ -179,30 +179,37 @@ Claude Code のチャット欄で:
 | `phase2_bottleneck_aishi.md` | #1 ボトルネック (アイシステム送金履歴) 攻略 | (手動実行) |
 | `phase2_kpi_sensors.py` | Gmail/Calendar/git からの自動 KPI 取得 | `python phase2_kpi_sensors.py --out kpi_report.md` |
 
-### Phase 2 で見えた数値
+### Phase 2 で見えた数値 (Phase 2.1 で更新)
 
-- **理論最短**: 19.25 年 (現 DAG / 現 est_years のまま)
-- **加速シナリオ S1** (LingLing 早期和解 + 借入加速 + 再婚を経済から切離): **15.65 年**
-- **クリティカル経路 8 ノード** はすべて social/relations 系
-- 物理 / fiction / infra / spirit は 12–13 年スラックあり (焦らず並行)
+| Phase | 理論最短 | クリティカル経路 |
+|---|---:|---|
+| 2.0 (初期 DAG) | 19.25 年 | 8 ノード (全て social/relations) |
+| **2.1 (過剰ブロッカー除去 + 売上ノード追加)** | **17.50 年** | **4 ノード (売上経由)** |
+| シナリオ S1 (売上 4 軸加速) | 13.40 年 | |
+| シナリオ S2 (+並走) | 12.90 年 | |
+| **シナリオ S3 (Aggressive + IPO 並走)** | **10.00 年** | 河崎氏 44 歳全達成 |
 
-### 直近 12 ヶ月のクリティカル
+**Phase 2.1 のキー発見**: 再婚 (ES=2y, EF=5y) と 子供 (EF=10y) は CP から外れた。
+ブロッカーは経済ではなく、出会いの場形成 (`13_meeting_partners`) のみ。
+
+### 直近 12 ヶ月のクリティカル (売上加速版)
 
 ```
-2026-06: アイシステム送金履歴 取得依頼 (TOTAL 水鳥)  ← Day 1-3 で即着手
-2026-07: 2021年 預かり資金 全件突合
-2026-08: 経理整合性証明書 ドラフト
-2026-09: LingLing 準備書面 (証明書を引用)
-2026-10: LingLing 期日対応 (第1期)
-2026-12: 中間総括 → 戦略再評価
-2027-Q1: 結審期 → 弁護団リソース解放
+2026-06: JK Wellness 改称登記 + Gftd 営業 3 件提案 + Etzhayyim 法人設立検討
+         + Cyber Treaty 経産省窓口 + アイシステム送金依頼
+2026-07: JK Wellness 単価上げ + Gftd 受注 + Etzhayyim 設立準備 + 海外出張
+2026-08: 売上 4 軸の月次 KPI 初回計測 + LingLing 経理整合性証明
+2026-09-12: 売上加速の慣性化 + LingLing 期日対応 + のどか受験本番
+2027-Q1: LingLing 結審期 + Gftd 月次黒字達成
+2027-Q2-Q4: 借入返済加速着手 + 再婚に向けた出会い設計
 ```
 
-### 次のアクション
+### 次のアクション (Phase 2.1)
 
-- `python kawasakijun/reverse_topo_pregel.py --budget-years 10` で 10 年経路を生成
-- `python kawasakijun/phase2_critical_path.py` で CPM を可視化
-- `python kawasakijun/phase2_acceleration.py` で「どこを切れば何年縮むか」を確認
-- `phase2_bottleneck_aishi.md` のメールテンプレートで **TOTAL 水鳥に正式依頼を送信** (今週)
+- `python kawasakijun/reverse_topo_pregel.py --budget-years 12` で 12 年経路 (19/24 達成)
+- `python kawasakijun/phase2_critical_path.py` で新 CP (売上経由) を可視化
+- `python kawasakijun/phase2_acceleration.py` で S1/S2/S3 シナリオを確認
+- **売上 4 軸を 6 月から並走着手** (Gftd 営業 + Etzhayyim + JK Wellness + Cyber Treaty)
+- `phase2_bottleneck_aishi.md` のメールで TOTAL 水鳥に正式依頼 (並走)
 - `python kawasakijun/phase2_kpi_sensors.py` を日次 cron に
 - Paidy 自動引き落とし設定 (秘書 山田 へ移管)

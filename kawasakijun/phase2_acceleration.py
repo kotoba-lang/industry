@@ -62,16 +62,16 @@ def report() -> str:
 
     lines.append("## A. エッジ削除 (依存を切る)\n")
     interesting_edges = [
-        ("14_loan_acceleration", "15_remarriage",
-         "再婚を借入完済の待ち期間から外す (パートナー要件を経済より関係性主導に)"),
+        ("23_jk_wellness_lab", "10_commons_revenue",
+         "宿泊業を JK Wellness ピボット完了を待たずに並走"),
         ("15_remarriage", "16_more_children",
-         "子供を再婚と切り離す (養子 / 共同養育 / シングルファーザー継続)"),
-        ("11_health_steady", "16_more_children",
-         "子供を健康改善と切り離す"),
-        ("06_lingling_brief", "10_commons_revenue",
-         "COMMONS 宿泊業を LingLing 結着前に並走"),
+         "子供を再婚と切り離す (養子 / 共同養育)"),
         ("17_internal_control", "18_ipo_or_foundation",
-         "IPO を内部統制と並走 (リスク高、要監査法人協議)"),
+         "IPO を内部統制と並走"),
+        ("10_commons_revenue", "14_loan_acceleration",
+         "借入返済の原資を COMMONS 以外に移す (Gftd 単独で返済)"),
+        ("14_loan_acceleration", "18_ipo_or_foundation",
+         "IPO を借入完済前に実施 (一部負債を抱えたまま上場)"),
     ]
     lines.append("| 切るエッジ | 効果 | 短縮 (年) | 新 CP 長 |")
     lines.append("|---|---|---:|---:|")
@@ -87,11 +87,13 @@ def report() -> str:
 
     lines.append("\n## B. ノード短縮 (実行を圧縮)\n")
     shrinks = [
-        ("14_loan_acceleration", 0.5, "借入返済を 7y→3.5y (Gftd 売上倍増 + COMMONS 早期回収)"),
-        ("06_lingling_brief", 0.5, "LingLing を 1y→0.5y (和解戦略 + 簡易裁判)"),
-        ("10_commons_revenue", 0.5, "COMMONS 宿泊業を 2y→1y (集中投資)"),
-        ("15_remarriage", 0.5, "再婚を 3y→1.5y (国際的に積極的なマッチング)"),
-        ("18_ipo_or_foundation", 0.5, "IPO を 7y→3.5y (PE/VC 巻き込み)"),
+        ("14_loan_acceleration", 0.5, "借入返済 7y→3.5y (Gftd+etzhayyim+cyber treaty による売上加速)"),
+        ("21_gftd_sales_pipeline", 0.6, "Gftd 営業 1.5y→0.9y (厚労省+Apple+鹿大+理研の同時攻略)"),
+        ("22_etzhayyim", 0.5, "Etzhayyim 2y→1y (オランダ拠点 + 01 Zen 既存資産活用)"),
+        ("23_jk_wellness_lab", 0.6, "JK Wellness 1.5y→0.9y (顧客 96→200/月)"),
+        ("10_commons_revenue", 0.5, "宿泊業を 2y→1y (集中投資)"),
+        ("24_cyber_treaty", 0.6, "サイバー条約 3y→1.8y (経産省 SSS 既登録の追い風)"),
+        ("18_ipo_or_foundation", 0.5, "IPO 7y→3.5y (PE/VC 巻き込み)"),
     ]
     lines.append("| 縮めるノード | 戦略 | 元 → 新 (年) | 短縮 (年) | 新 CP 長 |")
     lines.append("|---|---|---|---:|---:|")
@@ -106,36 +108,78 @@ def report() -> str:
         )
 
     lines.append("\n## C. 推奨組合せ (現実的な圧縮シナリオ)\n")
-    lines.append("**シナリオ S1**: LingLing 早期和解 + 借入返済加速 + 再婚を経済から切り離す")
 
+    lines.append("**シナリオ S1 (売上加速)**: "
+                 "Gftd 営業 + Etzhayyim + JK Wellness + Cyber Treaty で売上 2 倍速 "
+                 "→ 借入返済 7y→3.5y")
     dag = build_dag()
-    GOALS["06_lingling_brief"].est_years *= 0.5
-    GOALS["14_loan_acceleration"].est_years *= 0.7
-    dag.remove_edge("14_loan_acceleration", "15_remarriage")
+    for nid in ["21_gftd_sales_pipeline", "22_etzhayyim",
+                "23_jk_wellness_lab", "24_cyber_treaty"]:
+        GOALS[nid].est_years *= 0.6
+    GOALS["14_loan_acceleration"].est_years *= 0.5
     schedule = cpm_forward(dag)
     s1_dur = max(s["EF"] for s in schedule.values())
-    GOALS["06_lingling_brief"].est_years *= 2.0
-    GOALS["14_loan_acceleration"].est_years /= 0.7
+    for nid in ["21_gftd_sales_pipeline", "22_etzhayyim",
+                "23_jk_wellness_lab", "24_cyber_treaty"]:
+        GOALS[nid].est_years /= 0.6
+    GOALS["14_loan_acceleration"].est_years /= 0.5
     lines.append(f"  → **{s1_dur:.2f} 年** ({baseline - s1_dur:+.2f} 短縮)\n")
 
-    lines.append("**シナリオ S2 (積極)**: + 子供を再婚から切り離し養子経路を併走")
+    lines.append("**シナリオ S2 (S1 + 並走)**: "
+                 "+ COMMONS 宿泊業を JK Wellness と並走 (10 → 14 エッジを弱める)")
     dag = build_dag()
-    GOALS["06_lingling_brief"].est_years *= 0.5
-    GOALS["14_loan_acceleration"].est_years *= 0.7
-    dag.remove_edge("14_loan_acceleration", "15_remarriage")
-    dag.remove_edge("15_remarriage", "16_more_children")
+    for nid in ["21_gftd_sales_pipeline", "22_etzhayyim",
+                "23_jk_wellness_lab", "24_cyber_treaty"]:
+        GOALS[nid].est_years *= 0.6
+    GOALS["14_loan_acceleration"].est_years *= 0.5
+    if ("23_jk_wellness_lab", "10_commons_revenue") in dag.edges():
+        dag.remove_edge("23_jk_wellness_lab", "10_commons_revenue")
     schedule = cpm_forward(dag)
     s2_dur = max(s["EF"] for s in schedule.values())
-    GOALS["06_lingling_brief"].est_years *= 2.0
-    GOALS["14_loan_acceleration"].est_years /= 0.7
+    for nid in ["21_gftd_sales_pipeline", "22_etzhayyim",
+                "23_jk_wellness_lab", "24_cyber_treaty"]:
+        GOALS[nid].est_years /= 0.6
+    GOALS["14_loan_acceleration"].est_years /= 0.5
     lines.append(f"  → **{s2_dur:.2f} 年** ({baseline - s2_dur:+.2f} 短縮)\n")
 
-    lines.append("\n## D. 結論\n")
+    lines.append("**シナリオ S3 (Aggressive: + IPO 並走)**: "
+                 "+ IPO を借入完済前に実施 (一部負債抱えたまま)")
+    dag = build_dag()
+    for nid in ["21_gftd_sales_pipeline", "22_etzhayyim",
+                "23_jk_wellness_lab", "24_cyber_treaty"]:
+        GOALS[nid].est_years *= 0.6
+    GOALS["14_loan_acceleration"].est_years *= 0.5
+    GOALS["18_ipo_or_foundation"].est_years *= 0.5
+    if ("23_jk_wellness_lab", "10_commons_revenue") in dag.edges():
+        dag.remove_edge("23_jk_wellness_lab", "10_commons_revenue")
+    if ("14_loan_acceleration", "18_ipo_or_foundation") in dag.edges():
+        dag.remove_edge("14_loan_acceleration", "18_ipo_or_foundation")
+    schedule = cpm_forward(dag)
+    s3_dur = max(s["EF"] for s in schedule.values())
+    for nid in ["21_gftd_sales_pipeline", "22_etzhayyim",
+                "23_jk_wellness_lab", "24_cyber_treaty"]:
+        GOALS[nid].est_years /= 0.6
+    GOALS["14_loan_acceleration"].est_years /= 0.5
+    GOALS["18_ipo_or_foundation"].est_years /= 0.5
+    lines.append(f"  → **{s3_dur:.2f} 年** ({baseline - s3_dur:+.2f} 短縮)\n")
+
+    lines.append("\n## D. 再婚 / 子供 の到達タイミング (新 DAG)\n")
+    dag = build_dag()
+    schedule = cpm_forward(dag)
+    for nid in ["15_remarriage", "16_more_children"]:
+        s = schedule[nid]
+        g = GOALS[nid]
+        lines.append(
+            f"- **{g.title}**: ES={s['EF'] - g.est_years:.2f}y → EF={s['EF']:.2f}y"
+        )
+
+    lines.append("\n## E. 結論\n")
     lines.append(
-        "- ベースライン **19.25 年** は 50代後半まで子供が完結しない\n"
-        "- **S1** で借入と LingLing を圧縮するだけで大幅短縮\n"
-        "- **S2** で家族と財務を切り離せばさらに短縮\n"
-        "- 物理 / fiction / infra / spirit は 12+ 年スラックがあるので焦らず並行\n"
+        "- 過剰なブロッカー除去 + 売上加速ノード追加で **19.25y → 17.50y** (-1.75y)\n"
+        "- **再婚・子供は CP から外れた** (経済/健康/訴訟を待たない)\n"
+        "- 売上ノード 4 件 (Gftd/Etzhayyim/JK Wellness/Treaty) の達成で借入返済を半減 → "
+        "**S1 シナリオで 12-14 年圏**\n"
+        "- IPO も並走させる S3 では更に短縮可能\n"
     )
     return "\n".join(lines)
 

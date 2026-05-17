@@ -57,7 +57,13 @@ class Goal:
     fallback: str = ""  # 代替経路
 
 
-# === ゴール定義 (gap_analysis.md §5 の 20 ノードを反映) ===
+# === ゴール定義 (gap_analysis.md §5 の 20 ノード + Phase 2.1 で追加 4 ノード) ===
+# Phase 2.1 更新 (2026-05):
+#   - 過剰モデリング除去: (14_loan, 15_remarriage), (12_legal, 13_meeting),
+#     (12_legal, 11_health), (11_health, 15_remarriage) を削除
+#     → 再婚は経済・健康にゲートされない (ブロッカー除去)
+#   - 売上加速ノード 4 件追加 (21–24): Gftd 営業 / etzhayyim / JK Wellness /
+#     サイバー条約 — 借入返済の est_years を短縮する原資
 GOALS: dict[str, Goal] = {
     "01_aishi_disclosure": Goal(
         "01_aishi_disclosure", "アイシステム送金履歴の完全開示",
@@ -148,32 +154,70 @@ GOALS: dict[str, Goal] = {
         "20_zen_oss", "01 Zen OSS 公開 + 非分離コード共有",
         "decade", "spirit", 4.0, 0.20,
     ),
+
+    # === Phase 2.1 追加: 売上加速ノード ===
+    "21_gftd_sales_pipeline": Goal(
+        "21_gftd_sales_pipeline",
+        "Gftd Japan 営業パイプライン拡大 (厚労省 / Apple / 鹿大 / 理研 横展開)",
+        "year", "infra", 1.5, 0.35,
+    ),
+    "22_etzhayyim": Goal(
+        "22_etzhayyim",
+        "Etzhayyim (Tree of Life) — オランダ拠点 spirit-tech 事業立ち上げ",
+        "year", "spirit", 2.0, 0.25,
+    ),
+    "23_jk_wellness_lab": Goal(
+        "23_jk_wellness_lab",
+        "JK Wellness Research Lab (COMMONS 改称) 集中投資 + 単価向上",
+        "year", "social", 1.5, 0.25,
+    ),
+    "24_cyber_treaty": Goal(
+        "24_cyber_treaty",
+        "US×JP Mutual Cyber Security Treaty 提案 → 政府案件化",
+        "decade", "infra", 3.0, 0.35,
+        external_dependency="日米政府",
+        fallback="経産省 / 防衛省 単独案件化",
+    ),
 }
 
 
 # === 依存エッジ (prerequisite → dependent) ===
+# Phase 2.1 で削除した過剰エッジ:
+#   - (14_loan_acceleration, 15_remarriage)  ← 再婚は経済にゲートされない
+#   - (12_legal_offload, 13_meeting_partners) ← 出会いは訴訟解決を待たない
+#   - (12_legal_offload, 11_health_steady)   ← 健康は訴訟解決を待たない
+#   - (11_health_steady, 15_remarriage)      ← 再婚は完璧な健康を要求しない
+#   - (06_lingling_brief, 10_commons_revenue) ← COMMONS 宿泊業は並走可能
 EDGES: list[tuple[str, str]] = [
+    # 訴訟チェイン (証拠 → 書面)
     ("01_aishi_disclosure", "02_2021_reconcile"),
     ("02_2021_reconcile", "04_accounting_proof"),
     ("04_accounting_proof", "06_lingling_brief"),
     ("06_lingling_brief", "12_legal_offload"),
-    ("12_legal_offload", "13_meeting_partners"),
-    ("12_legal_offload", "11_health_steady"),
+
+    # 売上 → 借入返済原資
     ("08_gftd_breakeven", "14_loan_acceleration"),
     ("10_commons_revenue", "14_loan_acceleration"),
+    ("21_gftd_sales_pipeline", "08_gftd_breakeven"),
+    ("23_jk_wellness_lab", "10_commons_revenue"),
+    ("22_etzhayyim", "14_loan_acceleration"),
+    ("24_cyber_treaty", "14_loan_acceleration"),
+
+    # 借入返済 → IPO (内部統制と並列)
     ("14_loan_acceleration", "18_ipo_or_foundation"),
     ("08_gftd_breakeven", "17_internal_control"),
     ("17_internal_control", "18_ipo_or_foundation"),
+
+    # 再婚チェイン (出会いだけが前提)
     ("13_meeting_partners", "15_remarriage"),
-    ("11_health_steady", "15_remarriage"),
-    ("14_loan_acceleration", "15_remarriage"),
     ("15_remarriage", "16_more_children"),
-    ("11_health_steady", "16_more_children"),
+
+    # 物理 / fiction / spirit
     ("03_lean_mathlib", "05_adr_0003"),
     ("05_adr_0003", "07_arxiv_submit"),
     ("09_ghosthacker_scenarios", "19_ghosthacker_film"),
-    ("06_lingling_brief", "10_commons_revenue"),
     ("07_arxiv_submit", "20_zen_oss"),
+    ("22_etzhayyim", "20_zen_oss"),
 ]
 
 
