@@ -40,7 +40,12 @@ LivingSystem  = "https://github.com/com-junkawasaki/com-junkawasaki/tree/main/ka
 
 [tool.kawasakijun.identity]
 # Actor DID for the top-level orchestrator (see living/manifest.yaml).
-did = "did:web:kawasakijun.jp.luxury"
+# Canonical identity is unified under com-junkawasaki / junkawasaki.com.
+# (Previously did:web:kawasakijun.jp.luxury — consolidated 2026-05-18.)
+did = "did:web:junkawasaki.com"
+alias = "com-junkawasaki"
+homepage = "https://junkawasaki.com"
+repo = "https://github.com/com-junkawasaki/com-junkawasaki"
 role = "T0 orchestrator / top-level life planner"
 
 [tool.kawasakijun.downstream]

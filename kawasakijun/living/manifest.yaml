@@ -1,10 +1,14 @@
 actor:
-  did: did:web:kawasakijun.jp.luxury
+  did: did:web:junkawasaki.com
+  alias: com-junkawasaki
   type: T0 orchestrator
-  cluster: kawasakijun
+  cluster: com-junkawasaki
   role: top-level life planner / Pregel master
   super_step_interval: 24h
   default_mode: dry-run
+  did_document_location: https://junkawasaki.com/.well-known/did.json
+  homepage: https://junkawasaki.com
+  repo: https://github.com/com-junkawasaki/com-junkawasaki
 
 state_source:
   - kawasakijun/profile.jsonld

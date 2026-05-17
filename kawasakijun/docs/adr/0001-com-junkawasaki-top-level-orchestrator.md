@@ -45,7 +45,7 @@
                 ┌────────────────────────────────────┐
                 │ com-junkawasaki (THIS)             │
                 │  • Pregel state                    │
-                │  • DID: did:web:kawasakijun.jp.luxury
+                │  • DID: did:web:junkawasaki.com    │
                 │  • Sensors → state → Issues out    │
                 └────────────────────────────────────┘
                                 │  (issues, drafts, events)

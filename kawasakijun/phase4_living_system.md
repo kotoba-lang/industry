@@ -172,7 +172,7 @@ living system が呼び出す形式に。
 ```yaml
 # kawasakijun/living/manifest.yaml
 actor:
-  did: did:web:kawasakijun.jp.luxury
+  did: did:web:junkawasaki.com  # consolidated to com-junkawasaki (2026-05-18)
   type: T2 TS Native
   cluster: etzhayyim
   vertex_state: kawasakijun/profile.jsonld
