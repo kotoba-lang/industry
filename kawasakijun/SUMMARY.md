@@ -136,8 +136,43 @@ Claude Code のチャット欄で:
 - 共有フォルダ (ZeLo訴訟関連: `1MSyjtsp0pLgtFwuI6LhHuXkOyGyFdvET` 等)
 - 過去の契約書/プレゼン/ノート
 
+## 財務スナップショット (2026-05)
+
+| 項目 | 金額 |
+|---|---:|
+| Gftd Japan 借入 (公的+民間) | **¥167,000,000** |
+| ├ 西武信金 | 5M + 20M |
+| ├ 第一勧業信用組合 | 10M |
+| ├ 日本政策金融公庫 | 29M + 11M |
+| ├ みずほ銀行 | 20M |
+| └ 福祉医療機構 (3拠点 × 30M) | 90M |
+| **河崎 → COMMONS 貸付金 (R5/12/31)** | **¥133,876,442** |
+| 河崎の Gftd Japan 給与 | **ゼロ** (借金返済として処理) |
+| Paidy 小口滞納 | 6 ヶ月継続 (¥250–¥7,667) |
+
+## 係争スナップショット
+
+| 案件 | 役割 | 状態 |
+|---|---|---|
+| 水谷翔太 | 被害者 → 原告勝訴 | 解決済 (¥52M 認容) |
+| **LingLing → COMMONS** | **被告** | **継続中** (ZeLo + AMT 河合先生) |
+| 鹿児島大学 vs Gftd | 請求者 | 抗議書段階 (¥4,811,457) |
+| Rokes / HEC ハッキング | 被害者 | 対応済 |
+| 離婚 | 当事者 | 成立済 |
+
+## 現状 → 理想の 20 ノード DAG (逆トポロジカル順)
+
+`gap_analysis.md` 参照。実行順 (末端から):
+
+1. アイシステム送金履歴開示 → 2. 2021 預かり資金突合 → 3-4. Lean4 互換 / 経理整合性証明 →
+5-6. ADR-0003 / LingLing 準備書面 → 7-8. arXiv / Gftd 黒字化 → 9-10. Ghost Hacker / COMMONS 宿泊 →
+11-12. 健康定常 / 訴訟移譲 → 13-14. 出会い / 借入返済加速 → 15-16. 再婚 / 子 +2-3 →
+17-18. 内部統制 / IPO → 19-20. 映像化 / 01 Zen OSS
+
 ## 次のアクション
 
-- `python kawasakijun/pregel_planner.py --tau day --horizon 12` で経路計算
-- `roadmap.jsonld` の τ レイヤー目標を本人が更新
-- Drive 認証 → activities.jsonld を再ビルド
+- `python kawasakijun/reverse_topo_pregel.py --budget-years 10` で 10 年経路を生成
+- `python kawasakijun/pregel_planner.py --tau day --horizon 12` で日次経路を生成
+- `gap_analysis.md` を読み、ボトルネック (#1 アイシステム / #4 経理整合性証明) から着手
+- LingLing 訴訟戦略を AMT 河合 + ZeLo + TOTAL 水鳥 で共有再確認
+- Paidy 自動引き落とし設定 (秘書 山田 へ移管)

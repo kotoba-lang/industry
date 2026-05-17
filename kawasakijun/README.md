@@ -11,7 +11,14 @@
 | `profile.jsonld` | 基本属性、ロール、価値関数 W(τ) の重み |
 | `activities.jsonld` | これまでの活動を τ スケール (秒→世代→宇宙) でタグ付け |
 | `roadmap.jsonld` | 今後の計画。各 τ レイヤーに目標とドライバを置く |
-| `pregel_planner.py` | LangGraph Pregel グラフ。τ を super-step、活動領域を actor |
+| `financial_state.jsonld` | 借入・貸付・滞納・キャッシュフロー |
+| `litigation_state.jsonld` | 係争・刑事・離婚等の法的状態 |
+| `commons_state.jsonld` | COMMONS 株式会社の状態 (個人債権 1.34 億 + 宿泊業ピボット) |
+| `photos_timeline.jsonld` | Apple Photos 由来 (50,747 枚) — 旅行・人物・異常検知 |
+| `gap_analysis.md` | 現状 X_now → 理想 X_star の差分 + 依存 DAG + 逆トポロジカル順 |
+| `pregel_planner.py` | LangGraph Pregel グラフ (日次最適化)。τ を super-step、活動領域を actor |
+| `reverse_topo_pregel.py` | **10-20 年経路探索プランナー** — 逆トポロジカルソート + Pregel BSP |
+| `SUMMARY.md` | 統合ダッシュボード |
 
 ## 設計の元
 
