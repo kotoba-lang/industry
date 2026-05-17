@@ -116,8 +116,9 @@ GOALS: dict[str, Goal] = {
         "year", "social", 1.5, 0.20,
     ),
     "13_meeting_partners": Goal(
-        "13_meeting_partners", "出会いの場形成 (国際出張 / コミュニティ)",
-        "year", "relations", 2.0, 0.20,
+        "13_meeting_partners",
+        "出会いの場形成 + 経済的自立したパートナー候補との接触",
+        "year", "relations", 1.0, 0.25,
         fallback="既存ネットワーク内の再評価",
     ),
     "14_loan_acceleration": Goal(
@@ -125,16 +126,18 @@ GOALS: dict[str, Goal] = {
         "decade", "social", 7.0, 0.40,
     ),
     "15_remarriage": Goal(
-        "15_remarriage", "再婚",
-        "decade", "relations", 3.0, 0.50,
-        external_dependency="パートナー",
+        "15_remarriage",
+        "再婚 (パートナーに資力・収入があれば経済前提ナシで可)",
+        "year", "relations", 1.5, 0.50,
+        external_dependency="パートナー合意",
         fallback="事実婚 / パートナーシップ",
     ),
     "16_more_children": Goal(
-        "16_more_children", "子供 +2–3 人 (合計 3–4 人)",
-        "decade", "relations", 5.0, 0.50,
-        external_dependency="パートナー + 健康",
-        fallback="養子 / 教育投資による次世代育成",
+        "16_more_children",
+        "子供 +2–3 人 (パートナー合意 + 並走出産で 3y 圏)",
+        "year", "relations", 3.0, 0.50,
+        external_dependency="パートナー合意",
+        fallback="養子 / 並走出産 (代理含む)",
     ),
     "17_internal_control": Goal(
         "17_internal_control", "内部統制 + 監査法人選定",
@@ -142,8 +145,9 @@ GOALS: dict[str, Goal] = {
     ),
     "18_family_office_conversion": Goal(
         "18_family_office_conversion",
-        "Gftd Japan = シングルファミリープライベートオフィス化 (ADR-2605111000)",
-        "year", "infra", 1.0, 0.35,
+        "Gftd Japan = シングルファミリープライベートオフィス化 "
+        "(ADR-2605111000 のみで完了。実行は株主総会決議+登記 ¥60,000)",
+        "month", "infra", 0.25, 0.35,
     ),
     "19_ghosthacker_film": Goal(
         "19_ghosthacker_film", "Ghost Hacker 映像化",
@@ -166,9 +170,9 @@ GOALS: dict[str, Goal] = {
     ),
     "21b_gftd_anime_vertical": Goal(
         "21b_gftd_anime_vertical",
-        "animeka 12-stage BPMN pipeline 復旧 + Ghost Hacker IP 連結 "
-        "(2026-04-22 offline → 復旧後 commercial pipeline) — ADR-2604231328",
-        "year", "infra", 1.5, 0.30,
+        "animeka 12-stage BPMN pipeline 運用拡大 + Ghost Hacker IP 連結 "
+        "(RunPod Serverless v9si0sflsm0gh0 移行済) — ADR-2604231328",
+        "year", "infra", 0.75, 0.30,
     ),
 
     # Etzhayyim = principal / 宗教法人 / 既存運用中 (2026-05-10 org / 05-15 monorepo)
