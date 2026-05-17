@@ -1,35 +1,37 @@
 # Monthly Action Board — 直近 12 ヶ月 (2026-06 〜 2027-05)
 
-## 重要な戦略転換 (Phase 2.2 — 実態反映)
+## 重要な戦略転換 (Phase 2.3 — IPO 撤回 / family office 化 / animeka 復旧)
 
-実態に合わせて再構築:
-- **COMMONS 宿泊業ノード 削除** (やらない)
-- **Gftd 営業を law + anime 2 軸に分割** (`21_gftd_lawfirm_vertical`, `21b_gftd_anime_vertical`)
-- **Etzhayyim は既存運用** (`22_etzhayyim_ops`; org/monorepo は 2026-05 から live)
-- **JK 株式会社 = 改称済 private holding** (`23_jk_holding_governance` + `10_jk_holding_revenue`):
-  医療 / 研究 / 資産管理 の 3 軸 only
-- **Gftd Japan = vendor**, **Etzhayyim = principal** の境界明確化 (ADR 2605152100)
+`/Users/junkawasaki/gftdcojp/ai-gftd-apps-gftdcojp` の ADR から確定した実態:
 
-| ノード | 内容 | 状態 |
-|---|---|---|
-| `21_gftd_lawfirm_vertical` | LegalTech / e-discovery / 訴訟支援 | 着手 |
-| `21b_gftd_anime_vertical` | Ghost Hacker IP + 制作支援 + 配信 | 着手 |
-| `22_etzhayyim_ops` | 9 領域 (blockchain/baien/bpmn/lexicon/pregel/atproto/ameno/open-data/governance) | **既存運用中** |
-| `23_jk_holding_governance` | 医療 / 研究 / 資産管理 ガバナンス | 整備中 |
-| `25_magatama_sdk` | Magatama actor framework + Pregel SDK 公開 | 既存リポ |
-| `24_cyber_treaty` | US×JP Cyber Treaty | 提案段階 |
+- **IPO は進めない** → `18_family_office_conversion` (定款 23→6 項目、ADR-2605111000)
+- **`21_gftd_lawfirm_vertical`** は既存 `lawfirm.gftd.ai` (12 actor DIDs) の 9-actor 拡大 (ADR-0016)
+- **`21b_gftd_anime_vertical`** は `animeka.gftd.ai` の **復旧** (2026-04-22 offline; ADR-2604231328)
+- **Etzhayyim 9 領域** は既存運用 (org/monorepo 2026-05-15 live; Apache 2.0)
 
-→ **理論最短 19.50y、S2 シナリオで 13.72y、S3 で 10.0y**。
+| ノード | 状態 |
+|---|---|
+| `21_gftd_lawfirm_vertical` | **lawfirm.gftd.ai 既に live**。9-actor (judge/bengoshi/adr/legal-aid) 追加で拡大 |
+| `21b_gftd_anime_vertical` | **animeka 復旧フォーカス** (Linode GPU 退役 → RunPod L40S 切替) |
+| `22_etzhayyim_ops` | **9 領域既存運用** |
+| `18_family_office_conversion` | **定款変更のみ** (登記費用 ¥60,000) |
+| `23_jk_holding_governance` | 医療/研究/資産管理 3 軸 |
+| `25_magatama_sdk` | `etzhayyim/root/20-actors/magatama/` 公開済 |
+| `24_cyber_treaty` | 提案段階 |
+
+→ **理論最短 12.00y、S1/S2/S3 すべて 10.0y** (生物学的下限)。
 **再婚 ES=2y / 子供 EF=10y** (CP から外れている)。
 
-## 新クリティカル経路
+## 新クリティカル経路 (Phase 2.3)
 
 ```
-Ghost Hacker 残巻シナリオ (2.0y)
-  → Gftd アニメ IP バーティカル (2.0y)
+Ghost Hacker 残巻 (2.0y)
+  → animeka 復旧 + IP 連結 (1.5y)
   → Gftd 月次黒字化 (1.5y)
-  → 借入返済加速 (7.0y)
-  → Gftd IPO or 財団化 (7.0y)
+  → 借入返済 (7.0y) [売上加速で 3.5y に圧縮可能]
+
+  並走: Family Office 化 (1y, 内部統制 → 即決可能)
+  並走: 出会い (2y) → 再婚 (3y) → 子供 (5y) = 10y (生物学的下限)
 ```
 
 各月のアクション形式:
@@ -42,19 +44,20 @@ Ghost Hacker 残巻シナリオ (2.0y)
 - **SLACK**: スラックあり、CP の合間にこなす
 - **SENSE**: 自動化されたモニタリング (KPI センサ)
 
-## 2026-06 (Ghost Hacker + Gftd law/anime + Etzhayyim 運用)
+## 2026-06 (Family Office 化 + animeka 復旧 + Ghost Hacker 着手)
 
 | Item | Owner | Domain | Status check |
 |---|---|---|---|
 | **CP** Ghost Hacker 第3巻シナリオ ドラフト | 河崎 | fiction | 章立て完成 |
-| **REV** Gftd 法律事務所バーティカル: AMT/ZeLo 経由で LegalTech 案件提案 | 河崎+k.morioka | infra | 提案 2 件 |
-| **REV** Gftd アニメ IP バーティカル: Ghost Hacker 制作スタジオ打診 | 河崎 | infra | スタジオ候補 3 件 |
-| **REV** Etzhayyim 9 領域の運用継続 (既存 monorepo) | 河崎 | spirit | git activity |
+| **CP** animeka 復旧 着手: Linode GPU → RunPod L40S 切替 (ADR-0050) | 河崎+vendor | infra | 12-stage パイプライン inbetweener 再稼働 |
+| **REV** Family Office 化: 定款変更案 (6 項目) を株主総会へ — ADR-2605111000 | 河崎+中村+k.bakshi | infra | 株主総会決議 |
+| **REV** lawfirm.gftd.ai 9-actor 拡大 (judge/bengoshi 着手) | k.morioka | infra | 新 actor DID 払い出し |
+| **REV** Etzhayyim 9 領域継続 (既存 monorepo の運用 commit) | 河崎 | spirit | git activity |
 | **REV** Cyber Treaty 提案書 → 経産省 SSS 担当窓口 | 河崎 | infra | 1 次窓口アポ |
 | **PAR** JK株式会社 ガバナンス整理 (医療/研究/資産管理 3 軸の決算分離) | 河崎+加田 | social | フォーマット策定 |
 | **PAR** アイシステム送金履歴 取得依頼 → TOTAL 水鳥 | 河崎 | social | 6/10 依頼メール |
 | **PAR** Lean4 mathlib v4.25 互換性検証 | 河崎 | physics | `lake build` 緑 |
-| **PAR** Magatama Pregel SDK README + Quickstart | 河崎 | spirit | etzhayyim/root commit |
+| **PAR** Magatama Pregel SDK README (etzhayyim/root/20-actors/magatama/) | 河崎 | spirit | commit |
 | Paidy 自動引き落とし設定 | 山田 | infra | 残債務ゼロ |
 | 渋谷こころのクリニック 月1 | 河崎 | health | 通院記録 |
 | のどか 受験塾の中間面談 | 河崎 | relations | 親としての時間確保 |

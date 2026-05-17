@@ -179,23 +179,23 @@ Claude Code のチャット欄で:
 | `phase2_bottleneck_aishi.md` | #1 ボトルネック (アイシステム送金履歴) 攻略 | (手動実行) |
 | `phase2_kpi_sensors.py` | Gmail/Calendar/git からの自動 KPI 取得 | `python phase2_kpi_sensors.py --out kpi_report.md` |
 
-### Phase 2 で見えた数値 (Phase 2.2 で実態反映)
+### Phase 2 で見えた数値 (Phase 2.3 で IPO 撤回 + Family Office 化反映)
 
 | Phase | 理論最短 | クリティカル経路 |
 |---|---:|---|
 | 2.0 (初期 DAG) | 19.25 年 | 8 ノード (全て social/relations) |
 | 2.1 (過剰ブロッカー除去) | 17.50 年 | 4 ノード (売上経由) |
-| **2.2 (実態反映: COMMONS 削除 / law+anime 分割 / Etzhayyim 既存)** | **19.50 年** | **5 ノード (Ghost→アニメ→Gftd→借入→IPO)** |
-| シナリオ S1 (売上加速) | 15.20 年 | |
-| シナリオ S2 (+ Ghost Hacker 圧縮) | 13.72 年 | |
-| **シナリオ S3 (Aggressive + IPO 並走)** | **10.00 年** | 河崎氏 44 歳全達成 |
+| 2.2 (COMMONS 削除 / law+anime 分割) | 19.50 年 | 5 ノード (Ghost→アニメ→Gftd→借入→IPO) |
+| **2.3 (IPO 撤回 / Family Office / animeka 復旧 / lawfirm 既存)** | **12.00 年** | **4 ノード (Ghost→animeka→Gftd→借入)** |
+| シナリオ S1/S2/S3 | **10.00 年** | (生物学的下限: 出会い→再婚→子供 = 10y) |
 
-**Phase 2.2 のキー発見**:
-- COMMONS 宿泊業ノード除外で baseline がやや伸びる (-1.75y → -2.00y) が、現実的
-- **Gftd の真の CP は アニメ IP × Ghost Hacker IP** (Gftd の事業軸として law + anime に絞った)
-- **Etzhayyim は既存運用中** (org `etzhayyim/root` は 2026-05-15 から live, 9 領域)
-- **Gftd Japan = vendor / Etzhayyim = principal** の境界が明確 (ADR 2605152100)
-- 再婚 (ES=2y, EF=5y) / 子供 (EF=10y) は CP から外れたまま
+**Phase 2.3 のキー発見**:
+- **IPO 削除** + Family Office 化 (ADR-2605111000) で 7y ノード消失 → **-7.50y**
+- **animeka は復旧フォーカス** (vendor monorepo で 2026-04-22 から offline, ~15% completion)
+- **lawfirm.gftd.ai 既に live** (12 actor DIDs, 9-actor 拡大方針 ADR-0016)
+- **Gftd の vendor 性質** (corp #9007-2846, did:web:gftd.co.jp) が明確化
+- **10 年下限**: 出会い (2y) → 再婚 (3y) → 子供 (5y) の生物学的 path
+- 再婚 ES=2y → EF=5y (河崎氏 39 歳)、子供 EF=10y (44 歳)
 
 ### 直近 12 ヶ月のクリティカル (Phase 2.2 実態版)
 

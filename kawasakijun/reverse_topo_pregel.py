@@ -140,11 +140,10 @@ GOALS: dict[str, Goal] = {
         "17_internal_control", "内部統制 + 監査法人選定",
         "decade", "infra", 3.0, 0.20,
     ),
-    "18_ipo_or_foundation": Goal(
-        "18_ipo_or_foundation", "Gftd IPO or 持続可能財団化",
-        "decade", "infra", 7.0, 0.40,
-        external_dependency="市場環境",
-        fallback="持続可能財団化",
+    "18_family_office_conversion": Goal(
+        "18_family_office_conversion",
+        "Gftd Japan = シングルファミリープライベートオフィス化 (ADR-2605111000)",
+        "year", "infra", 1.0, 0.35,
     ),
     "19_ghosthacker_film": Goal(
         "19_ghosthacker_film", "Ghost Hacker 映像化",
@@ -157,17 +156,19 @@ GOALS: dict[str, Goal] = {
     ),
 
     # === Phase 2.2 売上加速ノード (実態反映) ===
-    # Gftd Japan = vendor / SOW 受託モデル (corp #9007-2846)
-    # 主軸: 法律事務所 + アニメ IP の 2 軸
+    # Gftd Japan = vendor / SOW 受託モデル (corp #9007-2846, family office 化中)
+    # 主軸: 法律事務所バーティカル (既存 9-actor 法務クラスタ) + アニメ IP (animeka 復旧)
     "21_gftd_lawfirm_vertical": Goal(
         "21_gftd_lawfirm_vertical",
-        "Gftd 法律事務所バーティカル (LegalTech / e-discovery / 訴訟支援)",
-        "year", "infra", 1.5, 0.30,
+        "Gftd 法務クラスタ 9-actor 拡大 (lawfirm/saiban/judge/bengoshi/adr/...; "
+        "200K judges + 2.5M lawyers データ収集) — ADR-0016",
+        "year", "infra", 1.0, 0.30,
     ),
     "21b_gftd_anime_vertical": Goal(
         "21b_gftd_anime_vertical",
-        "Gftd アニメ IP バーティカル (Ghost Hacker IP + 制作支援 + 配信)",
-        "year", "infra", 2.0, 0.30,
+        "animeka 12-stage BPMN pipeline 復旧 + Ghost Hacker IP 連結 "
+        "(2026-04-22 offline → 復旧後 commercial pipeline) — ADR-2604231328",
+        "year", "infra", 1.5, 0.30,
     ),
 
     # Etzhayyim = principal / 宗教法人 / 既存運用中 (2026-05-10 org / 05-15 monorepo)
@@ -226,10 +227,9 @@ EDGES: list[tuple[str, str]] = [
     ("22_etzhayyim_ops", "14_loan_acceleration"),
     ("24_cyber_treaty", "14_loan_acceleration"),
 
-    # 借入返済 → IPO (内部統制と並列)
-    ("14_loan_acceleration", "18_ipo_or_foundation"),
+    # Family office 化 (IPO ではなく) — 売上加速と並走、内部統制は前提
+    ("17_internal_control", "18_family_office_conversion"),
     ("08_gftd_breakeven", "17_internal_control"),
-    ("17_internal_control", "18_ipo_or_foundation"),
 
     # 再婚チェイン (出会いだけが前提)
     ("13_meeting_partners", "15_remarriage"),
