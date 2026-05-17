@@ -243,8 +243,14 @@
       "@id": "kj:sub/picoma",
       "name": "ピッコマ (Apple Account: mikaeru)",
       "recent_payment_jpy": 980,
-      "verdict": "REVIEW",
-      "note": "コミック app 内課金。継続要否判断"
+      "verdict": "CANCEL",
+      "kj:cancelled_at": "2026-05-18",
+      "kj:cancellation_actions": [
+        "1. iPhone → 設定 → App Store → ピッコマ → アプリを削除",
+        "2. 設定 → スクリーンタイム → コンテンツとプライバシーの制限 → iTunes & App Store での購入 → App 内課金 → 許可しない (Apple Account mikaeru / mika.3.etoile@icloud.com)",
+        "3. (オプション) ピッコマ運営に課金履歴削除リクエスト → 不要 (Apple 経由のため Apple Account に紐付き)"
+      ],
+      "kj:rationale": "In-App Purchase 都度課金、コミック消費は時間も浪費。即削除"
     },
     {
       "@id": "kj:sub/genomes-io",
@@ -262,10 +268,10 @@
 
   "kj:summary_by_verdict": {
     "KEEP_count": 8,
-    "REVIEW_count": 14,
-    "CANCEL_count": 0,
+    "REVIEW_count": 13,
+    "CANCEL_count": 1,
     "EXPIRED_count": 5,
-    "note": "REVIEW が多い — 本人判定で CANCEL / KEEP に振り分け要"
+    "note": "Phase 5.1: ピッコマ を CANCEL に確定 (2026-05-18)"
   },
 
   "kj:estimated_monthly_spend_jpy": {
@@ -299,7 +305,17 @@
     "8. hafh — 実利用率 ≦ 月1泊なら CANCEL",
     "9. hume — 用途確認、未使用なら downgrade or CANCEL",
     "10. notahotel-nac — buyback 進捗確認",
-    "11. rentio — 実利用要否",
-    "12. picoma — 個別アプリ内課金、継続要否"
+    "11. rentio — 実利用要否"
+  ],
+
+  "kj:cancellation_log": [
+    {
+      "@id": "kj:cancel/picoma",
+      "service": "ピッコマ",
+      "decided_at": "2026-05-18",
+      "method": "Apple App 削除 + In-App Purchase 許可しない設定",
+      "executed_by": "河崎純真",
+      "status": "decided (manual execution on iPhone)"
+    }
   ]
 }
