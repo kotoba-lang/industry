@@ -1,0 +1,74 @@
+[project]
+name = "kawasakijun"
+version = "0.1.0"
+description = "Top-level life-planning orchestrator for 河崎純真. Pregel-based DAG planner over 28 life goals with downstream-repo routing."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "Jun Kawasaki", email = "jun784@gmail.com" },
+]
+keywords = ["pregel", "life-planning", "langgraph", "orchestrator"]
+
+dependencies = [
+    "langgraph>=0.4",
+    "networkx>=3.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+sensors = [
+    # When implementing real (non-stub) sensors:
+    # "google-api-python-client>=2.0",   # Gmail/Calendar
+    # "moneyforward-api>=0.1",            # MoneyForward Cloud
+    # "osxphotos>=0.60",                  # Apple Photos
+]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.5",
+]
+
+[project.scripts]
+kawasakijun-plan       = "kawasakijun.reverse_topo_pregel:run"
+kawasakijun-cpm        = "kawasakijun.phase2_critical_path:analyze"
+kawasakijun-living     = "kawasakijun.living.run:main"
+
+[project.urls]
+Homepage      = "https://junkawasaki.com"
+Repository    = "https://github.com/com-junkawasaki/com-junkawasaki"
+LivingSystem  = "https://github.com/com-junkawasaki/com-junkawasaki/tree/main/kawasakijun/living"
+
+[tool.kawasakijun.identity]
+# Actor DID for the top-level orchestrator (see living/manifest.yaml).
+did = "did:web:kawasakijun.jp.luxury"
+role = "T0 orchestrator / top-level life planner"
+
+[tool.kawasakijun.downstream]
+# Authoritative list of downstream repositories under this orchestrator.
+# Each repo's own agent picks up issues labeled `kawasakijun-orchestrated`.
+spirit_in_physics  = "com-junkawasaki/spirit-in-physics"
+etzhayyim_root     = "etzhayyim/root"
+gftd_monorepo      = "gftdcojp/ai-gftd-apps-gftdcojp"
+ghost_hacker       = "com-junkawasaki/260208-spirit-in-physics"
+
+[tool.kawasakijun.pregel]
+budget_years_default = 10
+super_step_interval_hours = 24
+state_files = [
+    "profile.jsonld",
+    "activities.jsonld",
+    "roadmap.jsonld",
+    "financial_state.jsonld",
+    "litigation_state.jsonld",
+    "jk_state.jsonld",
+    "gftd_state.jsonld",
+    "photos_timeline.jsonld",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["kawasakijun", "kawasakijun.living", "kawasakijun.living.collectors"]
+package-dir = { kawasakijun = "." }
