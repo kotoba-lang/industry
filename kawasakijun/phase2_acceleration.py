@@ -62,16 +62,16 @@ def report() -> str:
 
     lines.append("## A. エッジ削除 (依存を切る)\n")
     interesting_edges = [
-        ("23_jk_wellness_lab", "10_commons_revenue",
-         "宿泊業を JK Wellness ピボット完了を待たずに並走"),
+        ("09_ghosthacker_scenarios", "21b_gftd_anime_vertical",
+         "アニメ事業を Ghost Hacker IP 完成を待たずに既存制作スタジオで先行"),
         ("15_remarriage", "16_more_children",
          "子供を再婚と切り離す (養子 / 共同養育)"),
         ("17_internal_control", "18_ipo_or_foundation",
          "IPO を内部統制と並走"),
-        ("10_commons_revenue", "14_loan_acceleration",
-         "借入返済の原資を COMMONS 以外に移す (Gftd 単独で返済)"),
         ("14_loan_acceleration", "18_ipo_or_foundation",
          "IPO を借入完済前に実施 (一部負債を抱えたまま上場)"),
+        ("08_gftd_breakeven", "14_loan_acceleration",
+         "Etzhayyim/Cyber Treaty 単独で返済原資を作る"),
     ]
     lines.append("| 切るエッジ | 効果 | 短縮 (年) | 新 CP 長 |")
     lines.append("|---|---|---:|---:|")
@@ -87,11 +87,11 @@ def report() -> str:
 
     lines.append("\n## B. ノード短縮 (実行を圧縮)\n")
     shrinks = [
-        ("14_loan_acceleration", 0.5, "借入返済 7y→3.5y (Gftd+etzhayyim+cyber treaty による売上加速)"),
-        ("21_gftd_sales_pipeline", 0.6, "Gftd 営業 1.5y→0.9y (厚労省+Apple+鹿大+理研の同時攻略)"),
-        ("22_etzhayyim", 0.5, "Etzhayyim 2y→1y (オランダ拠点 + 01 Zen 既存資産活用)"),
-        ("23_jk_wellness_lab", 0.6, "JK Wellness 1.5y→0.9y (顧客 96→200/月)"),
-        ("10_commons_revenue", 0.5, "宿泊業を 2y→1y (集中投資)"),
+        ("14_loan_acceleration", 0.5, "借入返済 7y→3.5y (Gftd law+anime + Etzhayyim + Cyber Treaty)"),
+        ("21_gftd_lawfirm_vertical", 0.6, "Gftd 法律事務所バーティカル 1.5y→0.9y (LegalTech + AMT/ZeLo 関係活用)"),
+        ("21b_gftd_anime_vertical", 0.6, "Gftd アニメ IP バーティカル 2y→1.2y (Ghost Hacker IP 早期立ち上げ)"),
+        ("22_etzhayyim_ops", 0.5, "Etzhayyim 1.5y→0.75y (既存運用; org/monorepo は live)"),
+        ("09_ghosthacker_scenarios", 0.5, "Ghost Hacker 残巻シナリオを 2y→1y (集中執筆)"),
         ("24_cyber_treaty", 0.6, "サイバー条約 3y→1.8y (経産省 SSS 既登録の追い風)"),
         ("18_ipo_or_foundation", 0.5, "IPO 7y→3.5y (PE/VC 巻き込み)"),
     ]
@@ -109,57 +109,58 @@ def report() -> str:
 
     lines.append("\n## C. 推奨組合せ (現実的な圧縮シナリオ)\n")
 
+    SALES_NODES = ["21_gftd_lawfirm_vertical", "21b_gftd_anime_vertical",
+                   "22_etzhayyim_ops", "24_cyber_treaty"]
+
     lines.append("**シナリオ S1 (売上加速)**: "
-                 "Gftd 営業 + Etzhayyim + JK Wellness + Cyber Treaty で売上 2 倍速 "
+                 "Gftd law/anime + Etzhayyim + Cyber Treaty を 0.6 倍速 "
                  "→ 借入返済 7y→3.5y")
     dag = build_dag()
-    for nid in ["21_gftd_sales_pipeline", "22_etzhayyim",
-                "23_jk_wellness_lab", "24_cyber_treaty"]:
+    for nid in SALES_NODES:
         GOALS[nid].est_years *= 0.6
     GOALS["14_loan_acceleration"].est_years *= 0.5
     schedule = cpm_forward(dag)
     s1_dur = max(s["EF"] for s in schedule.values())
-    for nid in ["21_gftd_sales_pipeline", "22_etzhayyim",
-                "23_jk_wellness_lab", "24_cyber_treaty"]:
+    for nid in SALES_NODES:
         GOALS[nid].est_years /= 0.6
     GOALS["14_loan_acceleration"].est_years /= 0.5
     lines.append(f"  → **{s1_dur:.2f} 年** ({baseline - s1_dur:+.2f} 短縮)\n")
 
-    lines.append("**シナリオ S2 (S1 + 並走)**: "
-                 "+ COMMONS 宿泊業を JK Wellness と並走 (10 → 14 エッジを弱める)")
+    lines.append("**シナリオ S2 (S1 + Ghost Hacker 圧縮)**: "
+                 "+ アニメ前提の Ghost Hacker シナリオを集中執筆")
     dag = build_dag()
-    for nid in ["21_gftd_sales_pipeline", "22_etzhayyim",
-                "23_jk_wellness_lab", "24_cyber_treaty"]:
+    for nid in SALES_NODES:
         GOALS[nid].est_years *= 0.6
     GOALS["14_loan_acceleration"].est_years *= 0.5
-    if ("23_jk_wellness_lab", "10_commons_revenue") in dag.edges():
-        dag.remove_edge("23_jk_wellness_lab", "10_commons_revenue")
+    GOALS["09_ghosthacker_scenarios"].est_years *= 0.5
+    GOALS["21b_gftd_anime_vertical"].est_years *= 0.6
     schedule = cpm_forward(dag)
     s2_dur = max(s["EF"] for s in schedule.values())
-    for nid in ["21_gftd_sales_pipeline", "22_etzhayyim",
-                "23_jk_wellness_lab", "24_cyber_treaty"]:
+    for nid in SALES_NODES:
         GOALS[nid].est_years /= 0.6
     GOALS["14_loan_acceleration"].est_years /= 0.5
+    GOALS["09_ghosthacker_scenarios"].est_years /= 0.5
+    GOALS["21b_gftd_anime_vertical"].est_years /= 0.6
     lines.append(f"  → **{s2_dur:.2f} 年** ({baseline - s2_dur:+.2f} 短縮)\n")
 
     lines.append("**シナリオ S3 (Aggressive: + IPO 並走)**: "
                  "+ IPO を借入完済前に実施 (一部負債抱えたまま)")
     dag = build_dag()
-    for nid in ["21_gftd_sales_pipeline", "22_etzhayyim",
-                "23_jk_wellness_lab", "24_cyber_treaty"]:
+    for nid in SALES_NODES:
         GOALS[nid].est_years *= 0.6
     GOALS["14_loan_acceleration"].est_years *= 0.5
+    GOALS["09_ghosthacker_scenarios"].est_years *= 0.5
+    GOALS["21b_gftd_anime_vertical"].est_years *= 0.6
     GOALS["18_ipo_or_foundation"].est_years *= 0.5
-    if ("23_jk_wellness_lab", "10_commons_revenue") in dag.edges():
-        dag.remove_edge("23_jk_wellness_lab", "10_commons_revenue")
     if ("14_loan_acceleration", "18_ipo_or_foundation") in dag.edges():
         dag.remove_edge("14_loan_acceleration", "18_ipo_or_foundation")
     schedule = cpm_forward(dag)
     s3_dur = max(s["EF"] for s in schedule.values())
-    for nid in ["21_gftd_sales_pipeline", "22_etzhayyim",
-                "23_jk_wellness_lab", "24_cyber_treaty"]:
+    for nid in SALES_NODES:
         GOALS[nid].est_years /= 0.6
     GOALS["14_loan_acceleration"].est_years /= 0.5
+    GOALS["09_ghosthacker_scenarios"].est_years /= 0.5
+    GOALS["21b_gftd_anime_vertical"].est_years /= 0.6
     GOALS["18_ipo_or_foundation"].est_years /= 0.5
     lines.append(f"  → **{s3_dur:.2f} 年** ({baseline - s3_dur:+.2f} 短縮)\n")
 
@@ -175,11 +176,12 @@ def report() -> str:
 
     lines.append("\n## E. 結論\n")
     lines.append(
-        "- 過剰なブロッカー除去 + 売上加速ノード追加で **19.25y → 17.50y** (-1.75y)\n"
-        "- **再婚・子供は CP から外れた** (経済/健康/訴訟を待たない)\n"
-        "- 売上ノード 4 件 (Gftd/Etzhayyim/JK Wellness/Treaty) の達成で借入返済を半減 → "
-        "**S1 シナリオで 12-14 年圏**\n"
-        "- IPO も並走させる S3 では更に短縮可能\n"
+        "- COMMONS 宿泊業ノード削除 + Gftd を law/anime 2 軸に分割 + Etzhayyim を既存運用扱い"
+        " → ベースライン **19.50y**\n"
+        "- **再婚・子供は CP から外れた**\n"
+        "- 売上 4 軸 + Ghost Hacker 圧縮で **S1/S2 シナリオで 12-15 年圏**\n"
+        "- IPO 並走させる S3 では更に短縮可能\n"
+        "- CP は Ghost Hacker → アニメ → Gftd 黒字 → 借入返済 → IPO の縦列\n"
     )
     return "\n".join(lines)
 

@@ -101,9 +101,10 @@ GOALS: dict[str, Goal] = {
         "09_ghosthacker_scenarios", "Ghost Hacker 残巻シナリオ (3–8 巻)",
         "year", "fiction", 2.0, 0.15,
     ),
-    "10_commons_revenue": Goal(
-        "10_commons_revenue", "COMMONS 宿泊業 営業 CF 達成",
-        "year", "social", 2.0, 0.20,
+    "10_jk_holding_revenue": Goal(
+        "10_jk_holding_revenue",
+        "JK株式会社 (旧 COMMONS) 医療/研究/資産管理事業の安定運営",
+        "year", "social", 1.0, 0.15,
     ),
     "11_health_steady": Goal(
         "11_health_steady", "健康指標安定化 (通院隔月化)",
@@ -155,22 +156,37 @@ GOALS: dict[str, Goal] = {
         "decade", "spirit", 4.0, 0.20,
     ),
 
-    # === Phase 2.1 追加: 売上加速ノード ===
-    "21_gftd_sales_pipeline": Goal(
-        "21_gftd_sales_pipeline",
-        "Gftd Japan 営業パイプライン拡大 (厚労省 / Apple / 鹿大 / 理研 横展開)",
-        "year", "infra", 1.5, 0.35,
+    # === Phase 2.2 売上加速ノード (実態反映) ===
+    # Gftd Japan = vendor / SOW 受託モデル (corp #9007-2846)
+    # 主軸: 法律事務所 + アニメ IP の 2 軸
+    "21_gftd_lawfirm_vertical": Goal(
+        "21_gftd_lawfirm_vertical",
+        "Gftd 法律事務所バーティカル (LegalTech / e-discovery / 訴訟支援)",
+        "year", "infra", 1.5, 0.30,
     ),
-    "22_etzhayyim": Goal(
-        "22_etzhayyim",
-        "Etzhayyim (Tree of Life) — オランダ拠点 spirit-tech 事業立ち上げ",
-        "year", "spirit", 2.0, 0.25,
+    "21b_gftd_anime_vertical": Goal(
+        "21b_gftd_anime_vertical",
+        "Gftd アニメ IP バーティカル (Ghost Hacker IP + 制作支援 + 配信)",
+        "year", "infra", 2.0, 0.30,
     ),
-    "23_jk_wellness_lab": Goal(
-        "23_jk_wellness_lab",
-        "JK Wellness Research Lab (COMMONS 改称) 集中投資 + 単価向上",
-        "year", "social", 1.5, 0.25,
+
+    # Etzhayyim = principal / 宗教法人 / 既存運用中 (2026-05-10 org / 05-15 monorepo)
+    # 9 領域: blockchain / baien / bpmn / lexicon / pregel / atproto /
+    #          ameno / open-data / public governance
+    "22_etzhayyim_ops": Goal(
+        "22_etzhayyim_ops",
+        "Etzhayyim 宗教法人 9 領域の運用拡大 (既存; did:web:etzhayyim.com)",
+        "year", "spirit", 1.5, 0.30,
     ),
+
+    # JK株式会社 = principal の private holding (医療・研究・資産管理)
+    "23_jk_holding_governance": Goal(
+        "23_jk_holding_governance",
+        "JK株式会社 (private) ガバナンス確立 (医療/研究/資産管理 3 軸)",
+        "year", "social", 1.0, 0.20,
+    ),
+
+    # US×JP Cyber Treaty
     "24_cyber_treaty": Goal(
         "24_cyber_treaty",
         "US×JP Mutual Cyber Security Treaty 提案 → 政府案件化",
@@ -178,16 +194,22 @@ GOALS: dict[str, Goal] = {
         external_dependency="日米政府",
         fallback="経産省 / 防衛省 単独案件化",
     ),
+
+    # Etzhayyim の Magatama Pregel SDK 公開 (既存ノード `20_zen_oss` を吸収)
+    "25_magatama_sdk": Goal(
+        "25_magatama_sdk",
+        "Etzhayyim Magatama actor framework + Pregel SDK 公開 (20-actors/magatama/)",
+        "year", "spirit", 1.0, 0.20,
+    ),
 }
 
 
 # === 依存エッジ (prerequisite → dependent) ===
-# Phase 2.1 で削除した過剰エッジ:
-#   - (14_loan_acceleration, 15_remarriage)  ← 再婚は経済にゲートされない
-#   - (12_legal_offload, 13_meeting_partners) ← 出会いは訴訟解決を待たない
-#   - (12_legal_offload, 11_health_steady)   ← 健康は訴訟解決を待たない
-#   - (11_health_steady, 15_remarriage)      ← 再婚は完璧な健康を要求しない
-#   - (06_lingling_brief, 10_commons_revenue) ← COMMONS 宿泊業は並走可能
+# Phase 2.2 実態反映:
+#   - COMMONS 宿泊業ノード 削除 (やらない)
+#   - 21 → 21_gftd_lawfirm + 21b_gftd_anime 分割
+#   - 22_etzhayyim_ops = 既存運用 (org/monorepo は 2026-05 に live)
+#   - 23 = JK 株式会社 (改称済) private holding
 EDGES: list[tuple[str, str]] = [
     # 訴訟チェイン (証拠 → 書面)
     ("01_aishi_disclosure", "02_2021_reconcile"),
@@ -195,12 +217,13 @@ EDGES: list[tuple[str, str]] = [
     ("04_accounting_proof", "06_lingling_brief"),
     ("06_lingling_brief", "12_legal_offload"),
 
-    # 売上 → 借入返済原資
+    # 売上 → 借入返済原資 (Gftd は law/anime の 2 軸)
+    ("21_gftd_lawfirm_vertical", "08_gftd_breakeven"),
+    ("21b_gftd_anime_vertical", "08_gftd_breakeven"),
     ("08_gftd_breakeven", "14_loan_acceleration"),
-    ("10_commons_revenue", "14_loan_acceleration"),
-    ("21_gftd_sales_pipeline", "08_gftd_breakeven"),
-    ("23_jk_wellness_lab", "10_commons_revenue"),
-    ("22_etzhayyim", "14_loan_acceleration"),
+    ("10_jk_holding_revenue", "14_loan_acceleration"),
+    ("23_jk_holding_governance", "10_jk_holding_revenue"),
+    ("22_etzhayyim_ops", "14_loan_acceleration"),
     ("24_cyber_treaty", "14_loan_acceleration"),
 
     # 借入返済 → IPO (内部統制と並列)
@@ -215,9 +238,11 @@ EDGES: list[tuple[str, str]] = [
     # 物理 / fiction / spirit
     ("03_lean_mathlib", "05_adr_0003"),
     ("05_adr_0003", "07_arxiv_submit"),
+    ("09_ghosthacker_scenarios", "21b_gftd_anime_vertical"),  # アニメ IP → Gftd 売上
     ("09_ghosthacker_scenarios", "19_ghosthacker_film"),
     ("07_arxiv_submit", "20_zen_oss"),
-    ("22_etzhayyim", "20_zen_oss"),
+    ("22_etzhayyim_ops", "20_zen_oss"),
+    ("22_etzhayyim_ops", "25_magatama_sdk"),
 ]
 
 

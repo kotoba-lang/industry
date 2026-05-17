@@ -1,24 +1,33 @@
 # Monthly Action Board — 直近 12 ヶ月 (2026-06 〜 2027-05)
 
-## 重要な戦略転換 (Phase 2.1)
+## 重要な戦略転換 (Phase 2.2 — 実態反映)
 
-**過剰なブロッカー (再婚 ← 借入完済) を除去**、代わりに **売上加速ノード** を 4 件追加:
+実態に合わせて再構築:
+- **COMMONS 宿泊業ノード 削除** (やらない)
+- **Gftd 営業を law + anime 2 軸に分割** (`21_gftd_lawfirm_vertical`, `21b_gftd_anime_vertical`)
+- **Etzhayyim は既存運用** (`22_etzhayyim_ops`; org/monorepo は 2026-05 から live)
+- **JK 株式会社 = 改称済 private holding** (`23_jk_holding_governance` + `10_jk_holding_revenue`):
+  医療 / 研究 / 資産管理 の 3 軸 only
+- **Gftd Japan = vendor**, **Etzhayyim = principal** の境界明確化 (ADR 2605152100)
 
-| ノード | 効果 |
-|---|---|
-| `21_gftd_sales_pipeline` | Gftd Japan 営業 (厚労省/Apple/鹿大/理研 横展開) |
-| `22_etzhayyim` | Etzhayyim (Tree of Life) — オランダ spirit-tech |
-| `23_jk_wellness_lab` | JK Wellness Research Lab (COMMONS 改称) |
-| `24_cyber_treaty` | US×JP Cyber Security Treaty 提案 |
+| ノード | 内容 | 状態 |
+|---|---|---|
+| `21_gftd_lawfirm_vertical` | LegalTech / e-discovery / 訴訟支援 | 着手 |
+| `21b_gftd_anime_vertical` | Ghost Hacker IP + 制作支援 + 配信 | 着手 |
+| `22_etzhayyim_ops` | 9 領域 (blockchain/baien/bpmn/lexicon/pregel/atproto/ameno/open-data/governance) | **既存運用中** |
+| `23_jk_holding_governance` | 医療 / 研究 / 資産管理 ガバナンス | 整備中 |
+| `25_magatama_sdk` | Magatama actor framework + Pregel SDK 公開 | 既存リポ |
+| `24_cyber_treaty` | US×JP Cyber Treaty | 提案段階 |
 
-→ **理論最短 17.50y、S3 シナリオで 10.0y**。**再婚 ES=2y / 子供 EF=10y**。
-クリティカル経路は社会派 (LingLing) から **売上派** に転移。
+→ **理論最短 19.50y、S2 シナリオで 13.72y、S3 で 10.0y**。
+**再婚 ES=2y / 子供 EF=10y** (CP から外れている)。
 
 ## 新クリティカル経路
 
 ```
-JK Wellness 集中投資 (1.5y)
-  → COMMONS 宿泊業 営業 CF (2.0y)
+Ghost Hacker 残巻シナリオ (2.0y)
+  → Gftd アニメ IP バーティカル (2.0y)
+  → Gftd 月次黒字化 (1.5y)
   → 借入返済加速 (7.0y)
   → Gftd IPO or 財団化 (7.0y)
 ```
@@ -33,31 +42,35 @@ JK Wellness 集中投資 (1.5y)
 - **SLACK**: スラックあり、CP の合間にこなす
 - **SENSE**: 自動化されたモニタリング (KPI センサ)
 
-## 2026-06 (売上加速 4 軸 + LingLing 着手)
+## 2026-06 (Ghost Hacker + Gftd law/anime + Etzhayyim 運用)
 
 | Item | Owner | Domain | Status check |
 |---|---|---|---|
-| **CP** JK Wellness Research Lab 改称登記 | 河崎+松本司法書士 | social | 登記完了 |
-| **REV** Gftd 営業: 厚労省 + 鹿大 + 理研 同時提案書 | 河崎+k.morioka | infra | 提案 3 件提出 |
-| **REV** Etzhayyim (Tree of Life) オランダ法人 設立検討 | 河崎+Kunal | spirit | 法務確認 |
+| **CP** Ghost Hacker 第3巻シナリオ ドラフト | 河崎 | fiction | 章立て完成 |
+| **REV** Gftd 法律事務所バーティカル: AMT/ZeLo 経由で LegalTech 案件提案 | 河崎+k.morioka | infra | 提案 2 件 |
+| **REV** Gftd アニメ IP バーティカル: Ghost Hacker 制作スタジオ打診 | 河崎 | infra | スタジオ候補 3 件 |
+| **REV** Etzhayyim 9 領域の運用継続 (既存 monorepo) | 河崎 | spirit | git activity |
 | **REV** Cyber Treaty 提案書 → 経産省 SSS 担当窓口 | 河崎 | infra | 1 次窓口アポ |
-| **PAR** アイシステム送金履歴 取得依頼 → TOTAL 水鳥 | 河崎 | social | 6/10 までに依頼メール |
+| **PAR** JK株式会社 ガバナンス整理 (医療/研究/資産管理 3 軸の決算分離) | 河崎+加田 | social | フォーマット策定 |
+| **PAR** アイシステム送金履歴 取得依頼 → TOTAL 水鳥 | 河崎 | social | 6/10 依頼メール |
 | **PAR** Lean4 mathlib v4.25 互換性検証 | 河崎 | physics | `lake build` 緑 |
+| **PAR** Magatama Pregel SDK README + Quickstart | 河崎 | spirit | etzhayyim/root commit |
 | Paidy 自動引き落とし設定 | 山田 | infra | 残債務ゼロ |
 | 渋谷こころのクリニック 月1 | 河崎 | health | 通院記録 |
 | のどか 受験塾の中間面談 | 河崎 | relations | 親としての時間確保 |
 
-## 2026-07 (売上 + 訴訟並走)
+## 2026-07 (Gftd 受注 + Ghost Hacker 作画)
 
 | Item | Owner | Domain | Status check |
 |---|---|---|---|
-| **CP** JK Wellness 単価上げ (客単価 ¥6,600 → ¥12,000) | 河崎+加田 | social | 価格表改定 |
-| **REV** Gftd 営業 案件クローズ +2 件 (厚労省 / 鹿大) | k.morioka | infra | 受注金額 |
-| **REV** Etzhayyim 設立準備 (定款・拠点) | 河崎+Kunal | spirit | 公証人段取り |
+| **CP** Ghost Hacker 第3巻 作画パイプライン投入 (1 シーン完成) | 河崎 | fiction | epub 出力 |
+| **REV** Gftd 法律事務所案件 クローズ +1 (LegalTech / e-discovery) | k.morioka | infra | 受注金額 |
+| **REV** Gftd アニメ IP: 制作委員会組成 検討 | 河崎 | infra | パートナー 2 件 |
+| **REV** Etzhayyim baien / ameno / atproto 同時進捗 | 河崎 | spirit | 90-docs commits |
 | **REV** Cyber Treaty 経産省ヒアリング | 河崎 | infra | 議事録 |
 | **PAR** 2021年 預かり資金移動 全件突合 (MF×220415) | 河崎+加田 | social | スプレッドシート完成 |
-| ADR-0003 ドラフト (5層整合性証明) | 河崎 | physics | git commit |
-| Ghost Hacker 第3巻 作画パイプラインに投入 | 河崎 | fiction | 1 シーン完成 |
+| **PAR** ADR-0003 ドラフト (5層整合性証明) | 河崎 | physics | git commit |
+| 夏季の海外短期出張 (DEF CON 34 / Etzhayyim 視察 / 出会いの場) | 河崎 | relations | 旅程確定 |
 | 夏季の海外短期出張 (DEF CON 34 / Etzhayyim 拠点視察 / 出会いの場) | 河崎 | relations | 旅程確定 |
 
 ## 2026-08 (CP #2 完了)
