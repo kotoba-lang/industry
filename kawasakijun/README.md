@@ -15,6 +15,7 @@
 | `litigation_state.jsonld` | 係争・刑事・離婚等の法的状態 |
 | `jk_state.jsonld` | JK株式会社 (旧 COMMONS, 改称済) の状態。医療/研究/資産管理 3 軸 only |
 | `gftd_state.jsonld` | Gftd Japan株式会社 (vendor) の状態。Family Office 化 + law/anime 2 軸 |
+| `subscriptions_state.jsonld` | 既存契約・サブスク・アカウント一覧 (Phase 5; 月額 ¥319k) |
 | `photos_timeline.jsonld` | Apple Photos 由来 (50,747 枚) — 旅行・人物・異常検知 |
 | `gap_analysis.md` | 現状 X_now → 理想 X_star の差分 + 依存 DAG + 逆トポロジカル順 |
 | `pregel_planner.py` | LangGraph Pregel グラフ (日次最適化)。τ を super-step、活動領域を actor |

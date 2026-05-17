@@ -237,6 +237,13 @@ GOALS: dict[str, Goal] = {
         "(lawfirm.gftd.ai の新 actor; 自己実証 → SaaS+成功報酬モデル)",
         "year", "infra", 1.5, 0.40,
     ),
+
+    # Phase 5: 契約・サブスク棚卸し
+    "29_subscription_audit": Goal(
+        "29_subscription_audit",
+        "サブスク・契約・アカウント整理 (Phase 5; 月額 ¥319k → 目標 ¥220k)",
+        "month", "infra", 0.25, 0.10,
+    ),
 }
 
 
