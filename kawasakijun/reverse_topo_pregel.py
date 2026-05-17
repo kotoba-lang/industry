@@ -142,8 +142,9 @@ GOALS: dict[str, Goal] = {
         fallback="養子 / 並走出産 (代理含む)",
     ),
     "17_internal_control": Goal(
-        "17_internal_control", "内部統制 + 監査法人選定",
-        "decade", "infra", 3.0, 0.20,
+        "17_internal_control",
+        "内部統制 (ISMS 既登録活用 + Family Office 用 reframing) — Phase 3.A",
+        "year", "infra", 1.5, 0.20,
     ),
     "18_family_office_conversion": Goal(
         "18_family_office_conversion",
