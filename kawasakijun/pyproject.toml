@@ -1,7 +1,7 @@
 [project]
 name = "kawasakijun"
-version = "0.1.0"
-description = "Top-level life-planning orchestrator for 河崎純真. Pregel-based DAG planner over 28 life goals with downstream-repo routing."
+version = "0.2.0"
+description = "Top-level life-planning orchestrator for 河崎純真. Pregel-based DAG planner over 29 life goals with downstream-repo routing + subscription audit."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -68,7 +68,26 @@ state_files = [
     "jk_state.jsonld",
     "gftd_state.jsonld",
     "photos_timeline.jsonld",
+    "subscriptions_state.jsonld",
 ]
+
+[tool.kawasakijun.phases]
+# Completed phases of the planner. New phases append.
+"2.0" = "initial DAG (19.25y baseline)"
+"2.1" = "remove over-modeled blockers (17.50y)"
+"2.2" = "reflect ground truth — COMMONS dropped, law+anime split (19.50y)"
+"2.3" = "IPO drop / Family Office / animeka recovery / lawfirm existing (12.00y)"
+"2.4" = "animeka RunPod-migrated / partner-financial assumption (11.25y)"
+"2.5" = "counter-litigation + Rokes→product (victim→service operator) (7.50y)"
+"3.0" = "internal-control ISMS reuse (7.00y)"
+"4.0" = "Ghost Hacker sprint + Living System automation (6.25y)"
+"4.E" = "Wheeler-DeWitt → spirit-in-physics; zenos absorbed into etzhayyim (5.75y)"
+"4.G" = "Living System orchestrator implemented (no change to baseline)"
+"5.0" = "subscription/account audit ingested (¥319k/mo discovered)"
+"5.1" = "ピッコマ cancellation decided (iOS-only)"
+"5.2" = "Nord / HafH / Clerk cancellation decided"
+"5.3" = "cancellation request emails drafted in Gmail"
+"5.4" = "cancellation requests SENT via Chrome computer use"
 
 [build-system]
 requires = ["setuptools>=68"]
