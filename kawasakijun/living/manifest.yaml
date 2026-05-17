@@ -1,0 +1,34 @@
+actor:
+  did: did:web:kawasakijun.jp.luxury
+  type: T0 orchestrator
+  cluster: kawasakijun
+  role: top-level life planner / Pregel master
+  super_step_interval: 24h
+  default_mode: dry-run
+
+state_source:
+  - kawasakijun/profile.jsonld
+  - kawasakijun/activities.jsonld
+  - kawasakijun/roadmap.jsonld
+  - kawasakijun/financial_state.jsonld
+  - kawasakijun/litigation_state.jsonld
+  - kawasakijun/jk_state.jsonld
+  - kawasakijun/gftd_state.jsonld
+  - kawasakijun/photos_timeline.jsonld
+  - kawasakijun/reverse_topo_pregel.py
+
+owner:
+  name: 河崎純真
+  email: jun784@gmail.com
+  github: junkawasaki
+
+emission_limits:
+  per_repo_per_day: 5
+  per_run: 20
+  duplicate_issue_check: true
+
+labels_applied:
+  - kawasakijun-orchestrated
+  - autonomous-planning
+
+action_audit_log: kawasakijun/living/.audit.jsonl
