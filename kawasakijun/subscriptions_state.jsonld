@@ -135,16 +135,30 @@
       "@id": "kj:sub/nordaccount",
       "name": "Nord (NordVPN/NordPass/NordLocker)",
       "renewal": "2026-05-27 自動課金予定",
-      "verdict": "REVIEW",
-      "note": "3 製品のうちどれ?利用頻度確認"
+      "verdict": "CANCEL",
+      "kj:cancelled_at": "2026-05-18",
+      "kj:cancellation_actions": [
+        "1. https://my.nordaccount.com → Login (確認: support@nordaccount.com)",
+        "2. Subscriptions タブ → 該当製品を選択 → Cancel subscription",
+        "3. 確認メールを保存、Gmail に label `cancelled` を付与",
+        "4. 自動更新 2026-05-27 の前に完了 (期限まで 9 日)"
+      ],
+      "kj:rationale": "用途未確認、使用していない可能性。VPN は Cloudflare WARP / Apple Private Relay で代替可"
     },
     {
       "@id": "kj:sub/clerk",
       "name": "Clerk (auth)",
       "billing_cycle": "monthly",
       "use_case": "認証 SaaS",
-      "verdict": "REVIEW",
-      "note": "atproto / DID 移行で不要になる可能性。Etzhayyim 側の認証フローと整合"
+      "verdict": "CANCEL",
+      "kj:cancelled_at": "2026-05-18",
+      "kj:cancellation_actions": [
+        "1. https://dashboard.clerk.com → 該当 application を選択",
+        "2. Settings → Billing → Cancel plan (Pro → Free または完全解約)",
+        "3. atproto / DID への移行で代替: did:web:gftd.co.jp / did:web:etzhayyim.com / did:web:junkawasaki.com",
+        "4. application 自体を削除する場合は Settings → General → Delete"
+      ],
+      "kj:rationale": "DID/atproto 移行で代替可能。Etzhayyim の `10-protocol/atproto` + did:web:* に統合"
     },
     {
       "@id": "kj:sub/one-ibc-uk",
@@ -168,8 +182,15 @@
       "name": "HafH (旅行 subscription)",
       "billing_cycle": "monthly",
       "use_case": "ホテル定額",
-      "verdict": "REVIEW",
-      "note": "実利用率要確認。Hilton/Marriott と重複の可能性"
+      "verdict": "CANCEL",
+      "kj:cancelled_at": "2026-05-18",
+      "kj:cancellation_actions": [
+        "1. HafH アプリ → マイページ → プラン管理 → 解約",
+        "2. (代替) https://www.hafh.com → Login → プラン解約",
+        "3. 残コイン (Stay coin) は失効するため、解約前に使い切る or 諦める",
+        "4. 確認メール (noreply@mail.hafh.com) を保存"
+      ],
+      "kj:rationale": "Hilton Honors / Marriott / SEIBU PRINCE 等と重複、実利用率低"
     },
     {
       "@id": "kj:sub/seibu-prince",
@@ -268,10 +289,10 @@
 
   "kj:summary_by_verdict": {
     "KEEP_count": 8,
-    "REVIEW_count": 13,
-    "CANCEL_count": 1,
+    "REVIEW_count": 10,
+    "CANCEL_count": 4,
     "EXPIRED_count": 5,
-    "note": "Phase 5.1: ピッコマ を CANCEL に確定 (2026-05-18)"
+    "note": "Phase 5.2: ピッコマ / Nord / HafH / Clerk を CANCEL に確定 (2026-05-18)"
   },
 
   "kj:estimated_monthly_spend_jpy": {
@@ -300,12 +321,9 @@
     "3. one-ibc-uk — UK 法人継続意義の判断",
     "4. vultr — 用途確認、必要なら削減",
     "5. squarespace domains — 棚卸し、不使用ドメイン削除",
-    "6. nordaccount — 3 製品のうち使用するもの 1 つに",
-    "7. clerk — DID/atproto 移行と並走判定",
-    "8. hafh — 実利用率 ≦ 月1泊なら CANCEL",
-    "9. hume — 用途確認、未使用なら downgrade or CANCEL",
-    "10. notahotel-nac — buyback 進捗確認",
-    "11. rentio — 実利用要否"
+    "6. hume — 用途確認、未使用なら downgrade or CANCEL",
+    "7. notahotel-nac — buyback 進捗確認",
+    "8. rentio — 実利用要否"
   ],
 
   "kj:cancellation_log": [
@@ -316,6 +334,30 @@
       "method": "Apple App 削除 + In-App Purchase 許可しない設定",
       "executed_by": "河崎純真",
       "status": "decided (manual execution on iPhone)"
+    },
+    {
+      "@id": "kj:cancel/nord",
+      "service": "Nord (NordVPN/NordPass/NordLocker)",
+      "decided_at": "2026-05-18",
+      "method": "my.nordaccount.com → Cancel subscription (期限: 2026-05-27)",
+      "executed_by": "河崎純真",
+      "status": "decided (manual execution required, deadline 9 days)"
+    },
+    {
+      "@id": "kj:cancel/hafh",
+      "service": "HafH",
+      "decided_at": "2026-05-18",
+      "method": "HafH アプリ → プラン解約",
+      "executed_by": "河崎純真",
+      "status": "decided (manual execution on app)"
+    },
+    {
+      "@id": "kj:cancel/clerk",
+      "service": "Clerk (auth)",
+      "decided_at": "2026-05-18",
+      "method": "dashboard.clerk.com → Cancel plan; 代替: did:web:*",
+      "executed_by": "河崎純真",
+      "status": "decided (manual execution on dashboard)"
     }
   ]
 }
