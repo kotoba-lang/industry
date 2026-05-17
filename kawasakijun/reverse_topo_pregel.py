@@ -90,7 +90,9 @@ GOALS: dict[str, Goal] = {
         "month", "social", 1.0, 0.25,
     ),
     "07_arxiv_submit": Goal(
-        "07_arxiv_submit", "Wheeler-DeWitt 検証 → arXiv 投稿",
+        "07_arxiv_submit",
+        "Wheeler-DeWitt 検証 → arXiv 投稿 "
+        "(repo: github.com/com-junkawasaki/spirit-in-physics, arxiv_submission/)",
         "year", "physics", 1.5, 0.20,
     ),
     "08_gftd_breakeven": Goal(
@@ -159,10 +161,8 @@ GOALS: dict[str, Goal] = {
         "year", "fiction", 3.0, 0.25,
         external_dependency="制作会社",
     ),
-    "20_zen_oss": Goal(
-        "20_zen_oss", "01 Zen OSS 公開 + 非分離コード共有",
-        "decade", "spirit", 4.0, 0.20,
-    ),
+    # 20_zen_oss は etzhayyim/root の artificial organism ecosystem に吸収
+    # zenos としての独立ノードは不要
 
     # === Phase 2.2 売上加速ノード (実態反映) ===
     # Gftd Japan = vendor / SOW 受託モデル (corp #9007-2846, family office 化中)
@@ -275,8 +275,8 @@ EDGES: list[tuple[str, str]] = [
     ("05_adr_0003", "07_arxiv_submit"),
     ("09_ghosthacker_scenarios", "21b_gftd_anime_vertical"),  # アニメ IP → Gftd 売上
     ("09_ghosthacker_scenarios", "19_ghosthacker_film"),
-    ("07_arxiv_submit", "20_zen_oss"),
-    ("22_etzhayyim_ops", "20_zen_oss"),
+    # 物理研究結果は etzhayyim の artificial organism ecosystem に組み込み
+    ("07_arxiv_submit", "22_etzhayyim_ops"),
     ("22_etzhayyim_ops", "25_magatama_sdk"),
 
     # Phase 2.5: 被害者反転モデル
