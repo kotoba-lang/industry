@@ -190,52 +190,45 @@ def build_dag() -> nx.DiGraph:
 
 # === Pregel state ===
 class PlanState(TypedDict):
-    completed: set[str]
-    pending: set[str]
+    completed: list[str]
+    pending: list[str]
     super_step: int
     cumulative_years: float
     budget_years: float
     log: list[dict]
-    dag_edges: list[tuple[str, str]]
+    halted: bool
 
 
 def init_state(budget_years: float, dag: nx.DiGraph) -> PlanState:
     return {
-        "completed": set(),
-        "pending": set(GOALS.keys()),
+        "completed": [],
+        "pending": list(GOALS.keys()),
         "super_step": 0,
         "cumulative_years": 0.0,
         "budget_years": budget_years,
         "log": [],
-        "dag_edges": list(dag.edges()),
+        "halted": False,
     }
 
 
 def ready_nodes(state: PlanState, dag: nx.DiGraph) -> list[str]:
     """前提を満たしたゴール (= 全 prerequisites が completed)。"""
+    completed = set(state["completed"])
     return [
         nid for nid in state["pending"]
-        if all(p in state["completed"] for p in dag.predecessors(nid))
+        if all(p in completed for p in dag.predecessors(nid))
     ]
 
 
 def parallel_executable(ready: list[str], state: PlanState) -> list[str]:
     """同一 super-step で並走可能なゴール選択 (年予算内で)。"""
-    selected = []
-    cost = 0.0
     remaining_budget = state["budget_years"] - state["cumulative_years"]
-    # 寄与/年 で降順ソート (ROI 優先)
     ranked = sorted(
         ready,
         key=lambda nid: GOALS[nid].W_contribution / max(GOALS[nid].est_years, 0.1),
         reverse=True,
     )
-    for nid in ranked:
-        g = GOALS[nid]
-        # 同 super-step では複数並走、ステップ寿命 = 最も長いノードに合わせる
-        if g.est_years <= remaining_budget:
-            selected.append(nid)
-    return selected
+    return [nid for nid in ranked if GOALS[nid].est_years <= remaining_budget]
 
 
 def super_step(state: PlanState) -> PlanState:
@@ -243,13 +236,23 @@ def super_step(state: PlanState) -> PlanState:
     ready = ready_nodes(state, dag)
     selected = parallel_executable(ready, state)
     if not selected:
-        state["log"].append({"step": state["super_step"], "event": "halt_no_ready"})
+        state["log"].append({
+            "step": state["super_step"],
+            "event": "halt_no_progress",
+            "ready_but_unaffordable": ready,
+            "still_pending": list(state["pending"]),
+        })
+        state["halted"] = True
         return state
     step_duration = max(GOALS[n].est_years for n in selected)
-    state["cumulative_years"] += step_duration
+    completed = set(state["completed"])
+    pending = set(state["pending"])
     for nid in selected:
-        state["completed"].add(nid)
-        state["pending"].discard(nid)
+        completed.add(nid)
+        pending.discard(nid)
+    state["completed"] = list(completed)
+    state["pending"] = list(pending)
+    state["cumulative_years"] += step_duration
     state["log"].append({
         "step": state["super_step"],
         "cumulative_years": round(state["cumulative_years"], 2),
@@ -262,6 +265,8 @@ def super_step(state: PlanState) -> PlanState:
 
 
 def should_continue(state: PlanState) -> str:
+    if state["halted"]:
+        return "end"
     if not state["pending"]:
         return "end"
     if state["cumulative_years"] >= state["budget_years"]:

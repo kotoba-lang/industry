@@ -169,10 +169,40 @@ Claude Code のチャット欄で:
 11-12. 健康定常 / 訴訟移譲 → 13-14. 出会い / 借入返済加速 → 15-16. 再婚 / 子 +2-3 →
 17-18. 内部統制 / IPO → 19-20. 映像化 / 01 Zen OSS
 
-## 次のアクション
+## Phase 2 — 実行支援スタック
+
+| ファイル | 役割 | 実行コマンド |
+|---|---|---|
+| `phase2_critical_path.py` | CPM 解析 (ES/EF/LS/LF/Slack) → クリティカル経路 | `python phase2_critical_path.py --out critical_path.md` |
+| `phase2_acceleration.py` | エッジ削除 / ノード短縮で何年縮むか | `python phase2_acceleration.py --out acceleration.md` |
+| `phase2_monthly_board.md` | 直近 12 ヶ月のアクションボード | (手動レビュー) |
+| `phase2_bottleneck_aishi.md` | #1 ボトルネック (アイシステム送金履歴) 攻略 | (手動実行) |
+| `phase2_kpi_sensors.py` | Gmail/Calendar/git からの自動 KPI 取得 | `python phase2_kpi_sensors.py --out kpi_report.md` |
+
+### Phase 2 で見えた数値
+
+- **理論最短**: 19.25 年 (現 DAG / 現 est_years のまま)
+- **加速シナリオ S1** (LingLing 早期和解 + 借入加速 + 再婚を経済から切離): **15.65 年**
+- **クリティカル経路 8 ノード** はすべて social/relations 系
+- 物理 / fiction / infra / spirit は 12–13 年スラックあり (焦らず並行)
+
+### 直近 12 ヶ月のクリティカル
+
+```
+2026-06: アイシステム送金履歴 取得依頼 (TOTAL 水鳥)  ← Day 1-3 で即着手
+2026-07: 2021年 預かり資金 全件突合
+2026-08: 経理整合性証明書 ドラフト
+2026-09: LingLing 準備書面 (証明書を引用)
+2026-10: LingLing 期日対応 (第1期)
+2026-12: 中間総括 → 戦略再評価
+2027-Q1: 結審期 → 弁護団リソース解放
+```
+
+### 次のアクション
 
 - `python kawasakijun/reverse_topo_pregel.py --budget-years 10` で 10 年経路を生成
-- `python kawasakijun/pregel_planner.py --tau day --horizon 12` で日次経路を生成
-- `gap_analysis.md` を読み、ボトルネック (#1 アイシステム / #4 経理整合性証明) から着手
-- LingLing 訴訟戦略を AMT 河合 + ZeLo + TOTAL 水鳥 で共有再確認
+- `python kawasakijun/phase2_critical_path.py` で CPM を可視化
+- `python kawasakijun/phase2_acceleration.py` で「どこを切れば何年縮むか」を確認
+- `phase2_bottleneck_aishi.md` のメールテンプレートで **TOTAL 水鳥に正式依頼を送信** (今週)
+- `python kawasakijun/phase2_kpi_sensors.py` を日次 cron に
 - Paidy 自動引き落とし設定 (秘書 山田 へ移管)
