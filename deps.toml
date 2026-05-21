@@ -1,0 +1,58 @@
+# com-junkawasaki — deps.toml
+#
+# Machine-readable SSoT for the com-junkawasaki workspace.
+# Three projects as git submodules under projects/.
+#
+# ADR reference: projects/2604-linde/docs/adr/0003-workspace-multi-project-submodule-structure.md
+
+# ─── Workspace identity ────────────────────────────────────────────
+
+[workspace]
+name = "com-junkawasaki"
+owner = "Jun Kawasaki"
+github = "com-junkawasaki/com-junkawasaki"
+description = "Personal research workspace: formal mathematics, religious-corp substrate, AI content pipeline."
+
+# ─── Projects ──────────────────────────────────────────────────────
+
+[[projects]]
+name = "2604-linde"
+path = "projects/2604-linde"
+kind = "lean4-formalization"
+submodule = false
+description = "Lean 4 formal mathematics. Formalizes 'computation = information = physics' via Verlinde entropic gravity, Black Hole Computer, and 5-layer GenerativeStructure stack."
+adrs = [
+  "docs/adr/0001-computation-as-thermal-mass-blocker.md",
+  "docs/adr/0002-generative-structure-from-physical-principles.md",
+  "docs/adr/0003-workspace-multi-project-submodule-structure.md",
+]
+stack = ["Lean 4", "Mathlib"]
+
+[[projects]]
+name = "etzhayyim-root"
+path = "projects/etzhayyim-root"
+kind = "blockchain-substrate"
+submodule = true
+remote = "https://github.com/etzhayyim/root.git"
+description = "Religious corporation (宗教法人 etzhayyim / 天御柱) open substrate. AT Protocol MST + IPFS + Base L2 anchor. No RisingWave. No fiat."
+stack = ["TypeScript", "Rust", "Solidity", "Python", "Go"]
+ssot = "projects/etzhayyim-root/deps.toml"
+
+[[projects]]
+name = "ghosthacker"
+path = "projects/ghosthacker"
+kind = "ai-content-pipeline"
+submodule = true
+remote = "git@github.com:com-junkawasaki/ghosthacker.git"
+description = "Ghost Hacker Producer Pipeline. AI-driven story generation (Webtoon / Wattpad / YouTube) set in 2065 Tokyo. Merkle DAG topological execution pipeline over Neo4j story graph."
+stack = ["Go", "Svelte", "Python"]
+ssot = "projects/ghosthacker/mise.toml"
+
+# ─── Project relationships ─────────────────────────────────────────
+#
+#   2604-linde (theory)  →  etzhayyim-root (substrate)  →  ghosthacker (application)
+#
+#   2604-linde formalizes "computation = information = physics".
+#   etzhayyim-root applies those principles to on-chain distributed systems.
+#   ghosthacker runs on that substrate to generate the Ghost Hacker story universe,
+#   where Ghosts (information lifeforms) embody the categorical universality of ADR-0002 Layer 5.
