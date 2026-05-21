@@ -1,7 +1,7 @@
 # com-junkawasaki — deps.toml
 #
 # Machine-readable SSoT for the com-junkawasaki workspace.
-# Three projects as git submodules under projects/.
+# Four projects as git submodules under projects/.
 #
 # ADR reference: projects/2604-linde/docs/adr/0003-workspace-multi-project-submodule-structure.md
 
@@ -11,7 +11,7 @@
 name = "com-junkawasaki"
 owner = "Jun Kawasaki"
 github = "com-junkawasaki/com-junkawasaki"
-description = "Personal research workspace: formal mathematics, religious-corp substrate, AI content pipeline."
+description = "Personal research workspace: formal mathematics, religious-corp substrate, AI content pipeline, AI agent platform."
 
 # ─── Projects ──────────────────────────────────────────────────────
 
@@ -48,11 +48,22 @@ description = "Ghost Hacker Producer Pipeline. AI-driven story generation (Webto
 stack = ["Go", "Svelte", "Python"]
 ssot = "projects/ghosthacker/mise.toml"
 
+[[projects]]
+name = "ai-gftd-apps-gftdcojp"
+path = "projects/ai-gftd-apps-gftdcojp"
+kind = "ai-agent-platform"
+submodule = true
+remote = "git@github.com:gftdcojp/ai-gftd-apps-gftdcojp.git"
+description = "AI Agent-First Platform (gftd.ai). W Protocol (AT Protocol superset) + Signal Protocol E2E. XRPC sole API (348 NSID), account-level Cloudflare Workers, DID-native auth."
+stack = ["TypeScript", "Cloudflare Workers"]
+org = "gftdcojp"
+
 # ─── Project relationships ─────────────────────────────────────────
 #
 #   2604-linde (theory)  →  etzhayyim-root (substrate)  →  ghosthacker (application)
+#                        ↘  ai-gftd-apps-gftdcojp (platform)
 #
 #   2604-linde formalizes "computation = information = physics".
 #   etzhayyim-root applies those principles to on-chain distributed systems.
-#   ghosthacker runs on that substrate to generate the Ghost Hacker story universe,
-#   where Ghosts (information lifeforms) embody the categorical universality of ADR-0002 Layer 5.
+#   ghosthacker runs on that substrate to generate the Ghost Hacker story universe.
+#   ai-gftd-apps-gftdcojp is the production AI agent platform (gftd.ai) built on W Protocol.
