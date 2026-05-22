@@ -1,0 +1,40 @@
+--- ai-gftd-apps-gftdcojp/60-apps/ai-gftd-project-kaisya/appview/kaisya-portal-kaisya01/src/app.ts
++++ ai-gftd-apps-gftdcojp/60-apps/ai-gftd-project-kaisya/appview/kaisya-portal-kaisya01/src/app.ts
+@@ -705,6 +705,24 @@
+   });
+ }));
+ 
++app.get('/xrpc/ai.gftd.apps.kaisya.getBmcList', async (c) => withDb(c.env, async (db) => {
++  const [heads, blocks] = await Promise.all([
++    db.query(`
++      SELECT org_did, version, canvas_json, created_at
++      FROM mv_bmc_state_head
++      ORDER BY created_at DESC
++    `),
++    db.query(`
++      SELECT org_did, block, hyp_total, hyp_active, avg_measured
++      FROM mv_bmc_block_health
++    `),
++  ]);
++  return c.json({
++    heads: heads.rows,
++    blocks: blocks.rows,
++  });
++}));
++
+ // GET /xrpc/ai.gftd.apps.kaisya.getFinanceOps
+ app.get('/xrpc/ai.gftd.apps.kaisya.getFinanceOps', async (c) => withDb(c.env, async (db) => {
+   const owner = c.req.query('owner') || 'did:plc:gftd-works';
+@@ -1655,6 +1673,12 @@
+     description: 'Home dashboard: KPIs, pending legal cases, strategy snapshot, workflow queue.',
+     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+     xrpc: { method: 'GET', nsid: 'ai.gftd.apps.kaisya.getHome' },
++  },
++  {
++    name: 'kaisya.getBmcList',
++    description: 'Get list of business models across orgs.',
++    inputSchema: { type: 'object', properties: {} },
++    xrpc: { method: 'GET', nsid: 'ai.gftd.apps.kaisya.getBmcList' },
+   },
+   {
+     name: 'kaisya.listTasks',
