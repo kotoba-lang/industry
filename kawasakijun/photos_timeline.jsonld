@@ -1,0 +1,82 @@
+{
+  "@context": {
+    "@vocab": "https://schema.org/",
+    "kj": "https://junkawasaki.com/ns#"
+  },
+  "@id": "kj:photos_timeline",
+  "@type": "ItemList",
+  "description": "Apple Photos ライブラリ (Photos.sqlite) からの自動抽出。50,747 枚 / 2012-09 ～ 2026-05。",
+  "kj:source": "~/Pictures/Photos Library.photoslibrary/database/Photos.sqlite",
+  "kj:totals": {
+    "asset_count": 50747,
+    "first_photo": "2012-09-18",
+    "last_photo": "2026-05-17",
+    "named_persons": {
+      "河崎純真": 5013,
+      "のどか": 2653
+    }
+  },
+  "kj:named_albums": [
+    {"title": "Instagram", "started": "2015-11-23", "domain": "infra"},
+    {"title": "メディア出演", "started": "2016-10-14", "domain": "relations"},
+    {"title": "201703-エストニア", "started": "2017-03-02", "domain": "infra", "note": "e-Residency / ブロックチェーン関連と推定"},
+    {"title": "201707-ツクヨミ", "started": "2017-07-10", "domain": "infra"},
+    {"title": "201707-TeckLab", "started": "2017-07-10", "domain": "infra"},
+    {"title": "201807-宗教法人大宗寺", "started": "2018-08-08", "domain": "spirit", "note": "比叡山出家直後の僧侶活動の証跡"},
+    {"title": "GJ/201811-アグレボ証拠", "started": "2018-11-04", "domain": "social", "note": "法的証拠"},
+    {"title": "201903-オランダライフ", "started": "2019-05-17", "domain": "social", "note": "オランダ拠点設置期"},
+    {"title": "0000-証明写真", "started": "2019-07-20", "domain": "infra"},
+    {"title": "202001-Wedding", "started": "2020-01-06", "domain": "relations", "note": "結婚式 (現在は離婚)"},
+    {"title": "202106-上田邸", "started": "2021-06-27", "domain": "relations"},
+    {"title": "202201-Mexico", "started": "2022-01-04", "domain": "social", "note": "メキシコ土地視察と推定"},
+    {"title": "202209-公園", "started": "2022-09-17", "domain": "health"},
+    {"title": "202304-パークコート渋谷1216", "started": "2023-04-20", "domain": "infra", "note": "住居 (渋谷区広尾 推定 → 後に神宮前)"},
+    {"title": "202304-スカイダイビング", "started": "2023-04-23", "domain": "health"},
+    {"title": "202306-HSC", "started": "2023-06-25", "domain": "research"},
+    {"title": "DJI Album", "started": "2023-08-14", "domain": "infra", "note": "ドローン撮影"},
+    {"title": "プロフィール写真", "started": "2024-02-28", "domain": "infra"},
+    {"title": "WONDER+", "started": "2024-06-15", "domain": "research"},
+    {"title": "HubSpot", "started": "2024-09-25", "domain": "social"}
+  ],
+  "kj:geographic_distribution_top15": [
+    {"region": "東京・関東 (35.5,139.5)", "count": 10460, "domain": "infra", "note": "中心拠点"},
+    {"region": "大阪・京都 (34.6,135.5)", "count": 2144},
+    {"region": "石垣島・八重山 (24.3,123.8)", "count": 783},
+    {"region": "サウジアラビア リヤド (24.6,46.5)", "count": 491, "note": "中東出張"},
+    {"region": "UAE ドバイ (25.0,55.1)", "count": 476},
+    {"region": "ヨルダン アンマン (31.7,35.6)", "count": 463},
+    {"region": "大分 (33.0,131.5)", "count": 450, "note": "出身地"},
+    {"region": "静岡・神奈川 (34.7,138.7)", "count": 409},
+    {"region": "ハワイ ホノルル (21.3,-158.0)", "count": 346},
+    {"region": "千葉・房総 (34.9,139.5)", "count": 331},
+    {"region": "スリランカ (7.9,80.7)", "count": 321},
+    {"region": "サンディエゴ (32.7,-117.2)", "count": 286},
+    {"region": "大分・熊本広域 (32.6,130.5)", "count": 284},
+    {"region": "山梨・群馬 (35.5,138.5)", "count": 266},
+    {"region": "長野 (35.7,137.7)", "count": 254}
+  ],
+  "kj:activity_intensity_anomalies": {
+    "2021_dip": {
+      "months": "2021-02 〜 2021-08 (月平均 ~130 枚、通常 350-600)",
+      "interpretation": "コロナ禍 + 結婚後 (202001-Wedding 翌年)・産後/育児初期と推定"
+    },
+    "2022_06_spike": {
+      "value": "2150 枚",
+      "interpretation": "大規模イベント or 旅行 — 確認要"
+    },
+    "2023_07_spike": {
+      "value": "948 枚"
+    },
+    "2024_dip": {
+      "value": "通年低調 (200-400/月)",
+      "interpretation": "離婚プロセス期 + 業務集中と推定"
+    }
+  },
+  "kj:gaps_to_verify_with_owner": [
+    "Wedding (2020-01) → 離婚 までの期間",
+    "のどか の生年月日 (受験準備中 = 小学校受験? 中受?)",
+    "中東出張 (リヤド/ドバイ/アンマン) のタイミング・目的 (サイバーセキュリティ案件?)",
+    "スリランカ・ハワイ・サンディエゴ滞在の用件",
+    "上田邸 (2021-06) の関係性"
+  ]
+}

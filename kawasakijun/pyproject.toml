@@ -1,0 +1,99 @@
+[project]
+name = "kawasakijun"
+version = "0.2.0"
+description = "Top-level life-planning orchestrator for 河崎純真. Pregel-based DAG planner over 29 life goals with downstream-repo routing + subscription audit."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "Jun Kawasaki", email = "jun784@gmail.com" },
+]
+keywords = ["pregel", "life-planning", "langgraph", "orchestrator"]
+
+dependencies = [
+    "langgraph>=0.4",
+    "networkx>=3.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+sensors = [
+    # When implementing real (non-stub) sensors:
+    # "google-api-python-client>=2.0",   # Gmail/Calendar
+    # "moneyforward-api>=0.1",            # MoneyForward Cloud
+    # "osxphotos>=0.60",                  # Apple Photos
+]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.5",
+]
+
+[project.scripts]
+kawasakijun-plan       = "kawasakijun.reverse_topo_pregel:run"
+kawasakijun-cpm        = "kawasakijun.phase2_critical_path:analyze"
+kawasakijun-living     = "kawasakijun.living.run:main"
+
+[project.urls]
+Homepage      = "https://junkawasaki.com"
+Repository    = "https://github.com/com-junkawasaki/com-junkawasaki"
+LivingSystem  = "https://github.com/com-junkawasaki/com-junkawasaki/tree/main/kawasakijun/living"
+
+[tool.kawasakijun.identity]
+# Actor DID for the top-level orchestrator (see living/manifest.yaml).
+# Canonical identity is unified under com-junkawasaki / junkawasaki.com.
+# (Previously did:web:kawasakijun.jp.luxury — consolidated 2026-05-18.)
+did = "did:web:junkawasaki.com"
+alias = "com-junkawasaki"
+homepage = "https://junkawasaki.com"
+repo = "https://github.com/com-junkawasaki/com-junkawasaki"
+role = "T0 orchestrator / top-level life planner"
+
+[tool.kawasakijun.downstream]
+# Authoritative list of downstream repositories under this orchestrator.
+# Each repo's own agent picks up issues labeled `kawasakijun-orchestrated`.
+spirit_in_physics  = "com-junkawasaki/spirit-in-physics"
+etzhayyim_root     = "etzhayyim/root"
+gftd_monorepo      = "gftdcojp/ai-gftd-apps-gftdcojp"
+ghost_hacker       = "com-junkawasaki/260208-spirit-in-physics"
+
+[tool.kawasakijun.pregel]
+budget_years_default = 10
+super_step_interval_hours = 24
+state_files = [
+    "profile.jsonld",
+    "activities.jsonld",
+    "roadmap.jsonld",
+    "financial_state.jsonld",
+    "litigation_state.jsonld",
+    "jk_state.jsonld",
+    "gftd_state.jsonld",
+    "photos_timeline.jsonld",
+    "subscriptions_state.jsonld",
+]
+
+[tool.kawasakijun.phases]
+# Completed phases of the planner. New phases append.
+"2.0" = "initial DAG (19.25y baseline)"
+"2.1" = "remove over-modeled blockers (17.50y)"
+"2.2" = "reflect ground truth — COMMONS dropped, law+anime split (19.50y)"
+"2.3" = "IPO drop / Family Office / animeka recovery / lawfirm existing (12.00y)"
+"2.4" = "animeka RunPod-migrated / partner-financial assumption (11.25y)"
+"2.5" = "counter-litigation + Rokes→product (victim→service operator) (7.50y)"
+"3.0" = "internal-control ISMS reuse (7.00y)"
+"4.0" = "Ghost Hacker sprint + Living System automation (6.25y)"
+"4.E" = "Wheeler-DeWitt → spirit-in-physics; zenos absorbed into etzhayyim (5.75y)"
+"4.G" = "Living System orchestrator implemented (no change to baseline)"
+"5.0" = "subscription/account audit ingested (¥319k/mo discovered)"
+"5.1" = "ピッコマ cancellation decided (iOS-only)"
+"5.2" = "Nord / HafH / Clerk cancellation decided"
+"5.3" = "cancellation request emails drafted in Gmail"
+"5.4" = "cancellation requests SENT via Chrome computer use"
+"5.5" = "Wise account audit — 3 accounts mapped; Business KYC pending; personal+legacy slated for closure"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["kawasakijun", "kawasakijun.living", "kawasakijun.living.collectors"]
+package-dir = { kawasakijun = "." }
