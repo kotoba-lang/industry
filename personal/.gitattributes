@@ -1,0 +1,15 @@
+# Personal data subtree.
+# Default: every file here is annexed (and encrypted when copied to the IPFS remote).
+# Plaintext is never committed to git/GitHub for data files.
+* annex.largefiles=anything
+
+# Keep human-authored structure/docs/scripts in plain git (no PII in these):
+README.md            annex.largefiles=nothing
+**/*.md              annex.largefiles=nothing
+.gitattributes       annex.largefiles=nothing
+bin/**               annex.largefiles=nothing
+**/SCHEMA.json       annex.largefiles=nothing
+
+# analysis/ holds derived PII (financial/security findings). Always annex+encrypt,
+# even .md. Placed last so it overrides the **/*.md=nothing rule above.
+analysis/**          annex.largefiles=anything

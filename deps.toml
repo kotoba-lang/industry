@@ -59,6 +59,32 @@ stack = ["TypeScript", "Cloudflare Workers"]
 org = "gftdcojp"
 ssot = "projects/ai-gftd-apps-gftdcojp/README.md"
 
+# ─── Personal data warehouse ───────────────────────────────────────
+#
+# Sensor-ingestion + encrypted storage layer for the top-level orchestrator
+# (ADR-0001). Implements the "Sensors (read-only)" input as a reproducible,
+# version-controlled, encrypted dataset. See ADR-0003.
+
+[personal]
+path = "personal"
+kind = "personal-data-warehouse"
+description = "Encrypted personal data warehouse: this terminal + Gmail/Calendar/Drive/GitHub ingested for analysis. DataLad dataset; data is git-annexed (pointers only in git) and gpg-hybrid encrypted; only ciphertext is pinned to IPFS."
+adr = "kawasakijun/docs/adr/0003-personal-data-warehouse-encrypted-ipfs.md"
+stack = ["DataLad", "git-annex", "gpg", "IPFS"]
+sources = ["device", "gmail", "google-calendar", "google-drive", "github"]
+secrets_policy = "env var NAMES only; GitHub token VALUE not stored; data never plaintext to GitHub"
+
+[personal.storage]
+vcs = "datalad"
+content = "git-annex (annex-ignore on origin)"
+remote = "ipfs (external special remote, encryption=hybrid)"
+
+[personal.encryption]
+cipher = "gpg encryption=hybrid"
+keyid = "09EE841334482F5A0F5C4958A70BB2C220DE88CA"
+passphrase_custody = "macOS Keychain (gpg:personal-data)"
+recovery = "offline armored secret key (paper/KeePass)"
+
 # ─── Project relationships ─────────────────────────────────────────
 #
 #   2604-linde (theory)  →  etzhayyim-root (substrate)  →  ghosthacker (application)
