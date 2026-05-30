@@ -37,7 +37,7 @@ ADR-0001 で `com-junkawasaki` を最上位 orchestrator と定め、その入�
    - 鍵 `09EE841334482F5A0F5C4958A70BB2C220DE88CA` (暗号副鍵 `D1CA341CF2327694`)。
    - パスフレーズは **macOS Keychain** 項目 `gpg:personal-data` に保管 (Touch ID 保護)。
    - 非対話運用: `personal/bin/gpg-unlock.sh` (Keychain → gpg-agent preset)。
-   - **オフライン復旧鍵** を armored export し紙/KeePass で保管。
+   - **復旧鍵 = 1Password** (Private vault, armored 秘密鍵 + パスフレーズ)。ディスク .asc は安全消去。
 4. **IPFS special remote (external, 自作)**: `personal/bin/git-annex-remote-ipfs`。
    git-annex が `hybrid` で **暗号化した後** の暗号文だけを `ipfs add --pin`。
    key→CID は git-annex branch の SETSTATE で版管理。**平文は IPFS に出ない**。
@@ -102,14 +102,15 @@ sensors (Gmail/Calendar/Drive/gh/device)
 ### 4.3 Mitigations
 
 - annex 平文 → **FileVault** + 鍵パスフレーズ。
-- 鍵紛失 → **オフライン復旧 .asc** を紙/KeePass に保管 (運用手順を README に明記)。
+- 鍵紛失 → **1Password** (Private vault) に復旧鍵 + パスフレーズを保管 (ADR-0001 §4.3 の
+  「1Password Gftd Japan vault」方針に整合。復旧手順は README に明記)。
 - 取消不能 pin → ingest 時に秘匿値を除外 (env 名のみ / token 非保存) し、pin 前に内容を確認。
 - 多端末同期 → iCloud Keychain or 復旧鍵共有 (将来 ADR で再検討)。
 
 ## 5. Implementation status
 
 - ✅ datalad dataset 化 + `personal/` 構造 + annex ルール
-- ✅ gpg 鍵生成 → パスフレーズ付与 → Keychain 保管 → オフライン復旧 export
+- ✅ gpg 鍵生成 → パスフレーズ付与 → Keychain 保管 → 復旧鍵を 1Password (Private) に保管
 - ✅ 暗号化 IPFS external special remote (自作) + 往復・暗号文検証
 - ✅ ingest: device / Gmail / Calendar / Drive / GitHub
 - ✅ 全 23 ファイルを暗号化して IPFS に pin (平文リーク 0 を検証)

@@ -56,18 +56,20 @@ git annex add personal/ && git annex copy personal/ --to ipfs
 - ✅ gpg 鍵に**強力なパスフレーズ付与済み**（空パスフレーズは拒否されることを検証）。
 - ✅ パスフレーズを **macOS login Keychain** 項目 `gpg:personal-data` に保管（Touch ID/パスコードで保護）。
 - ✅ 非対話運用は `bash personal/bin/gpg-unlock.sh`（Keychain → gpg-agent にキャッシュ）。
-- ✅ **オフライン復旧鍵**を `~/personal-data-gpg-RECOVERY-YYYYMMDD.asc` にエクスポート済み（パスフレーズ保護）。
+- ✅ **復旧鍵を 1Password に保管済み**: Private vault / アイテム「GPG: personal-data warehouse recovery (jun784)」。armored 秘密鍵(.asc)＋パスフレーズ＋keyid を格納。ディスク上の `.asc` は安全消去済み。
 
-### 復旧鍵の取り扱い（あなたの手作業 — 重要）
+### 復旧手順（鍵を失った/別端末で復元する時）
 ```bash
-# 紙に印刷 → 金庫 / KeePass に取り込み、その後ディスクから安全消去
-lpr ~/personal-data-gpg-RECOVERY-*.asc        # 印刷
-# KeePass に貼り付けたら:
-rm -P ~/personal-data-gpg-RECOVERY-*.asc       # secure delete (上書き削除)
+# 1Password から armored 秘密鍵を取り出して import
+op read "op://Private/GPG: personal-data warehouse recovery (jun784)/recovery_key.asc" \
+  | gpg --import
+# パスフレーズも同アイテムの passphrase フィールドにある
+op item get "GPG: personal-data warehouse recovery (jun784)" --fields passphrase --reveal
+# あとは git annex get personal/<path> で IPFS から復号取得
 ```
 
 ## まだ残る注意（任意の追加対策）
-1. **iCloud Keychain での端末間同期**: `security` で入れた項目は既定でローカル(login Keychain)。Apple 端末間同期が必要なら iCloud Keychain を有効化し、項目を同期可能にする/または pinentry-mac の GUI 入力時に「Save in Keychain」。最も確実な多端末 custody はオフライン復旧鍵の保管。
+1. **多端末 custody は 1Password に集約済み**（復旧鍵＋パスフレーズ）。macOS Keychain 項目 `gpg:personal-data` は当該 Mac の日常解錠用（既定でローカル）。別 Apple 端末で日常的に使うなら iCloud Keychain 同期 or 各端末で `op` から passphrase を取得。
 2. ローカル annex オブジェクト(`.git/annex/objects`)は**平文**。端末全体の暗号化(FileVault)で別途保護推奨。
 
 ## 注意
