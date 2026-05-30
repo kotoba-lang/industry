@@ -79,6 +79,8 @@ capture = ["metadata", "file-bodies"]   # ADR-0004: annexed binaries (drive/file
 analysis_artifacts = ["analysis/INDEX.md", "analysis/catalog.json", "analysis/observations.md", "analysis/financial-summary.json", "analysis/loan-ledger.json", "analysis/subscription-audit.json", "analysis/entities.json", "analysis/action-register.json", "analysis/sms-finance-timeline.jsonl"]
 file_count = 132   # annexed + pinned to IPFS (encrypted); as of 2026-05-30
 secrets_policy = "env var NAMES only; GitHub token VALUE not stored; 1Password = metadata only (no passwords/TOTP); SMS OTP/2FA codes redacted in derived files; data never plaintext to GitHub"
+litigation_state = "kawasakijun/litigation_state.jsonld"
+evidence_policy = "係争関連アカウントは削除せず保全 (ADR-0005); 正本=admin Data Export(mbox); 副本=warehouse; 改ざん封緘=SHA-256 + OpenTimestamps + git-annex"
 
 # Google account scope & reachability (ADR-0004).
 # The MCP Google connector is bound to a SINGLE OAuth session (jun784); it cannot
