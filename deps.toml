@@ -68,11 +68,39 @@ ssot = "projects/ai-gftd-apps-gftdcojp/README.md"
 [personal]
 path = "personal"
 kind = "personal-data-warehouse"
-description = "Encrypted personal data warehouse: this terminal + Gmail/Calendar/Drive/GitHub ingested for analysis. DataLad dataset; data is git-annexed (pointers only in git) and gpg-hybrid encrypted; only ciphertext is pinned to IPFS."
-adr = "kawasakijun/docs/adr/0003-personal-data-warehouse-encrypted-ipfs.md"
-stack = ["DataLad", "git-annex", "gpg", "IPFS"]
-sources = ["device", "gmail", "google-calendar", "google-drive", "github"]
-secrets_policy = "env var NAMES only; GitHub token VALUE not stored; data never plaintext to GitHub"
+description = "Encrypted personal data warehouse: Mac + Android terminals, Gmail/Calendar/Drive/GitHub/1Password, SMS/calls, finance/tax/legal/property/medical, plus derived analysis. DataLad dataset; data is git-annexed (pointers only in git) and gpg-hybrid encrypted; only ciphertext is pinned to IPFS."
+adrs = [
+  "kawasakijun/docs/adr/0003-personal-data-warehouse-encrypted-ipfs.md",
+  "kawasakijun/docs/adr/0004-account-scope-and-file-body-capture.md",
+]
+stack = ["DataLad", "git-annex", "gpg", "IPFS", "adb"]
+sources = ["device-mac", "device-android (getprop/packages/SMS-bodies/calls/contacts)", "gmail", "google-calendar", "google-drive", "github", "1password (metadata-only inventory)"]
+capture = ["metadata", "file-bodies"]   # ADR-0004: annexed binaries (drive/files/{tax,loans,contracts-corp})
+analysis_artifacts = ["analysis/INDEX.md", "analysis/catalog.json", "analysis/observations.md", "analysis/financial-summary.json", "analysis/loan-ledger.json", "analysis/subscription-audit.json", "analysis/entities.json", "analysis/action-register.json", "analysis/sms-finance-timeline.jsonl"]
+file_count = 132   # annexed + pinned to IPFS (encrypted); as of 2026-05-30
+secrets_policy = "env var NAMES only; GitHub token VALUE not stored; 1Password = metadata only (no passwords/TOTP); SMS OTP/2FA codes redacted in derived files; data never plaintext to GitHub"
+
+# Google account scope & reachability (ADR-0004).
+# The MCP Google connector is bound to a SINGLE OAuth session (jun784); it cannot
+# switch accounts. Other accounts need their own MCP connector, Takeout, or browser login.
+[[personal.account]]
+id = "jun784@gmail.com"
+role = "primary"
+reach = "mcp"          # Gmail/Calendar/Drive connector (+ Chrome /u/0)
+status = "ingested"    # full Drive inventory + 47 file-bodies + finance/calendar
+[[personal.account]]
+id = "root@jk.luxury"
+role = "corp (jk.luxury / LingLing litigation, LATOKEN, virtual office)"
+reach = "browser"      # Chrome /u/1 only; NOT on MCP
+status = "pending"     # needs MCP connector or Takeout for warehouse-scale ingest
+[[personal.account]]
+id = "root@junkawasaki.com"
+reach = "none"         # not logged into Chrome, not on MCP
+status = "unreachable"
+[[personal.account]]
+id = "jun@gftd.group"
+reach = "none"
+status = "unreachable"
 
 [personal.storage]
 vcs = "datalad"

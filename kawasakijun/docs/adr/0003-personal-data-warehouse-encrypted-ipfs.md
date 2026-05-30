@@ -112,15 +112,16 @@ sensors (Gmail/Calendar/Drive/gh/device)
 - ✅ datalad dataset 化 + `personal/` 構造 + annex ルール
 - ✅ gpg 鍵生成 → パスフレーズ付与 → Keychain 保管 → 復旧鍵を 1Password (Private) に保管
 - ✅ 暗号化 IPFS external special remote (自作) + 往復・暗号文検証
-- ✅ ingest: device / Gmail / Calendar / Drive / GitHub
-- ✅ 全 23 ファイルを暗号化して IPFS に pin (平文リーク 0 を検証)
-- ⏳ ingest の `datalad run` 化 (provenance 記録)
-- ⏳ Pregel sensor (`reverse_topo_pregel.py`) から `personal/` を直接参照
-- ⏳ iCloud Keychain 多端末同期の正式化
+- ✅ ingest (12 loop, subagent fan-out): Mac端末 / **Android (Pixel 10 Pro Fold: getprop/packages/SMS本文550/通話377/連絡先)** / Gmail(2019〜) / Calendar(2023〜) / Drive(目録620 + 実書類47) / GitHub / **1Password(1287, メタデータのみ)**
+- ✅ **132 ファイルを暗号化して IPFS に pin** (平文リーク 0 を検証; git は annex symlink のみ)
+- ✅ 派生分析: INDEX/catalog, observations(§1-35), financial-summary, loan-ledger(¥10.75M), subscription-audit, entities(人29/組織55), **action-register(P0=7)**, sms-finance-timeline
+- ⚠️ **並行ライター注意**: 別セッション/オーケストレータが同 repo の `personal/drive/files/` 実書類ダウンロードと deps.toml/ADR-0004 を並行更新。push 前に annex symlink(mode 120000)であることを必ず検証する運用とする。
+- ⏳ ingest の `datalad run` 化 (provenance 記録) / Pregel sensor 連携 / iCloud Keychain 多端末同期 / 他 Google アカウント(jk.luxury 等, ADR-0004)の取り込み
 
 ## 6. References
 
 - `personal/README.md` — 運用手順 (ingest / 暗号化 / pin / 復号 / 復旧)
 - `personal/analysis/observations.md` — 初期分析
 - ADR-0001 — sensor 層を定義した上位 ADR
+- ADR-0004 — アカウント到達性 (single-OAuth 制約) とファイル本体キャプチャ tier 方針
 - git-annex external special remote protocol / DataLad handbook
