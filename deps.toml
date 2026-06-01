@@ -59,6 +59,28 @@ stack = ["TypeScript", "Cloudflare Workers"]
 org = "gftdcojp"
 ssot = "projects/ai-gftd-apps-gftdcojp/README.md"
 
+[[projects]]
+name = "spirit-in-physics"
+path = "projects/spirit-in-physics"
+kind = "research"
+submodule = true
+remote = "git@github.com:com-junkawasaki/spirit-in-physics.git"
+description = "「Spirit in Physics」研究リポジトリ（web + mobile アプリ, jung-voice-assessment 音声 dataset, 論文 PDF）。大容量ファイルは Git LFS から DataLad/git-annex へ移行予定。"
+stack = ["Svelte", "Capacitor", "TypeScript"]
+adrs = ["kawasakijun/docs/adr/0006-spirit-in-physics-lfs-to-datalad.md"]
+# 大容量ファイル: Git LFS 115 obj(mp3/png/pdf, KB級) + 孤児化した .webm annex ポインタ。
+# 取り込みは GIT_LFS_SKIP_SMUDGE=1。git lfs pull は購入ロックでブロック中(ADR-0006)。
+large_files = { current = "git-lfs (+ orphaned git-annex pointers)", target = "datalad/git-annex", status = "blocked: account purchase-lock, GitHub Support 2026-06-01" }
+
+[[projects]]
+name = "260208-spirit-in-physics"
+path = "projects/260208-spirit-in-physics"
+kind = "research"
+submodule = true
+remote = "git@github.com:com-junkawasaki/260208-spirit-in-physics.git"
+description = "「Spirit in Physics」関連リポジトリ（2026-02-08 スナップショット）。大容量ファイル機構なし（通常リポジトリ）。"
+adrs = ["kawasakijun/docs/adr/0006-spirit-in-physics-lfs-to-datalad.md"]
+
 # ─── Personal data warehouse ───────────────────────────────────────
 #
 # Sensor-ingestion + encrypted storage layer for the top-level orchestrator
