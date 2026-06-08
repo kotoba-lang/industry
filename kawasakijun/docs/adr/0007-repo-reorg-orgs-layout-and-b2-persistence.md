@@ -83,21 +83,32 @@ gpg-hybrid 暗号・暗号文のみ外部 remote）に統合する。
 `personal/drive/jk-luxury-archive/` 配下の DataLad annex とし、実体は暗号化して B2 へ。
 git 本体・GitHub には pointer のみ（平文は決して push しない）。
 
-### 4. Backblaze B2 を git-annex special remote として全 dataset に追加
+### 4. Backblaze B2 を git-annex **S3互換** special remote として全 dataset に追加
 
 既存方針 `[personal.storage]`（vcs=datalad / content=git-annex / remote=ipfs /
 encryption=hybrid, key `09EE841334482F5A0F5C4958A70BB2C220DE88CA`）に **B2 を追加**。
-git-annex は B2 をネイティブサポートし、DataLad はその上位ラッパのため追加実装は不要。
+
+> **実装メモ**: 現行 git-annex 10.20251215 には built-in `type=B2` が**無い**
+> （remote types に B2 不在）。B2 の **S3 互換 API** を使い `type=S3` で接続する。
 
 ```bash
 # 各 DataLad dataset で一度だけ initremote（superdataset / personal / 大容量サブ）
-git annex initremote b2 type=B2 bucket=com-junkawasaki-annex \
-    encryption=hybrid keyid=09EE841334482F5A0F5C4958A70BB2C220DE88CA chunk=50MiB
+export AWS_ACCESS_KEY_ID=<b2 keyID>          # B2 application keyID
+export AWS_SECRET_ACCESS_KEY=<b2 appKey>     # B2 applicationKey
+git annex initremote b2 type=S3 \
+    host=s3.us-west-004.backblazeb2.com port=443 \
+    bucket=com-junkawasaki-annex \
+    signature=v4 chunk=50MiB \
+    encryption=hybrid keyid=09EE841334482F5A0F5C4958A70BB2C220DE88CA
 datalad push --to b2          # 実体を B2 へ、git には pointer のみ
 ```
 
-- **認証**: `B2_ACCOUNT_ID` / `B2_APP_KEY` を環境変数（macOS Keychain / 1Password 保管）。
-  既存 secrets_policy（値は git に入れない）と整合。
+- **アカウント/エンドポイント**: gftdcojp B2（region `us-west-004`,
+  endpoint `s3.us-west-004.backblazeb2.com`）。
+- **バケット**: 専用 `com-junkawasaki-annex` を新規作成（master key で bucket + scoped key
+  を発行し、訴訟証拠を gftd 資産と分離）。発行した scoped key は 1Password に格納。
+- **認証**: S3 互換のため `AWS_ACCESS_KEY_ID`=keyID / `AWS_SECRET_ACCESS_KEY`=appKey を
+  環境変数で渡す（macOS Keychain / 1Password 保管、値は git に入れない）。
 - **暗号**: `encryption=hybrid` で既存 GPG 鍵を再利用 → personal warehouse と同一封緘。
 - **チャンク**: `chunk=50MiB` で 41G archive を分割し再開可能アップロードにする。
 - **IPFS**: 副系として残置（B2=主系 / IPFS=冗長）。完全一本化はしない。
@@ -107,9 +118,12 @@ datalad push --to b2          # 実体を B2 へ、git には pointer のみ
 [personal.storage]
 vcs = "datalad"
 content = "git-annex (annex-ignore on origin)"
-remote_primary = "backblaze-b2 (special remote type=B2, encryption=hybrid)"
+remote_primary = "backblaze-b2 (git-annex type=S3, S3-compatible, encryption=hybrid)"
 remote_secondary = "ipfs (external special remote, encryption=hybrid)"
+b2_account = "gftdcojp"
+b2_endpoint = "s3.us-west-004.backblazeb2.com"
 bucket = "com-junkawasaki-annex"
+credential_custody = "1Password (gftdcojp vault); env AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY"
 ```
 
 ## Consequences

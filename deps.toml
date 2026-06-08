@@ -139,7 +139,13 @@ known_issues = ["txn double-count across 8 finance files (need dedup-key=date+ve
 [personal.storage]
 vcs = "datalad"
 content = "git-annex (annex-ignore on origin)"
-remote = "ipfs (external special remote, encryption=hybrid)"
+remote_primary = "backblaze-b2 (git-annex type=S3, encryption=hybrid)"   # ADR-0007
+remote_secondary = "ipfs (external special remote, encryption=hybrid)"
+b2_account = "gftdcojp"
+b2_endpoint = "s3.us-west-004.backblazeb2.com"   # region us-west-004
+b2_bucket = "com-junkawasaki-annex"              # allPrivate, dedicated (id 8d596f46ac50ab9a91e20518)
+b2_annex_uuid = "e5715721-d944-42ec-8458-3d8b18bc501b"
+b2_key_custody = "1Password gftdcojp vault: 'com-junkawasaki.b2/annex' (scoped key 004d9f6c0ba12580000000008); creds embedded gpg-encrypted in git-annex branch"
 
 [personal.encryption]
 cipher = "gpg encryption=hybrid"
