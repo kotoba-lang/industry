@@ -7,11 +7,16 @@ It fetches messages matching a Gmail query as format=RAW (true RFC822) and store
 each as mail/messages/<cid>.eml (cid = sha256 of the raw bytes), updating
 mail/messages/index.jsonl. Idempotent by cid and by Gmail message id.
 
-AUTH (one-time): the token needs the gmail.readonly scope. Easiest:
-    gcloud auth application-default login \
-        --scopes=https://www.googleapis.com/auth/gmail.readonly,openid
-then this script picks up the token automatically. Or pass a bearer token via
-    GMAIL_ACCESS_TOKEN=ya29.... python3 bin/ingest-gmail-batch.py 'label:LingLing'
+AUTH (one-time): the token needs the gmail.readonly scope.
+  NOTE: gcloud's DEFAULT ADC client is BLOCKED by Google from the Gmail restricted
+  scope ("このアプリはブロックされます"). So `gcloud auth application-default login
+  --scopes=...gmail.readonly` will NOT work. Two ways to get a usable token:
+   (a) Create your OWN OAuth Desktop client in GCP (project com-junkawasaki-sip),
+       enable the Gmail API, add yourself as a test user, then mint a token for it
+       and export GMAIL_ACCESS_TOKEN.
+   (b) Skip the API entirely and use bin/ingest-mbox.py on a Google Takeout mbox
+       (no OAuth; recommended for large one-time backfills).
+Then: GMAIL_ACCESS_TOKEN=ya29.... python3 bin/ingest-gmail-batch.py 'label:LingLing'
 
 USAGE:
     python3 bin/ingest-gmail-batch.py '<gmail query>' [max]
