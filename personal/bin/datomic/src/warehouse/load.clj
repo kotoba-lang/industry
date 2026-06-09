@@ -8,6 +8,7 @@
   (:require [datomic.client.api :as d]
             [clojure.data.json :as json]
             [clojure.java.io :as io]
+            [clojure.edn :as edn]
             [clojure.string :as str]))
 
 (def base "/Users/junkawasaki/github/com-junkawasaki/personal")
@@ -39,32 +40,9 @@
 
 (defn clean [s] (when s (str/trim (str s))))
 
-;; ---------- schema ----------
-(def schema
-  [{:db/ident :org/name        :db/valueType :db.type/string :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
-   {:db/ident :org/type        :db/valueType :db.type/string :db/cardinality :db.cardinality/one}
-   {:db/ident :person/email    :db/valueType :db.type/string :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
-   {:db/ident :person/name     :db/valueType :db.type/string :db/cardinality :db.cardinality/one}
-   {:db/ident :person/role     :db/valueType :db.type/string :db/cardinality :db.cardinality/one}
-   {:db/ident :txn/id          :db/valueType :db.type/string :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
-   {:db/ident :txn/date        :db/valueType :db.type/string :db/cardinality :db.cardinality/one}
-   {:db/ident :txn/month       :db/valueType :db.type/string :db/cardinality :db.cardinality/one}
-   {:db/ident :txn/amount-jpy  :db/valueType :db.type/long   :db/cardinality :db.cardinality/one}
-   {:db/ident :txn/kind        :db/valueType :db.type/string :db/cardinality :db.cardinality/one}
-   {:db/ident :txn/detail      :db/valueType :db.type/string :db/cardinality :db.cardinality/one}
-   {:db/ident :txn/vendor      :db/valueType :db.type/ref    :db/cardinality :db.cardinality/one}
-   {:db/ident :txn/source      :db/valueType :db.type/string :db/cardinality :db.cardinality/one}
-   {:db/ident :loan/id         :db/valueType :db.type/string :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
-   {:db/ident :loan/date       :db/valueType :db.type/string :db/cardinality :db.cardinality/one}
-   {:db/ident :loan/amount-jpy :db/valueType :db.type/long   :db/cardinality :db.cardinality/one}
-   {:db/ident :event/id        :db/valueType :db.type/string :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
-   {:db/ident :event/summary   :db/valueType :db.type/string :db/cardinality :db.cardinality/one}
-   {:db/ident :event/start     :db/valueType :db.type/string :db/cardinality :db.cardinality/one}
-   {:db/ident :event/category  :db/valueType :db.type/string :db/cardinality :db.cardinality/one}
-   {:db/ident :action/id       :db/valueType :db.type/string :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
-   {:db/ident :action/title    :db/valueType :db.type/string :db/cardinality :db.cardinality/one}
-   {:db/ident :action/priority :db/valueType :db.type/string :db/cardinality :db.cardinality/one}
-   {:db/ident :action/category :db/valueType :db.type/string :db/cardinality :db.cardinality/one}])
+;; ---------- schema (declarative, loaded from edn) ----------
+;; Relationships/refs live in bin/datomic/schema.edn (graph summary: model.edn).
+(def schema (edn/read-string (slurp (io/file base "bin/datomic/schema.edn"))))
 
 ;; ---------- normalization (file records -> datoms) ----------
 (def finance-files
@@ -147,6 +125,36 @@
                     (assoc :event/start (clean (or (:start e) (:date e) (:dates e))))))))
             items))))))
 
+;; ---------- email (cid/eml) + case ----------
+(defn- addr [s] (when s (let [m (re-find #"<([^>]+)>" (str s))] (clean (if m (second m) s)))))
+
+(defn- email->case [rec]
+  (let [hay (str (:subject rec) " " (str/join " " (:labels rec)))]
+    (when (re-find #"(?i)lingling|訴訟" hay) {:case/id "lingling"})))
+
+(defn email-tx []
+  (keep
+    (fn [rec]
+      (when-let [cid (:cid rec)]
+        (cond-> {:email/cid        cid
+                 :email/message-id (or (clean (:message_id rec)) cid)
+                 :email/blob       (cond-> {:blob/cid cid}
+                                     (:eml_path rec) (assoc :blob/path (clean (:eml_path rec)))
+                                     (:size rec)     (assoc :blob/size (long (:size rec))))}
+          (:thread_id rec) (assoc :email/thread-id (clean (:thread_id rec)))
+          (:date rec)      (assoc :email/date (clean (:date rec)))
+          (:subject rec)   (assoc :email/subject (clean (:subject rec)))
+          (seq (:labels rec)) (assoc :email/labels (vec (keep clean (:labels rec))))
+          (addr (:from rec))  (assoc :email/from {:person/email (addr (:from rec))})
+          (seq (:to rec))  (assoc :email/to (vec (for [t (:to rec) :let [a (addr t)] :when a] {:person/email a})))
+          (seq (:cc rec))  (assoc :email/cc (vec (for [t (:cc rec) :let [a (addr t)] :when a] {:person/email a})))
+          (email->case rec) (assoc :email/case (email->case rec)))))
+    (rd-jsonl "mail/messages/index.jsonl")))
+
+(defn case-tx []
+  (when (seq (email-tx))
+    [{:case/id "lingling" :case/name "LingLing訴訟" :case/kind "litigation"}]))
+
 ;; ---------- main ----------
 (defn -main [& _]
   (let [client (d/client {:server-type :datomic-local :storage-dir :mem :system "personal-warehouse"})]
@@ -156,7 +164,8 @@
       ;; reference data first (orgs/persons), then facts
       (doseq [[label tx] [["orgs" (org-tx)] ["persons" (person-tx)]
                           ["txns" (txn-tx)] ["loans" (loan-tx)]
-                          ["actions" (action-tx)] ["events" (event-tx)]]]
+                          ["actions" (action-tx)] ["events" (event-tx)]
+                          ["cases" (case-tx)] ["emails" (email-tx)]]]
         (when (seq tx)
           (d/transact conn {:tx-data (vec tx)})
           (println (format "  loaded %-8s %d" label (count tx)))))
@@ -171,6 +180,13 @@
         (println "  loans  " (n '[:find (count ?e) :where [?e :loan/id]]))
         (println "  events " (n '[:find (count ?e) :where [?e :event/id]]))
         (println "  actions" (n '[:find (count ?e) :where [?e :action/id]]))
+        (println "  emails " (n '[:find (count ?e) :where [?e :email/cid]]))
+        (println "  cases  " (n '[:find (count ?e) :where [?e :case/id]]))
+        (println "\n[Datalog] email -> case (cid/eml evidence linked by ref):")
+        (doseq [[subj cnm cid] (d/q '[:find ?subj ?cnm ?cid
+                                      :where [?e :email/case ?c] [?c :case/name ?cnm]
+                                             [?e :email/subject ?subj] [?e :email/cid ?cid]] db)]
+          (println (format "  [%s] %s  (cid %s…)" cnm subj (subs cid 0 12))))
         (println "\ntxn amount coverage:")
         (println "  txns with parsed amount:" (n '[:find (count ?t) :where [?t :txn/amount-jpy]]))
         (println "  sum of parsed amounts ¥:" (sum '[:find (sum ?a) :where [?t :txn/amount-jpy ?a]]))

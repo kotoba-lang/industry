@@ -200,12 +200,23 @@ status = "unreachable"
 
 # Normalized query layer (rebuildable derived index; JSONL remains source of truth).
 [personal.datomic]
-impl = "personal/bin/datomic (deps.edn + src/warehouse/load.clj)"
+impl = "personal/bin/datomic (deps.edn + schema.edn + model.edn + src/warehouse/load.clj)"
 engine = "com.datomic/local 1.0.291 (datomic:local, :storage-dir :mem, no transactor)"
 rebuild = "cd personal/bin/datomic && clojure -M -m warehouse.load"
-schema = "EAV refs: org / person / account / txn / loan / event / action"
-loaded = { org = 110, person = 29, txn = 631, loan = 19, event = 49, action = 23 }
+schema = "declarative in bin/datomic/schema.edn; relationship graph in bin/datomic/model.edn"
+entities = ["org", "person", "account", "txn", "loan", "event", "action", "email", "attachment", "case", "blob"]
+relationships = "EAV refs: txn→vendor/account/email, person→org, account→org/owner, loan→lender, event→people, action→case/email, email→from/to/cc/mentions/case/blob/attachments, attachment→email/blob, case→parties/orgs/evidence"
+loaded = { org = 110, person = 29, txn = 631, loan = 19, event = 49, action = 23, email = 1, case = 1 }
 known_issues = ["txn double-count across 8 finance files (need dedup-key=date+vendor+amount)", "loan-ledger total ¥10.75M vs agreement detail sum ¥7.89M mismatch (recompute from detail)"]
+
+# Raw email store: content-addressed (cid=sha256) .eml under git-annex -> B2/IPFS.
+[personal.mail_store]
+format = "RFC822 .eml, content-addressed (cid = sha256 hex)"
+path = "personal/mail/messages/<cid>.eml  (git-annex MD5E, encryption=hybrid -> Backblaze B2)"
+index = "personal/mail/messages/index.jsonl  (cid <-> message_id <-> thread <-> from/to/cc/subject/labels)"
+ingest = "pipe MCP get_thread FULL_CONTENT JSON to personal/bin/ingest-eml.py (idempotent by cid)"
+status = "bootstrapped 2026-06-09: 1 message backfilled (LingLing ETH NEO 175623 evidence). Derived finance/litigation jsonl remain the metadata layer; .eml is the raw/cid layer."
+note = "Before this, mail was derived-metadata jsonl only (no raw bodies, no cid/eml). cid/eml + edn relationships added per user request."
 
 # jk.luxury Drive archive — litigation evidence (ADR-0007 Phase 3).
 # 41G を personal/drive/jk-luxury-archive/ に取り込み、全ファイル annex(MD5E)→B2。
