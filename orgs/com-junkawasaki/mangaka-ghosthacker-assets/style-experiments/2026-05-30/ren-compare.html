@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>Ren scene — 6 finalists</title>
+<style>
+:root{color-scheme:dark;--bg:#0e0e10;--panel:#1a1a1f;--fg:#e8e8ec;
+      --muted:#8b8b95;--accent:#4cb5ff;--gold:#ffd54c;--good:#7cf8a7;--meh:#ff7a7a;
+      --border:#2a2a32}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,"Hiragino Sans",sans-serif}
+header{padding:16px 24px;border-bottom:1px solid var(--border)}
+h1{font-size:18px} h1 small{color:var(--muted);font-weight:400;margin-left:8px}
+main{padding:20px;max-width:1700px;margin:0 auto}
+.note{background:var(--panel);padding:12px 16px;border-radius:8px;margin-bottom:16px;
+      font-size:13px;color:var(--muted)}
+.note code{background:#000;padding:2px 6px;border-radius:3px;font-size:11px;color:var(--fg)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.cell{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px}
+.cell.best{border:2px solid var(--gold)}
+.cell.best::before{content:"★ poptokyo winner";color:var(--gold);font-size:10px;display:block;margin-bottom:4px;font-weight:600}
+.cell img{width:100%;height:auto;border-radius:4px;background:#fff;cursor:zoom-in}
+.cell h3{font-size:13px;font-weight:600;color:var(--fg);margin:8px 0 4px;
+         font-family:ui-monospace,monospace}
+.cell .meta{font-size:11px;color:var(--muted);font-family:ui-monospace,monospace;line-height:1.5}
+.cell .vote{margin-top:8px;display:flex;gap:5px}
+.cell .vote button{flex:1;background:transparent;color:var(--muted);
+                    border:1px solid var(--border);border-radius:4px;padding:6px;
+                    cursor:pointer;font:inherit;font-size:12px}
+.cell .vote button:hover{background:var(--border);color:var(--fg)}
+.cell .vote button[data-v=best].on{background:var(--accent);color:#000;border-color:var(--accent)}
+.cell .vote button[data-v=good].on{background:var(--good);color:#000;border-color:var(--good)}
+.cell .vote button[data-v=meh].on{background:var(--meh);color:#000;border-color:var(--meh)}
+#lb{position:fixed;inset:0;background:rgba(0,0,0,0.92);display:none;
+    align-items:center;justify-content:center;z-index:99;cursor:zoom-out}
+#lb.on{display:flex}
+#lb img{max-width:95vw;max-height:95vh}
+.tally{margin-top:24px;padding:16px;background:var(--panel);border-radius:8px}
+.tally h2{font-size:14px;margin-bottom:8px;color:var(--accent)}
+.tally pre{font:12px/1.6 ui-monospace,monospace}
+</style></head><body>
+<header><h1>Ren scene — 6 finalists
+<small>p01 P2 (Ren sleeping at desk) · 3 Best + 3 next-tier Good from poptokyo verdict</small></h1></header>
+<main>
+<div class="note">
+<b>Locked scene:</b> Ren sleeping at wooden classroom desk, head on folded arms, hoodie, donut/earphone/pencil details
+<br><b>Goal:</b> 同じ scene で どの style が Ren (静かな寝姿 CU) でも Best 取れるか
+</div>
+
+<div class="grid">
+  <div class="cell best" data-k="R1"><img src="file:///tmp/ren-R1-posuka.png">
+    <h3>R1 · posuka_demizu</h3>
+    <div class="meta">A4 winner — Promised Neverland 細密</div>
+    <div class="vote"><button data-v="best">Best</button><button data-v="good">Good</button><button data-v="meh">Meh</button></div>
+  </div>
+  <div class="cell best" data-k="R2"><img src="file:///tmp/ren-R2-nihei.png">
+    <h3>R2 · nihei_tsutomu</h3>
+    <div class="meta">A6 winner — Blame! cyber</div>
+    <div class="vote"><button data-v="best">Best</button><button data-v="good">Good</button><button data-v="meh">Meh</button></div>
+  </div>
+  <div class="cell best" data-k="R3"><img src="file:///tmp/ren-R3-obata-cool.png">
+    <h3>R3 · obata + cool</h3>
+    <div class="meta">C2 winner — Death Note + suspense modifier</div>
+    <div class="vote"><button data-v="best">Best</button><button data-v="good">Good</button><button data-v="meh">Meh</button></div>
+  </div>
+  <div class="cell" data-k="R4"><img src="file:///tmp/ren-R4-obata-pure.png">
+    <h3>R4 · obata pure</h3>
+    <div class="meta">A3 — Death Note alone (no modifier)</div>
+    <div class="vote"><button data-v="best">Best</button><button data-v="good">Good</button><button data-v="meh">Meh</button></div>
+  </div>
+  <div class="cell" data-k="R5"><img src="file:///tmp/ren-R5-asano.png">
+    <h3>R5 · asano_inio</h3>
+    <div class="meta">A1 — Punpun urban youth</div>
+    <div class="vote"><button data-v="best">Best</button><button data-v="good">Good</button><button data-v="meh">Meh</button></div>
+  </div>
+  <div class="cell" data-k="R6"><img src="file:///tmp/ren-R6-togashi-y2022.png">
+    <h3>R6 · togashi y2022</h3>
+    <div class="meta">A8 — HxH 復帰 sketchy</div>
+    <div class="vote"><button data-v="best">Best</button><button data-v="good">Good</button><button data-v="meh">Meh</button></div>
+  </div>
+</div>
+
+<div class="tally"><h2>Verdict</h2><pre id="tally">no votes yet</pre></div>
+</main>
+<div id="lb" onclick="this.classList.remove('on')"><img id="lbimg"></div>
+<script>
+const SK='ren-vote';
+const v=JSON.parse(localStorage.getItem(SK)||'{}');
+function render(){
+  document.querySelectorAll('.cell').forEach(c=>{
+    const k=c.dataset.k;
+    c.querySelectorAll('.vote button').forEach(b=>b.classList.toggle('on',b.dataset.v===v[k]));
+  });
+  const g={best:[],good:[],meh:[]};
+  for(const[k,vv]of Object.entries(v)){if(g[vv])g[vv].push(k);}
+  let out='';
+  if(g.best.length)out+='★ Best:\n  '+g.best.join('\n  ')+'\n\n';
+  if(g.good.length)out+='+ Good:\n  '+g.good.join('\n  ')+'\n\n';
+  if(g.meh.length) out+='✗ Meh:\n  '+g.meh.join('\n  ');
+  document.getElementById('tally').textContent=out||'no votes yet';
+}
+document.querySelectorAll('.vote button').forEach(b=>b.addEventListener('click',e=>{
+  const cell=e.target.closest('.cell'),k=cell.dataset.k;
+  v[k]=v[k]===e.target.dataset.v?null:e.target.dataset.v;
+  if(!v[k])delete v[k];
+  localStorage.setItem(SK,JSON.stringify(v));render();
+}));
+document.querySelectorAll('.cell img').forEach(img=>img.addEventListener('click',()=>{
+  document.getElementById('lbimg').src=img.src;
+  document.getElementById('lb').classList.add('on');
+}));
+render();
+</script>
+</body></html>
