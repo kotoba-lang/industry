@@ -152,12 +152,33 @@ credential_custody = "1Password (gftdcojp vault); env AWS_ACCESS_KEY_ID/AWS_SECR
 5. **Phase 4**: 全 dataset で `git annex initremote b2 …` → `datalad push --to b2`。
    `[personal.storage]` 更新、deps.toml の path 群を orgs/ に追従。
 
-## Status / Next
+## Status / Next（2026-06-09 更新）
 
-- 完了: 全 13 repo の git/branch/remote/size 調査、分類（A/B/C）、本 ADR 起票。
-- 待ち: (a) B2 バケット/鍵作成（ユーザ） (b) ADR-0006 の購入ロック解除。
-- 次アクション: Phase 1（orgs 統一）から着手。dirty tree(etzhayyim-root 16,
-  jk-archive 13 等)は取り込み前に各 repo で commit/退避。
+進捗ログ:
+
+- **Phase 1 完了**（commit `4495a2e0`）: `projects/` → `orgs/<org>/` 統一。重複 submodule
+  (ai-gftd-apps-gftdcojp) 削除、stale 2 件除去、moex / kotoba-topology 追加、
+  ghosthacker の worktree path 修復、2604-linde 移設。remote の kotoba 追加を rebase で統合。
+- **Phase 4 完了**（commit `26c2ea4f`）: B2 バケット `com-junkawasaki-annex`
+  (allPrivate, us-west-004, id `8d596f46ac50ab9a91e20518`) + scoped key
+  (`004d9f6c…008`, 1Password `com-junkawasaki.b2/annex`) を master key で作成。
+  `git annex initremote b2 type=S3`（signature=v4, chunk=50MiB, **encryption=hybrid**,
+  **embedcreds=yes**）。`testremote --fast` 125/125 合格（env 有無とも）。
+  GPG passphrase は Keychain `gpg:personal-data` から agent にプリセット
+  （keygrip 9B98…D091, max-cache 2h）。
+- **Phase 2 完了**（commit `35a3da8d`）: remote 無し C 群を `orgs/com-junkawasaki/` に
+  素フォルダ取り込み。systemofsystem(18→git)、yukkuri-assets(wav/png annex)、
+  mangaka-ghosthacker-assets(768 png + pdf annex)。元 repo は git-annex のため
+  symlink を実体化(`rsync -L`)し superdataset annex(MD5E) に再登録。
+  **813 キー(≈890M)を B2 へ copy 完了**（欠損 0、B2 から fsck OK）。
+- **Phase 3 保留（ディスク制約）**: `jk-luxury-drive-archive` は 41G・唯一の訴訟証拠
+  （36G が「触らないで」フォルダ、untracked 25,701、remote 無し）。ディスク空きが
+  **26G < 41G** で copy 不可。**先にディスク空きを確保**してから（退避先/削除対象は
+  別途相談）コピー方式で `personal/drive/jk-luxury-archive/` に取り込み → annex → B2。
+
+- 待ち: (a) Phase 3 用ディスク空き確保 (b) ADR-0006 の購入ロック解除（spirit-in-physics）。
+- 残: `git submodule update --init --force` での worktree 復元
+  （ghosthacker/260208 等。spirit-in-physics/webmaster は LFS ロック解除後）。
 
 ## Alternatives considered
 
