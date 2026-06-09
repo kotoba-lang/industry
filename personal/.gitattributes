@@ -13,3 +13,7 @@ bin/**               annex.largefiles=nothing
 # analysis/ holds derived PII (financial/security findings). Always annex+encrypt,
 # even .md. Placed last so it overrides the **/*.md=nothing rule above.
 analysis/**          annex.largefiles=anything
+
+# litigation/ holds case work product (答弁書 drafts, evidence figures, strategy).
+# Always annex+encrypt; never plaintext to GitHub. Overrides **/*.md=nothing.
+litigation/**        annex.largefiles=anything
