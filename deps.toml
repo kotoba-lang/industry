@@ -72,9 +72,10 @@ remote = "git@github.com:com-junkawasaki/spirit-in-physics.git"
 description = "「Spirit in Physics」研究リポジトリ（web + mobile アプリ, jung-voice-assessment 音声 dataset, 論文 PDF）。大容量ファイルは Git LFS から DataLad/git-annex へ移行予定。"
 stack = ["Svelte", "Capacitor", "TypeScript"]
 adrs = ["kawasakijun/docs/adr/0006-spirit-in-physics-lfs-to-datalad.md"]
-# 大容量ファイル: Git LFS 115 obj(mp3/png/pdf, KB級) + 孤児化した .webm annex ポインタ。
-# 取り込みは GIT_LFS_SKIP_SMUDGE=1。git lfs pull は購入ロックでブロック中(ADR-0006)。
-large_files = { current = "git-lfs (+ orphaned git-annex pointers)", target = "datalad/git-annex", status = "blocked: account purchase-lock, GitHub Support 2026-06-01" }
+# 大容量ファイル: Git LFS 115 obj(mp3/png/pdf, KB〜MB級, ~2.6MB) + 孤児化した .webm
+# annex ポインタ 20本(各~175MB, git-annex ブランチ無し=取得不能)。
+# 購入ロックは 2026-06-09 解除確認(git lfs fetch --all 成功)。移行(LFS→annex)は未実行(ADR-0006)。
+large_files = { current = "git-lfs (+ orphaned git-annex pointers)", target = "datalad/git-annex", status = "unblocked 2026-06-09: lfs fetch OK (114 obj/2.6MB); migration pending (ADR-0006)" }
 
 [[projects]]
 name = "260208-spirit-in-physics"
