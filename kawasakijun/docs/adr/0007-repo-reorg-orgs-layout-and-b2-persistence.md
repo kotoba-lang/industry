@@ -1,7 +1,7 @@
 # ADR-0007: 外部 repo 群の orgs/ レイアウト再配置と Backblaze B2 永続化
 
-- **Status**: Accepted（実行は段階的。B2 バケット/鍵作成と購入ロック解除がブロッカ）
-- **Date**: 2026-06-08
+- **Status**: Implemented（Phase 1/2/3/4 完了・main push 済み。2026-06-09）
+- **Date**: 2026-06-08（実装完了 2026-06-09）
 - **Deciders**: 河崎純真 (jun784@gmail.com)
 - **Context tags**: submodule, datalad, git-annex, backblaze-b2, storage-policy, repo-reorg, orgs-layout, litigation-evidence
 
@@ -171,14 +171,22 @@ credential_custody = "1Password (gftdcojp vault); env AWS_ACCESS_KEY_ID/AWS_SECR
   mangaka-ghosthacker-assets(768 png + pdf annex)。元 repo は git-annex のため
   symlink を実体化(`rsync -L`)し superdataset annex(MD5E) に再登録。
   **813 キー(≈890M)を B2 へ copy 完了**（欠損 0、B2 から fsck OK）。
-- **Phase 3 保留（ディスク制約）**: `jk-luxury-drive-archive` は 41G・唯一の訴訟証拠
-  （36G が「触らないで」フォルダ、untracked 25,701、remote 無し）。ディスク空きが
-  **26G < 41G** で copy 不可。**先にディスク空きを確保**してから（退避先/削除対象は
-  別途相談）コピー方式で `personal/drive/jk-luxury-archive/` に取り込み → annex → B2。
+- **ディスク確保完了**: 冗長な外部 clone `gftdcojp/ai-gftd-apps-gftdcojp`(44G) と
+  `github/ghosthacker`(23G)（全コミット remote 済・固有作業ゼロ）を削除し
+  **26G → 89G** に回復。両者は com-junkawasaki 内 submodule から復元可。
+- **Phase 3 完了**（commit `a170183a`）: `jk-luxury-drive-archive` 41G を
+  `personal/drive/jk-luxury-archive/` に copy → 全ファイル annex(MD5E)。
+  archive 内 nested `.gitignore` 由来 484 ファイルも `--no-check-gitignore --force-large`
+  で強制保全（.DS_Store 17 のみ除外、tracked 26,135）。annex-add の dedup で ~8G 回収。
+  **全 28,327 キー(≈33G unique) を B2 へ copy 完了**（欠損 0、`fsck --from b2` で
+  証拠 PDF まで実検証 OK）。ローカル + B2 の 2 コピー確認後、元の単独 clone を削除
+  （**89G → 97G**）。
 
-- 待ち: (a) Phase 3 用ディスク空き確保 (b) ADR-0006 の購入ロック解除（spirit-in-physics）。
-- 残: `git submodule update --init --force` での worktree 復元
-  （ghosthacker/260208 等。spirit-in-physics/webmaster は LFS ロック解除後）。
+- 完了: **全 Phase（1/2/3/4）完了・main へ push 済み**。全大容量コンテンツ
+  （C 群 890M + jk-archive 33G）が `com-junkawasaki-annex` バケットに encryption=hybrid で永続化。
+- 残（任意）: (a) 他の冗長外部 clone 整理（260208 4.7G / etzhayyim-root 3.1G dirty 等）
+  (b) `git submodule update --init --force` での worktree 復元（spirit-in-physics/webmaster
+  は ADR-0006 の GitHub 購入ロック解除後）。
 
 ## Alternatives considered
 

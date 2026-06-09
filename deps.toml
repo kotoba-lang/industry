@@ -1,9 +1,12 @@
 # com-junkawasaki — deps.toml
 #
 # Machine-readable SSoT for the com-junkawasaki workspace.
-# Four projects as git submodules under projects/.
+# Repos are organized under orgs/<org>/<repo> (ADR-0007). Large file content is
+# persisted to Backblaze B2 via git-annex (type=S3, encryption=hybrid); GitHub
+# holds pointers only.
 #
-# ADR reference: projects/2604-linde/docs/adr/0003-workspace-multi-project-submodule-structure.md
+# ADR reference: orgs/com-junkawasaki/2604-linde/docs/adr/0003-workspace-multi-project-submodule-structure.md
+#                kawasakijun/docs/adr/0007-repo-reorg-orgs-layout-and-b2-persistence.md
 
 # ─── Workspace identity ────────────────────────────────────────────
 
@@ -17,7 +20,7 @@ description = "Personal research workspace: formal mathematics, religious-corp s
 
 [[projects]]
 name = "2604-linde"
-path = "projects/2604-linde"
+path = "orgs/com-junkawasaki/2604-linde"
 kind = "lean4-formalization"
 submodule = false
 description = "Lean 4 formal mathematics. Formalizes 'computation = information = physics' via Verlinde entropic gravity, Black Hole Computer, and 5-layer GenerativeStructure stack."
@@ -30,38 +33,39 @@ stack = ["Lean 4", "Mathlib"]
 
 [[projects]]
 name = "etzhayyim-root"
-path = "projects/etzhayyim-root"
+path = "orgs/etzhayyim/root"
 kind = "blockchain-substrate"
 submodule = true
 remote = "https://github.com/etzhayyim/root.git"
 description = "Religious corporation (宗教法人 etzhayyim / 天御柱) open substrate. AT Protocol MST + IPFS + Base L2 anchor. No RisingWave. No fiat."
 stack = ["TypeScript", "Rust", "Solidity", "Python", "Go"]
-ssot = "projects/etzhayyim-root/deps.toml"
+ssot = "orgs/etzhayyim/root/deps.toml"
 
 [[projects]]
 name = "ghosthacker"
-path = "projects/ghosthacker"
+path = "orgs/com-junkawasaki/ghosthacker"
 kind = "ai-content-pipeline"
 submodule = true
 remote = "git@github.com:com-junkawasaki/ghosthacker.git"
 description = "Ghost Hacker Producer Pipeline. AI-driven story generation (Webtoon / Wattpad / YouTube) set in 2065 Tokyo. Merkle DAG topological execution pipeline over Neo4j story graph."
 stack = ["Go", "Svelte", "Python"]
-ssot = "projects/ghosthacker/mise.toml"
+ssot = "orgs/com-junkawasaki/ghosthacker/mise.toml"
+assets = "orgs/com-junkawasaki/mangaka-ghosthacker-assets"   # vendored, annex->B2 (ADR-0007)
 
 [[projects]]
 name = "ai-gftd-apps-gftdcojp"
-path = "projects/ai-gftd-apps-gftdcojp"
+path = "orgs/gftdcojp/ai-gftd-apps-gftdcojp"
 kind = "ai-agent-platform"
 submodule = true
 remote = "git@github.com:gftdcojp/ai-gftd-apps-gftdcojp.git"
 description = "AI Agent-First Platform (gftd.ai). AT Protocol + Signal Protocol E2E. XRPC sole API (348 NSID), account-level Cloudflare Workers, DID-native auth."
 stack = ["TypeScript", "Cloudflare Workers"]
 org = "gftdcojp"
-ssot = "projects/ai-gftd-apps-gftdcojp/README.md"
+ssot = "orgs/gftdcojp/ai-gftd-apps-gftdcojp/README.md"
 
 [[projects]]
 name = "spirit-in-physics"
-path = "projects/spirit-in-physics"
+path = "orgs/com-junkawasaki/spirit-in-physics"
 kind = "research"
 submodule = true
 remote = "git@github.com:com-junkawasaki/spirit-in-physics.git"
@@ -74,12 +78,79 @@ large_files = { current = "git-lfs (+ orphaned git-annex pointers)", target = "d
 
 [[projects]]
 name = "260208-spirit-in-physics"
-path = "projects/260208-spirit-in-physics"
+path = "orgs/com-junkawasaki/260208-spirit-in-physics"
 kind = "research"
 submodule = true
 remote = "git@github.com:com-junkawasaki/260208-spirit-in-physics.git"
 description = "「Spirit in Physics」関連リポジトリ（2026-02-08 スナップショット）。大容量ファイル機構なし（通常リポジトリ）。"
 adrs = ["kawasakijun/docs/adr/0006-spirit-in-physics-lfs-to-datalad.md"]
+
+[[projects]]
+name = "webmaster"
+path = "orgs/com-junkawasaki/webmaster"
+kind = "web"
+submodule = true
+remote = "git@github.com:com-junkawasaki/webmaster.git"
+description = "com-junkawasaki webmaster / サイト運用リポジトリ。"
+
+[[projects]]
+name = "ai-gftd-lf-case-lingling"
+path = "orgs/com-junkawasaki/ai-gftd-lf-case-lingling"
+kind = "litigation-case"
+submodule = true
+remote = "git@github.com:com-junkawasaki/ai-gftd-lf-case-lingling.git"
+description = "LingLing 訴訟ケース関連リポジトリ。"
+
+[[projects]]
+name = "moex"
+path = "orgs/com-junkawasaki/moex"
+kind = "app"
+submodule = true
+remote = "git@github.com:com-junkawasaki/moex.git"
+description = "moex（v1.0.0）。ADR-0007 で submodule 追加。"
+
+[[projects]]
+name = "kotoba-topology"
+path = "orgs/com-junkawasaki/kotoba-topology"
+kind = "research"
+submodule = true
+remote = "git@github.com:com-junkawasaki/kotoba-topology.git"
+description = "kotoba topology（v0.1.0）。ADR-0007 で submodule 追加。"
+
+[[projects]]
+name = "etzhayyim-kotoba"
+path = "orgs/etzhayyim/kotoba"
+kind = "compiler"
+submodule = true
+remote = "https://github.com/etzhayyim/kotoba.git"
+description = "kotoba-clj Clojure→WASM compiler（etzhayyim）。"
+org = "etzhayyim"
+
+# ─── Vendored repos (remote 無し → 素フォルダ取り込み, ADR-0007 Phase 2/3) ───
+#
+# GitHub remote を持たないため submodule 化せず DataLad superdataset に直接取り込み。
+# 後日 remote 作成時に submodule へ昇格可能。大容量は git-annex→B2。
+
+[[vendored]]
+name = "systemofsystem"
+path = "orgs/com-junkawasaki/systemofsystem"
+kind = "code"
+description = "systemofsystem（16M, dagger/system-thinking）。全ファイル git 直管理。"
+large_files = "none"
+
+[[vendored]]
+name = "yukkuri-assets-nist-csf-cis-scs"
+path = "orgs/com-junkawasaki/yukkuri-assets-nist-csf-cis-scs"
+kind = "assets"
+description = "ゆっくり動画アセット（NIST CSF / CIS / SCS）。wav/png を annex→B2。"
+large_files = { mechanism = "git-annex MD5E", remote = "backblaze-b2" }
+
+[[vendored]]
+name = "mangaka-ghosthacker-assets"
+path = "orgs/com-junkawasaki/mangaka-ghosthacker-assets"
+kind = "assets"
+description = "ghosthacker マンガ制作アセット（768 png + pdf）。annex→B2。元 git-annex repo の symlink を実体化して再 annex。"
+large_files = { mechanism = "git-annex MD5E", remote = "backblaze-b2", size = "869M" }
 
 # ─── Personal data warehouse ───────────────────────────────────────
 #
@@ -135,6 +206,19 @@ rebuild = "cd personal/bin/datomic && clojure -M -m warehouse.load"
 schema = "EAV refs: org / person / account / txn / loan / event / action"
 loaded = { org = 110, person = 29, txn = 631, loan = 19, event = 49, action = 23 }
 known_issues = ["txn double-count across 8 finance files (need dedup-key=date+vendor+amount)", "loan-ledger total ¥10.75M vs agreement detail sum ¥7.89M mismatch (recompute from detail)"]
+
+# jk.luxury Drive archive — litigation evidence (ADR-0007 Phase 3).
+# 41G を personal/drive/jk-luxury-archive/ に取り込み、全ファイル annex(MD5E)→B2。
+# GitHub にはポインタのみ（平文は載せない）。元の単独 clone は B2 検証後に削除。
+[personal.drive.jk_luxury_archive]
+path = "personal/drive/jk-luxury-archive"
+size = "41G (annex dedup 後の unique ~33G)"
+file_count = 26135   # annexed(26121) + git(14); .DS_Store(17) のみ除外
+contents = "OUCHI訴状準備, SQL dumps, Telegram exports, KYC docs, Commons_JK records 等"
+copies = "local git-annex + backblaze-b2 (encryption=hybrid)"
+verified = "git annex fsck --from b2 OK (証拠PDF含む); 全28327キー B2 在"
+source_clone = "deleted 2026-06-09 after B2 verification (no remote = was sole copy)"
+note = "ignore された archive 内 nested .gitignore 由来 484 ファイルも --no-check-gitignore で強制保全"
 
 [personal.storage]
 vcs = "datalad"
