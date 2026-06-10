@@ -14,6 +14,7 @@ set -uo pipefail
 REPO=/Users/junkawasaki/github/com-junkawasaki
 REG="$REPO/personal/bin/registry"
 AUTH="$REPO/personal/bin/google-auth.py"
+MSAUTH="$REPO/personal/bin/msgraph-auth.py"
 MSGS=personal/mail/messages
 LOGDIR="$HOME/.mail-sync"
 LOG="$LOGDIR/sync.log"
@@ -50,6 +51,18 @@ while IFS=$'\t' read -r slug provider window; do
       fi
       log "sync $slug (newer_than:$window)"
       if python3 personal/bin/ingest-gmail-batch.py --account "$slug" "newer_than:$window" 2000 >>"$LOG" 2>&1; then
+        synced=$((synced+1))
+      else
+        log "FAIL $slug (see $LOG)"
+      fi
+      ;;
+    microsoft)
+      if ! "$MSAUTH" token "$slug" >/dev/null 2>&1; then
+        log "SKIP $slug: no token (bootstrap: msgraph-auth.py login $slug)"
+        continue
+      fi
+      log "sync $slug (graph, $window)"
+      if python3 personal/bin/ingest-graph-mail.py --account "$slug" "$window" 2000 >>"$LOG" 2>&1; then
         synced=$((synced+1))
       else
         log "FAIL $slug (see $LOG)"

@@ -40,7 +40,8 @@ window = "14d"
 email = "j.kawasaki@gftd.co.jp"
 provider = "microsoft" # M365 — mail/calendar via Graph API, files via rclone onedrive
 [accounts.gftd-co-jp.mail]
-sync = false # TODO: ingest-graph-mail.py (Entra app registration + device-code flow)
+sync = true # ingest-graph-mail.py; bootstrap: msgraph-auth.py client-set + login gftd-co-jp
+window = "14d"
 
 # ── Takeout jobs ─────────────────────────────────────────────────────────────
 # One table per Google Takeout export job. The watcher routes ~/Downloads zips
