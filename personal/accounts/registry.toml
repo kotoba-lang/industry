@@ -7,6 +7,20 @@
 # bin/mail-sync.sh (launchd daily). window = sliding Gmail re-scan window
 # (overlap is fine — ingest is idempotent by message id / content hash).
 # Auth bootstrap (one-time per account): bin/google-auth.py login <slug>
+#
+# OAuth (google): GCP project personal-warehouse-jk (External/Testing); desktop
+#   client + refresh tokens live ONLY in macOS Keychain (google-oauth-client /
+#   google-oauth:<slug>). 4 Google accounts registered as test users.
+# OAuth (microsoft): Entra public client (TODO); tokens in Keychain
+#   (msgraph-oauth-client / msgraph-oauth:<slug>).
+#
+# auth status (2026-06-10) — mail.sync=true is the INTENT; actual token presence
+# is authoritative via `bin/google-auth.py status` / `bin/msgraph-auth.py status`.
+#   jun784        ✅ authorized + ingested (487 msgs)
+#   jk-luxury     ✅ authorized + ingested (73 msgs)
+#   gftd-group    ⏳ pending: not signed into Chrome; run `google-auth.py login gftd-group`
+#   junkawasaki-com ⏳ pending: same — `google-auth.py login junkawasaki-com`
+#   gftd-co-jp    ⏳ pending: Entra app registration + `msgraph-auth.py login gftd-co-jp`
 
 [accounts.jun784]
 email = "jun784@gmail.com"
@@ -14,6 +28,7 @@ provider = "google"
 [accounts.jun784.mail]
 sync = true
 window = "14d"
+authorized = true # 2026-06-10
 
 [accounts.jk-luxury]
 email = "root@jk.luxury"
@@ -21,6 +36,7 @@ provider = "google"
 [accounts.jk-luxury.mail]
 sync = true
 window = "14d"
+authorized = true # 2026-06-10
 
 [accounts.gftd-group]
 email = "jun@gftd.group"
@@ -28,6 +44,7 @@ provider = "google" # Workspace — Takeout requires admin enablement
 [accounts.gftd-group.mail]
 sync = true
 window = "14d"
+authorized = false # pending login (account not signed into Chrome)
 
 [accounts.junkawasaki-com]
 email = "root@junkawasaki.com"
@@ -35,6 +52,7 @@ provider = "google"
 [accounts.junkawasaki-com.mail]
 sync = true
 window = "14d"
+authorized = false # pending login (account not signed into Chrome)
 
 [accounts.gftd-co-jp]
 email = "j.kawasaki@gftd.co.jp"
@@ -42,6 +60,7 @@ provider = "microsoft" # M365 — mail/calendar via Graph API, files via rclone 
 [accounts.gftd-co-jp.mail]
 sync = true # ingest-graph-mail.py; bootstrap: msgraph-auth.py client-set + login gftd-co-jp
 window = "14d"
+authorized = false # pending Entra app registration
 
 # ── Takeout jobs ─────────────────────────────────────────────────────────────
 # One table per Google Takeout export job. The watcher routes ~/Downloads zips
