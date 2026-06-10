@@ -232,6 +232,21 @@ verified = "git annex fsck --from b2 OK (証拠PDF含む); 全28327キー B2 在
 source_clone = "deleted 2026-06-09 after B2 verification (no remote = was sole copy)"
 note = "ignore された archive 内 nested .gitignore 由来 484 ファイルも --no-check-gitignore で強制保全"
 
+# Google Takeout bulk ingest (ADR-0008). Account 別の全サービス export を
+# personal/takeout/<account>/<YYYY-MM-DD>/Takeout/ に展開し annex(MD5E)→B2。
+[personal.takeout]
+path = "personal/takeout/<account>/<YYYY-MM-DD>/Takeout/"
+scope = "Google Takeout 全サービス export（account 別）。"
+ingest = "personal/bin/takeout-watcher.sh — ~/Downloads の takeout-*.zip を job-timestamp prefix で account 振り分け → ditto 展開(Unicode安全) → git annex add → git annex copy --to b2 -J8 → git annex drop。冪等(~/.takeout-watcher/processed.log)、registry 駆動(personal/bin/registry takeout-jobs, 毎パス再読込)。"
+status_tool = "personal/bin/takeout-status.sh"
+download_constraint = "Takeout の download endpoint は part ごとに passkey 再認証を要求(manage ページの rapt を継承しない)。自動クリック不可 → ユーザがブラウザで手動 download、watcher が後段(展開→annex→B2→drop)を自動処理。ADR-0008。"
+jobs = [
+  { account = "jun784",    prefix = "takeout-20260609T040708Z", total_parts = 61, size = "388.34GB", note = "part 41 = 261.7GB 単一ファイル → 29-68GB 空きの内蔵ディスクに不可。外付けドライブ保留。" },
+  { account = "jk-luxury", prefix = "takeout-20260609T041224Z", total_parts = 85, size = "164.78GB" },
+]
+progress = "2026-06-10: jun784 1/61(502 files) + jk-luxury 1/85(881 files) on B2。残り 144 part は手動 download 待ち。archive 有効期限 2026-06-16。"
+adrs = ["kawasakijun/docs/adr/0008-google-takeout-ingestion.md"]
+
 [personal.storage]
 vcs = "datalad"
 content = "git-annex (annex-ignore on origin)"
@@ -260,6 +275,7 @@ b2_annex_uuid = "3336a5f2-298d-457d-9087-9fc81c653998"
 b2_key_custody = "macOS Keychain 'b2:gftdcojp-m365-annex' (scoped key 004d9f6c0ba12580000000009); creds embedded gpg-encrypted in git-annex branch"
 gpg_keyid = "EC1710FCE6FEB745B74D122FBDAE6794050EDB62"   # gftdcojp M365 Archive (dedicated org key)
 gpg_passphrase_custody = "macOS Keychain (gpg:gftd-m365); recovery + B2 key in 1Password gftdcojp vault: 'GPG: gftdcojp M365 archive recovery (EC1710FC)'"
+status = "2026-06-10 配線完了: CLIs(az 2.87/m365 11.8/rclone) 導入、gpg鍵 1Password→import + Keychain + agent preset、b2 special remote enableremote + round-trip(add→B2→drop→get) 検証 OK。残: bin/setup-auth.sh(対話 MFA/consent/OAuth) → bin/run-backup.sh(以降 非対話)。"
 
 # ─── Project relationships ─────────────────────────────────────────
 #
