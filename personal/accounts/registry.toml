@@ -1,0 +1,39 @@
+# personal/accounts/registry.toml — declarative registry of all personal accounts.
+# Git plaintext (see .gitattributes). NO SECRETS here — tokens/passphrases live in
+# macOS Keychain / 1Password. Consumed by bin/registry, which feeds
+# takeout-watcher.sh / takeout-status.sh (and future ingest tasks).
+
+[accounts.jun784]
+email = "jun784@gmail.com"
+provider = "google"
+
+[accounts.jk-luxury]
+email = "root@jk.luxury"
+provider = "google"
+
+[accounts.gftd-group]
+email = "jun@gftd.group"
+provider = "google" # Workspace — Takeout requires admin enablement
+
+[accounts.junkawasaki-com]
+email = "root@junkawasaki.com"
+provider = "google"
+
+[accounts.gftd-co-jp]
+email = "j.kawasaki@gftd.co.jp"
+provider = "microsoft" # M365 — mail/calendar via Graph API, files via rclone onedrive
+
+# ── Takeout jobs ─────────────────────────────────────────────────────────────
+# One table per Google Takeout export job. The watcher routes ~/Downloads zips
+# by this job-timestamp prefix to personal/takeout/<account>/<date>/.
+# Adding a table here is picked up live by the running watcher (re-read each pass).
+#   parts = expected number of zip parts (for status display)
+
+[takeout."takeout-20260609T040708Z"]
+account = "jun784"
+parts = 61
+note = "skip part 41 = 261GB -> external drive"
+
+[takeout."takeout-20260609T041224Z"]
+account = "jk-luxury"
+parts = 85
