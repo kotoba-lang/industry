@@ -105,7 +105,9 @@ def cmd_login(slug):
         "access_type": "offline", "prompt": "consent", "login_hint": email,
     })
     print(f"authorize {email} in the browser (login_hint set — pick that account)...")
-    webbrowser.open(url)
+    print(f"AUTH_URL {url}", flush=True)  # printed for headless/driven consent
+    if os.environ.get("NO_BROWSER_OPEN") != "1":
+        webbrowser.open(url)
     while "code" not in got and "error" not in got:
         srv.handle_request()
     srv.server_close()
