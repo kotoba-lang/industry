@@ -249,6 +249,18 @@ keyid = "09EE841334482F5A0F5C4958A70BB2C220DE88CA"
 passphrase_custody = "macOS Keychain (gpg:personal-data)"
 recovery = "1Password Private vault: 'GPG: personal-data warehouse recovery (jun784)' (armored secret key + passphrase)"
 
+[gftdcojp.m365-archive]
+path = "orgs/gftdcojp/m365-archive"
+github = "gftdcojp/m365-archive (private; git history only, annex-ignore)"
+dataset_id = "4caeaa74-1a31-4c9c-bb71-97c16afb8793"
+scope = "Outlook mail (.eml via Graph) / calendar / contacts / OneDrive / SharePoint"
+ingest_auth = "m365 CLI (PnP, device code) + rclone onedrive remotes gftd-onedrive / gftd-sharepoint"
+b2_bucket = "gftdcojp-m365-annex"                # allPrivate, us-west-004 (id ed796ff64ca0abfa91e20518)
+b2_annex_uuid = "3336a5f2-298d-457d-9087-9fc81c653998"
+b2_key_custody = "macOS Keychain 'b2:gftdcojp-m365-annex' (scoped key 004d9f6c0ba12580000000009); creds embedded gpg-encrypted in git-annex branch"
+gpg_keyid = "EC1710FCE6FEB745B74D122FBDAE6794050EDB62"   # gftdcojp M365 Archive (dedicated org key)
+gpg_passphrase_custody = "macOS Keychain (gpg:gftd-m365); recovery + B2 key in 1Password gftdcojp vault: 'GPG: gftdcojp M365 archive recovery (EC1710FC)'"
+
 # ─── Project relationships ─────────────────────────────────────────
 #
 #   2604-linde (theory)  →  etzhayyim-root (substrate)  →  ghosthacker (application)
