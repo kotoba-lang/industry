@@ -5,6 +5,8 @@ USAGE:
     registry accounts                 # slug<TAB>email<TAB>provider
     registry takeout-jobs             # prefix<TAB>account<TAB>parts<TAB>note
     registry takeout-account PREFIX   # -> account slug (exit 1 if unknown)
+    registry mail-accounts            # slug<TAB>provider<TAB>window (mail.sync=true only)
+    registry email SLUG               # -> email address (exit 1 if unknown)
 """
 import sys, os, tomllib
 
@@ -32,6 +34,16 @@ def main():
         if not j:
             sys.exit(1)
         print(j["account"])
+    elif cmd == "mail-accounts":
+        for slug, a in reg.get("accounts", {}).items():
+            m = a.get("mail") or {}
+            if m.get("sync"):
+                print(f"{slug}\t{a.get('provider','')}\t{m.get('window','14d')}")
+    elif cmd == "email":
+        a = reg.get("accounts", {}).get(sys.argv[2])
+        if not a:
+            sys.exit(1)
+        print(a["email"])
     else:
         sys.stderr.write(__doc__)
         sys.exit(2)

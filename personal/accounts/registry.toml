@@ -3,25 +3,44 @@
 # macOS Keychain / 1Password. Consumed by bin/registry, which feeds
 # takeout-watcher.sh / takeout-status.sh (and future ingest tasks).
 
+# Per-account [accounts.<slug>.mail] enables periodic incremental ingest by
+# bin/mail-sync.sh (launchd daily). window = sliding Gmail re-scan window
+# (overlap is fine — ingest is idempotent by message id / content hash).
+# Auth bootstrap (one-time per account): bin/google-auth.py login <slug>
+
 [accounts.jun784]
 email = "jun784@gmail.com"
 provider = "google"
+[accounts.jun784.mail]
+sync = true
+window = "14d"
 
 [accounts.jk-luxury]
 email = "root@jk.luxury"
 provider = "google"
+[accounts.jk-luxury.mail]
+sync = true
+window = "14d"
 
 [accounts.gftd-group]
 email = "jun@gftd.group"
 provider = "google" # Workspace — Takeout requires admin enablement
+[accounts.gftd-group.mail]
+sync = true
+window = "14d"
 
 [accounts.junkawasaki-com]
 email = "root@junkawasaki.com"
 provider = "google"
+[accounts.junkawasaki-com.mail]
+sync = true
+window = "14d"
 
 [accounts.gftd-co-jp]
 email = "j.kawasaki@gftd.co.jp"
 provider = "microsoft" # M365 — mail/calendar via Graph API, files via rclone onedrive
+[accounts.gftd-co-jp.mail]
+sync = false # TODO: ingest-graph-mail.py (Entra app registration + device-code flow)
 
 # ── Takeout jobs ─────────────────────────────────────────────────────────────
 # One table per Google Takeout export job. The watcher routes ~/Downloads zips

@@ -57,6 +57,23 @@ bash personal/bin/ingest-device.sh     # 端末情報を更新
 git annex add personal/ && git annex copy personal/ --to ipfs
 ```
 
+## メール定期 ingest（launchd 毎日 07:30）
+registry の `mail.sync=true` な全アカウントを `bin/mail-sync.sh` が差分 ingest:
+token mint (Keychain refresh token) → `ingest-gmail-batch.py --account <slug>
+newer_than:<window>`（message id / 内容ハッシュで冪等）→ annex add → b2 copy → commit。
+ログ: `~/.mail-sync/sync.log`。手動実行: `bash personal/bin/mail-sync.sh`。
+
+**Auth bootstrap（1回だけ・ブラウザ必要）**
+```bash
+# 1) GCP (com-junkawasaki-sip): Gmail API 有効化, OAuth 同意画面=External/Testing,
+#    4 アカウントを test user に追加, 「デスクトップアプリ」クライアント作成 → JSON DL
+python3 personal/bin/google-auth.py client-set ~/Downloads/client_secret_*.json  # → Keychain, json は削除
+# 2) アカウント毎にブラウザで同意（refresh token → Keychain）
+python3 personal/bin/google-auth.py login jun784       # 他: jk-luxury / gftd-group / junkawasaki-com
+python3 personal/bin/google-auth.py status             # 確認
+```
+gftd-co-jp (M365) は未実装（Graph API + Entra アプリ登録が必要 — registry に TODO）。
+
 ## 鍵の状態（鍵固め 完了）
 - ✅ gpg 鍵に**強力なパスフレーズ付与済み**（空パスフレーズは拒否されることを検証）。
 - ✅ パスフレーズを **macOS login Keychain** 項目 `gpg:personal-data` に保管（Touch ID/パスコードで保護）。

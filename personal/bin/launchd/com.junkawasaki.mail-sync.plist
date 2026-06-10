@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Daily incremental mail ingest for the personal warehouse.
+     Install:  cp personal/bin/launchd/com.junkawasaki.mail-sync.plist ~/Library/LaunchAgents/
+               launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.junkawasaki.mail-sync.plist
+     Run now:  launchctl kickstart gui/$(id -u)/com.junkawasaki.mail-sync -->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.junkawasaki.mail-sync</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>/Users/junkawasaki/github/com-junkawasaki/personal/bin/mail-sync.sh</string>
+	</array>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>7</integer>
+		<key>Minute</key>
+		<integer>30</integer>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>/tmp/com.junkawasaki.mail-sync.out</string>
+	<key>StandardErrorPath</key>
+	<string>/tmp/com.junkawasaki.mail-sync.err</string>
+</dict>
+</plist>

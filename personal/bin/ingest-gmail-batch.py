@@ -19,8 +19,11 @@ AUTH (one-time): the token needs the gmail.readonly scope.
 Then: GMAIL_ACCESS_TOKEN=ya29.... python3 bin/ingest-gmail-batch.py 'label:LingLing'
 
 USAGE:
-    python3 bin/ingest-gmail-batch.py '<gmail query>' [max]
+    python3 bin/ingest-gmail-batch.py [--account SLUG] '<gmail query>' [max]
     # e.g. 'label:LingLing'  '弁護士 OR 訴訟'  'after:2026/05/01 from:zelojapan.com'
+    # --account: registry slug. Token is minted via bin/google-auth.py (Keychain
+    # refresh token) unless GMAIL_ACCESS_TOKEN is set, and index records are
+    # tagged with the account. Used by bin/mail-sync.sh for periodic sync.
 """
 import sys, os, json, hashlib, base64, subprocess, urllib.request, urllib.error, urllib.parse
 from email.parser import BytesParser
@@ -32,10 +35,16 @@ INDEX = os.path.join(MSGDIR, "index.jsonl")
 API = "https://gmail.googleapis.com/gmail/v1/users/me"
 
 
-def token():
+def token(account=None):
     t = os.environ.get("GMAIL_ACCESS_TOKEN")
     if t:
         return t.strip()
+    if account:
+        out = subprocess.run([os.path.join(BASE, "bin", "google-auth.py"), "token", account],
+                             capture_output=True, text=True)
+        if out.returncode == 0 and out.stdout.strip():
+            return out.stdout.strip()
+        sys.exit(f"no token for account {account}: {out.stderr.strip()}")
     for cmd in (["gcloud", "auth", "application-default", "print-access-token"],
                 ["gcloud", "auth", "print-access-token"]):
         try:
@@ -92,15 +101,20 @@ def list_ids(query, tok, cap):
 
 
 def main():
-    if len(sys.argv) < 2:
+    argv = sys.argv[1:]
+    account = None
+    if argv and argv[0] == "--account":
+        account = argv[1]
+        argv = argv[2:]
+    if not argv:
         sys.exit(__doc__)
-    query = sys.argv[1]
-    cap = int(sys.argv[2]) if len(sys.argv) > 2 else 1000
-    tok = token()
+    query = argv[0]
+    cap = int(argv[1]) if len(argv) > 1 else 1000
+    tok = token(account)
     os.makedirs(MSGDIR, exist_ok=True)
     cids, mids = known()
     ids = list_ids(query, tok, cap)
-    print("query=%r matched %d message(s)" % (query, len(ids)))
+    print("account=%s query=%r matched %d message(s)" % (account, query, len(ids)))
     added = 0
     with open(INDEX, "a", encoding="utf-8") as idx:
         for mid in ids:
@@ -109,13 +123,15 @@ def main():
             msg = api_get("/messages/" + mid, tok, {"format": "raw"})
             raw = base64.urlsafe_b64decode(msg["raw"].encode())
             cid = hashlib.sha256(raw).hexdigest()
-            if cid in cids:
-                continue
-            with open(os.path.join(MSGDIR, cid + ".eml"), "wb") as fh:
-                fh.write(raw)
+            # cid already known = same RFC822 bytes seen via another account/source:
+            # keep the single .eml but still record this (account, message_id) sighting.
+            if cid not in cids:
+                with open(os.path.join(MSGDIR, cid + ".eml"), "wb") as fh:
+                    fh.write(raw)
             em = BytesParser(policy=default_policy).parsebytes(raw)
             rec = {
                 "cid": cid, "sha256": cid, "size": len(raw),
+                "account": account,
                 "message_id": mid,
                 "rfc822_message_id": em.get("Message-ID"),
                 "thread_id": msg.get("threadId"),
