@@ -82,7 +82,9 @@
  {:db/ident :engi/legal-hold      :db/valueType :db.type/boolean :db/cardinality :db.cardinality/one :db/doc "true = ADR-0005 係争保全、係争終結まで操作禁止"}
  {:db/ident :engi/monthly-cost-jpy :db/valueType :db.type/long   :db/cardinality :db.cardinality/one :db/doc "推定月額 (要実測は reason に明記)"}
  {:db/ident :engi/export-first    :db/valueType :db.type/boolean :db/cardinality :db.cardinality/one :db/doc "sever/archive 前に warehouse 保全が必要"}
- {:db/ident :engi/status          :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":proposed :approved :done"}
+ {:db/ident :engi/status          :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":proposed :approved :sent (解約メール送信済) :done"}
+ {:db/ident :engi/cancel-channel  :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":email (既定) :unsubscribe-link :web-only (メール不可と判明したもののみ) :phone"}
+ {:db/ident :engi/cancel-email    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/doc "解約依頼の宛先 (サポート/担当者)"}
 
  ;; ---------- prov (minimal embedded provenance; full detail in personal/prov/*.prov.jsonld) ----------
  {:db/ident :prov/derived-from :db/valueType :db.type/ref     :db/cardinality :db.cardinality/many :db/doc "fact -> source entity (email/blob/decision)"}

@@ -43,6 +43,27 @@
 - 削減見込み: `:engi/monthly-cost-jpy` の :sever/:archive/:reduce/:transfer 合計 → goal 29 のKPI。
 - 完了の定義: `:engi/status :done` + (export-first の場合) warehouse 内の annex パス記載。
 
+## 実行フロー: メール解約 (2026-06-11 本人指示で追加)
+
+各サービスの管理画面に入るのは手間なので、**解約・縮小・退会は原則メールで送る**。
+チャネル既定 = `:engi/cancel-email` 宛のメール。Web 画面でしか受け付けないと判明したものだけ
+`:cancel-channel :web-only` に倒す (その場合も先にメールで依頼し、断られた記録を残す —
+特定商取引法・約款上、メール解約を拒めないサービスは多い)。
+
+```
+① engi entry が :approved になる (本人判断)
+② export-first = true なら warehouse 保全を先に完了
+③ Claude が解約メールの Gmail 下書きを生成 (テンプレ: 契約特定情報 +
+   解約意思 + 希望日 + 確認返信の要求。証跡として BCC root@... は使わず
+   jun784+engi-<id>@gmail.com を Reply-To/CC に)
+④ 本人が下書きを確認して送信 (送信ボタンは常に本人)
+⑤ manimani が返信を :waiting で追跡。確認返信 = 証跡として cid 化
+⑥ :status :sent → 確認取得で :done。decision ledger に記録
+```
+
+下書き生成は Gmail MCP (create_draft) で即時可能。送信済み解約メールと先方の確認返信は
+ingest-eml.py で cid 化し、:prov/derived-from で engi entry に紐付ける (解約紛争の保険)。
+
 ## ファイル
 
 - `personal/facts/engi.edn` — 評価の SSoT (annex/暗号化)
