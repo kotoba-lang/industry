@@ -256,6 +256,8 @@ jobs = [
   { account = "jk-luxury", prefix = "takeout-20260609T041224Z", total_parts = 85, size = "164.78GB" },
   { account = "jun784",    prefix = "takeout-20260610T102914Z", total_parts = 60, size = "~189GB(zip+loose, vmdk除く)", note = "Drive 配送 export。passkey 問題回避。takeout-drive-pull.sh が rclone(gjun784)で自動取得。export-ami vmdk 281GB はユーザ判断で対象外(2026-06-11)。" },
   { account = "jun784",    prefix = "takeout-20260610T102913Z", total_parts = 1, size = "1.5MB" },
+  { account = "jk-luxury", prefix = "takeout-20260610T103007Z", total_parts = 85, size = "164.9GB", note = "Drive 配送 export(u/1)。takeout-drive-pull.sh(jklux) で自動取得。loose/巨大ファイルなし。" },
+  { account = "jk-luxury", prefix = "takeout-20260610T103006Z", total_parts = 1, size = "1.1MB" },
 ]
 progress = "2026-06-11: Drive 配送の新 export(20260610T102914Z)を takeout-drive-pull.sh で自動取得開始(rclone gjun784 + drive.readonly 再認可)。旧 download 待ち 144 part は Drive 経路に置換。loose(.mbox/.duckdb/.mp4)は drive-loose/ で annex。vmdk 281GB は対象外確定。"
 adrs = ["kawasakijun/docs/adr/0008-google-takeout-ingestion.md"]
