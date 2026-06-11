@@ -127,6 +127,16 @@ remote = "https://github.com/etzhayyim/kotoba.git"
 description = "kotoba-clj Clojure→WASM compiler（etzhayyim）。"
 org = "etzhayyim"
 
+[[projects]]
+name = "langgraph-clj"
+path = "orgs/com-junkawasaki/langgraph-clj"
+kind = "clojure-library"
+submodule = true
+remote = "git@github.com:com-junkawasaki/langgraph-clj.git"
+description = "LangGraph/LangChain 相当の LLM オーケストレーションを portable Clojure (.cljc, 依存ゼロ) で実装。Datomic API 前提（checkpoint/チャット履歴を datom 化、Datalog ビュー = ADR-0010 と同型）。kotoba-clj (Clojure→WASM) 等の WASM ホストで動く前提で I/O はホスト能力注入。"
+stack = ["Clojure"]
+adrs = ["docs/adr/0001-architecture.md"]
+
 # ─── Vendored repos (remote 無し → 素フォルダ取り込み, ADR-0007 Phase 2/3) ───
 #
 # GitHub remote を持たないため submodule 化せず DataLad superdataset に直接取り込み。
