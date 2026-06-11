@@ -197,10 +197,19 @@
          (assoc d :dyad/with [:person/id (:dyad/with d)]))))
 
 (defn hypothesis-tx []
+  ;; :evidence = vector of email cids (mail/messages/<cid>.eml) -> lookup refs.
   (vec (for [h (:hypotheses dyads-edn)]
-         (-> h
-             (assoc :hypothesis/about (vec (for [pid (:about h)] [:person/id pid])))
-             (dissoc :about)))))
+         (cond-> (-> h
+                     (assoc :hypothesis/about (vec (for [pid (:about h)] [:person/id pid])))
+                     (dissoc :about :evidence))
+           (seq (:evidence h))
+           (assoc :hypothesis/evidence (vec (for [c (:evidence h)] [:email/cid c])))))))
+
+;; thread_id -> latest cid (for obligation source resolution via index.jsonl)
+(defn thread->cid []
+  (->> (rd-jsonl "mail/messages/index.jsonl")
+       (sort-by #(str (:date %)))
+       (reduce (fn [m r] (if (:thread_id r) (assoc m (:thread_id r) (:cid r)) m)) {})))
 
 (defn people-alias-tx []
   (vec (for [p people-edn
@@ -211,16 +220,19 @@
            (:person/attention-class p) (assoc :person/attention-class (:person/attention-class p))))))
 
 (defn obligation-tx []
-  (keep (fn [o]
-          (when (and (:id o) (:due o))
-            (cond-> {:obligation/id       (clean (:id o))
-                     :obligation/title    (clean (:title o))
-                     :obligation/due      (iso->inst (:due o))
-                     :obligation/severity (keyword (or (:severity o) "normal"))
-                     :obligation/status   (keyword (or (:status o) "open"))}
-              (:case o) (assoc :obligation/case {:case/id (clean (:case o))})
-              (:goal o) (assoc :obligation/goal [:goal/id (clean (:goal o))]))))
-        (rd-jsonl "facts/obligations.jsonl")))
+  (let [t->c (thread->cid)]
+    (keep (fn [o]
+            (when (and (:id o) (:due o))
+              (let [src (or (:source_cid o) (t->c (:source_thread o)))]
+                (cond-> {:obligation/id       (clean (:id o))
+                         :obligation/title    (clean (:title o))
+                         :obligation/due      (iso->inst (:due o))
+                         :obligation/severity (keyword (or (:severity o) "normal"))
+                         :obligation/status   (keyword (or (:status o) "open"))}
+                  (:case o) (assoc :obligation/case {:case/id (clean (:case o))})
+                  (:goal o) (assoc :obligation/goal [:goal/id (clean (:goal o))])
+                  src       (assoc :obligation/source [:email/cid src])))))
+          (rd-jsonl "facts/obligations.jsonl"))))
 
 ;; ---------- main ----------
 (defn -main [& _]
