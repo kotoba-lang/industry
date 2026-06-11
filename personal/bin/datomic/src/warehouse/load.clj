@@ -215,6 +215,21 @@
              :kpi/at     (iso->inst (:at k))}))
         (rd-jsonl "facts/kpi.jsonl")))
 
+;; orgs.edn / accounts.edn / contracts.edn — curated entity registries (ADR-0015 + 整理)
+(defn- rd-edn-facts [rel]
+  (let [f (io/file base rel)] (when (.exists f) (edn/read-string (slurp f)))))
+
+(defn curated-org-tx []
+  (vec (rd-edn-facts "facts/orgs.edn")))
+
+(defn account2-tx []
+  (vec (for [a (rd-edn-facts "facts/accounts.edn")] a)))  ; refs already in lookup-ref form
+
+(defn contract-tx []
+  (vec (for [c (rd-edn-facts "facts/contracts.edn")]
+         (cond-> c
+           (:contract/case c) (assoc :contract/case {:case/id (:contract/case c)})))))
+
 ;; processes.edn: handoff state machine + capability policy (ADR-0015)
 (def processes-edn
   (let [f (io/file base "facts/processes.edn")]
@@ -291,6 +306,7 @@
                           ["actions" (action-tx)] ["events" (event-tx)]
                           ["cases" (case-tx)] ["emails" (email-tx)]
                           ["people" (people-tx)] ["people-aliases" (people-alias-tx)]
+                          ["orgs(curated)" (curated-org-tx)] ["accounts" (account2-tx)] ["contracts" (contract-tx)]
                           ["goals" (goal-tx)] ["goal-deps" (goal-edge-tx)]
                           ["obligations" (obligation-tx)]
                           ["dyads" (dyad-tx)] ["hypotheses" (hypothesis-tx)]
@@ -427,6 +443,21 @@
                                            [?e :engi/monthly-cost-jpy ?cost]] db)) 0)]
           (println (format "\n  個人負担の削減見込み: 確定系 (sever/archive/transfer) ¥%,d/月 + 縮小余地 (reduce対象) 最大 ¥%,d/月" (long sv) (long rd)))
           (println "  goal 29 KPI: ¥319k → 目標 ¥220k (要実測の概算を含む)"))
+        (println "\n=== 組織・アカウント・契約 (entity整理) ===")
+        (println "  orgs    " (n '[:find (count ?o) :where [?o :org/id]])
+                 " accounts" (n '[:find (count ?a) :where [?a :account/id] [?a :account/reach]])
+                 " contracts" (n '[:find (count ?c) :where [?c :contract/id]]))
+        (println "[Datalog] account/reachability (pending = ingest プロセス対象):")
+        (doseq [[id reach st] (->> (d/q '[:find ?id ?reach ?st
+                                          :where [?a :account/reach ?reach] [?a :account/id ?id] [?a :account/status ?st]] db)
+                                   (sort-by (fn [[_ _ s]] (name s))))]
+          (println (format "  %-24s reach=%-8s %s" id (name reach) (name st))))
+        (println "[Datalog] org/by-role (own-corp/equity/counterparty 抜粋):")
+        (doseq [[role nm] (->> (d/q '[:find ?role ?nm
+                                      :where [?o :org/role ?role] [(contains? #{:own-corp :equity :employer :counterparty} ?role)]
+                                             [?o :org/name ?nm]] db)
+                              (sort-by (comp name first)))]
+          (println (format "  %-12s %s" (name role) nm)))
         (println "\n=== Processes / ハンドオフ状態機械 (ADR-0015) ===")
         (println "[Datalog] process/next-human — 本人の手番で止まっている (私が依頼する対象):")
         (doseq [[pt sd cap] (d/q '[:find ?pt ?sd ?cap

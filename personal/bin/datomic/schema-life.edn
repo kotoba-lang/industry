@@ -88,6 +88,29 @@
  {:db/ident :engi/cancel-channel  :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":email (既定) :unsubscribe-link :web-only (メール不可と判明したもののみ) :phone"}
  {:db/ident :engi/cancel-email    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/doc "解約依頼の宛先 (サポート/担当者)"}
 
+ ;; ---------- account 拡張 + org 拡張 + contract (ADR-0004/0015 + entity整理) ----------
+ {:db/ident :account/provider :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :account/reach    :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":mcp :browser :cli :graph :none"}
+ {:db/ident :account/status   :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":ingested :pending :unreachable"}
+ {:db/ident :account/role     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :account/note     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+
+ {:db/ident :org/id           :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :org/role         :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":own-corp :equity :employer :law-firm :accounting :counterparty :vendor :financial :education :community :other"}
+ {:db/ident :org/status       :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":active :dormant :dissolved :disputed"}
+ {:db/ident :org/people       :db/valueType :db.type/ref     :db/cardinality :db.cardinality/many :db/doc "org -> 主要関係者"}
+ {:db/ident :org/note         :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+
+ {:db/ident :contract/id      :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :contract/title   :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :contract/kind    :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":employment :nda :service :equity :lease :insurance :loan :settlement :custody :mandate"}
+ {:db/ident :contract/date    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :contract/status  :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":active :terminated :completed :disputed :enforced"}
+ {:db/ident :contract/parties :db/valueType :db.type/ref     :db/cardinality :db.cardinality/many}
+ {:db/ident :contract/orgs    :db/valueType :db.type/ref     :db/cardinality :db.cardinality/many}
+ {:db/ident :contract/case    :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
+ {:db/ident :contract/note    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+
  ;; ---------- capability (agent boundary policy; ADR-0015) ----------
  {:db/ident :capability/id     :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
  {:db/ident :capability/agent  :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":yes(自動可) :ask(要確認) :no(本人のみ・Prohibited)"}
