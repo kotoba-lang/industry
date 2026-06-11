@@ -88,6 +88,25 @@
  {:db/ident :engi/cancel-channel  :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":email (既定) :unsubscribe-link :web-only (メール不可と判明したもののみ) :phone"}
  {:db/ident :engi/cancel-email    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/doc "解約依頼の宛先 (サポート/担当者)"}
 
+ ;; ---------- capability (agent boundary policy; ADR-0015) ----------
+ {:db/ident :capability/id     :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :capability/agent  :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":yes(自動可) :ask(要確認) :no(本人のみ・Prohibited)"}
+ {:db/ident :capability/reason :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+
+ ;; ---------- process / step (handoff state machine; ADR-0015) ----------
+ {:db/ident :process/id        :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :process/title     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :process/goal      :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
+ {:db/ident :process/status    :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":active :done :blocked :dropped"}
+ {:db/ident :step/id           :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :step/process      :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
+ {:db/ident :step/order        :db/valueType :db.type/long    :db/cardinality :db.cardinality/one}
+ {:db/ident :step/desc         :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :step/actor        :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":jun :claude :system"}
+ {:db/ident :step/capability   :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
+ {:db/ident :step/status       :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":blocked-on-human :pending :ready :done :skipped"}
+ {:db/ident :step/needs        :db/valueType :db.type/ref     :db/cardinality :db.cardinality/many :db/doc "prerequisite steps"}
+
  ;; ---------- prov (minimal embedded provenance; full detail in personal/prov/*.prov.jsonld) ----------
  {:db/ident :prov/derived-from :db/valueType :db.type/ref     :db/cardinality :db.cardinality/many :db/doc "fact -> source entity (email/blob/decision)"}
  {:db/ident :prov/activity     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one  :db/doc "e.g. \"mail-sync.sh@2026-06-11\", \"claude-extract/adr-0010\""}

@@ -215,6 +215,32 @@
              :kpi/at     (iso->inst (:at k))}))
         (rd-jsonl "facts/kpi.jsonl")))
 
+;; processes.edn: handoff state machine + capability policy (ADR-0015)
+(def processes-edn
+  (let [f (io/file base "facts/processes.edn")]
+    (when (.exists f) (edn/read-string (slurp f)))))
+
+(defn capability-tx [] (vec (:capabilities processes-edn)))
+
+(defn process-tx []
+  (vec (for [p (:processes processes-edn)]
+         (cond-> (dissoc p :steps)
+           (:process/goal p) (assoc :process/goal [:goal/id (:process/goal p)])))))
+
+(defn step-tx []
+  ;; pass 1: steps without :step/needs (so the unique :step/id exists in db)
+  (vec (for [p (:processes processes-edn)
+             s (:steps p)]
+         (cond-> (-> s (dissoc :step/needs) (assoc :step/process [:process/id (:process/id p)]))
+           (:step/capability s) (assoc :step/capability [:capability/id (:step/capability s)])))))
+
+(defn step-needs-tx []
+  ;; pass 2: add prerequisite edges via lookup ref (steps now exist)
+  (vec (for [p (:processes processes-edn)
+             s (:steps p) :when (seq (:step/needs s))]
+         {:step/id (:step/id s)
+          :step/needs (vec (for [n (:step/needs s)] [:step/id n]))})))
+
 ;; engi.edn: tie-release evaluations (ADR-0013)
 (defn engi-tx []
   (let [f (io/file base "facts/engi.edn")]
@@ -268,7 +294,9 @@
                           ["goals" (goal-tx)] ["goal-deps" (goal-edge-tx)]
                           ["obligations" (obligation-tx)]
                           ["dyads" (dyad-tx)] ["hypotheses" (hypothesis-tx)]
-                          ["engi" (engi-tx)] ["kpi" (kpi-tx)]]]
+                          ["engi" (engi-tx)] ["kpi" (kpi-tx)]
+                          ["capabilities" (capability-tx)] ["processes" (process-tx)]
+                          ["steps" (step-tx)] ["step-deps" (step-needs-tx)]]]
         (when (seq tx)
           (d/transact conn {:tx-data (vec tx)})
           (println (format "  loaded %-8s %d" label (count tx)))))
@@ -399,4 +427,24 @@
                                            [?e :engi/monthly-cost-jpy ?cost]] db)) 0)]
           (println (format "\n  個人負担の削減見込み: 確定系 (sever/archive/transfer) ¥%,d/月 + 縮小余地 (reduce対象) 最大 ¥%,d/月" (long sv) (long rd)))
           (println "  goal 29 KPI: ¥319k → 目標 ¥220k (要実測の概算を含む)"))
+        (println "\n=== Processes / ハンドオフ状態機械 (ADR-0015) ===")
+        (println "[Datalog] process/next-human — 本人の手番で止まっている (私が依頼する対象):")
+        (doseq [[pt sd cap] (d/q '[:find ?pt ?sd ?cap
+                                   :where [?s :step/status :blocked-on-human] [?s :step/actor :jun]
+                                          [?s :step/desc ?sd] [?s :step/capability ?c] [?c :capability/id ?cap]
+                                          [?s :step/process ?p] [?p :process/title ?pt]] db)]
+          (println (format "  ⏳[%s] %s\n      (%s)" pt sd cap)))
+        (println "\n[Datalog] process/claude-ready — 前提充足で私が自動実行できる step:")
+        (doseq [[pt o sd cap] (->> (d/q '[:find ?pt ?o ?sd ?cap
+                                          :where [?s :step/actor :claude]
+                                                 [?s :step/status ?st] [(contains? #{:pending :ready} ?st)]
+                                                 [?s :step/order ?o] [?s :step/desc ?sd]
+                                                 [?s :step/capability ?c] [?c :capability/id ?cap]
+                                                 [?s :step/process ?p] [?p :process/title ?pt]
+                                                 (not-join [?s] [?s :step/needs ?n] [?n :step/status ?nst] [(not= ?nst :done)])] db)
+                                   (sort-by (juxt first second)))]
+          (println (format "  ▶[%s] #%d %s (%s)" pt o sd cap)))
+        (println "\n[Datalog] policy/agent-prohibited — 機械が代行不可 (安全境界の監査ファクト):")
+        (doseq [[cap r] (d/q '[:find ?cap ?r :where [?c :capability/agent :no] [?c :capability/id ?cap] [?c :capability/reason ?r]] db)]
+          (println (format "  🔒%-18s %s" cap r)))
         (println "\nOK: normalized into Datomic. Rebuild anytime: clojure -M -m warehouse.load")))))
