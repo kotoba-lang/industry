@@ -222,6 +222,9 @@
 (defn channel-tx []
   (vec (rd-edn-facts "facts/channels.edn")))
 
+(defn finitem-tx []
+  (vec (rd-edn-facts "facts/corp-finance.edn")))
+
 (defn curated-org-tx []
   (vec (rd-edn-facts "facts/orgs.edn")))
 
@@ -310,7 +313,7 @@
                           ["cases" (case-tx)] ["emails" (email-tx)]
                           ["people" (people-tx)] ["people-aliases" (people-alias-tx)]
                           ["channels" (channel-tx)] ["orgs(curated)" (curated-org-tx)]
-                          ["accounts" (account2-tx)] ["contracts" (contract-tx)]
+                          ["accounts" (account2-tx)] ["contracts" (contract-tx)] ["finitems" (finitem-tx)]
                           ["goals" (goal-tx)] ["goal-deps" (goal-edge-tx)]
                           ["obligations" (obligation-tx)]
                           ["dyads" (dyad-tx)] ["hypotheses" (hypothesis-tx)]
@@ -471,6 +474,19 @@
                                              [?o :org/name ?nm]] db)
                               (sort-by (comp name first)))]
           (println (format "  %-12s %s" (name role) nm)))
+        (println "\n=== JK法人財務 triage (corp-finance.edn) ===")
+        (let [pay (or (first (first (d/q '[:find (sum ?a) :with ?f
+                                           :where [?f :finitem/direction :payable] [?f :finitem/amount-jpy ?a]] db))) 0)]
+          (println (format "  支払債務 (判明額合計): ¥%,d / 受領債権: NOT A HOTEL半期精算(プラス・入金確認要)" (long pay))))
+        (println "[Datalog] finitem by action (払う/減らす/切る/相殺/直す/監視):")
+        (doseq [[act t amt st] (->> (d/q '[:find ?act ?t ?amt ?st
+                                           :where [?f :finitem/action ?act] [?f :finitem/title ?t]
+                                                  [?f :finitem/status ?st]
+                                                  (or-join [?f ?amt]
+                                                    [?f :finitem/amount-jpy ?amt]
+                                                    (and [(missing? $ ?f :finitem/amount-jpy)] [(ground 0) ?amt]))] db)
+                                    (sort-by (fn [[a _ amt _]] [(name a) (- amt)])))]
+          (println (format "  %-8s ¥%-9s %-16s %s" (name act) (if (pos? amt) (format "%,d" amt) "-") (name st) t)))
         (println "\n=== Processes / ハンドオフ状態機械 (ADR-0015) ===")
         (println "[Datalog] process/next-human — 本人の手番で止まっている (私が依頼する対象):")
         (doseq [[pt sd cap] (d/q '[:find ?pt ?sd ?cap

@@ -123,6 +123,18 @@
  {:db/ident :contract/case    :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
  {:db/ident :contract/note    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
 
+ ;; ---------- finitem (corp finance triage; corp-finance.edn) ----------
+ {:db/ident :finitem/id        :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :finitem/org       :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
+ {:db/ident :finitem/title     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :finitem/amount-jpy :db/valueType :db.type/long   :db/cardinality :db.cardinality/one}
+ {:db/ident :finitem/direction :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":payable :receivable"}
+ {:db/ident :finitem/status    :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":overdue :restricted :recurring-decline :disputed :resolved"}
+ {:db/ident :finitem/action    :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":pay :reduce :sever :net-off :fix :monitor"}
+ {:db/ident :finitem/account   :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :finitem/cancel-channel :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ {:db/ident :finitem/note      :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+
  ;; ---------- capability (agent boundary policy; ADR-0015) ----------
  {:db/ident :capability/id     :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
  {:db/ident :capability/agent  :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":yes(自動可) :ask(要確認) :no(本人のみ・Prohibited)"}
