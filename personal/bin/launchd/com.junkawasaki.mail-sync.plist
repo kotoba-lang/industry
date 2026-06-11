@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Daily incremental mail ingest for the personal warehouse.
+<!-- Near-real-time incremental mail ingest for the personal warehouse.
+     Polls every 15 min (StartInterval); launchd serializes, so a slow run is
+     never overlapped. PATH is set so git-annex/datalad/python3 resolve under
+     launchd's minimal environment (the daily-cron version failed with
+     "git: 'annex' is not a git command").
      Install:  cp personal/bin/launchd/com.junkawasaki.mail-sync.plist ~/Library/LaunchAgents/
+               launchctl bootout  gui/$(id -u)/com.junkawasaki.mail-sync 2>/dev/null
                launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.junkawasaki.mail-sync.plist
      Run now:  launchctl kickstart gui/$(id -u)/com.junkawasaki.mail-sync -->
 <plist version="1.0">
@@ -13,13 +18,15 @@
 		<string>/bin/bash</string>
 		<string>/Users/junkawasaki/github/com-junkawasaki/personal/bin/mail-sync.sh</string>
 	</array>
-	<key>StartCalendarInterval</key>
+	<key>EnvironmentVariables</key>
 	<dict>
-		<key>Hour</key>
-		<integer>7</integer>
-		<key>Minute</key>
-		<integer>30</integer>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin:/usr/sbin:/sbin</string>
 	</dict>
+	<key>StartInterval</key>
+	<integer>900</integer>
+	<key>RunAtLoad</key>
+	<true/>
 	<key>StandardOutPath</key>
 	<string>/tmp/com.junkawasaki.mail-sync.out</string>
 	<key>StandardErrorPath</key>
