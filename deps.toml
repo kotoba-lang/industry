@@ -159,6 +159,28 @@ stack = ["Clojure"]
 adrs = ["docs/adr/0001-architecture.md"]
 deps = ["langchain-clj"]
 
+[[projects]]
+name = "browser-use-clj"
+path = "orgs/com-junkawasaki/browser-use-clj"
+kind = "clojure-library"
+submodule = true
+remote = "git@github.com:com-junkawasaki/browser-use-clj.git"
+description = "browser-use 相当のブラウザ操作エージェントを portable Clojure (.cljc) で実装。番号付き要素表現 + アクションレジストリ + langgraph StateGraph ループ。ブラウザは IBrowser protocol でホスト能力注入（Playwright/CDP/ページ内 WASM/MCP）、操作履歴を datom 化。MIT (本家準拠)。"
+stack = ["Clojure"]
+adrs = ["docs/adr/0001-architecture.md"]
+deps = ["langgraph-clj"]
+
+[[projects]]
+name = "computer-use-clj"
+path = "orgs/com-junkawasaki/computer-use-clj"
+kind = "clojure-library"
+submodule = true
+remote = "git@github.com:com-junkawasaki/computer-use-clj.git"
+description = "Anthropic computer use 相当のデスクトップ操作エージェントを portable Clojure (.cljc) で実装。computer tool の action 語彙 + サンプリングループ (langgraph StateGraph)。デスクトップは IComputer protocol でホスト能力注入（xdotool/VNC/MCP）、操作履歴を datom 化。MIT (本家リファレンス準拠)。"
+stack = ["Clojure"]
+adrs = ["docs/adr/0001-architecture.md"]
+deps = ["langgraph-clj"]
+
 # ─── Vendored repos (remote 無し → 素フォルダ取り込み, ADR-0007 Phase 2/3) ───
 #
 # GitHub remote を持たないため submodule 化せず DataLad superdataset に直接取り込み。
