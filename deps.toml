@@ -135,7 +135,7 @@ submodule = true
 remote = "git@github.com:com-junkawasaki/langchain-clj.git"
 description = "LangChain-core 相当の LLM 基盤レイヤを portable Clojure (.cljc, 依存ゼロ) で実装。LCEL Runnable / prompt / ChatModel (Anthropic adapter, I/O はホスト能力注入) / tool / parser / Datomic 互換ミニストア + datom チャット履歴（ADR-0010 と同型）。kotoba-clj 等の Clojure WASM ホスト前提。MIT (本家準拠)。"
 stack = ["Clojure"]
-adrs = ["docs/adr/0001-architecture.md"]
+adrs = ["docs/adr/0001-architecture.md", "kawasakijun/docs/adr/0013-clj-agent-stack.md"]
 
 [[projects]]
 name = "langgraph-clj"
@@ -145,7 +145,7 @@ submodule = true
 remote = "git@github.com:com-junkawasaki/langgraph-clj.git"
 description = "LangGraph 相当のグラフオーケストレーションを portable Clojure (.cljc) で実装。StateGraph + Pregel superstep / interrupt / checkpoint を datom 化（Datalog ビュー = ADR-0010 と同型）。langchain-clj に git 依存（本家 langchain-core/langgraph と同じ積層）。MIT (本家準拠)。"
 stack = ["Clojure"]
-adrs = ["docs/adr/0001-architecture.md"]
+adrs = ["docs/adr/0001-architecture.md", "kawasakijun/docs/adr/0013-clj-agent-stack.md"]
 deps = ["langchain-clj"]
 
 [[projects]]
@@ -156,7 +156,7 @@ submodule = true
 remote = "git@github.com:com-junkawasaki/comfyui-clj.git"
 description = "ComfyUI 相当のノードグラフ実行エンジンを portable Clojure (.cljc) で実装。API format 互換ワークフロー + content-addressed キャッシュ付きトポロジカル実行。キャッシュ・run 履歴を datom 化（Datalog ビュー = ADR-0010 と同型）。推論等の重い処理はホスト能力注入、langchain-clj に git 依存（ChatModel ノードパック）。GPL-3.0 (本家準拠)。"
 stack = ["Clojure"]
-adrs = ["docs/adr/0001-architecture.md"]
+adrs = ["docs/adr/0001-architecture.md", "kawasakijun/docs/adr/0013-clj-agent-stack.md"]
 deps = ["langchain-clj"]
 
 [[projects]]
@@ -167,7 +167,7 @@ submodule = true
 remote = "git@github.com:com-junkawasaki/browser-use-clj.git"
 description = "browser-use 相当のブラウザ操作エージェントを portable Clojure (.cljc) で実装。番号付き要素表現 + アクションレジストリ + langgraph StateGraph ループ。ブラウザは IBrowser protocol でホスト能力注入（Playwright/CDP/ページ内 WASM/MCP）、操作履歴を datom 化。MIT (本家準拠)。"
 stack = ["Clojure"]
-adrs = ["docs/adr/0001-architecture.md"]
+adrs = ["docs/adr/0001-architecture.md", "kawasakijun/docs/adr/0013-clj-agent-stack.md"]
 deps = ["langgraph-clj"]
 
 [[projects]]
@@ -178,7 +178,7 @@ submodule = true
 remote = "git@github.com:com-junkawasaki/computer-use-clj.git"
 description = "Anthropic computer use 相当のデスクトップ操作エージェントを portable Clojure (.cljc) で実装。computer tool の action 語彙 + サンプリングループ (langgraph StateGraph)。デスクトップは IComputer protocol でホスト能力注入（xdotool/VNC/MCP）、操作履歴を datom 化。MIT (本家リファレンス準拠)。"
 stack = ["Clojure"]
-adrs = ["docs/adr/0001-architecture.md"]
+adrs = ["docs/adr/0001-architecture.md", "kawasakijun/docs/adr/0013-clj-agent-stack.md"]
 deps = ["langgraph-clj"]
 
 # ─── Vendored repos (remote 無し → 素フォルダ取り込み, ADR-0007 Phase 2/3) ───
@@ -351,3 +351,14 @@ status = "2026-06-10 配線完了: CLIs(az 2.87/m365 11.8/rclone) 導入、gpg�
 #   etzhayyim-root applies those principles to on-chain distributed systems.
 #   ghosthacker runs on that substrate to generate the Ghost Hacker story universe.
 #   ai-gftd-apps-gftdcojp is the production AI agent platform (gftd.ai) built on AT Protocol.
+#
+#   portable Clojure agent stack (ADR-0013; SSoT: kawasakijun/clj-stack.edn):
+#
+#   browser-use-clj      computer-use-clj          ← agent layer
+#           └────────┬────────┘
+#             langgraph-clj          comfyui-clj   ← orchestration layer
+#                   └───────┬───────────┘
+#                     langchain-clj                ← foundation (zero-dep .cljc)
+#
+#   All .cljc / Clojure-on-WASM (kotoba-clj) ready; state as datoms (ADR-0010 pattern);
+#   I/O and heavy work injected as host capabilities.
