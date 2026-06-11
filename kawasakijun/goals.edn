@@ -1,0 +1,113 @@
+;; goals.edn — 人生DAG (ADR-0010 移行ステップ3: reverse_topo_pregel.py GOALS/EDGES のデータ化)
+;; SSoT はこのファイル。Python (reverse_topo_pregel.py) と Datomic (warehouse.load) は両方ここを読む側に回す。
+;; :goal/kind :guardrail は W(τ) 合計に入れない制約ノード (queries/attention.edn :guardrail/nodoka-floor が監視)。
+;; :edges は [prerequisite dependent]。dependent が :goal/depends-on prerequisite を持つ。
+
+{:version "2026-06-11 Phase2.5 + ADR-0010"
+
+ :goals
+ [;; --- guardrail (最大化対象ではなく床。トレードオフ禁止) ---
+  {:goal/id "00_nodoka_wellbeing"
+   :goal/title "のどかの安全基地維持 (週次接触の床 / 学校緊急連絡経路 / 訴訟・財務動揺からの遮断)"
+   :goal/kind :guardrail :goal/domain :relations :goal/tau :generation
+   :goal/est-years 12.0 :goal/w-contribution 0.0 :goal/status :active}
+
+  ;; --- objectives (= reverse_topo_pregel.py Phase 2.5) ---
+  {:goal/id "01_aishi_disclosure" :goal/title "アイシステム送金履歴の完全開示"
+   :goal/kind :objective :goal/domain :social :goal/tau :month :goal/est-years 0.25 :goal/w-contribution 0.10 :goal/status :active}
+  {:goal/id "02_2021_reconcile" :goal/title "2021年 預かり資金移動 全件突合"
+   :goal/kind :objective :goal/domain :social :goal/tau :month :goal/est-years 0.5 :goal/w-contribution 0.15 :goal/status :active}
+  {:goal/id "03_lean_mathlib" :goal/title "Lean4 mathlib v4.25 互換性検証"
+   :goal/kind :objective :goal/domain :physics :goal/tau :month :goal/est-years 0.25 :goal/w-contribution 0.05 :goal/status :active}
+  {:goal/id "04_accounting_proof" :goal/title "経理データ整合性証明書 (ZeLo + TOTAL 連名)"
+   :goal/kind :objective :goal/domain :social :goal/tau :month :goal/est-years 0.5 :goal/w-contribution 0.20 :goal/status :active}
+  {:goal/id "05_adr_0003" :goal/title "ADR-0003 + GenerativeStructure 完成"
+   :goal/kind :objective :goal/domain :physics :goal/tau :month :goal/est-years 0.5 :goal/w-contribution 0.10 :goal/status :active}
+  {:goal/id "06_lingling_brief" :goal/title "LingLing 準備書面 完成 + 期日対応"
+   :goal/kind :objective :goal/domain :social :goal/tau :month :goal/est-years 1.0 :goal/w-contribution 0.25 :goal/status :active}
+  {:goal/id "07_arxiv_submit" :goal/title "Wheeler-DeWitt 検証 → arXiv 投稿 (spirit-in-physics/arxiv_submission)"
+   :goal/kind :objective :goal/domain :physics :goal/tau :year :goal/est-years 1.5 :goal/w-contribution 0.20 :goal/status :active}
+  {:goal/id "08_gftd_breakeven" :goal/title "Gftd Japan 月次黒字化 (営業案件積上げ)"
+   :goal/kind :objective :goal/domain :infra :goal/tau :year :goal/est-years 1.5 :goal/w-contribution 0.30 :goal/status :active}
+  {:goal/id "09_ghosthacker_scenarios" :goal/title "Ghost Hacker 残6巻完結 (Vol.2-5 既存スクリプト消化 + Vol.6-8 新規) — Phase 4.A"
+   :goal/kind :objective :goal/domain :fiction :goal/tau :year :goal/est-years 1.0 :goal/w-contribution 0.20 :goal/status :active}
+  {:goal/id "10_jk_holding_revenue" :goal/title "JK株式会社 (旧COMMONS) 医療/研究/資産管理事業の安定運営"
+   :goal/kind :objective :goal/domain :social :goal/tau :year :goal/est-years 1.0 :goal/w-contribution 0.15 :goal/status :active}
+  {:goal/id "11_health_steady" :goal/title "健康指標安定化 (通院隔月化)"
+   :goal/kind :objective :goal/domain :health :goal/tau :year :goal/est-years 1.0 :goal/w-contribution 0.25 :goal/status :active
+   :goal/external-dependency "医師判断"}
+  {:goal/id "12_legal_offload" :goal/title "訴訟負荷の弁護団移譲 + 自己時間確保"
+   :goal/kind :objective :goal/domain :social :goal/tau :year :goal/est-years 1.5 :goal/w-contribution 0.20 :goal/status :active}
+  {:goal/id "13_meeting_partners" :goal/title "出会いの場形成 + 経済的自立したパートナー候補との接触"
+   :goal/kind :objective :goal/domain :relations :goal/tau :year :goal/est-years 1.0 :goal/w-contribution 0.25 :goal/status :active
+   :goal/fallback "既存ネットワーク内の再評価"}
+  {:goal/id "14_loan_acceleration" :goal/title "借入の法人債務化 + 個人保証解除 + JK→河崎 1.34億 回収 (Phase 4.D 自動化, 4-5年完済)"
+   :goal/kind :objective :goal/domain :social :goal/tau :year :goal/est-years 1.0 :goal/w-contribution 0.40 :goal/status :active}
+  {:goal/id "15_remarriage" :goal/title "再婚 (パートナーに資力・収入があれば経済前提ナシで可)"
+   :goal/kind :objective :goal/domain :relations :goal/tau :year :goal/est-years 1.5 :goal/w-contribution 0.50 :goal/status :active
+   :goal/external-dependency "パートナー合意" :goal/fallback "事実婚 / パートナーシップ"}
+  {:goal/id "16_more_children" :goal/title "子供 +2–3人 (パートナー合意 + 並走出産で 3y 圏)"
+   :goal/kind :objective :goal/domain :relations :goal/tau :year :goal/est-years 3.0 :goal/w-contribution 0.50 :goal/status :active
+   :goal/external-dependency "パートナー合意" :goal/fallback "養子 / 並走出産 (代理含む)"}
+  {:goal/id "17_internal_control" :goal/title "内部統制 (ISMS 既登録活用 + Family Office 用 reframing) — Phase 3.A"
+   :goal/kind :objective :goal/domain :infra :goal/tau :year :goal/est-years 1.5 :goal/w-contribution 0.20 :goal/status :active}
+  {:goal/id "18_family_office_conversion" :goal/title "Gftd Japan = シングルファミリープライベートオフィス化 (株主総会決議+登記 ¥60,000)"
+   :goal/kind :objective :goal/domain :infra :goal/tau :month :goal/est-years 0.25 :goal/w-contribution 0.35 :goal/status :active}
+  {:goal/id "19_ghosthacker_film" :goal/title "Ghost Hacker 映像化 (シナリオ完成済 + animeka pipeline 連結で短縮)"
+   :goal/kind :objective :goal/domain :fiction :goal/tau :year :goal/est-years 3.0 :goal/w-contribution 0.25 :goal/status :active
+   :goal/external-dependency "制作会社"}
+  {:goal/id "21_gftd_lawfirm_vertical" :goal/title "Gftd 法務クラスタ 9-actor 拡大 (lawfirm/saiban/judge/bengoshi/adr/…; 200K judges + 2.5M lawyers) — ADR-0016"
+   :goal/kind :objective :goal/domain :infra :goal/tau :year :goal/est-years 1.0 :goal/w-contribution 0.30 :goal/status :active}
+  {:goal/id "21b_gftd_anime_vertical" :goal/title "animeka 12-stage BPMN pipeline 運用拡大 + Ghost Hacker IP 連結 (RunPod Serverless 移行済) — ADR-2604231328"
+   :goal/kind :objective :goal/domain :infra :goal/tau :year :goal/est-years 0.75 :goal/w-contribution 0.30 :goal/status :active}
+  {:goal/id "22_etzhayyim_ops" :goal/title "Etzhayyim 宗教法人 9領域の運用拡大 (既存; did:web:etzhayyim.com)"
+   :goal/kind :objective :goal/domain :spirit :goal/tau :year :goal/est-years 1.5 :goal/w-contribution 0.30 :goal/status :active}
+  {:goal/id "23_jk_holding_governance" :goal/title "JK株式会社 (private) ガバナンス確立 (医療/研究/資産管理 3軸)"
+   :goal/kind :objective :goal/domain :social :goal/tau :year :goal/est-years 1.0 :goal/w-contribution 0.20 :goal/status :active}
+  {:goal/id "24_cyber_treaty" :goal/title "US×JP Mutual Cyber Security Treaty 提案 → 政府案件化"
+   :goal/kind :objective :goal/domain :infra :goal/tau :decade :goal/est-years 3.0 :goal/w-contribution 0.35 :goal/status :active
+   :goal/external-dependency "日米政府" :goal/fallback "経産省 / 防衛省 単独案件化"}
+  {:goal/id "25_magatama_sdk" :goal/title "Etzhayyim Magatama actor framework + Pregel SDK 公開 (20-actors/magatama/)"
+   :goal/kind :objective :goal/domain :spirit :goal/tau :year :goal/est-years 1.0 :goal/w-contribution 0.20 :goal/status :active}
+  {:goal/id "26_counter_litigation" :goal/title "債権者・関係者への反訴・起訴戦略 (個人請求の不適切性主張、法人債務として整理) — ZeLo + AMT 主導"
+   :goal/kind :objective :goal/domain :social :goal/tau :year :goal/est-years 1.0 :goal/w-contribution 0.35 :goal/status :active}
+  {:goal/id "27_rokes_attacker_pursuit" :goal/title "Rokes Exchange / HEC ハッカー追跡 (on-chain forensics + 国際捜査協力 + 民事保全)"
+   :goal/kind :objective :goal/domain :infra :goal/tau :year :goal/est-years 1.0 :goal/w-contribution 0.25 :goal/status :active}
+  {:goal/id "28_crypto_victim_lawfirm" :goal/title "Crypto 被害者向け追跡・回収 lawfirm product (lawfirm.gftd.ai 新 actor; SaaS+成功報酬)"
+   :goal/kind :objective :goal/domain :infra :goal/tau :year :goal/est-years 1.5 :goal/w-contribution 0.40 :goal/status :active}
+  {:goal/id "29_subscription_audit" :goal/title "サブスク・契約・アカウント整理 (Phase 5; 月額 ¥319k → 目標 ¥220k)"
+   :goal/kind :objective :goal/domain :infra :goal/tau :month :goal/est-years 0.25 :goal/w-contribution 0.10 :goal/status :active}]
+
+ ;; [prerequisite dependent]
+ :edges
+ [["01_aishi_disclosure" "02_2021_reconcile"]
+  ["02_2021_reconcile" "04_accounting_proof"]
+  ["04_accounting_proof" "06_lingling_brief"]
+  ["06_lingling_brief" "12_legal_offload"]
+
+  ["21_gftd_lawfirm_vertical" "08_gftd_breakeven"]
+  ["21b_gftd_anime_vertical" "08_gftd_breakeven"]
+  ["08_gftd_breakeven" "14_loan_acceleration"]
+  ["10_jk_holding_revenue" "14_loan_acceleration"]
+  ["23_jk_holding_governance" "10_jk_holding_revenue"]
+  ["22_etzhayyim_ops" "14_loan_acceleration"]
+  ["24_cyber_treaty" "14_loan_acceleration"]
+
+  ["17_internal_control" "18_family_office_conversion"]
+  ["08_gftd_breakeven" "17_internal_control"]
+
+  ["13_meeting_partners" "15_remarriage"]
+  ["15_remarriage" "16_more_children"]
+
+  ["03_lean_mathlib" "05_adr_0003"]
+  ["05_adr_0003" "07_arxiv_submit"]
+  ["09_ghosthacker_scenarios" "21b_gftd_anime_vertical"]
+  ["09_ghosthacker_scenarios" "19_ghosthacker_film"]
+  ["07_arxiv_submit" "22_etzhayyim_ops"]
+  ["22_etzhayyim_ops" "25_magatama_sdk"]
+
+  ["04_accounting_proof" "26_counter_litigation"]
+  ["26_counter_litigation" "14_loan_acceleration"]
+  ["27_rokes_attacker_pursuit" "28_crypto_victim_lawfirm"]
+  ["21_gftd_lawfirm_vertical" "28_crypto_victim_lawfirm"]
+  ["28_crypto_victim_lawfirm" "08_gftd_breakeven"]]}

@@ -42,7 +42,10 @@
 
 ;; ---------- schema (declarative, loaded from edn) ----------
 ;; Relationships/refs live in bin/datomic/schema.edn (graph summary: model.edn).
-(def schema (edn/read-string (slurp (io/file base "bin/datomic/schema.edn"))))
+;; ADR-0010: schema-life.edn adds goal/obligation/decision/kpi/prov + person aliases.
+(def schema
+  (vec (concat (edn/read-string (slurp (io/file base "bin/datomic/schema.edn")))
+               (edn/read-string (slurp (io/file base "bin/datomic/schema-life.edn"))))))
 
 ;; ---------- normalization (file records -> datoms) ----------
 (def finance-files
@@ -155,6 +158,55 @@
   (when (seq (email-tx))
     [{:case/id "lingling" :case/name "LingLing訴訟" :case/kind "litigation"}]))
 
+;; ---------- life graph (ADR-0010: goals.edn + facts/obligations.jsonl) ----------
+(def goals-edn
+  (let [f (io/file base "../kawasakijun/goals.edn")]
+    (when (.exists f) (edn/read-string (slurp f)))))
+
+(defn goal-tx []
+  (vec (:goals goals-edn)))
+
+(defn goal-edge-tx []
+  ;; separate tx: lookup refs need goals already transacted
+  (vec (for [[pre dep] (:edges goals-edn)]
+         {:db/id [:goal/id dep] :goal/depends-on [[:goal/id pre]]})))
+
+(defn- iso->inst [s]
+  (java.util.Date/from (.toInstant (java.time.OffsetDateTime/parse s))))
+
+;; people.edn: curated person registry. Pass 1 = canonical entities
+;; (primary email keeps :person/email identity so email-tx stubs upsert into
+;; the same entity). Pass 2 = alias addresses as thin entities pointing to
+;; canonical via :person/canonical (entity resolution, ADR-0010).
+(def people-edn
+  (let [f (io/file base "facts/people.edn")]
+    (when (.exists f) (edn/read-string (slurp f)))))
+
+(defn people-tx []
+  (vec (for [p people-edn]
+         (cond-> (dissoc p :emails)
+           (seq (:emails p)) (assoc :person/email (first (:emails p)))))))
+
+(defn people-alias-tx []
+  (vec (for [p people-edn
+             alias (rest (:emails p))]
+         (cond-> {:person/email alias
+                  :person/canonical [:person/id (:person/id p)]}
+           (:person/relation p)        (assoc :person/relation (:person/relation p))
+           (:person/attention-class p) (assoc :person/attention-class (:person/attention-class p))))))
+
+(defn obligation-tx []
+  (keep (fn [o]
+          (when (and (:id o) (:due o))
+            (cond-> {:obligation/id       (clean (:id o))
+                     :obligation/title    (clean (:title o))
+                     :obligation/due      (iso->inst (:due o))
+                     :obligation/severity (keyword (or (:severity o) "normal"))
+                     :obligation/status   (keyword (or (:status o) "open"))}
+              (:case o) (assoc :obligation/case {:case/id (clean (:case o))})
+              (:goal o) (assoc :obligation/goal [:goal/id (clean (:goal o))]))))
+        (rd-jsonl "facts/obligations.jsonl")))
+
 ;; ---------- main ----------
 (defn -main [& _]
   (let [client (d/client {:server-type :datomic-local :storage-dir :mem :system "personal-warehouse"})]
@@ -165,7 +217,10 @@
       (doseq [[label tx] [["orgs" (org-tx)] ["persons" (person-tx)]
                           ["txns" (txn-tx)] ["loans" (loan-tx)]
                           ["actions" (action-tx)] ["events" (event-tx)]
-                          ["cases" (case-tx)] ["emails" (email-tx)]]]
+                          ["cases" (case-tx)] ["emails" (email-tx)]
+                          ["people" (people-tx)] ["people-aliases" (people-alias-tx)]
+                          ["goals" (goal-tx)] ["goal-deps" (goal-edge-tx)]
+                          ["obligations" (obligation-tx)]]]
         (when (seq tx)
           (d/transact conn {:tx-data (vec tx)})
           (println (format "  loaded %-8s %d" label (count tx)))))
@@ -206,4 +261,33 @@
         (println "\n[Datalog] P0 アクション:")
         (doseq [[t] (d/q '[:find ?t :where [?a :action/priority "P0_urgent"] [?a :action/title ?t]] db)]
           (println "  -" t))
+        (println "\n=== Life graph (ADR-0010) ===")
+        (println "  people     " (n '[:find (count ?p) :where [?p :person/id]])
+                 " aliases" (n '[:find (count ?p) :where [?p :person/canonical]]))
+        (println "\n[Datalog] 人物レジストリ (relation / attention-class):")
+        (doseq [[rel ps] (->> (d/q '[:find ?rel ?nm ?cls
+                                     :where [?p :person/id] [?p :person/relation ?rel]
+                                            [?p :person/name ?nm]
+                                            [?p :person/attention-class ?cls]] db)
+                              (group-by first) (sort-by key))]
+          (println (format "  %s:" (name rel)))
+          (doseq [[_ nm cls] (sort-by second ps)]
+            (println (format "    %-38s [%s]" nm (name cls)))))
+        (println "  goals      " (n '[:find (count ?g) :where [?g :goal/id]]))
+        (println "  dag-edges  " (n '[:find (count ?d) :with ?g :where [?g :goal/depends-on ?d]]))
+        (println "  obligations" (n '[:find (count ?o) :where [?o :obligation/id]]))
+        (println "\n[Datalog] attention/queue — open obligations (期限順; 人間が見るのはこれだけ):")
+        (doseq [[title due sev] (->> (d/q '[:find ?title ?due ?sev
+                                            :where [?o :obligation/status :open]
+                                                   [?o :obligation/title ?title]
+                                                   [?o :obligation/due ?due]
+                                                   [?o :obligation/severity ?sev]] db)
+                                     (sort-by second))]
+          (println (format "  %-8s %tF  %s" (name sev) due title)))
+        (println "\n[Datalog] goal/blocked-critical-path — open obligation に塞がれた active goal:")
+        (doseq [[g t] (d/q '[:find ?gt ?ot
+                             :where [?g :goal/status :active] [?g :goal/title ?gt]
+                                    [?o :obligation/goal ?g] [?o :obligation/status :open]
+                                    [?o :obligation/title ?ot]] db)]
+          (println (format "  %s\n    └─ %s" g t)))
         (println "\nOK: normalized into Datomic. Rebuild anytime: clojure -M -m warehouse.load")))))

@@ -1,0 +1,55 @@
+;; schema-life.edn — ADR-0010: goals / obligations / decisions / kpi / prov / person拡張.
+;; Additive to schema.edn (load.clj should transact both files).
+
+[;; ---------- goal (life DAG node; migrated from reverse_topo_pregel.py) ----------
+ {:db/ident :goal/id             :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity :db/doc "e.g. \"15_remarriage\", \"00_nodoka_wellbeing\""}
+ {:db/ident :goal/title          :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :goal/kind           :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":objective (maximize) | :guardrail (constraint; never traded off)"}
+ {:db/ident :goal/domain         :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":relations :health :social :physics :fiction :infra :spirit :did"}
+ {:db/ident :goal/tau            :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":week :month :year :decade :generation"}
+ {:db/ident :goal/est-years      :db/valueType :db.type/double  :db/cardinality :db.cardinality/one}
+ {:db/ident :goal/w-contribution :db/valueType :db.type/double  :db/cardinality :db.cardinality/one}
+ {:db/ident :goal/depends-on     :db/valueType :db.type/ref     :db/cardinality :db.cardinality/many :db/doc "goal -> prerequisite goals (DAG edge)"}
+ {:db/ident :goal/status         :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":active :done :deferred :dropped"}
+ {:db/ident :goal/external-dependency :db/valueType :db.type/string :db/cardinality :db.cardinality/one :db/doc "外部依存 (相手・市場・裁判所など)"}
+ {:db/ident :goal/fallback       :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/doc "代替経路"}
+
+ ;; ---------- obligation (dated duty: court date, brief deadline, payment due, renewal) ----------
+ {:db/ident :obligation/id       :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :obligation/title    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :obligation/due      :db/valueType :db.type/instant :db/cardinality :db.cardinality/one}
+ {:db/ident :obligation/severity :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":critical (irreversible loss) :high :normal"}
+ {:db/ident :obligation/status   :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":open :done :waived"}
+ {:db/ident :obligation/case     :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
+ {:db/ident :obligation/goal     :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
+ {:db/ident :obligation/source   :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one :db/doc "obligation -> email/blob it was extracted from (provenance)"}
+
+ ;; ---------- decision (manimani ledger + human/agent calls; queryable judgment history) ----------
+ {:db/ident :decision/id         :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :decision/at         :db/valueType :db.type/instant :db/cardinality :db.cardinality/one}
+ {:db/ident :decision/policy     :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":reply-llm :todo :waiting :done :archive :unsubscribe :investigate :snooze"}
+ {:db/ident :decision/agent      :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":human :llm-auto :llm-suggested"}
+ {:db/ident :decision/input      :db/valueType :db.type/ref     :db/cardinality :db.cardinality/many :db/doc "decision -> emails/obligations it acted on"}
+ {:db/ident :decision/note       :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+
+ ;; ---------- kpi (sensor time-series; living system output) ----------
+ {:db/ident :kpi/id              :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity :db/doc "metric+at composite, e.g. \"nodoka.time/2026-W24\""}
+ {:db/ident :kpi/metric          :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":nodoka.time :health.sleep :health.clinic :meeting.partners :mail.noise-ratio"}
+ {:db/ident :kpi/value           :db/valueType :db.type/double  :db/cardinality :db.cardinality/one}
+ {:db/ident :kpi/at              :db/valueType :db.type/instant :db/cardinality :db.cardinality/one}
+ {:db/ident :kpi/goal            :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one :db/doc "kpi -> goal it measures"}
+
+ ;; ---------- person extensions (entity resolution + attention policy) ----------
+ ;; NOTE: :person/email (unique) stays for compat; :person/id becomes canonical,
+ ;; :person/emails collects aliases (iCloud Hide-My-Email relays, jun784+tag@, corp addrs).
+ {:db/ident :person/id              :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity :db/doc "canonical slug, e.g. \"nodoka\", \"mika\", \"takeshita-zelo\""}
+ {:db/ident :person/emails          :db/valueType :db.type/string  :db/cardinality :db.cardinality/many :db/doc "all known addresses incl. relay aliases"}
+ {:db/ident :person/relation        :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one  :db/doc ":self :family :co-parent :lawyer :accountant :counterparty :vendor :friend :cold"}
+ {:db/ident :person/attention-class :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one  :db/doc ":family :legal-deadline :money-anomaly :business :vendor-routine :cold-inbound (ADR-0010 L4)"}
+ {:db/ident :person/canonical       :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one  :db/doc "alias person-entity -> canonical person (entity resolution)"}
+ {:db/ident :person/note            :db/valueType :db.type/string  :db/cardinality :db.cardinality/one  :db/doc "curated context (people.edn)"}
+
+ ;; ---------- prov (minimal embedded provenance; full detail in personal/prov/*.prov.jsonld) ----------
+ {:db/ident :prov/derived-from :db/valueType :db.type/ref     :db/cardinality :db.cardinality/many :db/doc "fact -> source entity (email/blob/decision)"}
+ {:db/ident :prov/activity     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one  :db/doc "e.g. \"mail-sync.sh@2026-06-11\", \"claude-extract/adr-0010\""}
+ {:db/ident :prov/agent        :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one  :db/doc ":jun :launchd :claude :manimani"}]
