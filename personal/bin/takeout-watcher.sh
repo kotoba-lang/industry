@@ -42,6 +42,21 @@ stable(){ # path -> 0 if download complete (no .crdownload, size stable 4s)
 
 norm(){ basename "$1" | sed -E 's/ \([0-9]+\)\.zip$/.zip/'; }  # strip " (1)" dup suffix
 
+
+expand_zips(){ # $1 = extracted dest dir — 内容物 zip の隣に .extracted/ を併置（原本は保持）
+  # -type f: 未 annex の新規展開ファイルのみ対象（annex 済みは symlink なので対象外）
+  local z
+  while IFS= read -r -d '' z; do
+    [ -e "$z.extracted" ] && continue
+    if ditto -x -k "$z" "$z.extracted" >>"$LOG" 2>&1; then
+      log "EXPANDED: $(basename "$z")"
+    else
+      rm -rf "$z.extracted"
+      log "EXPAND FAIL (kept original only): $(basename "$z")"
+    fi
+  done < <(find "$1" -type f -name '*.zip' ! -path '*.zip.extracted/*' -print0 2>/dev/null)
+}
+
 process(){
   local zip="$1" acct="$2" base nm prefix date dest
   base=$(basename "$zip"); nm=$(norm "$zip")
@@ -53,6 +68,7 @@ process(){
   mkdir -p "$REPO/$dest"
   if ! ditto -x -k "$zip" "$REPO/$dest" >>"$LOG" 2>&1; then log "EXTRACT FAIL $base"; echo "!! EXTRACT FAIL $base"; return 1; fi
   rm -f "$zip"                       # free the zip immediately after extract
+  expand_zips "$REPO/$dest"          # 内容物 zip は原本+展開コピー併置 (ADR-0008 追記)
   cd "$REPO" || return 1
   preset_pass
   git annex add "$dest"                >>"$LOG" 2>&1
