@@ -171,6 +171,7 @@ adrs = [
   "kawasakijun/docs/adr/0011-no-public-network-pinning-pqc.md",
   "kawasakijun/docs/adr/0012-power-dynamics-model.md",
   "kawasakijun/docs/adr/0013-engi-release-model.md",
+  "kawasakijun/docs/adr/0014-vonneumann-lexicographic-criterion.md",
 ]
 stack = ["DataLad", "git-annex", "gpg", "adb", "Datomic Local (Clojure)"]
 sources = ["device-mac", "device-android (getprop/packages/SMS-bodies/calls/contacts)", "gmail", "google-calendar", "google-drive", "github", "1password (metadata-only inventory)"]
@@ -212,7 +213,7 @@ schema = "declarative in bin/datomic/schema.edn + schema-life.edn (ADR-0010: goa
 views = "named Datalog views in bin/datomic/queries/attention.edn (ADR-0010 L3: attention/queue, family-signals, money-anomalies, relationship/decay, goal/blocked-critical-path, guardrail/nodoka-floor)"
 provenance = "PROV-O JSON-LD sidecars: personal/prov/<cid>.prov.jsonld (ADR-0010 L2; @context = personal/prov/context.jsonld; seal-evidence.sh emits — pending)"
 entities = ["org", "person", "account", "txn", "loan", "event", "action", "email", "attachment", "case", "blob", "goal", "obligation", "decision", "kpi"]
-life_graph = "kawasakijun/goals.edn = SSoT of the life DAG (30 goals incl. 00_nodoka_wellbeing guardrail, 26 edges; extracted from reverse_topo_pregel.py per ADR-0010 step 3) + personal/facts/obligations.jsonl (dated duties -> attention/queue). load.clj transacts both; reverse_topo_pregel.py should be switched to read goals.edn (pending)."
+life_graph = "kawasakijun/goals.edn = SSoT of the life DAG (31 goals incl. 00_wellbecoming_self/00_nodoka_wellbeing guardrails + ADR-0014 lexicographic tiers, 26 edges; extracted from reverse_topo_pregel.py per ADR-0010 step 3) + personal/facts/obligations.jsonl (dated duties -> attention/queue). load.clj transacts both; reverse_topo_pregel.py should be switched to read goals.edn (pending)."
 people_registry = "personal/facts/people.edn = curated person entities (23 canonical incl. lawyers/family/counterparties, 8 alias emails resolved via :person/canonical; relation x attention-class 2-axis). Loaded as pass-1 canonical + pass-2 alias tx."
 power_dynamics = "personal/facts/dyads.edn = 9 dyads (Emerson dependence asymmetry, French&Raven bases, incentive/alignment/worst-case/lever) + 10 falsifiable hypotheses (confidence+falsifier+evidence email-cids = Shannon test agenda). Views in bin/datomic/queries/power.edn (balance/risk-dyads/levers/test-agenda). ADR-0012; family dyads = trust-investment only, never leverage."
 engi = "personal/facts/engi.edn = 22 tie-release evaluations (ADR-0013: keep/reduce/transfer/archive/sever/hold; legal-hold lexicographically first; :sever requires export-first; witnesses/family never severed). Views in queries/engi.edn (sever-queue/legal-holds/savings). Estimated personal-card relief: transfer/sever ~¥153k/mo + reduce up to ~¥57k/mo vs goal-29 target -¥99k."

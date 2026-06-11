@@ -205,6 +205,16 @@
            (seq (:evidence h))
            (assoc :hypothesis/evidence (vec (for [c (:evidence h)] [:email/cid c])))))))
 
+;; kpi.jsonl: sensor/self-report time-series (ADR-0014 felt-sense, wellness-8 etc.)
+(defn kpi-tx []
+  (keep (fn [k]
+          (when (and (:metric k) (:at k) (number? (:value k)))
+            {:kpi/id     (str (:metric k) "/" (:at k))
+             :kpi/metric (keyword (:metric k))
+             :kpi/value  (double (:value k))
+             :kpi/at     (iso->inst (:at k))}))
+        (rd-jsonl "facts/kpi.jsonl")))
+
 ;; engi.edn: tie-release evaluations (ADR-0013)
 (defn engi-tx []
   (let [f (io/file base "facts/engi.edn")]
@@ -258,7 +268,7 @@
                           ["goals" (goal-tx)] ["goal-deps" (goal-edge-tx)]
                           ["obligations" (obligation-tx)]
                           ["dyads" (dyad-tx)] ["hypotheses" (hypothesis-tx)]
-                          ["engi" (engi-tx)]]]
+                          ["engi" (engi-tx)] ["kpi" (kpi-tx)]]]
         (when (seq tx)
           (d/transact conn {:tx-data (vec tx)})
           (println (format "  loaded %-8s %d" label (count tx)))))
@@ -314,14 +324,27 @@
         (println "  goals      " (n '[:find (count ?g) :where [?g :goal/id]]))
         (println "  dag-edges  " (n '[:find (count ?d) :with ?g :where [?g :goal/depends-on ?d]]))
         (println "  obligations" (n '[:find (count ?o) :where [?o :obligation/id]]))
-        (println "\n[Datalog] attention/queue — open obligations (期限順; 人間が見るのはこれだけ):")
-        (doseq [[title due sev] (->> (d/q '[:find ?title ?due ?sev
-                                            :where [?o :obligation/status :open]
-                                                   [?o :obligation/title ?title]
-                                                   [?o :obligation/due ?due]
-                                                   [?o :obligation/severity ?sev]] db)
-                                     (sort-by second))]
-          (println (format "  %-8s %tF  %s" (name sev) due title)))
+        (println "\n[Datalog] attention/queue — open obligations (ADR-0014: tier→期限の辞書式順):")
+        (doseq [[title due sev tier] (->> (d/q '[:find ?title ?due ?sev ?tier
+                                                 :where [?o :obligation/status :open]
+                                                        [?o :obligation/title ?title]
+                                                        [?o :obligation/due ?due]
+                                                        [?o :obligation/severity ?sev]
+                                                        (or-join [?o ?tier]
+                                                          (and [?o :obligation/goal ?g]
+                                                               [(get-else $ ?g :goal/tier 2) ?tier])
+                                                          (and [(missing? $ ?o :obligation/goal)]
+                                                               [(ground 2) ?tier]))] db)
+                                          (sort-by (fn [[_ due _ tier]] [tier due])))]
+          (println (format "  T%d %-8s %tF  %s" tier (name sev) due title)))
+        (let [fs (d/q '[:find ?at ?v
+                        :where [?k :kpi/metric :wellbecoming.felt-sense]
+                               [?k :kpi/at ?at] [?k :kpi/value ?v]] db)]
+          (if (seq fs)
+            (println (format "\n  [Tier0] felt-sense 床 (全期間min): %.1f / 直近: %s"
+                             (apply min (map second fs))
+                             (second (last (sort-by first fs)))))
+            (println "\n  [Tier0] felt-sense 未計測 — facts/kpi.jsonl に日次1行 {\"metric\":\"wellbecoming.felt-sense\",\"value\":1-5,\"at\":...} (ADR-0014)")))
         (println "\n[Datalog] goal/blocked-critical-path — open obligation に塞がれた active goal:")
         (doseq [[g t] (d/q '[:find ?gt ?ot
                              :where [?g :goal/status :active] [?g :goal/title ?gt]

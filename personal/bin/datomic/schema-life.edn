@@ -11,6 +11,8 @@
  {:db/ident :goal/w-contribution :db/valueType :db.type/double  :db/cardinality :db.cardinality/one}
  {:db/ident :goal/depends-on     :db/valueType :db.type/ref     :db/cardinality :db.cardinality/many :db/doc "goal -> prerequisite goals (DAG edge)"}
  {:db/ident :goal/status         :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":active :done :deferred :dropped"}
+ {:db/ident :goal/tier           :db/valueType :db.type/long    :db/cardinality :db.cardinality/one :db/doc "ADR-0014 辞書式優先: 0=wellbecoming床 1=孫・子供(のどか) 2=その他(省略時)"}
+ {:db/ident :goal/wellness-dims  :db/valueType :db.type/keyword :db/cardinality :db.cardinality/many :db/doc "wellness 8次元: :physical :emotional :social :intellectual :spiritual :occupational :financial :environmental"}
  {:db/ident :goal/external-dependency :db/valueType :db.type/string :db/cardinality :db.cardinality/one :db/doc "外部依存 (相手・市場・裁判所など)"}
  {:db/ident :goal/fallback       :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/doc "代替経路"}
 
