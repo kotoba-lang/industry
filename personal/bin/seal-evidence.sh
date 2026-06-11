@@ -4,7 +4,7 @@
 # ADR-0005 の custody パイプライン:
 #   1) SHA-256 を計算し manifest に記録
 #   2) OpenTimestamps で存在証明 (ots があれば; 無ければ skip し WARN)
-#   3) git-annex add (内容アドレス化) → IPFS pin (暗号文のみ)
+#   3) git-annex add (内容アドレス化) → B2 へ暗号化コピー (ADR-0011: 公開網 pin は廃止)
 #
 # 使い方:
 #   personal/bin/seal-evidence.sh <case> <file> [<file> ...]
@@ -54,5 +54,5 @@ done
 echo "[seal] done. Next:"
 echo "  git -C $REPO annex add personal/litigation/$CASE/"
 echo "  git -C $REPO add personal/litigation/$CASE/MANIFEST.md personal/litigation/$CASE/*.ots 2>/dev/null"
-echo "  git -C $REPO annex copy personal/litigation/$CASE/ --to ipfs"
+echo "  git -C $REPO annex copy personal/litigation/$CASE/ --to b2"
 echo "  git -C $REPO commit -m 'evidence($CASE): seal + ingest (ADR-0005)'"

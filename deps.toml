@@ -162,18 +162,19 @@ large_files = { mechanism = "git-annex MD5E", remote = "backblaze-b2", size = "8
 [personal]
 path = "personal"
 kind = "personal-data-warehouse"
-description = "Encrypted personal data warehouse: Mac + Android terminals, Gmail/Calendar/Drive/GitHub/1Password, SMS/calls, finance/tax/legal/property/medical, plus derived analysis. DataLad dataset; data is git-annexed (pointers only in git) and gpg-hybrid encrypted; only ciphertext is pinned to IPFS."
+description = "Encrypted personal data warehouse: Mac + Android terminals, Gmail/Calendar/Drive/GitHub/1Password, SMS/calls, finance/tax/legal/property/medical, plus derived analysis. DataLad dataset; data is git-annexed (pointers only in git) and gpg-hybrid encrypted; persisted to private Backblaze B2 + local clones ONLY (no public-network pinning — IPFS retired 2026-06-11 per ADR-0011, quantum harvest-now-decrypt-later threat model)."
 adrs = [
   "kawasakijun/docs/adr/0003-personal-data-warehouse-encrypted-ipfs.md",
   "kawasakijun/docs/adr/0004-account-scope-and-file-body-capture.md",
   "kawasakijun/docs/adr/0005-legal-evidence-preservation.md",
   "kawasakijun/docs/adr/0010-life-graph-edn-datalog-provo.md",
+  "kawasakijun/docs/adr/0011-no-public-network-pinning-pqc.md",
 ]
-stack = ["DataLad", "git-annex", "gpg", "IPFS", "adb", "Datomic Local (Clojure)"]
+stack = ["DataLad", "git-annex", "gpg", "adb", "Datomic Local (Clojure)"]
 sources = ["device-mac", "device-android (getprop/packages/SMS-bodies/calls/contacts)", "gmail", "google-calendar", "google-drive", "github", "1password (metadata-only inventory)"]
 capture = ["metadata", "file-bodies"]   # ADR-0004: annexed binaries (drive/files/{tax,loans,contracts-corp})
 analysis_artifacts = ["analysis/INDEX.md", "analysis/catalog.json", "analysis/observations.md", "analysis/financial-summary.json", "analysis/loan-ledger.json", "analysis/subscription-audit.json", "analysis/entities.json", "analysis/action-register.json", "analysis/sms-finance-timeline.jsonl", "analysis/datomic-report.md"]
-file_count = 133   # annexed + pinned to IPFS (encrypted); as of 2026-05-31
+file_count = 133   # annexed -> B2 (encrypted); as of 2026-05-31
 secrets_policy = "env var NAMES only; GitHub token VALUE not stored; 1Password = metadata only (no passwords/TOTP); SMS OTP/2FA codes redacted in derived files; data never plaintext to GitHub"
 litigation_state = "kawasakijun/litigation_state.jsonld"
 evidence_policy = "係争関連アカウントは削除せず保全 (ADR-0005); 正本=admin Data Export(mbox); 副本=warehouse; 改ざん封緘=SHA-256 + OpenTimestamps + git-annex"
@@ -211,12 +212,12 @@ provenance = "PROV-O JSON-LD sidecars: personal/prov/<cid>.prov.jsonld (ADR-0010
 entities = ["org", "person", "account", "txn", "loan", "event", "action", "email", "attachment", "case", "blob", "goal", "obligation", "decision", "kpi"]
 life_graph = "kawasakijun/goals.edn = SSoT of the life DAG (30 goals incl. 00_nodoka_wellbeing guardrail, 26 edges; extracted from reverse_topo_pregel.py per ADR-0010 step 3) + personal/facts/obligations.jsonl (dated duties -> attention/queue). load.clj transacts both; reverse_topo_pregel.py should be switched to read goals.edn (pending)."
 people_registry = "personal/facts/people.edn = curated person entities (23 canonical incl. lawyers/family/counterparties, 8 alias emails resolved via :person/canonical; relation x attention-class 2-axis). Loaded as pass-1 canonical + pass-2 alias tx."
-source_availability_note = "txn/person/loan/action sources are annex-dropped locally (encrypted content in B2/IPFS only); counts load as 0 until `git annex get analysis/ mail/` with gpg key + B2 creds"
+source_availability_note = "txn/person/loan/action sources are annex-dropped locally (encrypted content in B2 only); counts load as 0 until `git annex get analysis/ mail/` with gpg key + B2 creds"
 relationships = "EAV refs: txn→vendor/account/email, person→org, account→org/owner, loan→lender, event→people, action→case/email, email→from/to/cc/mentions/case/blob/attachments, attachment→email/blob, case→parties/orgs/evidence"
 loaded = { org = 110, person = 29, txn = 631, loan = 19, event = 49, action = 23, email = 1, case = 1 }
 known_issues = ["txn double-count across 8 finance files (need dedup-key=date+vendor+amount)", "loan-ledger total ¥10.75M vs agreement detail sum ¥7.89M mismatch (recompute from detail)"]
 
-# Raw email store: content-addressed (cid=sha256) .eml under git-annex -> B2/IPFS.
+# Raw email store: content-addressed (cid=sha256) .eml under git-annex -> B2.
 [personal.mail_store]
 format = "RFC822 .eml, content-addressed (cid = sha256 hex)"
 path = "personal/mail/messages/<cid>.eml  (git-annex MD5E, encryption=hybrid -> Backblaze B2)"
@@ -257,7 +258,7 @@ adrs = ["kawasakijun/docs/adr/0008-google-takeout-ingestion.md"]
 vcs = "datalad"
 content = "git-annex (annex-ignore on origin)"
 remote_primary = "backblaze-b2 (git-annex type=S3, encryption=hybrid)"   # ADR-0007
-remote_secondary = "ipfs (external special remote, encryption=hybrid)"
+remote_secondary = "(none — IPFS retired 2026-06-11 per ADR-0011; 29,371 keys dropped/unpinned, remote marked dead. 3rd copy candidate: encrypted offline SSD, undecided)"
 b2_account = "gftdcojp"
 b2_endpoint = "s3.us-west-004.backblazeb2.com"   # region us-west-004
 b2_bucket = "com-junkawasaki-annex"              # allPrivate, dedicated (id 8d596f46ac50ab9a91e20518)
