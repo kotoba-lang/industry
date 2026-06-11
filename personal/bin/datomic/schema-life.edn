@@ -72,7 +72,7 @@
  {:db/ident :hypothesis/confidence :db/valueType :db.type/double  :db/cardinality :db.cardinality/one :db/doc "0..1 主観確信度"}
  {:db/ident :hypothesis/evidence   :db/valueType :db.type/ref     :db/cardinality :db.cardinality/many :db/doc "hypothesis -> email/blob"}
  {:db/ident :hypothesis/falsifier  :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/doc "何を観測すれば棄却されるか (情報利得アジェンダ)"}
- {:db/ident :hypothesis/status     :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":open :supported :refuted"}
+ {:db/ident :hypothesis/status     :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":open :supported :refuted :moot (検証不要になった)"}
 
  ;; ---------- engi (縁の手放し評価; ADR-0013) ----------
  {:db/ident :engi/id              :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
