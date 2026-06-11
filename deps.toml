@@ -285,6 +285,7 @@ adrs = ["kawasakijun/docs/adr/0011-gftdcojp-m365-full-archive.md"]
 entra_app = "gftd-m365-archive (appId 0ca452ab-2650-4c4e-b19d-32f81d26d36b, public client, delegated read + admin consent)"
 schedule = "launchd jp.co.gftd.m365-archive-backup daily 02:00 (single-instance lock in run-backup.sh)"
 status = "operational — initial full backup 2026-06-11: mail 103,662 eml / calendar 6,495 / onedrive ~131GiB; annex 131.4GB all verified on B2; annex.jobs=8 (31GB/h)"
+facts_layer = "ADR-0010 pattern: facts/{blobs,messages,events,crm,docs}.jsonl + {people,orgs,projects}.edn; CID=git-annex key; schema datomic/schema-m365.edn (:gftd.m365/*); regenerate via bin/extract-facts.py (2026-06-11: 103,662 msgs / 5,415 persons / 2,669 crm orgs / 5,614 docs / 51 projects)"
 status = "2026-06-10 配線完了: CLIs(az 2.87/m365 11.8/rclone) 導入、gpg鍵 1Password→import + Keychain + agent preset、b2 special remote enableremote + round-trip(add→B2→drop→get) 検証 OK。残: bin/setup-auth.sh(対話 MFA/consent/OAuth) → bin/run-backup.sh(以降 非対話)。"
 
 # ─── Project relationships ─────────────────────────────────────────
