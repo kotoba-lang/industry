@@ -27,7 +27,7 @@ BIN = os.path.dirname(os.path.abspath(__file__))
 SCOPES = " ".join([
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/calendar.readonly",
-    "https://www.googleapis.com/auth/drive.metadata.readonly",
+    "https://www.googleapis.com/auth/drive.readonly",
 ])
 CLIENT_SVC = "google-oauth-client"
 
