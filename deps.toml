@@ -169,6 +169,7 @@ adrs = [
   "kawasakijun/docs/adr/0005-legal-evidence-preservation.md",
   "kawasakijun/docs/adr/0010-life-graph-edn-datalog-provo.md",
   "kawasakijun/docs/adr/0011-no-public-network-pinning-pqc.md",
+  "kawasakijun/docs/adr/0012-power-dynamics-model.md",
 ]
 stack = ["DataLad", "git-annex", "gpg", "adb", "Datomic Local (Clojure)"]
 sources = ["device-mac", "device-android (getprop/packages/SMS-bodies/calls/contacts)", "gmail", "google-calendar", "google-drive", "github", "1password (metadata-only inventory)"]
@@ -212,6 +213,7 @@ provenance = "PROV-O JSON-LD sidecars: personal/prov/<cid>.prov.jsonld (ADR-0010
 entities = ["org", "person", "account", "txn", "loan", "event", "action", "email", "attachment", "case", "blob", "goal", "obligation", "decision", "kpi"]
 life_graph = "kawasakijun/goals.edn = SSoT of the life DAG (30 goals incl. 00_nodoka_wellbeing guardrail, 26 edges; extracted from reverse_topo_pregel.py per ADR-0010 step 3) + personal/facts/obligations.jsonl (dated duties -> attention/queue). load.clj transacts both; reverse_topo_pregel.py should be switched to read goals.edn (pending)."
 people_registry = "personal/facts/people.edn = curated person entities (23 canonical incl. lawyers/family/counterparties, 8 alias emails resolved via :person/canonical; relation x attention-class 2-axis). Loaded as pass-1 canonical + pass-2 alias tx."
+power_dynamics = "personal/facts/dyads.edn = 9 dyads (Emerson dependence asymmetry, French&Raven bases, incentive/alignment/worst-case/lever) + 8 falsifiable hypotheses (confidence+falsifier = Shannon test agenda). Views in bin/datomic/queries/power.edn (balance/risk-dyads/levers/test-agenda). ADR-0012; family dyads = trust-investment only, never leverage."
 source_availability_note = "txn/person/loan/action sources are annex-dropped locally (encrypted content in B2 only); counts load as 0 until `git annex get analysis/ mail/` with gpg key + B2 creds"
 relationships = "EAV refs: txn→vendor/account/email, person→org, account→org/owner, loan→lender, event→people, action→case/email, email→from/to/cc/mentions/case/blob/attachments, attachment→email/blob, case→parties/orgs/evidence"
 loaded = { org = 110, person = 29, txn = 631, loan = 19, event = 49, action = 23, email = 1, case = 1 }

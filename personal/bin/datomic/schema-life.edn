@@ -49,6 +49,29 @@
  {:db/ident :person/canonical       :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one  :db/doc "alias person-entity -> canonical person (entity resolution)"}
  {:db/ident :person/note            :db/valueType :db.type/string  :db/cardinality :db.cardinality/one  :db/doc "curated context (people.edn)"}
 
+ ;; ---------- dyad (relational power edge: self <-> person; ADR-0012) ----------
+ {:db/ident :dyad/id               :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity :db/doc "e.g. \"jun~takeshita-zelo\""}
+ {:db/ident :dyad/with             :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one :db/doc "dyad -> person (the other party)"}
+ {:db/ident :dyad/self-dependence  :db/valueType :db.type/double  :db/cardinality :db.cardinality/one :db/doc "0..1 自分→相手の依存 (代替不能性×重要度×時間切迫)"}
+ {:db/ident :dyad/their-dependence :db/valueType :db.type/double  :db/cardinality :db.cardinality/one :db/doc "0..1 相手→自分の依存"}
+ {:db/ident :dyad/power-bases      :db/valueType :db.type/keyword :db/cardinality :db.cardinality/many :db/doc "French&Raven: :expert :legitimate :reward :coercive :referent :informational"}
+ {:db/ident :dyad/incentive        :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/doc "相手の報酬構造"}
+ {:db/ident :dyad/alignment        :db/valueType :db.type/double  :db/cardinality :db.cardinality/one :db/doc "-1..1 利害一致度 (報酬構造から導出)"}
+ {:db/ident :dyad/info-asymmetry   :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":they-hold :we-hold :balanced"}
+ {:db/ident :dyad/switching-cost   :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":low :mid :high :prohibitive"}
+ {:db/ident :dyad/worst-case       :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/doc "関係最悪化時に起こること (minimax 入力)"}
+ {:db/ident :dyad/lever            :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/doc "非対称を是正する手 (家族辺は『信頼への投資』のみ)"}
+ {:db/ident :dyad/note             :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+
+ ;; ---------- hypothesis (falsifiable latent; ADR-0012) ----------
+ {:db/ident :hypothesis/id         :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :hypothesis/about      :db/valueType :db.type/ref     :db/cardinality :db.cardinality/many :db/doc "hypothesis -> person/dyad/case"}
+ {:db/ident :hypothesis/text       :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :hypothesis/confidence :db/valueType :db.type/double  :db/cardinality :db.cardinality/one :db/doc "0..1 主観確信度"}
+ {:db/ident :hypothesis/evidence   :db/valueType :db.type/ref     :db/cardinality :db.cardinality/many :db/doc "hypothesis -> email/blob"}
+ {:db/ident :hypothesis/falsifier  :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/doc "何を観測すれば棄却されるか (情報利得アジェンダ)"}
+ {:db/ident :hypothesis/status     :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":open :supported :refuted"}
+
  ;; ---------- prov (minimal embedded provenance; full detail in personal/prov/*.prov.jsonld) ----------
  {:db/ident :prov/derived-from :db/valueType :db.type/ref     :db/cardinality :db.cardinality/many :db/doc "fact -> source entity (email/blob/decision)"}
  {:db/ident :prov/activity     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one  :db/doc "e.g. \"mail-sync.sh@2026-06-11\", \"claude-extract/adr-0010\""}

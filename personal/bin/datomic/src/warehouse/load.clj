@@ -187,6 +187,21 @@
          (cond-> (dissoc p :emails)
            (seq (:emails p)) (assoc :person/email (first (:emails p)))))))
 
+;; dyads.edn: power-dynamics edges + falsifiable hypotheses (ADR-0012).
+(def dyads-edn
+  (let [f (io/file base "facts/dyads.edn")]
+    (when (.exists f) (edn/read-string (slurp f)))))
+
+(defn dyad-tx []
+  (vec (for [d (:dyads dyads-edn)]
+         (assoc d :dyad/with [:person/id (:dyad/with d)]))))
+
+(defn hypothesis-tx []
+  (vec (for [h (:hypotheses dyads-edn)]
+         (-> h
+             (assoc :hypothesis/about (vec (for [pid (:about h)] [:person/id pid])))
+             (dissoc :about)))))
+
 (defn people-alias-tx []
   (vec (for [p people-edn
              alias (rest (:emails p))]
@@ -220,7 +235,8 @@
                           ["cases" (case-tx)] ["emails" (email-tx)]
                           ["people" (people-tx)] ["people-aliases" (people-alias-tx)]
                           ["goals" (goal-tx)] ["goal-deps" (goal-edge-tx)]
-                          ["obligations" (obligation-tx)]]]
+                          ["obligations" (obligation-tx)]
+                          ["dyads" (dyad-tx)] ["hypotheses" (hypothesis-tx)]]]
         (when (seq tx)
           (d/transact conn {:tx-data (vec tx)})
           (println (format "  loaded %-8s %d" label (count tx)))))
@@ -290,4 +306,29 @@
                                     [?o :obligation/goal ?g] [?o :obligation/status :open]
                                     [?o :obligation/title ?ot]] db)]
           (println (format "  %s\n    └─ %s" g t)))
+        (println "\n=== Power dynamics (ADR-0012) ===")
+        (println "[Datalog] power/balance — 露出順 (balance = their-dep − self-dep):")
+        (doseq [[nm sd td cost] (->> (d/q '[:find ?name ?sd ?td ?cost
+                                            :where [?d :dyad/with ?p] [?p :person/name ?name]
+                                                   [?d :dyad/self-dependence ?sd]
+                                                   [?d :dyad/their-dependence ?td]
+                                                   [?d :dyad/switching-cost ?cost]] db)
+                                     (sort-by (fn [[_ sd td _]] (- td sd))))]
+          (println (format "  %+.2f  %-30s self=%.2f their=%.2f switch=%s"
+                           (- td sd) nm sd td (name cost))))
+        (println "\n[Datalog] power/risk-dyads — 高依存×低一致 (minimax 重点):")
+        (doseq [[nm sd al worst] (d/q '[:find ?name ?sd ?al ?worst
+                                        :where [?d :dyad/self-dependence ?sd] [(>= ?sd 0.5)]
+                                               [?d :dyad/alignment ?al] [(<= ?al 0.55)]
+                                               [?d :dyad/with ?p] [?p :person/name ?name]
+                                               [?d :dyad/worst-case ?worst]] db)]
+          (println (format "  %-22s dep=%.2f align=%.2f\n    ⚠ %s" nm sd al worst)))
+        (println "\n[Datalog] power/test-agenda — open 仮説 (|conf−0.5| 小 = 情報利得大):")
+        (doseq [[id _ conf fals] (->> (d/q '[:find ?id ?text ?conf ?fals
+                                             :where [?h :hypothesis/status :open]
+                                                    [?h :hypothesis/id ?id] [?h :hypothesis/text ?text]
+                                                    [?h :hypothesis/confidence ?conf]
+                                                    [?h :hypothesis/falsifier ?fals]] db)
+                                      (sort-by (fn [[_ _ c _]] (Math/abs (- c 0.5)))))]
+          (println (format "  [%.2f] %s\n    → %s" conf id fals)))
         (println "\nOK: normalized into Datomic. Rebuild anytime: clojure -M -m warehouse.load")))))
