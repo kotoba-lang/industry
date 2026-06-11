@@ -281,6 +281,10 @@ b2_annex_uuid = "3336a5f2-298d-457d-9087-9fc81c653998"
 b2_key_custody = "macOS Keychain 'b2:gftdcojp-m365-annex' (scoped key 004d9f6c0ba12580000000009); creds embedded gpg-encrypted in git-annex branch"
 gpg_keyid = "EC1710FCE6FEB745B74D122FBDAE6794050EDB62"   # gftdcojp M365 Archive (dedicated org key)
 gpg_passphrase_custody = "macOS Keychain (gpg:gftd-m365); recovery + B2 key in 1Password gftdcojp vault: 'GPG: gftdcojp M365 archive recovery (EC1710FC)'"
+adrs = ["kawasakijun/docs/adr/0011-gftdcojp-m365-full-archive.md"]
+entra_app = "gftd-m365-archive (appId 0ca452ab-2650-4c4e-b19d-32f81d26d36b, public client, delegated read + admin consent)"
+schedule = "launchd jp.co.gftd.m365-archive-backup daily 02:00 (single-instance lock in run-backup.sh)"
+status = "operational — initial full backup 2026-06-11: mail 103,662 eml / calendar 6,495 / onedrive ~131GiB; annex 131.4GB all verified on B2; annex.jobs=8 (31GB/h)"
 status = "2026-06-10 配線完了: CLIs(az 2.87/m365 11.8/rclone) 導入、gpg鍵 1Password→import + Keychain + agent preset、b2 special remote enableremote + round-trip(add→B2→drop→get) 検証 OK。残: bin/setup-auth.sh(対話 MFA/consent/OAuth) → bin/run-backup.sh(以降 非対話)。"
 
 # ─── Project relationships ─────────────────────────────────────────
