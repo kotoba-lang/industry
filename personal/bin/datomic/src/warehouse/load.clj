@@ -261,6 +261,35 @@
          (cond-> c
            (:contract/case c) (assoc :contract/case {:case/id (:contract/case c)})))))
 
+;; bank-sources.edn: 金融口座/カード/取引所の収集ソース registry (refs は lookup-ref 形)
+(defn bank-tx []
+  (vec (rd-edn-facts "facts/bank-sources.edn")))
+
+;; bank-txns.jsonl (pl/bank-txn-ingest: 通知メール→txn) + mf-txns.jsonl (pl/mf-csv-ingest)。
+;; MF は全口座集約で最濃 → 両方ある場合は (date,amount) 一致の bank-txn を落とす (二重計上防止)。
+(defn bank-txn-tx []
+  (let [mf   (or (rd-jsonl "mail/mf-txns.jsonl") [])
+        mfk  (set (map (juxt :date :amount) mf))
+        bank (->> (or (rd-jsonl "mail/bank-txns.jsonl") [])
+                  (remove #(and (:amount %) (contains? mfk [(:date %) (:amount %)]))))
+        ->tx (fn [prefix i rec]
+               (when (:date rec)
+                 (cond-> {:txn/id     (str prefix "/" (or (:cid rec) (:mf-id rec) i)
+                                           (when (:seq rec) (str "#" (:seq rec))))
+                          :txn/date   (:date rec)
+                          :txn/month  (month (:date rec))
+                          :txn/kind   (clean (or (:kind rec) (:cat1 rec) "unknown"))
+                          :txn/source (or (:source rec) "pl/bank-txn-ingest")}
+                   (:amount rec)  (assoc :txn/amount-jpy (long (:amount rec)))
+                   (:dir rec)     (assoc :txn/dir (:dir rec))
+                   (:bank rec)    (assoc :txn/bank [:bank/id (:bank rec)])
+                   (:cid rec)     (assoc :txn/email [:email/cid (:cid rec)])
+                   (clean (or (:vendor rec) (:detail rec)))
+                   (assoc :txn/detail (clean (str (or (:vendor rec) "") " " (or (:detail rec) (:subject rec) ""))))
+                   (clean (:vendor rec)) (assoc :txn/vendor {:org/name (clean (:vendor rec))}))))]
+    (vec (concat (keep-indexed (partial ->tx "bank") bank)
+                 (keep-indexed (partial ->tx "mf") mf)))))
+
 ;; processes.edn: handoff state machine + capability policy (ADR-0015)
 (def processes-edn
   (let [f (io/file base "facts/processes.edn")]
@@ -340,6 +369,7 @@
                           ["cases" (case-tx)] ["emails" (email-tx)]
                           ["people" (people-tx)] ["people-aliases" (people-alias-tx)]
                           ["channels" (channel-tx)] ["orgs(curated)" (curated-org-tx)]
+                          ["banks" (bank-tx)] ["bank-txns" (bank-txn-tx)]
                           ["accounts" (account2-tx)] ["contracts" (contract-tx)] ["finitems" (finitem-tx)]
                           ["mailrules" (mailrule-tx)] ["triage" (triage-tx)] ["coverage" (coverage-tx)]
                           ["goals" (goal-tx)] ["goal-deps" (goal-edge-tx)]
@@ -502,6 +532,28 @@
                                              [?o :org/name ?nm]] db)
                               (sort-by (comp name first)))]
           (println (format "  %-12s %s" (name role) nm)))
+        (println "\n=== 銀行口座 (bank-sources.edn + pl/bank-txn-ingest) ===")
+        (println "[Datalog] bank/coverage — 口座別 取込txn件数/金額 (dir=out|in; failed除外):")
+        (doseq [[bid st cnt amt] (->> (d/q '[:find ?bid ?st (count ?t) (sum ?a)
+                                             :where [?b :bank/id ?bid] [?b :bank/status ?st]
+                                                    [?t :txn/bank ?b]
+                                                    (or-join [?t ?a]
+                                                      [?t :txn/amount-jpy ?a]
+                                                      (and [(missing? $ ?t :txn/amount-jpy)] [(ground 0) ?a]))] db)
+                                      (sort-by (fn [[_ _ _ a]] (- a))))]
+          (println (format "  %-22s %-9s ×%-4d ¥%,d" bid (name st) cnt (long amt))))
+        (let [dark (d/q '[:find ?bid ?nm :where [?b :bank/status :dark] [?b :bank/id ?bid] [?b :bank/name ?nm]] db)]
+          (when (seq dark)
+            (println "  通知なし=dark (MF CSV で埋まる):")
+            (doseq [[bid nm] (sort dark)] (println (format "    %-20s %s" bid nm)))))
+        (println "[Datalog] bank/failed — 残高不足等の失敗イベント (要対応シグナル):")
+        (doseq [[d* k det] (->> (d/q '[:find ?d ?k ?det
+                                       :where [?t :txn/dir "failed"] [?t :txn/date ?d] [?t :txn/kind ?k]
+                                              (or-join [?t ?det]
+                                                [?t :txn/detail ?det]
+                                                (and [(missing? $ ?t :txn/detail)] [(ground "") ?det]))] db)
+                                (sort-by first) reverse (take 6))]
+          (println (format "  %s %-8s %s" d* k (subs det 0 (min 40 (count det))))))
         (println "\n=== 情報収集カバレッジ (coverage.edn) ===")
         (doseq [[st cnt] (->> (d/q '[:find ?st (count ?s) :where [?s :source/status ?st]] db)
                               (sort-by (fn [[s _]] ({:ingested 0 :archived 1 :partial 2 :dark 3 :n-a 4} s 9))))]
