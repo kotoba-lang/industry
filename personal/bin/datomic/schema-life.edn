@@ -44,7 +44,7 @@
  ;; :person/emails collects aliases (iCloud Hide-My-Email relays, jun784+tag@, corp addrs).
  {:db/ident :person/id              :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity :db/doc "canonical slug, e.g. \"nodoka\", \"mika\", \"takeshita-zelo\""}
  {:db/ident :person/emails          :db/valueType :db.type/string  :db/cardinality :db.cardinality/many :db/doc "all known addresses incl. relay aliases"}
- {:db/ident :person/relation        :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one  :db/doc ":self :family :co-parent :lawyer :accountant :counterparty :vendor :friend :cold"}
+ {:db/ident :person/relation        :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one  :db/doc ":self :family :co-parent :lawyer :accountant :counterparty :witness :vendor :friend :cold"}
  {:db/ident :person/attention-class :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one  :db/doc ":family :legal-deadline :money-anomaly :business :vendor-routine :cold-inbound (ADR-0010 L4)"}
  {:db/ident :person/canonical       :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one  :db/doc "alias person-entity -> canonical person (entity resolution)"}
  {:db/ident :person/note            :db/valueType :db.type/string  :db/cardinality :db.cardinality/one  :db/doc "curated context (people.edn)"}
