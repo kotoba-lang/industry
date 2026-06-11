@@ -225,6 +225,9 @@
 (defn finitem-tx []
   (vec (rd-edn-facts "facts/corp-finance.edn")))
 
+(defn coverage-tx []
+  (vec (rd-edn-facts "facts/coverage.edn")))
+
 ;; mail-triage.edn: triage ledger with rule ref + depends-on edges
 (defn triage-tx []
   (vec (for [t (rd-edn-facts "facts/mail-triage.edn")]
@@ -338,7 +341,7 @@
                           ["people" (people-tx)] ["people-aliases" (people-alias-tx)]
                           ["channels" (channel-tx)] ["orgs(curated)" (curated-org-tx)]
                           ["accounts" (account2-tx)] ["contracts" (contract-tx)] ["finitems" (finitem-tx)]
-                          ["mailrules" (mailrule-tx)] ["triage" (triage-tx)]
+                          ["mailrules" (mailrule-tx)] ["triage" (triage-tx)] ["coverage" (coverage-tx)]
                           ["goals" (goal-tx)] ["goal-deps" (goal-edge-tx)]
                           ["obligations" (obligation-tx)]
                           ["dyads" (dyad-tx)] ["hypotheses" (hypothesis-tx)]
@@ -499,6 +502,16 @@
                                              [?o :org/name ?nm]] db)
                               (sort-by (comp name first)))]
           (println (format "  %-12s %s" (name role) nm)))
+        (println "\n=== 情報収集カバレッジ (coverage.edn) ===")
+        (doseq [[st cnt] (->> (d/q '[:find ?st (count ?s) :where [?s :source/status ?st]] db)
+                              (sort-by (fn [[s _]] ({:ingested 0 :archived 1 :partial 2 :dark 3 :n-a 4} s 9))))]
+          (println (format "  %-9s ×%d" (name st) cnt)))
+        (println "  次に取るべき源 (dark, agent別):")
+        (doseq [[id ag nt] (->> (d/q '[:find ?id ?ag ?nt
+                                       :where [?s :source/status :dark] [?s :source/id ?id]
+                                              [?s :source/agent ?ag] [?s :source/note ?nt]] db)
+                               (sort-by (comp name second)))]
+          (println (format "    [%s] %-26s %s" (name ag) id (subs nt 0 (min 40 (count nt))))))
         (println "\n=== メール分類ルール / triage 依存 (mail-rules.edn + mail-triage.edn) ===")
         (println "  rules   " (n '[:find (count ?r) :where [?r :rule/id]])
                  " triage  " (n '[:find (count ?t) :where [?t :triage/id]]))

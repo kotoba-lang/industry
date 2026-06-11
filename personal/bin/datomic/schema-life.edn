@@ -125,6 +125,13 @@
  {:db/ident :contract/case    :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
  {:db/ident :contract/note    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
 
+ ;; ---------- source (情報収集カバレッジ; coverage.edn) ----------
+ {:db/ident :source/id     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :source/kind   :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":email :sns :device :files :export :derived :gap"}
+ {:db/ident :source/status :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":ingested :archived :partial :dark :n-a"}
+ {:db/ident :source/agent  :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":yes :ask :no"}
+ {:db/ident :source/note   :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+
  ;; ---------- triage (受信トリアージ台帳; mail-triage.edn) ----------
  {:db/ident :triage/id      :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
  {:db/ident :triage/from    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
