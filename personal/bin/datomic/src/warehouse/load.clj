@@ -319,6 +319,8 @@
                          :obligation/status   (keyword (or (:status o) "open"))}
                   (:case o) (assoc :obligation/case {:case/id (clean (:case o))})
                   (:goal o) (assoc :obligation/goal [:goal/id (clean (:goal o))])
+                  (seq (:blocked_by o)) (assoc :obligation/blocked-by (vec (:blocked_by o)))
+                  (:funded_by o) (assoc :obligation/funded-by (:funded_by o))
                   src       (assoc :obligation/source [:email/cid src])))))
           (rd-jsonl "facts/obligations.jsonl"))))
 
@@ -523,6 +525,13 @@
                                                     (and [(missing? $ ?f :finitem/amount-jpy)] [(ground 0) ?amt]))] db)
                                     (sort-by (fn [[a _ amt _]] [(name a) (- amt)])))]
           (println (format "  %-8s ¥%-9s %-16s %s" (name act) (if (pos? amt) (format "%,d" amt) "-") (name st) t)))
+        (println "[Datalog] obligation 依存チェーン (原資/前提に縛られた義務):")
+        (doseq [[oid t bb] (d/q '[:find ?oid ?t ?bb
+                                  :where [?o :obligation/id ?oid] [?o :obligation/title ?t]
+                                         [?o :obligation/blocked-by ?bb]] db)]
+          (let [fb (or (ffirst (d/q '[:find ?fb :in $ ?oid
+                                      :where [?o :obligation/id ?oid] [?o :obligation/funded-by ?fb]] db oid)) "-")]
+            (println (format "  %s『%s…』 blocked-by=%s funded-by=%s" oid (subs t 0 (min 24 (count t))) bb fb))))
         (println "\n=== Processes / ハンドオフ状態機械 (ADR-0015) ===")
         (println "[Datalog] process/next-human — 本人の手番で止まっている (私が依頼する対象):")
         (doseq [[pt sd cap] (d/q '[:find ?pt ?sd ?cap

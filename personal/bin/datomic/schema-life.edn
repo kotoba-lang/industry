@@ -25,6 +25,8 @@
  {:db/ident :obligation/case     :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
  {:db/ident :obligation/goal     :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
  {:db/ident :obligation/source   :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one :db/doc "obligation -> email/blob it was extracted from (provenance)"}
+ {:db/ident :obligation/blocked-by :db/valueType :db.type/string :db/cardinality :db.cardinality/many :db/doc "前提となる process/obligation id (満たすまで実行不可)"}
+ {:db/ident :obligation/funded-by  :db/valueType :db.type/string :db/cardinality :db.cardinality/one :db/doc "支払原資となる finitem id"}
 
  ;; ---------- decision (manimani ledger + human/agent calls; queryable judgment history) ----------
  {:db/ident :decision/id         :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
@@ -154,6 +156,7 @@
  {:db/ident :finitem/action    :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":pay :reduce :sever :net-off :fix :monitor"}
  {:db/ident :finitem/account   :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
  {:db/ident :finitem/cancel-channel :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ {:db/ident :finitem/funded-by :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/doc "支払原資となる別 finitem id"}
  {:db/ident :finitem/note      :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
 
  ;; ---------- capability (agent boundary policy; ADR-0015) ----------
