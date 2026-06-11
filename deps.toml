@@ -148,6 +148,17 @@ stack = ["Clojure"]
 adrs = ["docs/adr/0001-architecture.md"]
 deps = ["langchain-clj"]
 
+[[projects]]
+name = "comfyui-clj"
+path = "orgs/com-junkawasaki/comfyui-clj"
+kind = "clojure-library"
+submodule = true
+remote = "git@github.com:com-junkawasaki/comfyui-clj.git"
+description = "ComfyUI 相当のノードグラフ実行エンジンを portable Clojure (.cljc) で実装。API format 互換ワークフロー + content-addressed キャッシュ付きトポロジカル実行。キャッシュ・run 履歴を datom 化（Datalog ビュー = ADR-0010 と同型）。推論等の重い処理はホスト能力注入、langchain-clj に git 依存（ChatModel ノードパック）。GPL-3.0 (本家準拠)。"
+stack = ["Clojure"]
+adrs = ["docs/adr/0001-architecture.md"]
+deps = ["langchain-clj"]
+
 # ─── Vendored repos (remote 無し → 素フォルダ取り込み, ADR-0007 Phase 2/3) ───
 #
 # GitHub remote を持たないため submodule 化せず DataLad superdataset に直接取り込み。
