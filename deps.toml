@@ -128,14 +128,25 @@ description = "kotoba-clj Clojure→WASM compiler（etzhayyim）。"
 org = "etzhayyim"
 
 [[projects]]
+name = "langchain-clj"
+path = "orgs/com-junkawasaki/langchain-clj"
+kind = "clojure-library"
+submodule = true
+remote = "git@github.com:com-junkawasaki/langchain-clj.git"
+description = "LangChain-core 相当の LLM 基盤レイヤを portable Clojure (.cljc, 依存ゼロ) で実装。LCEL Runnable / prompt / ChatModel (Anthropic adapter, I/O はホスト能力注入) / tool / parser / Datomic 互換ミニストア + datom チャット履歴（ADR-0010 と同型）。kotoba-clj 等の Clojure WASM ホスト前提。MIT (本家準拠)。"
+stack = ["Clojure"]
+adrs = ["docs/adr/0001-architecture.md"]
+
+[[projects]]
 name = "langgraph-clj"
 path = "orgs/com-junkawasaki/langgraph-clj"
 kind = "clojure-library"
 submodule = true
 remote = "git@github.com:com-junkawasaki/langgraph-clj.git"
-description = "LangGraph/LangChain 相当の LLM オーケストレーションを portable Clojure (.cljc, 依存ゼロ) で実装。Datomic API 前提（checkpoint/チャット履歴を datom 化、Datalog ビュー = ADR-0010 と同型）。kotoba-clj (Clojure→WASM) 等の WASM ホストで動く前提で I/O はホスト能力注入。"
+description = "LangGraph 相当のグラフオーケストレーションを portable Clojure (.cljc) で実装。StateGraph + Pregel superstep / interrupt / checkpoint を datom 化（Datalog ビュー = ADR-0010 と同型）。langchain-clj に git 依存（本家 langchain-core/langgraph と同じ積層）。MIT (本家準拠)。"
 stack = ["Clojure"]
 adrs = ["docs/adr/0001-architecture.md"]
+deps = ["langchain-clj"]
 
 # ─── Vendored repos (remote 無し → 素フォルダ取り込み, ADR-0007 Phase 2/3) ───
 #
