@@ -72,6 +72,18 @@
  {:db/ident :hypothesis/falsifier  :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/doc "何を観測すれば棄却されるか (情報利得アジェンダ)"}
  {:db/ident :hypothesis/status     :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":open :supported :refuted"}
 
+ ;; ---------- engi (縁の手放し評価; ADR-0013) ----------
+ {:db/ident :engi/id              :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :engi/target          :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/doc "human label of the tie (service/account/person/domain)"}
+ {:db/ident :engi/target-kind     :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":subscription :account :service :person :org :domain :corp"}
+ {:db/ident :engi/person          :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one :db/doc "optional ref when target is a person"}
+ {:db/ident :engi/decision        :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":keep :reduce :transfer :archive :sever :hold (ADR-0013)"}
+ {:db/ident :engi/reason          :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :engi/legal-hold      :db/valueType :db.type/boolean :db/cardinality :db.cardinality/one :db/doc "true = ADR-0005 係争保全、係争終結まで操作禁止"}
+ {:db/ident :engi/monthly-cost-jpy :db/valueType :db.type/long   :db/cardinality :db.cardinality/one :db/doc "推定月額 (要実測は reason に明記)"}
+ {:db/ident :engi/export-first    :db/valueType :db.type/boolean :db/cardinality :db.cardinality/one :db/doc "sever/archive 前に warehouse 保全が必要"}
+ {:db/ident :engi/status          :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":proposed :approved :done"}
+
  ;; ---------- prov (minimal embedded provenance; full detail in personal/prov/*.prov.jsonld) ----------
  {:db/ident :prov/derived-from :db/valueType :db.type/ref     :db/cardinality :db.cardinality/many :db/doc "fact -> source entity (email/blob/decision)"}
  {:db/ident :prov/activity     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one  :db/doc "e.g. \"mail-sync.sh@2026-06-11\", \"claude-extract/adr-0010\""}

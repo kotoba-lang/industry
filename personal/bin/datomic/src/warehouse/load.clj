@@ -205,6 +205,15 @@
            (seq (:evidence h))
            (assoc :hypothesis/evidence (vec (for [c (:evidence h)] [:email/cid c])))))))
 
+;; engi.edn: tie-release evaluations (ADR-0013)
+(defn engi-tx []
+  (let [f (io/file base "facts/engi.edn")]
+    (when (.exists f)
+      (vec (for [e (edn/read-string (slurp f))]
+             (if-let [pid (:engi/person e)]
+               (assoc e :engi/person [:person/id pid])
+               e))))))
+
 ;; thread_id -> latest cid (for obligation source resolution via index.jsonl)
 (defn thread->cid []
   (->> (rd-jsonl "mail/messages/index.jsonl")
@@ -248,7 +257,8 @@
                           ["people" (people-tx)] ["people-aliases" (people-alias-tx)]
                           ["goals" (goal-tx)] ["goal-deps" (goal-edge-tx)]
                           ["obligations" (obligation-tx)]
-                          ["dyads" (dyad-tx)] ["hypotheses" (hypothesis-tx)]]]
+                          ["dyads" (dyad-tx)] ["hypotheses" (hypothesis-tx)]
+                          ["engi" (engi-tx)]]]
         (when (seq tx)
           (d/transact conn {:tx-data (vec tx)})
           (println (format "  loaded %-8s %d" label (count tx)))))
@@ -343,4 +353,27 @@
                                                     [?h :hypothesis/falsifier ?fals]] db)
                                       (sort-by (fn [[_ _ c _]] (Math/abs (- c 0.5)))))]
           (println (format "  [%.2f] %s\n    → %s" conf id fals)))
+        (println "\n=== Engi 縁の手放し (ADR-0013) ===")
+        (println "[Datalog] engi/sever-queue — 実行可能キュー (月額降順; export-first=✉は保全が前提):")
+        (doseq [[t dec cost exp] (->> (d/q '[:find ?target ?decision ?cost ?export
+                                             :where [?e :engi/legal-hold false]
+                                                    [?e :engi/decision ?decision]
+                                                    [(contains? #{:sever :archive :transfer :reduce} ?decision)]
+                                                    [?e :engi/target ?target]
+                                                    [?e :engi/monthly-cost-jpy ?cost]
+                                                    [?e :engi/export-first ?export]] db)
+                                      (sort-by (fn [[_ _ c _]] (- c))))]
+          (println (format "  %-9s ¥%,7d %s %s" (name dec) cost (if exp "✉" " ") t)))
+        (println "\n[Datalog] engi/legal-holds — 係争終結まで操作禁止:")
+        (doseq [[t] (d/q '[:find ?target :where [?e :engi/legal-hold true] [?e :engi/target ?target]] db)]
+          (println "  🔒" t))
+        (let [sv (or (ffirst (d/q '[:find (sum ?cost) :with ?e
+                                    :where [?e :engi/legal-hold false] [?e :engi/decision ?d]
+                                           [(contains? #{:sever :archive :transfer} ?d)]
+                                           [?e :engi/monthly-cost-jpy ?cost]] db)) 0)
+              rd (or (ffirst (d/q '[:find (sum ?cost) :with ?e
+                                    :where [?e :engi/legal-hold false] [?e :engi/decision :reduce]
+                                           [?e :engi/monthly-cost-jpy ?cost]] db)) 0)]
+          (println (format "\n  個人負担の削減見込み: 確定系 (sever/archive/transfer) ¥%,d/月 + 縮小余地 (reduce対象) 最大 ¥%,d/月" (long sv) (long rd)))
+          (println "  goal 29 KPI: ¥319k → 目標 ¥220k (要実測の概算を含む)"))
         (println "\nOK: normalized into Datomic. Rebuild anytime: clojure -M -m warehouse.load")))))
