@@ -219,6 +219,9 @@
 (defn- rd-edn-facts [rel]
   (let [f (io/file base rel)] (when (.exists f) (edn/read-string (slurp f)))))
 
+(defn channel-tx []
+  (vec (rd-edn-facts "facts/channels.edn")))
+
 (defn curated-org-tx []
   (vec (rd-edn-facts "facts/orgs.edn")))
 
@@ -306,7 +309,8 @@
                           ["actions" (action-tx)] ["events" (event-tx)]
                           ["cases" (case-tx)] ["emails" (email-tx)]
                           ["people" (people-tx)] ["people-aliases" (people-alias-tx)]
-                          ["orgs(curated)" (curated-org-tx)] ["accounts" (account2-tx)] ["contracts" (contract-tx)]
+                          ["channels" (channel-tx)] ["orgs(curated)" (curated-org-tx)]
+                          ["accounts" (account2-tx)] ["contracts" (contract-tx)]
                           ["goals" (goal-tx)] ["goal-deps" (goal-edge-tx)]
                           ["obligations" (obligation-tx)]
                           ["dyads" (dyad-tx)] ["hypotheses" (hypothesis-tx)]
@@ -447,11 +451,20 @@
         (println "  orgs    " (n '[:find (count ?o) :where [?o :org/id]])
                  " accounts" (n '[:find (count ?a) :where [?a :account/id] [?a :account/reach]])
                  " contracts" (n '[:find (count ?c) :where [?c :contract/id]]))
-        (println "[Datalog] account/reachability (pending = ingest プロセス対象):")
+        (println "[Datalog] account/reachability + 到達チャネル (pending = ingest プロセス対象):")
         (doseq [[id reach st] (->> (d/q '[:find ?id ?reach ?st
                                           :where [?a :account/reach ?reach] [?a :account/id ?id] [?a :account/status ?st]] db)
                                    (sort-by (fn [[_ _ s]] (name s))))]
-          (println (format "  %-24s reach=%-8s %s" id (name reach) (name st))))
+          (let [chs (->> (d/q '[:find ?cid :in $ ?id
+                                :where [?a :account/id ?id] [?a :account/channels ?c] [?c :channel/id ?cid]] db id)
+                         (map (comp name first)) sort (clojure.string/join ","))]
+            (println (format "  %-24s reach=%-8s %-10s via[%s]" id (name reach) (name st) chs))))
+        (println "[Datalog] channels — 実行リソース (agent=私が駆動可か):")
+        (doseq [[cid k ag stt] (->> (d/q '[:find ?cid ?k ?ag ?stt
+                                           :where [?c :channel/id ?cid] [?c :channel/kind ?k]
+                                                  [?c :channel/agent ?ag] [?c :channel/status ?stt]] db)
+                                    (sort-by (comp name first)))]
+          (println (format "  %-16s %-10s agent=%-4s %s" (name cid) (name k) (name ag) (name stt))))
         (println "[Datalog] org/by-role (own-corp/equity/counterparty 抜粋):")
         (doseq [[role nm] (->> (d/q '[:find ?role ?nm
                                       :where [?o :org/role ?role] [(contains? #{:own-corp :equity :employer :counterparty} ?role)]

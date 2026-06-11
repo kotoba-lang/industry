@@ -94,6 +94,18 @@
  {:db/ident :account/status   :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":ingested :pending :unreachable"}
  {:db/ident :account/role     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
  {:db/ident :account/note     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :account/verified :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :account/channels :db/valueType :db.type/ref     :db/cardinality :db.cardinality/many :db/doc "account -> 到達チャネル"}
+
+ ;; ---------- channel (execution resource registry; ADR-0015) ----------
+ {:db/ident :channel/id       :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :channel/kind     :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":connector :browser :cli :device :secret :store"}
+ {:db/ident :channel/agent    :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":yes :no (私が駆動可か)"}
+ {:db/ident :channel/status   :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":live :unconfigured :degraded"}
+ {:db/ident :channel/verified :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :channel/binds    :db/valueType :db.type/string  :db/cardinality :db.cardinality/many :db/doc "結びつくアカウント"}
+ {:db/ident :channel/sessions :db/valueType :db.type/string  :db/cardinality :db.cardinality/many :db/doc "browser: u/N=email"}
+ {:db/ident :channel/note     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
 
  {:db/ident :org/id           :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
  {:db/ident :org/role         :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":own-corp :equity :employer :law-firm :accounting :counterparty :vendor :financial :education :community :other"}
