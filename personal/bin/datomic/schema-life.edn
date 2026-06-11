@@ -123,6 +123,27 @@
  {:db/ident :contract/case    :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
  {:db/ident :contract/note    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
 
+ ;; ---------- triage (受信トリアージ台帳; mail-triage.edn) ----------
+ {:db/ident :triage/id      :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :triage/from    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :triage/subject :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :triage/summary :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :triage/class   :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ {:db/ident :triage/action  :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ {:db/ident :triage/rule    :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one :db/doc "適用された mail-rule"}
+ {:db/ident :triage/depends-on :db/valueType :db.type/string :db/cardinality :db.cardinality/many :db/doc "依存先 id (fin/obligation/contract...)"}
+ {:db/ident :triage/note    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+
+ ;; ---------- mailrule (分類ルール; mail-rules.edn) ----------
+ {:db/ident :rule/id     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :rule/class  :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ {:db/ident :rule/action :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":keep :archive :obligation :unsubscribe :investigate :seal"}
+ {:db/ident :rule/agent  :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":yes :ask :no (私が自動実行可か)"}
+ {:db/ident :rule/match-from    :db/valueType :db.type/string :db/cardinality :db.cardinality/many}
+ {:db/ident :rule/match-subject :db/valueType :db.type/string :db/cardinality :db.cardinality/many}
+ {:db/ident :rule/match-not     :db/valueType :db.type/string :db/cardinality :db.cardinality/many}
+ {:db/ident :rule/note   :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+
  ;; ---------- finitem (corp finance triage; corp-finance.edn) ----------
  {:db/ident :finitem/id        :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
  {:db/ident :finitem/org       :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}

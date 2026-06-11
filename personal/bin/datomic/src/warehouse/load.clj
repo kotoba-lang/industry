@@ -225,6 +225,28 @@
 (defn finitem-tx []
   (vec (rd-edn-facts "facts/corp-finance.edn")))
 
+;; mail-triage.edn: triage ledger with rule ref + depends-on edges
+(defn triage-tx []
+  (vec (for [t (rd-edn-facts "facts/mail-triage.edn")]
+         (cond-> {:triage/id (:triage/id t)}
+           (:from t)       (assoc :triage/from (:from t))
+           (:subject t)    (assoc :triage/subject (:subject t))
+           (:summary t)    (assoc :triage/summary (:summary t))
+           (:class t)      (assoc :triage/class (:class t))
+           (:action t)     (assoc :triage/action (:action t))
+           (:note t)       (assoc :triage/note (:note t))
+           (:rule t)       (assoc :triage/rule [:rule/id (:rule t)])
+           (:depends-on t) (assoc :triage/depends-on (vec (:depends-on t)))))))
+
+;; mail-rules.edn: flatten :rule/match map -> match-from/subject/not multi attrs
+(defn mailrule-tx []
+  (vec (for [r (:rules (rd-edn-facts "facts/mail-rules.edn"))]
+         (let [m (:rule/match r)]
+           (cond-> (dissoc r :rule/match)
+             (seq (:from m))        (assoc :rule/match-from (vec (:from m)))
+             (seq (:subject-has m)) (assoc :rule/match-subject (vec (:subject-has m)))
+             (seq (:not m))         (assoc :rule/match-not (vec (:not m))))))))
+
 (defn curated-org-tx []
   (vec (rd-edn-facts "facts/orgs.edn")))
 
@@ -314,6 +336,7 @@
                           ["people" (people-tx)] ["people-aliases" (people-alias-tx)]
                           ["channels" (channel-tx)] ["orgs(curated)" (curated-org-tx)]
                           ["accounts" (account2-tx)] ["contracts" (contract-tx)] ["finitems" (finitem-tx)]
+                          ["mailrules" (mailrule-tx)] ["triage" (triage-tx)]
                           ["goals" (goal-tx)] ["goal-deps" (goal-edge-tx)]
                           ["obligations" (obligation-tx)]
                           ["dyads" (dyad-tx)] ["hypotheses" (hypothesis-tx)]
@@ -474,6 +497,19 @@
                                              [?o :org/name ?nm]] db)
                               (sort-by (comp name first)))]
           (println (format "  %-12s %s" (name role) nm)))
+        (println "\n=== メール分類ルール / triage 依存 (mail-rules.edn + mail-triage.edn) ===")
+        (println "  rules   " (n '[:find (count ?r) :where [?r :rule/id]])
+                 " triage  " (n '[:find (count ?t) :where [?t :triage/id]]))
+        (println "[Datalog] rule by action (私が自動実行可=agent):")
+        (doseq [[act ag cnt] (->> (d/q '[:find ?act ?ag (count ?r)
+                                         :where [?r :rule/action ?act] [?r :rule/agent ?ag]] db)
+                                  (sort-by (comp name first)))]
+          (println (format "  %-12s agent=%-4s ×%d" (name act) (name ag) cnt)))
+        (println "[Datalog] triage → 依存先 (メール処理が繋がる finitem/obligation):")
+        (doseq [[tid dep] (->> (d/q '[:find ?tid ?dep
+                                      :where [?t :triage/id ?tid] [?t :triage/depends-on ?dep]] db)
+                              (sort-by first))]
+          (println (format "  %-22s → %s" tid dep)))
         (println "\n=== JK法人財務 triage (corp-finance.edn) ===")
         (let [pay (or (first (first (d/q '[:find (sum ?a) :with ?f
                                            :where [?f :finitem/direction :payable] [?f :finitem/amount-jpy ?a]] db))) 0)]
