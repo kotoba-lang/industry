@@ -156,8 +156,13 @@
                    raw-bytes (.decode (Base64/getUrlDecoder) ^String (:raw msg))
                    raw (String. raw-bytes "UTF-8")
                    cid (sha256-hex raw-bytes)]
-               (when-not (contains? (:cids st) cid)
-                 (io/copy raw-bytes (io/file msgs (str cid ".eml"))))
+               ;; cid名の .eml が既存(= 同一RFC822が別アカ/別sourceで保存済み、
+               ;; あるいは index と FS の不整合)なら上書きしない。locked annex
+               ;; symlink への書込は Permission denied になるため存在チェックで回避。
+               (let [eml (io/file msgs (str cid ".eml"))]
+                 (when (and (not (contains? (:cids st) cid))
+                            (not (.exists eml)))
+                   (io/copy raw-bytes eml)))
                (let [rec {:cid cid :sha256 cid :size (count raw-bytes)
                           :account slug
                           :message_id mid
@@ -194,6 +199,13 @@
   (preset-pass)
   (git "annex" "get" (str msgs-rel "/index.jsonl"))
   (git "annex" "unlock" (str msgs-rel "/index.jsonl"))
+  ;; unlock が効いて index が書込可能(=symlinkでない)であることを保証。
+  ;; 効いていないと io/writer の append が無に帰し silently 0件になる(過去バグ)。
+  (when (java.nio.file.Files/isSymbolicLink (.toPath (io/file index)))
+    (git "annex" "get" (str msgs-rel "/index.jsonl"))
+    (git "annex" "unlock" (str msgs-rel "/index.jsonl"))
+    (when (java.nio.file.Files/isSymbolicLink (.toPath (io/file index)))
+      (throw (ex-info "index.jsonl が unlock できず書込不可（annex lock状態）" {:path index}))))
   (let [only (first args)
         accts (cond->> (mail-accounts) only (filter #(= (:slug %) only)))
         init (merge (known) {:synced 0 :added 0})
