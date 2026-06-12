@@ -127,6 +127,60 @@ remote = "https://github.com/etzhayyim/kotoba.git"
 description = "kotoba-clj Clojure→WASM compiler（etzhayyim）。"
 org = "etzhayyim"
 
+[[projects]]
+name = "langchain-clj"
+path = "orgs/com-junkawasaki/langchain-clj"
+kind = "clojure-library"
+submodule = true
+remote = "git@github.com:com-junkawasaki/langchain-clj.git"
+description = "LangChain-core 相当の LLM 基盤レイヤを portable Clojure (.cljc, 依存ゼロ) で実装。LCEL Runnable / prompt / ChatModel (Anthropic adapter, I/O はホスト能力注入) / tool / parser / Datomic 互換ミニストア + datom チャット履歴（ADR-0010 と同型）。kotoba-clj 等の Clojure WASM ホスト前提。MIT (本家準拠)。"
+stack = ["Clojure"]
+adrs = ["docs/adr/0001-architecture.md", "kawasakijun/docs/adr/0013-clj-agent-stack.md"]
+
+[[projects]]
+name = "langgraph-clj"
+path = "orgs/com-junkawasaki/langgraph-clj"
+kind = "clojure-library"
+submodule = true
+remote = "git@github.com:com-junkawasaki/langgraph-clj.git"
+description = "LangGraph 相当のグラフオーケストレーションを portable Clojure (.cljc) で実装。StateGraph + Pregel superstep / interrupt / checkpoint を datom 化（Datalog ビュー = ADR-0010 と同型）。langchain-clj に git 依存（本家 langchain-core/langgraph と同じ積層）。MIT (本家準拠)。"
+stack = ["Clojure"]
+adrs = ["docs/adr/0001-architecture.md", "kawasakijun/docs/adr/0013-clj-agent-stack.md"]
+deps = ["langchain-clj"]
+
+[[projects]]
+name = "comfyui-clj"
+path = "orgs/com-junkawasaki/comfyui-clj"
+kind = "clojure-library"
+submodule = true
+remote = "git@github.com:com-junkawasaki/comfyui-clj.git"
+description = "ComfyUI 相当のノードグラフ実行エンジンを portable Clojure (.cljc) で実装。API format 互換ワークフロー + content-addressed キャッシュ付きトポロジカル実行。キャッシュ・run 履歴を datom 化（Datalog ビュー = ADR-0010 と同型）。推論等の重い処理はホスト能力注入、langchain-clj に git 依存（ChatModel ノードパック）。GPL-3.0 (本家準拠)。"
+stack = ["Clojure"]
+adrs = ["docs/adr/0001-architecture.md", "kawasakijun/docs/adr/0013-clj-agent-stack.md"]
+deps = ["langchain-clj"]
+
+[[projects]]
+name = "browser-use-clj"
+path = "orgs/com-junkawasaki/browser-use-clj"
+kind = "clojure-library"
+submodule = true
+remote = "git@github.com:com-junkawasaki/browser-use-clj.git"
+description = "browser-use 相当のブラウザ操作エージェントを portable Clojure (.cljc) で実装。番号付き要素表現 + アクションレジストリ + langgraph StateGraph ループ。ブラウザは IBrowser protocol でホスト能力注入（Playwright/CDP/ページ内 WASM/MCP）、操作履歴を datom 化。MIT (本家準拠)。"
+stack = ["Clojure"]
+adrs = ["docs/adr/0001-architecture.md", "kawasakijun/docs/adr/0013-clj-agent-stack.md"]
+deps = ["langgraph-clj"]
+
+[[projects]]
+name = "computer-use-clj"
+path = "orgs/com-junkawasaki/computer-use-clj"
+kind = "clojure-library"
+submodule = true
+remote = "git@github.com:com-junkawasaki/computer-use-clj.git"
+description = "Anthropic computer use 相当のデスクトップ操作エージェントを portable Clojure (.cljc) で実装。computer tool の action 語彙 + サンプリングループ (langgraph StateGraph)。デスクトップは IComputer protocol でホスト能力注入（xdotool/VNC/MCP）、操作履歴を datom 化。MIT (本家リファレンス準拠)。"
+stack = ["Clojure"]
+adrs = ["docs/adr/0001-architecture.md", "kawasakijun/docs/adr/0013-clj-agent-stack.md"]
+deps = ["langgraph-clj"]
+
 # ─── Vendored repos (remote 無し → 素フォルダ取り込み, ADR-0007 Phase 2/3) ───
 #
 # GitHub remote を持たないため submodule 化せず DataLad superdataset に直接取り込み。
@@ -298,6 +352,12 @@ b2_annex_uuid = "3336a5f2-298d-457d-9087-9fc81c653998"
 b2_key_custody = "macOS Keychain 'b2:gftdcojp-m365-annex' (scoped key 004d9f6c0ba12580000000009); creds embedded gpg-encrypted in git-annex branch"
 gpg_keyid = "EC1710FCE6FEB745B74D122FBDAE6794050EDB62"   # gftdcojp M365 Archive (dedicated org key)
 gpg_passphrase_custody = "macOS Keychain (gpg:gftd-m365); recovery + B2 key in 1Password gftdcojp vault: 'GPG: gftdcojp M365 archive recovery (EC1710FC)'"
+contract_terms = "facts/contract-terms.jsonl — LLM-extracted terms (parties/dates/amounts/auto-renew, prov:claude, confidence-tagged); drive 427 docs + mail-attachment docs; coverage gauge in facts/coverage.edn"
+adrs = ["kawasakijun/docs/adr/0011-gftdcojp-m365-full-archive.md"]
+entra_app = "gftd-m365-archive (appId 0ca452ab-2650-4c4e-b19d-32f81d26d36b, public client, delegated read + admin consent)"
+schedule = "launchd jp.co.gftd.m365-archive-backup daily 02:00 (single-instance lock in run-backup.sh)"
+status = "operational — initial full backup 2026-06-11: mail 103,662 eml / calendar 6,495 / onedrive ~131GiB; annex 131.4GB all verified on B2; annex.jobs=8 (31GB/h)"
+facts_layer = "ADR-0010 pattern: facts/{blobs,messages,threads,attachments,events,crm,docs}.jsonl + {people,orgs,projects,curation-queue}.edn + prov/*.prov.jsonld; CID=git-annex key; datomic loader (clojure -M:run, in-mem). 2026-06-12: 112,915 blobs / 102,158 msgs / 92,635 threads (1,686 needs-reply) / 25,577 attachments / 6,866 docs (project+counterparty edges) / crm 2,652 orgs + 148 persons / orgs 2,673 (85 named) / 51 projects"
 status = "2026-06-10 配線完了: CLIs(az 2.87/m365 11.8/rclone) 導入、gpg鍵 1Password→import + Keychain + agent preset、b2 special remote enableremote + round-trip(add→B2→drop→get) 検証 OK。残: bin/setup-auth.sh(対話 MFA/consent/OAuth) → bin/run-backup.sh(以降 非対話)。"
 
 # ─── Project relationships ─────────────────────────────────────────
@@ -309,3 +369,14 @@ status = "2026-06-10 配線完了: CLIs(az 2.87/m365 11.8/rclone) 導入、gpg�
 #   etzhayyim-root applies those principles to on-chain distributed systems.
 #   ghosthacker runs on that substrate to generate the Ghost Hacker story universe.
 #   ai-gftd-apps-gftdcojp is the production AI agent platform (gftd.ai) built on AT Protocol.
+#
+#   portable Clojure agent stack (ADR-0013; SSoT: kawasakijun/clj-stack.edn):
+#
+#   browser-use-clj      computer-use-clj          ← agent layer
+#           └────────┬────────┘
+#             langgraph-clj          comfyui-clj   ← orchestration layer
+#                   └───────┬───────────┘
+#                     langchain-clj                ← foundation (zero-dep .cljc)
+#
+#   All .cljc / Clojure-on-WASM (kotoba-clj) ready; state as datoms (ADR-0010 pattern);
+#   I/O and heavy work injected as host capabilities.
