@@ -45,7 +45,8 @@
 ;; ADR-0010: schema-life.edn adds goal/obligation/decision/kpi/prov + person aliases.
 (def schema
   (vec (concat (edn/read-string (slurp (io/file base "bin/datomic/schema.edn")))
-               (edn/read-string (slurp (io/file base "bin/datomic/schema-life.edn"))))))
+               (edn/read-string (slurp (io/file base "bin/datomic/schema-life.edn")))
+               (edn/read-string (slurp (io/file base "bin/datomic/schema-sources.edn"))))))
 
 ;; ---------- normalization (file records -> datoms) ----------
 (def finance-files
@@ -254,7 +255,9 @@
   (vec (rd-edn-facts "facts/orgs.edn")))
 
 (defn account2-tx []
-  (vec (for [a (rd-edn-facts "facts/accounts.edn")] a)))  ; refs already in lookup-ref form
+  ;; refs are already lookup-refs; :account/blocker はネスト map → Datomic 用に文字列化
+  (vec (for [a (rd-edn-facts "facts/accounts.edn")]
+         (cond-> a (map? (:account/blocker a)) (update :account/blocker pr-str)))))
 
 (defn contract-tx []
   (vec (for [c (rd-edn-facts "facts/contracts.edn")]
@@ -289,6 +292,79 @@
                    (clean (:vendor rec)) (assoc :txn/vendor {:org/name (clean (:vendor rec))}))))]
     (vec (concat (keep-indexed (partial ->tx "bank") bank)
                  (keep-indexed (partial ->tx "mf") mf)))))
+
+;; ---------- データソース統一registry (:datasrc) + 連絡先連携 (schema-sources.edn) ----------
+;; この session で取り込んだ全源を1グラフに連携し people/dyads と接続 (ADR-0010)。
+(def imessage-edn  (rd-edn-facts "facts/imessage.edn"))
+(def notes-edn     (rd-edn-facts "facts/notes.edn"))
+(def photos-edn    (rd-edn-facts "facts/photos-library.edn"))
+(def downloads-edn (rd-edn-facts "facts/downloads-inventory.edn"))
+
+(defn datasrc-tx []
+  (->> [(when imessage-edn
+          {:datasrc/id "src/imessage" :datasrc/name "iMessage / SMS" :datasrc/kind :comms
+           :datasrc/status :ingested :datasrc/backed-up true
+           :datasrc/count (:imessage/messages imessage-edn)
+           :datasrc/from (get-in imessage-edn [:imessage/date-range :from])
+           :datasrc/to   (get-in imessage-edn [:imessage/date-range :to])
+           :datasrc/path "personal/comms/imessage/index.jsonl"
+           :datasrc/note "本文は attributedBody デコード。people 連携=contact"})
+        (when notes-edn
+          {:datasrc/id "src/notes" :datasrc/name "Apple Notes" :datasrc/kind :notes
+           :datasrc/status :ingested :datasrc/backed-up true
+           :datasrc/count (:notes/count notes-edn)
+           :datasrc/from (get-in notes-edn [:notes/date-range :from])
+           :datasrc/to   (get-in notes-edn [:notes/date-range :to])
+           :datasrc/path "personal/notes/index.jsonl"})
+        (when photos-edn
+          {:datasrc/id "src/photos" :datasrc/name "Apple Photos" :datasrc/kind :photos
+           :datasrc/status (:photos/ingest-policy photos-edn)
+           :datasrc/count (:photos/assets photos-edn) :datasrc/size-gb (:photos/originals-gb photos-edn)
+           :datasrc/from (get-in photos-edn [:photos/year-range :from])
+           :datasrc/to   (get-in photos-edn [:photos/year-range :to])
+           :datasrc/path "personal/photos/index.jsonl" :datasrc/backed-up true
+           :datasrc/note "索引のみ取込。原本270GBはiCloud退避 (:metadata-only)"})
+        (when downloads-edn
+          {:datasrc/id "src/downloads" :datasrc/name "~/Downloads 整理" :datasrc/kind :files
+           :datasrc/status :ingested :datasrc/backed-up true
+           :datasrc/count (get-in downloads-edn [:inventory/total :items])
+           :datasrc/size-gb (double (get-in downloads-edn [:inventory/dedup :new-gb] 0))
+           :datasrc/path "facts/downloads-inventory.edn"
+           :datasrc/note "29.4GB→1.2GB。cid-dedup後 org/project へ再配置"})
+        {:datasrc/id "src/mail" :datasrc/name "Gmail (jun784 x3)" :datasrc/kind :mail
+         :datasrc/status :ingested :datasrc/count (count (or (rd-jsonl "mail/messages/index.jsonl") []))
+         :datasrc/path "mail/messages/index.jsonl" :datasrc/backed-up true
+         :datasrc/note "mail-sync 日次"}
+        {:datasrc/id "src/gdrive" :datasrc/name "Google Drive" :datasrc/kind :files
+         :datasrc/status :covered :datasrc/count 57565
+         :datasrc/path "personal/takeout/jun784/2026-06-10/Takeout/ドライブ" :datasrc/backed-up true
+         :datasrc/note "Takeout 2026-06-10 で取込済 (訴訟ドラフト含む)。ライブ同期は冗長"}
+        {:datasrc/id "src/tanabe-3d" :datasrc/name "tanabe-3d (3Dパイプライン)" :datasrc/kind :files
+         :datasrc/status :ingested :datasrc/path "orgs/com-junkawasaki/tanabe-3d" :datasrc/backed-up true
+         :datasrc/note "野良プロジェクトをmonorepo収録。output 4.2G除外"}]
+       (keep identity) vec))
+
+;; people.edn から email/名前 → person-id の解決表
+(def email->pid
+  (into {} (for [p people-edn, e (:emails p)] [(str/lower-case e) (:person/id p)])))
+(def name->pid
+  (into {} (for [p people-edn :when (:person/name p)]
+             [(first (str/split (:person/name p) #"\s|\(")) (:person/id p)])))
+
+(defn contact-tx []
+  ;; iMessage top-contacts → :contact。email一致で person 解決 (電話番号は people.edn に無く未解決)
+  (vec (for [[handle cnt] (:imessage/top-contacts imessage-edn)
+             :let [pid (email->pid (str/lower-case (str handle)))]]
+         (cond-> {:contact/id (str "imsg/" handle) :contact/handle handle
+                  :contact/msg-count cnt :contact/source :imessage}
+           pid (assoc :contact/person [:person/id pid])))))
+
+(defn person-media-link-tx []
+  ;; Photos top-persons の登場枚数を person に連携 (名前一致)
+  (vec (for [[nm cnt] (:photos/top-persons photos-edn)
+             :let [pid (or (name->pid nm) (name->pid (first (str/split (str nm) #"\s"))))]
+             :when pid]
+         {:person/id pid :person/photo-count cnt})))
 
 ;; processes.edn: handoff state machine + capability policy (ADR-0015)
 (def processes-edn
@@ -370,6 +446,8 @@
                           ["people" (people-tx)] ["people-aliases" (people-alias-tx)]
                           ["channels" (channel-tx)] ["orgs(curated)" (curated-org-tx)]
                           ["banks" (bank-tx)] ["bank-txns" (bank-txn-tx)]
+                          ["datasrc" (datasrc-tx)] ["contacts" (contact-tx)]
+                          ["person-media" (person-media-link-tx)]
                           ["accounts" (account2-tx)] ["contracts" (contract-tx)] ["finitems" (finitem-tx)]
                           ["mailrules" (mailrule-tx)] ["triage" (triage-tx)] ["coverage" (coverage-tx)]
                           ["goals" (goal-tx)] ["goal-deps" (goal-edge-tx)]
@@ -564,6 +642,30 @@
                                               [?s :source/agent ?ag] [?s :source/note ?nt]] db)
                                (sort-by (comp name second)))]
           (println (format "    [%s] %-26s %s" (name ag) id (subs nt 0 (min 40 (count nt))))))
+        (println "\n=== データソース統一registry (schema-sources.edn; 全取込源を1グラフに) ===")
+        (println "[Datalog] datasrc/inventory — 種別・状態・件数・B2バックアップ:")
+        (doseq [[id knd st cnt bu] (->> (d/q '[:find ?id ?knd ?st ?cnt ?bu
+                                               :where [?d :datasrc/id ?id] [?d :datasrc/kind ?knd]
+                                                      [?d :datasrc/status ?st]
+                                                      (or-join [?d ?cnt] [?d :datasrc/count ?cnt]
+                                                        (and [(missing? $ ?d :datasrc/count)] [(ground 0) ?cnt]))
+                                                      (or-join [?d ?bu] [?d :datasrc/backed-up ?bu]
+                                                        (and [(missing? $ ?d :datasrc/backed-up)] [(ground false) ?bu]))] db)
+                                        (sort-by (fn [[_ k _ c _]] [(name k) (- c)])))]
+          (println (format "  %-14s %-9s %-13s %7d件 %s" id (name knd) (name st) cnt (if bu "B2✓" ""))))
+        (println "[Datalog] comms/contacts → person 連携 (iMessage上位; 解決済のみ):")
+        (doseq [[h c nm] (->> (d/q '[:find ?h ?c ?nm
+                                     :where [?ct :contact/handle ?h] [?ct :contact/msg-count ?c]
+                                            [?ct :contact/person ?p] [?p :person/name ?nm]] db)
+                              (sort-by (fn [[_ c _]] (- c))))]
+          (println (format "  %-28s %5d件 → %s" h c nm)))
+        (let [unres (or (ffirst (d/q '[:find (count ?ct) :where [?ct :contact/id]
+                                       [(missing? $ ?ct :contact/person)]] db)) 0)]
+          (println (format "  (未解決 contact %d 件 = 電話番号中心; people.edn に番号追加で連携可)" unres)))
+        (println "[Datalog] person/media-presence — Photos/iMessage 出現量 (人物グラフ連携):")
+        (doseq [[nm pc] (->> (d/q '[:find ?nm ?pc :where [?p :person/photo-count ?pc] [?p :person/name ?nm]] db)
+                             (sort-by (fn [[_ pc]] (- pc))))]
+          (println (format "  %-30s 写真 %d枚" nm pc)))
         (println "\n=== メール分類ルール / triage 依存 (mail-rules.edn + mail-triage.edn) ===")
         (println "  rules   " (n '[:find (count ?r) :where [?r :rule/id]])
                  " triage  " (n '[:find (count ?t) :where [?t :triage/id]]))
