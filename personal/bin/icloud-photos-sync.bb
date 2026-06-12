@@ -67,7 +67,7 @@
     (println (format "  新規コピー %d 件 → %d dest" @copied (count @new-dests)))
     (when (pos? @copied)
       (doseq [d @new-dests] (shell {:dir root} "git" "annex" "add" d))
-      (shell {:dir root} "git" "commit" (str "-m") "sync(icloud-drive): 差分取込 (icloud-photos-sync.bb)"
+      (apply shell {:dir root :continue true} "git" "commit" "-m" "sync(icloud-drive): 差分取込 (icloud-photos-sync.bb)"
              (vec @new-dests))
       (println "  committed"))
     @copied)))
@@ -101,18 +101,18 @@
                       (shell oxp "export" (.getPath outdir) "--skip-missing" "--update"
                              "--dirtemplate" "{created.year}/{created.mm}" "--mute")
                       (shell {:dir root} "git" "annex" "add" "personal/photos/originals")
-                      (shell {:dir root} "git" "commit" "-m" "sync(photos): local originals" "personal/photos/originals"))
+                      (shell {:dir root :continue true} "git" "commit" "-m" "sync(photos): local originals" "personal/photos/originals"))
       :windowed (let [win (or (System/getenv "PHOTOS_WINDOW") "2026-01-01")]
                   (.mkdirs outdir)
                   (shell oxp "export" (.getPath outdir) "--from-date" win "--download-missing" "--update"
                          "--dirtemplate" "{created.year}/{created.mm}" "--mute")
                   (shell {:dir root} "git" "annex" "add" "personal/photos/originals")
-                  (shell {:dir root} "git" "commit" "-m" (str "sync(photos): window from " win) "personal/photos/originals"))
+                  (shell {:dir root :continue true} "git" "commit" "-m" (str "sync(photos): window from " win) "personal/photos/originals"))
       :full (do (.mkdirs outdir)
                 (shell oxp "export" (.getPath outdir) "--download-missing" "--update"
                        "--dirtemplate" "{created.year}/{created.mm}" "--mute")
                 (shell {:dir root} "git" "annex" "add" "personal/photos/originals")
-                (shell {:dir root} "git" "commit" "-m" "sync(photos): full originals" "personal/photos/originals"))
+                (shell {:dir root :continue true} "git" "commit" "-m" "sync(photos): full originals" "personal/photos/originals"))
       (println "  unknown policy — skip"))))
 
 (defn -main [& _]
@@ -125,7 +125,7 @@
   (let [st (:out (sh {:dir root} "git" "status" "--short" "personal/photos/index.jsonl"))]
     (when (seq (str/trim st))
       (shell {:dir root} "git" "annex" "add" "personal/photos/index.jsonl")
-      (shell {:dir root} "git" "commit" "-m" "sync(photos): 索引更新" "personal/photos/index.jsonl")))
+      (shell {:dir root :continue true} "git" "commit" "-m" "sync(photos): 索引更新" "personal/photos/index.jsonl")))
   (println "done."))
 
 (-main)
