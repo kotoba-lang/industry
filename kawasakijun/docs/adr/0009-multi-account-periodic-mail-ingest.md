@@ -89,18 +89,43 @@ gpg passphrase は ADR-0008 同様 Keychain `gpg:personal-data` から gpg-agent
   これは安全ルール上エージェントが行わない（computer use / 1Password 経由でも不可）。
   → 当該アカウントを Chrome にサインインしてもらってから同意を駆動する。
 
-## Status / Rollout（2026-06-10 時点）
+## Status / Rollout（2026-06-12 更新）
 
 | slug | auth | ingest |
 |---|---|---|
-| jun784 | ✅ Keychain | ✅ 487 msgs（B2・commit `f0be54d27`）|
-| jk-luxury | ✅ Keychain | ✅ 73 msgs |
+| jun784 | ✅ Keychain | ✅ 稼働（mail-sync.bb 15分毎） |
+| jk-luxury | ✅ Keychain | ✅ 稼働（同上） |
 | gftd-group | ⏳ | Chrome 未サインイン → `google-auth.py login gftd-group` |
-| junkawasaki-com | ⏳ | 同上 → `google-auth.py login junkawasaki-com` |
+| junkawasaki-com | ✗ **blocked** | **Gmail ServiceNotAllowed**（下記）。registry `sync=false` |
 | gftd-co-jp | ⏳ | Entra app 登録 → `msgraph-auth.py client-set <id>` → `login gftd-co-jp` |
 
-認証が揃えば launchd が 5 アカウントとも日次で差分 ingest する。`authorized` は INTENT、
-実際の token 有無は `google-auth.py status` / `msgraph-auth.py status` が正本。
+### 実装更新（2026-06-12）
+
+- **実行系を babashka(Clojure) に統合**: `mail-sync.sh`+`ingest-gmail-batch.py` →
+  `personal/bin/mail-sync.bb` 1 本（index.jsonl は byte 互換）。launchd を **15 分間隔**
+  + bb 実行 + `EnvironmentVariables PATH` 修正（旧 07:30 cron は launchd 最小 PATH で
+  git-annex 解決失敗＝0 件同期だった）。書込パス 2 バグ修正（① index が annex lock の
+  まま append が無に帰す → unlock 検証を追加、② 新着 .eml が既存 locked symlink で
+  Permission denied → 存在チェックで上書き回避）。
+
+### junkawasaki-com の認可不能（実検証 2026-06-12）
+
+`login junkawasaki-com` を試行 → OAuth 同意が `access.workspace.google.com/ServiceNotAllowed`
+（「Gmail へのアクセス権がありません」）で弾かれ、**認可コードが発行されない**。
+
+- **token 実体は jun784 に落ちる**: `login_hint=root@junkawasaki.com` は強制力が無く、
+  Chrome のアクティブ垢（jun784=u/0）が承認してしまう。検証で token の `emailAddress`=
+  jun784・messagesTotal=65,062 が jun784 と一致。`authuser=2`（root@junkawasaki.com の
+  Chrome index）強制でも ServiceNotAllowed の壁は同じ。誤 token は削除・registry `sync=false`。
+- **原因は admin で Gmail サービス無効**: Workspace 支払いは生きている（本人確認 2026-06-12）
+  ため未払い停止ではない。`admin.google.com`（junkawasaki.com）→ Apps → Workspace →
+  **Gmail を ON** が唯一の前提。有効化後は Chrome u/2 サインイン済み＋authuser 強制で
+  1 回開通できる（認証基盤は整備済み）。
+- 制約 #4（login_hint 非強制）に **#7 を追加**: 多垢サインイン時は `authuser=<index>` を
+  AUTH_URL に付与して対象垢を強制する（`NO_BROWSER_OPEN=1` でエージェント駆動）。
+
+`authorized` は INTENT、実際の token 有無は `google-auth.py status` が正本、
+サービス可否は Gmail `/users/me/profile` の応答（200 か ServiceNotAllowed）が正本。
 
 ## Consequences
 
