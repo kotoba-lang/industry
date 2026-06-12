@@ -39,18 +39,22 @@
   (or (some (fn [[re d]] (when (re-find re rel) d)) rules)
       "personal/drive/_intake/icloud"))
 
+(defn- dataless?
+  "iCloud退避ファイル = ローカルブロック0 (stat -f %b)。ブロッキング読込を避けるための判定。"
+  [path]
+  (try (zero? (Long/parseLong (str/trim (:out (sh "stat" "-f" "%b" path))))) (catch Exception _ false)))
+
 (defn sync-icloud-drive! [existing]
-  (println "[iCloud Drive] 実体化 + 差分同期")
-  ;; 実体化 (内容読込で Files provider に fetch させる)
-  (doseq [f (file-seq (io/file icloud))
-          :when (and (.isFile f) (not (str/ends-with? (.getName f) ".icloud"))
-                     (not= (.getName f) ".DS_Store"))]
-    (try (with-open [in (io/input-stream f)] (.read in (byte-array 4096))) (catch Exception _ nil)))
-  (let [files (->> (file-seq (io/file icloud))
-                   (filter #(and (.isFile %) (not (str/ends-with? (.getName %) ".icloud"))
-                                 (not= (.getName %) ".DS_Store"))))
-        new-dests (atom #{}) copied (atom 0)]
-    (doseq [f files
+  (println "[iCloud Drive] 差分同期 (実体化済のみ処理; 退避分は brctl 予約して次回)")
+  (let [all (->> (file-seq (io/file icloud))
+                 (filter #(and (.isFile %) (not (str/ends-with? (.getName %) ".icloud"))
+                               (not= (.getName %) ".DS_Store"))))
+        ;; 退避(dataless)は brctl download を投げて今回スキップ — 一切ブロックしない
+        {dataless true ready false} (group-by #(dataless? (.getPath %)) all)]
+    (doseq [f dataless] (try (sh "brctl" "download" (.getPath f)) (catch Exception _ nil)))
+    (when (seq dataless) (println (format "  退避 %d 件を brctl 予約 (次回取込)" (count dataless))))
+    (let [new-dests (atom #{}) copied (atom 0)]
+    (doseq [f ready
             :let [rel (subs (.getPath f) (inc (count icloud)))
                   m   (try (md5 (.getPath f)) (catch Exception _ nil))]
             :when (and m (not (contains? existing m)))]
@@ -66,7 +70,7 @@
       (shell {:dir root} "git" "commit" (str "-m") "sync(icloud-drive): 差分取込 (icloud-photos-sync.bb)"
              (vec @new-dests))
       (println "  committed"))
-    @copied))
+    @copied)))
 
 (defn read-policy []
   (let [edn (slurp (io/file base "facts/photos-library.edn"))]
