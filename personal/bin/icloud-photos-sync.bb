@@ -78,20 +78,12 @@
 
 (defn sync-photos! [existing]
   (println "[Photos] 索引更新 + policy 取込")
-  ;; 索引 (index.jsonl) を再生成 — osxphotos query --json → 軽量化
-  (let [tmp "/tmp/photos-sync.json"]
-    (spit tmp (:out (sh oxp "query" "--json" "--mute")))
-    (let [assets (json/parse-string (slurp tmp) true)]
-      (with-open [w (io/writer (io/file base "photos/index.jsonl"))]
-        (doseq [a (sort-by (juxt #(str (:date %)) :uuid) assets)]
-          (.write w (str (json/generate-string
-                          {:uuid (:uuid a) :name (:original_filename a)
-                           :date (some-> (:date a) (subs 0 19)) :kind (if (:ismovie a) "movie" "photo")
-                           :fav (boolean (:favorite a)) :size (or (:original_filesize a) 0)
-                           :missing (boolean (:ismissing a))
-                           :albums (:albums a) :persons (remove #{"_UNKNOWN_"} (:persons a))
-                           :lat (:latitude a) :lon (:longitude a)}) "\n"))))
-      (println (format "  索引 %d 件更新" (count assets)))))
+  ;; 索引 (index.jsonl) を再生成。500MB級JSONの変換は Python に委譲 (bbのメモリ捕捉は脆弱)。
+  (let [tmp "/tmp/photos-sync.json"
+        idxf (.getPath (io/file base "photos/index.jsonl"))]
+    (sh oxp "query" "--json" "--mute" {:out (io/file tmp)})
+    (let [r (sh "python3" (str base "/bin/photos-index.py") tmp idxf)]
+      (println "  " (str/trim (str (:out r) (:err r))))))
   (let [policy (read-policy)
         outdir (io/file base "photos/originals")]
     (println "  ingest-policy =" policy)
