@@ -1,0 +1,40 @@
+;; queries/process.edn — ADR-0015 L3: ハンドオフ状態機械のビュー。
+
+{:process/next-human
+ {:doc "いま本人の手番で止まっている step = 私が『これをやって』と頼む対象。"
+  :query [:find ?ptitle ?sdesc ?cap
+          :where
+          [?s :step/status :blocked-on-human]
+          [?s :step/actor :jun]
+          [?s :step/desc ?sdesc]
+          [?s :step/capability ?c] [?c :capability/id ?cap]
+          [?s :step/process ?p] [?p :process/title ?ptitle]]}
+
+ :process/claude-ready
+ {:doc "前提が全て :done で、私が自動実行できる step (actor=:claude)。"
+  :query [:find ?ptitle ?order ?sdesc ?cap
+          :where
+          [?s :step/actor :claude]
+          [?s :step/status ?st] [(contains? #{:pending :ready} ?st)]
+          [?s :step/desc ?sdesc] [?s :step/order ?order]
+          [?s :step/capability ?c] [?c :capability/id ?cap]
+          [?s :step/process ?p] [?p :process/title ?ptitle]
+          ;; 前提 step が無い or 全て done
+          (not-join [?s]
+            [?s :step/needs ?n] [?n :step/status ?nst] [(not= ?nst :done)])]}
+
+ :policy/agent-prohibited
+ {:doc "機械が代行できない能力 (:no)。安全境界の監査可能なファクト。"
+  :query [:find ?cap ?reason
+          :where
+          [?c :capability/agent :no]
+          [?c :capability/id ?cap]
+          [?c :capability/reason ?reason]]}
+
+ :process/board
+ {:doc "全 step を process×order で。進捗ボード。"
+  :query [:find ?ptitle ?order ?actor ?status ?sdesc
+          :where
+          [?s :step/process ?p] [?p :process/title ?ptitle]
+          [?s :step/order ?order] [?s :step/actor ?actor]
+          [?s :step/status ?status] [?s :step/desc ?sdesc]]}}

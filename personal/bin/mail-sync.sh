@@ -10,6 +10,7 @@
 # Accounts without a refresh token are skipped with a warning (bootstrap:
 # google-auth.py login <slug>).
 set -uo pipefail
+export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"  # launchd の最小 PATH 対策(git-annex/datalad)
 
 REPO=/Users/junkawasaki/github/com-junkawasaki
 REG="$REPO/personal/bin/registry"

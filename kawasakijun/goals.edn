@@ -6,10 +6,16 @@
 {:version "2026-06-11 Phase2.5 + ADR-0010"
 
  :goals
- [;; --- guardrail (最大化対象ではなく床。トレードオフ禁止) ---
+ [;; --- guardrails (最大化対象ではなく床。ADR-0014 辞書式: tier 0 → 1 → 2) ---
+  {:goal/id "00_wellbecoming_self"
+   :goal/title "wellbecoming の床維持 (今ここの felt sense 日次 + wellness 8次元の最低次元を高く保つ) — ADR-0014 Tier 0"
+   :goal/kind :guardrail :goal/domain :health :goal/tau :generation :goal/tier 0
+   :goal/wellness-dims [:physical :emotional :social :intellectual :spiritual :occupational :financial :environmental]
+   :goal/est-years 99.0 :goal/w-contribution 0.0 :goal/status :active}
   {:goal/id "00_nodoka_wellbeing"
    :goal/title "のどかの安全基地維持 (週次接触の床 / 学校緊急連絡経路 / 訴訟・財務動揺からの遮断)"
-   :goal/kind :guardrail :goal/domain :relations :goal/tau :generation
+   :goal/kind :guardrail :goal/domain :relations :goal/tau :generation :goal/tier 1
+   :goal/wellness-dims [:social :emotional]
    :goal/est-years 12.0 :goal/w-contribution 0.0 :goal/status :active}
 
   ;; --- objectives (= reverse_topo_pregel.py Phase 2.5) ---
@@ -35,6 +41,7 @@
    :goal/kind :objective :goal/domain :social :goal/tau :year :goal/est-years 1.0 :goal/w-contribution 0.15 :goal/status :active}
   {:goal/id "11_health_steady" :goal/title "健康指標安定化 (通院隔月化)"
    :goal/kind :objective :goal/domain :health :goal/tau :year :goal/est-years 1.0 :goal/w-contribution 0.25 :goal/status :active
+   :goal/tier 0 :goal/wellness-dims [:physical :emotional]
    :goal/external-dependency "医師判断"}
   {:goal/id "12_legal_offload" :goal/title "訴訟負荷の弁護団移譲 + 自己時間確保"
    :goal/kind :objective :goal/domain :social :goal/tau :year :goal/est-years 1.5 :goal/w-contribution 0.20 :goal/status :active}
@@ -45,9 +52,11 @@
    :goal/kind :objective :goal/domain :social :goal/tau :year :goal/est-years 1.0 :goal/w-contribution 0.40 :goal/status :active}
   {:goal/id "15_remarriage" :goal/title "再婚 (パートナーに資力・収入があれば経済前提ナシで可)"
    :goal/kind :objective :goal/domain :relations :goal/tau :year :goal/est-years 1.5 :goal/w-contribution 0.50 :goal/status :active
+   :goal/tier 1 :goal/wellness-dims [:social :emotional]
    :goal/external-dependency "パートナー合意" :goal/fallback "事実婚 / パートナーシップ"}
   {:goal/id "16_more_children" :goal/title "子供 +2–3人 (パートナー合意 + 並走出産で 3y 圏)"
    :goal/kind :objective :goal/domain :relations :goal/tau :year :goal/est-years 3.0 :goal/w-contribution 0.50 :goal/status :active
+   :goal/tier 1 :goal/wellness-dims [:social :emotional]
    :goal/external-dependency "パートナー合意" :goal/fallback "養子 / 並走出産 (代理含む)"}
   {:goal/id "17_internal_control" :goal/title "内部統制 (ISMS 既登録活用 + Family Office 用 reframing) — Phase 3.A"
    :goal/kind :objective :goal/domain :infra :goal/tau :year :goal/est-years 1.5 :goal/w-contribution 0.20 :goal/status :active}

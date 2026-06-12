@@ -187,6 +187,150 @@
          (cond-> (dissoc p :emails)
            (seq (:emails p)) (assoc :person/email (first (:emails p)))))))
 
+;; dyads.edn: power-dynamics edges + falsifiable hypotheses (ADR-0012).
+(def dyads-edn
+  (let [f (io/file base "facts/dyads.edn")]
+    (when (.exists f) (edn/read-string (slurp f)))))
+
+(defn dyad-tx []
+  (vec (for [d (:dyads dyads-edn)]
+         (assoc d :dyad/with [:person/id (:dyad/with d)]))))
+
+(defn hypothesis-tx []
+  ;; :evidence = vector of email cids (mail/messages/<cid>.eml) -> lookup refs.
+  (vec (for [h (:hypotheses dyads-edn)]
+         (cond-> (-> h
+                     (assoc :hypothesis/about (vec (for [pid (:about h)] [:person/id pid])))
+                     (dissoc :about :evidence))
+           (seq (:evidence h))
+           (assoc :hypothesis/evidence (vec (for [c (:evidence h)] [:email/cid c])))))))
+
+;; kpi.jsonl: sensor/self-report time-series (ADR-0014 felt-sense, wellness-8 etc.)
+(defn kpi-tx []
+  (keep (fn [k]
+          (when (and (:metric k) (:at k) (number? (:value k)))
+            {:kpi/id     (str (:metric k) "/" (:at k))
+             :kpi/metric (keyword (:metric k))
+             :kpi/value  (double (:value k))
+             :kpi/at     (iso->inst (:at k))}))
+        (rd-jsonl "facts/kpi.jsonl")))
+
+;; orgs.edn / accounts.edn / contracts.edn — curated entity registries (ADR-0015 + 整理)
+(defn- rd-edn-facts [rel]
+  (let [f (io/file base rel)] (when (.exists f) (edn/read-string (slurp f)))))
+
+(defn channel-tx []
+  (vec (rd-edn-facts "facts/channels.edn")))
+
+(defn finitem-tx []
+  (vec (rd-edn-facts "facts/corp-finance.edn")))
+
+(defn coverage-tx []
+  (vec (rd-edn-facts "facts/coverage.edn")))
+
+;; mail-triage.edn: triage ledger with rule ref + depends-on edges
+(defn triage-tx []
+  (vec (for [t (rd-edn-facts "facts/mail-triage.edn")]
+         (cond-> {:triage/id (:triage/id t)}
+           (:from t)       (assoc :triage/from (:from t))
+           (:subject t)    (assoc :triage/subject (:subject t))
+           (:summary t)    (assoc :triage/summary (:summary t))
+           (:class t)      (assoc :triage/class (:class t))
+           (:action t)     (assoc :triage/action (:action t))
+           (:note t)       (assoc :triage/note (:note t))
+           (:rule t)       (assoc :triage/rule [:rule/id (:rule t)])
+           (:depends-on t) (assoc :triage/depends-on (vec (:depends-on t)))))))
+
+;; mail-rules.edn: flatten :rule/match map -> match-from/subject/not multi attrs
+(defn mailrule-tx []
+  (vec (for [r (:rules (rd-edn-facts "facts/mail-rules.edn"))]
+         (let [m (:rule/match r)]
+           (cond-> (dissoc r :rule/match)
+             (seq (:from m))        (assoc :rule/match-from (vec (:from m)))
+             (seq (:subject-has m)) (assoc :rule/match-subject (vec (:subject-has m)))
+             (seq (:not m))         (assoc :rule/match-not (vec (:not m))))))))
+
+(defn curated-org-tx []
+  (vec (rd-edn-facts "facts/orgs.edn")))
+
+(defn account2-tx []
+  (vec (for [a (rd-edn-facts "facts/accounts.edn")] a)))  ; refs already in lookup-ref form
+
+(defn contract-tx []
+  (vec (for [c (rd-edn-facts "facts/contracts.edn")]
+         (cond-> c
+           (:contract/case c) (assoc :contract/case {:case/id (:contract/case c)})))))
+
+;; bank-sources.edn: 金融口座/カード/取引所の収集ソース registry (refs は lookup-ref 形)
+(defn bank-tx []
+  (vec (rd-edn-facts "facts/bank-sources.edn")))
+
+;; bank-txns.jsonl (pl/bank-txn-ingest: 通知メール→txn) + mf-txns.jsonl (pl/mf-csv-ingest)。
+;; MF は全口座集約で最濃 → 両方ある場合は (date,amount) 一致の bank-txn を落とす (二重計上防止)。
+(defn bank-txn-tx []
+  (let [mf   (or (rd-jsonl "mail/mf-txns.jsonl") [])
+        mfk  (set (map (juxt :date :amount) mf))
+        bank (->> (or (rd-jsonl "mail/bank-txns.jsonl") [])
+                  (remove #(and (:amount %) (contains? mfk [(:date %) (:amount %)]))))
+        ->tx (fn [prefix i rec]
+               (when (:date rec)
+                 (cond-> {:txn/id     (str prefix "/" (or (:cid rec) (:mf-id rec) i)
+                                           (when (:seq rec) (str "#" (:seq rec))))
+                          :txn/date   (:date rec)
+                          :txn/month  (month (:date rec))
+                          :txn/kind   (clean (or (:kind rec) (:cat1 rec) "unknown"))
+                          :txn/source (or (:source rec) "pl/bank-txn-ingest")}
+                   (:amount rec)  (assoc :txn/amount-jpy (long (:amount rec)))
+                   (:dir rec)     (assoc :txn/dir (:dir rec))
+                   (:bank rec)    (assoc :txn/bank [:bank/id (:bank rec)])
+                   (:cid rec)     (assoc :txn/email [:email/cid (:cid rec)])
+                   (clean (or (:vendor rec) (:detail rec)))
+                   (assoc :txn/detail (clean (str (or (:vendor rec) "") " " (or (:detail rec) (:subject rec) ""))))
+                   (clean (:vendor rec)) (assoc :txn/vendor {:org/name (clean (:vendor rec))}))))]
+    (vec (concat (keep-indexed (partial ->tx "bank") bank)
+                 (keep-indexed (partial ->tx "mf") mf)))))
+
+;; processes.edn: handoff state machine + capability policy (ADR-0015)
+(def processes-edn
+  (let [f (io/file base "facts/processes.edn")]
+    (when (.exists f) (edn/read-string (slurp f)))))
+
+(defn capability-tx [] (vec (:capabilities processes-edn)))
+
+(defn process-tx []
+  (vec (for [p (:processes processes-edn)]
+         (cond-> (dissoc p :steps)
+           (:process/goal p) (assoc :process/goal [:goal/id (:process/goal p)])))))
+
+(defn step-tx []
+  ;; pass 1: steps without :step/needs (so the unique :step/id exists in db)
+  (vec (for [p (:processes processes-edn)
+             s (:steps p)]
+         (cond-> (-> s (dissoc :step/needs) (assoc :step/process [:process/id (:process/id p)]))
+           (:step/capability s) (assoc :step/capability [:capability/id (:step/capability s)])))))
+
+(defn step-needs-tx []
+  ;; pass 2: add prerequisite edges via lookup ref (steps now exist)
+  (vec (for [p (:processes processes-edn)
+             s (:steps p) :when (seq (:step/needs s))]
+         {:step/id (:step/id s)
+          :step/needs (vec (for [n (:step/needs s)] [:step/id n]))})))
+
+;; engi.edn: tie-release evaluations (ADR-0013)
+(defn engi-tx []
+  (let [f (io/file base "facts/engi.edn")]
+    (when (.exists f)
+      (vec (for [e (edn/read-string (slurp f))]
+             (if-let [pid (:engi/person e)]
+               (assoc e :engi/person [:person/id pid])
+               e))))))
+
+;; thread_id -> latest cid (for obligation source resolution via index.jsonl)
+(defn thread->cid []
+  (->> (rd-jsonl "mail/messages/index.jsonl")
+       (sort-by #(str (:date %)))
+       (reduce (fn [m r] (if (:thread_id r) (assoc m (:thread_id r) (:cid r)) m)) {})))
+
 (defn people-alias-tx []
   (vec (for [p people-edn
              alias (rest (:emails p))]
@@ -196,16 +340,21 @@
            (:person/attention-class p) (assoc :person/attention-class (:person/attention-class p))))))
 
 (defn obligation-tx []
-  (keep (fn [o]
-          (when (and (:id o) (:due o))
-            (cond-> {:obligation/id       (clean (:id o))
-                     :obligation/title    (clean (:title o))
-                     :obligation/due      (iso->inst (:due o))
-                     :obligation/severity (keyword (or (:severity o) "normal"))
-                     :obligation/status   (keyword (or (:status o) "open"))}
-              (:case o) (assoc :obligation/case {:case/id (clean (:case o))})
-              (:goal o) (assoc :obligation/goal [:goal/id (clean (:goal o))]))))
-        (rd-jsonl "facts/obligations.jsonl")))
+  (let [t->c (thread->cid)]
+    (keep (fn [o]
+            (when (and (:id o) (:due o))
+              (let [src (or (:source_cid o) (t->c (:source_thread o)))]
+                (cond-> {:obligation/id       (clean (:id o))
+                         :obligation/title    (clean (:title o))
+                         :obligation/due      (iso->inst (:due o))
+                         :obligation/severity (keyword (or (:severity o) "normal"))
+                         :obligation/status   (keyword (or (:status o) "open"))}
+                  (:case o) (assoc :obligation/case {:case/id (clean (:case o))})
+                  (:goal o) (assoc :obligation/goal [:goal/id (clean (:goal o))])
+                  (seq (:blocked_by o)) (assoc :obligation/blocked-by (vec (:blocked_by o)))
+                  (:funded_by o) (assoc :obligation/funded-by (:funded_by o))
+                  src       (assoc :obligation/source [:email/cid src])))))
+          (rd-jsonl "facts/obligations.jsonl"))))
 
 ;; ---------- main ----------
 (defn -main [& _]
@@ -219,8 +368,16 @@
                           ["actions" (action-tx)] ["events" (event-tx)]
                           ["cases" (case-tx)] ["emails" (email-tx)]
                           ["people" (people-tx)] ["people-aliases" (people-alias-tx)]
+                          ["channels" (channel-tx)] ["orgs(curated)" (curated-org-tx)]
+                          ["banks" (bank-tx)] ["bank-txns" (bank-txn-tx)]
+                          ["accounts" (account2-tx)] ["contracts" (contract-tx)] ["finitems" (finitem-tx)]
+                          ["mailrules" (mailrule-tx)] ["triage" (triage-tx)] ["coverage" (coverage-tx)]
                           ["goals" (goal-tx)] ["goal-deps" (goal-edge-tx)]
-                          ["obligations" (obligation-tx)]]]
+                          ["obligations" (obligation-tx)]
+                          ["dyads" (dyad-tx)] ["hypotheses" (hypothesis-tx)]
+                          ["engi" (engi-tx)] ["kpi" (kpi-tx)]
+                          ["capabilities" (capability-tx)] ["processes" (process-tx)]
+                          ["steps" (step-tx)] ["step-deps" (step-needs-tx)]]]
         (when (seq tx)
           (d/transact conn {:tx-data (vec tx)})
           (println (format "  loaded %-8s %d" label (count tx)))))
@@ -276,18 +433,188 @@
         (println "  goals      " (n '[:find (count ?g) :where [?g :goal/id]]))
         (println "  dag-edges  " (n '[:find (count ?d) :with ?g :where [?g :goal/depends-on ?d]]))
         (println "  obligations" (n '[:find (count ?o) :where [?o :obligation/id]]))
-        (println "\n[Datalog] attention/queue — open obligations (期限順; 人間が見るのはこれだけ):")
-        (doseq [[title due sev] (->> (d/q '[:find ?title ?due ?sev
-                                            :where [?o :obligation/status :open]
-                                                   [?o :obligation/title ?title]
-                                                   [?o :obligation/due ?due]
-                                                   [?o :obligation/severity ?sev]] db)
-                                     (sort-by second))]
-          (println (format "  %-8s %tF  %s" (name sev) due title)))
+        (println "\n[Datalog] attention/queue — open obligations (ADR-0014: tier→期限の辞書式順):")
+        (doseq [[title due sev tier] (->> (d/q '[:find ?title ?due ?sev ?tier
+                                                 :where [?o :obligation/status :open]
+                                                        [?o :obligation/title ?title]
+                                                        [?o :obligation/due ?due]
+                                                        [?o :obligation/severity ?sev]
+                                                        (or-join [?o ?tier]
+                                                          (and [?o :obligation/goal ?g]
+                                                               [(get-else $ ?g :goal/tier 2) ?tier])
+                                                          (and [(missing? $ ?o :obligation/goal)]
+                                                               [(ground 2) ?tier]))] db)
+                                          (sort-by (fn [[_ due _ tier]] [tier due])))]
+          (println (format "  T%d %-8s %tF  %s" tier (name sev) due title)))
+        (let [fs (d/q '[:find ?at ?v
+                        :where [?k :kpi/metric :wellbecoming.felt-sense]
+                               [?k :kpi/at ?at] [?k :kpi/value ?v]] db)]
+          (if (seq fs)
+            (println (format "\n  [Tier0] felt-sense 床 (全期間min): %.1f / 直近: %s"
+                             (apply min (map second fs))
+                             (second (last (sort-by first fs)))))
+            (println "\n  [Tier0] felt-sense 未計測 — facts/kpi.jsonl に日次1行 {\"metric\":\"wellbecoming.felt-sense\",\"value\":1-5,\"at\":...} (ADR-0014)")))
         (println "\n[Datalog] goal/blocked-critical-path — open obligation に塞がれた active goal:")
         (doseq [[g t] (d/q '[:find ?gt ?ot
                              :where [?g :goal/status :active] [?g :goal/title ?gt]
                                     [?o :obligation/goal ?g] [?o :obligation/status :open]
                                     [?o :obligation/title ?ot]] db)]
           (println (format "  %s\n    └─ %s" g t)))
+        (println "\n=== Power dynamics (ADR-0012) ===")
+        (println "[Datalog] power/balance — 露出順 (balance = their-dep − self-dep):")
+        (doseq [[nm sd td cost] (->> (d/q '[:find ?name ?sd ?td ?cost
+                                            :where [?d :dyad/with ?p] [?p :person/name ?name]
+                                                   [?d :dyad/self-dependence ?sd]
+                                                   [?d :dyad/their-dependence ?td]
+                                                   [?d :dyad/switching-cost ?cost]] db)
+                                     (sort-by (fn [[_ sd td _]] (- td sd))))]
+          (println (format "  %+.2f  %-30s self=%.2f their=%.2f switch=%s"
+                           (- td sd) nm sd td (name cost))))
+        (println "\n[Datalog] power/risk-dyads — 高依存×低一致 (minimax 重点):")
+        (doseq [[nm sd al worst] (d/q '[:find ?name ?sd ?al ?worst
+                                        :where [?d :dyad/self-dependence ?sd] [(>= ?sd 0.5)]
+                                               [?d :dyad/alignment ?al] [(<= ?al 0.55)]
+                                               [?d :dyad/with ?p] [?p :person/name ?name]
+                                               [?d :dyad/worst-case ?worst]] db)]
+          (println (format "  %-22s dep=%.2f align=%.2f\n    ⚠ %s" nm sd al worst)))
+        (println "\n[Datalog] power/test-agenda — open 仮説 (|conf−0.5| 小 = 情報利得大):")
+        (doseq [[id _ conf fals] (->> (d/q '[:find ?id ?text ?conf ?fals
+                                             :where [?h :hypothesis/status :open]
+                                                    [?h :hypothesis/id ?id] [?h :hypothesis/text ?text]
+                                                    [?h :hypothesis/confidence ?conf]
+                                                    [?h :hypothesis/falsifier ?fals]] db)
+                                      (sort-by (fn [[_ _ c _]] (Math/abs (- c 0.5)))))]
+          (println (format "  [%.2f] %s\n    → %s" conf id fals)))
+        (println "\n=== Engi 縁の手放し (ADR-0013) ===")
+        (println "[Datalog] engi/sever-queue — 実行可能キュー (月額降順; export-first=✉は保全が前提):")
+        (doseq [[t dec cost exp] (->> (d/q '[:find ?target ?decision ?cost ?export
+                                             :where [?e :engi/legal-hold false]
+                                                    [?e :engi/decision ?decision]
+                                                    [(contains? #{:sever :archive :transfer :reduce} ?decision)]
+                                                    [?e :engi/target ?target]
+                                                    [?e :engi/monthly-cost-jpy ?cost]
+                                                    [?e :engi/export-first ?export]] db)
+                                      (sort-by (fn [[_ _ c _]] (- c))))]
+          (println (format "  %-9s ¥%,7d %s %s" (name dec) cost (if exp "✉" " ") t)))
+        (println "\n[Datalog] engi/legal-holds — 係争終結まで操作禁止:")
+        (doseq [[t] (d/q '[:find ?target :where [?e :engi/legal-hold true] [?e :engi/target ?target]] db)]
+          (println "  🔒" t))
+        (let [sv (or (ffirst (d/q '[:find (sum ?cost) :with ?e
+                                    :where [?e :engi/legal-hold false] [?e :engi/decision ?d]
+                                           [(contains? #{:sever :archive :transfer} ?d)]
+                                           [?e :engi/monthly-cost-jpy ?cost]] db)) 0)
+              rd (or (ffirst (d/q '[:find (sum ?cost) :with ?e
+                                    :where [?e :engi/legal-hold false] [?e :engi/decision :reduce]
+                                           [?e :engi/monthly-cost-jpy ?cost]] db)) 0)]
+          (println (format "\n  個人負担の削減見込み: 確定系 (sever/archive/transfer) ¥%,d/月 + 縮小余地 (reduce対象) 最大 ¥%,d/月" (long sv) (long rd)))
+          (println "  goal 29 KPI: ¥319k → 目標 ¥220k (要実測の概算を含む)"))
+        (println "\n=== 組織・アカウント・契約 (entity整理) ===")
+        (println "  orgs    " (n '[:find (count ?o) :where [?o :org/id]])
+                 " accounts" (n '[:find (count ?a) :where [?a :account/id] [?a :account/reach]])
+                 " contracts" (n '[:find (count ?c) :where [?c :contract/id]]))
+        (println "[Datalog] account/reachability + 到達チャネル (pending = ingest プロセス対象):")
+        (doseq [[id reach st] (->> (d/q '[:find ?id ?reach ?st
+                                          :where [?a :account/reach ?reach] [?a :account/id ?id] [?a :account/status ?st]] db)
+                                   (sort-by (fn [[_ _ s]] (name s))))]
+          (let [chs (->> (d/q '[:find ?cid :in $ ?id
+                                :where [?a :account/id ?id] [?a :account/channels ?c] [?c :channel/id ?cid]] db id)
+                         (map (comp name first)) sort (clojure.string/join ","))]
+            (println (format "  %-24s reach=%-8s %-10s via[%s]" id (name reach) (name st) chs))))
+        (println "[Datalog] channels — 実行リソース (agent=私が駆動可か):")
+        (doseq [[cid k ag stt] (->> (d/q '[:find ?cid ?k ?ag ?stt
+                                           :where [?c :channel/id ?cid] [?c :channel/kind ?k]
+                                                  [?c :channel/agent ?ag] [?c :channel/status ?stt]] db)
+                                    (sort-by (comp name first)))]
+          (println (format "  %-16s %-10s agent=%-4s %s" (name cid) (name k) (name ag) (name stt))))
+        (println "[Datalog] org/by-role (own-corp/equity/counterparty 抜粋):")
+        (doseq [[role nm] (->> (d/q '[:find ?role ?nm
+                                      :where [?o :org/role ?role] [(contains? #{:own-corp :equity :employer :counterparty} ?role)]
+                                             [?o :org/name ?nm]] db)
+                              (sort-by (comp name first)))]
+          (println (format "  %-12s %s" (name role) nm)))
+        (println "\n=== 銀行口座 (bank-sources.edn + pl/bank-txn-ingest) ===")
+        (println "[Datalog] bank/coverage — 口座別 取込txn件数/金額 (dir=out|in; failed除外):")
+        (doseq [[bid st cnt amt] (->> (d/q '[:find ?bid ?st (count ?t) (sum ?a)
+                                             :where [?b :bank/id ?bid] [?b :bank/status ?st]
+                                                    [?t :txn/bank ?b]
+                                                    (or-join [?t ?a]
+                                                      [?t :txn/amount-jpy ?a]
+                                                      (and [(missing? $ ?t :txn/amount-jpy)] [(ground 0) ?a]))] db)
+                                      (sort-by (fn [[_ _ _ a]] (- a))))]
+          (println (format "  %-22s %-9s ×%-4d ¥%,d" bid (name st) cnt (long amt))))
+        (let [dark (d/q '[:find ?bid ?nm :where [?b :bank/status :dark] [?b :bank/id ?bid] [?b :bank/name ?nm]] db)]
+          (when (seq dark)
+            (println "  通知なし=dark (MF CSV で埋まる):")
+            (doseq [[bid nm] (sort dark)] (println (format "    %-20s %s" bid nm)))))
+        (println "[Datalog] bank/failed — 残高不足等の失敗イベント (要対応シグナル):")
+        (doseq [[d* k det] (->> (d/q '[:find ?d ?k ?det
+                                       :where [?t :txn/dir "failed"] [?t :txn/date ?d] [?t :txn/kind ?k]
+                                              (or-join [?t ?det]
+                                                [?t :txn/detail ?det]
+                                                (and [(missing? $ ?t :txn/detail)] [(ground "") ?det]))] db)
+                                (sort-by first) reverse (take 6))]
+          (println (format "  %s %-8s %s" d* k (subs det 0 (min 40 (count det))))))
+        (println "\n=== 情報収集カバレッジ (coverage.edn) ===")
+        (doseq [[st cnt] (->> (d/q '[:find ?st (count ?s) :where [?s :source/status ?st]] db)
+                              (sort-by (fn [[s _]] ({:ingested 0 :archived 1 :partial 2 :dark 3 :n-a 4} s 9))))]
+          (println (format "  %-9s ×%d" (name st) cnt)))
+        (println "  次に取るべき源 (dark, agent別):")
+        (doseq [[id ag nt] (->> (d/q '[:find ?id ?ag ?nt
+                                       :where [?s :source/status :dark] [?s :source/id ?id]
+                                              [?s :source/agent ?ag] [?s :source/note ?nt]] db)
+                               (sort-by (comp name second)))]
+          (println (format "    [%s] %-26s %s" (name ag) id (subs nt 0 (min 40 (count nt))))))
+        (println "\n=== メール分類ルール / triage 依存 (mail-rules.edn + mail-triage.edn) ===")
+        (println "  rules   " (n '[:find (count ?r) :where [?r :rule/id]])
+                 " triage  " (n '[:find (count ?t) :where [?t :triage/id]]))
+        (println "[Datalog] rule by action (私が自動実行可=agent):")
+        (doseq [[act ag cnt] (->> (d/q '[:find ?act ?ag (count ?r)
+                                         :where [?r :rule/action ?act] [?r :rule/agent ?ag]] db)
+                                  (sort-by (comp name first)))]
+          (println (format "  %-12s agent=%-4s ×%d" (name act) (name ag) cnt)))
+        (println "[Datalog] triage → 依存先 (メール処理が繋がる finitem/obligation):")
+        (doseq [[tid dep] (->> (d/q '[:find ?tid ?dep
+                                      :where [?t :triage/id ?tid] [?t :triage/depends-on ?dep]] db)
+                              (sort-by first))]
+          (println (format "  %-22s → %s" tid dep)))
+        (println "\n=== JK法人財務 triage (corp-finance.edn) ===")
+        (let [pay (or (first (first (d/q '[:find (sum ?a) :with ?f
+                                           :where [?f :finitem/direction :payable] [?f :finitem/amount-jpy ?a]] db))) 0)]
+          (println (format "  支払債務 (判明額合計): ¥%,d / 受領債権: NOT A HOTEL半期精算(プラス・入金確認要)" (long pay))))
+        (println "[Datalog] finitem by action (払う/減らす/切る/相殺/直す/監視):")
+        (doseq [[act t amt st] (->> (d/q '[:find ?act ?t ?amt ?st
+                                           :where [?f :finitem/action ?act] [?f :finitem/title ?t]
+                                                  [?f :finitem/status ?st]
+                                                  (or-join [?f ?amt]
+                                                    [?f :finitem/amount-jpy ?amt]
+                                                    (and [(missing? $ ?f :finitem/amount-jpy)] [(ground 0) ?amt]))] db)
+                                    (sort-by (fn [[a _ amt _]] [(name a) (- amt)])))]
+          (println (format "  %-8s ¥%-9s %-16s %s" (name act) (if (pos? amt) (format "%,d" amt) "-") (name st) t)))
+        (println "[Datalog] obligation 依存チェーン (原資/前提に縛られた義務):")
+        (doseq [[oid t bb] (d/q '[:find ?oid ?t ?bb
+                                  :where [?o :obligation/id ?oid] [?o :obligation/title ?t]
+                                         [?o :obligation/blocked-by ?bb]] db)]
+          (let [fb (or (ffirst (d/q '[:find ?fb :in $ ?oid
+                                      :where [?o :obligation/id ?oid] [?o :obligation/funded-by ?fb]] db oid)) "-")]
+            (println (format "  %s『%s…』 blocked-by=%s funded-by=%s" oid (subs t 0 (min 24 (count t))) bb fb))))
+        (println "\n=== Processes / ハンドオフ状態機械 (ADR-0015) ===")
+        (println "[Datalog] process/next-human — 本人の手番で止まっている (私が依頼する対象):")
+        (doseq [[pt sd cap] (d/q '[:find ?pt ?sd ?cap
+                                   :where [?s :step/status :blocked-on-human] [?s :step/actor :jun]
+                                          [?s :step/desc ?sd] [?s :step/capability ?c] [?c :capability/id ?cap]
+                                          [?s :step/process ?p] [?p :process/title ?pt]] db)]
+          (println (format "  ⏳[%s] %s\n      (%s)" pt sd cap)))
+        (println "\n[Datalog] process/claude-ready — 前提充足で私が自動実行できる step:")
+        (doseq [[pt o sd cap] (->> (d/q '[:find ?pt ?o ?sd ?cap
+                                          :where [?s :step/actor :claude]
+                                                 [?s :step/status ?st] [(contains? #{:pending :ready} ?st)]
+                                                 [?s :step/order ?o] [?s :step/desc ?sd]
+                                                 [?s :step/capability ?c] [?c :capability/id ?cap]
+                                                 [?s :step/process ?p] [?p :process/title ?pt]
+                                                 (not-join [?s] [?s :step/needs ?n] [?n :step/status ?nst] [(not= ?nst :done)])] db)
+                                   (sort-by (juxt first second)))]
+          (println (format "  ▶[%s] #%d %s (%s)" pt o sd cap)))
+        (println "\n[Datalog] policy/agent-prohibited — 機械が代行不可 (安全境界の監査ファクト):")
+        (doseq [[cap r] (d/q '[:find ?cap ?r :where [?c :capability/agent :no] [?c :capability/id ?cap] [?c :capability/reason ?r]] db)]
+          (println (format "  🔒%-18s %s" cap r)))
         (println "\nOK: normalized into Datomic. Rebuild anytime: clojure -M -m warehouse.load")))))
