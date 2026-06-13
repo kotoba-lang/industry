@@ -356,6 +356,61 @@
            ^{:key i}
            [:li.kv [:span (:subject e)] [:span.r (subs (str (:start e)) 5 16)]])]])]))
 
+;; ---- 📅 カレンダー(アジェンダ) ----------------------------------------------
+
+(def ^:private wdays ["日" "月" "火" "水" "木" "金" "土"])
+
+(defn- date-label [ymd]
+  ;; "2026-06-13" → "6/13(金)"
+  (let [d (js/Date. (str ymd "T00:00:00"))]
+    (str (inc (.getMonth d)) "/" (.getDate d) "(" (nth wdays (.getDay d)) ")")))
+
+(defn calendar-pane []
+  (let [lm @(rf/subscribe [:live-m365])
+        events (:events lm)
+        by-day (when (seq events) (sort-by key (group-by #(subs (str (:start %)) 0 10) events)))]
+    [:section.panel
+     [:h2 "📅 カレンダー "
+      [:span.hint "実 M365 予定 (今後14日)"]
+      [:button.mini-btn {:on-click #(rf/dispatch [:m365-sync])} "🔄 更新"]
+      [:button.mini-btn {:on-click #(rf/dispatch [:m365-prep])} "📝 会議準備サマリ"]]
+     (cond
+       (nil? lm) [:p.empty "「📡 M365同期」で予定表を取得してください"]
+       (empty? events) [:p.empty "今後14日の予定はありません"]
+       :else
+       [:div.agenda
+        (for [[ymd evs] by-day]
+          ^{:key ymd}
+          [:div.agenda-day
+           [:div.agenda-date (date-label ymd)]
+           [:ul.agenda-list
+            (for [[i e] (map-indexed vector (sort-by :start evs))]
+              ^{:key i}
+              [:li.agenda-item
+               [:span.agenda-time (subs (str (:start e)) 11 16)]
+               [:span.agenda-subj (:subject e)]
+               (when (seq (str (:organizer e))) [:span.agenda-org (str "主催: " (:organizer e))])])]])])]))
+
+;; ---- 📨 受信トレイ ----------------------------------------------------------
+
+(defn inbox-pane []
+  (let [lm @(rf/subscribe [:live-m365])]
+    [:section.panel
+     [:h2 "📨 受信トレイ "
+      [:span.hint (if lm (str "未読 " (:unread lm) " 件") "未取得")]
+      [:button.mini-btn {:on-click #(rf/dispatch [:m365-sync])} "🔄 更新"]
+      [:button.mini-btn {:on-click #(rf/dispatch [:m365-triage])} "🤖 トリアージ"]]
+     (cond
+       (nil? lm) [:p.empty "「📡 M365同期」で受信トレイを取得してください"]
+       :else
+       [:ul.mail-list
+        (for [[i m] (map-indexed vector (:inbox lm))]
+          ^{:key i}
+          [:li {:class (when (:unread m) "unread")}
+           [:span.mail-from (:from m)]
+           [:span.mail-subj (:subject m)]
+           [:span.mail-date (subs (str (:received m)) 5 16)]])])]))
+
 ;; ---- レポート/要約モーダル --------------------------------------------------
 
 (defn modal []
@@ -375,19 +430,32 @@
       [:h2 "💸 資金ショート — 倒産"]
       [:p "現金残高がマイナスになりました。経営判断を見直してリスタートしてください。"]]]))
 
+(def ^:private tabs
+  [[:office "🏢 オフィス"] [:calendar "📅 カレンダー"] [:inbox "📨 受信トレイ"]
+   [:intel "🧠 インテリジェンス"] [:mgmt "📊 経営"]])
+
+(defn nav-tabs []
+  (let [active @(rf/subscribe [:tab])]
+    [:nav.tabs
+     (for [[k label] tabs]
+       ^{:key k}
+       [:button {:class (when (= active k) "active")
+                 :on-click #(rf/dispatch [:set-tab k])} label])]))
+
+(defn tab-content []
+  (case @(rf/subscribe [:tab])
+    :office   [:div.pane [office] [discussion-panel]]
+    :calendar [:div.pane.single [calendar-pane]]
+    :inbox    [:div.pane.single [inbox-pane]]
+    :intel    [:div.pane.single [intel-panel]]
+    :mgmt     [:div.pane.cols [trend-panel] [fin-panel] [ledger-panel]]
+    [:div.pane [office]]))
+
 (defn dashboard []
   [:<>
    [header]
    [kpis-hud]
-   [:main
-    [:div.center
-     [office]
-     [trend-panel]
-     [discussion-panel]]
-    [:aside.sidebar
-     [live-m365-panel]
-     [intel-panel]
-     [fin-panel]
-     [ledger-panel]]]
+   [nav-tabs]
+   [:main.tabbed [tab-content]]
    [modal]
    [gameover]])

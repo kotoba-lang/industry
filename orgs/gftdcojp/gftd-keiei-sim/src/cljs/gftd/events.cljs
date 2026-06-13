@@ -73,6 +73,7 @@
       (assoc db :modal {:title (str "商談要約: " (:org m)) :loading false :body (:summary m)}))))
 
 (rf/reg-event-db :close-modal (fn [db _] (assoc db :modal nil)))
+(rf/reg-event-db :set-tab (fn [db [_ t]] (assoc db :tab t)))
 
 ;; 実 M365 (Outlook) ライブ同期
 (rf/reg-event-fx :m365-sync (fn [_ _] {:http-post "/api/m365/sync"}))

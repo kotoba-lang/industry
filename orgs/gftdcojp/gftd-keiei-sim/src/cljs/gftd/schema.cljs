@@ -44,7 +44,8 @@
   [:map {:closed true}
    [:data     [:maybe AppData]]
    [:thinking :boolean]
-   [:modal    [:maybe map?]]])   ; レポート/要約モーダルの状態
+   [:modal    [:maybe map?]]    ; レポート/要約モーダルの状態
+   [:tab      keyword?]])        ; 表示中タブ
 
 (defn- check! [schema label value]
   (when-not (m/validate schema value)
