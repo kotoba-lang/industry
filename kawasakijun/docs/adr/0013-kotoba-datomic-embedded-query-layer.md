@@ -68,3 +68,17 @@ manimani Tauri commands (status/queue/decide) ── CLJS UI
 2. 我々の decision datom を transact → `q` で `:decisions/ledger` 相当を引く spike。
 3. 通れば manimani の Rust に path 依存追加 → `status` を 1 本 kotoba-datomic 経由に置換し
    computer-use で視覚確認 → 段階的に全コマンド移行。
+
+
+## Fact-layer EDN migration(2026-06-13 完了)
+
+JSONL を EDN-lines(1 行 1 EDN マップ)へ全面移行し、JSONL を除去:
+- 変換器 `bin/jsonl-to-edn.py` + 共有 `bin/edn.py`(EDN writer + 最小 reader)。
+- 検証: 全 12 ファイル **360,999 レコードを json.loads==edn.loads で round-trip 一致**、
+  各ファイルの行数一致(本文改行は \n エスケープ)。
+- 消費者: Clojure ローダー(`rd-jsonl`→EDN read、entity 数完全一致)、Tauri アプリ
+  (EDN⇄serde_json ブリッジ `edn_line`/`jsonv_to_edn`、起動時 kotoba 構築・全コマンド
+  EDN 読み、視覚確認済み)。
+- 生産者: extract-facts / extract-attachments / triage-inbox / extract-attachment-files /
+  write-prov を EDN 読み書きに。raw 取込(calendar/*.jsonl = Graph 出力)は対象外。
+- facts/ は EDN 17 ファイルのみ。B2/GitHub に保存済み。
