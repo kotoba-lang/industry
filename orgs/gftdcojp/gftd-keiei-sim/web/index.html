@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gftd 経営シミュレーション</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="logo">🎮</span>
+      <div>
+        <h1>gftdcojp 経営シミュレーション</h1>
+        <p class="sub">意思決定者: <strong>あなた</strong> ／ 社員: LLMエージェント</p>
+      </div>
+    </div>
+    <div class="head-right">
+      <span id="llm-badge" class="badge">LLM</span>
+      <span id="turn-badge" class="badge turn">ターン 0</span>
+      <button id="advance" class="primary">次の四半期へ ▶</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="kpis" id="kpis"></section>
+
+    <div class="columns">
+      <section class="proposals">
+        <h2>社員からの提案 <span class="hint">承認すると経営に反映されます</span></h2>
+        <div id="proposals" class="cards"></div>
+        <p id="empty-proposals" class="empty">「次の四半期へ」を押すと、社員エージェントが提案します。</p>
+      </section>
+
+      <aside class="sidebar">
+        <section class="panel intel">
+          <h2>🧠 インテリジェンス <span class="hint">kotoba-datomic 由来 · 深度 <b id="intel-depth">0</b></span></h2>
+          <h3>潜在リード <span class="hint">接触多・未契約</span></h3>
+          <ul id="leads" class="mini"></ul>
+          <h3>再生候補 <span class="hint">休眠・資産大</span></h3>
+          <ul id="revival" class="mini"></ul>
+          <h3>売上集中(依存) <span class="hint">取引先別</span></h3>
+          <ul id="deps" class="mini"></ul>
+        </section>
+
+        <section class="panel">
+          <h2>実財務 <span class="hint">m365 請求書実額</span></h2>
+          <div class="fin" id="fin"></div>
+        </section>
+
+        <section class="panel">
+          <h2>主要商談 <span class="hint">実契約</span></h2>
+          <ul id="pipeline" class="mini"></ul>
+        </section>
+
+        <section class="panel">
+          <h2>直近の実活動 <span class="hint">2026 会議/受信</span></h2>
+          <ul id="activity" class="mini"></ul>
+        </section>
+
+        <section class="panel">
+          <h2>意思決定台帳 <span class="hint">kotoba-datomic</span></h2>
+          <ul id="ledger" class="mini"></ul>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <div id="gameover" class="overlay hidden">
+    <div class="overlay-box">
+      <h2>💸 資金ショート — 倒産</h2>
+      <p>現金残高がマイナスになりました。経営判断を見直してリスタートしてください。</p>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
