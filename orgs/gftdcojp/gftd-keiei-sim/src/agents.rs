@@ -210,6 +210,28 @@ fn decode_ok(bytes: &[u8]) -> String {
     "（提案を生成できませんでした）".into()
 }
 
+/// 1 社員を所有引数で実行する (spawn_blocking から並列に呼ぶ用)。
+pub fn run_one(
+    exec: Arc<WasmExecutor>,
+    wasm: Vec<u8>,
+    role: String,
+    brief: String,
+    turn: u64,
+    snapshot: Vec<WitQuad>,
+) -> (String, String) {
+    if wasm.is_empty() {
+        return (role, "（エージェント未ロード）".into());
+    }
+    let action = match run_agent(&exec, &wasm, &role, &brief, turn, snapshot) {
+        Ok(a) => a,
+        Err(e) => {
+            tracing::warn!("agent {role} failed: {e}");
+            format!("（{}の提案生成に失敗）", role_label(&role))
+        }
+    };
+    (role, action)
+}
+
 /// 全社員を 1 ターン分実行し、(role, action) のリストを返す。
 pub fn run_all(
     exec: &WasmExecutor,

@@ -70,7 +70,7 @@ pub fn role_label(role: &str) -> &'static str {
 /// 承認時の KPI 影響プレビュー文。
 pub fn effect_hint(role: &str) -> &'static str {
     match role {
-        "sales" => "主要商談を受注: 現金+2億 / 売上+2億 / パイプライン-2億 / 士気+3",
+        "sales" => "商談を1段前進 (受注到達で売上自動計上) / 士気+3",
         "eng" => "増員5名 & プロダクト改善: 人員+5 / バーン+350万/月 / パイプライン+0.8億 / 士気+5",
         "finance" => "コスト最適化: バーン-1500万/月 (複利で効く) / 士気-2",
         "legal" => "契約リスク是正: パイプライン+0.4億 / 士気+3",
@@ -83,11 +83,10 @@ pub fn effect_hint(role: &str) -> &'static str {
 pub fn apply_effect(role: &str, k: &mut Kpis) -> String {
     let note = match role {
         "sales" => {
-            k.cash_jpy += 200_000_000;
-            k.revenue_total_jpy += 200_000_000;
-            k.pipeline_jpy = (k.pipeline_jpy - 200_000_000).max(0);
+            // 売上は商談ファネルの「受注(won)」到達時に自動計上される(close_deal)。
+            // 営業提案の承認はファネルを1段進め、士気を上げる。
             k.morale = (k.morale + 3).min(100);
-            "営業提案を承認: 主要商談を受注 (+2億)"
+            "営業提案を承認: 商談を前進 (受注で売上計上)"
         }
         "eng" => {
             k.headcount += 5;

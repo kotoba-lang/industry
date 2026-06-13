@@ -168,6 +168,23 @@
           :gftd.intel/stage :new}))
      orgs)))
 
+;; ---- 人物ノード: 上位リードの担当者(people)を org に紐づけて datom 化 (関係グラフ用) ----
+(defn people-nodes []
+  (let [orgs (->> (read-objs "crm.edn")
+                  (remove #(noise? (:org_domain %)))
+                  (sort-by #(- (or (:message_count %) 0)))
+                  (take 6))]
+    (apply concat
+           (map-indexed
+            (fn [i o]
+              (map-indexed
+               (fn [j email]
+                 {:db/id (str "ppl" i "-" j)
+                  :gftd.person/org (:org_domain o)
+                  :gftd.person/email (str email)})
+               (take 3 (:people o))))
+            orgs))))
+
 ;; ---- 市場分析: 接触上位 org をセグメント別に集計 ----
 (defn markets []
   (let [orgs (->> (read-objs "crm.edn") (remove #(noise? (:org_domain %))) (take 80))
@@ -234,5 +251,5 @@
      parties)))
 
 ;; ---- 出力: 全 intel datom を 1 ベクタで ----
-(let [all (vec (concat (latent-leads) (revivals) (renewal-risks) (deps) (markets)))]
+(let [all (vec (concat (latent-leads) (revivals) (renewal-risks) (deps) (markets) (people-nodes)))]
   (println (pr-str all)))

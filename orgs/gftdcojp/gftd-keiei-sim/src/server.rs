@@ -143,10 +143,13 @@ async fn advance_turn(State(app): State<Shared>) -> Json<serde_json::Value> {
         return Json(state_payload(&app));
     }
 
-    // 2. 社員エージェントを実行 (LLM/WASM 同期処理は spawn_blocking)
+    // 2. 社員エージェントを実行。
+    //    #1 並列推論: 機能部門(営業/開発/財務/法務)を spawn_blocking で同時実行。
+    //    #4 社員間ディスカッション: その4提案を CEO補佐が受けて統括提案する(2フェーズ)。
     let exec = app.exec.clone();
     let agents_map = app.agents.clone();
-    let world = agents::World {
+    let turn_n = kpis_snapshot.turn as u64;
+    let world = std::sync::Arc::new(agents::World {
         kpis: kpis_snapshot.clone(),
         pipeline: app.pipeline.clone(),
         projects: app.projects.clone(),
@@ -156,12 +159,52 @@ async fn advance_turn(State(app): State<Shared>) -> Json<serde_json::Value> {
         latent_leads: app.latent_leads.clone(),
         revival: app.revival.clone(),
         snapshot: intel::snapshot_quads(&app.conn),
-    };
-    let results = tokio::task::spawn_blocking(move || {
-        agents::run_all(&exec, &agents_map, &world)
-    })
-    .await
-    .unwrap_or_default();
+    });
+
+    // フェーズ1: 機能部門を並列実行
+    let mut handles = Vec::new();
+    for role in ["sales", "eng", "finance", "legal"] {
+        let exec = exec.clone();
+        let agents_map = agents_map.clone();
+        let world = world.clone();
+        let role = role.to_string();
+        handles.push(tokio::task::spawn_blocking(move || {
+            let wasm = agents_map.get(&role).cloned().unwrap_or_default();
+            let brief = agents::build_brief(&role, &world);
+            agents::run_one(exec, wasm, role, brief, turn_n, world.snapshot.clone())
+        }));
+    }
+    let mut results: Vec<(String, String)> = Vec::new();
+    for h in handles {
+        if let Ok(x) = h.await {
+            results.push(x);
+        }
+    }
+
+    // フェーズ2: CEO補佐が4提案を踏まえて統括 (社員間ディスカッション)
+    let peer = results
+        .iter()
+        .map(|(r, a)| format!("・{}: {}", role_label(r), a))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let ceo_brief = format!(
+        "{}\n--- 社内の議論(各責任者の提案) ---\n{}\n上記の議論を踏まえ、最優先の経営判断を1つ具申してください。",
+        agents::build_brief("ceo", &world),
+        peer
+    );
+    {
+        let exec = exec.clone();
+        let agents_map = agents_map.clone();
+        let snap = world.snapshot.clone();
+        if let Ok(c) = tokio::task::spawn_blocking(move || {
+            let wasm = agents_map.get("ceo").cloned().unwrap_or_default();
+            agents::run_one(exec, wasm, "ceo".to_string(), ceo_brief, turn_n, snap)
+        })
+        .await
+        {
+            results.push(c);
+        }
+    }
 
     // 3. 提案カードを作成
     let proposals: Vec<Proposal> = results
@@ -250,8 +293,26 @@ async fn decide(app: &App, id: &str, approved: bool) {
 
     // 営業提案の承認 → 商談ファネルを 1 段前進 (datomic に progress datom)
     if approved && role == "sales" {
-        if let Some((subj, stage)) = intel::close_deal(&app.conn, turn).await {
-            tracing::info!("deal advanced: {subj} -> {stage} (turn {turn})");
+        if let Some((subj, stage, booked)) = intel::close_deal(&app.conn, turn).await {
+            tracing::info!("deal advanced: {subj} -> {stage} (turn {turn}, booked {booked})");
+            // #2 受注(won)時の売上自動加算
+            if booked > 0 {
+                let note = {
+                    let mut k = app.kpis.lock().unwrap();
+                    k.cash_jpy += booked;
+                    k.revenue_total_jpy += booked;
+                    k.morale = (k.morale + 5).min(100);
+                    k.recompute();
+                    format!("🎉 受注: {subj} (+{}億)", booked as f64 / 1e8)
+                };
+                let edn = format!(
+                    "[{{:db/id \"won-t{turn}-{}\" :sim.decision/turn {turn} :sim.decision/by-role :sales :sim.decision/approved true :gftd.decision/note {note:?} :sim.decision/action {note:?}}}]",
+                    subj.len()
+                );
+                if let Ok(tx) = parse(&edn) {
+                    let _ = app.conn.transact(tx).await;
+                }
+            }
         }
     }
 

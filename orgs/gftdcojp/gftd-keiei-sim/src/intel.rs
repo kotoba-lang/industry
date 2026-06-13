@@ -190,6 +190,15 @@ pub fn views(conn: &Connection) -> serde_json::Value {
     .collect();
     markets.sort_by_key(|x| -(x["messages"].as_i64().unwrap_or(0)));
 
+    // 人物ノード (org → 担当者emailリスト) — 関係グラフ用
+    let mut people: std::collections::BTreeMap<String, Vec<String>> = std::collections::BTreeMap::new();
+    for r in q(
+        parse("{:find [?org ?email] :where [[?e :gftd.person/org ?org][?e :gftd.person/email ?email]]}").unwrap(),
+        &db, &[],
+    ).unwrap_or_default().iter() {
+        people.entry(str_at(r, 0)).or_default().push(str_at(r, 1));
+    }
+
     serde_json::json!({
         "latent_leads": leads,
         "revival": revival,
@@ -197,6 +206,7 @@ pub fn views(conn: &Connection) -> serde_json::Value {
         "dependencies": deps,
         "funnel": funnel,
         "markets": markets,
+        "people": people,
         "intel_depth": progressed.len(),
     })
 }
@@ -239,29 +249,32 @@ pub fn snapshot_quads(conn: &Connection) -> Vec<WitQuad> {
 
 /// 商談ファネルを 1 段進める (営業提案の承認時)。
 /// 最も進んだ未成約リードを次ステージへ (new→engaged→qualified→won)。
-pub async fn close_deal(conn: &Connection, turn: i64) -> Option<(String, String)> {
+/// 戻り値 (相手先, 新ステージ, 受注額)。won 到達時のみ受注額>0 (#2 売上自動加算)。
+pub async fn close_deal(conn: &Connection, turn: i64) -> Option<(String, String, i64)> {
     let done = progressed_subjects(conn);
     let order = |s: &str| match s { "won" => 3, "qualified" => 2, "engaged" => 1, _ => 0 };
     let next = |s: &str| match s { "new" => "engaged", "engaged" => "qualified", _ => "won" };
 
-    // latent リード一覧
-    let leads: Vec<String> = q(
-        parse("{:find [?subj ?kind] :where [[?e :gftd.intel/subject ?subj][?e :gftd.intel/kind ?kind]]}").unwrap(),
+    // latent リード一覧 (商流額つき: 受注額の算定に使う)
+    let leads: Vec<(String, i64)> = q(
+        parse("{:find [?subj ?money ?kind] :where [[?e :gftd.intel/subject ?subj][?e :gftd.intel/money-jpy ?money][?e :gftd.intel/kind ?kind]]}").unwrap(),
         &conn.db(), &[],
     ).unwrap_or_default()
     .iter()
-    .filter(|r| kw_at(r, 1) == "latent-lead")
-    .map(|r| str_at(r, 0))
+    .filter(|r| kw_at(r, 2) == "latent-lead")
+    .map(|r| (str_at(r, 0), i64_at(r, 1)))
     .collect();
 
     // 最も進んだ(ただし won 未満)リードを選ぶ。無ければ未着手を engaged へ。
     let pick = leads
         .iter()
-        .map(|s| (s.clone(), done.get(s).cloned().unwrap_or_else(|| "new".into())))
-        .filter(|(_, st)| order(st) < 3)
-        .max_by_key(|(_, st)| order(st));
-    let (subj, cur) = pick?;
+        .map(|(s, m)| (s.clone(), *m, done.get(s).cloned().unwrap_or_else(|| "new".into())))
+        .filter(|(_, _, st)| order(st) < 3)
+        .max_by_key(|(_, _, st)| order(st));
+    let (subj, money, cur) = pick?;
     let nx = next(&cur);
+    // 受注(won)なら売上を計上: 実商流額があればそれ、無ければ標準商談額 8000万
+    let booked = if nx == "won" { money.max(80_000_000) } else { 0 };
     let edn = format!(
         "[{{:db/id \"deal-t{turn}\" :gftd.progress/subject {:?} :gftd.progress/turn {turn} :gftd.progress/stage :{nx} :gftd.progress/note \"商談ステージ前進\"}}]",
         subj
@@ -269,7 +282,7 @@ pub async fn close_deal(conn: &Connection, turn: i64) -> Option<(String, String)
     if let Ok(tx) = parse(&edn) {
         let _ = conn.transact(tx).await;
     }
-    Some((subj, nx.to_string()))
+    Some((subj, nx.to_string(), booked))
 }
 
 /// progress イベントから subject ごとの最新ステージを畳み込む。

@@ -156,41 +156,53 @@
 (defn rel-ring [rel]
   (case rel "customer" "#3fb950" "vendor" "#f0883e" "partner" "#a371f7" nil))
 
-(defn render-graph! [leads]
+(defn render-graph! [leads people]
   (let [top (vec (take 8 leads))
         n (count top)
-        cx 120 cy 98
+        cx 120 cy 100
         max-pw (max 1 (apply max 1 (map :path_weight top)))
-        nodes (map-indexed
-               (fn [i l]
-                 (let [a (- (* (/ i (max 1 n)) 2 js/Math.PI) (/ js/Math.PI 2))
-                       x (+ cx (* 76 (js/Math.cos a)))
-                       y (+ cy (* 66 (js/Math.sin a)))
-                       sw (+ 0.6 (* 6 (/ (:path_weight l) max-pw)))   ; エッジ太さ=path-weight
-                       r (+ 6 (* 8 (/ (:path_weight l) 100.0)))
-                       churn (= (:risk l) "churn")
-                       ring (or (when churn "#f85149") (rel-ring (:rel_type l)))
-                       short (first (str/split (:subject l) #"\."))]
-                   (str "<line x1='" cx "' y1='" cy "' x2='" x "' y2='" y "' stroke='#3a4452' stroke-width='" sw "'/>"
-                        "<circle cx='" x "' cy='" y "' r='" r "' fill='" (market-color (:market l)) "' "
-                        (when ring (str "stroke='" ring "' stroke-width='2.5' ")) "/>"
-                        "<text x='" x "' y='" (+ y r 9) "' font-size='8' fill='#c7d0db' text-anchor='middle'>" (esc short) "</text>")))
-               top)]
+        ;; 各 org ノードの座標を先に確定
+        placed (vec (map-indexed
+                     (fn [i l]
+                       (let [a (- (* (/ i (max 1 n)) 2 js/Math.PI) (/ js/Math.PI 2))]
+                         (assoc l :idx i :gx (+ cx (* 78 (js/Math.cos a))) :gy (+ cy (* 70 (js/Math.sin a))))))
+                     top))
+        org-svg (for [l placed]
+                  (let [sw (+ 0.6 (* 6 (/ (:path_weight l) max-pw)))
+                        r (+ 6 (* 8 (/ (:path_weight l) 100.0)))
+                        ring (or (when (= (:risk l) "churn") "#f85149") (rel-ring (:rel_type l)))
+                        short (first (str/split (:subject l) #"\."))]
+                    (str "<line x1='" cx "' y1='" cy "' x2='" (:gx l) "' y2='" (:gy l) "' stroke='#3a4452' stroke-width='" sw "'/>"
+                         "<circle cx='" (:gx l) "' cy='" (:gy l) "' r='" r "' fill='" (market-color (:market l)) "' "
+                         (when ring (str "stroke='" ring "' stroke-width='2.5' ")) "/>"
+                         "<text x='" (:gx l) "' y='" (+ (:gy l) r 9) "' font-size='8' fill='#c7d0db' text-anchor='middle'>" (esc short) "</text>")))
+        ;; 上位3社の担当者(people)を org ノードから枝分かれさせて描画
+        ppl-svg (for [l (take 3 placed)
+                      :let [ems (take 3 (get people (keyword (:subject l)) (get people (:subject l))))]
+                      [k em] (map-indexed vector ems)]
+                  (let [pa (+ (* 1.3 k) (* 1.7 (:idx l)))
+                        px (+ (:gx l) (* 17 (js/Math.cos pa)))
+                        py (+ (:gy l) (* 17 (js/Math.sin pa)))
+                        loc (first (str/split (str em) #"@"))
+                        short (subs loc 0 (min 6 (count loc)))]
+                    (str "<line x1='" (:gx l) "' y1='" (:gy l) "' x2='" px "' y2='" py "' stroke='#2a3340' stroke-width='0.5'/>"
+                         "<circle cx='" px "' cy='" py "' r='3' fill='#56d4dd'/>"
+                         "<text x='" px "' y='" (- py 4) "' font-size='6' fill='#7f8c9b' text-anchor='middle'>" (esc short) "</text>")))]
     (set! (.-innerHTML ($ "graph"))
-          (str "<svg viewBox='0 0 240 200' class='graphsvg'>"
-               (str/join nodes)
+          (str "<svg viewBox='0 0 240 210' class='graphsvg'>"
+               (str/join org-svg) (str/join ppl-svg)
                "<circle cx='" cx "' cy='" cy "' r='15' fill='#1f6feb'/>"
                "<text x='" cx "' y='" (+ cy 3) "' font-size='9' fill='#fff' text-anchor='middle' font-weight='700'>gftd</text>"
                "</svg>"))
     (set! (.-innerHTML ($ "graph-legend"))
-          "<span>線=接触/商流(path-weight)</span> <span>色=市場</span> <span>リング: 緑顧客/橙仕入/紫提携/赤離反</span>")))
+          "<span>線=接触/商流(pw)</span> <span>色=市場</span> <span>水色=担当者</span> <span>リング:緑顧客/橙仕入/紫提携/赤離反</span>")))
 
 ;; ---- intel パネル -----------------------------------------------------------
 
 (defn render-intel! [it]
   (when it
     (set! (.-textContent ($ "intel-depth")) (or (:intel_depth it) 0))
-    (render-graph! (:latent_leads it))
+    (render-graph! (:latent_leads it) (:people it))
     (set! (.-innerHTML ($ "markets"))
           (str/join (for [m (take 6 (:markets it))]
                       (str "<li class='kv'><span><span class='dot' style='background:" (market-color (:segment m)) "'></span>"
