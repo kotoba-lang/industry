@@ -188,6 +188,38 @@ ADR-2606061000 §D1 の 4-tier ladder は変わらない:
 | G5 (A/B delta) | 0.5pp 未満の改善は deploy しない (noise guard) |
 | G6 (--confirm-deploy) | fleet push は明示的フラグ必須 (事故防止) |
 
+# Phase 0 実績 (2026-06-13 session close)
+
+## corpus 蓄積
+
+| batch | files | raw pairs | new (post-dedup) | corpus total |
+|---|---|---|---|---|
+| wave1 (旧 collect_corpus) | hakoniwa/hoshimori | — | 27 | 27 |
+| batch1 (unit_refactor fleet) | 50 files (asobi/hokorobi/hoshimori/他) | 99 | 98 | **125** |
+
+Target: 1000 pairs (train trigger delta=100 ごとに訓練発火)
+
+## インフラ
+
+| 項目 | 状態 |
+|---|---|
+| fleet SSH (naphtali/dan/他 9ノード) | **Tailscale IP (100.x.x.x) で全接続確認** |
+| fleet Ollama (naphtali) | `gemma4:12b-it-qat` / `gemma4:e4b-it-qat` 稼働中 |
+| EVO-X2 (gad) | **オフライン** — Tailscale 未接続, LAN 192.168.1.16 timeout |
+| 訓練実績 | **ゼロ** — gad 復帰まで corpus 蓄積のみ |
+
+## 対応済み
+
+- `~/.ssh/config` fleet HostName を LAN IP → Tailscale IP に更新 (全ノード `ssh <name>` で接続可)
+- batch2 dedup: unit_refactor が同ファイルを再処理 → `_pair_cid` が正しく弾いた (正常動作)
+- `tests/test_rsi.py` 20 tests green
+
+## 残タスク (Phase 0 完了まで)
+
+1. gad を Tailscale に接続 (`tailscale up`) → `~/.ssh/config` に gad エントリ追記
+2. harvest batch 3〜 を継続 (`discover_unharvested_py` で未処理ファイルを取得)
+3. corpus ≥ 1000 → `loop.py run` で Phase 1 (M1 training) 発火
+
 # Consequences
 
 ## Positive
@@ -199,11 +231,11 @@ ADR-2606061000 §D1 の 4-tier ladder は変わらない:
 
 ## Negative / 正直な限界
 
-- **現状 corpus ~600例 (推定)**: Phase 1 (M1) は corpus ≥ 1000 待ち。Phase 0 が先
+- **現状 corpus 125例**: Phase 1 (M1) は corpus ≥ 1000 待ち。Phase 0 が先 (27 wave1 + 98 batch1)
 - **bb gate は R0 では clj-kondo のみ**: 意味的正確性は G3 (bb load) まで保証されない
 - **deploy_threshold 0.5pp は conservative**: ノイズ域 (±2pp) に対して余裕は小さい。1pp 以上が望ましいが、まず動かす
 - **12b fleet → e4b Maxwell の capability gap**: 12b の teacher と e4b の student の間の能力差は蒸留損失になる。e4b の天井は 12b を超えられない
-- **EVO-X2 DHCP 腐敗**: discover.py が必要。`EVO_HOST` は動的に確認すること (ADR-2606120500 §罠5)
+- **EVO-X2 (gad) offline**: Tailscale 未接続。`tailscale up` 後に `~/.ssh/config` へ gad エントリ追記が必要 (現 LAN IP 192.168.1.16 は timeout)
 
 # Alternatives Considered
 
