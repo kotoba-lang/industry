@@ -100,7 +100,9 @@ def discover_unharvested_py(actor_dirs: list[Path] | None = None) -> list[Path]:
                 continue
             try:
                 rec = json.loads(line)
-                src = rec.get("meta", {}).get("src_py", "")
+                meta = rec.get("meta", {})
+                # unit_refactor uses meta.src; maxwell-sft-corpus uses meta.src_py
+                src = meta.get("src", meta.get("src_py", ""))
                 if src:
                     seen_paths.add(src)
             except Exception:

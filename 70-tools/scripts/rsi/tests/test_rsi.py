@@ -59,7 +59,7 @@ def test_corpus_ingest_dedup(tmp_path, monkeypatch):
     monkeypatch.setattr(c_mod, "write_corpus_pair", lambda *a, **k: True)
     # Mock charter scan + clj gate to pass
     monkeypatch.setattr(c_mod, "_charter_scan", lambda t: "skip")
-    monkeypatch.setattr(c_mod, "_clj_gate",     lambda t: "skip")
+    monkeypatch.setattr(c_mod, "_clj_gate",     lambda t, **kw: "skip")
 
     source = tmp_path / "source.jsonl"
     pairs = [_make_pair("actor/foo"), _make_pair("actor/bar")]
@@ -97,7 +97,7 @@ def test_charter_fail_skips(tmp_path, monkeypatch):
     monkeypatch.setattr(c_mod, "SFT_CORPUS", corpus_file)
     monkeypatch.setattr(c_mod, "write_corpus_pair", lambda *a, **k: True)
     monkeypatch.setattr(c_mod, "_charter_scan", lambda t: "fail:weapons")
-    monkeypatch.setattr(c_mod, "_clj_gate",     lambda t: "ok")
+    monkeypatch.setattr(c_mod, "_clj_gate",     lambda t, **kw: "ok")
 
     source = tmp_path / "source.jsonl"
     source.write_text(json.dumps(_make_pair("actor/bad")))
@@ -111,7 +111,7 @@ def test_clj_gate_fail_skips(tmp_path, monkeypatch):
     monkeypatch.setattr(c_mod, "SFT_CORPUS", corpus_file)
     monkeypatch.setattr(c_mod, "write_corpus_pair", lambda *a, **k: True)
     monkeypatch.setattr(c_mod, "_charter_scan", lambda t: "skip")
-    monkeypatch.setattr(c_mod, "_clj_gate",     lambda t: "fail")
+    monkeypatch.setattr(c_mod, "_clj_gate",     lambda t, **kw: "fail")
 
     source = tmp_path / "source.jsonl"
     source.write_text(json.dumps(_make_pair("actor/bad_clj", "(not clojure!!)")))

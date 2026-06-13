@@ -36,12 +36,31 @@ def _charter_scan(text: str) -> str:
 # Functional gate: clj-kondo + bb load
 # ---------------------------------------------------------------------------
 
-def _clj_gate(clj_src: str) -> str:
-    """Gate a Clojure snippet through clj-kondo lint.  Returns 'ok' or 'fail'."""
+def _strip_fences(src: str) -> str:
+    """Strip markdown code fences (```clojure ... ```) if present."""
+    lines = src.strip().splitlines()
+    if lines and lines[0].strip().startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip() == "```":
+        lines = lines[:-1]
+    return "\n".join(lines)
+
+
+def _clj_gate(clj_src: str, *, already_verified: bool = False) -> str:
+    """Gate a Clojure snippet through clj-kondo lint.  Returns 'ok', 'skip', or 'fail'.
+
+    If already_verified=True (meta.verified = 'clj-kondo-unit+file' set by unit_refactor),
+    trust the upstream gate and return 'ok' without re-running.
+    """
+    if already_verified:
+        return "ok"
+    src = _strip_fences(clj_src)
+    if not src.strip():
+        return "fail"
     try:
         r = subprocess.run(
             ["clj-kondo", "--lint", "-"],
-            input=clj_src, capture_output=True, text=True, timeout=10)
+            input=src, capture_output=True, text=True, timeout=10)
         return "ok" if r.returncode == 0 else "fail"
     except FileNotFoundError:
         return "skip"   # clj-kondo not installed on this host
@@ -71,8 +90,27 @@ def _seen_cids(corpus_path: Path) -> set[str]:
     return seen
 
 
+def _pair_id(pair: dict) -> str:
+    """Derive a stable string id from the pair, regardless of source format."""
+    if pair.get("id"):
+        return pair["id"]
+    meta = pair.get("meta", {})
+    # unit_refactor format: meta.src + meta.unit
+    src  = meta.get("src", meta.get("src_py", ""))
+    unit = meta.get("unit", meta.get("fn", ""))
+    if src or unit:
+        # make relative path if possible
+        import os
+        try:
+            src = os.path.relpath(src)
+        except Exception:
+            pass
+        return f"{src}/{unit}".lstrip("/")
+    return ""
+
+
 def _pair_cid(pair: dict) -> str:
-    key = pair.get("id", "") + "|" + json.dumps(pair.get("messages", []))
+    key = _pair_id(pair) + "|" + json.dumps(pair.get("messages", []))
     return cid_of_str(key)
 
 
@@ -108,29 +146,35 @@ def ingest_jsonl(source: Path, *, dry_run: bool = False) -> int:
                     clj_src = msg.get("content", "")
                     break
 
-            charter = _charter_scan(clj_src + " " + pair.get("id", ""))
-            gate    = _clj_gate(clj_src)
+            meta = pair.get("meta", {})
+            pid  = _pair_id(pair)
+
+            # Trust upstream gate when unit_refactor already verified with clj-kondo
+            already_ok = "clj-kondo" in meta.get("verified", "")
+
+            charter = _charter_scan(clj_src + " " + pid)
+            gate    = _clj_gate(clj_src, already_verified=already_ok)
 
             if charter.startswith("fail") or gate == "fail":
-                print(f"  SKIP {pair.get('id','?')}  charter={charter} gate={gate}")
+                print(f"  SKIP {pid or '?'}  charter={charter} gate={gate}")
                 continue
 
-            pair.setdefault("meta", {})["cid"] = cid
-            pair["meta"]["charter_scan"] = charter
-            pair["meta"]["clj_gate"]     = gate
+            pair.setdefault("meta", {}).update({
+                "cid": cid, "charter_scan": charter, "clj_gate": gate
+            })
+            # normalise id field for downstream consumers
+            if not pair.get("id"):
+                pair["id"] = pid
 
             if not dry_run:
                 out_f.write(json.dumps(pair, ensure_ascii=False) + "\n")
-                actor   = pair.get("meta", {}).get("actor",
-                            pair.get("id", "unknown").split("/")[0])
-                fn_name = pair.get("meta", {}).get("fn",
-                            pair.get("id", "?").split("/")[-1])
-                write_corpus_pair(cid, pair.get("id", cid),
-                                  actor, fn_name, charter, gate)
+                actor   = meta.get("actor", pid.split("/")[0] if pid else "unknown")
+                fn_name = meta.get("fn", meta.get("unit", pid.split("/")[-1] if pid else "?"))
+                write_corpus_pair(cid, pid or cid, actor, fn_name, charter, gate)
 
             seen.add(cid)
             new_count += 1
-            print(f"  + {pair.get('id', cid)}")
+            print(f"  + {pid or cid[:16]}")
 
     return new_count
 
