@@ -154,7 +154,21 @@
       :description "Anthropic computer use 相当のデスクトップ操作エージェントを portable Clojure (.cljc) で実装。computer tool の action 語彙 + サンプリングループ (langgraph StateGraph)。デスクトップは IComputer protocol でホスト能力注入（xdotool/VNC/MCP）、操作履歴を datom 化。MIT (本家リファレンス準拠)。"
       :stack ["Clojure"]
       :adrs ["docs/adr/0001-architecture.md" "kawasakijun/docs/adr/0013-clj-agent-stack.md"]
-      :deps ["langgraph-clj"]}]
+      :deps ["langgraph-clj"]}
+    {
+      :name "gftd-keiei-sim"
+      :path "orgs/gftdcojp/gftd-keiei-sim"
+      :kind "management-sim-game"
+      :submodule false
+      :org "gftdcojp"
+      :description "gftdcojp 経営シミュレーションゲーム。意思決定者(CEO)が判断・可視化し、LLMエージェント社員(営業/開発/財務/法務/CEO補佐)が kotoba-clj defgraph(ADR-0013 と同型) + llm-infer で経営を進める。状態/意思決定台帳は kotoba-datomic。実データは m365-archive/facts(EDN, ADR-0010/0012)。"
+      :stack ["Rust" "ClojureScript" "Clojure (kotoba-clj WASM agents)"]
+      :adrs ["kawasakijun/docs/adr/0017-gftd-keiei-sim-llm-backend-openrouter.md"]
+      :llm_backend {
+        :production "openrouter:minimax/minimax-m2.7 (OpenAI互換; ADR-0017)"
+        :fallback "local gemma4 e4b @ Ollama (gemma4:latest) — dev/offline"
+        :wiring "env KOTOBA_INFERENCE_URL / KOTOBA_INFERENCE_MODEL / KOTOBA_INFERENCE_API_KEY; HttpInferEngine in src/agents.rs"
+        :self_host "not adopted — Modal eval in orgs/gftdcojp/minimax-m2-modal (M2.7 opt ~$1.55/1M @ concurrency 64, ~18min cold start; GPU snapshot multi-GPU 非対応). ADR-0017"}}]
   :vendored [
     {
       :name "systemofsystem"
