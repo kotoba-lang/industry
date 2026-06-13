@@ -1,6 +1,6 @@
 # Phase 5 — 契約・サブスク・アカウント整理計画
 
-Gmail から ingest した既存サービスを `subscriptions_state.jsonld` に整理。
+Gmail から ingest した既存サービスを `subscriptions_state.edn` に整理。
 本ドキュメントは **解約・整理の実行計画**。
 
 ## 集計サマリ (2026-05-18)
@@ -79,7 +79,7 @@ Week 3:
   ☐ Apple Subscription 全件確認 (mikaeru / jun784)
 
 Week 4:
-  ☐ 解約結果まとめ → subscriptions_state.jsonld 更新
+  ☐ 解約結果まとめ → subscriptions_state.edn 更新
   ☐ 月額支出ベースライン再計測
   ☐ Living System の KPI に追加: subscriptions.monthly_spend
 ```
@@ -99,7 +99,7 @@ Week 4:
 - 上流: なし (即開始可能)
 - 下流: なし (独立タスク)
 - Slack: 大 (CP 外)
-- Living System で月次レビュー: `subscriptions_state.jsonld` を毎月 re-ingest
+- Living System で月次レビュー: `subscriptions_state.edn` を毎月 re-ingest
 
 ### KPI Sensor 追加
 
@@ -130,7 +130,7 @@ if state["subscriptions.review_count"] >= 14:
 | KPI | 計測 | 閾値 |
 |---|---|---|
 | 月額支出 (JPY) | Gmail billing 集計 | 月次 -10% を目標 |
-| REVIEW 件数 | `subscriptions_state.jsonld` | 4 週で 14 → 0 |
+| REVIEW 件数 | `subscriptions_state.edn` | 4 週で 14 → 0 |
 | CANCEL 完了率 | 解約成功 / 計画数 | 90%+ |
 | 隠れサブスク発見 | クレカ突合 | 月 1 件まで |
 

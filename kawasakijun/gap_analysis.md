@@ -1,7 +1,7 @@
 # Gap Analysis — 現状 vs 理想状態
 
-`profile.jsonld` / `activities.jsonld` / `financial_state.jsonld` /
-`litigation_state.jsonld` / `photos_timeline.jsonld` を統合して、
+`profile.edn` / `activities.edn` / `financial_state.edn` /
+`litigation_state.edn` / `photos_timeline.edn` を統合して、
 **現状ベクトル (X_now)** と **理想ベクトル (X_star)** の差分を τ × domain 行列で可視化。
 
 差分が大きい順に `reverse_topo_pregel.py` に渡し、依存関係 DAG の

@@ -134,7 +134,7 @@ credential_custody = "1Password (gftdcojp vault); env AWS_ACCESS_KEY_ID/AWS_SECR
 - (+) B2 は予算/帯域が GitHub LFS と独立 → ADR-0006 の購入ロック問題を迂回。
 - (−) B2 バケット・application key の作成が前提（未実施＝外部依存）。
 - (−) 41G の初回アップロードは時間とエグレス/ストレージ費用が発生。
-- (−) `projects/` 廃止に伴い deps.toml の path 群と既存リンクの追従が必要。
+- (−) `projects/` 廃止に伴い deps.edn の path 群と既存リンクの追従が必要。
 - (−) ADR-0006（spirit-in-physics LFS→annex）は GitHub 購入ロックで依然ブロック。
 
 ## 実行フェーズ
@@ -150,7 +150,7 @@ credential_custody = "1Password (gftdcojp vault); env AWS_ACCESS_KEY_ID/AWS_SECR
 4. **Phase 3**: `jk-luxury-drive-archive` を `personal/drive/jk-luxury-archive/` に
    DataLad annex 取り込み（平文を git に載せない）。
 5. **Phase 4**: 全 dataset で `git annex initremote b2 …` → `datalad push --to b2`。
-   `[personal.storage]` 更新、deps.toml の path 群を orgs/ に追従。
+   `:personal :storage` 更新、deps.edn の path 群を orgs/ に追従。
 
 ## Status / Next（2026-06-09 更新）
 
@@ -190,7 +190,7 @@ credential_custody = "1Password (gftdcojp vault); env AWS_ACCESS_KEY_ID/AWS_SECR
 
 ## Alternatives considered
 
-- **projects/ フラット統一**: deps.toml 既存記述と整合的だが owner 情報が失われる → 却下。
+- **projects/ フラット統一**: deps.edn 既存記述と整合的だが owner 情報が失われる → 却下。
 - **二重構造維持**: SSoT が割れ続ける → 却下。
 - **C 群を即 GitHub private + submodule 化**: 作業量大かつ 41G/1.2G を GitHub に載せる
   必要が生じる → 「とりあえず素フォルダ + B2」を優先。

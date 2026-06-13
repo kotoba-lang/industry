@@ -1,6 +1,6 @@
 #!/bin/bash
 # takeout-status.sh — progress of the Takeout ingest (parts ingested, files on B2, disk, queue).
-# Jobs/accounts come from accounts/registry.toml via bin/registry.
+# Jobs/accounts come from accounts/registry.edn via bin/registry.
 REPO=/Users/junkawasaki/github/com-junkawasaki
 REGISTRY="$REPO/personal/bin/registry"
 LEDGER="$HOME/.takeout-watcher/processed.log"

@@ -1,5 +1,7 @@
 # ADR-0012: gftdcojp M365 アーカイブの EDN 事実層 + Datomic ビュー
 
+> **更新 (2026-06-13, ADR-0013)**: L1 の JSONL は EDN-lines(1 行 1 EDN マップ)へ全面移行し JSONL は除去。360,999 レコード round-trip 検証済み。クエリは kotoba-datomic(埋め込み)+ clojure ローダー。以下の本文中「JSONL」は歴史的経緯。
+
 - **Status**: Accepted / Implemented(全レイヤ稼働・B2 push 済み)
 - **Date**: 2026-06-12
 - **Deciders**: 河崎純真 (j.kawasaki@gftd.co.jp)

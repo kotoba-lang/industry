@@ -1,6 +1,6 @@
 #!/bin/bash
 # mail-sync.sh — periodic incremental mail ingest for every account with
-# mail.sync=true in accounts/registry.toml (run daily via launchd, or manually).
+# mail.sync=true in accounts/registry.edn (run daily via launchd, or manually).
 #
 # Per account: mint an access token (Keychain refresh token via google-auth.py),
 # ingest a sliding window (mail.window, e.g. newer_than:14d) with

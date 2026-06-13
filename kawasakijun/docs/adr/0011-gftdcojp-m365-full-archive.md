@@ -5,7 +5,7 @@
 - **Deciders**: 河崎純真 (j.kawasaki@gftd.co.jp)
 - **Context tags**: gftdcojp, m365, outlook, onedrive, msgraph, datalad, git-annex, backblaze-b2, gpg-hybrid, launchd, entra-app
 - **Related**: ADR-0007(orgs レイアウト + B2 永続化パターン)、ADR-0009(multi-account mail ingest — gftd-co-jp の**個人 warehouse 向け**メール取り込み)
-- **Implementation**: `orgs/gftdcojp/m365-archive/`(bin/{setup-auth.sh,run-backup.sh,ingest-mail.py,ingest-calendar.py,ingest-drive.sh,gpg-unlock.sh})、`~/Library/LaunchAgents/jp.co.gftd.m365-archive-backup.plist`、deps.toml `[gftdcojp.m365-archive]`
+- **Implementation**: `orgs/gftdcojp/m365-archive/`(bin/{setup-auth.sh,run-backup.sh,ingest-mail.py,ingest-calendar.py,ingest-drive.sh,gpg-unlock.sh})、`~/Library/LaunchAgents/jp.co.gftd.m365-archive-backup.plist`、deps.edn `:gftdcojp :m365-archive`
 
 ## Context
 

@@ -1,0 +1,129 @@
+;; litigation_state.edn — 係争・法的紛争スナップショット (litigation_state.jsonld から移行, ADR-0010)
+;; 元 @context: @vocab=https://schema.org/, kj=https://junkawasaki.com/ns#
+;; 変換: @id→:id, @type→:type(schema.orgクラスはkeyword), kj:X→:kj/X, schema.org語彙→:X, 日本語ラベルキーは文字列
+{
+  :id "kj:litigation_state"
+  :type :ItemList
+  :description "係争・法的紛争・刑事事件 の包括スナップショット (Gmail/Drive 由来)。"
+  :kj/as_of "2026-05"
+  :itemListElement [
+    {
+      :id "kj:lit/mizutani"
+      :name "水谷翔太 事件"
+      :role_of_kawasaki "被害者 (氏名無断使用) → 原告 (Gftd Japan として民事)"
+      :perpetrator "水谷翔太 (元 天王寺区区長)"
+      :facts "イーサリアム・ステーキング事業を悪用、Gftd Japan / 河崎の名称を勝手に利用"
+      :criminal {
+        :case_number "令和5年第374号"
+        :verdict "実刑判決 (2024-10-21)"}
+      :civil {
+        :case_number "令和4年(ワ)第7237号"
+        :court "東京地方裁判所 民事第12部"
+        :judge "神吉康二"
+        :claimed_damages_jpy 52085084
+        :outcome "請求原因事実すべて認容"}
+      :status "解決済 (民事勝訴 / 刑事確定)"
+      :next "判決金回収手続 (執行) — 状況確認要"}
+    {
+      :id "kj:lit/lingling"
+      :name "LingLing 訴訟 (株式会社LingLing → COMMONS株式会社)"
+      :role_of_kawasaki "被告側 (COMMONS 代表として)"
+      :plaintiff "株式会社LingLing ほか原告ら"
+      :defendants ["COMMONS株式会社" "高橋優 (元共同創業)" "他被告"]
+      :subject "イーサリアム・ステーキング/マイニング預かり資金。アイシステム社への送金履歴と紹介料・解約手続が争点。NETH と ETH の同一性論。"
+      :counsel_for_kawasaki ["ZeLo: 水野雄介 / 神尾元樹 / 竹下晴哉" "AMT 法律事務所: 河合先生 (ken.kawai_grp@amt-law.com)"]
+      :evidence_repo [
+        "https://drive.google.com/drive/folders/1MSyjtsp0pLgtFwuI6LhHuXkOyGyFdvET"
+        "https://drive.google.com/drive/folders/1m7GHv43tWllBCJ-... (原告追加書面)"]
+      :timeline [
+        "2025-05-30 第1次提出書面準備"
+        "2025-06-26 水谷関連情報の Gftd 内開示要請"
+        "2025-07-11 第1回弁論準備期日"
+        "2025-09-10 原告ら準備書面2 + 甲40-42 受領"
+        "2025-12-25 期日打合せ (Teams 13:00-14:00)"
+        "2026-01-13 準備書面ドラフト提出"]
+      :status "進行中 / 多回戦"
+      :risk "敗訴時の損害賠償リスク高 (金額未確定)"}
+    {
+      :id "kj:lit/kagoshima-univ"
+      :name "国立大学法人 鹿児島大学 への抗議書"
+      :role_of_kawasaki "請求者 (個人/Gftd Japan)"
+      :counterparty "鹿児島大学 学長 井戸章雄 / ファインシステム社"
+      :claim "¥4,811,457 返還要求、研究費不正使用疑惑、外部委員会設置要求"
+      :filed "2025-05-29"
+      :status "抗議書段階"
+      :next "回答期限経過後の法的措置検討"}
+    {
+      :id "kj:lit/rokes-hec"
+      :name "Rokes Exchange / HEC ハッキング被害 → ハッカー追跡 + 同種被害者向けビジネス化"
+      :role_of_kawasaki "被害者 → 自己実証主体 → 追跡サービス事業者"
+      :perpetrator "未特定 (Exchange へのハッキング, 追跡中)"
+      :facts "HEC (ERC-20 → BEP-2 移行) のハッキング。MetaX Pro 移行で 7名分対応 (CTO 仙立博己、本野航平 と協働)"
+      :status "追跡フェーズ (Phase 2.5) — 河崎 CEH + サイバー経験 + lawfirm.gftd.ai (9-actor) で実証"
+      :next_strategy {
+        :step1 "On-chain forensics: HEC → ETH → 他 chain への送金経路の特定"
+        :step2 "Exchange 協力要請 (KYC 紐付け、出口口座の凍結)"
+        :step3 "国際捜査協力 (FBI / Interpol / 警察庁サイバー犯罪)"
+        :step4 "民事保全 + 損害賠償請求"
+        :productize "lawfirm.gftd.ai 内に `crypto-victim` actor を新設、SaaS + 成功報酬モデルで同種被害者向け展開"}}
+    {
+      :id "kj:lit/personal-debt-counter-claim"
+      :name "個人請求への反訴・起訴戦略 (Phase 2.5)"
+      :role_of_kawasaki "原告 (反訴側)"
+      :facts "借入金・支払い系の個人請求は不適切 (本来 Gftd Japan / JK の法人債務)。Family Office 化 (ADR-2605111000) と連動して個人保証解除を主張。"
+      :status "戦略策定中"
+      :counsel ["ZeLo" "AMT 河合"]
+      :principle "個人請求は不適切認識 → 全件反訴 + 場合により起訴"
+      :expected_impact "借入返済の est_years を 7y → 2y へ圧縮 (法人債務として粛々返済)"}
+    {
+      :id "kj:lit/crypto-victim-lawfirm-product"
+      :name "Crypto 被害者向け追跡・回収 lawfirm product (新規事業)"
+      :role_of_kawasaki "事業者 / lead architect"
+      :platform "lawfirm.gftd.ai (既存 9-actor 法務クラスタに新 actor 追加)"
+      :model "自己実証 (Rokes 自己ケース) → 同種被害者の SaaS + 成功報酬"
+      :tech_stack "On-chain forensics (Chainalysis 競合) + W Protocol + 9-actor (judge/bengoshi/adr/legal-aid 連携)"
+      :target_market "NEM 流出 / Mt.Gox / Liquid / Coincheck 被害者ら"
+      :expected_revenue "成功報酬 5–20% × 被害総額 + 月額 SaaS"}
+    {
+      :id "kj:lit/ling-ling-cluster"
+      :name "ステーキング・マイニング預かり資金関連 包括クラスタ"
+      :note "LingLing / 水谷 / Rokes / COMMONS 経費確認 220415 は 2021年のステーキング預かり資金移動 を共通根とする紛争群。共通の根因解消が複数訴訟に波及する可能性"
+      :common_root "2021年 ステーキング/マイニング 預かり資金移動"
+      :common_evidence "アイシステム社 送金履歴 / MoneyForward 仕訳 / COMMONS 経費確認 220415"}
+    {
+      :id "kj:lit/divorce"
+      :name "離婚"
+      :status "成立済"
+      :scope "本人申告。詳細未整理 (親権・養育費・共有財産分割 等は本人確認要)"}]
+  :kj/litigation_strategy_themes [
+    "経理データ (MoneyForward 仕訳 + 220415 経費確認) の完全な開示と整合性検証"
+    "アイシステム社送金履歴を共通証拠として複数係争に流用"
+    "Gftd Japan (vendor) / JK株式会社 (private holding) のレイヤー分離を法的・経理的に明確化"
+    "AMT + ZeLo + TOTAL (税理) の3者連携を継続"
+    "**Phase 2.5 戦略転換**: 個人請求 = 不適切認識で全件反訴・起訴。被害者ポジションから反転、Rokes 自己実証ケースを crypto 被害者向け lawfirm product に転化"]
+  :kj/evidence_ledger {
+    :as_of "2026-05-30"
+    :note "gap_analysis ボトルネック#1『アイシステム送金履歴開示』の受領状況。バイナリ本体は personal/ ウェアハウス未取り込み (Gmail MCP に添付DL機能なし)。第三者PII (OUCHI/NETHユーザー氏名・住所・ウォレット・KYC) は warehouse へ非コンパイル方針。"
+    :thread_id "197abcf1ab4ac875"
+    :thread_subject "COMMONS株式会社/Zelo/LingLing/水谷関連情報/トータル"
+    :items [
+      {
+        :received "2025-06-30T04:07:23Z"
+        :from "tomohito_mizutori@total-office.jp (税理士法人TOTAL 水鳥智仁)"
+        :attachment "添付資料.zip"
+        :purpose "2021年 ステーキング/マイニング 預かり資金移動・アイシステム社振込履歴・会計処理(仕訳)"
+        :ingested_to_warehouse false}
+      {
+        :received "2026-02-06T09:49:32Z"
+        :from "tomohito_mizutori@total-office.jp"
+        :attachment "追加資料_20260226.zip"
+        :purpose "追加証跡 (LingLing 準備書面・期日対応向け)"
+        :ingested_to_warehouse false}
+      {
+        :received "2026-01-05T04:16:59Z"
+        :from "jun784@gmail.com (本人回覧)"
+        :attachment ["添付資料.zip" "判決（令和7年10月8日付）.pdf"]
+        :purpose "判決(令和7年10月8日)の共有"
+        :ingested_to_warehouse false}]
+    :bottleneck_status "DISCLOSED (証跡は水鳥先生より受領済) / NOT_YET_INGESTED (warehouse 取り込み未)"
+    :next_action "添付zipのバイナリ取得手段を決定 (ブラウザDL or Drive再共有) → personal/litigation/ へ annex 取り込み → 2021年資金移動の全件突合"}}

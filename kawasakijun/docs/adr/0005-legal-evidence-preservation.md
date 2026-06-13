@@ -12,7 +12,7 @@ OU=root, 作成 2023-12-27, Gmail 77MB / Drive 6MB, Business Standard）の
 削除と root@jk.luxury へのデータ引き継ぎを検討した。
 
 しかし当該アドレスは **係争中の「Rokes Exchange / HEC ハッキング被害」案件
-（`litigation_state.jsonld` の `kj:lit/rokes-hec`）の当事者アドレス**であり、
+（`litigation_state.edn` の `:id "kj:lit/rokes-hec"`）の当事者アドレス**であり、
 メール履歴は法的証跡である。検討の結果、以下が判明した：
 
 1. **削除は証拠隠滅（スポリエーション）リスク**になり得る。係争中の当事者
@@ -59,7 +59,7 @@ OU=root, 作成 2023-12-27, Gmail 77MB / Drive 6MB, Business Standard）の
   パスキー段階認証で停止（本人による認証待ち）。
 - 次アクション：(a) 本人がパスキー認証 → データエクスポート実行 →
   (b) Claude が SHA-256 封緘 + OpenTimestamps + `personal/litigation/rokes/` 取り込み。
-- 関連：`kawasakijun/litigation_state.jsonld` `kj:evidence_ledger` /
+- 関連：`kawasakijun/litigation_state.edn` `:kj/evidence_ledger` /
   `kj:lit/rokes-hec`、`personal/analysis/observations.md` loop #7。
 
 ## Alternatives considered

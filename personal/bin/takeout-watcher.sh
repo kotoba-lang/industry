@@ -1,10 +1,10 @@
 #!/bin/bash
 # takeout-watcher.sh — ingest Google Takeout zip parts into the personal warehouse.
 # For each completed takeout-*.zip in ~/Downloads whose job-timestamp prefix is
-# registered in accounts/registry.toml ([takeout."<prefix>"]):
+# registered in accounts/registry.edn ([takeout."<prefix>"]):
 #   extract (ditto, Unicode-safe) -> delete zip -> git annex add -> copy --to b2 (-J8) -> drop local.
 # Routes to personal/takeout/<account>/<date>/. The registry is re-read every pass,
-# so new Takeout jobs added to registry.toml are picked up without a restart.
+# so new Takeout jobs added to registry.edn are picked up without a restart.
 # Idempotent via a processed-ledger; re-presets the GPG passphrase from Keychain each pass.
 set -uo pipefail
 
