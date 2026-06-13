@@ -50,9 +50,9 @@ async fn main() -> Result<()> {
     let n = seed::seed_datomic(&conn, &seed).await?;
     tracing::info!("datomic seeded with {n} datoms");
 
-    // 2b. 実 facts から intel(依存/latent/再生候補)を導出して datomic に書き込む
-    let intel_n = intel::build(&conn, &seed).await?;
-    tracing::info!("datomic intel layer: {intel_n} datoms (latent leads / revival / dependencies)");
+    // 2b. Clojure(babashka) で intel を導出して datomic に書き込む (分析ロジックは clj 側)
+    let intel_n = intel::build(&conn).await?;
+    tracing::info!("datomic intel layer (via analysis/intel.bb): {intel_n} datoms");
 
     // 2c. KPI を datomic クエリから導出し直す (メモリではなく datomic が源泉)
     let (hc, pl) = intel::kpis_from_datomic(&conn);
@@ -63,9 +63,9 @@ async fn main() -> Result<()> {
     seed.kpis.recompute();
     tracing::info!("KPIs derived from datomic: headcount={hc} pipeline={pl}円");
 
-    // brief 用の intel 抽出
-    let latent_leads = intel::latent_lead_names(&seed);
-    let revival = intel::revival_names(&seed);
+    // brief 用の intel 抽出 (datomic 由来 = clj が算出した確度順)
+    let latent_leads = intel::latent_lead_names(&conn);
+    let revival = intel::revival_names(&conn);
 
     // 3. 社員エージェントをコンパイル + 推論エンジン
     let compiled = agents::compile_all()?;

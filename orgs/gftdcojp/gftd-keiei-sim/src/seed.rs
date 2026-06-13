@@ -33,12 +33,23 @@ pub struct Seed {
     /// gftd 受領請求書の累計 (実コスト, 円)
     pub received_total_jpy: i64,
     // ---- intel 素材 (依存/latent 導出用) ----
-    /// crm 接触量上位 (org_domain, message_count)
-    pub crm_top: Vec<(String, i64)>,
+    /// crm 接触量上位 (確度スコア・離反リスク算出用)
+    pub crm_top: Vec<CrmOrg>,
     /// 既存契約の相手先名の集合
     pub contract_parties: Vec<String>,
     /// 休眠プロジェクト (name, file_count) — 再生候補導出用
     pub dormant_projects: Vec<(String, i64)>,
+}
+
+/// crm 取引先の生シグナル (確度スコア・離反リスクの材料)。
+#[derive(Clone)]
+pub struct CrmOrg {
+    pub domain: String,
+    pub messages: i64,
+    /// 最終接触 ISO 文字列 ("2026-06-11T...")
+    pub last_contact: String,
+    /// 関与した人数 (:people の要素数)
+    pub people: i64,
 }
 
 fn facts_dir() -> PathBuf {
@@ -158,22 +169,32 @@ pub fn load() -> Result<Seed> {
     // --- crm 接触量上位 (商談補完 + latent リード導出用) ---
     let mut crm = parse_objs("crm.edn", |_| true).unwrap_or_default();
     crm.sort_by_key(|c| -as_i64(kv(c, "message_count")).unwrap_or(0));
-    let crm_top: Vec<(String, i64)> = crm
+    let crm_top: Vec<CrmOrg> = crm
         .iter()
-        .filter_map(|c| Some((as_str(kv(c, "org_domain"))?, as_i64(kv(c, "message_count")).unwrap_or(0))))
+        .filter_map(|c| {
+            Some(CrmOrg {
+                domain: as_str(kv(c, "org_domain"))?,
+                messages: as_i64(kv(c, "message_count")).unwrap_or(0),
+                last_contact: as_str(kv(c, "last_contact")).unwrap_or_default(),
+                people: match kv(c, "people") {
+                    Some(EdnValue::Vector(v)) => v.len() as i64,
+                    _ => 0,
+                },
+            })
+        })
         .take(40)
         .collect();
 
     // 契約由来の商談が少ない場合は crm 接触量上位で補完
     if deals.len() < 8 {
-        for (dom, mc) in &crm_top {
+        for o in &crm_top {
             if deals.len() >= 12 {
                 break;
             }
-            if deals.iter().any(|(p, _)| p == dom) {
+            if deals.iter().any(|(p, _)| p == &o.domain) {
                 continue;
             }
-            deals.push((dom.clone(), (mc * 8_000).clamp(500_000, 30_000_000)));
+            deals.push((o.domain.clone(), (o.messages * 8_000).clamp(500_000, 30_000_000)));
         }
     }
     let pipeline_jpy: i64 = deals.iter().map(|(_, v)| *v).sum();

@@ -114,21 +114,38 @@ web/           ダッシュボード (index.html / style.css / app.js)
 ## インテリジェンス層 (kotoba-datomic がエンジン)
 
 ダッシュボードを開くだけでなく、実 facts から **会社のインテリジェンスを datomic 上で
-構築・前進**させる (`src/intel.rs`):
+構築・前進**させる。**分析ロジックは Clojure (babashka) `analysis/intel.bb`** に置き、
+Rust (`src/intel.rs`) は「bb を実行して出た intel EDN を datomic に transact し、Datalog で
+読み返す」オーケストレーションだけを担う（スコア計算式は一切 Rust に持たない）。
 
-- **KPI は datomic クエリ由来**: headcount / pipeline を Datalog `q` で集計
-  （メモリではなく datomic が源泉）。
-- **依存関係 (売上集中)**: `gftd → 取引先` の売上依存エッジを `:gftd.dep/*` datom 化。
-- **latent (潜在リード)**: 接触量上位だが定型ベンダでない org を `:gftd.intel/kind
-  :latent-lead` として datom 化 (d-standing.co.jp 14,637接触 等)。
-- **project (再生候補)**: file-count 大の休眠プロジェクトを `:revival` として datom 化
-  (From G Suite Drive 10,802ファイル 等)。
-- **intel の前進**: ターンごとに次の潜在リードを `engaged` へ進める **append-only の
-  `:gftd.progress/*` datom** を積む。現在ステージは progress イベントの畳み込みで
-  Datalog から復元 (datomic の事実ログとして知能が深化)。
+`analysis/intel.bb` が実 facts から導出するもの:
 
-これらは社員briefにも注入され、ダッシュボードの「🧠 インテリジェンス」パネルに
-Datalog クエリ結果として表示される。
+- **latent (潜在リード)** + **商談確度スコア(0-100)**: 接触量 + 直近性 + 関与人数を
+  合成 (`confidence`)。離反リスク (`churn`: 旧活発だが直近途絶) も判定。
+  → `:gftd.intel/kind :latent-lead` (linkedin.com 確度100 / rokes.exchange 離反 等)。
+- **契約更新リスク**: `auto_renew=false` or 満了日ありの契約を `:renewal-risk` 化
+  (iChain株式会社 満了2023-02-28 等)。
+- **project (再生候補)**: file-count 大の休眠プロジェクトを `:revival` 化。
+- **依存 (売上集中)**: `gftd → 取引先` の売上エッジを `:gftd.dep/*` 化。
+
+Rust 側の責務:
+
+- **KPI は datomic クエリ由来**: headcount / pipeline を Datalog `q` で集計。
+- **intel の前進**: ターンごとに確度上位の未着手リードを `engaged` へ進める
+  **append-only `:gftd.progress/*` datom** を積み、Datalog の畳み込みで現ステージを復元。
+
+ダッシュボードの「🧠 インテリジェンス」パネルは、これらを **関係グラフ(SVG: gftd↔
+取引先, 太さ=接触量・色=確度・赤リング=離反)** + 確度順リスト + 更新リスク + 再生候補 +
+売上集中として表示する。
+
+### ビルド (intel)
+
+`analysis/intel.bb` は babashka スクリプト。サーバ起動時に Rust が自動実行する
+（`bb` が PATH か `/opt/homebrew/bin/bb` か `~/.local/bin/bb` にあればよい）。単体実行:
+
+```sh
+bb analysis/intel.bb ../m365-archive/facts   # intel datom の EDN を stdout に出力
+```
 
 ## 設計メモ
 

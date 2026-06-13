@@ -50,7 +50,12 @@ main { display: grid; grid-template-columns: 1fr 320px; gap: 20px; padding: 20px
 .worker {
   position: absolute; transform: translate(-50%, -50%);
   display: flex; flex-direction: column; align-items: center; width: 92px; z-index: 2;
+  transition: none;
 }
+.worker.moving .avatar { animation: walk .4s ease-in-out infinite; }
+@keyframes walk { 0%,100% { transform: translateY(0) rotate(-5deg);} 50% { transform: translateY(-4px) rotate(5deg);} }
+.deco.table { font-size: 24px; opacity: .9; }
+.bubble-host { position: static; }
 .worker .avatar { font-size: 46px; line-height: 1; filter: drop-shadow(0 3px 4px rgba(0,0,0,.5));
   animation: idle 2.6s ease-in-out infinite; }
 .worker .desk { font-size: 26px; margin-top: -6px; }
@@ -122,6 +127,9 @@ li.kv .amt { color: var(--green); font-weight: 700; white-space: nowrap; }
 .stage { padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 700; }
 .stage.new { background: #2a3340; color: var(--muted); }
 .stage.eng { background: #1f3d2a; color: var(--green); }
+.risk { background: #3d1f22; color: var(--red); padding: 0 6px; border-radius: 999px; font-size: 10px; font-weight: 700; }
+#graph { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 10px; }
+.graphsvg { width: 100%; height: auto; display: block; }
 
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.8);
   display: flex; align-items: center; justify-content: center; z-index: 100; }
