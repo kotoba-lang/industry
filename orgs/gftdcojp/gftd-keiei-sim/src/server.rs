@@ -66,6 +66,8 @@ pub fn router(app: Shared) -> Router {
         .route("/api/report", post(report))
         .route("/api/summarize/:org", post(summarize))
         .route("/api/m365/sync", post(m365_sync))
+        .route("/api/m365/triage", post(m365_triage))
+        .route("/api/m365/meeting-prep", post(m365_meeting_prep))
         .route("/api/events", get(events))
         .fallback_service(ServeDir::new(web_dir()))
         .with_state(app)
@@ -196,7 +198,7 @@ async fn advance_turn(State(app): State<Shared>) -> Json<serde_json::Value> {
         received_total_jpy: app.received_total_jpy,
         latent_leads: app.latent_leads.clone(),
         revival: app.revival.clone(),
-        snapshot: intel::snapshot_quads(&app.conn),
+        snapshot: intel::snapshot_quads(&app.conn, &app.live_m365.lock().unwrap().clone()),
     });
 
     // フェーズ1: 機能部門を並列実行
@@ -446,6 +448,66 @@ async fn summarize(Path(org): Path<String>, State(app): State<Shared>) -> Json<s
         .and_then(|r| r.ok())
         .unwrap_or_else(|| "要約に失敗しました".into());
     Json(serde_json::json!({ "org": org, "summary": text }))
+}
+
+/// #2 メール担当エージェント: ライブ未読メールから重要なものを gemma4 が抽出・推奨。
+async fn m365_triage(State(app): State<Shared>) -> Json<serde_json::Value> {
+    let live = app.live_m365.lock().unwrap().clone();
+    let lines: Vec<String> = live["inbox"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .map(|m| format!(
+                    "{} {} :: {}",
+                    if m["unread"].as_bool().unwrap_or(false) { "[未読]" } else { "[既読]" },
+                    m["from"].as_str().unwrap_or("?"),
+                    m["subject"].as_str().unwrap_or("")
+                ))
+                .collect()
+        })
+        .unwrap_or_default();
+    if lines.is_empty() {
+        return Json(serde_json::json!({ "triage": "先に「📡 M365同期」で受信トレイを取得してください" }));
+    }
+    let prompt = format!(
+        "あなたは株式会社gftdのメール担当です。次の受信トレイ一覧から、ビジネス上重要・要対応のメールを最大5件抽出し、各1行で「送信者 → 件名 → 推奨アクション」形式で日本語提示してください。広告/通知/自動配信は除外。\n--- 受信トレイ ---\n{}",
+        lines.join("\n")
+    );
+    let infer = app.infer.clone();
+    let text = tokio::task::spawn_blocking(move || infer(&prompt, 600))
+        .await.ok().and_then(|r| r.ok())
+        .unwrap_or_else(|| "トリアージに失敗しました".into());
+    Json(serde_json::json!({ "triage": text }))
+}
+
+/// #3 予定表からの会議準備サマリを gemma4 が自動生成。
+async fn m365_meeting_prep(State(app): State<Shared>) -> Json<serde_json::Value> {
+    let live = app.live_m365.lock().unwrap().clone();
+    let lines: Vec<String> = live["events"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .map(|e| format!(
+                    "{} {} (主催: {})",
+                    e["start"].as_str().unwrap_or("").chars().take(16).collect::<String>(),
+                    e["subject"].as_str().unwrap_or(""),
+                    e["organizer"].as_str().unwrap_or("")
+                ))
+                .collect()
+        })
+        .unwrap_or_default();
+    if lines.is_empty() {
+        return Json(serde_json::json!({ "prep": "先に「📡 M365同期」で予定表を取得してください" }));
+    }
+    let prompt = format!(
+        "あなたは株式会社gftdのCEO補佐です。次の今後の予定一覧について、各会議の準備事項・確認すべき論点を1-2行で日本語提示してください(個人予定は簡潔に)。\n--- 予定表 ---\n{}",
+        lines.join("\n")
+    );
+    let infer = app.infer.clone();
+    let text = tokio::task::spawn_blocking(move || infer(&prompt, 700))
+        .await.ok().and_then(|r| r.ok())
+        .unwrap_or_else(|| "会議準備サマリの生成に失敗しました".into());
+    Json(serde_json::json!({ "prep": text }))
 }
 
 async fn events(State(app): State<Shared>) -> Sse<impl Stream<Item = Result<Event, std::convert::Infallible>>> {

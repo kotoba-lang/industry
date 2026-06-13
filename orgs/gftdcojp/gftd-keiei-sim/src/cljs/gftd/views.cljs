@@ -340,6 +340,9 @@
       [:span.hint (if lm (str "未読 " (:unread lm) " 件") "「📡 M365同期」で取得")]]
      (when lm
        [:<>
+        [:div.live-actions
+         [:button.mini-btn {:on-click #(rf/dispatch [:m365-triage])} "📨 メールトリアージ"]
+         [:button.mini-btn {:on-click #(rf/dispatch [:m365-prep])} "📅 会議準備"]]
         [:h3 "受信トレイ 直近"]
         [:ul.mini
          (for [[i m] (map-indexed vector (take 6 (:inbox lm)))]

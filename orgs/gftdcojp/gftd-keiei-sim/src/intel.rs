@@ -237,7 +237,7 @@ pub fn views(conn: &Connection) -> serde_json::Value {
 
 /// 社員エージェントが kqe で読むための intel ブリーフ quad を作る。
 /// graph "sim/intel" / subject "all" / predicate "sim.intel/brief" / object {"Text": <要約>}。
-pub fn snapshot_quads(conn: &Connection) -> Vec<WitQuad> {
+pub fn snapshot_quads(conn: &Connection, live: &serde_json::Value) -> Vec<WitQuad> {
     let v = views(conn);
     let lead = v["latent_leads"].as_array().and_then(|a| a.first());
     let renewal = v["renewal_risks"].as_array().and_then(|a| a.first());
@@ -262,6 +262,20 @@ pub fn snapshot_quads(conn: &Connection) -> Vec<WitQuad> {
             v["bad_debts"].as_array().map(|a| a.len()).unwrap_or(0),
             bdt as f64 / 1e8
         ));
+    }
+    // 実 M365 ライブ情報を注入 (今日の予定/未読を踏まえた提案ができるように)
+    if let Some(u) = live.get("unread").and_then(|x| x.as_i64()) {
+        s.push_str(&format!(" / 📡実Outlook: 未読{u}件"));
+        if let Some(ev) = live.get("events").and_then(|x| x.as_array()) {
+            let names: Vec<String> = ev
+                .iter()
+                .take(3)
+                .filter_map(|e| e.get("subject").and_then(|x| x.as_str()).map(String::from))
+                .collect();
+            if !names.is_empty() {
+                s.push_str(&format!(", 直近予定[{}]", names.join("/")));
+            }
+        }
     }
     if s.is_empty() {
         return vec![];

@@ -76,3 +76,22 @@
 
 ;; 実 M365 (Outlook) ライブ同期
 (rf/reg-event-fx :m365-sync (fn [_ _] {:http-post "/api/m365/sync"}))
+
+;; メールトリアージ (#2) / 会議準備サマリ (#3) — gemma4 生成をモーダル表示
+(rf/reg-event-fx :m365-triage
+  (fn [{:keys [db]} _]
+    {:db (assoc db :modal {:title "📨 メールトリアージ" :loading true})
+     :http-post-cb ["/api/m365/triage" :set-triage]}))
+(rf/reg-event-db :set-triage
+  (fn [db [_ raw]]
+    (assoc db :modal {:title "📨 メールトリアージ" :loading false
+                      :body (:triage (js->clj raw :keywordize-keys true))})))
+
+(rf/reg-event-fx :m365-prep
+  (fn [{:keys [db]} _]
+    {:db (assoc db :modal {:title "📅 会議準備サマリ" :loading true})
+     :http-post-cb ["/api/m365/meeting-prep" :set-prep]}))
+(rf/reg-event-db :set-prep
+  (fn [db [_ raw]]
+    (assoc db :modal {:title "📅 会議準備サマリ" :loading false
+                      :body (:prep (js->clj raw :keywordize-keys true))})))
