@@ -28,6 +28,8 @@ pub struct App {
     pub exec: Arc<WasmExecutor>,
     /// レポート/商談要約の LLM 直接呼出用 (exec 注入済みと同一エンジン)
     pub infer: kotoba_runtime::host::InferenceFn,
+    /// 相談 ReAct agent (react-consult.clj) の WASM
+    pub react_wasm: Arc<Vec<u8>>,
     pub agents: Arc<HashMap<String, Vec<u8>>>,
     /// 実契約由来の商談 (相手先名, 金額)
     pub pipeline: Vec<(String, i64)>,
@@ -522,21 +524,51 @@ struct ChatReq {
 }
 
 async fn chat(State(app): State<Shared>, Json(req): Json<ChatReq>) -> Json<serde_json::Value> {
-    let intel_brief = {
-        let q = intel::snapshot_quads(&app.conn, &app.live_m365.lock().unwrap().clone());
-        q.first()
-            .map(|w| String::from_utf8_lossy(&w.object_cbor).chars().filter(|c| !c.is_control()).collect::<String>())
-            .unwrap_or_default()
-    };
-    let prompt = format!(
-        "あなたは株式会社gftdの経営参謀です。以下の文脈・社内インテリジェンス・これまでの会話を踏まえ、CEO(意思決定者)の指示や質問に簡潔な日本語(3文以内)で答え、必要なら推奨アクションを1つ示してください。\n--- 対象の意思決定 ---\n{}\n--- 社内インテリジェンス ---\n{}\n--- これまでの会話 ---\n{}\n--- CEOの発言 ---\n{}",
-        req.context, intel_brief, req.history, req.message
+    // 相談文 q = 対象の意思決定 + これまでの会話 + CEOの発言 (文脈をまとめる)
+    let q = format!(
+        "【対象の意思決定】{}\n【これまでの会話】{}\n【CEOの発言】{}",
+        req.context, req.history, req.message
     );
-    let infer = app.infer.clone();
-    let text = tokio::task::spawn_blocking(move || infer(&prompt, 500))
-        .await.ok().and_then(|r| r.ok())
-        .unwrap_or_else(|| "応答に失敗しました".into());
+    // ctx CBOR {"q": q}
+    let mut ctx = Vec::new();
+    {
+        let mut m = std::collections::BTreeMap::new();
+        m.insert("q".to_string(), q);
+        ciborium::into_writer(&m, &mut ctx).ok();
+    }
+    // intel quad を snapshot で渡し、ReAct agent(react-consult.clj)を WASM 実行
+    let snapshot = intel::snapshot_quads(&app.conn, &app.live_m365.lock().unwrap().clone());
+    let exec = app.exec.clone();
+    let wasm = app.react_wasm.clone();
+    let out = tokio::task::spawn_blocking(move || {
+        exec.execute(
+            "react-consult", &wasm, "did:key:z6MkGftdSim", ctx, snapshot,
+            std::collections::HashMap::new(),
+        )
+    })
+    .await;
+    let text = match out {
+        Ok(Ok(res)) => decode_ok(&res.output_cbor),
+        _ => "応答に失敗しました".to_string(),
+    };
     Json(serde_json::json!({ "reply": text }))
+}
+
+/// CBOR {"ok": <text>} から ok 本文を取り出す。
+fn decode_ok(bytes: &[u8]) -> String {
+    match ciborium::from_reader::<ciborium::value::Value, _>(bytes) {
+        Ok(ciborium::value::Value::Map(entries)) => {
+            for (k, v) in entries {
+                if matches!(&k, ciborium::value::Value::Text(t) if t == "ok") {
+                    if let ciborium::value::Value::Text(t) = v {
+                        return t;
+                    }
+                }
+            }
+            String::new()
+        }
+        _ => String::new(),
+    }
 }
 
 async fn events(State(app): State<Shared>) -> Sse<impl Stream<Item = Result<Event, std::convert::Infallible>>> {

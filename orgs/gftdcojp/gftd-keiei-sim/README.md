@@ -138,8 +138,12 @@ web/           ダッシュボード (index.html / style.css / app.js)
   (不良債権/更新リスク/離反/財務・法務提案=依存の根)を先に、成長項目(リード/営業提案)を
   後に並べる(stabilize-before-scale)。同層は WSJF。意思決定や同期で data が変わるたびに
   再計算される (`priority-topo`)。
-- **チャット相談**: 各項目の「💬 相談」で承認/却下の二択でなく自由文で参謀(gemma4)と
-  対話できる。文脈(項目+社内intel)+会話履歴を踏まえて回答 (`POST /api/chat`)。
+- **チャット相談 (kotoba-clj ReAct agent)**: 各項目の「💬 相談」で承認/却下の二択でなく
+  自由文で参謀と対話。相談agentは **`agents/react-consult.clj` の defgraph ReActループ**
+  (`:observe → :reason → (if-edge need-more? :observe :end)`)。Reason(gemma4)が
+  「追加データ必要(MORE)」と判断したら Act=kqe で datomic intel を再観測してループする
+  (bounded、最大3ラウンド)。**制御ループは全て clj 側**で、Rust は WASM 実行と intel quad の
+  snapshot 受け渡しのみ。観測源は `sim.intel/brief`(要約)→`sim.intel/detail`(具体)。
 
 これにより Shneiderman の overview-first を満たし、認知負荷を最小化して
 「上から処理する」だけで経営判断が進む。

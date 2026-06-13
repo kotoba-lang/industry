@@ -280,17 +280,43 @@ pub fn snapshot_quads(conn: &Connection, live: &serde_json::Value) -> Vec<WitQua
     if s.is_empty() {
         return vec![];
     }
-    // object = CBOR {"Text": s}
-    let mut obj = Vec::new();
-    let mut map = std::collections::BTreeMap::new();
-    map.insert("Text".to_string(), s);
-    ciborium::into_writer(&map, &mut obj).ok();
-    vec![WitQuad {
-        graph: "sim/intel".into(),
-        subject: "all".into(),
-        predicate: "sim.intel/brief".into(),
-        object_cbor: obj,
-    }]
+    // 詳細(detail) quad: ReAct agent が2ラウンド目以降に深掘りする具体データ
+    let mut detail = String::new();
+    if let Some(leads) = v["latent_leads"].as_array() {
+        let t: Vec<String> = leads.iter().take(5).map(|l| format!(
+            "{}(確度{} pw{} {})",
+            l["subject"].as_str().unwrap_or(""), l["confidence"].as_i64().unwrap_or(0),
+            l["path_weight"].as_i64().unwrap_or(0), l["rel_type"].as_str().unwrap_or("")
+        )).collect();
+        detail.push_str(&format!("有力/離反リード: {}\n", t.join(", ")));
+    }
+    if let Some(rn) = v["renewal_risks"].as_array() {
+        let t: Vec<String> = rn.iter().take(4).map(|r| r["subject"].as_str().unwrap_or("").to_string()).collect();
+        detail.push_str(&format!("契約更新要確認: {}\n", t.join(", ")));
+    }
+    if let Some(bd) = v["bad_debts"].as_array() {
+        let t: Vec<String> = bd.iter().take(4).map(|b| format!(
+            "{} ¥{}万", b["subject"].as_str().unwrap_or(""), b["amount_jpy"].as_i64().unwrap_or(0) / 10000
+        )).collect();
+        detail.push_str(&format!("不良債権: {}\n", t.join(", ")));
+    }
+    if let Some(dg) = v["deal_digests"].as_array() {
+        for d in dg.iter().take(2) {
+            detail.push_str(&format!("商談履歴[{}]: {}\n", d["subject"].as_str().unwrap_or(""), d["note"].as_str().unwrap_or("")));
+        }
+    }
+
+    let mk = |subj: &str, pred: &str, text: String| {
+        let mut obj = Vec::new();
+        let mut map = std::collections::BTreeMap::new();
+        map.insert("Text".to_string(), text);
+        ciborium::into_writer(&map, &mut obj).ok();
+        WitQuad { graph: "sim/intel".into(), subject: subj.into(), predicate: pred.into(), object_cbor: obj }
+    };
+    vec![
+        mk("all", "sim.intel/brief", s),
+        mk("all", "sim.intel/detail", detail),
+    ]
 }
 
 /// 商談ファネルを 1 段進める (営業提案の承認時)。

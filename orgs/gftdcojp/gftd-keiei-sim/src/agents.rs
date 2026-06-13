@@ -44,6 +44,11 @@ fn compile_one(file: &str) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
+/// 相談 ReAct agent (react-consult.clj) をコンパイルする。
+pub fn compile_react() -> Result<Vec<u8>> {
+    compile_one("react-consult.clj")
+}
+
 /// 全社員をコンパイルしてバイト列をキャッシュする。
 pub fn compile_all() -> Result<HashMap<String, Vec<u8>>> {
     let mut out = HashMap::new();
