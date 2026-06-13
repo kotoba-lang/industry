@@ -161,6 +161,16 @@ pub fn views(conn: &Connection) -> serde_json::Value {
     .collect();
     revival.sort_by_key(|x| -(x["score"].as_i64().unwrap_or(0)));
 
+    // 商談ダイジェスト (スレッド件名履歴) — 要約の素材
+    let deal_digests: Vec<serde_json::Value> = q(
+        parse("{:find [?subj ?note ?kind] :where [[?e :gftd.intel/subject ?subj][?e :gftd.intel/note ?note][?e :gftd.intel/kind ?kind]]}").unwrap(),
+        &db, &[],
+    ).unwrap_or_default()
+    .iter()
+    .filter(|r| kw_at(r, 2) == "deal-digest")
+    .map(|r| serde_json::json!({ "subject": str_at(r,0), "note": str_at(r,1) }))
+    .collect();
+
     // 不良債権(売掛金・回収要確認)
     let bad_debts: Vec<serde_json::Value> = q(
         parse("{:find [?subj ?amt ?kind] :where [[?e :gftd.intel/subject ?subj][?e :gftd.intel/score ?amt][?e :gftd.intel/kind ?kind]]}").unwrap(),
@@ -220,6 +230,7 @@ pub fn views(conn: &Connection) -> serde_json::Value {
         "people": people,
         "bad_debts": bad_debts,
         "bad_debt_total_jpy": bad_debt_total,
+        "deal_digests": deal_digests,
         "intel_depth": progressed.len(),
     })
 }
@@ -304,6 +315,22 @@ pub async fn close_deal(conn: &Connection, turn: i64) -> Option<(String, String,
         let _ = conn.transact(tx).await;
     }
     Some((subj, nx.to_string(), booked))
+}
+
+/// ターン履歴 (時系列可視化用) を datomic から読む。
+pub fn turn_history(conn: &Connection) -> Vec<serde_json::Value> {
+    let mut rows: Vec<serde_json::Value> = q(
+        parse("{:find [?n ?cash ?rev ?morale ?pl] :where [[?t :sim.turn/n ?n][?t :sim.turn/cash-jpy ?cash][?t :sim.turn/revenue-jpy ?rev][?t :sim.turn/morale ?morale][?t :sim.turn/pipeline-jpy ?pl]]}").unwrap(),
+        &conn.db(), &[],
+    ).unwrap_or_default()
+    .iter()
+    .map(|r| serde_json::json!({
+        "turn": i64_at(r,0), "cash": i64_at(r,1), "revenue": i64_at(r,2),
+        "morale": i64_at(r,3), "pipeline": i64_at(r,4)
+    }))
+    .collect();
+    rows.sort_by_key(|x| x["turn"].as_i64().unwrap_or(0));
+    rows
 }
 
 /// progress イベントから subject ごとの最新ステージを畳み込む。

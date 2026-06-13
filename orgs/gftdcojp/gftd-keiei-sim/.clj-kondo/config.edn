@@ -15,9 +15,8 @@
   :redundant-do         {:level :warning}
   :redefined-var        {:level :warning}}
 
- ;; reagent / re-frame を導入したら下記 import を有効化すると、
- ;;   - (r/with-let ...) や hiccup の lint
- ;;   - reg-event-db / reg-sub のキーワード参照解決
- ;; が効く。導入前は不要 (コメントのまま)。
- ;; :config-paths ["macros"]
+ ;; reagent / re-frame 本体が jar 内に同梱する clj-kondo 設定を取り込むには、
+ ;; 一度だけクラスパスを走査してキャッシュ/設定をコピーする:
+ ;;   clojure -M:lint --dependencies --copy-configs --lint "$(clojure -Spath)"
+ ;; これで reg-event-db / reg-sub / with-let 等の lint が精緻化される。
  }

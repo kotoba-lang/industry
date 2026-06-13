@@ -60,7 +60,7 @@ async fn main() -> Result<()> {
 
     // 3. 社員エージェントをコンパイル + 推論エンジン
     let compiled = agents::compile_all()?;
-    let (exec, llm_live) = agents::make_executor()?;
+    let (exec, llm_live, infer_fn) = agents::make_executor()?;
     tracing::info!(
         "executor ready (LLM: {})",
         if llm_live { "REAL (gemma4 e4b @ Ollama)" } else { "STUB" }
@@ -71,6 +71,7 @@ async fn main() -> Result<()> {
     let app = Arc::new(server::App {
         conn,
         exec: Arc::new(exec),
+        infer: infer_fn,
         agents: Arc::new(compiled),
         pipeline: seed.pipeline,
         projects: seed.projects,
@@ -82,6 +83,7 @@ async fn main() -> Result<()> {
         llm_live,
         kpis: Mutex::new(seed.kpis),
         proposals: Mutex::new(Vec::new()),
+        discussion: Mutex::new(Vec::new()),
         tx,
         seq: AtomicU64::new(1),
     });

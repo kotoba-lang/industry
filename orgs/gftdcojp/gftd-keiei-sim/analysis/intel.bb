@@ -211,6 +211,35 @@
         :gftd.intel/stage :new})
      m)))
 
+;; ---- 商談ダイジェスト: 上位3社のスレッド件名履歴(商談の流れ)を抽出 ----
+;; (メール本文は facts に無いため件名列で商談経緯を要約する素材を作る)
+(defn deal-digests []
+  (let [orgs (->> (read-objs "crm.edn") (remove #(noise? (:org_domain %)))
+                  (sort-by #(- (or (:message_count %) 0))) (take 3))
+        doms (set (map :org_domain orgs))
+        path (str facts-dir "/threads.edn")
+        subs (if (and (seq doms) (.exists (io/file path)))
+               (with-open [r (io/reader path)]
+                 (reduce
+                  (fn [acc line]
+                    (if (some #(str/includes? line %) doms)
+                      (if-let [t (try (edn/read-string line) (catch Exception _ nil))]
+                        (reduce (fn [a p]
+                                  (let [d (last (str/split (str p) #"@"))]
+                                    (if (and (contains? doms d) (:subject t) (< (count (get a d [])) 6))
+                                      (update a d (fnil conj []) (:subject t)) a)))
+                                acc (:participants t))
+                        acc) acc))
+                  {} (line-seq r)))
+               {})]
+    (map-indexed
+     (fn [i o]
+       {:db/id (str "dg" i)
+        :gftd.intel/kind :deal-digest
+        :gftd.intel/subject (:org_domain o)
+        :gftd.intel/note (str/join " / " (take 6 (get subs (:org_domain o) [])))})
+     orgs)))
+
 ;; ---- 市場分析: 接触上位 org をセグメント別に集計 ----
 (defn markets []
   (let [orgs (->> (read-objs "crm.edn") (remove #(noise? (:org_domain %))) (take 80))
@@ -278,5 +307,5 @@
 
 ;; ---- 出力: 全 intel datom を 1 ベクタで ----
 (let [all (vec (concat (latent-leads) (revivals) (renewal-risks) (deps)
-                       (markets) (people-nodes) (bad-debts)))]
+                       (markets) (people-nodes) (bad-debts) (deal-digests)))]
   (println (pr-str all)))

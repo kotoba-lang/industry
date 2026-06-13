@@ -26,6 +26,8 @@ use crate::model::{apply_effect, effect_hint, role_label, Kpis, Proposal};
 pub struct App {
     pub conn: Connection,
     pub exec: Arc<WasmExecutor>,
+    /// レポート/商談要約の LLM 直接呼出用 (exec 注入済みと同一エンジン)
+    pub infer: kotoba_runtime::host::InferenceFn,
     pub agents: Arc<HashMap<String, Vec<u8>>>,
     /// 実契約由来の商談 (相手先名, 金額)
     pub pipeline: Vec<(String, i64)>,
@@ -41,6 +43,8 @@ pub struct App {
     pub llm_live: bool,
     pub kpis: Mutex<Kpis>,
     pub proposals: Mutex<Vec<Proposal>>,
+    /// 社員間ディスカッションの議事録 (speaker, text)
+    pub discussion: Mutex<Vec<serde_json::Value>>,
     pub tx: broadcast::Sender<String>,
     pub seq: AtomicU64,
 }
@@ -57,6 +61,8 @@ pub fn router(app: Shared) -> Router {
         .route("/api/turn/advance", post(advance_turn))
         .route("/api/proposal/:id/approve", post(approve))
         .route("/api/proposal/:id/reject", post(reject))
+        .route("/api/report", post(report))
+        .route("/api/summarize/:org", post(summarize))
         .route("/api/events", get(events))
         .fallback_service(ServeDir::new(web_dir()))
         .with_state(app)
@@ -99,6 +105,7 @@ fn ledger(conn: &Connection) -> Vec<serde_json::Value> {
 fn state_payload(app: &App) -> serde_json::Value {
     let kpis = app.kpis.lock().unwrap().clone();
     let proposals = app.proposals.lock().unwrap().clone();
+    let discussion = app.discussion.lock().unwrap().clone();
     let pipeline: Vec<serde_json::Value> = app
         .pipeline
         .iter()
@@ -117,6 +124,10 @@ fn state_payload(app: &App) -> serde_json::Value {
         "received_total_jpy": app.received_total_jpy,
         // datomic 由来の intel (依存/latent/再生候補)
         "intel": intel::views(&app.conn),
+        // 時系列 (受注/KPI推移の可視化)
+        "turn_history": intel::turn_history(&app.conn),
+        // 社員間ディスカッション議事録
+        "discussion": discussion,
     })
 }
 
@@ -181,16 +192,43 @@ async fn advance_turn(State(app): State<Shared>) -> Json<serde_json::Value> {
         }
     }
 
-    // フェーズ2: CEO補佐が4提案を踏まえて統括 (社員間ディスカッション)
+    // 議事録(transcript)を構築: まず各責任者の発言
+    let mut transcript: Vec<serde_json::Value> = results
+        .iter()
+        .map(|(r, a)| serde_json::json!({ "speaker": role_label(r), "role": r, "text": a }))
+        .collect();
+
     let peer = results
         .iter()
         .map(|(r, a)| format!("・{}: {}", role_label(r), a))
         .collect::<Vec<_>>()
         .join("\n");
+
+    // フェーズ1.5: 財務責任者が他部門案を批評する反論ラウンド (対話の深化)
+    {
+        let exec = exec.clone();
+        let agents_map = agents_map.clone();
+        let snap = world.snapshot.clone();
+        let crit_brief = format!(
+            "各責任者の提案は次の通り:\n{peer}\n財務責任者として、これらの中で最大の財務リスクを1つ指摘し、どの案を優先すべきか1文で述べてください。"
+        );
+        if let Ok((_, txt)) = tokio::task::spawn_blocking(move || {
+            let wasm = agents_map.get("finance").cloned().unwrap_or_default();
+            agents::run_one(exec, wasm, "finance".to_string(), crit_brief, turn_n, snap)
+        })
+        .await
+        {
+            transcript.push(serde_json::json!({ "speaker": "財務責任者 (反論)", "role": "finance", "text": txt }));
+        }
+    }
+    let critique = transcript.last().and_then(|t| t["text"].as_str()).unwrap_or("").to_string();
+
+    // フェーズ2: CEO補佐が提案と反論を踏まえて統括
     let ceo_brief = format!(
-        "{}\n--- 社内の議論(各責任者の提案) ---\n{}\n上記の議論を踏まえ、最優先の経営判断を1つ具申してください。",
+        "{}\n--- 社内の議論(各責任者の提案) ---\n{}\n--- 財務からの反論 ---\n{}\n上記の議論を踏まえ、最優先の経営判断を1つ具申してください。",
         agents::build_brief("ceo", &world),
-        peer
+        peer,
+        critique
     );
     {
         let exec = exec.clone();
@@ -202,9 +240,11 @@ async fn advance_turn(State(app): State<Shared>) -> Json<serde_json::Value> {
         })
         .await
         {
+            transcript.push(serde_json::json!({ "speaker": "CEO補佐 (統括)", "role": "ceo", "text": c.1 }));
             results.push(c);
         }
     }
+    *app.discussion.lock().unwrap() = transcript;
 
     // 3. 提案カードを作成
     let proposals: Vec<Proposal> = results
@@ -223,14 +263,16 @@ async fn advance_turn(State(app): State<Shared>) -> Json<serde_json::Value> {
         .collect();
     *app.proposals.lock().unwrap() = proposals;
 
-    // 4. ターン履歴を datomic に記録
+    // 4. ターン履歴を datomic に記録 (時系列可視化用に売上/パイプラインも)
     let edn = format!(
-        "[{{:db/id \"turn{t}\" :sim.turn/n {t} :sim.turn/cash-jpy {cash} :sim.turn/runway {runway} :sim.turn/morale {morale} :sim.turn/headcount {hc}}}]",
+        "[{{:db/id \"turn{t}\" :sim.turn/n {t} :sim.turn/cash-jpy {cash} :sim.turn/runway {runway} :sim.turn/morale {morale} :sim.turn/headcount {hc} :sim.turn/revenue-jpy {rev} :sim.turn/pipeline-jpy {pl}}}]",
         t = kpis_snapshot.turn,
         cash = kpis_snapshot.cash_jpy,
         runway = kpis_snapshot.runway_months as i64,
         morale = kpis_snapshot.morale,
         hc = kpis_snapshot.headcount,
+        rev = kpis_snapshot.revenue_total_jpy,
+        pl = kpis_snapshot.pipeline_jpy,
     );
     if let Ok(tx) = parse(&edn) {
         let _ = app.conn.transact(tx).await;
@@ -317,6 +359,66 @@ async fn decide(app: &App, id: &str, approved: bool) {
     }
 
     let _ = app.tx.send("update".to_string());
+}
+
+/// #4 複数四半期の経営レポートを gemma4 で自動生成する。
+async fn report(State(app): State<Shared>) -> Json<serde_json::Value> {
+    let hist = intel::turn_history(&app.conn);
+    let kpis = app.kpis.lock().unwrap().clone();
+    let led = ledger(&app.conn);
+    let hist_txt = hist
+        .iter()
+        .map(|h| format!(
+            "ターン{}: 現金{:.2}億 売上累計{:.2}億 パイプライン{:.2}億 士気{}",
+            h["turn"].as_i64().unwrap_or(0),
+            h["cash"].as_i64().unwrap_or(0) as f64 / 1e8,
+            h["revenue"].as_i64().unwrap_or(0) as f64 / 1e8,
+            h["pipeline"].as_i64().unwrap_or(0) as f64 / 1e8,
+            h["morale"].as_i64().unwrap_or(0),
+        ))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let dec_txt = led
+        .iter()
+        .take(12)
+        .map(|d| format!("・T{} {}", d["turn"].as_i64().unwrap_or(0), d["note"].as_str().unwrap_or("")))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let prompt = format!(
+        "あなたは株式会社gftdのCEO補佐です。以下のKPI推移と意思決定履歴をもとに、複数四半期の経営レポートを日本語で作成してください。構成: 1)現状サマリ 2)良かった点 3)課題とリスク 4)次期の重点方針。各項目2-3文、合計400字程度。\n\n【KPI推移】\n{hist_txt}\n\n【意思決定履歴】\n{dec_txt}\n\n【現在の状態】現金{:.2}億 ランウェイ{:.1}ヶ月 売上累計{:.2}億 士気{} 人員{}名",
+        kpis.cash_jpy as f64 / 1e8, kpis.runway_months, kpis.revenue_total_jpy as f64 / 1e8, kpis.morale, kpis.headcount
+    );
+    let infer = app.infer.clone();
+    let text = tokio::task::spawn_blocking(move || infer(&prompt, 800))
+        .await
+        .ok()
+        .and_then(|r| r.ok())
+        .unwrap_or_else(|| "レポート生成に失敗しました".into());
+    Json(serde_json::json!({ "report": text }))
+}
+
+/// #2 商談要約: 取引先のスレッド件名履歴(deal-digest)を gemma4 で要約する。
+async fn summarize(Path(org): Path<String>, State(app): State<Shared>) -> Json<serde_json::Value> {
+    let it = intel::views(&app.conn);
+    let digest = it["deal_digests"]
+        .as_array()
+        .and_then(|a| a.iter().find(|d| d["subject"].as_str() == Some(&org)))
+        .and_then(|d| d["note"].as_str())
+        .unwrap_or("")
+        .to_string();
+    if digest.is_empty() {
+        return Json(serde_json::json!({ "summary": "この取引先のスレッド履歴が見つかりません" }));
+    }
+    let prompt = format!(
+        "あなたはgftdの営業担当です。取引先「{org}」との以下のメール/スレッド件名の履歴から、商談の状況と次の一手を日本語3文以内で要約してください。\n--- 件名履歴 ---\n{digest}"
+    );
+    let infer = app.infer.clone();
+    let text = tokio::task::spawn_blocking(move || infer(&prompt, 400))
+        .await
+        .ok()
+        .and_then(|r| r.ok())
+        .unwrap_or_else(|| "要約に失敗しました".into());
+    Json(serde_json::json!({ "org": org, "summary": text }))
 }
 
 async fn events(State(app): State<Shared>) -> Sse<impl Stream<Item = Result<Event, std::convert::Infallible>>> {

@@ -4,7 +4,12 @@
 ;;   clojure -M:lint     → clj-kondo で静的解析 (未定義var/arity/typo を error で落とす)
 ;; 公式 ClojureScript コンパイラを使用 (shadow-cljs 不要、node も不要)。
 {:deps  {org.clojure/clojurescript {:mvn/version "1.11.132"}
-         metosin/malli            {:mvn/version "0.16.4"}}  ; dev時 app-data 形状検証
+         reagent/reagent          {:mvn/version "1.2.0"}   ; React ラッパ (hiccup ビュー)
+         re-frame/re-frame        {:mvn/version "1.4.3"}   ; 単方向データフロー (app-db/events/subs)
+         ;; npm 非使用 (公式cljsコンパイラ) のため React 本体は cljsjs で foreign-lib 供給
+         cljsjs/react             {:mvn/version "18.2.0-1"}
+         cljsjs/react-dom         {:mvn/version "18.2.0-1"}
+         metosin/malli            {:mvn/version "0.16.4"}}  ; dev時 app-db 形状検証
  :paths ["src/cljs"]
  :aliases
  {:cljs {:main-opts ["-m" "cljs.main"

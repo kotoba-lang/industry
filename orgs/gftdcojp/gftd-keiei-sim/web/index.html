@@ -7,65 +7,10 @@
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <header>
-    <div class="brand">
-      <span class="logo">🏢</span>
-      <div>
-        <h1>gftdcojp バーチャルオフィス経営シム</h1>
-        <p class="sub">意思決定者: <strong>あなた 👑</strong> ／ 社員: LLMエージェント（ClojureScript + kotoba-datomic）</p>
-      </div>
-    </div>
-    <div class="head-right">
-      <span id="llm-badge" class="badge">LLM</span>
-      <span id="turn-badge" class="badge turn">ターン 0</span>
-      <button id="advance" class="primary">次の四半期へ ▶</button>
-    </div>
-  </header>
+  <!-- reagent が #app 配下に全UIを描画する (旧: 固定divへ手動DOM操作) -->
+  <div id="app"></div>
 
-  <section class="kpis" id="kpis"></section>
-
-  <main>
-    <!-- 2D オフィス (Gather風) -->
-    <div id="office" class="office"></div>
-
-    <!-- サイドパネル -->
-    <aside class="sidebar">
-      <section class="panel intel">
-        <h2>🧠 インテリジェンス <span class="hint">clj導出 · datomic · 深度 <b id="intel-depth">0</b></span></h2>
-        <div id="graph"></div>
-        <div id="graph-legend" class="legend"></div>
-        <h3>市場分析 <span class="hint">セグメント別</span></h3>
-        <ul id="markets" class="mini"></ul>
-        <h3>潜在リード <span class="hint">path-weight順 · 商流</span></h3>
-        <ul id="leads" class="mini"></ul>
-        <h3>契約更新リスク <span class="hint">要フォロー</span></h3>
-        <ul id="renewal" class="mini"></ul>
-        <h3>再生候補 <span class="hint">休眠・資産大</span></h3>
-        <ul id="revival" class="mini"></ul>
-        <h3>売上集中(依存)</h3>
-        <ul id="deps" class="mini"></ul>
-      </section>
-      <section class="panel">
-        <h2>実財務 <span class="hint">m365 請求書実額</span></h2>
-        <div class="fin" id="fin"></div>
-        <h3>不良債権 <span class="hint">売掛金・回収要確認</span></h3>
-        <ul id="baddebt" class="mini"></ul>
-      </section>
-      <section class="panel">
-        <h2>意思決定台帳 <span class="hint">kotoba-datomic</span></h2>
-        <ul id="ledger" class="mini"></ul>
-      </section>
-    </aside>
-  </main>
-
-  <div id="gameover" class="overlay hidden">
-    <div class="overlay-box">
-      <h2>💸 資金ショート — 倒産</h2>
-      <p>現金残高がマイナスになりました。経営判断を見直してリスタートしてください。</p>
-    </div>
-  </div>
-
-  <!-- ClojureScript でコンパイルされた単一ファイル -->
+  <!-- ClojureScript (reagent + re-frame) でコンパイルされた単一ファイル -->
   <script src="/app.js"></script>
 </body>
 </html>

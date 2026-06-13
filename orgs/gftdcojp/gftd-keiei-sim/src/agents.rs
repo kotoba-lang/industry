@@ -57,18 +57,20 @@ pub fn compile_all() -> Result<HashMap<String, Vec<u8>>> {
 
 /// 推論エンジンを作る。ローカル Ollama (gemma4 e4b) が起動していれば実LLM、
 /// 届かなければスタブにフォールバックする。`GFTD_SIM_STUB=1` で強制スタブ。
-pub fn make_executor() -> Result<(WasmExecutor, bool)> {
+/// 返り値の InferenceFn は WasmExecutor に注入済みのものと同一(レポート/要約の直接呼出用)。
+pub fn make_executor() -> Result<(WasmExecutor, bool, InferenceFn)> {
     let force_stub = std::env::var("GFTD_SIM_STUB").is_ok();
-    if !force_stub && crate::infer::reachable() {
+    let live = !force_stub && crate::infer::reachable();
+    let f: InferenceFn = if live {
         tracing::info!("connecting real LLM: {} @ {}", crate::infer::model(), crate::infer::url());
-        let f = crate::infer::make_infer_fn();
-        return Ok((WasmExecutor::with_inference(GAS, f)?, true));
-    }
-    let f: InferenceFn = Arc::new(|prompt: &str, _max: usize| {
-        let head: String = prompt.lines().last().unwrap_or("").chars().take(40).collect();
-        Ok(format!("（スタブ提案: 「{head}…」を踏まえた具体策を実行する）"))
-    });
-    Ok((WasmExecutor::with_inference(GAS, f)?, false))
+        crate::infer::make_infer_fn()
+    } else {
+        Arc::new(|prompt: &str, _max: usize| {
+            let head: String = prompt.lines().last().unwrap_or("").chars().take(40).collect();
+            Ok(format!("（スタブ生成: 「{head}…」）"))
+        })
+    };
+    Ok((WasmExecutor::with_inference(GAS, f.clone())?, live, f))
 }
 
 /// 社員briefに渡す世界状態 (実データ込み)。spawn_blocking 越しに渡せるよう owned。

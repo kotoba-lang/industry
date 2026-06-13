@@ -1,9 +1,9 @@
 (ns gftd.schema
-  "サーバ /api 由来の app-data の形状スキーマ。
-   re-frame を使っていないため app-db の代わりにこの単一マップを検証対象とする。
-   dev (goog.DEBUG=true、:simple/:none ビルド) でのみ検証し、サーバとフロントの
-   形状ズレを Svelte の props 型エラーのように即座に throw して顕在化させる。
-   shape は src/model.rs の Kpis / Proposal (serde) と server.rs state_payload に対応。"
+  "re-frame app-db の形状スキーマ。
+   :data はサーバ /api/state 由来のスナップショット (src/model.rs の Kpis / Proposal
+   (serde) と server.rs state_payload に対応)。
+   gftd.events の global interceptor が dev (goog.DEBUG) で毎イベント後に検証し、
+   サーバとフロントの形状ズレを Svelte の props 型エラーのように即座に throw する。"
   (:require [malli.core :as m]
             [malli.error :as me]))
 
@@ -39,11 +39,25 @@
    [:ledger             [:sequential :map]]
    [:intel {:optional true} [:maybe :map]]])
 
+;; re-frame app-db 全体。:data は初回 fetch 前は nil。
+(def AppDb
+  [:map {:closed true}
+   [:data     [:maybe AppData]]
+   [:thinking :boolean]
+   [:modal    [:maybe map?]]])   ; レポート/要約モーダルの状態
+
+(defn- check! [schema label value]
+  (when-not (m/validate schema value)
+    (let [errs (me/humanize (m/explain schema value))]
+      (js/console.error (str "❌ " label " schema violation:") (clj->js errs))
+      (throw (ex-info (str label " schema violation") {:errors errs})))))
+
+(defn validate-db!
+  "re-frame app-db 全体を検証。global interceptor から goog.DEBUG ガードで呼ぶ。"
+  [db]
+  (check! AppDb "app-db" db))
+
 (defn validate!
-  "app-data を検証。形状違反なら console.error で humanize した差分を出して throw。
-   呼び出し側で goog.DEBUG ガードして dev のみ実行すること。"
+  "app-data (=:data) 単体を検証 (任意・テスト/直接利用向け)。"
   [data]
-  (when-not (m/validate AppData data)
-    (let [errs (me/humanize (m/explain AppData data))]
-      (js/console.error "❌ app-data schema violation:" (clj->js errs))
-      (throw (ex-info "app-data schema violation" {:errors errs})))))
+  (check! AppData "app-data" data))

@@ -155,3 +155,30 @@ li.funnel b { color: var(--green); }
 .overlay-box { background: var(--panel); border: 1px solid var(--red); border-radius: 14px;
   padding: 36px 44px; text-align: center; max-width: 420px; }
 .overlay-box h2 { color: var(--red); font-size: 24px; }
+
+/* ===== #1 時系列チャート / #3 議事録 / モーダル / 要約ボタン ===== */
+main { grid-template-columns: 1fr 320px; }
+.center { display: flex; flex-direction: column; gap: 16px; }
+.spark { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+.spark-label { font-size: 11.5px; color: var(--muted); margin-bottom: 2px; }
+.sparksvg { width: 100%; height: 46px; display: block; }
+
+ul.chat { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+ul.chat li { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; line-height: 1.5; border-left: 3px solid var(--accent); }
+ul.chat li.chat-sales { border-left-color: #4f9dff; }
+ul.chat li.chat-eng { border-left-color: #a371f7; }
+ul.chat li.chat-finance { border-left-color: #3fb950; }
+ul.chat li.chat-legal { border-left-color: #d29922; }
+ul.chat li.chat-ceo { border-left-color: #ffd966; }
+ul.chat .speaker { font-weight: 700; color: var(--muted); margin-right: 8px; }
+
+.mini-btn { border: 1px solid var(--line); background: var(--panel-2); color: var(--accent); border-radius: 6px; padding: 2px 9px; font-size: 11px; font-weight: 700; cursor: pointer; }
+.mini-btn:hover { background: var(--accent); color: #fff; }
+button.primary.alt { background: var(--panel-2); color: var(--accent); border: 1px solid var(--accent); }
+button.primary.alt:hover { background: var(--accent); color: #fff; }
+
+.modal-box { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 24px 28px; max-width: 560px; width: 90%; position: relative; max-height: 80vh; overflow-y: auto; }
+.modal-box h2 { font-size: 18px; margin: 0 0 14px; }
+.modal-close { position: absolute; top: 12px; right: 16px; background: none; border: none; color: var(--muted); font-size: 22px; cursor: pointer; }
+.report-body { font-size: 14px; line-height: 1.9; white-space: pre-wrap; color: var(--text); }
+.empty { color: var(--muted); font-size: 13px; }
