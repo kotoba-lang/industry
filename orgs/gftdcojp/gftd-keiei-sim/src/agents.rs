@@ -86,6 +86,8 @@ pub struct World {
     /// intel: 潜在リード(接触量上位org) / 再生候補プロジェクト
     pub latent_leads: Vec<String>,
     pub revival: Vec<String>,
+    /// 社員が kqe で読む intel ブリーフ quad (graph "sim/intel")
+    pub snapshot: Vec<WitQuad>,
 }
 
 /// 役割ごとの現状況 brief を組み立てる (LLM プロンプトに渡す)。実データを注入する。
@@ -164,9 +166,9 @@ pub fn run_agent(
     role: &str,
     brief: &str,
     turn: u64,
+    snapshot: Vec<WitQuad>,
 ) -> Result<String> {
     let ctx = encode_ctx(brief, role, turn);
-    let snapshot: Vec<WitQuad> = Vec::new();
     let res = exec
         .execute(role, wasm, "did:key:z6MkGftdSim", ctx, snapshot, HashMap::new())
         .map_err(|e| anyhow::anyhow!("execute {role}: {e}"))?;
@@ -218,7 +220,7 @@ pub fn run_all(
         .filter_map(|(role, _)| {
             let wasm = agents.get(*role)?;
             let brief = build_brief(role, w);
-            let action = match run_agent(exec, wasm, role, &brief, w.kpis.turn as u64) {
+            let action = match run_agent(exec, wasm, role, &brief, w.kpis.turn as u64, w.snapshot.clone()) {
                 Ok(a) => a,
                 Err(e) => {
                     tracing::warn!("agent {role} failed: {e}");

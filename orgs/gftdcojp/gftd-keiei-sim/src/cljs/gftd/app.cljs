@@ -147,14 +147,18 @@
   (when it
     (set! (.-textContent ($ "intel-depth")) (or (:intel_depth it) 0))
     (render-graph! (:latent_leads it))
-    (set! (.-innerHTML ($ "leads"))
-          (str/join (for [l (take 6 (:latent_leads it))]
-                      (let [eng? (= (:stage l) "engaged")
-                            churn? (= (:risk l) "churn")]
-                        (str "<li class='kv'><span>" (esc (:subject l))
-                             (when churn? " <span class='risk'>離反</span>")
-                             "</span><span class='r'>確度" (:confidence l)
-                             " <span class='stage " (if eng? "eng" "new") "'>" (:stage l) "</span></span></li>")))))
+    (let [f (:funnel it)
+          funnel-li (str "<li class='funnel'>商談ファネル: 新規 " (:new f 0) " ｜ 接触 " (:engaged f 0)
+                         " ｜ 商談 " (:qualified f 0) " ｜ <b>受注 " (:won f 0) "</b></li>")
+          leads (str/join (for [l (take 6 (:latent_leads it))]
+                            (let [churn? (= (:risk l) "churn")
+                                  open (:open_threads l)]
+                              (str "<li class='kv'><span>" (esc (:subject l))
+                                   (when churn? " <span class='risk'>離反</span>")
+                                   "</span><span class='r'>確度" (:confidence l)
+                                   (when (and open (pos? open)) (str " 📩" open))
+                                   " <span class='stage " (:stage l) "'>" (:stage l) "</span></span></li>"))))]
+      (set! (.-innerHTML ($ "leads")) (str funnel-li leads)))
     (set! (.-innerHTML ($ "renewal"))
           (str/join (for [r (take 4 (:renewal_risks it))]
                       (str "<li><span class='t'>⚠</span>" (esc (:subject r)) "</li>"))))

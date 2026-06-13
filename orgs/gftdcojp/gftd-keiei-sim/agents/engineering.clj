@@ -12,10 +12,19 @@
   (let [r (cbor-reader ctx)]
     (if (= (cbor-map-seek r "brief") 1) (cbor-text r) "")))
 
+(defn intel-kqe []
+  (let [h (kqe-get-objects "sim/intel" "all" "sim.intel/brief")]
+    (if (>= (kqe-count h) 1)
+      (let [r (cbor-reader (kqe-obj-nth h 0))]
+        (if (= (cbor-map-seek r "Text") 1) (cbor-text r) ""))
+      "")))
+
 (defn build-prompt [brief]
-  (let [b (bytes-alloc 1024)]
-    (buf-str! b "あなたは株式会社gftdのエンジニアリング責任者です。以下の現状況を踏まえ、プロダクト/開発体制について この四半期に取るべき施策を1つだけ、日本語で簡潔に1文(80字以内)で提案してください。\n--- 現状況 ---\n")
+  (let [b (bytes-alloc 1536)]
+    (buf-str! b "あなたは株式会社gftdのエンジニアリング責任者です。以下の現状況とインテリジェンスを踏まえ、プロダクト/開発体制について この四半期に取るべき施策を1つだけ、日本語で簡潔に1文(80字以内)で提案してください。\n--- 現状況 ---\n")
     (buf-str! b brief)
+    (buf-str! b "\n--- 社内インテリジェンス(datomic/kqe) ---\n")
+    (buf-str! b (intel-kqe))
     (bytes-finish b)))
 
 (defn ok-result [s]

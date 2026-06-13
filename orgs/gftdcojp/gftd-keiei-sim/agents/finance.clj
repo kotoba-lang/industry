@@ -12,10 +12,19 @@
   (let [r (cbor-reader ctx)]
     (if (= (cbor-map-seek r "brief") 1) (cbor-text r) "")))
 
+(defn intel-kqe []
+  (let [h (kqe-get-objects "sim/intel" "all" "sim.intel/brief")]
+    (if (>= (kqe-count h) 1)
+      (let [r (cbor-reader (kqe-obj-nth h 0))]
+        (if (= (cbor-map-seek r "Text") 1) (cbor-text r) ""))
+      "")))
+
 (defn build-prompt [brief]
-  (let [b (bytes-alloc 1024)]
-    (buf-str! b "あなたは株式会社gftdの財務責任者(CFO)です。以下の現状況(現金残高・ランウェイ・人員)を踏まえ、資金繰り/コストについて この四半期に取るべき判断を1つだけ、日本語で簡潔に1文(80字以内)で提案してください。\n--- 現状況 ---\n")
+  (let [b (bytes-alloc 1536)]
+    (buf-str! b "あなたは株式会社gftdの財務責任者(CFO)です。以下の現状況(現金残高・ランウェイ・人員)とインテリジェンスを踏まえ、資金繰り/コストについて この四半期に取るべき判断を1つだけ、日本語で簡潔に1文(80字以内)で提案してください。\n--- 現状況 ---\n")
     (buf-str! b brief)
+    (buf-str! b "\n--- 社内インテリジェンス(datomic/kqe) ---\n")
+    (buf-str! b (intel-kqe))
     (bytes-finish b)))
 
 (defn ok-result [s]

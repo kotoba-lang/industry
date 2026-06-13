@@ -21,11 +21,21 @@
   (let [r (cbor-reader ctx)]
     (if (= (cbor-map-seek r "brief") 1) (cbor-text r) "")))
 
-;; 役割プリアンブル + 現状況 brief から LLM プロンプト文字列を組み立てる
+;; datomic に投影された intel ブリーフ quad を kqe で読む (社員自身が intel を参照)
+(defn intel-kqe []
+  (let [h (kqe-get-objects "sim/intel" "all" "sim.intel/brief")]
+    (if (>= (kqe-count h) 1)
+      (let [r (cbor-reader (kqe-obj-nth h 0))]
+        (if (= (cbor-map-seek r "Text") 1) (cbor-text r) ""))
+      "")))
+
+;; 役割プリアンブル + 現状況 brief + intel(kqe) から LLM プロンプト文字列を組み立てる
 (defn build-prompt [brief]
-  (let [b (bytes-alloc 1024)]
-    (buf-str! b "あなたは株式会社gftdの営業責任者です。以下の現状況を踏まえ、この四半期に取るべき営業アクションを1つだけ、日本語で簡潔に1文(80字以内)で提案してください。数字や根拠があれば添えてください。\n--- 現状況 ---\n")
+  (let [b (bytes-alloc 1536)]
+    (buf-str! b "あなたは株式会社gftdの営業責任者です。以下の現状況とインテリジェンスを踏まえ、この四半期に取るべき営業アクションを1つだけ、日本語で簡潔に1文(80字以内)で提案してください。最有力リードへの具体策を優先してください。\n--- 現状況 ---\n")
     (buf-str! b brief)
+    (buf-str! b "\n--- 社内インテリジェンス(datomic/kqe) ---\n")
+    (buf-str! b (intel-kqe))
     (bytes-finish b)))
 
 ;; {"ok": <text>} を CBOR で返す (画面表示用)

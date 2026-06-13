@@ -12,10 +12,19 @@
   (let [r (cbor-reader ctx)]
     (if (= (cbor-map-seek r "brief") 1) (cbor-text r) "")))
 
+(defn intel-kqe []
+  (let [h (kqe-get-objects "sim/intel" "all" "sim.intel/brief")]
+    (if (>= (kqe-count h) 1)
+      (let [r (cbor-reader (kqe-obj-nth h 0))]
+        (if (= (cbor-map-seek r "Text") 1) (cbor-text r) ""))
+      "")))
+
 (defn build-prompt [brief]
-  (let [b (bytes-alloc 1024)]
-    (buf-str! b "あなたは株式会社gftdのCEO補佐(経営参謀)です。営業・開発・財務の各指標を俯瞰し、意思決定者(CEO)が今期 最優先で下すべき経営判断を1つだけ、日本語で簡潔に1文(90字以内)で具申してください。\n--- 経営KPIサマリ ---\n")
+  (let [b (bytes-alloc 1536)]
+    (buf-str! b "あなたは株式会社gftdのCEO補佐(経営参謀)です。各指標と社内インテリジェンスを俯瞰し、意思決定者(CEO)が今期 最優先で下すべき経営判断を1つだけ、日本語で簡潔に1文(90字以内)で具申してください。\n--- 経営KPIサマリ ---\n")
     (buf-str! b brief)
+    (buf-str! b "\n--- 社内インテリジェンス(datomic/kqe) ---\n")
+    (buf-str! b (intel-kqe))
     (bytes-finish b)))
 
 (defn ok-result [s]

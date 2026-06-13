@@ -155,6 +155,7 @@ async fn advance_turn(State(app): State<Shared>) -> Json<serde_json::Value> {
         received_total_jpy: app.received_total_jpy,
         latent_leads: app.latent_leads.clone(),
         revival: app.revival.clone(),
+        snapshot: intel::snapshot_quads(&app.conn),
     };
     let results = tokio::task::spawn_blocking(move || {
         agents::run_all(&exec, &agents_map, &world)
@@ -245,6 +246,13 @@ async fn decide(app: &App, id: &str, approved: bool) {
     );
     if let Ok(tx) = parse(&edn) {
         let _ = app.conn.transact(tx).await;
+    }
+
+    // 営業提案の承認 → 商談ファネルを 1 段前進 (datomic に progress datom)
+    if approved && role == "sales" {
+        if let Some((subj, stage)) = intel::close_deal(&app.conn, turn).await {
+            tracing::info!("deal advanced: {subj} -> {stage} (turn {turn})");
+        }
     }
 
     let _ = app.tx.send("update".to_string());

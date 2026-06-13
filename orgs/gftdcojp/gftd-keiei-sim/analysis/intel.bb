@@ -14,7 +14,8 @@
 ;;   :gftd.dep/*                     — 売上集中(依存)エッジ
 
 (require '[clojure.edn :as edn]
-         '[clojure.string :as str])
+         '[clojure.string :as str]
+         '[clojure.java.io :as io])
 
 (def facts-dir (or (first *command-line-args*) "../m365-archive/facts"))
 
@@ -57,22 +58,54 @@
 
 (defn edn-str [s] (pr-str (str s)))
 
-;; ---- 潜在リード datom ----
+;; ---- ③ messages/threads からの確度精緻化 ----
+;; threads.edn を「リード企業ドメインを含む行」だけ部分パースして(44MB全読みを回避)、
+;; 各ドメインの「スレッド数 / 未返信スレッド数(=商談モメンタム)」を集計する。
+(defn thread-signals [domains]
+  (let [path (str facts-dir "/threads.edn")
+        doms (set domains)]
+    (if (and (seq doms) (.exists (io/file path)))
+      (with-open [r (io/reader path)]
+        (reduce
+         (fn [acc line]
+           (if (some #(str/includes? line %) doms)
+             (if-let [t (try (edn/read-string line) (catch Exception _ nil))]
+               (reduce (fn [a p]
+                         (let [dom (last (str/split (str p) #"@"))]
+                           (if (contains? doms dom)
+                             (-> a
+                                 (update-in [dom :threads] (fnil inc 0))
+                                 (update-in [dom :open] (fnil + 0) (if (:needs_reply t) 1 0)))
+                             a)))
+                       acc (:participants t))
+               acc)
+             acc))
+         {} (line-seq r)))
+      {})))
+
+;; ---- 潜在リード datom (確度を threads モメンタムで精緻化) ----
 (defn latent-leads []
   (let [orgs (->> (read-objs "crm.edn")
                   (remove #(noise? (:org_domain %)))
                   (sort-by #(- (or (:message_count %) 0)))
-                  (take 12))]
+                  (take 12))
+        sig  (thread-signals (map :org_domain orgs))]
     (map-indexed
      (fn [i o]
-       {:db/id (str "lead" i)
-        :gftd.intel/kind :latent-lead
-        :gftd.intel/subject (:org_domain o)
-        :gftd.intel/score (or (:message_count o) 0)
-        :gftd.intel/confidence (confidence o)
-        :gftd.intel/people (count (or (:people o) []))
-        :gftd.intel/risk (if (churn? o) :churn :none)
-        :gftd.intel/stage :new})
+       (let [dom  (:org_domain o)
+             open (get-in sig [dom :open] 0)
+             base (confidence o)
+             ;; 未返信スレッドが多いほど確度を加点(最大+15)
+             conf (min 100 (+ base (min 15 (* 3 open))))]
+         {:db/id (str "lead" i)
+          :gftd.intel/kind :latent-lead
+          :gftd.intel/subject dom
+          :gftd.intel/score (or (:message_count o) 0)
+          :gftd.intel/confidence conf
+          :gftd.intel/people (count (or (:people o) []))
+          :gftd.intel/open-threads open
+          :gftd.intel/risk (if (churn? o) :churn :none)
+          :gftd.intel/stage :new}))
      orgs)))
 
 ;; ---- 休眠プロジェクト再生候補 datom ----

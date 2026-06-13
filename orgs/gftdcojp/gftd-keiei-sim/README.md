@@ -128,11 +128,23 @@ Rust (`src/intel.rs`) は「bb を実行して出た intel EDN を datomic に t
 - **project (再生候補)**: file-count 大の休眠プロジェクトを `:revival` 化。
 - **依存 (売上集中)**: `gftd → 取引先` の売上エッジを `:gftd.dep/*` 化。
 
+**③ messages/threads からの確度精緻化**: `threads.edn`(44MB) をリード企業ドメインを
+含む行だけ部分パース(全読み回避・1.4秒)し、未返信スレッド数(=商談モメンタム)を集計。
+確度に加点する (rokes.exchange 未返信204件 → 確度+15 等)。
+
+**① 社員エージェント自身が intel を kqe で読む**: サーバが intel 要約を
+`sim/intel` quad に投影し、各 clj 社員が `(kqe-get-objects "sim/intel" "all"
+"sim.intel/brief")` で読んで LLM プロンプトに織り込む(社員が datomic の知能を直接参照)。
+
+**② 商談ステージのゲーム化**: 潜在リードは `new → engaged → qualified → won` の
+ファネルを進む。ターン進行で確度上位リードが `engaged` へ、営業提案の承認で次段へ
+前進する (`:gftd.progress/*` datom)。ダッシュボードにファネル件数を表示。
+
 Rust 側の責務:
 
 - **KPI は datomic クエリ由来**: headcount / pipeline を Datalog `q` で集計。
-- **intel の前進**: ターンごとに確度上位の未着手リードを `engaged` へ進める
-  **append-only `:gftd.progress/*` datom** を積み、Datalog の畳み込みで現ステージを復元。
+- **ステージ進行**: append-only `:gftd.progress/*` datom を積み、Datalog の畳み込みで
+  現ステージを復元 (datomic の事実ログとして商談が進む)。
 
 ダッシュボードの「🧠 インテリジェンス」パネルは、これらを **関係グラフ(SVG: gftd↔
 取引先, 太さ=接触量・色=確度・赤リング=離反)** + 確度順リスト + 更新リスク + 再生候補 +

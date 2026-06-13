@@ -14,6 +14,7 @@ use std::process::Command;
 use anyhow::{Context, Result};
 use kotoba_datomic::{q, Connection};
 use kotoba_edn::{parse, EdnValue};
+use kotoba_runtime::host::WitQuad;
 
 fn manifest() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -121,23 +122,31 @@ pub fn views(conn: &Connection) -> serde_json::Value {
     let db = conn.db();
     let progressed = progressed_subjects(conn);
 
-    // 潜在リード (確度/関与人数/離反リスク つき)
+    // 潜在リード (確度/関与人数/離反リスク/未返信スレッド/商談ステージ つき)
     let mut leads: Vec<serde_json::Value> = q(
-        parse("{:find [?subj ?score ?conf ?ppl ?risk ?kind] :where [[?e :gftd.intel/subject ?subj][?e :gftd.intel/score ?score][?e :gftd.intel/confidence ?conf][?e :gftd.intel/people ?ppl][?e :gftd.intel/risk ?risk][?e :gftd.intel/kind ?kind]]}").unwrap(),
+        parse("{:find [?subj ?score ?conf ?ppl ?risk ?open ?kind] :where [[?e :gftd.intel/subject ?subj][?e :gftd.intel/score ?score][?e :gftd.intel/confidence ?conf][?e :gftd.intel/people ?ppl][?e :gftd.intel/risk ?risk][?e :gftd.intel/open-threads ?open][?e :gftd.intel/kind ?kind]]}").unwrap(),
         &db, &[],
     ).unwrap_or_default()
     .iter()
-    .filter(|r| kw_at(r, 5) == "latent-lead")
+    .filter(|r| kw_at(r, 6) == "latent-lead")
     .map(|r| {
         let subj = str_at(r, 0);
         let stage = progressed.get(&subj).cloned().unwrap_or_else(|| "new".into());
         serde_json::json!({
             "subject": subj, "score": i64_at(r,1), "confidence": i64_at(r,2),
-            "people": i64_at(r,3), "risk": kw_at(r,4), "stage": stage
+            "people": i64_at(r,3), "risk": kw_at(r,4), "open_threads": i64_at(r,5), "stage": stage
         })
     })
     .collect();
     leads.sort_by_key(|x| -(x["confidence"].as_i64().unwrap_or(0)));
+
+    // 商談ファネル集計 (ステージ別件数)
+    let funnel = serde_json::json!({
+        "new": leads.iter().filter(|l| l["stage"] == "new").count(),
+        "engaged": leads.iter().filter(|l| l["stage"] == "engaged").count(),
+        "qualified": leads.iter().filter(|l| l["stage"] == "qualified").count(),
+        "won": leads.iter().filter(|l| l["stage"] == "won").count(),
+    });
 
     // 再生候補
     let mut revival: Vec<serde_json::Value> = q(
@@ -174,8 +183,80 @@ pub fn views(conn: &Connection) -> serde_json::Value {
         "revival": revival,
         "renewal_risks": renewal,
         "dependencies": deps,
+        "funnel": funnel,
         "intel_depth": progressed.len(),
     })
+}
+
+/// 社員エージェントが kqe で読むための intel ブリーフ quad を作る。
+/// graph "sim/intel" / subject "all" / predicate "sim.intel/brief" / object {"Text": <要約>}。
+pub fn snapshot_quads(conn: &Connection) -> Vec<WitQuad> {
+    let v = views(conn);
+    let lead = v["latent_leads"].as_array().and_then(|a| a.first());
+    let renewal = v["renewal_risks"].as_array().and_then(|a| a.first());
+    let mut s = String::new();
+    if let Some(l) = lead {
+        s.push_str(&format!(
+            "最有力リード: {} (確度{}, 未返信{}件, {}){}",
+            l["subject"].as_str().unwrap_or(""),
+            l["confidence"].as_i64().unwrap_or(0),
+            l["open_threads"].as_i64().unwrap_or(0),
+            l["stage"].as_str().unwrap_or("new"),
+            if l["risk"] == "churn" { " ※離反リスク" } else { "" },
+        ));
+    }
+    if let Some(r) = renewal {
+        s.push_str(&format!(" / 更新要確認: {}", r["subject"].as_str().unwrap_or("")));
+    }
+    if s.is_empty() {
+        return vec![];
+    }
+    // object = CBOR {"Text": s}
+    let mut obj = Vec::new();
+    let mut map = std::collections::BTreeMap::new();
+    map.insert("Text".to_string(), s);
+    ciborium::into_writer(&map, &mut obj).ok();
+    vec![WitQuad {
+        graph: "sim/intel".into(),
+        subject: "all".into(),
+        predicate: "sim.intel/brief".into(),
+        object_cbor: obj,
+    }]
+}
+
+/// 商談ファネルを 1 段進める (営業提案の承認時)。
+/// 最も進んだ未成約リードを次ステージへ (new→engaged→qualified→won)。
+pub async fn close_deal(conn: &Connection, turn: i64) -> Option<(String, String)> {
+    let done = progressed_subjects(conn);
+    let order = |s: &str| match s { "won" => 3, "qualified" => 2, "engaged" => 1, _ => 0 };
+    let next = |s: &str| match s { "new" => "engaged", "engaged" => "qualified", _ => "won" };
+
+    // latent リード一覧
+    let leads: Vec<String> = q(
+        parse("{:find [?subj ?kind] :where [[?e :gftd.intel/subject ?subj][?e :gftd.intel/kind ?kind]]}").unwrap(),
+        &conn.db(), &[],
+    ).unwrap_or_default()
+    .iter()
+    .filter(|r| kw_at(r, 1) == "latent-lead")
+    .map(|r| str_at(r, 0))
+    .collect();
+
+    // 最も進んだ(ただし won 未満)リードを選ぶ。無ければ未着手を engaged へ。
+    let pick = leads
+        .iter()
+        .map(|s| (s.clone(), done.get(s).cloned().unwrap_or_else(|| "new".into())))
+        .filter(|(_, st)| order(st) < 3)
+        .max_by_key(|(_, st)| order(st));
+    let (subj, cur) = pick?;
+    let nx = next(&cur);
+    let edn = format!(
+        "[{{:db/id \"deal-t{turn}\" :gftd.progress/subject {:?} :gftd.progress/turn {turn} :gftd.progress/stage :{nx} :gftd.progress/note \"商談ステージ前進\"}}]",
+        subj
+    );
+    if let Ok(tx) = parse(&edn) {
+        let _ = conn.transact(tx).await;
+    }
+    Some((subj, nx.to_string()))
 }
 
 /// progress イベントから subject ごとの最新ステージを畳み込む。
