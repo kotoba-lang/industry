@@ -175,13 +175,12 @@ pub fn run_agent(
     brief: &str,
     turn: u64,
     snapshot: Vec<WitQuad>,
-) -> Result<String> {
+) -> Result<(String, i64)> {
     let ctx = encode_ctx(brief, role, turn);
     let res = exec
         .execute(role, wasm, "did:key:z6MkGftdSim", ctx, snapshot, HashMap::new())
         .map_err(|e| anyhow::anyhow!("execute {role}: {e}"))?;
-    let action = decode_ok(&res.output_cbor);
-    Ok(action)
+    Ok(decode_ok(&res.output_cbor))
 }
 
 fn encode_ctx(brief: &str, role: &str, turn: u64) -> Vec<u8> {
@@ -196,25 +195,27 @@ fn encode_ctx(brief: &str, role: &str, turn: u64) -> Vec<u8> {
     buf
 }
 
-fn decode_ok(bytes: &[u8]) -> String {
-    let val: ciborium::value::Value = match ciborium::from_reader(bytes) {
-        Ok(v) => v,
-        Err(_) => return String::from_utf8_lossy(bytes).into_owned(),
-    };
-    if let ciborium::value::Value::Map(entries) = val {
+/// 出力 CBOR {"ok": <提案>, "rounds": <観測回数>} を (提案, 観測回数) に復号。
+fn decode_ok(bytes: &[u8]) -> (String, i64) {
+    let mut action = "（提案を生成できませんでした）".to_string();
+    let mut rounds = 0i64;
+    if let Ok(ciborium::value::Value::Map(entries)) = ciborium::from_reader::<ciborium::value::Value, _>(bytes) {
         for (kk, vv) in entries {
-            if matches!(&kk, ciborium::value::Value::Text(t) if t == "ok") {
-                if let ciborium::value::Value::Text(t) = vv {
+            match (&kk, &vv) {
+                (ciborium::value::Value::Text(k), ciborium::value::Value::Text(t)) if k == "ok" => {
                     let trimmed = t.trim();
-                    if trimmed.is_empty() {
-                        return "（提案を生成できませんでした）".into();
+                    if !trimmed.is_empty() {
+                        action = trimmed.to_string();
                     }
-                    return trimmed.to_string();
                 }
+                (ciborium::value::Value::Text(k), ciborium::value::Value::Integer(n)) if k == "rounds" => {
+                    rounds = (*n).try_into().unwrap_or(0);
+                }
+                _ => {}
             }
         }
     }
-    "（提案を生成できませんでした）".into()
+    (action, rounds)
 }
 
 /// 1 社員を所有引数で実行する (spawn_blocking から並列に呼ぶ用)。
@@ -225,16 +226,15 @@ pub fn run_one(
     brief: String,
     turn: u64,
     snapshot: Vec<WitQuad>,
-) -> (String, String) {
+) -> (String, String, i64) {
     if wasm.is_empty() {
-        return (role, "（エージェント未ロード）".into());
+        return (role, "（エージェント未ロード）".into(), 0);
     }
-    let action = match run_agent(&exec, &wasm, &role, &brief, turn, snapshot) {
-        Ok(a) => a,
+    match run_agent(&exec, &wasm, &role, &brief, turn, snapshot) {
+        Ok((a, rounds)) => (role, a, rounds),
         Err(e) => {
             tracing::warn!("agent {role} failed: {e}");
-            format!("（{}の提案生成に失敗）", role_label(&role))
+            (role.clone(), format!("（{}の提案生成に失敗）", role_label(&role)), 0)
         }
-    };
-    (role, action)
+    }
 }

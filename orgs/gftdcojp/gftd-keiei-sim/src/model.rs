@@ -53,6 +53,9 @@ pub struct Proposal {
     pub status: String,
     /// 承認した場合の KPI 影響(プレビュー)
     pub effect_hint: String,
+    /// この提案を出すまでに ReAct で観測した回数(Act種別数) — 観測ログ可視化用
+    #[serde(default)]
+    pub rounds: i64,
 }
 
 /// 役割表示ラベル。

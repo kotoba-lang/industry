@@ -335,11 +335,39 @@ pub fn snapshot_quads(conn: &Connection, live: &serde_json::Value) -> Vec<WitQua
         ciborium::into_writer(&map, &mut obj).ok();
         WitQuad { graph: "sim/intel".into(), subject: subj.into(), predicate: pred.into(), object_cbor: obj }
     };
+    // #2 Build-Measure-Learn: 前ターンの承認結果と KPI 変化を観測ソース化
+    let db = conn.db();
+    let mut learn = String::new();
+    let hist = turn_history(conn);
+    if hist.len() >= 2 {
+        let cur = &hist[hist.len() - 1];
+        let prev = &hist[hist.len() - 2];
+        let d = |k: &str| cur[k].as_i64().unwrap_or(0) - prev[k].as_i64().unwrap_or(0);
+        learn.push_str(&format!(
+            "前ターン比のKPI変化: 現金{:+.2}億 / 売上{:+.2}億 / 士気{:+} / パイプライン{:+.2}億\n",
+            d("cash") as f64 / 1e8, d("revenue") as f64 / 1e8, d("morale"), d("pipeline") as f64 / 1e8
+        ));
+    }
+    let dec = q(
+        parse("{:find [?turn ?note ?approved] :where [[?d :sim.decision/turn ?turn][?d :gftd.decision/note ?note][?d :sim.decision/approved ?approved]]}").unwrap(),
+        &db, &[],
+    ).unwrap_or_default();
+    let mut recent: Vec<(i64, String)> = dec.iter()
+        .filter(|r| matches!(r.get(2), Some(EdnValue::Bool(true))))
+        .map(|r| (i64_at(r, 0), str_at(r, 1))).collect();
+    recent.sort_by_key(|(t, _)| -t);
+    if !recent.is_empty() {
+        let notes: Vec<String> = recent.iter().take(3).map(|(t, n)| format!("T{t}:{n}")).collect();
+        learn.push_str(&format!("直近の承認: {}", notes.join(" / ")));
+    }
+    if learn.is_empty() { learn.push_str("まだ実績データがありません(初回ターン)"); }
+
     vec![
         mk("all", "sim.intel/brief", s),
         mk("all", "sim.intel/detail", detail),
         mk("all", "sim.intel/digest", digest),
         mk("all", "sim.intel/calendar", cal),
+        mk("all", "sim.intel/learn", learn),
     ]
 }
 

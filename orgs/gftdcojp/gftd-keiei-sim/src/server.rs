@@ -217,7 +217,7 @@ async fn advance_turn(State(app): State<Shared>) -> Json<serde_json::Value> {
             agents::run_one(exec, wasm, role, brief, turn_n, world.snapshot.clone())
         }));
     }
-    let mut results: Vec<(String, String)> = Vec::new();
+    let mut results: Vec<(String, String, i64)> = Vec::new();
     for h in handles {
         if let Ok(x) = h.await {
             results.push(x);
@@ -227,12 +227,12 @@ async fn advance_turn(State(app): State<Shared>) -> Json<serde_json::Value> {
     // 議事録(transcript)を構築: まず各責任者の発言
     let mut transcript: Vec<serde_json::Value> = results
         .iter()
-        .map(|(r, a)| serde_json::json!({ "speaker": role_label(r), "role": r, "text": a }))
+        .map(|(r, a, _)| serde_json::json!({ "speaker": role_label(r), "role": r, "text": a }))
         .collect();
 
     let peer = results
         .iter()
-        .map(|(r, a)| format!("・{}: {}", role_label(r), a))
+        .map(|(r, a, _)| format!("・{}: {}", role_label(r), a))
         .collect::<Vec<_>>()
         .join("\n");
 
@@ -252,7 +252,7 @@ async fn advance_turn(State(app): State<Shared>) -> Json<serde_json::Value> {
         let crit_brief = format!(
             "各責任者の提案は次の通り:\n{peer}\n財務責任者として、これらの中で最大の財務リスクを1つ指摘し、どの案を優先すべきか1文で述べてください。"
         );
-        if let Ok((_, txt)) = tokio::task::spawn_blocking(move || {
+        if let Ok((_, txt, _)) = tokio::task::spawn_blocking(move || {
             let wasm = agents_map.get("finance").cloned().unwrap_or_default();
             agents::run_one(exec, wasm, "finance".to_string(), crit_brief, turn_n, snap)
         })
@@ -286,15 +286,16 @@ async fn advance_turn(State(app): State<Shared>) -> Json<serde_json::Value> {
     }
     *app.discussion.lock().unwrap() = transcript;
 
-    // 3. 提案カードを作成
+    // 3. 提案カードを作成 (観測回数 rounds を素通し → 集計/可視化は cljs 側)
     let proposals: Vec<Proposal> = results
         .into_iter()
-        .map(|(role, action)| {
+        .map(|(role, action, rounds)| {
             let id = app.seq.fetch_add(1, Ordering::SeqCst);
             Proposal {
                 id: format!("p{id}"),
                 role_label: role_label(&role).to_string(),
                 effect_hint: effect_hint(&role).to_string(),
+                rounds,
                 role,
                 action,
                 status: "pending".into(),

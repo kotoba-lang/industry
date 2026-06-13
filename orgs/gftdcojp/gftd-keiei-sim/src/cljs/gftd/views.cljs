@@ -321,6 +321,29 @@
 
 ;; ---- #3 社員間ディスカッション議事録 ----------------------------------------
 
+;; ---- #1 観測ログ: 各社員が ReAct で引いた Act 種別を可視化 (cljs集計) ----------
+
+(def ^:private act-names ["要約" "詳細" "商談履歴" "予定" "前回結果"])
+
+(defn obs-log-panel []
+  (let [props @(rf/subscribe [:proposals])]
+    (when (seq props)
+      [:section.panel
+       [:h2 "🔍 観測ログ " [:span.hint "各社員が ReAct で引いた Act 種別(kqe観測)"]]
+       [:ul.mini
+        (for [p props]
+          (let [n (or (:rounds p) 0)
+                acts (take n act-names)]
+            ^{:key (:id p)}
+            [:li.kv
+             [:span (:role_label p)]
+             [:span.r
+              (if (pos? n)
+                [:span.acts
+                 (for [[i a] (map-indexed vector acts)]
+                   ^{:key i} [:span.act-chip a])]
+                "観測なし")]]))]])))
+
 (defn discussion-panel []
   (let [log @(rf/subscribe [:discussion])]
     [:section.panel
@@ -512,7 +535,7 @@
 (defn tab-content []
   (case @(rf/subscribe [:tab])
     :priority [:div.pane.single [priority-pane]]
-    :office   [:div.pane [office] [discussion-panel]]
+    :office   [:div.pane [office] [obs-log-panel] [discussion-panel]]
     :calendar [:div.pane.single [calendar-pane]]
     :inbox    [:div.pane.single [inbox-pane]]
     :intel    [:div.pane.single [intel-panel]]
