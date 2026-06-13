@@ -115,7 +115,7 @@ sensors (Gmail/Calendar/Drive/gh/device)
 - ✅ ingest (12 loop, subagent fan-out): Mac端末 / **Android (Pixel 10 Pro Fold: getprop/packages/SMS本文550/通話377/連絡先)** / Gmail(2019〜) / Calendar(2023〜) / Drive(目録620 + 実書類47) / GitHub / **1Password(1287, メタデータのみ)**
 - ✅ **132 ファイルを暗号化して IPFS に pin** (平文リーク 0 を検証; git は annex symlink のみ)
 - ✅ 派生分析: INDEX/catalog, observations(§1-35), financial-summary, loan-ledger(¥10.75M), subscription-audit, entities(人29/組織55), **action-register(P0=7)**, sms-finance-timeline
-- ⚠️ **並行ライター注意**: 別セッション/オーケストレータが同 repo の `personal/drive/files/` 実書類ダウンロードと deps.toml/ADR-0004 を並行更新。push 前に annex symlink(mode 120000)であることを必ず検証する運用とする。
+- ⚠️ **並行ライター注意**: 別セッション/オーケストレータが同 repo の `personal/drive/files/` 実書類ダウンロードと deps.edn/ADR-0004 を並行更新。push 前に annex symlink(mode 120000)であることを必ず検証する運用とする。
 - ⏳ ingest の `datalad run` 化 (provenance 記録) / Pregel sensor 連携 / iCloud Keychain 多端末同期 / 他 Google アカウント(jk.luxury 等, ADR-0004)の取り込み
 
 ## 6. References

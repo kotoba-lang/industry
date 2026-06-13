@@ -1,53 +1,52 @@
-#!/usr/bin/env python3
-"""registry — query personal/accounts/registry.toml (tab-separated, bash-friendly).
+#!/usr/bin/env bb
+;; registry — query personal/accounts/registry.edn (tab-separated, bash-friendly).
+;; (registry.toml → registry.edn 移行に伴い Python tomllib 版から babashka 版へ。)
+;;
+;; USAGE:
+;;     registry accounts                 # slug<TAB>email<TAB>provider
+;;     registry takeout-jobs             # prefix<TAB>account<TAB>parts<TAB>note
+;;     registry takeout-account PREFIX   # -> account slug (exit 1 if unknown)
+;;     registry mail-accounts            # slug<TAB>provider<TAB>window (mail.sync=true only)
+;;     registry email SLUG               # -> email address (exit 1 if unknown)
+(require '[clojure.edn :as edn]
+         '[babashka.fs :as fs])
 
-USAGE:
-    registry accounts                 # slug<TAB>email<TAB>provider
-    registry takeout-jobs             # prefix<TAB>account<TAB>parts<TAB>note
-    registry takeout-account PREFIX   # -> account slug (exit 1 if unknown)
-    registry mail-accounts            # slug<TAB>provider<TAB>window (mail.sync=true only)
-    registry email SLUG               # -> email address (exit 1 if unknown)
-"""
-import sys, os, tomllib
+(def ^:private usage
+  (str "USAGE: registry accounts | takeout-jobs | takeout-account PREFIX"
+       " | mail-accounts | email SLUG\n"))
 
-BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # personal/
-PATH = os.path.join(BASE, "accounts", "registry.toml")
+(def ^:private path
+  ;; <repo>/personal/bin/registry -> <repo>/personal/accounts/registry.edn
+  (str (fs/file (fs/parent (fs/parent (fs/absolutize *file*))) "accounts" "registry.edn")))
 
+(def ^:private reg (edn/read-string (slurp path)))
 
-def load():
-    with open(PATH, "rb") as f:
-        return tomllib.load(f)
+(defn -main [& args]
+  (case (first args)
+    "accounts"
+    (doseq [[slug a] (:accounts reg)]
+      (println (str (name slug) "\t" (:email a "") "\t" (:provider a ""))))
 
+    "takeout-jobs"
+    (doseq [[prefix j] (:takeout reg)]
+      (println (str (name prefix) "\t" (:account j) "\t" (get j :parts "?") "\t" (:note j ""))))
 
-def main():
-    cmd = sys.argv[1] if len(sys.argv) > 1 else ""
-    reg = load()
-    if cmd == "accounts":
-        for slug, a in reg.get("accounts", {}).items():
-            print(f"{slug}\t{a.get('email','')}\t{a.get('provider','')}")
-    elif cmd == "takeout-jobs":
-        for prefix, j in reg.get("takeout", {}).items():
-            print(f"{prefix}\t{j['account']}\t{j.get('parts','?')}\t{j.get('note','')}")
-    elif cmd == "takeout-account":
-        prefix = sys.argv[2]
-        j = reg.get("takeout", {}).get(prefix)
-        if not j:
-            sys.exit(1)
-        print(j["account"])
-    elif cmd == "mail-accounts":
-        for slug, a in reg.get("accounts", {}).items():
-            m = a.get("mail") or {}
-            if m.get("sync"):
-                print(f"{slug}\t{a.get('provider','')}\t{m.get('window','14d')}")
-    elif cmd == "email":
-        a = reg.get("accounts", {}).get(sys.argv[2])
-        if not a:
-            sys.exit(1)
-        print(a["email"])
-    else:
-        sys.stderr.write(__doc__)
-        sys.exit(2)
+    "takeout-account"
+    (if-let [j (get (:takeout reg) (keyword (second args)))]
+      (println (:account j))
+      (System/exit 1))
 
+    "mail-accounts"
+    (doseq [[slug a] (:accounts reg)
+            :let [m (:mail a)]
+            :when (:sync m)]
+      (println (str (name slug) "\t" (:provider a "") "\t" (:window m "14d"))))
 
-if __name__ == "__main__":
-    main()
+    "email"
+    (if-let [a (get (:accounts reg) (keyword (second args)))]
+      (println (:email a))
+      (System/exit 1))
+
+    (do (binding [*out* *err*] (print usage)) (System/exit 2))))
+
+(apply -main *command-line-args*)

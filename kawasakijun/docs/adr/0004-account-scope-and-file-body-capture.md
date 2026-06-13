@@ -31,7 +31,7 @@ ADR-0003 で個人データウェアハウスの保管・暗号化基盤を定�
 
 ## 2. Decision
 
-### 2.1 アカウント到達性マトリクス (SSoT = `deps.toml [[personal.account]]`)
+### 2.1 アカウント到達性マトリクス (SSoT = `deps.edn :personal :account`)
 
 | アカウント | 到達経路 | 本ウェアハウスでの扱い |
 |---|---|---|
@@ -89,7 +89,7 @@ personal/drive/
 ### 4.1 Positive
 
 - 確定申告・借入契約・主要契約の**原本バイナリ**が暗号化ウェアハウスに保全された (47 件)。
-- アカウント到達性が `deps.toml` で機械可読化され、次アクション (connector/Takeout) が一意。
+- アカウント到達性が `deps.edn` で機械可読化され、次アクション (connector/Takeout) が一意。
 
 ### 4.2 Negative / Risks
 
@@ -104,7 +104,7 @@ personal/drive/
 
 ## 5. Implementation status
 
-- ✅ アカウント到達性を実機確認し `deps.toml [[personal.account]]` に SSoT 化
+- ✅ アカウント到達性を実機確認し `deps.edn :personal :account` に SSoT 化
 - ✅ jun784: Drive 全インベントリ (620) + 本体 47 件 (tax/loans/contracts-corp) を annex 化
 - ✅ jun784: Gmail 金融履歴拡充 (finance-history-3) + Calendar 欠落期間補完
 - ⏳ jk.luxury: MCP コネクタ接続 or Takeout (warehouse-scale ingest)
@@ -115,6 +115,6 @@ personal/drive/
 ## 6. References
 
 - ADR-0003 — warehouse 基盤 (DataLad + git-annex + encrypted IPFS)
-- `deps.toml [personal]` / `[[personal.account]]` — アカウント到達性 SSoT
+- `deps.edn :personal` / `:personal :account` — アカウント到達性 SSoT
 - `personal/analysis/2026-05-30_account-download.md` — 本ループの取得記録
 - `personal/drive/files-inventory-full.json` — Drive 全件メタデータ

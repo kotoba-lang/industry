@@ -1,7 +1,7 @@
 # ADR-0010: Life Graph — EDN事実層 + Datalogビュー + PROV-O来歴の3表現アーキテクチャ
 
-- Status: Proposed (2026-06-11)
-- 関連: ADR-0001 (orchestrator), ADR-0003 (warehouse), ADR-0005 (証拠保全), ADR-0009 (mail ingest), analysis/260611-wellbecoming-minimax-shannon.md
+- Status: Accepted (2026-06-11; 一部実装済 2026-06-13 — 下記「実装ログ」参照)
+- 関連: ADR-0001 (orchestrator), ADR-0003 (warehouse), ADR-0005 (証拠保全), ADR-0009 (mail ingest), ADR-0013 (clj-agent-stack), analysis/260611-wellbecoming-minimax-shannon.md
 
 ## 課題
 
@@ -15,7 +15,7 @@
 |---|---|---|
 | 生メール/添付 | personal/mail/messages/<cid>.eml | RFC822 + annex |
 | 事実(txn/loan/person…) | personal/bin/datomic/{schema,model}.edn | EDN/EAV ✅ |
-| 訴訟状態 | kawasakijun/litigation_state.jsonld | JSON-LD(スナップショット型) |
+| 訴訟状態 | kawasakijun/litigation_state.edn | EDN(スナップショット型) ✅ (旧 JSON-LD, 2026-06-13 移行) |
 | 人生目標DAG(28ノード) | kawasakijun/reverse_topo_pregel.py | **Pythonリテラル** ❌ |
 | 対応判断 | manimani data/decisions.jsonl | JSONL ✅ |
 | アクション | analysis/action-register.json | JSON(annex) |
@@ -32,7 +32,8 @@
 ```
 L0 raw      .eml/.pdf/blob   CID=sha256, git-annex → B2/IPFS     (不変・暗号化)  ✅既存
 L1 facts    EDN datoms       facts/*.jsonl → Datomic Local        (再構築可能)   ✅既存+拡張
-L2 prov     PROV-O JSON-LD   personal/prov/<cid>.prov.jsonld      (封緘・派生)   ★新設
+L2 prov     PROV-O           personal/prov/<cid>.prov.jsonld      (封緘・派生)   ★新設
+                             @context = personal/prov/context.edn (語彙SSoT, B2復号して移行)
 L3 views    Datalog queries  bin/datomic/queries/*.edn            (名前付きビュー)★新設
 L4 attention manimani + living actions                            (人間が見る唯一の面) ✅既存
 ```
@@ -82,11 +83,22 @@ L4 attention manimani + living actions                            (人間が見�
 ## 移行ステップ
 
 1. `schema-life.edn` + `queries/attention.edn` 追加(本ADRと同時) ✅
-2. `prov/context.jsonld` 追加、`seal-evidence.sh` が封緘時に `<cid>.prov.jsonld` を吐くよう拡張
+2. `prov/context.edn` 追加(語彙SSoT)、`seal-evidence.sh` が封緘時に `<cid>.prov.jsonld` を吐くよう拡張
 3. `reverse_topo_pregel.py` のノード定義を `kawasakijun/goals.edn` へ抽出(Python は EDN を読む側に)
 4. manimani decisions.jsonl → decision datoms の loader、attention-class を manimani の分類プロンプトに接続
 5. living sensors の出力先を kpi datoms に統一(最初の実装は `nodoka.time`)
-6. litigation_state.jsonld を「case datoms + PROV サイドカー」から生成される派生物に変更(手書きスナップショットの廃止)
+6. litigation_state.edn を「case datoms + PROV サイドカー」から生成される派生物に変更(手書きスナップショットの廃止)
+
+## 実装ログ
+
+- **2026-06-13 — 手書きSSoTの形式統一 (JSON-LD / TOML → EDN)。** 「1事実1表現」を表現形式にも適用し、
+  人手管理のSSoTを EDN に寄せた(既存 `goals.edn` / `facts/*.edn` と同流儀)。
+  - `kawasakijun/{profile,activities,roadmap,financial_state,litigation_state,jk_state,gftd_state,subscriptions_state,photos_timeline}.jsonld` → `*.edn`
+  - `personal/prov/context.jsonld` → `personal/prov/context.edn` (B2/git-annex `encryption=hybrid` を GPG鍵 `09EE8413…` で復号して移行)
+  - `personal/accounts/registry.toml` → `registry.edn`、ルート `deps.toml` → `deps.edn`
+  - 変換規則: `@id→:id` / `@type→:type`(schema.orgクラスはkeyword) / `kj:X→:kj/X` / schema.org語彙→bare keyword / 日本語ラベルは文字列。元データと逆変換JSONの深比較で値の無損失を確認。
+  - **消費側 Python を babashka へ移植 (ADR-0013)**: `kawasakijun/pregel_planner.py`→`pregel_planner.clj`、`personal/bin/registry`(tomllib→bb edn)。出力等価をテスト確認。
+  - 未了: 手書きスナップショット(state.edn)の datoms+PROV派生物化(ステップ6)、`reverse_topo_pregel.py`/`phase2_*.py`/ingest系Pythonの clj/bb 化。
 
 ## 帰結
 

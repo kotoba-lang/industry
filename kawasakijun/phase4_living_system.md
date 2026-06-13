@@ -175,7 +175,7 @@ actor:
   did: did:web:junkawasaki.com  # consolidated to com-junkawasaki (2026-05-18)
   type: T2 TS Native
   cluster: etzhayyim
-  vertex_state: kawasakijun/profile.jsonld
+  vertex_state: kawasakijun/profile.edn
   pregel_loop: kawasakijun/reverse_topo_pregel.py
   kpi_collectors:
     - gmail

@@ -12,7 +12,7 @@
 
 ```jsonld
 {
-  "@context": "context.jsonld",
+  "@context": "context.edn",   // 語彙SSoT (EDN; 必要なら JSON-LD context を生成)
   "@graph": [
     { "@id": "kj:blob/<cid>",
       "@type": "Entity",

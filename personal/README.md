@@ -16,11 +16,11 @@ personal/
 ├─ .gitattributes           ← personal/** を annex 化 (データ), bin/*.md は git 平文
 ├─ bin/
 │  ├─ git-annex-remote-ipfs ← 自作 IPFS external special remote (暗号文を ipfs add)
-│  ├─ registry              ← accounts/registry.toml の query helper (bash 向け TSV 出力)
+│  ├─ registry              ← accounts/registry.edn の query helper (babashka, bash 向け TSV 出力)
 │  ├─ takeout-watcher.sh    ← Takeout zip の自動 ingest (registry 駆動; extract→annex→b2→drop)
 │  ├─ takeout-status.sh     ← ingest 進捗表示 (registry 駆動)
 │  └─ ingest-device.sh      ← 端末情報 ingest (env は名前のみ収集)
-├─ accounts/registry.toml   ← 全アカウント(5)の宣言的レジストリ (git 平文, secrets なし)
+├─ accounts/registry.edn    ← 全アカウント(5)の宣言的レジストリ (git 平文, secrets なし)
 │                              Takeout job prefix→account のルーティングもここに追記
 ├─ device/    端末: system/hardware/packages(brew,pip,npm,cargo)/dotfiles/disk/env名
 ├─ mail/      Gmail: labels.json(107 ラベル分類), recent-activity-30d.jsonl

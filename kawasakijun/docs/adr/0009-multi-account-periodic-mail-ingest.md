@@ -5,7 +5,7 @@
 - **Deciders**: 河崎純真 (jun784@gmail.com)
 - **Context tags**: personal-warehouse, multi-account, gmail-api, msgraph, oauth, keychain, launchd, git-annex, backblaze-b2, registry-driven
 - **Related**: ADR-0003（暗号化 IPFS warehouse）, ADR-0004（account scope & file body）, ADR-0008（Google Takeout 取り込み）
-- **Implementation**: `personal/accounts/registry.toml`, `personal/bin/{registry,google-auth.py,msgraph-auth.py,ingest-gmail-batch.py,ingest-graph-mail.py,mail-sync.sh}`, `personal/bin/launchd/com.junkawasaki.mail-sync.plist`
+- **Implementation**: `personal/accounts/registry.edn`, `personal/bin/{registry,google-auth.py,msgraph-auth.py,ingest-gmail-batch.py,ingest-graph-mail.py,mail-sync.sh}`, `personal/bin/launchd/com.junkawasaki.mail-sync.plist`
 
 ## Context
 
@@ -43,7 +43,7 @@ ADR-0008 の Takeout は**一括バックフィル**には適すが、(a) part �
 
 ### 1. アカウントレジストリをコード化（宣言的・単一の真実源）
 
-`personal/accounts/registry.toml`（git 平文・**secret 無し**）に 5 アカウントと
+`personal/accounts/registry.edn`（git 平文・**secret 無し**）に 5 アカウントと
 Takeout job ルーティング、`[accounts.<slug>.mail]`（`sync` / `window` / `authorized`）を宣言。
 `personal/bin/registry`（python3/tomllib）が bash 向け TSV で供給
 （`accounts` / `mail-accounts` / `email` / `takeout-jobs` …）。watcher・mail-sync・auth

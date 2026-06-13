@@ -1,6 +1,6 @@
 ;; clj-stack.edn — portable Clojure エージェントスタックの machine-readable SSoT (ADR-0013)
 ;;
-;; 分担: ルート deps.toml = ワークスペース配置 (path/submodule/remote)。
+;; 分担: ルート deps.edn = ワークスペース配置 (path/submodule/remote)。
 ;;       このファイル     = スタック意味論 (層・依存辺・ns・ホスト能力・datom スキーマ・版)。
 ;; goals.edn と同じ規約: エンティティ map の vector + :edges。ツーリングはここを読む側に回る。
 ;; :edges は [upstream downstream] (downstream が :repo/depends-on upstream)。

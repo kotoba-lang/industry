@@ -39,7 +39,7 @@
    これは支払い方法の不備ではなく **GitHub バックエンドの課金状態(billing state)ロック**で、
    community #19123 等の解決報告では **支払い情報更新では解けず、Support 連絡で解決**。
 
-ワークスペースの保全方針（`deps.toml [personal.storage]`：vcs=datalad / content=git-annex /
+ワークスペースの保全方針（`deps.edn :personal :storage`：vcs=datalad / content=git-annex /
 remote=ipfs）は既に DataLad/git-annex に統一されており、LFS はこの方針から外れる。
 
 ## Decision
@@ -86,8 +86,8 @@ remote=ipfs）は既に DataLad/git-annex に統一されており、LFS はこ�
 - 解消：~~`com-junkawasaki` 購入ロック~~ → 解除済み。LFS 実体取得が可能になった。
 - 次アクション：(a) ~~解除確認~~済 → (b) **上記移行手順（LFS→DataLad/git-annex）を実行**
   → (c) `.webm` 20 本（annex 孤児ポインタ）実体の在処調査（別課題のまま）。
-- 関連：`.gitmodules`、`deps.toml`（projects: spirit-in-physics / 260208-spirit-in-physics /
-  webmaster）、`deps.toml [personal.storage]`、ADR-0007（orgs レイアウト）。
+- 関連：`.gitmodules`、`deps.edn`（projects: spirit-in-physics / 260208-spirit-in-physics /
+  webmaster）、`deps.edn :personal :storage`、ADR-0007（orgs レイアウト）。
 
 ## Alternatives considered
 
