@@ -1,6 +1,7 @@
 ;; finance.clj — gftd 経営シム社員 (kotoba-clj defgraph ReActループ)。
-;; 提案前に intel を kqe で観測(brief→detail)し、参謀が「追加データ必要(MORE)」と
-;; 判断したら再観測してループ(bounded 最大2ラウンド)→ 施策を提案。制御は全て clj。
+;; 提案前に intel を kqe で多角観測(brief→detail→digest→calendar)し、参謀が
+;; 「追加データ必要(MORE)」と判断したら別ソースを再観測してループ(bounded 最大4R)。
+;; 提案には観測した根拠を「〜を確認した結果、」の形で必ず含める(#1)。制御は全て clj。
 ;; ctx CBOR: {"brief": <役割別状況>, "role": "finance", "turn": <uint>} / 出力: {"ok": <提案>}
 
 (defn buf-str! [b s]
@@ -10,24 +11,26 @@
     (buf-str! buf a) (buf-str! buf b) (bytes-finish buf)))
 (defn obj-text [h]
   (let [r (cbor-reader h)] (if (= (cbor-map-seek r "Text") 1) (cbor-text r) "")))
+
+;; Act 種別: round に応じて観測ソースを切替 (0=要約 1=詳細 2=商談履歴 3=予定)
 (defn read-intel [r]
-  (let [h (if (= r 0)
-            (kqe-get-objects "sim/intel" "all" "sim.intel/brief")
-            (kqe-get-objects "sim/intel" "all" "sim.intel/detail"))]
+  (let [pred (cond (= r 0) "sim.intel/brief"
+                   (= r 1) "sim.intel/detail"
+                   (= r 2) "sim.intel/digest"
+                   :else   "sim.intel/calendar")
+        h (kqe-get-objects "sim/intel" "all" pred)]
     (if (>= (kqe-count h) 1) (obj-text (kqe-obj-nth h 0)) "")))
 (defn ctx-brief [ctx]
   (let [r (cbor-reader ctx)] (if (= (cbor-map-seek r "brief") 1) (cbor-text r) "")))
 
-;; Act=観測: intel を読み obs に追記し round を進める
 (defn observe [state]
   (let [r (map-get state "round")]
     (map-assoc! state "obs" (cat2 (cat2 (map-get state "obs") "\n") (read-intel r)))
     (map-assoc! state "round" (+ r 1))))
 
-;; Reason=思考: 観測を踏まえ提案 or MORE 要求
 (defn reason [state]
-  (let [b (bytes-alloc 2048)]
-    (buf-str! b "あなたは株式会社gftdの財務責任者(CFO)です。資金繰り/コスト/不良債権について、 観測(社内インテリジェンス)を踏まえ、追加データが必要なら一行目に MORE とだけ書いてください。十分なら この四半期に取るべき施策を1つだけ、日本語で簡潔に1文()で提案してください。\n--- 現状況 ---\n")
+  (let [b (bytes-alloc 2560)]
+    (buf-str! b "あなたは株式会社gftdの財務責任者(CFO)です。資金繰り/コスト/不良債権を扱います。 観測(社内インテリジェンス)を踏まえます。追加データが必要なら一行目に MORE とだけ書いてください(brief→詳細→商談履歴→予定 の順で観測できます)。十分なら この四半期に取るべき施策を1つだけ提案してください。提案は必ず『〜を確認した結果、…』の形で、観測した具体的な根拠(社名/金額/件名/予定など)を冒頭に含め、日本語1文()で。\n--- 現状況 ---\n")
     (buf-str! b (map-get state "brief"))
     (buf-str! b "\n--- 観測 ---\n")
     (buf-str! b (map-get state "obs"))
@@ -36,7 +39,7 @@
 (defn starts-more? [s]
   (and (>= (str-len s) 4) (= (byte-at s 0) 77) (= (byte-at s 1) 79) (= (byte-at s 2) 82) (= (byte-at s 3) 69)))
 (defn need-more? [state]
-  (and (< (map-get state "round") 2) (starts-more? (map-get state "action"))))
+  (and (< (map-get state "round") 4) (starts-more? (map-get state "action"))))
 
 (defgraph finance-agent
   :state {:brief :override :obs :override :round :override :action :override}

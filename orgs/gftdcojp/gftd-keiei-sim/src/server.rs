@@ -236,11 +236,19 @@ async fn advance_turn(State(app): State<Shared>) -> Json<serde_json::Value> {
         .collect::<Vec<_>>()
         .join("\n");
 
+    // #3 社員間ReAct討議: 各社員の提案を観測ソース(round0)に差し替え、討議agentが
+    //    kqe で peers を観測しながら反論/統括する(相互観測)。
+    let peer_snap = {
+        let mut s = world.snapshot.clone();
+        let pq = intel::peers_quad(format!("社内の議論(各責任者の提案):\n{peer}"));
+        if s.is_empty() { vec![pq] } else { s[0] = pq; s }
+    };
+
     // フェーズ1.5: 財務責任者が他部門案を批評する反論ラウンド (対話の深化)
     {
         let exec = exec.clone();
         let agents_map = agents_map.clone();
-        let snap = world.snapshot.clone();
+        let snap = peer_snap.clone();
         let crit_brief = format!(
             "各責任者の提案は次の通り:\n{peer}\n財務責任者として、これらの中で最大の財務リスクを1つ指摘し、どの案を優先すべきか1文で述べてください。"
         );
@@ -265,7 +273,7 @@ async fn advance_turn(State(app): State<Shared>) -> Json<serde_json::Value> {
     {
         let exec = exec.clone();
         let agents_map = agents_map.clone();
-        let snap = world.snapshot.clone();
+        let snap = peer_snap.clone();
         if let Ok(c) = tokio::task::spawn_blocking(move || {
             let wasm = agents_map.get("ceo").cloned().unwrap_or_default();
             agents::run_one(exec, wasm, "ceo".to_string(), ceo_brief, turn_n, snap)

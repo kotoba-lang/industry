@@ -306,6 +306,28 @@ pub fn snapshot_quads(conn: &Connection, live: &serde_json::Value) -> Vec<WitQua
         }
     }
 
+    // 商談ダイジェスト(スレッド件名履歴) — Act 種別: deal-digest 直読み
+    let mut digest = String::new();
+    if let Some(dg) = v["deal_digests"].as_array() {
+        for d in dg.iter().take(3) {
+            digest.push_str(&format!("{}: {}\n", d["subject"].as_str().unwrap_or(""), d["note"].as_str().unwrap_or("")));
+        }
+    }
+    if digest.is_empty() { digest.push_str("商談履歴の取得データなし"); }
+
+    // M365 予定 — Act 種別: 今後の予定確認
+    let mut cal = String::new();
+    if let Some(ev) = live.get("events").and_then(|x| x.as_array()) {
+        for e in ev.iter().take(8) {
+            cal.push_str(&format!(
+                "{} {}\n",
+                e.get("start").and_then(|x| x.as_str()).unwrap_or("").chars().take(16).collect::<String>(),
+                e.get("subject").and_then(|x| x.as_str()).unwrap_or("")
+            ));
+        }
+    }
+    if cal.is_empty() { cal.push_str("M365予定は未同期(『📡 M365同期』で取得)"); }
+
     let mk = |subj: &str, pred: &str, text: String| {
         let mut obj = Vec::new();
         let mut map = std::collections::BTreeMap::new();
@@ -316,7 +338,19 @@ pub fn snapshot_quads(conn: &Connection, live: &serde_json::Value) -> Vec<WitQua
     vec![
         mk("all", "sim.intel/brief", s),
         mk("all", "sim.intel/detail", detail),
+        mk("all", "sim.intel/digest", digest),
+        mk("all", "sim.intel/calendar", cal),
     ]
+}
+
+/// 社員間討議用: 各社員の提案を 1 つの観測テキストにまとめた quad を作る (#3 相互観測)。
+/// snapshot の先頭(brief相当)を差し替えて渡すと、ReActのround0で peers を観測できる。
+pub fn peers_quad(peers_text: String) -> WitQuad {
+    let mut obj = Vec::new();
+    let mut map = std::collections::BTreeMap::new();
+    map.insert("Text".to_string(), peers_text);
+    ciborium::into_writer(&map, &mut obj).ok();
+    WitQuad { graph: "sim/intel".into(), subject: "all".into(), predicate: "sim.intel/brief".into(), object_cbor: obj }
 }
 
 /// 商談ファネルを 1 段進める (営業提案の承認時)。
