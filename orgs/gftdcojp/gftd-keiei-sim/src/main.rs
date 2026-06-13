@@ -61,6 +61,7 @@ async fn main() -> Result<()> {
     // 3. 社員エージェントをコンパイル + 推論エンジン
     let compiled = agents::compile_all()?;
     let react_wasm = agents::compile_react()?;
+    let turn_wasm = agents::compile_turn()?;
     let (exec, llm_live, infer_fn) = agents::make_executor()?;
     tracing::info!(
         "executor ready (LLM: {})",
@@ -74,6 +75,7 @@ async fn main() -> Result<()> {
         exec: Arc::new(exec),
         infer: infer_fn,
         react_wasm: Arc::new(react_wasm),
+        turn_wasm: Arc::new(turn_wasm),
         agents: Arc::new(compiled),
         pipeline: seed.pipeline,
         projects: seed.projects,

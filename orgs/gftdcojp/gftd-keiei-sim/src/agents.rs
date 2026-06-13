@@ -10,7 +10,7 @@ use kotoba_runtime::WasmExecutor;
 
 use crate::model::{role_label, Kpis};
 
-pub const GAS: u64 = 10_000_000;
+pub const GAS: u64 = 2_000_000_000;
 
 /// 役割 → cljソースファイル名。
 pub const AGENTS: &[(&str, &str)] = &[
@@ -47,6 +47,23 @@ fn compile_one(file: &str) -> Result<Vec<u8>> {
 /// 相談 ReAct agent (react-consult.clj) をコンパイルする。
 pub fn compile_react() -> Result<Vec<u8>> {
     compile_one("react-consult.clj")
+}
+
+/// ターン統括 defgraph (turn.clj) をコンパイルする。
+pub fn compile_turn() -> Result<Vec<u8>> {
+    compile_one("turn.clj")
+}
+
+/// turn.clj に渡す共通の現状況ブリーフ (KPI/財務/件数)。
+pub fn common_brief(w: &World) -> String {
+    let oku = |v: i64| format!("{:.2}億円", v as f64 / 100_000_000.0);
+    let man = |v: i64| format!("{}万円", v / 10_000);
+    format!(
+        "ターン{}(四半期) / 現金{} / 月次バーン{} / ランウェイ{:.1}ヶ月 / 人員{}名 / 士気{} / 累計売上{} / パイプライン{} / 商談{}社 / 実売上累計{} / 実コスト累計{}",
+        w.kpis.turn, oku(w.kpis.cash_jpy), man(w.kpis.burn_jpy), w.kpis.runway_months,
+        w.kpis.headcount, w.kpis.morale, oku(w.kpis.revenue_total_jpy), oku(w.kpis.pipeline_jpy),
+        w.pipeline.len(), oku(w.issued_total_jpy), oku(w.received_total_jpy)
+    )
 }
 
 /// 全社員をコンパイルしてバイト列をキャッシュする。

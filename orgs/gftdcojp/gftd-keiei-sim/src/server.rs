@@ -30,6 +30,8 @@ pub struct App {
     pub infer: kotoba_runtime::host::InferenceFn,
     /// 相談 ReAct agent (react-consult.clj) の WASM
     pub react_wasm: Arc<Vec<u8>>,
+    /// ターン統括 defgraph (turn.clj) の WASM
+    pub turn_wasm: Arc<Vec<u8>>,
     pub agents: Arc<HashMap<String, Vec<u8>>>,
     /// 実契約由来の商談 (相手先名, 金額)
     pub pipeline: Vec<(String, i64)>,
@@ -186,13 +188,12 @@ async fn advance_turn(State(app): State<Shared>) -> Json<serde_json::Value> {
         return Json(state_payload(&app));
     }
 
-    // 2. 社員エージェントを実行。
-    //    #1 並列推論: 機能部門(営業/開発/財務/法務)を spawn_blocking で同時実行。
-    //    #4 社員間ディスカッション: その4提案を CEO補佐が受けて統括提案する(2フェーズ)。
+    // 2. ターン統括 turn.clj を 1 回実行。社員(営業/開発/財務/法務)→財務反論→CEO統括 の
+    //    オーケストレーションは全て clj(defgraph)側。Rust はホストとして WASM を回し、
+    //    結果(提案/議事録/観測ログ)を kqe-assert! の assert_quads から回収するだけ。
     let exec = app.exec.clone();
-    let agents_map = app.agents.clone();
-    let turn_n = kpis_snapshot.turn as u64;
-    let world = std::sync::Arc::new(agents::World {
+    let turn_wasm = app.turn_wasm.clone();
+    let world = agents::World {
         kpis: kpis_snapshot.clone(),
         pipeline: app.pipeline.clone(),
         projects: app.projects.clone(),
@@ -201,108 +202,75 @@ async fn advance_turn(State(app): State<Shared>) -> Json<serde_json::Value> {
         received_total_jpy: app.received_total_jpy,
         latent_leads: app.latent_leads.clone(),
         revival: app.revival.clone(),
-        snapshot: intel::snapshot_quads(&app.conn, &app.live_m365.lock().unwrap().clone()),
-    });
-
-    // フェーズ1: 機能部門を並列実行
-    let mut handles = Vec::new();
-    for role in ["sales", "eng", "finance", "legal"] {
-        let exec = exec.clone();
-        let agents_map = agents_map.clone();
-        let world = world.clone();
-        let role = role.to_string();
-        handles.push(tokio::task::spawn_blocking(move || {
-            let wasm = agents_map.get(&role).cloned().unwrap_or_default();
-            let brief = agents::build_brief(&role, &world);
-            agents::run_one(exec, wasm, role, brief, turn_n, world.snapshot.clone())
-        }));
-    }
-    let mut results: Vec<(String, String, i64)> = Vec::new();
-    for h in handles {
-        if let Ok(x) = h.await {
-            results.push(x);
-        }
-    }
-
-    // 議事録(transcript)を構築: まず各責任者の発言
-    let mut transcript: Vec<serde_json::Value> = results
-        .iter()
-        .map(|(r, a, _)| serde_json::json!({ "speaker": role_label(r), "role": r, "text": a }))
-        .collect();
-
-    let peer = results
-        .iter()
-        .map(|(r, a, _)| format!("・{}: {}", role_label(r), a))
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    // #3 社員間ReAct討議: 各社員の提案を観測ソース(round0)に差し替え、討議agentが
-    //    kqe で peers を観測しながら反論/統括する(相互観測)。
-    let peer_snap = {
-        let mut s = world.snapshot.clone();
-        let pq = intel::peers_quad(format!("社内の議論(各責任者の提案):\n{peer}"));
-        if s.is_empty() { vec![pq] } else { s[0] = pq; s }
+        snapshot: vec![],
     };
-
-    // フェーズ1.5: 財務責任者が他部門案を批評する反論ラウンド (対話の深化)
+    let brief = agents::common_brief(&world);
+    let snapshot = intel::snapshot_quads(&app.conn, &app.live_m365.lock().unwrap().clone());
+    let mut ctx = Vec::new();
     {
-        let exec = exec.clone();
-        let agents_map = agents_map.clone();
-        let snap = peer_snap.clone();
-        let crit_brief = format!(
-            "各責任者の提案は次の通り:\n{peer}\n財務責任者として、これらの中で最大の財務リスクを1つ指摘し、どの案を優先すべきか1文で述べてください。"
-        );
-        if let Ok((_, txt, _)) = tokio::task::spawn_blocking(move || {
-            let wasm = agents_map.get("finance").cloned().unwrap_or_default();
-            agents::run_one(exec, wasm, "finance".to_string(), crit_brief, turn_n, snap)
-        })
-        .await
-        {
-            transcript.push(serde_json::json!({ "speaker": "財務責任者 (反論)", "role": "finance", "text": txt }));
+        let mut m = std::collections::BTreeMap::new();
+        m.insert("brief".to_string(), brief);
+        ciborium::into_writer(&m, &mut ctx).ok();
+    }
+    let quads = tokio::task::spawn_blocking(move || {
+        exec.execute("turn", &turn_wasm, "did:key:z6MkGftdSim", ctx, snapshot,
+                     std::collections::HashMap::new())
+            .map(|r| r.assert_quads)
+            .unwrap_or_default()
+    })
+    .await
+    .unwrap_or_default();
+
+    // assert_quads を回収: proposal(role→action) / discussion / activity(観測回数)
+    let mut actions: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut obs: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+    let mut disc_critique = String::new();
+    let mut disc_ceo = String::new();
+    for q in &quads {
+        let text = parse_text_obj(&q.object_cbor);
+        match q.graph.as_str() {
+            "sim/proposal" => { actions.insert(q.subject.clone(), text); }
+            "sim/activity" => { obs.insert(q.subject.clone(), text.trim().parse().unwrap_or(0)); }
+            "sim/discussion" if q.subject == "critique" => disc_critique = text,
+            "sim/discussion" if q.subject == "ceo" => disc_ceo = text,
+            _ => {}
         }
     }
-    let critique = transcript.last().and_then(|t| t["text"].as_str()).unwrap_or("").to_string();
 
-    // フェーズ2: CEO補佐が提案と反論を踏まえて統括
-    let ceo_brief = format!(
-        "{}\n--- 社内の議論(各責任者の提案) ---\n{}\n--- 財務からの反論 ---\n{}\n上記の議論を踏まえ、最優先の経営判断を1つ具申してください。",
-        agents::build_brief("ceo", &world),
-        peer,
-        critique
-    );
-    {
-        let exec = exec.clone();
-        let agents_map = agents_map.clone();
-        let snap = peer_snap.clone();
-        if let Ok(c) = tokio::task::spawn_blocking(move || {
-            let wasm = agents_map.get("ceo").cloned().unwrap_or_default();
-            agents::run_one(exec, wasm, "ceo".to_string(), ceo_brief, turn_n, snap)
-        })
-        .await
-        {
-            transcript.push(serde_json::json!({ "speaker": "CEO補佐 (統括)", "role": "ceo", "text": c.1 }));
-            results.push(c);
-        }
-    }
-    *app.discussion.lock().unwrap() = transcript;
-
-    // 3. 提案カードを作成 (観測回数 rounds を素通し → 集計/可視化は cljs 側)
-    let proposals: Vec<Proposal> = results
-        .into_iter()
-        .map(|(role, action, rounds)| {
+    // 提案カード (役割順)
+    let order = ["sales", "eng", "finance", "legal", "ceo"];
+    let proposals: Vec<Proposal> = order
+        .iter()
+        .filter_map(|role| {
+            let action = actions.get(*role)?.clone();
             let id = app.seq.fetch_add(1, Ordering::SeqCst);
-            Proposal {
+            Some(Proposal {
                 id: format!("p{id}"),
-                role_label: role_label(&role).to_string(),
-                effect_hint: effect_hint(&role).to_string(),
-                rounds,
-                role,
+                role_label: role_label(role).to_string(),
+                effect_hint: effect_hint(role).to_string(),
+                rounds: *obs.get(*role).unwrap_or(&0),
+                role: role.to_string(),
                 action,
                 status: "pending".into(),
-            }
+            })
         })
         .collect();
     *app.proposals.lock().unwrap() = proposals;
+
+    // 議事録: 各提案 + 財務反論 + CEO統括
+    let mut transcript: Vec<serde_json::Value> = ["sales", "eng", "finance", "legal"]
+        .iter()
+        .filter_map(|r| {
+            actions.get(*r).map(|a| serde_json::json!({ "speaker": role_label(r), "role": r, "text": a }))
+        })
+        .collect();
+    if !disc_critique.is_empty() {
+        transcript.push(serde_json::json!({ "speaker": "財務責任者 (反論)", "role": "finance", "text": disc_critique }));
+    }
+    if !disc_ceo.is_empty() {
+        transcript.push(serde_json::json!({ "speaker": "CEO補佐 (統括)", "role": "ceo", "text": disc_ceo }));
+    }
+    *app.discussion.lock().unwrap() = transcript;
 
     // 4. ターン履歴を datomic に記録 (時系列可視化用に売上/パイプラインも)
     let edn = format!(
@@ -561,6 +529,23 @@ async fn chat(State(app): State<Shared>, Json(req): Json<ChatReq>) -> Json<serde
         _ => "応答に失敗しました".to_string(),
     };
     Json(serde_json::json!({ "reply": text }))
+}
+
+/// CBOR {"Text": <text>} オブジェクト(kqe quad の object)から本文を取り出す。
+fn parse_text_obj(bytes: &[u8]) -> String {
+    match ciborium::from_reader::<ciborium::value::Value, _>(bytes) {
+        Ok(ciborium::value::Value::Map(entries)) => {
+            for (k, v) in entries {
+                if matches!(&k, ciborium::value::Value::Text(t) if t == "Text") {
+                    if let ciborium::value::Value::Text(t) = v {
+                        return t;
+                    }
+                }
+            }
+            String::new()
+        }
+        _ => String::new(),
+    }
 }
 
 /// CBOR {"ok": <text>} から ok 本文を取り出す。
