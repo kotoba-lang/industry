@@ -58,6 +58,61 @@
 
 (defn edn-str [s] (pr-str (str s)))
 
+;; ============================================================================
+;; 関係グラフ用の多角的 intel: メール/threads/invoice/契約/contact/市場分析から
+;; ノードの score / rel-type / market、エッジの path-weight を計算する。
+;; ============================================================================
+
+(defn lower [s] (str/lower-case (str s)))
+(defn root-token [dom] (first (str/split (str dom) #"\.")))   ; "moneyforward.com"→"moneyforward"
+
+;; 市場分析: ドメインから市場セグメントを推定
+(defn market-of [dom]
+  (let [d (lower dom)]
+    (cond
+      (re-find #"exchange|crypto|web3|dao|chain|bitcoin|coin|nft|defi|blockchain" d) :web3
+      (re-find #"bank|finance|capital|securit|invest|fund|insur|shinkin|信金|保証|政策金融" d) :finance
+      (re-find #"\.go\.jp|\.lg\.jp|\.or\.jp" d) :public
+      (re-find #"\.ac\.jp|univ|\.edu" d) :academia
+      (re-find #"\.co\.jp|\.jp$|\.ne\.jp" d) :jp-corp
+      (re-find #"\.com$|\.io$|\.app$|\.net$" d) :global
+      :else :other)))
+
+;; 金額インデックス (一度だけ読む)
+(def contracts-idx
+  (delay (->> (read-objs "contract-terms.edn")
+              (keep (fn [c] (when (and (number? (:amount_jpy c)) (pos? (:amount_jpy c)) (seq (str (:party_b c))))
+                              [(lower (:party_b c)) (:amount_jpy c)])))
+              vec)))
+(def invoices-idx
+  (delay (->> (read-objs "invoice-terms.edn")
+              (keep (fn [v] (when (and (number? (:amount_jpy v)) (pos? (:amount_jpy v)))
+                              [(lower (:issuer v)) (lower (:billed_to v)) (:amount_jpy v)])))
+              vec)))
+(defn gftd? [s] (let [l (lower s)] (or (str/includes? l "gftd") (str/includes? (str s) "ギフテ"))))
+
+;; ドメイン語幹で契約/請求を緩くマッチし、商流の金額を算出する。
+;;   :in  = gftd が相手に発行(=売上)  :out = 相手が gftd に発行(=コスト)  :contract = 契約額
+(defn money-for [dom]
+  (let [tok (lower (root-token dom))]
+    (if (< (count tok) 3)
+      {:in 0 :out 0 :contract 0}
+      {:contract (reduce + 0 (for [[party amt] @contracts-idx :when (str/includes? party tok)] amt))
+       :in  (reduce + 0 (for [[iss bil amt] @invoices-idx :when (and (gftd? iss) (str/includes? bil tok))] amt))
+       :out (reduce + 0 (for [[iss bil amt] @invoices-idx :when (and (str/includes? iss tok) (gftd? bil))] amt))})))
+
+(defn rel-type [{:keys [in out contract]}]
+  (cond (pos? in) :customer (pos? out) :vendor (pos? contract) :partner :else :lead))
+
+;; エッジ path-weight 0-100: 接触量 + モメンタム + 直近性 + 商流金額 の合成
+(defn path-weight [o open money]
+  (let [contact (min 40.0 (/ (or (:message_count o) 0) 50.0))
+        mom (min 20.0 (* 4.0 open))
+        rm (recency-months (:last_contact o))
+        rec (cond (<= rm 2) 15 (<= rm 6) 10 (<= rm 12) 5 :else 0)
+        mny (min 25.0 (/ money 2000000.0))]
+    (long (Math/round (min 100.0 (+ contact mom rec mny))))))
+
 ;; ---- ③ messages/threads からの確度精緻化 ----
 ;; threads.edn を「リード企業ドメインを含む行」だけ部分パースして(44MB全読みを回避)、
 ;; 各ドメインの「スレッド数 / 未返信スレッド数(=商談モメンタム)」を集計する。
@@ -83,7 +138,7 @@
          {} (line-seq r)))
       {})))
 
-;; ---- 潜在リード datom (確度を threads モメンタムで精緻化) ----
+;; ---- 潜在リード datom: メール/threads/invoice/契約/市場 から多角的に算出 ----
 (defn latent-leads []
   (let [orgs (->> (read-objs "crm.edn")
                   (remove #(noise? (:org_domain %)))
@@ -92,11 +147,12 @@
         sig  (thread-signals (map :org_domain orgs))]
     (map-indexed
      (fn [i o]
-       (let [dom  (:org_domain o)
-             open (get-in sig [dom :open] 0)
-             base (confidence o)
-             ;; 未返信スレッドが多いほど確度を加点(最大+15)
-             conf (min 100 (+ base (min 15 (* 3 open))))]
+       (let [dom   (:org_domain o)
+             open  (get-in sig [dom :open] 0)
+             conf  (min 100 (+ (confidence o) (min 15 (* 3 open))))
+             m     (money-for dom)
+             money (+ (:in m) (:out m) (:contract m))
+             pw    (path-weight o open money)]
          {:db/id (str "lead" i)
           :gftd.intel/kind :latent-lead
           :gftd.intel/subject dom
@@ -104,9 +160,25 @@
           :gftd.intel/confidence conf
           :gftd.intel/people (count (or (:people o) []))
           :gftd.intel/open-threads open
+          :gftd.intel/path-weight pw
+          :gftd.intel/market (market-of dom)
+          :gftd.intel/rel-type (rel-type m)
+          :gftd.intel/money-jpy money
           :gftd.intel/risk (if (churn? o) :churn :none)
           :gftd.intel/stage :new}))
      orgs)))
+
+;; ---- 市場分析: 接触上位 org をセグメント別に集計 ----
+(defn markets []
+  (let [orgs (->> (read-objs "crm.edn") (remove #(noise? (:org_domain %))) (take 80))
+        g (group-by #(market-of (:org_domain %)) orgs)]
+    (map-indexed
+     (fn [i [seg os]]
+       {:db/id (str "mkt" i)
+        :gftd.market/segment seg
+        :gftd.market/orgs (count os)
+        :gftd.market/messages (reduce + 0 (map #(or (:message_count %) 0) os))})
+     g)))
 
 ;; ---- 休眠プロジェクト再生候補 datom ----
 (defn revivals []
@@ -162,5 +234,5 @@
      parties)))
 
 ;; ---- 出力: 全 intel datom を 1 ベクタで ----
-(let [all (vec (concat (latent-leads) (revivals) (renewal-risks) (deps)))]
+(let [all (vec (concat (latent-leads) (revivals) (renewal-risks) (deps) (markets)))]
   (println (pr-str all)))

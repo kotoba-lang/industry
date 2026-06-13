@@ -21,13 +21,33 @@
 (defonce positions (atom {}))   ; role -> {:x % :y %} 現在位置 (歩行アニメ)
 
 ;; 社員レイアウト: home(席) と meeting(会議卓近く) の座標(%)
+;; 提案者(LLMエージェント): 吹き出しで提案、承認/却下対象
 (def workers
-  [{:role "sales"   :label "営業"    :emoji "🧑‍💼" :desk "📞" :hx 20 :hy 26 :mx 40 :my 48 :ph 0.0}
-   {:role "eng"     :label "開発"    :emoji "🧑‍💻" :desk "💻" :hx 66 :hy 26 :mx 52 :my 46 :ph 1.6}
-   {:role "finance" :label "財務"    :emoji "👩‍💼" :desk "💴" :hx 20 :hy 64 :mx 44 :my 56 :ph 3.1}
-   {:role "ceo"     :label "CEO補佐" :emoji "🧑‍🏫" :desk "📊" :hx 66 :hy 64 :mx 56 :my 54 :ph 4.7}])
+  [{:role "sales"   :label "営業"    :emoji "🧑‍💼" :desk "📞" :hx 14 :hy 22 :mx 40 :my 52 :ph 0.0}
+   {:role "eng"     :label "開発"    :emoji "🧑‍💻" :desk "💻" :hx 50 :hy 16 :mx 50 :my 48 :ph 1.2}
+   {:role "finance" :label "財務"    :emoji "👩‍💼" :desk "💴" :hx 86 :hy 22 :mx 60 :my 52 :ph 2.4}
+   {:role "legal"   :label "法務"    :emoji "🧑‍⚖️" :desk "📜" :hx 28 :hy 44 :mx 44 :my 58 :ph 3.6}
+   {:role "ceo"     :label "CEO補佐" :emoji "🧑‍🏫" :desk "📊" :hx 72 :hy 44 :mx 58 :my 58 :ph 4.8}])
+
+;; アンビエント社員: LLMは呼ばず、役割別のライブ情報を表示しながら働く
+(def ambient
+  [{:id "soumu" :label "総務"     :emoji "🗂️" :hx 11 :hy 72 :ph 0.5 :cap :renewal}
+   {:id "shomu" :label "庶務"     :emoji "🧾" :hx 31 :hy 78 :ph 1.7 :cap :deps}
+   {:id "phone" :label "電話番"   :emoji "☎️" :hx 50 :hy 73 :ph 2.9 :cap :calls}
+   {:id "mail"  :label "メール担当" :emoji "📧" :hx 70 :hy 78 :ph 4.1 :cap :inbound}
+   {:id "rep"   :label "営業担当"  :emoji "🕴️" :hx 89 :hy 70 :ph 5.3 :cap :chase}])
 
 (defn prop-for [role props] (first (filter #(= (:role %) role) props)))
+
+(defn ambient-caption [cap d]
+  (let [it (:intel d) ra (or (:recent_activity d) [])]
+    (case cap
+      :renewal (str "更新確認 " (count (:renewal_risks it)) "件")
+      :deps    (str "取引 " (count (:dependencies it)) "件")
+      :calls   (str "会議 " (count (filter #(str/starts-with? % "📅") ra)) "件")
+      :inbound (str "inbound " (count (filter #(str/starts-with? % "📨") ra)) "件")
+      :chase   (str "追客: " (if-let [l (first (:latent_leads it))] (first (str/split (:subject l) #"\.")) "—"))
+      "")))
 
 ;; ---- KPI HUD ----------------------------------------------------------------
 
@@ -53,16 +73,22 @@
 ;; ---- 2D オフィス: 構築は一度だけ、位置は rAF、状態は paint で更新 ----------
 
 (defn build-office! []
-  (let [deco "<div class='deco' style='left:6%;top:8%'>🪴</div><div class='deco' style='left:92%;top:10%'>🪟</div><div class='deco' style='left:92%;top:88%'>☕️</div><div class='deco' style='left:6%;top:88%'>🗄️</div><div class='deco table' style='left:48%;top:50%'>🪑📋🪑</div>"
-        you "<div class='worker you' style='left:48%;top:84%'><div class='avatar'>👑</div><div class='nameplate'>あなた (CEO)</div></div>"
+  (let [deco "<div class='deco' style='left:5%;top:7%'>🪴</div><div class='deco' style='left:95%;top:9%'>🪟</div><div class='deco' style='left:50%;top:90%'>☕️</div><div class='deco table' style='left:50%;top:53%'>🪑📋🪑</div>"
+        you "<div class='worker you' style='left:50%;top:92%'><div class='avatar'>👑</div><div class='nameplate'>あなた (CEO)</div></div>"
         ws (str/join (for [w workers]
                        (str "<div class='worker " (:role w) "' id='w-" (:role w) "' style='left:" (:hx w) "%;top:" (:hy w) "%'>"
                             "<div class='bubble-host' id='bub-" (:role w) "'></div>"
                             "<div class='avatar'>" (:emoji w) "</div>"
                             "<div class='desk'>" (:desk w) "</div>"
-                            "<div class='nameplate'>" (:label w) "</div></div>")))]
-    (set! (.-innerHTML ($ "office")) (str deco ws you))
-    (reset! positions (into {} (for [w workers] [(:role w) {:x (:hx w) :y (:hy w)}])))))
+                            "<div class='nameplate'>" (:label w) "</div></div>")))
+        as (str/join (for [a ambient]
+                       (str "<div class='worker ambient' id='a-" (:id a) "' style='left:" (:hx a) "%;top:" (:hy a) "%'>"
+                            "<div class='avatar'>" (:emoji a) "</div>"
+                            "<div class='nameplate'>" (:label a) "</div>"
+                            "<div class='cap' id='cap-" (:id a) "'></div></div>")))]
+    (set! (.-innerHTML ($ "office")) (str deco ws as you))
+    (reset! positions (into {} (concat (for [w workers] [(:role w) {:x (:hx w) :y (:hy w)}])
+                                       (for [a ambient] [(:id a) {:x (:hx a) :y (:hy a)}]))))))
 
 (defn paint-office! [data thinking?]
   (let [props (:proposals data)]
@@ -90,56 +116,74 @@
                        "<button class='reject' onclick=\"window.decide('" (:id p) "','reject')\">却下</button></div></div>")
                   (= state "approved") "<div class='bubble ok'>✅ 承認</div>"
                   (= state "rejected") "<div class='bubble ng'>💢 却下</div>"
-                  :else "")))))))
+                  :else ""))))))
+  ;; アンビエント社員のライブ情報を更新
+  (doseq [a ambient]
+    (when-let [el ($ (str "cap-" (:id a)))]
+      (set! (.-textContent el) (ambient-caption (:cap a) data)))))
 
-;; 歩行: home↔meeting を ease で移動 + ゆらぎ。requestAnimationFrame ループ。
+;; キャラ1体を目標座標へ ease 移動 + ゆらぎ。
+(defn move! [key id tx ty ph t]
+  (let [pos (get @positions key {:x tx :y ty})
+        nx (+ (:x pos) (* 0.05 (- tx (:x pos))))
+        ny (+ (:y pos) (* 0.05 (- ty (:y pos))))
+        wob (* 1.3 (js/Math.sin (+ (/ t 600.0) ph)))
+        el ($ id)]
+    (swap! positions assoc key {:x nx :y ny})
+    (when el
+      (set! (.. el -style -left) (str (+ nx wob) "%"))
+      (set! (.. el -style -top) (str ny "%"))
+      (.toggle (.-classList el) "moving" (> (js/Math.abs (- tx nx)) 0.6)))))
+
+;; 歩行ループ: 提案者は思考時に会議卓へ集合、アンビエントは自席で徘徊。
 (defn tick! [t]
   (let [thinking (:thinking @ui)]
     (doseq [w workers]
-      (let [pos (get @positions (:role w) {:x (:hx w) :y (:hy w)})
-            tx (if thinking (:mx w) (:hx w))
-            ty (if thinking (:my w) (:hy w))
-            nx (+ (:x pos) (* 0.05 (- tx (:x pos))))
-            ny (+ (:y pos) (* 0.05 (- ty (:y pos))))
-            wob (* 1.3 (js/Math.sin (+ (/ t 600.0) (:ph w))))
-            el ($ (str "w-" (:role w)))]
-        (swap! positions assoc (:role w) {:x nx :y ny})
-        (when el
-          (set! (.. el -style -left) (str (+ nx wob) "%"))
-          (set! (.. el -style -top) (str ny "%"))
-          (.toggle (.-classList el) "moving" (> (js/Math.abs (- tx nx)) 0.6))))))
+      (move! (:role w) (str "w-" (:role w))
+             (if thinking (:mx w) (:hx w)) (if thinking (:my w) (:hy w)) (:ph w) t))
+    (doseq [a ambient]
+      (move! (:id a) (str "a-" (:id a)) (:hx a) (:hy a) (:ph a) t)))
   (js/requestAnimationFrame tick!))
 
 ;; ---- 関係グラフ (SVG): gftd ↔ 潜在リード, 太さ=接触量 色=確度 リング=離反 ----
 
-(defn lead-color [conf]
-  (cond (>= conf 80) "#3fb950" (>= conf 55) "#d29922" :else "#f85149"))
+;; 市場セグメント → 色
+(defn market-color [m]
+  (case m
+    "web3" "#a371f7" "finance" "#3fb950" "jp-corp" "#4f9dff"
+    "global" "#58a6ff" "public" "#d29922" "academia" "#56d4dd" "#8b98a9"))
+;; 関係種別 → リング色 (商流の性質)
+(defn rel-ring [rel]
+  (case rel "customer" "#3fb950" "vendor" "#f0883e" "partner" "#a371f7" nil))
 
 (defn render-graph! [leads]
-  (let [top (vec (take 7 leads))
+  (let [top (vec (take 8 leads))
         n (count top)
-        cx 120 cy 96
-        max-s (max 1 (apply max 1 (map :score top)))
+        cx 120 cy 98
+        max-pw (max 1 (apply max 1 (map :path_weight top)))
         nodes (map-indexed
                (fn [i l]
                  (let [a (- (* (/ i (max 1 n)) 2 js/Math.PI) (/ js/Math.PI 2))
-                       x (+ cx (* 74 (js/Math.cos a)))
-                       y (+ cy (* 64 (js/Math.sin a)))
-                       sw (+ 0.6 (* 5 (/ (:score l) max-s)))
-                       r (+ 6 (* 8 (/ (:confidence l) 100.0)))
+                       x (+ cx (* 76 (js/Math.cos a)))
+                       y (+ cy (* 66 (js/Math.sin a)))
+                       sw (+ 0.6 (* 6 (/ (:path_weight l) max-pw)))   ; エッジ太さ=path-weight
+                       r (+ 6 (* 8 (/ (:path_weight l) 100.0)))
                        churn (= (:risk l) "churn")
+                       ring (or (when churn "#f85149") (rel-ring (:rel_type l)))
                        short (first (str/split (:subject l) #"\."))]
                    (str "<line x1='" cx "' y1='" cy "' x2='" x "' y2='" y "' stroke='#3a4452' stroke-width='" sw "'/>"
-                        "<circle cx='" x "' cy='" y "' r='" r "' fill='" (lead-color (:confidence l)) "' "
-                        (when churn "stroke='#f85149' stroke-width='2.5' ") "/>"
+                        "<circle cx='" x "' cy='" y "' r='" r "' fill='" (market-color (:market l)) "' "
+                        (when ring (str "stroke='" ring "' stroke-width='2.5' ")) "/>"
                         "<text x='" x "' y='" (+ y r 9) "' font-size='8' fill='#c7d0db' text-anchor='middle'>" (esc short) "</text>")))
                top)]
     (set! (.-innerHTML ($ "graph"))
           (str "<svg viewBox='0 0 240 200' class='graphsvg'>"
                (str/join nodes)
-               "<circle cx='" cx "' cy='" cy "' r='15' fill='#4f9dff'/>"
+               "<circle cx='" cx "' cy='" cy "' r='15' fill='#1f6feb'/>"
                "<text x='" cx "' y='" (+ cy 3) "' font-size='9' fill='#fff' text-anchor='middle' font-weight='700'>gftd</text>"
-               "</svg>"))))
+               "</svg>"))
+    (set! (.-innerHTML ($ "graph-legend"))
+          "<span>線=接触/商流(path-weight)</span> <span>色=市場</span> <span>リング: 緑顧客/橙仕入/紫提携/赤離反</span>")))
 
 ;; ---- intel パネル -----------------------------------------------------------
 
@@ -147,15 +191,24 @@
   (when it
     (set! (.-textContent ($ "intel-depth")) (or (:intel_depth it) 0))
     (render-graph! (:latent_leads it))
+    (set! (.-innerHTML ($ "markets"))
+          (str/join (for [m (take 6 (:markets it))]
+                      (str "<li class='kv'><span><span class='dot' style='background:" (market-color (:segment m)) "'></span>"
+                           (esc (:segment m)) "</span><span class='r'>" (:orgs m) "社 / " (:messages m) "通</span></li>"))))
     (let [f (:funnel it)
+          rel-ja {"customer" "顧客" "vendor" "仕入先" "partner" "提携" "lead" "見込"}
           funnel-li (str "<li class='funnel'>商談ファネル: 新規 " (:new f 0) " ｜ 接触 " (:engaged f 0)
                          " ｜ 商談 " (:qualified f 0) " ｜ <b>受注 " (:won f 0) "</b></li>")
           leads (str/join (for [l (take 6 (:latent_leads it))]
                             (let [churn? (= (:risk l) "churn")
-                                  open (:open_threads l)]
+                                  open (:open_threads l)
+                                  money (:money_jpy l)]
                               (str "<li class='kv'><span>" (esc (:subject l))
                                    (when churn? " <span class='risk'>離反</span>")
-                                   "</span><span class='r'>確度" (:confidence l)
+                                   "</span><span class='r'>"
+                                   "<span class='rel " (:rel_type l) "'>" (rel-ja (:rel_type l) (:rel_type l)) "</span> "
+                                   "pw" (:path_weight l)
+                                   (when (and money (pos? money)) (str " ¥" (man money) "万"))
                                    (when (and open (pos? open)) (str " 📩" open))
                                    " <span class='stage " (:stage l) "'>" (:stage l) "</span></span></li>"))))]
       (set! (.-innerHTML ($ "leads")) (str funnel-li leads)))

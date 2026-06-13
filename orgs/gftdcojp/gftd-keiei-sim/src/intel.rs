@@ -122,23 +122,25 @@ pub fn views(conn: &Connection) -> serde_json::Value {
     let db = conn.db();
     let progressed = progressed_subjects(conn);
 
-    // 潜在リード (確度/関与人数/離反リスク/未返信スレッド/商談ステージ つき)
+    // 潜在リード (多角的: 確度/関与/リスク/未返信/path-weight/市場/関係種別/商流額/ステージ)
     let mut leads: Vec<serde_json::Value> = q(
-        parse("{:find [?subj ?score ?conf ?ppl ?risk ?open ?kind] :where [[?e :gftd.intel/subject ?subj][?e :gftd.intel/score ?score][?e :gftd.intel/confidence ?conf][?e :gftd.intel/people ?ppl][?e :gftd.intel/risk ?risk][?e :gftd.intel/open-threads ?open][?e :gftd.intel/kind ?kind]]}").unwrap(),
+        parse("{:find [?subj ?score ?conf ?ppl ?risk ?open ?pw ?mkt ?rel ?money ?kind] :where [[?e :gftd.intel/subject ?subj][?e :gftd.intel/score ?score][?e :gftd.intel/confidence ?conf][?e :gftd.intel/people ?ppl][?e :gftd.intel/risk ?risk][?e :gftd.intel/open-threads ?open][?e :gftd.intel/path-weight ?pw][?e :gftd.intel/market ?mkt][?e :gftd.intel/rel-type ?rel][?e :gftd.intel/money-jpy ?money][?e :gftd.intel/kind ?kind]]}").unwrap(),
         &db, &[],
     ).unwrap_or_default()
     .iter()
-    .filter(|r| kw_at(r, 6) == "latent-lead")
+    .filter(|r| kw_at(r, 10) == "latent-lead")
     .map(|r| {
         let subj = str_at(r, 0);
         let stage = progressed.get(&subj).cloned().unwrap_or_else(|| "new".into());
         serde_json::json!({
             "subject": subj, "score": i64_at(r,1), "confidence": i64_at(r,2),
-            "people": i64_at(r,3), "risk": kw_at(r,4), "open_threads": i64_at(r,5), "stage": stage
+            "people": i64_at(r,3), "risk": kw_at(r,4), "open_threads": i64_at(r,5),
+            "path_weight": i64_at(r,6), "market": kw_at(r,7), "rel_type": kw_at(r,8),
+            "money_jpy": i64_at(r,9), "stage": stage
         })
     })
     .collect();
-    leads.sort_by_key(|x| -(x["confidence"].as_i64().unwrap_or(0)));
+    leads.sort_by_key(|x| -(x["path_weight"].as_i64().unwrap_or(0)));
 
     // 商談ファネル集計 (ステージ別件数)
     let funnel = serde_json::json!({
@@ -178,12 +180,23 @@ pub fn views(conn: &Connection) -> serde_json::Value {
     .map(|r| serde_json::json!({ "to": str_at(r,0), "value_jpy": i64_at(r,1) }))
     .collect();
 
+    // 市場分析 (セグメント別 org 数・接触量)
+    let mut markets: Vec<serde_json::Value> = q(
+        parse("{:find [?seg ?orgs ?msgs] :where [[?e :gftd.market/segment ?seg][?e :gftd.market/orgs ?orgs][?e :gftd.market/messages ?msgs]]}").unwrap(),
+        &db, &[],
+    ).unwrap_or_default()
+    .iter()
+    .map(|r| serde_json::json!({ "segment": kw_at(r,0), "orgs": i64_at(r,1), "messages": i64_at(r,2) }))
+    .collect();
+    markets.sort_by_key(|x| -(x["messages"].as_i64().unwrap_or(0)));
+
     serde_json::json!({
         "latent_leads": leads,
         "revival": revival,
         "renewal_risks": renewal,
         "dependencies": deps,
         "funnel": funnel,
+        "markets": markets,
         "intel_depth": progressed.len(),
     })
 }

@@ -17,6 +17,7 @@ pub const AGENTS: &[(&str, &str)] = &[
     ("sales", "sales.clj"),
     ("eng", "engineering.clj"),
     ("finance", "finance.clj"),
+    ("legal", "legal.clj"),
     ("ceo", "ceo_advisor.clj"),
 ];
 

@@ -61,6 +61,7 @@ pub fn role_label(role: &str) -> &'static str {
         "sales" => "営業責任者",
         "eng" => "エンジニアリング責任者",
         "finance" => "財務責任者 (CFO)",
+        "legal" => "法務責任者",
         "ceo" => "CEO補佐 (経営参謀)",
         _ => "社員",
     }
@@ -72,6 +73,7 @@ pub fn effect_hint(role: &str) -> &'static str {
         "sales" => "主要商談を受注: 現金+2億 / 売上+2億 / パイプライン-2億 / 士気+3",
         "eng" => "増員5名 & プロダクト改善: 人員+5 / バーン+350万/月 / パイプライン+0.8億 / 士気+5",
         "finance" => "コスト最適化: バーン-1500万/月 (複利で効く) / 士気-2",
+        "legal" => "契約リスク是正: パイプライン+0.4億 / 士気+3",
         "ceo" => "戦略の明確化: パイプライン+1.2億 / 士気+8",
         _ => "",
     }
@@ -98,6 +100,11 @@ pub fn apply_effect(role: &str, k: &mut Kpis) -> String {
             k.burn_jpy = (k.burn_jpy - 15_000_000).max(10_000_000);
             k.morale = (k.morale - 2).max(0);
             "財務提案を承認: コスト最適化 (バーン-1500万/月)"
+        }
+        "legal" => {
+            k.pipeline_jpy += 40_000_000;
+            k.morale = (k.morale + 3).min(100);
+            "法務提案を承認: 契約リスク是正 (商談の確度向上)"
         }
         "ceo" => {
             k.pipeline_jpy += 120_000_000;
