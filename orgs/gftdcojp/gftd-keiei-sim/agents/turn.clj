@@ -31,9 +31,12 @@
     (cbor-enc-map-header! o 1) (cbor-enc-text! o "Text") (cbor-enc-text! o s) (bytes-finish o)))
 (defn assert-q [g subj pred s] (kqe-assert! g subj pred (txt-obj s)))
 
-;; persona + 現状況 + 観測 → プロンプト
-(defn mk-prompt [persona situation obs]
-  (let [b (bytes-alloc 2560)]
+;; persona + 現状況 + 観測 → プロンプト。先頭に [[M:model]] を付け Rust 側でモデル振分け。
+(defn mk-prompt [model persona situation obs]
+  (let [b (bytes-alloc 2816)]
+    (buf-str! b "[[M:")
+    (buf-str! b model)
+    (buf-str! b "]]")
     (buf-str! b persona)
     (buf-str! b " 観測を踏まえ、必ず『〜を確認した結果、…』の形で観測した具体根拠(社名/金額/件名/予定)を冒頭に含め、この四半期に取るべき施策を1つだけ日本語1文(90字以内)で提案してください。\n--- 現状況 ---\n")
     (buf-str! b situation)
@@ -45,28 +48,28 @@
 
 (defn node-sales [state]
   (let [obs (cat2 (read-intel "sim.intel/brief") (read-intel "sim.intel/digest"))
-        a (llm-infer "gftd-sim" (mk-prompt "あなたは株式会社gftdの営業責任者です。最有力リードへの具体策を優先します。" (map-get state "brief") obs))]
+        a (llm-infer "gftd-sim" (mk-prompt "qwen/qwen3.7-max" "あなたは株式会社gftdの営業責任者です。最有力リードへの具体策を優先します。" (map-get state "brief") obs))]
     (assert-q "sim/proposal" "sales" "sim.proposal/action" a)
     (assert-q "sim/activity" "sales" "observes" "2")
     (map-assoc! state "sales" a)))
 
 (defn node-eng [state]
   (let [obs (cat2 (read-intel "sim.intel/brief") (read-intel "sim.intel/detail"))
-        a (llm-infer "gftd-sim" (mk-prompt "あなたは株式会社gftdのエンジニアリング責任者です。プロダクト/開発体制を扱います。" (map-get state "brief") obs))]
+        a (llm-infer "gftd-sim" (mk-prompt "moonshotai/kimi-k2-thinking" "あなたは株式会社gftdのエンジニアリング責任者です。プロダクト/開発体制を扱います。" (map-get state "brief") obs))]
     (assert-q "sim/proposal" "eng" "sim.proposal/action" a)
     (assert-q "sim/activity" "eng" "observes" "2")
     (map-assoc! state "eng" a)))
 
 (defn node-finance [state]
   (let [obs (cat2 (cat2 (read-intel "sim.intel/brief") (read-intel "sim.intel/detail")) (read-intel "sim.intel/learn"))
-        a (llm-infer "gftd-sim" (mk-prompt "あなたは株式会社gftdの財務責任者(CFO)です。資金繰り/コスト/不良債権を扱います。" (map-get state "brief") obs))]
+        a (llm-infer "gftd-sim" (mk-prompt "qwen/qwen3.7-max" "あなたは株式会社gftdの財務責任者(CFO)です。資金繰り/コスト/不良債権を扱います。" (map-get state "brief") obs))]
     (assert-q "sim/proposal" "finance" "sim.proposal/action" a)
     (assert-q "sim/activity" "finance" "observes" "3")
     (map-assoc! state "finance" a)))
 
 (defn node-legal [state]
   (let [obs (cat2 (read-intel "sim.intel/brief") (read-intel "sim.intel/detail"))
-        a (llm-infer "gftd-sim" (mk-prompt "あなたは株式会社gftdの法務責任者です。契約更新リスク/コンプラを扱います。" (map-get state "brief") obs))]
+        a (llm-infer "gftd-sim" (mk-prompt "anthropic/claude-opus-4.8" "あなたは株式会社gftdの法務責任者です。契約更新リスク/コンプラを扱います。" (map-get state "brief") obs))]
     (assert-q "sim/proposal" "legal" "sim.proposal/action" a)
     (assert-q "sim/activity" "legal" "observes" "2")
     (map-assoc! state "legal" a)))
@@ -79,13 +82,13 @@
         (cat2 "\n法務: " (map-get state "legal"))))
 
 (defn node-critique [state]
-  (let [a (llm-infer "gftd-sim" (mk-prompt "あなたは株式会社gftdの財務責任者です。各部門案の最大の財務リスクを1つ指摘し、どの案を優先すべきか述べます。" "各責任者の提案:" (peers state)))]
+  (let [a (llm-infer "gftd-sim" (mk-prompt "qwen/qwen3.7-max" "あなたは株式会社gftdの財務責任者です。各部門案の最大の財務リスクを1つ指摘し、どの案を優先すべきか述べます。" "各責任者の提案:" (peers state)))]
     (assert-q "sim/discussion" "critique" "sim.disc/text" a)
     (map-assoc! state "critique" a)))
 
 (defn node-ceo [state]
   (let [obs (cat2 (cat2 (peers state) "\n財務の反論: ") (map-get state "critique"))
-        a (llm-infer "gftd-sim" (mk-prompt "あなたは株式会社gftdのCEO補佐(経営参謀)です。各提案と財務の反論を俯瞰し、最優先の経営判断を1つ具申します。" "社内の議論:" obs))]
+        a (llm-infer "gftd-sim" (mk-prompt "minimax/minimax-m3" "あなたは株式会社gftdのCEO補佐(経営参謀)です。各提案と財務の反論を俯瞰し、最優先の経営判断を1つ具申します。" "社内の議論:" obs))]
     (assert-q "sim/proposal" "ceo" "sim.proposal/action" a)
     (assert-q "sim/discussion" "ceo" "sim.disc/text" a)
     (assert-q "sim/activity" "ceo" "observes" "2")

@@ -65,7 +65,7 @@ async fn main() -> Result<()> {
     let (exec, llm_live, infer_fn) = agents::make_executor()?;
     tracing::info!(
         "executor ready (LLM: {})",
-        if llm_live { "REAL (gemma4 e4b @ Ollama)" } else { "STUB" }
+        if llm_live { "REAL (OpenRouter 役割別モデル)" } else { "STUB" }
     );
 
     // 4. 共有状態を組み立て
