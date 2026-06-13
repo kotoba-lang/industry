@@ -4,7 +4,8 @@
   (:require [clojure.string :as str]
             [re-frame.core :as rf]
             [gftd.db :as db]
-            [gftd.anim :as anim]))
+            [gftd.anim :as anim]
+            [gftd.priority :as prio]))
 
 ;; ---- 表示ヘルパ -------------------------------------------------------------
 
@@ -411,6 +412,52 @@
            [:span.mail-subj (:subject m)]
            [:span.mail-date (subs (str (:received m)) 5 16)]])])]))
 
+;; ---- 🎯 優先順位キュー (WSJF + MCDA内訳 + minimax最悪ケース) -----------------
+
+(def ^:private kind-class
+  {:proposal "k-prop" :renewal "k-renew" :baddebt "k-bd"
+   :churn "k-churn" :lead "k-lead" :inbox "k-inbox"})
+
+(defn- mcda-bars [a]
+  ;; ⑤ MCDA: 影響/緊急/リスク低減/工数 を小バーで内訳表示
+  [:div.mcda
+   (for [[label v color]
+         [["影響" (:impact a) "#4f9dff"] ["緊急" (:urgency a) "#f0883e"]
+          ["リスク低減" (:risk a) "#3fb950"] ["工数" (:effort a) "#8b98a9"]]]
+     ^{:key label}
+     [:div.mcda-row
+      [:span.mcda-label label]
+      [:div.mcda-track [:div.mcda-fill {:style {:width (str (* 10 v) "%") :background color}}]]])])
+
+(defn priority-pane []
+  (let [data @(rf/subscribe [:data])
+        q (when data (prio/queue data))]
+    [:section.panel
+     [:h2 "🎯 意思決定キュー "
+      [:span.hint "WSJF優先順 · 提案/リスク/不良債権/リード/メールを統合"]]
+     (cond
+       (nil? data) [:p.empty "読み込み中…"]
+       (empty? q)  [:p.empty "対応待ちの項目はありません。「次の四半期へ」で社員が提案します。"]
+       :else
+       [:ul.pq
+        (for [[i a] (map-indexed vector q)]
+          ^{:key (:id a)}
+          [:li.pq-item {:class (kind-class (:kind a))}
+           [:div.pq-rank (inc i)]
+           [:div.pq-main
+            [:div.pq-head
+             [:span.pq-badge (:badge a)]
+             [:span.pq-title (:title a)]
+             [:span.pq-score (str "WSJF " (.toFixed (:score a) 1))]]
+            [:div.pq-detail (:detail a)]
+            [mcda-bars a]
+            [:div.pq-worst "⚠ " (:worst a)]
+            (when (seq (:actions a))
+              [:div.pq-actions
+               (for [[j act] (map-indexed vector (:actions a))]
+                 ^{:key j}
+                 [:button.pq-btn {:on-click #(rf/dispatch (:ev act))} (:label act)])])]])])]))
+
 ;; ---- レポート/要約モーダル --------------------------------------------------
 
 (defn modal []
@@ -431,8 +478,8 @@
       [:p "現金残高がマイナスになりました。経営判断を見直してリスタートしてください。"]]]))
 
 (def ^:private tabs
-  [[:office "🏢 オフィス"] [:calendar "📅 カレンダー"] [:inbox "📨 受信トレイ"]
-   [:intel "🧠 インテリジェンス"] [:mgmt "📊 経営"]])
+  [[:priority "🎯 優先順位"] [:office "🏢 オフィス"] [:calendar "📅 カレンダー"]
+   [:inbox "📨 受信トレイ"] [:intel "🧠 インテリジェンス"] [:mgmt "📊 経営"]])
 
 (defn nav-tabs []
   (let [active @(rf/subscribe [:tab])]
@@ -444,6 +491,7 @@
 
 (defn tab-content []
   (case @(rf/subscribe [:tab])
+    :priority [:div.pane.single [priority-pane]]
     :office   [:div.pane [office] [discussion-panel]]
     :calendar [:div.pane.single [calendar-pane]]
     :inbox    [:div.pane.single [inbox-pane]]

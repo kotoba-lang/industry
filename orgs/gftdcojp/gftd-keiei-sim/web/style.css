@@ -219,3 +219,29 @@ main.tabbed { display: block; max-width: 1200px; margin: 0 auto; padding: 18px 2
 .mail-subj { font-weight: 600; }
 .mail-list li.unread .mail-subj::before { content: "● "; color: var(--accent); }
 .mail-date { color: var(--muted); text-align: right; font-size: 11px; }
+
+/* ===== 🎯 意思決定キュー (WSJF + MCDA + minimax) ===== */
+ul.pq { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.pq-item { display: grid; grid-template-columns: 40px 1fr; gap: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; border-left: 4px solid var(--accent); }
+.pq-item.k-renew { border-left-color: #d29922; }
+.pq-item.k-bd { border-left-color: #f85149; }
+.pq-item.k-churn { border-left-color: #f0883e; }
+.pq-item.k-lead { border-left-color: #4f9dff; }
+.pq-item.k-inbox { border-left-color: #56d4dd; }
+.pq-item.k-prop { border-left-color: #a371f7; }
+.pq-rank { font-size: 24px; font-weight: 800; color: var(--muted); text-align: center; }
+.pq-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.pq-badge { font-size: 11px; font-weight: 700; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; }
+.pq-title { font-size: 14.5px; font-weight: 700; flex: 1; }
+.pq-score { font-size: 12px; font-weight: 800; color: var(--accent); }
+.pq-detail { font-size: 12.5px; color: var(--muted); margin: 4px 0 8px; }
+.mcda { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 16px; margin-bottom: 8px; }
+.mcda-row { display: flex; align-items: center; gap: 8px; }
+.mcda-label { font-size: 10.5px; color: var(--muted); min-width: 60px; }
+.mcda-track { flex: 1; height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
+.mcda-fill { height: 100%; border-radius: 3px; }
+.pq-worst { font-size: 12px; color: #f0a878; margin-bottom: 8px; }
+.pq-actions { display: flex; gap: 8px; }
+.pq-btn { border: 1px solid var(--line); background: var(--panel-2); color: var(--text); padding: 6px 16px; border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 700; }
+.pq-btn:first-child:hover { background: var(--green); border-color: var(--green); color: #fff; }
+.pq-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }

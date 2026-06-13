@@ -21,4 +21,4 @@
   {:data     nil      ; サーバ /api/state 由来のスナップショット (旧 app-data)
    :thinking false    ; ターン進行中(社員が会議中)フラグ
    :modal    nil      ; レポート/商談要約モーダル {:title :body :loading} or nil
-   :tab      :office}) ; 表示中タブ :office/:calendar/:inbox/:intel/:mgmt
+   :tab      :priority}) ; 表示中タブ :priority/:office/:calendar/:inbox/:intel/:mgmt
