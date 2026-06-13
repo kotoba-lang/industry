@@ -176,6 +176,18 @@ WASM 実行 / HTTP サーバ の最小ランタイムに徹する。
 dev 品質ゲート: `clojure -M:build`(警告=エラー) / `clojure -M:lint`(clj-kondo) /
 malli による app-data 形状検証(`src/cljs/gftd/schema.cljs`, dev のみ)。
 
+### 実 Microsoft 365 (Outlook) ライブ接続
+
+抽出済み静的facts(extract-facts.py由来)に加え、**現在の M365 にライブ接続**できる。
+`analysis/m365-live.bb` が `m365` CLI(ログイン済みセッション)から Graph アクセストークンを
+取得し、受信トレイ直近・今後の予定(14日)・未読件数を取得(読み取り専用・メタデータのみ、
+本文は取らない)。ヘッダの「📡 M365同期」(`POST /api/m365/sync`)で取得し、サイドの
+「📡 ライブ M365」パネルに表示。電話番(予定件数)/メール担当(未読件数)のアンビエント社員も
+ライブ値に連動する。
+
+前提: `m365 login`(デバイスコード/MFA, `m365-archive/bin/setup-auth.sh` 参照)で
+Microsoft 365 CLI にサインイン済みであること。未ログイン時は同期はスキップされる。
+
 ### 時系列・要約・対話・レポート
 
 - **KPI時系列(#1)**: 各ターンの現金/売上/パイプラインを `:sim.turn/*` datom に記録し、

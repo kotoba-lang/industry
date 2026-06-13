@@ -84,6 +84,7 @@ async fn main() -> Result<()> {
         kpis: Mutex::new(seed.kpis),
         proposals: Mutex::new(Vec::new()),
         discussion: Mutex::new(Vec::new()),
+        live_m365: Mutex::new(serde_json::Value::Null),
         tx,
         seq: AtomicU64::new(1),
     });

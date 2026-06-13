@@ -28,12 +28,13 @@
     ""))
 
 (defn- ambient-caption [cap d]
-  (let [it (:intel d) ra (or (:recent_activity d) [])]
+  (let [it (:intel d) ra (or (:recent_activity d) []) lm (:live_m365 d)]
     (case cap
       :renewal (str "更新確認 " (count (:renewal_risks it)) "件")
       :deps    (str "取引 " (count (:dependencies it)) "件")
-      :calls   (str "会議 " (count (filter #(str/starts-with? % "📅") ra)) "件")
-      :inbound (str "inbound " (count (filter #(str/starts-with? % "📨") ra)) "件")
+      ;; 電話番/メール担当はライブM365があればそれを優先(実Outlook連動)
+      :calls   (if lm (str "予定 " (count (:events lm)) "件") (str "会議 " (count (filter #(str/starts-with? % "📅") ra)) "件"))
+      :inbound (if lm (str "未読 " (:unread lm) "件") (str "inbound " (count (filter #(str/starts-with? % "📨") ra)) "件"))
       :chase   (str "追客: " (if-let [l (first (:latent_leads it))]
                               (first (str/split (:subject l) #"\.")) "—"))
       "")))
@@ -56,6 +57,7 @@
       [:span {:class (str "badge " (case llm-live true "live" false "stub" nil))}
        (case llm-live true "実LLM gemma4" false "スタブLLM" "LLM")]
       [:span.badge.turn (str "ターン " (or turn 0))]
+      [:button.primary.alt {:on-click #(rf/dispatch [:m365-sync])} "📡 M365同期"]
       [:button.primary.alt {:on-click #(rf/dispatch [:gen-report])} "📊 経営レポート"]
       [:button.primary {:on-click #(rf/dispatch [:advance])
                         :disabled (= status "bankrupt")}
@@ -329,6 +331,28 @@
            [:span.speaker (:speaker m)] [:span.line (:text m)]])]
        [:p.empty "ターンを進めると会議の議事録が表示されます"])]))
 
+;; ---- 実 M365 (Outlook) ライブパネル -----------------------------------------
+
+(defn live-m365-panel []
+  (let [lm @(rf/subscribe [:live-m365])]
+    [:section.panel.live
+     [:h2 "📡 ライブ M365 "
+      [:span.hint (if lm (str "未読 " (:unread lm) " 件") "「📡 M365同期」で取得")]]
+     (when lm
+       [:<>
+        [:h3 "受信トレイ 直近"]
+        [:ul.mini
+         (for [[i m] (map-indexed vector (take 6 (:inbox lm)))]
+           ^{:key i}
+           [:li.kv
+            [:span (when (:unread m) [:span.risk "● "]) (:subject m)]
+            [:span.r (last (str/split (str (:from m)) #"@"))]])]
+        [:h3 "今後の予定 (14日)"]
+        [:ul.mini
+         (for [[i e] (map-indexed vector (take 6 (:events lm)))]
+           ^{:key i}
+           [:li.kv [:span (:subject e)] [:span.r (subs (str (:start e)) 5 16)]])]])]))
+
 ;; ---- レポート/要約モーダル --------------------------------------------------
 
 (defn modal []
@@ -358,6 +382,7 @@
      [trend-panel]
      [discussion-panel]]
     [:aside.sidebar
+     [live-m365-panel]
      [intel-panel]
      [fin-panel]
      [ledger-panel]]]

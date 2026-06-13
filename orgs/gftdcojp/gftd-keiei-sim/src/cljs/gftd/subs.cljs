@@ -15,4 +15,5 @@
 
 (rf/reg-sub :turn-history :<- [:data] (fn [d _] (:turn_history d)))
 (rf/reg-sub :discussion   :<- [:data] (fn [d _] (:discussion d)))
+(rf/reg-sub :live-m365    :<- [:data] (fn [d _] (:live_m365 d)))
 (rf/reg-sub :modal        (fn [db _] (:modal db)))

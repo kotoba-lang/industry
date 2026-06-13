@@ -45,6 +45,8 @@ pub struct App {
     pub proposals: Mutex<Vec<Proposal>>,
     /// 社員間ディスカッションの議事録 (speaker, text)
     pub discussion: Mutex<Vec<serde_json::Value>>,
+    /// 実 M365 ライブ情報 (Outlook 受信トレイ/予定/未読) — m365-live.bb 由来
+    pub live_m365: Mutex<serde_json::Value>,
     pub tx: broadcast::Sender<String>,
     pub seq: AtomicU64,
 }
@@ -63,6 +65,7 @@ pub fn router(app: Shared) -> Router {
         .route("/api/proposal/:id/reject", post(reject))
         .route("/api/report", post(report))
         .route("/api/summarize/:org", post(summarize))
+        .route("/api/m365/sync", post(m365_sync))
         .route("/api/events", get(events))
         .fallback_service(ServeDir::new(web_dir()))
         .with_state(app)
@@ -128,7 +131,31 @@ fn state_payload(app: &App) -> serde_json::Value {
         "turn_history": intel::turn_history(&app.conn),
         // 社員間ディスカッション議事録
         "discussion": discussion,
+        // 実 M365 ライブ情報 (Outlook)
+        "live_m365": app.live_m365.lock().unwrap().clone(),
     })
+}
+
+/// 実 Microsoft 365 (Outlook) のライブ情報を analysis/m365-live.bb で取得して保持する。
+async fn m365_sync(State(app): State<Shared>) -> Json<serde_json::Value> {
+    let script = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("analysis/m365-live.bb");
+    let bb = intel::bb_bin();
+    let res = tokio::task::spawn_blocking(move || {
+        std::process::Command::new(bb).arg(script).output()
+    })
+    .await;
+    match res {
+        Ok(Ok(out)) if out.status.success() => {
+            if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&out.stdout) {
+                *app.live_m365.lock().unwrap() = v;
+                tracing::info!("M365 live synced");
+            }
+        }
+        Ok(Ok(out)) => tracing::warn!("m365-live.bb failed: {}", String::from_utf8_lossy(&out.stderr)),
+        _ => tracing::warn!("m365-live.bb spawn failed"),
+    }
+    let _ = app.tx.send("update".to_string());
+    Json(state_payload(&app))
 }
 
 async fn get_state(State(app): State<Shared>) -> Json<serde_json::Value> {
