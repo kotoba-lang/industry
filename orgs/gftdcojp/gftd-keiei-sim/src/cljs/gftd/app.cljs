@@ -3,7 +3,8 @@
    Gather.town 風の 2D オフィスで LLM エージェント社員が歩き・働く様子を描画し、
    kotoba-datomic 由来の intel (確度/離反・更新リスク/依存) を関係グラフ等で見せる。
    サーバ権威 (/api) + SSE。"
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [gftd.schema :as schema]))
 
 ;; ---- ヘルパ -----------------------------------------------------------------
 
@@ -235,10 +236,16 @@
                       (str "<li class='kv'><span>" (esc (:to e)) "</span><span class='amt'>" (man (:value_jpy e)) "万</span></li>"))))))
 
 (defn render-fin! [data]
-  (set! (.-innerHTML ($ "fin"))
-        (str "<div class='fin-row'><span>発行請求(売上累計)</span><strong class='good'>" (oku (:issued_total_jpy data)) "円</strong></div>"
-             "<div class='fin-row'><span>受領請求(コスト累計)</span><strong class='bad'>" (oku (:received_total_jpy data)) "円</strong></div>"
-             "<div class='fin-row'><span>差引</span><strong>" (oku (- (:issued_total_jpy data) (:received_total_jpy data))) "円</strong></div>")))
+  (let [it (:intel data)
+        bdt (:bad_debt_total_jpy it 0)]
+    (set! (.-innerHTML ($ "fin"))
+          (str "<div class='fin-row'><span>発行請求(売上累計)</span><strong class='good'>" (oku (:issued_total_jpy data)) "円</strong></div>"
+               "<div class='fin-row'><span>受領請求(コスト累計)</span><strong class='bad'>" (oku (:received_total_jpy data)) "円</strong></div>"
+               "<div class='fin-row'><span>差引</span><strong>" (oku (- (:issued_total_jpy data) (:received_total_jpy data))) "円</strong></div>"
+               "<div class='fin-row'><span>不良債権(回収懸念)</span><strong class='bad'>" (oku bdt) "円</strong></div>"))
+    (set! (.-innerHTML ($ "baddebt"))
+          (str/join (for [b (take 6 (:bad_debts it))]
+                      (str "<li class='kv'><span>" (esc (:subject b)) "</span><span class='amt bad'>" (man (:amount_jpy b)) "万</span></li>"))))))
 
 (defn render-ledger! [rows]
   (set! (.-innerHTML ($ "ledger"))
@@ -264,7 +271,11 @@
 
 (defn fetch-json [url opts] (-> (js/fetch url (clj->js opts)) (.then #(.json %))))
 
-(defn apply-data! [d] (reset! app-data (js->clj d :keywordize-keys true)) (render!))
+(defn apply-data! [d]
+  (let [data (js->clj d :keywordize-keys true)]
+    (when ^boolean js/goog.DEBUG (schema/validate! data))  ; dev のみ: 形状違反で即throw
+    (reset! app-data data)
+    (render!)))
 
 (defn refresh [] (-> (fetch-json "/api/state" {}) (.then apply-data!)))
 

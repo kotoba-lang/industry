@@ -185,6 +185,32 @@
                (take 3 (:people o))))
             orgs))))
 
+;; ---- 不良債権(売掛金)分析: gftd発行請求のうち支払期限を大きく超過したもの ----
+;; 支払状況は facts に無いため、期限(:due)が基準(1年超前)を過ぎた発行請求を
+;; 「回収懸念=不良債権候補」として債務先(:billed_to)別に集計・整理する。
+(defn before-month? [d ym]
+  (and (string? d) (>= (count d) 7) (neg? (compare (subs d 0 7) ym))))
+
+(defn bad-debts []
+  (let [m (->> (read-objs "invoice-terms.edn")
+               (filter #(and (number? (:amount_jpy %)) (pos? (:amount_jpy %))
+                             (gftd? (str (:issuer %)))               ; gftd が発行=売掛
+                             (string? (:billed_to %)) (seq (:billed_to %))
+                             (not (gftd? (str (:billed_to %))))
+                             (before-month? (:due %) "2025-06")))    ; 1年以上 期限超過
+               (reduce (fn [acc v] (update acc (:billed_to v) (fnil + 0) (:amount_jpy v))) {})
+               (sort-by (comp - val))
+               (take 8))]
+    (map-indexed
+     (fn [i [debtor amt]]
+       {:db/id (str "bd" i)
+        :gftd.intel/kind :bad-debt
+        :gftd.intel/subject debtor
+        :gftd.intel/score amt
+        :gftd.intel/note "売掛金(支払期限1年超)・回収要確認"
+        :gftd.intel/stage :new})
+     m)))
+
 ;; ---- 市場分析: 接触上位 org をセグメント別に集計 ----
 (defn markets []
   (let [orgs (->> (read-objs "crm.edn") (remove #(noise? (:org_domain %))) (take 80))
@@ -251,5 +277,6 @@
      parties)))
 
 ;; ---- 出力: 全 intel datom を 1 ベクタで ----
-(let [all (vec (concat (latent-leads) (revivals) (renewal-risks) (deps) (markets) (people-nodes)))]
+(let [all (vec (concat (latent-leads) (revivals) (renewal-risks) (deps)
+                       (markets) (people-nodes) (bad-debts)))]
   (println (pr-str all)))

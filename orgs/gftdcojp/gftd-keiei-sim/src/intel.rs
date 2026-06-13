@@ -27,7 +27,7 @@ fn script() -> PathBuf {
 }
 
 /// babashka 実行ファイルを探す (PATH に無くても動くよう既知の場所も試す)。
-fn bb_bin() -> String {
+pub fn bb_bin() -> String {
     for cand in ["bb", "/opt/homebrew/bin/bb"] {
         if Command::new(cand).arg("--version").output().is_ok() {
             return cand.to_string();
@@ -161,6 +161,17 @@ pub fn views(conn: &Connection) -> serde_json::Value {
     .collect();
     revival.sort_by_key(|x| -(x["score"].as_i64().unwrap_or(0)));
 
+    // 不良債権(売掛金・回収要確認)
+    let bad_debts: Vec<serde_json::Value> = q(
+        parse("{:find [?subj ?amt ?kind] :where [[?e :gftd.intel/subject ?subj][?e :gftd.intel/score ?amt][?e :gftd.intel/kind ?kind]]}").unwrap(),
+        &db, &[],
+    ).unwrap_or_default()
+    .iter()
+    .filter(|r| kw_at(r, 2) == "bad-debt")
+    .map(|r| serde_json::json!({ "subject": str_at(r,0), "amount_jpy": i64_at(r,1) }))
+    .collect();
+    let bad_debt_total: i64 = bad_debts.iter().filter_map(|d| d["amount_jpy"].as_i64()).sum();
+
     // 契約更新リスク
     let renewal: Vec<serde_json::Value> = q(
         parse("{:find [?subj ?note ?kind] :where [[?e :gftd.intel/subject ?subj][?e :gftd.intel/note ?note][?e :gftd.intel/kind ?kind]]}").unwrap(),
@@ -207,6 +218,8 @@ pub fn views(conn: &Connection) -> serde_json::Value {
         "funnel": funnel,
         "markets": markets,
         "people": people,
+        "bad_debts": bad_debts,
+        "bad_debt_total_jpy": bad_debt_total,
         "intel_depth": progressed.len(),
     })
 }
@@ -230,6 +243,14 @@ pub fn snapshot_quads(conn: &Connection) -> Vec<WitQuad> {
     }
     if let Some(r) = renewal {
         s.push_str(&format!(" / 更新要確認: {}", r["subject"].as_str().unwrap_or("")));
+    }
+    let bdt = v["bad_debt_total_jpy"].as_i64().unwrap_or(0);
+    if bdt > 0 {
+        s.push_str(&format!(
+            " / 不良債権(回収要確認): {}社 計{:.2}億",
+            v["bad_debts"].as_array().map(|a| a.len()).unwrap_or(0),
+            bdt as f64 / 1e8
+        ));
     }
     if s.is_empty() {
         return vec![];

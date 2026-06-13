@@ -1,11 +1,26 @@
 ;; ダッシュボードの ClojureScript ビルド。
-;;   clojure -M:cljs        → web/app.js を生成 (:simple 最適化・単一ファイル)
+;;   clojure -M:cljs     → web/app.js を生成 (:simple 最適化・警告は無視・通常開発)
+;;   clojure -M:build    → 警告をエラー扱いでビルド (CI ゲート / Svelte 風に失敗させる)
+;;   clojure -M:lint     → clj-kondo で静的解析 (未定義var/arity/typo を error で落とす)
 ;; 公式 ClojureScript コンパイラを使用 (shadow-cljs 不要、node も不要)。
-{:deps  {org.clojure/clojurescript {:mvn/version "1.11.132"}}
+{:deps  {org.clojure/clojurescript {:mvn/version "1.11.132"}
+         metosin/malli            {:mvn/version "0.16.4"}}  ; dev時 app-data 形状検証
  :paths ["src/cljs"]
  :aliases
  {:cljs {:main-opts ["-m" "cljs.main"
                      "--optimizations" "simple"
                      "--output-to" "web/app.js"
                      "--output-dir" "target/cljs-out"
-                     "--compile" "gftd.app"]}}}
+                     "--compile" "gftd.app"]}
+
+  ;; 警告をエラーとして扱うビルド (dev/build.clj)。警告が1件でもあれば exit 1。
+  ;; cljs.main には warnings-as-errors が無いため build script で実現する。
+  :build {:extra-paths ["dev"]
+          :main-opts   ["-m" "build"]}
+
+  ;; 静的解析。clj-kondo を deps から直接実行 (バイナリ不要・CI 再現可)。
+  ;; --fail-level error で error 検出時に exit 非ゼロ。
+  :lint {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2024.11.14"}}
+         :main-opts    ["-m" "clj-kondo.main"
+                        "--lint" "src/cljs"
+                        "--fail-level" "error"]}}}

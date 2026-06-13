@@ -1,0 +1,23 @@
+;; clj-kondo 設定: Svelte のビルド時チェックに最も近い静的解析。
+;;   clojure -M:lint  で実行 (error が1件でもあれば CI 失敗)。
+;; エディタ統合 (VSCode Calva / clojure-lsp) でも同設定が使われ、保存時に赤線が出る。
+{:linters
+ {;; 未定義シンボル / 名前空間 — typo・未 require をビルド前に検出
+  :unresolved-symbol    {:level :error}
+  :unresolved-namespace {:level :error}
+  :unresolved-var       {:level :error}
+  ;; 関数呼び出しの引数ミス
+  :invalid-arity        {:level :error}
+  :type-mismatch        {:level :error}
+  ;; 衛生系 — 警告どまり (ビルドは止めない)
+  :unused-binding       {:level :warning}
+  :unused-namespace     {:level :warning}
+  :redundant-do         {:level :warning}
+  :redefined-var        {:level :warning}}
+
+ ;; reagent / re-frame を導入したら下記 import を有効化すると、
+ ;;   - (r/with-let ...) や hiccup の lint
+ ;;   - reg-event-db / reg-sub のキーワード参照解決
+ ;; が効く。導入前は不要 (コメントのまま)。
+ ;; :config-paths ["macros"]
+ }

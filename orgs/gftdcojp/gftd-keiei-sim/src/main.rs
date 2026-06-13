@@ -28,27 +28,18 @@ async fn main() -> Result<()> {
         .with_max_level(tracing::Level::INFO)
         .init();
 
-    // 1. 実 facts からゲーム初期状態を構築
-    let mut seed = seed::load()?;
+    // 1+2. Clojure(analysis/seed.bb) で実 facts から初期状態を構築し datomic にシード
+    let conn = Connection::new();
+    let mut seed = seed::load_and_seed(&conn).await?;
     tracing::info!(
-        "seeded KPIs: headcount={} cash={}円 burn={}円/月 pipeline={}円 ({}商談)",
+        "seeded via seed.bb: headcount={} cash={}円 burn={}円/月 pipeline={}円 売上累計={}円 直近活動={}件",
         seed.kpis.headcount,
         seed.kpis.cash_jpy,
         seed.kpis.burn_jpy,
         seed.kpis.pipeline_jpy,
-        seed.pipeline.len()
-    );
-    tracing::info!(
-        "real gftd data: 発行請求(売上累計)={}円 / 受領請求(コスト累計)={}円 / 直近活動={}件",
         seed.issued_total_jpy,
-        seed.received_total_jpy,
         seed.recent_activity.len()
     );
-
-    // 2. datomic を起動し会社の事実をシード
-    let conn = Connection::new();
-    let n = seed::seed_datomic(&conn, &seed).await?;
-    tracing::info!("datomic seeded with {n} datoms");
 
     // 2b. Clojure(babashka) で intel を導出して datomic に書き込む (分析ロジックは clj 側)
     let intel_n = intel::build(&conn).await?;

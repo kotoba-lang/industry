@@ -231,26 +231,3 @@ pub fn run_one(
     };
     (role, action)
 }
-
-/// 全社員を 1 ターン分実行し、(role, action) のリストを返す。
-pub fn run_all(
-    exec: &WasmExecutor,
-    agents: &HashMap<String, Vec<u8>>,
-    w: &World,
-) -> Vec<(String, String)> {
-    AGENTS
-        .iter()
-        .filter_map(|(role, _)| {
-            let wasm = agents.get(*role)?;
-            let brief = build_brief(role, w);
-            let action = match run_agent(exec, wasm, role, &brief, w.kpis.turn as u64, w.snapshot.clone()) {
-                Ok(a) => a,
-                Err(e) => {
-                    tracing::warn!("agent {role} failed: {e}");
-                    format!("（{}の提案生成に失敗: {e}）", role_label(role))
-                }
-            };
-            Some((role.to_string(), action))
-        })
-        .collect()
-}

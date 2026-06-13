@@ -160,6 +160,22 @@ Rust 側の責務:
 色=市場・リング=関係種別/離反)** + 市場分析 + path-weight/商流つきリード + 商談ファネル +
 更新リスク + 再生候補 + 売上集中。
 
+**不良債権(売掛金)分析**: `analysis/intel.bb` が gftd 発行請求のうち支払期限を大きく
+超過したもの(:due が1年超前)を債務先別に集計し `:gftd.intel/kind :bad-debt` 化
+(セールスリンク ¥4,308万 等 計¥1.3億)。実財務パネルに回収懸念として表示し、財務/法務の
+brief(kqe)にも注入する。
+
+### Rust は薄く、ロジックは Clojure
+
+facts→状態の導出も Clojure に集約した。`analysis/seed.bb` が実 facts から初期 World
+状態と datomic シード datom を 1 つの EDN マップで出力し、Rust(`src/seed.rs`)は
+それを解析して `transact` するだけ。スコアリング(intel.bb)・初期化(seed.bb)・社員
+(kotoba-clj)・ダッシュボード(ClojureScript)が Clojure 系で、Rust は datomic ストア /
+WASM 実行 / HTTP サーバ の最小ランタイムに徹する。
+
+dev 品質ゲート: `clojure -M:build`(警告=エラー) / `clojure -M:lint`(clj-kondo) /
+malli による app-data 形状検証(`src/cljs/gftd/schema.cljs`, dev のみ)。
+
 ### 豊富な actor (バーチャルオフィスの社員たち)
 
 - **提案者 (kotoba-clj LLMエージェント)**: 営業 / 開発 / 財務 / **法務** / CEO補佐。
