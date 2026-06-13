@@ -1,5 +1,7 @@
 # ADR-0010: Life Graph — EDN事実層 + Datalogビュー + PROV-O来歴の3表現アーキテクチャ
 
+> **更新 (2026-06-13, ADR-0013)**: L1 の JSONL は EDN-lines(1 行 1 EDN マップ)へ全面移行し JSONL は除去。360,999 レコード round-trip 検証済み。クエリは kotoba-datomic(埋め込み)+ clojure ローダー。以下の本文中「JSONL」は歴史的経緯。
+
 - Status: Accepted (2026-06-11; 一部実装済 2026-06-13 — 下記「実装ログ」参照)
 - 関連: ADR-0001 (orchestrator), ADR-0003 (warehouse), ADR-0005 (証拠保全), ADR-0009 (mail ingest), ADR-0013 (clj-agent-stack), analysis/260611-wellbecoming-minimax-shannon.md
 
