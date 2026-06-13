@@ -1,0 +1,11 @@
+;; ダッシュボードの ClojureScript ビルド。
+;;   clojure -M:cljs        → web/app.js を生成 (:simple 最適化・単一ファイル)
+;; 公式 ClojureScript コンパイラを使用 (shadow-cljs 不要、node も不要)。
+{:deps  {org.clojure/clojurescript {:mvn/version "1.11.132"}}
+ :paths ["src/cljs"]
+ :aliases
+ {:cljs {:main-opts ["-m" "cljs.main"
+                     "--optimizations" "simple"
+                     "--output-to" "web/app.js"
+                     "--output-dir" "target/cljs-out"
+                     "--compile" "gftd.app"]}}}

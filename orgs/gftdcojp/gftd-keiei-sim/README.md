@@ -27,7 +27,21 @@ KPI に反映され、意思決定は台帳に記録される。
 | 状態 SSoT | **kotoba-datomic** | 会社の事実(orgs/projects/pipeline)・意思決定台帳・ターン履歴を Datalog で保持 |
 | 社員 | **kotoba-clj** | `defgraph`(LangGraph風) + `llm-infer` の Clojure→WASM エージェント (`agents/*.clj`) |
 | 実行/推論 | **kotoba-runtime** `WasmExecutor` + **kotoba-llm** `HttpInferEngine` | clj社員を WASM 実行し、実LLMで提案生成 |
-| 可視化 | Web ダッシュボード (サーバ権威 + SSE) | kotoba-runtime-web と同じ「サーバが権威・ブラウザが描画」方式 |
+| 可視化 | **ClojureScript** + Gather風2Dオフィス (サーバ権威 + SSE) | 社員エージェントが2Dキャラとしてデスクで働き、提案を吹き出しで表示 |
+
+### ダッシュボード (ClojureScript) のビルド
+
+フロントは **ClojureScript**（公式コンパイラ、shadow-cljs不要）。`src/cljs/gftd/app.cljs`
+を `web/app.js` に :simple 最適化でコンパイルする:
+
+```sh
+clojure -M:cljs          # web/app.js を生成 (単一ファイル)
+```
+
+Gather.town 風の 2D オフィスで、営業/開発/財務/CEO補佐の4エージェントが
+デスクで「働く」アニメーションを見せ、ターンを進めると 💭→吹き出しで提案を出す。
+あなた(👑 CEO)が各吹き出しの承認/却下を判断する。コンパイル済み `web/app.js` は
+コミット済みなので `cargo run` だけで動く。
 
 kotoba は別ワークスペース (`../../etzhayyim/kotoba`) を **path dep** で参照する。
 
