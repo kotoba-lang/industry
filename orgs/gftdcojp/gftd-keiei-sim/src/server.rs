@@ -68,6 +68,7 @@ pub fn router(app: Shared) -> Router {
         .route("/api/m365/sync", post(m365_sync))
         .route("/api/m365/triage", post(m365_triage))
         .route("/api/m365/meeting-prep", post(m365_meeting_prep))
+        .route("/api/chat", post(chat))
         .route("/api/events", get(events))
         .fallback_service(ServeDir::new(web_dir()))
         .with_state(app)
@@ -508,6 +509,34 @@ async fn m365_meeting_prep(State(app): State<Shared>) -> Json<serde_json::Value>
         .await.ok().and_then(|r| r.ok())
         .unwrap_or_else(|| "会議準備サマリの生成に失敗しました".into());
     Json(serde_json::json!({ "prep": text }))
+}
+
+/// 意思決定項目について CEO(意思決定者)が自由文で相談 → gemma4 が文脈を踏まえ回答。
+/// 承認/却下の二択でなく対話的に判断できる。
+#[derive(serde::Deserialize)]
+struct ChatReq {
+    context: String,
+    message: String,
+    #[serde(default)]
+    history: String,
+}
+
+async fn chat(State(app): State<Shared>, Json(req): Json<ChatReq>) -> Json<serde_json::Value> {
+    let intel_brief = {
+        let q = intel::snapshot_quads(&app.conn, &app.live_m365.lock().unwrap().clone());
+        q.first()
+            .map(|w| String::from_utf8_lossy(&w.object_cbor).chars().filter(|c| !c.is_control()).collect::<String>())
+            .unwrap_or_default()
+    };
+    let prompt = format!(
+        "あなたは株式会社gftdの経営参謀です。以下の文脈・社内インテリジェンス・これまでの会話を踏まえ、CEO(意思決定者)の指示や質問に簡潔な日本語(3文以内)で答え、必要なら推奨アクションを1つ示してください。\n--- 対象の意思決定 ---\n{}\n--- 社内インテリジェンス ---\n{}\n--- これまでの会話 ---\n{}\n--- CEOの発言 ---\n{}",
+        req.context, intel_brief, req.history, req.message
+    );
+    let infer = app.infer.clone();
+    let text = tokio::task::spawn_blocking(move || infer(&prompt, 500))
+        .await.ok().and_then(|r| r.ok())
+        .unwrap_or_else(|| "応答に失敗しました".into());
+    Json(serde_json::json!({ "reply": text }))
 }
 
 async fn events(State(app): State<Shared>) -> Sse<impl Stream<Item = Result<Event, std::convert::Infallible>>> {

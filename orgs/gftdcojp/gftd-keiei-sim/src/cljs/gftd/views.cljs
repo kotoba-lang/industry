@@ -2,6 +2,7 @@
   "reagent ビュー (hiccup)。旧 app.cljs の imperative DOM 構築を宣言的に置換。
    状態は re-frame subscription、歩行位置は gftd.anim の ratom から引く。"
   (:require [clojure.string :as str]
+            [reagent.core :as r]
             [re-frame.core :as rf]
             [gftd.db :as db]
             [gftd.anim :as anim]
@@ -452,13 +453,31 @@
             [:div.pq-detail (:detail a)]
             [mcda-bars a]
             [:div.pq-worst "⚠ " (:worst a)]
-            (when (seq (:actions a))
-              [:div.pq-actions
-               (for [[j act] (map-indexed vector (:actions a))]
-                 ^{:key j}
-                 [:button.pq-btn {:on-click #(rf/dispatch (:ev act))} (:label act)])])]])])]))
+            [:div.pq-actions
+             (for [[j act] (map-indexed vector (:actions a))]
+               ^{:key j}
+               [:button.pq-btn {:on-click #(rf/dispatch (:ev act))} (:label act)])
+             [:button.pq-btn.chat {:on-click #(rf/dispatch [:open-chat a])} "💬 相談"]]]])])]))
 
 ;; ---- レポート/要約モーダル --------------------------------------------------
+
+(defn chat-box [_m]
+  (let [input (r/atom "")
+        send! (fn [] (when (seq (str/trim @input))
+                       (rf/dispatch [:send-chat @input]) (reset! input "")))]
+    (fn [m]
+      [:div.chat
+       [:div.chat-thread
+        (for [[i msg] (map-indexed vector (:chat m))]
+          ^{:key i} [:div {:class (str "cmsg " (:role msg))} (:text msg)])
+        (when (:loading m) [:div.cmsg.ai "…"])
+        (when (empty? (:chat m)) [:p.empty "承認/却下の前に相談できます。値引き余地・代替案・リスク・優先度などを質問してください。"])]
+       [:div.chat-input
+        [:textarea {:value @input
+                    :placeholder "指示や質問 (例: この商談の値引き余地は？ 法務リスクは？ 後回しでよい？) ⌘+Enterで送信"
+                    :on-change #(reset! input (.. % -target -value))
+                    :on-key-down #(when (and (= "Enter" (.-key %)) (.-metaKey %)) (send!))}]
+        [:button {:on-click send!} "送信"]]])))
 
 (defn modal []
   (when-let [m @(rf/subscribe [:modal])]
@@ -466,9 +485,10 @@
      [:div.modal-box {:on-click (fn [e] (.stopPropagation e))}
       [:button.modal-close {:on-click #(rf/dispatch [:close-modal])} "×"]
       [:h2 (:title m)]
-      (if (:loading m)
-        [:p.empty "gemma4 が生成中…"]
-        [:div.report-body (:body m)])]]))
+      (cond
+        (contains? m :chat) [chat-box m]
+        (:loading m)        [:p.empty "gemma4 が生成中…"]
+        :else               [:div.report-body (:body m)])]]))
 
 (defn gameover []
   (let [bankrupt? (= @(rf/subscribe [:status]) "bankrupt")]

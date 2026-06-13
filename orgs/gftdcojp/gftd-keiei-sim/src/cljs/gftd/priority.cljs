@@ -13,7 +13,7 @@
   (let [role (:role p)
         impact (case role "ceo" 8 "sales" 7 "finance" 6 "eng" 6 "legal" 5 6)
         risk   (if (#{"finance" "legal"} role) 7 4)]
-    {:id (str "prop-" (:id p)) :kind :proposal :badge (:role_label p)
+    {:id (str "prop-" (:id p)) :kind :proposal :role role :pid (:id p) :badge (:role_label p)
      :title (:action p) :detail (:effect_hint p)
      :impact impact :urgency 5 :risk risk :effort 2
      :worst "見送り → 商談/対応が1四半期停滞・士気低下"
@@ -56,8 +56,30 @@
   [{:keys [impact urgency risk effort]}]
   (/ (+ impact urgency risk) (max 1 effort)))
 
+;; リスク是正項目(=依存の根)。成長項目はこれらの解決後に着手すべき(stabilize-before-scale)。
+(defn- risk-node? [a]
+  (or (#{:baddebt :renewal :churn} (:kind a))
+      (and (= :proposal (:kind a)) (#{"finance" "legal"} (:role a)))))
+
+(defn priority-topo
+  "依存(path)を尊重した優先トポロジカルソート(Kahn法)。
+   依存が全て解決済みの ready ノードから、毎回 WSJF 最大のものを取り出す。
+   = リスク是正(依存の根)を先に、同層は WSJF 降順。意思決定後は data 変化で再計算される。"
+  [items]
+  (let [items (mapv #(assoc % :score (wsjf %)) items)
+        deps  (into {} (map (fn [a] [(:id a) (set (:deps a))]) items))]
+    (loop [resolved #{} order []]
+      (let [ready (->> items
+                       (remove #(resolved (:id %)))
+                       (filter #(every? resolved (deps (:id %)))))]
+        (if (empty? ready)
+          ;; 循環ガード: 残りを WSJF 順で付与
+          (into order (->> items (remove #(resolved (:id %))) (sort-by :score >)))
+          (let [pick (apply max-key :score ready)]
+            (recur (conj resolved (:id pick)) (conj order pick))))))))
+
 (defn queue
-  "全ソースを統合し WSJF 降順に並べた意思決定キューを返す。"
+  "全ソースを統合し、path(依存)を踏まえた逆トポロジカル順 + WSJF で並べたキューを返す。"
   [data]
   (let [it (:intel data)
         lm (:live_m365 data)
@@ -67,8 +89,9 @@
         leads (map-indexed (fn [i l] (lead->action l i))
                            (take 6 (filter #(or (= (:risk %) "churn") (>= (or (:confidence %) 0) 85))
                                            (:latent_leads it))))
-        inbox (when (and lm (> (or (:unread lm) 0) 20)) [(inbox->action (:unread lm))])]
-    (->> (concat props renews bds leads inbox)
-         (map #(assoc % :score (wsjf %)))
-         (sort-by :score >)
-         vec)))
+        inbox (when (and lm (> (or (:unread lm) 0) 20)) [(inbox->action (:unread lm))])
+        items (vec (concat props renews bds leads inbox))
+        risk-ids (mapv :id (filter risk-node? items))
+        ;; 成長項目はリスク是正項目に依存する(=後に着手)。リスク項目は依存なし(根)。
+        items (mapv (fn [a] (assoc a :deps (if (risk-node? a) [] risk-ids))) items)]
+    (priority-topo items)))

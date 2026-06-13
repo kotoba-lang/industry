@@ -2,6 +2,7 @@
   "re-frame イベントと副作用(fetch)。
    全イベント後に malli で app-db を検証する global interceptor を dev で登録。"
   (:require [re-frame.core :as rf]
+            [clojure.string :as str]
             [gftd.db :as db]
             [gftd.schema :as schema]))
 
@@ -20,6 +21,14 @@
 ;; 任意のイベントへ結果を渡す POST (レポート/要約用; :set-data とは別経路)。
 (rf/reg-fx :http-post-cb
   (fn [[url ev]] (-> (fetch-json url {:method "POST"}) (.then #(rf/dispatch [ev %])))))
+
+;; JSON ボディ付き POST (チャット相談用)。
+(rf/reg-fx :http-post-json
+  (fn [[url body ev]]
+    (-> (fetch-json url {:method "POST"
+                         :headers {"Content-Type" "application/json"}
+                         :body (js/JSON.stringify (clj->js body))})
+        (.then #(rf/dispatch [ev %])))))
 
 ;; ---- インターセプタ: app-db 形状検証 (Svelte の props 型エラー相当) -----------
 
@@ -74,6 +83,29 @@
 
 (rf/reg-event-db :close-modal (fn [db _] (assoc db :modal nil)))
 (rf/reg-event-db :set-tab (fn [db [_ t]] (assoc db :tab t)))
+
+;; ---- 意思決定項目のチャット相談 (承認/却下の二択でなく対話) ------------------
+
+(rf/reg-event-db :open-chat
+  (fn [db [_ item]]
+    (assoc db :modal {:title (str "💬 相談: " (:title item))
+                      :ctx (str (:badge item) " / " (:title item) " / " (:detail item))
+                      :chat [] :loading false})))
+
+(rf/reg-event-fx :send-chat
+  (fn [{:keys [db]} [_ msg]]
+    (let [m (:modal db)
+          chat (conj (vec (:chat m)) {:role "user" :text msg})
+          history (->> chat (map #(str (if (= "user" (:role %)) "CEO: " "参謀: ") (:text %))) (str/join "\n"))]
+      {:db (assoc db :modal (assoc m :chat chat :loading true))
+       :http-post-json ["/api/chat" {:context (:ctx m) :message msg :history history} :recv-chat]})))
+
+(rf/reg-event-db :recv-chat
+  (fn [db [_ raw]]
+    (let [reply (:reply (js->clj raw :keywordize-keys true))
+          m (:modal db)]
+      (assoc db :modal (assoc m :loading false
+                              :chat (conj (vec (:chat m)) {:role "ai" :text reply}))))))
 
 ;; 実 M365 (Outlook) ライブ同期
 (rf/reg-event-fx :m365-sync (fn [_ _] {:http-post "/api/m365/sync"}))
