@@ -19,6 +19,7 @@ use tokio_stream::{Stream, StreamExt};
 use tower_http::services::ServeDir;
 
 use crate::agents;
+use crate::htr;
 use crate::intel;
 use crate::model::{apply_effect, effect_hint, role_label, Kpis, Proposal};
 
@@ -69,6 +70,9 @@ pub fn router(app: Shared) -> Router {
         .route("/api/turn/advance", post(advance_turn))
         .route("/api/proposal/:id/approve", post(approve))
         .route("/api/proposal/:id/reject", post(reject))
+        .route("/api/htr", get(get_htr))
+        .route("/api/htr/:id/prune", post(htr_prune))
+        .route("/api/htr/:id/continue", post(htr_continue))
         .route("/api/report", post(report))
         .route("/api/summarize/:org", post(summarize))
         .route("/api/m365/sync", post(m365_sync))
@@ -142,6 +146,8 @@ fn state_payload(app: &App) -> serde_json::Value {
         "discussion": discussion,
         // 実 M365 ライブ情報 (Outlook)
         "live_m365": app.live_m365.lock().unwrap().clone(),
+        // 🌳 Hypothesis Tree (Arbor HTR): 仮説ノード・Elo・dev/worst・ステータス
+        "htr": htr::tree(&app.conn),
     })
 }
 
@@ -239,9 +245,10 @@ async fn advance_turn(State(app): State<Shared>) -> Json<serde_json::Value> {
         }
     }
 
-    // 提案カード (役割順)
-    let order = ["sales", "eng", "finance", "legal", "ceo"];
-    let proposals: Vec<Proposal> = order
+    // 提案カード (役割順)。evolution(Co-Scientist の進化版)も候補に含める。
+    let order = ["sales", "eng", "finance", "legal", "ceo", "evolution"];
+    let turn_n = kpis_snapshot.turn;
+    let mut proposals: Vec<Proposal> = order
         .iter()
         .filter_map(|role| {
             let action = actions.get(*role)?.clone();
@@ -251,12 +258,58 @@ async fn advance_turn(State(app): State<Shared>) -> Json<serde_json::Value> {
                 role_label: role_label(role).to_string(),
                 effect_hint: effect_hint(role).to_string(),
                 rounds: *obs.get(*role).unwrap_or(&0),
+                node_id: format!("htr-t{turn_n}-{role}"),
                 role: role.to_string(),
                 action,
                 status: "pending".into(),
+                elo: 0,
+                dev_score: 0.0,
+                worst_case: 0.0,
             })
         })
         .collect();
+
+    // ---- Arbor HTR サイクル: Dispatch(Executor) → Ranking(Elo) → 永続化 -------
+    // Dispatch: 各仮説を World クローン上で 4 四半期フォワードシムして dev/worst を出す。
+    let mut nodes: Vec<htr::Node> = Vec::new();
+    // evolution の親は当ターンの統括(ceo)ノード、それ以外は経営目標(root)。
+    // 評価ホライズンは現ランウェイ内に収める(四半期換算, 2〜6四半期)。runway を超える
+    // ホライズンだと全案が倒産penaltyで潰れ差がつかないため、stakes(残ランウェイ)に連動させる。
+    let horizon = ((kpis_snapshot.runway_months / 3.0).floor() as i64).clamp(2, 6);
+    for p in &proposals {
+        let sim = htr::simulate(&p.role, &kpis_snapshot, horizon);
+        nodes.push(htr::Node {
+            id: p.node_id.clone(),
+            turn: turn_n,
+            role: p.role.clone(),
+            hypothesis: p.action.clone(),
+            parent: if p.role == "evolution" { format!("htr-t{turn_n}-ceo") } else { "root".into() },
+            sim,
+        });
+    }
+    htr::record_nodes(&app.conn, &nodes).await;
+
+    // Ranking: 当ターン + 前ターン生存 leaf を Elo トーナメント(self-play, 3 ラウンド)。
+    let dev_of: std::collections::HashMap<String, f64> =
+        nodes.iter().map(|n| (n.id.clone(), n.sim.dev_score)).collect();
+    let mut cands: Vec<(String, f64)> = htr::surviving_leaves(&app.conn);
+    for n in &nodes {
+        if !cands.iter().any(|(id, _)| id == &n.id) {
+            cands.push((n.id.clone(), n.sim.dev_score));
+        }
+    }
+    let seed = htr::current_elos(&app.conn);
+    let elos = htr::tournament(&seed, &cands, 3);
+    let elo_rows: Vec<(String, i64)> = elos.iter().map(|(k, v)| (k.clone(), v.round() as i64)).collect();
+    htr::record_elos(&app.conn, turn_n, &elo_rows).await;
+
+    // 提案カードに Elo / dev / worst を付与し、Elo 降順(Select の順序)に並べる。
+    for p in &mut proposals {
+        p.elo = elos.get(&p.node_id).map(|v| v.round() as i64).unwrap_or(1200);
+        p.dev_score = *dev_of.get(&p.node_id).unwrap_or(&0.0);
+        p.worst_case = nodes.iter().find(|n| n.id == p.node_id).map(|n| n.sim.worst_case).unwrap_or(0.0);
+    }
+    proposals.sort_by(|a, b| b.elo.cmp(&a.elo));
     *app.proposals.lock().unwrap() = proposals;
 
     // 議事録: 各提案 + 財務反論 + CEO統括
@@ -271,6 +324,9 @@ async fn advance_turn(State(app): State<Shared>) -> Json<serde_json::Value> {
     }
     if !disc_ceo.is_empty() {
         transcript.push(serde_json::json!({ "speaker": "CEO補佐 (統括)", "role": "ceo", "text": disc_ceo }));
+    }
+    if let Some(ev) = actions.get("evolution") {
+        transcript.push(serde_json::json!({ "speaker": "経営参謀 (Evolution)", "role": "evolution", "text": ev }));
     }
     *app.discussion.lock().unwrap() = transcript;
 
@@ -308,6 +364,27 @@ async fn reject(Path(id): Path<String>, State(app): State<Shared>) -> Json<serde
     Json(state_payload(&app))
 }
 
+/// 🌳 仮説ツリー(Arbor HTR)の現状態を返す。
+async fn get_htr(State(app): State<Shared>) -> Json<serde_json::Value> {
+    Json(htr::tree(&app.conn))
+}
+
+/// Arbor Decide: ノードを prune(探索打ち切り)する。
+async fn htr_prune(Path(id): Path<String>, State(app): State<Shared>) -> Json<serde_json::Value> {
+    let turn = app.kpis.lock().unwrap().turn;
+    htr::record_status(&app.conn, turn, &id, "pruned").await;
+    let _ = app.tx.send("update".to_string());
+    Json(htr::tree(&app.conn))
+}
+
+/// Arbor Decide: ノードを continue(次ターンで再探索)する。
+async fn htr_continue(Path(id): Path<String>, State(app): State<Shared>) -> Json<serde_json::Value> {
+    let turn = app.kpis.lock().unwrap().turn;
+    htr::record_status(&app.conn, turn, &id, "continued").await;
+    let _ = app.tx.send("update".to_string());
+    Json(htr::tree(&app.conn))
+}
+
 /// 提案を承認/却下し、KPI を更新し、datomic に意思決定を記録する。
 async fn decide(app: &App, id: &str, approved: bool) {
     // 1. 提案を確定
@@ -318,10 +395,10 @@ async fn decide(app: &App, id: &str, approved: bool) {
             .find(|p| p.id == id && p.status == "pending")
             .map(|p| {
                 p.status = if approved { "approved" } else { "rejected" }.into();
-                (p.role.clone(), p.action.clone())
+                (p.role.clone(), p.action.clone(), p.node_id.clone())
             })
     };
-    let Some((role, action)) = found else { return };
+    let Some((role, action, node_id)) = found else { return };
 
     // 2. KPI 更新
     let (note, turn) = {
@@ -342,6 +419,11 @@ async fn decide(app: &App, id: &str, approved: bool) {
     );
     if let Ok(tx) = parse(&edn) {
         let _ = app.conn.transact(tx).await;
+    }
+
+    // Arbor Decide: 承認=merge / 却下=prune を HTR ノードの status イベントに記録
+    if !node_id.is_empty() {
+        htr::record_status(&app.conn, turn, &node_id, if approved { "merged" } else { "pruned" }).await;
     }
 
     // 営業提案の承認 → 商談ファネルを 1 段前進 (datomic に progress datom)

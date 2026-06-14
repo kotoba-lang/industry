@@ -20,6 +20,27 @@ KPI に反映され、意思決定は台帳に記録される。
               WasmExecutor (kotoba-runtime)
 ```
 
+## 🌳 経営エンジン: Arbor HTR × AI Co-Scientist
+
+経営判断を「反証可能な経営仮説」の**永続ツリー(Hypothesis-Tree Refinement)**上の探索として進める。
+[Arbor](https://ruc-nlpir.github.io/Arbor/)(長寿命 Coordinator + 短命 Executor + HTR)と
+[AI Co-Scientist](https://research.google/blog/accelerating-scientific-breakthroughs-with-an-ai-co-scientist/)
+(Generation/Reflection/Ranking/Evolution の連合 + Elo トーナメント)を既存資産に写像した。
+
+ターン進行(`/api/turn/advance`)で 1 Arbor サイクルが回る:
+
+1. **生成(Generation)**: 営業/開発/財務/法務/CEO補佐が intel 接地で仮説を提案(既存 `turn.clj`)。
+2. **進化(Evolution)**: `node-evolve` が上位案を結合・先鋭化した「進化版」を生成(Co-Scientist)。
+3. **検証(Executor)**: `htr::simulate` が `Kpis` クローン上で runway 連動ホライズンをフォワードシムし
+   **dev-score**(名目改善)と **worst-case**(バーン+20%・受注率半減の held-out ストレス)を算出。
+4. **ランク付け(Elo トーナメント)**: `htr::tournament` が pending leaf を round-robin self-play でランク付け。
+5. **Decide(人間 merge ゲート)**: 承認=**merge**(`apply_effect`+台帳)/ 却下=**prune**。
+   `:keiei.htr/*` datom に append-only で永続化し、過去の探索木が組織記憶になる。
+
+ダッシュボードの **🌳 仮説ツリー** タブで Elo 順の仮説・dev/worst・status を見て continue/prune できる。
+設計の全体像と段階的ロールアウトは [`docs/keiei-arbor-coscientist.md`](docs/keiei-arbor-coscientist.md)。
+コアは `src/htr.rs`(Executor + Elo + datomic 永続化)。スコア合成式のみ Rust、制御フローは clj。
+
 ## 技術スタック (指定どおり)
 
 | 層 | 技術 | 役割 |
