@@ -94,14 +94,25 @@
     (assert-q "sim/activity" "ceo" "observes" "2")
     (map-assoc! state "ceo" a)))
 
+;; ---- Evolution ノード (AI Co-Scientist) -------------------------------------
+;; 各部門案 + 財務反論 + CEO統括 を統合し、上位案を結合・先鋭化した「進化版」を生成。
+;; Arbor では親ノードを refine/extend した子仮説に相当する。
+(defn node-evolve [state]
+  (let [obs (cat2 (cat2 (cat2 (peers state) "\n財務の反論: ") (map-get state "critique"))
+                  (cat2 "\nCEO統括: " (map-get state "ceo")))
+        a (llm-infer "gftd-sim" (mk-prompt "anthropic/claude-opus-4.8" "あなたは株式会社gftdの経営参謀(Evolutionエージェント)です。上記の議論から最も成果が見込める2案を結合・先鋭化し、欠点を補った『進化版』の施策を1つに統合します。" "社内の議論(各案/反論/統括):" obs))]
+    (assert-q "sim/proposal" "evolution" "sim.proposal/action" a)
+    (assert-q "sim/activity" "evolution" "observes" "4")
+    (map-assoc! state "evolution" a)))
+
 (defgraph turn-graph
   :state {:brief :override :sales :override :eng :override :finance :override
-          :legal :override :critique :override :ceo :override}
+          :legal :override :critique :override :ceo :override :evolution :override}
   :entry :sales
   :nodes {:sales node-sales :eng node-eng :finance node-finance :legal node-legal
-          :critique node-critique :ceo node-ceo}
+          :critique node-critique :ceo node-ceo :evolve node-evolve}
   :edges {:sales :eng :eng :finance :finance :legal :legal :critique
-          :critique :ceo :ceo :end})
+          :critique :ceo :ceo :evolve :evolve :end})
 
 (defn ok-result [s]
   (let [out (bytes-alloc (+ 16 (str-len s)))]

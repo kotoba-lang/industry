@@ -9,6 +9,7 @@
 //!            KOTOBA_INFERENCE_API_KEY (OpenAI互換)。未設定ならスタブで動作。
 
 mod agents;
+mod htr;
 mod infer;
 mod intel;
 mod model;

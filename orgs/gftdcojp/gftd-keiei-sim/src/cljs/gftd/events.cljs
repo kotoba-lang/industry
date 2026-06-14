@@ -59,6 +59,15 @@
   (fn [_ [_ id what]]
     {:http-post (str "/api/proposal/" id "/" what)}))
 
+;; Arbor Decide: 仮説ノードを prune(打ち切り)/continue(次ターン再探索)する。
+;; 戻りは HTR ツリーのみ(:set-data ではなく) → 全体 state は別途 :refresh で同期。
+(rf/reg-event-fx :htr-decide
+  (fn [_ [_ id what]]
+    {:http-post-cb [(str "/api/htr/" id "/" what) :refresh-after]}))
+
+(rf/reg-event-fx :refresh-after
+  (fn [_ _] {:http-get "/api/state"}))
+
 ;; ---- #4 経営レポート / #2 商談要約 (モーダル表示) -----------------------------
 
 (rf/reg-event-fx :gen-report
