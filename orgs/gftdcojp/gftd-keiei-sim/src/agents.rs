@@ -54,6 +54,53 @@ pub fn compile_turn() -> Result<Vec<u8>> {
     compile_one("turn.clj")
 }
 
+/// 汎用社員エージェント (employee.clj) をコンパイルする。
+pub fn compile_employee() -> Result<Vec<u8>> {
+    compile_one("employee.clj")
+}
+
+/// 役割定義 (APQC PCF / ISCO ベース)。(role, ラベル, OpenRouterモデル, ペルソナ)。
+/// 最後の経営企画(strategy)は統括役で、他の提案を観測して最終判断する。
+pub struct Role {
+    pub key: &'static str,
+    pub label: &'static str,
+    pub model: &'static str,
+    pub persona: &'static str,
+}
+
+/// 機能部門 (並列実行)。
+pub const ROLES: &[Role] = &[
+    Role { key: "sales", label: "営業/マーケ (APQC3.0/ISCO1221)", model: "qwen/qwen3.7-max",
+           persona: "あなたは株式会社gftdの営業・マーケティング責任者です。最有力リードの獲得と売上を扱います。" },
+    Role { key: "product", label: "プロダクト/開発 (APQC2.0/ISCO2512)", model: "moonshotai/kimi-k2-thinking",
+           persona: "あなたは株式会社gftdのプロダクト/開発責任者です。製品開発と技術投資を扱います。" },
+    Role { key: "finance", label: "財務 (APQC8.0/ISCO1211)", model: "qwen/qwen3.7-max",
+           persona: "あなたは株式会社gftdの財務責任者(CFO)です。資金繰り/コスト/不良債権を扱います。" },
+    Role { key: "risk", label: "法務/リスク (APQC10.0/ISCO261)", model: "anthropic/claude-opus-4.8",
+           persona: "あなたは株式会社gftdの法務・リスク・コンプライアンス責任者です。契約更新リスク/法務/統制を扱います。" },
+    Role { key: "hr", label: "人事/人的資本 (APQC6.0/ISCO1212)", model: "minimax/minimax-m3",
+           persona: "あなたは株式会社gftdの人事責任者(CHRO)です。採用/組織/士気/人的資本を扱います。" },
+    Role { key: "it", label: "情報システム (APQC7.0/ISCO1330)", model: "moonshotai/kimi-k2-thinking",
+           persona: "あなたは株式会社gftdの情報システム責任者(CIO)です。ITインフラ/セキュリティ/DXを扱います。" },
+    Role { key: "cs", label: "カスタマーサクセス (APQC5.0)", model: "qwen/qwen3.7-max",
+           persona: "あなたは株式会社gftdのカスタマーサクセス責任者です。既存顧客の維持/拡大/離反防止を扱います。" },
+];
+
+/// 統括役 (機能部門の提案を観測して最終判断)。
+pub const STRATEGY: Role = Role {
+    key: "strategy", label: "経営企画/CEO補佐 (APQC1.0/ISCO1120)", model: "minimax/minimax-m3",
+    persona: "あなたは株式会社gftdの経営企画/CEO補佐(経営参謀)です。各部門の提案と財務リスクを俯瞰し統括します。",
+};
+
+/// employee.clj に渡す ctx をエンコードする。
+pub fn encode_role_ctx(brief: &str, role: &str, model: &str, persona: &str) -> Vec<u8> {
+    #[derive(serde::Serialize)]
+    struct Ctx<'a> { brief: &'a str, role: &'a str, model: &'a str, persona: &'a str }
+    let mut buf = Vec::new();
+    ciborium::into_writer(&Ctx { brief, role, model, persona }, &mut buf).expect("cbor");
+    buf
+}
+
 /// turn.clj に渡す共通の現状況ブリーフ (KPI/財務/件数)。
 pub fn common_brief(w: &World) -> String {
     let oku = |v: i64| format!("{:.2}億円", v as f64 / 100_000_000.0);

@@ -62,6 +62,7 @@ async fn main() -> Result<()> {
     let compiled = agents::compile_all()?;
     let react_wasm = agents::compile_react()?;
     let turn_wasm = agents::compile_turn()?;
+    let employee_wasm = agents::compile_employee()?;
     let (exec, llm_live, infer_fn) = agents::make_executor()?;
     tracing::info!(
         "executor ready (LLM: {})",
@@ -76,6 +77,7 @@ async fn main() -> Result<()> {
         infer: infer_fn,
         react_wasm: Arc::new(react_wasm),
         turn_wasm: Arc::new(turn_wasm),
+        employee_wasm: Arc::new(employee_wasm),
         agents: Arc::new(compiled),
         pipeline: seed.pipeline,
         projects: seed.projects,

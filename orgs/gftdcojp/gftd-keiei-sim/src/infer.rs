@@ -84,7 +84,7 @@ pub fn make_infer_fn() -> InferenceFn {
         // reasoning モデルは思考でトークンを消費するため、最終 content を出せるよう
         // 大きめに固定する(ランタイムが渡す max は小さいので無視)。
         let reasoning = is_reasoning(&model);
-        let max_tokens: i64 = if reasoning { 4000 } else { 1500 };
+        let max_tokens: i64 = if reasoning { 8000 } else { 3000 };
         let mut req = json!({
             "model": model,
             "messages": [{ "role": "user", "content": body }],

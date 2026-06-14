@@ -32,6 +32,8 @@ pub struct App {
     pub react_wasm: Arc<Vec<u8>>,
     /// ターン統括 defgraph (turn.clj) の WASM
     pub turn_wasm: Arc<Vec<u8>>,
+    /// 汎用社員エージェント (employee.clj) の WASM — 役割ごとに並列実行
+    pub employee_wasm: Arc<Vec<u8>>,
     pub agents: Arc<HashMap<String, Vec<u8>>>,
     /// 実契約由来の商談 (相手先名, 金額)
     pub pipeline: Vec<(String, i64)>,
