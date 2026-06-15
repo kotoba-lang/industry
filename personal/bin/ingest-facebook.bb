@@ -165,6 +165,61 @@
           :when (some #(re-matches #"message_\d+\.html" (.getName %)) (.listFiles d))]
     (parse-thread d box)))
 
+;; ---- messages (JSON: E2EE secure-storage export) -------------------------
+;; The Messenger "secure storage / E2EE chats" download is JSON (not the DYI HTML).
+;; Schema (classic Meta): {:participants [{:name}] :title :messages [{:sender_name
+;; :timestamp_ms :content :photos [..] :share {..}}] :thread_path}. This path is
+;; structure-agnostic: it finds every *.json that looks like a thread, so it works
+;; regardless of the ZIP's top-level layout. NOTE: verify against the real file on
+;; first arrival (E2EE export schema may differ slightly).
+(import '[java.time Instant ZoneId] '[java.time.format DateTimeFormatter])
+(def ^:private jst (ZoneId/of "Asia/Tokyo"))
+(def ^:private ts-fmt (DateTimeFormatter/ofPattern "yyyy-MM-dd HH:mm:ss"))
+(defn ms->iso [ms] (when (number? ms) (.format (.atZone (Instant/ofEpochMilli (long ms)) jst) ts-fmt)))
+
+(defn fix-mojibake
+  "Meta JSON encodes UTF-8 bytes as Latin-1 escapes; re-decode if it looks garbled."
+  [s]
+  (if (and (string? s) (re-find #"[-ÿ]" s))
+    (try (String. (.getBytes ^String s "ISO-8859-1") "UTF-8") (catch Exception _ s))
+    s))
+
+(defn thread-json? [m]
+  (and (map? m) (sequential? (:messages m)) (contains? m :participants)))
+
+(defn parse-thread-json [f box]
+  (let [j (json/parse-string (slurp f) true)
+        tid   (.getName (.getParentFile f))
+        title (some-> (:title j) fix-mojibake not-empty)
+        parts (->> (:participants j) (keep #(fix-mojibake (:name %))) (remove str/blank?) vec)
+        msgs  (->> (:messages j)
+                   (mapv (fn [m]
+                           (cond-> {:thread tid :box box}
+                             (:sender_name m)  (assoc :sender (fix-mojibake (:sender_name m)))
+                             (fix-mojibake (:content m)) (assoc :text (fix-mojibake (:content m)))
+                             (:timestamp_ms m) (assoc :ts (ms->iso (:timestamp_ms m))
+                                                       :ts-raw (str (:timestamp_ms m)))
+                             (seq (:photos m)) (assoc :media (count (:photos m))))))
+                   (sort-by #(or (:ts %) "")) vec)]
+    (doseq [m msgs] (emit! :messages m))
+    (let [ts (->> msgs (keep :ts) sort)]
+      (emit! :threads (cond-> {:thread tid :box box :messages (count msgs) :path (str (.getPath f))}
+                        title (assoc :title title)
+                        (seq parts) (assoc :participants parts)
+                        (seq ts) (assoc :from (first ts) :to (last ts)))))))
+
+(defn parse-messages-json
+  "Recursively ingest every thread-shaped *.json under root (E2EE secure-storage)."
+  [root]
+  (doseq [f (->> (file-seq (io/file root))
+                 (filter #(str/ends-with? (.getName %) ".json"))
+                 (filter #(re-find #"(?i)message" (.getName %))) sort)
+          :let [j (try (json/parse-string (slurp f) true) (catch Exception _ nil))]
+          :when (thread-json? j)]
+    ;; box = the messages-subfolder name if present, else "e2ee"
+    (let [p (.getPath f) box (or (second (re-find #"messages/([^/]+)/" p)) "e2ee")]
+      (parse-thread-json f box))))
+
 ;; ---- posts ---------------------------------------------------------------
 (defn parse-posts [export]
   (doseq [f (->> (file-seq (io/file export "your_facebook_activity/posts"))
@@ -219,6 +274,9 @@
     (parse-profile  export)
     (parse-friends  export)
     (parse-messages export)
+    (when (empty? (:messages @out-records))   ; HTML 形式でなければ JSON(E2EE secure-storage)を試す
+      (println "[facebook] no HTML threads — trying JSON (E2EE secure-storage) ...")
+      (parse-messages-json export))
     (parse-posts    export)
     (parse-activity export)
     (let [recs @out-records
