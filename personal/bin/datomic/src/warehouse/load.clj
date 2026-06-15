@@ -315,8 +315,12 @@
 (defn- norm-name [s] (when s (-> (str s) (str/replace "﨑" "崎") (str/replace #"\s+" ""))))
 
 (def ^:private fbname->pid
-  (into {} (for [p people-edn :when (:person/name p)]
-             [(norm-name (:person/name p)) (:person/id p)])))
+  ;; index both :person/name と curated :person/fb-name エイリアス (norm-name 正規化)
+  (into {} (concat
+             (for [p people-edn :when (:person/name p)]
+               [(norm-name (:person/name p)) (:person/id p)])
+             (for [p people-edn, fbn (:person/fb-name p)]
+               [(norm-name fbn) (:person/id p)]))))
 
 (defn- fb-acct [] (:facebook/account facebook-edn "jun784"))
 
@@ -342,6 +346,7 @@
          (cond-> {:fbthread/id            (str "fb/" (fb-acct) "/thread/" (:thread r))
                   :fbthread/account       (fb-acct)
                   :fbthread/message-count (long (or (:messages r) 0))}
+           (:box r)                (assoc :fbthread/box (keyword (:box r)))
            (:title r)              (assoc :fbthread/title (:title r))
            (seq (:participants r)) (assoc :fbthread/participants (vec (:participants r)))
            (:from r)               (assoc :fbthread/from (:from r))
@@ -355,6 +360,7 @@
            (let [pid (fbname->pid (norm-name (:sender r)))]
              (cond-> {:fbmsg/id     (str "fb/" (:thread r) "/" i)
                       :fbmsg/thread [:fbthread/id (str "fb/" (fb-acct) "/thread/" (:thread r))]}
+               (:box r)    (assoc :fbmsg/box (keyword (:box r)))
                (:sender r) (assoc :fbmsg/sender (:sender r))
                (:text r)   (assoc :fbmsg/text (:text r))
                (:ts r)     (assoc :fbmsg/ts (:ts r))

@@ -2,7 +2,10 @@
 ;; 正本は personal/social/facebook/<acct>/<date>/export/** (git-annex → B2 暗号化)。
 ;; 索引 JSONL は同 .../index/*.jsonl。本スキーマは warehouse.load が再構築する
 ;; クエリ可能な正規化グラフ。fb* 名前空間で既存 person グラフと name 一致で連携。
-[;; ---------- fbprofile: プロフィール field/value ----------
+[;; ---------- person 拡張: FB 表示名エイリアス (sender/friend → person 解決用) ----------
+ {:db/ident :person/fb-name :db/valueType :db.type/string :db/cardinality :db.cardinality/many :db/doc "Facebook 表示名 (people.edn の curated alias)"}
+
+ ;; ---------- fbprofile: プロフィール field/value ----------
  {:db/ident :fbprofile/id      :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
  {:db/ident :fbprofile/account :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
  {:db/ident :fbprofile/field   :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
@@ -19,6 +22,7 @@
  ;; ---------- fbthread: メッセージスレッド ----------
  {:db/ident :fbthread/id            :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
  {:db/ident :fbthread/account       :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :fbthread/box           :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":inbox :e2ee_cutover 等 (取込元フォルダ)"}
  {:db/ident :fbthread/title         :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
  {:db/ident :fbthread/participants  :db/valueType :db.type/string  :db/cardinality :db.cardinality/many :db/doc "参加者名 (生文字列)"}
  {:db/ident :fbthread/message-count :db/valueType :db.type/long    :db/cardinality :db.cardinality/one}
@@ -34,6 +38,7 @@
  {:db/ident :fbmsg/text   :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/fulltext true}
  {:db/ident :fbmsg/ts     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
  {:db/ident :fbmsg/media  :db/valueType :db.type/long    :db/cardinality :db.cardinality/one :db/doc "添付メディア数"}
+ {:db/ident :fbmsg/box    :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":inbox :e2ee_cutover 等"}
 
  ;; ---------- fbpost: 投稿/シェア ----------
  {:db/ident :fbpost/id    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}

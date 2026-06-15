@@ -127,7 +127,7 @@
 ;; ---- messages ------------------------------------------------------------
 (defn thread-id [dir] (.getName dir))
 
-(defn parse-thread [dir]
+(defn parse-thread [dir box]
   (let [htmls (->> (file-seq dir) (filter #(re-matches #"message_\d+\.html" (.getName %))) sort)
         tid   (thread-id dir)
         raw   (apply str (map read-html htmls))
@@ -145,21 +145,25 @@
                            (cond-> (assoc (select-keys m [:ts-raw :ts :text]) :thread tid)
                              (:name m)  (assoc :sender (:name m))
                              (:links m) (assoc :media (count (:links m)))))))]
-    (doseq [m msgs] (emit! :messages m))
+    (doseq [m (map #(assoc % :box box) msgs)] (emit! :messages m))
     (let [ts (->> msgs (keep :ts) sort)]
       (emit! :threads
-             (cond-> {:thread tid :messages (count msgs)
+             (cond-> {:thread tid :box box :messages (count msgs)
                       :path (str (.getPath dir))}
                title         (assoc :title title)
                (seq participants) (assoc :participants participants)
                (seq ts)      (assoc :from (first ts) :to (last ts)))))))
 
+;; message folders that hold thread dirs (inbox + E2EE-cutover history + any others)
+(def message-boxes ["inbox" "e2ee_cutover" "archived_threads" "filtered_threads" "message_requests"])
+
 (defn parse-messages [export]
-  (let [inbox (io/file export "your_facebook_activity/messages/inbox")]
-    (when (.isDirectory inbox)
-      (doseq [d (->> (.listFiles inbox) (filter #(.isDirectory %)) sort)]
-        (when (some #(re-matches #"message_\d+\.html" (.getName %)) (.listFiles d))
-          (parse-thread d))))))
+  (doseq [box message-boxes
+          :let [root (io/file export "your_facebook_activity/messages" box)]
+          :when (.isDirectory root)
+          d (->> (.listFiles root) (filter #(.isDirectory %)) sort)
+          :when (some #(re-matches #"message_\d+\.html" (.getName %)) (.listFiles d))]
+    (parse-thread d box)))
 
 ;; ---- posts ---------------------------------------------------------------
 (defn parse-posts [export]
