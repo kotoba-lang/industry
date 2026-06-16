@@ -56,6 +56,18 @@ pub struct Proposal {
     /// この提案を出すまでに ReAct で観測した回数(Act種別数) — 観測ログ可視化用
     #[serde(default)]
     pub rounds: i64,
+    /// HTR ノード id (この提案に対応する仮説ノード)。承認=merge / 却下=prune の対象。
+    #[serde(default)]
+    pub node_id: String,
+    /// Elo レーティング(トーナメント由来)。Select の順序付けに使う。
+    #[serde(default)]
+    pub elo: i64,
+    /// Executor のシミュ dev-score(億円相当, 高いほど良い)。
+    #[serde(default)]
+    pub dev_score: f64,
+    /// minimax 最悪ケース(ストレス下の held-out 検証)。
+    #[serde(default)]
+    pub worst_case: f64,
 }
 
 /// 役割表示ラベル。
@@ -66,6 +78,7 @@ pub fn role_label(role: &str) -> &'static str {
         "finance" => "財務責任者 (CFO)",
         "legal" => "法務責任者",
         "ceo" => "CEO補佐 (経営参謀)",
+        "evolution" => "経営参謀 (Evolution)",
         _ => "社員",
     }
 }
@@ -78,6 +91,7 @@ pub fn effect_hint(role: &str) -> &'static str {
         "finance" => "コスト最適化: バーン-1500万/月 (複利で効く) / 士気-2",
         "legal" => "契約リスク是正: パイプライン+0.4億 / 士気+3",
         "ceo" => "戦略の明確化: パイプライン+1.2億 / 士気+8",
+        "evolution" => "進化版の統合施策: パイプライン+0.6億 / 士気+5",
         _ => "",
     }
 }
@@ -112,6 +126,12 @@ pub fn apply_effect(role: &str, k: &mut Kpis) -> String {
             k.pipeline_jpy += 120_000_000;
             k.morale = (k.morale + 8).min(100);
             "CEO補佐の具申を承認: 戦略の明確化"
+        }
+        "evolution" => {
+            // Evolution(進化版)は上位案を統合した中庸の戦略ベット。
+            k.pipeline_jpy += 60_000_000;
+            k.morale = (k.morale + 5).min(100);
+            "進化版の統合施策を承認 (merge)"
         }
         _ => "提案を承認",
     };

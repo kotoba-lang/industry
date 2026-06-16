@@ -9,6 +9,7 @@
 //!            KOTOBA_INFERENCE_API_KEY (OpenAI互換)。未設定ならスタブで動作。
 
 mod agents;
+mod htr;
 mod infer;
 mod intel;
 mod model;
@@ -61,10 +62,12 @@ async fn main() -> Result<()> {
     // 3. 社員エージェントをコンパイル + 推論エンジン
     let compiled = agents::compile_all()?;
     let react_wasm = agents::compile_react()?;
+    let turn_wasm = agents::compile_turn()?;
+    let employee_wasm = agents::compile_employee()?;
     let (exec, llm_live, infer_fn) = agents::make_executor()?;
     tracing::info!(
         "executor ready (LLM: {})",
-        if llm_live { "REAL (gemma4 e4b @ Ollama)" } else { "STUB" }
+        if llm_live { "REAL (OpenRouter 役割別モデル)" } else { "STUB" }
     );
 
     // 4. 共有状態を組み立て
@@ -74,6 +77,8 @@ async fn main() -> Result<()> {
         exec: Arc::new(exec),
         infer: infer_fn,
         react_wasm: Arc::new(react_wasm),
+        turn_wasm: Arc::new(turn_wasm),
+        employee_wasm: Arc::new(employee_wasm),
         agents: Arc::new(compiled),
         pipeline: seed.pipeline,
         projects: seed.projects,

@@ -19,6 +19,7 @@ use tokio_stream::{Stream, StreamExt};
 use tower_http::services::ServeDir;
 
 use crate::agents;
+use crate::htr;
 use crate::intel;
 use crate::model::{apply_effect, effect_hint, role_label, Kpis, Proposal};
 
@@ -30,6 +31,10 @@ pub struct App {
     pub infer: kotoba_runtime::host::InferenceFn,
     /// 相談 ReAct agent (react-consult.clj) の WASM
     pub react_wasm: Arc<Vec<u8>>,
+    /// ターン統括 defgraph (turn.clj) の WASM
+    pub turn_wasm: Arc<Vec<u8>>,
+    /// 汎用社員エージェント (employee.clj) の WASM — 役割ごとに並列実行
+    pub employee_wasm: Arc<Vec<u8>>,
     pub agents: Arc<HashMap<String, Vec<u8>>>,
     /// 実契約由来の商談 (相手先名, 金額)
     pub pipeline: Vec<(String, i64)>,
@@ -65,6 +70,9 @@ pub fn router(app: Shared) -> Router {
         .route("/api/turn/advance", post(advance_turn))
         .route("/api/proposal/:id/approve", post(approve))
         .route("/api/proposal/:id/reject", post(reject))
+        .route("/api/htr", get(get_htr))
+        .route("/api/htr/:id/prune", post(htr_prune))
+        .route("/api/htr/:id/continue", post(htr_continue))
         .route("/api/report", post(report))
         .route("/api/summarize/:org", post(summarize))
         .route("/api/m365/sync", post(m365_sync))
@@ -138,6 +146,8 @@ fn state_payload(app: &App) -> serde_json::Value {
         "discussion": discussion,
         // 実 M365 ライブ情報 (Outlook)
         "live_m365": app.live_m365.lock().unwrap().clone(),
+        // 🌳 Hypothesis Tree (Arbor HTR): 仮説ノード・Elo・dev/worst・ステータス
+        "htr": htr::tree(&app.conn),
     })
 }
 
@@ -186,13 +196,12 @@ async fn advance_turn(State(app): State<Shared>) -> Json<serde_json::Value> {
         return Json(state_payload(&app));
     }
 
-    // 2. 社員エージェントを実行。
-    //    #1 並列推論: 機能部門(営業/開発/財務/法務)を spawn_blocking で同時実行。
-    //    #4 社員間ディスカッション: その4提案を CEO補佐が受けて統括提案する(2フェーズ)。
+    // 2. ターン統括 turn.clj を 1 回実行。社員(営業/開発/財務/法務)→財務反論→CEO統括 の
+    //    オーケストレーションは全て clj(defgraph)側。Rust はホストとして WASM を回し、
+    //    結果(提案/議事録/観測ログ)を kqe-assert! の assert_quads から回収するだけ。
     let exec = app.exec.clone();
-    let agents_map = app.agents.clone();
-    let turn_n = kpis_snapshot.turn as u64;
-    let world = std::sync::Arc::new(agents::World {
+    let turn_wasm = app.turn_wasm.clone();
+    let world = agents::World {
         kpis: kpis_snapshot.clone(),
         pipeline: app.pipeline.clone(),
         projects: app.projects.clone(),
@@ -201,108 +210,125 @@ async fn advance_turn(State(app): State<Shared>) -> Json<serde_json::Value> {
         received_total_jpy: app.received_total_jpy,
         latent_leads: app.latent_leads.clone(),
         revival: app.revival.clone(),
-        snapshot: intel::snapshot_quads(&app.conn, &app.live_m365.lock().unwrap().clone()),
-    });
-
-    // フェーズ1: 機能部門を並列実行
-    let mut handles = Vec::new();
-    for role in ["sales", "eng", "finance", "legal"] {
-        let exec = exec.clone();
-        let agents_map = agents_map.clone();
-        let world = world.clone();
-        let role = role.to_string();
-        handles.push(tokio::task::spawn_blocking(move || {
-            let wasm = agents_map.get(&role).cloned().unwrap_or_default();
-            let brief = agents::build_brief(&role, &world);
-            agents::run_one(exec, wasm, role, brief, turn_n, world.snapshot.clone())
-        }));
-    }
-    let mut results: Vec<(String, String, i64)> = Vec::new();
-    for h in handles {
-        if let Ok(x) = h.await {
-            results.push(x);
-        }
-    }
-
-    // 議事録(transcript)を構築: まず各責任者の発言
-    let mut transcript: Vec<serde_json::Value> = results
-        .iter()
-        .map(|(r, a, _)| serde_json::json!({ "speaker": role_label(r), "role": r, "text": a }))
-        .collect();
-
-    let peer = results
-        .iter()
-        .map(|(r, a, _)| format!("・{}: {}", role_label(r), a))
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    // #3 社員間ReAct討議: 各社員の提案を観測ソース(round0)に差し替え、討議agentが
-    //    kqe で peers を観測しながら反論/統括する(相互観測)。
-    let peer_snap = {
-        let mut s = world.snapshot.clone();
-        let pq = intel::peers_quad(format!("社内の議論(各責任者の提案):\n{peer}"));
-        if s.is_empty() { vec![pq] } else { s[0] = pq; s }
+        snapshot: vec![],
     };
-
-    // フェーズ1.5: 財務責任者が他部門案を批評する反論ラウンド (対話の深化)
+    let brief = agents::common_brief(&world);
+    let snapshot = intel::snapshot_quads(&app.conn, &app.live_m365.lock().unwrap().clone());
+    let mut ctx = Vec::new();
     {
-        let exec = exec.clone();
-        let agents_map = agents_map.clone();
-        let snap = peer_snap.clone();
-        let crit_brief = format!(
-            "各責任者の提案は次の通り:\n{peer}\n財務責任者として、これらの中で最大の財務リスクを1つ指摘し、どの案を優先すべきか1文で述べてください。"
-        );
-        if let Ok((_, txt, _)) = tokio::task::spawn_blocking(move || {
-            let wasm = agents_map.get("finance").cloned().unwrap_or_default();
-            agents::run_one(exec, wasm, "finance".to_string(), crit_brief, turn_n, snap)
-        })
-        .await
-        {
-            transcript.push(serde_json::json!({ "speaker": "財務責任者 (反論)", "role": "finance", "text": txt }));
+        let mut m = std::collections::BTreeMap::new();
+        m.insert("brief".to_string(), brief);
+        ciborium::into_writer(&m, &mut ctx).ok();
+    }
+    let quads = tokio::task::spawn_blocking(move || {
+        exec.execute("turn", &turn_wasm, "did:key:z6MkGftdSim", ctx, snapshot,
+                     std::collections::HashMap::new())
+            .map(|r| r.assert_quads)
+            .unwrap_or_default()
+    })
+    .await
+    .unwrap_or_default();
+
+    // assert_quads を回収: proposal(role→action) / discussion / activity(観測回数)
+    let mut actions: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut obs: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+    let mut disc_critique = String::new();
+    let mut disc_ceo = String::new();
+    for q in &quads {
+        let text = parse_text_obj(&q.object_cbor);
+        match q.graph.as_str() {
+            "sim/proposal" => { actions.insert(q.subject.clone(), text); }
+            "sim/activity" => { obs.insert(q.subject.clone(), text.trim().parse().unwrap_or(0)); }
+            "sim/discussion" if q.subject == "critique" => disc_critique = text,
+            "sim/discussion" if q.subject == "ceo" => disc_ceo = text,
+            _ => {}
         }
     }
-    let critique = transcript.last().and_then(|t| t["text"].as_str()).unwrap_or("").to_string();
 
-    // フェーズ2: CEO補佐が提案と反論を踏まえて統括
-    let ceo_brief = format!(
-        "{}\n--- 社内の議論(各責任者の提案) ---\n{}\n--- 財務からの反論 ---\n{}\n上記の議論を踏まえ、最優先の経営判断を1つ具申してください。",
-        agents::build_brief("ceo", &world),
-        peer,
-        critique
-    );
-    {
-        let exec = exec.clone();
-        let agents_map = agents_map.clone();
-        let snap = peer_snap.clone();
-        if let Ok(c) = tokio::task::spawn_blocking(move || {
-            let wasm = agents_map.get("ceo").cloned().unwrap_or_default();
-            agents::run_one(exec, wasm, "ceo".to_string(), ceo_brief, turn_n, snap)
-        })
-        .await
-        {
-            transcript.push(serde_json::json!({ "speaker": "CEO補佐 (統括)", "role": "ceo", "text": c.1 }));
-            results.push(c);
-        }
-    }
-    *app.discussion.lock().unwrap() = transcript;
-
-    // 3. 提案カードを作成 (観測回数 rounds を素通し → 集計/可視化は cljs 側)
-    let proposals: Vec<Proposal> = results
-        .into_iter()
-        .map(|(role, action, rounds)| {
+    // 提案カード (役割順)。evolution(Co-Scientist の進化版)も候補に含める。
+    let order = ["sales", "eng", "finance", "legal", "ceo", "evolution"];
+    let turn_n = kpis_snapshot.turn;
+    let mut proposals: Vec<Proposal> = order
+        .iter()
+        .filter_map(|role| {
+            let action = actions.get(*role)?.clone();
             let id = app.seq.fetch_add(1, Ordering::SeqCst);
-            Proposal {
+            Some(Proposal {
                 id: format!("p{id}"),
-                role_label: role_label(&role).to_string(),
-                effect_hint: effect_hint(&role).to_string(),
-                rounds,
-                role,
+                role_label: role_label(role).to_string(),
+                effect_hint: effect_hint(role).to_string(),
+                rounds: *obs.get(*role).unwrap_or(&0),
+                node_id: format!("htr-t{turn_n}-{role}"),
+                role: role.to_string(),
                 action,
                 status: "pending".into(),
-            }
+                elo: 0,
+                dev_score: 0.0,
+                worst_case: 0.0,
+            })
         })
         .collect();
+
+    // ---- Arbor HTR サイクル: Dispatch(Executor) → Ranking(Elo) → 永続化 -------
+    // Dispatch: 各仮説を World クローン上で 4 四半期フォワードシムして dev/worst を出す。
+    let mut nodes: Vec<htr::Node> = Vec::new();
+    // evolution の親は当ターンの統括(ceo)ノード、それ以外は経営目標(root)。
+    // 評価ホライズンは現ランウェイ内に収める(四半期換算, 2〜6四半期)。runway を超える
+    // ホライズンだと全案が倒産penaltyで潰れ差がつかないため、stakes(残ランウェイ)に連動させる。
+    let horizon = ((kpis_snapshot.runway_months / 3.0).floor() as i64).clamp(2, 6);
+    for p in &proposals {
+        let sim = htr::simulate(&p.role, &kpis_snapshot, horizon);
+        nodes.push(htr::Node {
+            id: p.node_id.clone(),
+            turn: turn_n,
+            role: p.role.clone(),
+            hypothesis: p.action.clone(),
+            parent: if p.role == "evolution" { format!("htr-t{turn_n}-ceo") } else { "root".into() },
+            sim,
+        });
+    }
+    htr::record_nodes(&app.conn, &nodes).await;
+
+    // Ranking: 当ターン + 前ターン生存 leaf を Elo トーナメント(self-play, 3 ラウンド)。
+    let dev_of: std::collections::HashMap<String, f64> =
+        nodes.iter().map(|n| (n.id.clone(), n.sim.dev_score)).collect();
+    let mut cands: Vec<(String, f64)> = htr::surviving_leaves(&app.conn);
+    for n in &nodes {
+        if !cands.iter().any(|(id, _)| id == &n.id) {
+            cands.push((n.id.clone(), n.sim.dev_score));
+        }
+    }
+    let seed = htr::current_elos(&app.conn);
+    let elos = htr::tournament(&seed, &cands, 3);
+    let elo_rows: Vec<(String, i64)> = elos.iter().map(|(k, v)| (k.clone(), v.round() as i64)).collect();
+    htr::record_elos(&app.conn, turn_n, &elo_rows).await;
+
+    // 提案カードに Elo / dev / worst を付与し、Elo 降順(Select の順序)に並べる。
+    for p in &mut proposals {
+        p.elo = elos.get(&p.node_id).map(|v| v.round() as i64).unwrap_or(1200);
+        p.dev_score = *dev_of.get(&p.node_id).unwrap_or(&0.0);
+        p.worst_case = nodes.iter().find(|n| n.id == p.node_id).map(|n| n.sim.worst_case).unwrap_or(0.0);
+    }
+    proposals.sort_by(|a, b| b.elo.cmp(&a.elo));
     *app.proposals.lock().unwrap() = proposals;
+
+    // 議事録: 各提案 + 財務反論 + CEO統括
+    let mut transcript: Vec<serde_json::Value> = ["sales", "eng", "finance", "legal"]
+        .iter()
+        .filter_map(|r| {
+            actions.get(*r).map(|a| serde_json::json!({ "speaker": role_label(r), "role": r, "text": a }))
+        })
+        .collect();
+    if !disc_critique.is_empty() {
+        transcript.push(serde_json::json!({ "speaker": "財務責任者 (反論)", "role": "finance", "text": disc_critique }));
+    }
+    if !disc_ceo.is_empty() {
+        transcript.push(serde_json::json!({ "speaker": "CEO補佐 (統括)", "role": "ceo", "text": disc_ceo }));
+    }
+    if let Some(ev) = actions.get("evolution") {
+        transcript.push(serde_json::json!({ "speaker": "経営参謀 (Evolution)", "role": "evolution", "text": ev }));
+    }
+    *app.discussion.lock().unwrap() = transcript;
 
     // 4. ターン履歴を datomic に記録 (時系列可視化用に売上/パイプラインも)
     let edn = format!(
@@ -338,6 +364,27 @@ async fn reject(Path(id): Path<String>, State(app): State<Shared>) -> Json<serde
     Json(state_payload(&app))
 }
 
+/// 🌳 仮説ツリー(Arbor HTR)の現状態を返す。
+async fn get_htr(State(app): State<Shared>) -> Json<serde_json::Value> {
+    Json(htr::tree(&app.conn))
+}
+
+/// Arbor Decide: ノードを prune(探索打ち切り)する。
+async fn htr_prune(Path(id): Path<String>, State(app): State<Shared>) -> Json<serde_json::Value> {
+    let turn = app.kpis.lock().unwrap().turn;
+    htr::record_status(&app.conn, turn, &id, "pruned").await;
+    let _ = app.tx.send("update".to_string());
+    Json(htr::tree(&app.conn))
+}
+
+/// Arbor Decide: ノードを continue(次ターンで再探索)する。
+async fn htr_continue(Path(id): Path<String>, State(app): State<Shared>) -> Json<serde_json::Value> {
+    let turn = app.kpis.lock().unwrap().turn;
+    htr::record_status(&app.conn, turn, &id, "continued").await;
+    let _ = app.tx.send("update".to_string());
+    Json(htr::tree(&app.conn))
+}
+
 /// 提案を承認/却下し、KPI を更新し、datomic に意思決定を記録する。
 async fn decide(app: &App, id: &str, approved: bool) {
     // 1. 提案を確定
@@ -348,10 +395,10 @@ async fn decide(app: &App, id: &str, approved: bool) {
             .find(|p| p.id == id && p.status == "pending")
             .map(|p| {
                 p.status = if approved { "approved" } else { "rejected" }.into();
-                (p.role.clone(), p.action.clone())
+                (p.role.clone(), p.action.clone(), p.node_id.clone())
             })
     };
-    let Some((role, action)) = found else { return };
+    let Some((role, action, node_id)) = found else { return };
 
     // 2. KPI 更新
     let (note, turn) = {
@@ -372,6 +419,11 @@ async fn decide(app: &App, id: &str, approved: bool) {
     );
     if let Ok(tx) = parse(&edn) {
         let _ = app.conn.transact(tx).await;
+    }
+
+    // Arbor Decide: 承認=merge / 却下=prune を HTR ノードの status イベントに記録
+    if !node_id.is_empty() {
+        htr::record_status(&app.conn, turn, &node_id, if approved { "merged" } else { "pruned" }).await;
     }
 
     // 営業提案の承認 → 商談ファネルを 1 段前進 (datomic に progress datom)
@@ -561,6 +613,23 @@ async fn chat(State(app): State<Shared>, Json(req): Json<ChatReq>) -> Json<serde
         _ => "応答に失敗しました".to_string(),
     };
     Json(serde_json::json!({ "reply": text }))
+}
+
+/// CBOR {"Text": <text>} オブジェクト(kqe quad の object)から本文を取り出す。
+fn parse_text_obj(bytes: &[u8]) -> String {
+    match ciborium::from_reader::<ciborium::value::Value, _>(bytes) {
+        Ok(ciborium::value::Value::Map(entries)) => {
+            for (k, v) in entries {
+                if matches!(&k, ciborium::value::Value::Text(t) if t == "Text") {
+                    if let ciborium::value::Value::Text(t) = v {
+                        return t;
+                    }
+                }
+            }
+            String::new()
+        }
+        _ => String::new(),
+    }
 }
 
 /// CBOR {"ok": <text>} から ok 本文を取り出す。

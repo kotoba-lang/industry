@@ -520,9 +520,51 @@
       [:h2 "💸 資金ショート — 倒産"]
       [:p "現金残高がマイナスになりました。経営判断を見直してリスタートしてください。"]]]))
 
+;; ---- 🌳 仮説ツリー (Arbor HTR × AI Co-Scientist) -----------------------------
+
+(defn- elo-bar [elo]
+  (let [w (-> (- elo 1000) (/ 600.0) (* 100) (max 4) (min 100))]
+    [:div.elo-bar [:div.elo-fill {:style {:width (str w "%")}}]]))
+
+(defn htr-pane []
+  (let [htr   @(rf/subscribe [:htr])
+        nodes (:nodes htr)
+        c     (:counts htr)]
+    [:section.panel
+     [:h2 "🌳 仮説ツリー "
+      [:span.hint "Arbor HTR × Co-Scientist: 生成→批評→Eloトーナメント→Executor検証→進化"]]
+     [:p.hint (str "経営目標(root): " (:root htr))]
+     (if (seq nodes)
+       [:<>
+        [:div.htr-counts
+         (str "探索中 " (:pending c) " / merged " (:merged c)
+              " / continued " (:continued c) " / pruned " (:pruned c)
+              " — Elo降順=Select順序")]
+        [:ul.htr
+         (for [n nodes]
+           ^{:key (:id n)}
+           [:li {:class (str "htr-node htr-" (:status n))}
+            [:div.htr-head
+             [:span.htr-role (:role n)]
+             [:span.htr-elo (str "Elo " (:elo n))]
+             [:span.htr-st (:status n)]]
+            [elo-bar (:elo n)]
+            [:p.htr-hyp (:hypothesis n)]
+            [:div.htr-metrics
+             [:span {:class (if (pos? (:dev_score n)) "good" "risk")}
+              (str "dev " (.toFixed (:dev_score n) 2) "億")]
+             [:span (str "最悪 " (.toFixed (:worst_case n) 2) "億")]
+             [:span.r (str "T" (:turn n))]]
+            (when (= "pending" (:status n))
+              [:div.htr-actions
+               [:button.mini-btn {:on-click #(rf/dispatch [:htr-decide (:id n) "continue"])} "↻ continue"]
+               [:button.mini-btn {:on-click #(rf/dispatch [:htr-decide (:id n) "prune"])} "✕ prune"]])])]]
+       [:p.empty "「次の四半期へ」を押すと仮説ツリーが構築されます(承認=merge / 却下=prune)"])]))
+
 (def ^:private tabs
-  [[:priority "🎯 優先順位"] [:office "🏢 オフィス"] [:calendar "📅 カレンダー"]
-   [:inbox "📨 受信トレイ"] [:intel "🧠 インテリジェンス"] [:mgmt "📊 経営"]])
+  [[:priority "🎯 優先順位"] [:office "🏢 オフィス"] [:tree "🌳 仮説ツリー"]
+   [:calendar "📅 カレンダー"] [:inbox "📨 受信トレイ"] [:intel "🧠 インテリジェンス"]
+   [:mgmt "📊 経営"]])
 
 (defn nav-tabs []
   (let [active @(rf/subscribe [:tab])]
@@ -536,6 +578,7 @@
   (case @(rf/subscribe [:tab])
     :priority [:div.pane.single [priority-pane]]
     :office   [:div.pane [office] [obs-log-panel] [discussion-panel]]
+    :tree     [:div.pane.single [htr-pane]]
     :calendar [:div.pane.single [calendar-pane]]
     :inbox    [:div.pane.single [inbox-pane]]
     :intel    [:div.pane.single [intel-panel]]

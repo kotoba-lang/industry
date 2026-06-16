@@ -260,3 +260,24 @@ ul.pq { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: 
 /* ===== 観測ログ Act チップ ===== */
 .acts { display: inline-flex; gap: 4px; flex-wrap: wrap; }
 .act-chip { background: var(--panel-2); border: 1px solid var(--line); color: #56d4dd; border-radius: 999px; padding: 1px 8px; font-size: 10.5px; font-weight: 700; }
+
+/* ===== 🌳 仮説ツリー (Arbor HTR × Co-Scientist) ===== */
+.htr-counts { color: var(--muted); font-size: 12px; margin: 4px 0 10px; }
+ul.htr { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.htr-node { background: var(--panel-2); border: 1px solid var(--line); border-left: 3px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.htr-node.htr-merged    { border-left-color: var(--green); }
+.htr-node.htr-pruned    { border-left-color: var(--red); opacity: .55; }
+.htr-node.htr-continued { border-left-color: var(--amber); }
+.htr-node.htr-pending   { border-left-color: var(--accent); }
+.htr-head { display: flex; align-items: center; gap: 8px; }
+.htr-role { font-weight: 800; color: var(--text); text-transform: uppercase; font-size: 11px; letter-spacing: .04em; }
+.htr-elo { font-weight: 800; color: var(--accent); font-size: 12px; }
+.htr-st { margin-left: auto; font-size: 10.5px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
+.elo-bar { height: 4px; background: var(--panel); border-radius: 999px; margin: 6px 0; overflow: hidden; }
+.elo-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--green)); border-radius: 999px; }
+.htr-hyp { margin: 4px 0 6px; font-size: 13px; line-height: 1.5; color: var(--text); }
+.htr-metrics { display: flex; gap: 12px; font-size: 11.5px; color: var(--muted); }
+.htr-metrics .good { color: var(--green); font-weight: 700; }
+.htr-metrics .risk { color: var(--red); font-weight: 700; }
+.htr-metrics .r { margin-left: auto; }
+.htr-actions { display: flex; gap: 6px; margin-top: 8px; }
