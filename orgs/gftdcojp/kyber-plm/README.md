@@ -29,7 +29,8 @@ Datomic Local を `:storage-dir :mem`（揮発・ディスク非残置）で使�
 | `kyber-plm.production` | **製造完了 backflush**: 部品を WIP へ払出(Dr WIP/Cr 在庫)、完成品受入(Dr 在庫/Cr WIP)、WIP クローズ |
 | `kyber-plm.erp` | ERP tx ビルダー: 残高ゼロ検証付き仕訳・原価スナップショット・OCEL・帳票クエリ |
 | `kyber-plm.store` | **バックエンド抽象**（Store protocol）: Datomic Local（dev）↔ kyber-datomic XRPC（本番, mangaka.store.kotoba 互換）|
-| `kyber-plm.demo` | `-main` シナリオ |
+| `kyber-plm.kotobase` | PLM item/BOM を **kotobase `kg.ingest` エンティティ**（claims `{:pred :value}` / relations）へ射影。本番テナント書き込み口（live/LIVE.md で write→commit→read-back 実証済み）|
+| `kyber-plm.demo` | `-main` シナリオ（§7 で kg.ingest 射影も表示）|
 
 ## 不変条件
 

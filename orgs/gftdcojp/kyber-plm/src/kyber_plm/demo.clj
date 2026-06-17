@@ -10,7 +10,9 @@
             [kyber-plm.erp :as erp]
             [kyber-plm.thread :as thread]
             [kyber-plm.mrp :as mrp]
-            [kyber-plm.production :as prod]))
+            [kyber-plm.production :as prod]
+            [kyber-plm.kotobase :as kb]
+            [clojure.pprint :as pp]))
 
 (defn- line [] (println (apply str (repeat 72 "─"))))
 (defn- h [s] (line) (println s) (line))
@@ -87,6 +89,9 @@
       (println "   WIP(1500) balance =" (get-in tb ["1500" :balance]) "(closed)")
       (println "   PN-1000@B on-hand =" (db/attr d :erp.inventory/qty-on-hand [:erp.inventory/id "INV-PN-1000@B"])))
 
+    (h "7) kotobase projection: PLM item → kg.ingest entity (tenant write path)")
+    (pp/pprint (kb/item->kg-entity (db/db conn) "PN-1000@B"))
+
     (line)
-    (println "done — EBOM→MBOM→inventory→cost→GL + effectivity / MRP / revision / production threaded.")
+    (println "done — EBOM→MBOM→inventory→cost→GL + effectivity / MRP / revision / production + kotobase projection.")
     (shutdown-agents)))
