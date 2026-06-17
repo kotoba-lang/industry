@@ -102,14 +102,30 @@ POST kotoba-backend.gftd.ai/xrpc/com.etzhayyim.apps.kotobase.kg.ingest
 - tenant did は**標準形 did:key で一貫**させれば operator hex-did バグを完全回避できる。
 - `x-internal-trust`（secret `kotoba-internal-trust`）で pod 直叩き（edge をバイパス）。
 
-### read-back は operator `kg.commit` 待ち
-ingest は **hot Arrangement** に入る。SPARQL（`kg.query`）は **cold storage** を読むため、
-封印前は 0 件（`{"ok":true,"results":[]}`）。`kotoba commit`（= `kg.commit`, **operator 操作**で
-hot→cold を ProllyTree に封印）後に SPARQL で読める。commit は共有 hot 状態全体を封印する
-operator mutation のため、本セッションでは checkpoint（未実行）。
+### ✅ ラウンドトリップ完成（ingest → commit → read-back）
 
-> SPARQL の述語は絶対 IRI 必須・SELECT のみ・変数述語不可。kg 射影は
-> `kg/id` `kg/type` `kg/label/en` `kg/claim/<pred>` `kg/relation/<pred>`（kotoba-server/src/kg.rs）。
+ingest は hot Arrangement 行き。封印には operator の `kg.commit`（global hot→cold seal）が要る:
+
+```
+POST kg.commit (operator Bearer sub=operator_did, internal-trust)
+→ {"ok":true,"commitCid":"bafyreieg7…","ipnsName":"k51-kotoba-…","ipnsSequence":14}
+```
+
+read-back は SPARQL より **`kg.entity`（id 直引き）**が確実（KG quads は固定グラフ
+`kotobase-kg-v1`、subject は CID なので SPARQL は IRI/CID 解決が要る）:
+
+```
+GET kg.entity?id=PROBE@A  (tenant Bearer, internal-trust)
+→ {"ok":true,"entity":{"id":"PROBE@A","type":"plm.item",
+     "claims":[{"predicate":"plm.item/make-buy","value":"buy"},
+               {"predicate":"plm.item/part-no","value":"PROBE"}],"relations":[]}}
+```
+
+**本番 kotobase で PLM item の書き込み→封印→読み戻しが完走**（tenant 経路、commit のみ operator）。
+
+> SPARQL(`kg.query`)は絶対 IRI 必須・SELECT のみ・変数述語不可で、subject=CID のため
+> id 直引きには `kg.entity` が向く。kg 射影述語は `kg/id` `kg/type` `kg/label/en`
+> `kg/claim/<pred>` `kg/relation/<pred>`（kotoba-server/src/kg.rs, named graph `kotobase-kg-v1`）。
 
 ## PLM ドメインを本番で動かすには
 
