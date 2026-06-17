@@ -4,8 +4,8 @@
 - **Date**: 2026-06-11
 - **Deciders**: 河崎純真 (j.kawasaki@gftd.co.jp)
 - **Context tags**: gftdcojp, m365, outlook, onedrive, msgraph, datalad, git-annex, backblaze-b2, gpg-hybrid, launchd, entra-app
-- **Related**: ADR-0007(orgs レイアウト + B2 永続化パターン)、ADR-0009(multi-account mail ingest — gftd-co-jp の**個人 warehouse 向け**メール取り込み)
-- **Implementation**: `orgs/gftdcojp/m365-archive/`(bin/{setup-auth.sh,run-backup.sh,ingest-mail.py,ingest-calendar.py,ingest-drive.sh,gpg-unlock.sh})、`~/Library/LaunchAgents/jp.co.gftd.m365-archive-backup.plist`、deps.edn `:gftdcojp :m365-archive`
+- **Related**: ADR-0007(orgs レイアウト + B2 永続化パターン)、ADR-0009(multi-account mail ingest — gftd-co-jp の**個人 warehouse 向け**メール取り込み)、ADR-0019(Teams チャット/チャネル ingest — 本 ADR の「Teams 対象外」を解消)
+- **Implementation**: `orgs/gftdcojp/m365-archive/`(bin/{setup-auth.sh,setup-auth.bb,run-backup.sh,run-backup.bb,ingest-mail.py,ingest-calendar.py,ingest-teams.py,ingest-drive.sh,gpg-unlock.sh})、`~/Library/LaunchAgents/jp.co.gftd.m365-archive-backup.plist`、deps.edn `:gftdcojp :m365-archive`
 
 ## Context
 
@@ -62,7 +62,8 @@ ADR-0007 の B2 永続化パターンを org 専用リソースで複製する:
   自社管理(B2 + GitHub + ローカル)で保持。リストアは clone → 鍵 import → `datalad get`。
 - (+) 差分日次なので 2 回目以降は数分〜数十分。
 - (−) SharePoint サイトは未ミラー(rclone `gftd-sharepoint` 未設定。必要時に追加)。
-- (−) Teams チャット本体・Planner 等 Graph の他ワークロードは対象外(メールに残る
-  会話履歴のみ)。必要なら ingest スクリプト追加で拡張。
+- (~) Teams チャット本体・チャネルメッセージは **ADR-0019 で取得対象に格上げ済み**
+  (delegated `ingest-teams.py`、2026-06-17 初回フル取得)。Planner 等 Graph の他
+  ワークロードは引き続き対象外。必要なら ingest スクリプト追加で拡張。
 - (−) ローカル作業ツリーが 131 GiB を占有(thin で単一保持)。逼迫時は B2 を正として
   `datalad drop` 可能。
