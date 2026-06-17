@@ -52,6 +52,39 @@ node kotobase_probe.mjs --write    # transact も試行
 `KOTOBASE_OPERATOR_DIDS` = `did:web:news.gftd.ai,did:web:media.gftd.ai` のみ）。
 共有本番に非機能な使い捨て鍵の operator 付与・デバッグコードは残していない。
 
+## オペレータ資格の所在（K8s で確認, 2026-06-17）
+
+1Password（gftdcojp 174 / Private 565 / Apple PM 364 項目）には operator seed は**無し**。
+実体は etzhayyim の Vultr K8s クラスタにある:
+
+- ns `kotoba` / secret **`kotoba-agent-identity`** … `KOTOBA_AGENT_DID`（公開: `did:key:z35dec6b49…` ＝本番 operator）/ `KOTOBA_AGENT_ED25519_HEX`（operator seed・秘匿）/ `KOTOBA_AGENT_X25519_HEX`
+- ns `kotoba` / secret **`kotoba-internal-trust`** … pod が要求する `x-internal-trust`
+
+検証で判明（pod 直叩き）:
+- `x-internal-trust` ＋ operatorBearer（`{sub: operator_did}` 非署名, alg:none）は**受理**される。
+- ただし private graph は `cacao_b64` 必須（operator でも）。
+
+## 最終ブロッカー：kotoba 内の did:key 符号化不整合
+
+同一 Ed25519 鍵に対し、kotoba のツール群が**異なる did:key 表現**を使う:
+
+| 生成元 | operator 鍵の表現 |
+|---|---|
+| agent identity / `KOTOBA_AGENT_DID` / `KOTOBASE_OPERATOR_DID` | hex 形 `did:key:z35dec6b49…` |
+| `kotoba cacao-sign` / `did-derive`（CACAO の iss・scope） | 標準 multibase 形 `did:key:z6Mki5YgG…` |
+| kotoba-wasm `useIdentity`（probe の tenant did） | hex 形 `did:key:zceda…` |
+
+このため `cacao-sign` が出す CACAO の iss/scope（標準形）が、サーバの owner/aud（hex 形）と
+**文字列一致せず** private graph の scope 照合に通らない。加えて `datomic.transact` は
+`kotoba://op/tx-create` リソースが必須だが公開 `cacao-sign` は出力しない。
+
+→ 実書き込みには (a) did:key 表現を揃えた CACAO を operator seed で**手組み（DAG-CBOR 署名）**、
+   または (b) kotoba 側ツールの did 表現統一フィックス、が必要。tenant の書き込み口は
+   `kg.ingest`（quad）で別データモデル。いずれも kotoba プラットフォーム側の作業。
+
+> 本番への高権限書き込み（operator マスター鍵での署名）はここで checkpoint。probe で作成した
+> 空グラフ（`kyber-plm`）は append-only/tombstone 可で無害、データ未書き込み。
+
 ## PLM ドメインを本番で動かすには
 
 オペレータ資格が用意できれば、`kyber-plm.store/kotoba` の `post-fn` を以下の kotobase NSID へ
