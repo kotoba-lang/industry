@@ -85,6 +85,32 @@ node kotobase_probe.mjs --write    # transact も試行
 > 本番への高権限書き込み（operator マスター鍵での署名）はここで checkpoint。probe で作成した
 > 空グラフ（`kyber-plm`）は append-only/tombstone 可で無害、データ未書き込み。
 
+## ✅ 本番への実書き込み成功（tenant 経路, operator 鍵不使用）
+
+`datomic.transact`（operator 専用・hex did バグでブロック）を避け、**tenant 書き込み口
+`kg.ingest`** で本番 kotoba pod に PLM item を実書き込みできた（`live/kg_ingest.mjs`）:
+
+```
+POST kotoba-backend.gftd.ai/xrpc/com.etzhayyim.apps.kotobase.kg.ingest
+→ {"ok":true,"subjectCid":"bafyreidqn5dhkho4pvsom2kbwjrgm2pjmcng2i4p4op43yxtilodn6wlgy","quadCount":4}
+```
+
+確定した本番 auth/スキーマ:
+- **KG write は Bearer JWT 必須**（CACAO 不可）。pod は `sub == tenant_did` で authorize。
+  edge BFF が trust 境界なので非署名 JWT（alg:none, `{sub: tenant_did}`）で可。
+- claim 形は **`{pred, value}`**（lexicon の `{predicate, object}` ではない）。
+- tenant did は**標準形 did:key で一貫**させれば operator hex-did バグを完全回避できる。
+- `x-internal-trust`（secret `kotoba-internal-trust`）で pod 直叩き（edge をバイパス）。
+
+### read-back は operator `kg.commit` 待ち
+ingest は **hot Arrangement** に入る。SPARQL（`kg.query`）は **cold storage** を読むため、
+封印前は 0 件（`{"ok":true,"results":[]}`）。`kotoba commit`（= `kg.commit`, **operator 操作**で
+hot→cold を ProllyTree に封印）後に SPARQL で読める。commit は共有 hot 状態全体を封印する
+operator mutation のため、本セッションでは checkpoint（未実行）。
+
+> SPARQL の述語は絶対 IRI 必須・SELECT のみ・変数述語不可。kg 射影は
+> `kg/id` `kg/type` `kg/label/en` `kg/claim/<pred>` `kg/relation/<pred>`（kotoba-server/src/kg.rs）。
+
 ## PLM ドメインを本番で動かすには
 
 オペレータ資格が用意できれば、`kyber-plm.store/kotoba` の `post-fn` を以下の kotobase NSID へ
