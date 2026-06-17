@@ -23,9 +23,11 @@ Datomic Local を `:storage-dir :mem`（揮発・ディスク非残置）で使�
 | `kyber-plm.schema` | Datomic スキーマ。`:plm.*`(品目/BOM辺/ECO) / `:erp.*`(在庫/PO/原価/COA/仕訳) / `:ocel.*`(監査) |
 | `kyber-plm.db` | Datomic Local facade（fresh-conn / tx! / q / pull / attr）|
 | `kyber-plm.plm` | PLM core: 品目・BOM辺・ECO の構築子、lifecycle、MBOM/where-used クエリ |
-| `kyber-plm.cost` | 標準原価ロールアップ（released MBOM を bottom-up 再帰、サイクル検出）|
-| `kyber-plm.thread` | PLM→ERP reactive 派生（**released gating**）: release-item! / receive-goods! / release-eco! |
+| `kyber-plm.cost` | 標準原価ロールアップ（released MBOM を bottom-up 再帰、サイクル検出、**effectivity as-of 対応**）|
+| `kyber-plm.thread` | PLM→ERP reactive 派生（**released gating**）: release-item! / receive-goods! / release-eco! / **revision supersede** |
+| `kyber-plm.mrp` | 多階層 MBOM 展開 → on-hand ネット → **PO 自動起票**（ocel po.created）|
 | `kyber-plm.erp` | ERP tx ビルダー: 残高ゼロ検証付き仕訳・原価スナップショット・OCEL・帳票クエリ |
+| `kyber-plm.store` | **バックエンド抽象**（Store protocol）: Datomic Local（dev）↔ kyber-datomic XRPC（本番, mangaka.store.kotoba 互換）|
 | `kyber-plm.demo` | `-main` シナリオ |
 
 ## 不変条件
@@ -42,8 +44,15 @@ Datomic Local を `:storage-dir :mem`（揮発・ディスク非残置）で使�
    在庫を 5000→6200 に再評価、差額 1200 を変動勘定(5900, P/L)へ計上。
 4. 全イベントを APQC タグ付き OCEL に記録（process-mining 可能）。
 
+## effectivity / MRP / revision / backend
+
+- **effectivity**: BOM辺の `:eff-from`/`:eff-to`（と `:eco`）を `cost/rolled-cost` の as-of で解決。同一ポジションの旧→新部品の切替を日付で展開。
+- **MRP**: `mrp/mrp-run!` が make 所要を多階層展開し on-hand とネットして買い品の不足分に PO を自動起票。
+- **revision**: `plm/revise-item-tx` で新版（BOM継承・旧版 supersede）を作成、`release-item!` 時に旧版を `:obsolete` 化（ocel item.superseded）。
+- **backend**: `kyber-plm.store` の Store protocol で Datomic Local（dev/test）と kyber-datomic XRPC（本番）を差替可能。本番 transport は mangaka.store.kotoba と同じ wire 契約（`tx_edn` / `rows_edn` / `entity_edn`）。
+
 ## ADR 上の位置づけ / 次の一手
 
 - NSID は実装実体に整合：`:plm.item/*` ↔ `ai.gftd.apps.kyber.plm.item`、`:erp.inventory/*` ↔ `ai.gftd.apps.kyber.inventoryItem`。
 - MVP は専用 projector を新設せず、本スレッドを ERP 側に相乗りさせる方針（ADR-2606171400 §4 注）。
-- 未実装（このモジュールの範囲外）: 日付/ECO 二系統の effectivity 解決、MRP 不足計算→PO 自動起票、revision supersede の完全運用、kyber-datomic 本番バックエンド。
+- 残課題: 既存ドメイン（plm/cost/thread/mrp）を `kyber-plm.db` 直呼びから `kyber-plm.store` 経由へ全面移行（現状 Store の wire 契約は round-trip テスト済み、ドメイン配線は db facade 経由）。在庫払出/製造完了の仕訳、ECO disposition（rework/scrap）の在庫処理。

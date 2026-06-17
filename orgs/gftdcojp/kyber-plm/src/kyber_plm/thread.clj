@@ -15,6 +15,17 @@
 
 (defn- inv-id [iid] (str "INV-" iid))
 
+(defn- maybe-supersede!
+  "If released item `iid` supersedes a prior item, obsolete that prior revision
+   and log an OCEL item.superseded (APQC 2.0 Product/Service). Returns the old id."
+  [conn iid]
+  (when-let [old (-> (db/pull (db/db conn) [{:plm.item/supersedes [:plm.item/id]}]
+                              [:plm.item/id iid])
+                     :plm.item/supersedes :plm.item/id)]
+    (db/tx! conn [{:plm.item/id old :plm.item/lifecycle :obsolete}
+                  (erp/ocel :item.superseded "2.0" [[:plm.item/id iid] [:plm.item/id old]])])
+    old))
+
 (defn release-item!
   "item :draft/:in-review → :released, then released-gated derivation:
      :make → register perpetual-inventory row (qty 0) at rolled standard cost
@@ -33,24 +44,37 @@
         (db/tx! conn [{:plm.item/id iid
                        :plm.item/lifecycle :released
                        :plm.item/released-at (erp/now)}])
-        (if (= mb :make)
-          (let [d1      (db/db conn)
-                rolled  (cost/rolled-cost d1 iid)
-                inv-tid "inv"]                         ; tempid links the new inventory row
-            (db/tx! conn
-              [{:db/id                     inv-tid
-                :erp.inventory/id          (inv-id iid)
-                :erp.inventory/item        [:plm.item/id iid]
-                :erp.inventory/qty-on-hand 0M
-                :erp.inventory/std-cost    rolled}
-               (erp/cost-snapshot iid rolled)
-               (erp/ocel :item.released        "10.0" [[:plm.item/id iid]])
-               (erp/ocel :inventory.registered "10.0" [inv-tid])
-               (erp/ocel :cost.rolledup        "9.0"  [[:plm.item/id iid]])])
-            {:ok true :item iid :make-buy :make :rolled-cost rolled})
-          (do
-            (db/tx! conn [(erp/ocel :item.released "4.0" [[:plm.item/id iid]])])
-            {:ok true :item iid :make-buy mb}))))))
+        (let [result
+              (if (= mb :make)
+                (let [d1      (db/db conn)
+                      rolled  (cost/rolled-cost d1 iid)
+                      inv-tid "inv"]                    ; tempid links the new inventory row
+                  (db/tx! conn
+                    [{:db/id                     inv-tid
+                      :erp.inventory/id          (inv-id iid)
+                      :erp.inventory/item        [:plm.item/id iid]
+                      :erp.inventory/qty-on-hand 0M
+                      :erp.inventory/std-cost    rolled}
+                     (erp/cost-snapshot iid rolled)
+                     (erp/ocel :item.released        "10.0" [[:plm.item/id iid]])
+                     (erp/ocel :inventory.registered "10.0" [inv-tid])
+                     (erp/ocel :cost.rolledup        "9.0"  [[:plm.item/id iid]])])
+                  {:ok true :item iid :make-buy :make :rolled-cost rolled})
+                ;; :buy — register a perpetual-inventory row (qty 0) so MRP can net
+                ;; against on-hand and goods can be received against stock.
+                (let [std     (or (plm/unit-cost (db/db conn) iid) 0M)
+                      inv-tid "inv"]
+                  (db/tx! conn
+                    [{:db/id                     inv-tid
+                      :erp.inventory/id          (inv-id iid)
+                      :erp.inventory/item        [:plm.item/id iid]
+                      :erp.inventory/qty-on-hand 0M
+                      :erp.inventory/std-cost    std}
+                     (erp/ocel :item.released        "4.0" [[:plm.item/id iid]])
+                     (erp/ocel :inventory.registered "4.0" [inv-tid])])
+                  {:ok true :item iid :make-buy mb}))
+              sup (maybe-supersede! conn iid)]
+          (cond-> result sup (assoc :superseded sup)))))))
 
 (defn receive-goods!
   "Goods receipt of `qty` of released make-item `iid` at current standard cost.

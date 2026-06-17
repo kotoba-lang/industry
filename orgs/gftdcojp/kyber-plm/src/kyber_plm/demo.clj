@@ -8,7 +8,8 @@
   (:require [kyber-plm.db :as db]
             [kyber-plm.plm :as plm]
             [kyber-plm.erp :as erp]
-            [kyber-plm.thread :as thread]))
+            [kyber-plm.thread :as thread]
+            [kyber-plm.mrp :as mrp]))
 
 (defn- line [] (println (apply str (repeat 72 "─"))))
 (defn- h [s] (line) (println s) (line))
@@ -63,6 +64,17 @@
       (doseq [e (erp/ocel-log d)]
         (println (format "   %-22s APQC %-5s" (str (:type e)) (:apqc e)))))
 
+    (h "4) MRP: explode demand 10 × PN-1000@A → net on-hand → auto PO")
+    (let [r (mrp/mrp-run! conn "PN-1000@A" 10)]
+      (doseq [o (:ordered r)] (println "   PO" (:item o) "qty" (:net o) "@unit" (:unit-cost o))))
+
+    (h "5) Revision: PN-1000 A→B (inherits BOM), release supersedes A")
+    (db/tx! conn (plm/revise-item-tx (db/db conn) "PN-1000@A" "B"))
+    (println " release-item! PN-1000@B →"
+             (select-keys (thread/release-item! conn "PN-1000@B") [:ok :rolled-cost :superseded]))
+    (println " lifecycle PN-1000@A =" (plm/lifecycle (db/db conn) "PN-1000@A")
+             "| PN-1000@B =" (plm/lifecycle (db/db conn) "PN-1000@B"))
+
     (line)
-    (println "done — EBOM→MBOM→inventory→cost→GL threaded end-to-end.")
+    (println "done — EBOM→MBOM→inventory→cost→GL + effectivity / MRP / revision threaded.")
     (shutdown-agents)))

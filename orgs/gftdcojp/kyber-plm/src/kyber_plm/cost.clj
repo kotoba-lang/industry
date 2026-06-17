@@ -9,17 +9,20 @@
   (:require [kyber-plm.plm :as plm]))
 
 (defn rolled-cost
-  [d iid]
-  (letfn [(roll [iid seen]
-            (when (contains? seen iid)
-              (throw (ex-info "BOM cycle detected" {:item iid :seen seen})))
-            (case (plm/make-buy d iid)
-              :buy (or (plm/unit-cost d iid)
-                       (throw (ex-info "buy item missing :std-unit-cost" {:item iid})))
-              (:make :phantom)
-              (reduce (fn [acc {:keys [child qty]}]
-                        (+ acc (* (roll child (conj seen iid)) qty)))
-                      0M
-                      (plm/mbom-children d iid))
-              (throw (ex-info "unknown / unmastered item" {:item iid}))))]
-    (roll iid #{})))
+  "Standard cost of `iid`. With `asof` (java.util.Date) the roll-up only walks
+   MBOM edges effective at that date; arity-2 rolls the whole structure."
+  ([d iid] (rolled-cost d iid nil))
+  ([d iid asof]
+   (letfn [(roll [iid seen]
+             (when (contains? seen iid)
+               (throw (ex-info "BOM cycle detected" {:item iid :seen seen})))
+             (case (plm/make-buy d iid)
+               :buy (or (plm/unit-cost d iid)
+                        (throw (ex-info "buy item missing :std-unit-cost" {:item iid})))
+               (:make :phantom)
+               (reduce (fn [acc {:keys [child qty]}]
+                         (+ acc (* (roll child (conj seen iid)) qty)))
+                       0M
+                       (plm/mbom-children d iid asof))
+               (throw (ex-info "unknown / unmastered item" {:item iid}))))]
+     (roll iid #{}))))
