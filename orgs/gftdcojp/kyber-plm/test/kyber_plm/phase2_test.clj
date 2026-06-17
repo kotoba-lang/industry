@@ -10,6 +10,7 @@
             [kyber-plm.erp :as erp]
             [kyber-plm.thread :as thread]
             [kyber-plm.mrp :as mrp]
+            [kyber-plm.production :as prod]
             [kyber-plm.store :as store]))
 
 ;; ─────────────────────────── effectivity ───────────────────────────────────
@@ -38,6 +39,7 @@
 
 (defn- mrp-world []
   (let [conn (db/fresh-conn (str "mrp-" (System/nanoTime)))]
+    (db/tx! conn erp/chart)
     (db/tx! conn
       [(plm/item {:part-no "P"  :make-buy :make})
        (plm/item {:part-no "RR" :make-buy :buy :std-unit-cost 100})
@@ -86,6 +88,27 @@
         (is (= :released (plm/lifecycle (db/db conn) "ASM@B")))
         (is (= :obsolete (plm/lifecycle (db/db conn) "ASM@A")))))))
 
+;; ─────────────────────────── production completion (backflush) ─────────────
+
+(deftest production-backflush-closes-wip
+  (let [conn (mrp-world)]                       ; P ← 4×RR(100) + 2×CC(50)
+    (thread/receive-goods! conn "RR@A" 40)      ; stock components
+    (thread/receive-goods! conn "CC@A" 20)
+    (let [r (prod/complete-production! conn "P@A" 10)]
+      (is (:ok r))
+      (is (= 5000M (:wip-cleared r)) "4×100×10 + 2×50×10")
+      (is (= 5000M (:finished-value r)) "10 × std 500"))
+    (let [d (db/db conn)]
+      (testing "components consumed, finished good in stock"
+        (is (= 0M  (db/attr d :erp.inventory/qty-on-hand [:erp.inventory/id "INV-RR@A"])))
+        (is (= 0M  (db/attr d :erp.inventory/qty-on-hand [:erp.inventory/id "INV-CC@A"])))
+        (is (= 10M (db/attr d :erp.inventory/qty-on-hand [:erp.inventory/id "INV-P@A"]))))
+      (testing "WIP closes to zero and GL stays balanced"
+        (let [tb (erp/trial-balance d)]
+          (is (= 0M (get-in tb ["1500" :balance])) "WIP cleared")
+          (is (= (reduce + 0M (map (comp :debit val) tb))
+                 (reduce + 0M (map (comp :credit val) tb)))))))))
+
 ;; ─────────────────────────── production backend (kotoba) ───────────────────
 
 (defn- fake-kotoba-postfn
@@ -117,3 +140,20 @@
       (is (= :buy (store/attr s :plm.item/make-buy [:plm.item/id "PN-1@A"])))
       (is (= "PN-1" (:plm.item/part-no
                      (store/pull* s [:plm.item/part-no] [:plm.item/id "PN-1@A"])))))))
+
+(deftest whole-domain-runs-on-kotoba-backend
+  ;; The proof of the Store abstraction: thread/cost/erp run unchanged on a
+  ;; KotobaStore (XRPC), because they only touch the graph via kyber-plm.db,
+  ;; which delegates to the Store protocol.
+  (let [raw (let [c (d/client {:server-type :datomic-local :storage-dir :mem :system "kyber-plm"})]
+              (d/delete-database c {:db-name "dom"})
+              (d/create-database c {:db-name "dom"})
+              (d/connect c {:db-name "dom"}))
+        s   (store/kotoba (fake-kotoba-postfn raw) "dom-graph")]
+    (db/tx! s [(plm/item {:part-no "B" :make-buy :buy :std-unit-cost 100})
+               (plm/item {:part-no "A" :make-buy :make})])
+    (db/tx! s [(plm/bom-edge {:parent "A@A" :child "B@A" :qty 3 :find-no 1})])
+    (thread/release-item! s "B@A")
+    (is (= 300M (:rolled-cost (thread/release-item! s "A@A"))) "3×100 rolled over XRPC backend")
+    (thread/receive-goods! s "A@A" 5)
+    (is (= 1500M (erp/inventory-value s)) "5×300 valued through the kotoba store")))

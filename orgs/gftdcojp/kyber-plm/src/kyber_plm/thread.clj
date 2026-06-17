@@ -116,15 +116,18 @@
       :else
       (let [new-cost (:plm.eco/new-unit-cost eco)
             affected (mapv :plm.item/id (:plm.eco/affected eco))
-            parents  (->> affected (mapcat #(plm/parents-using d0 %)) distinct sort vec)]
+            ;; revalue the affected buy items' OWN inventory *and* every MBOM
+            ;; parent that consumes them — a standard change ripples both ways.
+            targets  (->> (concat affected (mapcat #(plm/parents-using d0 %) affected))
+                          distinct sort vec)]
         ;; (1) release ECO + apply new standard cost to affected buy items
         (db/tx! conn
           (into [{:plm.eco/id eid :plm.eco/state :released :plm.eco/released-at (erp/now)}]
                 (for [iid affected]
                   {:plm.item/id iid :plm.item/std-unit-cost new-cost})))
-        ;; (2) re-roll each impacted parent, revalue on-hand, post variance
+        ;; (2) re-roll each target, revalue on-hand, post variance
         (let [results
-              (vec (for [pid parents]
+              (vec (for [pid targets]
                      (let [d1    (db/db conn)
                            old   (or (db/attr d1 :erp.inventory/std-cost    [:erp.inventory/id (inv-id pid)]) 0M)
                            new   (cost/rolled-cost d1 pid)

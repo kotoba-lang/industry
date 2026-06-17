@@ -9,7 +9,8 @@
             [kyber-plm.plm :as plm]
             [kyber-plm.erp :as erp]
             [kyber-plm.thread :as thread]
-            [kyber-plm.mrp :as mrp]))
+            [kyber-plm.mrp :as mrp]
+            [kyber-plm.production :as prod]))
 
 (defn- line [] (println (apply str (repeat 72 "─"))))
 (defn- h [s] (line) (println s) (line))
@@ -75,6 +76,17 @@
     (println " lifecycle PN-1000@A =" (plm/lifecycle (db/db conn) "PN-1000@A")
              "| PN-1000@B =" (plm/lifecycle (db/db conn) "PN-1000@B"))
 
+    (h "6) Production: stock components, complete 5 × PN-1000@B (backflush WIP)")
+    (thread/receive-goods! conn "PN-2000@A" 20)
+    (thread/receive-goods! conn "PN-2001@A" 10)
+    (println " complete-production! →"
+             (select-keys (prod/complete-production! conn "PN-1000@B" 5)
+                          [:ok :wip-cleared :finished-value]))
+    (let [d (db/db conn)
+          tb (erp/trial-balance d)]
+      (println "   WIP(1500) balance =" (get-in tb ["1500" :balance]) "(closed)")
+      (println "   PN-1000@B on-hand =" (db/attr d :erp.inventory/qty-on-hand [:erp.inventory/id "INV-PN-1000@B"])))
+
     (line)
-    (println "done — EBOM→MBOM→inventory→cost→GL + effectivity / MRP / revision threaded.")
+    (println "done — EBOM→MBOM→inventory→cost→GL + effectivity / MRP / revision / production threaded.")
     (shutdown-agents)))

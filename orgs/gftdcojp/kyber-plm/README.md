@@ -26,6 +26,7 @@ Datomic Local を `:storage-dir :mem`（揮発・ディスク非残置）で使�
 | `kyber-plm.cost` | 標準原価ロールアップ（released MBOM を bottom-up 再帰、サイクル検出、**effectivity as-of 対応**）|
 | `kyber-plm.thread` | PLM→ERP reactive 派生（**released gating**）: release-item! / receive-goods! / release-eco! / **revision supersede** |
 | `kyber-plm.mrp` | 多階層 MBOM 展開 → on-hand ネット → **PO 自動起票**（ocel po.created）|
+| `kyber-plm.production` | **製造完了 backflush**: 部品を WIP へ払出(Dr WIP/Cr 在庫)、完成品受入(Dr 在庫/Cr WIP)、WIP クローズ |
 | `kyber-plm.erp` | ERP tx ビルダー: 残高ゼロ検証付き仕訳・原価スナップショット・OCEL・帳票クエリ |
 | `kyber-plm.store` | **バックエンド抽象**（Store protocol）: Datomic Local（dev）↔ kyber-datomic XRPC（本番, mangaka.store.kotoba 互換）|
 | `kyber-plm.demo` | `-main` シナリオ |
@@ -49,10 +50,12 @@ Datomic Local を `:storage-dir :mem`（揮発・ディスク非残置）で使�
 - **effectivity**: BOM辺の `:eff-from`/`:eff-to`（と `:eco`）を `cost/rolled-cost` の as-of で解決。同一ポジションの旧→新部品の切替を日付で展開。
 - **MRP**: `mrp/mrp-run!` が make 所要を多階層展開し on-hand とネットして買い品の不足分に PO を自動起票。
 - **revision**: `plm/revise-item-tx` で新版（BOM継承・旧版 supersede）を作成、`release-item!` 時に旧版を `:obsolete` 化（ocel item.superseded）。
-- **backend**: `kyber-plm.store` の Store protocol で Datomic Local（dev/test）と kyber-datomic XRPC（本番）を差替可能。本番 transport は mangaka.store.kotoba と同じ wire 契約（`tx_edn` / `rows_edn` / `entity_edn`）。
+- **backend**: `kyber-plm.store` の Store protocol で Datomic Local（dev/test）と kyber-datomic XRPC（本番）を差替可能。本番 transport は mangaka.store.kotoba と同じ wire 契約（`tx_edn` / `rows_edn` / `entity_edn`）。**ドメイン全体（plm/cost/thread/mrp/production）が `kyber-plm.db` 経由で Store に委譲**するため、kotoba バックエンド上でもそのまま動く（テスト `whole-domain-runs-on-kotoba-backend` で実証）。
+- **production**: `production/complete-production!` が直下 MBOM 部品を払い出して WIP に積み、完成品を受け入れる。`parent std = Σ child std × qty` のロールアップ不変条件により WIP は 0 にクローズ。
+- ECO 再評価は affected 部品**自身の在庫**と、それを使う全親の両方を再評価（標準変更は両方向に波及）。
 
 ## ADR 上の位置づけ / 次の一手
 
 - NSID は実装実体に整合：`:plm.item/*` ↔ `ai.gftd.apps.kyber.plm.item`、`:erp.inventory/*` ↔ `ai.gftd.apps.kyber.inventoryItem`。
 - MVP は専用 projector を新設せず、本スレッドを ERP 側に相乗りさせる方針（ADR-2606171400 §4 注）。
-- 残課題: 既存ドメイン（plm/cost/thread/mrp）を `kyber-plm.db` 直呼びから `kyber-plm.store` 経由へ全面移行（現状 Store の wire 契約は round-trip テスト済み、ドメイン配線は db facade 経由）。在庫払出/製造完了の仕訳、ECO disposition（rework/scrap）の在庫処理。
+- 残課題: 実 kyber-datomic エンドポイントでの疎通（要 XRPC 認証情報）。ECO disposition（rework/scrap）の在庫処理、ロット/シリアル trace、複数プラント MBOM。

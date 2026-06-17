@@ -11,6 +11,7 @@
 (def chart
   "Minimal COA seed for the inventory→GL thread (ADR-0025 coa.seeded analog)."
   [{:erp.account/code "1400" :erp.account/name "Inventory"                     :erp.account/type :asset}
+   {:erp.account/code "1500" :erp.account/name "Work In Process"               :erp.account/type :asset}
    {:erp.account/code "2150" :erp.account/name "GR/IR Clearing"                :erp.account/type :liability}
    {:erp.account/code "5900" :erp.account/name "Inventory Revaluation Variance" :erp.account/type :expense}])
 
