@@ -1,8 +1,11 @@
 {:paths ["src"]
- :deps {com.datomic/local {:mvn/version "1.0.291"}}
+ :deps {com.datomic/local {:mvn/version "1.0.291"}
+        cheshire/cheshire {:mvn/version "5.13.0"}}
  :aliases
  {;; clojure -M:run  — end-to-end PLM→ERP thread demo
   :run  {:main-opts ["-m" "kyber-plm.demo"]}
+  ;; clojure -M:export — print the projected PLM graph as a kg.ingest_batch JSON
+  :export {:main-opts ["-m" "kyber-plm.export"]}
   ;; clojure -M:test — cognitect test-runner over test/
   :test {:extra-paths ["test"]
          :extra-deps  {io.github.cognitect-labs/test-runner

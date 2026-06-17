@@ -20,16 +20,17 @@
   (let [conn (world)
         e (kb/item->kg-entity (db/db conn) "PN-1000@A")
         claims (into {} (map (juxt :pred :value)) (:claims e))]
-    (testing "entity shell"
+    (testing "entity shell (camelCase labelEn per pod struct)"
       (is (= "PN-1000@A" (:id e)))
       (is (= "plm.item" (:type e)))
-      (is (= "Controller PCBA" (:label_en e))))
+      (is (= "Controller PCBA" (:labelEn e))))
     (testing "claims use {:pred :value} with stringified keyword/decimal values"
       (is (= "PN-1000" (claims "plm.item/part-no")))
       (is (= "make"    (claims "plm.item/make-buy")))   ; keyword → name
-      (is (= "released" (claims "plm.item/lifecycle"))))
-    (testing "MBOM child becomes a relation with qty (clean decimal string)"
-      (is (= [{:pred "plm.bom/child" :target "PN-2000@A" :qty "4"}] (:relations e))))
+      (is (= "released" (claims "plm.item/lifecycle")))
+      (is (= "4" (claims "plm.bom/qty/PN-2000@A"))))     ; BOM qty as companion claim
+    (testing "MBOM child becomes a relation {:pred :dstId} (no qty slot)"
+      (is (= [{:pred "plm.bom/child" :dstId "PN-2000@A"}] (:relations e))))
     (testing "buy item carries its std-unit-cost claim"
       (let [b (into {} (map (juxt :pred :value)) (:claims (kb/item->kg-entity (db/db conn) "PN-2000@A")))]
         (is (= "100" (b "plm.item/std-unit-cost")))

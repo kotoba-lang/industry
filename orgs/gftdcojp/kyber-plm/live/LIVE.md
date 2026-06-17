@@ -123,6 +123,21 @@ GET kg.entity?id=PROBE@A  (tenant Bearer, internal-trust)
 
 **本番 kotobase で PLM item の書き込み→封印→読み戻しが完走**（tenant 経路、commit のみ operator）。
 
+### ✅ PLM グラフ全体の一括投入（kyber-plm.kotobase 射影 → 本番）
+
+`clojure -M:export` が released PLM グラフを `kg.ingest_batch` JSON へ射影（`live/kg_batch_load.mjs`
+が ingest→commit→read-back）。entity = `{id,type,labelEn,claims:[{pred,value}],relations:[{pred,dstId}]}`
+（pod struct `KgIngestReq/KgClaim/KgRelation`, serde camelCase に一致）:
+
+```
+kg.ingest_batch → {"ok":true,"entityCount":3,"quadCount":33,"subjectCids":[…]}
+kg.commit       → {"ok":true,"ipnsSequence":15}
+kg.entity 読戻し → PN-1000@A: claims=8 relations=2 / PN-2000@A,PN-2001@A: claims=7 relations=0
+```
+
+→ kyber-plm の Datomic PLM/ERP グラフが、**射影→本番 kotobase 投入→封印→読み戻し（BOM relations 込み）**
+で完走。BOM 子数量は relation に slot が無いため `plm.bom/qty/<child>` claim として保持。
+
 > SPARQL(`kg.query`)は絶対 IRI 必須・SELECT のみ・変数述語不可で、subject=CID のため
 > id 直引きには `kg.entity` が向く。kg 射影述語は `kg/id` `kg/type` `kg/label/en`
 > `kg/claim/<pred>` `kg/relation/<pred>`（kotoba-server/src/kg.rs, named graph `kotobase-kg-v1`）。
