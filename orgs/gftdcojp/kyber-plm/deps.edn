@@ -1,0 +1,10 @@
+{:paths ["src"]
+ :deps {com.datomic/local {:mvn/version "1.0.291"}}
+ :aliases
+ {;; clojure -M:run  — end-to-end PLM→ERP thread demo
+  :run  {:main-opts ["-m" "kyber-plm.demo"]}
+  ;; clojure -M:test — cognitect test-runner over test/
+  :test {:extra-paths ["test"]
+         :extra-deps  {io.github.cognitect-labs/test-runner
+                       {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+         :main-opts   ["-m" "cognitect.test-runner"]}}}
