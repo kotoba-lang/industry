@@ -74,11 +74,11 @@ if (process.argv.includes("--write")) {
   console.log("\n== datomic.transact (write one PLM item) ==");
   const tx = "[{:plm.item/id \"PROBE@A\" :plm.item/part-no \"PROBE\" :plm.item/revision \"A\" :plm.item/make-buy :buy}]";
   const w = await xrpc("ai.gftd.apps.kotobase.datomic.transact", { graph, tx_edn: tx }, "datom:write", graph);
-  console.log("status", w.status, JSON.stringify(w.json).slice(0, 600));
+  console.log("status", w.status, JSON.stringify(w.json));
 }
 
-// 3) read back
+// 3) read back (Datomic map-form query, per worker datomic_cloud_compat_test)
 console.log("\n== datomic.q (read PLM items) ==");
 const rb = await xrpc("ai.gftd.apps.kotobase.datomic.q",
-  { graph, query_edn: "[:find ?id :where [?e :plm.item/id ?id]]" }, "datom:read", graph);
-console.log("status", rb.status, JSON.stringify(rb.json).slice(0, 600));
+  { graph, query_edn: "{:find [?id] :where [[?e :plm.item/id ?id]]}" }, "datom:read", graph);
+console.log("status", rb.status, JSON.stringify(rb.json));
