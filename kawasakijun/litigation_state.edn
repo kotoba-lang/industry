@@ -93,13 +93,28 @@
                             :reply_framing "二段階(本人選択): 河崎期にユーザーが実保有=Nodoka ETH(0xf2e5)。損害の対象 Nomos ETH(0x19cb)はOikos期2024-08発行の後発=河崎断絶後(答弁書第8と接続)"}
         :exhibit_plan "仮記号案 ①=乙6/6-2/6-3, ②=Safe払出明細, ③=Nomos Bridge履歴, 別添3(バリデータ⇔アドレス⇔サーバー対応表)・別添4(突合表)も乙号証化"
         :evidentiary_brief "証拠信頼性別紙: 民訴247(自由心証)/231の2・231の3(電磁的記録,令8.5.21施行)/228(真正)・資金決済法2条14項・国税庁/金融庁実務・参考US v. Ahlgren"}
-      :counsel_open_items ["河崎→水野/竹下【最優先・未返信】: 6/17修正版準備書面のファイナライズ可否回答 (6/18朝までの要請に未応答)"
-                           "河崎→竹下【6/18依頼1】: 別添3対応表の『運用サーバー名/ID』『当社運用台帳の対応』を要記入→運用記録を共有"
-                           "河崎→竹下【6/18依頼2】: 出金申請459件中107件突合の根拠=突合に用いた申請者リストを再共有 (repo: 突合一致_フォーム×ブリッジ_107件.json)"
-                           "河崎→竹下【6/18依頼3】: Nodoka ETH 0xf2e5118… と Nomos ETH 0x19cb6e81… の同一/別異を確定し払出トークンを特定 (→ :token_addr_conflict 参照)"
-                           "河崎→水野【6/17 3問】: (a)紹介報酬66.3万vs42万差異 (b)Mozomy/Lingling紹介報酬0の正否 (c)水谷封印破棄略式の事案内容"
+      :counsel_open_items ["✅解決(6/20) 修正版ファイナライズ: 河崎OK"
+                           "✅解決(6/20)【6/18依頼1 運用台帳】別添3のサーバー列を Parse_Validator.xlsx(validator id⇔instance mainnet1〜11⇔pubkey)で補完。運用受託=Open Reach Tech株式会社。別添3_…対応表_20260620.tsv 生成(99/100照合, id38は既存TSV欠落で要追補)"
+                           "🟡進行【6/18依頼2 107件突合】突合キー(送付先ウォレット×ブリッジ受領)で63/107即一致確認。申請者リスト+全払出データ+手順をZeLoと一本化して送付(要実行)"
+                           "✅解決(6/20)【6/18依頼3 NETH】→ :token_addr_resolved"
+                           "✅解決(6/20)【水野a 紹介報酬】当方42万=426,631.5(binary・OUCHI建て)=Hiroki(2619)288,950+Mayumayu(2677)137,681.5。料率≈5%で乙3整合。66.3万は当方記録に不在=原告独自集計→原告開示待ち"
+                           "✅解決(6/20)【水野b】Lingling(5590)/Mozomy(6896)単体は報酬0が正。報酬は同一wallet0x4Acの上位口座Hiroki/Mayumayuに集約計上。★訂正: Mayumayu(2677)=伊勢クラスタ、被告髙橋(別wallet0x5330,JUNYA TAKAHASHI)ではない"
+                           "✅解決(6/20)【水野c】水谷封印破棄: 詐欺は立件困難→成立しうる封印破棄で刑事起訴し罰金20万確定。実刑/詐欺有罪ではない"
                            "竹下→河崎: アイシステム社からの送金元アドレス/TxID (入金側起点の1件特定に必要)"
-                           "竹下→河崎: rokes側ステーキング元アドレス (2021/9〜2023/4原資の1件単位対応に必要)"]
+                           "竹下→河崎: rokes側ステーキング元アドレス (2021/9〜2023/4原資の1件単位対応に必要)"
+                           "原告開示待ち: 66.3万円紹介報酬の内訳(対象口座/期間/報酬種別)"]
+      :reward_ledger {:as_of "2026-06-20" :source "dump-eth2-202407081946.sql (c_users.total_binary_reward/total_infinity_reward; c_rewardテーブルは存在せずc_usersに集計値)"
+                      :ise_cluster_wallet "0x4Ac796A39C43F8540b96FDC13C1124e269DA74A0"
+                      :binary {:hiroki_2619 288950 :mayumayu_2677 137681.5 :lingling_5590 0 :mozomy_6896 0 :mizu_7139 0
+                               :ise_total 426631.5 :note "当方42万の根拠。OUCHIトークン建て・生涯累計(2024-07-08時点)"}
+                      :plaintiff_self_claim_jpy 663000 :discrepancy 236368.5
+                      :mlm_uplines "竹内5575/野木7601/伊勢=Mayumayu2677下, 金井7028=Lingling5590下, Mozomy6896=Hiroki2619下"
+                      :takahashi_distinct {:wallet "0x5330…" :kyc "JUNYA TAKAHASHI 1979-03-14" :note "Mayumayuとは別人。従前の同一性保留を解消"}}
+      :operations_ledger {:as_of "2026-06-20" :source "_資料庫_OUCHI/2306-OUCHI_A_272f/Rokes/Parse_Validator.xlsx (24か月分2021-06〜2023-05)"
+                          :columns "validator id(1-100) / instance name(mainnet1-11=運用サーバー論理ノード) / pubkey / 月次収益"
+                          :operator "Open Reach Tech株式会社 (ステーキングシステム保守運用を受託・経理部チャットに月次請求書)"
+                          :deliverable "証跡_竹下質問3_NETH同一性_20260620/別添3_バリデータ_アドレス_サーバー対応表_20260620.tsv"
+                          :caveat "instance名は論理ノード名。物理ホスト/IPは台帳外(Open Reach Tech構築記録で補完可)。id38はpubkey既存TSV欠落で要追補"}
       :deadline "2026-06-26 (金) 第5準備書面・乙5〜12号証・証拠説明書 提出期限 (6/18期日で延期)。次回期日 2026-07-10(金)10:30"
       :status "進行中 / 6/18期日で提出延期 → 6/26提出期限。竹下追加3点+水野3問が未返信 (本人は返信済と誤認・実体は6/16が最後の送信)"
       :next "(1)水谷修正版のファイナライズ可否を即返信 (2)token_addr_conflict を Blockscout で解消し#3回答 (3)運用台帳で別添3埋め+107件突合リスト再共有 (4)水野3問回答 → 6/26までに提出"
