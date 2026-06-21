@@ -25,7 +25,7 @@ This repository is a superproject with many (and nested) submodules.
   git merge --ff-only origin/main      # FF 不可なら merge / rebase で乖離を解消
   ```
 
-  これは PreToolUse フック `.claude/hooks/git-push-main-sync-guard.sh` で強制される
+  これは PreToolUse フック `.claude/hooks/git-push-main-sync-guard.bb`（babashka）で強制される
   （遅れた状態の `git push` は deny され、同期を促すメッセージが返る）。フックは
   破壊的な自動マージはしない（判定と指示のみ、fail-open）。
 
