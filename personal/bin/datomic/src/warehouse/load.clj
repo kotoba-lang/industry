@@ -46,7 +46,8 @@
 (def schema
   (vec (concat (edn/read-string (slurp (io/file base "bin/datomic/schema.edn")))
                (edn/read-string (slurp (io/file base "bin/datomic/schema-life.edn")))
-               (edn/read-string (slurp (io/file base "bin/datomic/schema-sources.edn"))))))
+               (edn/read-string (slurp (io/file base "bin/datomic/schema-sources.edn")))
+               (edn/read-string (slurp (io/file base "bin/datomic/schema-facebook.edn"))))))
 
 ;; ---------- normalization (file records -> datoms) ----------
 (def finance-files
@@ -300,6 +301,92 @@
 (def photos-edn    (rd-edn-facts "facts/photos-library.edn"))
 (def downloads-edn (rd-edn-facts "facts/downloads-inventory.edn"))
 
+;; ---------- Facebook (DYI HTML export) — social/facebook/<acct>/<date>/index/*.jsonl ----------
+;; 正本HTML/メディアは git-annex→B2(暗号化)。索引JSONLを fb* グラフへ正規化し、
+;; sender/friend 名を people.edn に name 一致で連携 (ADR-0010, ingest-facebook.bb 生成)。
+(def facebook-edn (rd-edn-facts "facts/facebook.edn"))
+
+(def ^:private fb-index-rel
+  (when facebook-edn (str/replace (:facebook/index-path facebook-edn) #"^personal/" "")))
+
+(defn- fb-jsonl [cat]
+  (when fb-index-rel (or (rd-jsonl (str fb-index-rel "/" cat ".jsonl")) [])))
+
+(defn- norm-name [s] (when s (-> (str s) (str/replace "﨑" "崎") (str/replace #"\s+" ""))))
+
+(def ^:private fbname->pid
+  ;; index both :person/name と curated :person/fb-name エイリアス (norm-name 正規化)
+  (into {} (concat
+             (for [p people-edn :when (:person/name p)]
+               [(norm-name (:person/name p)) (:person/id p)])
+             (for [p people-edn, fbn (:person/fb-name p)]
+               [(norm-name fbn) (:person/id p)]))))
+
+(defn- fb-acct [] (:facebook/account facebook-edn "jun784"))
+
+(defn facebook-profile-tx []
+  (vec (for [r (fb-jsonl "profile") :when (:field r)]
+         {:fbprofile/id      (str "fb/" (fb-acct) "/profile/" (:field r))
+          :fbprofile/account (fb-acct)
+          :fbprofile/field   (:field r)
+          :fbprofile/value   (str (:value r))})))
+
+(defn facebook-friend-tx []
+  (vec (for [[i r] (map-indexed vector (fb-jsonl "friends")) :when (:name r)]
+         (let [pid (fbname->pid (norm-name (:name r)))]
+           (cond-> {:fbfriend/id      (str "fb/" (fb-acct) "/friend/" (:rel r) "/" i)
+                    :fbfriend/account (fb-acct)
+                    :fbfriend/name    (:name r)
+                    :fbfriend/rel     (keyword (:rel r))}
+             (:ts r) (assoc :fbfriend/ts (:ts r))
+             pid     (assoc :fbfriend/person [:person/id pid]))))))
+
+(defn facebook-thread-tx []
+  (vec (for [r (fb-jsonl "threads")]
+         (cond-> {:fbthread/id            (str "fb/" (fb-acct) "/thread/" (:thread r))
+                  :fbthread/account       (fb-acct)
+                  :fbthread/message-count (long (or (:messages r) 0))}
+           (:box r)                (assoc :fbthread/box (keyword (:box r)))
+           (:title r)              (assoc :fbthread/title (:title r))
+           (seq (:participants r)) (assoc :fbthread/participants (vec (:participants r)))
+           (:from r)               (assoc :fbthread/from (:from r))
+           (:to r)                 (assoc :fbthread/to (:to r))
+           (:path r)               (assoc :fbthread/path (:path r))))))
+
+(defn facebook-message-tx []
+  (->> (fb-jsonl "messages")
+       (map-indexed
+         (fn [i r]
+           (let [pid (fbname->pid (norm-name (:sender r)))]
+             (cond-> {:fbmsg/id     (str "fb/" (:thread r) "/" i)
+                      :fbmsg/thread [:fbthread/id (str "fb/" (fb-acct) "/thread/" (:thread r))]}
+               (:box r)    (assoc :fbmsg/box (keyword (:box r)))
+               (:sender r) (assoc :fbmsg/sender (:sender r))
+               (:text r)   (assoc :fbmsg/text (:text r))
+               (:ts r)     (assoc :fbmsg/ts (:ts r))
+               (:media r)  (assoc :fbmsg/media (long (:media r)))
+               pid         (assoc :fbmsg/person [:person/id pid])))))
+       vec))
+
+(defn facebook-post-tx []
+  (vec (for [[i r] (map-indexed vector (fb-jsonl "posts"))]
+         (cond-> {:fbpost/id      (str "fb/" (fb-acct) "/post/" i)
+                  :fbpost/account (fb-acct)}
+           (:ts r)          (assoc :fbpost/ts (:ts r))
+           (:text r)        (assoc :fbpost/text (:text r))
+           (seq (:links r)) (assoc :fbpost/links (vec (:links r)))
+           (:file r)        (assoc :fbpost/file (:file r))))))
+
+(defn facebook-activity-tx []
+  (vec (for [[i r] (map-indexed vector (fb-jsonl "activity"))]
+         (cond-> {:fbact/id       (str "fb/" (fb-acct) "/act/" i)
+                  :fbact/account  (fb-acct)
+                  :fbact/category (keyword (:category r))}
+           (:ts r)   (assoc :fbact/ts (:ts r))
+           (:name r) (assoc :fbact/name (:name r))
+           (:text r) (assoc :fbact/text (:text r))
+           (:file r) (assoc :fbact/file (:file r))))))
+
 (defn datasrc-tx []
   (->> [(when imessage-edn
           {:datasrc/id "src/imessage" :datasrc/name "iMessage / SMS" :datasrc/kind :comms
@@ -341,7 +428,22 @@
          :datasrc/note "Takeout 2026-06-10 で取込済 (訴訟ドラフト含む)。ライブ同期は冗長"}
         {:datasrc/id "src/tanabe-3d" :datasrc/name "tanabe-3d (3Dパイプライン)" :datasrc/kind :files
          :datasrc/status :ingested :datasrc/path "orgs/com-junkawasaki/tanabe-3d" :datasrc/backed-up true
-         :datasrc/note "野良プロジェクトをmonorepo収録。output 4.2G除外"}]
+         :datasrc/note "野良プロジェクトをmonorepo収録。output 4.2G除外"}
+        (when facebook-edn
+          {:datasrc/id "src/facebook"
+           :datasrc/name (str "Facebook DYI (" (fb-acct) ")")
+           :datasrc/kind :comms :datasrc/status :ingested :datasrc/backed-up true
+           :datasrc/count (get-in facebook-edn [:facebook/counts :messages])
+           :datasrc/size-gb 0.358
+           :datasrc/from (get-in facebook-edn [:facebook/messages-date-range :from])
+           :datasrc/to   (get-in facebook-edn [:facebook/messages-date-range :to])
+           :datasrc/path (:facebook/index-path facebook-edn)
+           :datasrc/note (str "HTML export 全取込。threads="
+                              (get-in facebook-edn [:facebook/counts :threads])
+                              " friends=" (get-in facebook-edn [:facebook/counts :friends])
+                              " posts=" (get-in facebook-edn [:facebook/counts :posts])
+                              " activity=" (get-in facebook-edn [:facebook/counts :activity])
+                              "。生HTML/メディアはB2(annex)、ローカルにも保持")})]
        (keep identity) vec))
 
 ;; people.edn から email/名前 → person-id の解決表
@@ -455,7 +557,11 @@
                           ["dyads" (dyad-tx)] ["hypotheses" (hypothesis-tx)]
                           ["engi" (engi-tx)] ["kpi" (kpi-tx)]
                           ["capabilities" (capability-tx)] ["processes" (process-tx)]
-                          ["steps" (step-tx)] ["step-deps" (step-needs-tx)]]]
+                          ["steps" (step-tx)] ["step-deps" (step-needs-tx)]
+                          ;; Facebook: threads before messages (lookup-ref dependency)
+                          ["fb-profile" (facebook-profile-tx)] ["fb-friends" (facebook-friend-tx)]
+                          ["fb-threads" (facebook-thread-tx)] ["fb-messages" (facebook-message-tx)]
+                          ["fb-posts" (facebook-post-tx)] ["fb-activity" (facebook-activity-tx)]]]
         (when (seq tx)
           (d/transact conn {:tx-data (vec tx)})
           (println (format "  loaded %-8s %d" label (count tx)))))
@@ -666,6 +772,32 @@
         (doseq [[nm pc] (->> (d/q '[:find ?nm ?pc :where [?p :person/photo-count ?pc] [?p :person/name ?nm]] db)
                              (sort-by (fn [[_ pc]] (- pc))))]
           (println (format "  %-30s 写真 %d枚" nm pc)))
+        (when (pos? (n '[:find (count ?t) :where [?t :fbthread/id]]))
+          (println "\n=== Facebook (DYI export; fb* グラフ) ===")
+          (println (format "  threads %d  messages %d  friends %d  posts %d  activity %d  profile %d"
+                           (n '[:find (count ?e) :where [?e :fbthread/id]])
+                           (n '[:find (count ?e) :where [?e :fbmsg/id]])
+                           (n '[:find (count ?e) :where [?e :fbfriend/id]])
+                           (n '[:find (count ?e) :where [?e :fbpost/id]])
+                           (n '[:find (count ?e) :where [?e :fbact/id]])
+                           (n '[:find (count ?e) :where [?e :fbprofile/id]])))
+          (println "[Datalog] fbthread by volume (タイトル・件数・期間):")
+          (doseq [[t c f to] (->> (d/q '[:find ?t ?c ?f ?to
+                                         :where [?e :fbthread/message-count ?c] [?e :fbthread/from ?f]
+                                                [?e :fbthread/to ?to]
+                                                (or-join [?e ?t] [?e :fbthread/title ?t]
+                                                  (and [(missing? $ ?e :fbthread/title)] [(ground "(無題)") ?t]))] db)
+                                  (sort-by (fn [[_ c _ _]] (- c))) (take 12))]
+            (println (format "  %5d件 %-32s %s〜%s" c (subs t 0 (min 32 (count t))) (subs f 0 10) (subs to 0 10))))
+          (println "[Datalog] fbmsg sender → person 連携 (people.edn 解決済 上位):")
+          (doseq [[nm c] (->> (d/q '[:find ?nm (count ?m)
+                                     :where [?m :fbmsg/person ?p] [?p :person/name ?nm]] db)
+                              (sort-by (fn [[_ c]] (- c))) (take 10))]
+            (println (format "  %-24s %d通" nm c)))
+          (println "[Datalog] fbfriend → person 連携件数 / 未解決:")
+          (let [r (n '[:find (count ?f) :where [?f :fbfriend/person _]])
+                u (n '[:find (count ?f) :where [?f :fbfriend/id] [(missing? $ ?f :fbfriend/person)]])]
+            (println (format "  解決 %d名 / 未解決 %d名 (people.edn に名前追加で連携可)" r u))))
         (println "\n=== メール分類ルール / triage 依存 (mail-rules.edn + mail-triage.edn) ===")
         (println "  rules   " (n '[:find (count ?r) :where [?r :rule/id]])
                  " triage  " (n '[:find (count ?t) :where [?t :triage/id]]))
