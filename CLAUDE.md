@@ -16,6 +16,19 @@ This repository is a superproject with many (and nested) submodules.
   git submodule update --init --recursive
   ```
 
+- **`git push` の前に必ず `origin/main` との遅れを解消する。** push しようとする
+  リポ（superproject / submodule とも）が `origin/main`（既定ブランチ）より遅れて
+  いる場合は、先に同期してから push する:
+
+  ```bash
+  git fetch origin
+  git merge --ff-only origin/main      # FF 不可なら merge / rebase で乖離を解消
+  ```
+
+  これは PreToolUse フック `.claude/hooks/git-push-main-sync-guard.sh` で強制される
+  （遅れた状態の `git push` は deny され、同期を促すメッセージが返る）。フックは
+  破壊的な自動マージはしない（判定と指示のみ、fail-open）。
+
 - **`main` への同期が未コミット/未追跡のローカル変更でブロックされた場合**、
   勝手に破棄しない。次の順で安全に同期する:
   1. ブロック原因の未追跡ファイルが **incoming とバイト同一** なら（origin に
