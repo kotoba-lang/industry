@@ -5,6 +5,13 @@
 - **Deciders**: 河崎純真 (jun784@gmail.com)
 - **Context tags**: submodule, datalad, git-annex, backblaze-b2, storage-policy, repo-reorg, orgs-layout, litigation-evidence
 
+> **Update (2026-06-23, ADR-0020)**: 本 ADR は配置キーを *GitHub owner* とした。ADR-0020 が
+> *概念タクソノミ*（etzhayyim=agent中心 / gftdcojp=企業app+契約 / com-junkawasaki=lib+個人）を
+> 上位基準として追加し、owner と概念が食い違う場合は概念を「あるべき配置」の正本とする。
+> これに伴い `ai-gftd-lf-case-lingling`（本 ADR では `orgs/com-junkawasaki/` に配置）は
+> 2026-06-23 に **gftdcojp org へ完全移送**され `orgs/gftdcojp/ai-gftd-lf-case-lingling` へ移動した。
+> 下表の同 repo 行はこの移送以前の歴史的記録。
+
 ## Context
 
 ローカルに散在する 2 つの作業ディレクトリ配下の repo 群を `com-junkawasaki`
