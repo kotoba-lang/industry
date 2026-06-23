@@ -124,13 +124,13 @@
       :remote "git@github.com:com-junkawasaki/kotoba-topology.git"
       :description "kotoba topology（v0.1.0）。ADR-0007 で submodule 追加。"}
     {
-      :name "etzhayyim-kotoba"
-      :path "orgs/etzhayyim/kotoba"
-      :kind "compiler"
+      :name "kotoba"
+      :path "orgs/com-junkawasaki/kotoba"
+      :kind "substrate"
       :submodule true
-      :remote "https://github.com/etzhayyim/kotoba.git"
-      :description "kotoba-clj Clojure→WASM compiler（etzhayyim）。"
-      :org "etzhayyim"}
+      :remote "git@github.com:com-junkawasaki/kotoba.git"
+      :description "kotoba: Rust 製 content-addressed Datalog DB (kotoba-datomic) + Clojure→WASM compiler (kotoba-clj)。再利用 substrate。canonical home = com-junkawasaki（ADR-0020/0021。etzhayyim/kotoba は 2026-06 撤去済）。"
+      :org "com-junkawasaki"}
     {
       :name "langchain-clj"
       :path "orgs/com-junkawasaki/langchain-clj"
@@ -434,5 +434,5 @@
       :schedule "launchd jp.co.gftd.m365-archive-backup daily 02:00 (single-instance lock in run-backup.sh)"
       :status "operational — initial full backup 2026-06-11: mail 103,662 eml / calendar 6,495 / onedrive ~131GiB; annex 131.4GB all verified on B2; annex.jobs=8 (31GB/h)"
       :facts_layer "ADR-0010/0013: facts/*.edn (EDN-lines, JSONL fully migrated & removed 2026-06-13 — 360,999 records round-trip verified; CID=git-annex key). 17 edn files: blobs/messages/threads/attachments/events/crm/docs/contract-terms/invoice-terms/decisions/llm-cache/triage-log + people/orgs/projects/curation-queue/coverage. 102,197 msgs / 92,674 threads / 112,960 blobs / 25,577 attachments / 6,210 docs / 559 contracts / 3,075 invoices / 2,800 crm. queryable via kotoba-datomic (embedded, ADR-0013) and clojure -M:run"
-      :query_engine "kotoba-datomic (etzhayyim, Rust, content-addressed Datomic-compatible Datalog) embedded in manimani Tauri app — ADR-0013; JVM Datomic Local retired"
+      :query_engine "kotoba-datomic (com-junkawasaki, Rust, content-addressed Datomic-compatible Datalog) embedded in manimani Tauri app — ADR-0013/0021; JVM Datomic Local retired"
       :status_wiring "2026-06-10 配線完了: CLIs(az 2.87/m365 11.8/rclone) 導入、gpg鍵 1Password→import + Keychain + agent preset、b2 special remote enableremote + round-trip(add→B2→drop→get) 検証 OK。残: bin/setup-auth.sh(対話 MFA/consent/OAuth) → bin/run-backup.sh(以降 非対話)。"}}}
