@@ -8,6 +8,28 @@
     :owner "Jun Kawasaki"
     :github "com-junkawasaki/com-junkawasaki"
     :description "Personal research workspace: formal mathematics, religious-corp substrate, AI content pipeline, AI agent platform."}
+  ;; 三組織タクソノミ (ADR-0020)。配置の概念上の正本は kawasakijun/docs/adr/0020-three-org-taxonomy.edn。
+  ;; orgs/<owner> レイアウト(ADR-0007)は維持し、概念と owner が食い違う場合は :relocate で記録(物理移動は owner 承認要)。
+  :org-taxonomy {
+    :adr "kawasakijun/docs/adr/0020-three-org-taxonomy-agent-enterprise-library.md"
+    :registry "kawasakijun/docs/adr/0020-three-org-taxonomy.edn"
+    :orgs {
+      :etzhayyim {:subject :agent
+                  :role "agent中心の人工有機体。使命を持つ agent が人間へ自律 activity・loop 自己改善・人間非介入。"
+                  :rule "使命を持つ *デプロイされた organism*"}
+      :gftdcojp {:subject :enterprise
+                 :role "企業・組織が使う app/UIUX、ビジネス・契約。主体=顧客組織。"
+                 :rule "企業が操作する app、または ビジネス/契約に直結する資産"}
+      :com-junkawasaki {:subject :human+agent
+                        :role "人も agent も使う再利用 lib/runtime/substrate、および河崎個人の研究・資産。"
+                        :rule "再利用部品 または 河崎個人のもの"}}
+    ;; 境界原則(§2.3): agent コードでも *部品*=com-junkawasaki / *使命を持つ稼働体*=etzhayyim / *企業が操作する画面*=gftdcojp
+    :relocate-done [
+      {:repo "ai-gftd-lf-case-lingling" :from :com-junkawasaki :to :gftdcojp
+       :reason "Gftd Japan 被告の LingLing 訴訟ケース(企業の法務/契約) = 概念上 gftdcojp"
+       :status :done :executed "2026-06-23"
+       :detail "GitHub repo transfer (user com-junkawasaki -> org gftdcojp; pin 915d4d1 不変) + submodule path orgs/com-junkawasaki/ -> orgs/gftdcojp/ + remote URL 更新。owner 承認(2026-06-23)。旧 URL は GitHub redirect 維持"}]
+    :tidy-candidates ["_modelbake -> etzhayyim/root/70-tools" "minimax-m2-modal: 汎用 infra 化検討"]}
   :projects [
     {
       :name "2604-linde"
@@ -79,11 +101,14 @@
       :description "com-junkawasaki webmaster / サイト運用リポジトリ。"}
     {
       :name "ai-gftd-lf-case-lingling"
-      :path "orgs/com-junkawasaki/ai-gftd-lf-case-lingling"
+      :path "orgs/gftdcojp/ai-gftd-lf-case-lingling"
       :kind "litigation-case"
       :submodule true
-      :remote "git@github.com:com-junkawasaki/ai-gftd-lf-case-lingling.git"
-      :description "LingLing 訴訟ケース関連リポジトリ。"}
+      :remote "git@github.com:gftdcojp/ai-gftd-lf-case-lingling.git"
+      :org "gftdcojp"
+      :description "LingLing 訴訟ケース関連リポジトリ。"
+      :org-fit {:belongs :gftdcojp :status :relocated
+                :note "ADR-0020: 企業(Gftd Japan)の法務/契約 = 概念上 gftdcojp。2026-06-23 owner 承認で com-junkawasaki→gftdcojp 完全移送(GitHub transfer + path + remote)。旧 com-junkawasaki/ai-gftd-lf-case-lingling は redirect"}}
     {
       :name "moex"
       :path "orgs/com-junkawasaki/moex"
@@ -179,6 +204,8 @@
       :stack ["Python" "Modal" "vLLM"]
       :adrs ["kawasakijun/docs/adr/0017-gftd-keiei-sim-llm-backend-openrouter.md"]
       :related ["gftd-keiei-sim"]
+      :org-fit {:belongs :gftdcojp :status :ok-note
+                :note "ADR-0020: 汎用 LLM infra 評価だが keiei-sim backend 決定(ADR-0017)直結のため gftd 留置"}
       :entrypoints {
         :bench_modal "bench_modal.py — chat/tools/coding 直接対決 (fast-cold-start: prefetch+enforce-eager)"
         :bench_opt "bench_opt.py — CUDA-devel(nvcc)+CUDAグラフ+DeepGEMM, 並列スイープで throughput/cost($/1M) 実測"
