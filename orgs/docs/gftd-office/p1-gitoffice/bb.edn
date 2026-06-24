@@ -1,0 +1,7 @@
+{:paths ["."]
+ :tasks {test {:doc  "Run GitOffice Phase 0/1/3 + merge-policy gate tests"
+               :requires ([gitoffice-test] [gitdiff-test] [gitmerge-test] [gitpolicy-test])
+               :task (System/exit (+ (gitoffice-test/-main)
+                                     (gitdiff-test/-main)
+                                     (gitmerge-test/-main)
+                                     (gitpolicy-test/-main)))}}}
