@@ -1,0 +1,31 @@
+;; queries/engi.edn — ADR-0013 L3: 縁の手放しビュー。
+
+{:engi/sever-queue
+ {:doc "実行可能な切離/縮小/付替キュー (legal-hold 除外、月額降順)。export-first=true は保全完了が前提。"
+  :query [:find ?target ?decision ?cost ?export ?reason
+          :where
+          [?e :engi/legal-hold false]
+          [?e :engi/decision ?decision]
+          [(contains? #{:sever :archive :transfer :reduce} ?decision)]
+          [?e :engi/target ?target]
+          [?e :engi/monthly-cost-jpy ?cost]
+          [?e :engi/export-first ?export]
+          [?e :engi/reason ?reason]]}
+
+ :engi/legal-holds
+ {:doc "切りたくても切れないリスト (ADR-0005)。係争終結 = これらが一斉に :archive へ動く日。"
+  :query [:find ?target ?reason
+          :where
+          [?e :engi/legal-hold true]
+          [?e :engi/target ?target]
+          [?e :engi/reason ?reason]]}
+
+ :engi/savings
+ {:doc "削減見込み月額 (sever+archive+transfer+reduce の個人負担分合計)。goal 29 のKPI: ¥319k→¥220k。"
+  :query [:find (sum ?cost)
+          :with ?e
+          :where
+          [?e :engi/legal-hold false]
+          [?e :engi/decision ?d]
+          [(contains? #{:sever :archive :transfer} ?d)]
+          [?e :engi/monthly-cost-jpy ?cost]]}}
