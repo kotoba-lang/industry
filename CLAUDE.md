@@ -55,3 +55,29 @@ This repository is a superproject with many (and nested) submodules.
   **想定内・無害**。これらは per-machine のローカルデータで origin から clone
   できない。`--force` で消したり報告だけで止めたりせず、他の submodule 更新を
   完遂させる（該当パスは未初期化のまま放置でよい）。
+
+## 大容量バイナリの扱い（B2 + DataLad、最優先）
+
+- **モデル重み / wasm / 動画 / 画像データセット等の大きなバイナリを git 履歴に
+  直接コミットしない。** これらは clone/pull を重くする最大要因（過去に
+  ai-gftd-apps=16G, ghosthacker=9.7G 等まで肥大）。新規に大容量データを置く必要が
+  あるときは **DataLad データセット + git-annex の Backblaze B2 (S3 互換) special
+  remote** を使う。実体は B2 へ push し、git にはポインタ(annex キー)だけ残す。
+
+  ```bash
+  B2_KEY_ID=... B2_APP_KEY=... B2_BUCKET=... \
+  B2_ENDPOINT=s3.us-west-004.backblazeb2.com \
+    scripts/datalad-b2-init.bb <dataset-dir> [remote-name]
+  # 以後: datalad save → datalad push --to b2 → datalad drop / datalad get
+  ```
+
+  B2 認証は環境変数のみで渡し、**リポジトリには秘密情報を一切コミットしない**。
+
+- **既存の重い submodule は shallow で運用する。** 履歴肥大が原因のものは
+  `submodule.<name>.shallow true`（ローカル `.git/config`）＋ `--depth 1` 再取得で
+  大幅に縮む（実績: ai-gftd-apps 16G→305M, ghosthacker 9.7G→736M,
+  spirit-in-physics 1.1G→62M）。現行ツリー自体が重いもの（画像同梱の
+  260208-spirit-in-physics 等）は shallow では縮まないため、将来的に上記
+  B2+DataLad へ移すのが望ましい。`submodule.fetchJobs 8` で update を並列化する。
+  なお shallow 化に伴う履歴書き換え＋force-push は**行わない**（main 乖離・共有
+  リポへの影響を避けるため、shallow 運用で対処する）。
