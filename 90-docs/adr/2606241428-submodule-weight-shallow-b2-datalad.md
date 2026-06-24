@@ -47,15 +47,15 @@ CLAUDE.md の「常に main と同期・乖離を作らない」方針と衝突�
 `git submodule update --init --depth 1` での再取得で縮小する。`submodule.fetchJobs 8` で
 update を並列化する。**履歴書き換え/force-push は行わない**（main 乖離・共有リポへの影響を回避）。
 
-実績（`.git` 全体: **35G → 8.4G**, 約77%削減）:
+実績（`.git` 全体: **35G → 5.0G**, 約86%削減）:
 
 | submodule | 前 | 後 | 判定 |
 |---|---:|---:|---|
 | ai-gftd-apps-gftdcojp | 16G | **305M** | 履歴肥大 → shallow 効果大 |
 | ghosthacker | 9.7G | **736M** | 履歴肥大 → 効果大 |
 | spirit-in-physics | 1.1G | **62M** | 履歴肥大 → 効果大 |
-| 260208-spirit-in-physics | 1.5G | 1.5G | 現行ツリーに画像同梱 → shallow 不可 |
-| etzhayyim/root | 4.7G | 4.7G | 未コミット変更あり → 安全のため除外 |
+| etzhayyim/root | 3.7G | **314M** | 履歴肥大 → 効果大（未コミット30件はバックアップ/復元で保全） |
+| 260208-spirit-in-physics | 1.5G | 1.5G | 現行ツリーに画像同梱 → shallow 不可（force-push なしでは縮まない） |
 
 注意点:
 - `.git/modules` の格納キーは submodule の **パスではなく名前**（例: `projects/ghosthacker`）。
@@ -63,6 +63,13 @@ update を並列化する。**履歴書き換え/force-push は行わない**（
 - `deinit -f` は作業ツリーの未コミット変更を破棄する。実行前に各 submodule の dirty を確認し、
   本物のローカル編集があるものは除外する（etzhayyim/root を除外したのはこのため）。
 - `deinit` は `.git/config` の `submodule.<name>.*` を消すため、shallow 設定は再取得後に再付与する。
+- worktree に **書き込み続ける稼働プロセス**がある submodule（etzhayyim/root は organism/vitals の
+  生成データを吐くプロセスが動作中だった）では、`deinit` がツリーを消し切れず再 clone が
+  「destination not empty」で失敗する。この場合は **干渉のない一時ディレクトリへ `git clone --depth 1`
+  → `fetch --depth 1 <pin>` で superproject のピンに合わせる → その `.git` を `.git/modules/<name>` へ
+  移設し core.worktree と gitlink を張り直す → `reset --hard <pin>` で実体化 → バックアップを復元**、
+  という temp-clone 統合方式を使う（HTTPS リモートの etzhayyim/root もこれで 3.7G→314M に縮小、
+  ローカル30件を保全して復旧できた）。
 
 ### 2. 今後の大容量データは B2 + DataLad（git に入れない）
 
@@ -90,7 +97,8 @@ B2_ENDPOINT=s3.us-west-004.backblazeb2.com \
 - (+) force-push を一切行わないため、共有 org リポの履歴・他クローンに影響しない（main 乖離なし）
 - (+) 今後の大容量データは B2 に外部化され、superproject が再肥大しない仕組みができた
 - (−) shallow は履歴が浅くなるため、深い `git log`/`bisect` が必要なときは個別に unshallow が要る
-- (−) 現行ツリーに画像同梱の 260208-spirit-in-physics、未コミット変更を持つ etzhayyim/root は未対処
+- (−) 現行ツリーに画像同梱の 260208-spirit-in-physics は shallow 不可のまま（縮小には force-push を
+  伴う履歴書き換え＝B2+DataLad 移行が必要で、本 ADR では見送り）。将来オーナー判断で対応する
 - (−) B2 運用は資格情報（keyID/appKey/bucket/endpoint）の各マシン設定が前提。秘密の取り回しは
   環境変数 + セッション直実行（`! VAR=… scripts/datalad-b2-init.bb …`）で会話・リポに残さない
 
