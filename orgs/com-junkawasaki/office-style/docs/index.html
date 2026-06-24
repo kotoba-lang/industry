@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>office-style — pptx からトーン・マナー・スタイルを抽出</title>
+<meta name="description" content="アップロードした .pptx からスライドのトーン・マナー・スタイルを抽出し、単一の StyleIR に正規化する TypeScript パッケージ。OOXML 決定論抽出 + Gemma 4 vision。" />
+<style>
+  :root{
+    --dk1:#1A1A1A; --dk2:#2B3A55; --lt1:#FFFFFF; --lt2:#F2F4F7;
+    --a1:#3B82F6; --a2:#10B981; --a3:#F59E0B; --a4:#EF4444; --a5:#8B5CF6; --a6:#14B8A6;
+    --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:Inter,"Noto Sans JP",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--lt1);line-height:1.7;-webkit-font-smoothing:antialiased}
+  a{color:var(--a1);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:960px;margin:0 auto;padding:0 24px}
+  code,pre{font-family:var(--mono);font-size:.9em}
+  pre{background:#0f172a;color:#e2e8f0;border-radius:12px;padding:18px 20px;overflow:auto;line-height:1.55}
+  pre .c{color:#94a3b8}
+  /* hero */
+  header.hero{background:linear-gradient(135deg,var(--dk2),#1e293b);color:#fff;padding:84px 0 72px}
+  .badge{display:inline-block;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:#cbd5e1;border:1px solid #475569;border-radius:999px;padding:4px 12px;margin-bottom:20px}
+  h1{font-size:clamp(2rem,5vw,3.1rem);line-height:1.15;margin:0 0 16px;font-weight:800}
+  .hero p.lead{font-size:1.18rem;color:#e2e8f0;max-width:680px;margin:0 0 28px}
+  .swatches{display:flex;gap:8px;margin:28px 0 0}
+  .sw{width:34px;height:34px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+  .cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}
+  .btn{display:inline-block;background:var(--a1);color:#fff;font-weight:600;padding:11px 22px;border-radius:10px}
+  .btn.ghost{background:transparent;border:1px solid #475569;color:#e2e8f0}
+  .btn:hover{text-decoration:none;filter:brightness(1.06)}
+  /* sections */
+  section{padding:60px 0;border-bottom:1px solid var(--line)}
+  h2{font-size:1.6rem;margin:0 0 8px;color:var(--dk2)}
+  .sub{color:var(--muted);margin:0 0 28px}
+  .grid{display:grid;gap:18px}
+  .cols-2{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+  .cols-3{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+  .card{border:1px solid var(--line);border-radius:14px;padding:20px 22px;background:var(--lt1)}
+  .card h3{margin:0 0 6px;font-size:1.05rem;display:flex;align-items:center;gap:8px}
+  .card p{margin:0;color:#374151;font-size:.96rem}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+  .pill{display:inline-block;font-size:.78rem;font-weight:600;color:#065f46;background:#d1fae5;border-radius:999px;padding:2px 10px;margin-left:6px;vertical-align:middle}
+  table{width:100%;border-collapse:collapse;font-size:.94rem}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600;font-size:.82rem;text-transform:uppercase;letter-spacing:.04em}
+  .ok{color:var(--a2);font-weight:700}
+  .flow{font-family:var(--mono);font-size:.82rem;white-space:pre;overflow:auto;background:var(--lt2);border:1px solid var(--line);border-radius:12px;padding:18px 20px;color:#334155}
+  footer{padding:40px 0;color:var(--muted);font-size:.9rem}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  @media(max-width:720px){.two{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="badge">@com-junkawasaki/office-style · style-ir/1</span>
+    <h1>pptx から<br/>トーン・マナー・スタイルを抽出</h1>
+    <p class="lead">アップロードした <code>.pptx</code> を、配色・フォント・スライドマスター・ガイドの<strong>確定値</strong>と、Gemma&nbsp;4 vision が読む<strong>印象</strong>に分けて抽出し、単一の <strong>StyleIR</strong> に正規化する TypeScript パッケージ。</p>
+    <div class="swatches" aria-hidden="true">
+      <div class="sw" style="background:#3B82F6"></div>
+      <div class="sw" style="background:#10B981"></div>
+      <div class="sw" style="background:#F59E0B"></div>
+      <div class="sw" style="background:#EF4444"></div>
+      <div class="sw" style="background:#8B5CF6"></div>
+      <div class="sw" style="background:#14B8A6"></div>
+    </div>
+    <div class="cta">
+      <a class="btn" href="../README.md">使い方 (README)</a>
+      <a class="btn ghost" href="./architecture.md">アーキテクチャ</a>
+      <a class="btn ghost" href="./ir-schema.md">StyleIR スキーマ</a>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2>2 レイヤを 1 つの IR に</h2>
+    <p class="sub">構造は OOXML から確実に、印象は vision から。役割を分けて重複なく相補的に。</p>
+    <div class="two">
+      <div class="card">
+        <h3><span class="dot" style="background:var(--a1)"></span>決定論レイヤ <span class="pill">誤差ゼロ</span></h3>
+        <p>theme <code>clrScheme</code> 12 色・<code>fontScheme</code>、slideMaster/Layout の placeholder と既定テキストスタイル、<code>clrMap</code> 解決、ガイド (1/8pt→EMU 校正)、複数 master/theme を OOXML から直読み。</p>
+      </div>
+      <div class="card">
+        <h3><span class="dot" style="background:var(--a5)"></span>解釈レイヤ <span class="pill">ローカル LLM</span></h3>
+        <p>レンダリングしたスライド画像を Gemma&nbsp;4 vision に通し、フォーマリティ・ムード・カラームード・密度・ビジュアルスタイル・要約を <code>ToneProfile</code> として推定 (confidence 付)。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>パイプライン</h2>
+    <p class="sub">抽出 → 描画 → ラスタライズ → vision → 集約。下流は単一 IR だけ読めばよい。</p>
+    <div class="flow">.pptx ─► extractStyle ─► StyleIR ──► toSvgraphPresentation ─► svgraph editor
+                         │                (masters / layouts / guides / text_styles)
+                         ├─ renderDeckSlides(実スライド) ┐
+                         └─ renderPreviewSvg(代表1枚) ───┴► SVG ─► raster ─► PNG ─► Gemma vision ─► ToneProfile
+                                                          (resvg/canvas)   (cpu·q4 / webgpu·q4f16)        │
+                                                            aggregateTones ◄─ 複数スライド集約 ◄──────────┘</div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>主な機能</h2>
+    <p class="sub">slide master 対応・複数テーマ・実機 vision・svgraph 流し込み。</p>
+    <div class="grid cols-3">
+      <div class="card"><h3>🎨 デザイントークン</h3><p>配色 12 色・major/minor フォント・スライドサイズを正確に抽出。</p></div>
+      <div class="card"><h3>🧩 slide master 継承</h3><p>placeholder のフォント/サイズ/色を master の txStyles から継承して解決。</p></div>
+      <div class="card"><h3>🗂 複数 master/theme</h3><p>slide→layout→master の継承チェーンで各スライドを正しいテーマに束ねる。</p></div>
+      <div class="card"><h3>🖼 内蔵レンダラ</h3><p>図形・グラデ・回転・表・画像・色解決を SVG 化して vision 入力に。</p></div>
+      <div class="card"><h3>🤖 Gemma 4 vision</h3><p>ローカル・API キー不要。Node(cpu) / ブラウザ(WebGPU) 両対応。</p></div>
+      <div class="card"><h3>🔗 svgraph 流し込み</h3><p>presentation IR (masters/guides/text_styles) を svgraph editor へ。</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>使ってみる</h2>
+    <div class="two">
+      <div>
+        <h3 style="color:var(--dk2)">CLI</h3>
+        <pre><span class="c"># デザイントークン要約</span>
+office-style tokens deck.pptx
+
+<span class="c"># StyleIR を JSON 出力</span>
+office-style extract deck.pptx
+
+<span class="c"># 実スライド → vision でデッキトーン</span>
+office-style tone deck.pptx --deck
+
+<span class="c"># svgraph presentation IR へ</span>
+office-style svgraph deck.pptx</pre>
+      </div>
+      <div>
+        <h3 style="color:var(--dk2)">API / ブラウザ</h3>
+        <pre><span class="c">// Node</span>
+import { extractStyle } from
+  "@com-junkawasaki/office-style";
+const ir = extractStyle(bytes, "deck.pptx");
+ir.theme.colorScheme.accent1.hex; <span class="c">// "#3B82F6"</span>
+
+<span class="c">// ブラウザ (WebGPU + q4f16)</span>
+import { analyzeDeck } from
+  "@com-junkawasaki/office-style/browser";
+const { ir, perSlide } = await analyzeDeck(bytes);</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>検証</h2>
+    <p class="sub">集約・スキーマ・svgraph 整合は vision 非依存でテスト可能。</p>
+    <table>
+      <thead><tr><th>スイート</th><th>コマンド</th><th>結果</th></tr></thead>
+      <tbody>
+        <tr><td>ユニット</td><td><code>npm test</code></td><td class="ok">15 / 15</td></tr>
+        <tr><td>svgraph 流し込み</td><td><code>npm run verify:svgraph</code></td><td class="ok">9 / 9</td></tr>
+        <tr><td>実 OOXML ロバスト性</td><td><code>npm run verify:real</code></td><td class="ok">24 / 24</td></tr>
+        <tr><td>Gemma vision (実機)</td><td><code>examples/tone.ts</code></td><td class="ok">OK (cpu/q4)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <strong>@com-junkawasaki/office-style</strong> · style-ir/1 · MIT ·
+    <a href="../README.md">README</a> ·
+    <a href="./STATUS.md">STATUS</a> ·
+    <a href="./adr/0001-style-ir.md">ADR</a><br/>
+    OOXML 決定論抽出 + Gemma 4 vision。svgraph / office-causal の中間に位置し、
+    「visual からスタイルを抽出して IR 化する層」を埋める。
+  </div>
+</footer>
+
+</body>
+</html>
