@@ -4,6 +4,22 @@
 
 This repository is a superproject with many (and nested) submodules.
 
+- **`git pull` / `git submodule update --recursive` は shallow（`--depth 1`）を
+  デフォルトにする。** 巨大 superproject + 多数のネスト submodule で全履歴を取得
+  すると時間・帯域・ディスクを浪費するため、明示的に full 履歴が必要な場合
+  （`git bisect` / 古いコミットへの `git blame` / 履歴を跨ぐ調査）を除き、常に
+  `--depth 1` を付ける。fetch も `--depth 1` に揃える:
+
+  ```bash
+  git fetch --depth 1 origin
+  git pull --ff-only --depth 1
+  git submodule update --init --recursive --depth 1
+  ```
+
+  full 履歴が必要になったら、その時だけ対象を `git fetch --unshallow`（または
+  `--depth=<n>` で深掘り）して深くする。詳細は
+  `90-docs/adr/2606241600-shallow-depth1-git-default.md` を参照。
+
 - **常に `main` と同期し、乖離を作らない（最優先）。** 何らかの git 操作
   （pull / checkout / commit / branch 作業の開始など）を行う前に、上流 `main`
   に更新があれば必ず先に同期する。ローカルが `main` より遅れている状態
@@ -11,9 +27,9 @@ This repository is a superproject with many (and nested) submodules.
   新しい作業を積み上げない。fast-forward 可能なら `--ff-only` で取り込む:
 
   ```bash
-  git fetch origin
-  git pull --ff-only           # 乖離していなければ FF で取り込む
-  git submodule update --init --recursive
+  git fetch --depth 1 origin
+  git pull --ff-only --depth 1                       # 乖離していなければ FF で取り込む
+  git submodule update --init --recursive --depth 1
   ```
 
 - **`git push` の前に必ず `origin/main` との遅れを解消する。** push しようとする
@@ -55,29 +71,3 @@ This repository is a superproject with many (and nested) submodules.
   **想定内・無害**。これらは per-machine のローカルデータで origin から clone
   できない。`--force` で消したり報告だけで止めたりせず、他の submodule 更新を
   完遂させる（該当パスは未初期化のまま放置でよい）。
-
-## 大容量バイナリの扱い（B2 + DataLad、最優先）
-
-- **モデル重み / wasm / 動画 / 画像データセット等の大きなバイナリを git 履歴に
-  直接コミットしない。** これらは clone/pull を重くする最大要因（過去に
-  ai-gftd-apps=16G, ghosthacker=9.7G 等まで肥大）。新規に大容量データを置く必要が
-  あるときは **DataLad データセット + git-annex の Backblaze B2 (S3 互換) special
-  remote** を使う。実体は B2 へ push し、git にはポインタ(annex キー)だけ残す。
-
-  ```bash
-  B2_KEY_ID=... B2_APP_KEY=... B2_BUCKET=... \
-  B2_ENDPOINT=s3.us-west-004.backblazeb2.com \
-    scripts/datalad-b2-init.bb <dataset-dir> [remote-name]
-  # 以後: datalad save → datalad push --to b2 → datalad drop / datalad get
-  ```
-
-  B2 認証は環境変数のみで渡し、**リポジトリには秘密情報を一切コミットしない**。
-
-- **既存の重い submodule は shallow で運用する。** 履歴肥大が原因のものは
-  `submodule.<name>.shallow true`（ローカル `.git/config`）＋ `--depth 1` 再取得で
-  大幅に縮む（実績: ai-gftd-apps 16G→305M, ghosthacker 9.7G→736M,
-  spirit-in-physics 1.1G→62M）。現行ツリー自体が重いもの（画像同梱の
-  260208-spirit-in-physics 等）は shallow では縮まないため、将来的に上記
-  B2+DataLad へ移すのが望ましい。`submodule.fetchJobs 8` で update を並列化する。
-  なお shallow 化に伴う履歴書き換え＋force-push は**行わない**（main 乖離・共有
-  リポへの影響を避けるため、shallow 運用で対処する）。
