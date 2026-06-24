@@ -4,6 +4,43 @@
 
 This repository is a superproject with many (and nested) submodules.
 
+- **`git pull` / `git submodule update --recursive` は shallow（`--depth 1`）を
+  デフォルトにする。** 巨大 superproject + 多数のネスト submodule で全履歴を取得
+  すると時間・帯域・ディスクを浪費するため、明示的に full 履歴が必要な場合
+  （`git bisect` / 古いコミットへの `git blame` / 履歴を跨ぐ調査）を除き、常に
+  `--depth 1` を付ける。fetch も `--depth 1` に揃える:
+
+  ```bash
+  git fetch --depth 1 origin
+  git pull --ff-only --depth 1
+  git submodule update --init --recursive --depth 1
+  ```
+
+  full 履歴が必要になったら、その時だけ対象を `git fetch --unshallow`（または
+  `--depth=<n>` で深掘り）して深くする。詳細は
+  `90-docs/adr/2606241600-shallow-depth1-git-default.md` を参照。
+
+- **マージ / ancestry 判定をする時は、固定 depth を当て推量で増やさず
+  「merge-base を狙い撃ちで取得」する。** shallow なリポでマージや
+  `merge-base` / `--is-ancestor` / `rev-list --count` を行うと、共通祖先が
+  graft 境界の外にある場合に **`no merge base` で失敗するだけでなく、ancestry を
+  静かに誤判定する**（例: 純粋な前進を「系統分岐」と誤検出する）。`--depth 30`
+  等の固定値は「当たれば速い／外れると誤答 or 失敗」の博打で、誤答は depth 1 の
+  明示エラーより厄介。代わりに base を直接取る:
+
+  ```bash
+  # GitHub に full 履歴で merge-base を計算させ、その SHA だけピンポイント取得
+  BASE=$(gh api repos/<org>/<repo>/compare/main...<branch> --jq .merge_base_commit.sha)
+  git fetch --depth 1 origin "$BASE"      # 履歴が繋がり、判定が正しくなる
+  # 足りなければ --deepen=<n> / --shallow-since=<date> / 対象 ref だけ --unshallow
+  ```
+
+  さらに、**submodule ポインタの前進のような単純更新は、ローカルで shallow マージ
+  を戦うより GitHub API でサーバ側（full 履歴）に commit を起こす方が確実かつ安い**
+  （merge-base も ancestry もサーバが計算するため shallow 問題に触れない）。
+  実例: PR #61 / #62 は main の tree をベースに gitlink だけ差し替えた
+  クリーン commit を API で作成してマージした。
+
 - **常に `main` と同期し、乖離を作らない（最優先）。** 何らかの git 操作
   （pull / checkout / commit / branch 作業の開始など）を行う前に、上流 `main`
   に更新があれば必ず先に同期する。ローカルが `main` より遅れている状態
@@ -11,9 +48,9 @@ This repository is a superproject with many (and nested) submodules.
   新しい作業を積み上げない。fast-forward 可能なら `--ff-only` で取り込む:
 
   ```bash
-  git fetch origin
-  git pull --ff-only           # 乖離していなければ FF で取り込む
-  git submodule update --init --recursive
+  git fetch --depth 1 origin
+  git pull --ff-only --depth 1                       # 乖離していなければ FF で取り込む
+  git submodule update --init --recursive --depth 1
   ```
 
 - **`git push` の前に必ず `origin/main` との遅れを解消する。** push しようとする
