@@ -1,0 +1,68 @@
+{
+  "name": "@com-junkawasaki/office-style",
+  "version": "0.1.0",
+  "description": "Extract presentation tone / manner / style from .pptx into a single StyleIR: deterministic OOXML layer (theme colors, fonts, slide master/layout, placeholders, guides) + Gemma 4 vision interpretation layer.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "office-style": "dist/src/cli.js"
+  },
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/src/index.d.ts", "default": "./dist/src/index.js" },
+    "./browser": { "types": "./dist/src/browser.d.ts", "default": "./dist/src/browser.js" }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "ooxml",
+    "pptx",
+    "powerpoint",
+    "slide-master",
+    "theme",
+    "design-tokens",
+    "style-ir",
+    "transformers.js",
+    "gemma",
+    "webgpu"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/com-junkawasaki/office-style.git"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://npm.pkg.github.com"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "tsc -p tsconfig.json",
+    "gen:sample": "node scripts/gen-sample-pptx.mjs",
+    "demo": "node --import tsx examples/extract.ts",
+    "verify:svgraph": "npm run build && node examples/svgraph-roundtrip.mjs",
+    "verify:real": "npm run build && node examples/real-deck-sweep.mjs",
+    "test": "node --import tsx tests/extract.test.ts"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^4.5.0",
+    "fflate": "^0.8.2",
+    "zod": "^3.23.0"
+  },
+  "optionalDependencies": {
+    "@huggingface/transformers": "^4.2.0",
+    "@resvg/resvg-js": "^2.6.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.21",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.3"
+  }
+}
