@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# personal/bin/seal-evidence.sh — 法的証跡を改ざん不能で封緘し warehouse に取り込む
+# orgs/personal/bin/seal-evidence.sh — 法的証跡を改ざん不能で封緘し warehouse に取り込む
 #
 # ADR-0005 の custody パイプライン:
 #   1) SHA-256 を計算し manifest に記録
@@ -7,16 +7,16 @@
 #   3) git-annex add (内容アドレス化) → B2 へ暗号化コピー (ADR-0011: 公開網 pin は廃止)
 #
 # 使い方:
-#   personal/bin/seal-evidence.sh <case> <file> [<file> ...]
-#     <case> = rokes | aishisystem | ...   (personal/litigation/<case>/ に格納)
+#   orgs/personal/bin/seal-evidence.sh <case> <file> [<file> ...]
+#     <case> = rokes | aishisystem | ...   (orgs/personal/litigation/<case>/ に格納)
 # 例:
-#   personal/bin/seal-evidence.sh aishisystem ~/Downloads/添付資料.zip ~/Downloads/追加資料_20260226.zip
-#   personal/bin/seal-evidence.sh rokes ~/Downloads/takeout-rokes-*.tgz
+#   orgs/personal/bin/seal-evidence.sh aishisystem ~/Downloads/添付資料.zip ~/Downloads/追加資料_20260226.zip
+#   orgs/personal/bin/seal-evidence.sh rokes ~/Downloads/takeout-rokes-*.tgz
 #
 # 注意: ファイル本体は annex 化 (git には平文が乗らない)。manifest(.md/.json) は git 平文。
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"          # .../personal
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"          # .../orgs/personal
 REPO="$(cd "$ROOT/.." && pwd)"                                    # repo root
 
 [ $# -ge 2 ] || { echo "usage: $0 <case> <file> [file ...]" >&2; exit 2; }
@@ -52,7 +52,7 @@ for SRC in "$@"; do
 done
 
 echo "[seal] done. Next:"
-echo "  git -C $REPO annex add personal/litigation/$CASE/"
-echo "  git -C $REPO add personal/litigation/$CASE/MANIFEST.md personal/litigation/$CASE/*.ots 2>/dev/null"
-echo "  git -C $REPO annex copy personal/litigation/$CASE/ --to b2"
+echo "  git -C $REPO annex add orgs/personal/litigation/$CASE/"
+echo "  git -C $REPO add orgs/personal/litigation/$CASE/MANIFEST.md orgs/personal/litigation/$CASE/*.ots 2>/dev/null"
+echo "  git -C $REPO annex copy orgs/personal/litigation/$CASE/ --to b2"
 echo "  git -C $REPO commit -m 'evidence($CASE): seal + ingest (ADR-0005)'"

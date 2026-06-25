@@ -4,7 +4,7 @@ normalized SMS/contacts/call-log + a summary, mirroring the Android schema.
 
 iOS backups store every file by SHA1 under <UDID>/<ab>/<sha1>, indexed in
 Manifest.db (sqlite, table Files: fileID, domain, relativePath). We resolve the
-known dbs, parse them, and emit personal/device/iphone/{sms,call_log}.jsonl,
+known dbs, parse them, and emit orgs/personal/device/iphone/{sms,call_log}.jsonl,
 contacts.json, summary.json. Unencrypted backups only (encrypted -> reported).
 
 usage: parse-iphone-backup.py <backup-root-containing-UDID-dir> [out-dir]
@@ -12,7 +12,7 @@ usage: parse-iphone-backup.py <backup-root-containing-UDID-dir> [out-dir]
 import sys, os, sqlite3, json, plistlib, glob, datetime
 
 backup_root = sys.argv[1]
-out = sys.argv[2] if len(sys.argv) > 2 else "personal/device/iphone"
+out = sys.argv[2] if len(sys.argv) > 2 else "orgs/personal/device/iphone"
 # UDID dir = the single subdir holding Manifest.db
 udid_dirs = [d for d in glob.glob(os.path.join(backup_root, "*")) if os.path.isdir(d)
              and os.path.exists(os.path.join(d, "Manifest.db"))]

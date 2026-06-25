@@ -12,7 +12,7 @@
            [jakarta.mail.internet MimeMessage]
            [java.util Properties]))
 
-(def base "/Users/junkawasaki/github/com-junkawasaki/personal")
+(def base "/Users/junkawasaki/github/com-junkawasaki/orgs/personal")
 (def out-file "mail/bank-txns.jsonl")
 
 ;; ---------- host capabilities (I/O は library 外 = langchain-clj 設計) ----------

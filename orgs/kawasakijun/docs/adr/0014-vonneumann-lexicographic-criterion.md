@@ -47,7 +47,7 @@ Tier 2: W(τ) = αI + βR + γO    Tier 0/1 同値の中で従来の最適化
    - **Tier 1**: `00_nodoka_wellbeing`, `15_remarriage`, `16_more_children` (子・孫世代の形成)
    - Tier 2: その他すべて (訴訟・事業・研究 — 本人評価 hyp/lingling-bounded-loss と整合)
 2. **attention/queue は (tier, due) で並ぶ** — 期限が同じなら上位 tier が先。
-3. felt sense の記録: `personal/facts/kpi.jsonl` に
+3. felt sense の記録: `orgs/personal/facts/kpi.jsonl` に
    `{"metric": "wellbecoming.felt-sense", "value": 4, "at": "2026-06-11T22:00:00+09:00"}`
    を日次1行 (手動 or living system)。loader が kpi datoms 化し、
    `:guardrail/wellbecoming-floor` ビューが直近7日の min を返す。

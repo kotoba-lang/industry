@@ -45,6 +45,6 @@
  ;; content-addressing contract
  :content-addressing
  {:cid        "sha256 hex of the artifact bytes (.eml or attachment)"
-  :store      "personal/mail/messages/<cid>.eml  (git-annex MD5E -> B2/IPFS)"
-  :index      "personal/mail/messages/index.jsonl  (cid <-> message-id <-> thread <-> meta)"
+  :store      "orgs/personal/mail/messages/<cid>.eml  (git-annex MD5E -> B2/IPFS)"
+  :index      "orgs/personal/mail/messages/index.jsonl  (cid <-> message-id <-> thread <-> meta)"
   :blob-link  ":email/blob and :attachment/blob point to the :blob entity carrying annex-key"}}

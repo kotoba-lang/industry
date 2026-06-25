@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-05-30
 - Deciders: Jun Kawasaki
-- Implementation: `personal/` (this repo)
+- Implementation: `orgs/personal/` (this repo)
 - Related: ADR-0003 (warehouse: DataLad + git-annex + encrypted IPFS)
 
 ## 1. Context
@@ -64,7 +64,7 @@ ADR-0003 で個人データウェアハウスの保管・暗号化基盤を定�
 ### 2.3 配置
 
 ```
-personal/drive/
+orgs/personal/drive/
 ├─ files-inventory-full.json          # 全 620 件メタデータ (account=jun784)
 ├─ files-inventory-full-summary.json  # mimeType 別 + 高価値 id リスト
 └─ files/                             # 本体バイナリ (annex 化)
@@ -116,5 +116,5 @@ personal/drive/
 
 - ADR-0003 — warehouse 基盤 (DataLad + git-annex + encrypted IPFS)
 - `deps.edn :personal` / `:personal :account` — アカウント到達性 SSoT
-- `personal/analysis/2026-05-30_account-download.md` — 本ループの取得記録
-- `personal/drive/files-inventory-full.json` — Drive 全件メタデータ
+- `orgs/personal/analysis/2026-05-30_account-download.md` — 本ループの取得記録
+- `orgs/personal/drive/files-inventory-full.json` — Drive 全件メタデータ

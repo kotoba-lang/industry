@@ -8,7 +8,7 @@
          '[babashka.process :refer [shell sh]]
          '[clojure.string :as str])
 
-(def base "/Users/junkawasaki/github/com-junkawasaki/personal")
+(def base "/Users/junkawasaki/github/com-junkawasaki/orgs/personal")
 (def csv-file (str base "/inbox/mf-cashflow.csv"))
 (def ob-file (str base "/facts/obligations.jsonl"))
 (def banks-file (str base "/facts/bank-sources.edn"))
@@ -86,6 +86,6 @@
          (notify (str "取込失敗: " (ex-message e) " — 手動確認を"))))
 
   (>= (compare (str (java.time.LocalDate/now)) due) 0)
-  (notify "MoneyForward 入出金CSVが未エクスポートです → personal/inbox/mf-cashflow.csv (期限 6/19)")
+  (notify "MoneyForward 入出金CSVが未エクスポートです → orgs/personal/inbox/mf-cashflow.csv (期限 6/19)")
 
   :else nil)  ; 期限前で未着 — 静かに待つ

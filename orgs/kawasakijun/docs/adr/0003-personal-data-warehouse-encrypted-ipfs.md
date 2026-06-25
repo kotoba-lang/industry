@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-05-29
 - Deciders: Jun Kawasaki
-- Implementation: `personal/` (this repo)
+- Implementation: `orgs/personal/` (this repo)
 - Related: ADR-0001 (top-level orchestrator / sensors), ADR-0002 (pregel DAG)
 
 ## 1. Context
@@ -26,19 +26,19 @@ ADR-0001 で `com-junkawasaki` を最上位 orchestrator と定め、その入�
 
 ## 2. Decision
 
-`personal/` を **暗号化個人データウェアハウス** として構築する。
+`orgs/personal/` を **暗号化個人データウェアハウス** として構築する。
 
 1. **DataLad dataset**: この repo を `datalad create --force` で dataset 化。
    `origin` (GitHub) は `annex-ignore` とし、annex 実体は GitHub に送らない。
-2. **git-annex 管理**: `personal/**` のデータは annex (`annex.largefiles=anything`)。
+2. **git-annex 管理**: `orgs/personal/**` のデータは annex (`annex.largefiles=anything`)。
    git にはポインタ (symlink) のみ → **GitHub に平文が乗らない**。
    スクリプト/README/ADR は git 平文 (PII 無し)。
 3. **暗号 = gpg + git-annex `encryption=hybrid`**:
    - 鍵 `09EE841334482F5A0F5C4958A70BB2C220DE88CA` (暗号副鍵 `D1CA341CF2327694`)。
    - パスフレーズは **macOS Keychain** 項目 `gpg:personal-data` に保管 (Touch ID 保護)。
-   - 非対話運用: `personal/bin/gpg-unlock.sh` (Keychain → gpg-agent preset)。
+   - 非対話運用: `orgs/personal/bin/gpg-unlock.sh` (Keychain → gpg-agent preset)。
    - **復旧鍵 = 1Password** (Private vault, armored 秘密鍵 + パスフレーズ)。ディスク .asc は安全消去。
-4. **IPFS special remote (external, 自作)**: `personal/bin/git-annex-remote-ipfs`。
+4. **IPFS special remote (external, 自作)**: `orgs/personal/bin/git-annex-remote-ipfs`。
    git-annex が `hybrid` で **暗号化した後** の暗号文だけを `ipfs add --pin`。
    key→CID は git-annex branch の SETSTATE で版管理。**平文は IPFS に出ない**。
 5. **取り込み範囲 (合意)**: 端末情報 / Gmail / Calendar / Drive / アカウント情報。
@@ -47,7 +47,7 @@ ADR-0001 で `com-junkawasaki` を最上位 orchestrator と定め、その入�
 ### Layout
 
 ```
-personal/
+orgs/personal/
 ├─ bin/{git-annex-remote-ipfs, ingest-device.sh, gpg-unlock.sh}   # git 平文
 ├─ device/    OS / hardware / packages / dotfiles / disk / env-names
 ├─ mail/      Gmail labels(107) + recent-activity
@@ -63,7 +63,7 @@ personal/
 sensors (Gmail/Calendar/Drive/gh/device)
         │  ingest (MCP / gh / scripts)
         ▼
-   personal/<domain>/  ── git-annex add ──▶  annex object (plaintext, local disk)
+   orgs/personal/<domain>/  ── git-annex add ──▶  annex object (plaintext, local disk)
         │                                          │
    git (pointer only) ──▶ GitHub private           │ git annex copy --to ipfs
                                                     ▼
@@ -109,19 +109,19 @@ sensors (Gmail/Calendar/Drive/gh/device)
 
 ## 5. Implementation status
 
-- ✅ datalad dataset 化 + `personal/` 構造 + annex ルール
+- ✅ datalad dataset 化 + `orgs/personal/` 構造 + annex ルール
 - ✅ gpg 鍵生成 → パスフレーズ付与 → Keychain 保管 → 復旧鍵を 1Password (Private) に保管
 - ✅ 暗号化 IPFS external special remote (自作) + 往復・暗号文検証
 - ✅ ingest (12 loop, subagent fan-out): Mac端末 / **Android (Pixel 10 Pro Fold: getprop/packages/SMS本文550/通話377/連絡先)** / Gmail(2019〜) / Calendar(2023〜) / Drive(目録620 + 実書類47) / GitHub / **1Password(1287, メタデータのみ)**
 - ✅ **132 ファイルを暗号化して IPFS に pin** (平文リーク 0 を検証; git は annex symlink のみ)
 - ✅ 派生分析: INDEX/catalog, observations(§1-35), financial-summary, loan-ledger(¥10.75M), subscription-audit, entities(人29/組織55), **action-register(P0=7)**, sms-finance-timeline
-- ⚠️ **並行ライター注意**: 別セッション/オーケストレータが同 repo の `personal/drive/files/` 実書類ダウンロードと deps.edn/ADR-0004 を並行更新。push 前に annex symlink(mode 120000)であることを必ず検証する運用とする。
+- ⚠️ **並行ライター注意**: 別セッション/オーケストレータが同 repo の `orgs/personal/drive/files/` 実書類ダウンロードと deps.edn/ADR-0004 を並行更新。push 前に annex symlink(mode 120000)であることを必ず検証する運用とする。
 - ⏳ ingest の `datalad run` 化 (provenance 記録) / Pregel sensor 連携 / iCloud Keychain 多端末同期 / 他 Google アカウント(jk.luxury 等, ADR-0004)の取り込み
 
 ## 6. References
 
-- `personal/README.md` — 運用手順 (ingest / 暗号化 / pin / 復号 / 復旧)
-- `personal/analysis/observations.md` — 初期分析
+- `orgs/personal/README.md` — 運用手順 (ingest / 暗号化 / pin / 復号 / 復旧)
+- `orgs/personal/analysis/observations.md` — 初期分析
 - ADR-0001 — sensor 層を定義した上位 ADR
 - ADR-0004 — アカウント到達性 (single-OAuth 制約) とファイル本体キャプチャ tier 方針
 - git-annex external special remote protocol / DataLad handbook

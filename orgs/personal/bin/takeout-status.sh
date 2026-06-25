@@ -2,7 +2,7 @@
 # takeout-status.sh — progress of the Takeout ingest (parts ingested, files on B2, disk, queue).
 # Jobs/accounts come from accounts/registry.edn via bin/registry.
 REPO=/Users/junkawasaki/github/com-junkawasaki
-REGISTRY="$REPO/personal/bin/registry"
+REGISTRY="$REPO/orgs/personal/bin/registry"
 LEDGER="$HOME/.takeout-watcher/processed.log"
 cd "$REPO" || exit 1
 
@@ -12,7 +12,7 @@ printf "disk free: %sG\n\n" "$(df -g /System/Volumes/Data | tail -1 | awk '{prin
 
 while IFS=$'\t' read -r prefix acct total note; do
   parts=$(grep -c "$prefix" "$LEDGER" 2>/dev/null)
-  d=$(ls -d personal/takeout/$acct/* 2>/dev/null | head -1)
+  d=$(ls -d orgs/personal/takeout/$acct/* 2>/dev/null | head -1)
   if [ -n "$d" ]; then
     onb2=$(git annex find "$d" --in b2 2>/dev/null | wc -l | tr -d ' ')
   else onb2=0; fi

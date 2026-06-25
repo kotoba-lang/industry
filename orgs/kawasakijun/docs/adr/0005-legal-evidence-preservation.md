@@ -38,7 +38,7 @@ OU=root, 作成 2023-12-27, Gmail 77MB / Drive 6MB, Business Standard）の
    Business Standard は Vault 非対応のため対象 1 ユーザーを Business Plus 等へ。
    eDiscovery エクスポートは監査ログ・ハッシュ付き。
 4. **改ざん不能の封緘**：取得物に SHA-256 を計算し OpenTimestamps（オンチェーン
-   存在証明）または RFC3161 TSA でタイムスタンプ。`personal/litigation/` 配下の
+   存在証明）または RFC3161 TSA でタイムスタンプ。`orgs/personal/litigation/` 配下の
    **git-annex（キー＝コンテンツハッシュ）**に取り込み custody chain を担保。
 5. **保全方法は代理人主導**：提出形式・ホールド要否は ZeLo / AMT の指示に従う
    （admissibility に影響するため）。
@@ -58,9 +58,9 @@ OU=root, 作成 2023-12-27, Gmail 77MB / Drive 6MB, Business Standard）の
 - 進行中：管理コンソールの「データのエクスポート」画面まで遷移、Google の
   パスキー段階認証で停止（本人による認証待ち）。
 - 次アクション：(a) 本人がパスキー認証 → データエクスポート実行 →
-  (b) Claude が SHA-256 封緘 + OpenTimestamps + `personal/litigation/rokes/` 取り込み。
-- 関連：`kawasakijun/litigation_state.edn` `:kj/evidence_ledger` /
-  `kj:lit/rokes-hec`、`personal/analysis/observations.md` loop #7。
+  (b) Claude が SHA-256 封緘 + OpenTimestamps + `orgs/personal/litigation/rokes/` 取り込み。
+- 関連：`orgs/kawasakijun/litigation_state.edn` `:kj/evidence_ledger` /
+  `kj:lit/rokes-hec`、`orgs/personal/analysis/observations.md` loop #7。
 
 ## Alternatives considered
 

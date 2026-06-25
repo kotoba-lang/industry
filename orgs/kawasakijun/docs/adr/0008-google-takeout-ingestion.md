@@ -36,16 +36,16 @@
 2. **part 単位 streaming pipeline**（peak disk ≈ 1 part）：
    `~/Downloads の takeout-*.zip → ditto 展開(Unicode安全) → git annex add(MD5E)
    → git annex copy --to b2 -J8(hybrid暗号) → git annex drop`。
-3. **watcher 常駐**（`personal/bin/takeout-watcher.sh`）：job-timestamp prefix で
-   account 振り分け（registry 駆動 `personal/bin/registry takeout-jobs`、毎パス再読込）、
+3. **watcher 常駐**（`orgs/personal/bin/takeout-watcher.sh`）：job-timestamp prefix で
+   account 振り分け（registry 駆動 `orgs/personal/bin/registry takeout-jobs`、毎パス再読込）、
    `~/.takeout-watcher/processed.log` で冪等、`(1)` 重複は正規化して skip、
    毎パス Keychain から gpg passphrase を gpg-agent に preset（2h cache 対策）。
-   進捗は `personal/bin/takeout-status.sh`。
+   進捗は `orgs/personal/bin/takeout-status.sh`。
 4. **gpg passphrase 非対話 unlock**：`security find-generic-password -s gpg:personal-data`
    → `gpg-preset-passphrase`（agent の `allow-preset-passphrase` 利用）。GUI へ打鍵しない。
 5. **役割分担**：download（passkey 認証込み）はユーザがブラウザで実施、後段は watcher が自動処理。
 6. **part 41（261.7GB）は外付けドライブ保留**（≥300GB を staging に充ててから annex→B2→drop）。
-7. **配置**：`personal/takeout/<account>/<YYYY-MM-DD>/Takeout/`。`personal/.gitattributes`
+7. **配置**：`orgs/personal/takeout/<account>/<YYYY-MM-DD>/Takeout/`。`orgs/personal/.gitattributes`
    により全データ annex+暗号、平文は GitHub に載らない（ADR-0003/0004/0005 準拠）。
 
 ## Consequences

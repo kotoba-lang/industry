@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 from email.parser import BytesParser
 from email.policy import default as default_policy
 
-BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # personal/
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # orgs/personal/
 MSGDIR = os.path.join(BASE, "mail", "messages")
 INDEX = os.path.join(MSGDIR, "index.jsonl")
 API = "https://graph.microsoft.com/v1.0"

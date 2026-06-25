@@ -5,7 +5,7 @@
 - **Deciders**: 河崎純真 (jun784@gmail.com)
 - **Context tags**: personal-warehouse, multi-account, gmail-api, msgraph, oauth, keychain, launchd, git-annex, backblaze-b2, registry-driven
 - **Related**: ADR-0003（暗号化 IPFS warehouse）, ADR-0004（account scope & file body）, ADR-0008（Google Takeout 取り込み）
-- **Implementation**: `personal/accounts/registry.edn`, `personal/bin/{registry,google-auth.py,msgraph-auth.py,ingest-gmail-batch.py,ingest-graph-mail.py,mail-sync.sh}`, `personal/bin/launchd/com.junkawasaki.mail-sync.plist`
+- **Implementation**: `orgs/personal/accounts/registry.edn`, `orgs/personal/bin/{registry,google-auth.py,msgraph-auth.py,ingest-gmail-batch.py,ingest-graph-mail.py,mail-sync.sh}`, `orgs/personal/bin/launchd/com.junkawasaki.mail-sync.plist`
 
 ## Context
 
@@ -43,21 +43,21 @@ ADR-0008 の Takeout は**一括バックフィル**には適すが、(a) part �
 
 ### 1. アカウントレジストリをコード化（宣言的・単一の真実源）
 
-`personal/accounts/registry.edn`（git 平文・**secret 無し**）に 5 アカウントと
+`orgs/personal/accounts/registry.edn`（git 平文・**secret 無し**）に 5 アカウントと
 Takeout job ルーティング、`[accounts.<slug>.mail]`（`sync` / `window` / `authorized`）を宣言。
-`personal/bin/registry`（python3/tomllib）が bash 向け TSV で供給
+`orgs/personal/bin/registry`（python3/tomllib）が bash 向け TSV で供給
 （`accounts` / `mail-accounts` / `email` / `takeout-jobs` …）。watcher・mail-sync・auth
 スクリプトは全てここを読む。ADR-0008 の watcher も registry 駆動に一般化済み（毎パス再読込）。
 
 ### 2. per-account OAuth、token は Keychain のみ
 
-- **Google**: `personal/bin/google-auth.py`。GCP project `personal-warehouse-jk`
+- **Google**: `orgs/personal/bin/google-auth.py`。GCP project `personal-warehouse-jk`
   （Gmail/Calendar/Drive API 有効化、consent=External/Testing、4 Google を test user 登録）、
   **デスクトップ client**。`client-set` で client(JSON) を Keychain
   `google-oauth-client` へ取り込み JSON は安全削除。`login <slug>` は **loopback
   (127.0.0.1) authorization-code flow**（access_type=offline, prompt=consent）で
   refresh token を `google-oauth:<slug>` へ格納。`token <slug>` が都度 access token を mint。
-- **Microsoft**: `personal/bin/msgraph-auth.py`。Entra **public client** の
+- **Microsoft**: `orgs/personal/bin/msgraph-auth.py`。Entra **public client** の
   **device-code flow**（secret 無し）。MS は refresh token を毎回ローテートするため
   都度 `msgraph-oauth:<slug>` を更新。
 - scope は read-only（gmail/calendar/drive.metadata、Graph は Mail.Read/Calendars.Read/Files.Read/User.Read）。
@@ -73,7 +73,7 @@ Takeout job ルーティング、`[accounts.<slug>.mail]`（`sync` / `window` / 
 
 ### 4. 定期実行と封緘（launchd 日次）
 
-`personal/bin/mail-sync.sh`：registry の `mail.sync=true` を走査 → token mint →
+`orgs/personal/bin/mail-sync.sh`：registry の `mail.sync=true` を走査 → token mint →
 `newer_than:<window>` のスライディング窓で差分 ingest（窓重複は冪等で無害）→
 `git annex add` → `git annex copy --to b2`（hybrid 暗号）→ pointer を commit。
 annex 管理の `index.jsonl` は get→unlock→追記→re-lock のラウンドトリップで扱う。
@@ -102,7 +102,7 @@ gpg passphrase は ADR-0008 同様 Keychain `gpg:personal-data` から gpg-agent
 ### 実装更新（2026-06-12）
 
 - **実行系を babashka(Clojure) に統合**: `mail-sync.sh`+`ingest-gmail-batch.py` →
-  `personal/bin/mail-sync.bb` 1 本（index.jsonl は byte 互換）。launchd を **15 分間隔**
+  `orgs/personal/bin/mail-sync.bb` 1 本（index.jsonl は byte 互換）。launchd を **15 分間隔**
   + bb 実行 + `EnvironmentVariables PATH` 修正（旧 07:30 cron は launchd 最小 PATH で
   git-annex 解決失敗＝0 件同期だった）。書込パス 2 バグ修正（① index が annex lock の
   まま append が無に帰す → unlock 検証を追加、② 新着 .eml が既存 locked symlink で

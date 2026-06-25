@@ -185,7 +185,7 @@
  {:db/ident :step/status       :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":blocked-on-human :pending :ready :done :skipped"}
  {:db/ident :step/needs        :db/valueType :db.type/ref     :db/cardinality :db.cardinality/many :db/doc "prerequisite steps"}
 
- ;; ---------- prov (minimal embedded provenance; full detail in personal/prov/*.prov.jsonld) ----------
+ ;; ---------- prov (minimal embedded provenance; full detail in orgs/personal/prov/*.prov.jsonld) ----------
  {:db/ident :prov/derived-from :db/valueType :db.type/ref     :db/cardinality :db.cardinality/many :db/doc "fact -> source entity (email/blob/decision)"}
  {:db/ident :prov/activity     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one  :db/doc "e.g. \"mail-sync.sh@2026-06-11\", \"claude-extract/adr-0010\""}
  {:db/ident :prov/agent        :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one  :db/doc ":jun :launchd :claude :manimani"}]

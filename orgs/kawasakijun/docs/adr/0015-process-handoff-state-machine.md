@@ -49,5 +49,5 @@ process は順序付き step の列。各 step は:
 - 悪: プロセス定義の保守。status の手動更新 (将来 manimani/living で自動化)。
 
 ## ファイル
-- `personal/facts/processes.edn` — capability ポリシ + process/step 定義 (SSoT)
-- `personal/bin/datomic/queries/process.edn` — next-human / claude-ready / agent-prohibited
+- `orgs/personal/facts/processes.edn` — capability ポリシ + process/step 定義 (SSoT)
+- `orgs/personal/bin/datomic/queries/process.edn` — next-human / claude-ready / agent-prohibited

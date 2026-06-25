@@ -66,5 +66,5 @@ ingest-eml.py で cid 化し、:prov/derived-from で engi entry に紐付ける
 
 ## ファイル
 
-- `personal/facts/engi.edn` — 評価の SSoT (annex/暗号化)
-- `personal/bin/datomic/queries/engi.edn` — sever-queue / legal-holds / savings ビュー
+- `orgs/personal/facts/engi.edn` — 評価の SSoT (annex/暗号化)
+- `orgs/personal/bin/datomic/queries/engi.edn` — sever-queue / legal-holds / savings ビュー

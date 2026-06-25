@@ -1,4 +1,4 @@
-# kawasakijun/ — 河崎純真 活動・経路スタック
+# orgs/kawasakijun/ — 河崎純真 活動・経路スタック
 
 `/origins` (Ghost Hacker フィクション素材) には個人プロフィールは無いため、
 このディレクトリで河崎純真個人の **profile / activities / roadmap** を構造化し、
@@ -45,7 +45,7 @@ W(τ) = α·I(τ) + β·R(τ) + γ·O(τ)、𝒲 = ∫ w(τ) W(τ) d ln τ を�
 ## 使い方
 
 ```bash
-bb kawasakijun/pregel_planner.clj --tau month --horizon 12
+bb orgs/kawasakijun/pregel_planner.clj --tau month --horizon 12
 ```
 
 出力: 各 τ の推奨アクション列、W(τ) 推移、ボトルネック vertex。

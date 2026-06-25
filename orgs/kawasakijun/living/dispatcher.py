@@ -79,8 +79,8 @@ Pick up this node. Implement / progress it in this repo. Tag this issue
 as `completion: true` when done, or comment with progress updates.
 
 ### Tracking
-This issue is tracked in `kawasakijun/living/.audit.jsonl` and
-`kawasakijun/reverse_topo_pregel.py`.
+This issue is tracked in `orgs/kawasakijun/living/.audit.jsonl` and
+`orgs/kawasakijun/reverse_topo_pregel.py`.
 """
     return {
         "repo": repo["full_name"],

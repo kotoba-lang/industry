@@ -15,4 +15,4 @@ gpgconf --launch gpg-agent
 gpg --batch --with-keygrip --list-secret-keys "$KEYID" 2>/dev/null \
   | awk '/Keygrip/ {print $3}' \
   | while read -r KG; do "$PRESET" --preset -P "$PASS" "$KG"; done
-echo "gpg-agent primed for $KEYID. You can now: git annex get/copy personal/ ..."
+echo "gpg-agent primed for $KEYID. You can now: git annex get/copy orgs/personal/ ..."

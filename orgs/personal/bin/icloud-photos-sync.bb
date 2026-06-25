@@ -10,7 +10,7 @@
          '[clojure.java.io :as io]
          '[cheshire.core :as json])
 
-(def base "/Users/junkawasaki/github/com-junkawasaki/personal")
+(def base "/Users/junkawasaki/github/com-junkawasaki/orgs/personal")
 (def root "/Users/junkawasaki/github/com-junkawasaki")
 (def icloud (str (System/getProperty "user.home") "/Library/Mobile Documents/com~apple~CloudDocs"))
 (def oxp (str (System/getProperty "user.home") "/.venvs/osxphotos/bin/osxphotos"))
@@ -29,15 +29,15 @@
 
 ;; ---------- iCloud Drive 分類 (downloads/icloud と同方針) ----------
 (def rules
-  [[#"notahotel|profit_and_loss|損益"       "personal/litigation/lingling/evidence/finance"]
-   [#"Doshisha|IOWN|Project_(Finance|Plan)" "personal/research/doshisha-iown"]
-   [#"voicemail|Voicemail|留守"             "personal/voicemail"]
-   [#"\.cer$|\.pem$|/keys/"                 "personal/_keys/icloud"]
-   [#"ScanSnap|scan"                        "personal/drive/_intake/scansnap"]
+  [[#"notahotel|profit_and_loss|損益"       "orgs/personal/litigation/lingling/evidence/finance"]
+   [#"Doshisha|IOWN|Project_(Finance|Plan)" "orgs/personal/research/doshisha-iown"]
+   [#"voicemail|Voicemail|留守"             "orgs/personal/voicemail"]
+   [#"\.cer$|\.pem$|/keys/"                 "orgs/personal/_keys/icloud"]
+   [#"ScanSnap|scan"                        "orgs/personal/drive/_intake/scansnap"]
    [#"\.m4a$|\.mp3$"                         "orgs/com-junkawasaki/yukkuri-assets-nist-csf-cis-scs/_intake"]])
 (defn classify [rel]
   (or (some (fn [[re d]] (when (re-find re rel) d)) rules)
-      "personal/drive/_intake/icloud"))
+      "orgs/personal/drive/_intake/icloud"))
 
 (defn- dataless?
   "iCloud退避ファイル = ローカルブロック0 (stat -f %b)。ブロッキング読込を避けるための判定。"
@@ -92,19 +92,19 @@
       :local-only (do (.mkdirs outdir)
                       (shell oxp "export" (.getPath outdir) "--skip-missing" "--update"
                              "--dirtemplate" "{created.year}/{created.mm}" "--mute")
-                      (shell {:dir root} "git" "annex" "add" "personal/photos/originals")
-                      (shell {:dir root :continue true} "git" "commit" "-m" "sync(photos): local originals" "personal/photos/originals"))
+                      (shell {:dir root} "git" "annex" "add" "orgs/personal/photos/originals")
+                      (shell {:dir root :continue true} "git" "commit" "-m" "sync(photos): local originals" "orgs/personal/photos/originals"))
       :windowed (let [win (or (System/getenv "PHOTOS_WINDOW") "2026-01-01")]
                   (.mkdirs outdir)
                   (shell oxp "export" (.getPath outdir) "--from-date" win "--download-missing" "--update"
                          "--dirtemplate" "{created.year}/{created.mm}" "--mute")
-                  (shell {:dir root} "git" "annex" "add" "personal/photos/originals")
-                  (shell {:dir root :continue true} "git" "commit" "-m" (str "sync(photos): window from " win) "personal/photos/originals"))
+                  (shell {:dir root} "git" "annex" "add" "orgs/personal/photos/originals")
+                  (shell {:dir root :continue true} "git" "commit" "-m" (str "sync(photos): window from " win) "orgs/personal/photos/originals"))
       :full (do (.mkdirs outdir)
                 (shell oxp "export" (.getPath outdir) "--download-missing" "--update"
                        "--dirtemplate" "{created.year}/{created.mm}" "--mute")
-                (shell {:dir root} "git" "annex" "add" "personal/photos/originals")
-                (shell {:dir root :continue true} "git" "commit" "-m" "sync(photos): full originals" "personal/photos/originals"))
+                (shell {:dir root} "git" "annex" "add" "orgs/personal/photos/originals")
+                (shell {:dir root :continue true} "git" "commit" "-m" "sync(photos): full originals" "orgs/personal/photos/originals"))
       (println "  unknown policy — skip"))))
 
 (defn -main [& _]
@@ -114,10 +114,10 @@
     (sync-icloud-drive! existing)
     (sync-photos! existing))
   ;; 索引の commit (常に)
-  (let [st (:out (sh {:dir root} "git" "status" "--short" "personal/photos/index.jsonl"))]
+  (let [st (:out (sh {:dir root} "git" "status" "--short" "orgs/personal/photos/index.jsonl"))]
     (when (seq (str/trim st))
-      (shell {:dir root} "git" "annex" "add" "personal/photos/index.jsonl")
-      (shell {:dir root :continue true} "git" "commit" "-m" "sync(photos): 索引更新" "personal/photos/index.jsonl")))
+      (shell {:dir root} "git" "annex" "add" "orgs/personal/photos/index.jsonl")
+      (shell {:dir root :continue true} "git" "commit" "-m" "sync(photos): 索引更新" "orgs/personal/photos/index.jsonl")))
   (println "done."))
 
 (-main)

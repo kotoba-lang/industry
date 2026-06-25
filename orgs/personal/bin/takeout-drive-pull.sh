@@ -6,7 +6,7 @@
 #   -> takeout-watcher.sh が展開 -> git annex add -> copy --to b2 -> drop
 #
 # zip 以外の同梱 loose ファイル（.mbox/.duckdb/.mp4 等、Takeout が zip 外に
-# 出した >2GB 品）は personal/takeout/<acct>/<date>/drive-loose/ に置いて
+# 出した >2GB 品）は orgs/personal/takeout/<acct>/<date>/drive-loose/ に置いて
 # このスクリプト自身が annex -> b2 -> drop する。
 # .vmdk 等 SKIP_GB 超は内蔵ディスクに載らないためスキップして報告のみ。
 #
@@ -107,7 +107,7 @@ while IFS=$'\t' read -r size name; do
       fi
       ;;
     *)
-      dest="personal/takeout/$ACCT/$DATE/drive-loose"
+      dest="orgs/personal/takeout/$ACCT/$DATE/drive-loose"
       mkdir -p "$REPO/$dest"
       log "PULL loose ${gb}G: $name"
       if rclone copy "$REMOTE" --drive-root-folder-id "$FOLDER_ID" \
