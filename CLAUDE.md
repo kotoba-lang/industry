@@ -20,6 +20,27 @@ This repository is a superproject with many (and nested) submodules.
   `--depth=<n>` で深掘り）して深くする。詳細は
   `90-docs/adr/2606241600-shallow-depth1-git-default.md` を参照。
 
+- **マージ / ancestry 判定をする時は、固定 depth を当て推量で増やさず
+  「merge-base を狙い撃ちで取得」する。** shallow なリポでマージや
+  `merge-base` / `--is-ancestor` / `rev-list --count` を行うと、共通祖先が
+  graft 境界の外にある場合に **`no merge base` で失敗するだけでなく、ancestry を
+  静かに誤判定する**（例: 純粋な前進を「系統分岐」と誤検出する）。`--depth 30`
+  等の固定値は「当たれば速い／外れると誤答 or 失敗」の博打で、誤答は depth 1 の
+  明示エラーより厄介。代わりに base を直接取る:
+
+  ```bash
+  # GitHub に full 履歴で merge-base を計算させ、その SHA だけピンポイント取得
+  BASE=$(gh api repos/<org>/<repo>/compare/main...<branch> --jq .merge_base_commit.sha)
+  git fetch --depth 1 origin "$BASE"      # 履歴が繋がり、判定が正しくなる
+  # 足りなければ --deepen=<n> / --shallow-since=<date> / 対象 ref だけ --unshallow
+  ```
+
+  さらに、**submodule ポインタの前進のような単純更新は、ローカルで shallow マージ
+  を戦うより GitHub API でサーバ側（full 履歴）に commit を起こす方が確実かつ安い**
+  （merge-base も ancestry もサーバが計算するため shallow 問題に触れない）。
+  実例: PR #61 / #62 は main の tree をベースに gitlink だけ差し替えた
+  クリーン commit を API で作成してマージした。
+
 - **常に `main` と同期し、乖離を作らない（最優先）。** 何らかの git 操作
   （pull / checkout / commit / branch 作業の開始など）を行う前に、上流 `main`
   に更新があれば必ず先に同期する。ローカルが `main` より遅れている状態
@@ -71,3 +92,29 @@ This repository is a superproject with many (and nested) submodules.
   **想定内・無害**。これらは per-machine のローカルデータで origin から clone
   できない。`--force` で消したり報告だけで止めたりせず、他の submodule 更新を
   完遂させる（該当パスは未初期化のまま放置でよい）。
+
+## 大容量バイナリの扱い（B2 + DataLad、最優先）
+
+- **モデル重み / wasm / 動画 / 画像データセット等の大きなバイナリを git 履歴に
+  直接コミットしない。** これらは clone/pull を重くする最大要因（過去に
+  ai-gftd-apps=16G, ghosthacker=9.7G 等まで肥大）。新規に大容量データを置く必要が
+  あるときは **DataLad データセット + git-annex の Backblaze B2 (S3 互換) special
+  remote** を使う。実体は B2 へ push し、git にはポインタ(annex キー)だけ残す。
+
+  ```bash
+  B2_KEY_ID=... B2_APP_KEY=... B2_BUCKET=... \
+  B2_ENDPOINT=s3.us-west-004.backblazeb2.com \
+    scripts/datalad-b2-init.bb <dataset-dir> [remote-name]
+  # 以後: datalad save → datalad push --to b2 → datalad drop / datalad get
+  ```
+
+  B2 認証は環境変数のみで渡し、**リポジトリには秘密情報を一切コミットしない**。
+
+- **既存の重い submodule は shallow で運用する。** 履歴肥大が原因のものは
+  `submodule.<name>.shallow true`（ローカル `.git/config`）＋ `--depth 1` 再取得で
+  大幅に縮む（実績: ai-gftd-apps 16G→305M, ghosthacker 9.7G→736M,
+  spirit-in-physics 1.1G→62M）。現行ツリー自体が重いもの（画像同梱の
+  260208-spirit-in-physics 等）は shallow では縮まないため、将来的に上記
+  B2+DataLad へ移すのが望ましい。`submodule.fetchJobs 8` で update を並列化する。
+  なお shallow 化に伴う履歴書き換え＋force-push は**行わない**（main 乖離・共有
+  リポへの影響を避けるため、shallow 運用で対処する）。
