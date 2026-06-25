@@ -1,11 +1,17 @@
 ---
 id: adr-2606250956-browser-agent-clj-genspark-style-super-agent
 title: "ADR-2606250956: browser-agent-clj — genspark 風 super-agent（自前 browser 所有）を cljc/cljs + Datomic で設計"
-status: proposed
+status: accepted
 doc_type: adr
 topic: super-agent-runtime
 authoritative: true
 last_verified: 2026-06-25
+implemented: 2026-06-25
+implementation:
+  repo: com-junkawasaki/browser-agent-clj
+  submodule: orgs/com-junkawasaki/browser-agent-clj
+  pinned: c7bf2b2
+  landed_via: "com-junkawasaki/root PR #71 (merge 2fdc7eb)"
 authoritative_for:
   - genspark 風「汎用 super-agent」を com-junkawasaki に OSS 部品として新設する判断
   - agent が *自前で browser を所有・管理する*（owned/managed browser）設計
@@ -25,9 +31,15 @@ superseded_by: []
 
 # ADR-2606250956: browser-agent-clj — genspark 風 super-agent（自前 browser 所有）を cljc/cljs + Datomic で設計
 
-**Status**: proposed
+**Status**: accepted — **実装済み・main マージ済み**（2026-06-25）
 **Date**: 2026-06-25
 **Deciders**: Jun Kawasaki
+
+> **実装サマリ（2026-06-25）**: `com-junkawasaki/browser-agent-clj` を新設し
+> （MIT, public）、superproject に submodule 登録（`orgs/com-junkawasaki/browser-agent-clj`,
+> pin `c7bf2b2`）。本体 P0–P3 + 自前 browser 層を `.cljc` で実装、**end-to-end
+> テスト 19 assertions / 0 failures**、オフライン mock デモ動作。詳細は末尾
+> 「実装状況」を参照。
 
 ## Context
 
@@ -236,15 +248,20 @@ browser-agent-clj/
 
 ## ロードマップ（段階導入）
 
-- **P0 — supervisor MVP**: planner なしで router→web sub-agent→aggregator。
-  既存 browser-use-clj を subgraph 化。mock browser で e2e デモ。
-- **P1 — owned browser**: `browser/provider`+`session`+`live`。JVM Playwright で
-  agent 専用 Chromium 起動・プロファイル所有・screencast 配信・take-over。
-- **P2 — planner + memory**: plan-and-execute、semantic memory を datom 化、replan。
-- **P3 — fleet 拡張**: research / coder(kotoba-WASM exec) / author sub-agent。
-- **P4 — cljs UI**: 計画ツリー + **browser ライブビュー** + artifact プレビュー。
-- **P5 — MCP bridge + MoA**: ツールエコシステム拡張、multi-model ルーティング/cross-check。
-- **P6 — etzhayyim デプロイ**: 特定ミッションの organism として常駐稼働。
+- ✅ **P0 — supervisor MVP**: router→web sub-agent→aggregator を langgraph
+  StateGraph で。browser-use-clj を web sub-agent として組み込み。mock で e2e。
+- ◐ **P1 — owned browser**: `browser/provider`+`session`+`live` 実装済み
+  （mock provider 同梱・session を `:browser/*` datom 化・live frame 発火・
+  take-over ラッチ）。**JVM Playwright provider はスケッチのみ（未実装、次段）**。
+- ✅ **P2 — planner + memory**: plan-and-execute、`:plan/*`/semantic memory を
+  datom 化、replan フック。
+- ✅ **P3 — fleet**: web / research / coder / author sub-agent（後3者は langgraph
+  ReAct + 注入 host fn）。
+- ◐ **P4 — cljs UI**: reagent ビュー + 共有 `events.cljc` + shadow-cljs/HTML を
+  scaffold 済み。**ビルド配線（npm/shadow）は未実施。**
+- ☐ **P5 — MCP bridge + MoA 拡張**: `mcp.cljc`（MCP 橋渡し）と multi-model
+  ルーティング/cross-check は未着手。
+- ☐ **P6 — etzhayyim デプロイ**: 特定ミッションの organism として常駐稼働。
 
 ## genspark 機能 → 本設計の対応
 
@@ -254,29 +271,53 @@ browser-agent-clj/
 | Mixture-of-Agents（複数 LLM + supervisor） | `supervisor.cljc`（router/aggregator + `:models` 注入） |
 | Super Agent（自律マルチステップ） | `planner.cljc` + langgraph interrupt/checkpoint |
 | agentic browsing | `web` sub-agent = browser-use-clj（owned browser 上で動作） |
-| 80+ tools | `tools.cljc` + `mcp.cljc`（MCP 橋渡し） |
+| 80+ tools | `tools.cljc`（実装）+ `mcp.cljc`（MCP 橋渡し, P5 未着手） |
 | 成果物生成（slides/sheets/page…） | `author` sub-agent + `:artifact/*` datoms |
 | factuality / cross-check | aggregator の多数決・自己批判 + `:mem/source-url` 出典 |
 | （独自）監査・再現性 | 全状態 datom 化 + Datomic `as-of` time-travel（browser セッションも含む） |
 
-## 採否が必要な論点（owner 確認事項）
+## 論点の決着（旧「採否が必要な論点」）
 
-1. **owned browser の既定実体**: JVM=Playwright(Chromium) を第一実装にするか、
-   cljs in-browser を先にするか。プロファイル/cookie の暗号化保存方針。
-2. **新規 submodule をいま作るか** — 作成は API でクリーン commit 推奨（CLAUDE.md の
-   submodule 方針）。本 ADR 承認後に着手。
-3. **ライブビュー transport**: CDP screencast / 定期スクショ、SSE か WS か。
-4. **UI フレームワーク**: re-frame（推奨）/ 素 reagent。
-5. **coder exec**: kotoba-WASM サンドボックス前提でよいか。
+1. **repo 名** → **`browser-agent-clj`** に決定（owner）。`*-clj` 命名規則に整合。
+2. **新規 submodule をいま作るか** → **作成済み**。CLAUDE.md どおり、衝突時は
+   GitHub API でサーバ側にクリーン commit を起こして解決（`root` PR #71, merge
+   `2fdc7eb`）。
+3. **UI フレームワーク** → **re-frame** を採用（`ui/shadow-cljs.edn` に依存追加、
+   現状の scaffold は reagent ratom。re-frame への置換は P4 で）。
+4. **coder exec** → **kotoba-WASM サンドボックスを既定方針**として `:exec-fn`
+   注入で受ける形に（実体注入は利用側、ライブラリは純粋）。
+5. **owned browser の既定実体** → 当面 **`:mock` provider を既定**とし（テスト/
+   オフライン）、**JVM Playwright provider は P1 残作業**（`provider.cljc` に
+   スケッチ）。プロファイル/cookie 暗号化保存は Playwright 実装時に決める。**未決**。
+6. **ライブビュー transport**（CDP screencast / SSE か WS か）→ host capability
+   注入（`:emit-fn`/`:screenshot-fn`）に抽象化済みで、具体実装は **P4 で決定**。**未決**。
+
+## 実装状況（2026-06-25）
+
+- **repo**: `com-junkawasaki/browser-agent-clj`（MIT, public, init `c7bf2b2`）。
+- **submodule**: `orgs/com-junkawasaki/browser-agent-clj` を `root` に登録、
+  pin `c7bf2b2`（PR #71 / merge `2fdc7eb`）。
+- **実装名前空間**: `run` `planner` `supervisor` `fleet` `memory` `schema`
+  `events` + `browser/{provider,session,live}`（全 `.cljc`）。UI は
+  `ui/`（reagent + shadow-cljs scaffold）。
+- **検証**: `clojure -M:dev:test` → **19 assertions / 0 failures**
+  （planner→MoA→fleet の e2e、自前 browser のナビゲーション＋session datom、
+  semantic memory、artifact、`as-of` time-travel まで Datalog でアサート）。
+  `clojure -M:dev:run` でオフライン mock デモ（イベントストリーム＋監査証跡）。
+- **未実装（次段）**: JVM Playwright provider（P1）、cljs UI ビルド配線＋re-frame 化
+  （P4）、`mcp.cljc` と multi-model ルーティング/cross-check（P5）。
 
 ## Consequences
 
 - **＋** 既存 4 submodule を再利用、新規は薄いオーケストレーション層 + 自前 browser
   層に集約。`.cljc` 共有で server/WASM/browser を横断。**agent が自分の browser を
   所有**し、ユーザーは覗いて take-over でき、その browser セッションすら datom として
-  Datalog 照会＆time-travel できる——genspark にない監査性・再現性。
+  Datalog 照会＆time-travel できる——genspark にない監査性・再現性。e2e テストで
+  この一気通貫が動作することを実証済み。
 - **－** owned browser は実体（Playwright/Chromium プロセス、cookie 永続）を抱えるぶん、
   WASM/テストの純粋性は `mock-browser` で担保しつつ provider 側にネイティブ依存が出る。
-  MoA・MCP は外部依存（model API / MCP サーバ）が増える。
-- **中立** 既定 browser 実体・transport・UI・coder exec は未確定（上記論点）。本 ADR は
-  骨子を固定し、実装は P0→P1(owned browser)→… と段階導入する。
+  現時点では Playwright provider は未実装で、実ブラウザ動作は次段。MoA・MCP は外部
+  依存（model API / MCP サーバ）が増える。
+- **中立** 実ブラウザ provider・transport は host capability 注入として抽象化済みで
+  未決（P1/P4 で確定）。本 ADR は骨子を固定し、P0–P3 + 自前 browser 層を実装済み、
+  残りは P4–P6 で段階導入する。
