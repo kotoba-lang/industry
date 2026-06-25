@@ -1,0 +1,28 @@
+on:
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
+    branches:
+      - master
+      - develop
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set environment variables
+      run: cp .env.example .env
+
+    - name: Run containers
+      run: docker-compose up -d
+
+    - name: Wait for web server
+      run: docker-compose exec -T node sh -c "until nc -z -w30 localhost 3000 ; do sleep 5 ; done"
+
+    - name: Run tests
+      run: docker-compose exec -T node npm test
