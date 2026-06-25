@@ -1,0 +1,79 @@
+;; 0021-rust-clj-wasm-layering.edn — ADR-0021 companion (機械可読 SSoT)
+;; Rust/Clojure/WASM の責任分担。言語ではなく役割で層を切る (substrate / authoring / target)。
+{:adr "0021-rust-clj-wasm-layering-substrate"
+ :date "2026-06-23"
+ :related ["0013-clj-agent-stack"
+           "0013-kotoba-datomic-embedded-query-layer"
+           "0010-life-graph-edn-datalog-provo"
+           "0020-three-org-taxonomy-agent-enterprise-library"]
+
+ ;; §2.1 — 3 つは並列の言語選択肢ではなく役割の違う層 (T 字)
+ :layers
+ [{:layer :substrate :role "engine / machine" :language :rust
+   :what ["kotoba-datomic" "kotoba-clj (compiler)" "kotoba-store"]
+   :note "速い・埋め込める・native も WASM も吐く。普段書き換えない infra。"}
+  {:layer :authoring :role "全ドメイン/agent/engine ロジック" :language :clojure-cljc
+   :what ["langchain-clj" "langgraph-clj" "comfyui-clj" "browser-use-clj"
+          "computer-use-clj" "kototama-clj" "kami authoring surface"
+          "会計ドメイン (:gftd.acct/*)"]
+   :note "主言語。ここに全てを書く。"}
+  {:layer :target :role "実行ホスト (書く層ではない)" :language :artifact
+   :hosts [:jvm :sci :cljs :wasm]
+   :note "WASM は層ではなくホストの一つ。同じ .cljc が載るだけ。"}]
+
+ ;; §2.2 — 境界は 2 つの細い契約だけ
+ :boundary-contracts
+ {:data-api {:shape {:q :_ :transact! :_ :db :_ :pull :_ :entid :_}
+             :swappable ["langchain.db (mini)" "Datomic Local" "DataScript" "kotoba-datomic"]
+             :adr "0013-clj-agent-stack"}
+  :host-capability {:inject [:http-fn :json-read :json-write
+                             :IBrowser :IComputer :host-fn-node]
+                    :adr "0013-clj-agent-stack §2"}
+  :forbidden "Rust を直接呼ぶ Clojure を書くこと (ポータビリティが壊れる)"}
+
+ ;; §2.3 — 責任の所在
+ :responsibilities
+ {:kotoba-rust   "datom (E,A,V,T=CID,Added) / as-of / history / clj-subset コンパイル正しさ / WASM ABI。API 契約の安定性。"
+  :domain-clj    "全ビジネス/agent/engine ロジック。Rust の存在を知らないコードを書く (契約越し)。"
+  :wasm          "ビルド成果物。CI で JVM-緑 → WASM 化して同値を保証するだけ。責任の所在ではない。"}
+
+ ;; §2.4 — engine の Rust core + Clojure surface パターン (kotoba と同型)
+ :engine-pattern
+ {:rule "engine core = Rust (hot loop), authoring surface = .cljc。clj 化 = surface を clj にする (core を書き直すことではない)。"
+  :instances
+  [{:engine "kotoba"      :core-rust ["kotoba-datomic" "kotoba-clj"] :surface-clj "Datalog query (EDN) / agent stack"}
+   {:engine "kami-engine" :core-rust ["物理/レンダ/realtime ループ (現状 Rust 維持)"]
+    :surface-clj "シーン/挙動/agent DSL (.cljc, kotoba-clj で WASM 化) — 本 ADR で方針確定、実装は未着手"
+    :status :planned}
+   {:engine "kototama-clj" :core-rust [] :surface-clj "organism runtime (.cljc) — 既に surface-clj"}]}
+
+ ;; §2.5 / §3 — org 配置と canonical home (Rust であることは配置を動かさない)
+ :placement
+ {:rule "役割=再利用 substrate なら com-junkawasaki。Rust でも同じ (ADR-0020 §2.3)。"
+  :kotoba {:canonical-home :com-junkawasaki
+           :path "orgs/com-junkawasaki/kotoba"
+           :remote "git@github.com:com-junkawasaki/kotoba.git"
+           :etzhayyim-kotoba "2026-06 撤去済 (ADR-0020 companion edn と一致)"}
+  :kami-engine {:canonical-home :com-junkawasaki :path "orgs/com-junkawasaki/kami-engine"}}
+
+ ;; §3 — 表記ずれ是正 (drift reconciliation)。物理移動なし・表記のみ。
+ :drift-fixes
+ [{:file "deps.edn" :what "submodule entry"
+   :before {:name "etzhayyim-kotoba" :path "orgs/etzhayyim/kotoba"
+            :remote "https://github.com/etzhayyim/kotoba.git" :org "etzhayyim"}
+   :after  {:name "kotoba" :path "orgs/com-junkawasaki/kotoba"
+            :remote "git@github.com:com-junkawasaki/kotoba.git" :org "com-junkawasaki"}
+   :note "実体 com-junkawasaki/kotoba は従来 deps.edn 未登録だった (stale entry を正しいものに転換)。"}
+  {:file "deps.edn" :what ":query_engine"
+   :before "kotoba-datomic (etzhayyim, Rust, …)" :after "kotoba-datomic (com-junkawasaki, Rust, …)"}
+  {:file "orgs/kawasakijun/clj-stack.edn" :what ":premises :wasm"
+   :before "kotoba-clj (orgs/etzhayyim/kotoba)" :after "kotoba-clj (orgs/com-junkawasaki/kotoba) + WASM=ホストの一つ注記"}]
+
+ ;; 是正しないもの (歴史的記録 / プロダクト固有のブランド・運用境界)
+ :not-fixed
+ {:adr-0013-body "歴史的記録として保全。本 ADR が canonical home の正本、当該パスは表記上 superseded。"
+  :kotoba-internal ["com.etzhayyim.apps.kotoba.* (ATProto NSID)"
+                    "@etzhayyim/... (npm package)"
+                    "brew tap etzhayyim/kotoba"
+                    "etzhayyim-exclusive (PDS publication / on-chain 運用主体境界)"]
+  :why "kotoba プロダクト自身のブランド/運用境界であって org 配置ドリフトではない。かつ別 submodule の内部ファイル。"}}
