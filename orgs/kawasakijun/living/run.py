@@ -1,9 +1,9 @@
 """Living System entry point. Cron-friendly. Defaults to --dry-run.
 
 Usage:
-  python kawasakijun/living/run.py                # dry-run
-  python kawasakijun/living/run.py --execute      # actually emit actions
-  python kawasakijun/living/run.py --collect-only # print sensor state only
+  python orgs/kawasakijun/living/run.py                # dry-run
+  python orgs/kawasakijun/living/run.py --execute      # actually emit actions
+  python orgs/kawasakijun/living/run.py --collect-only # print sensor state only
 """
 
 from __future__ import annotations

@@ -3,13 +3,13 @@
 # For each completed takeout-*.zip in ~/Downloads whose job-timestamp prefix is
 # registered in accounts/registry.edn ([takeout."<prefix>"]):
 #   extract (ditto, Unicode-safe) -> delete zip -> git annex add -> copy --to b2 (-J8) -> drop local.
-# Routes to personal/takeout/<account>/<date>/. The registry is re-read every pass,
+# Routes to orgs/personal/takeout/<account>/<date>/. The registry is re-read every pass,
 # so new Takeout jobs added to registry.edn are picked up without a restart.
 # Idempotent via a processed-ledger; re-presets the GPG passphrase from Keychain each pass.
 set -uo pipefail
 
 REPO=/Users/junkawasaki/github/com-junkawasaki
-REGISTRY="$REPO/personal/bin/registry"
+REGISTRY="$REPO/orgs/personal/bin/registry"
 DL="$HOME/Downloads"
 STATEDIR="$HOME/.takeout-watcher"
 STATE="$STATEDIR/processed.log"
@@ -63,7 +63,7 @@ process(){
   grep -qxF "$nm" "$STATE" && { rm -f "$zip"; return 0; }   # already ingested -> just remove dup
   prefix=$(grep -oE 'takeout-[0-9]{8}T[0-9]{6}Z' <<<"$base") || { log "SKIP (no prefix): $base"; return 1; }
   date=$(sed -E 's/takeout-([0-9]{4})([0-9]{2})([0-9]{2}).*/\1-\2-\3/' <<<"$prefix")
-  dest="personal/takeout/$acct/$date"
+  dest="orgs/personal/takeout/$acct/$date"
   log "START $base -> $dest ($(free_gb)G free)"
   mkdir -p "$REPO/$dest"
   if ! ditto -x -k "$zip" "$REPO/$dest" >>"$LOG" 2>&1; then log "EXTRACT FAIL $base"; echo "!! EXTRACT FAIL $base"; return 1; fi

@@ -4,7 +4,7 @@
 - Date: 2026-05-18
 - Deciders: Jun Kawasaki
 - Predecessor: ADR-0001 (com-junkawasaki top-level orchestrator)
-- Related: `kawasakijun/phase2_critical_path.py`, `kawasakijun/phase2_acceleration.py`
+- Related: `orgs/kawasakijun/phase2_critical_path.py`, `orgs/kawasakijun/phase2_acceleration.py`
 
 ## 1. Context
 
@@ -179,8 +179,8 @@ Rokes ケースで Phase 2.5 が **-3.75y** を生んだのはこのパターン
 
 ## 6. References
 
-- `kawasakijun/gap_analysis.md` — 全 phase の DAG 進化
-- `kawasakijun/critical_path.md` — 最新 CPM
-- `kawasakijun/acceleration.md` — what-if 分析
-- `kawasakijun/phase3_counter_litigation_memo.md` — 反訴の個別判定
-- `kawasakijun/phase3_crypto_victim_product.md` — Pattern D の代表例
+- `orgs/kawasakijun/gap_analysis.md` — 全 phase の DAG 進化
+- `orgs/kawasakijun/critical_path.md` — 最新 CPM
+- `orgs/kawasakijun/acceleration.md` — what-if 分析
+- `orgs/kawasakijun/phase3_counter_litigation_memo.md` — 反訴の個別判定
+- `orgs/kawasakijun/phase3_crypto_victim_product.md` — Pattern D の代表例

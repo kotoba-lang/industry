@@ -1,6 +1,6 @@
 (ns ingest.mf
   "pl/mf-csv-ingest — MoneyForward ME 入出金CSV → txn 構造化 (facts/pipelines.edn alt-source)。
-   本人手番: MF管理画面 → 家計簿/入出金 → CSVエクスポート → personal/inbox/mf-cashflow.csv
+   本人手番: MF管理画面 → 家計簿/入出金 → CSVエクスポート → orgs/personal/inbox/mf-cashflow.csv
    (認証は本人 = :no 境界。私はファイルが置かれたら取込むだけ)。
    Run: clojure -M -m ingest.mf [csv-path]
    Output: mail/mf-txns.jsonl (derived; warehouse.load が txn datoms 化, bank-txns より優先)"
@@ -9,7 +9,7 @@
             [clojure.java.io :as io]
             [clojure.string :as str]))
 
-(def base "/Users/junkawasaki/github/com-junkawasaki/personal")
+(def base "/Users/junkawasaki/github/com-junkawasaki/orgs/personal")
 (def default-csv "inbox/mf-cashflow.csv")
 (def out-file "mail/mf-txns.jsonl")
 
@@ -60,7 +60,7 @@
   (let [f (io/file (or csv-path (str base "/" default-csv)))]
     (if-not (.exists f)
       (do (println (str "CSV がありません: " f))
-          (println "本人手番: MoneyForward → 入出金 → CSVエクスポート → personal/inbox/mf-cashflow.csv")
+          (println "本人手番: MoneyForward → 入出金 → CSVエクスポート → orgs/personal/inbox/mf-cashflow.csv")
           (println "(facts/obligations.jsonl ob/mf-csv-export 参照)"))
       (let [rows (with-open [r (io/reader f)] (doall (csv/read-csv r)))
             idx  (header-index (first rows))

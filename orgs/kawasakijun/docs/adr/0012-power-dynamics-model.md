@@ -67,6 +67,6 @@ guardrail (00_nodoka_wellbeing) の直撃経路として minimax にのみ使う
 
 ## ファイル
 
-- `personal/facts/dyads.edn` — dyad + hypothesis の curated SSoT (annex/暗号化)
-- `personal/bin/datomic/queries/power.edn` — balance / risk / 検証アジェンダのビュー
+- `orgs/personal/facts/dyads.edn` — dyad + hypothesis の curated SSoT (annex/暗号化)
+- `orgs/personal/bin/datomic/queries/power.edn` — balance / risk / 検証アジェンダのビュー
 - loader: `warehouse.load/dyad-tx, hypothesis-tx`

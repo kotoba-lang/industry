@@ -14,7 +14,7 @@ USAGE:
 """
 import sys, os, re, json, hashlib, mailbox
 
-BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # personal/
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # orgs/personal/
 MSGDIR = os.path.join(BASE, "mail", "messages")
 INDEX = os.path.join(MSGDIR, "index.jsonl")
 

@@ -9,15 +9,15 @@
 ;;   timestamp    -> class "_a72d"          (e.g. "1月 19, 2026 6:46:46 PM")
 ;;
 ;; USAGE:
-;;   personal/bin/ingest-facebook.bb <export-dir> <out-dir> [account] [export-date]
+;;   orgs/personal/bin/ingest-facebook.bb <export-dir> <out-dir> [account] [export-date]
 ;; e.g.
-;;   personal/bin/ingest-facebook.bb \
-;;     personal/social/facebook/jun784/2026-06-15/export \
-;;     personal/social/facebook/jun784/2026-06-15 jun784 2026-06-15
+;;   orgs/personal/bin/ingest-facebook.bb \
+;;     orgs/personal/social/facebook/jun784/2026-06-15/export \
+;;     orgs/personal/social/facebook/jun784/2026-06-15 jun784 2026-06-15
 ;;
 ;; Writes:
 ;;   <out-dir>/index/{profile,friends,threads,messages,posts,activity}.jsonl
-;;   personal/facts/facebook.edn   (summary consumed by warehouse.load :datasrc/facebook)
+;;   orgs/personal/facts/facebook.edn   (summary consumed by warehouse.load :datasrc/facebook)
 (require '[clojure.string :as str]
          '[clojure.java.io :as io]
          '[cheshire.core :as json]
@@ -284,8 +284,8 @@
           msgs (:messages recs)
           facts {:facebook/account (or account "jun784")
                  :facebook/export-date (or export-date "unknown")
-                 :facebook/source-path (str/replace export #".*/(personal/.*)" "$1")
-                 :facebook/index-path (str/replace (.getPath idx) #".*/(personal/.*)" "$1")
+                 :facebook/source-path (str/replace export #".*/(orgs/personal/.*)" "$1")
+                 :facebook/index-path (str/replace (.getPath idx) #".*/(orgs/personal/.*)" "$1")
                  :facebook/counts
                  {:profile  (count (:profile recs []))
                   :friends  (count (:friends recs []))

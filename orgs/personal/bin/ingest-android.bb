@@ -1,5 +1,5 @@
 #!/usr/bin/env bb
-;; ingest-android.bb — 接続中の Android (adb) を personal/device/android/ へ snapshot ingest。
+;; ingest-android.bb — 接続中の Android (adb) を orgs/personal/device/android/ へ snapshot ingest。
 ;;
 ;; sh 版 ingest-android.sh + 埋込み python を置換する Clojure 実装（ADR-0009 系譜）。
 ;;   adb getprop/dumpsys → system.txt、pm list → packages*.txt、
@@ -20,7 +20,7 @@
         '[java.time.temporal ChronoUnit])
 
 (def repo "/Users/junkawasaki/github/com-junkawasaki")
-(def out  (str repo "/personal/device/android"))
+(def out  (str repo "/orgs/personal/device/android"))
 
 (def ts (.format DateTimeFormatter/ISO_INSTANT (.truncatedTo (Instant/now) ChronoUnit/SECONDS)))
 

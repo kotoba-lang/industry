@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Ingest this terminal/device's information into personal/device/.
+# Ingest this terminal/device's information into orgs/personal/device/.
 # Safe-by-default: environment variables are captured by NAME ONLY (values are
 # never written) to avoid leaking secrets/tokens into the dataset.
 set -u
-cd "$(dirname "$0")/.." || exit 1   # -> personal/
+cd "$(dirname "$0")/.." || exit 1   # -> orgs/personal/
 OUT=device
 TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 j() { python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1"; }

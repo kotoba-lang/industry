@@ -1,6 +1,6 @@
 ;; registry.edn — 個人アカウント宣言レジストリ (registry.toml から移行)
 ;; 平文 (.gitattributes 参照)。秘密情報は不可 — token/passphrase は macOS Keychain / 1Password。
-;; 消費: personal/bin/registry (bb) → mail-sync.sh / takeout-watcher.sh / takeout-status.sh
+;; 消費: orgs/personal/bin/registry (bb) → mail-sync.sh / takeout-watcher.sh / takeout-status.sh
 ;; 変換: TOML [accounts.<slug>]/[accounts.<slug>.mail]→ネストマップ, [takeout."prefix"]→マップ
 {
   :accounts {

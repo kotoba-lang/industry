@@ -38,7 +38,7 @@
 **animeka pipeline に自動投入する組立ライン**。
 
 ```python
-# kawasakijun/living/animeka_dispatcher.py
+# orgs/kawasakijun/living/animeka_dispatcher.py
 def on_new_scenario_commit(commit):
     """git push hook: scene.jsonld が新規/更新されたら animeka 投入"""
     if commit.touches("260208-spirit-in-physics/origins/episodes-*/scene.jsonld"):
@@ -87,7 +87,7 @@ Strategy 4: 河崎個人への返済
 ### 3. 健康・関係性・家族 KPI ループ
 
 ```python
-# kawasakijun/living/kpi_collector.py (phase2_kpi_sensors.py の進化版)
+# orgs/kawasakijun/living/kpi_collector.py (phase2_kpi_sensors.py の進化版)
 
 class KPIPipeline:
     def collect(self) -> dict:
@@ -121,7 +121,7 @@ class KPIPipeline:
 ### 4. 自動アクション dispatch
 
 ```python
-# kawasakijun/living/dispatcher.py
+# orgs/kawasakijun/living/dispatcher.py
 
 class ActionDispatcher:
     def dispatch(self, actions: list[Action]):
@@ -170,13 +170,13 @@ living system が呼び出す形式に。
 **河崎個人の人生 = magatama 上の 1 actor**:
 
 ```yaml
-# kawasakijun/living/manifest.yaml
+# orgs/kawasakijun/living/manifest.yaml
 actor:
   did: did:web:junkawasaki.com  # consolidated to com-junkawasaki (2026-05-18)
   type: T2 TS Native
   cluster: etzhayyim
-  vertex_state: kawasakijun/profile.edn
-  pregel_loop: kawasakijun/reverse_topo_pregel.py
+  vertex_state: orgs/kawasakijun/profile.edn
+  pregel_loop: orgs/kawasakijun/reverse_topo_pregel.py
   kpi_collectors:
     - gmail
     - calendar

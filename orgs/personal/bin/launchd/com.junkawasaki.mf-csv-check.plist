@@ -3,7 +3,7 @@
 <!-- ob/mf-csv-export の自動消化 (mf-csv-check.bb 参照)。毎日18:00にチェックし、
      inbox/mf-cashflow.csv が置かれたら取込→コミット→このジョブ自体を自己解除する。
      期限 2026-06-19 以降は未着なら macOS 通知でリマインド。
-     Install:  cp personal/bin/launchd/com.junkawasaki.mf-csv-check.plist ~/Library/LaunchAgents/
+     Install:  cp orgs/personal/bin/launchd/com.junkawasaki.mf-csv-check.plist ~/Library/LaunchAgents/
                launchctl bootout  gui/$(id -u)/com.junkawasaki.mf-csv-check 2>/dev/null
                launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.junkawasaki.mf-csv-check.plist
      Run now:  launchctl kickstart gui/$(id -u)/com.junkawasaki.mf-csv-check -->
@@ -14,7 +14,7 @@
 	<key>ProgramArguments</key>
 	<array>
 		<string>/opt/homebrew/bin/bb</string>
-		<string>/Users/junkawasaki/github/com-junkawasaki/personal/bin/mf-csv-check.bb</string>
+		<string>/Users/junkawasaki/github/com-junkawasaki/orgs/personal/bin/mf-csv-check.bb</string>
 	</array>
 	<key>EnvironmentVariables</key>
 	<dict>

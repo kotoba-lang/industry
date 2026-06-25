@@ -212,10 +212,10 @@ Claude Code のチャット欄で:
 
 ### 次のアクション (Phase 2.1)
 
-- `python kawasakijun/reverse_topo_pregel.py --budget-years 12` で 12 年経路 (19/24 達成)
-- `python kawasakijun/phase2_critical_path.py` で新 CP (売上経由) を可視化
-- `python kawasakijun/phase2_acceleration.py` で S1/S2/S3 シナリオを確認
+- `python orgs/kawasakijun/reverse_topo_pregel.py --budget-years 12` で 12 年経路 (19/24 達成)
+- `python orgs/kawasakijun/phase2_critical_path.py` で新 CP (売上経由) を可視化
+- `python orgs/kawasakijun/phase2_acceleration.py` で S1/S2/S3 シナリオを確認
 - **売上 4 軸を 6 月から並走着手** (Gftd 営業 + Etzhayyim + JK Wellness + Cyber Treaty)
 - `phase2_bottleneck_aishi.md` のメールで TOTAL 水鳥に正式依頼 (並走)
-- `python kawasakijun/phase2_kpi_sensors.py` を日次 cron に
+- `python orgs/kawasakijun/phase2_kpi_sensors.py` を日次 cron に
 - Paidy 自動引き落とし設定 (秘書 山田 へ移管)

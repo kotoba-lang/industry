@@ -3,7 +3,7 @@
 <!-- iCloud Drive + Apple Photos の継続同期 (icloud-photos-sync.bb 参照)。毎日 7:30 起動。
      cid(annex MD5)で重複回避。iCloud Drive=差分コピー、Photos=索引更新+ingest-policy。
      原本270GBの全取込は facts/photos-library.edn の :photos/ingest-policy を :full にした時のみ。
-     Install:  cp personal/bin/launchd/com.junkawasaki.icloud-photos-sync.plist ~/Library/LaunchAgents/
+     Install:  cp orgs/personal/bin/launchd/com.junkawasaki.icloud-photos-sync.plist ~/Library/LaunchAgents/
                launchctl bootout  gui/$(id -u)/com.junkawasaki.icloud-photos-sync 2>/dev/null
                launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.junkawasaki.icloud-photos-sync.plist
      Run now:  launchctl kickstart gui/$(id -u)/com.junkawasaki.icloud-photos-sync -->
@@ -14,7 +14,7 @@
 	<key>ProgramArguments</key>
 	<array>
 		<string>/opt/homebrew/bin/bb</string>
-		<string>/Users/junkawasaki/github/com-junkawasaki/personal/bin/icloud-photos-sync.bb</string>
+		<string>/Users/junkawasaki/github/com-junkawasaki/orgs/personal/bin/icloud-photos-sync.bb</string>
 	</array>
 	<key>EnvironmentVariables</key>
 	<dict>

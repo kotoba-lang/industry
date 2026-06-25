@@ -119,7 +119,7 @@ ADR-0003                    → Lean4 mathlib v4.25 互換 + GenerativeStructure
 ## 8. Pregel 出力の使い方
 
 ```bash
-python kawasakijun/reverse_topo_pregel.py --budget-years 10 --report markdown
+python orgs/kawasakijun/reverse_topo_pregel.py --budget-years 10 --report markdown
 ```
 
 出力:

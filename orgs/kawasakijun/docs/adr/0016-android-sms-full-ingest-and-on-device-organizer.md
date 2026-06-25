@@ -5,7 +5,7 @@
 - **Deciders**: 河崎純真 (jun784@gmail.com)
 - **Context tags**: personal-warehouse, android, adb, sms, babashka, clojure, git-annex, backblaze-b2, smishing, yabai, on-device-llm, gemma-e4b, yoro, clojurescript
 - **Related**: ADR-0003（暗号化 warehouse）, ADR-0009（mail-sync.bb / sh→babashka 系譜）, ADR-0010（life-graph EDN）, ADR-0011（no public-network pinning）
-- **Implementation**: `personal/bin/ingest-android.bb`, `personal/facts/{sms-triage.edn,devices.edn,coverage.edn}`, `personal/device/android/`（annex）, etzhayyim/root `20-actors/yabai/data/sms-smishing-jp-2026h1.kotoba.edn`（PR #1707）
+- **Implementation**: `orgs/personal/bin/ingest-android.bb`, `orgs/personal/facts/{sms-triage.edn,devices.edn,coverage.edn}`, `orgs/personal/device/android/`（annex）, etzhayyim/root `20-actors/yabai/data/sms-smishing-jp-2026h1.kotoba.edn`（PR #1707）
 
 ## Context
 
@@ -17,7 +17,7 @@ etzhayyim の yabai に共有したい。さらに「端末側のメッセージ
 
 着手時の状況：
 
-1. 既存 `personal/bin/ingest-android.sh`（埋め込み python で content-query をパース）が存在。
+1. 既存 `orgs/personal/bin/ingest-android.sh`（埋め込み python で content-query をパース）が存在。
    前回 06-12 06:55 に 583通取得済だが、annex lock 済の dangling symlink が残り再実行が
    ENOENT で失敗していた。
 2. ユーザ要望により ingest を **sh → Clojure(babashka)** へ統一（ADR-0009 mail-sync.bb と同系譜）。
@@ -26,7 +26,7 @@ etzhayyim の yabai に共有したい。さらに「端末側のメッセージ
 
 ### 1. ingest-android.bb（sh+python → babashka）
 
-`ingest-android.sh` を削除し `personal/bin/ingest-android.bb` に置換。adb で getprop/dumpsys/
+`ingest-android.sh` を削除し `orgs/personal/bin/ingest-android.bb` に置換。adb で getprop/dumpsys/
 pm list/content query を実行し、`"Row: N k=v, k=v"` を Clojure でパースして
 `sms.jsonl` / `call_log.jsonl` / `contacts.json` を生成。要点：
 
@@ -41,7 +41,7 @@ annex → B2 暗号コピー済。
 
 ### 2. sms-triage.edn（要対応の機械可読台帳）
 
-`personal/facts/sms-triage.edn`（annex 暗号化）に SMS 内容から **14件** を抽出。
+`orgs/personal/facts/sms-triage.edn`（annex 暗号化）に SMS 内容から **14件** を抽出。
 `:triage/status`（:open/:in-progress/:verify/:stale/:watch）+ `:triage/priority`。主な urgent/high：
 弁護士法人あらた受任通知（期限超過）、三菱UFJニコス（弁護士委任予告）、Casa 賃料（明渡裁判警告→対応中）、
 ペイディ6ヶ月延滞、Revolut 電話番号変更（乗っ取り確認要）、Paysera パスポート期限切れ。

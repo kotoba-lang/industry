@@ -1,5 +1,5 @@
 #!/usr/bin/env bb
-;; registry — query personal/accounts/registry.edn (tab-separated, bash-friendly).
+;; registry — query orgs/personal/accounts/registry.edn (tab-separated, bash-friendly).
 ;; (registry.toml → registry.edn 移行に伴い Python tomllib 版から babashka 版へ。)
 ;;
 ;; USAGE:
@@ -16,7 +16,7 @@
        " | mail-accounts | email SLUG\n"))
 
 (def ^:private path
-  ;; <repo>/personal/bin/registry -> <repo>/personal/accounts/registry.edn
+  ;; <repo>/orgs/personal/bin/registry -> <repo>/orgs/personal/accounts/registry.edn
   (str (fs/file (fs/parent (fs/parent (fs/absolutize *file*))) "accounts" "registry.edn")))
 
 (def ^:private reg (edn/read-string (slurp path)))

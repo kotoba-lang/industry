@@ -1,4 +1,4 @@
-# personal/prov — PROV-O 来歴サイドカー (ADR-0010 L2)
+# orgs/personal/prov — PROV-O 来歴サイドカー (ADR-0010 L2)
 
 封緘済み証拠・派生事実の来歴を W3C PROV-O (JSON-LD) で記録する。
 ファイル名: `<cid>.prov.jsonld`(対象 blob の sha256)。`context.jsonld` を `@context` に使う。
@@ -37,4 +37,4 @@
 `Entity(obligation) --wasDerivedFrom--> Entity(email cid)` を張る。
 Datomic 側の `:prov/derived-from` は同じ辺の最小ミラー(クエリ用)であり、正本はこちら。
 
-次の実装: `personal/bin/seal-evidence.sh` が封緘時に本サイドカーを自動生成する (ADR-0010 移行ステップ2)。
+次の実装: `orgs/personal/bin/seal-evidence.sh` が封緘時に本サイドカーを自動生成する (ADR-0010 移行ステップ2)。

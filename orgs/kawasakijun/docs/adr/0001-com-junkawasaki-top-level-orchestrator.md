@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-05-18
 - Deciders: Jun Kawasaki
-- Implementation: `kawasakijun/living/`, `kawasakijun/reverse_topo_pregel.py`
+- Implementation: `orgs/kawasakijun/living/`, `orgs/kawasakijun/reverse_topo_pregel.py`
 - Related repos: spirit-in-physics, etzhayyim/root, gftdcojp/ai-gftd-apps-gftdcojp,
   260208-spirit-in-physics
 
@@ -123,7 +123,7 @@ issue を declare し、重複発行を防ぐ。`.audit.jsonl` で全 emission �
 
 ## 5. Implementation status
 
-- ✅ `kawasakijun/living/` 全ファイル commit 済 (`c879587f`)
+- ✅ `orgs/kawasakijun/living/` 全ファイル commit 済 (`c879587f`)
 - ✅ `--dry-run` 動作確認 (9 actions planned, 既存 #16/#1281/#1282 をスキップ)
 - ⏳ Sensor 実装 (gmail/calendar/animeka/MF/photos は stub)
 - ⏳ Cron 設定 + Discord/Slack 通知
@@ -132,9 +132,9 @@ issue を declare し、重複発行を防ぐ。`.audit.jsonl` で全 emission �
 
 ## 6. References
 
-- `kawasakijun/living/README.md` — 詳細アーキテクチャ
-- `kawasakijun/living/manifest.yaml` — actor identity
-- `kawasakijun/living/repos.yaml` — node ↔ repo routing
+- `orgs/kawasakijun/living/README.md` — 詳細アーキテクチャ
+- `orgs/kawasakijun/living/manifest.yaml` — actor identity
+- `orgs/kawasakijun/living/repos.yaml` — node ↔ repo routing
 - `gftdcojp/ai-gftd-apps-gftdcojp/90-docs/adr/2605152100-etzhayyim-github-org-boundary.md`
   — etzhayyim (principal) / Gftd Japan (vendor) の boundary 先行例
 - `gftdcojp/ai-gftd-apps-gftdcojp/90-docs/adr/2605111000-gftd-japan-family-office-conversion.md`

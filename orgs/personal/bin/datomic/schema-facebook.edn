@@ -1,5 +1,5 @@
 ;; schema-facebook.edn — Facebook DYI export entities (ADR-0010 索引層).
-;; 正本は personal/social/facebook/<acct>/<date>/export/** (git-annex → B2 暗号化)。
+;; 正本は orgs/personal/social/facebook/<acct>/<date>/export/** (git-annex → B2 暗号化)。
 ;; 索引 JSONL は同 .../index/*.jsonl。本スキーマは warehouse.load が再構築する
 ;; クエリ可能な正規化グラフ。fb* 名前空間で既存 person グラフと name 一致で連携。
 [;; ---------- person 拡張: FB 表示名エイリアス (sender/friend → person 解決用) ----------

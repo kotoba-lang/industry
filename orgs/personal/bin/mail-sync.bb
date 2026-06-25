@@ -22,11 +22,11 @@
         '[java.time LocalDate])
 
 (def repo "/Users/junkawasaki/github/com-junkawasaki")
-(def base (str repo "/personal"))
+(def base (str repo "/orgs/personal"))
 (def bin  (str base "/bin"))
 (def msgs (str base "/mail/messages"))
 (def index (str msgs "/index.jsonl"))
-(def msgs-rel "personal/mail/messages")
+(def msgs-rel "orgs/personal/mail/messages")
 (def api "https://gmail.googleapis.com/gmail/v1/users/me")
 (def log-file (str (System/getProperty "user.home") "/.mail-sync/sync.log"))
 

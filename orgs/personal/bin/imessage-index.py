@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""iMessage/SMS (chat.db) → personal/comms/imessage/index.jsonl + facts/imessage.edn。
+"""iMessage/SMS (chat.db) → orgs/personal/comms/imessage/index.jsonl + facts/imessage.edn。
 本文は text 列が空の場合 attributedBody (streamtyped NSAttributedString) をデコード。
 Full Disk Access 必須。icloud-photos-sync 同様 cid 重複は無関係 (DB由来の派生索引)。
 Usage: imessage-index.py [chat.db path]"""
 import sqlite3, json, os, sys, shutil, tempfile
 from collections import Counter
 
-BASE = "/Users/junkawasaki/github/com-junkawasaki/personal"
+BASE = "/Users/junkawasaki/github/com-junkawasaki/orgs/personal"
 SRC = sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser("~/Library/Messages/chat.db")
 OUT_DIR = os.path.join(BASE, "comms/imessage")
 OUT = os.path.join(OUT_DIR, "index.jsonl")
@@ -106,7 +106,7 @@ def main():
     top = by_contact.most_common(15)
     lines = [
         ";; imessage.edn — iMessage/SMS 索引サマリ (imessage-index.py, Full Disk Access)。",
-        ";; 本文は attributedBody(streamtyped) をデコード。全文索引: personal/comms/imessage/index.jsonl",
+        ";; 本文は attributedBody(streamtyped) をデコード。全文索引: orgs/personal/comms/imessage/index.jsonl",
         "",
         "{:imessage/source \"~/Library/Messages/chat.db\"",
         f" :imessage/scanned-at {es(__import__('datetime').date.today().isoformat())}",

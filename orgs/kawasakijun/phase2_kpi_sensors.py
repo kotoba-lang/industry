@@ -38,13 +38,13 @@ class KPI:
 # === センサ実装 ===
 
 def kpi_physics_commits(days: int = 30) -> KPI:
-    """git log で kawasakijun/ + projects/2604-linde の最近のコミット数。"""
+    """git log で orgs/kawasakijun/ + projects/2604-linde の最近のコミット数。"""
     since = (dt.date.today() - dt.timedelta(days=days)).isoformat()
     try:
         out = subprocess.check_output([
             "git", "-C", str(REPO), "log",
             f"--since={since}", "--oneline",
-            "--", "kawasakijun/", "projects/2604-linde/"
+            "--", "orgs/kawasakijun/", "projects/2604-linde/"
         ], text=True)
     except subprocess.CalledProcessError:
         out = ""

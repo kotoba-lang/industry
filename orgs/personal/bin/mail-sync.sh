@@ -13,10 +13,10 @@ set -uo pipefail
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"  # launchd の最小 PATH 対策(git-annex/datalad)
 
 REPO=/Users/junkawasaki/github/com-junkawasaki
-REG="$REPO/personal/bin/registry"
-AUTH="$REPO/personal/bin/google-auth.py"
-MSAUTH="$REPO/personal/bin/msgraph-auth.py"
-MSGS=personal/mail/messages
+REG="$REPO/orgs/personal/bin/registry"
+AUTH="$REPO/orgs/personal/bin/google-auth.py"
+MSAUTH="$REPO/orgs/personal/bin/msgraph-auth.py"
+MSGS=orgs/personal/mail/messages
 LOGDIR="$HOME/.mail-sync"
 LOG="$LOGDIR/sync.log"
 mkdir -p "$LOGDIR"
@@ -51,7 +51,7 @@ while IFS=$'\t' read -r slug provider window; do
         continue
       fi
       log "sync $slug (newer_than:$window)"
-      if python3 personal/bin/ingest-gmail-batch.py --account "$slug" "newer_than:$window" 2000 >>"$LOG" 2>&1; then
+      if python3 orgs/personal/bin/ingest-gmail-batch.py --account "$slug" "newer_than:$window" 2000 >>"$LOG" 2>&1; then
         synced=$((synced+1))
       else
         log "FAIL $slug (see $LOG)"
@@ -63,7 +63,7 @@ while IFS=$'\t' read -r slug provider window; do
         continue
       fi
       log "sync $slug (graph, $window)"
-      if python3 personal/bin/ingest-graph-mail.py --account "$slug" "$window" 2000 >>"$LOG" 2>&1; then
+      if python3 orgs/personal/bin/ingest-graph-mail.py --account "$slug" "$window" 2000 >>"$LOG" 2>&1; then
         synced=$((synced+1))
       else
         log "FAIL $slug (see $LOG)"

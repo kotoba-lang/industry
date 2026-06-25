@@ -1,5 +1,5 @@
 """
-kawasakijun/reverse_topo_pregel.py
+orgs/kawasakijun/reverse_topo_pregel.py
 
 現状 (X_now) → 理想 (X_star) を達成するための、
 依存関係 DAG の **逆トポロジカルソート** + **Pregel BSP** プランナー。

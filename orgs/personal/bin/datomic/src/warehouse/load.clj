@@ -11,7 +11,7 @@
             [clojure.edn :as edn]
             [clojure.string :as str]))
 
-(def base "/Users/junkawasaki/github/com-junkawasaki/personal")
+(def base "/Users/junkawasaki/github/com-junkawasaki/orgs/personal")
 
 ;; ---------- readers ----------
 (defn rd-jsonl [rel]
@@ -307,7 +307,7 @@
 (def facebook-edn (rd-edn-facts "facts/facebook.edn"))
 
 (def ^:private fb-index-rel
-  (when facebook-edn (str/replace (:facebook/index-path facebook-edn) #"^personal/" "")))
+  (when facebook-edn (str/replace (:facebook/index-path facebook-edn) #"^orgs/personal/" "")))
 
 (defn- fb-jsonl [cat]
   (when fb-index-rel (or (rd-jsonl (str fb-index-rel "/" cat ".jsonl")) [])))
@@ -394,7 +394,7 @@
            :datasrc/count (:imessage/messages imessage-edn)
            :datasrc/from (get-in imessage-edn [:imessage/date-range :from])
            :datasrc/to   (get-in imessage-edn [:imessage/date-range :to])
-           :datasrc/path "personal/comms/imessage/index.jsonl"
+           :datasrc/path "orgs/personal/comms/imessage/index.jsonl"
            :datasrc/note "本文は attributedBody デコード。people 連携=contact"})
         (when notes-edn
           {:datasrc/id "src/notes" :datasrc/name "Apple Notes" :datasrc/kind :notes
@@ -402,14 +402,14 @@
            :datasrc/count (:notes/count notes-edn)
            :datasrc/from (get-in notes-edn [:notes/date-range :from])
            :datasrc/to   (get-in notes-edn [:notes/date-range :to])
-           :datasrc/path "personal/notes/index.jsonl"})
+           :datasrc/path "orgs/personal/notes/index.jsonl"})
         (when photos-edn
           {:datasrc/id "src/photos" :datasrc/name "Apple Photos" :datasrc/kind :photos
            :datasrc/status (:photos/ingest-policy photos-edn)
            :datasrc/count (:photos/assets photos-edn) :datasrc/size-gb (:photos/originals-gb photos-edn)
            :datasrc/from (get-in photos-edn [:photos/year-range :from])
            :datasrc/to   (get-in photos-edn [:photos/year-range :to])
-           :datasrc/path "personal/photos/index.jsonl" :datasrc/backed-up true
+           :datasrc/path "orgs/personal/photos/index.jsonl" :datasrc/backed-up true
            :datasrc/note "索引のみ取込。原本270GBはiCloud退避 (:metadata-only)"})
         (when downloads-edn
           {:datasrc/id "src/downloads" :datasrc/name "~/Downloads 整理" :datasrc/kind :files
@@ -424,7 +424,7 @@
          :datasrc/note "mail-sync 日次"}
         {:datasrc/id "src/gdrive" :datasrc/name "Google Drive" :datasrc/kind :files
          :datasrc/status :covered :datasrc/count 57565
-         :datasrc/path "personal/takeout/jun784/2026-06-10/Takeout/ドライブ" :datasrc/backed-up true
+         :datasrc/path "orgs/personal/takeout/jun784/2026-06-10/Takeout/ドライブ" :datasrc/backed-up true
          :datasrc/note "Takeout 2026-06-10 で取込済 (訴訟ドラフト含む)。ライブ同期は冗長"}
         {:datasrc/id "src/tanabe-3d" :datasrc/name "tanabe-3d (3Dパイプライン)" :datasrc/kind :files
          :datasrc/status :ingested :datasrc/path "orgs/com-junkawasaki/tanabe-3d" :datasrc/backed-up true

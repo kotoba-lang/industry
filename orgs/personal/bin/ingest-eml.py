@@ -18,7 +18,7 @@ import sys, os, json, hashlib
 from email.message import EmailMessage
 from email.utils import format_datetime, parsedate_to_datetime
 
-BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # personal/
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # orgs/personal/
 MSGDIR = os.path.join(BASE, "mail", "messages")
 INDEX = os.path.join(MSGDIR, "index.jsonl")
 

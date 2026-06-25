@@ -6,7 +6,7 @@
 - **Context tags**: clojure, cljc, wasm, kotoba-clj, datomic, datalog, llm-agent, langchain, langgraph, comfyui, browser-use, computer-use
 - **Related**: ADR-0001(orchestrator)、ADR-0002(Pregel DAG)、ADR-0010(EDN 事実層 + Datalog ビュー — 本スタックの状態表現の原型)、ADR-0012(同パターンの org 適用)
 - **Implementation**: `orgs/com-junkawasaki/{langchain,langgraph,comfyui,browser-use,computer-use}-clj/`
-- **SSoT (machine-readable)**: `kawasakijun/clj-stack.edn`(スタック意味論)+ ルート `deps.edn`(ワークスペース配置)
+- **SSoT (machine-readable)**: `orgs/kawasakijun/clj-stack.edn`(スタック意味論)+ ルート `deps.edn`(ワークスペース配置)
 
 ## Context
 
@@ -72,7 +72,7 @@ datom と **同一表現**になり、join できる。
 ### 4. SSoT の分担
 
 - ルート `deps.edn` — ワークスペース**配置**(path / submodule / remote / 一行説明)。
-- `kawasakijun/clj-stack.edn` — スタック**意味論**(層・依存辺・名前空間・
+- `orgs/kawasakijun/clj-stack.edn` — スタック**意味論**(層・依存辺・名前空間・
   注入されるホスト能力・提供 datom スキーマ・版)。goals.edn と同様、
   ツーリングが読む側の machine-readable SSoT。
 - 各リポジトリ `docs/adr/0001-architecture.md` — 本家との対応表と

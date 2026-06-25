@@ -29,7 +29,7 @@ import sys, os, json, hashlib, base64, subprocess, urllib.request, urllib.error,
 from email.parser import BytesParser
 from email.policy import default as default_policy
 
-BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # personal/
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # orgs/personal/
 MSGDIR = os.path.join(BASE, "mail", "messages")
 INDEX = os.path.join(MSGDIR, "index.jsonl")
 API = "https://gmail.googleapis.com/gmail/v1/users/me"

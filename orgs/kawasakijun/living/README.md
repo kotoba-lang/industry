@@ -44,10 +44,10 @@ downstream repo's own agent (Claude Code / Codex / custom).
 
 ```bash
 # Dry run (recommended for first invocation)
-python kawasakijun/living/run.py --dry-run
+python orgs/kawasakijun/living/run.py --dry-run
 
 # Production (actually creates issues / events / drafts)
-python kawasakijun/living/run.py --execute
+python orgs/kawasakijun/living/run.py --execute
 ```
 
 ## Cron suggestion
@@ -55,7 +55,7 @@ python kawasakijun/living/run.py --execute
 ```cron
 # Daily Pregel super-step at 06:00 JST
 0 6 * * * cd /Users/junkawasaki/github/com-junkawasaki && \
-  kawasakijun/.venv/bin/python kawasakijun/living/run.py --execute >> /tmp/kawasakijun.log 2>&1
+  orgs/kawasakijun/.venv/bin/python orgs/kawasakijun/living/run.py --execute >> /tmp/kawasakijun.log 2>&1
 ```
 
 ## Downstream agent contract

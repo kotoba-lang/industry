@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Ingest a connected & TRUSTED iPhone (libimobiledevice) into personal/device/iphone/.
+# Ingest a connected & TRUSTED iPhone (libimobiledevice) into orgs/personal/device/iphone/.
 # Requires pairing first: unlock iPhone -> "Trust This Computer" -> passcode ->
 #   idevicepair pair   (must print "SUCCESS")
 # Metadata is cheap; SMS/contacts/calls/photos require a full backup (--backup),
-# which is large -> opt-in. All PII lands under personal/device (annex hybrid->B2).
+# which is large -> opt-in. All PII lands under orgs/personal/device (annex hybrid->B2).
 #
 # usage: ingest-iphone.sh            # metadata + diagnostics only
 #        ingest-iphone.sh --backup   # + full idevicebackup2 (GB-scale, slow)
 set -u
-cd "$(dirname "$0")/.." || exit 1   # -> personal/
+cd "$(dirname "$0")/.." || exit 1   # -> orgs/personal/
 OUT=device/iphone
 TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 mkdir -p "$OUT"

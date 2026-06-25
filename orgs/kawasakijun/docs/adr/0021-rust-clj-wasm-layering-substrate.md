@@ -5,8 +5,8 @@
 - **Deciders**: 河崎純真 (jun784@gmail.com)
 - **Context tags**: layering, rust, clojure, cljc, wasm, kotoba, kotoba-datomic, kotoba-clj, kototama-clj, kami-engine, substrate, authoring-surface, org-taxonomy
 - **Related**: ADR-0013（portable Clojure agent stack）、ADR-0013（kotoba-datomic 埋め込みクエリ層）、ADR-0010（EDN 事実層）、ADR-0020（三組織タクソノミ）
-- **Companion (機械可読)**: `kawasakijun/docs/adr/0021-rust-clj-wasm-layering.edn`
-- **SSoT 連携**: `deps.edn`（ワークスペース配置）/ `kawasakijun/clj-stack.edn`（スタック意味論）
+- **Companion (機械可読)**: `orgs/kawasakijun/docs/adr/0021-rust-clj-wasm-layering.edn`
+- **SSoT 連携**: `deps.edn`（ワークスペース配置）/ `orgs/kawasakijun/clj-stack.edn`（スタック意味論）
 
 ## 1. Context
 
@@ -98,7 +98,7 @@ ADR-0020 companion `.edn` が一致。`etzhayyim/kotoba` は 2026-06 撤去済�
 |---|---|---|
 | `deps.edn`（submodule エントリ） | `:name "etzhayyim-kotoba"` / `:path "orgs/etzhayyim/kotoba"` / `:remote https://github.com/etzhayyim/kotoba.git` / `:org "etzhayyim"`（しかも実体 `com-junkawasaki/kotoba` は未登録だった） | `:name "kotoba"` / `:path "orgs/com-junkawasaki/kotoba"` / `:remote git@github.com:com-junkawasaki/kotoba.git` / `:org "com-junkawasaki"` |
 | `deps.edn`（`:query_engine`） | `kotoba-datomic (etzhayyim, Rust, …)` | `kotoba-datomic (com-junkawasaki, Rust, …)` |
-| `kawasakijun/clj-stack.edn`（`:premises :wasm`） | `kotoba-clj (orgs/etzhayyim/kotoba)` | `kotoba-clj (orgs/com-junkawasaki/kotoba)` + WASM=ホストの一つ注記 |
+| `orgs/kawasakijun/clj-stack.edn`（`:premises :wasm`） | `kotoba-clj (orgs/etzhayyim/kotoba)` | `kotoba-clj (orgs/com-junkawasaki/kotoba)` + WASM=ホストの一つ注記 |
 
 **ADR-0013（clj-agent-stack / kotoba-datomic）本文に残る `orgs/etzhayyim/kotoba` 記述は
 歴史的記録として保全し、書き換えない**。本 ADR-0021 が canonical home の正本であり、ADR-0013 の

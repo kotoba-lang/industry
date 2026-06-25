@@ -44,6 +44,6 @@ while IFS= read -r -d '' z; do
     FAIL=$((FAIL+1))
   fi
   git annex drop --in b2 "$rel" >>"$LOG" 2>&1   # 原本 zip 本体は B2 にあるので local drop
-done < <(find ./personal/takeout -type l -name '*.zip' ! -path '*.zip.extracted/*' -print0 2>/dev/null)
+done < <(find ./orgs/personal/takeout -type l -name '*.zip' ! -path '*.zip.extracted/*' -print0 2>/dev/null)
 
 log "=== backfill done: expanded=$DONE skip=$SKIP fail=$FAIL ==="

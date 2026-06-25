@@ -83,11 +83,11 @@ GitHub remote が無い repo は、いきなり submodule 化せず `.git` を�
 superdataset が DataLad（`.datalad/config` id=9a0395b2…）のため、素フォルダでも
 `.gitattributes` の annex ルートに乗る大容量ファイルは自動で git-annex 管理になる。
 
-### 3. `jk-luxury-drive-archive`(41G) → `personal/` 暗号化 warehouse
+### 3. `jk-luxury-drive-archive`(41G) → `orgs/personal/` 暗号化 warehouse
 
 訴訟証拠であり ADR-0003/0005 の保全ポリシー（係争保全・SHA-256 + OpenTimestamps 封緘・
 gpg-hybrid 暗号・暗号文のみ外部 remote）に統合する。
-`personal/drive/jk-luxury-archive/` 配下の DataLad annex とし、実体は暗号化して B2 へ。
+`orgs/personal/drive/jk-luxury-archive/` 配下の DataLad annex とし、実体は暗号化して B2 へ。
 git 本体・GitHub には pointer のみ（平文は決して push しない）。
 
 ### 4. Backblaze B2 を git-annex **S3互換** special remote として全 dataset に追加
@@ -154,7 +154,7 @@ credential_custody = "1Password (gftdcojp vault); env AWS_ACCESS_KEY_ID/AWS_SECR
 3. **Phase 2**: C 群 3 repo（systemofsystem / yukkuri / mangaka）の `.git` を除去し
    `orgs/com-junkawasaki/` に素フォルダ取り込み。`.gitattributes` に asset 拡張子の
    annex ルートを追加。`datalad save`。
-4. **Phase 3**: `jk-luxury-drive-archive` を `personal/drive/jk-luxury-archive/` に
+4. **Phase 3**: `jk-luxury-drive-archive` を `orgs/personal/drive/jk-luxury-archive/` に
    DataLad annex 取り込み（平文を git に載せない）。
 5. **Phase 4**: 全 dataset で `git annex initremote b2 …` → `datalad push --to b2`。
    `:personal :storage` 更新、deps.edn の path 群を orgs/ に追従。
@@ -182,7 +182,7 @@ credential_custody = "1Password (gftdcojp vault); env AWS_ACCESS_KEY_ID/AWS_SECR
   `github/ghosthacker`(23G)（全コミット remote 済・固有作業ゼロ）を削除し
   **26G → 89G** に回復。両者は com-junkawasaki 内 submodule から復元可。
 - **Phase 3 完了**（commit `a170183a`）: `jk-luxury-drive-archive` 41G を
-  `personal/drive/jk-luxury-archive/` に copy → 全ファイル annex(MD5E)。
+  `orgs/personal/drive/jk-luxury-archive/` に copy → 全ファイル annex(MD5E)。
   archive 内 nested `.gitignore` 由来 484 ファイルも `--no-check-gitignore --force-large`
   で強制保全（.DS_Store 17 のみ除外、tracked 26,135）。annex-add の dedup で ~8G 回収。
   **全 28,327 キー(≈33G unique) を B2 へ copy 完了**（欠損 0、`fsck --from b2` で

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Apple Notes (NoteStore.sqlite) → personal/notes/index.jsonl + facts/notes.edn。
+"""Apple Notes (NoteStore.sqlite) → orgs/personal/notes/index.jsonl + facts/notes.edn。
 title/folder/dates/snippet を抽出 (本文全文は gzip protobuf のため snippet をプレビューに使用)。
 Full Disk Access 必須。Usage: notes-index.py [NoteStore.sqlite path]"""
 import sqlite3, json, os, sys, shutil, tempfile, datetime
 from collections import Counter
 
-BASE = "/Users/junkawasaki/github/com-junkawasaki/personal"
+BASE = "/Users/junkawasaki/github/com-junkawasaki/orgs/personal"
 SRC = sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser(
     "~/Library/Group Containers/group.com.apple.notes/NoteStore.sqlite")
 OUT_DIR = os.path.join(BASE, "notes")
@@ -62,7 +62,7 @@ def main():
     def es(s): return '"' + str(s).replace("\\", "\\\\").replace('"', '\\"') + '"'
     lines = [
         ";; notes.edn — Apple Notes 索引サマリ (notes-index.py, Full Disk Access)。",
-        ";; title/folder/dates/snippet。全文プレビュー: personal/notes/index.jsonl",
+        ";; title/folder/dates/snippet。全文プレビュー: orgs/personal/notes/index.jsonl",
         "",
         "{:notes/source \"NoteStore.sqlite\"",
         f" :notes/scanned-at {es(datetime.date.today().isoformat())}",

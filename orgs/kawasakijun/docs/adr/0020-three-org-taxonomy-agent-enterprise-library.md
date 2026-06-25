@@ -5,8 +5,8 @@
 - **Deciders**: 河崎純真 (jun784@gmail.com)
 - **Context tags**: org-taxonomy, repo-layout, agent-centric, enterprise-app, library, personal, placement-policy
 - **Supersedes (部分)**: ADR-0007（owner キーの `orgs/<org>/<repo>` レイアウト）に *概念上の配置基準* を追加して上書きするものではなく、補完する
-- **Companion (機械可読)**: `kawasakijun/docs/adr/0020-three-org-taxonomy.edn`
-- **SSoT 連携**: `deps.edn :org-taxonomy` / `personal/facts/orgs.edn`
+- **Companion (機械可読)**: `orgs/kawasakijun/docs/adr/0020-three-org-taxonomy.edn`
+- **SSoT 連携**: `deps.edn :org-taxonomy` / `orgs/personal/facts/orgs.edn`
 
 ## 1. Context
 
@@ -120,5 +120,5 @@ legal-hold 対象は ADR-0005 によりオーナー承認なしに移動・改�
 ## 5. Non-goals / 保留
 
 - `_modelbake`（→ `etzhayyim/root/70-tools`）と `minimax-m2-modal`（汎用 infra 化）の整理は優先度低・本 ADR では未実行。
-- 利益相反規程（PwC 就業 × 係争当事者性）の整合確認は `personal/facts/orgs.edn` 記載のとおり継続課題。
+- 利益相反規程（PwC 就業 × 係争当事者性）の整合確認は `orgs/personal/facts/orgs.edn` 記載のとおり継続課題。
   `ai-gftd-lf-case-lingling` の物理移送自体は owner 判断で 2026-06-23 実行済み（上記とは独立）。
