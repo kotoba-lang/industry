@@ -42,9 +42,24 @@ Backblaze B2 に置く。git には annex キー（ポインタ）だけが入�
 ```bash
 # git/annex スケルトンを取得（opt-in グループ）
 west update --group-filter +datalad m365-archive
-# 実体を B2 から取得 / 破棄（認証は環境変数のみ）
-B2_KEY_ID=... B2_APP_KEY=... B2_BUCKET=... west annex-get
+# 実体を B2 から取得 / 破棄
+west annex-get         # 認証は自動解決（下記）。実体を B2 から取得
 west annex-drop        # ローカル実体を捨てて B2 のコピーだけ残す
+```
+
+### B2 認証の解決（env → 1Password → Keychain）
+
+`west annex-get/annex-drop` は `scripts/b2-creds.bb` で B2 認証を解決する。順序と
+参照先は `manifest/repos.edn` の `:b2 :credentials`（既定
+`[:env :1password :keychain]`）。**秘密はリポジトリに置かず**、参照先（`op://` パス /
+Keychain service 名）だけを EDN に書く。初回は自分の保管先に合わせて `★` を編集する。
+
+```bash
+# 1Password: op に signin 済みなら op read で解決
+# Apple Keychain: security find-generic-password で解決（macOS ローカル）
+# CI 等: B2_KEY_ID / B2_APP_KEY / B2_BUCKET を環境変数で渡せば env が最優先
+eval "$(bb scripts/b2-creds.bb)"     # 手元の環境に流し込む（任意）
+bb scripts/b2-creds.bb --json        # プログラム用（west_annex.py が利用）
 ```
 
 ## 日常運用

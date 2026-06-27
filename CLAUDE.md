@@ -130,7 +130,11 @@ bb scripts/gen-west-manifest.bb
   # 以後: datalad save → datalad push --to b2 → datalad drop / datalad get
   ```
 
-  B2 認証は環境変数のみで渡し、**リポジトリには秘密情報を一切コミットしない**。
+  B2 認証は **`scripts/b2-creds.bb`** が解決する（既定の順 env→1Password→Keychain。
+  参照先は `manifest/repos.edn` の `:b2 :credentials`）。`op`(1Password CLI) /
+  `security`(Keychain) / 環境変数のどれでも同じコマンドで動く。**秘密情報は
+  リポジトリに一切コミットしない**（EDN に置くのは `op://` パスや Keychain service 名
+  といった非機密の参照先だけ）。CI では `B2_KEY_ID/B2_APP_KEY/B2_BUCKET` を env で渡す。
 
 - **DataLad dataset は west に統合してある。** `manifest/repos.edn` の `:datalad`
   に登録した project は `manifest/west.yml` で `userdata.datalad: true` + `datalad`
