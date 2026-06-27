@@ -218,13 +218,22 @@ EDN(canonical, doc CID) / SVG(`kasane.svg`→svgraph) / kotoba Datom(`kasane.qua
 | **BMP** | `grammar/bmp.edn`(データ, LE) + `bmp->doc` | ✅ ヘッダ（pixels=blob） |
 | **TIFF** | `kasane.tiff`(offset-based IFD 手書き, byte-order 自動判定, SHORT/LONG) + `tiff->doc` | ✅ メタ（dims/comp/bps） |
 | **GIF** | `grammar/gif.edn`(header/LSD) + `kasane.gif`(frame scan) + `gif->doc` | ✅ dims/frames（LZW pixel は保留） |
-| テスト | bb 純 cljc スイート | ✅ **17 tests / 64 assertions green** |
+| **ZIP** | `kasane.zip`(中央ディレクトリ + member を inflate-raw) | ✅ Sketch/.docx/.xlsx/.pptx/ODF/EPUB の基盤 |
+| **Sketch** | `sketch->doc`(`pages/*.json`→artboard) | ✅ 構造（JSON 意味解析は保留） |
+| **OOXML** | `ooxml->doc`(docx/pptx/xlsx 判定) | ✅ 構造（XML 意味解析は保留） |
+| テスト | bb 純 cljc スイート | ✅ **20 tests / 75 assertions green** |
 
-DEFLATE/zlib inflate は PSD-ZIP・PDF-Flate・PNG-IDAT・(TIFF-deflate) の **複数形式を 1 本で**
-賄えており、「形式追加＝EDN/ns 追加で増える」設計が実証された（PDF は線形文法に乗らない
-ので `kasane.cos`、TIFF は offset-based なので `kasane.tiff` と、非線形だけ手書きに分岐）。
-次手の順当: **Sketch/OOXML**（zip+構造, inflate 保有）→ GIF/TIFF の LZW pixel。
-JPEG 系（DCT/JPX）は別 ADR で R0 は opaque blob 通し。
+DEFLATE/zlib inflate は PSD-ZIP・PDF-Flate・PNG-IDAT・**ZIP(Sketch/OOXML/ODF/EPUB)** を
+**1 本で**賄えており、「形式追加＝EDN/ns 追加で増える」設計が実証された（PDF は線形文法に
+乗らないので `kasane.cos`、TIFF は offset-based なので `kasane.tiff`、ZIP は `kasane.zip` と、
+非線形だけ手書きに分岐）。
+
+**LZW（GIF/TIFF compression 5 / PDF LZWDecode）は意図的に deferred**: code-width 変更の
+ビット厳密タイミングは実ファイル fixture でしか検証できず（この環境に ImageIO/AWT が無く
+GIF を生成できない）、自作エンコーダ往復だけでは実ファイル互換を保証できない。**不正確な
+コーデックは実ファイルを静かに壊す**ため、検証用 fixture をリポジトリに入れるまで未出荷とする。
+次手: LZW（fixture 付き）→ Sketch/OOXML の JSON/XML 意味解析。JPEG 系（DCT/JPX）は別 ADR、
+R0 は opaque blob 通し。
 
 ## References
 
