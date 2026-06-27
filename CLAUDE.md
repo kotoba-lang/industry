@@ -91,6 +91,17 @@ bb scripts/gen-west-manifest.bb
   （遅れた状態の `git push` は deny され、同期を促すメッセージが返る）。フックは
   破壊的な自動マージはしない（判定と指示のみ、fail-open）。
 
+- **force-push は禁止（`git push --force` / `--force-with-lease` / `+refs` を使わない）。**
+  共有リポ（superproject / 各 project）のいかなるブランチに対しても、履歴を書き換えて
+  上流を上書きする push をしてはならない。force-push は他の clone・west pin・
+  ancestry 判定を静かに壊し（shallow 環境では「前進」を「分岐」と誤検出する原因にも
+  なる）、`upload-pack: not our ref` 由来の checkout 失敗を引き起こす。乖離は
+  **force-push ではなく merge / rebase してから通常 push** で解消し、それが不可能な
+  場合（既に push 済みの履歴を変えたい等）は**勝手に強制せず必ずユーザーに報告**する。
+  履歴書き換えが本当に必要なときも、shallow 化に伴う rewrite と同様に**行わない**
+  （後述「大容量バイナリ」節と整合）。upstream を進めたいだけの単純更新は、ローカルで
+  戦うより GitHub API でサーバ側にクリーン commit を起こす（PR #61/#62/#86 の実績）。
+
 - **`main` への同期が未コミット/未追跡のローカル変更でブロックされた場合**、
   勝手に破棄しない。次の順で安全に同期する:
   1. ブロック原因の未追跡ファイルが **incoming とバイト同一** なら（origin に
