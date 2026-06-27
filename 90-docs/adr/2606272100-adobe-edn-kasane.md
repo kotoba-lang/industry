@@ -219,21 +219,23 @@ EDN(canonical, doc CID) / SVG(`kasane.svg`→svgraph) / kotoba Datom(`kasane.qua
 | **TIFF** | `kasane.tiff`(offset-based IFD 手書き, byte-order 自動判定, SHORT/LONG) + `tiff->doc` | ✅ メタ（dims/comp/bps） |
 | **GIF** | `grammar/gif.edn`(header/LSD) + `kasane.gif`(frame scan) + `gif->doc` | ✅ dims/frames（LZW pixel は保留） |
 | **ZIP** | `kasane.zip`(中央ディレクトリ + member を inflate-raw) | ✅ Sketch/.docx/.xlsx/.pptx/ODF/EPUB の基盤 |
-| **Sketch** | `sketch->doc`(`pages/*.json`→artboard) | ✅ 構造（JSON 意味解析は保留） |
-| **OOXML** | `ooxml->doc`(docx/pptx/xlsx 判定) | ✅ 構造（XML 意味解析は保留） |
-| テスト | bb 純 cljc スイート | ✅ **20 tests / 75 assertions green** |
+| **Sketch** | `sketch->doc`(`pages/*.json`→artboard、`kasane.json` で意味解析) | ✅ artboard 名+frame→bbox |
+| **OOXML** | `ooxml->doc`(docx/pptx/xlsx 判定 + テキスト抽出 w:t/a:t/t) | ✅ text runs |
+| **JSON** | `kasane.json`(純 cljc 依存ゼロ JSON リーダ) | ✅ Sketch 等の基盤 |
+| **TTF/OTF** | `kasane.ttf`(SFNT table directory + head/maxp/name) | ✅ family/units/glyph 数（実 OFL font で head magic 検証） |
+| **LZW** | `kasane.codec/lzw` (MSB early / LSB) | ✅ TIFF=bit-exact(実 libtiff)、PDF=対応 / ⚠ GIF=experimental(画素数のみ一致) |
+| テスト | bb 純 cljc スイート | ✅ **27 tests / 104 assertions green** |
 
 DEFLATE/zlib inflate は PSD-ZIP・PDF-Flate・PNG-IDAT・**ZIP(Sketch/OOXML/ODF/EPUB)** を
 **1 本で**賄えており、「形式追加＝EDN/ns 追加で増える」設計が実証された（PDF は線形文法に
-乗らないので `kasane.cos`、TIFF は offset-based なので `kasane.tiff`、ZIP は `kasane.zip` と、
-非線形だけ手書きに分岐）。
+乗らないので `kasane.cos`、TIFF/TTF は offset-based なので `kasane.tiff`/`kasane.ttf`、ZIP は
+`kasane.zip` と、非線形だけ手書きに分岐）。
 
-**LZW（GIF/TIFF compression 5 / PDF LZWDecode）は意図的に deferred**: code-width 変更の
-ビット厳密タイミングは実ファイル fixture でしか検証できず（この環境に ImageIO/AWT が無く
-GIF を生成できない）、自作エンコーダ往復だけでは実ファイル互換を保証できない。**不正確な
-コーデックは実ファイルを静かに壊す**ため、検証用 fixture をリポジトリに入れるまで未出荷とする。
-次手: LZW（fixture 付き）→ Sketch/OOXML の JSON/XML 意味解析。JPEG 系（DCT/JPX）は別 ADR、
-R0 は opaque blob 通し。
+**LZW** は実 libtiff エンコードの fixture で **TIFF を bit-exact 検証**（9→10→11→12bit の
+code-width 境界跨ぎ含む。確定規則: early-change で next-free-code == 2^width−1 で width++）。
+**GIF(LSB) は experimental** — 画素数は正しいが行/辞書境界で参照と値が食い違うため未確定
+（共有 LZW コアは TIFF で実証済み）。JPEG 系（DCT/JPX）は別 ADR、R0 は opaque blob 通し。
+次手: GIF LZW の境界整合、Sketch/OOXML のレイヤ/図形ジオメトリ、glTF/WOFF2。
 
 ## References
 
