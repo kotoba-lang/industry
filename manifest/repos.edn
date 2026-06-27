@@ -51,6 +51,47 @@
    :keychain {:service  "b2:gftdcojp-m365-annex"   ; ★ keychain service(= b2:<bucket>)
               :combined true}}}                     ; account=key-id, password=app-key
 
+ ;; kotoba-server pod（kotobase.net）接続ポリシー（非機密）。詳細は CLAUDE.md
+ ;; 「Actors」節 / ai-gftd-itonami ADR-0002。認証は CACAO（SIWE/Ed25519 did:key、
+ ;; kotoba-auth DelegationChain）で、**actor ごとに鍵を発行**し自分の鍵由来 IPNS
+ ;; graph を所有 → 自己 mint。owner hand-off も共有 token も使わない。秘密鍵は
+ ;; repo に置かず `.<actor>/identity.edn`（gitignore）に永続。ここは非機密の
+ ;; 参照先・規約のみ。
+ :kotoba
+ {:endpoint "https://kotobase.net"
+  :xrpc     "ai.gftd.apps.kotobase.datomic.*"   ; transact / q / pull / entid
+  :auth     :cacao-self-issued                  ; actor が自分の did:key で自己発行
+  :capabilities {:read  ["datom:read"]
+                 :write ["datom:transact" "tx:create"]}
+  :identity
+  {:per-actor     true                          ; 1 actor = 1 Ed25519 鍵
+   :path-template ".<actor>/identity.edn"       ; 例 .itonami/identity.edn（gitignore）
+   :persist       :load-or-create               ; 初回生成→保存→再読込
+   :graph         :key-derived-ipns             ; graph = 鍵由来 IPNS 名（k51qzi5uqu5d…）
+   :note "秘密鍵は git にコミットしない。手本 ai-gftd-itonami/src/itonami/cacao.clj"}}
+
+ ;; manifest/west.yml への変更の起こし方（非機密ポリシー）。west.yml は生成物
+ ;; （repos.edn ＋ 各子repo HEAD → gen-west-manifest.bb、手書き禁止 / --check）。
+ ;; superproject も shallow なので local 3-way merge は信頼できない（merge-base が
+ ;; graft 境界外で "unrelated histories" / ancestry 誤判定）。詳細は
+ ;; ADR-2606272237 / CLAUDE.md「## Git operations」。生成器(gen-west-manifest.bb)は
+ ;; このキーを読まない（ドキュメント用の宣言）。
+ :manifest-workflow
+ {:canonical    :api-single-entry            ; 登録/rename/pin前進すべて API でサーバ側 commit
+  :method       "tip の west.yml + blob SHA を取得 → 当該 entry の行だけ編集 → blob SHA 一致で PUT(branch,sha)"
+  :conflict     :impossible-by-optimistic-lock ; tip がずれれば 409 → 取得し直してリトライ（marker 解決が出ない）
+  :verify       :pin-eq-child-head           ; commit 前に pin == 子repo HEAD を確認
+  :never        [:local-shallow-edit         ; ローカルで shallow 編集/merge を戦わない
+                 :hand-edit-conflict-markers ; west.yml の <<<<<<< を手編集しない（手書き禁止）
+                 :force-push]
+  :if-must-merge {:resolve   :regenerate     ; 衝突は marker でなく再生成で解く
+                  :steps     "superset 側採用 → west update で子を目的 pin に → gen-west-manifest.bb → --check"
+                  :pin-regression-trap "再生成はローカル working HEAD で pin する。子が遅れていると黙ってロールバック → 再生成前に必ず west update"
+                  :ancestry  "固定 depth で賭けず compare API で merge-base を狙い撃ち取得"}
+  :after-api    :recheck-canonical           ; API 手編集は生成器を通らない → 落ち着いたら --check で一致確認
+  :child-repos  :plain-git                    ; 子repo は普通の git(branch/PR/push)。west は pin を記録するだけ
+  :note "正経路は API single-entry。実例 PR #61/#62/#86、kenchi-actor→kenchi-clj rename(34988dd)。"}
+
  ;; ネスト submodule を持つ project は west に再帰取得させる。
  ;; (未指定でも生成スクリプトが各 repo の .gitmodules を検出して自動付与する。
  ;;  ここは明示的に強制したい場合の上書き用。)

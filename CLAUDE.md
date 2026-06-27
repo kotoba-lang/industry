@@ -66,6 +66,24 @@ bb scripts/gen-west-manifest.bb
   実例: PR #61 / #62 / #86 は main の tree をベースにクリーン commit を API で
   作成してマージした（#86 は 31 リポの west 移行を regression なしで取り込み）。
 
+- **`manifest/west.yml` への変更（登録 / rename / pin 前進）は GitHub API の
+  サーバ側 single-entry commit を「唯一の正経路」にする。** west.yml は生成物
+  （`repos.edn` ＋ 各子repo HEAD → `gen-west-manifest.bb`、手書き禁止 / `--check`）
+  なので、行指向 pin を textual 3-way merge するのはアンチパターンで、conflict
+  marker の手編集は **pin を静かに壊す**。代わりに: tip の west.yml と blob SHA を
+  取得（dir listing から SHA を採ると巨大 base64 を避けられる）→ **当該 entry の
+  行だけ**編集 → blob SHA 一致で PUT（`branch=` `sha=`）。**tip がずれれば 409**
+  で弾かれる（取得し直してリトライ）ので **conflict が構造的に発生しない**。
+  commit 前に **pin == 子repo HEAD を検証**。API 手編集は生成器を通らないので、
+  落ち着いたら `bb scripts/gen-west-manifest.bb --check` で canonical 一致を確認。
+  やむを得ずローカル merge する場合のみ、west.yml の衝突は **marker 手編集でなく
+  再生成で解決**: superset 側採用 → `west update` で子を目的 pin に揃える
+  （⚠ 再生成はローカル working HEAD で pin するので、子が遅れていると黙って
+  ロールバックする＝pin 退行の罠）→ `gen-west-manifest.bb` → `--check`。子repo
+  自体は普通の git（branch/PR/push）。詳細は ADR-2606272237 / `repos.edn`
+  `:manifest-workflow`。実例: PR #61/#62/#86、kenchi-actor→kenchi-clj rename
+  （`34988dd`、diff は当該 entry のみ）。
+
 - **常に `main` と同期し、乖離を作らない（最優先）。** 何らかの git 操作
   （pull / checkout / commit / branch 作業の開始など）を行う前に、上流 `main`
   に更新があれば必ず先に同期する。ローカルが `main` より遅れている状態
@@ -90,6 +108,17 @@ bb scripts/gen-west-manifest.bb
   これは PreToolUse フック `.claude/hooks/git-push-main-sync-guard.bb`（babashka）で強制される
   （遅れた状態の `git push` は deny され、同期を促すメッセージが返る）。フックは
   破壊的な自動マージはしない（判定と指示のみ、fail-open）。
+
+- **force-push は禁止（`git push --force` / `--force-with-lease` / `+refs` を使わない）。**
+  共有リポ（superproject / 各 project）のいかなるブランチに対しても、履歴を書き換えて
+  上流を上書きする push をしてはならない。force-push は他の clone・west pin・
+  ancestry 判定を静かに壊し（shallow 環境では「前進」を「分岐」と誤検出する原因にも
+  なる）、`upload-pack: not our ref` 由来の checkout 失敗を引き起こす。乖離は
+  **force-push ではなく merge / rebase してから通常 push** で解消し、それが不可能な
+  場合（既に push 済みの履歴を変えたい等）は**勝手に強制せず必ずユーザーに報告**する。
+  履歴書き換えが本当に必要なときも、shallow 化に伴う rewrite と同様に**行わない**
+  （後述「大容量バイナリ」節と整合）。upstream を進めたいだけの単純更新は、ローカルで
+  戦うより GitHub API でサーバ側にクリーン commit を起こす（PR #61/#62/#86 の実績）。
 
 - **`main` への同期が未コミット/未追跡のローカル変更でブロックされた場合**、
   勝手に破棄しない。次の順で安全に同期する:
@@ -149,3 +178,47 @@ bb scripts/gen-west-manifest.bb
   260208-spirit-in-physics 等）は shallow では縮まないため、将来的に上記 B2+DataLad
   へ移すのが望ましい。なお shallow 化に伴う履歴書き換え＋force-push は**行わない**
   （main 乖離・共有リポへの影響を避けるため、shallow 運用で対処する）。
+
+## Actors（langgraph-clj StateGraph アクター）
+
+ドメインを「actor」として作るときは、既存3例の同型パターンに揃える:
+**robotaxi-actor**（AR1 ⊣ SafetyGovernor）/ **gftd-talent-actor**（HR-LLM ⊣
+PolicyGovernor）/ **ai-gftd-itonami**（ops-LLM ⊣ CertGovernor）。
+
+- **封じ込め + 独立 governor + 不変台帳。** 知能ノード（LLM/研究モデル）を1ノードに
+  封じ込め *proposal のみ* 返させ、別系統の Governor が検閲して 可決/拒否/人間承認 に
+  振る。単一不変条件「**governor が拒否する 書込/開示/作動/認証 を actor は決して
+  行わない**」。全 commit/hold を append-only の監査台帳に積む（台帳＝データ主権/
+  トレーサビリティの核）。
+- **langgraph-clj StateGraph。** 1 run = 1 操作（無限内部ループ無し）。`interrupt-before`
+  を human-in-the-loop（承認/テレオペ/耐空性サインオフ）に転用。checkpoint で監査可能。
+- **注入境界（swap）。** Store（`MemStore` ‖ `DatomicStore`）/ Advisor（mock ‖ 実LLM=
+  `langchain.model`）/ Phase（0→3 段階導入）を注入で差し替え、コアは不変。
+- **Store は `:db-api` 駆動。** backend へは langchain.db の `{:q :transact! :db :pull
+  :entid}` マップ越しにのみ喋る。`langchain.db/api`（in-process）と
+  `langchain.kotoba-db/kotoba-api`（kotoba-server XRPC）が同マップを実装するので、
+  同一 record が in-mem / 実 Datomic / kotoba pod を選ばず動く（contract test で
+  `MemStore ≡ DatomicStore` を保証）。直呼びせず必ず `:db-api` を介す。
+- **deps / lint / test。** `io.github.com-junkawasaki/langgraph-clj
+  {:local/root "../../com-junkawasaki/langgraph-clj"}` ＋ `:dev` で langchain-clj を
+  override（3 actor 同形の deps.edn）。`clojure -M:lint`（clj-kondo・errors fail）/
+  `clojure -M:dev:test`。`.cljc` は `edn`/`Exception` を `#?(:clj/:cljs)` 条件化して
+  JVM/cljs/WASM 可搬に保つ。
+- **west 登録。** 新 actor repo は GitHub API の単一 entry クリーン commit で
+  `manifest/west.yml` に登録し、pin 前進も API で行う（ローカル shallow 編集をしない、
+  diff は当該 entry のみ、**pin == repo HEAD を検証**）。手書き禁止＝再生成と byte 一致。
+
+### kotoba-server（kotobase.net）= actor が自分の鍵で CACAO を自己発行
+
+- 認証は **CACAO**（SIWE/EIP-4361 を Ed25519 did:key で署名、kotoba-auth
+  DelegationChain）。**actor ごとに鍵を発行**し、その**鍵由来 IPNS 名がその actor の
+  graph**（`kotoba/write.cljs`: *AUTHORITY は鍵由来 IPNS 名への署名であってサーバでは
+  ない*）。actor は鍵を持つことで自分の graph の owner → depth-1 の自己 mint が
+  構造的に authorized。**owner hand-off も共有 token も要らない**（「token をもらう／
+  owner が grant する」前提は誤り）。
+- 手本は `ai-gftd-itonami/src/itonami/cacao.clj`（JVM）: did:key(0xED01+base58btc →
+  `z6Mk…`)、鍵由来 IPNS(`ipns-name` → `k51qzi5uqu5d…`)、SIWE/wire は `kotoba.cacao` の
+  byte-exact 純関数を移植、署名は JDK Ed25519、最小 CBOR。`load-or-create-identity!`
+  で actor 鍵を 初回生成→永続→再読込。**秘密鍵は `.<actor>/identity.edn` に置き
+  gitignore（git に絶対コミットしない）**。`kotoba-store {:identity me}` で graph 既定
+  ＝鍵由来 IPNS ＋ 自己 mint。設定参照は `manifest/repos.edn` の `:kotoba`。
