@@ -18,7 +18,7 @@
   :clone-depth 1}            ; CLAUDE.md の shallow 既定に準拠
 
  ;; west update --group-filter で選択取得。datalad は既定で無効化(opt-in)。
- :group-filter ["+com-junkawasaki" "+gftdcojp" "+etzhayyim" "-datalad"]
+ :group-filter ["+com-junkawasaki" "+gftdcojp" "-etzhayyim" "-datalad"]
 
  ;; DataLad dataset(git-annex + B2)。west project にはするが既定では取得しない。
  ;;   実体取得/破棄は `west annex-get` / `west annex-drop`(B2 creds は環境変数)。
