@@ -158,10 +158,14 @@ consent、break-glass（緊急 + 必須監査）、rate/anomaly、device posture
 
 - **Store**: `:db-api` map `{:q :transact! :db :pull :entid}` 越し。`MemStore`（test/`.cljc`）
   ≡ `KotobaStore`（`langchain.kotoba-db/kotoba-api`、CACAO 自己発行）を **contract test で等価保証**。
-- **Crypto provider**: `kagi.crypto/Provider` プロトコル。**JVM = BouncyCastle**
-  (`bcprov-jdk18on ≥1.78`：ML-KEM/ML-DSA/SLH-DSA を JCA 提供、Ed25519/AES-GCM は JDK+BC)、
+- **Crypto provider**: `kagi.crypto/Provider` プロトコル。**JVM = `jvm-provider`**
+  ＝ **JDK 24 標準**の ML-KEM-768(JEP 496/FIPS 203) と ML-DSA-65(JEP 497/FIPS 204)、
+  Ed25519/X25519/AES-256-GCM/HMAC は JDK、**Argon2id だけ BouncyCastle** の低レベル
+  `Argon2BytesGenerator`（JDK に無いため。`bcprov-jdk18on` を deps に保持）。
   **CLJS/WASM = kotoba-crypto Rust**（`ml-kem`/`ml-dsa` RustCrypto を `kotoba-crypto` に増設）。
   `:db-api` と同じく実装を差し替えてもコア不変。
+  *(設計時は BC を一次想定したが、probe で BC 1.78.1 は pre-standard `DILITHIUM` のみ・
+  ML-KEM 未提供と判明。JDK 24 が標準名で両者を final 提供するため JDK-native に確定。)*
 - **Phase**: 0 read-only(shadow audit) → 1 self-vault → 2 team share → 3 supervised auto-rotation。
 
 ### 7. identity（既存を継承、PQC は加法）
