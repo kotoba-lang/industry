@@ -217,25 +217,27 @@ EDN(canonical, doc CID) / SVG(`kasane.svg`→svgraph) / kotoba Datom(`kasane.qua
 | **PNG** | `grammar/png.edn`(データ) + `kasane.png`(IDAT=zlib→既存 inflate + unfilter) + `png->doc` | ✅ |
 | **BMP** | `grammar/bmp.edn`(データ, LE) + `bmp->doc` | ✅ ヘッダ（pixels=blob） |
 | **TIFF** | `kasane.tiff`(offset-based IFD 手書き, byte-order 自動判定, SHORT/LONG) + `tiff->doc` | ✅ メタ（dims/comp/bps） |
-| **GIF** | `grammar/gif.edn`(header/LSD) + `kasane.gif`(frame scan) + `gif->doc` | ✅ dims/frames（LZW pixel は保留） |
+| **GIF** | `grammar/gif.edn` + `kasane.gif`(frame scan + LZW pixels + de-interlace) | ✅ dims/frames + **画素 bit-exact** |
 | **ZIP** | `kasane.zip`(中央ディレクトリ + member を inflate-raw) | ✅ Sketch/.docx/.xlsx/.pptx/ODF/EPUB の基盤 |
-| **Sketch** | `sketch->doc`(`pages/*.json`→artboard、`kasane.json` で意味解析) | ✅ artboard 名+frame→bbox |
-| **OOXML** | `ooxml->doc`(docx/pptx/xlsx 判定 + テキスト抽出 w:t/a:t/t) | ✅ text runs |
-| **JSON** | `kasane.json`(純 cljc 依存ゼロ JSON リーダ) | ✅ Sketch 等の基盤 |
-| **TTF/OTF** | `kasane.ttf`(SFNT table directory + head/maxp/name) | ✅ family/units/glyph 数（実 OFL font で head magic 検証） |
-| **LZW** | `kasane.codec/lzw` (MSB early / LSB) | ✅ TIFF=bit-exact(実 libtiff)、PDF=対応 / ⚠ GIF=experimental(画素数のみ一致) |
-| テスト | bb 純 cljc スイート | ✅ **27 tests / 104 assertions green** |
+| **Sketch** | `sketch->doc`(`pages/*.json` を `kasane.json` で解析→入れ子レイヤツリー) | ✅ artboard/layer 木 + frame→bbox |
+| **OOXML** | `ooxml->doc` | ✅ docx/xlsx テキスト、**pptx 図形ジオメトリ(EMU)+テキスト** |
+| **JSON** | `kasane.json`(純 cljc 依存ゼロ JSON リーダ) | ✅ Sketch/glTF の基盤 |
+| **TTF/OTF** | `kasane.ttf`(SFNT directory + head/maxp/name) | ✅ family/units/glyph（実 OFL font で head magic 検証） |
+| **glTF/GLB** | `kasane.gltf`(GLB chunk + .gltf JSON) | ✅ scene/mesh ノード（name+transform） |
+| **SVG** | `kasane.svg`(XML shape 要素) | ✅ vector/text/raster ノード |
+| **JPEG** | `kasane.jpeg`(marker 走査) | ✅ 寸法/成分/progressive（**画素は DCT 未復号=opaque blob**, ADR-2606280010） |
+| **LZW** | `kasane.codec/lzw` (MSB early / LSB) | ✅ **TIFF/GIF とも bit-exact**(実 libtiff/Pillow fixture)、PDF=対応 |
+| テスト | bb 純 cljc スイート | ✅ **34 tests / 139 assertions green** |
 
-DEFLATE/zlib inflate は PSD-ZIP・PDF-Flate・PNG-IDAT・**ZIP(Sketch/OOXML/ODF/EPUB)** を
-**1 本で**賄えており、「形式追加＝EDN/ns 追加で増える」設計が実証された（PDF は線形文法に
-乗らないので `kasane.cos`、TIFF/TTF は offset-based なので `kasane.tiff`/`kasane.ttf`、ZIP は
-`kasane.zip` と、非線形だけ手書きに分岐）。
+DEFLATE/zlib inflate は PSD-ZIP・PDF-Flate・PNG-IDAT・**ZIP(Sketch/OOXML/ODF/EPUB)** を、
+LZW は TIFF/GIF/PDF を **それぞれ 1 本で**賄っており、「形式追加＝EDN/ns 追加で増える」設計が
+実証された（線形=EDN 文法、非線形だけ手書き: PDF=`kasane.cos`、TIFF/TTF=offset-based、
+ZIP=`kasane.zip`、JSON+binary=`kasane.gltf`）。
 
-**LZW** は実 libtiff エンコードの fixture で **TIFF を bit-exact 検証**（9→10→11→12bit の
-code-width 境界跨ぎ含む。確定規則: early-change で next-free-code == 2^width−1 で width++）。
-**GIF(LSB) は experimental** — 画素数は正しいが行/辞書境界で参照と値が食い違うため未確定
-（共有 LZW コアは TIFF で実証済み）。JPEG 系（DCT/JPX）は別 ADR、R0 は opaque blob 通し。
-次手: GIF LZW の境界整合、Sketch/OOXML のレイヤ/図形ジオメトリ、glTF/WOFF2。
+**LZW は TIFF・GIF とも実ファイル fixture で bit-exact 確定**（TIFF: early-change で
+next-free-code==2^width−1 で width++ / GIF: interlace の 4-pass de-ordering が値ズレの原因
+だった）。**JPEG/DCT の画素復号は別ライン**（ADR-2606280010、R0 はメタデータ+opaque blob）。
+次手: JPEG baseline デコーダ(R1)、WOFF/WOFF2、HEIC/AVIF は範囲外。
 
 ## References
 
