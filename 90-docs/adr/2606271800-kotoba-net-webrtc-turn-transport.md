@@ -147,23 +147,22 @@ hole-punch で確立。connect.edn の `:dialable` がこの非対称を表現�
   (com-junkawasaki/kotoba#228, stacked on #227). `cargo check -p kotoba-server` =
   Finished, exit 0. Operator-gated; mints the browser `iceServers` config via
   `kotoba_turn::ice`.
-- **P2 Patch B BLOCKED on a libp2p upgrade (compile-attempted 2026-06-27)** — the
-  `kotoba-net` `libp2p-webrtc` transport. The dep *resolves and fetches fine* (network
-  is available), but **no published `libp2p-webrtc` alpha pairs with libp2p 0.53**:
-  `0.7.0-alpha` targets `libp2p-core 0.40` (libp2p 0.52) and `0.8.0-alpha` targets
-  `libp2p-core 0.42` (libp2p 0.54) — there is **no release for `libp2p-core 0.41`
-  (= our libp2p 0.53)**. `cargo check -p kotoba-net --features webrtc` with `0.7.0-alpha`
-  fails *inside* the alpha crate (`upgrade.rs` `?` can't convert across a duplicated
-  `libp2p-noise` 0.43 vs 0.44), and `0.8.0-alpha` pulls a duplicate `libp2p-core` 0.42
-  vs 0.41 (the webrtc `Transport`'s `Output` types wouldn't satisfy `with_other_transport`
-  anyway). **Prerequisite: bump the workspace to libp2p 0.54 (core 0.42), then use
-  `libp2p-webrtc 0.8.0-alpha`** — a workspace-wide libp2p migration (kotoba-net / dht /
-  lattice / server) that is its own scoped task, not part of this transport patch. The
-  swarm wiring shape (Patch B below) is correct and reusable after that bump.
-- **connect.edn stays unflipped** — `:native :live` keeps `[:quic]` until the
-  `kotoba-net` transport actually speaks WebRTC on provisioned nodes; flipping it
-  early would make murakumo place `:reach :browser/live` apps where browsers can't yet
-  reach them. The flip is the LAST step of P2.
+- **P2 Patch B DONE + verified (kotoba#229, 2026-06-27)** — the `kotoba-net`
+  `libp2p-webrtc` (webrtc-direct) transport. The blocker was a version-pairing gap (no
+  `libp2p-webrtc` alpha for libp2p 0.53's `libp2p-core 0.41`: 0.7-alpha→core 0.40, 0.8-
+  alpha→core 0.42). Resolution: **bump the workspace to libp2p 0.54** — which compiled
+  with **ZERO source changes** across the whole workspace (kotoba only uses libp2p in
+  `kotoba-net` + `kotoba-lattice`) — then add `libp2p-webrtc 0.8.0-alpha` (core 0.42,
+  single version). Verified: `cargo check --workspace` (0 errors), `cargo check -p
+  kotoba-net --features webrtc` (0 errors), `cargo check -p kotoba-server --features p2p`
+  (0 errors). The transport is **default-off** (feature `webrtc`); QUIC native↔native
+  is unchanged.
+- **connect.edn stays unflipped (last step remaining)** — the transport now *compiles*,
+  but `:native :live` keeps `[:quic]` until nodes actually *speak* WebRTC at runtime:
+  a `/webrtc-direct` listen address + a `KOTOBA_WEBRTC` env gate + murakumo provisioning
+  the `webrtc`-feature build. Flipping early would make murakumo place `:reach
+  :browser/live` apps where browsers can't yet reach them. Feature compiling ≠ nodes
+  speaking WebRTC.
 
 ### Patch A — `kotoba-server` `turn.credential` XRPC ✅ DONE (kotoba#228)
 
@@ -223,6 +222,6 @@ immediately makes `:reach :browser/live` apps eligible on that node (proven offl
 
 ## References
 - ADR-2606271700 — 2平面 + 5プロトコル比較 + connect.edn 単一記述（本 ADR の上位）。
-- com-junkawasaki/kotoba#226 (P1 listener) / #227 (P2 ice core) / #228 (P2 turn.credential XRPC)。
+- com-junkawasaki/kotoba#226 (P1 listener) / #227 (P2 ice core) / #228 (P2 turn.credential XRPC) / #229 (P2 libp2p 0.54 + webrtc-direct transport)。
 - `kotoba/CLAUDE.md` の `kotoba-turn` 項 — socket-free core done / async listener shell remaining。
 - libp2p: `webrtc-direct` certhash multiaddr, circuit-relay-v2, dcutr。
