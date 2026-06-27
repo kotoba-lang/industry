@@ -147,10 +147,19 @@ hole-punch で確立。connect.edn の `:dialable` がこの非対称を表現�
   (com-junkawasaki/kotoba#228, stacked on #227). `cargo check -p kotoba-server` =
   Finished, exit 0. Operator-gated; mints the browser `iceServers` config via
   `kotoba_turn::ice`.
-- **P2 remaining (Patch B below)** — only the `kotoba-net` `libp2p-webrtc` transport.
-  It adds a new alpha dependency (`libp2p-webrtc`, a registry fetch on libp2p 0.53)
-  and is best landed in a build environment with crates.io access; it is **not**
-  compile-verified here, so this ADR carries the exact patch rather than half-built code.
+- **P2 Patch B BLOCKED on a libp2p upgrade (compile-attempted 2026-06-27)** — the
+  `kotoba-net` `libp2p-webrtc` transport. The dep *resolves and fetches fine* (network
+  is available), but **no published `libp2p-webrtc` alpha pairs with libp2p 0.53**:
+  `0.7.0-alpha` targets `libp2p-core 0.40` (libp2p 0.52) and `0.8.0-alpha` targets
+  `libp2p-core 0.42` (libp2p 0.54) — there is **no release for `libp2p-core 0.41`
+  (= our libp2p 0.53)**. `cargo check -p kotoba-net --features webrtc` with `0.7.0-alpha`
+  fails *inside* the alpha crate (`upgrade.rs` `?` can't convert across a duplicated
+  `libp2p-noise` 0.43 vs 0.44), and `0.8.0-alpha` pulls a duplicate `libp2p-core` 0.42
+  vs 0.41 (the webrtc `Transport`'s `Output` types wouldn't satisfy `with_other_transport`
+  anyway). **Prerequisite: bump the workspace to libp2p 0.54 (core 0.42), then use
+  `libp2p-webrtc 0.8.0-alpha`** — a workspace-wide libp2p migration (kotoba-net / dht /
+  lattice / server) that is its own scoped task, not part of this transport patch. The
+  swarm wiring shape (Patch B below) is correct and reusable after that bump.
 - **connect.edn stays unflipped** — `:native :live` keeps `[:quic]` until the
   `kotoba-net` transport actually speaks WebRTC on provisioned nodes; flipping it
   early would make murakumo place `:reach :browser/live` apps where browsers can't yet
@@ -166,30 +175,43 @@ new external crate). `GET /xrpc/com.etzhayyim.apps.kotoba.turn.credential?room=&
 the relay (P1) also loads; STUN/TURN URLs from `KOTOBA_STUN_URLS`/`KOTOBA_TURN_URLS`.
 Verified: `cargo check -p kotoba-server` = exit 0.
 
-### Patch B — `kotoba-net` `libp2p-webrtc` transport (adds an alpha dep)
+### Patch B — `kotoba-net` `libp2p-webrtc` transport (AFTER the libp2p 0.54 bump)
+
+The wiring shape below was authored + tried against libp2p 0.53 (see the BLOCKED note
+above). It is correct and reusable; apply it **once the workspace is on libp2p 0.54**
+with `libp2p-webrtc = "0.8.0-alpha"` (the version whose `libp2p-core 0.42` then matches).
 
 ```toml
-# Cargo.toml (workspace)  — new optional dep
-libp2p-webrtc = { version = "0.7.0-alpha", features = ["tokio"], optional = true }
+# Cargo.toml (workspace)
+libp2p-webrtc = { version = "0.8.0-alpha", features = ["tokio"] }   # needs libp2p 0.54
 
 # crates/kotoba-net/Cargo.toml
-# libp2p-webrtc = { workspace = true, optional = true }
-# [features]
-# webrtc = ["dep:libp2p-webrtc"]
+libp2p-webrtc = { workspace = true, optional = true }
+rand          = { workspace = true, optional = true }   # webrtc-direct cert RNG
+[features]
+webrtc = ["dep:libp2p-webrtc", "dep:rand"]
 ```
 
 ```rust
 // crates/kotoba-net/src/swarm.rs — compose webrtc-direct alongside QUIC.
-// The SwarmBuilder already does .with_tokio().with_quic(); add:
-let mut b = libp2p::SwarmBuilder::with_existing_identity(keypair)
-    .with_tokio()
-    .with_quic();
+// Two inlined arms (not factored) so the `with_behaviour` closure keeps inference:
 #[cfg(feature = "webrtc")]
-let b = b.with_other_transport(|key| {
+let mut swarm = {
     let cert = libp2p_webrtc::tokio::Certificate::generate(&mut rand::thread_rng())?;
-    Ok(libp2p_webrtc::tokio::Transport::new(key.clone(), cert))
-})?;
-let mut swarm = b.with_behaviour(|_| behaviour)?.build();
+    libp2p::SwarmBuilder::with_existing_identity(keypair)
+        .with_tokio()
+        .with_quic()
+        .with_other_transport(move |key| {
+            libp2p_webrtc::tokio::Transport::new(key.clone(), cert)
+        })?
+        .with_dns()?
+        .with_relay_client(libp2p::noise::Config::new, libp2p::yamux::Config::default)?
+        .with_behaviour(/* … KotobaBehaviour … */)?
+        .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
+        .build()
+};
+#[cfg(not(feature = "webrtc"))]
+let mut swarm = /* the existing QUIC-only builder, unchanged */;
 // listen addr: /ip4/<tailscale-ip>/udp/<port>/webrtc-direct
 // (cert hash is advertised in the emitted multiaddr; browser dials via js-libp2p)
 ```
