@@ -143,6 +143,10 @@ approved effect だけを handler map で実行する。handler がない effect
 これにより Hermes/OpenClaw 互換 tool-calling model は store 内の activity を読み、
 proposed effect を同じ kotoba/datom log に残せる。
 
+`cloud-itonami.kotoba` は JVM host-caps、`langchain.kotoba-db/kotoba-api`、schema install、
+facts import、counts、store-backed mock ReAct を CLI として提供する。接続情報は
+`KOTOBA_URL` / `KOTOBA_GRAPH` / `KOTOBA_TOKEN` または `KOTOBA_CACAO` + `KOTOBA_DID` から読む。
+
 ## Closure
 
 本 ADR は 2026-06-27 時点で closing。決定した統合境界は実装済み。
@@ -169,6 +173,7 @@ proposed effect を同じ kotoba/datom log に残せる。
 - `orgs/gftdcojp/cloud-itonami/src/cloud_itonami/m365.cljc`
 - `orgs/gftdcojp/cloud-itonami/src/cloud_itonami/facts.clj`
 - `orgs/gftdcojp/cloud-itonami/src/cloud_itonami/store.clj`
+- `orgs/gftdcojp/cloud-itonami/src/cloud_itonami/kotoba.clj`
 - `orgs/gftdcojp/cloud-itonami/src/cloud_itonami/operating.cljc`
 - `orgs/gftdcojp/cloud-itonami/src/cloud_itonami/agent.clj`
 - `orgs/gftdcojp/cloud-itonami/src/cloud_itonami/runtime.clj`
@@ -179,7 +184,7 @@ proposed effect を同じ kotoba/datom log に残せる。
 
 2026-06-27 の実装検証:
 
-- `bb test`: 16 tests, 59 assertions, 0 failures, 0 errors
+- `clojure -M:test`: 19 tests, 68 assertions, 0 failures, 0 errors
 - `git annex get facts/procedure-terms.edn facts/hr-terms.edn facts/people.edn facts/ses-engineers.edn facts/ses-cases.edn`
   で社員・手続き・SES facts content を取得
 - `clojure -M:ingest ../m365-archive/facts procedure-terms hr-terms people ses-engineers ses-cases`
@@ -190,9 +195,13 @@ proposed effect を同じ kotoba/datom log に残せる。
   再オープン後も同じ counts を確認
 - `clojure -M:runtime mock-react /tmp/cloud-itonami-procedure-hr.edn 手続きを進めて gftd-procedure-thread`
   で checkpoint 5 件と financial proposed effect 1 件を同じ store に追加
+- `clojure -M:kotoba` は `KOTOBA_URL is required` まで起動確認
+- `cloud-itonami.kotoba-test` で schema install と facts import が injected kotoba `db-api`
+  transaction に流れることを確認
 
 SES / people を含む 11,667 activities の全 subset store import は local `langchain.db` では重い。
-全量永続化は kotoba-backed store で再検証する。
+この checkout では `KOTOBA_URL` / `KOTOBA_GRAPH` が未設定のため、全量永続化は kotoba-backed
+store の実接続設定後に再検証する。
 
 ## Closed Decision
 

@@ -25,6 +25,7 @@
   :implementation {:language ".cljc"
                    :local_store "cloud-itonami.store over langchain.db"
                    :production_store "langchain.kotoba-db / kotoba-server XRPC"
+                   :kotoba_cli "cloud-itonami.kotoba"
                    :agent "langgraph-clj/langchain-clj"
                    :runtime "cloud-itonami.runtime"
                    :approval_runner "cloud-itonami.approval"
@@ -61,10 +62,12 @@
    :mes_projector "cloud-itonami.mes/kyber-completion->tx"}
   :operating_model "cloud-itonami.operating/lane-catalog"
   :store {:local "cloud-itonami.store"
+          :kotoba "cloud-itonami.kotoba"
           :import "actor/artifact -> activity -> relation/decision/effect/audit"
           :many_refs "expanded to :db/add"
           :lookup_refs "tempid optimized within batch"
-          :production_swap "langchain.kotoba-db"}
+          :production_swap "langchain.kotoba-db"
+          :env ["KOTOBA_URL" "KOTOBA_GRAPH" "KOTOBA_TOKEN" "KOTOBA_CACAO" "KOTOBA_DID"]}
   :approval {:queue "cloud-itonami.approval/pending-approvals"
              :states [:proposed :approved :rejected :executed :failed]
              :execution "cloud-itonami.approval/execute-approved!"
@@ -99,8 +102,14 @@
    :approval {:kind :procedure.review
               :risk :financial
               :status :proposed}}
+  :kotoba_verified_2026_06_27
+  {:unit "cloud-itonami.kotoba-test"
+   :cli "clojure -M:kotoba"
+   :cli_without_env "KOTOBA_URL is required"
+   :real_server_verified false
+   :reason "KOTOBA_URL / KOTOBA_GRAPH are not set in this checkout environment"}
   :verification_note_2026_06_27
-  "Annex pointer facts are now resolved by cloud-itonami.facts when content is locally available; full 11667 activity subset should be persisted on kotoba-backed store rather than local langchain.db."}
+  "Annex pointer facts are now resolved by cloud-itonami.facts when content is locally available; full 11667 activity subset should be persisted on kotoba-backed store after KOTOBA_URL and KOTOBA_GRAPH are configured."}
  :kyber_refactor
  {:keep_kyber_as "internal/compatibility PLM/ERP/MES invariant engine"
   :public_api ["cloud-itonami.plm" "cloud-itonami.ops"]
