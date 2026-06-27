@@ -6,7 +6,7 @@
 - **source of truth = `manifest/repos.edn`**（ポリシー: remote / 既定 / group-filter /
   DataLad / B2）。`manifest/west.yml` は **手書きせず** `scripts/gen-west-manifest.bb`
   が EDN + git の事実（各 working tree HEAD）から生成する。
-- **34 project を west 管理**。うち **33 は通常の git repo**、**1 は DataLad dataset**
+- **35 project を west 管理**。うち **34 は通常の git repo**、**1 は DataLad dataset**
   （`m365-archive`、git-annex + B2）。
 
 ## トポロジ

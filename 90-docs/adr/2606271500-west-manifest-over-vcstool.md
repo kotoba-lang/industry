@@ -137,3 +137,20 @@ main 記録値に固定し、west は untracked を消さず tracked 衝突時�
 - 関連: ADR-2606241428（肥大 submodule の shallow 運用 + B2/DataLad）,
   ADR-2606241600（shallow depth1 を git 既定に）
 - PR: #86 / #87 / #88（com-junkawasaki/root）
+
+## 完了・最終状態（2026-06-27 追記）
+
+移行は完了し、superproject(`com-junkawasaki/root`)は west 一元管理になった。
+
+- **submodule 全廃**: `.gitmodules` なし / index gitlink 0 / ローカル `.git/config` の
+  旧 submodule entry(76件・`submodule.recurse=true` 含む)も掃除済み。
+- **manifest が source of truth**: 35 project(34 通常 + DataLad の m365-archive 1)。
+  新規リポ(aiueos / ai-gftd-yukkuri / club-shinshi など)は submodule ではなく
+  manifest に追加する運用が定着。
+- **改名の統合**: `drawingml-svg` は `svgraph` へ改名済み。旧名の重複エントリ
+  (孤児 pin 0035b035、origin から消失)を manifest/.gitignore から除去した。
+- **B2 認証**: `scripts/b2-creds.bb` が env→1Password→Keychain で解決(PR #88)。
+- **未 PR 作業の救済**: 各 project の未push 作業/stash は reconcile ブランチ・PR 化して
+  消失を防止(stash は branch に移行)。機密(litigation)は push せずローカル branch で温存。
+- **残レガシー(無害)**: `.git/modules` に network-isekai/root の git 実体が gitfile 参照で
+  残るが機能上問題なし(完全除去は .git 再配置が必要なため見送り)。
