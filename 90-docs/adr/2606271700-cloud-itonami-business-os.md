@@ -102,6 +102,7 @@ Lane ごとの既定 owner/default policy は `cloud-itonami.operating/lane-cata
 
 ```sh
 clojure -M:ingest ../m365-archive/facts procedure-terms hr-terms people ses-engineers ses-cases
+clojure -M:ingest report ../m365-archive/facts procedure-terms hr-terms people ses-engineers ses-cases
 ```
 
 結果:
@@ -110,6 +111,13 @@ clojure -M:ingest ../m365-archive/facts procedure-terms hr-terms people ses-engi
 {:facts {:hr-terms 101, :people 5418, :procedure-terms 118, :ses-cases 2168, :ses-engineers 3862}
  :tx {:activities 11667, :actors 5526, :artifacts 219, :decisions 0, :effects 11667, :relations 0, :audits 0}}
 ```
+
+`report` は facts ごとの `:available?`、件数、tx summary を返す。未取得 git-annex pointer は
+全体を失敗させず、対象 pointer と `git annex get facts/<name>.edn` を返す。
+2026-06-27 時点では社員・手続き・SES subset はすべて `:available? true`。一方、
+`contract-att-terms` / `billing-att-terms` / `finance-terms` / `current-billing` /
+`invoice-amounts-recovered` / `financials-*` / `trial-balance` / `chart-of-accounts` は
+adapter 登録済みだが、この checkout では annex object 未取得のため `:available? false`。
 
 ## Agent Loop
 
@@ -146,6 +154,15 @@ proposed effect を同じ kotoba/datom log に残せる。
 `cloud-itonami.kotoba` は JVM host-caps、`langchain.kotoba-db/kotoba-api`、schema install、
 facts import、counts、store-backed mock ReAct を CLI として提供する。接続情報は
 `KOTOBA_URL` / `KOTOBA_GRAPH` / `KOTOBA_TOKEN` または `KOTOBA_CACAO` + `KOTOBA_DID` から読む。
+`cloud-itonami.company` は gftdcojp/gftdjapan の現在の手続き・社員 operating set
+（`procedure-terms` / `hr-terms` / `people` / `ses-engineers` / `ses-cases`）を
+coverage、local bulk import、mock React bootstrap する CLI として提供する。
+
+HermesAgent / OpenClaw は `cloud-itonami.runtime/real-model` で OpenAI-compatible tool-calling
+endpoint として扱う。`ITO_MODEL_PROVIDER=openclaw|hermes|openai|anthropic`、
+`ITO_MODEL_URL`、`ITO_MODEL`、`ITO_MODEL_API_KEY` で file-backed store 上の `real-react` を実行する。
+approval queue は `cloud-itonami.approval` CLI から `list` / `approve` / `reject` /
+`execute` / `execute-dry-run` できる。
 
 ## Closure
 
@@ -174,6 +191,7 @@ facts import、counts、store-backed mock ReAct を CLI として提供する。
 - `orgs/gftdcojp/cloud-itonami/src/cloud_itonami/facts.clj`
 - `orgs/gftdcojp/cloud-itonami/src/cloud_itonami/store.clj`
 - `orgs/gftdcojp/cloud-itonami/src/cloud_itonami/kotoba.clj`
+- `orgs/gftdcojp/cloud-itonami/src/cloud_itonami/company.clj`
 - `orgs/gftdcojp/cloud-itonami/src/cloud_itonami/operating.cljc`
 - `orgs/gftdcojp/cloud-itonami/src/cloud_itonami/agent.clj`
 - `orgs/gftdcojp/cloud-itonami/src/cloud_itonami/runtime.clj`
@@ -184,24 +202,44 @@ facts import、counts、store-backed mock ReAct を CLI として提供する。
 
 2026-06-27 の実装検証:
 
-- `clojure -M:test`: 19 tests, 68 assertions, 0 failures, 0 errors
+- `clojure -M:test`: 25 tests, 94 assertions, 0 failures, 0 errors
 - `git annex get facts/procedure-terms.edn facts/hr-terms.edn facts/people.edn facts/ses-engineers.edn facts/ses-cases.edn`
   で社員・手続き・SES facts content を取得
 - `clojure -M:ingest ../m365-archive/facts procedure-terms hr-terms people ses-engineers ses-cases`
   で `activities=11667, actors=5526, artifacts=219, effects=11667`
+- `clojure -M:company coverage ../m365-archive/facts`
+  で `procedure-terms` / `hr-terms` / `people` / `ses-engineers` / `ses-cases` がすべて
+  `:available? true`
+- `clojure -M:company import /tmp/cloud-itonami-company.edn ../m365-archive/facts`
+  で local file-backed store に bulk import。unique upsert 後
+  `activities=10938, actors=5511, artifacts=219, effects=10938, datoms=176717`
+- `/tmp/cloud-itonami-company.edn` に対して `clojure -M:runtime mock-react ... gftd-company-thread`、
+  `clojure -M:approval list`、`approve`、`execute-dry-run` を実行し、
+  `activities=10938, effects=10939, checkpoints=5, decisions=1, audits=2`
 - `clojure -M:store import /tmp/cloud-itonami-procedure-hr.edn ../m365-archive/facts procedure-terms hr-terms`
   取得済み store で `activities=219, artifacts=219, actors=93, effects=219`
 - `clojure -M:store counts /tmp/cloud-itonami-procedure-hr.edn`
   再オープン後も同じ counts を確認
 - `clojure -M:runtime mock-react /tmp/cloud-itonami-procedure-hr.edn 手続きを進めて gftd-procedure-thread`
   で checkpoint 5 件と financial proposed effect 1 件を同じ store に追加
+- fixture store で `clojure -M:runtime mock-react` -> `clojure -M:approval list` ->
+  `approve` -> `execute-dry-run` を通し、`audits=2, decisions=1, checkpoints=5` を確認
+- expanded fixture store で `procedure-terms + finance-terms + current-billing` を import し、
+  `activities=3, artifacts=2, effects=4, checkpoints=5, decisions=1, audits=2` を確認
+- `contract-att-terms` / `billing-att-terms` / `finance-terms` / `current-billing` /
+  `invoice-amounts-recovered` / `financials-*` / `trial-balance` / `chart-of-accounts`
+  の adapter と kind 登録を追加
+- `clojure -M:ingest report ...` を追加し、取得済み facts は件数と tx summary、未取得 annex content は
+  `Annex object is not available locally` と `git annex get facts/<name>.edn` の取得コマンドを返す
+- `cloud-itonami.runtime-test` で OpenClaw/OpenAI-compatible model factory の request と Bearer auth を確認
 - `clojure -M:kotoba` は `KOTOBA_URL is required` まで起動確認
 - `cloud-itonami.kotoba-test` で schema install と facts import が injected kotoba `db-api`
   transaction に流れることを確認
 
-SES / people を含む 11,667 activities の全 subset store import は local `langchain.db` では重い。
-この checkout では `KOTOBA_URL` / `KOTOBA_GRAPH` が未設定のため、全量永続化は kotoba-backed
-store の実接続設定後に再検証する。
+SES / people を含む会社 operating subset は local `langchain.db` file store に bulk snapshot として永続化し、
+mock React loop と approval dry-run まで検証済み。この checkout では `KOTOBA_URL` / `KOTOBA_GRAPH`
+が未設定のため、kotoba-backed store の実接続検証は接続設定後に行う。finance/billing 拡張 facts は一部 annex content 未取得のため、
+取得後に実データ件数を再集計する。
 
 ## Closed Decision
 
