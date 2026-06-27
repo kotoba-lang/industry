@@ -72,26 +72,39 @@
       :org "gftdcojp"
       :ssot "orgs/gftdcojp/ai-gftd-apps-gftdcojp/README.md"}
     {
-      :name "spirit-in-physics"
-      :path "orgs/com-junkawasaki/spirit-in-physics"
+      :name "org-spirit-in-physics"
+      :path "orgs/com-junkawasaki/org-spirit-in-physics"
       :kind "research"
       :submodule true
-      :remote "git@github.com:com-junkawasaki/spirit-in-physics.git"
+      :remote "git@github.com:com-junkawasaki/org-spirit-in-physics.git"
+      :renamed-from "spirit-in-physics"
       :description "「Spirit in Physics」研究リポジトリ（web + mobile アプリ, jung-voice-assessment 音声 dataset, 論文 PDF）。大容量ファイルは Git LFS から DataLad/git-annex へ移行予定。"
       :stack ["Svelte" "Capacitor" "TypeScript"]
-      :adrs ["orgs/kawasakijun/docs/adr/0006-spirit-in-physics-lfs-to-datalad.md"]
+      :adrs ["orgs/kawasakijun/docs/adr/0006-spirit-in-physics-lfs-to-datalad.md"
+             "orgs/kawasakijun/docs/adr/0022-spirit-in-physics-svelte-ts-to-clojure-kami-engine.md"]
+      :reimplementation {
+        :target "orgs/com-junkawasaki/kami-engine/kami-app-sip-clj"
+        :stack ["Clojure" "ClojureScript" "Datomic/datalevin" "Kotoba" "kami-render(wgpu)"]
+        :status "移行中（ADR-0022）: アプリ層コア完成・統合段階 / エンジン層(kami-engine-clj) ~70-80%。旧 Svelte/TS はパリティ達成まで現役"
+        :story-bible-source "orgs/com-junkawasaki/org-spirit-in-physics-comics"}
       :large_files {
         :current "git-lfs (+ orphaned git-annex pointers)"
         :target "datalad/git-annex"
         :status "unblocked 2026-06-09: lfs fetch OK (114 obj/2.6MB); migration pending (ADR-0006)"}}
     {
-      :name "260208-spirit-in-physics"
-      :path "orgs/com-junkawasaki/260208-spirit-in-physics"
+      :name "org-spirit-in-physics-comics"
+      :path "orgs/com-junkawasaki/org-spirit-in-physics-comics"
       :kind "research"
       :submodule true
-      :remote "git@github.com:com-junkawasaki/260208-spirit-in-physics.git"
-      :description "「Spirit in Physics」関連リポジトリ（2026-02-08 スナップショット）。大容量ファイル機構なし（通常リポジトリ）。"
-      :adrs ["orgs/kawasakijun/docs/adr/0006-spirit-in-physics-lfs-to-datalad.md"]}
+      :remote "git@github.com:com-junkawasaki/org-spirit-in-physics-comics.git"
+      :renamed-from "260208-spirit-in-physics"
+      :description "「Spirit in Physics」グラフィックノベル（8 巻 / 62 章）。clj 版アプリ kami-app-sip-clj の story-bible source of truth（volumes/personas/emotions/storyboards の EDN）。Cloudflare Pages で comics.spirit-in-physics.org に公開（private repo / static deploy）。"
+      :story-bible-for "orgs/com-junkawasaki/kami-engine/kami-app-sip-clj"
+      :published {:url "https://comics.spirit-in-physics.org"
+                  :host "Cloudflare Pages (org-spirit-in-physics-comics project, ai-gftd-cloud)"
+                  :build "bb build → public/ (babashka static reader from EDN)"}
+      :adrs ["orgs/kawasakijun/docs/adr/0006-spirit-in-physics-lfs-to-datalad.md"
+             "orgs/kawasakijun/docs/adr/0022-spirit-in-physics-svelte-ts-to-clojure-kami-engine.md"]}
     {
       :name "webmaster"
       :path "orgs/com-junkawasaki/webmaster"
