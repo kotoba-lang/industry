@@ -1,0 +1,122 @@
+{:frontmatter
+ {:id "adr-2606271700-cloud-itonami-business-os"
+  :title "cloud-itonami — manimani 企業版として gftdcojp business activity を統合する"
+  :status "closed"
+  :date "2026-06-27"
+  :closed "2026-06-27"
+  :authoritative true
+  :repo "orgs/gftdcojp/cloud-itonami"
+  :builds_on ["orgs/com-junkawasaki/manimani"
+              "orgs/gftdcojp/kyber-plm"
+              "orgs/gftdcojp/m365-archive"
+              "orgs/com-junkawasaki/kotoba"
+              "orgs/com-junkawasaki/langgraph-clj"]}
+ :decision
+ {:product "cloud-itonami"
+  :placement :gftdcojp
+  :subject :enterprise
+  :definition "manimani の business 版。gftdcojp の business activity を kotoba/datom log 上の activity/decision/effect/audit に統合する。"
+  :lanes [:inbox :sales :contract :billing :legal :procedure :employee :plm :erp :mes :keiei]
+  :kyber_integration {:facade "cloud-itonami.ops"
+                      :plm_api "cloud-itonami.plm"
+                      :role "kyber-plm is the PLM/ERP/MES invariant engine called from cloud-itonami"
+                      :sync "project kyber results into itonami activity/effect/audit after each operation"}
+  :core_ns [:itonami.activity :itonami.decision :itonami.effect :itonami.audit]
+  :implementation {:language ".cljc"
+                   :local_store "cloud-itonami.store over langchain.db"
+                   :production_store "langchain.kotoba-db / kotoba-server XRPC"
+                   :agent "langgraph-clj/langchain-clj"
+                   :runtime "cloud-itonami.runtime"
+                   :approval_runner "cloud-itonami.approval"
+                   :ui_origin "manimani approval inbox"}
+  :closure {:status :closed
+            :closed_on "2026-06-27"
+            :canonical_api ["cloud-itonami.plm"
+                            "cloud-itonami.ops"
+                            "cloud-itonami.mes"
+                            "cloud-itonami.migration"]
+            :compat_shims ["cloud-itonami.kyber-ops"]
+            :decision "kyber-plm is no longer the public operating surface; it remains an internal/compatibility invariant engine under cloud-itonami."}}
+ :business_coverage
+ {:m365
+  {:messages :inbox
+   :events :inbox
+   :teams-messages :inbox
+   :crm :sales
+   :projects :sales
+   :mail-projects :sales
+   :ses-engineers :sales
+   :ses-cases :sales
+   :contract-terms :contract
+   :invoice-terms :billing
+   :procedure-terms :procedure
+   :hr-terms :employee
+   :people [:employee :sales]
+   :decisions :inbox}
+  :kyber
+  {:store_projector "cloud-itonami.migration/project-kyber-graph"
+   :lanes [:plm :erp :mes]
+   :facade "cloud-itonami.ops"
+   :plm_api "cloud-itonami.plm"
+   :mes_projector "cloud-itonami.mes/kyber-completion->tx"}
+  :operating_model "cloud-itonami.operating/lane-catalog"
+  :store {:local "cloud-itonami.store"
+          :import "actor/artifact -> activity -> relation/decision/effect/audit"
+          :many_refs "expanded to :db/add"
+          :lookup_refs "tempid optimized within batch"
+          :production_swap "langchain.kotoba-db"}
+  :approval {:queue "cloud-itonami.approval/pending-approvals"
+             :states [:proposed :approved :rejected :executed :failed]
+             :execution "cloud-itonami.approval/execute-approved!"
+             :fail_closed true}
+  :runtime {:namespace "cloud-itonami.runtime"
+            :checkpoint_store "same conn as itonami facts"
+            :cli "clojure -M:runtime mock-react <store.edn> [goal] [thread-id]"}
+  :verified_counts_2026_06_27
+  {:command "clojure -M:ingest ../m365-archive/facts procedure-terms hr-terms people ses-engineers ses-cases"
+   :facts {:hr-terms 101
+           :people 5418
+           :procedure-terms 118
+           :ses-cases 2168
+           :ses-engineers 3862}
+   :tx {:activities 11667
+        :actors 5526
+        :artifacts 219
+        :effects 11667}}
+  :store_verified_2026_06_27
+  {:command "clojure -M:store import /tmp/cloud-itonami-procedure-hr.edn ../m365-archive/facts procedure-terms hr-terms"
+   :facts {:procedure-terms 118
+           :hr-terms 101}
+   :db {:activities 219
+        :actors 93
+        :artifacts 219
+        :effects 219}}
+  :runtime_verified_2026_06_27
+  {:command "clojure -M:runtime mock-react /tmp/cloud-itonami-procedure-hr.edn 手続きを進めて gftd-procedure-thread"
+   :db {:activities 219
+        :effects 220
+        :checkpoints 5}
+   :approval {:kind :procedure.review
+              :risk :financial
+              :status :proposed}}
+  :verification_note_2026_06_27
+  "Annex pointer facts are now resolved by cloud-itonami.facts when content is locally available; full 11667 activity subset should be persisted on kotoba-backed store rather than local langchain.db."}
+ :kyber_refactor
+ {:keep_kyber_as "internal/compatibility PLM/ERP/MES invariant engine"
+  :public_api ["cloud-itonami.plm" "cloud-itonami.ops"]
+  :compat_api ["cloud-itonami.kyber-ops"]
+  :project_to_itonami
+  {:plm.item :itonami.artifact
+   :plm.bom :itonami.relation
+   :plm.eco :itonami.activity
+   :erp.po :itonami.activity
+   :erp.inventory :itonami.artifact
+   :erp.journal :itonami.effect
+   :production.completed :itonami.activity
+   :mes.backflush :itonami.effect
+   :ocel :itonami.audit}}
+ :risk_gate
+ {:read-only :auto
+  :external-send :approve
+  :financial :approve
+  :destructive :approve}}
