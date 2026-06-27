@@ -1,0 +1,41 @@
+;; repos.edn — west manifest 運用の source of truth（人が編集するのはここ）。
+;; scripts/gen-west-manifest.bb がこれを読んで manifest/west.yml を生成する。
+;;   - project の一覧と pin(revision) は git の事実(working tree HEAD)から採る。
+;;   - ポリシー(remote 定義・既定・グループ・DataLad 連携)はこの EDN で宣言する。
+;;
+;; 方針: コード repo は全て west 管理。plain な git submodule は廃止(0 件)。
+;;       大容量データの DataLad dataset だけは west project にしつつ git-annex(B2)で
+;;       実体を扱う(:datalad で印を付け、既定では取得しない opt-in グループに隔離)。
+{;; org 名 -> git remote の url-base
+ :remotes
+ {"com-junkawasaki" "git@github.com:com-junkawasaki"
+  "gftdcojp"        "git@github.com:gftdcojp"
+  "etzhayyim"       "https://github.com/etzhayyim"}
+
+ ;; 全 project 共通の既定
+ :defaults
+ {:revision    "main"
+  :clone-depth 1}            ; CLAUDE.md の shallow 既定に準拠
+
+ ;; west update --group-filter で選択取得。datalad は既定で無効化(opt-in)。
+ :group-filter ["+com-junkawasaki" "+gftdcojp" "+etzhayyim" "-datalad"]
+
+ ;; DataLad dataset(git-annex + B2)。west project にはするが既定では取得しない。
+ ;;   実体取得/破棄は `west annex-get` / `west annex-drop`(B2 creds は環境変数)。
+ :datalad
+ {"orgs/gftdcojp/m365-archive"
+  {:annex-remote "b2"
+   :group        "datalad"   ; このグループのみ → group-filter の -datalad で既定 off
+   :note "M365 アーカイブ。実体は B2、git には annex キーのみ。"}}
+
+ ;; B2 (S3 互換) special remote 設定(非機密。認証は環境変数で渡す)。
+ ;;   B2_KEY_ID / B2_APP_KEY / B2_BUCKET を環境変数で供給する。
+ :b2
+ {:endpoint "s3.us-west-004.backblazeb2.com"
+  :type     "S3"}
+
+ ;; ネスト submodule を持つ project は west に再帰取得させる。
+ ;; (未指定でも生成スクリプトが各 repo の .gitmodules を検出して自動付与する。
+ ;;  ここは明示的に強制したい場合の上書き用。)
+ :force-recurse-submodules
+ #{}}
