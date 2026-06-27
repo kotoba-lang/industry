@@ -157,12 +157,15 @@ hole-punch で確立。connect.edn の `:dialable` がこの非対称を表現�
   kotoba-net --features webrtc` (0 errors), `cargo check -p kotoba-server --features p2p`
   (0 errors). The transport is **default-off** (feature `webrtc`); QUIC native↔native
   is unchanged.
-- **connect.edn stays unflipped (last step remaining)** — the transport now *compiles*,
-  but `:native :live` keeps `[:quic]` until nodes actually *speak* WebRTC at runtime:
-  a `/webrtc-direct` listen address + a `KOTOBA_WEBRTC` env gate + murakumo provisioning
-  the `webrtc`-feature build. Flipping early would make murakumo place `:reach
-  :browser/live` apps where browsers can't yet reach them. Feature compiling ≠ nodes
-  speaking WebRTC.
+- **P2 final wiring DONE (kotoba#229 + murakumo#1, 2026-06-27)** — the full runtime path
+  is in place: kotoba-net listens on `/ip4/0.0.0.0/udp/<port>/webrtc-direct` when
+  `KOTOBA_WEBRTC` is set (kotoba#229); murakumo's plist + `provision` render
+  `KOTOBA_WEBRTC` for native nodes; and `connect.edn :native :live` is **flipped to
+  `[:quic :webrtc]`** so `reconcile` now makes every `:reach :browser/live` app eligible
+  on the fleet (guarded by a test; `bb test` 13/36 green). **One operational step
+  remains** (not code): build + `bb murakumo pin` a kotoba binary with `--features
+  p2p,webrtc` (bin/BUILD.edn `:features` already declares it) and re-`provision`, so the
+  `KOTOBA_WEBRTC` listen actually binds. Until that build is deployed the env is a no-op.
 
 ### Patch A — `kotoba-server` `turn.credential` XRPC ✅ DONE (kotoba#228)
 
