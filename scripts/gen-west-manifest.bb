@@ -29,6 +29,24 @@
     (->> (str/split-lines (slurp out-file))
          (keep #(second (re-find #"^\s*path:\s*(\S+)" %))))))
 
+(defn projects-from-west-yml []
+  (when (.exists out-file)
+    (let [entries (atom {})
+          current (atom nil)]
+      (doseq [line (str/split-lines (slurp out-file))]
+        (when-let [name (second (re-find #"^\s*- name:\s*(\S+)" line))]
+          (reset! current {:name name}))
+        (when @current
+          (when-let [revision (second (re-find #"^\s*revision:\s*(\S+)" line))]
+            (swap! current assoc :revision revision))
+          (when-let [path (second (re-find #"^\s*path:\s*(\S+)" line))]
+            (swap! current assoc :path path))
+          (when (re-find #"^\s*submodules:\s*true\s*$" line)
+            (swap! current assoc :submodules true))
+          (when-let [path (:path @current)]
+            (swap! entries assoc path @current))))
+      @entries)))
+
 (defn paths-from-gitlinks []
   (->> (:out (sh "git" "ls-tree" "-r" "HEAD"))
        str/split-lines
@@ -43,12 +61,17 @@
 (defn name-of [p] (last (str/split p #"/")))
 (defn nested? [p] (.exists (io/file root p ".gitmodules")))
 
+(def existing-projects (projects-from-west-yml))
+
 (defn project-entry [path]
-  (let [sha     (working-head path)
+  (let [existing (get existing-projects path)
+        sha     (or (working-head path) (:revision existing))
         dl      (get-in cfg [:datalad path])
         depth   (get-in cfg [:defaults :clone-depth])
         groups  (if dl [(:group dl)] [(org-of path)])
-        recurse (or (contains? (:force-recurse-submodules cfg) path) (nested? path))]
+        recurse (or (contains? (:force-recurse-submodules cfg) path)
+                    (nested? path)
+                    (:submodules existing))]
     (when sha
       (str "    - name: " (name-of path) "\n"
            "      remote: " (org-of path) "\n"
