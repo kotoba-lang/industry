@@ -28,11 +28,26 @@
    :group        "datalad"   ; このグループのみ → group-filter の -datalad で既定 off
    :note "M365 アーカイブ。実体は B2、git には annex キーのみ。"}}
 
- ;; B2 (S3 互換) special remote 設定(非機密。認証は環境変数で渡す)。
- ;;   B2_KEY_ID / B2_APP_KEY / B2_BUCKET を環境変数で供給する。
+ ;; B2 (S3 互換) special remote 設定(非機密)。
+ ;; 認証は scripts/b2-creds.bb が下記 :credentials の順で解決する(env→1Password→Keychain)。
+ ;; 参照先(op:// パス / keychain service)は秘密ではないのでここに置く。実値(key/secret)は
+ ;; 解決時のみ取得し、リポジトリには一切置かない。★ の値を自分の保管先に合わせて編集する。
  :b2
  {:endpoint "s3.us-west-004.backblazeb2.com"
-  :type     "S3"}
+  :type     "S3"
+  :credentials
+  {:order [:env :1password :keychain]   ; 揃ったソースを採用(env > 1Password > Keychain)
+   ;; env: この名前の環境変数を直接使う(CI 等)
+   :env {:key-id "B2_KEY_ID" :app-key "B2_APP_KEY" :bucket "B2_BUCKET"}
+   ;; 1Password: op read の参照。★ vault/item/field を自分のものに。
+   :1password {:key-id  "op://Private/Backblaze B2/key-id"     ; ★
+               :app-key "op://Private/Backblaze B2/app-key"    ; ★
+               :bucket  "op://Private/Backblaze B2/bucket"}    ; ★
+   ;; Apple Keychain: security find-generic-password -s <service> -a <account> -w
+   :keychain {:service         "backblaze-b2"   ; ★ keychain の service 名
+              :key-id-account  "key-id"         ; ★ account 名
+              :app-key-account "app-key"        ; ★
+              :bucket-account  "bucket"}}}      ; ★
 
  ;; ネスト submodule を持つ project は west に再帰取得させる。
  ;; (未指定でも生成スクリプトが各 repo の .gitmodules を検出して自動付与する。
