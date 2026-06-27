@@ -85,7 +85,8 @@
                          "        annex-remote: " (:annex-remote dl) "\n"))))))
 
 (defn render []
-  (let [paths (->> (or (seq (paths-from-west-yml)) (paths-from-gitlinks))
+  (let [paths (->> (concat (or (seq (paths-from-west-yml)) (paths-from-gitlinks))
+                           (:extra-projects cfg))   ; repos.edn の新規追加口を union
                    (filter #(str/starts-with? % "orgs/"))
                    distinct sort)]
     (str
