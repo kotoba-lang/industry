@@ -1,6 +1,6 @@
 # ADR-0022: spirit-in-physics を Svelte/TypeScript から Clojure + kami-engine へ移行する
 
-- **Status**: Accepted（移行中 — エンジン層 ~70-80%、アプリ層コア完成・統合段階。2026-06-27 ローカル実地検証）
+- **Status**: Accepted（移行中 — P0/P1 ✅ 完了（HUD 実装+検証+sip.etzhayyim.com 公開）/ エンジン層 ~70-80%。2026-06-27）
 - **Date**: 2026-06-27
 - **Deciders**: 河崎純真 (jun@gftd.group)
 - **Context tags**: spirit-in-physics, kami-engine, clojure, clojurescript, datomic, datalevin, kotoba, webgpu, migration, rewrite
@@ -134,7 +134,7 @@ time-travel が無く Datomic Cloud/Peer が必要）、mobile/researcher。
 | Phase | 内容 | 主要タスク | Exit 条件 |
 |---|---|---|---|
 | **P0 ✅ 済** | clj コア基盤 | engine層 + app scaffold | session/world/render/store 緑（2026-06-27 検証済み）、cljs bundle 生成可 |
-| **P1 web パリティ** | プレイ可能な web | ゲームプレイ UI/HUD・入力処理（既存 FSM の上に）、cljs bundle を CF Pages/Workers へ deploy | 旧 apps/web の公開体験を新実装で代替でき、`sip.etzhayyim.com` で実プレイ可能 |
+| **P1 ✅ 済** web パリティ | プレイ可能な web | HUD `sip.ui`（純粋 FSM 駆動・DOM オーバーレイ・心音/寄り添いメーター・呼吸入力・完了画面）+ wasm 動的 import。Worker 静的配信で **sip.etzhayyim.com** へ deploy | **達成**（kami-engine PR #59 HUD / #62 deploy）。cljs build 0警告・`bb test:pure` 緑・ヘッドレス実クリックで observe→resonate→accompany→name→complete・エッジ HTTP 200。※現状 wasm 無で HUD のみ（3D 背景は後続） |
 | **P2 durable/multiplayer** | 永続・非同期協調 | 本番 Kotoba サーバ連携、瓶詞（CID 非同期マルチ）end-to-end | LocalCas mock を実サーバへ置換し往復成立 |
 | **P3 researcher** | 研究ポータル | apps/researcher（voice assessment / n=1000 study）の移植 or TS researcher 併存判断、D1→datalevin/**Datomic Cloud**（as-of 用）データ移行 | 研究データ継続性を保ったまま新基盤で研究フロー成立 |
 | **P4 mobile** | ネイティブ出荷 | Capacitor を **Model B（game.wasm native ship）** か PWA へ置換 | iOS/Android で配布可能 |
