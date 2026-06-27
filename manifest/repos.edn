@@ -40,17 +40,25 @@
    ;; env: この名前の環境変数を直接使う(CI 等)
    :env {:key-id "B2_KEY_ID" :app-key "B2_APP_KEY" :bucket "B2_BUCKET"}
    ;; 1Password: op read の参照。★ vault/item/field を自分のものに。
-   :1password {:key-id  "op://Private/Backblaze B2/key-id"     ; ★
-               :app-key "op://Private/Backblaze B2/app-key"    ; ★
-               :bucket  "op://Private/Backblaze B2/bucket"}    ; ★
-   ;; Apple Keychain: security find-generic-password -s <service> -a <account> -w
-   :keychain {:service         "backblaze-b2"   ; ★ keychain の service 名
-              :key-id-account  "key-id"         ; ★ account 名
-              :app-key-account "app-key"        ; ★
-              :bucket-account  "bucket"}}}      ; ★
+   ;;   (このマシンの実体は Keychain 側。op を使う環境では vault/item を作って参照する)
+   :1password {:key-id  "op://gftdcojp/com-junkawasaki.b2_annex/keyID"          ; ★
+               :app-key "op://gftdcojp/com-junkawasaki.b2_annex/applicationKey" ; ★
+               :bucket  "op://gftdcojp/com-junkawasaki.b2_annex/bucket"}        ; ★
+   ;; Apple Keychain(単一アイテム方式): service=b2:<bucket> の generic-password 1 件に
+   ;;   account=KEY_ID / password=APP_KEY を格納し、bucket は service 名の "b2:" 以降から導く。
+   ;;   登録例:
+   ;;     security add-generic-password -s b2:gftdcojp-m365-annex -a <KEY_ID> -w <APP_KEY>
+   :keychain {:service  "b2:gftdcojp-m365-annex"   ; ★ keychain service(= b2:<bucket>)
+              :combined true}}}                     ; account=key-id, password=app-key
 
  ;; ネスト submodule を持つ project は west に再帰取得させる。
  ;; (未指定でも生成スクリプトが各 repo の .gitmodules を検出して自動付与する。
  ;;  ここは明示的に強制したい場合の上書き用。)
  :force-recurse-submodules
- #{}}
+ #{}
+
+ ;; 新規 project の追加口（SSoT）。west.yml にまだ path が無い repo をここに列挙すると
+ ;; 生成時に既存 path 群と union される（一度 west.yml に載れば自動追従、distinct で重複排除）。
+ ;; clone 済みの working tree（orgs/<org>/<repo>）が存在し HEAD を持つこと。
+ :extra-projects
+ #{"orgs/com-junkawasaki/kasane"}}   ; ADR-2606272100: Adobe(AI/PSD/PDF) 純cljc+EDN ライブラリ
