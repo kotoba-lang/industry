@@ -143,45 +143,28 @@ hole-punch で確立。connect.edn の `:dialable` がこの非対称を表現�
 - **P2 core done + verified** — `kotoba-turn::ice` mints the browser `iceServers`
   config from the relay-verifiable ephemeral credential
   (com-junkawasaki/kotoba#227). `cargo test -p kotoba-turn` = 32 passed.
-- **P2 remaining (concrete patches below)** — the `kotoba-server` XRPC and the
-  `kotoba-net` `libp2p-webrtc` transport. The latter adds a new alpha dependency
-  (`libp2p-webrtc`, a registry fetch on libp2p 0.53) and is best landed in a build
-  environment with crates.io access; it is **not** compile-verified here, so this ADR
-  carries the exact patch rather than half-built code.
+- **P2 XRPC done + verified (Patch A)** — `kotoba-server` `turn.credential` XRPC
+  (com-junkawasaki/kotoba#228, stacked on #227). `cargo check -p kotoba-server` =
+  Finished, exit 0. Operator-gated; mints the browser `iceServers` config via
+  `kotoba_turn::ice`.
+- **P2 remaining (Patch B below)** — only the `kotoba-net` `libp2p-webrtc` transport.
+  It adds a new alpha dependency (`libp2p-webrtc`, a registry fetch on libp2p 0.53)
+  and is best landed in a build environment with crates.io access; it is **not**
+  compile-verified here, so this ADR carries the exact patch rather than half-built code.
 - **connect.edn stays unflipped** — `:native :live` keeps `[:quic]` until the
   `kotoba-net` transport actually speaks WebRTC on provisioned nodes; flipping it
   early would make murakumo place `:reach :browser/live` apps where browsers can't yet
   reach them. The flip is the LAST step of P2.
 
-### Patch A — `kotoba-server` `turn.credential` XRPC (no new external dep)
+### Patch A — `kotoba-server` `turn.credential` XRPC ✅ DONE (kotoba#228)
 
-`kotoba-server` already routes `/xrpc/:nsid → xrpc::generic_invoke`; add `kotoba-turn`
-as a workspace dep and a dispatch arm (operator-gated, like `audit.listReceipts`):
-
-```rust
-// crates/kotoba-server/Cargo.toml
-// kotoba-turn = { workspace = true }
-
-// in xrpc::generic_invoke's nsid match:
-"com.etzhayyim.apps.kotoba.turn.credential" => {
-    // operator-gated: same Bearer/CACAO operator check the audit XRPCs use
-    require_operator(&state, &headers)?;
-    let room   = query.get("room").map(String::as_str).unwrap_or("default");
-    let player: u32 = query.get("player").and_then(|s| s.parse().ok()).unwrap_or(0);
-    let ttl    = query.get("ttl").and_then(|s| s.parse().ok()).unwrap_or(300);
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
-    let secret = std::env::var("KOTOBA_TURN_SECRET")
-        .map_err(|_| xrpc_err(500, "turn secret not configured"))?;
-    let stun: Vec<&str> = state.turn_stun_urls.iter().map(String::as_str).collect();
-    let turn: Vec<&str> = state.turn_urls.iter().map(String::as_str).collect();
-    let cfg = kotoba_turn::ice::ice_config(&secret, &stun, &turn, room, player, ttl, now);
-    return Ok(json_response(kotoba_turn::ice::to_json(&cfg, now)));
-}
-```
-
-`KOTOBA_TURN_SECRET` is the shared secret the relay (`kotoba-turn` listener, P1) also
-loads; `state.turn_urls`/`turn_stun_urls` come from `KOTOBA_TURN_URLS`/`KOTOBA_STUN_URLS`.
+Implemented as a dedicated handler `crates/kotoba-server/src/turn_xrpc.rs` (mirroring
+the `audit.listReceipts` pattern: `require_operator_auth` gate → `kotoba_turn::ice::
+ice_config`), registered next to the audit routes, with a `kotoba-turn` path dep (no
+new external crate). `GET /xrpc/com.etzhayyim.apps.kotoba.turn.credential?room=&player=
+&ttl=` → `{ iceServers, ttl, expiresAt }`. `KOTOBA_TURN_SECRET` is the shared secret
+the relay (P1) also loads; STUN/TURN URLs from `KOTOBA_STUN_URLS`/`KOTOBA_TURN_URLS`.
+Verified: `cargo check -p kotoba-server` = exit 0.
 
 ### Patch B — `kotoba-net` `libp2p-webrtc` transport (adds an alpha dep)
 
@@ -218,6 +201,6 @@ immediately makes `:reach :browser/live` apps eligible on that node (proven offl
 
 ## References
 - ADR-2606271700 — 2平面 + 5プロトコル比較 + connect.edn 単一記述（本 ADR の上位）。
-- com-junkawasaki/kotoba#226 (P1 listener) / #227 (P2 ice core)。
+- com-junkawasaki/kotoba#226 (P1 listener) / #227 (P2 ice core) / #228 (P2 turn.credential XRPC)。
 - `kotoba/CLAUDE.md` の `kotoba-turn` 項 — socket-free core done / async listener shell remaining。
 - libp2p: `webrtc-direct` certhash multiaddr, circuit-relay-v2, dcutr。
