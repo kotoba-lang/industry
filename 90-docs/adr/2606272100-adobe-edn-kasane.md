@@ -228,9 +228,11 @@ EDN(canonical, doc CID) / SVG(`kasane.svg`→svgraph) / kotoba Datom(`kasane.qua
 | **SVG** | `kasane.svg`(XML shape 要素) | ✅ vector/text/raster ノード |
 | **Sketch/OOXML 詳細** | fill 色・shapePath 点列 / pptx fill・prstGeom | ✅ ジオメトリ拡充 |
 | **EPUB/ODF** | `epub->doc`(OPF/spine/XHTML) / `odf->doc`(odt/ods/odp, text:p) | ✅ ZIP 基盤で text 抽出 |
+| **AVIF/HEIC** | `kasane.isobmff`(box-tree → brand/ispe) | ✅ メタ（dims/brand）。AV1/HEVC 画素は opaque |
+| **PDF 画像** | `kasane.cos/page-images`+`decode-image` | ✅ XObject 抽出（FlateDecode→raw / DCTDecode→jpeg.decode / 他 opaque） |
 | **JPEG** | `kasane.jpeg`(marker) + `kasane.jpeg.decode`(baseline 画素) | ✅ メタ + **baseline 画素復号**（Pillow 平均誤差1.6, ADR-2606280010 R1） |
 | **LZW** | `kasane.codec/lzw` (MSB early / LSB) | ✅ **TIFF/GIF とも bit-exact**(実 libtiff/Pillow fixture)、PDF=対応 |
-| テスト | bb 純 cljc スイート | ✅ **40 tests / 163 assertions green** |
+| テスト | bb 純 cljc スイート | ✅ **42 tests / 175 assertions green** |
 
 DEFLATE/zlib inflate は PSD-ZIP・PDF-Flate・PNG-IDAT・**ZIP(Sketch/OOXML/ODF/EPUB)** を、
 LZW は TIFF/GIF/PDF を **それぞれ 1 本で**賄っており、「形式追加＝EDN/ns 追加で増える」設計が
