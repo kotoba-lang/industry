@@ -227,9 +227,18 @@ PolicyGovernor）/ **ai-gftd-itonami**（ops-LLM ⊣ CertGovernor）。
   override（3 actor 同形の deps.edn）。`clojure -M:lint`（clj-kondo・errors fail）/
   `clojure -M:dev:test`。`.cljc` は `edn`/`Exception` を `#?(:clj/:cljs)` 条件化して
   JVM/cljs/WASM 可搬に保つ。
-- **west 登録。** 新 actor repo は GitHub API の単一 entry クリーン commit で
-  `manifest/west.yml` に登録し、pin 前進も API で行う（ローカル shallow 編集をしない、
-  diff は当該 entry のみ、**pin == repo HEAD を検証**）。手書き禁止＝再生成と byte 一致。
+- **west / RAD 登録。** 新 actor workflow は `20-actors/{name}` に実装を置くだけで完了
+  しない。actor 単位 repo `etzhayyim/com-etzhayyim-{name}` を作り、
+  `orgs/etzhayyim/com-etzhayyim-{name}` として west に登録し、RAD identity 台帳にも
+  同じ actor identity を登録するまでを完了条件にする。west は `manifest/repos.edn` を
+  SSoT とし、GitHub API の単一 entry クリーン commit で登録 / pin 前進する
+  （`manifest/west.yml` は生成物、手書き禁止）。diff は当該 entry のみ、
+  `bb scripts/gen-west-manifest.bb --check` と **pin == repo HEAD** を確認。RAD は
+  etzhayyim/root の `80-data/kotoba-rad/{name}.identity.journal.edn`（または同等の
+  RAD identity ledger）に `:rad/repo "github.com/etzhayyim/com-etzhayyim-{name}"`、
+  `:rad/did-web "did:web:etzhayyim.github.io:com-etzhayyim-{name}"`、署名 /
+  attestation 参照を積む。`20-actors/{name}` だけに存在する actor は **未分離** と扱い、
+  child repo 作成 → west entry → RAD identity の follow-up を残す。
 
 ### kotoba-server（kotobase.net）= actor が自分の鍵で CACAO を自己発行
 
