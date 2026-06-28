@@ -66,12 +66,31 @@ storyboard には `:dialogue`/`:narration` が既にあるのに、reader が画
 
 - **正**: スマホで crisp・reflow・選択可能なテキスト。1 スキーマ + 2 レンダラ。新作品/
   新 locale はデータ追加のみ。SIP comics も ghosthacker jump も同一 commons で動く。
-- **未解決(要対応)**: comics の Pages CI は comics リポ単体を checkout するため、
-  `:local/root "../kami-engine/…"` が**CI で解決しない**。対応案: (a) west superproject
-  内で build、(b) cross-repo git dep + PAT、(c) commons を tag/Maven 公開。ローカル
-  `bb build` は通る（アーキテクチャは実証済み）。
-- **未着手**: `kami-mangaka-page-clj`(Java2D bake) を `MangaText`/locale 対応に統一、
-  EN 翻訳の投入、未 render ページ（13/16/17 等）の render、座標(`x,y`)指定の精密配置。
+- **解決済**: comics の commons 依存は **kami-engine が PUBLIC** なので **git dep**
+  （pinned sha + `:deps/root`、transitive な text-clj は同一 checkout 内の
+  `:local/root` で解決）で消費。シークレット不要で `bb build` がローカル/CI とも解決
+  （2026-06-28 検証）。ローカル commons 作業時のみ `:local/root` で override。
+- **EN 翻訳 / bake 統一 (済)**: ch01 の全セリフ・ナレーション(37本)を locale マップ化、
+  SFX も日英。`kami-mangaka-page-clj`(bake) は `MangaText`/locale + SFX 描画に統一済み
+  （PR kami-engine#76）。
+- **未着手**: 未 render ページ（13/16/17 等）の render（AnimagineXL/MPS GPU 要）、
+  座標(`x,y`)指定の精密配置、他章の EN 翻訳。
+
+## Deployment (2026-06-29 追記)
+
+- **GitHub Pages は使えない**: comics は **private** で、現プランでは private リポの
+  Pages が非対応（`POST /repos/.../pages` が HTTP 422「current plan does not support
+  GitHub Pages」）。従来の Pages ワークフローは `configure-pages` で失敗していた。
+- **Cloudflare Pages に移行**: ビルド済み `public/` を既存 CF Pages プロジェクト
+  **`org-spirit-in-physics-comics`**（カスタムドメイン **comics.spirit-in-physics.org**
+  をバインド済み）へ **Direct Upload**。本番反映を確認（chapter 01 = `#mk-app` +
+  `window.__manga` + `reader.js` + 吹き出し + JA/EN payload + SFX、HTTP 200）。
+- **CI**: `.github/workflows/deploy.yml`（`bb build` → `cloudflare/wrangler-action`、
+  PR comics#4）を追加。**auto-deploy は当面オフ**（option 2）— 有効化には repo secret
+  `CLOUDFLARE_API_TOKEN`（+ `CLOUDFLARE_ACCOUNT_ID 4da88288dc30d9ee257f319d3c33ecf0`）
+  が必要。1Password の既存 CF トークン3件（`gftd.cloudflare/API_TOKEN`・`/CF_API`・
+  `gftd.cf/API_TOKEN`）は Cloudflare 検証で **Invalid（失効）** のため未設定。当面は
+  wrangler OAuth セッションでの手動 `wrangler pages deploy` で更新する。
 
 ## Alternatives Considered
 1. **画像に焼き込み(baked)**: locale ごとに再 render が必要で多言語と両立しない。却下。
