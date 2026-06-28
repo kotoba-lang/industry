@@ -1,6 +1,6 @@
 # ADR-0022: spirit-in-physics を Svelte/TypeScript から Clojure + kami-engine へ移行する
 
-- **Status**: Accepted（移行中 — P0/P1 ✅ 完了（HUD 実装+検証+sip.etzhayyim.com 公開）/ エンジン層 ~70-80%。2026-06-27）
+- **Status**: Accepted（移行中 — P0/P1/P2/P3-A/P4-A ✅ 実装・公開。Datomic は kotobase.net（as-of ネイティブ、Datomic Cloud 不要）。残: P3-B 実収集（同意/IRB・Hume・kotobase graph+token）/ P4-B native / P5 cutover。2026-06-28）
 - **Date**: 2026-06-27
 - **Deciders**: 河崎純真 (jun@gftd.group)
 - **Context tags**: spirit-in-physics, kami-engine, clojure, clojurescript, datomic, datalevin, kotoba, webgpu, migration, rewrite
@@ -93,8 +93,7 @@ kami-engine は Rust コア（29 crates / ~536 .rs）の上に Clojure 著作層
 schema（kokoro/agent/area/session/insight/瓶詞）/ store 二層（Datomic + Kotoba CID）/
 panel 生成（108 storyboard → 実 768×1152 PNG, AnimagineXL）/ ブラウザ end-to-end GPU 描画（Chrome WebGPU 確認済み）。
 
-未実装: ゲームプレイ UI/HUD・入力処理、本番 Kotoba サーバ連携、`as-of` undo（datalevin に
-time-travel が無く Datomic Cloud/Peer が必要）、mobile/researcher。
+（更新 2026-06-28）これらは順次実装済み: プレイ UI/HUD（P1）、瓶詞 UI+認証+共有索引（P2）、researcher read-only（P3-A）、研究データ基盤（P3-B）、PWA（P4-A）。as-of は kotobase.net で確定。残は P3-B 実収集（同意/Hume/graph+token）・P4-B native・P5 cutover。
 
 ### エンジン層 `kami-engine-clj` 系 — ~70-80%
 
@@ -135,24 +134,26 @@ time-travel が無く Datomic Cloud/Peer が必要）、mobile/researcher。
 |---|---|---|---|
 | **P0 ✅ 済** | clj コア基盤 | engine層 + app scaffold | session/world/render/store 緑（2026-06-27 検証済み）、cljs bundle 生成可 |
 | **P1 ✅ 済** web パリティ | プレイ可能な web | HUD `sip.ui`（純粋 FSM 駆動・DOM オーバーレイ・心音/寄り添いメーター・呼吸入力・完了画面）+ wasm 動的 import。Worker 静的配信で **sip.etzhayyim.com** へ deploy | **達成**（kami-engine PR #59 HUD / #62 deploy）。cljs build 0警告・`bb test:pure` 緑・ヘッドレス実クリックで observe→resonate→accompany→name→complete・エッジ HTTP 200。※現状 wasm 無で HUD のみ（3D 背景は後続） |
-| **P2 durable/multiplayer** | 永続・非同期協調 | 本番 Kotoba サーバ連携、瓶詞（CID 非同期マルチ）end-to-end | LocalCas mock を実サーバへ置換し往復成立 |
-| **P3 researcher** | 研究ポータル | apps/researcher（voice assessment / n=1000 study）の移植 or TS researcher 併存判断、D1→datalevin/**Datomic Cloud**（as-of 用）データ移行 | 研究データ継続性を保ったまま新基盤で研究フロー成立 |
-| **P4 mobile** | ネイティブ出荷 | Capacitor を **Model B（game.wasm native ship）** か PWA へ置換 | iOS/Android で配布可能 |
+| **P2 ✅ 実装** durable/瓶詞 | 永続・非同期協調 | web 瓶詞 UI（`sip.kotoba`, localStorage⇄kotoba 切替）+ `KotobaHttp` operator-JWT 認証 + 共有索引（kotoba Datomic XRPC, as-of）| **達成（実装・公開）** PR #63 UI / #64 認証+設計 / #67 共有索引（mock 検証）。瓶詞 UI は sip.etzhayyim.com で稼働。実サーバ E2E は kotobase.net の graph+token 待ち |
+| **P3-A ✅ 済** researcher 閲覧 | read-only ダッシュボード | participants/sessions の感情サマリ（PII 非表示・isPublic）、seed⇄kotoba 切替 | **達成・公開** sip.etzhayyim.com/researcher（PR #65、ヘッドレス検証） |
+| **P3-B 🟡 基盤済** 収集 | データ収集 | データモデル+ingest/query+テスト（PR #66）、**Datomic=kotobase.net（as-of ネイティブ・Datomic Cloud 不要; PR #69）** | 実収集は同意/IRB・Hume・kotobase の graph+token 待ち |
+| **P4-A ✅ 済** PWA | インストール可能・オフライン | manifest + service worker + maskable icon で既存 HUD を PWA 化 | **達成・公開**（PR #71、sip.etzhayyim.com）。P4-B native（Model B / NDA toolchain）は後続 |
 | **P5 cutover & 廃止** | 切替・退役 | DNS（spirit-in-physics.com）を新実装へ、旧 apps を archive、本 ADR と STRATEGY/PROJECT を更新 | 全トラフィックが新実装、旧 repo は参照専用にアーカイブ |
 
 **クリティカルパス / リスク**:
-- **as-of undo は datalevin 不可** → P3 で Datomic Cloud/Peer 昇格（コスト発生）。それまで P1/P2 は baked snapshot + Kotoba で回す。
+- **as-of / 来歴は kotobase.net の kotoba-datomic で得る**（datomic.q `as_of`/`history` ネイティブ、Datomic Cloud 不要・決定 2026-06-28）。datalevin はローカル/テスト用。
 - **researcher の研究継続性**（n=1000 戦略 / Nature 投稿）が最大の非機能要件。P3 はデータ移行を慎重に。
 - **mobile はストア再申請**が絡むため最後段（P4）。
 - 旧 `org-spirit-in-physics` は大容量データ移行（ADR-0006: LFS→DataLad）が未了。P5 アーカイブ時に併せて B2+DataLad へ。
 
-**次の着手は P1**（既存の緑なコア＋生成済み `sip.js` の上に、プレイ UI と入力を載せて公開）。
+**次の着手**: kotobase.net に research/瓶詞 graph + operator/CACAO トークンを用意（owner 作業）→ 実データ接続（共有瓶詞・dashboard 共有 read・研究 ingest が即有効）。並行して P4-B native / P5 cutover。
 
 ## References
 
 - 新実装: `orgs/com-junkawasaki/kami-engine/kami-app-sip-clj/README.md`, `docs/ARCHITECTURE.md`
 - エンジン層: kami-engine `90-docs/adr/0035,0036,0038,0039`
 - 旧実装: `orgs/com-junkawasaki/org-spirit-in-physics/claude.md`, `STRATEGY.jsonld`, `PROJECT.jsonld`
+- 設計: `kami-app-sip-clj/docs/p2-shared-index.md`（共有索引）, `docs/p3b-data-collection.md`（収集・同意・kotobase.net）
+- PR: kami-engine #59/#62/#63/#64/#65/#66/#67/#69/#71（P1〜P4-A）/ superproject #99/#112（rename+ADR）
+- 公開: https://comics.spirit-in-physics.org ・ https://sip.etzhayyim.com （ゲーム/PWA）・ https://sip.etzhayyim.com/researcher
 - 関連: ADR-0006（spirit-in-physics LFS→DataLad）, ADR-0020（three-org taxonomy）
-</content>
-</invoke>
