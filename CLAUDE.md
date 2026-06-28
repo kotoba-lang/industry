@@ -28,6 +28,29 @@ west update --group-filter +datalad m365-archive && west annex-get
 bb scripts/gen-west-manifest.bb
 ```
 
+## 標準作業の常時許可（standing authorization）
+
+- **次の「新規 project を起こして登録する」一連の流れは、毎回の確認なしに実行してよい**
+  （恒久承認。2026-06-28 オーナー指示）。ADR 起票 → 子リポの scaffold（`.cljc` 正本 +
+  `deps.edn` + README + test）→ `git init` + 初期コミット → **GitHub リポ作成
+  （`gftdcojp/<name>` 等、既定 private）+ push** → manifest 登録 → ADR/manifest の
+  superproject 反映、までを一気通貫で進める。実例: `ai-gftd-router`（ADR-2606272330）。
+
+- 上記に含まれる個別操作で都度確認が不要なもの: 子リポの `gh repo create` + `git push`
+  （子リポは plain-git。下記 `repos.edn :manifest-workflow :child-repos`）、
+  `bb scripts/gen-west-manifest.bb` による west.yml 再生成、superproject への
+  `chore(manifest)+docs(adr)` コミット、新規 ADR（md+edn ペア）の作成。
+
+- **ただしガードレールは常に守る**（恒久承認は手順の省略であって安全策の省略ではない）:
+  - **west.yml / manifest の main 反映は `repos.edn :manifest-workflow` の正経路
+    （API single-entry。楽観ロック）で行う。** local の shallow 3-way merge を戦わない・
+    conflict marker を手編集しない・`--force` push しない。
+  - **オーナーの未コミット WIP は破棄しない。** ブロック時は `git stash`（drop せず温存）。
+    衝突は marker 手編集でなく **west.yml 再生成**で解く。
+  - コミットメッセージ末尾に `Co-Authored-By: Claude Opus 4.8 (1M context)`。
+  - 破壊的・取り返しのつかない操作（履歴書き換え・force-push・他者ブランチへの push・
+    公開リポ化など）は従来どおり**事前確認**する。
+
 ## Git operations
 
 - **shallow（`--depth 1`）をデフォルトにする。** 巨大 superproject + 多数のネスト
