@@ -35,7 +35,11 @@ JPEG は ecosystem 横断で頻出する（写真、PDF 埋込画像、PSD smart
 これにより「JPEG を含むドキュメントでも、構造とメタデータは完全に EDN 化でき、画素だけ
 未復号」という一貫した状態になる。
 
-### R1（将来・本 ADR が設計を確保）: 純 cljc baseline JPEG デコーダ
+### R1（**実装済み 2026-06-28**: `kasane.jpeg.decode`）: 純 cljc baseline JPEG デコーダ
+
+> 状態更新: baseline(SOF0) デコーダを実装。実 JPEG(Pillow quality-80, 4:2:0)に対し
+> **平均絶対誤差 1.615 / 最大 6**（float IDCT のため bit-exact でなく bit-close）。
+> progressive(SOF2)・restart 多用は best-effort。設計は以下のとおり:
 
 別 crate/ns（例 `kasane.jpeg.decode`）として、baseline(SOF0) + progressive(SOF2) を段階実装:
 
