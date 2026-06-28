@@ -89,7 +89,45 @@ WASM Component という 1 枚の基板**の上に、各技術の役割が汎用
 
 > 一言で: **kotoba は wasmCloud の*分散*と Spin の*DX*を採り、Spin の*分散*を捨てた。**
 
-### 3. murakumo(com-junkawasaki) ≅ wadm + wash
+### 3. Security posture — Radicle 型 selective replication だけに秘密を置かない
+
+Radicle の private repository は、Git/RID/identity による content-addressing と
+allow-list による selective replication が中核であり、**暗号化 at rest の境界ではない**。
+これは「信頼 peer にだけ複製する」アクセス制御であって、seed node / 許可 peer が侵害されると
+平文 repository は読まれる。kotoba は Radicle protocol 互換を目指すのではなく同じ役割を
+CID+Datom+DHT で再現するため、private data の境界は最初から **object encryption** に置く。
+
+決定:
+
+- **public / shareable metadata**: CID、Datom、CommitDag、capability policy、identity journal。
+- **private content**: 常に envelope encryption。DHT / untrusted peer / B2 / local clone へは
+  暗号文を複製できる設計にする。
+- **CID の分離**: `ciphertext-cid = hash(ciphertext)` を複製・取得の主キーにし、
+  `plaintext-cid = hash(plaintext)` は検証用 metadata として権限内に閉じる。
+- **access control**: capability datom + recipient set + epoch key。revocation は既存暗号文を
+  消せない前提で、新 epoch への key rotation と future writes の遮断で扱う。
+- **crypto agility**: `alg` / `hash` / `sig` / `kem` / `key-id` / `recipient-set` /
+  `epoch` / `created-at` を identity journal または storage manifest の datom に明示し、
+  hash・署名・KEM の移行をデータモデルで表現できるようにする。
+- **post-quantum stance**: harvest-now-decrypt-later を前提に、長期秘匿データは将来
+  `X25519 + ML-KEM`、`Ed25519 + ML-DSA/SLH-DSA` のような hybrid KEM / hybrid signature へ
+  移行できる形で置く。現行 GPG/git-annex は実運用の at-rest 暗号、kotoba は次世代の
+  algorithm-agile envelope を設計面で受ける。
+
+`age` / `sops` / `gpg` の位置づけ:
+
+| ツール | kotoba での位置づけ | 採用境界 |
+|---|---|---|
+| `gpg` / OpenPGP | 現行 DataLad/git-annex の at-rest 暗号 | 大容量・証跡・warehouse の実運用 |
+| `age` | シンプルな file/blob envelope の候補 | 小〜中規模 secret blob。標準 age 単体は PQ ではないため長期秘匿は hybrid 化が必要 |
+| `sops` | 構造化 secret config の管理 | YAML/JSON/EDN 相当の設定値。大容量 blob には使わない |
+| kotoba envelope | CID/Datom/DHT と一体化した object encryption | untrusted mesh へ暗号文を撒くための将来 SSoT |
+
+したがって、kotoba の security target は Radicle private repo より強く置く:
+**trusted peer だけに平文を配る**のではなく、**暗号文なら untrusted mesh にも配れる**ことを
+第一原則にする。
+
+### 4. murakumo(com-junkawasaki) ≅ wadm + wash
 
 一次 ADR が「唯一の gap」と呼ぶ L4(lattice 制御面)/ L5(宣言的アプリ reconciler)を
 ターミナルから駆動する operator が `com-junkawasaki/murakumo`。対応は明確:
@@ -103,7 +141,7 @@ murakumo : kotoba  ≅  wash + wadm : wasmCloud
 - ノードに常駐エージェントは入れない。各ノードは `kotoba-server` を macOS
   LaunchAgent として常駐させ、murakumo は Tailscale SSH 越しに束ねる。
 
-### 4. 2 つの murakumo の曖昧性解消
+### 5. 2 つの murakumo の曖昧性解消
 
 | | **murakumo (com-junkawasaki)** | **murakumo (etzhayyim-project-murakumo)** |
 |---|---|---|
@@ -125,6 +163,8 @@ murakumo : kotoba  ≅  wash + wadm : wasmCloud
 - `murakumo : kotoba = wadm/wash : wasmCloud` という対応で、murakumo の設計判断
   (宣言的 desired state は datom、CLI 体験は wash 準拠)が一次設計から導ける。
 - 2 つの murakumo を「採った分散 / 捨てた分散」という対比で恒久的に区別できる。
+- security boundary が明確になる。Radicle 的な selective replication は発見・同期の
+  制御面として使い、長期秘匿は object encryption + recipient set + epoch key に寄せる。
 
 **Negative / 制約(honest)**
 
@@ -135,6 +175,9 @@ murakumo : kotoba  ≅  wash + wadm : wasmCloud
   いるわけではなく、git DAG の content-addressing(`kotoba-git`)+ source chain
   (`kotoba-dht`)+ identity journal(`kotoba-rad`)で *同じ役割* を満たしているという
   対応関係。
+- post-quantum 対応は現時点では設計要件であり、実装済み crypto suite ではない。現行の
+  DataLad/git-annex は GPG hybrid encryption に依存するため、長期秘匿データは将来
+  PQ/hybrid envelope への再暗号化 migration を前提に保全する。
 - この対応表は positioning(理解のための地図)であって crate 境界の規範ではない。
   実装上の SSoT は各 crate と `kotoba/docs/ADR-kotoba-mesh-wasm-hosting.md`。
 
@@ -148,3 +191,7 @@ murakumo : kotoba  ≅  wash + wadm : wasmCloud
   AT Protocol × LLM/Weight × WASM/WIT`。
 - `orgs/com-junkawasaki/murakumo/README.md` + `fleet.edn` — kotoba WASM mesh の
   制御面。2 つの murakumo の区別を明記。
+- `orgs/kawasakijun/docs/adr/0007-repo-reorg-orgs-layout-and-b2-persistence.md` —
+  現行の DataLad/git-annex + B2 + GPG hybrid encryption 運用。
+- NIST FIPS 203/204/205 — ML-KEM / ML-DSA / SLH-DSA。post-quantum 移行時の
+  hybrid KEM / signature 候補。
