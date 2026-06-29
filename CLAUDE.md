@@ -157,6 +157,18 @@ bb scripts/gen-west-manifest.bb
 - ユーザーが「git pull」とだけ指示した場合も、上記の main 同期 + `west update`
   まで含めて実行する（プルだけで終わらせない）。
 
+- ユーザーが「cleanup」とだけ指示した場合、superproject と `orgs/` 配下などの
+  子リポを含めて、未完了の PR/merge 整理を同じ手順で行う:
+  1. 各 git repo で `git worktree list`、現在 branch、`git stash list`、`git status
+     --short --branch`、open PR を確認する。
+  2. 既定 branch（通常 `main`）へ未反映の local/remote branch があれば、未コミット
+     WIP を破棄せず commit 可能な差分だけ `cleanup` メッセージで commit し、push
+     して PR を作成する。
+  3. CI/mergeability が通る PR は main へ merge する。merge 不可、remote 不在、stash
+     だけが残る、または commit のない placeholder repo は理由を記録して止める。
+  4. 作業後に再度 `git status --short --branch`、open PR、stash を確認し、残った
+     WIP/stash/未追跡 repo を報告する。
+
 - **west project の checkout が「ローカルの未コミット変更」で失敗（衝突）した場合**、
   勝手に `west update --force` 等で破棄しないこと。`west` は既定で破壊的更新を
   しない（衝突時は当該 project を skip）。ユーザーに確認するか、まず差分を提示する。

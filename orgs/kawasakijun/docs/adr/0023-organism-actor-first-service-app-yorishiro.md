@@ -5,7 +5,7 @@
 - **Deciders**: 河崎純真
 - **Context tags**: clojure, cljc, actor, organism, yorishiro, skill, browser-use, computer-use, arxiv
 - **Related**: ADR-0013 portable Clojure agent stack, ADR-0020 three-org taxonomy, ADR-0021 rust/clj/wasm layering
-- **First implementation**: `orgs/com-junkawasaki/org-arxiv-kotoba/`
+- **First implementation**: `orgs/kotoba-lang/arxiv/`
 
 ## Context
 

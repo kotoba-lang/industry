@@ -1,0 +1,116 @@
+;; Canonical ownership boundaries for the kotoba stack.
+;;
+;; Keep kotoba-lang focused on libraries, language/runtime substrate, data
+;; structures, protocols, and test fixtures. Product/domain actors live in
+;; etzhayyim. AT Protocol actors and PDS/AppView live in app-aozora. Hosting and
+;; fleet placement live in murakumo.
+{:owners
+ {:library-and-language "orgs/kotoba-lang"
+  :domain-actors        "orgs/etzhayyim/com-etzhayyim-*"
+  :atproto-actors       "orgs/gftdcojp/app-aozora"
+  :hosting              "orgs/kotoba-lang/murakumo"}
+
+ :legacy
+ {:kotoba-kotodama
+  {:path "orgs/kotoba-lang/kotoba/crates/kotoba-kotodama"
+   :status :migrate-out
+   :rule "Rust config/inference crates may remain only if they are generic language/runtime substrate. Domain cells, Python UDFs, AT Protocol actors, and hosting code must move out."}}
+
+ :compat-shims
+ {"orgs/kotoba-lang/kotoba/crates/kotoba-kotodama/py/src/kotodama/primitives/murakumo_fleet.py"
+  {:target "orgs/kotoba-lang/murakumo"
+   :replacement "orgs/kotoba-lang/murakumo/py/murakumo_host/fleet.py"
+   :remove-after "legacy Kotodama Zeebe worker imports murakumo_host.fleet directly"}}
+
+:primitive-routes
+{"shinka_murakumo.py" "orgs/etzhayyim/com-etzhayyim-shinka"
+ "joucho_murakumo.py" "orgs/etzhayyim/com-etzhayyim-joucho"
+ "yoro_social_murakumo.py" "orgs/gftdcojp/app-aozora"
+ "test_shinka_murakumo.py" "orgs/etzhayyim/com-etzhayyim-shinka"
+ "test_shinka_m2_complete.py" "orgs/etzhayyim/com-etzhayyim-shinka"
+ "test_e2e_religious_corp.py" "orgs/etzhayyim/com-etzhayyim-shinka"
+ "test_joucho_murakumo.py" "orgs/etzhayyim/com-etzhayyim-joucho"
+ "test_yoro_m4.py" "orgs/gftdcojp/app-aozora"
+ "test_yoro_m5.py" "orgs/gftdcojp/app-aozora"}
+
+:primitive-route-kinds
+{"yoro_social_murakumo.py" :atproto-actor
+ "test_yoro_m4.py" :atproto-actor
+ "test_yoro_m5.py" :atproto-actor}
+
+:cell-prefix-routes
+{"abuse" "com-etzhayyim-abuse"
+  "akashi" "com-etzhayyim-akashi"
+  "air" "com-etzhayyim-cargo"
+  "auto" "com-etzhayyim-vin"
+  "biz" "com-etzhayyim-business-person"
+  "charter" "com-etzhayyim-kaname"
+  "const" "com-etzhayyim-tatekata"
+  "crisis" "com-etzhayyim-sonae"
+  "danjo" "com-etzhayyim-danjo"
+  "doc" "com-etzhayyim-bunken"
+  "elv" "com-etzhayyim-moto"
+  "energy" "com-etzhayyim-oil-coverage"
+  "env" "com-etzhayyim-kami-sabiotoshi"
+  "ethics" "com-etzhayyim-kaname"
+  "feed" "com-etzhayyim-kawaraban"
+  "fin" "com-etzhayyim-credits"
+  "geo" "com-etzhayyim-maps"
+  "gov" "com-etzhayyim-ooyake"
+  "health" "com-etzhayyim-hc"
+  "hr" "com-etzhayyim-recruit"
+  "hydrogen" "com-etzhayyim-hs"
+  "igata" "com-etzhayyim-igata"
+  "industrial" "com-etzhayyim-insatsu"
+  "infra" "com-etzhayyim-jp-ashiba"
+  "kataribe" "com-etzhayyim-kataribe"
+  "kawase" "com-etzhayyim-kawase-yui"
+  "kazaori" "com-etzhayyim-kazaori"
+  "kizashi" "com-etzhayyim-kizashi"
+  "kokoro" "com-etzhayyim-kokoro"
+  "kuni" "com-etzhayyim-kuni-umi"
+  "kurashimori" "com-etzhayyim-kurashimori"
+  "lab" "com-etzhayyim-kenkyusha"
+  "land" "com-etzhayyim-kaname"
+  "legal" "com-etzhayyim-hanrei"
+  "logistics" "com-etzhayyim-bunker"
+  "marine" "com-etzhayyim-marine-insurance"
+  "maritime" "com-etzhayyim-vessel"
+  "market" "com-etzhayyim-kakaku"
+  "media" "com-etzhayyim-media-gamers"
+  "member" "com-etzhayyim-kaname"
+  "mitate" "com-etzhayyim-mitate"
+  "moto" "com-etzhayyim-moto"
+  "moushibumi" "com-etzhayyim-moushibumi"
+  "musubi" "com-etzhayyim-musubi"
+  "network" "com-etzhayyim-ipaddress"
+  "oil" "com-etzhayyim-oil-coverage"
+  "organizer" "com-etzhayyim-organizer"
+  "os" "com-etzhayyim-os"
+  "osint" "com-etzhayyim-intel"
+  "ossekai" "com-etzhayyim-ossekai"
+  "pharma" "com-etzhayyim-yakushi"
+  "pillow" "com-etzhayyim-makura"
+  "power" "com-etzhayyim-infra-utility-connect"
+  "religious" "com-etzhayyim-kaname"
+  "resource" "com-etzhayyim-rare-earth-coverage"
+  "retail" "com-etzhayyim-omise"
+  "robotics" "com-etzhayyim-wadachi"
+  "schedule" "com-etzhayyim-yotei"
+  "seigyo" "com-etzhayyim-seigyo"
+  "silicon" "com-etzhayyim-handotai"
+  "smart" "com-etzhayyim-society6"
+  "socialsecurity" "com-etzhayyim-tasuke"
+  "special" "com-etzhayyim-demining"
+  "suki" "com-etzhayyim-suki"
+  "tadori" "com-etzhayyim-tadori"
+  "talent" "com-etzhayyim-talent"
+  "tithe" "com-etzhayyim-kaname"
+  "toritate" "com-etzhayyim-toritate"
+  "toritsugi" "com-etzhayyim-toritsugi"
+  "treasury" "com-etzhayyim-kaname"
+  "tsukuroi" "com-etzhayyim-tsukuroi"
+  "tsutae" "com-etzhayyim-tsutae"
+  "water" "com-etzhayyim-mizuho"
+  "waste" "com-etzhayyim-akuma"
+  "yorishiro" "com-etzhayyim-yorishiro"}}

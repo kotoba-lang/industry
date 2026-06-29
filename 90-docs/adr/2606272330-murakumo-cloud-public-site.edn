@@ -1,0 +1,72 @@
+{:frontmatter
+ {:id "adr-2606272330-murakumo-cloud-public-site"
+  :title "murakumo.cloud — 公開サイトを CLJS+Reagent+re-frame で Cloudflare に出す"
+  :status "closed"
+  :closed "2026-06-28"
+  :date "2026-06-27"
+  :authoritative true
+  :repo "orgs/gftdcojp/cloud-murakumo"
+  :builds_on ["90-docs/adr/2606272300-cloud-murakumo-gpu-cloud.md"]
+  :related ["orgs/gftdcojp/app-aozora-svelte/wrangler.jsonc"   ; Cloudflare assets 方式の前例
+            "orgs/com-junkawasaki/manimani/shadow-cljs.edn"]}  ; shadow-cljs + re-frame 前例
+
+ :decision
+ {:product "murakumo.cloud"
+  :domain {:name "murakumo.cloud" :registrar :cloudflare :status :acquired}
+  :frontend {:lang :cljs :ui :reagent :state :re-frame :build :shadow-cljs}
+  :single-bundle {:target :browser
+                  :init-fn "cloud-murakumo.ui.core/init!"
+                  :routes [:landing :console]
+                  :routing :hash}
+  :live-playground
+  {:insight "scheduler は純粋 .cljc → browser の playground が CLI -M:schedule と同一結果を実行する"
+   :inputs "fn-id -> in-flight スライダ"
+   :computes [:placements :unscheduled :utilization :hourly-cost :proposed-effects]
+   :shared-cljc ["cloud-murakumo.scheduler" "cloud-murakumo.spec" "cloud-murakumo.runtime" "cloud-murakumo.vllm"]}
+  :ssot {:file "resources/murakumo.edn"
+         :web-copy "public/murakumo.edn(prebuild が cp で生成)"
+         :jvm "io/resource で同一ファイル"
+         :no-duplication true}
+  :deploy {:platform :cloudflare-workers-static-assets
+           :config "wrangler.jsonc"
+           :assets "./public"
+           :spa "not_found_handling: single-page-application"
+           :custom-domain ["murakumo.cloud" "www.murakumo.cloud"]
+           :commands ["npm run release" "wrangler deploy"]
+           :dev "npm run watch -> http://localhost:8700"}
+  :safety {:client-side "純粋計算のみ(配置・見積り)"
+           :no-side-effects "実 GPU 確保(deploy/scale-up=財務)はサイトから起こさない"
+           :effects-shown ":proposed として表示するだけ。実 transact は murakumo 制御面 + kotoba XRPC"
+           :no-secrets "公開面に LLM_KEY 等を置かない(secret は参照のみ)"}}
+
+ :files
+ ["orgs/gftdcojp/cloud-murakumo/shadow-cljs.edn"
+  "orgs/gftdcojp/cloud-murakumo/package.json"
+  "orgs/gftdcojp/cloud-murakumo/wrangler.jsonc"
+  "orgs/gftdcojp/cloud-murakumo/public/index.html"
+  "orgs/gftdcojp/cloud-murakumo/src/cloud_murakumo/ui/core.cljs"
+  "orgs/gftdcojp/cloud-murakumo/src/cloud_murakumo/ui/events.cljs"
+  "orgs/gftdcojp/cloud-murakumo/src/cloud_murakumo/ui/subs.cljs"
+  "orgs/gftdcojp/cloud-murakumo/src/cloud_murakumo/ui/views.cljs"]
+
+ :deps-added
+ {:deps.edn-alias :cljs
+  :maven {reagent "1.2.0" re-frame "1.4.3" thheller/shadow-cljs "2.28.20"}
+  :npm {react "^18.3.1" react-dom "^18.3.1" shadow-cljs "^2.28.20" wrangler "^3.90.0"}}
+
+ :verification_2026_06_27
+ {:env {:node "26.0.0" :java "21.0.1" :shadow-cljs "2.28.20"
+        :reagent "1.2.0" :re-frame "1.4.3"}
+  :npm-install {:result :ok :got [:react :react-dom :shadow-cljs :wrangler]}
+  :release-build {:command "npm run release"
+                  :optimizations :advanced
+                  :result "Build completed. 125 files, 54 compiled, 0 warnings, 0 errors"
+                  :artifact "public/js/main.js (~412K)"
+                  :shared-cljc-bundled true}
+  :static-smoke {:server "python3 -m http.server"
+                 :http {"/" 200 "/js/main.js" 200 "/murakumo.edn" 200}}
+  :playground-equiv {:note "playground は CLI と同一 .cljc を呼ぶ"
+                     :ref "ADR-2606272300 schedule 検証(minimax-m27=80 kimi-k27=16 embed=20 -> $86.72/h)"}
+  :pending {:browser-render "Chrome 拡張未接続のため目視は未実施(advanced 0-warning + 検証済 .cljc で計算面は担保)"
+            :prod-deploy "Cloudflare 本番 deploy / custom domain は DNS・wrangler login 後"
+            :real-fleet "実 node 在庫を kotoba XRPC から読む昇格は KOTOBA_URL 設定後"}}}
