@@ -117,6 +117,18 @@ cleanup 処理を `scripts/cleanup.bb`（babashka・読取専用 dry-run 既定�
 
 これらはすべてオーナー WIP。本 runbook は commit/push/PR/merge しない。
 
+### 本 runbook + スクリプトの land（2026-06-29）
+
+- superproject の日常ブランチにはオーナー WIP（`manifest/west.yml` の pin 推進等）が残るため、
+  本 runbook と `cleanup.bb` は **専用 worktree に最新 `origin/main` から clean branch
+  (`chore/cleanup-runbook`) を切り** そこに乗せた。長生き docs ブランチ（129 behind）には積まない。
+- セッション中にオーナー運用でブランチ削除/切替えが起き、初回 commit が一時 **孤児 commit**
+  （どの branch にも属さない SHA のみ）になった。`git show <sha>` で実体を確認のうえ
+  **cherry-pick で clean branch に回収**。git は到達不能 commit を約2週間保持するので即座に消えないが、
+  land は速やかに行うのが安全。
+- `origin/main` がオーナー運用で force-update されることがある。本 runbook の作業ブランチは
+  **常に最新 `origin/main` を基底**とする（`git fetch --depth 1 origin main` 後に分岐）。
+
 ## Verification
 
 - `bb scripts/cleanup.bb` が dry-run で survey + PR 分類 + 子リポ一覧を出力し、副作用無いこと。
