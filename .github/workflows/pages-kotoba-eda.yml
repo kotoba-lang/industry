@@ -1,0 +1,47 @@
+name: Deploy Kotoba EDA ADR
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '90-docs/adr/2606291100-kotoba-eda-web-semiconductor-app.md'
+      - '90-docs/adr/2606291100-kotoba-eda-web-semiconductor-app.edn'
+      - 'public/kotoba-eda/**'
+      - '.github/workflows/pages-kotoba-eda.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build static site
+        run: |
+          mkdir -p _site/kotoba-eda _site/adr
+          cp public/kotoba-eda/index.html _site/index.html
+          cp public/kotoba-eda/index.html _site/kotoba-eda/index.html
+          cp 90-docs/adr/2606291100-kotoba-eda-web-semiconductor-app.md _site/adr/kotoba-eda-web-semiconductor-app.md
+          cp 90-docs/adr/2606291100-kotoba-eda-web-semiconductor-app.edn _site/adr/kotoba-eda-web-semiconductor-app.edn
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
