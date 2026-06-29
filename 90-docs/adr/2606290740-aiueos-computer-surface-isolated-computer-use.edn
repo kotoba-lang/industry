@@ -1,0 +1,38 @@
+{:frontmatter {:id "adr-2606290740-aiueos-computer-surface-isolated-computer-use"
+               :title "ADR-2606290740: computer-use を aiueos の能力隔離 surface として実施する"
+               :status "active"
+               :doc_type "adr"
+               :topic "aiueos-computer-surface"
+               :authoritative true
+               :last_verified "2026-06-29"
+               :authoritative_for ["computer-use（画面キャプチャ + pointer/keyboard 操作）を host の実 HID から隔離する正準アーキテクチャ"
+                                   "host の env/key/secrets を ambient 継承させない原則（明示・scoped・監査つき capability のみ）"
+                                   "wasm component と コンテナ/microVM の役割分担（component=wasm、コンテナ=surface backing/TCB）"]
+               :related ["com-junkawasaki/aiueos/90-docs/adr/0007-virtual-computer-surface.md"
+                         "com-junkawasaki/aiueos/90-docs/adr/0005-multi-surface-providers.md"
+                         "com-junkawasaki/aiueos/90-docs/adr/0004-code-as-data-admit.md"
+                         "https://github.com/com-junkawasaki/aiueos/pull/5"]
+               :supersedes []
+               :superseded_by []}
+
+ :decision {:mechanism "computer-use を aiueos の `computer` surface family として実施。隔離は設定の約束でなく構造的保証: host の実 HID(pointer/host・keyboard/host・display/host)に provider を offer しない → 呼べば unresolved-capability で loud denial。合成入力は仮想 surface(Xvfb/microVM)にのみ解決。admit が trust を :ai-generated に floor、:host-input forbid、:net-allow 減衰、全操作監査が多層化。"
+            :canonical {:aiueos-adr "0007-virtual-computer-surface" :pr "com-junkawasaki/aiueos#5 (merged to main)"}}
+
+ :surfaces [{:id "computer-virtual" :backing "Linux + Xvfb + Chrome (OrbStack/Lima)" :host-isolated true  :gpu "software/WebGL2" :use "headless CI / UX QA"}
+            {:id "computer-vm"      :backing "Parallels/QEMU microVM (virtio-gpu)"   :host-isolated true  :gpu "near-native WebGPU" :use "GPU 正確な描画検証"}
+            {:id "computer-host"    :backing "host WindowServer (従来 macos-computer-use)" :host-isolated false :gpu "native" :use "署名必須の opt-in 脱出口"}]
+
+ :principles {:env-secrets "deny-by-default。host env/key/1Password/Keychain は wasm に ambient 継承しない。必要な秘密は明示・scoped・監査つき capability(:net-allow で net/fetch を origin 限定したのと同型。secrets/get を当該 component にだけ grant、実値は host 側 provider=TCB が保持)。"
+              :wasm-vs-container "component=Wasm(wasmtime, fuel/mem 制限。exec/process 能力は deny-by-default で無くコンテナを起動できない)。コンテナ/microVM は surface の backing(provider)=host 側 TCB。wasm 隔離 と コンテナ/VM 隔離が二重合成。"}
+
+ :consequences {:positive ["computer-use の自由度を保ちつつ host の kbd/mouse/display を奪わない"
+                           "隔離が構造的(host HID は un-offered 能力で同一 gate で deny)"
+                           "危険な computer-host は削除でなく署名・明示・監査つき脱出口に格下げ"
+                           "同一 component が CI(virtual)と GPU 正確(vm)で manifest 無改変に動く"]
+                :negative ["provider の host 側コード(Xvfb/X 入力 binding・microVM 入力 agent・WindowServer adapter)は TCB で監査対象"
+                           "computer-virtual の WebGPU は software/WebGL2 fallback。pixel 厳密検証は computer-vm"]}
+
+ :references ["aiueos ADR-0007 — The `computer` surface: capability-isolated computer-use"
+             "aiueos ADR-0005 — Multi-surface capability providers"
+             "aiueos ADR-0004 — code-as-data admit (trust floor)"
+             "実装 PR com-junkawasaki/aiueos#5 (main マージ済み、verify/admit で隔離を実機証明)"]}
