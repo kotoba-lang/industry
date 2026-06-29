@@ -29,13 +29,26 @@
 ## インストール / ビルド
 
 ```bash
+# GitHub Packages から使う場合
+echo "@com-junkawasaki:registry=https://npm.pkg.github.com" >> .npmrc
+# private package として見える場合は read:packages token も設定
+# echo "//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}" >> .npmrc
+npm install @com-junkawasaki/office-style
+
+# ローカル開発
 npm install
 npm run gen:sample   # examples/sample.pptx を生成 (デモ用 2-master pptx)
 npm run build        # dist/ に出力
 npm test             # ユニットテスト (15)
 ```
 
-任意依存: `@huggingface/transformers` (vision), `@resvg/resvg-js` (Node ラスタライズ)。
+## 実行環境 / 依存
+
+- 実装: TypeScript (`src/**/*.ts`)。配布物は `dist/**/*.js` + `.d.ts`。
+- ランタイム: Node.js 18+ / browser (WebGPU 対応入口は `@com-junkawasaki/office-style/browser`)。
+- 必須依存: `fflate` (OOXML zip), `fast-xml-parser` (XML), `zod` (StyleIR schema)。
+- 任意依存: `@huggingface/transformers` (Gemma vision), `@resvg/resvg-js` (Node ラスタライズ)。
+- Python 依存はない。ビルド、CLI、API、テストは Node/TypeScript だけで動く。
 
 ## CLI
 
