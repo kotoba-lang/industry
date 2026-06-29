@@ -223,11 +223,16 @@ EDN(canonical, doc CID) / SVG(`kasane.svg`→svgraph) / kotoba Datom(`kasane.qua
 | **OOXML** | `ooxml->doc` | ✅ docx/xlsx テキスト、**pptx 図形ジオメトリ(EMU)+テキスト** |
 | **JSON** | `kasane.json`(純 cljc 依存ゼロ JSON リーダ) | ✅ Sketch/glTF の基盤 |
 | **TTF/OTF** | `kasane.ttf`(SFNT directory + head/maxp/name) | ✅ family/units/glyph（実 OFL font で head magic 検証） |
+| **WOFF** | `kasane.woff`(SFNT 再構成→`kasane.ttf`に委譲, per-table zlib) | ✅ 元 TTF と同一メタデータ（**WOFF2=Brotli は deferred**: 122KB 静的辞書要、別ライン） |
 | **glTF/GLB** | `kasane.gltf`(GLB chunk + .gltf JSON) | ✅ scene/mesh ノード（name+transform） |
 | **SVG** | `kasane.svg`(XML shape 要素) | ✅ vector/text/raster ノード |
-| **JPEG** | `kasane.jpeg`(marker 走査) | ✅ 寸法/成分/progressive（**画素は DCT 未復号=opaque blob**, ADR-2606280010） |
+| **Sketch/OOXML 詳細** | fill 色・shapePath 点列 / pptx fill・prstGeom | ✅ ジオメトリ拡充 |
+| **EPUB/ODF** | `epub->doc`(OPF/spine/XHTML) / `odf->doc`(odt/ods/odp, text:p) | ✅ ZIP 基盤で text 抽出 |
+| **AVIF/HEIC** | `kasane.isobmff`(box-tree → brand/ispe) | ✅ メタ（dims/brand）。AV1/HEVC 画素は opaque |
+| **PDF 画像** | `kasane.cos/page-images`+`decode-image` | ✅ XObject 抽出（FlateDecode→raw / DCTDecode→jpeg.decode / 他 opaque） |
+| **JPEG** | `kasane.jpeg`(marker) + `kasane.jpeg.decode`(baseline 画素) | ✅ メタ + **baseline 画素復号**（Pillow 平均誤差1.6, ADR-2606280010 R1） |
 | **LZW** | `kasane.codec/lzw` (MSB early / LSB) | ✅ **TIFF/GIF とも bit-exact**(実 libtiff/Pillow fixture)、PDF=対応 |
-| テスト | bb 純 cljc スイート | ✅ **34 tests / 139 assertions green** |
+| テスト | bb 純 cljc スイート | ✅ **42 tests / 175 assertions green** |
 
 DEFLATE/zlib inflate は PSD-ZIP・PDF-Flate・PNG-IDAT・**ZIP(Sketch/OOXML/ODF/EPUB)** を、
 LZW は TIFF/GIF/PDF を **それぞれ 1 本で**賄っており、「形式追加＝EDN/ns 追加で増える」設計が

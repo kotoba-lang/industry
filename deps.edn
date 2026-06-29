@@ -428,7 +428,14 @@
       :cipher "gpg encryption=hybrid"
       :keyid "09EE841334482F5A0F5C4958A70BB2C220DE88CA"
       :passphrase_custody "macOS Keychain (gpg:personal-data)"
-      :recovery "1Password Private vault: 'GPG: personal-data warehouse recovery (jun784)' (armored secret key + passphrase)"}}
+      :recovery "1Password Private vault: 'GPG: personal-data warehouse recovery (jun784)' (armored secret key + passphrase)"
+      :crypto_posture {
+        :adr "90-docs/adr/2606271600-kotoba-stack-equivalences.md"
+        :current_boundary "DataLad/git-annex + B2 + GPG hybrid encryption; Git/GitHub stores pointers only"
+        :radicle_note "Radicle-style private repo/selective replication is access control, not at-rest encryption; do not use it as the sole long-term secrecy boundary"
+        :age_sops_position "age = simple file/blob encryption candidate; sops = structured secret config encryption; neither replaces git-annex+GPG for large annexed evidence"
+        :post_quantum_target "future kotoba envelope encryption should be algorithm-agile and support hybrid classical+PQ KEM/signatures (e.g. X25519+ML-KEM, Ed25519+ML-DSA/SLH-DSA) for harvest-now-decrypt-later risk"}}
+    }
   :gftdcojp {
     :m365-archive {
       :path "orgs/gftdcojp/m365-archive"
