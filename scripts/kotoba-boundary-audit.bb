@@ -47,6 +47,9 @@
 (defn primitive-route [path]
   (get (:primitive-routes cfg) (last (str/split path #"/"))))
 
+(defn primitive-route-kind [path]
+  (get (:primitive-route-kinds cfg) (last (str/split path #"/")) :domain-actor))
+
 (defn prefix-route [cell-name]
   (let [prefix (first (str/split cell-name #"[_-]"))]
     (when-let [repo (get-in cfg [:cell-prefix-routes prefix])]
@@ -73,7 +76,7 @@
       {:kind :compat-shim :path path :target (:target (compat-shim path))}
 
       (primitive-route path)
-      {:kind :domain-actor :path path :target (primitive-route path)}
+      {:kind (primitive-route-kind path) :path path :target (primitive-route path)}
 
       (re-find #"(?i)atproto|com\.atproto|PDS_BASE|xrpc|repo\.createRecord" text)
       {:kind :atproto-actor :path path :target (get-in cfg [:owners :atproto-actors])}
@@ -109,10 +112,10 @@
         primitives (map classify-primitive
                         (files-under (io/file legacy-root "py/src/kotodama/primitives")
                                      #(str/ends-with? (.getName %) ".py")))
-        routed-files (map (fn [f] {:kind :domain-actor :path (rel f) :target (primitive-route (rel f))})
+        routed-files (map (fn [f] {:kind (primitive-route-kind (rel f)) :path (rel f) :target (primitive-route (rel f))})
                           (files-under legacy-root
                                        #(and (primitive-route (rel %))
-                                             (not (str/includes? (rel %) "/py/src/kotodama/primitives/")))))
+                                            (not (str/includes? (rel %) "/py/src/kotodama/primitives/")))))
         atproto-files (map (fn [f] {:kind :atproto-actor :path (rel f) :target (get-in cfg [:owners :atproto-actors])})
                            (files-under legacy-root
                                         #(and (not (under-legacy-cells? %))

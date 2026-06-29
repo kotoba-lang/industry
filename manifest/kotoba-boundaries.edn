@@ -22,16 +22,24 @@
    :replacement "orgs/kotoba-lang/murakumo/py/murakumo_host/fleet.py"
    :remove-after "legacy Kotodama Zeebe worker imports murakumo_host.fleet directly"}}
 
- :primitive-routes
- {"shinka_murakumo.py" "orgs/etzhayyim/com-etzhayyim-shinka"
-  "joucho_murakumo.py" "orgs/etzhayyim/com-etzhayyim-joucho"
-  "test_shinka_murakumo.py" "orgs/etzhayyim/com-etzhayyim-shinka"
-  "test_shinka_m2_complete.py" "orgs/etzhayyim/com-etzhayyim-shinka"
-  "test_e2e_religious_corp.py" "orgs/etzhayyim/com-etzhayyim-shinka"
-  "test_joucho_murakumo.py" "orgs/etzhayyim/com-etzhayyim-joucho"}
+:primitive-routes
+{"shinka_murakumo.py" "orgs/etzhayyim/com-etzhayyim-shinka"
+ "joucho_murakumo.py" "orgs/etzhayyim/com-etzhayyim-joucho"
+ "yoro_social_murakumo.py" "orgs/gftdcojp/app-aozora"
+ "test_shinka_murakumo.py" "orgs/etzhayyim/com-etzhayyim-shinka"
+ "test_shinka_m2_complete.py" "orgs/etzhayyim/com-etzhayyim-shinka"
+ "test_e2e_religious_corp.py" "orgs/etzhayyim/com-etzhayyim-shinka"
+ "test_joucho_murakumo.py" "orgs/etzhayyim/com-etzhayyim-joucho"
+ "test_yoro_m4.py" "orgs/gftdcojp/app-aozora"
+ "test_yoro_m5.py" "orgs/gftdcojp/app-aozora"}
 
- :cell-prefix-routes
- {"abuse" "com-etzhayyim-abuse"
+:primitive-route-kinds
+{"yoro_social_murakumo.py" :atproto-actor
+ "test_yoro_m4.py" :atproto-actor
+ "test_yoro_m5.py" :atproto-actor}
+
+:cell-prefix-routes
+{"abuse" "com-etzhayyim-abuse"
   "akashi" "com-etzhayyim-akashi"
   "air" "com-etzhayyim-cargo"
   "auto" "com-etzhayyim-vin"
