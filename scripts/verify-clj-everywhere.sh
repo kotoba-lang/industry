@@ -8,14 +8,14 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOST="$(rustc -vV 2>/dev/null | sed -n 's/host: //p')"
 
 echo "── JVM: .cljc domain interpreters (babashka) ──"
-( cd "$ROOT/orgs/com-junkawasaki/kami-webgpu" && bb test )
+( cd "$ROOT/orgs/kotoba-lang/kami-webgpu" && bb test )
 
 echo "── native WASM: kotoba-clj keystone (CLJ data subset → WASM) ──"
-( cd "$ROOT/orgs/com-junkawasaki/kotoba" \
+( cd "$ROOT/orgs/kotoba-lang/kotoba" \
     && cargo test -p kotoba-clj --test keystone_domains --target "$HOST" )
 
 echo "── native renderer: kami-webgpu-rs (EDN render-IR → wgpu; GPU-free subset) ──"
-( cd "$ROOT/orgs/com-junkawasaki/kami-engine" \
+( cd "$ROOT/orgs/kotoba-lang/kami-engine" \
     && cargo test -p kami-webgpu-rs --lib --target "$HOST" -- \
          --skip renders_geometry_headless --skip caster_casts_a_shadow )
 

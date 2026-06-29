@@ -5,12 +5,14 @@ status: active
 doc_type: adr
 topic: submodule-weight
 authoritative: true
-last_verified: 2026-06-24
+last_verified: 2026-06-27
 authoritative_for:
   - superproject の重い submodule を縮小する手段 (shallow 運用 / force-push 禁止)
   - 大容量バイナリ (モデル重み / wasm / 動画 / 画像データセット) の保管方針 (B2 + DataLad)
   - git-annex の Backblaze B2 (S3 互換) special remote 初期化手順 (scripts/datalad-b2-init.bb)
   - clone/pull 高速化のためのローカル git 設定 (submodule.<name>.shallow / submodule.fetchJobs)
+  - B2 creds の解決方式 (scripts/b2-creds.bb / repos.edn :b2 :credentials。Keychain 単一アイテム b2:<bucket> 方式)
+  - west annex-drop / annex-get による DataLad 実体の B2 退避・復元手順
 related: []
 supersedes: []
 superseded_by: []
@@ -102,8 +104,48 @@ B2_ENDPOINT=s3.us-west-004.backblazeb2.com \
 - (−) B2 運用は資格情報（keyID/appKey/bucket/endpoint）の各マシン設定が前提。秘密の取り回しは
   環境変数 + セッション直実行（`! VAR=… scripts/datalad-b2-init.bb …`）で会話・リポに残さない
 
+## Update 2026-06-27: m365-archive の実 drop と B2 creds 解決の修正
+
+ディスク逼迫（`/` が 98%、空き 25G）の棚卸しで、`orgs/gftdcojp/m365-archive`
+(DataLad/git-annex) の実体が **145G ローカルに materialize されたまま**だったため、
+本 ADR の方針通り `west annex-drop` で B2 へ退避（ローカル破棄）した。
+
+- 実績: m365-archive **145G → 23G**（`datalad drop`、**117,652 ファイル**を B2 上の複製を
+  検証してから破棄。data loss なし）。`/` 空きは 25G → 240G に回復。
+- 復元は同 creds で `west annex-get`（必要時のみ）。
+- 内訳の主因は `onedrive/` 133G（少数の大ファイル）。`mail/` は 3.6G だが小ファイル多数で、
+  1 件ごとに B2 へ存在確認(HEAD)するため drop の所要時間を支配した。
+
+### B2 creds 解決の不整合を修正（Keychain 単一アイテム方式を追加）
+
+`west annex-drop` が当初 creds 未解決で skip した。原因は **`scripts/b2-creds.bb` /
+`manifest/repos.edn :b2 :credentials` の参照先がこのマシンの実体と不一致**だったこと:
+
+- repos.edn は `:1password "op://Private/Backblaze B2/..."` を指すが、その item は実在しない
+  （1Password 上の実体は vault `gftdcojp`）。
+- repos.edn の Keychain 設定は「service `backblaze-b2` の下に key-id/app-key/bucket の
+  3 account（各 password が値）」を前提にしていたが、**実際の Keychain は単一アイテム**
+  （service=`b2:<bucket>`、account=KEY_ID、password=APP_KEY、bucket は service 名の `b2:` 以降）
+  という別レイアウトだった。`-a <account> -w` が password しか返さない現行ロジックでは
+  key-id/bucket を取り出せず解決に失敗していた。
+
+対応:
+- `scripts/b2-creds.bb` の Keychain 解決に **`:combined true` モード**を追加。単一アイテムから
+  `account`(=`security -g` の `"acct"`)→key-id、`password`(=`-w`)→app-key、service 名の
+  `b2:` 以降→bucket を導く。従来の 3-account 方式とは後方互換。
+- `manifest/repos.edn :b2 :credentials :keychain` を
+  `{:service "b2:gftdcojp-m365-annex" :combined true}` に更新。`:1password` も
+  vault `gftdcojp` の実 item パスへ。`env -u B2_*` でも keychain 経由で
+  key-id/app-key/bucket が解決することを確認済み。
+- 登録例: `security add-generic-password -s b2:gftdcojp-m365-annex -a <KEY_ID> -w <APP_KEY>`
+
+教訓: **annex drop は B2 に複製が検証できたキーしかローカル削除しない**ため安全だが、その
+検証には creds が必須。creds 参照先（op:// / keychain service）は秘密でないので repos.edn に
+正しく書き、各マシンの保管レイアウトに合わせる（このマシンは `b2:<bucket>` 単一アイテム）。
+
 ## References
 
-- 実装: `scripts/datalad-b2-init.bb`（B2 + DataLad 初期化）
+- 実装: `scripts/datalad-b2-init.bb`（B2 + DataLad 初期化）/ `scripts/b2-creds.bb`（creds 解決）
+- 実装: `manifest/west_annex.py`（west annex-get / annex-drop）
 - 方針: `CLAUDE.md` の「大容量バイナリの扱い（B2 + DataLad、最優先）」節
 - git-annex S3 special remote（B2 は S3 互換 API で接続）

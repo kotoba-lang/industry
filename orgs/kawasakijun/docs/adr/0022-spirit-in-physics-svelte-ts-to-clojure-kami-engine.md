@@ -150,7 +150,7 @@ panel 生成（108 storyboard → 実 768×1152 PNG, AnimagineXL）/ ブラウ�
 
 ## References
 
-- 新実装: `orgs/com-junkawasaki/kami-engine/kami-app-sip-clj/README.md`, `docs/ARCHITECTURE.md`
+- 新実装: `orgs/kotoba-lang/kami-engine/kami-app-sip-clj/README.md`, `docs/ARCHITECTURE.md`
 - エンジン層: kami-engine `90-docs/adr/0035,0036,0038,0039`
 - 旧実装: `orgs/com-junkawasaki/org-spirit-in-physics/claude.md`, `STRATEGY.jsonld`, `PROJECT.jsonld`
 - 設計: `kami-app-sip-clj/docs/p2-shared-index.md`（共有索引）, `docs/p3b-data-collection.md`（収集・同意・kotobase.net）
