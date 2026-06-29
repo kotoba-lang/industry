@@ -97,7 +97,7 @@ L4 attention manimani + living actions                            (人間が見�
   人手管理のSSoTを EDN に寄せた(既存 `goals.edn` / `facts/*.edn` と同流儀)。
   - `orgs/kawasakijun/{profile,activities,roadmap,financial_state,litigation_state,jk_state,gftd_state,subscriptions_state,photos_timeline}.jsonld` → `*.edn`
   - `orgs/personal/prov/context.jsonld` → `orgs/personal/prov/context.edn` (B2/git-annex `encryption=hybrid` を GPG鍵 `09EE8413…` で復号して移行)
-  - `orgs/personal/accounts/registry.toml` → `registry.edn`、ルート `deps.toml` → `deps.edn`
+  - `orgs/personal/accounts/registry.toml` → `registry.edn`、ルート `deps.toml` は deprecated/pruned 済みで `deps.edn` が現行正本
   - 変換規則: `@id→:id` / `@type→:type`(schema.orgクラスはkeyword) / `kj:X→:kj/X` / schema.org語彙→bare keyword / 日本語ラベルは文字列。元データと逆変換JSONの深比較で値の無損失を確認。
   - **消費側 Python を babashka へ移植 (ADR-0013)**: `orgs/kawasakijun/pregel_planner.py`→`pregel_planner.clj`、`orgs/personal/bin/registry`(tomllib→bb edn)。出力等価をテスト確認。
   - 未了: 手書きスナップショット(state.edn)の datoms+PROV派生物化(ステップ6)、`reverse_topo_pregel.py`/`phase2_*.py`/ingest系Pythonの clj/bb 化。
