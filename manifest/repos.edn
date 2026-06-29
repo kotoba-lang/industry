@@ -9,8 +9,21 @@
 {;; org 名 -> git remote の url-base
  :remotes
  {"com-junkawasaki" "git@github.com:com-junkawasaki"
+  "kotoba-lang"     "git@github.com:kotoba-lang"
   "gftdcojp"        "git@github.com:gftdcojp"
   "etzhayyim"       "https://github.com/etzhayyim"}
+
+ ;; GitHub owner だけ移した project の west remote を上書きする。
+ :remote-overrides
+ {}
+
+ ;; GitHub owner/path 移管済み project の canonical path。
+ :path-overrides
+ {"orgs/com-junkawasaki/freeboard"   "orgs/kotoba-lang/freeboard"
+  "orgs/com-junkawasaki/kami-webgpu" "orgs/kotoba-lang/kami-webgpu"
+  "orgs/com-junkawasaki/kasane"      "orgs/kotoba-lang/kasane"
+  "orgs/com-junkawasaki/murakumo"    "orgs/kotoba-lang/murakumo"
+  "orgs/com-junkawasaki/utsushi"     "orgs/kotoba-lang/utsushi"}
 
  ;; 全 project 共通の既定
  :defaults
@@ -18,7 +31,7 @@
   :clone-depth 1}            ; CLAUDE.md の shallow 既定に準拠
 
  ;; west update --group-filter で選択取得。datalad は既定で無効化(opt-in)。
- :group-filter ["+com-junkawasaki" "+gftdcojp" "+etzhayyim" "-datalad"]
+ :group-filter ["+com-junkawasaki" "+kotoba-lang" "+gftdcojp" "+etzhayyim" "-datalad"]
 
  ;; DataLad dataset(git-annex + B2)。west project にはするが既定では取得しない。
  ;;   実体取得/破棄は `west annex-get` / `west annex-drop`(B2 creds は環境変数)。
@@ -51,47 +64,6 @@
    :keychain {:service  "b2:gftdcojp-m365-annex"   ; ★ keychain service(= b2:<bucket>)
               :combined true}}}                     ; account=key-id, password=app-key
 
- ;; kotoba-server pod（kotobase.net）接続ポリシー（非機密）。詳細は CLAUDE.md
- ;; 「Actors」節 / ai-gftd-itonami ADR-0002。認証は CACAO（SIWE/Ed25519 did:key、
- ;; kotoba-auth DelegationChain）で、**actor ごとに鍵を発行**し自分の鍵由来 IPNS
- ;; graph を所有 → 自己 mint。owner hand-off も共有 token も使わない。秘密鍵は
- ;; repo に置かず `.<actor>/identity.edn`（gitignore）に永続。ここは非機密の
- ;; 参照先・規約のみ。
- :kotoba
- {:endpoint "https://kotobase.net"
-  :xrpc     "ai.gftd.apps.kotobase.datomic.*"   ; transact / q / pull / entid
-  :auth     :cacao-self-issued                  ; actor が自分の did:key で自己発行
-  :capabilities {:read  ["datom:read"]
-                 :write ["datom:transact" "tx:create"]}
-  :identity
-  {:per-actor     true                          ; 1 actor = 1 Ed25519 鍵
-   :path-template ".<actor>/identity.edn"       ; 例 .itonami/identity.edn（gitignore）
-   :persist       :load-or-create               ; 初回生成→保存→再読込
-   :graph         :key-derived-ipns             ; graph = 鍵由来 IPNS 名（k51qzi5uqu5d…）
-   :note "秘密鍵は git にコミットしない。手本 ai-gftd-itonami/src/itonami/cacao.clj"}}
-
- ;; manifest/west.yml への変更の起こし方（非機密ポリシー）。west.yml は生成物
- ;; （repos.edn ＋ 各子repo HEAD → gen-west-manifest.bb、手書き禁止 / --check）。
- ;; superproject も shallow なので local 3-way merge は信頼できない（merge-base が
- ;; graft 境界外で "unrelated histories" / ancestry 誤判定）。詳細は
- ;; ADR-2606272237 / CLAUDE.md「## Git operations」。生成器(gen-west-manifest.bb)は
- ;; このキーを読まない（ドキュメント用の宣言）。
- :manifest-workflow
- {:canonical    :api-single-entry            ; 登録/rename/pin前進すべて API でサーバ側 commit
-  :method       "tip の west.yml + blob SHA を取得 → 当該 entry の行だけ編集 → blob SHA 一致で PUT(branch,sha)"
-  :conflict     :impossible-by-optimistic-lock ; tip がずれれば 409 → 取得し直してリトライ（marker 解決が出ない）
-  :verify       :pin-eq-child-head           ; commit 前に pin == 子repo HEAD を確認
-  :never        [:local-shallow-edit         ; ローカルで shallow 編集/merge を戦わない
-                 :hand-edit-conflict-markers ; west.yml の <<<<<<< を手編集しない（手書き禁止）
-                 :force-push]
-  :if-must-merge {:resolve   :regenerate     ; 衝突は marker でなく再生成で解く
-                  :steps     "superset 側採用 → west update で子を目的 pin に → gen-west-manifest.bb → --check"
-                  :pin-regression-trap "再生成はローカル working HEAD で pin する。子が遅れていると黙ってロールバック → 再生成前に必ず west update"
-                  :ancestry  "固定 depth で賭けず compare API で merge-base を狙い撃ち取得"}
-  :after-api    :recheck-canonical           ; API 手編集は生成器を通らない → 落ち着いたら --check で一致確認
-  :child-repos  :plain-git                    ; 子repo は普通の git(branch/PR/push)。west は pin を記録するだけ
-  :note "正経路は API single-entry。実例 PR #61/#62/#86、kenchi-actor→kenchi-clj rename(34988dd)。"}
-
  ;; ネスト submodule を持つ project は west に再帰取得させる。
  ;; (未指定でも生成スクリプトが各 repo の .gitmodules を検出して自動付与する。
  ;;  ここは明示的に強制したい場合の上書き用。)
@@ -102,9 +74,68 @@
  ;; 生成時に既存 path 群と union される（一度 west.yml に載れば自動追従、distinct で重複排除）。
  ;; clone 済みの working tree（orgs/<org>/<repo>）が存在し HEAD を持つこと。
  :extra-projects
- #{"orgs/com-junkawasaki/freeboard"
-  "orgs/com-junkawasaki/kasane"      ; ADR-2606272100: Adobe(AI/PSD/PDF) 純cljc+EDN ライブラリ
-  "orgs/com-junkawasaki/org-arxiv-kotoba" ; ADR-0023: arXiv organism actor + yorishiro automation
-  "orgs/etzhayyim/com-etzhayyim-sng"      ; ADR-2606290000: e-methane Sabatier SNG standalone actor
-  "orgs/etzhayyim/com-google-ads"         ; ADR-2606292130: charter-clean outreach & performance-marketing actor
-  "orgs/gftdcojp/ai-gftd-router"}}   ; ADR-2606272330: gftd.ai 生成スタジオの製品面(router/gateway)
+ #{"orgs/etzhayyim/com-etzhayyim-shinka" ; religious-corp Shinka domain actor; migrated cljc actor target
+   "orgs/etzhayyim/com-etzhayyim-joucho" ; religious-corp Joucho domain actor; migrated cljc actor target
+   "orgs/etzhayyim/com-etzhayyim-sng" ; ADR-2606290000: e-methane Sabatier SNG standalone actor
+   "orgs/etzhayyim/com-google-ads" ; ADR-2606292130: charter-clean outreach & performance-marketing actor
+   "orgs/kotoba-lang/kasane"         ; ADR-2606272100: Adobe(AI/PSD/PDF) 純cljc+EDN ライブラリ
+   "orgs/kotoba-lang/arxiv"          ; ADR-0023: arXiv organism actor + yorishiro automation
+   "orgs/kotoba-lang/aero"
+   "orgs/kotoba-lang/bpmn"
+   "orgs/kotoba-lang/cacao"
+   "orgs/kotoba-lang/cae-solver"
+   "orgs/kotoba-lang/ci"
+   "orgs/kotoba-lang/cmmn"
+   "orgs/kotoba-lang/crash"
+   "orgs/kotoba-lang/cron"
+   "orgs/kotoba-lang/dag-cbor"
+   "orgs/kotoba-lang/datom"
+   "orgs/kotoba-lang/ddl"
+   "orgs/kotoba-lang/dmn"
+   "orgs/kotoba-lang/dot"
+   "orgs/kotoba-lang/echem"
+   "orgs/kotoba-lang/ed25519"
+   "orgs/kotoba-lang/eth-crypto"
+   "orgs/kotoba-lang/graphql"
+   "orgs/kotoba-lang/homebrew-kotoba"
+   "orgs/kotoba-lang/ical"
+   "orgs/kotoba-lang/jsonlogic"
+   "orgs/kotoba-lang/kenchi"
+   "orgs/kotoba-lang/koe"
+   "orgs/kotoba-lang/kotoba-pages-poc"
+   "orgs/kotoba-lang/kotoba-v2025"
+   "orgs/kotoba-lang/kotobase"
+   "orgs/kotoba-lang/kudaki"
+   "orgs/kotoba-lang/mcp"
+   "orgs/kotoba-lang/motor"
+   "orgs/kotoba-lang/multiformats"
+   "orgs/kotoba-lang/nagare"
+   "orgs/kotoba-lang/num"
+   "orgs/kotoba-lang/openapi"
+   "orgs/kotoba-lang/policy"
+   "orgs/kotoba-lang/sigma"
+   "orgs/kotoba-lang/statechart"
+   "orgs/kotoba-lang/states"
+   "orgs/kotoba-lang/torch"
+   "orgs/kotoba-lang/vllm"
+   "orgs/kotoba-lang/vphysics"
+   "orgs/kotoba-lang/zone"
+   "orgs/kotoba-lang/browser-agent"
+   "orgs/kotoba-lang/freeboard"
+   "orgs/kotoba-lang/kami-webgpu"
+   "orgs/kotoba-lang/kotoba-code"
+   "orgs/kotoba-lang/kotoba-topology"
+   "orgs/kotoba-lang/kototama-clj"
+   "orgs/kotoba-lang/langchain"
+   "orgs/kotoba-lang/langgraph"
+   "orgs/kotoba-lang/murakumo"
+   "orgs/kotoba-lang/playwright"
+   "orgs/kotoba-lang/utsushi"
+   "orgs/gftdcojp/ai-gftd-router"     ; ADR-2606272330: gftd.ai 生成スタジオの製品面(router/gateway)
+   "orgs/kotoba-lang/authenticator"
+   "orgs/kotoba-lang/browser-use"
+   "orgs/kotoba-lang/comfyui"
+   "orgs/kotoba-lang/computer-use"
+   "orgs/kotoba-lang/godaddy-dns"
+   "orgs/kotoba-lang/kami-engine"
+   "orgs/kotoba-lang/kagi"}}

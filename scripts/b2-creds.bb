@@ -33,11 +33,28 @@
       (when (zero? exit) (str/trim out)))))
 
 (defn from-keychain [field]
-  (let [svc (get-in cred [:keychain :service])
-        acct (get-in cred [:keychain (keyword (str (name field) "-account"))])]
-    (when (and svc acct)
-      (let [{:keys [exit out]} (sh "security" "find-generic-password" "-s" svc "-a" acct "-w")]
-        (when (zero? exit) (str/trim out))))))
+  (let [kc  (:keychain cred)
+        svc (:service kc)]
+    (when svc
+      (if (:combined kc)
+        ;; 単一アイテム方式: service=b2:<bucket> の generic-password 1 件に
+        ;;   account = key-id, password = app-key を入れ、bucket は service 名の
+        ;;   "b2:" 以降(または :bucket 明示)から導く。
+        ;;   実例(macOS): security add-generic-password -s b2:<bucket> -a <KEY_ID> -w <APP_KEY>
+        (case field
+          :app-key (let [{:keys [exit out]} (sh "security" "find-generic-password" "-s" svc "-w")]
+                     (when (zero? exit) (str/trim out)))
+          :key-id  (let [{:keys [exit out]} (sh "security" "find-generic-password" "-s" svc "-g")]
+                     (when (zero? exit)
+                       (some-> (re-find #"\"acct\"<blob>=\"([^\"]*)\"" out) second)))
+          :bucket  (or (:bucket kc)
+                       (some-> (re-find #"^b2:(.+)$" svc) second))
+          nil)
+        ;; 従来方式: service 下に field ごとの account(値は各 item の password)。
+        (let [acct (get kc (keyword (str (name field) "-account")))]
+          (when acct
+            (let [{:keys [exit out]} (sh "security" "find-generic-password" "-s" svc "-a" acct "-w")]
+              (when (zero? exit) (str/trim out)))))))))
 
 (defn resolve-field [field]
   (some (fn [src]

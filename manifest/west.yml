@@ -10,11 +10,13 @@ manifest:
       url-base: https://github.com/etzhayyim
     - name: gftdcojp
       url-base: git@github.com:gftdcojp
+    - name: kotoba-lang
+      url-base: git@github.com:kotoba-lang
 
   defaults:
     revision: main
 
-  group-filter: [+com-junkawasaki, +gftdcojp, +etzhayyim, -datalad]
+  group-filter: [+com-junkawasaki, +kotoba-lang, +gftdcojp, +etzhayyim, -datalad]
 
   projects:
     - name: 260208-spirit-in-physics
@@ -149,15 +151,9 @@ manifest:
       path: orgs/com-junkawasaki/echem-clj
       clone-depth: 1
       groups: [com-junkawasaki]
-    - name: freeboard
-      remote: com-junkawasaki
-      revision: 3019c985f85fc6cd7376d0120f8bbb9a0c09f13b
-      path: orgs/com-junkawasaki/freeboard
-      clone-depth: 1
-      groups: [com-junkawasaki]
     - name: ghosthacker
       remote: com-junkawasaki
-      revision: e567917712eca625ee95d3af82141ef264ea0cdb
+      revision: 0b6dd5f7e542c1f5fa1f4af490ad29237a2dd6c0
       path: orgs/com-junkawasaki/ghosthacker
       clone-depth: 1
       groups: [com-junkawasaki]
@@ -209,18 +205,6 @@ manifest:
       remote: com-junkawasaki
       revision: 91ff23bb7615b036829097f63fe0f28b043dbc84
       path: orgs/com-junkawasaki/kami-engine-sdk
-      clone-depth: 1
-      groups: [com-junkawasaki]
-    - name: kami-webgpu
-      remote: com-junkawasaki
-      revision: f8dc142bbb1baa34b9f3f1480c42c2b475fbb4de
-      path: orgs/com-junkawasaki/kami-webgpu
-      clone-depth: 1
-      groups: [com-junkawasaki]
-    - name: kasane
-      remote: com-junkawasaki
-      revision: 9392dd64d8cb2bfe687040e7ea965a4aabe98ae5
-      path: orgs/com-junkawasaki/kasane
       clone-depth: 1
       groups: [com-junkawasaki]
     - name: kekkai-actor
@@ -297,7 +281,7 @@ manifest:
       groups: [com-junkawasaki]
     - name: manimani
       remote: com-junkawasaki
-      revision: b1958b34221ec01501e34dcdb1ebed94db34b476
+      revision: 2d10ec66bece0ca125a8d3300fe513cea2ec1621
       path: orgs/com-junkawasaki/manimani
       clone-depth: 1
       groups: [com-junkawasaki]
@@ -345,7 +329,7 @@ manifest:
       groups: [com-junkawasaki]
     - name: org-spirit-in-physics
       remote: com-junkawasaki
-      revision: 6fb4c3ec3a4b4c2fe10890eeca3fb500e0527278
+      revision: 643f743e7ad37486d4edae6b71171273a539e20c
       path: orgs/com-junkawasaki/org-spirit-in-physics
       clone-depth: 1
       groups: [com-junkawasaki]
@@ -397,12 +381,6 @@ manifest:
       path: orgs/com-junkawasaki/torch-clj
       clone-depth: 1
       groups: [com-junkawasaki]
-    - name: utsushi
-      remote: com-junkawasaki
-      revision: e329e8136a60740caae146969eef1e6968ef01cc
-      path: orgs/com-junkawasaki/utsushi
-      clone-depth: 1
-      groups: [com-junkawasaki]
     - name: vehicle-design-actor
       remote: com-junkawasaki
       revision: fe4e42ff4f4bc0913612b961053723e8b396530d
@@ -423,7 +401,7 @@ manifest:
       groups: [com-junkawasaki]
     - name: webmaster
       remote: com-junkawasaki
-      revision: 00a37f6252035508610fab000d215bea01e343ab
+      revision: 07d74a35427c9ffbccaca62e7d683a5a358982b7
       path: orgs/com-junkawasaki/webmaster
       clone-depth: 1
       groups: [com-junkawasaki]
@@ -1207,12 +1185,6 @@ manifest:
       path: orgs/etzhayyim/com-etzhayyim-sng
       clone-depth: 1
       groups: [etzhayyim]
-    - name: com-google-ads
-      remote: etzhayyim
-      revision: e9ffefbf51d4d68376125b75a0d84f31014859da
-      path: orgs/etzhayyim/com-google-ads
-      clone-depth: 1
-      groups: [etzhayyim]
     - name: com-etzhayyim-society6
       remote: etzhayyim
       revision: 93b6c976ea4fba8ca1ffe8b6042273cbc390db63
@@ -1453,6 +1425,12 @@ manifest:
       path: orgs/etzhayyim/com-etzhayyim-yotei
       clone-depth: 1
       groups: [etzhayyim]
+    - name: com-google-ads
+      remote: etzhayyim
+      revision: e9ffefbf51d4d68376125b75a0d84f31014859da
+      path: orgs/etzhayyim/com-google-ads
+      clone-depth: 1
+      groups: [etzhayyim]
     - name: root
       remote: etzhayyim
       revision: 1935cfdb3523f819c05c65fd5eca5e608033075c
@@ -1462,7 +1440,7 @@ manifest:
       submodules: true
     - name: ai-gftd-apps-gftdcojp
       remote: gftdcojp
-      revision: 16ddd62284f0266e869b1eff09392c40ea6b663e
+      revision: 150305c13c77f2b986db82b5cc25209dce107aa4
       path: orgs/gftdcojp/ai-gftd-apps-gftdcojp
       clone-depth: 1
       groups: [gftdcojp]
@@ -1475,7 +1453,7 @@ manifest:
       groups: [gftdcojp]
     - name: ai-gftd-lf-case-lingling
       remote: gftdcojp
-      revision: 0151dff6766aa797f62b08c121060ec5d37d3d8b
+      revision: 915d4d1e81959261dd9ed3163e4f1d92c044fea0
       path: orgs/gftdcojp/ai-gftd-lf-case-lingling
       clone-depth: 1
       groups: [gftdcojp]
@@ -1499,7 +1477,7 @@ manifest:
       groups: [gftdcojp]
     - name: cloud-itonami
       remote: gftdcojp
-      revision: bb435512160779a327447b8cb5ede803f934cba9
+      revision: 74c43145f19111172bf23203060d3b65828df04e
       path: orgs/gftdcojp/cloud-itonami
       clone-depth: 1
       groups: [gftdcojp]
@@ -1517,7 +1495,7 @@ manifest:
       groups: [gftdcojp]
     - name: m365-archive
       remote: gftdcojp
-      revision: 8c867c65586e747ec224cc7b44c8278ae2141d94
+      revision: d760e773f04456b8b1497a81e2321138d78f863e
       path: orgs/gftdcojp/m365-archive
       clone-depth: 1
       groups: [datalad]
@@ -1526,10 +1504,371 @@ manifest:
         annex-remote: b2
     - name: network-isekai
       remote: gftdcojp
-      revision: 0c7377431b294e286e9635cd9bfb13a1897019e9
+      revision: 032c23eab983c79f6e6476a267085038f1dd8aba
       path: orgs/gftdcojp/network-isekai
       clone-depth: 1
       groups: [gftdcojp]
+    - name: aero
+      remote: kotoba-lang
+      revision: d3b715b5437cab98bb3fcab2a7690c4ecea00711
+      path: orgs/kotoba-lang/aero
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: arxiv
+      remote: kotoba-lang
+      revision: 77f84f3b19e2d81ab82d6ad200c3b57ea0e9921a
+      path: orgs/kotoba-lang/arxiv
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: authenticator
+      remote: kotoba-lang
+      revision: 66c8a7d7a844b4d20ed8943cff511780707c8f31
+      path: orgs/kotoba-lang/authenticator
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: bpmn
+      remote: kotoba-lang
+      revision: 43125fe3f84f0dd4eb584e1e517c6e4718ff73b8
+      path: orgs/kotoba-lang/bpmn
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: browser-agent
+      remote: kotoba-lang
+      revision: c7bf2b2c3ff746ef6bd99f8d52fcf973b0df3e70
+      path: orgs/kotoba-lang/browser-agent
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: browser-use
+      remote: kotoba-lang
+      revision: 12b10ce5d8cffc4c0f7b65015d39776b1853200e
+      path: orgs/kotoba-lang/browser-use
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: cacao
+      remote: kotoba-lang
+      revision: 32fe0b63a815afc0827729394435deee627ea582
+      path: orgs/kotoba-lang/cacao
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: cae-solver
+      remote: kotoba-lang
+      revision: a82eb6d5e5bcf3f89b7198f410b4d5daa2dad717
+      path: orgs/kotoba-lang/cae-solver
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: ci
+      remote: kotoba-lang
+      revision: a1d12d463820fa696912a977fdd6ca92083a4527
+      path: orgs/kotoba-lang/ci
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: cmmn
+      remote: kotoba-lang
+      revision: 1c5ade3c27c4a7e5c2341010c11808206dd29713
+      path: orgs/kotoba-lang/cmmn
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: comfyui
+      remote: kotoba-lang
+      revision: 2a653b1bc271cedf32ffb9096faedd6004d123ad
+      path: orgs/kotoba-lang/comfyui
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: computer-use
+      remote: kotoba-lang
+      revision: 79f980c53a4251bcbe39eb7684d4981b4369c8f0
+      path: orgs/kotoba-lang/computer-use
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: crash
+      remote: kotoba-lang
+      revision: 20166fff676297427b0ac77a3680a0fc05c06c09
+      path: orgs/kotoba-lang/crash
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: cron
+      remote: kotoba-lang
+      revision: 50f4f476bb8102275aa8debea92519e2cc661fb1
+      path: orgs/kotoba-lang/cron
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: dag-cbor
+      remote: kotoba-lang
+      revision: 52b008d96820660196ee8dd15e7d213c9022a6b5
+      path: orgs/kotoba-lang/dag-cbor
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: datom
+      remote: kotoba-lang
+      revision: 987105901308e28750831512d68f2c0933e88c03
+      path: orgs/kotoba-lang/datom
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: ddl
+      remote: kotoba-lang
+      revision: a794cf71a58e78afddf58ae31d29339f352310ff
+      path: orgs/kotoba-lang/ddl
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: dmn
+      remote: kotoba-lang
+      revision: a4944815ae6d0c92b4ac2324e102c32000a6207c
+      path: orgs/kotoba-lang/dmn
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: dot
+      remote: kotoba-lang
+      revision: 2b1d4a7add157feb8c3419a334dd0cd5b69531b4
+      path: orgs/kotoba-lang/dot
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: echem
+      remote: kotoba-lang
+      revision: 9787ef66cccc70aab4ec15e255ae472cb9f0f456
+      path: orgs/kotoba-lang/echem
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: ed25519
+      remote: kotoba-lang
+      revision: ec077bca1f90027bc718557f1e8bb6fbc004fe5a
+      path: orgs/kotoba-lang/ed25519
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: eth-crypto
+      remote: kotoba-lang
+      revision: 9208ecc09a32cf51627ed32eb417e4834f208324
+      path: orgs/kotoba-lang/eth-crypto
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: freeboard
+      remote: kotoba-lang
+      revision: b8ddf01c835704590931fc1f37aeebdd5f49e24d
+      path: orgs/kotoba-lang/freeboard
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: godaddy-dns
+      remote: kotoba-lang
+      revision: b5b7efa34d14e01d2ab23d6fdce56cea7e5f2e50
+      path: orgs/kotoba-lang/godaddy-dns
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: graphql
+      remote: kotoba-lang
+      revision: 13de9f80123ddb3ff65829bae43f1eb8fc826996
+      path: orgs/kotoba-lang/graphql
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: homebrew-kotoba
+      remote: kotoba-lang
+      revision: f36d8e5314e5e4256738555f868577d77069403e
+      path: orgs/kotoba-lang/homebrew-kotoba
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: ical
+      remote: kotoba-lang
+      revision: 7260256db58c45ecf1e78db11da6814f88b2f72c
+      path: orgs/kotoba-lang/ical
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: jsonlogic
+      remote: kotoba-lang
+      revision: 87dea26214cbc67366a80fd268b84898cfd59487
+      path: orgs/kotoba-lang/jsonlogic
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: kagi
+      remote: kotoba-lang
+      revision: 651f24a2e0020c222c199bde4433d15604166517
+      path: orgs/kotoba-lang/kagi
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: kami-engine
+      remote: kotoba-lang
+      revision: 34b72266462acccd93cb300fd2937e228b85ad69
+      path: orgs/kotoba-lang/kami-engine
+      clone-depth: 1
+      groups: [kotoba-lang]
+      submodules: true
+    - name: kami-webgpu
+      remote: kotoba-lang
+      revision: dc3c3f59b3693d0b19041065a1767c4dd2f8c847
+      path: orgs/kotoba-lang/kami-webgpu
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: kasane
+      remote: kotoba-lang
+      revision: 9392dd64d8cb2bfe687040e7ea965a4aabe98ae5
+      path: orgs/kotoba-lang/kasane
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: kenchi
+      remote: kotoba-lang
+      revision: 71c174738402eda2fad0debb9865a217b99aeafe
+      path: orgs/kotoba-lang/kenchi
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: koe
+      remote: kotoba-lang
+      revision: 2c5946f595490e5a74ea093b79b72d6465dc925e
+      path: orgs/kotoba-lang/koe
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: kotoba-code
+      remote: kotoba-lang
+      revision: c8e6ae33da11b29625b12f4d56b62cd957d1f267
+      path: orgs/kotoba-lang/kotoba-code
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: kotoba-pages-poc
+      remote: kotoba-lang
+      revision: f655620ba3135646bb2f08b0fea7c5ad9c857b5a
+      path: orgs/kotoba-lang/kotoba-pages-poc
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: kotoba-topology
+      remote: kotoba-lang
+      revision: d8b759858d68e9375c6b56cdd9480ea25a8bc43a
+      path: orgs/kotoba-lang/kotoba-topology
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: kotoba-v2025
+      remote: kotoba-lang
+      revision: 6a2ce2d8077742db27d58ad7ea42e25b1d59dbc8
+      path: orgs/kotoba-lang/kotoba-v2025
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: kotobase
+      remote: kotoba-lang
+      revision: 09f849fde1a75ae69a737d45100e342e66957129
+      path: orgs/kotoba-lang/kotobase
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: kototama-clj
+      remote: kotoba-lang
+      revision: a9134aff445b7bddd816e073740ff51affa65121
+      path: orgs/kotoba-lang/kototama-clj
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: kudaki
+      remote: kotoba-lang
+      revision: 75badd4cbd7ed25db64d41ff4d3c3aea231f0dd3
+      path: orgs/kotoba-lang/kudaki
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: langchain
+      remote: kotoba-lang
+      revision: bafa74b76d74b4122a9b7855b6ea5a0844d5e59e
+      path: orgs/kotoba-lang/langchain
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: langgraph
+      remote: kotoba-lang
+      revision: c7daa07d4e50f55d7e2a02e4b89dbeb2b200961d
+      path: orgs/kotoba-lang/langgraph
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: mcp
+      remote: kotoba-lang
+      revision: cf456c90b6cb8ad484acecc3bd691b3589134ed5
+      path: orgs/kotoba-lang/mcp
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: motor
+      remote: kotoba-lang
+      revision: 2a240f6a8a808a03f06e2d3eaf71286582331770
+      path: orgs/kotoba-lang/motor
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: multiformats
+      remote: kotoba-lang
+      revision: e3a75a6376441cbf7aaefefce463b404b4254404
+      path: orgs/kotoba-lang/multiformats
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: murakumo
+      remote: kotoba-lang
+      revision: ab68810cbc025390dbc451fc9e8c25f3231333a1
+      path: orgs/kotoba-lang/murakumo
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: nagare
+      remote: kotoba-lang
+      revision: 50fdf6657b437faa4111ec45c0d35f1982e8284a
+      path: orgs/kotoba-lang/nagare
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: num
+      remote: kotoba-lang
+      revision: 97f436e42a6c133ebca86c744e317907cb156022
+      path: orgs/kotoba-lang/num
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: openapi
+      remote: kotoba-lang
+      revision: 92f3c9a5f133cc13786eb87ea99f3579ef4d8bc7
+      path: orgs/kotoba-lang/openapi
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: playwright
+      remote: kotoba-lang
+      revision: 70783258e08f6637c76747a4b8f7c4b6f81a102c
+      path: orgs/kotoba-lang/playwright
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: policy
+      remote: kotoba-lang
+      revision: 16ba9b330c0fb55caccef0cdec2135e543f62191
+      path: orgs/kotoba-lang/policy
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: sigma
+      remote: kotoba-lang
+      revision: c33ad3a143166b7af063ef82e271043599159be5
+      path: orgs/kotoba-lang/sigma
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: statechart
+      remote: kotoba-lang
+      revision: ce5f6c08af1d6c467ebb1da871119dac46f5d4c9
+      path: orgs/kotoba-lang/statechart
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: states
+      remote: kotoba-lang
+      revision: a49e1b07dd808e2496c4d0142c3924f8cb4ae7ea
+      path: orgs/kotoba-lang/states
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: torch
+      remote: kotoba-lang
+      revision: 40182873f0b4201a7d93eb69e8c2196311d5ed03
+      path: orgs/kotoba-lang/torch
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: utsushi
+      remote: kotoba-lang
+      revision: e329e8136a60740caae146969eef1e6968ef01cc
+      path: orgs/kotoba-lang/utsushi
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: vllm
+      remote: kotoba-lang
+      revision: ef25c5d4323cd608fd398f070a0ab100b22f4e67
+      path: orgs/kotoba-lang/vllm
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: vphysics
+      remote: kotoba-lang
+      revision: a551a4dc6a30084fdeb6d34a03d710c93ec40c82
+      path: orgs/kotoba-lang/vphysics
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: zone
+      remote: kotoba-lang
+      revision: 30b84beb1047101616c1ab525a4ba7d19c4aac5b
+      path: orgs/kotoba-lang/zone
+      clone-depth: 1
+      groups: [kotoba-lang]
 
   self:
     path: manifest

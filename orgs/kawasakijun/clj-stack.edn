@@ -8,7 +8,7 @@
 {:version "2026-06-23 ADR-0013/0021（kotoba canonical home = com-junkawasaki に表記統一）"
 
  :premises
- {:wasm    "全コード .cljc / サードパーティ依存ゼロ / JVM interop・スレッド・wall clock・乱数なし。kotoba-clj (orgs/com-junkawasaki/kotoba。canonical home = com-junkawasaki、ADR-0021。etzhayyim/kotoba は 2026-06 撤去済) 等の Clojure WASM ホストで動く前提。WASM は層ではなくホストの一つ（JVM/SCI/CLJS/WASM）。"
+ {:wasm    "全コード .cljc / サードパーティ依存ゼロ / JVM interop・スレッド・wall clock・乱数なし。kotoba-clj (orgs/kotoba-lang/kotoba。canonical GitHub owner = kotoba-lang、ADR-0024。etzhayyim/kotoba は 2026-06 撤去済) 等の Clojure WASM ホストで動く前提。WASM は層ではなくホストの一つ（JVM/SCI/CLJS/WASM）。"
   :datomic "状態・履歴・キャッシュは EAV datom (ADR-0010 L1)。ストアは langchain.db (Datomic API 互換ミニ実装)、langchain.db/api の関数マップ {:q :transact! :db :pull :entid} で本物の Datomic Local / DataScript に差し替え可能。"
   :host-capability "I/O・重い処理は protocol / fn 注入: :http-fn・:json-write/:json-read (anthropic-model)、IBrowser、IComputer、host-fn-node (拡散モデル等)。"}
 

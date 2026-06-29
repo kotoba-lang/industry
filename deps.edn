@@ -1,7 +1,6 @@
-;; deps.edn — com-junkawasaki ワークスペース機械可読 SSoT (ADR-0007/0010)
-;; deps.toml は deprecated/pruned 済み。現行の正本は EDN registry と ADR EDN。
-;; 由来: TOML [table]→マップ, [[array-of-tables]]→ベクタ, inline table→マップ, キーはkeyword(snake_case保持)
-;; 重複キー解消(旧TOMLは不正): :personal/datomic 2つ目 entities→:entities_facts, :gftdcojp/m365-archive 2つ目 status→:status_wiring
+;; deps.edn — com-junkawasaki ワークスペース機械可読 SSoT (deps.toml から移行, ADR-0007)
+;; 変換: TOML [table]→マップ, [[array-of-tables]]→ベクタ, inline table→マップ, キーはkeyword(snake_case保持)
+;; 重複キー解消(元TOMLは不正): :personal/datomic 2つ目 entities→:entities_facts, :gftdcojp/m365-archive 2つ目 status→:status_wiring
 ;; 参照: orgs/kawasakijun/docs/adr/0003, 0007
 {
   :workspace {
@@ -84,7 +83,7 @@
       :adrs ["orgs/kawasakijun/docs/adr/0006-spirit-in-physics-lfs-to-datalad.md"
              "orgs/kawasakijun/docs/adr/0022-spirit-in-physics-svelte-ts-to-clojure-kami-engine.md"]
       :reimplementation {
-        :target "orgs/com-junkawasaki/kami-engine/kami-app-sip-clj"
+        :target "orgs/kotoba-lang/kami-engine/kami-app-sip-clj"
         :stack ["Clojure" "ClojureScript" "Datomic/datalevin" "Kotoba" "kami-render(wgpu)"]
         :status "移行中（ADR-0022）: アプリ層コア完成・統合段階 / エンジン層(kami-engine-clj) ~70-80%。旧 Svelte/TS はパリティ達成まで現役"
         :story-bible-source "orgs/com-junkawasaki/org-spirit-in-physics-comics"}
@@ -100,7 +99,7 @@
       :remote "git@github.com:com-junkawasaki/org-spirit-in-physics-comics.git"
       :renamed-from "260208-spirit-in-physics"
       :description "「Spirit in Physics」グラフィックノベル（8 巻 / 62 章）。clj 版アプリ kami-app-sip-clj の story-bible source of truth（volumes/personas/emotions/storyboards の EDN）。Cloudflare Pages で comics.spirit-in-physics.org に公開（private repo / static deploy）。"
-      :story-bible-for "orgs/com-junkawasaki/kami-engine/kami-app-sip-clj"
+      :story-bible-for "orgs/kotoba-lang/kami-engine/kami-app-sip-clj"
       :published {:url "https://comics.spirit-in-physics.org"
                   :host "Cloudflare Pages (org-spirit-in-physics-comics project, ai-gftd-cloud)"
                   :build "bb build → public/ (babashka static reader from EDN)"}
@@ -132,64 +131,75 @@
       :description "moex（v1.0.0）。ADR-0007 で submodule 追加。"}
     {
       :name "kotoba-topology"
-      :path "orgs/com-junkawasaki/kotoba-topology"
+      :path "orgs/kotoba-lang/kotoba-topology"
       :kind "research"
       :submodule true
-      :remote "git@github.com:com-junkawasaki/kotoba-topology.git"
+      :remote "git@github.com:kotoba-lang/kotoba-topology.git"
+      :org "kotoba-lang"
       :description "kotoba topology（v0.1.0）。ADR-0007 で submodule 追加。"}
     {
       :name "kotoba"
-      :path "orgs/com-junkawasaki/kotoba"
+      :path "orgs/kotoba-lang/kotoba"
       :kind "substrate"
       :submodule true
-      :remote "git@github.com:com-junkawasaki/kotoba.git"
-      :description "kotoba: Rust 製 content-addressed Datalog DB (kotoba-datomic) + Clojure→WASM compiler (kotoba-clj)。再利用 substrate。canonical home = com-junkawasaki（ADR-0020/0021。etzhayyim/kotoba は 2026-06 撤去済）。"
-      :org "com-junkawasaki"}
+      :remote "git@github.com:kotoba-lang/kotoba.git"
+      :description "kotoba: Rust 製 content-addressed Datalog DB (kotoba-datomic) + Clojure→WASM compiler (kotoba-clj)。再利用 substrate。canonical GitHub owner = kotoba-lang（2026-06-29 transfer。ADR-0024）。"
+      :org "kotoba-lang"}
     {
       :name "langchain-clj"
-      :path "orgs/com-junkawasaki/langchain-clj"
+      :path "orgs/kotoba-lang/langchain"
       :kind "clojure-library"
       :submodule true
-      :remote "git@github.com:com-junkawasaki/langchain-clj.git"
+      :remote "git@github.com:kotoba-lang/langchain.git"
+      :github-name "langchain"
+      :org "kotoba-lang"
       :description "LangChain-core 相当の LLM 基盤レイヤを portable Clojure (.cljc, 依存ゼロ) で実装。LCEL Runnable / prompt / ChatModel (Anthropic adapter, I/O はホスト能力注入) / tool / parser / Datomic 互換ミニストア + datom チャット履歴（ADR-0010 と同型）。kotoba-clj 等の Clojure WASM ホスト前提。MIT (本家準拠)。"
       :stack ["Clojure"]
       :adrs ["docs/adr/0001-architecture.md" "orgs/kawasakijun/docs/adr/0013-clj-agent-stack.md"]}
     {
       :name "langgraph-clj"
-      :path "orgs/com-junkawasaki/langgraph-clj"
+      :path "orgs/kotoba-lang/langgraph"
       :kind "clojure-library"
       :submodule true
-      :remote "git@github.com:com-junkawasaki/langgraph-clj.git"
+      :remote "git@github.com:kotoba-lang/langgraph.git"
+      :github-name "langgraph"
+      :org "kotoba-lang"
       :description "LangGraph 相当のグラフオーケストレーションを portable Clojure (.cljc) で実装。StateGraph + Pregel superstep / interrupt / checkpoint を datom 化（Datalog ビュー = ADR-0010 と同型）。langchain-clj に git 依存（本家 langchain-core/langgraph と同じ積層）。MIT (本家準拠)。"
       :stack ["Clojure"]
       :adrs ["docs/adr/0001-architecture.md" "orgs/kawasakijun/docs/adr/0013-clj-agent-stack.md"]
       :deps ["langchain-clj"]}
     {
       :name "comfyui-clj"
-      :path "orgs/com-junkawasaki/comfyui-clj"
+      :path "orgs/kotoba-lang/comfyui"
       :kind "clojure-library"
       :submodule true
-      :remote "git@github.com:com-junkawasaki/comfyui-clj.git"
+      :remote "git@github.com:kotoba-lang/comfyui.git"
+      :github-name "comfyui"
+      :org "kotoba-lang"
       :description "ComfyUI 相当のノードグラフ実行エンジンを portable Clojure (.cljc) で実装。API format 互換ワークフロー + content-addressed キャッシュ付きトポロジカル実行。キャッシュ・run 履歴を datom 化（Datalog ビュー = ADR-0010 と同型）。推論等の重い処理はホスト能力注入、langchain-clj に git 依存（ChatModel ノードパック）。GPL-3.0 (本家準拠)。"
       :stack ["Clojure"]
       :adrs ["docs/adr/0001-architecture.md" "orgs/kawasakijun/docs/adr/0013-clj-agent-stack.md"]
       :deps ["langchain-clj"]}
     {
       :name "browser-use-clj"
-      :path "orgs/com-junkawasaki/browser-use-clj"
+      :path "orgs/kotoba-lang/browser-use"
       :kind "clojure-library"
       :submodule true
-      :remote "git@github.com:com-junkawasaki/browser-use-clj.git"
+      :remote "git@github.com:kotoba-lang/browser-use.git"
+      :github-name "browser-use"
+      :org "kotoba-lang"
       :description "browser-use 相当のブラウザ操作エージェントを portable Clojure (.cljc) で実装。番号付き要素表現 + アクションレジストリ + langgraph StateGraph ループ。ブラウザは IBrowser protocol でホスト能力注入（Playwright/CDP/ページ内 WASM/MCP）、操作履歴を datom 化。MIT (本家準拠)。"
       :stack ["Clojure"]
       :adrs ["docs/adr/0001-architecture.md" "orgs/kawasakijun/docs/adr/0013-clj-agent-stack.md"]
       :deps ["langgraph-clj"]}
     {
       :name "computer-use-clj"
-      :path "orgs/com-junkawasaki/computer-use-clj"
+      :path "orgs/kotoba-lang/computer-use"
       :kind "clojure-library"
       :submodule true
-      :remote "git@github.com:com-junkawasaki/computer-use-clj.git"
+      :remote "git@github.com:kotoba-lang/computer-use.git"
+      :github-name "computer-use"
+      :org "kotoba-lang"
       :description "Anthropic computer use 相当のデスクトップ操作エージェントを portable Clojure (.cljc) で実装。computer tool の action 語彙 + サンプリングループ (langgraph StateGraph)。デスクトップは IComputer protocol でホスト能力注入（xdotool/VNC/MCP）、操作履歴を datom 化。MIT (本家リファレンス準拠)。"
       :stack ["Clojure"]
       :adrs ["docs/adr/0001-architecture.md" "orgs/kawasakijun/docs/adr/0013-clj-agent-stack.md"]
@@ -210,7 +220,21 @@
         :bench "src/minimax_m2_modal/bench.cljc — chat/tools/coding 直接対決"
         :client "src/minimax_m2_modal/client.cljc — OpenAI互換クライアント (LLM_URL/LLM_MODEL/LLM_KEY)"
         :kotoba "src/minimax_m2_modal/kotoba.cljc — cloud-murakumo と同型の vLLM serve 宣言生成"}
-      :status "history/eval-only / not deployed"}]
+      :status "history/eval-only / not deployed"}
+    {
+      :name "ongakuka"
+      :path "orgs/gftdcojp/ongakuka"
+      :kind "ai-audio-service"
+      :submodule false
+      :org "gftdcojp"
+      :description "ongakuka.gftd.ai: yukkuri/animeka 用 BGM composer/selector。Python placeholder を退役し、portable .cljc + EDN catalog で DOVA 等のライセンス付き音源と生成BGMを render-only policy 付きで選曲する。"
+      :stack ["Clojure" "ClojureScript" "EDN" "DataLad/git-annex"]
+      :entrypoints {
+        :catalog "resources/catalog.edn"
+        :compose "src/ongakuka/compose.cljc"
+        :policy "src/ongakuka/policy.cljc"}
+      :assets "orgs/com-junkawasaki/yukkuri-assets-nist-csf-cis-scs/bgm/dova"
+      :status "initial cljc implementation / DOVA render-only catalog imported 2026-06-29"}]
   :vendored [
     {
       :name "systemofsystem"
