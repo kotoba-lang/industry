@@ -21,9 +21,15 @@ superseded_by: []
 
 # ADR-2606290740: computer-use を aiueos の能力隔離 surface として実施する
 
-**Status**: accepted
+**Status**: accepted — **implemented** (2026-06-29)
 **Date**: 2026-06-29
 **Deciders**: Jun Kawasaki
+
+> **実装完了 (2026-06-29).** aiueos PR #5–#10 で surface 設計・provider・実 backing
+> （仮想スクリーン daemon + Xvfb コンテナ）・`aiueos run` への配線まで完了し、
+> `https://isekai.network/gftd/orbs` を host 画面ゼロで駆動して実証済み。
+> **既定 backing は隔離 Linux コンテナ**（computer-use=CLJ/aiueos を使う時はコンテナが
+> 基本。headless Playwright は dev 機の便宜であって既定ではない）。
 
 ## Context
 
@@ -60,8 +66,8 @@ policy の `:host-input` forbid と `:net-allow` 減衰、全操作の監査が�
 
 | surface | backing | host 隔離 | GPU | 用途 |
 |---|---|---|---|---|
-| `computer-virtual` | Linux + Xvfb + Chrome（OrbStack/Lima） | 完全 | software/WebGL2 | headless CI・UX QA |
-| `computer-vm` | Parallels/QEMU microVM（virtio-gpu） | 完全 | 実 WebGPU 寄り | GPU 正確な描画検証 |
+| `computer-virtual` **（既定）** | Linux + Xvfb + Chrome（OrbStack/Lima 隔離コンテナ） | 完全 | software/WebGL2 | **computer-use の既定**・headless CI・UX QA |
+| `computer-vm` | Parallels/QEMU microVM（virtio-gpu） | 完全 | 実 WebGPU 寄り | GPU 正確な描画検証（将来） |
 | `computer-host` | host WindowServer（従来の macos-computer-use） | 無し | native | **署名必須**の opt-in 脱出口 |
 
 従来あなたの画面を奪っていたのは実質 `computer-host`。本決定で **既定が virtual** になり、

@@ -15,10 +15,21 @@
                :supersedes []
                :superseded_by []}
 
+ :implementation {:status "implemented"
+                  :date "2026-06-29"
+                  :prs ["com-junkawasaki/aiueos#5 surface 設計+ADR-0007"
+                        "com-junkawasaki/aiueos#6 computer-virtual provider(gate+監査)"
+                        "com-junkawasaki/aiueos#7 実 backing(仮想スクリーン daemon + Xvfb Dockerfile)"
+                        "com-junkawasaki/aiueos#8 computer-backing bridge(aiueos run→実ブラウザ)"
+                        "com-junkawasaki/aiueos#9 Xvfb コンテナ実証(完全 Linux 隔離)"
+                        "com-junkawasaki/aiueos#10 隔離コンテナを既定 backing 化 + ADR-0007 accepted"]
+                  :default-backing "computer-virtual (隔離 Linux コンテナ)。computer-use=CLJ/aiueos を使う時はコンテナが基本。headless Playwright は dev 機の便宜であって既定ではない。"
+                  :proof "aiueos run drive.edn --surface computer-virtual (AIUEOS_COMPUTER_BACKING=run.sh) が https://isekai.network/gftd/orbs を Linux コンテナ内で駆動し ./out にフレーム捕捉。host 画面ゼロ。"}
+
  :decision {:mechanism "computer-use を aiueos の `computer` surface family として実施。隔離は設定の約束でなく構造的保証: host の実 HID(pointer/host・keyboard/host・display/host)に provider を offer しない → 呼べば unresolved-capability で loud denial。合成入力は仮想 surface(Xvfb/microVM)にのみ解決。admit が trust を :ai-generated に floor、:host-input forbid、:net-allow 減衰、全操作監査が多層化。"
             :canonical {:aiueos-adr "0007-virtual-computer-surface" :pr "com-junkawasaki/aiueos#5 (merged to main)"}}
 
- :surfaces [{:id "computer-virtual" :backing "Linux + Xvfb + Chrome (OrbStack/Lima)" :host-isolated true  :gpu "software/WebGL2" :use "headless CI / UX QA"}
+ :surfaces [{:id "computer-virtual" :default true :backing "Linux + Xvfb + Chrome (OrbStack/Lima 隔離コンテナ)" :host-isolated true  :gpu "software/WebGL2" :use "computer-use の既定 / headless CI / UX QA"}
             {:id "computer-vm"      :backing "Parallels/QEMU microVM (virtio-gpu)"   :host-isolated true  :gpu "near-native WebGPU" :use "GPU 正確な描画検証"}
             {:id "computer-host"    :backing "host WindowServer (従来 macos-computer-use)" :host-isolated false :gpu "native" :use "署名必須の opt-in 脱出口"}]
 
