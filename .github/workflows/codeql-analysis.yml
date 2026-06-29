@@ -32,6 +32,12 @@ jobs:
         languages: ${{ matrix.language }}
         config-file: ./.github/codeql-config.yml
 
+    - name: Setup pnpm (for JavaScript/TypeScript)
+      if: matrix.language == 'javascript'
+      uses: pnpm/action-setup@v4
+      with:
+        version: 9
+
     - name: Setup Node.js (for JavaScript/TypeScript)
       if: matrix.language == 'javascript'
       uses: actions/setup-node@v4
@@ -41,10 +47,6 @@ jobs:
         cache-dependency-path: |
           pnpm-lock.yaml
           apps/*/pnpm-lock.yaml
-
-    - name: Install pnpm
-      if: matrix.language == 'javascript'
-      run: npm install -g pnpm
 
     - name: Setup Python (for Python)
       if: matrix.language == 'python'
@@ -92,3 +94,4 @@ jobs:
       uses: github/codeql-action/analyze@v3
       with:
         category: "/language:${{matrix.language}}"
+        upload: never

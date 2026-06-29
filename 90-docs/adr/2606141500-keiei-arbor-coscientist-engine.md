@@ -1,11 +1,11 @@
 ---
 id: adr-2606141500-keiei-arbor-coscientist-engine
 title: "ADR-2606141500: 経営を Arbor HTR × AI Co-Scientist で進める仮説ツリー経営エンジン"
-status: active
+status: superseded
 doc_type: adr
 topic: keiei-arbor-coscientist
 authoritative: true
-last_verified: 2026-06-14
+last_verified: 2026-06-29
 authoritative_for:
   - gftd-keiei-sim の意思決定ループのアーキテクチャ (Arbor HTR サイクル)
   - 経営仮説の永続化スキーマ :keiei.htr/* (datomic)
@@ -15,14 +15,20 @@ authoritative_for:
 related:
   - adr-2606130000-gftd-revenue-portfolio-pivot
 supersedes: []
-superseded_by: []
+superseded_by:
+  - adr-2606271700-cloud-itonami-business-os
 ---
 
 # ADR-2606141500: 経営を Arbor HTR × AI Co-Scientist で進める仮説ツリー経営エンジン
 
-**Status**: accepted
+**Status**: superseded
 **Date**: 2026-06-14
+**Superseded**: 2026-06-29
 **Deciders**: Jun Kawasaki
+
+## 2026-06-29 Closure
+
+The standalone `orgs/gftdcojp/gftd-keiei-sim/` source tree is retired. This ADR is kept as historical design context for the HTR/AI co-scientist management loop, but it is no longer authoritative for an active project path. The active operating surface is `cloud-itonami`; related people/talent fact reuse is represented through `gftd-talent-actor`.
 
 ## Context
 
@@ -80,7 +86,7 @@ Arbor の **merge ゲート**に残り、既存の承認/却下 UX を壊さな�
 - **Clojure**: 制御フロー(生成・批評・進化)は `agents/turn.clj`(defgraph)。
 - **ClojureScript**: 🌳 仮説ツリータブ(`views.cljs`/`subs.cljs`/`events.cljs` — Elo バー・dev/worst・
   continue/prune)。
-- 設計の全体像は `orgs/gftdcojp/gftd-keiei-sim/docs/keiei-arbor-coscientist.md`。
+- Historical design was `orgs/gftdcojp/gftd-keiei-sim/docs/keiei-arbor-coscientist.md`; the source tree has been retired, and the durable concepts now inform `cloud-itonami` keiei lanes and datom logs.
 
 実 API: `POST /api/turn/advance`(1サイクル)/ `GET /api/htr` / `POST /api/htr/:id/{prune,continue}`
 (merge は既存 `POST /api/proposal/:id/approve` が兼ねる)。

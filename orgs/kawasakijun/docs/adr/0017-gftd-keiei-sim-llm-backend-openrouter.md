@@ -1,12 +1,21 @@
 # ADR-0017: gftd-keiei-sim の実LLMバックエンドを OpenRouter (MiniMax-M2.7) にする
 
-- **Status**: Accepted
+- **Status**: Superseded
 - **Date**: 2026-06-13
+- **Superseded**: 2026-06-29
 - **Deciders**: 河崎純真 (jun@gftd.group)
 - **Context tags**: llm, gftd-keiei-sim, kotoba-llm, openrouter, minimax, modal, self-host, cost, agent
 - **Related**: ADR-0013(portable Clojure エージェントスタック — 本ゲームの clj 社員が同型)、ADR-0010(EDN 事実層 + Datalog ビュー)
-- **Implementation**: `orgs/gftdcojp/gftd-keiei-sim/`（`agents/*.clj` の `llm-infer`、配線は `src/agents.rs` の `HttpInferEngine`、接続は env `KOTOBA_INFERENCE_URL` / `KOTOBA_INFERENCE_MODEL` / `KOTOBA_INFERENCE_API_KEY` = OpenAI 互換）
-- **SSoT (machine-readable)**: ルート `deps.edn`（`:projects` に gftd-keiei-sim を登録、本 ADR を参照）
+- **Implementation**: historical `orgs/gftdcojp/gftd-keiei-sim/` source tree was retired on 2026-06-29. Business/keiei operating surface is now `cloud-itonami`; people/talent facts reuse lives in `gftd-talent-actor`.
+- **SSoT (machine-readable)**: ルート `deps.edn` no longer registers `gftd-keiei-sim` as an active project. This ADR is retained as backend-selection history.
+
+## 2026-06-29 Closure
+
+`gftd-keiei-sim` is no longer an active root project path. The source tree was retired to remove the stale standalone management-game surface. The durable decisions remain:
+
+- OpenRouter MiniMax-M2.7 remains the historical backend decision for the game experiment.
+- `orgs/gftdcojp/minimax-m2-modal/` remains as a `.cljc` eval-only harness and cloud-murakumo reference, not a deployed service.
+- Keiei/business activity is represented through `cloud-itonami` lanes and datom logs rather than the standalone Rust/CLJS game tree.
 
 ## Context
 

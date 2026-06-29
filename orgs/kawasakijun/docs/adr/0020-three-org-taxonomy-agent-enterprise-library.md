@@ -82,10 +82,10 @@ legal-hold 対象は ADR-0005 によりオーナー承認なしに移動・改�
 |---|---|---|
 | `ai-gftd-apps-gftdcojp` | ✅ | gftd.ai の企業向け AI agent platform |
 | `app-aozora` | ✅ | 企業向け app |
-| `gftd-keiei-sim` | ✅ | CEO が意思決定する経営シミュレーション（人間が操作・判断 = §2.1 gftd 主体） |
-| `kyber-plm` | ✅ | DoDAF 準拠 PLM/ERP（_intake の Kyber ERP 契約と対応） |
+| `gftd-keiei-sim` | 🕘 | 履歴化。経営判断/HTR 設計は `cloud-itonami` keiei lane へ吸収。standalone source tree は 2026-06-29 retired |
+| `kyber-plm` | 🕘 | 履歴化。PLM/ERP/MES 語彙と不変条件は `cloud-itonami` compat/history model へ吸収。standalone source tree は 2026-06-29 retired |
 | `m365-archive` | ✅ | gftd 法人の M365 業務データ archive（ビジネスデータ） |
-| `minimax-m2-modal` | 🟡 | LLM 自前ホスト評価 harness。汎用 infra 寄りで本来 com-junkawasaki でも成立するが、gftd-keiei-sim の backend 決定（ADR-0017）に直結するため gftd に留め置く |
+| `minimax-m2-modal` | 🟡 | LLM 自前ホスト評価 harness。`.cljc` 履歴資産として残し、cloud-murakumo の vLLM serve 参照実装に寄せる |
 | `ai-gftd-lf-case-lingling` | ✅（2026-06-23 移送）| Gftd Japan 被告の LingLing 訴訟ケース（企業の法務・契約）。com-junkawasaki から org transfer 済 |
 | `_intake` | ✅ | 企業の契約書・営業資料・入社書類の staging。gftd の典型 |
 
@@ -114,11 +114,11 @@ legal-hold 対象は ADR-0005 によりオーナー承認なしに移動・改�
   を保全。**利益相反規程（PwC × 係争当事者性）の確認は別途継続課題**（移送はそれと独立に owner 判断で実行）。
 - agent 関連の見かけ上の重複（kototama-clj 等が etzhayyim っぽい）は §2.3 の lib/deployment
   境界で解消され、**現状配置はほぼ妥当**（root 以外の agent コードは部品なので com-junkawasaki）。
-- `_modelbake` と `minimax-m2-modal` は機能 fit だが整理余地あり（root 配下へ畳む / 汎用 infra 化）。
+- `_modelbake` と `minimax-m2-modal` は機能 fit だが整理余地あり（root 配下へ畳む / cloud-murakumo へ吸収）。
   優先度低。
 
 ## 5. Non-goals / 保留
 
-- `_modelbake`（→ `etzhayyim/root/70-tools`）と `minimax-m2-modal`（汎用 infra 化）の整理は優先度低・本 ADR では未実行。
+- `_modelbake`（→ `etzhayyim/root/70-tools`）と `minimax-m2-modal`（cloud-murakumo へ吸収）の整理は優先度低・本 ADR では未実行。
 - 利益相反規程（PwC 就業 × 係争当事者性）の整合確認は `orgs/personal/facts/orgs.edn` 記載のとおり継続課題。
   `ai-gftd-lf-case-lingling` の物理移送自体は owner 判断で 2026-06-23 実行済み（上記とは独立）。

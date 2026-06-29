@@ -1,17 +1,18 @@
 ---
 id: adr-2606272330-kagi-clj-pqc-vault
 title: "ADR-2606272330: kagi-clj — 対量子(PQC)シークレット vault（1Password 代替）を kotoba 上に主権設計"
-status: proposed
+status: accepted
 doc_type: adr
 topic: security-vault
 authoritative: true
-last_verified: 2026-06-27
+last_verified: 2026-06-28
 authoritative_for:
   - kagi-clj リポの暗号方針（hybrid PQC：鍵交換/署名/対称/KDF の選定）
   - vault item の鍵階層（unlock → VMK → compartment → DEK）と共有(share)エンベロープ
   - 平文/鍵をサーバに渡さない zero-knowledge ストレージ分割（sealed block ⟂ Datomic index）
   - vault の actor 化（StateGraph + AccessGovernor + 不変台帳、単一不変条件）
-  - crypto provider seam（JVM=BouncyCastle / CLJS・WASM=kotoba-crypto Rust）
+  - crypto provider seam（JVM=JDK24 標準 ML-KEM-768/ML-DSA-65 + BouncyCastle Argon2id / CLJS・WASM=kotoba-crypto Rust）
+  - op 相当 CLI（kagi.cli）と vault 永続化（kagi.persist：暗号文のみ）
 related:
   - orgs/com-junkawasaki/kagi-clj
   - orgs/gftdcojp/ai-gftd-itonami/src/itonami/cacao.clj
@@ -174,6 +175,30 @@ consent、break-glass（緊急 + 必須監査）、rate/anomaly、device posture
 `load-or-create-identity!` をそのまま使う（**kotoba authority は不変**）。これに **ML-DSA-65 公開鍵を
 graph に publish** し、vault commit と CACAO に hybrid 署名を併記する。秘密鍵（Ed25519 + ML-DSA +
 KEM）は `.kagi/identity.edn` に置き **gitignore（git に絶対コミットしない）**。
+
+## 実装状況（2026-06-28、accepted）
+
+リポ `com-junkawasaki/kagi-clj` で **設計の中核を実装・検証済み**（clj-kondo clean、30 tests / 64 assertions pass、CLI 手動検証）:
+
+- **hybrid PQC crypto**（`kagi.crypto`, `jvm-provider`）: KEM = X25519 + **ML-KEM-768**、署名 =
+  Ed25519 + **ML-DSA-65**（いずれも **JDK 24 標準** JEP 496/497）、対称 = AES-256-GCM、KDF = HKDF、
+  unlock = **Argon2id**（BouncyCastle、JDK 非提供のため）。KEM 往復・署名 tamper reject を contract test 化。
+  *(設計時は BC 一次想定 → probe で BC 1.78.1 は pre-standard DILITHIUM のみと判明し JDK-native に確定。)*
+- **identity**（`kagi.identity`）: Ed25519 authority(did:key/IPNS) + ML-DSA-65 共同署名 + hybrid KEM
+  受信鍵。`member-record` で公開鍵束を graph publish、actor `:authn` が **depth-1 self-mint** 登録。
+- **CACAO 自己発行**（`kagi.cacao`）: SIWE/EIP-4361 を Ed25519 で mint、**verify を実装**（CBOR decode +
+  did:key→公開鍵復元 + Ed25519 検証 + **expiry / replay(nonce) / audience**）。iss 詐称・改竄を reject、
+  actor `:authn` が実検証し失敗を `:hold` へ。
+- **改竄検知台帳**（`kagi.ledger`）: ハッシュ鎖 + entry ごと hybrid 署名、`verify-chain` で hash/連結/
+  署名を検証（破損位置を特定）。actor の commit/hold を全署名。
+- **actor**（`kagi.operation`）: langgraph-clj StateGraph + `kagi.governor` AccessGovernor。
+  create/reveal/update/rotate/share/revoke/list を実装、PQC 共有を end-to-end 検証。
+- **CLI（op 相当）**（`kagi.cli` + `bin/kagi`）: `init/add/get/ls/rotate/log/whoami`。master passphrase →
+  Argon2id → KEK → VMK(wrap 解除)。`kagi.persist` が vault を edn 永続化（**暗号文 + wrap 済み鍵 +
+  台帳のみ。平文・素 VMK は不書込**。byte[]→base64）。`.kagi/`（identity, vault）は gitignore。
+
+**段階導入（未）**: `KotobaStore` の XRPC 実配線（要 kotoba-server）・`SealedBlockStore`、CLJS/WASM
+provider（kotoba-crypto Rust に ml-kem/ml-dsa 増設）、Shamir 復旧の実装、uberjar 化での global install。
 
 ## Threat model
 

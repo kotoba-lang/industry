@@ -47,14 +47,16 @@
    :why "gftd.ai の企業向け AI agent platform"}
   {:repo "gftdcojp/app-aozora" :owner :gftdcojp :belongs :gftdcojp :subject :enterprise :fit :ok
    :why "企業向け app"}
-  {:repo "gftdcojp/gftd-keiei-sim" :owner :gftdcojp :belongs :gftdcojp :subject :enterprise :fit :ok
-   :why "CEO が操作・判断する経営シミュレーション(人間が主体)"}
-  {:repo "gftdcojp/kyber-plm" :owner :gftdcojp :belongs :gftdcojp :subject :enterprise :fit :ok
-   :why "DoDAF 準拠 PLM/ERP。_intake の Kyber ERP 契約と対応"}
+  {:repo "gftdcojp/gftd-keiei-sim" :owner :gftdcojp :belongs :gftdcojp :subject :enterprise :fit :retired
+   :retired_on "2026-06-29"
+   :why "Standalone source tree retired; HTR/keiei design absorbed into cloud-itonami keiei lane"}
+  {:repo "gftdcojp/kyber-plm" :owner :gftdcojp :belongs :gftdcojp :subject :enterprise :fit :retired
+   :retired_on "2026-06-29"
+   :why "Standalone source tree retired; PLM/ERP/MES vocabulary and invariants absorbed into cloud-itonami compat/history model"}
   {:repo "gftdcojp/m365-archive" :owner :gftdcojp :belongs :gftdcojp :subject :enterprise :fit :ok
    :why "gftd 法人 M365 業務データ archive"}
   {:repo "gftdcojp/minimax-m2-modal" :owner :gftdcojp :belongs :gftdcojp :subject :enterprise :fit :ok-note
-   :why "LLM 自前ホスト評価 harness。汎用 infra 寄りだが gftd-keiei-sim backend 決定(ADR-0017)に直結のため gftd 留置"}
+   :why "LLM 自前ホスト評価 harness。`.cljc` 履歴資産として残し、cloud-murakumo の vLLM serve 参照実装に寄せる"}
   {:repo "gftdcojp/_intake" :owner :gftdcojp :belongs :gftdcojp :subject :enterprise :fit :ok
    :why "企業の契約書・営業資料・入社書類 staging"}
 
@@ -122,5 +124,5 @@
 
  :summary
  {:relocated ["ai-gftd-lf-case-lingling (com-junkawasaki -> gftdcojp, 2026-06-23 完全移送済)"]
-  :tidy-candidates ["_modelbake (-> etzhayyim/root/70-tools)" "minimax-m2-modal (汎用 infra 化検討)"]
+  :tidy-candidates ["_modelbake (-> etzhayyim/root/70-tools)" "minimax-m2-modal (cloud-murakumo へ吸収)"]
   :verdict "現状配置は概念タクソノミと整合。唯一の再配置 ai-gftd-lf-case-lingling は 2026-06-23 に gftdcojp へ完全移送済。agent lib の見かけ上の重複は §2.3 lib/deployment 境界で解消"}}

@@ -1,0 +1,238 @@
+{:frontmatter
+ {:id "adr-2606271700-cloud-itonami-business-os"
+  :title "cloud-itonami — manimani 企業版として gftdcojp business activity を統合する"
+  :status "closed"
+  :date "2026-06-27"
+  :closed "2026-06-27"
+  :authoritative true
+  :repo "orgs/gftdcojp/cloud-itonami"
+  :builds_on ["orgs/com-junkawasaki/manimani"
+              "orgs/gftdcojp/m365-archive"
+              "orgs/com-junkawasaki/kotoba"
+              "orgs/com-junkawasaki/langgraph-clj"]}
+ :decision
+ {:product "cloud-itonami"
+  :placement :gftdcojp
+  :subject :enterprise
+  :definition "manimani の business 版。gftdcojp の business activity を kotoba/datom log 上の activity/decision/effect/audit に統合する。"
+  :lanes [:inbox :sales :contract :billing :legal :procedure :employee :plm :erp :mes :keiei]
+  :kyber_integration {:facade "cloud-itonami.ops"
+                      :plm_api "cloud-itonami.plm"
+                      :role "kyber-plm standalone source tree is retired; PLM/ERP/MES invariants live as cloud-itonami compat/history vocabulary"
+                      :sync "project kyber-derived events into itonami activity/effect/audit after each operation"}
+  :core_ns [:itonami.activity :itonami.decision :itonami.effect :itonami.audit]
+  :implementation {:language ".cljc"
+                   :local_store "cloud-itonami.store over langchain.db"
+                   :production_store "langchain.kotoba-db / kotoba-server XRPC"
+                   :kotoba_cli "cloud-itonami.kotoba"
+                   :company_cli "cloud-itonami.company"
+                   :agent "langgraph-clj/langchain-clj"
+                   :runtime "cloud-itonami.runtime"
+                   :runtime_model {:factory "cloud-itonami.runtime/real-model"
+                                   :providers [:openai :openclaw :hermes :anthropic]
+                                   :env ["ITO_MODEL_PROVIDER" "ITO_MODEL_URL" "ITO_MODEL" "ITO_MODEL_API_KEY"]}
+                   :approval_runner "cloud-itonami.approval"
+                   :ui_origin "manimani approval inbox"}
+  :closure {:status :closed
+            :closed_on "2026-06-27"
+            :canonical_api ["cloud-itonami.plm"
+                            "cloud-itonami.ops"
+                            "cloud-itonami.mes"
+                            "cloud-itonami.migration"
+                            "cloud-itonami.company"]
+            :compat_shims ["cloud-itonami.kyber-ops"]
+            :decision "kyber-plm is no longer the public operating surface or active source tree; its durable invariants remain as cloud-itonami compat/history vocabulary."}}
+ :business_coverage
+ {:m365
+  {:messages :inbox
+   :events :inbox
+   :teams-messages :inbox
+   :crm :sales
+   :projects :sales
+   :mail-projects :sales
+   :ses-engineers :sales
+   :ses-cases :sales
+   :contract-terms :contract
+   :contract-att-terms :contract
+   :invoice-terms :billing
+   :billing-att-terms :billing
+   :finance-terms :billing
+   :current-billing :billing
+   :invoice-amounts-recovered :billing
+   :financials-annual :billing
+   :financials-by-period :billing
+   :financials-reconciliation :billing
+   :trial-balance :billing
+   :chart-of-accounts :billing
+   :procedure-terms :procedure
+   :hr-terms :employee
+   :people [:employee :sales]
+   :decisions :inbox}
+  :kyber
+  {:status :retired-source-tree
+   :store_projector "cloud-itonami.migration/project-kyber-graph"
+   :lanes [:plm :erp :mes]
+   :facade "cloud-itonami.ops"
+   :plm_api "cloud-itonami.plm"
+   :mes_projector "cloud-itonami.mes/kyber-completion->tx"}
+  :operating_model "cloud-itonami.operating/lane-catalog"
+  :store {:local "cloud-itonami.store"
+          :kotoba "cloud-itonami.kotoba"
+          :import "actor/artifact -> activity -> relation/decision/effect/audit"
+          :many_refs "expanded to :db/add"
+          :lookup_refs "tempid optimized within batch"
+          :production_swap "langchain.kotoba-db"
+          :env ["KOTOBA_URL" "KOTOBA_GRAPH" "KOTOBA_TOKEN" "KOTOBA_CACAO" "KOTOBA_DID"]}
+  :approval {:queue "cloud-itonami.approval/pending-approvals"
+             :cli "clojure -M:approval list|approve|reject|execute|execute-dry-run <store.edn>"
+             :states [:proposed :approved :rejected :executed :failed]
+             :execution "cloud-itonami.approval/execute-approved!"
+             :fail_closed true}
+  :runtime {:namespace "cloud-itonami.runtime"
+            :checkpoint_store "same conn as itonami facts"
+            :cli "clojure -M:runtime mock-react <store.edn> [goal] [thread-id]"}
+  :company_operating_set
+  {:namespace "cloud-itonami.company"
+   :cli "clojure -M:company coverage|import|bootstrap-mock ..."
+   :kinds [:procedure-terms :hr-terms :people :ses-engineers :ses-cases]
+   :purpose "current gftdcojp/gftdjapan procedure and employee operating subset"}
+  :coverage_report
+  {:cli "clojure -M:ingest report <facts-dir> [kind ...]"
+   :available "returns fact count and tx summary"
+   :missing_annex "returns pointer and git annex get command without aborting the whole report"}
+  :verified_counts_2026_06_27
+  {:command "clojure -M:ingest ../m365-archive/facts procedure-terms hr-terms people ses-engineers ses-cases"
+   :facts {:hr-terms 101
+           :people 5418
+           :procedure-terms 118
+           :ses-cases 2168
+           :ses-engineers 3862}
+   :tx {:activities 11667
+        :actors 5526
+        :artifacts 219
+        :effects 11667}}
+  :store_verified_2026_06_27
+  {:command "clojure -M:store import /tmp/cloud-itonami-procedure-hr.edn ../m365-archive/facts procedure-terms hr-terms"
+   :facts {:procedure-terms 118
+           :hr-terms 101}
+   :db {:activities 219
+        :actors 93
+        :artifacts 219
+        :effects 219}}
+  :company_store_verified_2026_06_27
+  {:coverage_command "clojure -M:company coverage ../m365-archive/facts"
+   :import_command "clojure -M:company import /tmp/cloud-itonami-company.edn ../m365-archive/facts"
+   :coverage {:procedure-terms :available
+              :hr-terms :available
+              :people :available
+              :ses-engineers :available
+              :ses-cases :available}
+   :facts {:hr-terms 101
+           :people 5418
+           :procedure-terms 118
+           :ses-cases 2168
+           :ses-engineers 3862}
+   :db {:activities 10938
+        :actors 5511
+        :artifacts 219
+        :effects 10938
+        :datoms 176717}
+   :note "Counts are after unique identity upsert in the file-backed store; tx-data summary before upsert has 11667 activities/effects."}
+  :runtime_verified_2026_06_27
+  {:command "clojure -M:runtime mock-react /tmp/cloud-itonami-procedure-hr.edn 手続きを進めて gftd-procedure-thread"
+   :db {:activities 219
+        :effects 220
+        :checkpoints 5}
+   :approval {:kind :procedure.review
+              :risk :financial
+              :status :proposed}}
+  :company_runtime_approval_verified_2026_06_27
+  {:runtime_command "clojure -M:runtime mock-react /tmp/cloud-itonami-company.edn 'gftdcojp と gftdjapan株式会社の手続き・社員対応を確認し、必要な承認へ進めて' gftd-company-thread"
+   :approval_commands ["clojure -M:approval list /tmp/cloud-itonami-company.edn"
+                       "clojure -M:approval approve /tmp/cloud-itonami-company.edn <effect-id> jun 'company bootstrap approval'"
+                       "clojure -M:approval execute-dry-run /tmp/cloud-itonami-company.edn"]
+   :thread-id "gftd-company-thread"
+   :effect-kind :procedure.review
+   :final-db {:activities 10938
+              :actors 5511
+              :artifacts 219
+              :effects 10939
+              :checkpoints 5
+              :decisions 1
+              :audits 2
+              :datoms 176770}}
+  :approval_cli_verified_2026_06_27
+  {:commands ["clojure -M:runtime mock-react /tmp/cloud-itonami-cli-smoke.edn 手続きを進めて cli-smoke-thread"
+              "clojure -M:approval list /tmp/cloud-itonami-cli-smoke.edn"
+              "clojure -M:approval approve /tmp/cloud-itonami-cli-smoke.edn <effect-id> jun ok"
+              "clojure -M:approval execute-dry-run /tmp/cloud-itonami-cli-smoke.edn"
+              "clojure -M:store counts /tmp/cloud-itonami-cli-smoke.edn"]
+   :db {:activities 1
+        :effects 2
+        :checkpoints 5
+        :decisions 1
+        :audits 2}}
+  :expanded_billing_contract_verified_2026_06_27
+  {:unit ["cloud-itonami.m365-test" "cloud-itonami.facts-test"]
+   :report_command "clojure -M:ingest report ../m365-archive/facts contract-att-terms billing-att-terms finance-terms current-billing invoice-amounts-recovered financials-annual financials-by-period financials-reconciliation trial-balance chart-of-accounts"
+   :kinds [:contract-att-terms
+           :billing-att-terms
+           :finance-terms
+           :current-billing
+           :invoice-amounts-recovered
+           :financials-annual
+           :financials-by-period
+           :financials-reconciliation
+           :trial-balance
+           :chart-of-accounts]
+   :smoke {:facts [:procedure-terms :finance-terms :current-billing]
+           :db {:activities 3
+                :artifacts 2
+                :effects 4
+                :checkpoints 5
+                :decisions 1
+                :audits 2}}
+   :unavailable_annex_2026_06_27
+   {:contract-att-terms "git -C ../m365-archive annex get facts/contract-att-terms.edn"
+    :billing-att-terms "git -C ../m365-archive annex get facts/billing-att-terms.edn"
+    :finance-terms "git -C ../m365-archive annex get facts/finance-terms.edn"
+    :current-billing "git -C ../m365-archive annex get facts/current-billing.edn"
+    :invoice-amounts-recovered "git -C ../m365-archive annex get facts/invoice-amounts-recovered.edn"
+    :financials-annual "git -C ../m365-archive annex get facts/financials-annual.edn"
+    :financials-by-period "git -C ../m365-archive annex get facts/financials-by-period.edn"
+    :financials-reconciliation "git -C ../m365-archive annex get facts/financials-reconciliation.edn"
+    :trial-balance "git -C ../m365-archive annex get facts/trial-balance.edn"
+    :chart-of-accounts "git -C ../m365-archive annex get facts/chart-of-accounts.edn"}
+   :annex_note "Some finance/billing annex objects are not available locally; cloud-itonami.facts coverage report returns the git annex get command instead of aborting the whole ingest check."}
+  :real_model_verified_2026_06_27
+  {:unit "cloud-itonami.runtime-test/real-model-factory-supports-openclaw-openai-compatible-endpoints"
+   :provider :openclaw
+   :wire :openai-compatible
+   :auth :bearer}
+  :kotoba_verified_2026_06_27
+  {:unit "cloud-itonami.kotoba-test"
+   :cli "clojure -M:kotoba"
+   :cli_without_env "KOTOBA_URL is required"
+   :real_server_verified false
+   :reason "KOTOBA_URL / KOTOBA_GRAPH are not set in this checkout environment"}
+  :verification_note_2026_06_27
+  "Annex pointer facts are now resolved by cloud-itonami.facts when content is locally available; clojure -M:ingest report shows available/missing coverage; company operating subset is persisted locally and driven through mock React + approval dry-run; kotoba-backed verification still requires KOTOBA_URL and KOTOBA_GRAPH."}
+ :kyber_refactor
+ {:keep_kyber_as "internal/compatibility PLM/ERP/MES invariant engine"
+  :public_api ["cloud-itonami.plm" "cloud-itonami.ops"]
+  :compat_api ["cloud-itonami.kyber-ops"]
+  :project_to_itonami
+  {:plm.item :itonami.artifact
+   :plm.bom :itonami.relation
+   :plm.eco :itonami.activity
+   :erp.po :itonami.activity
+   :erp.inventory :itonami.artifact
+   :erp.journal :itonami.effect
+   :production.completed :itonami.activity
+   :mes.backflush :itonami.effect
+   :ocel :itonami.audit}}
+ :risk_gate
+ {:read-only :auto
+  :external-send :approve
+  :financial :approve
+  :destructive :approve}}

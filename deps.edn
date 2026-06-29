@@ -1,6 +1,7 @@
-;; deps.edn — com-junkawasaki ワークスペース機械可読 SSoT (deps.toml から移行, ADR-0007)
-;; 変換: TOML [table]→マップ, [[array-of-tables]]→ベクタ, inline table→マップ, キーはkeyword(snake_case保持)
-;; 重複キー解消(元TOMLは不正): :personal/datomic 2つ目 entities→:entities_facts, :gftdcojp/m365-archive 2つ目 status→:status_wiring
+;; deps.edn — com-junkawasaki ワークスペース機械可読 SSoT (ADR-0007/0010)
+;; deps.toml は deprecated/pruned 済み。現行の正本は EDN registry と ADR EDN。
+;; 由来: TOML [table]→マップ, [[array-of-tables]]→ベクタ, inline table→マップ, キーはkeyword(snake_case保持)
+;; 重複キー解消(旧TOMLは不正): :personal/datomic 2つ目 entities→:entities_facts, :gftdcojp/m365-archive 2つ目 status→:status_wiring
 ;; 参照: orgs/kawasakijun/docs/adr/0003, 0007
 {
   :workspace {
@@ -72,26 +73,39 @@
       :org "gftdcojp"
       :ssot "orgs/gftdcojp/ai-gftd-apps-gftdcojp/README.md"}
     {
-      :name "spirit-in-physics"
-      :path "orgs/com-junkawasaki/spirit-in-physics"
+      :name "org-spirit-in-physics"
+      :path "orgs/com-junkawasaki/org-spirit-in-physics"
       :kind "research"
       :submodule true
-      :remote "git@github.com:com-junkawasaki/spirit-in-physics.git"
+      :remote "git@github.com:com-junkawasaki/org-spirit-in-physics.git"
+      :renamed-from "spirit-in-physics"
       :description "「Spirit in Physics」研究リポジトリ（web + mobile アプリ, jung-voice-assessment 音声 dataset, 論文 PDF）。大容量ファイルは Git LFS から DataLad/git-annex へ移行予定。"
       :stack ["Svelte" "Capacitor" "TypeScript"]
-      :adrs ["orgs/kawasakijun/docs/adr/0006-spirit-in-physics-lfs-to-datalad.md"]
+      :adrs ["orgs/kawasakijun/docs/adr/0006-spirit-in-physics-lfs-to-datalad.md"
+             "orgs/kawasakijun/docs/adr/0022-spirit-in-physics-svelte-ts-to-clojure-kami-engine.md"]
+      :reimplementation {
+        :target "orgs/com-junkawasaki/kami-engine/kami-app-sip-clj"
+        :stack ["Clojure" "ClojureScript" "Datomic/datalevin" "Kotoba" "kami-render(wgpu)"]
+        :status "移行中（ADR-0022）: アプリ層コア完成・統合段階 / エンジン層(kami-engine-clj) ~70-80%。旧 Svelte/TS はパリティ達成まで現役"
+        :story-bible-source "orgs/com-junkawasaki/org-spirit-in-physics-comics"}
       :large_files {
         :current "git-lfs (+ orphaned git-annex pointers)"
         :target "datalad/git-annex"
         :status "unblocked 2026-06-09: lfs fetch OK (114 obj/2.6MB); migration pending (ADR-0006)"}}
     {
-      :name "260208-spirit-in-physics"
-      :path "orgs/com-junkawasaki/260208-spirit-in-physics"
+      :name "org-spirit-in-physics-comics"
+      :path "orgs/com-junkawasaki/org-spirit-in-physics-comics"
       :kind "research"
       :submodule true
-      :remote "git@github.com:com-junkawasaki/260208-spirit-in-physics.git"
-      :description "「Spirit in Physics」関連リポジトリ（2026-02-08 スナップショット）。大容量ファイル機構なし（通常リポジトリ）。"
-      :adrs ["orgs/kawasakijun/docs/adr/0006-spirit-in-physics-lfs-to-datalad.md"]}
+      :remote "git@github.com:com-junkawasaki/org-spirit-in-physics-comics.git"
+      :renamed-from "260208-spirit-in-physics"
+      :description "「Spirit in Physics」グラフィックノベル（8 巻 / 62 章）。clj 版アプリ kami-app-sip-clj の story-bible source of truth（volumes/personas/emotions/storyboards の EDN）。Cloudflare Pages で comics.spirit-in-physics.org に公開（private repo / static deploy）。"
+      :story-bible-for "orgs/com-junkawasaki/kami-engine/kami-app-sip-clj"
+      :published {:url "https://comics.spirit-in-physics.org"
+                  :host "Cloudflare Pages (org-spirit-in-physics-comics project, ai-gftd-cloud)"
+                  :build "bb build → public/ (babashka static reader from EDN)"}
+      :adrs ["orgs/kawasakijun/docs/adr/0006-spirit-in-physics-lfs-to-datalad.md"
+             "orgs/kawasakijun/docs/adr/0022-spirit-in-physics-svelte-ts-to-clojure-kami-engine.md"]}
     {
       :name "webmaster"
       :path "orgs/com-junkawasaki/webmaster"
@@ -181,37 +195,22 @@
       :adrs ["docs/adr/0001-architecture.md" "orgs/kawasakijun/docs/adr/0013-clj-agent-stack.md"]
       :deps ["langgraph-clj"]}
     {
-      :name "gftd-keiei-sim"
-      :path "orgs/gftdcojp/gftd-keiei-sim"
-      :kind "management-sim-game"
-      :submodule false
-      :org "gftdcojp"
-      :description "gftdcojp 経営シミュレーションゲーム。意思決定者(CEO)が判断・可視化し、LLMエージェント社員(営業/開発/財務/法務/CEO補佐)が kotoba-clj defgraph(ADR-0013 と同型) + llm-infer で経営を進める。状態/意思決定台帳は kotoba-datomic。実データは m365-archive/facts(EDN, ADR-0010/0012)。"
-      :stack ["Rust" "ClojureScript" "Clojure (kotoba-clj WASM agents)"]
-      :adrs ["orgs/kawasakijun/docs/adr/0017-gftd-keiei-sim-llm-backend-openrouter.md"]
-      :llm_backend {
-        :production "openrouter:minimax/minimax-m2.7 (OpenAI互換; ADR-0017)"
-        :fallback "local gemma4 e4b @ Ollama (gemma4:latest) — dev/offline"
-        :wiring "env KOTOBA_INFERENCE_URL / KOTOBA_INFERENCE_MODEL / KOTOBA_INFERENCE_API_KEY; HttpInferEngine in src/agents.rs"
-        :self_host "not adopted — Modal eval in orgs/gftdcojp/minimax-m2-modal (M2.7 opt ~$1.55/1M @ concurrency 64, ~18min cold start; GPU snapshot multi-GPU 非対応). ADR-0017"}}
-    {
       :name "minimax-m2-modal"
       :path "orgs/gftdcojp/minimax-m2-modal"
       :kind "llm-infra-eval"
       :submodule false
       :org "gftdcojp"
-      :description "ADR-0017 の参考実装。Modal サーバーレスGPUで LLM 自前ホストを評価する harness。MiniMax-M2.7(4×H100,FP8) と Kimi-K2.7-Code(8×H200,int4) を vLLM OpenAI互換で起動して直接対決(chat/tools/coding) + コスパ実測。MiniMax-M3 は MSA 未対応で起動不可を確認。検証専用(非デプロイ)、Modal の Volume/pod は評価後に削除済。"
-      :stack ["Python" "Modal" "vLLM"]
+      :description "ADR-0017 の履歴化された参考実装。Modal サーバーレスGPUで LLM 自前ホストを評価する .cljc harness。MiniMax-M2.7/Kimi を vLLM OpenAI互換で起動した chat/tools/coding + コスパ計測の記録を保持する。検証専用(非デプロイ)、Modal の Volume/pod は評価後に削除済。"
+      :stack ["Clojure" "Clojure-compatible .cljc" "Modal" "vLLM"]
       :adrs ["orgs/kawasakijun/docs/adr/0017-gftd-keiei-sim-llm-backend-openrouter.md"]
-      :related ["gftd-keiei-sim"]
+      :related ["cloud-murakumo" "cloud-itonami"]
       :org-fit {:belongs :gftdcojp :status :ok-note
-                :note "ADR-0020: 汎用 LLM infra 評価だが keiei-sim backend 決定(ADR-0017)直結のため gftd 留置"}
+                :note "ADR-0020: 汎用 LLM infra 評価だが gftd backend 決定(ADR-0017)由来の履歴資産として gftd 留置"}
       :entrypoints {
-        :bench_modal "bench_modal.py — chat/tools/coding 直接対決 (fast-cold-start: prefetch+enforce-eager)"
-        :bench_opt "bench_opt.py — CUDA-devel(nvcc)+CUDAグラフ+DeepGEMM, 並列スイープで throughput/cost($/1M) 実測"
-        :m27_api "m27_api.py — 単一H200 W4A16 + sleep-mode GPU snapshot の永続API試作 (未デプロイ)"
-        :client "client.py — OpenAI互換クライアント (LLM_URL/LLM_MODEL/LLM_KEY)"}
-      :status "eval-only / not deployed"}]
+        :bench "src/minimax_m2_modal/bench.cljc — chat/tools/coding 直接対決"
+        :client "src/minimax_m2_modal/client.cljc — OpenAI互換クライアント (LLM_URL/LLM_MODEL/LLM_KEY)"
+        :kotoba "src/minimax_m2_modal/kotoba.cljc — cloud-murakumo と同型の vLLM serve 宣言生成"}
+      :status "history/eval-only / not deployed"}]
   :vendored [
     {
       :name "systemofsystem"
@@ -415,7 +414,14 @@
       :cipher "gpg encryption=hybrid"
       :keyid "09EE841334482F5A0F5C4958A70BB2C220DE88CA"
       :passphrase_custody "macOS Keychain (gpg:personal-data)"
-      :recovery "1Password Private vault: 'GPG: personal-data warehouse recovery (jun784)' (armored secret key + passphrase)"}}
+      :recovery "1Password Private vault: 'GPG: personal-data warehouse recovery (jun784)' (armored secret key + passphrase)"
+      :crypto_posture {
+        :adr "90-docs/adr/2606271600-kotoba-stack-equivalences.md"
+        :current_boundary "DataLad/git-annex + B2 + GPG hybrid encryption; Git/GitHub stores pointers only"
+        :radicle_note "Radicle-style private repo/selective replication is access control, not at-rest encryption; do not use it as the sole long-term secrecy boundary"
+        :age_sops_position "age = simple file/blob encryption candidate; sops = structured secret config encryption; neither replaces git-annex+GPG for large annexed evidence"
+        :post_quantum_target "future kotoba envelope encryption should be algorithm-agile and support hybrid classical+PQ KEM/signatures (e.g. X25519+ML-KEM, Ed25519+ML-DSA/SLH-DSA) for harvest-now-decrypt-later risk"}}
+    }
   :gftdcojp {
     :m365-archive {
       :path "orgs/gftdcojp/m365-archive"

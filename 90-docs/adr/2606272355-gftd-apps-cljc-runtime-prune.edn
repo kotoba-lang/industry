@@ -1,0 +1,65 @@
+{:frontmatter
+ {:id "adr-2606272355-gftd-apps-cljc-runtime-prune"
+  :title "gftd 60-apps の Python 実装を CLJ/CLJC runtime contract へ寄せて prune する"
+  :status "closed"
+  :date "2026-06-27"
+  :closed "2026-06-27"
+  :authoritative true
+  :repo "orgs/gftdcojp/ai-gftd-apps-gftdcojp/60-apps"}
+ :decision
+ {:action :migrate-and-prune
+  :from [:python-langgraph-pods
+         :python-launchagent
+         :python-renderer
+         :python-mlx-poc
+         :python-comfyui-helpers
+         :python-publish-backfill-helpers]
+  :to :clj-cljc-plan-result-contracts
+  :tracked-note "orgs/gftdcojp/ai-gftd-apps-gftdcojp is gitignored in this repository; this ADR is the tracked SSoT for the ignored app-tree migration."
+  :runtime-boundary
+  {:mode :plan-only
+   :external-io false
+   :no-server-side-t0 true
+   :no-t1-persist true
+   :live-write-owner [:appview :dispatcher :operator-runner]
+   :approval-required-for [:deploy :publish :merge :billing :destructive]}
+  :prune
+  {:files ["*.py" "pyproject.toml" "requirements*.txt"]
+   :caches ["__pycache__" "*.pyc" ".pytest_cache" ".cpcache"]}}
+ :migration_coverage
+ {:langgraph-pods [:animeka :mangaka :dougaka :pornhub :gameka :kaisya :syosetsuka
+                   :hume :hakken :jp-ashiba :kakure :yukkuri :manimani :nemuri :shinshi]
+  :weight-kototama {:namespace "kototama.*"
+                    :surface [:experts :router :snapshot :training]}
+  :weight-oka {:namespace "oka-lm.*"
+               :surface [:config :model :kernels :pipeline]}
+  :murakumo-mlx {:namespace "murakumo.mlx.*"
+                 :surface [:gemma4-tp :kotoba-weights :pipeline]}
+  :yukkuri-renderer-mac {:namespace "yukkuri.renderer"
+                         :surface [:render-plan :batch-plan]}
+  :hume-scripts {:namespace "hume.artifacts"
+                 :surface [:artifact-plan :persist-plan]}
+  :manimani-agent {:namespace "manimani.agent"
+                   :surface [:source-fan-in :seal-plan :secret-ref :whitelist :action-report-plan]}
+  :shinshi-scripts {:namespace "shinshi.ops"
+                    :surface [:gad-smoke-render :gad-render-model :coscientist :upload-d1
+                              :aozora-post :publish :aozora-backfill :prep-gen]}}
+ :verification
+ {:tests
+  [{:project :weight-kototama :command "clojure -M:test" :result :pass}
+   {:project :weight-oka :command "clojure -M:test" :result :pass}
+   {:project :murakumo-mlx-distributed :command "clojure -M:test" :result :pass}
+   {:project :yukkuri-renderer-mac :command "clojure -M:test" :result :pass}
+   {:project :hume :command "clojure -M:test" :result :pass}
+   {:project :manimani :command "clojure -M:test" :result :pass :assertions 26}
+   {:project :shinshi :command "clojure -M:test" :result :pass :assertions 37}
+   {:project :shinshi :command "clojure -M -m shinshi.ops prep-gen alice intro 2" :result :pass}]
+  :final-audit
+  {:python-files "find ai-gftd-apps-gftdcojp/60-apps \\( -name '*.py' -o -name 'pyproject.toml' -o -name 'requirements*.txt' \\) -type f"
+   :python-files-result :empty
+   :caches "find ai-gftd-apps-gftdcojp/60-apps \\( -name '__pycache__' -o -name '*.pyc' -o -name '.pytest_cache' -o -name '.cpcache' \\)"
+   :caches-result :empty}}
+ :consequences
+ {:runtime-language :clj-cljc
+  :python-runtime :removed
+  :future-python-policy "Reopen this ADR and document why the CLJ/CLJC plan contract is insufficient before adding Python under 60-apps."}}
