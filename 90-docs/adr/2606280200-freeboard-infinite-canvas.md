@@ -1,7 +1,7 @@
 # ADR-2606280200: freeboard — Apple-Freeform 風 無限キャンバスを clj 頭脳 + kami-render + kasane で実装
 
-**Status**: proposed (draft / たたき台)
-**Date**: 2026-06-28
+**Status**: accepted（R2 実装完了 / WebGPU 実機描画検証済み）
+**Date**: 2026-06-28（更新 2026-06-29）
 **Deciders**: Jun Kawasaki
 
 ## Context
@@ -83,12 +83,61 @@ vector→shape / artboard・page→frame。**画素実体はインラインせ�
 - (−) 無限キャンバスの大量アイテム描画は culling/instancing 最適化が今後必要。
 - (−) 共同編集（kotoba CRDT/CACAO）は設計のみ、配線は次フェーズ。
 
-## R0 実装状況
+## 実装状況（R0→R2、本セッションで end-to-end 完了）
 
-- `freeboard.board`/`import`/`render`（cljc）+ `schema`（malli）実装、**bb で 5 tests / 24
-  assertions green**（座標往復・zoom-at 固定点・hit-test・kasane ドロップ・draw-list/entity）。
-- `freeboard.web`（cljs）+ `shadow-cljs.edn` + `index.html` は scaffold（入力→操作→draw-list）。
-- repo: `com-junkawasaki/freeboard`（public）、west project 登録。
+**freeboard は WebGPU で実描画まで到達**（headless Chromium + browser-use-clj で検証）。
+ボードに付箋・図形・**実フォントのテキスト**・ベジェコネクタ・インク・**画像テクスチャ**が
+正色で同時描画されることを確認済み。**bb 19 tests / 98 assertions green**、shadow-cljs
+`:advanced` クリーンコンパイル。
+
+### 完了した機能（freeboard, public）
+- **頭脳/操作**（cljc）: board 文書・viewport 数学・item CRUD・`hit-test`・`bring-to-front`、
+  **複数選択/ラバーバンド/グループ化**、コネクタ（リンク端点解決）・インク（フリーハンド）・
+  テキスト set/編集。
+- **描画配線**（cljs）: `kami.backend.browser/make`→`gpu/ensure-assets!`→`ecs/load-snapshot`
+  →`kami.render/frame`→`gpu/submit! {:tint? true}`（Model A: 頭脳=clj、GPU=kami-render）。
+- **正射影 2D**: 専用 ortho camera-ir（下記 #70）でスクリーン空間 quad をピクセル正確に。
+- **フラット 2D 配色**: clj 製フラット WGSL を `register_shader` で登録（データ駆動、3D
+  ライティング無効化）。per-item 色は `[:material/params :tint]`（SDK 契約）で適用。
+- **コネクタ曲線**: 3次ベジェを線分テッセレーション。**インク**: フリーハンド折線。
+- **画像テクスチャ**（R2-③）: image item → `:texture/asset`、`add-image` で手続き
+  テクスチャ生成・描画（下記 #77）。
+- **テキストグリフ**（R2-②）: `:text` item → グリフ quad メッシュ（kami-text の Poppins
+  SDF アトラスを texture 化、`register_text`）で実フォント描画（下記 #78）。
+- **インライン編集**: ダブルクリックで DOM textarea オーバーレイ（Canvas2D 不使用、kami 規約準拠）。
+- **取込**: kasane `:kasane/doc`→items（純粋、blob/CID 参照）。
+- **永続/共編**: `freeboard.snapshot`（kotoba QuadStore round-trip）+ `freeboard.collab`
+  （収束 op ログ: push/pull/merge/replay、2-client 同期テスト green）。
+- **ビルド**: `scripts/build.sh` / `bb build`・`bb serve`（kami-clj-host wasm + shadow release）。
+
+### EDN データ形式の共通化（mangaka/kami と相互運用）
+- **render-IR**: `freeboard.render-ir` が board → **ADR-0044 render-IR EDN**
+  `{:globals :camera :instances}`（kami-webgpu-rs / `run_with_render_ir` / kami-live 共通面）。
+- **doc envelope**: `freeboard.doc` が board ⇄ **Genko 構造 EDN**
+  `{:name :pages [{:nodes [{:id :type :visible :data}]}]}`（mangaka/Genko と doc 相互運用）。
+- 既に `:transform/*`・`:material/params`・`:asset/*`・`:camera/*` という kami component 語彙で
+  データ駆動（独自形式ではない）。
+
+### kami-engine（共有エンジン）への additive 反映（PR、main 統合）
+本アプリのために engine 側を後方互換で拡張（いずれも main へ careful 再統合 + `cargo check
+wasm32 --features host` 検証）:
+- **#70** `kami.math/ortho` + `camera-ir` の `:camera/projection :ortho` 対応（2D ピクセル正確）。
+- **#72** `kami.backend.browser` の wasm-bindgen interop に `^js` ヒント（:advanced のメソッド
+  改名で `host.Nc is not a function` になる不具合の修正）。
+- **#77** テクスチャ基盤: `register_texture` + textured pipeline（group2）+ render-IR `:texture`
+  （`IGpuBackend`/`ensure-assets!`/`merge-instances`/`frame->meta`）。
+- **#78** テキスト: kami-text の Poppins SDF アトラス + `register_text`（グリフ quad メッシュ）。
+
+### デバッグ基盤（browser-use-clj）
+`freeboard.debug`: browser-use-clj の Playwright セッションで実 Chromium を駆動し、console/
+`debug-state`（backend/frame/webgpu/items 等）を probe して根本原因を分類（`:bundle-load-error`
+/`:no-webgpu`/`:kami-host-wasm-missing`/`:gpu-host-panic`/`:ok` 等）。これで本番のみで出る
+**7 つのバグ**を特定・修正した（dev `:compile`×ESM の `goog` / `^:export` 漏れの DCE / wasm 未
+ビルド / :advanced のメソッド改名 / asset-data の 0 長バッファ panic / 頂点レイアウト・巻き順 /
+perspective→ortho camera）。
+
+### pin
+- freeboard `b8ddf01`（public）、kami-engine `bcc11d1`（#70/#72/#77/#78）。west.yml pin 反映済み。
 
 ## Alternatives considered
 
