@@ -10,13 +10,11 @@ manifest:
       url-base: https://github.com/etzhayyim
     - name: gftdcojp
       url-base: git@github.com:gftdcojp
-    - name: kotoba-lang
-      url-base: git@github.com:kotoba-lang
 
   defaults:
     revision: main
 
-  group-filter: [+com-junkawasaki, +kotoba-lang, +gftdcojp, +etzhayyim, -datalad]
+  group-filter: [+com-junkawasaki, +gftdcojp, +etzhayyim, -datalad]
 
   projects:
     - name: 260208-spirit-in-physics
@@ -73,18 +71,6 @@ manifest:
       path: orgs/com-junkawasaki/ci-clj
       clone-depth: 1
       groups: [com-junkawasaki]
-    - name: cloud-manimani
-      remote: com-junkawasaki
-      revision: cfa0df57c90279ce22c8560b0ac5a121bc332e11
-      path: orgs/com-junkawasaki/cloud-manimani
-      clone-depth: 1
-      groups: [com-junkawasaki]
-    - name: cloud-murakumo
-      remote: com-junkawasaki
-      revision: 594922ffd15952d5a121c730b383ce20c67ab02d
-      path: orgs/com-junkawasaki/cloud-murakumo
-      clone-depth: 1
-      groups: [com-junkawasaki]
     - name: cmmn-clj
       remote: com-junkawasaki
       revision: 1c5ade3c27c4a7e5c2341010c11808206dd29713
@@ -139,12 +125,6 @@ manifest:
       path: orgs/com-junkawasaki/dot-clj
       clone-depth: 1
       groups: [com-junkawasaki]
-    - name: drawingml-svg
-      remote: com-junkawasaki
-      revision: 0035b0353904283de3ad15ca9d854c67a67353c7
-      path: orgs/com-junkawasaki/drawingml-svg
-      clone-depth: 1
-      groups: [com-junkawasaki]
     - name: echem-clj
       remote: com-junkawasaki
       revision: 9787ef66cccc70aab4ec15e255ae472cb9f0f456
@@ -153,7 +133,7 @@ manifest:
       groups: [com-junkawasaki]
     - name: ghosthacker
       remote: com-junkawasaki
-      revision: 0b6dd5f7e542c1f5fa1f4af490ad29237a2dd6c0
+      revision: e567917712eca625ee95d3af82141ef264ea0cdb
       path: orgs/com-junkawasaki/ghosthacker
       clone-depth: 1
       groups: [com-junkawasaki]
@@ -194,10 +174,23 @@ manifest:
       path: orgs/com-junkawasaki/kami-cfd
       clone-depth: 1
       groups: [com-junkawasaki]
+    - name: kami-engine
+      remote: com-junkawasaki
+      revision: 1b514e486610fe34cc000d1e8a7f3325f2d665c1
+      path: orgs/com-junkawasaki/kami-engine
+      clone-depth: 1
+      groups: [com-junkawasaki]
+      submodules: true
     - name: kami-engine-sdk
       remote: com-junkawasaki
       revision: 91ff23bb7615b036829097f63fe0f28b043dbc84
       path: orgs/com-junkawasaki/kami-engine-sdk
+      clone-depth: 1
+      groups: [com-junkawasaki]
+    - name: kami-webgpu
+      remote: com-junkawasaki
+      revision: f8dc142bbb1baa34b9f3f1480c42c2b475fbb4de
+      path: orgs/com-junkawasaki/kami-webgpu
       clone-depth: 1
       groups: [com-junkawasaki]
     - name: kekkai-actor
@@ -218,10 +211,16 @@ manifest:
       path: orgs/com-junkawasaki/kotoba
       clone-depth: 1
       groups: [com-junkawasaki]
-    - name: kotobase-clj
+    - name: kotoba-code
       remote: com-junkawasaki
-      revision: 09f849fde1a75ae69a737d45100e342e66957129
-      path: orgs/com-junkawasaki/kotobase-clj
+      revision: 1e7cec98ac99f90cb36c7d4e4c83bff5d7aea40b
+      path: orgs/com-junkawasaki/kotoba-code
+      clone-depth: 1
+      groups: [com-junkawasaki]
+    - name: kotoba-topology
+      remote: com-junkawasaki
+      revision: d8b759858d68e9375c6b56cdd9480ea25a8bc43a
+      path: orgs/com-junkawasaki/kotoba-topology
       clone-depth: 1
       groups: [com-junkawasaki]
     - name: kotodama
@@ -236,10 +235,10 @@ manifest:
       path: orgs/com-junkawasaki/kototama
       clone-depth: 1
       groups: [com-junkawasaki]
-    - name: kudaki-clj
+    - name: kototama-clj
       remote: com-junkawasaki
-      revision: 75badd4cbd7ed25db64d41ff4d3c3aea231f0dd3
-      path: orgs/com-junkawasaki/kudaki-clj
+      revision: a9134aff445b7bddd816e073740ff51affa65121
+      path: orgs/com-junkawasaki/kototama-clj
       clone-depth: 1
       groups: [com-junkawasaki]
     - name: langchain-clj
@@ -256,7 +255,7 @@ manifest:
       groups: [com-junkawasaki]
     - name: manimani
       remote: com-junkawasaki
-      revision: 2d10ec66bece0ca125a8d3300fe513cea2ec1621
+      revision: b1958b34221ec01501e34dcdb1ebed94db34b476
       path: orgs/com-junkawasaki/manimani
       clone-depth: 1
       groups: [com-junkawasaki]
@@ -278,18 +277,6 @@ manifest:
       path: orgs/com-junkawasaki/motor-clj
       clone-depth: 1
       groups: [com-junkawasaki]
-    - name: nagare-clj
-      remote: com-junkawasaki
-      revision: 50fdf6657b437faa4111ec45c0d35f1982e8284a
-      path: orgs/com-junkawasaki/nagare-clj
-      clone-depth: 1
-      groups: [com-junkawasaki]
-    - name: num-clj
-      remote: com-junkawasaki
-      revision: 97f436e42a6c133ebca86c744e317907cb156022
-      path: orgs/com-junkawasaki/num-clj
-      clone-depth: 1
-      groups: [com-junkawasaki]
     - name: office-causal
       remote: com-junkawasaki
       revision: db2379ca58ce32e2181d5b6e715b751ee8436733
@@ -300,18 +287,6 @@ manifest:
       remote: com-junkawasaki
       revision: 92f3c9a5f133cc13786eb87ea99f3579ef4d8bc7
       path: orgs/com-junkawasaki/openapi-clj
-      clone-depth: 1
-      groups: [com-junkawasaki]
-    - name: org-spirit-in-physics
-      remote: com-junkawasaki
-      revision: 643f743e7ad37486d4edae6b71171273a539e20c
-      path: orgs/com-junkawasaki/org-spirit-in-physics
-      clone-depth: 1
-      groups: [com-junkawasaki]
-    - name: org-spirit-in-physics-comics
-      remote: com-junkawasaki
-      revision: c593d4f2bfd1d326d4ffa7b3d6ed004f9535198c
-      path: orgs/com-junkawasaki/org-spirit-in-physics-comics
       clone-depth: 1
       groups: [com-junkawasaki]
     - name: playwright-clj
@@ -330,6 +305,12 @@ manifest:
       remote: com-junkawasaki
       revision: c33ad3a143166b7af063ef82e271043599159be5
       path: orgs/com-junkawasaki/sigma-clj
+      clone-depth: 1
+      groups: [com-junkawasaki]
+    - name: spirit-in-physics
+      remote: com-junkawasaki
+      revision: 643f743e7ad37486d4edae6b71171273a539e20c
+      path: orgs/com-junkawasaki/spirit-in-physics
       clone-depth: 1
       groups: [com-junkawasaki]
     - name: statechart-clj
@@ -376,7 +357,7 @@ manifest:
       groups: [com-junkawasaki]
     - name: webmaster
       remote: com-junkawasaki
-      revision: 07d74a35427c9ffbccaca62e7d683a5a358982b7
+      revision: 00a37f6252035508610fab000d215bea01e343ab
       path: orgs/com-junkawasaki/webmaster
       clone-depth: 1
       groups: [com-junkawasaki]
@@ -388,7 +369,7 @@ manifest:
       groups: [com-junkawasaki]
     - name: com-etzhayyim-aburi
       remote: etzhayyim
-      revision: c869dea6739a42eea9bdd94e54ecc53b4615220f
+      revision: 21f29b4fa2a86506ac43512ed1811ac1a7eb82f6
       path: orgs/etzhayyim/com-etzhayyim-aburi
       clone-depth: 1
       groups: [etzhayyim]
@@ -400,13 +381,13 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-akashi
       remote: etzhayyim
-      revision: 7f64d0c189715b8c4b519ff2640be050f68b0ec7
+      revision: e49e26c407cf8ac5bd169da271bd8db3268e9ed0
       path: orgs/etzhayyim/com-etzhayyim-akashi
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-ake
       remote: etzhayyim
-      revision: 1cf43beb0bdd245b1b9cbb295d3cadce4984fbc2
+      revision: 14be746210a42d6e7ac5fcc8d75970aa05c6ccfe
       path: orgs/etzhayyim/com-etzhayyim-ake
       clone-depth: 1
       groups: [etzhayyim]
@@ -520,25 +501,25 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-funadaiku
       remote: etzhayyim
-      revision: 606bd4723f727067f88026952a8505ccfde39564
+      revision: a9ddb3dd333b8aedca42d30e80549b40f6273574
       path: orgs/etzhayyim/com-etzhayyim-funadaiku
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-futawa
       remote: etzhayyim
-      revision: ac2dded261f9181a59bee33ffa6ce7a05cb3b028
+      revision: 56d9e12b437f76998b12b696a68890237f2cd76f
       path: orgs/etzhayyim/com-etzhayyim-futawa
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-gov-municipality
       remote: etzhayyim
-      revision: aeb0dd4a4a165a2d433f649ef4cee65bab21e3e1
+      revision: bcf0dfb8de7e4af7412f59485edf657e78a578d4
       path: orgs/etzhayyim/com-etzhayyim-gov-municipality
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-gov_municipality
       remote: etzhayyim
-      revision: c19068183359afb3bb56c08ecdaee06bc28cb45d
+      revision: 85215b2ecf6c8804648b685f524fcfcd3f4e80a3
       path: orgs/etzhayyim/com-etzhayyim-gov_municipality
       clone-depth: 1
       groups: [etzhayyim]
@@ -556,7 +537,7 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-hagukumi
       remote: etzhayyim
-      revision: 7d34cb0660057005643f95fd9c298aeb1ff0ac82
+      revision: fdbb146ddbe3a729be6dec7687a72159207ddd7d
       path: orgs/etzhayyim/com-etzhayyim-hagukumi
       clone-depth: 1
       groups: [etzhayyim]
@@ -586,7 +567,7 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-hikari
       remote: etzhayyim
-      revision: 0a2a0ec962eb1cb72914a9f0aef9701e8948d556
+      revision: 40badae661a4f1c4881aa6b5a781f6c54af032a4
       path: orgs/etzhayyim/com-etzhayyim-hikari
       clone-depth: 1
       groups: [etzhayyim]
@@ -598,7 +579,7 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-himotoki
       remote: etzhayyim
-      revision: e5c138287745f9c744c2ae00701ad119fbb61451
+      revision: de4a70dddb9a559c32e93404ac519754771b7756
       path: orgs/etzhayyim/com-etzhayyim-himotoki
       clone-depth: 1
       groups: [etzhayyim]
@@ -610,7 +591,7 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-hodoki
       remote: etzhayyim
-      revision: e6b3b6882930c7373589082c645a0e8b297c56a8
+      revision: bff0923e07c1a65f99fdcd45909bf75489ff56cf
       path: orgs/etzhayyim/com-etzhayyim-hodoki
       clone-depth: 1
       groups: [etzhayyim]
@@ -646,25 +627,25 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-ibuki
       remote: etzhayyim
-      revision: 703c61226e093b5b39aeb5011532bc90b1e5b0bb
+      revision: 49bb23f6ac127f97f261ef47043d2313db66db72
       path: orgs/etzhayyim/com-etzhayyim-ibuki
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-igata
       remote: etzhayyim
-      revision: 93815934f704d94c2bc1a61ec99701c8bcb59309
+      revision: a6daa19b84ff390ca4e07529f9f8beba7df23150
       path: orgs/etzhayyim/com-etzhayyim-igata
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-infra-utility-connect
       remote: etzhayyim
-      revision: 9e2e7ac7a23f74959e60c5aefa1c0a50bca07404
+      revision: ef3f8ebe58d2d384b6269b1b70ea9c0791406b07
       path: orgs/etzhayyim/com-etzhayyim-infra-utility-connect
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-infra_utility_connect
       remote: etzhayyim
-      revision: 123b6c9e40107bb98921331e2085f5c90527f0c0
+      revision: 853f6ebc2d5885ed172ac2b59325220f1932d912
       path: orgs/etzhayyim/com-etzhayyim-infra_utility_connect
       clone-depth: 1
       groups: [etzhayyim]
@@ -736,7 +717,7 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-kabuto
       remote: etzhayyim
-      revision: 69ed7811a50e1f39692958560760fae9a53a6bda
+      revision: e438574b8b723b9f6651479c29f29cc8089f1caf
       path: orgs/etzhayyim/com-etzhayyim-kabuto
       clone-depth: 1
       groups: [etzhayyim]
@@ -748,13 +729,13 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-kakaku
       remote: etzhayyim
-      revision: da835fb1020c1b00a94388659b6cefb88476e928
+      revision: ec5ee9fa29d1194b33682519faeec9e0204d34e5
       path: orgs/etzhayyim/com-etzhayyim-kakaku
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-kamado
       remote: etzhayyim
-      revision: 4c87c0e40599a1a53828ca3068d824b647450125
+      revision: 3fe40201eaab1177188f3d01782fdf64cdad97d6
       path: orgs/etzhayyim/com-etzhayyim-kamado
       clone-depth: 1
       groups: [etzhayyim]
@@ -778,13 +759,13 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-kanayama
       remote: etzhayyim
-      revision: 043f55022dd15dc457837b1f9ce7b2a9521bc8c5
+      revision: 0a076e08c546194b91d3ca0c153c94e3a6680a8d
       path: orgs/etzhayyim/com-etzhayyim-kanayama
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-kanjo
       remote: etzhayyim
-      revision: fd51179ee767a2050867b5c290748fdcbad7be22
+      revision: 2eba52c224c423beb4ec8fb4a8e9eb8c1f1ef884
       path: orgs/etzhayyim/com-etzhayyim-kanjo
       clone-depth: 1
       groups: [etzhayyim]
@@ -796,7 +777,7 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-kasa
       remote: etzhayyim
-      revision: 25c1a8dbe61c7c40cb43c86d458f0ef15169d551
+      revision: 8976742bdaefb9cc94ce9ff63ca2fab43b077d4e
       path: orgs/etzhayyim/com-etzhayyim-kasa
       clone-depth: 1
       groups: [etzhayyim]
@@ -808,7 +789,7 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-kawaraban
       remote: etzhayyim
-      revision: 26180aa8c493d46ebdc692bf3931856d3b2674cf
+      revision: 1e42b99d883e439d3e0080e6b934390151d87d9d
       path: orgs/etzhayyim/com-etzhayyim-kawaraban
       clone-depth: 1
       groups: [etzhayyim]
@@ -826,7 +807,7 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-keizu
       remote: etzhayyim
-      revision: dc1bb4fec5387c5d5d7dec6bc490915a0863780e
+      revision: e6cae419389e46a0558fc16d2090dbf6d3bb7227
       path: orgs/etzhayyim/com-etzhayyim-keizu
       clone-depth: 1
       groups: [etzhayyim]
@@ -862,19 +843,19 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-kosatsu
       remote: etzhayyim
-      revision: 6336a047ddc006657b7f70127e5551db3172488e
+      revision: f1f60681e62baabbced6ca32f4c644db63574d0a
       path: orgs/etzhayyim/com-etzhayyim-kosatsu
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-kuni-umi
       remote: etzhayyim
-      revision: 610d1eb3e32c44c61f513a3a72fbfc2b66f1f040
+      revision: 5d0b21cd9bae2711b86bf3f7e6529c05fe0a2688
       path: orgs/etzhayyim/com-etzhayyim-kuni-umi
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-kuni_umi
       remote: etzhayyim
-      revision: af12854b0b0991720e5823342438c030d1fbcf84
+      revision: 7fce5d6a064a6fafa85ef98ff50ba19ceadc32b3
       path: orgs/etzhayyim/com-etzhayyim-kuni_umi
       clone-depth: 1
       groups: [etzhayyim]
@@ -898,13 +879,13 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-makura
       remote: etzhayyim
-      revision: 556b42f3157c5a312650419bbc88a3d246d24726
+      revision: e7e9bef9a272cfe129bb55266757d63a73aaa7e3
       path: orgs/etzhayyim/com-etzhayyim-makura
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-manabi
       remote: etzhayyim
-      revision: c4632e1965d1454105fec0aa9235c014f7612a60
+      revision: 0bc93a58a01c50a49cddf3cccbd26dc0ae28b8ba
       path: orgs/etzhayyim/com-etzhayyim-manabi
       clone-depth: 1
       groups: [etzhayyim]
@@ -952,13 +933,13 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-mitsuho
       remote: etzhayyim
-      revision: 8ce9513470ef1df97568fd575a34c852baa755cd
+      revision: 9f3b4a0c5739bb7effa3ec376bde45c588fb82a8
       path: orgs/etzhayyim/com-etzhayyim-mitsuho
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-mizuho
       remote: etzhayyim
-      revision: ba9b77e598bff20a52e697f021f61c8fd17adefc
+      revision: 16e60c49ec0823c52aa021afecfbd57e4276c069
       path: orgs/etzhayyim/com-etzhayyim-mizuho
       clone-depth: 1
       groups: [etzhayyim]
@@ -982,7 +963,7 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-noroshi
       remote: etzhayyim
-      revision: 07974266c24af5e34140567f67a5ab3f520241bc
+      revision: 14882d7e18556fdf3d5ce9f352a20340724f4248
       path: orgs/etzhayyim/com-etzhayyim-noroshi
       clone-depth: 1
       groups: [etzhayyim]
@@ -1042,7 +1023,7 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-omise
       remote: etzhayyim
-      revision: bb736e0f0a919b80e21e07dc0d6f8361038dc8db
+      revision: 232ba06058ff114a3bd943985a73b3c3773715c9
       path: orgs/etzhayyim/com-etzhayyim-omise
       clone-depth: 1
       groups: [etzhayyim]
@@ -1054,7 +1035,7 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-organizer
       remote: etzhayyim
-      revision: 5810d4a3c6ec668fcea21d3e6de6e75ff39ae90d
+      revision: e24d01c1b1a0379091256a62fbba6dcabb2b6aa2
       path: orgs/etzhayyim/com-etzhayyim-organizer
       clone-depth: 1
       groups: [etzhayyim]
@@ -1066,7 +1047,7 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-ossekai
       remote: etzhayyim
-      revision: f72dc67b3a2cd2e1d06154490225bfec9ca256f4
+      revision: 2898371b0a22486ab4b4c8970519156aba100a37
       path: orgs/etzhayyim/com-etzhayyim-ossekai
       clone-depth: 1
       groups: [etzhayyim]
@@ -1084,7 +1065,7 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-rasen
       remote: etzhayyim
-      revision: b26f3a80e46b7457b7e2a20e23182b75a7a7ae6f
+      revision: 9b804012f00462c38fc68c494d19c5af1003c44f
       path: orgs/etzhayyim/com-etzhayyim-rasen
       clone-depth: 1
       groups: [etzhayyim]
@@ -1096,25 +1077,25 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-sanae
       remote: etzhayyim
-      revision: 351633712cbfc6d04cff55b8b09f89ee4fa22862
+      revision: 7b5eba346f0d3d44e8511c6b6f366b30a3c3f9a1
       path: orgs/etzhayyim/com-etzhayyim-sanae
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-sarutahiko
       remote: etzhayyim
-      revision: 853900528c357b7b4b4bc141ae1f23f3bba29fd4
+      revision: 3563d70521a993909c8f466086954ad717862115
       path: orgs/etzhayyim/com-etzhayyim-sarutahiko
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-seigyo
       remote: etzhayyim
-      revision: 770a638d70ea93892d6e78328dad88a27819dcd1
+      revision: dec08d260eb52a6b976421179224ea8c6a23bd6e
       path: orgs/etzhayyim/com-etzhayyim-seigyo
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-sentei
       remote: etzhayyim
-      revision: 380c460cee12ec7e77837eb5bc2fdeca83153a38
+      revision: 5bd1cb3c5a942edb415501bcae31ea16bf82c96f
       path: orgs/etzhayyim/com-etzhayyim-sentei
       clone-depth: 1
       groups: [etzhayyim]
@@ -1132,7 +1113,7 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-shionome
       remote: etzhayyim
-      revision: efb098edf0f8f0a50b15e3424d7bc65d6eaaa53a
+      revision: 4623d3fdfd6db41f1091d62edbd086160abc05f1
       path: orgs/etzhayyim/com-etzhayyim-shionome
       clone-depth: 1
       groups: [etzhayyim]
@@ -1154,12 +1135,6 @@ manifest:
       path: orgs/etzhayyim/com-etzhayyim-shomei
       clone-depth: 1
       groups: [etzhayyim]
-    - name: com-etzhayyim-sng
-      remote: etzhayyim
-      revision: 03b3b6ce426a5b844e43e9c42b71bf7458f0ad2a
-      path: orgs/etzhayyim/com-etzhayyim-sng
-      clone-depth: 1
-      groups: [etzhayyim]
     - name: com-etzhayyim-society6
       remote: etzhayyim
       revision: 93b6c976ea4fba8ca1ffe8b6042273cbc390db63
@@ -1174,13 +1149,13 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-subaru
       remote: etzhayyim
-      revision: 87c5288cde390e55326d9f85b5c56866c4941e68
+      revision: 109e9d886b9b4ada29c18d4d56e5a4a37db04f13
       path: orgs/etzhayyim/com-etzhayyim-subaru
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-suimin
       remote: etzhayyim
-      revision: 4fe40b287a02b44f55f81d849f0e8155ee0e2299
+      revision: 4c19fb234b4e362f15ee7a3c6af1a31aacb0adba
       path: orgs/etzhayyim/com-etzhayyim-suimin
       clone-depth: 1
       groups: [etzhayyim]
@@ -1192,13 +1167,13 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-sukashi
       remote: etzhayyim
-      revision: c15551a95939beddebd128a908bee0fa0fafee61
+      revision: 792e788624c1a55e1326a1b371ed3ac847c4f705
       path: orgs/etzhayyim/com-etzhayyim-sukashi
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-suki
       remote: etzhayyim
-      revision: a2c05e41b218ddf88d8d46b587233329482850c1
+      revision: ff9e8bf3bd23a01597b18bed0a1991b712f9f0ab
       path: orgs/etzhayyim/com-etzhayyim-suki
       clone-depth: 1
       groups: [etzhayyim]
@@ -1210,7 +1185,7 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-talent
       remote: etzhayyim
-      revision: cb9f05972c35446855b250b120b1faf3632aac05
+      revision: 51a8c711f0385e28f2ed63b72baf0f56b4d3b6f0
       path: orgs/etzhayyim/com-etzhayyim-talent
       clone-depth: 1
       groups: [etzhayyim]
@@ -1222,7 +1197,7 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-tasuke
       remote: etzhayyim
-      revision: 597f525b3702d8415f8f42f6e66f87b3ad207429
+      revision: 32ee8fcf041a4628a73d4a1cc6027ace5bd52838
       path: orgs/etzhayyim/com-etzhayyim-tasuke
       clone-depth: 1
       groups: [etzhayyim]
@@ -1234,13 +1209,13 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-tatekata
       remote: etzhayyim
-      revision: fcfc6752d68b6feb5fe397203ae57ed623c35cbb
+      revision: 8c0c6fd87c83e71c3905a8de31cb1a7b688a1016
       path: orgs/etzhayyim/com-etzhayyim-tatekata
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-tazuna
       remote: etzhayyim
-      revision: 3b9d5fa3508f4183d401d77e0f146f5b3295b0cd
+      revision: 635f805b92cc4850a3d3eb89439bd31166f179f7
       path: orgs/etzhayyim/com-etzhayyim-tazuna
       clone-depth: 1
       groups: [etzhayyim]
@@ -1264,13 +1239,13 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-torifune
       remote: etzhayyim
-      revision: 7f2dbc6309c4d51f91b6fe70ac595fe0da5b0d85
+      revision: ceb116c51f85002b82f94381a2821560c1b1a014
       path: orgs/etzhayyim/com-etzhayyim-torifune
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-toritate
       remote: etzhayyim
-      revision: e66ddee604193734788833f01e962f2bbcf68140
+      revision: 3354850aa05408e840426f91fe067ddad8535e5b
       path: orgs/etzhayyim/com-etzhayyim-toritate
       clone-depth: 1
       groups: [etzhayyim]
@@ -1294,13 +1269,13 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-tsukuru
       remote: etzhayyim
-      revision: e0d8ad057a1e5a62423614d45d70c708edf30d6e
+      revision: 6f98f8d4d5008175f5b317f4e3a364af31c638be
       path: orgs/etzhayyim/com-etzhayyim-tsukuru
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-tsumugi
       remote: etzhayyim
-      revision: 5049f6e6c07398d85f05ad2b13b213a50a21bfb5
+      revision: 16b338273d2145560042f9831cc0eda19df1d973
       path: orgs/etzhayyim/com-etzhayyim-tsumugi
       clone-depth: 1
       groups: [etzhayyim]
@@ -1312,7 +1287,7 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-uchiwake
       remote: etzhayyim
-      revision: f71cc76dd99934429778d0c880cb9b565654629d
+      revision: 5276cb66bf56d2e4eb7a372c6f3b9d58c10e8497
       path: orgs/etzhayyim/com-etzhayyim-uchiwake
       clone-depth: 1
       groups: [etzhayyim]
@@ -1324,7 +1299,7 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-utsushie
       remote: etzhayyim
-      revision: 1fb8ae5a44dca18c6087397f9d96da34889185a6
+      revision: bb78343213c956d4e47972c7b9879aedb1a0e45d
       path: orgs/etzhayyim/com-etzhayyim-utsushie
       clone-depth: 1
       groups: [etzhayyim]
@@ -1342,31 +1317,31 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-wadachi
       remote: etzhayyim
-      revision: 6a35ad4487bdb5ab9fbe635d757182f41eb32d0e
+      revision: b058c2d8daa3427b75cca792db6a5a5cf6dbf720
       path: orgs/etzhayyim/com-etzhayyim-wadachi
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-wakai
       remote: etzhayyim
-      revision: a74e025786fa0bbfc1cd07f9a052291768b5ed9e
+      revision: 2a2260dc4f331348016391501d0141baf2662052
       path: orgs/etzhayyim/com-etzhayyim-wakai
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-watari
       remote: etzhayyim
-      revision: a4636a3702ec2394c00a8d49ac585df9f11f8586
+      revision: 6462431ce7eb30039fd915b48899948e84b193f2
       path: orgs/etzhayyim/com-etzhayyim-watari
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-watatsumi
       remote: etzhayyim
-      revision: 203ab989e986488883d885114bc76b8fb4ef20e1
+      revision: 92032e5f6980ed24d9257dbb8fb9f1963c5dea94
       path: orgs/etzhayyim/com-etzhayyim-watatsumi
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-watatsuna
       remote: etzhayyim
-      revision: a38f379559261ad5a3c29601678d85043c9de6cf
+      revision: 3c8c3713d85c4759929002ad1dae22c2c2e79659
       path: orgs/etzhayyim/com-etzhayyim-watatsuna
       clone-depth: 1
       groups: [etzhayyim]
@@ -1384,58 +1359,40 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-yakushi
       remote: etzhayyim
-      revision: 8b03b7e5bec9ecabf8f9074e23ae58a6158d69c8
+      revision: 02b66507a6c5166b1fd17420018c7330912cd8d1
       path: orgs/etzhayyim/com-etzhayyim-yakushi
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-yamabiko
       remote: etzhayyim
-      revision: 07f3fb8005879b8bf7cc4ce0583cc6c9e193fce1
+      revision: 306990f6870ff02ae474545d25e9d34b00db55a9
       path: orgs/etzhayyim/com-etzhayyim-yamabiko
       clone-depth: 1
       groups: [etzhayyim]
     - name: com-etzhayyim-yotei
       remote: etzhayyim
-      revision: a7d9c8b6536eca41bbfe892c384777bc86dc4ad0
+      revision: 425680a7dd9e6ebac0d18135da5b877c2435cd2b
       path: orgs/etzhayyim/com-etzhayyim-yotei
-      clone-depth: 1
-      groups: [etzhayyim]
-    - name: com-google-ads
-      remote: etzhayyim
-      revision: e9ffefbf51d4d68376125b75a0d84f31014859da
-      path: orgs/etzhayyim/com-google-ads
       clone-depth: 1
       groups: [etzhayyim]
     - name: root
       remote: etzhayyim
-      revision: 1935cfdb3523f819c05c65fd5eca5e608033075c
+      revision: 59c236d3e5a54370e28ca55031125350a3546edb
       path: orgs/etzhayyim/root
       clone-depth: 1
       groups: [etzhayyim]
       submodules: true
     - name: ai-gftd-apps-gftdcojp
       remote: gftdcojp
-      revision: 150305c13c77f2b986db82b5cc25209dce107aa4
+      revision: 16ddd62284f0266e869b1eff09392c40ea6b663e
       path: orgs/gftdcojp/ai-gftd-apps-gftdcojp
       clone-depth: 1
       groups: [gftdcojp]
       submodules: true
-    - name: ai-gftd-itonami
-      remote: gftdcojp
-      revision: c7a065dde5022a2da10956465714accbe6c468d6
-      path: orgs/gftdcojp/ai-gftd-itonami
-      clone-depth: 1
-      groups: [gftdcojp]
     - name: ai-gftd-lf-case-lingling
       remote: gftdcojp
-      revision: 915d4d1e81959261dd9ed3163e4f1d92c044fea0
+      revision: 0151dff6766aa797f62b08c121060ec5d37d3d8b
       path: orgs/gftdcojp/ai-gftd-lf-case-lingling
-      clone-depth: 1
-      groups: [gftdcojp]
-    - name: ai-gftd-router
-      remote: gftdcojp
-      revision: 2bfe8509af6e5cdc0c5e5f910df0bab37b77179c
-      path: orgs/gftdcojp/ai-gftd-router
       clone-depth: 1
       groups: [gftdcojp]
     - name: ai-gftd-yukkuri
@@ -1446,14 +1403,8 @@ manifest:
       groups: [gftdcojp]
     - name: app-aozora
       remote: gftdcojp
-      revision: 6fe4dc45cb3e1ec020beb2a36948e001162a3c85
+      revision: 49d4f73f526fce740dee45e054ff7fd6c437a35d
       path: orgs/gftdcojp/app-aozora
-      clone-depth: 1
-      groups: [gftdcojp]
-    - name: cloud-itonami
-      remote: gftdcojp
-      revision: 74c43145f19111172bf23203060d3b65828df04e
-      path: orgs/gftdcojp/cloud-itonami
       clone-depth: 1
       groups: [gftdcojp]
     - name: club-shinshi
@@ -1462,15 +1413,9 @@ manifest:
       path: orgs/gftdcojp/club-shinshi
       clone-depth: 1
       groups: [gftdcojp]
-    - name: gftd-talent-actor
-      remote: gftdcojp
-      revision: 4fcdc4fdb08b25b7cfcb268be855e7a066816add
-      path: orgs/gftdcojp/gftd-talent-actor
-      clone-depth: 1
-      groups: [gftdcojp]
     - name: m365-archive
       remote: gftdcojp
-      revision: d760e773f04456b8b1497a81e2321138d78f863e
+      revision: 8c867c65586e747ec224cc7b44c8278ae2141d94
       path: orgs/gftdcojp/m365-archive
       clone-depth: 1
       groups: [datalad]
@@ -1479,371 +1424,10 @@ manifest:
         annex-remote: b2
     - name: network-isekai
       remote: gftdcojp
-      revision: 032c23eab983c79f6e6476a267085038f1dd8aba
+      revision: 0c7377431b294e286e9635cd9bfb13a1897019e9
       path: orgs/gftdcojp/network-isekai
       clone-depth: 1
       groups: [gftdcojp]
-    - name: aero
-      remote: kotoba-lang
-      revision: d3b715b5437cab98bb3fcab2a7690c4ecea00711
-      path: orgs/kotoba-lang/aero
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: arxiv
-      remote: kotoba-lang
-      revision: 77f84f3b19e2d81ab82d6ad200c3b57ea0e9921a
-      path: orgs/kotoba-lang/arxiv
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: authenticator
-      remote: kotoba-lang
-      revision: 66c8a7d7a844b4d20ed8943cff511780707c8f31
-      path: orgs/kotoba-lang/authenticator
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: bpmn
-      remote: kotoba-lang
-      revision: 43125fe3f84f0dd4eb584e1e517c6e4718ff73b8
-      path: orgs/kotoba-lang/bpmn
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: browser-agent
-      remote: kotoba-lang
-      revision: c7bf2b2c3ff746ef6bd99f8d52fcf973b0df3e70
-      path: orgs/kotoba-lang/browser-agent
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: browser-use
-      remote: kotoba-lang
-      revision: 12b10ce5d8cffc4c0f7b65015d39776b1853200e
-      path: orgs/kotoba-lang/browser-use
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: cacao
-      remote: kotoba-lang
-      revision: 32fe0b63a815afc0827729394435deee627ea582
-      path: orgs/kotoba-lang/cacao
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: cae-solver
-      remote: kotoba-lang
-      revision: a82eb6d5e5bcf3f89b7198f410b4d5daa2dad717
-      path: orgs/kotoba-lang/cae-solver
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: ci
-      remote: kotoba-lang
-      revision: a1d12d463820fa696912a977fdd6ca92083a4527
-      path: orgs/kotoba-lang/ci
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: cmmn
-      remote: kotoba-lang
-      revision: 1c5ade3c27c4a7e5c2341010c11808206dd29713
-      path: orgs/kotoba-lang/cmmn
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: comfyui
-      remote: kotoba-lang
-      revision: 2a653b1bc271cedf32ffb9096faedd6004d123ad
-      path: orgs/kotoba-lang/comfyui
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: computer-use
-      remote: kotoba-lang
-      revision: 79f980c53a4251bcbe39eb7684d4981b4369c8f0
-      path: orgs/kotoba-lang/computer-use
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: crash
-      remote: kotoba-lang
-      revision: 20166fff676297427b0ac77a3680a0fc05c06c09
-      path: orgs/kotoba-lang/crash
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: cron
-      remote: kotoba-lang
-      revision: 50f4f476bb8102275aa8debea92519e2cc661fb1
-      path: orgs/kotoba-lang/cron
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: dag-cbor
-      remote: kotoba-lang
-      revision: 52b008d96820660196ee8dd15e7d213c9022a6b5
-      path: orgs/kotoba-lang/dag-cbor
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: datom
-      remote: kotoba-lang
-      revision: 987105901308e28750831512d68f2c0933e88c03
-      path: orgs/kotoba-lang/datom
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: ddl
-      remote: kotoba-lang
-      revision: a794cf71a58e78afddf58ae31d29339f352310ff
-      path: orgs/kotoba-lang/ddl
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: dmn
-      remote: kotoba-lang
-      revision: a4944815ae6d0c92b4ac2324e102c32000a6207c
-      path: orgs/kotoba-lang/dmn
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: dot
-      remote: kotoba-lang
-      revision: 2b1d4a7add157feb8c3419a334dd0cd5b69531b4
-      path: orgs/kotoba-lang/dot
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: echem
-      remote: kotoba-lang
-      revision: 9787ef66cccc70aab4ec15e255ae472cb9f0f456
-      path: orgs/kotoba-lang/echem
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: ed25519
-      remote: kotoba-lang
-      revision: ec077bca1f90027bc718557f1e8bb6fbc004fe5a
-      path: orgs/kotoba-lang/ed25519
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: eth-crypto
-      remote: kotoba-lang
-      revision: 9208ecc09a32cf51627ed32eb417e4834f208324
-      path: orgs/kotoba-lang/eth-crypto
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: freeboard
-      remote: kotoba-lang
-      revision: b8ddf01c835704590931fc1f37aeebdd5f49e24d
-      path: orgs/kotoba-lang/freeboard
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: godaddy-dns
-      remote: kotoba-lang
-      revision: b5b7efa34d14e01d2ab23d6fdce56cea7e5f2e50
-      path: orgs/kotoba-lang/godaddy-dns
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: graphql
-      remote: kotoba-lang
-      revision: 13de9f80123ddb3ff65829bae43f1eb8fc826996
-      path: orgs/kotoba-lang/graphql
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: homebrew-kotoba
-      remote: kotoba-lang
-      revision: f36d8e5314e5e4256738555f868577d77069403e
-      path: orgs/kotoba-lang/homebrew-kotoba
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: ical
-      remote: kotoba-lang
-      revision: 7260256db58c45ecf1e78db11da6814f88b2f72c
-      path: orgs/kotoba-lang/ical
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: jsonlogic
-      remote: kotoba-lang
-      revision: 87dea26214cbc67366a80fd268b84898cfd59487
-      path: orgs/kotoba-lang/jsonlogic
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: kagi
-      remote: kotoba-lang
-      revision: 651f24a2e0020c222c199bde4433d15604166517
-      path: orgs/kotoba-lang/kagi
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: kami-engine
-      remote: kotoba-lang
-      revision: 3076a040b507f6868b56210d0430c2c277f9a458
-      path: orgs/kotoba-lang/kami-engine
-      clone-depth: 1
-      groups: [kotoba-lang]
-      submodules: true
-    - name: kami-webgpu
-      remote: kotoba-lang
-      revision: dc3c3f59b3693d0b19041065a1767c4dd2f8c847
-      path: orgs/kotoba-lang/kami-webgpu
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: kasane
-      remote: kotoba-lang
-      revision: 9392dd64d8cb2bfe687040e7ea965a4aabe98ae5
-      path: orgs/kotoba-lang/kasane
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: kenchi
-      remote: kotoba-lang
-      revision: 71c174738402eda2fad0debb9865a217b99aeafe
-      path: orgs/kotoba-lang/kenchi
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: koe
-      remote: kotoba-lang
-      revision: 2c5946f595490e5a74ea093b79b72d6465dc925e
-      path: orgs/kotoba-lang/koe
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: kotoba-code
-      remote: kotoba-lang
-      revision: f55a74773c213b1633ff0c84f82ed21df67d8a67
-      path: orgs/kotoba-lang/kotoba-code
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: kotoba-pages-poc
-      remote: kotoba-lang
-      revision: f655620ba3135646bb2f08b0fea7c5ad9c857b5a
-      path: orgs/kotoba-lang/kotoba-pages-poc
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: kotoba-topology
-      remote: kotoba-lang
-      revision: d8b759858d68e9375c6b56cdd9480ea25a8bc43a
-      path: orgs/kotoba-lang/kotoba-topology
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: kotoba-v2025
-      remote: kotoba-lang
-      revision: 6a2ce2d8077742db27d58ad7ea42e25b1d59dbc8
-      path: orgs/kotoba-lang/kotoba-v2025
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: kotobase
-      remote: kotoba-lang
-      revision: 09f849fde1a75ae69a737d45100e342e66957129
-      path: orgs/kotoba-lang/kotobase
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: kototama-clj
-      remote: kotoba-lang
-      revision: a9134aff445b7bddd816e073740ff51affa65121
-      path: orgs/kotoba-lang/kototama-clj
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: kudaki
-      remote: kotoba-lang
-      revision: 75badd4cbd7ed25db64d41ff4d3c3aea231f0dd3
-      path: orgs/kotoba-lang/kudaki
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: langchain
-      remote: kotoba-lang
-      revision: bafa74b76d74b4122a9b7855b6ea5a0844d5e59e
-      path: orgs/kotoba-lang/langchain
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: langgraph
-      remote: kotoba-lang
-      revision: c7daa07d4e50f55d7e2a02e4b89dbeb2b200961d
-      path: orgs/kotoba-lang/langgraph
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: mcp
-      remote: kotoba-lang
-      revision: cf456c90b6cb8ad484acecc3bd691b3589134ed5
-      path: orgs/kotoba-lang/mcp
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: motor
-      remote: kotoba-lang
-      revision: 2a240f6a8a808a03f06e2d3eaf71286582331770
-      path: orgs/kotoba-lang/motor
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: multiformats
-      remote: kotoba-lang
-      revision: e3a75a6376441cbf7aaefefce463b404b4254404
-      path: orgs/kotoba-lang/multiformats
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: murakumo
-      remote: kotoba-lang
-      revision: ab68810cbc025390dbc451fc9e8c25f3231333a1
-      path: orgs/kotoba-lang/murakumo
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: nagare
-      remote: kotoba-lang
-      revision: 50fdf6657b437faa4111ec45c0d35f1982e8284a
-      path: orgs/kotoba-lang/nagare
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: num
-      remote: kotoba-lang
-      revision: 97f436e42a6c133ebca86c744e317907cb156022
-      path: orgs/kotoba-lang/num
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: openapi
-      remote: kotoba-lang
-      revision: 92f3c9a5f133cc13786eb87ea99f3579ef4d8bc7
-      path: orgs/kotoba-lang/openapi
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: playwright
-      remote: kotoba-lang
-      revision: 70783258e08f6637c76747a4b8f7c4b6f81a102c
-      path: orgs/kotoba-lang/playwright
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: policy
-      remote: kotoba-lang
-      revision: 16ba9b330c0fb55caccef0cdec2135e543f62191
-      path: orgs/kotoba-lang/policy
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: sigma
-      remote: kotoba-lang
-      revision: c33ad3a143166b7af063ef82e271043599159be5
-      path: orgs/kotoba-lang/sigma
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: statechart
-      remote: kotoba-lang
-      revision: ce5f6c08af1d6c467ebb1da871119dac46f5d4c9
-      path: orgs/kotoba-lang/statechart
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: states
-      remote: kotoba-lang
-      revision: a49e1b07dd808e2496c4d0142c3924f8cb4ae7ea
-      path: orgs/kotoba-lang/states
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: torch
-      remote: kotoba-lang
-      revision: 40182873f0b4201a7d93eb69e8c2196311d5ed03
-      path: orgs/kotoba-lang/torch
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: utsushi
-      remote: kotoba-lang
-      revision: e329e8136a60740caae146969eef1e6968ef01cc
-      path: orgs/kotoba-lang/utsushi
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: vllm
-      remote: kotoba-lang
-      revision: ef25c5d4323cd608fd398f070a0ab100b22f4e67
-      path: orgs/kotoba-lang/vllm
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: vphysics
-      remote: kotoba-lang
-      revision: a551a4dc6a30084fdeb6d34a03d710c93ec40c82
-      path: orgs/kotoba-lang/vphysics
-      clone-depth: 1
-      groups: [kotoba-lang]
-    - name: zone
-      remote: kotoba-lang
-      revision: 30b84beb1047101616c1ab525a4ba7d19c4aac5b
-      path: orgs/kotoba-lang/zone
-      clone-depth: 1
-      groups: [kotoba-lang]
 
   self:
     path: manifest
