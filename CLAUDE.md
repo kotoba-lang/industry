@@ -157,6 +157,24 @@ bb scripts/gen-west-manifest.bb
 - ユーザーが「git pull」とだけ指示した場合も、上記の main 同期 + `west update`
   まで含めて実行する（プルだけで終わらせない）。
 
+- **`git push` / PR 作成・更新の前に、superproject と west の両方を最新化してから
+  行う。** push や PR（`gh pr create`/`gh pr ready`/PR への追加 commit 等）の直前に、
+  逐次・省略せず、以下を必ず実行してから push/PR する:
+
+  ```bash
+  git fetch --depth 1 origin                       # origin/main 他を取得
+  git merge --ff-only origin/main                  # superproject を main に同期（FF 不可なら merge/rebase）
+  west update --fetch smart                        # 子リポ群を manifest の pin に合わせて同期
+  bb scripts/gen-west-manifest.bb --check          # west.yml が canonical か（生成器と一致か）確認
+  ```
+
+  これらを飛ばして push/PR すると、main 乖離・west.yml の pin 退行・子リポの
+  checkout 不一致が他者 clone や CI に伝播する。`west.yml` は生成物（手書き禁止）
+  なので、`--check` が STALE なら **ローカル pin 退行の罠**（`gen-west-manifest.bb`
+  はローカル working HEAD で pin する＝子が遅れていると黙ってロールバック）に注意しつつ
+  再生成し、`--check` が通ってから push/PR する。子リポ単位の push/PR も同様に、
+  その子リポの `origin/<default-branch>` との遅れを解消してから行う。
+
 - ユーザーが「cleanup」とだけ指示した場合、superproject と `orgs/` 配下などの
   子リポを含めて、未完了の PR/merge 整理を同じ手順で行う:
   1. 各 git repo で `git worktree list`、現在 branch、`git stash list`、`git status
@@ -227,6 +245,10 @@ PolicyGovernor）/ **ai-gftd-itonami**（ops-LLM ⊣ CertGovernor）。
   トレーサビリティの核）。
 - **langgraph-clj StateGraph。** 1 run = 1 操作（無限内部ループ無し）。`interrupt-before`
   を human-in-the-loop（承認/テレオペ/耐空性サインオフ）に転用。checkpoint で監査可能。
+  長期耐久 loop が必要な kotoba code / Claude Code 型 agent は、StateGraph 内で回さず
+  **durable outer loop**（lease / tick / budget / governor / crash recovery）で有界 run を
+  反復する。継続状態は `:checkpoint/*` と `:agent.loop/*` / `:agent.tick/*` /
+  `:agent.lease/*` / `:agent.budget/*` / `:agent.event/*` datom に分離して積む。
 - **注入境界（swap）。** Store（`MemStore` ‖ `DatomicStore`）/ Advisor（mock ‖ 実LLM=
   `langchain.model`）/ Phase（0→3 段階導入）を注入で差し替え、コアは不変。
 - **Store は `:db-api` 駆動。** backend へは langchain.db の `{:q :transact! :db :pull

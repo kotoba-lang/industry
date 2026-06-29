@@ -85,3 +85,23 @@ datom と **同一表現**になり、join できる。
   ファイアウォール(ADR-0010)の入力源としてエージェント由来の事実を扱える)。
 - 非スコープ(各 ADR 参照): Datalog rules / Send API / トークン単位
   ストリーミング / 実ブラウザ・デスクトップドライバ / 拡散モデルノード。
+
+## Addendum: 長期耐久 loop の扱い (2026-06-28)
+
+Claude Code 型の kotoba code agent は、長時間にわたり repository 観察、tool
+実行、編集、検証、checkpoint 復帰を続ける可能性がある。これは
+`langgraph-clj` の **内部無限ループ**として実装しない。設計上は
+**有界 StateGraph run を durable outer loop が反復する**。
+
+- 内側: `create-react-agent` / StateGraph。`recursion-limit`、checkpoint、
+  `interrupt-before/after` を持つ 1 tick の有界実行。
+- 外側: kotoba code runtime / host。lease、cadence、sleep、crash recovery、
+  token/tool/spend budget、stale worker 回収、governor 判定を持つ長期 supervisor。
+- 永続化: `:checkpoint/*` に加え、`:agent.loop/*`、`:agent.tick/*`、
+  `:agent.lease/*`、`:agent.budget/*`、`:agent.event/*`、
+  `:agent.governor/*` を datom として積む。
+- 安全境界: 外部副作用は idempotency key 付き tool call として記録し、各 tick
+  境界と privileged tool 前に governor を通す。
+
+従って「長期耐久 loop」は許容するが、`.cljc` ライブラリは clock/thread/sleep/process
+を持たない。継続性は kotoba/Datomic checkpoint と host supervisor の責務である。
