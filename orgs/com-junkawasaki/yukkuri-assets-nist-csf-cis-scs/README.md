@@ -34,7 +34,8 @@ canonical persistence path と一致する (CLAUDE.md §Operating Entity Boundar
 - voice wav bytes: 13,204.5 KB (~12.9 MB)
 - backgrounds: 6 (1024×576 placeholders)
 - character refs: 2 (512×768 placeholders, L=ゆきり / R=まりり)
-- BGM: 1 (260s, 44.1kHz 16-bit mono, ~22 MB)
+- BGM: 1 legacy placeholder (260s, 44.1kHz 16-bit mono, ~22 MB)
+- BGM library: 30 MP3 tracks (20 DOVA-SYNDROME + 10 Incompetech) in `bgm/dova/` and `bgm/incompetech/`
 
 ## IPFS CIDs (CIDv1 base32)
 
@@ -59,11 +60,32 @@ per-asset CIDs:
 | Voice (35 lines) | real | VOICEVOX engine 0.25.2 (in-cluster via kubectl port-forward, 四国めたん + ずんだもん, speed=0.95) |
 | Backgrounds (6) | **placeholder** | PIL gradient + Hiragino label (disk-full prevented diffusers SD-turbo DL, 2.4GB free) |
 | Characters L/R (2) | **placeholder** | PIL silhouette + Hiragino label (same disk constraint) |
-| BGM (1) | **placeholder** | NumPy ambient pad + C-minor pentatonic arpeggio (ongakuka XRPC unreachable, RW-blocked) |
+| Legacy BGM (1) | **placeholder / retired** | NumPy ambient pad + C-minor pentatonic arpeggio (ongakuka XRPC was unreachable, RW-blocked) |
+| BGM library (30) | licensed external material | DOVA-SYNDROME + Incompetech tracks, render-only use via `ongakuka.gftd.ai` catalog |
 
 `image_kind="placeholder"` / `generator` フィールドで識別可能。real 出力に差し替える際は同じ
 key (`scene-00-sunset-shrine.png` 等) で上書き → `ipfs add` → manifest の該当 CID 更新 →
 `datalad save` で provenance を維持したまま swap できる。
+
+## BGM library (2026-06-29)
+
+`ongakuka.gftd.ai` is now the cljc BGM selector/composer. The imported BGM
+tracks are internal production materials only. Current pack:
+
+- Japan/common yukkuri style: 20 DOVA-SYNDROME tracks under `bgm/dova/`
+- US/global/region-tagged style: 10 Incompetech/Kevin MacLeod tracks under `bgm/incompetech/`
+
+The exact track list, license IDs, attribution text, moods, regions, SHA-256,
+and local paths are maintained in `orgs/gftdcojp/ongakuka/resources/catalog.edn`.
+
+Policy: use only as background music muxed into produced videos; do not expose
+raw files through public app static paths/CDNs; do not use for AI training; do
+not register in Content ID or equivalent fingerprinting systems. Runtime
+selection and credit strings live in
+`orgs/gftdcojp/ongakuka/resources/catalog.edn`.
+
+Annex/B2 operation notes are recorded in:
+`orgs/gftdcojp/ongakuka/docs/b2-annex-runbook.md`.
 
 Local daemon (`12D3KooWBhvfp6ZEhSiNDTQ3RmhkWdNsPZWmNmPdPDkqpkrN4kYU`) に
 auto-pin 済み。他ノードからは:
