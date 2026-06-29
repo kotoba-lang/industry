@@ -11,8 +11,8 @@
 gftdcojp には同じ構造で扱える業務が既に存在する。
 
 - M365 archive: mail/calendar/docs/contracts/invoices/crm facts
-- kyber-plm: PLM、ERP、MRP、MES production、GL、OCEL
-- gftd-keiei-sim: HTR による経営仮説と意思決定
+- kyber-plm: PLM、ERP、MRP、MES production、GL、OCEL の履歴語彙
+- gftd-keiei-sim: HTR による経営仮説と意思決定の履歴設計
 - litigation/legal repos: 証跡、期限、書面、外部専門家連携
 
 これらが個別 repo / 個別語彙に分散しているため、「今の business activity 全体」を 1 つの
@@ -33,14 +33,14 @@ operating surface で扱えない。
 実装正本は `.cljc` とし、kotoba/datom log に保存する。Clojure/JVM、babashka、CLJS、
 kotoba-clj/WASM のどこでも同じ業務モデルを使う。
 
-kyber-plm は別操作面として残さず、`cloud-itonami.ops` / `cloud-itonami.plm` から呼び出す下位ドメイン
-エンジンとして統合する。PLM/ERP/MES の不変条件は kyber が維持し、操作結果は
-itonami store の activity/effect/audit へ同期する。
+kyber-plm は別操作面として残さず、PLM/ERP/MES の語彙と不変条件を `cloud-itonami.ops` /
+`cloud-itonami.plm` / `cloud-itonami.mes` へ吸収する。操作結果は itonami store の
+activity/effect/audit へ同期する。
 
 ## Refactor From Kyber
 
-kyber-plm は PLM/ERP 専門ドメインとして残す。`cloud-itonami` は kyber の entity/event を
-上位語彙へ射影する。
+kyber-plm の standalone source tree は retired とし、`cloud-itonami` は kyber 由来の entity/event を
+上位語彙へ射影する compat/history model を持つ。
 
 | kyber-plm | cloud-itonami |
 |---|---|
@@ -68,7 +68,7 @@ kyber-plm は PLM/ERP 専門ドメインとして残す。`cloud-itonami` は ky
 ## Consequences
 
 - gftdcojp の日次 business activity は `cloud-itonami` の lane として統一される。
-- kyber は外部操作面としては閉じ、`cloud-itonami.ops` / `cloud-itonami.plm` の下位互換エンジンとして維持できる。
+- kyber は外部操作面としては閉じ、`cloud-itonami.ops` / `cloud-itonami.plm` の compat/history 語彙として維持できる。
 - kotoba/clj substrate に寄せることで、企業 UI、agent、CLI、WASM host が同じモデルを共有できる。
 - 既存データの破壊的移行はしない。kyber 由来の entity/event は itonami activity/effect/audit へ射影する。
 
@@ -92,8 +92,8 @@ kyber-plm は PLM/ERP 専門ドメインとして残す。`cloud-itonami` は ky
 | `m365-archive/facts/ses-cases.edn` | `cloud-itonami.m365/ses-case->tx` | `:sales` |
 | `m365-archive/facts/teams-messages.edn` | `cloud-itonami.m365/teams-message->tx` | `:inbox` |
 | `m365-archive/facts/decisions.edn` | `cloud-itonami.m365/decision-fact->tx` | `:inbox` decision |
-| `kyber-plm` Store graph | `cloud-itonami.migration/project-kyber-graph` | `:plm` / `:erp` |
-| `kyber-plm.production/complete-production!` | `cloud-itonami.mes/kyber-completion->tx` | `:mes` |
+| kyber historical Store graph | `cloud-itonami.migration/project-kyber-graph` | `:plm` / `:erp` |
+| kyber production completion event | `cloud-itonami.mes/kyber-completion->tx` | `:mes` |
 
 Lane ごとの既定 owner/default policy は `cloud-itonami.operating/lane-catalog` に置く。
 `:read-only` は自動実行、`:external-send` / `:financial` / `:destructive` は承認 inbox へ送る。
@@ -243,6 +243,6 @@ mock React loop と approval dry-run まで検証済み。この checkout では
 
 ## Closed Decision
 
-`kyber-plm` は名称・操作面としては閉じ、`cloud-itonami` の下位ドメインエンジンにする。
+`kyber-plm` は名称・操作面・standalone source tree としては閉じ、`cloud-itonami` の compat/history 語彙にする。
 利用者・agent・UI は `cloud-itonami.ops` / `cloud-itonami.plm` を呼び、結果は itonami store の
 activity/effect/audit に残す。kyber namespace は互換・内部実装としてのみ残す。

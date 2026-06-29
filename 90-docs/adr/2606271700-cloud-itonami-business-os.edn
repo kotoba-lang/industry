@@ -7,7 +7,6 @@
   :authoritative true
   :repo "orgs/gftdcojp/cloud-itonami"
   :builds_on ["orgs/com-junkawasaki/manimani"
-              "orgs/gftdcojp/kyber-plm"
               "orgs/gftdcojp/m365-archive"
               "orgs/com-junkawasaki/kotoba"
               "orgs/com-junkawasaki/langgraph-clj"]}
@@ -19,8 +18,8 @@
   :lanes [:inbox :sales :contract :billing :legal :procedure :employee :plm :erp :mes :keiei]
   :kyber_integration {:facade "cloud-itonami.ops"
                       :plm_api "cloud-itonami.plm"
-                      :role "kyber-plm is the PLM/ERP/MES invariant engine called from cloud-itonami"
-                      :sync "project kyber results into itonami activity/effect/audit after each operation"}
+                      :role "kyber-plm standalone source tree is retired; PLM/ERP/MES invariants live as cloud-itonami compat/history vocabulary"
+                      :sync "project kyber-derived events into itonami activity/effect/audit after each operation"}
   :core_ns [:itonami.activity :itonami.decision :itonami.effect :itonami.audit]
   :implementation {:language ".cljc"
                    :local_store "cloud-itonami.store over langchain.db"
@@ -42,7 +41,7 @@
                             "cloud-itonami.migration"
                             "cloud-itonami.company"]
             :compat_shims ["cloud-itonami.kyber-ops"]
-            :decision "kyber-plm is no longer the public operating surface; it remains an internal/compatibility invariant engine under cloud-itonami."}}
+            :decision "kyber-plm is no longer the public operating surface or active source tree; its durable invariants remain as cloud-itonami compat/history vocabulary."}}
  :business_coverage
  {:m365
   {:messages :inbox
@@ -70,7 +69,8 @@
    :people [:employee :sales]
    :decisions :inbox}
   :kyber
-  {:store_projector "cloud-itonami.migration/project-kyber-graph"
+  {:status :retired-source-tree
+   :store_projector "cloud-itonami.migration/project-kyber-graph"
    :lanes [:plm :erp :mes]
    :facade "cloud-itonami.ops"
    :plm_api "cloud-itonami.plm"

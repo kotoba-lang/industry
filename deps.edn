@@ -194,37 +194,22 @@
       :adrs ["docs/adr/0001-architecture.md" "orgs/kawasakijun/docs/adr/0013-clj-agent-stack.md"]
       :deps ["langgraph-clj"]}
     {
-      :name "gftd-keiei-sim"
-      :path "orgs/gftdcojp/gftd-keiei-sim"
-      :kind "management-sim-game"
-      :submodule false
-      :org "gftdcojp"
-      :description "gftdcojp 経営シミュレーションゲーム。意思決定者(CEO)が判断・可視化し、LLMエージェント社員(営業/開発/財務/法務/CEO補佐)が kotoba-clj defgraph(ADR-0013 と同型) + llm-infer で経営を進める。状態/意思決定台帳は kotoba-datomic。実データは m365-archive/facts(EDN, ADR-0010/0012)。"
-      :stack ["Rust" "ClojureScript" "Clojure (kotoba-clj WASM agents)"]
-      :adrs ["orgs/kawasakijun/docs/adr/0017-gftd-keiei-sim-llm-backend-openrouter.md"]
-      :llm_backend {
-        :production "openrouter:minimax/minimax-m2.7 (OpenAI互換; ADR-0017)"
-        :fallback "local gemma4 e4b @ Ollama (gemma4:latest) — dev/offline"
-        :wiring "env KOTOBA_INFERENCE_URL / KOTOBA_INFERENCE_MODEL / KOTOBA_INFERENCE_API_KEY; HttpInferEngine in src/agents.rs"
-        :self_host "not adopted — Modal eval in orgs/gftdcojp/minimax-m2-modal (M2.7 opt ~$1.55/1M @ concurrency 64, ~18min cold start; GPU snapshot multi-GPU 非対応). ADR-0017"}}
-    {
       :name "minimax-m2-modal"
       :path "orgs/gftdcojp/minimax-m2-modal"
       :kind "llm-infra-eval"
       :submodule false
       :org "gftdcojp"
-      :description "ADR-0017 の参考実装。Modal サーバーレスGPUで LLM 自前ホストを評価する harness。MiniMax-M2.7(4×H100,FP8) と Kimi-K2.7-Code(8×H200,int4) を vLLM OpenAI互換で起動して直接対決(chat/tools/coding) + コスパ実測。MiniMax-M3 は MSA 未対応で起動不可を確認。検証専用(非デプロイ)、Modal の Volume/pod は評価後に削除済。"
-      :stack ["Python" "Modal" "vLLM"]
+      :description "ADR-0017 の履歴化された参考実装。Modal サーバーレスGPUで LLM 自前ホストを評価する .cljc harness。MiniMax-M2.7/Kimi を vLLM OpenAI互換で起動した chat/tools/coding + コスパ計測の記録を保持する。検証専用(非デプロイ)、Modal の Volume/pod は評価後に削除済。"
+      :stack ["Clojure" "Clojure-compatible .cljc" "Modal" "vLLM"]
       :adrs ["orgs/kawasakijun/docs/adr/0017-gftd-keiei-sim-llm-backend-openrouter.md"]
-      :related ["gftd-keiei-sim"]
+      :related ["cloud-murakumo" "cloud-itonami"]
       :org-fit {:belongs :gftdcojp :status :ok-note
-                :note "ADR-0020: 汎用 LLM infra 評価だが keiei-sim backend 決定(ADR-0017)直結のため gftd 留置"}
+                :note "ADR-0020: 汎用 LLM infra 評価だが gftd backend 決定(ADR-0017)由来の履歴資産として gftd 留置"}
       :entrypoints {
-        :bench_modal "bench_modal.py — chat/tools/coding 直接対決 (fast-cold-start: prefetch+enforce-eager)"
-        :bench_opt "bench_opt.py — CUDA-devel(nvcc)+CUDAグラフ+DeepGEMM, 並列スイープで throughput/cost($/1M) 実測"
-        :m27_api "m27_api.py — 単一H200 W4A16 + sleep-mode GPU snapshot の永続API試作 (未デプロイ)"
-        :client "client.py — OpenAI互換クライアント (LLM_URL/LLM_MODEL/LLM_KEY)"}
-      :status "eval-only / not deployed"}]
+        :bench "src/minimax_m2_modal/bench.cljc — chat/tools/coding 直接対決"
+        :client "src/minimax_m2_modal/client.cljc — OpenAI互換クライアント (LLM_URL/LLM_MODEL/LLM_KEY)"
+        :kotoba "src/minimax_m2_modal/kotoba.cljc — cloud-murakumo と同型の vLLM serve 宣言生成"}
+      :status "history/eval-only / not deployed"}]
   :vendored [
     {
       :name "systemofsystem"
