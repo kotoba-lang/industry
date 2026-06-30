@@ -125,20 +125,27 @@ bb scripts/gen-west-manifest.bb
 
   ```bash
   git fetch origin
-  git merge --ff-only origin/main      # FF 不可なら merge / rebase で乖離を解消
+  git merge --ff-only origin/main      # FF 不可なら停止。rebase しない
   ```
 
   これは PreToolUse フック `.claude/hooks/git-push-main-sync-guard.bb`（babashka）で強制される
   （遅れた状態の `git push` は deny され、同期を促すメッセージが返る）。フックは
   破壊的な自動マージはしない（判定と指示のみ、fail-open）。
 
+- **rebase は基本禁止。** `git rebase` / `git pull --rebase` / rebase での乖離解消を
+  標準手順にしない。FF できない stale branch は、最新 `origin/main` から clean branch /
+  一時 worktree を作り、必要な小差分だけを `cherry-pick` または patch として載せ直す。
+  `manifest/west.yml` の pin 前進は、ローカル rebase で解かず GitHub API single-entry
+  commit（または最新 main ベースの clean worktree で当該 entry のみ commit）にする。
+  既に rebase を開始して競合した場合は `git rebase --abort` し、marker 手編集で続行しない。
+
 - **force-push は禁止（`git push --force` / `--force-with-lease` / `+refs` を使わない）。**
   共有リポ（superproject / 各 project）のいかなるブランチに対しても、履歴を書き換えて
   上流を上書きする push をしてはならない。force-push は他の clone・west pin・
   ancestry 判定を静かに壊し（shallow 環境では「前進」を「分岐」と誤検出する原因にも
   なる）、`upload-pack: not our ref` 由来の checkout 失敗を引き起こす。乖離は
-  **force-push ではなく merge / rebase してから通常 push** で解消し、それが不可能な
-  場合（既に push 済みの履歴を変えたい等）は**勝手に強制せず必ずユーザーに報告**する。
+  **force-push ではなく fast-forward できる clean branch / clean commit** で解消し、
+  それが不可能な場合（既に push 済みの履歴を変えたい等）は**勝手に強制せず必ずユーザーに報告**する。
   履歴書き換えが本当に必要なときも、shallow 化に伴う rewrite と同様に**行わない**
   （後述「大容量バイナリ」節と整合）。upstream を進めたいだけの単純更新は、ローカルで
   戦うより GitHub API でサーバ側にクリーン commit を起こす（PR #61/#62/#86 の実績）。
@@ -163,7 +170,7 @@ bb scripts/gen-west-manifest.bb
 
   ```bash
   git fetch --depth 1 origin                       # origin/main 他を取得
-  git merge --ff-only origin/main                  # superproject を main に同期（FF 不可なら merge/rebase）
+  git merge --ff-only origin/main                  # superproject を main に同期（FF 不可なら停止。rebase しない）
   west update --fetch smart                        # 子リポ群を manifest の pin に合わせて同期
   bb scripts/gen-west-manifest.bb --check          # west.yml が canonical か（生成器と一致か）確認
   ```

@@ -77,7 +77,8 @@ cleanup 処理を `scripts/cleanup.bb`（babashka・読取専用 dry-run 既定�
 ### ガードレール（必須）
 
 - shallow ancestry で `git rev-list --count origin/main..HEAD` 等を信じない → server-side compare で確定。
-- `git push --force` / `--force-with-lease` / `+refs` 禁止。乖離は merge/rebase で解消。
+- `git push --force` / `--force-with-lease` / `+refs` 禁止。`rebase` も基本禁止。FF できない乖離は
+  最新 `origin/main` から clean branch/worktree を作り、必要 commit か patch だけを載せ直す。
 - `manifest/west.yml` の main 反映は `repos.edn :manifest-workflow` の API single-entry 正経路。
 - オーナー未コミット WIP は破棄せず `git stash`（drop せず温存）。衝突は marker 手編集でなく再生成。
 - 子リポ WIP の自動 PR 化はしない。main は常に最優先で同期。

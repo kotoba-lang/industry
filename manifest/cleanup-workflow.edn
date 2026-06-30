@@ -15,6 +15,8 @@
    :rule "Never discard owner WIP. Preserve dirty files and untracked repos with stash or explicit report."}
   {:id :no-force-push
    :rule "Do not use force-push or history rewrite on shared branches."}
+  {:id :no-rebase
+   :rule "Do not use rebase as the default conflict or divergence resolver. If a branch cannot fast-forward, create a clean branch/worktree from current origin/main and replay only the needed commits or patch."}
   {:id :main-first
    :rule "Prefer a branch created from current origin/main over fighting a stale shallow branch."}
   {:id :generated-west
@@ -80,7 +82,8 @@
                 "git switch -c cleanup-<date> origin/main"]}
     {:type :replay
      :commands ["git cherry-pick <needed-commit>"
-                "or apply the small diff manually if shallow ancestry causes add/add conflicts"]}
+                "or apply the small diff manually if shallow ancestry causes add/add conflicts"
+                "do not switch to rebase to solve stale branch conflicts"]}
     {:type :commit
      :commands ["git add <resolved-files>"
                 "git commit -m cleanup -m 'Co-Authored-By: Claude Opus 4.8 (1M context)'"]}]}

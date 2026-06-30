@@ -11,6 +11,7 @@ merge conflicts in this superproject and its `orgs/` child repos.
 
 - Do not discard owner WIP.
 - Do not force-push shared branches.
+- Do not rebase. If a stale branch cannot fast-forward, create a clean branch/worktree from current `origin/main` and replay only the needed commits or patch.
 - Prefer a new branch from current `origin/main` when an old branch is stale or shallow ancestry is unreliable.
 - Treat `manifest/west.yml` as generated output. Resolve source files and regenerate it; do not hand-edit conflict markers.
 - Keep failed `stash pop` entries. Git keeps the stash on failed pop; inspect it before applying manually.
@@ -43,6 +44,7 @@ merge conflicts in this superproject and its `orgs/` child repos.
    ```
 
    If shallow history turns a small cherry-pick into add/add conflicts, abort and apply the small diff manually.
+   Do not switch to rebase to solve the conflict.
 
 4. Commit cleanup work with:
 
