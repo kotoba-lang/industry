@@ -132,7 +132,13 @@
  ;; 生成時に既存 path 群と union される（一度 west.yml に載れば自動追従、distinct で重複排除）。
  ;; clone 済みの working tree（orgs/<org>/<repo>）が存在し HEAD を持つこと。
  :extra-projects
- #{"orgs/gftdcojp/ai-gftd-apex"
+ #{;; kotoba-lang foundational stdlib P0 (ADR-kotoba-lang-foundational-stdlib)
+   "orgs/kotoba-lang/async"
+   "orgs/kotoba-lang/coll"
+   "orgs/kotoba-lang/json"
+   "orgs/kotoba-lang/spec"
+   "orgs/kotoba-lang/wit"
+   "orgs/gftdcojp/ai-gftd-apex"
    "orgs/gftdcojp/ai-gftd-ads"
    "orgs/gftdcojp/ai-gftd-animeka"
    "orgs/gftdcojp/ai-gftd-arms"
