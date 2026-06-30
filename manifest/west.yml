@@ -31,12 +31,6 @@ manifest:
       path: orgs/com-junkawasaki/aero-clj
       clone-depth: 1
       groups: [com-junkawasaki]
-    - name: aiueos
-      remote: com-junkawasaki
-      revision: 517917461a678921ed493f14a766470e2a2c71d5
-      path: orgs/com-junkawasaki/aiueos
-      clone-depth: 1
-      groups: [com-junkawasaki]
     - name: authenticator-clj
       remote: com-junkawasaki
       revision: 66c8a7d7a844b4d20ed8943cff511780707c8f31
@@ -182,34 +176,16 @@ manifest:
       path: orgs/com-junkawasaki/kagi-clj
       clone-depth: 1
       groups: [com-junkawasaki]
-    - name: kami-cfd
-      remote: com-junkawasaki
-      revision: 2958ba88f2b30a616c3191454a25af4e9c3960b9
-      path: orgs/com-junkawasaki/kami-cfd
-      clone-depth: 1
-      groups: [com-junkawasaki]
     - name: kami-engine
       remote: com-junkawasaki
       revision: 1b514e486610fe34cc000d1e8a7f3325f2d665c1
       path: orgs/com-junkawasaki/kami-engine
       clone-depth: 1
       groups: [com-junkawasaki]
-    - name: kekkai-actor
-      remote: com-junkawasaki
-      revision: a81b4a288acb94ba401fad3d01e791c1166d9649
-      path: orgs/com-junkawasaki/kekkai-actor
-      clone-depth: 1
-      groups: [com-junkawasaki]
     - name: kenchi-clj
       remote: com-junkawasaki
       revision: 71c174738402eda2fad0debb9865a217b99aeafe
       path: orgs/com-junkawasaki/kenchi-clj
-      clone-depth: 1
-      groups: [com-junkawasaki]
-    - name: kotoba
-      remote: com-junkawasaki
-      revision: fb60b80ade3f2e2d7477ca65a31396042317b7b3
-      path: orgs/com-junkawasaki/kotoba
       clone-depth: 1
       groups: [com-junkawasaki]
     - name: kotoba-code
@@ -360,12 +336,6 @@ manifest:
       remote: com-junkawasaki
       revision: 40182873f0b4201a7d93eb69e8c2196311d5ed03
       path: orgs/com-junkawasaki/torch-clj
-      clone-depth: 1
-      groups: [com-junkawasaki]
-    - name: vehicle-design-actor
-      remote: com-junkawasaki
-      revision: fe4e42ff4f4bc0913612b961053723e8b396530d
-      path: orgs/com-junkawasaki/vehicle-design-actor
       clone-depth: 1
       groups: [com-junkawasaki]
     - name: vllm-clj
@@ -1482,6 +1452,12 @@ manifest:
       path: orgs/kotoba-lang/aero
       clone-depth: 1
       groups: [kotoba-lang]
+    - name: aiueos
+      remote: kotoba-lang
+      revision: 867e36f5d7d6be0af32397922d2cefde3721144e
+      path: orgs/kotoba-lang/aiueos
+      clone-depth: 1
+      groups: [kotoba-lang]
     - name: arxiv
       remote: kotoba-lang
       revision: 11a4f9667cb80dbdbe14c6c024a8c1c3a54919e0
@@ -1693,10 +1669,22 @@ manifest:
       clone-depth: 1
       groups: [kotoba-lang]
       submodules: true
+    - name: kami-engine-cfd
+      remote: kotoba-lang
+      revision: 2958ba88f2b30a616c3191454a25af4e9c3960b9
+      path: orgs/kotoba-lang/kami-engine-cfd
+      clone-depth: 1
+      groups: [kotoba-lang]
     - name: kami-engine-sdk
       remote: com-junkawasaki
       revision: 91ff23bb7615b036829097f63fe0f28b043dbc84
       path: orgs/kotoba-lang/kami-engine-sdk
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: kami-engine-vehicle-designer
+      remote: kotoba-lang
+      revision: fe4e42ff4f4bc0913612b961053723e8b396530d
+      path: orgs/kotoba-lang/kami-engine-vehicle-designer
       clone-depth: 1
       groups: [kotoba-lang]
     - name: kami-webgpu
@@ -1711,16 +1699,34 @@ manifest:
       path: orgs/kotoba-lang/kasane
       clone-depth: 1
       groups: [kotoba-lang]
+    - name: kekkai
+      remote: kotoba-lang
+      revision: a81b4a288acb94ba401fad3d01e791c1166d9649
+      path: orgs/kotoba-lang/kekkai
+      clone-depth: 1
+      groups: [kotoba-lang]
     - name: kenchi
       remote: kotoba-lang
       revision: 71c174738402eda2fad0debb9865a217b99aeafe
       path: orgs/kotoba-lang/kenchi
       clone-depth: 1
       groups: [kotoba-lang]
+    - name: kobo
+      remote: kotoba-lang
+      revision: 1a862c0deec182adca2368ef933ca121a0ac6795
+      path: orgs/kotoba-lang/kobo
+      clone-depth: 1
+      groups: [kotoba-lang]
     - name: koe
       remote: kotoba-lang
       revision: 2c5946f595490e5a74ea093b79b72d6465dc925e
       path: orgs/kotoba-lang/koe
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: kotoba
+      remote: kotoba-lang
+      revision: dd60e8ac2925e1bde8d800fa6c6b2b1b24bb8911
+      path: orgs/kotoba-lang/kotoba
       clone-depth: 1
       groups: [kotoba-lang]
     - name: kotoba-code
@@ -1763,6 +1769,12 @@ manifest:
       remote: kotoba-lang
       revision: 580c7cef9aadaca51212c7e5255cdff0f4a14600
       path: orgs/kotoba-lang/kudaki
+      clone-depth: 1
+      groups: [kotoba-lang]
+    - name: kuro
+      remote: kotoba-lang
+      revision: f64a6d337648f8e528fb476426ac30297a5f73c1
+      path: orgs/kotoba-lang/kuro
       clone-depth: 1
       groups: [kotoba-lang]
     - name: langchain
@@ -1863,7 +1875,7 @@ manifest:
       groups: [kotoba-lang]
     - name: slides
       remote: kotoba-lang
-      revision: eddc3a0d29109f90f98e83ffeea3dd62d53cc5b6
+      revision: a0c05e33bbb40344295a874e9326d1ae82ed5aad
       path: orgs/kotoba-lang/slides
       clone-depth: 1
       groups: [kotoba-lang]
