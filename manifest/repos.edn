@@ -9,8 +9,29 @@
 {;; org 名 -> git remote の url-base
  :remotes
  {"com-junkawasaki" "git@github.com:com-junkawasaki"
+  "kotoba-lang"     "git@github.com:kotoba-lang"
   "gftdcojp"        "git@github.com:gftdcojp"
   "etzhayyim"       "https://github.com/etzhayyim"}
+
+ ;; GitHub owner だけ移した project の west remote を上書きする。
+ :remote-overrides
+ {"orgs/kotoba-lang/kami-engine-sdk" "com-junkawasaki"} ; repo at com-junkawasaki/kami-engine-sdk (etzhayyim is a stale redirect), checked out under kotoba-lang path
+
+ ;; GitHub owner/path 移管済み project の canonical path。
+ :path-overrides
+ {"orgs/com-junkawasaki/freeboard"      "orgs/kotoba-lang/freeboard"
+  "orgs/com-junkawasaki/kami-webgpu"    "orgs/kotoba-lang/kami-webgpu"
+  "orgs/com-junkawasaki/kami-engine-sdk" "orgs/kotoba-lang/kami-engine-sdk"
+  "orgs/com-junkawasaki/kasane"         "orgs/kotoba-lang/kasane"
+  "orgs/com-junkawasaki/murakumo"       "orgs/kotoba-lang/murakumo"
+  "orgs/com-junkawasaki/drawingml-svg"  "orgs/kotoba-lang/svg"
+  "orgs/com-junkawasaki/office-causal"  "orgs/kotoba-lang/office"
+  "orgs/com-junkawasaki/office-style"   "orgs/kotoba-lang/office-style"
+  "orgs/com-junkawasaki/svgraph"        "orgs/kotoba-lang/svgraph"
+  "orgs/kotoba-lang/edn"                "orgs/kotoba-lang/office"
+  "orgs/kotoba-lang/kootba"             "orgs/kotoba-lang/svgraph"
+  "orgs/kotoba-lang/clc"                "orgs/kotoba-lang/office-style"
+  "orgs/com-junkawasaki/utsushi"        "orgs/kotoba-lang/utsushi"}
 
  ;; 全 project 共通の既定
  :defaults
@@ -18,7 +39,7 @@
   :clone-depth 1}            ; CLAUDE.md の shallow 既定に準拠
 
  ;; west update --group-filter で選択取得。datalad は既定で無効化(opt-in)。
- :group-filter ["+com-junkawasaki" "+gftdcojp" "+etzhayyim" "-datalad"]
+ :group-filter ["+com-junkawasaki" "+kotoba-lang" "+gftdcojp" "+etzhayyim" "-datalad"]
 
  ;; DataLad dataset(git-annex + B2)。west project にはするが既定では取得しない。
  ;;   実体取得/破棄は `west annex-get` / `west annex-drop`(B2 creds は環境変数)。
@@ -40,14 +61,16 @@
    ;; env: この名前の環境変数を直接使う(CI 等)
    :env {:key-id "B2_KEY_ID" :app-key "B2_APP_KEY" :bucket "B2_BUCKET"}
    ;; 1Password: op read の参照。★ vault/item/field を自分のものに。
-   :1password {:key-id  "op://Private/Backblaze B2/key-id"     ; ★
-               :app-key "op://Private/Backblaze B2/app-key"    ; ★
-               :bucket  "op://Private/Backblaze B2/bucket"}    ; ★
-   ;; Apple Keychain: security find-generic-password -s <service> -a <account> -w
-   :keychain {:service         "backblaze-b2"   ; ★ keychain の service 名
-              :key-id-account  "key-id"         ; ★ account 名
-              :app-key-account "app-key"        ; ★
-              :bucket-account  "bucket"}}}      ; ★
+   ;;   (このマシンの実体は Keychain 側。op を使う環境では vault/item を作って参照する)
+   :1password {:key-id  "op://gftdcojp/com-junkawasaki.b2_annex/keyID"          ; ★
+               :app-key "op://gftdcojp/com-junkawasaki.b2_annex/applicationKey" ; ★
+               :bucket  "op://gftdcojp/com-junkawasaki.b2_annex/bucket"}        ; ★
+   ;; Apple Keychain(単一アイテム方式): service=b2:<bucket> の generic-password 1 件に
+   ;;   account=KEY_ID / password=APP_KEY を格納し、bucket は service 名の "b2:" 以降から導く。
+   ;;   登録例:
+   ;;     security add-generic-password -s b2:gftdcojp-m365-annex -a <KEY_ID> -w <APP_KEY>
+   :keychain {:service  "b2:gftdcojp-m365-annex"   ; ★ keychain service(= b2:<bucket>)
+              :combined true}}}                     ; account=key-id, password=app-key
 
  ;; kotoba-server pod（kotobase.net）接続ポリシー（非機密）。詳細は CLAUDE.md
  ;; 「Actors」節 / ai-gftd-itonami ADR-0002。認証は CACAO（SIWE/Ed25519 did:key、
@@ -94,4 +117,96 @@
  ;; (未指定でも生成スクリプトが各 repo の .gitmodules を検出して自動付与する。
  ;;  ここは明示的に強制したい場合の上書き用。)
  :force-recurse-submodules
- #{}}
+ #{}
+
+ ;; 新規 project の追加口（SSoT）。west.yml にまだ path が無い repo をここに列挙すると
+ ;; 生成時に既存 path 群と union される（一度 west.yml に載れば自動追従、distinct で重複排除）。
+ ;; clone 済みの working tree（orgs/<org>/<repo>）が存在し HEAD を持つこと。
+ :extra-projects
+ #{"orgs/com-junkawasaki/cloud-manimani"
+   "orgs/com-junkawasaki/cloud-murakumo"
+   "orgs/kotoba-lang/svg"
+   "orgs/com-junkawasaki/kotobase-clj"
+   "orgs/com-junkawasaki/kudaki-clj"
+   "orgs/com-junkawasaki/nagare-clj"
+   "orgs/com-junkawasaki/num-clj"
+   "orgs/com-junkawasaki/org-spirit-in-physics"
+   "orgs/com-junkawasaki/org-spirit-in-physics-comics"
+   "orgs/gftdcojp/cloud-itonami"
+   "orgs/gftdcojp/gftd-talent-actor"
+   "orgs/etzhayyim/com-etzhayyim-shinka" ; religious-corp Shinka domain actor; migrated cljc actor target
+   "orgs/etzhayyim/com-etzhayyim-joucho" ; religious-corp Joucho domain actor; migrated cljc actor target
+   "orgs/etzhayyim/com-etzhayyim-sng" ; ADR-2606290000: e-methane Sabatier SNG standalone actor
+   "orgs/etzhayyim/com-google-ads" ; ADR-2606292130: charter-clean outreach & performance-marketing actor
+   "orgs/kotoba-lang/kasane"         ; ADR-2606272100: Adobe(AI/PSD/PDF) 純cljc+EDN ライブラリ
+   "orgs/kotoba-lang/arxiv"          ; ADR-0023: arXiv organism actor + yorishiro automation
+   "orgs/kotoba-lang/aero"
+   "orgs/kotoba-lang/bpmn"
+   "orgs/kotoba-lang/briefing"
+   "orgs/kotoba-lang/cacao"
+   "orgs/kotoba-lang/cae-solver"
+   "orgs/kotoba-lang/calendar"
+   "orgs/kotoba-lang/ci"
+   "orgs/kotoba-lang/cmmn"
+   "orgs/kotoba-lang/contacts"
+   "orgs/kotoba-lang/crash"
+   "orgs/kotoba-lang/cron"
+   "orgs/kotoba-lang/dag-cbor"
+   "orgs/kotoba-lang/datom"
+   "orgs/kotoba-lang/ddl"
+   "orgs/kotoba-lang/dmn"
+   "orgs/kotoba-lang/dot"
+   "orgs/kotoba-lang/docs"
+   "orgs/kotoba-lang/drive"
+   "orgs/kotoba-lang/echem"
+   "orgs/kotoba-lang/ed25519"
+   "orgs/kotoba-lang/eth-crypto"
+   "orgs/kotoba-lang/forms"
+   "orgs/kotoba-lang/graphql"
+   "orgs/kotoba-lang/homebrew-kotoba"
+   "orgs/kotoba-lang/ical"
+   "orgs/kotoba-lang/jsonlogic"
+   "orgs/kotoba-lang/kenchi"
+   "orgs/kotoba-lang/koe"
+   "orgs/kotoba-lang/kotoba-pages-poc"
+   "orgs/kotoba-lang/kotoba-v2025"
+   "orgs/kotoba-lang/kotobase"
+   "orgs/kotoba-lang/kudaki"
+   "orgs/kotoba-lang/mcp"
+   "orgs/kotoba-lang/motor"
+   "orgs/kotoba-lang/multiformats"
+   "orgs/kotoba-lang/nagare"
+   "orgs/kotoba-lang/num"
+   "orgs/kotoba-lang/openapi"
+   "orgs/kotoba-lang/policy"
+   "orgs/kotoba-lang/search"
+   "orgs/kotoba-lang/sigma"
+   "orgs/kotoba-lang/sheets"
+   "orgs/kotoba-lang/slides"
+   "orgs/kotoba-lang/office-style"
+   "orgs/kotoba-lang/statechart"
+   "orgs/kotoba-lang/states"
+   "orgs/kotoba-lang/svgraph"
+   "orgs/kotoba-lang/torch"
+   "orgs/kotoba-lang/vllm"
+   "orgs/kotoba-lang/vphysics"
+   "orgs/kotoba-lang/zone"
+   "orgs/kotoba-lang/browser-agent"
+   "orgs/kotoba-lang/freeboard"
+   "orgs/kotoba-lang/kami-webgpu"
+   "orgs/kotoba-lang/kotoba-code"
+   "orgs/kotoba-lang/kotoba-topology"
+   "orgs/kotoba-lang/kototama-clj"
+   "orgs/kotoba-lang/langchain"
+   "orgs/kotoba-lang/langgraph"
+   "orgs/kotoba-lang/murakumo"
+   "orgs/kotoba-lang/playwright"
+   "orgs/kotoba-lang/utsushi"
+   "orgs/gftdcojp/ai-gftd-router"     ; ADR-2606272330: gftd.ai 生成スタジオの製品面(router/gateway)
+   "orgs/kotoba-lang/authenticator"
+   "orgs/kotoba-lang/browser-use"
+   "orgs/kotoba-lang/comfyui"
+   "orgs/kotoba-lang/computer-use"
+   "orgs/kotoba-lang/godaddy-dns"
+   "orgs/kotoba-lang/kami-engine"
+   "orgs/kotoba-lang/kagi"}}
