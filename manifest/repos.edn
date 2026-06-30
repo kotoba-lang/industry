@@ -60,7 +60,30 @@
  ;; 全 project 共通の既定
  :defaults
  {:revision    "main"
-  :clone-depth 1}            ; CLAUDE.md の shallow 既定に準拠
+  :clone-depth 1}            ; clone-depth の値。適用先は下記 :heavy のみ（ADR-2606302100）
+
+ ;; shallow(clone-depth)を適用する heavy(バイナリ同梱)repo だけのリスト。light(純コード)
+ ;; repo は full clone にし、west の pin checkout を pin lag に強くする（一律 shallow は pin が
+ ;; tip より古いと update を失敗させる。ADR-2606302100）。heavy は順次 B2+DataLad へ移す。
+ :heavy
+ #{"orgs/com-junkawasaki/manimani"
+   "orgs/com-junkawasaki/org-spirit-in-physics"
+   "orgs/com-junkawasaki/org-spirit-in-physics-comics"
+   "orgs/com-junkawasaki/260208-spirit-in-physics"
+   "orgs/com-junkawasaki/spirit-in-physics"
+   "orgs/com-junkawasaki/ghosthacker"
+   "orgs/com-junkawasaki/kototama"
+   "orgs/com-junkawasaki/webmaster"
+   "orgs/kotoba-lang/kotoba"
+   "orgs/kotoba-lang/kami-engine"
+   "orgs/kotoba-lang/kotoba-v2025"
+   "orgs/etzhayyim/root"
+   "orgs/gftdcojp/app-aozora"
+   "orgs/gftdcojp/ai-gftd-apps-gftdcojp"
+   "orgs/gftdcojp/m365-archive"
+   "orgs/gftdcojp/network-isekai"
+   "orgs/gftdcojp/ai-gftd-yukkuri"
+   "orgs/gftdcojp/ai-gftd-lf-case-lingling"}
 
  ;; west update --group-filter で選択取得。datalad は既定で無効化(opt-in)。
  :group-filter ["+com-junkawasaki" "+kotoba-lang" "+gftdcojp" "+etzhayyim" "-datalad"]
