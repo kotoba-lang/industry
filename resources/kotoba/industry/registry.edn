@@ -72,4 +72,12 @@
    :required-technologies [:banking :swift :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
    ;; :repo / :business-id filled when cloud-itonami-6419 actor repo lands.
-   :operating-states [:intake :onboard :transact :clear :settle :audit]}]}
+   :operating-states [:intake :onboard :transact :clear :settle :audit]}
+  {:id "6190"
+   :name "Community Telecommunications Access"
+   :repo nil
+   :business-id nil
+   :required-technologies [:phone :identity :forms :dmn :bpmn :audit-ledger]
+   :optional-technologies [:optimization]
+   ;; :repo / :business-id filled when cloud-itonami-6190 actor repo lands.
+   :operating-states [:intake :provision :route :bill :support :audit]}]}
