@@ -170,7 +170,9 @@
  ;; 生成時に既存 path 群と union される（一度 west.yml に載れば自動追従、distinct で重複排除）。
  ;; clone 済みの working tree（orgs/<org>/<repo>）が存在し HEAD を持つこと。
  :extra-projects
- #{;; kotoba-lang foundational stdlib P0 (ADR-kotoba-lang-foundational-stdlib)
+ #{;; fleet coordination — 20-agent lease/governor substrate (ADR-2606302000)
+   "orgs/kotoba-lang/kotoba-fleet"
+   ;; kotoba-lang foundational stdlib P0 (ADR-kotoba-lang-foundational-stdlib)
    "orgs/kotoba-lang/async"
    "orgs/kotoba-lang/coll"
    "orgs/kotoba-lang/json"
