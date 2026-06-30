@@ -80,4 +80,12 @@
    :required-technologies [:phone :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
    ;; :repo / :business-id filled when cloud-itonami-6190 actor repo lands.
-   :operating-states [:intake :provision :route :bill :support :audit]}]}
+   :operating-states [:intake :provision :route :bill :support :audit]}
+  {:id "6619"
+   :name "Card Transaction Processing and Settlement"
+   :repo nil
+   :business-id nil
+   :required-technologies [:card :banking :swift :identity :forms :dmn :bpmn :audit-ledger]
+   :optional-technologies [:optimization]
+   ;; :repo / :business-id filled when cloud-itonami-6619 actor repo lands.
+   :operating-states [:intake :authorize :clear :settle :reconcile :chargeback :audit]}]}
