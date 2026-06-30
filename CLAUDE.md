@@ -138,6 +138,11 @@ bb scripts/gen-west-manifest.bb
   `manifest/west.yml` の pin 前進は、ローカル rebase で解かず GitHub API single-entry
   commit（または最新 main ベースの clean worktree で当該 entry のみ commit）にする。
   既に rebase を開始して競合した場合は `git rebase --abort` し、marker 手編集で続行しない。
+  fleet 活動中など `origin/main` が逐次前進して `git push main` が race する時は、変更を
+  feature branch に push し（push 同期ガードは非-main を許可）、`gh api repos/<org>/<repo>/merges
+  -f base=main -f head=<branch> -f commit_message=...` で **サーバ側マージ commit** を作る。
+  ローカル shallow・push race に触れず、409(conflict/race) で再試行。実績: ADR-2606302300 の
+  doc commit をこの経路で main 化（rebase も force-push も使わず）。
 
 - **force-push は禁止（`git push --force` / `--force-with-lease` / `+refs` を使わない）。**
   共有リポ（superproject / 各 project）のいかなるブランチに対しても、履歴を書き換えて
