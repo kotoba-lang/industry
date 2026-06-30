@@ -75,6 +75,13 @@ bb scripts/gen-west-manifest.bb --check                 # CI: 乖離で exit 1
 > west 1.5 の `west update` は `-j` 非対応（直列）。fetch は `smart` で差分のみ。
 > zsh は引用なし変数を単語分割しないため、複数 project 指定は `xargs` を使う。
 
+## Cleanup / merge conflict
+
+PR/branch/stash/worktree の掃除と、`manifest/west.yml` を含む merge conflict の解決は
+[`cleanup-workflow.md`](cleanup-workflow.md) に従う。機械可読の手順は
+[`cleanup-workflow.edn`](cleanup-workflow.edn)。Codex からは `$git-cleanup-conflict`
+skill で参照する。
+
 ## 新しいリポを追加するには
 
 1. その repo を作って push（origin に存在させる）。
