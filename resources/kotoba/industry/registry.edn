@@ -1,0 +1,67 @@
+{:kotoba.registry/id :kotoba/industry
+ :kotoba.registry/version 1
+ :kotoba.registry/updated "2026-06-30"
+ :industries
+ [{:id "3512"
+   :name "Community Renewable Energy Operations"
+   :repo "https://github.com/gftdcojp/cloud-itonami-3512"
+   :business-id "cloud-itonami-3512"
+   :required-technologies [:telemetry :optimization :dmn :bpmn :audit-ledger :forms]
+   :optional-technologies [:cfd :cae]
+   :operating-states [:intake :observe :recommend :approve :dispatch :settle :audit]}
+  {:id "3600"
+   :name "Community Water Safety Operations"
+   :repo "https://github.com/gftdcojp/cloud-itonami-3600"
+   :business-id "cloud-itonami-3600"
+   :required-technologies [:telemetry :dmn :bpmn :audit-ledger :forms]
+   :optional-technologies [:cfd :cae]
+   :operating-states [:intake :sample :alert :maintain :publish :audit]}
+  {:id "3830"
+   :name "Local Materials Recovery"
+   :repo "https://github.com/gftdcojp/cloud-itonami-3830"
+   :business-id "cloud-itonami-3830"
+   :required-technologies [:forms :telemetry :optimization :audit-ledger :bpmn :dmn]
+   :optional-technologies [:identity]
+   :operating-states [:collect :sort :grade :route :transfer :report]}
+  {:id "6310"
+   :name "Talent Actor"
+   :repo "https://github.com/gftdcojp/cloud-itonami-6310"
+   :business-id "cloud-itonami-6310"
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+   :optional-technologies [:telemetry]
+   :operating-states [:intake :advise :govern :approve :commit :audit]}
+  {:id "8569"
+   :name "Community Learning Support"
+   :repo "https://github.com/gftdcojp/cloud-itonami-8569"
+   :business-id "cloud-itonami-8569"
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+   :optional-technologies [:optimization]
+   :operating-states [:intake :plan :review :follow-up :refer :audit]}
+  {:id "8691"
+   :name "Health Access Navigation"
+   :repo "https://github.com/gftdcojp/cloud-itonami-8691"
+   :business-id "cloud-itonami-8691"
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger :optimization]
+   :optional-technologies [:telemetry]
+   :operating-states [:intake :triage :match :review :refer :follow-up :audit]}
+  {:id "8810"
+   :name "Community Care Coordination"
+   :repo "https://github.com/gftdcojp/cloud-itonami-8810"
+   :business-id "cloud-itonami-8810"
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger :optimization]
+   :optional-technologies [:telemetry]
+   :operating-states [:intake :check-in :assign :escalate :report :audit]}
+  {:id "2610"
+   :name "Semiconductor and Electronics Manufacturing Enablement"
+   :repo nil
+   :business-id nil
+   :required-technologies [:eda :cae :dmn :bpmn :audit-ledger]
+   :optional-technologies [:cfd :telemetry :optimization]
+   :operating-states [:spec :design :verify :package :manufacture :audit]}
+  {:id "3030"
+   :name "Aircraft and Aerospace Manufacturing Enablement"
+   :repo nil
+   :business-id nil
+   :required-technologies [:cae :cfd :dmn :bpmn :audit-ledger :optimization]
+   :optional-technologies [:eda :telemetry]
+   :operating-states [:requirements :simulate :verify :approve :manufacture :audit]}]}
