@@ -1,0 +1,78 @@
+{:frontmatter
+ {:id "adr-2606302300-org-taxonomy-4-orgs"
+  :title "ADR-2606302300: Four-org taxonomy — kotoba-lang (language) / etzhayyim (agent+公益) / gftdcojp (human+ビジネス) / com-junkawasaki (foundation→cloud+data)"
+  :status "proposed"
+  :doc_type "adr"
+  :topic "org-taxonomy"
+  :authoritative true
+  :last_verified "2026-06-30"
+  :authoritative_for
+  ["which GitHub org a new repo belongs in: any library (language or -clj infra) -> kotoba-lang / public-interest agent -> etzhayyim / commercial product -> gftdcojp / cloud+data -> com-junkawasaki"
+   "the 公益=etzhayyim / 事業=gftdcojp split that library ADRs assert only inline"
+   "com-junkawasaki -> kotoba-lang full -clj migration (decided 2026-06-30); com-junkawasaki end-state = cloud + data only"]
+  :related
+  ["manifest/repos.edn"
+   "CLAUDE.md"
+   "90-docs/adr/2606272212-ci-clj-github-actions-edn-dag.md"
+   "90-docs/adr/2606272209-policy-clj-abac-rbac-edn.md"
+   "90-docs/adr/2606272213-ddl-clj-sql-schema-migration.md"
+   "90-docs/adr/2606272200-bpmn-clj-edn-process-library.md"
+   "90-docs/adr/2606301900-isco-cofog-organism-actors.md"
+   "90-docs/adr/2606272237-manifest-workflow-single-entry-commit.md"]
+  :supersedes []
+  :superseded_by []}
+
+ :problem
+ {:source "owner clarification 2026-06-30"
+  :gap "org partition existed only implicitly — passing 公益/事業 refs in library ADRs plus structural repos.edn keys; no single authoritative taxonomy"
+  :risk "new repos land in the wrong org by accident; migration scope (com-junkawasaki->kotoba-lang) ambiguous"}
+
+ :decision
+ {:axes
+  [{:axis "what (kind of thing)"
+    :values ["library / substrate (kotoba-lang) — language core + all -clj infra after migration"
+             "agent/product (etzhayyim, gftdcojp)"
+             "cloud control plane / heavy data (com-junkawasaki, post-migration)"]}
+   {:axis "whom (actors/products only)"
+    :values ["公益 public-interest = etzhayyim"
+             "ビジネス business = gftdcojp"]}]
+  :orgs
+  {"kotoba-lang"     {:role :language-substrate
+                      :role-text "kotoba 言語 + (after migration) all generic -clj infra libraries"
+                      :scope "language/infra substrate, consumed by all orgs"
+                      :remote "git@github.com:kotoba-lang" :projects "85 -> growing"}
+   "etzhayyim"       {:role :agent-centric
+                      :role-text "dispatchable organism actors (com-etzhayyim-*, UNSPSC/ISCO/COFOG)"
+                      :scope "公益 (public-interest)"
+                      :remote "github.com/etzhayyim" :projects 170}
+   "gftdcojp"        {:role :human-centric
+                      :role-text "human-facing products & business services (ai-gftd-*, apps, talent)"
+                      :scope "ビジネス (business)"
+                      :remote "git@github.com:gftdcojp" :projects 50}
+   "com-junkawasaki" {:role :transitional-foundation
+                      :role-text "generic -clj infra migrating fully to kotoba-lang; retains cloud control planes + heavy/data"
+                      :scope "Jun Kawasaki origin org; end-state = cloud + data only"
+                      :remote "git@github.com:com-junkawasaki" :projects "53 -> shrinking"}}
+  :placement-rule
+  {:any-library "kotoba-lang (language core OR generic -clj infra)"
+   :public-interest-agent "etzhayyim/com-etzhayyim-*"
+   :commercial-product "gftdcojp/ai-gftd-* or app-*"
+   :cloud-or-heavy-data "com-junkawasaki (only thing that stays once migration completes)"}
+  :migration
+  {:mechanism "repos.edn :path-overrides (com-junkawasaki/<x>-clj -> kotoba-lang/<x>) + :remote-overrides where GitHub org stays"
+   :moved     "kotoba-language-core: kotoba, kotoba-code, kasane, kami-*, murakumo, office-*, svgraph, aiueos, kekkai, utsushi, vehicle-design-actor..."
+   :to-migrate "generic -clj infra: aero-clj, bpmn-clj, ci-clj, ddl-clj, dmn-clj, crash-clj, cron-clj, datom-clj, graphql-clj, ical-clj, jsonlogic-clj, kagi-clj, kenchi-clj, kotobase-clj, ..."
+   :decided   "generic -clj infra FULLY migrates to kotoba-lang (owner decision 2026-06-30); com-junkawasaki end-state = cloud (cloud-manimani, cloud-murakumo) + data (spirit-in-physics, ghosthacker) only"
+   :github-org-relocation "per-repo decision; some stay at github.com/com-junkawasaki and check out under kotoba-lang/ via :remote-overrides (cf. kami-engine-sdk)"}
+  :out-of-scope
+  {:not-west-managed ["orgs/kawasakijun/ (personal ops/state)"
+                      "orgs/personal/ (life-data vault)"]}}
+
+ :consequences
+ ["single authoritative reference for org taxonomy — supersedes the inline 公益/事業 mentions in library ADRs"
+  "new-repo placement decided by axis: any library -> kotoba-lang; agent+公益 -> etzhayyim; product+ビジネス -> gftdcojp; cloud+data -> com-junkawasaki"
+  "com-junkawasaki -> kotoba-lang full -clj migration DECIDED (2026-06-30); language-core already moved, generic -clj infra to follow; com-junkawasaki end-state = cloud + data only"
+  "codified in repos.edn as a doc-only :orgs key (generator does not read it, mirroring :manifest-workflow)"]
+
+ :open-questions
+ []}  ; resolved 2026-06-30: full -clj migration to kotoba-lang decided

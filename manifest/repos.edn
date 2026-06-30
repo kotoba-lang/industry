@@ -13,6 +13,21 @@
   "gftdcojp"        "git@github.com:gftdcojp"
   "etzhayyim"       "https://github.com/etzhayyim"}
 
+ ;; org の役割分担（taxonomy の権威は ADR-2606302300）。生成器はこのキーを読まない（doc 用宣言。
+  ;;   :manifest-workflow / :kotoba 等と同じく人間が読むポリシーメタ）。新規 repo の所属判定は
+  ;;   この role/scope に従う: language-substrate→kotoba-lang, agent+公益→etzhayyim,
+  ;;   human+ビジネス→gftdcojp, cross-cutting 基盤 -clj→com-junkawasaki。
+ :orgs
+ {"kotoba-lang"     {:role :language-substrate   ; kotoba 言語 — 純CLJC 言語/コアライブラリ群。全 org が消費
+                     :scope :platform}
+  "etzhayyim"       {:role :agent-centric        ; com-etzhayyim-* organism actors (UNSPSC/ISCO/COFOG)
+                     :scope :public-interest}    ; 公益
+  "gftdcojp"        {:role :human-centric        ; ai-gftd-* 製品/サービス, apps, talent
+                     :scope :business}           ; ビジネス
+  "com-junkawasaki" {:role :transitional-foundation ; 汎用 -clj 基盤ライブラリ + cloud 制御面 + data project
+                     :scope :private-foundation  ; 言語コアは kotoba-lang へ移動済み (:path-overrides)
+                     :note "汎用基盤 -clj も最終的に kotoba-lang へ全移行（ADR-2606302300, 決定 2026-06-30）。当 org は cloud(cloud-manimani/cloud-murakumo) + data(spirit-in-physics 等) のみへ縮退予定"}}
+
  ;; GitHub owner だけ移した project の west remote を上書きする。
  :remote-overrides
  {"orgs/kotoba-lang/kami-engine-sdk" "com-junkawasaki"} ; repo at com-junkawasaki/kami-engine-sdk (etzhayyim is a stale redirect), checked out under kotoba-lang path
