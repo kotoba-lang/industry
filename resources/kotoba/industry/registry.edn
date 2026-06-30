@@ -64,4 +64,12 @@
    :business-id nil
    :required-technologies [:cae :cfd :dmn :bpmn :audit-ledger :optimization]
    :optional-technologies [:eda :telemetry]
-   :operating-states [:requirements :simulate :verify :approve :manufacture :audit]}]}
+   :operating-states [:requirements :simulate :verify :approve :manufacture :audit]}
+  {:id "6419"
+   :name "Community Monetary Intermediation"
+   :repo nil
+   :business-id nil
+   :required-technologies [:banking :swift :identity :forms :dmn :bpmn :audit-ledger]
+   :optional-technologies [:optimization]
+   ;; :repo / :business-id filled when cloud-itonami-6419 actor repo lands.
+   :operating-states [:intake :onboard :transact :clear :settle :audit]}]}
