@@ -292,8 +292,10 @@
    :rust-remains "CAD import (roxmltree)" :phase nil :gate "n/a"}
   {:crate "kami-cae" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
    :rust-remains "CAE facade" :phase nil :gate "n/a" :note "aero contract CAE — review in follow-up"}
-  {:crate "kami-dft" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
-   :rust-remains "DFT" :phase nil :gate "n/a"}
+  {:crate "kami-dft" :class :migrate-out :substrate? false :hot-loop? false :clj-mechanism :cljc-restore
+   :rust-remains "none — deleted in kami-engine #82 (Remove Rust workspace)"
+   :phase 4 :gate "n/a"
+   :note "DFT = Design-For-Test (scan chain insertion, BIST generation, ATPG pattern generation, JTAG/BSDL), NOT Discrete Fourier Transform — original 'DFT' short-hand note was ambiguous. Restored to kotoba-lang/dft (4 modules: scan/bist/atpg/jtag, 13 tests / 32 assertions green)."}
   {:crate "kami-spice" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
    :rust-remains "SPICE" :phase nil :gate "n/a"}
   {:crate "kami-pdk" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
