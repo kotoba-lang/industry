@@ -123,3 +123,36 @@ confirm the new entry resolves and checks out correctly.
   fleet activity concurrent with this session; a full regen would have
   silently bundled ~90 unrelated pin advances into a one-line registration
   commit. Used the single-entry API method instead.
+
+## Correction (2026-07-01, same day)
+
+The original Context/Decision above framed `ai-gftd-mangaka` as the
+(accidental) parent and didn't name an intended production engine.
+`orgs/gftdcojp/ai-gftd-mangaka/data/ghosthacker-shiropico/pipeline-specs.json`
+was in fact authored against `ai-gftd-mangaka`'s `storyboardFromPrompt` (2D
+panel) convention — but SHIRO & PICO is structurally an **anime**, not a
+manga: 11-minute episodes, VOICEVOX voice acting, an OP/ED, and a motion
+comic, per `SERIES-BIBLE.md` and `episode-01.md`.
+
+`orgs/gftdcojp/ai-gftd-animeka` (also split from `ai-gftd-apps-gftdcojp`
+the same day, structure mirrors `ai-gftd-mangaka`) is a materially better
+structural fit: its own `CLAUDE.md` describes it as "`mangaka`（manga）の
+anime 版" — same team-based production-appview shape, but the creative atom
+is `cut` (a shot on a time axis) rather than `page/panel`, over a
+`work → episode → scene → cut` domain model
+(`clj/src/animeka/domain.cljc`) and a 12-stage pipeline (script →
+storyboard → layout → keyAnim → inbetween → colorDesign → finish →
+background → composite → edit → sound → delivery). Stronger still:
+animeka's own test fixture (`clj/test/animeka/core_test.cljc`) already uses
+`{:title "Shiro Pico" :id "work-shiro"}` as its canonical round-trip
+example — independent evidence that this series was already understood
+elsewhere in the codebase as animeka's, not mangaka's, reference content.
+
+This does not change the decision to split `ghosthacker-shiropico` into
+its own repo (content remains engine-agnostic and correctly independent
+either way). It corrects the record on which engine is the intended
+consumer: **`ai-gftd-animeka`, not `ai-gftd-mangaka`**, is primary;
+`pipeline-specs.json`'s mangaka-shaped spec is a legacy/secondary path
+pending reconciliation to animeka's cut-based model. Landed via
+`orgs/gftdcojp/ai-gftd-ghosthacker-shiropico` PR #1
+(`docs/animeka-consumer-note`), which amends `README.md.edn` accordingly.
