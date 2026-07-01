@@ -42,6 +42,23 @@
       (is (pos? (:blueprint m)))
       (is (= 1 (:implemented m))))))
 
+(deftest maturity-roadmap-reports-next-step
+  (testing "an implemented entry is at maturity ceiling"
+    (let [r (industry/maturity-roadmap "6310")]
+      (is (= :implemented (:maturity r)))
+      (is (nil? (:next-step r)))
+      (is (= "at maturity ceiling" (:next-action r)))))
+  (testing "a blueprint entry's next step is implemented"
+    (let [r (industry/maturity-roadmap "6419")]
+      (is (= :blueprint (:maturity r)))
+      (is (= :implemented (:next-step r)))
+      (is (true? (:has-repo r)))))
+  (testing "a spec entry's next step is blueprint"
+    (let [r (industry/maturity-roadmap "011")]
+      (is (= :spec (:maturity r)))
+      (is (= :blueprint (:next-step r)))
+      (is (false? (:has-repo r))))))
+
 (deftest execution-plan-reports-ui-export-readiness
   (testing "a vertical backed by a capability lib reports ui+export ready"
     (let [p (industry/execution-plan "6419")]

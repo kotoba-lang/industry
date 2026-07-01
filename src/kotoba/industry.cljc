@@ -87,3 +87,28 @@
      :spec       (count (filter #(= :spec (maturity (:id %))) inds))
      :blueprint  (count (filter #(= :blueprint (maturity (:id %))) inds))
      :implemented (count (filter #(= :implemented (maturity (:id %))) inds))}))
+
+(defn maturity-roadmap
+  "Return the next maturity step for an ISIC entry: :spec→:blueprint→:implemented,
+  with the action required to advance and whether a capability lib with UI/export
+  already backs it (so the spec entry can be promoted cheaply)."
+  [isic]
+  (let [industry (get-industry isic)
+        level (maturity isic)
+        stack (technology-stack isic)
+        ui? (some :ui? stack)
+        export? (some :export? stack)
+        has-repo (boolean (:repo industry))]
+    {:isic (str isic)
+     :maturity level
+     :next-step (condp = level
+                  :spec       :blueprint
+                  :blueprint  :implemented
+                  :implemented nil)
+     :next-action (condp = level
+                    :spec       "publish a blueprint repo (scaffold + blueprint.edn + docs)"
+                    :blueprint  "implement the actor (source + tests)"
+                    :implemented "at maturity ceiling")
+     :ui-ready? ui?
+     :export-ready? export?
+     :has-repo has-repo}))
