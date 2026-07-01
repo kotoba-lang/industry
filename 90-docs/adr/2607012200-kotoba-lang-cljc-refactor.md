@@ -1,6 +1,6 @@
 # ADR-2607012200: kotoba-lang TypeScript → portable CLJC refactor (pure core + injected-capability seam; delete TS)
 
-**Status**: accepted (in progress — repo-by-repo)
+**Status**: accepted (Steps 1–6 complete; Steps 7–8 phased)
 **Date**: 2026-07-01
 **Deciders**: Jun Kawasaki
 **Scope**: `orgs/kotoba-lang/` repos still authored in TypeScript / TS+Rust after the etzhayyim-sdk relocation.
@@ -85,11 +85,11 @@ reusable recipe (proven on `ipfs`, ADR exemplar) applies to all:
 | repo | real TS src | PURE core (port) | injected capability (host) | status |
 |---|---|---|---|---|
 | `ipfs` | 106 LOC | URLs (`add-url`/`gateway-url`/…), NDJSON `parse-add-response`, bytes⇄string | `IHttp` (`-get`/`-post`/`-post-file`) | ✅ done (PR #1, pin advanced) |
-| `atproto-client` | 376 LOC | `create-agent`, `xrpc` URL/headers/query, `did-web->url`, `pick-pds-service`, record orchestration | `IHttp` (xrpc + `fetch-json`) | ⏳ has prior direct-network port; refactor to seam |
-| `base-l2` | 369 LOC | `ANCHOR_ABI` (EDN data), config records, `resolveSponsoredHolder`, encoding | `IAnchorClient` / `ISponsoredWriter` (viem) | ⏳ |
-| `witness-quorum` | 2127 LOC (~80% pure) | witness selection (SHA-256), `quorumState` reducer, attestation validation + `canonicalAttestationBytes`, Ed25519 sign/verify (**reuse `ed25519`**) | `WitnessTransport` (pds-transport) | ⏳ |
-| `pqh` | 1806 LOC (100% pure) | AEAD envelope framing, ISO-7816 pad/`pickBucket`, KDF composition, HKDF, PQ hybrid binding, did-signal canonical/fingerprint | raw-primitive seam (XChaCha20-Poly1305 / Argon2id / ML-KEM-768 / ML-DSA-65; JVM BouncyCastle 1.78+, cljs `@noble/*`) | ⏳ ⚠ flag ML-KEM/ML-DSA cross-platform vector parity |
-| `checkpointer` | 721 LOC | wire-protocol `Op`/`Request`/`Response`, msgpack codec, `indexKey`; AEAD wrap/unwrap (**reuse `pqh`**) | fs/socket, `pin-blob` (**reuse `ipfs`**), `IMstCar` (`@atproto/repo` MST/CAR — inject now; native CLJC MST is a follow-up) | ⏳ most entangled; do last |
+| `atproto-client` | 376 LOC | `create-agent`, `xrpc` URL/headers/query, `did-web->url`, `pick-pds-service`, record orchestration | `IHttp` (xrpc + `fetch-json`) | ✅ done (IHttp seam; JVM reference adapter `377236e`; pin `377236ed`) |
+| `base-l2` | 369 LOC | `ANCHOR_ABI` (EDN data), config records, `resolveSponsoredHolder`, encoding | `IAnchorClient` / `ISponsoredWriter` (viem) | ✅ done (`ITransport` seam; pin `c95543d6`) |
+| `witness-quorum` | 2127 LOC (~80% pure) | witness selection (SHA-256), `quorumState` reducer, attestation validation + `canonicalAttestationBytes`, Ed25519 sign/verify (**reuse `ed25519`**) | `WitnessTransport` (pds-transport) | ✅ done (reuses `ed25519`; pin `e247f212`) |
+| `pqh` | 1806 LOC (100% pure) | AEAD envelope framing, ISO-7816 pad/`pickBucket`, KDF composition, HKDF, PQ hybrid binding, did-signal canonical/fingerprint | raw-primitive seam (XChaCha20-Poly1305 / Argon2id / ML-KEM-768 / ML-DSA-65; JVM BouncyCastle 1.78+, cljs `@noble/*`) | ✅ done (`IAead`/`IKdf`/`IPq` seams; bcprov→`:test`; X25519+ML-KEM+ML-DSA+HKDF noble parity verified; pin `77102f75`) |
+| `checkpointer` | 721 LOC | wire-protocol `Op`/`Request`/`Response`, msgpack codec, `indexKey`; AEAD wrap/unwrap (**reuse `pqh`**) | fs/socket, `pin-blob` (**reuse `ipfs`**), `IMstCar` (`@atproto/repo` MST/CAR — inject now; native CLJC MST is a follow-up) | ✅ done (native MST via `kotoba-lang/mst`; reimplemented msgpack/dagcbor; reuses ipfs/pqh; pin `8c005480`) |
 | `kami-nv-compat` | 20 557 LOC | (classify per own ADR) | NVIDIA SDK seam | ⏳ own ADR, phased |
 | `kotodama-host` | TS+Rust | (merge into `kototama`) | — | ⏳ own ADR |
 
@@ -110,12 +110,12 @@ reusable recipe (proven on `ipfs`, ADR exemplar) applies to all:
 
 ## Status & sequencing
 
-- ✅ **Step 1 — `ipfs`**: complete; exemplar for the recipe. `kotoba-lang/ipfs`
-  PR #1 (`1e26843885a5`); superproject pin advanced (`427636fb5bc`); ipfs now
-  Clojure-only.
-- ⏳ Steps 2–6 (`atproto-client`, `base-l2`, `witness-quorum`, `pqh`,
-  `checkpointer`): dependency-ordered; `atproto-client` already has a prior
-  direct-network `.cljc` port to refactor to the seam.
+- ✅ **Steps 1–6 (`ipfs`, `atproto-client`, `base-l2`, `witness-quorum`, `pqh`,
+  `checkpointer`)**: ALL COMPLETE — every relocated TS facade is now
+  Clojure/CLJC-only with pin == HEAD. `pqh` shipped in 4 verified increments
+  (crypto/kdf/pq seams + TS deletion); `checkpointer` (native MST via
+  `kotoba-lang/mst`, reimplemented msgpack/dagcbor, reuses ipfs/pqh) landed by a
+  concurrent session + cleanup. The 6-facade core of this ADR is done.
 - ⏳ Steps 7–8 (`kami-nv-compat`, `kotodama-host→kototama`): own ADRs, phased.
 
 Recommend executing the remaining repos one per session for context headroom;
