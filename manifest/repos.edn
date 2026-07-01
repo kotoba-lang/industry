@@ -232,6 +232,16 @@
    ;; successor registered anywhere until now). Scaffold-only; see the ADR for
    ;; the still-unrestored kotoba-auth/core/datomic/edn/ipfs/cli/ipns-record gap.
    "orgs/kotoba-lang/shell"
+   ;; Bitcoin mining/mining-pool/wallet substrate (ADR-2607012230) — plain
+   ;; libraries (not actors): btc-crypto (RIPEMD160/Base58/Bech32/BIP-32/39/
+   ;; tx signing, secp256k1 reused from eth-crypto), btc-mining (CPU PoW
+   ;; engine, education/verification scope), mining-pool (Stratum v1
+   ;; protocol/share/vardiff/PPLNS), wallet (non-custodial multi-chain +
+   ;; real SIWE/EIP-4361).
+   "orgs/kotoba-lang/btc-crypto"
+   "orgs/kotoba-lang/btc-mining"
+   "orgs/kotoba-lang/mining-pool"
+   "orgs/kotoba-lang/wallet"
    "orgs/gftdcojp/ai-gftd-apex"
    "orgs/gftdcojp/ai-gftd-ads"
    "orgs/gftdcojp/ai-gftd-animeka"
