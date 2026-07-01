@@ -36,3 +36,9 @@ business model to an executable operating stack.
 | 8810 | Community Care Coordination | identity, forms, DMN, BPMN, audit |
 
 Engineering/manufacturing ISICs can add EDA/CFD/CAE through the same registry.
+
+## Test
+
+```bash
+clojure -M:test
+```
