@@ -35,7 +35,12 @@
    "orgs/kotoba-lang/vc"
    "orgs/kotoba-lang/activitystreams"
    "orgs/kotoba-lang/activitypub"
-   "orgs/kotoba-lang/annotation"]}
+   "orgs/kotoba-lang/annotation"
+   "orgs/kotoba-lang/rdf"
+   "orgs/kotoba-lang/turtle"
+   "orgs/kotoba-lang/n-quads"
+   "orgs/kotoba-lang/rdf-canon"
+   "orgs/kotoba-lang/shacl"]}
  :w3c-substrate-candidates
  [{:standard "JSON-LD 1.1"
    :repo "orgs/kotoba-lang/json-ld"
@@ -77,7 +82,22 @@
    :features [:actor :collection :ordered-collection :activity-request]}
   :kotoba-lang/annotation
   {:revision "32def0c4f488cb8fd41ded2559340272a8fe04da"
-   :features [:annotation :text-body :specific-resource :fragment-selector :text-position-selector]}}
+   :features [:annotation :text-body :specific-resource :fragment-selector :text-position-selector]}
+  :kotoba-lang/rdf
+  {:revision "54303aa098314671cb89b068270d9572ca87ba45"
+   :features [:iri :blank-node :literal :triple :quad :dataset :validate]}
+  :kotoba-lang/turtle
+  {:revision "7ad53620c9ad63c563292db26f39afcc45b60516"
+   :features [:term :triple :prefix :turtle]}
+  :kotoba-lang/n-quads
+  {:revision "c5dfc0399a31370a32570541a9b666be379fa46a"
+   :features [:term :quad :n-quads]}
+  :kotoba-lang/rdf-canon
+  {:revision "31a8b4b4e5fd89880a6c03c2ef89035df0f90636"
+   :features [:canonical :sha-256 :digest]}
+  :kotoba-lang/shacl
+  {:revision "0e502ac5b3405da02a5f7127cd7daa3fa144dd16"
+   :features [:node-shape :property-shape :validate]}}
  :watch
  [{:standard "DID Resolution v0.3"
    :status :draft
