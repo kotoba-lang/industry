@@ -32,6 +32,7 @@ manifest:
       groups: [com-junkawasaki]
     - name: com-junkawasaki-cloud-murakumo
       remote: com-junkawasaki
+      repo-path: cloud-murakumo
       revision: 594922ffd15952d5a121c730b383ce20c67ab02d
       path: orgs/com-junkawasaki/cloud-murakumo
       groups: [com-junkawasaki]
@@ -51,12 +52,6 @@ manifest:
       remote: com-junkawasaki
       revision: 75b5cadeaf97ebd9dbad0cd41a6ab5975137e082
       path: orgs/com-junkawasaki/kototama
-      clone-depth: 1
-      groups: [com-junkawasaki]
-    - name: manimani
-      remote: com-junkawasaki
-      revision: 777f2dc494326330bdac117e51fdcdf48d3cc51d
-      path: orgs/com-junkawasaki/manimani
       clone-depth: 1
       groups: [com-junkawasaki]
     - name: moex
@@ -1187,6 +1182,7 @@ manifest:
       groups: [gftdcojp]
     - name: gftdcojp-cloud-murakumo
       remote: gftdcojp
+      repo-path: cloud-murakumo
       revision: 764e5b9482d31c7893e9542708eadccb955cf557
       path: orgs/gftdcojp/cloud-murakumo
       groups: [gftdcojp]
@@ -1209,17 +1205,18 @@ manifest:
       userdata:
         datalad: true
         annex-remote: b2
+    - name: manimani
+      remote: gftdcojp
+      revision: 777f2dc494326330bdac117e51fdcdf48d3cc51d
+      path: orgs/gftdcojp/manimani
+      clone-depth: 1
+      groups: [gftdcojp]
     - name: network-isekai
       remote: gftdcojp
       revision: 0c7377431b294e286e9635cd9bfb13a1897019e9
       path: orgs/gftdcojp/network-isekai
       clone-depth: 1
       groups: [gftdcojp]
-    - name: aero
-      remote: kotoba-lang
-      revision: 512e6cceec1c7f9ec6218fefbaf9b3a8720a190e
-      path: orgs/kotoba-lang/aero
-      groups: [kotoba-lang]
     - name: activitypub
       remote: kotoba-lang
       revision: 5a8e30573e62d76405c0039261e1121fccb26a2a
@@ -1229,6 +1226,11 @@ manifest:
       remote: kotoba-lang
       revision: 81abaf05c122914ccfbe7aaee1afe2bf22e3760b
       path: orgs/kotoba-lang/activitystreams
+      groups: [kotoba-lang]
+    - name: aero
+      remote: kotoba-lang
+      revision: 512e6cceec1c7f9ec6218fefbaf9b3a8720a190e
+      path: orgs/kotoba-lang/aero
       groups: [kotoba-lang]
     - name: aiueos
       remote: kotoba-lang
@@ -1302,7 +1304,7 @@ manifest:
       groups: [kotoba-lang]
     - name: chobo
       remote: kotoba-lang
-      revision: daf4dac8d56a41fa2c3302ae8e8c3750a9234ac9
+      revision: 716e8f88753cb26cf52cb14116337ba211968ef1
       path: orgs/kotoba-lang/chobo
       groups: [kotoba-lang]
     - name: ci
@@ -1435,15 +1437,15 @@ manifest:
       revision: c1d3ebdb372d29ad73ccfc98c0252baee8f0d15a
       path: orgs/kotoba-lang/graphql
       groups: [kotoba-lang]
-    - name: html
-      remote: kotoba-lang
-      revision: 122a31e2f6714c1b965b6c0a2d1b9b9e0a3fc8bd
-      path: orgs/kotoba-lang/html
-      groups: [kotoba-lang]
     - name: homebrew-kotoba
       remote: kotoba-lang
       revision: f36d8e5314e5e4256738555f868577d77069403e
       path: orgs/kotoba-lang/homebrew-kotoba
+      groups: [kotoba-lang]
+    - name: html
+      remote: kotoba-lang
+      revision: 122a31e2f6714c1b965b6c0a2d1b9b9e0a3fc8bd
+      path: orgs/kotoba-lang/html
       groups: [kotoba-lang]
     - name: http
       remote: kotoba-lang
@@ -1631,7 +1633,7 @@ manifest:
       groups: [kotoba-lang]
     - name: langchain
       remote: kotoba-lang
-      revision: c74e358c486bdbbed415261abe352ae73831bb8e
+      revision: 41352eb4ae031bc22d2c72894f55b77de217600e
       path: orgs/kotoba-lang/langchain
       groups: [kotoba-lang]
     - name: langgraph
@@ -1643,7 +1645,6 @@ manifest:
       remote: kotoba-lang
       revision: 0c1ed0ca1e877af7022a8c31409299dcb7a72559
       path: orgs/kotoba-lang/lint
-      clone-depth: 1
       groups: [kotoba-lang]
     - name: logistics
       remote: kotoba-lang
@@ -1657,7 +1658,7 @@ manifest:
       groups: [kotoba-lang]
     - name: madoguchi
       remote: kotoba-lang
-      revision: e1124ed8d896702d64f3deec6fe88927d19a140c
+      revision: 37ea9bf5fb9ad38e93bdf5295837428f83a3a652
       path: orgs/kotoba-lang/madoguchi
       groups: [kotoba-lang]
     - name: mail
@@ -1695,15 +1696,15 @@ manifest:
       revision: 6f0b643d6c4476761042900b232ced6169d12819
       path: orgs/kotoba-lang/murakumo
       groups: [kotoba-lang]
-    - name: nagare
-      remote: kotoba-lang
-      revision: 9f580872c42722f08ff613c928efe0fe698447da
-      path: orgs/kotoba-lang/nagare
-      groups: [kotoba-lang]
     - name: n-quads
       remote: kotoba-lang
       revision: c5dfc0399a31370a32570541a9b666be379fa46a
       path: orgs/kotoba-lang/n-quads
+      groups: [kotoba-lang]
+    - name: nagare
+      remote: kotoba-lang
+      revision: 9f580872c42722f08ff613c928efe0fe698447da
+      path: orgs/kotoba-lang/nagare
       groups: [kotoba-lang]
     - name: num
       remote: kotoba-lang
@@ -1769,7 +1770,6 @@ manifest:
       remote: kotoba-lang
       revision: 72d16cea9f8ecc6b63e0e94958655b617de26d43
       path: orgs/kotoba-lang/scheduler
-      clone-depth: 1
       groups: [kotoba-lang]
     - name: search
       remote: kotoba-lang
@@ -1778,7 +1778,7 @@ manifest:
       groups: [kotoba-lang]
     - name: senden
       remote: kotoba-lang
-      revision: 9ba1536fd71abb68ca61c7b03e7d27a6e1d0147e
+      revision: a65092e3931f103f07d6cbffe2a0f50a71a78989
       path: orgs/kotoba-lang/senden
       groups: [kotoba-lang]
     - name: shacl
@@ -1808,7 +1808,7 @@ manifest:
       groups: [kotoba-lang]
     - name: soko
       remote: kotoba-lang
-      revision: f36601879f1936689a6bda76639946b92682f15b
+      revision: fb27e5e2eef8fa03443d48f21d09f6218252cfdb
       path: orgs/kotoba-lang/soko
       groups: [kotoba-lang]
     - name: spec
@@ -1830,7 +1830,6 @@ manifest:
       remote: kotoba-lang
       revision: 149e78e8315030d3706591f297c8534f9e6a5bde
       path: orgs/kotoba-lang/store
-      clone-depth: 1
       groups: [kotoba-lang]
     - name: svg
       remote: kotoba-lang
