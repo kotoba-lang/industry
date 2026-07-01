@@ -1,0 +1,13 @@
+{:paths ["src"]
+ :deps {kotoba-lang/faceid {:local/root "../faceid"}
+        kotoba-lang/touchid {:local/root "../touchid"}
+        kotoba-lang/webauthn {:local/root "../webauthn"}
+        kotoba-lang/onetime {:local/root "../onetime"}
+        kotoba-lang/oauth {:local/root "../oauth"}
+        kotoba-lang/oidc {:local/root "../oidc"}
+        kotoba-lang/saml {:local/root "../saml"}}
+ :aliases {:test {:extra-paths ["test"]
+                  :extra-deps {io.github.cognitect-labs/test-runner
+                               {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+                  :main-opts ["-m" "cognitect.test-runner"]
+                  :exec-fn cognitect.test-runner.api/test}}}
