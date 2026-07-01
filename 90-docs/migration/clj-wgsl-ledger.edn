@@ -217,12 +217,18 @@
    :clj-mechanism :none :rust-remains "OS input capture/injection (CGEvent/Win32)" :phase nil :gate "n/a"}
   {:crate "kami-os" :class :stay-Rust-substrate :substrate? true :hot-loop? true
    :clj-mechanism :none :rust-remains "wgpu window manager compositor" :phase nil :gate "n/a"}
-  {:crate "kami-eng-core" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
-   :rust-remains "engine core" :phase nil :gate "n/a"}
-  {:crate "kami-eng-render" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
-   :rust-remains "engine render" :phase nil :gate "n/a"}
-  {:crate "kami-eng-io" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
-   :rust-remains "engine I/O" :phase nil :gate "n/a"}
+  {:crate "kami-eng-core" :class :migrate-out :substrate? false :hot-loop? false :clj-mechanism :cljc-restore
+   :rust-remains "none — deleted in kami-engine #82 (Remove Rust workspace)"
+   :phase 4 :gate "n/a"
+   :note "NOT a game-engine crate despite the name — 'KAMI Engineering SDK' (CAD/EDA): constraint solver, parametric engine, undo/redo, measurement, selection, layer, grid, DRC base (726-line lib.rs). Misclassified as :stay-Rust-substrate originally; ledger correction 2026-07-01. Restored to kotoba-lang/engineer (Phase 4 supplemental scaffold). dft/spice/pdk/pnr/bim/rtl/cad/cae-solver/eda depend on this."}
+  {:crate "kami-eng-render" :class :migrate-out :substrate? false :hot-loop? true :clj-mechanism :cljc-restore
+   :rust-remains "none — deleted in kami-engine #82 (Remove Rust workspace)"
+   :phase 4 :gate "n/a"
+   :note "KAMI Engineering SDK — CAD/EDA 2D/3D rendering: schematic lines, pads, dimension annotations, hatching, grid overlay, ruler, crosshair cursor (250-line lib.rs). Restored to kotoba-lang/engineer-render. Depends on kotoba-lang/engineer."}
+  {:crate "kami-eng-io" :class :migrate-out :substrate? false :hot-loop? false :clj-mechanism :cljc-restore
+   :rust-remains "none — deleted in kami-engine #82 (Remove Rust workspace)"
+   :phase 4 :gate "n/a"
+   :note "KAMI Engineering SDK — CAD/EDA file-format I/O: STEP, IGES, STL, Gerber, G-code, Verilog, VHDL, SPICE, VCD, EDIF, LEF/DEF (314-line lib.rs). Restored to kotoba-lang/engineer-io. Depends on kotoba-lang/engineer."}
   {:crate "kami-eng-web" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
    :rust-remains "engine web" :phase nil :gate "n/a"}
   {:crate "kami-web" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
@@ -305,7 +311,8 @@
   {:crate "kami-ip" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
    :rust-remains "IP" :phase nil :gate "n/a"}
   {:crate "kami-flow" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
-   :rust-remains "flow" :phase nil :gate "n/a"}
+   :rust-remains "graph.etzhayyim.com Node.js/Cypher ingest tool (kami-flow/graph)" :phase nil :gate "n/a"
+   :note "STILL LIVE in kami-engine (verified 2026-07-01, NOT deleted). Misclassified in Phase 4 as a deleted crate needing CLJC restoration — it's a graph ingest tool (run_ingest_graph_worker.mjs + Cypher scripts for graph.etzhayyim.com), not KAMI Engineering SDK workflow logic. The mistaken kotoba-lang/flow scaffold repo was created then deleted 2026-07-01. No action needed — this crate is fine as-is."}
   {:crate "kami-pnr" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
    :rust-remains "PNR" :phase nil :gate "n/a"}
   {:crate "kami-verify" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
@@ -512,5 +519,26 @@
    "playwright" "policy" "sigma" "statechart" "states" "torch" "vllm" "vphysics"
    "zone"]
   :pre-check "audit path-dep on ../../kotoba/crates/kotoba-edn before moving each"
-  :gate "gen-west-manifest.bb --check 0; west list shows new paths; 0 old com-junkawasaki/*-clj entries remain"}}
+  :gate "gen-west-manifest.bb --check 0; west list shows new paths; 0 old com-junkawasaki/*-clj entries remain"}
+
+ ;; =========================================================================
+ ;; Phase 4 supplemental (2026-07-01): coverage-gap audit after the initial
+ ;; 61-repo scaffold. Found via crate-diff (ledger's 103 kami-engine crates vs
+ ;; live kami-engine tree) after 61 crates had already been deleted.
+ ;; =========================================================================
+ :phase-4-supplemental-2026-07-01
+ {:summary "post-scaffold audit found 1 mis-scaffolded repo (kami-flow, still live) and 4 uncovered deleted crates (kami-eng-core/io/render, kami-engine-clj)"
+  :mis-scaffolded
+  {"kami-flow" {:issue "still live in kami-engine — NOT deleted; is a graph.etzhayyim.com ingest tool, not a CLJC-migration target"
+                :action "deleted the mistaken kotoba-lang/flow scaffold repo + its manifest entries"}}
+  :coverage-gap-filled
+  {:crates ["kami-eng-core" "kami-eng-io" "kami-eng-render"]
+   :root-cause "naming collision: 'kami-eng-*' (KAMI Engineering SDK, CAD/EDA) vs 'kami-engine-*' (KAMI Game Engine) look similar but are different domains; missed in the original 61-repo diff"
+   :deleted-in "kotoba-lang/kami-engine PR #82 'Remove Rust workspace from kami-engine'"
+   :restored-to ["kotoba-lang/engineer" "kotoba-lang/engineer-io" "kotoba-lang/engineer-render"]
+   :dependency-note "dft/spice/pdk/pnr/bim/rtl/cad/cae-solver/eda (already-scaffolded EDA/CAD domain repos) depend on engineer for shared constraint-solver/DRC contracts"}
+  :not-restored
+  {:crate "kami-engine-clj"
+   :reason "the CLJ→WASM compiler itself (self-reference, out-of-scope per this ADR's stay-Rust boundary) — its removal from kami-engine is not a gap; the compiler role is served by kotoba-lang/kotoba's kotoba-clj"}
+  :manifest "repos.edn de317a3, west.yml 7d63ec4"}}
 
