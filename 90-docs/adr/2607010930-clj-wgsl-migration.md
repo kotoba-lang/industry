@@ -169,7 +169,115 @@ The set:
 The `kami-engine-script-runtime` repo is the future home of the wasmi no-JIT
 build gate (Phase 3.3's dead CI step revives once this repo hosts the
 backend-wasmi contract). Manifest registration (repos.edn `:extra-projects`
-+ west.yml) is pending.
++ west.yml) is complete (61 repos registered, 0 pin regressions — see below).
+
+## Phase 5 — reconcile with the parallel ADR-2607010000 authority/provider split (2026-07-01)
+
+A concurrent agent independently drafted **ADR-2607010000** ("runtime・SDK・OS
+substrate を kotoba-only 正本へ寄せる") with its own working docs
+(`90-docs/migration/{kami-kotoba-repo-split,kami-provider-catalog,
+kotoba-only-runtime-ledger}.edn`, uncommitted at the time of this Phase 5
+entry). It targets an overlapping but *differently shaped* problem: not
+"which 61 deleted crates need a CLJC home" (this ADR's Phase 4) but "how
+should `kami-engine`'s *remaining* Rust be organized into authority-contract
+vs. Wasm-Component-provider repos, going forward." The two efforts must be
+reconciled, not run in parallel unaware of each other.
+
+### The shape of ADR-2607010000's design (for context)
+
+Four layers: **(1) Kotoba layer** — EDN/kotoba graph is the true source of
+meaning; **(2) Contract layer** — `.cljc` pure functions + EDN are the
+executable authority (`kami-contracts`, `kami-scene-contracts`,
+`kotoba-core-contracts`, etc.); **(3) Wasm Component adapter layer** — native
+code is reduced to a WIT-shaped provider shell that only executes
+contract-validated requests; **(4) Host implementation layer** — Rust/TS/Python
+survive only for GPU/OS/device/native-crypto/realtime-loop capability the
+provider needs, never for domain policy. `kami-provider-catalog.edn`
+consolidates the *remaining* kami-engine Rust crates (as of 2026-07-01) into
+**8 provider families**, each backed by one target repo:
+
+| Family | Target repo | Crates it absorbs |
+|---|---|---|
+| render | `kami-render-provider` | kami-render, kami-webgpu-rs, kami-web(-modelb), kami-clj-host, kami-eng-render, kami-eng-web, kami-ui-gpu, kami-rt, kami-rtx-native |
+| physics | `kami-physics-provider` | kami-genesis, kami-physics-solvers, kami-physics-2d, kami-vehicle, kami-articulated, kami-shugyo, kami-sensor-sim, kami-autodrive, kami-cartpole-wasm |
+| scene-domains | `kami-scene-contracts` | kami-*-scene family (13 crates) |
+| domain-providers | `kami-domain-providers` | kami-cad(-import), kami-cae, kami-eda, kami-bim, kami-dft, kami-spice, kami-pdk-adjacent, kami-pnr, kami-ip, kami-si, kami-power, kami-yield, kami-usd(-native), kami-gltf, kami-vrm, kami-audio, kami-rtc, kami-os, kami-pkg |
+| app-fixtures | `kami-app-fixtures` | kami-app family, kami-clj-play(3d) |
+| visual-render-providers | `kami-render-provider` | kami-atmosphere, kami-character, kami-graph, kami-live, kami-map, kami-mesher, kami-nerf, kami-pbrt, kami-postfx, kami-replicator, kami-sdf, kami-skeleton, kami-terrain, kami-text, kami-tilemap, kami-vegetation, kami-voxel |
+| engine-runtime-providers | `kami-runtime-provider` | kami-core, kami-engine, kami-engine-clj, kami-game, kami-input, kami-scene, kami-scene-graph, kami-script-runtime |
+| engineering-workflow-providers | `kami-domain-providers` | kami-bridge, kami-dec, kami-eng-core, kami-eng-io, kami-flow, kami-groot, kami-knp, kami-mine-{ai,pds}, kami-pathfind, kami-pdk, kami-pipelines, kami-scad, kami-verify |
+
+Authority repos: `kami-contracts` (component worlds, scene/render/ipc/gpu/rt/sim
+contracts — the split target of `kami-engine-sdk-clj`) and `kami-scene-contracts`
+(scene-domain EDN vocabularies).
+
+### Reconciliation decision
+
+**No repo-name collisions exist** between this ADR's 61 Phase-4 repos and
+ADR-2607010000's 8 authority/provider repos (verified 2026-07-01: empty
+intersection). The two sets are complementary, not competing, once framed
+correctly:
+
+1. **ADR-2607010000 owns the authority/provider *architecture*** — which
+   repo is the EDN/CLJC source of truth (`kami-contracts`,
+   `kami-scene-contracts`) and which repos are Wasm-Component provider
+   shells for native execution (`kami-render-provider`,
+   `kami-physics-provider`, `kami-domain-providers`,
+   `kami-runtime-provider`, `kami-app-fixtures`). This is the durable shape.
+
+2. **This ADR's Phase-4 repos are pre-existing, scaffolded homes for the
+   crate-level *content*** that provider-catalog's `:crates` lists name —
+   e.g. `kami-provider-catalog.edn`'s `domain-providers` family lists
+   `kami-dft`/`kami-spice`/`kami-cad`/`kami-eda`/`kami-audio`/`kami-vrm`/
+   `kami-rtc`/`kami-os`/`kami-pkg`/`kami-pnr`/`kami-si`/`kami-power`/
+   `kami-yield`/`kami-ip`/`kami-bim` — every one of which already has a
+   scaffolded 1:1 CLJC repo from this ADR's Phase 4 (`dft`, `spice`, `cad`,
+   `eda`, `audio`, `vrm`, `rtc`, `os`, `pkg`, `pnr`, `si`, `power`, `yield`,
+   `ip`, `bim`). Likewise `engine-runtime-providers` (core/engine/game/input/
+   scene/scene-graph/script-runtime) and `engineering-workflow-providers`
+   (bridge/dec/flow/knp/mine-ai/mine-pds/pathfind/pdk/pipelines/scad/verify)
+   are ~90% covered by Phase-4 repos.
+
+3. **Resolution: Phase-4 repos are the *content* layer; ADR-2607010000's
+   provider-family repos are optional *aggregation* points, not replacements.**
+   A Phase-4 repo (e.g. `kotoba-lang/dft`) is not obsoleted by
+   `kami-domain-providers` — either (a) `kami-domain-providers` becomes a
+   thin umbrella that `:local/root`-deps or git-subtree-vendors the
+   already-scaffolded per-domain repos, or (b) the provider-catalog's
+   `:crates` grouping is reinterpreted as "these Phase-4 repos together form
+   the domain-providers family" without a physical merge. Either way, no
+   Phase-4 scaffold work is wasted, and CLJC restoration proceeds directly
+   in the Phase-4 repos using ADR-2607010000's four-layer discipline
+   (EDN/CLJC = authority; native, if any, = validated-request executor only).
+
+4. **Coverage gap (crates ADR-2607010000 names that Phase 4 does NOT cover)**
+   are crates that still exist in `kami-engine` today (not yet deleted) —
+   `kami-render`, `kami-webgpu-rs`, `kami-web`, `kami-genesis`,
+   `kami-physics-solvers`, `kami-vehicle`, `kami-articulated`, the
+   `kami-*-scene` family, `kami-live`, `kami-map`, `kami-pbrt`,
+   `kami-clj-play(3d)`, `kami-app-{amenominaka,car-sim,giemon,...}`,
+   `kami-cad-import`, `kami-usd(-native)`, `kami-engine-clj`,
+   `kami-eng-core`, `kami-eng-io`, `kami-groot`. These are out of Phase 4's
+   scope (Phase 4 only restores *deleted* crates) and belong entirely to
+   ADR-2607010000's provider-split, which operates on the live tree.
+
+### CLJC restoration order (going forward)
+
+Restoration in the Phase-4 repos should follow ADR-2607010000's authority
+discipline even though the repos predate it:
+
+1. Each Phase-4 repo's `.cljc` restoration starts with the **EDN contract**
+   (data shapes, request/response, capability grants) before any executable
+   logic — mirroring `kami-contracts`'s `:new-repo-defaults` convention
+   (`forbidden-authority-files ["Cargo.toml" "package.json" "pyproject.toml"]`).
+2. Where a Phase-4 repo's domain has native-only concerns (GPU dispatch,
+   OS syscalls, realtime audio), it stays a thin provider — logic lives in
+   the CLJC contract, native code only executes validated requests
+   (ADR-2607010000 layer 3/4 discipline), consistent with this ADR's own
+   Phase 2 principle (hot loop in WGSL/native; CLJ authors + dispatches).
+3. Cross-reference `kami-provider-catalog.edn`'s per-family `:rule` when
+   restoring a given Phase-4 repo (e.g. `dft`/`spice`/`pdk` etc. follow
+   `:native-code-only-executes-validated-requests`).
 
 ## Related
 

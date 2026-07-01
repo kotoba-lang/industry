@@ -63,6 +63,24 @@
     "core" "scene" "scene-graph" "game" "cam" "input" "skeleton" "tilemap" "voxel" "sdf" "mesher" "nerf" "gltf" "vrm" "postfx" "audio" "dec" "terrain" "vegetation" "atmosphere" "physics-2d" "ui-gpu" "graph" "geo" "os" "rtc" "bridge" "knp" "scad" "pathfind" "character" "cartpole-wasm" "articulated-scene" "demo" "devtools" "pipelines" "app"
     "kami-engine-core" "kami-engine-io" "kami-engine-render" "kami-engine-web" "kami-engine-script-runtime" "kami-engine-engine"
     "kami-app" "kami-app-isekai" "kami-app-quarry-walk"]
-   :manifest-registration "pending — repos.edn :extra-projects + west.yml"
-   :note "kami-engine-script-runtime is the future home of the wasmi no-JIT build gate (Phase 3.3 dead CI step revives once this repo hosts the backend-wasmi contract)"}}}
+   :manifest-registration "complete — repos.edn commit cb5119e (+61, 2 pre-existing ipfs/checkpointer entries preserved), west.yml commit dcd5c17 (+61 project blocks, 0 pin regressions verified)"
+   :note "kami-engine-script-runtime is the future home of the wasmi no-JIT build gate (Phase 3.3 dead CI step revives once this repo hosts the backend-wasmi contract)"}
+  :phase-5-2026-07-01
+  {:summary "reconciled with concurrently-drafted ADR-2607010000 (authority/provider split for kami-engine's REMAINING Rust). No repo-name collisions (verified). Phase-4 repos = content layer; ADR-2607010000's 8 provider-family repos = optional aggregation/architecture layer. No Phase-4 work wasted."
+   :other-adr "90-docs/adr/2607010000-kotoba-runtime-sdk-cljc-migration.md"
+   :other-adr-docs
+   ["90-docs/migration/kami-kotoba-repo-split.edn"
+    "90-docs/migration/kami-provider-catalog.edn"
+    "90-docs/migration/kotoba-only-runtime-ledger.edn"]
+   :provider-families
+   [{:family :render :target-repo "kami-render-provider" :phase4-coverage ["ui-gpu"] :gap ["kami-render" "kami-webgpu-rs" "kami-web" "kami-web-modelb" "kami-clj-host" "kami-eng-render" "kami-eng-web" "kami-rt" "kami-rtx-native"]}
+    {:family :physics :target-repo "kami-physics-provider" :phase4-coverage ["physics-2d" "cartpole-wasm"] :gap ["kami-genesis" "kami-physics-solvers" "kami-vehicle" "kami-articulated" "kami-shugyo" "kami-sensor-sim" "kami-autodrive"]}
+    {:family :scene-domains :target-repo "kami-scene-contracts" :phase4-coverage ["articulated-scene"] :gap ["kami-atmosphere-scene" "kami-autodrive-scene" "kami-cam-scene" "kami-character-scene" "kami-game-scene" "kami-input-scene" "kami-mangaka-scene" "kami-postfx-scene" "kami-skeleton-scene" "kami-terrain-scene" "kami-vegetation-scene" "kami-vehicle-scene"]}
+    {:family :domain-providers :target-repo "kami-domain-providers" :phase4-coverage ["audio" "bim" "cad" "cae-solver" "cam" "dft" "eda" "geo" "gltf" "ip" "os" "pkg" "pnr" "power" "rtc" "rtl" "si" "spice" "vrm" "yield"] :gap ["kami-cad-import" "kami-usd" "kami-usd-native"]}
+    {:family :app-fixtures :target-repo "kami-app-fixtures" :phase4-coverage ["app" "kami-app-isekai" "kami-app-quarry-walk"] :gap ["kami-app-amenominaka" "kami-app-car-sim" "kami-app-giemon" "kami-app-giemon-factory" "kami-app-sarutahiko-factory" "kami-app-shibuya" "kami-app-tatekata" "kami-clj-play" "kami-clj-play3d"]}
+    {:family :visual-render-providers :target-repo "kami-render-provider" :phase4-coverage ["atmosphere" "character" "graph" "mesher" "nerf" "postfx" "sdf" "skeleton" "terrain" "tilemap" "vegetation" "voxel"] :gap ["kami-live" "kami-map" "kami-pbrt" "kami-replicator" "kami-text"]}
+    {:family :engine-runtime-providers :target-repo "kami-runtime-provider" :phase4-coverage ["core" "kami-engine-engine" "game" "input" "scene" "scene-graph" "kami-engine-script-runtime"] :gap ["kami-engine-clj"]}
+    {:family :engineering-workflow-providers :target-repo "kami-domain-providers" :phase4-coverage ["bridge" "dec" "flow" "knp" "mine-ai" "mine-pds" "pathfind" "pdk" "pipelines" "scad" "verify"] :gap ["kami-eng-core" "kami-eng-io" "kami-groot"]}]
+   :resolution "Phase-4 repos are pre-existing scaffolded homes for the crate-level content ADR-2607010000's provider-catalog names; they are not obsoleted by the provider-family repos. Either the provider-family repo becomes a thin umbrella that :local/root-deps the Phase-4 repos, or the catalog grouping stays conceptual (no physical merge). CLJC restoration in Phase-4 repos should follow ADR-2607010000's authority discipline (EDN contract first, native code executes-validated-requests-only where applicable)."
+   :gap-repos-out-of-scope "crates ADR-2607010000 names that Phase 4 does not cover still exist in the live kami-engine tree (not deleted) — entirely ADR-2607010000's scope, not Phase 4's (Phase 4 only restores deleted crates)."}}}
 
