@@ -51,5 +51,18 @@
   ["kami-physics-solvers is an 18-line stub; 5-solver WGSL not yet built — real physics+WGSL is in kami-genesis"
    "Rust repos are under orgs/kotoba-lang/, not orgs/com-junkawasaki/"
    "kotoba-lang/kotoba-lang is a pure-spec repo with no deps.edn — not a runnable Clojure target"
-   "superproject CI runs no cargo/clojure/--check today (CodeQL + JupyterLite only)"]}}
+   "superproject CI runs no cargo/clojure/--check today (CodeQL + JupyterLite only)"]
+  :post-phase-3-survey-2026-07-01
+  ["kotoba-lang/kotoba removed its entire legacy Rust workspace in 604896171b (#259, 2026-07-01); kotoba-llm Rust crate + &str WGSL shaders are git-history-only — LLM stack now CLJC-first in kotoba-lang/{torch,num,inference} with its own num.wgsl emitter; ledger Phase 2b (LLM shader via kami.wgsl) is MOOT/superseded"
+   "kotoba-lang/kami-engine has zero .rs/Cargo.toml; CI enforces a no-rust guard; 61 of the ledger's 103 kami-engine crates were deleted; ~58 deleted WITHOUT a CLJC home (cad/eda/cae migrated to sibling CLJC repos)"
+   "no separate Rust workspace repo anywhere (com-junkawasaki/kotoba-lang/etzhayyim) hosts the executor trio (kami-webgpu-rs/kami-render/kami-script-runtime) — gone, not relocated; the original Out-of-scope stay-Rust list is partly stale (historical, not current inventory)"]
+  :phase-4-2026-07-01
+  {:summary "63 new kotoba-lang/{repo} repos scaffolded (zero-dep .cljc: deps.edn + README + .gitignore + src/test skeleton) as homes for the ~58 deleted-not-migrated crates; scaffold-only, restoration pending per-repo"
+   :repos
+   ["dft" "spice" "pdk" "pnr" "verify" "mine-ai" "mine-pds" "bim" "rtl" "power" "si" "pkg" "yield" "ip" "flow"
+    "core" "scene" "scene-graph" "game" "cam" "input" "skeleton" "tilemap" "voxel" "sdf" "mesher" "nerf" "gltf" "vrm" "postfx" "audio" "dec" "terrain" "vegetation" "atmosphere" "physics-2d" "ui-gpu" "graph" "geo" "os" "rtc" "bridge" "knp" "scad" "pathfind" "character" "cartpole-wasm" "articulated-scene" "demo" "devtools" "pipelines" "app"
+    "kami-engine-core" "kami-engine-io" "kami-engine-render" "kami-engine-web" "kami-engine-script-runtime" "kami-engine-engine"
+    "kami-app" "kami-app-isekai" "kami-app-quarry-walk"]
+   :manifest-registration "pending — repos.edn :extra-projects + west.yml"
+   :note "kami-engine-script-runtime is the future home of the wasmi no-JIT build gate (Phase 3.3 dead CI step revives once this repo hosts the backend-wasmi contract)"}}}
 

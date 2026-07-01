@@ -116,6 +116,61 @@ substitute, or self-reference:
   grow storage-buffer indexing and workgroup-id, with a raw-WGSL-string
   escape hatch (`:wgsl/body "raw wgsl"`) for complex kernels.
 
+## Post-Phase-3 premise correction (2026-07-01, post-completion survey)
+
+The original Out-of-scope list (above) assumed a live Rust substrate in
+`kotoba-lang/kotoba` and `kotoba-lang/kami-engine`. **That Rust is gone.**
+A post-completion survey (Phase 3.1/3.3 + two read-only subagent sweeps)
+found:
+
+- `kotoba-lang/kotoba` removed its entire legacy Rust workspace in
+  `604896171b "Remove legacy Rust workspace (#259)"` (2026-07-01). The
+  `kotoba-llm` Rust crate (and its `&str` WGSL shaders) is git-history-only;
+  the LLM stack now lives CLJC-first in `kotoba-lang/{torch, num, inference}`
+  with its own `num.wgsl` emitter — so the ledger's "Phase 2b LLM shader
+  authoring via `kami.wgsl`" is **MOOT/superseded** (re-scope to `num.wgsl`
+  if ever desired).
+- `kotoba-lang/kami-engine` has **zero `.rs`/`Cargo.toml`**; CI enforces a
+  no-rust guard ("ensure Rust runtime files stay out"). 61 of the ledger's
+  103 kami-engine crates were deleted. Of those, a handful were migrated to
+  sibling CLJC repos (`kami-cad`→`cad`, `kami-eda`→`eda`, `kami-cae`→`cae-solver`),
+  but ~58 were **deleted without a CLJC home**. There is no separate Rust
+  workspace repo anywhere (com-junkawasaki / kotoba-lang / etzhayyim) hosting
+  the executor trio (`kami-webgpu-rs`/`kami-render`/`kami-script-runtime`) —
+  they are gone, not relocated.
+
+This makes the original Out-of-scope "stay-Rust" boundary **partly stale**:
+the named Rust substrate no longer exists in-manifest. The *principle*
+(hot loop in WGSL; CLJ authors + dispatches; compilers/hosts/crypto/net stay
+native substrate) still holds — but the concrete "stay-Rust crate" list now
+describes historical state, not current inventory.
+
+## Phase 4 — restore the deleted-not-migrated crates as kotoba-lang CLJC repos (2026-07-01)
+
+To give the ~58 deleted-not-migrated crates a CLJC home, **63 new
+`kotoba-lang/{repo}` repos were scaffolded** (zero-dep `.cljc`: `deps.edn` +
+README + `.gitignore` + src/test skeleton). These are scaffold-only — the
+CLJC restoration (contracts / data interpreters / EDN IR) is pending per-repo.
+The set:
+
+- EDA/CAD/CAE domains (no home yet): `dft` `spice` `pdk` `pnr` `verify`
+  `mine-ai` `mine-pds` `bim` `rtl` `power` `si` `pkg` `yield` `ip` `flow`
+- Engine/render/game domains: `core` `scene` `scene-graph` `render`(=engine-render)
+  `game` `cam` `input` `skeleton` `tilemap` `voxel` `sdf` `mesher` `nerf`
+  `gltf` `vrm` `postfx` `audio` `dec` `terrain` `vegetation` `atmosphere`
+  `physics-2d` `ui-gpu` `graph` `geo` `os` `rtc` `bridge` `knp` `scad`
+  `pathfind` `character` `cartpole-wasm` `articulated-scene` `demo` `devtools`
+  `pipelines` `app`(=builder SDK)
+- Engine-family (kept `kami-engine-*` prefix): `kami-engine-core` `-io`
+  `-render` `-web` `-script-runtime` `-engine`
+- App-family (kept `kami-app-*` prefix): `kami-app` `kami-app-isekai`
+  `kami-app-quarry-walk`
+
+The `kami-engine-script-runtime` repo is the future home of the wasmi no-JIT
+build gate (Phase 3.3's dead CI step revives once this repo hosts the
+backend-wasmi contract). Manifest registration (repos.edn `:extra-projects`
++ west.yml) is pending.
+
 ## Related
 
 - `90-docs/migration/clj-wgsl-ledger.edn` (the crate-by-crate ledger, SSoT for this migration)
