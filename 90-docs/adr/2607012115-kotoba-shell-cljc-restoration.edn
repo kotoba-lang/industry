@@ -1,0 +1,59 @@
+{:frontmatter
+ {:id "adr-2607012115-kotoba-shell-cljc-restoration"
+  :title "ADR-2607012115: kotoba-shell -- CLJC restoration scaffold (kotoba-lang/shell)"
+  :status "accepted"
+  :doc_type "adr"
+  :topic "kotoba-lang"
+  :authoritative true
+  :last_verified "2026-07-01"
+  :authoritative_for
+  ["kotoba-shell (the Tauri-replacement app shell proposed for manimani in
+    docs/ADR-kotoba-shell-aiueos-safe-kotoba.md / -safety-clj.md, kotoba-lang/kotoba)
+    was deleted along with the rest of the legacy Rust workspace in PR #259
+    (604896171b, 2026-07-01 10:45 JST) and had no restoration path registered
+    anywhere -- unlike kami-engine's crates (ADR-2607010930 Phase 4) and unlike
+    kotoba-lang/kotoba's own kotoba-rt/turn/net/signal (already restored as
+    kotoba-lang/rt/turn/net/signal)"
+   "kotoba-lang/shell is scaffolded now as a zero-dep .cljc placeholder (same
+    convention as kotoba-lang/os, kotoba-lang/app) and registered in
+    manifest/repos.edn :extra-projects + manifest/west.yml; this reserves the
+    name/path only -- it does not port the Rust implementation"
+   "actual restoration should follow the kotoba-lang/rt precedent (real ported
+    CLJC contract + tests + documented scope boundary), starting with manifest
+    parsing / ShellPlan / capability model before any native WebView packaging"
+   "the known bug in the last real dev-mode run (UNUserNotificationCenter called
+    from an unbundled swift-script process -> NSInternalInconsistencyException:
+    bundleProxyForCurrentProcess is nil, observed twice 2026-07-01 17:19-17:22 JST)
+    must be guarded in any future native adapter"
+   "kotoba-auth/core/datomic/edn/ipfs/cli/ipns-record -- the rest of PR #259's
+    casualties -- are also still unrestored; out of scope here"]
+  :related
+  ["docs/ADR-kotoba-shell-aiueos-safe-kotoba.md (kotoba-lang/kotoba)"
+   "docs/ADR-kotoba-shell-aiueos-safety-clj.md (kotoba-lang/kotoba)"
+   "docs/rust-crate-migration.md (kotoba-lang/kotoba)"
+   "ADR-2607010930 (kami-engine Rust->Clojure Phase-4 restoration pattern)"]
+  :scope_repos
+  {:scaffolded ["orgs/kotoba-lang/shell"]
+   :precedent  ["orgs/kotoba-lang/rt"
+                "orgs/kotoba-lang/turn"
+                "orgs/kotoba-lang/net"
+                "orgs/kotoba-lang/signal"]
+   :still_unrestored ["kotoba-auth" "kotoba-core" "kotoba-datomic" "kotoba-edn"
+                      "kotoba-ipfs" "kotoba-cli" "kotoba-ipns-record"]}
+  :incident
+  {:id "kotoba-shell-deletion-260701"
+   :summary "kotoba-lang/kotoba PR #259 deleted crates/kotoba-shell (11179-line
+             lib.rs, working macOS WKWebView dev runner + full CLI) along with
+             the rest of the legacy Rust workspace, with no CLJC successor
+             registered anywhere; left manimani (kotoba-shell's explicit MVP
+             dogfood target) with no working native launch path"
+   "deleted_at" "2026-07-01T01:45:56Z"
+   "deleted_by_commit" "604896171bbbffc86696190c7be2442d59e6b59f"
+   :verified_no_successor "GitHub code search across kotoba-lang org for
+                           kotoba-shell/aiueos: 0 hits outside the deleted crate;
+                           0 matching repo name among 243 org repos; no open
+                           PR/branch reviving it (2026-07-01)"
+   :nearest_working_alternative "serve tauri/dist/index-reframe.html + main.js
+                                 over localhost in a regular browser -- verified
+                                 rendering real content, zero console errors,
+                                 2026-07-01"}}}
