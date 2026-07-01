@@ -53,6 +53,11 @@ Date: 2026-07-01
 | `kotoba-lang/annotation` | `32def0c4f488cb8fd41ded2559340272a8fe04da` | Web Annotation document/target/body helper |
 | `kotoba-lang/html` | `122a31e2f6714c1b965b6c0a2d1b9b9e0a3fc8bd` | Hiccup-compatible HTML renderer |
 | `kotoba-lang/css` | `43b998d5f95bf4d416a70c157d07d75e59fd071b` | CSS as EDN renderer |
+| `kotoba-lang/rdf` | `54303aa098314671cb89b068270d9572ca87ba45` | RDF term/triple/quad/dataset EDN model |
+| `kotoba-lang/turtle` | `7ad53620c9ad63c563292db26f39afcc45b60516` | Turtle serializer for RDF EDN triples |
+| `kotoba-lang/n-quads` | `c5dfc0399a31370a32570541a9b666be379fa46a` | N-Quads serializer for RDF EDN quads |
+| `kotoba-lang/rdf-canon` | `31a8b4b4e5fd89880a6c03c2ef89035df0f90636` | Deterministic RDF canonical string/hash substrate |
+| `kotoba-lang/shacl` | `0e502ac5b3405da02a5f7127cd7daa3fa144dd16` | EDN shape validator inspired by SHACL Core |
 
 Primary references:
 
