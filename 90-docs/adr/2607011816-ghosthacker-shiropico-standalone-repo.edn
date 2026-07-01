@@ -10,12 +10,16 @@
   ["SHIRO & PICO (the global-kids sibling series to Ren's Ghost Hacker, in the same GFTD cyber universe) lives at orgs/gftdcojp/ai-gftd-ghosthacker-shiropico, not nested under ai-gftd-mangaka/data/"
    "binary assets for this series (character refs, generated panels, motion comic) are NOT in this repo — they live in the separately-named DataLad dataset ~/gftdcojp/ghosthacker-shiropico-assets (B2 + IPFS), unaffected by this split"
    "manifest/west.yml registration for a single new project is done via the GitHub Contents API single-entry commit against origin/main tip, not a local edit + full bb scripts/gen-west-manifest.bb regen, when the local checkout's other child-repo pins have drifted from concurrent fleet activity (regen would bundle unrelated pin advances)"
-   "git fetch showing '(forced update)' on a shallow superproject clone is not itself evidence of a real force-push -- verify with gh api repos/<org>/<repo>/compare/<old>...<new> before treating it as one (ahead_by>0, behind_by:0, merge_base_commit==old tip => false positive from shallow re-grafting)"]
+   "git fetch showing '(forced update)' on a shallow superproject clone is not itself evidence of a real force-push -- verify with gh api repos/<org>/<repo>/compare/<old>...<new> before treating it as one (ahead_by>0, behind_by:0, merge_base_commit==old tip => false positive from shallow re-grafting)"
+   "CORRECTION (same day): orgs/gftdcojp/ai-gftd-animeka, not ai-gftd-mangaka, is the structurally-correct production engine for this series -- SHIRO & PICO is an anime (work/episode/scene/cut, VOICEVOX, OP/ED, motion comic) matching animeka's cut-based 12-stage pipeline, and animeka's own test fixture already uses \"Shiro Pico\"/work-shiro as its canonical example. pipeline-specs.json's mangaka storyboardFromPrompt framing is a legacy/secondary path pending reconciliation. See :correction below."]
   :related
   ["CLAUDE.md"
    "90-docs/adr/2606282100-mangaka-render-commons-vs-sip-work-split.md"
    "90-docs/adr/2607011500-ghosthacker-sip-atproto-actor.md"
-   "manifest/repos.edn"]
+   "manifest/repos.edn"
+   "orgs/gftdcojp/ai-gftd-animeka/CLAUDE.md"
+   "orgs/gftdcojp/ai-gftd-animeka/clj/src/animeka/domain.cljc"
+   "orgs/gftdcojp/ai-gftd-ghosthacker-shiropico#1 (docs/animeka-consumer-note)"]
   :supersedes []
   :superseded_by []}
 
@@ -57,4 +61,16 @@
   {:option "history-preserving git subtree split / git-filter-repo instead of a plain copy"
    :rejected_because "breaks consistency with the precedent this split follows (ai-gftd-mangaka's own same-day split from ai-gftd-apps-gftdcojp was a plain copy + README.md.edn provenance note, not history-preserving); no concrete need surfaced for preserved blame history on this text corpus"}
   {:option "regenerate and commit manifest/west.yml in full this session (bb scripts/gen-west-manifest.bb with no --check)"
-   :rejected_because "would have silently bundled ~90 unrelated child-repo pin advances (from concurrent fleet activity already reflected in the local checkout) into a one-line registration commit; used the GitHub API single-entry method instead, per repos.edn :manifest-workflow's stated canonical path"}]}
+   :rejected_because "would have silently bundled ~90 unrelated child-repo pin advances (from concurrent fleet activity already reflected in the local checkout) into a one-line registration commit; used the GitHub API single-entry method instead, per repos.edn :manifest-workflow's stated canonical path"}]
+
+ :correction
+ {:date "2026-07-01"
+  :what_was_wrong "original :problem/:decision framed ai-gftd-mangaka as the (accidental) parent repo and named no intended production engine; pipeline-specs.json in the moved corpus was in fact authored against ai-gftd-mangaka's storyboardFromPrompt (2D panel) convention"
+  :correct_consumer {:repo "orgs/gftdcojp/ai-gftd-animeka"
+                      :why ["own CLAUDE.md self-describes as \"mangaka（manga）の anime 版\" -- same team-based production-appview shape, atom is `cut` (shot, time-axis) not page/panel"
+                            "domain model work -> episode -> scene -> cut (clj/src/animeka/domain.cljc) matches SHIRO & PICO's actual shape: 11-min episodes, VOICEVOX voice acting, OP/ED, motion comic (SERIES-BIBLE.md, episode-01.md) -- not manga pages/panels"
+                            "12-stage pipeline (script/storyboard/layout/keyAnim/inbetween/colorDesign/finish/background/composite/edit/sound/delivery) is the anime production pipeline this series actually needs"
+                            "animeka's own test fixture (clj/test/animeka/core_test.cljc) already uses {:title \"Shiro Pico\" :id \"work-shiro\"} as its canonical round-trip example -- independent prior evidence this series was already animeka's reference content, not mangaka's"]}
+  :unchanged "the decision to split ghosthacker-shiropico into its own repo is still correct -- the content is engine-agnostic regardless of which engine consumes it"
+  :followup "pipeline-specs.json's mangaka-shaped spec is legacy/secondary pending reconciliation to animeka's cut-based model (not done in this pass)"
+  :landed_via "orgs/gftdcojp/ai-gftd-ghosthacker-shiropico PR #1 (docs/animeka-consumer-note), amending README.md.edn's :engine-note"}}
