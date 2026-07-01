@@ -1,0 +1,1 @@
+@/private/tmp/claude-501/-Users-junkawasaki-github-com-junkawasaki/ea5f81eb-28f1-48ed-a309-c02a88345b95/scratchpad/adr-svg-era.md
