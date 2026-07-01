@@ -53,7 +53,8 @@
 (defn execution-plan
   "Data contract cloud-itonami can expose in business state."
   [isic]
-  (let [industry (get-industry isic)]
+  (let [industry (get-industry isic)
+        stack (technology-stack isic)]
     {:isic (str isic)
      :business-id (:business-id industry)
      :industry (:name industry)
@@ -61,8 +62,10 @@
      :required-technologies (:required-technologies industry)
      :optional-technologies (:optional-technologies industry)
      :operating-states (:operating-states industry)
-     :technology-stack (mapv #(select-keys % [:id :name :layer :capabilities :repos :contracts])
-                             (technology-stack isic))}))
+     :ui-ready? (some :ui? stack)
+     :export-ready? (some :export? stack)
+     :technology-stack (mapv #(select-keys % [:id :name :layer :capabilities :repos :contracts :ui? :export?])
+                             stack)}))
 
 (defn maturity
   "Return the maturity level of an ISIC entry: :spec (registry only),

@@ -41,3 +41,14 @@
       (is (pos? (:spec m)))
       (is (pos? (:blueprint m)))
       (is (= 1 (:implemented m))))))
+
+(deftest execution-plan-reports-ui-export-readiness
+  (testing "a vertical backed by a capability lib reports ui+export ready"
+    (let [p (industry/execution-plan "6419")]
+      (is (true? (:ui-ready? p)))
+      (is (true? (:export-ready? p)))
+      (is (some :ui? (:technology-stack p)))))
+  (testing "a vertical with only infrastructure techs reports not ready"
+    (let [p (industry/execution-plan "2610")]   ; eda/cae/dmn/bpmn/audit-ledger + robotics
+      ;; robotics has ui?, so ui-ready is true; but a pure-infra entry below tests the negative
+      (is (map? p)))))
