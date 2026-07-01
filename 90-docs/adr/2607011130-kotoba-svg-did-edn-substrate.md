@@ -16,6 +16,8 @@ Date: 2026-07-01
 - CSS は shadow-css 型に EDN map/vector から宣言文字列へ変換する。
 - 旧 `drawingml-svg` の path override は外し、`kotoba-lang/svg` を旧 repo の単純な移管先として扱わない。
 - `kotoba-lang/did` を追加し、DID/DID URL parse、DID document EDN、`did:key` Ed25519、`did:web` helper を CLJ/CLJC で提供する。
+- `kotoba-lang/html` を Hiccup-compatible EDN HTML renderer として切り出す。
+- `kotoba-lang/css` を `kami.css` / shadow-css authoring と互換の EDN CSS renderer として切り出す。
 
 ## Consequences
 
@@ -37,6 +39,20 @@ Date: 2026-07-01
 | Web Annotation | `kotoba-lang/annotation` | document、media、code、office artifact への annotation model。JSON-LD preferred serialization なので EDN 化しやすい。 |
 
 `DID Resolution v0.3`、`VC Confidence Method`、`VC Rendering Methods`、`VCALM` は 2026-07-01 時点では draft/experimental 色が強いため、すぐ独立 repo にせず、`kotoba-lang/did` / `kotoba-lang/vc` 内の namespace または ADR watch 対象に留める。
+
+## Implemented follow-on substrates
+
+`kotoba-lang/json-ld`、`kotoba-lang/vc`、`kotoba-lang/activitystreams`、`kotoba-lang/activitypub`、`kotoba-lang/annotation` を EDN-first CLJ/CLJC substrate として追加する。あわせて、W3C 固有ではないが web substrate の基礎として `kotoba-lang/html` と `kotoba-lang/css` も追加する。
+
+| Repo | Revision | Scope |
+| --- | --- | --- |
+| `kotoba-lang/json-ld` | `985ce7eb51b3d5fb256ad24bae7ee5311b8d872d` | JSON-LD context/node/value/list/set/graph helper |
+| `kotoba-lang/vc` | `61bd3a985ee523e9374524919d2f4b0e6c9370ee` | Verifiable Credential / Presentation EDN document helper |
+| `kotoba-lang/activitystreams` | `81abaf05c122914ccfbe7aaee1afe2bf22e3760b` | ActivityStreams object/activity helper |
+| `kotoba-lang/activitypub` | `5a8e30573e62d76405c0039261e1121fccb26a2a` | ActivityPub actor/collection/request boundary helper |
+| `kotoba-lang/annotation` | `32def0c4f488cb8fd41ded2559340272a8fe04da` | Web Annotation document/target/body helper |
+| `kotoba-lang/html` | `122a31e2f6714c1b965b6c0a2d1b9b9e0a3fc8bd` | Hiccup-compatible HTML renderer |
+| `kotoba-lang/css` | `43b998d5f95bf4d416a70c157d07d75e59fd071b` | CSS as EDN renderer |
 
 Primary references:
 
