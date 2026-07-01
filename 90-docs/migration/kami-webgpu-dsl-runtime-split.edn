@@ -1,0 +1,2498 @@
+{:runtime-repos
+ [{:repo "orgs/kotoba-lang/aiueos-cljc-contract",
+   :ns aiueos.contract,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/aiueos-cljc-contract/src/aiueos/contract.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/aiueos-cljc-contract/test/aiueos/contract_test.cljc"]}
+  {:repo "orgs/kotoba-lang/async",
+   :ns kotoba.lang.async,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/async/src/kotoba/lang/async.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/async/test/kotoba/lang/async_test.cljc"]}
+  {:repo "orgs/kotoba-lang/audio",
+   :ns kotoba.audio,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/audio/src/kotoba/audio.cljc"],
+   :test-paths ["orgs/kotoba-lang/audio/test/audio_test.clj"]}
+  {:repo "orgs/kotoba-lang/authenticator",
+   :ns auth.core,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/authenticator/src/auth/base32.cljc"
+    "orgs/kotoba-lang/authenticator/src/auth/cli.cljc"
+    "orgs/kotoba-lang/authenticator/src/auth/clock.cljc"
+    "orgs/kotoba-lang/authenticator/src/auth/core.cljc"
+    "orgs/kotoba-lang/authenticator/src/auth/db.cljc"
+    "orgs/kotoba-lang/authenticator/src/auth/otp.cljc"
+    "orgs/kotoba-lang/authenticator/src/auth/uri.cljc"
+    "orgs/kotoba-lang/authenticator/src/auth/vault.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/authenticator/test/auth/db_test.cljc"
+    "orgs/kotoba-lang/authenticator/test/auth/otp_test.cljc"
+    "orgs/kotoba-lang/authenticator/test/auth/uri_test.cljc"]}
+  {:repo "orgs/kotoba-lang/browser",
+   :ns browser.core,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/browser/src/browser/accessibility.cljc"
+    "orgs/kotoba-lang/browser/src/browser/account.cljc"
+    "orgs/kotoba-lang/browser/src/browser/audit.cljc"
+    "orgs/kotoba-lang/browser/src/browser/chrome.cljc"
+    "orgs/kotoba-lang/browser/src/browser/compat.cljc"
+    "orgs/kotoba-lang/browser/src/browser/compat/quickjs.cljc"
+    "orgs/kotoba-lang/browser/src/browser/compat/quickjs_binary.cljc"
+    "orgs/kotoba-lang/browser/src/browser/compat/quickjs_binding.cljc"
+    "orgs/kotoba-lang/browser/src/browser/compat/quickjs_execution.cljc"
+    "orgs/kotoba-lang/browser/src/browser/compat/quickjs_wasm.cljc"
+    "orgs/kotoba-lang/browser/src/browser/compat/webapi.cljc"
+    "orgs/kotoba-lang/browser/src/browser/compat/webcomponent.cljc"
+    "orgs/kotoba-lang/browser/src/browser/core.cljc"
+    "orgs/kotoba-lang/browser/src/browser/css.cljc"
+    "orgs/kotoba-lang/browser/src/browser/document_input.cljc"
+    "orgs/kotoba-lang/browser/src/browser/dom_bridge.cljc"
+    "orgs/kotoba-lang/browser/src/browser/event_loop.cljc"
+    "orgs/kotoba-lang/browser/src/browser/html.cljc"
+    "orgs/kotoba-lang/browser/src/browser/input.cljc"
+    "orgs/kotoba-lang/browser/src/browser/net.cljc"
+    "orgs/kotoba-lang/browser/src/browser/origin.cljc"
+    "orgs/kotoba-lang/browser/src/browser/page_script.cljc"
+    "orgs/kotoba-lang/browser/src/browser/persistence.cljc"
+    "orgs/kotoba-lang/browser/src/browser/persistence_provider.cljc"
+    "orgs/kotoba-lang/browser/src/browser/profile.cljc"
+    "orgs/kotoba-lang/browser/src/browser/runtime.cljc"
+    "orgs/kotoba-lang/browser/src/browser/script.cljc"
+    "orgs/kotoba-lang/browser/src/browser/script_engine.cljc"
+    "orgs/kotoba-lang/browser/src/browser/script_scheduler.cljc"
+    "orgs/kotoba-lang/browser/src/browser/session.cljc"
+    "orgs/kotoba-lang/browser/src/browser/storage.cljc"
+    "orgs/kotoba-lang/browser/src/browser/surface.cljc"
+    "orgs/kotoba-lang/browser/src/browser/text_edit.cljc"
+    "orgs/kotoba-lang/browser/src/browser/visual_smoke_model.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/browser/test/browser/accessibility_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/audit_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/chrome_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/compat_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/core_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/css_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/document_input_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/dom_bridge_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/event_loop_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/input_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/net_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/origin_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/page_script_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/persistence_provider_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/persistence_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/profile_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/quickjs_binary_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/quickjs_binding_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/quickjs_execution_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/quickjs_wasm_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/runtime_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/script_scheduler_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/script_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/session_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/storage_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/surface_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/text_edit_test.clj"
+    "orgs/kotoba-lang/browser/test/browser/visual_smoke_model_test.clj"]}
+  {:repo "orgs/kotoba-lang/browser-agent",
+   :ns browseragent.schema,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/browser-agent/src/browseragent/browser/live.cljc"
+    "orgs/kotoba-lang/browser-agent/src/browseragent/browser/provider.cljc"
+    "orgs/kotoba-lang/browser-agent/src/browseragent/browser/session.cljc"
+    "orgs/kotoba-lang/browser-agent/src/browseragent/events.cljc"
+    "orgs/kotoba-lang/browser-agent/src/browseragent/fleet.cljc"
+    "orgs/kotoba-lang/browser-agent/src/browseragent/memory.cljc"
+    "orgs/kotoba-lang/browser-agent/src/browseragent/planner.cljc"
+    "orgs/kotoba-lang/browser-agent/src/browseragent/run.cljc"
+    "orgs/kotoba-lang/browser-agent/src/browseragent/schema.cljc"
+    "orgs/kotoba-lang/browser-agent/src/browseragent/supervisor.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/browser-agent/test/browseragent/core_test.cljc"]}
+  {:repo "orgs/kotoba-lang/browser-use",
+   :ns browseruse.agent,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/browser-use/src/browseruse/actions.cljc"
+    "orgs/kotoba-lang/browser-use/src/browseruse/agent.cljc"
+    "orgs/kotoba-lang/browser-use/src/browseruse/browser.cljc"
+    "orgs/kotoba-lang/browser-use/src/browseruse/playwright_browser.clj"
+    "orgs/kotoba-lang/browser-use/src/browseruse/recipe.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/browser-use/test/browseruse/agent_test.cljc"
+    "orgs/kotoba-lang/browser-use/test/browseruse/recipe_test.cljc"]}
+  {:repo "orgs/kotoba-lang/btc-crypto",
+   :source-paths
+   ["orgs/kotoba-lang/btc-crypto/src/btc_crypto/base58.cljc"
+    "orgs/kotoba-lang/btc-crypto/src/btc_crypto/bech32.cljc"
+    "orgs/kotoba-lang/btc-crypto/src/btc_crypto/bip32.cljc"
+    "orgs/kotoba-lang/btc-crypto/src/btc_crypto/bip39.cljc"
+    "orgs/kotoba-lang/btc-crypto/src/btc_crypto/core.cljc"
+    "orgs/kotoba-lang/btc-crypto/src/btc_crypto/ripemd160.cljc"
+    "orgs/kotoba-lang/btc-crypto/src/btc_crypto/tx.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/btc-crypto/test/btc_crypto/base58_test.cljc"
+    "orgs/kotoba-lang/btc-crypto/test/btc_crypto/bech32_test.cljc"
+    "orgs/kotoba-lang/btc-crypto/test/btc_crypto/bip32_test.cljc"
+    "orgs/kotoba-lang/btc-crypto/test/btc_crypto/bip39_test.cljc"
+    "orgs/kotoba-lang/btc-crypto/test/btc_crypto/core_test.cljc"
+    "orgs/kotoba-lang/btc-crypto/test/btc_crypto/ripemd160_test.cljc"
+    "orgs/kotoba-lang/btc-crypto/test/btc_crypto/tx_test.cljc"],
+   :status :done,
+   :ns btc-crypto.core}
+  {:repo "orgs/kotoba-lang/btc-mining",
+   :source-paths
+   ["orgs/kotoba-lang/btc-mining/src/btc_mining/core.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/btc-mining/test/btc_mining/core_test.cljc"],
+   :status :done,
+   :ns btc-mining.core}
+  {:repo "orgs/kotoba-lang/cacao",
+   :source-paths ["orgs/kotoba-lang/cacao/src/cacao/core.clj"],
+   :test-paths ["orgs/kotoba-lang/cacao/test/cacao/core_test.clj"],
+   :status :done,
+   :ns cacao.core}
+  {:repo "orgs/kotoba-lang/cae-solver",
+   :ns cae.solver,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/cae-solver/src/cae/solver.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/cae-solver/test/cae/solver_test.clj"]}
+  {:repo "orgs/kotoba-lang/coll",
+   :ns kotoba.lang.coll,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/coll/src/kotoba/lang/coll.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/coll/test/kotoba/lang/coll_test.cljc"]}
+  {:repo "orgs/kotoba-lang/comfyui",
+   :ns comfyui.workflow,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/comfyui/src/comfyui/exec.cljc"
+    "orgs/kotoba-lang/comfyui/src/comfyui/node.cljc"
+    "orgs/kotoba-lang/comfyui/src/comfyui/nodes/langchain.cljc"
+    "orgs/kotoba-lang/comfyui/src/comfyui/queue.cljc"
+    "orgs/kotoba-lang/comfyui/src/comfyui/std.cljc"
+    "orgs/kotoba-lang/comfyui/src/comfyui/viz.cljc"
+    "orgs/kotoba-lang/comfyui/src/comfyui/workflow.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/comfyui/test/comfyui/exec_test.cljc"
+    "orgs/kotoba-lang/comfyui/test/comfyui/langchain_nodes_test.cljc"
+    "orgs/kotoba-lang/comfyui/test/comfyui/workflow_test.cljc"]}
+  {:repo "orgs/kotoba-lang/computer-use",
+   :ns computeruse.agent,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/computer-use/src/computeruse/agent.cljc"
+    "orgs/kotoba-lang/computer-use/src/computeruse/android.cljc"
+    "orgs/kotoba-lang/computer-use/src/computeruse/computer.cljc"
+    "orgs/kotoba-lang/computer-use/src/computeruse/macos.cljc"
+    "orgs/kotoba-lang/computer-use/src/computeruse/openai_model.cljc"
+    "orgs/kotoba-lang/computer-use/src/computeruse/tool.cljc"
+    "orgs/kotoba-lang/computer-use/src/computeruse/vault.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/computer-use/test/computeruse/agent_test.cljc"
+    "orgs/kotoba-lang/computer-use/test/computeruse/vault_test.cljc"]}
+  {:repo "orgs/kotoba-lang/crash",
+   :ns crash.solver,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/crash/src/crash/solver.cljc"],
+   :test-paths ["orgs/kotoba-lang/crash/test/crash/solver_test.clj"]}
+  {:repo "orgs/kotoba-lang/ed25519",
+   :ns ed25519.core,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/ed25519/src/ed25519/core.clj"],
+   :test-paths ["orgs/kotoba-lang/ed25519/test/ed25519/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/eth-crypto",
+   :ns eth-crypto.core,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/eth-crypto/src/eth_crypto/core.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/eth-crypto/test/eth_crypto/test_eth_crypto.cljc"
+    "orgs/kotoba-lang/eth-crypto/test/eth_crypto/test_signing.cljc"]}
+  {:repo "orgs/kotoba-lang/freeboard",
+   :ns freeboard.board,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/freeboard/src/freeboard/board.cljc"
+    "orgs/kotoba-lang/freeboard/src/freeboard/collab.cljc"
+    "orgs/kotoba-lang/freeboard/src/freeboard/doc.cljc"
+    "orgs/kotoba-lang/freeboard/src/freeboard/import.cljc"
+    "orgs/kotoba-lang/freeboard/src/freeboard/render.cljc"
+    "orgs/kotoba-lang/freeboard/src/freeboard/render_ir.cljc"
+    "orgs/kotoba-lang/freeboard/src/freeboard/scene.cljc"
+    "orgs/kotoba-lang/freeboard/src/freeboard/schema.cljc"
+    "orgs/kotoba-lang/freeboard/src/freeboard/snapshot.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/freeboard/test/freeboard/board_test.cljc"
+    "orgs/kotoba-lang/freeboard/test/freeboard/collab_test.cljc"
+    "orgs/kotoba-lang/freeboard/test/freeboard/interop_test.cljc"
+    "orgs/kotoba-lang/freeboard/test/freeboard/ops_test.cljc"
+    "orgs/kotoba-lang/freeboard/test/freeboard/scene_test.cljc"]}
+  {:repo "orgs/kotoba-lang/giemon",
+   :ns kotoba.giemon,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/giemon/src/kotoba/giemon.cljc"
+    "orgs/kotoba-lang/giemon/src/kotoba/giemon/arm.cljc"
+    "orgs/kotoba-lang/giemon/src/kotoba/giemon/export.cljc"
+    "orgs/kotoba-lang/giemon/src/kotoba/giemon/governor.cljc"
+    "orgs/kotoba-lang/giemon/src/kotoba/giemon/kinematics.cljc"
+    "orgs/kotoba-lang/giemon/src/kotoba/giemon/ui.cljc"
+    "orgs/kotoba-lang/giemon/src/kotoba/giemon/viewer.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/giemon/test/kotoba/giemon_test.cljc"
+    "orgs/kotoba-lang/giemon/test/kotoba/giemon/arm_test.cljc"
+    "orgs/kotoba-lang/giemon/test/kotoba/giemon/export_test.cljc"
+    "orgs/kotoba-lang/giemon/test/kotoba/giemon/governor_test.cljc"
+    "orgs/kotoba-lang/giemon/test/kotoba/giemon/kinematics_test.cljc"
+    "orgs/kotoba-lang/giemon/test/kotoba/giemon/ui_test.cljc"
+    "orgs/kotoba-lang/giemon/test/kotoba/giemon/viewer_test.cljc"]}
+  {:repo "orgs/kotoba-lang/godaddy-dns",
+   :ns godaddydns.agent,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/godaddy-dns/src/godaddydns/agent.cljc"
+    "orgs/kotoba-lang/godaddy-dns/src/godaddydns/dns.cljc"
+    "orgs/kotoba-lang/godaddy-dns/src/godaddydns/godaddy.cljc"
+    "orgs/kotoba-lang/godaddy-dns/src/godaddydns/tool.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/godaddy-dns/test/godaddydns/agent_test.cljc"
+    "orgs/kotoba-lang/godaddy-dns/test/godaddydns/dns_test.cljc"
+    "orgs/kotoba-lang/godaddy-dns/test/godaddydns/tool_test.cljc"]}
+  {:repo "orgs/kotoba-lang/gpu",
+   :ns kotoba.gpu,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/gpu/src/kotoba/gpu.cljc"],
+   :test-paths ["orgs/kotoba-lang/gpu/test/gpu_test.clj"]}
+  {:repo "orgs/kotoba-lang/host",
+   :ns kotoba.host,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/host/src/kami/backend/browser.cljc"
+                  "orgs/kotoba-lang/host/src/kotoba/host.cljc"],
+   :test-paths ["orgs/kotoba-lang/host/test/host_test.clj"]}
+  {:repo "orgs/kotoba-lang/input",
+   :ns kotoba.input,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/input/src/kotoba/input.cljc"],
+   :test-paths ["orgs/kotoba-lang/input/test/input_test.clj"]}
+  {:repo "orgs/kotoba-lang/io",
+   :ns kotoba.lang.io,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/io/src/kotoba/lang/io.cljc"],
+   :test-paths ["orgs/kotoba-lang/io/test/kotoba/lang/io_test.cljc"]}
+  {:repo "orgs/kotoba-lang/kagi",
+   :ns kagi.vault,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kagi/src/kagi/advisor.cljc"
+    "orgs/kotoba-lang/kagi/src/kagi/cacao.clj"
+    "orgs/kotoba-lang/kagi/src/kagi/cli.clj"
+    "orgs/kotoba-lang/kagi/src/kagi/clipboard.clj"
+    "orgs/kotoba-lang/kagi/src/kagi/crypto.clj"
+    "orgs/kotoba-lang/kagi/src/kagi/governor.cljc"
+    "orgs/kotoba-lang/kagi/src/kagi/identity.clj"
+    "orgs/kotoba-lang/kagi/src/kagi/ledger.clj"
+    "orgs/kotoba-lang/kagi/src/kagi/operation.cljc"
+    "orgs/kotoba-lang/kagi/src/kagi/persist.clj"
+    "orgs/kotoba-lang/kagi/src/kagi/phase.cljc"
+    "orgs/kotoba-lang/kagi/src/kagi/secret_store.clj"
+    "orgs/kotoba-lang/kagi/src/kagi/sim.clj"
+    "orgs/kotoba-lang/kagi/src/kagi/store.cljc"
+    "orgs/kotoba-lang/kagi/src/kagi/unlock.clj"
+    "orgs/kotoba-lang/kagi/src/kagi/vault.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/kagi/test/kagi/cacao_test.clj"
+    "orgs/kotoba-lang/kagi/test/kagi/clipboard_test.clj"
+    "orgs/kotoba-lang/kagi/test/kagi/crypto_test.clj"
+    "orgs/kotoba-lang/kagi/test/kagi/governor_contract_test.clj"
+    "orgs/kotoba-lang/kagi/test/kagi/identity_store_test.clj"
+    "orgs/kotoba-lang/kagi/test/kagi/ledger_test.clj"
+    "orgs/kotoba-lang/kagi/test/kagi/secret_store_test.clj"
+    "orgs/kotoba-lang/kagi/test/kagi/store_contract_test.clj"
+    "orgs/kotoba-lang/kagi/test/kagi/unlock_test.clj"]}
+  {:repo "orgs/kotoba-lang/kami-app-fixtures",
+   :ns kami.app-fixtures,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kami-app-fixtures/src/kami/app_fixtures.cljc"
+    "orgs/kotoba-lang/kami-app-fixtures/src/kami/provider/contract.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/kami-app-fixtures/test/kami/app_fixtures_test.cljc"
+    "orgs/kotoba-lang/kami-app-fixtures/test/kami/provider/contract_test.cljc"]}
+  {:repo "orgs/kotoba-lang/kami-contracts",
+   :ns kami.component,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kami-contracts/src/kami/app_fixtures.cljc"
+    "orgs/kotoba-lang/kami-contracts/src/kami/app_state_machines.cljc"
+    "orgs/kotoba-lang/kami-contracts/src/kami/component.cljc"
+    "orgs/kotoba-lang/kami-contracts/src/kami/contracts/gpu.cljc"
+    "orgs/kotoba-lang/kami-contracts/src/kami/contracts/ipc.cljc"
+    "orgs/kotoba-lang/kami-contracts/src/kami/contracts/render.cljc"
+    "orgs/kotoba-lang/kami-contracts/src/kami/contracts/rt.cljc"
+    "orgs/kotoba-lang/kami-contracts/src/kami/contracts/sim.cljc"
+    "orgs/kotoba-lang/kami-contracts/src/kami/contracts/wit.cljc"
+    "orgs/kotoba-lang/kami-contracts/src/kami/contracts/wit_cli.clj"
+    "orgs/kotoba-lang/kami-contracts/src/kami/provider_catalog.cljc"
+    "orgs/kotoba-lang/kami-contracts/src/kami/scene.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/kami-contracts/test/kami/app_fixtures_test.cljc"
+    "orgs/kotoba-lang/kami-contracts/test/kami/app_state_machines_test.cljc"
+    "orgs/kotoba-lang/kami-contracts/test/kami/component_test.cljc"
+    "orgs/kotoba-lang/kami-contracts/test/kami/contracts_test.cljc"
+    "orgs/kotoba-lang/kami-contracts/test/kami/provider_catalog_test.cljc"]}
+  {:repo "orgs/kotoba-lang/kami-engine-vehicle-designer",
+   :ns vdesign.design,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kami-engine-vehicle-designer/src/vdesign/datom.cljc"
+    "orgs/kotoba-lang/kami-engine-vehicle-designer/src/vdesign/design.cljc"
+    "orgs/kotoba-lang/kami-engine-vehicle-designer/src/vdesign/physics.cljc"
+    "orgs/kotoba-lang/kami-engine-vehicle-designer/src/vdesign/powertrain.cljc"
+    "orgs/kotoba-lang/kami-engine-vehicle-designer/src/vdesign/process.cljc"
+    "orgs/kotoba-lang/kami-engine-vehicle-designer/src/vdesign/proposer.cljc"
+    "orgs/kotoba-lang/kami-engine-vehicle-designer/src/vdesign/sim.cljc"
+    "orgs/kotoba-lang/kami-engine-vehicle-designer/src/vdesign/simverify.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/kami-engine-vehicle-designer/test/vdesign/closure_contract_test.clj"]}
+  {:repo "orgs/kotoba-lang/kami-scene-contracts",
+   :ns kami.scene.contracts,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kami-scene-contracts/src/kami/scene/authority_manifest.clj"
+    "orgs/kotoba-lang/kami-scene-contracts/src/kami/scene/contracts.cljc"
+    "orgs/kotoba-lang/kami-scene-contracts/src/kami/scene/fixture_sync.clj"
+    "orgs/kotoba-lang/kami-scene-contracts/src/kami/scene/mirror_check.clj"],
+   :test-paths
+   ["orgs/kotoba-lang/kami-scene-contracts/test/kami/scene/contracts_test.cljc"]}
+  {:repo "orgs/kotoba-lang/kekkai",
+   :ns kekkai.governor,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kekkai/src/kekkai/acl.cljc"
+    "orgs/kotoba-lang/kekkai/src/kekkai/cacao.cljc"
+    "orgs/kotoba-lang/kekkai/src/kekkai/coordllm.cljc"
+    "orgs/kotoba-lang/kekkai/src/kekkai/governor.cljc"
+    "orgs/kotoba-lang/kekkai/src/kekkai/kotoba.cljc"
+    "orgs/kotoba-lang/kekkai/src/kekkai/operation.cljc"
+    "orgs/kotoba-lang/kekkai/src/kekkai/phase.cljc"
+    "orgs/kotoba-lang/kekkai/src/kekkai/sim.cljc"
+    "orgs/kotoba-lang/kekkai/src/kekkai/store.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/kekkai/test/kekkai/cacao_test.clj"
+    "orgs/kotoba-lang/kekkai/test/kekkai/governor_contract_test.clj"
+    "orgs/kotoba-lang/kekkai/test/kekkai/store_contract_test.clj"]}
+  {:repo "orgs/kotoba-lang/kenchi",
+   :ns kenchi.core,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kenchi/src/kenchi/cc_real.clj"
+    "orgs/kotoba-lang/kenchi/src/kenchi/commoncrawl.clj"
+    "orgs/kotoba-lang/kenchi/src/kenchi/core.cljc"
+    "orgs/kotoba-lang/kenchi/src/kenchi/flywheel.cljc"
+    "orgs/kotoba-lang/kenchi/src/kenchi/fusion.cljc"
+    "orgs/kotoba-lang/kenchi/src/kenchi/governor.cljc"
+    "orgs/kotoba-lang/kenchi/src/kenchi/http.clj"
+    "orgs/kotoba-lang/kenchi/src/kenchi/ingest.cljc"
+    "orgs/kotoba-lang/kenchi/src/kenchi/live.clj"
+    "orgs/kotoba-lang/kenchi/src/kenchi/live_real.clj"
+    "orgs/kotoba-lang/kenchi/src/kenchi/parcel.cljc"
+    "orgs/kotoba-lang/kenchi/src/kenchi/publish.cljc"
+    "orgs/kotoba-lang/kenchi/src/kenchi/sim.cljc"
+    "orgs/kotoba-lang/kenchi/src/kenchi/sources.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/kenchi/test/kenchi/commoncrawl_test.clj"
+    "orgs/kotoba-lang/kenchi/test/kenchi/core_test.clj"
+    "orgs/kotoba-lang/kenchi/test/kenchi/live_pipeline_test.clj"
+    "orgs/kotoba-lang/kenchi/test/kenchi/provenance_contract_test.clj"]}
+  {:repo "orgs/kotoba-lang/kobo",
+   :ns kobo.workbench,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kobo/src/kobo/editor.cljc"
+    "orgs/kotoba-lang/kobo/src/kobo/grant.cljc"
+    "orgs/kotoba-lang/kobo/src/kobo/workbench.cljc"],
+   :test-paths ["orgs/kotoba-lang/kobo/test/kobo/workbench_test.cljc"]}
+  {:repo "orgs/kotoba-lang/koe",
+   :ns koe.session,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/koe/src/koe/ports.cljc"
+    "orgs/kotoba-lang/koe/src/koe/session.cljc"],
+   :test-paths ["orgs/kotoba-lang/koe/test/koe/session_test.cljc"]}
+  {:repo "orgs/kotoba-lang/kotoba-adapter-contracts",
+   :ns kotoba.adapter.contracts,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kotoba-adapter-contracts/src/kotoba/adapter/contracts.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/kotoba-adapter-contracts/test/kotoba/adapter/contracts_test.cljc"]}
+  {:repo "orgs/kotoba-lang/kotoba-code",
+   :ns kotoba-code.agent,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kotoba-code/src/kotoba_code/agent.cljc"
+    "orgs/kotoba-lang/kotoba-code/src/kotoba_code/gate.cljc"
+    "orgs/kotoba-lang/kotoba-code/src/kotoba_code/host.clj"
+    "orgs/kotoba-lang/kotoba-code/src/kotoba_code/inference.cljc"
+    "orgs/kotoba-lang/kotoba-code/src/kotoba_code/main.clj"
+    "orgs/kotoba-lang/kotoba-code/src/kotoba_code/resilience.clj"
+    "orgs/kotoba-lang/kotoba-code/src/kotoba_code/tools.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/kotoba-code/test/kotoba_code/agent_test.cljc"
+    "orgs/kotoba-lang/kotoba-code/test/kotoba_code/inference_test.clj"
+    "orgs/kotoba-lang/kotoba-code/test/kotoba_code/resilience_test.clj"]}
+  {:repo "orgs/kotoba-lang/kotoba-core-contracts",
+   :ns kotoba.core.contracts,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kotoba-core-contracts/src/kotoba/core/contracts.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/kotoba-core-contracts/test/kotoba/core/contracts_test.cljc"]}
+  {:repo "orgs/kotoba-lang/kotoba-fleet",
+   :ns kotoba.fleet.core,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kotoba-fleet/src/kotoba/fleet/core.cljc"
+    "orgs/kotoba-lang/kotoba-fleet/src/kotoba/fleet/governor.cljc"
+    "orgs/kotoba-lang/kotoba-fleet/src/kotoba/fleet/lease.cljc"
+    "orgs/kotoba-lang/kotoba-fleet/src/kotoba/fleet/schema.cljc"
+    "orgs/kotoba-lang/kotoba-fleet/src/kotoba/fleet/store.cljc"
+    "orgs/kotoba-lang/kotoba-fleet/src/kotoba/fleet/view.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/kotoba-fleet/test/kotoba/fleet/governor_test.clj"
+    "orgs/kotoba-lang/kotoba-fleet/test/kotoba/fleet/lease_test.clj"]}
+  {:repo "orgs/kotoba-lang/kotoba-lang",
+   :ns kotoba.lang.package-contract,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kotoba-lang/src/kotoba/lang/package_contract.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/kotoba-lang/test/kotoba/lang/package_contract_test.clj"]}
+  {:repo "orgs/kotoba-lang/kotoba-lang-cli-contract",
+   :ns kotoba.lang.cli-contract,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kotoba-lang-cli-contract/src/kotoba/lang/cli_contract.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/kotoba-lang-cli-contract/test/kotoba/lang/cli_contract_test.clj"]}
+  {:repo "orgs/kotoba-lang/kotoba-selfhost-contracts",
+   :ns kotoba.selfhost.contracts,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kotoba-selfhost-contracts/src/kotoba/selfhost/contracts.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/kotoba-selfhost-contracts/test/kotoba/selfhost/contracts_test.cljc"]}
+  {:repo "orgs/kotoba-lang/kotobase",
+   :ns kotobase.store,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kotobase/src/kotobase/kotobase.cljc"
+    "orgs/kotoba-lang/kotobase/src/kotobase/local.cljc"
+    "orgs/kotoba-lang/kotobase/src/kotobase/store.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/kotobase/test/kotobase/contract.cljc"
+    "orgs/kotoba-lang/kotobase/test/kotobase/store_test.cljc"]}
+  {:repo "orgs/kotoba-lang/kotodama",
+   :ns kotodama.organism,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kotodama/src/kotodama/life.cljc"
+    "orgs/kotoba-lang/kotodama/src/kotodama/organism.cljc"
+    "orgs/kotoba-lang/kotodama/src/kotodama/react.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/kotodama/test/kotodama/life_test.cljc"
+    "orgs/kotoba-lang/kotodama/test/kotodama/organism_test.cljc"]}
+  {:repo "orgs/kotoba-lang/kotodama-host",
+   :ns kotodama.host-contract,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kotodama-host/src/kotodama/host_contract.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/kotodama-host/test/kotodama/host_contract_test.cljc"]}
+  {:repo "orgs/kotoba-lang/kotodama-mcp",
+   :ns kotodama.mcp-contract,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kotodama-mcp/src/kotodama/mcp_contract.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/kotodama-mcp/test/kotodama/mcp_contract_test.cljc"]}
+  {:repo "orgs/kotoba-lang/kototama-clj",
+   :ns kototama.unspsc.organism,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kototama-clj/src/kototama/unspsc/build_taxonomy.clj"
+    "orgs/kotoba-lang/kototama-clj/src/kototama/unspsc/capability.cljc"
+    "orgs/kotoba-lang/kototama-clj/src/kototama/unspsc/enrich.clj"
+    "orgs/kotoba-lang/kototama-clj/src/kototama/unspsc/fleet.clj"
+    "orgs/kotoba-lang/kototama-clj/src/kototama/unspsc/life.cljc"
+    "orgs/kotoba-lang/kototama-clj/src/kototama/unspsc/organism.cljc"
+    "orgs/kotoba-lang/kototama-clj/src/kototama/unspsc/react.cljc"
+    "orgs/kotoba-lang/kototama-clj/src/kototama/unspsc/taxonomy.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/kototama-clj/test/kototama/unspsc/capability_test.clj"
+    "orgs/kotoba-lang/kototama-clj/test/kototama/unspsc/fleet_test.clj"
+    "orgs/kotoba-lang/kototama-clj/test/kototama/unspsc/life_test.clj"
+    "orgs/kotoba-lang/kototama-clj/test/kototama/unspsc/organism_test.clj"
+    "orgs/kotoba-lang/kototama-clj/test/kototama/unspsc/react_test.clj"]}
+  {:repo "orgs/kotoba-lang/kototama-cljc-contract",
+   :ns kototama.contract,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kototama-cljc-contract/src/kototama/contract.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/kototama-cljc-contract/test/kototama/contract_test.cljc"]}
+  {:repo "orgs/kotoba-lang/kuro",
+   :ns kuro.terminal,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/kuro/src/kuro/terminal.cljc"],
+   :test-paths ["orgs/kotoba-lang/kuro/test/kuro/terminal_test.cljc"]}
+  {:repo "orgs/kotoba-lang/langchain",
+   :ns langchain.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/langchain/src/langchain/db.cljc"
+    "orgs/kotoba-lang/langchain/src/langchain/json.cljc"
+    "orgs/kotoba-lang/langchain/src/langchain/kotoba_db.cljc"
+    "orgs/kotoba-lang/langchain/src/langchain/memory.cljc"
+    "orgs/kotoba-lang/langchain/src/langchain/message.cljc"
+    "orgs/kotoba-lang/langchain/src/langchain/model.cljc"
+    "orgs/kotoba-lang/langchain/src/langchain/parser.cljc"
+    "orgs/kotoba-lang/langchain/src/langchain/prompt.cljc"
+    "orgs/kotoba-lang/langchain/src/langchain/runnable.cljc"
+    "orgs/kotoba-lang/langchain/src/langchain/tool.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/langchain/test/langchain/chain_test.cljc"
+    "orgs/kotoba-lang/langchain/test/langchain/db_test.cljc"
+    "orgs/kotoba-lang/langchain/test/langchain/kotoba_db_test.cljc"
+    "orgs/kotoba-lang/langchain/test/langchain/openai_model_test.cljc"
+    "orgs/kotoba-lang/langchain/test/langchain/parser_test.cljc"
+    "orgs/kotoba-lang/langchain/test/langchain/runnable_test.cljc"]}
+  {:repo "orgs/kotoba-lang/langgraph",
+   :ns langgraph.graph,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/langgraph/src/langgraph/checkpoint.cljc"
+    "orgs/kotoba-lang/langgraph/src/langgraph/graph.cljc"
+    "orgs/kotoba-lang/langgraph/src/langgraph/kg_checkpoint.cljc"
+    "orgs/kotoba-lang/langgraph/src/langgraph/kotoba_checkpoint.cljc"
+    "orgs/kotoba-lang/langgraph/src/langgraph/prebuilt.cljc"
+    "orgs/kotoba-lang/langgraph/src/langgraph/viz.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/langgraph/test/langgraph/agent_test.cljc"
+    "orgs/kotoba-lang/langgraph/test/langgraph/graph_test.cljc"
+    "orgs/kotoba-lang/langgraph/test/langgraph/kg_checkpoint_test.cljc"
+    "orgs/kotoba-lang/langgraph/test/langgraph/kotoba_checkpoint_test.cljc"]}
+  {:repo "orgs/kotoba-lang/lint",
+   :ns kotoba.lang.lint,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/lint/src/kotoba/lang/lint.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/lint/test/kotoba/lang/lint_test.cljc"]}
+  {:repo "orgs/kotoba-lang/lint-kotoba",
+   :ns kotoba.lang.lint-kotoba,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/lint-kotoba/src/kotoba/lang/lint_kotoba.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/lint-kotoba/test/kotoba/lang/lint_kotoba_test.cljc"]}
+  {:repo "orgs/kotoba-lang/liquid-glass-ui",
+   :ns liquid-glass.components,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/liquid-glass-ui/src/liquid_glass/components.cljc"
+    "orgs/kotoba-lang/liquid-glass-ui/src/liquid_glass/style.cljc"
+    "orgs/kotoba-lang/liquid-glass-ui/src/liquid_glass/tokens.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/liquid-glass-ui/test/liquid_glass/components_test.cljc"
+    "orgs/kotoba-lang/liquid-glass-ui/test/liquid_glass/style_test.cljc"
+    "orgs/kotoba-lang/liquid-glass-ui/test/liquid_glass/tokens_test.cljc"]}
+  {:repo "orgs/kotoba-lang/log",
+   :ns kotoba.lang.log,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/log/src/kotoba/lang/log.cljc"],
+   :test-paths ["orgs/kotoba-lang/log/test/kotoba/lang/log_test.cljc"]}
+  {:repo "orgs/kotoba-lang/lsp",
+   :ns kotoba.lang.lsp,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/lsp/src/kotoba/lang/lsp.cljc"],
+   :test-paths ["orgs/kotoba-lang/lsp/test/kotoba/lang/lsp_test.cljc"]}
+  {:repo "orgs/kotoba-lang/lsp-rpc",
+   :ns kotoba.lang.lsp-rpc,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/lsp-rpc/src/kotoba/lang/lsp_rpc.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/lsp-rpc/test/kotoba/lang/lsp_rpc_test.cljc"]}
+  {:repo "orgs/kotoba-lang/mailer",
+   :ns mailer.core,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/mailer/src/mailer/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/mailer/test/mailer/core_test.cljc"]}
+  {:repo "orgs/kotoba-lang/mcp",
+   :ns mcp.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/mcp/src/mcp/execute.cljc"
+    "orgs/kotoba-lang/mcp/src/mcp/json.cljc"
+    "orgs/kotoba-lang/mcp/src/mcp/model.cljc"
+    "orgs/kotoba-lang/mcp/src/mcp/ports.cljc"
+    "orgs/kotoba-lang/mcp/src/mcp/validate.cljc"],
+   :test-paths ["orgs/kotoba-lang/mcp/test/mcp/core_test.cljc"]}
+  {:repo "orgs/kotoba-lang/mining-pool",
+   :source-paths
+   ["orgs/kotoba-lang/mining-pool/src/mining_pool/ledger.cljc"
+    "orgs/kotoba-lang/mining-pool/src/mining_pool/protocol.cljc"
+    "orgs/kotoba-lang/mining-pool/src/mining_pool/share.cljc"
+    "orgs/kotoba-lang/mining-pool/src/mining_pool/vardiff.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/mining-pool/test/mining_pool/ledger_test.cljc"
+    "orgs/kotoba-lang/mining-pool/test/mining_pool/protocol_test.cljc"
+    "orgs/kotoba-lang/mining-pool/test/mining_pool/share_test.cljc"
+    "orgs/kotoba-lang/mining-pool/test/mining_pool/vardiff_test.cljc"],
+   :status :done,
+   :ns mining-pool.protocol}
+  {:repo "orgs/kotoba-lang/motor",
+   :ns motor.solver,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/motor/src/motor/solver.cljc"],
+   :test-paths ["orgs/kotoba-lang/motor/test/motor/solver_test.clj"]}
+  {:repo "orgs/kotoba-lang/mst",
+   :ns mst.core,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/mst/src/mst/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/mst/test/mst/core_test.cljc"]}
+  {:repo "orgs/kotoba-lang/murakumo",
+   :ns murakumo.core,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/murakumo/src/murakumo/connect.clj"
+    "orgs/kotoba-lang/murakumo/src/murakumo/core.clj"
+    "orgs/kotoba-lang/murakumo/src/murakumo/dash.clj"
+    "orgs/kotoba-lang/murakumo/src/murakumo/fleet.clj"
+    "orgs/kotoba-lang/murakumo/src/murakumo/reconcile.clj"
+    "orgs/kotoba-lang/murakumo/src/murakumo/ssh.clj"],
+   :test-paths
+   ["orgs/kotoba-lang/murakumo/test/murakumo/reconcile_test.clj"
+    "orgs/kotoba-lang/murakumo/test/murakumo/reconcile_test_runner.clj"]}
+  {:repo "orgs/kotoba-lang/net",
+   :ns kotoba.net.gossip,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/net/src/kotoba/net/bitswap.cljc"
+    "orgs/kotoba-lang/net/src/kotoba/net/gossip.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/net/test/kotoba/net/bitswap_test.clj"
+    "orgs/kotoba-lang/net/test/kotoba/net/gossip_test.clj"]}
+  {:repo "orgs/kotoba-lang/netcap",
+   :ns kotoba.lang.netcap,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/netcap/src/kotoba/lang/netcap.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/netcap/test/kotoba/lang/netcap_test.cljc"]}
+  {:repo "orgs/kotoba-lang/num",
+   :ns num.core,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/num/src/num/array.cljc"
+    "orgs/kotoba-lang/num/src/num/core.cljc"
+    "orgs/kotoba-lang/num/src/num/cpu.cljc"
+    "orgs/kotoba-lang/num/src/num/protocol.cljc"
+    "orgs/kotoba-lang/num/src/num/sparse.cljc"
+    "orgs/kotoba-lang/num/src/num/wgsl.cljc"
+    "orgs/kotoba-lang/num/src/num/wgsl_backend.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/num/test/num/cljs_verify.cljc"
+    "orgs/kotoba-lang/num/test/num/contract.cljc"
+    "orgs/kotoba-lang/num/test/num/cpu_test.cljc"
+    "orgs/kotoba-lang/num/test/num/wgsl_test.cljc"]}
+  {:repo "orgs/kotoba-lang/physics",
+   :ns kotoba.physics,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/physics/src/kotoba/physics.cljc"],
+   :test-paths ["orgs/kotoba-lang/physics/test/physics_test.clj"]}
+  {:repo "orgs/kotoba-lang/playwright",
+   :ns kotoba.playwright,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/playwright/src/kotoba/playwright.clj"
+    "orgs/kotoba-lang/playwright/src/playwright_clj/core.clj"
+    "orgs/kotoba-lang/playwright/src/playwright_clj/install.clj"],
+   :test-paths
+   ["orgs/kotoba-lang/playwright/test/kotoba/playwright_test.clj"
+    "orgs/kotoba-lang/playwright/test/playwright_clj/smoke_test.clj"]}
+  {:repo "orgs/kotoba-lang/policy",
+   :ns policy.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/policy/src/policy/execute.cljc"
+    "orgs/kotoba-lang/policy/src/policy/model.cljc"
+    "orgs/kotoba-lang/policy/src/policy/ports.cljc"
+    "orgs/kotoba-lang/policy/src/policy/validate.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/policy/test/policy/execute_test.cljc"]}
+  {:repo "orgs/kotoba-lang/rt",
+   :ns kotoba.rt.core,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/rt/src/kotoba/rt/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/rt/test/kotoba/rt/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/scheduler",
+   :ns kotoba.lang.scheduler,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/scheduler/src/kotoba/lang/scheduler.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/scheduler/test/kotoba/lang/scheduler_test.cljc"]}
+  {:repo "orgs/kotoba-lang/search",
+   :ns search.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/search/src/search/model.cljc"
+    "orgs/kotoba-lang/search/src/search/validate.cljc"],
+   :test-paths ["orgs/kotoba-lang/search/test/search/model_test.cljc"]}
+  {:repo "orgs/kotoba-lang/shell",
+   :ns kotoba.shell.launcher,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/shell/src/kotoba/shell/launcher.clj"],
+   :test-paths
+   ["orgs/kotoba-lang/shell/test/kotoba/shell/launcher_test.clj"]}
+  {:repo "orgs/kotoba-lang/shitsuke",
+   :ns shitsuke.components,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/shitsuke/src/kotoba/editor.cljc"
+    "orgs/kotoba-lang/shitsuke/src/shitsuke/components.cljc"
+    "orgs/kotoba-lang/shitsuke/src/shitsuke/hiccup.cljc"
+    "orgs/kotoba-lang/shitsuke/src/shitsuke/re_frame.cljc"
+    "orgs/kotoba-lang/shitsuke/src/shitsuke/re_frame/core.cljc"
+    "orgs/kotoba-lang/shitsuke/src/shitsuke/reagent/core.cljc"
+    "orgs/kotoba-lang/shitsuke/src/shitsuke/style.cljc"
+    "orgs/kotoba-lang/shitsuke/src/shitsuke/tokens.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/shitsuke/test/kotoba/editor_test.cljc"
+    "orgs/kotoba-lang/shitsuke/test/shitsuke/components_test.cljc"
+    "orgs/kotoba-lang/shitsuke/test/shitsuke/hiccup_test.cljc"
+    "orgs/kotoba-lang/shitsuke/test/shitsuke/re_frame_test.cljc"
+    "orgs/kotoba-lang/shitsuke/test/shitsuke/seam_test.cljc"
+    "orgs/kotoba-lang/shitsuke/test/shitsuke/style_test.cljc"
+    "orgs/kotoba-lang/shitsuke/test/shitsuke/tokens_test.cljc"]}
+  {:repo "orgs/kotoba-lang/signal",
+   :source-paths
+   ["orgs/kotoba-lang/signal/src/kotoba/signal/group.clj"
+    "orgs/kotoba-lang/signal/src/kotoba/signal/hkdf.clj"
+    "orgs/kotoba-lang/signal/src/kotoba/signal/ratchet.clj"
+    "orgs/kotoba-lang/signal/src/kotoba/signal/x25519.clj"
+    "orgs/kotoba-lang/signal/src/kotoba/signal/x3dh.clj"],
+   :test-paths
+   ["orgs/kotoba-lang/signal/test/kotoba/signal/group_test.clj"
+    "orgs/kotoba-lang/signal/test/kotoba/signal/hkdf_test.clj"
+    "orgs/kotoba-lang/signal/test/kotoba/signal/ratchet_test.clj"
+    "orgs/kotoba-lang/signal/test/kotoba/signal/x3dh_test.clj"],
+   :status :done,
+   :ns kotoba.signal.x3dh}
+  {:repo "orgs/kotoba-lang/spec",
+   :ns kotoba.lang.spec,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/spec/src/kotoba/lang/spec.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/spec/test/kotoba/lang/spec_test.cljc"]}
+  {:repo "orgs/kotoba-lang/sprite-gpu",
+   :ns kotoba.sprite-gpu,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/sprite-gpu/src/kotoba/sprite_gpu.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/sprite-gpu/test/sprite_gpu_test.clj"]}
+  {:repo "orgs/kotoba-lang/sprite2d",
+   :ns kotoba.sprite2d,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/sprite2d/src/kotoba/sprite2d.cljc"
+    "orgs/kotoba-lang/sprite2d/src/kotoba/sprite2d/layout.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/sprite2d/test/sprite2d_layout_test.clj"
+    "orgs/kotoba-lang/sprite2d/test/sprite2d_test.clj"]}
+  {:repo "orgs/kotoba-lang/states",
+   :ns states.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/states/src/states/execute.cljc"
+    "orgs/kotoba-lang/states/src/states/json.cljc"
+    "orgs/kotoba-lang/states/src/states/model.cljc"
+    "orgs/kotoba-lang/states/src/states/ports.cljc"
+    "orgs/kotoba-lang/states/src/states/validate.cljc"],
+   :test-paths ["orgs/kotoba-lang/states/test/states/core_test.cljc"]}
+  {:repo "orgs/kotoba-lang/store",
+   :ns kotoba.lang.store,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/store/src/kotoba/lang/store.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/store/test/kotoba/lang/store_test.cljc"]}
+  {:repo "orgs/kotoba-lang/test",
+   :ns kotoba.lang.test,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/test/src/kotoba/lang/test.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/test/test/kotoba/lang/test_test.cljc"]}
+  {:repo "orgs/kotoba-lang/time",
+   :ns kotoba.lang.time,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/time/src/kotoba/lang/time.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/time/test/kotoba/lang/time_test.cljc"]}
+  {:repo "orgs/kotoba-lang/triage",
+   :source-paths
+   ["orgs/kotoba-lang/triage/src/triage/classify.cljc"
+    "orgs/kotoba-lang/triage/src/triage/eval.cljc"
+    "orgs/kotoba-lang/triage/src/triage/metrics.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/triage/test/triage/classify_test.cljc"
+    "orgs/kotoba-lang/triage/test/triage/metrics_test.cljc"],
+   :status :done,
+   :ns triage.classify}
+  {:repo "orgs/kotoba-lang/turn",
+   :source-paths
+   ["orgs/kotoba-lang/turn/src/kotoba/turn/bytes.cljc"
+    "orgs/kotoba-lang/turn/src/kotoba/turn/credential.cljc"
+    "orgs/kotoba-lang/turn/src/kotoba/turn/sha1.cljc"
+    "orgs/kotoba-lang/turn/src/kotoba/turn/stun.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/turn/test/kotoba/turn/credential_test.clj"
+    "orgs/kotoba-lang/turn/test/kotoba/turn/sha1_test.clj"
+    "orgs/kotoba-lang/turn/test/kotoba/turn/stun_test.clj"],
+   :status :done,
+   :ns kotoba.turn.stun}
+  {:repo "orgs/kotoba-lang/ui",
+   :ns kotoba.ui,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/ui/src/kotoba/ui.cljc"],
+   :test-paths ["orgs/kotoba-lang/ui/test/ui_test.clj"]}
+  {:repo "orgs/kotoba-lang/vc",
+   :ns vc.core,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/vc/src/vc/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/vc/test/vc/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/vllm",
+   :ns vllm.core,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/vllm/src/vllm/core.cljc"
+    "orgs/kotoba-lang/vllm/src/vllm/ports.cljc"
+    "orgs/kotoba-lang/vllm/src/vllm/request.cljc"
+    "orgs/kotoba-lang/vllm/src/vllm/sampling.cljc"
+    "orgs/kotoba-lang/vllm/src/vllm/validate.cljc"
+    "orgs/kotoba-lang/vllm/src/vllm/wire.cljc"],
+   :test-paths ["orgs/kotoba-lang/vllm/test/vllm/core_test.cljc"]}
+  {:repo "orgs/kotoba-lang/vphysics",
+   :ns vphysics.core,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/vphysics/src/vphysics/core.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/vphysics/test/vphysics/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/wallet",
+   :source-paths
+   ["orgs/kotoba-lang/wallet/src/wallet/chain.cljc"
+    "orgs/kotoba-lang/wallet/src/wallet/keystore.cljc"
+    "orgs/kotoba-lang/wallet/src/wallet/siwe.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/wallet/test/wallet/chain_test.cljc"
+    "orgs/kotoba-lang/wallet/test/wallet/keystore_test.cljc"
+    "orgs/kotoba-lang/wallet/test/wallet/siwe_test.cljc"],
+   :status :done,
+   :ns wallet.chain}
+  {:repo "orgs/kotoba-lang/wasm-ui",
+   :ns kotoba.wasm.dom,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/wasm-ui/src/kotoba/wasm/abi.cljc"
+    "orgs/kotoba-lang/wasm-ui/src/kotoba/wasm/debug.cljc"
+    "orgs/kotoba-lang/wasm-ui/src/kotoba/wasm/dom.cljc"
+    "orgs/kotoba-lang/wasm-ui/src/kotoba/wasm/host.cljc"
+    "orgs/kotoba-lang/wasm-ui/src/kotoba/wasm/host/retained.cljc"
+    "orgs/kotoba-lang/wasm-ui/src/kotoba/wasm/layout.cljc"
+    "orgs/kotoba-lang/wasm-ui/src/kotoba/wasm/re_frame.cljc"
+    "orgs/kotoba-lang/wasm-ui/src/kotoba/wasm/reagent.cljc"
+    "orgs/kotoba-lang/wasm-ui/src/kotoba/wasm/runtime.cljc"
+    "orgs/kotoba-lang/wasm-ui/src/re_frame/core.cljc"
+    "orgs/kotoba-lang/wasm-ui/src/reagent/core.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/wasm-ui/test/kotoba/wasm/abi_runtime_test.cljc"
+    "orgs/kotoba-lang/wasm-ui/test/kotoba/wasm/compat_api_test.cljc"
+    "orgs/kotoba-lang/wasm-ui/test/kotoba/wasm/debug_test.cljc"
+    "orgs/kotoba-lang/wasm-ui/test/kotoba/wasm/dom_compat_test.cljc"
+    "orgs/kotoba-lang/wasm-ui/test/kotoba/wasm/golden_test.cljc"
+    "orgs/kotoba-lang/wasm-ui/test/kotoba/wasm/retained_host_test.cljc"
+    "orgs/kotoba-lang/wasm-ui/test/kotoba/wasm/wit_contract_test.cljc"]}
+  {:repo "orgs/kotoba-lang/webgl",
+   :ns kotoba.webgl,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/webgl/src/kotoba/webgl.cljc"
+    "orgs/kotoba-lang/webgl/src/kotoba/webgl/glsl.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/webgl/test/webgl_glsl_test.clj"
+    "orgs/kotoba-lang/webgl/test/webgl_test.clj"]}
+  {:repo "orgs/kotoba-lang/webgpu",
+   :ns kotoba.webgpu,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/webgpu/src/kotoba/webgpu.cljc"
+    "orgs/kotoba-lang/webgpu/src/kotoba/webgpu/geometry.cljc"
+    "orgs/kotoba-lang/webgpu/src/kotoba/webgpu/ir.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/webgpu/test/geometry_test.clj"
+    "orgs/kotoba-lang/webgpu/test/render_ir_test.clj"]}
+  {:repo "orgs/kotoba-lang/webrtc",
+   :ns kotoba.webrtc,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/webrtc/src/kotoba/webrtc.cljc"
+    "orgs/kotoba-lang/webrtc/src/kotoba/webrtc/export.cljc"
+    "orgs/kotoba-lang/webrtc/src/kotoba/webrtc/room.cljc"
+    "orgs/kotoba-lang/webrtc/src/kotoba/webrtc/session.cljc"
+    "orgs/kotoba-lang/webrtc/src/kotoba/webrtc/stats.cljc"
+    "orgs/kotoba-lang/webrtc/src/kotoba/webrtc/ui.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/webrtc/test/kotoba/webrtc_test.cljc"
+    "orgs/kotoba-lang/webrtc/test/kotoba/webrtc/export_test.cljc"
+    "orgs/kotoba-lang/webrtc/test/kotoba/webrtc/room_test.cljc"
+    "orgs/kotoba-lang/webrtc/test/kotoba/webrtc/session_test.cljc"
+    "orgs/kotoba-lang/webrtc/test/kotoba/webrtc/stats_test.cljc"
+    "orgs/kotoba-lang/webrtc/test/kotoba/webrtc/ui_test.cljc"]}],
+ :date "2026-07-01",
+ :removed-from-webgpu
+ {:source-trees ["src/kami" "copied non-webgpu src/kotoba namespaces"],
+  :tests ["copied monolith test files outside geometry/render-ir"],
+  :scripts
+  ["scripts/gen_glsl.clj"
+   "scripts/format_gate.clj"
+   "scripts/gltf_validate.js"
+   "scripts/graphql_validate.js"
+   "scripts/gen_pipeline_specs.clj"],
+  :fixtures ["fixtures/glsl" "fixtures/pipeline_specs.rs"],
+  :forbidden-paths
+  ["orgs/kotoba-lang/webgpu/src/kami"
+   "orgs/kotoba-lang/webgpu/scripts/gen_glsl.clj"
+   "orgs/kotoba-lang/webgpu/scripts/format_gate.clj"
+   "orgs/kotoba-lang/webgpu/scripts/gltf_validate.js"
+   "orgs/kotoba-lang/webgpu/scripts/graphql_validate.js"
+   "orgs/kotoba-lang/webgpu/scripts/gen_pipeline_specs.clj"
+   "orgs/kotoba-lang/webgpu/fixtures/glsl"
+   "orgs/kotoba-lang/webgpu/fixtures/pipeline_specs.rs"],
+  :allowed-webgpu-source-paths
+  ["orgs/kotoba-lang/webgpu/src/kotoba/webgpu.cljc"
+   "orgs/kotoba-lang/webgpu/src/kotoba/webgpu/geometry.cljc"
+   "orgs/kotoba-lang/webgpu/src/kotoba/webgpu/ir.cljc"
+   "orgs/kotoba-lang/webgpu/scripts/gen_wgsl.clj"
+   "orgs/kotoba-lang/webgpu/test/geometry_test.clj"
+   "orgs/kotoba-lang/webgpu/test/render_ir_test.clj"]},
+ :required-format-dsl-repos
+ #{"orgs/kotoba-lang/ooxml"
+   "orgs/kotoba-lang/exr"
+   "orgs/kotoba-lang/srt"
+   "orgs/kotoba-lang/scad"
+   "orgs/kotoba-lang/arxiv"
+   "orgs/kotoba-lang/aero"
+   "orgs/kotoba-lang/spice"
+   "orgs/kotoba-lang/datom"
+   "orgs/kotoba-lang/rdf"
+   "orgs/kotoba-lang/industry"
+   "orgs/kotoba-lang/materialx"
+   "orgs/kotoba-lang/phone"
+   "orgs/kotoba-lang/dsl-core"
+   "orgs/kotoba-lang/kicad"
+   "orgs/kotoba-lang/usd"
+   "orgs/kotoba-lang/proto"
+   "orgs/kotoba-lang/calendar"
+   "orgs/kotoba-lang/card"
+   "orgs/kotoba-lang/spirv"
+   "orgs/kotoba-lang/activitypub"
+   "orgs/kotoba-lang/technology"
+   "orgs/kotoba-lang/banking"
+   "orgs/kotoba-lang/turtle"
+   "orgs/kotoba-lang/did"
+   "orgs/kotoba-lang/property"
+   "orgs/kotoba-lang/crypto"
+   "orgs/kotoba-lang/device"
+   "orgs/kotoba-lang/fs"
+   "orgs/kotoba-lang/activitystreams"
+   "orgs/kotoba-lang/bpmn"
+   "orgs/kotoba-lang/ddl"
+   "orgs/kotoba-lang/ocio"
+   "orgs/kotoba-lang/robotics"
+   "orgs/kotoba-lang/graphml"
+   "orgs/kotoba-lang/mathml"
+   "orgs/kotoba-lang/css"
+   "orgs/kotoba-lang/statechart"
+   "orgs/kotoba-lang/transit"
+   "orgs/kotoba-lang/toml"
+   "orgs/kotoba-lang/n-quads"
+   "orgs/kotoba-lang/force3d"
+   "orgs/kotoba-lang/cue"
+   "orgs/kotoba-lang/gltf"
+   "orgs/kotoba-lang/wit"
+   "orgs/kotoba-lang/http"
+   "orgs/kotoba-lang/shacl"
+   "orgs/kotoba-lang/dmn"
+   "orgs/kotoba-lang/step"
+   "orgs/kotoba-lang/fmt"
+   "orgs/kotoba-lang/dot"
+   "orgs/kotoba-lang/dxf"
+   "orgs/kotoba-lang/rdf-canon"
+   "orgs/kotoba-lang/graphql"
+   "orgs/kotoba-lang/cmmn"
+   "orgs/kotoba-lang/musicxml"
+   "orgs/kotoba-lang/svg"
+   "orgs/kotoba-lang/json-ld"
+   "orgs/kotoba-lang/atom"
+   "orgs/kotoba-lang/cron"
+   "orgs/kotoba-lang/katex"
+   "orgs/kotoba-lang/dag-cbor"
+   "orgs/kotoba-lang/retail"
+   "orgs/kotoba-lang/d3"
+   "orgs/kotoba-lang/capnp"
+   "orgs/kotoba-lang/geojson"
+   "orgs/kotoba-lang/echem"
+   "orgs/kotoba-lang/annotation"
+   "orgs/kotoba-lang/drawingml"
+   "orgs/kotoba-lang/verilog"
+   "orgs/kotoba-lang/otio"
+   "orgs/kotoba-lang/ical"
+   "orgs/kotoba-lang/sql"
+   "orgs/kotoba-lang/contacts"
+   "orgs/kotoba-lang/atproto"
+   "orgs/kotoba-lang/forms"
+   "orgs/kotoba-lang/jsonlogic"
+   "orgs/kotoba-lang/presentationml"
+   "orgs/kotoba-lang/docs"
+   "orgs/kotoba-lang/openapi"
+   "orgs/kotoba-lang/editor"
+   "orgs/kotoba-lang/mermaid"
+   "orgs/kotoba-lang/occupation"
+   "orgs/kotoba-lang/briefing"},
+ :format-dsl-repos
+ [{:repo "orgs/kotoba-lang/activitypub",
+   :ns activitypub.core,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/activitypub/src/activitypub/core.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/activitypub/test/activitypub/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/activitystreams",
+   :ns activitystreams.core,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/activitystreams/src/activitystreams/core.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/activitystreams/test/activitystreams/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/aero",
+   :ns aero.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/aero/src/aero/bridge.cljc"
+    "orgs/kotoba-lang/aero/src/aero/case.cljc"
+    "orgs/kotoba-lang/aero/src/aero/cli.cljc"
+    "orgs/kotoba-lang/aero/src/aero/lbm.clj"
+    "orgs/kotoba-lang/aero/src/aero/model.cljc"
+    "orgs/kotoba-lang/aero/src/aero/solver.cljc"],
+   :test-paths ["orgs/kotoba-lang/aero/test/aero/aero_test.clj"]}
+  {:repo "orgs/kotoba-lang/annotation",
+   :ns annotation.core,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/annotation/src/annotation/core.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/annotation/test/annotation/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/arxiv",
+   :ns arxiv-kotoba.manifest,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/arxiv/src/arxiv_kotoba/dialogue.cljc"
+    "orgs/kotoba-lang/arxiv/src/arxiv_kotoba/manifest.cljc"
+    "orgs/kotoba-lang/arxiv/src/arxiv_kotoba/ops.cljc"
+    "orgs/kotoba-lang/arxiv/src/arxiv_kotoba/policy.cljc"
+    "orgs/kotoba-lang/arxiv/src/arxiv_kotoba/routes.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/arxiv/test/arxiv_kotoba/ops_test.cljc"]}
+  {:repo "orgs/kotoba-lang/atom",
+   :ns kotoba.atom,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/atom/src/kotoba/atom.cljc"
+    "orgs/kotoba-lang/atom/src/atom/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/atom/test/atom/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/atproto",
+   :ns atproto.core,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/atproto/src/atproto/core.cljc"
+    "orgs/kotoba-lang/atproto/src/atproto/sdk.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/atproto/test/atproto/core_test.cljc"]}
+  {:repo "orgs/kotoba-lang/banking",
+   :ns kotoba.banking,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/banking/src/kotoba/banking.cljc"
+    "orgs/kotoba-lang/banking/src/kotoba/banking/export.cljc"
+    "orgs/kotoba-lang/banking/src/kotoba/banking/ui.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/banking/test/kotoba/banking/export_test.cljc"
+    "orgs/kotoba-lang/banking/test/kotoba/banking/ui_test.cljc"
+    "orgs/kotoba-lang/banking/test/kotoba/banking_test.cljc"]}
+  {:repo "orgs/kotoba-lang/bpmn",
+   :ns bpmn.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/bpmn/src/bpmn/execute.cljc"
+    "orgs/kotoba-lang/bpmn/src/bpmn/model.cljc"
+    "orgs/kotoba-lang/bpmn/src/bpmn/ports.cljc"
+    "orgs/kotoba-lang/bpmn/src/bpmn/validate.cljc"
+    "orgs/kotoba-lang/bpmn/src/bpmn/xml.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/bpmn/test/bpmn/execute_test.cljc"
+    "orgs/kotoba-lang/bpmn/test/bpmn/model_test.cljc"
+    "orgs/kotoba-lang/bpmn/test/bpmn/validate_test.cljc"
+    "orgs/kotoba-lang/bpmn/test/bpmn/xml_test.cljc"]}
+  {:repo "orgs/kotoba-lang/briefing",
+   :ns briefing.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/briefing/src/briefing/model.cljc"
+    "orgs/kotoba-lang/briefing/src/briefing/validate.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/briefing/test/briefing/model_test.cljc"]}
+  {:repo "orgs/kotoba-lang/calendar",
+   :ns calendar.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/calendar/src/calendar/model.cljc"
+    "orgs/kotoba-lang/calendar/src/calendar/validate.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/calendar/test/calendar/model_test.cljc"]}
+  {:repo "orgs/kotoba-lang/capnp",
+   :ns kotoba.capnp,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/capnp/src/kotoba/capnp.cljc"
+    "orgs/kotoba-lang/capnp/src/capnp/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/capnp/test/capnp/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/card",
+   :ns kotoba.card,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/card/src/kotoba/card.cljc"
+    "orgs/kotoba-lang/card/src/kotoba/card/export.cljc"
+    "orgs/kotoba-lang/card/src/kotoba/card/ui.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/card/test/kotoba/card/export_test.cljc"
+    "orgs/kotoba-lang/card/test/kotoba/card/ui_test.cljc"
+    "orgs/kotoba-lang/card/test/kotoba/card_test.cljc"]}
+  {:repo "orgs/kotoba-lang/chobo",
+   :ns chobo.ledger,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/chobo/src/chobo/events.cljc"
+    "orgs/kotoba-lang/chobo/src/chobo/invoice.cljc"
+    "orgs/kotoba-lang/chobo/src/chobo/ledger.cljc"
+    "orgs/kotoba-lang/chobo/src/chobo/ssr.clj"
+    "orgs/kotoba-lang/chobo/src/chobo/subscription.cljc"
+    "orgs/kotoba-lang/chobo/src/chobo/tenant.cljc"
+    "orgs/kotoba-lang/chobo/src/chobo/views.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/chobo/test/chobo/decision_lifecycle_test.cljc"
+    "orgs/kotoba-lang/chobo/test/chobo/dunning_tiers_test.cljc"
+    "orgs/kotoba-lang/chobo/test/chobo/effect_lifecycle_test.cljc"
+    "orgs/kotoba-lang/chobo/test/chobo/events_test.cljc"
+    "orgs/kotoba-lang/chobo/test/chobo/invoice_tax_test.cljc"
+    "orgs/kotoba-lang/chobo/test/chobo/invoice_test.cljc"
+    "orgs/kotoba-lang/chobo/test/chobo/ledger_test.cljc"
+    "orgs/kotoba-lang/chobo/test/chobo/partial_payment_test.cljc"
+    "orgs/kotoba-lang/chobo/test/chobo/prorated_refund_test.cljc"
+    "orgs/kotoba-lang/chobo/test/chobo/subscription_lifecycle_test.cljc"
+    "orgs/kotoba-lang/chobo/test/chobo/subscription_test.cljc"
+    "orgs/kotoba-lang/chobo/test/chobo/tenant_roles_test.cljc"
+    "orgs/kotoba-lang/chobo/test/chobo/tenant_test.cljc"
+    "orgs/kotoba-lang/chobo/test/chobo/views_test.cljc"]}
+  {:repo "orgs/kotoba-lang/ci",
+   :ns ci.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/ci/src/ci/execute.cljc"
+    "orgs/kotoba-lang/ci/src/ci/model.cljc"
+    "orgs/kotoba-lang/ci/src/ci/validate.cljc"
+    "orgs/kotoba-lang/ci/src/ci/yaml.cljc"],
+   :test-paths ["orgs/kotoba-lang/ci/test/ci/ci_test.cljc"]}
+  {:repo "orgs/kotoba-lang/cmmn",
+   :ns cmmn.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/cmmn/src/cmmn/execute.cljc"
+    "orgs/kotoba-lang/cmmn/src/cmmn/model.cljc"
+    "orgs/kotoba-lang/cmmn/src/cmmn/ports.cljc"
+    "orgs/kotoba-lang/cmmn/src/cmmn/validate.cljc"],
+   :test-paths ["orgs/kotoba-lang/cmmn/test/cmmn/core_test.cljc"]}
+  {:repo "orgs/kotoba-lang/contacts",
+   :ns contacts.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/contacts/src/contacts/model.cljc"
+    "orgs/kotoba-lang/contacts/src/contacts/validate.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/contacts/test/contacts/model_test.cljc"]}
+  {:repo "orgs/kotoba-lang/cron",
+   :ns cron.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/cron/src/cron/execute.cljc"
+    "orgs/kotoba-lang/cron/src/cron/model.cljc"
+    "orgs/kotoba-lang/cron/src/cron/validate.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/cron/test/cron/execute_test.cljc"
+    "orgs/kotoba-lang/cron/test/cron/model_test.cljc"
+    "orgs/kotoba-lang/cron/test/cron/validate_test.cljc"]}
+  {:repo "orgs/kotoba-lang/crypto",
+   :ns kotoba.lang.crypto,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/crypto/src/kotoba/lang/crypto.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/crypto/test/kotoba/lang/crypto_test.cljc"]}
+  {:repo "orgs/kotoba-lang/css",
+   :ns kotoba.css,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/css/src/kotoba/css.cljc"
+    "orgs/kotoba-lang/css/src/css/core.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/css/test/kotoba/css_test.clj"
+    "orgs/kotoba-lang/css/test/css/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/cue",
+   :ns kotoba.cue,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/cue/src/kotoba/cue.cljc"
+    "orgs/kotoba-lang/cue/src/cue/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/cue/test/cue/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/d3",
+   :ns kotoba.lang.d3.scale,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/d3/src/kotoba/lang/d3/scale.cljc"
+    "orgs/kotoba-lang/d3/src/kotoba/lang/d3/shape.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/d3/test/kotoba/lang/d3/scale_test.cljc"
+    "orgs/kotoba-lang/d3/test/kotoba/lang/d3/shape_test.cljc"]}
+  {:repo "orgs/kotoba-lang/dag-cbor",
+   :ns cbor.core,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/dag-cbor/src/cbor/core.clj"],
+   :test-paths ["orgs/kotoba-lang/dag-cbor/test/cbor/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/datom",
+   :ns datom.core,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/datom/src/datom/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/datom/test/datom/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/dcs",
+   :ns dcs.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/dcs/src/dcs/alarm.cljc"
+    "orgs/kotoba-lang/dcs/src/dcs/execute.cljc"
+    "orgs/kotoba-lang/dcs/src/dcs/model.cljc"
+    "orgs/kotoba-lang/dcs/src/dcs/pid.cljc"
+    "orgs/kotoba-lang/dcs/src/dcs/ports.cljc"
+    "orgs/kotoba-lang/dcs/src/dcs/runner.clj"
+    "orgs/kotoba-lang/dcs/src/dcs/validate.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/dcs/test/dcs/alarm_test.cljc"
+    "orgs/kotoba-lang/dcs/test/dcs/execute_test.cljc"
+    "orgs/kotoba-lang/dcs/test/dcs/model_test.cljc"
+    "orgs/kotoba-lang/dcs/test/dcs/pid_test.cljc"
+    "orgs/kotoba-lang/dcs/test/dcs/runner_test.clj"
+    "orgs/kotoba-lang/dcs/test/dcs/validate_test.cljc"]}
+  {:repo "orgs/kotoba-lang/ddl",
+   :ns ddl.ddl,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/ddl/src/ddl/ddl.cljc"
+    "orgs/kotoba-lang/ddl/src/ddl/execute.cljc"
+    "orgs/kotoba-lang/ddl/src/ddl/model.cljc"
+    "orgs/kotoba-lang/ddl/src/ddl/validate.cljc"],
+   :test-paths ["orgs/kotoba-lang/ddl/test/ddl/core_test.cljc"]}
+  {:repo "orgs/kotoba-lang/device",
+   :ns kotoba.lang.device,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/device/src/kotoba/lang/device.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/device/test/kotoba/lang/device_test.cljc"]}
+  {:repo "orgs/kotoba-lang/did",
+   :ns did.core,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/did/src/did/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/did/test/did/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/dmn",
+   :ns dmn.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/dmn/src/dmn/execute.cljc"
+    "orgs/kotoba-lang/dmn/src/dmn/model.cljc"
+    "orgs/kotoba-lang/dmn/src/dmn/ports.cljc"
+    "orgs/kotoba-lang/dmn/src/dmn/validate.cljc"],
+   :test-paths ["orgs/kotoba-lang/dmn/test/dmn/execute_test.cljc"]}
+  {:repo "orgs/kotoba-lang/docs",
+   :ns docs.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/docs/src/docs/model.cljc"
+    "orgs/kotoba-lang/docs/src/docs/validate.cljc"
+    "orgs/kotoba-lang/docs/src/docs/wire.cljc"],
+   :test-paths ["orgs/kotoba-lang/docs/test/docs/model_test.cljc"]}
+  {:repo "orgs/kotoba-lang/dot",
+   :ns kotoba.dot,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/dot/src/kotoba/dot.cljc"
+    "orgs/kotoba-lang/dot/src/dot/dot.cljc"
+    "orgs/kotoba-lang/dot/src/dot/model.cljc"
+    "orgs/kotoba-lang/dot/src/dot/emit.cljc"
+    "orgs/kotoba-lang/dot/src/dot/validate.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/dot/test/dot/dot_test.cljc"
+    "orgs/kotoba-lang/dot/test/dot/emit_test.cljc"]}
+  {:repo "orgs/kotoba-lang/drawingml",
+   :ns drawingml.core,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/drawingml/src/drawingml/core.cljc"
+    "orgs/kotoba-lang/drawingml/src/drawingml/parse.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/drawingml/test/drawingml/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/drive",
+   :ns drive.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/drive/src/drive/model.cljc"
+    "orgs/kotoba-lang/drive/src/drive/validate.cljc"],
+   :test-paths ["orgs/kotoba-lang/drive/test/drive/model_test.cljc"]}
+  {:repo "orgs/kotoba-lang/dsl-core",
+   :ns kotoba.dsl.problem,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/dsl-core/src/kotoba/dsl/problem.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/dsl-core/test/kotoba/dsl/problem_test.cljc"]}
+  {:repo "orgs/kotoba-lang/dxf",
+   :ns kotoba.dxf,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/dxf/src/kotoba/dxf.cljc"
+    "orgs/kotoba-lang/dxf/src/dxf/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/dxf/test/dxf/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/echem",
+   :ns echem.solver,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/echem/src/echem/solver.cljc"],
+   :test-paths ["orgs/kotoba-lang/echem/test/echem/solver_test.clj"]}
+  {:repo "orgs/kotoba-lang/editor",
+   :ns editor.core,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/editor/src/editor/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/editor/test/editor/core_test.cljc"]}
+  {:repo "orgs/kotoba-lang/expr",
+   :ns kotoba.expr,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/expr/src/kotoba/expr.cljc"
+    "orgs/kotoba-lang/expr/src/expr/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/expr/test/expr/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/exr",
+   :ns kotoba.exr,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/exr/src/kotoba/exr.cljc"
+    "orgs/kotoba-lang/exr/src/exr/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/exr/test/exr/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/fmt",
+   :ns kotoba.lang.fmt,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/fmt/src/kotoba/lang/fmt.cljc"],
+   :test-paths ["orgs/kotoba-lang/fmt/test/kotoba/lang/fmt_test.cljc"]}
+  {:repo "orgs/kotoba-lang/force3d",
+   :ns kotoba.lang.force3d.core,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/force3d/src/kotoba/lang/force3d/core.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/force3d/test/kotoba/lang/force3d/core_test.cljc"]}
+  {:repo "orgs/kotoba-lang/forms",
+   :ns forms.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/forms/src/forms/model.cljc"
+    "orgs/kotoba-lang/forms/src/forms/validate.cljc"],
+   :test-paths ["orgs/kotoba-lang/forms/test/forms/model_test.cljc"]}
+  {:repo "orgs/kotoba-lang/fs",
+   :ns kotoba.lang.fs,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/fs/src/kotoba/lang/fs.cljc"],
+   :test-paths ["orgs/kotoba-lang/fs/test/kotoba/lang/fs_test.cljc"]}
+  {:repo "orgs/kotoba-lang/geojson",
+   :ns kotoba.geojson,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/geojson/src/kotoba/geojson.cljc"
+    "orgs/kotoba-lang/geojson/src/geojson/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/geojson/test/geojson/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/gltf",
+   :ns kotoba.gltf,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/gltf/src/kotoba/gltf.cljc"
+    "orgs/kotoba-lang/gltf/src/gltf/core.cljc"],
+   :from-webgpu ["orgs/kotoba-lang/webgpu/scripts/gltf_validate.js"],
+   :test-paths ["orgs/kotoba-lang/gltf/test/gltf/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/graphml",
+   :ns kotoba.graphml,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/graphml/src/kotoba/graphml.cljc"
+    "orgs/kotoba-lang/graphml/src/graphml/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/graphml/test/graphml/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/graphql",
+   :ns kotoba.graphql,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/graphql/src/kotoba/graphql.cljc"
+    "orgs/kotoba-lang/graphql/src/graphql/model.cljc"
+    "orgs/kotoba-lang/graphql/src/graphql/query.cljc"
+    "orgs/kotoba-lang/graphql/src/graphql/sdl.cljc"
+    "orgs/kotoba-lang/graphql/src/graphql/validate.cljc"
+    "orgs/kotoba-lang/graphql/src/graphql/emit.cljc"
+    "orgs/kotoba-lang/graphql/src/graphql/execute.cljc"
+    "orgs/kotoba-lang/graphql/src/graphql/ports.cljc"],
+   :from-webgpu
+   ["orgs/kotoba-lang/webgpu/scripts/graphql_validate.js"],
+   :test-paths
+   ["orgs/kotoba-lang/graphql/test/graphql/core_test.cljc"
+    "orgs/kotoba-lang/graphql/test/graphql/emit_test.cljc"]}
+  {:repo "orgs/kotoba-lang/html",
+   :ns kotoba.html,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/html/src/kotoba/html.cljc"
+    "orgs/kotoba-lang/html/src/html/core.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/html/test/html/core_test.clj"
+    "orgs/kotoba-lang/html/test/kotoba/html_test.clj"]}
+  {:repo "orgs/kotoba-lang/http",
+   :ns kotoba.lang.http,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/http/src/kotoba/lang/http.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/http/test/kotoba/lang/http_test.cljc"]}
+  {:repo "orgs/kotoba-lang/ical",
+   :ns kotoba.ical,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/ical/src/kotoba/ical.cljc"
+    "orgs/kotoba-lang/ical/src/ical/ical.cljc"
+    "orgs/kotoba-lang/ical/src/ical/model.cljc"
+    "orgs/kotoba-lang/ical/src/ical/builder.cljc"
+    "orgs/kotoba-lang/ical/src/ical/validate.cljc"
+    "orgs/kotoba-lang/ical/src/ical/execute.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/ical/test/ical/builder_test.cljc"
+    "orgs/kotoba-lang/ical/test/ical/ical_test.cljc"]}
+  {:repo "orgs/kotoba-lang/industry",
+   :ns kotoba.industry,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/industry/src/kotoba/industry.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/industry/test/kotoba/industry_test.clj"]}
+  {:repo "orgs/kotoba-lang/json",
+   :ns kotoba.json,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/json/src/kotoba/json.cljc"
+    "orgs/kotoba-lang/json/src/kotoba/lang/json.cljc"
+    "orgs/kotoba-lang/json/src/json/core.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/json/test/json/core_test.clj"
+    "orgs/kotoba-lang/json/test/kotoba/lang/json_test.cljc"]}
+  {:repo "orgs/kotoba-lang/json-ld",
+   :ns json-ld.core,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/json-ld/src/json_ld/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/json-ld/test/json_ld/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/jsonlogic",
+   :ns jsonlogic.core,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/jsonlogic/src/jsonlogic/core.cljc"
+    "orgs/kotoba-lang/jsonlogic/src/jsonlogic/ports.cljc"
+    "orgs/kotoba-lang/jsonlogic/src/jsonlogic/validate.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/jsonlogic/test/jsonlogic/core_test.cljc"]}
+  {:repo "orgs/kotoba-lang/kasane",
+   :ns kasane.decode,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kasane/src/kasane/bytes.cljc"
+    "orgs/kotoba-lang/kasane/src/kasane/codec.cljc"
+    "orgs/kotoba-lang/kasane/src/kasane/codec/inflate.cljc"
+    "orgs/kotoba-lang/kasane/src/kasane/cos.cljc"
+    "orgs/kotoba-lang/kasane/src/kasane/decode.cljc"
+    "orgs/kotoba-lang/kasane/src/kasane/gif.cljc"
+    "orgs/kotoba-lang/kasane/src/kasane/gltf.cljc"
+    "orgs/kotoba-lang/kasane/src/kasane/isobmff.cljc"
+    "orgs/kotoba-lang/kasane/src/kasane/jpeg.cljc"
+    "orgs/kotoba-lang/kasane/src/kasane/jpeg/decode.cljc"
+    "orgs/kotoba-lang/kasane/src/kasane/json.cljc"
+    "orgs/kotoba-lang/kasane/src/kasane/normalize.cljc"
+    "orgs/kotoba-lang/kasane/src/kasane/png.cljc"
+    "orgs/kotoba-lang/kasane/src/kasane/schema.cljc"
+    "orgs/kotoba-lang/kasane/src/kasane/svg.cljc"
+    "orgs/kotoba-lang/kasane/src/kasane/tiff.cljc"
+    "orgs/kotoba-lang/kasane/src/kasane/ttf.cljc"
+    "orgs/kotoba-lang/kasane/src/kasane/woff.cljc"
+    "orgs/kotoba-lang/kasane/src/kasane/zip.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/kasane/test/kasane/codec_test.cljc"
+    "orgs/kotoba-lang/kasane/test/kasane/container_test.clj"
+    "orgs/kotoba-lang/kasane/test/kasane/cos_test.clj"
+    "orgs/kotoba-lang/kasane/test/kasane/decode_test.cljc"
+    "orgs/kotoba-lang/kasane/test/kasane/inflate_test.clj"
+    "orgs/kotoba-lang/kasane/test/kasane/jpeg_decode_test.clj"
+    "orgs/kotoba-lang/kasane/test/kasane/jpeg_test.clj"
+    "orgs/kotoba-lang/kasane/test/kasane/json_test.cljc"
+    "orgs/kotoba-lang/kasane/test/kasane/lzw_test.clj"
+    "orgs/kotoba-lang/kasane/test/kasane/png_test.clj"
+    "orgs/kotoba-lang/kasane/test/kasane/raster_test.cljc"
+    "orgs/kotoba-lang/kasane/test/kasane/ttf_test.clj"
+    "orgs/kotoba-lang/kasane/test/kasane/vector_test.cljc"
+    "orgs/kotoba-lang/kasane/test/kasane/woff_test.clj"
+    "orgs/kotoba-lang/kasane/test/kasane/zip_test.clj"]}
+  {:repo "orgs/kotoba-lang/katex",
+   :ns kotoba.lang.katex.parse,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/katex/src/kotoba/lang/katex/mathml.cljc"
+    "orgs/kotoba-lang/katex/src/kotoba/lang/katex/parse.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/katex/test/kotoba/lang/katex/mathml_test.cljc"
+    "orgs/kotoba-lang/katex/test/kotoba/lang/katex/parse_test.cljc"]}
+  {:repo "orgs/kotoba-lang/kicad",
+   :ns kotoba.kicad,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kicad/src/kotoba/kicad.cljc"
+    "orgs/kotoba-lang/kicad/src/kicad/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/kicad/test/kicad/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/kiyaku",
+   :ns kiyaku.returns,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kiyaku/src/kiyaku/account.cljc"
+    "orgs/kotoba-lang/kiyaku/src/kiyaku/events.cljc"
+    "orgs/kotoba-lang/kiyaku/src/kiyaku/projection.cljc"
+    "orgs/kotoba-lang/kiyaku/src/kiyaku/return_analytics.cljc"
+    "orgs/kotoba-lang/kiyaku/src/kiyaku/returns.cljc"
+    "orgs/kotoba-lang/kiyaku/src/kiyaku/ssr.clj"
+    "orgs/kotoba-lang/kiyaku/src/kiyaku/views.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/kiyaku/test/kiyaku/account_test.cljc"
+    "orgs/kotoba-lang/kiyaku/test/kiyaku/address_validation_test.cljc"
+    "orgs/kotoba-lang/kiyaku/test/kiyaku/events_test.cljc"
+    "orgs/kotoba-lang/kiyaku/test/kiyaku/ledger_roundtrip_test.cljc"
+    "orgs/kotoba-lang/kiyaku/test/kiyaku/projection_test.cljc"
+    "orgs/kotoba-lang/kiyaku/test/kiyaku/refund_restock_test.cljc"
+    "orgs/kotoba-lang/kiyaku/test/kiyaku/return_analytics_test.cljc"
+    "orgs/kotoba-lang/kiyaku/test/kiyaku/returns_test.cljc"
+    "orgs/kotoba-lang/kiyaku/test/kiyaku/ssr_test.clj"
+    "orgs/kotoba-lang/kiyaku/test/kiyaku/wallet_test.cljc"]}
+  {:repo "orgs/kotoba-lang/kudaki",
+   :ns kudaki.integrate,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/kudaki/src/kudaki/contact.cljc"
+    "orgs/kotoba-lang/kudaki/src/kudaki/demo.cljc"
+    "orgs/kotoba-lang/kudaki/src/kudaki/element.cljc"
+    "orgs/kotoba-lang/kudaki/src/kudaki/integrate.cljc"
+    "orgs/kotoba-lang/kudaki/src/kudaki/linalg.cljc"
+    "orgs/kotoba-lang/kudaki/src/kudaki/material.cljc"
+    "orgs/kotoba-lang/kudaki/src/kudaki/mesh.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/kudaki/test/kudaki/contact_test.cljc"
+    "orgs/kotoba-lang/kudaki/test/kudaki/element_test.cljc"
+    "orgs/kotoba-lang/kudaki/test/kudaki/integrate_test.cljc"
+    "orgs/kotoba-lang/kudaki/test/kudaki/linalg_test.cljc"
+    "orgs/kotoba-lang/kudaki/test/kudaki/material_test.cljc"
+    "orgs/kotoba-lang/kudaki/test/kudaki/mesh_test.cljc"
+    "orgs/kotoba-lang/kudaki/test/kudaki/portability_test.cljc"]}
+  {:repo "orgs/kotoba-lang/labor",
+   :source-paths
+   ["orgs/kotoba-lang/labor/src/kotoba/labor.cljc"
+    "orgs/kotoba-lang/labor/src/kotoba/labor/export.cljc"
+    "orgs/kotoba-lang/labor/src/kotoba/labor/ui.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/labor/test/kotoba/labor_test.cljc"
+    "orgs/kotoba-lang/labor/test/kotoba/labor/export_test.cljc"
+    "orgs/kotoba-lang/labor/test/kotoba/labor/ui_test.cljc"],
+   :status :done,
+   :ns kotoba.labor}
+  {:repo "orgs/kotoba-lang/logistics",
+   :source-paths
+   ["orgs/kotoba-lang/logistics/src/kotoba/logistics.cljc"
+    "orgs/kotoba-lang/logistics/src/kotoba/logistics/export.cljc"
+    "orgs/kotoba-lang/logistics/src/kotoba/logistics/ui.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/logistics/test/kotoba/logistics_test.cljc"
+    "orgs/kotoba-lang/logistics/test/kotoba/logistics/export_test.cljc"
+    "orgs/kotoba-lang/logistics/test/kotoba/logistics/ui_test.cljc"],
+   :status :done,
+   :ns kotoba.logistics}
+  {:repo "orgs/kotoba-lang/madoguchi",
+   :ns madoguchi.ticket,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/madoguchi/src/madoguchi/customer.cljc"
+    "orgs/kotoba-lang/madoguchi/src/madoguchi/events.cljc"
+    "orgs/kotoba-lang/madoguchi/src/madoguchi/projection.cljc"
+    "orgs/kotoba-lang/madoguchi/src/madoguchi/ssr.clj"
+    "orgs/kotoba-lang/madoguchi/src/madoguchi/ticket.cljc"
+    "orgs/kotoba-lang/madoguchi/src/madoguchi/views.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/madoguchi/test/madoguchi/customer360_test.cljc"
+    "orgs/kotoba-lang/madoguchi/test/madoguchi/customer_test.cljc"
+    "orgs/kotoba-lang/madoguchi/test/madoguchi/escalation_test.cljc"
+    "orgs/kotoba-lang/madoguchi/test/madoguchi/events_test.cljc"
+    "orgs/kotoba-lang/madoguchi/test/madoguchi/ledger_roundtrip_test.cljc"
+    "orgs/kotoba-lang/madoguchi/test/madoguchi/merge_test.cljc"
+    "orgs/kotoba-lang/madoguchi/test/madoguchi/nps_test.cljc"
+    "orgs/kotoba-lang/madoguchi/test/madoguchi/projection_test.cljc"
+    "orgs/kotoba-lang/madoguchi/test/madoguchi/sla_policy_test.cljc"
+    "orgs/kotoba-lang/madoguchi/test/madoguchi/ssr_test.clj"
+    "orgs/kotoba-lang/madoguchi/test/madoguchi/ticket_test.cljc"]}
+  {:repo "orgs/kotoba-lang/mail",
+   :ns mail.message,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/mail/src/mail/draft.cljc"
+    "orgs/kotoba-lang/mail/src/mail/message.cljc"
+    "orgs/kotoba-lang/mail/src/mail/receipt.cljc"],
+   :test-paths ["orgs/kotoba-lang/mail/test/mail/message_test.cljc"]}
+  {:repo "orgs/kotoba-lang/materialx",
+   :ns kotoba.materialx,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/materialx/src/kotoba/materialx.cljc"
+    "orgs/kotoba-lang/materialx/src/materialx/core.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/materialx/test/materialx/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/mathml",
+   :ns kotoba.mathml,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/mathml/src/kotoba/mathml.cljc"
+    "orgs/kotoba-lang/mathml/src/mathml/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/mathml/test/mathml/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/mermaid",
+   :ns kotoba.mermaid,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/mermaid/src/kotoba/mermaid.cljc"
+    "orgs/kotoba-lang/mermaid/src/mermaid/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/mermaid/test/mermaid/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/mise",
+   :ns mise.checkout,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/mise/src/mise/cart.cljc"
+    "orgs/kotoba-lang/mise/src/mise/catalog.cljc"
+    "orgs/kotoba-lang/mise/src/mise/checkout.cljc"
+    "orgs/kotoba-lang/mise/src/mise/events.cljc"
+    "orgs/kotoba-lang/mise/src/mise/inventory.cljc"
+    "orgs/kotoba-lang/mise/src/mise/ledger.cljc"
+    "orgs/kotoba-lang/mise/src/mise/order.cljc"
+    "orgs/kotoba-lang/mise/src/mise/pricing.cljc"
+    "orgs/kotoba-lang/mise/src/mise/ssr.clj"
+    "orgs/kotoba-lang/mise/src/mise/views.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/mise/test/mise/cart_discount_test.cljc"
+    "orgs/kotoba-lang/mise/test/mise/cart_test.cljc"
+    "orgs/kotoba-lang/mise/test/mise/catalog_test.cljc"
+    "orgs/kotoba-lang/mise/test/mise/category_tree_test.cljc"
+    "orgs/kotoba-lang/mise/test/mise/checkout_test.cljc"
+    "orgs/kotoba-lang/mise/test/mise/coupon_test.cljc"
+    "orgs/kotoba-lang/mise/test/mise/events_test.cljc"
+    "orgs/kotoba-lang/mise/test/mise/inventory_test.cljc"
+    "orgs/kotoba-lang/mise/test/mise/ledger_test.cljc"
+    "orgs/kotoba-lang/mise/test/mise/order_test.cljc"
+    "orgs/kotoba-lang/mise/test/mise/pricing_test.cljc"
+    "orgs/kotoba-lang/mise/test/mise/shipping_validation_test.cljc"
+    "orgs/kotoba-lang/mise/test/mise/variant_matrix_test.cljc"
+    "orgs/kotoba-lang/mise/test/mise/views_test.cljc"
+    "orgs/kotoba-lang/mise/test/mise/volume_discount_test.cljc"]}
+  {:repo "orgs/kotoba-lang/multiformats",
+   :ns multiformats.core,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/multiformats/src/multiformats/core.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/multiformats/test/multiformats/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/musicxml",
+   :ns kotoba.musicxml,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/musicxml/src/kotoba/musicxml.cljc"
+    "orgs/kotoba-lang/musicxml/src/musicxml/core.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/musicxml/test/musicxml/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/n-quads",
+   :ns n-quads.core,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/n-quads/src/n_quads/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/n-quads/test/n_quads/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/nagare",
+   :ns nagare.solver,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/nagare/src/nagare/demo.cljc"
+    "orgs/kotoba-lang/nagare/src/nagare/diagnostics.cljc"
+    "orgs/kotoba-lang/nagare/src/nagare/field.cljc"
+    "orgs/kotoba-lang/nagare/src/nagare/fvm.cljc"
+    "orgs/kotoba-lang/nagare/src/nagare/linsolve.cljc"
+    "orgs/kotoba-lang/nagare/src/nagare/mesh.cljc"
+    "orgs/kotoba-lang/nagare/src/nagare/solver.cljc"
+    "orgs/kotoba-lang/nagare/src/nagare/transport.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/nagare/test/nagare/diagnostics_test.cljc"
+    "orgs/kotoba-lang/nagare/test/nagare/field_test.cljc"
+    "orgs/kotoba-lang/nagare/test/nagare/fvm_test.cljc"
+    "orgs/kotoba-lang/nagare/test/nagare/linsolve_test.cljc"
+    "orgs/kotoba-lang/nagare/test/nagare/mesh_test.cljc"
+    "orgs/kotoba-lang/nagare/test/nagare/portability_test.cljc"
+    "orgs/kotoba-lang/nagare/test/nagare/solver_test.cljc"
+    "orgs/kotoba-lang/nagare/test/nagare/transport_test.cljc"]}
+  {:repo "orgs/kotoba-lang/occupation",
+   :ns kotoba.occupation,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/occupation/src/kotoba/occupation.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/occupation/test/kotoba/occupation_test.clj"]}
+  {:repo "orgs/kotoba-lang/ocio",
+   :ns kotoba.ocio,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/ocio/src/kotoba/ocio.cljc"
+    "orgs/kotoba-lang/ocio/src/ocio/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/ocio/test/ocio/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/office",
+   :ns office.graph,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/office/src/office/cli.clj"
+    "orgs/kotoba-lang/office/src/office/embed.cljc"
+    "orgs/kotoba-lang/office/src/office/export.cljc"
+    "orgs/kotoba-lang/office/src/office/graph.cljc"
+    "orgs/kotoba-lang/office/src/office/opc.cljc"
+    "orgs/kotoba-lang/office/src/office/visual.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/office/test/office/cli_test.clj"
+    "orgs/kotoba-lang/office/test/office/graph_test.clj"]}
+  {:repo "orgs/kotoba-lang/office-style",
+   :ns office-style.style,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/office-style/src/office_style/cli.clj"
+    "orgs/kotoba-lang/office-style/src/office_style/opc.cljc"
+    "orgs/kotoba-lang/office-style/src/office_style/preview.cljc"
+    "orgs/kotoba-lang/office-style/src/office_style/style.cljc"
+    "orgs/kotoba-lang/office-style/src/office_style/svgraph.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/office-style/test/office_style/cli_test.clj"
+    "orgs/kotoba-lang/office-style/test/office_style/style_test.clj"]}
+  {:repo "orgs/kotoba-lang/ooxml",
+   :ns ooxml.core,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/ooxml/src/ooxml/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/ooxml/test/ooxml/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/openapi",
+   :ns openapi.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/openapi/src/openapi/execute.cljc"
+    "orgs/kotoba-lang/openapi/src/openapi/json.cljc"
+    "orgs/kotoba-lang/openapi/src/openapi/model.cljc"
+    "orgs/kotoba-lang/openapi/src/openapi/ports.cljc"
+    "orgs/kotoba-lang/openapi/src/openapi/validate.cljc"],
+   :test-paths ["orgs/kotoba-lang/openapi/test/openapi/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/otio",
+   :ns kotoba.otio,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/otio/src/kotoba/otio.cljc"
+    "orgs/kotoba-lang/otio/src/otio/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/otio/test/otio/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/phone",
+   :ns kotoba.phone,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/phone/src/kotoba/phone.cljc"
+    "orgs/kotoba-lang/phone/src/kotoba/phone/export.cljc"
+    "orgs/kotoba-lang/phone/src/kotoba/phone/ui.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/phone/test/kotoba/phone/export_test.cljc"
+    "orgs/kotoba-lang/phone/test/kotoba/phone/ui_test.cljc"
+    "orgs/kotoba-lang/phone/test/kotoba/phone_test.cljc"]}
+  {:repo "orgs/kotoba-lang/plm",
+   :ns kotoba.plm.core,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/plm/src/kotoba/plm/core.cljc"
+    "orgs/kotoba-lang/plm/src/kotoba/plm/runner.clj"
+    "orgs/kotoba-lang/plm/src/kotoba/plm/ui.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/plm/test/kotoba/plm/core_test.clj"
+    "orgs/kotoba-lang/plm/test/kotoba/plm/runner_test.clj"
+    "orgs/kotoba-lang/plm/test/kotoba/plm/ui_test.clj"]}
+  {:repo "orgs/kotoba-lang/presentationml",
+   :ns presentationml.core,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/presentationml/src/presentationml/core.cljc"
+    "orgs/kotoba-lang/presentationml/src/presentationml/parse.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/presentationml/test/presentationml/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/property",
+   :ns kotoba.property,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/property/src/kotoba/property.cljc"
+    "orgs/kotoba-lang/property/src/kotoba/property/export.cljc"
+    "orgs/kotoba-lang/property/src/kotoba/property/ui.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/property/test/kotoba/property/export_test.cljc"
+    "orgs/kotoba-lang/property/test/kotoba/property/ui_test.cljc"
+    "orgs/kotoba-lang/property/test/kotoba/property_test.cljc"]}
+  {:repo "orgs/kotoba-lang/proto",
+   :ns kotoba.proto,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/proto/src/kotoba/proto.cljc"
+    "orgs/kotoba-lang/proto/src/proto/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/proto/test/proto/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/rdf",
+   :ns rdf.core,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/rdf/src/rdf/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/rdf/test/rdf/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/rdf-canon",
+   :ns rdf-canon.core,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/rdf-canon/src/rdf_canon/core.clj"],
+   :test-paths
+   ["orgs/kotoba-lang/rdf-canon/test/rdf_canon/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/retail",
+   :ns kotoba.retail,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/retail/src/kotoba/retail.cljc"
+    "orgs/kotoba-lang/retail/src/kotoba/retail/export.cljc"
+    "orgs/kotoba-lang/retail/src/kotoba/retail/ui.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/retail/test/kotoba/retail/export_test.cljc"
+    "orgs/kotoba-lang/retail/test/kotoba/retail/ui_test.cljc"
+    "orgs/kotoba-lang/retail/test/kotoba/retail_test.cljc"]}
+  {:repo "orgs/kotoba-lang/robotics",
+   :ns kotoba.robotics,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/robotics/src/kotoba/robotics.cljc"
+    "orgs/kotoba-lang/robotics/src/kotoba/robotics/export.cljc"
+    "orgs/kotoba-lang/robotics/src/kotoba/robotics/ui.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/robotics/test/kotoba/robotics/export_test.cljc"
+    "orgs/kotoba-lang/robotics/test/kotoba/robotics/ui_test.cljc"
+    "orgs/kotoba-lang/robotics/test/kotoba/robotics_test.cljc"]}
+  {:repo "orgs/kotoba-lang/scad",
+   :ns kotoba.scad,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/scad/src/kotoba/scad.cljc"
+    "orgs/kotoba-lang/scad/src/scad/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/scad/test/scad/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/senden",
+   :ns senden.campaign,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/senden/src/senden/attribution.cljc"
+    "orgs/kotoba-lang/senden/src/senden/campaign.cljc"
+    "orgs/kotoba-lang/senden/src/senden/channel.cljc"
+    "orgs/kotoba-lang/senden/src/senden/events.cljc"
+    "orgs/kotoba-lang/senden/src/senden/funnel.cljc"
+    "orgs/kotoba-lang/senden/src/senden/ssr.clj"
+    "orgs/kotoba-lang/senden/src/senden/views.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/senden/test/senden/ab_test_test.cljc"
+    "orgs/kotoba-lang/senden/test/senden/attribution_test.cljc"
+    "orgs/kotoba-lang/senden/test/senden/budget_test.cljc"
+    "orgs/kotoba-lang/senden/test/senden/campaign_test.cljc"
+    "orgs/kotoba-lang/senden/test/senden/channel_test.cljc"
+    "orgs/kotoba-lang/senden/test/senden/cohort_test.cljc"
+    "orgs/kotoba-lang/senden/test/senden/events_test.cljc"
+    "orgs/kotoba-lang/senden/test/senden/funnel_test.cljc"
+    "orgs/kotoba-lang/senden/test/senden/ledger_roundtrip_test.cljc"
+    "orgs/kotoba-lang/senden/test/senden/ssr_test.clj"
+    "orgs/kotoba-lang/senden/test/senden/time_decay_test.cljc"]}
+  {:repo "orgs/kotoba-lang/shacl",
+   :ns shacl.core,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/shacl/src/shacl/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/shacl/test/shacl/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/sheets",
+   :ns sheets.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/sheets/src/sheets/model.cljc"
+    "orgs/kotoba-lang/sheets/src/sheets/validate.cljc"
+    "orgs/kotoba-lang/sheets/src/sheets/wire.cljc"],
+   :test-paths ["orgs/kotoba-lang/sheets/test/sheets/model_test.cljc"]}
+  {:repo "orgs/kotoba-lang/sigma",
+   :ns sigma.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/sigma/src/sigma/execute.cljc"
+    "orgs/kotoba-lang/sigma/src/sigma/model.cljc"
+    "orgs/kotoba-lang/sigma/src/sigma/ports.cljc"
+    "orgs/kotoba-lang/sigma/src/sigma/validate.cljc"
+    "orgs/kotoba-lang/sigma/src/sigma/yaml.cljc"],
+   :test-paths ["orgs/kotoba-lang/sigma/test/sigma/core_test.cljc"]}
+  {:repo "orgs/kotoba-lang/slides",
+   :ns slides.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/slides/src/slides/build.clj"
+    "orgs/kotoba-lang/slides/src/slides/causal.cljc"
+    "orgs/kotoba-lang/slides/src/slides/cli.cljc"
+    "orgs/kotoba-lang/slides/src/slides/design.cljc"
+    "orgs/kotoba-lang/slides/src/slides/hiccup.cljc"
+    "orgs/kotoba-lang/slides/src/slides/model.cljc"
+    "orgs/kotoba-lang/slides/src/slides/office.cljc"
+    "orgs/kotoba-lang/slides/src/slides/pptx.cljc"
+    "orgs/kotoba-lang/slides/src/slides/pptx/import.cljc"
+    "orgs/kotoba-lang/slides/src/slides/render.cljc"
+    "orgs/kotoba-lang/slides/src/slides/routes.cljc"
+    "orgs/kotoba-lang/slides/src/slides/site.clj"
+    "orgs/kotoba-lang/slides/src/slides/svgraph.cljc"
+    "orgs/kotoba-lang/slides/src/slides/validate.cljc"
+    "orgs/kotoba-lang/slides/src/slides/visual.clj"
+    "orgs/kotoba-lang/slides/src/slides/web/events.cljc"
+    "orgs/kotoba-lang/slides/src/slides/web/sample.cljc"
+    "orgs/kotoba-lang/slides/src/slides/web/ssr.clj"
+    "orgs/kotoba-lang/slides/src/slides/web/views.cljc"
+    "orgs/kotoba-lang/slides/src/slides/wire.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/slides/test/slides/causal_test.clj"
+    "orgs/kotoba-lang/slides/test/slides/cli_test.clj"
+    "orgs/kotoba-lang/slides/test/slides/coverage_gate.clj"
+    "orgs/kotoba-lang/slides/test/slides/coverage_gate_test.clj"
+    "orgs/kotoba-lang/slides/test/slides/design_test.clj"
+    "orgs/kotoba-lang/slides/test/slides/hiccup_test.clj"
+    "orgs/kotoba-lang/slides/test/slides/model_test.cljc"
+    "orgs/kotoba-lang/slides/test/slides/office_test.clj"
+    "orgs/kotoba-lang/slides/test/slides/package_test.clj"
+    "orgs/kotoba-lang/slides/test/slides/pptx_test.clj"
+    "orgs/kotoba-lang/slides/test/slides/render_test.clj"
+    "orgs/kotoba-lang/slides/test/slides/roundtrip_matrix_test.clj"
+    "orgs/kotoba-lang/slides/test/slides/site_test.clj"
+    "orgs/kotoba-lang/slides/test/slides/svgraph_test.cljc"
+    "orgs/kotoba-lang/slides/test/slides/validate_test.clj"
+    "orgs/kotoba-lang/slides/test/slides/visual_test.clj"
+    "orgs/kotoba-lang/slides/test/slides/web/events_test.cljc"
+    "orgs/kotoba-lang/slides/test/slides/web/ssr_test.clj"
+    "orgs/kotoba-lang/slides/test/slides/wire_test.cljc"]}
+  {:repo "orgs/kotoba-lang/soko",
+   :ns soko.fulfillment,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/soko/src/soko/events.cljc"
+    "orgs/kotoba-lang/soko/src/soko/fulfillment.cljc"
+    "orgs/kotoba-lang/soko/src/soko/projection.cljc"
+    "orgs/kotoba-lang/soko/src/soko/shipment.cljc"
+    "orgs/kotoba-lang/soko/src/soko/ssr.clj"
+    "orgs/kotoba-lang/soko/src/soko/views.cljc"
+    "orgs/kotoba-lang/soko/src/soko/warehouse.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/soko/test/soko/backorder_transfer_test.cljc"
+    "orgs/kotoba-lang/soko/test/soko/carrier_validation_test.cljc"
+    "orgs/kotoba-lang/soko/test/soko/events_test.cljc"
+    "orgs/kotoba-lang/soko/test/soko/fulfillment_test.cljc"
+    "orgs/kotoba-lang/soko/test/soko/ledger_roundtrip_test.cljc"
+    "orgs/kotoba-lang/soko/test/soko/projection_test.cljc"
+    "orgs/kotoba-lang/soko/test/soko/reorder_test.cljc"
+    "orgs/kotoba-lang/soko/test/soko/shipment_test.cljc"
+    "orgs/kotoba-lang/soko/test/soko/split_shipment_test.cljc"
+    "orgs/kotoba-lang/soko/test/soko/ssr_test.clj"
+    "orgs/kotoba-lang/soko/test/soko/warehouse_test.cljc"]}
+  {:repo "orgs/kotoba-lang/spice",
+   :ns kotoba.spice,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/spice/src/kotoba/spice.cljc"
+    "orgs/kotoba-lang/spice/src/spice/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/spice/test/spice/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/spirv",
+   :ns kotoba.spirv,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/spirv/src/kotoba/spirv.cljc"
+    "orgs/kotoba-lang/spirv/src/spirv/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/spirv/test/spirv/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/sql",
+   :ns kotoba.sql,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/sql/src/kotoba/sql.cljc"
+    "orgs/kotoba-lang/sql/src/sql/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/sql/test/sql/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/srt",
+   :ns kotoba.srt,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/srt/src/kotoba/srt.cljc"
+    "orgs/kotoba-lang/srt/src/srt/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/srt/test/srt/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/statechart",
+   :ns statechart.model,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/statechart/src/statechart/execute.cljc"
+    "orgs/kotoba-lang/statechart/src/statechart/model.cljc"
+    "orgs/kotoba-lang/statechart/src/statechart/ports.cljc"
+    "orgs/kotoba-lang/statechart/src/statechart/validate.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/statechart/test/statechart/execute_test.cljc"]}
+  {:repo "orgs/kotoba-lang/step",
+   :ns kotoba.step,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/step/src/kotoba/step.cljc"
+    "orgs/kotoba-lang/step/src/step/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/step/test/step/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/svg",
+   :ns svg.core,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/svg/src/svg/core.cljc"
+    "orgs/kotoba-lang/svg/src/svg/css.cljc"
+    "orgs/kotoba-lang/svg/src/svg/shapes.cljc"],
+   :test-paths ["orgs/kotoba-lang/svg/test/svg/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/svgraph",
+   :ns svgraph.core,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/svgraph/src/svgraph/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/svgraph/test/svgraph/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/swift",
+   :source-paths
+   ["orgs/kotoba-lang/swift/src/kotoba/swift.cljc"
+    "orgs/kotoba-lang/swift/src/kotoba/swift/export.cljc"
+    "orgs/kotoba-lang/swift/src/kotoba/swift/ui.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/swift/test/kotoba/swift_test.cljc"
+    "orgs/kotoba-lang/swift/test/kotoba/swift/export_test.cljc"
+    "orgs/kotoba-lang/swift/test/kotoba/swift/ui_test.cljc"],
+   :status :done,
+   :ns kotoba.swift}
+  {:repo "orgs/kotoba-lang/technology",
+   :ns kotoba.technology,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/technology/src/kotoba/technology.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/technology/test/kotoba/technology_test.clj"]}
+  {:repo "orgs/kotoba-lang/tex",
+   :ns kotoba.lang.tex.core,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/tex/src/kotoba/lang/tex/core.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/tex/test/kotoba/lang/tex/core_test.cljc"]}
+  {:repo "orgs/kotoba-lang/toml",
+   :ns kotoba.toml,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/toml/src/kotoba/toml.cljc"
+    "orgs/kotoba-lang/toml/src/toml/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/toml/test/toml/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/torch",
+   :ns torch.core,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/torch/src/torch/core.cljc"
+    "orgs/kotoba-lang/torch/src/torch/model.cljc"
+    "orgs/kotoba-lang/torch/src/torch/ports.cljc"
+    "orgs/kotoba-lang/torch/src/torch/shape.cljc"
+    "orgs/kotoba-lang/torch/src/torch/validate.cljc"],
+   :test-paths ["orgs/kotoba-lang/torch/test/torch/core_test.cljc"]}
+  {:repo "orgs/kotoba-lang/transit",
+   :ns transit.core,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/transit/src/transit/core.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/transit/test/transit/core_test.cljc"]}
+  {:repo "orgs/kotoba-lang/turtle",
+   :ns turtle.core,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/turtle/src/turtle/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/turtle/test/turtle/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/usd",
+   :ns kotoba.usd,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/usd/src/kotoba/usd.cljc"
+    "orgs/kotoba-lang/usd/src/usd/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/usd/test/usd/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/utsushi",
+   :ns utsushi.graph,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/utsushi/src/utsushi/bitstream.cljc"
+    "orgs/kotoba-lang/utsushi/src/utsushi/blob.cljc"
+    "orgs/kotoba-lang/utsushi/src/utsushi/bytes.cljc"
+    "orgs/kotoba-lang/utsushi/src/utsushi/codec.cljc"
+    "orgs/kotoba-lang/utsushi/src/utsushi/container.cljc"
+    "orgs/kotoba-lang/utsushi/src/utsushi/demux.cljc"
+    "orgs/kotoba-lang/utsushi/src/utsushi/graph.cljc"
+    "orgs/kotoba-lang/utsushi/src/utsushi/mux.cljc"
+    "orgs/kotoba-lang/utsushi/src/utsushi/policy.cljc"
+    "orgs/kotoba-lang/utsushi/src/utsushi/pregel.cljc"
+    "orgs/kotoba-lang/utsushi/src/utsushi/quads.cljc"
+    "orgs/kotoba-lang/utsushi/src/utsushi/remux.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/utsushi/test/utsushi/container_test.cljc"
+    "orgs/kotoba-lang/utsushi/test/utsushi/e2e_test.cljc"
+    "orgs/kotoba-lang/utsushi/test/utsushi/pregel_test.cljc"]}
+  {:repo "orgs/kotoba-lang/verilog",
+   :ns kotoba.verilog,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/verilog/src/kotoba/verilog.cljc"
+    "orgs/kotoba-lang/verilog/src/verilog/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/verilog/test/verilog/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/wgsl",
+   :ns kotoba.wgsl,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/wgsl/src/kotoba/wgsl.cljc"],
+   :test-paths ["orgs/kotoba-lang/wgsl/test/wgsl_test.clj"]}
+  {:repo "orgs/kotoba-lang/wit",
+   :ns kotoba.lang.wit,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/wit/src/kotoba/lang/wit.cljc"],
+   :test-paths ["orgs/kotoba-lang/wit/test/kotoba/lang/wit_test.cljc"]}
+  {:repo "orgs/kotoba-lang/xml",
+   :ns kotoba.xml,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/xml/src/kotoba/xml.cljc"
+    "orgs/kotoba-lang/xml/src/xml/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/xml/test/xml/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/yaml",
+   :ns kotoba.yaml,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/yaml/src/kotoba/yaml.cljc"
+    "orgs/kotoba-lang/yaml/src/yaml/core.cljc"],
+   :test-paths ["orgs/kotoba-lang/yaml/test/yaml/core_test.clj"]}
+  {:repo "orgs/kotoba-lang/zone",
+   :ns zone.zone,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/zone/src/zone/model.cljc"
+    "orgs/kotoba-lang/zone/src/zone/validate.cljc"
+    "orgs/kotoba-lang/zone/src/zone/zone.cljc"],
+   :test-paths ["orgs/kotoba-lang/zone/test/zone/zone_test.cljc"]}],
+ :allowed-non-webgpu-west-drift-repos
+ #{"orgs/kotoba-lang/kotoba-core-contracts"
+   "orgs/kotoba-lang/kami-scene-contracts"
+   "orgs/kotoba-lang/physics"
+   "orgs/kotoba-lang/aiueos-cljc-contract"
+   "orgs/com-junkawasaki/kotodama"
+   "orgs/gftdcojp/net-kotobase"
+   "orgs/kotoba-lang/kotoba-selfhost-contracts"
+   "orgs/kotoba-lang/kotoba-adapter-contracts"},
+ :verification
+ {:manifest
+  ["bb scripts/kami-webgpu-dsl-runtime-split-audit.bb --strict"
+   "bb scripts/kami-webgpu-dsl-runtime-split-audit.bb --publish-manifest --strict"
+   "bb scripts/kami-webgpu-dsl-runtime-split-audit.bb --publish-checklist --strict"
+   "bb scripts/kami-webgpu-dsl-runtime-split-audit.bb --publish-checklist --batch ci-only --strict"
+   "bb scripts/kami-webgpu-dsl-runtime-split-audit.bb --publish-checklist --batch readme-ci --strict"
+   "bb scripts/kami-webgpu-dsl-runtime-split-audit.bb --publish-checklist --batch source-bearing --strict"
+   "bb scripts/kami-webgpu-dsl-runtime-split-audit.bb --publish-progress --strict"
+   "bb scripts/kami-webgpu-dsl-runtime-split-audit.bb --strict --requested-tests"
+   "bash scripts/verify-clj-everywhere.sh"
+   "bb scripts/kotoba-only-runtime-audit.bb --strict"
+   "bb scripts/kami-provider-split-audit.bb --strict"],
+  :west-generator-note
+  "bb scripts/gen-west-manifest.bb --check is intentionally not the migration gate while unrelated checked-out repos can advance generated revisions outside this split.",
+  :runtime
+  ["cd orgs/kotoba-lang/webgpu && clojure -M:test"
+   "cd orgs/kotoba-lang/webgl && clojure -M:test"
+   "cd orgs/kotoba-lang/sprite2d && clojure -M:test"
+   "cd orgs/kotoba-lang/host && clojure -M:test"
+   "cd orgs/kotoba-lang/input && clojure -M:test"
+   "cd orgs/kotoba-lang/audio && clojure -M:test"
+   "cd orgs/kotoba-lang/ui && clojure -M:test"],
+  :format-dsl "for each :repo below, run clojure -M:test"},
+ :source "orgs/kotoba-lang/webgpu",
+ :requested-scope
+ {:format-dsl
+  #{"orgs/kotoba-lang/scad"
+    "orgs/kotoba-lang/verilog"
+    "orgs/kotoba-lang/spirv"
+    "orgs/kotoba-lang/usd"
+    "orgs/kotoba-lang/otio"
+    "orgs/kotoba-lang/gltf"
+    "orgs/kotoba-lang/materialx"
+    "orgs/kotoba-lang/ocio"
+    "orgs/kotoba-lang/graphml"
+    "orgs/kotoba-lang/mathml"
+    "orgs/kotoba-lang/musicxml"
+    "orgs/kotoba-lang/atom"
+    "orgs/kotoba-lang/proto"
+    "orgs/kotoba-lang/capnp"
+    "orgs/kotoba-lang/graphql"
+    "orgs/kotoba-lang/geojson"
+    "orgs/kotoba-lang/dot"
+    "orgs/kotoba-lang/mermaid"
+    "orgs/kotoba-lang/toml"
+    "orgs/kotoba-lang/cue"
+    "orgs/kotoba-lang/sql"
+    "orgs/kotoba-lang/kicad"
+    "orgs/kotoba-lang/dxf"
+    "orgs/kotoba-lang/spice"
+    "orgs/kotoba-lang/step"
+    "orgs/kotoba-lang/srt"
+    "orgs/kotoba-lang/ical"
+    "orgs/kotoba-lang/exr"},
+  :runtime-browser
+  #{"orgs/kotoba-lang/webgl"
+    "orgs/kotoba-lang/sprite2d"
+    "orgs/kotoba-lang/ui"
+    "orgs/kotoba-lang/host"
+    "orgs/kotoba-lang/input"
+    "orgs/kotoba-lang/audio"
+    "orgs/kotoba-lang/playwright"}},
+ :requested-publish-plan
+ {:source "bb scripts/kami-webgpu-dsl-runtime-split-audit.bb --edn --strict"
+  :unit :repo-pr
+  :batches
+  [{:id :ci-only
+    :intent "Add missing CLJ/CLJC CI to already-materialized requested split repos."
+    :allowed-change-kinds #{:ci}
+    :repos
+    ["orgs/kotoba-lang/audio"
+     "orgs/kotoba-lang/capnp"
+     "orgs/kotoba-lang/cue"
+     "orgs/kotoba-lang/dxf"
+     "orgs/kotoba-lang/exr"
+     "orgs/kotoba-lang/input"
+     "orgs/kotoba-lang/kicad"
+     "orgs/kotoba-lang/mermaid"
+     "orgs/kotoba-lang/proto"
+     "orgs/kotoba-lang/scad"
+     "orgs/kotoba-lang/spice"
+     "orgs/kotoba-lang/spirv"
+     "orgs/kotoba-lang/sprite2d"
+     "orgs/kotoba-lang/sql"
+     "orgs/kotoba-lang/srt"
+     "orgs/kotoba-lang/step"
+     "orgs/kotoba-lang/toml"
+     "orgs/kotoba-lang/ui"
+     "orgs/kotoba-lang/usd"
+     "orgs/kotoba-lang/verilog"
+     "orgs/kotoba-lang/webgl"]}
+   {:id :readme-ci
+    :intent "Align README test instructions and add missing CLJ/CLJC CI."
+    :allowed-change-kinds #{:readme :ci}
+    :repos
+    ["orgs/kotoba-lang/atom"
+     "orgs/kotoba-lang/geojson"
+     "orgs/kotoba-lang/gltf"
+     "orgs/kotoba-lang/graphml"
+     "orgs/kotoba-lang/materialx"
+     "orgs/kotoba-lang/mathml"
+     "orgs/kotoba-lang/musicxml"
+     "orgs/kotoba-lang/ocio"
+     "orgs/kotoba-lang/otio"]}
+   {:id :source-bearing
+    :intent "Publish split source/test additions or tracked source/deps changes with README/CI alignment."
+    :allowed-change-kinds #{:readme :ci :tracked :untracked}
+    :repos
+    ["orgs/kotoba-lang/dot"
+     "orgs/kotoba-lang/graphql"
+     "orgs/kotoba-lang/host"
+     "orgs/kotoba-lang/ical"
+     "orgs/kotoba-lang/playwright"]}]},
+ :policy
+ {:source-of-truth #{:edn :cljc :kotoba},
+  :split-unit :semantic-domain,
+  :rust-authority? false,
+  :js-authority? false,
+  :ci
+  {:workflow-path-fragment "/.github/workflows/"
+   :required-patterns ["actions/setup-java"
+                       "DeLaGuardo/setup-clojure"
+                       "clojure -M:test"]
+   :forbidden-patterns ["\\bcargo\\b"
+                        "rust-toolchain"
+                        "actions/setup-node"
+                        "pnpm/action-setup"
+                        "\\bnpm\\b"
+                        "\\bpnpm\\b"
+                        "\\byarn\\b"
+                        "\\bnpx\\b"
+                        "\\bnode\\b"
+                        "shadow-cljs"]},
+  :repo-shape
+  {:required ["deps.edn" "src" "test"],
+   :required-readme-patterns ["# " "clojure -M:test"],
+   :license-required? false,
+   :preferred-source-ext #{".cljc" ".clj"},
+   :forbidden-artifacts #{"Cargo.toml"
+                          "Cargo.lock"
+                          "package.json"
+                          "package-lock.json"
+                          "shadow-cljs.edn"
+                          "tsconfig.json"
+                          "*.cljs"
+                          "*.rs"
+                          "*.ts"
+                          "*.tsx"
+                          "*.jsx"
+                          "*.svelte"},
+   :browser-executor-allowed-only-with-clj-stub? true}},
+ :render-domain-repos
+ [{:repo "orgs/kotoba-lang/fsm",
+   :ns kotoba.fsm,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/fsm/src/kotoba/fsm.cljc"],
+   :test-paths ["orgs/kotoba-lang/fsm/test/fsm_test.clj"]}
+  {:repo "orgs/kotoba-lang/level",
+   :ns kotoba.level,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/level/src/kotoba/level.cljc"],
+   :test-paths ["orgs/kotoba-lang/level/test/level_test.clj"]}
+  {:repo "orgs/kotoba-lang/netsync",
+   :ns kotoba.netsync,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/netsync/src/kotoba/netsync.cljc"],
+   :test-paths ["orgs/kotoba-lang/netsync/test/netsync_test.clj"]}
+  {:repo "orgs/kotoba-lang/pipelines",
+   :ns kotoba.pipelines,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/pipelines/src/kotoba/pipelines.cljc"],
+   :from-webgpu
+   ["orgs/kotoba-lang/webgpu/scripts/gen_pipeline_specs.clj"
+    "orgs/kotoba-lang/webgpu/fixtures/pipeline_specs.rs"],
+   :test-paths ["orgs/kotoba-lang/pipelines/test/pipelines_test.clj"]}
+  {:repo "orgs/kotoba-lang/shaders",
+   :ns kotoba.shaders,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/shaders/src/kotoba/shaders.cljc"],
+   :from-webgpu
+   ["orgs/kotoba-lang/webgpu/scripts/gen_glsl.clj"
+    "orgs/kotoba-lang/webgpu/fixtures/glsl"],
+   :test-paths ["orgs/kotoba-lang/shaders/test/shader_test.clj"]}
+  {:repo "orgs/kotoba-lang/render-shaders",
+   :ns kotoba.render-shaders,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/render-shaders/src/kotoba/render_shaders.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/render-shaders/test/render_naga_test.clj"]}
+  {:repo "orgs/kotoba-lang/sky",
+   :ns kotoba.sky,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/sky/src/kotoba/sky.cljc"],
+   :test-paths ["orgs/kotoba-lang/sky/test/sky_test.clj"]}
+  {:repo "orgs/kotoba-lang/scene2d",
+   :ns kotoba.scene2d,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/scene2d/src/kotoba/scene2d.cljc"],
+   :test-paths ["orgs/kotoba-lang/scene2d/test/scene2d_test.clj"]}
+  {:repo "orgs/kotoba-lang/vrm",
+   :ns kotoba.vrm,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/vrm/src/kotoba/vrm.cljc"],
+   :test-paths ["orgs/kotoba-lang/vrm/test/vrm_test.clj"]}
+  {:repo "orgs/kotoba-lang/dance",
+   :ns kotoba.dance,
+   :status :done,
+   :source-paths ["orgs/kotoba-lang/dance/src/kotoba/dance.cljc"],
+   :test-paths ["orgs/kotoba-lang/dance/test/dance_test.clj"]}
+  {:repo "orgs/kotoba-lang/text",
+   :ns kotoba.text,
+   :status :done,
+   :source-paths
+   ["orgs/kotoba-lang/text/src/kotoba/text.cljc"
+    "orgs/kotoba-lang/text/src/kotoba/lang/text.cljc"
+    "orgs/kotoba-lang/text/src/kotoba/re.cljc"
+    "orgs/kotoba-lang/text/src/text/regex.cljc"],
+   :test-paths
+   ["orgs/kotoba-lang/text/test/kotoba/lang/text_test.cljc"
+    "orgs/kotoba-lang/text/test/kotoba/text_test.clj"
+    "orgs/kotoba-lang/text/test/text/regex_test.clj"]}],
+ :id :kami-webgpu-dsl-runtime-split,
+ :required-runtime-repos
+ #{"orgs/kotoba-lang/input"
+   "orgs/kotoba-lang/ed25519"
+   "orgs/kotoba-lang/kenchi"
+   "orgs/kotoba-lang/eth-crypto"
+   "orgs/kotoba-lang/test"
+   "orgs/kotoba-lang/kuro"
+   "orgs/kotoba-lang/store"
+   "orgs/kotoba-lang/playwright"
+   "orgs/kotoba-lang/sprite2d"
+   "orgs/kotoba-lang/spec"
+   "orgs/kotoba-lang/audio"
+   "orgs/kotoba-lang/computer-use"
+   "orgs/kotoba-lang/browser-agent"
+   "orgs/kotoba-lang/coll"
+   "orgs/kotoba-lang/async"
+   "orgs/kotoba-lang/time"
+   "orgs/kotoba-lang/motor"
+   "orgs/kotoba-lang/net"
+   "orgs/kotoba-lang/cae-solver"
+   "orgs/kotoba-lang/netcap"
+   "orgs/kotoba-lang/kotoba-code"
+   "orgs/kotoba-lang/webgl"
+   "orgs/kotoba-lang/lsp"
+   "orgs/kotoba-lang/host"
+   "orgs/kotoba-lang/log"
+   "orgs/kotoba-lang/browser-use"
+   "orgs/kotoba-lang/freeboard"
+   "orgs/kotoba-lang/kagi"
+   "orgs/kotoba-lang/vphysics"
+   "orgs/kotoba-lang/lsp-rpc"
+   "orgs/kotoba-lang/mailer"
+   "orgs/kotoba-lang/ui"
+   "orgs/kotoba-lang/crash"
+   "orgs/kotoba-lang/vc"}}

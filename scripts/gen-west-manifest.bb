@@ -53,9 +53,17 @@
        (keep (fn [l] (when (str/includes? l " commit ")
                        (-> (str/split l #"\t" 2) second))))))
 
+(defn separate-working-tree? [path]
+  (let [path-file (io/file root path)
+        {:keys [exit out]} (sh "git" "-C" (str path-file) "rev-parse" "--show-toplevel")]
+    (and (zero? exit)
+         (not= (.getCanonicalPath (io/file root))
+               (.getCanonicalPath (io/file (str/trim out)))))))
+
 (defn working-head [path]
-  (let [{:keys [exit out]} (sh "git" "-C" (str (io/file root path)) "rev-parse" "HEAD")]
-    (when (zero? exit) (str/trim out))))
+  (when (separate-working-tree? path)
+    (let [{:keys [exit out]} (sh "git" "-C" (str (io/file root path)) "rev-parse" "HEAD")]
+      (when (zero? exit) (str/trim out)))))
 
 (defn org-of  [p] (second (str/split p #"/")))
 (defn name-of [p] (last (str/split p #"/")))

@@ -1,19 +1,4 @@
-name: clj-wgsl parity
-
-# Phase 3.2 (ADR-2607010930) — standing CI that gates the Rust→CLJ/WGSL migration.
-# Runs the migration's verification surfaces:
-#   1. west.yml canonical gate (gen-west-manifest.bb --check)         [required]
-#   2. kotoba boundary audit — default mode, assert kotodama cells empty [required]
-#   3. verify-clj-everywhere.sh — 4 surfaces (JVM babashka / kotoba-clj
-#      keystone / kami-webgpu-rs / WGSL parity)                       [continue-on-error: heavy]
-#   4. cargo parity (kami-engine-clj --test parity)                   [continue-on-error: first CI]
-#   5. cargo wasmi no-JIT invariant (kami-script-runtime
-#      --no-default-features --features backend-wasmi)                [continue-on-error: first CI]
-#
-# The babashka + --check steps MUST stay required. The cargo / verify-clj-everywhere
-# surfaces need child repos (west update) + a rust toolchain with the native adapter
-# crates; until the workspace adapter is wired into CI they run as continue-on-error so
-# the migration has a standing harness without red-blocking the rest of the repo.
+name: kotoba migration parity
 
 on:
   push:
@@ -23,7 +8,7 @@ on:
 
 jobs:
   parity:
-    name: clj-wgsl parity
+    name: kotoba migration parity
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -32,46 +17,33 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup babashka
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Clojure and Babashka
         uses: DeLaGuardo/setup-clojure@13.0
         with:
-          bb: 'latest'
-
-      - name: Setup rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+          cli: latest
+          bb: latest
 
       - name: Setup python + west
         run: |
           python -m pip install --upgrade pip
           pip install west
 
-      # ---- required gates (no child repos needed) ----
-
       - name: west.yml canonical (--check)
         run: bb scripts/gen-west-manifest.bb --check
 
-      - name: west init + update (shallow, for child-repo surfaces)
-        continue-on-error: true
+      - name: west init + update
         run: |
           west init -l manifest
           west update --fetch smart
 
-      - name: kotoba boundary audit (default — assert kotodama cells empty)
+      - name: kotoba boundary audit
         run: bb scripts/kotoba-boundary-audit.bb
 
-      # ---- heavy cargo / 4-surface gates (continue-on-error until adapter wired) ----
-
-      - name: "verify-clj-everywhere (4 surfaces: JVM / WASM keystone / wgpu / WGSL parity)"
-        continue-on-error: true
+      - name: CLJ/CLJC migration gates
         run: bash scripts/verify-clj-everywhere.sh
-
-      - name: cargo parity (kami-engine-clj --test parity)
-        continue-on-error: true
-        working-directory: orgs/kotoba-lang/kami-engine
-        run: cargo test -p kami-engine-clj --test parity
-
-      - name: cargo wasmi no-JIT invariant (kami-script-runtime --no-default-features --features backend-wasmi)
-        continue-on-error: true
-        working-directory: orgs/kotoba-lang/kami-engine
-        # DEAD pending Rust workspace — kami-engine is CLJC-only (no-rust guard); wasmi build gate deferred until the Rust executor repo is in-manifest. Phase 3.3 dispatch-budget is asserted in kami-engine's bb test instead.
-        run: cargo check -p kami-script-runtime --no-default-features --features backend-wasmi
