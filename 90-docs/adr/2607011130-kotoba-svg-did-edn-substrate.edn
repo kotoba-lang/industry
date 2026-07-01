@@ -1,0 +1,27 @@
+{:adr/id "2607011130"
+ :adr/title "kotoba-lang/svg and kotoba-lang/did as EDN substrates"
+ :adr/status :accepted
+ :adr/date "2026-07-01"
+ :context
+ {:svg "Treat SVG like hicuupus/shadowcss: EDN data plus CLJ/CLJC helpers, not a browser/SVG pipeline repo."
+  :did "Provide a small EDN-first identity substrate for DID documents and local DID helpers."}
+ :decision
+ {:kotoba-lang/svg
+  {:repo "git@github.com:kotoba-lang/svg.git"
+   :revision "0c2776c736bc06010fcaca0fc083d9bd7cd50d7c"
+   :shape [:svg {:viewBox "0 0 100 100"} [:circle {:cx 50 :cy 50 :r 40}]]
+   :features [:hiccup-like-nodes :tag-sugar :style-maps :raw-svg :render :validate]}
+  :kotoba-lang/did
+  {:repo "git@github.com:kotoba-lang/did.git"
+   :revision "32865d4725c390ac92dcbae297f37eec383919a6"
+   :features [:parse :did-document :did-key-ed25519 :did-web]}}
+ :manifest
+ {:path-overrides
+  {:remove ["orgs/com-junkawasaki/drawingml-svg"]}
+  :projects
+  ["orgs/kotoba-lang/svg"
+   "orgs/kotoba-lang/did"]}
+ :consequences
+ [:svg-can-be-composed-as-edn
+  :browser-office-svg-pipelines-remain-outside-the-edn-substrate
+  :did-documents-can-be-shared-as-edn]}
