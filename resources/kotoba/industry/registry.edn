@@ -6,6 +6,7 @@
    :name "Community Renewable Energy Operations"
    :repo "https://github.com/gftdcojp/cloud-itonami-3512"
    :business-id "cloud-itonami-3512"
+  :maturity :blueprint
    :required-technologies [:robotics :telemetry :optimization :dmn :bpmn :audit-ledger :forms]
    :optional-technologies [:cfd :cae]
    :operating-states [:intake :observe :recommend :approve :dispatch :settle :audit]}
@@ -13,6 +14,7 @@
    :name "Community Water Safety Operations"
    :repo "https://github.com/gftdcojp/cloud-itonami-3600"
    :business-id "cloud-itonami-3600"
+  :maturity :blueprint
    :required-technologies [:robotics :telemetry :dmn :bpmn :audit-ledger :forms]
    :optional-technologies [:cfd :cae]
    :operating-states [:intake :sample :alert :maintain :publish :audit]}
@@ -20,6 +22,7 @@
    :name "Local Materials Recovery"
    :repo "https://github.com/gftdcojp/cloud-itonami-3830"
    :business-id "cloud-itonami-3830"
+  :maturity :blueprint
    :required-technologies [:robotics :forms :telemetry :optimization :audit-ledger :bpmn :dmn]
    :optional-technologies [:identity]
    :operating-states [:collect :sort :grade :route :transfer :report]}
@@ -27,6 +30,7 @@
    :name "Talent Actor"
    :repo "https://github.com/gftdcojp/cloud-itonami-6310"
    :business-id "cloud-itonami-6310"
+  :maturity :implemented
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:telemetry]
    :operating-states [:intake :advise :govern :approve :commit :audit]}
@@ -34,6 +38,7 @@
    :name "Community Learning Support"
    :repo "https://github.com/gftdcojp/cloud-itonami-8569"
    :business-id "cloud-itonami-8569"
+  :maturity :blueprint
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
    :operating-states [:intake :plan :review :follow-up :refer :audit]}
@@ -41,6 +46,7 @@
    :name "Health Access Navigation"
    :repo "https://github.com/gftdcojp/cloud-itonami-8691"
    :business-id "cloud-itonami-8691"
+  :maturity :blueprint
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :optimization]
    :optional-technologies [:telemetry]
    :operating-states [:intake :triage :match :review :refer :follow-up :audit]}
@@ -48,6 +54,7 @@
    :name "Community Care Coordination"
    :repo "https://github.com/gftdcojp/cloud-itonami-8810"
    :business-id "cloud-itonami-8810"
+  :maturity :blueprint
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :optimization]
    :optional-technologies [:telemetry]
    :operating-states [:intake :check-in :assign :escalate :report :audit]}
@@ -55,6 +62,7 @@
    :name "Semiconductor and Electronics Manufacturing Enablement"
    :repo "https://github.com/gftdcojp/cloud-itonami-2610"
    :business-id "cloud-itonami-2610"
+  :maturity :blueprint
    :required-technologies [:robotics :eda :cae :dmn :bpmn :audit-ledger]
    :optional-technologies [:cfd :telemetry :optimization]
    :operating-states [:spec :design :verify :package :manufacture :audit]}
@@ -62,6 +70,7 @@
    :name "Aircraft and Aerospace Manufacturing Enablement"
    :repo "https://github.com/gftdcojp/cloud-itonami-3030"
    :business-id "cloud-itonami-3030"
+  :maturity :blueprint
    :required-technologies [:robotics :cae :cfd :dmn :bpmn :audit-ledger :optimization]
    :optional-technologies [:eda :telemetry]
    :operating-states [:requirements :simulate :verify :approve :manufacture :audit]}
@@ -69,6 +78,7 @@
    :name "Community Monetary Intermediation"
    :repo "https://github.com/gftdcojp/cloud-itonami-6419"
    :business-id "cloud-itonami-6419"
+  :maturity :blueprint
    :required-technologies [:robotics :banking :swift :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
    :operating-states [:intake :onboard :transact :clear :settle :audit]}
@@ -76,6 +86,7 @@
    :name "Community Telecommunications Access"
    :repo "https://github.com/gftdcojp/cloud-itonami-6190"
    :business-id "cloud-itonami-6190"
+  :maturity :blueprint
    :required-technologies [:robotics :phone :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
    :operating-states [:intake :provision :route :bill :support :audit]}
@@ -83,6 +94,7 @@
    :name "Card Transaction Processing and Settlement"
    :repo "https://github.com/gftdcojp/cloud-itonami-6619"
    :business-id "cloud-itonami-6619"
+  :maturity :blueprint
    :required-technologies [:robotics :card :banking :swift :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
    :operating-states [:intake :authorize :clear :settle :reconcile :chargeback :audit]}
@@ -188,6 +200,7 @@
   {:id "011"
    :name "Growing of non-perennial crops"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -195,6 +208,7 @@
   {:id "012"
    :name "Growing of perennial crops"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -202,6 +216,7 @@
   {:id "013"
    :name "Plant propagation"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -209,6 +224,7 @@
   {:id "014"
    :name "Animal production"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -216,6 +232,7 @@
   {:id "015"
    :name "Mixed farming"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -223,6 +240,7 @@
   {:id "017"
    :name "Hunting, trapping and related service activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -230,6 +248,7 @@
   {:id "021"
    :name "Silviculture and other forestry activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -237,6 +256,7 @@
   {:id "022"
    :name "Logging"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -244,6 +264,7 @@
   {:id "023"
    :name "Gathering of non-wood forest products"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -251,6 +272,7 @@
   {:id "024"
    :name "Support services to forestry"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -258,6 +280,7 @@
   {:id "031"
    :name "Fishing"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -265,6 +288,7 @@
   {:id "032"
    :name "Aquaculture"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -272,6 +296,7 @@
   {:id "051"
    :name "Mining of hard coal"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -279,6 +304,7 @@
   {:id "052"
    :name "Mining of lignite"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -286,6 +312,7 @@
   {:id "061"
    :name "Extraction of crude petroleum"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -293,6 +320,7 @@
   {:id "062"
    :name "Extraction of natural gas"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -300,6 +328,7 @@
   {:id "071"
    :name "Mining of iron ores"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -307,6 +336,7 @@
   {:id "072"
    :name "Mining of non-ferrous metal ores"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -314,6 +344,7 @@
   {:id "089"
    :name "Mining and quarrying n.e.c."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -321,6 +352,7 @@
   {:id "091"
    :name "Support activities for petroleum and natural gas extraction"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -328,6 +360,7 @@
   {:id "099"
    :name "Support activities for other mining and quarrying"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -335,6 +368,7 @@
   {:id "101"
    :name "Processing and preserving of meat"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -342,6 +376,7 @@
   {:id "102"
    :name "Processing and preserving of fish, crustaceans and molluscs"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -349,6 +384,7 @@
   {:id "103"
    :name "Processing and preserving of fruit and vegetables"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -356,6 +392,7 @@
   {:id "104"
    :name "Manufacture of vegetable and animal oils and fats"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -363,6 +400,7 @@
   {:id "105"
    :name "Manufacture of dairy products"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -370,6 +408,7 @@
   {:id "106"
    :name "Manufacture of grain mill products, starches and starch p..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -377,6 +416,7 @@
   {:id "107"
    :name "Manufacture of other food products"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -384,6 +424,7 @@
   {:id "108"
    :name "Manufacture of prepared animal feeds"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -391,6 +432,7 @@
   {:id "110"
    :name "Manufacture of beverages"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -398,6 +440,7 @@
   {:id "120"
    :name "Manufacture of tobacco products"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -405,6 +448,7 @@
   {:id "131"
    :name "Spinning, weaving and finishing of textiles"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -412,6 +456,7 @@
   {:id "139"
    :name "Manufacture of other textiles"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -419,6 +464,7 @@
   {:id "141"
    :name "Manufacture of wearing apparel, except fur apparel"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -426,6 +472,7 @@
   {:id "142"
    :name "Manufacture of articles of fur"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -433,6 +480,7 @@
   {:id "143"
    :name "Manufacture of knitted and crocheted apparel"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -440,6 +488,7 @@
   {:id "151"
    :name "Tanning and dressing of leather"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -447,6 +496,7 @@
   {:id "152"
    :name "Manufacture of footwear"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -454,6 +504,7 @@
   {:id "161"
    :name "Sawmilling and planing of wood"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -461,6 +512,7 @@
   {:id "162"
    :name "Manufacture of products of wood, cork, straw and plaiting..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -468,6 +520,7 @@
   {:id "170"
    :name "Manufacture of paper and paper products"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -475,6 +528,7 @@
   {:id "181"
    :name "Printing and service activities related to printing"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -482,6 +536,7 @@
   {:id "182"
    :name "Reproduction of recorded media"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -489,6 +544,7 @@
   {:id "191"
    :name "Manufacture of coke oven products"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -496,6 +552,7 @@
   {:id "192"
    :name "Manufacture of refined petroleum products"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -503,6 +560,7 @@
   {:id "201"
    :name "Manufacture of basic chemicals, fertilizers and nitrogen ..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae :cfd]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -510,6 +568,7 @@
   {:id "202"
    :name "Manufacture of other chemical products"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae :cfd]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -517,6 +576,7 @@
   {:id "203"
    :name "Manufacture of man-made fibres"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae :cfd]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -524,6 +584,7 @@
   {:id "210"
    :name "Manufacture of pharmaceuticals, medicinal chemical and bo..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae :cfd]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -531,6 +592,7 @@
   {:id "221"
    :name "Manufacture of rubber products"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae :cfd]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -538,6 +600,7 @@
   {:id "222"
    :name "Manufacture of plastics products"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae :cfd]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -545,6 +608,7 @@
   {:id "231"
    :name "Manufacture of glass and glass products"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -552,6 +616,7 @@
   {:id "239"
    :name "Manufacture of non-metallic mineral products n.e.c."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -559,6 +624,7 @@
   {:id "241"
    :name "Manufacture of basic iron and steel"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -566,6 +632,7 @@
   {:id "242"
    :name "Manufacture of basic precious and other non-ferrous metals"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -573,6 +640,7 @@
   {:id "243"
    :name "Casting of metals"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -580,6 +648,7 @@
   {:id "251"
    :name "Manufacture of structural metal products, tanks, reservoi..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -587,6 +656,7 @@
   {:id "252"
    :name "Manufacture of weapons and ammunition"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -594,6 +664,7 @@
   {:id "259"
    :name "Manufacture of other fabricated metal products"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -601,6 +672,7 @@
   {:id "262"
    :name "Manufacture of computers and peripheral equipment"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -608,6 +680,7 @@
   {:id "263"
    :name "Manufacture of communication equipment"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -615,6 +688,7 @@
   {:id "264"
    :name "Manufacture of consumer electronics"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -622,6 +696,7 @@
   {:id "265"
    :name "Manufacture of measuring, testing, navigating and control..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -629,6 +704,7 @@
   {:id "266"
    :name "Manufacture of irradiation, electromedical and electrothe..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -636,6 +712,7 @@
   {:id "267"
    :name "Manufacture of optical instruments and photographic equip..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -643,6 +720,7 @@
   {:id "268"
    :name "Manufacture of magnetic and optical media"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -650,6 +728,7 @@
   {:id "271"
    :name "Manufacture of electric motors, generators, transformers ..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -657,6 +736,7 @@
   {:id "272"
    :name "Manufacture of batteries and accumulators"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -664,6 +744,7 @@
   {:id "273"
    :name "Manufacture of wiring and wiring devices"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -671,6 +752,7 @@
   {:id "274"
    :name "Manufacture of electric lighting equipment"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -678,6 +760,7 @@
   {:id "275"
    :name "Manufacture of domestic appliances"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -685,6 +768,7 @@
   {:id "279"
    :name "Manufacture of other electrical equipment"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -692,6 +776,7 @@
   {:id "281"
    :name "Manufacture of general-purpose machinery"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -699,6 +784,7 @@
   {:id "282"
    :name "Manufacture of special-purpose machinery"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -706,6 +792,7 @@
   {:id "291"
    :name "Manufacture of motor vehicles"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -713,6 +800,7 @@
   {:id "292"
    :name "Manufacture of bodies"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -720,6 +808,7 @@
   {:id "293"
    :name "Manufacture of parts and accessories for motor vehicles"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -727,6 +816,7 @@
   {:id "301"
    :name "Building of ships and boats"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -734,6 +824,7 @@
   {:id "302"
    :name "Manufacture of railway locomotives and rolling stock"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -741,6 +832,7 @@
   {:id "304"
    :name "Manufacture of military fighting vehicles"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -748,6 +840,7 @@
   {:id "309"
    :name "Manufacture of transport equipment n.e.c."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -755,6 +848,7 @@
   {:id "310"
    :name "Manufacture of furniture"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -762,6 +856,7 @@
   {:id "321"
    :name "Manufacture of jewellery, bijouterie and related articles"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -769,6 +864,7 @@
   {:id "322"
    :name "Manufacture of musical instruments"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -776,6 +872,7 @@
   {:id "323"
    :name "Manufacture of sports goods"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -783,6 +880,7 @@
   {:id "324"
    :name "Manufacture of games and toys"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -790,6 +888,7 @@
   {:id "325"
    :name "Manufacture of medical and dental instruments and supplies"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -797,6 +896,7 @@
   {:id "329"
    :name "Other manufacturing n.e.c."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -804,6 +904,7 @@
   {:id "331"
    :name "Repair of fabricated metal products, machinery and equipment"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -811,6 +912,7 @@
   {:id "332"
    :name "Installation of industrial machinery and equipment"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -818,6 +920,7 @@
   {:id "351"
    :name "Electric power generation, transmission and distribution"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -825,6 +928,7 @@
   {:id "352"
    :name "Manufacture of gas"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -832,6 +936,7 @@
   {:id "353"
    :name "Steam and air conditioning supply"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -839,6 +944,7 @@
   {:id "370"
    :name "Sewerage"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -846,6 +952,7 @@
   {:id "381"
    :name "Waste collection"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -853,6 +960,7 @@
   {:id "382"
    :name "Waste treatment and disposal"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -860,6 +968,7 @@
   {:id "390"
    :name "Remediation activities and other waste management services"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -867,6 +976,7 @@
   {:id "410"
    :name "Construction of buildings"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -874,6 +984,7 @@
   {:id "421"
    :name "Construction of roads and railways"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -881,6 +992,7 @@
   {:id "422"
    :name "Construction of utility projects"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -888,6 +1000,7 @@
   {:id "429"
    :name "Construction of other civil engineering projects"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -895,6 +1008,7 @@
   {:id "431"
    :name "Demolition and site preparation"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -902,6 +1016,7 @@
   {:id "432"
    :name "Electrical, plumbing and other construction installation ..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -909,6 +1024,7 @@
   {:id "433"
    :name "Building completion and finishing"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -916,6 +1032,7 @@
   {:id "439"
    :name "Other specialized construction activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -923,6 +1040,7 @@
   {:id "451"
    :name "Sale of motor vehicles"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -930,6 +1048,7 @@
   {:id "452"
    :name "Maintenance and repair of motor vehicles"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -937,6 +1056,7 @@
   {:id "453"
    :name "Sale of motor vehicle parts and accessories"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -944,6 +1064,7 @@
   {:id "454"
    :name "Sale, maintenance and repair of motorcycles and related p..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -951,6 +1072,7 @@
   {:id "461"
    :name "Wholesale on a fee or contract basis"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -958,6 +1080,7 @@
   {:id "462"
    :name "Wholesale of agricultural raw materials and live animals"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -965,6 +1088,7 @@
   {:id "463"
    :name "Wholesale of food, beverages and tobacco"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -972,6 +1096,7 @@
   {:id "464"
    :name "Wholesale of household goods"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -979,6 +1104,7 @@
   {:id "465"
    :name "Wholesale of machinery, equipment and supplies"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -986,6 +1112,7 @@
   {:id "466"
    :name "Other specialized wholesale"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -993,6 +1120,7 @@
   {:id "469"
    :name "Non-specialized wholesale trade"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1000,6 +1128,7 @@
   {:id "472"
    :name "Retail sale of food, beverages and tobacco in specialized..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1007,6 +1136,7 @@
   {:id "473"
    :name "Retail sale of automotive fuel in specialized stores"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1014,6 +1144,7 @@
   {:id "474"
    :name "Retail sale of information and communications equipment i..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1021,6 +1152,7 @@
   {:id "475"
    :name "Retail sale of other household equipment in specialized s..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1028,6 +1160,7 @@
   {:id "476"
    :name "Retail sale of cultural and recreation goods in specializ..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1035,6 +1168,7 @@
   {:id "477"
    :name "Retail sale of other goods in specialized stores"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1042,6 +1176,7 @@
   {:id "478"
    :name "Retail sale via stalls and markets"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1049,6 +1184,7 @@
   {:id "479"
    :name "Retail trade not in stores, stalls or markets"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1056,6 +1192,7 @@
   {:id "491"
    :name "Transport via railways"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1063,6 +1200,7 @@
   {:id "492"
    :name "Other land transport"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1070,6 +1208,7 @@
   {:id "493"
    :name "Transport via pipeline"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1077,6 +1216,7 @@
   {:id "501"
    :name "Sea and coastal water transport"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1084,6 +1224,7 @@
   {:id "502"
    :name "Inland water transport"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1091,6 +1232,7 @@
   {:id "511"
    :name "Passenger air transport"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1098,6 +1240,7 @@
   {:id "512"
    :name "Freight air transport"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1105,6 +1248,7 @@
   {:id "521"
    :name "Warehousing and storage"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1112,6 +1256,7 @@
   {:id "522"
    :name "Support activities for transportation"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1119,6 +1264,7 @@
   {:id "531"
    :name "Postal activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1126,6 +1272,7 @@
   {:id "532"
    :name "Courier activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1133,6 +1280,7 @@
   {:id "552"
    :name "Camping grounds, recreational vehicle parks and trailer p..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1140,6 +1288,7 @@
   {:id "559"
    :name "Other accommodation"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1147,6 +1296,7 @@
   {:id "561"
    :name "Restaurants and mobile food service activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1154,6 +1304,7 @@
   {:id "562"
    :name "Event catering and other food service activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1161,6 +1312,7 @@
   {:id "563"
    :name "Beverage serving activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1168,6 +1320,7 @@
   {:id "581"
    :name "Publishing of books, periodicals and other publishing act..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1175,6 +1328,7 @@
   {:id "582"
    :name "Software publishing"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1182,6 +1336,7 @@
   {:id "591"
    :name "Motion picture, video and television programme activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1189,6 +1344,7 @@
   {:id "592"
    :name "Sound recording and music publishing activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1196,6 +1352,7 @@
   {:id "601"
    :name "Radio broadcasting"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1203,6 +1360,7 @@
   {:id "602"
    :name "Television programming and broadcasting activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1210,6 +1368,7 @@
   {:id "611"
    :name "Wired telecommunications activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1217,6 +1376,7 @@
   {:id "612"
    :name "Wireless telecommunications activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1224,6 +1384,7 @@
   {:id "613"
    :name "Satellite telecommunications activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1231,6 +1392,7 @@
   {:id "620"
    :name "Computer programming, consultancy and related activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1238,6 +1400,7 @@
   {:id "631"
    :name "Data processing, hosting and related activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1245,6 +1408,7 @@
   {:id "639"
    :name "Other information service activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1252,6 +1416,7 @@
   {:id "642"
    :name "Activities of holding companies"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :banking]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1259,6 +1424,7 @@
   {:id "643"
    :name "Trusts, funds and similar financial entities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :banking]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1266,6 +1432,7 @@
   {:id "649"
    :name "Other financial service activities, except insurance and ..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :banking]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1273,6 +1440,7 @@
   {:id "651"
    :name "Insurance"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :banking]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1280,6 +1448,7 @@
   {:id "652"
    :name "Reinsurance"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :banking]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1287,6 +1456,7 @@
   {:id "653"
    :name "Pension funding"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :banking]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1294,6 +1464,7 @@
   {:id "662"
    :name "Activities auxiliary to insurance and pension funding"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :banking]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1301,6 +1472,7 @@
   {:id "663"
    :name "Fund management activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :banking]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1308,6 +1480,7 @@
   {:id "682"
    :name "Real estate activities on a fee or contract basis"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :property]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1315,6 +1488,7 @@
   {:id "691"
    :name "Legal activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1322,6 +1496,7 @@
   {:id "692"
    :name "Accounting, bookkeeping and auditing activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1329,6 +1504,7 @@
   {:id "701"
    :name "Activities of head offices"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1336,6 +1512,7 @@
   {:id "702"
    :name "Management consultancy activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1343,6 +1520,7 @@
   {:id "712"
    :name "Technical testing and analysis"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1350,6 +1528,7 @@
   {:id "721"
    :name "Research and experimental development on natural sciences..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1357,6 +1536,7 @@
   {:id "722"
    :name "Research and experimental development on social sciences ..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1364,6 +1544,7 @@
   {:id "731"
    :name "Advertising"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1371,6 +1552,7 @@
   {:id "732"
    :name "Market research and public opinion polling"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1378,6 +1560,7 @@
   {:id "741"
    :name "Specialized design activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1385,6 +1568,7 @@
   {:id "742"
    :name "Photographic activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1392,6 +1576,7 @@
   {:id "749"
    :name "Other professional, scientific and technical activities n..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1399,6 +1584,7 @@
   {:id "750"
    :name "Veterinary activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1406,6 +1592,7 @@
   {:id "771"
    :name "Renting and leasing of motor vehicles"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1413,6 +1600,7 @@
   {:id "772"
    :name "Renting and leasing of personal and household goods"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1420,6 +1608,7 @@
   {:id "773"
    :name "Renting and leasing of other machinery, equipment and tan..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1427,6 +1616,7 @@
   {:id "774"
    :name "Leasing of intellectual property and similar products, ex..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1434,6 +1624,7 @@
   {:id "782"
    :name "Temporary employment agency activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1441,6 +1632,7 @@
   {:id "783"
    :name "Other human resources provision"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1448,6 +1640,7 @@
   {:id "791"
    :name "Travel agency and tour operator activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1455,6 +1648,7 @@
   {:id "799"
    :name "Other reservation service and related activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1462,6 +1656,7 @@
   {:id "801"
    :name "Private security activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1469,6 +1664,7 @@
   {:id "802"
    :name "Security systems service activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1476,6 +1672,7 @@
   {:id "803"
    :name "Investigation activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1483,6 +1680,7 @@
   {:id "811"
    :name "Combined facilities support activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1490,6 +1688,7 @@
   {:id "812"
    :name "Cleaning activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1497,6 +1696,7 @@
   {:id "813"
    :name "Landscape care and maintenance service activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1504,6 +1704,7 @@
   {:id "821"
    :name "Office administrative and support activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1511,6 +1712,7 @@
   {:id "822"
    :name "Activities of call centres"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1518,6 +1720,7 @@
   {:id "823"
    :name "Organization of conventions and trade shows"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1525,6 +1728,7 @@
   {:id "829"
    :name "Business support service activities n.e.c."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1532,6 +1736,7 @@
   {:id "842"
    :name "Provision of services to the community as a whole"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1539,6 +1744,7 @@
   {:id "843"
    :name "Compulsory social security activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1546,6 +1752,7 @@
   {:id "851"
    :name "Pre-primary and primary education"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1553,6 +1760,7 @@
   {:id "852"
    :name "Secondary education"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1560,6 +1768,7 @@
   {:id "853"
    :name "Higher education"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1567,6 +1776,7 @@
   {:id "854"
    :name "Other education"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1574,6 +1784,7 @@
   {:id "855"
    :name "Educational support activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1581,6 +1792,7 @@
   {:id "861"
    :name "Hospital activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1588,6 +1800,7 @@
   {:id "862"
    :name "Medical and dental practice activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1595,6 +1808,7 @@
   {:id "869"
    :name "Other human health activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1602,6 +1816,7 @@
   {:id "871"
    :name "Residential nursing care facilities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1609,6 +1824,7 @@
   {:id "872"
    :name "Residential care activities for mental retardation, menta..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1616,6 +1832,7 @@
   {:id "873"
    :name "Residential care activities for the elderly and disabled"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1623,6 +1840,7 @@
   {:id "879"
    :name "Other residential care activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1630,6 +1848,7 @@
   {:id "889"
    :name "Other social work activities without accommodation"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1637,6 +1856,7 @@
   {:id "900"
    :name "Creative, arts and entertainment activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1644,6 +1864,7 @@
   {:id "920"
    :name "Gambling and betting activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1651,6 +1872,7 @@
   {:id "931"
    :name "Sports activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1658,6 +1880,7 @@
   {:id "932"
    :name "Other amusement and recreation activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1665,6 +1888,7 @@
   {:id "941"
    :name "Activities of business, employers and professional member..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1672,6 +1896,7 @@
   {:id "942"
    :name "Activities of trade unions"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1679,6 +1904,7 @@
   {:id "949"
    :name "Activities of other membership organizations"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1686,6 +1912,7 @@
   {:id "952"
    :name "Repair of personal and household goods"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1693,6 +1920,7 @@
   {:id "960"
    :name "Other personal service activities"
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1700,6 +1928,7 @@
   {:id "981"
    :name "Undifferentiated goods-producing activities of private ho..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
@@ -1707,6 +1936,7 @@
   {:id "982"
    :name "Undifferentiated service-producing activities of private ..."
    :repo nil :business-id nil
+  :maturity :spec
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension

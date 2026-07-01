@@ -57,8 +57,30 @@
     {:isic (str isic)
      :business-id (:business-id industry)
      :industry (:name industry)
+     :maturity (:maturity industry)
      :required-technologies (:required-technologies industry)
      :optional-technologies (:optional-technologies industry)
      :operating-states (:operating-states industry)
      :technology-stack (mapv #(select-keys % [:id :name :layer :capabilities :repos :contracts])
                              (technology-stack isic))}))
+
+(defn maturity
+  "Return the maturity level of an ISIC entry: :spec (registry only),
+  :blueprint (blueprint repo published), or :implemented (source actor exists).
+  Defaults to :spec when unset."
+  [isic]
+  (let [industry (get-industry isic)]
+    (or (:maturity industry)
+        (cond
+          (:implemented? industry) :implemented
+          (:repo industry)         :blueprint
+          :else                    :spec))))
+
+(defn maturity-summary
+  "Aggregate maturity counts across all industries."
+  []
+  (let [inds (industries)]
+    {:total      (count inds)
+     :spec       (count (filter #(= :spec (maturity (:id %))) inds))
+     :blueprint  (count (filter #(= :blueprint (maturity (:id %))) inds))
+     :implemented (count (filter #(= :implemented (maturity (:id %))) inds))}))
