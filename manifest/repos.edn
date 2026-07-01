@@ -212,6 +212,17 @@
    "orgs/kotoba-lang/robotics"
    ;; WebRTC signaling/session/room as pure data contracts (ADR-2607011700)
    "orgs/kotoba-lang/webrtc"
+   ;; kotoba-lang media/networking substrate — CLJC reimplementation of the
+   ;; Rust crates removed by kotoba-lang/kotoba PR #259 (2026-07-01):
+   ;; kotoba-rt/kotoba-turn/kotoba-net/kotoba-signal → rt/turn/net/signal.
+   ;; Overlaps with kotoba-lang/webrtc's room/session records (ADR-2607011700);
+   ;; that ADR's "no actual TURN/STUN deployment in kotoba-lang" boundary was
+   ;; retracted by the owner the same day (see addendum in the ADR) — protocol
+   ;; codecs/crypto belong here, only server deployment/ops stays elsewhere.
+   "orgs/kotoba-lang/rt"
+   "orgs/kotoba-lang/turn"
+   "orgs/kotoba-lang/net"
+   "orgs/kotoba-lang/signal"
    "orgs/gftdcojp/ai-gftd-apex"
    "orgs/gftdcojp/ai-gftd-ads"
    "orgs/gftdcojp/ai-gftd-animeka"

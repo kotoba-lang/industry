@@ -68,3 +68,24 @@ transport — mirroring the `card`/`swift`/`phone` house style.
 - `deps.edn` depends on `kotoba-lang/html` + `kotoba-lang/css` (dashboard),
   `:test`/`:lint` aliases match the house convention (cognitect test-runner
   + clj-kondo).
+
+## 追記 (2026-07-01, Jun Kawasaki): "no actual TURN/STUN deployment" 境界の撤回
+
+上記の「実際の signaling サーバ・TURN/STUN デプロイは kotoba-lang 不可、
+gftdcojp/etzhayyim 側の step-2 分類が必要」という記述は **オーナー判断で撤回する**。
+`kotoba-lang/card`・`kotoba-lang/swift` が ISO 8583 / SWIFT MT の実プロトコル
+codec を kotoba-lang に持つのと同じ理由で、TURN(RFC 8656)/STUN(RFC 8489) の
+メッセージ codec・ephemeral credential mint/verify のような **`.cljc` で書ける
+プロトコル実装**は kotoba-lang に置いてよい。「実際のプロトコル実装を持てるか」
+と「特定 org のデプロイ(サーバプロセス起動・鍵管理・運用)を持つか」は別軸であり、
+前者は言語基盤として kotoba-lang の責務内、後者(実運用サーバの起動・鍵配布・
+インシデント対応等)のみが gftdcojp/etzhayyim 側の判断になる。
+
+これに伴い `kotoba-lang/turn`(RFC 8656 TURN relay の STUN/TURN メッセージ層 +
+ephemeral credential mint/verify、`.cljc`、実ソケットI/Oなし)は本ADRの記述に
+関わらず kotoba-lang 配置として確定する。`kotoba-lang/rt`(signaling relay
+ルーティング純関数)・`kotoba-lang/net`(gossip/bitswap 意味論)・
+`kotoba-lang/signal`(X3DH/Double Ratchet)も同様の「プロトコル/暗号ロジックの
+.cljc 実装、実ネットワークI/Oは別 adapter」という基準で kotoba-lang に登録済み。
+`kotoba.webrtc.room`/`kotoba.webrtc.session` との room-membership / signaling
+状態機械の役割分担(どちらが正か)は未整理で、follow-up の統合課題として残す。
