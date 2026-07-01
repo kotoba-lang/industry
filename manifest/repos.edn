@@ -1,1 +1,466 @@
-@/private/tmp/claude-501/-Users-junkawasaki-github-com-junkawasaki/ea5f81eb-28f1-48ed-a309-c02a88345b95/scratchpad/fresh-repos.edn
+;; repos.edn — west manifest 運用の source of truth（人が編集するのはここ）。
+;; scripts/gen-west-manifest.bb がこれを読んで manifest/west.yml を生成する。
+;;   - project の一覧と pin(revision) は git の事実(working tree HEAD)から採る。
+;;   - ポリシー(remote 定義・既定・グループ・DataLad 連携)はこの EDN で宣言する。
+;;
+;; 方針: コード repo は全て west 管理。plain な git submodule は廃止(0 件)。
+;;       大容量データの DataLad dataset だけは west project にしつつ git-annex(B2)で
+;;       実体を扱う(:datalad で印を付け、既定では取得しない opt-in グループに隔離)。
+{;; org 名 -> git remote の url-base
+ :remotes
+ {"com-junkawasaki" "git@github.com:com-junkawasaki"
+  "kotoba-lang"     "git@github.com:kotoba-lang"
+  "gftdcojp"        "git@github.com:gftdcojp"
+  "etzhayyim"       "https://github.com/etzhayyim"}
+
+ ;; org の役割分担（taxonomy の権威は ADR-2606302300）。生成器はこのキーを読まない（doc 用宣言。
+  ;;   :manifest-workflow / :kotoba 等と同じく人間が読むポリシーメタ）。新規 repo の所属判定は
+  ;;   この role/scope に従う: language-substrate→kotoba-lang, agent+公益→etzhayyim,
+  ;;   human+ビジネス→gftdcojp, cross-cutting 基盤 -clj→com-junkawasaki。
+ :orgs
+ {"kotoba-lang"     {:role :language-substrate   ; kotoba 言語 — 純CLJC 言語/コアライブラリ群。全 org が消費
+                     :scope :platform}
+  "etzhayyim"       {:role :agent-centric        ; com-etzhayyim-* organism actors (UNSPSC/ISCO/COFOG)
+                     :scope :public-interest}    ; 公益
+  "gftdcojp"        {:role :human-centric        ; ai-gftd-* 製品/サービス, apps, talent
+                     :scope :business}           ; ビジネス
+  "com-junkawasaki" {:role :transitional-foundation ; 汎用 -clj 基盤ライブラリ + cloud 制御面 + data project
+                     :scope :private-foundation  ; 言語コアは kotoba-lang へ移動済み (:path-overrides)
+                     :note "汎用基盤 -clj も最終的に kotoba-lang へ全移行（ADR-2606302300, 決定 2026-06-30）。当 org は cloud(cloud-manimani/cloud-murakumo) + data(spirit-in-physics 等) のみへ縮退予定"}}
+
+ ;; GitHub owner だけ移した project の west remote を上書きする。
+ :remote-overrides
+ {"orgs/kotoba-lang/kami-engine-sdk" "com-junkawasaki"} ; repo at com-junkawasaki/kami-engine-sdk (etzhayyim is a stale redirect), checked out under kotoba-lang path
+
+ ;; GitHub owner/path 移管済み project の canonical path。
+ :path-overrides
+ {"orgs/com-junkawasaki/aiueos"         "orgs/kotoba-lang/aiueos"
+  "orgs/com-junkawasaki/freeboard"      "orgs/kotoba-lang/freeboard"
+  "orgs/com-junkawasaki/kami-engine"     "orgs/kotoba-lang/kami-engine"
+  "orgs/com-junkawasaki/kami-cfd"       "orgs/kotoba-lang/kami-engine-cfd"
+  "orgs/com-junkawasaki/kami-webgpu"    "orgs/kotoba-lang/kami-webgpu"
+  "orgs/com-junkawasaki/kami-engine-sdk" "orgs/kotoba-lang/kami-engine-sdk"
+  "orgs/com-junkawasaki/kasane"         "orgs/kotoba-lang/kasane"
+  "orgs/com-junkawasaki/kekkai-actor"   "orgs/kotoba-lang/kekkai"
+  "orgs/com-junkawasaki/kotoba"         "orgs/kotoba-lang/kotoba"
+  "orgs/com-junkawasaki/kotoba-code"    "orgs/kotoba-lang/kotoba-code"
+  "orgs/com-junkawasaki/kotoba-topology" "orgs/kotoba-lang/kotoba-topology"
+  "orgs/com-junkawasaki/kototama-clj"   "orgs/kotoba-lang/kototama-clj"
+  "orgs/com-junkawasaki/murakumo"       "orgs/kotoba-lang/murakumo"
+  "orgs/com-junkawasaki/office-style"   "orgs/kotoba-lang/office-style"
+  "orgs/kotoba-lang/edn"                "orgs/kotoba-lang/office"
+  "orgs/kotoba-lang/kootba"             "orgs/kotoba-lang/svgraph"
+  "orgs/kotoba-lang/clc"                "orgs/kotoba-lang/office-style"
+  "orgs/com-junkawasaki/utsushi"        "orgs/kotoba-lang/utsushi"
+  "orgs/com-junkawasaki/vehicle-design-actor" "orgs/kotoba-lang/kami-engine-vehicle-designer"
+  "orgs/com-junkawasaki/manimani"       "orgs/gftdcojp/manimani"} ; GitHub-transferred to gftdcojp 2026-07-01 (private; mobile/ iOS+Android app, fastlane App Store pipeline in progress)
+
+ ;; 全 project 共通の既定
+ :defaults
+ {:revision    "main"
+  :clone-depth 1}            ; clone-depth の値。適用先は下記 :heavy のみ（ADR-2606302100）
+
+ ;; shallow(clone-depth)を適用する heavy(バイナリ同梱)repo だけのリスト。light(純コード)
+ ;; repo は full clone にし、west の pin checkout を pin lag に強くする（一律 shallow は pin が
+ ;; tip より古いと update を失敗させる。ADR-2606302100）。heavy は順次 B2+DataLad へ移す。
+ :heavy
+ #{"orgs/gftdcojp/manimani"
+   "orgs/com-junkawasaki/org-spirit-in-physics"
+   "orgs/com-junkawasaki/org-spirit-in-physics-comics"
+   "orgs/com-junkawasaki/260208-spirit-in-physics"
+   "orgs/com-junkawasaki/spirit-in-physics"
+   "orgs/com-junkawasaki/ghosthacker"
+   "orgs/com-junkawasaki/kototama"
+   "orgs/com-junkawasaki/webmaster"
+   "orgs/kotoba-lang/kotoba"
+   "orgs/kotoba-lang/kami-engine"
+   "orgs/kotoba-lang/kotoba-v2025"
+   "orgs/etzhayyim/root"
+   "orgs/gftdcojp/app-aozora"
+   "orgs/gftdcojp/ai-gftd-apps-gftdcojp"
+   "orgs/gftdcojp/m365-archive"
+   "orgs/gftdcojp/network-isekai"
+   "orgs/gftdcojp/ai-gftd-yukkuri"
+   "orgs/gftdcojp/ai-gftd-lf-case-lingling"}
+
+ ;; west update --group-filter で選択取得。datalad は既定で無効化(opt-in)。
+ :group-filter ["+com-junkawasaki" "+kotoba-lang" "+gftdcojp" "+etzhayyim" "-datalad"]
+
+ ;; DataLad dataset(git-annex + B2)。west project にはするが既定では取得しない。
+ ;;   実体取得/破棄は `west annex-get` / `west annex-drop`(B2 creds は環境変数)。
+ :datalad
+ {"orgs/gftdcojp/m365-archive"
+  {:annex-remote "b2"
+   :group        "datalad"   ; このグループのみ → group-filter の -datalad で既定 off
+   :note "M365 アーカイブ。実体は B2、git には annex キーのみ。"}}
+
+ ;; B2 (S3 互換) special remote 設定(非機密)。
+ ;; 認証は scripts/b2-creds.bb が下記 :credentials の順で解決する(env→1Password→Keychain)。
+ ;; 参照先(op:// パス / keychain service)は秘密ではないのでここに置く。実値(key/secret)は
+ ;; 解決時のみ取得し、リポジトリには一切置かない。★ の値を自分の保管先に合わせて編集する。
+ :b2
+ {:endpoint "s3.us-west-004.backblazeb2.com"
+  :type     "S3"
+  :credentials
+  {:order [:env :1password :keychain]   ; 揃ったソースを採用(env > 1Password > Keychain)
+   ;; env: この名前の環境変数を直接使う(CI 等)
+   :env {:key-id "B2_KEY_ID" :app-key "B2_APP_KEY" :bucket "B2_BUCKET"}
+   ;; 1Password: op read の参照。★ vault/item/field を自分のものに。
+   ;;   (このマシンの実体は Keychain 側。op を使う環境では vault/item を作って参照する)
+   :1password {:key-id  "op://gftdcojp/com-junkawasaki.b2_annex/keyID"          ; ★
+               :app-key "op://gftdcojp/com-junkawasaki.b2_annex/applicationKey" ; ★
+               :bucket  "op://gftdcojp/com-junkawasaki.b2_annex/bucket"}        ; ★
+   ;; Apple Keychain(単一アイテム方式): service=b2:<bucket> の generic-password 1 件に
+   ;;   account=KEY_ID / password=APP_KEY を格納し、bucket は service 名の "b2:" 以降から導く。
+   ;;   登録例:
+   ;;     security add-generic-password -s b2:gftdcojp-m365-annex -a <KEY_ID> -w <APP_KEY>
+   :keychain {:service  "b2:gftdcojp-m365-annex"   ; ★ keychain service(= b2:<bucket>)
+              :combined true}}}                     ; account=key-id, password=app-key
+
+ ;; kotoba-server pod（kotobase.net）接続ポリシー（非機密）。詳細は CLAUDE.md
+ ;; 「Actors」節 / ai-gftd-itonami ADR-0002。認証は CACAO（SIWE/Ed25519 did:key、
+ ;; kotoba-auth DelegationChain）で、**actor ごとに鍵を発行**し自分の鍵由来 IPNS
+ ;; graph を所有 → 自己 mint。owner hand-off も共有 token も使わない。秘密鍵は
+ ;; repo に置かず `.<actor>/identity.edn`（gitignore）に永続。ここは非機密の
+ ;; 参照先・規約のみ。
+ :kotoba
+ {:endpoint "https://kotobase.net"
+  :xrpc     "ai.gftd.apps.kotobase.datomic.*"   ; transact / q / pull / entid
+  :auth     :cacao-self-issued                  ; actor が自分の did:key で自己発行
+  :capabilities {:read  ["datom:read"]
+                 :write ["datom:transact" "tx:create"]}
+  :identity
+  {:per-actor     true                          ; 1 actor = 1 Ed25519 鍵
+   :path-template ".<actor>/identity.edn"       ; 例 .itonami/identity.edn（gitignore）
+   :persist       :load-or-create               ; 初回生成→保存→再読込
+   :graph         :key-derived-ipns             ; graph = 鍵由来 IPNS 名（k51qzi5uqu5d…）
+   :note "秘密鍵は git にコミットしない。手本 ai-gftd-itonami/src/itonami/cacao.clj"}}
+
+ ;; manifest/west.yml への変更の起こし方（非機密ポリシー）。west.yml は生成物
+ ;; （repos.edn ＋ 各子repo HEAD → gen-west-manifest.bb、手書き禁止 / --check）。
+ ;; superproject も shallow なので local 3-way merge は信頼できない（merge-base が
+ ;; graft 境界外で "unrelated histories" / ancestry 誤判定）。詳細は
+ ;; ADR-2606272237 / CLAUDE.md「## Git operations」。生成器(gen-west-manifest.bb)は
+ ;; このキーを読まない（ドキュメント用の宣言）。
+ :manifest-workflow
+ {:canonical    :api-single-entry            ; 登録/rename/pin前進すべて API でサーバ側 commit
+  :method       "tip の west.yml + blob SHA を取得 → 当該 entry の行だけ編集 → blob SHA 一致で PUT(branch,sha)"
+  :conflict     :impossible-by-optimistic-lock ; tip がずれれば 409 → 取得し直してリトライ（marker 解決が出ない）
+  :verify       :pin-eq-child-head           ; commit 前に pin == 子repo HEAD を確認
+  :never        [:local-shallow-edit         ; ローカルで shallow 編集/merge を戦わない
+                 :hand-edit-conflict-markers ; west.yml の <<<<<<< を手編集しない（手書き禁止）
+                 :force-push]
+  :if-must-merge {:resolve   :regenerate     ; 衝突は marker でなく再生成で解く
+                  :steps     "superset 側採用 → west update で子を目的 pin に → gen-west-manifest.bb → --check"
+                  :pin-regression-trap "再生成はローカル working HEAD で pin する。子が遅れていると黙ってロールバック → 再生成前に必ず west update"
+                  :ancestry  "固定 depth で賭けず compare API で merge-base を狙い撃ち取得"}
+  :after-api    :recheck-canonical           ; API 手編集は生成器を通らない → 落ち着いたら --check で一致確認
+  :child-repos  :plain-git                    ; 子repo は普通の git(branch/PR/push)。west は pin を記録するだけ
+  :note "正経路は API single-entry。実例 PR #61/#62/#86、kenchi-actor→kenchi-clj rename(34988dd)。"}
+
+ ;; ネスト submodule を持つ project は west に再帰取得させる。
+ ;; (未指定でも生成スクリプトが各 repo の .gitmodules を検出して自動付与する。
+ ;;  ここは明示的に強制したい場合の上書き用。)
+ :force-recurse-submodules
+ #{}
+
+ ;; 新規 project の追加口（SSoT）。west.yml にまだ path が無い repo をここに列挙すると
+ ;; 生成時に既存 path 群と union される（一度 west.yml に載れば自動追従、distinct で重複排除）。
+ ;; clone 済みの working tree（orgs/<org>/<repo>）が存在し HEAD を持つこと。
+ :extra-projects
+ #{;; fleet coordination — 20-agent lease/governor substrate (ADR-2606302000)
+   "orgs/kotoba-lang/kotoba-fleet"
+   "orgs/etzhayyim/com-etzhayyim-fleet"
+   ;; kotoba-lang foundational stdlib P0 (ADR-kotoba-lang-foundational-stdlib)
+   "orgs/kotoba-lang/async"
+   "orgs/kotoba-lang/device"
+   "orgs/kotoba-lang/coll"
+   "orgs/kotoba-lang/json"
+   "orgs/kotoba-lang/spec"
+   "orgs/kotoba-lang/wit"
+   ;; kotoba-lang stdlib M5 consumers (ADR-kotoba-lang-foundational-stdlib)
+   "orgs/kotoba-lang/scheduler"
+   "orgs/kotoba-lang/store"
+   "orgs/kotoba-lang/lint"
+   "orgs/kotoba-lang/text"
+   "orgs/kotoba-lang/log"
+   "orgs/kotoba-lang/lint-kotoba"
+   "orgs/kotoba-lang/lsp-rpc"
+   ;; kotoba-lang foundational stdlib P2 (ADR-kotoba-lang-foundational-stdlib)
+   "orgs/kotoba-lang/fmt"
+   "orgs/kotoba-lang/lsp"
+   "orgs/kotoba-lang/test"
+   ;; AT Protocol shared substrate split out of app-aozora/kotoba.
+   "orgs/kotoba-lang/atproto"
+   "orgs/kotoba-lang/mst"
+   ;; kotoba-lang foundational stdlib P1 (ADR-kotoba-lang-foundational-stdlib)
+   "orgs/kotoba-lang/fs"
+   "orgs/kotoba-lang/http"
+   "orgs/kotoba-lang/io"
+   "orgs/kotoba-lang/time"
+   ;; ISIC vertical capability libs (ADR-2607011000 cloud-itonami robotics + isic-21-21)
+   "orgs/kotoba-lang/swift"
+   "orgs/kotoba-lang/banking"
+   "orgs/kotoba-lang/phone"
+   "orgs/kotoba-lang/card"
+   "orgs/kotoba-lang/retail"
+   "orgs/kotoba-lang/logistics"
+   "orgs/kotoba-lang/property"
+   "orgs/kotoba-lang/labor"
+   "orgs/kotoba-lang/robotics"
+   ;; WebRTC signaling/session/room as pure data contracts (ADR-2607011700)
+   "orgs/kotoba-lang/webrtc"
+   ;; kotoba-lang media/networking substrate — CLJC reimplementation of the
+   ;; Rust crates removed by kotoba-lang/kotoba PR #259 (2026-07-01):
+   ;; kotoba-rt/kotoba-turn/kotoba-net/kotoba-signal → rt/turn/net/signal.
+   ;; Overlaps with kotoba-lang/webrtc's room/session records (ADR-2607011700);
+   ;; that ADR's "no actual TURN/STUN deployment in kotoba-lang" boundary was
+   ;; retracted by the owner the same day (see addendum in the ADR) — protocol
+   ;; codecs/crypto belong here, only server deployment/ops stays elsewhere.
+   "orgs/kotoba-lang/rt"
+   "orgs/kotoba-lang/turn"
+   "orgs/kotoba-lang/net"
+   "orgs/kotoba-lang/signal"
+   "orgs/gftdcojp/ai-gftd-apex"
+   "orgs/gftdcojp/ai-gftd-ads"
+   "orgs/gftdcojp/ai-gftd-animeka"
+   "orgs/gftdcojp/ai-gftd-arms"
+   "orgs/gftdcojp/ai-gftd-cyber-drill"
+   "orgs/gftdcojp/ai-gftd-dogaka"
+   "orgs/gftdcojp/ai-gftd-dougaka"
+   "orgs/gftdcojp/ai-gftd-exoclick"
+   "orgs/gftdcojp/ai-gftd-face-tracker"
+   "orgs/gftdcojp/ai-gftd-fashion"
+   "orgs/gftdcojp/ai-gftd-gameka"
+   "orgs/gftdcojp/ai-gftd-ghosthacker-shiropico"
+   "orgs/gftdcojp/ai-gftd-hakken"
+   "orgs/gftdcojp/ai-gftd-hubspot-hb5p0t1n"
+   "orgs/gftdcojp/ai-gftd-hume"
+   "orgs/gftdcojp/ai-gftd-isekai"
+   "orgs/gftdcojp/ai-gftd-jp-ashiba"
+   "orgs/gftdcojp/ai-gftd-kabuto"
+   "orgs/gftdcojp/ai-gftd-kaisya"
+   "orgs/gftdcojp/ai-gftd-kakure"
+   "orgs/gftdcojp/ai-gftd-kotoba"
+   "orgs/gftdcojp/ai-gftd-kotobase"
+   "orgs/gftdcojp/ai-gftd-livecam"
+   "orgs/gftdcojp/ai-gftd-mamori"
+   "orgs/gftdcojp/ai-gftd-mangaka"
+   "orgs/gftdcojp/ai-gftd-manimani"
+   "orgs/gftdcojp/ai-gftd-media"
+   "orgs/gftdcojp/ai-gftd-murakumo"
+   "orgs/gftdcojp/ai-gftd-nemuri"
+   "orgs/gftdcojp/ai-gftd-news"
+   "orgs/gftdcojp/ai-gftd-oshikatsu"
+   "orgs/gftdcojp/ai-gftd-pachinko"
+   "orgs/gftdcojp/ai-gftd-pornhub"
+   "orgs/gftdcojp/ai-gftd-shinshi"
+   "orgs/gftdcojp/ai-gftd-shirabe"
+   "orgs/gftdcojp/ai-gftd-stripe"
+   "orgs/gftdcojp/ai-gftd-syosetsuka"
+   "orgs/gftdcojp/ai-gftd-weight-kototama"
+   "orgs/gftdcojp/ai-gftd-weight-modal-emotion"
+   "orgs/gftdcojp/ai-gftd-weight-modal-world"
+   "orgs/gftdcojp/ai-gftd-weight-oka"
+   "orgs/com-junkawasaki/cloud-manimani"
+   "orgs/com-junkawasaki/cloud-murakumo"
+   ;; ADR-2607011100: SVG-era Office tooling restored as com-junkawasaki repos
+   ;; while kotoba-lang/office and kotoba-lang/svgraph remain the CLJ/EDN line.
+   "orgs/com-junkawasaki/office-causal"
+   "orgs/com-junkawasaki/svgraph"
+   "orgs/kotoba-lang/svg"
+   "orgs/kotoba-lang/did"
+   "orgs/kotoba-lang/json-ld"
+   "orgs/kotoba-lang/vc"
+   "orgs/kotoba-lang/activitystreams"
+   "orgs/kotoba-lang/activitypub"
+   "orgs/kotoba-lang/annotation"
+   "orgs/kotoba-lang/html"
+   "orgs/kotoba-lang/css"
+   "orgs/kotoba-lang/rdf"
+   "orgs/kotoba-lang/turtle"
+   "orgs/kotoba-lang/n-quads"
+   "orgs/kotoba-lang/rdf-canon"
+   "orgs/kotoba-lang/shacl"
+   "orgs/kotoba-lang/ooxml"
+   "orgs/kotoba-lang/drawingml"
+   "orgs/kotoba-lang/presentationml"
+   "orgs/com-junkawasaki/org-spirit-in-physics"
+   "orgs/com-junkawasaki/org-spirit-in-physics-comics"
+   "orgs/gftdcojp/cloud-itonami"
+   "orgs/gftdcojp/cloud-murakumo"
+   "orgs/gftdcojp/gftd-talent-actor"
+   "orgs/etzhayyim/com-etzhayyim-shinka" ; religious-corp Shinka domain actor; migrated cljc actor target
+   "orgs/etzhayyim/com-etzhayyim-joucho" ; religious-corp Joucho domain actor; migrated cljc actor target
+   "orgs/etzhayyim/com-etzhayyim-sng" ; ADR-2606290000: e-methane Sabatier SNG standalone actor
+   "orgs/etzhayyim/com-etzhayyim-yomi" ; ADR-2607010900: news-intelligence actor (intel-LLM ⊣ IntelGovernor); subscribes kawaraban mirror, autonomous publication (ADR-2606281500)
+   "orgs/etzhayyim/com-etzhayyim-tsumugu" ; ADR-2607011500: Spirit in Physics manga publishing actor (mangallm ⊣ PolicyGovernor); self-sovereign kotoba-server identity, coscientist quality loop
+   "orgs/etzhayyim/com-google-ads" ; ADR-2606292130: charter-clean outreach & performance-marketing actor
+   "orgs/kotoba-lang/kasane"         ; ADR-2606272100: Adobe(AI/PSD/PDF) 純cljc+EDN ライブラリ
+   "orgs/kotoba-lang/kami-nv-compat" ; NVIDIA Omniverse/Isaac/OptiX/RTX API-compat facade; relocated from etzhayyim-sdk per ADR-2606302300 org-taxonomy library-placement rule
+   "orgs/kotoba-lang/hinshitsu"      ; 品質: portable evidence/gate schema + mokushi visual/snapshot testing for kotoba tools
+   "orgs/kotoba-lang/pqh"            ; AEAD envelope + Argon2id KDF + post-quantum hybrid (suite pqh-v1) + DID<->Signal binding; relocated from etzhayyim-sdk per ADR-2607011830
+   "orgs/kotoba-lang/ipfs"           ; Kubo (IPFS) HTTP API pin/fetch/nodeInfo helpers; relocated from etzhayyim-sdk per ADR-2607011930
+   "orgs/kotoba-lang/checkpointer"   ; LangGraph MstCheckpointSaver wire-protocol sidecar (atproto MST/CAR, IPFS+L2 anchor); relocated from etzhayyim-sdk per ADR-2607011930
+   "orgs/kotoba-lang/base-l2"        ; Base L2 MST-root anchor client (viem) + ERC-4337 sponsored-write helper; relocated from etzhayyim-sdk per ADR-2607011940
+   "orgs/kotoba-lang/witness-quorum" ; deterministic witness selection + quorum decision rule + Ed25519 validation-membrane attestation; relocated from etzhayyim-sdk per ADR-2607011940
+   "orgs/kotoba-lang/atproto-client" ; AT Protocol client facade + PDS read/write helpers over @atproto/api; relocated from etzhayyim-sdk per ADR-2607011940
+   "orgs/kotoba-lang/arxiv"          ; ADR-0023: arXiv organism actor + yorishiro automation
+   "orgs/kotoba-lang/aero"
+   "orgs/kotoba-lang/bpmn"
+   "orgs/kotoba-lang/briefing"
+   "orgs/kotoba-lang/cacao"
+   "orgs/kotoba-lang/cae-solver"
+   "orgs/kotoba-lang/calendar"
+   "orgs/kotoba-lang/ci"
+   "orgs/kotoba-lang/cmmn"
+   "orgs/kotoba-lang/contacts"
+   "orgs/kotoba-lang/crash"
+   "orgs/kotoba-lang/cron"
+   "orgs/kotoba-lang/dag-cbor"
+   "orgs/kotoba-lang/datom"
+   "orgs/kotoba-lang/ddl"
+   "orgs/kotoba-lang/dmn"
+   "orgs/kotoba-lang/dot"
+   "orgs/kotoba-lang/docs"
+   "orgs/kotoba-lang/drive"
+   "orgs/kotoba-lang/echem"
+   "orgs/kotoba-lang/ed25519"
+   "orgs/kotoba-lang/eth-crypto"
+   "orgs/kotoba-lang/forms"
+   "orgs/kotoba-lang/graphql"
+   "orgs/kotoba-lang/homebrew-kotoba"
+   "orgs/kotoba-lang/ical"
+   "orgs/kotoba-lang/jsonlogic"
+   "orgs/kotoba-lang/kenchi"
+   "orgs/kotoba-lang/koe"
+   "orgs/kotoba-lang/kotoba-pages-poc"
+   "orgs/kotoba-lang/kotoba-v2025"
+   "orgs/kotoba-lang/kotobase"
+   "orgs/kotoba-lang/inference"
+   "orgs/kotoba-lang/kotodama-cells"
+   "orgs/kotoba-lang/kotodama-holochain"
+   "orgs/kotoba-lang/kotodama-host"
+   "orgs/kotoba-lang/kotodama-mcp"
+   "orgs/kotoba-lang/kotodama-py"
+   "orgs/kotoba-lang/kudaki"
+   "orgs/kotoba-lang/mcp"
+   "orgs/kotoba-lang/motor"
+   "orgs/kotoba-lang/multiformats"
+   "orgs/kotoba-lang/nagare"
+   "orgs/kotoba-lang/num"
+   "orgs/kotoba-lang/openapi"
+   "orgs/kotoba-lang/policy"
+   "orgs/kotoba-lang/search"
+   "orgs/kotoba-lang/sigma"
+   "orgs/kotoba-lang/sheets"
+   "orgs/kotoba-lang/slides"
+   "orgs/kotoba-lang/office-style"
+   "orgs/kotoba-lang/statechart"
+   "orgs/kotoba-lang/states"
+   "orgs/kotoba-lang/svgraph"
+   "orgs/kotoba-lang/torch"
+   "orgs/kotoba-lang/vllm"
+   "orgs/kotoba-lang/vphysics"
+   "orgs/kotoba-lang/zone"
+   "orgs/kotoba-lang/browser-agent"
+   "orgs/kotoba-lang/freeboard"
+   "orgs/kotoba-lang/kami-webgpu"
+   "orgs/kotoba-lang/kotoba-code"
+   "orgs/kotoba-lang/kotoba-topology"
+   "orgs/kotoba-lang/kototama-clj"
+   "orgs/kotoba-lang/langchain"
+   "orgs/kotoba-lang/langgraph"
+   "orgs/kotoba-lang/mail"
+   "orgs/kotoba-lang/mailer"
+   "orgs/kotoba-lang/murakumo"
+   "orgs/kotoba-lang/playwright"
+   "orgs/kotoba-lang/utsushi"
+   "orgs/gftdcojp/ai-gftd-router"     ; ADR-2606272330: gftd.ai 生成スタジオの製品面(router/gateway)
+   "orgs/kotoba-lang/authenticator"
+   "orgs/kotoba-lang/browser-use"
+   "orgs/kotoba-lang/comfyui"
+   "orgs/kotoba-lang/computer-use"
+   "orgs/kotoba-lang/godaddy-dns"
+   "orgs/kotoba-lang/aiueos"
+   "orgs/kotoba-lang/kami-engine"
+   "orgs/kotoba-lang/kagi"
+   "orgs/kotoba-lang/kobo"
+   "orgs/kotoba-lang/kotoba"
+   "orgs/kotoba-lang/kuro"
+   "orgs/kotoba-lang/shitsuke"
+   "orgs/kotoba-lang/mise"
+   "orgs/kotoba-lang/chobo"
+   "orgs/kotoba-lang/senden"
+   "orgs/kotoba-lang/madoguchi"
+   "orgs/kotoba-lang/soko"
+   ;; blob store + checkpointer for LangGraph apps -- the domain-agnostic
+   ;; half of the short-lived genapp-clj (comfy/llm moved into
+   ;; kotoba-lang/comfyui + kotoba-lang/langchain instead, ADR-2607011900)
+   "orgs/kotoba-lang/langgraph-store"
+   "orgs/kotoba-lang/kiyaku"
+
+   ;; clj-wgsl migration Phase 4 (ADR-2607010930): homes for the ~58 kami-engine
+   ;; crates deleted without a CLJC migration (#259 Rust removal) — scaffold-only,
+   ;; restoration pending.
+   "orgs/kotoba-lang/dft"
+   "orgs/kotoba-lang/spice"
+   "orgs/kotoba-lang/pdk"
+   "orgs/kotoba-lang/pnr"
+   "orgs/kotoba-lang/verify"
+   "orgs/kotoba-lang/mine-ai"
+   "orgs/kotoba-lang/mine-pds"
+   "orgs/kotoba-lang/bim"
+   "orgs/kotoba-lang/rtl"
+   "orgs/kotoba-lang/power"
+   "orgs/kotoba-lang/si"
+   "orgs/kotoba-lang/pkg"
+   "orgs/kotoba-lang/yield"
+   "orgs/kotoba-lang/ip"
+   "orgs/kotoba-lang/flow"
+   "orgs/kotoba-lang/core"
+   "orgs/kotoba-lang/scene"
+   "orgs/kotoba-lang/scene-graph"
+   "orgs/kotoba-lang/game"
+   "orgs/kotoba-lang/cam"
+   "orgs/kotoba-lang/input"
+   "orgs/kotoba-lang/skeleton"
+   "orgs/kotoba-lang/tilemap"
+   "orgs/kotoba-lang/voxel"
+   "orgs/kotoba-lang/sdf"
+   "orgs/kotoba-lang/mesher"
+   "orgs/kotoba-lang/nerf"
+   "orgs/kotoba-lang/gltf"
+   "orgs/kotoba-lang/vrm"
+   "orgs/kotoba-lang/postfx"
+   "orgs/kotoba-lang/audio"
+   "orgs/kotoba-lang/dec"
+   "orgs/kotoba-lang/terrain"
+   "orgs/kotoba-lang/vegetation"
+   "orgs/kotoba-lang/atmosphere"
+   "orgs/kotoba-lang/physics-2d"
+   "orgs/kotoba-lang/ui-gpu"
+   "orgs/kotoba-lang/graph"
+   "orgs/kotoba-lang/geo"
+   "orgs/kotoba-lang/os"
+   "orgs/kotoba-lang/rtc"
+   "orgs/kotoba-lang/bridge"
+   "orgs/kotoba-lang/knp"
+   "orgs/kotoba-lang/scad"
+   "orgs/kotoba-lang/pathfind"
+   "orgs/kotoba-lang/character"
+   "orgs/kotoba-lang/cartpole-wasm"
+   "orgs/kotoba-lang/articulated-scene"
+   "orgs/kotoba-lang/demo"
+   "orgs/kotoba-lang/devtools"
+   "orgs/kotoba-lang/pipelines"
+   "orgs/kotoba-lang/app"
+   "orgs/kotoba-lang/kami-engine-core"
+   "orgs/kotoba-lang/kami-engine-io"
+   "orgs/kotoba-lang/kami-engine-render"
+   "orgs/kotoba-lang/kami-engine-web"
+   "orgs/kotoba-lang/kami-engine-script-runtime"
+   "orgs/kotoba-lang/kami-engine-engine"
+   "orgs/kotoba-lang/kami-app"
+   "orgs/kotoba-lang/kami-app-isekai"
+   "orgs/kotoba-lang/kami-app-quarry-walk"}}
