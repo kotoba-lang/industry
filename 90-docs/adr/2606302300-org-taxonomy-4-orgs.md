@@ -140,3 +140,15 @@ This makes the org choice for a new individual-service repo a **two-step,
 answerable-before-scaffolding** check instead of a taxonomy migration done
 after the fact. Encoded machine-readably in the companion `.edn` under
 `:repo-creation-check`.
+
+## Amendment (2026-07-01): noted exception — `cloud-itonami` org
+
+ADR-2607012100 moved the 35 `cloud-itonami-*` public OSS business/occupation
+blueprint repos (formerly `gftdcojp`, public) to a dedicated `cloud-itonami`
+org. This is **not** a 5th taxonomy tier: the four org roles above are
+unchanged, and `cloud-itonami` exists solely as the public-repo home for the
+`cloud-itonami-*` product line (fork-away business/occupation blueprints,
+distinct in kind from `gftdcojp`'s own commercial `ai-gftd-*` products and
+from the private `cloud-itonami` business-os base repo, which stays under
+`gftdcojp`). Future `cloud-itonami-*` blueprint repos may be created directly
+under `cloud-itonami` without transiting `gftdcojp` first.
