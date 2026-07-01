@@ -14,13 +14,28 @@
   :kotoba-lang/did
   {:repo "git@github.com:kotoba-lang/did.git"
    :revision "32865d4725c390ac92dcbae297f37eec383919a6"
-   :features [:parse :did-document :did-key-ed25519 :did-web]}}
+   :features [:parse :did-document :did-key-ed25519 :did-web]}
+  :kotoba-lang/html
+  {:repo "git@github.com:kotoba-lang/html.git"
+   :revision "122a31e2f6714c1b965b6c0a2d1b9b9e0a3fc8bd"
+   :features [:hiccup-compatible :tag-sugar :style-maps :raw-html :render]}
+  :kotoba-lang/css
+  {:repo "git@github.com:kotoba-lang/css.git"
+   :revision "43b998d5f95bf4d416a70c157d07d75e59fd071b"
+   :features [:style :rule :media :keyframes :style-node]}}
  :manifest
  {:path-overrides
   {:remove ["orgs/com-junkawasaki/drawingml-svg"]}
   :projects
   ["orgs/kotoba-lang/svg"
-   "orgs/kotoba-lang/did"]}
+   "orgs/kotoba-lang/did"
+   "orgs/kotoba-lang/html"
+   "orgs/kotoba-lang/css"
+   "orgs/kotoba-lang/json-ld"
+   "orgs/kotoba-lang/vc"
+   "orgs/kotoba-lang/activitystreams"
+   "orgs/kotoba-lang/activitypub"
+   "orgs/kotoba-lang/annotation"]}
  :w3c-substrate-candidates
  [{:standard "JSON-LD 1.1"
    :repo "orgs/kotoba-lang/json-ld"
@@ -47,6 +62,22 @@
    :priority :medium
    :reason "Shared annotation data model for documents, media, code, and office artifacts."
    :reference "https://www.w3.org/TR/annotation-model/"}]
+ :implemented-follow-on-substrates
+ {:kotoba-lang/json-ld
+  {:revision "985ce7eb51b3d5fb256ad24bae7ee5311b8d872d"
+   :features [:context :term :node :value :list :set :graph]}
+  :kotoba-lang/vc
+  {:revision "61bd3a985ee523e9374524919d2f4b0e6c9370ee"
+   :features [:credential :presentation :validate]}
+  :kotoba-lang/activitystreams
+  {:revision "81abaf05c122914ccfbe7aaee1afe2bf22e3760b"
+   :features [:object :activity :note :person :create :follow :like :announce]}
+  :kotoba-lang/activitypub
+  {:revision "5a8e30573e62d76405c0039261e1121fccb26a2a"
+   :features [:actor :collection :ordered-collection :activity-request]}
+  :kotoba-lang/annotation
+  {:revision "32def0c4f488cb8fd41ded2559340272a8fe04da"
+   :features [:annotation :text-body :specific-resource :fragment-selector :text-position-selector]}}
  :watch
  [{:standard "DID Resolution v0.3"
    :status :draft
