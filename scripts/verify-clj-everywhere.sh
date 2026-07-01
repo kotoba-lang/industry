@@ -19,5 +19,18 @@ echo "── native renderer: kami-webgpu-rs (EDN render-IR → wgpu; GPU-free s
     && cargo test -p kami-webgpu-rs --lib --target "$HOST" -- \
          --skip renders_geometry_headless --skip caster_casts_a_shadow )
 
+# Phase 0.2 (clj-wgsl migration): WGSL authoring parity surface. The CLJC-authored
+# shaders (kami.shaders → bb gen-wgsl → fixtures/*.wgsl) must (a) be regenerable from
+# CLJC with zero diff against the committed fixture (single-source — no hand-edits to
+# generated WGSL), and (b) be token-equivalent to the native include_str!'d shader
+# (bb wgsl-parity --strict). Today only lit/shadow are CLJC-authored; the remaining
+# kami-render/src/shaders/*.wgsl are hand-authored native (tracked as :wgsl-ownership
+# stay-Rust-builtin until Phase 2.3 ports them). See 90-docs/migration/clj-wgsl-ledger.edn.
+echo "── WGSL authoring parity: CLJC canonical ↔ native include_str! (clj-wgsl Phase 0.2) ──"
+( cd "$ROOT/orgs/kotoba-lang/kami-webgpu" \
+    && bb gen-wgsl \
+    && git diff --exit-code -- fixtures/lit-shader.wgsl fixtures/shadow-shader.wgsl fixtures/pipeline_specs.rs \
+    && bb wgsl-parity --strict )
+
 echo
 echo "✓ all surfaces green — same EDN/CLJ runs on web, native, and JVM (ADR-0042)"

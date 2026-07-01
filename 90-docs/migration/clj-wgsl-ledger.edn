@@ -1,0 +1,516 @@
+;; clj-wgsl-ledger.edn — Rust→Clojure/WGSL 移行の crate 別分類台帳（正本）
+;;
+;; Context: オーナー指示「より野心的: ホットコアの一部も CLJ/WGSL 化」。
+;; 核心不変条件: ホットループは WGSL compute（GPU）、CLJ は authoring＋粗粒度
+;; dispatch のみ。これが iOS/console の wasmi no-JIT 制約を回避する唯一の道。
+;; compiler crate・WASM host・crypto・libp2p・content-addressed storage hot path は
+;; substrate で Clojure 移植不可（自己参照/代替無し）。
+;;
+;; 5クラス:
+;;   :stay-Rust-substrate              — 温存（基盤。ホットコア/GPU/runtime/crypto/net/storage）
+;;   :migrate-out                       — Rust crate 内の非基盤ドメインコードを別 repo へ移動
+;;   :port-to-CLJC-domain-interpreter  — data-heavy な解釈器を CLJC→WASM 化（小データ、wasmi で可）
+;;   :port-to-WGSL-compute              — per-element ホット計算を CLJC-authored WGSL compute 化
+;;   :org-transfer                      — 別 repo（com-junkawasaki/<x>-clj → kotoba-lang/<x>）。repos.edn 管理対象
+;;
+;; 各エントリ: {:crate :path :class :substrate? :hot-loop? :clj-mechanism
+;;              :rust-remains :phase :gate :note}
+;; :phase — 1 = 境界を尊重した win / 2 = 野心的ホットコア / nil = 対象外(温存)
+;;
+;; この台帳は 90-docs/migration/ に置く（manifest/kotoba-boundaries.edn は kotoba org
+;; 所有権表で別物）。CI（Phase 3 で新設）が「台帳が両 workspace 全 crate を網羅」を検査。
+
+{:meta
+ {:version "0.1.0"
+  :date "2026-07-01"
+  :invariant "hot-loop in WGSL; CLJ only authors + dispatches (coarse-grained, wasmi-safe)"
+  :out-of-scope
+  ["kotoba-crypto (constant-time, #![deny(unsafe_code)])"
+   "kotoba-net (libp2p)"
+   "kotoba-store/ProllyTree/CID (content-addressed storage hot path)"
+   "kotoba-clj + kami-engine-clj (compiler — self-reference)"
+   "kotoba-runtime + kami-script-runtime (WASM host = substrate)"
+   "kotoba-edn (SSoT EDN reader — porting is circular)"
+   "kami-webgpu-rs + kami-render wgpu command recorder itself (what-to-record → EDN; recorder stays Rust)"
+   "kami-genesis Isaac Sim/PhysX facade (vendor API)"
+   "hecs ECS storage (60fps tick is native)"
+   "aiueos (capability-secure WASM OS supervisor)"]}
+
+ ;; =========================================================================
+ ;; kotoba workspace (orgs/kotoba-lang/kotoba) — 36 crates + 3 examples
+ ;; =========================================================================
+ :kotoba
+ [;; --- substrate: 絶対温存 ---
+  {:crate "kotoba-core" :path "orgs/kotoba-lang/kotoba/crates/kotoba-core"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? true
+   :clj-mechanism :none :rust-remains "CIDv1/blake3, KAIS frame, ProllyTree, HLC"
+   :phase nil :gate "n/a" :note "content-addressed storage hot path — out-of-scope"}
+  {:crate "kotoba-rt" :path "orgs/kotoba-lang/kotoba/crates/kotoba-rt"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? false
+   :clj-mechanism :none :rust-remains "runtime/host wiring" :phase nil :gate "n/a"}
+  {:crate "kotoba-vault" :path "orgs/kotoba-lang/kotoba/crates/kotoba-vault"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? true
+   :clj-mechanism :none :rust-remains "LiveBus/Vault WAL, object_store, chunker" :phase nil :gate "n/a"}
+  {:crate "kotoba-query" :path "orgs/kotoba-lang/kotoba/crates/kotoba-query"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? true
+   :clj-mechanism :none :rust-remains "KQE Datalog engine, 4-index Arrangement (EAVT/AEVT/AVET/VAET)"
+   :phase nil :gate "n/a" :note "hot query path — substrate"}
+  {:crate "kotoba-dht" :path "orgs/kotoba-lang/kotoba/crates/kotoba-dht"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? false
+   :clj-mechanism :none :rust-remains "Kademlia DHT, Source Chain, Warrant" :phase nil :gate "n/a"}
+  {:crate "kotoba-net" :path "orgs/kotoba-lang/kotoba/crates/kotoba-net"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? true
+   :clj-mechanism :none :rust-remains "libp2p QUIC/Noise/GossipSub/KAD/relay/DCUtR/AutoNAT"
+   :phase nil :gate "n/a" :note "out-of-scope — no CLJ substitute for libp2p"}
+  {:crate "kotoba-auth" :path "orgs/kotoba-lang/kotoba/crates/kotoba-auth"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? false
+   :clj-mechanism :none :rust-remains "CACAO chain verify, DID, EVM/BTC read+verify codec"
+   :phase nil :gate "n/a" :note "crypto-adjacent, constant-time deps — substrate"}
+  {:crate "kotoba-graph" :path "orgs/kotoba-lang/kotoba/crates/kotoba-graph"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? true
+   :clj-mechanism :none :rust-remains "SPARQL→Datalog, Commit DAG, cold-path BGP" :phase nil :gate "n/a"}
+  {:crate "kotoba-vm" :path "orgs/kotoba-lang/kotoba/crates/kotoba-vm"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? true
+   :clj-mechanism :none :rust-remains "Pregel BSP, KVM, CALL_FOREIGN, DistributedPregelRunner"
+   :phase nil :gate "n/a"}
+  {:crate "kotoba-runtime" :path "orgs/kotoba-lang/kotoba/crates/kotoba-runtime"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? true
+   :clj-mechanism :none :rust-remains "wasmtime + WIT Component-Model host (WasmExecutor/UdfExecutor)"
+   :phase nil :gate "n/a" :note "WASM host IS the substrate — cannot be CLJ"}
+  {:crate "kotoba-server" :path "orgs/kotoba-lang/kotoba/crates/kotoba-server"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? true
+   :clj-mechanism :none :rust-remains "XRPC/MCP endpoints, firehose, access receipts" :phase nil :gate "n/a"}
+  {:crate "kotoba-store" :path "orgs/kotoba-lang/kotoba/crates/kotoba-store"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? true
+   :clj-mechanism :none :rust-remains "BlockStore (Memory/Kubo/Tiered/Budgeted/CAR/Sealed)" :phase nil :gate "n/a"
+   :note "content-addressed storage hot path — out-of-scope"}
+  {:crate "kotoba-store-web" :path "orgs/kotoba-lang/kotoba/crates/kotoba-store-web"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? false
+   :clj-mechanism :none :rust-remains "browser IndexedDB AsyncBlockStore (wasm32)" :phase nil :gate "n/a"}
+  {:crate "kotoba-wasm" :path "orgs/kotoba-lang/kotoba/crates/kotoba-wasm"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? true
+   :clj-mechanism :none :rust-remains "browser node: query→wasm32, IndexedDB/OPFS, ProllyTree in-browser"
+   :phase nil :gate "n/a" :note "CLJC siblings in crates/kotoba-wasm/web/cljs already exist"}
+  {:crate "kotoba-lattice" :path "orgs/kotoba-lang/kotoba/crates/kotoba-lattice"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "lattice substrate" :phase nil :gate "n/a"}
+  {:crate "kotoba-guest" :path "orgs/kotoba-lang/kotoba/crates/kotoba-guest"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "WASM guest helpers" :phase nil :gate "n/a"}
+  {:crate "kotoba-crypto" :path "orgs/kotoba-lang/kotoba/crates/kotoba-crypto"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "AEAD/HKDF/HPKE/key-wrap/proof-of-control, #![deny(unsafe_code)]" :phase nil :gate "n/a"
+   :note "out-of-scope — constant-time crypto must not move to GC language"}
+  {:crate "kotoba-custody" :path "orgs/kotoba-lang/kotoba/crates/kotoba-custody"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "t-of-N Shamir custody, HPKE per-custodian wrap" :phase nil :gate "n/a"}
+  {:crate "kotoba-signal" :path "orgs/kotoba-lang/kotoba/crates/kotoba-signal"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "X3DH + Double Ratchet + group sessions (SSoT replacement for TS signal)" :phase nil :gate "n/a"}
+  {:crate "kotoba-turn" :path "orgs/kotoba-lang/kotoba/crates/kotoba-turn"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "pure-Rust TURN relay (RFC 8656), STUN/CRC-32" :phase nil :gate "n/a"
+   :note "I/O + binary protocol — substrate"}
+  {:crate "kotoba-ingest" :path "orgs/kotoba-lang/kotoba/crates/kotoba-ingest"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "Gmail OAuth2, RFC2822, multimodal search, BM25/PageRank/fusion" :phase nil :gate "n/a"}
+  {:crate "kotoba-ipfs" :path "orgs/kotoba-lang/kotoba/crates/kotoba-ipfs"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "IPFS block/pin I/O" :phase nil :gate "n/a"}
+  {:crate "kotoba-ipns-record" :path "orgs/kotoba-lang/kotoba/crates/kotoba-ipns-record"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "IPNS record codec" :phase nil :gate "n/a"}
+  {:crate "kotoba-cli" :path "orgs/kotoba-lang/kotoba/crates/kotoba-cli"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "the `kotoba` binary" :phase nil :gate "n/a"}
+  {:crate "kotoba-edn" :path "orgs/kotoba-lang/kotoba/crates/kotoba-edn"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "SSoT EDN reader/writer" :phase nil :gate "n/a"
+   :note "out-of-scope — porting the SSoT reader to CLJC is circular; every CLJC layer reads EDN via this on native"}
+  {:crate "kotoba-lang" :path "orgs/kotoba-lang/kotoba/crates/kotoba-lang"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "language profile / .kotoba canonical + #?(?kotoba) reader branches" :phase nil :gate "n/a"
+   :note "language surface, not a compute crate"}
+  {:crate "kotoba-clj" :path "orgs/kotoba-lang/kotoba/crates/kotoba-clj"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "Clojure-subset → WASM compiler (wasm-encoder, safe-clj capability profile)"
+   :phase nil :gate "n/a" :note "out-of-scope — the compiler itself; self-reference"}
+  {:crate "kotoba-datomic" :path "orgs/kotoba-lang/kotoba/crates/kotoba-datomic"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "Datomic-compatible facade, DistributedDatomCommit" :phase nil :gate "n/a"}
+  {:crate "kotoba-vc" :path "orgs/kotoba-lang/kotoba/crates/kotoba-vc"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "W3C Verifiable Credentials" :phase nil :gate "n/a"}
+  {:crate "kotoba-didcomm" :path "orgs/kotoba-lang/kotoba/crates/kotoba-didcomm"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "DIDComm v2" :phase nil :gate "n/a"}
+  {:crate "kotoba-git" :path "orgs/kotoba-lang/kotoba/crates/kotoba-git"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "git↔kotoba bridge, pure-Rust packfile decoder" :phase nil :gate "n/a"
+   :note "binary codec hot path — substrate"}
+  {:crate "kotoba-rad" :path "orgs/kotoba-lang/kotoba/crates/kotoba-rad"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "RAD identity ledger" :phase nil :gate "n/a"}
+  {:crate "kotoba-evm" :path "orgs/kotoba-lang/kotoba/crates/kotoba-evm"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "EVM state in query" :phase nil :gate "n/a"}
+  {:crate "kotoba-word" :path "orgs/kotoba-lang/kotoba/crates/kotoba-word"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "word/root registry + projection (MCP/ATProto lexicon)" :phase nil :gate "n/a"}
+  {:crate "kotoba-shell" :path "orgs/kotoba-lang/kotoba/crates/kotoba-shell"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "shell" :phase nil :gate "n/a"}
+  {:crate "kotoba-llm" :path "orgs/kotoba-lang/kotoba/crates/kotoba-llm"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "Weight/LoRA/KV-cache + WebGPU train/infer (FP8)"
+   :phase nil :gate "n/a"
+   :note "WGSL shaders (RMS_NORM/ROPE/ATTENTION/SWIGLU/SAMPLE/MATMUL) are hand-authored &str — future kami.wgsl-authoring stretch (Phase 2b), not in scope now"}
+
+  ;; --- migrate-out ---
+  {:crate "kotoba-kotodama" :path "orgs/kotoba-lang/kotoba/crates/kotoba-kotodama"
+   :class :migrate-out :substrate? false :hot-loop? false
+   :clj-mechanism :none :rust-remains "CANONICAL_REPOSITORIES redirect table only"
+   :phase 1 :gate "kotoba-boundary-audit.bb: crates/kotoba-kotodama/cells/ :domain-cell/:domain-actor == 0"
+   :note "already :status :migrate-out in manifest/kotoba-boundaries.edn; cells/ + py primitives route to etzhayyim/gftdcojp/murakumo"}
+
+  ;; --- examples (Rust, stay) ---
+  {:crate "ashiba-bmc" :path "orgs/kotoba-lang/kotoba/examples/ashiba-bmc"
+   :class :stay-Rust-substrate :substrate? false :hot-loop? false :clj-mechanism :none
+   :rust-remains "example" :phase nil :gate "n/a" :note "example crate"}
+  {:crate "etzhayyim-chargespot-bma" :path "orgs/kotoba-lang/kotoba/examples/etzhayyim-chargespot-bma"
+   :class :stay-Rust-substrate :substrate? false :hot-loop? false :clj-mechanism :none
+   :rust-remains "example" :phase nil :gate "n/a" :note "example crate"}
+  {:crate "etzhayyim-chargespot-ingest" :path "orgs/kotoba-lang/kotoba/examples/etzhayyim-chargespot-ingest"
+   :class :stay-Rust-substrate :substrate? false :hot-loop? false :clj-mechanism :none
+   :rust-remains "example" :phase nil :gate "n/a" :note "example crate"}]
+
+ ;; =========================================================================
+ ;; kami-engine workspace (orgs/kotoba-lang/kami-engine) — 103 crates
+ ;; =========================================================================
+ :kami-engine
+ [;; --- substrate / compiler / host (絶対温存) ---
+  {:crate "kami-engine-clj" :class :stay-Rust-substrate :substrate? true :hot-loop? false
+   :clj-mechanism :none :rust-remains "CLJ→WASM game-script compiler (extends kotoba-clj, defsystem)"
+   :phase nil :gate "n/a" :note "out-of-scope — compiler, self-reference"}
+  {:crate "kami-script-runtime" :class :stay-Rust-substrate :substrate? true :hot-loop? true
+   :clj-mechanism :none :rust-remains "wasmtime/wasmi dual backend host, bit-identical"
+   :phase nil :gate "n/a" :note "out-of-scope — WASM host = substrate; the no-JIT invariant guardian"}
+  {:crate "kami-clj-host" :class :stay-Rust-substrate :substrate? true :hot-loop? true
+   :clj-mechanism :none :rust-remains "Rust host bridge: decode KAMI render-IR → kami-render wgpu"
+   :phase nil :gate "n/a" :note "substrate — the render-IR recorder stays Rust"}
+  {:crate "kami-core" :class :stay-Rust-substrate :substrate? true :hot-loop? true
+   :clj-mechanism :none :rust-remains "hecs ECS + Actor + KAMI columnar IPC" :phase nil :gate "n/a"
+   :note "hecs storage is out-of-scope"}
+  {:crate "kami-render" :class :stay-Rust-substrate :substrate? true :hot-loop? true
+   :clj-mechanism :none :rust-remains "wgpu bootstrap + scene pipelines + WGSL shaders (single GPU bootstrap owner, ADR-0039)"
+   :phase nil :gate "n/a" :note "the wgpu command recorder stays Rust; *what to record* → EDN"}
+  {:crate "kami-webgpu-rs" :class :stay-Rust-substrate :substrate? true :hot-loop? true
+   :clj-mechanism :none :rust-remains "native wgpu executor for EDN render-IR (golden-frame harness)"
+   :phase nil :gate "n/a" :note "out-of-scope recorder; TEMPLATE for compute-IR executor + golden-frame (Phase 2/3)"}
+  {:crate "kami-engine" :class :stay-Rust-substrate :substrate? true :hot-loop? false
+   :clj-mechanism :none :rust-remains "umbrella (World + Clock + Net)" :phase nil :gate "n/a"}
+  {:crate "kami-knp" :class :stay-Rust-substrate :substrate? true :hot-loop? true
+   :clj-mechanism :none :rust-remains "KAMI Network Protocol (UDP + WebTransport)" :phase nil :gate "n/a"}
+  {:crate "kami-rtc" :class :stay-Rust-substrate :substrate? true :hot-loop? true
+   :clj-mechanism :none :rust-remains "WebRTC SDK (room/peer/media/signaling)" :phase nil :gate "n/a"}
+  {:crate "kami-bridge" :class :stay-Rust-substrate :substrate? true :hot-loop? true
+   :clj-mechanism :none :rust-remains "OS input capture/injection (CGEvent/Win32)" :phase nil :gate "n/a"}
+  {:crate "kami-os" :class :stay-Rust-substrate :substrate? true :hot-loop? true
+   :clj-mechanism :none :rust-remains "wgpu window manager compositor" :phase nil :gate "n/a"}
+  {:crate "kami-eng-core" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "engine core" :phase nil :gate "n/a"}
+  {:crate "kami-eng-render" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "engine render" :phase nil :gate "n/a"}
+  {:crate "kami-eng-io" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "engine I/O" :phase nil :gate "n/a"}
+  {:crate "kami-eng-web" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "engine web" :phase nil :gate "n/a"}
+  {:crate "kami-web" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "legacy monolithic WASM entry (frozen; new games → kami-app-{game})" :phase nil :gate "n/a"}
+  {:crate "kami-web-modelb" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "legacy web modelb" :phase nil :gate "n/a"}
+  {:crate "kami-app" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "Builder SDK (KamiApp, RenderPipeline trait, Camera, RAF)" :phase nil :gate "n/a"
+   :note "Builder contract owner — substrate"}
+  {:crate "kami-pipelines" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "shared RenderPipeline adapters (Sky/Terrain/Water/Voxel/Particle/DEC-vis/Atlas/Gsplat)"
+   :phase nil :gate "n/a" :note "wgpu dispatch adapters stay Rust; adapter config is EDN"}
+  {:crate "kami-demo" :class :stay-Rust-substrate :substrate? false :hot-loop? false :clj-mechanism :none
+   :rust-remains "desktop demo (winit)" :phase nil :gate "n/a"}
+  {:crate "kami-devtools" :class :stay-Rust-substrate :substrate? false :hot-loop? false :clj-mechanism :none
+   :rust-remains "devtools" :phase nil :gate "n/a"}
+  {:crate "kami-cartpole-wasm" :class :stay-Rust-substrate :substrate? false :hot-loop? true :clj-mechanism :none
+   :rust-remains "WASM cdylib demonstrator" :phase nil :gate "n/a"}
+  ;; rendering/asset codecs — substrate
+  {:crate "kami-text" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "SDF text rendering (GPU instanced quads)" :phase nil :gate "n/a"}
+  {:crate "kami-ui-gpu" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "GPU UI (wgpu instanced)" :phase nil :gate "n/a"}
+  {:crate "kami-gltf" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "glTF 2.0 loader (wasm-safe)" :phase nil :gate "n/a"}
+  {:crate "kami-vrm" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "VRM spec parse/compose/export + spring bone + constraint solver" :phase nil :gate "n/a"
+   :note "pure Rust, no gpu; consumed by native render"}
+  {:crate "kami-scad" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "OpenSCAD parser + CSG evaluator" :phase nil :gate "n/a"}
+  {:crate "kami-geo" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "geospatial Web Mercator + H3" :phase nil :gate "n/a"}
+  {:crate "kami-map" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "map renderer WASM entry" :phase nil :gate "n/a"}
+  {:crate "kami-terrain" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "FBM heightmap + splatmap + chunk mesh/LOD + Gerstner water + biome presets"
+   :phase nil :gate "n/a" :note "open-world L0 leaf, GPU compute/rendering; WGSL in kami-render — future kami.wgsl-authoring stretch"}
+  {:crate "kami-atmosphere" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "procedural sky + sun + cloud ray-march + day/night + wind_field (2-octave FBM)"
+   :phase nil :gate "n/a" :note "open-world L0 leaf, GPU; WGSL mirrored in shader — future authoring stretch"}
+  {:crate "kami-vegetation" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "GPU-instanced vegetation (taxonomy-driven mesh_from_profile, Poisson placement, WASM cull)"
+   :phase nil :gate "n/a" :note "open-world L1, GPU instanced; WGSL — future authoring stretch"}
+  {:crate "kami-graph" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "Merkle DAG PCB layout + force-directed" :phase nil :gate "n/a"}
+  {:crate "kami-scene-graph" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "Scene DAG (parent-child transform, hecs)" :phase nil :gate "n/a"}
+  {:crate "kami-scene" :class :stay-Rust-substrate :substrate? false :hot-loop? false :clj-mechanism :none
+   :rust-remains "tolerant EDN accessors for scene.edn" :phase nil :gate "n/a"
+   :note "data-tier EDN loader (native side); CLJC (kami.scene) authors the EDN"}
+  {:crate "kami-voxel" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "voxel storage (Dense/Sparse/Octree)" :phase nil :gate "n/a"}
+  {:crate "kami-nerf" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "NeRF" :phase nil :gate "n/a"}
+  {:crate "kami-pathfind" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "A* grid + NavMesh" :phase nil :gate "n/a" :note "A* on GPU is unusual; stay native"}
+  ;; EDA/CAD/CAE/semiconductor vendor facades — substrate, pending follow-up review
+  {:crate "kami-cad" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "CAD facade" :phase nil :gate "n/a" :note "vendor API facade — review data-interpreter migration in follow-up"}
+  {:crate "kami-cad-import" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "CAD import (roxmltree)" :phase nil :gate "n/a"}
+  {:crate "kami-cae" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "CAE facade" :phase nil :gate "n/a" :note "aero contract CAE — review in follow-up"}
+  {:crate "kami-dft" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "DFT" :phase nil :gate "n/a"}
+  {:crate "kami-spice" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "SPICE" :phase nil :gate "n/a"}
+  {:crate "kami-pdk" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "PDK" :phase nil :gate "n/a"}
+  {:crate "kami-eda" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "EDA" :phase nil :gate "n/a"}
+  {:crate "kami-power" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "power" :phase nil :gate "n/a"}
+  {:crate "kami-si" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "SI units" :phase nil :gate "n/a"}
+  {:crate "kami-pkg" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "packaging" :phase nil :gate "n/a"}
+  {:crate "kami-yield" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "yield" :phase nil :gate "n/a"}
+  {:crate "kami-ip" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "IP" :phase nil :gate "n/a"}
+  {:crate "kami-flow" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "flow" :phase nil :gate "n/a"}
+  {:crate "kami-pnr" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "PNR" :phase nil :gate "n/a"}
+  {:crate "kami-verify" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "verification" :phase nil :gate "n/a"}
+  {:crate "kami-mine-pds" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "mine PDS" :phase nil :gate "n/a"}
+  {:crate "kami-mine-ai" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "mine AI" :phase nil :gate "n/a"}
+  {:crate "kami-bim" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "BIM" :phase nil :gate "n/a" :note "review data-interpreter migration in follow-up"}
+  {:crate "kami-rtl" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "RTL" :phase nil :gate "n/a"}
+  {:crate "kami-pbrt" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "pbrt ray tracer" :phase nil :gate "n/a"}
+  {:crate "kami-rt" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "rendering tech (Omniverse API-compat)" :phase nil :gate "n/a"}
+  {:crate "kami-usd" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "USD (Omniverse API-compat)" :phase nil :gate "n/a"}
+  {:crate "kami-rtx-native" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "contingent native RT fallback (Council Lv6+)" :phase nil :gate "n/a"}
+  {:crate "kami-usd-native" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "contingent native USD fallback (Council Lv6+)" :phase nil :gate "n/a"}
+  {:crate "kami-groot" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "GR00T N1.x foundation-policy compat" :phase nil :gate "n/a" :note "vendor API"}
+  {:crate "kami-shugyo" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "shugyo (training)" :phase nil :gate "n/a"}
+  {:crate "kami-replicator" :class :stay-Rust-substrate :substrate? true :hot-loop? false :clj-mechanism :none
+   :rust-remains "data replicator" :phase nil :gate "n/a"}
+  {:crate "kami-sensor-sim" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "sensor sim" :phase nil :gate "n/a"}
+  {:crate "kami-autodrive" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "autonomous driving (13 rs)" :phase nil :gate "n/a"}
+
+  ;; --- port-to-CLJC-domain-interpreter (Phase 1.2) ---
+  {:crate "kami-game" :class :port-to-CLJC-domain-interpreter :substrate? false :hot-loop? false
+   :clj-mechanism :data-interpreter
+   :rust-remains "executor that the interpreter dispatches into; per-element hot loops stay native"
+   :phase 1 :gate "keystone_domains.rs + 1 test per migrated interpreter; verify-clj-everywhere.sh green; Rust mirror behavior-invariant on same EDN fixtures"
+   :note "25 game-systems modules (FSM/behavior-tree/camera rigs/NPC/inventory) — THE Phase 1.2 target. PRELUDE (get-in/select-keys/reduce/merge/some) already compiles these (keystone_domains.rs green)"}
+  {:crate "kami-cam" :class :port-to-CLJC-domain-interpreter :substrate? false :hot-loop? false
+   :clj-mechanism :data-interpreter
+   :rust-remains "per-frame transform eval (native); rig selection → CLJC"
+   :phase 1 :gate "keystone_domains.rs camera-rig case; parity vs native transform"
+   :note "camera rigs (follow/look-constraint/shake profile) — data-shaped, Phase 1.2"}
+  {:crate "kami-input" :class :port-to-CLJC-domain-interpreter :substrate? false :hot-loop? false
+   :clj-mechanism :data-interpreter
+   :rust-remains "native event capture (keyboard/mouse/touch/gamepad) + FocusManager"
+   :phase 1 :gate "keystone_domains.rs input_axes_from_held (already green) extended to action-map set"
+   :note "input action maps → CLJC; native capture stays Rust"}
+  {:crate "kami-skeleton" :class :port-to-CLJC-domain-interpreter :substrate? false :hot-loop? false
+   :clj-mechanism :data-interpreter
+   :rust-remains "GPU skinning + native clip eval; EDN clips already authored in kami-skeleton-scene"
+   :phase 1 :gate "parity vs native blend/crossfade/CCD-IK on fixed clip set"
+   :note "blend/crossfade/IK (CCD) eval is data-shaped — candidate; clips already EDN. Stretch in Phase 1.2"}
+  {:crate "kami-tilemap" :class :port-to-CLJC-domain-interpreter :substrate? false :hot-loop? false
+   :clj-mechanism :data-interpreter
+   :rust-remains "tile rendering (GPU); collision map data → CLJC"
+   :phase 1 :gate "collision-map parity vs native" :note "tile collision map is data — candidate, stretch"}
+
+  ;; --- data-tier -scene crates (native EDN loaders; stay Rust, CLJC authors EDN) ---
+  {:crate "kami-vehicle-scene" :class :stay-Rust-substrate :substrate? false :hot-loop? false
+   :clj-mechanism :none :rust-remains "from_edn/build EDN → native structs (parity oracle)"
+   :phase nil :gate "n/a" :note "data-tier EDN loader; CLJC authors the EDN"}
+  {:crate "kami-atmosphere-scene" :class :stay-Rust-substrate :substrate? false :hot-loop? false :clj-mechanism :none
+   :rust-remains "EDN accessor" :phase nil :gate "n/a" :note "data-tier"}
+  {:crate "kami-terrain-scene" :class :stay-Rust-substrate :substrate? false :hot-loop? false :clj-mechanism :none
+   :rust-remains "EDN accessor" :phase nil :gate "n/a" :note "data-tier"}
+  {:crate "kami-vegetation-scene" :class :stay-Rust-substrate :substrate? false :hot-loop? false :clj-mechanism :none
+   :rust-remains "EDN accessor" :phase nil :gate "n/a" :note "data-tier"}
+  {:crate "kami-postfx-scene" :class :stay-Rust-substrate :substrate? false :hot-loop? false :clj-mechanism :none
+   :rust-remains "EDN accessor" :phase nil :gate "n/a" :note "data-tier"}
+  {:crate "kami-autodrive-scene" :class :stay-Rust-substrate :substrate? false :hot-loop? false :clj-mechanism :none
+   :rust-remains "EDN accessor" :phase nil :gate "n/a" :note "data-tier"}
+  {:crate "kami-character-scene" :class :stay-Rust-substrate :substrate? false :hot-loop? false :clj-mechanism :none
+   :rust-remains "EDN accessor" :phase nil :gate "n/a" :note "data-tier"}
+  {:crate "kami-game-scene" :class :stay-Rust-substrate :substrate? false :hot-loop? false :clj-mechanism :none
+   :rust-remains "EDN accessor" :phase nil :gate "n/a" :note "data-tier"}
+  {:crate "kami-input-scene" :class :stay-Rust-substrate :substrate? false :hot-loop? false :clj-mechanism :none
+   :rust-remains "EDN accessor" :phase nil :gate "n/a" :note "data-tier"}
+  {:crate "kami-skeleton-scene" :class :stay-Rust-substrate :substrate? false :hot-loop? false :clj-mechanism :none
+   :rust-remains "EDN clip accessor" :phase nil :gate "n/a" :note "data-tier (EDN-authored clips)"}
+  {:crate "kami-cam-scene" :class :stay-Rust-substrate :substrate? false :hot-loop? false :clj-mechanism :none
+   :rust-remains "EDN accessor" :phase nil :gate "n/a" :note "data-tier"}
+  {:crate "kami-articulated-scene" :class :stay-Rust-substrate :substrate? false :hot-loop? false :clj-mechanism :none
+   :rust-remains "EDN accessor" :phase nil :gate "n/a" :note "data-tier"}
+  {:crate "kami-mangaka-scene" :class :stay-Rust-substrate :substrate? false :hot-loop? false :clj-mechanism :none
+   :rust-remains "EDN accessor" :phase nil :gate "n/a" :note "data-tier"}
+  {:crate "kami-live" :class :stay-Rust-substrate :substrate? false :hot-loop? false :clj-mechanism :none
+   :rust-remains "DanceScene::from_edn + frame(dt) → render-IR (host entry)"
+   :phase nil :gate "n/a" :note "already EDN-authored (:dance/*); the native composer stays Rust"}
+  {:crate "kami-character" :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "character controller (18 rs)" :phase nil :gate "n/a"}
+
+  ;; --- per-game crates (Rust shell hosts logic.clj + scene.edn) ---
+  {:crate "kami-clj-play" :class :stay-Rust-substrate :substrate? false :hot-loop? true :clj-mechanism :none
+   :rust-remains "native winit+wgpu player (2D); loads logic.clj + scene.edn" :phase nil :gate "n/a"
+   :note "Rust shell — gameplay is CLJ (survivors/waves)"}
+  {:crate "kami-clj-play3d" :class :stay-Rust-substrate :substrate? false :hot-loop? true :clj-mechanism :none
+   :rust-remains "native winit+wgpu player (3D); loads logic.clj + scene.edn" :phase nil :gate "n/a"
+   :note "Rust shell — gameplay is CLJ (royale/dance/rt-audio-demo)"}
+  {:crate "kami-app-isekai" :class :stay-Rust-substrate :substrate? false :hot-loop? true :clj-mechanism :none
+   :rust-remains "ISEKAI game crate (loads logic.clj + scene.edn)" :phase nil :gate "n/a" :note "hosts CLJ gameplay"}
+  {:crate "kami-app-quarry-walk" :class :stay-Rust-substrate :substrate? false :hot-loop? true :clj-mechanism :none
+   :rust-remains "Quarry game crate" :phase nil :gate "n/a" :note "hosts CLJ gameplay"}
+  {:crate "kami-app-car-sim" :class :stay-Rust-substrate :substrate? false :hot-loop? true :clj-mechanism :none
+   :rust-remains "car-sim game crate (builds from EDN at boot)" :phase nil :gate "n/a" :note "hosts CLJ gameplay; EDN-built"}
+  {:crate "kami-app-amenominaka" :class :stay-Rust-substrate :substrate? false :hot-loop? true :clj-mechanism :none
+   :rust-remains "amenominaka game crate" :phase nil :gate "n/a" :note "hosts CLJ gameplay"}
+
+  ;; --- port-to-WGSL-compute (Phase 2 — ambitious) ---
+  {:crate "kami-genesis" :class :port-to-WGSL-compute :substrate? false :hot-loop? true
+   :clj-mechanism :author-wgsl-from-cljc
+   :rust-remains "thin wgpu dispatch + buffer binding (wgpu_backend.rs / wgpu_planar.rs)"
+   :phase 2 :gate "golden-frame: WGSL-authored kernel vs CPU reference, f32-tolerant bit-identical buffer hash (kami-webgpu-rs harness, pixel→buffer readback)"
+   :note "THE physics reference (mpm/cartpole/double_pendulum/planar_chain + wgsl/*_step.wgsl). Author the not-yet-built 5-solver WGSL from kami.wgsl CLJC here"}
+  {:crate "kami-physics-solvers" :class :port-to-WGSL-compute :substrate? false :hot-loop? true
+   :clj-mechanism :author-wgsl-from-cljc
+   :rust-remains "thin dispatch (or retire stub → genesis)" :phase 2
+   :gate "5-solver (rigid/MPM/SPH/FEM/PBD) golden-frame parity"
+   :note "18-line stub today (SOLVERS const only). Repurpose as thin dispatch crate or delete in favor of genesis"}
+  {:crate "kami-vehicle" :class :port-to-WGSL-compute :substrate? false :hot-loop? true
+   :clj-mechanism :author-wgsl-from-cljc
+   :rust-remains "powertrain + chassis binding; soft-body beams → WGSL PBD kernel"
+   :phase 2 :gate "soft-body parity vs native XPBD on fixed scenario"
+   :note "BeamNG-grade soft-body (80 nodes/220 beams, XPBD) — PBD-variant; stretch in Phase 2"}
+  {:crate "kami-physics-2d" :class :port-to-WGSL-compute :substrate? false :hot-loop? true
+   :clj-mechanism :author-wgsl-from-cljc
+   :rust-remains "2D pipeline dispatch" :phase 2 :gate "AABB/circle/impulse parity vs native"
+   :note "2D physics — WGSL compute candidate; stretch in Phase 2"}
+  {:crate "kami-dec" :class :port-to-WGSL-compute :substrate? false :hot-loop? true
+   :clj-mechanism :author-wgsl-from-cljc
+   :rust-remains "chunk management + dispatch; field ops → WGSL compute"
+   :phase 2 :gate "DEC operator (d/curl/div/Poisson-multigrid/Maxwell) parity vs native on fixed grid"
+   :note "v3 DEC physics (Λ⁰/Λ¹/Λ², Poisson multigrid, Maxwell Yee) — strong WGSL-compute candidate"}
+  {:crate "kami-articulated" :class :port-to-WGSL-compute :substrate? false :hot-loop? true
+   :clj-mechanism :author-wgsl-from-cljc
+   :rust-remains "articulated dispatch" :phase 2 :gate "articulation3d parity vs native"
+   :note "articulated body physics — stretch in Phase 2"}
+  {:crate "kami-audio" :class :port-to-WGSL-compute :substrate? false :hot-loop? true
+   :clj-mechanism :author-wgsl-from-cljc
+   :rust-remains "mixer loop + voice alloc + SR buffer mgmt; emit :native stays for real-time latency"
+   :phase 2 :gate "bit-identical stereo (f32) vs binaural.rs path on fixed source set; emit :wgsl for offline bounce"
+   :note "spatialization (ITD/ILD/gain/delay) → WGSL compute (offline bounce); real-time path stays emit :native (latency)"}
+  {:crate "kami-postfx" :class :port-to-WGSL-compute :substrate? false :hot-loop? true
+   :clj-mechanism :author-wgsl-from-cljc
+   :rust-remains "pass executor + pipeline dispatch" :phase 2
+   :gate "golden-frame (kami-webgpu-rs headless pixel readback) extended to post chain"
+   :note "bloom/outline/CRT/vignette/pixelate → kami.wgsl data; render-IR :passes (postfx is 'just another pass', ADR-0040)"}
+  {:crate "kami-mesher" :class :port-to-WGSL-compute :substrate? false :hot-loop? true
+   :clj-mechanism :author-wgsl-from-cljc
+   :rust-remains "mesh upload" :phase 2 :gate "marching-cubes parity vs native" :note "marching-cubes → WGSL compute candidate; stretch"}
+  {:crate "kami-sdf" :class :port-to-WGSL-compute :substrate? false :hot-loop? true
+   :clj-mechanism :author-wgsl-from-cljc :rust-remains "SDF eval dispatch" :phase 2
+   :gate "CSG/SDF parity vs native" :note "SDF + CSG tree → WGSL; stretch"}]
+
+ ;; =========================================================================
+ ;; 小規模 standalone Rust repos (orgs/kotoba-lang/) — 別 repo
+ ;; =========================================================================
+ :small-rust-repos
+ [{:crate "aiueos" :path "orgs/kotoba-lang/aiueos"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "capability-secure WASM OS (wasmtime + ed25519, deny-by-default broker)"
+   :phase nil :gate "n/a" :note "out-of-scope — supervisor that runs confined components cannot itself be one"}
+  {:crate "inference" :path "orgs/kotoba-lang/inference"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "GPU inference runtime (wgpu/WGSL, wasm32+WebGPU dual target)"
+   :phase nil :gate "n/a" :note "domain-native backend — stays Rust behind CLJC contracts (kotodama.inference.*)"}
+  {:crate "kami-engine-cfd" :path "orgs/kotoba-lang/kami-engine-cfd"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "D2Q9 lattice-Boltzmann CFD solver (:lbm backend for cae-solver)"
+   :phase nil :gate "n/a" :note "domain-native compute backend — stays Rust behind CAE/aero contracts"}
+  {:crate "kotodama-host" :path "orgs/kotoba-lang/kotodama-host"
+   :class :stay-Rust-substrate :substrate? true :hot-loop? true :clj-mechanism :none
+   :rust-remains "WIT/WASI P2 host scaffolds + config + TS host SDK"
+   :phase nil :gate "n/a" :note "host runtimes stay native (WIT-bound); config/SDK contracts may move to CLJC (follow-up)"}
+  {:crate "kotodama-holochain" :path "orgs/kotoba-lang/kotodama-holochain"
+   :class :stay-Rust-substrate :substrate? false :hot-loop? false :clj-mechanism :none
+   :rust-remains "placeholder (agent-actor-runtime stub, no Cargo.toml)"
+   :phase nil :gate "n/a" :note "stub/placeholder — no substantial code to migrate"}
+  {:crate "kototama" :path "orgs/kotoba-lang/kototama"
+   :class :port-to-CLJC-domain-interpreter :substrate? false :hot-loop? false
+   :clj-mechanism :dispatch-only
+   :rust-remains "re-export of kotoba-clj + kami-engine-clj + wasmtime backend capability"
+   :phase 1 :gate "CLJC test compiles logic.clj via contract; WASM bytes reproducible (safe_reproducible.rs invariant)"
+   :note "unifying seam — surface HostCaps/safe_compile_clj facade via kototama-clj + kototama-cljc-contract; wasmtime stays backend"}
+  {:crate "kami-webgpu" :path "orgs/kotoba-lang/kami-webgpu"
+   :class :stay-Rust-substrate :substrate? false :hot-loop? false :clj-mechanism :none
+   :rust-remains "none (the .rs is a generated fixture)"
+   :phase nil :gate "n/a" :note "CLJC-first already; single .rs is generated fixture (gen_wgsl/gen_pipeline_specs). Phase 1.3 confirms single-source generation"}]
+
+ ;; =========================================================================
+ ;; org-transfer (repos.edn :path-overrides 管理) — ADR-2606302300
+ ;; 言語移植でなく所有権移管。com-junkawasaki/<x>-clj → kotoba-lang/<x>
+ ;; =========================================================================
+ :org-transfer
+ {:policy "ADR-2606302300 (owner decision 2026-06-30: all generic -clj infra libraries fully migrate to kotoba-lang)"
+  :mechanism "repos.edn :path-overrides + bb scripts/gen-west-manifest.bb --check + pin == repo HEAD"
+  :scope-note "Verified 2026-07-01 against west.yml: all 41 com-junkawasaki/*-clj repos have a matching kotoba-lang/<name> entry (full duplicate). The 41 old west.yml project blocks + 4 :extra-projects entries (kotobase/kudaki/nagare/num -clj) are stale duplicates removed in Phase 1.5. Not 14 — the ADR-2606302300 'To migrate' list understated; the actual migrated set is 41."
+  :repos
+  ["aero" "authenticator" "bpmn" "browser-agent" "browser-use" "cae-solver" "ci"
+   "cmmn" "comfyui" "computer-use" "crash" "cron" "datom" "ddl" "dmn" "dot"
+   "echem" "godaddy-dns" "graphql" "ical" "jsonlogic" "kagi" "kenchi" "kotobase"
+   "kudaki" "langchain" "langgraph" "mcp" "motor" "nagare" "num" "openapi"
+   "playwright" "policy" "sigma" "statechart" "states" "torch" "vllm" "vphysics"
+   "zone"]
+  :pre-check "audit path-dep on ../../kotoba/crates/kotoba-edn before moving each"
+  :gate "gen-west-manifest.bb --check 0; west list shows new paths; 0 old com-junkawasaki/*-clj entries remain"}}
+

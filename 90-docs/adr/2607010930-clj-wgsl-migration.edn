@@ -1,0 +1,55 @@
+{:frontmatter
+ {:id "adr-2607010930-clj-wgsl-migration"
+  :title "ADR-2607010930: Rust→Clojure/WGSL migration (ambitious scope; hot loop in WGSL, CLJ authors + dispatches)"
+  :status "proposed"
+  :doc_type "adr"
+  :topic "clj-wgsl-migration"
+  :authoritative true
+  :last_verified "2026-07-01"
+  :authoritative_for
+  ["the hot-loop-in-WGSL / CLJ-authors-and-dispatches-only rule that resolves the wasmi no-JIT constraint for ambitious hot-core migration"
+   "the five-class crate ledger (90-docs/migration/clj-wgsl-ledger.edn) classifying every kotoba + kami-engine Rust crate"
+   "the stay-Rust substrate hard boundary (crypto/net/storage-hot/compilers/WASM hosts/edn/wgpu-recorder/hecs/aiueos)"
+   "phasing: Phase 0 ledger+guardrails / Phase 1 boundary wins / Phase 2 WGSL-authored hot compute / Phase 3 golden-frame + CI"]
+  :related
+  ["90-docs/migration/clj-wgsl-ledger.edn"
+   "manifest/kotoba-boundaries.edn"
+   "scripts/verify-clj-everywhere.sh"
+   "scripts/kotoba-boundary-audit.bb"
+   "90-docs/adr/2606241700-kotoba-clj-runtime-kotoba-ext.md"
+   "90-docs/adr/2606302300-org-taxonomy-4-orgs.md"]
+  :supersedes []
+  :superseded_by []}
+
+ :problem
+ {:source "owner directive 2026-07-01: more ambitious — bring parts of the hot core (physics solvers, audio mixer) into CLJ/WGSL; re-examine wasmi no-JIT"
+  :gap "no authoritative rule for how hot-core compute can move to CLJ/WGSL without breaking the iOS/console wasmi no-JIT invariant; no crate-level ledger distinguishing substrate (stay) from migration targets"
+  :risk "porting per-element hot loops into CLJ-WASM silently breaks iOS/console (wasmi interprets every iteration); or the ambition is blocked by treating all Rust as untouchable substrate"}
+
+ :decision
+ {:core-rule "the per-element hot loop runs on GPU hardware as WGSL compute; CLJ only authors (edit time) and dispatches (one coarse call per system per frame); the per-element loop never runs in CLJ-WASM"
+  :wasmi-resolution "hot loop in WGSL (hardware, not interpreted) + coarse-grained CLJ dispatch (one -tick per system per frame, the existing kami-script-runtime contract) — the no-JIT path is never on the hot loop"
+  :ledger-classes
+  [:stay-Rust-substrate :migrate-out :port-to-CLJC-domain-interpreter :port-to-WGSL-compute :org-transfer]
+  :phases
+  {:0 "ledger + guardrails (verify-clj-everywhere WGSL-parity surface; kotoba-boundary-audit --clj-wgsl)"
+   :1 "boundary-respecting wins (kotodama migrate-out; data interpreters→CLJC; kami-webgpu fixture single-source; kototama CLJC contract; -clj infra→kotoba-lang org transfer)"
+   :2 "ambitious: kami.wgsl @compute support; 5-solver WGSL authored from CLJC (greenfield, reference in kami-genesis); binaural emit :wgsl; postfx→kami.wgsl; ECS defsystem (declare+dispatch, never per-entity)"
+   :3 "golden-frame to compute (buffer-hash across wgpu native+web+CPU); clj-wgsl-parity CI workflow; wasmi no-JIT build gate + dispatch-budget test"}
+  :out-of-scope
+  ["kotoba-crypto (constant-time, #![deny(unsafe_code)])"
+   "kotoba-net (libp2p)"
+   "kotoba-store/ProllyTree/CID (content-addressed storage hot path)"
+   "kotoba-clj + kami-engine-clj (compiler — self-reference)"
+   "kotoba-runtime + kami-script-runtime (WASM host = substrate)"
+   "kotoba-edn (SSoT EDN reader — porting is circular)"
+   "kami-webgpu-rs + kami-render wgpu command recorder (what-to-record → EDN; recorder stays Rust)"
+   "kami-genesis Isaac Sim/PhysX facade (vendor API)"
+   "hecs ECS storage (60fps tick is native)"
+   "aiueos (capability-secure WASM OS supervisor)"]
+  :premise-corrections
+  ["kami-physics-solvers is an 18-line stub; 5-solver WGSL not yet built — real physics+WGSL is in kami-genesis"
+   "Rust repos are under orgs/kotoba-lang/, not orgs/com-junkawasaki/"
+   "kotoba-lang/kotoba-lang is a pure-spec repo with no deps.edn — not a runnable Clojure target"
+   "superproject CI runs no cargo/clojure/--check today (CodeQL + JupyterLite only)"]}}
+

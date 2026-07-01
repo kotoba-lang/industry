@@ -38,6 +38,24 @@
  "test_yoro_m4.py" :atproto-actor
  "test_yoro_m5.py" :atproto-actor}
 
+;; clj-wgsl migration (90-docs/migration/clj-wgsl-ledger.edn): ownership of the
+;; hand-authored WGSL shaders `include_str!`'d into native crates. The audit
+;; (scripts/kotoba-boundary-audit.bb --clj-wgsl) scans include_str!(".wgsl") under
+;; kami-render/src, kami-webgpu-rs/src, kami-genesis/src and classifies each:
+;;   :cljc-authored  — generated from a CLJC canonical (parity-enforced by verify-clj-everywhere.sh)
+;;   :port-target    — hand-authored today, scheduled to be CLJC-authored (Phase 2)
+;;   :stay-rust-builtin (default) — native builtin pipeline; the wgpu recorder stays Rust
+:wgsl-ownership
+{:cljc-authored
+ {"kami-webgpu-rs/src/lit_shader.wgsl"   "kami-webgpu/fixtures/lit-shader.wgsl"
+  "kami-webgpu-rs/src/shadow_shader.wgsl" "kami-webgpu/fixtures/shadow-shader.wgsl"}
+ :port-target
+ {"kami-webgpu-rs/src/post.wgsl"                  {:phase 2.3 :ledger "kami-postfx"}
+  "kami-genesis/src/wgsl/cartpole_step.wgsl"        {:phase 2.1 :ledger "kami-genesis"}
+  "kami-genesis/src/wgsl/double_pendulum_step.wgsl" {:phase 2.1 :ledger "kami-genesis"}
+  "kami-genesis/src/wgsl/planar_chain_step.wgsl"    {:phase 2.1 :ledger "kami-genesis"}}
+ :default :stay-rust-builtin}
+
 :cell-prefix-routes
 {"abuse" "com-etzhayyim-abuse"
   "akashi" "com-etzhayyim-akashi"

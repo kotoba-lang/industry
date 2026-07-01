@@ -140,10 +140,99 @@
    :by-kind (frequencies (map :kind xs))
    :by-target (into (sorted-map) (frequencies (map :target xs)))})
 
+;; ---- clj-wgsl audit (Phase 0.3) ----
+;; Scan include_str!(".wgsl") under the shader-bearing native crates and classify each
+;; referenced shader against :wgsl-ownership in kotoba-boundaries.edn.
+(def wgsl-crate-roots
+  {"kami-render"   (io/file root "orgs/kotoba-lang/kami-engine/kami-render/src")
+   "kami-webgpu-rs" (io/file root "orgs/kotoba-lang/kami-engine/kami-webgpu-rs/src")
+   "kami-genesis"  (io/file root "orgs/kotoba-lang/kami-engine/kami-genesis/src")})
+
+(def include-str-re #"include_str!\(\"([^\"]*\.wgsl)\"\)")
+
+(defn wgsl-include-refs [crate-root]
+  (when (.exists crate-root)
+    (->> (file-seq crate-root)
+         (filter #(.isFile %))
+         (filter #(or (str/ends-with? (.getName %) ".rs")
+                      (str/ends-with? (.getName %) ".wgsl")))
+         (mapcat
+          (fn [f]
+            (let [text (slurp f)
+                  refs (map second (re-seq include-str-re text))]
+              (when (seq refs)
+                (let [src-file (rel f)
+                      src-dir (.getParent (io/file f))]
+                  (map (fn [r] {:src-file src-file :shader-ref r :src-dir src-dir}) refs)))))))))
+
+(defn resolve-shader-path [{:keys [src-dir shader-ref]}]
+  ;; include_str! paths are relative to the .rs file's directory (Rust semantics).
+  (let [resolved (io/file src-dir shader-ref)]
+    (rel resolved)))
+
+(defn crate-relative [shader-path]
+  ;; kotoba-boundaries.edn :wgsl-ownership keys are crate-relative
+  ;; (e.g. "kami-webgpu-rs/src/lit_shader.wgsl"); the resolved path is repo-relative
+  ;; (e.g. "orgs/kotoba-lang/kami-engine/kami-webgpu-rs/src/lit_shader.wgsl").
+  (let [prefixes ["orgs/kotoba-lang/kami-engine/" "orgs/kotoba-lang/"]]
+    (reduce (fn [p prefix]
+              (if (str/starts-with? p prefix) (subs p (count prefix)) p))
+            shader-path prefixes)))
+
+(defn classify-wgsl [shader-path]
+  (let [own (:wgsl-ownership cfg)
+        cljc (:cljc-authored own)
+        port (:port-target own)
+        key (crate-relative shader-path)]
+    (cond
+      (get cljc key)
+      {:kind :cljc-authored :path shader-path :canonical (get cljc key)}
+      (get port key)
+      (let [p (get port key)]
+        {:kind :port-target :path shader-path :phase (:phase p) :ledger (:ledger p)})
+      :else
+      {:kind (:default own :stay-rust-builtin) :path shader-path})))
+
+(defn wgsl-entries []
+  (let [refs (mapcat (fn [[crate dir]] (wgsl-include-refs dir)) wgsl-crate-roots)]
+    (->> refs
+         (map (fn [r] (assoc r :shader-path (resolve-shader-path r))))
+         (map (fn [r] (merge (classify-wgsl (:shader-path r))
+                             {:shader-path (:shader-path r) :src-file (:src-file r)})))
+         (distinct-by :shader-path))))
+
+(defn wgsl-summary [xs]
+  {:total (count xs)
+   :by-kind (into (sorted-map) (frequencies (map :kind xs)))
+   :cljc-authored (count (filter #(= :cljc-authored (:kind %)) xs))
+   :port-target (count (filter #(= :port-target (:kind %)) xs))
+   :stay-rust-builtin (count (filter #(= :stay-rust-builtin (:kind %)) xs))})
+
+(defn report-wgsl [edn?]
+  (let [xs (vec (wgsl-entries))]
+    (if edn?
+      (prn {:summary (wgsl-summary xs) :entries xs})
+      (do
+        (println "clj-wgsl boundary audit (WGSL include_str! ownership)")
+        (println "summary:" (pr-str (wgsl-summary xs)))
+        (println)
+        (doseq [{:keys [kind shader-path src-file phase ledger canonical]} (sort-by :shader-path xs)]
+          (println (format "%-20s %s" (name kind) shader-path))
+          (when phase (println (format "    -> Phase %s  ledger: %s" phase ledger)))
+          (when canonical (println (format "    -> canonical: %s" canonical)))
+          (when src-file (println (format "    src: %s" src-file))))))))
+
 (let [xs (vec (entries))
-      edn? (some #{"--edn"} *command-line-args*)]
-  (if edn?
+      edn? (some #{"--edn"} *command-line-args*)
+      wgsl? (some #{"--clj-wgsl"} *command-line-args*)]
+  (cond
+    wgsl?
+    (report-wgsl edn?)
+
+    edn?
     (prn {:summary (summary xs) :entries xs})
+
+    :else
     (do
       (println "kotoba boundary audit")
       (println "summary:" (pr-str (summary xs)))
