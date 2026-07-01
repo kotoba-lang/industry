@@ -58,9 +58,9 @@ Date: 2026-07-01
 | `kotoba-lang/n-quads` | `c5dfc0399a31370a32570541a9b666be379fa46a` | N-Quads serializer for RDF EDN quads |
 | `kotoba-lang/rdf-canon` | `31a8b4b4e5fd89880a6c03c2ef89035df0f90636` | Deterministic RDF canonical string/hash substrate |
 | `kotoba-lang/shacl` | `0e502ac5b3405da02a5f7127cd7daa3fa144dd16` | EDN shape validator inspired by SHACL Core |
-| `kotoba-lang/ooxml` | `820b184efb1b55b3f4de89c47ba8626dad448ab1` | OOXML OPC package/rels/content-types substrate |
-| `kotoba-lang/drawingml` | `42d2ab4d0c5175ef954879215e80d21fbc3ac177` | DrawingML XML builder/parser substrate |
-| `kotoba-lang/presentationml` | `6156f488080ba9d384db9a740d2432bc720a4be0` | PresentationML/PPTX package projection/parser substrate |
+| `kotoba-lang/ooxml` | `757f8ad88cd3969e24f999dd300ed1cfb040a6f8` | OOXML OPC package/rels/content-types substrate |
+| `kotoba-lang/drawingml` | `3ba468a5e32d10fb079dce7a088e9b59632849e5` | DrawingML XML builder/parser substrate |
+| `kotoba-lang/presentationml` | `6e13d306d71ee231e483d0dacecdb31ae30d26f5` | PresentationML/PPTX package projection/parser substrate |
 
 ## OOXML adoption update
 
@@ -72,7 +72,7 @@ Date: 2026-07-01
 - PPTX import uses a CLJC DrawingML/PresentationML parser for `p:sp`, `a:xfrm`, `a:solidFill`, `a:ln`, `p:pic`, and `a:tbl`.
 - When a PPTX contains `ocz/causal.edn`, the causal deck is treated as metadata/provenance, not as the sole source of truth. Current slide XML is parsed and reconciled back into the deck so edits made in PowerPoint can be re-imported.
 
-The west manifest pins this adoption at `kotoba-lang/ooxml` `820b184efb1b55b3f4de89c47ba8626dad448ab1`, `kotoba-lang/drawingml` `42d2ab4d0c5175ef954879215e80d21fbc3ac177`, `kotoba-lang/presentationml` `6156f488080ba9d384db9a740d2432bc720a4be0`, `kotoba-lang/office` `b5838def811d05f1db1e7d77e5daede8ac953883`, and `kotoba-lang/slides` `b12210bbd98faa8bf69ca9ccbf6de1a033f3c67a`.
+The west manifest pins this adoption at `kotoba-lang/ooxml` `757f8ad88cd3969e24f999dd300ed1cfb040a6f8`, `kotoba-lang/drawingml` `3ba468a5e32d10fb079dce7a088e9b59632849e5`, `kotoba-lang/presentationml` `6e13d306d71ee231e483d0dacecdb31ae30d26f5`, `kotoba-lang/office` `b5838def811d05f1db1e7d77e5daede8ac953883`, and `kotoba-lang/slides` `b12210bbd98faa8bf69ca9ccbf6de1a033f3c67a`.
 
 ## OOXML maturity update
 
@@ -80,9 +80,11 @@ The OOXML substrate family now has explicit coverage gates, validation helpers, 
 
 | Repo | Maturity | Coverage gate | Current measured coverage | Notes |
 | --- | --- | --- | --- | --- |
-| `kotoba-lang/ooxml` | M3 | 85% | 89.07% forms / 93.22% lines | OPC map, rels, content-types, validation helpers |
-| `kotoba-lang/drawingml` | M2 | 75% | 77.65% forms / 83.42% lines | Builder plus `drawingml.parse` for shapes, transforms, fill, line, text, pic, table |
-| `kotoba-lang/presentationml` | M2 | 85% | 91.36% forms / 93.06% lines | Package projection plus `presentationml.parse` for PPTX entries |
+| `kotoba-lang/ooxml` | M3 | 85% | 96.08% forms / 100.00% lines | OPC map, rels, content-types, validation helpers |
+| `kotoba-lang/drawingml` | M2 | 75% | 99.05% forms / 100.00% lines | Builder plus `drawingml.parse` for shapes, transforms, fill, line, text, pic, table |
+| `kotoba-lang/presentationml` | M2 | 85% | 99.22% forms / 100.00% lines | Package projection plus `presentationml.parse` for PPTX entries |
+
+The remaining non-100 form counts are Cloverage instrumentation artifacts around reader-conditionals, namespace metadata, literals, and partially instrumented compile-time forms. Executable source lines are covered at 100% for all three substrate repos.
 
 `slides.pptx.import` is now an adapter from `presentationml.parse` EDN to the `:slides/*` model rather than the owner of the DrawingML/PresentationML parser.
 

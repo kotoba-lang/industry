@@ -102,13 +102,13 @@
   {:revision "0e502ac5b3405da02a5f7127cd7daa3fa144dd16"
    :features [:node-shape :property-shape :validate]}
   :kotoba-lang/ooxml
-  {:revision "820b184efb1b55b3f4de89c47ba8626dad448ab1"
+  {:revision "757f8ad88cd3969e24f999dd300ed1cfb040a6f8"
    :features [:package :relationships :content-types :rels-path :package-kind :office-parts :ensure-content-type :ensure-root-relationship]}
   :kotoba-lang/drawingml
-  {:revision "42d2ab4d0c5175ef954879215e80d21fbc3ac177"
+  {:revision "3ba468a5e32d10fb079dce7a088e9b59632849e5"
    :features [:emu :xfrm :solid-fill :line :preset-geometry :text-body :table :parse-shapes :validate]}
   :kotoba-lang/presentationml
-  {:revision "6156f488080ba9d384db9a740d2432bc720a4be0"
+  {:revision "6e13d306d71ee231e483d0dacecdb31ae30d26f5"
    :features [:slide :presentation-xml :relationships :content-types :theme :layout :package-map :parse-deck :validate]}}
  :ooxml-adoption
  {:kotoba-lang/office
@@ -124,18 +124,20 @@
  {:kotoba-lang/ooxml
   {:maturity :m3
    :coverage-gate 85
-   :coverage {:forms 89.07 :lines 93.22}
+   :coverage {:forms 96.08 :lines 100.00}
    :tests [:validation :rels-roundtrip :content-types :office-part-ordering]}
   :kotoba-lang/drawingml
   {:maturity :m2
    :coverage-gate 75
-   :coverage {:forms 77.65 :lines 83.42}
+   :coverage {:forms 99.05 :lines 100.00}
    :tests [:builder :parser-fixture :rendered-text-roundtrip :validation]}
   :kotoba-lang/presentationml
   {:maturity :m2
    :coverage-gate 85
-   :coverage {:forms 91.36 :lines 93.06}
-   :tests [:package-map :parser-fixture :generated-package-roundtrip :validation]}}
+   :coverage {:forms 99.22 :lines 100.00}
+   :tests [:package-map :parser-fixture :generated-package-roundtrip :validation]}
+  :coverage-note
+  "Executable source lines are 100% covered in all three substrate repos; remaining non-100 form counts are Cloverage reader-conditional/ns/literal instrumentation artifacts."}
  :watch
  [{:standard "DID Resolution v0.3"
    :status :draft
