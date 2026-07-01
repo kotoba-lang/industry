@@ -92,3 +92,11 @@ README は "Robotics premise" 節で領域 robot と governor 名を明示する
 - langgraph-clj ADR-0001 (Pregel superstep + interrupt + Datomic checkpoint)
 - `kotoba-lang/robotics` README の safety model 表
 - 本 ADR とペアの `.edn`
+
+## Addendum (2026-07-01, ADR-2607012100)
+
+「新規 repo」節の blueprint repo(`cloud-itonami-4711` `-4920` `-6810` `-9700`
+`-9900` を含む ISIC 由来 26 件)は `gftdcojp` org, public として発行したが、
+ADR-2607012100 により `cloud-itonami` org へ transfer 済み(visibility は public の
+まま不変)。上記本文の「gftdcojp org」表記は移管当時の事実として保持し書き換えない
+— 現在の所属 org は ADR-2607012100 を参照。

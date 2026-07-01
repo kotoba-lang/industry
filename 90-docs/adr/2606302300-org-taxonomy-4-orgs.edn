@@ -21,7 +21,8 @@
    "90-docs/adr/2606301900-isco-cofog-organism-actors.md"
    "90-docs/adr/2606272237-manifest-workflow-single-entry-commit.md"
    "orgs/gftdcojp/ai-gftd-stripe/NOT-MIGRATED-VENDOR-REGULATORY.md.edn"
-   "orgs/gftdcojp/ai-gftd-livecam/NOT-MIGRATED-CHARTER-VIOLATION.md.edn"]
+   "orgs/gftdcojp/ai-gftd-livecam/NOT-MIGRATED-CHARTER-VIOLATION.md.edn"
+   "90-docs/adr/2607012100-cloud-itonami-org-split.md"]
   :supersedes []
   :superseded_by []}
 
@@ -76,7 +77,8 @@
   "new-repo placement decided by axis: any library -> kotoba-lang; agent+公益 -> etzhayyim; product+ビジネス -> gftdcojp; cloud+data -> com-junkawasaki"
   "com-junkawasaki -> kotoba-lang full -clj migration DECIDED (2026-06-30); language-core already moved, generic -clj infra to follow; com-junkawasaki end-state = cloud + data only"
   "codified in repos.edn as a doc-only :orgs key (generator does not read it, mirroring :manifest-workflow)"
-  "individual/vendor-specific service repos now classified BEFORE scaffolding via :repo-creation-check, not retroactively at migration time"]
+  "individual/vendor-specific service repos now classified BEFORE scaffolding via :repo-creation-check, not retroactively at migration time"
+  "noted exception (2026-07-01, ADR-2607012100): cloud-itonami-* public OSS business/occupation blueprint repos (35, formerly under gftdcojp) live in a dedicated cloud-itonami org — a product-line-specific public repo home, not a 5th taxonomy tier; the 4-org role split above is unchanged"]
 
  :repo-creation-check
  {:amended "2026-07-01"
