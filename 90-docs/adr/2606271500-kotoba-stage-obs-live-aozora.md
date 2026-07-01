@@ -9,7 +9,7 @@ last_verified: 2026-06-27
 authoritative_for:
   - OBS 相当のシーン/ソース/ミキサ合成を kotoba データ + .kotoba(CLJ→WASM) で表す設計
   - OBS から app-aozora へライブ配信する取り込み(WHIP/RTMP/SRT)・配信(LL-HLS/WebRTC)経路
-  - ライブ配信の AT Protocol レキシコン名前空間 com.etzhayyim.aozora.live.*
+  - ライブ配信の AT Protocol レキシコン名前空間 app.aozora.live.*
 related:
   - kotoba/crates/kotoba-rt          # リアルタイム signaling relay(ClientMsg::Signal で SDP/ICE 中継)
   - kotoba/crates/kotoba-turn        # TURN(coturn use-auth-secret) ephemeral credential
@@ -28,7 +28,9 @@ superseded_by: []
 
 # ADR-2606271500: kotoba-stage — OBS 相当の配信ツールと OBS→app-aozora ライブ配信
 
-**Status**: accepted（control plane + studio UI + media plane を cljc で実装・動作検証済み / 残:SRTP トランスポート）
+**Status**: accepted（設計は確定。下記「実装状況の更新」節が主張する control plane /
+studio UI / media plane の実装・動作検証は、**2026-07-01 時点でリポジトリ上に実体が
+確認できず未着手**。詳細は末尾「追記 (2026-07-01)」参照）
 **Date**: 2026-06-27
 **Deciders**: Jun Kawasaki
 
@@ -123,7 +125,7 @@ OBS の命令的な C++ プラグイン/シーンコレクションを、**宣�
   「このシーンを CID で配って誰でも同じ絵を再現」が成立する(OBS のシーンコレクション
    json の上位互換)。
 
-スキーマ(EDN、`com.etzhayyim.aozora.live.scene` レコードの本体としても保存):
+スキーマ(EDN、`app.aozora.live.scene` レコードの本体としても保存):
 
 ```clojure
 ;; scene.kotoba — データとしてのシーン + 純粋な合成関数
@@ -206,18 +208,19 @@ WHIP/RTMP/SRT 終端
 ライブを **AT Protocol レコード**として PDS / kotoba appview に publish し、yoro feed に
 載せる。既存 `getRankedFeed`(datom→ranked feed)パターンをそのまま踏襲する。
 
-新規レキシコン名前空間 `com.etzhayyim.aozora.live.*`
-(配置: `app-aozora/00-contracts/lexicons/com/etzhayyim/etzhayyim/aozora/live/`、
-既存 yoro と同じ「ディレクトリは etzhayyim 二重 / id は単一」規約):
+新規レキシコン名前空間 `app.aozora.live.*`
+(配置: `app-aozora/00-contracts/lexicons/app/aozora/live/`、
+`app.aozora.convo.*` 等の既存 rename 済みレキシコンと同じ「ディレクトリ = id
+そのままのパス」規約。旧 `com.etzhayyim.aozora.*` 名前空間は廃止):
 
 | lexicon id | type | 役割 |
 |---|---|---|
-| `com.etzhayyim.aozora.live.broadcast` | record | ライブ/ VOD 1 本。title/status/ingest head CID/playlist ref/visibility/edge hints |
-| `com.etzhayyim.aozora.live.scene` | record | コンテンツアドレス可能な kotoba-stage シーン(EDN CID) |
-| `com.etzhayyim.aozora.live.getIngestTicket` | query | OBS 用 stream key(WHIP/RTMP)+ TURN cred を CACAO スコープで mint |
-| `com.etzhayyim.aozora.live.getPlaylist` | query | segment datom → LL-HLS/DASH manifest |
-| `com.etzhayyim.aozora.live.getViewerTicket` | query | 視聴者 TURN cred / 署名済み再生トークン |
-| `com.etzhayyim.aozora.live.startBroadcast` / `stopBroadcast` | procedure | 配信状態 datom の遷移 |
+| `app.aozora.live.broadcast` | record | ライブ/ VOD 1 本。title/status/ingest head CID/playlist ref/visibility/edge hints |
+| `app.aozora.live.scene` | record | コンテンツアドレス可能な kotoba-stage シーン(EDN CID) |
+| `app.aozora.live.getIngestTicket` | query | OBS 用 stream key(WHIP/RTMP)+ TURN cred を CACAO スコープで mint |
+| `app.aozora.live.getPlaylist` | query | segment datom → LL-HLS/DASH manifest |
+| `app.aozora.live.getViewerTicket` | query | 視聴者 TURN cred / 署名済み再生トークン |
+| `app.aozora.live.startBroadcast` / `stopBroadcast` | procedure | 配信状態 datom の遷移 |
 
 公開エッジは **既存 `xrpc-adapter`(Cloudflare Worker)** に `live.*` ハンドラを追加。
 appview(`kotoba-appview`)は `live.broadcast` レコードを index、yoro `getRankedFeed` が
@@ -299,8 +302,8 @@ ClojureScript Common (`.cljc`) に正準化**する追加判断を行った（�
 | 領域 | 実体 | 検証 |
 |---|---|---|
 | **control plane**(正準) | `aozora.live` `.cljc`(`get-ingest-ticket`/`get-viewer-ticket`/`get-playlist`/`render-ll-hls-manifest`/`mint-*`/Worker `fetch`) | `:cljs` 20 tests・`:clj` 4 tests・両方 golden ピン |
-| **配信先**(レキシコン) | `com.etzhayyim.aozora.live.{broadcast,getIngestTicket,getPlaylist,getViewerTicket}` | JSON 妥当性 |
-| **デプロイ配線** | cljs Worker `wrangler.jsonc`(route `…/xrpc/com.etzhayyim.aozora.live.*`、特異性で TS アダプタに優先) | `wrangler deploy --dry-run` 通過 |
+| **配信先**(レキシコン) | `app.aozora.live.{broadcast,getIngestTicket,getPlaylist,getViewerTicket}` | JSON 妥当性 |
+| **デプロイ配線** | cljs Worker `wrangler.jsonc`(route `…/xrpc/app.aozora.live.*`、特異性で TS アダプタに優先) | `wrangler deploy --dry-run` 通過 |
 | **配信スタジオ UI** | `appview/…/cljs`(reagent+re-frame, `/live`): scene/source/mixer/Studio Mode/create-broadcast/OBS-connect/LL-HLS viewer | cljs.test 20 tests |
 | **`.kotoba` シーン/compositor** | `40-engine/kotoba-stage/examples/{scene,compositor}.kotoba` | — |
 | **e2e デモ**(Rust 不要) | `examples/{mock-ingest,demo-live}.mjs`(production `get-playlist` 経由で live→VOD) | 実行確認 |
@@ -333,6 +336,42 @@ fMP4** を、JVM と Worker で同一バイト生成することを実証。cont
   が必要で、実 OBS + プレイヤーでの byte-perfect 再生検証を伴う。
 - `kami-webgpu` 合成バックエンドの実結線、`kotoba-signal` group ratchet による
   E2E private 配信は未着手(設計のみ)。
+
+## 追記 (2026-07-01): 実装状況の再確認 — 上記「実装済み・検証済み」は現行リポジトリに実体なし
+
+`orgs/kotoba-lang/kotoba` を PR #259「Remove legacy Rust workspace」が
+2026-07-01 に main へ merge し、Rust workspace(`kotoba-turn`/`kotoba-net`/
+`kotoba-rt`/`kotoba-media`/`kotoba-ingest` を含む)を**リポジトリから完全削除**
+した（方針: 「Historical Rust implementation details remain available through
+git history; new behavior should land first in CLJC/EDN contracts」）。この
+削除を機に本 ADR の実装状況を再確認したところ、上記「実装済み・検証済み」表が
+挙げる成果物は **`app-aozora` / `kotoba-lang/kotoba` / `kotoba-lang/kotoba-lang`
+のいずれにも実体が見つからない**:
+
+- `xrpc-adapter/cljs/src/aozora/live.cljc`、`aozora.media.{rtp,h264,cmaf,pipeline}`、
+  `40-engine/kotoba-stage/`（examples・testdata・`_archive/ingest-rust-retired/`
+  含む）— いずれもローカル checkout・GitHub 上のブランチ/PR に存在しない
+  （`grep -rl "aozora\.media\|aozora\.stage"` / `find -iname "*kotoba-stage*"`
+  は 0 件、`kotoba-lang/kotoba` の merge 済み PR 一覧にも該当なし）。
+- `app-aozora/00-contracts/lexicons/` にも `live.*` レキシコン(`broadcast`/
+  `scene`/`getIngestTicket`/`getPlaylist`/`getViewerTicket`)は存在しない。
+  存在するのは `com.etzhayyim.aozora.repo.{prepareWrite,commitSigned}`
+  (ADR-2606201000、PDS 用途で live とは無関係)と、進行中の
+  `app.aozora.convo.*`(messenger, rename 済み/進行中 WIP)のみ。
+- `kotoba-lang/kotoba` の crates は現在 `kotoba-clj`/`kotoba-kotodama`/
+  `kotoba-transit`/`kotoba-wasm` のみで、`kotoba-turn`/`kotoba-net`/`kotoba-rt`
+  は git 履歴には残るが HEAD には存在しない。
+- 後継の CLI/言語権威 repo `kotoba-lang/kotoba-lang` にも、WebRTC/TURN/SRTP/
+  WHIP/RTP/H264/CMAF に関するコード・EDN 契約・ADR は一件もない
+  （`docs/adr/` 7 本はいずれも言語仕様・パッケージ管理・RAD・ワイヤプロトコル）。
+
+結論: 「実装状況の更新 (2026-06-27)」節と「end-to-end 動作検証」節の記述は、
+**当時のセッションでは検証されたとしても、その成果物は main に merge されず
+現存しない**。本 ADR は**設計提案として有効**だが、実装は事実上ゼロから
+（かつ Rust ではなく CLJC/EDN 方針で）やり直す必要がある。レキシコン名前空間は
+本追記の時点で `app.aozora.live.*`(旧 `com.etzhayyim.aozora.live.*` から
+rename済み表記)に統一した。次に着手する場合は、本 ADR を「accepted」のまま
+実装フェーズ節から書き直すか、後継 ADR を新規に起票すること。
 
 ## Notes
 

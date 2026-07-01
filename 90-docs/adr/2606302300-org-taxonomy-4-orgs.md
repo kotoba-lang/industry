@@ -94,3 +94,49 @@ taxonomy:
   (cloud-manimani, cloud-murakumo) + heavy/data projects (spirit-in-physics,
   ghosthacker)**. Migration in progress; tracked via `repos.edn
   :path-overrides`.
+
+## Amendment (2026-07-01): repo-creation-time placement check
+
+The "what" axis (§Axes 1) was previously judged informally ("does this look
+like a library?"). Formalize it into a decision procedure run **before**
+scaffolding any new repo, not after:
+
+**Step 1 — layer test (kotoba-lang admission).** A candidate belongs in
+`kotoba-lang` only if it is a **pure technical layer**: `.cljc`, zero network
+I/O, zero vendor SDK, models records/protocol/data only (cf. `banking`,
+`card`, `swift`, `eth-crypto`, `cacao`, `did`, `vc`, `koe` — the last defines
+ports + a dialog loop but injects every concrete capability from the host,
+so it stays admissible even though its domain, voice telephony, is
+service-shaped). The moment a repo needs to *actually call* PayPay/Stripe/a
+bank API/a WebRTC SFU/an Ethereum RPC node, it fails this test and moves to
+step 2.
+
+**Step 2 — 3-axis + Charter Rider check (etzhayyim vs gftdcojp).** For any
+individual/vendor-specific service (real API integration, a video-call app,
+a payment rail client, a wallet UI, …), run the same classification already
+applied during the gftdcojp→etzhayyim migration (see
+`orgs/gftdcojp/ai-gftd-stripe/NOT-MIGRATED-VENDOR-REGULATORY.md.edn` and
+`orgs/gftdcojp/ai-gftd-livecam/NOT-MIGRATED-CHARTER-VIOLATION.md.edn` for the
+worked examples) **at creation time, not retroactively**:
+
+  1. **3-axis regulatory/settlement check** — does the service hit a
+     Settlement/regulatory axis (PCI-DSS, 資金決済法, 景品表示法・特定商取引法,
+     KYC/AML, banking/broker-dealer licensing, …)? If yes →
+     `gftdcojp/ai-gftd-*` (vendor-retained; regulatory liability sits with
+     the gftd business entity, not the public-interest actor mesh).
+  2. **Charter Rider v2.0 §2(a–h) check** — does the business model or
+     content type hit any of WEAPONS/MILITARY, SPECULATIVE FINANCE,
+     SURVEILLANCE CAPITALISM (ad-tech/data brokerage), FOSSIL FUEL
+     EXTRACTION, SPECIALIST GATEKEEPING, MULTI-GENERATIONAL HARM, STRICT
+     INDIVIDUALIST ONTOLOGY, or WELLBECOMING SUBORDINATION? If yes →
+     `gftdcojp/ai-gftd-*` (excluded from etzhayyim by charter, same as
+     `ai-gftd-livecam`).
+  3. If **neither** axis hits → `etzhayyim/com-etzhayyim-*` as a proper
+     actor (sealed-intelligence ⊣ independent governor, append-only ledger,
+     RAD identity — per the Actors section of `CLAUDE.md`), consuming
+     `kotoba-lang` protocol libraries for the technical layer.
+
+This makes the org choice for a new individual-service repo a **two-step,
+answerable-before-scaffolding** check instead of a taxonomy migration done
+after the fact. Encoded machine-readably in the companion `.edn` under
+`:repo-creation-check`.

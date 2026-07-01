@@ -9,7 +9,8 @@
   :authoritative_for
   ["which GitHub org a new repo belongs in: any library (language or -clj infra) -> kotoba-lang / public-interest agent -> etzhayyim / commercial product -> gftdcojp / cloud+data -> com-junkawasaki"
    "the 公益=etzhayyim / 事業=gftdcojp split that library ADRs assert only inline"
-   "com-junkawasaki -> kotoba-lang full -clj migration (decided 2026-06-30); com-junkawasaki end-state = cloud + data only"]
+   "com-junkawasaki -> kotoba-lang full -clj migration (decided 2026-06-30); com-junkawasaki end-state = cloud + data only"
+   "repo-creation-time placement check for individual/vendor-specific services: layer test (kotoba-lang) then 3-axis+Charter Rider check (etzhayyim vs gftdcojp) — amendment 2026-07-01"]
   :related
   ["manifest/repos.edn"
    "CLAUDE.md"
@@ -18,7 +19,9 @@
    "90-docs/adr/2606272213-ddl-clj-sql-schema-migration.md"
    "90-docs/adr/2606272200-bpmn-clj-edn-process-library.md"
    "90-docs/adr/2606301900-isco-cofog-organism-actors.md"
-   "90-docs/adr/2606272237-manifest-workflow-single-entry-commit.md"]
+   "90-docs/adr/2606272237-manifest-workflow-single-entry-commit.md"
+   "orgs/gftdcojp/ai-gftd-stripe/NOT-MIGRATED-VENDOR-REGULATORY.md.edn"
+   "orgs/gftdcojp/ai-gftd-livecam/NOT-MIGRATED-CHARTER-VIOLATION.md.edn"]
   :supersedes []
   :superseded_by []}
 
@@ -72,7 +75,34 @@
  ["single authoritative reference for org taxonomy — supersedes the inline 公益/事業 mentions in library ADRs"
   "new-repo placement decided by axis: any library -> kotoba-lang; agent+公益 -> etzhayyim; product+ビジネス -> gftdcojp; cloud+data -> com-junkawasaki"
   "com-junkawasaki -> kotoba-lang full -clj migration DECIDED (2026-06-30); language-core already moved, generic -clj infra to follow; com-junkawasaki end-state = cloud + data only"
-  "codified in repos.edn as a doc-only :orgs key (generator does not read it, mirroring :manifest-workflow)"]
+  "codified in repos.edn as a doc-only :orgs key (generator does not read it, mirroring :manifest-workflow)"
+  "individual/vendor-specific service repos now classified BEFORE scaffolding via :repo-creation-check, not retroactively at migration time"]
+
+ :repo-creation-check
+ {:amended "2026-07-01"
+  :purpose "answer 'which org does a NEW repo go in' at creation time, before scaffolding"
+  :step-1-layer-test
+  {:question "is this a pure technical layer: .cljc, zero network I/O, zero vendor SDK, records/protocol/data-model only?"
+   :yes "kotoba-lang"
+   :exemplars ["banking" "card" "swift" "eth-crypto" "cacao" "did" "vc"
+               "koe (ports + dialog-loop only; every concrete capability injected by host, so admissible despite service-shaped domain)"]
+   :no "fails layer test -> go to step-2 (this covers: real PayPay/Stripe/bank API calls, a video-call app, a wallet UI, an Ethereum RPC client, ...)"}
+  :step-2-3-axis-charter-check
+  {:when "candidate is an individual/vendor-specific service (fails step-1)"
+   :worked-examples ["orgs/gftdcojp/ai-gftd-stripe/NOT-MIGRATED-VENDOR-REGULATORY.md.edn"
+                     "orgs/gftdcojp/ai-gftd-livecam/NOT-MIGRATED-CHARTER-VIOLATION.md.edn"]
+   :axis-a-settlement-regulatory
+   {:question "does the service hit a Settlement/regulatory axis? (PCI-DSS, 資金決済法, 景品表示法, 特定商取引法, KYC/AML, banking/broker-dealer licensing, ...)"
+    :if-hit "gftdcojp/ai-gftd-* (vendor-retained; regulatory liability stays with the gftd business entity)"}
+   :axis-b-charter-rider-v2
+   {:question "does the business model or content type hit Charter Rider v2.0 §2(a-h)?"
+    :clauses ["(a) WEAPONS AND MILITARY" "(b) SPECULATIVE FINANCE"
+              "(c) SURVEILLANCE CAPITALISM (ad-tech / data brokerage)"
+              "(d) FOSSIL FUEL EXTRACTION (new projects)" "(e) SPECIALIST GATEKEEPING"
+              "(f) MULTI-GENERATIONAL HARM" "(g) STRICT INDIVIDUALIST ONTOLOGY"
+              "(h) WELLBECOMING SUBORDINATION VIOLATION"]
+    :if-hit "gftdcojp/ai-gftd-* (excluded from etzhayyim by charter, same as ai-gftd-livecam)"}
+   :neither-hit "etzhayyim/com-etzhayyim-* as a proper actor (sealed-intelligence dashv independent governor, append-only ledger, RAD identity per CLAUDE.md Actors section); consumes kotoba-lang protocol libs for the technical layer"}}
 
  :open-questions
- []}  ; resolved 2026-06-30: full -clj migration to kotoba-lang decided
+ []}  ; resolved 2026-06-30: full -clj migration to kotoba-lang decided; 2026-07-01: repo-creation-time placement check added
