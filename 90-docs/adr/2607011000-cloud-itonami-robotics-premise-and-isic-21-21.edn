@@ -1,0 +1,22 @@
+{:frontmatter
+ {:id "adr-2607011000-cloud-itonami-robotics-premise-and-isic-21-21"
+  :title "ADR-2607011000: cloud-itonami の robotics 前提設計と ISIC section coverage 21/21"
+  :status "accepted"
+  :date "2026-07-01"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "cloud-itonami-robotics-isic-coverage"
+  :authoritative true
+  :authoritative_for
+  ["cloud-itonami 全 vertical の robotics 前提設計（物理作業は robot、actor は提案、governor が gate）"
+   "kotoba-lang/robotics capability lib の mission/action/safety-stop/telemetry-proof 契約"
+   "kotoba-lang/industry registry における全 itonami の :robotics 必須化"
+   "ISIC Rev.5 section coverage 21/21（A〜U）の達成"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2606271700-cloud-itonami-business-os"
+            "adr-2606302300-org-taxonomy-4-orgs"
+            "adr-2606302330-cloud-itonami-isic-banking"]
+  :last_verified "2026-07-01"}
+ :body
+ "# ADR-2607011000: cloud-itonami の robotics 前提設計と ISIC section coverage 21/21\n\n**Status**: accepted  \n**Date**: 2026-07-01  \n**Deciders**: Jun Kawasaki\n\n## Decision\n\n1. ISIC section coverage を 7/21 → 21/21 に拡張（未カバー section 各 1 件の代表 class を industry registry に追加; G/H/L/T には独自 lib を新設）。\n2. 全 itonami を robotics 前提で設計 — 物理領域作業は robot が行い、actor は action を提案し、独立 governor が gate する。robotics 契約は `kotoba-lang/robotics` に純データで定義（mission / action+safety-class / governor gate / safety-stop / telemetry-proof）。単一不変条件: governor が拒否する action を actor は決してハードウェアへ dispatch しない（policy, not control）。\n3. industry registry 全 26 entry の :required-technologies に :robotics を一括必須化し、機械可読かつ readiness で検証可能に。各 blueprint.edn は :robotics true、README は Robotics premise 節を持つ。\n\n## Consequences\n\n- (+) 21/21 section 覆盖、26 industry entry / 19 tech、execution-plan/readiness 全件解決済。\n- (+) robotics 前提が registry / blueprint flag / README の三重で表明。\n- (−) 既存 6 blueprint は retrofit で対応。registry-only 11 section は repo 未作成。\n- superproject 登録: manifest/repos.edn と manifest/west.yml に上記 9 lib を登録する。\n\n## Artifacts\n\n- lib: kotoba-lang/{swift,banking,phone,card,retail,logistics,property,labor,robotics}\n- blueprint repo: gftdcojp/cloud-itonami-{4711,4920,6810,9700,9900}\n- registry: kotoba-lang/technology, kotoba-lang/industry\n\n## References\n\n- 既存 actor 3 例 (robotaxi-actor / gftd-talent-actor / ai-gftd-itonami)\n- langgraph-clj ADR-0001\n- 本 ADR とペアの .md"}
