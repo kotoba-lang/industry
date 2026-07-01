@@ -419,7 +419,16 @@
    "orgs/kotoba-lang/pkg"
    "orgs/kotoba-lang/yield"
    "orgs/kotoba-lang/ip"
-   "orgs/kotoba-lang/flow"
+   ;; kami-flow was NOT a CLJC-migration target — it's a graph.etzhayyim.com
+   ;; Node.js/Cypher ingest tool (kami-engine/kami-flow/graph), not KAMI
+   ;; Engineering SDK workflow logic. The mistaken kotoba-lang/flow scaffold
+   ;; was deleted 2026-07-01.
+   ;; KAMI Engineering SDK — restored as 3 repos (was kami-eng-core/io/render,
+   ;; deleted in kami-engine #82 "Remove Rust workspace"). dft/spice/pdk/pnr/
+   ;; bim/rtl/cad/cae-solver/eda depend on these for shared CAD/EDA contracts.
+   "orgs/kotoba-lang/engineer"
+   "orgs/kotoba-lang/engineer-io"
+   "orgs/kotoba-lang/engineer-render"
    "orgs/kotoba-lang/core"
    "orgs/kotoba-lang/scene"
    "orgs/kotoba-lang/scene-graph"
