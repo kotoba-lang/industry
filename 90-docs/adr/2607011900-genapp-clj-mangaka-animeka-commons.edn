@@ -7,17 +7,21 @@
   :authoritative true
   :last_verified "2026-07-01"
   :authoritative_for
-  ["Shared LangGraph generation-app scaffolding (blob store, graph checkpointer, ComfyUI gateway client, LLM chat model + structured-output parsing) lives in orgs/kotoba-lang/genapp-clj, consumed by ai-gftd-mangaka and ai-gftd-animeka as thin facades over their original blob/checkpoint/comfy/llm namespaces (same public API, no call-site changes)"
+  ["CORRECTION (same day): kotoba-lang/genapp-clj was split apart and DELETED. comfy -> comfyui.gateway (orgs/kotoba-lang/comfyui), llm -> langchain.jvm (orgs/kotoba-lang/langchain), blob+checkpoint -> orgs/kotoba-lang/langgraph-store (no -clj suffix). See :correction below -- this is the current, authoritative shape."
    "store.cljc (the durable domain schema) is NOT extracted -- mangaka's page/panel schema and animeka's work/episode/scene/cut schema are genuinely different domains (~90% line-diff measured), matching ADR-2606282100's rejection of forcing per-work data into a generic shape"
-   "new generic -clj libraries land in kotoba-lang directly, not com-junkawasaki first, per repos.edn's own stated org-migration direction"
-   "a shared generic library must not be named after one consumer -- genapp-clj, not e.g. mangaka-clj -- the same naming correction already made once in ADR-2607011816 (animeka, not mangaka, as SHIRO & PICO's consumer)"]
+   "new generic libraries land in kotoba-lang directly, not com-junkawasaki first, per repos.edn's own stated org-migration direction -- AND kotoba-lang repos do not use the -clj suffix com-junkawasaki's langgraph-clj/comfyui-clj/langchain-clj use (langgraph-store, not langgraph-store-clj)"
+   "a shared generic library must not be named after one consumer -- the same naming correction already made once in ADR-2607011816 (animeka, not mangaka, as SHIRO & PICO's consumer) -- AND must not be named for an artificial bundling concern (\"genapp\") when its parts belong split to their pure-engine siblings' own repos"]
   :related
   ["CLAUDE.md"
    "90-docs/adr/2606282100-mangaka-render-commons-vs-sip-work-split.md"
    "90-docs/adr/2607011816-ghosthacker-shiropico-standalone-repo.md"
    "manifest/repos.edn"
-   "orgs/gftdcojp/ai-gftd-mangaka PR #1 (refactor/extract-genapp-clj)"
-   "orgs/gftdcojp/ai-gftd-animeka PR #1 (refactor/extract-genapp-clj)"]
+   "orgs/gftdcojp/ai-gftd-mangaka PR #1+#2"
+   "orgs/gftdcojp/ai-gftd-animeka PR #1+#2"
+   "orgs/gftdcojp/ai-gftd-ghosthacker-shiropico PR #3"
+   "orgs/kotoba-lang/comfyui PR #1 (feat/gateway-jvm-adapter)"
+   "orgs/kotoba-lang/langchain PR #6 (feat/jvm-host-adapter)"
+   "orgs/kotoba-lang/langgraph-store (new repo)"]
   :supersedes []
   :superseded_by []}
 
@@ -66,4 +70,21 @@
   {:option "put the extraction under com-junkawasaki (matching the two apps' existing -clj deps) instead of kotoba-lang"
    :rejected_because "repos.edn's own :orgs taxonomy states com-junkawasaki's remaining generic -clj libs are mid-migration OUT to kotoba-lang -- not a landing zone for new ones"}
   {:option "name it after one consumer (e.g. kotoba-lang/mangaka-clj)"
-   :rejected_because "exactly the naming anti-pattern already fixed twice this session (ADR-2607011816's mangaka->animeka consumer correction, and ADR-2606282100's original kami-mangaka-render-clj naming decision) -- genapp names what it is, not who uses it"}]}
+   :rejected_because "exactly the naming anti-pattern already fixed twice this session (ADR-2607011816's mangaka->animeka consumer correction, and ADR-2606282100's original kami-mangaka-render-clj naming decision) -- genapp names what it is, not who uses it"}]
+
+ :correction
+ {:date "2026-07-01"
+  :trigger "direct user feedback on genapp-clj immediately after it shipped: 'comfy, llm は別で分けた方がいいかな. genapp は一般的ではないので、一般的な名前にできる?' (should comfy/llm be split out separately? genapp isn't a generic-enough name, can it be made more generic?)"
+  :what_was_wrong
+  ["bundled 4 unrelated-enough concerns into one repo: blob+checkpoint (truly domain-agnostic LangGraph storage primitives) vs comfy+llm (specific-tool JVM I/O adapters for comfyui-clj/langchain-clj's pure cores)"
+   "\"genapp\" is an invented, non-standard name with no clear referent"
+   "built on the STALE org: kotoba-lang/comfyui and kotoba-lang/langchain already existed as the migrated successors of com-junkawasaki/comfyui-clj and com-junkawasaki/langchain-clj (kotoba-lang/langgraph's tip commit literally reads \"chore(reconcile): org-rename -> kotoba-lang\"; kotoba-lang/comfyui's tip SHA 2a653b1 was byte-identical to what genapp-clj had just pinned from com-junkawasaki/comfyui-clj) -- genapp-clj was accidentally built one repo away from its own natural home"]
+  :compatibility_check "diff'd every file genapp.comfy/genapp.llm actually required (comfyui.{node,std,queue,exec}, langchain.{model,message,db,kotoba_db}) between com-junkawasaki and kotoba-lang copies before touching anything -- all byte-identical except langgraph.checkpoint (kotoba-lang added a backward-compatible :db/id field); ran genapp-clj's own test suite against kotoba-lang-sourced deps first, separating 'safe to swap orgs' from 'split the bundle'"
+  :split
+  {:comfyui_gateway {:from "genapp.comfy" :to "orgs/kotoba-lang/comfyui, ns comfyui.gateway" :pr 1 :tests "9 tests / 26 assertions added, 18/69 repo-wide"}
+   :langchain_jvm {:from "genapp.llm" :to "orgs/kotoba-lang/langchain, ns langchain.jvm" :pr 6 :tests "8 tests / 20 assertions added"}
+   :langgraph_store {:from "genapp.blob + genapp.checkpoint" :to "orgs/kotoba-lang/langgraph-store (new repo, no -clj suffix per kotoba-lang naming convention)" :tests "8 tests / 19 assertions (blob 3, checkpoint 5 -- checkpoint had no direct unit tests in genapp-clj, added fresh)"}}
+  :dep_hygiene "comfyui.gateway's and langchain.jvm's http-kit/jsonista deps live ONLY in each repo's :test alias, not main :deps -- langchain's deps.edn documents a 'zero third-party runtime dependencies by design' invariant (every ns .cljc, runs on JVM/CLJS/SCI/WASM) that unconditional http-kit would have broken for non-JVM consumers; every actual consumer (mangaka/animeka/shiropico) already declares http-kit/jsonista itself"
+  :migration_completed_for_consumers "mangaka/animeka/shiropico's deps.edn now point langgraph/comfyui/langchain at kotoba-lang, not com-junkawasaki -- completing the migration repos.edn's :orgs taxonomy note already declared as the direction. Also fixed the same off-by-2-levels :dev :local/root path bug (5 levels up instead of 3) for the kotoba-lang targets."
+  :deletion "kotoba-lang/genapp-clj deleted (gh repo delete) once all three consumers' facades were repointed and re-verified green: mangaka 82/560, animeka 5/32, shiropico 19/49 -- all unchanged across both the original extraction and this correction, proving the facade pattern absorbs relocation with zero call-site changes"
+  :manifest "repos.edn/west.yml updated via the same GitHub API single-entry method as ADR-2607011816 (genapp-clj entry removed, langgraph-store added, comfyui/langchain/mangaka/animeka/shiropico pins advanced) -- same rationale (shallow-clone false-positive risk, concurrent fleet checkouts of these exact shared kotoba-lang repos, one of which (langchain) was confirmed to have another agent's WIP branch checked out in a separate worktree at the time)"}}

@@ -157,5 +157,73 @@ be tested locally via `-M:dev:test` in the first place.
 - 90-docs/adr/2607011816-ghosthacker-shiropico-standalone-repo.md (sibling
   ADR from the same investigation, corrected mangaka→animeka as
   SHIRO & PICO's intended consumer)
-- `orgs/kotoba-lang/genapp-clj` (new repo)
+- `orgs/kotoba-lang/genapp-clj` (**deleted**, see Correction below)
 - `orgs/gftdcojp/ai-gftd-mangaka` PR #1 / `orgs/gftdcojp/ai-gftd-animeka` PR #1
+
+## Correction (2026-07-01, same day): genapp-clj split apart and deleted
+
+Direct feedback on `genapp-clj` itself, immediately after it shipped:
+`comfy`/`llm` don't belong bundled with `blob`/`checkpoint` (different
+concerns — ComfyUI/LLM tool wrappers vs generic LangGraph storage
+primitives), and `genapp` isn't a real/generic-enough name. Investigating
+turned up something more specific: `kotoba-lang/comfyui` and
+`kotoba-lang/langchain` already existed as the **migrated successors** of
+`com-junkawasaki/comfyui-clj` and `com-junkawasaki/langchain-clj` (confirmed
+via `git log` — `kotoba-lang/langgraph`'s tip commit is literally
+`"chore(reconcile): org-rename → kotoba-lang"`; `kotoba-lang/comfyui`'s tip
+SHA `2a653b1` was byte-identical, at that point, to what `genapp-clj` had
+just pinned from `com-junkawasaki/comfyui-clj`) — i.e. `genapp-clj` had
+built on the **stale** org without noticing the real migration target
+already existed, one repo away.
+
+**Verified compatible before touching anything**: `diff`'d every file
+`genapp.comfy`/`genapp.llm` actually required (`comfyui.{node,std,queue,
+exec}`, `langchain.{model,message,db,kotoba_db}`) between the
+`com-junkawasaki` and `kotoba-lang` copies — all byte-identical except
+`langgraph.checkpoint` (kotoba-lang added a backward-compatible `:db/id`
+field). Ran genapp-clj's own test suite against `kotoba-lang`-sourced deps
+before splitting anything, to separate the "safe to swap orgs" question
+from the "split the bundle" question.
+
+**Split, three ways, each to its natural home**:
+
+- `genapp.comfy` → `comfyui.gateway` in `kotoba-lang/comfyui` (PR #1) — the
+  JVM http-kit/jsonista I/O adapter for `comfyui.exec`'s pure engine,
+  living right next to it.
+- `genapp.llm` → `langchain.jvm` in `kotoba-lang/langchain` (PR #6) — the
+  JVM host-fn reference implementation `langchain-clj`'s pure core
+  deliberately doesn't ship (model adapters take `:http-fn`/`:json-write`/
+  `:json-read` as injected capabilities for JVM/CLJS/SCI/WASM portability).
+- `genapp.blob` + `genapp.checkpoint` (the genuinely domain-agnostic half,
+  the two files that were byte-identical between mangaka/animeka
+  originally) → new repo `kotoba-lang/langgraph-store` (no `-clj` suffix —
+  `kotoba-lang` doesn't use that suffix convention, unlike
+  `com-junkawasaki`'s `langgraph-clj`/`comfyui-clj`/`langchain-clj`).
+
+In both `comfyui` and `langchain`, the new JVM-only namespace's http-kit/
+jsonista deps were added to the **`:test` alias only**, not the main
+`:deps` — `langchain`'s own deps.edn documents a "zero third-party runtime
+dependencies by design" invariant (every namespace `.cljc`, runs on JVM/
+CLJS/SCI/WASM) that adding http-kit unconditionally would have broken for
+every non-JVM consumer. Every actual consumer (mangaka, animeka, shiropico)
+already declares http-kit/jsonista itself for its own server needs, so
+nothing downstream needed the main `:deps` polluted.
+
+**Completed the kotoba-lang migration for consumers, while here**:
+mangaka/animeka/shiropico's `deps.edn` now point `langgraph`/`comfyui`/
+`langchain` at `kotoba-lang`, not `com-junkawasaki` — the migration
+`repos.edn`'s `:orgs` taxonomy note already declared as the direction but
+these three apps hadn't yet made. Also fixed mangaka's/animeka's `:dev`
+`:local/root` paths in the same pass (previously wrong for
+`com-junkawasaki` targets too, same off-by-2-levels bug documented in
+ADR-2607011816's mangaka/animeka commons work).
+
+**`kotoba-lang/genapp-clj` deleted** (`gh repo delete`) once all three
+consumers' facades were repointed and every test suite re-verified green:
+mangaka 82/560, animeka 5/32, shiropico 19/49 (all unchanged from before
+either the original extraction or this correction — the facade pattern
+absorbed two consecutive relocations with zero call-site changes).
+`manifest/repos.edn`/`west.yml` updated to match (genapp-clj entry removed,
+langgraph-store added, consumer + comfyui/langchain pins advanced) via the
+same GitHub API single-entry method as ADR-2607011816, for the same
+reasons (shallow-clone false-positive risk, concurrent fleet checkouts).
