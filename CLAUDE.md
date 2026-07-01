@@ -28,6 +28,39 @@ west update --group-filter +datalad m365-archive && west annex-get
 bb scripts/gen-west-manifest.bb
 ```
 
+### agent 専用 worktree で west を動かすときの topdir 固定（重要）
+
+**agent ごとの git worktree で `west update` を動かすときは、worktree を
+superproject ルートの *外*（sibling path）に作り、worktree 内で `west init -l manifest`
+をやり直して topdir をその worktree に固定せよ。** これをしないと west は
+子リポジトリを agent の worktree でなく **superproject 本体の `orgs/` に展開**してしまい、
+他 agent の WIP と衝突する・`west update` が dirty で skip される。
+
+理由: west は cwd から上方向に `.west/` を探して topdir を決める。`git worktree add`
+を superproject *配下*（既定の `.claude/worktrees/<name>` 等）で作ると、その path は
+superproject のサブディレクトリなので上方向の探索が superproject 本体の `.west/`
+に当たり、topdir = superproject 本体と誤認される。`WEST_TOPDIR` 環境変数での上書きも
+効かない（`.west/` 発見が優先される）。superproject ルートの *外* に worktree を作れば
+`.west/` に当たらず、`west init -l manifest` でその worktree 専用の `.west/` が生成され
+topdir が固定される。実測検証: ADR-2607011300。
+
+```bash
+# ✅ 正: superproject の外に worktree を作り、topdir を固定
+git worktree add -b <agent-branch> /tmp/root-<agent-name> origin/main
+cd /tmp/root-<agent-name>
+west init -l manifest                       # ← この worktree 専用の .west/ を生成
+west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独立 checkout
+# ❌ 誤: .claude/worktrees/<name> 配下の worktree で west を動かす
+#        （superproject 本体を topdir と誤認し、本体の orgs/ を書き換える）
+```
+
+注意:
+- これでも防げないのは **上流の force-push 系**（`origin/main` の force-rewrite /
+  子 repo remote の force-rewrite による pin 退行）。worktree 分離は作業 tree の
+  WIP 衝突しか防ぐ。force-push は上流の運用で撲滅するしかない。
+- 大容量 repo は worktree ごとに重複取得される。`--fetch smart` + shallow 既定で
+  軽減、heavy は DataLad/B2 経路（`west annex-get`）。
+
 ## 標準作業の常時許可（standing authorization）
 
 - **次の「新規 project を起こして登録する」一連の流れは、毎回の確認なしに実行してよい**
