@@ -79,10 +79,16 @@
         groups  (if dl [(:group dl)] [(org-of path)])
         recurse (or (contains? (:force-recurse-submodules cfg) path)
                     (nested? path)
-                    (:submodules existing))]
+                    (:submodules existing))
+        wname   (west-name path dup-names)
+        base    (name-of path)]
     (when sha
-      (str "    - name: " (west-name path dup-names) "\n"
+      (str "    - name: " wname "\n"
            "      remote: " (remote-of path) "\n"
+           ;; dedup により name(=west-name) と実 repo 名(basename) が乖離する場合、
+           ;; repo-path で実 repo 名を明示しないと west が url-base/name で
+           ;; 存在しない repo を叩く(例: gftdcojp-cloud-murakumo)。
+           (when (not= wname base) (str "      repo-path: " base "\n"))
            "      revision: " sha "\n"
            "      path: " path "\n"
            (when depth (str "      clone-depth: " depth "\n"))
