@@ -122,6 +122,29 @@ west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独�
   実例: PR #61 / #62 / #86 は main の tree をベースにクリーン commit を API で
   作成してマージした（#86 は 31 リポの west 移行を regression なしで取り込み）。
 
+- **`git fetch` の `(forced update)` 表示や `git merge` の
+  `fatal: refusing to merge unrelated histories` は、それ単独では本物の
+  force-push と断定しない。** shallow clone は `--depth 1` フェッチのたびに
+  新しい shallow graft（親情報を持たない境界コミット）を作るため、upstream が
+  **純粋な fast-forward で前進しただけ**でも、ローカルの祖先証明が古い graft の
+  壁で止まり同じ症状（`(forced update)` 表示・`unrelated histories` エラー）が出る。
+  実測（2026-07-01、`root` superproject）: ローカル HEAD が 6 commit 遅れていた
+  だけの純前進で両症状が発生。**本物の force-push か判定するには GitHub API で
+  比較する**（ローカルの ancestry 判定を信用しない）:
+
+  ```bash
+  gh api repos/<org>/<repo>/compare/<old-local-tip>...<new-origin-tip> \
+    --jq '{status, ahead_by, behind_by, merge_base_commit: .merge_base_commit.sha}'
+  # status:"ahead" かつ behind_by:0 かつ merge_base_commit == old-local-tip なら
+  # 純粋な fast-forward（shallow の偽陽性）。diverged や merge_base が別物なら本物の force-push。
+  ```
+
+  偽陽性と判明したら `git fetch --deepen=<n>`（10〜30 程度）でローカルの祖先鎖を
+  修復してから `git merge --ff-only` を再試行する（未コミット WIP がブロックする
+  場合は上述の通り `git stash push -- <paths>` で退避、drop しない）。それでも
+  `upload-pack: not our ref` で失敗する場合のみ、本物の force-push として下記
+  「force-push は禁止」節の対応（ユーザーへの報告）に進む。
+
 - **`manifest/west.yml` への変更（登録 / rename / pin 前進）は GitHub API の
   サーバ側 single-entry commit を「唯一の正経路」にする。** west.yml は生成物
   （`repos.edn` ＋ 各子repo HEAD → `gen-west-manifest.bb`、手書き禁止 / `--check`）
@@ -181,7 +204,10 @@ west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独�
   共有リポ（superproject / 各 project）のいかなるブランチに対しても、履歴を書き換えて
   上流を上書きする push をしてはならない。force-push は他の clone・west pin・
   ancestry 判定を静かに壊し（shallow 環境では「前進」を「分岐」と誤検出する原因にも
-  なる）、`upload-pack: not our ref` 由来の checkout 失敗を引き起こす。乖離は
+  なる）、`upload-pack: not our ref` 由来の checkout 失敗を引き起こす。**逆に
+  `(forced update)` 表示や `unrelated histories` エラーだけでは本物の force-push と
+  断定できない**（shallow の偽陽性が多い。判別法は上述「マージ / ancestry 判定」節）。
+  確度の高い実サインは `upload-pack: not our ref` によるチェックアウト失敗。乖離は
   **force-push ではなく fast-forward できる clean branch / clean commit** で解消し、
   それが不可能な場合（既に push 済みの履歴を変えたい等）は**勝手に強制せず必ずユーザーに報告**する。
   履歴書き換えが本当に必要なときも、shallow 化に伴う rewrite と同様に**行わない**
