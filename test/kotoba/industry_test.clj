@@ -40,4 +40,4 @@
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
       (is (pos? (:spec m)))
       (is (pos? (:blueprint m)))
-      (is (= 1 (:implemented m)))))
+      (is (= 1 (:implemented m)))))))
