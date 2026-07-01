@@ -24,4 +24,6 @@
   (let [r (industry/readiness "8691" #{:identity :forms})]
     (is (false? (:ready? r)))
     (is (contains? (:missing r) :audit-ledger)))
-  (is (:ready? (industry/readiness "6310" #{:identity :forms :dmn :bpmn :audit-ledger}))))
+  ;; :robotics is required on every itonami vertical (robotics-premise design),
+  ;; so it must be in the available set for a vertical to read ready.
+  (is (:ready? (industry/readiness "6310" #{:robotics :identity :forms :dmn :bpmn :audit-ledger}))))

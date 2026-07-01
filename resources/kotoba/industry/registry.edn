@@ -6,159 +6,173 @@
    :name "Community Renewable Energy Operations"
    :repo "https://github.com/gftdcojp/cloud-itonami-3512"
    :business-id "cloud-itonami-3512"
-   :required-technologies [:telemetry :optimization :dmn :bpmn :audit-ledger :forms]
+   :required-technologies [:robotics :telemetry :optimization :dmn :bpmn :audit-ledger :forms]
    :optional-technologies [:cfd :cae]
    :operating-states [:intake :observe :recommend :approve :dispatch :settle :audit]}
   {:id "3600"
    :name "Community Water Safety Operations"
    :repo "https://github.com/gftdcojp/cloud-itonami-3600"
    :business-id "cloud-itonami-3600"
-   :required-technologies [:telemetry :dmn :bpmn :audit-ledger :forms]
+   :required-technologies [:robotics :telemetry :dmn :bpmn :audit-ledger :forms]
    :optional-technologies [:cfd :cae]
    :operating-states [:intake :sample :alert :maintain :publish :audit]}
   {:id "3830"
    :name "Local Materials Recovery"
    :repo "https://github.com/gftdcojp/cloud-itonami-3830"
    :business-id "cloud-itonami-3830"
-   :required-technologies [:forms :telemetry :optimization :audit-ledger :bpmn :dmn]
+   :required-technologies [:robotics :forms :telemetry :optimization :audit-ledger :bpmn :dmn]
    :optional-technologies [:identity]
    :operating-states [:collect :sort :grade :route :transfer :report]}
   {:id "6310"
    :name "Talent Actor"
    :repo "https://github.com/gftdcojp/cloud-itonami-6310"
    :business-id "cloud-itonami-6310"
-   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:telemetry]
    :operating-states [:intake :advise :govern :approve :commit :audit]}
   {:id "8569"
    :name "Community Learning Support"
    :repo "https://github.com/gftdcojp/cloud-itonami-8569"
    :business-id "cloud-itonami-8569"
-   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
    :operating-states [:intake :plan :review :follow-up :refer :audit]}
   {:id "8691"
    :name "Health Access Navigation"
    :repo "https://github.com/gftdcojp/cloud-itonami-8691"
    :business-id "cloud-itonami-8691"
-   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger :optimization]
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :optimization]
    :optional-technologies [:telemetry]
    :operating-states [:intake :triage :match :review :refer :follow-up :audit]}
   {:id "8810"
    :name "Community Care Coordination"
    :repo "https://github.com/gftdcojp/cloud-itonami-8810"
    :business-id "cloud-itonami-8810"
-   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger :optimization]
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :optimization]
    :optional-technologies [:telemetry]
    :operating-states [:intake :check-in :assign :escalate :report :audit]}
   {:id "2610"
    :name "Semiconductor and Electronics Manufacturing Enablement"
    :repo nil
    :business-id nil
-   :required-technologies [:eda :cae :dmn :bpmn :audit-ledger]
+   :required-technologies [:robotics :eda :cae :dmn :bpmn :audit-ledger]
    :optional-technologies [:cfd :telemetry :optimization]
    :operating-states [:spec :design :verify :package :manufacture :audit]}
   {:id "3030"
    :name "Aircraft and Aerospace Manufacturing Enablement"
    :repo nil
    :business-id nil
-   :required-technologies [:cae :cfd :dmn :bpmn :audit-ledger :optimization]
+   :required-technologies [:robotics :cae :cfd :dmn :bpmn :audit-ledger :optimization]
    :optional-technologies [:eda :telemetry]
    :operating-states [:requirements :simulate :verify :approve :manufacture :audit]}
   {:id "6419"
    :name "Community Monetary Intermediation"
    :repo "https://github.com/gftdcojp/cloud-itonami-6419"
    :business-id "cloud-itonami-6419"
-   :required-technologies [:banking :swift :identity :forms :dmn :bpmn :audit-ledger]
+   :required-technologies [:robotics :banking :swift :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
    :operating-states [:intake :onboard :transact :clear :settle :audit]}
   {:id "6190"
    :name "Community Telecommunications Access"
    :repo "https://github.com/gftdcojp/cloud-itonami-6190"
    :business-id "cloud-itonami-6190"
-   :required-technologies [:phone :identity :forms :dmn :bpmn :audit-ledger]
+   :required-technologies [:robotics :phone :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
    :operating-states [:intake :provision :route :bill :support :audit]}
   {:id "6619"
    :name "Card Transaction Processing and Settlement"
    :repo "https://github.com/gftdcojp/cloud-itonami-6619"
    :business-id "cloud-itonami-6619"
-   :required-technologies [:card :banking :swift :identity :forms :dmn :bpmn :audit-ledger]
+   :required-technologies [:robotics :card :banking :swift :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
    :operating-states [:intake :authorize :clear :settle :reconcile :chargeback :audit]}
   ;; ---- Section-coverage extension: one representative class per uncovered section ----
   {:id "0162" ; A — Agriculture, forestry and fishing
    :name "Community Agronomy Support"
    :repo nil :business-id nil
-   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger :telemetry]
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies [:optimization]
    :operating-states [:intake :sample :advise :treat :record :audit]}
   {:id "0810" ; B — Mining and quarrying
    :name "Community Quarry and Stone Supply"
    :repo nil :business-id nil
-   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger :telemetry]
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies [:optimization :cae]
    :operating-states [:intake :survey :extract :grade :ship :audit]}
   {:id "4211" ; F — Construction
    :name "Community Building Construction"
    :repo nil :business-id nil
-   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization :cae]
    :operating-states [:intake :design :permit :build :inspect :handover :audit]}
   {:id "4711" ; G — Wholesale and retail trade
    :name "Community Retail Operations"
    :repo "https://github.com/gftdcojp/cloud-itonami-4711"
    :business-id "cloud-itonami-4711"
-   :required-technologies [:retail :identity :forms :dmn :bpmn :audit-ledger]
+   :required-technologies [:robotics :retail :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
    :operating-states [:intake :stock :sell :reconcile :reorder :audit]}
   {:id "4920" ; H — Transportation and storage
    :name "Community Freight Transport"
    :repo "https://github.com/gftdcojp/cloud-itonami-4920"
    :business-id "cloud-itonami-4920"
-   :required-technologies [:logistics :identity :forms :dmn :bpmn :audit-ledger :optimization]
+   :required-technologies [:robotics :logistics :identity :forms :dmn :bpmn :audit-ledger :optimization]
    :optional-technologies [:telemetry]
    :operating-states [:intake :book :pick-up :transit :deliver :reconcile :audit]}
   {:id "5510" ; I — Accommodation and food service
    :name "Community Accommodation Operations"
    :repo nil :business-id nil
-   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
    :operating-states [:intake :reserve :check-in :serve :check-out :audit]}
   {:id "6810" ; L — Real estate activities
    :name "Community Real-Estate Agency"
    :repo "https://github.com/gftdcojp/cloud-itonami-6810"
    :business-id "cloud-itonami-6810"
-   :required-technologies [:property :identity :forms :dmn :bpmn :audit-ledger]
+   :required-technologies [:robotics :property :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
    :operating-states [:intake :list :show :lease :manage :audit]}
   {:id "7110" ; M — Professional, scientific and technical
    :name "Community Architectural and Engineering Practice"
    :repo nil :business-id nil
-   :required-technologies [:cae :identity :forms :dmn :bpmn :audit-ledger]
+   :required-technologies [:robotics :cae :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:cfd :optimization]
    :operating-states [:intake :scope :design :verify :deliver :audit]}
   {:id "7810" ; N — Administrative and support service
    :name "Community Employment Agency"
    :repo nil :business-id nil
-   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
    :operating-states [:intake :register :match :place :follow-up :audit]}
   {:id "8411" ; O — Public administration
    :name "Community Public Administration Service"
    :repo nil :business-id nil
-   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
    :operating-states [:intake :register :decide :notify :appeal :audit]}
   {:id "9101" ; R — Arts, entertainment and recreation
    :name "Community Library and Archive"
    :repo nil :business-id nil
-   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
    :operating-states [:intake :catalog :lend :preserve :exhibit :audit]}
   {:id "9511" ; S — Other service activities
    :name "Community ICT Equipment Repair"
    :repo nil :business-id nil
-   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
-   :operating-states [:intake :diagnose :quote :repair :return :audit]}]}
+   :operating-states [:intake :diagnose :quote :repair :return :audit]}
+  {:id "9700" ; T — Activities of households as employers of domestic personnel
+   :name "Community Domestic Employment"
+   :repo "https://github.com/gftdcojp/cloud-itonami-9700"
+   :business-id "cloud-itonami-9700"
+   :required-technologies [:robotics :labor :identity :forms :dmn :bpmn :audit-ledger]
+   :optional-technologies [:optimization]
+   :operating-states [:intake :contract :schedule :work :pay :audit]}
+  {:id "9900" ; U — Activities of extraterritorial organizations and bodies
+   :name "Community Mission Operations Support"
+   :repo "https://github.com/gftdcojp/cloud-itonami-9900"
+   :business-id "cloud-itonami-9900"
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
+   :optional-technologies [:optimization]
+   :operating-states [:intake :credential :dispatch :report :audit]}]}
