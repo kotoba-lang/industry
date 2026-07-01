@@ -1,0 +1,66 @@
+{:adr/id "2607011130"
+ :adr/title "kotoba-lang/svg and kotoba-lang/did as EDN substrates"
+ :adr/status :accepted
+ :adr/date "2026-07-01"
+ :context
+ {:svg "Treat SVG like hicuupus/shadowcss: EDN data plus CLJ/CLJC helpers, not a browser/SVG pipeline repo."
+  :did "Provide a small EDN-first identity substrate for DID documents and local DID helpers."}
+ :decision
+ {:kotoba-lang/svg
+  {:repo "git@github.com:kotoba-lang/svg.git"
+   :revision "0c2776c736bc06010fcaca0fc083d9bd7cd50d7c"
+   :shape [:svg {:viewBox "0 0 100 100"} [:circle {:cx 50 :cy 50 :r 40}]]
+   :features [:hiccup-like-nodes :tag-sugar :style-maps :raw-svg :render :validate]}
+  :kotoba-lang/did
+  {:repo "git@github.com:kotoba-lang/did.git"
+   :revision "32865d4725c390ac92dcbae297f37eec383919a6"
+   :features [:parse :did-document :did-key-ed25519 :did-web]}}
+ :manifest
+ {:path-overrides
+  {:remove ["orgs/com-junkawasaki/drawingml-svg"]}
+  :projects
+  ["orgs/kotoba-lang/svg"
+   "orgs/kotoba-lang/did"]}
+ :w3c-substrate-candidates
+ [{:standard "JSON-LD 1.1"
+   :repo "orgs/kotoba-lang/json-ld"
+   :priority :high
+   :reason "Shared linked-data substrate for DID, VC, Web Annotation, and ActivityStreams."
+   :reference "https://www.w3.org/TR/json-ld11/"}
+  {:standard "Verifiable Credentials Data Model v2.1"
+   :repo "orgs/kotoba-lang/vc"
+   :priority :high
+   :reason "Identity credential layer directly above DID; credential and presentation documents should be EDN."
+   :reference "https://www.w3.org/TR/vc-data-model-2.1/"}
+  {:standard "ActivityStreams 2.0"
+   :repo "orgs/kotoba-lang/activitystreams"
+   :priority :medium
+   :reason "Actor/event/message vocabulary substrate for social and agent event objects."
+   :reference "https://www.w3.org/TR/activitystreams-core/"}
+  {:standard "ActivityPub"
+   :repo "orgs/kotoba-lang/activitypub"
+   :priority :medium
+   :reason "Federation layer over ActivityStreams; keep protocol data separate from runtime adapters."
+   :reference "https://www.w3.org/TR/activitypub/"}
+  {:standard "Web Annotation Data Model"
+   :repo "orgs/kotoba-lang/annotation"
+   :priority :medium
+   :reason "Shared annotation data model for documents, media, code, and office artifacts."
+   :reference "https://www.w3.org/TR/annotation-model/"}]
+ :watch
+ [{:standard "DID Resolution v0.3"
+   :status :draft
+   :reference "https://www.w3.org/TR/did-resolution/"}
+  {:standard "VC Confidence Method v1.0"
+   :status :experimental
+   :reference "https://www.w3.org/TR/vc-confidence-method/"}
+  {:standard "VC Rendering Methods v1.0"
+   :status :draft
+   :reference "https://www.w3.org/TR/vc-render-method/"}
+  {:standard "VCALM v1.0"
+   :status :working-draft
+   :reference "https://www.w3.org/TR/vcalm-1.0/"}]
+ :consequences
+ [:svg-can-be-composed-as-edn
+  :browser-office-svg-pipelines-remain-outside-the-edn-substrate
+  :did-documents-can-be-shared-as-edn]}
