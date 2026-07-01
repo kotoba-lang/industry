@@ -1,0 +1,42 @@
+{:frontmatter
+ {:id "adr-2607011900-kotoba-lang-liquid-glass-ui"
+  :title "kotoba-lang/liquid-glass-ui を shitsuke 上の共通 liquid-glass 視覚スキンとして設計する"
+  :status "accepted"
+  :date "2026-07-01"
+  :authoritative true
+  :repos ["orgs/kotoba-lang/liquid-glass-ui"]
+  :related ["90-docs/adr/2606301900-kotoba-lang-shitsuke-design-system.md"]}
+
+ :context
+ {:request "kotoba-lang org に liquid-glass-ui を設計し、kotoba-lang の uiux として共通 uiux component として使えるようにする"
+  :existing-foundations
+  {"shitsuke" "kotoba-lang 共通 UI design system: token IR + hiccup renderer + CSS-var style 層 + portable re-frame + 純hiccup component primitives. 意図的に視覚(見た目)に無関心 — class名 hookのみ、実CSSはshadow-css :pages build配線予定だが未配線"
+   "ui"       "kami-engine HUD向けの薄いhiccup->DOM overlay(kotoba.ui)。design system層は持たない"}
+  :gap "kotoba-lang配下frontend候補(slides/wasm-ui/kobo/kami-engine HUD等)がそれぞれ独自の半透明/blur系UIを持つか統一された見た目を持たず、Apple Liquid Glass相当の共通視覚スキンが無かった"}
+
+ :decision
+ {:repo "orgs/kotoba-lang/liquid-glass-ui"
+  :pattern :visual-skin-on-shitsuke ;; shitsukeのinteraction/state/dual-render契約を再実装しない
+  :deps ["shitsuke"] ;; portable .cljc、third-party runtime dep ゼロ
+  :layers
+  {"liquid-glass.tokens"     "material token IR(:liquid-glass/surface :elevation :specular :radius :motion) + light(default-tokens)/dark(dark-tokens partial override)resolver + :root / @media(prefers-color-scheme:dark)でのCSS var再宣言(同名var、-dark接尾辞にしない)"
+   "liquid-glass.style"      "class-name registry(liquid-glass__<component>) + Tier A root-css(vars) + Tier B component-css(shadow-cssに依存しないポータブルliteral CSS文字列。backdrop-filter/specular overlay/elevation shadow/press-hover motion。reduced-motion guard + no-backdrop-filter fallback含む)"
+   "liquid-glass.components" "純hiccup: panel(shitsuke.components/card wrap)/button/icon-button(shitsuke.components wrap, act契約そのまま)/toolbar(wrap)/tab-bar(shitsuke対応物なし、直接実装)/sheet(直接実装)/scrim(直接実装)/badge(直接実装)"}
+  :future-work ["liquid-glass.gpu: kami-engine canvas HUD向けWebGPU/WGSL refraction(v1 out-of-scope, 具体的consumerが現れてから)"
+                "shadow-css :pages extraction (shitsuke側の配線が済んでから)"
+                "[data-lg-theme] 手動light/darkトグル(prefers-color-schemeに加えて。consumer需要が出てから)"]}
+
+ :verification
+ {:tests "16 tests / 54 assertions green (clojure -M:local:test)"
+  :repo-created "gh repo create kotoba-lang/liquid-glass-ui --private"
+  :registration-workflow ["scaffold(.cljc + deps.edn + README + docs/design.md + docs/adr/0001 + test; shitsuke consumer template: chobo/mise/senden同形)"
+                          "git init + initial commit"
+                          "gh repo create kotoba-lang/liquid-glass-ui --private + push"
+                          "add path to manifest/repos.edn :extra-projects"
+                          "bb scripts/gen-west-manifest.bb (+ --check)"
+                          "commit ADR + manifest diff to superproject: chore(manifest)+docs(adr)"]}
+
+ :out-of-scope ["WebGPU/canvas実refraction描画(liquid-glass.gpu)"
+                "shadow-css :pages実配線"
+                "手動light/darkトグルUI"
+                "各frontend repo(slides/wasm-ui/kobo等)への実採用(個別follow-up)"]}
