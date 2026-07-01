@@ -40,7 +40,10 @@
    "orgs/kotoba-lang/turtle"
    "orgs/kotoba-lang/n-quads"
    "orgs/kotoba-lang/rdf-canon"
-   "orgs/kotoba-lang/shacl"]}
+   "orgs/kotoba-lang/shacl"
+   "orgs/kotoba-lang/ooxml"
+   "orgs/kotoba-lang/drawingml"
+   "orgs/kotoba-lang/presentationml"]}
  :w3c-substrate-candidates
  [{:standard "JSON-LD 1.1"
    :repo "orgs/kotoba-lang/json-ld"
@@ -97,7 +100,16 @@
    :features [:canonical :sha-256 :digest]}
   :kotoba-lang/shacl
   {:revision "0e502ac5b3405da02a5f7127cd7daa3fa144dd16"
-   :features [:node-shape :property-shape :validate]}}
+   :features [:node-shape :property-shape :validate]}
+  :kotoba-lang/ooxml
+  {:revision "3d50559f010327fab368b04d8f1b19dc74fd4de0"
+   :features [:package :relationships :content-types :rels-path :package-kind]}
+  :kotoba-lang/drawingml
+  {:revision "3ce239d800e8ed1d25c17b4e3f2783e0eb9ccf6f"
+   :features [:emu :xfrm :solid-fill :line :preset-geometry :text-body :table]}
+  :kotoba-lang/presentationml
+  {:revision "1eec72b75ea33c99a25bf0922a643a5c79eb4f8e"
+   :features [:slide :presentation-xml :relationships :content-types :theme :layout :package-map]}}
  :watch
  [{:standard "DID Resolution v0.3"
    :status :draft

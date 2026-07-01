@@ -58,6 +58,9 @@ Date: 2026-07-01
 | `kotoba-lang/n-quads` | `c5dfc0399a31370a32570541a9b666be379fa46a` | N-Quads serializer for RDF EDN quads |
 | `kotoba-lang/rdf-canon` | `31a8b4b4e5fd89880a6c03c2ef89035df0f90636` | Deterministic RDF canonical string/hash substrate |
 | `kotoba-lang/shacl` | `0e502ac5b3405da02a5f7127cd7daa3fa144dd16` | EDN shape validator inspired by SHACL Core |
+| `kotoba-lang/ooxml` | `3d50559f010327fab368b04d8f1b19dc74fd4de0` | OOXML OPC package/rels/content-types substrate |
+| `kotoba-lang/drawingml` | `3ce239d800e8ed1d25c17b4e3f2783e0eb9ccf6f` | DrawingML XML builder substrate |
+| `kotoba-lang/presentationml` | `1eec72b75ea33c99a25bf0922a643a5c79eb4f8e` | PresentationML/PPTX package projection substrate |
 
 Primary references:
 
