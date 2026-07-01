@@ -102,14 +102,24 @@
   {:revision "0e502ac5b3405da02a5f7127cd7daa3fa144dd16"
    :features [:node-shape :property-shape :validate]}
   :kotoba-lang/ooxml
-  {:revision "3d50559f010327fab368b04d8f1b19dc74fd4de0"
-   :features [:package :relationships :content-types :rels-path :package-kind]}
+  {:revision "4b87825e63ecc78bf97f26d98ff87c8bac7a26cd"
+   :features [:package :relationships :content-types :rels-path :package-kind :office-parts :ensure-content-type :ensure-root-relationship]}
   :kotoba-lang/drawingml
   {:revision "3ce239d800e8ed1d25c17b4e3f2783e0eb9ccf6f"
    :features [:emu :xfrm :solid-fill :line :preset-geometry :text-body :table]}
   :kotoba-lang/presentationml
   {:revision "1eec72b75ea33c99a25bf0922a643a5c79eb4f8e"
    :features [:slide :presentation-xml :relationships :content-types :theme :layout :package-map]}}
+ :ooxml-adoption
+ {:kotoba-lang/office
+  {:revision "b5838def811d05f1db1e7d77e5daede8ac953883"
+   :uses [:ooxml/package-kind :ooxml/office-parts :ooxml/ensure-content-type-extension :ooxml/ensure-root-relationship]
+   :keeps [:host-zip-read :host-zip-write]}
+  :kotoba-lang/slides
+  {:revision "5888088cec8afa32fa1ece52215b148870e64a44"
+   :emits [:ooxml/relationships :ooxml/content-types :drawingml/namespaces :presentationml/namespaces]
+   :imports [:p-sp :a-xfrm :a-solidFill :a-ln :p-pic :a-tbl]
+   :reconcile [:causal-sidecar :current-pptx-xml]}}
  :watch
  [{:standard "DID Resolution v0.3"
    :status :draft

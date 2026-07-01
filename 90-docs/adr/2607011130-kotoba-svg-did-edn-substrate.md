@@ -58,9 +58,21 @@ Date: 2026-07-01
 | `kotoba-lang/n-quads` | `c5dfc0399a31370a32570541a9b666be379fa46a` | N-Quads serializer for RDF EDN quads |
 | `kotoba-lang/rdf-canon` | `31a8b4b4e5fd89880a6c03c2ef89035df0f90636` | Deterministic RDF canonical string/hash substrate |
 | `kotoba-lang/shacl` | `0e502ac5b3405da02a5f7127cd7daa3fa144dd16` | EDN shape validator inspired by SHACL Core |
-| `kotoba-lang/ooxml` | `3d50559f010327fab368b04d8f1b19dc74fd4de0` | OOXML OPC package/rels/content-types substrate |
+| `kotoba-lang/ooxml` | `4b87825e63ecc78bf97f26d98ff87c8bac7a26cd` | OOXML OPC package/rels/content-types substrate |
 | `kotoba-lang/drawingml` | `3ce239d800e8ed1d25c17b4e3f2783e0eb9ccf6f` | DrawingML XML builder substrate |
 | `kotoba-lang/presentationml` | `1eec72b75ea33c99a25bf0922a643a5c79eb4f8e` | PresentationML/PPTX package projection substrate |
+
+## OOXML adoption update
+
+`kotoba-lang/office` now depends on `kotoba-lang/ooxml` for OPC package kind detection, Office part ordering, content type updates, and root relationship updates. ZIP host IO remains in `office.opc`; reusable OOXML package semantics live in `ooxml.core`.
+
+`kotoba-lang/slides` now uses the OOXML substrates in two directions:
+
+- PPTX emission uses `ooxml` relationship/content-type helpers and `drawingml`/`presentationml` namespace constants while keeping the slides EDN model in inches.
+- PPTX import uses a CLJC DrawingML/PresentationML parser for `p:sp`, `a:xfrm`, `a:solidFill`, `a:ln`, `p:pic`, and `a:tbl`.
+- When a PPTX contains `ocz/causal.edn`, the causal deck is treated as metadata/provenance, not as the sole source of truth. Current slide XML is parsed and reconciled back into the deck so edits made in PowerPoint can be re-imported.
+
+The west manifest pins this adoption at `kotoba-lang/ooxml` `4b87825e63ecc78bf97f26d98ff87c8bac7a26cd`, `kotoba-lang/office` `b5838def811d05f1db1e7d77e5daede8ac953883`, and `kotoba-lang/slides` `5888088cec8afa32fa1ece52215b148870e64a44`.
 
 Primary references:
 
