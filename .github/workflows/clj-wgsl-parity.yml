@@ -73,4 +73,5 @@ jobs:
       - name: cargo wasmi no-JIT invariant (kami-script-runtime --no-default-features --features backend-wasmi)
         continue-on-error: true
         working-directory: orgs/kotoba-lang/kami-engine
+        # DEAD pending Rust workspace — kami-engine is CLJC-only (no-rust guard); wasmi build gate deferred until the Rust executor repo is in-manifest. Phase 3.3 dispatch-budget is asserted in kami-engine's bb test instead.
         run: cargo check -p kami-script-runtime --no-default-features --features backend-wasmi
