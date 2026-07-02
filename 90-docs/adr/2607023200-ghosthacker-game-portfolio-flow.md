@@ -1,0 +1,123 @@
+# ADR-2607023200: Ghost Hacker ゲームポートフォリオ — FreeTEMPOのグルーヴ感を軸にした10ジャンル展開、および GHOST HACKER: FLOW の起票（proposed・FLOWのみ scaffold 実装）
+
+**Status**: proposed（ポートフォリオ設計は proposed。GHOST HACKER: FLOW のみ pure .cljc core を scaffold 実装済み）
+**Date**: 2026-07-02
+**Deciders**: Jun Kawasaki
+
+## Context
+
+### Ghost Hacker（既存カノン）
+
+`orgs/com-junkawasaki/ghosthacker` は「情報は物理だ」を哲学の核に据えた、実在の
+サイバー犯罪対策（フィッシング・アカウント乗っ取り・闇バイト等、IPA/JPCERT監修）
+を少年漫画の文法で描く作品。中学生時代からの幼馴染 **Ren（沼野蓮）** と
+**Nei** が主人公で、Renは「ネットワーク監視をしない」（自分がアクセス権を持つ
+範囲＝父の遺したサーバ・公開OSINTのみで動く）という明確なコンプライアンス制約の
+下で事件を解決する。Neiは異変を最初に察知する観察役。事件が深刻化すると
+**情報場**（クラスの3割にだけ薄く見える情報空間）が発現し、そこで
+**Ghost Battle / Daemon Battle** が起きる。README の「2065年・水の都・東京」
+という旧ビジョンと、現行エピソード（`260123-jump/resources`）の「現代日本の
+中学〜高校」という舞台設定は、**情報場の中だけがネオ東京的ビジュアルを持つ**、
+という解釈で統合できる（本ADR時点で会話ベースの解釈、正式なカノン変更ではない）。
+
+### FreeTEMPO（訂正済みの実像）
+
+当初「90年代クラブミュージック」という前提で検討したが、公式サイト
+（freetempo.net/biography, freetempo.net/music）と Wikipedia を確認した結果、
+実像は以下の通り:
+
+- 本名 半沢武志。**2000年**にFreeTEMPOとして始動（イタリアIRMA RECORDSへの参加が
+  デビューのきっかけ）。活動の中心は**2000年代**（2010年に一区切り、2021年に
+  再始動）。
+- ジャンルは「**ボサノバ・AOR・ジャズ・ハウス**の要素を持つクラブミュージック」
+  （ラウンジ/ハウス）。攻撃的なブレイクビート/ジャングル/ビッグビートではなく、
+  **温かく浮遊感のある四つ打ち＋メロディセンス**が核。
+- `Sky High` は単独アルバムではなく、2003年『The World Is Echoed』収録曲で、
+  渋谷HMV発で火が付き全国区の知名度を得た代表曲。`TENSE` は2010年発表の
+  初ベストアルバムのタイトル。
+- 代表曲: Tuning / Sky High / Vamos a Bailar / Duet / Twilight（2003）、
+  MELODY / SYMMETRY / HARMONY / ASYMMETRY（2007 mini）、
+  Tomorrow / Breezin' / Family / メモライズ / Time Machine（2010）、
+  Lightning / Prelude（2005）等。
+
+この訂正を受け、当初案（アシッドジャズDJスクラッチ／トリップホップ潜入／
+ドラムンベース弾幕／ビッグビート乱闘、等）を破棄し、**ボサノバ/AOR/ジャズ/ハウス
+の温かい四つ打ちグルーヴ**を軸にジャンルを再設計した。
+
+## Decision
+
+### ポートフォリオ: 10ジャンル×10タイトル
+
+FreeTEMPOの実在曲/アルバム名から命名し、Ren（行動・Ghost Battle実行役）と
+Nei（観察・察知役）の既存カノンの役割分担にジャンルを対応させる。
+
+| # | ジャンル | タイトル | 出典曲（収録アルバム・年） | 主人公 | コンセプト |
+|---|---|---|---|---|---|
+| 1 | アクション | **GHOST HACKER: FLOW** | （造語。近縁曲: "Breezin'" 『Life』2010） | Ren単独 | 情報場を滑走してログの粒子を拾う疾走アクション。四つ打ちのグルーヴに乗り続けることが失敗条件を左右する |
+| 2 | 音ゲー（旗艦） | **GHOST HACKER: HARMONY** | "HARMONY"/"ASYMMETRY"（『HARMONY』2007） | Ren単独 | Ghost Battle本編。四つ打ちに同期し続ける精度を競う。ズレる=ASYMMETRY、噛み合う=HARMONYが成否表現そのもの |
+| 3 | アドベンチャー | **GHOST HACKER: ECHOES** | 『The World Is Echoed』（2003）由来 | Nei単独 | 関係修復ノベル。README原点の "Healing connections in a disconnected world" を主題化 |
+| 4 | RPG | **GHOST HACKER: TIME MACHINE** | "Time Machine"（『Life』2010） | Ren & Nei共同 | 父の遺したサーバの過去ログを遡り、Ghostを仲間にして育てる時間軸探索型RPG |
+| 5 | シミュレーション | **GHOST HACKER: FAMILY** | "Family"（『Life』2010） | Ren & Nei共同 | 事務所併設リスニングバー経営。見つけた家族=Familyがテーマと直結 |
+| 6 | パズル | **GHOST HACKER: TUNING** | "Tuning"（『The World Is Echoed』2003） | Nei単独 | 周波数/ログを合わせて整合させる、Neiの観察眼が活きる整合パズル |
+| 7 | カードゲーム | **GHOST HACKER: メモライズ** | "メモライズ"（『Life』2010） | Nei主導 | 事件の記憶=Ghostをカード化して集める記憶デッキビルダー |
+| 8 | スポーツ | **GHOST HACKER: DUET** | "Duet"（『The World Is Echoed』2003） | Ren単独 | 他校/他事務所との1対1対抗戦。競技化されたGhost Battle |
+| 9 | パーティゲーム | **GHOST HACKER: VAMOS A BAILAR** | "Vamos a Bailar"（『The World Is Echoed』2003） | Ren & Nei + 事務所メンバー総出演 | 大人数ミニゲーム集 |
+| 10 | シューティング | **GHOST HACKER: LIGHTNING** | "Lightning"（『Oriental Quaint.』2005） | Ren単独 | Daemon大量発生に対抗する弾幕シューティング |
+
+共通ルール: いずれのタイトルも Ren の「ネットワーク監視をしない」コンプライアンス
+制約と、既存カノンの `:gh/educationalContent`（実在のセキュリティ教育）を
+ゲームルール/UIとして継承する。新規オリジナルキャラクターは追加しない。
+
+### 着手順序: GHOST HACKER: FLOW から
+
+FLOWを最初の実装対象に選ぶ。理由:
+- 10本のうち最もシンプルな判定モデル（単一の「グルーヴに乗るか外れるか」の連続量）
+  で、他の9本（特に旗艦 HARMONY）が共有する核ロジック（ビート同期判定・
+  TENSE⇄Sky Highのcrossfadeパラメータ）を最小コストで検証できる。
+- ジャンルとして独立性が高く（RPG/シム/カードのような長期セーブ状態や大きい
+  データモデルを持たない）、1リポジトリのscaffoldとして完結しやすい。
+
+## GHOST HACKER: FLOW — 詳細設計
+
+- **ジャンル**: アクション（疾走フロー）。**主人公**: Ren単独。
+- **コアループ**: 情報場をボードで滑走し、四つ打ちのビートグリッドに合わせて
+  入力する。入力タイミングのズレ(ms)を判定し、`:perfect` / `:good` / `:miss`
+  に分類。判定は combo（連続成功数）と `:groove`（0.0=TENSE〜1.0=Sky High の
+  楽曲crossfadeパラメータ）を更新する。`:groove` は成功が続くほど上がり、
+  `:miss` で大きく下がる — 「情報は物理だ」を、演出ではなく操作の結果として
+  楽曲の質感が変わる形で実装する。
+- **スコープ（今回のscaffold）**: `ghosthacker-flow.core`（`.cljc`、pure）に
+  ビート位相計算・判定・状態遷移のみを実装し、test を添える。レンダリング/
+  入力/音声ホストアダプタ（Svelte/Canvas等、tech stack未確定）は対象外
+  — `ghosthacker`本体の `ghosthacker.resources`(pure) /
+  `ghosthacker.import`(host adapter) と同型のレイヤ分離方針を踏襲し、
+  純ロジックを先に固める。
+- **リポジトリ**: `com-junkawasaki/ghosthacker-flow`（private。
+  `:orgs :com-junkawasaki :scope :private-foundation` に従う）。west
+  `:extra-projects` 経由で登録。
+
+## Open Questions
+
+- 残り9本（HARMONY以下）の着手順序と、それぞれのtech stack最終決定
+  （レンダリング層は kami-engine-sdk 流用が有力候補だが未決定）。
+- FLOW/HARMONYが共有する `groove`/判定ロジックを、別途 shared lib に切り出すか
+  各リポジトリに複製するかは、2本目（HARMONY）着手時に判断する。
+- ghosthacker本体（manga pipeline）とゲームポートフォリオの資産共有範囲
+  （キャラクター画像・世界観設定EDNの参照方法）は未設計。
+
+## Consequences
+
+**Positive**
+- FreeTEMPOの実像（2000年代ボサノバ/AOR/ジャズ/ハウス）に基づいた、誤情報を
+  含まない音楽方向性がポートフォリオ全体に定まった。
+- 10本のジャンル/主人公/出典曲がすべて確定し、以降の着手判断が速い。
+- FLOWのcore判定ロジックはpure `.cljc` かつテスト付きで、JVM/CLJS/WASM
+  いずれのホストにも移植可能な状態で着地している。
+
+**Negative / 制約（honest）**
+- 本ADR時点でFLOW以外の9本は未実装（設計のみ）。
+- FLOWもレンダリング/入力/音声のホストアダプタが無く、実際に「遊べる」状態
+  ではない（判定ロジックのみ）。
+- 「情報場が2065年ネオ東京ビジュアルを持つ」という統合解釈は、ghosthacker本体
+  のカノンとして正式に確定していない（本ADRのゲームポートフォリオ文脈限定の
+  暫定解釈）。
