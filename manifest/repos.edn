@@ -26,7 +26,7 @@
                      :scope :business}           ; ビジネス
   "com-junkawasaki" {:role :transitional-foundation ; 汎用 -clj 基盤ライブラリ + cloud 制御面 + data project
                      :scope :private-foundation  ; 言語コアは kotoba-lang へ移動済み (:path-overrides)
-                     :note "汎用基盤 -clj も最終的に kotoba-lang へ全移行（ADR-2606302300, 決定 2026-06-30）。当 org は cloud(cloud-murakumo; cloud-manimani は 2026-07-02 gftdcojp へ transfer 済み) + data(spirit-in-physics 等) のみへ縮退予定"}}
+                     :note "汎用基盤 -clj も最終的に kotoba-lang へ全移行（ADR-2606302300, 決定 2026-06-30）。当 org は data(spirit-in-physics 等) のみへ縮退予定（cloud-manimani / cloud-murakumo(-fleet) は 2026-07-02 gftdcojp へ transfer 済み）"}}
 
  ;; GitHub owner だけ移した project の west remote を上書きする。
  :remote-overrides
@@ -54,7 +54,8 @@
   "orgs/com-junkawasaki/utsushi"        "orgs/kotoba-lang/utsushi"
   "orgs/com-junkawasaki/vehicle-design-actor" "orgs/kotoba-lang/kami-engine-vehicle-designer"
   "orgs/com-junkawasaki/manimani"       "orgs/gftdcojp/manimani" ; GitHub-transferred to gftdcojp 2026-07-01 (private; mobile/ iOS+Android app, fastlane App Store pipeline in progress)
-  "orgs/gftdcojp/cloud-manimani" "orgs/gftdcojp/cloud-manimani"} ; GitHub-transferred to gftdcojp 2026-07-02 (private; Cloudflare Worker API for manimani triage Decision Ledger)
+  "orgs/com-junkawasaki/cloud-manimani" "orgs/gftdcojp/cloud-manimani" ; GitHub-transferred to gftdcojp 2026-07-02 (private; Cloudflare Worker API for manimani triage Decision Ledger)
+  "orgs/com-junkawasaki/cloud-murakumo" "orgs/gftdcojp/cloud-murakumo-fleet"} ; GitHub-transferred+renamed 2026-07-02 (kotoba WASM lattice fleet Worker API; gftdcojp/cloud-murakumo(Sora) と衝突のため -fleet)
 
  ;; 全 project 共通の既定
  :defaults
@@ -337,8 +338,8 @@
    "orgs/gftdcojp/ai-gftd-weight-modal-emotion"
    "orgs/gftdcojp/ai-gftd-weight-modal-world"
    "orgs/gftdcojp/ai-gftd-weight-oka"
-   "orgs/com-junkawasaki/cloud-manimani"
-   "orgs/com-junkawasaki/cloud-murakumo"
+   "orgs/gftdcojp/cloud-manimani"
+   "orgs/gftdcojp/cloud-murakumo-fleet"
    "orgs/kotoba-lang/svg"
    "orgs/kotoba-lang/did"
    "orgs/kotoba-lang/json-ld"
