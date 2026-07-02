@@ -284,6 +284,36 @@ west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独�
   main に着地させたあと、共有 checkout 側は `git fetch` と（内容一致を `shasum`
   で確認した上での）重複ファイルの削除だけで追従させる。
 
+## 並行エージェント運用（worktree-per-agent / stash を積まない）
+
+複数セッション・エージェントが同時に走る前提の標準フロー。stash・branch・worktree の
+無限増殖はこのフローからの逸脱の症状（実測: 2026-07-01→02 の一晩で、共有 checkout 上の
+WIP を並行セッションが約40分間隔で退避し続け stash が20個堆積。棚卸しの結果、実質的な
+未着地は2件だけで残り18件は着地済み/陳腐化だった）。
+
+- **superproject 本体 checkout（このフォルダ）は「統合・閲覧専用」。** ここでは編集・
+  commit・ブランチ切替をしない。やってよいのは `git fetch` / `--ff-only` pull /
+  `west update` / 読み取りだけ。本体に未コミット編集が転がっていると、並行セッションの
+  main 同期のたびに「他人の WIP を stash 温存」が発火して stash が堆積する。
+- **作業は 1 task = 1 branch = 1 worktree（superproject の外、sibling path）。**
+  `git worktree add -b <branch> /tmp/root-<name> origin/main`。superproject の
+  full checkout は重い（2分超）ので、触るパスが少ない作業は `--no-checkout` +
+  `git sparse-checkout set --no-cone <paths>` で部分 checkout にする。worktree 内で
+  west を使う場合は前節のとおり `west init -l manifest` で topdir を固定する。
+- **WIP の退避は stash でなく session branch への commit。** commit は名前・履歴・
+  所有者が付き branch 単位で棚卸しできるが、stash は無名の共有スタックで誰のものか
+  追えなくなる。stash を使ってよいのは「共有 checkout で見つけた他人の未コミット WIP を
+  消さないための緊急退避」だけで、積んだら cleanup で必ず棚卸しする。
+- **着地後の後片付けまでがタスクの完了条件。** push → サーバ側マージ
+  （`gh api .../merges`）→ `git worktree remove` → `git branch -D <branch>` →
+  マージ済み remote branch の削除。「マージしたのに branch/worktree が残っている」
+  状態を作らない。
+- **stash / branch の棚卸し（retirement）手順は `manifest/cleanup-workflow.md` の
+  Retirement 節**: 着地判定（追加行が現 main に含まれるかの content-containment。
+  生成物 `manifest/west.yml` は判定から除外）→ `.git/stash-archive-<date>/` に
+  パッチを退避 → drop / 削除。並行セッションが stash index をずらすので、drop は
+  SHA を控えて毎回 index を再解決してから行う。
+
 ## 大容量バイナリの扱い（B2 + DataLad、最優先）
 
 - **モデル重み / wasm / 動画 / 画像データセット等の大きなバイナリを git 履歴に

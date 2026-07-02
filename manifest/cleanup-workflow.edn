@@ -1,6 +1,6 @@
 {:id :com-junkawasaki.root/cleanup-workflow
- :version 1
- :updated "2026-06-29"
+ :version 2
+ :updated "2026-07-02"
  :purpose "Run cleanup for unmerged branches, PRs, worktrees, stashes, and merge conflicts without losing owner WIP."
 
  :triggers
@@ -22,7 +22,11 @@
   {:id :generated-west
    :rule "manifest/west.yml is generated. Resolve conflicts by choosing a side for source files, then regenerate; do not hand-edit conflict markers."}
   {:id :structured-before-text
-   :rule "Use EDN/source-of-truth files and generators before ad hoc line edits."}]
+   :rule "Use EDN/source-of-truth files and generators before ad hoc line edits."}
+  {:id :worktree-per-agent
+   :rule "Agents work in per-task worktrees outside the superproject root (sparse checkout for speed); the main superproject checkout is integration/read-only. See CLAUDE.md § 並行エージェント運用."}
+  {:id :no-stash-accumulation
+   :rule "Park WIP as commits on a session branch, not in stash. Stash is only an emergency preserve for someone else's uncommitted WIP found in the shared checkout, and must be retired via :retirement afterwards."}]
 
  :commands
  {:repo-discovery
@@ -125,6 +129,33 @@
     "git stash list"
     "git status --short -- <relevant-paths>"
     "Report untracked placeholder repos, preserved stashes, and any remote branches intentionally left."]}]
+
+ :retirement
+ {:purpose "Drain accumulated stashes and local branches without losing work. Verified 2026-07-02: 20 stashes + 8 branches drained, 2 unlanded items rescued."
+  :snapshot
+  {:rule "Concurrent sessions shift stash indices. Snapshot `git stash list --format='%H %gs'` once; before every drop, re-resolve each SHA to its current index."}
+  :classify
+  {:method :content-containment
+   :rule "Judge by content, not patch-id or shallow ancestry. Exclude generated files (manifest/west.yml) — stashed generated content is disposable. For each remaining file, test whether every added line of the stash diff exists in current main's version."
+   :outcomes
+   [{:case :all-lines-present :verdict :landed :action :archive-and-drop}
+    {:case :only-comment-lines-missing :verdict :landed-reworded :action :archive-and-drop}
+    {:case :later-round-of-same-series-landed :verdict :superseded :action :archive-and-drop}
+    {:case :substantive-lines-missing :verdict :unlanded :action :rescue-to-branch}]}
+  :archive
+  {:location ".git/stash-archive-<date>/"
+   :rule "Before dropping anything, export each stash as `git diff <sha>^ <sha>` patch (plus stash^3 untracked list when present) and an index.txt of `SHA | message`. Branch archives (diff vs main + commit log) go under branches/. Makes retirement reversible without relying on reflog/gc."}
+  :rescue
+  {:rule "Rescue unlanded content to a pushed branch, never back into a stash. Build in a sparse worktree outside the superproject; apply with `git apply -3 --include=<path>`; merge stays owner's call."
+   :commands
+   ["git worktree add --no-checkout -b stash-rescue-<date> /tmp/root-stash-rescue origin/main"
+    "git sparse-checkout set --no-cone <paths> && git checkout"
+    "git apply -3 --include='<path>' <archive>/<sha>.patch"
+    "git commit && git push origin stash-rescue-<date>"]}
+  :branches
+  {:rule "Same discipline per branch: ancestor-of-main → delete; else content containment; unrelated-history branches → remote-preservation check (tip commit exists in successor repo via gh api). Archive first, then `git branch -D`."
+   :deepen-first "git fetch --shallow-since=<date> origin main  ;; do not trust shallow ancestry"
+   :never-delete ["git-annex" "branches another session is actively using"]}}
 
  :stash-pop
  {:safe-default "Run git stash pop only when the working tree files touched by the stash are clean."
