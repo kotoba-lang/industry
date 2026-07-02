@@ -1,6 +1,6 @@
 # ADR-2607012200: kotoba-lang TypeScript → portable CLJC refactor (pure core + injected-capability seam; delete TS)
 
-**Status**: accepted (Steps 1–6 complete; Steps 7–8 phased)
+**Status**: accepted (complete — Steps 1–8 all landed; Step 8's plan conflict resolved by ADR-2607022900, 2026-07-02)
 **Date**: 2026-07-01
 **Deciders**: Jun Kawasaki
 **Scope**: `orgs/kotoba-lang/` repos still authored in TypeScript / TS+Rust after the etzhayyim-sdk relocation.
@@ -91,7 +91,7 @@ reusable recipe (proven on `ipfs`, ADR exemplar) applies to all:
 | `pqh` | 1806 LOC (100% pure) | AEAD envelope framing, ISO-7816 pad/`pickBucket`, KDF composition, HKDF, PQ hybrid binding, did-signal canonical/fingerprint | raw-primitive seam (XChaCha20-Poly1305 / Argon2id / ML-KEM-768 / ML-DSA-65; JVM BouncyCastle 1.78+, cljs `@noble/*`) | ✅ done (`IAead`/`IKdf`/`IPq` seams; bcprov→`:test`; X25519+ML-KEM+ML-DSA+HKDF noble parity verified; pin `65dbafff`, 2026-07-02: all 6 src + 1 test file ported to genuine `.cljc`) |
 | `checkpointer` | 721 LOC | wire-protocol `Op`/`Request`/`Response`, msgpack codec, `indexKey`; AEAD wrap/unwrap (**reuse `pqh`**) | fs/socket, `pin-blob` (**reuse `ipfs`**), `IMstCar` (`@atproto/repo` MST/CAR — inject now; native CLJC MST is a follow-up) | ✅ done (native MST via `kotoba-lang/mst`; reimplemented msgpack/dagcbor; reuses ipfs/pqh; pin `d583e4f0`, 2026-07-02: 10 files ported to genuine `.cljc`, incl. the native MST/CAR/dagcbor stack) |
 | `kami-nv-compat` | 71 real TS files / 14 382 LOC (classification corrected the initial 20 557 estimate — see own ADR-2607020130) | pure math/algorithm/data — no vendor SDK, no seam needed | — (none required) | ✅ done (own ADR-2607020130; all 16 subdir waves + 13 top-level facades landed 2026-07-02; zero tracked `.ts` files) |
-| `kotodama-host` | TS+Rust | (own ADR: standalone `:component-host` EDN/CLJC contract) | — | ✅ CLJC/TS-deletion complete upstream (pin `cb6c0870`, repaired 2026-07-02 from an unreachable stale pin); **plan conflict unresolved** — this ADR's original Step 8 said "merge into `kototama`," but what landed is a standalone `:component-host`, not a merge; needs owner reconciliation |
+| `kotodama-host` | TS+Rust | standalone `:component-host` EDN/CLJC contract (own ADR-2607022900) | — | ✅ done (pin `cb6c0870`, repaired 2026-07-02 from an unreachable stale pin); **plan conflict resolved by ADR-2607022900** — the "merge into `kototama`" framing below was inaccurate shorthand; `kotodama-host`'s own originating design ADR-2607010000 always specified a standalone Wasm component host, which is what shipped; `kototama` (com-junkawasaki) is an unrelated Wasm unikernel tender for a different actor family (ADR-2607022400) |
 
 **Reuse targets (do NOT re-port):** `ed25519`, `cacao`, `did`, `dag-cbor`,
 `multiformats` (genuinely `.cljc`/deliberately-`.clj` as documented per-repo);
@@ -136,11 +136,12 @@ infer it from "TS deleted."
   correctly left `.clj`-only.
 - ✅ **Step 7 (`kami-nv-compat`)**: complete (own ADR-2607020130), landed
   2026-07-02.
-- ⏳ **Step 8 (`kotodama-host`)**: the CLJC-migration/TS-deletion half is
-  complete upstream, but this ADR's original framing ("merge into
-  `kototama`") conflicts with what actually landed (a standalone
-  `:component-host`) — needs owner reconciliation before this step can be
-  marked done.
+- ✅ **Step 8 (`kotodama-host`)**: complete (own ADR-2607022900, closed
+  2026-07-02). The CLJC-migration/TS-deletion half landed upstream; the
+  "merge into `kototama`" plan conflict is resolved — retired in favor of
+  ratifying the standalone `:component-host` architecture that actually
+  shipped (and that `kotodama-host`'s own originating ADR-2607010000
+  specified all along).
 
-All 8 repos have now had at least one landing pass; only Step 8's plan
-conflict remains open.
+All 8 repos have now had at least one landing pass, and Step 8's plan
+conflict is resolved. This umbrella ADR's scope is fully closed.

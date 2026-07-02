@@ -12,13 +12,15 @@
    "TS disposition: delete TS entirely (host injects the vendor capability) — owner-confirmed 2026-07-01"
    "landing: child-repo worktree -> lint+test -> server-side merge -> advance superproject west pin via GitHub-API single-entry; no --force, no rewrite"
    "out of scope: svgraph, kotoba-v2025 (76MB Rust), kotodama-mcp/-py/-cells/-holochain (deferred)"
-   "2026-07-02: all 8 repos have landed at least one pass. A follow-up audit found base-l2/pqh/checkpointer had real .clj-vs-.cljc gaps (TS deleted but files never made genuinely dual-platform) despite being marked done -- fixed; witness-quorum audited and correctly confirmed intentional .clj-only (documented per-file + README + genuine JVM-concurrency/sibling-dep blockers). kami-nv-compat (Step 7) landed complete via its own ADR-2607020130. kotodama-host (Step 8)'s CLJC migration + TS deletion is complete upstream, but its landed shape (standalone :component-host) conflicts with this ADR's original 'merge into kototama' framing -- unresolved, needs owner reconciliation"]
+   "2026-07-02: all 8 repos have landed at least one pass. A follow-up audit found base-l2/pqh/checkpointer had real .clj-vs-.cljc gaps (TS deleted but files never made genuinely dual-platform) despite being marked done -- fixed; witness-quorum audited and correctly confirmed intentional .clj-only (documented per-file + README + genuine JVM-concurrency/sibling-dep blockers). kami-nv-compat (Step 7) landed complete via its own ADR-2607020130. kotodama-host (Step 8) is now COMPLETE via its own ADR-2607022900: the 'merge into kototama' framing was retired as inaccurate shorthand (kotodama-host's own originating ADR-2607010000 always specified a standalone Wasm component host, which is what shipped; kototama is an unrelated Wasm unikernel tender per ADR-2607022400). This umbrella ADR's full scope is now closed -- all 8 repos done, no open plan conflicts."]
   :related
   ["ADR-2606302300 (org taxonomy; kotoba-lang layer test §Step-1)"
    "ADR-2606290000 (all-workers-CLJC-only policy)"
    "ADR-2607010930 (clj-wgsl Rust->Clojure migration; substrate boundary)"
    "ADR-2607011830 / 2607011930 / 2607011940 (etzhayyim-sdk relocation of these repos)"
-   "ADR-2606302300 / 2607011100 (SVG-era office repo split — the #222 clobber incident)"]
+   "ADR-2606302300 / 2607011100 (SVG-era office repo split — the #222 clobber incident)"
+   "ADR-2607020130 (Step 7, kami-nv-compat CLJC port, own ADR)"
+   "ADR-2607022900 (Step 8, kotodama-host standalone :component-host, own ADR, closes this umbrella ADR's last open item)"]
   :scope_repos
   {:done    ["orgs/kotoba-lang/ipfs"
              "orgs/kotoba-lang/atproto-client"
@@ -26,9 +28,10 @@
              "orgs/kotoba-lang/witness-quorum"
              "orgs/kotoba-lang/pqh"
              "orgs/kotoba-lang/checkpointer"
-             "orgs/kotoba-lang/kami-nv-compat"]
+             "orgs/kotoba-lang/kami-nv-compat"
+             "orgs/kotoba-lang/kotodama-host"]
    :pending []
-   :phased  ["orgs/kotoba-lang/kotodama-host -> kototama (CLJC migration done; merge-vs-standalone plan conflict open)"]}
+   :phased  []}
   :reuse ["orgs/kotoba-lang/ed25519"
           "orgs/kotoba-lang/cacao"
           "orgs/kotoba-lang/did"
