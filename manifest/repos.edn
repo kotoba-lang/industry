@@ -325,6 +325,15 @@
    "orgs/kotoba-lang/quad-store"
    "orgs/kotoba-lang/kqe"
    "orgs/kotoba-lang/kotoba-client"
+   ;; canonical IPLD DAG-CBOR 層 (ADR-2607023200) — multiformats + dag-cbor を
+   ;; 合成し tag-42 の真の CID リンクを提供。prolly-tree/quad-store/commit-dag/
+   ;; kotoba-client/kotobase-engine はこれ経由に移行済み (旧 plain-CID-string
+   ;; encoding の honesty note を実際に閉じた。全 CID 変更のクリーンブレーク)。
+   "orgs/kotoba-lang/ipld"
+   ;; P2P graph-sync プロトコル (ADR-2607023200) — net の gossip/bitswap 意味論 +
+   ;; commit-dag 検証 + kotoba-client の tag-42 hydrate を合成した pure state
+   ;; machine (transport 注入、loopback 参照実装同梱)。net は意味論層のまま。
+   "orgs/kotoba-lang/p2p"
    ;; Bitcoin mining/mining-pool/wallet substrate (ADR-2607012230) — plain
    ;; libraries (not actors): btc-crypto (RIPEMD160/Base58/Bech32/BIP-32/39/
    ;; tx signing, secp256k1 reused from eth-crypto), btc-mining (CPU PoW
