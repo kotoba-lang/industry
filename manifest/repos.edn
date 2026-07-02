@@ -233,6 +233,10 @@
    ;; the byte-identical copies embedded in app-aozora / app-aozora-boundary /
    ;; kami-genko; consumed as a shadow-cljs source-path (ADR-2607022330 addendum).
    "orgs/kotoba-lang/kotobase-client"
+   ;; filter-honoring CLJC kotobase datom worker (:esm/workerd) on kotobase-engine
+   ;; — replaces the deleted-source WASM worker that ignored index/components/limit
+   ;; (ADR-2607022330 addendum 2). Deploy + yoro-social migration are gated.
+   "orgs/kotoba-lang/kotobase-cljc-worker"
    ;; kotobase XRPC-surface engine (transact/datoms/q/pull + verifiable persist),
    ;; composing prolly-tree/quad-store/kqe/commit-dag (ADR-2607022600).
    "orgs/kotoba-lang/kotobase-engine"
