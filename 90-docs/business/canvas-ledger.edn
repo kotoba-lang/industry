@@ -1,0 +1,4 @@
+#:event{:type :react/observation, :actor "advisor:mock", :tick 1, :value {:product :cloud-murakumo, :hyp-status {:untested 1}, :proposals 1}, :seq 1, :at "2026-07-02T00:44:23.530669Z"}
+{:canvas/id :cloud-murakumo.metrics, :event/value "次の検証 (murakumo-tok-price): 社内 3 アプリの推論を fleet へ移し run ledger 実測で原価比較", :event/type :canvas/add-item, :event/actor "advisor:mock", :event/reason "riskiest 仮説が未検証 — gate を運用指標に昇格", :event/tick 1, :event/seq 2, :event/at "2026-07-02T00:44:23.530669Z"}
+#:event{:type :react/observation, :actor "advisor:mock", :tick 2, :value {:product :cloud-murakumo, :hyp-status {:untested 1}, :proposals 0}, :seq 3, :at "2026-07-02T00:44:23.540182Z"}
+#:event{:type :governor/rejected, :actor "governor", :value {:proposal/action :canvas/add-item, :canvas/id :etzhayyim.revenue, :event/value "広告収益を追加"}, :reason "non-profit invariant: etzhayyim funding must stay 非営利", :seq 4, :at "2026-07-02T00:44:35.008672Z"}

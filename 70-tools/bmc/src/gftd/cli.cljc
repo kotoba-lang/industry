@@ -1,0 +1,212 @@
+(ns gftd.cli
+  "Shared CLI core for the 7 portfolio CLIs (ADR-2607021600):
+   itonami / manimani / murakumo / kotoba / aozora / e7m / gftd.
+
+   Each CLI is the same .cljc engine bound to its product(s); `gftd` is the
+   umbrella over all products. すべての書込（人手の canvas add/retract/note・
+   hyp pass/fail も含む）は gftd.react/governor を通ってから ledger に積まれる。
+
+   Commands:
+     products                              — 扱える product 一覧
+     canvas show [--product P]             — 端末表示（fold 済）
+     canvas md [--product P|--all] [--out-dir D]  — md 生成（正本は datoms+ledger）
+     canvas add|retract <canvas-id> <text> — item 追加/撤回
+     canvas note <canvas-id> <text>        — note 差替
+     hyp list [--product P]
+     hyp pass|fail <hyp-id> --evidence \"…\"
+     react tick [--product P] [--metrics k=v…]    — ReAct 1 tick（有界）
+     react loop [--product P] [--max-ticks N]     — dry まで反復（budget 有界）
+     ledger show [--tail N]"
+  (:require [clojure.string :as str]
+            #?(:clj [clojure.edn :as edn])
+            [gftd.canvas :as canvas]
+            [gftd.ledger :as ledger]
+            [gftd.react :as react]))
+
+(def registry
+  {:itonami  {:products [:cloud-itonami]                :desc "business operator (L3)"}
+   :manimani {:products [:cloud-manimani]               :desc "personal wellbecoming OS (L5)"}
+   :murakumo {:products [:cloud-murakumo]               :desc "LLM 推論 infra (L1)"}
+   :kotoba   {:products [:net-kotobase]                 :desc "storage hosting / graph BaaS (L2)"}
+   :aozora   {:products [:app-aozora :app-aozora-yoro]  :desc "social network + messenger (L4)"}
+   :e7m      {:products [:etzhayyim]                    :desc "artificial organism platform (L0, 非営利)"}
+   :gftd     {:products :all                            :desc "umbrella — 全 product + ai-gftd-apex"}})
+
+(def base-rel   "90-docs/adr/2607021500-portfolio-bmc-lean.datoms.edn")
+(def ledger-rel "90-docs/business/canvas-ledger.edn")
+(def md-out-rel "90-docs/business")
+(def metrics-rel "90-docs/business/metrics")
+
+;; ---- arg parsing ---------------------------------------------------------------
+
+(defn parse-args
+  "args → [positional-vec flags-map]; --k v / --k (boolean)."
+  [args]
+  (loop [[a & r] args pos [] flags {}]
+    (cond
+      (nil? a) [pos flags]
+      (str/starts-with? a "--")
+      (let [k (keyword (subs a 2))]
+        (if (or (nil? (first r)) (str/starts-with? (str (first r)) "--"))
+          (recur r pos (assoc flags k true))
+          (recur (rest r) pos (assoc flags k (first r)))))
+      :else (recur r (conj pos a) flags))))
+
+(defn ->kw [s] (if (keyword? s) s (keyword (str/replace (str s) #"^:" ""))))
+
+#?(:clj
+   (do
+     ;; ---- paths ---------------------------------------------------------------
+     (defn find-root
+       "GFTD_ROOT env か、cwd から上方向に base datoms を探して repo root を決める。"
+       []
+       (or (System/getenv "GFTD_ROOT")
+           (loop [d (.getCanonicalFile (java.io.File. ".")) n 0]
+             (cond
+               (.exists (java.io.File. d ^String base-rel)) (.getPath d)
+               (or (nil? (.getParentFile d)) (>= n 8))
+               (throw (ex-info (str "repo root not found (looked for " base-rel
+                                    "). run from repo root or set GFTD_ROOT.") {}))
+               :else (recur (.getParentFile d) (inc n))))))
+
+     (defn paths []
+       (let [root (find-root)
+             j (fn [rel] (str root "/" rel))]
+         {:root root :base (j base-rel) :ledger (j ledger-rel)
+          :md-out (j md-out-rel) :metrics (j metrics-rel)}))
+
+     (defn load-idx [{:keys [base ledger]}]
+       (canvas/load-index base (ledger/read-events ledger)))
+
+     ;; ---- product resolution ----------------------------------------------------
+     (defn cli-products [cli-key idx]
+       (let [ps (get-in registry [cli-key :products])]
+         (if (= :all ps) (vec (:products idx)) ps)))
+
+     (defn resolve-product
+       "単一 product が必要なコマンド用。CLI が 1 product ならそれ、複数なら --product 必須。"
+       [cli-key idx flags]
+       (let [ps (cli-products cli-key idx)]
+         (cond
+           (:product flags) (let [p (->kw (:product flags))]
+                              (if (some #{p} ps)
+                                p
+                                (throw (ex-info (str p " is not managed by this cli (allowed: " ps ")") {}))))
+           (= 1 (count ps)) (first ps)
+           :else (throw (ex-info (str "--product required (one of " (str/join ", " (map name ps)) ")") {})))))
+
+     ;; ---- governed writes ---------------------------------------------------------
+     (defn governed-append!
+       "proposals → governor → 可決分+拒否記録を ledger へ。拒否があれば表示して exit 1。"
+       [cli-key {:keys [ledger] :as ps} idx proposals]
+       (let [{:keys [approved rejected]} (react/governor idx proposals)
+             actor (str "cli:" (name cli-key))
+             events (concat (map #(react/proposal->event 0 actor %) approved)
+                            (for [{:keys [proposal reason]} rejected]
+                              {:event/type :governor/rejected :event/actor "governor"
+                               :event/value (select-keys proposal [:proposal/action :canvas/id :hyp/id :event/value])
+                               :event/reason reason}))]
+         (ledger/append! ledger events)
+         (doseq [p approved]
+           (println "ok:" (name (:proposal/action p)) (or (:canvas/id p) (:hyp/id p)) (pr-str (:event/value p))))
+         (doseq [{:keys [proposal reason]} rejected]
+           (println "REJECTED by governor:" reason "--" (pr-str (:event/value proposal))))
+         (when (seq rejected) (System/exit 1))))
+
+     ;; ---- commands ---------------------------------------------------------------
+     (defn cmd-canvas-md [cli-key ps idx [_ _] flags]
+       (let [products (if (:all flags) (cli-products cli-key idx) [(resolve-product cli-key idx flags)])
+             out-dir (or (:out-dir flags) (:md-out ps))
+             as-of (str (java.time.LocalDate/now))]
+         (doseq [p products]
+           (let [f (java.io.File. (str out-dir "/" (name p) "-business-model.md"))]
+             (.mkdirs (.getParentFile f))
+             (spit f (canvas/render-md idx p {:as-of as-of}))
+             (println "wrote" (.getPath f))))))
+
+     (defn read-metrics [ps product flags]
+       (let [f (java.io.File. (str (:metrics ps) "/" (name product) ".edn"))
+             file-m (when (.exists f) (edn/read-string (slurp f)))
+             flag-m (when-let [m (:metrics flags)]
+                      (into {} (for [kv (str/split m #",")
+                                     :let [[k v] (str/split kv #"=" 2)]]
+                                 [(keyword k) v])))]
+         (merge file-m flag-m)))
+
+     (defn cmd-react [cli-key ps idx sub flags]
+       (let [product (resolve-product cli-key idx flags)
+             metrics (read-metrics ps product flags)
+             actor "advisor:mock"
+             run (case sub
+                   "tick" (let [r (react/tick {:idx idx :product product :metrics metrics :actor actor})]
+                            {:ticks [r]})
+                   "loop" (react/run-ticks {:idx idx :product product :metrics metrics :actor actor
+                                            :max-ticks (parse-long (str (or (:max-ticks flags) "5")))}))]
+         (doseq [[i r] (map-indexed vector (:ticks run))]
+           (ledger/append! (:ledger ps) (:events r))
+           (println (str "tick " (inc i) ": " (count (:proposals r)) " proposal(s), "
+                         (count (:approved r)) " approved, " (count (:rejected r)) " rejected"))
+           (doseq [p (:approved r)] (println "  +" (:canvas/id p) (pr-str (:event/value p))))
+           (doseq [{:keys [proposal reason]} (:rejected r)]
+             (println "  x governor:" reason "--" (pr-str (:event/value proposal)))))
+         (when (:dry? run) (println "loop went dry (no more proposals) — 進化は収束"))))
+
+     (defn -main-for
+       "Entry point shared by the 7 wrappers."
+       [cli-key args]
+       (let [[pos flags] (parse-args args)
+             ps (paths)
+             idx (load-idx ps)
+             [c1 c2 c3 c4] pos]
+         (try
+           (case [c1 c2]
+             ["products" nil]
+             (doseq [p (cli-products cli-key idx)]
+               (println (name p) "\t" (get canvas/layer-labels (canvas/product-layer idx p))))
+
+             ["canvas" "show"]
+             (println (canvas/render-text idx (resolve-product cli-key idx flags)))
+
+             ["canvas" "md"] (cmd-canvas-md cli-key ps idx pos flags)
+
+             ["canvas" "add"]
+             (governed-append! cli-key ps idx
+                               [{:proposal/action :canvas/add-item :canvas/id (->kw c3)
+                                 :event/value c4 :proposal/reason "manual edit"}])
+             ["canvas" "retract"]
+             (governed-append! cli-key ps idx
+                               [{:proposal/action :canvas/retract-item :canvas/id (->kw c3)
+                                 :event/value c4 :proposal/reason "manual edit"}])
+             ["canvas" "note"]
+             (governed-append! cli-key ps idx
+                               [{:proposal/action :canvas/note :canvas/id (->kw c3)
+                                 :event/value c4 :proposal/reason "manual edit"}])
+
+             ["hyp" "list"]
+             (let [p (resolve-product cli-key idx flags)]
+               (doseq [{:keys [hyp/id hyp/status hyp/claim]} (canvas/product-hyps idx p)]
+                 (println id (str "[" (name status) "]") claim)))
+             ["hyp" "pass"]
+             (governed-append! cli-key ps idx
+                               [{:proposal/action :hyp/status :hyp/id (->kw c3) :event/value :validated
+                                 :event/evidence (:evidence flags) :proposal/reason "gate passed"}])
+             ["hyp" "fail"]
+             (governed-append! cli-key ps idx
+                               [{:proposal/action :hyp/status :hyp/id (->kw c3) :event/value :refuted
+                                 :event/evidence (:evidence flags) :proposal/reason "gate failed"}])
+
+             ["react" "tick"] (cmd-react cli-key ps idx "tick" flags)
+             ["react" "loop"] (cmd-react cli-key ps idx "loop" flags)
+
+             ["ledger" "show"]
+             (let [es (ledger/read-events (:ledger ps))
+                   n (parse-long (str (or (:tail flags) "20")))]
+               (doseq [e (take-last n es)] (println (pr-str e))))
+
+             ;; default: help
+             (do (println (str (name cli-key) " cli — " (get-in registry [cli-key :desc])))
+                 (println "commands: products | canvas show|md|add|retract|note | hyp list|pass|fail | react tick|loop | ledger show")
+                 (println "flags: --product P --all --out-dir D --evidence \"…\" --metrics k=v,… --max-ticks N --tail N")))
+           (catch clojure.lang.ExceptionInfo e
+             (println "error:" (ex-message e))
+             (System/exit 1)))))))
