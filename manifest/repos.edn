@@ -230,6 +230,10 @@
    ;; kotoba database-crates CLJC migration roadmap (ADR-2607022600). Composes
    ;; with kotoba-lang/prolly-tree + quad-store (ADR-2607010930 Phase 6).
    "orgs/kotoba-lang/commit-dag"
+   ;; canonical kotobase datom-plane client (kotobase.client/cacao/cid) — de-forks
+   ;; the byte-identical copies embedded in app-aozora / app-aozora-boundary /
+   ;; kami-genko; consumed as a shadow-cljs source-path (ADR-2607022330 addendum).
+   "orgs/kotoba-lang/kotobase-client"
    ;; kotobase XRPC-surface engine (transact/datoms/q/pull + verifiable persist),
    ;; composing prolly-tree/quad-store/kqe/commit-dag (ADR-2607022600).
    "orgs/kotoba-lang/kotobase-engine"
