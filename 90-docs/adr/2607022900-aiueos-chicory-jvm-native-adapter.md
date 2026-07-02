@@ -85,6 +85,52 @@ manifest.edn --edn`（`:aiueos/quota {:publishes 0}`）で実際に中断・
 host 呼び出し内部での無限ループや大量計算は防げない。fuel/gas metering の
 欠落は依然 real gap のまま。
 
+**Follow-up 2（2026-07-02、fuel/gas metering・生ハードウェアアクセスの再調査）**:
+
+- **fuel/gas metering**: Chicory の "Resource Control API" は本稿執筆時点
+  （1.5.0〜1.7.5 まで確認）でも未出荷——ただし **命令レベル fuel を今日から
+  実装できる実在の DIY フックがある**: `Instance.builder(...)
+  .withUnsafeExecutionListener((instruction, stack) -> ...)`
+  （`ExecutionListener`）が Wasm 命令 1 個ごとに発火する。ここでカウンタを
+  持たせて閾値超過で例外を投げれば、真の命令レベル fuel が実装できる。
+  ただし: (a) Chicory 公式ドキュメントが明示的に "unsafe" "extremely risky"
+  "experimental" "we might drop it at a later stage" と警告している**非正式
+  API**（issue #895/#896 によれば、公式にサポートされる実行制限手段は
+  thread-interrupt/`ExecutorService` によるウォールクロックタイムアウトの方）、
+  (b) **インタプリタ経路限定**——Chicory の AOT コンパイラ（`compiler` モジュール、
+  `AotMachine`）はこのフックを経由しない命令ループを使うため、将来 `aiueos.execute`
+  が性能目的で AOT に切り替えると効かなくなる。「fuel は今日から prototype
+  可能」だが「安全に永続利用できる正式 API ではない」——`Chicory 側の実装待ち`
+  という従来の記述はやや不正確で、正しくは「非公式フックでの prototype は可能、
+  公式 API 化は待ち」。
+- **生ハードウェアアクセス（`java.lang.foreign` 経路）**: この設問自体が
+  **フレーミング誤り**だったと判明。Solo5 の実アーキテクチャ（本 ADR が採用した
+  tender パターンの元ネタ）を確認したところ、`hvt`（ハードウェア仮想化 tender）
+  では **tender 側が KVM 特権で guest のメモリ/デバイスマッピングを設定し、
+  guest（unikernel）自身は生 MMIO に一切触れない**——guest は
+  `solo5_net_write` のような narrow hostcall を発行するだけで、tender がそれを
+  仲介する。`spt` では guest はさらに seccomp で制限された非特権プロセスとして
+  動く。**つまり生 MMIO/DMA へのアクセスは元々「Rust か Java か」という言語の
+  問題ではなく、「特権レベル」の問題**——root＋`/dev/mem`（最近の Linux では
+  `CONFIG_STRICT_DEVMEM` で年々制限強化）か、KVM/hypervisor 権限か、カーネル
+  自身であることが必須で、非特権のユーザースペースプロセスはどの言語であっても
+  生 MMIO に直接触れない。`java.lang.foreign`（Java 22 で正式化。本リポジトリの
+  CI が pin する Java 21 では **preview のみ**、`--enable-preview` 必須）は
+  Rust の `libc` バインディングと同等の `mmap()`/`ioctl()` 呼び出しを行う能力は
+  確かにある——なので「特権レイヤーの実装言語として Java 22+ か Rust か」は
+  今や実際に開いた選択だが、**「特権/hypervisor 協調レイヤーそのものを書く」
+  という本質的な仕事は言語に関わらず未着手のまま**。本 ADR の
+  「Rust vs `java.lang.foreign`」という設問設定を、「特権/hypervisor 協調 tender
+  レイヤーが必要（言語は問わない）」に訂正する。
+
+以上を踏まえた更新版の推奨: fuel は `withUnsafeExecutionListener` を使った
+prototype に着手する価値があるが、非公式 API 依存・インタプリタ限定という
+制約を実装コメントに明記すること。生ハードウェアアクセスは
+「Rust か Java か」ではなく「特権/hypervisor 協調レイヤーの不在」が真のブロッカー
+であり、Java 21→22 への JDK バンプ判断とは独立して、まず特権レイヤーの設計
+自体（KVM ベースの最小 VMM か、root+`/dev/mem` ドライバか）が必要——これは
+本 ADR のスコープを大きく超える別課題として、明確に blocked のまま残す。
+
 ## Consequences
 
 - (+) native adapter の**大部分**（device-access quartet を除く全て）が Rust
