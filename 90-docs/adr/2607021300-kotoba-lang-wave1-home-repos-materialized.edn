@@ -1,0 +1,50 @@
+{:frontmatter
+ {
+  :id "adr-2607021300-kotoba-lang-wave1-home-repos-materialized"
+  :title "ADR-2607021300: Wave-1 home 46 repo の実体化と west.yml stale entry 3 件の除去"
+  :status "accepted"
+  :date "2026-07-02"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "kotoba-lang-wave1-home-repos-materialized"
+  :authoritative true
+  :authoritative_for ["Wave-1 home 46 repo（clj-wgsl Phase 4, ADR-2607010930）の GitHub 実体化と pin 張り替えの根拠" "west.yml stale entry（verify / kotoba-lang-svgraph / kotoba-lang-kotodama）除去" "crypto/spice の regen 前 pin 欠落の根本原因（worktree ローカル commit の消失）"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607021230" "adr-2607010930"]
+  :last_verified "2026-07-02"}
+ :body
+ "# ADR-2607021300: Wave-1 home 46 repo の実体化と west.yml stale entry 3 件の除去
+
+**Status**: accepted
+**Date**: 2026-07-02
+**Deciders**: Jun Kawasaki
+
+## Context
+
+ADR-2607021230 の follow-up として kotoba-lang org を全数照合（west entry 313 vs
+GitHub 272 + redirect 解決）。**49 entry のリポが未存在**（pin 全滅 = west update
+不能）。うち 46 は ADR-2607010930 の port home で、pin は Wave-1 agent worktree の
+scaffold commit — **worktree 掃除で消失**（ローカル checkout は空 git を実測）。
+3 件（verify / kotoba-lang-svgraph / kotoba-lang-kotodama）は repos.edn に無い
+stale。kami-webgpu は rename redirect で正常。crypto/spice の pre pin 欠落の根本
+原因も同型（両リポ created_at = Wave-1 当日。旧 pin は実体化前の worktree commit）。
+
+## Decision
+
+1. 46 home repo を private + auto_init で実体化し、west.yml pin を実在する
+   initial commit SHA へ張り替え（repos.edn は変更なし。Wave-2 port が pin を前進）。
+2. stale 3 entry を west.yml から除去（repos.edn に無い entry の反映。diff は
+   当該 entry のみ）。
+3. crypto/spice は現 pin 有効のため変更なし（根本原因を記録しクローズ）。
+
+## Consequences
+
+- (+) kotoba-lang 全 entry が「リポ実在 + pin 到達可能」になり west update 全面回復。
+- (−) 46 home は README のみの scaffold。Wave-1 の scaffold 内容は復元不能で、
+  Wave-2 は ADR-2607010930 の手順で作り直す。
+
+## References
+
+- ADR-2607021230 / ADR-2607010930 / 6246e89、ペアの .md
+"}
