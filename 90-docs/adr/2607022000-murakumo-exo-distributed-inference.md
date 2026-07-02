@@ -95,6 +95,29 @@ llama.cpp RPC の**テンソルキャッシュ**（`rpc-server -c`: 受信した
   2 台復帰後に `llama-server --tensor-split 9,7,7,7,7,7,7,7,7,7,6` で再実行する。
   9 worker では 78 層を保持できない（63 + head 上限 ~11 = 74 < 78）。
 
+## 追記（2026-07-02 夕）: 16 GiB mini の安定限界と中止判断
+
+gad（linux x86_64 48GB, fleet LAN）を head + CPU rank ×3 role に立てる構成
+（gad = GGUF 保持 + layers 0-9 CPU + rpc 38-44 + rpc 73-77、Mac worker 8×7 層、
+全キャッシュ再利用）まで到達し、ロードは cache-hit で進行した。しかし
+**shard ロードが自ノードに到達した 16GiB mini が順に kernel panic** し
+（judah → levi）、さらにロードと無関係の idle ノードも停止
+（naphtali / issachar / benjamin）。半日で 11 台中 5 台がハード停止・自動復帰なし。
+
+推定原因: `iogpu.wired_limit_mb=13312`（RAM の 87%）+ 12.8GB 級 shard +
+常駐サービス（ComfyUI/ollama）で wired 圧殺。**16GiB M4 mini の安定 shard 上限は
+実測的に ~9-10GB（5-6 層）**であり、139GB を安定に載せるには healthy 12 ノード
+以上が必要。fleet 保全を優先し、生存 6 Mac の rpc-server 停止 +
+wired limit 既定復元で**中止**した。
+
+物理復帰後の再挑戦レシピ（安定重視の再設計）:
+- wired limit 11776MB（=RAM の 73%、Apple 既定近傍）
+- Mac worker は 6 層 (11.0GB) 上限、可能なら 5 層 (9.2GB)
+- 11 Mac × 6 = 66 + gad 12 層（CPU 0-9 + rpc 73-77 相当）= 78 ✓
+- ロード前に各ノードの常駐（ComfyUI/ollama）を一時停止（launchctl、再起動で復元）
+- llama.cpp RPC は half-open に無限待ちする（levi 死亡時に head が 20 分ブロック）
+  → petals 型の timeout/再ルートが engine 側の必須改修点
+
 ## credits — メモリ×時間比例の推論経済（murakumo.infer.credits）
 
 fleet で希少なのは**メモリ×時間**。run の credits は
