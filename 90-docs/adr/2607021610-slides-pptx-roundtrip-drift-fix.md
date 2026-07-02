@@ -117,3 +117,39 @@ pptx_roundtrip_matrix.edn` の全ケースを確認したが `schemeClr` を使�
 - `orgs/kotoba-lang/slides/src/slides/office.cljc`
 - `orgs/kotoba-lang/slides/README.md`（Office PPTX インポート節）
 - 本 ADR とペアの .edn
+
+## Addendum（2026-07-02、computer-use による視覚品質評価で追加発見・修正）
+
+修正の視覚的品質確認のため、python-pptx で実 PowerPoint 相当の複合デッキ
+（複数レイアウトの未接触プレースホルダー、混在テキストラン色、画像、
+テーマ色塗り+明示ボーダーの AutoShape、表、グラフ、グループ化シェイプを
+全て含む）を生成し、Keynote（computer-use スクリーンショット）と
+LibreOffice headless（`render-pptx` CLI）の両方で修正前後を視覚比較した。
+
+原因1・2の修正は複合デッキでも正しく機能することを確認した一方、
+**原因4（新規）: `text-shape` の色抽出がシェイプ全体を検索するため、
+`:rect` 以外のジオメトリ（roundRect, oval 等）を持つ AutoShape で
+テーマ塗り色がテキスト色として誤って適用される**ことを発見した。
+`rect-shape` は `prstGeom prst="rect"` のみにマッチするため、丸角四角形や
+楕円等の非矩形 AutoShape はテキストを持つ限り `text-shape` にのみ捕捉され、
+`text-shape` の `:drawingml/color` が block 全体から最初の `<a:solidFill>`
+を拾う実装だったため、シェイプ自身の `<p:spPr>` 塗り色（テーマ色）が
+テキスト色に化けていた。原因2の修正（schemeClr 解決）が効くようになった
+ことで、以前は暗黙に "17202A" フォールバックへ落ちて見えなかったこの
+バグが実際の誤色として表面化した。
+
+`drawingml.parse/text-color`（`<p:txBody>`/`<a:txBody>` にスコープした
+色抽出）を新設し、`text-shape` の `:drawingml/color` をこれに切り替えて
+修正（`drawingml` commit `363f6a7`）。新規テスト
+`text-color-does-not-leak-shape-fill-test` で回帰を防止。
+`drawingml` 13 tests/114 assertions、`presentationml` 7 tests/47
+assertions、`slides` 137 tests/658 assertions、全て pass。
+
+併せて確認した「バグではない」既知の制約:
+- 表/グラフ/画像は `slides.pptx/write-pptx!`（フル再生成）経由でエクスポート
+  すると素朴なテキストボックスに縮退する（README に明記済みの既知動作。
+  元の native semantics 保持は `:ooxml/source` を持つ shape に対する
+  `update`（差分パッチ）経路でのみ可能）。
+- 同一シェイプ内の複数テキストラン（段落）は `:slides/color` が
+  シェイプ単位の単一値であるため、ラン単位の異なる色は最初に見つかった
+  ものへ収束する（原因1・2・4とは独立した、モデルの意図的な簡略化）。
