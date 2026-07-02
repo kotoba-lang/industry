@@ -2286,6 +2286,7 @@
     "orgs/kotoba-lang/d3"
     "orgs/kotoba-lang/dag-cbor"
     "orgs/kotoba-lang/datom"
+    "orgs/kotoba-lang/dcs"
     "orgs/kotoba-lang/device"
     "orgs/kotoba-lang/did"
     "orgs/kotoba-lang/spirv"
@@ -2355,6 +2356,8 @@
     "orgs/kotoba-lang/cae-solver"
     "orgs/kotoba-lang/coll"
     "orgs/kotoba-lang/crash"
+    "orgs/kotoba-lang/btc-crypto"
+    "orgs/kotoba-lang/btc-mining"
     "orgs/kotoba-lang/ed25519"
     "orgs/kotoba-lang/eth-crypto"
     "orgs/kotoba-lang/webgl"
@@ -2362,12 +2365,14 @@
     "orgs/kotoba-lang/ui"
     "orgs/kotoba-lang/host"
     "orgs/kotoba-lang/input"
+    "orgs/kotoba-lang/io"
     "orgs/kotoba-lang/kotoba-code"
     "orgs/kotoba-lang/kuro"
     "orgs/kotoba-lang/log"
     "orgs/kotoba-lang/lsp"
     "orgs/kotoba-lang/lsp-rpc"
     "orgs/kotoba-lang/mailer"
+    "orgs/kotoba-lang/mining-pool"
     "orgs/kotoba-lang/motor"
     "orgs/kotoba-lang/net"
     "orgs/kotoba-lang/netcap"
@@ -2378,18 +2383,33 @@
     "orgs/kotoba-lang/freeboard"
     "orgs/kotoba-lang/spec"
     "orgs/kotoba-lang/store"
+    "orgs/kotoba-lang/shitsuke"
     "orgs/kotoba-lang/kagi"
     "orgs/kotoba-lang/kenchi"
     "orgs/kotoba-lang/test"
     "orgs/kotoba-lang/time"
+    "orgs/kotoba-lang/turn"
     "orgs/kotoba-lang/vc"
     "orgs/kotoba-lang/vphysics"
+    "orgs/kotoba-lang/wallet"
     "orgs/kotoba-lang/playwright"}},
  :requested-publish-plan
  {:source "bb scripts/kami-webgpu-dsl-runtime-split-audit.bb --edn --strict"
   :unit :repo-pr
   :batches
-  [{:id :ci-only
+  [{:id :publish-ready
+    :intent "Promote already-clean CLJ/CLJC split repos into the requested publish gate."
+    :allowed-change-kinds #{}
+    :repos
+    ["orgs/kotoba-lang/btc-crypto"
+     "orgs/kotoba-lang/btc-mining"
+     "orgs/kotoba-lang/dcs"
+     "orgs/kotoba-lang/io"
+     "orgs/kotoba-lang/mining-pool"
+     "orgs/kotoba-lang/shitsuke"
+     "orgs/kotoba-lang/turn"
+     "orgs/kotoba-lang/wallet"]}
+   {:id :ci-only
     :intent "Add missing CLJ/CLJC CI to already-materialized requested split repos."
     :allowed-change-kinds #{:ci}
     :repos
