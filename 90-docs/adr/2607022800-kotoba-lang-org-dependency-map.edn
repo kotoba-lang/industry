@@ -618,4 +618,31 @@
    :connected-components 15,
    :largest-component 51,
    :cyclic false,
-   :note "standalone-leaves = repos with deps.edn but no internal kotoba-lang edge in either direction"}}}
+   :note "standalone-leaves = repos with deps.edn but no internal kotoba-lang edge in either direction"}}
+
+ ;; Phase 5, same day, owner "do it" on Phase 4's findings — the fix sweep.
+ :phase-5-2026-07-02-fix-sweep
+ {:summary "fixes for Phase 4's :findings (stale *-clj coords + monorepo-only coordinates), which surfaced and forced the fix of a REAL namespace collision between two published repos; west pins advanced for every repo touched today"
+  :fixed
+  [{:repo "signal" :sha "36cb3c11"
+    :fix "io.github.com-junkawasaki/ed25519-clj -> io.github.kotoba-lang/ed25519, SAME pinned SHA ec077bca (reachable in the migrated repo, so the resolved tree is byte-identical — pure coordinate fix)"
+    :test-result "23 tests / 62 assertions, 0 failures"}
+   {:repo "inference" :sha "d4b8de31"
+    :fix "org.kotoba-lang/{num,torch} :local/root (never resolvable as a git dep) -> io.github.kotoba-lang/{num,torch} main-HEAD pins; :dev alias keeps workspace-offline :local/root overrides"
+    :test-result "12 tests / 125 assertions, 0 failures"}
+   {:repo "kotoba" :sha "7096842d"
+    :fix "all four :local/root ../../kotoba-lang/* deps (kotoba-core-contracts + kotoba-selfhost-contracts with bare non-github groups, kotoba-lang, cacao) -> main-HEAD git pins; :dev alias keeps offline overrides. A fresh standalone clone previously could not even build a classpath; now the full suite runs"
+    :test-result "109 tests / 613 assertions, 0 failures"}
+   {:repo "cacao" :sha "c88333c7"
+    :fix "ns RENAME kotoba.cli -> cacao.cli (+ bin/kotoba, bb.edn tasks, tests, README). Not in Phase 4's findings — discovered BY the kotoba fix: cacao and kotoba-lang/kotoba-lang both shipped a kotoba.cli ns (identity CLI vs canonical contract-dispatch CLI); on an alphabetized classpath cacao's src sorts first and silently hides kotoba.cli/dispatch. The monorepo :local/root era masked it; real git pins surfaced it as 'No such var: cli/dispatch'. No external consumer of the old ns found (org code search + the Phase-4 org-wide deps scan)"
+    :test-result "21 tests / 115 assertions, 0 failures"}]
+  :not-fixed
+  [{:repo "kototama-clj"
+    :reason "repo is ARCHIVED on GitHub (read-only since 2026-06-15) — the fix (kotoba-lang/{langgraph,langchain} git pins + :dev alias, 40 tests / 222 assertions green locally) was verified but cannot be pushed. Stale coords are moot for consumers while frozen; if the repo is ever unarchived, the verified patch applies as-is"}
+   {:repo "kagi"
+    :reason "kagitaba is still unpushed concurrent-session WIP (ADR-2607023000) — unchanged from Phase 4; pin after it lands on GitHub"}]
+  :west-pins-advanced
+  {:note "manifest/west.yml --entry minimal diff, all 12 verified server-side as pure fast-forwards (covers the ADR-2607023200 tag-42 chain pushed earlier today, which had not yet had its pins advanced, plus this phase's fixes)"
+   :entries ["dag-cbor 9c60d583" "prolly-tree 8da6d1e1" "quad-store ecb99b8f" "commit-dag 05cc0473"
+             "kotoba-client 92cbadab" "kqe 9901532a" "kotobase-engine 60d922b9" "net 20d99d1e"
+             "signal 36cb3c11" "inference d4b8de31" "kotoba 7096842d" "cacao c88333c7"]}}}

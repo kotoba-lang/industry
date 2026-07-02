@@ -332,3 +332,32 @@ ipld / p2p（ADR-2607023200）もグラフに入っている。
    `:local-root-internal-edges :by-repo` に収載。ほか `inference` と
    `kotoba` は group 名も非 github 形式（`org.kotoba-lang/…`、素の
    `kotoba-lang/…`）で、git 依存としては永遠に解決不能な座標。
+
+## Phase 5 (2026-07-02) — Phase 4 findings の fix sweep
+
+オーナー承認("do it")により Phase 4 の findings を修正した。
+
+- **signal** (`36cb3c11`): `com-junkawasaki/ed25519-clj` → `kotoba-lang/ed25519`。
+  pin SHA `ec077bca` は移行先 repo からも到達可能だったため **SHA 据え置きの
+  純座標修正**(解決される tree はバイト同一)。23 tests green。
+- **inference** (`d4b8de31`): `org.kotoba-lang/*`(git 依存として解決不能な
+  group)+ `:local/root` → `io.github.kotoba-lang/{num,torch}` の main-HEAD
+  pin。`:dev` alias に offline 用 `:local/root` override を温存。12 tests green。
+- **kotoba** (`7096842d`): `:local/root ../../kotoba-lang/*` 4 本 → git pin。
+  従来 **fresh clone では classpath 構築すら不能**だったが、full suite
+  (109 tests / 613 assertions) が通るようになった。
+- **cacao** (`c88333c7`, Phase 4 の findings に無かった実バグ): kotoba の修正が
+  **公開 repo 2 つの namespace 衝突**を炙り出した — cacao と
+  kotoba-lang/kotoba-lang の両方が `kotoba.cli` を出荷しており、アルファベット順
+  classpath で cacao 側(identity CLI)が canonical な `kotoba.cli/dispatch` を
+  黙って shadow する。monorepo の `:local/root` 時代は露見しなかったが、git pin
+  化で `No such var: cli/dispatch` として顕在化。cacao 側を `cacao.cli` に
+  rename(bin/bb.edn/test/README 追従、外部消費者なしを確認)。21 tests green。
+
+**修正しなかったもの**: kototama-clj は **archived(read-only)** のため
+push 不能(fix 自体はローカルで 40 tests green まで検証済み、unarchive されれば
+そのまま適用可)。kagi → kagitaba は他セッションの未 push WIP のまま変わらず。
+
+併せて、本日 push した全 12 repo(ADR-2607023200 の tag-42 チェーン 8 repo +
+本フェーズ 4 repo)の **west pin を `--entry` 最小 diff で前進**(全件サーバ側
+検証で pure fast-forward 確認済み)。
