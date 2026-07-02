@@ -1,6 +1,6 @@
 # ADR-2607020130: kami-nv-compat TypeScript → portable CLJC port (pure math/algorithm core; NO vendor seam)
 
-**Status**: proposed (classification complete; wave-by-wave port pending)
+**Status**: accepted (complete — all 16 subdir waves + 13 top-level facades ported; final TS deletion sweep landed 2026-07-02)
 **Date**: 2026-07-01
 **Refines**: ADR-2607012200 §Step-7 (whose numbers + "NVIDIA SDK seam" assumption pre-dated a direct scan of this repo)
 
@@ -91,3 +91,18 @@ applied repo-at-completion, not per-wave — the final wave deletes the last TS
   any CID use; otherwise zero runtime deps).
 - Scope is ~14k LOC across 16 waves + 13 facade files — multi-session,
   wave-per-session, "丁寧に".
+
+## Completion note (2026-07-02)
+
+All 16 subdir waves + all 13 top-level facades landed. `warp/examples.ts`
+(2475 LOC, 38 exports — larger than this ADR's original LOC census counted,
+since it was undercounted at classification time) was ported last, as
+planned, split across 8 waves (3 solo + 5 via parallel subagents porting
+disjoint kernel groups, integrated sequentially to a shared file). The
+final batch TS-deletion sweep (44 superseded `.ts` files, then a further
+31 dead `test/*.test.ts` files discovered during the final pass, then
+`examples.ts`/`warp/index.ts`/`package.json`/`package-lock.json`/
+`tsconfig.json`) landed 2026-07-02; the repo now has zero tracked `.ts`
+files (`git ls-files '*.ts'` empty). No injected-capability seam was
+needed, as predicted — the one `@noble/hashes` site was replaced with the
+kotoba-lang `multiformats` sha256, matching the plan.

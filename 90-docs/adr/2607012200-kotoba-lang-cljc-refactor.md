@@ -84,17 +84,31 @@ reusable recipe (proven on `ipfs`, ADR exemplar) applies to all:
 
 | repo | real TS src | PURE core (port) | injected capability (host) | status |
 |---|---|---|---|---|
-| `ipfs` | 106 LOC | URLs (`add-url`/`gateway-url`/…), NDJSON `parse-add-response`, bytes⇄string | `IHttp` (`-get`/`-post`/`-post-file`) | ✅ done (PR #1, pin advanced) |
-| `atproto-client` | 376 LOC | `create-agent`, `xrpc` URL/headers/query, `did-web->url`, `pick-pds-service`, record orchestration | `IHttp` (xrpc + `fetch-json`) | ✅ done (IHttp seam; JVM reference adapter `377236e`; pin `377236ed`) |
-| `base-l2` | 369 LOC | `ANCHOR_ABI` (EDN data), config records, `resolveSponsoredHolder`, encoding | `IAnchorClient` / `ISponsoredWriter` (viem) | ✅ done (`ITransport` seam; pin `c95543d6`) |
-| `witness-quorum` | 2127 LOC (~80% pure) | witness selection (SHA-256), `quorumState` reducer, attestation validation + `canonicalAttestationBytes`, Ed25519 sign/verify (**reuse `ed25519`**) | `WitnessTransport` (pds-transport) | ✅ done (reuses `ed25519`; pin `e247f212`) |
-| `pqh` | 1806 LOC (100% pure) | AEAD envelope framing, ISO-7816 pad/`pickBucket`, KDF composition, HKDF, PQ hybrid binding, did-signal canonical/fingerprint | raw-primitive seam (XChaCha20-Poly1305 / Argon2id / ML-KEM-768 / ML-DSA-65; JVM BouncyCastle 1.78+, cljs `@noble/*`) | ✅ done (`IAead`/`IKdf`/`IPq` seams; bcprov→`:test`; X25519+ML-KEM+ML-DSA+HKDF noble parity verified; pin `77102f75`) |
-| `checkpointer` | 721 LOC | wire-protocol `Op`/`Request`/`Response`, msgpack codec, `indexKey`; AEAD wrap/unwrap (**reuse `pqh`**) | fs/socket, `pin-blob` (**reuse `ipfs`**), `IMstCar` (`@atproto/repo` MST/CAR — inject now; native CLJC MST is a follow-up) | ✅ done (native MST via `kotoba-lang/mst`; reimplemented msgpack/dagcbor; reuses ipfs/pqh; pin `8c005480`) |
-| `kami-nv-compat` | 20 557 LOC | (classify per own ADR) | NVIDIA SDK seam | ⏳ own ADR, phased |
-| `kotodama-host` | TS+Rust | (merge into `kototama`) | — | ⏳ own ADR |
+| `ipfs` | 106 LOC | URLs (`add-url`/`gateway-url`/…), NDJSON `parse-add-response`, bytes⇄string | `IHttp` (`-get`/`-post`/`-post-file`) | ✅ done, genuinely `.cljc` (PR #1, pin advanced) |
+| `atproto-client` | 376 LOC | `create-agent`, `xrpc` URL/headers/query, `did-web->url`, `pick-pds-service`, record orchestration | `IHttp` (xrpc + `fetch-json`) | ✅ done, genuinely `.cljc` (IHttp seam; JVM reference adapter `377236e`; pin `377236ed`) |
+| `base-l2` | 369 LOC | `ANCHOR_ABI` (EDN data), config records, `resolveSponsoredHolder`, encoding | `IAnchorClient` / `ISponsoredWriter` (viem) | ✅ done (`ITransport` seam; pin `2aa4b34f`, 2026-07-02: `rpc.clj`→`.cljc`, 8 files stay `.clj` — transitively blocked by the sibling `eth-crypto` dep, itself mislabeled `.cljc` while genuinely JVM-only, flagged as a follow-up) |
+| `witness-quorum` | 2127 LOC (~80% pure) | witness selection (SHA-256), `quorumState` reducer, attestation validation + `canonicalAttestationBytes`, Ed25519 sign/verify (**reuse `ed25519`**) | `WitnessTransport` (pds-transport) | ✅ done, **intentionally `.clj`-only** (pin `e247f212`, unchanged 2026-07-02 audit: every file's docstring + README explicitly document this; blocked by genuine JVM concurrency primitives with no cljs equivalent in `orchestrator.clj`, and by the sibling `ed25519` repo's own deliberate JVM/babashka-only design) |
+| `pqh` | 1806 LOC (100% pure) | AEAD envelope framing, ISO-7816 pad/`pickBucket`, KDF composition, HKDF, PQ hybrid binding, did-signal canonical/fingerprint | raw-primitive seam (XChaCha20-Poly1305 / Argon2id / ML-KEM-768 / ML-DSA-65; JVM BouncyCastle 1.78+, cljs `@noble/*`) | ✅ done (`IAead`/`IKdf`/`IPq` seams; bcprov→`:test`; X25519+ML-KEM+ML-DSA+HKDF noble parity verified; pin `65dbafff`, 2026-07-02: all 6 src + 1 test file ported to genuine `.cljc`) |
+| `checkpointer` | 721 LOC | wire-protocol `Op`/`Request`/`Response`, msgpack codec, `indexKey`; AEAD wrap/unwrap (**reuse `pqh`**) | fs/socket, `pin-blob` (**reuse `ipfs`**), `IMstCar` (`@atproto/repo` MST/CAR — inject now; native CLJC MST is a follow-up) | ✅ done (native MST via `kotoba-lang/mst`; reimplemented msgpack/dagcbor; reuses ipfs/pqh; pin `d583e4f0`, 2026-07-02: 10 files ported to genuine `.cljc`, incl. the native MST/CAR/dagcbor stack) |
+| `kami-nv-compat` | 71 real TS files / 14 382 LOC (classification corrected the initial 20 557 estimate — see own ADR-2607020130) | pure math/algorithm/data — no vendor SDK, no seam needed | — (none required) | ✅ done (own ADR-2607020130; all 16 subdir waves + 13 top-level facades landed 2026-07-02; zero tracked `.ts` files) |
+| `kotodama-host` | TS+Rust | (own ADR: standalone `:component-host` EDN/CLJC contract) | — | ✅ CLJC/TS-deletion complete upstream (pin `cb6c0870`, repaired 2026-07-02 from an unreachable stale pin); **plan conflict unresolved** — this ADR's original Step 8 said "merge into `kototama`," but what landed is a standalone `:component-host`, not a merge; needs owner reconciliation |
 
 **Reuse targets (do NOT re-port):** `ed25519`, `cacao`, `did`, `dag-cbor`,
-`multiformats`, `eth-crypto` (all pure `.cljc`/`.clj` in `kotoba-lang`).
+`multiformats` (genuinely `.cljc`/deliberately-`.clj` as documented per-repo);
+`eth-crypto` is `.cljc`-named but was found (2026-07-02, via the `base-l2`
+audit) to have zero reader conditionals and be genuinely JVM-only —
+mislabeled, not yet fixed, flagged as a follow-up.
+
+**2026-07-02 finding on this table's own "done" bar**: the original passes
+for `base-l2`/`witness-quorum`/`pqh`/`checkpointer` marked "done" once TS was
+deleted and the capability seam was established, but did not verify actual
+dual-platform `.cljc` loadability (verification item 3 below) — every one of
+them was still 100% plain `.clj` until a follow-up audit (2026-07-02) checked
+this specifically. `base-l2`/`pqh`/`checkpointer` had real, fixable gaps
+(now closed, see pins above); `witness-quorum` was re-verified as correctly,
+deliberately `.clj`-only and left unchanged. Anyone repeating this ledger
+pattern for a new repo should check verification item 3 explicitly, not
+infer it from "TS deleted."
 
 ## Verification (per repo, end-to-end)
 
@@ -115,9 +129,18 @@ reusable recipe (proven on `ipfs`, ADR exemplar) applies to all:
   Clojure/CLJC-only with pin == HEAD. `pqh` shipped in 4 verified increments
   (crypto/kdf/pq seams + TS deletion); `checkpointer` (native MST via
   `kotoba-lang/mst`, reimplemented msgpack/dagcbor, reuses ipfs/pqh) landed by a
-  concurrent session + cleanup. The 6-facade core of this ADR is done.
-- ⏳ Steps 7–8 (`kami-nv-compat`, `kotodama-host→kototama`): own ADRs, phased.
+  concurrent session + cleanup. The 6-facade core of this ADR is done. A
+  2026-07-02 follow-up audit additionally verified genuine `.cljc` dual-
+  platform loadability (not just TS-deletion) for all 6 — see the ledger
+  table above for the real gaps found/fixed and why `witness-quorum` was
+  correctly left `.clj`-only.
+- ✅ **Step 7 (`kami-nv-compat`)**: complete (own ADR-2607020130), landed
+  2026-07-02.
+- ⏳ **Step 8 (`kotodama-host`)**: the CLJC-migration/TS-deletion half is
+  complete upstream, but this ADR's original framing ("merge into
+  `kototama`") conflicts with what actually landed (a standalone
+  `:component-host`) — needs owner reconciliation before this step can be
+  marked done.
 
-Recommend executing the remaining repos one per session for context headroom;
-the recipe above + the `ipfs` exemplar are sufficient to continue without
-re-derivation.
+All 8 repos have now had at least one landing pass; only Step 8's plan
+conflict remains open.
