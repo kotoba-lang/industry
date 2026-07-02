@@ -95,7 +95,11 @@
  {"orgs/gftdcojp/m365-archive"
   {:annex-remote "b2"
    :group        "datalad"   ; このグループのみ → group-filter の -datalad で既定 off
-   :note "M365 アーカイブ。実体は B2、git には annex キーのみ。"}}
+   :note "M365 アーカイブ。実体は B2、git には annex キーのみ。"}
+  "orgs/gftdcojp/mangaka-data"
+  {:annex-remote "b2"
+   :group        "datalad"
+   :note "ai-gftd-mangaka の data/ 分離 dataset (ADR-2607023000)。バイナリは B2 (fileprefix=mangaka-data/)、テキストは text2git。"}}
 
  ;; B2 (S3 互換) special remote 設定(非機密)。
  ;; 認証は scripts/b2-creds.bb が下記 :credentials の順で解決する(env→1Password→Keychain)。
@@ -340,6 +344,11 @@
    "orgs/kotoba-lang/anime"
    "orgs/kotoba-lang/ongaku"
    "orgs/kotoba-lang/douga"
+   ;; -ka follow-ups (ADR-2607023000): ongakuka を superproject plain tree から
+   ;; child repo 化した private カタログ (kotoba-lang/ongaku を消費)、mangaka の
+   ;; data/ を分離した DataLad dataset (:datalad 参照、既定 off)。
+   "orgs/gftdcojp/ai-gftd-ongakuka"
+   "orgs/gftdcojp/mangaka-data"
    ;; sha256d-clj (ADR-2607012300) — portable, host-crypto-free .cljc SHA-256/
    ;; SHA-256d + a Google-co-scientist/AlphaEvolve-shaped evolutionary benchmark
    ;; tournament over individually-proven-equivalent round-primitive formulations.
@@ -354,7 +363,7 @@
    "orgs/gftdcojp/ai-gftd-animeka"
    "orgs/gftdcojp/ai-gftd-arms"
    "orgs/gftdcojp/ai-gftd-cyber-drill"
-   "orgs/gftdcojp/ai-gftd-dogaka"
+   ;; ai-gftd-dogaka は空 stub のため削除 (repo/west とも、ADR-2607023000 follow-up)
    "orgs/gftdcojp/ai-gftd-dougaka"
    "orgs/gftdcojp/ai-gftd-exoclick"
    "orgs/gftdcojp/ai-gftd-face-tracker"

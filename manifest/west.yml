@@ -979,7 +979,7 @@ manifest:
       groups: [gftdcojp]
     - name: ai-gftd-animeka
       remote: gftdcojp
-      revision: 2ad4266001da351351c019d2b4955463f2da05c8
+      revision: d692972bd362b76e5290065c448629f4d327795e
       path: orgs/gftdcojp/ai-gftd-animeka
       groups: [gftdcojp]
     - name: ai-gftd-apex
@@ -1004,14 +1004,9 @@ manifest:
       revision: 6efe2e3dd664ce3999fa4bf673bd6d5af8dda931
       path: orgs/gftdcojp/ai-gftd-cyber-drill
       groups: [gftdcojp]
-    - name: ai-gftd-dogaka
-      remote: gftdcojp
-      revision: 338e896e827025c2e21c51e3159a1c3c56a3ec3d
-      path: orgs/gftdcojp/ai-gftd-dogaka
-      groups: [gftdcojp]
     - name: ai-gftd-dougaka
       remote: gftdcojp
-      revision: 91cf7fd4ac68310fa902eed20a560b244c2a4ba3
+      revision: 895223ed6c2503035c71f7de7f82e5dfce5b258d
       path: orgs/gftdcojp/ai-gftd-dougaka
       groups: [gftdcojp]
     - name: ai-gftd-exoclick
@@ -1107,7 +1102,7 @@ manifest:
       groups: [gftdcojp]
     - name: ai-gftd-mangaka
       remote: gftdcojp
-      revision: 4d46da46421929d7fee30bf1138346fc7c95e3a8
+      revision: 9ee973e942b3252b4dcd663621c50566e5f39aac
       path: orgs/gftdcojp/ai-gftd-mangaka
       groups: [gftdcojp]
     - name: ai-gftd-manimani
@@ -1139,6 +1134,11 @@ manifest:
       remote: gftdcojp
       revision: c7a513c9811779ade367d8fd47e0fd696f7a8562
       path: orgs/gftdcojp/ai-gftd-newscaster
+      groups: [gftdcojp]
+    - name: ai-gftd-ongakuka
+      remote: gftdcojp
+      revision: 072bff03298451b80c09d8df60f736907dd41c41
+      path: orgs/gftdcojp/ai-gftd-ongakuka
       groups: [gftdcojp]
     - name: ai-gftd-oshikatsu
       remote: gftdcojp
@@ -1247,6 +1247,14 @@ manifest:
       revision: d760e773f04456b8b1497a81e2321138d78f863e
       path: orgs/gftdcojp/m365-archive
       clone-depth: 1
+      groups: [datalad]
+      userdata:
+        datalad: true
+        annex-remote: b2
+    - name: mangaka-data
+      remote: gftdcojp
+      revision: 103c442cd7f6c884700dc1c3f298996448672132
+      path: orgs/gftdcojp/mangaka-data
       groups: [datalad]
       userdata:
         datalad: true
