@@ -77,11 +77,6 @@ manifest:
       path: orgs/com-junkawasaki/org-spirit-in-physics-comics
       clone-depth: 1
       groups: [com-junkawasaki]
-    - name: security
-      remote: kotoba-lang
-      revision: abfaa0ebea482814d546d848cd70951b3cc91484
-      path: orgs/kotoba-lang/security
-      groups: [kotoba-lang]
     - name: sha256d-clj
       remote: com-junkawasaki
       revision: 5fd4e64d0fc5a616b798edbca7327da33c78eb02
@@ -1137,7 +1132,7 @@ manifest:
       groups: [gftdcojp]
     - name: ai-gftd-newscaster
       remote: gftdcojp
-      revision: 37f7c5365edfa1ed3670771f40e2944cdcb723af
+      revision: c8ac397893e031aa3ea5e7f0b3f0f566a4fe43f3
       path: orgs/gftdcojp/ai-gftd-newscaster
       groups: [gftdcojp]
     - name: ai-gftd-oshikatsu
@@ -1250,7 +1245,7 @@ manifest:
       groups: [gftdcojp]
     - name: net-kotobase
       remote: gftdcojp
-      revision: 699384fcfeddfea57d663eee9d1ffa74f2b0a6d9
+      revision: d5388a33af7b503b865e0958326fcb96bf390891
       path: orgs/gftdcojp/net-kotobase
       groups: [gftdcojp]
       submodules: true
@@ -1460,6 +1455,11 @@ manifest:
       revision: 7fbacff21bd7ab5707dcf3891c6809c50b171252
       path: orgs/kotoba-lang/cmmn
       groups: [kotoba-lang]
+    - name: cnc
+      remote: kotoba-lang
+      revision: aa11b30c3fa23d9fe3756e1ebed4d938afe74590
+      path: orgs/kotoba-lang/cnc
+      groups: [kotoba-lang]
     - name: coll
       remote: kotoba-lang
       revision: 9740cc2dc43a192077d77374b869a37940c801e4
@@ -1562,7 +1562,7 @@ manifest:
       groups: [kotoba-lang]
     - name: dft
       remote: kotoba-lang
-      revision: ec7117addda6f3addb9efd678efd7020ae323523
+      revision: d4594c218d85b991669bf5c977d97399bf09bcaa
       path: orgs/kotoba-lang/dft
       groups: [kotoba-lang]
     - name: did
@@ -1642,7 +1642,7 @@ manifest:
       groups: [kotoba-lang]
     - name: expr
       remote: kotoba-lang
-      revision: 2af32124678064bfbe6abe40ab6e7d2d426d1398
+      revision: 8c60b09f7952474da9264080a00537285910199b
       path: orgs/kotoba-lang/expr
       groups: [kotoba-lang]
     - name: exr
@@ -1652,7 +1652,7 @@ manifest:
       groups: [kotoba-lang]
     - name: fea
       remote: kotoba-lang
-      revision: 94a8045cd025ec2eec1c1e7012591490536473e8
+      revision: 3dec463af230902a458f1c3131b52de6c56592ac
       path: orgs/kotoba-lang/fea
       groups: [kotoba-lang]
     - name: fmt
@@ -1692,7 +1692,7 @@ manifest:
       groups: [kotoba-lang]
     - name: geo
       remote: kotoba-lang
-      revision: 41bb09fea85cf902e82817809010ec9e7fe5223c
+      revision: 8c22faa2ffc97e8ab60858dc38ef4099699444c4
       path: orgs/kotoba-lang/geo
       groups: [kotoba-lang]
     - name: geojson
@@ -1717,7 +1717,7 @@ manifest:
       groups: [kotoba-lang]
     - name: gpu
       remote: kotoba-lang
-      revision: e1db1a2835cdeeac4a48a8cd51ff3b6a025cd52b
+      revision: 3b11ba0bc281543b023653b833c9296d45381eb0
       path: orgs/kotoba-lang/gpu
       groups: [kotoba-lang]
     - name: graph
@@ -1734,6 +1734,11 @@ manifest:
       remote: kotoba-lang
       revision: 6dea336fd1a470a1889e2afb678c01df9ecc13ba
       path: orgs/kotoba-lang/graphql
+      groups: [kotoba-lang]
+    - name: groot
+      remote: kotoba-lang
+      revision: 1cd4f226ed6acdbb0f7bc4bf1b0c0854adde5a92
+      path: orgs/kotoba-lang/groot
       groups: [kotoba-lang]
     - name: hinshitsu
       remote: kotoba-lang
@@ -1760,11 +1765,6 @@ manifest:
       revision: cd6333ebdbda4b7c9d06b426862e69307f025add
       path: orgs/kotoba-lang/http
       groups: [kotoba-lang]
-    - name: ic-packaging
-      remote: kotoba-lang
-      revision: 91a088656dd356cfd1c71d0159d763c6fe857de7
-      path: orgs/kotoba-lang/ic-packaging
-      groups: [kotoba-lang]
     - name: ical
       remote: kotoba-lang
       revision: b789c549a308fb2731a77269354c7ddd868d2d8b
@@ -1790,10 +1790,10 @@ manifest:
       revision: 39cf95c0a0fc2c6e629ad548eb2ec407ee2ae5c8
       path: orgs/kotoba-lang/io
       groups: [kotoba-lang]
-    - name: ip-xact
+    - name: ip
       remote: kotoba-lang
-      revision: f4e2f056120dd86ee977c1a910e888cfe43b338f
-      path: orgs/kotoba-lang/ip-xact
+      revision: e5da427d16eb6abcaa52ad6221656fc85fa14616
+      path: orgs/kotoba-lang/ip
       groups: [kotoba-lang]
     - name: ipfs
       remote: kotoba-lang
@@ -1825,6 +1825,16 @@ manifest:
       revision: 8fc9cc60b72f45c38912660e2c886590c9ff5a6e
       path: orgs/kotoba-lang/kami-app
       groups: [kotoba-lang]
+    - name: kami-app-amenominaka
+      remote: kotoba-lang
+      revision: 5a2f6a7eea78affc5434bb4aafcda64df207c1e7
+      path: orgs/kotoba-lang/kami-app-amenominaka
+      groups: [kotoba-lang]
+    - name: kami-app-car-sim
+      remote: kotoba-lang
+      revision: 40f8e9906dd40f74e9a1d7d197729986cfdd546e
+      path: orgs/kotoba-lang/kami-app-car-sim
+      groups: [kotoba-lang]
     - name: kami-app-fixtures
       remote: kotoba-lang
       revision: a033a50a0d3a8b1aee21c7914d6f974c199d7f11
@@ -1840,6 +1850,21 @@ manifest:
       revision: 9017a4d79a7e43874e2ef13815ef437977a68e70
       path: orgs/kotoba-lang/kami-app-quarry-walk
       groups: [kotoba-lang]
+    - name: kami-app-sarutahiko-factory
+      remote: kotoba-lang
+      revision: d1a06ae5b928ade367c67d2156c88801095a3e91
+      path: orgs/kotoba-lang/kami-app-sarutahiko-factory
+      groups: [kotoba-lang]
+    - name: kami-app-shibuya
+      remote: kotoba-lang
+      revision: 4773042e5f2e8daef2fd5ce30398524cec563a29
+      path: orgs/kotoba-lang/kami-app-shibuya
+      groups: [kotoba-lang]
+    - name: kami-app-tatekata
+      remote: kotoba-lang
+      revision: 8c6505c948ff5a73944e50e58cef19ecb3d40676
+      path: orgs/kotoba-lang/kami-app-tatekata
+      groups: [kotoba-lang]
     - name: kami-contracts
       remote: kotoba-lang
       revision: fafac35399a061d2478d7828d192b2a25a4c27f1
@@ -1847,7 +1872,7 @@ manifest:
       groups: [kotoba-lang]
     - name: kami-engine
       remote: kotoba-lang
-      revision: 83ee14aeb4fd0abf6875b189cc37b2369e71cbd6
+      revision: 34b72266462acccd93cb300fd2937e228b85ad69
       path: orgs/kotoba-lang/kami-engine
       clone-depth: 1
       groups: [kotoba-lang]
@@ -1884,7 +1909,7 @@ manifest:
       groups: [kotoba-lang]
     - name: kami-engine-sdk
       remote: com-junkawasaki
-      revision: 379b9550ee56199bc3f993ec92042008ef31ab3f
+      revision: 91ff23bb7615b036829097f63fe0f28b043dbc84
       path: orgs/kotoba-lang/kami-engine-sdk
       groups: [kotoba-lang]
     - name: kami-engine-vehicle-designer
@@ -1899,12 +1924,12 @@ manifest:
       groups: [kotoba-lang]
     - name: kami-genko
       remote: kotoba-lang
-      revision: 703440fdbc9483ea6da99f32b70ee69df3f93f93
+      revision: 3579fe64769720bdbe107ebf2f984e237a3475fd
       path: orgs/kotoba-lang/kami-genko
       groups: [kotoba-lang]
     - name: kami-nv-compat
       remote: kotoba-lang
-      revision: cfc3626b2fb54c6263925a60b91405c8b382ed1c
+      revision: 2135d3e9d0eb478788b4b7191c239c4f01edc4bc
       path: orgs/kotoba-lang/kami-nv-compat
       groups: [kotoba-lang]
     - name: kami-scene-contracts
@@ -2112,7 +2137,7 @@ manifest:
       groups: [kotoba-lang]
     - name: liquid-glass-ui
       remote: kotoba-lang
-      revision: a24d2b42492308f600284251771538899a05cdbb
+      revision: 23bde30c102bcf8ab1bdf7f8d1bceef21783236a
       path: orgs/kotoba-lang/liquid-glass-ui
       groups: [kotoba-lang]
     - name: log
@@ -2195,11 +2220,6 @@ manifest:
       revision: b725a9101d6fe210dfb17b5cae3a95fd36f48287
       path: orgs/kotoba-lang/mise
       groups: [kotoba-lang]
-    - name: model-checking
-      remote: kotoba-lang
-      revision: b9860ce079e1fae456d3028613bab81068bcc8b4
-      path: orgs/kotoba-lang/model-checking
-      groups: [kotoba-lang]
     - name: motor
       remote: kotoba-lang
       revision: d49a16e7563ef230531b3b0c7f3152f5f9d2ce8c
@@ -2207,7 +2227,7 @@ manifest:
       groups: [kotoba-lang]
     - name: mst
       remote: kotoba-lang
-      revision: ab049be52444f5b89ee87f14594fac8abb660002
+      revision: 2dc31325a730d989b4c3a3268f848450963ccf03
       path: orgs/kotoba-lang/mst
       groups: [kotoba-lang]
     - name: multiformats
@@ -2217,7 +2237,7 @@ manifest:
       groups: [kotoba-lang]
     - name: murakumo
       remote: kotoba-lang
-      revision: 410e1cee2370d5c69be17264754a8a34e203ee29
+      revision: ab68810cbc025390dbc451fc9e8c25f3231333a1
       path: orgs/kotoba-lang/murakumo
       groups: [kotoba-lang]
     - name: musicxml
@@ -2322,7 +2342,7 @@ manifest:
       groups: [kotoba-lang]
     - name: physics
       remote: kotoba-lang
-      revision: c19f1be35e81ea3c584a43d61db5f9f979c8ee26
+      revision: 933a6ffa9544265c24344355dca6a1b03a7da1b2
       path: orgs/kotoba-lang/physics
       groups: [kotoba-lang]
     - name: physics-2d
@@ -2334,6 +2354,11 @@ manifest:
       remote: kotoba-lang
       revision: c36a4914d86ed0eed0096cbc8bab9ed1c4a9e824
       path: orgs/kotoba-lang/pipelines
+      groups: [kotoba-lang]
+    - name: pkg
+      remote: kotoba-lang
+      revision: 37dc9541d52d1ef4448aa0dbe1bf946707337fe9
+      path: orgs/kotoba-lang/pkg
       groups: [kotoba-lang]
     - name: playwright
       remote: kotoba-lang
@@ -2460,6 +2485,11 @@ manifest:
       revision: 835e9e9a281169966266ec0a2937166eef0fa224
       path: orgs/kotoba-lang/search
       groups: [kotoba-lang]
+    - name: security
+      remote: kotoba-lang
+      revision: abfaa0ebea482814d546d848cd70951b3cc91484
+      path: orgs/kotoba-lang/security
+      groups: [kotoba-lang]
     - name: senden
       remote: kotoba-lang
       revision: d531239c25b115b048e468e60778da66cd39ed7e
@@ -2489,6 +2519,11 @@ manifest:
       remote: kotoba-lang
       revision: d7988c24f5cb37074b6bfc1f0c2e223f4e218f84
       path: orgs/kotoba-lang/shitsuke
+      groups: [kotoba-lang]
+    - name: si
+      remote: kotoba-lang
+      revision: c1670727d4cef33b69f72acea7b5576c4b71d636
+      path: orgs/kotoba-lang/si
       groups: [kotoba-lang]
     - name: sigma
       remote: kotoba-lang
@@ -2691,6 +2726,11 @@ manifest:
       revision: c8c228acc9ec774677fe6cb18a1e9b41ec33e23e
       path: orgs/kotoba-lang/vegetation
       groups: [kotoba-lang]
+    - name: verify
+      remote: kotoba-lang
+      revision: b1b421c00052692e712a06336ae87fd936d4fcfd
+      path: orgs/kotoba-lang/verify
+      groups: [kotoba-lang]
     - name: verilog
       remote: kotoba-lang
       revision: bc13582b52fd7e8ff879f651f99fb5259e6ee6f9
@@ -2768,7 +2808,7 @@ manifest:
       groups: [kotoba-lang]
     - name: yield
       remote: kotoba-lang
-      revision: 31ee270a574da18bb602d58f8422f1350cdd11f4
+      revision: 8245d6019ef6457645cfcf5c6f30c3b027be1983
       path: orgs/kotoba-lang/yield
       groups: [kotoba-lang]
     - name: zone
