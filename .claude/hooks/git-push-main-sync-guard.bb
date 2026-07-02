@@ -34,11 +34,41 @@
 
 (defn strip-ref [s] (-> s (str/replace #"^refs/heads/" "") (str/replace #"^refs/" "")))
 
+;; パス1トークン: "..." / '...' / スペース・;&| を含まない裸トークン。
+;; クォート付きパス（`cd "$SCRATCH/x"` 等）を裸トークン用の文字クラスだけで拾おうとすると、
+;; 先頭の `"` がクラス除外文字に当たって即マッチ失敗し、`dir` が "."(=判定不能な cwd) に
+;; フォールバックする。その結果、対象と無関係な repo（このスクリプト自身の cwd）の同期状態を
+;; 見てしまう誤検出が起きる（実例: 2026-07-02, `git -C "$SCRATCH/repos/map-live" push` を
+;; superproject の乖離ありと誤判定）。クォート付き/裸の両方を候補にして拾う。
+(def ^:private path-tok-src "\"[^\"]*\"|'[^']*'|[^\\s;&|]+")
+
+(defn- strip-quotes [s]
+  (when s
+    (if (and (>= (count s) 2)
+             (or (and (str/starts-with? s "\"") (str/ends-with? s "\""))
+                 (and (str/starts-with? s "'") (str/ends-with? s "'"))))
+      (subs s 1 (dec (count s)))
+      s)))
+
+;; トップレベルの対象判定に生の (str/includes? cmd "git push") を使うと、
+;; `git -C <path> push ...` のように git と push の間に -C 引数が挟まる形を
+;; 取りこぼし（"git push" という隣接部分文字列が存在しないため）、ガードが
+;; まるごと素通りしてしまう。`git -C <path> push` も明示的に対象に含める。
+(def ^:private git-push-re
+  (re-pattern (str "git\\s+(?:-C\\s+(?:" path-tok-src ")\\s+)?push\\b")))
+
+(def ^:private git-push-tail-re
+  "`push` 以降の引数列を丸ごと取り出す。`git-push-re` と同じく `-C <path>` を
+   git と push の間に許す（`pushed-dst` も同じ取りこぼしを持っていた:
+   `git -C <path> push origin <branch>` で refspec を拾えず、常に dir の
+   現在ブランチにフォールバックして every push looked like a main-push）。"
+  (re-pattern (str "git\\s+(?:-C\\s+(?:" path-tok-src ")\\s+)?push\\b(.*)$")))
+
 (defn pushed-dst
   "push コマンドから「更新先ブランチ名」を推定する。refspec が無ければ dir の現在ブランチ。
    <src>:<dst> は dst 側、HEAD:refs/heads/x は x。判定不能なら nil。"
   [cmd dir]
-  (let [after (second (re-find #"git\s+push\b(.*)$" cmd))
+  (let [after (second (re-find git-push-tail-re cmd))
         toks  (->> (str/split (or after "") #"\s+")
                    (remove str/blank?)
                    (remove #(str/starts-with? % "-")))   ; フラグ除去(origin/branch だけ残す)
@@ -54,14 +84,17 @@
                         (json/parse-string true)
                         (get-in [:tool_input :command]))
                 "")]
-    ;; git push を含むコマンドのみ対象。--dry-run / --delete は対象外で素通り。
-    (when-not (str/includes? cmd "git push") (allow!))
+    ;; git push (`git -C <path> push` 含む) を含むコマンドのみ対象。--dry-run / --delete は対象外で素通り。
+    (when-not (re-find git-push-re cmd) (allow!))
     (when (str/includes? cmd "--dry-run") (allow!))
     (when (or (str/includes? cmd "--delete") (re-find #"\spush\b[^|;&]*\s-d\b" cmd)) (allow!))
 
     ;; 対象リポ dir: `git -C <path>` を優先、無ければ `cd <path>`、それも無ければ cwd。
-    (let [cdir (some-> (re-find #"git\s+-C\s+([^\s;&|\"']+)" cmd) second)
-          cd   (some-> (re-find #"cd\s+([^\s;&|\"']+)" cmd) second)
+    ;; <path> はクォート付き("...` / '...') でも裸トークンでも拾う（strip-quotes で正規化）。
+    (let [cdir (some-> (re-find (re-pattern (str "git\\s+-C\\s+(" path-tok-src ")")) cmd)
+                        second strip-quotes)
+          cd   (some-> (re-find (re-pattern (str "cd\\s+(" path-tok-src ")")) cmd)
+                        second strip-quotes)
           dir  (or cdir cd ".")
           top  (git dir "rev-parse" "--show-toplevel")]
       (when (str/blank? top) (allow!))
