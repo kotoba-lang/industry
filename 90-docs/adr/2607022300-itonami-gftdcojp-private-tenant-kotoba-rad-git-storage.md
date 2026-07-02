@@ -178,6 +178,36 @@ CACAO identity を生成し `wrangler kv key put --binding=ITONAMI_DATA
 kotoba 本番 store との接続（実 queue/effects/audits データ）は未接続
 ——このFunctionは認可ゲートのみで、data source は空 shape を返す。
 
+**同日、素の JS 実装を cljc へ書き直した**（`gftdcojp/cloud-itonami#11`〜`#13`、
+`be740c7`、本番デプロイ済み）。`functions/lib/*.js` は本リポジトリの実際の
+慣習（net-kotobase/clj-edge が shadow-cljs `:target :esm` で同じ CACAO/
+did:key 検証を Cloudflare Worker へコンパイルしている前例）からの逸脱だった
+ため、`src/cloud_itonami/edge/{base58,cbor,cacao,tenant,state}.cljc` に置換。
+書き直しの過程で実バグを2つ発見・修正:
+1. `:advanced`（shadow の release 既定）は未知の外部オブジェクト
+   （Cloudflare context/env/KV binding、このFunction自身の `#js {}`）への
+   `.-foo` dot-property 読み取りを `:infer-externs :auto` があっても
+   静かに壊す（リクエスト時に「Cannot read properties of undefined」）。
+   全て `(aget obj "foo")` に置換して解決（kotobase.cacao.cljc と同じ
+   rename-safe な convention）。
+2. cbor.cljc の配列 decode が `(into [] ...)`（CLJS PersistentVector、
+   `.-length` を持たない）を返していたため、CACAO の `resources` 配列が
+   `siwe-message` の再構成で silently 空扱いされ、`Resources:` セクション
+   が signed message から欠落 → 署名検証が常に失敗する実バグだった
+   （「有効だが未 bind」に見えていたテストケースは実は全部これで壊れていた）。
+   `array`/`.push` で真の JS array を作るよう修正。
+3. （1の対処で `:simple` を試した際に判明した副作用）`:simple` は
+   cljs.core/goog の base runtime に含まれる未使用の `eval()`（goog の
+   module-loader fallback 等、リクエスト時には到達しないデッドコード）を
+   バンドルに残し、Cloudflare の本番デプロイパイプラインがこれを静的検出して
+   デプロイそのものを拒否した（`wrangler pages deploy` が
+   "Unknown internal error" で失敗）。1の aget 修正後は `:advanced` に戻せ、
+   dead-code elimination で eval も自動的に消え、両問題が同時に解決した。
+
+JVM の `cacao.core/mint` に対するクロス検証・`wrangler pages dev`
+（実 workerd runtime）での 5 パターンE2E確認は JS 版と同一、本番でも
+再確認済み。
+
 ## Follow-up
 
 - `orgs/gftdcojp/cloud-itonami/docs/adr/0002-org-repo-tenant-isolation.md` に
