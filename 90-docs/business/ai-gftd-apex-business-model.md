@@ -14,6 +14,7 @@
 - 規制業種・匿名必須層に選択肢がない
 - agent 購読は provider lock-in
 - 観測 (signal): gftd.ai 実測 422889 req/7d・4644 uniques(日次和)、workers 32517 inv/7d
+- 観測 (signal): gftd.ai 実測 456291 req/7d・4941 uniques(日次和)、workers 36494 inv/7d
 
 ## Customer Segments
 
@@ -35,6 +36,10 @@
 - 準備 (apex-privacy-premium): tier 価格定義
 - 準備 (apex-privacy-premium): Stripe product 作成
 - 準備 (apex-privacy-premium): Free→Plus 転換テレメトリ
+- 準備 (apex-privacy-premium): Stripe checkout 配線 (product 既存)
+- 計器 (funnel): 訪問 の計測（funnel emitter で funnel/visitors を出力）
+- 計器 (funnel): signup(Free) の計測（funnel emitter で funnel/signups を出力）
+- 計器 (funnel): Plus 転換 の計測（funnel emitter で conversion/plus を出力）
 
 ## Channels
 

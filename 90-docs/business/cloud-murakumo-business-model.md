@@ -14,6 +14,7 @@
 - GPU クラウド推論は高コスト、consumer device fleet は遊休
 - fine-tune/LoRA の provenance が追えない
 - 観測 (signal): murakumo.cloud 実測 536 req/7d・1 uniques(日次和)、workers 158768 inv/7d
+- 観測 (signal): murakumo.cloud 実測 1554 req/7d・122 uniques(日次和)、workers 171179 inv/7d
 
 ## Customer Segments
 

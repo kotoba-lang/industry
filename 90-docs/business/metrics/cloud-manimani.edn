@@ -1,10 +1,13 @@
-{:as-of "2026-07-02",
- :sources [:cloudflare :health],
- :zone
- {:requests-7d 443,
-  :pageviews-7d 0,
-  :uniques-7d-sum 1,
-  :zone "manimani.cloud"},
+{:health-status 404,
  :zone-name "manimani.cloud",
- :health-status nil,
- :signal "manimani.cloud 実測 443 req/7d・1 uniques(日次和)"}
+ :zone
+ {:requests-7d 559,
+  :pageviews-7d 0,
+  :uniques-7d-sum 46,
+  :zone "manimani.cloud"},
+ :sources [:cloudflare :health :emitter],
+ :cloud {:signups 2},
+ :as-of "2026-07-02",
+ :conversion {:oss-active 2, :cloud-paid 2, :pct 1},
+ :oss {:installs 2},
+ :signal "manimani.cloud 実測 559 req/7d・46 uniques(日次和)"}

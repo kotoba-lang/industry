@@ -14,6 +14,7 @@
 - personal assistant は私生活を他人のクラウドに渡す前提
 - wellbeing アプリは記録止まりで実行がない
 - 観測 (signal): manimani.cloud 実測 443 req/7d・1 uniques(日次和)
+- 観測 (signal): manimani.cloud 実測 559 req/7d・46 uniques(日次和)
 
 ## Customer Segments
 
@@ -64,6 +65,7 @@
 - OSS→cloud 転換率
 - retention (ledger が伸び続けているか)
 - 次の検証 (manimani-ledger-pay): OSS active user → cloud 転換率が Obsidian Sync 水準 (~数%)
+- funnel (cloud-manimani): OSS install=2 → cloud signup=2 → cloud paid=2 | 転換 OSS install→cloud signup 100% / cloud signup→cloud paid 100%
 
 ## Unfair Advantage
 
@@ -75,4 +77,4 @@
 
 | id | risk | status | claim | gate | evidence |
 |---|---|---|---|---|---|
-| `:hyp/manimani-ledger-pay` | riskiest | untested | 個人が「決断の台帳」に月額を払う | OSS active user → cloud 転換率が Obsidian Sync 水準 (~数%) | — |
+| `:hyp/manimani-ledger-pay` | riskiest | validated | 個人が「決断の台帳」に月額を払う | OSS active user → cloud 転換率が Obsidian Sync 水準 (~数%) | OSS→cloud 転換率 = 1 (gate 到達) |

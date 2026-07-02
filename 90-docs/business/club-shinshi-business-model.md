@@ -38,6 +38,9 @@
 - 準備 (club-shinshi-creator-take): PSP/crypto rail 解禁 (ADR-2605220000 凍結)
 - 準備 (club-shinshi-creator-take): creator billing
 - 準備 (club-shinshi-creator-take): creator GMV 計測
+- 計器 (funnel): 訪問 の計測（funnel emitter で funnel/visitors を出力）
+- 計器 (funnel): 登録 の計測（funnel emitter で funnel/signups を出力）
+- 計器 (funnel): 課金/creator GMV の計測（funnel emitter で funnel/paying を出力）
 
 ## Channels
 
