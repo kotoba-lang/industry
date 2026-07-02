@@ -1,0 +1,56 @@
+{:frontmatter
+ {
+  :id "adr-2607021230-west-wave1-pin-regression-repair"
+  :title "ADR-2607021230: Wave-1 west.yml regen の pin 退行/不達 pin の監査と修復"
+  :status "accepted"
+  :date "2026-07-02"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "west-wave1-pin-regression-repair"
+  :authoritative true
+  :authoritative_for ["Wave-1 regen (5323da6) 起因の pin 退行/不達 pin の監査結果と修復 pin の根拠" "全体 regen を main に入れる前の pin 検証手順（remote 到達可能 + 前進のみ）" "expr/gpu/physics（GitHub リポ未存在）と crypto/spice（pre pin 欠落）の未解決事項"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2606272237"]
+  :last_verified "2026-07-02"}
+ :body
+ "# ADR-2607021230: Wave-1 west.yml regen の pin 退行/不達 pin の監査と修復
+
+**Status**: accepted
+**Date**: 2026-07-02
+**Deciders**: Jun Kawasaki
+
+## Context
+
+`5323da6`（Wave-1 regen）は gen-west-manifest.bb の全体再生成で、生成器が
+**ローカル working HEAD で pin する**罠により実行セッションの checkout 状態が
+main の pin に写った。newscaster 退行（2b23f48 で修復済み）を契機に全数監査。
+方法: `5323da6^` と現 main の west.yml を API 取得 → pin 差分 21 件 → 各子リポの
+compare API で分類（shallow ローカル ancestry は不使用）。
+
+結果: 前進 11 / **退行 3**（murakumo -10, net-kotobase -2, kami-engine-sdk -6）/
+**不達 pin 2**（kami-engine, mst — pin がリモートに存在せず west update 不能）/
+**リポ未存在 3**（expr, gpu, physics — Wave-1 port 未 push）/ pre 欠落 2
+（crypto, spice — 現 pin は有効）。
+
+## Decision
+
+1. 修復 5 件（全て remote HEAD 一致 or 純前進、compare で検証済み）:
+   murakumo `ab68810c`→`06125846`(HEAD) / net-kotobase `d5388a33`→`699384fc`
+   (=pre=HEAD) / kami-engine-sdk `91ff23bb`→`379b9550`(=pre=HEAD) /
+   kami-engine `34b72266`(不達)→`83ee14ae`(=pre=HEAD) / mst `2dc31325`(不達)→
+   `ab049be5`(=pre=HEAD)。
+2. 記録のみ: expr/gpu/physics（子リポ push or entry 取り下げまで west 不能、
+   follow-up）。crypto/spice は現 pin 温存（pre 欠落 = 上流 rewrite 疑いを記録）。
+3. 再発防止: 全体 regen は「pin ⊆ remote 到達可能 && 前進のみ」を通してから
+   main へ（--check は canonical 一致しか見ない）。
+
+## Consequences
+
+- (+) kami-engine/mst の west update 不能を解消、3 件の退行を修復。監査手順が残る。
+- (−) expr/gpu/physics は依然不能（follow-up）。crypto/spice の根本原因未特定。
+
+## References
+
+- 5323da6 / 7c27999 / 2b23f48、CLAUDE.md「pin 退行の罠」、ADR-2606272237、ペアの .md
+"}
