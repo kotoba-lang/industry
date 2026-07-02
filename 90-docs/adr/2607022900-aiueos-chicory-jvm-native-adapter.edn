@@ -18,7 +18,8 @@
                        "fuel prototype実装完了(aiueos-cljc-contract#7)、up(マルチコンポーネント起動)実装完了(#8)でCLIコマンド網羅完了"
                        "native adapterの実行層+CLI本体がRust不要でJVM/Clojureに完全移行、残る唯一のギャップは生ハードウェアアクセス(言語非依存の特権層課題)"
                        ":aiueos/publishes:subscribes(トピックID許可セット)強制実装完了(#9)、:aiueos/schedule(period/priority、cycle-based boot)実装完了(#10)"
-                       "本ADRはimplementedとしてclose。恒久的未解決事項(fuel正式API化/生ハードウェアアクセス/deadline-cycles/memory-pages独立上限)は着手時に別ADR起票"]
+                       ":aiueos/limits:memory-pages実装完了(#11、安定版withMemoryLimits API)。manifest署名検証(aiueos.signing)を監査、実意思決定パスに配線済みでギャップ無しと確認"
+                       "本ADRはaccepted,implementedとしてclose。恒久的未解決事項はfuel正式API化/生ハードウェアアクセス/deadline-cyclesの3点のみ、着手時に別ADR起票"]
   :supersedes []
   :superseded_by []
   :related ["adr-2607022700-aiueos-native-adapter-tender-design"
@@ -143,7 +144,8 @@ fuel prototype実装完了(#7)、up(マルチコンポーネント起動)実装�
 aiueos.launcherのverify/run/admit/inspect/surface/audit/up 7コマンド全て
 動作。native adapterの実行層+CLI本体がRust不要でJVM/Clojureに完全移行。
 topic許可セット(#9)、schedule(#10)、memory-pages(#11、安定版API)も実装完了。
-本ADRはaccepted,implementedとしてclose。残る恒久的ギャップはfuel正式API化/
-生ハードウェアアクセス(言語非依存の特権/hypervisor協調tenderレイヤー課題)/
-deadline-cyclesの3点のみ。詳細はmdファイルのFollow-up 1-6・Closing Summaryを
-参照。"}
+manifest署名検証(aiueos.signing)を監査、実意思決定パス(verify-one)に配線済み
+でギャップ無しと確認。本ADRはaccepted,implementedとしてclose。残る恒久的
+ギャップはfuel正式API化/生ハードウェアアクセス(言語非依存の特権/hypervisor
+協調tenderレイヤー課題)/deadline-cyclesの3点のみ。詳細はmdファイルの
+Follow-up 1-7・Closing Summaryを参照。"}
