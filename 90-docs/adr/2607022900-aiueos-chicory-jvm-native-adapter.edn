@@ -35,7 +35,7 @@
                  "ADR-kotoba-wasm-clj-execution.md documents real CLI run: kotoba wasm run ... --json"
                  "host-import functions are ordinary Clojure closures (HostFunction/WasmFunctionHandle), no FFI ceremony"]
   :gaps ["fuel/gas metering: Chicory's Resource Control API still in development, no instruction-budget enforcement today -- still open as of the 2026-07-02 follow-up below"
-         "memory-page limits: only what the compiled module itself declares, no independent per-manifest cap verified"
+         "memory-page limits: only what the compiled module itself declares, no independent per-manifest cap verified -- RESOLVED, see follow-up-6-2026-07-02 below (aiueos-cljc-contract#11, stable withMemoryLimits API)"
          "raw MMIO/DMA/hardware access: nothing in Chicory touches this, still needs native shim or java.lang.foreign (unverified)"]
   :follow-up-2026-07-02
   {:what ":aiueos/quota {:host-calls N :publishes N} (ADR-0006) implemented+verified in aiueos.execute -- a per-run host-function CALL COUNT cap, wrapping every host-import via count-and-check!, throwing ex-info through Chicory's .apply on overrun (caught by run-if-granted, returns :aiueos.execute/quota-exceeded, offending call's own effect never lands)"
@@ -142,5 +142,8 @@ aiueos.manifestの:aiueos/limits{:fuel N}は現時点で執行時に強制でき
 fuel prototype実装完了(#7)、up(マルチコンポーネント起動)実装完了(#8)。
 aiueos.launcherのverify/run/admit/inspect/surface/audit/up 7コマンド全て
 動作。native adapterの実行層+CLI本体がRust不要でJVM/Clojureに完全移行。
-残る唯一の本質的ギャップは生ハードウェアアクセス(言語非依存の特権/hypervisor
-協調tenderレイヤー課題)。詳細はmdファイルのFollow-up 1-4を参照。"}
+topic許可セット(#9)、schedule(#10)、memory-pages(#11、安定版API)も実装完了。
+本ADRはaccepted,implementedとしてclose。残る恒久的ギャップはfuel正式API化/
+生ハードウェアアクセス(言語非依存の特権/hypervisor協調tenderレイヤー課題)/
+deadline-cyclesの3点のみ。詳細はmdファイルのFollow-up 1-6・Closing Summaryを
+参照。"}
