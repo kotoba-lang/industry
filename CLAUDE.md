@@ -66,7 +66,7 @@ west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独�
 - **次の「新規 project を起こして登録する」一連の流れは、毎回の確認なしに実行してよい**
   （恒久承認。2026-06-28 オーナー指示）。ADR 起票 → 子リポの scaffold（`.cljc` 正本 +
   `deps.edn` + README + test）→ `git init` + 初期コミット → **GitHub リポ作成
-  （`gftdcojp/<name>` 等、既定 private）+ push** → manifest 登録 → ADR/manifest の
+  （visibility は org 既定 — **kotoba-lang / etzhayyim = public、gftdcojp / com-junkawasaki = private**。repos.edn `:orgs :visibility` が SSoT、ADR-2607021330）+ push** → manifest 登録 → ADR/manifest の
   superproject 反映、までを一気通貫で進める。実例: `ai-gftd-router`（ADR-2606272330）。
 
 - 上記に含まれる個別操作で都度確認が不要なもの: 子リポの `gh repo create` + `git push`
