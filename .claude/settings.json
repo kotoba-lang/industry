@@ -16,6 +16,12 @@
             "command": "bb \"$CLAUDE_PROJECT_DIR/.claude/hooks/west-pin-verify-guard.bb\"",
             "timeout": 90,
             "statusMessage": "Verifying west.yml pins against upstream (server-side)…"
+          },
+          {
+            "type": "command",
+            "command": "bb \"$CLAUDE_PROJECT_DIR/.claude/hooks/git-pull-west-sync-guard.bb\"",
+            "timeout": 15,
+            "statusMessage": "Checking git pull uses depth+west-update sequence…"
           }
         ]
       }
