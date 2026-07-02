@@ -1,0 +1,208 @@
+{:frontmatter
+ {:id "adr-2607022200-aiueos-cljc-wasm-component-kernel-architecture"
+  :title "ADR-2607022200: aiueos を「CLJC 意味論 + Wasm Component Model 境界 + kernel（native adapter）」の三層として固定し、kotoba-lang 言語設計への準拠を明文化する"
+  :status "accepted"
+  :date "2026-07-02"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "aiueos-cljc-wasm-component-kernel-architecture"
+  :authoritative true
+  :authoritative_for ["aiueos の意味論の正本は CLJC（aiueos-cljc-contract）であるという pivot を決定として固定すること"
+                       "aiueos を CLJC 意味論 / Wasm Component Model 境界 / kernel（現状 host runtime、将来 native microkernel）の三層アーキテクチャとして位置づけること"
+                       "kernel（native 実装を含む）は恒久的に adapter であり意味論の正本には決してならないという制約"
+                       "aiueos が kotoba-lang の言語設計原則（capability values の型付け・package/component の CID-lock・4層 stdlib・Rust adapter-only 方針）にどう従うかの対応表"
+                       "ADR-2606290900 / ADR-2606290930 の未解決ギャップに対する解決方向（実装自体は follow-up）"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2606271304-aiueos-vs-zephyr-os-positioning"
+            "adr-2606290740-aiueos-computer-surface-isolated-computer-use"
+            "adr-2606290900-kotoba-aiueos-key-lifecycle-revocation"
+            "adr-2606290930-kotoba-aiueos-capability-bridge"
+            "com-junkawasaki/orgs/kotoba-lang/aiueos/90-docs/adr/0001-aiueos-phase0-capability-os.md"
+            "com-junkawasaki/orgs/kotoba-lang/aiueos/90-docs/adr/0002-host-abi-topic-bus.md"
+            "com-junkawasaki/orgs/kotoba-lang/aiueos/90-docs/adr/0003-signed-manifests.md"
+            "com-junkawasaki/orgs/kotoba-lang/aiueos/90-docs/adr/0004-code-as-data-admit.md"
+            "com-junkawasaki/orgs/kotoba-lang/aiueos/90-docs/adr/0005-multi-surface-providers.md"
+            "com-junkawasaki/orgs/kotoba-lang/aiueos/90-docs/adr/0006-scheduler-and-io-quota.md"
+            "com-junkawasaki/orgs/kotoba-lang/aiueos/90-docs/adr/0007-virtual-computer-surface.md"
+            "com-junkawasaki/orgs/kotoba-lang/aiueos/90-docs/adr/0008-language-runtimes-as-wasm-components.md"
+            "com-junkawasaki/orgs/kotoba-lang/aiueos-cljc-contract/README.md"
+            "com-junkawasaki/orgs/kotoba-lang/kotoba-lang/docs/adr/ADR-kotoba-lang-profile.md"
+            "com-junkawasaki/orgs/kotoba-lang/kotoba-lang/docs/adr/ADR-safe-capability-language.md"
+            "com-junkawasaki/orgs/kotoba-lang/kotoba-lang/docs/adr/ADR-kotoba-package-cid-lock.md"
+            "com-junkawasaki/orgs/kotoba-lang/kotoba-lang/docs/adr/ADR-kotoba-lang-foundational-stdlib.md"
+            "com-junkawasaki/orgs/kotoba-lang/kotoba-lang/docs/lang/capability-values.md"
+            "com-junkawasaki/orgs/kotoba-lang/kotoba-lang/docs/rust-migration-inventory.md"]
+  :last_verified "2026-07-02"}
+
+ :layers
+ {:layer1 {:name "CLJC/EDN 意味論の正本"
+           :owner "aiueos-cljc-contract/src/aiueos/contract.cljc"
+           :defines ["manifest" "policy" "grant" "audit" "run-plan" "run-receipt" "aiueos/component 境界の型"]
+           :not "実行ロジックを持たない。純粋データ検証のみ"}
+  :layer2 {:name "Wasm Component Model 境界"
+           :owner "aiueos-cljc-contract/resources/aiueos/component_boundary.edn"
+           :adapter :wasm-component-model
+           :vocabulary "kotoba-lang/wit（WIT を plain EDN、deny-by-default capability token）"}
+  :layer3 {:name "kernel"
+           :current "host OS 上の broker + wasmtime runtime"
+           :future "native microkernel（Rust/Zig, Phase 6/7）"
+           :constraint "capability 名で呼ばれるだけのアダプタ。意味論の正本には決してならない"}}
+
+ :kotoba-lang-alignment
+ [{:principle "capability は resource string でなく型付き opaque handle"
+   :source "kotoba-lang/docs/lang/capability-values.md"
+   :application "aiueos manifest capability 文字列を kotoba-lang/wit 語彙へ統合する方向。2606290930 の解決方向"}
+  {:principle "package/component は CID + DID 署名で pin"
+   :source "kotoba-lang ADR-kotoba-package-cid-lock"
+   :application "aiueos signed manifest（flat ed25519 signer registry）を CID/DID lock モデルへ寄せる方向。2606290900 の解決方向"}
+  {:principle "4 層 zero-dep .cljc stdlib"
+   :source "kotoba-lang ADR-kotoba-lang-foundational-stdlib"
+   :application "aiueos-cljc-contract は Layer2(cap/effect) 相当。kotoba-lang/wit を re-implement せず依存"}
+  {:principle "capability confinement が第一原理"
+   :source "kotoba-lang ADR-safe-capability-language"
+   :application "aiueos の deny-by-default + IOMMU 必須 DMA ルール（ADR-0001/0002）の位置づけ再確認。変更なし"}
+  {:principle "Rust は adapter 専用、意味論の正本にしない"
+   :source "kotoba-lang docs/rust-migration-inventory.md"
+   :application "Layer3（現状 broker/runtime、将来 native microkernel）は恒久的に adapter。Rust/Zig で書いても正本にはならない"}
+  {:principle "CLJC は JVM/SCI/CLJS/GraalVM/kotoba-Wasm 可搬"
+   :source "org 全体の .cljc 方針"
+   :application "aiueos-cljc-contract は zero third-party runtime dep を維持"}]
+
+ :phase-status
+ [{:adr "0001" :topic "capability-component 基盤" :status "decided/実装済" :note "kernel は明示的に未着手と明記済み"}
+  {:adr "0002" :topic "host ABI + topic bus" :status "decided/実装済" :note "named per-topic capability・real driver は deferred"}
+  {:adr "0003" :topic "signed manifests" :status "decided/Phase1実装中" :note "CID/DID 化は follow-up（2606290900）"}
+  {:adr "0004" :topic "code-as-data admit" :status "decided/Phase2実装中" :note "変更なし"}
+  {:adr "0005" :topic "multi-surface providers" :status "proposed/未実装(Phase3)" :note "変更なし"}
+  {:adr "0006" :topic "scheduler/IO quota" :status "proposed/未実装(Phase4)" :note "preemptive RT は Phase6 microkernel = Layer3方針と整合"}
+  {:adr "0007" :topic "virtual computer surface" :status "decided/実装済" :note "ADR-2606290740 で実装確認。Layer2/3 実装例"}
+  {:adr "0008" :topic "language runtimes as wasm components" :status "decided/実装済(2026-07-01)" :note "非kotoba言語ランタイムもLayer2のWasm component"}
+  {:adr "kernel" :topic "native microkernel, 実MMIO/DMA/IRQ" :status "未着手(Phase6/7)" :note "着手時期は約束しない。adapter-only制約のみ固定"}]
+
+ :body
+ "# ADR-2607022200: aiueos を「CLJC 意味論 + Wasm Component Model 境界 + kernel（native adapter）」の三層として固定し、kotoba-lang 言語設計への準拠を明文化する
+
+**Status**: accepted
+**Date**: 2026-07-02
+**Deciders**: Jun Kawasaki
+
+## Context
+
+aiueos は当初（ADR-0001〜0008、`aiueos/90-docs/adr/`）単一の Rust crate として設計され、
+manifest/policy/broker/audit のロジックも Rust 側に置かれていた。ところが直近
+（2026-07-01〜02）で `aiueos/README.md` は「aiueos は Rust runtime crate をもう持たない」
+と書き換わり、manifest・policy 判定・broker plan・audit receipt・
+`aiueos/component` Wasm Component Model 境界の意味論の正本は `aiueos-cljc-contract`
+（CLJC）に移った。しかし、この pivot 自体を決定として固定した ADR がこれまで無く、
+0001〜0008 と、CLJC 移行前の Rust ソースパスを参照したまま open になっている
+2606290900（signer lifecycle gap）・2606290930（capability bridge gap）が、
+新旧どちらの実装基盤を前提にしているか曖昧なままだった。
+
+一方、kotoba-lang/kotoba-lang は言語設計として capability confinement 第一原理
+（ADR-safe-capability-language）、resource string でなく型付き capability value
+（capability-values.md）、CID/DID lock された package（ADR-kotoba-package-cid-lock）、
+4層 zero-dep stdlib（ADR-kotoba-lang-foundational-stdlib、Layer2 が
+kotoba-lang/wit）、Rust は org 全体で adapter 専用（rust-migration-inventory.md）
+という原則を既に確立している。aiueos-cljc-contract の `component_boundary.edn` は
+既に `:aiueos/adapter :wasm-component-model` を宣言し実質 Wasm Component Model
+境界として実装済みだが、「CLJC が正本／Wasm Component Model が境界／kernel は
+将来の native adapter に過ぎない」という全体像と、それが kotoba-lang の言語設計に
+どう従うのかを一箇所に固定した文書が無かった。
+
+## Decision
+
+### 1. 三層アーキテクチャとして固定する
+
+Layer 1（CLJC/EDN 意味論の正本）= `aiueos-cljc-contract/src/aiueos/contract.cljc`。
+manifest / policy / grant / audit / run-plan / run-receipt の validator・スキーマ。
+実行ロジックを持たない純粋データ検証。
+
+Layer 2（Wasm Component Model 境界）= `aiueos-cljc-contract/resources/aiueos/component_boundary.edn`。
+`:aiueos/adapter :wasm-component-model`。import/export は kotoba-lang/wit 語彙の
+capability token で型付け。
+
+Layer 3（kernel）= 現状は host OS 上の broker + wasmtime runtime、将来は native
+microkernel（Rust/Zig, Phase 6/7）。capability 名で呼ばれるだけの **adapter** で
+あり、意味論の正本には決してならない。
+
+Rust・JavaScript・Python・Svelte・将来の native microkernel は、すべて Layer 1/2
+の消費者（adapter）であって意味論の正本にはならない
+（`aiueos-cljc-contract/README.md` の明言どおり）。これは `rust-migration-inventory.md`
+の org 全体方針を aiueos に適用したものであり、ADR-0006 の「Phase 6 microkernel は
+native」という将来計画とも矛盾しない — microkernel が native で書かれることと、
+それが意味論の正本になることは別であり、本 ADR は後者を明確に否定する。
+
+### 2. kotoba-lang 言語設計への準拠点
+
+- capability values（resource string でなく型付き opaque handle）→ aiueos manifest
+  の capability 文字列を kotoba-lang/wit 語彙へ将来一本化する方向とし、2606290930
+  の解決方向として採用する。
+- package/component CID lock → aiueos の signed manifest（現状は flat な ed25519
+  signer registry）を CID/DID lock モデルへ寄せる方向とし、2606290900 の解決方向
+  として採用する。
+- 4 層 zero-dep stdlib → aiueos-cljc-contract は Layer2(cap/effect) 相当と位置づけ、
+  kotoba-lang/wit を re-implement せず依存する。
+- capability confinement 第一原理 → aiueos の deny-by-default・IOMMU 必須 DMA
+  ルール（ADR-0001/0002）の位置づけを再確認（既存決定は変更なし）。
+- Rust adapter-only → Layer3（現状の broker/runtime、将来の native microkernel）は
+  恒久的に adapter 実装であり続ける。
+- CLJC 可搬性 → aiueos-cljc-contract は zero third-party runtime dep を維持し、
+  JVM/SCI/CLJS/GraalVM/kotoba-Wasm を問わず同一の validator を使う。
+
+### 3. 既存 ADR の位置づけ再確認
+
+0001〜0004・0007・0008 は decided/実装済（0001/0002 は kernel 未着手を明記済み、
+0007 は ADR-2606290740 で実装確認、0008 は 2026-07-01 accepted）。0005・0006 は
+proposed のまま未実装。kernel（native microkernel, 実 MMIO/DMA/IRQ）は Phase 6/7
+として明示的に未着手。本 ADR は「着手するとしても adapter-only」という制約のみを
+固定し、実装や着手時期は約束しない。
+
+### 4. 既存 ADR との関係
+
+ADR-2606271304（Zephyr positioning）は変更なし、直交する軸として補完。
+ADR-2606290740（computer surface）は実装済みの Layer2/3 具体例として位置づけ
+再確認。ADR-2606290900 / 2606290930 は依然 open だが、本 ADR で解決の方向性
+（CID/DID lock・kotoba-lang/wit capability token への統合）を確定させる。
+実装そのものは follow-up として残る。
+
+## Consequences
+
+- (+) aiueos の正本（CLJC）・境界（Wasm Component Model）・kernel の位置づけ
+  （native adapter、意味論の正本ではない）が一つの ADR に固定される。
+- (+) 2606290900 / 2606290930 の未解決ギャップに、kotoba-lang 側で確立済みの
+  CID-lock・capability-value モデルという具体的な解決方向が与えられる。
+- (+) 将来 Phase 6/7 で microkernel に着手する際、「native だが adapter 専用」
+  という制約が設計段階で事前に固定される。
+- (+) `aiueos/90-docs/adr/0001〜0008` を書き換えずに、CLJC pivot という事後的な
+  意味論変更を後方互換に説明できる。
+- (−) 本 ADR はアーキテクチャの位置づけの固定であり、2606290900 / 2606290930 の
+  実装そのもの・kernel Phase6/7 着手・0005/0006 の実装完了は含まない。
+- (−) `aiueos/90-docs/adr/0001〜0007` の一部記述（Rust ソースパス等）は歴史的
+  記録として残るため、CLJC 正本と読み合わせる際に文脈補足が要る。
+
+## References
+
+- `com-junkawasaki/orgs/kotoba-lang/aiueos/README.md`
+- `com-junkawasaki/orgs/kotoba-lang/aiueos/90-docs/adr/0001-aiueos-phase0-capability-os.md`
+- `com-junkawasaki/orgs/kotoba-lang/aiueos/90-docs/adr/0002-host-abi-topic-bus.md`
+- `com-junkawasaki/orgs/kotoba-lang/aiueos/90-docs/adr/0003-signed-manifests.md`
+- `com-junkawasaki/orgs/kotoba-lang/aiueos/90-docs/adr/0004-code-as-data-admit.md`
+- `com-junkawasaki/orgs/kotoba-lang/aiueos/90-docs/adr/0005-multi-surface-providers.md`
+- `com-junkawasaki/orgs/kotoba-lang/aiueos/90-docs/adr/0006-scheduler-and-io-quota.md`
+- `com-junkawasaki/orgs/kotoba-lang/aiueos/90-docs/adr/0007-virtual-computer-surface.md`
+- `com-junkawasaki/orgs/kotoba-lang/aiueos/90-docs/adr/0008-language-runtimes-as-wasm-components.md`
+- `com-junkawasaki/orgs/kotoba-lang/aiueos-cljc-contract/README.md`
+- `com-junkawasaki/orgs/kotoba-lang/aiueos-cljc-contract/src/aiueos/contract.cljc`
+- `com-junkawasaki/orgs/kotoba-lang/aiueos-cljc-contract/resources/aiueos/component_boundary.edn`
+- `com-junkawasaki/orgs/kotoba-lang/kotoba-lang/docs/adr/ADR-kotoba-lang-profile.md`
+- `com-junkawasaki/orgs/kotoba-lang/kotoba-lang/docs/adr/ADR-safe-capability-language.md`
+- `com-junkawasaki/orgs/kotoba-lang/kotoba-lang/docs/adr/ADR-kotoba-package-cid-lock.md`
+- `com-junkawasaki/orgs/kotoba-lang/kotoba-lang/docs/adr/ADR-kotoba-lang-foundational-stdlib.md`
+- `com-junkawasaki/orgs/kotoba-lang/kotoba-lang/docs/lang/capability-values.md`
+- `com-junkawasaki/orgs/kotoba-lang/kotoba-lang/docs/rust-migration-inventory.md`
+- `com-junkawasaki/orgs/kotoba-lang/wit/README.md`
+- ADR-2606271304（aiueos vs Zephyr positioning）
+- ADR-2606290740（computer surface, isolated computer-use）
+- ADR-2606290900（kotoba-aiueos key lifecycle / revocation gap）
+- ADR-2606290930（kotoba-aiueos capability bridge gap）"}
