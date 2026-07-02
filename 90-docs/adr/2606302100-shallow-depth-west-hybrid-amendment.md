@@ -1,11 +1,11 @@
 ---
 id: adr-2606302100-shallow-depth-west-hybrid-amendment
 title: "ADR-2606302100: west 導入後の clone-depth 方針 — 一律 shallow を heavy-only ハイブリッドへ（分析・提案）"
-status: proposed
+status: accepted
 doc_type: adr
 topic: git-shallow-policy
-authoritative: false
-last_verified: 2026-06-30
+authoritative: true
+last_verified: 2026-07-02
 amends:
   - 90-docs/adr/2606241600-shallow-depth1-git-default.md
 authoritative_for:
@@ -24,8 +24,11 @@ superseded_by: []
 
 # ADR-2606302100: clone-depth 方針の west 整合（分析・提案）
 
-**Status**: proposed（分析のみ。実装は次タスク。オーナー指示 2026-06-30）
-**Date**: 2026-06-30
+**Status**: accepted — implemented（`manifest/repos.edn` に `:heavy` セット、
+`scripts/gen-west-manifest.bb` は `(when (heavy? path) ...)` で `:heavy` の
+project にのみ `clone-depth` を出力。light project は行自体を出さず full
+clone になる。2026-07-02 時点で確認済み）
+**Date**: 2026-06-30（実装確認: 2026-07-02）
 **Deciders**: Jun Kawasaki
 
 ## Context
@@ -137,3 +140,20 @@ full 履歴で数十 GB 級）。逆に light を full 化しても増分は無�
   （別途）。
 - `manimani` は未コミット WIP で west checkout が skip 済み（owner WIP 温存。reconcile
   待ち）。
+
+## 実装確認メモ（2026-07-02）
+
+`manifest/repos.edn`/`scripts/gen-west-manifest.bb` レベルの実装は完了済みと確認した
+（`git log` 上、本 ADR 執筆後の別ターンで着手されたとみられる）。固定 depth 増（例:
+`--depth 100`）ではなく本 ADR のハイブリッド方針が既に採用されていることを、
+別件（サイト UI/UX 移行 PR のマージ作業）で shallow 由来の `merge-base` 不明・pin 到達
+不能に複数回遭遇したことを機に確認した。
+
+未確認/未実施のまま残っているもの（本 ADR のスコープ外・別途）:
+- 既存ローカル checkout のうち light だが実際には shallow のままの repo を
+  `git fetch --unshallow` で深くする移行スイープ（本 ADR §「実装時のガードレール」の
+  4 番目）。今回は個別に遭遇した repo（例: `net-kotobase`）だけをその場で unshallow
+  した。357 project 全体の一括スイープは未実施。
+- `bb scripts/gen-west-manifest.bb --check` は 2026-07-02 時点で `west.yml is STALE`
+  を報告している（pin 前進や repo rename の反映漏れ、本件とは別要因）。再生成は
+  pin 退行の罠（本文 §「実装時のガードレール」）に注意しつつ別途行う。
