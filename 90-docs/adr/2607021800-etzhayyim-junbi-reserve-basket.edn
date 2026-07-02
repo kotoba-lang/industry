@@ -77,8 +77,8 @@
    :scope "pure .cljc core (params validation, NAV, drift, rebalance proposal, governor J1–J12) + tests; repo + west + RAD registration"}
   {:phase :r1 :state "landed 2026-07-02 (owner-ratified)"
    :scope "langgraph-clj StateGraph TreasuryActor (interrupt-before human approval, J10); banking double-entry (J8); base-l2 read-only Base observation (USDC+EURC readable; JPYC read gated on Council address attestation); audit datoms over :db-api"}
-  {:phase :r2 :state :post-r1
-   :scope "+EURC live; rebalance-proposer cell; toritate cross-ref; HAKARI denominates EN credit limits"}
+  {:phase :r2 :state "landed 2026-07-02 (owner-ratified)"
+   :scope "Chainlink attestation feed (USDC/USD 0x7e86..bc6B + EURC/USD 0xDAe3..8250 on Base; JPY/USD feed does NOT exist on Base — JPYC unattested until Council alternative); rebalance-proposer cell (1 tick = 1 bounded run); toritate.ledgerEntry cross-ref; HAKARI-denominated EN credit-limit sizing"}
   {:phase :r3 :state :post-r2
    :scope "+e-CNY Tier-2 (jurisdiction legal analysis + Council Lv7+ unanimity + authorized-operator wallet + attestation feed)"}]
 
