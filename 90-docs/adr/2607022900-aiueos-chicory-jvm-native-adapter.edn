@@ -14,7 +14,9 @@
                        "decision subprocess(bb decide)は別ホスト言語向け汎用インターフェースとして温存、JVM adapterは同一プロセス内で直結可能"
                        ":aiueos/quota{:host-calls:publishes}によるhost-call回数caps実装(ADR-0006、fuelとは別物)"
                        "fuel/gas meteringはChicoryのwithUnsafeExecutionListenerで命令レベルprototype可能だが非公式API・インタプリタ限定と明記"
-                       "生ハードウェアアクセスの設問を「Rust vs java.lang.foreign」から「特権/hypervisor協調tenderレイヤーの不在(言語非依存)」に訂正"]
+                       "生ハードウェアアクセスの設問を「Rust vs java.lang.foreign」から「特権/hypervisor協調tenderレイヤーの不在(言語非依存)」に訂正"
+                       "fuel prototype実装完了(aiueos-cljc-contract#7)、up(マルチコンポーネント起動)実装完了(#8)でCLIコマンド網羅完了"
+                       "native adapterの実行層+CLI本体がRust不要でJVM/Clojureに完全移行、残る唯一のギャップは生ハードウェアアクセス(言語非依存の特権層課題)"]
   :supersedes []
   :superseded_by []
   :related ["adr-2607022700-aiueos-native-adapter-tender-design"
@@ -131,4 +133,12 @@ aiueos.manifestの:aiueos/limits{:fuel N}は現時点で執行時に強制でき
 - kotoba-lang/kotoba docs/ADR-kotoba-wasm-clj-execution.md
 - kotoba-lang/kotoba src/kotoba/wasm_exec.clj, test/kotoba/wasm_exec_test.clj
 - Chicory: https://github.com/dylibso/chicory
-- aiueos-cljc-contract/src/aiueos/topic.cljc"}
+- aiueos-cljc-contract/src/aiueos/topic.cljc
+
+## Follow-up 4 (2026-07-02)
+
+fuel prototype実装完了(#7)、up(マルチコンポーネント起動)実装完了(#8)。
+aiueos.launcherのverify/run/admit/inspect/surface/audit/up 7コマンド全て
+動作。native adapterの実行層+CLI本体がRust不要でJVM/Clojureに完全移行。
+残る唯一の本質的ギャップは生ハードウェアアクセス(言語非依存の特権/hypervisor
+協調tenderレイヤー課題)。詳細はmdファイルのFollow-up 1-4を参照。"}
