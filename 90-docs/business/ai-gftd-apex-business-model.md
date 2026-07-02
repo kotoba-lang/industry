@@ -32,6 +32,9 @@
 - policy-routed providers
 - agent subscriptions
 - murakumo self-host 推論 backend
+- 準備 (apex-privacy-premium): tier 価格定義
+- 準備 (apex-privacy-premium): Stripe product 作成
+- 準備 (apex-privacy-premium): Free→Plus 転換テレメトリ
 
 ## Channels
 

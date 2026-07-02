@@ -32,6 +32,8 @@
 
 - kotobase.net 稼働済: pin (CAR-on-B2) / Datalog / SPARQL/Cypher 読み / KG ingest
 - add-on surface: map tiles/geo query / git remote / search index
+- 準備 (kotobase-graph-arpu): signup→checkout 配線 (yatabase price 既存)
+- 準備 (kotobase-graph-arpu): tenant 従量計測
 
 ## Channels
 

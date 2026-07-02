@@ -67,6 +67,7 @@
 - RPM (YPP 後)
 - ショート流入からの登録転換
 - 次の検証 (yukkuri-ypp-then-rpm): YPP 加入 (登録者1,000 + 総再生4,000h) 到達、その後 RPM 実測が原価を上回る
+- gate 距離 (yukkuri-ypp-then-rpm): YouTube 登録者/総再生 現在 3 / 10.2 (gate 未到達)
 
 ## Unfair Advantage
 

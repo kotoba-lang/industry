@@ -35,6 +35,9 @@
 - AI 生成 (LangGraph: image/video/voice/bgm、品質ループ)
 - path-based DID / blob = content-addressed (uploadBlob SHA-256)
 - creator monetization: サブスク/PPV/チップ + ExoClick ad tier
+- 準備 (club-shinshi-creator-take): PSP/crypto rail 解禁 (ADR-2605220000 凍結)
+- 準備 (club-shinshi-creator-take): creator billing
+- 準備 (club-shinshi-creator-take): creator GMV 計測
 
 ## Channels
 

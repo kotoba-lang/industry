@@ -33,6 +33,9 @@
 - cloud-manimani Worker (kotobase 同期・multi-device, 実装済)
 - rules による triage 自動化
 - Hermes 型 personal agent (proposal のみ、決めるのは本人)
+- 準備 (manimani-ledger-pay): OSS install テレメトリ
+- 準備 (manimani-ledger-pay): cloud signup funnel
+- 準備 (manimani-ledger-pay): 価格設計
 
 ## Channels
 

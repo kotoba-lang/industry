@@ -31,6 +31,8 @@
 - /infer/models registry + /infer/plans + append-only run ledger (実装済)
 - murakumo CLI (OSS standalone) → cloud connect
 - B2 weight storage / memory-weighted shard plan
+- 準備 (murakumo-tok-price): run ledger の原価/tok export (node別 tok/s × 電力)
+- 準備 (murakumo-tok-price): 社内3アプリ推論の fleet 移管で原価比較
 
 ## Channels
 
