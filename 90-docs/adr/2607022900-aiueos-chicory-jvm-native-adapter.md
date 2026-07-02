@@ -70,7 +70,7 @@ JVM/Chicory 上の Clojure コードで行い、decision subprocess を別プロ
   「解決済み」と扱わない）。
 - **memory-pages 制限**はコンパイル済みモジュール自身が宣言する範囲でしか
   効かない。manifest 側の `:memory-pages` を独立した実行時上限として強制する
-  経路は未検証。
+  経路は未検証。（**解決済み** — Follow-up 6 参照、`aiueos-cljc-contract#11`）
 
 **Follow-up（2026-07-02、`aiueos-cljc-contract`）**: `:aiueos/quota
 {:host-calls N :publishes N}`（ADR-0006、命令数ではなく host 関数呼び出し回数の
@@ -234,11 +234,28 @@ wasmtime 相当）・CLI 本体（旧 bin/aiueos.rs）ともに JVM/Clojure へ�
    実測: shellから`--cycle 1`で周期外のコンポーネントがスキップされ、
    `--cycle 3`で再度起動されることを確認済み。
 
-**明示的に未実装のまま**: `:aiueos/limits :memory-pages`の独立した実行時上限
-（コンパイル済みモジュール自身の宣言範囲でしか効かない）、
-`:aiueos.manifest/deadline-cycles`（ADR-0006が意図的に持たないwall clockと、
-Chicoryの同期・非プリエンプティブな実行モデルの間に本質的な非互換がある——
-真のインクリメンタル/割り込み可能な実行機構を発明しない限り正しく実装できない）。
+**明示的に未実装のまま**: `:aiueos.manifest/deadline-cycles`（ADR-0006が意図的に
+持たないwall clockと、Chicoryの同期・非プリエンプティブな実行モデルの間に
+本質的な非互換がある——真のインクリメンタル/割り込み可能な実行機構を発明しない
+限り正しく実装できない）。
+
+**Follow-up 6（2026-07-02、`:aiueos/limits :memory-pages`実装、
+`aiueos-cljc-contract#11`）**: 「独立した実行時上限として強制する経路は未検証」
+だった`:memory-pages`を実装した。fuelと異なり**安定版**Chicory API
+（`Instance.Builder/withMemoryLimits`、unsafe/experimentalマーク無し）を使用。
+実装前に実際のChicoryクラスに対する検証で確認: モジュール自身が宣言する
+`initialPages`を上書きすると（例えば0に）、`Instance/builder`は「成功」する
+ように見えて実際にはguestに想定より少ないメモリしか渡さない危険な挙動になる
+ため、`memory-limits-for`はモジュール自身の`initialPages`を**絶対に上書きせず**、
+`memory.grow`が到達できる**最大値**だけを`min(manifest上限, モジュール自身の
+宣言する最大値)`に制限する。quota/fuel/topic-forbiddenと異なりrunを中断
+しない——`memory.grow`が上限を超えると、Wasm本来のセマンティクス通り`-1`
+（実失敗センチネル）がguest自身のコードに返るだけで、`:aiueos.execute/result`
+に直接現れる。実測: hand-authored WAT（`wasm-tools parse`でコンパイル、
+kotoba-clj不使用——このモジュールは`kotoba:*` importを一切必要としないため）
+で`main`が`memory.grow(10)`し結果を返す53バイトの実Wasmモジュールを使い、
+無制限時は`1`（成功、旧ページ数）、`:memory-pages 1`時は`-1`（失敗）が実際に
+返ることをテスト・shell実行両方で確認済み。
 
 ## Closing Summary（2026-07-02）
 
@@ -257,12 +274,14 @@ Chicory で構築する）は、5 件の follow-up を経て実装・実測検�
 | 4 | `up`（マルチコンポーネント起動） | `aiueos-cljc-contract#8` | ✅ 実装・実測済み |
 | 5 | `:aiueos/publishes`/`:subscribes`（トピックID許可セット） | `aiueos-cljc-contract#9` | ✅ 実装・実測済み |
 | 5 | `:aiueos/schedule`（period/priority、cycle-based boot） | `aiueos-cljc-contract#10` | ✅ 実装・実測済み |
+| 6 | `:aiueos/limits :memory-pages`（安定版Chicory API） | `aiueos-cljc-contract#11` | ✅ 実装・実測済み |
 
 **到達点**: aiueos の native adapter（旧 host.rs/runtime.rs 相当の実行層）と
 CLI 本体（旧 bin/aiueos.rs）は、Rust を一切経由せず JVM/Clojure だけで実装・
 実行証明済み。`aiueos.launcher` は `verify`/`run`/`admit`/`inspect`/`surface`/
 `audit`/`up` の 7 コマンドが実際に動作する。manifest が宣言する契約フィールド
-（quota/fuel/topic 許可セット/schedule）は全て実際に強制されるところまで到達した。
+（quota/fuel/memory-pages/topic 許可セット/schedule）は全て実際に強制される
+ところまで到達した。
 
 **恒久的に残る未解決事項**（本 ADR のスコープでは解決しない、今後も blocked
 のまま明記し続ける）:
@@ -275,8 +294,6 @@ CLI 本体（旧 bin/aiueos.rs）は、Rust を一切経由せず JVM/Clojure �
 - **`:aiueos.manifest/deadline-cycles`**: Chicory の同期・非プリエンプティブな
   実行モデルと ADR-0006 の wall-clock-free 設計原則の間に本質的な非互換があり、
   真のインクリメンタル/割り込み可能な実行機構を発明しない限り正しく実装できない。
-- **`:aiueos/limits :memory-pages`** の独立した実行時上限（コンパイル済み
-  モジュール自身の宣言範囲でしか現状効かない）。
 
 本 ADR はこれにて実装完了として close する。上記の恒久的な未解決事項は、
 着手する際に新しい ADR（生ハードウェアアクセス層の設計など、スコープが
