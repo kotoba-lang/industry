@@ -1,6 +1,6 @@
 # ADR-2607022900: aiueos native adapter（kototama tender の実行部）を Rust/wasmtime ではなく JVM/Clojure + Chicory で構築する — ADR-2607022700/2607022400 の「native adapter = Rust」枠組みを実行層に限り更新する
 
-**Status**: accepted
+**Status**: accepted, implemented
 **Date**: 2026-07-02
 **Deciders**: Jun Kawasaki
 
@@ -239,3 +239,45 @@ wasmtime 相当）・CLI 本体（旧 bin/aiueos.rs）ともに JVM/Clojure へ�
 `:aiueos.manifest/deadline-cycles`（ADR-0006が意図的に持たないwall clockと、
 Chicoryの同期・非プリエンプティブな実行モデルの間に本質的な非互換がある——
 真のインクリメンタル/割り込み可能な実行機構を発明しない限り正しく実装できない）。
+
+## Closing Summary（2026-07-02）
+
+本 ADR の決定（native adapter の実行層 + CLI を Rust ではなく JVM/Clojure +
+Chicory で構築する）は、5 件の follow-up を経て実装・実測検証が完了した:
+
+| # | 内容 | PR | 状態 |
+|---|---|---|---|
+| 1 | `aiueos.execute`: Chicory による Wasm 実行（topic-publish 実証） | `aiueos-cljc-contract#2` | ✅ 実装・実測済み |
+| — | device-access quartet の execution-layer 証明 | `aiueos-cljc-contract#3` | ✅ 実装・実測済み |
+| — | `aiueos.launcher`: 実CLI（verify/run/admit） | `aiueos-cljc-contract#4` | ✅ 実装・実測済み |
+| — | `aiueos.launcher`: inspect/surface/audit 配線 + `aiueos.cli`の`:audit`ギャップ修正 | `aiueos-cljc-contract#5` | ✅ 実装・実測済み |
+| 2 | 研究: Chicory gas metering 状況 / MMIO の再フレーミング | — | ✅ 調査完了 |
+| — | `:aiueos/quota`（host-call count cap） | `aiueos-cljc-contract#6` | ✅ 実装・実測済み |
+| 3 | `:aiueos/limits :fuel`（命令レベル、非公式API prototype） | `aiueos-cljc-contract#7` | ✅ 実装・実測済み（non-guarantee） |
+| 4 | `up`（マルチコンポーネント起動） | `aiueos-cljc-contract#8` | ✅ 実装・実測済み |
+| 5 | `:aiueos/publishes`/`:subscribes`（トピックID許可セット） | `aiueos-cljc-contract#9` | ✅ 実装・実測済み |
+| 5 | `:aiueos/schedule`（period/priority、cycle-based boot） | `aiueos-cljc-contract#10` | ✅ 実装・実測済み |
+
+**到達点**: aiueos の native adapter（旧 host.rs/runtime.rs 相当の実行層）と
+CLI 本体（旧 bin/aiueos.rs）は、Rust を一切経由せず JVM/Clojure だけで実装・
+実行証明済み。`aiueos.launcher` は `verify`/`run`/`admit`/`inspect`/`surface`/
+`audit`/`up` の 7 コマンドが実際に動作する。manifest が宣言する契約フィールド
+（quota/fuel/topic 許可セット/schedule）は全て実際に強制されるところまで到達した。
+
+**恒久的に残る未解決事項**（本 ADR のスコープでは解決しない、今後も blocked
+のまま明記し続ける）:
+- **fuel/gas metering の正式 API 化**: 現状は Chicory の非公式・実験的フック
+  （`withUnsafeExecutionListener`）に依存した prototype。Chicory が公式
+  Resource Control API を出荷したら移行を検討する。
+- **生ハードウェアアクセス**（device-access quartet の真の MMIO/DMA/PCI/IRQ）:
+  「Rust か Java か」ではなく「特権/hypervisor 協調 tender レイヤーそのものが
+  未着手」という、本 ADR とは独立した大きな別課題。
+- **`:aiueos.manifest/deadline-cycles`**: Chicory の同期・非プリエンプティブな
+  実行モデルと ADR-0006 の wall-clock-free 設計原則の間に本質的な非互換があり、
+  真のインクリメンタル/割り込み可能な実行機構を発明しない限り正しく実装できない。
+- **`:aiueos/limits :memory-pages`** の独立した実行時上限（コンパイル済み
+  モジュール自身の宣言範囲でしか現状効かない）。
+
+本 ADR はこれにて実装完了として close する。上記の恒久的な未解決事項は、
+着手する際に新しい ADR（生ハードウェアアクセス層の設計など、スコープが
+本 ADR を大きく超えるもの）を起票すること。
