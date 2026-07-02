@@ -151,7 +151,20 @@
   :verify       :pin-eq-child-head           ; commit 前に pin == 子repo HEAD を確認
   :never        [:local-shallow-edit         ; ローカルで shallow 編集/merge を戦わない
                  :hand-edit-conflict-markers ; west.yml の <<<<<<< を手編集しない（手書き禁止）
-                 :force-push]
+                 :force-push
+                 :wholesale-regen-commit]    ; 全 entry 再生成のまま commit しない(--entry で最小 diff。ADR-2607022900 の 44 pin 破損)
+  :pin-verification                          ; pin 変更のサーバ側検証(ADR-2607022900)
+  {:script "scripts/verify-west-pins.bb"     ; 生成器 / CI / hook の3箇所から同一検証を呼ぶ
+   :rule   [:exists-upstream                 ; push 済み commit のみ(未 push ローカル HEAD の pin 化禁止)
+            :reachable-from-default-branch   ; rewrite されうる未 merge branch 上の commit は不可
+            :fast-forward-from-old-pin]      ; behind(静かな pin 退行) / diverged を弾く
+   :judge  :github-api                       ; サーバ側 full 履歴で判定。ローカル shallow ancestry を信用しない
+   :enforced-by ["gen-west-manifest.bb(生成時、失敗なら書かない)"
+                 ".github/workflows/west-pin-verify.yml(PR + push to main。main 破損は issue 起票)"
+                 ".claude/hooks/west-pin-verify-guard.bb(git push / gh api PUT の両経路)"]
+   :minimal-diff "--entry <name> で当該 entry のみ生成"
+   :escape "--no-verify-remote / WEST_PIN_VERIFY_SKIP=1(緊急のみ。理由を commit message に残す)"
+   :ci-note "github.token では private org の子リポが見えず WARN 素通し。厳密化は WEST_PIN_VERIFY_TOKEN secret(org read PAT)"}
   :if-must-merge {:resolve   :regenerate     ; 衝突は marker でなく再生成で解く
                   :steps     "superset 側採用 → west update で子を目的 pin に → gen-west-manifest.bb → --check"
                   :pin-regression-trap "再生成はローカル working HEAD で pin する。子が遅れていると黙ってロールバック → 再生成前に必ず west update"

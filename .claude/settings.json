@@ -10,6 +10,12 @@
             "command": "bb \"$CLAUDE_PROJECT_DIR/.claude/hooks/git-push-main-sync-guard.bb\"",
             "timeout": 30,
             "statusMessage": "Checking branch is in sync with main before push…"
+          },
+          {
+            "type": "command",
+            "command": "bb \"$CLAUDE_PROJECT_DIR/.claude/hooks/west-pin-verify-guard.bb\"",
+            "timeout": 90,
+            "statusMessage": "Verifying west.yml pins against upstream (server-side)…"
           }
         ]
       }
