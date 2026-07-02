@@ -4,6 +4,22 @@
 **Date**: 2026-07-02
 **Deciders**: Jun Kawasaki
 
+## 訂正 (Corrections, 2026-07-02) — 実 repo / Stripe 実データ検証で判明
+
+本 ADR 本文の以下の記述は、各 repo コード・Stripe live の実データ検証で誤り/未確認と判明した。
+本節を正とし、本文該当箇所は将来 rewrite する（履歴保持のため原文は残置）。
+
+- **ai-gftd-apex の tier**: 「Free / Plus / Visionary」は誤り。実 repo の tier は
+  **Free / Pro / Max / Team / Enterprise**（"Plus" は Pro の内部別名、**"Visionary" は存在しない**）。
+- **app-aozora の blob backend**: 「blob=B2」は誤り。実際は **Cloudflare R2**（`aozora-pds-blobs`、CID content-addressed）。
+- **app-aozora の creator 80/20 split**: repo に**根拠が見つからない**（現状は広告ネットワーク収益のみ確認）。
+  「creator 80/20」は**未確認**として扱う（実装/契約で確定するまで断定しない）。
+- **net-kotobase の Stripe price**: 旧記載の price ID（`price_1TVVI7…`）は **live に存在しなかった**（捏造/test）。
+  2026-07-02 に実 live USD price を作成し確定: **Standard $7 / Pro $33 / Regulated $350**（ADR-2607023000、collect #252）。
+- **network-isekai の gem 経済**: 実装は **virtual gem**（ADR は "cash" 表記だが shipped は仮想通貨）。
+- 各 product の運営法人: **gftdcojp = Gftd Japan 株式会社**（kotobase/murakumo/apex/itonami/manimani/aozora+yoro/isekai/yukkuri）、
+  **club-shinshi = JK 株式会社**、**etzhayyim = 米国宗教法人（非営利、管轄 US）**（法務 draft PR 群に反映済）。
+
 ## Context
 
 gftd / etzhayyim ポートフォリオには互いに依存する 8 つのプロダクトがあるが、
