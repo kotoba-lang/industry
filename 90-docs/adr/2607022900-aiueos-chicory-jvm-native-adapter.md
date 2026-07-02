@@ -171,3 +171,18 @@ prototype に着手する価値があるが、非公式 API 依存・インタ�
   https://chicory.dev/docs/usage/runtime-compiler/
 - `aiueos-cljc-contract/src/aiueos/topic.cljc`（topic-* host-import の
   実装先として再利用可能）
+
+**Follow-up 3（2026-07-02、fuel prototype 実装）**: Follow-up 2 で「今日から
+prototype 可能」と判定した `withUnsafeExecutionListener` 経由の命令レベル fuel を
+`aiueos.execute` に実装・実測検証済み（`aiueos-cljc-contract#7`）。`:aiueos/limits
+{:fuel N}` を Wasm 命令ごとに発火するリスナーでカウントし、超過時に
+`:aiueos.execute/fuel-exceeded {:limit :count}` で実行を中断する。実測: `fuel 1`
+で shell から `clojure -M -m aiueos.launcher run` を実行し、実際に
+`{:limit 1, :count 2}` で中断・topic-bus が空のまま返ることを確認。**ただし
+non-guarantee のまま**——`withUnsafeExecutionListener` は Chicory 公式ドキュメント
+が明示的に unsafe/experimental/将来削除の可能性ありと警告する非公式 API で、かつ
+インタプリタ経路限定（将来 AOT コンパイラに切り替えると効かなくなる）。「fuel gap
+は解決済み」ではなく「非公式APIでのprototypeが動くことを実証した」段階であり、
+将来 Chicory が正式な Resource Control API を出荷したら、そちらへの移行を検討する
+こと。生ハードウェアアクセス（特権/hypervisor協調tenderレイヤーの不在）は依然
+完全に未着手のまま。
