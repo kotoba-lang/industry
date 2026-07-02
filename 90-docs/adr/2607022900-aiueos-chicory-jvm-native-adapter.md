@@ -374,6 +374,22 @@ CLI 本体（旧 bin/aiueos.rs）は、Rust を一切経由せず JVM/Clojure �
 配線されていない。優先度は低い（`run-receipt`が実質的な監査ニーズをカバー
 している）が、着手する場合は新しいfollow-upとして扱うこと。
 
+**2026-07-03 追記（`run-plan`統合を再検討し、`run-receipt`ほど単純ではない
+と判明——着手時の注意点）**: `component-boundary`自体は
+`aiueos.contract/load-component-boundary`で単一のグローバル resource
+（`resources/aiueos/component_boundary.edn`）としてロード可能——これ自体は
+`run-receipt`と同様に簡単に配線できる。しかし**`broker/run-plan`は内部で
+必ず`verify-one`（trust floorなし）を呼ぶ**ため、`aiueos.execute/
+execute-admission`（`verify-admission`でtrust floorを適用してから実行する
+パス）にそのまま組み込むと、**`:aiueos/run-plan`に埋め込まれる決定が
+実際に実行に使われた決定（trust floor適用後）と食い違う**、という
+サイレントな正誤性バグを生む。`execute`（floorなし）側だけなら安全に
+配線できるが、`execute`/`execute-admission`の両方に一貫した形で追加する
+には、`run-plan`側にもtrust floorを適用するバリアント（あるいは既に計算済み
+の`decision`を再利用する形への`run-plan`自体の改修）が必要——`run-receipt`
+のように「既存関数をそのまま呼ぶだけ」では済まない。着手する場合はこの
+食い違いを最初にテストで再現・確認してから直すこと。
+
 本 ADR はこれにて実装完了として close する。上記の恒久的な未解決事項は、
 着手する際に新しい ADR（生ハードウェアアクセス層の設計など、スコープが
 本 ADR を大きく超えるもの）を起票すること。
