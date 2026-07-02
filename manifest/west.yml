@@ -964,7 +964,14 @@ manifest:
       path: orgs/etzhayyim/root
       clone-depth: 1
       groups: [etzhayyim]
-      submodules: true
+      submodules:
+        - path: 50-infra/etzhayyim-chain-contracts/lib/forge-std
+        - path: 50-infra/etzhayyim-paymaster/lib/account-abstraction
+        - path: 50-infra/etzhayyim-paymaster/lib/openzeppelin-contracts
+        - path: 50-infra/etzhayyim-yobel-contract/lib/forge-std
+        - path: 50-infra/etzhayyim-authz/contracts/lib/forge-std
+        - path: 50-infra/etzhayyim-k2/contracts/lib/forge-std
+        - path: 50-infra/etzhayyim-fiat-bridge/contracts/lib/forge-std
     - name: ai-gftd-ads
       remote: gftdcojp
       revision: b59e2f44a84783270ceb1a64d15b70806e5d0605
