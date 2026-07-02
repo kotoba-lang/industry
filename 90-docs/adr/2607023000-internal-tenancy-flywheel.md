@@ -28,8 +28,10 @@ apex / manimani / itonami / club-shinshi が net-kotobase・cloud-murakumo を�
   `did:web:apex.gftd.ai` / `did:web:manimani.gftd.ai` / `did:web:itonami.gftd.ai` /
   `did:web:shinshi.gftd.ai`（各 product の canonical actor DID を用いる。確定値は各
   product README/DID document を正とし、subagent が配線時に確認する）。
-- **kotobase price**（既存、ADR-2607022200/PR#249）: Standard=Developer `price_1TVVI7BcblPoapUJivZq5PUa`
-  / Pro=Business `price_1TVVI7BcblPoapUJe9950Vcr`。
+- **kotobase price**（live USD、2026-07-02 作成・`livemode:true` 確認済）: Standard $7 `price_1TohewBcblPoapUJX098Knc3`
+  / Pro $33 `price_1ToheyBcblPoapUJwJS2FCLT` / Regulated $350 `price_1TohezBcblPoapUJeLF7J8Qn`。
+  旧 `price_1TVVI7…`（Developer/Business）は live に実在せず（test/誤り）破棄。競合調査は
+  ADR-2606130100 + Supabase/Neon/Dgraph/Pinata 等の実 pricing（Standard を攻めた低価格に設定）。
 - **murakumo price**: 従量（¥/Mtok）。murakumo は未 deploy・billing 未整備のため
   **本 ADR では kotobase の内部課金を先行**し、murakumo 課金は murakumo deploy 後の
   follow-up（プレースホルダ: 内部移管 tok を run ledger で計測 → 後日 price 化）。

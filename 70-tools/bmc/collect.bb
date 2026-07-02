@@ -94,8 +94,11 @@
 ;; 数えると 2017 年レガシーの無関係サブスク (price=group_monthly, ¥0) を誤カウントし
 ;; gate を false-validate する。kotobase price に紐づく active sub だけを数える。
 (def kotobase-price-ids
-  #{"price_1TVVI7BcblPoapUJivZq5PUa"    ; Standard = kotobase Developer $33
-    "price_1TVVI7BcblPoapUJe9950Vcr"})  ; Pro = kotobase Business $650
+  ;; live USD prices (2026-07-02 作成・livemode:true 確認済、ADR-2607023000)。
+  ;; 旧 price_1TVVI7… は live に存在せず (test/誤り) 破棄。
+  #{"price_1TohewBcblPoapUJX098Knc3"    ; Standard $7/mo    (prod_UoKJjsdqxDvmLz)
+    "price_1ToheyBcblPoapUJwJS2FCLT"    ; Pro $33/mo        (prod_UoKJ7ooZynkf8E)
+    "price_1TohezBcblPoapUJeLF7J8Qn"})  ; Regulated $350/mo (prod_UoKJ83riUJKfTn)
 
 (defn- sub-price-ids [sub]
   (set (keep #(get-in % [:price :id]) (get-in sub [:items :data]))))
