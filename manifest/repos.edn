@@ -180,6 +180,15 @@
  :force-recurse-submodules
  #{}
 
+ ;; project 内の特定 submodule を west の取得対象から外す(path → 除外する submodule paths)。
+ ;; west は `git submodule update --init --checkout` を使い `.gitmodules` の `update = none` を
+ ;; コマンドラインで override してしまうため、clone 不能な local-only submodule はここで除外し、
+ ;; 生成器が `submodules: true` の代わりに残り submodule の明示 path リストを emit する
+ ;; (ADR-2607022900)。baien/datasets は local-only の DataLad superdataset(ADR-2605241500、
+ ;; URL 自己参照で clone 不能。取得は operator の datalad clone)。
+ :submodule-excludes
+ {"orgs/etzhayyim/root" #{"90-docs/baien/datasets"}}
+
  ;; 新規 project の追加口（SSoT）。west.yml にまだ path が無い repo をここに列挙すると
  ;; 生成時に既存 path 群と union される（一度 west.yml に載れば自動追従、distinct で重複排除）。
  ;; clone 済みの working tree（orgs/<org>/<repo>）が存在し HEAD を持つこと。

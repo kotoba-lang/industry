@@ -88,6 +88,20 @@
 
 (def existing-projects (projects-from-west-yml))
 
+(defn submodule-paths
+  "project の .gitmodules から submodule path 一覧を返す(excl を除外)。
+   west は `git submodule update --init --checkout` を使い `update = none` を
+   コマンドラインで override するため、local-only submodule(baien/datasets 等)は
+   `submodules: true` でなく明示 path リストから外すしかない(ADR-2607022900)。"
+  [path excl]
+  (let [gm (io/file root path ".gitmodules")]
+    (when (.exists gm)
+      (->> (str/split-lines (:out (sh "git" "config" "-f" (str gm)
+                                      "--get-regexp" "\\.path$")))
+           (keep #(second (re-find #"\s(\S+)$" %)))
+           (remove (set excl))
+           seq))))
+
 (defn project-entry [path dup-names]
   (let [existing (get existing-projects path)
         sha     (or (working-head path) (:revision existing))
@@ -97,6 +111,8 @@
         recurse (or (contains? (:force-recurse-submodules cfg) path)
                     (nested? path)
                     (:submodules existing))
+        excl    (get (:submodule-excludes cfg) path)
+        subs    (when (and recurse (seq excl)) (submodule-paths path excl))
         wname   (west-name path dup-names)
         base    (name-of path)]
     (when sha
@@ -110,7 +126,10 @@
            "      path: " path "\n"
            (when depth (str "      clone-depth: " depth "\n"))
            "      groups: [" (str/join ", " groups) "]\n"
-           (when recurse "      submodules: true\n")
+           (cond
+             subs    (str "      submodules:\n"
+                          (apply str (for [p subs] (str "        - path: " p "\n"))))
+             recurse "      submodules: true\n")
            (when dl (str "      userdata:\n"
                          "        datalad: true\n"
                          "        annex-remote: " (:annex-remote dl) "\n"))))))
