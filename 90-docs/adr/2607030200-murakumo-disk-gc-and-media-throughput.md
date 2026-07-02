@@ -41,6 +41,7 @@
 | 画像 | animagine-xl-4.0 (SDXL) | 1 台 (zebulun) | 1.33 imgs/min (~45s/枚) |
 | 画像 | 同 | fleet 2 台 (zebulun+dan) | 1.75 imgs/min = **1.3x** |
 | 動画 | svd_xt (SVD img2vid, 9.56GB) | 1 台 (asher 16GB) | **~307 s/step**（32フレ/20step ≈ 102分）— memory-bound、実用外 |
+| 動画 | **ltxv-2b-0.9.1 (LTX DiT 5.72GB + T5 4.9GB)** | 1 台 (dan 16GB, ollama停止) | **~15.6 s/step**（72フレ/24step ≈ 6分）— **SVD比 ~20倍速、16GB で実用可** |
 | 音声 | stable-audio-open | — | ComfyUI 音声ノード(EmptyLatentAudio/VAEDecodeAudio)は present、ただし **モデルが HF gated**（要トークン）で配布不可 |
 
 **スケーリングの上限は checkpoint 保有ノード数**(現状 2 台が warm)。GC で空けた
@@ -62,9 +63,18 @@ SVD が実用外だったのはモデルが 9.3GB UNet で 16GB を食い潰す�
 可能性がある。方針:
 - checkpoint: `Lightricks/LTX-Video` の distilled fp8 2B（4.46GB、要 ComfyUI-LTXVideo
   custom nodes）
-- 期待: 常駐 ollama を停止せず（4.46GB なら同居可能）に short clip を生成
-- 実測欄（本 ADR 末尾）に step 時間と ×realtime を追記予定
-- 前提: fleet mini への LTX custom node 導入。未導入なら「custom node 依存」を記録。
+### LTX 実測結果（2026-07-03、dan 16GB）
+
+- **~15.6 s/step**（SVD の 307 s/step の **~20 倍速**）。72 フレーム/24 step で
+  sampling ~6 分（SVD の ~100 分に対し桁違い）。DiT は UNet より per-step が軽い。
+- **落とし穴1: LTX checkpoint は diffusion のみ**。text encoder を含まず、
+  CLIPTextEncode が `clip=None` で即エラー。**T5-XXL(4.9GB)を CLIPLoader
+  type=ltxv で別読み込み**が必須。→ 総メモリ 10.6GB(LTX 5.7 + T5 4.9)。
+- **落とし穴2: 総 10.6GB は 16GB mini に対し ollama 常駐と両立不可**。
+  ollama 停止で 12.3GB 空けて初めて回る（画像 SDXL は ollama 同居可、動画は不可）。
+- 結論: **LTX が 16GB fleet の動画の答え**。SVD は同じ 16GB で実用外だったが、
+  モデルアーキ(DiT)と量子化の選択で動画生成が回るようになった。
+  fleet の LTX custom node は導入済み(EmptyLTXVLatentVideo/LTXVConditioning)。
 
 ## 得られた教訓
 
