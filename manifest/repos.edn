@@ -26,7 +26,7 @@
                      :scope :business}           ; ビジネス
   "com-junkawasaki" {:role :transitional-foundation ; 汎用 -clj 基盤ライブラリ + cloud 制御面 + data project
                      :scope :private-foundation  ; 言語コアは kotoba-lang へ移動済み (:path-overrides)
-                     :note "汎用基盤 -clj も最終的に kotoba-lang へ全移行（ADR-2606302300, 決定 2026-06-30）。当 org は cloud(cloud-manimani/cloud-murakumo) + data(spirit-in-physics 等) のみへ縮退予定"}}
+                     :note "汎用基盤 -clj も最終的に kotoba-lang へ全移行（ADR-2606302300, 決定 2026-06-30）。当 org は cloud(cloud-murakumo; cloud-manimani は 2026-07-02 gftdcojp へ transfer 済み) + data(spirit-in-physics 等) のみへ縮退予定"}}
 
  ;; GitHub owner だけ移した project の west remote を上書きする。
  :remote-overrides
@@ -53,7 +53,8 @@
   "orgs/kotoba-lang/clc"                "orgs/kotoba-lang/office-style"
   "orgs/com-junkawasaki/utsushi"        "orgs/kotoba-lang/utsushi"
   "orgs/com-junkawasaki/vehicle-design-actor" "orgs/kotoba-lang/kami-engine-vehicle-designer"
-  "orgs/com-junkawasaki/manimani"       "orgs/gftdcojp/manimani"} ; GitHub-transferred to gftdcojp 2026-07-01 (private; mobile/ iOS+Android app, fastlane App Store pipeline in progress)
+  "orgs/com-junkawasaki/manimani"       "orgs/gftdcojp/manimani" ; GitHub-transferred to gftdcojp 2026-07-01 (private; mobile/ iOS+Android app, fastlane App Store pipeline in progress)
+  "orgs/gftdcojp/cloud-manimani" "orgs/gftdcojp/cloud-manimani"} ; GitHub-transferred to gftdcojp 2026-07-02 (private; Cloudflare Worker API for manimani triage Decision Ledger)
 
  ;; 全 project 共通の既定
  :defaults
