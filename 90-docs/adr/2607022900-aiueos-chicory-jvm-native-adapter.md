@@ -275,13 +275,43 @@ Chicory で構築する）は、5 件の follow-up を経て実装・実測検�
 | 5 | `:aiueos/publishes`/`:subscribes`（トピックID許可セット） | `aiueos-cljc-contract#9` | ✅ 実装・実測済み |
 | 5 | `:aiueos/schedule`（period/priority、cycle-based boot） | `aiueos-cljc-contract#10` | ✅ 実装・実測済み |
 | 6 | `:aiueos/limits :memory-pages`（安定版Chicory API） | `aiueos-cljc-contract#11` | ✅ 実装・実測済み |
+| 7 | 監査: manifest署名検証（`aiueos.signing`）が実意思決定パスに配線されているか | — | ✅ 調査完了・**ギャップ無し**（後述） |
+
+**Follow-up 7（2026-07-02、署名検証の監査——ギャップ無しの確認）**:
+これまで4件（audit/topic許可セット/schedule/memory-pages）を「宣言・検証は
+されるが実際には強制されない」ギャップとして発見・修正してきた流れで、
+より重大度が高い可能性のある箇所——**manifest署名検証（`aiueos.signing`）が
+実際の意思決定パス（`aiueos.broker/verify-one`）に本当に配線されているか**
+——を監査した。結論: **配線済みで、意図通りの設計・テスト済み**。
+
+`aiueos.broker/verify-one`（`aiueos.execute/execute`/`aiueos.launcher/
+run-command`が実際に呼ぶ関数）は capability チェックより**先に**
+`authenticate`を実行する: manifestの`:aiueos/signature`/`:aiueos/signer`/
+`:aiueos/wasm-sha256`とpolicyの`:aiueos.policy/signers`レジストリを
+`aiueos.signing/verify`で検証し、偽造署名は`:bad-signature`で即座に
+capability gateより前でdenyする（`verify-one-denies-a-forged-signature`
+でテスト済み）。有効な署名は`elevate-for-signature`で`:aiueos/trust`を
+`:verified`まで引き上げる（`verify-one-elevates-trust-on-valid-signature`）。
+`:aiueos.policy/require-signed`で未署名を拒否する運用も可能
+（`verify-one-honors-require-signed`）。`verify-admission`（ADR-0004の
+agent提出/code-as-data経路）は`floor-trust-for-admission`をこの署名検証+
+elevateフローの下に重ねる——floorされた信頼度を有効な署名がその後
+引き上げられる、という意図された設計。
+
+唯一の注意点（バグではなく運用ポリシーの選択）: manifestは署名なしで
+`:aiueos/trust :verified`を直接宣言することも可能（`resolve-trust`の
+docstring: "宣言値があればそれを使う"）。これが安全かは manifest ファイル
+自体をデプロイ境界で信頼するかどうかに依存し、`:aiueos.policy/require-signed`
+が既に用意されているレバー。これまでの4件のようなサイレントな未実装とは
+異なる。
 
 **到達点**: aiueos の native adapter（旧 host.rs/runtime.rs 相当の実行層）と
 CLI 本体（旧 bin/aiueos.rs）は、Rust を一切経由せず JVM/Clojure だけで実装・
 実行証明済み。`aiueos.launcher` は `verify`/`run`/`admit`/`inspect`/`surface`/
 `audit`/`up` の 7 コマンドが実際に動作する。manifest が宣言する契約フィールド
 （quota/fuel/memory-pages/topic 許可セット/schedule）は全て実際に強制される
-ところまで到達した。
+ところまで到達し、署名検証（`aiueos.signing`）も監査済みでギャップ無しと
+確認した。
 
 **恒久的に残る未解決事項**（本 ADR のスコープでは解決しない、今後も blocked
 のまま明記し続ける）:
