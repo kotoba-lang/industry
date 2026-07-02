@@ -41,7 +41,7 @@
 | 画像 | animagine-xl-4.0 (SDXL) | 1 台 (zebulun) | 1.33 imgs/min (~45s/枚) |
 | 画像 | 同 | fleet 2 台 (zebulun+dan) | 1.75 imgs/min = **1.3x** |
 | 動画 | svd_xt (SVD img2vid, 9.56GB) | 1 台 (asher 16GB) | **~307 s/step**（32フレ/20step ≈ 102分）— memory-bound、実用外 |
-| 動画 | **ltxv-2b-0.9.1 (LTX DiT 5.72GB + T5 4.9GB)** | 1 台 (dan 16GB, ollama停止) | **~15.6 s/step**（72フレ/24step ≈ 6分）— **SVD比 ~20倍速、16GB で実用可** |
+| 動画 | **ltxv-2b-0.9.1 (LTX DiT 5.72GB + T5 4.9GB)** | 1 台 (dan 16GB, ollama停止) | **512×320/25フレ: end-to-end 74.9秒で完走 ✓**（sampling 4.55 s/step、704×480 は 15.6 s/step）— **SVD比 ~20倍速、16GB で動画が回る** |
 | 音声 | stable-audio-open | — | ComfyUI 音声ノード(EmptyLatentAudio/VAEDecodeAudio)は present、ただし **モデルが HF gated**（要トークン）で配布不可 |
 
 **スケーリングの上限は checkpoint 保有ノード数**(現状 2 台が warm)。GC で空けた
@@ -75,6 +75,10 @@ SVD が実用外だったのはモデルが 9.3GB UNet で 16GB を食い潰す�
 - 結論: **LTX が 16GB fleet の動画の答え**。SVD は同じ 16GB で実用外だったが、
   モデルアーキ(DiT)と量子化の選択で動画生成が回るようになった。
   fleet の LTX custom node は導入済み(EmptyLTXVLatentVideo/LTXVConditioning)。
+- **end-to-end 完走を実機で確認**: 512×320/25フレ/20step が VAE decode 含め
+  **74.9 秒**で完了、25 フレームの animated webp を生成(青空を漂う cloud spirit)。
+  704×480/72フレは sampling は通るが VAE decode が 16GB の memory wall に当たる。
+  **解像度・フレーム数を絞れば 16GB mini で実用的な動画が回る**が確定。
 
 ## 得られた教訓
 
