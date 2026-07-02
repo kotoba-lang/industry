@@ -1,6 +1,6 @@
 # ADR-2607021800: junbi (準備) reserve treasury actor + HAKARI (秤) basket unit of account
 
-**Status**: accepted (R0 scaffold · R1 landed 2026-07-02, owner-ratified)
+**Status**: accepted (R0 · R1 · R2 landed 2026-07-02, owner-ratified)
 **Date**: 2026-07-02
 **Deciders**: Jun Kawasaki (owner directive 2026-07-02)
 
@@ -140,7 +140,7 @@ collateral valuation). HAKARI never mints or burns EN.
 |---|---|---|
 | **R0** | this ADR — pure `.cljc` core (params validation J2–J5, NAV, drift, rebalance proposal J10, governor J1–J12) + tests; repo + west + RAD registration | **landed 2026-07-02** |
 | **R1** | langgraph-clj StateGraph TreasuryActor (`interrupt-before` human approval, J10); `banking` double-entry wiring (J8); `base-l2` read-only Base observation — USDC + EURC readable at attested addresses, **JPYC read unlocks on Council address attestation** (never faked); audit datoms over `:db-api` | **landed 2026-07-02** (owner-ratified "r1") |
-| **R2** | +EURC live; rebalance-proposer cell; toritate cross-ref; HAKARI denominates EN credit limits | post-R1 |
+| **R2** | Chainlink attestation feed over `ITransport` (USDC/USD `0x7e86…bc6B` + EURC/USD `0xDAe3…8250`, verified vs the Chainlink reference data directory; **no JPY/USD feed exists on Base** — JPYC rate unattested until Council attests an alternative); rebalance-proposer cell (1 tick = 1 bounded run); `toritate.ledgerEntry` cross-ref (G3/G4 + G12 mirrored; EURC/JPYC → `nativeAsset "n-a"` pending toritate enum extension); HAKARI-denominated EN credit-limit sizing (J12 intact) | **landed 2026-07-02** (owner-ratified "r2") |
 | **R3** | +e-CNY Tier-2 (per-jurisdiction legal analysis + Council Lv7+ unanimity; authorized-operator wallet; attestation feed); digital euro / digital yen remain placeholders | post-R2 |
 
 ## Honesty (R0)
