@@ -1,0 +1,282 @@
+{:frontmatter
+ {:id "adr-2607022800-kotoba-lang-org-dependency-map"
+  :title "ADR-2607022800: kotoba-lang org — dependency/relationship map (west-registration gap sweep + tribal-knowledge consolidation)"
+  :status "accepted"
+  :doc_type "adr"
+  :topic "kotoba-lang"
+  :authoritative true
+  :last_verified "2026-07-02"
+  :authoritative_for
+  ["west-registration coverage of the kotoba-lang GitHub org (363 repos on GitHub as of 2026-07-02; 358 correctly covered by manifest/west.yml paths, 5 gap repos registered by this ADR's companion commit (cad/eda/genome/mst-projector/lab), 4 documented exceptions left untouched (see :exceptions)"
+   "consolidated map of the ~44 comment-documented repo clusters already curated in manifest/repos.edn's :extra-projects, normalized into one queryable :clusters vector"
+   "ground-truthed dependency graph for the crypto/CBOR/CID/CRDT/MST substrate hub repos, derived from actual deps.edn :local/root and io.github.kotoba-lang/* git-sha coordinates (not just comment inference)"
+   "naming-collision-avoidance table: every case where a kami-engine-crate restoration target renamed away from its natural short name because an unrelated, pre-existing kotoba-lang/<short-name> repo already occupied it"
+   "does NOT claim exhaustive per-repo dependency edges for all 363 repos — most are leaf libraries with no documented cross-repo relationship; this ADR reports what is actually documented/grounded, not a fabricated complete graph"]
+  :related
+  ["ADR-2606302300 (4-org taxonomy: kotoba-lang/etzhayyim/gftdcojp/com-junkawasaki role+scope, authoritative source for :orgs below)"
+   "ADR-kotoba-lang-foundational-stdlib (stdlib P0/P1/P2/M5 tiers)"
+   "ADR-2607010930 (clj-wgsl migration Phase 4 — the largest single cluster family: kami-engine crate restoration waves, ~150+ repos)"
+   "ADR-2607011830 / -011930 / -011940 (etzhayyim-sdk relocation batch, 3 waves)"
+   "ADR-2607022600 (kotoba database-crates cljc migration roadmap — commit-dag/prolly-tree/quad-store/kqe/kotoba-client)"
+   "manifest/repos.edn (source of truth this ADR consolidates; every cluster below cites its origin comment/line region there)"]
+  :scope
+  {:gh_repos_total 363
+   :west_registered_correct 358
+   :gap_repos_registered_by_this_adr 5
+   :documented_exceptions 4
+   :clusters_found 44
+   :hub_repos_ground_truthed 17}}
+
+ ;; 4-org taxonomy (authority: ADR-2606302300). gen-west-manifest.bb does NOT read
+ ;; this — doc-only policy metadata for where a NEW repo should be created.
+ :orgs
+ {"kotoba-lang"
+  {:role :language-substrate
+   :scope :platform
+   :note "pure-CLJC language + core library substrate; every other org consumes it"}
+  "etzhayyim"
+  {:role :agent-centric
+   :scope :public-interest
+   :note "com-etzhayyim-* organism actors (UNSPSC/ISCO/COFOG-flavored)"}
+  "gftdcojp"
+  {:role :human-centric
+   :scope :business
+   :note "ai-gftd-* products/services, apps, talent"}
+  "com-junkawasaki"
+  {:role :transitional-foundation
+   :scope :private-foundation
+   :note "shrinking toward data-only (e.g. spirit-in-physics); language core already migrated to kotoba-lang via :path-overrides, generic -clj foundation libs slated to follow (decided 2026-06-30)"}}
+
+ ;; placement rule (repos.edn line 18-19): language-substrate -> kotoba-lang,
+ ;; agent+public-interest -> etzhayyim, human+business -> gftdcojp,
+ ;; cross-cutting foundation -clj -> com-junkawasaki.
+ :placement-rule
+ {:language-substrate "kotoba-lang"
+  :agent-public-interest "etzhayyim"
+  :human-business "gftdcojp"
+  :cross-cutting-foundation-clj "com-junkawasaki"}
+
+ ;; the 5 repos this ADR's companion commit (ec595a181b7e / merge b22032257bb0)
+ ;; added to :extra-projects — real, pre-existing GitHub repos that had simply
+ ;; never been added to the manifest (not collision-renamed restorations; those
+ ;; are the DIFFERENT repos referenced in :naming-collisions below).
+ :gap-sweep-2026-07-02
+ {:registered ["orgs/kotoba-lang/cad" "orgs/kotoba-lang/eda" "orgs/kotoba-lang/genome"
+               "orgs/kotoba-lang/mst-projector" "orgs/kotoba-lang/lab"]
+  :note "landed via GitHub-API server-side merge on a fresh worktree off current main (first attempt hit a genuine 10-commit divergence from a concurrent session and was redone, not force-merged)"}
+
+ ;; repos confirmed NOT registered, and why — none require action from this ADR.
+ :exceptions
+ [{:repo "kotoba-lang/cnc-toolpath"
+   :reason "documented duplicate of kotoba-lang/cnc (canonical restoration); repo description says 'Owner to decide disposition' — deliberately left unregistered pending owner call"}
+  {:repo "kotoba-lang/kami-autodrive"
+   :reason "size:0, pushed within minutes of this ADR's authoring — active WIP of a concurrent session restoring kami-engine crates per ADR-2607010930; not registered here per the standing rule against touching other sessions' in-flight work"}
+  {:repo "kotoba-lang/kami-shugyo"
+   :reason "same as kami-autodrive: concurrent-session WIP, size:0, pushed minutes before this ADR"}
+  {:repo "kotoba-lang/kami-vehicle"
+   :reason "same as kami-autodrive: concurrent-session WIP, size:0, pushed minutes before this ADR"}
+  {:repo "com-junkawasaki/kototama"
+   :reason "GitHub-transferred to kotoba-lang/kototama but local checkout + :path-overrides not yet updated; adding the override alone (without relocating the checkout) would make the generator silently DROP the entry (working-head lookup fails at the new canonical path with no existing entry there either) — deferred, needs the checkout relocated in the same change as the override"}]
+
+ ;; the ~44 comment-documented clusters in manifest/repos.edn's :extra-projects,
+ ;; in file order. :adr is the spawning ADR id(s) as cited in the comment
+ ;; (or nil if none was cited). :rel is any explicitly stated dependency/
+ ;; composition/split relationship (or nil).
+ :clusters
+ [{:n 1 :theme "fleet coordination substrate" :adr "ADR-2606302000"
+   :members ["kotoba-fleet" "etzhayyim/com-etzhayyim-fleet"]
+   :rel "20-agent lease/governor substrate"}
+  {:n 2 :theme "junbi treasury/basket" :adr "ADR-2607021800"
+   :members ["etzhayyim/com-etzhayyim-junbi"]
+   :rel "reserve treasury actor + HAKARI basket"}
+  {:n 3 :theme "stdlib P0" :adr "ADR-kotoba-lang-foundational-stdlib"
+   :members ["async" "device" "coll" "json" "spec" "wit"] :rel nil}
+  {:n 4 :theme "stdlib M5 consumers" :adr "ADR-kotoba-lang-foundational-stdlib"
+   :members ["scheduler" "store" "lint" "text" "log" "lint-kotoba" "lsp-rpc"]
+   :rel "consumes the P0 tier"}
+  {:n 5 :theme "stdlib P2" :adr "ADR-kotoba-lang-foundational-stdlib"
+   :members ["fmt" "lsp" "test"] :rel nil}
+  {:n 6 :theme "AT Protocol shared substrate" :adr nil
+   :members ["atproto" "mst"] :rel "split out of app-aozora/kotoba"}
+  {:n 7 :theme "CRDT convergent-replica primitives" :adr "ADR-2607021614"
+   :members ["crdt"]
+   :rel "zero-dep, pure merge only; hosts (kotobase, kotoba.editor, slides/docs/sheets) own every effect — ground-truthed via deps.edn comment"}
+  {:n 8 :theme "CommitDag" :adr "ADR-2607022600 (roadmap); composition also cites ADR-2607010930 Phase 6"
+   :members ["commit-dag"]
+   :rel "composes with prolly-tree + quad-store; ground-truthed deps: multiformats, dag-cbor"}
+  {:n 9 :theme "stdlib P1" :adr "ADR-kotoba-lang-foundational-stdlib"
+   :members ["fs" "http" "io" "time"] :rel nil}
+  {:n 10 :theme "ISIC vertical capability libs" :adr "ADR-2607011000"
+   :members ["swift" "banking" "phone" "card" "retail" "logistics" "property" "labor" "robotics"]
+   :rel nil}
+  {:n 11 :theme "Giemon robot product line" :adr "ADR-2607020000"
+   :members ["giemon"] :rel "depends on kotoba-lang/robotics; KAMI provider split family :giemon"}
+  {:n 12 :theme "clj-wgsl migration Phase 4, Wave 1" :adr "ADR-2607010930"
+   :members ["cnc" "groot" "si" "kami-app-car-sim" "kami-app-shibuya" "kami-app-tatekata"
+             "kami-app-sarutahiko-factory" "kami-app-amenominaka"]
+   :rel "kami-cam restored as cnc, not cam (kotoba-lang/cam already exists, unrelated camera-rig repo)"}
+  {:n 13 :theme "clj-wgsl migration Phase 4, Wave 2" :adr "ADR-2607010930"
+   :members ["raytrace" "rtx-native" "clj-host" "kami-web" "web-modelb" "map" "pbrt"
+             "replicator" "glyph" "live" "render" "webgpu-rs" "engine-clj"]
+   :rel "kami-rt restored as raytrace not rt (rt = real-time media transport, ADR-2607011700); kami-text restored as glyph not text (text = stdlib repo, cluster 5)"}
+  {:n 14 :theme "KAMI provider split authority/materialized repos" :adr nil
+   :members ["kami-contracts" "kami-app-fixtures"] :rel nil}
+  {:n 15 :theme "kami-genko manga-editor doc-model" :adr "ADR-2607020300"
+   :members ["kami-genko"]
+   :rel "split out of kami-engine's kami-mangaka-genko-clj; precedent for cluster 43"}
+  {:n 16 :theme "ISCO-08 occupation vertical registry" :adr "ADR-2607012000"
+   :members ["occupation"] :rel "occupation counterpart to kotoba-lang/industry"}
+  {:n 17 :theme "WebRTC data-contract substrate" :adr "ADR-2607011700"
+   :members ["webrtc"] :rel "signaling/session/room as pure data contracts"}
+  {:n 18 :theme "kotoba media/networking substrate (Rust-crate restoration)" :adr "ADR-2607011700 (boundary retracted same day)"
+   :members ["rt" "turn" "net" "signal"]
+   :rel "CLJC reimplementation of kotoba-rt/turn/net/signal removed by kotoba PR #259; overlaps cluster 17; owner retracted the original no-TURN-deployment boundary same day — codecs/crypto belong in kotoba-lang, only ops stays elsewhere"}
+  {:n 19 :theme "kotoba-shell CLJC restoration scaffold" :adr "ADR-2607012115"
+   :members ["shell"]
+   :rel "scaffold-only; still-unrestored siblings: kotoba-auth/core/datomic/edn/ipfs/cli/ipns-record"}
+  {:n 20 :theme "kotoba-store/query/browser-client CLJC restoration" :adr "ADR-2607010930 Phase 6"
+   :members ["prolly-tree" "quad-store" "kqe" "kotoba-client"]
+   :rel "prolly-tree(was kotoba-store/ProllyTree)->quad-store(was kotoba-query storage half)->kqe(was kotoba-query Datalog half)->kotoba-client(was kotoba-runtime KotobaNode); reuses multiformats+dag-cbor+cacao rather than duplicating CID/CBOR/CACAO — ground-truthed accurate for prolly-tree+quad-store"}
+  {:n 21 :theme "Bitcoin mining/pool/wallet substrate" :adr "ADR-2607012230"
+   :members ["btc-crypto" "btc-mining" "mining-pool" "wallet"]
+   :rel "plain libraries, not actors; btc-crypto reuses secp256k1 from eth-crypto"}
+  {:n 22 :theme "sha256d-clj evolutionary-benchmark SHA-256" :adr "ADR-2607012300"
+   :members ["com-junkawasaki/sha256d-clj"]
+   :rel "deliberately com-junkawasaki not kotoba-lang: from-scratch/algorithm-searchable, NOT host-injected vetted crypto like cluster 21's stack"}
+  {:n 23 :theme "ai-gftd-newscaster" :adr "ADR-2607020910"
+   :members ["gftdcojp/ai-gftd-newscaster"]
+   :rel "anchor-LLM dashv EditorialGovernor; publication always requires human approval"}
+  {:n 24 :theme "KAMI (Adobe cljc+EDN) library" :adr "ADR-2606272100"
+   :members ["kasane"] :rel nil}
+  {:n 25 :theme "KAMI provider split targets — NOT YET CREATED" :adr nil
+   :members [] :status :commented-out
+   :rel "kami-render-provider/kami-physics-provider/kami-domain-providers/kami-runtime-provider are commented out in repos.edn pending gh repo create; not live set members"}
+  {:n 26 :theme "etzhayyim-sdk relocation batch (3 ADR waves)" :adr "ADR-2606302300, 2607011830, 2607011930, 2607011940"
+   :members ["kami-nv-compat" "hinshitsu" "pqh" "ipfs" "checkpointer" "base-l2" "witness-quorum" "atproto-client"]
+   :rel "former etzhayyim-sdk monorepo split into 8 kotoba-lang repos"}
+  {:n 27 :theme "arxiv organism actor" :adr "ADR-0023"
+   :members ["arxiv"] :rel "arXiv organism actor + yorishiro automation"}
+  {:n 28 :theme "security governance" :adr nil
+   :members ["security"] :rel "policy docs + risk/evidence/exception registers + executable release/crypto gates (kotoba#264/#265)"}
+  {:n 29 :theme "langgraph-store" :adr "ADR-2607011900"
+   :members ["langgraph-store"]
+   :rel "domain-agnostic half of short-lived genapp-clj; comfy/llm moved into comfyui + langchain instead"}
+  {:n 30 :theme "clj-wgsl Phase 4 — kami-engine crate restoration scaffolds" :adr "ADR-2607010930"
+   :members ["brep" "fea" "pcb" "dft" "spice"]
+   :rel "homes for ~58 kami-engine crates deleted without CLJC migration (#259); scaffold-only. See :naming-collisions for the brep/fea/pcb rename reasons."}
+  {:n 31 :theme "KAMI WebGPU DSL/runtime semantic split" :adr nil
+   :members ["atom" "browser" "capnp" "crypto" "cue" "dance" "dsl-core" "dxf" "editor" "expr"
+             "exr" "fsm" "geojson" "gpu" "graphml" "industry" "kami-engine-vehicle-designer"
+             "kekkai" "kicad" "kotoba-lang" "kotoba-lang-cli-contract" "kotodama"
+             "kototama-cljc-contract" "level" "materialx" "mathml" "mermaid" "musicxml"
+             "netcap" "netsync" "ocio" "office" "otio" "proto" "render-shaders" "scene2d"
+             "shaders" "sky" "spirv" "sprite-gpu" "sql" "srt" "step" "technology" "toml"
+             "transit" "triage" "usd" "verilog" "wasm-ui" "wgsl" "xml" "yaml" "pdk" "pnr"]
+   :rel "authority homes tracked by 90-docs/migration/kami-webgpu-dsl-runtime-split.edn"}
+  {:n 32 :theme "model-checking (rename)" :adr nil
+   :members ["model-checking"]
+   :rel "kami-verify restored as model-checking, not verify (too generic/collision-prone); mistaken kotoba-lang/verify scaffold deleted 2026-07-02"}
+  {:n 33 :theme "mine-ai/mine-pds/bim/rtl/power" :adr nil
+   :members ["mine-ai" "mine-pds" "bim" "rtl" "power"]
+   :rel "uncommented, sits inside the kami-engine-restoration region"}
+  {:n 34 :theme "signal-integrity (rename)" :adr nil
+   :members ["signal-integrity"]
+   :rel "kami-si restored as signal-integrity, not si (ambiguous vs SI units); mistaken kotoba-lang/si scaffold deleted 2026-07-02. NOTE: a DIFFERENT, currently-registered kotoba-lang/si exists from cluster 12 — two distinct si-named things, see :open-questions"}
+  {:n 35 :theme "ic-packaging (rename)" :adr nil
+   :members ["ic-packaging" "yield"]
+   :rel "kami-pkg restored as ic-packaging, not pkg (generic npm/Debian connotation); mistaken kotoba-lang/pkg scaffold deleted 2026-07-02"}
+  {:n 36 :theme "ip-xact (rename)" :adr nil
+   :members ["ip-xact"]
+   :rel "kami-ip restored as ip-xact, not ip (IP address vs intellectual property ambiguity); mistaken kotoba-lang/ip scaffold deleted 2026-07-01"}
+  {:n 37 :theme "KAMI Engineering SDK (dependency hub)" :adr nil
+   :members ["engineer" "engineer-io" "engineer-render"]
+   :rel "restored as 3 repos (was kami-eng-core/io/render, deleted kami-engine #82). STATED dependents: dft/spice/pdk/pnr/bim/rtl + the EDA-collision-renamed cluster depend on these for shared CAD/EDA contracts — comment uses PRE-RENAME shorthand (cad/cae-solver/eda); real targets are brep/fea/pcb per cluster 30. See :open-questions."}
+  {:n 38 :theme "KAMI-engine scene/gameplay block (uncommented, contextually cluster 30's continuation)" :adr "ADR-2607010930 (contextual)"
+   :members ["actor-ipc" "scene" "scene-graph" "game" "cam" "input" "host" "physics" "skeleton"
+             "sprite2d" "tilemap" "ui" "voxel" "sdf" "mesher" "nerf" "gltf" "vrm" "postfx"
+             "audio" "webgl" "webgpu" "dec" "terrain" "vegetation" "atmosphere" "physics-2d"
+             "ui-gpu" "graph" "geo" "window-session-state" "rtc" "bridge" "knp" "scad"
+             "pathfind" "character" "cartpole-wasm" "articulated-scene" "demo" "devtools"
+             "pipelines" "app" "kami-engine-core" "kami-engine-io" "kami-engine-render"
+             "kami-engine-web" "kami-engine-script-runtime" "kami-engine-engine" "kami-app"
+             "kami-app-isekai" "kami-app-quarry-walk"]
+   :rel nil}
+  {:n 39 :theme "Visualization/typesetting EDN-first substrate" :adr "ADR-2607012000"
+   :members ["tex" "katex" "force3d" "d3"] :rel nil}
+  {:n 40 :theme "liquid-glass-ui design skin" :adr "ADR-2607011900"
+   :members ["liquid-glass-ui"] :rel "layered on the shitsuke design system"}
+  {:n 41 :theme "SVG-era exception repos" :adr "ADR-2607011100"
+   :members ["com-junkawasaki/office-causal" "com-junkawasaki/svgraph"]
+   :rel "deliberately excluded from :path-overrides; NOTE a DIFFERENT kotoba-lang/svgraph also exists (rename-target of kootba) — two distinct svgraph-named things, see :open-questions"}
+  {:n 42 :theme "dcs/plm industrial-app pair" :adr "ADR-2607020100"
+   :members ["dcs" "plm"]
+   :rel "dcs newly created (BPC domain: tag/loop/alarm/PID/scan-cycle, ISA-18.2); plm already implemented, registered here"}
+  {:n 43 :theme "mangaka *-clj domain crates" :adr "ADR-2607010930"
+   :members ["kami-mangaka-page-clj" "kami-mangaka-reader-clj" "kami-mangaka-scene-clj"
+             "kami-mangaka-render-clj" "kami-mangaka-text-clj" "kami-app-sip-clj"
+             "kami-engine-sdk-clj" "kami-atmosphere-scene" "kami-cam-scene" "kami-input-scene"
+             "kami-postfx-scene" "kami-vegetation-scene" "kami-character-scene"
+             "kami-terrain-scene" "kami-app-giemon-factory" "kami-app-giemon"
+             "kami-autodrive-scene" "kami-articulated" "kami-vehicle-scene"
+             "kami-skeleton-scene" "kami-game-scene" "kami-genesis"]
+   :rel "split from kami-engine, follows the kami-genko precedent (cluster 15); kami-app-giemon(-factory) links to cluster 11"}
+  {:n 44 :theme "kotoba-lang gap sweep 2026-07-02" :adr nil
+   :members ["cad" "eda" "genome" "mst-projector" "lab"]
+   :rel "this ADR's own registration act; explicitly unrelated to the kami-cad/kami-eda restoration renames (clusters 30/32) — these are the pre-existing repos those renames were avoiding collision with"}]
+
+ ;; naming-collision-avoidance table: kami-engine-crate restoration target ->
+ ;; rejected short name -> actual registered name -> why.
+ :naming-collisions
+ [{:crate "kami-cam"   :rejected "cam"        :actual "cnc"             :reason "kotoba-lang/cam = unrelated camera-rig repo"}
+  {:crate "kami-rt"    :rejected "rt"         :actual "raytrace"        :reason "kotoba-lang/rt = real-time media transport, ADR-2607011700"}
+  {:crate "kami-text"  :rejected "text"       :actual "glyph"           :reason "kotoba-lang/text = foundational stdlib repo"}
+  {:crate "kami-cad"   :rejected "cad"        :actual "brep"            :reason "kotoba-lang/cad = unrelated industrial CAD/CAM workbench"}
+  {:crate "kami-cae"   :rejected "cae-solver" :actual "fea"             :reason "kotoba-lang/cae-solver = unrelated ROM/LBM CFD solve-dispatch contract"}
+  {:crate "kami-eda"   :rejected "eda"        :actual "pcb"             :reason "kotoba-lang/eda = unrelated OpenSTA/OpenROAD-class timing/routing kernel"}
+  {:crate "kami-verify" :rejected "verify"    :actual "model-checking"  :reason "too generic/collision-prone; mistaken scaffold deleted 2026-07-02"}
+  {:crate "kami-si"    :rejected "si"         :actual "signal-integrity" :reason "prior shorthand ambiguous (SI units vs Signal Integrity); mistaken scaffold deleted 2026-07-02"}
+  {:crate "kami-pkg"   :rejected "pkg"        :actual "ic-packaging"    :reason "npm/Debian package connotation too generic"}
+  {:crate "kami-ip"    :rejected "ip"         :actual "ip-xact"         :reason "IP address vs intellectual property ambiguity"}
+  {:crate "kami-flow"  :rejected "flow"       :actual nil               :reason "not restored at all — actually graph.etzhayyim.com's Node.js/Cypher ingest tool, unrelated to KAMI Engineering SDK; mistaken scaffold deleted 2026-07-01"}]
+
+ ;; ground-truthed dependency graph for the crypto/CBOR/CID/CRDT/MST substrate
+ ;; hub repos, derived from real deps.edn (:local/root + io.github.kotoba-lang/*
+ ;; git-sha coordinates), not comment inference.
+ :dependency-graph
+ {:method "deps.edn read directly from the 17 locally-checked-out orgs/kotoba-lang/* hub repos on 2026-07-02"
+  :edges
+  [{:from "ed25519"      :to "cacao"       :kind :local-root}
+   {:from "dag-cbor"     :to "cacao"       :kind :local-root}
+   {:from "ed25519"      :to "pqh"         :kind :git-sha}
+   {:from "dag-cbor"     :to "pqh"         :kind :git-sha}
+   {:from "ed25519"      :to "witness-quorum" :kind :git-sha}
+   {:from "eth-crypto"   :to "base-l2"     :kind :git-sha}
+   {:from "mst"          :to "checkpointer" :kind :git-sha}
+   {:from "multiformats" :to "checkpointer" :kind :git-sha}
+   {:from "pqh"          :to "checkpointer" :kind :git-sha}
+   {:from "multiformats" :to "commit-dag"  :kind :git-sha}
+   {:from "dag-cbor"     :to "commit-dag"  :kind :git-sha}
+   {:from "multiformats" :to "prolly-tree" :kind :git-sha}
+   {:from "dag-cbor"     :to "prolly-tree" :kind :git-sha}
+   {:from "prolly-tree"  :to "quad-store"  :kind :git-sha}
+   {:from "multiformats" :to "quad-store"  :kind :git-sha}
+   {:from "dag-cbor"     :to "quad-store"  :kind :git-sha}]
+  :zero-dep-leaves ["ed25519" "dag-cbor" "multiformats" "did" "atproto" "mst" "eth-crypto" "crdt"]
+  :notable-facts
+  ["commit-dag has NO compile-time dependency on prolly-tree despite both being part of the same database-crates roadmap (ADR-2607022600) — a commit wraps an opaque state value"
+   "koe's :dev alias has a stale :local/root (../langgraph-clj, ../langchain-clj) that resolves incorrectly from koe's current kotoba-lang location — the real targets are orgs/com-junkawasaki/{langgraph-clj,langchain-clj}; likely a leftover from before koe migrated orgs"
+   "eth-crypto's own deps.edn header states it is lift-ready for extraction to com-junkawasaki/eth-crypto-clj — a directional tension against the general kotoba-lang-ward migration note in :orgs"
+   "sha256d-clj (cluster 22) is the one deliberate counter-example to 'crypto belongs in kotoba-lang': its research/benchmark purpose needs algorithm-searchability that conflicts with the substrate's host-injected-vetted-crypto convention"]}
+
+ ;; things this ADR surfaced but does not resolve — flagged for a future pass,
+ ;; not blocking since none affect west/CI correctness today.
+ :open-questions
+ [{:q "repos.edn line ~630 (KAMI Engineering SDK dependents comment) names dft/spice/pdk/pnr/bim/rtl/cad/cae-solver/eda as depending on engineer/engineer-io/engineer-render, using PRE-RENAME kami-crate shorthand — cad/cae-solver/eda are confirmed-unrelated pre-existing repos (cluster 44), not the actual restoration targets (brep/fea/pcb, cluster 30). The comment likely means brep/fea/pcb, not the literal names it uses."
+   :impact "documentation-only; no west/pin correctness issue since the comment isn't machine-read"
+   :suggested-fix "amend the comment in repos.edn to use the actual registered names (brep/fea/pcb) next time that region is touched"}
+  {:q "two distinct svgraph-named repos: com-junkawasaki/svgraph (cluster 41, deliberate SVG-era exception) vs kotoba-lang/svgraph (rename-target of kootba per :path-overrides line 52). Both are real, separately-registered west entries with the same basename."
+   :impact "none — west disambiguates by full path, not basename; purely a human-readability trap"
+   :suggested-fix "none required; noted here so a future reader doesn't assume they're the same repo"}
+  {:q "two distinct si-named things: kotoba-lang/si (cluster 12, clj-wgsl Wave 1, currently registered, no rename comment) vs the deleted kotoba-lang/si scaffold that was meant to become signal-integrity (cluster 34). Unclear from the comments alone whether these ever coexisted."
+   :impact "none currently — the live entry is unambiguous (single kotoba-lang/si path in west.yml)"
+   :suggested-fix "none required; noted for historical clarity only"}]}
