@@ -257,6 +257,30 @@ kotoba-clj不使用——このモジュールは`kotoba:*` importを一切必�
 無制限時は`1`（成功、旧ページ数）、`:memory-pages 1`時は`-1`（失敗）が実際に
 返ることをテスト・shell実行両方で確認済み。
 
+**Follow-up 8（2026-07-02、`:aiueos/run-plan`/`:aiueos/run-receipt`統合の監査
+——未着手のまま意図的に保留）**: `aiueos.broker`は自身のnamespace docstring
+で「`:aiueos/run-plan`/`:aiueos/run-receipt`のpure data assembly」を3つの
+核心的責務の1つと明記しており、実際に`broker/run-plan`/`broker/run-receipt`
+という実装済み・テスト済みの生成関数が存在する（`:aiueos/run-receipt`は
+`:aiueos/run-cid`/`:input-cid`/`:output-cid`やtimestampを持つ、
+`:aiueos.execute/*`より richer な監査記録契約）。しかし
+`aiueos.execute`/`aiueos.launcher`の`run`/`up`はこれを一度も呼ばず、
+このセッション後半で独自に発明した簡易な形（`:aiueos/decision` +
+`:aiueos.execute/result`/`:aiueos.execute/log`/`:aiueos.execute/topic-bus`）
+をそのまま返し続けている。
+
+これはこれまでの4件（audit/topic許可セット/schedule/memory-pages——manifestが
+宣言するポリシーがサイレントに未強制だった、セキュリティ関連のギャップ）とは
+**性質が異なる**: `run-plan`/`run-receipt`自体は動作する実装であり、単に
+「後から作った実行パスが、既存のより豊富な契約を採用しなかった」統合漏れ
+（integration gap）に過ぎない。ユーザーへ配線を提案したが応答が得られな
+かったため、シェイプ変更を伴う統合は今回実施せず、**意図的に保留**とする
+——`run`/`up`の戻り値shapeを変更する意思決定は、CID/timestampが現状の
+launcherの用途に本当に必要かという設計判断であり、オーナー確認が要ると判断
+したため。着手する場合は`up-command`/`run-command`の戻り値を`broker/
+run-receipt`経由に統合し、`:aiueos.execute/*`のキーを`run-receipt`の
+`:aiueos/result`/`:aiueos/audit-events`等にマッピングする形になる。
+
 ## Closing Summary（2026-07-02）
 
 本 ADR の決定（native adapter の実行層 + CLI を Rust ではなく JVM/Clojure +
@@ -276,6 +300,7 @@ Chicory で構築する）は、5 件の follow-up を経て実装・実測検�
 | 5 | `:aiueos/schedule`（period/priority、cycle-based boot） | `aiueos-cljc-contract#10` | ✅ 実装・実測済み |
 | 6 | `:aiueos/limits :memory-pages`（安定版Chicory API） | `aiueos-cljc-contract#11` | ✅ 実装・実測済み |
 | 7 | 監査: manifest署名検証（`aiueos.signing`）が実意思決定パスに配線されているか | — | ✅ 調査完了・**ギャップ無し**（後述） |
+| 8 | 監査: `:aiueos/run-plan`/`:aiueos/run-receipt`統合 | — | ⏸️ 調査完了・**意図的に保留**（後述） |
 
 **Follow-up 7（2026-07-02、署名検証の監査——ギャップ無しの確認）**:
 これまで4件（audit/topic許可セット/schedule/memory-pages）を「宣言・検証は
@@ -324,6 +349,13 @@ CLI 本体（旧 bin/aiueos.rs）は、Rust を一切経由せず JVM/Clojure �
 - **`:aiueos.manifest/deadline-cycles`**: Chicory の同期・非プリエンプティブな
   実行モデルと ADR-0006 の wall-clock-free 設計原則の間に本質的な非互換があり、
   真のインクリメンタル/割り込み可能な実行機構を発明しない限り正しく実装できない。
+
+**意図的に保留した統合課題**（バグではなく設計判断待ち）:
+- **`:aiueos/run-plan`/`:aiueos/run-receipt`統合**: `aiueos.broker`に実装・
+  テスト済みの生成関数があるのに、`aiueos.launcher`の`run`/`up`が採用せず
+  独自の簡易shapeを使い続けている。CID/timestamp付きのrun-receiptが今の
+  launcherの用途に必要かはオーナー判断が必要——着手時は`up-command`/
+  `run-command`の戻り値shapeを変更する破壊的変更になる。
 
 本 ADR はこれにて実装完了として close する。上記の恒久的な未解決事項は、
 着手する際に新しい ADR（生ハードウェアアクセス層の設計など、スコープが
