@@ -40,11 +40,18 @@
 |---|---|---|---|
 | 画像 | animagine-xl-4.0 (SDXL) | 1 台 (zebulun) | 1.33 imgs/min (~45s/枚) |
 | 画像 | 同 | fleet 2 台 (zebulun+dan) | 1.75 imgs/min = **1.3x** |
-| 動画 | svd_xt (SVD img2vid) | 1 台 (asher) | 本 ADR 末尾に実測 |
-| 音声 | stable-audio-open | checkpoint 配布待ち | — |
+| 動画 | svd_xt (SVD img2vid, 9.56GB) | 1 台 (asher 16GB) | **~307 s/step**（32フレ/20step ≈ 102分）— memory-bound、実用外 |
+| 音声 | stable-audio-open | — | ComfyUI 音声ノード(EmptyLatentAudio/VAEDecodeAudio)は present、ただし **モデルが HF gated**（要トークン）で配布不可 |
 
 **スケーリングの上限は checkpoint 保有ノード数**(現状 2 台が warm)。GC で空けた
 ディスクへ checkpoint を再配布すれば線形に伸びる — これが GC と分散の接続点。
+
+**動画は 16GB mini では memory-bound で実用外**: SVD_xt(9.3GB)は ollama 停止で
+13GB 空けても、sampling 中に 2.4GB→1.2GB free まで swap し **1 step 307 秒**
+(SDXL 画像 1 枚 45 秒に対し桁違い)。動画は ≥32GB unified memory のノード
+(gad は 48GB だが Metal GPU 無し→CPU で更に遅い)か、小型動画モデル
+(LTX-Video 等)か、Thunderbolt mesh が要る。**画像はメディア分散の sweet spot、
+動画は次のハード世代待ち**というのが正直な容量計画上の結論。
 
 ## 得られた教訓
 
