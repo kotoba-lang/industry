@@ -1,7 +1,13 @@
 # ADR-2607010000: runtime・SDK・OS substrate を kotoba-only 正本へ寄せる
 
-**Status**: proposed
-**Date**: 2026-07-01
+**Status**: accepted (aiueos / aiueos-cljc-contract / kotodama-mcp / kotodama-host / net-kotobase landed; kami-engine in progress)
+**Date**: 2026-07-01 (status updated 2026-07-02)
+**Progress note (2026-07-02)**: ledger `90-docs/migration/kotoba-only-runtime-ledger.edn` の全 item が done。
+aiueos の Rust runtime crate 削除・kotodama-mcp の EDN manifest 化 + TS provider 削除・
+kotodama-host の host contract CLJC 化 + TS SDK 削除・kototama の Rust wrapper 削除は
+origin main に着地済み（stalled WIP の cleanup landing 含む: kotodama-mcp `5247c16`,
+kotodama-host `cb6c087`, kototama `10ddfe2`）。kami-engine は Rust 削除 sweep + 複数
+セッションの WIP が共有 checkout に滞留しており、sub-project 単位の triage が残件。
 **Scope**:
 
 - `orgs/kotoba-lang/aiueos`
