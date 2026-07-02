@@ -253,18 +253,31 @@ entries) across **all 362 repos that have a `deps.edn`** (362/377; the other
   (11, all from Phase 7's `kami-*-scene` restorations), `shitsuke` (10),
   `langchain`/`langchain-clj`-*sic*-now-`langchain` (7).
 
-### Known remaining gap (flagged, not fixed this pass)
+### Known remaining gap — closed in Phase 3 (2026-07-02, same day)
 
 A broader sweep for stale `-clj`-suffixed dependency coordinates (beyond the
-`koe` fix above) found **~17 more `deps.edn` files** referencing
-`aero-clj`/`crash-clj`/`datom-clj`/`echem-clj`/`motor-clj`/`vphysics-clj`
-(the pre-ADR renames) at old `io.github.com-junkawasaki/*-clj` coordinates —
-`browser-use`, `authenticator`, `cae-solver`, `computer-use`, `kagi`,
-`godaddy-dns`, `langgraph-store`, `kami-engine-vehicle-designer`, `kenchi`,
-`kotoba-fleet`, `kekkai`, `kotoba-code`, and others. These were **not**
-fixed in this pass (out of scope for a single-session sweep given the
-volume) but are recorded here as a concrete follow-up list rather than
-silently missed — see `:known-stale-clj-refs` in the `.edn`.
+`koe` fix above) initially flagged ~17 `deps.edn` files as possible
+candidates. Re-verifying each against a fresh fetch found only **8 genuinely
+still stale**: `kami-engine-vehicle-designer`, `authenticator`,
+`kotoba-code`, `kekkai`, `computer-use`, `kotodama`, `kotoba-fleet`,
+`godaddy-dns` — the rest (`browser-use`, `kagi`, `langgraph-store`, `kenchi`,
+`cae-solver`, bare `langgraph`/`datom`/`vphysics`) turned out not to actually
+contain the stale pattern; the original flagging grep had matched a looser
+pattern than the real issue.
+
+All 8 were fixed: `io.github.com-junkawasaki/<name>-clj` →
+`io.github.kotoba-lang/<name>` (dropping `-clj`), preserving the original
+`:git/tag` where one was pinned (SHA resolved to its full 40-hex form —
+unchanged by the rename, since renaming a GitHub repo doesn't rewrite
+history) or pinning to the target repo's current `main` HEAD where the
+original only used an unversioned `:local/root`. `kami-engine-vehicle-
+designer` was the deepest fix (7 deps: `langgraph`/`datom`/`vphysics`/
+`aero`/`crash`/`echem`/`motor`, all converted from never-resolving
+monorepo-sibling `:local/root` paths to real `:git/url`+`:sha` coordinates).
+
+**Total: 8 repos fixed, 98 tests / 366 assertions passing, 0 failures.**
+See `:phase-3-2026-07-02-stale-clj-dep-fix-sweep` in the `.edn` for the
+full per-repo breakdown.
 
 ## Consequences
 
