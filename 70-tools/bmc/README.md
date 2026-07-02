@@ -80,3 +80,15 @@ bb 70-tools/bmc/collect.bb        # Cloudflare/Stripe/health → 90-docs/busines
 ```
 
 business を回す 1 運転 = `collect.bb` → 各 product `react loop` → `canvas md --all` → `score md` → commit。
+
+## gate 評価器 + LLM advisor (ADR-2607022100)
+
+```bash
+70-tools/bmc/bin/gftd gate                 # 全 product の gate 状態 (validated/measuring/blocked + 不足計器)
+```
+
+ReAct loop のデフォルト advisor は `gate-aware-advisor` (mock + gate 評価)。gate が機械測定可能
+(`{:metric :op :threshold}` / `:all`) で満たされれば hyp を validated に自動昇格、計器不足なら
+`{:needs [...]}` を Solution ブロックに「準備:」to-do として提案する。これで schedule は dry でなく
+毎朝「gate 測定 → 昇格 or 不足計器 surface」する kaizen サイクルになる。LLM advisor は
+`react/llm-advisor` に `(fn [prompt]->string)` (langchain.model / murakumo text) を注入して差し替え。

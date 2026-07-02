@@ -3,6 +3,7 @@
             [gftd.canvas :as canvas]
             [gftd.ledger :as ledger]
             [gftd.react :as react]
+            [gftd.gate :as gate]
             [gftd.score :as score]))
 
 (def base
@@ -88,6 +89,53 @@
              (get-in s [:yc :score]))))
     (testing "render"
       (is (re-find #"cloud-itonami" (score/render-table {:cloud-itonami s}))))))
+
+(deftest gate-evaluation
+  (testing "machine-measurable gate: met → validated"
+    (is (= :validated (:status (gate/evaluate-hyp {:n 5} {:metric [:n] :op :>= :threshold 3})))))
+  (testing "machine-measurable gate: not met → measuring"
+    (is (= :measuring (:status (gate/evaluate-hyp {:n 1} {:metric [:n] :op :>= :threshold 3})))))
+  (testing "unmeasurable metric → blocked with fallback needs"
+    (is (= :blocked (:status (gate/evaluate-hyp {} {:metric [:n] :op :>= :threshold 3
+                                                    :needs-when-unmeasurable ["x"]})))))
+  (testing ":all conjunction"
+    (is (= :validated (:status (gate/evaluate-hyp {:a 2000 :b 5000}
+                                                  {:all [{:metric [:a] :op :>= :threshold 1000}
+                                                         {:metric [:b] :op :>= :threshold 4000}]}))))
+    (is (= :measuring (:status (gate/evaluate-hyp {:a 3 :b 10}
+                                                  {:all [{:metric [:a] :op :>= :threshold 1000}
+                                                         {:metric [:b] :op :>= :threshold 4000}]})))))
+  (testing "instrument-blocked spec"
+    (is (= :blocked (:status (gate/evaluate-hyp {} {:needs ["計器A"]}))))))
+
+(deftest gate-proposals-cycle
+  (testing "blocked gate → 準備 proposal into solution block"
+    (let [idx (canvas/index (conj base
+                                  {:canvas/kind :lean :canvas/product :cloud-itonami
+                                   :canvas/id :cloud-itonami.solution :canvas/block :lean/solution
+                                   :canvas/label "Solution" :canvas/items ["s1"]}))
+          ;; reuse :hyp/t1 by pointing a spec at it via with-redefs
+          props (with-redefs [gate/gate-specs {:hyp/t1 {:needs ["計器X"]}}]
+                  (gate/proposals idx :cloud-itonami {}))]
+      (is (some #(and (= :canvas/add-item (:proposal/action %))
+                      (= :cloud-itonami.solution (:canvas/id %))
+                      (re-find #"準備" (:event/value %))) props))))
+  (testing "measurable+met gate → hyp validated proposal with evidence"
+    (let [idx (canvas/index base)
+          props (with-redefs [gate/gate-specs {:hyp/t1 {:metric [:subs] :op :>= :threshold 1
+                                                        :evidence-label "subs"}}]
+                  (gate/proposals idx :cloud-itonami {:subs 3}))]
+      (is (some #(and (= :hyp/status (:proposal/action %)) (= :validated (:event/value %))
+                      (:event/evidence %)) props)))))
+
+(deftest gate-aware-advisor-advances
+  (testing "gate-aware advisor adds gate proposals on top of mock; validated hyp folds"
+    (let [idx (canvas/index base)
+          r (with-redefs [gate/gate-specs {:hyp/t1 {:metric [:subs] :op :>= :threshold 1
+                                                    :evidence-label "subs"}}]
+              (react/tick {:idx idx :product :cloud-itonami :metrics {:subs 9}
+                           :advisor react/gate-aware-advisor}))]
+      (is (= :validated (get-in (:idx r) [:hyps :hyp/t1 :hyp/status]))))))
 
 (deftest render-md-smoke
   (let [idx (canvas/index base)

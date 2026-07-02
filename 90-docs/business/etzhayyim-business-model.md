@@ -31,6 +31,8 @@
 - RAD identity ledger (did:web + attestation, 運用中)
 - actor 完了条件 = child repo + west 登録 + RAD 登録 (CLAUDE.md 準拠)
 - CACAO 自己発行鍵 = organism が自分の graph を所有
+- 準備 (etzhayyim-registry-value): itonami 契約の RAD attestation 参照フック
+- 準備 (etzhayyim-registry-value): 資金チャネル (寄付/助成)
 
 ## Channels
 

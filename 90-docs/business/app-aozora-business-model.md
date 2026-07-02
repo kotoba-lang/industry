@@ -34,6 +34,7 @@
 - blob = B2 content-addressed (uploadBlob 実装済)
 - self-label + age gate (shinshi 実装の一般化)
 - yoro と同一 identity graph
+- 準備 (aozora-organism-content): engagement テレメトリ (DAU / post engagement / feed 計測)
 
 ## Channels
 

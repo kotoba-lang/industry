@@ -11,7 +11,10 @@
    ReAct: observe（canvas + hypotheses + metrics）→ think（advisor proposals）
           → act（governor 検閲 → events）→ 次 tick は folded canvas を観測。"
   (:require [clojure.string :as str]
-            [gftd.canvas :as canvas]))
+            #?(:clj [clojure.edn]
+               :cljs [cljs.reader])
+            [gftd.canvas :as canvas]
+            [gftd.gate :as gate]))
 
 ;; ---- observe -----------------------------------------------------------------
 
@@ -67,6 +70,35 @@
         :canvas/id (block-id product "problem")
         :event/value text
         :proposal/reason "実測 metric を課題仮説へ反映"}))))
+
+(defn gate-aware-advisor
+  "Default advisor: mock-advisor + gate evaluator (ADR-2607022100).
+   The gate step is what makes the schedule cycle — it auto-advances validated
+   hypotheses and surfaces each product's missing instrument as a 準備 proposal.
+   Needs :idx + :product in the observation (tick supplies them)."
+  [{:keys [idx product] :as obs}]
+  (concat (mock-advisor obs)
+          (when (and idx product) (gate/proposals idx product (:metrics obs)))))
+
+(defn llm-advisor
+  "LLM-backed advisor seam (ADR-2607022100). `complete` is an injected
+   (fn [prompt-string] -> string) — e.g. langchain.model / murakumo text. The
+   model is asked to return an EDN vector of proposals; malformed output yields
+   no proposals (fail-safe, governor is the backstop anyway). Compose with
+   gate-aware-advisor at the call site for both novelty and gate progression."
+  [complete]
+  (fn [obs]
+    (let [prompt (str "あなたは lean canvas の advisor。以下の観測に対し、canvas を"
+                      "前進させる proposal を EDN ベクタで *だけ* 返せ。各要素は"
+                      " {:proposal/action :canvas/add-item :canvas/id <product>.<block>"
+                      " :event/value \"...\" :proposal/reason \"...\"}。block は"
+                      " problem/uvp/solution/channels/metrics/unfair 等。観測:\n"
+                      (pr-str (select-keys obs [:product :layer :blocks :hyps :metrics])))
+          out (try (complete prompt) (catch #?(:clj Exception :cljs :default) _ nil))]
+      (try
+        (let [v (#?(:clj clojure.edn/read-string :cljs cljs.reader/read-string) (str out))]
+          (if (vector? v) (filter map? v) []))
+        (catch #?(:clj Exception :cljs :default) _ [])))))
 
 ;; ---- act (governor — 検閲) ------------------------------------------------------
 
@@ -133,8 +165,8 @@
    {:observation … :proposals … :approved … :rejected … :events […] :idx folded-idx}.
    The caller persists :events (ledger) — this fn never does io."
   [{:keys [idx product metrics advisor actor tick-n]
-    :or {advisor mock-advisor actor "advisor:mock" tick-n 1}}]
-  (let [obs (observe idx product metrics)
+    :or {advisor gate-aware-advisor actor "advisor:gate" tick-n 1}}]
+  (let [obs (assoc (observe idx product metrics) :idx idx :product product)
         proposals (vec (advisor obs))
         {:keys [approved rejected]} (governor idx proposals)
         approved-events (mapv #(proposal->event tick-n actor %) approved)

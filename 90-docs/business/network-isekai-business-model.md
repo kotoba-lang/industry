@@ -34,6 +34,7 @@
 - play/fork/share loop = EDN を kotoba に pin (immutable + URL 共有)
 - VRM dance stage (kami.dance) / open asset hub (/assets.html, AT-Proto lexicon)
 - AI 生成 backend (Modal GPU: TRELLIS photo→3D / image / TTS / music)
+- 準備 (isekai-fork-viral): fork イベントテレメトリ (週次 fork 数 / fork 由来新規作品比率)
 
 ## Channels
 

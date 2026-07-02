@@ -32,6 +32,8 @@
 - DM/inbox/thread/receipts (aozora と同一 identity graph)
 - ed25519 E2E (kotoba crypto)
 - agent interrupt-before → 承認 UI
+- 準備 (yoro-aozora-funnel): yoro child repo 分離
+- 準備 (yoro-aozora-funnel): MAU テレメトリ
 
 ## Channels
 

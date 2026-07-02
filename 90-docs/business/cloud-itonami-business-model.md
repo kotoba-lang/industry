@@ -33,6 +33,9 @@
 - langgraph-clj StateGraph actor + 独立 Governor + 不変台帳 (3 実例で確立)
 - 職種 actor 群 (com-etzhayyim-*) の module 化
 - investment: deal flow を同じ decision ledger に載せる
+- 準備 (itonami-smb-pay): 初期 vertical の絞り込み
+- 準備 (itonami-smb-pay): 外部オンボーディング導線
+- 準備 (itonami-smb-pay): per-seat billing
 
 ## Channels
 

@@ -22,6 +22,7 @@
             [gftd.canvas :as canvas]
             [gftd.ledger :as ledger]
             [gftd.react :as react]
+            [gftd.gate :as gate]
             [gftd.score :as score]))
 
 (def registry
@@ -141,7 +142,7 @@
      (defn cmd-react [cli-key ps idx sub flags]
        (let [product (resolve-product cli-key idx flags)
              metrics (read-metrics ps product flags)
-             actor "advisor:mock"
+             actor "advisor:gate"
              run (case sub
                    "tick" (let [r (react/tick {:idx idx :product product :metrics metrics :actor actor})]
                             {:ticks [r]})
@@ -155,6 +156,19 @@
            (doseq [{:keys [proposal reason]} (:rejected r)]
              (println "  x governor:" reason "--" (pr-str (:event/value proposal)))))
          (when (:dry? run) (println "loop went dry (no more proposals) — 進化は収束"))))
+
+     (defn cmd-gate [cli-key ps idx flags]
+       (let [products (if (or (:all flags) (not (:product flags)))
+                        (cli-products cli-key idx)
+                        [(resolve-product cli-key idx flags)])]
+         (doseq [p products]
+           (let [metrics (read-metrics ps p flags)]
+             (doseq [h (canvas/product-hyps idx p)
+                     :let [r (gate/evaluate-hyp metrics (get gate/gate-specs (:hyp/id h)))]]
+               (println (name p) (:hyp/id h)
+                        (str "[" (name (:status r)) "]")
+                        (or (:evidence r) (:distance r)
+                            (when (:needs r) (str "需: " (str/join " / " (:needs r)))))))))))
 
      (defn -main-for
        "Entry point shared by the 7 wrappers."
@@ -203,6 +217,8 @@
              ["react" "tick"] (cmd-react cli-key ps idx "tick" flags)
              ["react" "loop"] (cmd-react cli-key ps idx "loop" flags)
 
+             ["gate" nil] (cmd-gate cli-key ps idx flags)
+
              ["score" nil]
              (let [facts (edn/read-string (slurp (:facts ps)))
                    products (if (or (:all flags) (not (:product flags)))
@@ -223,7 +239,7 @@
 
              ;; default: help
              (do (println (str (name cli-key) " cli — " (get-in registry [cli-key :desc])))
-                 (println "commands: products | canvas show|md|add|retract|note | hyp list|pass|fail | react tick|loop | score [md] | ledger show")
+                 (println "commands: products | canvas show|md|add|retract|note | hyp list|pass|fail | gate | react tick|loop | score [md] | ledger show")
                  (println "flags: --product P --all --out-dir D --evidence \"…\" --metrics k=v,… --max-ticks N --tail N")))
            (catch clojure.lang.ExceptionInfo e
              (println "error:" (ex-message e))
