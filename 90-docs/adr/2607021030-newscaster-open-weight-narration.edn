@@ -1,0 +1,64 @@
+{:frontmatter
+ {
+  :id "adr-2607021030-newscaster-open-weight-narration"
+  :title "ADR-2607021030: ai-gftd-newscaster — open-weight ナレーション（hume quality）+ 多言語"
+  :status "accepted"
+  :date "2026-07-02"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "newscaster-open-weight-narration"
+  :authoritative true
+  :authoritative_for ["newscaster の Narrator port / TTS gateway 契約（POST $TTS_URL/tts → WAV）" "open-weight TTS backend の選定（TADA=Hume 純正 open weights 主 / Kokoro 軽量 fallback）" "音声実尺によるセグメント尺同期の方式" "EditorialGovernor の :voice-consent / :unsupported-lang HARD 不変条件" "多言語 script（:i18n locale map）と per-lang 動画の規約"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607020910"]
+  :last_verified "2026-07-02"}
+ :body
+ "# ADR-2607021030: ai-gftd-newscaster — open-weight ナレーション（hume quality）+ 多言語
+
+**Status**: accepted
+**Date**: 2026-07-02
+**Deciders**: Jun Kawasaki
+
+## Context
+
+newscaster（ADR-2607020910）の動画は無音だった。要件:「音声も生成、hume quality、
+ただし Hume API は使わず open weight。多言語対応も」。調査の結果、**Hume 自身が
+TTS を open-source 化している**: TADA（github.com/HumeAI/tada、コード MIT /
+weights Llama 3.2 Community License、`HumeAI/tada-3b-ml` は**日本語を含む多言語**、
+bf16 ~9GB）。軽量代替は Kokoro（82M、Apache-2.0、ja 対応、CPU 実時間超）。
+
+## Decision
+
+**Narrator port（第 4 の注入境界）を追加し、live は「TTS gateway + open-weight
+backend（TADA 主 / Kokoro 軽量）」にする。**
+
+1. `newscaster.ports/Narrator`: `(-narrate n channel segment lang)` →
+   `{:path :duration-s :cid :voice} | nil`。mock は nil（無音）。
+2. TTS gateway: `POST $TTS_URL/tts {text, lang, voice}` → WAV。
+   `scripts/tts_server.py`（BACKEND=kokoro|tada）。WAV 実尺は RIFF ヘッダで読む。
+   音声 asset は sha256 cid で放送台帳へ。
+3. 尺同期: セグメント mp4 = `-loop 1 -i slide.png -i seg.wav -af apad -t 尺`
+   （尺 = max(音声+0.5s, 3s)、無音は anullsrc）、aac 48kHz stereo 正規化 →
+   `-c copy` concat。編成表の尺は上限目安に降格。
+4. Governor HARD 追加: `:voice-consent`（voice は channel 登録済みのみ =
+   無断クローン排除）/ `:unsupported-lang`（lang は channel :langs 内のみ）。
+5. 多言語: channel `:langs` + per-lang voice registry。script は主言語 +
+   `:i18n {lang {:lines :caption}}`。cites は構造側にあり**全 locale で構造的に
+   同一**。`:video/produce :lang` で per-lang render（episode `:videos {lang v}`）。
+   YouTube は per-locale 動画 + localizations（multi-audio は follow-up）。
+
+## Consequences
+
+- (+) Hume API 非依存の hume quality（TADA = Hume 純正 open weights、ja 対応）。
+  backend は gateway の後ろで差し替え自由。尺が音声に同期した音声つき mp4。
+- (+) 無断 voice clone / 未対応言語 / 出典すり替えは governor と構造で排除。
+- (−) TADA 3B はローカル Mac に重い（日常確認は Kokoro、TADA は GPU pod 運用）。
+- (−) 演技指示は TADA では reference audio 依存（persona 音源整備が follow-up）。
+- (−) YouTube multi-audio track 未対応（per-locale 動画で開始）。
+
+## References
+
+- ADR-2607020910 / github.com/HumeAI/tada / `HumeAI/tada-3b-ml` / Kokoro-82M
+- 本 ADR とペアの .md
+"}
