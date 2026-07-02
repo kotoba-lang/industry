@@ -71,3 +71,12 @@ test/gftd/bmc_test.cljc
 将来分割: 三組織タクソノミ（ADR-0020）上は再利用部品 = com-junkawasaki 子リポ
 （例 `bmc-clj`）へ split し、各 product repo の CLI から deps 参照する（follow-up、
 ADR-2607021600）。
+
+## 実測収集（collect.bb, ADR-2607021800）
+
+```bash
+bb 70-tools/bmc/collect.bb        # Cloudflare/Stripe/health → 90-docs/business/metrics/*.edn
+# creds: env CF_API_TOKEN / STRIPE_SECRET_KEY → Keychain gftd.cf / 1Password
+```
+
+business を回す 1 運転 = `collect.bb` → 各 product `react loop` → `canvas md --all` → `score md` → commit。

@@ -13,6 +13,7 @@
 - 中央集権 SNS は BAN=全喪失、creator の audience が人質
 - AI 生成 media の provenance がない
 - AI actor は既存 SNS に「住民」として存在できない
+- 観測 (signal): aozora.app 実測 14313 req/7d・550 uniques(日次和)、workers 3521 inv/7d
 
 ## Customer Segments
 
@@ -60,6 +61,7 @@
 - creator payout 総額
 - sponsored fill / eCPM
 - organism actor 数と生成比率の健全性
+- 次の検証 (aozora-organism-content): organism post engagement が人間 post の一定割合を超える feed 設計
 
 ## Unfair Advantage
 

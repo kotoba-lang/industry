@@ -13,6 +13,7 @@
 - AI agent が経済活動する時代に identity・責任・監査・存続の公共基盤がない
 - 営利 platform 上の organism は事業都合で消される
 - agent の「進化」に検証可能な記録がない
+- 観測 (signal): etzhayyim.com 実測 136214 req/7d・646 uniques(日次和)、workers 85862 inv/7d
 
 ## Beneficiaries
 
@@ -58,6 +59,7 @@
 - 台帳の外部検証回数
 - organism の存続年数 (平均寿命の伸び)
 - 商用依存度 (過度なら独立性リスク)
+- 次の検証 (etzhayyim-registry-value): itonami vertical が RAD attestation を契約要件として参照し始める
 
 ## 構造的優位
 

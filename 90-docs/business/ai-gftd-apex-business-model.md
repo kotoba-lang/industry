@@ -13,6 +13,7 @@
 - 主要 AI チャットは個人 identity を主キーにし prompt を telemetry 扱い
 - 規制業種・匿名必須層に選択肢がない
 - agent 購読は provider lock-in
+- 観測 (signal): gftd.ai 実測 422889 req/7d・4644 uniques(日次和)、workers 32517 inv/7d
 
 ## Customer Segments
 
@@ -60,6 +61,7 @@
 - churn
 - (price−cost)/tok
 - ephemeral 率 (privacy 遵守指標)
+- 次の検証 (apex-privacy-premium): Free→Plus 転換率が Proton 水準 (~数%)
 
 ## Unfair Advantage
 

@@ -13,6 +13,7 @@
 - graph DB の自前運用は重い
 - pin/storage サービスに provenance がない
 - map/git/search が別 SaaS に分散し data 主権が失われる
+- 観測 (signal): kotobase.net 実測 3483 req/7d・272 uniques(日次和)、workers 5311 inv/7d
 
 ## Customer Segments
 
@@ -59,6 +60,7 @@
 - storage GB
 - paid workspace 数
 - add-on attach 率
+- 次の検証 (kotobase-graph-arpu): Standard→Pro 転換率と add-on attach 率
 
 ## Unfair Advantage
 

@@ -9,62 +9,62 @@
 
 | product | BMC 成熟度 | YC bench 成熟度 | validation | 主な不足 |
 |---|---|---|---|---|
+| etzhayyim | 64.0 | 60.0 | 0.0 | revenue=0.0, validation=0.0 |
 | net-kotobase | 76.0 | 58.3 | 0.0 | validation=0.0, revenue=1.0 |
-| etzhayyim | 64.0 | 56.7 | 0.0 | revenue=0.0, validation=0.0 |
-| cloud-murakumo | 60.0 | 48.3 | 0.0 | revenue=0.0, validation=0.0 |
+| cloud-murakumo | 64.0 | 51.7 | 0.0 | revenue=0.0, validation=0.0 |
+| app-aozora | 64.0 | 46.7 | 0.0 | revenue=0.0, validation=0.0 |
+| ai-gftd-apex | 60.0 | 45.0 | 0.0 | revenue=0.0, validation=0.0 |
+| cloud-manimani | 56.0 | 43.3 | 0.0 | revenue=0.0, validation=0.0 |
 | cloud-itonami | 56.0 | 43.3 | 0.0 | revenue=0.0, validation=0.0 |
-| app-aozora | 60.0 | 40.0 | 0.0 | revenue=0.0, validation=0.0 |
-| cloud-manimani | 56.0 | 40.0 | 0.0 | revenue=0.0, validation=0.0 |
-| ai-gftd-apex | 56.0 | 38.3 | 0.0 | revenue=0.0, validation=0.0 |
-| app-aozora-yoro | 44.0 | 30.0 | 0.0 | revenue=0.0, launched=0.0 |
+| app-aozora-yoro | 52.0 | 40.0 | 0.0 | revenue=0.0, validation=0.0 |
 
 ## 次元別詳細
 
 ### ai-gftd-apex
 
-- BMC: completeness=5.0, hypothesis=5.0, validation=0.0, pricing=1.0, grounding=3.0
-- YC: acute-problem=3.0, wedge=3.0, tenx=3.0, founder-fit=4.0, distribution=1.0, defensibility=3.0, launched=2.0, users=1.0, revenue=0.0
-- note: apex app + Privacy Contract は実装/明文化済。privacy premium の需要実証ゼロ、獲得経路未着手。tier 価格未定義。
+- BMC: completeness=5.0, hypothesis=5.0, validation=0.0, pricing=1.0, grounding=4.0
+- YC: acute-problem=3.0, wedge=3.0, tenx=3.0, founder-fit=4.0, distribution=1.0, defensibility=3.0, launched=3.0, users=2.0, revenue=0.0
+- note: 実測: gftd.ai 422,889 req/7d・uniques 日次和 4,644 — 公開稼働で実流入あり (launched 2→3, users 1→2, grounding 3→4)。課金導線なし (revenue 0)、獲得チャネル未計測 (distribution 1 据置)。
 
 ### app-aozora
 
-- BMC: completeness=5.0, hypothesis=5.0, validation=0.0, pricing=2.0, grounding=3.0
-- YC: acute-problem=3.0, wedge=3.0, tenx=3.0, founder-fit=4.0, distribution=2.0, defensibility=3.0, launched=2.0, users=1.0, revenue=0.0
-- note: PDS/blob/age-gate/ad の経路は shinshi.club で本番実証済（≒隣接実証）。aozora.app 自体の公開 SNS としての稼働・外部ユーザーはこれから。eCPM/80-20 は shinshi 実測が参照値。
+- BMC: completeness=5.0, hypothesis=5.0, validation=0.0, pricing=2.0, grounding=4.0
+- YC: acute-problem=3.0, wedge=3.0, tenx=3.0, founder-fit=4.0, distribution=2.0, defensibility=3.0, launched=3.0, users=2.0, revenue=0.0
+- note: 実測: aozora.app 14,313 req/7d・PV 6,960・uniques 550、app-aozora-appview/pds workers 3,521 inv/7d — PDS/AppView は公開実運転 (launched 2→3, users 1→2, grounding 3→4)。収益導線は未接続。
 
 ### app-aozora-yoro
 
-- BMC: completeness=5.0, hypothesis=5.0, validation=0.0, pricing=0.0, grounding=1.0
-- YC: acute-problem=3.0, wedge=3.0, tenx=4.0, founder-fit=3.0, distribution=2.0, defensibility=3.0, launched=0.0, users=0.0, revenue=0.0
-- note: 設計のみ（child repo 未作成、README 上の companion 定義まで）。tenx=4 は『agent 承認面を messenger が握る』の独自性。全 traction ゼロ。
+- BMC: completeness=5.0, hypothesis=5.0, validation=0.0, pricing=0.0, grounding=3.0
+- YC: acute-problem=3.0, wedge=3.0, tenx=4.0, founder-fit=3.0, distribution=2.0, defensibility=3.0, launched=2.0, users=1.0, revenue=0.0
+- note: 実測で「設計のみ」を訂正: aozora-yoro-appview/pds/spa workers がデプロイ済・1,673 inv/7d (launched 0→2, grounding 1→3, users 0→1)。専用 zone なし (aozora.app 配下)。child repo 未分離は未解消。
 
 ### cloud-itonami
 
 - BMC: completeness=5.0, hypothesis=5.0, validation=0.0, pricing=1.0, grounding=3.0
 - YC: acute-problem=4.0, wedge=2.0, tenx=4.0, founder-fit=5.0, distribution=1.0, defensibility=4.0, launched=2.0, users=1.0, revenue=0.0
-- note: cockpit 稼働 (itonami.cloud) + actor/governor 3 実例 + 26 ISIC blueprint。ただし『全業種・職種』は wedge としては逆風（楔が太い）— 初期 vertical の絞り込みが未決。外販ゼロ。
+- note: 実測: itonami.cloud 6 req/7d・uniques 3 — cockpit は外部に発見されていない (据置が正直値)。wedge=2 (「全業種」は楔が太い) と合わせ、初期 vertical 絞込 + 導線が律速。
 
 ### cloud-manimani
 
 - BMC: completeness=5.0, hypothesis=5.0, validation=0.0, pricing=0.0, grounding=4.0
-- YC: acute-problem=3.0, wedge=3.0, tenx=3.0, founder-fit=5.0, distribution=2.0, defensibility=2.0, launched=2.0, users=1.0, revenue=0.0
-- note: OSS manimani + cloud worker 実装/テスト済・owner 自用（dogfood 最良）。価格未設計、OSS→cloud 転換の実証ゼロ。
+- YC: acute-problem=3.0, wedge=3.0, tenx=3.0, founder-fit=5.0, distribution=2.0, defensibility=2.0, launched=3.0, users=1.0, revenue=0.0
+- note: 実測: manimani.cloud 443 req/7d・uniques 1 — 公開エンドポイント稼働 (launched 2→3) だが利用者は owner 1 名 (users 1 据置)。OSS→cloud 転換の実証ゼロ。
 
 ### cloud-murakumo
 
-- BMC: completeness=5.0, hypothesis=5.0, validation=0.0, pricing=1.0, grounding=4.0
-- YC: acute-problem=4.0, wedge=4.0, tenx=4.0, founder-fit=5.0, distribution=2.0, defensibility=4.0, launched=2.0, users=1.0, revenue=0.0
-- note: worker + /infer surface + run ledger 実装済・fleet 実在（内部運用）。tok 単価は未実測（riskiest gate 未通過）、外部ユーザー・収益なし。
+- BMC: completeness=5.0, hypothesis=5.0, validation=0.0, pricing=1.0, grounding=5.0
+- YC: acute-problem=4.0, wedge=4.0, tenx=4.0, founder-fit=5.0, distribution=2.0, defensibility=4.0, launched=3.0, users=1.0, revenue=0.0
+- note: 実測: ai-gftd-murakumo worker 158,768 inv/7d — 社内推論需要は実在・常時運転 (grounding 4→5, launched 2→3)。murakumo.cloud zone は 536 req/7d・uniques 1 = 外部利用ゼロ (users 1 据置)。tok 単価は未実測 (riskiest gate 未通過)。
 
 ### etzhayyim
 
 - BMC: completeness=5.0, hypothesis=5.0, validation=0.0, pricing=1.0, grounding=5.0
-- YC: acute-problem=3.0, wedge=4.0, tenx=4.0, founder-fit=5.0, distribution=1.0, defensibility=5.0, launched=3.0, users=3.0, revenue=0.0
-- note: 非営利につき YC bench は参考値。RAD identity ledger 運用中・数百 organism が現住（users=3 は organism 数の代理指標）。寄付・助成・endowment は未着手 (revenue=0)。
+- YC: acute-problem=3.0, wedge=4.0, tenx=4.0, founder-fit=5.0, distribution=1.0, defensibility=5.0, launched=4.0, users=3.0, revenue=0.0
+- note: 非営利につき YC bench は参考値。実測: etzhayyim.com 136,214 req/7d、etzhayyim-did-web + xrpc-proxy workers 85,862 inv/7d — organism identity 解決は常時実運転 (launched 3→4)。寄付・助成・endowment は未着手 (revenue 0)。
 
 ### net-kotobase
 
 - BMC: completeness=5.0, hypothesis=5.0, validation=0.0, pricing=4.0, grounding=5.0
 - YC: acute-problem=4.0, wedge=4.0, tenx=4.0, founder-fit=5.0, distribution=2.0, defensibility=4.0, launched=3.0, users=2.0, revenue=1.0
-- note: 8 プロダクト中で最成熟: 稼働中 + tier 価格定義 (ADR-2606130100) + Stripe billing 配線 + RUNBOOK/SLO + YCBench 30日 pass 条件が既に文書化。外部 paid tenant はまだ 0（revenue=1 は billing wired の意）。
+- note: 実測: kotobase.net 3,483 req/7d・uniques 272、worker 5,311 inv/7d、/health ok。Stripe 実測: active subscriptions 0・直近 charge は 2024 年の非関連決済 — billing 配線済だが転換ゼロ (revenue 1 据置が正直値)。
 
