@@ -1,0 +1,150 @@
+{:frontmatter
+ {:id "adr-2607022400-kototama-unikernel-tender-runtime-vocabulary"
+  :title "ADR-2607022400: kotoba-lang（言語）/ kototama（Wasm 実行 runtime）/ aiueos（OS layer）の用語を確定し、kototama の runtime 設計に Solo5 tender パターンを採用する"
+  :status "accepted"
+  :date "2026-07-02"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "kototama-unikernel-tender-runtime-vocabulary"
+  :authoritative true
+  :authoritative_for ["kotoba-lang / kototama / aiueos の役割定義の正典（ADR-kotoba-shell-aiueos-safety-clj.md 版を採用、aiueos ADR-0001 の旧定義を superseded 宣言）"
+                       "kototama の native runtime 設計に Solo5 の tender パターン（tender=kototama, guest=aiueosが載せるWasm component）を採用する決定"
+                       "Unikraft/Mewz型（Wasmエンジンをkernel imageに焼き込む）を kototama には不採用とする決定とその理由"
+                       "aiueos の既存 scheduler（ADR-0006）・memory limits 設計が unikernel 規範と整合していることの検証（変更なし）"
+                       "本 monorepo に unikernel を参照した既存設計が無かったこと、および本ADRが初回の調査であることの記録"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607022200-aiueos-cljc-wasm-component-kernel-architecture"
+            "com-junkawasaki/orgs/kotoba-lang/aiueos/90-docs/adr/0001-aiueos-phase0-capability-os.md"
+            "com-junkawasaki/orgs/kotoba-lang/kotoba/docs/ADR-kotoba-shell-aiueos-safety-clj.md"
+            "com-junkawasaki/orgs/kotoba-lang/kotoba/docs/ADR-kotoba-shell-aiueos-safe-kotoba.md"
+            "com-junkawasaki/orgs/kotoba-lang/kototama/README.md"]
+  :last_verified "2026-07-02"}
+
+ :vocabulary
+ {:kotoba-lang {:role "言語 + コンパイラ"
+                :owns ["source contract (.kotoba/.cljc/.clj)" "kotoba-edn 意味論的基盤"
+                       "安全言語ゲート(eval/require/reflection/ambient-IO/raw-memory 拒否, 実装=kotoba-clj)"
+                       "capability/effect gate" "Kotoba/CLJ -> Wasm component コンパイル"]}
+  :kototama {:role "Wasm 実行 runtime"
+             :owns ["wasmtime相当のエンジン" "aiueos:host ABI" "capability gate 執行"
+                    "HostCaps/RuntimeLimits" "import-surface validation"]
+             :unikernel-pattern :solo5-tender}
+  :aiueos {:role "OS layer (component supervisor + capability broker)"
+           :owns ["policy" "graph" "surface" "manifest" "signing" "audit" "topic" "broker" "cli"]
+           :cljc-status "全てCLJC化済み（本セッション、ADR-2607022200準拠）"}}
+
+ :unikernel-survey
+ [{:project "Solo5" :tcb-mechanism "tender（hvt=hw仮想化 / spt=seccomp 7syscall）でguestとhw/hypervisorアクセスを分離。guestはapplication manifestで論理デバイス宣言"
+   :wasm-fit :best :adopted true}
+  {:project "Nanos" :tcb-mechanism "VMM(Firecracker/QEMU)依存、tender相当の専用抽象なし" :wasm-fit :thin :adopted false}
+  {:project "Unikraft" :tcb-mechanism "microlibrary静的リンク。WAMR第一級統合(unikraft/app-wamr)" :wasm-fit "engineをkernel imageに焼き込む" :adopted false}
+  {:project "Mewz" :tcb-mechanism "Wasm/WASIをAoTコンパイルしkernelのWASI実装に直接リンク、syscall境界なし" :wasm-fit "engineがTCB内側" :adopted false}
+  {:project "seL4" :tcb-mechanism "形式検証済みcapability microkernel。driverは非特権プロセス+capability-gated IPC" :wasm-fit "driver-as-componentはaiueosと近いが形式検証は現時点non-claim" :adopted false}]
+
+ :decisions
+ [{:decision "kotoba-lang/kototama/aiueosの用語をADR-kotoba-shell-aiueos-safety-clj.md版に統一"
+   :supersedes "aiueos ADR-0001の旧kototama定義(Kotoba/CLJ host contract + safe execution facade)"}
+  {:decision "kototamaの runtime設計にSolo5 tenderパターンを採用"
+   :mapping "kototama=tender, aiueosが起動するWasm component群=guest, manifestの:aiueos/imports/:aiueos/device/:aiueos/requires=Solo5 application manifest相当"
+   :isolation-tiers {:hvt "regulated/high-assuranceプロファイル向け(別VM/軽量ハイパーバイザ)"
+                      :spt "research/sensitive-localプロファイル向け(seccomp限定host process)"}}
+  {:decision "Unikraft/Mewz型(runtimeをkernel imageに焼き込む)は不採用"
+   :reason "wasmtime+host-ABI+capability gate執行コードは境界の外側であるべき。焼き込むとwasmtimeの脆弱性がそのままTCB内の脆弱性になる"}
+  {:decision "scheduler(ADR-0006)・memory limits設計は変更不要、unikernel規範との整合を検証"
+   :evidence "cooperative非プリエンプティブscheduling(MirageOS lwt等)とstatic memory sizing(Unikraft microlibrary, Solo5 application manifest)が両方とも既存aiueos設計と一致"}]
+
+ :body
+ "# ADR-2607022400: kotoba-lang（言語）/ kototama（Wasm 実行 runtime）/ aiueos（OS layer）の用語を確定し、kototama の runtime 設計に Solo5 tender パターンを採用する
+
+**Status**: accepted
+**Date**: 2026-07-02
+**Deciders**: Jun Kawasaki
+
+## Context
+
+ADR-2607022200 は aiueos を「CLJC 意味論 + Wasm Component Model 境界 + kernel（native
+adapter）」の三層として固定したが、Layer 3（kernel）を「native adapter」とだけ呼び、
+内部構造・命名を詰めていなかった。並行して、kotoba/kototama/aiueos の三語の役割定義が
+リポジトリ間でズレていた: aiueos ADR-0001（古い）は「kototama = Kotoba/CLJ host
+contract + safe execution facade」、kotoba-lang/kotoba の `ADR-kotoba-shell-aiueos-safety-clj.md`
+（accepted-in-progress、2026-07-01更新、最新）は「kototama(kotoba-clj) = Kotoba/CLJ ->
+Wasm component + 安全言語ゲート」「aiueos = component OS / broker / capability graph」。
+kototama/README.md 自身の記述はさらに別（CLJC authority layer for actor/organism host
+capability contracts）。
+
+kototama（Wasm ホスティング + host-ABI + capability gate 執行）は sandbox 化できない
+唯一の native レイヤーであり、mythos 級攻撃者を前提にするなら最優先で最小化・硬化
+すべき攻撃対象になる。過去に unikernel（Solo5/Nanos/Unikraft 等）を参照した設計調査は
+本 monorepo に存在しなかった（全文検索で unikernel/Solo5/MirageOS/unikraft/IncludeOS/
+single address space/libOS は全てゼロヒット）。本 ADR で初めてこの調査を行い、決定に
+反映する。
+
+## Decision
+
+### 1. 用語を確定する（ADR-kotoba-shell-aiueos-safety-clj.md を正典として採用）
+
+kotoba-lang = 言語 + コンパイラ（source contract + kotoba-edn + 安全言語ゲート[実装
+kotoba-clj] + capability/effect gate + Wasm へのコンパイル）。kototama = Wasm 実行
+runtime（コンパイル済み Wasm component をホストする側。wasmtime相当 + aiueos:host ABI
++ capability gate 執行 + HostCaps/RuntimeLimits + import-surface validation）。
+aiueos = OS layer（component supervisor + capability broker + policy reasoner。本
+セッションで CLJC 化済み: policy/graph/surface/manifest/signing/audit/topic/broker/
+cli）。依存方向は kotoba-shell -> aiueos -> kototama/kotoba-clj -> kotoba-edn の
+一方向固定。旧 aiueos ADR-0001 の kototama 定義は本 ADR により superseded（ファイルは
+書き換えず、事実だけ記録）。
+
+### 2. kototama の runtime 設計に Solo5 の tender パターンを採用する
+
+unikernel 先行事例調査（Solo5/Nanos/Unikraft/Mewz/urunc/seL4、web調査）の結論:
+Unikraft/Mewz 型（Wasm エンジンを kernel image に焼き込み、guest と runtime が同一
+バイナリ）は不採用 — wasmtime+host-ABI+capability gate 執行コードそのものが境界の
+外側であるべき aiueos の設計と逆行する。Solo5 の tender パターン（guest と
+hardware/hypervisor アクセスを、hvt=hw仮想化 or spt=seccomp 7syscall の tender に
+分離、guest は application manifest で論理デバイス宣言）を採用: kototama = tender、
+aiueos が起動する Wasm component 群 = guest。既存 manifest の
+`:aiueos/imports`/`:aiueos/device`/`:aiueos/requires #{:iommu}` が Solo5 application
+manifest 相当。hvt/spt の二択が deployment-profiles.md の profile 段階（regulated/
+high-assurance は hvt 相当、research/sensitive-local は spt 相当）とそのまま整合。
+既存 kernel-provided capability 名（mmio/map dma/map irq/subscribe pci/config）は
+ADR-0001/0002 が最初から意図していたものを Solo5 実装パターンで具体化しただけ。
+
+### 3. scheduler / memory モデルは検証済み・変更不要
+
+調査した unikernel は軒並み協調的・非プリエンプティブスケジューリングが標準
+（MirageOS の lwt 等）— aiueos の ADR-0006（deterministic cooperative cycle-based、
+非プリエンプティブ）と既に一致。Unikraft の静的 microlibrary リンク・Solo5 の固定
+application manifest は demand-paged VM でなく静的サイズ決定が規範 — aiueos の
+`:aiueos/limits {:memory-pages :fuel}` と既に一致。どちらも変更不要、後付けの
+unikernel 調査による検証という位置づけ。
+
+## Consequences
+
+- (+) kotoba-lang/kototama/aiueos の役割定義がリポジトリ間で一つに揃う。
+- (+) kototama の native runtime 設計に実在・検証済みの参照実装（Solo5 tender/
+  hvt/spt）という具体的な雛形が付いた。
+- (+) 既存の capability 名・scheduler・memory limits 設計が unikernel 調査によって
+  裏付けられた（変更ではなく検証）。
+- (+) Unikraft/Mewz 型不採用という否定的決定も明文化され、将来 TCB を広げる方向の
+  提案に気づかずに乗るリスクを防げる。
+- (−) 設計方針の決定であり、実際に Solo5 tender 上で kototama を動かす実装は
+  follow-up。現状の kototama はまだ host OS 上で直接動く前提のまま。
+- (−) aiueos ADR-0001 の旧定義はファイル自体を書き換えない（歴史的記録として保持）。
+- (−) seL4 レベルの形式検証は依然 non-claim（high-assurance プロファイル前提条件が
+  揃うまで）。tender パターン採用は TCB を小さくするがゼロにはしない。
+
+## References
+
+- ADR-2607022200（aiueos の三層アーキテクチャ。本ADRはLayer3の内部構造を具体化する
+  形でrefineする。supersedeではない）
+- aiueos/90-docs/adr/0001-aiueos-phase0-capability-os.md（旧kototama定義、superseded）
+- kotoba-lang/kotoba/docs/ADR-kotoba-shell-aiueos-safety-clj.md（正典）
+- kotoba-lang/kotoba/docs/ADR-kotoba-shell-aiueos-safe-kotoba.md（旧草稿）
+- kotoba-lang/kototama/README.md
+- Solo5: https://github.com/Solo5/solo5, docs/architecture.md
+- Nanos: https://nanovms.com
+- Unikraft + WAMR: https://github.com/unikraft/app-wamr
+- Mewz: https://arxiv.org/html/2411.01129v1
+- urunc: https://blog.cloudkernels.net/posts/wasm-urunc/
+- seL4: https://sel4.systems
+- aiueos/SECURITY.md（deployment-profiles.mdのprofile段階とhvt/sptの対応）"}
