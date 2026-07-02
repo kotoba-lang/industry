@@ -515,7 +515,10 @@
    "orgs/kotoba-lang/yaml"
    "orgs/kotoba-lang/pdk"
    "orgs/kotoba-lang/pnr"
-   "orgs/kotoba-lang/verify"
+   ;; kami-verify restored as "model-checking" (not "verify") — "verify" is
+   ;; a generic verb with high future collision risk in a large org.
+   ;; The mistaken kotoba-lang/verify scaffold was deleted 2026-07-02.
+   "orgs/kotoba-lang/model-checking"
    "orgs/kotoba-lang/mine-ai"
    "orgs/kotoba-lang/mine-pds"
    "orgs/kotoba-lang/bim"
@@ -531,7 +534,10 @@
    ;; The mistaken kotoba-lang/pkg scaffold was deleted 2026-07-02.
    "orgs/kotoba-lang/ic-packaging"
    "orgs/kotoba-lang/yield"
-   "orgs/kotoba-lang/ip"
+   ;; kami-ip restored as "ip-xact" (not "ip") — "ip" is dangerously
+   ;; ambiguous (IP address vs intellectual property) in a large org.
+   ;; The mistaken kotoba-lang/ip scaffold was deleted 2026-07-02.
+   "orgs/kotoba-lang/ip-xact"
    ;; kami-flow was NOT a CLJC-migration target — it's a graph.etzhayyim.com
    ;; Node.js/Cypher ingest tool (kami-engine/kami-flow/graph), not KAMI
    ;; Engineering SDK workflow logic. The mistaken kotoba-lang/flow scaffold
