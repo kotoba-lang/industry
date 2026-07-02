@@ -475,9 +475,11 @@
    :ns kotoba.lang.package-contract,
    :status :done,
    :source-paths
-   ["orgs/kotoba-lang/kotoba-lang/src/kotoba/lang/package_contract.cljc"],
+   ["orgs/kotoba-lang/kotoba-lang/src/kotoba/cli.cljc"
+    "orgs/kotoba-lang/kotoba-lang/src/kotoba/lang/package_contract.cljc"],
    :test-paths
-   ["orgs/kotoba-lang/kotoba-lang/test/kotoba/lang/package_contract_test.clj"]}
+   ["orgs/kotoba-lang/kotoba-lang/test/kotoba/cli_test.cljc"
+    "orgs/kotoba-lang/kotoba-lang/test/kotoba/lang/package_contract_test.clj"]}
   {:repo "orgs/kotoba-lang/kotoba-lang-cli-contract",
    :ns kotoba.lang.cli-contract,
    :status :done,
@@ -610,6 +612,7 @@
    :status :done,
    :source-paths
    ["orgs/kotoba-lang/liquid-glass-ui/src/liquid_glass/components.cljc"
+    "orgs/kotoba-lang/liquid-glass-ui/src/liquid_glass/demo.clj"
     "orgs/kotoba-lang/liquid-glass-ui/src/liquid_glass/style.cljc"
     "orgs/kotoba-lang/liquid-glass-ui/src/liquid_glass/tokens.cljc"],
    :test-paths
@@ -679,14 +682,10 @@
     "orgs/kotoba-lang/murakumo/src/murakumo/core.clj"
     "orgs/kotoba-lang/murakumo/src/murakumo/dash.clj"
     "orgs/kotoba-lang/murakumo/src/murakumo/fleet.clj"
-    "orgs/kotoba-lang/murakumo/src/murakumo/infer.clj"
-    "orgs/kotoba-lang/murakumo/src/murakumo/infer/engine.cljc"
-    "orgs/kotoba-lang/murakumo/src/murakumo/infer/plan.cljc"
     "orgs/kotoba-lang/murakumo/src/murakumo/reconcile.clj"
     "orgs/kotoba-lang/murakumo/src/murakumo/ssh.clj"],
    :test-paths
-   ["orgs/kotoba-lang/murakumo/test/murakumo/infer_test.clj"
-    "orgs/kotoba-lang/murakumo/test/murakumo/reconcile_test.clj"
+   ["orgs/kotoba-lang/murakumo/test/murakumo/reconcile_test.clj"
     "orgs/kotoba-lang/murakumo/test/murakumo/reconcile_test_runner.clj"]}
   {:repo "orgs/kotoba-lang/net",
    :ns kotoba.net.gossip,
