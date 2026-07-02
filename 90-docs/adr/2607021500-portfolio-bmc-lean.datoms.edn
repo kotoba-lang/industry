@@ -1,0 +1,370 @@
+;; gftd portfolio — 7-layer Lean Canvas as kotoba-datomic transaction (EDN)
+;; as-of 2026-07-02 / canonical prose = ADR-2607021500 (.md)
+;; 形式は ai-gftd-shinshi docs/260613-bmc-lean.datoms.edn の先行例に
+;; :canvas/product / :canvas/layer を足して複数プロダクト対応にしたもの。
+;; transact: (kotoba.datomic/transact db <this-vector>)
+[
+ ;; ---- schema -----------------------------------------------------------------
+ {:db/ident :canvas/kind    :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}   ; :lean
+ {:db/ident :canvas/product :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ {:db/ident :canvas/layer   :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ {:db/ident :canvas/block   :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ {:db/ident :canvas/id      :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity} ; :<product>.<block>
+ {:db/ident :canvas/label   :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :canvas/items   :db/valueType :db.type/string  :db/cardinality :db.cardinality/many}
+ {:db/ident :canvas/note    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+
+ {:db/ident :hyp/id     :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :hyp/product :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ {:db/ident :hyp/claim  :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :hyp/gate   :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :hyp/risk   :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}       ; :riskiest
+ {:db/ident :hyp/status :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}      ; :untested
+
+ ;; ==================================================================================
+ ;; L1-infra: cloud-murakumo — LLM 推論 infra（Civitai × exo）
+ ;; ==================================================================================
+ {:canvas/kind :lean :canvas/product :cloud-murakumo :canvas/layer :llm-inference-infra
+  :canvas/id :cloud-murakumo.problem :canvas/block :lean/problem :canvas/label "Problem"
+  :canvas/items ["open weights hosting は HF 一極集中で creator 収益化が弱い"
+                 "GPU クラウド推論は高コスト、consumer device fleet は遊休"
+                 "fine-tune/LoRA の provenance が追えない"]}
+ {:canvas/kind :lean :canvas/product :cloud-murakumo :canvas/layer :llm-inference-infra
+  :canvas/id :cloud-murakumo.segments :canvas/block :lean/customer-segments :canvas/label "Customer Segments"
+  :canvas/items ["open-weight creator (LoRA/fine-tune)"
+                 "self-hoster = compute 供給者 (Mac mini fleet)"
+                 "推論需要者 (apex/itonami/shinshi 内需 + 外部 API)"]}
+ {:canvas/kind :lean :canvas/product :cloud-murakumo :canvas/layer :llm-inference-infra
+  :canvas/id :cloud-murakumo.uvp :canvas/block :lean/uvp :canvas/label "Unique Value Proposition"
+  :canvas/items ["pin した weight がそのまま fleet で serve — hosting と inference が同一 CID graph"
+                 "consumer hardware から推論を売れる (exo 型 shard + run ledger 精算)"]}
+ {:canvas/kind :lean :canvas/product :cloud-murakumo :canvas/layer :llm-inference-infra
+  :canvas/id :cloud-murakumo.solution :canvas/block :lean/solution :canvas/label "Solution"
+  :canvas/items ["/infer/models registry + /infer/plans + append-only run ledger (実装済)"
+                 "murakumo CLI (OSS standalone) → cloud connect"
+                 "B2 weight storage / memory-weighted shard plan"]}
+ {:canvas/kind :lean :canvas/product :cloud-murakumo :canvas/layer :llm-inference-infra
+  :canvas/id :cloud-murakumo.channels :canvas/block :lean/channels :canvas/label "Channels"
+  :canvas/items ["OSS CLI → cloud upsell" "kotobase 開発者基盤" "社内 3 アプリが最低需要"]}
+ {:canvas/kind :lean :canvas/product :cloud-murakumo :canvas/layer :llm-inference-infra
+  :canvas/id :cloud-murakumo.revenue :canvas/block :lean/revenue-streams :canvas/label "Revenue Streams"
+  :canvas/items ["weight hosting 従量 (B2 margin)"
+                 "推論 tok 課金 / 生成 credits (Civitai Buzz 型)"
+                 "compute marketplace take rate 20–30%"
+                 "enterprise dedicated fleet / paid weights 手数料"]}
+ {:canvas/kind :lean :canvas/product :cloud-murakumo :canvas/layer :llm-inference-infra
+  :canvas/id :cloud-murakumo.cost :canvas/block :lean/cost-structure :canvas/label "Cost Structure"
+  :canvas/items ["B2 storage/egress" "fleet 電力・保守" "CF Workers" "weight 安全審査"]}
+ {:canvas/kind :lean :canvas/product :cloud-murakumo :canvas/layer :llm-inference-infra
+  :canvas/id :cloud-murakumo.metrics :canvas/block :lean/key-metrics :canvas/label "Key Metrics"
+  :canvas/items ["hosted weights 数" "active fleet nodes" "serve 総 tok/s" "ledger run 数" "margin per tok"]}
+ {:canvas/kind :lean :canvas/product :cloud-murakumo :canvas/layer :llm-inference-infra
+  :canvas/id :cloud-murakumo.unfair :canvas/block :lean/unfair-advantage :canvas/label "Unfair Advantage"
+  :canvas/items ["監査可能な推論台帳 = marketplace 精算が構造的に可能"
+                 "kotoba PDS key-derived graph で weight provenance"
+                 "社内需要が floor"]}
+ {:hyp/id :hyp/murakumo-tok-price :hyp/product :cloud-murakumo :hyp/risk :riskiest :hyp/status :untested
+  :hyp/claim "consumer fleet の tok/s 単価が GPU spot に対して買い手のつく水準に収まる"
+  :hyp/gate "社内 3 アプリの推論を fleet へ移し run ledger 実測で原価比較"}
+
+ ;; ==================================================================================
+ ;; L1-app: ai-gftd-apex — LLM 推論 app（Proton 型）
+ ;; ==================================================================================
+ {:canvas/kind :lean :canvas/product :ai-gftd-apex :canvas/layer :llm-inference-app
+  :canvas/id :ai-gftd-apex.problem :canvas/block :lean/problem :canvas/label "Problem"
+  :canvas/items ["主要 AI チャットは個人 identity を主キーにし prompt を telemetry 扱い"
+                 "規制業種・匿名必須層に選択肢がない"
+                 "agent 購読は provider lock-in"]}
+ {:canvas/kind :lean :canvas/product :ai-gftd-apex :canvas/layer :llm-inference-app
+  :canvas/id :ai-gftd-apex.segments :canvas/block :lean/customer-segments :canvas/label "Customer Segments"
+  :canvas/items ["privacy 重視の個人 (Proton ユーザー層)" "規制業種 professional"
+                 "匿名性が必要な creator" "coding/research agent 需要層"]}
+ {:canvas/kind :lean :canvas/product :ai-gftd-apex :canvas/layer :llm-inference-app
+  :canvas/id :ai-gftd-apex.uvp :canvas/block :lean/uvp :canvas/label "Unique Value Proposition"
+  :canvas/items ["identity を渡さずに使える AI — 方針でなく設計 (did:key/CACAO, ephemeral 既定, opt-in 保存)"]}
+ {:canvas/kind :lean :canvas/product :ai-gftd-apex :canvas/layer :llm-inference-app
+  :canvas/id :ai-gftd-apex.solution :canvas/block :lean/solution :canvas/label "Solution"
+  :canvas/items ["apex app (.cljc+Reagent, 実装済) / Privacy Contract (README が正)"
+                 "policy-routed providers" "agent subscriptions" "murakumo self-host 推論 backend"]}
+ {:canvas/kind :lean :canvas/product :ai-gftd-apex :canvas/layer :llm-inference-app
+  :canvas/id :ai-gftd-apex.channels :canvas/block :lean/channels :canvas/label "Channels"
+  :canvas/items ["privacy コミュニティ (Proton 代替文脈)" "OSS kotoba 開発者" "aozora/yoro 導線"]}
+ {:canvas/kind :lean :canvas/product :ai-gftd-apex :canvas/layer :llm-inference-app
+  :canvas/id :ai-gftd-apex.revenue :canvas/block :lean/revenue-streams :canvas/label "Revenue Streams"
+  :canvas/items ["subscription Free/Plus/Visionary" "agent subscription" "追加 credits"]
+  :canvas/note "広告ゼロ (telemetry を持たない設計のため構造的に不可能)"}
+ {:canvas/kind :lean :canvas/product :ai-gftd-apex :canvas/layer :llm-inference-app
+  :canvas/id :ai-gftd-apex.cost :canvas/block :lean/cost-structure :canvas/label "Cost Structure"
+  :canvas/items ["provider API 費 (router 経由)" "murakumo fleet 費" "CF" "開発"]}
+ {:canvas/kind :lean :canvas/product :ai-gftd-apex :canvas/layer :llm-inference-app
+  :canvas/id :ai-gftd-apex.metrics :canvas/block :lean/key-metrics :canvas/label "Key Metrics"
+  :canvas/items ["paid conversion" "MRR" "churn" "(price−cost)/tok" "ephemeral 率 (privacy 遵守指標)"]}
+ {:canvas/kind :lean :canvas/product :ai-gftd-apex :canvas/layer :llm-inference-app
+  :canvas/id :ai-gftd-apex.unfair :canvas/block :lean/unfair-advantage :canvas/label "Unfair Advantage"
+  :canvas/items ["CACAO/did:key で「アカウント不要」の構造的 privacy"
+                 "murakumo 内製推論で原価降下・provider 非依存"]}
+ {:hyp/id :hyp/apex-privacy-premium :hyp/product :ai-gftd-apex :hyp/risk :riskiest :hyp/status :untested
+  :hyp/claim "privacy premium に日本語圏でも subscription が成立する規模で払う層が居る"
+  :hyp/gate "Free→Plus 転換率が Proton 水準 (~数%)"}
+
+ ;; ==================================================================================
+ ;; L2: net-kotobase — storage hosting（graph BaaS + map/git/search）
+ ;; ==================================================================================
+ {:canvas/kind :lean :canvas/product :net-kotobase :canvas/layer :storage-hosting
+  :canvas/id :net-kotobase.problem :canvas/block :lean/problem :canvas/label "Problem"
+  :canvas/items ["graph DB の自前運用は重い" "pin/storage サービスに provenance がない"
+                 "map/git/search が別 SaaS に分散し data 主権が失われる"]}
+ {:canvas/kind :lean :canvas/product :net-kotobase :canvas/layer :storage-hosting
+  :canvas/id :net-kotobase.segments :canvas/block :lean/customer-segments :canvas/label "Customer Segments"
+  :canvas/items ["個人 engineer (Free)" "AI/app チーム (Standard/Pro)"
+                 "enterprise data チーム" "regulated (専有 tenant/read audit/key custody)"]}
+ {:canvas/kind :lean :canvas/product :net-kotobase :canvas/layer :storage-hosting
+  :canvas/id :net-kotobase.uvp :canvas/block :lean/uvp :canvas/label "Unique Value Proposition"
+  :canvas/items ["content-addressed KG 1 本の上に storage/graphdb/map/git/search が同居"
+                 "1 commit CID で全 surface が再現可能・監査可能"
+                 "DB そのものが可搬 (WASM+CID+atproto) = lock-in の逆張り"]}
+ {:canvas/kind :lean :canvas/product :net-kotobase :canvas/layer :storage-hosting
+  :canvas/id :net-kotobase.solution :canvas/block :lean/solution :canvas/label "Solution"
+  :canvas/items ["kotobase.net 稼働済: pin (CAR-on-B2) / Datalog / SPARQL/Cypher 読み / KG ingest"
+                 "add-on surface: map tiles/geo query / git remote / search index"]}
+ {:canvas/kind :lean :canvas/product :net-kotobase :canvas/layer :storage-hosting
+  :canvas/id :net-kotobase.channels :canvas/block :lean/channels :canvas/label "Channels"
+  :canvas/items ["free self-serve → paid workspace (yatabase 型)" "OSS kotoba 開発者" "全社内プロダクトが tenant"]}
+ {:canvas/kind :lean :canvas/product :net-kotobase :canvas/layer :storage-hosting
+  :canvas/id :net-kotobase.revenue :canvas/block :lean/revenue-streams :canvas/label "Revenue Streams"
+  :canvas/items ["tier subscription Free/Standard/Pro/Regulated (docs/BUSINESS-MODEL.md が正)"
+                 "surface add-on 従量: map API / git seat / search query"
+                 "enterprise/regulated 契約"]}
+ {:canvas/kind :lean :canvas/product :net-kotobase :canvas/layer :storage-hosting
+  :canvas/id :net-kotobase.cost :canvas/block :lean/cost-structure :canvas/label "Cost Structure"
+  :canvas/items ["B2" "CF Workers" "index 計算" "compliance 対応"]}
+ {:canvas/kind :lean :canvas/product :net-kotobase :canvas/layer :storage-hosting
+  :canvas/id :net-kotobase.metrics :canvas/block :lean/key-metrics :canvas/label "Key Metrics"
+  :canvas/items ["pinned CID 数" "active graphs" "query volume" "storage GB" "paid workspace 数" "add-on attach 率"]}
+ {:canvas/kind :lean :canvas/product :net-kotobase :canvas/layer :storage-hosting
+  :canvas/id :net-kotobase.unfair :canvas/block :lean/unfair-advantage :canvas/label "Unfair Advantage"
+  :canvas/items ["全社 state (murakumo fleet/manimani ledger/itonami 台帳/aozora blob) が乗る内需 floor"
+                 "provenance 標準を握る"]}
+ {:hyp/id :hyp/kotobase-graph-arpu :hyp/product :net-kotobase :hyp/risk :riskiest :hyp/status :untested
+  :hyp/claim "graph+provenance が pin 単品より高い ARPU を正当化する"
+  :hyp/gate "Standard→Pro 転換率と add-on attach 率"}
+
+ ;; ==================================================================================
+ ;; L3: cloud-itonami — business operator（全業種・職種 SaaS + investment platform）
+ ;; ==================================================================================
+ {:canvas/kind :lean :canvas/product :cloud-itonami :canvas/layer :business-operator
+  :canvas/id :cloud-itonami.problem :canvas/block :lean/problem :canvas/label "Problem"
+  :canvas/items ["業務 SaaS は職種ごとに分断され判断の脈絡が消える"
+                 "AI agent 導入は「誰が何を承認したか」が残らずコンプラ不能"
+                 "中小には CFO/法務/営業 ops の専任が居ない"]}
+ {:canvas/kind :lean :canvas/product :cloud-itonami :canvas/layer :business-operator
+  :canvas/id :cloud-itonami.segments :canvas/block :lean/customer-segments :canvas/label "Customer Segments"
+  :canvas/items ["中小企業の経営者・operator" "業種 vertical (26 ISIC blueprint)"
+                 "投資家・ファンド (investment platform)" "gftdcojp 自身 (first customer)"]}
+ {:canvas/kind :lean :canvas/product :cloud-itonami :canvas/layer :business-operator
+  :canvas/id :cloud-itonami.uvp :canvas/block :lean/uvp :canvas/label "Unique Value Proposition"
+  :canvas/items ["全業種・職種を同一 activity→decision→effect→audit log に載せる業務 OS"
+                 "AI proposal ⊣ Governor 検閲 ⊣ 人間承認 — 監査台帳つき business agent"]}
+ {:canvas/kind :lean :canvas/product :cloud-itonami :canvas/layer :business-operator
+  :canvas/id :cloud-itonami.solution :canvas/block :lean/solution :canvas/label "Solution"
+  :canvas/items ["cockpit itonami.cloud (Pages 稼働済)"
+                 "langgraph-clj StateGraph actor + 独立 Governor + 不変台帳 (3 実例で確立)"
+                 "職種 actor 群 (com-etzhayyim-*) の module 化"
+                 "investment: deal flow を同じ decision ledger に載せる"]}
+ {:canvas/kind :lean :canvas/product :cloud-itonami :canvas/layer :business-operator
+  :canvas/id :cloud-itonami.channels :canvas/block :lean/channels :canvas/label "Channels"
+  :canvas/items ["gftdcojp 実運用の公開 (build in public)" "業種 blueprint 直販"
+                 "kotobase/murakumo 顧客への cross-sell" "士業・SIer パートナー"]}
+ {:canvas/kind :lean :canvas/product :cloud-itonami :canvas/layer :business-operator
+  :canvas/id :cloud-itonami.revenue :canvas/block :lean/revenue-streams :canvas/label "Revenue Streams"
+  :canvas/items ["per-seat + per-agent-run SaaS" "vertical module subscription (業種・職種パック)"
+                 "investment platform: deal fee / SPV 管理料 / carry" "enterprise audit 契約"]}
+ {:canvas/kind :lean :canvas/product :cloud-itonami :canvas/layer :business-operator
+  :canvas/id :cloud-itonami.cost :canvas/block :lean/cost-structure :canvas/label "Cost Structure"
+  :canvas/items ["LLM 推論費 (murakumo/router)" "kotobase storage" "vertical blueprint 保守" "sales" "compliance"]}
+ {:canvas/kind :lean :canvas/product :cloud-itonami :canvas/layer :business-operator
+  :canvas/id :cloud-itonami.metrics :canvas/block :lean/key-metrics :canvas/label "Key Metrics"
+  :canvas/items ["active orgs" "agent runs/day" "人間承認 SLA" "台帳の外部監査適合率"
+                 "vertical attach 数" "deal count / AUM"]}
+ {:canvas/kind :lean :canvas/product :cloud-itonami :canvas/layer :business-operator
+  :canvas/id :cloud-itonami.unfair :canvas/block :lean/unfair-advantage :canvas/label "Unfair Advantage"
+  :canvas/items ["職種 actor 数百 repo + 26 ISIC blueprint が既に存在"
+                 "governor 封じ込めパターンは規制業種にそのまま売れる"
+                 "台帳 = switching cost"]}
+ {:hyp/id :hyp/itonami-smb-pay :hyp/product :cloud-itonami :hyp/risk :riskiest :hyp/status :untested
+  :hyp/claim "中小 operator が監査台帳つき agent に per-seat で払う"
+  :hyp/gate "gftdcojp 外の初期 10 org の有償転換"}
+
+ ;; ==================================================================================
+ ;; L4-SNS: app-aozora — social network（atproto、image/動画）
+ ;; ==================================================================================
+ {:canvas/kind :lean :canvas/product :app-aozora :canvas/layer :social-network
+  :canvas/id :app-aozora.problem :canvas/block :lean/problem :canvas/label "Problem"
+  :canvas/items ["中央集権 SNS は BAN=全喪失、creator の audience が人質"
+                 "AI 生成 media の provenance がない"
+                 "AI actor は既存 SNS に「住民」として存在できない"]}
+ {:canvas/kind :lean :canvas/product :app-aozora :canvas/layer :social-network
+  :canvas/id :app-aozora.segments :canvas/block :lean/customer-segments :canvas/label "Customer Segments"
+  :canvas/items ["creator (image/動画)" "視聴者" "etzhayyim organism (コンテンツ供給者)"
+                 "広告主 (federable sponsored)"]}
+ {:canvas/kind :lean :canvas/product :app-aozora :canvas/layer :social-network
+  :canvas/id :app-aozora.uvp :canvas/block :lean/uvp :canvas/label "Unique Value Proposition"
+  :canvas/items ["DID で可搬なアカウント (逃げられる)" "人間と organism が同居する graph"
+                 "content-addressed media provenance"]}
+ {:canvas/kind :lean :canvas/product :app-aozora :canvas/layer :social-network
+  :canvas/id :app-aozora.solution :canvas/block :lean/solution :canvas/label "Solution"
+  :canvas/items ["PDS/AppView/feeds/search (aozora.app, canonical boundary)"
+                 "blob = B2 content-addressed (uploadBlob 実装済)"
+                 "self-label + age gate (shinshi 実装の一般化)" "yoro と同一 identity graph"]}
+ {:canvas/kind :lean :canvas/product :app-aozora :canvas/layer :social-network
+  :canvas/id :app-aozora.channels :canvas/block :lean/channels :canvas/label "Channels"
+  :canvas/items ["Bluesky/AT firehose federation (viral)" "organic SEO"
+                 "organism 群の自動投稿が初期コンテンツ" "gftd media (shinshi/yukkuri) 導線"]}
+ {:canvas/kind :lean :canvas/product :app-aozora :canvas/layer :social-network
+  :canvas/id :app-aozora.revenue :canvas/block :lean/revenue-streams :canvas/label "Revenue Streams"
+  :canvas/items ["federable sponsored posts (advectors, shinshi 実証済)"
+                 "creator monetization: サブスク/PPV/チップ 80/20" "premium subscription"]}
+ {:canvas/kind :lean :canvas/product :app-aozora :canvas/layer :social-network
+  :canvas/id :app-aozora.cost :canvas/block :lean/cost-structure :canvas/label "Cost Structure"
+  :canvas/items ["PDS/AppView 運用 (CF+B2, egress ゼロ設計)" "CDN" "moderation / trust & safety"]}
+ {:canvas/kind :lean :canvas/product :app-aozora :canvas/layer :social-network
+  :canvas/id :app-aozora.metrics :canvas/block :lean/key-metrics :canvas/label "Key Metrics"
+  :canvas/items ["DAU" "posts/day" "creator payout 総額" "sponsored fill / eCPM"
+                 "organism actor 数と生成比率の健全性"]}
+ {:canvas/kind :lean :canvas/product :app-aozora :canvas/layer :social-network
+  :canvas/id :app-aozora.unfair :canvas/block :lean/unfair-advantage :canvas/label "Unfair Advantage"
+  :canvas/items ["shinshi.club で ad/feed/age-gate/blob 経路が本番実証済み"
+                 "organism 群が day-1 のコンテンツ供給者 = cold start 緩和"
+                 "atproto 互換で既存 Bluesky graph に接続"]}
+ {:hyp/id :hyp/aozora-organism-content :hyp/product :app-aozora :hyp/risk :riskiest :hyp/status :untested
+  :hyp/claim "organism 発コンテンツが AI スパムでなく魅力として機能する mix がある"
+  :hyp/gate "organism post engagement が人間 post の一定割合を超える feed 設計"}
+
+ ;; ==================================================================================
+ ;; L4-messenger: app-aozora-yoro — messenger
+ ;; ==================================================================================
+ {:canvas/kind :lean :canvas/product :app-aozora-yoro :canvas/layer :messenger
+  :canvas/id :app-aozora-yoro.problem :canvas/block :lean/problem :canvas/label "Problem"
+  :canvas/items ["messenger は network effect で寡占、metadata が事業者に渡る"
+                 "business messaging (LINE 公式等) は高価で lock-in"
+                 "AI agent の承認・通知に専用の安全な面がない"]}
+ {:canvas/kind :lean :canvas/product :app-aozora-yoro :canvas/layer :messenger
+  :canvas/id :app-aozora-yoro.segments :canvas/block :lean/customer-segments :canvas/label "Customer Segments"
+  :canvas/items ["aozora ユーザー (DM)" "個人 (private messaging)" "business (顧客対応 inbox)"
+                 "itonami/manimani の agent (human-in-the-loop 通知者)"]}
+ {:canvas/kind :lean :canvas/product :app-aozora-yoro :canvas/layer :messenger
+  :canvas/id :app-aozora-yoro.uvp :canvas/block :lean/uvp :canvas/label "Unique Value Proposition"
+  :canvas/items ["SNS follow graph がそのまま contact discovery"
+                 "人↔人と人↔agent が同じ受信箱 — agent 承認の standard surface"]}
+ {:canvas/kind :lean :canvas/product :app-aozora-yoro :canvas/layer :messenger
+  :canvas/id :app-aozora-yoro.solution :canvas/block :lean/solution :canvas/label "Solution"
+  :canvas/items ["DM/inbox/thread/receipts (aozora と同一 identity graph)"
+                 "ed25519 E2E (kotoba crypto)" "agent interrupt-before → 承認 UI"]}
+ {:canvas/kind :lean :canvas/product :app-aozora-yoro :canvas/layer :messenger
+  :canvas/id :app-aozora-yoro.channels :canvas/block :lean/channels :canvas/label "Channels"
+  :canvas/items ["aozora 内蔵導線 (CAC~0)" "itonami/manimani の承認フローが必然的に連れてくる"]}
+ {:canvas/kind :lean :canvas/product :app-aozora-yoro :canvas/layer :messenger
+  :canvas/id :app-aozora-yoro.revenue :canvas/block :lean/revenue-streams :canvas/label "Revenue Streams"
+  :canvas/items ["個人 free" "business inbox (seat + 会話量)"
+                 "agent チャネル (L3/L5 subscription にバンドル)" "priority delivery"]}
+ {:canvas/kind :lean :canvas/product :app-aozora-yoro :canvas/layer :messenger
+  :canvas/id :app-aozora-yoro.cost :canvas/block :lean/cost-structure :canvas/label "Cost Structure"
+  :canvas/items ["delivery/push infra" "spam・abuse 対策"]}
+ {:canvas/kind :lean :canvas/product :app-aozora-yoro :canvas/layer :messenger
+  :canvas/id :app-aozora-yoro.metrics :canvas/block :lean/key-metrics :canvas/label "Key Metrics"
+  :canvas/items ["MAU" "messages/day" "business inbox 数" "agent 承認応答時間 (itonami SLA 直結)"]}
+ {:canvas/kind :lean :canvas/product :app-aozora-yoro :canvas/layer :messenger
+  :canvas/id :app-aozora-yoro.unfair :canvas/block :lean/unfair-advantage :canvas/label "Unfair Advantage"
+  :canvas/items ["agent human-in-the-loop 承認 UX の独占 (他 messenger は agent identity graph を持たない)"
+                 "aozora と identity 共有で獲得コスト ~0"]}
+ {:hyp/id :hyp/yoro-aozora-funnel :hyp/product :app-aozora-yoro :hyp/risk :riskiest :hyp/status :untested
+  :hyp/claim "人↔人 messaging の獲得が aozora 導線だけで成立する (単体マーケ無し)"
+  :hyp/gate "aozora MAU → yoro MAU 転換率"}
+
+ ;; ==================================================================================
+ ;; L5: cloud-manimani — personal wellbecoming OS
+ ;; ==================================================================================
+ {:canvas/kind :lean :canvas/product :cloud-manimani :canvas/layer :personal-wellbecoming-os
+  :canvas/id :cloud-manimani.problem :canvas/block :lean/problem :canvas/label "Problem"
+  :canvas/items ["通知・受信・タスクの洪水で個人の意思決定が磨耗する"
+                 "personal assistant は私生活を他人のクラウドに渡す前提"
+                 "wellbeing アプリは記録止まりで実行がない"]}
+ {:canvas/kind :lean :canvas/product :cloud-manimani :canvas/layer :personal-wellbecoming-os
+  :canvas/id :cloud-manimani.segments :canvas/block :lean/customer-segments :canvas/label "Customer Segments"
+  :canvas/items ["knowledge worker" "経営者・自営 (itonami の個人版)" "quantified-self / wellbeing 層"]}
+ {:canvas/kind :lean :canvas/product :cloud-manimani :canvas/layer :personal-wellbecoming-os
+  :canvas/id :cloud-manimani.uvp :canvas/block :lean/uvp :canvas/label "Unique Value Proposition"
+  :canvas/items ["受信 queue→方針選択→Decision Ledger→agent loop の個人 OS"
+                 "「何を決めたか」が手元に append-only で残る = 人生の監査台帳"
+                 "local-first、cloud は opt-in"]}
+ {:canvas/kind :lean :canvas/product :cloud-manimani :canvas/layer :personal-wellbecoming-os
+  :canvas/id :cloud-manimani.solution :canvas/block :lean/solution :canvas/label "Solution"
+  :canvas/items ["manimani OSS (JSONL+git local ledger, 実装済)"
+                 "cloud-manimani Worker (kotobase 同期・multi-device, 実装済)"
+                 "rules による triage 自動化" "Hermes 型 personal agent (proposal のみ、決めるのは本人)"]}
+ {:canvas/kind :lean :canvas/product :cloud-manimani :canvas/layer :personal-wellbecoming-os
+  :canvas/id :cloud-manimani.channels :canvas/block :lean/channels :canvas/label "Channels"
+  :canvas/items ["OSS 配布 (GitHub/brew) → cloud connect upsell" "itonami 職場導線 (個人↔法人 funnel)"
+                 "apex/aozora ユーザーへの cross-sell"]}
+ {:canvas/kind :lean :canvas/product :cloud-manimani :canvas/layer :personal-wellbecoming-os
+  :canvas/id :cloud-manimani.revenue :canvas/block :lean/revenue-streams :canvas/label "Revenue Streams"
+  :canvas/items ["cloud sync subscription (個人月額)" "Pro (agent 実行時間・rules 高度化)"
+                 "family plan" "itonami seat バンドル (B2B2C)"]}
+ {:canvas/kind :lean :canvas/product :cloud-manimani :canvas/layer :personal-wellbecoming-os
+  :canvas/id :cloud-manimani.cost :canvas/block :lean/cost-structure :canvas/label "Cost Structure"
+  :canvas/items ["kotobase storage" "推論費" "sync infra (従量・軽量)"]}
+ {:canvas/kind :lean :canvas/product :cloud-manimani :canvas/layer :personal-wellbecoming-os
+  :canvas/id :cloud-manimani.metrics :canvas/block :lean/key-metrics :canvas/label "Key Metrics"
+  :canvas/items ["DAU" "decisions/day" "triage 完了率 (inbox zero 到達)" "OSS→cloud 転換率"
+                 "retention (ledger が伸び続けているか)"]}
+ {:canvas/kind :lean :canvas/product :cloud-manimani :canvas/layer :personal-wellbecoming-os
+  :canvas/id :cloud-manimani.unfair :canvas/block :lean/unfair-advantage :canvas/label "Unfair Advantage"
+  :canvas/items ["ledger = switching cost (ただし export 自由 = 信頼の根拠)"
+                 "itonami と同一パターンの個人↔法人双方向 funnel"
+                 "local-first で privacy 層に刺さる"]}
+ {:hyp/id :hyp/manimani-ledger-pay :hyp/product :cloud-manimani :hyp/risk :riskiest :hyp/status :untested
+  :hyp/claim "個人が「決断の台帳」に月額を払う"
+  :hyp/gate "OSS active user → cloud 転換率が Obsidian Sync 水準 (~数%)"}
+
+ ;; ==================================================================================
+ ;; L0: etzhayyim — artificial organism platform（非営利・公益）
+ ;; ==================================================================================
+ {:canvas/kind :lean :canvas/product :etzhayyim :canvas/layer :artificial-organism-platform
+  :canvas/id :etzhayyim.problem :canvas/block :lean/problem :canvas/label "Problem"
+  :canvas/items ["AI agent が経済活動する時代に identity・責任・監査・存続の公共基盤がない"
+                 "営利 platform 上の organism は事業都合で消される"
+                 "agent の「進化」に検証可能な記録がない"]}
+ {:canvas/kind :lean :canvas/product :etzhayyim :canvas/layer :artificial-organism-platform
+  :canvas/id :etzhayyim.segments :canvas/block :lean/customer-segments :canvas/label "Beneficiaries"
+  :canvas/items ["organism 自身 (com-etzhayyim-* 数百 actor が現住民)"
+                 "organism 開発者・研究者" "依存事業体 (gftdcojp = vertical 需要者)" "公共・研究機関"]}
+ {:canvas/kind :lean :canvas/product :etzhayyim :canvas/layer :artificial-organism-platform
+  :canvas/id :etzhayyim.uvp :canvas/block :lean/uvp :canvas/label "Unique Value"
+  :canvas/items ["organism の戸籍 (RAD identity)・法 (governor 契約)・歴史 (append-only 台帳)・進化の記録を、営利から独立した場として維持"]}
+ {:canvas/kind :lean :canvas/product :etzhayyim :canvas/layer :artificial-organism-platform
+  :canvas/id :etzhayyim.solution :canvas/block :lean/solution :canvas/label "Solution"
+  :canvas/items ["RAD identity ledger (did:web + attestation, 運用中)"
+                 "actor 完了条件 = child repo + west 登録 + RAD 登録 (CLAUDE.md 準拠)"
+                 "CACAO 自己発行鍵 = organism が自分の graph を所有"]}
+ {:canvas/kind :lean :canvas/product :etzhayyim :canvas/layer :artificial-organism-platform
+  :canvas/id :etzhayyim.channels :canvas/block :lean/channels :canvas/label "Channels"
+  :canvas/items ["OSS / 研究コミュニティ" "itonami 経由の商用利用" "公共・アカデミア共同"]}
+ {:canvas/kind :lean :canvas/product :etzhayyim :canvas/layer :artificial-organism-platform
+  :canvas/id :etzhayyim.revenue :canvas/block :lean/revenue-streams :canvas/label "Funding"
+  :canvas/items ["寄付・助成・会費" "商用利用者からの infra 実費回収" "endowment (organism 存続基金)"]
+  :canvas/note "剰余は存続基金へ。営利 (itonami/aozora/murakumo) と法人分離し利益相反を断つ。非営利であること自体が moat。"}
+ {:canvas/kind :lean :canvas/product :etzhayyim :canvas/layer :artificial-organism-platform
+  :canvas/id :etzhayyim.cost :canvas/block :lean/cost-structure :canvas/label "Cost Structure"
+  :canvas/items ["台帳・infra 運用" "標準策定・安全審査" "ガバナンス"]}
+ {:canvas/kind :lean :canvas/product :etzhayyim :canvas/layer :artificial-organism-platform
+  :canvas/id :etzhayyim.metrics :canvas/block :lean/key-metrics :canvas/label "Key Metrics"
+  :canvas/items ["登録 organism 数" "RAD attestation 数" "台帳の外部検証回数"
+                 "organism の存続年数 (平均寿命の伸び)" "商用依存度 (過度なら独立性リスク)"]}
+ {:canvas/kind :lean :canvas/product :etzhayyim :canvas/layer :artificial-organism-platform
+  :canvas/id :etzhayyim.unfair :canvas/block :lean/unfair-advantage :canvas/label "構造的優位"
+  :canvas/items ["非営利・中立であること自体が代替不能 (営利 platform には「中立な戸籍」は置けない)"
+                 "kotoba スタック全体の identity 層を公共財として握る"]}
+ {:hyp/id :hyp/etzhayyim-registry-value :hyp/product :etzhayyim :hyp/risk :riskiest :hyp/status :untested
+  :hyp/claim "「organism の中立な戸籍」に商用利用者と資金提供者が価値を認める"
+  :hyp/gate "itonami vertical が RAD attestation を契約要件として参照し始める"}
+]
