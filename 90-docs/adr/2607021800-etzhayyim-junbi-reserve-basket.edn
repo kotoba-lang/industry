@@ -1,0 +1,88 @@
+{:frontmatter
+ {:id "adr-2607021800-etzhayyim-junbi-reserve-basket"
+  :title "ADR-2607021800: junbi (準備) reserve treasury actor + HAKARI (秤) basket unit of account"
+  :status "accepted (R0 scaffold landed 2026-07-02)"
+  :doc_type "adr"
+  :topic "etzhayyim-reserve-basket"
+  :authoritative true
+  :last_verified "2026-07-02"
+  :authoritative_for
+  ["which reserve assets etzhayyim may hold: Tier-1 on-chain {USDC, EURC (Circle), JPYC (JPYC株式会社)} on Base L2; Tier-2 CBDC {e-CNY (PBOC); digital euro / digital yen placeholders} attestation-observed"
+   "USDT is structurally excluded (owner decision 2026-07-02); readmission = Council Lv7+ unanimity + ADR amendment"
+   "HAKARI (秤) is an SDR-style basket UNIT OF ACCOUNT only — never minted as a token (Alt C / Charter Rider §2(b) intact)"
+   "Tier-2 CBDC carries weight 0 until Council Lv7+ unanimity activation; basket NAV renormalizes over active assets"
+   "EN (縁/ENGI) stays net-zero mutual credit; HAKARI generalizes the cross-boundary settlement asset from single-USDC to the basket and may denominate EN credit-limit sizing"]
+  :related
+  ["orgs/kotoba-lang/kotoba/docs/ADR-engi-mutual-credit-on-chain.md"
+   "orgs/etzhayyim/com-etzhayyim-kawase-yui/README.md"
+   "90-docs/adr/2606302300-org-taxonomy-4-orgs.md"
+   "orgs/kotoba-lang/banking/README.md"
+   "orgs/kotoba-lang/base-l2/README.md"]
+  :supersedes []
+  :superseded_by []}
+
+ :problem
+ {:source "owner directive 2026-07-02"
+  :gap "EN is internal-only mutual credit; the scarce cross-boundary asset was pinned to a single issuer/currency (USDC on Base L2) — no multi-issuer, multi-currency reserve and no balanced unit over it"
+  :risk "single-issuer concentration (Circle/USD); no JPY/EUR/CNY diversification; ad-hoc reserve decisions without gates would drift into speculative finance (Charter Rider §2(b) violation)"}
+
+ :decision
+ {:actor {:name "junbi"
+          :kanji "準備"
+          :repo "github.com/etzhayyim/com-etzhayyim-junbi"
+          :path "orgs/etzhayyim/com-etzhayyim-junbi"
+          :did-web "did:web:etzhayyim.github.io:com-etzhayyim-junbi"
+          :namespace "com.etzhayyim.junbi.*"
+          :pattern "containment + independent TreasuryGovernor + append-only audit ledger (langgraph-clj StateGraph at R1)"}
+  :basket {:unit "HAKARI (秤)"
+           :kind :unit-of-account          ; SDR-style — NEVER a minted token
+           :numeraire :usd
+           :band-bps 50                    ; inherits kawase-yui G4
+           :weights-r1 {:usdc 0.40 :jpyc 0.40 :eurc 0.20}
+           :weights-r3-example {:usdc 0.35 :jpyc 0.35 :eurc 0.20 :ecny 0.10}
+           :params-pattern "Council-versioned blob (same as mKOTO tariff / social-capital params)"}
+  :tier-1 [{:asset :usdc :issuer "Circle Internet Financial" :chain :base-l2}
+           {:asset :eurc :issuer "Circle Internet Financial" :chain :base-l2}
+           {:asset :jpyc :issuer "JPYC株式会社" :chain :base-l2
+            :legal "資金移動業 / 改正資金決済法(2023) 電子決済手段"}]
+  :tier-2 [{:asset :ecny :issuer "中国人民銀行 (PBOC)" :custody :authorized-operator-wallet
+            :observation :attestation-datoms-only :activation :council-lv7-unanimity :phase :r3}
+           {:asset :d-eur :issuer "European Central Bank" :status :not-yet-issued}
+           {:asset :d-jpy :issuer "日本銀行 (BoJ)" :status :pilot-only}]
+  :excluded #{:usdt}
+  :custody {:tier-1 "ERC-4337 smart account / Safe on Base L2; kotoba-custody t-of-N Shamir"
+            :signing :etzhayyim-exclusive  ; kotoba = read+verify only
+            :accounting "kotoba-lang/banking double-entry + append-only audit datoms + toritate cross-ref"}
+  :rebalance {:trigger :weight-drift-bps
+              :mode :proposal-only          ; execution needs human approval (interrupt-before)
+              :execution :mid-market-band   ; no AMM / no spread / no yield
+              }}
+
+ :gates
+ {:j1 "no token mint — HAKARI is unit of account; no ERC-20 deploy path"
+  :j2 "issuer whitelist only (Tier-1 + Council-activated Tier-2)"
+  :j3 "USDT structurally rejected (hard-coded excluded set)"
+  :j4 "Σ weights = 1.0 (ε), weights ≥ 0"
+  :j5 "NAV rate band ±0.5% mid-market (band-bps 50 = KAWASE_MAX_BAND_BPS)"
+  :j6 "no yield / no DeFi / no lending of reserve"
+  :j7 "no fiat custody — stablecoin ERC-20 + authorized CBDC wallet only"
+  :j8 "double-entry balanced postings only"
+  :j9 "Tier-2 CBDC attestation-observed; weight 0 until Council activation"
+  :j10 "rebalance is proposal-only; execution requires human approval"
+  :j11 "no spread profit — mid-market locked"
+  :j12 "EN net-zero untouched — no EN mint/burn surface in basket code"}
+
+ :phases
+ [{:phase :r0 :state "landed 2026-07-02"
+   :scope "pure .cljc core (params validation, NAV, drift, rebalance proposal, governor J1–J12) + tests; repo + west + RAD registration"}
+  {:phase :r1 :state :gated-on-council
+   :scope "USDC+JPYC live on Base smart account (base-l2 ERC-4337); banking double-entry wiring; langgraph-clj StateGraph + TreasuryGovernor; attestation datoms"}
+  {:phase :r2 :state :post-r1
+   :scope "+EURC live; rebalance-proposer cell; toritate cross-ref; HAKARI denominates EN credit limits"}
+  {:phase :r3 :state :post-r2
+   :scope "+e-CNY Tier-2 (jurisdiction legal analysis + Council Lv7+ unanimity + authorized-operator wallet + attestation feed)"}]
+
+ :honesty
+ {:ecny "foreign-entity e-CNY custody not currently establishable at scale (pilot corridors) — hence Tier-2 / weight-0 / attestation-only; nothing faked at R0"
+  :repo-visibility "created private per standing authorization default; public flip for did:web Pages resolution awaits owner confirmation"
+  :r0-purity "no on-chain I/O at R0; banking / base-l2 / StateGraph wiring is R1"}}
