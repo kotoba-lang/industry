@@ -158,3 +158,34 @@ PDS/AppView・SPA 両ビルドを shadow-cljs source-path でこれを消費す�
 削除。PDS 237/1030・SPA 30/83 green・両ビルド0 warnings で本番デプロイ済み。
 **残 follow-up: app-aozora-boundary / kami-genko の埋め込みコピーも同様に de-fork**（本 live
 サービスには非影響のため保留）。
+
+## Addendum 3（2026-07-02）— kotobase 500 の根治: filter-honoring CLJC worker + route 切替
+
+オーナー指摘「index/components_edn/limit を無視するのが根本問題では?」を受け、リトライ緩和
+（対症）でなく**分散層での根治**を実装。調査で判明した経路: quad-store は既に AVET 相当の
+`:pos` インデックス（`by-predicate`/`by-predicate-value`）を持つのにエンジンが使っていなかった。
+
+- **kotobase-engine（kotoba-lang、pin `aa4e1de`）**: `datoms` が `{:index :components :limit}` を
+  honor（AVET point lookup へ接続）、`cold-datoms`（永続 snapshot から該当 index tree だけを
+  prefix-seek、全 db を rehydrate しない — cold-query gap をクローズ）、`hydrate-db`（write 用に
+  snapshot→hot db を ~1× 復元、wasm の 10-30× 増幅を回避）。JVM 8-10 tests green。
+- **kotobase-cljc-worker（新設 kotoba-lang public、pin `03b6044`）**: `:esm`/workerd worker。
+  handler（純 XRPC dispatch + tx_edn→quads）+ r2（block-miss トランポリンで非同期 R2↔同期
+  エンジン）+ CACAO 検証（PDS と byte-exact）+ write（buffer→flush→head）。node 6/21 + mint tool。
+- **切替（オーナー承認: 旧データ廃棄 + CLJC prolly/commit-dag フォーマット採用）**: Rust WASM の
+  R2 データは非互換なので移行せず、`kotobase.aozora.app` の custom-domain route を新 worker へ移し
+  yoro-social を fresh（`kotobase/cljc` prefix）で開始。旧 wasm worker はロールバック用に残置。
+
+**workerd smoke test が node では出ない 3 実バグを検出・修正**: (1) 空 allowlist が CACAO 要件を
+skip（no-CACAO transact が commit）→ issuer 必須化、(2) transact は `:db_name` を送る wire を
+`:graph` 前提にしていた → `canonical-graph(issuer, db_name)` 導出、(3) handle の try/catch が
+トランポリンの block-miss シグナルを飲み込み → re-throw。
+
+**検証（live）**: kotobase.aozora.app = 新 worker、**getBackup 500 が 0/12（~0.8s、従来 ~6s +
+25-90% 失敗）**、E2E signup→session→recovery-phrase-restore green（PDS→worker 書込読戻）。
+リトライ緩和（addendum 2）は根治で不要になったが無害な保険として残置。
+
+**残 follow-up**: (a) PDS の keyed read（getBackup/getAccount/resolveHandle）を full `:eavt` から
+narrow components へ（fresh graph が育っても高速維持、worker は既に honor）、(b) prolly-tree
+`scan-prefix` の key-range 刈り込み（keyed read を O(path) の数ブロックに）、(c) KOTOBASE_OPERATOR_DIDS
+allowlist を operator DID に絞る（現状 staging で空=任意の有効 CACAO 許可）。
