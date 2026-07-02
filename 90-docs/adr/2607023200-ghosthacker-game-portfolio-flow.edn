@@ -9,11 +9,12 @@
   :authoritative false
   :authoritative_for
   ["FreeTEMPOの実像（2000年代ボサノバ/AOR/ジャズ/ハウス）に基づく Ghost Hacker ゲームポートフォリオ 10タイトルのジャンル/主人公/出典曲マッピング"
-   "GHOST HACKER: FLOW の groove-sync 判定モデル（pure .cljc core、TENSE⇄Sky High crossfadeパラメータ）"]
+   "GHOST HACKER: FLOW の groove-sync 判定モデル（pure .cljc core、TENSE⇄Sky High crossfadeパラメータ）"
+   "HARMONY着手時、FLOWのcoreは複製せずshared libへ切り出す方向（Addendum 2026-07-03）"]
   :supersedes []
   :superseded_by []
   :related []
-  :last_verified "2026-07-02"
+  :last_verified "2026-07-03"
   :artifacts
   {:ghosthacker "orgs/com-junkawasaki/ghosthacker — 既存カノン（Ren/Nei、情報場、Ghost Battle/Daemon Battle、教育監修）"
    :ghosthacker-flow "orgs/com-junkawasaki/ghosthacker-flow — 本ADRで新規scaffold（pure .cljc groove-sync core + test のみ、host adapter未実装）"}}
@@ -119,10 +120,41 @@ FLOWを最初の実装対象に選ぶ。理由:
 
 - 残り9本（HARMONY以下）の着手順序と、それぞれのtech stack最終決定
   （レンダリング層は kami-engine-sdk 流用が有力候補だが未決定）。
-- FLOW/HARMONYが共有する `groove`/判定ロジックを、別途 shared lib に切り出すか
-  各リポジトリに複製するかは、2本目（HARMONY）着手時に判断する。
+- ~~FLOW/HARMONYが共有する `groove`/判定ロジックを、別途 shared lib に切り出す
+  か各リポジトリに複製するかは、2本目（HARMONY）着手時に判断する。~~
+  → 下記Addendumで暫定決着（実装はHARMONY着手時）。
 - ghosthacker本体（manga pipeline）とゲームポートフォリオの資産共有範囲
   （キャラクター画像・世界観設定EDNの参照方法）は未設計。
+
+## Addendum（2026-07-03、FLOW 14イテレーション後の知見）
+
+FLOWの `ghosthacker-flow.core` は、当初想定した「ビート位相計算・判定・
+状態遷移のみ」の薄いscaffoldから、以下まで育った（103 assertions）:
+
+- 判定窓パラメータ化（`judge-with-windows`）と難易度プリセット
+  （`:easy`/`:normal`/`:hard`、`judge-input-difficulty` /
+  `judge-detailed-difficulty`）
+- score/combo倍率/`:groove`crossfadeの状態遷移一式（`apply-judgment`）
+- 対マッシュガード（`judge-input-once`/`judge-sequence-once`、
+  `beat-index`による同一拍の二重入力検出）
+- 空振り検出（`judge-run`/`play-run`、期待される拍数と実入力の突き合わせ）
+- `beat-schedule`（譜面/理想入力列の生成）、`accuracy`/`grade`/`summary`
+
+これらは**FLOWの疾走アクションという表現に固有の要素をほぼ含まない**——
+「四つ打ちのビートに同期し続ける」判定エンジンそのもの。一方、
+HARMONY（旗艦・音ゲー本編）の設計は「Ghost Battle本編。四つ打ちに同期し
+続ける精度を競い、乗れているほどTENSE→Sky Highへ曲が転調していく」と、
+FLOWの核と**同一の判定・crossfadeモデル**を前提にしている。
+
+**暫定決定**: HARMONY着手時、`ghosthacker-flow.core`（判定/score/crossfade/
+対マッシュ/空振り検出）は複製せず、shared libへ切り出す方向で進める
+（FLOW固有なのは `demo.clj` とREADMEのFLOW向け説明のみ）。切り出し方の
+選択肢（a. `ghosthacker-flow`からcoreを剥がして新規`ghosthacker-groove-core`
+のようなrepoに移し両者が依存する、b. HARMONY作成時に一旦複製して2本の
+実装が揃ってから共通化する、のどちらを取るかはHARMONY着手PRで判断——
+本Addendumの役割は「複製ではなく共通化する」という方向性だけを先に
+固定しておくこと。実装（repo分割・manifest更新）は本ADRの対象外で、
+HARMONY起票時の別作業とする。
 
 ## Consequences
 
