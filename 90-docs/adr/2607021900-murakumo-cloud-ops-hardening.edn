@@ -1,0 +1,121 @@
+{:frontmatter
+ {
+  :id "adr-2607021900-murakumo-cloud-ops-hardening"
+  :title "ADR-2607021900: murakumo.cloud 稼働化 — KV interim fleet storage / deep health / kotoba-server HTTP-wedge watchdog"
+  :status "accepted"
+  :date "2026-07-02"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "murakumo-cloud-ops-hardening"
+  :authoritative true
+  :authoritative_for ["murakumo.cloud / www / api カスタムドメイン配置（site=murakumo-cloud, fleet API=cloud-murakumo, account=ai-gftd-cloud）" "fleet API storage の FLEET_KV interim backend 規約（binding 有→KV / 無→kotobase+CACAO）と退役条件" "GET /health の deep storage check 契約（{:storage {:backend :ok}}、供給ミス=503）" "com.murakumo.kotoba-mesh-watchdog（60s probe / 2-strike kill / KeepAlive respawn）" "KOTOBASE_CACAO を net.kotobase.store.* 実装前に供給しない方針"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2606272300" "adr-2606272330" "adr-2607022000"]
+  :last_verified "2026-07-02"}
+ :body
+ "# ADR-2607021900: murakumo.cloud 稼働化 — KV interim fleet storage / deep health / kotoba-server HTTP-wedge watchdog
+
+**Status**: accepted
+**Date**: 2026-07-02
+**Deciders**: Jun Kawasaki
+
+## Context
+
+2026-07-02 の稼働評価で、murakumo 系の公開面と fleet が三重に不動作だった:
+
+1. **murakumo.cloud が未デプロイ** — ドメインは Cloudflare 登録済み（2026-06-22、
+   ADR-2606272330 は closed）だが、apex/www に DNS レコードが無く、Worker
+   `murakumo-cloud`（site）も `cloud-murakumo`（fleet API）も ai-gftd-cloud
+   アカウントに存在しなかった。
+2. **fleet API の data plane が全滅** — `cloud-murakumo`（fleet API worker）は
+   kotobase.net の `net.kotobase.store.*` XRPC を呼ぶ設計（kotobase-clj の
+   `IStore` 契約）だが、**kotobase.net（net-kotobase/clj-edge）が実装する
+   surface は `ai.gftd.apps.kotobase.*`（datomic.* / kg.ingest / billing 等）
+   のみで、`net.kotobase.store.*` はサーバ側に存在しない**。応答の
+   `{\"ok\":false,\"error\":\"Unauthorized\"}` は手前の viewer ゲート
+   （`proxy/resolve-viewer`）によるもので、「KOTOBASE_CACAO secret 未設定」は
+   真因ではない — **CACAO を mint しても検証先の store surface が無い**。
+   さらに worker の xrpc 経路はエラー JSON をそのまま resolve する（reject
+   しない）ため、/nodes が壊れた配列を返し、/health は無条件 ok を返す —
+   供給ミスがサイレントだった。
+3. **kotoba mesh fleet 全ノード health down** — kotoba-server（pin `4f38b74a`、
+   webrtc ビルド）が数日稼働後に **HTTP 面だけ wedge**（TCP accept するが
+   無応答。外形は connection reset / empty reply）。libp2p 面は生存し続け、
+   プロセスは exit しないため LaunchDaemon の KeepAlive では自己回復しない。
+   dash（:8899）は全 10 ノード down を表示し続けた（到達可能 5 台 + Tailscale
+   圏外 5 台）。プロセス kill → KeepAlive respawn で即座に health ok に戻る
+   ことを asher canary で実証し、到達可能 5 台を復旧した。
+
+## Decision
+
+### 1. murakumo.cloud への配置（site + fleet API）
+
+- site `murakumo-cloud`（gftdcojp/cloud-murakumo、assets-only SPA）→ custom
+  domains **murakumo.cloud / www.murakumo.cloud**。
+- fleet API `cloud-murakumo`（gftdcojp/cloud-murakumo-fleet）→ custom domain
+  **api.murakumo.cloud**（site が apex/www を持つため api. サブドメイン。
+  wrangler.toml に routes として明記）。
+- repo transfer（com-junkawasaki→gftdcojp）で壊れていた kotobase-clj の
+  `:local/root` を `../../com-junkawasaki/kotobase-clj` に修正。
+
+### 2. fleet state は FLEET_KV interim backend（kotobase.net は温存）
+
+`worker.cljs` が request 時に backend を選ぶ:
+
+- **`FLEET_KV` binding があれば同 worker の Cloudflare KV**（`kv_store.cljs`。
+  `xrpc/make` と同形の `{:put :get :list :append :read}` Promise op-map。
+  doc は `d:<coll>:<k>`、stream は `s:<stream>:<seq16>`（zero-pad で KV の
+  辞書順 = `:seq` 順。`:seq` は wall-clock ms ベース — fleet の低頻度イベント
+  用であり高頻度 writer には不適）。
+- binding が無ければ従来どおり kotobase.net + `KOTOBASE_CACAO`（**target
+  architecture**。kotobase.net が `net.kotobase.store.*` を実装した時点で
+  binding を外して戻す）。
+
+**CACAO は store surface がサーバに載るまで供給しない**（mint しても検証先が
+無い。README にも明記）。
+
+### 3. /health の deep 化（供給ミスの外形化）
+
+`GET /health` は実 store round-trip の結果を
+`{:ok :service :storage {:backend \"kv\"|\"kotobase\" :ok}}` で返し、backend
+供給ミス（binding 欠落・kotobase Unauthorized）を **503 として外形監視可能**
+にする。xrpc 経路はエラーを resolve するため、`.catch` でなく **shape 検証
+（sequential?）** で判定する。
+
+### 4. kotoba-server HTTP-wedge watchdog（provision 並設）
+
+`murakumo provision` が mesh LaunchDaemon の隣に
+**`com.murakumo.kotoba-mesh-watchdog`**（system LaunchDaemon）を render・
+bootstrap する: StartInterval 60s で `http://127.0.0.1:<port>/health` を
+probe、**2 連続失敗**（strike file が run を跨いで持続）で
+`~/.murakumo/bin/kotoba-server` を kill → mesh 側 KeepAlive が再起動。
+kill は `~/.murakumo/watchdog.log` に記録。到達可能 5 台
+（asher/dan/joseph/simeon/zebulun）へ即日展開済み（canary asher で誤殺なしを
+確認）。圏外 5 台は復帰後の provision で watchdog が乗る。
+
+## Consequences / follow-ups
+
+- **KV interim の退役条件**: kotobase.net に `net.kotobase.store.*` を実装する
+  （または fleet worker を `ai.gftd.apps.kotobase.datomic.*` + tenant CACAO
+  経路へ移行する）。その時点で FLEET_KV binding を外し、CACAO mint 手順
+  （itonami `cacao.clj` 手本、operator seed は dash daemon env に存在）を整備。
+- **cloud-manimani も同じ穴**（KOTOBASE_CACAO 未設定 + 同じ store surface 不在）。
+  同じ KV interim + deep health パターンの適用候補。
+- **wedge の根本原因は kotoba 上流**（pin `4f38b74a`、`--features p2p,webrtc`
+  ビルド）。HTTP 面のみの飢餓/デッドロックの調査 issue を起こす。watchdog は
+  緩和策であり根治ではない。
+- Tailscale 圏外 5 台（naphtali/judah/levi/issachar/benjamin）は物理復帰待ち。
+
+## Evidence
+
+- fleet repo: `1c67399`（deps path fix）`f44908a`（api route）`b0c107c`
+  （KV interim + deep health merge）。JVM route tests 27 assertions green。
+- murakumo repo: `01c4078`（watchdog merge）。bb tests 605 assertions green。
+- 検証: `https://murakumo.cloud/` 200、`https://api.murakumo.cloud/health` →
+  `{\"ok\":true,…,\"storage\":{\"backend\":\"kv\",\"ok\":true}}`、POST/GET /events
+  round-trip、dash で 5/10 ノード ok・lattice 再形成をログで確認。
+
+**Related**: ADR-2606272300（cloud-murakumo GPU cloud）/ ADR-2606272330
+（murakumo.cloud 公開サイト）/ ADR-2607022000（murakumo exo 分散推論）
+"}
