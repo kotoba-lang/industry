@@ -1,6 +1,8 @@
 (ns gftd.bmc-test
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [clojure.string :as str]
+            [clojure.test :refer [deftest is testing]]
             [gftd.canvas :as canvas]
+            [gftd.cli :as cli]
             [gftd.ledger :as ledger]
             [gftd.react :as react]
             [gftd.gate :as gate]
@@ -195,3 +197,32 @@
         md (canvas/render-md idx :cloud-itonami {:as-of "2026-07-02"})]
     (is (re-find #"cloud-itonami — business model / lean canvas" md))
     (is (re-find #"\| `:hyp/t1` \| riskiest \| untested \|" md))))
+
+(deftest cli-help-text
+  (testing "global help (nil topic) lists cli desc + every command's usage"
+    (let [txt (cli/help-text :itonami nil)]
+      (is (str/starts-with? txt "itonami cli — business operator (L3)"))
+      (is (str/includes? txt "commands:"))
+      (is (str/includes? txt "canvas show [--product P]"))
+      (is (str/includes? txt "hyp list [--product P]"))
+      (is (str/includes? txt "ledger show [--tail N]"))
+      (is (str/includes? txt "run `itonami <command> --help`"))))
+  (testing "per-command topic scopes usage to just that command"
+    (let [txt (cli/help-text :manimani "canvas")]
+      (is (str/starts-with? txt "manimani canvas — usage:"))
+      (is (str/includes? txt "canvas add|retract <canvas-id> <text>"))
+      (is (not (str/includes? txt "hyp list")))
+      (is (not (str/includes? txt "ledger show")))))
+  (testing "unknown topic falls back to global help rather than erroring"
+    (let [txt (cli/help-text :itonami "no-such-command")]
+      (is (str/includes? txt "commands:"))))
+  (testing "every registry cli-key renders without throwing, using its own desc"
+    (doseq [[cli-key {:keys [desc]}] cli/registry]
+      (is (str/includes? (cli/help-text cli-key nil) desc)))))
+
+(deftest cli-command-help-covers-every-documented-command
+  ;; command-help は ns docstring の一覧と対応させる運用なので、両者がズレたら
+  ;; help がサイレントに古びる。docstring 側に出てくる各コマンド語がここにも
+  ;; 出てくることをスモークチェックする。
+  (doseq [cmd ["products" "canvas" "hyp" "react" "gate" "funnel" "score" "ledger"]]
+    (is (some? (cli/find-command-help cmd)) (str cmd " missing from command-help"))))

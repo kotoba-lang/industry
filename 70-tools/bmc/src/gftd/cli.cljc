@@ -64,6 +64,41 @@
 
 (defn ->kw [s] (if (keyword? s) s (keyword (str/replace (str s) #"^:" ""))))
 
+;; ---- help --------------------------------------------------------------------
+;; コマンドごとの usage 行。ns docstring の一覧と対応させて保守する。
+
+(def command-help
+  [{:cmd "products" :usage ["products                              — 扱える product 一覧"]}
+   {:cmd "canvas"   :usage ["canvas show [--product P]             — 端末表示（fold 済）"
+                            "canvas md [--product P|--all] [--out-dir D]  — md 生成（正本は datoms+ledger）"
+                            "canvas add|retract <canvas-id> <text> — item 追加/撤回"
+                            "canvas note <canvas-id> <text>        — note 差替"]}
+   {:cmd "hyp"      :usage ["hyp list [--product P]"
+                            "hyp pass|fail <hyp-id> --evidence \"…\""]}
+   {:cmd "react"    :usage ["react tick [--product P] [--metrics k=v…]    — ReAct 1 tick（有界）"
+                            "react loop [--product P] [--max-ticks N]     — dry まで反復（budget 有界）"]}
+   {:cmd "gate"     :usage ["gate [--product P|--all]                     — 仮説 gate の現況（測定/距離/需）"]}
+   {:cmd "funnel"   :usage ["funnel show [--product P]                    — 獲得→収益ファネルの現況"
+                            "funnel analyze [--product P|--all]           — bottleneck に GTM 提案（governor 経由 ledger）"]}
+   {:cmd "score"    :usage ["score [md]                                   — 成熟度スコア表示 / md 出力"]}
+   {:cmd "ledger"   :usage ["ledger show [--tail N]"]}])
+
+(defn find-command-help [cmd]
+  (some #(when (= (:cmd %) cmd) %) command-help))
+
+(defn help-text
+  "副作用なしで help 文字列を返す（テスト容易）。topic が既知コマンド名なら
+   そのコマンドの usage のみ、nil/未知なら全体 help。"
+  [cli-key topic]
+  (if-let [{:keys [usage]} (find-command-help topic)]
+    (str/join "\n" (cons (str (name cli-key) " " topic " — usage:")
+                         (map #(str "  " %) usage)))
+    (str/join "\n" (concat [(str (name cli-key) " cli — " (get-in registry [cli-key :desc]))
+                            "commands:"]
+                           (map #(str "  " %) (mapcat :usage command-help))
+                           [(str "flags: --product P --all --out-dir D --evidence \"…\" --metrics k=v,… --max-ticks N --tail N")
+                            (str "run `" (name cli-key) " <command> --help` for command-specific usage.")]))))
+
 #?(:clj
    (do
      ;; ---- paths ---------------------------------------------------------------
@@ -204,13 +239,22 @@
                  (println "  x governor:" reason "--" (pr-str (:event/value proposal)))))))))
 
      (defn -main-for
-       "Entry point shared by the 7 wrappers."
+       "Entry point shared by the 7 wrappers. `--help` / `help` (グローバルまたは
+        `<cmd> --help` / `help <cmd>`) は repo root 解決や datoms 読込より前に
+        処理し、help-text を印字するだけで終える。"
        [cli-key args]
        (let [[pos flags] (parse-args args)
-             ps (paths)
-             idx (load-idx ps)
-             [c1 c2 c3 c4] pos]
-         (try
+             [c1 c2 c3 c4] pos
+             help? (or (:help flags) (= c1 "help") (= c1 "--help"))
+             help-topic (cond (and (= c1 "help") c2) c2
+                              (= c1 "help") nil
+                              help? c1
+                              :else nil)]
+        (if help?
+          (println (help-text cli-key help-topic))
+          (let [ps (paths)
+                idx (load-idx ps)]
+           (try
            (case [c1 c2]
              ["products" nil]
              (doseq [p (cli-products cli-key idx)]
@@ -274,9 +318,7 @@
                (doseq [e (take-last n es)] (println (pr-str e))))
 
              ;; default: help
-             (do (println (str (name cli-key) " cli — " (get-in registry [cli-key :desc])))
-                 (println "commands: products | canvas show|md|add|retract|note | hyp list|pass|fail | gate | react tick|loop | score [md] | ledger show")
-                 (println "flags: --product P --all --out-dir D --evidence \"…\" --metrics k=v,… --max-ticks N --tail N")))
+             (println (help-text cli-key nil)))
            (catch clojure.lang.ExceptionInfo e
              (println "error:" (ex-message e))
-             (System/exit 1)))))))
+             (System/exit 1)))))))))
