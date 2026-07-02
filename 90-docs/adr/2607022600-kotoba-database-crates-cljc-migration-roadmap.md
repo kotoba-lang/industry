@@ -52,6 +52,43 @@
 > 一つが埋まった。まだ残る: 実 BlockStore backend（R2/B2/Kubo）、CACAO 認証
 > 配線、cold query/hydrate-from-commit。本番カットオーバーは引き続き対象外。
 
+> **2026-07-02 追記3（`nbb` は嘘をつく——実 `shadow-cljs` で再検証し、2件の
+> 実バグを発見・修正）**: オーナーから「multiformats/dag-cbor をちゃんと
+> cljc に」と念押しされ、既存の `.clj` テストを `.cljc` 化した上で
+> **`nbb`（SCI ベースの軽量 cljs インタプリタ）ではなく実コンパイラ
+> `shadow-cljs`（`net-kotobase`/`app-aozora` が実際に使っているのと同じ
+> toolchain）でテストし直した**。結果、`nbb` では見えなかった実バグを2件
+> 発見:
+>
+> 1. **`multiformats/multihash-sha256` が :cljs でプレーンな Clojure vector
+>    を返していた。** このライブラリの他の「bytes」は全て array-like
+>    （:clj は byte-array、:cljs は Uint8Array）で `aget`/`alength` で読める
+>    前提だが、`aget` はプレーンな vector に対して**例外を投げず黙って
+>    `nil`**（`bit-and` で `0` に変換される）を返す。実際に自分のテストで
+>    `aget`/`count` を使って踏んだ。`nbb` は `deftype` の `.-field` アクセス
+>    自体をサポートしておらず（別バグ、後述）本件を検出できなかった。
+> 2. **`dag-cbor` の CBOR uint32/uint64 ヘッダ生成が :cljs で 2^32 以上の値を
+>    静かに壊していた。** JS のビット演算子（`bit-and`/`bit-shift-*`）は
+>    演算前にオペランドを Int32/Uint32 に強制変換するため、
+>    `(unsigned-bit-shift-right 4294967296 24)` は 4294967296(2^32) を
+>    シフト**する前に** 0 に切り詰めてしまう。除算/剰余ベースの実装
+>    （`Number.MAX_SAFE_INTEGER`=2^53 まで正確）に置き換えて修正。
+>
+> 両方とも `multiformats`/`dag-cbor`/`prolly-tree`/`quad-store`/`kqe`/
+> `commit-dag`/`kotobase-engine` の7リポジトリに pin bump で反映し、
+> **実 `shadow-cljs` で全チェーンの e2e(`kotobase-engine` の
+> transact/commit!/chain/verify-chain)を再実行し、JVM とバイト一致する
+> CID を再確認**した。加えて各リポジトリの CI に `shadow-cljs node-test`
+> ジョブを追加し（`npm install && npm run test:cljs`）、以後は push の
+> たびに実コンパイラで検証される。
+>
+> **教訓（重要）**: `nbb` は`deftype` の直接フィールドアクセス
+> （`.-field`）を実装しておらず、また `seq`/`count` の TypedArray 対応が
+> 実コンパイラと食い違う場面がある——**「nbb で動いた」は「実際に cljs で
+> 動く」の証明にならない。** 「ちゃんと動く」の検証は実デプロイ toolchain
+> （ここでは `shadow-cljs`）でやる。速いインタプリタは一次スクリーニング
+> にはなるが、最終確認の代わりにはならない。
+
 ## Context
 
 `kotoba-lang/kotoba` の Rust ワークスペース（crates/* 全体、約38万行）は
