@@ -127,3 +127,34 @@ E2EE プラットフォーム同期）を踏まえ、web だけで完結する 3
   length"）に律速され、E2E がこの窓で不安定。これは getAccount 等既存 API も同様に落ちる
   **アプリ全体の既存インフラ課題**で、当機能のバグではない。datom スキャンの
   ページング/インデックス化が別 follow-up。
+
+## Addendum 2（2026-07-02）— kotobase 500 の根因確定 + アプリ層緩和 + kotobase-client の canonical 化
+
+**kotobase 500「Invalid array buffer length」の根因（調査確定）**: kotobase.aozora.app は
+net-kotobase/kotobase-cf-wasm の **WASM worker で、datoms が index/components_edn/limit を
+無視し毎回グラフ全体を rehydrate**（全 R2 ブロック→JS バッファ→WASM メモリ→巨大 JSON
+export→JSON.parse→再 stringify、ピーク約10-30×DBサイズ）。`new Uint8Array(await
+o.arrayBuffer())`（datomic-engine.mjs:35）が isolate メモリ上限（128MB）で失敗する RangeError。
+WASM 線形メモリは伸びるだけ・warm isolate 再利用・`*/5` cron の全 re-assert が圧を複合。
+**サイズ極限では決定的、現状は isolate warmth/GC/並行/cron 依存で非決定的**（実測 10-90% で
+変動）。worker のソースは削除済み（net-kotobase `b4ced2c`、Rust エンジン kotoba-lang/kotobase
+`60489617`）。真の修正は worker の server 側フィルタ/limit/streaming/圧縮で範囲外。
+
+**アプリ層緩和（kotobase.client、app-aozora `bd04697` / kotobase-client `5ee5a70`）**: transient
+5xx を冪等リードで自動リトライ（transact は idempotent keyed re-assert のみ `:retry?` opt-in、
+keylink put-backup/deposit/take が使用）。SPA は key エンドポイントの read timeout を 20-30s に
+拡張。**実測: リトライは spike（40-90%）を ~25% 床まで均すが、床は破れない** — 失敗は
+同期リトライ窓内で相関し（5リトライを約10s に広げても同率で失敗）、backoff は latency を
+悪化させるだけ。よって light（3回・250ms→1.2s・jitter）に留めた。**durable fix は server 側**
+（worker の components_edn/limit 実装 or streaming/compaction）。in-tree レバーとして `*/5`
+cron（RELAY_CRON_ENABLED=1、毎回全 re-assert で圧を増やす）頻度削減や、PDS 側 KV キャッシュ層
+（getBackup/getAccount を KV から配信し kotobase をフォールバックに）が候補（未着手 follow-up）。
+
+**kotobase-client の canonical 化（オーナー指示 2026-07-02）**: `kotobase.client/cacao/cid`
+（約380行）が app-aozora / app-aozora-boundary / kami-genko に **byte-identical で3重コピー**
+（fix が1コピーにしか入らない実害＝上記リトライも当初 app-aozora のみ）。canonical repo
+**kotoba-lang/kotobase-client**（public、west 登録、上記リトライ込み）を新設し、app-aozora の
+PDS/AppView・SPA 両ビルドを shadow-cljs source-path でこれを消費するよう切替、埋め込みコピーを
+削除。PDS 237/1030・SPA 30/83 green・両ビルド0 warnings で本番デプロイ済み。
+**残 follow-up: app-aozora-boundary / kami-genko の埋め込みコピーも同様に de-fork**（本 live
+サービスには非影響のため保留）。
