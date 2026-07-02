@@ -55,6 +55,16 @@ mechanism as the language-core.
   `cloud-murakumo`) + **heavy/data projects** (`spirit-in-physics`,
   `ghosthacker`) only. All libraries will have left for `kotoba-lang`.
 
+### Exception: SVG-era Office tooling restored to com-junkawasaki
+
+Resolved 2026-07-01 in ADR-2607011100: the CLJ/EDN rewrites remain in
+`kotoba-lang` (`office`, `svgraph`), but the legacy SVG-era browser/TypeScript
+tooling is restored as separate `com-junkawasaki` repos:
+`com-junkawasaki/office-causal` and `com-junkawasaki/svgraph`. This is an
+explicit exception to the general library migration rule because those repos
+preserve package names, GitHub Pages URLs, and SVG/Office integration surfaces
+that should not be conflated with the kotoba CLJ/EDN substrate.
+
 Mechanism: add `<x>-clj` → `<x>` entries to `:path-overrides`; regenerate
 (`bb scripts/gen-west-manifest.bb`) + `west update` to relocate checkouts;
 verify `--check` canonical and `pin == repo HEAD`. GitHub org relocation per
