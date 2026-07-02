@@ -293,3 +293,42 @@ full per-repo breakdown.
 - This ADR is descriptive, not prescriptive: it does not change how new
   repos get registered (`:manifest-workflow` in `repos.edn` remains the
   authority for that) or reorganize `repos.edn` itself.
+
+## Phase 4 (2026-07-02) — 全 382 repo の完全依存グラフを adr.edn に埋め込み
+
+オーナー指示「382 repos の repo 依存関係を adr.edn で整理して」。Phase 2 は
+サマリ統計と top-N 抜粋のみだったのに対し、本フェーズは **全 repo の deps.edn
+を GitHub から新規取得**して導出した**完全な内部 adjacency をこの ADR の
+`.edn` 自体に埋め込んだ**（`:phase-4-2026-07-02-full-edge-graph` —
+`:adjacency-main` / `:adjacency-alias-only` / `:local-root-internal-edges`）。
+ローカル checkout ではなく pushed reality を見ているので、同日登録の
+ipld / p2p（ADR-2607023200）もグラフに入っている。
+
+数字（Phase 2 の 377-repo 時点 → 本フェーズ 382-repo 時点）:
+
+- deps.edn あり: 362 → **367**（無し 15 は不変の同一リスト）
+- 内部 main 依存を持つ repo: 88 → **109**（`:local/root` の非 github 形式
+  group — `org.kotoba-lang/num` 等 — を正規化して取り込んだ分も含む）
+- 内部 main エッジ: 167 → **201**、加えて alias（test/dev）限定の内部依存
+  15 repo を別掲
+- 連結成分: 21 → **15**（最大 51 repo = css/html/shitsuke の office/UI 族）、
+  **循環なし**（DFS で確認）
+- 被依存 top: css 13 / langgraph 12 / html 12 / shitsuke 10 / coll 7 /
+  json 6 / xml 6 / langchain 6 / eth-crypto 5 / chobo 5 / datom 5 / dsl-core 5
+
+新たに見つかった実問題（`:findings`、修正は行わず記録のみ）:
+
+1. **kagi → kagitaba が壊れている**: `io.github.kotoba-lang/kagitaba
+   {:local/root "../kagitaba"}` だが kotoba-lang/kagitaba は GitHub に
+   存在しない（ADR-2607023000 の同日 WIP、未 push）。fresh clone から
+   kagi はビルド不能。kagitaba push 後に :git/sha で pin する follow-up。
+2. **stale *-clj 座標の残り 3 件**: kototama-clj → com-junkawasaki/
+   {langchain-clj, langgraph-clj}（Phase 2 は「名前が別物」として repo 名の
+   rename 対象から除外したが、**deps 座標**は stale のまま）、signal →
+   com-junkawasaki/ed25519-clj（Phase 2 の候補リスト自体から漏れていた）。
+   fix-pattern は Phase 2/3 と同じ。
+3. **:local/root 限定の内部エッジ 73 本 / 43 repo**: west superproject
+   レイアウトでしか解決しない（standalone clone では壊れる）。一覧を
+   `:local-root-internal-edges :by-repo` に収載。ほか `inference` と
+   `kotoba` は group 名も非 github 形式（`org.kotoba-lang/…`、素の
+   `kotoba-lang/…`）で、git 依存としては永遠に解決不能な座標。

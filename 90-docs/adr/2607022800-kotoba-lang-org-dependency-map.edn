@@ -349,4 +349,273 @@
     {:repo "kotoba-fleet" :deps-fixed ["langchain-clj (:kotoba alias :extra-deps)"] :method ":local/root -> :git/url+:sha, isolated to the optional :kotoba test alias so the core lib stays dependency-free" :test-result "clojure -M:kotoba: 3 tests / 10 assertions, 0 failures"}
     {:repo "godaddy-dns" :deps-fixed ["langgraph-clj (main :deps + :dev override)"] :method ":git/tag v0.2.0 preserved, SHA resolved to full 133740f3df2f4aa57e9e98b32f70e2483c025a7e" :test-result "8 tests / 38 assertions, 0 failures"}]
    :total {:repos-fixed 8 :total-tests-passing 98 :total-assertions-passing 366 :total-failures 0}
-   :not-fixed-because-already-fine ["browser-use" "kagi" "langgraph-store" "kenchi" "cae-solver" "langgraph" "datom" "vphysics"]}}}
+   :not-fixed-because-already-fine ["browser-use" "kagi" "langgraph-store" "kenchi" "cae-solver" "langgraph" "datom" "vphysics"]}}
+
+ ;; Phase 4, same day, owner request: "382 repos の repo 依存関係を adr.edn で
+ ;; 整理して" — the FULL org-wide internal dependency graph as embedded data
+ ;; (phase 2 recorded only summary statistics + top-N excerpts; this section
+ ;; makes the adjacency itself queryable from this file). Fresh GitHub fetch,
+ ;; not local checkouts, so it reflects pushed reality incl. the same-day
+ ;; ipld/p2p registrations (ADR-2607023200).
+ :phase-4-2026-07-02-full-edge-graph
+ {:findings
+  {:acyclic true,
+   :broken-edge
+   [{:repo "kagi",
+     :dep "kagitaba",
+     :issue
+     "io.github.kotoba-lang/kagitaba {:local/root \"../kagitaba\"} — kotoba-lang/kagitaba does NOT exist on GitHub (ADR-2607023000 same-day WIP, local-only checkout); kagi is unbuildable from a fresh clone until kagitaba is pushed + the coord gets a :git/sha",
+     :action "follow-up for the kagitaba session: push repo, then pin kagi's coord"}],
+   :stale-com-junkawasaki-clj-refs
+   {:note
+    "phase-3 fixed the 8 repos confirmed then; a fresh org-wide re-scan finds 3 more coordinates it missed (kototama-clj was skipped as name-distinct but its DEPS are still stale; signal was not in the phase-2 candidate list at all)",
+    :refs
+    [{:repo "kototama-clj", :coord "com-junkawasaki/langchain-clj", :scope :main}
+     {:repo "kototama-clj", :coord "com-junkawasaki/langgraph-clj", :scope :main}
+     {:repo "signal", :coord "com-junkawasaki/ed25519-clj", :scope :main}],
+    :fix-pattern "same as phase 2 :known-stale-clj-refs :fix-pattern"},
+   :non-github-style-groups
+   [{:repo "inference",
+     :coords ["org.kotoba-lang/num" "org.kotoba-lang/torch"],
+     :issue
+     "group org.kotoba-lang (not io.github.kotoba-lang) + :local/root only — never resolvable as a git dep; works only in-monorepo"}
+    {:repo "kotoba",
+     :coords ["kotoba-lang/kotoba-core-contracts" "kotoba-lang/kotoba-selfhost-contracts"],
+     :issue "bare kotoba-lang/ group + :local/root ../../kotoba-lang/* — same monorepo-only resolution"}],
+   :ipld-p2p-now-in-graph
+   "the two repos registered by ADR-2607023200 the same day appear with their full dep chains: ipld <- {prolly-tree quad-store commit-dag kotoba-client kotobase-engine(transitive) p2p(transitive)}; p2p -> {net commit-dag kotoba-client} (+ kotobase-engine/prolly-tree as test aliases)"},
+  :method
+  "gh api contents/deps.edn for all 382 repos -> parse with clojure.edn -> extract io.github.kotoba-lang/* git coords AND :local/root coords (normalizing non-github-style groups like org.kotoba-lang/num, kotoba-lang/kotoba-core-contracts when the target is a real org repo). Alias deps (:extra-deps/:override-deps/:replace-deps) tracked separately from main :deps. cognitect-labs/test-runner excluded as test-tooling noise.",
+  :coverage
+  {:gh-repos 382,
+   :with-deps-edn 367,
+   :without-deps-edn
+   ["homebrew-kotoba"
+    "kami-engine"
+    "kami-engine-sdk"
+    "kotoba-adapter-contracts"
+    "kotoba-lang-cli-contract"
+    "kotoba-pages-poc"
+    "kotoba-topology"
+    "kotoba-v2025"
+    "kotodama-cells"
+    "kotodama-holochain"
+    "kotodama-py"
+    "kototama-cljc-contract"
+    "lab"
+    "svgraph"
+    "yaml"]},
+  :local-root-internal-edges
+  {:note
+   "internal deps declared via :local/root — resolve ONLY when the sibling checkout exists at the expected relative path (the west superproject layout); a fresh standalone clone of the consumer repo cannot resolve them. 71 edges across 46 repos.",
+   :by-repo
+   {"appkit" ["kotoba-ui"],
+    "atom" ["xml"],
+    "banking" ["html" "css"],
+    "browser" ["wasm-ui"],
+    "browser-agent" ["browser-use" "langgraph" "langchain"],
+    "browser-use" ["langgraph"],
+    "card" ["html" "css"],
+    "dance" ["vrm"],
+    "freeboard" ["kami-engine-sdk" "kasane"],
+    "geojson" ["json"],
+    "giemon" ["html" "css" "robotics"],
+    "graphml" ["xml"],
+    "host" ["physics" "kami-engine-sdk-clj"],
+    "industry" ["technology"],
+    "inference" ["num" "torch"],
+    "kagi" ["langgraph" "kagitaba"],
+    "kenchi" ["langgraph"],
+    "kobo" ["kuro"],
+    "kotoba" ["kotoba-core-contracts" "kotoba-selfhost-contracts" "kotoba-lang" "cacao"],
+    "kotoba-ui" ["shitsuke" "liquid-glass-ui"],
+    "kotodama-mcp" ["mcp"],
+    "labor" ["html" "css"],
+    "liquid-glass-ui" ["shitsuke"],
+    "logistics" ["html" "css"],
+    "mailer" ["mail"],
+    "materialx" ["xml"],
+    "mathml" ["xml"],
+    "musicxml" ["xml"],
+    "occupation" ["technology"],
+    "ocio" ["yaml"],
+    "otio" ["json"],
+    "phone" ["html" "css"],
+    "property" ["html" "css"],
+    "render-shaders" ["wgsl"],
+    "retail" ["html" "css"],
+    "robotics" ["html" "css"],
+    "scene2d" ["sprite-gpu" "sprite2d" "text"],
+    "shaders" ["wgsl"],
+    "sky" ["wgsl"],
+    "sprite-gpu" ["wgsl"],
+    "swift" ["html" "css"],
+    "uikit" ["kotoba-ui"],
+    "verilog" ["expr"],
+    "webgl" ["gpu" "sprite-gpu"],
+    "webrtc" ["html" "css"],
+    "wgsl" ["expr"]}},
+  :top-depended-upon
+  [{:repo "css", :dependents 13}
+   {:repo "langgraph", :dependents 12}
+   {:repo "html", :dependents 12}
+   {:repo "shitsuke", :dependents 10}
+   {:repo "coll", :dependents 7}
+   {:repo "json", :dependents 6}
+   {:repo "xml", :dependents 6}
+   {:repo "langchain", :dependents 6}
+   {:repo "eth-crypto", :dependents 5}
+   {:repo "chobo", :dependents 5}
+   {:repo "datom", :dependents 5}
+   {:repo "dsl-core", :dependents 5}
+   {:repo "wgsl", :dependents 4}
+   {:repo "ipld", :dependents 4}
+   {:repo "cae-solver", :dependents 4}
+   {:repo "crypto", :dependents 4}
+   {:repo "mise", :dependents 4}
+   {:repo "multiformats", :dependents 4}
+   {:repo "lsp", :dependents 3}
+   {:repo "transit", :dependents 3}],
+  :summary
+  "owner asked for the org-wide repo dependency map to live IN this adr.edn as data, not just as the summary statistics phase 2 recorded. Re-derived from a fresh fetch of every repo's deps.edn on GitHub (not local checkouts), and — unlike phase 2 — the COMPLETE internal adjacency is embedded below (:adjacency-main / :adjacency-alias-only), so the graph is queryable from this file alone.",
+  :adjacency-alias-only
+  {"godaddy-dns" ["langchain"],
+   "kagi" ["langchain"],
+   "kami-genko" ["kami-mangaka-expression"],
+   "computer-use" ["langchain"],
+   "p2p" ["kotobase-engine" "prolly-tree"],
+   "browser" ["browser-use"],
+   "kami-engine-vehicle-designer" ["langchain"],
+   "kotodama" ["langchain"],
+   "browser-use" ["langchain"],
+   "kotoba-fleet" ["langchain"],
+   "koe" ["langchain"],
+   "kami-cad-import" ["kami-vehicle"],
+   "kenchi" ["langchain"],
+   "kotoba-client" ["prolly-tree"],
+   "kekkai" ["langchain"]},
+  :hub-tiers
+  {:note "reading of :top-depended-upon — three distinct hub families, matching the cluster map above",
+   :ui-substrate ["css" "html" "shitsuke" "chobo" "kotoba-ui" "uikit" "appkit"],
+   :agent-substrate ["langgraph" "langchain"],
+   :data-substrate ["coll" "json" "xml" "datom" "dsl-core" "multiformats" "dag-cbor" "ipld"],
+   :crypto-substrate ["eth-crypto" "ed25519" "crypto" "cacao"]},
+  :adjacency-main
+  {"retail" ["css" "html"],
+   "webrtc" ["css" "html"],
+   "map" ["kotoba-client" "kqe" "quad-store"],
+   "kotoba" ["cacao" "kotoba-core-contracts" "kotoba-lang" "kotoba-selfhost-contracts"],
+   "uikit" ["kotoba-ui"],
+   "langgraph-store" ["langchain" "langgraph"],
+   "godaddy-dns" ["langgraph"],
+   "device" ["coll" "wit"],
+   "kqe" ["quad-store"],
+   "pqh" ["dag-cbor" "ed25519"],
+   "dance" ["vrm"],
+   "kagi" ["kagitaba" "langgraph"],
+   "comfyui" ["langchain"],
+   "soko" ["chobo" "mise" "shitsuke"],
+   "commit-dag" ["ipld"],
+   "wallet" ["btc-crypto" "crypto" "eth-crypto"],
+   "sprite-gpu" ["wgsl"],
+   "madoguchi" ["chobo" "mise" "shitsuke"],
+   "base-l2" ["eth-crypto"],
+   "inference" ["num" "torch"],
+   "witness-quorum" ["ed25519"],
+   "kotodama-mcp" ["mcp"],
+   "appkit" ["kotoba-ui"],
+   "mathml" ["xml"],
+   "kami-genko" ["shitsuke"],
+   "host" ["kami-engine-sdk-clj" "physics"],
+   "statechart" ["dsl-core"],
+   "ocio" ["yaml"],
+   "netcap" ["coll" "wit"],
+   "computer-use" ["langgraph"],
+   "sigma" ["dsl-core"],
+   "wgsl" ["expr"],
+   "http" ["json"],
+   "shaders" ["wgsl"],
+   "quad-store" ["ipld" "prolly-tree"],
+   "swift" ["css" "html"],
+   "states" ["dsl-core"],
+   "lsp-rpc" ["json" "lsp"],
+   "industry" ["technology"],
+   "materialx" ["xml"],
+   "lint" ["coll" "fmt" "fs" "lsp"],
+   "lint-kotoba" ["coll" "lint" "lsp"],
+   "torch" ["dsl-core"],
+   "kotoba-code" ["langchain" "langgraph"],
+   "p2p" ["commit-dag" "kotoba-client" "net"],
+   "btc-crypto" ["crypto" "eth-crypto"],
+   "ipld" ["dag-cbor" "multiformats"],
+   "log" ["coll"],
+   "browser" ["wasm-ui"],
+   "prolly-tree" ["ipld" "multiformats"],
+   "echem" ["cae-solver" "datom"],
+   "webgl" ["gpu" "sprite-gpu"],
+   "office" ["ooxml"],
+   "browser-agent" ["browser-use" "langchain" "langgraph"],
+   "langchain" ["json"],
+   "freeboard" ["kami-engine-sdk" "kasane"],
+   "langgraph" ["langchain"],
+   "motor" ["cae-solver" "datom"],
+   "banking" ["css" "html"],
+   "mailer" ["mail"],
+   "atom" ["xml"],
+   "musicxml" ["xml"],
+   "kami-engine-vehicle-designer" ["aero" "crash" "datom" "echem" "langgraph" "motor" "vphysics"],
+   "kotodama" ["langgraph"],
+   "render-shaders" ["wgsl"],
+   "liquid-glass-ui" ["css" "shitsuke"],
+   "authenticator" ["langchain"],
+   "property" ["css" "html"],
+   "policy" ["dsl-core"],
+   "browser-use" ["langgraph"],
+   "kotoba-ui" ["liquid-glass-ui" "shitsuke"],
+   "kami-nv-compat" ["multiformats"],
+   "presentationml" ["drawingml"],
+   "occupation" ["technology"],
+   "chobo" ["shitsuke"],
+   "scene2d" ["sprite-gpu" "sprite2d" "text"],
+   "phone" ["css" "html"],
+   "aero" ["cae-solver" "datom" "vphysics"],
+   "giemon" ["css" "html" "robotics"],
+   "kobo" ["kuro"],
+   "koe" ["langgraph"],
+   "scheduler" ["async" "coll" "time"],
+   "card" ["css" "html"],
+   "kotobase-engine" ["commit-dag" "kqe"],
+   "logistics" ["css" "html"],
+   "sheets" ["transit"],
+   "mise" ["chobo" "shitsuke"],
+   "otio" ["json"],
+   "kiyaku" ["chobo" "mise" "shitsuke"],
+   "geojson" ["json"],
+   "kenchi" ["langgraph"],
+   "checkpointer" ["ipfs" "mst" "multiformats" "pqh"],
+   "mining-pool" ["btc-crypto" "btc-mining" "crypto" "eth-crypto" "json"],
+   "verilog" ["expr"],
+   "robotics" ["css" "html"],
+   "senden" ["chobo" "mise" "shitsuke"],
+   "graphml" ["xml"],
+   "kotoba-client" ["ipld"],
+   "store" ["coll" "fs" "io" "wit"],
+   "kekkai" ["langgraph"],
+   "docs" ["transit"],
+   "cacao" ["dag-cbor" "ed25519"],
+   "btc-mining" ["btc-crypto" "crypto" "eth-crypto"],
+   "drawingml" ["xml"],
+   "labor" ["css" "html"],
+   "test" ["spec"],
+   "slides" ["css" "drawingml" "html" "office" "office-style" "ooxml" "presentationml" "shitsuke" "transit"],
+   "crash" ["cae-solver" "datom" "vphysics"],
+   "sky" ["wgsl"]},
+  :stats
+  {:repos-with-internal-main-deps 109,
+   :internal-main-edges 201,
+   :repos-with-alias-only-internal-deps 15,
+   :standalone-leaves 209,
+   :connected-components 15,
+   :largest-component 51,
+   :cyclic false,
+   :note "standalone-leaves = repos with deps.edn but no internal kotoba-lang edge in either direction"}}}
