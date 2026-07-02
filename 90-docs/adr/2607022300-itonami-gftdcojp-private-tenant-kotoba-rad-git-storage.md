@@ -159,6 +159,25 @@ private tenant のガードレール（本 ADR、CACAO 認証）を伴うコー�
 ——「main に merge 済み」と「本番で有効」を同一視しない。デプロイ後は
 本ADRのような認証境界の変更点を都度 `curl` で本番相手に直接検証する。
 
+**恒久対応も完了**（同日）: `functions/api/[org]/[repo]/state.js` +
+`functions/lib/{base58,cbor,cacao,tenant}.js`
+（`gftdcojp/cloud-itonami#10`、`58e6eed`、本番デプロイ済み）。
+`io.github.kotoba-lang/{ed25519,dag-cbor,cacao}` の verify 経路を JS へ
+移植（Ed25519 署名検証自体は自前実装せず Web Crypto の native Ed25519 を使用、
+移植したのは base58btc / definite-length CBOR / SIWE 再構成のみ）し、
+JVM の `cacao.core/mint` で作った実 CACAO を同じ JS 実装で検証して署名が
+一致することをクロス検証済み（改ざん・ガーベジ入力は正しく reject）。
+認可データは `ITONAMI_DATA` KV（`repo:{org}/{repo}:visibility` /
+`actor:by-did:{did}` / `permission:{org}/{repo}:{actorId}`）に置き、
+未設定は private/no-access（fail-closed）。本番確認: 匿名 →401、
+有効署名だが未 bind の did →401、改ざん署名 →401。**現時点で本番に
+bind された actor は無い**（jun の実 did:key が未生成のため）ため、
+今は「誰も読めない」が正しい安全な状態。jun が実際に読めるようにするには
+CACAO identity を生成し `wrangler kv key put --binding=ITONAMI_DATA
+"actor:by-did:<did>" "<actor-id>"` + permission key を投入する。
+kotoba 本番 store との接続（実 queue/effects/audits データ）は未接続
+——このFunctionは認可ゲートのみで、data source は空 shape を返す。
+
 ## Follow-up
 
 - `orgs/gftdcojp/cloud-itonami/docs/adr/0002-org-repo-tenant-isolation.md` に
