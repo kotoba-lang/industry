@@ -58,6 +58,7 @@
    :adult-creator-platform       "L4 adult creator platform（PornHub / OnlyFans / FANZA 型）"
    :personal-wellbecoming-os     "L5 personal wellbecoming OS"
    :ugc-game-platform            "L6 UGC game / creator platform（Roblox 型）"
+   :video-content-channel        "L7 AI video content channel（YouTube 収益型）"
    :artificial-organism-platform "L0 artificial organism platform（非営利・公益）"})
 
 (def block-order

@@ -16,6 +16,7 @@
 | network-isekai | 60.0 | 50.0 | 0.0 | revenue=0.0, validation=0.0 |
 | app-aozora | 64.0 | 46.7 | 0.0 | revenue=0.0, validation=0.0 |
 | ai-gftd-apex | 60.0 | 45.0 | 0.0 | revenue=0.0, validation=0.0 |
+| ai-gftd-yukkuri | 60.0 | 45.0 | 0.0 | revenue=0.0, validation=0.0 |
 | cloud-manimani | 56.0 | 43.3 | 0.0 | revenue=0.0, validation=0.0 |
 | cloud-itonami | 56.0 | 43.3 | 0.0 | revenue=0.0, validation=0.0 |
 | app-aozora-yoro | 52.0 | 40.0 | 0.0 | revenue=0.0, validation=0.0 |
@@ -27,6 +28,12 @@
 - BMC: completeness=5.0, hypothesis=5.0, validation=0.0, pricing=1.0, grounding=4.0
 - YC: acute-problem=3.0, wedge=3.0, tenx=3.0, founder-fit=4.0, distribution=1.0, defensibility=3.0, launched=3.0, users=2.0, revenue=0.0
 - note: 実測: gftd.ai 422,889 req/7d・uniques 日次和 4,644 — 公開稼働で実流入あり (launched 2→3, users 1→2, grounding 3→4)。課金導線なし (revenue 0)、獲得チャネル未計測 (distribution 1 据置)。
+
+### ai-gftd-yukkuri
+
+- BMC: completeness=5.0, hypothesis=5.0, validation=0.0, pricing=1.0, grounding=4.0
+- YC: acute-problem=3.0, wedge=3.0, tenx=4.0, founder-fit=4.0, distribution=2.0, defensibility=3.0, launched=3.0, users=1.0, revenue=0.0
+- note: ゆっくり実況を全自動生成 → YouTube 投稿 → 広告収益。実測 (260607 channel analysis, ゆっくりサイバーch UCTisE2aPQp3i8i6JUVIUoiw): 公開 2026/06/06、登録者 1→3、総再生 約10.2h — 立ち上げ直後で YPP 未達 (登録者1,000+総再生4,000h が gate)。生成パイプライン (10 actor + kami render + dougaka ffmpeg) は実装済 (grounding 4, launched 3)。収益ゼロ (revenue 0、YPP 前)。tenx=4 は全自動量産で 1 本の限界コスト ~0。YouTube Data API OAuth 復活が metadata 自動最適化の前提 (docs/youtube-upload-setup)。
 
 ### app-aozora
 
