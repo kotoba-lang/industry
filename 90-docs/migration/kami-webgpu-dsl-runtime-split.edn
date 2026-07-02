@@ -2289,6 +2289,7 @@
     "orgs/kotoba-lang/dcs"
     "orgs/kotoba-lang/device"
     "orgs/kotoba-lang/did"
+    "orgs/kotoba-lang/kasane"
     "orgs/kotoba-lang/spirv"
     "orgs/kotoba-lang/usd"
     "orgs/kotoba-lang/ddl"
@@ -2340,6 +2341,7 @@
     "orgs/kotoba-lang/cue"
     "orgs/kotoba-lang/sql"
     "orgs/kotoba-lang/kicad"
+    "orgs/kotoba-lang/kudaki"
     "orgs/kotoba-lang/dxf"
     "orgs/kotoba-lang/spice"
     "orgs/kotoba-lang/step"
@@ -2348,11 +2350,15 @@
     "orgs/kotoba-lang/ical"
     "orgs/kotoba-lang/forms"
     "orgs/kotoba-lang/katex"
+    "orgs/kotoba-lang/multiformats"
+    "orgs/kotoba-lang/nagare"
     "orgs/kotoba-lang/wit"
+    "orgs/kotoba-lang/zone"
     "orgs/kotoba-lang/json"
     "orgs/kotoba-lang/exr"},
   :runtime-browser
-  #{"orgs/kotoba-lang/async"
+  #{"orgs/kotoba-lang/aiueos-cljc-contract"
+    "orgs/kotoba-lang/async"
     "orgs/kotoba-lang/cae-solver"
     "orgs/kotoba-lang/coll"
     "orgs/kotoba-lang/crash"
@@ -2367,11 +2373,13 @@
     "orgs/kotoba-lang/input"
     "orgs/kotoba-lang/io"
     "orgs/kotoba-lang/kotoba-code"
+    "orgs/kotoba-lang/kotobase"
     "orgs/kotoba-lang/kuro"
     "orgs/kotoba-lang/log"
     "orgs/kotoba-lang/lsp"
     "orgs/kotoba-lang/lsp-rpc"
     "orgs/kotoba-lang/mailer"
+    "orgs/kotoba-lang/mcp"
     "orgs/kotoba-lang/mining-pool"
     "orgs/kotoba-lang/motor"
     "orgs/kotoba-lang/net"
@@ -2391,6 +2399,7 @@
     "orgs/kotoba-lang/turn"
     "orgs/kotoba-lang/vc"
     "orgs/kotoba-lang/vphysics"
+    "orgs/kotoba-lang/vllm"
     "orgs/kotoba-lang/wallet"
     "orgs/kotoba-lang/playwright"}},
  :requested-publish-plan
@@ -2409,6 +2418,19 @@
      "orgs/kotoba-lang/shitsuke"
      "orgs/kotoba-lang/turn"
      "orgs/kotoba-lang/wallet"]}
+   {:id :readme-only
+    :intent "Align README test instructions for CLJ/CLJC split repos that already have Clojure CI."
+    :allowed-change-kinds #{:readme}
+    :repos
+    ["orgs/kotoba-lang/aiueos-cljc-contract"
+     "orgs/kotoba-lang/kasane"
+     "orgs/kotoba-lang/kotobase"
+     "orgs/kotoba-lang/kudaki"
+     "orgs/kotoba-lang/mcp"
+     "orgs/kotoba-lang/multiformats"
+     "orgs/kotoba-lang/nagare"
+     "orgs/kotoba-lang/vllm"
+     "orgs/kotoba-lang/zone"]}
    {:id :ci-only
     :intent "Add missing CLJ/CLJC CI to already-materialized requested split repos."
     :allowed-change-kinds #{:ci}
