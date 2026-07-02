@@ -111,3 +111,19 @@ kami-genko / kami-mangaka-\* が該当。syosetsuka の技芸 lib は将来 `sho
 - ADR-2607010930 / ADR-2607020300 (kami-mangaka-\* / kami-genko 分離の前例)
 - ADR-2607022900 (west pin server-side verification / --entry 最小 diff)
 - ADR-2606301900 (ISCO/COFOG organism actors — etzhayyim 側の分類 organism)
+
+## Addendum (2026-07-02, follow-ups executed)
+
+- ai-gftd-dougaka → kotoba-lang/douga 消費に rewire（merge 895223e、46 assertions green）。
+- ai-gftd-animeka → kotoba-lang/anime 消費に rewire（animeka.domain を facade 化、
+  merge d692972、32 assertions green）。
+- ongakuka を child repo 化: private `gftdcojp/ai-gftd-ongakuka`（カタログ+docs、
+  kotoba-lang/ongaku を消費、smoke 8 assertions green）。superproject の plain tree
+  `orgs/gftdcojp/ongakuka` は削除、west 登録に置換。
+- mangaka data/（180 files、うち ghosthacker 53M）→ DataLad dataset
+  `gftdcojp/mangaka-data`（git-annex + B2、fileprefix=mangaka-data/、44 keys /
+  54MB uploaded、text2git）。import-ghosthacker は env → sibling checkout →
+  旧 path の順で解決（merge 9ee973e、85 tests / 572 assertions green）。
+- ai-gftd-dogaka（空 stub）を GitHub / west / local checkout とも削除。
+- 未了: mangaka の kami-genko への domain 統合（別途）、2651/2652 公開（権限ゲート）、
+  syosetsuka の shousetsu lib 分離（domain 実装後）。
