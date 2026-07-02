@@ -5,7 +5,7 @@
   :doc_type "adr"
   :topic "sha256d-clj"
   :authoritative true
-  :last_verified "2026-07-01"
+  :last_verified "2026-07-02"
   :authoritative_for
   ["sha256d-clj lives at orgs/com-junkawasaki/sha256d-clj (github.com/com-junkawasaki/sha256d-clj, private), not under kotoba-lang -- cross-cutting -clj foundation lib per manifest/repos.edn's org-routing rule, not a language-substrate lib"
    "the matrixflow.net/case-study/110 reference is about AlphaProof/Gemini Deep Think/AlphaEvolve/FunSearch, NOT SHA-256/Bitcoin -- the transferable idea is the evolutionary-search-over-a-scored-population shape, reframed here with correctness as a hard gate (not a fitness term) because a hash function cannot be 'approximately' correct"
@@ -13,7 +13,12 @@
    "this repo is NOT a duplicate of ADR-2607012230's kotoba-lang/btc-crypto+btc-mining: that stack's SHA-256 is host-injected (kotoba-lang/crypto contract, vetted platform crypto for production use); sha256d-clj is deliberately from-scratch and host-crypto-free specifically so its formula/implementation-strategy space is searchable/benchmarkable, which a host crypto API black box structurally cannot be"
    "every test-vector hex literal in this repo was generated via Python hashlib / the system shasum utility and cross-checked by exact string length, never hand-transcribed from memory -- a live near-miss during authoring (a by-hand copy of the well-known million-'a' NIST vector came out one hex character short) is the concrete reason for this rule"
    "the cljs portability proof (test/sha256d/cljs_verify.cljs, run via `clojure -M:cljs && node target/cljs-verify.js`) caught a real bug the JVM test suite alone did not: JS bitwise shift operators mask the shift count to 5 bits (x >>> 40 behaves as x >>> 8), which broke the original pad function's 64-bit big-endian length-field encoding (fixed in sha256d.core/u64be-bytes by splitting into two 32-bit halves via quot/mod)"
-   "docs/evolution-log.md's first entry is an honest negative result from an actual run, not a fabricated discovery: no stable champion across 3 runs (2 of 3 land in one proximity cluster -- Ranking found no significant difference at the current gene-pool size/noise floor), and evolve-round loses gene diversity generation-over-generation because recombination only reintroduces variants already present among elites"]
+   "docs/evolution-log.md's first entry is an honest negative result from an actual run, not a fabricated discovery: no stable champion across 3 runs (2 of 3 land in one proximity cluster -- Ranking found no significant difference at the current gene-pool size/noise floor), and evolve-round loses gene diversity generation-over-generation because recombination only reintroduces variants already present among elites"
+   "ADDENDUM 2026-07-02: the tournament ran 17 rounds (see docs/evolution-log.md summary table). The ONLY lever that moved single-hash throughput was removing per-operation runtime overhead: compress-primitive-inline (JVM, unboxed round loop + inlined ch/maj) ~2.7x, compress-v8-inline (cljs, Int32Array) ~3.6x -- each a platform-only opt-in fast path, portable compress stays the default. Ch/Maj formula and schedule data structure NEVER mattered (measured, incl. a zero-alloc long-array schedule that only ties precompute); software 2-way multi-buffer is ~6% SLOWER (register spills). Allocation never mattered single-thread or parallel."
+   "ADDENDUM 2026-07-02: the parallel nonce-search plateau (~4.6x on 10 cores) is all-core turbo FREQUENCY scaling, NOT GC/allocation -- proven by a GC-MXBean diagnostic (<1% pause) + an all-cores-hot test (single-thread drops to 46% = the per-thread parallel rate; 46% x 10 = 4.6). No code change lifts it; search-nonce-parallel scales as well as the hardware allows."
+   "ADDENDUM 2026-07-02: mining composes midstate + fast compress via header-hash-with/search-nonce/search-nonce-parallel = ~4.4x per-nonce over naive full-header hashing (1.59x midstate x 2.78x fast compress), ~272k nonce/s on 10 cores, all bit-identical. Validated against the REAL Bitcoin genesis block (block 0, hash 000000000019d668...) on JVM+V8; search-nonce recovers Satoshi's genesis nonce 2083236893. Fixtures independently verified via Python hashlib."
+   "ADDENDUM 2026-07-02 (cryptanalysis / inverse direction, sha256d.mitm + docs/preimage-mitm-cosci.md): below-brute-force PREIMAGE algorithms are real (MITM/splice-and-cut/biclique) and the co-scientist search DESIGNS them over the message-schedule dependency graph. run-mitm RUNS one on the real 32-bit round function: 8-round SHA-256 partial preimage in 2049 chunk-evals vs 2,325,617 brute = measured/verified ~1135x. Word-granularity dies at ~24 rounds; bit-level neutral bits give NO sound gain over word-level (tested: a bit of W_i is neutral for a chunk iff the whole word is unused). The ~45-round/2^255.5 record needs bicliques (differential trails) -- described, NOT fabricated."
+   "ADDENDUM 2026-07-02: FULL 64-round SHA-256 is NOT broken and this repo does NOT fabricate a break. Honest reasoning recorded: a below-2^256 full-round preimage is conjectured not to exist; a co-scientist / AlphaEvolve / AlphaProof-Nexus-style search cannot conjure one (it searches within known-technique templates and a proof of a false statement cannot be found), and one-wayness is a circuit lower bound beyond known mathematics no prover can establish. Defensive risk: full-round break is a negligible tail (best 2^255.5 on 45/64 rounds; Grover only 2^128, sequential/infeasible); real risks are implementation/misuse (length-extension->HMAC, low-entropy->KDF, non-constant-time); AI-assisted cryptanalysis is a monitoring signal that may accelerate reduced-round records but not the full-round tail."]
   :related
   ["CLAUDE.md"
    "manifest/repos.edn"
@@ -21,7 +26,9 @@
    "orgs/kotoba-lang/eth-crypto/src/eth_crypto/core.cljc"
    "orgs/com-junkawasaki/num-clj/test/num/cljs_verify.cljs"
    "orgs/com-junkawasaki/sha256d-clj/README.md"
-   "orgs/com-junkawasaki/sha256d-clj/docs/evolution-log.md"]
+   "orgs/com-junkawasaki/sha256d-clj/docs/evolution-log.md"
+   "orgs/com-junkawasaki/sha256d-clj/docs/preimage-mitm-cosci.md"
+   "orgs/com-junkawasaki/sha256d-clj/src/sha256d/mitm.cljc"]
   :supersedes []
   :superseded_by []}
 

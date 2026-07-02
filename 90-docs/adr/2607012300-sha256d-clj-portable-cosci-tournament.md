@@ -169,3 +169,66 @@ New repo `orgs/com-junkawasaki/sha256d-clj` (GitHub, private, `com-junkawasaki` 
   itself).
 - If desired, offer `sha256d.core` as an alternative host-crypto-free backend option for
   `kotoba-lang/crypto`'s SHA-256 contract (see Context) -- not attempted here.
+
+## Addendum (2026-07-02): the full 17-round search, mining, real-genesis validation, and the cryptanalysis pivot
+
+The initial scaffold above was iterated as a running co-scientist tournament (17 rounds, all in
+`orgs/com-junkawasaki/sha256d-clj/docs/evolution-log.md`, which has a summary table at its top).
+Every result is bit-identical-gated and, where a speedup is claimed, measured. Net outcome:
+
+**Forward direction (efficient derivation).** The tournament *rejected* four plausible optimizations
+after measuring them -- Ch/Maj round-primitive formula (noise on JVM & V8, boxed & unboxed),
+schedule data structure (`:rolling` ~7-10% slower, `:precompute-transient`/`:mutable` tie the
+reference: even a zero-allocation `long-array` schedule does not beat the persistent-vector
+precompute), and software 2-way multi-buffer interleave (~6% slower: register spills > ILP gain).
+The one lever that moved single-hash throughput was **removing per-operation runtime overhead**:
+`compress-primitive-inline` (JVM, unboxed round loop + inlined ch/maj) ~2.7x; `compress-v8-inline`
+(cljs, `Int32Array` + fixed-arity int32 arithmetic) ~3.6x -- each a JVM- resp. cljs-only opt-in
+fast path, with the portable `compress` staying the default. Portable *relative* verdicts were
+confirmed to reproduce on V8 (round 8); the parallel nonce-search plateau (~4.6x on 10 cores) was
+diagnosed (round 14) as all-core turbo frequency scaling, NOT GC/allocation (a cheap GC-MXBean +
+all-cores-hot diagnostic refuted the allocation hypothesis and correctly stopped an allocation-free
+path from being built). Allocation never mattered anywhere -- single-thread or parallel.
+
+**Mining.** `sha256d.midstate` composes with the fast path via `header-hash-with`/`search-nonce`/
+`search-nonce-parallel` for ~4.4x per-nonce over naive full-header hashing (1.59x midstate x 2.78x
+fast compress, stacking cleanly), ~272k nonce/s on 10 cores, all bit-identical.
+
+**Real-world grounding.** The whole stack (core sha256d + midstate + fast path) was validated
+against the **actual Bitcoin genesis block** (block 0, hash `000000000019d668...`) on JVM and V8,
+and `search-nonce` recovers Satoshi's real genesis nonce 2083236893 -- the first non-synthetic
+validation, with fixtures independently verified via Python hashlib.
+
+**Cryptanalysis pivot (inverse direction).** The owner then redirected from *forward* optimization to
+the *inverse* problem: use the co-scientist approach to invert SHA-256 (find a preimage) below the
+2^256 brute-force bound. `sha256d.mitm` (see `docs/preimage-mitm-cosci.md`) delivers the honest
+answer:
+- Below-brute-force preimage algorithms are real (meet-in-the-middle / splice-and-cut / biclique).
+  The co-scientist search *designs* them by finding neutral-word splits over the message-schedule
+  dependency graph, and `run-mitm` **runs one on the real 32-bit round function**: 8-round SHA-256,
+  a partial preimage found in 2,049 compression-chunk evals vs brute force's 2,325,617 -- a measured,
+  verified **~1135x** speedup (the MITM square root, on real rounds, not a toy cipher).
+- It *locates the wall*: word-granularity MITM dies at ~24 rounds when the message expansion's
+  dependency fan-out makes every base word feed both chunks. Bit-level neutral bits give NO gain over
+  word-level under sound analysis (tested): a bit of W_i is neutral for a chunk iff the whole word is
+  unused. The published ~45-round / 2^255.5 record needs bicliques (differential trails), which this
+  repo describes but does **not** fabricate a complexity for.
+- **Full 64-round SHA-256 stays unbroken by any meaningful margin, and this repo does not fabricate a
+  break.** The honest reasoning was recorded (including why an AlphaProof-Nexus-style formal-proof AI
+  cannot help either: a fast inversion is conjectured false so no proof can be searched for it, and
+  one-wayness is a circuit lower bound beyond known mathematics that no prover can establish -- SHA-256
+  sits in the deliberate gap between provably-true and provably-false).
+
+**Defensive risk framing** (discussed, not yet doc'd): full-round preimage break risk is a negligible
+tail (best attack 2^255.5 on 45/64 rounds; ~17 years of zero full-round margin; Grover only reaches
+2^128, sequential/infeasible); the real practical risks are implementation/misuse (length-extension ->
+HMAC, low-entropy -> KDF, non-constant-time compare); AI-assisted formal/automated cryptanalysis
+(AlphaProof/co-scientist style) is a monitoring signal that may *accelerate reduced-round records* but
+does not change the full-round tail risk. A `docs/sha256-preimage-risk.md` capturing this is an open
+follow-up.
+
+**Shipped API:** `compress` (portable reference) · `compress-primitive-inline` (JVM ~2.7x) ·
+`compress-v8-inline` (V8 ~3.6x) · `midstate`/`header-hash`/`search-nonce`/`search-nonce-parallel` ·
+`mitm` (reduced-round preimage-attack search + runnable demo). Correctness gated throughout
+(clojure -M:test: 29 tests / 8000 assertions; cljs-verify 8/8), verified against NIST vectors and the
+real Bitcoin genesis block.
