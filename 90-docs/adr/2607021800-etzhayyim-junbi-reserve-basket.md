@@ -1,6 +1,6 @@
 # ADR-2607021800: junbi (準備) reserve treasury actor + HAKARI (秤) basket unit of account
 
-**Status**: accepted (R0 scaffold landed 2026-07-02)
+**Status**: accepted (R0 scaffold · R1 landed 2026-07-02, owner-ratified)
 **Date**: 2026-07-02
 **Deciders**: Jun Kawasaki (owner directive 2026-07-02)
 
@@ -139,7 +139,7 @@ collateral valuation). HAKARI never mints or burns EN.
 | Phase | Scope | State |
 |---|---|---|
 | **R0** | this ADR — pure `.cljc` core (params validation J2–J5, NAV, drift, rebalance proposal J10, governor J1–J12) + tests; repo + west + RAD registration | **landed 2026-07-02** |
-| **R1** | USDC + JPYC live on Base smart account (ERC-4337 via `base-l2`); `banking` double-entry wiring; langgraph-clj StateGraph + TreasuryGovernor; attestation datoms | gated on Council ratify |
+| **R1** | langgraph-clj StateGraph TreasuryActor (`interrupt-before` human approval, J10); `banking` double-entry wiring (J8); `base-l2` read-only Base observation — USDC + EURC readable at attested addresses, **JPYC read unlocks on Council address attestation** (never faked); audit datoms over `:db-api` | **landed 2026-07-02** (owner-ratified "r1") |
 | **R2** | +EURC live; rebalance-proposer cell; toritate cross-ref; HAKARI denominates EN credit limits | post-R1 |
 | **R3** | +e-CNY Tier-2 (per-jurisdiction legal analysis + Council Lv7+ unanimity; authorized-operator wallet; attestation feed); digital euro / digital yen remain placeholders | post-R2 |
 
@@ -154,6 +154,12 @@ collateral valuation). HAKARI never mints or burns EN.
   (`/.well-known/did.json`, `.nojekyll`), cross-linking the RAD identity.
 - R0 core is pure `.cljc` with no on-chain I/O — banking / base-l2 / StateGraph
   wiring is R1, not pretended at R0.
+- **R1 honesty**: chain reads go through base-l2's injected `ITransport`
+  (unit-tested against a mock JSON-RPC transport); the production Safe /
+  ERC-4337 smart-account provisioning and funding is an etzhayyim ops act,
+  not code, and remains to be executed. JPYC has no Council-attested Base
+  address yet (`:address nil` — reads throw rather than guess). Rates are
+  injected attestations at R1; the live Chainlink feed cell is R2.
 
 ## Related
 

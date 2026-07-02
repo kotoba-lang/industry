@@ -75,8 +75,8 @@
  :phases
  [{:phase :r0 :state "landed 2026-07-02"
    :scope "pure .cljc core (params validation, NAV, drift, rebalance proposal, governor J1–J12) + tests; repo + west + RAD registration"}
-  {:phase :r1 :state :gated-on-council
-   :scope "USDC+JPYC live on Base smart account (base-l2 ERC-4337); banking double-entry wiring; langgraph-clj StateGraph + TreasuryGovernor; attestation datoms"}
+  {:phase :r1 :state "landed 2026-07-02 (owner-ratified)"
+   :scope "langgraph-clj StateGraph TreasuryActor (interrupt-before human approval, J10); banking double-entry (J8); base-l2 read-only Base observation (USDC+EURC readable; JPYC read gated on Council address attestation); audit datoms over :db-api"}
   {:phase :r2 :state :post-r1
    :scope "+EURC live; rebalance-proposer cell; toritate cross-ref; HAKARI denominates EN credit limits"}
   {:phase :r3 :state :post-r2
