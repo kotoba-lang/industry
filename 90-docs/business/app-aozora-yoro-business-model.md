@@ -13,6 +13,7 @@
 - messenger は network effect で寡占、metadata が事業者に渡る
 - business messaging (LINE 公式等) は高価で lock-in
 - AI agent の承認・通知に専用の安全な面がない
+- 観測 (signal): workers 1673 inv/7d、zone 無し (aozora.app 配下)
 
 ## Customer Segments
 
@@ -55,6 +56,7 @@
 - messages/day
 - business inbox 数
 - agent 承認応答時間 (itonami SLA 直結)
+- 次の検証 (yoro-aozora-funnel): aozora MAU → yoro MAU 転換率
 
 ## Unfair Advantage
 

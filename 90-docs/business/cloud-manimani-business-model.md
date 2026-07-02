@@ -13,6 +13,7 @@
 - 通知・受信・タスクの洪水で個人の意思決定が磨耗する
 - personal assistant は私生活を他人のクラウドに渡す前提
 - wellbeing アプリは記録止まりで実行がない
+- 観測 (signal): manimani.cloud 実測 443 req/7d・1 uniques(日次和)
 
 ## Customer Segments
 
@@ -59,6 +60,7 @@
 - triage 完了率 (inbox zero 到達)
 - OSS→cloud 転換率
 - retention (ledger が伸び続けているか)
+- 次の検証 (manimani-ledger-pay): OSS active user → cloud 転換率が Obsidian Sync 水準 (~数%)
 
 ## Unfair Advantage
 

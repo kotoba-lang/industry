@@ -13,6 +13,7 @@
 - 業務 SaaS は職種ごとに分断され判断の脈絡が消える
 - AI agent 導入は「誰が何を承認したか」が残らずコンプラ不能
 - 中小には CFO/法務/営業 ops の専任が居ない
+- 観測 (signal): itonami.cloud 実測 6 req/7d・3 uniques(日次和)
 
 ## Customer Segments
 
@@ -63,6 +64,7 @@
 - 台帳の外部監査適合率
 - vertical attach 数
 - deal count / AUM
+- 次の検証 (itonami-smb-pay): gftdcojp 外の初期 10 org の有償転換
 
 ## Unfair Advantage
 
