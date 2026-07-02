@@ -1,0 +1,144 @@
+{:frontmatter
+ {:id "adr-2607022900-aiueos-chicory-jvm-native-adapter"
+  :title "ADR-2607022900: aiueos native adapter（kototama tender の実行部）を Rust/wasmtime ではなく JVM/Clojure + Chicory で構築する — ADR-2607022700/2607022400 の「native adapter = Rust」枠組みを実行層に限り更新する"
+  :status "accepted"
+  :date "2026-07-02"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "aiueos-chicory-jvm-native-adapter"
+  :authoritative true
+  :authoritative_for ["aiueos native adapterの実行層(host.rs/runtime.rs相当)をRustではなくJVM/Clojure+Chicoryで構築する決定"
+                       "ADR-2607022700のモジュール計画(host.rs/runtime.rs/bin-aiueos.rsをRustで復元)を実行層に限り更新"
+                       "device-access quartet(pci/dma/irq/mmio)の生アクセスは依然native課題として残ることの明記"
+                       "Chicoryのfuel/gas metering欠落をreal gapとして明記(黙って解決済み扱いしない)"
+                       "decision subprocess(bb decide)は別ホスト言語向け汎用インターフェースとして温存、JVM adapterは同一プロセス内で直結可能"
+                       ":aiueos/quota{:host-calls:publishes}によるhost-call回数caps実装(ADR-0006、fuelとは別物)"
+                       "fuel/gas meteringはChicoryのwithUnsafeExecutionListenerで命令レベルprototype可能だが非公式API・インタプリタ限定と明記"
+                       "生ハードウェアアクセスの設問を「Rust vs java.lang.foreign」から「特権/hypervisor協調tenderレイヤーの不在(言語非依存)」に訂正"
+                       "fuel prototype実装完了(aiueos-cljc-contract#7)、up(マルチコンポーネント起動)実装完了(#8)でCLIコマンド網羅完了"
+                       "native adapterの実行層+CLI本体がRust不要でJVM/Clojureに完全移行、残る唯一のギャップは生ハードウェアアクセス(言語非依存の特権層課題)"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607022700-aiueos-native-adapter-tender-design"
+            "adr-2607022400-kototama-unikernel-tender-runtime-vocabulary"
+            "adr-2607022200-aiueos-cljc-wasm-component-kernel-architecture"
+            "com-junkawasaki/orgs/kotoba-lang/kotoba/docs/ADR-kotoba-wasm-clj-execution.md"
+            "com-junkawasaki/orgs/kotoba-lang/kotoba/src/kotoba/wasm_exec.clj"]
+  :last_verified "2026-07-02"}
+
+ :evidence
+ {:claim "Wasm execution engine can run entirely on JVM as pure Clojure, no Rust/wasmtime needed"
+  :source "kotoba-lang/kotoba: com.dylibso.chicory/wasm + com.dylibso.chicory/runtime (deps.edn), kotoba.wasm_exec.clj"
+  :verification ["wasm-binary-actually-executes test green (independently re-run)"
+                 "ADR-kotoba-wasm-clj-execution.md documents real CLI run: kotoba wasm run ... --json"
+                 "host-import functions are ordinary Clojure closures (HostFunction/WasmFunctionHandle), no FFI ceremony"]
+  :gaps ["fuel/gas metering: Chicory's Resource Control API still in development, no instruction-budget enforcement today -- still open as of the 2026-07-02 follow-up below"
+         "memory-page limits: only what the compiled module itself declares, no independent per-manifest cap verified"
+         "raw MMIO/DMA/hardware access: nothing in Chicory touches this, still needs native shim or java.lang.foreign (unverified)"]
+  :follow-up-2026-07-02
+  {:what ":aiueos/quota {:host-calls N :publishes N} (ADR-0006) implemented+verified in aiueos.execute -- a per-run host-function CALL COUNT cap, wrapping every host-import via count-and-check!, throwing ex-info through Chicory's .apply on overrun (caught by run-if-granted, returns :aiueos.execute/quota-exceeded, offending call's own effect never lands)"
+   :verified-via "real shell run: clojure -M -m aiueos.launcher run manifest.edn --edn with :aiueos/quota {:publishes 0} genuinely aborts and returns an empty topic-bus"
+   :not-solved "this is call-COUNT, not instruction-level fuel -- a single host call that internally loops/computes heavily is still unbounded; fuel/gas metering itself remains unresolved"}
+
+  :follow-up-2-2026-07-02-research
+  {:chicory-gas-metering
+   {:status "not shipped as first-class API (checked releases 1.5.0-1.7.5, docs, issues)"
+    :diy-hook "Instance.builder(...).withUnsafeExecutionListener((instruction, stack) -> ...) fires per Wasm instruction -- a real, working hook for genuine instruction-level fuel"
+    :caveats ["Chicory docs explicitly label it unsafe/experimental/may-be-dropped"
+              "official supported execution-limit mechanism is thread-interrupt/ExecutorService wall-clock timeout, not this listener (per issues #895/#896)"
+              "interpreter-only -- Chicory's separate AOT compiler (AotMachine) bypasses this hook entirely"]
+    :verdict "fuel prototype is actionable today via withUnsafeExecutionListener, but not a safe/permanent API -- correct prior framing of 'Chicory-side implementation pending' to 'unofficial hook available for prototyping, official API still pending'"}
+   :java-lang-foreign-mmio
+   {:original-question "does java.lang.foreign let the JVM do raw MMIO/DMA/hardware access instead of Rust"
+    :finding "category error -- Solo5's own hvt tender architecture: the TENDER holds KVM privilege and sets up guest memory/device mappings; the GUEST unikernel never does raw MMIO itself, it issues narrow hostcalls (e.g. solo5_net_write) the tender mediates. spt guests run under seccomp as unprivileged processes. No unprivileged userspace process in ANY language can do raw MMIO/DMA without root+/dev/mem or KVM/hypervisor privilege or being the kernel itself"
+    :java-lang-foreign-capability "genuinely CAN make the same mmap()/ioctl() downcalls Rust's libc bindings make -- not fundamentally less capable for FFI/syscalls -- BUT only finalized in Java 22; this repo's CI pins Java 21 where it's preview-only (--enable-preview required)"
+    :corrected-framing "the real unsolved work is the privileged/hypervisor-cooperating tender layer itself (root+/dev/mem driver or a minimal KVM-based VMM) -- its IMPLEMENTATION LANGUAGE (Java 22+ FFM vs Rust) is now a genuinely open choice, but writing that privileged layer is substantial systems engineering regardless of language, and was never really a Rust-vs-Java question"}}}
+
+ :module-plan-update
+ [{:module "host.rs/runtime.rs (wasmtime hosting)" :old-plan "Rustで復元・改修" :new-plan "Chicory経由のJVM/Clojure実行層として新規実装、Rust側は復元しない"}
+  {:module "decision subprocess (bb decide)" :old-plan "native adapterが別プロセスとして呼ぶ" :new-plan "同一JVMプロセス内でaiueos.brokerの判定→Chicory実行を直結可能。bb decideのEDN-over-stdio経路はJVMでないadapter向けに温存"}
+  {:module "bin/aiueos.rs (CLI)" :old-plan "Rustで復元・改修" :new-plan "JVM/Clojure(bb/clojureベース)で実装可能"}
+  {:module "virtio.rs (device-access生アクセス)" :old-plan "低信頼度のまま書き直す" :new-plan "変更なし。ただしnativeがRustを意味するとは限らない、java.lang.foreign経路は未検証のまま残る"}]
+
+ :body
+ "# ADR-2607022900: aiueos native adapter（kototama tender の実行部）を Rust/wasmtime ではなく JVM/Clojure + Chicory で構築する
+
+**Status**: accepted
+**Date**: 2026-07-02
+**Deciders**: Jun Kawasaki
+
+## Context
+
+ADR-2607022400/2607022700 は「Wasm を実際にホストする層は native/Rust でなければ
+ならない」という前提に立っていた——`.kotoba` は Wasm へコンパイルされる側であり、
+他の Wasm をホストできないから、という ADR-2607022200 の論拠に基づく。
+
+この前提を native adapter 着手の直前に再検証した。`kotoba-lang/kotoba` の
+deps.edn に `com.dylibso.chicory/wasm` + `com.dylibso.chicory/runtime`
+（pure-JVM Wasm runtime、native toolchain 不要）が既にあり、`kotoba.wasm-exec`
+（accepted・実装済み）がこれを使って「コンパイル済み Wasm バイナリを Chicory で
+ロード・実行し、host-import を Clojure クロージャで実装し、結果を受け取る」を
+実装・検証済みだった。実測: `wasm-binary-actually-executes` テストが green。
+
+この事実は「Wasm をホストする側は native でなければならない」という前提を崩す。
+Wasm 実行エンジンを JVM 上で pure Clojure として動かせるなら、host.rs が担って
+いた役割全体を Rust を介さず aiueos-cljc-contract の延長として実装できる。
+
+## Decision
+
+### 1. Chicory/JVM を aiueos native adapter の実行層として採用する
+
+ADR-2607022700 の「native adapter は decision subprocess にのみ問い合わせ、
+capability を自分で判定しない」という原則はそのまま維持する。変わるのは
+「native adapter が Rust である必要」という前提だけ。host-import 関数
+（log-write/clock-monotonic/random-bytes/topic-publish/topic-poll/topic-take/
+topic-count）は生ハードウェアを要さないため Chicory の host function として
+Clojure クロージャで直接実装できる。topic-* は既存の aiueos.topic にそのまま
+委譲できる。pci-config/dma-map/irq-subscribe/mmio-map（device-access quartet）
+は引き続き native/adapter 側の責務だが、java.lang.foreign 経由で Rust を介さず
+JVM から直接扱える可能性がある（本ADRでは未検証・future課題）。
+
+### 2. モジュール計画を更新する
+
+host.rs/runtime.rs は Rust で復元せず、Chicory経由のJVM/Clojure実行層として
+新規実装。decision subprocess(bb decide)は同一JVMプロセス内で直結可能に
+なるが、JVMでないadapter向けの汎用インターフェースとして温存。bin/aiueos.rs
+のCLIもJVM/Clojureで実装可能。virtio.rsのdevice-access生アクセスは変更なし。
+
+### 3. 既知の未解決ギャップ
+
+fuel/gas meteringがChicoryに無い(Resource Control APIがまだin development)。
+aiueos.manifestの:aiueos/limits{:fuel N}は現時点で執行時に強制できない
+——real gapとして明記する。memory-pages制限もコンパイル済みモジュール自身が
+宣言する範囲でしか効かない。
+
+## Consequences
+
+- (+) native adapterの大部分(device-access quartetを除く全て)がRustを経由
+  せずJVM/Clojureで完結できる可能性が開けた。
+- (+) decision subprocessとexecutionを同一JVMプロセスに同居させられるため、
+  bb decideのper-invocationレイテンシがJVMホストのadapterでは実質解消する。
+- (+) kotoba.wasm-execは既に実装・テスト済みの資産——ゼロから書く必要がない。
+  ただしaiueos側はkotoba-lang/kotobaの他の巨大な依存を引きずらないよう、
+  Chicoryへの直接依存として独立実装する必要がある。
+- (−) fuel/gas meteringの欠落はreal gap。Chicory側の対応を待つか自前で
+  命令数カウントを足す必要がある。
+- (−) device-access quartetの生アクセスは依然未解決。java.lang.foreign経路の
+  検証は本ADRのスコープ外、次のfollow-up。
+- (−) 本ADRは方針転換の決定であり、実装はfollow-up。
+
+## References
+
+- ADR-2607022700, ADR-2607022400, ADR-2607022200
+- kotoba-lang/kotoba docs/ADR-kotoba-wasm-clj-execution.md
+- kotoba-lang/kotoba src/kotoba/wasm_exec.clj, test/kotoba/wasm_exec_test.clj
+- Chicory: https://github.com/dylibso/chicory
+- aiueos-cljc-contract/src/aiueos/topic.cljc
+
+## Follow-up 4 (2026-07-02)
+
+fuel prototype実装完了(#7)、up(マルチコンポーネント起動)実装完了(#8)。
+aiueos.launcherのverify/run/admit/inspect/surface/audit/up 7コマンド全て
+動作。native adapterの実行層+CLI本体がRust不要でJVM/Clojureに完全移行。
+残る唯一の本質的ギャップは生ハードウェアアクセス(言語非依存の特権/hypervisor
+協調tenderレイヤー課題)。詳細はmdファイルのFollow-up 1-4を参照。"}

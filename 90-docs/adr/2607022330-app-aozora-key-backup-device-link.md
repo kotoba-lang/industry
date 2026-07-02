@@ -101,3 +101,29 @@ E2EE プラットフォーム同期）を踏まえ、web だけで完結する 3
   と SAS が実防御（設計どおりだが SAS 目視をユーザーが省くリスクは残る）。
 - follow-up: WhatsApp 型「端末別鍵 + DelegationChain」への移行（seed を運ばない
   多端末化、端末失効 UI）、バックアップ削除/ローテート UI、日本語 wordlist。
+
+## Addendum（2026-07-02）— WebAuthn E2E で出荷ビルド固有の :advanced バグを検出・修正（app-aozora `b887802`）
+
+オーナー指摘「WebAuthn は kotoba-lang/playwright で検証できるのでは?」を受け、CDP の
+**WebAuthn virtual authenticator（ctap2 + `hasPrf`）**で PRF セレモニーを headless 実行。
+これにより **node 単体テスト（`:none`）と `:simple` ビルドでは緑なのに、出荷の
+`:advanced` ビルドでだけ PRF バックアップが nil を返す**実バグを検出した。
+
+- **根因**: `getClientExtensionResults().prf` は新しい拡張出力で Closure の externs に
+  無いため、`:advanced` が `(some-> ext .-prf .-results .-first)` のダッシュ経由読みを
+  rename して nil 化していた（`rawId`/`type` 等は externs にあり無傷 → 発見が遅れた）。
+- **修正**: `goog.object/getValueByKeys ext "prf" "results" "first"`（string-key は
+  `:advanced` でも不変）。加えて signup のパスキー生成で `{:prf {}}` を要求し、ログイン
+  パスキー自体でバックアップを封緘（常用経路は 2 枚目のパスキー不要）。`enable-backup!`
+  は create 時の advisory な `enabled` フラグでなく**実 PRF 評価の結果**で判定、バックアップ
+  用パスキーは `user.id = <did>#backup` で resident なログインパスキーを上書きしない。
+- **検証**: `:advanced` の keytest ブリッジ（`yoro-ui.dev.keytest`、dev 専用・非出荷）で
+  実 cljs の eval-prf/enable-backup/restore-from-blob を実 authenticator に対し駆動し、
+  ログイン経路・フォールバック経路とも wrap→restore が seed 一致（`match:true`）。本番 UI
+  E2E では リカバリーフレーズ経路の登録→表示→別端末復元が緑、PRF バックアップの有効化も緑。
+  ハーネスは `60-apps/appview/cljs/e2e/`（`prf_roundtrip.clj` / `key_flows.clj`）に常設。
+- **残課題（本機能外）**: getBackup の read と device-link の deposit（read+write）は
+  kotobase `yoro-social` の full `:eavt` スキャン肥大による間欠 500（"Invalid array buffer
+  length"）に律速され、E2E がこの窓で不安定。これは getAccount 等既存 API も同様に落ちる
+  **アプリ全体の既存インフラ課題**で、当機能のバグではない。datom スキャンの
+  ページング/インデックス化が別 follow-up。
