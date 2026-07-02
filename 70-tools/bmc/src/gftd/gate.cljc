@@ -34,7 +34,7 @@
    :hyp/apex-privacy-premium
    ;; measurable via subscription telemetry emitter (apex): Free→Plus 転換率 >= Proton 水準
    ;; Stripe product は既存 (Gftd AI Pro prod_SdVVTqTHT1Z206 / price_1RiEU5… $20)。
-   {:metric [:subscription :conversion-pct] :op :>= :threshold 0.02
+   {:metric [:conversion :pct] :op :>= :threshold 0.02
     :evidence-label "Free→Plus 転換率"
     :needs-when-unmeasurable ["Stripe checkout 配線 (product 既存)" "Free→Plus 転換テレメトリ"]}
 
@@ -70,11 +70,14 @@
     :needs-when-unmeasurable ["OSS install テレメトリ" "cloud signup funnel" "価格設計"]}
 
    :hyp/etzhayyim-registry-value
-   ;; measurable via RAD metrics emitter (etzhayyim): itonami が attestation を参照し始める
-   ;; (attestation-refs>=1 は leading indicator。最終「価値を認める」判断は評議=人間)。
-   {:metric [:rad :attestation-refs] :op :>= :threshold 1
-    :evidence-label "RAD attestation 参照回数"
-    :needs-when-unmeasurable ["itonami 契約の RAD attestation 参照フック" "資金チャネル (寄付/助成)"]}
+   ;; 非営利・主観 gate: 自動 validate しない (needs-only)。
+   ;; etzhayyim RAD emitter (PR#2840) の :rad {:attestation-refs 320 ...} は「既存
+   ;; attestation(sigref)数」であって gate 意図の「itonami が契約要件として参照した回数」
+   ;; ではない — これで auto-pass させると未達成 gate を誤 validate する。最終「価値を
+   ;; 認める」判断は評議=人間 (scout/PR#2840 明記)。itonami-contract-ref の実計測が
+   ;; 入るまで needs-only を維持し、通過は人手で hyp pass する。
+   {:needs ["itonami 契約の RAD attestation 参照フック (rad_attestation_ref scaffold の live 化)"
+            "資金チャネル (寄付/助成)"]}
 
    :hyp/isekai-fork-viral
    ;; measurable via public/feed/fork-stats.edn emitter (network-isekai PR#15): viral 係数 >= 1.0
