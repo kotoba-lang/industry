@@ -62,6 +62,53 @@ merge conflicts in this superproject and its `orgs/` child repos.
 
    If `gh pr merge` fails only because local `main` is checked out in another worktree, merge via GitHub API.
 
+## Stash / Branch Retirement
+
+Use this to drain an accumulated `git stash list` / local branch list without losing work.
+Prevention lives in `CLAUDE.md` § 並行エージェント運用 (worktree-per-agent, no stash
+accumulation); this section is the recovery path. Verified in practice 2026-07-02:
+20 stashes + 8 branches drained, 2 genuinely unlanded items rescued.
+
+1. **Snapshot by SHA first.** Concurrent sessions push/pop stashes, so indices shift.
+   Record `git stash list --format='%H %gs'` once, and before every drop re-resolve the
+   SHA to its current index.
+
+2. **Classify each stash by content containment, not by patch-id or ancestry.**
+   Exclude generated files (`manifest/west.yml`) from the check — their stashed content
+   is disposable by definition. For the remaining files, test whether each added line of
+   the stash diff exists in current `main`'s version of that file:
+
+   - all lines present → landed; safe to retire.
+   - only `;;` comment/wording lines missing → landed with rewording; safe to retire.
+   - substantive lines missing (repo registrations, code) → unlanded; rescue.
+   - same-file-set stashes in a numbered series ("round N") where the latest round is
+     fully landed → earlier rounds are superseded intermediates; safe to retire.
+
+3. **Archive everything before dropping.** Export each stash as a patch (plus its
+   untracked-file list from `stash^3` when present) into
+   `.git/stash-archive-<date>/` with an `index.txt` of `SHA | message`. Dropping is then
+   fully reversible without relying on reflog/gc timing.
+
+4. **Rescue unlanded content to a branch, not back into a stash.** Build the branch in a
+   sparse worktree outside the superproject (full checkout is slow):
+
+   ```bash
+   git worktree add --no-checkout -b stash-rescue-<date> /tmp/root-stash-rescue origin/main
+   cd /tmp/root-stash-rescue && git sparse-checkout set --no-cone <paths> && git checkout
+   git apply -3 --include='<path>' <archive>/<sha>.patch   # 3-way, per rescued file
+   git commit && git push origin stash-rescue-<date>        # push; merge is owner's call
+   ```
+
+5. **Retire branches with the same discipline.** Per branch: check
+   `git merge-base --is-ancestor <branch> main` (deepen with
+   `git fetch --shallow-since=<date> origin main` first if grafts block it — do not trust
+   shallow ancestry). Non-ancestors get the added-line containment check (step 2), and
+   unrelated-history branches (no merge base) get a remote-preservation check
+   (`gh api repos/<org>/<repo>/commits/<tip>` — if the tip exists in the successor repo,
+   the branch is preserved remotely). Archive `git diff main...<branch>` + a commit log to
+   `.git/stash-archive-<date>/branches/`, then `git branch -D`. Never touch `git-annex`
+   (annex metadata) or branches another session is actively using.
+
 ## Conflict Resolution
 
 Inspect first:
