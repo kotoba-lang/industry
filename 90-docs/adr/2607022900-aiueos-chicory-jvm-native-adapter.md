@@ -186,3 +186,28 @@ non-guarantee のまま**——`withUnsafeExecutionListener` は Chicory 公式�
 将来 Chicory が正式な Resource Control API を出荷したら、そちらへの移行を検討する
 こと。生ハードウェアアクセス（特権/hypervisor協調tenderレイヤーの不在）は依然
 完全に未着手のまま。
+
+**Follow-up 4（2026-07-02、CLI コマンド網羅完了・移行状況の総括）**:
+`aiueos.launcher`（本 ADR/ADR-2607022700 のモジュール計画表が「JVM/Clojure で
+実装可能」とした CLI）に `up`（`aiueos-cljc-contract#8`）を配線し、
+`verify`/`run`/`admit`/`inspect`/`surface`/`audit`/`up` の 7 コマンドが実際に
+動作する状態になった。`up` は `aiueos.graph/boot-order`（provider が consumer
+より先）でシステムの全コンポーネントを起動し、`:aiueos/wasm` を持つものは
+`aiueos.execute` で実際に実行、持たないもの（純粋な capability provider）は
+決定のみ。deny または quota/fuel 超過で停止するコンポーネントがあれば、
+そこでブート全体を止める（依存先が壊れているコンポーネントより後ろを起動しない）。
+依存サイクルは実行前に検出して報告する。実測: 2 コンポーネントの system.edn
+（fs = provider、app = fs の capability を import しつつ実 wasm も持つ consumer）
+を shell から `up` 実行し、fs → app の順で起動、app の topic-publish 呼び出しが
+実際に topic bus に反映されることを確認。
+
+**この時点での Rust 依存削減の到達点**: 「aiueos の native adapter は Rust で
+書く」という ADR-2607022700 時点の前提は、実行層（旧 host.rs/runtime.rs =
+wasmtime 相当）・CLI 本体（旧 bin/aiueos.rs）ともに JVM/Clojure へ完全に
+置き換わった。残る唯一の本質的ギャップは生ハードウェアアクセス
+（device-access quartet の真の MMIO/DMA/PCI/IRQ）で、これは Follow-up 2 で
+訂正した通り「Rust か Java か」ではなく「特権/hypervisor 協調 tender レイヤー
+そのものが未着手」という、言語選択とは独立した別課題として残る
+（`virtio.rs` の書き直しもこれに連動して保留）。adapter-only 系 6 コマンド
+（`sign`/`check`/`compile`/`hash`/`image`/`vm`）は元々 kototama/kotoba-clj
+委譲・鍵管理ツール・native provisioning が正しい設計であり、意図的に移行対象外。
