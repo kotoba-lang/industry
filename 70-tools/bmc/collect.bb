@@ -89,6 +89,17 @@
                               (get-in g [:sum :requests] 0)))
             {} (get-in r [:data :viewer :accounts 0 :workersInvocationsAdaptive]))))
 
+;; kotobase 課金 product の price_id (ADR-2607022200)。gate kotobase-graph-arpu は
+;; 「kotobase の初 paid tenant」を測るので、アカウント全体の active-subscriptions を
+;; 数えると 2017 年レガシーの無関係サブスク (price=group_monthly, ¥0) を誤カウントし
+;; gate を false-validate する。kotobase price に紐づく active sub だけを数える。
+(def kotobase-price-ids
+  #{"price_1TVVI7BcblPoapUJivZq5PUa"    ; Standard = kotobase Developer $33
+    "price_1TVVI7BcblPoapUJe9950Vcr"})  ; Pro = kotobase Business $650
+
+(defn- sub-price-ids [sub]
+  (set (keep #(get-in % [:price :id]) (get-in sub [:items :data]))))
+
 (defn stripe-summary [sk]
   (let [get* (fn [ep] (-> (curl/get (str "https://api.stripe.com/v1/" ep)
                                     {:basic-auth [sk ""] :throw false})
@@ -96,9 +107,14 @@
         subs (get* "subscriptions?status=active&limit=100")
         charges (get* "charges?limit=100")]
     (when-not (:error subs)
-      {:active-subscriptions (count (:data subs))
-       :charges-total (count (:data charges))
-       :last-charge-epoch (some-> (first (:data charges)) :created)})))
+      (let [all-active (:data subs)
+            kotobase-active (filter #(seq (clojure.set/intersection
+                                            (sub-price-ids %) kotobase-price-ids))
+                                    all-active)]
+        {:active-subscriptions (count kotobase-active)   ; ← kotobase price のみ (gate)
+         :active-subscriptions-account-wide (count all-active) ; 参考: 全体 (レガシー含む)
+         :charges-total (count (:data charges))
+         :last-charge-epoch (some-> (first (:data charges)) :created)}))))
 
 (defn http-status [url]
   (when url
