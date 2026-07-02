@@ -16,6 +16,9 @@
      hyp pass|fail <hyp-id> --evidence \"…\"
      react tick [--product P] [--metrics k=v…]    — ReAct 1 tick（有界）
      react loop [--product P] [--max-ticks N]     — dry まで反復（budget 有界）
+     gate [--product P|--all]                     — 仮説 gate の現況（測定/距離/需）
+     funnel show [--product P]                    — 獲得→収益ファネルの現況
+     funnel analyze [--product P|--all]           — bottleneck に GTM 提案（governor 経由 ledger）
      ledger show [--tail N]"
   (:require [clojure.string :as str]
             #?(:clj [clojure.edn :as edn])
@@ -23,6 +26,7 @@
             [gftd.ledger :as ledger]
             [gftd.react :as react]
             [gftd.gate :as gate]
+            [gftd.funnel :as funnel]
             [gftd.score :as score]))
 
 (def registry
@@ -170,6 +174,35 @@
                         (or (:evidence r) (:distance r)
                             (when (:needs r) (str "需: " (str/join " / " (:needs r)))))))))))
 
+     (defn cmd-funnel [cli-key ps idx sub flags]
+       (let [products (if (or (:all flags) (not (:product flags)))
+                        (cli-products cli-key idx)
+                        [(resolve-product cli-key idx flags)])]
+         (case sub
+           "show"
+           (doseq [p products]
+             (let [metrics (read-metrics ps p flags)]
+               (println (funnel/render-text p metrics))))
+           "analyze"
+           ;; sales/marketing motion: bottleneck→GTM 提案を governor に通して ledger へ。
+           ;; schedule で反復するので dedup 拒否は正常 — react と同じく exit しない。
+           (doseq [p products
+                   :let [metrics (read-metrics ps p flags)
+                         props (funnel/proposals p metrics)]
+                   :when (seq props)]
+             (let [{:keys [approved rejected]} (react/governor idx props)
+                   actor (str "advisor:funnel")
+                   events (concat (map #(react/proposal->event 0 actor %) approved)
+                                  (for [{:keys [proposal reason]} rejected]
+                                    {:event/type :governor/rejected :event/actor "governor"
+                                     :event/value (select-keys proposal [:proposal/action :canvas/id :hyp/id :event/value])
+                                     :event/reason reason}))]
+               (ledger/append! (:ledger ps) events)
+               (println (name p) "funnel:" (count approved) "approved," (count rejected) "rejected")
+               (doseq [a approved] (println "  +" (:canvas/id a) (pr-str (:event/value a))))
+               (doseq [{:keys [proposal reason]} rejected]
+                 (println "  x governor:" reason "--" (pr-str (:event/value proposal)))))))))
+
      (defn -main-for
        "Entry point shared by the 7 wrappers."
        [cli-key args]
@@ -218,6 +251,9 @@
              ["react" "loop"] (cmd-react cli-key ps idx "loop" flags)
 
              ["gate" nil] (cmd-gate cli-key ps idx flags)
+
+             ["funnel" "show"] (cmd-funnel cli-key ps idx "show" flags)
+             ["funnel" "analyze"] (cmd-funnel cli-key ps idx "analyze" flags)
 
              ["score" nil]
              (let [facts (edn/read-string (slurp (:facts ps)))

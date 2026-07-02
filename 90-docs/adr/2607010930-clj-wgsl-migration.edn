@@ -1,11 +1,11 @@
 {:frontmatter
  {:id "adr-2607010930-clj-wgsl-migration"
   :title "ADR-2607010930: Rust→Clojure/WGSL migration (ambitious scope; hot loop in WGSL, CLJ authors + dispatches)"
-  :status "proposed"
+  :status "largely-complete-phase-7"
   :doc_type "adr"
   :topic "clj-wgsl-migration"
   :authoritative true
-  :last_verified "2026-07-01"
+  :last_verified "2026-07-02"
   :authoritative_for
   ["the hot-loop-in-WGSL / CLJ-authors-and-dispatches-only rule that resolves the wasmi no-JIT constraint for ambitious hot-core migration"
    "the five-class crate ledger (90-docs/migration/clj-wgsl-ledger.edn) classifying every kotoba + kami-engine Rust crate"
@@ -106,5 +106,22 @@
      :status "real initial implementation landed for ingest-block + hydrate-via-blocks; IPNS-verify explicitly TODO (see repo README)"}]
    :application "kotoba-lang/map gets kotoba-client as its data layer (viewport → geo/H3 tile keys → kotoba-client hydrate+kqe query → existing mvt/orbital/projection render pipeline); wiring lands as a follow-up PR in kotoba-lang/map, not part of this phase's four new repos"
    :manifest-registration "manifest/repos.edn + west.yml, this commit"
-   :not-done "full re-derivation of kotoba-lang-adr.edn's inter-repo dependency graph across all 332 org repos (only additive entries for the 4 new repos + map were made; a from-scratch 332-repo gh-api sweep is a separate follow-up, the existing file's :repo-count was already stale at 200)"}}}
+   :not-done "full re-derivation of kotoba-lang-adr.edn's inter-repo dependency graph across all 332 org repos (only additive entries for the 4 new repos + map were made; a from-scratch 332-repo gh-api sweep is a separate follow-up, the existing file's :repo-count was already stale at 200)"}
+  :phase-7-2026-07-02
+  {:summary "ambitious-scope wave closed: where Phase 4 only scaffolded 63 kotoba-lang/{repo} homes, this phase performed the actual CLJC restoration for those scaffolds AND extended coverage via a full crate-by-crate re-audit of kami-engine's complete original 116-crate kami-* inventory (not just Phase 4's deleted-not-migrated subset)"
+   :final-tally "113/116 original kami-* crates now have a CLJC or documented-exclusion home in kotoba-lang"
+   :confirmed-genuine-exclusions
+   ["kami-clj-play / kami-clj-play3d — single src/main.rs native windowed players (winit+wgpu), zero portable domain logic, correctly excluded"
+    "kami-ui-sdk — JavaScript (not Rust) SDK, out of this ADR's Rust->CLJC scope by definition, left for separate decision"]
+   :not-counted-against-tally "kami-webgpu investigated and confirmed a separate mature unrelated CLJS project (\"Declarative WebGPU from EDN\", own ADR/CHANGELOG/tests) sharing a naming pattern only — explicit owner-decision exclusion, not part of either count"
+   :corrected-mistaken-exclusions
+   [{:crate "kami-flow" :was "misjudged as unrelated Node.js/Cypher graph-ingest tool" :actually "that description applied to an unrelated graph/ subdirectory sharing the same kami-engine/kami-flow/ folder path; src/lib.rs is a genuine RTL->PnR->GDSII->Verify/Power/DFT/SI/Yield->STA->DRC/LVS->Signoff orchestrator" :restored-to "kotoba-lang/kami-flow, wiring 7 already-restored sibling EDA crates (rtl/pnr/model-checking/power/dft/signal-integrity/yield)"}
+    {:crate "kami-script-runtime" :was "correctly out-of-scope as a whole (the WASM host itself, wasmtime/wasmi binding kami:engine/* imports)" :actually "src/input_map.rs submodule is, per its own doc comment, pure Rust with no platform deps (device-neutral touch/analog input mapping)" :restored-to "kotoba-lang/kami-script-runtime, scoped to ONLY input_map.rs — lib.rs/platform.rs/bin/* remain unported substrate"}]
+   :method "verify target scaffold genuinely empty (or nonexistent, for ~50 crates outside Phase 4's original list) before touching; fetch deleted Rust source at kami-engine@a8368f9c0d784dbc9d11e8fa8f407aa95c7ce4fa; port 1:1 with every original #[test] mirrored; for wasm-bindgen/native-app crates scope to portable computational kernels/config data with documented native-only exclusions rather than force a whole-crate port; for kami-*-scene crates depend on already-restored kotoba-lang/scene (kami-scene EDN accessor port) + the paired domain crate, duck-typing a local default shape when the domain crate was still mid-restoration in a parallel dispatch; manifest/repos.edn (:extra-projects) + manifest/west.yml updated per-repo via direct GitHub API commits with fresh-fetch retry-on-409 loops + mandatory post-write SHA verification against the actual API-fetched repo HEAD"
+   :separate-clj-split
+   {:summary "7 live (never-deleted) kami-*-clj subdirectories inside kotoba-lang/kami-engine, distinct from the 116-crate Rust-deletion tally, split out to standalone repos following the kami-mangaka-genko-clj -> kotoba-lang/kami-genko precedent (copy-out, not move — source subtree untouched)"
+    :repos ["kami-mangaka-page-clj" "kami-mangaka-reader-clj" "kami-mangaka-scene-clj" "kami-mangaka-render-clj" "kami-mangaka-text-clj" "kami-app-sip-clj" "kami-engine-sdk-clj"]
+    :note "kami-engine-sdk-clj is distinct from the pre-existing, unrelated kotoba-lang/kami-engine-sdk (Svelte UI mirror); page/reader's broken :local/root dep on text-clj was fixed to :git/url+:sha coords once text-clj landed, both test green"}
+   :incident-self-caught
+   "a manifest-write script bug during kami-shugyo's registration accidentally wiped manifest/repos.edn to 0 bytes (assertion failure on a concurrently-modified trailing block, script proceeded with a stale/empty content variable instead of aborting); caught via routine post-write line-count check, reverted from parent commit within the same session with kami-shugyo re-applied, zero registrations lost; every subsequent manifest write in this phase added a hard line-count-must-not-decrease guard before every PUT"}}}
 

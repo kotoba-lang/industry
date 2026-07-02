@@ -9,5 +9,10 @@
  :workers-invocations-7d
  {"net-kotobase" 3444, "kotobase-cf-wasm-staging" 1867},
  :health-status 200,
+ ;; sales/marketing funnel (ADR-2607022600)。現状は awareness のみ実測（zone
+ ;; pageviews を訪問 proxy に）、signup/checkout の funnel emitter は未配線なので 0。
+ ;; active-subscriptions は kotobase price 限定（collect stripe-summary, PR#249）で 0。
+ :funnel {:visitors 248, :signups 0, :checkouts 0},
+ :stripe {:active-subscriptions 0},
  :signal
  "kotobase.net 実測 3483 req/7d・272 uniques(日次和)、workers 5311 inv/7d"}
