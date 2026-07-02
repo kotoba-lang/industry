@@ -32,12 +32,12 @@
 
 - kotobase.net 稼働済: pin (CAR-on-B2) / Datalog / SPARQL/Cypher 読み / KG ingest
 - add-on surface: map tiles/geo query / git remote / search index
-- 準備 (kotobase-graph-arpu): signup→checkout 配線 (yatabase price 既存)
 - 準備 (kotobase-graph-arpu): tenant 従量計測
+- 準備 (kotobase-graph-arpu): signup→checkout 配線 (kotobase price 既存)
 
 ## Channels
 
-- free self-serve → paid workspace (yatabase 型)
+- free self-serve → paid workspace (kotobase tier 型)
 - OSS kotoba 開発者
 - 全社内プロダクトが tenant
 
