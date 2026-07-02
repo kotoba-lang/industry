@@ -127,3 +127,17 @@ kami-genko / kami-mangaka-\* が該当。syosetsuka の技芸 lib は将来 `sho
 - ai-gftd-dogaka（空 stub）を GitHub / west / local checkout とも削除。
 - 未了: mangaka の kami-genko への domain 統合（別途）、2651/2652 公開（権限ゲート）、
   syosetsuka の shousetsu lib 分離（domain 実装後）。
+
+## Addendum 2 (2026-07-02, shousetsu + 2651/2652 公開で5職能完結)
+
+- cloud-itonami-isco-2651 / 2652 をオーナー承認のもと公開、occupation registry
+  v27（88/436）に登録。5職能すべて registry 掲載完了。
+- `kotoba-lang/shousetsu` を分離（syosetsuka.edn の連載小説語彙: author/work/
+  episode entity scheme・slug・tx helpers・record→ops・body-as-blob 不変条件。
+  24 assertions green。lib 化に伴い slug / TextEncoder の cljs 非対応を修正）。
+- ai-gftd-syosetsuka は facade 化で consumer 無変更（merge 819b48f、42
+  assertions green）。isco-2641 blueprint の craft-libraries に逆参照を追加。
+- これで craft lib の対称性が完成: anime / ongaku / douga / shousetsu +
+  既存 kami-genko & kami-mangaka-*。syosetsuka の「domain 実装後に分離」条件は
+  scaffold の実在語彙（edn.cljc）を先行分離する形で前倒しした — actor 側の
+  kotoba 永続実装（sovereign ゲート、CLAUDE.md backlog）は引き続き別作業。
