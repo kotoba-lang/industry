@@ -11,7 +11,10 @@
                        "ADR-2607022700のモジュール計画(host.rs/runtime.rs/bin-aiueos.rsをRustで復元)を実行層に限り更新"
                        "device-access quartet(pci/dma/irq/mmio)の生アクセスは依然native課題として残ることの明記"
                        "Chicoryのfuel/gas metering欠落をreal gapとして明記(黙って解決済み扱いしない)"
-                       "decision subprocess(bb decide)は別ホスト言語向け汎用インターフェースとして温存、JVM adapterは同一プロセス内で直結可能"]
+                       "decision subprocess(bb decide)は別ホスト言語向け汎用インターフェースとして温存、JVM adapterは同一プロセス内で直結可能"
+                       ":aiueos/quota{:host-calls:publishes}によるhost-call回数caps実装(ADR-0006、fuelとは別物)"
+                       "fuel/gas meteringはChicoryのwithUnsafeExecutionListenerで命令レベルprototype可能だが非公式API・インタプリタ限定と明記"
+                       "生ハードウェアアクセスの設問を「Rust vs java.lang.foreign」から「特権/hypervisor協調tenderレイヤーの不在(言語非依存)」に訂正"]
   :supersedes []
   :superseded_by []
   :related ["adr-2607022700-aiueos-native-adapter-tender-design"
@@ -33,7 +36,21 @@
   :follow-up-2026-07-02
   {:what ":aiueos/quota {:host-calls N :publishes N} (ADR-0006) implemented+verified in aiueos.execute -- a per-run host-function CALL COUNT cap, wrapping every host-import via count-and-check!, throwing ex-info through Chicory's .apply on overrun (caught by run-if-granted, returns :aiueos.execute/quota-exceeded, offending call's own effect never lands)"
    :verified-via "real shell run: clojure -M -m aiueos.launcher run manifest.edn --edn with :aiueos/quota {:publishes 0} genuinely aborts and returns an empty topic-bus"
-   :not-solved "this is call-COUNT, not instruction-level fuel -- a single host call that internally loops/computes heavily is still unbounded; fuel/gas metering itself remains unresolved"}}
+   :not-solved "this is call-COUNT, not instruction-level fuel -- a single host call that internally loops/computes heavily is still unbounded; fuel/gas metering itself remains unresolved"}
+
+  :follow-up-2-2026-07-02-research
+  {:chicory-gas-metering
+   {:status "not shipped as first-class API (checked releases 1.5.0-1.7.5, docs, issues)"
+    :diy-hook "Instance.builder(...).withUnsafeExecutionListener((instruction, stack) -> ...) fires per Wasm instruction -- a real, working hook for genuine instruction-level fuel"
+    :caveats ["Chicory docs explicitly label it unsafe/experimental/may-be-dropped"
+              "official supported execution-limit mechanism is thread-interrupt/ExecutorService wall-clock timeout, not this listener (per issues #895/#896)"
+              "interpreter-only -- Chicory's separate AOT compiler (AotMachine) bypasses this hook entirely"]
+    :verdict "fuel prototype is actionable today via withUnsafeExecutionListener, but not a safe/permanent API -- correct prior framing of 'Chicory-side implementation pending' to 'unofficial hook available for prototyping, official API still pending'"}
+   :java-lang-foreign-mmio
+   {:original-question "does java.lang.foreign let the JVM do raw MMIO/DMA/hardware access instead of Rust"
+    :finding "category error -- Solo5's own hvt tender architecture: the TENDER holds KVM privilege and sets up guest memory/device mappings; the GUEST unikernel never does raw MMIO itself, it issues narrow hostcalls (e.g. solo5_net_write) the tender mediates. spt guests run under seccomp as unprivileged processes. No unprivileged userspace process in ANY language can do raw MMIO/DMA without root+/dev/mem or KVM/hypervisor privilege or being the kernel itself"
+    :java-lang-foreign-capability "genuinely CAN make the same mmap()/ioctl() downcalls Rust's libc bindings make -- not fundamentally less capable for FFI/syscalls -- BUT only finalized in Java 22; this repo's CI pins Java 21 where it's preview-only (--enable-preview required)"
+    :corrected-framing "the real unsolved work is the privileged/hypervisor-cooperating tender layer itself (root+/dev/mem driver or a minimal KVM-based VMM) -- its IMPLEMENTATION LANGUAGE (Java 22+ FFM vs Rust) is now a genuinely open choice, but writing that privileged layer is substantial systems engineering regardless of language, and was never really a Rust-vs-Java question"}}}
 
  :module-plan-update
  [{:module "host.rs/runtime.rs (wasmtime hosting)" :old-plan "Rustで復元・改修" :new-plan "Chicory経由のJVM/Clojure実行層として新規実装、Rust側は復元しない"}
