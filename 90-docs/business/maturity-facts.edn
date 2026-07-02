@@ -1,0 +1,57 @@
+;; maturity-facts.edn — スコアリングの主観入力 (ADR-2607021700)
+;; 全次元 0–5。捏造ゼロ: 実測・実装の裏付けがない次元は低く付ける。
+;; 更新したら `gftd score md` で 90-docs/business/maturity-scores.md を再生成する。
+;; facts 次元:
+;;   BMC 側: :pricing (価格・単価の確定度) / :grounding (solution の実装接地度)
+;;   YC design: :acute-problem :wedge :tenx :founder-fit :distribution :defensibility
+;;   YC traction: :launched (0 idea/1 prototype/2 internal/3 public alpha/4 GA/5 scaled)
+;;                :users (external traction) / :revenue (0 none/1 billing wired/3 first $/5 repeatable)
+{:as-of "2026-07-02"
+ :products
+ {:cloud-murakumo
+  {:pricing 1 :grounding 4
+   :acute-problem 4 :wedge 4 :tenx 4 :founder-fit 5 :distribution 2 :defensibility 4
+   :launched 2 :users 1 :revenue 0
+   :note "worker + /infer surface + run ledger 実装済・fleet 実在（内部運用）。tok 単価は未実測（riskiest gate 未通過）、外部ユーザー・収益なし。"}
+
+  :ai-gftd-apex
+  {:pricing 1 :grounding 3
+   :acute-problem 3 :wedge 3 :tenx 3 :founder-fit 4 :distribution 1 :defensibility 3
+   :launched 2 :users 1 :revenue 0
+   :note "apex app + Privacy Contract は実装/明文化済。privacy premium の需要実証ゼロ、獲得経路未着手。tier 価格未定義。"}
+
+  :net-kotobase
+  {:pricing 4 :grounding 5
+   :acute-problem 4 :wedge 4 :tenx 4 :founder-fit 5 :distribution 2 :defensibility 4
+   :launched 3 :users 2 :revenue 1
+   :note "8 プロダクト中で最成熟: 稼働中 + tier 価格定義 (ADR-2606130100) + Stripe billing 配線 + RUNBOOK/SLO + YCBench 30日 pass 条件が既に文書化。外部 paid tenant はまだ 0（revenue=1 は billing wired の意）。"}
+
+  :cloud-itonami
+  {:pricing 1 :grounding 3
+   :acute-problem 4 :wedge 2 :tenx 4 :founder-fit 5 :distribution 1 :defensibility 4
+   :launched 2 :users 1 :revenue 0
+   :note "cockpit 稼働 (itonami.cloud) + actor/governor 3 実例 + 26 ISIC blueprint。ただし『全業種・職種』は wedge としては逆風（楔が太い）— 初期 vertical の絞り込みが未決。外販ゼロ。"}
+
+  :app-aozora
+  {:pricing 2 :grounding 3
+   :acute-problem 3 :wedge 3 :tenx 3 :founder-fit 4 :distribution 2 :defensibility 3
+   :launched 2 :users 1 :revenue 0
+   :note "PDS/blob/age-gate/ad の経路は shinshi.club で本番実証済（≒隣接実証）。aozora.app 自体の公開 SNS としての稼働・外部ユーザーはこれから。eCPM/80-20 は shinshi 実測が参照値。"}
+
+  :app-aozora-yoro
+  {:pricing 0 :grounding 1
+   :acute-problem 3 :wedge 3 :tenx 4 :founder-fit 3 :distribution 2 :defensibility 3
+   :launched 0 :users 0 :revenue 0
+   :note "設計のみ（child repo 未作成、README 上の companion 定義まで）。tenx=4 は『agent 承認面を messenger が握る』の独自性。全 traction ゼロ。"}
+
+  :cloud-manimani
+  {:pricing 0 :grounding 4
+   :acute-problem 3 :wedge 3 :tenx 3 :founder-fit 5 :distribution 2 :defensibility 2
+   :launched 2 :users 1 :revenue 0
+   :note "OSS manimani + cloud worker 実装/テスト済・owner 自用（dogfood 最良）。価格未設計、OSS→cloud 転換の実証ゼロ。"}
+
+  :etzhayyim
+  {:pricing 1 :grounding 5
+   :acute-problem 3 :wedge 4 :tenx 4 :founder-fit 5 :distribution 1 :defensibility 5
+   :launched 3 :users 3 :revenue 0
+   :note "非営利につき YC bench は参考値。RAD identity ledger 運用中・数百 organism が現住（users=3 は organism 数の代理指標）。寄付・助成・endowment は未着手 (revenue=0)。"}}}

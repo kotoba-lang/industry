@@ -21,7 +21,8 @@
             #?(:clj [clojure.edn :as edn])
             [gftd.canvas :as canvas]
             [gftd.ledger :as ledger]
-            [gftd.react :as react]))
+            [gftd.react :as react]
+            [gftd.score :as score]))
 
 (def registry
   {:itonami  {:products [:cloud-itonami]                :desc "business operator (L3)"}
@@ -36,6 +37,7 @@
 (def ledger-rel "90-docs/business/canvas-ledger.edn")
 (def md-out-rel "90-docs/business")
 (def metrics-rel "90-docs/business/metrics")
+(def facts-rel  "90-docs/business/maturity-facts.edn")
 
 ;; ---- arg parsing ---------------------------------------------------------------
 
@@ -73,7 +75,7 @@
        (let [root (find-root)
              j (fn [rel] (str root "/" rel))]
          {:root root :base (j base-rel) :ledger (j ledger-rel)
-          :md-out (j md-out-rel) :metrics (j metrics-rel)}))
+          :md-out (j md-out-rel) :metrics (j metrics-rel) :facts (j facts-rel)}))
 
      (defn load-idx [{:keys [base ledger]}]
        (canvas/load-index base (ledger/read-events ledger)))
@@ -198,6 +200,19 @@
              ["react" "tick"] (cmd-react cli-key ps idx "tick" flags)
              ["react" "loop"] (cmd-react cli-key ps idx "loop" flags)
 
+             ["score" nil]
+             (let [facts (edn/read-string (slurp (:facts ps)))
+                   products (if (or (:all flags) (not (:product flags)))
+                              (cli-products cli-key idx)
+                              [(resolve-product cli-key idx flags)])]
+               (print (score/render-table (score/score-all idx facts products))))
+             ["score" "md"]
+             (let [facts (edn/read-string (slurp (:facts ps)))
+                   scores (score/score-all idx facts (cli-products :gftd idx))
+                   f (java.io.File. (str (:md-out ps) "/maturity-scores.md"))]
+               (spit f (score/render-md scores facts))
+               (println "wrote" (.getPath f)))
+
              ["ledger" "show"]
              (let [es (ledger/read-events (:ledger ps))
                    n (parse-long (str (or (:tail flags) "20")))]
@@ -205,7 +220,7 @@
 
              ;; default: help
              (do (println (str (name cli-key) " cli — " (get-in registry [cli-key :desc])))
-                 (println "commands: products | canvas show|md|add|retract|note | hyp list|pass|fail | react tick|loop | ledger show")
+                 (println "commands: products | canvas show|md|add|retract|note | hyp list|pass|fail | react tick|loop | score [md] | ledger show")
                  (println "flags: --product P --all --out-dir D --evidence \"…\" --metrics k=v,… --max-ticks N --tail N")))
            (catch clojure.lang.ExceptionInfo e
              (println "error:" (ex-message e))

@@ -2,7 +2,8 @@
   (:require [clojure.test :refer [deftest is testing]]
             [gftd.canvas :as canvas]
             [gftd.ledger :as ledger]
-            [gftd.react :as react]))
+            [gftd.react :as react]
+            [gftd.score :as score]))
 
 (def base
   [{:canvas/kind :lean :canvas/product :cloud-itonami :canvas/layer :business-operator
@@ -63,6 +64,30 @@
                   (canvas/fold [{:event/type :hyp/status :hyp/id :hyp/t1 :event/value :refuted :event/evidence "e"}]))
           {:keys [approved]} (react/tick {:idx idx :product :cloud-itonami})]
       (is (some #(= :cloud-itonami.uvp (:canvas/id %)) approved)))))
+
+(deftest scoring
+  (let [idx (canvas/index base)
+        facts {:as-of "t" :products {:cloud-itonami {:pricing 2 :grounding 3
+                                                     :acute-problem 4 :wedge 2 :tenx 4 :founder-fit 5
+                                                     :distribution 1 :defensibility 4
+                                                     :launched 2 :users 1 :revenue 0}}}
+        s (score/score-product idx :cloud-itonami facts)]
+    (testing "auto dims"
+      ;; base fixture has 3 of 9 blocks, avg 1 item → completeness (5*3/9)-1
+      (is (< 0.6 (get-in s [:bmc :dims :completeness]) 0.7))
+      (is (= 5.0 (get-in s [:bmc :dims :hypothesis])))
+      (is (= 0.0 (get-in s [:bmc :dims :validation]))))
+    (testing "validation moves when hyp is validated via ledger"
+      (let [idx' (canvas/fold idx [{:event/type :hyp/status :hyp/id :hyp/t1
+                                    :event/value :validated :event/evidence "e"}])
+            s' (score/score-product idx' :cloud-itonami facts)]
+        (is (= 5.0 (get-in s' [:bmc :dims :validation])))
+        (is (> (get-in s' [:bmc :score]) (get-in s [:bmc :score])))))
+    (testing "yc = design 50% + traction 50%"
+      (is (= (+ (* 50.0 (/ 20.0 30.0)) (* 50.0 (/ 3.0 15.0)))
+             (get-in s [:yc :score]))))
+    (testing "render"
+      (is (re-find #"cloud-itonami" (score/render-table {:cloud-itonami s}))))))
 
 (deftest render-md-smoke
   (let [idx (canvas/index base)
