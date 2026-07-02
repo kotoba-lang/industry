@@ -211,3 +211,31 @@ wasmtime 相当）・CLI 本体（旧 bin/aiueos.rs）ともに JVM/Clojure へ�
 （`virtio.rs` の書き直しもこれに連動して保留）。adapter-only 系 6 コマンド
 （`sign`/`check`/`compile`/`hash`/`image`/`vm`）は元々 kototama/kotoba-clj
 委譲・鍵管理ツール・native provisioning が正しい設計であり、意図的に移行対象外。
+
+**Follow-up 5（2026-07-02、manifest契約の未強制フィールド監査・実装）**:
+「宣言・検証はされるが実際には使われない」ギャップを体系的に監査し、2件の実装を
+追加した:
+
+1. **`:aiueos/publishes`/`:aiueos/subscribes`（トピックID許可セット、
+   `aiueos-cljc-contract#9`）**: `aiueos.manifest`が検証・導出していたのに
+   `aiueos.execute`のtopic-*ホスト関数がどこにも参照していなかった——付与された
+   コンポーネントが宣言していないトピックIDにも自由にアクセスできてしまう
+   **実セキュリティギャップ**だった。`assert-topic-allowed!`で4つのtopic-*
+   host関数全てに強制を追加、`:aiueos.execute/topic-forbidden`で中断する。
+   実測: shellから実際に`{:op :publish :topic-id 1}`で中断確認済み。
+
+2. **`:aiueos/schedule`（period/priority、`aiueos-cljc-contract#10`）**:
+   `normalize-schedule`が`{:period-cycles :deadline-cycles :priority}`を
+   導出していたのに、`up-command`は常に全コンポーネントを無条件実行していた。
+   `aiueos.manifest/due-this-cycle?`（cycle基準の周期判定）と
+   `aiueos.graph/priority-boot-order`（同depth内でpriority順に並べ替え——
+   `depths`のdocstringが元々想定していたユースケースだが未実装だった）を実装し、
+   `up`に`--cycle N`を追加。デフォルト（cycle省略）は従来通り全起動で後方互換。
+   実測: shellから`--cycle 1`で周期外のコンポーネントがスキップされ、
+   `--cycle 3`で再度起動されることを確認済み。
+
+**明示的に未実装のまま**: `:aiueos/limits :memory-pages`の独立した実行時上限
+（コンパイル済みモジュール自身の宣言範囲でしか効かない）、
+`:aiueos.manifest/deadline-cycles`（ADR-0006が意図的に持たないwall clockと、
+Chicoryの同期・非プリエンプティブな実行モデルの間に本質的な非互換がある——
+真のインクリメンタル/割り込み可能な実行機構を発明しない限り正しく実装できない）。
