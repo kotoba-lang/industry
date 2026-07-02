@@ -118,6 +118,25 @@ wired limit 既定復元で**中止**した。
 - llama.cpp RPC は half-open に無限待ちする（levi 死亡時に head が 20 分ブロック）
   → petals 型の timeout/再ルートが engine 側の必須改修点
 
+## 中型 MoE 3 種の実測（2026-07-02 夜、生存 6 Mac + gad head、全 LAN）
+
+GLM-5.2 中止後、オーナー指示で中型 MoE に切替。head=gad (48GB linux)、
+worker=16GB M4 mini (wired limit 既定、rpc-server -d MTL0 -c)。
+
+| モデル | quant / size | ranks | prefill | decode | 判定 |
+|---|---|---|---|---|---|
+| Gemma 4 26B-A4B | MXFP4_MOE 16.5GB | 3 Mac (~5.5GB/台) | 18.3 tok/s | **13.88 tok/s** | ✓ 安定 |
+| Nemotron-3-Nano-30B-A3B | Q4_K_M 24.6GB | — | — | — | **✗ RPC 分散不可**: Mamba-2 の再帰状態が ggml RPC でグラフ構築できない（worker 側 `[create_node] invalid data ptr` → `graph_compute failed`、llama.cpp #20570 系） |
+| Qwen3-Next-80B-A3B | Q4_K_M 48.4GB | 6 Mac (-ngl 38 ≈6.4GB/台) + gad CPU 10 層 | 6.1 tok/s | **4.68 tok/s** | ✓（ngl 44/999 では linear-attention の compute buffer で Mac が Metal OOM → 38 で安定） |
+
+教訓:
+- **RPC 分散は attention 系 MoE のみ**。Mamba/再帰 hybrid（Nemotron）は engine 非対応。
+  Qwen3-Next の GDN linear-attention は動くが compute buffer が重い。
+- **16GB mini の実効 GPU shard は常駐サービス込みで ~6.5GB が安定圏**
+  （8GB で asher/dan が Metal OOM。kernel panic ではなく rpc-server の
+  graceful abort — wired limit 既定なら mini 本体は死なない ✓）。
+- rpc キャッシュの威力: Qwen 48.4GB の再ロードが 21.5 分 → **3.5 分**。
+
 ## credits — メモリ×時間比例の推論経済（murakumo.infer.credits）
 
 fleet で希少なのは**メモリ×時間**。run の credits は
