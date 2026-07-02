@@ -10,6 +10,7 @@
 (require '[babashka.curl :as curl]
          '[babashka.fs :as fs]
          '[cheshire.core :as json]
+         '[clojure.edn]
          '[clojure.java.shell :refer [sh]]
          '[clojure.pprint]
          '[clojure.string :as str])
@@ -104,6 +105,40 @@
     (try (:status (curl/get url {:throw false :raw-args ["--max-time" "8"]}))
          (catch Exception _ nil))))
 
+;; ---- gate-metric emitter fetch (ADR-2607022200/2607022100) -------------------
+;; 各 product repo が deploy した emitter endpoint から gate 用 metric を取得し
+;; metrics/<product>.edn へ merge する。emitter が未 deploy / 到達不可なら no-op
+;; (defensive) — その product の gate は引き続き needs-fallback を surface する。
+;; CLI/file 型 emitter (murakumo cost / apex subscription / etzhayyim rad /
+;; yukkuri channelStats) は各 repo の CI/実行で自 metrics に出す設計なので、この
+;; generic HTTP collector の対象外 (URL を持たない product は fetch されない)。
+(def gate-emitters
+  {:network-isekai {:url "https://isekai.network/feed/fork-stats.edn" :fmt :edn :key :fork}
+   :cloud-manimani {:url "https://manimani.cloud/metrics"            :fmt :json :merge true}
+   :cloud-itonami  {:url "https://itonami.cloud/api/metrics"          :fmt :json :merge true}})
+
+(defn fetch-emitter
+  "→ parsed emitter map, or nil if unreachable/unparseable (no-op)."
+  [{:keys [url fmt]}]
+  (try
+    (let [r (curl/get url {:throw false :raw-args ["--max-time" "8"]})]
+      (when (= 200 (:status r))
+        (case fmt
+          :edn  (clojure.edn/read-string (:body r))
+          :json (json/parse-string (:body r) true))))
+    (catch Exception _ nil)))
+
+(defn merge-emitter
+  "Merge a product's live gate-metric emitter output into its metrics map m.
+   :key → nest under that key; :merge → shallow-merge top-level."
+  [m product]
+  (if-let [{:keys [key merge] :as cfg} (get gate-emitters product)]
+    (if-let [em (fetch-emitter cfg)]
+      (cond-> (if merge (clojure.core/merge m em) (assoc m key em))
+        true (update :sources (fnil conj []) :emitter))
+      m)
+    m))
+
 (defn signal [p m]
   (let [z (:zone m) w (:workers-invocations-7d m)]
     (str/join "、"
@@ -132,6 +167,7 @@
                                      (into {} (filter (fn [[k _]] (contains? workers k)) wi)))
                 (and (:stripe cfg) stripe) (assoc :stripe stripe)
                 health (assoc :health-status (http-status health)))
+            m (merge-emitter m p)
             m (assoc m :signal (signal p m))]
         (spit (str out-dir "/" (name p) ".edn") (with-out-str (clojure.pprint/pprint m)))
         (println "wrote" (name p) "-" (:signal m))))))
