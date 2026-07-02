@@ -148,9 +148,10 @@ collateral valuation). HAKARI never mints or burns EN.
 - e-CNY custody for a foreign entity is **not currently establishable** at
   scale (pilot corridors only); that is exactly why Tier-2 exists with weight 0
   and attestation-only observation. No e-CNY integration is faked at R0.
-- The child repo is created **private** (standing-authorization default).
-  Flipping public for did:web GitHub-Pages resolution awaits owner
-  confirmation (公開リポ化 guardrail).
+- The child repo was created private (standing-authorization default) and
+  flipped **public with owner approval (2026-07-02)**; the static did:web
+  document is served from the repo's GitHub Pages root
+  (`/.well-known/did.json`, `.nojekyll`), cross-linking the RAD identity.
 - R0 core is pure `.cljc` with no on-chain I/O — banking / base-l2 / StateGraph
   wiring is R1, not pretended at R0.
 
