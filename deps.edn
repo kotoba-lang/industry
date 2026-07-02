@@ -179,6 +179,18 @@
       :adrs ["docs/adr/0001-architecture.md" "orgs/kawasakijun/docs/adr/0013-clj-agent-stack.md"]
       :deps ["langchain-clj"]}
     {
+      :name "browser"
+      :path "orgs/kotoba-lang/browser"
+      :kind "clojure-library"
+      :submodule false
+      :remote "git@github.com:kotoba-lang/browser.git"
+      :github-name "browser"
+      :org "kotoba-lang"
+      :description "kotoba-only / WASM-only browser engine orchestrator。HTML-like document input -> kotoba:dom virtual document -> ui layout/draw ops -> WebGL/WebGPU/native host。JS互換ブラウザではなく、document scripts は kotoba-clj/WASM capability に限定。現行 wasm-ui を UI substrate として再利用。"
+      :stack ["Clojure" "WASM" "kotoba:dom"]
+      :adrs ["docs/adr/0001-kotoba-only-browser.md"]
+      :deps ["wasm-ui" "html" "css" "kami-webgpu"]}
+    {
       :name "comfyui-clj"
       :path "orgs/kotoba-lang/comfyui"
       :kind "clojure-library"

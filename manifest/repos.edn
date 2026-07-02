@@ -347,6 +347,15 @@
    "orgs/etzhayyim/com-etzhayyim-tsumugu" ; ADR-2607011500: Spirit in Physics manga publishing actor (mangallm ⊣ PolicyGovernor); self-sovereign kotoba-server identity, coscientist quality loop
    "orgs/etzhayyim/com-google-ads" ; ADR-2606292130: charter-clean outreach & performance-marketing actor
    "orgs/kotoba-lang/kasane"         ; ADR-2606272100: Adobe(AI/PSD/PDF) 純cljc+EDN ライブラリ
+   ;; KAMI provider split targets. Rust implementation crates move here only as
+   ;; Wasm Component providers checked by CLJC/EDN contracts.
+   ;; NOTE(2026-07-02 stash rescue): GitHub repos not yet created — entries stay
+   ;; commented out so west update keeps working. Uncomment per repo after
+   ;; `gh repo create kotoba-lang/<name>` + scaffold + initial push, then regen west.yml.
+   ;; "orgs/kotoba-lang/kami-render-provider"
+   ;; "orgs/kotoba-lang/kami-physics-provider"
+   ;; "orgs/kotoba-lang/kami-domain-providers"
+   ;; "orgs/kotoba-lang/kami-runtime-provider"
    "orgs/kotoba-lang/kami-nv-compat" ; NVIDIA Omniverse/Isaac/OptiX/RTX API-compat facade; relocated from etzhayyim-sdk per ADR-2606302300 org-taxonomy library-placement rule
    "orgs/kotoba-lang/hinshitsu"      ; 品質: portable evidence/gate schema + mokushi visual/snapshot testing for kotoba tools
    "orgs/kotoba-lang/pqh"            ; AEAD envelope + Argon2id KDF + post-quantum hybrid (suite pqh-v1) + DID<->Signal binding; relocated from etzhayyim-sdk per ADR-2607011830
