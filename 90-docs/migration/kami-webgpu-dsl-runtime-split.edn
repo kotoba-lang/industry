@@ -5,6 +5,7 @@
    :source-paths
    ["orgs/kotoba-lang/aiueos-cljc-contract/src/aiueos/audit.cljc"
     "orgs/kotoba-lang/aiueos-cljc-contract/src/aiueos/broker.cljc"
+    "orgs/kotoba-lang/aiueos-cljc-contract/src/aiueos/cli.cljc"
     "orgs/kotoba-lang/aiueos-cljc-contract/src/aiueos/contract.cljc"
     "orgs/kotoba-lang/aiueos-cljc-contract/src/aiueos/graph.cljc"
     "orgs/kotoba-lang/aiueos-cljc-contract/src/aiueos/manifest.cljc"
@@ -15,6 +16,7 @@
    :test-paths
    ["orgs/kotoba-lang/aiueos-cljc-contract/test/aiueos/audit_test.cljc"
     "orgs/kotoba-lang/aiueos-cljc-contract/test/aiueos/broker_test.cljc"
+    "orgs/kotoba-lang/aiueos-cljc-contract/test/aiueos/cli_test.cljc"
     "orgs/kotoba-lang/aiueos-cljc-contract/test/aiueos/contract_test.cljc"
     "orgs/kotoba-lang/aiueos-cljc-contract/test/aiueos/graph_test.cljc"
     "orgs/kotoba-lang/aiueos-cljc-contract/test/aiueos/manifest_test.cljc"
@@ -1406,7 +1408,8 @@
    ["orgs/kotoba-lang/drawingml/src/drawingml/core.cljc"
     "orgs/kotoba-lang/drawingml/src/drawingml/parse.cljc"],
    :test-paths
-   ["orgs/kotoba-lang/drawingml/test/drawingml/core_test.clj"]}
+   ["orgs/kotoba-lang/drawingml/test/drawingml/core_test.clj"
+    "orgs/kotoba-lang/drawingml/test/drawingml/parse_test.clj"]}
   {:repo "orgs/kotoba-lang/drive",
    :ns drive.model,
    :status :done,
@@ -2303,6 +2306,8 @@
     "orgs/kotoba-lang/briefing"
     "orgs/kotoba-lang/calendar"
     "orgs/kotoba-lang/card"
+    "orgs/kotoba-lang/chobo"
+    "orgs/kotoba-lang/ci"
     "orgs/kotoba-lang/cmmn"
     "orgs/kotoba-lang/contacts"
     "orgs/kotoba-lang/cron"
@@ -2319,6 +2324,7 @@
     "orgs/kotoba-lang/ddl"
     "orgs/kotoba-lang/dmn"
     "orgs/kotoba-lang/drawingml"
+    "orgs/kotoba-lang/drive"
     "orgs/kotoba-lang/dsl-core"
     "orgs/kotoba-lang/echem"
     "orgs/kotoba-lang/editor"
@@ -2327,6 +2333,7 @@
     "orgs/kotoba-lang/force3d"
     "orgs/kotoba-lang/fs"
     "orgs/kotoba-lang/gltf"
+    "orgs/kotoba-lang/html"
     "orgs/kotoba-lang/http"
     "orgs/kotoba-lang/industry"
     "orgs/kotoba-lang/materialx"
@@ -2365,6 +2372,7 @@
     "orgs/kotoba-lang/cue"
     "orgs/kotoba-lang/sql"
     "orgs/kotoba-lang/kicad"
+    "orgs/kotoba-lang/kiyaku"
     "orgs/kotoba-lang/kudaki"
     "orgs/kotoba-lang/dxf"
     "orgs/kotoba-lang/spice"
@@ -2383,8 +2391,11 @@
   :runtime-browser
   #{"orgs/kotoba-lang/aiueos-cljc-contract"
     "orgs/kotoba-lang/async"
+    "orgs/kotoba-lang/authenticator"
     "orgs/kotoba-lang/cae-solver"
+    "orgs/kotoba-lang/cacao"
     "orgs/kotoba-lang/coll"
+    "orgs/kotoba-lang/comfyui"
     "orgs/kotoba-lang/crash"
     "orgs/kotoba-lang/btc-crypto"
     "orgs/kotoba-lang/btc-mining"
@@ -2413,11 +2424,15 @@
     "orgs/kotoba-lang/browser-use"
     "orgs/kotoba-lang/computer-use"
     "orgs/kotoba-lang/freeboard"
+    "orgs/kotoba-lang/godaddy-dns"
     "orgs/kotoba-lang/spec"
     "orgs/kotoba-lang/store"
     "orgs/kotoba-lang/shitsuke"
     "orgs/kotoba-lang/kagi"
+    "orgs/kotoba-lang/kekkai"
     "orgs/kotoba-lang/kenchi"
+    "orgs/kotoba-lang/kobo"
+    "orgs/kotoba-lang/koe"
     "orgs/kotoba-lang/test"
     "orgs/kotoba-lang/time"
     "orgs/kotoba-lang/turn"
@@ -2434,10 +2449,22 @@
     :intent "Promote already-clean CLJ/CLJC split repos into the requested publish gate."
     :allowed-change-kinds #{}
     :repos
-    ["orgs/kotoba-lang/btc-crypto"
+    ["orgs/kotoba-lang/authenticator"
+     "orgs/kotoba-lang/btc-crypto"
      "orgs/kotoba-lang/btc-mining"
+     "orgs/kotoba-lang/cacao"
+     "orgs/kotoba-lang/chobo"
+     "orgs/kotoba-lang/ci"
+     "orgs/kotoba-lang/comfyui"
      "orgs/kotoba-lang/dcs"
+     "orgs/kotoba-lang/drive"
+     "orgs/kotoba-lang/godaddy-dns"
+     "orgs/kotoba-lang/html"
      "orgs/kotoba-lang/io"
+     "orgs/kotoba-lang/kekkai"
+     "orgs/kotoba-lang/kiyaku"
+     "orgs/kotoba-lang/kobo"
+     "orgs/kotoba-lang/koe"
      "orgs/kotoba-lang/mining-pool"
      "orgs/kotoba-lang/shitsuke"
      "orgs/kotoba-lang/turn"
