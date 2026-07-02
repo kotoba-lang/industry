@@ -279,4 +279,61 @@
    :suggested-fix "none required; noted here so a future reader doesn't assume they're the same repo"}
   {:q "two distinct si-named things: kotoba-lang/si (cluster 12, clj-wgsl Wave 1, currently registered, no rename comment) vs the deleted kotoba-lang/si scaffold that was meant to become signal-integrity (cluster 34). Unclear from the comments alone whether these ever coexisted."
    :impact "none currently — the live entry is unambiguous (single kotoba-lang/si path in west.yml)"
-   :suggested-fix "none required; noted for historical clarity only"}]}
+   :suggested-fix "none required; noted for historical clarity only"}]
+
+ ;; Follow-up pass, same day, triggered by an owner re-check of duplicates/deps
+ ;; across the (now 377-repo) org. Corrects one claim from the section above
+ ;; (kami-flow), performs a -clj suffix rename sweep, fixes broken post-rename
+ ;; dep coordinates, and re-derives the dependency graph across ALL 377 repos
+ ;; (not just the 17 substrate-hub repos ground-truthed above).
+ :phase-2-2026-07-02
+ {:correction-kami-flow
+  "kami-flow was initially misjudged (in this ADR's original collision table
+   above) as an unrelated Node.js/Cypher graph-ingest tool. That description
+   actually belongs to an unrelated graph/ subdirectory sharing the same
+   kami-engine/kami-flow/ folder path. kami-flow's own src/lib.rs is a
+   genuine RTL->PnR->GDSII->Verify/Power/DFT/SI/Yield->STA->DRC/LVS->Signoff
+   orchestrator, restored to kotoba-lang/kami-flow (ADR-2607010930 Phase 7),
+   wiring 7 already-restored sibling EDA crates."
+
+  :clj-suffix-rename-sweep
+  {:convention "-clj suffix is dropped on kotoba-lang migration UNLESS it would collide with an unrelated, older, still-live kotoba-lang/<short-name> repo (established pre-ADR by aero-clj->aero, crash-clj->crash, datom-clj->datom, echem-clj->echem, motor-clj->motor, vphysics-clj->vphysics, langchain-clj->langchain, langgraph-clj->langgraph)"
+   :renamed
+   [{:from "engine-clj" :to "engine"}
+    {:from "kami-mangaka-page-clj" :to "kami-mangaka-page"}
+    {:from "kami-mangaka-reader-clj" :to "kami-mangaka-reader"}
+    {:from "kami-mangaka-render-clj" :to "kami-mangaka-render"}
+    {:from "kami-mangaka-text-clj" :to "kami-mangaka-text"}
+    {:from "kami-app-sip-clj" :to "kami-app-sip"}]
+   :kept-as-is
+   [{:name "kami-mangaka-scene-clj" :reason "collides with kotoba-lang/kami-mangaka-scene (separate Rust/PyO3-origin 3D crate, ADR-2607010930 Phase 7)"}
+    {:name "kami-engine-sdk-clj" :reason "collides with kotoba-lang/kami-engine-sdk (pre-existing unrelated Svelte 5 UI component mirror)"}
+    {:name "kototama-clj" :reason "genuinely distinct project from kotoba-lang/kototama (the WASM-runtime compiler), not a naming legacy"}]
+   :method "gh repo rename (GitHub preserves history + sets up redirect from old name); manifest/repos.edn :extra-projects entry and manifest/west.yml name:/path: fields updated to match"}
+
+  :post-rename-dep-fixes
+  [{:repo "kami-app-sip" :fixed-deps ["kami-mangaka-render-clj -> kami-mangaka-render" "kami-mangaka-page-clj -> kami-mangaka-page"] :test-result "pre-existing unrelated gap in sip.store/:datomic alias, unaffected"}
+   {:repo "kami-mangaka-reader" :fixed-deps ["kami-mangaka-text-clj -> kami-mangaka-text"] :test-result "3 tests / 19 assertions, 0 failures"}
+   {:repo "kami-mangaka-page" :fixed-deps ["kami-mangaka-text-clj -> kami-mangaka-text"] :test-result "7 tests / 21 assertions, 0 failures"}
+   {:repo "koe" :fixed-deps ["io.github.com-junkawasaki/langgraph-clj -> io.github.kotoba-lang/langgraph (both main :deps and :dev :override-deps)"] :note "SHA unchanged across the rename (133740f...) — confirms pure coordinate fix, not a version skew" :test-result "3 tests / 13 assertions, 0 failures"}]
+  ;; all SHAs are commit SHAs unchanged by rename; renaming a GitHub repo does not rewrite history
+
+  :full-org-dependency-graph
+  {:scope "all 377 kotoba-lang repos, parsed deps.edn (:git/url + :local/root entries)"
+   :deps-edn-coverage {:has-deps-edn 362 :no-deps-edn 15 :no-deps-edn-examples ["homebrew-kotoba" "kami-engine" "kami-engine-sdk" "kotoba-adapter-contracts" "kotoba-lang-cli-contract" "kotoba-pages-poc" "kotoba-topology" "kotoba-v2025" "kotodama-cells" "kotodama-holochain" "kotodama-py" "kototama-cljc-contract" "lab" "svgraph" "yaml"]}
+   :internal-dep-stats {:repos-with-kotoba-lang-deps 88 :standalone-leaf-repos 274 :total-edges 167 :multi-node-clusters 21}
+   :top-in-degree [{:repo "css" :count 13} {:repo "html" :count 12} {:repo "scene" :count 11} {:repo "shitsuke" :count 10} {:repo "langchain" :count 7} {:repo "langgraph" :count 5} {:repo "chobo" :count 5}]
+   :top-clusters-by-size
+   [{:size 35 :root "css/html/shitsuke/chobo/mise" :theme "office/appkit/OOXML family" :members ["appkit" "banking" "card" "chobo" "css" "docs" "drawingml" "giemon" "html" "kami-engine" "kami-genko" "kiyaku" "kotoba-ui" "labor" "liquid-glass-ui" "logistics" "madoguchi" "mise" "office" "office-style" "ooxml" "phone" "presentationml" "property" "retail" "robotics" "senden" "sheets" "shitsuke" "slides" "soko" "swift" "transit" "uikit" "webrtc"]}
+    {:size 21 :root "scene" :theme "kami-*-scene family, ADR-2607010930 Phase 7" :members ["atmosphere" "character" "cnc" "game" "input" "kami-atmosphere-scene" "kami-autodrive-scene" "kami-cam-scene" "kami-character-scene" "kami-game-scene" "kami-input-scene" "kami-postfx-scene" "kami-skeleton-scene" "kami-terrain-scene" "kami-vegetation-scene" "kami-vehicle-scene" "postfx" "scene" "skeleton" "terrain" "vegetation"]}
+    {:size 15 :root "langgraph-clj/langchain-clj-descended" :theme "AI/cloud-control-plane actors" :members ["aero-clj" "authenticator" "computer-use" "crash-clj" "datom-clj" "echem-clj" "godaddy-dns" "kami-engine-vehicle-designer" "kekkai" "koe" "kotodama" "langchain-clj" "langgraph-clj" "motor-clj" "vphysics-clj"] :note "member names here are the STALE pre-rename coordinates found in these repos' deps.edn (see :known-stale-clj-refs) — the real target repos are aero/crash/datom/echem/motor/vphysics/langchain/langgraph"}
+    {:size 12 :root "wgsl/gpu" :theme "shader/graphics DSL family" :members ["expr" "gpu" "render-shaders" "scene2d" "shaders" "sky" "sprite-gpu" "sprite2d" "text" "verilog" "webgl" "wgsl"]}
+    {:size 10 :root "langchain/langgraph" :theme "browser/agent automation" :members ["browser" "browser-agent" "browser-use" "comfyui" "kagi" "kenchi" "langchain" "langgraph" "langgraph-store" "wasm-ui"]}
+    {:size 8 :root "kami-flow" :theme "EDA signoff pipeline, ADR-2607010930 Phase 7" :members ["dft" "kami-flow" "model-checking" "pnr" "power" "rtl" "signal-integrity" "yield"]}
+    {:size 7 :root "cae-solver" :theme "reduced-order vehicle CAE solvers" :members ["aero" "cae-solver" "crash" "datom" "echem" "motor" "vphysics"]}
+    {:size 6 :root "kami-mangaka-*" :theme "mangaka *-clj split, ADR-2607010930 Phase 7 (post-rename names)" :members ["kami-app-sip" "kami-engine-sdk-clj" "kami-mangaka-page" "kami-mangaka-reader" "kami-mangaka-render" "kami-mangaka-text"]}]}
+
+  :known-stale-clj-refs
+  {:summary "beyond the koe fix above, ~17 more deps.edn files reference OLD -clj-suffixed com-junkawasaki coordinates for repos that were renamed to kotoba-lang/<name> (no -clj) BEFORE this ADR existed (aero-clj/crash-clj/datom-clj/echem-clj/motor-clj/vphysics-clj/langchain-clj/langgraph-clj) — not fixed in this pass, flagged as a concrete follow-up list"
+   :affected-repos ["browser-use" "authenticator" "cae-solver" "datom" "computer-use" "kagi" "godaddy-dns" "kotodama" "langgraph-store" "kami-engine-vehicle-designer" "kenchi" "kotoba-fleet" "kekkai" "kotoba-code" "langgraph" "vphysics"]
+   :fix-pattern "same as koe: replace io.github.com-junkawasaki/<name>-clj with io.github.kotoba-lang/<name> (drop -clj), keep the same commit SHA (renaming doesn't change history), verify via clojure -M:test"}}}
