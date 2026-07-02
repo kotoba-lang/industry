@@ -51,7 +51,20 @@
 (SDXL 画像 1 枚 45 秒に対し桁違い)。動画は ≥32GB unified memory のノード
 (gad は 48GB だが Metal GPU 無し→CPU で更に遅い)か、小型動画モデル
 (LTX-Video 等)か、Thunderbolt mesh が要る。**画像はメディア分散の sweet spot、
-動画は次のハード世代待ち**というのが正直な容量計画上の結論。
+動画は次のハード世代待ち**というのが SVD での結論。ただし**モデル選択で
+16GB でも動画が回る可能性**が残る（下記 LTX-Video 検証）。
+
+### 追試: LTX-Video（軽量 DiT）を 16GB で
+
+SVD が実用外だったのはモデルが 9.3GB UNet で 16GB を食い潰すため。対して
+**LTX-Video 2B は DiT（transformer）で step が UNet より速く、distilled fp8 版は
+4.46GB** と半分以下。16GB mini に 8GB 以上の headroom を残せるので swap を避けられる
+可能性がある。方針:
+- checkpoint: `Lightricks/LTX-Video` の distilled fp8 2B（4.46GB、要 ComfyUI-LTXVideo
+  custom nodes）
+- 期待: 常駐 ollama を停止せず（4.46GB なら同居可能）に short clip を生成
+- 実測欄（本 ADR 末尾）に step 時間と ×realtime を追記予定
+- 前提: fleet mini への LTX custom node 導入。未導入なら「custom node 依存」を記録。
 
 ## 得られた教訓
 
