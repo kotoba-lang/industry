@@ -17,6 +17,41 @@
 > 棚卸しは **ローカル checkout の grep だけでなく `gh repo list <org>` で
 > GitHub 側の全 repo を見る**こと。
 
+> **2026-07-02 追記2（`kotoba-lang/kotobase-engine` 新設 + 全チェーンの実 cljs 化）**:
+> 本 ADR の「hot Arrangement + commit-dag 完了」を実際に組み上げる
+> **`kotoba-lang/kotobase-engine`** を新規実装・push した——
+> `prolly-tree`/`quad-store`/`kqe`/`commit-dag` を composeし、
+> `transact`/`datoms`/`q`/`pull`/`commit!`/`chain`/`verify-chain` を実装
+> （`quad-store/commit!` と `commit-dag` の概念重複は「`commit!` を必ず
+> `prev=nil` で叩いて index snapshot 専用に限定し、chain/`:seq`/検証は
+> commit-dag に一本化」という設計で解消——両ライブラリとも無改造）。
+>
+> **さらに重要な発見**: `multiformats`/`dag-cbor` は自身の docstring で
+> 「`.cljc` という名前ながら実際は JVM 専用」と明記していたが、これは
+> **単なる注記で終わらせず実際に埋めた**——`multiformats` に実 `:cljs`
+> 実装（`@noble/hashes` 経由の SHA-256、varint/CID組み立ての移植）、
+> `dag-cbor` を `cbor.core.clj` → `.cljc`（JS 配列/Uint8Array ベースの
+> byte sink/source）に変更。副産物として `prolly-tree` 自身にも隠れた
+> JVM 専用呼び出し（`utf8-bytes` が `.getBytes` を無条件使用）を発見・
+> 修正した（`.cljc` 拡張子を名乗りながら実際には cljs で動かない、という
+> 同型のギャップが依存関係だけでなく `prolly-tree` 自身にも存在していた）。
+> 併せて自作の `commit-dag`/`kotobase-engine` も `.clj` → `.cljc` に変更
+> （JVM 専用構文が元々無かったので実装変更は不要）。
+>
+> **「書いた」で止めず `nbb`（Node 上の実 ClojureScript ランタイム）で
+> 実行検証した**: `multiformats`→`dag-cbor`→`prolly-tree`→`quad-store`→
+> `kqe`→`commit-dag`→`kotobase-engine` の全チェーンが cljs 上で実際に動作し、
+> かつ **JVM と cljs で同一データから同一 CID（バイト一致）が得られる**
+> ことを確認した（例: 500件データの prolly-tree root が両プラットフォームで
+> `bafyreicfnr6l2bfpuxamhubyndp3wsdtp4x3zbnmhjzhnaxsaoktxdoic4` と完全一致）。
+> content-addressing はプラットフォーム間で同じ CID に一致して初めて意味を
+> 持つため、これは「動くはず」ではなく実測で担保した。7 リポジトリ全ての
+> pin を manifest/west.yml に反映済み。**これにより kotobase-engine は
+> JVM サーバだけでなく実際に Cloudflare Worker(cljs) へ配置可能になった**
+> ——本番 `kotobase.net`/`kotobase.aozora.app` の置き換えに必要な前提条件の
+> 一つが埋まった。まだ残る: 実 BlockStore backend（R2/B2/Kubo）、CACAO 認証
+> 配線、cold query/hydrate-from-commit。本番カットオーバーは引き続き対象外。
+
 ## Context
 
 `kotoba-lang/kotoba` の Rust ワークスペース（crates/* 全体、約38万行）は
