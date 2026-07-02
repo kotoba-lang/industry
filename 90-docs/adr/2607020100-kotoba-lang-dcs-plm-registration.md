@@ -80,3 +80,26 @@
 - `orgs/kotoba-lang/plm`（既存実装、本 ADR で west 登録）
 - `orgs/kotoba-lang/ddl` / `orgs/kotoba-lang/dmn`（namespace/deps.edn/CI の
   規約を踏襲した先例）
+
+## Addendum (2026-07-02): kyber-plm ドメインの kotoba-lang/plm への統合
+
+オーナー指示「kyber plm の話は古い。kotoba-lang/plm に lib、ビジネスとしては
+itonami の repo に」に基づき、ADR-2607023000 の3層分解を PLM にも適用した:
+
+- **コード (kotoba-lang/plm、merge a3d59bf)**: cloud-itonami の `kyber-plm.*`
+  純ドメイン 10 ns を `kotoba.plm.*` として統合（`kyber-plm.plm` →
+  `kotoba.plm.item`）。store は zero-dep の protocol/KotobaStore と
+  `store-datomic`（Datomic Local、`:datomic`/`:test` alias opt-in）に分割。
+  既存の lifecycle engine (`kotoba.plm.core`) / workbench とは共存し、
+  reagent 系 UI deps は `:cljs` alias に隔離（shadow-cljs は
+  `:deps {:aliases [:cljs]}`）。phase2/thread テストも lib へ移管
+  （9 tests / 40 assertions green）。
+- **商売 (gftdcojp/cloud-itonami、merge 5093a48)**: kotobase kg.ingest
+  projection を `cloud-itonami.kotobase-kg`、live 運用 CLI を
+  `cloud-itonami.plm-export` として残置し、`src/kyber_plm` は消滅
+  （kyber 名の退役完了）。lib は `:local/root` で消費。230 tests /
+  2234 assertions、0 failures（4 errors は pristine main と同一の
+  live-credential 依存テスト = 既存問題）。
+- 併せて kotoba-lang/mail の pin 遅れ（`mail.inbound` 欠落で cloud-itonami
+  の test suite が classpath 段階で壊れていた既存問題）を upstream main
+  (77508c8) へ前進して解消。
