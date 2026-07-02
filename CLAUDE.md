@@ -163,6 +163,21 @@ west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独�
   `:manifest-workflow`。実例: PR #61/#62/#86、kenchi-actor→kenchi-clj rename
   （`34988dd`、diff は当該 entry のみ）。
 
+- **west.yml の pin 変更はサーバ側 pin 検証を必ず通す（`scripts/verify-west-pins.bb`、
+  ADR-2607022900）。** pin に許されるのは「上流 repo の default branch から到達可能な
+  commit」だけ: ①存在（= push 済み。未 push のローカル HEAD の pin 化は禁止）、
+  ②default branch 到達性（rewrite されうる未 merge branch 上の commit は不可）、
+  ③旧 pin からの前進（behind = 静かな pin 退行 / diverged を弾く）。判定はすべて
+  GitHub API（サーバ側 full 履歴）で行い、**ローカル shallow の ancestry を信用しない**。
+  `gen-west-manifest.bb` は生成時に自動でこの検証を行い、失敗したら west.yml を
+  書かない（緊急スキップ: `--no-verify-remote` / `WEST_PIN_VERIFY_SKIP=1`。使ったら
+  理由を commit message に残す）。**登録・rename・pin 前進は `--entry <name>` で当該
+  entry のみの最小 diff を生成する — wholesale 再生成 commit は禁止**（1件の登録の
+  つもりが未 push HEAD 由来の壊れた pin を 44 件 main に流した実事故 `90852b86` の
+  再発防止）。CI（`.github/workflows/west-pin-verify.yml`）と PreToolUse hook
+  （`.claude/hooks/west-pin-verify-guard.bb`。`git push` と `gh api PUT` の両経路）が
+  同じ検証を強制する。
+
 - **常に `main` と同期し、乖離を作らない（最優先）。** 何らかの git 操作
   （pull / checkout / commit / branch 作業の開始など）を行う前に、上流 `main`
   に更新があれば必ず先に同期する。ローカルが `main` より遅れている状態
