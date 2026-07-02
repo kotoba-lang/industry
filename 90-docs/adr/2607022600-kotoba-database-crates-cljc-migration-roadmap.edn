@@ -1,0 +1,217 @@
+{:frontmatter
+ {:id "adr-2607022600-kotoba-database-crates-cljc-migration-roadmap"
+  :title "ADR-2607022600: 削除された kotoba Rust crates（DB本体 — CID/Prolly Tree/5-index Datalog/CommitDag/BlockStore/SPARQL/DHT等）を CLJC へ移行するロードマップ"
+  :status "proposed"
+  :date "2026-07-02"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "kotoba-database-crates-cljc-migration-roadmap"
+  :authoritative true
+  :authoritative_for ["削除済みkotoba Rust crates(DB本体)のCLJC側現状棚卸し(完了/部分/未着手の分類)"
+                       "新規実装をorgs/kotoba-lang/<name>の小さな独立cljcライブラリとして切り出すアーキテクチャ規約"
+                       "Wave0(完了)からWave5(DHT/Pregel、投機的・保留)までのフェーズ順ロードマップ"
+                       "kotoba-git/kotoba-rad・ドメインセル・WASMランタイム・LLM・Ingest・Custodyを本ADRの対象外とする境界線引き"
+                       "Prolly chunkingのハッシュ関数選定・dag-cborコーデック追加・CACAO実装重複・Datalog build-vs-adoptという未決の設計課題の明示"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2606271600-kotoba-stack-equivalences"
+            "adr-2606041151-kotoba-commitdag-as-wal-and-incremental-query-tier"
+            "adr-2606041130-kotoba-b2-blockstore-cold-pin"
+            "adr-2605312345-kotoba-datom-first-class-canonical-state"
+            "adr-2606280300-kotoba-rad-git-sovereign-repo"
+            "adr-2607022200-aiueos-cljc-wasm-component-kernel-architecture"
+            "adr-2606290900-kotoba-aiueos-key-lifecycle-revocation"
+            "kotoba-lang/kotoba PR #259 (604896171 Remove legacy Rust workspace)"
+            "kotoba-lang/kotoba PR #270 (docs/restore-database-cid-prolly-readme)"
+            "kotoba-lang/kotoba docs/rust-crate-migration.md"
+            "orgs/kotoba-lang/multiformats" "orgs/kotoba-lang/dag-cbor" "orgs/kotoba-lang/mst"
+            "orgs/kotoba-lang/cacao" "orgs/kotoba-lang/signal" "orgs/kotoba-lang/crypto"
+            "orgs/kotoba-lang/ed25519" "orgs/kotoba-lang/datom" "orgs/kotoba-lang/store"
+            "orgs/kotoba-lang/crdt" "orgs/kotoba-lang/net"
+            "orgs/kotoba-lang/kekkai/src/kekkai/cacao.cljc"
+            "orgs/kotoba-lang/kekkai/src/kekkai/kotoba.cljc"]
+  :last_verified "2026-07-02"}
+
+ :crate-inventory
+ [{:area "CID / multihash" :rust-crate "kotoba-core::cid, kotoba-ipfs::cid"
+   :cljc-status "kotoba-lang/multiformats (203行) — ipfs add --cid-version=1 --raw-leaves とバイト同一のCIDv1(sha2-256,base32,base58btc)。dag-cbor(0x71)コーデック未対応"
+   :status :partial}
+  {:area "DAG-CBOR" :rust-crate "kotoba-core(prolly.rs内部)"
+   :cljc-status "kotoba-lang/dag-cbor (127行) — 正規順ソートのdefinite-length CBOR encode/decode(stdlib only)"
+   :status :done}
+  {:area "Prolly Tree" :rust-crate "kotoba-core::prolly"
+   :cljc-status "無し。近縁のkotoba-lang/mst(AT Protocol MST, SHA-256 leading-zero fanout, 83行)は設計が別物"
+   :status :not-started}
+  {:area "Datom log / EAVT" :rust-crate "kotoba-datomic, kotoba-graph::quad_store"
+   :cljc-status "kotoba-lang/datom(39行、フラット化のみ)、kotoba-lang/kotoba src/kotoba/kgraph.clj(63行、インメモリEAVT)"
+   :status :shape-helper-only}
+  {:area "5-index Arrangement(EAVT/AEVT/AVET/VAET/TEA)" :rust-crate "kotoba-query::arrangement"
+   :cljc-status "無し" :status :not-started}
+  {:area "CommitDag" :rust-crate "kotoba-graph::commit"
+   :cljc-status "無し(設計はADR-2606041151に既存)" :status :not-started}
+  {:area "BlockStore(Memory/Kubo/LRU/Tiered/Distributed/B2)" :rust-crate "kotoba-store"
+   :cljc-status "無し。kotobase-clj/store.cljc(26行、doc/streamのIStoreでblock-storeではない)。B2/DataLad運用は別レイヤで既存"
+   :status :not-started}
+  {:area "SPARQL 1.1" :rust-crate "kotoba-graph::sparql" :cljc-status "無し(README自身がauxiliaryと明言)" :status :not-started}
+  {:area "CACAO(depth-2 delegation, multi-graph grants)" :rust-crate "kotoba-auth::cacao"
+   :cljc-status "kotoba-lang/cacao(191行)と別にkekkai/cacao.cljcが並存(要統合)" :status :partial-duplicated}
+  {:area "Signal Protocol" :rust-crate "kotoba-signal"
+   :cljc-status "kotoba-lang/signal(ratchet/hkdf/x3dh/group/x25519, 計526行)" :status :mostly-done}
+  {:area "汎用暗号(AEAD/HKDF/key wrap)" :rust-crate "kotoba-crypto"
+   :cljc-status "kotoba-lang/crypto(162行), kotoba-lang/ed25519(233行)" :status :done}
+  {:area "DHT(Source Chain/Warrant/Neighborhood)" :rust-crate "kotoba-dht"
+   :cljc-status "kotoba-lang/net(gossip.cljc+bitswap.cljc, 計201行)の断片のみ" :status :fragment-only}
+  {:area "Pregel BSP" :rust-crate "kotoba-graph内" :cljc-status "無し" :status :not-started}
+  {:area "kotoba-git/kotoba-rad" :rust-crate "kotoba-git, kotoba-rad"
+   :cljc-status "ADR-2606280300に独立ロードマップ(R0-R4)あり" :status :out-of-scope}
+  {:area "ドメインセル" :rust-crate "kotoba-kotodama"
+   :cljc-status "CLAUDE.md Actorsパターンで個別リポジトリへ移行中" :status :out-of-scope}
+  {:area "WASMコンパイラ/ランタイム" :rust-crate "kotoba-clj(Rust), kotoba-runtime"
+   :cljc-status "ADR-2607022200が担当。本ADRのDBを:db-api経由で消費する側" :status :out-of-scope}
+  {:area "LLM(weight blob/LoRA/WebGPU)" :rust-crate "kotoba-llm"
+   :cljc-status "webgpu/inference/torch系ディレクトリが将来の受け皿候補。未計画" :status :out-of-scope-needs-own-adr}
+  {:area "Ingest(Gmail/CC/BM25/pagerank/media embed)" :rust-crate "kotoba-ingest"
+   :cljc-status "無し" :status :out-of-scope-needs-own-adr}
+  {:area "Custody(X-Road t-of-N shares/audit)" :rust-crate "kotoba-custody"
+   :cljc-status "無し。目標設計はADR-2606271600 §3(object encryption, ciphertext-CID, epoch key)に既述"
+   :status :out-of-scope-needs-own-adr}]
+
+ :roadmap
+ [{:wave 0 :title "完了済み"
+   :content "CID・DAG-CBOR・CACAO基礎・Signal・ed25519・汎用暗号・datom形状ヘルパー・gossip/bitswap断片"
+   :depends-on nil :priority :done}
+  {:wave 1 :title "基盤(Prolly Tree + BlockStore)"
+   :content "kotoba-lang/prolly: 決定的チャンキング(ハッシュ関数選定要検討)+path-copy+DAG-CBORノード。multiformatsにdag-cborコーデック(0x71)追加。kotoba-lang/block-store: Memory backend→Kubo HTTP backend→既存B2/DataLad運用と接続"
+   :depends-on [0] :priority :high}
+  {:wave 2 :title "Datomログ + 5-index Arrangement + CommitDag"
+   :content "datom/core.cljcをappend-onlyログ(t, added/retracted付き)に拡張。kotoba-lang/arrangement: EAVT/AEVT/AVET/VAET/TEAをProlly Tree上に構築。kotoba-lang/commit-dag: ADR-2606041151準拠"
+   :depends-on [1] :priority :high}
+  {:wave 3 :title "クエリ面"
+   :content "Arrangement上のDatalog(join/scan)。DataScript等の既存実装を採用するか独自実装するかはWave3着手時に決定(build-vs-adopt、本ADRでは未決)。SPARQL 1.1は優先度を下げる"
+   :depends-on [2] :priority :medium}
+  {:wave 4 :title "認可/暗号の配線強化"
+   :content "kotoba-lang/cacaoとkekkai/cacao.cljcの重複を解消しdepth-2 delegation+multi-graph grantsに強化。Signal Protocolをグラフの E2E envelope経路に配線"
+   :depends-on [1] :priority :medium}
+  {:wave 5 :title "DHT/Pregel(投機的、着手保留)"
+   :content "Source Chain/Warrant/Neighborhood、Pregel BSP。Wave1-3が着地し実際の分散クエリ需要が具体化してから再検討"
+   :depends-on [2 3] :priority :low-deferred}]
+
+ :open-design-questions
+ ["Prolly chunkingのハッシュ関数: 旧RustはblakeVerified3だがCLJC側にネイティブblake3実装が無い。mst/multiformatsはJVM MessageDigest/@noble-hashes経由のSHA-256に統一している。同路線を踏襲するかblake3依存を追加するかWave1着手時に決定"
+  "multiformatsにdag-cborコーデック(0x71)が無い(raw leaf 0x55のみ)"
+  "kotoba-lang/cacaoとkekkai/cacao.cljcの重複実装の統合方針"
+  "Datalogエンジンのbuild-vs-adopt(DataScript等の既存Clojureライブラリを採用するか独自実装か)"
+  "本番kotobase.netが削除済みRustバイナリのまま稼働しているか未確認。kekkai/kotoba.cljcは既にXRPC経由のクライアント配線を持つため、稼働中ならWave2完了後にカットオーバー手順が別途必要"]
+
+ :body
+ "# ADR-2607022600: 削除された kotoba Rust crates（DB本体 — CID/Prolly Tree/5-index Datalog/CommitDag/BlockStore/SPARQL/DHT等）を CLJC へ移行するロードマップ
+
+**Status**: proposed
+**Date**: 2026-07-02
+**Deciders**: Jun Kawasaki
+
+## Context
+
+`kotoba-lang/kotoba` の Rust ワークスペース（crates/* 全体、約38万行）は
+PR #259「Remove legacy Rust workspace」（2026-07-01, commit `604896171`）で
+一括削除された。README も同時に最小限の CLJC ランチャー説明に差し替えられて
+いたが、本セッションで PR #270（`docs/restore-database-cid-prolly-readme`）
+により削除直前の全文（CID/Prolly Tree/5-index Arrangement/CommitDag/SPARQL/
+CACAO/DHT/Pregel/Signal を備えた分散 content-addressed Datalog データベース、
+という説明）を復元した。しかしこの復元は歴史的記述の復元であって現状の主張
+ではない——実際に調査した結果、次が判明している。
+
+1. `docs/rust-crate-migration.md`（kotoba-lang/kotoba 内）が定める既存の移行方針
+   は CLI/ランチャー/selfhost リソースの範囲に限定されており、DB 本体（Prolly
+   Tree・5-index Arrangement・CommitDag・階層化 BlockStore・SPARQL・DHT・Pregel）
+   の具体的な移行計画は存在しない。
+2. `kotoba-lang/kotoba` の CLJC 側実装は `src/kotoba/kgraph.clj`（63行、インメモリ
+   EAVT ベクタ + 単純パターンマッチのみ）と `datom/core.cljc` 系（39行）に留まり、
+   永続化も content-addressing も無い。
+3. ADR-2606271600（kotoba-stack-equivalences、2026-06-27）は Rust crate 構成を
+   wasmCloud/Spin/Datomic/Radicle と対応づける positioning 地図として書かれたが、
+   4日後の crate 削除を反映しておらず、実装マップとしては陳腐化している。本
+   ADR はその実装面のギャップを引き継ぐ。
+4. 一方で `orgs/kotoba-lang/*` には Rust crate とは独立に育ってきた小さな
+   CLJC/EDN ライブラリ群が既に存在し、DB 本体の一部プリミティブは既に実装済み
+   である。ゼロからの移行ではない。
+5. `kotoba-git`/`kotoba-rad` は ADR-2606280300 に R0–R4 の独立した成熟度ロード
+   マップが既にあり、`kotoba-kotodama` のドメインセル群は CLAUDE.md の Actors
+   パターンで別リポジトリへ個別移行する既定路線がある。WASM コンパイラ/ランタ
+   イム層は ADR-2607022200 が担う。これらは本 ADR の対象外とし、参照のみ行う。
+
+## Decision
+
+### 1. 現状棚卸し
+
+CID/multihash は `kotoba-lang/multiformats`（ipfs add とバイト同一の CIDv1、
+ただし dag-cbor コーデック未対応）、DAG-CBOR は `kotoba-lang/dag-cbor` で完了。
+Prolly Tree は未着手（近縁の `mst` は設計が別物）。Datom ログ/EAVT は形状ヘル
+パーのみ。5-index Arrangement・CommitDag・BlockStore・SPARQL・Pregel は未着手。
+CACAO は `kotoba-lang/cacao` と `kekkai/cacao.cljc` が重複並存。Signal Protocol
+は `kotoba-lang/signal` でほぼ完了。汎用暗号（AEAD/HKDF/ed25519）は完了。DHT は
+gossip/bitswap の断片のみ。kotoba-git/kotoba-rad・ドメインセル・WASM ランタイム
+・LLM・Ingest・Custody は本 ADR の対象外（既存 ADR か別途 ADR が必要）。
+
+### 2. 移行方針
+
+新規実装は `orgs/kotoba-lang/<name>` 配下の小さな独立 `.cljc` ライブラリとして
+切り出す（`multiformats`/`dag-cbor`/`mst`/`cacao`/`signal` と同じ粒度）。
+`kotoba-lang/kotoba` 本体は薄いホストアダプタに留め、CLAUDE.md の Actors パター
+ンにある Store 注入境界（`:db-api` 経由でのみ backend と会話）を踏襲する。
+正しさの検証は、IPFS 相互運用が必要な CID 部分は `ipfs add` CLI をオラクルにし、
+Prolly Tree の内部チャンキングはバイト一致を要求する外部契約が現存しないため
+新規設計してよい（ただし DAG-CBOR + tag-42 リンクの IPLD 形は維持）。CommitDag/
+Arrangement は ADR-2606041151 の設計をそのまま仕様として使う。
+
+### 3. フェーズロードマップ
+
+Wave 0（完了済み）: CID・DAG-CBOR・CACAO基礎・Signal・ed25519・汎用暗号・datom
+形状ヘルパー・gossip/bitswap断片。
+
+Wave 1（高優先）— 基盤: Prolly Tree（チャンキングのハッシュ関数選定要検討）+
+BlockStore（Memory→Kubo HTTP→既存B2/DataLad接続）。multiformatsにdag-cbor
+コーデック追加。
+
+Wave 2（高優先）— Datomログ + 5-index Arrangement + CommitDag（ADR-2606041151
+準拠）。
+
+Wave 3（中優先）— クエリ面: Arrangement上のDatalog（DataScript等の採用 vs 独自
+実装は着手時に決定）。SPARQLは優先度を下げる。
+
+Wave 4（中優先、Wave1と並行可）— CACAO重複解消・depth-2delegation強化、Signal
+のグラフ層配線。
+
+Wave 5（低優先・保留）— DHT（Source Chain/Warrant/Neighborhood）・Pregel BSP。
+Wave1-3着地後、実需要が具体化してから再検討。
+
+## Consequences
+
+(+) 抽象的な「新規挙動はCLJC/EDNを先に」という方針を、DB本体について具体的な
+順序付きロードマップに落とし込んだ。(+) Wave0の既存資産棚卸しにより、Wave1は
+ゼロからでなく大部分を再利用して始められる。(+) Wave1着手前に解くべき具体的な
+設計課題（Prollyのハッシュ関数選定、dag-cborコーデック追加、CACAO重複解消、
+Datalog build-vs-adopt）を可視化した。
+
+(−) 本ADRは計画のみで、コード変更を一切伴わない。複数リポジトリ・複数ヶ月規模
+であり、各Wave着手時に個別ADRを積むことを前提とする。(−) 本番kotobase.netが
+削除済みRustバイナリのまま稼働しているか未確認——稼働中ならWave2完了後にカット
+オーバー手順が別途必要。Wave1着手前に要調査。(−) SPARQL・DHT・Pregelは明示的に
+後回しにした。(−) kotoba-git/kotoba-rad、ドメインセル、WASMランタイム、LLM、
+Ingest、Custodyは意図的に対象外とした——「kotoba crates を全て CLJC に」という
+要求に対する部分的な回答であることを明記する。
+
+## References
+
+- PR #259（`604896171` Remove legacy Rust workspace）
+- PR #270（`docs/restore-database-cid-prolly-readme`）
+- `kotoba-lang/kotoba/docs/rust-crate-migration.md`
+- ADR-2606271600（kotoba-stack-equivalences）
+- ADR-2606041151（kotoba-commitdag-as-wal-and-incremental-query-tier）
+- ADR-2606041130（kotoba-b2-blockstore-cold-pin）
+- ADR-2605312345（kotoba-datom-first-class-canonical-state）
+- ADR-2606280300（kotoba-rad-git-sovereign-repo）
+- ADR-2607022200（aiueos-cljc-wasm-component-kernel-architecture）
+- ADR-2606290900（kotoba-aiueos-key-lifecycle-revocation）
+- `orgs/kotoba-lang/{multiformats,dag-cbor,mst,cacao,signal,crypto,ed25519,datom,store,crdt,net}`
+- `orgs/kotoba-lang/kekkai/src/kekkai/{cacao,kotoba,store}.cljc`"}
