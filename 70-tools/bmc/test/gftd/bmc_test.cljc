@@ -4,6 +4,7 @@
             [gftd.ledger :as ledger]
             [gftd.react :as react]
             [gftd.gate :as gate]
+            [gftd.funnel :as funnel]
             [gftd.score :as score]))
 
 (def base
@@ -148,6 +149,46 @@
               (react/tick {:idx idx :product :cloud-itonami :metrics {:subs 9}
                            :advisor react/gate-aware-advisor}))]
       (is (= :validated (get-in (:idx r) [:hyps :hyp/t1 :hyp/status]))))))
+
+(deftest funnel-evaluation
+  (let [spec [{:key :awareness :label "訪問" :metric [:v]}
+              {:key :acquisition :label "signup" :metric [:s] :benchmark 0.05}
+              {:key :revenue :label "paid" :metric [:p] :benchmark 0.30}]]
+    (testing "stage counts + step conversion rates"
+      (let [r (funnel/evaluate-funnel {:v 1000 :s 30 :p 12} spec)]
+        (is (= [1000 30 12] (map :count (:stages r))))
+        (is (= 2 (count (:steps r))))
+        ;; 30/1000 = 0.03 < 0.05 benchmark (below); 12/30 = 0.4 >= 0.30 (ok)
+        (is (< (Math/abs (- 0.03 (:rate (first (:steps r))))) 1e-9))
+        (is (neg? (:gap (first (:steps r)))))
+        (is (not (neg? (:gap (second (:steps r))))))))
+    (testing "bottleneck = measured step furthest below benchmark"
+      (let [r (funnel/evaluate-funnel {:v 1000 :s 30 :p 12} spec)]
+        (is (= :awareness (:from (:bottleneck r))))
+        (is (= :acquisition (:to (:bottleneck r))))))
+    (testing "unmeasured stage → :missing, no false bottleneck"
+      (let [r (funnel/evaluate-funnel {:v 1000} spec)]
+        (is (= [:acquisition :revenue] (:missing r)))
+        (is (nil? (:bottleneck r)))))
+    (testing "all above benchmark → no bottleneck"
+      (let [r (funnel/evaluate-funnel {:v 1000 :s 200 :p 100} spec)]
+        (is (nil? (:bottleneck r)))))))
+
+(deftest funnel-proposals-cycle
+  (testing "bottleneck → GTM proposal into channels block; snapshot into metrics; missing → 計器 into solution"
+    (let [props (with-redefs [funnel/funnel-specs
+                              {:cloud-itonami [{:key :awareness :label "訪問" :metric [:v]}
+                                               {:key :acquisition :label "signup" :metric [:s] :benchmark 0.10}
+                                               {:key :revenue :label "paid" :metric [:p] :benchmark 0.30}]}]
+                  (funnel/proposals :cloud-itonami {:v 1000 :s 20}))]  ; s/v=2% < 10%, p missing
+      (is (some #(and (= :cloud-itonami.channels (:canvas/id %))
+                      (re-find #"GTM" (:event/value %))) props))
+      (is (some #(and (= :cloud-itonami.metrics (:canvas/id %))
+                      (re-find #"funnel" (:event/value %))) props))
+      (is (some #(and (= :cloud-itonami.solution (:canvas/id %))
+                      (re-find #"計器" (:event/value %))) props))))
+  (testing "no spec → no proposals"
+    (is (empty? (funnel/proposals :no-such-product {})))))
 
 (deftest render-md-smoke
   (let [idx (canvas/index base)
