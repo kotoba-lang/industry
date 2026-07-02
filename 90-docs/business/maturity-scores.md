@@ -9,9 +9,11 @@
 
 | product | BMC 成熟度 | YC bench 成熟度 | validation | 主な不足 |
 |---|---|---|---|---|
+| club-shinshi | 68.0 | 68.3 | 0.0 | validation=0.0, distribution=2.0 |
 | etzhayyim | 64.0 | 60.0 | 0.0 | revenue=0.0, validation=0.0 |
 | net-kotobase | 76.0 | 58.3 | 0.0 | validation=0.0, revenue=1.0 |
 | cloud-murakumo | 64.0 | 51.7 | 0.0 | revenue=0.0, validation=0.0 |
+| network-isekai | 60.0 | 50.0 | 0.0 | revenue=0.0, validation=0.0 |
 | app-aozora | 64.0 | 46.7 | 0.0 | revenue=0.0, validation=0.0 |
 | ai-gftd-apex | 60.0 | 45.0 | 0.0 | revenue=0.0, validation=0.0 |
 | cloud-manimani | 56.0 | 43.3 | 0.0 | revenue=0.0, validation=0.0 |
@@ -56,6 +58,12 @@
 - YC: acute-problem=4.0, wedge=4.0, tenx=4.0, founder-fit=5.0, distribution=2.0, defensibility=4.0, launched=3.0, users=1.0, revenue=0.0
 - note: 実測: ai-gftd-murakumo worker 158,768 inv/7d — 社内推論需要は実在・常時運転 (grounding 4→5, launched 2→3)。murakumo.cloud zone は 536 req/7d・uniques 1 = 外部利用ゼロ (users 1 据置)。tok 単価は未実測 (riskiest gate 未通過)。
 
+### club-shinshi
+
+- BMC: completeness=5.0, hypothesis=5.0, validation=0.0, pricing=2.0, grounding=5.0
+- YC: acute-problem=4.0, wedge=3.0, tenx=3.0, founder-fit=5.0, distribution=2.0, defensibility=4.0, launched=4.0, users=3.0, revenue=3.0
+- note: PornHub/OnlyFans/FANZA 型アダルト creator platform (shinshi.club)。実測: 29,397 req/7d・PV 3,859・uniques 540 = 8 product 中 traffic 上位。ExoClick ad が gftd 唯一の :live 収益 (ADR-2606130000、revenue 3=first $ 実績)。AI 生成 (LangGraph) + AppView + 自前 age gate + H1/H2 telemetry 本番稼働 (launched 4, grounding 5)。creator 課金 (サブスク/PPV) は PSP 制約で未解禁 (pricing 2)。ai-gftd-shinshi の ad-supported BMC (260613) の platform 版。
+
 ### etzhayyim
 
 - BMC: completeness=5.0, hypothesis=5.0, validation=0.0, pricing=1.0, grounding=5.0
@@ -67,4 +75,10 @@
 - BMC: completeness=5.0, hypothesis=5.0, validation=0.0, pricing=4.0, grounding=5.0
 - YC: acute-problem=4.0, wedge=4.0, tenx=4.0, founder-fit=5.0, distribution=2.0, defensibility=4.0, launched=3.0, users=2.0, revenue=1.0
 - note: 実測: kotobase.net 3,483 req/7d・uniques 272、worker 5,311 inv/7d、/health ok。Stripe 実測: active subscriptions 0・直近 charge は 2024 年の非関連決済 — billing 配線済だが転換ゼロ (revenue 1 据置が正直値)。
+
+### network-isekai
+
+- BMC: completeness=5.0, hypothesis=5.0, validation=0.0, pricing=1.0, grounding=4.0
+- YC: acute-problem=3.0, wedge=3.0, tenx=4.0, founder-fit=4.0, distribution=2.0, defensibility=4.0, launched=3.0, users=2.0, revenue=0.0
+- note: Roblox 型 UGC ゲーム/creator platform。実測: isekai.network 12,186 req/7d・PV 7,819・uniques 316 — 公開稼働 (launched 3, users 2)。play/fork/share + kami WASM renderer + AI 生成 backend 実装済 (grounding 4)。creator 経済圏 (DevEx/marketplace) は未収益化 (revenue 0)、価格未定義。tenx=4 は「作品=データで fork/可搬」の Roblox に無い独自性。
 
