@@ -29,9 +29,17 @@ ADR-2607021500 の 7 レイヤー lean canvas を CLI で扱い、進化・成�
 70-tools/bmc/bin/murakumo hyp pass :hyp/murakumo-tok-price --evidence "run ledger 実測 …"
 70-tools/bmc/bin/murakumo react tick                  # ReAct 1 tick（有界）
 70-tools/bmc/bin/aozora react loop --max-ticks 5      # dry まで反復
+70-tools/bmc/bin/gftd score                           # BMC/YC bench 成熟度スコア表
+70-tools/bmc/bin/gftd score md                        # maturity-scores.md 再生成
 70-tools/bmc/bin/gftd ledger show --tail 20
 bb 70-tools/bmc/run-tests.bb                          # tests
 ```
+
+スコア（ADR-2607021700）: BMC 成熟度 = completeness/hypothesis/validation
+（自動、validation は ledger の hyp status）+ pricing/grounding（facts）。
+YC bench 成熟度 = design 6 次元（YCBench 基準）50% + traction 3 次元 50%。
+主観入力は `90-docs/business/maturity-facts.edn`、`hyp pass|fail` で検証が
+進むと validation → スコアが自動で動く。
 
 repo root 以外から動かすときは `GFTD_ROOT=<superproject root>`。
 
