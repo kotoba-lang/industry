@@ -130,6 +130,35 @@ Decision 1 is code-complete and tested, not yet run against production:
 Decision 2 (kotoba-git/kotoba-rad sovereign storage) is untouched — still
 entirely future work per its own R0→R4 staging (ADR-2606280300).
 
+## Incident: stale production deployment served gftdcojp/gftdcojp without auth（2026-07-02、mitigated）
+
+Cloudflare Pages の `cloud-itonami` project は git 連携ではなく手動
+`wrangler pages deploy` 運用（`wrangler pages project list` の Git Provider
+列が `No`）。本 ADR の作業当日、本番 `itonami.cloud` の最新デプロイは
+1 日前・コミット `ad52b45`（`638bdc3` で `functions/api/[[path]].js` が
+削除される**前**、かつ本 ADR の private tenant / CACAO / visibility 施策が
+入る**前**）のままだった。結果として `GET
+https://itonami.cloud/api/gftdcojp/gftdcojp/state` は認証なしで queue/
+permissions/audit の JSON を返し続けていた（`"actor": null` でも
+`canReadQueue: true`）。実データではなく seed/デフォルトデータだったが、
+アクセス制御の穴自体は本物で、この上に `tenants.gftdcojp/seed!` や
+`import-m365-facts!` を本番 store に対して実行すれば実データがそのまま
+露出する状態だった。
+
+**即時対応**（オーナー承認済み）: 現行 `main`（`functions/` ディレクトリ
+なし）を `wrangler pages deploy public --project-name=cloud-itonami
+--branch=main` で再デプロイ。`/api/*` は `_redirects` の SPA catch-all で
+`index.html` にフォールバックするだけになり、匿名 data path が消えた
+（fail-closed）ことを `curl` で確認済み。これは「認証を追加した」のでは
+なく「認証の無い経路を閉じた」段階（恒久対応は上記 Follow-up の CACAO
+認証込み API 層——後述の Cloudflare Pages Function 実装で対応）。
+
+**教訓**: このプロジェクトの Pages デプロイは git push で自動追従しない。
+private tenant のガードレール（本 ADR、CACAO 認証）を伴うコードを merge
+しても、`wrangler pages deploy` を明示的に打たない限り本番には反映されない
+——「main に merge 済み」と「本番で有効」を同一視しない。デプロイ後は
+本ADRのような認証境界の変更点を都度 `curl` で本番相手に直接検証する。
+
 ## Follow-up
 
 - `orgs/gftdcojp/cloud-itonami/docs/adr/0002-org-repo-tenant-isolation.md` に
