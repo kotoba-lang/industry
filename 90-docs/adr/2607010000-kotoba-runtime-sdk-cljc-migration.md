@@ -1,13 +1,17 @@
 # ADR-2607010000: runtime・SDK・OS substrate を kotoba-only 正本へ寄せる
 
-**Status**: accepted (aiueos / aiueos-cljc-contract / kotodama-mcp / kotodama-host / net-kotobase landed; kami-engine in progress)
+**Status**: accepted (all six scoped repos landed & reconciled; kami-nv-compat port waves continue as follow-up)
 **Date**: 2026-07-01 (status updated 2026-07-02)
 **Progress note (2026-07-02)**: ledger `90-docs/migration/kotoba-only-runtime-ledger.edn` の全 item が done。
 aiueos の Rust runtime crate 削除・kotodama-mcp の EDN manifest 化 + TS provider 削除・
 kotodama-host の host contract CLJC 化 + TS SDK 削除・kototama の Rust wrapper 削除は
 origin main に着地済み（stalled WIP の cleanup landing 含む: kotodama-mcp `5247c16`,
-kotodama-host `cb6c087`, kototama `10ddfe2`）。kami-engine は Rust 削除 sweep + 複数
-セッションの WIP が共有 checkout に滞留しており、sub-project 単位の triage が残件。
+kotodama-host `cb6c087`, kototama `10ddfe2`）。kami-engine も reconcile 完了
+（2026-07-02 午後）: Rust 削除 sweep・sdk-clj 更新・mangaka 分割は着地済み残骸と判定し
+archive、sip dashboard の adapter 化完成 2 ファイルを救出着地（`aed5d85`）、GitHub に
+存在しない commit を指していた west pin を修復（archive branch
+`archive/34b7226-quality-liveness-unlanded` で旧 pin の fetch 可能性も回復）。
+残る進行中作業は kami-nv-compat の port waves（wave 33+ 活発に進行中、pin == HEAD）のみ。
 **Scope**:
 
 - `orgs/kotoba-lang/aiueos`
