@@ -106,7 +106,19 @@
                                                   {:all [{:metric [:a] :op :>= :threshold 1000}
                                                          {:metric [:b] :op :>= :threshold 4000}]})))))
   (testing "instrument-blocked spec"
-    (is (= :blocked (:status (gate/evaluate-hyp {} {:needs ["計器A"]}))))))
+    (is (= :blocked (:status (gate/evaluate-hyp {} {:needs ["計器A"]})))))
+  (testing ":compare form (lhs op rhs)"
+    (let [spec {:compare {:lhs [:a] :op :> :rhs [:b]} :needs-when-unmeasurable ["x"]}]
+      (is (= :validated (:status (gate/evaluate-hyp {:a 100 :b 10} spec))))
+      (is (= :measuring (:status (gate/evaluate-hyp {:a 5 :b 10} spec))))
+      (is (= :blocked (:status (gate/evaluate-hyp {:a 5} spec))))))
+  (testing "real gate-specs: isekai viral-coefficient measurable"
+    (is (= :validated (:status (gate/evaluate-hyp {:fork {:viral-coefficient 1.5}}
+                                                  (get gate/gate-specs :hyp/isekai-fork-viral)))))
+    (is (= :blocked (:status (gate/evaluate-hyp {} (get gate/gate-specs :hyp/isekai-fork-viral))))))
+  (testing "real gate-specs: club-shinshi creator-gmv vs ad compare"
+    (is (= :validated (:status (gate/evaluate-hyp {:revenue {:creator-gmv-jpy 500000 :ad-revenue-jpy 100000}}
+                                                  (get gate/gate-specs :hyp/club-shinshi-creator-take)))))))
 
 (deftest gate-proposals-cycle
   (testing "blocked gate → 準備 proposal into solution block"

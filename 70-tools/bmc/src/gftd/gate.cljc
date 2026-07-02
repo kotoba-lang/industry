@@ -25,8 +25,11 @@
 
 (def gate-specs
   {:hyp/murakumo-tok-price
-   {:needs ["run ledger の原価/tok export (node別 tok/s × 電力)"
-            "社内3アプリ推論の fleet 移管で原価比較"]}
+   ;; measurable via GET /infer/cost emitter (ADR-2607022200): fleet ¥/Mtok <= spot ¥/Mtok
+   {:compare {:lhs [:cost :fleet-yen-per-mtok] :op :<= :rhs [:cost :spot-yen-per-mtok]}
+    :evidence-label "fleet ¥/Mtok vs spot"
+    :needs-when-unmeasurable ["run ledger の原価/tok export (node別 tok/s × 電力)"
+                              "社内3アプリ推論の fleet 移管で原価比較"]}
 
    :hyp/apex-privacy-premium
    {:needs ["tier 価格定義" "Stripe product 作成" "Free→Plus 転換テレメトリ"]}
@@ -47,16 +50,25 @@
    {:needs ["yoro child repo 分離" "MAU テレメトリ"]}
 
    :hyp/manimani-ledger-pay
-   {:needs ["OSS install テレメトリ" "cloud signup funnel" "価格設計"]}
+   ;; measurable via /telemetry/install + signups emitter (ADR-2607022200): 転換率 >= Obsidian Sync 水準
+   {:metric [:conversion :pct] :op :>= :threshold 0.04
+    :evidence-label "OSS→cloud 転換率"
+    :needs-when-unmeasurable ["OSS install テレメトリ" "cloud signup funnel" "価格設計"]}
 
    :hyp/etzhayyim-registry-value
    {:needs ["itonami 契約の RAD attestation 参照フック" "資金チャネル (寄付/助成)"]}
 
    :hyp/isekai-fork-viral
-   {:needs ["fork イベントテレメトリ (週次 fork 数 / fork 由来新規作品比率)"]}
+   ;; measurable via public/feed/fork-stats.edn emitter (network-isekai PR#15): viral 係数 >= 1.0
+   {:metric [:fork :viral-coefficient] :op :>= :threshold 1.0
+    :evidence-label "fork viral 係数"
+    :needs-when-unmeasurable ["fork イベントテレメトリ (週次 fork 数 / fork 由来新規作品比率)"]}
 
    :hyp/club-shinshi-creator-take
-   {:needs ["PSP/crypto rail 解禁 (ADR-2605220000 凍結)" "creator billing" "creator GMV 計測"]}
+   ;; measurable via creator_billing_daily emitter (ADR-2607022200): creator GMV > ad 収益
+   {:compare {:lhs [:revenue :creator-gmv-jpy] :op :> :rhs [:revenue :ad-revenue-jpy]}
+    :evidence-label "creator GMV vs ad 収益"
+    :needs-when-unmeasurable ["PSP/crypto rail 解禁 (ADR-2605220000 凍結)" "creator billing" "creator GMV 計測"]}
 
    :hyp/yukkuri-ypp-then-rpm
    ;; machine-measurable: YPP = subscribers>=1000 AND watch-hours>=4000
@@ -69,7 +81,7 @@
 
 (defn- num [x] (cond (number? x) x (string? x) (parse-double x) :else nil))
 
-(defn- op-fn [op] (case op :>= >= :> > :<= <= :< < :== ==))
+(defn- op-fn [op] (case op :>= >= :> > :<= <= :< < := == :== ==))
 
 (defn- eval-clause
   "→ {:measurable bool :met bool :value v} for one {:metric :op :threshold} clause."
@@ -100,6 +112,17 @@
         {:status :measuring
          :distance (str (:evidence-label spec) " 現在 "
                         (str/join " / " (map :value rs)) " (gate 未到達)")}))
+
+    ;; cross-metric comparison (lhs op rhs)
+    (:compare spec)
+    (let [{:keys [lhs op rhs]} (:compare spec)
+          l (num (get-in metrics lhs)) r (num (get-in metrics rhs))]
+      (cond
+        (or (nil? l) (nil? r)) {:status :blocked :needs (:needs-when-unmeasurable spec)}
+        ((op-fn op) l r) {:status :validated
+                          :evidence (str (:evidence-label spec) " gate 到達: " l " vs " r)}
+        :else {:status :measuring
+               :distance (str (:evidence-label spec) " 現在 " l " vs " r " (gate 未到達)")}))
 
     ;; single measurable clause
     (:metric spec)
