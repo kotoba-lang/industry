@@ -82,5 +82,29 @@
     {:family :engine-runtime-providers :target-repo "kami-runtime-provider" :phase4-coverage ["core" "kami-engine-engine" "game" "input" "scene" "scene-graph" "kami-engine-script-runtime"] :gap ["kami-engine-clj"]}
     {:family :engineering-workflow-providers :target-repo "kami-domain-providers" :phase4-coverage ["bridge" "dec" "flow" "knp" "mine-ai" "mine-pds" "pathfind" "pdk" "pipelines" "scad" "verify"] :gap ["kami-eng-core" "kami-eng-io" "kami-groot"]}]
    :resolution "Phase-4 repos are pre-existing scaffolded homes for the crate-level content ADR-2607010000's provider-catalog names; they are not obsoleted by the provider-family repos. Either the provider-family repo becomes a thin umbrella that :local/root-deps the Phase-4 repos, or the catalog grouping stays conceptual (no physical merge). CLJC restoration in Phase-4 repos should follow ADR-2607010000's authority discipline (EDN contract first, native code executes-validated-requests-only where applicable)."
-   :gap-repos-out-of-scope "crates ADR-2607010000 names that Phase 4 does not cover still exist in the live kami-engine tree (not deleted) — entirely ADR-2607010000's scope, not Phase 4's (Phase 4 only restores deleted crates)."}}}
+   :gap-repos-out-of-scope "crates ADR-2607010000 names that Phase 4 does not cover still exist in the live kami-engine tree (not deleted) — entirely ADR-2607010000's scope, not Phase 4's (Phase 4 only restores deleted crates)."}
+  :phase-6-2026-07-02
+  {:summary "closes the gap this ADR's own :post-phase-3-survey-2026-07-01 flagged but did not act on: kotoba-store/ProllyTree/CID + kotoba-query(KQE 4-index Arrangement)+kotoba-runtime browser client were classified :stay-Rust-substrate (line :out-of-scope) yet were deleted with the rest of kotoba-lang/kotoba's Rust workspace in 604896171b with zero CLJC replacement plan — kotoba-lang/map (real MVT/globe-math CLJC, restored per Phase 4/5) has domain-render logic but no data layer to query kotobase.net's IPLD blocks from the browser"
+   :trigger "owner directive 2026-07-02: kotoba-lang/map design — browser kotoba-wasm does all query/assembly client-side, server (kotobase.net) is delivery-only (block.get, no server-side request-shaping); this is the base design for the whole service surface (map, murakumo, ...), not map-only"
+   :reused-existing-repos
+   {"multiformats" "base58/base32/varint/sha2-256-multihash/CIDv1, pure CLJC, already real (not scaffold)"
+    "dag-cbor" "canonical dag-cbor encode/decode (cbor.core/encode,decode), pure CLJC, already real"
+    "cacao" "CAIP-122/SIWE CACAO mint+verify, pure CLJC, already real — IPNS-record signer/verifier for kotoba-client builds on this, not a new auth primitive"
+    "kotoba-pages-poc" "GitHubPagesBlockStore — CID-queryable static tier (ADR-2606242400) — reference pattern for 'server = delivery only'; net-kotobase's own reduction to a delivery-only surface is ADR-2607010000's `net-kotobase` scope, not redefined here"}
+   :new-repos
+   [{:repo "prolly-tree" :deps ["multiformats" "dag-cbor"]
+     :scope "content-addressed probabilistic B-tree: rolling-hash chunk boundary (~1/256, boundary determined by child CID bytes at internal levels — matches the deleted Rust kotoba-store fix, not leaf max-key), multi-level build-tree, CID-addressed nodes via injected put! port, lookup/scan-prefix via injected get-fn port. No I/O owned by core (ports, per ADR-2607010000 layer-2 discipline)."
+     :status "real initial implementation landed (not scaffold-only) — build-tree/lookup/scan-prefix + round-trip tests"}
+    {:repo "quad-store" :deps ["prolly-tree" "multiformats" "dag-cbor"]
+     :scope "Quad{s p o} model + 4-index in-memory Arrangement (spo/pso/pos/ocp, matching the deleted kotoba-query naming) + commit! snapshotting the 4 indices to prolly-tree roots, CID-addressed commit chain (:prev linkage)."
+     :status "real initial implementation landed — assert/retract/4-index lookups/commit! + tests"}
+    {:repo "kqe" :deps ["quad-store"]
+     :scope "Kotoba Query Engine (name matches the deleted Rust crate) — [s p o] triple-pattern query with wildcards, routes to the right quad-store index by which positions are bound (bound-s→spo, bound-p-only→pso, bound-p+bound-o→pos), matching the deleted `route_bgp_triples` routing logic. Full Datalog fixpoint/SPARQL BGP is out of scope for this landing — noted as follow-up in README."
+     :status "real initial implementation landed — pattern-query + index routing + tests"}
+    {:repo "kotoba-client" :deps ["kqe" "quad-store" "prolly-tree" "multiformats" "cacao" "dag-cbor"]
+     :scope "browser-oriented orchestration: ingest-block (CID re-verify claimed-cid against recomputed hash, matching the deleted `KotobaNode.ingestBlock`), hydrate-via-blocks (missing-cid walk + injected fetch-block port + injected local-store port, looping to convergence, matching the deleted `hydrateViaBlocks` algorithm). IPNS-record IpnsRecord signature verification (trustless head resolution, matching the deleted `hydrate-and-query-verified!`) is explicitly deferred — needs cacao's exact key/signature surface, tracked as follow-up, not fabricated."
+     :status "real initial implementation landed for ingest-block + hydrate-via-blocks; IPNS-verify explicitly TODO (see repo README)"}]
+   :application "kotoba-lang/map gets kotoba-client as its data layer (viewport → geo/H3 tile keys → kotoba-client hydrate+kqe query → existing mvt/orbital/projection render pipeline); wiring lands as a follow-up PR in kotoba-lang/map, not part of this phase's four new repos"
+   :manifest-registration "manifest/repos.edn + west.yml, this commit"
+   :not-done "full re-derivation of kotoba-lang-adr.edn's inter-repo dependency graph across all 332 org repos (only additive entries for the 4 new repos + map were made; a from-scratch 332-repo gh-api sweep is a separate follow-up, the existing file's :repo-count was already stale at 200)"}}}
 

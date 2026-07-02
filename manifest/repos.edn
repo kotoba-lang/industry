@@ -274,6 +274,22 @@
    ;; successor registered anywhere until now). Scaffold-only; see the ADR for
    ;; the still-unrestored kotoba-auth/core/datomic/edn/ipfs/cli/ipns-record gap.
    "orgs/kotoba-lang/shell"
+   ;; kotoba-store/query/browser-client CLJC restoration (ADR-2607010930 Phase 6,
+   ;; 2026-07-02) — closes the "still-unrestored kotoba-auth/core/datomic/edn/
+   ;; ipfs/cli/ipns-record gap" flagged in the shell scaffold note above:
+   ;; prolly-tree (content-addressed B-tree, was kotoba-store/ProllyTree) →
+   ;; quad-store (4-index spo/pso/pos/ocp Arrangement + commit chain, was
+   ;; kotoba-query's storage half) → kqe (pattern-query index routing, was
+   ;; kotoba-query's Datalog half, name unchanged) → kotoba-client (CID-verified
+   ;; block ingest + hydrate-via-blocks, was kotoba-runtime's KotobaNode browser
+   ;; client). Real initial implementations, not scaffold-only (see each repo's
+   ;; README for what is/isn't landed; IPNS-verify + Datalog fixpoint are
+   ;; explicit follow-ups). Reuses existing kotoba-lang/{multiformats,dag-cbor,
+   ;; cacao} rather than duplicating CID/CBOR/CACAO primitives.
+   "orgs/kotoba-lang/prolly-tree"
+   "orgs/kotoba-lang/quad-store"
+   "orgs/kotoba-lang/kqe"
+   "orgs/kotoba-lang/kotoba-client"
    ;; Bitcoin mining/mining-pool/wallet substrate (ADR-2607012230) — plain
    ;; libraries (not actors): btc-crypto (RIPEMD160/Base58/Bech32/BIP-32/39/
    ;; tx signing, secp256k1 reused from eth-crypto), btc-mining (CPU PoW

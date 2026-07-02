@@ -279,6 +279,71 @@ discipline even though the repos predate it:
    restoring a given Phase-4 repo (e.g. `dft`/`spice`/`pdk` etc. follow
    `:native-code-only-executes-validated-requests`).
 
+## Phase 6 (2026-07-02) — kotoba-store/query/browser-client gap closure
+
+The `:post-phase-3-survey-2026-07-01` entry above flagged but did not act on
+a gap: this ADR's original `:out-of-scope` list classified
+`kotoba-store/ProllyTree/CID` (content-addressed storage hot path) and
+`kotoba-query`/`kotoba-runtime` (4-index Datalog Arrangement + browser
+client) as **`:stay-Rust-substrate`** — deliberately *not* migration
+targets. `kotoba-lang/kotoba` then deleted its entire Rust workspace in
+`604896171b` anyway, taking that "must stay" substrate with it and leaving
+**zero CLJC replacement plan** for it. `kotoba-lang/map` (Phase 4/5 restored
+real MVT decoder + globe/orbital-math CLJC) has domain-render logic but no
+data layer — nothing in the org can query kotobase.net's IPLD blocks from
+the browser today.
+
+Trigger: owner directive 2026-07-02 for `kotoba-lang/map`'s design —
+**browser kotoba-wasm does all query/assembly client-side; kotobase.net is
+delivery-only** (serves `block.get` CID fetches, does not shape queries
+server-side). This is stated as the base design for the whole service
+surface (map, murakumo, ...), not map-specific.
+
+### Reused (already real, not scaffold)
+
+- `kotoba-lang/multiformats` — CID/multihash/multibase, pure CLJC
+- `kotoba-lang/dag-cbor` — canonical dag-cbor encode/decode, pure CLJC
+- `kotoba-lang/cacao` — CAIP-122/SIWE CACAO mint+verify, pure CLJC (IPNS
+  record signing/verification builds on this, not a new primitive)
+- `kotoba-lang/kotoba-pages-poc` — GitHubPagesBlockStore, CID-queryable
+  static tier (ADR-2606242400) — the existing reference pattern for
+  "server = delivery only". `net-kotobase`'s own reduction to a
+  delivery-only surface belongs to ADR-2607010000's `net-kotobase` scope,
+  not redefined here.
+
+### New repos
+
+| repo | deps | scope |
+|---|---|---|
+| `kotoba-lang/prolly-tree` | multiformats, dag-cbor | content-addressed probabilistic B-tree — chunk boundary ~1/256 determined by **child CID bytes** at internal levels (matches the deleted Rust fix: boundary must not be keyed on leaf max-key, which caused infinite recursion), multi-level build, CID-addressed nodes via an injected `put!` port, lookup/scan-prefix via an injected `get-fn` port |
+| `kotoba-lang/quad-store` | prolly-tree, multiformats, dag-cbor | `Quad{s p o}` + 4-index in-memory Arrangement (`spo`/`pso`/`pos`/`ocp`, same naming as the deleted `kotoba-query`), `commit!` snapshots the 4 indices to prolly-tree roots forming a CID-addressed commit chain |
+| `kotoba-lang/kqe` | quad-store | Kotoba Query Engine — `[s p o]` pattern query with wildcards, routes to the index matching which positions are bound (mirrors the deleted `route_bgp_triples`); full Datalog fixpoint/SPARQL BGP is **not** in this landing |
+| `kotoba-lang/kotoba-client` | kqe, quad-store, prolly-tree, multiformats, cacao, dag-cbor | browser orchestration — `ingest-block` (CID re-verify, mirrors the deleted `KotobaNode.ingestBlock`), `hydrate-via-blocks` (missing-CID walk + injected fetch/store ports, loops to convergence, mirrors the deleted `hydrateViaBlocks`). **IPNS-record signature verification (trustless head resolution) is explicitly deferred** — needs `cacao`'s exact signing surface, tracked as a repo-local TODO rather than fabricated |
+
+All four ship with real initial implementations (not scaffold-only stubs) —
+matching the quality bar of `kotoba-lang/mst`, not Phase 4's "deps.edn +
+README + empty src" convention — because the leaf-most pieces
+(`prolly-tree` chunking, `quad-store` indices, `kqe` routing, `kotoba-client`
+CID-verify + hydrate loop) are genuinely tractable in one pass; the
+Datalog-fixpoint and IPNS-verify pieces are explicitly named follow-ups in
+each repo's own README rather than silently omitted.
+
+### Application
+
+`kotoba-lang/map` gets `kotoba-client` wired in as its data layer (viewport
+→ `geo` H3 tile keys → `kotoba-client` hydrate + `kqe` query → the existing
+`mvt`/`orbital`/`projection` render pipeline). This wiring is a follow-up PR
+against `kotoba-lang/map`, not part of the four new repos landed in this
+phase.
+
+### Known gap not closed by this phase
+
+`90-docs/kotoba-lang-adr.edn`'s inter-repo dependency index was generated
+against 200 repos; the org now has 332. This phase only adds entries for the
+4 new repos (+ `map`'s new `kotoba-client` dependency) — a full from-scratch
+332-repo `gh api` sweep to regenerate every repo's dependency edges is a
+separate follow-up, not silently claimed done here.
+
 ## Related
 
 - `90-docs/migration/clj-wgsl-ledger.edn` (the crate-by-crate ledger, SSoT for this migration)
