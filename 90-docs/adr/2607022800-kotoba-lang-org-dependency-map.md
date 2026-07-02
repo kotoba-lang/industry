@@ -128,7 +128,7 @@ repo:
 | kami-si | `si` | `signal-integrity` | ambiguous vs SI units |
 | kami-pkg | `pkg` | `ic-packaging` | npm/Debian package connotation |
 | kami-ip | `ip` | `ip-xact` | IP address vs intellectual property |
-| kami-flow | — | *(not restored)* | actually an unrelated Node.js/Cypher tool |
+| kami-flow | — | `kami-flow` (kept, no rename needed) | **correction, 2026-07-02**: `kami-flow` was *initially* misjudged as an unrelated Node.js/Cypher graph-ingest tool (that description actually belongs to an unrelated `graph/` subdirectory sharing the same `kami-engine/kami-flow/` folder path). Its own `src/lib.rs` is a genuine RTL→PnR→GDSII→Verify/Power/DFT/SI/Yield→STA→DRC/LVS→Signoff orchestrator; it has since been restored to `kotoba-lang/kami-flow`, wiring together 7 already-restored sibling EDA crates (`rtl`/`pnr`/`model-checking`/`power`/`dft`/`signal-integrity`/`yield`). See ADR-2607010930 Phase 7. |
 
 This is also exactly why this ADR's own gap-sweep registration of `cad` and
 `eda` (cluster 44) is unrelated to the `brep`/`pcb` renames — those renames
@@ -166,14 +166,105 @@ dependency on `prolly-tree` despite both belonging to the same
 database-crates roadmap (ADR-2607022600) — a commit wraps an opaque `state`
 value, so the coupling is architectural, not a code dependency.
 
-Two loose ends worth knowing about (not fixed here, see `:open-questions`):
-`koe`'s `:dev` alias has a stale `:local/root` pointing at
-`../langgraph-clj`/`../langchain-clj`, which resolves incorrectly from
-`koe`'s current `kotoba-lang` location (the real targets are under
-`orgs/com-junkawasaki/`) — likely a leftover from before `koe` migrated orgs.
-And `eth-crypto`'s own `deps.edn` header says it's "lift-ready" for
+One loose end from this ADR's first pass has since been fixed (2026-07-02,
+same day): `koe`'s `deps.edn` — both its main `:deps` entry and its `:dev`
+`:override-deps` — referenced the stale `io.github.com-junkawasaki/
+langgraph-clj`/`langchain-clj` coordinates (`langgraph-clj` was renamed to
+`langgraph` and moved org to `kotoba-lang` before this ADR was written, but
+`koe`'s own `deps.edn` was never updated to follow). Fixed to
+`io.github.kotoba-lang/langgraph` at the same commit the `v0.2.0` tag
+already pointed to (`133740f...` — confirming this was purely a stale
+coordinate, not a version skew); `clojure -M:test` now passes (3 tests / 13
+assertions). See `:phase-2-2026-07-02` in the `.edn`.
+
+`eth-crypto`'s own `deps.edn` header still says it's "lift-ready" for
 extraction back to `com-junkawasaki/eth-crypto-clj`, a small tension against
-the general kotoba-lang-ward migration direction.
+the general kotoba-lang-ward migration direction — left as-is (not this
+ADR's call to make).
+
+## Phase 2 (2026-07-02, same day) — `-clj` suffix cleanup + full repo re-audit
+
+A follow-up pass, triggered by an owner request to re-verify duplicates and
+dependency health across the (now 377-repo) org, found and fixed several
+additional issues this ADR's first pass didn't cover:
+
+### `-clj`-suffix rename sweep
+
+The org's established convention (see the naming-collision table above, and
+the pre-existing `aero-clj→aero`, `crash-clj→crash`, `datom-clj→datom`,
+`echem-clj→echem`, `motor-clj→motor`, `vphysics-clj→vphysics`,
+`langchain-clj→langchain`, `langgraph-clj→langgraph` renames from before this
+ADR existed) is: when a `-clj`-suffixed repo migrates into `kotoba-lang`, the
+suffix is dropped **unless** doing so would collide with an unrelated,
+older, still-live `kotoba-lang/<short-name>` repo.
+
+Applying this discipline to the 9 `-clj`-suffixed repos still live as of
+2026-07-02 (7 from ADR-2607010930 Phase 7's `*-clj` monorepo split, plus 2
+pre-existing):
+
+| repo | action | reason |
+|---|---|---|
+| `engine-clj` → `engine` | **renamed** | no collision |
+| `kami-mangaka-page-clj` → `kami-mangaka-page` | **renamed** | no collision |
+| `kami-mangaka-reader-clj` → `kami-mangaka-reader` | **renamed** | no collision |
+| `kami-mangaka-render-clj` → `kami-mangaka-render` | **renamed** | no collision |
+| `kami-mangaka-text-clj` → `kami-mangaka-text` | **renamed** | no collision |
+| `kami-app-sip-clj` → `kami-app-sip` | **renamed** | no collision |
+| `kami-mangaka-scene-clj` | **kept** | collides with `kotoba-lang/kami-mangaka-scene` (the separate Rust/PyO3-origin 3D crate, ADR-2607010930 Phase 7) |
+| `kami-engine-sdk-clj` | **kept** | collides with `kotoba-lang/kami-engine-sdk` (a pre-existing, unrelated Svelte 5 UI component mirror) |
+| `kototama-clj` | **kept** | genuinely distinct project from `kotoba-lang/kototama` (the WASM-runtime compiler) — not a naming legacy, a real different thing |
+
+Each rename was performed via `gh repo rename` (GitHub preserves history and
+sets up an automatic redirect from the old name), followed by updating
+`manifest/repos.edn`'s `:extra-projects` entry and `manifest/west.yml`'s
+`name:`/`path:` fields to match.
+
+### Dependent-repo dep fixes (post-rename)
+
+3 repos had `deps.edn` `:git/url` coordinates pointing at the pre-rename
+names, which would 404 on next resolve:
+
+- `kami-app-sip` (deps on `kami-mangaka-render`, `kami-mangaka-page`)
+- `kami-mangaka-reader` (deps on `kami-mangaka-text`)
+- `kami-mangaka-page` (deps on `kami-mangaka-text`)
+
+All 3 fixed to the new `:git/url`s (SHAs unchanged — renaming a GitHub repo
+does not change any commit SHA), verified via `clojure -M:test` (all green
+except `kami-app-sip`'s pre-existing, unrelated `sip.store`/`:datomic`-alias
+gap, already documented in that repo's own history).
+
+### Full-org dependency graph (quantitative, all 377 repos)
+
+Distinct from this ADR's original "17 locally-checked-out hub repos" ground-
+truth, this pass parsed `deps.edn` (both `:git/url` and `:local/root`
+entries) across **all 362 repos that have a `deps.edn`** (362/377; the other
+15 are non-CLJC or contract-only, e.g. `homebrew-kotoba`, `kami-engine`,
+`kotoba-v2025`). Headline numbers (full graph in the `.edn`'s
+`:full-org-dependency-graph`):
+
+- **88 repos** declare at least one `kotoba-lang`-internal dependency; the
+  other **274 (73%)** are genuinely standalone zero-dep leaves.
+- **167 total dependency edges.**
+- **21 connected clusters** of size ≥2 (the largest single one, 35 repos, is
+  the office/appkit/OOXML family rooted at `css`/`html`/`shitsuke`; the
+  second-largest, 21 repos, is the `kami-*-scene` family rooted at `scene`
+  from ADR-2607010930 Phase 7).
+- Most-depended-upon repos (in-degree): `css` (13), `html` (12), `scene`
+  (11, all from Phase 7's `kami-*-scene` restorations), `shitsuke` (10),
+  `langchain`/`langchain-clj`-*sic*-now-`langchain` (7).
+
+### Known remaining gap (flagged, not fixed this pass)
+
+A broader sweep for stale `-clj`-suffixed dependency coordinates (beyond the
+`koe` fix above) found **~17 more `deps.edn` files** referencing
+`aero-clj`/`crash-clj`/`datom-clj`/`echem-clj`/`motor-clj`/`vphysics-clj`
+(the pre-ADR renames) at old `io.github.com-junkawasaki/*-clj` coordinates —
+`browser-use`, `authenticator`, `cae-solver`, `computer-use`, `kagi`,
+`godaddy-dns`, `langgraph-store`, `kami-engine-vehicle-designer`, `kenchi`,
+`kotoba-fleet`, `kekkai`, `kotoba-code`, and others. These were **not**
+fixed in this pass (out of scope for a single-session sweep given the
+volume) but are recorded here as a concrete follow-up list rather than
+silently missed — see `:known-stale-clj-refs` in the `.edn`.
 
 ## Consequences
 
