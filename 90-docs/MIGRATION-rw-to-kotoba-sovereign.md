@@ -8,7 +8,11 @@ kotoba→RW/D1 に戻した）ため、sovereign 宣言は「動いているよ�
 
 ## Gate 定義（§7 verification graph）
 
-app の CLJ runtime に検証 graph を実装し、WARM pod に対して以下を実測する:
+app の CLJ runtime に検証 graph を実装し、kotoba storage substrate に対して
+実測する。**k8s の lg-* pod は prune 済み** — 実測先は kotobase.net の tenant
+Datom plane（ADR-2607022300: kotoba=storage / murakumo=compute /
+aozora=publish。認証は actor 鍵の CACAO 自己発行、書込は
+`kotobase/db/<actor-did>/<db-name>` の自 tenant）:
 
 | check | 内容 |
 |---|---|
@@ -23,9 +27,9 @@ app の CLJ runtime に検証 graph を実装し、WARM pod に対して以下�
 - 既定はネットワークを触らない決定的 store（`{:store "mem"}`）で、CI では
   gate 自体の regression を検知する。**mem 実行は sovereign 判定に使えない**
   （`:sovereign_ready` は常に false）。
-- sovereign 判定は `{:store "kotoba", :probe_slug <fresh>}` を WARM pod に対して
-  実行し `:sovereign_ready true` を得ることのみ。endpoint 未設定での kotoba
-  指定は fail-closed（silent pass 禁止）。
+- sovereign 判定は `{:store "kotoba", :probe_slug <fresh>}` を kotobase.net に
+  対して実行し `:sovereign_ready true` を得ることのみ。live 実行は production
+  への書込を伴うため owner が行う（auto-mode agent は permission gate で停止）。
 - probe entity は run ごとに fresh な slug を使う（durable store 上での再実行
   衝突を避ける）。
 
@@ -35,10 +39,10 @@ app の CLJ runtime に検証 graph を実装し、WARM pod に対して以下�
 |---|---|---|---|
 | shinshi | **rolled back** (kotoba→RW) | 未実装 | ロールバック先例。再挑戦時はこの gate を先に実装する |
 | yukkuri | **rolled back** (kotoba→D1) | 未実装 | 同上 |
-| ai-gftd-syosetsuka | **gate 実装済み / WARM 実測待ち** | `ai.gftd.apps.syosetsuka.verifyStore`（`syosetsuka.graphs.verify-store`、merge `9e020ac`、2026-07-02） | probe は kotoba-lang/shousetsu 語彙。client は `syosetsuka.store.kotoba`（XRPC transact/q/pull、transport 注入可）。sovereign 宣言は lg-syosetsuka pod deploy 後に operator が `{:store "kotoba"}` 実測で判定 |
+| ai-gftd-syosetsuka | **gate 実装済み / kotobase.net 実測待ち** | `ai.gftd.apps.syosetsuka.verifyStore`（v2 merge `2f895e0`、2026-07-02） | probe は kotoba-lang/shousetsu 語彙。CACAO 自己発行（`syosetsuka.cacao`、caip122 方言、canonical-graph CID は既知 KG CID とバイト一致検証済み）+ `syosetsuka.store.kotoba`（langchain.kotoba-db、write=db_name+CACAO / read=graph CID）。fake edge で wire 契約テスト済み。live 実測コマンドは repo CLAUDE.md §7（owner 実行） |
 
 ## 追記の仕方
 
 app に検証 graph を実装 → 本台帳に行を追加（gate NSID / merge SHA / 実測状態）
-→ WARM pod で `{:store "kotoba"}` を実行し `:sovereign_ready true` の evidence
+→ kotobase.net で `{:store "kotoba"}` を実行し `:sovereign_ready true` の evidence
 （run 出力）を備考にリンク → その app の CLAUDE.md で sovereign 宣言。
