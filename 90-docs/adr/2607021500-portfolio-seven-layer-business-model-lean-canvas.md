@@ -29,6 +29,7 @@ business model と lean canvas を設計・整理する。
 | **L0 artificial organism platform** | etzhayyim | 非営利 foundation | 自律的な生命体の活動と進化の場（公益） |
 | **L6 UGC game / creator platform** | network-isekai | Roblox | play/fork/share の AI-native UGC ゲーム/資産（ADR-2607021900 で追加） |
 | **L4 adult creator platform** | club-shinshi | PornHub/OnlyFans/FANZA | 3 型ハイブリッドのアダルト creator 経済圏（ADR-2607021900 で追加） |
+| **L7 AI video content channel** | ai-gftd-yukkuri | YouTube 広告収益 | ゆっくり実況を全自動生成し YouTube 投稿→広告収益（ADR-2607022000 で追加） |
 
 縦の依存: **etzhayyim（L0: identity/存在）→ net-kotobase（L2: state）→
 cloud-murakumo（L1: compute）→ ai-gftd-apex（L1: 推論面）→

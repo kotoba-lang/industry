@@ -476,4 +476,59 @@
  {:hyp/id :hyp/club-shinshi-creator-take :hyp/product :club-shinshi :hyp/risk :riskiest :hyp/status :untested
   :hyp/claim "低手数料 creator 課金 (サブスク/PPV) が ad 収益を超える収益軸になる"
   :hyp/gate "PSP/crypto rail 解禁後、creator 課金 GMV が ad 収益 (ExoClick) を上回る"}
+
+ ;; ==================================================================================
+ ;; L7: ai-gftd-yukkuri — AI video content channel（YouTube 収益 / MCN 型）
+ ;; (ADR-2607022000 で追加。yukkuri.gftd.ai、ゆっくり実況を全自動生成 → YouTube 投稿 → 広告収益)
+ ;; ==================================================================================
+ {:canvas/kind :lean :canvas/product :ai-gftd-yukkuri :canvas/layer :video-content-channel
+  :canvas/id :ai-gftd-yukkuri.problem :canvas/block :lean/problem :canvas/label "Problem"
+  :canvas/items ["YouTube 動画制作 (台本→音声→作画→編集→render) は人手で高コスト・低スループット"
+                 "ゆっくり実況等の量産チャンネルは 1 本ごとの工数が収益を圧迫"
+                 "新規チャンネルは冷スタート — 何のチャンネルか YouTube に学習させる投稿頻度が保てない"]}
+ {:canvas/kind :lean :canvas/product :ai-gftd-yukkuri :canvas/layer :video-content-channel
+  :canvas/id :ai-gftd-yukkuri.segments :canvas/block :lean/customer-segments :canvas/label "Customer Segments"
+  :canvas/items ["視聴者 (ゆっくり実況・解説動画の視聴層、JA primary)"
+                 "広告主 (YouTube 広告 = AdSense/YPP 経由、間接)"
+                 "将来: 同型パイプラインを使う他チャンネル運営者 (MCN/OEM 供給先)"]}
+ {:canvas/kind :lean :canvas/product :ai-gftd-yukkuri :canvas/layer :video-content-channel
+  :canvas/id :ai-gftd-yukkuri.uvp :canvas/block :lean/uvp :canvas/label "Unique Value Proposition"
+  :canvas/items ["1 トピック/1 台本から動画を全自動生成 (台本→TTS→立ち絵→挿絵→SFX→BGM→render→mp4)"
+                 "量産 → 48h 後に勝ち筋採用 → 次に反映 の高速イテレーションが最大の武器"
+                 "尺分割・サムネ複数案・タイトル複数案・ショート切り出しがいずれも低コスト"]}
+ {:canvas/kind :lean :canvas/product :ai-gftd-yukkuri :canvas/layer :video-content-channel
+  :canvas/id :ai-gftd-yukkuri.solution :canvas/block :lean/solution :canvas/label "Solution"
+  :canvas/items ["yukkuri.gftd.ai 生成基盤 (10 actor DID: scriptwriter→voice L/R→character→illustrator→sfx→composer→editor→renderer→critic)"
+                 "murakumo text/image/audio + VOICEVOX TTS + ongakuka BGM + kami-engine headless render + dougaka ffmpeg mux"
+                 "YouTube Data API 投稿 (docs/youtube-upload-setup) + metadata 最適化 + Co-Scientist kaizen ループ"
+                 "domain data = Cloudflare D1、blob = B2 不変"]}
+ {:canvas/kind :lean :canvas/product :ai-gftd-yukkuri :canvas/layer :video-content-channel
+  :canvas/id :ai-gftd-yukkuri.channels :canvas/block :lean/channels :canvas/label "Channels"
+  :canvas/items ["YouTube (長尺 + ショート切り出しで発見導線)"
+                 "organic 検索 / 関連動画 / 再生リスト (session 視聴)"
+                 "1 ジャンル集中 + 週2-3本の投稿頻度で YouTube に学習させる"
+                 "将来: aozora/shinshi 等 gftd media へのクロスポスト"]}
+ {:canvas/kind :lean :canvas/product :ai-gftd-yukkuri :canvas/layer :video-content-channel
+  :canvas/id :ai-gftd-yukkuri.revenue :canvas/block :lean/revenue-streams :canvas/label "Revenue Streams"
+  :canvas/items ["YouTube 広告収益 (YPP、視聴時間 × RPM) — 主軸"
+                 "チャンネルメンバーシップ / Super Thanks (将来)"
+                 "複数チャンネル横展開 (ジャンル別に同型パイプラインを増殖)"
+                 "MCN/OEM: 生成パイプラインの外部チャンネル向け提供 (将来)"]
+  :canvas/note "YPP 加入要件 (登録者1,000 + 総再生4,000h or ショート1,000万) が最初の gate。生成原価 ~0 に近く、traffic × RPM が律速。"}
+ {:canvas/kind :lean :canvas/product :ai-gftd-yukkuri :canvas/layer :video-content-channel
+  :canvas/id :ai-gftd-yukkuri.cost :canvas/block :lean/cost-structure :canvas/label "Cost Structure"
+  :canvas/items ["生成 GPU (murakumo/ComfyUI image+audio、render)" "VOICEVOX/kokoro TTS"
+                 "CF Workers/D1 + B2 storage" "YouTube Data API quota" "集客コスト ~0 (organic-only)"]}
+ {:canvas/kind :lean :canvas/product :ai-gftd-yukkuri :canvas/layer :video-content-channel
+  :canvas/id :ai-gftd-yukkuri.metrics :canvas/block :lean/key-metrics :canvas/label "Key Metrics"
+  :canvas/items ["登録者数 (YPP gate = 1,000)" "総再生時間 (YPP gate = 4,000h)"
+                 "動画/週の投稿本数" "平均視聴維持率" "RPM (YPP 後)" "ショート流入からの登録転換"]}
+ {:canvas/kind :lean :canvas/product :ai-gftd-yukkuri :canvas/layer :video-content-channel
+  :canvas/id :ai-gftd-yukkuri.unfair :canvas/block :lean/unfair-advantage :canvas/label "Unfair Advantage"
+  :canvas/items ["全自動生成で 1 本の限界コストが ~0 → 量産 A/B と横展開が構造的に可能"
+                 "10 actor パイプライン + kami-engine render + murakumo 内製推論で原価降下"
+                 "Co-Scientist kaizen ループで品質・metadata を自己改善"]}
+ {:hyp/id :hyp/yukkuri-ypp-then-rpm :hyp/product :ai-gftd-yukkuri :hyp/risk :riskiest :hyp/status :untested
+  :hyp/claim "全自動量産チャンネルが YPP 要件を越え、RPM × 視聴時間が生成原価を上回る収益になる"
+  :hyp/gate "YPP 加入 (登録者1,000 + 総再生4,000h) 到達、その後 RPM 実測が原価を上回る"}
 ]
