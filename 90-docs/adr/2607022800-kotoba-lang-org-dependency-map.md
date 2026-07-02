@@ -361,3 +361,14 @@ push 不能(fix 自体はローカルで 40 tests green まで検証済み、una
 併せて、本日 push した全 12 repo(ADR-2607023200 の tag-42 チェーン 8 repo +
 本フェーズ 4 repo)の **west pin を `--entry` 最小 diff で前進**(全件サーバ側
 検証で pure fast-forward 確認済み)。
+
+### Phase 5 追記 — kototama-clj の退役 (2026-07-02)
+
+Phase 5 で「archived のため push 不能」と記録した kototama-clj は、オーナー判断
+(「不要なら削除していい」) により **GitHub から削除・manifest から除籍**した。
+削除前に検証: 382-repo 依存グラフで dependents ゼロ、org 横断 code search で
+参照ゼロ、`kototama`(organism 契約 authority)・`kototama-cljc-contract`
+(clj-wgsl scaffold)とは別物、ローカル 2 checkout とも WIP なし(west 側は
+remote HEAD `a9134aff` と一致、これがディスク上に残る最後のコピー)。west.yml
+は entry block 5 行のみの最小 diff で除籍(sparse worktree での wholesale 再生成
+は環境依存の submodule リスト脱落を混ぜるため破棄した)。

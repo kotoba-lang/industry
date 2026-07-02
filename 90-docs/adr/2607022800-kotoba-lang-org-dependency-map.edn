@@ -645,4 +645,26 @@
   {:note "manifest/west.yml --entry minimal diff, all 12 verified server-side as pure fast-forwards (covers the ADR-2607023200 tag-42 chain pushed earlier today, which had not yet had its pins advanced, plus this phase's fixes)"
    :entries ["dag-cbor 9c60d583" "prolly-tree 8da6d1e1" "quad-store ecb99b8f" "commit-dag 05cc0473"
              "kotoba-client 92cbadab" "kqe 9901532a" "kotobase-engine 60d922b9" "net 20d99d1e"
-             "signal 36cb3c11" "inference d4b8de31" "kotoba 7096842d" "cacao c88333c7"]}}}
+             "signal 36cb3c11" "inference d4b8de31" "kotoba 7096842d" "cacao c88333c7"]}}
+
+ ;; Phase 5 追記 (同日): kototama-clj の退役。Phase 5 の :not-fixed で「archived の
+ ;; ため push 不能」と記録した直後、オーナーが「古い? 不要なら削除していい」と
+ ;; 判断。削除前検証: org 内 382-repo 依存グラフに dependents ゼロ / org 横断
+ ;; code search 参照ゼロ / kotoba-lang/kototama (organism 契約 authority) とも
+ ;; kototama-cljc-contract (clj-wgsl Phase 4 scaffold) とも別物 (Phase 2 の
+ ;; 判定どおり) / ローカル 2 checkout とも WIP なし・west checkout は remote
+ ;; HEAD と一致。GitHub repo 削除済み + manifest 除籍 (west.yml entry 5 行 +
+ ;; repos.edn の path-override / :extra-projects 各 1 行)。
+ :retirement-kototama-clj-2026-07-02
+ {:repo "kotoba-lang/kototama-clj"
+  :was "UNSPSC organism actors on the Clojure substrate (ADR-2606131645), archived read-only since 2026-06-15"
+  :last-head "a9134aff445b7bddd816e073740ff51affa65121"
+  :verified-before-delete
+  {:dependents-in-org 0
+   :cross-org-code-search-hits 0
+   :distinct-from ["kotoba-lang/kototama" "kotoba-lang/kototama-cljc-contract"]
+   :local-checkouts-clean true}
+  :deregistered
+  {:west-yml "entry block removed (minimal 5-line diff; NOT a wholesale regen — the sparse-worktree regen was discarded because it dropped environment-dependent submodule lists)"
+   :repos-edn ["path-override \"orgs/com-junkawasaki/kototama-clj\" line" ":extra-projects entry"]}
+  :note "local checkouts (orgs/kotoba-lang/kototama-clj, orgs/com-junkawasaki/kototama-clj) left on disk untouched as the remaining copies; GitHub-side recovery window is the usual ~90-day support path if this turns out to be wrong"}}
