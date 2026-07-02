@@ -1,6 +1,6 @@
 # ADR-2607022300: gftdcojp/gftdcojp を itonami.cloud の private tenant として登録し、itonami.cloud の repo storage を GitHub 依存から kotoba-git/kotoba-rad 主権層へ段階移行する
 
-**Status**: proposed
+**Status**: accepted (Decision 1 implemented; Decision 2 remains future work per its own staged roadmap)
 **Date**: 2026-07-02
 **Deciders**: Jun Kawasaki
 
@@ -104,11 +104,39 @@ epoch key、revocation = epoch rotation）である、という設計方針も A
 - 既存データの破壊的移行はしない。m365-archive の生データ・ローカル `.bin` 検証
   ストアはそのまま残し、kotoba 本番 store への transact は追加のみ。
 
+## Implementation status (2026-07-02)
+
+Decision 1 is code-complete and tested, not yet run against production:
+
+- Tenant registration (`cloud-itonami.tenant/bootstrap-tx` +
+  `:itonami.repo/visibility` + `cloud-itonami.tenants.gftdcojp`) and CACAO
+  auth (`cloud-itonami.auth`, `io.github.kotoba-lang/cacao`) landed via the
+  `cacao-auth` merge (`a309147`).
+- The remaining gap this ADR's `:known-gaps` flagged — "company.cljc
+  ingestion does not yet tag activities with `:itonami.activity/repo`" — is
+  closed: `cloud-itonami.facts/tag-repo` + `:repo` opt threaded through
+  `facts/ingest-dir` / `kotoba/import-facts!` /
+  `kotoba/import-kinds-streaming!` (`gftdcojp/cloud-itonami#9`).
+  `cloud-itonami.tenants.gftdcojp/import-m365-facts!` and a
+  `clojure -M:gftdcojp seed|import-m365` CLI wrap this for the gftdcojp
+  tenant specifically.
+- ADR-0002 addendum (Pages Functions API removed 2026-07-01) added, same PR.
+- **Not yet done**: `seed!`/`import-m365-facts!` have not actually been run
+  against a live `KOTOBA_URL`/`KOTOBA_GRAPH` — this ADR's tenant exists in
+  code and tests (local `store/create-conn`), not yet as live production
+  data. Running that needs production kotoba credentials this session did
+  not have.
+
+Decision 2 (kotoba-git/kotoba-rad sovereign storage) is untouched — still
+entirely future work per its own R0→R4 staging (ADR-2606280300).
+
 ## Follow-up
 
 - `orgs/gftdcojp/cloud-itonami/docs/adr/0002-org-repo-tenant-isolation.md` に
   「Pages Functions API 実体は 2026-07-01 に削除済み」の addendum を追記する
-  （本 ADR からの参照のみで足りなければ）。
+  （本 ADR からの参照のみで足りなければ）。 — done, see above.
+- Run `clojure -M:gftdcojp seed` + `import-m365` against production
+  `KOTOBA_URL`/`KOTOBA_GRAPH` once credentials are available.
 - `kotoba-rad` R1 実装（`orgs/com-junkawasaki/kotoba/crates/kotoba-git` または
   新設 `kotoba-rad` crate）は別 ADR/作業として着手する。
 - CACAO 認証込みの itonami.cloud API 層（Worker/Pages Functions）の設計・実装。

@@ -1,7 +1,7 @@
 {:frontmatter
  {:id "adr-2607022300-itonami-gftdcojp-private-tenant-kotoba-rad-git-storage"
   :title "ADR-2607022300: gftdcojp/gftdcojp を itonami.cloud の private tenant として登録し、itonami.cloud の repo storage を GitHub 依存から kotoba-git/kotoba-rad 主権層へ段階移行する"
-  :status "proposed"
+  :status "accepted"
   :date "2026-07-02"
   :deciders ["Jun Kawasaki"]
   :doc_type "adr"
@@ -37,9 +37,16 @@
  :known-gaps
  ["ADR-0002 Pages Functions API (functions/api/[[path]].js) removed 2026-07-01 (638bdc3); no live API currently serves itonami.cloud"
   "kotoba-rad R1/R2 not yet implemented (status: next / next-after-R1 per ADR-2606280300)"
-  "company.cljc ingestion does not yet tag activities with :itonami.activity/repo or transact to production kotoba store"]
+  "seed!/import-m365-facts! (cloud-itonami.tenants.gftdcojp) are implemented and tested but have not been run against a live KOTOBA_URL/KOTOBA_GRAPH — the tenant exists in code/tests, not yet as live production data"]
+
+ :implemented
+ ["gftdcojp/gftdcojp tenant registration + :itonami.repo/visibility :private (cacao-auth merge, a309147)"
+  "CACAO/did:key auth boundary (cloud-itonami.auth, io.github.kotoba-lang/cacao), no ITONAMI_OPERATOR_TOKEN"
+  "company.cljc/m365.cljc ingestion repo-tagging: cloud-itonami.facts/tag-repo + :repo opt in facts/ingest-dir, store/import-facts!, kotoba/import-facts!, kotoba/import-kinds-streaming! (gftdcojp/cloud-itonami#9)"
+  "cloud-itonami.tenants.gftdcojp/import-m365-facts! + clojure -M:gftdcojp seed|import-m365 CLI"
+  "ADR-0002 addendum recording the Pages Functions API removal (gftdcojp/cloud-itonami#9)"]
 
  :follow-up
- ["addendum to orgs/gftdcojp/cloud-itonami/docs/adr/0002-org-repo-tenant-isolation.md noting API removal"
+ ["run clojure -M:gftdcojp seed + import-m365 against production KOTOBA_URL/KOTOBA_GRAPH once credentials are available"
   "kotoba-rad R1 implementation (orgs/com-junkawasaki/kotoba crates: kotoba-git rad module or new kotoba-rad crate)"
   "CACAO-authenticated itonami.cloud API layer design/implementation"]}
