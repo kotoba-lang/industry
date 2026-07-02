@@ -5,13 +5,14 @@
   :doc_type "adr"
   :topic "kotoba-lang"
   :authoritative true
-  :last_verified "2026-07-01"
+  :last_verified "2026-07-02"
   :authoritative_for
-  ["kotoba-lang repos still authored in TypeScript after the etzhayyim-sdk relocation (ipfs, atproto-client, base-l2, checkpointer, witness-quorum, pqh, + phased: kami-nv-compat, kotodama-host->kototama) are ported to pure .cljc with an injected-capability seam and the TypeScript deleted"
+  ["kotoba-lang repos still authored in TypeScript after the etzhayyim-sdk relocation (ipfs, atproto-client, base-l2, checkpointer, witness-quorum, pqh, kami-nv-compat, kotodama-host->kototama) are ported to pure .cljc with an injected-capability seam and the TypeScript deleted"
    "the porting recipe: pure .cljc core (records/protocol/data, zero vendor SDK, zero network I/O) + defprotocol capability seam + host-injected reify impls; koe ports.cljc is the template, ed25519 deps.edn/bb.edn the scaffold"
    "TS disposition: delete TS entirely (host injects the vendor capability) — owner-confirmed 2026-07-01"
    "landing: child-repo worktree -> lint+test -> server-side merge -> advance superproject west pin via GitHub-API single-entry; no --force, no rewrite"
-   "out of scope: svgraph, kotoba-v2025 (76MB Rust), kotodama-mcp/-py/-cells/-holochain (deferred)"]
+   "out of scope: svgraph, kotoba-v2025 (76MB Rust), kotodama-mcp/-py/-cells/-holochain (deferred)"
+   "2026-07-02: all 8 repos have landed at least one pass. A follow-up audit found base-l2/pqh/checkpointer had real .clj-vs-.cljc gaps (TS deleted but files never made genuinely dual-platform) despite being marked done -- fixed; witness-quorum audited and correctly confirmed intentional .clj-only (documented per-file + README + genuine JVM-concurrency/sibling-dep blockers). kami-nv-compat (Step 7) landed complete via its own ADR-2607020130. kotodama-host (Step 8)'s CLJC migration + TS deletion is complete upstream, but its landed shape (standalone :component-host) conflicts with this ADR's original 'merge into kototama' framing -- unresolved, needs owner reconciliation"]
   :related
   ["ADR-2606302300 (org taxonomy; kotoba-lang layer test §Step-1)"
    "ADR-2606290000 (all-workers-CLJC-only policy)"
@@ -24,10 +25,10 @@
              "orgs/kotoba-lang/base-l2"
              "orgs/kotoba-lang/witness-quorum"
              "orgs/kotoba-lang/pqh"
-             "orgs/kotoba-lang/checkpointer"]
+             "orgs/kotoba-lang/checkpointer"
+             "orgs/kotoba-lang/kami-nv-compat"]
    :pending []
-   :phased  ["orgs/kotoba-lang/kami-nv-compat"
-             "orgs/kotoba-lang/kotodama-host -> kototama"]}
+   :phased  ["orgs/kotoba-lang/kotodama-host -> kototama (CLJC migration done; merge-vs-standalone plan conflict open)"]}
   :reuse ["orgs/kotoba-lang/ed25519"
           "orgs/kotoba-lang/cacao"
           "orgs/kotoba-lang/did"
