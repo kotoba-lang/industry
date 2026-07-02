@@ -30,6 +30,8 @@
    :murakumo {:products [:cloud-murakumo]               :desc "LLM 推論 infra (L1)"}
    :kotoba   {:products [:net-kotobase]                 :desc "storage hosting / graph BaaS (L2)"}
    :aozora   {:products [:app-aozora :app-aozora-yoro]  :desc "social network + messenger (L4)"}
+   :isekai   {:products [:network-isekai]               :desc "UGC game / creator platform (L6, Roblox 型)"}
+   :club     {:products [:club-shinshi]                 :desc "adult creator platform (L4, PornHub/OnlyFans/FANZA 型)"}
    :e7m      {:products [:etzhayyim]                    :desc "artificial organism platform (L0, 非営利)"}
    :gftd     {:products :all                            :desc "umbrella — 全 product + ai-gftd-apex"}})
 

@@ -57,4 +57,17 @@
   {:pricing 1 :grounding 5
    :acute-problem 3 :wedge 4 :tenx 4 :founder-fit 5 :distribution 1 :defensibility 5
    :launched 4 :users 3 :revenue 0
-   :note "非営利につき YC bench は参考値。実測: etzhayyim.com 136,214 req/7d、etzhayyim-did-web + xrpc-proxy workers 85,862 inv/7d — organism identity 解決は常時実運転 (launched 3→4)。寄付・助成・endowment は未着手 (revenue 0)。"}}}
+   :note "非営利につき YC bench は参考値。実測: etzhayyim.com 136,214 req/7d、etzhayyim-did-web + xrpc-proxy workers 85,862 inv/7d — organism identity 解決は常時実運転 (launched 3→4)。寄付・助成・endowment は未着手 (revenue 0)。"}
+
+  ;; 2026-07-02 追加 (ADR-2607021900): Roblox 型 / PornHub・OnlyFans・FANZA 型
+  :network-isekai
+  {:pricing 1 :grounding 4
+   :acute-problem 3 :wedge 3 :tenx 4 :founder-fit 4 :distribution 2 :defensibility 4
+   :launched 3 :users 2 :revenue 0
+   :note "Roblox 型 UGC ゲーム/creator platform。実測: isekai.network 12,186 req/7d・PV 7,819・uniques 316 — 公開稼働 (launched 3, users 2)。play/fork/share + kami WASM renderer + AI 生成 backend 実装済 (grounding 4)。creator 経済圏 (DevEx/marketplace) は未収益化 (revenue 0)、価格未定義。tenx=4 は「作品=データで fork/可搬」の Roblox に無い独自性。"}
+
+  :club-shinshi
+  {:pricing 2 :grounding 5
+   :acute-problem 4 :wedge 3 :tenx 3 :founder-fit 5 :distribution 2 :defensibility 4
+   :launched 4 :users 3 :revenue 3
+   :note "PornHub/OnlyFans/FANZA 型アダルト creator platform (shinshi.club)。実測: 29,397 req/7d・PV 3,859・uniques 540 = 8 product 中 traffic 上位。ExoClick ad が gftd 唯一の :live 収益 (ADR-2606130000、revenue 3=first $ 実績)。AI 生成 (LangGraph) + AppView + 自前 age gate + H1/H2 telemetry 本番稼働 (launched 4, grounding 5)。creator 課金 (サブスク/PPV) は PSP 制約で未解禁 (pricing 2)。ai-gftd-shinshi の ad-supported BMC (260613) の platform 版。"}}}

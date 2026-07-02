@@ -55,7 +55,9 @@
    :business-operator            "L3 business operator（全業種・職種 SaaS + investment platform）"
    :social-network               "L4 social network（atproto SNS）"
    :messenger                    "L4 messenger"
+   :adult-creator-platform       "L4 adult creator platform（PornHub / OnlyFans / FANZA 型）"
    :personal-wellbecoming-os     "L5 personal wellbecoming OS"
+   :ugc-game-platform            "L6 UGC game / creator platform（Roblox 型）"
    :artificial-organism-platform "L0 artificial organism platform（非営利・公益）"})
 
 (def block-order

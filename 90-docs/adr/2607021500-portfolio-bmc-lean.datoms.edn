@@ -367,4 +367,113 @@
  {:hyp/id :hyp/etzhayyim-registry-value :hyp/product :etzhayyim :hyp/risk :riskiest :hyp/status :untested
   :hyp/claim "「organism の中立な戸籍」に商用利用者と資金提供者が価値を認める"
   :hyp/gate "itonami vertical が RAD attestation を契約要件として参照し始める"}
+
+ ;; ==================================================================================
+ ;; L6: network-isekai — UGC game / creator platform（Roblox 型）
+ ;; (ADR-2607021900 で追加。isekai.network 稼働、play/fork/share CLJ/EDN games + VRM dance stages + AI asset hub)
+ ;; ==================================================================================
+ {:canvas/kind :lean :canvas/product :network-isekai :canvas/layer :ugc-game-platform
+  :canvas/id :network-isekai.problem :canvas/block :lean/problem :canvas/label "Problem"
+  :canvas/items ["ゲーム/3D 制作は専用エンジン + 配信 + マネタイズを個別に組む必要があり参入障壁が高い"
+                 "Roblox/UGC platform は作品もアバターも platform に人質 (可搬性ゼロ・BAN=全喪失)"
+                 "AI 生成 3D/アバター資産に provenance と再編集性がない"]}
+ {:canvas/kind :lean :canvas/product :network-isekai :canvas/layer :ugc-game-platform
+  :canvas/id :network-isekai.segments :canvas/block :lean/customer-segments :canvas/label "Customer Segments"
+  :canvas/items ["ゲーム/体験の creator (CLJ/EDN で作る・fork する層)"
+                 "player (ブラウザで遊ぶ・fork する層)"
+                 "VRM/アバター creator・VTuber (dance stage)"
+                 "3D/asset creator (AI 生成 + 販売)"]}
+ {:canvas/kind :lean :canvas/product :network-isekai :canvas/layer :ugc-game-platform
+  :canvas/id :network-isekai.uvp :canvas/block :lean/uvp :canvas/label "Unique Value Proposition"
+  :canvas/items ["ゲームが「データ」(EDN scene + CLJ logic) — 全作品が view source + instant fork"
+                 "作品・アバター・資産が content-addressed で可搬 (逃げられる Roblox)"
+                 "AI 生成資産 (photo→3D/image/TTS/music) をワンクリックで publish 可能"]}
+ {:canvas/kind :lean :canvas/product :network-isekai :canvas/layer :ugc-game-platform
+  :canvas/id :network-isekai.solution :canvas/block :lean/solution :canvas/label "Solution"
+  :canvas/items ["isekai.network 稼働 (Cloudflare Pages, kami-web WASM WebGPU renderer)"
+                 "play/fork/share loop = EDN を kotoba に pin (immutable + URL 共有)"
+                 "VRM dance stage (kami.dance) / open asset hub (/assets.html, AT-Proto lexicon)"
+                 "AI 生成 backend (Modal GPU: TRELLIS photo→3D / image / TTS / music)"]}
+ {:canvas/kind :lean :canvas/product :network-isekai :canvas/layer :ugc-game-platform
+  :canvas/id :network-isekai.channels :canvas/block :lean/channels :canvas/label "Channels"
+  :canvas/items ["fork の viral loop (URL 共有で作品が増殖)" "CodePen 型 build-in-public / OSS"
+                 "aozora SNS への作品・dance stage 投稿導線" "AI 生成デモ (generate.html)"]}
+ {:canvas/kind :lean :canvas/product :network-isekai :canvas/layer :ugc-game-platform
+  :canvas/id :network-isekai.revenue :canvas/block :lean/revenue-streams :canvas/label "Revenue Streams"
+  :canvas/items ["Roblox 型 creator economy: 仮想通貨 + DevEx (creator payout の take rate)"
+                 "AI 生成従量 (photo→3D/image/music の GPU credits)"
+                 "asset marketplace 手数料 (販売 asset の take rate)"
+                 "premium (高 GPU quota・限定 asset・非公開 fork)"]
+  :canvas/note "Roblox 経済圏: platform は UGC をホストし creator に revenue share、GPU 原価は murakumo/Modal。"}
+ {:canvas/kind :lean :canvas/product :network-isekai :canvas/layer :ugc-game-platform
+  :canvas/id :network-isekai.cost :canvas/block :lean/cost-structure :canvas/label "Cost Structure"
+  :canvas/items ["AI 生成 GPU (Modal/murakumo、生成量比例)" "kotoba storage (asset/scene の pin)"
+                 "CF Pages/Workers" "moderation (UGC + 生成物)"]}
+ {:canvas/kind :lean :canvas/product :network-isekai :canvas/layer :ugc-game-platform
+  :canvas/id :network-isekai.metrics :canvas/block :lean/key-metrics :canvas/label "Key Metrics"
+  :canvas/items ["公開 games/stages/assets 数" "fork 数 (viral 係数)" "DAU / play セッション"
+                 "AI 生成ジョブ数" "creator payout 総額" "marketplace GMV"]}
+ {:canvas/kind :lean :canvas/product :network-isekai :canvas/layer :ugc-game-platform
+  :canvas/id :network-isekai.unfair :canvas/block :lean/unfair-advantage :canvas/label "Unfair Advantage"
+  :canvas/items ["作品=データ (EDN) で fork/provenance/可搬性が構造的 (Roblox は不可)"
+                 "kami-engine WASM renderer + kotoba pin + AI backend が既に稼働"
+                 "murakumo 内製 GPU で生成原価降下"]}
+ {:hyp/id :hyp/isekai-fork-viral :hyp/product :network-isekai :hyp/risk :riskiest :hyp/status :untested
+  :hyp/claim "「作品=データで fork できる」が Roblox 的な creator/player の増殖ループを起こす"
+  :hyp/gate "fork 由来の新規作品比率と週次 fork 数の伸び (viral 係数 > 1 に近づくか)"}
+
+ ;; ==================================================================================
+ ;; L4-adult: club-shinshi — adult creator platform（PornHub / OnlyFans / FANZA 型）
+ ;; (ADR-2607021900 で追加。shinshi.club 稼働、AT-Proto AppView + AI 生成、gftd 唯一の :live 収益)
+ ;; ==================================================================================
+ {:canvas/kind :lean :canvas/product :club-shinshi :canvas/layer :adult-creator-platform
+  :canvas/id :club-shinshi.problem :canvas/block :lean/problem :canvas/label "Problem"
+  :canvas/items ["アダルト creator は決済・集客・配信基盤を大手 platform に握られ手数料が高い (OnlyFans 20%)"
+                 "NSFW は主要決済・広告・SNS が封鎖され収益化と集客が困難"
+                 "AI 生成アダルトは大量供給できるが provenance・年齢/同意コンプラが弱い"]}
+ {:canvas/kind :lean :canvas/product :club-shinshi :canvas/layer :adult-creator-platform
+  :canvas/id :club-shinshi.segments :canvas/block :lean/customer-segments :canvas/label "Customer Segments"
+  :canvas/items ["視聴者 (18+ anime/コスプレ・AI companion 需要層、JA primary / EN)"
+                 "creator (人間 performer + AI character 双方)"
+                 "広告主 (成人=ExoClick / 1st-party sponsored)"]
+  :canvas/note "除外: 18 歳未満、規制地域 (英 AVSA / 仏 LCEN / 米 KOSA)。"}
+ {:canvas/kind :lean :canvas/product :club-shinshi :canvas/layer :adult-creator-platform
+  :canvas/id :club-shinshi.uvp :canvas/block :lean/uvp :canvas/label "Unique Value Proposition"
+  :canvas/items ["3 型ハイブリッド: PornHub 型無料 tube (ad) + OnlyFans 型 creator 課金 + FANZA 型 marketplace"
+                 "視聴者: 無料で無限・高品質・可搬 (AT-Proto DID) キャラ"
+                 "creator: NSFW でも出せる決済/在庫 + 低手数料 + AI 生成支援"]}
+ {:canvas/kind :lean :canvas/product :club-shinshi :canvas/layer :adult-creator-platform
+  :canvas/id :club-shinshi.solution :canvas/block :lean/solution :canvas/label "Solution"
+  :canvas/items ["shinshi.club 稼働 (SvelteKit AppView, AT Protocol, 自前 age gate 18+)"
+                 "AI 生成 (LangGraph: image/video/voice/bgm、品質ループ)"
+                 "path-based DID / blob = content-addressed (uploadBlob SHA-256)"
+                 "creator monetization: サブスク/PPV/チップ + ExoClick ad tier"]}
+ {:canvas/kind :lean :canvas/product :club-shinshi :canvas/layer :adult-creator-platform
+  :canvas/id :club-shinshi.channels :canvas/block :lean/channels :canvas/label "Channels"
+  :canvas/items ["organic SEO (NSFW で唯一 scalable な集客)" "Bluesky/AT firehose (viral, !ad federate)"
+                 "aozora クロスプロモ" "Web-only/PWA (app store 不可 = NSFW)"]
+  :canvas/note "NSFW は paid 集客が全封鎖 → organic のみ。集客が事業の律速。"}
+ {:canvas/kind :lean :canvas/product :club-shinshi :canvas/layer :adult-creator-platform
+  :canvas/id :club-shinshi.revenue :canvas/block :lean/revenue-streams :canvas/label "Revenue Streams"
+  :canvas/items ["成人 tier ads (ExoClick) — 現行 gftd 唯一の :live 収益 (ADR-2606130000)"
+                 "creator monetization: サブスク/PPV/チップ (80/20、OnlyFans より低手数料)"
+                 "FANZA 型 marketplace: 単品/セット販売の手数料"
+                 "1st-party sponsored (advectors auction + !ad post)"]
+  :canvas/note "PSP 制約で B2C 課金は凍結履歴あり (ADR-2605220000)。crypto USDC + fiat dual-rail / etzhayyim settlement 後に creator 課金解禁。"}
+ {:canvas/kind :lean :canvas/product :club-shinshi :canvas/layer :adult-creator-platform
+  :canvas/id :club-shinshi.cost :canvas/block :lean/cost-structure :canvas/label "Cost Structure"
+  :canvas/items ["AI 生成 GPU (ComfyUI/Modal/murakumo、生成量比例)" "LangGraph pod プール (Vultr)"
+                 "B2 storage (blob、egress ゼロ)" "CF Workers" "moderation・年齢/同意コンプラ"]}
+ {:canvas/kind :lean :canvas/product :club-shinshi :canvas/layer :adult-creator-platform
+  :canvas/id :club-shinshi.metrics :canvas/block :lean/key-metrics :canvas/label "Key Metrics"
+  :canvas/items ["DAU / 視聴 traffic" "ad eCPM × fill (H2 telemetry)" "creator payout 総額"
+                 "有料転換率 (サブスク/PPV)" "marketplace GMV" "organic PV growth (H1 telemetry)"]}
+ {:canvas/kind :lean :canvas/product :club-shinshi :canvas/layer :adult-creator-platform
+  :canvas/id :club-shinshi.unfair :canvas/block :lean/unfair-advantage :canvas/label "Unfair Advantage"
+  :canvas/items ["NSFW 決済/集客/配信の封鎖を越える独自基盤 (自前 age gate + organic + ExoClick + crypto rail)"
+                 "AI 生成で creator 供給を無限化 (人間 performer に非依存)"
+                 "gftd 唯一の本番収益実績 + H1/H2 telemetry 本番稼働"]}
+ {:hyp/id :hyp/club-shinshi-creator-take :hyp/product :club-shinshi :hyp/risk :riskiest :hyp/status :untested
+  :hyp/claim "低手数料 creator 課金 (サブスク/PPV) が ad 収益を超える収益軸になる"
+  :hyp/gate "PSP/crypto rail 解禁後、creator 課金 GMV が ad 収益 (ExoClick) を上回る"}
 ]

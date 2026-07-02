@@ -27,6 +27,8 @@ business model と lean canvas を設計・整理する。
 | **L4 messenger** | app-aozora-yoro | Signal/LINE | 同一 identity graph 上の messenger |
 | **L5 personal wellbecoming OS** | cloud-manimani | Hermes 型 personal agent | 個人の受信→決断→ledger OS |
 | **L0 artificial organism platform** | etzhayyim | 非営利 foundation | 自律的な生命体の活動と進化の場（公益） |
+| **L6 UGC game / creator platform** | network-isekai | Roblox | play/fork/share の AI-native UGC ゲーム/資産（ADR-2607021900 で追加） |
+| **L4 adult creator platform** | club-shinshi | PornHub/OnlyFans/FANZA | 3 型ハイブリッドのアダルト creator 経済圏（ADR-2607021900 で追加） |
 
 縦の依存: **etzhayyim（L0: identity/存在）→ net-kotobase（L2: state）→
 cloud-murakumo（L1: compute）→ ai-gftd-apex（L1: 推論面）→
