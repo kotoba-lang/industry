@@ -280,6 +280,16 @@ west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独�
   git worktree remove <path>                                 # 使い終わったら片付ける
   ```
 
+  **`<path>` は superproject ルートの外（例: scratchpad / `/tmp` 配下）にする。**
+  `.claude/worktrees/` 等 superproject 内側に worktree を作ると、west は `.west/`
+  を親ディレクトリへ辿って発見するため topdir が superproject ルートのままになり、
+  worktree 内で `west update` しても実際には共有の `orgs/` を操作してしまう
+  （false isolation。`WEST_TOPDIR` 環境変数でも直らない）。west コマンドを worktree
+  内で使う必要がある場合は、外側に作った上でさらに `west init -l manifest` を
+  worktree 内で実行し、worktree ローカルな `.west/` を作って topdir を固定する。
+  詳細は ADR-2607011345。plain git（commit/push、west 不使用）だけなら
+  superproject 内側の worktree でも問題ない。
+
   共有 checkout（west 管理パス）には直接 commit/push しない。worktree 経由で
   main に着地させたあと、共有 checkout 側は `git fetch` と（内容一致を `shasum`
   で確認した上での）重複ファイルの削除だけで追従させる。
