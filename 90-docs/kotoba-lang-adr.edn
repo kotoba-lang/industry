@@ -1,0 +1,1060 @@
+{:meta
+ {:doc
+  "kotoba-lang org — ADR + inter-repo dependency index (reference)",
+  :generated "2026-07-02",
+  :source
+  "gh api over ALL kotoba-lang repos: 90-docs/adr frontmatter + deps.edn kotoba-lang coords",
+  :repo-count 200,
+  :repos-with-adr 4,
+  :adr-count 34,
+  :note
+  "ADR は大半が superproject(com-junkawasaki/root) 90-docs/adr の date-time 系に集約。ここは各 kotoba-lang repo が repo 内に持つ ADR(90-docs/adr) と、deps.edn 由来の kotoba-lang 間依存のみ。"},
+ :genko-rewrite-reuse
+ {:note "genko 全面移植(immutable nodes + 再描画)で再利用すべき既存実装",
+  :ui-substrate
+  "wasm-ui (DOM互換 WASM UI; WebGL/WebGPU retained renderer; reagent/re-frame compat ns)",
+  :canvas-precedent
+  "freeboard (clj/cljc brain + kami-render(wgpu) render-IR + cljs web driver; board/viewport/hit-test/selection/CRUD)",
+  :editor-state
+  "shitsuke/kotoba.editor (selection/undo-redo/nudge/align/duplicate/delete) + re-frame seam + components",
+  :render-ir
+  "kami-engine-sdk-clj → kami-render(wgpu) (kami-app-sip/freeboard と同流儀)",
+  :also
+  ["webgpu (declarative WebGPU from EDN)"
+   "kototama (clj→wasm runtime)"
+   "aiueos (capability host OS)"]},
+ :repos-with-adr ["aiueos" "kami-engine" "kototama" "webgpu"],
+ :repos
+ [{:repo "activitypub",
+   :description "EDN-first activitypub substrate for kotoba",
+   :adrs [],
+   :deps []}
+  {:repo "activitystreams",
+   :description "EDN-first activitystreams substrate for kotoba",
+   :adrs [],
+   :deps []}
+  {:repo "aero",
+   :description
+   "reduced-order aero Cd solver (component build-up) + design range loop",
+   :adrs [],
+   :deps ["datom" "vphysics" "cae-solver"]}
+  {:repo "aiueos",
+   :description
+   "Capability-secure Wasm component OS — Kotoba-defined, Kototama-executed, AI-agent-native. Built for containment under mythos-class adversaries; runs on edge, robotics, cloud, browser, client.",
+   :adrs
+   [{:id "0001-aiueos-phase0-capability-os",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0002-host-abi-topic-bus",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0003-signed-manifests",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0004-code-as-data-admit",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0005-multi-surface-providers",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0006-scheduler-and-io-quota",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0007-kotoba-kais-host-surface",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0007-virtual-computer-surface",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0008-bootable-image-and-virtio-guest-drivers",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0009-gui-surface-and-framebuffer",
+     :title "",
+     :status "",
+     :date "",
+     :related []}],
+   :deps []}
+  {:repo "annotation",
+   :description "EDN-first annotation substrate for kotoba",
+   :adrs [],
+   :deps []}
+  {:repo "articulated-scene",
+   :description
+   "open-world articulated body scene (data tier) — clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "arxiv", :description "", :adrs [], :deps []}
+  {:repo "async", :description "", :adrs [], :deps []}
+  {:repo "atmosphere",
+   :description
+   "procedural sky/cloud/wind — clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "atproto", :description "", :adrs [], :deps []}
+  {:repo "audio",
+   :description
+   "spatial audio (HRTF/binaural) CLJC contracts — clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "authenticator",
+   :description
+   "Authy-like TOTP/HOTP one-time-password manager CLI — ClojureScript + Datomic-API vault",
+   :adrs [],
+   :deps []}
+  {:repo "banking", :description "", :adrs [], :deps ["html" "css"]}
+  {:repo "bim",
+   :description "BIM domain — clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "bpmn",
+   :description
+   "Handle BPMN 2.0 as EDN/Clojure data — zero-dep portable .cljc (model + validate + XML I/O + pure token interpreter)",
+   :adrs [],
+   :deps []}
+  {:repo "bridge",
+   :description
+   "OS input capture/injection bridge — clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "briefing",
+   :description "Portable CLJC briefing model for briefing.gftd.ai",
+   :adrs [],
+   :deps []}
+  {:repo "browser-agent",
+   :description
+   "genspark-style general super-agent in portable Clojure (.cljc) — Mixture-of-Agents supervisor + browser, state as datoms, built on browser-use-clj / langgraph-clj / langchain-clj",
+   :adrs [],
+   :deps []}
+  {:repo "browser-use",
+   :description
+   "browser-use-style browser automation agent in portable Clojure (.cljc) — injected IBrowser host capability, action history as datoms, built on langgraph-clj",
+   :adrs [],
+   :deps []}
+  {:repo "cacao",
+   :description
+   "CAIP-122 / SIWE (EIP-4361) CACAO mint + verify in pure Clojure — self-sovereign Ed25519 capability for kotoba/kotobase, no-server-key, babashka-friendly.",
+   :adrs [],
+   :deps []}
+  {:repo "cad",
+   :description
+   "Open-source CAD/CAM workbench as EDN geometry data + portable CLJC model.",
+   :adrs [],
+   :deps []}
+  {:repo "cae-solver",
+   :description
+   "CAE solver contract — solve multimethod dispatch (:rom <-> :lbm)",
+   :adrs [],
+   :deps []}
+  {:repo "calendar",
+   :description "Portable CLJC calendar model for calendar.gftd.ai",
+   :adrs [],
+   :deps []}
+  {:repo "cam",
+   :description
+   "camera rigs (follow/look-constraint/shake) — Phase 1.2 CLJC interpreter — clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "card", :description "", :adrs [], :deps ["html" "css"]}
+  {:repo "cartpole-wasm",
+   :description
+   "WASM cdylib demonstrator (cartpole) — restored from legacy kami-engine Rust crate (deleted #259) as zero-dep portable CLJC. Part of the clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "character",
+   :description
+   "character controller — restored from legacy kami-engine Rust crate (deleted #259) as zero-dep portable CLJC. Part of the clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "chobo",
+   :description
+   "Kotoba services-EC foundation: audit-ledger (EAVT) + subscription/metering + invoice + tenant (.cljc, on shitsuke). Extracted from itonami.",
+   :adrs [],
+   :deps ["shitsuke"]}
+  {:repo "ci",
+   :description
+   "GitHub Actions workflows as EDN + job-DAG planner — zero-dep portable .cljc",
+   :adrs [],
+   :deps []}
+  {:repo "cmmn",
+   :description
+   "CMMN case management as EDN + pure lifecycle engine — zero-dep portable .cljc",
+   :adrs [],
+   :deps []}
+  {:repo "coll", :description "", :adrs [], :deps []}
+  {:repo "comfyui",
+   :description
+   "ComfyUI-style node-graph execution engine in portable Clojure (.cljc) — content-addressed cached execution, cache & run history as datoms, Clojure-on-WASM ready",
+   :adrs [],
+   :deps ["langchain"]}
+  {:repo "computer-use",
+   :description
+   "Anthropic-computer-use-style desktop automation agent in portable Clojure (.cljc) — injected IComputer host capability, action history as datoms, built on langgraph-clj",
+   :adrs [],
+   :deps []}
+  {:repo "contacts",
+   :description "Portable CLJC contacts model for contacts.gftd.ai",
+   :adrs [],
+   :deps []}
+  {:repo "core",
+   :description
+   "hecs ECS + Actor + KAMI IPC CLJC contracts — restored from legacy kami-engine Rust crate (deleted #259) as zero-dep portable CLJC. Part of the clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "crash",
+   :description "reduced-order frontal-crash solver (:rom-crash)",
+   :adrs [],
+   :deps ["datom" "vphysics" "cae-solver"]}
+  {:repo "cron",
+   :description
+   "Cron expressions as EDN + pure next-fire evaluator — zero-dep portable .cljc",
+   :adrs [],
+   :deps []}
+  {:repo "crypto", :description "", :adrs [], :deps []}
+  {:repo "css",
+   :description "EDN-first css substrate for kotoba",
+   :adrs [],
+   :deps []}
+  {:repo "dag-cbor",
+   :description
+   "Definite-length CBOR (RFC 8949) encode/decode in pure Clojure — canonical dag-cbor + order-preserving encoders, no deps, babashka-friendly.",
+   :adrs [],
+   :deps []}
+  {:repo "datom",
+   :description
+   "kotoba Datom-log (EAVT) representation — shared data-representation lib",
+   :adrs [],
+   :deps []}
+  {:repo "ddl",
+   :description
+   "SQL DDL <-> EDN schema + migration diff — zero-dep portable .cljc",
+   :adrs [],
+   :deps []}
+  {:repo "dec",
+   :description
+   "v3 DEC physics (discrete exterior calculus) — restored from legacy kami-engine Rust crate (deleted #259) as zero-dep portable CLJC. Part of the clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "demo",
+   :description
+   "desktop demo — restored from legacy kami-engine Rust crate (deleted #259) as zero-dep portable CLJC. Part of the clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "device", :description "", :adrs [], :deps ["wit" "coll"]}
+  {:repo "devtools",
+   :description
+   "devtools — restored from legacy kami-engine Rust crate (deleted #259) as zero-dep portable CLJC. Part of the clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "dft",
+   :description
+   "Kotoba CLJC DFT (discrete Fourier transform) — restored from legacy kami-engine/kami-dft Rust crate (deleted #259) as zero-dep portable CLJC.",
+   :adrs [],
+   :deps []}
+  {:repo "did",
+   :description "EDN-first DID library for kotoba",
+   :adrs [],
+   :deps []}
+  {:repo "dmn",
+   :description
+   "DMN decision tables + DRG as EDN — zero-dep portable .cljc with a pure evaluator",
+   :adrs [],
+   :deps []}
+  {:repo "docs",
+   :description
+   "Portable CLJC document workspace model for docs.gftd.ai",
+   :adrs [],
+   :deps ["transit"]}
+  {:repo "dot",
+   :description
+   "Graphviz DOT <-> EDN graph (+ graph algorithms) — zero-dep portable .cljc",
+   :adrs [],
+   :deps []}
+  {:repo "drawingml",
+   :description "EDN-first drawingml substrate for kotoba",
+   :adrs [],
+   :deps []}
+  {:repo "drive",
+   :description
+   "Portable CLJC drive object workspace model for drive.gftd.ai",
+   :adrs [],
+   :deps []}
+  {:repo "dsl-core",
+   :description
+   "Shared dependency-free CLJC helpers for portable kotoba DSL libraries",
+   :adrs [],
+   :deps []}
+  {:repo "echem",
+   :description "reduced-order PEM fuel-cell solver (:rom-fc)",
+   :adrs [],
+   :deps ["datom" "cae-solver"]}
+  {:repo "ed25519",
+   :description
+   "Recover an Ed25519 public key (and did:key) from a raw 32-byte seed — pure Clojure (RFC 8032), babashka-friendly.",
+   :adrs [],
+   :deps []}
+  {:repo "eda",
+   :description
+   "EDN-driven CLJC kernels for kotoba native EDA computation",
+   :adrs [],
+   :deps []}
+  {:repo "eth-crypto",
+   :description
+   "Dependency-free Ethereum crypto for Clojure/babashka — Keccak-256 + secp256k1 ecrecover + EIP-712 + EIP-55",
+   :adrs [],
+   :deps []}
+  {:repo "fmt", :description "", :adrs [], :deps []}
+  {:repo "forms",
+   :description "Portable CLJC forms model for forms.gftd.ai",
+   :adrs [],
+   :deps []}
+  {:repo "freeboard",
+   :description
+   "Apple-Freeform-style infinite-canvas board — clj brain + kami-render(wgpu) + kasane import (ADR-2606280200)",
+   :adrs [],
+   :deps []}
+  {:repo "fs", :description "", :adrs [], :deps []}
+  {:repo "game",
+   :description
+   "game systems (FSM/behavior-tree/NPC/inventory) — Phase 1.2 CLJC interpreter — clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "genome",
+   :description
+   "Open-source genomics workflow workbench as EDN data + portable CLJC pipeline model.",
+   :adrs [],
+   :deps []}
+  {:repo "geo",
+   :description
+   "geospatial (Web Mercator + H3) — clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "gltf",
+   :description
+   "glTF 2.0 loader (wasm-safe) — clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "godaddy-dns",
+   :description
+   "GoDaddy DNS management agent in portable Clojure (.cljc) — injected IDns host capability, dry-run-by-default writes, action history as datoms, built on langgraph-clj",
+   :adrs [],
+   :deps []}
+  {:repo "graph",
+   :description
+   "graph layout (Merkle DAG PCB + force-directed) — clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "graphql",
+   :description
+   "GraphQL SDL -> EDN AST + resolver query executor — zero-dep portable .cljc",
+   :adrs [],
+   :deps []}
+  {:repo "hinshitsu",
+   :description
+   "hinshitsu (品質) — portable quality-evidence schema + mokushi visual/snapshot testing for kotoba tools",
+   :adrs [],
+   :deps []}
+  {:repo "homebrew-kotoba",
+   :description
+   "Homebrew tap for kotoba — content-addressed distributed Datalog database",
+   :adrs [],
+   :deps []}
+  {:repo "html",
+   :description "EDN-first html substrate for kotoba",
+   :adrs [],
+   :deps []}
+  {:repo "http", :description "", :adrs [], :deps ["json"]}
+  {:repo "ical",
+   :description
+   "iCalendar (RFC5545) + RRULE <-> EDN + recurrence expansion — zero-dep portable .cljc",
+   :adrs [],
+   :deps []}
+  {:repo "industry",
+   :description
+   "Kotoba industry registry mapping ISIC businesses to executable technology stacks",
+   :adrs [],
+   :deps ["technology"]}
+  {:repo "inference",
+   :description
+   "Kotoba CLJC/Rust inference runtime over torch and num",
+   :adrs [],
+   :deps ["num" "torch"]}
+  {:repo "input",
+   :description
+   "input action maps — Phase 1.2 CLJC interpreter — clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "io", :description "", :adrs [], :deps []}
+  {:repo "ip",
+   :description
+   "IP (intellectual property) tagging — clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "json", :description "", :adrs [], :deps []}
+  {:repo "json-ld",
+   :description "EDN-first json-ld substrate for kotoba",
+   :adrs [],
+   :deps []}
+  {:repo "jsonlogic",
+   :description
+   "JSONLogic rules-as-data evaluator — zero-dep portable .cljc",
+   :adrs [],
+   :deps []}
+  {:repo "kagi", :description "", :adrs [], :deps []}
+  {:repo "kami-engine",
+   :description
+   "Reusable Rust game/robotics engine (wgpu + physics + WASM) — etzhayyim L2 layer (ADR-2606011500)",
+   :adrs
+   [{:id "0032-gltf-asset-extension-decoders",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0033-kami-genesis-isaacsim-core-api-surface",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0034-isaac-compat-stack-maturation",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0035-kami-clj-clojure-wasm-game-scripting",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0036-kami-engine-sdk-clj-datomic-webgpu",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0037-kami-cross-platform-packaging-ios-android-console",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0037-kami-groot-foundation-policy-compat-surface",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0038-kami-cosmos-world-model-compat-roadmap",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id
+     "0038-kami-game-architecture-rust-base-clj-datomic-game-layer",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0039-kototama-and-render-ir-single-entry",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0040-everything-describable-is-edn-datomic",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0041-play3d-adopts-kami-webgpu-rs",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0042-cross-platform-clj-edn-everywhere",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0043-vrm-dance-scene-clj-edn",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0044-edn-render-ir-threejs-vrm-parity",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0045-kami-rt-binaural-edn-data-driven-backend-delegation",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0045-live2d-2d-avatar-clj-edn",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0046-scene-data-crates-presets-as-parity-tested-edn",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0047-real-vrm-offscreen-render-reference",
+     :title "",
+     :status "",
+     :date "",
+     :related []}],
+   :deps []}
+  {:repo "kami-engine-cfd",
+   :description
+   "clean-room D2Q9 lattice-Boltzmann CFD — high-fidelity :lbm backend",
+   :adrs [],
+   :deps []}
+  {:repo "kami-engine-sdk",
+   :description
+   "KAMI Engine SDK: Svelte 5 VRM character components, headless builders, Genko manga editor, trackpad embeds, manufacturing planning helpers.",
+   :adrs [],
+   :deps []}
+  {:repo "kami-engine-vehicle-designer",
+   :description
+   "Clean-sheet BEV/FCEV vehicle design actor — concept proposer sealed behind a PhysicsGovernor (langgraph-clj StateGraph).",
+   :adrs [],
+   :deps []}
+  {:repo "kami-nv-compat",
+   :description
+   "NVIDIA Omniverse/Isaac/OptiX/RTX API-compat facade for the KAMI engine family (WebGPU+WASM). ADR-2606302300.",
+   :adrs [],
+   :deps []}
+  {:repo "kasane",
+   :description
+   "Adobe(AI/PSD/PDF)+ を外部依存ゼロの純cljc+EDNデータ駆動文法で扱う (ADR-2606272100)",
+   :adrs [],
+   :deps []}
+  {:repo "kekkai",
+   :description
+   "結界 — zero-trust mesh-overlay coordination actor (Tailscale-equivalent control plane): coord-LLM ⊣ TailnetGovernor on langgraph-clj",
+   :adrs [],
+   :deps []}
+  {:repo "kenchi", :description "", :adrs [], :deps []}
+  {:repo "kiyaku",
+   :description
+   "Kotoba customer accounts + returns/RMA domain lib (.cljc, on chobo+shitsuke)",
+   :adrs [],
+   :deps ["shitsuke" "chobo" "mise"]}
+  {:repo "knp",
+   :description
+   "KAMI Network Protocol (UDP + WebTransport) — clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "kobo", :description "", :adrs [], :deps ["kuro"]}
+  {:repo "koe",
+   :description
+   "Reusable voice-session kernel (host-injected telephony/STT/TTS/booking ports + dialog loop). ADR-2606271930.",
+   :adrs [],
+   :deps []}
+  {:repo "kotoba",
+   :description "Content-Addressed Distributed Datalog Database",
+   :adrs [],
+   :deps
+   ["kotoba-core-contracts" "kotoba-selfhost-contracts" "kotoba-lang"]}
+  {:repo "kotoba-code",
+   :description
+   "Model-neutral, test-gated, kotoba-Datom-backed agentic coding agent (Clojure, on the kotoba-clj stack)",
+   :adrs [],
+   :deps []}
+  {:repo "kotoba-fleet",
+   :description
+   "Fleet-coordination substrate: many terminal coding agents in parallel without git conflict (lease + governor-drain + fleet-view). ADR-2606302000.",
+   :adrs [],
+   :deps []}
+  {:repo "kotoba-lang",
+   :description
+   "Kotoba language design, source profile, and conformance contract",
+   :adrs [],
+   :deps []}
+  {:repo "kotoba-pages-poc",
+   :description
+   "kotoba GitHubPagesBlockStore — CID-queryable static tier (ADR-2606242400)",
+   :adrs [],
+   :deps []}
+  {:repo "kotoba-topology", :description "", :adrs [], :deps []}
+  {:repo "kotoba-v2025", :description "", :adrs [], :deps []}
+  {:repo "kotobase",
+   :description
+   "External-storage IStore port — :local (OSS standalone) ↔ :kotobase (kotobase.net PDS), zero-dep .cljc",
+   :adrs [],
+   :deps []}
+  {:repo "kotodama",
+   :description
+   "Generic functional-organism runtime on the kotoba-clj stack (life + organism graph + ReAct; domain-injected)",
+   :adrs [],
+   :deps []}
+  {:repo "kotodama-cells",
+   :description "Kotodama split repository: kotodama-cells",
+   :adrs [],
+   :deps []}
+  {:repo "kotodama-holochain",
+   :description "Kotodama split repository: kotodama-holochain",
+   :adrs [],
+   :deps []}
+  {:repo "kotodama-host",
+   :description "Kotodama split repository: kotodama-host",
+   :adrs [],
+   :deps []}
+  {:repo "kotodama-mcp",
+   :description "Kotodama split repository: kotodama-mcp",
+   :adrs [],
+   :deps []}
+  {:repo "kotodama-py",
+   :description "Kotodama split repository: kotodama-py",
+   :adrs [],
+   :deps []}
+  {:repo "kototama",
+   :description
+   "kototama — clojure-wasm-runtime: Clojure/EDN subset → WebAssembly, unifying kotoba-clj + kami-engine-clj. Compiles & runs CLJ in the browser.",
+   :adrs
+   [{:id "0001-kototama-clojure-wasm-runtime",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0002-actor-organism-runtime-lib",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id
+     "0003-consolidate-kototama-clj-and-common-organism-cell-library",
+     :title "",
+     :status "",
+     :date "",
+     :related []}
+    {:id "0004-unify-actor-and-kototama-namespaces",
+     :title "",
+     :status "",
+     :date "",
+     :related []}],
+   :deps []}
+  {:repo "kototama-clj",
+   :description
+   "Functional UNSPSC organism actors on the Clojure substrate — one framework + per-code data → 18,342 living actors. ADR-2606131645.",
+   :adrs [],
+   :deps []}
+  {:repo "kudaki",
+   :description
+   "砕き — LS-DYNA-class explicit nonlinear structural dynamics (crash FEA) in portable zero-dep .cljc",
+   :adrs [],
+   :deps []}
+  {:repo "kuro", :description "", :adrs [], :deps []}
+  {:repo "lab", :description "", :adrs [], :deps []}
+  {:repo "labor", :description "", :adrs [], :deps ["html" "css"]}
+  {:repo "langchain",
+   :description
+   "LangChain-core-style LLM foundation layer in portable Clojure (.cljc, zero deps) — Datomic-API-first, Clojure-on-WASM ready",
+   :adrs [],
+   :deps ["json"]}
+  {:repo "langgraph",
+   :description
+   "LangGraph/LangChain-style LLM orchestration in portable Clojure (.cljc, zero deps) — Datomic-API-first, Clojure-on-WASM ready",
+   :adrs [],
+   :deps ["langchain"]}
+  {:repo "lint",
+   :description "",
+   :adrs [],
+   :deps ["fmt" "lsp" "fs" "coll"]}
+  {:repo "lint-kotoba",
+   :description "",
+   :adrs [],
+   :deps ["lint" "lsp" "coll"]}
+  {:repo "log", :description "", :adrs [], :deps ["coll"]}
+  {:repo "logistics", :description "", :adrs [], :deps ["html" "css"]}
+  {:repo "lsp", :description "", :adrs [], :deps []}
+  {:repo "lsp-rpc", :description "", :adrs [], :deps ["lsp" "json"]}
+  {:repo "madoguchi",
+   :description
+   "Kotoba support/CRM domain lib: tickets/customers/SLA (.cljc, on chobo+shitsuke)",
+   :adrs [],
+   :deps ["shitsuke" "chobo"]}
+  {:repo "mail",
+   :description
+   "Pure CLJC email message, draft, approval, and receipt model for kotoba-lang",
+   :adrs [],
+   :deps []}
+  {:repo "mailer",
+   :description
+   "Pure CLJC provider request contracts for email delivery hosts",
+   :adrs [],
+   :deps ["mail"]}
+  {:repo "mcp",
+   :description
+   "Model Context Protocol manifests + pure JSON-RPC dispatch as EDN — zero-dep portable .cljc",
+   :adrs [],
+   :deps []}
+  {:repo "mesher",
+   :description
+   "marching cubes mesh generation — clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "mine-ai",
+   :description "mine AI — clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "mine-pds",
+   :description "mine PDS — clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "mise",
+   :description
+   "Kotoba shared e-commerce system: catalog + pricing + cart + inventory + checkout + order + re-frame events + pure-hiccup components (.cljc, on shitsuke).",
+   :adrs [],
+   :deps ["shitsuke" "chobo"]}
+  {:repo "motor",
+   :description "reduced-order traction-motor solver (:rom-motor)",
+   :adrs [],
+   :deps ["datom" "cae-solver"]}
+  {:repo "mst", :description "", :adrs [], :deps []}
+  {:repo "multiformats",
+   :description
+   "base58 / base32 / varint / sha2-256 multihash / CIDv1 in pure Clojure — babashka-friendly.",
+   :adrs [],
+   :deps []}
+  {:repo "murakumo",
+   :description
+   "kotoba WASM mesh control plane — resident lattice nodes + fleet ops over Tailscale (bb/clj)",
+   :adrs [],
+   :deps []}
+  {:repo "n-quads",
+   :description "EDN-first n-quads substrate for kotoba",
+   :adrs [],
+   :deps []}
+  {:repo "nagare",
+   :description
+   "流れ — OpenFOAM-class finite-volume incompressible CFD in portable zero-dep .cljc",
+   :adrs [],
+   :deps []}
+  {:repo "nerf",
+   :description
+   "NeRF (neural radiance field) — clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "net", :description "", :adrs [], :deps []}
+  {:repo "netcap", :description "", :adrs [], :deps ["wit" "coll"]}
+  {:repo "num",
+   :description
+   "数 — GPU numerical compute (BLAS+sparse) for Clojure: portable .cljc contract + WGSL/CUDA/Metal/ROCm backends",
+   :adrs [],
+   :deps []}
+  {:repo "office",
+   :description "Office document graph and OOXML toolkit",
+   :adrs [],
+   :deps ["ooxml"]}
+  {:repo "office-style",
+   :description "Office presentation style extraction toolkit",
+   :adrs [],
+   :deps []}
+  {:repo "ooxml",
+   :description "EDN-first ooxml substrate for kotoba",
+   :adrs [],
+   :deps []}
+  {:repo "openapi",
+   :description
+   "OpenAPI 3 contract as EDN + request builder — zero-dep portable .cljc",
+   :adrs [],
+   :deps []}
+  {:repo "os",
+   :description
+   "OS compositor (wgpu window manager) — clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "pathfind",
+   :description
+   "A* grid + NavMesh — clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "pdk",
+   :description
+   "PDK (process design kit) — clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "phone", :description "", :adrs [], :deps ["html" "css"]}
+  {:repo "physics-2d",
+   :description
+   "2D physics (AABB/circle/impulse) — clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "pkg",
+   :description
+   "packaging — restored from legacy kami-engine Rust crate (deleted #259) as zero-dep portable CLJC. Part of the clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "playwright",
+   :description
+   "Idiomatic Clojure wrapper over Playwright for Java — drive real browsers for WASM/ClojureScript E2E (incl. WebAuthn passkey virtual authenticator).",
+   :adrs [],
+   :deps []}
+  {:repo "plm",
+   :description
+   "Open-source PLM workbench as EDN data + portable CLJC lifecycle engine.",
+   :adrs [],
+   :deps []}
+  {:repo "pnr",
+   :description
+   "PNR (place and route) — restored from legacy kami-engine Rust crate (deleted #259) as zero-dep portable CLJC. Part of the clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "policy",
+   :description
+   "ABAC/RBAC authorization policy as EDN + pure decision engine — zero-dep portable .cljc",
+   :adrs [],
+   :deps ["dsl-core"]}
+  {:repo "postfx",
+   :description
+   "post-processing (bloom/outline/CRT/vignette/pixelate) — Phase 2.3 CLJC WGSL — restored from legacy kami-engine Rust crate (deleted #259) as zero-dep portable CLJC. Part of the clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "power",
+   :description
+   "power analysis — restored from legacy kami-engine Rust crate (deleted #259) as zero-dep portable CLJC. Part of the clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "presentationml",
+   :description "EDN-first presentationml substrate for kotoba",
+   :adrs [],
+   :deps ["drawingml"]}
+  {:repo "property", :description "", :adrs [], :deps ["html" "css"]}
+  {:repo "rdf",
+   :description "EDN-first rdf substrate for kotoba",
+   :adrs [],
+   :deps []}
+  {:repo "rdf-canon",
+   :description "EDN-first rdf-canon substrate for kotoba",
+   :adrs [],
+   :deps []}
+  {:repo "retail", :description "", :adrs [], :deps ["html" "css"]}
+  {:repo "robotics", :description "", :adrs [], :deps ["html" "css"]}
+  {:repo "rt", :description "", :adrs [], :deps []}
+  {:repo "rtc",
+   :description
+   "WebRTC SDK — restored from legacy kami-engine Rust crate (deleted #259) as zero-dep portable CLJC. Part of the clj-wgsl migration (ADR-2607010930).",
+   :adrs [],
+   :deps []}
+  {:repo "scheduler",
+   :description "",
+   :adrs [],
+   :deps ["async" "time" "coll"]}
+  {:repo "search",
+   :description
+   "Portable CLJC search workspace model for search.gftd.ai",
+   :adrs [],
+   :deps []}
+  {:repo "senden",
+   :description
+   "Kotoba marketing domain lib: campaigns/funnel/attribution (.cljc, on chobo+shitsuke)",
+   :adrs [],
+   :deps ["shitsuke" "chobo" "mise"]}
+  {:repo "shacl",
+   :description "EDN-first shacl substrate for kotoba",
+   :adrs [],
+   :deps []}
+  {:repo "sheets",
+   :description
+   "Portable CLJC spreadsheet workspace model for sheets.gftd.ai",
+   :adrs [],
+   :deps ["transit"]}
+  {:repo "shitsuke",
+   :description
+   "Kotoba shared UI design system: design tokens + hiccup + style + portable re-frame seam + pure-hiccup components (.cljc, dual-render).",
+   :adrs [],
+   :deps []}
+  {:repo "sigma",
+   :description
+   "Sigma detection rules as EDN + pure event matcher — zero-dep portable .cljc",
+   :adrs [],
+   :deps ["dsl-core"]}
+  {:repo "signal", :description "", :adrs [], :deps []}
+  {:repo "slides",
+   :description
+   "Portable CLJC workspace model for gftd slides, docs, drive, and sheets",
+   :adrs [],
+   :deps
+   ["office"
+    "ooxml"
+    "transit"
+    "drawingml"
+    "presentationml"
+    "office-style"
+    "shitsuke"]}
+  {:repo "soko",
+   :description
+   "Kotoba warehouse/logistics domain lib: multi-location stock/shipments/fulfillment (.cljc, on chobo+shitsuke+mise)",
+   :adrs [],
+   :deps ["shitsuke" "chobo" "mise"]}
+  {:repo "spec", :description "", :adrs [], :deps []}
+  {:repo "statechart",
+   :description
+   "Harel statecharts / SCXML-subset as EDN — zero-dep portable .cljc with a pure interpreter",
+   :adrs [],
+   :deps ["dsl-core"]}
+  {:repo "states",
+   :description
+   "AWS Step Functions ASL as EDN + pure interpreter — zero-dep portable .cljc",
+   :adrs [],
+   :deps ["dsl-core"]}
+  {:repo "store",
+   :description "",
+   :adrs [],
+   :deps ["fs" "io" "wit" "coll"]}
+  {:repo "svg",
+   :description "SVG conversion and presentation graphics toolkit",
+   :adrs [],
+   :deps []}
+  {:repo "svgraph",
+   :description "SVGraph browser SVG and presentation graph toolkit",
+   :adrs [],
+   :deps []}
+  {:repo "swift", :description "", :adrs [], :deps ["html" "css"]}
+  {:repo "technology",
+   :description
+   "Kotoba technology capability registry for EDA, CFD, CAE, workflow, policy, identity and audit",
+   :adrs [],
+   :deps []}
+  {:repo "test", :description "", :adrs [], :deps ["spec"]}
+  {:repo "text", :description "", :adrs [], :deps []}
+  {:repo "time", :description "", :adrs [], :deps []}
+  {:repo "torch",
+   :description
+   "PyTorch-style neural-net module graph as EDN data — pure shape/param engine, host-injected ports. Zero-dep portable .cljc.",
+   :adrs [],
+   :deps ["dsl-core"]}
+  {:repo "transit",
+   :description "Transit JSON wire library for Kotoba Datomic APIs",
+   :adrs [],
+   :deps []}
+  {:repo "triage",
+   :description
+   "Portable LLM-classification + golden-eval kernel (zero-dep .cljc, host-injected transport)",
+   :adrs [],
+   :deps []}
+  {:repo "turn", :description "", :adrs [], :deps []}
+  {:repo "turtle",
+   :description "EDN-first turtle substrate for kotoba",
+   :adrs [],
+   :deps []}
+  {:repo "utsushi",
+   :description
+   "utsushi（映し）: 時間ベースメディア(動画/音声)を 純cljc+EDN × defgraph filtergraph × capability-gated codec で扱う ffmpeg 的ライブラリ。kasane の姉妹。ADR-2606272200",
+   :adrs [],
+   :deps []}
+  {:repo "vc",
+   :description "EDN-first vc substrate for kotoba",
+   :adrs [],
+   :deps []}
+  {:repo "vllm",
+   :description
+   "vLLM (OpenAI-compatible) inference request as EDN data — pure wire render/parse, host-injected transport ports. Zero-dep portable .cljc.",
+   :adrs [],
+   :deps []}
+  {:repo "vphysics",
+   :description
+   "shared vehicle-physics primitives (road load, aero force, range)",
+   :adrs [],
+   :deps []}
+  {:repo "wasm-ui",
+   :description
+   "kotoba DOM-compatible WASM UI substrate with WebGL and WebGPU browser hosts",
+   :adrs [],
+   :deps []}
+  {:repo "webgpu",
+   :description
+   "Declarative WebGPU from EDN — hiccup for the GPU. CLJS drives WebGPU directly from a pure EDN render-IR (no Rust/wasm).",
+   :adrs
+   [{:id "0001-declarative-webgpu-from-edn",
+     :title "",
+     :status "",
+     :date "",
+     :related []}],
+   :deps []}
+  {:repo "webrtc",
+   :description
+   "WebRTC signaling, session negotiation and room membership in pure Clojure (kotoba-lang capability library)",
+   :adrs [],
+   :deps ["html" "css"]}
+  {:repo "wit", :description "", :adrs [], :deps []}
+  {:repo "zone",
+   :description
+   "DNS zone files (RFC1035) <-> EDN + diff — zero-dep portable .cljc",
+   :adrs [],
+   :deps []}],
+ :reverse-deps
+ {"async" ["scheduler"],
+  "cae-solver" ["aero" "crash" "echem" "motor"],
+  "chobo" ["kiyaku" "madoguchi" "mise" "senden" "soko"],
+  "coll"
+  ["device" "lint" "lint-kotoba" "log" "netcap" "scheduler" "store"],
+  "css"
+  ["banking"
+   "card"
+   "labor"
+   "logistics"
+   "phone"
+   "property"
+   "retail"
+   "robotics"
+   "swift"
+   "webrtc"],
+  "datom" ["aero" "crash" "echem" "motor"],
+  "drawingml" ["presentationml" "slides"],
+  "dsl-core" ["policy" "sigma" "statechart" "states" "torch"],
+  "fmt" ["lint"],
+  "fs" ["lint" "store"],
+  "html"
+  ["banking"
+   "card"
+   "labor"
+   "logistics"
+   "phone"
+   "property"
+   "retail"
+   "robotics"
+   "swift"
+   "webrtc"],
+  "io" ["store"],
+  "json" ["http" "langchain" "lsp-rpc"],
+  "kotoba-core-contracts" ["kotoba"],
+  "kotoba-lang" ["kotoba"],
+  "kotoba-selfhost-contracts" ["kotoba"],
+  "kuro" ["kobo"],
+  "langchain" ["comfyui" "langgraph"],
+  "lint" ["lint-kotoba"],
+  "lsp" ["lint" "lint-kotoba" "lsp-rpc"],
+  "mail" ["mailer"],
+  "mise" ["kiyaku" "senden" "soko"],
+  "num" ["inference"],
+  "office" ["slides"],
+  "office-style" ["slides"],
+  "ooxml" ["office" "slides"],
+  "presentationml" ["slides"],
+  "shitsuke"
+  ["chobo" "kiyaku" "madoguchi" "mise" "senden" "slides" "soko"],
+  "spec" ["test"],
+  "technology" ["industry"],
+  "time" ["scheduler"],
+  "torch" ["inference"],
+  "transit" ["docs" "sheets" "slides"],
+  "vphysics" ["aero" "crash"],
+  "wit" ["device" "netcap" "store"]}}
