@@ -84,6 +84,22 @@
   {:phase :r3b :state :blocked-on-ops
    :scope "actual e-CNY activation: per-jurisdiction legal analysis + Council Lv7+ unanimity vote + real authorized-operator custody — ops/legal, not code"}]
 
+ :substrate-alignment
+ {:recorded "2026-07-02 owner Q&A"
+  :wallet   {:base :cljc :datomic :stateless-by-design}   ; kotoba-lang/wallet — key/signing lib, no DB
+  :banking  {:base :cljc :datomic :pure-records}
+  :junbi    {:base :cljc :datomic :db-api}                ; langchain.db map — in-mem ‖ Datomic ‖ kotoba pod
+  :en       {:base :rust :datomic :kotoba-source-chain}   ; engi_chain.rs — engine work, deliberately not cljc
+  :execution {:kotoba-engine :real-pregel-bsp             ; kotoba-vm Wasm/DistributedPregelRunner
+              :langgraph-clj :pregel-style-superstep-loop ; in-process, interrupt-before + checkpoints
+              :bridge "kotoba-clj defgraph→WASM→kotoba-runtime Pregel BSP (end-to-end, tests/pregel.rs)"}}
+
+ :follow-ups
+ [{:id :junbi-kotodama-cell :scope "compile TreasuryActor via kotoba-clj defgraph → kotodama Pregel cell on kotoba-vm BSP"}
+  {:id :en-datom-projection :scope "read-only ENGI balance/transfer projection as kotoba datoms for :db-api consumers (D8 credit sizing)"}
+  {:id :toritate-enum-extension :scope "nativeAsset +eurc/+jpyc; reserve-rebalance category (toritate-side)"}
+  {:id :r3b-ecny-ops :scope "jurisdiction legal analysis + Council Lv7+ vote + real operator custody, then cbdc/activate"}]
+
  :honesty
  {:ecny "foreign-entity e-CNY custody not currently establishable at scale (pilot corridors) — hence Tier-2 / weight-0 / attestation-only; nothing faked at R0"
   :repo-visibility "created private, flipped public with owner approval 2026-07-02; static did:web doc served from GitHub Pages root (/.well-known/did.json)"

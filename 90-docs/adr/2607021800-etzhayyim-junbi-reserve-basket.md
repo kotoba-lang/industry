@@ -162,6 +162,40 @@ collateral valuation). HAKARI never mints or burns EN.
   address yet (`:address nil` — reads throw rather than guess). Rates are
   injected attestations at R1; the live Chainlink feed cell is R2.
 
+## Substrate alignment (recorded 2026-07-02, owner Q&A)
+
+Where the wallet / currency stack actually sits on the kotoba-lang substrate:
+
+| Layer | Language / base | Datomic posture |
+|---|---|---|
+| `kotoba-lang/wallet` | pure `.cljc` (BIP-32/39/44 HD, real SIWE/EIP-4361, AES-256-GCM keystore; non-custodial) | intentionally **stateless** — a key/signing library, no DB |
+| `kotoba-lang/banking` | pure `.cljc` (double-entry, IBAN, clearing) | pure records; persistence is the caller's concern |
+| junbi (HAKARI / reserve) | pure `.cljc` | **Datomic-API-based** — audit ledger over the `langchain.db` `:db-api` map (in-mem ‖ real Datomic ‖ kotoba pod swap) |
+| **EN (縁 / ENGI)** | **Rust** (`kotoba-dht` / `kotoba-server`, `engi_chain.rs`) | agent-centric Source Chain + countersigned CBOR on the kotoba content-addressed Datalog substrate — deliberately NOT `.cljc` (consensus/validation is engine work) |
+
+Execution model: the kotoba engine runs **real Pregel BSP** (`kotoba-vm`
+`WasmPregelRunner` / `DistributedPregelRunner`); `langgraph-clj` (junbi's
+StateGraph) is a **Pregel-style superstep loop** in-process (single-threaded,
+`interrupt-before`, checkpoints); the bridge already exists end-to-end —
+`kotoba-clj` compiles the Clojure subset (incl. `defgraph`) to WASM and runs
+it on kotoba-runtime as *compiled Clojure agent = langgraph defgraph × kqe
+datom writes × Pregel BSP*. junbi's TreasuryActor therefore has a designed
+continuity path from the JVM superstep loop onto the engine's real BSP.
+
+### Follow-ups (recorded, not landed)
+
+1. **junbi → kotodama Pregel cell**: compile the TreasuryActor graph via
+   `kotoba-clj` `defgraph` and register it as a kotodama cell, moving the
+   superstep loop onto kotoba-vm BSP.
+2. **EN datom projection bridge**: expose ENGI balances/transfers as
+   queryable kotoba datoms (read-only projection of the Source-Chain record)
+   so HAKARI credit-limit sizing (D8) can consume EN state via `:db-api`.
+3. **toritate enum extension** (toritate-side): `nativeAsset` +eurc/+jpyc and
+   a `reserve-rebalance` category (junbi currently maps to `"n-a"` /
+   `"uncategorized"` per lexicon R0).
+4. **R3b** (ops/legal): e-CNY jurisdiction analysis + Council Lv7+ vote +
+   real authorized-operator custody; then `cbdc/activate` applies.
+
 ## Related
 
 - `orgs/kotoba-lang/kotoba/docs/ADR-engi-mutual-credit-on-chain.md` (EN/ENGI)
