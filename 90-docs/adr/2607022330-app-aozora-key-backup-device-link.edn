@@ -20,7 +20,13 @@
     /settings で UV ゲート + 警告後に一度だけ表示。restore は auth modal"
    "復元ガード: 別アカウントの鍵が既にある端末では上書き中止。復元 3 経路の
     着地は :auth/kotoba-create-session に一本化 (yoro-ui.state.key-backup)"
-   "SPA ルート /settings (鍵とバックアップ) と /link-device (旧端末確認ページ)"]
+   "SPA ルート /settings (鍵とバックアップ) と /link-device (旧端末確認ページ)"
+   "Addendum (app-aozora b887802): WebAuthn E2E (kotoba-lang/playwright CDP
+    virtual authenticator ctap2+hasPrf) で出荷 :advanced ビルド固有の PRF 読み
+    バグを検出・修正。getClientExtensionResults().prf が非-extern のため
+    :advanced が dashed read を rename→nil 化 (node :none / :simple では緑)。
+    goog.object/getValueByKeys の string-key 読みへ修正 + signup パスキーで
+    {:prf {}} 要求 + eval 結果で判定。keytest ブリッジ (dev 専用) + e2e/ 常設"]
   :supersedes []
   :superseded_by []
   :related ["adr-2607021400" "adr-2606251700" "adr-2606231100" "adr-2606131950"]
