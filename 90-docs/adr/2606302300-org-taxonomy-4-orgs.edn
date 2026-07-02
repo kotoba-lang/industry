@@ -68,6 +68,13 @@
    :to-migrate "generic -clj infra: aero-clj, bpmn-clj, ci-clj, ddl-clj, dmn-clj, crash-clj, cron-clj, datom-clj, graphql-clj, ical-clj, jsonlogic-clj, kagi-clj, kenchi-clj, kotobase-clj, ..."
    :decided   "generic -clj infra FULLY migrates to kotoba-lang (owner decision 2026-06-30); com-junkawasaki end-state = cloud (cloud-manimani, cloud-murakumo) + data (spirit-in-physics, ghosthacker) only"
    :github-org-relocation "per-repo decision; some stay at github.com/com-junkawasaki and check out under kotoba-lang/ via :remote-overrides (cf. kami-engine-sdk)"}
+  :exceptions
+  [{:id "adr-2607011100-svg-era-office-repo-split"
+    :date "2026-07-01"
+    :summary "CLJ/EDN rewrites remain in kotoba-lang, but SVG-era browser/TypeScript tooling is restored as com-junkawasaki/office-causal and com-junkawasaki/svgraph."
+    :repos ["com-junkawasaki/office-causal"
+            "com-junkawasaki/svgraph"]
+    :reason "preserve package names, GitHub Pages URLs, and SVG/Office integration surfaces without conflating them with the kotoba CLJ/EDN substrate"}]
   :out-of-scope
   {:not-west-managed ["orgs/kawasakijun/ (personal ops/state)"
                       "orgs/personal/ (life-data vault)"]}}
