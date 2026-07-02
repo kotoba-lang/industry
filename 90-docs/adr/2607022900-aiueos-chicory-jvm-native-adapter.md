@@ -281,6 +281,23 @@ launcherの用途に本当に必要かという設計判断であり、オーナ
 run-receipt`経由に統合し、`:aiueos.execute/*`のキーを`run-receipt`の
 `:aiueos/result`/`:aiueos/audit-events`等にマッピングする形になる。
 
+**Follow-up 9（2026-07-02、run-receipt統合を実施——ADDITIVEな形で解決、
+`aiueos-cljc-contract#12`）**: Follow-up 8 で確認応答が得られなかったため、
+戻り値shapeを**変更**する統合ではなく、**追加**する形に設計を変えて実施した。
+`run-if-granted`が`broker/run-receipt`を呼び、`:aiueos/run-receipt`キーを
+既存の`:aiueos.execute/*`キー群に**並べて追加**する——既存キーは一切変更
+されないため、Follow-up 8で懸念した「オーナー確認が必要な破壊的変更」には
+該当しない。status は `:succeeded`（正常完了）/`:failed`（quota/fuel/
+topic-forbidden中断、`:aiueos/error`にexceptionメッセージ）/`:denied`
+（`:aiueos/decision`が`:deny`、実行未実施）の3通り、`:started-at`/
+`:finished-at`（epoch ms）と`:aiueos.broker/audit-entries`を含む。
+`aiueos.launcher`の`run`/`up`は`execute`/`execute-admission`を直接呼ぶだけ
+なので、launcher側の変更なしに自動的にこの恩恵を受ける。実測: shellから
+`clojure -M -m aiueos.launcher run manifest.edn --edn`で
+`:aiueos/run-receipt`が既存キーと並んで実際に返ることを確認済み。
+`:aiueos/run-plan`（`component-boundary`引数が必要で、現状の実行パスには
+まだ配線されていない）は引き続きスコープ外のまま。
+
 ## Closing Summary（2026-07-02）
 
 本 ADR の決定（native adapter の実行層 + CLI を Rust ではなく JVM/Clojure +
@@ -300,7 +317,8 @@ Chicory で構築する）は、5 件の follow-up を経て実装・実測検�
 | 5 | `:aiueos/schedule`（period/priority、cycle-based boot） | `aiueos-cljc-contract#10` | ✅ 実装・実測済み |
 | 6 | `:aiueos/limits :memory-pages`（安定版Chicory API） | `aiueos-cljc-contract#11` | ✅ 実装・実測済み |
 | 7 | 監査: manifest署名検証（`aiueos.signing`）が実意思決定パスに配線されているか | — | ✅ 調査完了・**ギャップ無し**（後述） |
-| 8 | 監査: `:aiueos/run-plan`/`:aiueos/run-receipt`統合 | — | ⏸️ 調査完了・**意図的に保留**（後述） |
+| 8 | 監査: `:aiueos/run-plan`/`:aiueos/run-receipt`統合 | — | ⏸️→✅ 監査後、ADDITIVEな形で解決（#9参照） |
+| 9 | `:aiueos/run-receipt`のADDITIVE統合 | `aiueos-cljc-contract#12` | ✅ 実装・実測済み |
 
 **Follow-up 7（2026-07-02、署名検証の監査——ギャップ無しの確認）**:
 これまで4件（audit/topic許可セット/schedule/memory-pages）を「宣言・検証は
@@ -350,12 +368,11 @@ CLI 本体（旧 bin/aiueos.rs）は、Rust を一切経由せず JVM/Clojure �
   実行モデルと ADR-0006 の wall-clock-free 設計原則の間に本質的な非互換があり、
   真のインクリメンタル/割り込み可能な実行機構を発明しない限り正しく実装できない。
 
-**意図的に保留した統合課題**（バグではなく設計判断待ち）:
-- **`:aiueos/run-plan`/`:aiueos/run-receipt`統合**: `aiueos.broker`に実装・
-  テスト済みの生成関数があるのに、`aiueos.launcher`の`run`/`up`が採用せず
-  独自の簡易shapeを使い続けている。CID/timestamp付きのrun-receiptが今の
-  launcherの用途に必要かはオーナー判断が必要——着手時は`up-command`/
-  `run-command`の戻り値shapeを変更する破壊的変更になる。
+**`:aiueos/run-plan`統合は引き続きスコープ外**: `run-receipt`（post-execution
+の監査記録）はFollow-up 9でADDITIVEに解決したが、`run-plan`（pre-execution
+の計画shaping）は`component-boundary`引数が必要で、現状の実行パスにはまだ
+配線されていない。優先度は低い（`run-receipt`が実質的な監査ニーズをカバー
+している）が、着手する場合は新しいfollow-upとして扱うこと。
 
 本 ADR はこれにて実装完了として close する。上記の恒久的な未解決事項は、
 着手する際に新しい ADR（生ハードウェアアクセス層の設計など、スコープが
