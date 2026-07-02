@@ -38,7 +38,7 @@
    ;; machine-measurable: first paid tenant = Stripe active subscription >= 1
    {:metric [:stripe :active-subscriptions] :op :>= :threshold 1
     :evidence-label "Stripe active subscriptions"
-    :needs-when-unmeasurable ["signup→checkout 配線 (yatabase price 既存)" "tenant 従量計測"]}
+    :needs-when-unmeasurable ["signup→checkout 配線 (kotobase price 既存)" "tenant 従量計測"]}
 
    :hyp/itonami-smb-pay
    {:needs ["初期 vertical の絞り込み" "外部オンボーディング導線" "per-seat billing"]}

@@ -45,7 +45,7 @@ signal を貼ると 2 日目以降は dedup で dry になり、canvas が前進
 | product | 状態 | 内容 |
 |---|---|---|
 | ai-gftd-yukkuri | **measuring** | 登録者 3 / 総再生 10.2h（YPP gate 1,000 / 4,000h 未到達）— 機械測定可 |
-| net-kotobase | blocked | signup→checkout 配線（yatabase price 既存）/ tenant 従量計測。Stripe 収集で active-subscriptions が入れば first-tenant gate が機械測定に変わる |
+| net-kotobase | blocked | signup→checkout 配線（kotobase price 既存）/ tenant 従量計測。Stripe 収集で active-subscriptions が入れば first-tenant gate が機械測定に変わる |
 | cloud-murakumo | blocked | run ledger の原価/tok export / 社内3アプリ fleet 移管 |
 | ai-gftd-apex | blocked | tier 価格定義 / Stripe product / Free→Plus 転換テレメトリ |
 | cloud-itonami | blocked | 初期 vertical 絞り込み / 外部オンボーディング / per-seat billing |

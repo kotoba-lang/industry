@@ -8,7 +8,7 @@
 
 gftd / etzhayyim ポートフォリオには互いに依存する 8 つのプロダクトがあるが、
 それぞれの business model と lean canvas が体系として整理されていなかった。
-既存の設計資料は net-kotobase（`docs/BUSINESS-MODEL.md`、yatabase 型 tier）、
+既存の設計資料は net-kotobase（`docs/BUSINESS-MODEL.md`、kotobase tier 型）、
 ai-gftd-shinshi（`docs/260613-bmc-lean.datoms.edn`、ad-supported）、
 gftd-talent-actor（`docs/business-model.md`）と単品ごとに散在している。
 
@@ -111,7 +111,7 @@ provider 原価を下げる。
 
 ### Business model
 
-既存 `docs/BUSINESS-MODEL.md`（yatabase 型: Free / Standard / Pro / Regulated、
+既存 `docs/BUSINESS-MODEL.md`（kotobase tier 型: Free / Standard / Pro / Regulated、
 subscription 主軸 + enterprise 高単価）を正として維持し、本 ADR で **同一
 content-addressed graph 上の追加 surface** を位置づける:
 
@@ -133,7 +133,7 @@ search query 従量）として課金する。
 | Customer Segments | 個人 engineer（Free）/ AI・app チーム（Standard/Pro）/ enterprise data チーム / regulated（専有 tenant・read audit・key custody） |
 | UVP | content-addressed KG 1 本の上に storage・graphdb・map・git・search が同居。DB そのものが可搬（WASM + CID + atproto）= lock-in の逆張り |
 | Solution | kotobase.net（既存稼働）: pin / Datalog / KG ingest + add-on surface: map・git remote・search index |
-| Channels | landing で技術価値を即示 → free self-serve → paid workspace（yatabase 型）/ OSS kotoba 開発者 / 全社内プロダクトが tenant |
+| Channels | landing で技術価値を即示 → free self-serve → paid workspace（kotobase tier 型）/ OSS kotoba 開発者 / 全社内プロダクトが tenant |
 | Revenue | tier subscription（既存 4 段）+ surface add-on 従量（map / git / search）+ enterprise 契約 |
 | Cost | B2 / CF Workers / index 計算 / compliance 対応 |
 | Key Metrics | pinned CID 数 / active graphs / query volume / storage GB / paid workspace 数 / add-on attach 率 |
