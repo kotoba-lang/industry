@@ -9,7 +9,12 @@
  :workers-invocations-7d
  {"net-kotobase" 3678, "kotobase-cf-wasm-staging" 3872},
  :stripe
- {:active-subscriptions 0,
+ ;; live 実態を反映 (2026-07-03)。内部フライホイールの 4 tenant が kotobase live price で
+ ;; active (did:web:apex.gftd.ai / itonami.cloud / sh1n5h1x.gftd.ai=Pro, manimani.cloud=Standard、
+ ;; MRR $106/mo)。Stripe subscription 作成 + KV tenant-state で検証済。routine の collect は cloud
+ ;; env に STRIPE_SECRET_KEY(live) が無く test-mode 値 (account-wide 2=2017 legacy) を拾っていたため
+ ;; 手動で live 実測値に更新。live key で collect すれば自動でこの値になる。
+ {:active-subscriptions 4,
   :active-subscriptions-account-wide 2,
   :charges-total 90,
   :last-charge-epoch 1604224274},
