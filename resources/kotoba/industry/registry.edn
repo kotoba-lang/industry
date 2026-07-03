@@ -1,6 +1,6 @@
 {:kotoba.registry/id :kotoba/industry
  :kotoba.registry/version 1
- :kotoba.registry/updated "2026-06-30"
+ :kotoba.registry/updated "2026-07-03"
  :industries
  [{:id "3512"
    :name "Community Renewable Energy Operations"
@@ -4652,40 +4652,40 @@
    :operating-states [:intake :onboard :transact :clear :settle :audit]},
   {:id "6511"
    :name "Life insurance"
-   :repo "https://github.com/gftdcojp/cloud-itonami-K6511"
-   :business-id "cloud-itonami-K6511"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :banking]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-6511"
+   :business-id "cloud-itonami-6511"
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :insurance]
    :optional-technologies []
-   :maturity :spec
+   :maturity :blueprint
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :onboard :transact :clear :settle :audit]},
+   :operating-states [:intake :underwrite :bind :endorse :claim :settle :audit]},
   {:id "6512"
    :name "Non-life insurance"
-   :repo "https://github.com/gftdcojp/cloud-itonami-K6512"
-   :business-id "cloud-itonami-K6512"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :banking]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-6512"
+   :business-id "cloud-itonami-6512"
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :insurance]
    :optional-technologies []
-   :maturity :spec
+   :maturity :blueprint
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :onboard :transact :clear :settle :audit]},
+   :operating-states [:intake :underwrite :bind :endorse :claim :settle :audit]},
   {:id "6520"
    :name "Reinsurance"
-   :repo "https://github.com/gftdcojp/cloud-itonami-K6520"
-   :business-id "cloud-itonami-K6520"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :banking]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-6520"
+   :business-id "cloud-itonami-6520"
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :insurance]
    :optional-technologies []
-   :maturity :spec
+   :maturity :blueprint
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :onboard :transact :clear :settle :audit]},
+   :operating-states [:intake :underwrite :bind :endorse :claim :settle :audit]},
   {:id "6530"
    :name "Pension funding"
-   :repo "https://github.com/gftdcojp/cloud-itonami-K6530"
-   :business-id "cloud-itonami-K6530"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :banking]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-6530"
+   :business-id "cloud-itonami-6530"
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :insurance]
    :optional-technologies []
-   :maturity :spec
+   :maturity :blueprint
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :onboard :transact :clear :settle :audit]},
+   :operating-states [:intake :enroll :accrue :claim :settle :audit]},
   {:id "6611"
    :name "Administration of financial markets"
    :repo "https://github.com/gftdcojp/cloud-itonami-K6611"
@@ -4706,31 +4706,31 @@
    :operating-states [:intake :onboard :transact :clear :settle :audit]},
   {:id "6621"
    :name "Risk and damage evaluation"
-   :repo "https://github.com/gftdcojp/cloud-itonami-K6621"
-   :business-id "cloud-itonami-K6621"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :banking]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-6621"
+   :business-id "cloud-itonami-6621"
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :insurance]
    :optional-technologies []
-   :maturity :spec
+   :maturity :blueprint
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :onboard :transact :clear :settle :audit]},
+   :operating-states [:intake :inspect :evaluate :report :audit]},
   {:id "6622"
    :name "Activities of insurance agents and brokers"
-   :repo "https://github.com/gftdcojp/cloud-itonami-K6622"
-   :business-id "cloud-itonami-K6622"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :banking]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-6622"
+   :business-id "cloud-itonami-6622"
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :insurance]
    :optional-technologies []
-   :maturity :spec
+   :maturity :blueprint
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :onboard :transact :clear :settle :audit]},
+   :operating-states [:intake :place :bind :endorse :audit]},
   {:id "6629"
    :name "Other activities auxiliary to insurance and pension funding"
-   :repo "https://github.com/gftdcojp/cloud-itonami-K6629"
-   :business-id "cloud-itonami-K6629"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :banking]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-6629"
+   :business-id "cloud-itonami-6629"
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :insurance]
    :optional-technologies []
-   :maturity :spec
+   :maturity :blueprint
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :onboard :transact :clear :settle :audit]},
+   :operating-states [:intake :administer :evaluate :report :audit]},
   {:id "6630"
    :name "Fund management activities"
    :repo "https://github.com/gftdcojp/cloud-itonami-K6630"
@@ -4742,13 +4742,13 @@
    :operating-states [:intake :onboard :transact :clear :settle :audit]},
   {:id "6820"
    :name "Real estate activities on a fee or contract basis"
-   :repo "https://github.com/gftdcojp/cloud-itonami-L6820"
-   :business-id "cloud-itonami-L6820"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-6820"
+   :business-id "cloud-itonami-6820"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :property]
    :optional-technologies []
-   :maturity :spec
+   :maturity :blueprint
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :list :lease :manage :audit]},
+   :operating-states [:intake :manage :appraise :bill :audit]},
   {:id "6910"
    :name "Legal activities"
    :repo "https://github.com/gftdcojp/cloud-itonami-M6910"
