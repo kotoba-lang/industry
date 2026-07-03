@@ -1,0 +1,31 @@
+{:frontmatter
+ {:id "adr-2607040300-cloud-itonami-iso3166-jpn-agency-maturity-promotion-batch3"
+  :title "ADR-2607040300: cloud-itonami-iso3166-jpn — agency maturity promotion, batch 3 (MAFF / MLIT / MOE)"
+  :status "accepted"
+  :date "2026-07-04"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "cloud-itonami-iso3166-jpn-agency-maturity-promotion-batch3"
+  :authoritative true
+  :authoritative_for ["cloud-itonami-iso3166-jpn-{maff,mlit,moe} blueprint scope"]
+  :related ["adr-2607040100-cloud-itonami-iso3166-jpn-agency-level-extension"
+            "adr-2607040200-cloud-itonami-iso3166-jpn-agency-maturity-promotion-batch2"
+            "adr-2607031600-cloud-itonami-cofog-government-function-blueprints"]
+  :supersedes []
+  :superseded_by []
+  :amends []}
+
+ :decision-summary
+ {:updated-lib "kotoba-lang/iso3166"
+  :new-blueprints ["cloud-itonami-iso3166-jpn-maff" "cloud-itonami-iso3166-jpn-mlit" "cloud-itonami-iso3166-jpn-moe"]
+  :org "cloud-itonami"
+  :visibility :public
+  :license "AGPL-3.0-or-later"
+  :registry-coverage {:total 212 :blueprint 16 :spec 196
+                       :jpn-agencies {:total 19 :blueprint 11 :spec 8}}
+  :promoted {:JPN-MAFF "gov.jpn.maff (ministry) -- food-safety classification + JAS certification"
+             :JPN-MLIT "gov.jpn.mlit (ministry) -- construction-business licensing (建設業許可) + building code"
+             :JPN-MOE "gov.jpn.moe (ministry) -- environmental impact assessment + waste-management permit"}
+  :robotics false
+  :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+  :manifest-registration "no new kotoba-lang/* repo -- extends existing kotoba-lang/iso3166; west.yml pin advances. The 3 blueprint repos remain standalone."}}
