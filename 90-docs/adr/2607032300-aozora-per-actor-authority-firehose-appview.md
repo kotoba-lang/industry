@@ -171,3 +171,28 @@ federation**。これが `PER_ACTOR_DB=1` を解禁する唯一のブロッカ�
   完全依存する検証、(c) 並行 CAS work（AppView index = 共有 writer なので、CAS は
   ここに正しく効く）との協調、が要る調整作業。self-sovereign 化（Level B: actor 自身の
   key-backup 鍵でのクライアント署名）は custody 移行の別ステップ。
+
+### 実装状況更新（2607032430）— staging cutover 完了・live 検証 green
+
+`PER_ACTOR_DB=1` + fresh `YORO_DB_NAME=yoro-social-v2` を staging（pds.aozora.app）で
+有効化し、live E2E で全経路を検証:
+
+- ✅ **read federation** — getBackup/getAccount(did) が per-actor graph を読む
+  （**0.35s**、肥大 shared db 時代の 30s から）。
+- ✅ **AppView projection（step 2）** — per-actor write が AppView index に projection
+  され、firehose（`com.etzhayyim.yoro.sync.getEvents` / `com.atproto.sync.subscribeRepos`）
+  が commit を認識。
+- ✅ **per-actor write→read roundtrip** — `prepareWrite → commitSigned → getRepo`
+  の no-server-key CAR egress が green（200 vnd.ipld.car）。
+
+live cutover が炙り出した2つの実バグ（＝ staging 検証の価値）を修正（app-aozora `d552830`）:
+1. `handle-prepare-write`/`handle-commit-signed` は repo commit を **operator db** に書くのに
+   `handle-get-repo` は per-actor graph を読む **write/read graph 不一致** → getRepo 501。
+   両者を `per-actor/read-client-db`（repo did でキー）で per-actor graph に揃えた。
+2. commitSigned が record と commit を **2 連続 transact** で書き、**fresh per-actor graph** では
+   2回目の head advance が落ちて commit 未 persist → getRepo 501。commit entity を record と
+   **同一 transact に統合**（`repo/{create-record,delete-record}` の `:_extra`）= 1 atomic head
+   advance（そもそも record と commit は atomic であるべき）。
+
+**結論**: 3層 per-actor アーキテクチャは staging で完全に稼働。残りは本番移行判断
+（既存データ方針・段階ロールアウト・self-sovereign 化 Level B）のみ。
