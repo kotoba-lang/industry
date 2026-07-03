@@ -1,0 +1,79 @@
+# ADR-2607031100: kotoba-lang/qa-governor — 「Nintendoクオリティ」ルーブリックを共通のQA governor actorに（proposed・pure core のみ scaffold 実装）
+
+**Status**: proposed（pure `.cljc` のルーブリック/governor/台帳ロジックのみ scaffold 実装済み。langgraph-clj StateGraphへの実配線・実LLMノードは未実装）
+**Date**: 2026-07-03
+**Deciders**: Jun Kawasaki
+
+## Context
+
+`ghosthacker-flow`（Ghost Hacker ゲームポートフォリオ第1弾）の品質改善サイクルの中で、
+「Nintendoクオリティを score 品質に」変換して自動検証するアイデアが出た。設計としては
+CLAUDE.md の「Actors」節にある既存パターン——**知能ノード（LLM）を1ノードに封じ込め
+proposal のみ返させ、別系統の Governor が検閲して可決/拒否に振る。単一不変条件
+「governor が拒否する commit を actor は決して行わない」。全 commit を append-only の
+監査台帳に積む**——をそのままQAに転用するのが筋が良い、と判断した。
+
+このQA governorは`ghosthacker-flow`固有のものにする必要が無い——ルーブリック
+（安定性・正しさ・堅牢性・ドキュメント整合性等）も、Governorの検証ロジック
+（LLMの自己申告採点を実行ログ等の証拠なしに信用しない）も、台帳の形も、
+どのリポジトリのQAにも一般化できる。`manifest/repos.edn`の org taxonomy
+（ADR-2606302300）は「language-substrate → kotoba-lang、全org が消費」と
+定めており、この位置づけに一致する。よって `ghosthacker-flow` 固有に作るのではなく
+`kotoba-lang/qa-governor` として共通化し、`ghosthacker-flow` を最初のconsumerにする。
+
+## Decision
+
+**`kotoba-lang/qa-governor`** を新設し、以下3層のpure `.cljc` ロジックを実装する
+（`ghosthacker-flow.core` と同じく、pure core を先に固め、langgraph-clj
+StateGraphへの実配線・実LLMノードは別途のホストアダプタ層とする）:
+
+1. **`qa-governor.rubric`** — カテゴリ×重みのルーブリック定義と加重平均スコア計算。
+   既定ルーブリックは「Nintendoクオリティ」を項目化したもの:
+   - `:stability`（クラッシュ/ハング0件）
+   - `:correctness`（テスト/lint green率）
+   - `:robustness`（対マッシュ・空振り検出等、不正な得点稼ぎ手段が塞がれているか）
+   - `:documentation`（README/CHANGELOGとコードの整合性）
+   - `:consistency`（API命名の対称性等、深堀りレビューでの指摘件数）
+
+   これらはドメイン非依存の既定カテゴリで、consumer（`ghosthacker-flow`等）が
+   `:extra-categories`（例: game-feel＝判定窓のチューニング妥当性）を追加できる
+   ようルーブリック自体をデータ（EDN）として拡張可能にする。
+
+2. **`qa-governor.governor`** — 知能ノードが返す採点案（`{:category :score :evidence}`
+   の集合）を検証する。**LLMの自己申告を無条件で信用しない**——各カテゴリの
+   `:evidence` が空、またはスコアの主張と矛盾する場合（例: correctness=100だが
+   evidenceに"failures"の記述がある）は却下し、`:verdict :rejected`を返す。
+   承認されたスコアのみ台帳にcommitされる。
+
+3. **`qa-governor.ledger`** — append-onlyのスコア履歴。`record`で1件追記、
+   `history`/`latest`/`trend`で参照する。時系列でスコア推移を追える。
+
+## Scope（今回のscaffold）
+
+pure `.cljc` の3namespaceとtestのみ。langgraph-clj StateGraphでの実際の
+QA-LLMノード配線、実リポジトリ（テスト実行結果・lint結果・git履歴）からの
+evidence収集ホストアダプタは対象外——`ghosthacker-flow.core`と同型のレイヤ
+分離方針（pure core先行、host adapterは別途）を踏襲する。
+
+## Open Questions
+
+- evidence検証のルール（何が「証拠として妥当」かの判定基準）は現状シンプルな
+  パターンマッチのみ。実運用では、governorがテスト実行ログ/CI結果を実際に
+  parseして突き合わせる、より厳密な検証ロジックへ強化する必要がある。
+- langgraph-clj StateGraphへの実配線（QA-LLMノード、interrupt-before による
+  人間承認等）は別PRで行う。
+- `ghosthacker-flow`以外のconsumer（kami-engine、kotoba-lang自身等）への適用は
+  今回のスコープ外。
+
+## Consequences
+
+**Positive**
+- QAの仕組みを`ghosthacker-flow`専用に作らず、org taxonomyに沿ってkotoba-lang
+  へ最初から共通化したことで、将来他repoへの適用時に複製が発生しない。
+- 既存のActorsパターン（封じ込め+governor+台帳）をQAという新しい用途に
+  転用でき、アーキテクチャの一貫性が保たれる。
+
+**Negative / 制約（honest）**
+- 本ADR時点でLLMノード・langgraph-clj配線は未実装（pure決定ロジックのみ）。
+  実際に「AIが採点する」動作はまだ無い。
+- evidence検証は簡易実装で、実運用に耐える厳密さにはまだ達していない。
