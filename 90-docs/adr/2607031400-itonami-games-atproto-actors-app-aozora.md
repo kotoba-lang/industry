@@ -148,3 +148,69 @@ shot.
 - CLAUDE.md's "kotoba-server（kotobase.net）= actor が自分の鍵で CACAO を
   自己発行" section
 - 本 ADR とペアの `.edn`
+
+## Addendum (2026-07-03, reconciled with ADR-2607032300 / ADR-2607032400)
+
+Two ADRs landed in `app-aozora`/`network-isekai` after this ADR was written,
+both directly relevant:
+
+**ADR-2607032300 (aozora self-sovereign 3-layer authority)** replaces the
+flat "app-aozora is a no-server-key XRPC surface" picture this ADR's Context
+used with a more specific one: writes land in a **per-actor graph**
+(`canonical-graph(actor-did, db)`), not a shared operator graph — the old
+single-`OPERATOR_SECRET`-signs-everyone's-writes design is explicitly the
+antipattern that ADR dismantles. Discovery/feed/timeline is a separate,
+derived **AppView** layer (`com.etzhayyim.yoro.*` projection today), never
+the authoritative write target itself. This ADR's Context was directionally
+right (client-signed, no shared secret held by the app-aozora *server*) but
+under-specified *where* a write actually lands — it lands in the writing
+actor's own graph, full stop, not "app-aozora" as an undifferentiated whole.
+
+More importantly, ADR-2607032300 reveals `app-aozora` already ships a
+**custodial per-actor key derivation mechanism** this ADR didn't know about:
+`aozora.pds.actorkey` — HKDF-SHA256 over `operator master + actor-did →
+per-actor Ed25519 key`, landing writes in `kotobase/db/<actor-did>/repo`,
+gated behind the (currently off) `PER_ACTOR_DB` env flag, already
+implemented and node-testable. ADR-2607032300 explicitly names the
+follow-up migration **"Level B self-sovereign"** (the actor's own
+`key-backup` credential, ADR-2607022330, signs client-side instead of the
+operator-held master) — it does not literally name the *current* custodial
+state; this addendum labels it **"Level A custodial"** only for symmetry
+with the source ADR's own "Level B," not as a direct quote.
+
+**Revises Decision §2**: rather than this ADR's original "run
+`kotoba-lang/cacao`'s `cacao/mint` out-of-band per game and store each
+result as its own `backend/` Worker secret" (a bespoke minting step,
+growing one secret per game, up to 111), the `backend/` Worker should derive
+each game's key **the same way `aozora.pds.actorkey` already does**: HKDF
+from a single operator-held master seed + the game's `did`/slug as the
+derivation input. One master secret, not N per-game secrets; no separate
+out-of-band `bb` minting step per game; and it's the exact mechanism
+`app-aozora` itself already uses for this exact custodial stage, rather than
+a parallel bespoke scheme this ADR would otherwise be inventing. This is
+still squarely the custodial stage this addendum calls "Level A" above — it
+does not change this ADR's original Consequences trade-off (key custody stays
+Worker-held, not self-sovereign; migrating to Level B still needs the
+not-yet-built `.cljc` port of CACAO client-side signing) — it only
+simplifies *how* the custodial key is produced, and aligns it with the
+platform's own roadmap instead of a one-off design.
+
+**Revises Decision §3**: the publish endpoint signs a commit into the
+*publishing game's own per-actor graph* (`canonical-graph(<game-did>,
+<db>)`), never a shared graph. Cross-game discovery (an "itonami games"
+feed/timeline across all 8+ games) is an AppView-layer concern — a future
+`app.aozora.*`/`com.etzhayyim.yoro.*`-style projection reading the games'
+per-actor commit streams — not something this ADR's write path should ever
+touch directly. This keeps itonami games' publish path from accidentally
+reproducing the exact single-shared-graph antipattern ADR-2607032300 spent
+an incident dismantling.
+
+**ADR-2607032400 (network-isekai consolidation)** is orthogonal to this
+ADR's actual decision — it confirms `network-isekai` (not `isekai-network`)
+is the canonical repo, which this ADR and ADR-2607031000 already assumed
+correctly. No change needed; noted here only for completeness since it
+landed in the same window.
+
+No change to this ADR's Status, numbered Decision list beyond §2/§3 above,
+or overall Consequences — the shape (one actor per game, Worker-custodial
+for now, Governor-gated publish, land `plumbing-rounds` first) still holds.
