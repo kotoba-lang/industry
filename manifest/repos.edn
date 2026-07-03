@@ -845,9 +845,15 @@
    ;; isekai/tensei RPG template asset lib (ADR-2607022340): race/class/monster/
    ;; skill EDN generator → kami.sprite2d primitives, no external asset files.
    "orgs/kotoba-lang/kami-isekai-assets"
-   ;; Ghost Hacker game portfolio #1 (ADR-2607023200): FLOW, pure .cljc
-   ;; groove-sync judgment core only (no rendering/input/audio host adapter yet).
+   ;; Ghost Hacker game portfolio #1 (ADR-2607023200): FLOW, host adapters
+   ;; (demo.clj/terminal.clj). The groove-sync judgment core moved out per
+   ;; ADR-2607032600 — see ghosthacker-groove-core below.
    "orgs/com-junkawasaki/ghosthacker-flow"
+   ;; Shared four-on-the-floor groove-sync judgment core (ADR-2607032600),
+   ;; extracted from ghosthacker-flow ahead of ghosthacker-harmony
+   ;; (Ghost Hacker portfolio #2, the flagship rhythm game) needing the
+   ;; same judgment/crossfade model.
+   "orgs/com-junkawasaki/ghosthacker-groove-core"
    ;; Common QA governor actor (ADR-2607031100): Nintendo-quality rubric +
    ;; evidence-checking governor + audit ledger, pure .cljc only (no
    ;; langgraph-clj wiring / real LLM scoring node yet). ghosthacker-flow is
