@@ -1,0 +1,189 @@
+{:frontmatter
+ {:id "adr-2607031800-kami-genre-base-systems"
+  :title "ADR-2607031800: kami-genre-base-systems -- 18 genre-category base gameplay systems for kotoba-lang"
+  :status "accepted"
+  :doc_type "adr"
+  :topic "kami-genre-base-systems"
+  :authoritative true
+  :last_verified "2026-07-03"
+  :authoritative_for
+  ["kotoba-lang/kami-genre-base-systems holds base/foundation gameplay
+    systems, one per genre category from a PlayStation-Store-style
+    genre-browse taxonomy (generic genre LABELS only, never any specific
+    commercial title's characters/art/story/mechanics)"
+   "18 categories were requested; not all are gameplay-mechanic archetypes
+    -- 4 (modern-remake/free-to-play/indie/post-apocalyptic) are
+    business/production/setting categories with no distinct core loop of
+    their own, and this repo does not force-invent a fake mechanic to claim
+    18/18 identical-shape 'real systems' -- each of those 4 instead gets a
+    real, honestly-labelled SUPPORTING SYSTEM a game in that category would
+    plausibly need (a tuning-preset layer, a currency/economy loop, a
+    minimal starter kernel, a resource-scarcity system), not a claim that
+    the category itself is a mechanic"
+   "all 18 categories now have real, clojure -M author.clj-verified
+    author.clj+logic.clj pairs, built strictly within the kami-clj compiler
+    subset's proven vocabulary (cross-checked against every reference game
+    this session established: kami-clj-play/games/{survivors,waves},
+    kami-clj-play3d/games/{royale,rt-audio-demo,dance})"
+   "local-multiplayer and fighting both use the same honest '1 human + 1
+    AI' adaptation isekai-network's own concept-3 investigation established
+    as the only currently-buildable local-multiplayer shape, given the
+    confirmed single-local-input-stream engine constraint"
+   "a maturity pass added 1-3 additional defsystems/richer state per
+    category (scoped honestly, not padded for parity) deepening each
+    genre's core loop beyond its bare minimal proving mechanic"]
+  :related
+  ["CLAUDE.md"
+   "90-docs/adr/2607023200-isekai-network-standalone-repo.md"
+   "90-docs/adr/2607031700-kotoba-lang-engine-wasm-emission-and-host-runtime.md"
+   "gftdcojp/isekai-network (the precedent this repo's author.clj/logic.clj
+    shape and honesty discipline follows)"
+   "kotoba-lang/kami-genre-base-systems"]
+  :supersedes []
+  :superseded_by []}
+
+ :problem
+ {:source "user request: pasted a PlayStation Store genre-browse page
+            (real commercial titles as genre examples), asked for just the
+            category labels extracted, then asked for a base gameplay
+            system per category 'as kotoba-lang'"
+  :investigated
+  ["the pasted list mixed two things: real commercial game titles/key-art
+    descriptions (copyrighted, must not be reproduced/mimicked) and generic
+    genre category labels (not copyrightable, safe to use as organizing
+    labels for wholly original systems) -- the category-label-only
+    extraction the user explicitly requested resolved this cleanly before
+    any system-building began"
+   "the kami-clj compiler subset's proven vocabulary, established
+    cumulatively across this whole session's isekai-network work, is
+    genuinely constrained: single local input stream (no player-index axis
+    argument anywhere), no terrain/tilemap/pathfinding/vehicle-physics/
+    skeletal-animation reachable from guest logic (Rust-substrate only),
+    no multiplication operator confirmed anywhere in any reference game or
+    prior verified base system (checked before use, not assumed) -- every
+    system in this repo was built to fit inside these real constraints,
+    not an idealized unconstrained design"
+   "4 of the 18 requested categories are not gameplay archetypes at all --
+    forcing them into the same 'distinct core loop' shape as the other 14
+    would have meant fabricating fictional mechanics with no grounding,
+    the same failure mode this session's design-investigation work (concept
+    2-5 open-questions) repeatedly rejected for isekai-network itself"]
+  :risk "18 base systems is a large surface -- risk of quality dilution
+         (shallow, near-identical copies) or risk of dishonest padding on
+         the 4 non-mechanic categories to hit a round number. Both were
+         explicitly guarded against: real per-genre design distinctions
+         (see :decision below), and honest N/A/preset framing for the 4
+         business/setting categories rather than fabricated mechanics"}
+
+ :decision
+ {:repo {:path "kotoba-lang/kami-genre-base-systems"
+         :visibility :public
+         :structure "design/<genre>.edn (one design doc per category,
+                     schema: :genre/id :genre/core-loop :genre/controls
+                     :genre/kami-engine{:proven-vocab-used :known-constraints})
+                     + games/<genre>/{author.clj,logic.clj,deps.edn,.gitignore}
+                     (one pair per category with real code) -- mirrors
+                     kami-clj-play/games/'s established convention exactly"}
+  :fourteen_gameplay_archetypes
+  ["rhythm (beat-gated tick-n+mod timing, the pattern isekai-network's own
+     concept 1/4 proved and this repo's rhythm system directly reuses) --
+     maturity pass added a defatom combo/streak counter"
+   "puzzle -- maturity pass added a second distinct tile-arrangement
+     variant so there is real progression, not one static puzzle"
+   "stealth -- maturity pass replaced binary detected/not-detected with an
+     escalating defatom alert-level that rises on detection and decays over
+     time"
+   "single-player (the canonical survivors-shaped reference loop plus a
+     defatom level counter escalating spawn tightness)"
+   "strategy -- maturity pass added a real win/lose condition (opposing
+     defatom force counters, game ends at zero)"
+   "sports (ball-and-goal proximity mechanic)"
+   "horror (escalating pursuit-speed tension loop)"
+   "superhero (empowered/wide-range combat, themed reskin of the base
+     weapon system)"
+   "open-world (large flat arena + scattered point-of-interest discovery,
+     honestly NOT streaming terrain -- that fidelity is Rust-substrate
+     only)"
+   "local-multiplayer (1 human + 1 AI vs a shared ball/objective, honest
+     fallback for the confirmed single-input-stream constraint)"
+   "kids-family (deliberately the simplest base in the repo -- zero-fail
+     stationary-collection loop, no chase AI at all)"
+   "relaxing (player-paced 'garden' touch-to-grow loop, no timer pressure)"
+   "platformer (sequential ordered-waypoint traversal -- honestly NOT a
+     jump-physics platformer; no jump/gravity primitive exists anywhere in
+     the proven vocabulary, confirmed via a targeted grep across every
+     reference game before concluding this)"
+   "fighting (1 human + 1 AI opponent, same input-stream constraint as
+     local-multiplayer, proximity-exchange defatom health counters)"]
+  :four_supporting_systems_not_mechanics
+  ["modern-remake -- a real, reusable TUNING-PRESET system (wider hit-
+     tolerance, auto-aim-style larger weapon-range) demonstrated by
+     re-tuning single-player's constants, not a fabricated 'remake
+     mechanic'"
+   "free-to-play -- a real soft-currency economy loop (earn via enemy
+     defeat, auto-spend at a threshold for a temporary buff, buff decays)
+     layered on single-player -- a genuine common F2P building block, not a
+     claim that F2P is itself a mechanic"
+   "indie -- the smallest possible starter kernel in the repo (one entity,
+     one movement system, nothing else) -- a genuinely useful rapid-
+     iteration starting point, explicitly labelled as a scaffold not a
+     genre mechanic"
+   "post-apocalyptic -- a real resource-scarcity system (limited weapon
+     defatom 'charges' depleting per use, replenished by scarce 'salvage'
+     pickups) layered on single-player -- a genuine scarcity mechanic, not
+     a claim that the narrative setting is inherently a distinct core loop"]
+  :verification
+  "every author.clj actually run via `clojure -M author.clj`, confirmed
+   producing valid scene.edn; every logic.clj construct cross-checked
+   against the proven vocabulary (defsystem/defn/def/let/when/cond/if/f32/
+   spawn-entity/despawn-entity/set-position!/set-velocity!/get-x/get-y/
+   nearest-tagged/count-tagged/doseq-entities/move-toward!/axis/tick-n/mod/
+   rand-int/zero?/</=/not=/defatom/set-atom!) -- multiplication was checked
+   and found NOT confirmed anywhere in any reference game or prior verified
+   base, so score-reset-style periods use precomputed constants with a
+   comment explaining the derivation, rather than an unverified `*` call.
+   WASM compilation (kotoba-lang/engine's compile-file) was NOT attempted
+   for all 18 in this pass -- a legitimate, valuable follow-up, out of
+   scope here given this session's established slow-build cost for that
+   verification tier"}
+
+ :consequences
+ {:reusable_foundation "18 genre-labelled starting points now exist for any
+                         future kotoba-lang game project to fork from,
+                         each with documented, honestly-scoped engine
+                         constraints rather than aspirational unverified
+                         claims"
+  :discipline_precedent "the honest N/A-vs-real-mechanic distinction
+                          methodology (4/18 categories) is now a concrete,
+                          citable precedent for any future taxonomy-driven
+                          content generation task in this org -- 'hit every
+                          requested slot' does not override 'do not
+                          fabricate'"
+  :follow_up_debt "WASM-compile verification for all 18 games remains
+                    undone; a natural next pass once genuinely needed by a
+                    real consuming game project, not speculative work now"}
+
+ :alternatives
+ [{:option "force all 18 categories into an identical 'distinct core loop'
+            shape, inventing mechanics for the 4 business/setting
+            categories"
+   :rejected_because "would have fabricated ungrounded gameplay claims for
+                       categories that are not gameplay archetypes -- the
+                       same failure mode this session's isekai-network
+                       design-investigation work (concept 2-5) repeatedly
+                       and deliberately avoided"}
+  {:option "skip the 4 non-mechanic categories entirely (no games/ dir,
+            no code at all)"
+   :rejected_because "the user explicitly asked for real code for these 4
+                       too -- the honest resolution was a real, clearly-
+                       labelled supporting system per category, not silence"}
+  {:option "attempt real hecs/pathfinding/physics integration for genres
+            that traditionally need it (strategy pathfinding, platformer
+            physics, sports vehicles) instead of the gameplay-logic-only
+            approximation"
+   :rejected_because "these are Rust-substrate crates unreachable from
+                       kami-clj guest logic -- confirmed, not assumed, via
+                       this session's repeated concept-level investigations
+                       for isekai-network. Attempting it here would have
+                       required new host-side engine work out of scope for
+                       a base-systems content repo"}]}

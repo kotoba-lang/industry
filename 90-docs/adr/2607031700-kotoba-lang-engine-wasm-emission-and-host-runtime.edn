@@ -1,0 +1,238 @@
+{:frontmatter
+ {:id "adr-2607031700-kotoba-lang-engine-wasm-emission-and-host-runtime"
+  :title "ADR-2607031700: kotoba-lang/engine WASM byte-emission + kotoba-lang/kami-script-runtime-rs (the recovered WASM host substrate)"
+  :status "accepted"
+  :doc_type "adr"
+  :topic "kotoba-lang-clj-wgsl-runtime-closure"
+  :authoritative true
+  :last_verified "2026-07-03"
+  :authoritative_for
+  ["kotoba.engine-clj.wasm-bytes (kotoba-lang/engine, PR #1) is the byte-emission
+    step that closes the gap between kotoba.engine-clj's Module IR (semantic
+    compile, already-ported from deleted Rust codegen.rs) and real loadable
+    .wasm bytes -- ported 1:1 from the deleted Rust codegen.rs::compile
+    (kami-engine@a8368f9c0d784dbc9d11e8fa8f407aa95c7ce4fa:kami-engine-clj/src/codegen.rs)"
+   "PR #2 fixed a real semantic bug PR #1 introduced (:f32-const encoded the
+    raw Clojure float literal instead of its num/f32-bits IEEE-754 bit
+    pattern) -- found only by kami-script-runtime-rs's real tick-loop
+    execution, not by wasm-tools validate (structurally valid, semantically
+    wrong -- any 4 bytes are valid IEEE-754)"
+   "kotoba-lang/kami-script-runtime-rs is a new repo hosting the WASM HOST
+    substrate (wasmtime + wasmi backends, 14 host-import bindings, entity
+    store) recovered 1:1 from kami-engine's deleted
+    kami-script-runtime/src/lib.rs -- this Rust substrate was ALWAYS
+    classified :stay-Rust-substrate in ADR-2607010930's original ledger but
+    was accidentally swept into the wholesale kami-engine Rust-workspace
+    deletion; kotoba-lang/kami-script-runtime (the CLJC-scoped repo) only
+    ported the genuinely-portable input_map.rs submodule and explicitly,
+    permanently excludes the host substrate from its own scope -- this ADR
+    is the missing repo that closes that gap"
+   "isekai-network's real games/01-netsurvivors/logic.clj compiles through
+    the full pipeline end-to-end and was verified actually running: entity
+    count grows via spawn, the beat-gated bonus mechanic fires, pixel-level
+    on-screen colour verification (via a real render-to-texture screenshot
+    capture) confirms shiro-pico/ghost accent colours match
+    character-design-spec.json's canonical palette after accounting for the
+    shader's glow-brightening + sRGB-encode pipeline"]
+  :related
+  ["CLAUDE.md"
+   "90-docs/adr/2607010930-clj-wgsl-migration.md"
+   "90-docs/adr/2607023200-isekai-network-standalone-repo.md"
+   "manifest/repos.edn"
+   "kotoba-lang/engine PR #1, PR #2 (both merged)"
+   "kotoba-lang/kami-script-runtime-rs (new repo)"
+   "gftdcojp/isekai-network"]
+  :supersedes []
+  :superseded_by []}
+
+ :problem
+ {:source "session-long thread: isekai-network (gftdcojp/isekai-network,
+            Ghost Hacker: Shiro & Pico) had a real, EDN-validated,
+            proven-vocabulary-checked games/01-netsurvivors/logic.clj since
+            early in the session, but no way to verify it actually ran --
+            kami-engine-clj (the compiler CLAUDE.md documented) turned out
+            to have been deleted upstream (kotoba-lang/kotoba PR #259) as
+            part of ADR-2607010930's clj-wgsl migration, and its CLJC
+            replacement (found under the differently-named kotoba-lang/engine)
+            only produced a Module IR data structure, not loadable .wasm
+            bytes -- and even with bytes, nothing existed to actually load
+            and execute them with real host-import behaviour"
+  :investigated
+  ["kotoba.engine-clj/compile-file successfully compiled isekai-network's
+    real logic.clj to a Module IR with all 8 expected functions, 14
+    host-imports, correctly-evaluated constants -- confirmed via direct
+    testing before any new code was written"
+   "the Module IR's byte-emission gap was explicitly documented in
+    kotoba-lang/engine's own README (\"a future host-adapter package is
+    expected to do this\") -- not a surprise discovery, a known, scoped-out
+    TODO"
+   "the deleted Rust kami-script-runtime/src/lib.rs (2042 lines) was fully
+    recoverable from kami-engine's git history at the same pinned SHA
+    codegen.rs was recovered from, confirming both halves of the deleted
+    Rust workspace share one recoverable snapshot"
+   "kotoba-lang/kami-script-runtime's own README states the host-runtime
+    exclusion in absolute terms (\"permanent scope exclusion, not a TODO\"),
+    confirming no other repo was quietly planning to cover this -- a real
+    gap, not a duplication risk (kotoba-lang/wasm-ui, kotoba-lang/webgpu,
+    kotoba-lang/ui, kotoba-lang/webgl, kotoba-lang/gpu were all separately
+    surveyed and confirmed unrelated: browser-only DOM/WebGPU UI substrate
+    or empty Phase-4 scaffolds, none targeting native windowed wasmtime
+    hosting)"]
+  :risk "porting Rust->CLJC codegen semantics correctly does not guarantee
+         the separate mechanical byte-emission step is correct -- WASM
+         binary format bugs (wrong section order, wrong opcode, wrong
+         immediate encoding) can be structurally valid (wasm-tools validate
+         passes) while being semantically wrong, as PR #2's f32-const bug
+         demonstrated concretely"}
+
+ :decision
+ {:byte_emission
+  {:location "kotoba-lang/engine, new namespace kotoba.engine-clj.wasm-bytes"
+   :method "1:1 port of the deleted Rust codegen.rs::compile's section
+            assembly (type/import/function/memory/global/export/code/data,
+            same order, same cabi_realloc bump-allocator special case),
+            recovered read-only from kami-engine's git history at the pin
+            already used for codegen.cljc's own recovery"
+   :verification "wasm-tools validate (independent external validator, not
+                   self-consistency) on both a minimal example and
+                   isekai-network's real logic.clj; wasmtime run --invoke
+                   actually executing emitted bytes and returning the
+                   correct value; 51 tests / 213 assertions"
+   :bug_found_and_fixed "PR #2: :f32-const missing num/f32-bits conversion,
+                          found by kami-script-runtime-rs's real tick-loop
+                          execution (ghosts spawned via a def-bound constant
+                          moved correctly; ghosts using an inline f32
+                          literal in the same cond sat at a NaN position
+                          forever) -- fixed with 2 new regression tests
+                          decoding the emitted bytes back via an independent
+                          ByteBuffer read"}
+  :host_runtime
+  {:new_repo {:path "kotoba-lang/kami-script-runtime-rs"
+              :visibility :public
+              :naming_note "no stronger established -rs-suffix convention
+                             was found in kotoba-lang for \"thin Rust
+                             substrate paired with an almost-same-named CLJC
+                             sibling\" at the time this repo was created --
+                             flagged, not resolved (see :naming_review below)"}
+   :scope "wasmtime (JIT) + wasmi (no-JIT/interpreted) dual backends, one
+           binding codebase, 14 host-import implementations recovered 1:1
+           from the deleted lib.rs, hand-rolled HashMap-based entity store
+           (NOT hecs -- disclosed simplification, hecs recovery was not
+           attempted), render/audio/physics host-imports NOT implemented
+           because isekai-network's actual compiled module declares none
+           (confirmed empirically via the parity test's clean run, not
+           assumed) -- matches the original pre-deletion Rust's own no-op
+           status for those bindings"
+   :verification "wasmi/wasmtime parity test runs isekai-network's real
+                   compiled module through both backends for 200 ticks,
+                   asserts bit-for-bit identical position/velocity/tag/count
+                   state -- the golden-frame determinism contract
+                   ADR-2607010930's original kami-script-runtime design
+                   called for"
+   :kami_clj_play_integration "src/bin/kami_clj_play.rs reuses the deleted
+                                original's wgpu rendering/shader/instanced-
+                                sprite code, replaced its in-process
+                                hecs+CLJ-compile Game struct with a thin
+                                KamiHost wrapper loading a pre-compiled
+                                game.wasm (disclosed architectural change --
+                                the compiler is CLJC now, not callable from
+                                Rust at runtime) plus a hand-rolled
+                                scene.edn parser scoped to author.clj's
+                                known flat output shape (disclosed
+                                simplification, not a general EDN reader).
+                                Confirmed running: real window, sustained
+                                ~60fps for 720 frames, isekai-network's
+                                game.wasm executing live (entity count 5->21
+                                via spawn, beat-spark bonus firing), pixel-
+                                level colour verification via a real
+                                render-to-texture screenshot capture
+                                (Shiro-hood white near-exact match; teal/lime
+                                eye-accent colours consistent with the
+                                shader's 0.35*halo glow-brightening + sRGB
+                                encode once that two-step colour pipeline
+                                was correctly accounted for -- documented as
+                                a comment directly in the fragment shader
+                                source so future verification work does not
+                                repeat the naive-hex-comparison gap)"}
+  :naming_review
+  {:finding "no established kotoba-lang naming convention was found for
+             this exact \"Rust substrate host paired with an almost-same-
+             named CLJC sibling repo\" shape at the time of creation --
+             kami-script-runtime-rs's own README already flagged this
+             explicitly"
+   :recommendation "not acted on unilaterally -- renaming a live,
+                     manifest-registered, actively-depended-on public repo
+                     is a disruptive decision this ADR defers to the
+                     project owner. If a convention is later established
+                     (e.g. a -rs suffix pattern emerges from other Phase-4/7
+                     migration landings), kami-script-runtime-rs is the
+                     first known instance and a rename would need a
+                     west.yml pin update + isekai-network build-doc update,
+                     not a blocking concern today"}
+  :genre_base_systems_naming
+  {:finding "kami-genre-base-systems' games/<genre>/ layout mirrors
+             kami-clj-play/games/<name>/'s established convention exactly
+             (author.clj+logic.clj+deps.edn+.gitignore per named game) --
+             consistent, no naming gap found"
+   :future_question "whether individual genre systems should eventually
+                      become separate kami-app-{genre} crates per
+                      ARCHITECTURE.md's stated per-game-crate convention is
+                      a real open question, deliberately not resolved here
+                      -- these are BASE/FOUNDATION systems (pre-crate-worthy
+                      prototypes), not shipped games, so the kami-clj-play/
+                      games/ precedent (which also holds prototype-tier
+                      reference games, not crate-worthy products) is the
+                      better-fitting precedent for this repo's current
+                      maturity level"}
+  :library_reuse_check
+  {:finding "none of the ~113 Phase-7-restored kotoba-lang CLJC crates
+             (kotoba-lang/physics-2d, /pathfind, /tilemap, etc.) expose
+             anything the kami-clj GUEST compiler can call -- they are
+             host-side-only Rust-callable libraries (or CLJC ports thereof
+             consumed by Rust hosts), not part of the guest module's fixed
+             host-import vocabulary. Confirmed, not assumed: the guest
+             compiler's callable surface is exactly the 14 host-imports
+             kami-script-runtime-rs implements, nothing more, matching this
+             session's established finding (concept 2/3/4/5 investigations)
+             that guest logic cannot reach Rust-substrate crates directly"}}
+
+ :consequences
+ {:isekai_network_unblocked "the specific compile-and-run blocker
+                              isekai-network's README documented all
+                              session is closed -- real execution, real
+                              pixel-verified rendering, both backends
+                              deterministic"
+  :third_kamiclj_gap_closed "kotoba-lang/engine now has both halves closed
+                              (semantic compile + byte emission); the
+                              previously-undocumented host-runtime gap
+                              (kami-script-runtime's permanent scope
+                              exclusion) now has an owner"
+  :genre_base_systems_downstream "kami-genre-base-systems (a separate,
+                                   parallel initiative this session) can
+                                   now, as real follow-up, actually
+                                   WASM-compile + run its systems through
+                                   this same pipeline -- not attempted in
+                                   this ADR's scope, a legitimate next step"
+  :naming_debt "one open naming question (kami-script-runtime-rs) is
+                explicitly deferred, not silently accepted as final"}
+
+ :alternatives
+ [{:option "wait for kotoba-lang/kami-script-runtime's own scope to
+            eventually cover the host runtime, rather than creating a new
+            repo"
+   :rejected_because "that repo's README states the exclusion in absolute,
+                       permanent terms -- waiting on a scope change that has
+                       already been explicitly ruled out is not a real path"}
+  {:option "port the deleted Rust host runtime into kami-engine (the
+            asset/contract shell repo) instead of a new repo"
+   :rejected_because "kami-engine runs a CI \"no-rust guard\" (confirmed via
+                       its own CLAUDE.md) -- structurally cannot host Rust
+                       source"}
+  {:option "attempt a full hecs-based entity store instead of the
+            hand-rolled HashMap store, to match the original more closely"
+   :rejected_because "time-boxed given this session's established slow-
+                       build cost for wgpu/wasmtime-adjacent Rust crates --
+                       the hand-rolled store is real, tested, and
+                       functionally equivalent for this session's
+                       verification needs; hecs parity is a disclosed,
+                       legitimate follow-up, not silently dropped"}]}
