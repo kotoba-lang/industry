@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L3 business operator（全業種・職種 SaaS + investment platform）  
-**As-of**: 2026-07-02  
+**As-of**: 2026-07-03  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -14,6 +14,7 @@
 - AI agent 導入は「誰が何を承認したか」が残らずコンプラ不能
 - 中小には CFO/法務/営業 ops の専任が居ない
 - 観測 (signal): itonami.cloud 実測 6 req/7d・3 uniques(日次和)
+- 観測 (signal): itonami.cloud 実測 68 req/7d・18 uniques(日次和)
 
 ## Customer Segments
 

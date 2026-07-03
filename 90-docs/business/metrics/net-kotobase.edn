@@ -1,13 +1,13 @@
-{:as-of "2026-07-02",
+{:as-of "2026-07-03",
  :sources [:cloudflare :stripe :health],
  :zone
- {:requests-7d 3631,
-  :pageviews-7d 279,
-  :uniques-7d-sum 314,
+ {:requests-7d 3586,
+  :pageviews-7d 247,
+  :uniques-7d-sum 289,
   :zone "kotobase.net"},
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 3678, "kotobase-cf-wasm-staging" 3872},
+ {"net-kotobase" 3603, "kotobase-cf-wasm-staging" 3810},
  :stripe
  ;; live 実態を反映 (2026-07-03)。内部フライホイールの 4 tenant が kotobase live price で
  ;; active (did:web:apex.gftd.ai / itonami.cloud / sh1n5h1x.gftd.ai=Pro, manimani.cloud=Standard、
@@ -20,4 +20,4 @@
   :last-charge-epoch 1604224274},
  :health-status 200,
  :signal
- "kotobase.net 実測 3631 req/7d・314 uniques(日次和)、workers 7550 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 3586 req/7d・289 uniques(日次和)、workers 7413 inv/7d、Stripe active subs 0"}
