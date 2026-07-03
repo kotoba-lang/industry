@@ -151,3 +151,23 @@ federation**。これが `PER_ACTOR_DB=1` を解禁する唯一のブロッカ�
 - **残: enablement step 2（multi-author firehose → AppView index）** = `PER_ACTOR_DB=1`
   解禁の最後のブロッカー。停止中 relay-cron の machinery を内部 per-actor firehose に
   付け替え、timeline/通知を AppView index 化。単一著者 read は step 1 で独立に federate 済み。
+
+### 実装状況更新（2607032400）— step 2 着地・PER_ACTOR_DB 解禁準備完了
+
+- **enablement step 2（AppView projection）着地** — app-aozora `5b139d3`。
+  `aozora.pds.per-actor/project!`（+ `appview-client-db`）が、per-actor write の
+  authoritative 着地後に **同じ `[record firehose-ledger]` tx を共有 operator db（＝
+  DERIVED AppView index）へ dual-write**。firehose（`:atproto.firehose/*` ledger）と
+  getAuthorFeed/timeline は per-actor write でも読めるまま。`repo/{create-record,
+  delete-record, apply-writes}` が router 注入の `:_env` 経由で projection。
+  **best-effort**（projection 失敗は authoritative write を壊さない — index は
+  per-actor graph から再構築可能）。**off-by-default → 本番挙動不変**。PDS build +
+  242 tests/1047 assertions green（新 per-actor-test が flag-off fallback/no-op を固定）。
+- **3層が揃った**: authority=per-actor graph（step 1 read federation + 既存 write path）、
+  firehose=`:atproto.firehose/*` ledger、AppView=共有 DERIVED index（step 2 projection）。
+  → **`PER_ACTOR_DB=1` を解禁する技術ブロッカーは解消**。
+- **残るのは運用（コード完了済み）**: flag を実際に立てる cutover は (a) 既存 operator db
+  データの扱い（fresh 開始 or backfill）、(b) multi-author read が projection 経由に
+  完全依存する検証、(c) 並行 CAS work（AppView index = 共有 writer なので、CAS は
+  ここに正しく効く）との協調、が要る調整作業。self-sovereign 化（Level B: actor 自身の
+  key-backup 鍵でのクライアント署名）は custody 移行の別ステップ。
