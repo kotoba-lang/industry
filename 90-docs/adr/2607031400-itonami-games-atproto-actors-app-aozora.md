@@ -171,11 +171,12 @@ More importantly, ADR-2607032300 reveals `app-aozora` already ships a
 `aozora.pds.actorkey` — HKDF-SHA256 over `operator master + actor-did →
 per-actor Ed25519 key`, landing writes in `kotobase/db/<actor-did>/repo`,
 gated behind the (currently off) `PER_ACTOR_DB` env flag, already
-implemented and node-testable. ADR-2607032300 names this **"Level A
-custodial"** — an operator-held master derives every actor's key
-deterministically — with **"Level B self-sovereign"** (the actor's own
-`key-backup` credential, ADR-2607022330, signs client-side instead) as the
-follow-up migration once it's built.
+implemented and node-testable. ADR-2607032300 explicitly names the
+follow-up migration **"Level B self-sovereign"** (the actor's own
+`key-backup` credential, ADR-2607022330, signs client-side instead of the
+operator-held master) — it does not literally name the *current* custodial
+state; this addendum labels it **"Level A custodial"** only for symmetry
+with the source ADR's own "Level B," not as a direct quote.
 
 **Revises Decision §2**: rather than this ADR's original "run
 `kotoba-lang/cacao`'s `cacao/mint` out-of-band per game and store each
@@ -187,8 +188,8 @@ derivation input. One master secret, not N per-game secrets; no separate
 out-of-band `bb` minting step per game; and it's the exact mechanism
 `app-aozora` itself already uses for this exact custodial stage, rather than
 a parallel bespoke scheme this ADR would otherwise be inventing. This is
-still squarely **"Level A custodial"** in ADR-2607032300's terms — it does
-not change this ADR's original Consequences trade-off (key custody stays
+still squarely the custodial stage this addendum calls "Level A" above — it
+does not change this ADR's original Consequences trade-off (key custody stays
 Worker-held, not self-sovereign; migrating to Level B still needs the
 not-yet-built `.cljc` port of CACAO client-side signing) — it only
 simplifies *how* the custodial key is produced, and aligns it with the
