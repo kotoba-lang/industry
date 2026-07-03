@@ -196,7 +196,12 @@
  ;; 生成時に既存 path 群と union される（一度 west.yml に載れば自動追従、distinct で重複排除）。
  ;; clone 済みの working tree（orgs/<org>/<repo>）が存在し HEAD を持つこと。
  :extra-projects
- #{;; gijiroku (議事録) — Zoom/Meet/Teams meeting-record actor, scribe-LLM ⊣
+ #{;; youtube-upload — YouTube Data API v3 upload client (OAuth refresh + resumable
+   ;; videos.insert + captions.insert + thumbnails.set), extracted from
+   ;; ai-gftd-project-yukkuri's upload_youtube.py so other video-producing actors can
+   ;; reuse it. Python (deliberate .cljc-convention exception, see ADR-2607031500)
+   "orgs/kotoba-lang/youtube-upload"
+   ;; gijiroku (議事録) — Zoom/Meet/Teams meeting-record actor, scribe-LLM ⊣
    ;; PrivacyGovernor; common kotoba-lang infra for cloud-itonami/cloud-manimani (ADR-2607031100)
    "orgs/kotoba-lang/gijiroku"
    ;; fleet coordination — 20-agent lease/governor substrate (ADR-2606302000)
