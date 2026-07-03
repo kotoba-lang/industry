@@ -170,3 +170,31 @@ datom store が、**同一の datom model を共有**する（Datomic の db val
 **残り（最後の一歩）**: worker（`kotobase-cljc-worker/handler.tx-edn->quads`）の datafication
 を engine の `entities->datoms` に委譲。現在は並行セッションが handler.cljc を D1 novelty-log で
 編集中のため、その決着後に。これで transport 層も canonical model に揃う。
+
+## 実装状況更新（2607032630）— datom model 統一 **全3層完了**
+
+最後の transport 層も統一（kotobase-cljc-worker `cf7f0b7`）:
+
+- **worker の `handler/tx-edn->quads` が engine の `entities->datoms`（= `datom.core/eavt`）
+  経由に**。private な entity→quad ループを撤去し、DB・言語と同一の `[e a v]` datafication に。
+  behavior-preserving（worker build + node-test 12/54 green）。
+- **副次修正（必須）**: engine が `datom.core` を require し始めたため、worker の shadow-cljs
+  source-paths に `../datom/src` を追加（無いと `namespace datom.core not available` で build 破綻）。
+
+**→ 全3層が唯一の datom model（datom-clj）に収束**:
+
+```
+                       datom.core (datom-clj)
+            ┌───────────────┼───────────────┐
+   language(kotoba)      DB(kotobase-engine)   transport(worker)
+   kgraph                 entities->datoms      tx-edn->quads
+   assert-entity          transact-tx           = entities->datoms
+        └───── すべて datom.core/eavt = 同一 [e a v] datafication ─────┘
+```
+
+**kotoba : kotobase = Clojure : Datomic** が、positioning（ADR/README）だけでなく **言語・
+データベース・transport の全層のコードで、唯一の共有 datom model として実体化**した。
+Datomic が Clojure データを db value・query・tx に使うのと同型。共有依存は
+`check-foundation-deps.bb`（CI）が drift なく維持する。
+
+**この ADR の follow-up は全て着地**（残作業なし）。
