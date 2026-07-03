@@ -874,4 +874,9 @@
    ;; evidence-checking governor + audit ledger, pure .cljc only (no
    ;; langgraph-clj wiring / real LLM scoring node yet). ghosthacker-flow is
    ;; the first intended consumer.
-   "orgs/kotoba-lang/qa-governor"}}
+   "orgs/kotoba-lang/qa-governor"
+   ;; murakumo-studio (ADR-2607032700): LM Studio-like local inference desktop
+   ;; app on kotoba-lang/inference (Tauri 2 + shadow-cljs/reagent + kotoba-ui/
+   ;; appkit). v1 = CPU backend, model manager, OpenAI-compatible local
+   ;; server, murakumo fleet announce-only.
+   "orgs/kotoba-lang/murakumo-studio"}}
