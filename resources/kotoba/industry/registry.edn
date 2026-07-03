@@ -4752,13 +4752,17 @@
    :operating-states [:intake :manage :appraise :bill :audit]},
   {:id "6910"
    :name "Legal activities"
-   :repo "https://github.com/gftdcojp/cloud-itonami-M6910"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-M6910"
    :business-id "cloud-itonami-M6910"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
+   ;; No :robotics -- company-formation execution is a digital/document
+   ;; service with no physical domain work, the same exemption class as
+   ;; cloud-itonami-6310 (ADR-2607031500 Addendum, ADR-2607031800).
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :scope :design :verify :deliver :audit]},
+   :maturity :implemented
+   ;; real actor: formation.{store,registry,facts,registrarllm,governor,
+   ;; phase,operation}.cljc, 32 tests / 172 assertions, CI green (lint+test)
+   :operating-states [:application/intake :jurisdiction/assess :kyc/screen :filing/submit :audit]},
   {:id "6920"
    :name "Accounting, bookkeeping and auditing activities"
    :repo "https://github.com/gftdcojp/cloud-itonami-M6920"
