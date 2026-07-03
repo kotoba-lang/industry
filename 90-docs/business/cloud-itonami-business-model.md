@@ -15,6 +15,7 @@
 - 中小には CFO/法務/営業 ops の専任が居ない
 - 観測 (signal): itonami.cloud 実測 6 req/7d・3 uniques(日次和)
 - 観測 (signal): itonami.cloud 実測 68 req/7d・18 uniques(日次和)
+- 観測 (signal): itonami.cloud 実測 275 req/7d・38 uniques(日次和)
 
 ## Customer Segments
 
