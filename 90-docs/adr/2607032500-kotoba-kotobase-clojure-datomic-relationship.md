@@ -141,3 +141,32 @@ follow-up「datom model の統一」の**具体化を開始・engine 側を着�
 - worker（`kotobase-cljc-worker/handler.tx-edn->quads`）の datafication も engine の
   `entities->datoms` に委譲（現在は並行セッションが handler.cljc を D1 novelty-log で編集中のため
   その決着後）。
+
+## 実装状況更新（2607032600）— datom model 統一 **両側完了**（invariant 2 実体化）
+
+前回の engine 側に続き、**言語側（kgraph）も datom-clj を consume**（kotoba `338c233`）:
+
+- **`kotoba.kgraph`（言語の in-mem EAVT datom store）が datom-clj を依存採用**し、entity
+  tx-map の datafication を `datom.core/eavt` 経由に: `assert-entity` / `assert-entities`。
+  engine の `entities->datoms` / `transact-tx` と**同一の datafication 経路**。
+- test で等価性をロック: `(kgraph/assert-entity [] ent) == (datom.core/eavt ent)`
+  （kgraph-test 4 tests/11 assertions green）。
+- kotoba `deps.edn` に datom-clj（:deps git-pin + :dev :local/root）。
+
+**→ invariant 2 が両側で実体化**:
+
+```
+                    datom.core (datom-clj)   ← 唯一の datom model [e a v] / entity↔eavt
+                    ↙                      ↘
+kotoba.kgraph（言語の in-mem view）      kotobase-engine（DB の永続 view）
+   assert-entity/assert-entities            entities->datoms/transact-tx
+        = 同一 datafication ============================ 同一 datafication
+```
+
+言語（Clojure=kotoba）の in-mem datom store と データベース（Datomic=kotobase）の永続
+datom store が、**同一の datom model を共有**する（Datomic の db value が Clojure データで
+あるのと同型）。この shared 依存は `check-foundation-deps.bb`（CI）が drift なく維持する。
+
+**残り（最後の一歩）**: worker（`kotobase-cljc-worker/handler.tx-edn->quads`）の datafication
+を engine の `entities->datoms` に委譲。現在は並行セッションが handler.cljc を D1 novelty-log で
+編集中のため、その決着後に。これで transport 層も canonical model に揃う。
