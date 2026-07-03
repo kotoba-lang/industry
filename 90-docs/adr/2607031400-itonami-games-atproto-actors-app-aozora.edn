@@ -1,0 +1,36 @@
+{:frontmatter
+ {:id "adr-2607031400-itonami-games-atproto-actors-app-aozora"
+  :title "ADR-2607031400: itonami games as AT-Protocol actors — per-game Worker-held identity, posting to app-aozora"
+  :status "accepted"
+  :date "2026-07-03"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "itonami-games-atproto-actors-app-aozora"
+  :authoritative true
+  :authoritative_for
+  ["each cloud-itonami itonami game (public/games/itonami/<slug>/) gets its
+    own Ed25519 did:key CACAO actor identity, not one shared account,
+    minted out-of-band via kotoba-lang/cacao's cacao/mint (JVM/bb-only —
+    cacao/core.clj is not .cljc and cannot mint/sign in-browser today)"
+   "keys are stored as network-isekai's existing backend/ Cloudflare Worker
+    secrets (per game slug), never held or touched by the browser client"
+   "backend/ Worker gains POST /api/itonami/publish: looks up the
+    requesting game's stored CACAO identity, signs a
+    com.atproto.repo.createRecord commit, relays it to app-aozora's XRPC
+    surface (app-aozora is a no-server-key PDS+AppView -- it verifies
+    client-signed commits statelessly, never holds a publishing secret
+    itself)"
+   "new lexicon network.isekai.session (extends the declared-but-unemitted
+    network.isekai.asset precedent, ADR-0008 §5) for in-game events: round
+    cleared, fork, urgent-bonus catch"
+   "publish is Governor-gated the same containment shape as
+    com-etzhayyim-tashikame/kouhou (ADR-2607022200/2607022210): game client
+    proposes, a lightweight rule (not an LLM) approves/denies, every
+    publish/deny appended to an audit trail"
+   "rollout: wire one game (plumbing-rounds) end-to-end first, then extend
+    the same wiring to the remaining games mechanically"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607031000" "adr-2607022200" "adr-2607022210"]
+  :last_verified "2026-07-03"}
+ :body "see 2607031400-itonami-games-atproto-actors-app-aozora.md"}
