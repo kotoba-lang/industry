@@ -1,7 +1,7 @@
 # ADR-2607031200: kotoba-lang/kami-app-character-creator — EDN-native VRM キャラクターメイキング
 
-**Status**: proposed
-**Date**: 2026-07-03
+**Status**: accepted（Phase 1〜4 実装完了 + Phase 5 でアーキテクチャ転換、下記参照）
+**Date**: 2026-07-03（Phase 5 追記も同日 — `/loop` セッション1本で完結）
 **Deciders**: Jun Kawasaki
 
 ## Context
@@ -182,6 +182,113 @@ Phase 1 が単独で動く character creator（2Dプレビュー＋`.vrm`エク�
   着手不能。Phase 1 のローカル保存（`localStorage` + ファイルダウンロード）で
   実用上は困らないため、無理に先取りしない。
 
+## Phase 1〜4 実装ログ（同日、`/loop` セッション内で完了）
+
+当初計画どおり `kotoba-lang/kami-app-character-creator` を新規 repo として起こし、
+Phase 1（`CharacterDoc` + 生成パイプライン + 表情ブリッジ + ローカル保存/`.vrm`
+エクスポート）を土台に、当初計画を大幅に超えて以下まで実装・ブラウザ実機検証済み
+（各コミットの詳細は `kotoba-lang/{character,vrm,webgpu,kami-app-character-creator}`
+の commit history 参照 — この ADR には要約のみ記す）:
+
+- **Phase 2 前倒し**: `kotoba-lang/webgpu` に `kami.webgpu.mesh`（スキニング+モーフ
+  +テクスチャ+2-tone トゥーンシェーディング対応の追加専用 WebGPU 実行系）を実装し
+  レビュー後 merge。procedural 生成キャラクターの全身スキニング・表情モーフィング
+  をライブ描画。
+- procedural 生成側の作り込み: 全身メッシュ化（23→35 ボーン、VRM 1.0 標準ボーン名、
+  指/足指の関節）、体の継ぎ目ブレンディング+法線スムージング、服の脚/腕カバレッジ、
+  ARKit 52 ターゲットの実データ化（VRM 18 プリセット全対応）、眉毛+体型プリセット、
+  ヘアシェル生成（`character.hair-gen` の既存だが未使用だった 3層ポリゴンシェル
+  ジェネレータを接続）、アクセサリー装備システム+タトゥー/傷デカール、グラデーション/
+  放射状/縞のプロシージャルマテリアル、保存/読込+ランダム生成ボタン。
+- 副産物として見つかり修正した実バグ: JVM負の浮動小数点読み取りクラッシュ
+  (`vrm.convert`)、cljsでの`Math.signum`未定義クラッシュ (`character.math`)、
+  VRM表情バインドの`node`/`mesh`フィールド取り違え、`vrm.cljc`ルート名前空間の
+  `vrm.compose`衝突クラッシュ、メッシュ分類の誤判定（素材名の偶然の部分一致）。
+
+## Phase 5（同日）— procedural 生成の限界認識と VRM-first アーキテクチャへの転換
+
+### きっかけ
+
+Phase 1〜4 で procedural 生成（`character.body`/`character.hair`/
+`character.base-mesh` のリング押し出し・楕円体ベースのプリミティブ生成）を
+スムージング・継ぎ目処理・ヘアシェル化まで作り込んだ後、オーナーが実際に
+ブラウザで確認し「頭部が怖い」「MetaHumanと混ざっていないか」と指摘。調査の結果:
+
+- **技術的には MetaHuman とは無関係**（`generate-character` は `character.metahuman`
+  を一度も呼ばない — `generate-character` / `metahuman/generate-metahuman` /
+  `dna/from-bytes` は並列の独立エントリポイントで、パイプラインとして繋がっていない）。
+- しかし本質的な問題はより根深い: procedural 生成は**そもそも一度も本物の
+  彫刻済みキャラクターアートだったことがない**（削除された Rust クレート
+  `kami-character` 自体がプレースホルダーのプロシージャル生成だった、ADR-2607010930
+  参照）。土台がプリミティブ生成である限り、スムージングや継ぎ目処理では
+  越えられない根本的な質の天井がある。
+
+### CC0 素体調達の行き詰まりと解決
+
+本物の彫刻済み VRM 素体（VRoid Hub/Studio 由来等）を探したが、クリーンな
+CC0 ライセンスのモデルの確定に難航（`vrm-c/vrm-specification` の公式サンプル
+`Seed-san.vrm` 等は「VRM Public License 1.0」— モデルごとに設定可能な条件付き
+ライセンスで、アバター利用が特定人物に制限されている可能性がありCC0ではない）。
+
+オーナーの決定: **VRM バイナリ自体は一切コミットせず、代わりに「ユーザーが自分の
+VRM ファイルを持ち込んで使う」機能を提供する** — `M3-org/CharacterStudio`
+（MIT licensed、公開 OSS）と同じ思想。この方式なら誰の著作物も再配布しないため、
+ライセンス問題が構造的に発生しない。
+
+### 実装: VRM アップロード → CharacterStudio 風マルチパーツミキシング
+
+1. **単一VRMアップロード**（`kotoba-lang/vrm` の `vrm.parse`/`vrm.expression`/
+   `vrm.spring` + `kami-app-character-creator` の `character-creator.gpu-adapter`
+   の拡張 — `mesh-primitives-by-index`（マルチプリミティブ対応。実データで
+   1メッシュに複数マテリアルがあることを確認）、`node-world-transforms`/
+   `skin-joint-palette`（実スキニング）、`material-base-color-texture`）で、
+   実VRMファイルを読み込んでライブ描画・実表情・実スプリングボーン揺れ物理まで
+   動作する状態にした。
+2. **`vrm.convert` に glTF sparse accessor 対応を追加**（VRoid Studio標準の
+   圧縮ブレンドシェイプ形式。これが無いと実VRMの表情モーフが一切読めなかった）。
+3. `vrm.part` のメッシュ分類ヒューリスティックを改善（メッシュ自身の名前を
+   マテリアル名より優先 — 実データで衣装メッシュがマテリアル名の偶然の部分一致で
+   顔に誤分類されるバグを発見・修正）。
+4. **CharacterStudio の実装を調査**（`CharacterManager` の実態は「多数の
+   小規模な事前用意アセットをホストされたマニフェストから選ぶ」方式 — 当初
+   想定した「アップロード済みアバターを分解する」とは異なると判明）し、
+   我々の制約（素体を一切ホストできない）に合わせて適応: **ユーザーが複数の
+   VRMをアップロードして自分のライブラリを作り、カテゴリ（body/hair/face/
+   outfit/accessory/other）ごとにどのVRM由来のパーツを使うか選んでミックスする**
+   UI（`!library`/`!active-parts`/`recompose-library!`、カテゴリごとの
+   `kami-ui-sdk.widgets/carousel!`）。procedural 生成は「(procedural
+   placeholder)」としてパネル下部に降格（削除はしていない — VRM を持たない
+   ユーザー向けのフォールバック）。
+5. **本当に異なる2つの実VRM**（Seed-san.vrm、VRM公式サンプル
+   Constraint-Twist-Sample.vrm、共に VRM Public License 1.0 系・ローカル検証
+   限定・非コミット）でクロスアバター・パーツミキシングを実ブラウザ操作で検証
+   — 髪カテゴリを切り替えてシルエットが実際に変化、エクスポート後の再パースで
+   正しい由来ミックスを確認。バグなし。
+6. **`vrm.compose` のバッファ重複排除バグを発見・修正**: 複数パーツが同じ
+   ソースドキュメントを共有する場合（実際のミキシングで頻発するケース）に、
+   そのドキュメントの全バイナリ（テクスチャ含む）がパーツ数分重複していた
+   （2ファイル・5パーツの実測で 54MB → 修正後 21.6MB、正しい重複排除を確認）。
+
+### 結論・今後
+
+VRM-first（ユーザー持ち込み素体 + `vrm.part`/`compose` によるマルチパーツ
+ミキシング）が **character creator の主役アーキテクチャ**として採用された。
+procedural 生成は素体を持たないユーザー向けの副次的フォールバックとして残る。
+残課題:
+
+- procedural フォールバック自体の質は本質的な天井があるため、追加のスムージング等
+  より、VRM アップロード体験の充実（ドラッグ&ドロップ、ライブラリのサムネイル表示等）
+  を優先すべき。
+- `vrm.compose` は今も各ソースドキュメントの全バイナリを保持したまま
+  マージしている（reachability グラフに基づく未使用バイトの刈り込みは
+  別途の効果。ADR-2607010930/2607021900 のような「CharacterStudio のVRM
+  optimizer（メッシュマージ+テクスチャアトラス化）」相当の最適化は未着手）。
+- 顔のペイントされたテクスチャ（目・鼻・口）がまだ表示されないケースがある
+  （メッシュが複数プリミティブ/マテリアルを持つ場合の描画ループ側の合成が
+  未完 — データ層の読み取り自体は `mesh-primitives-by-index` で解決済み）。
+- kotobase.net への保存（Phase 3）は引き続き `kotoba-client` の write path
+  待ちで未着手。
+
 ## References
 
 - ADR-2607010930（Rust→Clojure/WGSL migration） — `vrm`/`character`/`gltf`/
@@ -197,3 +304,12 @@ Phase 1 が単独で動く character creator（2Dプレビュー＋`.vrm`エク�
   `kotoba.webgpu-rs.render-ir` に移植済み）
 - root `CLAUDE.md` 「kotoba-server（kotobase.net）」節（Phase 3 の認証/publish
   方式の参照実装 `ai-gftd-itonami/src/itonami/cacao.clj`）
+- `M3-org/CharacterStudio`（MIT license, https://github.com/M3-org/CharacterStudio）
+  — Phase 5 の VRM-first マルチパーツミキング設計の着想元。`CharacterManager`の
+  実態調査を踏まえ、素体を一切ホストできない我々の制約に合わせて「ユーザーが
+  複数VRMをアップロードして自分のライブラリを作る」形に適応した（コードの
+  移植ではなく、UXパターンの参考）。
+- `vrm-c/vrm-specification` `samples/`（Seed-san / VRM1_Constraint_Twist_Sample
+  — Phase 5 の実VRMクロスミキシング検証に使用したローカル限定テストアセット。
+  いずれも VRM Public License 1.0 系で CC0 ではないため、どのリポジトリにも
+  コミットしていない）
