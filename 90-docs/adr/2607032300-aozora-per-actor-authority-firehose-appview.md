@@ -98,3 +98,43 @@ write をこの派生層でなく operator graph に混ぜていたこと。
 
 **自分のもの = per-actor 自己主権 graph（小・署名・競合なし）。graph-over なもの =
 firehose から作る AppView（派生・再構築可能・自由に最適化）。権威と集約を混ぜない。**
+
+## Current build-state（実測 2607032300）
+
+コードを追うと **layer-1（per-actor authority）は既に実装済みで env フラグ gated**:
+
+- `aozora.pds.actorkey`（ADR-2606231100 §2, Phase 4b）: HKDF-SHA256 で
+  `operator master + actor-did → per-actor ed25519 鍵`、`kotobase/db/<actor-did>/repo`
+  に着地。**完成・node-testable**。
+- `router.cljc` write path（L298）＋ `getrepo.cljc` read path が **`PER_ACTOR_DB`**
+  env フラグで per-actor client に切替（default off → 現行の共有 operator db）。
+- **フラグが off の唯一の理由（コード注記そのまま）**:
+  「*enabling this needs AppView cross-db read federation (still the operator db today)*」。
+
+すなわち本 ADR は新規発明ではなく**「概ね build 済みだが gated な設計を正式化し、
+gate を外す条件（＝ layer-3 の cross-db 集約）を定義する」**もの。gate の正体は
+本 ADR の「graph-over は AppView が処理する」原則そのもの。
+
+### 段階的 enablement（gate の外し方）
+
+1. **単一著者 AppView read（getAuthorFeed / getRecord / getProfile）→ per-actor graph
+   直読**（`canonical-graph(actor-did, repo)`）。cross-graph 集約が要らない = 容易。
+   これだけで per-actor の「自分のもの」は完全に動く。
+2. **multi-author read（timeline / 通知）→ firehose-fed AppView index**。per-actor の
+   commit-dag head を ingest して `yoro-social-v1` に projection。**唯一の新規サブ
+   システム**で、**relay-cron の machinery を "外部 bsky firehose" から "内部 per-actor
+   firehose" に付け替える**のが実体（＝停止中の relay-cron の正しい再利用先）。
+3. 1+2 が揃ったら **`PER_ACTOR_DB=1`**。write が per-actor graph に散る →
+   contention / bloat / O(n)-rebuild が**構造的に消える**（症状対処だった CAS は
+   handle 索引と AppView に限定）。
+4. **self-sovereign 化（Level B）**: `actorkey` は今 custodial HD 派生（operator が
+   master を保持し任意 actor の鍵を再導出できる）。ADR-2607022330 の key-backup 鍵で
+   **actor 自身がクライアント署名**する形に替えると、operator は署名不能になり真の
+   自己主権に到達。layer 構造は不変のまま鍵の custody だけが移る。
+
+### 残る唯一の新規実装
+
+**layer-2 firehose（per-actor commit head の stream）→ layer-3 AppView projection の
+federation**。これが `PER_ACTOR_DB=1` を解禁する唯一のブロッカーであり、本 ADR で
+定義した3層の「配線の最後の1本」。単一著者 read の直読（enablement 1）は小さく、
+先行して落とせる。
