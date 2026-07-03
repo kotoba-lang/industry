@@ -39,12 +39,14 @@
     (is (= :implemented (industry/maturity "6810"))))
   (testing "a third implemented actor (cloud-itonami-M6910) is also :implemented"
     (is (= :implemented (industry/maturity "6910"))))
+  (testing "a fourth implemented actor (cloud-itonami-6511) is also :implemented"
+    (is (= :implemented (industry/maturity "6511"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
       (is (pos? (:spec m)))
       (is (pos? (:blueprint m)))
-      (is (= 3 (:implemented m))))))
+      (is (= 4 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
