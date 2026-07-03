@@ -189,3 +189,45 @@ skip（no-CACAO transact が commit）→ issuer 必須化、(2) transact は `:
 narrow components へ（fresh graph が育っても高速維持、worker は既に honor）、(b) prolly-tree
 `scan-prefix` の key-range 刈り込み（keyed read を O(path) の数ブロックに）、(c) KOTOBASE_OPERATOR_DIDS
 allowlist を operator DID に絞る（現状 staging で空=任意の有効 CACAO 許可）。
+
+## Addendum 4 — 「narrow reads / fast at scale」の実装と、真因だった worker prefix バグ（2607030100）
+
+オーナー指示「PDS を narrow components に切り替えてスケールしても速く」+「relay cron の膨張解消 +
+トランポリン並列化」への対応。narrow 化を着地させた後、live read が依然 15-38s だった。深掘りの結果、
+**遅さの真因は narrow 化や pruning ではなく、worker の R2 key prefix が空文字に潰れていたこと**だった。
+
+- **真因: `KOTOBASE_B2_PREFIX` が `(.-KOTOBASE_B2_PREFIX env)` 直読で Closure `:advanced` に改名され
+  undefined を読む** → `prefix` が `""` に fallback → 全 block/head が R2 バケット **root 直下**
+  （`heads/…`, `blocks/…`）に散逸。設定した `kotobase/cljc*` の名前空間分離が **no-op** になり、
+  relay-cron の firehose 膨張（~3k datoms）が root に堆積、keyed read がそれを丸ごと walk していた。
+  **PRF extension の `.advanced` バグと同型**。修正: `goog.object/get` で読む（プロパティ名が保存され、
+  `.-` 直読も含めて解決）。`KOTOBASE_OPERATOR_DIDS` も同型で、**空 allowlist では不可視だが本番 allowlist
+  を設定すると黙って無視して任意署名者を許可する**セキュリティ欠陥になるため同時に修正。worker pin `96ed55b`。
+- **診断を阻んだ2つの落とし穴**:
+  - **`wrangler r2 object get/delete` はデフォルトでローカル miniflare を操作**（`--remote` 必須）。
+    これに気づくまで、head 削除は "Delete complete" でも実 R2 に無反応、head 存在チェックは偽陰性。
+    以後 `--remote` を付けて実 R2 を操作。
+  - **`wrangler deploy` は版を作るだけで 100% traffic に promote しない**（gradual deployment）。
+    `wrangler versions deploy <id>@100% --yes` で明示 promote が必要。`deployments list` は古い順で
+    先頭が最古 → 現行版は `deployments status` で確認。これで cron-off PDS / prefix-fix worker を実効化。
+- **relay cron 停止（#17）**: `RELAY_CRON_ENABLED=0`（app-aozora `1036f277`）。scheduled handler は 0 で no-op。
+  external-feed ingest は operator db と別 db に分離すべき（再スコープは follow-up）。
+- **yoro-social reset**: prefix 修正で worker が `kotobase/cljc-v2`（fresh）を見るようになり、旧 root 直下の
+  膨張データは orphan 化（オーナー承認済みの廃棄）。残っていた cljc-v2 head も `--remote` で削除し 0 datoms に。
+- **PDS narrow keyed reads（app-aozora `c0807f6`）**: getBackup/getAccount/resolveHandle/deposit/take が
+  full `:eavt` scan をやめ最小 index prefix（`fetch-entity`/`fetch-index`）を渡す。後方互換。PDS 237/1030 green。
+- **prolly-tree scan-prefix key-range 刈り込み（#16、`ef43a9d`）**: keyed read を O(path) ブロックに。
+  ローカル inline 検証で pruning ロジックは正しい（child skip/descend が意図通り）。
+
+**検証（live, 修正後）**: getBackup / getAccount / resolveHandle / 直 worker narrow・full すべて
+**0.15–0.3s**（fresh yoro-social）、cron off で再膨張なし。真因修正前は 15-38s→500。
+
+**残 follow-up**:
+- **worker トランポリンの並列 block fetch（#18）**: 現状 block-miss は逐次 fetch。真のスケール（巨大な
+  正規グラフ）では 1 read = O(blocks) 逐次 = 遅い。1 run で全 miss 収集→並列 fetch（O(depth) round）に。
+- **prolly-tree pruning が engine 経由で無効化される依存問題**: kotobase-engine の deps.edn は prolly-tree を
+  **kqe の git SHA 経由（transitive、ef43a9d 以前）**で解決するため、engine を deps 経由で使う consumer では
+  pruning が効かない（worker は shadow-cljs の local src `../prolly-tree/src` を使うので影響なし）。
+  quad-store/commit-dag/kqe の prolly-tree pin を ef43a9d に前進させて engine の公開 deps にも pruning を載せる。
+- **relay ingest の別 db 分離**（operator db を汚さない external-feed 経路）。
+- KOTOBASE_OPERATOR_DIDS allowlist を operator DID に絞る（現状 staging で空）。
