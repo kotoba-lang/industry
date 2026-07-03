@@ -1,0 +1,54 @@
+{:frontmatter
+ {
+  :id "adr-2607031200-kotoba-lang-vrm-character-creator"
+  :title "ADR-2607031200: kotoba-lang/kami-app-character-creator — EDN-native VRM キャラクターメイキング"
+  :status "proposed"
+  :date "2026-07-03"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "kotoba-lang-vrm-character-creator"
+  :authoritative true
+  :authoritative_for ["ユーザー向け VRM character creator の CharacterDoc EDN スキーマ" "生成パイプライン配線（character/generate-character → vrm.part/compose/humanoid/export）" "VRM 表情プリセット(17) ⇄ ARKit ブレンドシェイプ(52) ブリッジテーブルの置き場所と方針" "Phase 1〜4 のスコープ切り（2Dプレビュー→ライブ3D→kotobase.net保存→UI部品)"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607010930"]
+  :last_verified "2026-07-03"}
+ :body
+ "# ADR-2607031200: kotoba-lang/kami-app-character-creator — EDN-native VRM キャラクターメイキング
+
+**Status**: proposed
+**Date**: 2026-07-03
+**Deciders**: Jun Kawasaki
+
+## Context
+
+オンラインゲームのキャラクターメイキングを VRM アバターに対して用意したいという
+オーナー要求。設計前に実体調査を行った結果、生成側のデータ/ロジック層は
+`kotoba-lang/vrm`（VRM 1.0 parse/decompose/compose/export、CLJC 1:1移植）と
+`kotoba-lang/character`（MetaHuman互換パラメトリック生成SDK、CLJC 1:1移植）に
+ほぼ全て既に実在することが判明した。ギャップは (1) ブラウザGPU実行系が
+skin/morphを描画しない (2) VRM表情プリセット⇄ARKitブレンドシェイプの対応表が
+無い (3) kotobase.net への書き込み経路が無い (4) スライダー/カラースウォッチ等
+のUI部品が無い、の4点。詳細は本 ADR とペアの .md を参照。
+
+## Decision
+
+新規 repo `kotoba-lang/kami-app-character-creator` を、既存の
+vrm/character/webgpu/skeleton/kami-isekai-assets を土台に4フェーズで実装する。
+Phase 1（CharacterDoc スキーマ + 生成パイプライン配線 + 表情ブリッジEDN +
+2Dサムネイルプレビュー + ローカル保存/.vrmエクスポート）は新規エンジン作業ゼロで
+完結させ、Phase 2（ライブ3Dプレビュー、kotoba-lang/webgpu への additive 変更）・
+Phase 3（kotobase.net保存、kotoba-client の write path 実装待ち）・Phase 4
+（kami-ui-sdk への Slider/ColorSwatch/Carousel 追加）は独立した follow-up として
+明示的にスコープする。詳細は本 ADR とペアの .md を参照。
+
+## Consequences
+
+Phase 1単独で「パラメータ編集→2Dプレビュー→.vrmエクスポート」の character
+creator ループが成立する。ライブ3Dプレビューと kotobase.net 保存は明示的に
+Phase 2/3 の follow-up。詳細は本 ADR とペアの .md を参照。
+
+## References
+
+本 ADR とペアの .md 参照。
+"}
