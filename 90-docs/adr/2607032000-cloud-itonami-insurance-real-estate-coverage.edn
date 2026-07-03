@@ -1,0 +1,37 @@
+{:frontmatter
+ {:id "adr-2607032000-cloud-itonami-insurance-real-estate-coverage"
+  :title "ADR-2607032000: cloud-itonami insurance (ISIC 65/66) + real-estate (ISIC 68) coverage push"
+  :status "accepted"
+  :date "2026-07-03"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "cloud-itonami-insurance-real-estate-coverage"
+  :authoritative true
+  :authoritative_for ["insurance (ISIC 65/662) blueprint-tier scope and template"
+                      "kotoba-lang/insurance capability lib scope (pure contracts, no real actuarial data)"
+                      "cloud-itonami-L6810 :implemented actuation invariant (title transfer / escrow disbursement always human)"]
+  :related ["adr-2607011000-cloud-itonami-robotics-premise-and-isic-21-21"
+            "adr-2607012100-cloud-itonami-org-split"
+            "adr-2607031500-cloud-itonami-m6910-global-incorporation-actor"]
+  :supersedes []
+  :superseded_by []
+  :amends []}
+
+ :decision-summary
+ {:new-lib "kotoba-lang/insurance"
+  :new-blueprint-repos ["cloud-itonami-6511" "cloud-itonami-6512" "cloud-itonami-6520"
+                        "cloud-itonami-6530" "cloud-itonami-6621" "cloud-itonami-6622"
+                        "cloud-itonami-6629" "cloud-itonami-6820"]
+  :deepened-to-implemented "cloud-itonami-L6810"
+  :pattern-6810 "sealed Realtor-LLM advisor + independent RealtorGovernor + append-only audit ledger (same shape as cloud-itonami-M6910 / cloud-itonami-6310)"
+  :actuation-invariant-6810 "title transfer and escrow/fund disbursement are never members of any realty.phase phase's :auto set, and realty.governor's :actuation high-stakes check always escalates them to human sign-off"
+  :coverage-before {:insurance-blueprint "0/7" :insurance-implemented "0/7"
+                     :real-estate-blueprint "1/2" :real-estate-implemented "0/2"}
+  :coverage-after {:insurance-blueprint "7/7" :insurance-implemented "0/7"
+                    :real-estate-blueprint "2/2" :real-estate-implemented "1/2"}
+  :fleet-maturity-before {:implemented 1 :blueprint 25 :spec 617 :total 643}
+  :fleet-maturity-after {:implemented 2 :blueprint 33 :spec 608 :total 643}
+  :out-of-scope ["central banking 6411" "holding companies 6420/642" "financial leasing 6491/6492"
+                 "fund management 663/6630" "financial market administration 6611"
+                 "securities brokerage 6612"]
+  :manifest-registration "kotoba-lang/insurance registered (real capability lib, same as property/labor); the 8 cloud-itonami-* repos stay standalone per existing convention"}}
