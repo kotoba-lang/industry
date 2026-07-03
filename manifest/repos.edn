@@ -785,6 +785,13 @@
    ;; shitsuke design system 上の共通 liquid-glass 視覚スキン (ADR-2607011900)
    "orgs/kotoba-lang/liquid-glass-ui"
 
+   ;; kotoba-lang default UI/UX design の統合エントリ + screen-shape binding
+   ;; (ADR-2607022800: kotoba-ui = shitsuke+liquid-glass-ui の single require point、
+   ;;  appkit = desktop/dense、uikit = touch/mobile/card。初採用: manimani ADR-0033)
+   "orgs/kotoba-lang/kotoba-ui"
+   "orgs/kotoba-lang/appkit"
+   "orgs/kotoba-lang/uikit"
+
    ;; ADR-2607011100: SVG-era exception repos (removed from :path-overrides above)
    ;; ADR-2607011100: SVG-era Office tooling restored as com-junkawasaki repos
    ;; while kotoba-lang/office and kotoba-lang/svgraph remain the CLJ/EDN line.
