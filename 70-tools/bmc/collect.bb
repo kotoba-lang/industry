@@ -134,7 +134,10 @@
 (def gate-emitters
   {:network-isekai {:url "https://isekai.network/feed/fork-stats.edn" :fmt :edn :key :fork}
    :cloud-manimani {:url "https://manimani.cloud/metrics"            :fmt :json :merge true}
-   :cloud-itonami  {:url "https://itonami.cloud/api/metrics"          :fmt :json :merge true}})
+   :cloud-itonami  {:url "https://itonami.cloud/api/metrics"          :fmt :json :merge true}
+   ;; 外部獲得 funnel テレメトリ (net-kotobase #150): {"funnel":{visitors/signups/checkouts}}
+   ;; を top-level merge → funnel spec (ADR-2607022600) の [:funnel …] が実データ化。
+   :net-kotobase   {:url "https://kotobase.net/api/funnel"            :fmt :json :merge true}})
 
 (defn fetch-emitter
   "→ parsed emitter map, or nil if unreachable/unparseable (no-op)."
