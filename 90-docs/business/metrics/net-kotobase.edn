@@ -1,23 +1,19 @@
-{:as-of "2026-07-03",
- :sources [:cloudflare :stripe :health],
- :zone
- {:requests-7d 3586,
-  :pageviews-7d 247,
-  :uniques-7d-sum 289,
-  :zone "kotobase.net"},
+{:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 3603, "kotobase-cf-wasm-staging" 3810},
+ {"net-kotobase" 3641, "kotobase-cf-wasm-staging" 3810},
+ :zone
+ {:requests-7d 3621,
+  :pageviews-7d 257,
+  :uniques-7d-sum 298,
+  :zone "kotobase.net"},
+ :sources [:cloudflare :stripe :health :emitter],
  :stripe
- ;; live 実態を反映 (2026-07-03)。内部フライホイールの 4 tenant が kotobase live price で
- ;; active (did:web:apex.gftd.ai / itonami.cloud / sh1n5h1x.gftd.ai=Pro, manimani.cloud=Standard、
- ;; MRR $106/mo)。Stripe subscription 作成 + KV tenant-state で検証済。routine の collect は cloud
- ;; env に STRIPE_SECRET_KEY(live) が無く test-mode 値 (account-wide 2=2017 legacy) を拾っていたため
- ;; 手動で live 実測値に更新。live key で collect すれば自動でこの値になる。
- {:active-subscriptions 4,
+ {:active-subscriptions 0,
   :active-subscriptions-account-wide 2,
   :charges-total 90,
   :last-charge-epoch 1604224274},
- :health-status 200,
+ :as-of "2026-07-03",
+ :funnel {:visitors 8, :signups 0, :checkouts 0},
  :signal
- "kotobase.net 実測 3586 req/7d・289 uniques(日次和)、workers 7413 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 3621 req/7d・298 uniques(日次和)、workers 7451 inv/7d、Stripe active subs 0"}
