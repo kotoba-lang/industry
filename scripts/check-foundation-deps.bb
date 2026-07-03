@@ -40,7 +40,7 @@
 ;; ここは「検査対象の repo」列挙のみ(DAG はハードコードしない)。
 (def default-repos
   ["multiformats" "dag-cbor" "ipld" "prolly-tree" "commit-dag"
-   "quad-store" "kqe" "kotobase-engine" "kotobase-client"])
+   "quad-store" "kqe" "datom" "kotobase-engine" "kotobase-client"])
 
 (defn gh-json [& args]
   (let [{:keys [out exit]} (apply shell {:out :string :err :string :continue true} "gh" "api" args)]
@@ -103,10 +103,10 @@
             (cond
               (= st "identical")
               (println (format "  ✓ %-18s → %-16s %s (== HEAD)" repo dep (subs s 0 12)))
-              (= st "ahead")   ; HEAD ahead of pin = pin behind = drift
-              (do (swap! drifts conj {:repo repo :dep dep :pin s :head h :behind (:behind cs)})
-                  (println (format "  ✗ %-18s → %-16s %s  DRIFT: %s behind HEAD %s"
-                                   repo dep (subs s 0 12) (:behind cs) (subs h 0 12))))
+              (= st "ahead")   ; HEAD ahead of pin = pin is (ahead_by) commits behind = drift
+              (do (swap! drifts conj {:repo repo :dep dep :pin s :head h :behind (:ahead cs)})
+                  (println (format "  ✗ %-18s → %-16s %s  DRIFT: pin is %s commit(s) behind HEAD %s"
+                                   repo dep (subs s 0 12) (:ahead cs) (subs h 0 12))))
               :else
               (do (swap! drifts conj {:repo repo :dep dep :pin s :head h :status st})
                   (println (format "  ! %-18s → %-16s %s  %s (HEAD %s)"
