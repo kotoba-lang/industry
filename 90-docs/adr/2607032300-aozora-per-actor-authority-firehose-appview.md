@@ -138,3 +138,16 @@ gate を外す条件（＝ layer-3 の cross-db 集約）を定義する」**も
 federation**。これが `PER_ACTOR_DB=1` を解禁する唯一のブロッカーであり、本 ADR で
 定義した3層の「配線の最後の1本」。単一著者 read の直読（enablement 1）は小さく、
 先行して落とせる。
+
+### 実装状況更新（2607032330）
+
+- **enablement step 1（単一著者 read federation）着地** — app-aozora `4d34764`。
+  `aozora.pds.per-actor/read-client-db`（新設）＋ router が read handler に `:_env` を
+  渡す＋ `keylink/get-backup`・`account/get-account` が **did 解決後の entity read を
+  per-actor graph へ**（handle→did は operator の global 索引のまま）。
+  **off-by-default `PER_ACTOR_DB` 配下 → 本番挙動不変**。PDS build + 239 tests/1036
+  assertions green。foundation の deps 整理（prolly-tree pruning が engine に到達、
+  ADR-2607032300 上部）と合わせ、read 経路は per-actor でスケール可能に。
+- **残: enablement step 2（multi-author firehose → AppView index）** = `PER_ACTOR_DB=1`
+  解禁の最後のブロッカー。停止中 relay-cron の machinery を内部 per-actor firehose に
+  付け替え、timeline/通知を AppView index 化。単一著者 read は step 1 で独立に federate 済み。
