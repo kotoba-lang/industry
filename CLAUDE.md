@@ -178,6 +178,30 @@ west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独�
   （`.claude/hooks/west-pin-verify-guard.bb`。`git push` と `gh api PUT` の両経路）が
   同じ検証を強制する。
 
+- **`git push` / `git pull` / `west update` の前に、manifest の pin が upstream
+  GitHub の最新から取り残されていないか（pin 鮮度）を必ず確認する。** `west update`
+  は west.yml に**既に書かれている** pin へ checkout を合わせるだけで、GitHub 側の
+  新しいコミットを pin に反映するコマンドではない（pin 自体の前進は別操作。
+  「`west update` すれば GitHub 最新に追従する」と誤解しないこと）。実測
+  （2026-07-03）: `bb scripts/gen-west-manifest.bb`（引数なし dry-run）で kotoba-lang
+  org 配下の character / comfyui / kami-engine / kotoba / kotobase / murakumo 等
+  多数の project で、ローカル checkout が **既存 pin より遅れている**状態を検出
+  （気付かず push すると stale checkout や古い pin が他 clone / CI に伝播する）。
+  対象 project を触る git 操作の前に:
+
+  ```bash
+  # 1) 対象 project の pin 鮮度を GitHub API で確認（ahead_by > 0 なら upstream が先行）
+  gh api "repos/<org>/<repo>/compare/<pinned-sha>...<default-branch>" \
+    --jq '{ahead_by, behind_by}'
+  # 2) 先行していたら該当 project の checkout を最新化
+  cd orgs/<org>/<repo> && git fetch origin && git merge --ff-only origin/<default-branch>
+  # 3) manifest の pin を前進（当該 entry のみ最小 diff。wholesale 再生成は禁止）
+  bb scripts/gen-west-manifest.bb --entry <repo-name>
+  bb scripts/gen-west-manifest.bb --check
+  ```
+
+  これを終えてから本来の `git push` / `git pull` / `west update` を実行する。
+
 - **常に `main` と同期し、乖離を作らない（最優先）。** 何らかの git 操作
   （pull / checkout / commit / branch 作業の開始など）を行う前に、上流 `main`
   に更新があれば必ず先に同期する。ローカルが `main` より遅れている状態
