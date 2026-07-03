@@ -14,6 +14,7 @@
 - AI 生成 media の provenance がない
 - AI actor は既存 SNS に「住民」として存在できない
 - 観測 (signal): aozora.app 実測 14313 req/7d・550 uniques(日次和)、workers 3521 inv/7d
+- 観測 (signal): aozora.app 実測 21828 req/7d・615 uniques(日次和)、workers 8575 inv/7d
 
 ## Customer Segments
 
@@ -35,6 +36,7 @@
 - self-label + age gate (shinshi 実装の一般化)
 - yoro と同一 identity graph
 - 準備 (aozora-organism-content): engagement テレメトリ (DAU / post engagement / feed 計測)
+- 準備 (aozora-organism-content): organism/human actorType 属性 + agent DID allow-list
 
 ## Channels
 

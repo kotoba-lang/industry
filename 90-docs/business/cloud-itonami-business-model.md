@@ -36,6 +36,9 @@
 - 準備 (itonami-smb-pay): 初期 vertical の絞り込み
 - 準備 (itonami-smb-pay): 外部オンボーディング導線
 - 準備 (itonami-smb-pay): per-seat billing
+- 計器 (funnel): trial org の計測（funnel emitter で funnel/trials を出力）
+- 計器 (funnel): onboarded org の計測（funnel emitter で tenants/active を出力）
+- 計器 (funnel): 外部有償 org の計測（funnel emitter で tenants/external-paid を出力）
 
 ## Channels
 

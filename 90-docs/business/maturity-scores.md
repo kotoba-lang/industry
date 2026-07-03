@@ -17,7 +17,7 @@
 | app-aozora | 64.0 | 46.7 | 0.0 | revenue=0.0, validation=0.0 |
 | ai-gftd-apex | 60.0 | 45.0 | 0.0 | revenue=0.0, validation=0.0 |
 | ai-gftd-yukkuri | 60.0 | 45.0 | 0.0 | revenue=0.0, validation=0.0 |
-| cloud-manimani | 56.0 | 43.3 | 0.0 | revenue=0.0, validation=0.0 |
+| cloud-manimani | 76.0 | 43.3 | 5.0 | revenue=0.0, pricing=0.0 |
 | cloud-itonami | 56.0 | 43.3 | 0.0 | revenue=0.0, validation=0.0 |
 | app-aozora-yoro | 52.0 | 40.0 | 0.0 | revenue=0.0, validation=0.0 |
 
@@ -55,7 +55,7 @@
 
 ### cloud-manimani
 
-- BMC: completeness=5.0, hypothesis=5.0, validation=0.0, pricing=0.0, grounding=4.0
+- BMC: completeness=5.0, hypothesis=5.0, validation=5.0, pricing=0.0, grounding=4.0
 - YC: acute-problem=3.0, wedge=3.0, tenx=3.0, founder-fit=5.0, distribution=2.0, defensibility=2.0, launched=3.0, users=1.0, revenue=0.0
 - note: 実測: manimani.cloud 443 req/7d・uniques 1 — 公開エンドポイント稼働 (launched 2→3) だが利用者は owner 1 名 (users 1 据置)。OSS→cloud 転換の実証ゼロ。
 

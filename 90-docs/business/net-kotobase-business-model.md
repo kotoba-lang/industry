@@ -14,6 +14,7 @@
 - pin/storage サービスに provenance がない
 - map/git/search が別 SaaS に分散し data 主権が失われる
 - 観測 (signal): kotobase.net 実測 3483 req/7d・272 uniques(日次和)、workers 5311 inv/7d
+- 観測 (signal): kotobase.net 実測 3631 req/7d・314 uniques(日次和)、workers 7550 inv/7d、Stripe active subs 0
 
 ## Customer Segments
 
@@ -34,6 +35,9 @@
 - add-on surface: map tiles/geo query / git remote / search index
 - 準備 (kotobase-graph-arpu): tenant 従量計測
 - 準備 (kotobase-graph-arpu): signup→checkout 配線 (kotobase price 既存)
+- 計器 (funnel): landing 訪問 の計測（funnel emitter で funnel/visitors を出力）
+- 計器 (funnel): signup の計測（funnel emitter で funnel/signups を出力）
+- 計器 (funnel): checkout 開始 の計測（funnel emitter で funnel/checkouts を出力）
 
 ## Channels
 
@@ -63,6 +67,8 @@
 - paid workspace 数
 - add-on attach 率
 - 次の検証 (kotobase-graph-arpu): Standard→Pro 転換率と add-on attach 率
+- gate 距離 (kotobase-graph-arpu): Stripe active subscriptions = 0 (gate 未到達)
+- funnel (net-kotobase): landing 訪問=? → signup=? → checkout 開始=? → paid(active sub)=0 | 転換 
 
 ## Unfair Advantage
 

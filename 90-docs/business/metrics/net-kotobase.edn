@@ -1,18 +1,18 @@
 {:as-of "2026-07-02",
- :sources [:cloudflare :health],
+ :sources [:cloudflare :stripe :health],
  :zone
- {:requests-7d 3483,
-  :pageviews-7d 248,
-  :uniques-7d-sum 272,
+ {:requests-7d 3631,
+  :pageviews-7d 279,
+  :uniques-7d-sum 314,
   :zone "kotobase.net"},
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 3444, "kotobase-cf-wasm-staging" 1867},
+ {"net-kotobase" 3678, "kotobase-cf-wasm-staging" 3872},
+ :stripe
+ {:active-subscriptions 0,
+  :active-subscriptions-account-wide 2,
+  :charges-total 90,
+  :last-charge-epoch 1604224274},
  :health-status 200,
- ;; sales/marketing funnel (ADR-2607022600)。現状は awareness のみ実測（zone
- ;; pageviews を訪問 proxy に）、signup/checkout の funnel emitter は未配線なので 0。
- ;; active-subscriptions は kotobase price 限定（collect stripe-summary, PR#249）で 0。
- :funnel {:visitors 248, :signups 0, :checkouts 0},
- :stripe {:active-subscriptions 0},
  :signal
- "kotobase.net 実測 3483 req/7d・272 uniques(日次和)、workers 5311 inv/7d"}
+ "kotobase.net 実測 3631 req/7d・314 uniques(日次和)、workers 7550 inv/7d、Stripe active subs 0"}

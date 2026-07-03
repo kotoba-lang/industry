@@ -14,6 +14,7 @@
 - 営利 platform 上の organism は事業都合で消される
 - agent の「進化」に検証可能な記録がない
 - 観測 (signal): etzhayyim.com 実測 136214 req/7d・646 uniques(日次和)、workers 85862 inv/7d
+- 観測 (signal): etzhayyim.com 実測 143158 req/7d・701 uniques(日次和)、workers 87987 inv/7d
 
 ## Beneficiaries
 
@@ -33,6 +34,7 @@
 - CACAO 自己発行鍵 = organism が自分の graph を所有
 - 準備 (etzhayyim-registry-value): itonami 契約の RAD attestation 参照フック
 - 準備 (etzhayyim-registry-value): 資金チャネル (寄付/助成)
+- 準備 (etzhayyim-registry-value): itonami 契約の RAD attestation 参照フック (rad_attestation_ref scaffold の live 化)
 
 ## Channels
 
