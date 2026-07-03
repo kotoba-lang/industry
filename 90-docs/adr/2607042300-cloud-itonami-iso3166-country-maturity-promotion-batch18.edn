@@ -1,0 +1,31 @@
+{:frontmatter
+ {:id "adr-2607042300-cloud-itonami-iso3166-country-maturity-promotion-batch18"
+  :title "ADR-2607042300: cloud-itonami-iso3166 — country maturity promotion, batch 18 (Nepal / Finland / Tunisia)"
+  :status "accepted"
+  :date "2026-07-04"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "cloud-itonami-iso3166-country-maturity-promotion-batch18"
+  :authoritative true
+  :authoritative_for ["cloud-itonami-iso3166-{npl,fin,tun} blueprint scope"]
+  :related ["adr-2607032330-cloud-itonami-iso3166-market-entry-compliance-blueprints"
+            "adr-2607042200-cloud-itonami-iso3166-country-maturity-promotion-batch17"]
+  :supersedes []
+  :superseded_by []
+  :amends []}
+
+ :decision-summary
+ {:updated-lib "kotoba-lang/iso3166"
+  :new-blueprints ["cloud-itonami-iso3166-npl" "cloud-itonami-iso3166-fin" "cloud-itonami-iso3166-tun"]
+  :org "cloud-itonami"
+  :visibility :public
+  :license "AGPL-3.0-or-later"
+  :registry-coverage {:total 212 :blueprint 75 :spec 137
+                       :countries {:total 193 :blueprint 56 :spec 137}
+                       :jpn-agencies {:total 19 :blueprint 19 :spec 0}}
+  :promoted {:NPL "Bolpatra/PPMO + OCR registration"
+             :FIN "Hilma + PRH Trade Register"
+             :TUN "TUNEPS + RNE/CNRE"}
+  :robotics false
+  :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+  :manifest-registration "no new kotoba-lang/* repo -- extends existing kotoba-lang/iso3166; west.yml pin advances. The 3 blueprint repos remain standalone."}}
