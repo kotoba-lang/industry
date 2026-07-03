@@ -117,3 +117,27 @@ kotobase-cljc-worker（edge runtime = kotobase.net PDS）
 **kotoba は言語（Clojure）。kotobase はその datom を永続化・索引・query する
 データベース（Datomic）で、kotoba の上に建ち kotoba に依存する。言語は「DB」を
 名乗らず、DB は言語を書き換えない。**
+
+## 実装状況更新（2607032530）— datom model 統一（engine 側）着地
+
+follow-up「datom model の統一」の**具体化を開始・engine 側を着地**（kotobase-engine `963ed6d`）:
+
+- **canonical datom model = `io.github.kotoba-lang/datom`（datom-clj）**。zero-dep 可搬
+  `.cljc`、"EAVT, Datomic-isomorphic" な entity↔`[e a v]` 表現（`datom.core/{entity,eavt,log}`）。
+  従来は孤児（誰も依存せず、kgraph も quad-store も独自定義）だった。
+- **kotobase-engine が datom-clj を依存に採用**し、entity tx-map の datafication を
+  `datom.core/eavt` 経由に:
+  - `entities->datoms` / `tx-map->datoms` / `transact-tx`（entity tx-maps → `[e a v]` →
+    `transact`）。engine の `transact`/`->quad` は元々 `[e a v]` を受理するので自然な接続。
+  - test: engine の entity datafication == canonical `[e a v]` モデル（18 tests/66 assertions green）。
+- これで **DB（kotobase-engine）が「private な entity→quad 再実装」でなく共有 datom model を
+  consume** する（Datomic が Clojure データを使う構図のコード化）。依存 edge は
+  `check-foundation-deps.bb`（CI）が drift なく維持（engine → datom を追加）。
+
+**残り（paired step）**:
+- **`kotoba.kgraph`（言語の in-mem view）も datom-clj を consume** させ、両側（言語の in-mem
+  datom store と DB の永続 datom store）が **同一 datom model を共有**する状態にする。kgraph は既に
+  `[e a v]` を話すので低リスク。これで invariant 2（datom model は一度だけ定義）が両側で実体化。
+- worker（`kotobase-cljc-worker/handler.tx-edn->quads`）の datafication も engine の
+  `entities->datoms` に委譲（現在は並行セッションが handler.cljc を D1 novelty-log で編集中のため
+  その決着後）。
