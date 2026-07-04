@@ -1,8 +1,10 @@
 # ADR-2607041500: etzhayyim `*-compat` catalog (1,027 repos) → kotoba-lang, one repo per vendor, reverse-domain naming
 
-**Status**: accepted (rollout in progress — 188/1,027 landed: 8 pilot + batch1-6
-alphabetical (`8th_wall-compat`..`climate_fieldview-compat`); remaining ~839 scheduled as
-batched follow-up)
+**Status**: accepted (rollout in progress — 218/1,027 landed: 8 pilot + batch1-7
+alphabetical (`8th_wall-compat`..`coupang-compat`); remaining ~809 scheduled as
+batched follow-up. One naming collision resolved: `com-cloudflare-compat` (this
+catalog's `cloudflare-compat`) disambiguated from a pre-existing, unrelated
+`kotoba-lang/com-cloudflare` real API client.)
 **Date**: 2026-07-04
 **Related**: ADR-2606302300 (org taxonomy, kotoba-lang library-placement rule) · ADR-2607020130
 (`kami-nv-compat` relocation precedent) · ADR-2607012200 (umbrella kotoba-lang TS→CLJC refactor —
