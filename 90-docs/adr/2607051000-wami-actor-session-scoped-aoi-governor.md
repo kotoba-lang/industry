@@ -1,7 +1,8 @@
 # ADR-2607051000: wami-actor — Wide Area Motion Imagery を session-scoped TrackAdvisor ⊣ AOIGovernor actor として実装
 
-**Status**: accepted
+**Status**: closed(設計 + 最小スケルトン実装が完了・検証済み。下記 Verification 参照)
 **Date**: 2026-07-04
+**Closed**: 2026-07-04
 **Deciders**: Jun Kawasaki
 
 ## Context
@@ -86,6 +87,24 @@ Store/Advisor/Phase 注入、langgraph-clj StateGraph、1 run = 1 操作。
    照会/hold/人間承認/配信/公開の全 disposition を積み、「いつ・どの区画で・
    何を根拠に・誰が承認して・誰に配信/公開したか」を不変に残す（監視範囲の
    説明責任そのものが台帳の存在理由）。
+
+## Verification (closing, 2026-07-04)
+
+| 項目 | 状態 | 備考 |
+|---|---|---|
+| repo `gftdcojp/wami-actor` 作成 + push | ✅ 完了 | private、`gh repo create --source=. --push`（`https://github.com/gftdcojp/wami-actor`, commit `4750b24`） |
+| `src/wami/{store,trackllm,governor,phase,ports,operation,sim}.cljc` + `test/wami/*_test.clj` | ✅ 完了 | Store(MemStore‖DatomicStore)/Advisor/AOIGovernor/Phase/Ports/StateGraph/demo をすべて実装 |
+| `clojure -M:dev:test` | ✅ 完了 | **20 tests / 54 assertions / 0 failures** — session-scope・purpose-scope・anonymization・no-cross-session-reference・retention-ttl・no-actuation の6 HARD 不変条件、alert常時human-signoff、Mem≡Datomic parity、phase 0→3 rolloutをすべて実行時に確認 |
+| `clojure -M:dev:run`（offline demo） | ✅ 完了 | ingest→detect(auto-commit)→alert propose(interrupt)→human signoff→dispatch→wrong-purpose report attempt(hold: purpose-scope)を実行し監査台帳を出力、設計どおりの挙動を目視確認 |
+| `clojure -M:lint`（clj-kondo） | ✅ 完了 | errors: 0, warnings: 0 |
+| `manifest/repos.edn` `:extra-projects` 登録 + `bb scripts/gen-west-manifest.bb --entry wami-actor` | ✅ 完了 | 新規 entry、pin `4750b24cbfa0` は main から到達可能と検証（`verify-west-pins` OK）。diff は当該 entry のみ（west.yml +5 行） |
+| superproject `com-junkawasaki/root` main へ反映 | ✅ 完了 | ADR pair + manifest 変更を commit `aaf5e0b69d14` として push（事前に `origin/main` との乖離なしを確認済み） |
+
+残作業（本 ADR が明示的に scope 外とした follow-up、closing のブロッカーではない）: 実カメラ/UAV
+Sensor 結線、実モザイキング/検出アルゴリズム（現状は決定的 mock）、実 Datomic Local /
+kotoba-server pod への `DatomicStore` 接続確認。個体識別（顔/ナンバープレート認識）は
+意図的に未実装のまま — 追加するなら本 ADR とは別に governor の型を変える重い変更として
+レビューする。
 
 ## Consequences
 
