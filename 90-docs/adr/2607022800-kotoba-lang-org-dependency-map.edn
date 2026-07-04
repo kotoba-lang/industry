@@ -668,3 +668,29 @@
   {:west-yml "entry block removed (minimal 5-line diff; NOT a wholesale regen — the sparse-worktree regen was discarded because it dropped environment-dependent submodule lists)"
    :repos-edn ["path-override \"orgs/com-junkawasaki/kototama-clj\" line" ":extra-projects entry"]}
   :note "local checkouts (orgs/kotoba-lang/kototama-clj, orgs/com-junkawasaki/kototama-clj) left on disk untouched as the remaining copies; GitHub-side recovery window is the usual ~90-day support path if this turns out to be wrong"}}
+
+ ;; Follow-up (2026-07-04): owner asked whether kotoba-lang/mangaka and the
+ ;; itonami-cloud mangaka actor's relationship is organized. Found: two
+ ;; unrelated things both called "mangaka" were being conflated (see :md
+ ;; companion doc for the full narrative).
+ :follow-up-2026-07-04
+ {:trigger "owner question: is kotoba-lang/mangaka <-> itonami-cloud mangaka actor relationship organized?"
+  :finding-cluster-43-real-consumers
+  {:consumers ["kotoba-lang/kami-app-sip" "etzhayyim/com-etzhayyim-tsumugu"]
+   :not-a-consumer "gftdcojp/ai-gftd-mangaka"
+   :note "ai-gftd-mangaka (mangaka.gftd.ai, generic manga-SaaS) only depends on kami-mangaka-expression (kami-engine :deps/root, HUNTER x HUNTER-derived expression patterns) -- a different family from kami-mangaka-page/reader/render/text/scene (this cluster). The two 'mangaka' repos/products are unrelated; do not conflate."}
+  :fix-tsumugu-missed-clj-rename
+  {:repo "etzhayyim/com-etzhayyim-tsumugu"
+   :was "gftd/kami-mangaka-render-clj + gftd/kami-mangaka-page-clj as :local/root into kotoba-lang/kami-engine's orphaned pre-rename subtree copies (kami-app-sip got the equivalent fix in Phase 2 above; tsumugu was missed)"
+   :fix "git/sha coords on kotoba-lang/kami-mangaka-render (2122c2a6) and kami-mangaka-page (c416dd96)"
+   :test-result "23 tests / 62 assertions, 0 failures"
+   :commit "etzhayyim/com-etzhayyim-tsumugu@4b105b8"}
+  :mangaka-vs-itonami-relationship
+  {:ai-gftd-mangaka-and-itonami "no code dependency either direction (bidirectional grep, zero hits); not among CLAUDE.md Actors' 3 same-pattern examples (robotaxi-actor / gftd-talent-actor / cloud-itonami)"
+   :tsumugu-and-itonami "REAL relationship: tsumugu.cacao / tsumugu.kotoba are a deliberate hand-port of itonami.cacao / itonami.kotoba (containment discipline -- not a runtime dep, kept in sync by hand; graph-derivation intentionally diverges to match what kotobase.net's edge actually resolves). See ADR-2607011500. This is the actual 'mangaka actor <-> itonami' relationship the owner was asking about."}
+  :kami-engine-residue-cleanup
+  {:removed ["kami-mangaka-reader-clj" "kami-mangaka-scene-clj"]
+   :removed-why "last live :local/root reference to these two was removed by the tsumugu fix above; src confirmed byte-identical to the standalone split repos before deletion"
+   :commit "kotoba-lang/kami-engine@d432d79"
+   :not-removed ["kami-mangaka-render-clj" "kami-mangaka-page-clj" "kami-mangaka-text-clj"]
+   :not-removed-why "kami-engine's own kami-app-sip-clj (NOT the same as the standalone kami-app-sip split -- its src has diverged, possibly where the Ghost Hacker jump content pipeline's migration is actively landing per 260123-jump's latest commit) still resolves these three via :local/root. Reconciling kami-app-sip-clj with the standalone kami-app-sip is left as separate, more careful follow-up work."}}}
