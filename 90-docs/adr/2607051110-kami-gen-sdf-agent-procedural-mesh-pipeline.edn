@@ -1,0 +1,22 @@
+{:frontmatter
+ {:id "adr-2607051110-kami-gen-sdf-agent-procedural-mesh-pipeline"
+  :title "ADR-2607051110: kotoba-lang/kami-gen-sdf-agent — LLM-authored SDF/CSG mesh pipeline (Approach 2 of 4)"
+  :status "accepted"
+  :date "2026-07-05"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "kami-gen-sdf-agent"
+  :authoritative true
+  :authoritative_for
+  ["new repo kotoba-lang/kami-gen-sdf-agent: LLM writes/edits a bounded CSG/SDF EDN program
+    (not raw geometry) targeting kotoba-lang/scad+sdf, compiled by kotoba-lang/mesher"
+   "bounded propose/compile/render/critique loop (max N rounds, no unbounded retry),
+    offscreen render reuses kami-engine ADR-0047's wgpu reference-renderer pattern"
+   "v0 produces a static prop-like mesh, no VRM/skeleton rig (no bone hierarchy from CSG)"
+   "one of 4 sibling approaches built for a head-to-head comparison against the same
+    photoreal chibi-penguin-kigurumi reference image target"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607051100" "adr-2607051120" "adr-2607051130"]
+  :last_verified "2026-07-05"}
+ :body "see 2607051110-kami-gen-sdf-agent-procedural-mesh-pipeline.md"}

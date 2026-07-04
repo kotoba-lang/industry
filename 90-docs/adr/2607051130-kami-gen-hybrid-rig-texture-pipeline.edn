@@ -1,0 +1,26 @@
+{:frontmatter
+ {:id "adr-2607051130-kami-gen-hybrid-rig-texture-pipeline"
+  :title "ADR-2607051130: kotoba-lang/kami-gen-hybrid — deterministic rig + ML-textured costume pipeline (Approach 4 of 4)"
+  :status "accepted"
+  :date "2026-07-05"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "kami-gen-hybrid"
+  :authoritative true
+  :authoritative_for
+  ["new repo kotoba-lang/kami-gen-hybrid: deterministic parametric humanoid body/rig from
+    kotoba-lang/character (shared with kami-gen-procedural) + LLM-authored comfyui-clj
+    node-graph EDN generating only texture maps (albedo/normal/roughness), assembled via
+    kotoba-lang/vrm"
+   "texture execution is injected (DI): real comfyui-clj run needs a live ComfyUI/diffusion
+    backend not present yet (generate.html backend status table: image=TODO); mock executor
+    returns fixture textures for CI / no-GPU comparison leg"
+   "cannot reproduce the reference image's non-humanoid rounded penguin-suit silhouette,
+    only its surface coloring as a texture skin over a humanoid body shape"
+   "one of 4 sibling approaches built for a head-to-head comparison against the same
+    photoreal chibi-penguin-kigurumi reference image target"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607051100" "adr-2607051110" "adr-2607051120"]
+  :last_verified "2026-07-05"}
+ :body "see 2607051130-kami-gen-hybrid-rig-texture-pipeline.md"}
