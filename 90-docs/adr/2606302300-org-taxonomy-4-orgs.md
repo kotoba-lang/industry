@@ -162,3 +162,18 @@ distinct in kind from `gftdcojp`'s own commercial `ai-gftd-*` products and
 from the private `cloud-itonami` business-os base repo, which stays under
 `gftdcojp`). Future `cloud-itonami-*` blueprint repos may be created directly
 under `cloud-itonami` without transiting `gftdcojp` first.
+
+## Amendment (2026-07-04): `cloud-manimani` / `cloud-murakumo` already transferred to `gftdcojp`
+
+The "com-junkawasaki end-state" text above (§Migration, §Decisions) still reads
+"cloud control planes (cloud-manimani, cloud-murakumo)" as staying under
+`com-junkawasaki` — that is stale. Both were GitHub-transferred to `gftdcojp`
+on 2026-07-02 (`manifest/repos.edn` `:path-overrides` note, line ~29/57);
+`cloud-murakumo` was renamed to `cloud-murakumo-fleet` on transfer to avoid
+colliding with the pre-existing `gftdcojp/cloud-murakumo` (Sora, the GPU
+serverless product). ADR-2607041302 formalizes the resulting three-repo
+`murakumo` family (`kotoba-lang/murakumo` common lib/CLI,
+`gftdcojp/cloud-murakumo` Sora, `gftdcojp/cloud-murakumo-fleet` → proposed
+rename to `gftdcojp/local-murakumo`) and is now the authority for that naming;
+this ADR's org-taxonomy table is unaffected (both remain `gftdcojp`-owned
+cloud control planes, not `com-junkawasaki`).

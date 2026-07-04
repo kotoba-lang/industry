@@ -26,7 +26,7 @@
                      :scope :business}           ; ビジネス
   "com-junkawasaki" {:role :transitional-foundation ; 汎用 -clj 基盤ライブラリ + cloud 制御面 + data project
                      :scope :private-foundation  ; 言語コアは kotoba-lang へ移動済み (:path-overrides)
-                     :note "汎用基盤 -clj も最終的に kotoba-lang へ全移行（ADR-2606302300, 決定 2026-06-30）。当 org は data(spirit-in-physics 等) のみへ縮退予定（cloud-manimani / cloud-murakumo(-fleet) は 2026-07-02 gftdcojp へ transfer 済み）"}}
+                     :note "汎用基盤 -clj も最終的に kotoba-lang へ全移行（ADR-2606302300, 決定 2026-06-30）。当 org は data(spirit-in-physics 等) のみへ縮退予定（cloud-manimani / local-murakumo(旧 cloud-murakumo(-fleet)) は 2026-07-02 gftdcojp へ transfer 済み、local-murakumo は 2026-07-04 に再改名 ADR-2607041302）"}}
 
  ;; GitHub owner だけ移した project の west remote を上書きする。
  :remote-overrides
@@ -54,7 +54,7 @@
   "orgs/com-junkawasaki/vehicle-design-actor" "orgs/kotoba-lang/kami-engine-vehicle-designer"
   "orgs/com-junkawasaki/manimani"       "orgs/gftdcojp/manimani" ; GitHub-transferred to gftdcojp 2026-07-01 (private; mobile/ iOS+Android app, fastlane App Store pipeline in progress)
   "orgs/com-junkawasaki/cloud-manimani" "orgs/gftdcojp/cloud-manimani" ; GitHub-transferred to gftdcojp 2026-07-02 (private; Cloudflare Worker API for manimani triage Decision Ledger)
-  "orgs/com-junkawasaki/cloud-murakumo" "orgs/gftdcojp/cloud-murakumo-fleet" ; GitHub-transferred+renamed 2026-07-02 (kotoba WASM lattice fleet Worker API; gftdcojp/cloud-murakumo(Sora) と衝突のため -fleet)
+  "orgs/com-junkawasaki/cloud-murakumo" "orgs/gftdcojp/local-murakumo" ; GitHub-transferred 2026-07-02 (as cloud-murakumo-fleet, colliding with gftdcojp/cloud-murakumo(Sora) so -fleet); renamed again 2026-07-04 to local-murakumo (ADR-2607041302; kotoba WASM lattice fleet Worker API for your own on-prem fleet, vs. cloud-murakumo(Sora)=GPU rental product)
   "orgs/com-junkawasaki/kototama"       "orgs/kotoba-lang/kototama" ; GitHub-transferred to kotoba-lang 2026-07-02; landed together with a fresh clone at the new path (:heavy entry renamed too) so gen-west-manifest.bb's working-head lookup succeeds at the new canonical path instead of silently dropping the entry
   "orgs/com-junkawasaki/260208-spirit-in-physics" "orgs/com-junkawasaki/org-spirit-in-physics-comics"} ; 同一 GitHub repo (260208-… は rename 前の旧名で redirect)。west entry を comics に一本化 2026-07-02
 
@@ -458,7 +458,7 @@
    "orgs/gftdcojp/ai-gftd-weight-modal-world"
    "orgs/gftdcojp/ai-gftd-weight-oka"
    "orgs/gftdcojp/cloud-manimani"
-   "orgs/gftdcojp/cloud-murakumo-fleet"
+   "orgs/gftdcojp/local-murakumo"
    "orgs/kotoba-lang/svg"
    "orgs/kotoba-lang/did"
    ;; libp2p-key IPNS-name derivation (Ed25519 pubkey -> 'k51...' CIDv1),
