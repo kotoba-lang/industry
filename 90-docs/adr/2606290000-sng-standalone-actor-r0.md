@@ -148,3 +148,10 @@ pathway selection は常に high-stakes → Council Lv6+≥3。
   `.cursor/rules/always/actor-pattern-rule.mdc` に拠る。
 - 本 ADR を supersede する場合は、pathway の Council ratify 状態・rulebook の
   curation進捗・kotoba-server sovereign ledger 立ち上げ有無を併せて更新すること。
+
+## Addendum (2026-07-04, ai-gftd-itonami deprecation cleanup)
+
+本文が同型4例の1つとして挙げる `ai-gftd-itonami` は repo として実体化しないまま終わった
+（GitHub 上に実在せず、ローカルの空 placeholder checkout も削除済み）。
+ops-LLM⊣CertGovernor の実装は `orgs/gftdcojp/cloud-itonami` 本体に統合されている。
+本文は起票時点の記述として保持し書き換えない。

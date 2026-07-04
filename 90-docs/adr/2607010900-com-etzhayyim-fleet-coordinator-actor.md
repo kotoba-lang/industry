@@ -69,3 +69,10 @@ drain! だけでなく **actor graph からも 1 提案の決定を receipt で�
   **Ed25519 CACAO 自己署名（actor 鍵）は鍵 provision 後の follow-up**（journal の
   `:rad/attestation :pending-self-sign` で明示）。
 - west 登録は light（clone-depth 無し、full）で ADR-2606302100 のハイブリッド方針と整合。
+
+## Addendum (2026-07-04, ai-gftd-itonami deprecation cleanup)
+
+本文が同型パターンの一例として挙げる `ai-gftd-itonami` は repo として実体化しないまま
+終わった（GitHub 上に実在せず、ローカルの空 placeholder checkout も削除済み）。
+ops-LLM⊣CertGovernor の実装は `orgs/gftdcojp/cloud-itonami` 本体に統合されている。
+本文は起票時点の記述として保持し書き換えない。

@@ -412,7 +412,13 @@ WIP を並行セッションが約40分間隔で退避し続け stash が20個�
 
 ドメインを「actor」として作るときは、既存3例の同型パターンに揃える:
 **robotaxi-actor**（AR1 ⊣ SafetyGovernor）/ **gftd-talent-actor**（HR-LLM ⊣
-PolicyGovernor）/ **ai-gftd-itonami**（ops-LLM ⊣ CertGovernor）。
+PolicyGovernor）/ **cloud-itonami**（ops-LLM ⊣ CertGovernor）。
+
+> 2026-07-04 追記: 上記3例目は当初 standalone repo `gftdcojp/ai-gftd-itonami` として
+> 計画されていたが、実際にはその repo は作成されず（GitHub 上に実在しない・ローカルの
+> 空 placeholder checkout も削除済み）、実装は `gftdcojp/cloud-itonami` 本体の
+> `itonami`/`cloud_itonami.edge.*` namespace にそのまま統合された。以下の CACAO 手本
+> パスも `cloud-itonami` 側を参照する。
 
 - **封じ込め + 独立 governor + 不変台帳。** 知能ノード（LLM/研究モデル）を1ノードに
   封じ込め *proposal のみ* 返させ、別系統の Governor が検閲して 可決/拒否/人間承認 に
@@ -458,7 +464,7 @@ PolicyGovernor）/ **ai-gftd-itonami**（ops-LLM ⊣ CertGovernor）。
   ない*）。actor は鍵を持つことで自分の graph の owner → depth-1 の自己 mint が
   構造的に authorized。**owner hand-off も共有 token も要らない**（「token をもらう／
   owner が grant する」前提は誤り）。
-- 手本は `ai-gftd-itonami/src/itonami/cacao.clj`（JVM）: did:key(0xED01+base58btc →
+- 手本は `cloud-itonami/src/cloud_itonami/edge/cacao.cljc`（旧 `ai-gftd-itonami/src/itonami/cacao.clj` 参照は廃止。2026-07-04）: did:key(0xED01+base58btc →
   `z6Mk…`)、鍵由来 IPNS(`ipns-name` → `k51qzi5uqu5d…`)、SIWE/wire は `kotoba.cacao` の
   byte-exact 純関数を移植、署名は JDK Ed25519、最小 CBOR。`load-or-create-identity!`
   で actor 鍵を 初回生成→永続→再読込。**秘密鍵は `.<actor>/identity.edn` に置き

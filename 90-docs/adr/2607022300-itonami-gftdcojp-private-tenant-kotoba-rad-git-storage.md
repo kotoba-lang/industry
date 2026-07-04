@@ -225,4 +225,11 @@ JVM の `cacao.core/mint` に対するクロス検証・`wrangler pages dev`
 - ADR-2606280300（kotoba-rad / kotoba-git 主権 repository layer）
 - `orgs/gftdcojp/cloud-itonami/docs/adr/0001-cloudflare-pages-operator-cockpit.md`
 - `orgs/gftdcojp/cloud-itonami/docs/adr/0002-org-repo-tenant-isolation.md`
-- `orgs/gftdcojp/ai-gftd-itonami/src/itonami/cacao.clj`
+- `orgs/gftdcojp/ai-gftd-itonami/src/itonami/cacao.clj`（参照は廃止。下記 Addendum 参照）
+
+## Addendum (2026-07-04, ai-gftd-itonami deprecation cleanup)
+
+`orgs/gftdcojp/ai-gftd-itonami` は実際には repo として作成されず（GitHub 上に実在せず、
+ローカルの空 placeholder checkout も削除済み）。本文が参照する CACAO 自己発行実装は
+`orgs/gftdcojp/cloud-itonami/src/cloud_itonami/edge/cacao.cljc` に統合されている。
+本文の記述は起票時点の事実として保持し書き換えない。
