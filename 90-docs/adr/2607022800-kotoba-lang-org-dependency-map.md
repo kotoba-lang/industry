@@ -372,3 +372,40 @@ Phase 5 で「archived のため push 不能」と記録した kototama-clj は�
 remote HEAD `a9134aff` と一致、これがディスク上に残る最後のコピー)。west.yml
 は entry block 5 行のみの最小 diff で除籍(sparse worktree での wholesale 再生成
 は環境依存の submodule リスト脱落を混ぜるため破棄した)。
+
+### Follow-up (2026-07-04) — cluster 43 の実消費者と、隣接する2つの "mangaka" の混同を解消
+
+オーナーから「`kotoba-lang/mangaka` と itonami-cloud の mangaka actor の関係は
+整理されているか」という問いがあり、調査したところ **"mangaka" と呼ばれるものが
+同一 org 内・org 横断の両方で複数存在し、混同されていた**ことが判明した。整理:
+
+1. **cluster 43 (このADR) の実消費者は `kami-app-sip` と
+   `etzhayyim/com-etzhayyim-tsumugu` の2つ**であり、`gftdcojp/ai-gftd-mangaka`
+   ではない。`ai-gftd-mangaka`(mangaka.gftd.ai、汎用マンガ生成SaaS)は
+   `kami-mangaka-expression`(kami-engine `:deps/root`、cluster 43 とは別系統の
+   HUNTER×HUNTER由来の表情パターン)しか使っておらず、`kami-mangaka-page/
+   reader/render/text/scene` 系には一切依存していない。両者は無関係な別の
+   "mangaka" 実装であり、混同しないこと。
+2. **`com-etzhayyim-tsumugu`(ADR-2607011500)が cluster 43 の -clj rename
+   sweep(上記 Phase 2)を missed していた** — `kami-mangaka-render-clj` /
+   `kami-mangaka-page-clj` を `kami-engine` 内の孤立サブツリーへの `:local/root`
+   のまま参照し続けていた(`kami-app-sip` 側は同じ fix が適用済みだった)。
+   `kotoba-lang/kami-mangaka-render` / `kami-mangaka-page` への git/sha 座標に
+   修正、`clojure -M:dev:test` 23 tests / 62 assertions green を確認。
+3. **`gftdcojp/ai-gftd-mangaka` と itonami(`cloud-itonami` /
+   `etzhayyim/com-etzhayyim-itonami`)の間にコード上の依存関係は無い**
+   (相互 grep 双方向ゼロヒット)。CLAUDE.md 「Actors」節が挙げる同型パターン
+   3例(robotaxi-actor / gftd-talent-actor / cloud-itonami)にも含まれない。
+4. 一方 **`com-etzhayyim-tsumugu` は itonami と実在する関係を持つ** —
+   `tsumugu.cacao` / `tsumugu.kotoba` は `itonami.cacao` / `itonami.kotoba`
+   からの意図的な hand-port(ランタイム依存にはしない containment 規律。
+   graph 導出方式は kotobase.net の実装に合わせて意図的に diverge — 詳細は
+   ADR-2607011500 参照)。これが実質的な「mangaka actor ↔ itonami」の関係。
+5. **`kami-engine` 内の孤立コピー整理**: 上記2の fix で最後の生きた参照が
+   消えた `kami-mangaka-reader-clj` / `kami-mangaka-scene-clj` を削除(src は
+   標準化先 repo とバイト一致、deps.edn/README のみ post-split で更新されていた
+   ことを確認済み)。`kami-mangaka-render-clj` / `kami-mangaka-page-clj` /
+   `kami-mangaka-text-clj` は**削除しなかった** — `kami-engine` 内の
+   `kami-app-sip-clj`(標準化先 `kami-app-sip` と src が分岐した別コピー、
+   Ghost Hacker jump の新パイプライン移行先の可能性あり)がまだ `:local/root`
+   で参照しており、そちらの reconciliation は別作業として残す。
