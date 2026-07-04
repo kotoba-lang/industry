@@ -239,19 +239,24 @@
    "orgs/kotoba-lang/crdt"
    ;; parent-linked content-addressed commit chain (CommitDag), Wave 1/2 of the
    ;; kotoba database-crates CLJC migration roadmap (ADR-2607022600). Composes
-   ;; with kotoba-lang/prolly-tree + quad-store (ADR-2607010930 Phase 6).
+   ;; with kotoba-lang/prolly-tree + arrangement (ADR-2607010930 Phase 6; arrangement
+   ;; was quad-store until ADR-2607050700 merged in kqe and renamed it).
    "orgs/kotoba-lang/commit-dag"
    ;; canonical kotobase datom-plane client (kotobase.client/cacao/cid) — de-forks
    ;; the byte-identical copies embedded in app-aozora / app-aozora-boundary /
    ;; kami-genko; consumed as a shadow-cljs source-path (ADR-2607022330 addendum).
    "orgs/kotoba-lang/kotobase-client"
-   ;; filter-honoring CLJC kotobase datom worker (:esm/workerd) on kotobase-engine
-   ;; — replaces the deleted-source WASM worker that ignored index/components/limit
-   ;; (ADR-2607022330 addendum 2). Deploy + yoro-social migration are gated.
+   ;; filter-honoring CLJC kotobase datom worker (:esm/workerd) on kotobase-peer
+   ;; (was kotobase-engine until ADR-2607050700) — replaces the deleted-source WASM
+   ;; worker that ignored index/components/limit (ADR-2607022330 addendum 2).
+   ;; Deploy + yoro-social migration are gated.
    "orgs/kotoba-lang/kotobase-cljc-worker"
-   ;; kotobase XRPC-surface engine (transact/datoms/q/pull + verifiable persist),
-   ;; composing prolly-tree/quad-store/kqe/commit-dag (ADR-2607022600).
-   "orgs/kotoba-lang/kotobase-engine"
+   ;; kotobase XRPC-surface peer library (transact/datoms/q/pull + verifiable
+   ;; persist), composing prolly-tree/arrangement/commit-dag (ADR-2607022600).
+   ;; Renamed from kotobase-engine — "engine" matched no Datomic term; Datomic
+   ;; calls this a Peer (ADR-2607050700, `kotoba : kotobase = Clojure : Datomic`
+   ;; per ADR-2607032500).
+   "orgs/kotoba-lang/kotobase-peer"
    ;; kotoba-lang foundational stdlib P1 (ADR-kotoba-lang-foundational-stdlib)
    "orgs/kotoba-lang/fs"
    "orgs/kotoba-lang/http"
@@ -353,21 +358,25 @@
    ;; 2026-07-02) — closes the "still-unrestored kotoba-auth/core/datomic/edn/
    ;; ipfs/cli/ipns-record gap" flagged in the shell scaffold note above:
    ;; prolly-tree (content-addressed B-tree, was kotoba-store/ProllyTree) →
-   ;; quad-store (4-index spo/pso/pos/ocp Arrangement + commit chain, was
-   ;; kotoba-query's storage half) → kqe (pattern-query index routing, was
-   ;; kotoba-query's Datalog half, name unchanged) → kotoba-client (CID-verified
-   ;; block ingest + hydrate-via-blocks, was kotoba-runtime's KotobaNode browser
-   ;; client). Real initial implementations, not scaffold-only (see each repo's
-   ;; README for what is/isn't landed; IPNS-verify + Datalog fixpoint are
-   ;; explicit follow-ups). Reuses existing kotoba-lang/{multiformats,dag-cbor,
-   ;; cacao} rather than duplicating CID/CBOR/CACAO primitives.
+   ;; arrangement (4-index spo/pso/pos/ocp Arrangement + commit chain, was
+   ;; kotoba-query's storage half) → kotoba-client (CID-verified block ingest +
+   ;; hydrate-via-blocks, was kotoba-runtime's KotobaNode browser client). Real
+   ;; initial implementations, not scaffold-only (see each repo's README for
+   ;; what is/isn't landed; IPNS-verify + Datalog fixpoint are explicit
+   ;; follow-ups). Reuses existing kotoba-lang/{multiformats,dag-cbor,cacao}
+   ;; rather than duplicating CID/CBOR/CACAO primitives.
+   ;; ADR-2607050700 (2026-07-05): quad-store renamed to arrangement (Datomic's
+   ;; own term for this 4-index structure, replacing RDF-flavored naming) and
+   ;; absorbed kqe (pattern-query index routing, was kotoba-query's Datalog
+   ;; half) as arrangement.query — kqe was pure routing over arrangement's own
+   ;; indices with no storage of its own, so two repos for one read path was
+   ;; duplication, not a real split. kqe repo retired/archived.
    "orgs/kotoba-lang/prolly-tree"
-   "orgs/kotoba-lang/quad-store"
-   "orgs/kotoba-lang/kqe"
+   "orgs/kotoba-lang/arrangement"
    "orgs/kotoba-lang/kotoba-client"
    ;; canonical IPLD DAG-CBOR 層 (ADR-2607023200) — multiformats + dag-cbor を
-   ;; 合成し tag-42 の真の CID リンクを提供。prolly-tree/quad-store/commit-dag/
-   ;; kotoba-client/kotobase-engine はこれ経由に移行済み (旧 plain-CID-string
+   ;; 合成し tag-42 の真の CID リンクを提供。prolly-tree/arrangement/commit-dag/
+   ;; kotoba-client/kotobase-peer はこれ経由に移行済み (旧 plain-CID-string
    ;; encoding の honesty note を実際に閉じた。全 CID 変更のクリーンブレーク)。
    "orgs/kotoba-lang/ipld"
    ;; P2P graph-sync プロトコル (ADR-2607023200) — net の gossip/bitswap 意味論 +
