@@ -60,7 +60,8 @@
   "orgs/kotoba-lang/ui"         "orgs/kotoba-lang/kami-engine-hud" ; renamed 2026-07-04 (ADR-2607051200): kami-engine's WebGPU-canvas HUD widget package (kotoba.ui) collided in name with the new kotoba-ui/appkit/uikit app design-system family — unrelated stacks
   "orgs/kotoba-lang/ui-gpu"     "orgs/kotoba-lang/kami-engine-hud-gpu" ; renamed together with kami-engine-hud (ADR-2607051200); its GPU rendering backend, restored from the deleted Rust kami-ui-gpu crate
   "orgs/kotoba-lang/wasm-ui"    "orgs/kotoba-lang/dom-gpu" ; renamed 2026-07-04 (ADR-2607051200): names the kotoba:dom retained-tree-to-GPU substrate (consumed by browser/cssom/htmldom/shell) for what it does, avoiding collision with kotoba-ui/appkit/uikit; browser/README.md's prior aspirational rename target "ui" was permanently blocked by kotoba-lang/ui above (now kami-engine-hud)
-  "orgs/kotoba-lang/kami-ui-sdk" "orgs/kotoba-lang/kami-engine-app-sdk"} ; renamed 2026-07-04 (ADR-2607051200): the six ported SDKs cover UI+animation+particle-FX+audio-synth+WebRTC, not UI alone; aligned to the kami-app-*/kami-engine-* naming families
+  "orgs/kotoba-lang/kami-ui-sdk" "orgs/kotoba-lang/kami-engine-app-sdk" ; renamed 2026-07-04 (ADR-2607051200): the six ported SDKs cover UI+animation+particle-FX+audio-synth+WebRTC, not UI alone; aligned to the kami-app-*/kami-engine-* naming families
+  "orgs/kotoba-lang/kami-app-sip" "orgs/etzhayyim/com-etzhayyim-sip"} ; GitHub-transferred to etzhayyim 2026-07-04 + renamed (ADR-2607041245; leaf consumer product, not substrate -- moved to the agent-centric actor bucket alongside com-etzhayyim-tsumugu)
 
  ;; 全 project 共通の既定
  :defaults
@@ -521,6 +522,7 @@
    "orgs/etzhayyim/com-etzhayyim-sng" ; ADR-2606290000: e-methane Sabatier SNG standalone actor
    "orgs/etzhayyim/com-etzhayyim-yomi" ; ADR-2607010900: news-intelligence actor (intel-LLM ⊣ IntelGovernor); subscribes kawaraban mirror, autonomous publication (ADR-2606281500)
    "orgs/etzhayyim/com-etzhayyim-tsumugu" ; ADR-2607011500: Spirit in Physics manga publishing actor (mangallm ⊣ PolicyGovernor); self-sovereign kotoba-server identity, coscientist quality loop
+   "orgs/etzhayyim/com-etzhayyim-sip" ; ADR-2607041245: Spirit in Physics companion game actor (formerly kotoba-lang/kami-app-sip, GitHub-transferred 2026-07-04 -- leaf consumer product, not substrate; same universe as com-etzhayyim-tsumugu)
    "orgs/etzhayyim/com-etzhayyim-tashikame" ; ADR-2607022200: fact-check verdict publisher (factllm ⊣ FactGovernor); autonomous app-aozora publication (ADR-2606281500); ingests kawaraban mirror + mentions
    "orgs/etzhayyim/com-etzhayyim-kouhou" ; ADR-2607022210: public-interest/public-sector info curator (organizer ⊣ PublicInfoGovernor + registry whitelist); autonomous app-aozora publication
    "orgs/etzhayyim/com-google-ads" ; ADR-2606292130: charter-clean outreach & performance-marketing actor
@@ -861,7 +863,6 @@
    "orgs/kotoba-lang/kami-mangaka-scene-clj"
    "orgs/kotoba-lang/kami-mangaka-render"
    "orgs/kotoba-lang/kami-mangaka-text"
-   "orgs/kotoba-lang/kami-app-sip"
    "orgs/kotoba-lang/kami-engine-sdk-clj"
    "orgs/kotoba-lang/kami-atmosphere-scene"
    "orgs/kotoba-lang/kami-cam-scene"
