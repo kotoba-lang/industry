@@ -1,6 +1,6 @@
 # ADR-2607041245: kami-app-sip を kotoba-lang から etzhayyim へ org transfer（`com-etzhayyim-sip`）
 
-**Status**: accepted
+**Status**: closed
 **Date**: 2026-07-04
 **Deciders**: Jun Kawasaki
 **Scope**: `orgs/kotoba-lang/kami-app-sip` → `orgs/etzhayyim/com-etzhayyim-sip`, `orgs/kotoba-lang/kami-engine/kami-app-sip-clj`
@@ -91,3 +91,25 @@ substrate を**消費する側**の、完結したリーフ製品(ゲーム)だ�
 - ADR-2607011500: `com-etzhayyim-tsumugu`(同一世界観の manga publishing actor)。
 - ADR-2607022800 follow-up-2026-07-04: この issue を発見した調査(mangaka
   cluster 43 の実消費者、mangaka actor と itonami の関係)。
+
+
+## Closed (2026-07-04, same session)
+
+Final verification after all steps landed:
+
+- `etzhayyim/com-etzhayyim-sip` live, `main` at `ef8d56cd3389bf5ba08a07c7d8b9d403dd405d04`; old
+  URL `kotoba-lang/kami-app-sip` correctly redirects (GitHub API confirms — a
+  request to the old path returns the new repo's data).
+- `kotoba-lang/kami-engine` no longer contains `kami-app-sip-clj` (`main` at
+  `abfeb2c1588d8f16e995b8910b8206b0bc2fc8c0`); local leftover `.cpcache`/`public`
+  build artifacts (untracked, gitignored) cleaned from the shared checkout.
+- `manifest/repos.edn`: zero remaining `kami-app-sip` references under
+  `kotoba-lang`; `orgs/etzhayyim/com-etzhayyim-sip` registered next to
+  `com-etzhayyim-tsumugu`; `:path-overrides` redirect in place.
+- `manifest/west.yml`: `kami-app-sip` entry count is zero; `com-etzhayyim-sip`
+  registered under the `etzhayyim` remote at the correct alphabetical position;
+  `kami-engine`'s pin advanced to the removal commit.
+- Org-wide grep confirms no `deps.edn` anywhere in the fleet references
+  `kotoba-lang/kami-app-sip` as a git coordinate — nothing else needed updating.
+
+No open follow-ups from this ADR remain. Closing.
