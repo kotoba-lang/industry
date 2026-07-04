@@ -196,6 +196,28 @@ continuity path from the JVM superstep loop onto the engine's real BSP.
 4. **R3b** (ops/legal): e-CNY jurisdiction analysis + Council Lv7+ vote +
    real authorized-operator custody; then `cbdc/activate` applies.
 
+## 追記（2607050300）— Execution model 節・Follow-up 1 は kotoba-vm 削除により unactionable
+
+本 ADR の「Execution model」節（"the kotoba engine runs real Pregel BSP
+(`kotoba-vm` `WasmPregelRunner` / `DistributedPregelRunner`)"）と
+Follow-up 1（「junbi → kotodama Pregel cell: ... moving the superstep loop
+onto kotoba-vm BSP」）が参照する `kotoba-vm`/`WasmPregelRunner`/
+`DistributedPregelRunner` は、**本 ADR の前日（2026-07-01, `604896171b`）に
+削除された Rust workspace の一部で、現在は存在しない**（`kotoba-lang/kotoba`
+は現在 JVM launcher + Chicory WASM runtime + in-mem `kgraph` のみ）。
+`quad-store`/`kqe`/`commit-dag` と異なり、distributed Pregel の CLJC 復元は
+一度も着手されておらず、ADR-2607050300（Pregel/BSP positioning）の decision
+により **復元しない**（`p2p` の graph-sync + per-actor sharding
+（ADR-2607032430）+ `kototama` cell が同じ課題を既に別経路で解決しているため）。
+
+**本 ADR 自体の decision（junbi のアーキテクチャ、EN/ENGI 設計）は不変**。
+影響を受けるのは Execution model 節の記述と Follow-up 1 のみ:
+Follow-up 1 は「移行先の engine が無い」ため現状 unactionable — TreasuryActor
+の superstep loop を JVM/WASM 以外の場所に移す必要が実際に生じたら、削除済み
+kotoba-vm への言及ではなく、今実在するもの（`p2p`/per-actor sharding/
+`kototama` cell）を土台に新しい ADR として設計し直す。詳細は
+ADR-2607050300 を参照。
+
 ## Related
 
 - `orgs/kotoba-lang/kotoba/docs/ADR-engi-mutual-credit-on-chain.md` (EN/ENGI)

@@ -5,7 +5,7 @@
   :doc_type "adr"
   :topic "etzhayyim-reserve-basket"
   :authoritative true
-  :last_verified "2026-07-02"
+  :last_verified "2026-07-04"
   :authoritative_for
   ["which reserve assets etzhayyim may hold: Tier-1 on-chain {USDC, EURC (Circle), JPYC (JPYC株式会社)} on Base L2; Tier-2 CBDC {e-CNY (PBOC); digital euro / digital yen placeholders} attestation-observed"
    "USDT is structurally excluded (owner decision 2026-07-02); readmission = Council Lv7+ unanimity + ADR amendment"
@@ -17,9 +17,14 @@
    "orgs/etzhayyim/com-etzhayyim-kawase-yui/README.md"
    "90-docs/adr/2606302300-org-taxonomy-4-orgs.md"
    "orgs/kotoba-lang/banking/README.md"
-   "orgs/kotoba-lang/base-l2/README.md"]
+   "orgs/kotoba-lang/base-l2/README.md"
+   "90-docs/adr/2607050300-pregel-bsp-positioning.md"]
   :supersedes []
-  :superseded_by []}
+  :superseded_by []
+  :corrections
+  [{:date "2026-07-04"
+    :by "adr-2607050300-pregel-bsp-positioning"
+    :note "Execution model 節と Follow-up 1 が参照する kotoba-vm/WasmPregelRunner/DistributedPregelRunner は 2026-07-01 の Rust workspace 削除により現存しない（本 ADR 自体の decision は不変。詳細は本文の追記節）。"}]}
 
  :problem
  {:source "owner directive 2026-07-02"
