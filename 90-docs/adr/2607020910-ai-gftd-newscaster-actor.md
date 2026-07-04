@@ -95,3 +95,10 @@ B 層放送 actor として実装する。** ai-gftd-news は上流（A 層）�
   `orgs/kotoba-lang/kami-engine`（kami-mangaka-{render,text,page}-clj、`wit/cine`）
 - ADR-2606272330（ai-gftd-router — 新規 project 一気通貫登録の実例・恒久承認）
 - 本 ADR とペアの .edn
+
+## Addendum (2026-07-04, ai-gftd-itonami deprecation cleanup)
+
+`orgs/gftdcojp/ai-gftd-itonami` は repo として実体化しないまま終わった（GitHub 上に
+実在せず、ローカルの空 placeholder checkout も削除済み）。ops-LLM⊣CertGovernor の
+同型実装は `orgs/gftdcojp/cloud-itonami` 本体に統合されている。本文は起票時点の
+記述として保持し書き換えない。

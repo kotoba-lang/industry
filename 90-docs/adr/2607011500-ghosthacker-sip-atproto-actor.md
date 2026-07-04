@@ -90,3 +90,12 @@ Two candidate publish topologies were considered:
   Worker's write path was built around a single static owner secret, so
   retrofitting it is a bigger, separate, security-sensitive project than
   extending the existing pull-based projector.
+
+## Addendum (2026-07-04, ai-gftd-itonami deprecation cleanup)
+
+`orgs/gftdcojp/ai-gftd-itonami` was never actually created as a repo (does not
+exist on GitHub; the local empty placeholder checkout has been removed). The
+self-sovereign CACAO pattern this ADR cites (`itonami/{cacao.clj,kotoba.clj}`)
+is implemented in `orgs/gftdcojp/cloud-itonami/src/cloud_itonami/edge/cacao.cljc`
+instead. The body text is kept as written at the time of this ADR and not
+rewritten.

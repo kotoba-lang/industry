@@ -15,7 +15,7 @@ authoritative_for:
   - op 相当 CLI（kagi.cli）と vault 永続化（kagi.persist：暗号文のみ）
 related:
   - orgs/com-junkawasaki/kagi-clj
-  - orgs/gftdcojp/ai-gftd-itonami/src/itonami/cacao.clj
+  - orgs/gftdcojp/cloud-itonami/src/cloud_itonami/edge/cacao.cljc  # 旧 ai-gftd-itonami/src/itonami/cacao.clj (repo未実体化のまま削除、2026-07-04)
   - orgs/com-junkawasaki/kotoba/crates/kotoba-crypto
   - orgs/com-junkawasaki/kotoba/crates/kotoba-auth
   - orgs/gftdcojp/gftd-talent-actor

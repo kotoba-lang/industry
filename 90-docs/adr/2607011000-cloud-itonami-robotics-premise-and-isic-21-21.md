@@ -100,3 +100,10 @@ README は "Robotics premise" 節で領域 robot と governor 名を明示する
 ADR-2607012100 により `cloud-itonami` org へ transfer 済み(visibility は public の
 まま不変)。上記本文の「gftdcojp org」表記は移管当時の事実として保持し書き換えない
 — 現在の所属 org は ADR-2607012100 を参照。
+
+## Addendum (2026-07-04, ai-gftd-itonami deprecation cleanup)
+
+本文が同型3例の1つとして挙げる `ai-gftd-itonami` は repo として実体化しないまま終わった
+（GitHub 上に実在せず、ローカルの空 placeholder checkout も削除済み）。
+ops-LLM⊣CertGovernor の実装は `orgs/gftdcojp/cloud-itonami` 本体に統合されている。
+上記本文は起票時点の記述として保持し書き換えない。
