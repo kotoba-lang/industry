@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L1 LLM 推論 — app（Proton 型）  
-**As-of**: 2026-07-02  
+**As-of**: 2026-07-04  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -15,6 +15,7 @@
 - agent 購読は provider lock-in
 - 観測 (signal): gftd.ai 実測 422889 req/7d・4644 uniques(日次和)、workers 32517 inv/7d
 - 観測 (signal): gftd.ai 実測 456291 req/7d・4941 uniques(日次和)、workers 36494 inv/7d
+- 観測 (signal): gftd.ai 実測 369449 req/7d・4875 uniques(日次和)、workers 31676 inv/7d
 
 ## Customer Segments
 

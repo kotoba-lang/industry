@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L2 storage hosting（graph BaaS + map / git / search）  
-**As-of**: 2026-07-02  
+**As-of**: 2026-07-04  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -15,6 +15,7 @@
 - map/git/search が別 SaaS に分散し data 主権が失われる
 - 観測 (signal): kotobase.net 実測 3483 req/7d・272 uniques(日次和)、workers 5311 inv/7d
 - 観測 (signal): kotobase.net 実測 3631 req/7d・314 uniques(日次和)、workers 7550 inv/7d、Stripe active subs 0
+- 観測 (signal): kotobase.net 実測 3653 req/7d・336 uniques(日次和)、workers 7475 inv/7d、Stripe active subs 0
 
 ## Customer Segments
 
@@ -44,6 +45,7 @@
 - free self-serve → paid workspace (kotobase tier 型)
 - OSS kotoba 開発者
 - 全社内プロダクトが tenant
+- GTM (awareness→acquisition): landing 訪問→signup 転換 0% < 目標 3% — landing の価値提案/CTA と価格ページの A/B、SEO・技術コンテンツ、既存導線からの招待
 
 ## Revenue Streams
 
@@ -69,6 +71,7 @@
 - 次の検証 (kotobase-graph-arpu): Standard→Pro 転換率と add-on attach 率
 - gate 距離 (kotobase-graph-arpu): Stripe active subscriptions = 0 (gate 未到達)
 - funnel (net-kotobase): landing 訪問=? → signup=? → checkout 開始=? → paid(active sub)=0 | 転換 
+- funnel (net-kotobase): landing 訪問=63 → signup=0 → checkout 開始=0 → paid(active sub)=0 | 転換 landing 訪問→signup 0%
 
 ## Unfair Advantage
 
