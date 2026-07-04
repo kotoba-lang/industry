@@ -35,9 +35,9 @@
     (is (= :blueprint (industry/maturity "6419"))))
   (testing "a registry-only group entry is :spec"
     (is (= :spec (industry/maturity "011"))))
-  (testing "a second implemented actor (cloud-itonami-L6810) is also :implemented"
+  (testing "a second implemented actor (cloud-itonami-isic-6810) is also :implemented"
     (is (= :implemented (industry/maturity "6810"))))
-  (testing "a third implemented actor (cloud-itonami-M6910) is also :implemented"
+  (testing "a third implemented actor (cloud-itonami-isic-6910) is also :implemented"
     (is (= :implemented (industry/maturity "6910"))))
   (testing "a fourth implemented actor (cloud-itonami-6511) is also :implemented"
     (is (= :implemented (industry/maturity "6511"))))
