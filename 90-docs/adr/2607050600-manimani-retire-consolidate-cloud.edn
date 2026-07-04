@@ -1,0 +1,25 @@
+{:frontmatter
+ {:id "adr-2607050600-manimani-retire-consolidate-cloud"
+  :title "ADR-2607050600: ai-gftd-manimani を退役し、manimani 系を manimani(OSS)+cloud-manimani の2系統に集約"
+  :status "accepted"
+  :date "2026-07-05"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "manimani-portfolio-consolidation"
+  :authoritative true
+  :authoritative_for
+  ["ai-gftd-manimani(標準リポジトリ + 本番 hostname manimani.gftd.ai / lg-manimani.gftd.ai)
+    の退役決定。k8s pod teardown とモノレポ内ソース削除は本 ADR の範囲外(follow-up)。"
+   "cloud-manimani へは ai-gftd-manimani の機能(decision-support / work board)を移植しない。
+    cloud-manimani の今後の設計は Claude Desktop 型(chat/cowork/code 統合)を優先する。"
+   "portfolio の manimani 系実装を 4 系統(manimani OSS / cloud-manimani / ai-gftd-manimani /
+    etzhayyim 独自実装)から 2 系統(manimani OSS / cloud-manimani)へ収束。etzhayyim 側は
+    既に自己申告 superseded のため対象外。"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2606282000-cloud-workers-kotobase-external-storage"
+            "adr-2607021700-portfolio-maturity-scoring"
+            "adr-2607022200-per-product-gate-instruments"]
+  :last_verified "2026-07-05"}
+ :body
+ "# ADR-2607050600\n\n**Status**: accepted **Date**: 2026-07-05\n\n## Decision\n\nai-gftd-manimani の標準リポジトリ(スキャフォールドのみ、実機能なし)を退役し GitHub archive +\nmanifest から除去。本番 hostname manimani.gftd.ai(Worker route)/ lg-manimani.gftd.ai(共有\nTunnel cedba8e6 の ingress rule 1件のみ)も退役、D1 database ai-gftd-manimani(uuid\n4473765b-c767-4e5e-9538-0cc8a53975e6、num_tables=0)を drop。work board の plan/execute は\n2026-06-15 の D1 移行で既に壊れており、consent 署名も未検証、helm chart も再デプロイ不能\n(Chart.yaml/values.yaml 欠落)だったため、移植せず退役を選択。cloud-manimani は\nai-gftd-manimani の schema を継承せず、Claude Desktop 型 chat/cowork/code 統合を独自に設計する。\n\n## 範囲外(follow-up)\n\nk8s pod(lg-manimani, Vultr VKE)はこの作業環境から到達不能のため手動 teardown が必要。\nモノレポ ai-gftd-apps-gftdcojp 内のソース/lexicon/helm chart は共有モノレポのため今回は\n削除せず残置。\n\n## Consequences\n\n(+) manimani 系実装が 4→2 系統に収束、移植コストなし(schema 重複が無かったため)。\n(+) 壊れた plan/execute ループ・未検証 consent・deploy 不能な chart を「動いている前提」で\n持ち込むリスクを回避。(−) k8s teardown とモノレポ内ソース削除が未完了で残る。\n\nペアの .md が正。"}
