@@ -241,7 +241,12 @@
    ;; kotoba database-crates CLJC migration roadmap (ADR-2607022600). Composes
    ;; with kotoba-lang/prolly-tree + arrangement (ADR-2607010930 Phase 6; arrangement
    ;; was quad-store until ADR-2607050700 merged in kqe and renamed it).
-   "orgs/kotoba-lang/commit-dag"
+   ;; Renamed from commit-dag to chain (ADR-2607050800) -- "chain" names the
+   ;; parent-linked structure itself, matching the repo's own chain/verify-
+   ;; chain/head functions; "log" (Datomic's own term for this immutable,
+   ;; append-only transaction sequence) was the first choice but collides
+   ;; with the unrelated, already-existing kotoba-lang/log.
+   "orgs/kotoba-lang/chain"
    ;; canonical kotobase datom-plane client (kotobase.client/cacao/cid) — de-forks
    ;; the byte-identical copies embedded in app-aozora / app-aozora-boundary /
    ;; kami-genko; consumed as a shadow-cljs source-path (ADR-2607022330 addendum).
@@ -252,7 +257,7 @@
    ;; Deploy + yoro-social migration are gated.
    "orgs/kotoba-lang/kotobase-cljc-worker"
    ;; kotobase XRPC-surface peer library (transact/datoms/q/pull + verifiable
-   ;; persist), composing prolly-tree/arrangement/commit-dag (ADR-2607022600).
+   ;; persist), composing prolly-tree/arrangement/chain (ADR-2607022600).
    ;; Renamed from kotobase-engine — "engine" matched no Datomic term; Datomic
    ;; calls this a Peer (ADR-2607050700, `kotoba : kotobase = Clojure : Datomic`
    ;; per ADR-2607032500).
@@ -375,13 +380,14 @@
    "orgs/kotoba-lang/arrangement"
    "orgs/kotoba-lang/kotoba-client"
    ;; canonical IPLD DAG-CBOR 層 (ADR-2607023200) — multiformats + dag-cbor を
-   ;; 合成し tag-42 の真の CID リンクを提供。prolly-tree/arrangement/commit-dag/
+   ;; 合成し tag-42 の真の CID リンクを提供。prolly-tree/arrangement/chain/
    ;; kotoba-client/kotobase-peer はこれ経由に移行済み (旧 plain-CID-string
    ;; encoding の honesty note を実際に閉じた。全 CID 変更のクリーンブレーク)。
    "orgs/kotoba-lang/ipld"
    ;; P2P graph-sync プロトコル (ADR-2607023200) — net の gossip/bitswap 意味論 +
-   ;; commit-dag 検証 + kotoba-client の tag-42 hydrate を合成した pure state
-   ;; machine (transport 注入、loopback 参照実装同梱)。net は意味論層のまま。
+   ;; chain (旧 commit-dag, ADR-2607050800) 検証 + kotoba-client の tag-42
+   ;; hydrate を合成した pure state machine (transport 注入、loopback 参照実装
+   ;; 同梱)。net は意味論層のまま。
    "orgs/kotoba-lang/p2p"
    ;; Bitcoin mining/mining-pool/wallet substrate (ADR-2607012230) — plain
    ;; libraries (not actors): btc-crypto (RIPEMD160/Base58/Bech32/BIP-32/39/
