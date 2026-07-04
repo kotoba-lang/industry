@@ -205,8 +205,8 @@
  :extra-projects
  #{;; etzhayyim/root/20-actors/*-compat catalog (1,027 clean-room API-compat cljc
    ;; actors) relocated to kotoba-lang per org-taxonomy library-placement rule
-   ;; (ADR-2606302300), reverse-domain naming (ADR-2607041500). 38/1,027 landed
-   ;; (8 pilot + batch1 alphabetical); ~989 remain, batched follow-up in progress.
+   ;; (ADR-2606302300), reverse-domain naming (ADR-2607041500). 68/1,027 landed
+   ;; (8 pilot + batch1 + batch2 alphabetical); ~959 remain, batched follow-up in progress.
    "orgs/kotoba-lang/com-nvidia-isaac"   ; was etzhayyim/root/20-actors/nvidia_isaac-compat
    "orgs/kotoba-lang/com-nvidia-cosmos"  ; was etzhayyim/root/20-actors/nvidia_cosmos-compat
    "orgs/kotoba-lang/com-nvidia-drive"   ; was etzhayyim/root/20-actors/nvidia_drive-compat
@@ -246,6 +246,37 @@
    "orgs/kotoba-lang/com-amadeus-airlines" ; was etzhayyim/root/20-actors/amadeus_airlines-compat
    "orgs/kotoba-lang/com-amadeus-altea"    ; was etzhayyim/root/20-actors/amadeus_altéa-compat
    "orgs/kotoba-lang/com-amadeus-gds"      ; was etzhayyim/root/20-actors/amadeus_gds-compat
+   ;; batch2 (alphabetical cursor, amd_rocm..astm_codes)
+   "orgs/kotoba-lang/com-amd-rocm"          ; was etzhayyim/root/20-actors/amd_rocm-compat
+   "orgs/kotoba-lang/com-amdocs-billing"    ; was etzhayyim/root/20-actors/amdocs_billing-compat
+   "orgs/kotoba-lang/com-amerisourcebergen" ; was etzhayyim/root/20-actors/amerisourcebergen-compat
+   "orgs/kotoba-lang/com-amex-auth"         ; was etzhayyim/root/20-actors/amex_auth-compat
+   "orgs/kotoba-lang/com-amtrak"            ; was etzhayyim/root/20-actors/amtrak-compat
+   "orgs/kotoba-lang/com-android-aosp"      ; was etzhayyim/root/20-actors/android_aosp-compat
+   "orgs/kotoba-lang/com-anduril-lattice"   ; was etzhayyim/root/20-actors/anduril_lattice-compat
+   "orgs/kotoba-lang/com-ansys"             ; was etzhayyim/root/20-actors/ansys-compat
+   "orgs/kotoba-lang/com-aphis-usda"        ; was etzhayyim/root/20-actors/aphis_usda-compat
+   "orgs/kotoba-lang/com-apigee"            ; was etzhayyim/root/20-actors/apigee-compat
+   "orgs/kotoba-lang/com-apollo-auto"       ; was etzhayyim/root/20-actors/apollo_auto-compat
+   "orgs/kotoba-lang/com-apollo-gds"        ; was etzhayyim/root/20-actors/apollo_gds-compat
+   "orgs/kotoba-lang/com-appdynamics"       ; was etzhayyim/root/20-actors/appdynamics-compat
+   "orgs/kotoba-lang/com-appfolio"          ; was etzhayyim/root/20-actors/appfolio-compat
+   "orgs/kotoba-lang/com-apple-visionos"    ; was etzhayyim/root/20-actors/apple_visionos-compat
+   "orgs/kotoba-lang/com-applovin"          ; was etzhayyim/root/20-actors/applovin-compat
+   "orgs/kotoba-lang/com-appsflyer"         ; was etzhayyim/root/20-actors/appsflyer-compat
+   "orgs/kotoba-lang/com-aptos-pos"         ; was etzhayyim/root/20-actors/aptos_pos-compat
+   "orgs/kotoba-lang/com-argo-ocean-floats" ; was etzhayyim/root/20-actors/argo_ocean_floats-compat
+   "orgs/kotoba-lang/com-argus-media"       ; was etzhayyim/root/20-actors/argus_media-compat
+   "orgs/kotoba-lang/com-ariba"             ; was etzhayyim/root/20-actors/ariba-compat
+   "orgs/kotoba-lang/com-arm-cpu"           ; was etzhayyim/root/20-actors/arm_cpu-compat
+   "orgs/kotoba-lang/com-arm-isa"           ; was etzhayyim/root/20-actors/arm_isa-compat
+   "orgs/kotoba-lang/com-arxiv-api"         ; was etzhayyim/root/20-actors/arxiv_api-compat
+   "orgs/kotoba-lang/com-as-400-ibmi"       ; was etzhayyim/root/20-actors/as_400_ibmi-compat
+   "orgs/kotoba-lang/com-as2-protocol"      ; was etzhayyim/root/20-actors/as2_protocol-compat
+   "orgs/kotoba-lang/com-asana"             ; was etzhayyim/root/20-actors/asana-compat
+   "orgs/kotoba-lang/com-asimov"            ; was etzhayyim/root/20-actors/asimov-compat
+   "orgs/kotoba-lang/com-asme-materials"    ; was etzhayyim/root/20-actors/asme_materials-compat
+   "orgs/kotoba-lang/com-astm-codes"        ; was etzhayyim/root/20-actors/astm_codes-compat
    ;; wami-actor — Wide Area Motion Imagery, TrackAdvisor ⊣ AOIGovernor.
    ;; Session-scoped to 2 authorized use cases only (facility-security /
    ;; disaster-response); AOIGovernor enforces session-scope/purpose-scope/
