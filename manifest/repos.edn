@@ -897,6 +897,19 @@
    ;; isekai/tensei RPG template asset lib (ADR-2607022340): race/class/monster/
    ;; skill EDN generator → kami.sprite2d primitives, no external asset files.
    "orgs/kotoba-lang/kami-isekai-assets"
+   ;; 4 sibling 3D-character-generation approaches (ADR-2607051100/1110/1120/1130),
+   ;; a head-to-head comparison sharing one penguin-kigurumi chibi test target:
+   ;; deterministic EDN-composed parametric character (character+mesher+vegetation+vrm).
+   "orgs/kotoba-lang/kami-gen-procedural"
+   ;; LLM-authored bounded SDF/CSG propose/compile/render/critique loop (scad+sdf+mesher).
+   "orgs/kotoba-lang/kami-gen-sdf-agent"
+   ;; cloud-murakumo :model3d (trellis/hunyuan3d-2.1) distributed-inference client +
+   ;; auto-rig to VRM humanoid (skeleton+vrm); real code, tested against a mock executor,
+   ;; no live GPU backend wired in this environment yet.
+   "orgs/kotoba-lang/kami-gen-ml3d"
+   ;; deterministic parametric rig (character) + LLM-authored comfyui-clj texture
+   ;; node-graph (mock diffusion executor pending a live ComfyUI/SDXL backend).
+   "orgs/kotoba-lang/kami-gen-hybrid"
    ;; Ghost Hacker game portfolio #1 (ADR-2607023200): FLOW, host adapters
    ;; (demo.clj/terminal.clj). The groove-sync judgment core moved out per
    ;; ADR-2607032600 — see ghosthacker-groove-core below.
