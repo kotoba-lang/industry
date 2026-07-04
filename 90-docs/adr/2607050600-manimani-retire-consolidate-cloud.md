@@ -1,7 +1,8 @@
 # ADR-2607050600: ai-gftd-manimani を退役し、manimani 系を manimani(OSS)+cloud-manimani の2系統に集約
 
-**Status**: accepted
+**Status**: closed(実行完了。残 2 件は手動 follow-up、下記参照)
 **Date**: 2026-07-05
+**Closed**: 2026-07-04
 **Deciders**: Jun Kawasaki
 
 ## Context
@@ -49,9 +50,9 @@ enterprise actor)、`etzhayyim/root` 内の別実装(自己申告で "SUPERSEDED
 4. **k8s 側(`lg-manimani` pod, Vultr VKE)は本 PR の範囲外** — 作業環境から当該クラスタへ
    接続不可(connection refused)のため直接 teardown できない。クラスタへ到達可能な環境での
    手動確認・削除が残作業。
-5. **モノレポ内ソース(`ai-gftd-apps-gftdcojp/60-apps/ai-gftd-project-manimani/`)は本 PR では
-   削除しない** — 他アプリと同居する共有モノレポであり、退役範囲は「標準リポジトリ+本番
-   hostname」に限定する今回のオーナー判断に従う。デッドコードとして残置、削除は follow-up。
+5. **モノレポ内ソース(`ai-gftd-apps-gftdcojp/60-apps/ai-gftd-project-manimani/`)** —
+   当初は範囲外としたが、同日中にオーナー承認(「wrangler, vultr はコード削除で OK」)を得て
+   削除まで実施(下記 Execution 参照)。
 
 ## Consequences
 
@@ -62,10 +63,24 @@ enterprise actor)、`etzhayyim/root` 内の別実装(自己申告で "SUPERSEDED
 - (+) cloud-manimani は ai-gftd-manimani の重い T0/T1/T2 境界モデルを背負わずに、
   Claude Desktop 型の chat/cowork/code 統合という別方向の設計に進める(2026-07-04 成熟度診断の
   P3–P5 に相当。実装は別途)。
-- (−) k8s pod のクリーンアップが未完了のまま残る(到達可能な環境での手動作業が必要)。
-- (−) モノレポ内ソース・lexicon・helm chart はデッドコードとして残置(follow-up 課題)。
+- (−) k8s pod・Cloudflare Tunnel ingress rule のクリーンアップが未完了のまま残る
+  (下記 Execution の「未完了」参照。到達可能な環境での手動作業が必要)。
 - (−) `manimani.gftd.ai`/`lg-manimani.gftd.ai` の 522/1033 は本 ADR の判断根拠であって
   独立障害の追跡ではない — 退役完了後は「意図した停止」として扱う。
+
+## Execution(closing, 2026-07-04)
+
+| 項目 | 状態 | 備考 |
+|---|---|---|
+| ADR 作成 + `manifest/repos.edn`/`west.yml` から entry 削除 | ✅ 完了 | `com-junkawasaki/root` main へ server-side merge(`efb6eb24`) |
+| モノレポ内ソース削除(`60-apps/ai-gftd-project-manimani/` + lexicon 20件 + `mitama-manimani-pool` helm chart、計70ファイル) | ✅ 完了 | `ai-gftd-apps-gftdcojp` main へ server-side merge(`6e8c4caf`)。オーナー承認「wrangler, vultr はコード削除で OK」に基づき当初の範囲外判断を修正・実施 |
+| Cloudflare Worker `magatama-m4n1m4n1` 削除 | ✅ 該当なし | 削除実行時点で既にアカウント上に存在せず(code 10007)。522 到達不能の裏付けと整合 |
+| D1 database `ai-gftd-manimani`(uuid `4473765b-c767-4e5e-9538-0cc8a53975e6`) | ✅ 完了 | `wrangler d1 delete` 実行・削除確認済み |
+| GitHub repo `gftdcojp/ai-gftd-manimani`(標準リポジトリ) | ✅ 完了 | archive 済み(`archived: true` 確認) |
+| k8s pod `lg-manimani`(Vultr VKE, `mitama-udf` namespace) | ⏸ 未完了 | 作業環境から当該クラスタへ接続不可(kubeconfig が `127.0.0.1:6443` 転送前提 — 到達可能な環境からの SSH トンネル等が必要)。到達可能な環境での手動 `kubectl delete` が残作業 |
+| Cloudflare Tunnel(`cedba8e6`, 共有)の `lg-manimani.gftd.ai` ingress rule | ⏸ 未完了 | remote-managed 設定のため編集には Tunnel 編集権限を持つ Cloudflare API token が必要(`cloudflared` の cert 認証はダッシュボード同等の一覧取得はできるが ingress 編集 API には別途トークンが要る)。Worker が既に存在しないため実害は無し(1033 のまま)。Cloudflare ダッシュボード(Zero Trust > Networks > Tunnels > `bpmn-dispatcher-local-20260514093458`)からの手動削除を推奨 |
+
+残 2 件(k8s pod・Tunnel ingress rule)はどちらも「既に機能していないものの後始末」であり緊急性は低い。オーナー側で到達可能な環境から対応後、本 ADR を fully-closed としてよい。
 
 ## References
 
