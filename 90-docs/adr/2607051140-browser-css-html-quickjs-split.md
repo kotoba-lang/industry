@@ -148,14 +148,30 @@ with the thing it integrates, not the library it exercises.
 
 ## Follow-up
 
-- The 75 failures + 1 error in `browser`'s test suite (flexbox layout,
+> **2026-07-04 追記 (same session)**: the layout-engine gap below is now
+> closed. `cssom`'s `feat/box-model-flex-layout` (PR #1,
+> `713aeae23bfebc242989fec0be6a51ba04676678`) replaced the reference
+> vertical-stack `cssom.layout` with a real implementation: box model
+> (padding/border/margin, min/max-width, content-box/border-box),
+> flexbox (row/column, wrap, justify-content, align-items, gap),
+> position:relative/absolute + z-index stacking, multiplicatively
+> inherited opacity, background/background-color, borders,
+> overflow+scroll clipping, and form-control value/checked/selection/caret
+> projection — derived directly from the 76 failing assertions below as
+> the behavioral spec. `wasm-ui`'s golden-test fixture was regenerated in
+> a companion commit (`fc5ffc456e720118f5a734c9eddee828533c0586`) since it
+> snapshot-compares exact draw-op shape. Result: `browser` 438 tests/2486
+> assertions, 0 failures/0 errors (was 75/1); `test-browser-use` 13/112, 0
+> failures (was 2). Superproject pins advanced in the same session.
+
+- ~~The 75 failures + 1 error in `browser`'s test suite (flexbox layout,
   `position` + `z-index`, min/max-width + border-box sizing, border
   draw-ops, caret/selection width) point at `cssom.layout` needing a real
   box-model/flexbox implementation to replace the current reference
-  vertical-stack projection. Not started by this ADR.
-- The 2 scroll-position failures newly visible in `test-browser-use`
+  vertical-stack projection. Not started by this ADR.~~ Done, see above.
+- ~~The 2 scroll-position failures newly visible in `test-browser-use`
   (`document-wheel-events-*`) are likely downstream of the same layout gap;
-  not investigated further here.
+  not investigated further here.~~ Fixed as a byproduct of the above.
 - `quickjs.binary` is a contract with no actual JS execution behind it on
   the JVM; real execution requires the CLJS + `quickjs-emscripten-core` +
   `@jitl/quickjs-singlefile-cjs-release-sync` path in `browser.compat.
