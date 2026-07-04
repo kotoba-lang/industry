@@ -1,8 +1,8 @@
 # ADR-2607041500: etzhayyim `*-compat` catalog (1,027 repos) → kotoba-lang, one repo per vendor, reverse-domain naming
 
-**Status**: accepted (rollout in progress — 68/1,027 landed: 8 pilot + batch1 + batch2
-alphabetical (`8th_wall-compat`..`astm_codes-compat`); remaining ~959 scheduled as batched
-follow-up)
+**Status**: accepted (rollout in progress — 98/1,027 landed: 8 pilot + batch1-3
+alphabetical (`8th_wall-compat`..`bentley_projectwise-compat`); remaining ~929 scheduled as
+batched follow-up)
 **Date**: 2026-07-04
 **Related**: ADR-2606302300 (org taxonomy, kotoba-lang library-placement rule) · ADR-2607020130
 (`kami-nv-compat` relocation precedent) · ADR-2607012200 (umbrella kotoba-lang TS→CLJC refactor —
