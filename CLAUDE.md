@@ -286,10 +286,18 @@ west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独�
   その子リポの `origin/<default-branch>` との遅れを解消してから行う。
 
 - ユーザーが「cleanup」とだけ指示した場合、または PR/merge/stash/merge conflict の
-  整理を依頼した場合は、`manifest/cleanup-workflow.md` を読む。機械可読の正本は
-  `manifest/cleanup-workflow.edn`、Codex skill は `$git-cleanup-conflict`。
-  superproject と `orgs/` 配下などの子リポを含め、WIP を破棄せず、`cleanup`
-  メッセージで PR を作り、merge 可なら main へ merge し、残った stash/未追跡 repo を報告する。
+  整理を依頼した場合、あるいは自分から `git stash drop` / `git branch -D` をしようと
+  している場合は、**Skill ツールで `git-cleanup-conflict` を呼ぶ**
+  （`.claude/skills/git-cleanup-conflict/SKILL.md`。Codex 側の同名 skill
+  `$git-cleanup-conflict` と同じ runbook を共有）。手順の正本は
+  `manifest/cleanup-workflow.edn`（readable 版が `manifest/cleanup-workflow.md`）—
+  **trigger した節だけでなく edn 全体（`:retirement`/`:stash-pop`/`:west-conflict`
+  含む）を読む**。superproject と `orgs/` 配下などの子リポを含め、WIP を破棄せず、
+  `cleanup` メッセージで PR を作り、merge 可なら main へ merge し、残った stash/
+  未追跡 repo を報告する。**stash/branch を drop/削除する前は「もう landed だと
+  確信していても」必ず `.git/stash-archive-<date>/` へ退避してから**（実際に
+  2026-07-04、確信を理由に archive を省略して drop した事例あり — 幸い
+  `git fsck --unreachable` で拾えたが、運に頼らない）。
 
 - **west project の checkout が「ローカルの未コミット変更」で失敗（衝突）した場合**、
   勝手に `west update --force` 等で破棄しないこと。`west` は既定で破壊的更新を
@@ -357,11 +365,13 @@ WIP を並行セッションが約40分間隔で退避し続け stash が20個�
   （`gh api .../merges`）→ `git worktree remove` → `git branch -D <branch>` →
   マージ済み remote branch の削除。「マージしたのに branch/worktree が残っている」
   状態を作らない。
-- **stash / branch の棚卸し（retirement）手順は `manifest/cleanup-workflow.md` の
-  Retirement 節**: 着地判定（追加行が現 main に含まれるかの content-containment。
-  生成物 `manifest/west.yml` は判定から除外）→ `.git/stash-archive-<date>/` に
-  パッチを退避 → drop / 削除。並行セッションが stash index をずらすので、drop は
-  SHA を控えて毎回 index を再解決してから行う。
+- **stash / branch の棚卸し（retirement）は Skill `git-cleanup-conflict` を使う**
+  （手順の正本は `manifest/cleanup-workflow.edn` の `:retirement`、readable 版は
+  `manifest/cleanup-workflow.md` の Retirement 節）: 着地判定（追加行が現 main に
+  含まれるかの content-containment。生成物 `manifest/west.yml` は判定から除外）→
+  **drop/削除の前に必ず** `.git/stash-archive-<date>/` へパッチを退避（「landed だと
+  確信している」は archive 省略の理由にならない）→ drop / 削除。並行セッションが
+  stash index をずらすので、drop は SHA を控えて毎回 index を再解決してから行う。
 
 ## 大容量バイナリの扱い（B2 + DataLad、最優先）
 
