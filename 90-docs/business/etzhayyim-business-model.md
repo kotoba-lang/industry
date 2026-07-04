@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L0 artificial organism platform（非営利・公益）  
-**As-of**: 2026-07-02  
+**As-of**: 2026-07-04  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -15,6 +15,7 @@
 - agent の「進化」に検証可能な記録がない
 - 観測 (signal): etzhayyim.com 実測 136214 req/7d・646 uniques(日次和)、workers 85862 inv/7d
 - 観測 (signal): etzhayyim.com 実測 143158 req/7d・701 uniques(日次和)、workers 87987 inv/7d
+- 観測 (signal): etzhayyim.com 実測 76863 req/7d・775 uniques(日次和)、workers 28501 inv/7d
 
 ## Beneficiaries
 

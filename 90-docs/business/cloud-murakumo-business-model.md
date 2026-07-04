@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L1 LLM 推論 — infra（Civitai × exo）  
-**As-of**: 2026-07-02  
+**As-of**: 2026-07-04  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -15,6 +15,7 @@
 - fine-tune/LoRA の provenance が追えない
 - 観測 (signal): murakumo.cloud 実測 536 req/7d・1 uniques(日次和)、workers 158768 inv/7d
 - 観測 (signal): murakumo.cloud 実測 1554 req/7d・122 uniques(日次和)、workers 171179 inv/7d
+- 観測 (signal): murakumo.cloud 実測 10901 req/7d・269 uniques(日次和)、workers 147603 inv/7d
 
 ## Customer Segments
 

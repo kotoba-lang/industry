@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L4 messenger  
-**As-of**: 2026-07-02  
+**As-of**: 2026-07-04  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -14,6 +14,7 @@
 - business messaging (LINE 公式等) は高価で lock-in
 - AI agent の承認・通知に専用の安全な面がない
 - 観測 (signal): workers 1673 inv/7d、zone 無し (aozora.app 配下)
+- 観測 (signal): workers 806 inv/7d、zone 無し (aozora.app 配下)
 
 ## Customer Segments
 
