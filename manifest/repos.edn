@@ -202,7 +202,19 @@
  ;; 生成時に既存 path 群と union される（一度 west.yml に載れば自動追従、distinct で重複排除）。
  ;; clone 済みの working tree（orgs/<org>/<repo>）が存在し HEAD を持つこと。
  :extra-projects
- #{;; wami-actor — Wide Area Motion Imagery, TrackAdvisor ⊣ AOIGovernor.
+ #{;; etzhayyim/root/20-actors/*-compat catalog (1,027 clean-room API-compat cljc
+   ;; actors) relocated to kotoba-lang per org-taxonomy library-placement rule
+   ;; (ADR-2606302300), reverse-domain naming (ADR-2607041500). Pilot batch of 8;
+   ;; ~1,019 remain scheduled as batched follow-up (see ADR-2607041500).
+   "orgs/kotoba-lang/com-nvidia-isaac"   ; was etzhayyim/root/20-actors/nvidia_isaac-compat
+   "orgs/kotoba-lang/com-nvidia-cosmos"  ; was etzhayyim/root/20-actors/nvidia_cosmos-compat
+   "orgs/kotoba-lang/com-nvidia-drive"   ; was etzhayyim/root/20-actors/nvidia_drive-compat
+   "orgs/kotoba-lang/com-nvidia-nvml"    ; was etzhayyim/root/20-actors/nvidia_nvml-compat
+   "orgs/kotoba-lang/com-adyen"          ; was etzhayyim/root/20-actors/adyen-compat
+   "orgs/kotoba-lang/com-stripe"         ; was etzhayyim/root/20-actors/stripe-compat
+   "orgs/kotoba-lang/com-anthropic"      ; was etzhayyim/root/20-actors/anthropic-compat
+   "orgs/kotoba-lang/com-sentry"         ; was etzhayyim/root/20-actors/sentry-compat
+   ;; wami-actor — Wide Area Motion Imagery, TrackAdvisor ⊣ AOIGovernor.
    ;; Session-scoped to 2 authorized use cases only (facility-security /
    ;; disaster-response); AOIGovernor enforces session-scope/purpose-scope/
    ;; anonymization/no-cross-session-reference/retention-ttl/no-actuation
