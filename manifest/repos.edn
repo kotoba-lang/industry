@@ -967,4 +967,15 @@
    ;; defmessages compile-time accessors (paraglide-js equivalent) + CLDR-lite
    ;; plural rules + RTL/tier language registry + etzhayyim TM-service JSON
    ;; bridge + shitsuke-seam re-frame/reagent integration.
-   "orgs/kotoba-lang/i18n"}}
+   "orgs/kotoba-lang/i18n"
+   ;; com-youtube -- portable .cljc YouTube Data API v3 upload client (OAuth2
+   ;; refresh, resumable videos.insert/update, captions.insert, thumbnails.set),
+   ;; re-derived (by explicit request, not the recommended wrap-don't-rewrite
+   ;; path) from kotoba-lang/youtube-upload's Python client so ai-gftd-yukkuri's
+   ;; new .cljc graph namespaces have a same-ecosystem real client (ADR-2607043000).
+   "orgs/kotoba-lang/com-youtube"
+   ;; jp-hiroshiba-voicevox -- portable .cljc VOICEVOX Engine client
+   ;; (audio_query/synthesis, style_id catalog, emotion switching, credit
+   ;; lines), the real-HTTP execution half of ai-gftd-yukkuri's plan-only
+   ;; yukkuri.voicevox port (ADR-2607043000).
+   "orgs/kotoba-lang/jp-hiroshiba-voicevox"}}
