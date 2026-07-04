@@ -816,7 +816,11 @@
    "orgs/kotoba-lang/kotodama"
    "orgs/kotoba-lang/kototama-cljc-contract"
    "orgs/kotoba-lang/level"
-   "orgs/kotoba-lang/materialx"
+   ;; MaterialX (materialx.org) shading-graph format — reverse-domain named
+   ;; (ADR-2607041500 precedent: correcting a repo name after the fact via
+   ;; GitHub rename + path update, to avoid future collision with a short
+   ;; generic name as a language-lib slug).
+   "orgs/kotoba-lang/org-materialx"
    "orgs/kotoba-lang/mathml"
    "orgs/kotoba-lang/mermaid"
    "orgs/kotoba-lang/musicxml"
@@ -839,7 +843,9 @@
    "orgs/kotoba-lang/toml"
    "orgs/kotoba-lang/transit"
    "orgs/kotoba-lang/triage"
-   "orgs/kotoba-lang/usd"
+   ;; OpenUSD (openusd.org) ASCII interchange — reverse-domain named, same
+   ;; ADR-2607041500-precedent rename as org-materialx/org-khronos-{gltf,glb}.
+   "orgs/kotoba-lang/org-openusd"
    "orgs/kotoba-lang/verilog"
    "orgs/kotoba-lang/dom-gpu" ; renamed from wasm-ui 2026-07-04, ADR-2607051200
    "orgs/kotoba-lang/wgsl"
@@ -898,8 +904,10 @@
    "orgs/kotoba-lang/nerf"
    ;; Binary GLB container codec (12-byte header + JSON + BIN chunk), extracted from
    ;; duplicated logic in gltf (write) and vrm (read) per ADR-0048 (kami-engine).
-   "orgs/kotoba-lang/glb"
-   "orgs/kotoba-lang/gltf"
+   ;; Binary GLB container codec + glTF-JSON lib (khronos.org) — reverse-domain
+   ;; named for the same reason (ADR-2607041500 precedent), ADR-0048 (kami-engine).
+   "orgs/kotoba-lang/org-khronos-glb"
+   "orgs/kotoba-lang/org-khronos-gltf"
    "orgs/kotoba-lang/vrm"
    "orgs/kotoba-lang/postfx"
    "orgs/kotoba-lang/audio"
