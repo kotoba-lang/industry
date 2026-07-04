@@ -1,7 +1,7 @@
 {:frontmatter
  {:id "adr-2607041245-kami-app-sip-org-transfer-etzhayyim"
   :title "kami-app-sip を kotoba-lang から etzhayyim へ org transfer (com-etzhayyim-sip)"
-  :status "accepted"
+  :status "closed"
   :date "2026-07-04"
   :authoritative true
   :repos ["orgs/kotoba-lang/kami-app-sip (transferred away)"
@@ -42,5 +42,14 @@
   {:step 3 :action "kotoba-lang/kami-engine: git rm -r kami-app-sip-clj, worktree + server-side merge" :commit "kotoba-lang/kami-engine@abfeb2c"}
   {:step 4 :action "manifest/repos.edn: removed orgs/kotoba-lang/kami-app-sip from cluster-43 :extra-projects list; added orgs/etzhayyim/com-etzhayyim-sip next to com-etzhayyim-tsumugu; added :path-overrides redirect"}
   {:step 5 :action "manifest/west.yml: name/remote/path/groups updated to etzhayyim/com-etzhayyim-sip, revision advanced" :method "GitHub API single-entry commit (concurrent session was actively writing manifest/west.yml locally; avoided touching the shared working tree)"}]
+
+ :closed-2026-07-04
+ {:verified
+  ["etzhayyim/com-etzhayyim-sip main @ ef8d56cd3389bf5ba08a07c7d8b9d403dd405d04, old URL redirects correctly (GitHub API)"
+   "kotoba-lang/kami-engine main @ abfeb2c1588d8f16e995b8910b8206b0bc2fc8c0, kami-app-sip-clj absent; untracked .cpcache/public build cruft cleaned from shared checkout"
+   "manifest/repos.edn: zero kami-app-sip refs under kotoba-lang; com-etzhayyim-sip registered; :path-overrides redirect present"
+   "manifest/west.yml: zero kami-app-sip entries; com-etzhayyim-sip registered under etzhayyim; kami-engine pin advanced"
+   "org-wide grep: no deps.edn anywhere references kotoba-lang/kami-app-sip as a git coordinate"]
+  :open-follow-ups []}
 
  :note "Repo transfer changes URL/ownership -- confirmed with owner before executing (not covered by the standing new-project-creation authorization in CLAUDE.md)."}
