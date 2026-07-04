@@ -668,6 +668,13 @@
    ;; authority homes tracked by 90-docs/migration/kami-webgpu-dsl-runtime-split.edn.
    "orgs/kotoba-lang/atom"
    "orgs/kotoba-lang/browser"
+   ;; browser.css/browser.html/browser.compat.quickjs-binary split out of
+   ;; browser into their own repos (ADR-2607041700). cssom/htmldom are new
+   ;; names, not renames of the org's unrelated existing css/html repos
+   ;; (those are EDN->markup Hiccup renderers, opposite direction).
+   "orgs/kotoba-lang/cssom"
+   "orgs/kotoba-lang/htmldom"
+   "orgs/kotoba-lang/quickjs"
    "orgs/kotoba-lang/capnp"
    "orgs/kotoba-lang/crypto"
    "orgs/kotoba-lang/cue"
