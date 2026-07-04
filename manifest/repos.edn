@@ -205,8 +205,8 @@
  :extra-projects
  #{;; etzhayyim/root/20-actors/*-compat catalog (1,027 clean-room API-compat cljc
    ;; actors) relocated to kotoba-lang per org-taxonomy library-placement rule
-   ;; (ADR-2606302300), reverse-domain naming (ADR-2607041500). 188/1,027 landed
-   ;; (8 pilot + batch1-6 alphabetical); ~839 remain, batched follow-up in progress.
+   ;; (ADR-2606302300), reverse-domain naming (ADR-2607041500). 218/1,027 landed
+   ;; (8 pilot + batch1-7 alphabetical); ~809 remain, batched follow-up in progress.
    "orgs/kotoba-lang/com-nvidia-isaac"   ; was etzhayyim/root/20-actors/nvidia_isaac-compat
    "orgs/kotoba-lang/com-nvidia-cosmos"  ; was etzhayyim/root/20-actors/nvidia_cosmos-compat
    "orgs/kotoba-lang/com-nvidia-drive"   ; was etzhayyim/root/20-actors/nvidia_drive-compat
@@ -401,6 +401,38 @@
    "orgs/kotoba-lang/com-clearstream"       ; was etzhayyim/root/20-actors/clearstream-compat
    "orgs/kotoba-lang/com-clearwater"        ; was etzhayyim/root/20-actors/clearwater-compat
    "orgs/kotoba-lang/com-climate-fieldview" ; was etzhayyim/root/20-actors/climate_fieldview-compat
+   ;; batch7 (alphabetical cursor, clio..coupang; com-cloudflare-compat disambiguated
+   ;; from pre-existing unrelated kotoba-lang/com-cloudflare real API client)
+   "orgs/kotoba-lang/com-clio"                ; was etzhayyim/root/20-actors/clio-compat
+   "orgs/kotoba-lang/com-cloudbeds"           ; was etzhayyim/root/20-actors/cloudbeds-compat
+   "orgs/kotoba-lang/com-cloudflare-compat"   ; was etzhayyim/root/20-actors/cloudflare-compat
+   "orgs/kotoba-lang/com-cloudinary"          ; was etzhayyim/root/20-actors/cloudinary-compat
+   "orgs/kotoba-lang/com-cma-cgm-api"         ; was etzhayyim/root/20-actors/cma_cgm_api-compat
+   "orgs/kotoba-lang/com-cma"                 ; was etzhayyim/root/20-actors/cma-compat
+   "orgs/kotoba-lang/com-cme-globex"          ; was etzhayyim/root/20-actors/cme_globex-compat
+   "orgs/kotoba-lang/com-cmic"                ; was etzhayyim/root/20-actors/cmic-compat
+   "orgs/kotoba-lang/com-cobot-assembly"      ; was etzhayyim/root/20-actors/cobot_assembly-compat
+   "orgs/kotoba-lang/com-cohere"              ; was etzhayyim/root/20-actors/cohere-compat
+   "orgs/kotoba-lang/com-coherence"           ; was etzhayyim/root/20-actors/coherence-compat
+   "orgs/kotoba-lang/com-coinbase"            ; was etzhayyim/root/20-actors/coinbase-compat
+   "orgs/kotoba-lang/com-coinbaseprime"       ; was etzhayyim/root/20-actors/coinbaseprime-compat
+   "orgs/kotoba-lang/com-comarch"             ; was etzhayyim/root/20-actors/comarch-compat
+   "orgs/kotoba-lang/com-comma-ai-openpilot"  ; was etzhayyim/root/20-actors/comma_ai_openpilot-compat
+   "orgs/kotoba-lang/com-comma-ai"            ; was etzhayyim/root/20-actors/comma_ai-compat
+   "orgs/kotoba-lang/com-commercetools"       ; was etzhayyim/root/20-actors/commercetools-compat
+   "orgs/kotoba-lang/com-commonwealth-fusion" ; was etzhayyim/root/20-actors/commonwealth_fusion-compat
+   "orgs/kotoba-lang/com-compliancequest"     ; was etzhayyim/root/20-actors/compliancequest-compat
+   "orgs/kotoba-lang/com-confluent"           ; was etzhayyim/root/20-actors/confluent-compat
+   "orgs/kotoba-lang/com-contentful"          ; was etzhayyim/root/20-actors/contentful-compat
+   "orgs/kotoba-lang/com-copackaged-optics"   ; was etzhayyim/root/20-actors/copackaged_optics-compat
+   "orgs/kotoba-lang/com-copernicus-sentinel" ; was etzhayyim/root/20-actors/copernicus_sentinel-compat
+   "orgs/kotoba-lang/com-corelogic-hazard"    ; was etzhayyim/root/20-actors/corelogic_hazard-compat
+   "orgs/kotoba-lang/com-corelogic"           ; was etzhayyim/root/20-actors/corelogic-compat
+   "orgs/kotoba-lang/com-corteva-api"         ; was etzhayyim/root/20-actors/corteva_api-compat
+   "orgs/kotoba-lang/com-cosco-api"           ; was etzhayyim/root/20-actors/cosco_api-compat
+   "orgs/kotoba-lang/com-costar"              ; was etzhayyim/root/20-actors/costar-compat
+   "orgs/kotoba-lang/com-coupa"               ; was etzhayyim/root/20-actors/coupa-compat
+   "orgs/kotoba-lang/com-coupang"             ; was etzhayyim/root/20-actors/coupang-compat
    ;; wami-actor — Wide Area Motion Imagery, TrackAdvisor ⊣ AOIGovernor.
    ;; Session-scoped to 2 authorized use cases only (facility-security /
    ;; disaster-response); AOIGovernor enforces session-scope/purpose-scope/
