@@ -198,7 +198,13 @@
  ;; 生成時に既存 path 群と union される（一度 west.yml に載れば自動追従、distinct で重複排除）。
  ;; clone 済みの working tree（orgs/<org>/<repo>）が存在し HEAD を持つこと。
  :extra-projects
- #{;; shinshi-growth-actor — growth-LLM ⊣ MarketingGovernor client-service actor;
+ #{;; wami-actor — Wide Area Motion Imagery, TrackAdvisor ⊣ AOIGovernor.
+   ;; Session-scoped to 2 authorized use cases only (facility-security /
+   ;; disaster-response); AOIGovernor enforces session-scope/purpose-scope/
+   ;; anonymization/no-cross-session-reference/retention-ttl/no-actuation
+   ;; (ADR-2607051000). ADR + minimal runnable skeleton (20 tests, mock CV backend).
+   "orgs/gftdcojp/wami-actor"
+   ;; shinshi-growth-actor — growth-LLM ⊣ MarketingGovernor client-service actor;
    ;; itonami (Gftd Japan株式会社, cloud-itonami) serves club-shinshi (JK株式会社)
    ;; a growth-loop-as-a-service (ADR-2607040900). Phase 0 scaffold only.
    "orgs/gftdcojp/shinshi-growth-actor"
