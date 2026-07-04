@@ -56,7 +56,11 @@
   "orgs/com-junkawasaki/cloud-manimani" "orgs/gftdcojp/cloud-manimani" ; GitHub-transferred to gftdcojp 2026-07-02 (private; Cloudflare Worker API for manimani triage Decision Ledger)
   "orgs/com-junkawasaki/cloud-murakumo" "orgs/gftdcojp/local-murakumo" ; GitHub-transferred 2026-07-02 (as cloud-murakumo-fleet, colliding with gftdcojp/cloud-murakumo(Sora) so -fleet); renamed again 2026-07-04 to local-murakumo (ADR-2607041302; kotoba WASM lattice fleet Worker API for your own on-prem fleet, vs. cloud-murakumo(Sora)=GPU rental product)
   "orgs/com-junkawasaki/kototama"       "orgs/kotoba-lang/kototama" ; GitHub-transferred to kotoba-lang 2026-07-02; landed together with a fresh clone at the new path (:heavy entry renamed too) so gen-west-manifest.bb's working-head lookup succeeds at the new canonical path instead of silently dropping the entry
-  "orgs/com-junkawasaki/260208-spirit-in-physics" "orgs/com-junkawasaki/org-spirit-in-physics-comics"} ; 同一 GitHub repo (260208-… は rename 前の旧名で redirect)。west entry を comics に一本化 2026-07-02
+  "orgs/com-junkawasaki/260208-spirit-in-physics" "orgs/com-junkawasaki/org-spirit-in-physics-comics" ; 同一 GitHub repo (260208-… は rename 前の旧名で redirect)。west entry を comics に一本化 2026-07-02
+  "orgs/kotoba-lang/ui"         "orgs/kotoba-lang/kami-engine-hud" ; renamed 2026-07-04 (ADR-2607051200): kami-engine's WebGPU-canvas HUD widget package (kotoba.ui) collided in name with the new kotoba-ui/appkit/uikit app design-system family — unrelated stacks
+  "orgs/kotoba-lang/ui-gpu"     "orgs/kotoba-lang/kami-engine-hud-gpu" ; renamed together with kami-engine-hud (ADR-2607051200); its GPU rendering backend, restored from the deleted Rust kami-ui-gpu crate
+  "orgs/kotoba-lang/wasm-ui"    "orgs/kotoba-lang/dom-gpu" ; renamed 2026-07-04 (ADR-2607051200): names the kotoba:dom retained-tree-to-GPU substrate (consumed by browser/cssom/htmldom/shell) for what it does, avoiding collision with kotoba-ui/appkit/uikit; browser/README.md's prior aspirational rename target "ui" was permanently blocked by kotoba-lang/ui above (now kami-engine-hud)
+  "orgs/kotoba-lang/kami-ui-sdk" "orgs/kotoba-lang/kami-engine-app-sdk"} ; renamed 2026-07-04 (ADR-2607051200): the six ported SDKs cover UI+animation+particle-FX+audio-synth+WebRTC, not UI alone; aligned to the kami-app-*/kami-engine-* naming families
 
  ;; 全 project 共通の既定
  :defaults
@@ -730,7 +734,7 @@
    "orgs/kotoba-lang/triage"
    "orgs/kotoba-lang/usd"
    "orgs/kotoba-lang/verilog"
-   "orgs/kotoba-lang/wasm-ui"
+   "orgs/kotoba-lang/dom-gpu" ; renamed from wasm-ui 2026-07-04, ADR-2607051200
    "orgs/kotoba-lang/wgsl"
    "orgs/kotoba-lang/xml"
    "orgs/kotoba-lang/yaml"
@@ -780,7 +784,7 @@
    "orgs/kotoba-lang/skeleton"
    "orgs/kotoba-lang/sprite2d"
    "orgs/kotoba-lang/tilemap"
-   "orgs/kotoba-lang/ui"
+   "orgs/kotoba-lang/kami-engine-hud" ; renamed from ui 2026-07-04, ADR-2607051200
    "orgs/kotoba-lang/voxel"
    "orgs/kotoba-lang/sdf"
    "orgs/kotoba-lang/mesher"
@@ -796,7 +800,7 @@
    "orgs/kotoba-lang/vegetation"
    "orgs/kotoba-lang/atmosphere"
    "orgs/kotoba-lang/physics-2d"
-   "orgs/kotoba-lang/ui-gpu"
+   "orgs/kotoba-lang/kami-engine-hud-gpu" ; renamed from ui-gpu 2026-07-04, ADR-2607051200
    "orgs/kotoba-lang/graph"
    "orgs/kotoba-lang/geo"
    "orgs/kotoba-lang/window-session-state"
@@ -893,7 +897,7 @@
    "orgs/kotoba-lang/kami-cad-import"
    "orgs/kotoba-lang/kami-script-runtime"
    "orgs/kotoba-lang/kami-flow"
-   "orgs/kotoba-lang/kami-ui-sdk"
+   "orgs/kotoba-lang/kami-engine-app-sdk" ; renamed from kami-ui-sdk 2026-07-04, ADR-2607051200
    ;; isekai/tensei RPG template asset lib (ADR-2607022340): race/class/monster/
    ;; skill EDN generator → kami.sprite2d primitives, no external asset files.
    "orgs/kotoba-lang/kami-isekai-assets"
