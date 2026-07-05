@@ -1835,4 +1835,12 @@
    ;; (audio_query/synthesis, style_id catalog, emotion switching, credit
    ;; lines), the real-HTTP execution half of ai-gftd-yukkuri's plan-only
    ;; yukkuri.voicevox port (ADR-2607043000).
-   "orgs/kotoba-lang/jp-hiroshiba-voicevox"}}
+   "orgs/kotoba-lang/jp-hiroshiba-voicevox"
+   ;; PS5 DualSense teleop bridge for cloud-itonami robotics (ADR-2607052200):
+   ;; org-ros (ROS 2 message/CDR/rosbridge contract, no native DDS-RTPS),
+   ;; com-sony-dualsense (DualSense HID input/output codec, no device I/O),
+   ;; teleop (device-agnostic speed-mode/deadman/e-stop bridge over
+   ;; kotoba-lang/robotics' action/gate contract). All pure .cljc, no I/O.
+   "orgs/kotoba-lang/org-ros"
+   "orgs/kotoba-lang/com-sony-dualsense"
+   "orgs/kotoba-lang/teleop"}}
