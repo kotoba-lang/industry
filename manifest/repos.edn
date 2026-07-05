@@ -1622,6 +1622,12 @@
    ;; webgpu's executor to depend on this instead of calling navigator.gpu
    ;; inline).
    "orgs/kotoba-lang/org-w3-webgpu"
+   ;; Pure WAI-ARIA accessibility-tree projection (aria.core), split out of
+   ;; browser.accessibility's host-independent half per ADR-2607051500 — same
+   ;; org-<standards-body>-<spec> naming rule as org-w3-webgpu (WAI-ARIA is a
+   ;; W3C/WAI spec). Unlike the org-* placeholders above, this repo has real,
+   ;; tested code from day one (not a scaffold-only reservation).
+   "orgs/kotoba-lang/org-w3-aria"
    "orgs/kotoba-lang/dec"
    "orgs/kotoba-lang/terrain"
    "orgs/kotoba-lang/vegetation"
