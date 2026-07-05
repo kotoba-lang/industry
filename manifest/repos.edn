@@ -53,6 +53,7 @@
   "orgs/com-junkawasaki/utsushi"        "orgs/kotoba-lang/utsushi"
   "orgs/com-junkawasaki/vehicle-design-actor" "orgs/kotoba-lang/kami-engine-vehicle-designer"
   "orgs/com-junkawasaki/manimani"       "orgs/gftdcojp/manimani" ; GitHub-transferred to gftdcojp 2026-07-01 (private; mobile/ iOS+Android app, fastlane App Store pipeline in progress)
+  "orgs/gftdcojp/manimani"              "orgs/gftdcojp/local-manimani" ; renamed on GitHub 2026-07-05 (ADR-2607051600): mirrors the cloud-manimani/local-murakumo taxonomy — this is the on-device client vs. cloud-manimani's Cloudflare Worker API, so "local-" names the same local/cloud contrast as local-murakumo vs. cloud-murakumo
   "orgs/com-junkawasaki/cloud-manimani" "orgs/gftdcojp/cloud-manimani" ; GitHub-transferred to gftdcojp 2026-07-02 (private; Cloudflare Worker API for manimani triage Decision Ledger)
   "orgs/com-junkawasaki/cloud-murakumo" "orgs/gftdcojp/local-murakumo" ; GitHub-transferred 2026-07-02 (as cloud-murakumo-fleet, colliding with gftdcojp/cloud-murakumo(Sora) so -fleet); renamed again 2026-07-04 to local-murakumo (ADR-2607041302; kotoba WASM lattice fleet Worker API for your own on-prem fleet, vs. cloud-murakumo(Sora)=GPU rental product)
   "orgs/com-junkawasaki/kototama"       "orgs/kotoba-lang/kototama" ; GitHub-transferred to kotoba-lang 2026-07-02; landed together with a fresh clone at the new path (:heavy entry renamed too) so gen-west-manifest.bb's working-head lookup succeeds at the new canonical path instead of silently dropping the entry
@@ -72,7 +73,7 @@
  ;; repo は full clone にし、west の pin checkout を pin lag に強くする（一律 shallow は pin が
  ;; tip より古いと update を失敗させる。ADR-2606302100）。heavy は順次 B2+DataLad へ移す。
  :heavy
- #{"orgs/gftdcojp/manimani"
+ #{"orgs/gftdcojp/local-manimani"
    "orgs/com-junkawasaki/org-spirit-in-physics"
    "orgs/com-junkawasaki/org-spirit-in-physics-comics"
    "orgs/com-junkawasaki/spirit-in-physics"
