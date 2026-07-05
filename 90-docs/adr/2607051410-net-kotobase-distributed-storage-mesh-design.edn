@@ -149,4 +149,21 @@
    "fleetノードがストレージ役も担うことでディスク容量・帯域の運用負荷が増える(DataLad/B2運用と同様、shallow/容量管理の検討が要る)"
    "L6(storage bid)が実装されるまでdocs/BUSINESS-MODEL.mdのstorage系メトリクスは現状の『B2を信じる』ままであり続ける"]}
 
- :note "本ADRは設計提案のみ。実装(L2 fleet storage shell・L3 discovery・L5 validation・L6 bid+audit の各コード、west manifest登録、org境界確定)は別PR/ブランチで、オーナー確認の上で行う。"}
+ ;; ============================================================
+ ;; Follow-up(2026-07-05) — L6は新規bid機構ではなく既存credits台帳への
+ ;; 相乗りで足りる。オーナー: 「実際にkotobase.netとしてこの経済に参加
+ ;; するにはどうすれば良い?」への回答調査で判明。
+ ;; ============================================================
+ :follow-up-2026-07-05-credits-reuse
+ {:trigger "owner: \"実際に kotobase.net としてこの経済に参加するにはどうすれば良い?\""
+  :finding "kotoba-lang/murakumo/src/murakumo/infer/credits.cljc(ADR-2607022000系譜)は既にMEMORY×TIME(shard-bytes×run-duration)の純関数credits台帳で、Civitai-Buzz方式の拡張可能unit-prices map(:tokens/:images/:video-seconds/:audio-seconds/:training-steps)を持つ。block-bytes×hold-durationというstorageの稀少性はこの式にそのまま一致する。"
+  :implication "本ADRのL6(当初案: cloud-murakumo.schedulerのleaderless auctionをstorage bidへ一般化)は過剰設計だった。unit-pricesに:gb-months(または:byte-seconds)を1エントリ足すだけで、job-cost/settle/charge/spend/receipt/balancesは無改造のままstorage課金に使える。"
+  :revised-l6-plan
+  [{:demand-side "net-kotobaseのpin/write pathからcharge/spendを呼ぶ。残高不足は既存CACAOゲートと同じ場所で402"}
+   {:supply-side "storage peerが保持バイト×保持時間をplan{:assignments[...]}と同じshapeで報告→memory-time/settleが:run/sharesを配分"}
+   {:audit "receipt(hash chain+CACAO署名)がFilecoinのproof-of-storage相当を提供。verify-chain(L5)とは別レイヤとして引き続き必要"}
+   {:fiat-rail "ADR-2607030030の『非貢献者はfiat→credits(Stripe)』がnet-kotobaseのStripe active subs 0ギャップの解消経路になる"}
+   {:phase-alignment "GPU経済Phase 1(単一テナントgftd fleet、稼働済み)に相乗りすれば内部chargebackとして即着手可。外部テナント貢献はPhase 2(fleet連邦・murakumo.cloud公開)待ち"}]
+  :not-executed "設計の訂正のみ(オーナー確認済み、2026-07-05)。unit-prices拡張・net-kotobase Worker配線・料率決定は別PR・別オーナー確認。"}
+
+ :note "本ADRは設計提案のみ。実装(L2 fleet storage shell・L3 discovery・L5 validation・L6 credits台帳への相乗り、west manifest登録、org境界確定)は別PR/ブランチで、オーナー確認の上で行う。"}

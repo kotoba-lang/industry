@@ -151,6 +151,49 @@ net-kotobase を単一 origin 構成から、`cloud-murakumo` 陣営と同じレ
 - L6(storage bid) が実装されるまで、`docs/BUSINESS-MODEL.md` の
   storage 系メトリクスは現状の「B2 を信じる」ままであり続ける。
 
+## Follow-up（2026-07-05）— L6 は新規 bid 機構ではなく既存 credits 台帳への相乗りで足りる
+
+オーナーから「実際に kotobase.net としてこの経済（murakumo 推論経済、
+ADR-2607030030・accepted）に参加するには」と問われ調査した結果、
+L6(Incentive/market) の当初案（「`cloud-murakumo.scheduler` の
+leaderless auction を storage bid へ一般化する」）は過剰設計だったと判明
+した。
+
+`kotoba-lang/murakumo` の `src/murakumo/infer/credits.cljc`
+（ADR-2607022000 系譜）は、稀少性を **MEMORY×TIME**（shard-bytes ×
+run-duration）として定式化した純関数の credits 台帳で、すでに
+**Civitai-Buzz 方式の拡張可能な単価マップ** `unit-prices`
+（`:tokens`/`:images`/`:video-seconds`/`:audio-seconds`/
+`:training-steps`）を持つ。この式は「block-bytes × hold-duration」という
+ストレージの稀少性にそのまま一致する — **新しいオークション機構を作らず**、
+`unit-prices` に `:gb-months`（または `:byte-seconds`）エントリを1つ足す
+だけで、`job-cost`/`settle`/`charge`/`spend`/`receipt`/`balances` は
+無改造のまま storage 課金に使える。
+
+**L6 の実装コストは当初想定より大幅に小さい:**
+
+- **需要側**（テナントが払う）: net-kotobase の pin/write path から
+  `charge`/`spend` を呼ぶだけ（残高不足は既存 CACAO ゲートと同じ場所で
+  402）。
+- **供給側**（fleet ノードが稼ぐ）: storage peer が「保持バイト×保持時間」
+  を `plan {:assignments [...]}` と同じ shape で報告すれば
+  `memory-time`/`settle` がそのまま `:run/shares` を配分。
+- **監査/証跡**: `receipt`（hash chain + CACAO 署名）が Filecoin の
+  proof-of-storage 相当を提供 — L6 が想定していた「定期サンプル再検証+
+  監査 datom」の実体はこれで代替できる（`verify-chain`(L5) との併用は
+  引き続き必要、別レイヤのまま）。
+- **fiat 導線**: ADR-2607030030「非貢献者は fiat→credits(Stripe)」が
+  そのまま net-kotobase の `Stripe active subs 0` ギャップの解消経路になる
+  （`90-docs/business/net-kotobase-business-model.md`）。
+- **フェーズ整合**: GPU 経済の Phase 1（単一テナント gftd fleet、稼働済み）
+  に相乗りする形なら、storage 課金は外部フェーズ(2/3)を待たず内部
+  chargeback として即着手可能。外部テナントが自分のノードで貢献できるのは
+  Phase 2（fleet 連邦・murakumo.cloud 公開）待ち。
+
+この follow-up は**設計の訂正のみ**（オーナー確認済み、2026-07-05）。
+実装（`unit-prices` 拡張、net-kotobase Worker 配線、料率決定）は引き続き
+別 PR・別オーナー確認。
+
 ## Related
 
 - ADR-2607023100（murakumo × kotoba-lang/net gossip/bitswap 統合設計。
