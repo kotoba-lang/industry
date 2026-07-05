@@ -1,12 +1,15 @@
 # ADR-2607041500: etzhayyim `*-compat` catalog (1,027 repos) → kotoba-lang, one repo per vendor, reverse-domain naming
 
-**Status**: accepted (rollout in progress — 728/1,027 landed: 8 pilot + batch1-24
-alphabetical (`8th_wall-compat`..`planetscale-compat`); remaining ~299 scheduled as
+**Status**: accepted (rollout in progress — 758/1,027 landed: 8 pilot + batch1-25
+alphabetical (`8th_wall-compat`..`ratp_paris-compat`); remaining ~268 scheduled as
 batched follow-up. One naming collision resolved: `com-cloudflare-compat` (this
 catalog's `cloudflare-compat`) disambiguated from a pre-existing, unrelated
 `kotoba-lang/com-cloudflare` real API client. Note: batch22's alphabetical range
 included 4 nvidia_*-compat dirs already registered by the original pilot batch -
-skipped, not re-migrated.)
+skipped, not re-migrated. Note: `post_quantum-compat` (in batch25's range) has an
+anomalous structure (bare `methods/*.cljc`, no README/deps.edn/src/test) and was
+skipped rather than migrated; `ratp_paris-compat` substituted to keep the batch at
+30. `post_quantum-compat` needs manual handling as a follow-up.)
 **Date**: 2026-07-04
 **Related**: ADR-2606302300 (org taxonomy, kotoba-lang library-placement rule) · ADR-2607020130
 (`kami-nv-compat` relocation precedent) · ADR-2607012200 (umbrella kotoba-lang TS→CLJC refactor —
