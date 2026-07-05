@@ -1843,4 +1843,9 @@
    ;; kotoba-lang/robotics' action/gate contract). All pure .cljc, no I/O.
    "orgs/kotoba-lang/org-ros"
    "orgs/kotoba-lang/com-sony-dualsense"
-   "orgs/kotoba-lang/teleop"}}
+   "orgs/kotoba-lang/teleop"
+   ;; claude-lmstudio -- run Claude Code against a local LM Studio server
+   ;; instead of Anthropic's own models, same shape as z.ai's claude-zai and
+   ;; kotoba-lang/murakumo's claude-murakumo, but no translation bridge needed
+   ;; since LM Studio >=0.4.1 speaks the Anthropic Messages API natively.
+   "orgs/com-junkawasaki/claude-lmstudio"}}
