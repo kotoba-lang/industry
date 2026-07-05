@@ -38,7 +38,7 @@
   "orgs/com-junkawasaki/freeboard"      "orgs/kotoba-lang/freeboard"
   "orgs/com-junkawasaki/kami-engine"     "orgs/kotoba-lang/kami-engine"
   "orgs/com-junkawasaki/kami-cfd"       "orgs/kotoba-lang/kami-engine-cfd"
-  "orgs/com-junkawasaki/kami-webgpu"    "orgs/kotoba-lang/kami-webgpu"
+  "orgs/com-junkawasaki/kami-webgpu"    "orgs/kotoba-lang/webgpu" ; kami-webgpu was renamed to webgpu on GitHub (ADR-2607051400); the stale "orgs/kotoba-lang/kami-webgpu" extra-project entry was removed, not renamed in place, so this override now points straight at the surviving canonical path
   "orgs/com-junkawasaki/kami-engine-sdk" "orgs/kotoba-lang/kami-engine-sdk"
   "orgs/com-junkawasaki/kasane"         "orgs/kotoba-lang/kasane"
   "orgs/com-junkawasaki/kekkai-actor"   "orgs/kotoba-lang/kekkai"
@@ -1366,7 +1366,9 @@
    "orgs/kotoba-lang/zone"
    "orgs/kotoba-lang/browser-agent"
    "orgs/kotoba-lang/freeboard"
-   "orgs/kotoba-lang/kami-webgpu"
+   ;; kami-webgpu entry removed 2026-07-05 (ADR-2607051400): GitHub-renamed to
+   ;; "webgpu" (already registered below, line ~977); this was a stale duplicate
+   ;; pinned to a now-superseded commit.
    "orgs/kotoba-lang/kotoba-code"
    "orgs/kotoba-lang/kotoba-topology"
    "orgs/kotoba-lang/langchain"
