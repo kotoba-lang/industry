@@ -243,3 +243,85 @@ fixing if the RPC-ring path is used again.
 - `orgs/gftdcojp/local-murakumo/src/local_murakumo/routes.cljc` +
   `worker.cljs` — new routes (`/v1/messages`, `/itonami/benchmark/clj-datomic`
   [+`/compare`]), upstream-error surfacing fix.
+
+## Addendum (2026-07-05): speed vs. hosted models, parallelism, context ceiling
+
+Follow-up investigation after a real Claude Code request hit
+`exceed_context_size_error` at the (then-current) 65536-token ctx — a
+concrete request measured 65561 tokens, 25 over — prompting the question
+"how do we actually raise ctx safely, and while we're at it, how close can
+this hardware get to 300 tok/s?"
+
+**Single-stream speed, put in perspective.** 61.5 tok/s (the standalone-GPU
+result from Decision 6) is not slow — it's in the same range as hosted
+flagship models. Claude Sonnet 5 (Adaptive Reasoning, Max Effort) streams
+at ~72 tok/s per artificialanalysis.ai's 2026-07 measurement, the median
+for reasoning models in its price tier. A single consumer APU with no
+discrete GPU landing in the same tok/s band as a model served from a
+datacenter GPU cluster is, if anything, the more surprising number here.
+**300 tok/s was never a realistic single-stream target** — it's well above
+what mainstream hosted models themselves stream at for one conversation.
+The real ceiling is memory bandwidth: decode reads the ~3B active MoE
+params (Q4_K_M) from LPDDR5x unified memory once per token, and Strix
+Halo's bandwidth sets that floor regardless of software tuning.
+
+**Parallelism raises aggregate throughput, not single-stream speed —
+confirmed by direct measurement.** Fired N concurrent
+`/v1/chat/completions` requests at `llama-server --parallel N` and measured
+wall-clock aggregate tok/s (sum of completion_tokens / wall_seconds):
+
+| N | aggregate tok/s |
+|---|---|
+| 1 | 53.8 |
+| 2 | 77.1 |
+| 4 | 107.8 |
+| 6 | 121.2 (peak) |
+| 8 | 74.6 (regressed) |
+
+Continuous batching genuinely lifts *aggregate* throughput up to ~6
+concurrent streams on this iGPU, then falls off (per-slot context shrinking
+to 8192 at N=8, plus scheduling/compute saturation). This only matters for
+genuine concurrent load — parallel subagents, multiple sessions — not for
+a single Claude Code conversation, which has one request in flight at a
+time and still sees ~61.5 tok/s regardless of the `--parallel` setting.
+
+**Context ceiling: 262144, not an arbitrary bump.** Investigated rather
+than just raising the number again. `qwen-agentworld-35b-a3b`'s GGUF
+metadata declares `qwen35moe.context_length = 262144` — its own native
+training context, and (this session confirmed by direct testing) the real
+hard ceiling on the current `llama-server` binary. Architecturally, long
+context is cheap for this model: it's a hybrid Gated-DeltaNet(SSM)/
+Gated-Attention model (`full_attention_interval = 4`), so only 10 of 40
+layers need traditional KV cache that grows with context — measured 5GB at
+262144 (f16) — while the other 30 layers use a **fixed** ~63MB recurrent
+state regardless of context length.
+
+Attempted the model's own claimed 1,010,000-token YaRN extension directly:
+`--rope-scaling yarn --yarn-orig-ctx 262144 --rope-scale 4 -c 1010000`.
+`llama-server` unconditionally capped it back down to 262144 anyway — this
+is a known, still-unresolved upstream bug
+([ggml-org/llama.cpp#22140](https://github.com/ggml-org/llama.cpp/issues/22140),
+closed not-planned; [#17459](https://github.com/ggml-org/llama.cpp/issues/17459),
+open unconfirmed): the server hard-caps any `-c` above the model's declared
+training context regardless of explicit override flags. The only known
+workaround is patching `tools/server` source to remove the check and
+rebuilding from source — not achievable via CLI flags on the official
+release binaries, and not attempted here (logged as a follow-up). Back-of-
+envelope memory check for if it *did* work: KV cache at 1,010,000 would be
+~19.3GB (f16) — tight but not impossible against the head's ~46GB unified
+RAM alongside the 20.6GB model (~40GB combined). Confirmed separately that
+KV cache quantization (`--cache-type-k q8_0 --cache-type-v q8_0`) loads and
+serves correctly on this Vulkan/RADV backend at unchanged speed (62.5
+tok/s) — that would roughly halve the 1M-context memory bill to ~30GB
+combined, comfortable — future headroom if the server-side cap is ever
+lifted.
+
+**Landed:** `:infer/ctx` → 262144, `:infer/flash-attn "on"` (measured no
+speed difference vs. auto for this mostly-linear-attention architecture,
+set explicitly anyway so it's not silently disabled by a future build),
+`cmd-serve-standalone` now accepts an optional `parallel` arg. Fixed a real
+race found while testing: the kill-then-relaunch sequence used a fixed
+0.5s sleep after `kill -9` that wasn't always enough for the old
+`llama-server` to release its port before the replacement tried to bind
+it — now polls until the process is actually gone. All of this exposed at
+`GET /itonami/perf` on `api.murakumo.cloud`.
