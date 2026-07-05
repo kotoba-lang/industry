@@ -1,0 +1,152 @@
+{:frontmatter
+ {:id "adr-2607051410-net-kotobase-distributed-storage-mesh-design"
+  :title "ADR-2607051410: net-kotobase を分散ストレージ mesh として設計する — Holochain/IPFS/Filecoin 参照設計（proposed・未実装）"
+  :status "proposed"
+  :date "2026-07-05"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "net-kotobase-distributed-storage-mesh"
+  :authoritative false
+  :authoritative_for
+  ["net-kotobase(kotobase.net)を単一origin構成からkotobase meshへ段階移行する設計方針（未実装）"
+   "cloud-murakumo陣営（kekkai/overlay/kotoba-lang net/leaderless auction）のレイヤ積みをストレージ側へ転用するという決定"
+   "Holochain(agent-centric source chain/validating DHT)・IPFS(content-address/bitswap/DHT)・Filecoin(storage deal/proof-of-storage)の各要素をどのレイヤに対応させるかのマッピング"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607023100" "adr-2607041302"]
+  :last_verified "2026-07-05"
+  :artifacts
+  {:net-kotobase "gftdcojp/net-kotobase — 現行: Cloudflare Worker(唯一の外部書込面) + 単一kotoba pod(S1-locked) + B2(CAR pin archive)。分散複製なし"
+   :kotobase-peer "kotoba-lang/kotobase-peer — content-addressed commit chain (prolly-tree+arrangement+chain+IPLD), JVM/cljs byte-identical CID"
+   :kotobase-browser-worker "kotoba-lang/kotobase-browser-worker — kotobase-cljc-workerと同じ純粋handlerをIndexedDBに配線、ブラウザ単独でtransact/q/pull/fold完結を実証済み"
+   :kotobase-client "kotoba-lang/kotobase-client — did:key+CACAO自己発行、DAG-CBOR、client/server共通実装"
+   :kotoba-net "kotoba-lang/net — gossip(peer/topic dedup・決定的fanout・route-message)+bitswap(want/have・WantSince delta-sync)の純関数、transport非依存、consumer未着地(ADR-2607023100時点)"
+   :murakumo "kotoba-lang/murakumo — kekkai(zero-trust admission台帳)+overlay(JVM Kwik QUIC+relay)+leaderless auction"
+   :cloud-murakumo "gftdcojp/cloud-murakumo — GPU serverless製品。scheduler の leaderless auction bid + :murakumo.run/:murakumo.audit 監査datomパターン"}}
+
+ ;; ============================================================
+ ;; 現状: net-kotobase は単一障害点構成
+ ;; ============================================================
+ :current-state
+ {:write-path "Browser/API client -> kotobase.net Worker(唯一の外部write surface) -> kotoba-backend.gftd.ai tunnel(S1-locked) -> 単一kotoba pod"
+  :storage "pin = named commit CIDをquad storeに保存、CAR化してB2へoff-site archive(単一バケット)"
+  :distribution "皆無 — CIDによる内容アドレスとテナント分離(kotobase/db/<did>/<db-name>)はあるが、ノード間複製・ゴシップ・DHTは無い"
+  :single-points-of-failure ["Worker 1枚" "kotoba pod 1枚(K8s, S1-locked)" "B2 バケット1つ"]
+  :source "orgs/gftdcojp/net-kotobase/README.md Architecture節"}
+
+ ;; ============================================================
+ ;; すでに存在する部品 — 気づかず再発明しないための棚卸し
+ ;; ============================================================
+ :existing-building-blocks
+ [{:component "kotobase-peer" :repo "kotoba-lang/kotobase-peer"
+   :role "per-tenant content-addressed commit chain (prolly-tree+arrangement+chain+IPLD)"
+   :reuse-as "L1 data model — Holochainのagent-centric source chainにすでに一致する形"}
+  {:component "kotobase-browser-worker / kotobase-cljc-worker" :repo "kotoba-lang/kotobase-{browser,cljc}-worker"
+   :role "同じ純粋handlerをR2/IndexedDB双方に配線、ローカルファースト実行(offline-first)を実証済み"
+   :reuse-as "L2 local storage shellのテンプレート — fleetノード版も同じ配線パターンで作れる"}
+  {:component "kotobase-client" :repo "kotoba-lang/kotobase-client"
+   :role "did:key+CACAO自己発行、client/server共通のbyte-exact実装"
+   :reuse-as "L0 identity/membrane — 自己主権鍵はすでに完成済み"}
+  {:component "kotoba-lang/net" :repo "kotoba-lang/net"
+   :role "gossip(dedup・決定的fanout)+bitswap(want/have・WantSince delta-sync)の純関数、transport非依存"
+   :reuse-as "L4 replication protocol — IPFSのbitswapに相当、consumerゼロのまま眠っている"}
+  {:component "murakumo.kekkai" :repo "kotoba-lang/murakumo"
+   :role "zero-trust admission台帳(Tailscale相当)。fleet membershipのゲート"
+   :reuse-as "L0/L3 — storage peer membershipのゲート、暫定providerリストにも流用可能"}
+  {:component "murakumo.overlay" :repo "kotoba-lang/murakumo"
+   :role "JVM Kwik QUIC+relay。Tailscale/WireGuard置換"
+   :reuse-as "L4 transport — kotoba-lang/netのnative adapter先(ADR-2607023100が既に提案)"}
+  {:component "cloud-murakumo.scheduler leaderless auction" :repo "gftdcojp/cloud-murakumo"
+   :role "bid->placement、:murakumo.run/:murakumo.audit監査datom"
+   :reuse-as "L6 incentive/market — GPU bidと同じ機構をstorage bidへ一般化できる"}]
+
+ ;; ============================================================
+ ;; Holochain/IPFS/Filecoin 参照マッピング
+ ;; ============================================================
+ :reference-mapping
+ [{:system "IPFS"
+   :borrowed-concepts ["content addressing" "Merkle DAG" "bitswap(want/have)" "DHT provider records"]
+   :already-have ["content addressing = kotobase-peerのCID" "Merkle DAG = IPLD links(chain prev/snapshot/index roots)" "bitswap意味論 = kotoba-lang/net(未配線)"]
+   :gap ["provider record discovery(DHT) — 現状は静的fleet membership以外に発見手段がない(L3)"]}
+  {:system "Holochain"
+   :borrowed-concepts ["agent-centric architecture" "per-agent source chain" "validating DHT(近傍ノードがzomeルールで検証してからhold)" "capability token"]
+   :already-have ["source chain per agent = kotobase/db/<did>/<db-name>のcommit chain(kotobase-peer)" "capability token = CACAO自己発行"]
+   :gap ["validating DHT相当の層 — bitswapで受信したブロックをverify-chain+quota/schemaで検証してからreplica setに取り込む処理が無い(L5)"]}
+  {:system "Filecoin"
+   :borrowed-concepts ["storage market(deal: price/duration/replication-factor)" "proof-of-replication(PoRep)" "proof-of-spacetime(PoSt)"]
+   :already-have []
+   :gap ["deal機構丸ごと — cloud-murakumo.schedulerのbid auctionをGPUからstorageへ一般化すれば新規実装は最小で済む(L6)"
+         "定期的な保持証明(PoSt相当) — サンプルブロック再ハッシュ+verify-chainを:kotobase.storage.audit/*datomに記録する仕組みが無い(L6)"]}]
+
+ ;; ============================================================
+ ;; レイヤ設計
+ ;; ============================================================
+ :layer-design
+ [{:layer "L0" :name "Identity/Membrane"
+   :reuse ["kotobase-client cacao(did:key+CACAO)" "murakumo.kekkai admission台帳パターン"]
+   :new ["kekkai台帳をstorage-peer membershipにも使う配線"]}
+  {:layer "L1" :name "Data model"
+   :reuse ["kotobase-peer(prolly-tree/arrangement/chain/IPLD) — per-tenant content-addressed commit chain"]
+   :new []}
+  {:layer "L2" :name "Local storage"
+   :reuse ["kotobase-cljc-worker(R2)" "kotobase-browser-worker(IndexedDB) — 同じ純粋handler"]
+   :new ["fleetノード用ローカルディスクshell(新規だが既存handlerの再配線のみ)"]}
+  {:layer "L3" :name "Discovery"
+   :reuse ["kekkai membershipリストを暫定provider-listとして流用"]
+   :new ["本格DHTは現規模では不要。ノード数増加時にKademlia化を検討"]}
+  {:layer "L4" :name "Replication protocol"
+   :reuse ["kotoba-lang/net(gossip dedup/fanout + bitswap want/have/delta-sync)" "murakumo.overlay(QUIC transport)"]
+   :new ["ADR-2607023100の配線パターンをstorage CIDにも適用する薄いアダプタ"]}
+  {:layer "L5" :name "Validation"
+   :reuse ["kotobase-peer/verify-chain"]
+   :new ["bitswap受信ブロックにverify-chain+tenant quota/schema checkを通してからreplica setに取り込む処理(Holochainのvalidating DHT相当)"]}
+  {:layer "L6" :name "Incentive/market"
+   :reuse ["cloud-murakumo.schedulerのleaderless auction" ":murakumo.audit/*監査datomパターン"]
+   :new ["storage bid($/GB-month)機構" "定期サンプル再検証を:kotobase.storage.audit/*に記録(Filecoin PoSt相当)"]}
+  {:layer "L7" :name "Edge/API"
+   :reuse ["現行kotobase.net Worker"]
+   :new ["Workerを『唯一のorigin』から『mesh前段のゲートウェイ/キャッシュ』へ役割変更"]}]
+
+ ;; ============================================================
+ ;; 移行フェーズ（非破壊・段階的）
+ ;; ============================================================
+ :migration-phases
+ [{:phase 0 :description "現行Worker+pod+B2はそのままpeer #1(bootstrap peer)として残す。リスクゼロ、変更なし。"}
+  {:phase 1 :description "kotoba-lang/netのgossip/bitswapをmurakumo.overlayへ配線(ADR-2607023100をそのまま実行、本ADRは新規に何も足さない)。"}
+  {:phase 2 :description "Mac-mini fleetノードにL2 shell(新規、kotobase-cljc-workerのR2部分をローカルディスクに差し替えるだけ)を立て、fleetノードをcompute peerだけでなくstorage peerにもする。"}
+  {:phase 3 :description "L3(discovery)は当面kekkai membershipリストで代用。ノード数が静的リストで足りなくなった時点でのみ本格DHTを検討。"}
+  {:phase 4 :description "L5(validation)とL6(incentive/market・監査)を追加し、『B2を信じるだけ』だったpinned CID数/storage GBメトリクス(docs/BUSINESS-MODEL.md)を実測の複製証跡に置き換える。"}
+  {:phase 5 :description "(長期・任意)kotobase-browser-workerをオフラインファーストな軽量/edge replicaとしてmeshに参加させる。ネットワークのglue(L3/L4)さえ足せばエンジン自体は証明済み。"}]
+
+ ;; ============================================================
+ ;; Open Questions（実装PRで解く）
+ ;; ============================================================
+ :open-questions
+ [{:q "L3のDHT化タイミング — 静的kekkaiリストで実運用上十分な規模はどこまでか"
+   :impact "規模が小さいうちは過剰設計になる、大きくなれば発見漏れが起きる"}
+  {:q "L5(validation)の置き場所 — kotobase-peer自身に足すか、kotoba-lang/net側のbitswap受信フックとして足すか"
+   :impact "責務境界。kotobase-peerはCACAO/capability authに『opinionを持たない』設計方針(README)と整合させる必要がある"}
+  {:q "L6(storage bid)のデータ形状 — :murakumo.fn/*(GPU)と同じshapeを共用するか、:kotobase.storage.bid/*として独立させるか"
+   :impact "cloud-murakumo.schedulerの既存auctionコードをどこまで再利用できるかに直結"}
+  {:q "Org境界 — net-kotobase READMEの『kotobase/IPFS pinningはgftd vendor機能、kotoba自体はetzhayyim製品』という区分(ADR-2606011400)に対し、L3/L5/L6の新規コンポーネントはどちらに属するか"
+   :impact "murakumo/cloud-murakumoの役割分離と同型の整理が要る"}
+  {:q "命名 — ADR-2607041302と同じ教訓: 『kotobase.netという製品』と『その下で動く分散ストレージprotocol/mesh』を同一視しない方がよいか"
+   :impact "mesh自体に独立した名前が要るかもしれない(例: protocol層はkotoba-lang側、net-kotobaseはgftd側の製品名のまま)"}]
+
+ :naming-consideration
+ {:precedent "adr-2607041302"
+  :lesson "Sora(cloud-murakumo)/local-murakumoの対比と同様、『kotobase.netという製品』と『分散ストレージprotocol/mesh』を混同しない方が将来の役割分離がしやすい"
+  :not-decided "本ADRでは命名の結論は出さない。open-questions #5として残す"}
+
+ :consequences
+ {:positive
+  ["新しいP2Pプロトコルを何一つ発明しない — identity(CACAO)/data-model(kotobase-peer)/gossip・bitswap(kotoba-lang/net)/transport(murakumo.overlay)/auction(cloud-murakumo.scheduler)を全て他ドメインで検証済みの実装から借用する"
+   "ADR-2607023100の2つ目の実consumerになり、kotoba-lang/netが真にtransport非依存の汎用意味論であるという設計意図がストレージ/計算両ドメインで検証される"
+   "net-kotobaseのbusiness modelが抱える『pin/storageサービスにprovenanceがない』というProblem(90-docs/business/net-kotobase-business-model.md)に対し、L6の監査証跡が直接的な答えになる"]
+  :negative
+  ["本ADRは設計のみ。L2/L3/L5/L6は実装ゼロ、別PRで行う"
+   "L4の土台であるADR-2607023100自体もまだ未実装 — 両方が実装されるまで実効的な分散ストレージにはならない"
+   "fleetノードがストレージ役も担うことでディスク容量・帯域の運用負荷が増える(DataLad/B2運用と同様、shallow/容量管理の検討が要る)"
+   "L6(storage bid)が実装されるまでdocs/BUSINESS-MODEL.mdのstorage系メトリクスは現状の『B2を信じる』ままであり続ける"]}
+
+ :note "本ADRは設計提案のみ。実装(L2 fleet storage shell・L3 discovery・L5 validation・L6 bid+audit の各コード、west manifest登録、org境界確定)は別PR/ブランチで、オーナー確認の上で行う。"}
