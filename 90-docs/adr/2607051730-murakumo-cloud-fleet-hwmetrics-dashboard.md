@@ -88,3 +88,26 @@ workflow, from worktrees outside the superproject root.
   list by hand instead of being generated.
 - No alerting on node flap/offline — this is read-only visualization, not
   monitoring.
+
+## Addendum 2026-07-05, part 1 — GPU as the default metric
+
+Swapped GPU above CPU in both the SSR card (`local-murakumo.infer-view/
+node-card`) and the live JS poller's `renderNode` — GPU now renders first,
+CPU second. GPU is the meaningful utilization signal for an inference
+fleet; CPU is dominated by the concurrent `xmrig` mining load (see the
+collector decision above), so leading with CPU was visually prioritizing
+the less relevant number. Pure view-ordering fix, no schema/route change.
+
+## Addendum 2026-07-05, part 2 — offline-node investigation
+
+User asked why `dan`/`joseph`/`levi`/`simeon` show offline on the
+dashboard. Direct SSH from the operator machine timed out for all four
+(consistent with the dashboard's `reachable:false`); cross-checked
+independently against `tailscale status` (outside the hwmetrics collector's
+own SSH path entirely) — all four show `offline, last seen 1d ago` at the
+Tailscale layer itself, while the other 6 mesh nodes (asher, benjamin, gad,
+issachar, judah, naphtali, zebulun) show active/reachable. **Verdict**: the
+dashboard is reporting correctly — these nodes are genuinely powered
+off/asleep, not an SSH quirk or a dashboard bug. Reconfirms ADR-2607051431's
+existing note that not all 10 `fleet.edn` nodes are kept awake at once. No
+fix needed.
