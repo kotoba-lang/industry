@@ -461,3 +461,78 @@ more than one active `claude-murakumo` session at a time). Verified live:
 restarted with `parallel 1`, confirmed `n_slots = 1` in the server log, and
 confirmed a real in-flight request completed at the expected 60.05 tok/s
 baseline once it had the slot to itself.
+
+## Addendum (2026-07-05, part 6): LM-Studio-shaped model catalog (`GET /itonami/catalog`)
+
+Request: design, in EDN, a model-browser information architecture for
+murakumo.cloud shaped like LM Studio's local-model picker — search,
+format filter (GGUF/MLX/**kotoba**), "Best Match" sort — rather than the
+existing thin `itonami/model-catalog` (a `{:id :kind :unit :cr :mem}`
+pricing table with no room for capability badges, per-format status, or
+README text).
+
+Added a new `local-murakumo.catalog` namespace, kept deliberately separate
+from `itonami/model-catalog` (the credits/business layer doesn't need
+README text or fleet-fit data, and the existing pricing consumers stay
+unchanged). Two places this design is intentionally NOT a copy of LM
+Studio, because copying would be dishonest for a self-hosted fleet:
+
+- **"Download Options" → `:model/variants` + `:variant/status`
+  (`:registered`/`:resident`/`:serving`)**. murakumo doesn't download to
+  the caller's machine — it swaps a GGUF/MLX artifact onto the fleet. A
+  variant's status says whether it's catalogued, sitting on the head's
+  disk, or the model currently answering requests.
+- **"Best Match" is a real computed score, not a popularity/hardware
+  guess**: `best-match-score` hard-gates on `:fit/status`
+  (`:does-not-fit` scores near zero regardless of benchmark speed
+  elsewhere — an oversized model is never "the best match" for THIS
+  fleet), then weights measured tok/s (40%), clj-datomic benchmark
+  pass-rate (35%), capability breadth (15%), and staff-pick curation
+  (10%). Verified live:
+  `qwen-agentworld-35b-a3b` (61.5 tok/s, 6/6, staff pick) → 94.1%,
+  `qwen3.6-35b-a3b` (registered, unbenchmarked) → 32.5%,
+  `gemma-4-12b-it` (7.54 tok/s, 1/6) → 21.7%.
+
+The **kotoba** format tag is the one forward-looking, non-descriptive part
+of this catalog: `kotoba-lang/inference`'s `kotodama.inference.shard`
+(reuses `murakumo.infer.plan`'s fleet layer-assignment as the seam to a
+pure-cljc execution engine) and `kotodama.inference.mlx` (an `IModelRuntime`
+adapter for `mlx-lm`/`mlx-moe`) are real, tested building blocks — but no
+model on this fleet is actually served through them yet. Every model's
+kotoba format entry is honestly `:format/status :experimental`, never
+`:available`, until that's true. GGUF is `:available` for all 3 current
+base models (llama.cpp/Vulkan on this fleet); MLX is `:experimental` for
+all 3 (real `mlx-community` conversions exist on HuggingFace — e.g.
+`Qwen-AgentWorld-35B-A3B-oQ4`, `Qwen3.6-35B-A3B-4bit` — but none are
+registered/tested on this fleet) or `:unsupported` (gemma-4-12b-it, no
+conversion checked yet).
+
+New routes, wired in both `routes.cljc` (JVM-tested) and `worker.cljs`
+(deployed): `GET /itonami/catalog` (SSR page, plain-GET search/filter
+form, matching the page's existing "zero JS needed for a readable page"
+convention) and `GET /itonami/catalog.json` (raw data). Query params:
+`q` (search name/publisher/tagline), `format` (`gguf`/`mlx`/`kotoba`),
+`capability`, `sort` (`best-match`/`updated`), `include-retired`.
+
+Bug found only via real HTTP traffic against the live Worker (not the JVM
+route tests, which construct `:query` maps directly): `worker.cljs`'s
+`fetch-handler` built its `query` map by explicitly listing 4 known params
+(`since`/`usd`/`did`/`model`) rather than generically reading
+`URLSearchParams` — so `?q=gemma` silently returned the unfiltered list
+instead of erroring or filtering, until the new params were added to that
+explicit list. Same shape as the mid-conversation-system and
+`:infer/ctx` bugs from Decision 4/the earlier addenda: this Worker's
+`route`/`fetch-handler` split makes it easy for a JVM-tested route to be
+correct while the real deployed entrypoint quietly drops query
+parameters it doesn't know about — worth grepping `fetch-handler`'s
+`query` map construction whenever a route gains a new query param.
+
+Landed via `gftdcojp/local-murakumo` PR `feat/model-catalog` →
+`gh api .../merges` (concurrently, another session had uncommitted
+`kotoba-lang/treasury` delegation work sitting in the shared checkout —
+worked in an isolated `git worktree` instead of touching that checkout
+in place, then fast-forwarded the shared checkout afterward). Deployed
+and verified live on `api.murakumo.cloud`; the concurrently-merged
+`/infer/hwmetrics` fleet dashboard (a different, unrelated feature that
+landed on `main` in between) was also re-verified working post-deploy —
+no regression.
