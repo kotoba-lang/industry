@@ -1,7 +1,7 @@
 # ADR-2607041500: etzhayyim `*-compat` catalog (1,027 repos) → kotoba-lang, one repo per vendor, reverse-domain naming
 
-**Status**: accepted (rollout in progress — 758/1,027 landed: 8 pilot + batch1-25
-alphabetical (`8th_wall-compat`..`ratp_paris-compat`); remaining ~268 scheduled as
+**Status**: accepted (rollout in progress — 788/1,027 landed: 8 pilot + batch1-26
+alphabetical (`8th_wall-compat`..`roblox-compat`); remaining ~238 scheduled as
 batched follow-up. One naming collision resolved: `com-cloudflare-compat` (this
 catalog's `cloudflare-compat`) disambiguated from a pre-existing, unrelated
 `kotoba-lang/com-cloudflare` real API client. Note: batch22's alphabetical range
