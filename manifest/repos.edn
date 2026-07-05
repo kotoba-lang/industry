@@ -34,7 +34,19 @@
 
  ;; GitHub owner/path 移管済み project の canonical path。
  :path-overrides
- {"orgs/com-junkawasaki/aiueos"         "orgs/kotoba-lang/aiueos"
+ {;; reverse-domain external-spec renames (2026-07-05, same org-<body>-<spec>
+  ;; precedent as org-openusd/org-materialx/org-khronos-{gltf,glb}/org-w3-webauthn):
+  ;; turn implements IETF RFC 8656 (TURN); signal implements the Signal Protocol
+  ;; (signal.org, X3DH/Double Ratchet); rt is kotoba's own WebRTC signaling-relay
+  ;; routing contract (not itself a standardized external spec, named after the
+  ;; broader WebRTC signaling concept it relays); net is explicitly NOT a libp2p
+  ;; port (its own ADR disclaims full conformance) but is named after libp2p.io,
+  ;; the spec family its gossip/bitswap semantics are modeled on.
+  "orgs/kotoba-lang/turn"   "orgs/kotoba-lang/org-ietf-turn"
+  "orgs/kotoba-lang/rt"     "orgs/kotoba-lang/org-w3-webrtc-signaling"
+  "orgs/kotoba-lang/net"    "orgs/kotoba-lang/io-libp2p"
+  "orgs/kotoba-lang/signal" "orgs/kotoba-lang/org-signal"
+  "orgs/com-junkawasaki/aiueos"         "orgs/kotoba-lang/aiueos"
   "orgs/com-junkawasaki/freeboard"      "orgs/kotoba-lang/freeboard"
   "orgs/com-junkawasaki/kami-engine"     "orgs/kotoba-lang/kami-engine"
   "orgs/com-junkawasaki/kami-cfd"       "orgs/kotoba-lang/kami-engine-cfd"
@@ -1188,15 +1200,17 @@
    "orgs/kotoba-lang/webrtc"
    ;; kotoba-lang media/networking substrate — CLJC reimplementation of the
    ;; Rust crates removed by kotoba-lang/kotoba PR #259 (2026-07-01):
-   ;; kotoba-rt/kotoba-turn/kotoba-net/kotoba-signal → rt/turn/net/signal.
+   ;; kotoba-rt/kotoba-turn/kotoba-net/kotoba-signal → rt/turn/net/signal,
+   ;; renamed 2026-07-05 to reverse-domain external-spec names (see
+   ;; :path-overrides above for the rationale per repo).
    ;; Overlaps with kotoba-lang/webrtc's room/session records (ADR-2607011700);
    ;; that ADR's "no actual TURN/STUN deployment in kotoba-lang" boundary was
    ;; retracted by the owner the same day (see addendum in the ADR) — protocol
    ;; codecs/crypto belong here, only server deployment/ops stays elsewhere.
-   "orgs/kotoba-lang/rt"
-   "orgs/kotoba-lang/turn"
-   "orgs/kotoba-lang/net"
-   "orgs/kotoba-lang/signal"
+   "orgs/kotoba-lang/org-w3-webrtc-signaling" ; renamed from rt 2026-07-05
+   "orgs/kotoba-lang/org-ietf-turn"           ; renamed from turn 2026-07-05
+   "orgs/kotoba-lang/io-libp2p"               ; renamed from net 2026-07-05
+   "orgs/kotoba-lang/org-signal"              ; renamed from signal 2026-07-05
    ;; kotoba-shell CLJC restoration scaffold (ADR-2607012115) — the same PR #259
    ;; also deleted crates/kotoba-shell (manimani's Tauri replacement, no CLJC
    ;; successor registered anywhere until now). Scaffold-only; see the ADR for
