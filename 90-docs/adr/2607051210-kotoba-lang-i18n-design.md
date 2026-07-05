@@ -1,7 +1,7 @@
 # ADR-2607051210: kotoba-lang/i18n — portable cljc i18n library
 
-**Status**: accepted (implemented)
-**Date**: 2026-07-04
+**Status**: accepted (implemented, closed out)
+**Date**: 2026-07-04 (follow-up/close-out: 2026-07-05)
 **Deciders**: Jun Kawasaki
 
 ## Context
@@ -62,7 +62,7 @@ reactivity.
 | `i18n.core` | runtime registry (`register!`/`set-locale!`/`t`): interpolation + select-map (plural) dispatch, source-locale fallback, never-throws (`"{missing:k}"`) | zero |
 | `i18n.plural` | CLDR-*lite* plural-category rules (curated families: other-only/one-other/french/slavic/polish/arabic/hebrew), not full CLDR | zero |
 | `i18n.registry` | language metadata (name/native-name/dir/tier); curated tier-1 (25) + tier-2 default table, `load!` to extend from a live registry | zero |
-| `i18n.messages` | `defmessages` macro — the paraglide equivalent | zero |
+| `i18n.messages` | `defmessages` macro (compile-time accessors) + `embed-catalog` macro (cljs catalog-data bootstrap) — the paraglide equivalent | zero |
 | `i18n.tm-import` | pure data-shape bridge to/from etzhayyim TM service's flat JSON | zero |
 | `i18n.re-frame` | `:i18n/*` event/sub registration over `shitsuke.re-frame.core` | `shitsuke` |
 | `i18n.reagent` | `root-attrs` (RTL), `locale-links` + `wire-lang-switch!` | `shitsuke` |
@@ -149,16 +149,63 @@ duplicate.
   the full list fetch it at runtime and call `i18n.registry/load!` via
   `i18n.tm-import/language-registry->entries` — the static table exists so
   the library still works fully offline/zero-dep by default.
-- No automated ClojureScript compile check exists in this repo's CI (same
-  as `shitsuke`/`liquid-glass-ui`/`dot` etc — only `clojure -M:test` on the
-  JVM runs in CI). The `.cljc` reader-conditional `:cljs` branches
-  (`i18n.messages`, `i18n.re-frame`, `i18n.reagent`) were structurally
-  validated by mirroring shitsuke's proven seam pattern; full cljs
-  compilation is exercised by real app builds (e.g. a shadow-cljs app in
-  the style of `murakumo-studio`), not by this library's own CI.
-- 36 tests / 83 assertions, 0 failures, both via `clojure -M:test` (real
+- 37 tests / 85 assertions, 0 failures, both via `clojure -M:test` (real
   git-pinned `shitsuke` dependency, matches CI) and `clojure -M:local:test`
   (monorepo sibling checkout).
+
+## Follow-up (2026-07-05) — close-out
+
+Two things happened after initial acceptance, both driven by wiring the
+library into a real consuming app rather than just its own test suite:
+
+1. **`i18n.messages/embed-catalog` added** (kotoba-lang/i18n@73cc2e5,
+   @ac3eb33). `defmessages` fixes the compile-time *key set* but never gets
+   catalog *values* into a running app — ClojureScript has no runtime
+   classpath resource loading, so a browser build had no way to load
+   `ja.edn`/`en.edn`'s actual strings into `i18n.core/register!`.
+   `embed-catalog` closes this the same way `defmessages` does: read the
+   EDN file once at macroexpansion time, inline it as a literal map.
+
+2. **First real consumer: `gftdcojp/app-aozora`'s reagent+re-frame SPA**
+   (`60-apps/appview/cljs`, [PR gftdcojp/app-aozora#46](https://github.com/gftdcojp/app-aozora/pull/46),
+   open/not yet merged). This surfaced two real ClojureScript interop bugs
+   the JVM-only test suite could never catch:
+   - Plain `(:require [i18n.messages :refer [defmessages]])` fails to
+     resolve the macro under cljs compilation at all (`Invalid :refer, var
+     ... does not exist`).
+   - Bare `(:require-macros [i18n.messages :refer [defmessages]])`
+     compiles, but leaves the macro-generated `i18n.core/t` calls as
+     unresolved vars under `:advanced` Closure optimization —
+     `:require-macros` alone never adds `i18n.core` as a compiled runtime
+     dependency.
+   - Fix (now documented in the library's docstring + README): consumers
+     must `(:require [i18n.messages :refer [defmessages] :include-macros
+     true])`.
+
+   The compile-time-checked-key claim was verified concretely against this
+   real app: a deliberately typo'd generated accessor name
+   (`app-not-found-titlee`) was reported by the ClojureScript compiler as
+   `Use of undeclared Var` at the exact file/line, under both plain
+   `compile` and `:advanced`-optimized `release` builds — confirmed to be a
+   **warning**, not a build-halting error, by default (documented as a
+   caveat; CI wanting a hard failure should grep build output or configure
+   Closure warning promotion).
+
+   In app-aozora, the shell (header/tab-bar/app) + settings/home/feeds/
+   credits pages were migrated to `defmessages`-generated accessors (ja
+   source + en translation), with a header locale switcher reusing
+   `i18n.reagent/locale-links` + `wire-lang-switch!`. Deferred there
+   (tracked in the PR, not this library): `legal/content.cljc` (needs
+   owner/counsel review before translating) and ~25 remaining pages/
+   components — same mechanical pattern, not yet extracted.
+
+**Close-out status**: kotoba-lang/i18n's own design and implementation are
+done — both cljs interop gaps found via real-world use are fixed and
+documented, and the paraglide-equivalence claims (compile-time key safety,
+Fluent-inspired plural/select) are now validated by an actual consumer, not
+only unit tests. No further design work is open on this ADR. The
+app-aozora integration itself remains a separate, open PR under review —
+tracked there, not by this ADR.
 
 ## One-line summary
 
@@ -167,4 +214,6 @@ New `kotoba-lang/i18n` repo: a zero-dep `.cljc` message registry + a
 idea, adapted to stay runtime-locale-switchable) + CLDR-lite plurals +
 RTL/tier language registry + a pure data-shape bridge to the etzhayyim
 TM/LLM translation service + a `shitsuke`-seam re-frame/reagent integration
-generalizing kami-mangaka-reader's proven locale-switch UI pattern.
+generalizing kami-mangaka-reader's proven locale-switch UI pattern. Closed
+out 2026-07-05 after real-world validation via `gftdcojp/app-aozora`
+surfaced and fixed two cljs interop gaps (`:include-macros true`).
