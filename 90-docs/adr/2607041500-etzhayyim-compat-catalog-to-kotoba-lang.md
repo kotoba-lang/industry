@@ -166,3 +166,64 @@ the recipe across shapes, not because these are otherwise prioritized.
 2. `bb scripts/gen-west-manifest.bb --check`: the 8 new entries are absent from the stale diff;
    pin == repo HEAD for each.
 3. `orgs/etzhayyim/root/20-actors/<old>-compat/` untouched (git status clean in that checkout).
+
+
+## Session closing summary (2026-07-05, session paused here)
+
+This ADR's rollout ran as a self-paced `/loop` (30-min cadence) across 26 batches
+following the pilot. Landed **788/1,027 (~77%)** before this session closed out:
+
+| batch | old-dir range | landed |
+|---|---|---|
+| pilot | (scattered) nvidia_isaac/cosmos/drive/nvml, adyen, stripe, anthropic, sentry | 8 |
+| batch1 | `8th_wall-compat`..`amadeus_gds-compat` | 30 |
+| batch2 | `amd_rocm-compat`..`astm_codes-compat` | 30 |
+| batch3 | `athenahealth-compat`..`bentley_projectwise-compat` | 30 |
+| batch4 | `bentley-compat`..`boeing_health-compat` | 30 |
+| batch5 | `boeing_tap-compat`..`cbot_agri-compat` | 30 |
+| batch6 | `cdc-compat`..`climate_fieldview-compat` | 30 |
+| batch7 | `clio-compat`..`coupang-compat` | 30 (1 naming collision resolved: `com-cloudflare-compat`) |
+| batch8 | `covermymeds-compat`..`ddbj-compat` | 30 |
+| batch9 | `deel-compat`..`drone_deploy-compat` | 30 |
+| batch10 | `dropbox-compat`..`emotiv-compat` | 30 |
+| batch11 | `encompass-compat`..`fawry-compat` | 30 |
+| batch12 | `fbi_ucr-compat`..`fortinet-compat` | 30 |
+| batch13 | `freebsd-compat`..`gong-compat` | 30 |
+| batch14 | `goodrx-compat`..`heroku-compat` | 30 |
+| batch15 | `hike_messenger-compat`..`iea_stats-compat` | 30 |
+| batch16 | `iea-compat`..`isara-compat` | 30 |
+| batch17 | `isic_codes-compat`..`kingdee-compat` | 30 |
+| batch18 | `klarna-compat`..`logikcull-compat` | 30 |
+| batch19 | `logingov-compat`..`mavlink_swarm-compat` | 30 |
+| batch20 | `maxar_technologies-compat`..`mosip-compat` | 30 |
+| batch21 | `mpesa-compat`..`neoncrm-compat` | 30 |
+| batch22 | `netcracker-compat`..`oceaneering-compat` | 30 (4 nvidia_*-compat in range skipped — already in pilot) |
+| batch23 | `ocpp_charging-compat`..`oracle_xstore-compat` | 30 |
+| batch24 | `oracle-compat`..`planetscale-compat` | 30 |
+| batch25 | `planview_innotas-compat`..`ratp_paris-compat` | 30 (`post_quantum-compat` skipped — anomalous structure, `ratp_paris-compat` substituted) |
+| batch26 | `ray-compat`..`roblox-compat` | 30 |
+
+**Cursor for resuming**: next batch starts alphabetically **after `roblox-compat`**
+(`find orgs/etzhayyim/root/20-actors -maxdepth 1 -iname '*-compat' -printf '%f\n' | sort`,
+skip anything already present in `manifest/repos.edn`'s `:extra-projects`).
+
+**Outstanding items for the next session/batch**:
+- ~238 `*-compat` directories remain unmigrated (alphabetically from ~`roblox`-adjacent
+  onward through the end of the catalog).
+- `post_quantum-compat` needs bespoke, manual migration — its source is a bare
+  `methods/*.cljc` directory with no `README.md`/`deps.edn`/`manifest.json`/`schema/`/
+  `src/`/`test/`, incompatible with `scripts/migrate-etzhayyim-compat.sh`'s assumptions.
+  Recommend either hand-authoring the standard scaffold around the existing `methods/*.cljc`
+  content, or confirming with the source repo's owner what the intended shape was before
+  migrating.
+- No PR was opened for any of this work — every batch landed via the GitHub Contents API
+  single-entry commit path directly to `origin/main` (per `manifest/repos.edn`
+  `:manifest-workflow`), which is this repo's canonical path for `manifest/repos.edn` /
+  `manifest/west.yml` changes and does not go through a branch/PR. There is therefore no
+  open branch from this work to convert into a PR.
+- The reusable migration script (`scripts/migrate-etzhayyim-compat.sh`) and the batch
+  recipe (fetch remote sha → splice by exact-name regex → structural validation →
+  API PUT → re-verify) are stable and were exercised successfully across 26 consecutive
+  batches, including recovering cleanly from one real `west.yml` corruption (an off-by-one
+  in an earlier line-range extraction, found and fixed in batch2) and multiple 409
+  optimistic-lock conflicts from concurrent fleet sessions editing the same manifest files.
