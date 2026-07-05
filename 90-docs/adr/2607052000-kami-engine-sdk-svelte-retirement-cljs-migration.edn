@@ -1,0 +1,196 @@
+{:frontmatter
+ {:id "adr-2607052000-kami-engine-sdk-svelte-retirement-cljs-migration"
+  :title "ADR-2607052000: kami-engine-sdk -- retire Svelte, migrate to ClojureScript
+          incrementally (cljc SSoT delegation, per ADR-2607020200's genko precedent)"
+  :status "proposed"
+  :doc_type "adr"
+  :topic "kami-engine-sdk-svelte-retirement"
+  :authoritative true
+  :last_verified "2026-07-05"
+  :authoritative_for
+  ["kami-engine-sdk (kotoba-lang/kami-engine-sdk, Svelte 5, 11 modules ~91 files) is being
+    migrated to ClojureScript INCREMENTALLY -- one function/component at a time, each
+    delegated to a cljc SSoT and verified before the next -- NOT as a big-bang rewrite;
+    this follows the already-in-flight ADR-2607020200 genko precedent (2 real increments
+    landed 2026-07-02) discovered mid-task, which explicitly overrode an initial
+    full-rewrite scoping"
+   "call/webvr's protocol layer (turn.ts HMAC-SHA1 credentials, wire.ts CBOR signaling)
+    delegates to ALREADY-EXISTING cljc SSoT repos kotoba-lang/turn|rt|net|signal (CLJC
+    reimplementations of the Rust kotoba-turn/kotoba-rt/kotoba-net/kotoba-signal crates
+    removed by kotoba-lang/kotoba PR #259) -- not new repos to create"
+   "first real increment landed this ADR: kotoba-lang/turn commit 2d90bddc added
+    mint-credential-scoped/verify-credential-scoped to kotoba.turn.credential, matching
+    turn.ts's exact room/player-scoped username encoding and reason-reporting verify
+    result shape, with JVM tests replicating all 7 of turn.test.ts's assertions -- turn.ts
+    itself does NOT yet delegate to this (that needs a shadow-cljs globalThis.KotobaTurn
+    bridge, mirroring kami-genko's :genko build, not yet built)"
+   "consumer apps (cyber-drill, ai-gftd-mangaka, image2metahuman, image2vrm,
+    etzhayyim-project-baminiku, sumitsubo, kotodama-host-sdk) are explicitly OUT OF SCOPE
+    for this migration -- they keep using the current published Svelte package at their
+    pinned version until they separately choose to migrate"
+   "kotoba-lang/kami-engine-sdk-clj is confirmed NOT the SSoT target for builders/
+    components -- its own README states it's an unrelated project (scene/ECS/render-IR/WIT
+    contract authoring, not UI-component/controller logic)"]
+  :related
+  ["90-docs/adr/2607020200-mangaka-genko-cljc.md"]
+  :supersedes []
+  :superseded_by []}
+
+ :problem
+ {:source "user direction 2026-07-05: '@etzhayyim/kami-engine-sdk を svelte から cljs に
+           して. svelte は退役' -- convert kami-engine-sdk from Svelte to ClojureScript,
+           Svelte is being retired org-wide"
+  :investigated
+  ["kami-engine-sdk full inventory: 11 modules (~91 files) -- builders (9, headless Svelte-5
+    -runes controllers wrapping KamiWasmExports), components (13, VrmViewer/VrmCanvas/
+    IsekaiCanvas/panels/CallPanel Svelte components), call (8, plain TS WebRTC signaling +
+    TURN credentials + CBOR wire codec, zero Svelte), webvr (7, mostly plain TS choice-
+    scenario state machine + one Svelte-runes engine file), genko (21, manga editor --
+    components/stores/canvas-pregel), gsplat/manufacturing/trackpad/document (11 total,
+    all plain TS), data/types (20, pure preset/type data). 5 parallel deep-read agents
+    produced complete, literal, file-by-file ground truth for every module (retained in
+    session transcript)."
+   "real consumers confirmed via grep across orgs/: ai-gftd-cyber-drill, ai-gftd-mangaka,
+    etzhayyim-project-image2metahuman, etzhayyim-project-image2vrm,
+    etzhayyim-project-baminiku, sumitsubo/sdk, kotoba-kotodama/kotodama-host-sdk -- all
+    import the Svelte package via package.json; user confirmed these are follow-up, not
+    this migration's scope"
+   "CRITICAL discovery mid-task: 90-docs/adr/2607020200-mangaka-genko-cljc.md documents an
+    already-real, in-flight incremental migration for the genko module specifically -- 2
+    increments (移植#1/#2, commits 67c3ce5/517bd8d, 2026-07-02, user-authored) already
+    landed, each delegating ONE pure function (allNodes, wouldCycle) from genko-embed.ts's
+    inline JS to globalThis.KamiGenko (a compiled kotoba-lang/kami-genko cljc SSoT bundle),
+    each verified in a real browser (WebGPU Chrome) before landing. ADR-2607020200's own
+    text: the TS runtime is NOT replaced wholesale, cljc is a parallel SSoT with a
+    follow-up to compile+swap incrementally."
+   "second discovery: kotoba-lang/turn, rt, net, signal already exist in manifest/repos.edn
+    :extra-projects -- CLJC reimplementations of the Rust kotoba-turn/kotoba-rt/kotoba-net/
+    kotoba-signal crates (removed by kotoba-lang/kotoba PR #259, restored per that repo's
+    own comment). kami-engine-sdk's turn.ts (HMAC-SHA1 TURN credential mint/verify) and
+    wire.ts (hand-rolled CBOR signaling codec, byte-compatible with kotoba-rt's Rust
+    ciborium implementation) are TypeScript reimplementations of exactly what these repos
+    are the canonical home for -- not new-SSoT-needed territory like genko was."
+   "kotoba-lang/turn's kotoba.turn.credential ns already has hmac-sha1-base64,
+    constant-time-eq, RFC-2202-tested mint-credential/verify-credential -- but under a
+    single-opaque-user, plain-boolean-verify contract, not turn.ts's room/player-scoped,
+    reason-reporting one"]
+  :risk "this is a real, published SDK with real external consumers; a wholesale rewrite
+         risks both duplicating genko's already-in-flight work and introducing regressions
+         with no verification path for ~40+ Svelte components in one pass. Incremental,
+         delegate-to-existing-SSoT, verify-each-step is the only responsible path at this
+         scale."}
+
+ :decision
+ {:methodology
+  {:what "migrate module-by-module: pure logic -> cljc SSoT (existing repo if one already
+          canonically owns that logic, new repo split out only if none does) -> compiled
+          globalThis.<Name> JS bridge -> TS/Svelte host delegates one function/component at
+          a time -> verify (browser if a live host exists, JVM/bb test if not) -> next
+          increment. Exactly ADR-2607020200's genko shape, generalized to the other 10
+          modules."
+   :process_constraints
+   ["no wholesale rewrite commits -- one function/component/small cohesive group per
+     commit, never a whole module at once"
+    "delegate to an existing canonical SSoT before creating a new one (turn/rt/net/signal,
+     kami-genko) -- do not build a second competing implementation of the same protocol"
+    "verify before moving to the next increment -- real browser when a live host exists
+     (genko's own precedent), JVM/bb test otherwise"
+    "host/DOM/WASM stays host; only pure logic moves to cljc -- same split
+     ADR-2607020200 already established for genko's oplog/tree/doc-model vs its
+     WebGPU/DOM runtime"]}
+
+  :per_module_plan
+  {:call_webvr
+   {:turn_ts {:ssot "kotoba-lang/turn (kotoba.turn.credential)"
+              :status "first increment LANDED: mint-credential-scoped/
+                       verify-credential-scoped added, commit 2d90bddc, JVM tests replicate
+                       all 7 turn.test.ts assertions"
+              :not_yet_done "wiring turn.ts itself to delegate to a compiled
+                             globalThis.KotobaTurn.* bridge -- needs a new shadow-cljs.edn
+                             :browser build + install! init-fn in kotoba-lang/turn (mirror
+                             of kami-genko's :genko build target), not built yet"}
+    :wire_ts {:ssot "kotoba-lang/rt or kotoba-lang/signal (whichever owns the kotoba-rt
+                     CBOR wire-format port)" :status "not started"}
+    :call_ts {:note "RTCPeerConnection/WebSocket orchestration is inherently host/browser-
+                     API code, not pure logic -- likely stays a thin host shell calling
+                     into the wire/turn cljc bridges, matching genko's host/cljc split"
+              :status "not started"}
+    :webvr_incident_pregel
+    {:note "applySelection/initialState (the actually-executed pure state machine --
+            INCIDENT_GRAPH's compiled StateGraph is vestigial/unused at runtime) is a
+            good small next candidate: pure, fully tested, no host/DOM coupling"
+     :ssot "not yet chosen -- candidate: new small kami-webvr-clj, or fold into
+            kotoba-lang/rt if scope allows; decide at that increment's start"
+     :status "not started"}}
+   :genko {:note "already in progress under ADR-2607020200/kotoba-lang/kami-genko --
+                  continue its existing 移植#N numbering, do not restart or duplicate"
+           :flagged_bug "Genko.svelte's FloatingTools onundo/onredo callbacks are wired to
+                         console.info stubs instead of the component's own real undo()/
+                         redo() functions -- worth fixing in a future genko increment, not
+                         this ADR's concern directly"}
+   :builders_components
+   {:ssot "new cljc SSoT, name TBD at that increment's start -- NOT
+           kotoba-lang/kami-engine-sdk-clj (confirmed different/unrelated project per its
+           own README); likely a new kami-vrm-controllers-clj split from kami-engine's
+           monorepo, same pattern as kami-mangaka-genko-clj -> kami-genko"
+    :good_first_candidates
+    ["data/joint-limits.ts's clampBoneDeg/clampBoneRad -- pure, already has a documented
+      Rust counterpart (kami-skeleton::defaultHumanoidConstraints)"
+     "data/emotion-patterns.ts's analyzeTextEmotion/emotionToMorphWeights -- pure
+      regex+arithmetic, well-isolated"]
+    :do_last "VrmViewer/VrmCanvas/panel components -- highest-risk, ~1370 lines of
+              imperative WebGPU/WebGL/DOM in Canvas.svelte alone; ports mechanically once
+              the pure logic underneath is already cljc"
+    :status "not started"}
+   :small_utility_modules
+   {:modules ["gsplat" "manufacturing" "document" "trackpad"]
+    :note "all four are already plain framework-agnostic TypeScript (zero Svelte runes),
+           each with real test coverage -- lowest-risk, most mechanical ports in the whole
+           SDK, good early increments since they carry no UI-reactivity-mapping risk"
+    :ssot "likely a new kami-industrial-clj-family split; decide per-module at increment
+           time"
+    :status "not started"}}
+
+  :consumer_migration
+  {:in_scope false
+   :note "cyber-drill, ai-gftd-mangaka, image2metahuman, image2vrm,
+          etzhayyim-project-baminiku, sumitsubo, kotodama-host-sdk are unaffected until
+          they explicitly upgrade -- the published Svelte package keeps working at its
+          current pinned version throughout"}}
+
+ :consequences
+ {:no_single_finish_commit "this is a long-running multi-increment effort, same as genko's
+                            already-real 2-increments-in-progress state; this ADR's
+                            concrete output is the full research ground truth, the first
+                            landed increment, and a sequencing plan -- not a finished port"
+  :consumers_unaffected "no immediate breaking change forced on any of the 7 real consumer
+                         apps"
+  :subtleties_to_preserve_not_silently_fix
+  ["BoneController.setBone's single-axis-quaternion overwrite (clobbers other axes
+     previously set on the same bone)"
+   "createConversationController.idleMicro's same-class Z-only quaternion clobber"
+   "createMotionPlayer's Rust-WASM branch is dead in practice (kami param never passed at
+     the one real createVrmEngine call site) -- the TS evaluateTS switch is what's actually
+     exercised"
+   "createVoiceSynth.speak()'s speaking flag not reset on the Kokoro no-audio success path
+     (only playAudio's onended/catch and explicit stop() reset it)"
+   "NodeRow.svelte's collapse-arrow glyph is hardcoded to always ▼, never ▶, even when
+     collapsed (the collapsed $derived value is computed but unused)"
+   "Toolbar.svelte's paper-texture selector is local-state-only and functionally inert (no
+     onpaperchange prop exists)"
+   "FloatingTools' onundo/onredo props are wired to console.info stubs in Genko.svelte
+     instead of that file's own real undo()/redo() functions"]}
+
+ :alternatives
+ [{:option "full rewrite of all 91 files in one pass, as initially scoped before the
+            ADR-2607020200 precedent was found"
+   :rejected_because "contradicts the user's own established, working, browser-verified
+                       incremental methodology once discovered; risks duplicating/
+                       conflicting with genko's already-in-flight increments and
+                       reinventing what kotoba-lang/turn/rt/net/signal already canonically
+                       own"}
+  {:option "reuse kotoba-lang/kami-engine-sdk-clj for the builders/components port"
+   :rejected_because "that repo's own README states it is a different project (scene/ECS/
+                       render-IR/WIT contract authoring for kami-engine, not a UI-
+                       component/controller SSoT) -- forcing VRM controller logic into it
+                       would misuse its documented scope"}]}
