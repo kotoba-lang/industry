@@ -1572,6 +1572,12 @@
    "orgs/kotoba-lang/audio"
    "orgs/kotoba-lang/webgl"
    "orgs/kotoba-lang/webgpu"
+   ;; Raw W3C WebGPU JS API thin wrapper, factored out of webgpu's executor
+   ;; per ADR-2607051400 — same org-khronos-glb/org-materialx/org-openusd
+   ;; external-spec naming/split pattern (Phase 1 scaffold; Phase 2 rewires
+   ;; webgpu's executor to depend on this instead of calling navigator.gpu
+   ;; inline).
+   "orgs/kotoba-lang/org-w3-webgpu"
    "orgs/kotoba-lang/dec"
    "orgs/kotoba-lang/terrain"
    "orgs/kotoba-lang/vegetation"
