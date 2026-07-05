@@ -168,4 +168,25 @@
   :verdict "parallel=2's real-world failure mode under genuine concurrent load is BOTH sessions degrade together — worse for a human waiting on either one than parallel=1's failure mode (one request queues completely but gets the FULL ~60 tok/s the instant its turn comes: a bounded, predictable wait vs. an unbounded crawl for both parties)"
   :action "reverted serve-standalone default parallel: 2 -> 1, same day"
   :not-fixed "the actual root cause from part4 (llama-server not promptly detecting a dead/killed client connection) is STILL unfixed — would need a server-side request/idle timeout, not attempted. This revert just accepts 'a second request queues and waits' as the more predictable failure mode for this hardware's real usage pattern (rarely more than one active claude-murakumo session at a time)."
-  :verified ["restarted with parallel=1, confirmed n_slots=1 in server log" "confirmed a real in-flight request completed at the expected 60.05 tok/s baseline once it had the slot to itself"]}}
+  :verified ["restarted with parallel=1, confirmed n_slots=1 in server log" "confirmed a real in-flight request completed at the expected 60.05 tok/s baseline once it had the slot to itself"]}
+
+ :addendum-2026-07-05-part6-lmstudio-shaped-catalog
+ {:trigger "request: design, in EDN, a model catalog for murakumo.cloud shaped like LM Studio's local-model picker (search, gguf/mlx/kotoba format filter, best-match sort)"
+  :new-namespace "local-murakumo.catalog — kept separate from itonami/model-catalog (thin {:id :kind :unit :cr :mem} pricing table; unchanged, still used by the credits/business layer)"
+  :deliberate-departures-from-lmstudio
+  {:download-options "-> :model/variants + :variant/status (:registered/:resident/:serving) — murakumo swaps an artifact onto the FLEET, it doesn't download to the caller's machine"
+   :best-match "a REAL computed score (best-match-score), not a popularity/hardware guess: hard-gates on :fit/status (:does-not-fit -> near-zero regardless of benchmark speed elsewhere), then 40% measured tok/s + 35% clj-datomic pass-rate + 15% capability breadth + 10% staff-pick"}
+  :best-match-scores-verified-live {"qwen-agentworld-35b-a3b" 94.1 "qwen3.6-35b-a3b" 32.5 "gemma-4-12b-it" 21.7}
+  :kotoba-format-tag
+  {:status "every model: :format/status :experimental, NEVER :available"
+   :why "kotodama.inference.shard (murakumo.infer.plan fleet-assignment reused as the seam to a pure-cljc exec engine) and kotodama.inference.mlx (IModelRuntime adapter for mlx-lm/mlx-moe) are real/tested building blocks in kotoba-lang/inference, but no model on this fleet is actually served through them yet"}
+  :gguf-mlx-status {:gguf ":available for all 3 current base models (llama.cpp/Vulkan)"
+                     :mlx ":experimental for qwen-agentworld-35b-a3b/qwen3.6-35b-a3b (real mlx-community conversions exist on HF, e.g. Qwen-AgentWorld-35B-A3B-oQ4, Qwen3.6-35B-A3B-4bit — none registered/tested on this fleet); :unsupported for gemma-4-12b-it (no conversion checked)"}
+  :new-routes ["GET /itonami/catalog (SSR page, plain-GET search/filter form)" "GET /itonami/catalog.json (raw data)"]
+  :query-params ["q" "format" "capability" "sort" "include-retired"]
+  :bug-found-via-real-traffic
+  {:what "worker.cljs's fetch-handler built its `query` map from 4 explicitly-named params (since/usd/did/model) instead of generically reading URLSearchParams — ?q=gemma silently returned the unfiltered list instead of filtering, until the new params were added to that explicit list"
+   :caught-by "curl against the live deployed Worker after the JVM route tests (which construct :query maps directly and can't catch this) all passed"
+   :pattern-note "same shape as the mid-conversation-system / :infer/ctx bugs from earlier decisions — the JVM-tested pure route can be correct while the Worker's fetch-handler entrypoint silently drops query params it doesn't know about; worth grepping fetch-handler's query map whenever a route gains a new query param"}
+  :landing-note "concurrently, another session had uncommitted kotoba-lang/treasury delegation work sitting in the shared orgs/gftdcojp/local-murakumo checkout; worked in an isolated git worktree instead of editing that checkout in place, then fast-forwarded the shared checkout to the new main afterward. The concurrently-merged /infer/hwmetrics fleet dashboard (unrelated feature, landed on main in between) was re-verified working post-deploy — no regression."
+  :verified-live "api.murakumo.cloud/itonami/catalog and /itonami/catalog.json — search, format filter, include-retired, and html rendering all confirmed against the deployed Worker"}}
