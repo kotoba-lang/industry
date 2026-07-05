@@ -1429,15 +1429,24 @@
    "orgs/kotoba-lang/identify"
    "orgs/kotoba-lang/authentication"
    "orgs/kotoba-lang/authorization"
-   "orgs/kotoba-lang/webauthn"
+   ;; webauthn/oauth/oidc/saml/faceid/touchid were registered here as bare
+   ;; slugs but never actually scaffolded (no GitHub repo, no west.yml pin —
+   ;; 2026-07-05 audit). Implemented for real under the correct reverse-domain
+   ;; names instead of scaffolding-then-renaming: org-w3-webauthn (W3C),
+   ;; org-ietf-oauth2 (RFC 6749+7636), org-openid-oidc (OpenID Foundation),
+   ;; org-oasis-saml (OASIS) — same org-<body>-<spec> rule as org-materialx/
+   ;; org-khronos-{gltf,glb}; com-apple-touchid/com-apple-faceid — Apple's
+   ;; proprietary LocalAuthentication framework, so the vendor com-<vendor>
+   ;; scheme (ADR-2607041500), not the standards-body org-<body> one.
+   "orgs/kotoba-lang/org-w3-webauthn"
    "orgs/kotoba-lang/session"
    "orgs/kotoba-lang/onetime"
    "orgs/kotoba-lang/mfa"
-   "orgs/kotoba-lang/oauth"
-   "orgs/kotoba-lang/oidc"
-   "orgs/kotoba-lang/saml"
-   "orgs/kotoba-lang/faceid"
-   "orgs/kotoba-lang/touchid"
+   "orgs/kotoba-lang/org-ietf-oauth2"
+   "orgs/kotoba-lang/org-openid-oidc"
+   "orgs/kotoba-lang/org-oasis-saml"
+   "orgs/kotoba-lang/com-apple-faceid"
+   "orgs/kotoba-lang/com-apple-touchid"
    "orgs/kotoba-lang/ekyc"
    "orgs/kotoba-lang/aml"
    "orgs/kotoba-lang/ctf"
