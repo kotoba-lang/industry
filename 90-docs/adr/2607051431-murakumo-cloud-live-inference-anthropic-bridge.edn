@@ -145,4 +145,17 @@
  :addendum-2026-07-05-part3-claude-murakumo-skip-permissions
  {:change "claude-murakumo now defaults to --dangerously-skip-permissions"
   :reason "throwaway model on a self-hosted fleet, not a live Claude session — permission prompts were pure friction"
-  :opt-out ["MURAKUMO_CLAUDE_NO_SKIP_PERMISSIONS env var" "passing your own --permission-mode/--dangerously-skip-permissions/--allow-dangerously-skip-permissions flag (no double-up)"]}}
+  :opt-out ["MURAKUMO_CLAUDE_NO_SKIP_PERMISSIONS env var" "passing your own --permission-mode/--dangerously-skip-permissions/--allow-dangerously-skip-permissions flag (no double-up)"]}
+
+ :addendum-2026-07-05-part4-single-slot-queueing-incident
+ {:trigger "user report: 'execution speed is quite slow' -> live-diagnosed against the running production server, not speculation"
+  :test "36018-token synthetic prompt (approximating Claude Code's real tool-def payload) sent directly to the head"
+  :measured {:reported-prompt-ms 40700.95 :reported-prompt-tok-s 884.9 :actual-wall-clock-seconds 154.6
+             :unaccounted-gap-seconds 113 :note "prefill itself is fast (884.9 tok/s, compute-bound/parallelizable) — the gap is NOT a prompt-processing-speed issue"}
+  :root-cause "--parallel 1 = exactly one processing slot, strict serialization of ALL requests. Live server log showed the fresh request queued behind a task holding 105,503 tokens of context mid-cancellation (W srv stop: cancel task) — very plausibly an earlier interactive test in this same session where the local client was pkill'd but llama-server's HTTP-disconnect detection hadn't yet noticed. A locally-killed client does NOT instantly free the server-side slot."
+  :qualitative-difference-from-earlier-parallelism-findings "earlier N=1..8 data was about raising AGGREGATE throughput under intentional concurrent load; this is about RESILIENCE — with one slot, a single stuck/abandoned/oversized request is a full outage for every other request, including yourself in a different terminal"
+  :fix {:change "serve-standalone default parallel: 1 -> 2"
+        :per-slot-ctx-at-262144-total 131072
+        :headroom-check "comfortably above the largest real conversation observed so far, 105503 tokens"
+        :verified ["single-stream speed unchanged (~62.6 tok/s)" "live claude-murakumo round-trip works correctly against the new config"]}
+  :caveat "does not eliminate queueing under heavier concurrent load (see N=1..8 aggregate-throughput data) — reduces how often ONE abandoned/oversized request fully blocks a second independent one"}}
