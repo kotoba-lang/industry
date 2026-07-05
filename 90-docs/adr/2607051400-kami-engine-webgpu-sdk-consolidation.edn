@@ -1,7 +1,7 @@
 {:frontmatter
  {:id "adr-2607051400-kami-engine-webgpu-sdk-consolidation"
   :title "kami-engine の WebGPU/SDK 系統合 — org-w3-webgpu 新設と kami-engine-sdk の cljc/Reagent 移行"
-  :status "accepted-execution-pending"
+  :status "accepted-phase0-1-3-done"
   :date "2026-07-04"
   :deciders ["Jun Kawasaki"]
   :doc_type "adr"
@@ -64,9 +64,9 @@
 
  :execution-phases
  [{:phase 0 :status "done-2026-07-05" :action "webgpu/webgpu-rs/webgpu.pre-canonical-rename の git remote・履歴を確認し統合/重複を最終検証。kami-engine-sdkのgenkoとkami-genkoの重複有無を確認" :result "phase0-findings参照"}
-  {:phase 1 :status "pending" :action "org-w3-webgpu をscaffold（ADR起票->scaffold->git init->GitHub repo作成+push->manifest登録、標準フロー・確認不要）"}
+  {:phase 1 :status "done-2026-07-05" :action "org-w3-webgpu をscaffold（ADR起票->scaffold->git init->GitHub repo作成+push->manifest登録、標準フロー・確認不要）" :result "kotoba-lang/org-w3-webgpu (public) created, pushed, registered in repos.edn :extra-projects + west.yml (pin 5c178ea9cd02, verified). w3.webgpu covers every raw call webgpu's executor currently makes; not yet consumed by webgpu (Phase 2)."}
   {:phase 2 :status "pending" :action "webgpu の executor部分を org-w3-webgpu へ分離、webgpuは薄い consumer 層に"}
-  {:phase 3 :status "pending" :action "kami-webgpu/webgpu-rs/webgpu.pre-canonical-rename のローカルディレクトリを削除（owner確認のうえ実行、Phase0で安全性確認済み、GitHub側操作は不要）"}
+  {:phase 3 :status "done-2026-07-05" :action "kami-webgpu/webgpu-rs/webgpu.pre-canonical-rename のローカルディレクトリを削除（owner確認のうえ実行、Phase0で安全性確認済み、GitHub側操作は不要）"}
   {:phase 4 :status "pending" :action "kami-engine-sdk cljc移行: genkoをkami-genkoへ一本化->非UIロジックをkami-engine-sdk-cljへ統合->UIをReagentへ書き換え。規模大、独立セッションでスコープを切る"}]
 
  :consequences
