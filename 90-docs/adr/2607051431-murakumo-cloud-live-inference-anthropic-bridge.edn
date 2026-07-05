@@ -158,4 +158,14 @@
         :per-slot-ctx-at-262144-total 131072
         :headroom-check "comfortably above the largest real conversation observed so far, 105503 tokens"
         :verified ["single-stream speed unchanged (~62.6 tok/s)" "live claude-murakumo round-trip works correctly against the new config"]}
-  :caveat "does not eliminate queueing under heavier concurrent load (see N=1..8 aggregate-throughput data) — reduces how often ONE abandoned/oversized request fully blocks a second independent one"}}
+  :caveat "does not eliminate queueing under heavier concurrent load (see N=1..8 aggregate-throughput data) — reduces how often ONE abandoned/oversized request fully blocks a second independent one"}
+
+ :addendum-2026-07-05-part5-parallel-2-reverted-to-1
+ {:trigger "same day, parallel=2 live in production: 2 real Claude Code sessions ended up active simultaneously"
+  :observed {:slot-a "session doing repeated tool-call round-trips, reprocessing 14K-28K-token growing prompts per turn, some cancelled+relaunched (LCP similarity sim_best=0.460 — under half the prompt prefix-cache-hit)"
+             :slot-b "a DIFFERENT session's generation crawled to 0.24-0.38 tok/s (tg_3s), ~250x slower than the ~60 tok/s baseline, for as long as slot-a's heavy prefill ran"}
+  :root-cause "2 logical slots share ONE physical GPU. llama-server does not time-slice fairly between a slot doing heavy prompt processing (compute-heavy, can dominate the device for tens of seconds) and another slot trying to decode (needs frequent small time-slices) — the prefill-heavy slot starves the decode-only slot."
+  :verdict "parallel=2's real-world failure mode under genuine concurrent load is BOTH sessions degrade together — worse for a human waiting on either one than parallel=1's failure mode (one request queues completely but gets the FULL ~60 tok/s the instant its turn comes: a bounded, predictable wait vs. an unbounded crawl for both parties)"
+  :action "reverted serve-standalone default parallel: 2 -> 1, same day"
+  :not-fixed "the actual root cause from part4 (llama-server not promptly detecting a dead/killed client connection) is STILL unfixed — would need a server-side request/idle timeout, not attempted. This revert just accepts 'a second request queues and waits' as the more predictable failure mode for this hardware's real usage pattern (rarely more than one active claude-murakumo session at a time)."
+  :verified ["restarted with parallel=1, confirmed n_slots=1 in server log" "confirmed a real in-flight request completed at the expected 60.05 tok/s baseline once it had the slot to itself"]}}
