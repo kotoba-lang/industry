@@ -204,7 +204,11 @@
  ;; 生成時に既存 path 群と union される（一度 west.yml に載れば自動追従、distinct で重複排除）。
  ;; clone 済みの working tree（orgs/<org>/<repo>）が存在し HEAD を持つこと。
  :extra-projects
- #{;; etzhayyim/root/20-actors/*-compat catalog (1,027 clean-room API-compat cljc
+ #{;; AI VTuber/VRM companion chat, gftdcojp — new product, shares kami-engine with
+   ;; network-isekai but via @etzhayyim/kami-engine-sdk (Svelte), private data model
+   ;; (ADR-2607051800).
+   "orgs/gftdcojp/net-babiniku"
+   ;; etzhayyim/root/20-actors/*-compat catalog (1,027 clean-room API-compat cljc
    ;; actors) relocated to kotoba-lang per org-taxonomy library-placement rule
    ;; (ADR-2606302300), reverse-domain naming (ADR-2607041500). 788/1,027 landed
    ;; (8 pilot + batch1-26 alphabetical); ~238 remain, batched follow-up in progress.
