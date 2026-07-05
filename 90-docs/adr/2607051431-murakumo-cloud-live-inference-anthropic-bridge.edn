@@ -189,4 +189,29 @@
    :caught-by "curl against the live deployed Worker after the JVM route tests (which construct :query maps directly and can't catch this) all passed"
    :pattern-note "same shape as the mid-conversation-system / :infer/ctx bugs from earlier decisions — the JVM-tested pure route can be correct while the Worker's fetch-handler entrypoint silently drops query params it doesn't know about; worth grepping fetch-handler's query map whenever a route gains a new query param"}
   :landing-note "concurrently, another session had uncommitted kotoba-lang/treasury delegation work sitting in the shared orgs/gftdcojp/local-murakumo checkout; worked in an isolated git worktree instead of editing that checkout in place, then fast-forwarded the shared checkout to the new main afterward. The concurrently-merged /infer/hwmetrics fleet dashboard (unrelated feature, landed on main in between) was re-verified working post-deploy — no regression."
-  :verified-live "api.murakumo.cloud/itonami/catalog and /itonami/catalog.json — search, format filter, include-retired, and html rendering all confirmed against the deployed Worker"}}
+  :verified-live "api.murakumo.cloud/itonami/catalog and /itonami/catalog.json — search, format filter, include-retired, and html rendering all confirmed against the deployed Worker"}
+
+ :addendum-2026-07-05-part7-qwen36-vs-agentworld
+ {:trigger "user: has qwen3.6-35b-a3b actually been compared against the live default? -> no -> user: run it"
+  :setup {:download "Qwen3.6-35B-A3B-Q4_K_M.gguf, 21.2GB, lmstudio-community/Qwen3.6-35B-A3B-GGUF — verified byte-exact against HF's x-linked-size header (21166757728 bytes) before trusting it"
+          :harness-smoke-test "verification harness proven trustworthy BEFORE spending real inference time: positive control (hand-written correct code for all 6 tasks) -> 6/6 PASS; negative control (deliberately wrong fib/query-age-filter) -> both correctly FAIL"
+          :verification-method "real execution — Clojure eval on the JVM for :clojure tasks, DataScript (create-conn/transact!/q) for :datomic tasks, custom #db/id EDN reader — same methodology as the original qwen-agentworld/gemma benchmarks"}
+  :result {:pass 6 :total 6 :tied-with "qwen-agentworld-35b-a3b's 6/6"}
+  :production-collision
+  {:what "serve-standalone swaps the SAME port (8090) that api.murakumo.cloud/claude-murakumo route to — no separate test endpoint. A real Claude Code session was actively using the fleet during the test window."
+   :evidence "one real conversation hit 168,931 tokens before being cancelled; another reached 204,459 before also being cancelled — both repeatedly grabbed the single --parallel 1 slot ahead of/interleaved with the benchmark's requests"
+   :impact "client-side wall-clock timing for 4 of 6 tasks (atom-counter, schema-person, query-age-filter, transact-new-entity) came back at 5.3-17.0 tok/s — would have been a materially wrong 'qwen3.6 is much slower' conclusion if trusted"
+   :fix "read llama-server's own per-task `eval time` log line instead of client wall-clock — pure decode time, unaffected by queueing delay. Cross-checked against the 2 uncontaminated tasks (fib-memo/flatten-map, ran before the collision started): server eval-time and client wall-clock agreed exactly (70.34/69.11 tok/s both ways), confirming the method. Recovered true speed for the 4 contaminated tasks: 70.43, 70.28, 70.50, 69.86 tok/s — all consistent with the clean two."
+   :avg-tok-s 70.09}
+  :comparability-caveat
+  {:problem "pre-existing clj-datomic-comparison entry for qwen-agentworld records 12.67 tok/s, but that predates the standalone-GPU fix (Decision 6) — measured on the old CPU-bound RPC ring, not the current serving path. Comparing 70.09 against 12.67 would overstate the difference ~5.5x."
+   :fair-comparison "qwen-agentworld's CURRENT standalone-GPU baseline is 61.5-62.6 tok/s (perf-single-stream) -> qwen3.6-35b-a3b is ~14% faster at IDENTICAL 6/6 clj-datomic correctness"
+   :fix-applied "added explicit :note fields to both the stale qwen-agentworld entry and the new qwen3.6 entry in itonami.cljc/infer_view.cljc; added qwen3.6 to perf-single-stream's :hosted-model-comparison"}
+  :catalog-impact
+  {:fleet-fit-measured-tok-s 70.09
+   :benchmarks-populated true
+   :status-kept ":registered-not-serving — qwen-agentworld remains the live default; this is a real evidenced CANDIDATE, not an automatic switch"
+   :best-match-score-recomputed {"qwen-agentworld-35b-a3b" 94.1 "qwen3.6-35b-a3b" 90.0}
+   :score-gap-explained "agentworld keeps the edge from staff-pick flag + currently-serving status, not from being faster or more correct"}
+  :cleanup "restored qwen-agentworld-35b-a3b as production default immediately after collecting results (same serve-standalone kill-and-relaunch, which necessarily also killed whatever real request was in flight on the swapped model — the affected user's client will retry, per the same recovery behavior as part 4). Verified live: /itonami/catalog.json, /itonami/benchmark/clj-datomic/compare, /infer/models all reflect qwen-agentworld serving again."
+  :open-follow-up "the 6 clj-datomic task prompts are still not committed anywhere as a reusable script — reconstructed from :desc fields again this time, risking slight wording drift each time a new model is benchmarked. Worth committing the actual prompt text (e.g. tools/clj-datomic-bench/tasks.edn in kotoba-lang/murakumo) for byte-identical future comparisons."}}

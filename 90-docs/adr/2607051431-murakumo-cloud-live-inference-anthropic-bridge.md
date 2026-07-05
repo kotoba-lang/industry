@@ -536,3 +536,94 @@ and verified live on `api.murakumo.cloud`; the concurrently-merged
 `/infer/hwmetrics` fleet dashboard (a different, unrelated feature that
 landed on `main` in between) was also re-verified working post-deploy —
 no regression.
+
+## Addendum (2026-07-05, part 7): qwen3.6-35b-a3b vs qwen-agentworld-35b-a3b head-to-head
+
+User question: has qwen3.6-35b-a3b (registered since Decision 1 but never
+served or benchmarked — see catalog part 6's honest `:registered-not-serving`
+status) actually been compared against the live default, qwen-agentworld?
+Answer at the time: no. User: run it.
+
+**Setup.** Downloaded `Qwen3.6-35B-A3B-Q4_K_M.gguf` (21.2GB,
+`lmstudio-community/Qwen3.6-35B-A3B-GGUF`) to the head — verified byte-exact
+against HuggingFace's `x-linked-size` header (21,166,757,728 bytes) before
+trusting it. Before touching the live model, smoke-tested the verification
+harness itself both positively (hand-written correct code for all 6 tasks →
+6/6 PASS) and negatively (deliberately wrong `fib`/`query-age-filter` → both
+correctly FAIL) — the earlier session already found one harness-correctness
+bug (load-string-as-code vs edn/read-string-as-data) the hard way, so this
+time the harness was proven trustworthy before spending real inference time
+on it. Verification is real execution: Clojure eval on the JVM for the 3
+`:clojure` tasks, DataScript (`d/create-conn` + `d/transact!` + `d/q`) for
+the 3 `:datomic` tasks, with a custom `#db/id` EDN reader — same methodology
+as the original qwen-agentworld/gemma benchmarks.
+
+**Result: 6/6 pass**, tied with qwen-agentworld. Task prompts reconstructed
+from the existing `clj-datomic-benchmarks` `:desc` fields (the exact original
+prompt text wasn't preserved as a script from the earlier session — a real
+gap; see follow-up below).
+
+**A real production incident happened mid-benchmark.** Deploying qwen3.6
+standalone via `serve-standalone` swaps the SAME port (8090) that
+`api.murakumo.cloud`/`claude-murakumo` route to — there's no separate
+test endpoint. A real Claude Code session was actively using the fleet
+during the test window; its own huge, growing prompt (one conversation hit
+168,931 tokens before being cancelled; another reached 204,459 before also
+being cancelled) repeatedly grabbed the single `--parallel 1` slot ahead of
+or interleaved with the benchmark's requests, exactly the single-slot
+queueing risk documented in part 4/5 — except this time the "other tenant"
+was a real user colliding with an intentional benchmark, not two benchmark
+runs colliding with each other. Client-side wall-clock timing for 4 of the
+6 tasks (atom-counter, schema-person, query-age-filter, transact-new-entity)
+came back at 5.3-17.0 tok/s — apparently much slower than qwen-agentworld —
+which would have been a materially wrong conclusion had it been trusted.
+
+**Fix: read the server's own per-task timing instead of client wall-clock.**
+llama-server logs a `slot print_timing: ... | task N | eval time = X ms /
+Y tokens (... Z tokens per second)` line per completed request — this is
+pure decode time, unaffected by how long the request sat queued beforehand.
+Cross-checked against the 2 *uncontaminated* tasks (fib-memo, flatten-map,
+which happened to run before the collision started): client wall-clock and
+server eval-time agreed exactly (70.34/69.11 tok/s both ways). For the 4
+contaminated tasks, server eval-time recovered the true speed: 70.43, 70.28,
+70.50, 69.86 tok/s — all consistent with the clean two, confirming the
+"slow" client-side numbers were 100% queueing artifact, not real generation
+slowness. **avg-tok-s = 70.09** (mean of all 6 server-reported eval-times).
+
+**Comparability caveat, corrected in the data.** The pre-existing
+`clj-datomic-comparison` entry for qwen-agentworld records **12.67** tok/s —
+but that run predates the standalone-GPU fix (Decision 6): it was measured
+on the old 6-Mac-mini CPU-bound RPC ring, not this fleet's current serving
+path. Comparing qwen3.6's 70.09 against that stale 12.67 would overstate
+the difference by ~5.5x. The fair comparison is against qwen-agentworld's
+CURRENT standalone-GPU baseline, 61.5-62.6 tok/s (`perf-single-stream`) —
+**qwen3.6-35b-a3b is ~14% faster than qwen-agentworld's current speed, at
+identical 6/6 clj-datomic correctness.** Added explicit `:note` fields to
+both the stale qwen-agentworld entry and the new qwen3.6 entry in
+`itonami.cljc`/`infer_view.cljc` so this isn't misread again; also added
+qwen3.6 to `perf-single-stream`'s `:hosted-model-comparison` list.
+
+**Catalog impact.** `catalog.cljc`'s qwen3.6-35b-a3b entry updated:
+`:model/fleet-fit :fit/measured-tok-s 70.09`, `:model/benchmarks` populated
+(previously `nil`), `:model/status` left as `:registered-not-serving` (NOT
+promoted to `:serving` — qwen-agentworld remains the live default; this
+result makes qwen3.6 a real, evidenced *candidate* for a future switch, not
+an automatic one). `best-match-score` recomputed live: qwen3.6 90.0% vs
+qwen-agentworld's 94.1% (agentworld keeps the edge from its staff-pick flag
+and currently-serving status, not from being faster or more correct).
+
+**Cleanup:** restored qwen-agentworld-35b-a3b as the production default
+immediately after collecting the qwen3.6 results (same `serve-standalone`
+kill-and-relaunch this always does — which necessarily also killed
+whatever real request was still in flight on the swapped model at that
+moment; the affected user's client will retry, per the same recovery
+behavior documented in part 4). Verified live: `/itonami/catalog.json`,
+`/itonami/benchmark/clj-datomic/compare`, and `/infer/models` all reflect
+qwen-agentworld serving again post-restore.
+
+**Open follow-up:** the 6 clj-datomic task prompts are still not committed
+anywhere as a reusable script — reconstructed from `:desc` fields both this
+time and implicitly risk drifting slightly from the original wording each
+time a new model is benchmarked. Worth committing the actual prompt text
+(e.g. `tools/clj-datomic-bench/tasks.edn` in `kotoba-lang/murakumo`) so
+future comparisons use byte-identical prompts.
