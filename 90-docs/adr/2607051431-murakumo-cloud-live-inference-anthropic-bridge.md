@@ -112,6 +112,11 @@ Same shape of bridge z.ai runs in front of Claude Code for GLM. Built in
   `MURAKUMO_CLAUDE_TOKEN` or 1Password
   (`gftd.murakumo/ANTHROPIC_PROXY_TOKEN`, vault `gftdcojp`). Symlinked to
   `~/.local/bin/claude-murakumo` for direct shell use; also `bb claude`.
+  2026-07-05: defaults to `--dangerously-skip-permissions` (this is a
+  throwaway model on a self-hosted fleet, not a live Claude session, so the
+  permission prompts were pure friction) — opt out via
+  `MURAKUMO_CLAUDE_NO_SKIP_PERMISSIONS` or by passing your own
+  permission-mode flag.
 
 ### Bugs found only by running real Claude Code traffic
 
@@ -325,3 +330,51 @@ race found while testing: the kill-then-relaunch sequence used a fixed
 `llama-server` to release its port before the replacement tried to bind
 it — now polls until the process is actually gone. All of this exposed at
 `GET /itonami/perf` on `api.murakumo.cloud`.
+
+## Addendum (2026-07-05, part 2): RPC-distributing across the Mac-mini fleet — measured, and slower
+
+Standalone-on-head (Decision 6) means `qwen-agentworld-35b-a3b` runs on the
+head alone, with the 6-Mac-mini RPC ring sitting idle (`bb murakumo infer
+down`'d). Asked directly: what if this model *were* spread across the
+fleet via RPC instead — wouldn't more GPUs (the head's Radeon 8060S plus
+6× Apple M4 Metal) be faster?
+
+Tested directly rather than assuming. Brought the 6 Mac-mini `rpc-server`
+workers back up (`bb murakumo infer up` — all confirmed Metal-accelerated,
+`ggml_metal_init: found device: Apple M4`, unaffected by the head's earlier
+CPU-only-binary bug) and ran the head's Vulkan (GPU) `llama-server` binary
+as the RPC-ring head, `--rpc` pointed at all 6 workers, same
+`--tensor-split`/`--split-mode layer` the plan already computed, flash-attn
+on, 262144 ctx — i.e. the best possible all-GPU version of the ring.
+
+| configuration | tok/s |
+|---|---|
+| standalone on head alone (GPU) | 61.5–62.5 |
+| RPC ring, GPU head + Metal Mac minis (this test) | **17.0** |
+| RPC ring, original CPU-only head + Metal Mac minis (Decision 6 baseline) | 12.7 |
+
+Even with **every node in the ring GPU-accelerated**, RPC-distributing this
+model is **~3.6x slower** than running it standalone on the head alone
+(fixing the head's GPU-linkage bug only bought the ring a ~34% improvement,
+12.7 → 17.0 — nowhere near closing the gap to 61.5). The reason is
+structural, not a configuration mistake: `llama.cpp`'s RPC ring is a
+**strict sequential pipeline** — each token must pass through all 40
+layers in order, and every layer-group boundary crossed between machines
+costs a real network round-trip (LAN latency + serialization), for every
+single token generated. Splitting a model across N machines doesn't give
+you N× the compute in parallel the way data-parallel batching does; it
+adds N-1 network hops to every token's critical path in exchange for
+letting a model too big for one machine run at all.
+
+**The corollary that matters operationally:** RPC-distributing a model
+across this fleet is a **capacity mechanism, not a speed mechanism** — use
+it only when a model's weights don't fit in the head's own ~46GB RAM.
+`qwen-agentworld-35b-a3b` (22GB) has never needed it; `serve-standalone`
+was the right default the whole time this model has been in production.
+The RPC ring stays valuable for a genuinely oversized model (e.g. the
+originally-catalogued `glm-5.2-reap50-q2k`, 139GB, which cannot fit on any
+single node in this fleet including the head) — for THAT class of model,
+17 tok/s distributed beats 0 tok/s (doesn't fit at all). Reverted the fleet
+to standalone-on-head after this measurement; registered both RPC numbers
+alongside the standalone number in `/infer/models` and `GET /itonami/perf`
+for future reference.

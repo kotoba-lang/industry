@@ -128,4 +128,21 @@
   [":infer/ctx 262144" ":infer/flash-attn \"on\" (measured no speed difference vs auto, set explicitly anyway)"
    "cmd-serve-standalone accepts optional parallel arg"
    "fixed kill-then-relaunch race: fixed 0.5s sleep after kill -9 wasn't always enough for the port to free before rebind; now polls pgrep until process is gone"]
-  :exposed-at "GET /itonami/perf (api.murakumo.cloud)"}}
+  :exposed-at "GET /itonami/perf (api.murakumo.cloud)"}
+
+ :addendum-2026-07-05-part2-rpc-vs-standalone
+ {:question "would RPC-distributing qwen-agentworld-35b-a3b across the 6-Mac-mini fleet be faster than standalone-on-head, given more GPUs (head Radeon 8060S + 6x Apple M4 Metal)?"
+  :method "brought the 6 Mac-mini rpc-server workers back up (confirmed Metal-accelerated, unaffected by the head's earlier CPU-only-binary bug); ran the head's Vulkan (GPU) llama-server as RPC-ring head, --rpc pointed at all 6 workers, same tensor-split/split-mode the plan computed, flash-attn on, 262144 ctx — the best-case all-GPU ring"
+  :results
+  {:standalone-on-head-gpu-tok-s [61.5 62.5]
+   :rpc-ring-gpu-head-metal-workers-tok-s 17.0
+   :rpc-ring-original-cpu-head-metal-workers-tok-s 12.7 :note-cpu-head "Decision 6 baseline, before the GPU-linkage fix"}
+  :verdict "even with EVERY node GPU-accelerated, RPC-distributing is ~3.6x SLOWER than standalone-on-head (fixing head's GPU bug only bought the ring +34%, 12.7->17.0, nowhere near closing the gap)"
+  :root-cause "llama.cpp's RPC ring is a strict sequential pipeline — every token passes through all 40 layers in order, and each layer-group boundary crossed between machines costs a real network round-trip PER TOKEN. Splitting a model across N machines doesn't parallelize compute like data-parallel batching does; it adds N-1 network hops to every token's critical path."
+  :operational-corollary "RPC-distributing is a CAPACITY mechanism (use when a model's weights don't fit in the head's ~46GB alone), NOT a speed mechanism. qwen-agentworld-35b-a3b (22GB) never needed it — serve-standalone was correct the whole time. Still valuable for genuinely oversized models (e.g. the retired glm-5.2-reap50-q2k, 139GB, doesn't fit any single node here) where 17 tok/s distributed beats 0 tok/s (doesn't run at all)."
+  :fleet-state-after "reverted to standalone-on-head; both RPC numbers registered in /infer/models and GET /itonami/perf alongside the standalone number"}
+
+ :addendum-2026-07-05-part3-claude-murakumo-skip-permissions
+ {:change "claude-murakumo now defaults to --dangerously-skip-permissions"
+  :reason "throwaway model on a self-hosted fleet, not a live Claude session — permission prompts were pure friction"
+  :opt-out ["MURAKUMO_CLAUDE_NO_SKIP_PERMISSIONS env var" "passing your own --permission-mode/--dangerously-skip-permissions/--allow-dangerously-skip-permissions flag (no double-up)"]}}
