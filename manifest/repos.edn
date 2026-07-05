@@ -1027,6 +1027,10 @@
    ;; worker that ignored index/components/limit (ADR-2607022330 addendum 2).
    ;; Deploy + yoro-social migration are gated.
    "orgs/kotoba-lang/kotobase-cljc-worker"
+   ;; kotobase-cljc-worker's browser shell (ADR-2607051700, app-aozora):
+   ;; wires the SAME pure handler + block-miss trampoline to IndexedDB
+   ;; instead of R2, so the datom-plane engine runs entirely client-side.
+   "orgs/kotoba-lang/kotobase-browser-worker"
    ;; kotobase XRPC-surface peer library (transact/datoms/q/pull + verifiable
    ;; persist), composing prolly-tree/arrangement/chain (ADR-2607022600).
    ;; Renamed from kotobase-engine — "engine" matched no Datomic term; Datomic
