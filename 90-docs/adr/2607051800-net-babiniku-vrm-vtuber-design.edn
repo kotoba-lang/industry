@@ -1,0 +1,156 @@
+{:frontmatter
+ {:id "adr-2607051800-net-babiniku-vrm-vtuber-design"
+  :title "ADR-2607051800: net-babiniku -- a new gftdcojp product, AI VTuber/VRM companion
+          chat, distinct from network-isekai but sharing the kami engine"
+  :status "proposed"
+  :doc_type "adr"
+  :topic "net-babiniku-vrm-vtuber"
+  :authoritative true
+  :last_verified "2026-07-05"
+  :authoritative_for
+  ["gftdcojp/net-babiniku is a NEW, separate repo from gftdcojp/network-isekai -- both
+    render VRM avatars via the same kotoba-lang/kami-engine substrate, but through
+    different integration layers (Svelte + @etzhayyim/kami-engine-sdk for net-babiniku vs
+    hand-rolled ClojureScript/reagent glue for network-isekai) and for different audiences
+    (private single-purpose AI-companion product vs open public forkable game platform)"
+   "net-babiniku's product shape is modeled on isekaizero.ai (interactive AI stories,
+    choices-matter roleplay chat, per-character voice) but replaces its 2D visual-novel
+    character portraits with a live-rendered 3D VRM avatar (VTuber presentation), via
+    kami-engine-sdk's VrmViewer/createVrmEngine"
+   "net-babiniku reuses kami-engine-sdk's `webvr` headless choice-scenario runner
+    (createIncidentVrEngine, langgraph/Pregel StateGraph, pluggable onScene renderer) --
+    originally built for cyber-drill's incident-response drills -- repurposed to
+    conversational roleplay content, supplying VrmViewer as the onScene renderer instead
+    of cyber-drill's vendor-private three.js scene"
+   "AI-persona content is containment + governor per the existing Actors doctrine: the
+    LLM-persona node proposes {dialogue, emotion, motion-cue} only; a separate
+    ContentGovernor filters before anything renders to the VRM avatar or is spoken via
+    TTS; every commit/hold is appended to an audit ledger"
+   "net-babiniku's data model is private/per-user (chat sessions, personas, avatar
+    customization), NOT network-isekai's public content-addressed everything-forkable EDN
+    model -- kotoba-style content-addressing may still be used internally for asset
+    caching only"]
+  :related
+  ["90-docs/adr/2607032400-network-isekai-primary-consolidation.md"
+   "90-docs/adr/2607041430-network-isekai-reagent-spa-consolidation.md"]
+  :supersedes []
+  :superseded_by []}
+
+ :problem
+ {:source "user direction 2026-07-05: design gftdcojp/net-babiniku, separate from
+           gftdcojp/network-isekai, sharing the same kami engine, shaped as a VRM/VTuber
+           app in the spirit of isekaizero.ai"
+  :investigated
+  ["isekaizero.ai (ISEKAI ZERO, ARX MEDIA SDN BHD): interactive AI story/roleplay mobile
+    app, #1 Games/#2 Entertainment App Store (2026-05), chat with LLM characters +
+    choices-matter narrative + experimental Visual Novel Mode (2D background/character
+    images with expression/pose swaps + per-character TTS), multi-LLM backend
+    (Deepseek 3.2 default, switchable Gemini/Grok), Mana(free)/Arcane(paid) dual currency"
+   "network-isekai is an open 'CodePen for games' platform: games + VRM :dance stages
+    (kami.dance/kami-live vocabulary, isekai.stage.cljc + isekai.vrm-bridge.cljc hand-rolled
+    against kami-web wasm directly) + asset hub, everything public/forkable EDN in Datomic
+    via kotoba -- VRM is one mode among several, not the product's identity, and the
+    public/forkable data model is wrong for private AI-companion chat sessions"
+   "kotoba-lang/kami-engine-sdk (@etzhayyim/kami-engine-sdk, Svelte 5, three.js-free per
+    ADR-2605264300) already packages VrmViewer/createVrmEngine (live VRM avatar via
+    Rust+wgpu WASM KamiWasmExports, no three.js) + headless morph/bone/motion/voice/
+    emotion builders + `./webvr` (createIncidentVrEngine, langgraph/Pregel StateGraph,
+    pluggable onScene renderer) -- built after network-isekai's own vrm-bridge glue, for
+    exactly this kind of app"
+   "no existing product combines webvr's choice engine with VrmViewer as the onScene
+    renderer; cyber-drill (the only current webvr consumer) supplies its own vendor-private
+    three.js renderer for incident-response drills, an unrelated domain"
+   "gftdcojp/ai-gftd-isekai checked and is unrelated -- a Minecraft-voxel-sandbox x
+    creature-collection game (isekai.gftd.ai) sharing kami-engine's WebGPU renderer and the
+    'isekai' name only coincidentally"]
+  :risk "AI-companion/roleplay chat is a known content-moderation surface; 'babiniku'
+         (バ美肉, embodying a VRM/VTuber persona) framing raises the stakes of getting the
+         containment/governor boundary right from the start, not as a retrofit."}
+
+ :decision
+ {:repo {:org "gftdcojp" :visibility :private
+         :rationale "human-centric/business scope per repos.edn :orgs; gftdcojp default
+                     visibility is private per repos.edn :orgs :visibility (ADR-2607021330)"
+         :registration "plain-git child repo, manifest/repos.edn :extra-projects ->
+                        manifest/west.yml, --entry net-babiniku minimal-diff generation"}
+  :frontend
+  {:stack "Svelte 5 via @etzhayyim/kami-engine-sdk (VrmViewer/createVrmEngine), NOT
+           network-isekai's ClojureScript/reagent"
+   :rationale "the SDK already packages the live-avatar render surface (wgpu/WASM,
+               three.js-free); network-isekai's isekai.vrm-bridge.cljc/isekai.stage.cljc
+               predate the SDK and hand-roll the same glue directly against kami-web wasm
+               -- no reason to redo that work in CLJS for a second app"}
+  :turn_engine
+  {:what "kami-engine-sdk's `webvr` headless choice-scenario runner
+          (createIncidentVrEngine, langgraph/Pregel StateGraph), repurposed from
+          incident-response drill content to conversational-roleplay content"
+   :renderer "VrmViewer supplied as the onScene callback -- net-babiniku is webvr's
+              SECOND consumer (after cyber-drill) and FIRST VrmViewer-as-onScene consumer,
+              validating the headless-engine/pluggable-renderer split across two
+              unrelated domains"}
+  :expression_motion
+  {:model "each LLM turn emits {dialogue emotion motion-cue}; emotion drives the SDK's
+           morph builder (facial blend-shape targets), motion-cue drives the bone/motion
+           builder (idle/gesture pose) -- data-driven render state, same philosophy as
+           kami.dance's pose-from-EDN but keyed to conversation turns instead of a beat
+           grid"}
+  :voice
+  {:what "SDK's voice builder drives per-character TTS, matching isekaizero.ai's
+          per-character-voice Visual Novel Mode but spoken through a live avatar"
+   :backend "net-babiniku stands up its OWN backend (LLM chat completion + TTS) --
+             independent deploy from network-isekai's backend/ (Modal GPU: TRELLIS/
+             image/TTS/music); where the same Modal-GPU-TTS pattern applies, copy-adapt
+             rather than cross-repo depend, matching isekai.vrm-bridge.cljc's own
+             precedent for character-creator's gpu-adapter"}
+  :ai_persona_containment
+  {:pattern "Actors doctrine (CLAUDE.md Actors section; precedent isekai.moderation.cljc):
+             LLM-persona node proposes {dialogue emotion motion-cue} only; a separate
+             ContentGovernor filters before anything renders to the VRM avatar or is
+             spoken via TTS; every commit/hold appended to an audit ledger"
+   :non_negotiable true}
+  :data_model
+  {:what "private, per-user chat sessions / personas / avatar customization -- NOT
+          network-isekai's public content-addressed everything-forkable EDN model"
+   :kotoba_use "content-addressing may still be used internally for asset caching
+                (avatar/voice asset dedup) only -- no public asset hub, no fork-by-URL"}}
+
+ :consequences
+ {:shared_engine_different_layers "net-babiniku and network-isekai both render VRM via the
+                                    same kotoba-lang/kami-engine substrate, through
+                                    different integration layers fit to each app's own
+                                    stack/audience"
+  :sdk_validation "validates kami-engine-sdk's webvr + pluggable-onScene design as reusable
+                   across two unrelated domains (incident-response drills, AI-companion
+                   roleplay)"
+  :new_backend_needed "standalone backend (LLM chat + TTS + governor) and private data
+                       store to build; nothing inherited automatically from
+                       network-isekai's backend/"
+  :scaffold_shape_followup "network-isekai-like scaffold (README + 90-docs/adr +
+                            package.json, ADR-driven), not ai-gftd-isekai's dodaf
+                            PROJECT.jsonld/OWNERS/nanoid shape -- net-babiniku is a
+                            kami-engine app in network-isekai's lineage, not part of the
+                            ai-gftd-*/ai-gftd-apps-gftdcojp product-registry line"
+  :out_of_scope_followup "exact LLM provider(s), pricing/currency model, and detailed
+                          moderation policy are product decisions out of scope for this
+                          architecture ADR"}
+
+ :alternatives
+ [{:option "build it as a new mode/page inside network-isekai (like assets.html/
+            generate.html today)"
+   :rejected_because "different audience (private product vs open platform) and different
+                       data model (private chat sessions vs public forkable EDN) --
+                       architecturally wrong, not a styling difference; would also keep
+                       the ClojureScript/re-frame stack instead of the SDK's native Svelte
+                       packaging"}
+  {:option "reimplement VRM rendering glue directly (network-isekai's own
+            isekai.vrm-bridge.cljc + isekai.stage.cljc pattern) instead of depending on
+            kami-engine-sdk"
+   :rejected_because "the SDK already packages VrmViewer + morph/bone/voice/emotion
+                       builders for exactly this; redoing it in CLJS+JS glue duplicates
+                       real, already-built work for no benefit"}
+  {:option "reuse cyber-drill's three.js scene renderer as the webvr onScene
+            implementation"
+   :rejected_because "cyber-drill's renderer is vendor-private and three.js-based; the SDK
+                       is explicitly three.js-free (ADR-2605264300) and VrmViewer's native
+                       wgpu path is the better-fit, on-brand renderer for a VTuber avatar
+                       body"}]}
