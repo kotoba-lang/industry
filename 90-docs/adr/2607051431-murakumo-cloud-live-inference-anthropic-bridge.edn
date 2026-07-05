@@ -1,0 +1,93 @@
+{:frontmatter
+ {:id "adr-2607051431-murakumo-cloud-live-inference-anthropic-bridge"
+  :title "murakumo.cloud — from zero live models to a working Claude Code backend"
+  :status "closed"
+  :date "2026-07-04..2026-07-05"
+  :authoritative true
+  :repos ["orgs/kotoba-lang/murakumo" "orgs/gftdcojp/local-murakumo"]
+  :related ["90-docs/adr/2607041302-murakumo-family-naming.md"
+            "90-docs/adr/2607033500-murakumo-mlx-moe-support.md"
+            "90-docs/adr/2607041100-murakumo-coding-inference-mlx-native-path.md"]}
+
+ :problem
+ {:found "GET /infer/models and GET /nodes both [] on api.murakumo.cloud despite /itonami/models declaring 7 supported models — nothing was actually deployed against the real fleet"
+  :old-catalog ["glm-5.2-reap50-q2k (139GB, ~all of 110.9 GiB usable)" "qwen3-next-80b-a3b" "gemma-4-26b-a4b"]}
+
+ :decisions
+ {:1-base-models
+  {:retired ["glm-5.2-reap50-q2k" "qwen3-next-80b-a3b" "gemma-4-26b-a4b"]
+   :added [{:id "qwen-agentworld-35b-a3b" :size-gib 20.6}
+           {:id "qwen3.6-35b-a3b" :size-gib 19.7}
+           {:id "gemma-4-12b-it" :size-gib 6.6}]
+   :verified-via "bb murakumo infer plan (all FIT against live fleet, 110.9 GiB total usable)"
+   :incidental-fixes ["stale itonami-verticals model refs (2512/2432/2356)"
+                       "infer_view.cljc kotoba.html require -> real html.core/->html namespace"]}
+
+  :2-live-deploy
+  {:model "qwen-agentworld-35b-a3b"
+   :fleet "6x Apple M4 mini (rpc-server, Metal) + 1 AMD head 'gad' (llama-server)"
+   :verified "real /v1/chat/completions completion, not just health check"
+   :cloudflare-tailscale-gap
+   {:problem "Cloudflare edge cannot reach head's Tailscale CGNAT IP directly"
+    :fix "hostname route infer.murakumo.cloud -> localhost:8090 added to head's existing cloudflared tunnel (id c75a3e83-6cef-4d9b-ba22-fbb459ee6fbe, originally for ComfyUI) + matching DNS CNAME on murakumo.cloud zone"
+    :dns-token-source "1Password gftd.cloudflare/API_TOKEN (wrangler OAuth token lacked zone:write)"}}
+
+  :3-clj-datomic-benchmark
+  {:methodology "execution-verified, not LLM-judged: pure Clojure on JVM, Datomic-style tasks against DataScript"
+   :harness-bugs-found ["clojure -M:test -e prints every top-level form's value, not just the last"
+                         "Datalog query vectors need clojure.edn/read-string (data), not load-string (evaluates)"]
+   :result-qwen-agentworld {:passed 6 :total 6 :avg-tok-s 12.67 :budget "2500 (4500 for 2/6)"}
+   :route "GET /itonami/benchmark/clj-datomic"}
+
+  :4-anthropic-bridge
+  {:route "POST /v1/messages"
+   :impl {:pure-translation "local-murakumo.anthropic (JVM-tested)"
+          :worker-wiring "worker.cljs — auth (ANTHROPIC_PROXY_TOKEN), model->endpoint via infer.models, TransformStream SSE translation"
+          :launcher "kotoba-lang/murakumo/tools/claude-murakumo (bb claude), symlinked ~/.local/bin/claude-murakumo"
+          :token-resolution "MURAKUMO_CLAUDE_TOKEN env or 1Password gftd.murakumo/ANTHROPIC_PROXY_TOKEN"}
+   :bugs-found-by-real-traffic
+   [{:bug "mid-conversation-system beta puts role=system anywhere in messages[]"
+     :symptom "chat template Jinja error: System message must be at the beginning"
+     :fix "anthropic-msg->openai remaps non-top-level system role to user"}
+    {:bug "non-streaming path treated any parseable upstream JSON (incl. {\"error\":...}) as a valid completion"
+     :symptom "Claude Code: malformed response, no diagnostic info"
+     :fix "worker.cljs checks for :error key, returns proper Anthropic error envelope"}
+    {:bug ":infer/ctx never set, llama-server defaulted to 4096"
+     :symptom "Claude Code always sends ~89 tool defs (~48K tokens) -> exceed_context_size_error on every request"
+     :fix ":infer/ctx 65536 in infer.edn"}]
+   :verified "claude-murakumo -p \"...\" completes real turns end-to-end post-fix"}
+
+  :5-gemma-comparison
+  {:route "GET /itonami/benchmark/clj-datomic/compare"
+   :qwen-agentworld-35b-a3b {:passed 6 :total 6 :avg-tok-s 12.67 :budget "2500 (4500 for 2/6)"}
+   :gemma-4-12b-it {:passed 1 :total 6 :avg-tok-s 7.54 :budget "4000 (3/6 non-convergent; fib-memo re-verified passing @ 8000 tokens)"
+                     :genuine-failures ["wrong Datomic keyword namespacing (:db/string vs :db.type/string)"
+                                        "invalid Clojure syntax: extra parens around map literal -> 0-arg fn call"]}
+   :verdict "qwen-agentworld-35b-a3b wins clearly; dense 12B loses to 35B-total/3B-active MoE despite being smaller"
+   :fleet-state-after "switched back to qwen-agentworld-35b-a3b"}
+
+  :6-standalone-gpu
+  {:finding "head ('gad', AMD Ryzen AI MAX+ 395 Strix Halo, Radeon 8060S iGPU) ran a CPU-only llama-server build — no Vulkan/ROCm linked, -ngl 999 was a no-op"
+   :mac-minis-checked "confirmed GPU-accelerated the whole time: ggml_metal_init: found device: Apple M4"
+   :fix {:binary "official llama.cpp Vulkan release (llama-b9873-bin-ubuntu-vulkan-x64.tar.gz) — Mesa/RADV detects Radeon 8060S Graphics (RADV GFX1151)"
+         :topology "standalone on head only, no RPC ring (model fits in head's ~46GB RAM)"
+         :new-command "bb murakumo infer serve-standalone <model> [gguf] (cmd-serve-standalone)"
+         :config-key ":infer/head :standalone-bin-dir"}
+   :result {:before-tok-s 12.67 :after-tok-s 61.5 :speedup "~4.8x"}
+   :rocm-attempt {:build "llama-b9873-bin-ubuntu-rocm-7.2-x64.tar.gz"
+                  :result "detects no device — gfx1151/Strix Halo not yet ROCm-supported"
+                  :workarounds-tried ["HSA_OVERRIDE_GFX_VERSION=11.0.0"]
+                  :outcome "abandoned, Vulkan is the working path"}
+   :known-unfixed-bug "bb murakumo infer down / cmd-ps pgrep pattern ('.murakumo/bin/rpc-server') doesn't match actual argv0 (./rpc-server, relative) — down has never actually killed a worker; harmless while serve-standalone doesn't need the ring"}}
+
+ :consequences
+ ["api.murakumo.cloud has a real live model (qwen-agentworld-35b-a3b, standalone-GPU, 61.5 tok/s) instead of an empty registry"
+  "reachable both as murakumo's native OpenAI-compatible API and as an Anthropic Messages API backend for Claude Code"
+  "/itonami/benchmark/clj-datomic(/compare) gives execution-verified evidence for future model swaps, not vibes"
+  "standalone-GPU-on-head should be the default path for any model fitting ~46GB; RPC ring reserved for models too big for one node"
+  "300 tok/s (original ask) requires a real discrete GPU (cloud A100/H100 + vLLM) — logged as the honest ceiling on this hardware, not chased further"]
+
+ :follow-ups-not-done
+ ["fix cmd-down/cmd-ps pgrep pattern mismatch"
+  "wire serve-standalone into plan/provision orchestration instead of a parallel manual-ish path"
+  "/v1/messages/count_tokens unimplemented"]}
