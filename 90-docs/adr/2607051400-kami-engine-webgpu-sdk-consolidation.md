@@ -1,6 +1,6 @@
 # ADR-2607051400: kami-engine の WebGPU/SDK 系統合 — `org-w3-webgpu` 新設と `kami-engine-sdk` の cljc/Reagent 移行
 
-**Status**: accepted — Phase 0 (検証) 完了 2026-07-05、Phase 1-4 は owner 確認のうえ着手
+**Status**: accepted — Phase 0/1/3 完了 2026-07-05、Phase 2/4 は owner 確認のうえ着手
 **Date**: 2026-07-04
 **Deciders**: Jun Kawasaki
 **Scope**: `orgs/kotoba-lang/{webgpu,webgpu-rs,webgpu.pre-canonical-rename,kami-webgpu,kami-engine-sdk,kami-engine-sdk-clj}`
@@ -104,13 +104,21 @@ canonical な `webgpu` の `src/kami/` に `materialx`/`dxf`/`verilog`/`scad`/
    `kami-engine-sdk`のgenkoは`kami-genko`（既存独立repo）と重複、
    `kami-engine-sdk-clj`にはgenko名前空間無しを確認。追加で`webgpu` repo内の
    名前空間ステージング残骸を発見（2.5節、別スコープ）。
-2. **Phase 1 — `org-w3-webgpu` scaffold**: ADR起票→scaffold→git init→GitHub
-   repo作成+push→manifest登録の標準フロー（CLAUDE.md標準作業、確認不要）。
-3. **Phase 2 — `webgpu` からexecutor分離**: 生WebGPU JS API呼び出し部分を
-   `org-w3-webgpu` へ移し、`webgpu` はそれを呼ぶ薄い consumer 層に。
-4. **Phase 3 — stale checkoutのローカル削除**: `kami-webgpu`/`webgpu-rs`/
-   `webgpu.pre-canonical-rename` のローカルディレクトリを削除。Phase 0で
-   安全確認済みだが、既存チェックアウトの削除を伴うため owner 確認のうえ実行。
+2. **Phase 1 — `org-w3-webgpu` scaffold【完了 2026-07-05】**: ADR起票→scaffold
+   （`w3.webgpu` — `webgpu`の`kami/webgpu.cljs`executorが呼ぶ生API呼び出し
+   全部をカバーする1:1薄いラッパー、記述子はJSオブジェクトのまま・Clojure map
+   自動変換はしない）→git init→GitHub repo作成
+   (`kotoba-lang/org-w3-webgpu`, public)+push→manifest登録
+   （`repos.edn`の`:extra-projects`に追加、`bb scripts/gen-west-manifest.bb
+   --entry org-w3-webgpu`でwest.yml反映、pin検証OK）。まだ`webgpu`側からは
+   依存されていない（Phase 2待ち）。
+3. **Phase 2 — `webgpu` からexecutor分離【未着手】**: `kami/webgpu.cljs`が
+   `org-w3-webgpu`の`w3.webgpu`を`:local/root`依存として呼ぶように書き換え、
+   生API呼び出し（`navigator.gpu`/`GPUDevice`/...直接呼び出し）を置き換える。
+   挙動不変のはずの純粋な抽出作業。
+4. **Phase 3 — stale checkoutのローカル削除【完了 2026-07-05】**:
+   `kami-webgpu`/`webgpu-rs`/`webgpu.pre-canonical-rename` のローカル
+   ディレクトリを削除済み。
 5. **Phase 4 — `kami-engine-sdk` cljc移行**: genkoは`kami-genko`へ寄せる→
    非UIロジックの `kami-engine-sdk-clj` 統合→UIのReagent書き換え。規模が
    大きいため独立セッションでスコープを切って進める。
