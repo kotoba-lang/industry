@@ -378,3 +378,45 @@ single node in this fleet including the head) — for THAT class of model,
 to standalone-on-head after this measurement; registered both RPC numbers
 alongside the standalone number in `/infer/models` and `GET /itonami/perf`
 for future reference.
+
+## Addendum (2026-07-05, part 4): a real "why is this slow" incident — single-slot queueing
+
+A user report ("execution speed is quite slow") led to a live diagnosis
+against the running production server, not speculation. Sent a synthetic
+36,018-token prompt (approximating Claude Code's real tool-definition
+payload) directly to the head and measured both the server's own reported
+timings and true wall-clock:
+
+- Reported: `prompt_ms = 40700.95` (40.7s for prompt processing, 884.9
+  tok/s — prefill is fast, as expected, since it's compute-bound and
+  parallelizable unlike decode), plus a few hundred ms of generation.
+- Actual wall-clock: **154.6 seconds** — a ~113-second gap unaccounted for
+  by the request's own processing.
+
+Checked the head's live server log for the actual cause. `--parallel 1`
+means **exactly one processing slot** — every request is strictly
+serialized, no exceptions. The log showed the fresh request queued behind
+several OTHER tasks already in the pipeline, including one holding
+**105,503 tokens of context** that was in the process of being detected as
+cancelled (`W srv stop: cancel task`) — very plausibly an earlier
+interactive test from this same working session, where the local
+`claude-murakumo`/`claude` client process had been `pkill`'d, but
+llama-server's HTTP-disconnect detection hadn't yet noticed the client was
+gone. A locally-killed client does **not** instantly free the server-side
+slot; it can keep "processing" (or slowly discovering it should stop) for
+a long time, and with only one slot, that blocks every other request
+completely, however unrelated.
+
+This is qualitatively different from the earlier `--parallel` findings
+(which were about raising *aggregate* throughput under intentional
+concurrent load) — this is about **resilience**: with one slot, a single
+stuck/abandoned/oversized request is a full outage for everyone else,
+including yourself in a different terminal. `serve-standalone`'s default
+`parallel` moved from 1 to 2 as a direct result (131072 ctx per slot at the
+current 262144 total ctx — comfortably above the largest real conversation
+observed, 105,503 tokens): confirmed unchanged single-stream speed (~62.6
+tok/s) and a live `claude-murakumo` round-trip working correctly against
+the new config. This doesn't eliminate queueing under heavier concurrent
+load (see the N=1..8 aggregate-throughput data above), but it means one
+abandoned or oversized request no longer creates a full serialization
+bottleneck for a second, independent one.
