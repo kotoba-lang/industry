@@ -1,0 +1,38 @@
+{:frontmatter
+ {:id "adr-2607052100-shinshi-crypto-payout-rail-regulatory-design-review"
+  :title "ADR-2607052100: club-shinshi creator payout x crypto settlement rail -- regulatory/design review (investigation only, no implementation)"
+  :status "proposed"
+  :doc_type "adr"
+  :topic "shinshi-crypto-payout-rail"
+  :authoritative true
+  :last_verified "2026-07-05"
+  :authoritative_for
+  ["investigation-only finding: reusing local-murakumo's existing USDC/Gnosis-Safe treasury
+    rail for club-shinshi's frozen creator monetization (PPV/subscriptions/tips) is NOT a
+    safe drop-in reuse -- it conflicts with two already-decided portfolio ADRs
+    (2606010100's fiat-first/crypto-second sequencing + on-chain-code boundary for the
+    shinshi repo, and 2606011400's etzhayyim-resident-only on-chain settlement pattern
+    where gftd is never merchant-of-record/custodian)"
+   "new concrete risk identified: treasury commingling -- local-murakumo's Safe is a
+    freezable-USDC address; sharing it across two unrelated business lines (murakumo
+    compute credits + shinshi creator payouts) means a compliance freeze on one freezes
+    the other's unrelated revenue too"
+   "crypto does not remove the adult-business PSP problem, it moves it to whichever fiat
+    on-ramp provider is used (their KYB/AUP typically also excludes adult businesses,
+    same as Stripe) -- the fiat-rail search (CCBill/Verotel/Epoch/Segpay) already
+    identified in ADR-2606010100 remains necessary regardless"
+   "recommendation: do not deprioritize the fiat PSP search; if a crypto rail is pursued,
+    use a separate shinshi-specific treasury, not local-murakumo's; follow the existing
+    etzhayyim-resident on-chain pattern rather than inventing a third settlement shape;
+    vendor/PSP selection and compliance certification are explicitly out of scope (business
+    and legal decisions, not engineering ones)"]
+  :depends_on
+  ["orgs/gftdcojp/club-shinshi 90-docs/adr/2606010100-shinshi-ad-monetization-bmc.md.edn"
+   "orgs/gftdcojp/ai-gftd-apps-gftdcojp 90-docs/adr/2606011400-consensys-pattern-etzhayyim-product-gftd-infra-vendor.md.edn"]
+  :related
+  ["orgs/gftdcojp/local-murakumo/docs/business.md"
+   "90-docs/business/maturity-scores.md"
+   "orgs/gftdcojp/cloud-itonami/docs/adr/0010-itonami-cli-canvas-lean-funding.md"
+   "orgs/gftdcojp/cloud-itonami/docs/adr/0011-business-react-loop-maturity-roadmap.md"]
+  :supersedes []
+  :superseded_by []}}
