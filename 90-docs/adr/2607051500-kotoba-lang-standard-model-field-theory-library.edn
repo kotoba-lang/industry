@@ -35,7 +35,11 @@
    "follows CLAUDE.md standing 'new project' authorization (2026-06-28): ADR ->
     scaffold -> git init+commit -> gh repo create kotoba-lang/standard-model
     --public + push -> repos.edn + gen-west-manifest.bb --entry standard-model
-    -> this ADR + manifest reflected in superproject"]
+    -> this ADR + manifest reflected in superproject"
+   "landed 2026-07-05: github.com/kotoba-lang/standard-model (public), 22 tests /
+    85 assertions passing, CI green (JDK 17+21); manifest registration verified
+    via gen-west-manifest.bb --entry standard-model (minimal diff, server-side
+    pin check OK)"]
   :supersedes []
   :superseded_by []
   :related ["adr-2607051400" "adr-2606302300"]

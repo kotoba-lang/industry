@@ -1,7 +1,15 @@
 # ADR-2607051500: `kotoba-lang/standard-model` — gauge/tensor/vector/spinor field library computing classical Standard Model field content in `.cljc`
 
 ## Status
-Accepted (Phase 1 — classical field algebra — implemented this pass; Phase 2 — quantization/RGE/scattering — explicitly deferred, see Consequences)
+Accepted and landed (Phase 1 — classical field algebra — implemented and shipped this
+pass; Phase 2 — quantization/RGE/scattering — explicitly deferred, see Consequences).
+
+**Landed 2026-07-05:** repo created and pushed at
+[`github.com/kotoba-lang/standard-model`](https://github.com/kotoba-lang/standard-model)
+(public), all six namespaces implemented with `deftest` coverage — 22 tests / 85
+assertions, 0 failures — CI green on GitHub Actions (JDK 17 + 21). Registered in
+`manifest/repos.edn`/`manifest/west.yml` via `gen-west-manifest.bb --entry
+standard-model` (minimal diff, server-side pin verification OK).
 
 ## Context
 
