@@ -219,6 +219,28 @@ mesh への transact は murakumo 制御面 + KOTOBA_URL/KOTOBA_GRAPH 設定後�
 - 承認 gate 実行側（`:financial` effect 承認後に実際に GPU を起動する
   API 呼び出し）の実装。
 
+## 2026-07-05 追記 — kami-gen-ml3d(ADR-2607051120)からの実行試行で再確認
+
+`kotoba-lang/kami-gen-ml3d`（ADR-2607051120、TRELLIS/Hunyuan3D-2 image→3D pipeline）と
+`:autorig`（ADR-0048、`kami-engine`、UniRig 連携）を実際に本番実行する判断を owner が
+検討し、本 ADR に記載の GPU fleet 未整備状況を独立に再調査した。結果、本 ADR 執筆時点
+（2026-07-03）から状況は変わっていないことを確認:
+
+- `cloud_murakumo.cli/cmd-deploy` は依然 propose-only（承認 effect を印字するのみ、
+  実 GPU 起動 API 呼び出しは無し）。
+- `scheduler.cljc` の `gpu-catalog`/`plan-placements` は純データ計算のみで、
+  Modal/RunPod/AWS 等いかなる実クラウド GPU SDK の import・API 呼び出しもリポジトリ内に
+  存在しない（`modal.com` の言及は README のドキュメントリンクと比較 UI 文言のみ）。
+- `resources/murakumo.edn` の H100×8/H200×8/A100-80×8/L4×4 fleet 宣言は引き続き
+  宣言のみ、調達元・契約の記述は無い。
+- `GET /infer/cost` は未実装、`cost.cljc` の電力係数/spot 参照は引き続き PLACEHOLDER。
+
+**Owner 判断（2026-07-05）**: 今回は実 GPU 起動を見送り、本 ADR の既存ギャップとして
+記録を維持する。GPU プロバイダ選定・契約は本 ADR の範囲外のビジネス判断であり、
+この場（コーディングセッション）で決定しない。実行を再検討する際は、本 ADR §3
+（Provisioning 経路）のいずれかを選定した上で、§5 の `:financial` 承認 gate を通す
+実装 PR から着手する。
+
 ## Consequences
 
 **Positive**
