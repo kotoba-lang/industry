@@ -1,6 +1,6 @@
 # ADR-2607051400: kami-engine の WebGPU/SDK 系統合 — `org-w3-webgpu` 新設と `kami-engine-sdk` の cljc/Reagent 移行
 
-**Status**: accepted — Phase 0/1/3 完了 2026-07-05、Phase 2/4 は owner 確認のうえ着手
+**Status**: accepted — Phase 0/1/2/3 完了 2026-07-05、Phase 4 は owner 確認のうえ着手
 **Date**: 2026-07-04
 **Deciders**: Jun Kawasaki
 **Scope**: `orgs/kotoba-lang/{webgpu,webgpu-rs,webgpu.pre-canonical-rename,kami-webgpu,kami-engine-sdk,kami-engine-sdk-clj}`
@@ -112,10 +112,16 @@ canonical な `webgpu` の `src/kami/` に `materialx`/`dxf`/`verilog`/`scad`/
    （`repos.edn`の`:extra-projects`に追加、`bb scripts/gen-west-manifest.bb
    --entry org-w3-webgpu`でwest.yml反映、pin検証OK）。まだ`webgpu`側からは
    依存されていない（Phase 2待ち）。
-3. **Phase 2 — `webgpu` からexecutor分離【未着手】**: `kami/webgpu.cljs`が
-   `org-w3-webgpu`の`w3.webgpu`を`:local/root`依存として呼ぶように書き換え、
-   生API呼び出し（`navigator.gpu`/`GPUDevice`/...直接呼び出し）を置き換える。
-   挙動不変のはずの純粋な抽出作業。
+3. **Phase 2 — `webgpu` からexecutor分離【完了 2026-07-05】**: `kami/webgpu.cljs`
+   の生API呼び出し（`navigator.gpu`/`GPUDevice`/`GPUBufferUsage`/`GPUTextureUsage`/
+   ...直接呼び出し35箇所）を全て`w3.webgpu`（`:local/root "../org-w3-webgpu"`）
+   経由に置き換え。純粋な抽出（意味論の変更なし）。ブラウザ実機テストは無い
+   （リポジトリに元々`kami.webgpu`用のテストが存在しない）ため、
+   `cljs.build.api`での`:optimizations :none`コンパイルチェック
+   （`src` + `../org-w3-webgpu/src`）で全参照の解決とarity一致を検証 —
+   `kami.webgpu`/`w3.webgpu`に関する warning はゼロ（他の無関係な既存
+   namespaceのwarningのみ、本変更と無関係）。`webgpu`のwest pinも
+   前進済み。
 4. **Phase 3 — stale checkoutのローカル削除【完了 2026-07-05】**:
    `kami-webgpu`/`webgpu-rs`/`webgpu.pre-canonical-rename` のローカル
    ディレクトリを削除済み。
