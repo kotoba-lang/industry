@@ -1,9 +1,9 @@
 # ADR-2607051621: cloud-murakumo AGPLv3 OSS化 + ISIC/ISCO ネットワークレジストリ + kotoba-lang 共有決済台帳ライブラリ
 
-**Status**: proposed
+**Status**: accepted(一部修正、下記Amendment参照)
 **Date**: 2026-07-05
 **Deciders**: Jun Kawasaki
-**Scope**: `orgs/gftdcojp/cloud-murakumo`, `orgs/gftdcojp/cloud-itonami`, `orgs/gftdcojp/local-murakumo`, 新設 `orgs/kotoba-lang/kotoba-treasury`
+**Scope**: `orgs/gftdcojp/cloud-murakumo`, `orgs/gftdcojp/cloud-itonami`, `orgs/gftdcojp/local-murakumo`, 新設 `orgs/kotoba-lang/treasury`
 
 ## Context
 
@@ -61,7 +61,7 @@ Ethereum/Base/Arbitrum対応)が既に存在することが判明した。`crypt
      共有ライブラリ経由とする。
    - **Layer 3(デュアルライセンス)**: AGPLの改変ソース公開義務を避けたい企業向けに
      商用ライセンスを別売りする。Layer 0の「誰でも無料運用できる」とは独立。
-4. **`kotoba-lang/kotoba-treasury`(新設)**: `local-murakumo` の `itonami.cljc` から、
+4. **`kotoba-lang/treasury`(新設)**: `local-murakumo` の `itonami.cljc` から、
    chains設定・`crypto-quote`・`crypto-topup-entry`・`crypto-pending-entry`・
    `verify-payment`・`pending-payments`・`payment-status`・`etherscan-row->onchain`・
    `min-confirmations`・汎用append-only台帳エントリschemaを抽出し、ドメイン非依存の
@@ -74,19 +74,19 @@ Ethereum/Base/Arbitrum対応)が既に存在することが判明した。`crypt
 ## Execution(段階的。各ステップは個別に検証してから次へ進む)
 
 1. [本ADR] 設計を確定する。
-2. `kotoba-lang/kotoba-treasury` をscaffoldする(標準手順: ADR起票 → scaffold
+2. `kotoba-lang/treasury` をscaffoldする(標準手順: ADR起票 → scaffold
    `.cljc` + `deps.edn` + README + test → `git init` + 初期コミット →
    `gh repo create` + push → manifest登録)。
-3. `local-murakumo` を `kotoba-treasury` 依存へリファクタする。実運用中のtreasury
+3. `local-murakumo` を `treasury` 依存へリファクタする。実運用中のtreasury
    アドレス(`0xA003...`)の挙動が変わらないことを既存テスト+ドライランで確認して
    からマージする(生きている決済コードのため、マージ前にユーザー確認を挟む)。
 4. `cloud-itonami` に自己登録フロー + 動的レジストリを実装する。
-5. `cloud-murakumo` をAGPLv3化・ISIC/ISCO再構成・`kotoba-treasury`依存での
+5. `cloud-murakumo` をAGPLv3化・ISIC/ISCO再構成・`treasury`依存での
    protocol fee実装・`cloud-itonami`登録連携まで仕上げる。
 
 ## Consequences
 
-- (+) crypto決済/台帳の実装が1箇所(`kotoba-treasury`)に集約され、`local-murakumo`
+- (+) crypto決済/台帳の実装が1箇所(`treasury`)に集約され、`local-murakumo`
   と`cloud-murakumo`の二重実装を避けられる。
 - (+) AGPL自体では強制できない金銭対価を、登録+protocol fee+デュアルライセンスの
   組み合わせで、証券性(Howey test)を避けながら実現できる。
@@ -105,3 +105,38 @@ Ethereum/Base/Arbitrum対応)が既に存在することが判明した。`crypt
 - `cloud-itonami` ADR-0009(open-business)、ADR-0010(itonami-cli-canvas-lean-funding)。
 - 本ADRに先立つ会話: 米国VC資金調達戦略の検討、および非証券crypto資金調達の
   法的整理(Howey test、DePIN型対価モデル等)。
+
+## Amendment(2026-07-05 17:54、実行状況とスコープ変更)
+
+Execution 1〜4は完了。Execution 5(`cloud-murakumo`本体のAGPLv3化)はオーナー
+判断により**行わない**ことになった:「`cloud-murakumo`本体はprivateでOK」。
+
+**実施済み**:
+
+1. `kotoba-lang/treasury`(https://github.com/kotoba-lang/treasury) を新設。
+   `local-murakumo`の`itonami.cljc`からchains設定/`crypto-quote`/`verify-payment`等の
+   USDC決済プリミティブを抽出、テスト7件30assertion、manifest登録済み。
+2. `cloud-itonami`にADR-0013として第三者自己登録(`POST /api/{org}/{repo}/register`、
+   CACAO resource-scoped、first-come claim)+ `GET /api/open-business`の動的化を実装。
+   PR https://github.com/gftdcojp/cloud-itonami/pull/29 (レビュー待ち、mainには未マージ
+   — `itonami.cloud`がmainから自動デプロイされる本番環境のため)。
+3. `local-murakumo`をkotoba-lang/treasury依存へ**限定的に**リファクタ(chains/
+   chain-cfg/crypto-asset/usdc-per-usd/min-confirmations/etherscan-row->onchainの
+   静的設定のみ委譲。`quote-topup`等、本番KVに既に保存されている台帳形式を
+   直接読み書きする関数群は意図的に未変更)。特性テスト新規作成、35テスト238assertion
+   全パス。PR https://github.com/gftdcojp/local-murakumo/pull/31 (レビュー待ち)。
+
+**行わないことになった部分(Execution 5、Decision 1/3の一部)**:
+
+- `cloud-murakumo`本体のAGPLv3 relicenseは**しない**。private repoのまま。
+- Decision 3の4層報酬モデルのうち **Layer 0(AGPL無料自己ホスト)と Layer 3
+  (デュアルライセンス)は前提(OSS化)が無くなったため成立しない**。
+- Layer 1(itonami.cloudネットワーク登録)とLayer 2(kotoba-lang/treasury経由の
+  protocol fee)は、`cloud-murakumo`自身がOSSでなくとも利用可能なインフラとして
+  既に実装済み — 将来`cloud-murakumo`または別プロダクトが「有償で登録・
+  protocol feeを払って参加する」形を採る場合の土台として残す。ISIC/ISCO業種
+  再構成(Decision 1後段)も現時点では見送り。
+
+**Status**は上記の通り「accepted(一部修正)」とし、Execution 5と紐づくDecision
+1/3の該当箇所は本Amendmentにより取り下げられたものとして読む(ADR自体は再作成
+せず、実行結果としてこのAmendmentで閉じる)。
