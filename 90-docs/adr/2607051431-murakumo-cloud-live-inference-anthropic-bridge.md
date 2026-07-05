@@ -627,3 +627,84 @@ time and implicitly risk drifting slightly from the original wording each
 time a new model is benchmarked. Worth committing the actual prompt text
 (e.g. `tools/clj-datomic-bench/tasks.edn` in `kotoba-lang/murakumo`) so
 future comparisons use byte-identical prompts.
+
+## Addendum (2026-07-05, part 8): "which terminal has which model loaded" — `/infer/model-map`
+
+User question: is there a UI showing, per node, which model is loaded —
+across text/image/video/audio/text-to-3D? Investigated first (forked
+research, not assumed): `murakumo-studio` (ADR-2607032700) turned out to be
+the wrong place to look — it's a single-machine LM-Studio-equivalent
+desktop app (Tauri + CLJS, v1 scaffold only), and its fleet participation
+is announce-only (one machine registers itself; no multi-node dashboard).
+The real fleet-wide building blocks were scattered and partially hidden:
+
+- **text**: exactly one model serves fleet-wide at a time (standalone-GPU
+  on the head) — no per-node concept needed, just "what's currently being
+  served and where."
+- **image/video/audio**: `bb murakumo infer media nodes` already existed
+  and already queries every node's ComfyUI instance for its resident
+  checkpoint (`/object_info/CheckpointLoaderSimple`) — real per-node model
+  placement, but **CLI-only**, never exposed as data or a UI.
+- **text-to-3D**: absent everywhere — not a UI gap, a genuine content gap
+  (no model registered in `infer.edn`, no ComfyUI 3D workflow, nothing in
+  `catalog.cljc`).
+- `/infer/hwmetrics` (part of the concurrently-landed `feat/hwmetrics-dashboard`
+  work) gives per-node hardware but carries zero model identity.
+
+**Built, rather than just designed** (per the user's explicit choice of the
+"implement + deploy" option over "design only" / "pick a text-to-3D model
+first"):
+
+1. `bb murakumo infer media model-map [--push]` (`kotoba-lang/murakumo`,
+   new `cmd-model-map` in `media.clj`): queries the head's own `/v1/models`
+   to identify the live text model (matched back to `infer.edn` by GGUF
+   filename), reuses the existing `live-fleet` ComfyUI probe for per-node
+   media checkpoints, and matches each checkpoint against the registry
+   three ways — `:exact` (byte match), `:family-guess` (a small hand-
+   maintained keyword table, e.g. "ltxv"→`ltxv-2b-0.9.1`, when the registry
+   has drifted), or `:unregistered`. `--push` POSTs the snapshot to a new
+   endpoint, same Bearer-token gate (`MURAKUMO_METRICS_TOKEN`) as the
+   hwmetrics collector.
+2. `GET/POST /infer/model-map` + `GET /infer/model-map/ui`
+   (`gftdcojp/local-murakumo`) — a **third**, distinct KV doc from both
+   `hwmetrics` (hardware, no model identity) and `/infer/placement` (the
+   *rebalancer's desired* pool-seat allocation, a different concept from
+   *what's actually resident* — naming collision avoided deliberately).
+   The `/ui` page merges the model-map snapshot with the latest hwmetrics
+   snapshot (two independent `st/-get` reads in one handler) into one
+   node×category table, so a node with no media model loaded still shows
+   up (as "no media model loaded"), not just the nodes that happen to be
+   running something.
+
+**Real drift surfaced immediately on first live push**: `naphtali`/`issachar`
+are actually running `ltxv-2b-0.9.6-distilled-04-25.safetensors`, not the
+`ltx-video-2b-v0.9.1.safetensors` currently registered in `infer.edn` for
+`ltxv-2b-0.9.1` — labelled `:family-guess` with an explicit "drifted from
+infer.edn" note on the page, not silently matched or hidden. text-to-3D
+renders as an explicit "unsupported" card with the honest reason (no
+registered model), matching this session's consistent norm of surfacing
+gaps rather than omitting the category.
+
+**Known simplification, stated plainly**: text placement only reports the
+single serving node (the head, under the current standalone-GPU
+architecture) — an RPC-ring deployment would need `.murakumo-infer-plan.edn`'s
+shard assignments for a real per-node breakdown, not implemented here since
+standalone-on-head is this fleet's current mode (see Decision 6/part 2).
+`model-map` is pushed on-demand by an operator, not a continuous ~10s feed
+like `hwmetrics` — the `/ui` page is plain SSR, no live poller, by design.
+
+Landed as two separate PRs (`kotoba-lang/murakumo` `feat/model-map`,
+`gftdcojp/local-murakumo` `feat/model-map`) via the usual worktree→push→
+`gh api .../merges` workflow. One recoverable mistake during landing: a
+`git diff ... > file.patch` redirect silently produced an empty file
+(shell cwd had reset between tool calls without notice), and the immediately
+following `git checkout --` reverted the *shared checkout's* working tree
+before the patch was verified non-empty — the local-murakumo-side changes
+were briefly lost from disk. Recovered by re-applying the exact edits from
+this conversation's own tool-call history directly onto a fresh worktree
+(no data was actually unrecoverable, since the edits existed as this
+session's own record) — but confirms the write-then-verify order matters:
+`wc -l` the patch file before running any revert that depends on it.
+Verified live: `api.murakumo.cloud/infer/model-map` and `/infer/model-map/ui`
+both reflect the real fleet state, `/infer/hwmetrics` unaffected (separate
+KV doc, no regression).
