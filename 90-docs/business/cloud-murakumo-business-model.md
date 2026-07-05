@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L1 LLM 推論 — infra（Civitai × exo）  
-**As-of**: 2026-07-04  
+**As-of**: 2026-07-05  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -41,6 +41,9 @@
 - OSS CLI → cloud upsell
 - kotobase 開発者基盤
 - 社内 3 アプリが最低需要
+- US: Bonus Depreciation/Section 179 訴求コンテンツ(ブログ+HN/X、Q4 tax-season起点、90-docs/business/cloud-murakumo-gtm-country-plan.md)
+- EU: AI Act/GDPR監査台帳を差別化にしたコンプライアンス重視企業への直接outreach(独1年償却を補助訴求)
+- CN: Stripe決済(USD建てAlipay/WeChat Pay)の限界と規制ギャップを理由に、能動広告出稿は保留(watchのみ)
 
 ## Revenue Streams
 
