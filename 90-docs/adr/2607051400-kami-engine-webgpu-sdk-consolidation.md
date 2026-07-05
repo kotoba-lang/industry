@@ -1,7 +1,7 @@
 # ADR-2607051400: kami-engine の WebGPU/SDK 系統合 — `org-w3-webgpu` 新設と `kami-engine-sdk` の cljc/Reagent 移行
 
 **Status**: accepted — Phase 0/1/2/3 完了、Phase 4 は genko部分を調査完了（コード変更
-見送り）、残り（builders/data/UI移行）は ADR-2607051500 へ引き継ぎ（2026-07-05）
+見送り）、残り（builders/data/UI移行）は ADR-2607051510 へ引き継ぎ（2026-07-05）
 **Date**: 2026-07-04
 **Deciders**: Jun Kawasaki
 **Scope**: `orgs/kotoba-lang/{webgpu,webgpu-rs,webgpu.pre-canonical-rename,kami-webgpu,kami-engine-sdk,kami-engine-sdk-clj}`
@@ -159,7 +159,7 @@ canonical な `webgpu` の `src/kami/` に `materialx`/`dxf`/`verilog`/`scad`/
    - **未着手のまま残る**: `builders`/`data`/`document`/`manufacturing`/
      `trackpad`の移行先（`kami-engine-sdk-clj`直下ではなく、別namespace/
      別repoが必要）、UIのReagent書き換え、`components`（VRMビューアUI）。
-     エコシステム全体のcljc/cljs中心の重複整理は ADR-2607051500 へ切り出す。
+     エコシステム全体のcljc/cljs中心の重複整理は ADR-2607051510 へ切り出す。
 
 ## Consequences
 

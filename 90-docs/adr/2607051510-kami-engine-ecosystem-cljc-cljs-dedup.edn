@@ -1,0 +1,65 @@
+{:frontmatter
+ {:id "adr-2607051510-kami-engine-ecosystem-cljc-cljs-dedup"
+  :title "kami-engine エコシステムの cljc/cljs 中心の重複整理"
+  :status "accepted-webgpu-done-kami-engine-kami-engine-sdk-investigated-only"
+  :date "2026-07-05"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "kami-engine-ecosystem-dedup"
+  :authoritative true
+  :authoritative_for ["ADR-2607010930のmigration waveに共通する『切り出し元削除の未実行』という系統的パターンの発見と記録"
+                       "webgpuの38個の孤児フォーマットDSL名前空間の削除決定と実行記録(実依存グラフ検証+テスト確認済み)"
+                       "kami.wgsl->kami.expr の唯一の実依存をexpr標準repoへのlocal/root化で解決"
+                       "移行台帳(kami-webgpu-dsl-runtime-split.edn)を鵜呑みにせず実依存グラフ+生きたテストで検証してから削除するという手順の確立"
+                       "kami-engine本体・kami-engine-sdkの残存重複(未実行)の記録"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607051400-kami-engine-webgpu-sdk-consolidation"
+            "adr-2607010930-clj-wgsl-migration"]
+  :last_verified "2026-07-05"}
+
+ :investigations
+ [{:target "orgs/kotoba-lang/webgpu"
+   :status "resolved-2026-07-05"
+   :finding "sole outlier among 219 ledgered repos: cleanup step recorded :status :done but never executed"
+   :root-cause "90-docs/migration/kami-webgpu-dsl-runtime-split.edn + scripts/kami-webgpu-dsl-runtime-split-audit.bb (both existed in git but were outside local sparse-checkout scope; restored and run)"
+   :orphan-namespaces-removed ["atom" "capnp" "css" "cue" "dance" "dot" "dxf" "expr" "exr" "geojson" "gltf" "graphml" "graphql" "html" "ical" "json" "kicad" "mathml" "materialx" "mermaid" "musicxml" "ocio" "otio" "proto" "re" "scad" "scene2d" "spice" "spirv" "sql" "srt" "step" "text" "toml" "usd" "verilog" "xml" "yaml"]
+   :real-internal-dependency {:from "kami.wgsl" :to "kami.expr" :resolution "redirected to standalone expr repo via :local/root, kotoba.expr facade; all other 37 orphans had zero live callers"}
+   :also-removed ["scripts/format_gate.clj (25 requires, 23 were orphans)" "scripts/gltf_validate.js" "scripts/graphql_validate.js" "34 orphan-only test files" "test/dsl_test.clj (tested only kami.re+kami.css)"]
+   :ledger-instructions-overridden ["scripts/gen_glsl.clj" "scripts/gen_pipeline_specs.clj" "fixtures/glsl" "fixtures/pipeline_specs.edn"]
+   :override-reason "ledger dated 2026-07-01 predates both the 2026-07-02 webgpu-rs merge and a live playwright render/webgl test suite that actually depends on these; kept them after confirming via grep that nothing in the removed orphan set touches them"
+   :verification ["cljs.build.api :optimizations :none compile (src + ../org-w3-webgpu/src + ../expr/src): zero warnings on any kept namespace" "bb verify: all JVM .cljc tests green"]
+   :result "80 files changed, 4152 deletions, 28 insertions; merged to kotoba-lang/webgpu main; superproject west pin advanced"}
+
+  {:target "orgs/kotoba-lang/kami-engine"
+   :status "investigated-not-executed"
+   :finding "systemic pattern: extraction migrations ran but source subtree was never deleted afterward; not isolated to webgpu"
+   :confirmed-duplicates
+   [{:subtree "kami-engine-sdk-clj/" :files-in-kami-engine 38 :standalone-repo "orgs/kotoba-lang/kami-engine-sdk-clj" :standalone-files 35 :note "standalone repo split out 2026-07-02, kami-engine's copy incidentally touched 2026-07-03 by an unrelated commit -- diff before deleting to check nothing unique got stranded"}
+    {:subtree "kami-genesis/" :files-in-kami-engine 4 :standalone-repo "orgs/kotoba-lang/kami-genesis" :standalone-files 49 :note "kami-engine's copy is a stub, standalone is clearly authoritative, safe to delete"}
+    {:subtree "kami-webgpu-rs/" :files-in-kami-engine 7 :note "third copy of the same already-resolved webgpu-rs migration (standalone webgpu-rs repo is GitHub-archived, content merged into kotoba-lang/webgpu), safe to delete"}]
+   :needs-owner-decision
+   [{:subtree "kami-ui-sdk/" :note "ADR-2607051200 renamed this elsewhere to kami-engine-app-sdk, but kami-engine's own copy has the MOST RECENT commit in the whole repo (Slider/ColorSwatch/Carousel) -- either genuinely divergent new work needing upstreaming, or the rename ADR wasn't fully propagated"}
+    {:subtree "kami-text/" :note "same rename-reconciliation question as kami-ui-sdk (renamed elsewhere to glyph)"}]
+   :not-yet-checked ["kami-render" "kami-usd-native" "kami-rtx-native" "kami-web" "kami-web-modelb" "-- likely same leftover pattern, not individually verified"]
+   :do-not-touch {:path "kami-app-sip-clj/" :reason "untracked directory despite kami-engine's own git log showing a prior removal of this exact subtree (superseded by etzhayyim/com-etzhayyim-sip) -- possibly another session's WIP, per CLAUDE.md policy left untouched"}
+   :recommendation "sweep every kami-engine/kami-* subdirectory against standalone orgs/kotoba-lang/kami-* repos before any deletion; resolve kami-ui-sdk/kami-text rename status with owner first"}
+
+  {:target "orgs/com-junkawasaki/kami-engine-sdk (non-genko subfolders)"
+   :status "investigated-not-executed"
+   :per-subfolder
+   [{:folder "data/*.ts" :files 12 :coupling "pure, zero Svelte reactivity" :verdict "lowest-risk cljc port candidate, mostly no duplicates"
+     :exception {:files ["joint-limits.ts" "motion-key-map.ts"] :verdict "CONFIRMED real duplicate" :detail "joint-limits.ts values numerically identical to orgs/kotoba-lang/skeleton/src/skeleton.cljc (cljc port of Rust kami-skeleton::defaultHumanoidConstraints()); kami-engine/ARCHITECTURE.md already documents this as a known pre-existing audit risk vs kami-web::evaluate_motion (still Rust)" :durable-fix "port kami-web's evaluate_motion/clamp_bone to cljc first, then have the TS side consume it instead of hand-maintaining a parallel copy"}}
+    {:folder "builders/*.svelte.ts" :files 8 :coupling "Svelte 5 runes ($state/$derived/$effect) reactive controllers" :verdict "not pure logic, cannot be mechanically ported; needs a cljc/cljs reactive-state framework decision first (e.g. Reagent atoms). No duplicate cljc implementation found."}
+    {:folder "call/ gsplat/ types/ document/ manufacturing/ trackpad/" :verdict "no genuine duplication found, no action needed"}]}]
+
+ :consequences
+ {:positive ["webgpu: 4152 lines / 80 files of duplication removed, repo returned to its intended single-responsibility scope"
+             "established a repeatable, verify-before-delete procedure (require-graph grep + compile-check + test run) that doesn't blindly trust a stale migration ledger"]
+  :negative ["kami-engine's subtree duplication (at least 3 confirmed instances, full sweep not done) remains unresolved"
+             "kami-engine-sdk's joint-limits.ts/motion-key-map.ts duplication has a hard prerequisite (kami-web Rust->cljc port) not addressed here"
+             "kami-ui-sdk/kami-text rename-reconciliation status is unresolved, needs owner input"]}
+
+ :alternatives-considered
+ [{:alternative "blindly execute the ledger's full :removed-from-webgpu list" :verdict "rejected" :reason "gen_glsl.clj/fixtures/glsl are live dependencies of the current playwright render/webgl test suite and kami.wgsl/kami.shaders, added after the ledger's 2026-07-01 date; verified via grep before keeping them"}
+  {:alternative "also execute the kami-engine subtree cleanup and joint-limits.ts fix in this same session" :verdict "rejected, owner decision needed" :reason "larger scope (at least 5 subtrees, not fully audited), and kami-ui-sdk specifically has ambiguous signal (recent active work vs stale duplicate) requiring owner judgment before deleting"}]}
