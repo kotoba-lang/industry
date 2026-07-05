@@ -151,3 +151,33 @@ render substrate via the SDK rather than reimplementing it.
 - `gftdcojp/ai-gftd-isekai` — checked, unrelated (voxel-sandbox game, name coincidence only)
 - CLAUDE.md "Actors" section — containment + independent governor + append-only ledger
   doctrine, applied here to the LLM-persona/ContentGovernor split
+
+
+## Amendment (2026-07-05): frontend stack corrected to ClojureScript + reagent/re-frame
+
+Per direct user direction, decision #2 (Svelte 5 + `@etzhayyim/kami-engine-sdk`) and
+decision #3 (`webvr`'s headless choice-scenario runner as the turn engine) are **superseded**
+by: **ClojureScript + reagent/re-frame + `kami-webgpu` + `kotoba-lang/vrm`, matching
+`network-isekai`'s own toolchain exactly** (same `deps.edn` library coordinates —
+`kotoba-lang/kami-webgpu`, `kotoba-lang/vrm`, `re-frame/re-frame`, `reagent/reagent` — same
+`:local/root` relative paths, since both repos sit at `orgs/<org>/<repo>` depth).
+
+`net-babiniku/src/babiniku/vrm-bridge.cljc` is a direct adaptation of network-isekai's
+`isekai.vrm-bridge.cljc` (duplicated, not depended-on — the file's own precedent already
+covers exactly this tradeoff). The render loop (`babiniku.web`) uses `kami.webgpu`'s
+render-IR EDN directly (`kami.webgpu/draw!`, `kami.webgpu.mesh/draw!`) instead of the SDK's
+`VrmViewer` component — no Svelte, no `webvr` Pregel/StateGraph turn engine in this repo.
+
+The containment-boundary decision (#6: LLM-persona proposes only, a separate governor is the
+sole path to a renderable/speakable turn, append-only ledger) is **unchanged** — re-expressed
+in `.cljc` (`babiniku.governor/review-turn`) instead of TypeScript, gated by `bb governor`
+(matching network-isekai's `isekai.moderation.cljc` + `bb moderation` convention). The
+private-data-model decision (#7) is also unchanged.
+
+Deployed (Milestone 0, placeholder): a kami-webgpu render loop (a placeholder box by
+default, a real live VRM avatar via `?vrm=<url>` through the adapted vrm-bridge) plus a
+reagent/re-frame UI with a live governor demo, on Cloudflare Pages —
+https://net-babiniku.pages.dev. No LLM backend, no TTS, no real chat yet.
+
+This also **retires alternative #3** ("reuse cyber-drill's three.js scene renderer") as
+moot — there is no `webvr`/SDK dependency left to supply an `onScene` renderer for.
