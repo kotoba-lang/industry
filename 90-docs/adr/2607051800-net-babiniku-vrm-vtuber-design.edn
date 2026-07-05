@@ -153,4 +153,24 @@
    :rejected_because "cyber-drill's renderer is vendor-private and three.js-based; the SDK
                        is explicitly three.js-free (ADR-2605264300) and VrmViewer's native
                        wgpu path is the better-fit, on-brand renderer for a VTuber avatar
-                       body"}]}
+                       body"}]
+
+ :amendments
+ [{:date "2026-07-05"
+   :what "frontend stack corrected to ClojureScript + reagent/re-frame + kami-webgpu +
+          kotoba-lang/vrm, matching network-isekai's own toolchain exactly -- per direct
+          user direction, superseding the :frontend and :turn_engine decisions above
+          (Svelte 5 + @etzhayyim/kami-engine-sdk + webvr's headless choice-scenario
+          runner)"
+   :unchanged ["the :ai_persona_containment decision (LLM-persona proposes only, a
+                separate governor is the sole path to a renderable/speakable turn,
+                append-only ledger) -- re-expressed in .cljc (babiniku.governor/
+                review-turn) instead of TypeScript, gated by `bb governor`"
+               "the :data_model decision (private, per-user)"]
+   :retires ["alternative #3 (reuse cyber-drill's three.js scene renderer) -- moot, no
+              webvr/SDK dependency left to supply an onScene renderer for"]
+   :deployed "Milestone 0 placeholder: a kami-webgpu render loop (placeholder box by
+              default, real live VRM avatar via ?vrm=<url> through babiniku.vrm-bridge,
+              adapted from isekai.vrm-bridge.cljc) + reagent/re-frame UI with a live
+              governor demo, on Cloudflare Pages -- https://net-babiniku.pages.dev. No
+              LLM backend, no TTS, no real chat yet."}]}
