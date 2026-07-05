@@ -86,4 +86,24 @@
    would need a bounded ring buffer if trend charts are wanted"
   "hwmetrics-report.sh's WORKERS array duplicates fleet.edn's :host list by hand — could be generated at
    `bb scripts/gen-west-manifest.bb`-adjacent tooling time instead of maintained by hand"
-  "no alerting (e.g. a node flapping offline/online) — dashboard is read-only visualization, not monitoring"]}
+  "no alerting (e.g. a node flapping offline/online) — dashboard is read-only visualization, not monitoring"]
+
+ :addendum-2026-07-05-part1-gpu-default
+ {:change "swapped GPU above CPU in both the SSR card (local-murakumo.infer-view/node-card) and the live
+          JS poller's renderNode — GPU renders first now, CPU second"
+  :reason "GPU is the meaningful utilization signal for an inference fleet; CPU is dominated by the
+          concurrent xmrig mining load noted in decision :2-collector above, so leading with CPU was
+          visually prioritizing the less relevant number"
+  :repo "orgs/gftdcojp/local-murakumo — no schema/route change, pure view-ordering fix"}
+
+ :addendum-2026-07-05-part2-offline-node-investigation
+ {:trigger "user asked why dan/joseph/levi/simeon show offline on the dashboard"
+  :method "direct SSH from this machine timed out for all four (consistent with the dashboard's
+          reachable:false), then cross-checked against `tailscale status` independently of the
+          hwmetrics collector/SSH path entirely"
+  :finding "all four show `offline, last seen 1d ago` in tailscale status itself — genuinely powered
+           off/asleep at the network layer, not an SSH quirk or a dashboard bug. The other 6 mesh nodes
+           (asher, benjamin, gad, issachar, judah, naphtali, zebulun) show active/reachable."
+  :verdict "dashboard is reporting correctly; this reconfirms decision :1-precision-and-placement's
+           and ADR-2607051431's existing note that not all 10 fleet.edn nodes are kept awake at once —
+           no fix needed, no bug"}}
