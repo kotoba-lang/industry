@@ -80,6 +80,52 @@ rename整合の確認をowner判断で先に行う。
 - **`call/`/`gsplat/`/`types/`/`document/`/`manufacturing/`/`trackpad/`**:
   重複なし、対応不要。
 
+### 調査4: `orgs/kotoba-lang/kotoba` の Rust 撤去状況（クリーン、対応不要）
+
+オーナーの追加指示「`kotoba-lang/kotoba`、`kami-engine`等でRustからの切り出しが
+ちゃんとできていない/cljc移行ができていない箇所」を受けて調査した結果、
+**`kotoba-lang/kotoba` はこのパターンに該当しない**ことを確認した:
+
+- `crates/`（36 crateのRust workspace）は **PR #259「Remove legacy Rust
+  workspace」（2026-07-01）で完全かつクリーンに削除済み**。PR説明を確認したところ、
+  `clojure -M:test`・CLI contract検証・`npm pack --dry-run`・パックした
+  tarballのグローバルインストールsmoke testまで検証したうえでの、意図的な
+  アーキテクチャ決定だった（「デフォルトのCLI/packageパスは既にCLJC/EDN
+  backed」という判断）。
+- `90-docs/migration/clj-wgsl-ledger.edn`の`:kotoba`節（36 crate、大半が
+  `:stay-Rust-substrate`=「意図的に恒久Rustのまま」指定）は、**この削除以降
+  完全に陳腐化している**（記載されている crate は1つも実在しない）。これは
+  webgpuのような「cleanup未実行」問題ではなく、**移行がledgerの想定より
+  先に進んでしまった**ケース。ledger自体をarchive/superseded扱いにする
+  ドキュメント更新が今後必要（本ADRでは未実施）。
+- `kami-kotoba-repo-split.edn`（同ディレクトリ内の別ledger）も自ら
+  「Compatibility stub... 実際の移行はこの形を超えて進んでいる」と明記済み。
+
+### 調査5: `orgs/kotoba-lang/kami-engine` の追加4crate + Phase1候補群（概ねクリーン）
+
+同ledgerの`:kami-engine`節から、調査2で未確認だった項目を追加調査した:
+
+- **`kami-eng-core`/`kami-eng-render`/`kami-eng-io`/`kami-dft`**（いずれも
+  `:class :migrate-out`、"Restored to kotoba-lang/X"と記載）: 4つとも
+  **クリーン**と確認 — 標準repo（`engineer`/`engineer-render`/
+  `engineer-io`/`dft`）は実装済みでテストgreen（9/19、4/8、6/19、
+  17/40 assertions）、`kami-engine`側に同名のleftoverサブツリーは
+  **存在しない**（webgpu-rs/kami-genesis/kami-engine-sdk-cljとは違い、
+  抽出元の削除も正しく実行されていた）。ledger自身の`:phase-4-supplemental-
+  2026-07-01`節（本ADR起票時に読み落としていた既存の監査記録）が既にこれを
+  裏付けていた。
+- **`:port-to-CLJC-domain-interpreter`のPhase1候補**（kami-game/kami-cam/
+  kami-input/kami-skeleton/kami-tilemap）: 標準repoはいずれも実在し実装内容も
+  ledgerの説明と一致（kami-gameは60ファイルと特に大きく「25 game-systems
+  modules」の記述と整合）。**ただし、ledgerが検証根拠として挙げている
+  `keystone_domains.rs`（"already green"の gate）は、kami-engineのRust
+  workspace撤去（PR #82）で完全に削除済み — 今日この時点で再検証する手段が
+  無い**。つまりledgerの「green」という記述は「削除前のスナップショットで
+  一度greenだった」以上の意味を持たない。コード重複ではなくドキュメント/
+  検証手段の陳腐化として記録する。
+- `kami-skeleton`の実体は`orgs/kotoba-lang/skeleton`と確認済み — 調査3で
+  見つけた`kami-engine-sdk`の`joint-limits.ts`重複の対象と同一repo。
+
 ## Decision
 
 ### webgpuの重複解消（本ADRで実行済み）
@@ -121,6 +167,11 @@ joint-limits.tsのcljc配線）はスコープが大きいため、owner確認�
   「1 repo = 1 責務」に実質的に復帰した。
 - (+) 「移行台帳を鵜呑みにせず、実依存グラフとテストで検証してから削除する」
   という手順が、今後同種のcleanupにも適用できる再現可能な型になった。
+- (+) `kotoba-lang/kotoba`のRust撤去（PR #259）と`kami-engine`の4crate
+  追加移行（kami-eng-core/render/io、kami-dft）は、いずれも**クリーンに
+  実行済み**と確認できた — このエコシステムの問題は「全部が中途半端」では
+  なく「一部（webgpu、kami-genesis等）だけが未完了」という限定的なもの
+  だと判明した。
 - (−) kami-engine本体のサブツリー重複（少なくとも3件確認、全数未確認）は
   未解消のまま残っている。
 - (−) `kami-engine-sdk`のjoint-limits.ts/motion-key-map.ts重複は、根本解決に
