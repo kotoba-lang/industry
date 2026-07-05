@@ -194,6 +194,156 @@ run-duration）として定式化した純関数の credits 台帳で、すで�
 実装（`unit-prices` 拡張、net-kotobase Worker 配線、料率決定）は引き続き
 別 PR・別オーナー確認。
 
+## Follow-up（2026-07-05・その2）— 前回 follow-up の過大主張を訂正 + cljc での軽量 retrieval-proof 設計 + 経済圏の分離
+
+前回の follow-up で「`receipt`（hash chain + CACAO 署名）が Filecoin の
+proof-of-storage 相当を提供する」と書いたが、これは**不正確**だった。
+`receipt` は決済計算とその署名が改ざんされていないことの証明であり、
+**申告されたバイト列が今も物理的に保持されているかどうかは何も検証しない**。
+ノードは初回 pin 時に本物のブロックを受け取った後、静かに削除しても
+`settle`/`balances`/`receipt` はそれを検知できない。加えて、複製の水増し
+（1つの物理コピーを複数 replica として申告する — Filecoin の PoRep が
+防ぐ攻撃）への対策も現設計には無い。
+
+### 発見: この解決策は一度このプロジェクトで設計されていた（Rust で、失われた）
+
+`gftdcojp/ai-gftd-apps-gftdcojp`（net-kotobase の前身 vendor monorepo）の
+ADR-2605252200「Kotoba Token Economy」§5.2 に、まさにこの解が書かれてい
+た: 毎 epoch nonce をブロードキャストし、ストレージノードが
+`blake3(block_bytes || nonce)` を返し、失敗/無応答なら stake の5%を
+slash する「軽量 PoSt」。実装予定だった
+`kotoba-dht/src/availability_proof.rs` は、kotoba の Rust ワークスペース
+削除に伴い実装されないまま失われた。この旧 ADR は KOTO トークン・staking
+という、現行の ADR-2607030030（consensus/L1 を持ち込まない方針）とは
+異なる、より重い経済圏を前提にしており、2つの ADR は supersede 関係もな
+く静かに分岐したまま残っている。
+
+### cljc での再設計（イラストレーティブ・未着地。実装は別 PR）
+
+blake3 の代わりに、このコードベースで JVM/cljs 両対応が実証済みの
+`multiformats.core/sha256` を使う。**正直な限界**: この方式は Filecoin
+の PoRep/PoSt（検証者がデータを一切持たずに検証できる、SNARK による）
+ではない。検証者は**自分も同じバイト列を持っている**（別の replica 保持
+ピア・テナント自身の保持コピー・L3 の provider-list から選ばれる巡回監
+査役）ことが前提で、その上で「今も持っているか（鮮度）」を、フルデータ
+の再転送なしにハッシュ1つで確認する、というより軽い trade-off。kekkai
+によって参加者が既知の身元に限定されていることと、耐久性のためにすでに
+replication-factor≥2 が要求されることを理由に、この軽量化は正当化でき
+る。
+
+```clojure
+(ns kotobase.peer.availability
+  "Lightweight, salted-hash proof-of-retrievability for pinned blocks —
+   a periodic challenge/response BETWEEN REPLICA-HOLDING PEERS (not a
+   trustless prover-only scheme). Redesigned in cljc from the
+   pre-Rust-deletion kotoba-dht/availability_proof.rs sketch (legacy
+   ADR-2605252200 §5.2, 'lightweight PoSt'); reuses this codebase's own
+   portable SHA-256 (multiformats.core/sha256, real JVM+cljs parity)
+   instead of introducing blake3.
+
+   HONEST SCOPE: NOT Filecoin's PoRep/PoSt. The verifier must already
+   hold the same bytes (another replica peer, the tenant's own kept
+   copy, or a rotating auditor from L3's provider-list) to recompute
+   the expected hash — this proves ongoing possession/freshness
+   between two parties who both once had the data, at the cost of one
+   hash instead of a full re-transfer. Justified because kekkai gates
+   membership to known identities and durable pins already require
+   replication >= 2 for other reasons (see redundancy-tiers)."
+  (:require [multiformats.core :as mf]))
+
+;; mirrors legacy ADR-2605252200 §5.1 pricing — only tiers with >=1
+;; OTHER replica holder can run this audit at all.
+(def redundancy-tiers
+  {:volatile {:replicas 1 :availability-proof? false}   ; base price, unauditable
+   :standard {:replicas 3 :availability-proof? false}   ; replicated, unaudited
+   :sla      {:replicas 5 :availability-proof? true}})  ; replicated + audited, premium
+
+(defn challenge
+  "Verifier -> one challenge for one (node, cid) pair. `nonce` is
+   caller-supplied randomness (host chooses the source; this stays a
+   pure fn of its inputs, matching this codebase's Date.now/random
+   discipline elsewhere)."
+  [cid nonce epoch]
+  {:kotobase.availability/cid cid
+   :kotobase.availability/nonce nonce
+   :kotobase.availability/epoch epoch})
+
+(defn- salted-hash [block-bytes nonce]
+  (mf/hexify (mf/sha256 (byte-array (concat block-bytes nonce)))))
+
+(defn prove
+  "Storage node's response, via the SAME get-fn seam kotobase-peer.core
+   /commit! and hot-datoms already use. Returns nil (not a fabricated
+   proof) if the node lacks the block — fails closed, same discipline
+   as verify-chain/quota-exceeded?."
+  [get-fn {:kotobase.availability/keys [cid nonce]}]
+  (when-let [block-bytes (get-fn cid)]
+    {:kotobase.availability/cid cid
+     :kotobase.availability/proof (salted-hash block-bytes nonce)}))
+
+(defn verify
+  "Verifier resolves `cid` through ITS OWN get-fn (its own replica) and
+   recomputes the salted hash — only the compact `proof` crosses the
+   wire from the node under audit, not the block itself. Never throws;
+   fails closed on a missing local replica or malformed response."
+  [verifier-get-fn {:kotobase.availability/keys [cid nonce]} node-response]
+  (let [local-bytes (verifier-get-fn cid)]
+    (cond
+      (nil? local-bytes) :verifier-lacks-replica
+      (nil? node-response) :missed
+      (not= (:kotobase.availability/cid node-response) cid) :malformed
+      (= (:kotobase.availability/proof node-response) (salted-hash local-bytes nonce)) :ok
+      :else :failed)))
+
+(defn audit-outcome
+  "One epoch's result for one (node, cid) pair -> pure decision record.
+   Caller wires :ok into the storage-economy settle/credit path and
+   :failed/:missed into kekkai membership standing — this ns holds no
+   opinion on credits or admission, same stance kotobase-peer already
+   takes on CACAO (its own README: 'no auth opinion of its own')."
+  [node cid epoch verdict]
+  {:audit/node node :audit/cid cid :audit/epoch epoch :audit/verdict verdict})
+```
+
+この ns の置き場所は未決（open question に追加、下記）— `kotobase-peer`
+自身に足すか、`kotobase-peer` の「CACAO/capability auth に opinion を持
+たない」という既存の狭いスコープ方針に倣い、別の小さな sibling repo
+（kotoba-lang の他の単機能 repo と同型）にするか。
+
+### 経済圏: 分離を推奨（`murakumo.infer.credits` の核だけを共有）
+
+kotobase.net（graphdb storage）と murakumo.cloud（computing cloud）は、
+資源の物理的性質（有界イベント vs 継続保有）・事業境界（GPU 経済の
+treasury/価格変動と storage の regulated テナント会計を混ぜたくない）・
+監査プロセス（compute は無しで足りる、storage には上記の定期監査が要る）
+が異なるため、**台帳/feed/treasury は分離**し、**決済の数式
+（memory-time 按分）と身元/transport（CACAO・kekkai・kotoba-lang/net・
+overlay）だけ共有**するのが適切と判断する。
+
+```clojure
+;; kotoba-lang/ledger（新規・最小）— murakumo.infer.credits の核(memory-time
+;; 按分)を "推論" から切り離しただけ。cloud-murakumo は自分の feed/treasury
+;; でこのまま使い続け、net-kotobase は自分専用の feed/treasury で使う。
+(ns kotoba.ledger.memory-time)
+
+(defn settle
+  "汎用 memory-time 決済(GPU shard-seconds でも storage byte-seconds でも
+   同じ式)。assignments = [{:node :est-bytes :span} ...]。呼び出し側が
+   head-frac/protocol-frac/価格レジストリを自分の経済圏の値で渡す。"
+  [{:keys [job-cost duration-ms assignments head-frac protocol-frac]}]
+  ,,,) ; murakumo.infer.credits/settle と同じ本体、:model への依存だけ外す
+```
+
+`net-kotobase` はこの `settle` を呼びつつ、独自の `unit-prices`
+（`:gb-months`）・独自 treasury 比率・独自の kekkai storage-peer 入会条
+件・上記 `kotobase.peer.availability` による監査を持つ。GPU 経済側
+（`murakumo.infer.credits`、`cloud-murakumo`）は無改造のまま。
+
+この follow-up も設計の訂正・追加提案のみ（オーナー確認済み、
+2026-07-05）。実装（`kotoba.ledger.memory-time`/`kotobase.peer.
+availability` の新規抽出・net-kotobase 配線・料率決定）は引き続き別 PR・
+別オーナー確認。
+
 ## Related
 
 - ADR-2607023100（murakumo × kotoba-lang/net gossip/bitswap 統合設計。

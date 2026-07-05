@@ -166,4 +166,45 @@
    {:phase-alignment "GPU経済Phase 1(単一テナントgftd fleet、稼働済み)に相乗りすれば内部chargebackとして即着手可。外部テナント貢献はPhase 2(fleet連邦・murakumo.cloud公開)待ち"}]
   :not-executed "設計の訂正のみ(オーナー確認済み、2026-07-05)。unit-prices拡張・net-kotobase Worker配線・料率決定は別PR・別オーナー確認。"}
 
- :note "本ADRは設計提案のみ。実装(L2 fleet storage shell・L3 discovery・L5 validation・L6 credits台帳への相乗り、west manifest登録、org境界確定)は別PR/ブランチで、オーナー確認の上で行う。"}
+ ;; ============================================================
+ ;; Follow-up(2026-07-05・その2) — 前回follow-upのreceipt=proof-of-storage
+ ;; という主張を訂正。cljcでの軽量retrieval-proof設計 + 経済圏の分離。
+ ;; オーナー: 「このアプローチでも不正はないのかな？また murakumo はai演算を
+ ;; 想定していますが、kotobaseにそのまま使える？これはholochain的な経済圏？
+ ;; filecoin? vast?」→「cljcで再設計して、経済圏の分離/共通化を比較検討して」
+ ;; ============================================================
+ :follow-up-2026-07-05-availability-proof-and-zone-split
+ {:correction
+  {:overclaimed "前回follow-upの『receipt(hash chain+CACAO署名)がFilecoinのproof-of-storage相当を提供する』という記述"
+   :actual "receiptは決済計算とその署名が改ざんされていないことの証明であり、申告バイト列が今も物理的に保持されているかは何も検証しない。ノードが初回pin後に静かに削除しても settle/balances/receipt は検知しない。複製の水増し(1物理コピーを複数replicaとして申告、FilecoinのPoRepが防ぐ攻撃)への対策も無い。"}
+
+  :prior-art-found
+  {:location "gftdcojp/ai-gftd-apps-gftdcojp(net-kotobaseの前身vendor monorepo) ADR-2605252200 Kotoba Token Economy §5.2"
+   :design "毎epoch nonceをブロードキャスト→storage nodeがblake3(block_bytes||nonce)を返す→検証成功でstorage報酬、失敗/無応答でstakeの5%をslash。実装予定はkotoba-dht/src/availability_proof.rs(新規)"
+   :status "kotobaのRustワークスペース削除に伴い実装されないまま失われた設計。KOTOトークン・staking前提で、現行ADR-2607030030(consensus/L1を持ち込まない方針)とは異なる重い経済圏。両ADRはsupersede関係なく静かに分岐したまま。"}
+
+  :cljc-redesign
+  {:namespace "kotobase.peer.availability(仮。置き場所はopen question — kotobase-peer自身か、CACAO同様opinionを持たない別sibling repoか)"
+   :approach "blake3の代わりにmultiformats.core/sha256(JVM/cljs byte-identical実証済み)を使うsalted-hash challenge/response"
+   :honest-limit "Filecoin PoRep/PoSt(検証者がデータを一切持たずSNARKで検証)ではない。検証者は自分も同じバイト列を持っている(別replica保持ピア・テナント自身の保持コピー・L3 provider-listからの巡回監査役)ことが前提。durable pinがreplication-factor>=2を要求することと、kekkaiによる既知身元限定を理由に正当化。"
+   :redundancy-tiers {:volatile {:replicas 1 :availability-proof? false} :standard {:replicas 3 :availability-proof? false} :sla {:replicas 5 :availability-proof? true}}
+   :functions ["challenge: [cid nonce epoch] -> challenge map"
+               "prove: [get-fn challenge] -> {:cid :proof} または nil(fail-closed、ブロックが無ければ)"
+               "verify: [verifier-get-fn challenge node-response] -> :ok|:missed|:malformed|:failed|:verifier-lacks-replica"
+               "audit-outcome: [node cid epoch verdict] -> 監査結果のpure record。credits/kekkaiへの配線は呼び出し側の責務"]
+   :code-listing-location "全文は同名.mdのFollow-up(2026-07-05・その2)節に掲載(EDN文字列としての大量エスケープを避けるため重複しない)"}
+
+  :economic-zone-recommendation
+  {:decision "分離(台帳/feed/treasuryは別)。共有(決済数式+身元/transport)は継続。"
+   :why-separate
+   ["資源の物理的性質が異なる: computeは有界イベント(1 run)、storageは継続保有(無期限)"
+    "監査プロセスが異なる: computeは無しで足りる(正しい出力=shard保持の暗黙証明)、storageには上記availability-proofの明示プロトコルが要る"
+    "事業境界: net-kotobaseはFree/Standard/Pro/Regulated(専有tenant/read audit/key custody)という独自tierとcompliance境界を持ち、GPU経済のtreasury/価格変動と会計を混ぜたくない"]
+   :what-to-share ["memory-time按分の決済数式(kotoba.ledger.memory-timeとしてmurakumo.infer.creditsから資源非依存に抽出)" "CACAO/kekkai(身元・入会)" "kotoba-lang/net + murakumo.overlay(輸送)"]
+   :what-to-keep-separate ["feed(append-only signed event stream)" "treasury比率" "unit-prices/料率" "kekkai storage-peer入会条件の詳細" "availability-proof監査(storage固有)"]
+   :sketch-namespace "kotoba.ledger.memory-time(新規・最小、settle関数のみ資源非依存化。code-listingは同名.mdに掲載)"
+   :future-optional "経済圏間でcreditsを交換可能にする橋は任意・後回し。今回は結合を強めない。"}
+
+  :not-executed "設計の訂正・追加提案のみ(オーナー確認済み、2026-07-05)。kotoba.ledger.memory-time/kotobase.peer.availabilityの新規抽出・実装・net-kotobase配線・料率決定は引き続き別PR・別オーナー確認。"}
+
+ :note "本ADRは設計提案のみ。実装(L2 fleet storage shell・L3 discovery・L5 validation・kotobase.peer.availability・kotoba.ledger.memory-time抽出・L6 credits台帳への相乗り、west manifest登録、org境界確定)は別PR/ブランチで、オーナー確認の上で行う。"}
