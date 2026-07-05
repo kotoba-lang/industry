@@ -1,6 +1,7 @@
 # ADR-2607051400: kami-engine の WebGPU/SDK 系統合 — `org-w3-webgpu` 新設と `kami-engine-sdk` の cljc/Reagent 移行
 
-**Status**: accepted — Phase 0/1/2/3 完了 2026-07-05、Phase 4 は owner 確認のうえ着手
+**Status**: accepted — Phase 0/1/2/3 完了、Phase 4 は genko部分を調査完了（コード変更
+見送り）、残り（builders/data/UI移行）は ADR-2607051500 へ引き継ぎ（2026-07-05）
 **Date**: 2026-07-04
 **Deciders**: Jun Kawasaki
 **Scope**: `orgs/kotoba-lang/{webgpu,webgpu-rs,webgpu.pre-canonical-rename,kami-webgpu,kami-engine-sdk,kami-engine-sdk-clj}`
@@ -125,9 +126,40 @@ canonical な `webgpu` の `src/kami/` に `materialx`/`dxf`/`verilog`/`scad`/
 4. **Phase 3 — stale checkoutのローカル削除【完了 2026-07-05】**:
    `kami-webgpu`/`webgpu-rs`/`webgpu.pre-canonical-rename` のローカル
    ディレクトリを削除済み。
-5. **Phase 4 — `kami-engine-sdk` cljc移行**: genkoは`kami-genko`へ寄せる→
-   非UIロジックの `kami-engine-sdk-clj` 統合→UIのReagent書き換え。規模が
-   大きいため独立セッションでスコープを切って進める。
+5. **Phase 4 — `kami-engine-sdk` cljc移行【調査完了・genko部分はコード変更不要と判断
+   2026-07-05】**: 実地調査の結果、当初の前提（`genko-embed.ts`と`kami-genko`は
+   危険な重複で解消すべき）を修正する。
+   - **規模の実測**: `kami-engine-sdk`全体で約17,700行（11サブフォルダ）。
+     `genko`だけで8,334行（21ファイル）— 単なるdocument modelではなく
+     Canvas/ChatPanel/認証/プロジェクト選択を含む本物のインタラクティブUI。
+   - **`kami-engine-sdk-clj`への統合という前提の誤り**: `kami-engine-sdk-clj`
+     は`kami.ecs`/`kami.render`/`kami.physics_compute`/`kami.schedule`/
+     `kami.sim`等の**汎用ECS/物理/レンダリングのエンジンコア**であり、
+     `kami-engine-sdk`の`builders`/`data`（`createBoneController`/
+     `createEmotionAnalyzer`/pose-presets等、VRMアバター特有のドメイン
+     ロジック、Svelte 5 runes `.svelte.ts`）をそのまま統合するのは抽象度の
+     ミスマッチ。この部分の移行先は未確定のまま残す。
+   - **genko重複の実態**: `genko-embed.ts`の`serializeDoc`/`deserializeDoc`
+     と`kami-genko`の`write-doc`/`read-doc`/`normalize`を実装レベルで
+     突き合わせた結果、これは事故的な重複ではなく**意図的な二層設計**と判明。
+     `genko-embed.ts`は「外部依存ゼロの自己完結HTML文字列」を生成する必要が
+     あり生JSをテンプレートリテラルに埋め込む設計。`kami-genko`は同じロジックを
+     **サーバーサイド/他消費者（storyboardブリッジ等）から再利用可能にする**
+     ための独立cljc SSoTで、`genko-embed.ts`を置き換える目的ではない。挙動は
+     既に一致している（`kami-genko`の`normalize`が担う同期処理は
+     `genko-embed.ts`側では`deserializeDoc`直後の`loadPage()`内で既に
+     行われている）。
+   - **`genko-embed.ts`を実際にKamiGenkoバンドルへ配線し直す判断**: 却下。
+     shadow-cljsビルド動作が未確認、コンパイル済みJSバンドルを
+     テンプレートリテラル文字列内に安全に埋め込む必要（エスケープリスク）、
+     ブラウザ実機で視覚検証できない、という実装コストに対し、既に挙動が
+     一致しているため得られる実益がほぼ無い（防御的normalizeが多少堅牢になる
+     程度）。「危険な重複を解消する」という前提そのものが崩れたため、
+     リスクを取ってまでのコード変更は見送る。
+   - **未着手のまま残る**: `builders`/`data`/`document`/`manufacturing`/
+     `trackpad`の移行先（`kami-engine-sdk-clj`直下ではなく、別namespace/
+     別repoが必要）、UIのReagent書き換え、`components`（VRMビューアUI）。
+     エコシステム全体のcljc/cljs中心の重複整理は ADR-2607051500 へ切り出す。
 
 ## Consequences
 
