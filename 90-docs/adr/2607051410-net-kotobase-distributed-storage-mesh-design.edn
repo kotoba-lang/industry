@@ -1,12 +1,13 @@
 {:frontmatter
  {:id "adr-2607051410-net-kotobase-distributed-storage-mesh-design"
-  :title "ADR-2607051410: net-kotobase を分散ストレージ mesh として設計する — Holochain/IPFS/Filecoin 参照設計（proposed・未実装）"
-  :status "proposed"
+  :title "ADR-2607051410: net-kotobase を分散ストレージ mesh として設計する — Holochain/IPFS/Filecoin 参照設計（accepted・実装は別PR）"
+  :status "accepted"
   :date "2026-07-05"
+  :accepted_date "2026-07-05"
   :deciders ["Jun Kawasaki"]
   :doc_type "adr"
   :topic "net-kotobase-distributed-storage-mesh"
-  :authoritative false
+  :authoritative true
   :authoritative_for
   ["net-kotobase(kotobase.net)を単一origin構成からkotobase meshへ段階移行する設計方針（未実装）"
    "cloud-murakumo陣営（kekkai/overlay/kotoba-lang net/leaderless auction）のレイヤ積みをストレージ側へ転用するという決定"
@@ -207,4 +208,17 @@
 
   :not-executed "設計の訂正・追加提案のみ(オーナー確認済み、2026-07-05)。kotoba.ledger.memory-time/kotobase.peer.availabilityの新規抽出・実装・net-kotobase配線・料率決定は引き続き別PR・別オーナー確認。"}
 
- :note "本ADRは設計提案のみ。実装(L2 fleet storage shell・L3 discovery・L5 validation・kotobase.peer.availability・kotoba.ledger.memory-time抽出・L6 credits台帳への相乗り、west manifest登録、org境界確定)は別PR/ブランチで、オーナー確認の上で行う。"}
+ ;; ============================================================
+ ;; Acceptance(2026-07-05) — オーナーが"accept"と明示指示。design onlyの
+ ;; 意味を誤解しないよう明文化。
+ ;; ============================================================
+ :acceptance
+ {:date "2026-07-05"
+  :meaning "設計方針の確定であり、実装の完了ではない。L0/L1(既存流用そのまま)以外は全レイヤ・全follow-upとも実装ゼロのまま。"
+  :still-open ["org境界(gftd vendor vs etzhayyim product) — open-questions #4"
+               "命名(mesh protocolに独立名を与えるか) — open-questions #5"
+               "kotobase.peer.availability / kotoba.ledger.memory-timeの置き場所"
+               "ADR-2607023100(L4の土台)自体もまだ未実装"]
+  :recommended-first-step "kotobase.peer.availability を実コード+テストにする(pure関数のみ・依存最小・最大のギャップである不正検知を実際に埋められるか検証できる)。または ADR-2607023100 の実装(L4土台、これも未着手)を先に着手。いずれも別PR・オーナー確認の上で進める。"}
+
+ :note "本ADRはaccepted(設計方針確定)だが実装はまだ別PR。実装(L2 fleet storage shell・L3 discovery・L5 validation・kotobase.peer.availability・kotoba.ledger.memory-time抽出・L6 credits台帳への相乗り、west manifest登録、org境界確定)はいずれも未着手、オーナー確認の上で行う。"}

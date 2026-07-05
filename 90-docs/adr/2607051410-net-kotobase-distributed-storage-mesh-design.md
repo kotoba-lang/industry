@@ -1,9 +1,17 @@
-# ADR-2607051410: net-kotobase を分散ストレージ mesh として設計する — Holochain/IPFS/Filecoin 参照設計（proposed・未実装）
+# ADR-2607051410: net-kotobase を分散ストレージ mesh として設計する — Holochain/IPFS/Filecoin 参照設計（accepted・実装は別PR）
 
-**Status**: proposed
+**Status**: accepted（2026-07-05、オーナー確認）
 **Date**: 2026-07-05
 **Deciders**: Jun Kawasaki
 **Data SSoT**: `2607051410-net-kotobase-distributed-storage-mesh-design.edn`（本文の構造化コンパニオン）
+
+**Acceptance note**: この ADR が「accepted」を意味するのは**設計方針の確定**
+であり、実装の完了ではない。L0/L1（既存流用）以外の全レイヤ・全follow-up
+（`kotobase.peer.availability`、`kotoba.ledger.memory-time` 抽出含む）は
+引き続き実装ゼロ。次の一歩は、置き場所（org境界・命名）を決めた上で
+`kotobase.peer.availability` を実コード+テストにする、または
+ADR-2607023100（L4の土台、これも未実装）を先に着手する、のいずれか — 別
+PR・オーナー確認の上で進める。
 
 ## Context
 
@@ -57,7 +65,7 @@ DHT は一切ない — 「分散」なのは CID による内容アドレスと
 ファースト実行** の4つはすでに実在する。欠けているのは「ノード間の発見・
 複製・検証・インセンティブ」という**mesh 化そのもの**。
 
-## Decision（設計提案のみ・実装は別 PR）
+## Decision（accepted・実装は別 PR）
 
 net-kotobase を単一 origin 構成から、`cloud-murakumo` 陣営と同じレイヤ積み
 を再利用した **kotobase mesh** に段階移行する。レイヤと、それぞれ「何を
