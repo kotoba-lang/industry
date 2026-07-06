@@ -138,3 +138,19 @@ via `bb scripts/gen-west-manifest.bb --entry <name>` per repo (minimal diff per
   `methods/teleop_safety.cljc` — related prior art (not modified by this ADR)
 - `kotoba-lang/robotics` README's safety model table
 - 本 ADR とペアの `.edn`
+
+## Addendum (2026-07-06, org-ros scope growth)
+
+A separate, unrelated project (`kotoba-lang/swarm-choreo`, ADR-2607052300 —
+governed, precomputed multi-agent drone-light-show choreography over ROS 2) landed
+`kotoba-lang/org-ros` PR #1, extending `kotoba.ros.msgs` with
+`geometry_msgs/{Point,Quaternion,Pose,PoseStamped}` encode/decode plus the matching
+`type-geometry-msgs-{point,quaternion,pose,pose-stamped}` rosbridge type-strings,
+to place a performer's per-tick 3D setpoint on the wire (38 tests / 99 assertions,
+up from this ADR's original 34/91). This is exactly the kind of consumer this ADR's
+"Decision" section anticipated ("any future consumer... a real, tested ROS 2
+message/CDR/rosbridge contract") — noted here so `org-ros`'s message coverage as
+described above (§1) is read as a snapshot at this ADR's original date, not
+`org-ros`'s current state; the CDR/rosbridge architecture and the native-DDS-out-of-
+scope boundary are unchanged. No code in `com-sony-dualsense` or `teleop` was
+touched by this addendum.
