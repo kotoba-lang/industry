@@ -1,7 +1,8 @@
 ---
 id: adr-2607061450-kotoba-lang-com-vultr
 title: "ADR-2607061450: kotoba-lang に com-vultr ポータブル .cljc Vultr API v2 client を追加する"
-status: accepted
+status: closed
+closed: "2026-07-06"
 doc_type: adr
 topic: agent-loop
 authoritative: true
@@ -21,7 +22,8 @@ superseded_by: []
 
 # ADR-2607061450: kotoba-lang/com-vultr
 
-- Status: accepted (2026-07-06)。scaffold・テスト green・push・manifest 登録まで完了。
+- Status: closed (2026-07-06)。本ADRのスコープである com-vultr ライブラリ本体は
+  scaffold・テスト green・push・manifest 登録・pin 検証まで全て完了。
 
 ## 課題
 
@@ -88,11 +90,19 @@ bb scripts/gen-west-manifest.bb --entry com-vultr
 bb scripts/gen-west-manifest.bb --check
 ```
 
-## 実装フェーズ
+## 実装フェーズ（完了）
 
 - **Phase A（完了）**: scaffold・テスト green・`kotoba-lang/com-vultr`（public）
   作成・push、`manifest/repos.edn` の `:extra-projects` に登録、
   `gen-west-manifest.bb --entry com-vultr` で最小 diff 生成、pin 検証通過。
-- **Phase B（未着手）**: オーナーが Claude in Chrome 経由で Vultr ダッシュボード
-  にログインし、オートペイのみ無効化する実操作（本ライブラリのスコープ外の
-  ダッシュボード専用設定のため）。
+
+本ADRのスコープは「com-vultr ライブラリを作る」という決定であり、上記 Phase A
+の完了をもって全て完了・closed とする。
+
+**本ADRのスコープ外として残る別件（このライブラリでは解決できない）**: オーナーの
+「Vultr は自動契約停止」指示のうち、オートペイ無効化の実操作自体は、上記「非目標」
+の通り Vultr API に該当エンドポイントが無いため本ライブラリでは実行不可能で、
+Claude in Chrome 経由でオーナー本人がダッシュボードにログインして操作する必要が
+ある。これは本ADR/ライブラリの実装物ではなく別途の一回限りの手動操作なので、
+本ADRの closed 判定をブロックしない（トラッキングはこのADRではなく元の会話の
+todo で継続）。
