@@ -4625,9 +4625,15 @@
    ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
    ;; :blueprint -> :implemented as the fund-vehicle actor (TrustAdmin-LLM
    ;; ⊣ TrustFundGovernor) in a three-actor VC-fund system alongside 6499
-   ;; (investment decisions) and 6630 (management company); issues the
-   ;; binding capital-call NOTICE off an upstream 6499 proposal, never
-   ;; trusting its numbers as-is (independent pro-rata re-verification).
+   ;; (investment decisions) and 6630 (management company). Three governed
+   ;; ops, each reading an upstream 6499 fact and never trusting it as-is:
+   ;; capital-call NOTICE issuance (independent pro-rata re-verification),
+   ;; LP-distribution recording (independently computes its own per-LP
+   ;; split, since 6499's waterfall exposes only a fund-wide total), and
+   ;; NAV disclosure (verifies only the one figure this vehicle tracks
+   ;; independently -- each LP's called-amount -- since it holds no
+   ;; portfolio-valuation data of its own). Closes every offer this
+   ;; blueprint's own business-model.md originally listed.
    :operating-states [:intake :value :distribute :report :audit]},
   {:id "6491"
    :name "Financial leasing"
@@ -4659,6 +4665,12 @@
    ;; InvestmentCommitteeGovernor): the UN ISIC Rev.4 explanatory note for
    ;; 6499 names "own-account investment activities, such as by venture
    ;; capital companies" explicitly (superproject ADR-2607061700 addendum).
+   ;; Fifteen governed decision gates spanning the deal pipeline, cap-
+   ;; table math, whole-fund NAV/waterfall, portfolio-concentration
+   ;; reporting (`vcfund.concentration`, an upstream fact 6630's guideline-
+   ;; disclosure op cross-checks), and crypto-native (SAFT/wallet) support
+   ;; -- the anchor of the three-actor VC-fund system alongside 6430 (fund
+   ;; vehicle) and 6630 (management company).
    :operating-states [:intake :dd :commit :distribute :audit]},
   {:id "6511"
    :name "Life insurance"
@@ -4752,9 +4764,15 @@
    ;; :blueprint -> :implemented as the management-company actor
    ;; (FundManager-LLM ⊣ FundManagementGovernor) in a three-actor VC-fund
    ;; system alongside 6499 (investment decisions) and 6430 (fund
-   ;; vehicle); draws the management fee off an upstream 6499 fee-accrual
-   ;; report, never trusting it as-is (independent formula recompute +
-   ;; own mandate rate-cap check + double-draw prevention).
+   ;; vehicle). Three governed ops: management-fee drawdown and GP carry
+   ;; distribution off upstream 6499 facts (independent formula recompute
+   ;; + own mandate rate-cap check + double-draw/-distribution
+   ;; prevention), and guideline (sector/stage concentration) compliance
+   ;; disclosure off 6499's portfolio-concentration report -- a genuine
+   ;; two-sided cross-check against THIS company's own mandate-defined
+   ;; caps, since neither repo holds both halves alone. Closes every
+   ;; offer this blueprint's own business-model.md originally listed
+   ;; (rebalancing/trade explicitly marked not applicable to a VC fund).
    :operating-states [:intake :allocate :rebalance :report :audit]},
   {:id "6820"
    :name "Real estate activities on a fee or contract basis"
