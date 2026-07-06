@@ -178,6 +178,32 @@ every subsequent increment; that research is not repeated here.
    contract for kami-engine authoring, not a UI-component/controller SSoT); forcing the VRM
    controller logic into it would misuse its documented scope.
 
+## Amendment (2026-07-06): second increment landed — full `webvr` port
+
+`kotoba-lang/kami-webvr` — the entire `webvr` module (`types.ts`, `incident-pregel.ts`,
+`cine-bridge.ts`, `createIncidentVrEngine.svelte.ts`) ported to CLJC/CLJS in one new repo,
+not the incremental "delegate one function, keep the TS host" shape genko's `移植#N`
+pattern uses. This refines (does not contradict) this ADR's own methodology section: a
+full-module port is the right increment size when there's no live embedded-HTML host to
+incrementally de-risk against — `webvr`'s only real consumer (`ai-gftd-cyber-drill`)
+supplies its own renderer via `onScene` and isn't touched by this port at all, unlike
+`genko-embed.ts`'s live production runtime. The bar stayed the same either way: every
+original test assertion ported 1:1 before landing (20/20 green — 9 JVM `bb test` for the
+pure `types.cljc`/`incident_pregel.cljc`, 11 CLJS `node-test` for `engine.cljs`/
+`cine_bridge.cljs`).
+
+The compiled `INCIDENT_GRAPH` LangGraph `StateGraph` (8 super-steps mirroring
+`incident-pregel.ts`'s logic, for LangGraph-Studio parity) was deliberately **not**
+ported — confirmed via direct reading of the original source that the real engine drives
+state through the pure `applySelection`/`initialState` functions directly, never
+`INCIDENT_GRAPH.invoke(...)`, and no test exercises the graph. It was non-functional
+documentation scaffolding; can be added later as a thin wrapper around the same pure
+functions if LangGraph-Studio visualization is ever actually needed.
+
+Consumer migration (wiring `ai-gftd-cyber-drill`'s Svelte side to `kami-webvr` instead of
+`kami-engine-sdk`'s `./webvr` export) remains explicit follow-up, unaffected by this
+increment — same as `org-ietf-turn`'s still-pending `turn.ts` delegation bridge.
+
 ## References
 
 - `90-docs/adr/2607020200-mangaka-genko-cljc.md` (the precedent this ADR follows)
