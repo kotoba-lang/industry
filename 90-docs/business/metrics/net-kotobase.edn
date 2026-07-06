@@ -1,19 +1,14 @@
-{:health-status 200,
+{:as-of "2026-07-06",
+ :sources [:cloudflare :health :emitter],
+ :zone
+ {:requests-7d 857,
+  :pageviews-7d 224,
+  :uniques-7d-sum 289,
+  :zone "kotobase.net"},
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 1044, "kotobase-cf-wasm-staging" 3038},
- :zone
- {:requests-7d 853,
-  :pageviews-7d 224,
-  :uniques-7d-sum 287,
-  :zone "kotobase.net"},
- :sources [:cloudflare :stripe :health :emitter],
- :stripe
- {:active-subscriptions 4,
-  :active-subscriptions-account-wide 4,
-  :charges-total 11,
-  :last-charge-epoch 1718681591},
- :as-of "2026-07-06",
+ {"net-kotobase" 1049, "kotobase-cf-wasm-staging" 3038},
+ :health-status 200,
  :funnel {:visitors 95, :signups 0, :checkouts 0},
  :signal
- "kotobase.net 実測 853 req/7d・287 uniques(日次和)、workers 4082 inv/7d、Stripe active subs 4"}
+ "kotobase.net 実測 857 req/7d・289 uniques(日次和)、workers 4087 inv/7d"}
