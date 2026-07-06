@@ -228,7 +228,13 @@
  ;; 生成時に既存 path 群と union される（一度 west.yml に載れば自動追従、distinct で重複排除）。
  ;; clone 済みの working tree（orgs/<org>/<repo>）が存在し HEAD を持つこと。
  :extra-projects
- #{;; kami-webvr — choice-based scenario engine, full CLJC/CLJS port of
+ #{;; kotoba-document-contracts — shared .cljc data-shape contract (DOM tree /
+   ;; resolved style / draw-ops) for kotoba's document-rendering pipeline,
+   ;; stub-only, split out so kotoba-lang/browser's htmldom+cssom and a future
+   ;; aiueos-side "mainuiux" renderer can conform to the same interchange
+   ;; shapes without either owning the other's runtime (ADR-2607061930).
+   "orgs/kotoba-lang/kotoba-document-contracts"
+   ;; kami-webvr — choice-based scenario engine, full CLJC/CLJS port of
    ;; kami-engine-sdk's webvr module (ADR-2607052000, kami-engine-sdk Svelte
    ;; retirement plan; local ADR-0001 in the repo itself).
    "orgs/kotoba-lang/kami-webvr"
