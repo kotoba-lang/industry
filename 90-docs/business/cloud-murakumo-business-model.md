@@ -19,6 +19,7 @@
 - 観測 (signal): murakumo.cloud 実測 21870 req/7d・341 uniques(日次和)、workers 107880 inv/7d
 - 観測 (signal): murakumo.cloud 実測 22125 req/7d・341 uniques(日次和)、workers 108130 inv/7d
 - 観測 (2026-07-06): wrangler secret list が空 — STRIPE_SECRET_KEY 未設定のため #store/* checkout は現状 503 fail-closed(実収益ゼロの直接原因、docs/stripe-go-live-checklist.md)
+- 観測 (signal): murakumo.cloud 実測 22414 req/7d・341 uniques(日次和)、workers 108395 inv/7d
 
 ## Customer Segments
 
@@ -50,7 +51,7 @@
 - EU: AI Act/GDPR監査台帳を差別化にしたコンプライアンス重視企業への直接outreach(独1年償却を補助訴求)
 - CN: Stripe決済(USD建てAlipay/WeChat Pay)の限界と規制ギャップを理由に、能動広告出稿は保留(watchのみ)
 
-> 実行済み (2026-07-06 tick3): EU コールドアウトリーチのメールテンプレート下書き完了(送信は未実施、content/outreach/eu-compliance-cold-email-template.md)
+> 実行済み (2026-07-06 tick4): US HN/X投稿コピー下書き + GTM launch runbook作成(Stripe未設定の間はGate 0で投稿ブロック、docs/gtm-launch-runbook.md)
 
 ## Revenue Streams
 
