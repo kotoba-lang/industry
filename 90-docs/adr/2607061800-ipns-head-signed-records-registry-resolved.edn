@@ -1,0 +1,21 @@
+{:frontmatter
+ {:id "adr-2607061800-ipns-head-signed-records-registry-resolved"
+  :title "ADR-2607061800: ipns.head — signed IPNS head records, resolved in kotobase.net's own registry"
+  :status "accepted"
+  :date "2026-07-06"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "ipns-head-signed-records-registry-resolved"
+  :authoritative true
+  :authoritative_for
+  ["ipns.head is a NEW NAMESPACE in the existing kotoba-lang/ipns repo (ADR-2607050100), not a new repo -- ipns.core (name derivation) already existed and stays zero-dep/portable; only ipns.head pulls in ed25519/dag-cbor"
+   "ipns.core/pubkey->name is now cross-checked against a real Kubo 0.41.0 node's ipfs id / ipfs cid format output for the same Ed25519 key, in addition to the prior kekkai/kagi cross-check from ADR-2607050100"
+   "kotobase.net resolves IPNS heads through its own XRPC registry (head.json/publish.json lexicon), not the real IPFS/libp2p DHT -- deliberate scope"
+   "ipns.head/sign and verify are :clj-only (JCA Ed25519 via ed25519's did:key primitives, reused not reimplemented); :cljs porting for kotobase-client is a tracked follow-up"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607050100" "adr-2607061200" "adr-2607032500" "adr-2607022400"]
+  :last_verified "2026-07-06"
+  :artifacts
+  {:ipns "kotoba-lang/ipns (ipns.head namespace added) — 6 tests/15 assertions green, JVM, includes a real-Kubo cross-check test"}}
+ :body "see 2607061800-ipns-head-signed-records-registry-resolved.md"}
