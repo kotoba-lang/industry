@@ -161,6 +161,29 @@ quote→claim→verify→mint パターンを Sora 専用 treasury で再利用)
   一切出していない)。
 - **未検証のまま残る**: 実際の**live mode でのカード決済**(実課金。オーナー
   自身が行う方針——`docs/gtm-launch-runbook.md` Gate 0 は「対応済み」に更新済み
-  だが、real-money の最終確認はまだ)、Affirm/Klarna/Alipay/WeChat Pay の実際の
-  有効化(Stripe ダッシュボード側の設定次第)、実 Chrome での通常ページ
+  だが、real-money の最終確認はまだ)、実 Chrome での通常ページ
   (landing/console/studio)の目視レンダリング。
+
+**2026-07-06 追記2 — QA で発見・修正した本番事故、分割払い撤回、PR チェックポイント:**
+
+- 分割払い(Affirm/Klarna/Alipay/WeChat Pay)は Stripe アカウント側で未有効化
+  と判明し、オーナーが非対応を決定。`storefront.cljc` の
+  `:financing-payment-method-types` 分岐を撤去し全国 `[:card]` に統一、
+  ブログ/GTM プラン/go-live チェックリストの該当記述も削除・修正。
+- QA(react loop)で本番事故を2件発見・即修正・再デプロイ: (1)
+  `public/blog/*.html` が作業ツリー上で生 markdown に上書きされ本番配信される
+  事故が2回(原因不明、本リポジトリに同期スクリプトは存在せず)、(2) US 記事の
+  CTA が未実装の `curl murakumo.cloud/join | sh`(404、ADR-2607030030 の
+  Phase 2/3 ビジョン)を誤って案内。`#console` playground(スライダー操作で
+  実際にスケジューラが再計算することを実機確認済み、72 in-flight→4 replica)
+  への案内に差し替え。
+- nav の "Source" リンクが private repo(`gftdcojp/cloud-murakumo`)への 404
+  だったため `gftdcojp/local-murakumo`(オーナーが public 化予定)へ変更。
+- US HN/X 投稿コピーをブランチ+PR 経由でマージ(`gftdcojp/cloud-murakumo`
+  PR #8、technical EDN-datom/`:vllm`/`:mlx-moe` の訴求へ調整)— このチェック
+  ポイント以降、この ADR に関わる変更は PR 作成→レビュー→main マージの経路も
+  使う(直接 push 一本槍ではない)。
+- 関連: `kotoba-lang/com-reddit` を ADR-2607070100 で Reddit 実ドメイン
+  (Subreddit/User/Post/Comment/Vote)に実装し直し、Reddit 配信チャネルの
+  信頼性(clean-room actor が汎用プレースホルダーのままでは「本当に動くのか」
+  という疑義を招く)を担保。
