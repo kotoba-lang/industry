@@ -1156,15 +1156,16 @@
    ;; securities/fund capability lib for cloud-itonami 6420/6430/6611/6612/
    ;; 6630 (ADR-2607032000 follow-up: division 64/66 financial-services batch)
    "orgs/kotoba-lang/securities"
-   ;; cloud-itonami-vc-fund (DD-LLM ⊣ InvestmentCommitteeGovernor): a venture
-   ;; capital fund blueprint (LP intake → DD → capital deployment → exit
-   ;; distribution) published standalone under the cloud-itonami org, NOT as
-   ;; a west project — same non-west convention as every other
-   ;; cloud-itonami-* blueprint repo, and (per ADR-2607061700) also NOT added
-   ;; to kotoba-lang/industry's registry.edn, since it sits outside ISIC
-   ;; numbering (6420/6430/6499/6630 were all already occupied by unrelated
-   ;; published blueprints). Self-contained; does not depend on
-   ;; kotoba-lang/securities.
+   ;; cloud-itonami-isic-6499 (DD-LLM ⊣ InvestmentCommitteeGovernor): promoted
+   ;; from a bare :blueprint n.e.c. scaffold to a full venture-capital-fund
+   ;; actor (LP intake → DD → capital deployment → exit distribution) — UN
+   ;; ISIC 6499's own explanatory note names "venture capital companies"
+   ;; explicitly. A short-lived standalone cloud-itonami-vc-fund repo was
+   ;; consolidated into this ISIC-numbered one same-day, at owner request, to
+   ;; keep the ISIC naming convention (ADR-2607061700 + addendum). Registered
+   ;; only in kotoba-lang/industry's registry.edn (:maturity :implemented);
+   ;; NOT a west project, same as every other cloud-itonami-* blueprint repo.
+   ;; Self-contained; does not depend on kotoba-lang/securities.
    "orgs/kotoba-lang/robotics"
    ;; Giemon open-hardware robot product line; KAMI provider split family :giemon
    ;; (ADR-2607020000). Depends on kotoba-lang/robotics.
@@ -1420,6 +1421,7 @@
    "orgs/kotoba-lang/com-gmail"           ; portable .cljc Gmail API v1 client (threads/labels/drafts, injectable HTTP) (2607061423)
    "orgs/kotoba-lang/com-wise"            ; portable .cljc Wise Platform API client (profiles/transfers/quotes/recipients/balances, read-focused) (2607061423)
    "orgs/kotoba-lang/kotoba-procedure-clj" ; multi-step external procedure tracker (ordered steps, whose-turn, deadline); pairs with com-gmail/com-wise (2607061423)
+   "orgs/kotoba-lang/com-vultr"           ; portable .cljc Vultr API v2 client (account/billing/instances, read-focused; no auto-pay toggle -- not exposed by the API) (2607061450)
    "orgs/kotoba-lang/atproto-client" ; AT Protocol client facade + PDS read/write helpers over @atproto/api; relocated from etzhayyim-sdk per ADR-2607011940
    "orgs/kotoba-lang/arxiv"          ; ADR-0023: arXiv organism actor + yorishiro automation
    "orgs/kotoba-lang/aero"

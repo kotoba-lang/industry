@@ -181,3 +181,50 @@ clean.
 - UN ISIC Rev.4 code 6499:
   `https://unstats.un.org/unsd/classifications/Econ/Detail/EN/27/6499`
   (verified 2026-07-06).
+
+## Addendum (2026-07-06, same day): consolidated into cloud-itonami-isic-6499
+
+The owner pushed back on publishing outside the ISIC-numbered naming
+convention and asked to reconsider whether `6499` was really unavailable.
+On inspection, `cloud-itonami-isic-6499` (published 2026-07-04) was a
+two-commit, zero-fork, zero-star, code-free `:blueprint`-tier scaffold
+illustrated with a different member of the same n.e.c. bucket (factoring /
+check-cashing / money-order issuance) -- not meaningfully "occupied," and
+`6499`'s own explanatory note names venture capital first among its
+examples. Decision reversed from "Alternatives considered" above:
+
+1. `cloud-itonami-isic-6499`'s content (README, blueprint.edn, docs,
+   GOVERNANCE/CONTRIBUTING/SECURITY) was replaced with the venture-fund
+   business description, and the full `vcfund.*` implementation
+   (`src/`, `test/`, `deps.edn`) was moved in as-is (namespace unchanged --
+   `vcfund.*` is a domain word, not tied to the ISIC number, same
+   convention as `underwriting.*`/`realty.*`/`formation.*` on their own
+   ISIC-numbered repos). 33 tests / 153 assertions, lint clean, re-verified
+   in the new location before push.
+2. The standalone `cloud-itonami-vc-fund` repo was deleted (`gh repo
+   delete`) -- it had existed for under an hour, this same session, no
+   forks/stars/clones to worry about.
+3. `kotoba-lang/industry`'s `registry.edn` entry for `"6499"` was promoted
+   `:maturity :blueprint` → `:implemented` (its own established
+   maturity-roadmap: `:spec` → `:blueprint` → `:implemented`), via a
+   worktree branch + server-side merge (the shared west checkout was in
+   detached HEAD; direct commits to it are exactly what the superproject's
+   "並行エージェント運用" convention warns against). `:required-technologies`
+   switched `:banking` → `:securities` to match the actual domain.
+   `docs/cloud-itonami.md`'s maturity-tier counts and
+   `test/kotoba/industry_test.clj`'s hardcoded `:implemented` count (4→5)
+   were updated in the same commit; both re-verified (7 tests / 53
+   assertions green).
+4. `manifest/west.yml`'s pin for the `industry` project was advanced via
+   `bb scripts/gen-west-manifest.bb --entry industry` (single-entry,
+   server-verified fast-forward) to include the promotion commit.
+5. This ADR's decision text above (the "publish standalone, non-ISIC"
+   reasoning and its "Alternatives considered" table) is left unedited as
+   the historical record of the first attempt; this addendum is the
+   corrected final state. `manifest/repos.edn`'s doc-comment (originally
+   written to describe the standalone repo) was updated in the same spirit
+   to point at the consolidated `cloud-itonami-isic-6499` entry instead.
+
+Net effect: one venture-capital-fund actor, at `cloud-itonami-isic-6499`,
+`:implemented` maturity, ISIC-numbered like every sibling blueprint, with
+no dangling standalone repo left behind.
