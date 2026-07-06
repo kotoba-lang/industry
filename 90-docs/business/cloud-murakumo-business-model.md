@@ -61,6 +61,8 @@
 - enterprise dedicated fleet / paid weights 手数料
 - 実績 (2026-07-06): Stripe Checkout 本番稼働確認(#store/* が実際に cs_live_ セッションを発行、docs/stripe-go-live-checklist.md)。実購入はまだゼロ
 
+> 実績 (2026-07-06): test-modeキーでの実ブラウザ購入(4242テストカード)でcheckout全経路(session作成→カード入力→success redirect)をend-to-endで実証。live purchaseはまだゼロ
+
 ## Cost Structure
 
 - B2 storage/egress
