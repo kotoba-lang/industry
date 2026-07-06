@@ -298,6 +298,12 @@
    ;; kami-engine-sdk's webvr module (ADR-2607052000, kami-engine-sdk Svelte
    ;; retirement plan; local ADR-0001 in the repo itself).
    "orgs/kotoba-lang/kami-webvr"
+   ;; wasm-webcomponent -- browser-native WASM AOT WebComponent library
+   ;; (KotobaWasmElement + kgraph.js host-import port), extracted from
+   ;; kototama/web/'s original PoC so any kotoba-lang repo can host a
+   ;; `kotoba wasm emit` binary as a WebComponent without duplicating the
+   ;; hosting code (ADR-2607061630 follow-up, com-junkawasaki/root).
+   "orgs/kotoba-lang/wasm-webcomponent"
    ;; AI VTuber/VRM companion chat, gftdcojp — new product, shares kami-engine with
    ;; network-isekai but via @etzhayyim/kami-engine-sdk (Svelte), private data model
    ;; (ADR-2607051800).
