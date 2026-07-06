@@ -78,13 +78,38 @@ tamper/wrong-signer roundtrip.
   tenant-plane client) can already derive names via `ipns.core` but
   cannot sign/verify heads without its own port (tracked follow-up).
 
-## Follow-up
+## Follow-up (closed, second addendum 2026-07-06)
 
-- Port `ipns.head/sign`/`verify` to `:cljs` (`@noble/curves`, matching
-  `kotobase-client`'s own `cacao.cljc` precedent).
-- Wire `ipns.head` into `kotoba-client`'s documented IPNS stub and
-  `kotobase-cljc-worker`'s XRPC dispatch for the `ipns.head`/
-  `ipns.publish` lexicon methods.
+Both follow-ups above are now done, same day:
+
+- **`kotoba-client`** (JVM): `verify-ipns-head` added, calling `ipns.head/
+  verify` directly — the documented "NOT implemented" stub is resolved.
+  7 tests/513 assertions green.
+- **`kotobase-client`** (`:cljs`): new `kotobase.ipns/sign-head`/
+  `verify-head`, built on this repo's own `@noble/curves`/`@ipld/dag-cbor`
+  stack (same precedent `kotobase.cacao` already established, ADR-2607050100)
+  rather than porting `ipns.head` itself. **Verified against a real
+  JVM-signed fixture, not just cljs self-consistency**: the same seed +
+  record produces the byte-identical canonical dag-cbor payload AND the
+  byte-identical deterministic Ed25519 signature on both platforms.
+  25 tests/80 assertions green.
+- **`kotobase-cljc-worker`**: wired `com.etzhayyim.apps.kotoba.ipns.
+  {head,publish}` as a XRPC route family separate from the `ai.gftd.apps.
+  kotobase.datomic.*` surface (genuinely different trust model —
+  unauthenticated self-verifying reads, signature-gated writes with no
+  CACAO). `publish` calls `kotobase.ipns/verify-head` server-side before
+  ever touching R2 (401 on failure) and CASes on a monotonic `:sequence`
+  (409 on rollback), reusing `r2-get-head`/`r2-put-head-if-match` by
+  JSON-stringifying the signed record as that pair's "chain" string.
+  20 tests/69 assertions green.
+  - **Lexicon/implementation mismatch found and documented, not silently
+    resolved**: `ipns/head.json`'s query param is named `graph`
+    ("Graph CID ... IPNS name is derived from it"), but no graph-CID→
+    IPNS-name derivation exists anywhere — `ipns.core/pubkey->name`
+    derives a name from an Ed25519 **pubkey**. Owner-confirmed
+    resolution: storage/lookup key off the signed record's own `:name`
+    field instead; the worker's actual query param is `name`. Fixing the
+    lexicon file itself is a separate, not-yet-scheduled follow-up.
 
 ## One-line summary
 
