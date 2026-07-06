@@ -1257,6 +1257,16 @@
    ;; only in kotoba-lang/industry's registry.edn (:maturity :implemented);
    ;; NOT a west project, same as every other cloud-itonami-* blueprint repo.
    ;; Self-contained; does not depend on kotoba-lang/securities.
+   ;; cloud-itonami-isic-6430 (TrustAdmin-LLM ⊣ TrustFundGovernor) and
+   ;; cloud-itonami-isic-6630 (FundManager-LLM ⊣ FundManagementGovernor):
+   ;; same-day promoted alongside 6499, at owner request, to a three-actor
+   ;; VC-fund system -- 6430 is the fund vehicle (holds LP subscriptions,
+   ;; issues capital-call notices), 6630 is the management company (draws
+   ;; the management fee). Each independently re-verifies an upstream 6499
+   ;; fact rather than trusting it as-is (separate re-implementations of
+   ;; the same math, no shared code -- ADR-2607061700 addendum 2). Also
+   ;; registered only in kotoba-lang/industry's registry.edn (both
+   ;; :maturity :implemented); NOT west projects.
    "orgs/kotoba-lang/robotics"
    ;; Giemon open-hardware robot product line; KAMI provider split family :giemon
    ;; (ADR-2607020000). Depends on kotoba-lang/robotics.
