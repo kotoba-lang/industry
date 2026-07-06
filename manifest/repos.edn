@@ -1156,6 +1156,15 @@
    ;; securities/fund capability lib for cloud-itonami 6420/6430/6611/6612/
    ;; 6630 (ADR-2607032000 follow-up: division 64/66 financial-services batch)
    "orgs/kotoba-lang/securities"
+   ;; cloud-itonami-vc-fund (DD-LLM ⊣ InvestmentCommitteeGovernor): a venture
+   ;; capital fund blueprint (LP intake → DD → capital deployment → exit
+   ;; distribution) published standalone under the cloud-itonami org, NOT as
+   ;; a west project — same non-west convention as every other
+   ;; cloud-itonami-* blueprint repo, and (per ADR-2607061700) also NOT added
+   ;; to kotoba-lang/industry's registry.edn, since it sits outside ISIC
+   ;; numbering (6420/6430/6499/6630 were all already occupied by unrelated
+   ;; published blueprints). Self-contained; does not depend on
+   ;; kotoba-lang/securities.
    "orgs/kotoba-lang/robotics"
    ;; Giemon open-hardware robot product line; KAMI provider split family :giemon
    ;; (ADR-2607020000). Depends on kotoba-lang/robotics.
