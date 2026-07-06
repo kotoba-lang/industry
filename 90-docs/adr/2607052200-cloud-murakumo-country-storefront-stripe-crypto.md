@@ -149,8 +149,18 @@ quote→claim→verify→mint パターンを Sora 専用 treasury で再利用)
   への実課金コールが本番で機能することを確認)。`skuId:"does-not-exist"` → 400
   (validation は本番でも保持)。
   `/`・`/js/main.js`・`/murakumo.edn` → 200(静的配信も deploy 後に正常)。
-- **未検証のまま残る**: 実際にカード情報を入力して購入を完了する end-to-end
-  テスト(session 作成の確認まではしたが、実課金はオーナー自身が行う方針
-  ——`docs/gtm-launch-runbook.md` Gate 0)、Affirm/Klarna/Alipay/WeChat Pay の
-  実際の有効化(Stripe ダッシュボード側の設定次第)、実 Chrome での目視
-  レンダリング。
+- **同日追記 — test-mode での完全な end-to-end 購入検証**: オーナーが Stripe
+  ダッシュボードで test-mode secret key を発行(1Password には live key のみ
+  存在)。Worker secret を一時的に test key へ差し替え → `#store/us` の
+  Checkout Session を実ブラウザ(claude-in-chrome)で開き、Stripe テストカード
+  (`4242 4242 4242 4242`)で購入を完了 → `murakumo.cloud/#store/us?status=success`
+  へのリダイレクトと "Payment complete — thank you." バナー表示を確認。
+  カード名義(ローマ字)必須フィールドを含むフォーム全体・成功リダイレクトの
+  status パース(`core.cljs`)まで実証。直後に Worker secret を live key へ
+  戻し、`cs_live_...` セッションが再び発行されることを確認(値はチャット/ログに
+  一切出していない)。
+- **未検証のまま残る**: 実際の**live mode でのカード決済**(実課金。オーナー
+  自身が行う方針——`docs/gtm-launch-runbook.md` Gate 0 は「対応済み」に更新済み
+  だが、real-money の最終確認はまだ)、Affirm/Klarna/Alipay/WeChat Pay の実際の
+  有効化(Stripe ダッシュボード側の設定次第)、実 Chrome での通常ページ
+  (landing/console/studio)の目視レンダリング。
