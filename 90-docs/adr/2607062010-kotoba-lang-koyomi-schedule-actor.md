@@ -1,7 +1,9 @@
 # ADR-2607062010: kotoba-lang/koyomi — 予定共有 actor（schedule-LLM ⊣ ComplianceGovernor）
 
-**Status**: proposed
+**Status**: closed(実行完了。scaffold + 独立レビューで見つかった4件の修正まで完了。
+cloud-itonami 側 UI 配線・実 Distributor 接続は明記済みの follow-up）
 **Date**: 2026-07-06
+**Closed**: 2026-07-06
 **Deciders**: Jun Kawasaki
 
 ## Context
@@ -75,16 +77,18 @@ ComplianceGovernor 型の予定共有 actor として実装する。
   既定は mock-scheduleport による決定的 sim で動く。
 - (−) cloud-itonami 側 UI 配線は本 ADR の範囲外（別 PR）。
 
-## Execution
+## Execution(closing, 2026-07-06)
 
 | 項目 | 状態 | 備考 |
 |---|---|---|
-| repo scaffold(ScheduleTarget port・統一データモデル・StateGraph・governor・phase・store・CACAO 自己発行) | ⏳ 未着手 | |
-| `kotoba-lang/koyomi` GitHub repo 作成・push(public) | ⏳ 未着手 | |
-| manifest 登録(`repos.edn` + `west.yml --entry koyomi`、pin 検証) | ⏳ 未着手 | |
-| 独立レビュー | ⏳ 未着手 | |
-| cloud-itonami 側 `workspace.cljc` 配線 | ⏳ 未着手 | |
-| superproject `main` 反映 | ⏳ 未着手 | |
+| repo scaffold(ScheduleTarget port・統一データモデル・StateGraph・governor・phase・store・CACAO 自己発行) | ✅ 完了 | initial commit `cd18c91` |
+| `kotoba-lang/koyomi` GitHub repo 作成・push(public) | ✅ 完了 | `gh repo create` + `git push`、CI(lint/test)green |
+| manifest 登録(`repos.edn` + `west.yml --entry koyomi`、pin 検証) | ✅ 完了 | pin == repo HEAD をサーバ側検証で確認 |
+| 独立レビュー(governor/operation/ICS 生成中心の敵対的レビュー) | ✅ 完了 | confirmed 4 件: `:event/share` が govern 時点で検証済みの内容ではなく commit 時点で store を再読込する TOCTOU（承認待ちの間に attendee が consent-blocked に変わっても素通り）／governor に「subject(activity) 存在」チェックが無く rogue tenant が黙って auto-commit／ICS 生成が RFC 5545 未エスケープで自由文字列経由の ATTENDEE 行インジェクションが可能／draft 無しの `:event/share` が phantom send + 台帳への偽 `:shared` 記録を許す |
+| 上記 4 件の修正 + regression test 追加 | ✅ 完了 | commit `0a2e2ee`。28 tests / 118 assertions(新規6件)、lint clean、sim 再検証。`koyomi.model` の `draft`/`contact` 未使用コンストラクタも配線して解消 |
+| manifest pin 前進(`cd18c91`→`0a2e2ee`) | ✅ 完了 | `--entry koyomi` 最小 diff、サーバ側検証 OK |
+| cloud-itonami 側 `workspace.cljc` 配線 | ✅ 完了 | `:calendar/schedule-event`/`:calendar/share-event` effect ハンドラ、`cloud-itonami.approval` 経由で人間承認、422 tests / 2949 assertions green |
+| superproject `main` 反映 | ✅ 完了 | teian/koyomi/shoko/ichiran 一括登録 commit（feature branch経由のサーバサイドmerge） |
 
 ## References
 

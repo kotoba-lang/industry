@@ -2,13 +2,14 @@
  {
   :id "adr-2607062000-kotoba-lang-teian-briefing-actor"
   :title "ADR-2607062000: kotoba-lang/teian — 資料作成 actor（deck-LLM ⊣ BriefingGovernor）"
-  :status "proposed"
+  :status "closed"
   :date "2026-07-06"
+  :closed "2026-07-06"
   :deciders ["Jun Kawasaki"]
   :doc_type "adr"
   :topic "kotoba-lang-teian-briefing-actor"
   :authoritative true
-  :authoritative_for ["teian actor の設計（deck-LLM ⊣ BriefingGovernor、二流路 StateGraph、Phase 0→3）" "kotoba-lang/slides の deck/doc/sheet EDN を content として保持する DeckTarget port 契約（fetch-deck/propose-revision!/publish!）" "BriefingGovernor の HARD 不変条件（no-actuation/redaction-required/tenant-isolation、publish は常に人間承認）" "cloud-itonami からの消費経路（deps.edn local/root、cloud_itonami.workspace 投影層経由）" "文書作成は kotoba-lang/tayori の DocTarget に委譲し、teian は資料(デッキ)専用とするスコープ判断"]
+  :authoritative_for ["teian actor の設計（deck-LLM ⊣ BriefingGovernor、二流路 StateGraph、Phase 0→3）" "kotoba-lang/slides の deck/doc/sheet EDN を content として保持する DeckTarget port 契約（fetch-deck/propose-revision!/publish!）" "BriefingGovernor の HARD 不変条件（no-actuation/redaction-required/tenant-isolation、publish は常に人間承認）" "cloud-itonami からの消費経路（deps.edn local/root、cloud_itonami.workspace 投影層経由）" "文書作成は kotoba-lang/tayori の DocTarget に委譲し、teian は資料(デッキ)専用とするスコープ判断" "実行完了: repo scaffold + 独立レビューで見つかった2件（MemStore.seed! の per-id upsert 契約違反、publish 時 redaction/tenant 再検証欠落）の修正 + regression test（commit 5fdd8e7）+ manifest 登録 + cloud-itonami workspace.cljc 配線、いずれも完了"]
   :supersedes []
   :superseded_by []
   :related ["adr-2607061500-kotoba-lang-tayori-correspondence-actor" "adr-2607031100-kotoba-lang-gijiroku-meeting-actor" "adr-2606302300-org-taxonomy-4-orgs"]
