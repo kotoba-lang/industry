@@ -56,6 +56,60 @@ this acceptance presupposes — read the two together.
    revisited before the re-transact-under-a-fresh-prefix plan is executed as
    final.
 
+## Addendum (2026-07-06): the value slot needs encryption too — original text was wrong
+
+Found during implementation ([kotoba-lang/arrangement#1](https://github.com/kotoba-lang/arrangement/pull/1),
+[kotoba-lang/kotobase-peer#4](https://github.com/kotoba-lang/kotobase-peer/pull/4)),
+not caught during design review. The Decision section below (see "Proposed
+shape") originally claimed: *"the value slot (currently always `true`,
+membership-only) is unaffected by this — there's nothing to encrypt there —
+but the datom's actual payload for anything `cold-datoms` reconstructs via
+`->eav` is exactly the s/p/o triple that's now blinded, so no separate
+'value encryption' step is needed at this layer; the protection comes
+entirely from blinding the key."*
+
+That is wrong. `blind-fn` is a one-way keyed MAC (HMAC-SHA256) — once the
+leaf key stops being the plaintext `(pr-str [k1 k2 v])` and becomes a blind
+token, **there is no way to invert it back to the original triple**.
+`cold-datoms` previously read the row's actual `{:e :a :v_edn}` by
+`edn/read-string`-ing the KEY (`arrangement.core/index-root`'s "all the
+information is packed into the key; the value carries zero bits" encoding,
+quoted in this document's own Context section). With the key blinded, that
+recovery path is gone — and since `hydrate-db` calls `cold-datoms` to
+rebuild the actual hot db that `fold!` then re-commits as the new canonical
+snapshot, this wasn't just a read-path bug: the first `fold!` after this
+design shipped as originally written would have baked corrupted (blinded,
+unreadable) data into the graph permanently.
+
+**The fix, now implemented as accepted**: the value slot carries the AEAD
+ciphertext of the real `[k1 k2 v]` triple (`encrypt-fn`'d, not `true`); the
+key stays blind-only (for prefix search). `cold-datoms` decrypts the
+*value* to reconstruct each row, never the key. See
+`arrangement.core/index-root`'s and `kotobase-peer.core/cold-datoms`'s
+current docstrings for the corrected contract.
+
+A second implementation-time finding, also corrected: the original text's
+"a random nonce is fine for tx blocks" reasoning doesn't extend to the new
+value-slot ciphertext for `index-root` — `commit!`'s content-addressing
+(*"committing the same `db` + `prev` + `schema-version` twice returns the
+same CID"*, and `kotobase-peer.core/fold!`'s *"concurrent folds of the same
+state are safe, redundant, and cheap"*) depends on identical plaintext
+producing identical ciphertext. A random-nonce `encrypt-fn` would silently
+break that property (same db → different snapshot CID every time). Both
+implementations' test `encrypt-fn` derives its nonce deterministically
+(`HMAC-SHA256(nonce-key, plaintext)` truncated to 12 bytes — a standard
+synthetic-IV composition of two primitives already used elsewhere in this
+document, not a new hand-rolled construction) specifically to preserve this.
+Production `encrypt-fn` implementations should make the same choice unless
+they've separately decided this idempotency property doesn't matter to
+them.
+
+Neither correction changes this document's threat model, algorithm choice
+(AES-256-GCM + HMAC-SHA256), or key-management story — both are
+implementation-detail corrections to the Decision section's mechanics, not
+new design decisions. See ADR-2607061900 (gftdcojp recipient-set) for the
+layer built on top of this corrected design.
+
 ## Context
 
 ADR-2607050500's operational-semantics gap assessment named "Plaintext-first
@@ -239,12 +293,16 @@ component)))` instead of the raw `pr-str`'d value, keeping the same
 "print the known prefix, truncate before the closing bracket" trick keeps
 working unchanged — a caller filtering on a known entity/attribute
 independently computes the same HMAC (it has the plaintext, and the same
-`index-key`) and gets the identical prefix bytes to seek on. The value slot
+`index-key`) and gets the identical prefix bytes to seek on. ~~The value slot
 (currently always `true`, membership-only) is unaffected by this — there's
 nothing to encrypt there — but the datom's actual payload for anything
 `cold-datoms` reconstructs via `->eav` is exactly the s/p/o triple that's now
 blinded, so no separate "value encryption" step is needed at this layer; the
-protection comes entirely from blinding the key.
+protection comes entirely from blinding the key.~~ **Wrong — see the
+Addendum (2026-07-06) above.** `blind-fn` is one-way; once the key stops
+being plaintext, the value slot is the ONLY place left to recover the real
+triple from, so it now carries `encrypt-fn`'d ciphertext of `[k1 k2 v]`
+instead of `true`.
 
 What this explicitly does **not** hide: which blinded tokens repeat
 (equality/frequency pattern — e.g. "predicate X appears 40 times" is visible
@@ -551,6 +609,11 @@ now answered above, not still open:
 
 ## References
 
+- [kotoba-lang/arrangement#1](https://github.com/kotoba-lang/arrangement/pull/1)
+  and [kotoba-lang/kotobase-peer#4](https://github.com/kotoba-lang/kotobase-peer/pull/4)
+  — the implementation PRs (JVM-only, per ADR-2607061900's sequencing
+  decision) that found and fixed the value-slot bug this ADR's 2026-07-06
+  Addendum documents.
 - ADR-2607061900 (gftdcojp recipient-set / capability-grant / epoch rotation)
   — the follow-on document that adds multi-reader access (per-recipient HPKE
   wrapping of this document's per-graph DEK) and defines the rotation policy
