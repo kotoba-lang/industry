@@ -1,0 +1,67 @@
+{:frontmatter
+ {:id "adr-2607061600-kotoba-issue-ledger-shared-libs"
+  :title "issue -> proposal(PR) -> review -> merge -> audit ループ + kotoba-lang 共通ライブラリ抽出"
+  :status "accepted"
+  :date "2026-07-06"
+  :authoritative true
+  :repo ["orgs/kotoba-lang/kotoba-issue-clj"
+         "orgs/kotoba-lang/kotoba-ledger-clj"]
+  :builds_on ["orgs/gftdcojp/cloud-itonami"    ; activity.cljc/approval.cljc の propose/approve/execute/audit ゲート
+              "orgs/gftdcojp/local-manimani"]  ; agent.cljc の plan/act/observe FSM + ledger.cljc の投影
+  :related ["90-docs/adr/2606272330-cae-shared-libs-and-seeds.md"]}
+
+ :decision
+ {:vocabulary {:issue ":kotoba.issue/*  -- 前提: cloud-itonami の :itonami.activity/* / manimani の Inbox item"
+               :proposal ":kotoba.issue.proposal/*  -- 新規語彙。risk + rationale(=PRのdiff)。前提: :itonami.effect/*"
+               :review ":kotoba.issue.review/*  -- verdict は approve/reject/request-changes(request-changesは新規)"
+               :merge "gate/merge! -- 旧 execute-approved! の改称。承認済み proposal を handler で実行 + audit"
+               :audit ":kotoba.issue.audit/*  -- ほぼ itonami の :itonami.audit/* のまま"}
+
+  :libraries
+  {:kotoba-issue-clj {:role "gate(状態機械) + run(plan/act/observe 純粋reducer)"
+                      :modules ["kotoba.issue.store" "kotoba.issue.gate" "kotoba.issue.run"]
+                      :deps "zero-dep, .cljc"
+                      :tests "16 tests / 32 assertions, clojure -M:test green"}
+   :kotoba-ledger-clj {:role "append-only projection(JSONL codec + run-status/supervisor-snapshot) + I/O backends"
+                       :modules ["kotoba.ledger.core" "kotoba.ledger.file-git" "kotoba.ledger.kotobase"]
+                       :deps "cheshire only, .cljc core + #?(:clj ...) file-git backend"
+                       :tests "10 tests / 21 assertions, clojure -M:test green"}}
+
+  :namespace-strategy
+  {:principle "属性 namespace を強制統一しない -- cloud-itonami は :itonami.* を維持し境界でアダプト、manimani は :kotoba.issue.* を直接採用"
+   :reason "cloud-itonami の schema は store/doctor/tests に生きているため migration 不要。IssueStore は kind をただの caller-chosen partition keyword として name-agnostic に設計"}
+
+  :manimani-scope {:choice "全 policy を issue/PR 化(ユーザー選択)"
+                   :risk-routing {:auto-merge [:todo :waiting :done :archive :snooze]
+                                  :human-merge [:reply_llm :unsubscribe :investigate]}
+                   :ux-note "auto-merge は同一 runner tick 内で発火するため体感速度は現状維持。ただし proposed/merged の2イベントとして監査には残る"}}
+
+ :phases
+ {:A {:status "done" :date "2026-07-06"
+      :work ["kotoba-issue-clj scaffold + test + push"
+             "kotoba-ledger-clj scaffold + test + push"
+             "repos.edn :extra-projects 登録"
+             "gen-west-manifest.bb --entry kotoba-issue-clj,kotoba-ledger-clj (最小diff, pin検証OK)"]}
+  :B {:status "pending" :repo "orgs/gftdcojp/cloud-itonami"
+      :work ["activity.cljc/approval.cljc をアダプタ化" "execute-approved! -> merge! 改称"
+             "/api/{org}/{repo}/effects, /effects/approve を新規実装" "既存テスト再実行で回帰確認"]}
+  :C {:status "pending" :repo "orgs/gftdcojp/local-manimani"
+      :work ["agent.cljc/ledger.cljc をアダプタ化" "全policyの propose->merge化"
+             "babashka経路に kotoba.ledger.file-git で git-commit-per-decision 追加"
+             "bb triage/triage.bb eval golden.json の精度不変を確認"]}
+  :D {:status "pending" :repo "orgs/gftdcojp/cloud-manimani"
+      :work ["routes.cljc に /proposals /reviews /proposals/<id>/merge を追加(既存 /decisions は維持)"]}
+  :E {:status "pending" :work ["本ADRを closed へ更新" "gen-west-manifest.bb --check 最終確認"]}}
+
+ :alternatives_rejected
+ ["単一 kotoba-agent-clj への集約 -- CAE-libs 前例(2606272330)と同じ理由で却下(ゲートと台帳は読み手・生存期間が違う)"
+  "cloud-itonami の :itonami.* を :kotoba.issue.* へ schema migration -- 生きたコードへの影響が大きく不要"
+  "manimani の TS(server/)・Rust(tauri/,mobile/)実装の統合 -- .cljc は Node/Rust から直接呼べない。babashka/CLJC面を正本とする既存方針(README)と整合させ今回はスコープ外"]
+
+ :verification_2026_07_06
+ {:kotoba-issue-clj {:command "clojure -M:test" :result "16 tests, 32 assertions, 0 failures, 0 errors"}
+  :kotoba-ledger-clj {:command "clojure -M:test" :result "10 tests, 21 assertions, 0 failures, 0 errors"}
+  :west {:command "bb scripts/gen-west-manifest.bb --entry kotoba-issue-clj,kotoba-ledger-clj"
+         :result "2件のpin変更を検証OK。1464 projects書き込み"}}
+
+ :status_note "Phase A(2ライブラリの新規構築・push・west登録)完了、green。Phase B(cloud-itonami)/C(manimani)/D(cloud-manimani)/E(ADR最終化)は別コミットで進行中。"}
