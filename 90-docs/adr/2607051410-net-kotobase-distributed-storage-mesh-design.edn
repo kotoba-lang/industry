@@ -217,8 +217,36 @@
   :meaning "設計方針の確定であり、実装の完了ではない。L0/L1(既存流用そのまま)以外は全レイヤ・全follow-upとも実装ゼロのまま。"
   :still-open ["org境界(gftd vendor vs etzhayyim product) — open-questions #4"
                "命名(mesh protocolに独立名を与えるか) — open-questions #5"
-               "kotobase.peer.availability / kotoba.ledger.memory-timeの置き場所"
+               "kotoba.ledger.memory-timeの置き場所"
                "ADR-2607023100(L4の土台)自体もまだ未実装"]
-  :recommended-first-step "kotobase.peer.availability を実コード+テストにする(pure関数のみ・依存最小・最大のギャップである不正検知を実際に埋められるか検証できる)。または ADR-2607023100 の実装(L4土台、これも未着手)を先に着手。いずれも別PR・オーナー確認の上で進める。"}
+  :recommended-first-step "(2026-07-05時点で完了 — 下記:landed-2026-07-05参照) kotobase.peer.availability を実コード+テストにする。または ADR-2607023100 の実装(L4土台、まだ未着手)。いずれも別PR・オーナー確認の上で進める。"}
 
- :note "本ADRはaccepted(設計方針確定)だが実装はまだ別PR。実装(L2 fleet storage shell・L3 discovery・L5 validation・kotobase.peer.availability・kotoba.ledger.memory-time抽出・L6 credits台帳への相乗り、west manifest登録、org境界確定)はいずれも未着手、オーナー確認の上で行う。"}
+ ;; ============================================================
+ ;; Landed(2026-07-05) — kotobase.peer.availability が
+ ;; kotoba-lang/kotobase-peer#3 として実装・merge された。
+ ;; ============================================================
+ :landed-2026-07-05
+ {:pr "kotoba-lang/kotobase-peer#3 (feat/availability-proof -> main)"
+  :merge-commit "042cf7fdb7d2be6c6d835507ad0cd6d058ee7c43"
+  :files ["src/kotobase_peer/availability.cljc" "test/kotobase_peer/availability_test.cljc"]
+  :test-result "35 tests / 88 assertions, 0 failures — verified identically on JVM(clojure -M:test) and real Node.js(shadow-cljs compile test)"
+  :scope "standalone、commit!/hot-datomsやどのWorkerにも未配線。superprojectのmanifest/west.ymlのkotobase-peer pinはこのcommitへ前進済み。"
+  :review
+  {:method "8観点(correctness x3, reuse, simplification, efficiency, altitude, CLAUDE.md規約)adversarial review + 1票verify"
+   :merge-blocking-findings []
+   :follow-up-findings
+   [{:severity :correctness :verdict :confirmed
+     :finding "verifyのdocstring『Never throws』は、verifier-get-fnが非バイト型を返す場合bytes-concat内でClassCastException/TypeErrorが実際に飛ぶため不正確。get-fnの型契約はこのコードベース全体でprose-onlyでruntime強制が無く、到達可能。"}
+    {:severity :correctness :verdict :plausible
+     :finding "nonce/block-bytesがnilでも検証エラーにならず、freshness保証のないhashに静かに劣化する。現状呼び出し元ゼロで未発火だが、実配線前に防御チェックを足すべき。"}
+    {:severity :efficiency :verdict :confirmed
+     :finding "bytes-concatの:clj分岐が既に正しい型の入力を(byte-array a)/(byte-array b)で毎回再コピーしており、実測でaclone比約40倍遅い。"}
+    {:severity :reuse :verdict :confirmed
+     :finding "bytes-concatはkotoba-lang/pqh(util/concat-bytes)・kotoba-lang/knp(packet.cljc)に既存の同型ロジックの再実装。ただしpqhは現状kotobase-peerの依存ではなく、採用は新規cross-repo依存を足すコストとのトレードオフ。"}
+    {:severity :simplification :verdict :confirmed
+     :finding "redundancy-tiersはこのPR内で一切参照されないdead data。"}
+    {:severity :cosmetic :verdict :confirmed
+     :finding "challenge/prove/verifyは:kotobase.availability/*、audit-outcomeは:audit/*と、同一ファイル内でキーワード名前空間の流儀が割れている。"}]}
+  :manifest {:commit "chore(manifest): advance kotobase-peer pin (availability-proof landed, PR #3)" :method "west.yml single-entry pin advance, --entry kotobase-peer, verified reachable from main"}}
+
+ :note "本ADRはaccepted(設計方針確定)。kotobase.peer.availabilityは実装・merge済み(:landed-2026-07-05)。残る実装(L2 fleet storage shell・L3 discovery・L4 ADR-2607023100・kotoba.ledger.memory-time抽出・L6 credits台帳への相乗り、org境界確定、および:landed-2026-07-05 :reviewのfollow-up-findings)は別PR/ブランチで、オーナー確認の上で行う。"}

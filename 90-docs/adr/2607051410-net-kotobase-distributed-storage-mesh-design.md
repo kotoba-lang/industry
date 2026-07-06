@@ -7,11 +7,12 @@
 
 **Acceptance note**: この ADR が「accepted」を意味するのは**設計方針の確定**
 であり、実装の完了ではない。L0/L1（既存流用）以外の全レイヤ・全follow-up
-（`kotobase.peer.availability`、`kotoba.ledger.memory-time` 抽出含む）は
-引き続き実装ゼロ。次の一歩は、置き場所（org境界・命名）を決めた上で
-`kotobase.peer.availability` を実コード+テストにする、または
-ADR-2607023100（L4の土台、これも未実装）を先に着手する、のいずれか — 別
-PR・オーナー確認の上で進める。
+（`kotoba.ledger.memory-time` 抽出含む）は引き続き実装ゼロ。唯一の例外は
+`kotobase.peer.availability`（L5寄りの監査プリミティブ）— これは実装され
+`kotoba-lang/kotobase-peer` に着地済み（下記「Landed」節）。次の一歩は、
+L4の土台である ADR-2607023100（これも未実装）に着手するか、あるいは
+`kotobase.peer.availability` を実際に credits/kekkai へ配線する、のいずれ
+か — 別PR・オーナー確認の上で進める。
 
 ## Context
 
@@ -351,6 +352,47 @@ overlay）だけ共有**するのが適切と判断する。
 2026-07-05）。実装（`kotoba.ledger.memory-time`/`kotobase.peer.
 availability` の新規抽出・net-kotobase 配線・料率決定）は引き続き別 PR・
 別オーナー確認。
+
+## Landed（2026-07-05）— `kotobase.peer.availability` merged
+
+`kotoba-lang/kotobase-peer#3`（`feat/availability-proof` →
+`main`、merge commit `042cf7fdb7d2be6c6d835507ad0cd6d058ee7c43`）が
+merge 済み。`src/kotobase_peer/availability.cljc` +
+`test/kotobase_peer/availability_test.cljc` — 上記 cljc 再設計をそのまま
+実装したもの。テストは JVM(`clojure -M:test`) と実 Node.js
+(`shadow-cljs compile test`) の両方で 35 tests / 88 assertions, 0
+failures を確認済み。**まだ standalone** — `commit!`/`hot-datoms` や
+どの Worker にも配線されていない。superproject の
+`manifest/west.yml` の kotobase-peer pin もこの commit に前進済み。
+
+8観点(correctness×3, reuse, simplification, efficiency, altitude,
+CLAUDE.md規約)のadversarial reviewを実施、verify(1票)を経て以下が
+survived — いずれもマージを止めるほどではないが、次にこの ns を実配線
+する前に潰しておくべき follow-up:
+
+- **[correctness, confirmed]** `verify` の docstring は「Never
+  throws」と主張するが、`verifier-get-fn` が非バイト型データを返すと
+  `bytes-concat` 内で `ClassCastException`/`TypeError` が実際に飛ぶ
+  （`get-fn` の「bytesを返す」契約はこのコードベース全体でprose-onlyで
+  runtime強制が無いため到達可能）。fail-closedにするか、docstringを
+  正直に書き直すか。
+- **[correctness, plausible]** `nonce`/`block-bytes` が `nil` でも
+  検証エラーにならず、静かに freshness 保証のない hash に劣化する。
+  現状呼び出し元ゼロなので未発火だが、実配線前に防御チェックを足すべき。
+- **[efficiency, confirmed]** `bytes-concat` の `:clj` 分岐が
+  `(byte-array a)`/`(byte-array b)` で既に正しい型の入力を毎回コピーし
+  直しており、実測で素の `aclone` の約40倍遅い。無条件coercionをやめ、
+  型ガード付きにすべき。
+- **[reuse, confirmed]** `bytes-concat` は `kotoba-lang/pqh`(`util/
+  concat-bytes`)・`kotoba-lang/knp`(`packet.cljc`)等に既に存在するのと
+  同じロジックの再実装。ただし `pqh` は現状 `kotobase-peer` の依存では
+  ないため、「再利用」は新規cross-repo依存を足すコストとのトレードオフ。
+- **[simplification, confirmed]** `redundancy-tiers` はこのPR内で一切
+  参照されない dead data。実際に tier gating を強制するか、次PRまで
+  削るか。
+- **[cosmetic, confirmed]** `challenge`/`prove`/`verify` は
+  `:kotobase.availability/*`、`audit-outcome` は `:audit/*` と、同一
+  ファイル内でキーワード名前空間の流儀が割れている。
 
 ## Related
 
