@@ -96,7 +96,12 @@
   "orgs/kotoba-lang/activitypub"     "orgs/kotoba-lang/org-w3-activitypub"
   "orgs/kotoba-lang/activitystreams" "orgs/kotoba-lang/org-w3-activitystreams"
   "orgs/kotoba-lang/rdf"             "orgs/kotoba-lang/org-w3-rdf"
-  "orgs/kotoba-lang/turtle"          "orgs/kotoba-lang/org-w3-turtle"}
+  "orgs/kotoba-lang/turtle"          "orgs/kotoba-lang/org-w3-turtle"
+  ;; follow-up batch, renamed 2026-07-06 (ADR-2607061613): ipfs joins the
+  ;; io-<domain> family (io-libp2p/io-ipld/io-multiformats, ipfs.tech-governed);
+  ;; svg is a W3C Recommendation, same org-w3-* precedent as the batch above.
+  "orgs/kotoba-lang/ipfs" "orgs/kotoba-lang/io-ipfs"
+  "orgs/kotoba-lang/svg"  "orgs/kotoba-lang/org-w3-svg"}
 
  ;; 全 project 共通の既定
  :defaults
@@ -1377,7 +1382,7 @@
    "orgs/gftdcojp/ai-gftd-weight-oka"
    "orgs/gftdcojp/cloud-manimani"
    "orgs/gftdcojp/local-murakumo"
-   "orgs/kotoba-lang/svg"
+   "orgs/kotoba-lang/org-w3-svg" ; renamed from svg 2026-07-06
    "orgs/kotoba-lang/org-w3-did" ; renamed from did 2026-07-06
    ;; libp2p-key IPNS-name derivation (Ed25519 pubkey -> 'k51...' CIDv1),
    ;; split out of kekkai/kagi's copy-pasted actor-identity code (ADR-2607050100).
@@ -1432,7 +1437,7 @@
    "orgs/kotoba-lang/kami-nv-compat" ; NVIDIA Omniverse/Isaac/OptiX/RTX API-compat facade; relocated from etzhayyim-sdk per ADR-2606302300 org-taxonomy library-placement rule
    "orgs/kotoba-lang/hinshitsu"      ; 品質: portable evidence/gate schema + mokushi visual/snapshot testing for kotoba tools
    "orgs/kotoba-lang/pqh"            ; AEAD envelope + Argon2id KDF + post-quantum hybrid (suite pqh-v1) + DID<->Signal binding; relocated from etzhayyim-sdk per ADR-2607011830
-   "orgs/kotoba-lang/ipfs"           ; Kubo (IPFS) HTTP API pin/fetch/nodeInfo helpers; relocated from etzhayyim-sdk per ADR-2607011930
+   "orgs/kotoba-lang/io-ipfs"        ; Kubo (IPFS) HTTP API pin/fetch/nodeInfo helpers; relocated from etzhayyim-sdk per ADR-2607011930; renamed from ipfs 2026-07-06
    "orgs/kotoba-lang/checkpointer"   ; LangGraph MstCheckpointSaver wire-protocol sidecar (atproto MST/CAR, IPFS+L2 anchor); relocated from etzhayyim-sdk per ADR-2607011930
    "orgs/kotoba-lang/base-l2"        ; Base L2 MST-root anchor client (viem) + ERC-4337 sponsored-write helper; relocated from etzhayyim-sdk per ADR-2607011940
    "orgs/kotoba-lang/witness-quorum" ; deterministic witness selection + quorum decision rule + Ed25519 validation-membrane attestation; relocated from etzhayyim-sdk per ADR-2607011940
