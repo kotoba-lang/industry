@@ -1,7 +1,10 @@
 # ADR-2607061500: kotoba-lang/tayori — 通信文下書き actor（reply-LLM ⊣ ComplianceGovernor）
 
-**Status**: accepted
+**Status**: closed(実行完了。本 ADR の実行範囲=tayori 自体の scaffold はここで
+閉じる。local-manimani 側の配線は当初から本 ADR の範囲外と明記した通り、別 PR の
+follow-up として残る)
 **Date**: 2026-07-06
+**Closed**: 2026-07-06
 **Deciders**: Jun Kawasaki
 
 ## Context
@@ -133,6 +136,21 @@ manimani 側の責務とし、tayori は「下書き・審査・チャネル送�
   mock-channel/mock-doctarget による決定的 sim で動く。
 - (−) local-manimani 側の `reply_llm` 方針を tayori 経由へ実際に配線する作業は
   本 ADR の範囲外（別 PR）。
+
+## Execution(closing, 2026-07-06)
+
+| 項目 | 状態 | 備考 |
+|---|---|---|
+| repo scaffold(Channel/DocTarget port・統一データモデル・StateGraph・governor・phase・store・CACAO 自己発行) | ✅ 完了 | initial commit `bc31bff0` |
+| `kotoba-lang/tayori` GitHub repo 作成・push(public) | ✅ 完了 | `gh repo create` + `git push`、CI(lint/test)green |
+| manifest 登録(`repos.edn` + `west.yml --entry tayori`、pin 検証) | ✅ 完了 | pin == repo HEAD をサーバ側検証で確認 |
+| 独立レビュー(8 finder angle: 正誤3・cleanup3・altitude・CLAUDE.md conventions) | ✅ 完了 | confirmed 6 件(governor の subject 未存在チェック欠落・consent 判定が先頭 participant のみ・fail-open な未知 op・commit 前に store を書く順序バグ・GitHub Contents API の sha 欠落・email list-new-messages の重複取り込み) |
+| 上記 6 件の修正 + regression test 追加 | ✅ 完了 | commit `bf44f3f2`。28 tests / 99 assertions(新規7件)、lint clean、sim 再検証 |
+| manifest pin 前進(`bc31bff0`→`bf44f3f2`) | ✅ 完了 | `--entry tayori` 最小 diff、サーバ側検証 OK |
+| superproject `main` 反映 | ✅ 完了 | 並行セッションとの race を検知(shallow 偽陽性ではなく本物の diverge を GitHub API で確認) → feature branch 経由の `gh api .../merges` サーバ側マージ(`c6dcf96c`)でローカル rebase/force を使わず解消 |
+| local-manimani 側 `reply_llm` の tayori 配線(Decision Ledger schema 拡張) | ⏸ 範囲外のまま | 当初から別 PR と明記(Decision セクション「local-manimani/cloud-manimani からの利用」参照)。tracked as follow-up |
+
+残 1 件(local-manimani 配線)は「本 ADR の意図的な非対象」であり本 ADR の未完了ではない。着手する際は新規 ADR または本 ADR への追記のどちらでもよいが、tayori 側の Channel/DocTarget/Store 契約は本 ADR の decision がそのまま正本であり続ける。
 
 ## References
 
