@@ -1161,6 +1161,14 @@
    ;; calendar events on top of kotoba-lang/calendar EDN, share always
    ;; human-approved; cloud-itonami consumer (ADR-2607062010)
    "orgs/kotoba-lang/koyomi"
+   ;; goyoukiki (御用聞き) — JP government-procurement signal + bidder-matching
+   ;; actor, match-LLM ⊣ ProcurementGovernor; ingests forecast(調達予定)/
+   ;; tender(入札公告) + 全省庁統一資格 candidate ground facts, proposes
+   ;; opportunity⟷candidate matches, share always human-approved and
+   ;; structurally cannot reach the issuing agency (MatchTarget has no
+   ;; agency-destination param), silence-period hard-blocks share; JP-only v1
+   ;; (ADR-2607070200)
+   "orgs/kotoba-lang/goyoukiki"
    ;; shoko (書庫) — 保管ガバナンス actor scaffold on top of kotoba-lang/drive EDN.
    ;; Status: proposed, scaffold-only; governor/operation impl is follow-up
    ;; (ADR-2607062020)
