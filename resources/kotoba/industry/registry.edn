@@ -4621,8 +4621,13 @@
    :business-id "cloud-itonami-isic-6430"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :securities]
    :optional-technologies []
-   :maturity :blueprint
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as the fund-vehicle actor (TrustAdmin-LLM
+   ;; ⊣ TrustFundGovernor) in a three-actor VC-fund system alongside 6499
+   ;; (investment decisions) and 6630 (management company); issues the
+   ;; binding capital-call NOTICE off an upstream 6499 proposal, never
+   ;; trusting its numbers as-is (independent pro-rata re-verification).
    :operating-states [:intake :value :distribute :report :audit]},
   {:id "6491"
    :name "Financial leasing"
@@ -4742,8 +4747,14 @@
    :business-id "cloud-itonami-isic-6630"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :securities]
    :optional-technologies []
-   :maturity :blueprint
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as the management-company actor
+   ;; (FundManager-LLM ⊣ FundManagementGovernor) in a three-actor VC-fund
+   ;; system alongside 6499 (investment decisions) and 6430 (fund
+   ;; vehicle); draws the management fee off an upstream 6499 fee-accrual
+   ;; report, never trusting it as-is (independent formula recompute +
+   ;; own mandate rate-cap check + double-draw prevention).
    :operating-states [:intake :allocate :rebalance :report :audit]},
   {:id "6820"
    :name "Real estate activities on a fee or contract basis"
