@@ -228,3 +228,63 @@ examples. Decision reversed from "Alternatives considered" above:
 Net effect: one venture-capital-fund actor, at `cloud-itonami-isic-6499`,
 `:implemented` maturity, ISIC-numbered like every sibling blueprint, with
 no dangling standalone repo left behind.
+
+## Addendum 2 (2026-07-06, same day): `cloud-itonami-isic-6430`/`6630` promoted, real cross-repo integration designed
+
+The owner asked whether `cloud-itonami-isic-6499` was itself "連携/連動"
+(linked/interoperating) with any other ISIC classification. Investigation
+found `6430` (trust/fund vehicle) and `6630` (fee-based fund management)
+were named as "adjacent" in `cloud-itonami-isic-6499`'s own repo-level
+ADR (`docs/adr/0001-architecture.md` §6), but the relationship was
+documentation-only: both were still `:blueprint`-tier markdown stubs with
+zero lines of code, so `6499` exchanged no actual data with either. Asked
+to design real interoperation, the owner picked the largest of three
+offered scopes: implement BOTH as real governed actors and wire them to
+genuinely interoperate with `6499`.
+
+1. **`cloud-itonami-isic-6430`** promoted `:blueprint` → `:implemented`:
+   `trustfund.*` (TrustAdmin-LLM ⊣ TrustFundGovernor) -- the fund vehicle,
+   the legal entity that actually holds LP subscriptions and issues the
+   binding capital-call NOTICE off an upstream `6499` proposal. 26 tests /
+   116 assertions, lint-clean.
+2. **`cloud-itonami-isic-6630`** promoted `:blueprint` → `:implemented`:
+   `fundmgmt.*` (FundManager-LLM ⊣ FundManagementGovernor) -- the
+   management company, the GP entity that draws the management fee `6499`
+   computes as an accrual. 25 tests / 98 assertions, lint-clean.
+3. **The integration is a documented DATA CONTRACT, not shared code**:
+   each downstream actor's governor independently RE-VERIFIES an upstream
+   `6499` fact rather than trusting it -- `trustfund.governor`
+   independently re-derives the SAME pro-rata-by-commitment-share math
+   `vcfund.registry/capital-call-allocations` computes (a deliberately
+   separate re-implementation); `fundmgmt.governor` independently
+   reapplies the SAME flat-rate fee formula `vcfund.nav/management-fee-
+   accrued` computes, AND checks the claimed rate against its own
+   recorded LPA mandate cap (a check `6499` has no concept of at all).
+   Neither new repo imports or requires `vcfund.*` -- the same
+   "self-contained sibling" posture `underwriting.*` already has toward
+   `kotoba-lang/insurance`.
+4. **`cloud-itonami-isic-6499` needed almost no change** -- its existing
+   pure functions already produced the exact fact shapes needed. One
+   small, additive change: `vcfund.nav/fund-nav-report`'s return now also
+   exposes `:fee-basis`/`:annual-fee-rate`/`:years-elapsed` (previously
+   internal-only), so a downstream fee-drawdown actor doesn't have to
+   separately re-derive the fee basis. Purely additive, all 164
+   pre-existing tests pass unmodified.
+5. `kotoba-lang/industry`'s `registry.edn` entries for `"6430"`/`"6630"`
+   were promoted `:blueprint` → `:implemented`, via a worktree branch +
+   server-side merge (same convention as `6499`'s own promotion in
+   Addendum 1 -- the shared checkout stays browse-only).
+   `docs/cloud-itonami.md`'s maturity-tier counts (5→7 implemented,
+   92→90 blueprint) and `test/kotoba/industry_test.clj`'s hardcoded
+   `:implemented` count (5→7) were updated in the same commit; 7 tests /
+   55 assertions re-verified green.
+6. `manifest/repos.edn`'s doc-comment for the finance-repo batch was
+   extended to describe `6430`/`6630`'s promotion alongside `6499`'s.
+
+Net effect: a real, tested three-actor VC-fund system --
+`cloud-itonami-isic-6499` (investment decisions), `cloud-itonami-isic-
+6430` (fund vehicle), `cloud-itonami-isic-6630` (management company) --
+each independently forkable and deployable, interoperating through a
+documented fact contract rather than shared code, each with its own
+independent-re-verification governor check proven by tests and demos,
+not merely asserted.
