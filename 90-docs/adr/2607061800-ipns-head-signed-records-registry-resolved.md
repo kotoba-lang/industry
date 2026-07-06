@@ -94,3 +94,37 @@ new repo) adds JVM-only signed IPNS head record sign/verify — reusing
 `ipns.core`'s existing name derivation gains a cross-check against a
 real Kubo node's byte output; resolution stays inside kotobase.net's own
 XRPC registry, deliberately not the real IPFS/libp2p DHT.**
+
+## Addendum (2026-07-06, same day): repo renamed to the reverse-domain external-spec convention
+
+Per owner direction, `kotoba-lang/ipns` → `kotoba-lang/tech-ipfs-specs-ipns`,
+following the same `org-<body>-<spec>`/`io-<domain>` reverse-domain
+convention ADR-2607052300 already established (e.g. `org-ietf-turn`,
+`io-libp2p`) — here reversing `specs.ipfs.tech` (the spec's actual host)
+with the `-ipns` suffix scoping the name to the one spec section this
+repo implements (IPFS/IPFS specs host several other specs — bitswap,
+graphsync, etc. — under the same domain; the suffix keeps the name from
+overclaiming conformance to specs this repo doesn't touch, the same
+discipline ADR-2607052300 states explicitly).
+
+Executed the same procedure as ADR-2607052300: `gh repo rename` (GitHub
+preserves a redirect from the old name), local checkout path moved +
+remote retargeted, the 3 real dependents' `deps.edn` coordinates updated
+(`kekkai`, `kagi`, `tayori` — same pinned commit, coordinate only, no
+functional change), and `manifest/repos.edn`/`manifest/west.yml` updated
+(`:path-overrides` entry added, `:extra-projects` path renamed, new
+west.yml entry added via `gen-west-manifest.bb --entry` then the stale
+old-name entry removed manually — `--entry` mode doesn't auto-delete the
+superseded entry, same caveat ADR-2607052300 notes for its own renames).
+
+**`bb scripts/gen-west-manifest.bb --check` reports STALE after this
+edit** — not because this rename is wrong, but because a full regen at
+the time of this change would also "fix" two *unrelated* pin regressions
+(`kotoba`, `tayori` — both had local checkouts behind their true
+upstream) that are out of scope here and belong to whoever is actively
+working those repos. Per CLAUDE.md's explicit pin-freshness guardrail, a
+wholesale regen to chase a clean `--check` would silently roll those
+pins backward — worse than a STALE flag. This ADR's own entry (`tech-
+ipfs-specs-ipns`, pin `f3847f2ca371...`) was individually verified
+reachable-from-main via `--entry`'s own per-project check before the
+manual old-entry removal.

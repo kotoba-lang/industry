@@ -85,7 +85,8 @@
   "orgs/kotoba-lang/ui-gpu"     "orgs/kotoba-lang/kami-engine-hud-gpu" ; renamed together with kami-engine-hud (ADR-2607051200); its GPU rendering backend, restored from the deleted Rust kami-ui-gpu crate
   "orgs/kotoba-lang/wasm-ui"    "orgs/kotoba-lang/dom-gpu" ; renamed 2026-07-04 (ADR-2607051200): names the kotoba:dom retained-tree-to-GPU substrate (consumed by browser/cssom/htmldom/shell) for what it does, avoiding collision with kotoba-ui/appkit/uikit; browser/README.md's prior aspirational rename target "ui" was permanently blocked by kotoba-lang/ui above (now kami-engine-hud)
   "orgs/kotoba-lang/kami-ui-sdk" "orgs/kotoba-lang/kami-engine-app-sdk" ; renamed 2026-07-04 (ADR-2607051200): the six ported SDKs cover UI+animation+particle-FX+audio-synth+WebRTC, not UI alone; aligned to the kami-app-*/kami-engine-* naming families
-  "orgs/kotoba-lang/kami-app-sip" "orgs/etzhayyim/com-etzhayyim-sip"} ; GitHub-transferred to etzhayyim 2026-07-04 + renamed (ADR-2607041245; leaf consumer product, not substrate -- moved to the agent-centric actor bucket alongside com-etzhayyim-tsumugu)
+  "orgs/kotoba-lang/kami-app-sip" "orgs/etzhayyim/com-etzhayyim-sip" ; GitHub-transferred to etzhayyim 2026-07-04 + renamed (ADR-2607041245; leaf consumer product, not substrate -- moved to the agent-centric actor bucket alongside com-etzhayyim-tsumugu)
+  "orgs/kotoba-lang/ipns" "orgs/kotoba-lang/tech-ipfs-specs-ipns"} ; renamed 2026-07-06 (ADR-2607061800 addendum): reverse-domain external-spec name, specs.ipfs.tech/ipns/ -> tech-ipfs-specs-ipns, same org-<body>-<spec>/io-<domain> precedent as the batch-2 renames above
 
  ;; 全 project 共通の既定
  :defaults
@@ -1364,7 +1365,9 @@
    "orgs/kotoba-lang/did"
    ;; libp2p-key IPNS-name derivation (Ed25519 pubkey -> 'k51...' CIDv1),
    ;; split out of kekkai/kagi's copy-pasted actor-identity code (ADR-2607050100).
-   "orgs/kotoba-lang/ipns"
+   ;; Renamed 2026-07-06 (ADR-2607061800 addendum): reverse-domain external-spec
+   ;; name for specs.ipfs.tech/ipns/ -- see :path-overrides above.
+   "orgs/kotoba-lang/tech-ipfs-specs-ipns"
    "orgs/kotoba-lang/json-ld"
    "orgs/kotoba-lang/vc"
    "orgs/kotoba-lang/activitystreams"
