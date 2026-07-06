@@ -186,6 +186,21 @@ open, but as a policy-adapter integration (aiueos's decision translated
 into a `HostCaps` value), not a code-level merge of the two execution
 namespaces.
 
+## Addendum 4 (2026-07-06, same day): `:now`/`:log-append!` renamed to `:clock-monotonic`/`:log-write`
+
+Preparing addendum 3's follow-up (extending `kotoba-core-contracts`'
+closed host-import table for a real `.kotoba`-source E2E test) surfaced
+that a concurrent session had already independently registered
+`clock-monotonic`/`log-write` in that same shared table, for `aiueos`'s
+kernel-capability vocabulary, with wire signatures identical to
+`kototama.contract`'s own `:now`/`:log-append!`. Decision: rename
+kototama's side to reuse the existing names rather than register the same
+operation twice under different names. Landed across `kototama.contract`/
+`kototama.tender`/both test files (kototama#21), the browser-native
+`actor-host.js` counterpart (`wasm-webcomponent`#3), and kototama's
+`web/` demo + pin bump (kototama#22). Full detail in
+ADR-2607062400's addendum.
+
 ## One-line summary
 
 **`kototama.tender` is the Chicory/JVM execution layer ADR-2607022400/
