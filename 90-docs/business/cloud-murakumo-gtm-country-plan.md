@@ -62,8 +62,12 @@ ADR-2607052200(国別 storefront + Stripe Checkout 実装)、
 3. **既存 design partner(gftd 自社フリート)の実データを事例化** — ADR-2607030030 の
    GTM 方針どおり、自社利用の実測(tok/s・稼働率)をケーススタディとして公開する。
    これは追加コスト無しで「実際に動いている」証拠になる。
-4. **OSS CLI → cloud upsell**(既存 Channels 項目)— `curl murakumo.cloud/join | sh`
-   の配布先を開発者コミュニティに絞って広げる。
+4. ~~OSS CLI → cloud upsell(`curl murakumo.cloud/join | sh`)~~ — 2026-07-06
+   実測: `murakumo.cloud/join` は 404(実装なし)。ADR-2607030030 の一般ユーザー
+   参加導線は Phase 2/3 のビジョンであって、この Sora ドメインには未実装。
+   誤って公開ブログ記事に載せていたため削除・修正済み(`try before you buy` =
+   `#console` playground を無料の試用導線として使う、に置換)。この Channel 項目
+   は「実装されたら」復活させる。
 
 ### 90日プラン(具体)
 | 週 | アクション |
