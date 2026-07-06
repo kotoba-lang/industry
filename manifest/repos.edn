@@ -29,11 +29,13 @@
                      :scope :private-foundation  ; 言語コアは kotoba-lang へ移動済み (:path-overrides)
                      :note "汎用基盤 -clj も最終的に kotoba-lang へ全移行（ADR-2606302300, 決定 2026-06-30）。当 org は data(spirit-in-physics 等) のみへ縮退予定（cloud-manimani / local-murakumo(旧 cloud-murakumo(-fleet)) は 2026-07-02 gftdcojp へ transfer 済み、local-murakumo は 2026-07-04 に再改名 ADR-2607041302）"}
   "jk-luxury"       {:role :human-centric        ; gftdcojp と同じ human-centric/business カテゴリだが
-                                                  ; 別法人（JK株式会社）が運営するアダルト/クリエイター
-                                                  ; 経済圏ブランド。gftd-talent-actor の既存記述
-                                                  ; 「itonami (Gftd Japan株式会社) serves club-shinshi
-                                                  ; (JK株式会社)」の通り元々別法人運営だった実態を
-                                                  ; GitHub org 構造にも反映（ADR-2607062300）
+                                                  ; 別法人（JK Inc.、British Virgin Islands
+                                                  ; business company）が運営するアダルト/
+                                                  ; クリエイター経済圏ブランド。元々別法人運営
+                                                  ; だった実態を GitHub org 構造にも反映
+                                                  ; （ADR-2607062300、2026-07-06 amendment:
+                                                  ; JK株式会社(日本)ではなく JK Inc.(BVI) —
+                                                  ; jk-luxury/club-shinshi#3 legal/terms.md 確定）
                      :scope :business
                      :note "club-shinshi・net-babiniku を 2026-07-06 に gftdcojp から transfer
                             （ADR-2607062300）。private。PSP/クレジット決済の契約主体・

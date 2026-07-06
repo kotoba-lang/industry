@@ -131,3 +131,24 @@ project):
   boundary this amendment still respects)
 - `orgs/gftdcojp/gftd-talent-actor` docs (pre-existing JK株式会社/Gftd Japan株式会社 entity
   split reference)
+
+## Amendment (2026-07-06): operating entity is JK Inc. (BVI), not JK株式会社 (Japan)
+
+`jk-luxury/club-shinshi#3` (`legal/terms.md`, `legal/privacy.md`, merged this session) reflects
+a **2026-07-03 owner decision, made before this ADR was written**, that superseded the
+`gftd-talent-actor`-docs framing this ADR's Context/Decision/Alternatives sections relied on:
+the operator is **JK Inc., a British Virgin Islands business company** (CR-113 Hannah Bay
+Commercial Building Unit 2, Hannah's Bay, Tortola, BVI; `[CONFIRM: BVI company/registration
+number]`), governing law **British Virgin Islands** (not Japan/APPI as primary regime — APPI/
+GDPR/CCPA are maintained as secondary regimes for users in those jurisdictions). This ADR's
+body text (Context, Decision §1, Alternative #1) still says "JK株式会社" — left as originally
+written per this repo's amendment convention (the original decision record isn't rewritten),
+corrected here instead. The underlying decision this ADR made — split `jk-luxury` out as its
+own GitHub org/access-control/compliance-audit boundary, distinct from `gftdcojp` — is
+unaffected by which specific entity operates within that boundary.
+
+`legal/terms.md`/`legal/privacy.md` are themselves still DRAFT with multiple unresolved
+`[CONFIRM]` items (age-assurance method, 18 U.S.C. §2257 applicability, regional access
+restrictions, ad-partner data-sharing classification, creator payout/tax terms, BVI company
+number) requiring specialized adult-industry counsel review before being relied upon —
+merging the PR landed the draft in `main`, it did not resolve those items.
