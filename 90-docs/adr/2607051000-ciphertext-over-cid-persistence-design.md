@@ -1,8 +1,60 @@
 # ADR-2607051000: ciphertext-over-CID persistence design for `arrangement`/`kotobase-peer` (Phase 2 of ADR-2607050500)
 
-**Status**: proposed
+**Status**: accepted (2026-07-06 — see "Acceptance" section below for the owner's resolution of each Open question)
 **Date**: 2026-07-05 (session-numbered; see repos.edn ADR numbering convention)
-**Deciders**: Jun Kawasaki (pending — this document proposes a design; it is not yet accepted, and no implementation should start against it without explicit sign-off)
+**Deciders**: Jun Kawasaki
+
+## Acceptance (2026-07-06)
+
+This design is accepted as written, with the six Open questions below resolved
+as follows. ADR-2607061900 (gftdcojp recipient-set / capability-grant / epoch
+rotation) is the follow-on document that builds the multi-reader access layer
+this acceptance presupposes — read the two together.
+
+1. **Granularity: per-graph, as recommended, extended to per-graph +
+   per-recipient.** The DEK stays one-per-graph (not per-actor-global), but
+   ADR-2607061900 adds a wrapping layer on top: the same per-graph DEK is
+   HPKE-wrapped once per authorized reader's X25519 public key, so "who can
+   read this graph" is a set, not a single key-holder. This does not change
+   anything in this document's Decision section (the DEK/blind-index design
+   is unaffected) — it only answers "how does more than one actor come to
+   hold the same DEK."
+2. **Key-separation: option (b), a dedicated X25519 KEM keypair per actor.**
+   Reusing the Ed25519 signing key via signature-derived HKDF (option a) does
+   not compose with ADR-2607061900's requirement that each gftdcojp member
+   have an addressable X25519 public key to wrap graph DEKs to — HPKE needs a
+   Diffie-Hellman-capable key, and Ed25519 is not that (converting via XEdDSA
+   was already ruled out for `kotoba-signal`'s own reasons, cited in this
+   document's Alternatives). Every actor generates+persists one companion
+   X25519 keypair alongside its existing Ed25519 identity key, exactly the
+   shape `kotoba-signal`'s `:ik`/`:sign-seed` split already established.
+3. **Compromised-Worker threat model: out of scope, as this document already
+   stated.** No per-request key-wrapping/KMS-equivalent layer is added. A
+   Worker instance that holds a graph's unwrapped DEK in memory during a
+   request is trusted for that request's duration, same as today's capability
+   host. Revisit only if a concrete incident or compliance requirement forces
+   the question.
+4. **Mandatory, no silent default — as this document leaned toward.** Every
+   new graph on `arrangement`/`kotobase-peer` must supply `blind-fn` and
+   `encrypt-fn`/`decrypt-fn` from day one; there is no opt-in/legacy-plaintext
+   path (Alternative (c) is rejected, not merely deprioritized).
+5. **Rotation policy: defined in ADR-2607061900, not here.** Summary: rotation
+   is membership-driven (adding/removing a recipient bumps the graph's epoch
+   and mints a new DEK, wrapped only to the then-current recipient set) and
+   forward-only — an old epoch's DEK stays wrapped to whoever held it when it
+   was current, so data written under that epoch remains readable to those
+   readers without a mandatory O(graph) re-blind/re-encrypt pass. A removed
+   member therefore keeps the ability to decrypt data from before their
+   removal unless a stronger (and explicitly opt-in, because it's expensive)
+   re-encrypt-under-new-epoch pass is run — this asymmetry is intentional, not
+   an oversight, and is spelled out in ADR-2607061900's own Key management
+   section.
+6. **Current `kotobase/cljc-v2` volume: not independently re-confirmed by
+   this acceptance.** The Migration section's "real but likely small" framing
+   stands as this document's working assumption; if the owner has since
+   confirmed a materially different volume, the Migration section should be
+   revisited before the re-transact-under-a-fresh-prefix plan is executed as
+   final.
 
 ## Context
 
@@ -415,9 +467,10 @@ in practice (e.g. if R2/block-store access is already as tightly scoped as
 the query API, this whole design is unnecessary complexity), but one this
 document flags rather than assumes.
 
-## Open questions for the owner
+## Open questions for the owner (resolved — see "Acceptance" section above)
 
-Since this is `proposed`, not `accepted`:
+Preserved verbatim as the record of what was open at proposal time; each is
+now answered above, not still open:
 
 1. **Per-graph key vs. per-actor key vs. some other granularity** — this
    document recommends per-graph (Key management, above), but the owner may
@@ -498,6 +551,10 @@ Since this is `proposed`, not `accepted`:
 
 ## References
 
+- ADR-2607061900 (gftdcojp recipient-set / capability-grant / epoch rotation)
+  — the follow-on document that adds multi-reader access (per-recipient HPKE
+  wrapping of this document's per-graph DEK) and defines the rotation policy
+  this document's Open question 5 left undesigned.
 - ADR-2607050500 (kotoba-lang operational-semantics gap assessment) — names
   this gap ("Plaintext-first persistence") and phases it as Phase 2.
 - ADR-2607050700 (Datomic terminology rename) — `quad-store`+`kqe` →
