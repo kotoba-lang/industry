@@ -201,6 +201,46 @@ operation twice under different names. Landed across `kototama.contract`/
 `web/` demo + pin bump (kototama#22). Full detail in
 ADR-2607062400's addendum.
 
+## Addendum 5 (2026-07-06, same day): addendum 3's E2E gap closed — a real `.kotoba`-compiled guest now runs through `kototama.tender`
+
+Addendum 3 found `kotoba wasm emit` could not call any of
+`kototama.contract`'s `actor:host` imports — the compiler resolves
+host-import calls against `kotoba-core-contracts`' closed
+`capability_contract.edn` table, and (before addendum 4's rename) none
+of the 8 imports had an entry there at all. This addendum closes that
+gap end to end, across three repos:
+
+1. **`kotoba-core-contracts`** (kotoba-core-contracts#3): registered the
+   6 imports net-new after addendum 4's rename (`log-write`/
+   `clock-monotonic` already existed) — `gen-keypair`/`sign`/`verify`/
+   `sha256-hex`/`http-post`/`log-read`, capability ids 219–224
+   (`identity/keypair`, `identity/sign`, `identity/verify`,
+   `hash/sha256`, `http/post`, `log/read`), field names/param/result
+   shapes copied 1:1 from `kototama.tender`'s actual `HostFunction`
+   wiring so nothing would need reconciling later.
+2. **`kotoba`** (kotoba#288): bumped its `kotoba-core-contracts` pin,
+   added one minimal `.kotoba` demo + granting policy per new import
+   (`test/kotoba/actor_host_test.clj`, mirroring
+   `kotoba.aiueos-kernel-caps-test`'s exact shape — denies without a
+   policy, compiles to a real Wasm binary with one). Confirmed by
+   actually attempting the compile (not just reading the source) that
+   `kotoba.runtime`'s `op->kind`/`cap-passing-imports` need NO changes
+   for these ops: they don't participate in the `cap-acquire`/`<op>-with`
+   capability-passing extension (an aiueos-specific feature) — a plain
+   `:capability`-gated `host-imports` entry is sufficient, same as
+   `kgraph-assert!`/`clipboard-write`.
+3. **`kototama`** (kototama#23): checked in the actual `.wasm` bytes
+   `kotoba wasm emit` produced (not a hand-written WAT string) as test
+   fixtures, alongside their `.kotoba` source for provenance, and ran
+   them through `kototama.tender/instantiate`/`run-main`. The
+   `sha256-hex` fixture computes and returns `sha256("")` correctly
+   through the real host function; the `gen-keypair` fixture writes a
+   real 32-byte seed + 32-byte derived pubkey. This is the actual
+   end-to-end proof this ADR's original text could only gesture at —
+   a genuinely independent compiler's output linking against a
+   genuinely independent execution runtime, with no shape mismatch,
+   checked into CI so it can't silently regress.
+
 ## One-line summary
 
 **`kototama.tender` is the Chicory/JVM execution layer ADR-2607022400/
