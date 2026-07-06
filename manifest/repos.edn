@@ -111,7 +111,13 @@
   ;; already stale in a different way -- com-junkawasaki/ed25519-clj -- and
   ;; the repo has an actively in-progress worktree; GitHub's redirect keeps
   ;; it working either way).
-  "orgs/kotoba-lang/ed25519" "orgs/kotoba-lang/org-ietf-ed25519"}
+  "orgs/kotoba-lang/ed25519" "orgs/kotoba-lang/org-ietf-ed25519"
+  ;; renamed 2026-07-06 (ADR-2607061640): RFC 8949 (CBOR) is an IETF
+  ;; document, same org-ietf-* precedent. 4 real dependents' deps.edn/bb.edn
+  ;; coordinates updated in the same pass (io-ipld, pqh, gftdcojp/net-kotobase,
+  ;; kotoba-lang/cacao); etzhayyim/root deliberately skipped (same reasoning
+  ;; as the ed25519 rename above).
+  "orgs/kotoba-lang/dag-cbor" "orgs/kotoba-lang/org-ietf-cbor"}
 
  ;; 全 project 共通の既定
  :defaults
@@ -1470,7 +1476,7 @@
    "orgs/kotoba-lang/contacts"
    "orgs/kotoba-lang/crash"
    "orgs/kotoba-lang/cron"
-   "orgs/kotoba-lang/dag-cbor"
+   "orgs/kotoba-lang/org-ietf-cbor" ; renamed from dag-cbor 2026-07-06
    "orgs/kotoba-lang/datom"
    "orgs/kotoba-lang/ddl"
    "orgs/kotoba-lang/org-omg-dmn" ; renamed from dmn 2026-07-06
