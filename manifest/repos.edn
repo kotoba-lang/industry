@@ -11,7 +11,8 @@
  {"com-junkawasaki" "git@github.com:com-junkawasaki"
   "kotoba-lang"     "git@github.com:kotoba-lang"
   "gftdcojp"        "git@github.com:gftdcojp"
-  "etzhayyim"       "https://github.com/etzhayyim"}
+  "etzhayyim"       "https://github.com/etzhayyim"
+  "jk-luxury"       "git@github.com:jk-luxury"}
 
  ;; org の役割分担（taxonomy の権威は ADR-2606302300）。生成器はこのキーを読まない（doc 用宣言。
   ;;   :manifest-workflow / :kotoba 等と同じく人間が読むポリシーメタ）。新規 repo の所属判定は
@@ -26,7 +27,17 @@
                      :scope :business}           ; ビジネス
   "com-junkawasaki" {:role :transitional-foundation ; 汎用 -clj 基盤ライブラリ + cloud 制御面 + data project
                      :scope :private-foundation  ; 言語コアは kotoba-lang へ移動済み (:path-overrides)
-                     :note "汎用基盤 -clj も最終的に kotoba-lang へ全移行（ADR-2606302300, 決定 2026-06-30）。当 org は data(spirit-in-physics 等) のみへ縮退予定（cloud-manimani / local-murakumo(旧 cloud-murakumo(-fleet)) は 2026-07-02 gftdcojp へ transfer 済み、local-murakumo は 2026-07-04 に再改名 ADR-2607041302）"}}
+                     :note "汎用基盤 -clj も最終的に kotoba-lang へ全移行（ADR-2606302300, 決定 2026-06-30）。当 org は data(spirit-in-physics 等) のみへ縮退予定（cloud-manimani / local-murakumo(旧 cloud-murakumo(-fleet)) は 2026-07-02 gftdcojp へ transfer 済み、local-murakumo は 2026-07-04 に再改名 ADR-2607041302）"}
+  "jk-luxury"       {:role :human-centric        ; gftdcojp と同じ human-centric/business カテゴリだが
+                                                  ; 別法人（JK株式会社）が運営するアダルト/クリエイター
+                                                  ; 経済圏ブランド。gftd-talent-actor の既存記述
+                                                  ; 「itonami (Gftd Japan株式会社) serves club-shinshi
+                                                  ; (JK株式会社)」の通り元々別法人運営だった実態を
+                                                  ; GitHub org 構造にも反映（ADR-2607062300）
+                     :scope :business
+                     :note "club-shinshi・net-babiniku を 2026-07-06 に gftdcojp から transfer
+                            （ADR-2607062300）。private。PSP/クレジット決済の契約主体・
+                            コンプライアンス監査面を gftdcojp の他事業から分離する狙い。"}}
 
  ;; GitHub owner だけ移した project の west remote を上書きする。
  :remote-overrides
@@ -128,7 +139,14 @@
   ;; `origin` remote pointing at com-junkawasaki/root) -- GitHub's actual
   ;; authentication repo has zero deps and no cacao reference in its
   ;; history, so no change was needed there; left the checkout untouched.
-  "orgs/kotoba-lang/cacao" "orgs/kotoba-lang/org-chainagnostic-cacao"}
+  "orgs/kotoba-lang/cacao" "orgs/kotoba-lang/org-chainagnostic-cacao"
+  ;; GitHub-transferred 2026-07-06 (ADR-2607062300): both were gftdcojp
+  ;; (Gftd Japan株式会社) repos, moved to the new jk-luxury org (JK株式会社)
+  ;; -- adult-content/creator-economy brand line, split out to its own
+  ;; GitHub-org boundary (PSP/compliance audit surface, access control)
+  ;; distinct from gftdcojp's other business lines. Both remain private.
+  "orgs/gftdcojp/club-shinshi" "orgs/jk-luxury/club-shinshi"
+  "orgs/gftdcojp/net-babiniku" "orgs/jk-luxury/net-babiniku"}
 
  ;; 全 project 共通の既定
  :defaults
@@ -158,7 +176,7 @@
    "orgs/gftdcojp/ai-gftd-lf-case-lingling"}
 
  ;; west update --group-filter で選択取得。datalad は既定で無効化(opt-in)。
- :group-filter ["+com-junkawasaki" "+kotoba-lang" "+gftdcojp" "+etzhayyim" "-datalad"]
+ :group-filter ["+com-junkawasaki" "+kotoba-lang" "+gftdcojp" "+etzhayyim" "+jk-luxury" "-datalad"]
 
  ;; DataLad dataset(git-annex + B2)。west project にはするが既定では取得しない。
  ;;   実体取得/破棄は `west annex-get` / `west annex-drop`(B2 creds は環境変数)。

@@ -10,13 +10,15 @@ manifest:
       url-base: https://github.com/etzhayyim
     - name: gftdcojp
       url-base: git@github.com:gftdcojp
+    - name: jk-luxury
+      url-base: git@github.com:jk-luxury
     - name: kotoba-lang
       url-base: git@github.com:kotoba-lang
 
   defaults:
     revision: main
 
-  group-filter: [+com-junkawasaki, +kotoba-lang, +gftdcojp, +etzhayyim, -datalad]
+  group-filter: [+com-junkawasaki, +kotoba-lang, +gftdcojp, +etzhayyim, +jk-luxury, -datalad]
 
   projects:
     - name: claude-lmstudio
@@ -1257,10 +1259,10 @@ manifest:
       path: orgs/gftdcojp/cloud-murakumo
       groups: [gftdcojp]
     - name: club-shinshi
-      remote: gftdcojp
+      remote: jk-luxury
       revision: 6f7b5306c106ec2dbeeddd69c4e4552b1824d1c8
-      path: orgs/gftdcojp/club-shinshi
-      groups: [gftdcojp]
+      path: orgs/jk-luxury/club-shinshi
+      groups: [jk-luxury]
     - name: gftd-talent-actor
       remote: gftdcojp
       revision: 2e09104e7b53eb011ad13d102254bf5250537dba
@@ -1295,10 +1297,10 @@ manifest:
         datalad: true
         annex-remote: b2
     - name: net-babiniku
-      remote: gftdcojp
+      remote: jk-luxury
       revision: 3f51f5b27fd16f8cb5961315132235c029408c8a
-      path: orgs/gftdcojp/net-babiniku
-      groups: [gftdcojp]
+      path: orgs/jk-luxury/net-babiniku
+      groups: [jk-luxury]
     - name: net-kotobase
       remote: gftdcojp
       revision: 20c065a574fa11d5ab2e4c2629ebbea554083d6c
