@@ -131,6 +131,26 @@ quote→claim→verify→mint パターンを Sora 専用 treasury で再利用)
   (secret 未設定のため到達しない設計どおり)。
 - `python3 -m http.server` で `public/` を静的配信: `/`=200, `/js/main.js`=200,
   `/murakumo.edn`=200(ADR-2606272330 と同じ smoke パターン)。
-- 未検証: 実 Chrome での目視レンダリング(拡張未接続)、実 `STRIPE_SECRET_KEY` を使った
-  実 Checkout Session 作成、Cloudflare 本番 deploy(`wrangler deploy` は
-  `wrangler secret put STRIPE_SECRET_KEY` 設定後)。
+- 未検証(2026-07-05 時点): 実 Chrome での目視レンダリング(拡張未接続)、実
+  `STRIPE_SECRET_KEY` を使った実 Checkout Session 作成、Cloudflare 本番 deploy。
+
+**2026-07-06 追記 — 本番 go-live 検証済み:**
+
+- `STRIPE_SECRET_KEY` を 1Password(`gftdcojp/Stripe Live API Keys`)から
+  `op read | wrangler secret put` で直接設定(値はチャット/ログに一切出さず、
+  オーナーの明示承認後に設定)。`npx wrangler secret list` で登録確認。
+- `npm run release` → `npx wrangler deploy` で `dist/worker.js`(CLJS
+  site_worker)+ `public/` を本番デプロイ(275 files, 2.86s)。
+- 本番エンドポイントを直接叩いて確認:
+  `GET https://murakumo.cloud/api/v1` → 200 capability payload(旧 worker.js
+  ではなく新 CLJS Worker が応答していることを確認)。
+  `POST https://murakumo.cloud/api/store/checkout {"country":"us","skuId":"credits-starter"}`
+  → 200、実際の `cs_live_...` Stripe Checkout Session URL を取得(実 Stripe API
+  への実課金コールが本番で機能することを確認)。`skuId:"does-not-exist"` → 400
+  (validation は本番でも保持)。
+  `/`・`/js/main.js`・`/murakumo.edn` → 200(静的配信も deploy 後に正常)。
+- **未検証のまま残る**: 実際にカード情報を入力して購入を完了する end-to-end
+  テスト(session 作成の確認まではしたが、実課金はオーナー自身が行う方針
+  ——`docs/gtm-launch-runbook.md` Gate 0)、Affirm/Klarna/Alipay/WeChat Pay の
+  実際の有効化(Stripe ダッシュボード側の設定次第)、実 Chrome での目視
+  レンダリング。
