@@ -1417,6 +1417,9 @@
    "orgs/kotoba-lang/witness-quorum" ; deterministic witness selection + quorum decision rule + Ed25519 validation-membrane attestation; relocated from etzhayyim-sdk per ADR-2607011940
    "orgs/kotoba-lang/kotoba-issue-clj"  ; issue -> proposal(PR) -> review -> merge -> audit gate; extracted from cloud-itonami's activity.cljc/approval.cljc + manimani's agent.cljc (2607061600)
    "orgs/kotoba-lang/kotoba-ledger-clj" ; append-only issue/proposal/review/run ledger (JSONL/file+git + kotobase backends); extracted from manimani's ledger.cljc (2607061600)
+   "orgs/kotoba-lang/com-gmail"           ; portable .cljc Gmail API v1 client (threads/labels/drafts, injectable HTTP) (2607061423)
+   "orgs/kotoba-lang/com-wise"            ; portable .cljc Wise Platform API client (profiles/transfers/quotes/recipients/balances, read-focused) (2607061423)
+   "orgs/kotoba-lang/kotoba-procedure-clj" ; multi-step external procedure tracker (ordered steps, whose-turn, deadline); pairs with com-gmail/com-wise (2607061423)
    "orgs/kotoba-lang/atproto-client" ; AT Protocol client facade + PDS read/write helpers over @atproto/api; relocated from etzhayyim-sdk per ADR-2607011940
    "orgs/kotoba-lang/arxiv"          ; ADR-0023: arXiv organism actor + yorishiro automation
    "orgs/kotoba-lang/aero"
