@@ -41,7 +41,7 @@
 - 準備 (murakumo-tok-price): run ledger の原価/tok export (node別 tok/s × 電力)
 - 準備 (murakumo-tok-price): 社内3アプリ推論の fleet 移管で原価比較
 
-> QA確認済み (2026-07-06): #console playgroundはスライダー操作で実際にスケジューラが再計算する(72 in-flight→4 replica)ことをブラウザ実機で検証。'試す'訴求は本物
+> QA発見+修正 (2026-07-06): navの"Source"リンクがprivate repo(gftdcojp/cloud-murakumo)への404だった。gftdcojp/local-murakumo(オーナーがpublic化予定)へ変更。技術者コミュニティ投稿前の必須チェック項目として記録
 
 ## Channels
 
