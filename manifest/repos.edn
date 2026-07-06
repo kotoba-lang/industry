@@ -1881,6 +1881,12 @@
    "orgs/kotoba-lang/appkit"
    "orgs/kotoba-lang/uikit"
 
+   ;; manga viewer — 正規化 work model + RTL 見開き pagination + css 文字列 +
+   ;; pure-hiccup views (works-grid/reader)。zero runtime deps、状態/handler は
+   ;; consumer 注入 (liquid-glass-ui 型)。consumer: app-aozora /manga
+   ;; (ADR-2607070500)
+   "orgs/kotoba-lang/manga-viewer"
+
    ;; ADR-2607011100: SVG-era exception repos (removed from :path-overrides above)
    ;; ADR-2607011100: SVG-era Office tooling restored as com-junkawasaki repos
    ;; while kotoba-lang/office and kotoba-lang/svgraph remain the CLJ/EDN line.
