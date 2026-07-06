@@ -59,6 +59,7 @@
 - 推論 tok 課金 / 生成 credits (Civitai Buzz 型)
 - compute marketplace take rate 20–30%
 - enterprise dedicated fleet / paid weights 手数料
+- 実績 (2026-07-06): Stripe Checkout 本番稼働確認(#store/* が実際に cs_live_ セッションを発行、docs/stripe-go-live-checklist.md)。実購入はまだゼロ
 
 ## Cost Structure
 
