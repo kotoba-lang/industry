@@ -4646,11 +4646,15 @@
    :name "Other financial service activities, except insurance and pe..."
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6499"
    :business-id "cloud-itonami-isic-6499"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :banking]
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :securities]
    :optional-technologies []
-   :maturity :blueprint
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :disclose :execute :audit]},
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as a venture-capital-fund actor (DD-LLM ⊣
+   ;; InvestmentCommitteeGovernor): the UN ISIC Rev.4 explanatory note for
+   ;; 6499 names "own-account investment activities, such as by venture
+   ;; capital companies" explicitly (superproject ADR-2607061700 addendum).
+   :operating-states [:intake :dd :commit :distribute :audit]},
   {:id "6511"
    :name "Life insurance"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6511"
