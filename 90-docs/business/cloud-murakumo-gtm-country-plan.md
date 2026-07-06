@@ -26,9 +26,10 @@ ADR-2607052200(国別 storefront + Stripe Checkout 実装)、
 
 **US → EU → CN の順**で立ち上げる。理由:
 
-- US は Stripe 決済がそのまま機能し(USD, card + Affirm)、Bonus Depreciation という
-  即効性のある訴求材料が Q4(12/31 taxable-year-end)に向けて時限性を持つ。
-- EU は決済は US と同型(EUR, card + Klarna)だが、訴求(AI Act/GDPR 監査台帳)は
+- US は Stripe 決済がそのまま機能し(USD, card。分割払いは 2026-07-06 時点で
+  非対応と決定 — 下記参照)、Bonus Depreciation という即効性のある訴求材料が
+  Q4(12/31 taxable-year-end)に向けて時限性を持つ。
+- EU は決済は US と同型(EUR, card)だが、訴求(AI Act/GDPR 監査台帳)は
   エンタープライズ営業サイクルが長く、成果が出るまでの時間が US より長い。
 - **CN は今回のスコープでは "watch" に留める(能動的な広告出稿はしない)。**
   storefront の決済は Alipay/WeChat Pay 経由でも実際は USD 建て決済(Stripe が CNY
@@ -96,7 +97,10 @@ ADR-2607052200(国別 storefront + Stripe Checkout 実装)、
 2. **直接 outreach**(コールドメール/LinkedIn)— 対象は「GDPR/AI Act 対応」を
    公言している中堅 SaaS/AI スタートアップの CTO/データ保護責任者。件数は少なくてよい
    (最初の 10–20 社に絞った質重視の outreach)。
-3. **`#store/eu` の Klarna 分割払い**をハードウェア購入のハードルを下げる訴求として明記。
+3. ~~`#store/eu` の Klarna 分割払い~~ — 2026-07-06、分割払い(Affirm/Klarna/
+   Alipay/WeChat Pay)は非対応と決定(Stripe アカウント側で未有効化、
+   `docs/stripe-go-live-checklist.md` #5)。ハードウェア購入のハードル低減は
+   別の訴求(節税角度・リース型オーナーシップ)のみで行う。
 
 ### 90日プラン
 | 週 | アクション |
