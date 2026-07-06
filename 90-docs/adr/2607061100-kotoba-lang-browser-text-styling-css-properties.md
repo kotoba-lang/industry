@@ -1,0 +1,74 @@
+# ADR-2607061100: kotoba-lang/browser text-styling CSS properties — font-weight, font-style, text-decoration, text-align, text-transform now thread through the real cascade → layout → paint pipeline
+
+**Status**: accepted (implemented)
+**Date**: 2026-07-06 (session-numbered; see repos.edn ADR numbering convention)
+**Deciders**: Jun Kawasaki
+
+## Context
+
+A standing recurring `/loop` task ("成熟度をさらに向上, browser としての品質を比較、評価" — further improve kotoba-lang/browser's maturity, compare/evaluate its quality as a browser) ran a fresh survey of this engine's text-styling CSS support and found a real, surprising gap: **none** of `text-align`, `font-weight`, `font-style`, `text-decoration`, `white-space`, or `text-transform` were read anywhere in `cssom.layout.cljc` — six of the most basic, universal real-world text-styling properties were all silent no-ops, despite `color`/`font-size` already working correctly via the file's existing inherited-with-override mechanism.
+
+For each property investigated, the SAME bug shape recurred: `cssom.core`'s cascade already resolved the property correctly onto the node (this file's style resolution is generic — it has no allowlist of known property names — so an author-written `font-weight: bold` or `text-align: center` already existed as a real `:style/font-weight`/`:style/text-align` attribute on the node), but `cssom.layout`'s `layout-text`/`node-style` never read it, so it never reached a `:text` draw-op, so it had **zero visual effect** in a real rendered page no matter what a real author wrote. This was confirmed via direct REPL reproduction against the real functions, for each property, before any source was touched.
+
+Four of the six properties were fixed across four `/loop` cycles this session, landing directly on `main` in each affected repo per the standing project's existing "each cycle lands one genuinely-verified fix, commits, pushes, advances the west-manifest pin" ritual (no PRs were used at landing time — see Consequences). `white-space` was investigated and explicitly deferred (see Follow-up) as materially bigger in scope than the other five.
+
+## Decision
+
+### Pattern: thread every new text-styling property through the SAME inherited-with-override mechanism `color`/`font-size` already use
+
+For each of the four properties fixed, the same three-point change shape was applied to `cssom/src/cssom/layout.cljc`:
+
+1. **`node-style`** gains a new key reading the property directly off the node's cascade-resolved style (e.g. `:font-weight (style node :font-weight)`).
+2. **`layout-text`** gains a new explicit parameter (not read off `inherited` internally, mirroring `color`/`font-size`'s own existing rationale — a pseudo-element's own resolved style can override any of them while still falling back to whatever a real text child in the same spot would use).
+3. **`layout-node`'s two `layout-text` call sites** (the `generated-node?` branch and the `text-node?` branch) and **the `:element` branch's `inherited` construction** all thread the new property through `(or (:prop st) (:prop inherited))` — a child's own explicit value always wins over an inherited one, and an unset value falls through to whatever the parent already resolved.
+
+This SAME pattern was applied four times this session (font-weight, font-style, text-decoration, text-align, text-transform — five properties, four cycles, since font-weight+font-style landed together as one cycle) with no deviation, establishing it as the **standard, expected shape** for any future text-styling property this engine adds (`white-space` when it lands, and any others).
+
+### Backward compatibility: `cond->`, not unconditional `assoc`
+
+`layout-text`'s final draw-op construction uses `cond->` so a property that resolves to `nil` (never set anywhere in the ancestor chain) contributes **no key at all** to the draw-op — not a `nil`-valued key, not a default string. This keeps every existing, unstyled call's draw-op byte-for-byte identical to before each feature existed, verified via a dedicated test in every cycle (`text-draw-op-has-no-font-weight-or-style-keys-when-never-set`, `text-draw-op-has-no-text-decoration-key-when-never-set`).
+
+### Two property categories, with different real-CSS-fidelity tradeoffs, both documented explicitly in-source
+
+- **`font-weight`/`font-style`/`text-align`/`text-transform` are genuine, spec-accurate inherited CSS properties** — this engine's ordinary inherited-with-override model matches real CSS exactly for these four; no simplification was needed or made.
+- **`text-decoration` is NOT actually an inherited property in real CSS** — real `text-decoration-line` instead *propagates* its drawn line across descendant inline boxes by a separate, non-overridable mechanism (a descendant setting `text-decoration: none` does not normally stop an ancestor's line from visually continuing through it). This engine deliberately models `text-decoration` as an ordinary inherited-with-override property anyway — the same shape as the other three — trading a small, explicitly-documented spec divergence (a child's explicit `none` DOES stop its own line here, unlike a real browser) for implementation consistency with every other text property this file tracks. This tradeoff is written directly into `layout-text`'s docstring, not just this ADR, so a future reader hits the explanation at the point of the code, not only in a historical decision record.
+
+### `text-transform` is qualitatively different: it rewrites TEXT CONTENT, not paint metadata
+
+The other four properties are threaded onto the draw-op as inert metadata for a real paint backend to interpret (`kotoba-lang/dom-gpu`'s `webgl.cljs`/`webgpu.cljs` read `:font-weight`/`:font-style` to build a Canvas 2D `font` string, and `:text-decoration` to draw an extra filled rect). `text-transform` instead has to rewrite the actual `:text` STRING before it reaches the draw-op — a new `apply-text-transform` applies `uppercase`/`lowercase`/`capitalize` to the text, and critically does so **before** word-wrapping, not after: an upper-cased word is often visibly wider than its lowercase original, so wrapping must decide line breaks against the already-transformed text, or it could wrap at the wrong point relative to what actually renders. This is the one property of the five where `dom-gpu` needed zero changes — both paint backends already just render whatever string `:text` carries.
+
+### `text-align` offsets against `content-w`, not `layout-text`'s own shrink-to-fit box width
+
+`layout-text` reports its own box `:w` shrunk to fit its content (for callers that need an auto-sized box), but that is NOT the width `center`/`right` alignment should offset against — a plain, unstyled `<div>` already fills its full available width by default (`resolve-width`'s `avail` fallback, matching real CSS block layout), so centering needs to happen within that full `content-w`, not within the narrower shrink-to-fit `w`, or centering would be invisible on the single most common real-world case. Each line's own individually-measured width is subtracted from `content-w` per line (not once for the whole paragraph), since a wrapped paragraph's lines are not all the same width.
+
+### Deliberate scope cuts, each explicitly documented rather than silently absent
+
+- `text-align: justify` falls back to `left` — no per-space stretch-justification is implemented. A safe degrade, not a wrong guess, matching this codebase's existing convention for other unimplemented keyword values (e.g. malformed numeric attributes falling back to a safe default rather than crashing).
+- `text-decoration`'s three keywords (`underline`/`overline`/`line-through`) are painted with simple, approximate baseline-relative offsets (fractions of `font-size`) — this engine has no real font-metrics/ascent-descent of its own, matching the existing char-width word-wrap approximation's level of precision. Real CSS's multi-value `text-decoration-line: underline overline` form is not supported (one keyword at a time only).
+- `text-transform`'s `full-width`/`full-size-kana` (CJK-specific, real but rare CSS values) are not implemented.
+- The optional host `:measure-text` word-wrap callback (`(fn [text font-size] width-in-px)`, supplied by `webgl.cljs`/`webgpu.cljs` via Canvas 2D's real `measureText`) has **no font-weight/font-style parameter at all**, so a real host's word-wrap MEASUREMENT for bold/italic text still uses normal-weight/upright metrics even though the PAINT step correctly renders bold/italic — a real, minor, rarely-visible inconsistency between where a line wraps and how wide its real glyphs render. Fixing this would mean changing an already-established host callback contract, deliberately left for a future cycle rather than folded into any of these four.
+
+## Verification discipline applied identically across all four cycles
+
+Every cycle followed the same sequence, without exception: (1) read the relevant code and form a hypothesis; (2) verify the hypothesis live via REPL against the REAL function, before touching source; (3) implement the fix; (4) re-verify via REPL across every edge case (explicit value, absent value, inheritance, override); (5) write real tests exercising the full `dom/create-element` → `dom/consume-ops` → `layout/draw-ops` pipeline; (6) run the FULL test suite (`cssom`'s own `clojure -M:test`, plus the downstream `kotoba-lang/browser`'s JVM `clojure -M:dev:test` and CLJS `npm run test:cljs`); (7) a revert-and-restore check — back up the fixed file, restore the pre-fix version via `git show HEAD:<path>`, confirm the EXACT predicted failure count and mechanism, restore the fix, confirm green again; (8) for the two cycles touching `dom-gpu`'s paint backends (font-weight/font-style, text-decoration — both pure CLJS files with zero JVM test coverage), a live-Chrome verification via a temporary probe added to `browser`'s demo page, compiled with shadow-cljs, served locally, screenshotted in a fresh Chrome tab, then fully reverted; for the two cssom-only cycles (text-align, text-transform), a live-Chrome check was still performed even though no `dom-gpu` change was needed, confirming the full real pipeline end-to-end rather than trusting layout-level test assertions alone.
+
+## Consequences
+
+- (+) Four of the six most basic real-world text-styling CSS properties now have real, verified, tested visual effect in this engine, closing a genuinely surprising gap for something this fundamental.
+- (+) A single, consistent, three-point threading pattern is now established and repeatable — the next property this engine needs to support (starting with `white-space`) has a known shape to follow rather than a fresh design decision each time.
+- (+) Zero regressions across five test suites this session (`cssom` JVM: 221/546 → 233/568 across the four cycles; `dom-gpu` JVM: 81/187 unaffected throughout; `kotoba-lang/browser` JVM: 524/2724 unaffected throughout; `kotoba-lang/browser` CLJS: 32/122 unaffected throughout), each confirmed via the full revert-and-restore discipline above, not merely "tests still pass."
+- (±) `text-decoration`'s inherited-with-override model is a KNOWN, documented divergence from real CSS's non-inherited-but-propagating semantics — acceptable because it is explicitly written into the source, not a silent behavioral surprise, and because this engine's own stated goal (ADR-0001, this repo's founding document) is a "kotoba-only, WASM-only" document runtime, not WHATWG-spec conformance.
+- (±) This work landed as **four separate direct-to-main commits per cycle** in each affected repo (`cssom`, `dom-gpu`), per the standing `/loop` project's existing ritual — not via GitHub pull requests. This ADR itself is the first artifact from this specific piece of work to land via a real PR (see below), at explicit owner request, as a retrospective architectural record rather than a landing mechanism change for the underlying code fixes (which have already merged).
+- (−) `white-space` remains unaddressed — see Follow-up.
+- (−) The `:measure-text` word-wrap-metrics gap (bold/italic text measured at normal-weight metrics) remains unaddressed — see Follow-up.
+
+## Follow-up
+
+- **`white-space`** (`normal`/`nowrap`/`pre`/`pre-wrap`/`pre-line`) is the one property from the original six-property survey not yet fixed. Unlike the five properties above (each a per-line paint/offset/rewrite detail layered onto the existing word-wrap algorithm), `white-space` interacts with the word-wrap algorithm's OWN control flow — whether whitespace collapses at all, and whether wrapping happens at all (`pre`/`pre-wrap` need literal newline preservation, which may also require upstream `htmldom` parser changes to whitespace handling, not just a `cssom.layout` change) — a materially larger, architecturally distinct change correctly deferred to its own future cycle rather than forced into this session's pattern.
+- **Threading `font-weight`/`font-style` into the `:measure-text` host callback contract** so word-wrap measurement matches bold/italic paint metrics exactly remains a separate, deferred follow-up (changing an already-established callback signature).
+- Known, previously-flagged, still-open items from earlier cycles this session remain open and unaffected by this ADR: real per-side `margin`/`padding` (currently a single uniform scalar each, anywhere in `cssom.layout.cljc`); `history.pushState`/`back()`/`forward()` not feeding real session navigation state; `<ol reversed>`/`<li value=>`; full `list-style-type`/`list-style-position`.
+- The `browser-maturity-matrix` Artifact (updated once per cycle throughout this session, currently at rev. 92) documents each of these four cycles individually in far greater technical detail (exact test-count deltas, REPL verification transcripts, live-Chrome screenshots described) than this ADR's higher-level architectural summary.
+
+## One-line summary
+
+**Four `/loop` cycles this session found that `font-weight`, `font-style`, `text-decoration`, `text-align`, and `text-transform` all resolved correctly in `cssom`'s cascade but were silently dropped by `cssom.layout`'s `:text` draw-op construction — fixed by establishing one consistent, repeatable inherited-with-override threading pattern (mirroring `color`/`font-size`'s own existing shape) across all five, with `text-decoration`'s divergence from real CSS's non-inherited-but-propagating semantics and `text-transform`'s unique text-content-rewriting-before-wrap behavior both explicitly documented as deliberate, scoped simplifications; `white-space` remains the one property from the original six-property survey still open.**
