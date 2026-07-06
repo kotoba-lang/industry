@@ -46,6 +46,17 @@
   "orgs/kotoba-lang/rt"     "orgs/kotoba-lang/org-w3-webrtc-signaling"
   "orgs/kotoba-lang/net"    "orgs/kotoba-lang/io-libp2p"
   "orgs/kotoba-lang/signal" "orgs/kotoba-lang/org-signal"
+  ;; batch 2 (2026-07-06): more reverse-domain external-spec renames, same
+  ;; org-<body>-<spec>/io-<domain> precedent -- see ADR-2607060100 (batch 2).
+  "orgs/kotoba-lang/atproto"      "orgs/kotoba-lang/org-bluesky-atproto"
+  "orgs/kotoba-lang/ipld"         "orgs/kotoba-lang/io-ipld"
+  "orgs/kotoba-lang/bpmn"         "orgs/kotoba-lang/org-omg-bpmn"
+  "orgs/kotoba-lang/cmmn"         "orgs/kotoba-lang/org-omg-cmmn"
+  "orgs/kotoba-lang/dmn"          "orgs/kotoba-lang/org-omg-dmn"
+  "orgs/kotoba-lang/ical"         "orgs/kotoba-lang/org-ietf-ical"
+  "orgs/kotoba-lang/mcp"          "orgs/kotoba-lang/org-anthropic-mcp"
+  "orgs/kotoba-lang/multiformats" "orgs/kotoba-lang/io-multiformats"
+  "orgs/kotoba-lang/vrm"          "orgs/kotoba-lang/org-vrmc-vrm"
   "orgs/com-junkawasaki/aiueos"         "orgs/kotoba-lang/aiueos"
   "orgs/com-junkawasaki/freeboard"      "orgs/kotoba-lang/freeboard"
   "orgs/com-junkawasaki/kami-engine"     "orgs/kotoba-lang/kami-engine"
@@ -1084,7 +1095,7 @@
    "orgs/kotoba-lang/lsp"
    "orgs/kotoba-lang/test"
    ;; AT Protocol shared substrate split out of app-aozora/kotoba.
-   "orgs/kotoba-lang/atproto"
+   "orgs/kotoba-lang/org-bluesky-atproto" ; renamed from atproto 2026-07-06
    "orgs/kotoba-lang/mst"
    ;; convergent-replica primitives for collaborative document editing (ADR-2607021614)
    "orgs/kotoba-lang/crdt"
@@ -1240,7 +1251,7 @@
    ;; 合成し tag-42 の真の CID リンクを提供。prolly-tree/arrangement/chain/
    ;; kotoba-client/kotobase-peer はこれ経由に移行済み (旧 plain-CID-string
    ;; encoding の honesty note を実際に閉じた。全 CID 変更のクリーンブレーク)。
-   "orgs/kotoba-lang/ipld"
+   "orgs/kotoba-lang/io-ipld" ; renamed from ipld 2026-07-06
    ;; P2P graph-sync プロトコル (ADR-2607023200) — net の gossip/bitswap 意味論 +
    ;; chain (旧 commit-dag, ADR-2607050800) 検証 + kotoba-client の tag-42
    ;; hydrate を合成した pure state machine (transport 注入、loopback 参照実装
@@ -1390,20 +1401,20 @@
    "orgs/kotoba-lang/atproto-client" ; AT Protocol client facade + PDS read/write helpers over @atproto/api; relocated from etzhayyim-sdk per ADR-2607011940
    "orgs/kotoba-lang/arxiv"          ; ADR-0023: arXiv organism actor + yorishiro automation
    "orgs/kotoba-lang/aero"
-   "orgs/kotoba-lang/bpmn"
+   "orgs/kotoba-lang/org-omg-bpmn" ; renamed from bpmn 2026-07-06
    "orgs/kotoba-lang/briefing"
    "orgs/kotoba-lang/cacao"
    "orgs/kotoba-lang/cae-solver"
    "orgs/kotoba-lang/calendar"
    "orgs/kotoba-lang/ci"
-   "orgs/kotoba-lang/cmmn"
+   "orgs/kotoba-lang/org-omg-cmmn" ; renamed from cmmn 2026-07-06
    "orgs/kotoba-lang/contacts"
    "orgs/kotoba-lang/crash"
    "orgs/kotoba-lang/cron"
    "orgs/kotoba-lang/dag-cbor"
    "orgs/kotoba-lang/datom"
    "orgs/kotoba-lang/ddl"
-   "orgs/kotoba-lang/dmn"
+   "orgs/kotoba-lang/org-omg-dmn" ; renamed from dmn 2026-07-06
    "orgs/kotoba-lang/dot"
    "orgs/kotoba-lang/docs"
    "orgs/kotoba-lang/drive"
@@ -1413,7 +1424,7 @@
    "orgs/kotoba-lang/forms"
    "orgs/kotoba-lang/graphql"
    "orgs/kotoba-lang/homebrew-kotoba"
-   "orgs/kotoba-lang/ical"
+   "orgs/kotoba-lang/org-ietf-ical" ; renamed from ical 2026-07-06
    "orgs/kotoba-lang/jsonlogic"
    "orgs/kotoba-lang/kenchi"
    "orgs/kotoba-lang/koe"
@@ -1427,9 +1438,9 @@
    "orgs/kotoba-lang/kotodama-mcp"
    "orgs/kotoba-lang/kotodama-py"
    "orgs/kotoba-lang/kudaki"
-   "orgs/kotoba-lang/mcp"
+   "orgs/kotoba-lang/org-anthropic-mcp" ; renamed from mcp 2026-07-06
    "orgs/kotoba-lang/motor"
-   "orgs/kotoba-lang/multiformats"
+   "orgs/kotoba-lang/io-multiformats" ; renamed from multiformats 2026-07-06
    "orgs/kotoba-lang/nagare"
    "orgs/kotoba-lang/num"
    ;; safetensors format reader/writer (huggingface.co, no dedicated TLD of its
@@ -1666,7 +1677,7 @@
    ;; named for the same reason (ADR-2607041500 precedent), ADR-0048 (kami-engine).
    "orgs/kotoba-lang/org-khronos-glb"
    "orgs/kotoba-lang/org-khronos-gltf"
-   "orgs/kotoba-lang/vrm"
+   "orgs/kotoba-lang/org-vrmc-vrm" ; renamed from vrm 2026-07-06
    "orgs/kotoba-lang/postfx"
    "orgs/kotoba-lang/audio"
    "orgs/kotoba-lang/webgl"
