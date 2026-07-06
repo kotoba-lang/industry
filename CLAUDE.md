@@ -470,3 +470,38 @@ PolicyGovernor）/ **cloud-itonami**（ops-LLM ⊣ CertGovernor）。
   で actor 鍵を 初回生成→永続→再読込。**秘密鍵は `.<actor>/identity.edn` に置き
   gitignore（git に絶対コミットしない）**。`kotoba-store {:identity me}` で graph 既定
   ＝鍵由来 IPNS ＋ 自己 mint。設定参照は `manifest/repos.edn` の `:kotoba`。
+
+## `.cljc` / `.kotoba` ランタイム優先順位（2026-07-06 決定、将来方針）
+
+- **`.cljc` の実行環境優先順位は `kototama`（WASM ランタイム）> ClojureScript >
+  nbb > JVM とする。** JVM を「基本」に据えない。これは repowide のルールで、
+  今後書く `.cljc` の設計・reader-conditional 分岐・依存選定はこの順序を意識する。
+- **`.kotoba` 拡張子のファイルは明示的に kototama WASM ランタイム向け**（kotoba
+  言語の極小サブセット — `def`/`defn`/`ns`/`if`/`when`/`let`/`do`/算術/比較/
+  `and`/`or`/`not`/文字列基本操作 + 再帰のみ、Java/JS interop 一切なし、サード
+  パーティ lib 不可。`kotoba wasm emit` で WASM にコンパイルし、現状は
+  `kotoba.wasm-exec`（Chicory 経由、実体は JVM ホスト）で実行する）。
+- **ただし 2026-07-06 時点でこの優先順位を機械的に実現する手段はまだ無い**
+  （実測確認済み、ADR起票前の調査結果）:
+  - `kototama` リポ自体はまだ HostCaps/RuntimeLimits 等の**契約サーフェスのみ**
+    で、tender/wasmtime ホスティングの実装自体が follow-up（README 記載どおり）。
+    唯一動く「kototama 実行」経路は上記の `.kotoba`→WASM→Chicory/JVM だけ。
+  - `#?(:kototama ...)` という reader-conditional は**コードベース全体を検索して
+    ゼロ**——Clojure 標準は `:clj`/`:cljs`/`:cljr`/`:default` しか認識せず、
+    `:kototama` を feature として認識させるカスタム reader/ビルドステップは
+    存在しない。**存在しないものとして `#?(:kototama ...)` を書かない**（無言で
+    どちらの分岐も評価されない dead branch になる）。
+  - `.kotoba` の極小サブセットは Java/JS interop 不可なので、`ed25519`/`cacao`/
+    `dag-cbor` 等の既存暗号・CBOR ライブラリを直接そこへ移植することはできない
+    （ゼロから書き直すか、別のコンパイラで WASM 化するかが必要）。
+  - よって **`kotoba-lang/ed25519`・`kotoba-lang/cacao`・`kotoba-lang/tech-ipfs-
+    specs-ipns`（`ipns.head`）等、既に JVM(`:clj`)専用として実装済みの暗号系
+    ライブラリは、このルール制定時点でリトロアクティブに書き直さない**——
+    メカニズムが無い状態で JVM 専用にしたことは当時の唯一動く前例に沿った判断
+    であり、正しい。今後 kototama の reader/ビルド機構が実際に用意された時点で
+    移行を検討する（ADR 化してから着手）。
+- 新しい `.cljc` を書く／既存の `:clj`/`:cljs` 分岐を拡張する判断に迷ったら、
+  まず「kototama 向けの実行手段が今あるか」を確認し（無ければ上記の制約を
+  そのまま書き残す）、無いなら次点の cljs を優先し、JVM 専用は最後の手段とする
+  ——ただし目の前のタスクを止めてまで存在しないインフラを今から作ることは
+  しない（別スコープの ADR とプロジェクトとして切り出す）。
