@@ -151,6 +151,41 @@ its cap while staying within it succeeds. 15 tests/31 assertions green.
   needs concurrent outbound calls.
 - The privileged device-access layer ADR-2607030900 left unresolved.
 
+## Addendum (2026-07-06, same day): `aiueos.execute` vs `kototama.tender` — deliberately NOT consolidated
+
+Investigating the "aiueos calls kototama.tender" follow-up above surfaced
+that `aiueos.execute`/`aiueos.launcher` (in `aiueos-cljc-contract`'s real
+`main`, not the stale local worktree that was checked out) already
+implements a similar-looking Chicory-hosted, capability-gated execution
+path — independently built, more mature in places (a STABLE
+`withMemoryLimits`-based memory cap predates this ADR's own later
+memory-pages addition; topic pub/sub gating via `aiueos.topic`). Its own
+merge PR flagged this as an unresolved "naming/purpose collision."
+
+**Decision: the two stay separate, on purpose, not consolidated.**
+- `kototama.tender` enforces `kototama.contract`'s `actor:host` ABI — a
+  vocabulary shared with the BROWSER-native substrate
+  (`actor-host.js` in `wasm-webcomponent`, ADR-2607062400). This is the
+  cross-substrate contract kototama itself owns.
+- `aiueos.execute` enforces `aiueos`'s own manifest/policy/broker
+  vocabulary (`:aiueos/quota`, `:aiueos/limits`, `:aiueos/publishes`/
+  `:subscribes`) — JVM-only, no browser counterpart, and never intended
+  to have one (topic pub/sub and the device-access quartet are OS-broker
+  concerns, not something a Wasm guest's browser-side ABI should need).
+
+They are two different capability vocabularies solving two different
+problems that both happen to use Chicory to run Wasm — not one thing
+duplicated. Forcing them into one would mean either dragging aiueos's
+OS-broker vocabulary (topics, device access) into kototama's cross-
+substrate ABI, which the browser substrate has no way to honor, or
+stripping `kototama.contract`'s browser-shared ABI down to only what
+aiueos's manifest vocabulary already expresses — both are worse than
+documenting the boundary and moving on. `aiueos`'s own broker calling
+into `kototama.tender/instantiate` (the follow-up bullet above) remains
+open, but as a policy-adapter integration (aiueos's decision translated
+into a `HostCaps` value), not a code-level merge of the two execution
+namespaces.
+
 ## One-line summary
 
 **`kototama.tender` is the Chicory/JVM execution layer ADR-2607022400/
