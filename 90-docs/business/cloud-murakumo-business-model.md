@@ -20,6 +20,7 @@
 - 観測 (signal): murakumo.cloud 実測 22125 req/7d・341 uniques(日次和)、workers 108130 inv/7d
 - 観測 (2026-07-06): wrangler secret list が空 — STRIPE_SECRET_KEY 未設定のため #store/* checkout は現状 503 fail-closed(実収益ゼロの直接原因、docs/stripe-go-live-checklist.md)
 - 観測 (signal): murakumo.cloud 実測 22414 req/7d・341 uniques(日次和)、workers 108395 inv/7d
+- 観測 (2026-07-06 QA): 公開ブログ2本のpublic/blog/*.htmlが作業ツリー上で生markdownに上書きされ本番で配信される事故が2回発生(原因不明、build scriptでの同期処理は存在せず)。加えてUS記事のCTAがcurl murakumo.cloud/join|sh(404、未実装のPhase2/3導線)を誤って案内していた。両方とも検知・修正・再デプロイ済み
 
 ## Customer Segments
 
@@ -40,7 +41,7 @@
 - 準備 (murakumo-tok-price): run ledger の原価/tok export (node別 tok/s × 電力)
 - 準備 (murakumo-tok-price): 社内3アプリ推論の fleet 移管で原価比較
 
-> 実行済み (2026-07-06 tick2): EU AI Act/監査台帳ブログ記事ドラフト公開準備 (content/blog/2026-eu-ai-act-audit-ledger.md)。US記事に続く2本目のGTMコンテンツ
+> QA確認済み (2026-07-06): #console playgroundはスライダー操作で実際にスケジューラが再計算する(72 in-flight→4 replica)ことをブラウザ実機で検証。'試す'訴求は本物
 
 ## Channels
 
