@@ -117,7 +117,18 @@
   ;; coordinates updated in the same pass (io-ipld, pqh, gftdcojp/net-kotobase,
   ;; kotoba-lang/cacao); etzhayyim/root deliberately skipped (same reasoning
   ;; as the ed25519 rename above).
-  "orgs/kotoba-lang/dag-cbor" "orgs/kotoba-lang/org-ietf-cbor"}
+  "orgs/kotoba-lang/dag-cbor" "orgs/kotoba-lang/org-ietf-cbor"
+  ;; renamed 2026-07-06 (ADR-2607061650): CAIP-122/CAIP-74 (CACAO) are Chain
+  ;; Agnostic Improvement Proposals (chainagnostic.org). Real dependents'
+  ;; deps.edn/bb.edn coordinates updated in the same pass (cloud-itonami,
+  ;; local-manimani/agents, gftdcojp/net-kotobase, kotoba-lang/kotoba);
+  ;; etzhayyim/root deliberately skipped (same reasoning as ed25519/dag-cbor).
+  ;; kotoba-lang/authentication's apparent cacao reference turned out to be
+  ;; uncommitted local-only WIP in a corrupted shared checkout (broken
+  ;; `origin` remote pointing at com-junkawasaki/root) -- GitHub's actual
+  ;; authentication repo has zero deps and no cacao reference in its
+  ;; history, so no change was needed there; left the checkout untouched.
+  "orgs/kotoba-lang/cacao" "orgs/kotoba-lang/org-chainagnostic-cacao"}
 
  ;; 全 project 共通の既定
  :defaults
@@ -1468,7 +1479,7 @@
    "orgs/kotoba-lang/aero"
    "orgs/kotoba-lang/org-omg-bpmn" ; renamed from bpmn 2026-07-06
    "orgs/kotoba-lang/briefing"
-   "orgs/kotoba-lang/cacao"
+   "orgs/kotoba-lang/org-chainagnostic-cacao" ; renamed from cacao 2026-07-06
    "orgs/kotoba-lang/cae-solver"
    "orgs/kotoba-lang/calendar"
    "orgs/kotoba-lang/ci"
