@@ -174,3 +174,24 @@ existing repo — no manifest change needed since that path is already registere
   Swarm-Formation and USC ACT Lab Crazyswarm2 — swarm trajectory/architecture
   research prior art
 - 本 ADR とペアの `.edn`
+
+## Follow-up (2026-07-06)
+
+- Landed `kotoba.swarm-choreo.physics-check`: a stronger, slower check that
+  runs `kami-autodrive`'s *real* closed-loop `:drone` autopilot +
+  `autodrive.dynamics/multirotor` plant (not `validate`'s straight-line
+  finite-difference approximation) on each show segment, in an open world,
+  and checks arrival within a slack-adjusted time budget
+  (`horizontal-segment-feasible?`, `show-segments-feasible`). Vertical
+  (climb/descent) rate is checked separately against a swarm-choreo-owned
+  conservative default (`default-vertical-speed-limit`, 5 m/s) —
+  `kami-autodrive`'s plant models no altitude channel at all for any
+  vehicle class, `:drone` included, so there is nothing in the dependency
+  itself to check a climb rate against. 22 tests / 65 assertions,
+  clj-kondo clean, CI green (`kotoba-lang/swarm-choreo` commit `5afe83b`).
+- This is additive to the already-scoped `kotoba-lang/swarm-choreo` repo —
+  it does not change the Decision above, and does not touch `org-ros`,
+  `kami-autodrive`, or `robotics`.
+- Still open, unchanged from the original Decision's scope: the Skybrush
+  import format, native DDS-RTPS/MAVROS, and any product integration
+  remain deliberately out of scope.
