@@ -1153,6 +1153,22 @@
    ;; revision actor, reply-LLM ⊣ ComplianceGovernor; common kotoba-lang infra
    ;; for local-manimani/cloud-manimani (ADR-2607061500)
    "orgs/kotoba-lang/tayori"
+   ;; teian (提案) — 資料作成 actor, deck-LLM ⊣ BriefingGovernor; drafts decks/
+   ;; docs/sheets on top of kotoba-lang/slides EDN, publish always human-approved;
+   ;; cloud-itonami consumer (ADR-2607062000)
+   "orgs/kotoba-lang/teian"
+   ;; koyomi (暦) — 予定共有 actor, schedule-LLM ⊣ ComplianceGovernor; drafts
+   ;; calendar events on top of kotoba-lang/calendar EDN, share always
+   ;; human-approved; cloud-itonami consumer (ADR-2607062010)
+   "orgs/kotoba-lang/koyomi"
+   ;; shoko (書庫) — 保管ガバナンス actor scaffold on top of kotoba-lang/drive EDN.
+   ;; Status: proposed, scaffold-only; governor/operation impl is follow-up
+   ;; (ADR-2607062020)
+   "orgs/kotoba-lang/shoko"
+   ;; ichiran (一覧) — 集計表生成 actor scaffold on top of kotoba-lang/sheets EDN.
+   ;; Status: proposed, scaffold-only; governor/operation impl is follow-up
+   ;; (ADR-2607062030)
+   "orgs/kotoba-lang/ichiran"
    ;; fleet coordination — 20-agent lease/governor substrate (ADR-2606302000)
    "orgs/kotoba-lang/kotoba-fleet"
    "orgs/etzhayyim/com-etzhayyim-fleet"
