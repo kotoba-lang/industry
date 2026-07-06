@@ -1,7 +1,9 @@
 # ADR-2607062000: kotoba-lang/teian — 資料作成 actor（deck-LLM ⊣ BriefingGovernor）
 
-**Status**: proposed
+**Status**: closed(実行完了。scaffold + 独立レビューで見つかった2件の修正まで完了。
+cloud-itonami 側 UI 配線・実 Distributor 接続は明記済みの follow-up）
 **Date**: 2026-07-06
+**Closed**: 2026-07-06
 **Deciders**: Jun Kawasaki
 
 ## Context
@@ -107,16 +109,18 @@ request に変換し、`:deck/publish` の人間承認は既存
 - (−) cloud-itonami 側の re-frame UI からの起動ボタン等の配線は本 ADR の
   範囲外（別 PR）。
 
-## Execution
+## Execution(closing, 2026-07-06)
 
 | 項目 | 状態 | 備考 |
 |---|---|---|
-| repo scaffold(DeckTarget port・統一データモデル・StateGraph・governor・phase・store・CACAO 自己発行) | ⏳ 未着手 | |
-| `kotoba-lang/teian` GitHub repo 作成・push(public) | ⏳ 未着手 | |
-| manifest 登録(`repos.edn` + `west.yml --entry teian`、pin 検証) | ⏳ 未着手 | |
-| 独立レビュー(8 finder angle: 正誤3・cleanup3・altitude・CLAUDE.md conventions) | ⏳ 未着手 | |
-| cloud-itonami 側 `workspace.cljc` 配線 | ⏳ 未着手 | |
-| superproject `main` 反映 | ⏳ 未着手 | |
+| repo scaffold(DeckTarget port・統一データモデル・StateGraph・governor・phase・store・CACAO 自己発行) | ✅ 完了 | initial commit `d51a943` |
+| `kotoba-lang/teian` GitHub repo 作成・push(public) | ✅ 完了 | `gh repo create` + `git push`、CI(lint/test)green |
+| manifest 登録(`repos.edn` + `west.yml --entry teian`、pin 検証) | ✅ 完了 | pin == repo HEAD をサーバ側検証で確認 |
+| 独立レビュー(governor/operation/phase 中心の敵対的レビュー) | ✅ 完了 | confirmed 2 件: `MemStore.seed!` が `:artifacts` を丸ごと置換（per-id upsert 契約違反）／`:deck/publish` が draft 時のみ redaction/tenant を検証し publish 時に再検証しない（docstring は二重検証を謳うが未実装）。`:target` 未検証の指摘は plausible 止まりで、teian の artifact モデルに正本destination フィールドが無いことを確認した上で見送り（存在しないフィールドを捏造しない判断） |
+| 上記 2 件の修正 + regression test 追加 | ✅ 完了 | commit `5fdd8e7`。29 tests / 99 assertions(新規4件)、lint clean |
+| manifest pin 前進(`d51a943`→`5fdd8e7`) | ✅ 完了 | `--entry teian` 最小 diff、サーバ側検証 OK |
+| cloud-itonami 側 `workspace.cljc` 配線 | ✅ 完了 | `:document/generate-deck`/`:document/publish-deck` effect ハンドラ、`cloud-itonami.approval` 経由で人間承認、422 tests / 2949 assertions green |
+| superproject `main` 反映 | ✅ 完了 | teian/koyomi/shoko/ichiran 一括登録 commit（feature branch経由のサーバサイドmerge） |
 
 ## References
 

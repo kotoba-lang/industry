@@ -2,13 +2,14 @@
  {
   :id "adr-2607062010-kotoba-lang-koyomi-schedule-actor"
   :title "ADR-2607062010: kotoba-lang/koyomi — 予定共有 actor（schedule-LLM ⊣ ComplianceGovernor）"
-  :status "proposed"
+  :status "closed"
   :date "2026-07-06"
+  :closed "2026-07-06"
   :deciders ["Jun Kawasaki"]
   :doc_type "adr"
   :topic "kotoba-lang-koyomi-schedule-actor"
   :authoritative true
-  :authoritative_for ["koyomi actor の設計（schedule-LLM ⊣ ComplianceGovernor、二流路 StateGraph、Phase 0→3）" "kotoba-lang/calendar の event EDN を content として保持する ScheduleTarget port 契約（fetch-event/propose-revision!/share!）" "ComplianceGovernor の HARD 不変条件（no-actuation/consent-required/tenant-isolation、share は常に人間承認）" "cloud-itonami からの消費経路（deps.edn local/root、cloud_itonami.workspace 投影層経由）"]
+  :authoritative_for ["koyomi actor の設計（schedule-LLM ⊣ ComplianceGovernor、二流路 StateGraph、Phase 0→3）" "kotoba-lang/calendar の event EDN を content として保持する ScheduleTarget port 契約（fetch-event/propose-revision!/share!）" "ComplianceGovernor の HARD 不変条件（no-actuation/consent-required/tenant-isolation、share は常に人間承認）" "cloud-itonami からの消費経路（deps.edn local/root、cloud_itonami.workspace 投影層経由）" "実行完了: repo scaffold + 独立レビューで見つかった4件（event/share の TOCTOU、governor の subject-exists チェック欠落、ICS RFC5545 未エスケープ injection、draft無しshareのphantom send）の修正 + regression test（commit 0a2e2ee）+ manifest 登録 + cloud-itonami workspace.cljc 配線、いずれも完了"]
   :supersedes []
   :superseded_by []
   :related ["adr-2607062000-kotoba-lang-teian-briefing-actor" "adr-2607061500-kotoba-lang-tayori-correspondence-actor" "adr-2606302300-org-taxonomy-4-orgs"]
