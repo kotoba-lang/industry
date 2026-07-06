@@ -200,9 +200,10 @@ state through the pure `applySelection`/`initialState` functions directly, never
 documentation scaffolding; can be added later as a thin wrapper around the same pure
 functions if LangGraph-Studio visualization is ever actually needed.
 
-Consumer migration (wiring `ai-gftd-cyber-drill`'s Svelte side to `kami-webvr` instead of
-`kami-engine-sdk`'s `./webvr` export) remains explicit follow-up, unaffected by this
-increment — same as `org-ietf-turn`'s still-pending `turn.ts` delegation bridge.
+**`ai-gftd-cyber-drill` is out of scope entirely** (owner-confirmed 2026-07-06) — not a
+pending follow-up, not migrated to `kami-webvr`, not planned to be. `kami-webvr` exists as
+a standalone port in its own right; nothing here obligates or schedules migrating its
+original TS-side consumer.
 
 ## References
 
