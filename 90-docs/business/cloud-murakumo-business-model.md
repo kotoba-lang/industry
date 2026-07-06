@@ -16,6 +16,7 @@
 - 観測 (signal): murakumo.cloud 実測 536 req/7d・1 uniques(日次和)、workers 158768 inv/7d
 - 観測 (signal): murakumo.cloud 実測 1554 req/7d・122 uniques(日次和)、workers 171179 inv/7d
 - 観測 (signal): murakumo.cloud 実測 10901 req/7d・269 uniques(日次和)、workers 147603 inv/7d
+- 観測 (signal): murakumo.cloud 実測 21870 req/7d・341 uniques(日次和)、workers 107880 inv/7d
 
 ## Customer Segments
 
@@ -36,7 +37,7 @@
 - 準備 (murakumo-tok-price): run ledger の原価/tok export (node別 tok/s × 電力)
 - 準備 (murakumo-tok-price): 社内3アプリ推論の fleet 移管で原価比較
 
-> 実行済み (2026-07-06): US Bonus Depreciation ブログ記事ドラフト公開準備 (orgs/gftdcojp/cloud-murakumo/content/blog/2026-bonus-depreciation-idle-gpu-cloud.md、90-docs/business/cloud-murakumo-gtm-country-plan.md week1-2)
+> 実行済み (2026-07-06 tick2): EU AI Act/監査台帳ブログ記事ドラフト公開準備 (content/blog/2026-eu-ai-act-audit-ledger.md)。US記事に続く2本目のGTMコンテンツ
 
 ## Channels
 
