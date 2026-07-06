@@ -1,0 +1,46 @@
+{:frontmatter
+ {
+  :id "adr-2607062020-kotoba-lang-shoko-archive-scaffold"
+  :title "ADR-2607062020: kotoba-lang/shoko — 保管ガバナンス actor（雛形のみ）"
+  :status "proposed"
+  :date "2026-07-06"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "kotoba-lang-shoko-archive-scaffold"
+  :authoritative true
+  :authoritative_for ["shoko repo の scaffold-only スコープ判断（governor/operation 実装は follow-up）" "将来の ArchiveGovernor / ArchivePort 設計方向のプレースホルダ"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607062000-kotoba-lang-teian-briefing-actor" "adr-2607062010-kotoba-lang-koyomi-schedule-actor"]
+  :last_verified "2026-07-06"}
+ :body
+ "# ADR-2607062020: kotoba-lang/shoko — 保管ガバナンス actor（雛形のみ）
+
+**Status**: proposed(scaffold-only)
+**Date**: 2026-07-06
+**Deciders**: Jun Kawasaki
+
+## Context
+
+ADR-2607062000（teian）と同じ依頼のうち「保管」面。`kotoba-lang/drive` は
+ACL・共有・監査の概念が無い pure data model（実測確認済み）。今回のスコープは
+資料作成・予定共有を優先し、保管面は ADR 起票 + repo 雛形のみに留める。
+
+## Decision
+
+新規 repo `kotoba-lang/shoko`（書庫）を scaffold のみ作成する。README・
+deps.edn（drive 依存 + langgraph/ed25519/ipns 先行登録）・namespace 骨組み
+（governor/operation は宣言のみ、'Status: proposed — 雛形のみ' と明記）・
+smoke テスト1本。ArchiveGovernor（no-actuation/share-requires-acl/
+tenant-isolation）・ArchivePort（fetch-file/propose-revision!/share!）の
+設計方向のみ記録し、実装は follow-up。
+
+## Consequences
+
+repo/manifest/deps.edn は先に確定するが、実装が無いため cloud-itonami からは
+呼び出せない。
+
+## References
+
+ADR-2607062000(teian)、ADR-2607062010(koyomi)、`orgs/kotoba-lang/kekkai`、
+`orgs/kotoba-lang/tayori`。"}
