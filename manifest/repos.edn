@@ -101,7 +101,17 @@
   ;; io-<domain> family (io-libp2p/io-ipld/io-multiformats, ipfs.tech-governed);
   ;; svg is a W3C Recommendation, same org-w3-* precedent as the batch above.
   "orgs/kotoba-lang/ipfs" "orgs/kotoba-lang/io-ipfs"
-  "orgs/kotoba-lang/svg"  "orgs/kotoba-lang/org-w3-svg"}
+  "orgs/kotoba-lang/svg"  "orgs/kotoba-lang/org-w3-svg"
+  ;; renamed 2026-07-06 (ADR-2607061620): RFC 8032 (edwards25519) is an IETF
+  ;; document, same org-ietf-* precedent as org-ietf-turn/org-ietf-ical/
+  ;; org-ietf-imap/org-ietf-smtp. 8 real dependents' deps.edn/bb.edn
+  ;; coordinates updated in the same pass (pqh, witness-quorum, kagi, tayori,
+  ;; kekkai, org-signal, gftdcojp/net-kotobase, kotoba-lang/cacao);
+  ;; etzhayyim/root deliberately left untouched (its own coordinate is
+  ;; already stale in a different way -- com-junkawasaki/ed25519-clj -- and
+  ;; the repo has an actively in-progress worktree; GitHub's redirect keeps
+  ;; it working either way).
+  "orgs/kotoba-lang/ed25519" "orgs/kotoba-lang/org-ietf-ed25519"}
 
  ;; 全 project 共通の既定
  :defaults
@@ -1468,7 +1478,7 @@
    "orgs/kotoba-lang/docs"
    "orgs/kotoba-lang/drive"
    "orgs/kotoba-lang/echem"
-   "orgs/kotoba-lang/ed25519"
+   "orgs/kotoba-lang/org-ietf-ed25519" ; renamed from ed25519 2026-07-06
    "orgs/kotoba-lang/eth-crypto"
    "orgs/kotoba-lang/forms"
    "orgs/kotoba-lang/graphql"
