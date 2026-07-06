@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L1 LLM 推論 — infra（Civitai × exo）  
-**As-of**: 2026-07-05  
+**As-of**: 2026-07-06  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -35,6 +35,8 @@
 - B2 weight storage / memory-weighted shard plan
 - 準備 (murakumo-tok-price): run ledger の原価/tok export (node別 tok/s × 電力)
 - 準備 (murakumo-tok-price): 社内3アプリ推論の fleet 移管で原価比較
+
+> 実行済み (2026-07-06): US Bonus Depreciation ブログ記事ドラフト公開準備 (orgs/gftdcojp/cloud-murakumo/content/blog/2026-bonus-depreciation-idle-gpu-cloud.md、90-docs/business/cloud-murakumo-gtm-country-plan.md week1-2)
 
 ## Channels
 
