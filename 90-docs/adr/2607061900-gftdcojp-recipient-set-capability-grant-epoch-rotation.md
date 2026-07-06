@@ -178,6 +178,44 @@ encryption-at-a-different-key story this document does not attempt.
   tenant's business data does not, by itself, imply the power to add or
   remove readers.
 
+### For-cause revocation: mandatory re-encrypt escalation (resolved 2026-07-06)
+
+Forward-only rotation (above) is the default for routine removal. For a
+removal reason the owner designates "for cause," this document requires the
+stronger, explicit escalation instead — not automatic on every removal, but
+mandatory once invoked:
+
+1. Rotate to a new epoch as usual (new DEK, wrapped only to the remaining
+   recipients).
+2. Export the graph's live dataset via `hot-datoms`/`datoms` — the same
+   mechanism ADR-2607051000's own Migration section already uses for its
+   WASM→CLJC-style cutover — using a reader who still holds the *old*
+   epoch's DEK/blind-index key.
+3. Re-assert the exported dataset into a fresh graph root (new commit-chain
+   genesis / new IPNS-published head), encrypted from block one under the
+   *new* epoch's DEK and blind-index key.
+4. Repoint whatever resolves "the gftdcojp graph" for clients to the new
+   root.
+5. Unpin and garbage-collect the *old* root's blocks from the block store
+   (R2/IPFS) so the old ciphertext is no longer fetchable at all, not merely
+   re-keyed.
+
+**A hard limit, stated plainly and not softened**: this revokes access
+*through the system* going forward only. If the removed party (or anyone)
+already fetched and retained a copy of the old ciphertext while they still
+held a valid wrapped-DEK grant, no re-encrypt or block deletion can claw
+that back — this is a property of any encryption-based revocation scheme,
+not a gap specific to this design. If gftdcojp ever needs a guarantee that
+goes beyond "can no longer access it going forward" for a real for-cause
+case, that is a legal/organizational response (e.g. device recovery,
+employment agreement enforcement), not something this — or any — crypto
+design can provide.
+
+This is expensive (full re-transact + block GC, comparable cost to the
+O(graph) rotation ADR-2607051000 already named) and is therefore a manually
+invoked admin operation triggered by an explicit for-cause designation, not
+something every removal runs automatically.
+
 ## Consequences
 
 - (+) No new cryptographic primitive to design or review: same X25519 +
@@ -209,43 +247,54 @@ encryption-at-a-different-key story this document does not attempt.
   named leak in the same spirit as ADR-2607051000's wrapper-node-metadata
   non-goal, not a silent gap.
 
-## Open questions for the owner
+## Open questions for the owner (resolved 2026-07-06)
 
-1. **Initial recipient list.** Today gftdcojp has zero bound production
-   actors (ADR-2607022300's own words). Before this can be exercised for
-   real, at least Jun's own X25519 companion keypair needs to exist
-   alongside the (also still ungenerated, per that same ADR) Ed25519
-   identity. Any other initial members/service accounts?
-2. **Retroactive revocation policy.** Should any removal reason (e.g.
-   termination for cause) mandate the expensive full re-encrypt-under-new-
-   epoch pass, or is forward-only rotation acceptable as the standing
-   default with re-encrypt as a manually-invoked escalation? This document
-   leans toward "manual escalation, not automatic," but that's a real
-   organizational-risk call, not a technical one.
-3. **Where grant datoms physically live.** This document assumes a small,
-   dedicated `gftdcojp/access-grants` graph (or equivalent metadata space)
-   rather than folding grant datoms into the same tenant graph as business
-   data. A dedicated space keeps the "openly fetchable, HPKE-protected"
-   property clean and easy to reason about, but the owner may prefer a
+Preserved verbatim as the record of what was open at authoring time; each is
+now answered, not still open:
+
+1. **Initial recipient list.** ~~Today gftdcojp has zero bound production
+   actors...~~ **Resolved: Jun only, for now.** gftdcojp bootstraps solo —
+   Jun's Ed25519 identity and companion X25519 keypair are the first (and
+   currently only) recipient. Adding a second member later is the cheap
+   O(1) path (Epoch rotation, above), not a redesign.
+2. **Retroactive revocation policy.** ~~Should any removal reason... mandate
+   the expensive full re-encrypt-under-new-epoch pass...~~ **Resolved:
+   forward-only is the standing default; for-cause removal mandates the
+   re-encrypt escalation** — see "For-cause revocation" above for the
+   concrete re-transact + block-GC procedure and its named exfiltration
+   limit.
+3. **Where grant datoms physically live.** ~~...the owner may prefer a
    different placement (e.g. inside `cloud-itonami`'s existing `itonami.
-   repo/*` data model instead of a new kotoba-native graph).
+   repo/*` data model...)~~ **Resolved: a dedicated `gftdcojp/access-grants`
+   graph, not folded into `cloud-itonami`'s tenant data model.** Rejected
+   the cloud-itonami-integrated alternative on three grounds: (a) it would
+   invert the kotoba/kotobase layering ADR-2607032500 established, making
+   the encryption design gftdcojp-specific rather than reusable by any
+   future tenant; (b) folding grants into the same tenant-encrypted graph
+   as business data just relocates the chicken-and-egg problem into
+   cloud-itonami's schema rather than solving it — cloud-itonami would
+   still need its own unencrypted sub-space for grants; (c) it would
+   conflate cloud-itonami's query-API-level KV permissions with the
+   crypto-level wrapped-DEK grant into one data model, risking the two
+   drifting out of sync — the same shape of gap ADR-2607022300's
+   stale-deployment incident already exposed once.
 4. **New capability scope vs. reusing `cloud-itonami`'s KV permission
-   model.** `cloud-itonami` already has its own `permission:{org}/{repo}:
-   {actorId}` KV-based authorization (ADR-2607022300). Should `graph:grant`
-   be a new kotoba-native CACAO capability (this document's assumption), or
-   should grant/revoke instead be mediated entirely through
-   `cloud-itonami`'s existing KV permission layer, with kotoba only
-   enforcing "does a valid wrapped-DEK grant exist," not "who is allowed to
-   create one"? Both are defensible; this document picked the former for
-   symmetry with the rest of kotoba's CACAO capability model, not because
-   the latter was ruled out.
-5. **Implementation sequencing.** Should ADR-2607051000's base seam
-   (encrypt/blind functions, single DEK per graph) and this recipient-set
-   layer land in one PR, or should ADR-2607051000 ship first (provable with
-   a single dev-only DEK) with this layer as a second increment once the
-   base seam is verified end-to-end? This document leans toward the latter
-   (smaller, independently-reviewable steps) but doesn't treat that as
-   settled.
+   model.** ~~Should `graph:grant` be a new kotoba-native CACAO
+   capability... or should grant/revoke instead be mediated entirely
+   through `cloud-itonami`'s existing KV permission layer...~~ **Resolved:
+   new CACAO capability `graph:grant`**, as this document originally
+   assumed, for symmetry with the rest of kotoba's CACAO capability model
+   and consistency with the access-grants-graph decision above (item 3) —
+   both keep this design's authority self-contained in kotoba rather than
+   delegated to a tenant-specific KV store.
+5. **Implementation sequencing.** ~~Should ADR-2607051000's base seam...
+   and this recipient-set layer land in one PR, or should ADR-2607051000
+   ship first...~~ **Resolved: ADR-2607051000 ships first, standalone**
+   (encrypt/blind seam in `arrangement`/`kotobase-peer`, provable with a
+   single dev-only DEK, verified end-to-end on both runtimes), with this
+   document's recipient-set/grant/epoch layer implemented as a separate,
+   independently-reviewable follow-up PR once the base seam is verified —
+   smaller review units over a single combined change.
 
 ## References
 
