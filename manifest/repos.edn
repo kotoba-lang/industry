@@ -227,7 +227,11 @@
  ;; 生成時に既存 path 群と union される（一度 west.yml に載れば自動追従、distinct で重複排除）。
  ;; clone 済みの working tree（orgs/<org>/<repo>）が存在し HEAD を持つこと。
  :extra-projects
- #{;; AI VTuber/VRM companion chat, gftdcojp — new product, shares kami-engine with
+ #{;; kami-webvr — choice-based scenario engine, full CLJC/CLJS port of
+   ;; kami-engine-sdk's webvr module (ADR-2607052000, kami-engine-sdk Svelte
+   ;; retirement plan; local ADR-0001 in the repo itself).
+   "orgs/kotoba-lang/kami-webvr"
+   ;; AI VTuber/VRM companion chat, gftdcojp — new product, shares kami-engine with
    ;; network-isekai but via @etzhayyim/kami-engine-sdk (Svelte), private data model
    ;; (ADR-2607051800).
    "orgs/gftdcojp/net-babiniku"
