@@ -16,12 +16,26 @@ cascade+layout）は、オーナーの指摘どおり **既に `browser` への�
 現時点でコード上の実体はまだ無い新規概念）を持つ際、この parse→cascade→
 layout→draw-ops パイプラインを再利用できる可能性がある。
 
-ただし `aiueos` は **Rust の Wasm-component OS**（`kototama` = kotoba/clj subset
-→ Wasm compiler、現状は「CLJC contract のみ実装済み、実際のコンパイラ/wasmtime
-hosting は follow-up」）であり、`htmldom`/`cssom` は JVM Clojure + ClojureScript
-（shadow-cljs 経由）で動く。したがって `aiueos` 側が `htmldom`/`cssom` の
-**実装（アルゴリズム）そのもの**を直接実行することは今日時点でできない —
-ランタイムが異なる。
+ただし `aiueos` の checkout は今日時点で **実際に Rust crate**（`Cargo.toml`/
+`src/`）であり、`htmldom`/`cssom` は JVM Clojure + ClojureScript（shadow-cljs
+経由）で動く — ランタイムが異なるため `aiueos` 側が `htmldom`/`cssom` の
+**実装（アルゴリズム）そのもの**を直接実行することは今日時点でできない。
+
+**訂正（オーナー指摘、初稿時の誤認）**: 初稿では「aiueos は Rust の
+Wasm-component OS」であり将来の mainuiux 実装も「Rust/Wasm」になると書いたが、
+これは `aiueos` 自身が明文化している方向性と矛盾する誤認だった。
+`kotoba-lang/kotoba-lang` の `ADR-safe-capability-language.md` は
+**self-hosting** の方針を明記する：意味論の正本を Rust から `.kotoba`
+（safe Kotoba、Clojure 形の capability-safe 言語）ソースへ段階移行し、
+Wasm component としてコンパイル・実行する。Rust は **恒久的に** adapter/
+bootstrap 専用（意味論の正本にしない）。`kotoba-lang/kotoba` は自身の
+compiler path で既にこの移行を完了済み — 旧 Rust `kotoba-clj` compiler を
+撤去し、JVM Clojure（`com.dylibso.chicory` 経由で Wasm 実行）に置き換えた
+実例がある。したがって将来 mainuiux レンダラーが実装されるとすれば、それは
+**`.kotoba`（safe Kotoba）ソース、Wasm component としてコンパイル**される
+ものであるべきで、Rust ではない —— ただし `aiueos` 自身の checkout が
+「pure `.kotoba` wasm」に到達しているのはまだ先（今日は Rust crate のまま）
+であることも同時に正直に記す。
 
 この org には既にこの種の断絶を埋める確立された規約がある: `kototama` 自身の
 README が明言する **「新しい振る舞いはまず CLJC/EDN contract として着地させ、
@@ -97,9 +111,9 @@ scope 境界として明文化する。`kotoba-lang/browser` 自身の ADR-0001
 
 - `htmldom`/`cssom` 自体は無変更（既に standalone-consumable だったため
   抽出/decoupling 作業は不要だった、と確認できたこと自体が本 ADR の副産物）。
-- `aiueos` 側で実際に mainuiux レンダラーを実装する作業（Rust/Wasm 側の
-  contract 適合実装）は別の、将来の cycle に残す — 本 ADR は stub の設計・
-  登録のみを完了条件とする。
+- `aiueos` 側で実際に mainuiux レンダラーを実装する作業（`.kotoba`
+  ソース + Wasm component としての contract 適合実装）は別の、将来の
+  cycle に残す — 本 ADR は stub の設計・登録のみを完了条件とする。
 - `known-properties`/draw-ops 語彙は `cssom`/`dom-gpu` 側の今後の機能追加
   （list-style-type、real per-side margin/padding 等、`browser` の
   maturity matrix に記録済みの open items）に伴い増分更新される前提 —
@@ -112,3 +126,7 @@ scope 境界として明文化する。`kotoba-lang/browser` 自身の ADR-0001
 - `orgs/kotoba-lang/aiueos/README.md`
 - `orgs/kotoba-lang/kotoba-lang/docs/adr/ADR-safe-capability-language.md`
 - `90-docs/adr/2607051300-cross-org-capability-map.md`
+- `orgs/kotoba-lang/kotoba/docs/ADR-kotoba-shell-aiueos-safe-kotoba.md`（Rust
+  bootstrap と `.kotoba` component の照合パターンの実例）
+- `orgs/kotoba-lang/kotoba/CLAUDE.md`（旧 Rust `kotoba-clj` → JVM Clojure +
+  Chicory 移行の実例）
