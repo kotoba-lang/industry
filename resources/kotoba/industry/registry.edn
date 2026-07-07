@@ -5519,7 +5519,33 @@
    :business-id "cloud-itonami-isic-9000"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :blueprint
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as a creative/arts/entertainment
+   ;; actor (EntertainmentOps-LLM ⊣ Content and Booking Governor),
+   ;; the seventeenth build outside ADR-2607032000's original
+   ;; insurance/real-estate batch (after 6612, 6492, 6920, 6611,
+   ;; 7120, 8620, 8530, 9200, 7500, 9603, 9521, 9321, 8730, 9102,
+   ;; 9103, 9602), the first ISIC division 90 (creative/arts/
+   ;; entertainment) vertical in this fleet, modeled closely on
+   ;; siblings 6511/6512/6621/6622/6629/6520/6530/6820/6612/6492/
+   ;; 6920/6611/7120/8620/8530/9200/7500/9603/9521/9321/8730/9102/
+   ;; 9103/9602.
+   ;; Distinctive check: release-channel-restricted? is the THIRD
+   ;; instance of the set-membership/conflict family (clinic
+   ;; established the first, veterinary reused it verbatim for the
+   ;; second), applied here to a fresh concern: a production's own
+   ;; proposed release channel must not appear in its own recorded
+   ;; restricted-channel set (contractual exclusivity/windowing
+   ;; conflict, not clinical safety).
+   ;; rights-clearance-unresolved-violations is the FOURTEENTH
+   ;; grounding of the unconditional-evaluation screening discipline
+   ;; (casualty.governor/sanctions-violations) -- tested via
+   ;; :rights/screen directly from the start, applying parksafety's/
+   ;; eldercare's/museum's/conservation's/salon's lesson proactively
+   ;; for a fifth consecutive vertical. Single actuation
+   ;; (:actuation/release-production). See ADR (superproject) for
+   ;; detail.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :catalog :present :exhibit :audit]}
   {:id "9102"
