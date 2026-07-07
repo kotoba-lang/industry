@@ -5415,7 +5415,33 @@
    :business-id "cloud-itonami-isic-8610"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :blueprint
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as a hospital actor (HospitalOps-LLM
+   ;; ⊣ Clinical Oversight Governor), the nineteenth build outside
+   ;; ADR-2607032000's original insurance/real-estate batch (after
+   ;; 6612, 6492, 6920, 6611, 7120, 8620, 8530, 9200, 7500, 9603,
+   ;; 9521, 9321, 8730, 9102, 9103, 9602, 9000, 8890), a second ISIC
+   ;; division 86 (human health) vertical in this fleet alongside
+   ;; 8620's clinic (inpatient care rather than outpatient practice),
+   ;; modeled closely on siblings 6511/6512/6621/6622/6629/6520/
+   ;; 6530/6820/6612/6492/6920/6611/7120/8620/8530/9200/7500/9603/
+   ;; 9521/9321/8730/9102/9103/9602/9000/8890.
+   ;; Distinctive check: observation-period-elapsed? is the THIRD
+   ;; instance of this fleet's MINIMUM-threshold temporal-sufficiency
+   ;; shape (veterinary established the first, gated on a type tag;
+   ;; funeral the second, unconditional), applied here unconditionally
+   ;; to post-procedure observation before discharge.
+   ;; hospital.facts cites INSTITUTIONAL hospital-operation regulators,
+   ;; distinct from clinic.facts's individual-practitioner-licensing
+   ;; bodies, even where jurisdictions overlap.
+   ;; credential-not-current-violations is the SIXTEENTH grounding of
+   ;; the unconditional-evaluation screening discipline overall, and
+   ;; the third specifically for this clinical-licensing concept
+   ;; (after clinic, veterinary) -- tested via :credential/screen
+   ;; directly from the start, applying the established lesson
+   ;; proactively for a seventh consecutive vertical. See ADR
+   ;; (superproject) for detail.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :triage :treat :review :follow-up :audit]}
   {:id "8620"
