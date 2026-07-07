@@ -1,7 +1,7 @@
 {:frontmatter
  {:id "adr-2607071500-kotoba-lang-kotoba-protocol-atprotocol-layering"
   :title "ADR-2607071500: kotoba-protocol 層設計の正本化 + atprotocol 投影層分離 + appview/embedUrl (W-Protocol 退役)"
-  :status "accepted"
+  :status "closed"
   :doc_type "adr"
   :topic "kotoba-protocol-layering"
   :authoritative true
@@ -94,7 +94,27 @@
  {:positive
   ["基盤の層表・語彙が 1 箇所に — 新規設計が層で会話できる"
    "atproto 互換 = 投影の明文化 (encode/scan を契約の実装と再定義)"
-   "W-Protocol 資産は alias で温存、新規は :kotoba.app/* のみ"]
+   "W-Protocol 資産は alias で温存、新規は :kotoba.app/* のみ"
+   "L0–L5 の全層が単一 miniapp で貫通して本番稼働する状態を実証
+    (mangaka/bridge-demo/wasm-demo の 3 app actor が aozora.app profile で
+    live 動作。CID/IPLD→datom→graph→did:key/鍵由来IPNS→IPFS配布+実B2書込→
+    cap-bridge mount / WASM actor 実行まで通し)"
+   "副産物の一般則: vendor JS を Closure :advanced と併用する際、cljs↔JS
+    境界の object literal はプロパティ名 renaming が食い違いうる — externs
+    ファイルで固定するのが解 (Addendum 2)。今後の vendor 作業に適用可能"]
   :negative
   ["spec と実装の drift リスク (data 化 + テスト参照で軽減)"
-   "repo 2 つ分の管理コスト"]}}
+   "repo 2 つ (kotoba-protocol/atprotocol) + vendor JS (actor-host.js) +
+    externs ファイルの追加管理コスト"
+   "cap-bridge は graph/query (読取専用) のみ、wasm actor は 7/8 imports
+    (http-post 不可) — 書込み系 capability の host 代行は未実装のまま
+    open follow-up として持ち越し"]}
+
+ :open-follow-up
+ ["lexicon _lexicon DNS 公開・firehose・MST encoding の kotoba graph 導出
+   (atprotocol の wire 互換を深める話、miniapp モデル自体には不要)"
+  "cap-bridge の書込み系 capability (graph/transact・llm/complete) の host
+   代行実装 (現状は grant registry に名前があるだけ)"
+  "studio への actor 鍵 import UI の汎用化 (現状 mangaka-app 専用)"
+  ":kotoba.app/bundle-cid の appview 側 integrity 検証 (現状 embed-url の
+   resolve のみで配信内容との一致は未検証)"]}
