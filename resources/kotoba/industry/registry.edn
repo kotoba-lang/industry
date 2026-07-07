@@ -5340,8 +5340,22 @@
    :business-id "cloud-itonami-isic-8530"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :blueprint
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as a higher-education actor
+   ;; (RegistrarOps-LLM ⊣ Academic Integrity Governor), the seventh
+   ;; build outside ADR-2607032000's original insurance/real-estate
+   ;; batch (after 6612, 6492, 6920, 6611, 7120, 8620), the first ISIC
+   ;; division 85 (education) vertical in this fleet, modeled closely
+   ;; on siblings 6511/6512/6621/6622/6629/6520/6530/6820/6612/6492/
+   ;; 6920/6611/7120/8620.
+   ;; Distinctive check: prerequisites-satisfied? is the FIRST check in
+   ;; this fleet to be a SET-CONTAINMENT/subset test (every required
+   ;; prerequisite must appear in the completed-course set) rather than
+   ;; a single-item set-membership/conflict test. Dual actuation
+   ;; (:grade/finalize, :degree/confer) on the SAME entity, neither
+   ;; ever auto at any phase; like 6920/7120/8620, no bespoke
+   ;; capability lib.
    :operating-states [:intake :plan :review :follow-up :audit]}
   {:id "8541"
    :name "Sports and recreation education"
