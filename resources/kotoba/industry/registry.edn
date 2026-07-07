@@ -5686,7 +5686,32 @@
    :business-id "cloud-itonami-isic-9311"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :blueprint
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as a sports-facility actor (FacilityOps-LLM
+   ;; ⊣ Facility Safety Governor), the twentieth build outside
+   ;; ADR-2607032000's original insurance/real-estate batch (after
+   ;; 6612, 6492, 6920, 6611, 7120, 8620, 8530, 9200, 7500, 9603,
+   ;; 9521, 9321, 8730, 9102, 9103, 9602, 9000, 8890, 8610), a second
+   ;; leisure-attractions vertical (ISIC division 93) in this fleet
+   ;; alongside 9321's amusement parks (gyms/stadiums/arenas rather
+   ;; than mechanical rides), modeled closely on siblings 6511/6512/
+   ;; 6621/6622/6629/6520/6530/6820/6612/6492/6920/6611/7120/8620/
+   ;; 8530/9200/7500/9603/9521/9321/8730/9102/9103/9602/9000/8890/8610.
+   ;; Distinctive check: occupancy-exceeds-capacity? is the FIRST
+   ;; non-temporal instance of this fleet's MAXIMUM-ceiling family
+   ;; (eldercare/museum/salon established the first three, all
+   ;; temporal), reusing parksafety's two-field-on-one-entity
+   ;; comparison shape for the MAXIMUM direction. Also reuses the
+   ;; unconditional-evaluation screening discipline for a seventeenth
+   ;; distinct grounding (inspection-not-passed-violations, the
+   ;; second specifically for the post-hold-inspection concept after
+   ;; parksafety), tested via the screening op directly for an
+   ;; eighth consecutive vertical (after eldercare/museum/
+   ;; conservation/salon/entertainment/casework/hospital). Single
+   ;; actuation (:facility/authorize-use); double-authorization
+   ;; guarded via a dedicated boolean per the 6492 lesson. See
+   ;; cloud-itonami-isic-9311/docs/adr/0001-architecture.md.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :book :operate :maintain :audit]}
   {:id "9312"
