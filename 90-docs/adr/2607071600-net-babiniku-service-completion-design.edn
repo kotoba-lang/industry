@@ -129,11 +129,40 @@
                flow embed -> M7 LP restructure; M4/M5 independent"
   :open_items ["murakumo bridge's ANTHROPIC_PROXY_TOKEN production state"
                "qwen model's JSON-contract fidelity"
-               "2 missing character avatars until kisekae supplies them"
                "kotobase-backed SpecStore + account identity"]
   :new_deps "net-babiniku gains kotoba-lang/kisekae, canvaskit, editor (sibling
              :local/root) when M6 lands"
-  :adr_amendment "ADR-2607070800 amended in place: provider superseded, boundary retained"}
+  :adr_amendment "ADR-2607070800 amended in place: provider superseded, boundary retained"
+  :addendum_2607080800
+  {:context "M6's compose engine (ADR-2607071610, shipped and verified live) closes
+             the '2 missing character avatars' open item without any new
+             third-party asset"
+   :closed
+   {:what "jk-luxury/net-babiniku#39: rin and mei get real avatars composed from
+           the SAME two already-licensed VRM Consortium sample files aoi/yui
+           already use -- rin = VRM1_Constraint_Twist_Sample body + Seed-san
+           hair/outfit; mei = Seed-san body/outfit + VRM1_Constraint_Twist_Sample
+           hair/face (Twist-Sample has no separate :outfit category to donate)"
+    :license_basis "checked directly against both files' embedded VRMC_vrm.meta,
+                    not assumed -- both declare modification:
+                    allowModificationRedistribution, avatarPermission: everyone,
+                    allowRedistribution: true under VRM Public License 1.0"}
+   :compliance_gap_also_fixed
+   {:what "Seed-san's creditNotation is 'required' (credit VirtualCast, Inc.) but
+           nothing in the app credited it anywhere for aoi's existing avatar
+           either -- a real, previously-missing gap, not hypothetical"
+    :fix "every built-in character now carries :avatar-credit, rendered
+         unconditionally and visibly on its card, not tucked in a collapsed
+         details block"}
+   :design_note ":avatar-spec (built-in characters only) kept SEPARATE from
+                 :kisekae/spec (user-created characters) so character-card-view's
+                 created? check stays correctly scoped -- rin/mei get real
+                 composed avatars without gaining Edit/Export/Delete UI meant only
+                 for what a visitor actually created"
+   :verification "verified live in production: both avatars render as full,
+                  correctly-posed, distinct humanoids; no console errors; full bb
+                  test suite (character/governor/monetization/embodiment/persona)
+                  passes"}}
 
  :alternatives
  [{:option "keep direct Anthropic and just provision the key"

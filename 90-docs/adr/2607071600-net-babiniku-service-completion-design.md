@@ -154,6 +154,36 @@ and `babiniku.net` DNS (still blocked on a dashboard action or DNS-scoped token)
   `kotoba-lang/editor` when M6 lands (all sibling `:local/root`, the existing convention).
 - ADR-2607070800 amended in place (provider superseded, boundary design retained).
 
+### Addendum (2026-07-08): "2 missing character avatars" closed — Rin and Mei get
+real composed avatars, plus a real VRM license-credit compliance gap fixed
+
+M6's compose engine (ADR-2607071610, shipped and verified live) closes this open
+item without any new third-party asset: Rin and Mei now get real avatars **composed
+from the same two already-licensed VRM Consortium sample files** Aoi/Yui already
+use (`jk-luxury/net-babiniku#39`) — Rin = VRM1_Constraint_Twist_Sample's body with
+Seed-san's hair+outfit; Mei = Seed-san's body/outfit with VRM1_Constraint_Twist_
+Sample's hair+face (Twist-Sample has no separate `:outfit` category to donate).
+
+**License basis checked directly against both files' embedded `VRMC_vrm.meta`, not
+assumed**: both declare `modification: "allowModificationRedistribution"`,
+`avatarPermission: "everyone"`, `allowRedistribution: true` under VRM Public
+License 1.0 — composing/remixing parts between them is explicitly within license
+terms. This also surfaced a real, previously-missing compliance gap: Seed-san's
+`creditNotation` is `"required"` (credit VirtualCast, Inc.), but nothing in the app
+credited it anywhere for Aoi's existing avatar either. Every built-in character now
+carries `:avatar-credit`, rendered unconditionally and visibly on its card.
+
+A new `:avatar-spec` field (built-in characters only, distinct from user-created
+characters' `:kisekae/spec`) keeps `character-card-view`'s `created?` check
+correctly scoped — Rin/Mei get real composed avatars without gaining the
+Edit/Export/Delete UI meant only for what a visitor actually created. Verified live
+in production: both avatars render as full, correctly-posed, distinct humanoids;
+no console errors; `bb character`/`governor`/`monetization`/`embodiment`/`persona`
+all pass.
+
+Remaining open items unchanged: `MURAKUMO_PROXY_TOKEN` production state, `babiniku.net`
+DNS, kotobase-backed SpecStore + account identity.
+
 ## Alternatives Considered
 
 1. **Keep the direct Anthropic backend and just provision the key.** Rejected — explicit
