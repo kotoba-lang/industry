@@ -5393,7 +5393,38 @@
    :business-id "cloud-itonami-isic-8521"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :blueprint
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as a secondary-education actor
+   ;; (SchoolOps-LLM ⊣ Curriculum Safeguarding Governor -- the SAME
+   ;; governor+advisor names cloud-itonami-isic-8510 uses, per this
+   ;; blueprint's own template), the twenty-fifth build outside
+   ;; ADR-2607032000's original insurance/real-estate batch (after
+   ;; 6612, 6492, 6920, 6611, 7120, 8620, 8530, 9200, 7500, 9603,
+   ;; 9521, 9321, 8730, 9102, 9103, 9602, 9000, 8890, 8610, 9311,
+   ;; 8510, 9412, 6491, 8720), a SECOND education vertical alongside
+   ;; 8510's pre-primary/primary school, but for adolescent secondary
+   ;; education (grading/graduation rather than promotion/
+   ;; safeguarding), modeled closely on siblings 6511/6512/6621/6622/
+   ;; 6629/6520/6530/6820/6612/6492/6920/6611/7120/8620/8530/9200/
+   ;; 7500/9603/9521/9321/8730/9102/9103/9602/9000/8890/8610/9311/
+   ;; 8510/9412/6491/8720.
+   ;; Distinctive checks: attendance-hours-insufficient? is the
+   ;; SECOND non-temporal instance of the MINIMUM-threshold
+   ;; sufficiency family (association established the first);
+   ;; graduation-requirements-unsatisfied? is the THIRD instance of
+   ;; the set-containment/subset family (registrar 1st, casework
+   ;; 2nd). Also reuses the unconditional-evaluation screening
+   ;; discipline for a twenty-third distinct grounding (academic-
+   ;; integrity-flag-unresolved-violations, the FIRST specifically
+   ;; for an academic-integrity-flag concept), tested via the
+   ;; screening op directly for a thirteenth consecutive vertical
+   ;; (after eldercare/museum/conservation/salon/entertainment/
+   ;; casework/hospital/facility/school/association/leasing/
+   ;; behavioral). Dual actuation (:grading/finalize, :graduation/
+   ;; finalize) on the same student entity; double-finalization
+   ;; guarded via dedicated booleans per the 6492 lesson. See
+   ;; cloud-itonami-isic-8521/docs/adr/0001-architecture.md.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :plan :review :follow-up :audit]}
   {:id "8522"
