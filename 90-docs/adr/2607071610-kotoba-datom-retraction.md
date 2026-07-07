@@ -161,6 +161,18 @@ assert し、AppView scan が drop）で deleteRecord を復旧した（app-aozo
 - app-aozora 側テスト: 281 tests / 1213 assertions / 0 failures（retraction
   順序を検証する新規アサーション込み）。
 
+## Addendum 3: worker 既存 18 failures は解消済みと確認（2026-07-07）
+
+Addendum 1 で「pre-existing、本変更の回帰ゼロ」と記録した 18 件の worker test
+failures は、追調査の結果 **別バグではなく ADR-2607051000（crypto-seam）の
+未採用と同一の根本原因**だったと判明。ADR-2607051000 addendum
+（本 ADR とは別文書）で crypto-seam を worker に採用した際に handler.cljc の
+`do-datoms`/`do-transact`/`do-q`/`do-pull`/`do-fold` を async 化し
+（`then*` アダプタ）、`handler_test.cljc`/`r2_test.cljc` を Promise 契約に
+合わせて書き直した時点で、この 18 failures も同時に解消していた（同じ
+worktree で `pnpm test` 実行: 22 tests / 79 assertions / **0 failures**、
+2026-07-07 時点の worker main `7c0e3d7` で確認）。追加の別調査は不要。
+
 ## Follow-ups
 
 - Phase 2: as-of / :added false 表面化（kotobase-peer）
@@ -168,4 +180,3 @@ assert し、AppView scan が drop）で deleteRecord を復旧した（app-aozo
   substrate イベントとの対応付け）
 - fold の GC 指標（retract 適用で node 数がどれだけ縮むか計測。fold 自体は
   CACAO 認証が必要で本セッションでは未実行 — 次の FOLD_CRON 起動時に確認）
-- worker 既存 18 failures（pre-existing、roundtrip/async 系）の別途調査
