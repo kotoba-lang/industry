@@ -146,7 +146,38 @@
                Seed-san/VRM1_Constraint_Twist_Sample bytes) rather than more
                hand-rolled browser-script JS interop, so the diagnosis tool is
                held to the same rigor as the fixes"
-    :blocks "net-babiniku M6 slice 2 part-swap UI remains unshipped"}}}
+    :blocks "net-babiniku M6 slice 2 part-swap UI remains unshipped"}}
+  :addendum_2607071800
+  {:method "a direct clojure -M -e script against the actual downloaded .vrm bytes
+            (vrm.parse/vrm.part/vrm.compose called directly, JVM ex-data inspected) --
+            addendum 2's own recommendation, followed this time. Immediately caught
+            that addendum 2's browser probe had read the WRONG skin (donor has 3
+            skins; hair mesh uses skin 2; probe inspected skin 0) and reported a
+            bogus node/bone name as a result"
+   :bug_4_fixed
+   {:what "the real unmappable-joint case carries weight 0.00266 (~0.27%), an
+           ordinary blend-smoothing residual -- addendum 2's 1e-4 tolerance was too
+           strict for real content"
+    :fix "kotoba-lang/org-vrmc-vrm#3 (pin advanced): raised to 1e-2 (1%), with a test
+         locking in the exact real-world value"}
+   :bug_5_confirmed_bigger
+   {:what "Seed-san has 5 SEPARATE skins, one per mesh (hair=23 joints,
+           hair_tail=7, head=1, robo_arm=21, wear=80) -- compose's whole design
+           assumes ONE shared skin per document (base-skin = first skin). A mesh
+           using any other skin has joints joint-index-of doesn't contain, so even
+           Seed-san's OWN wear/body mesh fails the unmappable-joint check against
+           its OWN base document -- not a donor issue at all"
+    :confidence "CONFIRMED with certainty this time (not addendum 2's
+                'inconclusive') -- verified via the reliable direct-JVM method"
+    :real_fix_scope "unify a document's own multiple skins into one before donor
+                     merging, or extend composed output to support multiple skins --
+                     a genuine architecture decision (likely its own ADR), not a
+                     bounded patch"
+    :blocks "net-babiniku M6 slice 2 part-swap UI remains unshipped"}
+   :lesson "the previous cycle's unreliable browser-script diagnosis was itself the
+           obstacle -- switching to direct in-JVM calls against real bytes (no
+           browser, no JS interop) resolved the ambiguity immediately and is the
+           right default tool for future org-vrmc-vrm diagnosis"}}
 
  :alternatives
  [{:option "store exported .vrm blobs as the artifact of record"

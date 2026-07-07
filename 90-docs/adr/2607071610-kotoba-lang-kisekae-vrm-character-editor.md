@@ -168,6 +168,41 @@ Seed-san/VRM1_Constraint_Twist_Sample bytes, not a browser script) rather than m
 hand-rolled JS interop, so the diagnosis tool itself is held to the same test rigor
 as the fixes. `net-babiniku`'s part-swap UI remains unshipped.
 
+### Addendum 3 (2026-07-07, later cycle): definitive diagnosis, using the recommended method — a smaller fix landed, a genuinely bigger design gap confirmed
+
+Followed addendum 2's own recommendation: a direct `clojure -M -e` script against the
+actual downloaded `.vrm` bytes (`vrm.parse`/`vrm.part`/`vrm.compose` called directly,
+JVM exceptions and `ex-data` inspected in the REPL) rather than another browser
+script. This immediately caught that addendum 2's browser probe had been WRONG —
+inspecting the wrong skin entirely (the donor file has 3 skins; the probe read skin 0
+when the hair mesh actually uses skin 2) and reporting a bogus node/bone name as a
+result. The reliable method surfaced two real, distinct findings:
+
+1. **Fixed** (`kotoba-lang/org-vrmc-vrm#3`, pin advanced): the real unmappable-joint
+   case in VRM1_Constraint_Twist_Sample carries a weight of 0.00266 (~0.27%) — an
+   ordinary blend-smoothing residual, not exactly zero. Addendum 2's `1e-4` tolerance
+   was too strict for real content; raised to `1e-2` (1%), with a test locking in the
+   exact real-world value.
+2. **Confirmed, genuinely bigger, correctly NOT attempted**: composing Seed-san
+   specifically still fails — not on a donor issue at all, but because **Seed-san has
+   5 separate skins**, one per mesh (`hair`=skin0/23 joints, `hair_tail`=skin1/7,
+   `head`=skin2/1, `robo_arm`=skin3/21, `wear`=skin4/80). `compose`'s entire design
+   assumes ONE shared skin per document (`base-skin = (first (:skins base-gltf))`);
+   a mesh using any OTHER skin has joints `joint-index-of` (built from skin 0 only)
+   simply doesn't contain — so even Seed-san's OWN "wear" (body) mesh fails the
+   "no place in the unified skeleton" check against its own base document. This is a
+   materially different, more fundamental gap than anything found before it: it
+   requires either unifying a single document's own multiple skins into one before
+   any donor merging, or extending composed output to support multiple skins — a real
+   architecture decision, not a bounded patch, and confirmed this time with certainty
+   (not "inconclusive" as addendum 2 left it).
+
+**Consequence**: `net-babiniku`'s part-swap UI remains unshipped. The multi-skin
+question is the concrete next blocker — precisely diagnosed, not vague — but is
+correctly left for a dedicated design decision (likely its own ADR) rather than
+improvised under the pressure of "one more fix might finish it," which is exactly how
+addendum 2's unreliable probe happened in the first place.
+
 ## Alternatives Considered
 
 1. **Store exported `.vrm` blobs as the artifact of record.** Rejected — opaque,
