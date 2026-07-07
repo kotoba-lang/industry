@@ -5025,8 +5025,24 @@
    :business-id "cloud-itonami-isic-7500"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :blueprint
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as a veterinary actor (VetOps-LLM ⊣
+   ;; Veterinary Care Governor), the ninth build outside
+   ;; ADR-2607032000's original insurance/real-estate batch (after
+   ;; 6612, 6492, 6920, 6611, 7120, 8620, 8530, 9200), the first ISIC
+   ;; division 75 (veterinary/animal-health) vertical in this fleet,
+   ;; modeled closely on siblings 6511/6512/6621/6622/6629/6520/6530/
+   ;; 6820/6612/6492/6920/6611/7120/8620/8530/9200.
+   ;; Distinctive check: withdrawal-period-insufficient? is the FIRST
+   ;; check in this fleet to model a food-safety/temporal-sufficiency
+   ;; concept (for a food-producing animal, a drug's withdrawal period
+   ;; must fully elapse before its planned harvest date), combining a
+   ;; MINIMUM-threshold recompute with a type-tag gate, deliberately
+   ;; guarding on :food-producing? first (informed by the 6920
+   ;; NullPointerException lesson before writing any code). Single
+   ;; actuation (:treatment/administer), never auto at any phase; like
+   ;; 6920/7120/8620/8530/9200, no bespoke capability lib.
    :operating-states [:intake :diagnose :treat :prescribe :audit]},
   {:id "7710"
    :name "Renting and leasing of motor vehicles"
