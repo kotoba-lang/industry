@@ -1,6 +1,6 @@
 # ADR-2607071500: kotoba-protocol — 層設計の正本化（datom/IPLD/IPNS/IPFS 統合）+ atprotocol を「上に立つ投影層」として分離 + appview / embedUrl モデル（W-Protocol 退役）
 
-**Status**: accepted (scaffold implemented this session)
+**Status**: closed (implemented — scaffold + 全 follow-up が本番 live で実証済み)
 **Date**: 2026-07-07
 **Deciders**: Jun Kawasaki
 
@@ -117,14 +117,22 @@ repo の中身:
 - ActorFrame → 廃語。host（aozora SPA）は「profile の投影に embedUrl があれば
   mount する」だけで、mount 実装（iframe / wasm-webcomponent）は host 実装詳細。
 
-### 意図的に scaffold に入れないもの（follow-up）
+### 意図的に scaffold に入れなかったもの → 全て Addendum 1/2 で実装済み
 
-- kotobase の公開 IPFS retrieval（既知ギャップ）— `ipfs://` embed-url の実配信
-  はこれ待ち。それまで `https://` embed-url + `:kotoba.app/bundle-cid` で
-  integrity を先に刻む。
-- aozora SPA への embedUrl mount 実装（cljs 版 appview/embed ホスト）。
-- lexicon `_lexicon` DNS 公開、firehose、MST encoding の kotoba graph 導出。
-- kototama bridge caps の実装（postMessage 契約は vocab のみ先行定義）。
+以下は起票時点で follow-up と明記したが、本 ADR のクローズまでに全て実装・
+本番 live で実証した（詳細は Addendum 1/2）:
+
+- ~~kotobase の公開 IPFS retrieval~~ → `KOTOBASE_IPFS_GATEWAY_URL` +
+  `PUT /ipfs/:cid` で実配信・実 B2 書込まで live（Addendum 1 §3）。
+- ~~aozora SPA への embedUrl mount 実装~~ → `app-embed-panel`（opaque
+  origin iframe）+ `wasm-actor-panel`（kind=actor、WebAssembly 直接実行）
+  として実装（Addendum 1 §2 / Addendum 2）。
+- ~~kototama bridge caps の実装~~ → `kotoba.protocol.bridge` + host
+  `yoro-ui.interop.app-bridge`、round-trip 実証済み（Addendum 1 §2）。
+
+**未実装のまま残るもの**（本 ADR のスコープ外として明示的に持ち越し）:
+- lexicon `_lexicon` DNS 公開、firehose、MST encoding の kotoba graph 導出
+  （atprotocol 層の wire 互換を深める話で、miniapp モデル自体には不要）。
 
 ## Consequences
 
@@ -135,9 +143,33 @@ repo の中身:
   させられる。
 - (+) W-Protocol は互換 alias として残るため既存 archive を壊さない。
   新規コードは `:kotoba.app/*` だけを見ればよい。
+- (+) **L0–L5 の全層が単一の miniapp で貫通して本番稼働する状態を実証**:
+  CID/IPLD（L0）→ datom（L1）→ graph（L2）→ did:key/鍵由来 IPNS（L3）→
+  IPFS 配布・実 B2 書込（L4）→ app 提供の両形態（L5: embed の cap-bridge
+  mount、actor の WASM ブラウザ実行）まで、mangaka / bridge-demo /
+  wasm-demo の 3 app actor が aozora.app の profile で live 動作
+  （Addendum 1/2）。
+- (+) 副産物として発見・修正した一般則: vendor JS を Closure `:advanced`
+  最適化と併用する際、object literal を介した cljs↔JS 境界はプロパティ名
+  renaming の不一致を起こしうる（Addendum 2 の externs 修正）— 今後の
+  kototama/wasm-webcomponent 系 vendor 作業に適用できる知見として記録。
 - (−) spec repo と実装 repo の drift リスク — layers/vocab を data にして
   テストから参照させることで軽減（宣言が壊れたらテストが落ちる）。
-- (−) 2 repo 追加分の west/manifest 管理コスト。
+- (−) 2 repo（kotoba-protocol/atprotocol）+ vendor JS（actor-host.js）+
+  externs ファイルの追加管理コスト。
+- (−) cap-bridge は `graph/query`（読取専用）のみ、wasm actor は 7/8
+  imports（`http-post` 不可）— 書込み系 capability の host 代行は
+  引き続き未実装（下記 open follow-up）。
+
+## Open follow-up（本 ADR クローズ後も残る）
+
+- lexicon `_lexicon` DNS 公開・firehose・MST encoding の kotoba graph 導出
+  （atprotocol の wire 互換を深める話、miniapp モデル自体には不要）。
+- cap-bridge の書込み系 capability（`graph/transact`・`llm/complete`）の
+  host 代行実装（現状は grant registry に名前があるだけで未実装）。
+- studio への actor 鍵 import UI の汎用化（現状 mangaka-app 専用）。
+- `:kotoba.app/bundle-cid` の appview 側 integrity 検証（現状 `embed-url`
+  の resolve のみで、配信内容と bundle-cid の一致は未検証）。
 
 ## Addendum (2026-07-07 同日): follow-up 3 件 (IPNS / cap-bridge / bundle CID) 実装
 
