@@ -44,7 +44,13 @@
   :reside "✅ 本 ADR (mesh guests + murakumo.app.edn 登録)"
   :pin "✅ component build が CID 発行 (deploy 時に pin)"}
 
+ :addendum-2607071330
+ {:deployed "bb deploy → asher (operator seed = 1Password)。CID はローカル build と完全一致 (決定的ビルド)"
+  :e2e "POST /mesh/http/minidrama/profile → HTTP 200 (identity record 応答)。GET は 405 (on-http は POST 契約)"
+  :cid-recorded "murakumo.app.edn に drama-profile CID 記入 (murakumo 84235dce)"
+  :reconcile "bb reconcile --dry-run → minidrama 1/1 :satisfied on asher (宣言的ループ閉包)"}
+
  :follow-ups
- ["実 fleet 配置 (operator: bb murakumo deploy … または bb reconcile --apply) → 観測 CID を :cid に記入"
+ ["✅ 実 fleet 配置 + :cid 記入 (addendum-2607071330 で完了)"
   "registry :keyed? false→true flip は PDS account/did 昇格と合わせ別 follow-up (ADR-2607070400 系列)"
   "animeka / dougaka / work actors への横展開 (本 ADR の型を複製)"]}

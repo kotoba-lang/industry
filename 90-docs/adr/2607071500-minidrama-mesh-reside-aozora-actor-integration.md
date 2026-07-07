@@ -92,3 +92,19 @@ pin      (kotoba):  guest は CID で content-addressed（component build が CI
 - ADR-2607071400（murakumo family positioning）: 本配線が乗る control plane の
   ポジショニング（wadm 型 reconcile、auction placement）。
 - kenchi mesh surface（`orgs/kotoba-lang/kenchi/mesh/`）: split-of-duties の先例。
+
+## 追記 (2026-07-07): 実 fleet 配置 + E2E 実証完了（follow-up ①②）
+
+- **配置**: operator seed（1Password「Murakumo Operator Seed」）で
+  `bb deploy …/mesh/minidrama.app.edn asher` を実行。両 component の CID は
+  ローカル build と**完全一致**（決定的ビルド）。desired datom 10 件 +
+  PutRoutes(http=1) が control graph に書かれ、asher に install。
+- **E2E 実証**: `POST http://asher:8077/mesh/http/minidrama/profile` →
+  **HTTP 200** で actor identity record（handle/did/registry/role）が
+  WASM component から応答（GET は 405 — mesh on-http は POST 契約）。
+- **:cid 記入**: murakumo.app.edn に representative CID（drama-profile）を記録
+  （murakumo `84235dce`）。`bb reconcile --dry-run` が
+  **`minidrama 1 desired / 1 running / satisfied on asher`** を報告 —
+  宣言的ループ（desired ↔ observed）が閉じた。
+- 運用注: 配置は canary (asher) 1 replica。fleet 全体の常駐化・replicas 増は
+  `bb reconcile --apply` / `--watch` の運用判断に委ねる。
