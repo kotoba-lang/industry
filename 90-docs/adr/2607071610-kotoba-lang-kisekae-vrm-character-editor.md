@@ -135,6 +135,39 @@ every prior compose test/usage composed parts from the SAME source document (bas
   remap fix lands. That fix is the concrete, precisely-diagnosed prerequisite for
   M6 slice 2 — not a vague "make part-swap work" task.
 
+### Addendum 2 (2026-07-07, later cycle): item 2 above is now fixed — a third issue surfaced composing the real pair
+
+`kotoba-lang/org-vrmc-vrm#2` (pin advanced) fixes the JOINTS_0 per-vertex remap bug
+(addendum 1, item 2): joint-set computation moved earlier in `compose` (right after
+node-remap, before mesh merge) so mesh merge can build `joint-index-of` and rewrite
+every skinned mesh's `JOINTS_0` data with real remapped values, not raw donor-local
+copies. Two regression tests with unambiguous right/wrong answers (a reversed-joint-
+order donor; an unmappable-joint-with-zero-weight tolerance case) confirmed the fix
+against the pre-fix code's wrong output, not just "doesn't crash." Full suite:
+44 tests / 158 assertions.
+
+That fix also had to tolerate a real pattern found in actual content: a `JOINTS_0`
+slot referencing a joint with no place in the unified skeleton no longer throws
+unconditionally — only when its paired `WEIGHTS_0` is genuinely non-zero (a
+zero-weight slot's joint index has no effect on the render; real exporters commonly
+leave arbitrary-but-valid indices there from a whole-file shared skin).
+
+**Still not resolved**: composing the ACTUAL real-world pair this ADR keeps testing
+against (Seed-san as base + VRM1_Constraint_Twist_Sample's hair as donor) still
+throws — now on a DIFFERENT unmappable-joint case (a full, non-zero weight on a node
+whose name resolves to a leg-related bone, which shouldn't legitimately be a hair
+vertex's binding). Diagnosis in this cycle was inconclusive: an ad-hoc browser probe
+script (hand-rolled `cljs.core` interop to inspect the donor's raw glTF structure)
+produced results that contradicted each other across two attempts regarding which of
+the file's 3 skins the hair mesh's node actually references — meaning the probe
+script itself is suspect, not necessarily `compose`. Continuing to add ad-hoc probe
+scripts was correctly judged lower-value than stopping and recording this precisely:
+the next attempt at this specific real-avatar case should add direct, in-code
+diagnostics inside `vrm.compose`/`vrm.part` (a `deftest` against the actual
+Seed-san/VRM1_Constraint_Twist_Sample bytes, not a browser script) rather than more
+hand-rolled JS interop, so the diagnosis tool itself is held to the same test rigor
+as the fixes. `net-babiniku`'s part-swap UI remains unshipped.
+
 ## Alternatives Considered
 
 1. **Store exported `.vrm` blobs as the artifact of record.** Rejected — opaque,

@@ -117,7 +117,36 @@
              what's shipped"}
    :consequence "the part-swap UI built this cycle was NOT shipped (reverted, no PR)
                 rather than ship a visibly broken character -- this ADR's own
-                fail-loudly invariant applied to itself"}}
+                fail-loudly invariant applied to itself"}
+  :addendum_2607071730
+  {:bug_2_fixed
+   {:what "kotoba-lang/org-vrmc-vrm#2 (pin advanced): joint-set computation moved
+           before mesh merge so it can build joint-index-of and rewrite every
+           skinned mesh's JOINTS_0 data with real remapped values"
+    :tolerance "a JOINTS_0 slot referencing an unmappable joint no longer throws
+               unconditionally -- only when its paired WEIGHTS_0 is genuinely
+               non-zero; real content commonly leaves harmless arbitrary indices
+               in zero-weight slots from a whole-file shared skin"
+    :verification "two new regression tests with unambiguous right/wrong answers
+                  (reversed joint order; unmappable+zero-weight vs.
+                  unmappable+real-weight), both confirmed to distinguish pre-fix
+                  from post-fix behavior, not just non-crash. 44 tests/158
+                  assertions"}
+   :bug_3_open
+   {:what "composing the ACTUAL real-world pair (Seed-san base + VRM1_
+           Constraint_Twist_Sample donor hair) still throws, now on a DIFFERENT
+           unmappable joint -- a full non-zero weight on a node whose name
+           resolves to a leg-related bone, implausible for a hair vertex"
+    :diagnosis_status "inconclusive this cycle -- an ad-hoc browser probe script
+                       (hand-rolled cljs.core interop) produced CONTRADICTORY
+                       results across two attempts about which of the donor's 3
+                       skins the hair mesh's node actually references, meaning
+                       the PROBE ITSELF is suspect, not necessarily compose"
+    :next_step "add direct in-code diagnostics (a deftest against the actual
+               Seed-san/VRM1_Constraint_Twist_Sample bytes) rather than more
+               hand-rolled browser-script JS interop, so the diagnosis tool is
+               held to the same rigor as the fixes"
+    :blocks "net-babiniku M6 slice 2 part-swap UI remains unshipped"}}}
 
  :alternatives
  [{:option "store exported .vrm blobs as the artifact of record"
