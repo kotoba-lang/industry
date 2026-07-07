@@ -4705,8 +4705,17 @@
    :business-id "cloud-itonami-isic-6520"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :insurance]
    :optional-technologies []
-   :maturity :blueprint
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as a reinsurance actor (Treaty-LLM ⊣
+   ;; Reinsurance Governor), modeled closely on siblings 6511/6512/6621/
+   ;; 6622/6629. Distinctive check: recovery-calculation-mismatch
+   ;; independently recomputes a claims-recovery amount via the treaty's
+   ;; own quota-share (percentage-of-loss, capped) or excess-of-loss
+   ;; (retention/layer) formula, reusing 6629's "never trust a claimed
+   ;; figure" arithmetic-verification pattern on a new domain-specific
+   ;; formula. Dual actuation (:treaty/bind, :recovery/pay), neither
+   ;; ever auto at any phase.
    :operating-states [:intake :underwrite :bind :endorse :claim :settle :audit]},
   {:id "6530"
    :name "Pension funding"
