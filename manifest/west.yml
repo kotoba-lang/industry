@@ -1254,7 +1254,7 @@ manifest:
       groups: [gftdcojp]
     - name: app-aozora
       remote: gftdcojp
-      revision: 10ddccb4529bd12ac1bb2b182596d49de8a4fed7
+      revision: 949f9d07dce9157eac1341b672db401aa56a9443
       path: orgs/gftdcojp/app-aozora
       clone-depth: 1
       groups: [gftdcojp]
@@ -1278,6 +1278,11 @@ manifest:
       revision: 359c7001bf5b9a7162a886f26fb72750f19cb742
       path: orgs/gftdcojp/net-kotobase-ipfs
       groups: [gftdcojp]
+    - name: shinshi-growth-actor
+      remote: gftdcojp
+      revision: 39fb8784b23524e453a6226c747f76d79df409e5
+      path: orgs/gftdcojp/shinshi-growth-actor
+      groups: [gftdcojp]
     - name: club-shinshi
       remote: jk-luxury
       revision: 0dbab1f81f2bcd7a8a1f67b44a66d13949439686
@@ -1296,7 +1301,7 @@ manifest:
       groups: [gftdcojp]
     - name: local-murakumo
       remote: gftdcojp
-      revision: 613ad8d5eac5058e8c0ebc770fbf3ffadf85e5ce
+      revision: f27388d82ff318acf5cfbe009b95be2261f6af5b
       path: orgs/gftdcojp/local-murakumo
       groups: [gftdcojp]
     - name: m365-archive
@@ -1410,7 +1415,7 @@ manifest:
       groups: [kotoba-lang]
     - name: atprotocol
       remote: kotoba-lang
-      revision: 6c5f2184fef708ff469699407d031ac7b063bd8b
+      revision: 821d9a742980f14638d469b0b049c3c757eaf709
       path: orgs/kotoba-lang/atprotocol
       groups: [kotoba-lang]
     - name: audio
@@ -1418,10 +1423,20 @@ manifest:
       revision: 87df6c3a850c4b87562de30d166b54d01b817e76
       path: orgs/kotoba-lang/audio
       groups: [kotoba-lang]
+    - name: authentication
+      remote: kotoba-lang
+      revision: 90630f3f033c9e5b79e48a69bc6aa24a34ec2b0b
+      path: orgs/kotoba-lang/authentication
+      groups: [kotoba-lang]
     - name: authenticator
       remote: kotoba-lang
       revision: 66c8a7d7a844b4d20ed8943cff511780707c8f31
       path: orgs/kotoba-lang/authenticator
+      groups: [kotoba-lang]
+    - name: authorization
+      remote: kotoba-lang
+      revision: f941d8924538cf7f23f2701425ce0f612e2acbad
+      path: orgs/kotoba-lang/authorization
       groups: [kotoba-lang]
     - name: banking
       remote: kotoba-lang
@@ -5713,6 +5728,11 @@ manifest:
       revision: caebe4f5c9d805fd8848e218a8bb1150719704c9
       path: orgs/kotoba-lang/edu-berkeley-spice
       groups: [kotoba-lang]
+    - name: ekyc
+      remote: kotoba-lang
+      revision: d1d806dffd897e6c54b077966d5b3f18a9cc1050
+      path: orgs/kotoba-lang/ekyc
+      groups: [kotoba-lang]
     - name: engineer
       remote: kotoba-lang
       revision: 0ce502a66676b8555fff867ee91358c495395c53
@@ -5892,6 +5912,16 @@ manifest:
       remote: kotoba-lang
       revision: 821a1fc6384243f2d9aa16e680e19fb34bd9e350
       path: orgs/kotoba-lang/ichiran
+      groups: [kotoba-lang]
+    - name: identify
+      remote: kotoba-lang
+      revision: fecec409e0ae86d47ed86b5118e0908fb95b30ba
+      path: orgs/kotoba-lang/identify
+      groups: [kotoba-lang]
+    - name: identity
+      remote: kotoba-lang
+      revision: 10387818a023273623308fe88af721a91f6926d1
+      path: orgs/kotoba-lang/identity
       groups: [kotoba-lang]
     - name: industry
       remote: kotoba-lang
@@ -6122,7 +6152,7 @@ manifest:
       groups: [kotoba-lang]
     - name: kami-script-runtime-rs
       remote: kotoba-lang
-      revision: 2b88debc34a9b7f3fb1d1979fc109ea7b8cf96c5
+      revision: ec36c5a55bb326f356e37d246054d9cdb617f435
       path: orgs/kotoba-lang/kami-script-runtime-rs
       groups: [kotoba-lang]
     - name: kami-genre-base-systems
@@ -6418,7 +6448,7 @@ manifest:
       groups: [kotoba-lang]
     - name: kotoba-protocol
       remote: kotoba-lang
-      revision: c88e4a3564ff15933296806d52a54a038053c91f
+      revision: 651d484eee32b0c1945263834d4caeff0a7e7224
       path: orgs/kotoba-lang/kotoba-protocol
       groups: [kotoba-lang]
     - name: kotoba-rad
@@ -6459,7 +6489,7 @@ manifest:
       groups: [kotoba-lang]
     - name: kotobase-client
       remote: kotoba-lang
-      revision: 6a6126f87b6e98c75129e9e9044ce3a6702fdb9e
+      revision: ac7fe263e65eeb129bac63c5ea243b2e75254cd4
       path: orgs/kotoba-lang/kotobase-client
       groups: [kotoba-lang]
     - name: kotobase-cljc-worker
@@ -6621,7 +6651,7 @@ manifest:
       groups: [kotoba-lang]
     - name: manga-viewer
       remote: kotoba-lang
-      revision: d9e0bf8c0b4cb4543493a846c279bcbe7b93229a
+      revision: b6b362c7de9d44bda91e40cb4ece87a0e7c21345
       path: orgs/kotoba-lang/manga-viewer
       groups: [kotoba-lang]
     - name: map
@@ -6648,6 +6678,11 @@ manifest:
       remote: kotoba-lang
       revision: b0946760efc82955888ced1e9c257170fb8033dd
       path: orgs/kotoba-lang/mesher
+      groups: [kotoba-lang]
+    - name: mfa
+      remote: kotoba-lang
+      revision: 1e2abbb47756b21732eafd7fabf10eddf94a742a
+      path: orgs/kotoba-lang/mfa
       groups: [kotoba-lang]
     - name: mine-ai
       remote: kotoba-lang
@@ -6736,7 +6771,7 @@ manifest:
       groups: [kotoba-lang]
     - name: occupation
       remote: kotoba-lang
-      revision: 87ce6cce254e36c34379749533aa2447297612ef
+      revision: 577dc0ceb0274bdbc356a9ed43fc73e7c8970e97
       path: orgs/kotoba-lang/occupation
       groups: [kotoba-lang]
     - name: ocio
@@ -6753,6 +6788,11 @@ manifest:
       remote: kotoba-lang
       revision: c02bcaa93b0906ca3c2adec1d7da2e2ef502bfac
       path: orgs/kotoba-lang/office-style
+      groups: [kotoba-lang]
+    - name: onetime
+      remote: kotoba-lang
+      revision: 06b6984fbd9c4e5e1cb334d818e641b9b20fd520
+      path: orgs/kotoba-lang/onetime
       groups: [kotoba-lang]
     - name: ongaku
       remote: kotoba-lang
@@ -6786,7 +6826,7 @@ manifest:
       groups: [kotoba-lang]
     - name: org-chainagnostic-cacao
       remote: kotoba-lang
-      revision: c88333c72690bc1463f077125b37c7eb8f11eb62
+      revision: 343ca4a6c06b17878c9a29dbd82f384e74cf3b5a
       path: orgs/kotoba-lang/org-chainagnostic-cacao
       groups: [kotoba-lang]
     - name: org-farama-gymnasium
@@ -7248,6 +7288,11 @@ manifest:
       remote: kotoba-lang
       revision: 95149afb45baa417cbc1b20b324ea6230d1d100d
       path: orgs/kotoba-lang/senden
+      groups: [kotoba-lang]
+    - name: session
+      remote: kotoba-lang
+      revision: 879206099d2dd7c6563fe641f58da6b488d6d3de
+      path: orgs/kotoba-lang/session
       groups: [kotoba-lang]
     - name: shacl
       remote: kotoba-lang
