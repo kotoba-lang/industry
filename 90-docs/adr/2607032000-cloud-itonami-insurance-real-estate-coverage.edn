@@ -81,4 +81,17 @@
   :fleet-maturity-before {:implemented 10 :blueprint 87 :spec 546 :total 643}
   :fleet-maturity-after {:implemented 11 :blueprint 86 :spec 546 :total 643}
   :test-status-6629 "30 tests / 125 assertions, lint clean, demo verified end-to-end"
-  :remaining-blueprint-from-original-batch ["cloud-itonami-6520 (reinsurance)" "cloud-itonami-6530 (pension funding)" "cloud-itonami-6820 (real estate on a fee/contract basis)"]}}
+  :remaining-blueprint-from-original-batch ["cloud-itonami-6520 (reinsurance)" "cloud-itonami-6530 (pension funding)" "cloud-itonami-6820 (real estate on a fee/contract basis)"]}
+
+ :addendum-5
+ {:date "2026-07-07"
+  :deepened-to-implemented "cloud-itonami-isic-6520"
+  :pattern-6520 "sealed Treaty-LLM advisor + independent Reinsurance Governor + append-only audit ledger, modeled closely on siblings cloud-itonami-isic-6511/6512/6621/6622/6629; treaty/recovery lifecycle mirrors 6512's policy/claim shape (recovery/file auto-eligible once bound, recovery/pay always human-gated)"
+  :distinctive-check-6520 "recovery-calculation-mismatch -- independently recomputes a claims-recovery amount via the treaty's own quota-share (percentage-of-loss, capped) or excess-of-loss (retention/layer) formula and compares it against the claimed figure, reusing cloud-itonami-isic-6629's arithmetic-verification pattern on a NEW domain-specific formula"
+  :no-party-concept-6520 "like 6629, this actor deliberately has NO party/conflict-of-interest Store concept at all -- a ceding insurer is a named contractual counterparty, not a screened individual"
+  :status-lifecycle-reasoning-6520 "treaty-not-bound-violations safely checks :status :bound directly (like casualty.governor/policy-not-bound-violations) because a treaty's status never advances past :bound, unlike 6622's placement -- this reasoning is written into the check's own docstring rather than defensively copying 6622's fix where it isn't needed"
+  :dual-actuation-6520 "two actuation events (:actuation/bind, :actuation/pay-recovery), matching 6512's/6622's dual-actuation shape, not 6511's/6621's/6629's single-actuation one"
+  :fleet-maturity-before {:implemented 11 :blueprint 86 :spec 546 :total 643}
+  :fleet-maturity-after {:implemented 12 :blueprint 85 :spec 546 :total 643}
+  :test-status-6520 "36 tests / 171 assertions, lint clean, demo verified end-to-end (two clean lifecycles + five HARD-hold cases, all correct on the first run)"
+  :remaining-blueprint-from-original-batch ["cloud-itonami-6530 (pension funding)" "cloud-itonami-6820 (real estate on a fee/contract basis)"]}}
