@@ -233,6 +233,38 @@ follow-up rather than done unilaterally. If the `adapter-contracts` /
 fresh against the *current* migration plan rather than reusing these
 empty, stale-citation placeholders.
 
+## Follow-up (2026-07-08) — witness-quorum org-placement question resolved
+
+Re-examined `witness-quorum`'s residence in `kotoba-lang` against
+ADR-2606302300's actual placement criteria, rather than domain-name
+intuition:
+
+- ADR-2606302300 defines `kotoba-lang` as "language substrate, consumed
+  by all orgs" — the decisive test is genericity/parameterization, not
+  whether a library's *subject matter* (witness selection, quorum,
+  attestation) sounds agent-flavored.
+- `witness-quorum`'s own README already states this directly: "Zero
+  etzhayyim-specific coupling beyond an NSID string constant and a
+  \"council\" escalation label — every fleet topology, membrane rule,
+  and signer is a caller-supplied parameter." `WitnessTransport` is
+  "a documented plain map of functions," and the production HTTP/PDS
+  transport was *deliberately not ported* so the package doesn't
+  hard-code any one deployment's shape.
+- Its stated real target consumer is "Murakumo babashka cell-runners" —
+  `kotoba-lang/murakumo`, itself a `kotoba-lang` cross-cutting
+  infra repo, not an `etzhayyim` actor.
+- This matches — and was the actual justification for — its 2026-07-01
+  relocation *from* `etzhayyim/root` *to* `kotoba-lang` in the first
+  place (per the README's own "Provenance" section), applying
+  ADR-2606302300's rule as designed.
+
+**Conclusion: no move needed.** The naming-audit ADR's placement
+question is resolved as "already correctly placed" — surface-level
+domain vibes (witness/quorum/attestation "sounds" agent-centric) don't
+override the taxonomy's actual test (generic + parameterized + already
+consumed by kotoba-lang's own infra). This closes the last open
+follow-up from this ADR.
+
 ## One-line summary
 
 **A scoped naming sweep of `kotoba-lang`'s IPLD/Datomic/IPNS/IPFS/
