@@ -5329,7 +5329,34 @@
    :business-id "cloud-itonami-isic-8510"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :blueprint
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as a school actor (SchoolOps-LLM
+   ;; ⊣ Curriculum Safeguarding Governor), the twenty-first build outside
+   ;; ADR-2607032000's original insurance/real-estate batch (after
+   ;; 6612, 6492, 6920, 6611, 7120, 8620, 8530, 9200, 7500, 9603,
+   ;; 9521, 9321, 8730, 9102, 9103, 9602, 9000, 8890, 8610, 9311), the
+   ;; FIRST education vertical (ISIC section P) in this fleet, modeled
+   ;; closely on siblings 6511/6512/6621/6622/6629/6520/6530/6820/
+   ;; 6612/6492/6920/6611/7120/8620/8530/9200/7500/9603/9521/9321/
+   ;; 8730/9102/9103/9602/9000/8890/8610/9311.
+   ;; Distinctive check: class-size-exceeds-maximum? is the SECOND
+   ;; non-temporal instance of this fleet's MAXIMUM-ceiling family
+   ;; (facility's occupancy-exceeds-capacity? established the first),
+   ;; reusing the same two-field-on-one-entity comparison shape for a
+   ;; genuinely different ground truth: destination-classroom size vs.
+   ;; its own maximum. Also reuses the unconditional-evaluation
+   ;; screening discipline for an eighteenth distinct grounding
+   ;; (background-check-not-cleared-violations, the FIRST specifically
+   ;; for the staff-background-check-clearance concept, distinct from
+   ;; the credential-CURRENCY concept clinic/veterinary/hospital
+   ;; established), tested via the screening op directly for a ninth
+   ;; consecutive vertical (after eldercare/museum/conservation/salon/
+   ;; entertainment/casework/hospital/facility). Dual actuation
+   ;; (:promotion/finalize, :safeguarding/finalize) on the same
+   ;; student entity; double-finalization guarded via dedicated
+   ;; booleans per the 6492 lesson. See
+   ;; cloud-itonami-isic-8510/docs/adr/0001-architecture.md.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :plan :review :follow-up :audit]}
   {:id "8521"
