@@ -97,7 +97,18 @@
    :name "Aircraft and Aerospace Manufacturing Enablement"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3030"
    :business-id "cloud-itonami-isic-3030"
-  :maturity :blueprint
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as an aerospace-manufacturing
+   ;; actor (Aerospace Advisor ⊣ Aerospace Manufacturing Governor), the
+   ;; twenty-ninth build outside ADR-2607032000's original insurance/
+   ;; real-estate batch (after 6612, 6492, 6920, 6611, 7120, 8620,
+   ;; 8530, 9200, 7500, 9603, 9521, 9321, 8730, 9102, 9103, 9602, 9000,
+   ;; 8890, 8610, 9311, 8510, 9412, 6491, 8720, 8521, 6619, 3600,
+   ;; 6190), the FIRST manufacturing vertical built in this fleet,
+   ;; modeled closely on siblings 6511/6512/6621/6622/6629/6520/6530/
+   ;; 6820/6612/6492/6920/6611/7120/8620/8530/9200/7500/9603/9521/
+   ;; 9321/8730/9102/9103/9602/9000/8890/8610/9311/8510/9412/6491/
+   ;; 8720/8521/6619/3600/6190.
    :required-technologies [:robotics :cae :cfd :dmn :bpmn :audit-ledger :optimization]
    :optional-technologies [:eda :telemetry]
    :operating-states [:requirements :simulate :verify :approve :manufacture :audit]}
