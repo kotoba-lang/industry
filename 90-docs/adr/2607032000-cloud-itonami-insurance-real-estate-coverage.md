@@ -262,15 +262,60 @@ check as central to the business.
   exceeding cap, double-booking) that never reach a human at all. See
   `cloud-itonami-isic-6622`'s own ADR-0001 for the full design.
 
+## Addendum 4 (2026-07-07, owner-directed): `cloud-itonami-isic-6629` deepened to `:implemented`
+
+Continuing the SAME "pick a new ISIC blueprint vertical" direction that
+produced Addenda 1-3, `6629` (other activities auxiliary to insurance
+and pension funding) was selected next -- the fifth insurance-adjacent
+class from THIS ADR's own original 8-repo batch to receive this
+treatment, and the one bundling two genuinely distinct activities
+(outsourced claims administration, and marine general-average
+adjustment) under a single governed workflow.
+
+- `cloud-itonami-isic-6629` gains **Claims-LLM ⊣ Insurance Auxiliary
+  Governor** -- `auxiliary.*` namespaces, modeled closely on
+  `6511`/`6512`/`6621`/`6622`'s Store/Registry/Governor/Phase/Advisor/
+  Operation/Sim shape and the SAME generic langgraph-clj StateGraph. A
+  single actuation op (`:recommendation/finalize`, matching `6511`'s/
+  `6621`'s single-actuation shape) serves BOTH bundled activities,
+  dispatching its HARD checks by the case's own `:case-type` rather than
+  duplicating StateGraph wiring per activity.
+- **A genuinely different KIND of check, not another party screen**:
+  `apportionment-mismatch-violations` independently recomputes a
+  general-average apportionment (pro-rata by value-at-risk share) and
+  compares it against the case's claimed figures -- reusing the
+  CROSS-REPO "never trust a claimed number, independently re-derive it"
+  discipline `cloud-itonami-isic-6499`/`6430` established, applied here
+  WITHIN one repo. Unlike `6511`/`6512`'s sanctions checks and `6621`'s/
+  `6622`'s conflict-of-interest checks (all party-screening), this is
+  pure arithmetic verification -- the actor deliberately has NO party/
+  conflict-of-interest concept at all, since none applies to its core
+  failure mode.
+- `kotoba-lang/industry`'s registry: `:maturity :blueprint` →
+  `:implemented` for `"6629"`, fleet-wide maturity counts move from 10
+  implemented / 87 blueprint / 546 spec to 11 implemented / 86 blueprint /
+  546 spec (out of 643 total), `test/kotoba/industry_test.clj`'s
+  `maturity-summary` assertion updated to match.
+- `test/auxiliary/*` -- 30 tests / 125 assertions, lint-clean, demo
+  (`clojure -M:dev:run`) runs end-to-end: one clean average-adjustment
+  finalization lifecycle (escalate → approve → commit) plus three
+  HARD-hold cases (no spec-basis, evidence incomplete, apportionment
+  mismatch) that never reach a human at all -- all correct on the FIRST
+  demo run, since this check is new territory rather than a ported
+  pattern with a known failure mode already lurking in it (unlike
+  `6512`'s and `6622`'s own ADRs, which each record a real bug caught
+  during demo verification). See `cloud-itonami-isic-6629`'s own
+  ADR-0001 for the full design.
+
 Of the 7 insurance classes (division 65/662) this ADR originally
-published, 4 are now `:implemented` (`6511` life insurance, implemented
+published, 5 are now `:implemented` (`6511` life insurance, implemented
 before this addendum sequence began; `6512` non-life, `6621` loss
-adjustment and `6622` intermediation, implemented by Addenda 1-3). THREE
-remain at `:blueprint` from the original 8-repo batch -- `6520`
-(reinsurance), `6530` (pension funding) and `6629` (other insurance
-auxiliary activities) -- plus `6820` (real estate on a fee/contract
-basis, a separate division entirely). All four are candidates for a
-future addendum, not silently forgotten.
+adjustment, `6622` intermediation and `6629` insurance-auxiliary
+services, implemented by Addenda 1-4). TWO remain at `:blueprint` from
+the original 8-repo batch -- `6520` (reinsurance) and `6530` (pension
+funding) -- plus `6820` (real estate on a fee/contract basis, a separate
+division entirely). All three are candidates for a future addendum, not
+silently forgotten.
 
 ## References
 
