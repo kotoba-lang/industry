@@ -471,37 +471,58 @@ PolicyGovernor）/ **cloud-itonami**（ops-LLM ⊣ CertGovernor）。
   gitignore（git に絶対コミットしない）**。`kotoba-store {:identity me}` で graph 既定
   ＝鍵由来 IPNS ＋ 自己 mint。設定参照は `manifest/repos.edn` の `:kotoba`。
 
-## `.cljc` / `.kotoba` ランタイム優先順位（2026-07-06 決定、将来方針）
+## `.cljc` / `.kotoba` ランタイム優先順位（2026-07-07 改訂。初版は2026-07-06）
 
-- **`.cljc` の実行環境優先順位は `kototama`（WASM ランタイム）> ClojureScript >
-  nbb > JVM とする。** JVM を「基本」に据えない。これは repowide のルールで、
-  今後書く `.cljc` の設計・reader-conditional 分岐・依存選定はこの順序を意識する。
-- **`.kotoba` 拡張子のファイルは明示的に kototama WASM ランタイム向け**（kotoba
-  言語の極小サブセット — `def`/`defn`/`ns`/`if`/`when`/`let`/`do`/算術/比較/
-  `and`/`or`/`not`/文字列基本操作 + 再帰のみ、Java/JS interop 一切なし、サード
-  パーティ lib 不可。`kotoba wasm emit` で WASM にコンパイルし、現状は
-  `kotoba.wasm-exec`（Chicory 経由、実体は JVM ホスト）で実行する）。
-- **ただし 2026-07-06 時点でこの優先順位を機械的に実現する手段はまだ無い**
-  （実測確認済み、ADR起票前の調査結果）:
-  - `kototama` リポ自体はまだ HostCaps/RuntimeLimits 等の**契約サーフェスのみ**
-    で、tender/wasmtime ホスティングの実装自体が follow-up（README 記載どおり）。
-    唯一動く「kototama 実行」経路は上記の `.kotoba`→WASM→Chicory/JVM だけ。
-  - `#?(:kototama ...)` という reader-conditional は**コードベース全体を検索して
-    ゼロ**——Clojure 標準は `:clj`/`:cljs`/`:cljr`/`:default` しか認識せず、
-    `:kototama` を feature として認識させるカスタム reader/ビルドステップは
-    存在しない。**存在しないものとして `#?(:kototama ...)` を書かない**（無言で
-    どちらの分岐も評価されない dead branch になる）。
-  - `.kotoba` の極小サブセットは Java/JS interop 不可なので、`ed25519`/`cacao`/
-    `dag-cbor` 等の既存暗号・CBOR ライブラリを直接そこへ移植することはできない
-    （ゼロから書き直すか、別のコンパイラで WASM 化するかが必要）。
-  - よって **`kotoba-lang/ed25519`・`kotoba-lang/cacao`・`kotoba-lang/tech-ipfs-
-    specs-ipns`（`ipns.head`）等、既に JVM(`:clj`)専用として実装済みの暗号系
-    ライブラリは、このルール制定時点でリトロアクティブに書き直さない**——
-    メカニズムが無い状態で JVM 専用にしたことは当時の唯一動く前例に沿った判断
-    であり、正しい。今後 kototama の reader/ビルド機構が実際に用意された時点で
-    移行を検討する（ADR 化してから着手）。
-- 新しい `.cljc` を書く／既存の `:clj`/`:cljs` 分岐を拡張する判断に迷ったら、
-  まず「kototama 向けの実行手段が今あるか」を確認し（無ければ上記の制約を
-  そのまま書き残す）、無いなら次点の cljs を優先し、JVM 専用は最後の手段とする
-  ——ただし目の前のタスクを止めてまで存在しないインフラを今から作ることは
+- **設計・実装の優先順位は `kotoba wasm` > `clojurewasm` > `ClojureScript` >
+  `nbb` とする（JVM 単体は最後の手段）。** 2026-07-06 初版の「kototama >
+  cljs > nbb > jvm」を、`kototama` 自身の実行ランタイムが実在するようになった
+  ことと `clojurewasm` という新選択肢の登場を踏まえて改訂したもの。repowide の
+  ルールで、今後書く `.cljc`/`.kotoba` の設計・reader-conditional 分岐・
+  依存選定はこの順序を意識する。
+- **`kotoba wasm`** — `.kotoba` 拡張子（kotoba 言語の極小サブセット —
+  `def`/`defn`/`ns`/`if`/`when`/`let`/`do`/算術/比較/`and`/`or`/`not`/
+  文字列基本操作 + 再帰のみ、Java/JS interop 一切なし、サードパーティ lib
+  不可）を `kotoba wasm emit` で WASM にコンパイルし、`kototama` の
+  `actor:host` ABI（`kototama.contract`/`kototama.tender`, ADR-2607062330/
+  2607062400）でホストする経路。**2026-07-06 版と異なり、これは今や実在し
+  E2E で動作確認済み**（ADR-2607062330 addendum 5、2026-07-06〜07）:
+  `kotoba-core-contracts` の閉じたホストインポート表に `.kotoba` から呼べる
+  capability を登録し、`kotoba wasm emit` が実際に出力した（手書き WAT では
+  ない）`.wasm` が `kototama.tender`（JVM/Chicory）にリンクして正しく実行
+  することを確認済み（`kotoba-lang/kototama` の `test/kototama/fixtures/`
+  に実バイナリとして checked in）。ホストは JVM/Chicory 経路
+  （`kototama.tender`）と ブラウザネイティブ経路
+  （`wasm-webcomponent` の `actor-host.js`、ADR-2607062400）の両方が実在。
+- **`clojurewasm`** — `.kotoba` の極小サブセットではなく**フルの Clojure**
+  を書きたい場合の次点。外部プロジェクト
+  [`clojurewasm/ClojureWasm`](https://github.com/clojurewasm/ClojureWasm)
+  （通称 `cljw`）: Zig で書かれた JVM フリーの Clojure ランタイムで、
+  WebAssembly を FFI として呼べる（`(wasm/load "mod.wasm")` /
+  `(:require ["comp.wasm" :as c])` で WASM component を名前空間のように
+  require できる）。2026-02 発足、2026-07 時点で v1.0.0 安定版・実働デモ
+  （cw-playground, cw-serverless-demo, cw-arcade）あり、157 stars、直近まで
+  push されている活発なプロジェクト（確認日 2026-07-07）。**ただし
+  Issues/PR は現在受け付けていない**（小規模チームのため。EPL-2.0）ので、
+  このリポジトリへの直接貢献はできず「利用する」側の依存としてのみ扱う。
+  **2026-07-07 時点でこのモノレポ内に `clojurewasm`/`cljw` の利用例・
+  ビルド・統合は一切無い**（新規導入。既存 `.cljc` を勝手に `cljw` 前提に
+  書き換えない — 導入する場合は対象を決めてから着手する）。
+- **`ClojureScript`（cljs）** — ブラウザ/Node 向け。次点。
+- **`nbb`** — ClojureScript-on-Node の高速スクリプティング。静的サイト生成
+  など軽量タスク向け（実例: `kototama/web/generate.cljs`）。
+- **JVM 単体は最後の手段。** 既存の JVM(`:clj`)専用ライブラリ
+  （`kotoba-lang/ed25519`・`kotoba-lang/cacao`・`kotoba-lang/tech-ipfs-specs-
+  ipns` 等）は、実装当時「唯一動く経路が JVM だった」という正しい判断の結果
+  なので、上位の選択肢が実在するようになった今もリトロアクティブに書き直さ
+  ない（移行する場合は対象を決めて ADR 化してから着手する）。
+- `#?(:kototama ...)` / `#?(:clojurewasm ...)` という reader-conditional は
+  **コードベース全体を検索してゼロ**——Clojure 標準は `:clj`/`:cljs`/
+  `:cljr`/`:default` しか認識せず、これらを feature として認識させるカスタム
+  reader/ビルドステップは存在しない。**存在しないものとしてこれらの
+  reader-conditional を書かない**（無言でどちらの分岐も評価されない dead
+  branch になる）。
+- 新しい `.cljc`/`.kotoba` を書く／既存の `:clj`/`:cljs` 分岐を拡張する判断に
+  迷ったら、上記の順序（kotoba wasm → clojurewasm → cljs → nbb → jvm）で
+  「今実際に動く経路はどれか」を確認してから選ぶ——ただし目の前のタスクを
+  止めてまで存在しない統合（例: `clojurewasm` の新規導入）を今から作ることは
   しない（別スコープの ADR とプロジェクトとして切り出す）。

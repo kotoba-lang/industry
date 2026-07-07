@@ -153,6 +153,11 @@ its cap while staying within it succeeds. 15 tests/31 assertions green.
 
 ## Addendum (2026-07-06, same day): `aiueos.execute` vs `kototama.tender` — deliberately NOT consolidated
 
+**Correction (2026-07-07, see addendum 6): the premise below is false.**
+`aiueos.execute`/`aiueos.launcher` do not exist anywhere in this org.
+Read on for what this addendum originally claimed, kept verbatim for the
+record, then see addendum 6 for what investigating it for real found.
+
 Investigating the "aiueos calls kototama.tender" follow-up above surfaced
 that `aiueos.execute`/`aiueos.launcher` (in `aiueos-cljc-contract`'s real
 `main`, not the stale local worktree that was checked out) already
@@ -240,6 +245,59 @@ gap end to end, across three repos:
    a genuinely independent compiler's output linking against a
    genuinely independent execution runtime, with no shape mismatch,
    checked into CI so it can't silently regress.
+
+## Addendum 6 (2026-07-07): the "keep separate" decision's premise was false — `aiueos.execute`/`aiueos.launcher` don't exist
+
+The owner asked to revisit the "keep separate" decision above. Investigating
+it for real (reading the actual current `orgs/kotoba-lang/aiueos-cljc-contract`
+checkout, not trusting the prior addendum's claim) found there is nothing to
+revisit: **`aiueos.execute` and `aiueos.launcher` do not exist anywhere in
+this org.**
+
+- `aiueos-cljc-contract`'s `src/aiueos/` contains only `audit.cljc`,
+  `broker.cljc`, `cli.cljc`, `contract.cljc`, `graph.cljc`, `manifest.cljc`,
+  `policy.cljc`, `signing.cljc`, `surface.cljc`, `topic.cljc` — pure `.cljc`
+  data/validation (manifest normalization, policy contract, signing,
+  topic-id derivation). No `execute.cljc`, no `launcher.cljc`, no
+  `com.dylibso.chicory` dependency in `deps.edn`, zero hits for
+  `Chicory`/`HostFunction`/`withMemoryLimits`/`Instance.Builder` anywhere in
+  the checkout. This repo has zero commits since 2026-07-02 — nothing
+  changed there even once since before the addendum above was written.
+- The actual Chicory-based execution code the prior addendum was comparing
+  against is `kotoba.launcher`/`kotoba.wasm-exec` in `kotoba-lang/kotoba`'s
+  `src/kotoba/{launcher,wasm_exec}.clj` — a different repo, with its own
+  vocabulary (`kotoba.runtime/capability-contract`, `:kotoba.policy/
+  capabilities`), that only *references* `aiueos.policy/default-kernel-caps`
+  by name in a comment (registering host-import primitives *for* aiueos's
+  kernel-capability set, per ADR-2607022700) — not aiueos-owned execution
+  code being run.
+- `aiueos.contract.cljc`'s actual keys (`:aiueos/limits`, `:aiueos/quota`,
+  `:aiueos/publishes`, `:aiueos/subscribes`, `:aiueos/topics`, `:aiueos/
+  imports`, `:aiueos/exports`, `:aiueos/effects`, `:aiueos/device`,
+  `:aiueos/capability`) and the device-access quartet in `surface.cljc`
+  (`pci-config`/`dma-map`/`irq-subscribe`/`mmio-map`, string provider names)
+  are pure data — never wired to a `HostFunction`, a `Chicory` `Instance`,
+  or anything else that executes. There is no wire-shape overlap with
+  `kototama.tender`'s 8 imports to reconcile, because there is no second
+  execution path to compare against.
+
+**This is the same pattern ADR-2607022900 already caught once** (that ADR's
+own "already landed in aiueos-cljc-contract PRs #2–#12" claim, verified
+false by ADR-2607062330's original text above). The prior addendum
+repeated the mistake — asserting a specific, detailed-sounding
+implementation existed ("more mature in places... a STABLE
+`withMemoryLimits`-based memory cap... its own merge PR flagged this...")
+without having actually opened the repo to check. Recorded here rather
+than quietly re-editing the addendum above, so the failure mode (fabricated
+implementation-status claims about aiueos specifically, twice now) is on
+the record and not silently overwritten.
+
+**Consequence for the open follow-up** ("aiueos's own broker calling into
+`kototama.tender/instantiate`, translating aiueos's decision into a
+`HostCaps` value"): still open, unaffected in substance — building that
+adapter was never blocked by whether aiueos already had its own execution
+path, only by nobody having written the adapter. Not attempted in this
+addendum; tracked as before.
 
 ## One-line summary
 
