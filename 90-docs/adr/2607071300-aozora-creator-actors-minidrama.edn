@@ -1,0 +1,93 @@
+{:frontmatter
+ {:id "adr-2607071300-aozora-creator-actors-minidrama"
+  :title "ADR-2607071300: aozora — creator actors (animeka/dougaka/minidrama) 登録 + 縦型ミニドラマ制作 actor の設計"
+  :status "accepted"
+  :doc_type "adr"
+  :topic "aozora-creator-actors-minidrama"
+  :authoritative true
+  :last_verified "2026-07-07"
+  :authoritative_for
+  ["creator actor registry (aozora.appview.creator-actors) —
+    animeka/dougaka/minidrama .aozora.app の projected identity と SPA 配線"
+   "creator 系 actor identity を *.gftd.ai に作らないという適用
+    (wave2/wave3 の帰結。ai-gftd-{mangaka,animeka} は生成エンジン、identity は aozora)"
+   "minidrama actor (DramaLLM ⊣ DramaGovernor) の設計 — pipeline、governor
+    検閲項目、:drama/* 台帳 schema、/videos + live 公開経路"]
+  :related
+  ["90-docs/adr/2607070400-app-aozora-manga-work-actor-profiles.md"
+   "90-docs/adr/2607062200-gftdcojp-legacy-gftd-ai-hosts-retirement-wave2.md"
+   "90-docs/adr/2607071100-gftdcojp-mangaka-retirement-wave3-aozora-studio.md"
+   "90-docs/adr/2607011900-genapp-clj-mangaka-animeka-commons.md"
+   "90-docs/adr/2607062100-app-aozora-vertical-video-feed.md"
+   "90-docs/adr/2607071000-app-aozora-video-upload-r2-blob.md"
+   "90-docs/adr/2607071100-app-aozora-live-media-plane-v0.md"]
+  :supersedes []
+  :superseded_by []}
+
+ :problem
+ {:source "オーナー指示 (2026-07-07):「animeka.gftd.ai, dougaka.gftd.ai などの
+           actor も登録して。また dougaka 関係で mini drama を作る actor を
+           設計して」。命名は AskUserQuestion で確認 → aozora.app 配下 +
+           設計 ADR + 登録まで、を承認"
+  :facts
+  ["wave2/wave3 (ADR-2607062200 / 2607071100) が *.gftd.ai ホスト新設を禁止、
+    atproto identity は aozora.app に集約済み (mangaka.gftd.ai も退役)"
+   "actor 登録の現行パターン = ADR-2607070400 の projected identity registry
+    (manga-actors)。resolve-handle did:web fail-open で追加配線なし"
+   "動画の公開/再生/ライブ経路は ADR-2607062100/2607071000/2607071100 で稼働済み"
+   "生成アプリの共通 scaffold は genapp-clj (ADR-2607011900、mangaka/animeka)"]}
+
+ :decision
+ {:chosen
+  ["registry: aozora.appview.creator-actors (manga-actors 同型、職能単位)。
+    animeka (アニメ家) / dougaka (動画家) / minidrama (ミニドラマ座) を
+    <name>.aozora.app の projected identity (keyed? false) + intro post で登録。
+    SPA: profile dispatcher 分岐 + creator-actor-profile page + 検索 creators
+    セクション。actors->tx で kotobase 後追い transact 可能"
+   "minidrama actor 設計 (robotaxi/gftd-talent/cloud-itonami 同型):
+    DramaLLM (Advisor 注入: mock ‖ 実LLM) は proposal のみ、DramaGovernor が
+    可決/拒否/human-escalate。不変条件: governor が拒否する 書込/開示/作動/認証
+    を actor は決して行わない"
+   "governor 検閲項目: ①フォーマット (総尺≤120s, 縦720x1280, shot≤24, 1shot≤10s)
+    ②コンテンツ (暴力/性的/実在人物 likeness/商標 拒否、生成素材のみ、外部素材は
+    provenance 必須) ③予算 (:agent.budget/*, 超過は縮小再提案) ④publish は常に
+    human 承認 (interrupt-before) ⑤連投 ≤N本/日"
+   "StateGraph: plan → script → [interrupt: 脚本承認] → storyboard →
+    generate (shot 単位・有界 retry、エンジンは genapp-clj 系 video instance =
+    dougaka エンジン、フリート ComfyUI → 将来 murakumo.cloud) → assemble
+    (ffmpeg concat + 字幕 → 縦 mp4) → preview → [interrupt: 公開承認] → publish"
+   "publish: PDS uploadBlob (R2, ADR-2607071000) → app.aozora.embed.video を
+    embed に持つ post を minidrama.aozora.app として createRecord → /videos。
+    予告/同時上映は app.aozora.live playlist + embed.live=true"
+   "台帳 (append-only, :db-api 駆動, MemStore≡DatomicStore≡kotoba-api):
+    :drama.episode/* :drama.scene/* :drama.shot/* :drama.decision/*
+    :drama.publish/*。長期運転は durable outer loop (:agent.loop/* 系)"
+   "Phase 注入: 0 mock 全通し → 1 実LLM+mock生成 → 2 実生成 unlisted →
+    3 公開運転"]
+  :rejected
+  [{:option "animeka.gftd.ai / dougaka.gftd.ai / minidrama.gftd.ai として登録"
+    :why "wave2/wave3 の「*.gftd.ai ホストを増やさない」への逆行。オーナー確認の
+          上 aozora.app 配下を採用"}
+   {:option "dougaka actor に mini drama も担わせる"
+    :why "minidrama は governor 検閲項目 (脚本承認・尺・連投) が固有で、台帳も
+          :drama/* として独立させた方が監査可能。系列関係は registry で表現"}
+   {:option "video 生成を actor 内に実装"
+    :why "生成エンジンは genapp-clj 系に分離 (mangaka/animeka と共通 scaffold)。
+          actor は proposal + 台帳 + governor + 公開 orchestration に徹する"}]}
+
+ :implementation
+ {:repo "gftdcojp/app-aozora"
+  :merges ["879bd02a4f6f (creator-actors registry + SPA 配線)"]
+  :deploys ["app-aozora-spa a37070dc"]
+  :verification
+  ["本番 aozora.app/profile/minidrama.aozora.app の実描画を headless Chrome で
+    確認 (displayName/handle/creator actor チップ/intro post)"
+   "tests: registry 5件含む 40-engine 272/1187 + SPA 52/151 green"]}
+
+ :follow-ups
+ ["minidrama 実装 scaffold — 20-actors/minidrama →
+   etzhayyim/com-etzhayyim-minidrama repo → west 登録 → RAD identity
+   (CLAUDE.md Actors 節の完了条件、常時許可フロー)"
+  "dougaka エンジン = genapp-clj video instance の起票"
+  "creator actors の kotobase 後追い transact (actors->tx)"
+  "鍵付き actor 化 (CACAO 自己発行、ADR-2607070400 系列)"]}
