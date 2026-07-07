@@ -11,7 +11,8 @@
    "kotoba wasm emit の実際のWASMコード生成対象(compile-wasm-expr)が対応する演算子: 特殊形式 do/let/if + - * quot / rem mod = < > <= >= zero? not inc dec のみ — pos?/neg?/and/or/when は非対応(unsupported-op)"
    "kototama.tender(JVM/Chicory)経由で、kotoba-lang/kototama自身のデモfixture以外の他repoの実business logicをホストした初の実例"
    "host importを一切要求しない(純粋演算のみの).kotobaモジュールが実際にコンパイル・実行できることの実測確認"
-   "同一の.kotoba成果物(affordability.wasm)がkototama.tender(JVM/Chicory)とwasm-webcomponent(Node.js)の両ホストで動作し、実murakumo fleetノード(asher)上での実行確認も得ていること"]
+   "同一の.kotoba成果物(affordability.wasm)がkototama.tender(JVM/Chicory)とwasm-webcomponent(Node.js)の両ホストで動作し、実murakumo fleetノード(asher)上での実行確認も得ていること"
+   "affordability.wasmは0-arity mainのまま、実引数をexport済みlinear memory(オフセット0/4/8、リトルエンディアンi32)経由で受け取るパラメータ化ABIを持つこと(kotoba wasm emitが引数付きmainを:main-arityで拒否するための設計)"]
   :related
   ["90-docs/adr/2607062330-kototama-tender-chicory-execution-runtime.md"
    "90-docs/adr/2607072530-cloud-itonami-kototama-wasm-llm-infer-poc-isic-6511.md"
@@ -58,4 +59,17 @@
    "ssh asher \"node wasm/verify_node.mjs\" 実行、ローカルと同一の{\"result\":1,\"ok\":true}を得た"
    "転送した一時ファイルのみ削除(Node.js自体は残置、再インストール・削除なし)"]
   :verification
-  ["gh push: orgs/cloud-itonami/cloud-itonami-isic-6492 main (e862464..da59057) -- wasm/verify_node.mjs, wasm/README.md"]}}
+  ["gh push: orgs/cloud-itonami/cloud-itonami-isic-6492 main (e862464..da59057) -- wasm/verify_node.mjs, wasm/README.md"]}
+
+ :addendum-2026-07-07-parameterized-abi
+ {:summary "main を0-arityのまま、実引数3つ(existing-debt/requested-amount/annual-income)をexport済みlinear memory経由(オフセット0/4/8、リトルエンディアンi32)で受け取るABIへ変更。ハードコード2シナリオの自己検証を廃止。ADR-2607072530のunderwriting_decision.kotobaと同じ規約。"
+  :why-memory-not-params "kotoba wasm emitは引数付きmainを:main-arityで無条件拒否(compile-wasm-exprの固定仕様)。コンパイラ本体を変更せず実現するには、export済みmemory経由の入力しかない。"
+  :changes
+  ["wasm/affordability.kotoba: mainを(affordable? (mem-i32-at 0 0) (mem-i32-at 0 4) (mem-i32-at 0 8))に変更(121バイトへ縮小)"
+   "test/wasm/affordability_test.clj: kototama.tender/instantiateの生Chicory Instanceの(.memory instance)にwriteI32で書き込んでからcall-mainを呼ぶ形に変更。承認/却下/ゼロ収入の3実テストに(旧: ハードコード自己検証1本)"
+   "wasm/verify_node.mjs: 名前付きシナリオ(approve/reject/zero-income)または生3引数を受け取り、DataView.setInt32(offset,value,true)でメモリに書き込む形に変更"]
+  :verification
+  ["clojure -M:test (cloud-itonami-isic-6492) : 34 tests, 131 assertions, 0 failures/errors"
+   "clojure -M:lint (cloud-itonami-isic-6492) : errors 0, warnings 0"
+   "node wasm/verify_node.mjs (approve/reject/zero-income) : ローカルと実murakumo fleetノード(asher)で全シナリオ一致確認"
+   "gh push: orgs/cloud-itonami/cloud-itonami-isic-6492 main (da59057..36729d3)"]}}

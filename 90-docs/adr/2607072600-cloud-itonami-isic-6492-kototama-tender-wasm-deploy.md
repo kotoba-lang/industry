@@ -12,6 +12,7 @@ authoritative_for:
   - "kototama.tender(JVM/Chicory)経由で、kotoba-lang/kototama自身のデモfixture(sha256-hex/gen-keypair)以外の、他repoの実business logicをホストした初の実例であること(ADR-2607062330 addendum 5 の対象範囲を拡張)"
   - "host import を一切要求しない(純粋演算のみの).kotoba モジュールが実際にコンパイル・実行できることの実測確認(ADR-2607072530のllm-infer capability経由の事例とは異なる、capability不要パスの実証)"
   - "同一の .kotoba 成果物(affordability.wasm)が kototama.tender(JVM/Chicory)と wasm-webcomponent(Node.js)の両ホストで動作し、かつ実 murakumo fleet ノード(asher)上での実行確認も得ていること(Addendum参照)"
+  - "affordability.wasm は0-arity mainのまま、実引数(existing-debt/requested-amount/annual-income)をexport済みlinear memory(オフセット0/4/8、リトルエンディアンi32)経由で受け取るパラメータ化ABIを持つこと(Addendum 2参照。kotoba wasm emitが引数付きmainを:main-arityで拒否するための設計)"
 related:
   - 90-docs/adr/2607062330-kototama-tender-chicory-execution-runtime.md
   - 90-docs/adr/2607072530-cloud-itonami-kototama-wasm-llm-infer-poc-isic-6511.md
@@ -66,7 +67,6 @@ superseded_by: []
 ## What this ADR does NOT decide
 
 - `.kotoba` コンパイラの `pos?`/`neg?`/`and`/`or`/`when` 対応化（follow-up、ADR-2607072530 と共通）。
-- パラメータ化された呼び出しABI（現状は2シナリオをハードコードした自己検証のみ）。
 - cloud-itonami-isic-6492 の他のgovernorロジック（HARD違反チェック等、mapを扱う複雑な部分）のwasm化。
 
 ## Addendum (2026-07-07, same day): murakumo fleet 実機(asher)への配備、完了
@@ -78,6 +78,19 @@ superseded_by: []
 手順: ローカルで `orgs/kotoba-lang/wasm-webcomponent/src/`（21ファイル）と本ADRの成果物一式を west と同じ sibling-checkout レイアウトのまま `rsync` で `asher:/tmp/` へ転送（`ssh asher "node --version"` で v26.4.0 稼働中——ADR-2607072530 が残置した Node.js が今も生きていることを確認済み）→ `ssh asher "node wasm/verify_node.mjs"` を実行 → ローカル実行と完全一致する `{"result": 1, "ok": true}` を得た → 転送した一時ファイルのみ削除（Node.js自体は前ADRの方針を継続し残置）。
 
 これにより、本ADRの kototama.tender(JVM) 側の実行確認と合わせて、cloud-itonami-isic-6492 の同一 `.kotoba` 成果物が **JVM/Chicory ホストと Node.js/wasm-webcomponent ホストの両方、かつ実 murakumo fleet ノード上** で動くことを確認した。
+
+## Addendum 2 (2026-07-07, same day): パラメータ化された呼び出しABI、完了
+
+「What this ADR does NOT decide」に記載していた「パラメータ化された呼び出しABI」を解消した。
+
+`kotoba wasm emit` は引数付き `main` を無条件に拒否する（`:main-arity` — `compile-wasm-expr` が0-arity以外の `main` を弾く固定仕様、コンパイラ本体の修正なしにこの制約は回避不能と実測確認）。そこで、ハードコードした2シナリオの自己検証をやめ、`main` は0-arityのまま、実引数3つ（existing-debt/requested-amount/annual-income、いずれもcents単位のi32）を**export済み linear memory 越し**に受け取る形に変更した——これは ADR-2607072530 の `underwriting_decision.kotoba` が既に使っている規約と同じ（オフセット0/4/8に各i32をリトルエンディアンで書き込んでから `main()` を呼ぶ）。`heap-base`(2048)より十分小さいオフセットのため、コンパイラ自身が配置するものと衝突しない。
+
+- `wasm/affordability.kotoba`: `main` の中身を `(affordable? (mem-i32-at 0 0) (mem-i32-at 0 4) (mem-i32-at 0 8))` に変更(121バイトへ縮小)。
+- `test/wasm/affordability_test.clj`: `kototama.tender/instantiate` が返す生の Chicory `Instance` の `(.memory instance)`(`writeI32`)を直接叩いてメモリに書き込んでから `tender/call-main` を呼ぶ形に変更。承認/却下/ゼロ収入(不正入力)の3ケースを実テスト化(旧: ハードコード2シナリオの自己検証1本)。
+- `wasm/verify_node.mjs`: 名前付きシナリオ(`approve`/`reject`/`zero-income`)または生の3引数を受け取り、`DataView.setInt32(offset, value, true)`(リトルエンディアン)でメモリに書き込む形に変更。
+- 3シナリオすべてローカル(JVM・Node.js)と実 murakumo fleet ノード(asher)で実行し、結果が一致することを確認済み。
+
+これにより、cloud-itonami-isic-6492 の DTI affordability check は「本物の申込者数値をホストが渡せば実際に呼び出せる決定サービス」になった(ワイヤー越しの公開はまだ無い——下記follow-up参照)。
 
 ## References
 
