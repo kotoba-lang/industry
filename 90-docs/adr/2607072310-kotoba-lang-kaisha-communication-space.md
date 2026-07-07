@@ -1,6 +1,6 @@
 ---
-id: adr-2607072300-kotoba-lang-kaisha-communication-space
-title: "ADR-2607072300: kotoba-lang/kaisha — communication space (Slack/Teams 相当) の EDN workspace surface"
+id: adr-2607072310-kotoba-lang-kaisha-communication-space
+title: "ADR-2607072310: kotoba-lang/kaisha — communication space (Slack/Teams 相当) の EDN workspace surface"
 status: accepted
 doc_type: adr
 topic: kotoba-lang-kaisha-communication-space
@@ -21,7 +21,7 @@ supersedes: []
 superseded_by: []
 ---
 
-# ADR-2607072300: kotoba-lang/kaisha — communication space (Slack/Teams 相当) の EDN workspace surface
+# ADR-2607072310: kotoba-lang/kaisha — communication space (Slack/Teams 相当) の EDN workspace surface
 
 **Status**: accepted
 **Date**: 2026-07-07
