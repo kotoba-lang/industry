@@ -91,7 +91,35 @@
    :name "Community Learning Support"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-8569"
    :business-id "cloud-itonami-isic-8569"
-  :maturity :blueprint
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as a community-learning-support
+   ;; actor (Learning Advisor ⊣ Learner Safety Governor), the thirty-eighth
+   ;; build outside ADR-2607032000's original insurance/real-estate batch
+   ;; (after 6612, 6492, 6920, 6611, 7120, 8620, 8530, 9200, 7500, 9603,
+   ;; 9521, 9321, 8730, 9102, 9103, 9602, 9000, 8890, 8610, 9311, 8510,
+   ;; 9412, 6491, 8720, 8521, 6619, 3600, 6190, 3030, 3830, 7020, 9420,
+   ;; 9491, 2610, 3512, 8810, 8691), modeled closely on siblings 6511/
+   ;; 6512/6621/6622/6629/6520/6530/6820/6612/6492/6920/6611/7120/8620/
+   ;; 8530/9200/7500/9603/9521/9321/8730/9102/9103/9602/9000/8890/8610/
+   ;; 9311/8510/9412/6491/8720/8521/6619/3600/6190/3030/3830/7020/9420/
+   ;; 9491/2610/3512/8810/8691.
+   ;; Distinctive check: learner-to-tutor-ratio-exceeds-maximum? is the
+   ;; FIFTH instance of this fleet's ratio-based sufficiency check family
+   ;; (leasing/behavioral/union/fab established the first four), applying
+   ;; the MAXIMUM-ceiling direction. Also reuses the unconditional-
+   ;; evaluation screening discipline for a THIRTY-SIXTH distinct
+   ;; grounding (dropout-risk-unresolved-violations, a genuinely new
+   ;; concept grep-verified absent from every prior sibling, grounded in
+   ;; this blueprint's own :dropout-prevention social-impact tag), tested
+   ;; via the screening op directly for a twenty-sixth consecutive
+   ;; vertical (after eldercare/museum/conservation/salon/entertainment/
+   ;; casework/hospital/facility/school/association/leasing/behavioral/
+   ;; secondary/card/water/telecom/aerospace/recovery/consulting/union/
+   ;; congregation/fab/energy/care/navigator). Dual actuation (:actuation/
+   ;; finalize-support-plan, :actuation/contact-guardian) on the same
+   ;; learner entity, both POSITIVE. Double-actuation guarded via
+   ;; dedicated booleans per the 6492 lesson. See cloud-itonami-isic-
+   ;; 8569/docs/adr/0001-architecture.md.
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
    :operating-states [:intake :plan :review :follow-up :refer :audit]}
