@@ -1922,6 +1922,14 @@
    ;; CanvasKit とは無関係 (ADR-2607071130)
    "orgs/kotoba-lang/canvaskit"
 
+   ;; VRM character editor ドメイン lib (着せ替え) — character-spec EDN が正本
+   ;; (base + hair/outfit/face/accessory 差し替え、:body は差し替え不可) + pure
+   ;; edit ops/undo-redo + spec→.vrm build (org-vrmc-vrm の decompose/compose/
+   ;; export engine 呼び出し) + SpecStore 契約 (MemSpecStore 実装済 / kotobase
+   ;; datom mapping 済、backed store は follow-up)。UI は consumer 側
+   ;; (canvaskit/webgpu/editor)。first consumer: net-babiniku (ADR-2607071610)
+   "orgs/kotoba-lang/kisekae"
+
    ;; manga viewer — 正規化 work model + RTL 見開き pagination + css 文字列 +
    ;; pure-hiccup views (works-grid/reader)。zero runtime deps、状態/handler は
    ;; consumer 注入 (liquid-glass-ui 型)。consumer: app-aozora /manga

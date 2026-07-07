@@ -1,0 +1,110 @@
+{:frontmatter
+ {:id "adr-2607071610-kotoba-lang-kisekae-vrm-character-editor"
+  :title "ADR-2607071610: kotoba-lang/kisekae -- VRM character editor as a domain library
+          (spec-as-artifact, org-vrmc-vrm engine, kotobase persistence)"
+  :status "accepted"
+  :doc_type "adr"
+  :topic "kotoba-lang-kisekae"
+  :authoritative true
+  :last_verified "2026-07-07"
+  :authoritative_for
+  ["the VRM character editor lives at kotoba-lang/kisekae as a pure-.cljc DOMAIN library
+    (no UI) over org-vrmc-vrm's existing decompose/compose/export engine -- the editor
+    layer was the missing piece, not the engine"
+   "the character spec (small plain EDN: base URL, part overrides, material edits, user
+    meta) is the artifact of record; the .vrm is deterministically rebuilt from it on
+    demand, never stored as the truth"
+   "dress-up semantics: one override per part kind (replace, not stack); :body is never
+    overridable (the base's skeleton is compose's :skeleton-base); part vocabulary
+    derives from vrm.part/part-categories, never a parallel list"
+   "edits are data ({:op/type ...}), applied by one pure fn; unknown ops / unfetched URLs
+    / missing donor parts THROW -- never silent no-ops or substitutions"
+   "persistence is a SpecStore protocol with MemSpecStore built+tested now, plus the pure
+    kotobase datom mapping (spec->tx/entity->spec, document-as-datom); the kotobase-backed
+    record via the :db-api map is follow-up wiring, not design"
+   "runtime priority honestly applied: interop-free .cljc, cljs-executable today,
+    kototama-subset by construction, zero #?(:kototama) branches (the feature doesn't
+    exist); .kotoba numeric cores are recorded aspiration only"
+   "UI belongs to consumers: canvaskit viewport + kami-webgpu preview + kotoba-lang/editor
+    controls; first app is babiniku.net's create-your-character flow (ADR-2607071600 M6)"]
+  :related
+  ["90-docs/adr/2607071600-net-babiniku-service-completion-design.md"
+   "90-docs/adr/2607071130-kotoba-lang-canvaskit-scroll-view-consolidation.md"
+   "90-docs/adr/2607021330 (kotoba-lang org visibility = public)"]
+  :supersedes []
+  :superseded_by []}
+
+ :problem
+ {:source "user direction 2026-07-07: 'vrm character editor なども kotoba-lang として、
+           ユーザーが使いやすいものを再設計して. kotoba wasm, cljc, kotobase datomic' --
+           confirmed 'do it'"
+  :engine_already_exists
+  {:what "kotoba-lang/org-vrmc-vrm (restored from the deleted kami-vrm Rust crate,
+          ADR-2607010930): vrm.part/decompose (parts classified #{:body :hair :face
+          :outfit :accessory :other}, production-hardened name heuristic),
+          vrm.compose/compose (cross-document merge onto a unified :skeleton-base),
+          vrm.export/export-glb (VRM 1.0 GLB out, via kotoba-lang/glb), plus mtoon/
+          expressions/springs/humanoid and zero-dep JSON+math"
+   :missing "everything AROUND the engine: persisted document model of user choices,
+             pure edit ops + undo/redo, selection logic into compose inputs, storage
+             contract"}
+  :adjacent_blocks "canvaskit (viewport gestures), editor (walk-EDN controls), webgpu
+                    (preview), kotobase :db-api (persistence) -- compose, don't rebuild"}
+
+ :decision
+ {:library "kotoba-lang/kisekae (着せ替え) -- pure .cljc, one dep (org-vrmc-vrm), no UI;
+            public repo, pushed @ adc47d0, 33-check bb gate, clj-kondo clean"
+  :namespaces
+  {:kisekae.spec "character-spec EDN + problem-list validation + overridable-kinds
+                  derived from vrm.part/part-categories (minus :body :other) +
+                  part-urls fetch-list"
+   :kisekae.edit "ops (:op/rename :op/set-meta :op/add-part[replace-per-kind]
+                  :op/remove-part :op/set-base-color), op-log history with undo/redo and
+                  redo-tail truncation; unknown op throws"
+   :kisekae.build "effective-sources (base minus overridden kinds + donor parts,
+                   :skeleton-base tracked) -> compose -> apply-material-edits
+                   (baseColorFactor) -> apply-meta (USER's name/authors/license) ->
+                   export-glb; pure given docs-by-url, caller does I/O; missing anything
+                   throws"
+   :kisekae.store "SpecStore protocol + MemSpecStore (tested), spec->tx/entity->spec pure
+                   datom mapping ({:kisekae/id :kisekae/name :kisekae/spec-edn},
+                   document-as-datom) for the future kotobase-backed record via the
+                   :db-api map"}
+  :invariants
+  ["spec is the artifact; .vrm is derived cache"
+   ":body never overridable -- skeleton swapping is a rigging problem this editor does
+     not pretend to solve"
+   "fail loudly: no silent op drops, no silent part substitution"
+   "license meta is first-class at export; base/donor license compatibility is the
+    consuming app's concern to surface, not build's to fake-check"]
+  :runtime_priority "interop-free .cljc; cljs today; kototama-subset by construction; no
+                     #?(:kototama); .kotoba aspiration recorded, not claimed"}
+
+ :consequences
+ {:shipped "repo scaffolded/pushed/registered (west.yml, this landing commit); 33 checks"
+  :followups ["compose->export integration test against a real fixture .vrm (synthetic
+               docs cover selection/transforms; buffer merge rides the engine's own
+               116-assertion suite meanwhile)"
+              "kotobase-backed SpecStore (:db-api wiring)"
+              "the editor app inside babiniku (ADR-2607071600 M6)"
+              "expression/texture/spring-bone ops -- engine supports them; additive"]
+  :first_consumer "net-babiniku gains the kisekae dependency at ADR-2607071600 M6"}
+
+ :alternatives
+ [{:option "store exported .vrm blobs as the artifact of record"
+   :rejected_because "opaque, undiffable, storage-heavy, hostile to kotobase-datomic; the
+                      rebuild is deterministic so the blob is cache, not truth"}
+  {:option "full mesh-modeling editor (VRoid Studio class)"
+   :rejected_because "the engine does decompose/compose/recolor, not sculpting --
+                      claiming otherwise is vaporware; dress-up composition is what the
+                      engine supports and babiniku needs"}
+  {:option "build the editor inside net-babiniku"
+   :rejected_because "explicit user direction (kotoba-lang として); private vendor repo is
+                      the wrong home for a reusable public lib; network-isekai is an
+                      obvious second consumer"}
+  {:option "name it vrm-editor"
+   :rejected_because "editor is already the generic EDN-editor lib; Japanese product-name
+                      family (murakumo/giemon/kenchi/itonami) is the org convention"}
+  {:option "wire kotobase persistence now"
+   :rejected_because "tested pure mapping makes the follow-up mechanical; blocking a pure
+                      scaffold on live service wiring couples the wrong things"}]}
