@@ -89,9 +89,10 @@ AppKit の語彙をこの領域の standard vocabulary として採用する下�
   (`e9f49c1`。on-wheel の固定 ±1.1 ズームは UX 維持のため意図的に非移行)。
   非適合と確定: `map`(球面 pan)、`sprite2d`+`webgpu` 内コピー(操作なしの
   follow-cam render layout)、`network-isekai`(WebGPU 3D)、
-  `etzhayyim-project-maps`(kami-map GPU camera)。TS/Svelte 側の残候補:
-  `etzhayyim-project-pptx`(教科書的適合、要 JS バンドル基盤)・同 xlsx
-  (zoom ヘルパのみ)— canvaskit の `globalThis` バンドル整備が前提の follow-up。
+  `etzhayyim-project-maps`(kami-map GPU camera)。TS/Svelte 側の残候補だった
+  `etzhayyim-project-pptx` は **2026-07-07 に deprecated として prune 済み**
+  (ADR-2607071310)— canvaskit JS バンドル基盤の follow-up は主候補消滅により
+  保留(残るのは xlsx の zoom ヘルパのみで、単独ではバンドル整備を正当化しない)。
 - aozora.app `/studio`(ADR-2607071100)の storyboard editor が canvas 面を
   持つ時は viewport を自作せず canvaskit を使うこと(現 v1 は DOM フォームで
   canvas 面なし)。
