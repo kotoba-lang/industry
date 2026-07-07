@@ -162,3 +162,24 @@ Store は langchain.db `{:q :transact! :db :pull :entid}` マップ越しのみ
 - dougaka エンジン = genapp-clj video instance の起票
 - creator actors の kotobase 後追い transact（transact 健全化後、actors->tx）
 - 鍵付き actor 化（CACAO、ADR-2607070400 系列）
+
+## 追記 (2026-07-07): Part 2 実装 scaffold 完了 (R0)
+
+follow-up 先頭の実装 scaffold を同日完了:
+
+- **repo**: `etzhayyim/com-etzhayyim-minidrama`（public、`52e7eb25`）。
+  tashikame 同型の R0 — operation/governor/advisor/store/publisher/phase/sim
+  (.cljc) + governor-contract / store-contract / operation テスト
+  （lint 0/0、15 tests / 51 assertions green、`clojure -M:dev:run` 実走確認）。
+- **west 登録**: repos.edn + west.yml `--entry` 最小 diff（pin = 子 main HEAD、
+  server-side 検証 OK）。
+- **設計からの R0 確定差分**（repo `docs/adr/0001-architecture.md`）:
+  publish 承認は interrupt-before ではなく **run context の
+  `:approvals #{:publish}`** で gate（1 run = 1 操作を保つ。この family に
+  interrupt-before の前例が無いため。checkpointer resume ベース化は
+  follow-up）。phase 既定は 0 (draft)。
+- **RAD identity journal は defer**（sng / kyoninka と同じ前例 —
+  実 `:rad/head` 署名 CID は kotoba/IPFS signing tooling 待ち。did:web は
+  `did:web:etzhayyim.github.io:com-etzhayyim-minidrama` を assert 済み）。
+- 残 follow-up: 実 aozora Publisher + CACAO 鍵、genapp-clj video エンジン
+  （dougaka エンジン）統合、durable outer loop、RAD journal 本登録。
