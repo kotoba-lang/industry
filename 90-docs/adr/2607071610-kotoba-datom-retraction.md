@@ -1,7 +1,7 @@
 ---
 id: adr-2607071610-kotoba-datom-retraction
 title: "ADR-2607071610: kotoba substrate — datom retraction（novelty block :op + fold retract + 読み経路）の設計"
-status: proposed
+status: accepted
 doc_type: adr
 topic: kotoba-datom-retraction
 authoritative: true
@@ -22,7 +22,7 @@ superseded_by: []
 
 # ADR-2607071610: kotoba substrate — datom retraction の設計
 
-**Status**: proposed（設計のみ。実装は本 ADR 承認後に kotoba-lang 側で phased に）
+**Status**: accepted（Phase 1 実装済み — 下記 Addendum）
 **Date**: 2026-07-07
 **Deciders**: Jun Kawasaki（起票: 成熟ループ — app-aozora deleteRecord 修理
 (tombstone 方式) 時に記録した substrate follow-up の履行）
@@ -121,9 +121,32 @@ assert し、AppView scan が drop）で deleteRecord を復旧した（app-aozo
 - **Datomic excision 相当（履歴からの物理抹消）**: chain の
   content-addressed append-only と根本的に非両立。非目標と明記。
 
+## Addendum: Phase 1 実装着地（2026-07-07）
+
+- **kotobase-peer `8e2eb554`**: `->quad` retract 2 形式 + `:op` 付き quad map、
+  `apply-quad`/`retract-entity*`（fold/hydrate-chain/since/hot-datoms が経由）、
+  `hot-datoms` は novelty retraction を snapshot 行にも set-based で適用、
+  wire codec は非 assert のみ `"op"` を付与（旧 block は 3-key のまま =
+  migration 不要を実装でも確認）。contract tests 3 本（tx 3 形式 /
+  block・fold 跨ぎキャンセル+snapshot 縮小 / 旧 block 互換）全 green、
+  スイート 80 tests 0 failures。
+- **kotobase-cljc-worker `0804d0ee`**: `tx-edn->quads` が retract vector を
+  `datom.core/eavt` の前段で dispatch（eavt は純 map 用のまま）。パーサ test
+  追加。既存 18 test failures は未パッチ baseline と失敗集合が完全一致
+  （pre-existing、本変更の回帰ゼロを diff で確認）。
+- superproject pin 前進: `4c75889ae9e6`。
+- **本番 worker デプロイは未実施（意図的）**: 現時点で retract を発行する
+  消費者がゼロ（PDS deleteRecord は tombstone のみ）のため、デプロイは
+  Phase 3（PDS tombstone+retractEntity 併発行）着地と同時に行い、throwaway
+  graph での live 検証（FOLD_CRON 前例）を挟む。
+
 ## Follow-ups
 
-- kotoba-lang 側 Phase 1 実装（着手時に本 ADR を accepted へ）
+- Phase 2: as-of / :added false 表面化（kotobase-peer）
+- Phase 3: PDS deleteRecord = tombstone + retractEntity 併発行（app-aozora）
+  — **このタイミングで kotobase-cljc-worker を本番デプロイ + throwaway graph
+  live 検証**
 - retract の firehose 表現（:atproto.firehose/action "delete" は既にある —
   substrate イベントとの対応付け）
 - fold の GC 指標（retract 適用で node 数がどれだけ縮むか計測）
+- worker 既存 18 failures（pre-existing、roundtrip/async 系）の別途調査

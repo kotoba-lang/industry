@@ -1,7 +1,7 @@
 {:frontmatter
  {:id "adr-2607071610-kotoba-datom-retraction"
   :title "ADR-2607071610: kotoba substrate — datom retraction（novelty block :op + fold retract + 読み経路）の設計"
-  :status "proposed"
+  :status "accepted"
   :doc_type "adr"
   :topic "kotoba-datom-retraction"
   :authoritative true
@@ -54,7 +54,24 @@
    {:option "Datomic excision 相当 (履歴物理抹消)"
     :why "content-addressed append-only chain と非両立 — 非目標と明記"}]}
 
+ :addendum
+ {:date "2026-07-07"
+  :phase-1-landed
+  {:kotobase-peer "8e2eb554 — ->quad retract 2形式 + :op quad、apply-quad/
+    retract-entity* (fold/hydrate-chain/since/hot-datoms 経由)、hot-datoms は
+    novelty retraction を snapshot 行にも適用、wire codec は非 assert のみ op
+    付与 (旧 block 互換)。contract tests 3本 green、スイート 80 tests 0 fail"
+   :kotobase-cljc-worker "0804d0ee — tx-edn->quads が retract vector を eavt
+    前段で dispatch。既存 18 failures は baseline と完全一致 (pre-existing、
+    回帰ゼロを diff 確認)"
+   :superproject-pin "4c75889ae9e6"
+   :prod-deploy "未実施 (意図的): retract 発行消費者ゼロのため Phase 3 着地と
+    同時にデプロイ + throwaway graph live 検証 (FOLD_CRON 前例)"}}
+
  :follow-ups
- ["kotoba-lang 側 Phase 1 実装 (着手時に本 ADR を accepted へ)"
+ ["Phase 2: as-of / :added false 表面化 (kotobase-peer)"
+  "Phase 3: PDS tombstone+retractEntity 併発行 (app-aozora) — worker 本番
+   デプロイ + throwaway graph live 検証をこのタイミングで"
   "retract の firehose 表現との対応付け"
-  "fold GC 指標 (retract 適用での node 数縮小の計測)"]}
+  "fold GC 指標 (retract 適用での node 数縮小の計測)"
+  "worker 既存 18 failures (pre-existing) の別途調査"]}
