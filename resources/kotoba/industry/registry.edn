@@ -5575,8 +5575,29 @@
    :business-id "cloud-itonami-isic-9321"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :blueprint
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as an amusement-park/ride-safety
+   ;; actor (ParkOps-LLM ⊣ Ride Safety Governor), the twelfth build
+   ;; outside ADR-2607032000's original insurance/real-estate batch
+   ;; (after 6612, 6492, 6920, 6611, 7120, 8620, 8530, 9200, 7500,
+   ;; 9603, 9521), the first ISIC division 93 (leisure attractions)
+   ;; vertical in this fleet, modeled closely on siblings
+   ;; 6511/6512/6621/6622/6629/6520/6530/6820/6612/6492/6920/6611/
+   ;; 7120/8620/8530/9200/7500/9603/9521.
+   ;; Distinctive check: operators-sufficient? reuses this fleet's
+   ;; MINIMUM-threshold pure-ground-truth-recompute shape, but the
+   ;; FIRST instance to compare TWO fields on the SAME entity
+   ;; (certified-operators-on-duty vs. minimum-operators-required)
+   ;; rather than one field against a shared constant. A real
+   ;; test/demo-design bug was caught and fixed during verification
+   ;; (see ADR-0001 Decision 5): the unconditional-evaluation check
+   ;; family fires only via the current proposal's own verdict or a
+   ;; prior store commit, never via an independent ground-truth
+   ;; recompute for the actuation op. Single actuation
+   ;; (:actuation/reopen-ride), never auto at any phase; like
+   ;; 6920/7120/8620/8530/9200/7500/9603/9521, no bespoke capability
+   ;; lib.
    :operating-states [:intake :ticket :operate :inspect :audit]}
   {:id "9329"
    :name "Other amusement and recreation activities n.e.c."
