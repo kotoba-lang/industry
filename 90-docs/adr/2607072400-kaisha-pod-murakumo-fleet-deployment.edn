@@ -44,8 +44,13 @@ murakumo.cloud 完成を live 化のブロッカーにしない。addendum 同�
 denrei.pod（dc59f13）が実 fleet node (asher) で e2e 実測成功
 （transact/pull/q）。kaisha graph は actor private graph の初回 write
 自動登録で成立（provision 不要）。fleet 方言（aud=node did / multi-cap /
-dual scope / 秒精度 / :db/id）は fleet-channelport が pre-wire。残
-follow-up は on-kse WASM component（push 型 realtime）のみ。
+dual scope / 秒精度 / :db/id）は fleet-channelport が pre-wire。addendum 2
+（KSE 訂正、オーナー指摘）: 当初 follow-up の on-kse component は撤回し
+KSE 依存を除去 — KSE は kotoba-server runtime 固有（kotobase/kotoba-peer
+engine に不在）で datomic tail は ephemeral・catch-up 不能。realtime 正本は
+datom 面共通の :db-api 契約とし、denrei 69a3f5d の messages-since/follow!
+（cursor tail、loss-free）で実装済み。kotoba-server 本体の KSE は mesh
+用途で現役のため除去は主張しない。
 
 ## References
 

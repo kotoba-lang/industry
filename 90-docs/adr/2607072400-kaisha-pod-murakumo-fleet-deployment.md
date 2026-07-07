@@ -82,8 +82,22 @@ provision 不要で成立する。実測で確定した fleet 方言（`fleet-ch
 （datom:read + datom:transact + tx:create）、graph scope は write=CID /
 read=private/<did> 名前形の両方、秒精度 timestamp、tx map に :db/id 必須、
 graph param は dag-cbor CID のみ（IPNS 名 / libp2p-key CID は不可）。
-残 follow-up は lattice `on-kse` WASM component による push 型 realtime
-fan-out のみ（pull 型 substrate は live）。
+Addendum 2（2026-07-07 同日、KSE 訂正 — オーナー指摘による）: 本 ADR が
+当初 follow-up とした「lattice `on-kse` WASM component による push 型
+realtime fan-out」は**撤回し、kaisha の設計から KSE 依存を除去した**。
+実装照合（kotoba-server Rust ソース）の結果: KSE（Kotoba Stream Engine、
+LiveBus topic pub/sub）は kotoba-server / lattice **runtime 固有**の設備で、
+kotoba-protocol の層スタックに含まれず、**workerd / browser の kotobase
+engine（kotobase-cljc-worker / kotobase-peer / kotobase-client）には存在
+しない**。datomic.transact は各 datom を gossip topic `quad/assert` に
+ephemeral broadcast し on-kse component も受信可能だが（橋は実在）、
+LiveBus は datomic topic を永続せず catch-up 不能（永続 replay は datom 面の
+`sync.eventsFromCommits` のみ）。よって realtime 追従の正本は **kotobase /
+kotoba-peer と共通の datom 面（`:db-api` 契約）**とし、denrei `69a3f5d` の
+`messages-since` / `follow!`（cursor tail、loss-free・replayable、全
+backend 同一コード）で実装済み。KSE は kaisha にとって「使わない」が結論
+（kotoba-server 本体の KSE subsystem は mesh の signal/realtime/ENGI 用途で
+現役のため、本 ADR は kotoba-server からの KSE 除去までは主張しない）。
 
 ## References
 
