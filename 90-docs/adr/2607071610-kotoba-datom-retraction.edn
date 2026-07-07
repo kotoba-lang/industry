@@ -91,8 +91,21 @@
    (handler.cljc then* + handler_test/r2_test の Promise 書き直し) で同時解消
    済み。worker main 7c0e3d7 で再確認: 22 tests / 79 assertions / 0 failures"}
 
+ :addendum-4
+ {:date "2026-07-07"
+  :fold-persistence-confirmed
+  "datomic.fold は :graph を直接指定 (transact と異なり署名者から導出しない)
+   — staging の空 allowlist 規約により使い捨て鍵の CACAO でも fold 可能。
+   実行したら {:folded false} (novelty 0 = 本物の FOLD_CRON が既に fold 済み)。
+   Phase 3 の smoke-test entity を fold 済み cold snapshot 経由で pull し、
+   novelty 側でなく永続 indexed snapshot からの retraction を確認 (tombstone
+   の2属性のみ、実コンテンツは復活せず)。ブロック数の精密な before/after
+   計測は R2 flat 空間の graph 単位切り分けツールが無く見送り — 定性的な
+   永続性確認で follow-up の核心は充足"}
+
  :follow-ups
- ["Phase 2: as-of / :added false 表面化 (kotobase-peer)"
+ ["Phase 2: as-of / :added false 表面化 (kotobase-peer) — 現行消費者は
+   current-state のみ必要とするため、具体的要求が出るまで先送り"
   "retract の firehose 表現との対応付け"
-  "fold GC 指標 (retract 適用での node 数縮小の計測。fold は CACAO 認証必須で
-   本セッション未実行 — 次の FOLD_CRON で確認)"]}
+  "fold GC 指標の定量化 (S3 互換 API 経由の graph 単位ブロック数計測ツールが
+   あればより精密に)"]}
