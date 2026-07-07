@@ -129,3 +129,16 @@ minidrama で閉じた reside 経路を、murakumo.app.edn に宣言されたま
 - reconcile 現況: `minidrama 1/1 satisfied` / `kenchi-valuation 1/2 place`
   (2nd replica の `--apply` は operator seed の 1Password 再認証待ち。planner の
   提案先 benjamin は mesh 未設置のため、実配置は auction の生き bidder に決まる)。
+
+## 追記 3 (2026-07-07): 収束完了 — kenchi 2/2 satisfied + reconcile --apply の bare-filename バグ修理
+
+- `reconcile --apply` が **bare filename で FileNotFoundException**
+  (`murakumo.app.edn/../kenchi/…`) — `deploy/plan.cljc` の `manifest-dir` が
+  slash なしパスを素通ししていたバグを発見・修正（murakumo `5e721ed9`、
+  bare filename → "."。test 期待値も更新、176/810 green)。
+- kenchi の 2nd replica は cross-node auction 未配線(ADR-2606271600 既知
+  ギャップ)のため gossip では収束せず、`bb deploy … zebulun` の imperative
+  配置で充足。zebulun 上で `POST /mesh/http/kenchi/valuation` → HTTP 200 実測。
+- 最終状態: **kenchi-valuation 2/2 satisfied on asher,zebulun /
+  minidrama 1/1 satisfied on asher**。kotodama-bot / live-ui は設計どおり
+  needs-build(placeholder :links / manifest 不在)。
