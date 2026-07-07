@@ -1,0 +1,29 @@
+{:frontmatter
+ {:id "adr-2607062130-gftdcojp-dispatcher-gftd-ai-retirement-org-wide"
+  :title "ADR-2607062130: gftdcojp -- retire dispatcher.gftd.ai org-wide; migrate app-by-app"
+  :status "proposed"
+  :doc_type "adr"
+  :topic "gftdcojp-dispatcher-retirement"
+  :authoritative true
+  :last_verified "2026-07-06"
+  :authoritative_for
+  ["dispatcher.gftd.ai returns HTTP 530 / Cloudflare error 1033 on every request
+    (k8s cluster vke-31d5f7dc-... unreachable, kubectl connection refused) --
+    owner directive: k8s deprecated, prune"
+   "migration pattern: per-app, verify whether each NSID behind dispatcher.gftd.ai
+    is a pure D1/Cloudflare-native passthrough (port in-Worker, zero backend hop) or
+    needs real compute (fail honestly with 410/503 until a reachable replacement
+    backend exists) -- do not bulk-edit wrangler.jsonc across apps without this
+    per-app verification"
+   "club-shinshi migrated this session (PR github.com/gftdcojp/club-shinshi/pull/4);
+    ai-gftd-dogaka/ai-gftd-kakure/ai-gftd-nemuri/ai-gftd-shinshi not yet investigated"
+   "orgs/gftdcojp/ai-gftd-shinshi and orgs/gftdcojp/club-shinshi are two different
+    repos both claiming to be the shinshi standalone extraction and both configuring
+    the same Cloudflare Worker name magatama-sh1n5h1x -- verified club-shinshi is the
+    one actually live (curl HTML router.ts vs ai-gftd-shinshi's router.cljc) but the
+    duplicate-repo situation itself is unresolved"]
+  :related ["adr-2604282300-cf-worker-edge-layer-zeebe-rw-udf-business-logic"
+            "adr-2605151600-maps-langserver-direct-call"
+            "adr-2607031540-yukkuri-render-path-cloud-murakumo"]
+  :supersedes []
+  :superseded_by []}}
