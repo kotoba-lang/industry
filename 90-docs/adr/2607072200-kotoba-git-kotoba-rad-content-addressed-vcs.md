@@ -5,7 +5,7 @@ status: accepted
 doc_type: adr
 topic: kotoba-git-kotoba-rad-content-addressed-vcs
 authoritative: true
-last_verified: 2026-07-07
+last_verified: 2026-07-07 (addendum same day: object model redesigned onto native arrangement datoms)
 authoritative_for:
   - "kotoba-lang/kotoba-git owns the content-addressed git object model (blob/tree/commit) and mutable ref store for this ecosystem"
   - "kotoba-lang/kotoba-rad owns sovereign repo identity (RID), delegate authorization, and signed refs (the Radicle-equivalent layer)"
@@ -181,3 +181,61 @@ decide").
   `authorize-push?` (owner push, delegated push, outsider rejection,
   mismatched-target rejection, revoked-delegate rejection).
 - No `wrangler deploy` / production wiring attempted for either repo.
+
+## Addendum (2026-07-07, same day): object model redesigned onto native arrangement datoms
+
+**Owner instruction**: "git は外部化するのではなく、kotoba-git で git 自体を
+Datomic、kotoba で再設計実装してください" — don't externalize git as a
+side store; redesign git itself on Datomic/kotoba, inside `kotoba-git`.
+
+**What changed**: the original decision above stored blob/tree/commit as
+`io-ipld` content-addressed DAG-CBOR blocks — a store that happened to sit
+*next to* `arrangement` (which only held refs). That is a git object store
+riding alongside the Datomic-shaped foundation, not git redesigned as part
+of it. This addendum corrects that:
+
+- `kotoba-git.object`'s `write-blob`/`write-tree`/`write-commit` (the
+  trailing `!` dropped — they are now pure) assert blob/tree/commit
+  content directly as `arrangement` quads whose **subject is the object's
+  own content hash** — `{cid "blob/bytes" bytes}`, `{cid "tree/entries"
+  [...]}`, `{cid "commit/tree" (ipld/link tree)}` +
+  `commit/parents`/`commit/author`/`commit/message`/`commit/ts`. Every
+  write function is now `(fn [db ...] -> [db' cid])`, matching
+  `kotoba-git.refs`'s pre-existing db-in/db-out style, so object writes and
+  ref updates thread the *same* db value.
+- `io-multiformats`/`org-ietf-cbor`/`io-ipld` are now used **only** for
+  their pure canonical-encoding/hashing functions (`cidv1-raw`,
+  `encode`+`cid`) to derive each object's content-addressed identity —
+  nothing is persisted through them anymore. Persisting a repo to durable
+  storage is one operation over the whole db (new `kotoba-git.repo/
+  persist!`, wrapping `arrangement.core/commit!`), covering objects and
+  refs together, the same path every other `kotobase-peer` domain uses.
+- A concrete Datomic-native payoff, not just a storage-location change:
+  `commit/tree` is asserted as a real `ipld/link`, so
+  `arrangement.core/refs-to` answers "which commits reference this tree"
+  with zero extra code — a reverse graph query that the prior
+  side-content-store design could not offer for free.
+- **Trade-off accepted, stated plainly**: `commit/parents` is stored as one
+  literal vector-of-links (not decomposed into one quad per parent), to
+  preserve parent order (first-parent history matters for `log`); the
+  cost is that individual parents are not reverse-indexed via `refs-to`.
+  `ancestors`/`log`/`missing-since` still walk the DAG procedurally rather
+  than as a single Datalog query, because `arrangement.datalog` is a
+  conjunctive-join layer, not (yet) a transitive-closure/fixpoint one
+  (ADR-2607022600 already flags "Datalog fixpoint" as an open follow-up
+  for this whole stack, not something this ADR resolves).
+- `kotoba-rad` is untouched: it never depended on `kotoba-git`'s object
+  representation (only on plain CID strings), so the decoupling from the
+  original decision paid off exactly as intended when this half of the
+  design changed underneath it.
+
+**Verification**: `kotoba-git`'s own suite grew from 12 to 14 tests / 25 to
+28 assertions (adding `kotoba-git.repo-test` and an
+`arrangement.core/refs-to` reverse-lookup test), all green against both
+pinned `:git/sha` deps and local sibling checkouts. The full cross-repo
+integration script from this ADR's original Verification section (RID →
+delegate → object write → sigref → `authorize-push?` → ref move → second
+commit → revoke → outsider-rejection) was re-run end-to-end against the
+new API and produced identical pass/fail results, plus a new step
+demonstrating `arrangement.core/refs-to` resolving `tree-2`'s referencing
+commit with no `kotoba-git`-specific code.
