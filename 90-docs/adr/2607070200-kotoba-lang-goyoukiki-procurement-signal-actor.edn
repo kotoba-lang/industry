@@ -4,16 +4,16 @@
   :title "ADR-2607070200: kotoba-lang/goyoukiki — JP 政府調達 signal + bidder-matching actor（match-LLM ⊣ ProcurementGovernor）"
   :status "closed"
   :date "2026-07-06"
-  :closed "2026-07-06"
+  :closed "2026-07-07"
   :deciders ["Jun Kawasaki"]
   :doc_type "adr"
   :topic "kotoba-lang-goyoukiki-procurement-signal-actor"
   :authoritative true
-  :authoritative_for ["goyoukiki actor の設計（match-LLM ⊣ ProcurementGovernor、二流路 StateGraph、Phase 0→3）" "opportunity(:forecast調達予定/:tender入札公告)⟷candidate(全省庁統一資格)のマッチングモデルと MatchTarget port 契約（fetch-match/propose-match!/share!）" "ProcurementGovernor の HARD 不変条件（no-actuation/nomination/eligibility/redaction-required/silence-period、share は常に人間承認）" "share! が発注機関を宛先にできない構造的安全境界（候補自身のcontactのみ解決）" "v1 スコープ判断: 日本のみ、入札応答文書のドラフトは kotoba-lang/teian・tayori に委譲、実データ取得(live fetcher)は follow-up" "実行完了: repo scaffold + 31 tests/110 assertions green + lint clean + demo sim 確認 + manifest 登録、いずれも完了"]
+  :authoritative_for ["goyoukiki actor の設計（match-LLM ⊣ ProcurementGovernor、二流路 StateGraph、Phase 0→3）" "opportunity(:forecast調達予定/:tender入札公告)⟷candidate(全省庁統一資格)のマッチングモデルと MatchTarget port 契約（fetch-match/propose-match!/share!）" "ProcurementGovernor の HARD 不変条件（no-actuation/nomination/eligibility/redaction-required/silence-period、share は常に人間承認）" "share! が発注機関を宛先にできない構造的安全境界（候補自身のcontactのみ解決）" "v1 スコープ判断: 日本のみ、入札応答文書のドラフトは kotoba-lang/teian・tayori に委譲" "実行完了: repo scaffold + 31 tests/110 assertions green + lint clean + demo sim 確認 + manifest 登録、いずれも完了。実データingestion(kkj.go.jp+GEPS)はADR-2607070300で完了。cloud-itonami配線(cloud_itonami.workspaceへの:procurement/propose-match・:procurement/share-match追加)はgftdcojp/cloud-itonami PR #34としてコード完成・テスト済み(429 tests/2983 assertions green)、本番相当のitonami.cloudに影響するためレビュー待ちでマージ未了" "残るfollow-up: candidate(全省庁統一資格)側の実データ取得、US/EU/中国展開、teian/tayori側の応答文書ドラフト配線"]
   :supersedes []
   :superseded_by []
-  :related ["adr-2607032330-cloud-itonami-iso3166-market-entry-compliance-blueprints" "adr-2607051300-cross-org-capability-map" "adr-2607062000-kotoba-lang-teian-briefing-actor" "adr-2607062010-kotoba-lang-koyomi-schedule-actor" "adr-2606302300-org-taxonomy-4-orgs"]
-  :last_verified "2026-07-06"}
+  :related ["adr-2607070300-kotoba-lang-goyoukiki-jp-real-ingestion-connectors" "adr-2607032330-cloud-itonami-iso3166-market-entry-compliance-blueprints" "adr-2607051300-cross-org-capability-map" "adr-2607062000-kotoba-lang-teian-briefing-actor" "adr-2607062010-kotoba-lang-koyomi-schedule-actor" "adr-2606302300-org-taxonomy-4-orgs"]
+  :last_verified "2026-07-07"}
  :body
  "# ADR-2607070200: kotoba-lang/goyoukiki — JP 政府調達 signal + bidder-matching actor（match-LLM ⊣ ProcurementGovernor）
 
