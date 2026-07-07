@@ -108,3 +108,24 @@ pin      (kotoba):  guest は CID で content-addressed（component build が CI
   宣言的ループ（desired ↔ observed）が閉じた。
 - 運用注: 配置は canary (asher) 1 replica。fleet 全体の常駐化・replicas 増は
   `bb reconcile --apply` / `--watch` の運用判断に委ねる。
+
+## 追記 2 (2026-07-07): 宣言済み desired state の fleet 収束 — kenchi 配置 + manifest 修理
+
+minidrama で閉じた reside 経路を、murakumo.app.edn に宣言されたまま
+`:needs-build`(running 0) で放置されていた他 app に適用した。
+
+- **kotoba-clj reader は regex literal (`#"…"`) 非対応と判明**(kenchi guest の
+  deploy で発覚。escape 文字列・`defn-`・`subs`/`count` は可)。kenchi
+  `valuation_query.clj` を subs ベースに書き換え(kenchi `7ae1af3b`)、両 guest の
+  CID 解決 → asher へ deploy →
+  `POST /mesh/http/kenchi/valuation` **HTTP 200** 実測。
+- **murakumo.app.edn の 3 manifest パスが broken だった**(murakumo `386e8d2d`
+  で修理): kotodama-bot `../kotoba` → `../../com-junkawasaki/kotoba`(examples は
+  com-junkawasaki 側)、kenchi `../kenchi-actor` → `../kenchi`(rename)、live-ui
+  は `apps/live-ui.edn` 自体が不在(注記のみ、honest desired state のまま)。
+- **kotodama-bot は deploy 済みだが `:cid` は意図的に未記録**: example manifest
+  の `:links` が placeholder CID(`bafyGemmaModelCid` 等)のままで on-http が
+  502(実 model CID + CACAO grant が入るまで収束不能)。
+- reconcile 現況: `minidrama 1/1 satisfied` / `kenchi-valuation 1/2 place`
+  (2nd replica の `--apply` は operator seed の 1Password 再認証待ち。planner の
+  提案先 benjamin は mesh 未設置のため、実配置は auction の生き bidder に決まる)。
