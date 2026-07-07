@@ -317,6 +317,75 @@ funding) -- plus `6820` (real estate on a fee/contract basis, a separate
 division entirely). All three are candidates for a future addendum, not
 silently forgotten.
 
+## Addendum 5 (2026-07-07, owner-directed): `cloud-itonami-isic-6520` deepened to `:implemented`
+
+Continuing the SAME "pick a new ISIC blueprint vertical" direction that
+produced Addenda 1-4, `6520` (reinsurance) was selected next -- the
+sixth insurance-adjacent class from THIS ADR's own original 8-repo
+batch to receive this treatment.
+
+- `cloud-itonami-isic-6520` gains **Treaty-LLM ⊣ Reinsurance Governor**
+  -- `reinsurance.*` namespaces, modeled closely on `6511`/`6512`/
+  `6621`/`6622`/`6629`'s Store/Registry/Governor/Phase/Advisor/
+  Operation/Sim shape and the SAME generic langgraph-clj StateGraph.
+  Two entities (`treaties`, `recoveries`) mirror `6512`'s policy/claim
+  lifecycle shape almost exactly: `:recovery/file` (auto-eligible once
+  the treaty is bound, no capital risk) → `:recovery/pay` (always
+  human-gated actuation), the same shape as `:claim/file` → `:claim/
+  settle`. Dual actuation (`:treaty/bind`, `:recovery/pay`), matching
+  `6512`'s/`6622`'s dual-actuation shape, not `6511`'s/`6621`'s/`6629`'s
+  single-actuation one.
+- **A genuinely different KIND of check, reusing `6629`'s arithmetic-
+  verification pattern on a NEW formula**: `recovery-calculation-
+  mismatch-violations` independently recomputes a claims-recovery
+  amount via the treaty's OWN quota-share (percentage-of-loss, capped
+  at an aggregate limit) or excess-of-loss (retention/layer) formula
+  and compares it against the recovery request's claimed figure --
+  reusing the "never trust a claimed number, independently re-derive
+  it" discipline `cloud-itonami-isic-6629`'s `apportionment-mismatch-
+  violations` established for general-average apportionment, applied
+  here to a different well-known formula (reinsurance treaty math).
+  Like `6629`, this actor deliberately has NO party/conflict-of-
+  interest concept at all, since none applies to its core failure mode
+  -- a ceding insurer is a named contractual counterparty, not a
+  screened individual.
+- **A lesson from `6622` applied by REASONING, not by copying a fix
+  defensively**: `6622`'s ADR records a real bug where checking
+  `:status :bound` directly broke because a placement's status
+  legitimately advances PAST `:bound`. `6520`'s `treaty-not-bound-
+  violations` checks `:status :bound` directly too -- but SAFELY, since
+  a treaty's status never advances past `:bound` (recovery filing/
+  payment only ever change the recovery's own status). This reasoning
+  is written into the check's own docstring and `cloud-itonami-isic-
+  6520`'s own ADR-0001, rather than defensively copying `6622`'s fix
+  where it isn't needed.
+- `kotoba-lang/industry`'s registry: `:maturity :blueprint` →
+  `:implemented` for `"6520"`, fleet-wide maturity counts move from 11
+  implemented / 86 blueprint / 546 spec to 12 implemented / 85 blueprint /
+  546 spec (out of 643 total), `test/kotoba/industry_test.clj`'s
+  `maturity-summary` assertion updated to match.
+- `test/reinsurance/*` -- 36 tests / 171 assertions, lint-clean, demo
+  (`clojure -M:dev:run`) runs end-to-end: two clean lifecycles (a
+  quota-share treaty bind + recovery-payment cycle, and a separate
+  excess-of-loss treaty bind) plus five HARD-hold cases (no spec-basis,
+  recovery filed against an unbound treaty, a recovery-calculation
+  mismatch, a nonexistent recovery, a double payment) that never reach
+  a human at all -- all correct on the FIRST demo run, since this
+  build's status-lifecycle risk was reasoned through up front rather
+  than discovered by a failing demo (unlike `6512`'s and `6622`'s own
+  ADRs, which each record a real bug caught during demo verification).
+  See `cloud-itonami-isic-6520`'s own ADR-0001 for the full design.
+
+Of the 7 insurance classes (division 65/662) this ADR originally
+published, 6 are now `:implemented` (`6511` life insurance, implemented
+before this addendum sequence began; `6512` non-life, `6621` loss
+adjustment, `6622` intermediation, `6629` insurance-auxiliary services
+and `6520` reinsurance, implemented by Addenda 1-5). ONE remains at
+`:blueprint` from the original 8-repo batch -- `6530` (pension funding)
+-- plus `6820` (real estate on a fee/contract basis, a separate
+division entirely). Both are candidates for a future addendum, not
+silently forgotten.
+
 ## References
 
 - ADR-2607011000 (cloud-itonami robotics premise + ISIC 21/21 section
