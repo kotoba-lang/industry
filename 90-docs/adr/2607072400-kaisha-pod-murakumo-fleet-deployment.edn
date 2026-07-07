@@ -40,8 +40,12 @@ kotoba-store は :url 注入 + CACAO 自己発行のまま deploy 先非依存�
 ## Consequences
 
 live ChannelTarget は murakumo fleet 上の kaisha pod を対象に実装。
-murakumo.cloud 完成を live 化のブロッカーにしない。pod 配置・on-kse fan-out
-component・denrei live Deliverer の実装は follow-up。
+murakumo.cloud 完成を live 化のブロッカーにしない。addendum 同日実装完了:
+denrei.pod（dc59f13）が実 fleet node (asher) で e2e 実測成功
+（transact/pull/q）。kaisha graph は actor private graph の初回 write
+自動登録で成立（provision 不要）。fleet 方言（aud=node did / multi-cap /
+dual scope / 秒精度 / :db/id）は fleet-channelport が pre-wire。残
+follow-up は on-kse WASM component（push 型 realtime）のみ。
 
 ## References
 

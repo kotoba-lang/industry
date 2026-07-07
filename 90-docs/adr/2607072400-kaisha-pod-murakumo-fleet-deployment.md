@@ -67,9 +67,23 @@ WebRTC/WebTransport + relay fallback で置き換える構築中の overlay。
 live ChannelTarget（ADR-2607072330 の follow-up）は murakumo fleet 上の
 kaisha pod を対象に実装する。murakumo.cloud overlay の完成を kaisha の
 live 化のブロッカーにしない（tailnet で先行できる）。kotobase.net は
-realtime を持たない現状のまま公開面に専念できる。実装（pod への kaisha
-graph 配置、`on-kse` fan-out component、denrei live Deliverer）は本 ADR の
-スコープ外の follow-up。
+realtime を持たない現状のまま公開面に専念できる。
+
+Addendum（2026-07-07 同日、実装完了）: `denrei.pod`（denrei `dc59f13`）として
+live ChannelTarget を実装し、**実 fleet node（asher, tailnet :8077）で
+end-to-end 実測成功**（post!=transact 200 / fetch-message=pull round-trip /
+channel-messages=q index read）。kaisha graph の「配置」は deploy 作業では
+なく **actor の account-owned private graph の初回 write 自動登録**
+（kotoba-server の data-sovereignty 経路: graph CID =
+CID("kotoba://graph/private/<did>") なら Private{owner=issuer} で自動登録）
+で実現される — つまり fleet ノードが生きていれば kaisha pod は
+provision 不要で成立する。実測で確定した fleet 方言（`fleet-channelport`
+が pre-wire）: CACAO aud = node did:key（URL 不可）、multi-cap grant
+（datom:read + datom:transact + tx:create）、graph scope は write=CID /
+read=private/<did> 名前形の両方、秒精度 timestamp、tx map に :db/id 必須、
+graph param は dag-cbor CID のみ（IPNS 名 / libp2p-key CID は不可）。
+残 follow-up は lattice `on-kse` WASM component による push 型 realtime
+fan-out のみ（pull 型 substrate は live）。
 
 ## References
 
