@@ -4832,8 +4832,19 @@
    :business-id "cloud-itonami-isic-6820"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :property]
    :optional-technologies []
-   :maturity :blueprint
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as a real-estate-fee-services actor
+   ;; (Realty-Fee-LLM ⊣ Real-Estate Fee-Services Governor), the FIRST
+   ;; actor in this fleet outside the insurance division (65/66),
+   ;; modeled closely on siblings 6511/6512/6621/6622/6629/6520/6530.
+   ;; Two checks in one governor: fee-calculation-mismatch (exact-match
+   ;; independent recompute, reusing 6629's/6520's pattern) and
+   ;; contract-exceeds-authorization (static cap, reusing casualty's
+   ;; claim-exceeds-coverage shape). A pending contract lives inline on
+   ;; the property record; executing it clears the field, doubling as
+   ;; the double-execution guard. Dual actuation (:fee/pay, :contract/
+   ;; execute), neither ever auto at any phase.
    :operating-states [:intake :manage :appraise :bill :audit]},
   {:id "6910"
    :name "Legal activities"
