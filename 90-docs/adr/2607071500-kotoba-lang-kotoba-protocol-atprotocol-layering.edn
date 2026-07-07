@@ -26,7 +26,18 @@
     aozora.pds.encode / aozora.appview.scan (既に本番稼働、移植しない)"
    "W-Protocol (performerType/contentMode/uiType/service/system + ActorFrame)
     は退役 — atprotocol.profile の deprecated compat alias にのみ残る。
-    正は :kotoba.app/kind と :kotoba.app/embed-url"]
+    正は :kotoba.app/kind と :kotoba.app/embed-url"
+   "Addendum (同日): follow-up 3 件 live 実装 — (1) :kotoba.app/latest =
+    ipns.core/pubkey->name で actor 鍵由来 IPNS を導出し manifest に刻む
+    (mangaka appLatest=k51qzi5uqu5dk5in… 確認)。(2) cap-bridge:
+    kotoba.protocol.bridge (hello/request/result, grant=要求∩対応,
+    validate-request fail-closed) + yoro-ui.interop.app-bridge host
+    (embed を opaque origin で mount、graph/query のみ host 代行、鍵/token
+    は app に渡さない、round-trip 実証)。(3) PUT /ipfs/:cid content-addressed
+    write (archive-put.cljc: base32/raw-sha256 検証 + web CSP-sandbox 配信、
+    Bearer token + digest fail-closed。GET retrieval は
+    KOTOBASE_IPFS_GATEWAY_URL で live。実 B2 書込は writable public-web
+    bucket の ops 前提)"]
   :related
   ["90-docs/adr/2607062330-kototama-tender-chicory-execution-runtime.md"
    "90-docs/adr/2607062400-kototama-actor-host-browser-native-and-tender-module-fix.md"
