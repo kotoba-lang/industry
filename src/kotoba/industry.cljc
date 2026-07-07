@@ -7,6 +7,10 @@
 (def registry-resource "kotoba/industry/registry.edn")
 
 (defn registry []
+  ;; JVM-only resource loading (matches kotoba.technology's own registry
+  ;; loader, same house pattern) -- clj-kondo lints .cljc under :cljs too,
+  ;; where `slurp` doesn't exist; no cljs consumer of this ns exists yet.
+  #_:clj-kondo/ignore
   (edn/read-string (slurp (io/resource registry-resource))))
 
 (defn industries

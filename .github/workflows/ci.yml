@@ -9,6 +9,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # deps.edn depends on io.github.kotoba-lang/technology via
+      # :local/root "../technology" -- must land as a sibling checkout
+      # (RUNNER_WORKSPACE/industry/technology) or classpath resolution
+      # fails before any test/lint step runs.
+      - uses: actions/checkout@v4
+        with:
+          repository: kotoba-lang/technology
+          path: technology
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -17,3 +25,4 @@ jobs:
         with:
           cli: latest
       - run: clojure -M:test
+      - run: clojure -M:lint
