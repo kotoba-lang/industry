@@ -462,6 +462,83 @@ the original 8-repo batch outside insurance proper -- `6820` (real
 estate on a fee/contract basis, ISIC division 68, a separate division
 entirely) -- a candidate for a future addendum, not silently forgotten.
 
+## Addendum 7 (2026-07-07, owner-directed): `cloud-itonami-isic-6820` deepened to `:implemented` -- closes the original 8-repo batch
+
+Continuing the SAME "pick a new ISIC blueprint vertical" direction that
+produced Addenda 1-6, `6820` (real estate on a fee or contract basis)
+was selected next -- the LAST remaining candidate from THIS ADR's
+original 8-repo batch, and the FIRST actor in this whole fleet outside
+the insurance division (65/66).
+
+- `cloud-itonami-isic-6820` gains **Realty-Fee-LLM ⊣ Real-Estate
+  Fee-Services Governor** -- `realty.*` namespaces, modeled closely on
+  `6511`/`6512`/`6621`/`6622`/`6629`/`6520`/`6530`'s Store/Registry/
+  Governor/Phase/Advisor/Operation/Sim shape and the SAME generic
+  langgraph-clj StateGraph. Two lifecycle shapes coexist: `:fee/file` →
+  `:fee/pay` (a TWO-step lifecycle mirroring `casualty`'s/`pension`'s
+  claim/disbursement shape) and `:contract/execute` (a ONE-step
+  lifecycle acting directly on a property's inline pending contract,
+  mirroring `reinsurance`'s `:treaty/bind` shape) -- both in one actor.
+- **Two DIFFERENT check shapes in ONE governor, a new combination**:
+  `fee-calculation-mismatch-violations` reuses the EXACT-MATCH
+  independent-recompute pattern (`6629`'s/`6520`'s discipline, applied
+  to a fourth domain-specific formula: fixed-percentage-of-rent), while
+  `contract-exceeds-authorization-violations` reuses the STATIC-CAP
+  pattern (`casualty.governor/claim-exceeds-coverage-violations`'s
+  shape, a cap against a stored constant). No sibling combines a
+  computed exact-match AND a static cap in the SAME governor; `6530`
+  blended them into ONE check instead of keeping two separate ones.
+- **A new guard mechanism**: a pending contract lives INLINE on the
+  property record (no separate `contracts` collection, like `6629`'s/
+  `6530`'s "no unused collection" judgment), and executing it CLEARS
+  the field -- so a repeat execution attempt naturally falls into the
+  SAME `contract-missing` check a never-had-one property would also
+  trigger. One accurate check for two occurrences of the same
+  underlying fact, not a separate double-execution guard.
+- **`6530`'s lesson applied proactively, before it could recur**:
+  `spec-basis-violations` is scoped to an op (`:fee/pay`) that ALSO
+  carries a "missing entity" check (`fee-missing-violations`) -- the
+  exact shape that caused `6530`'s audit-trail-accuracy bug. This
+  build's `spec-basis-violations` guards on the fee actually existing
+  FIRST, from the very first draft, and passed the full demo clean on
+  the first attempt for this specific concern.
+- **Two real bugs WERE still caught, of two NEW kinds for this
+  fleet**: (a) during BUILD, not demo -- the Datomic `property->tx`
+  initially wrote `:pending-contract` unconditionally, which would
+  have silently clobbered an existing pending contract on any partial
+  upsert never mentioning the key; caught by re-reading the diff,
+  fixed via a `contains?` guard matching `MemStore`'s `merge`
+  semantics. (b) during demo verification -- the sim's own intake step
+  copied `casualty.sim`'s `:status :ready` patch verbatim, but unlike
+  `casualty` (policies start at `:intake`, later bound), this actor's
+  properties start already `:under-management` with no separate
+  property-binding actuation -- the patch clobbered the seed status,
+  and the governor CORRECTLY held every subsequent fee scenario; the
+  bug was in the demo's storytelling, not the governance logic. Fixed
+  by patching a harmless already-true field instead.
+- `kotoba-lang/industry`'s registry: `:maturity :blueprint` →
+  `:implemented` for `"6820"`, fleet-wide maturity counts move from 13
+  implemented / 84 blueprint / 546 spec to 14 implemented / 83 blueprint /
+  546 spec (out of 643 total), `test/kotoba/industry_test.clj`'s
+  `maturity-summary` assertion updated to match.
+- `test/realty/*` -- 39 tests / 187 assertions, lint-clean, demo
+  (`clojure -M:dev:run`) runs end-to-end: two clean lifecycles (a fee-
+  payment cycle, and a contract-execution cycle) plus seven HARD-hold
+  cases (no spec-basis, a fee filed for a property not under
+  management, a fee-calculation mismatch, a contract exceeding
+  authorization, a contract-execution attempt with no pending
+  contract, a nonexistent fee, a double payment) that never reach a
+  human at all -- all correct after the two build-time/demo-time fixes
+  above. See `cloud-itonami-isic-6820`'s own ADR-0001 for the full
+  design.
+
+This closes the ENTIRE original 8-repo batch from this ADR: all 7
+insurance classes (`6511`/`6512`/`6621`/`6622`/`6629`/`6520`/`6530`)
+plus `6820` (real estate) are now `:implemented`. No candidates remain
+from this ADR's original scope -- future "pick a new ISIC blueprint
+vertical" work moves to a DIFFERENT ISIC class outside this ADR's
+original batch entirely.
+
 ## References
 
 - ADR-2607011000 (cloud-itonami robotics premise + ISIC 21/21 section

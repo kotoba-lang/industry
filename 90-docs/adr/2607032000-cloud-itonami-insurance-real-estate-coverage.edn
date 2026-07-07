@@ -108,4 +108,19 @@
   :fleet-maturity-after {:implemented 13 :blueprint 84 :spec 546 :total 643}
   :test-status-6530 "40 tests / 195 assertions, lint clean, demo verified end-to-end (two clean lifecycles + seven HARD-hold cases, all correct on the SECOND run after the spec-basis/missing-entity overlap was found and fixed)"
   :closes-all-seven-original-insurance-classes true
-  :remaining-blueprint-from-original-batch ["cloud-itonami-6820 (real estate on a fee/contract basis)"]}}
+  :remaining-blueprint-from-original-batch ["cloud-itonami-6820 (real estate on a fee/contract basis)"]}
+
+ :addendum-7
+ {:date "2026-07-07"
+  :deepened-to-implemented "cloud-itonami-isic-6820"
+  :pattern-6820 "sealed Realty-Fee-LLM advisor + independent Real-Estate Fee-Services Governor + append-only audit ledger, modeled closely on siblings cloud-itonami-isic-6511/6512/6621/6622/6629/6520/6530; FIRST actor in this fleet outside the insurance division (65/66); two lifecycle shapes in one actor -- :fee/file->:fee/pay (two-step, mirrors casualty/pension) and :contract/execute (one-step, mirrors reinsurance's :treaty/bind)"
+  :distinctive-checks-6820 "TWO different check shapes in ONE governor, a new combination: fee-calculation-mismatch (exact-match independent recompute, reusing 6629's/6520's pattern on a fourth formula) and contract-exceeds-authorization (static cap, reusing casualty's claim-exceeds-coverage shape) -- no sibling combines both shapes in one governor; 6530 blended them into one check instead"
+  :new-guard-mechanism-6820 "a pending contract lives INLINE on the property record (no separate collection, like 6629's/6530's no-unused-collection judgment); executing it clears the field, so a repeat execution falls into the SAME contract-missing check a never-had-one property would trigger -- one accurate check for two occurrences of the same fact, not a separate double-execution guard"
+  :lesson-applied-proactively-6820 "spec-basis-violations (scoped to :fee/pay, which ALSO carries fee-missing-violations -- the exact shape that caused 6530's bug) guards on the fee actually existing FIRST from the very first draft, applying 6530's lesson before it could recur"
+  :bugs-found-and-fixed-6820 "TWO bugs of NEW kinds for this fleet: (a) build-time, not demo-time -- Datomic property->tx wrote :pending-contract unconditionally, which would have clobbered an existing pending contract on any partial upsert never mentioning the key; caught by re-reading the diff, fixed via a contains? guard matching MemStore's merge semantics; (b) demo-time -- the sim's intake step copied casualty's :status :ready patch verbatim, but this actor's properties start already :under-management with no separate binding actuation; the patch clobbered the seed status and the governor correctly held every downstream fee scenario -- a demo-storytelling bug, not a governance bug"
+  :dual-actuation-6820 "two actuation events (:actuation/pay-fee, :actuation/execute-contract), matching 6512's/6622's/6520's/6530's dual-actuation shape, not 6511's/6621's/6629's single-actuation one"
+  :fleet-maturity-before {:implemented 13 :blueprint 84 :spec 546 :total 643}
+  :fleet-maturity-after {:implemented 14 :blueprint 83 :spec 546 :total 643}
+  :test-status-6820 "39 tests / 187 assertions, lint clean, demo verified end-to-end (two clean lifecycles + seven HARD-hold cases, all correct after the two build-time/demo-time fixes)"
+  :closes-entire-original-8-repo-batch true
+  :remaining-blueprint-from-original-batch []}}
