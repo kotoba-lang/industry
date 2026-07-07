@@ -299,6 +299,36 @@ adapter was never blocked by whether aiueos already had its own execution
 path, only by nobody having written the adapter. Not attempted in this
 addendum; tracked as before.
 
+## Addendum 7 (2026-07-07): the open follow-up, closed — `kototama.aiueos-adapter`
+
+New namespace `kototama.aiueos-adapter` (`kototama` repo, kototama#24)
+translates a REAL aiueos decision into a `kototama.contract/host-caps`
+value. `aiueos.decide`'s documented "V1 integration" is a `bb decide`
+subprocess a native host shells out to (for hosts that aren't already
+JVM/Clojure); since kototama already is, the adapter instead depends on
+`io.github.kotoba-lang/aiueos` directly and calls `aiueos.cli/
+command-result` in-process — the exact pure function `aiueos.decide/
+handle-request` itself calls one layer down, skipping only the EDN-line
+marshaling a subprocess boundary needs and an in-process call doesn't.
+`kototama.tender` still never computes a grant itself (ADR-2607022700's
+rule, unchanged) — the adapter only removes the need for every caller
+to hand-build `HostCaps` from a decision aiueos already made.
+
+Covers the subset of `actor:host` imports aiueos's own default kernel
+capabilities recognize today (`log-write`/`clock-monotonic`/
+`random-bytes`); `gen-keypair`/`sign`/`verify`/`sha256-hex`/`http-post`/
+`log-read` have no aiueos-kernel-capability counterpart and still take
+caller-supplied `HostCaps`, unchanged.
+
+Verified end to end, not just internal translation consistency: a real
+`:grant` from `aiueos.cli/command-result` (aiueos's own broker, its own
+audit trail) drives a real Chicory-hosted WASM guest through
+`kototama.tender` to a real result; a real `:deny` (an unsigned
+component under an `:aiueos/require-signed` policy overlay — aiueos's
+own signature-authenticity check, ADR-0003) is what `kototama.tender`'s
+own pre-flight rejects. No test-hardcoded `HostCaps` anywhere in either
+path. 25 tests/50 assertions green.
+
 ## One-line summary
 
 **`kototama.tender` is the Chicory/JVM execution layer ADR-2607022400/
