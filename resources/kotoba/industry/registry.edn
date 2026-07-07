@@ -237,7 +237,38 @@
    :name "Community Monetary Intermediation"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6419"
    :business-id "cloud-itonami-isic-6419"
-  :maturity :blueprint
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as a community-banking actor
+   ;; (Banking Advisor ⊣ Monetary Intermediation Governor), the thirty-
+   ;; ninth build outside ADR-2607032000's original insurance/real-estate
+   ;; batch (after 6612, 6492, 6920, 6611, 7120, 8620, 8530, 9200, 7500,
+   ;; 9603, 9521, 9321, 8730, 9102, 9103, 9602, 9000, 8890, 8610, 9311,
+   ;; 8510, 9412, 6491, 8720, 8521, 6619, 3600, 6190, 3030, 3830, 7020,
+   ;; 9420, 9491, 2610, 3512, 8810, 8691, 8569), modeled closely on
+   ;; siblings 6511/6512/6621/6622/6629/6520/6530/6820/6612/6492/6920/
+   ;; 6611/7120/8620/8530/9200/7500/9603/9521/9321/8730/9102/9103/9602/
+   ;; 9000/8890/8610/9311/8510/9412/6491/8720/8521/6619/3600/6190/3030/
+   ;; 3830/7020/9420/9491/2610/3512/8810/8691/8569.
+   ;; Distinctive check: iban-checksum-invalid? is the FIRST instance of
+   ;; this fleet's checksum/format-validity check family -- a REAL ISO
+   ;; 7064 MOD 97-10 IBAN validation (not a fabricated placeholder),
+   ;; tested against published IBAN examples. Also reuses the exact
+   ;; sanctions-violations concept/name underwriting/casualty/vcfund/
+   ;; formation/realty already established (sanctions screening is a
+   ;; genuinely shared AML/OFAC compliance concept across financial-
+   ;; services verticals, unlike this fleet's domain-specific
+   ;; "safeguarding"/"risk" concepts) -- the SIXTH literal grounding of
+   ;; that name, and the THIRTY-SEVENTH distinct application of the
+   ;; unconditional-evaluation discipline overall, tested via the
+   ;; screening op directly for a twenty-seventh consecutive vertical
+   ;; (after eldercare/museum/conservation/salon/entertainment/casework/
+   ;; hospital/facility/school/association/leasing/behavioral/secondary/
+   ;; card/water/telecom/aerospace/recovery/consulting/union/congregation/
+   ;; fab/energy/care/navigator/learning). Dual actuation (:actuation/
+   ;; post-settlement, :actuation/dispatch-interbank-message) on the same
+   ;; account entity, both POSITIVE. Double-actuation guarded via
+   ;; dedicated booleans per the 6492 lesson. See cloud-itonami-isic-
+   ;; 6419/docs/adr/0001-architecture.md.
    :required-technologies [:robotics :banking :swift :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
    :operating-states [:intake :onboard :transact :clear :settle :audit]}
