@@ -84,10 +84,18 @@
     確認 (displayName/handle/creator actor チップ/intro post)"
    "tests: registry 5件含む 40-engine 272/1187 + SPA 52/151 green"]}
 
+ :addendum-2607071400
+ {:status "Part 2 scaffold 完了 (R0, 2026-07-07)"
+  :repo "etzhayyim/com-etzhayyim-minidrama @ 52e7eb25 (public, west 登録済み)"
+  :r0-delta "publish 承認は interrupt-before でなく run context :approvals #{:publish} で gate (repo docs/adr/0001)。phase 既定 0 (draft)"
+  :rad "defer (sng/kyoninka 前例 — signing tooling 待ち)。did:web:etzhayyim.github.io:com-etzhayyim-minidrama を assert"
+  :tests "lint 0/0, 15 tests / 51 assertions green, -M:dev:run 実走"}
+
  :follow-ups
- ["minidrama 実装 scaffold — 20-actors/minidrama →
-   etzhayyim/com-etzhayyim-minidrama repo → west 登録 → RAD identity
-   (CLAUDE.md Actors 節の完了条件、常時許可フロー)"
+ ["minidrama 実 aozora Publisher + CACAO 鍵 (tashikame.aozora 同型)"
+  "genapp-clj video エンジン (dougaka エンジン) 統合 — shot 生成→assemble→uploadBlob→announce"
+  "durable outer loop (:agent.loop/* 系)"
+  "RAD identity journal 本登録 (signing seat 待ち)"
   "dougaka エンジン = genapp-clj video instance の起票"
   "creator actors の kotobase 後追い transact (actors->tx)"
   "鍵付き actor 化 (CACAO 自己発行、ADR-2607070400 系列)"]}
