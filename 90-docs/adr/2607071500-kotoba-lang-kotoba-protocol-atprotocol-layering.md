@@ -157,16 +157,17 @@ repo の中身:
   テストから参照させることで軽減（宣言が壊れたらテストが落ちる）。
 - (−) 2 repo（kotoba-protocol/atprotocol）+ vendor JS（actor-host.js）+
   externs ファイルの追加管理コスト。
-- (−) cap-bridge は `graph/query`（読取専用）のみ、wasm actor は 7/8
-  imports（`http-post` 不可）— 書込み系 capability の host 代行は
-  引き続き未実装（下記 open follow-up）。
+- (−) cap-bridge は `graph/query`（読取専用）+ `graph/transact`（書込み、
+  Addendum 3）。wasm actor は 7/8 imports（`http-post` 不可）、`llm/complete`
+  は proxy 先 backend が無く未実装（下記 open follow-up）。
 
 ## Open follow-up（本 ADR クローズ後も残る）
 
 - lexicon `_lexicon` DNS 公開・firehose・MST encoding の kotoba graph 導出
   （atprotocol の wire 互換を深める話、miniapp モデル自体には不要）。
-- cap-bridge の書込み系 capability（`graph/transact`・`llm/complete`）の
-  host 代行実装（現状は grant registry に名前があるだけで未実装）。
+- ~~cap-bridge の書込み系 capability（`graph/transact`）の host 代行実装~~ →
+  実装済み（Addendum 3）。`llm/complete` は proxy 先の LLM completion
+  XRPC/backend 自体がまだ存在しないため未実装のまま持ち越し。
 - studio への actor 鍵 import UI の汎用化（現状 mangaka-app 専用）。
 - `:kotoba.app/bundle-cid` の appview 側 integrity 検証（現状 `embed-url`
   の resolve のみで、配信内容と bundle-cid の一致は未検証）。
@@ -236,3 +237,33 @@ repo の中身:
   `2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824` を返し、
   `log_write` が `"hello"` を記録。CID 配信の wasm → HostCaps 検証付き
   ブラウザ実行という L5 の最後のピースが本番で一周した。
+
+## Addendum 3 (2026-07-07 同日): cap-bridge 書込み系 capability — graph/transact 実装
+
+クローズ時に open follow-up として残した cap-bridge の書込み capability
+（`graph/query` 読取専用の対）を実装（`llm/complete` は proxy 先 backend が
+まだ無いため引き続き未実装）。
+
+- **host 側**: `yoro-ui.interop.app-bridge/run-cap` に `graph/transact` 分岐を
+  追加。embed app は生の nsid を渡せず、代わりに
+  `{:action "create"|"put"|"delete" :collection :rkey :record}` を渡す —
+  host 側で action → procedure nsid（`com.atproto.repo.{createRecord,
+  putRecord,deleteRecord}`）を解決するため、app が任意 nsid を叩くことは
+  できない。`collection` は `com.etzhayyim.` 名前空間のみ許可
+  （identity/account 等の core atproto collection は書けない）。
+  `host-supported-caps` に `"graph/transact"` を追加（`kotoba.protocol.app`
+  の `bridge-caps` には元々 `graph/transact`/`llm/complete` 両方が登録済み
+  だったので protocol 層の変更は不要 — host 側の対応表を埋めただけ）。
+- **書込みルーティング**: 新設 `yoro-ui.interop.atproto/at-write-record` が
+  既存の `:atproto/procedure` re-frame fx と同じ no-server-key ルーティングを
+  再利用: セッション DID がこの端末にローカル repo 鍵を持てば
+  `repo-signer/write-record!`（on-device 署名）、無ければ従来の
+  server-signed `at-procedure` にフォールバック。cap-bridge 経由でも鍵/token
+  は embed app には一切渡らない（host が代行するのは「操作」であって
+  「権限そのもの」ではない、という cap-bridge の不変条件を維持）。
+- **検証**: 実 shadow-cljs `:test` build（monorepo の相対パス依存を要するため
+  隔離 worktree でなく、clean な共有 checkout に一時的にファイルを重ねて
+  build → 直後に `git checkout --` で復元、というノーコミットの手法で検証）
+  で 174 ファイルがコンパイル成功（既存の無関係な `:infer-warning` 1 件のみ）。
+  実ブラウザでの round-trip デモ（bridge-demo-app からの実書込み）は
+  持ち越し — 次に embed app を書き込みテストするときに確認する。
