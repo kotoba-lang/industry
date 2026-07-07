@@ -4887,8 +4887,21 @@
    :business-id "cloud-itonami-isic-6920"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :blueprint
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as an accounting/auditing actor
+   ;; (Ledger-LLM ⊣ Audit Independence Governor), the FIRST
+   ;; professional-services vertical (ISIC division 69) in this fleet
+   ;; and the third built outside ADR-2607032000's original insurance/
+   ;; real-estate batch (after 6612, 6492), modeled closely on siblings
+   ;; 6511/6512/6621/6622/6629/6520/6530/6820/6612/6492. Distinctive
+   ;; checks: wrong-engagement-type (a new type-tag validity check) and
+   ;; trial-balance-out-of-balance (a pure ground-truth equality-of-
+   ;; sums recompute, extending 6492's threshold-recompute family). A
+   ;; real NullPointerException bug (recomputing trial balance for a
+   ;; non-audit engagement) was found and fixed in both the advisor and
+   ;; the governor. Dual actuation (:audit-opinion/issue,
+   ;; :tax-filing/submit), neither ever auto at any phase.
    :operating-states [:intake :reconcile :opine :file :audit]},
   {:id "7010"
    :name "Activities of head offices"
