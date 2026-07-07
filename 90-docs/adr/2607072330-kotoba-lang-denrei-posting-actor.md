@@ -67,8 +67,15 @@ kaisha への AI 投稿が governed actor の型に集約され、private channe
 投稿不能・blocked member への mention 不能・投稿は常に人間承認が構造的に
 強制される。実行状況（2026-07-07）: repo scaffold 完了（src 9 ns + test 5 ns、
 31 tests / 129 assertions 全緑、clj-kondo errors/warnings 0、sim デモ完動）、
-GitHub 作成（public）+ push（`99a85ba`）、west 登録、本 ADR。実 kaisha host
-への live ChannelTarget（kotoba-server XRPC）と cloud-itonami 配線は follow-up。
+GitHub 作成（public）+ push（`99a85ba`）、west 登録、本 ADR。
+
+Addendum（2026-07-07 同日）: cloud-itonami 配線も完了 — `cloud_itonami.workspace`
+の投影層に teian/koyomi と同型で `:chat/draft-message`（→ denrei
+:message/draft、:read-only）/ `:chat/post-message`（→ denrei :message/post、
+:external-send、denrei 自身の :request-approval interrupt を real resume、
+HARD hold は override しない）を追加（cloud-itonami `1f27ceb`、350 tests /
+2719 assertions 全緑）。実 kaisha host への live ChannelTarget
+（kotoba-server XRPC）は引き続き follow-up。
 
 ## References
 
