@@ -4687,8 +4687,17 @@
    :business-id "cloud-itonami-isic-6512"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :insurance]
    :optional-technologies []
-   :maturity :blueprint
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as a property/casualty actor
+   ;; (Underwriter-LLM ⊣ Non-Life Insurance Governor), modeled closely on
+   ;; the sibling 6511 (life insurance) architecture. Governed ops: policy
+   ;; intake/assessment/KYC/binding (the same lifecycle 6511 has), PLUS a
+   ;; genuinely new claims lifecycle 6511 never modeled (claim filing,
+   ;; HARD-gated on the referenced policy actually being bound; claim
+   ;; settlement, independently checked against the policy's own coverage
+   ;; limit and double-settlement-protected). Two actuation events
+   ;; (:policy/bind, :claim/settle), neither ever auto at any phase.
    :operating-states [:intake :underwrite :bind :endorse :claim :settle :audit]},
   {:id "6520"
    :name "Reinsurance"
