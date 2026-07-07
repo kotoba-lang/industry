@@ -5719,8 +5719,23 @@
    :business-id "cloud-itonami-isic-9603"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :blueprint
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as a funeral/death-care actor
+   ;; (FuneralOps-LLM ⊣ Funeral Services Governor), the tenth build
+   ;; outside ADR-2607032000's original insurance/real-estate batch
+   ;; (after 6612, 6492, 6920, 6611, 7120, 8620, 8530, 9200, 7500), the
+   ;; first ISIC division 96 (personal services/death-care) vertical
+   ;; in this fleet, modeled closely on siblings 6511/6512/6621/6622/
+   ;; 6629/6520/6530/6820/6612/6492/6920/6611/7120/8620/8530/9200/7500.
+   ;; Distinctive check: waiting-period-elapsed? reuses veterinary's
+   ;; newly-established temporal-sufficiency shape for a SECOND domain
+   ;; instance, applied UNCONDITIONALLY (every decedent, unlike
+   ;; veterinary's food-producing-animal-only gate) -- the 24-hour
+   ;; figure is drawn from Japan's real Cemetery and Burial Act
+   ;; Article 3. Single actuation (:disposition/perform, irreversible),
+   ;; never auto at any phase; like 6920/7120/8620/8530/9200/7500, no
+   ;; bespoke capability lib.
    :operating-states [:intake :book :service :deliver :audit]}
   {:id "9609"
    :name "Other personal service activities n.e.c."
