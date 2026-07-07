@@ -115,6 +115,13 @@
   ;; variant for university-originated (not formal-standards-body) specs.
   "orgs/kotoba-lang/spice"           "orgs/kotoba-lang/edu-berkeley-spice"
   "orgs/kotoba-lang/verilog"         "orgs/kotoba-lang/org-ieee-verilog"
+  ;; genuine-conformance batch, renamed 2026-07-07 (ADR-2607072600): unlike
+  ;; the other clj-wgsl-migration restorations, these two actually touch a
+  ;; real external format/API (URDF XML fixture+parser; Gymnasium Env API
+  ;; contract), verified before renaming -- see repos.edn comments above
+  ;; each entry for the specific evidence.
+  "orgs/kotoba-lang/articulated-scene" "orgs/kotoba-lang/org-ros-urdf"
+  "orgs/kotoba-lang/cartpole-wasm"      "orgs/kotoba-lang/org-farama-gymnasium"
   ;; follow-up batch, renamed 2026-07-06 (ADR-2607061613): ipfs joins the
   ;; io-<domain> family (io-libp2p/io-ipld/io-multiformats, ipfs.tech-governed);
   ;; svg is a W3C Recommendation, same org-w3-* precedent as the batch above.
@@ -1930,8 +1937,17 @@
    "orgs/kotoba-lang/scad"
    "orgs/kotoba-lang/pathfind"
    "orgs/kotoba-lang/character"
-   "orgs/kotoba-lang/cartpole-wasm"
-   "orgs/kotoba-lang/articulated-scene"
+   ;; renamed to org-farama-gymnasium 2026-07-07 (ADR-2607072600): the ported
+   ;; cartpole dynamics expose reset/step -> terminated?/truncated?, i.e. the
+   ;; actual Farama Foundation Gymnasium Env API contract (CartPole-v1), not
+   ;; just a similarly-named technique -- same org-<body>-<spec> naming rule.
+   "orgs/kotoba-lang/org-farama-gymnasium"
+   ;; renamed to org-ros-urdf 2026-07-07 (ADR-2607072600): embeds a real URDF
+   ;; XML fixture (giemon_arm6) and a test-local URDF parser, i.e. genuinely
+   ;; touches the URDF format (ROS), not just a similarly-shaped concept --
+   ;; same org-<body>-<spec> naming rule, sibling to the existing org-ros
+   ;; (ROS 2 message/wire-format, a different spec under the same body).
+   "orgs/kotoba-lang/org-ros-urdf"
    "orgs/kotoba-lang/demo"
    "orgs/kotoba-lang/devtools"
    "orgs/kotoba-lang/pipelines"
