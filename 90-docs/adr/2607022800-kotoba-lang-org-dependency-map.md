@@ -409,3 +409,14 @@ remote HEAD `a9134aff` と一致、これがディスク上に残る最後のコ
    `kami-app-sip-clj`(標準化先 `kami-app-sip` と src が分岐した別コピー、
    Ghost Hacker jump の新パイプライン移行先の可能性あり)がまだ `:local/root`
    で参照しており、そちらの reconciliation は別作業として残す。
+
+### Follow-up (2026-07-08) — finding 1「kagi → kagitaba が壊れている」解消
+
+`kotoba-lang/kagitaba` を push した(public、既存のクリーンなローカル checkout
+そのまま。13 tests / 78 assertions 済み、`.github/workflows/ci.yml` も既存 —
+push した初回 CI run で green を確認)。`manifest/repos.edn` の
+`:extra-projects` に登録、`west.yml` に反映済み。これで `kagi` の fresh clone
+がビルド不能だった状態は解消。finding 1 で言及していた「push 後に `:git/sha`
+で pin する follow-up」は対象外とした — kagi 自身は `:local/root` のまま
+運用中の他の kotoba-lang 依存(html/css 等)と同じ扱いで揃え、`:git/sha` への
+個別切り替えは行っていない(揃える方が家の慣習に合致)。
