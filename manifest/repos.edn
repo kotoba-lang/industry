@@ -1384,6 +1384,16 @@
    ;; hydrate を合成した pure state machine (transport 注入、loopback 参照実装
    ;; 同梱)。net は意味論層のまま。
    "orgs/kotoba-lang/p2p"
+   ;; kotoba-git + kotoba-rad (ADR-2607072200) — 削除済み Rust kotoba-git
+   ;; (kotoba-lang/kotoba PR #259) の後継。git 相当（blob/tree/commit の
+   ;; content-addressed オブジェクトモデル、arrangement 上の ref store、
+   ;; DAG walk）と Radicle 相当（RID/identity、chain 上の delegate 台帳、
+   ;; Ed25519 sigref、authorize-push? ゲート）を、既存の kotobase-peer
+   ;; スタック（io-multiformats/org-ietf-cbor/io-ipld/prolly-tree/
+   ;; arrangement/chain/org-ietf-ed25519）合成のみで実装。実装済み・
+   ;; unit test 済み（各 README 参照）。
+   "orgs/kotoba-lang/kotoba-git"
+   "orgs/kotoba-lang/kotoba-rad"
    ;; Bitcoin mining/mining-pool/wallet substrate (ADR-2607012230) — plain
    ;; libraries (not actors): btc-crypto (RIPEMD160/Base58/Bech32/BIP-32/39/
    ;; tx signing, secp256k1 reused from eth-crypto), btc-mining (CPU PoW

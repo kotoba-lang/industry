@@ -1,0 +1,183 @@
+---
+id: adr-2607072200-kotoba-git-kotoba-rad-content-addressed-vcs
+title: "ADR-2607072200: kotoba-git + kotoba-rad — content-addressed git/Radicle-equivalent layer on the kotobase-peer stack"
+status: accepted
+doc_type: adr
+topic: kotoba-git-kotoba-rad-content-addressed-vcs
+authoritative: true
+last_verified: 2026-07-07
+authoritative_for:
+  - "kotoba-lang/kotoba-git owns the content-addressed git object model (blob/tree/commit) and mutable ref store for this ecosystem"
+  - "kotoba-lang/kotoba-rad owns sovereign repo identity (RID), delegate authorization, and signed refs (the Radicle-equivalent layer)"
+  - "The prior Rust kotoba-git (kotoba-lang/kotoba, deleted PR #259, 2026-07-01) and ADR-2606280300/2606251200's Rust-era implementation claims are superseded by this ADR for any future work"
+related:
+  - 90-docs/adr/2606280300-kotoba-rad-git-sovereign-repo.md
+  - 90-docs/adr/2607022600-kotoba-database-crates-cljc-migration-roadmap.md
+  - 90-docs/adr/2607032430-kotoba-datom-log-structured-engine-redesign.md
+  - 90-docs/adr/2607032500-kotoba-kotobase-clojure-datomic-relationship.md
+supersedes: []
+superseded_by: []
+---
+
+# ADR-2607072200: kotoba-git + kotoba-rad — content-addressed git/Radicle-equivalent layer
+
+**Status**: accepted (both repos created, code real and unit-tested, not yet published/registered at time of writing this section — see Verification)
+**Date**: 2026-07-07
+**Deciders**: Jun Kawasaki (instruction: "kotobase の datomic 基盤の上に git, racile 相当を構築してね" — build a git-equivalent and Radicle-equivalent on top of kotobase's Datomic-shaped foundation)
+
+## Context
+
+An earlier investigation this session established:
+
+- A real Rust `kotoba-git` (byte-exact git object↔CID bridging, packfile
+  decode, smart-HTTP v0) existed in `kotoba-lang/kotoba` and was **deleted
+  wholesale** on 2026-07-01 (PR #259). ADR-2606251200's "implemented and
+  wired... proven end-to-end" claim about it has no corresponding code
+  anywhere in the repo as of this writing.
+- ADR-2607022600 (the CLJC migration roadmap rebuilding a Datomic-shaped
+  substrate as `prolly-tree`/`arrangement`/`chain`/`kotobase-peer`/
+  `io-ipld`/`io-multiformats`/`org-ietf-cbor`) **explicitly excludes**
+  `kotoba-git`/`kotoba-rad` from its scope.
+- `kotoba-lang/kotobase-peer` (ADR-2607032430, ADR-2607032500: "kotoba :
+  kotobase = Clojure : Datomic") is the real, actively-developed Datomic-
+  shaped engine — not real Datomic, not DataScript, a from-scratch 4-index
+  (`arrangement`) + log-structured (`chain`) + content-addressed
+  (`prolly-tree`/`io-ipld`) design, borrowing Datomic's vocabulary and API
+  shape, not its code.
+- `etzhayyim/root/70-tools/src/etzhayyim/kotoba_rad.cljc` is a real,
+  unit-tested RID/identity/sigref prototype, but uses its own hand-rolled
+  raw-codec (0x55) CID implementation, independent of and incompatible with
+  the `io-multiformats`/`io-ipld` scheme the actual `kotobase-peer` stack
+  uses — a fragmentation this ADR resolves by building on the latter.
+
+So: there was no working git-equivalent or Radicle-equivalent layer on the
+codebase's actual current Datomic-shaped foundation, only design documents,
+a deleted prototype, and a disconnected earlier CLJC prototype using a
+different CID scheme.
+
+## Decision
+
+**Build `kotoba-git` (git-equivalent) and `kotoba-rad` (Radicle-equivalent)
+as two new, decoupled `kotoba-lang` CLJC repos, composed entirely from the
+existing `kotobase-peer` stack's real primitives, rather than reimplementing
+git's own SHA-1/packfile format or resurrecting the deleted Rust code.**
+
+### Layering
+
+```
+kotoba-rad   RID/identity, delegate authorization, signed refs, push-gate
+   |         (arrangement not required; built on chain + io-ipld + ed25519)
+kotoba-git   blob/tree/commit objects, ref store, DAG walk
+   |         (io-multiformats + org-ietf-cbor + io-ipld + arrangement)
+kotobase-peer / arrangement / chain / prolly-tree / io-ipld   (existing, unmodified)
+```
+
+- **`kotoba-git.object`**: blobs are raw-codec (0x55) content-addressed
+  bytes (`multiformats.core/cidv1-raw`); trees and commits are DAG-CBOR
+  nodes (`io-ipld`, real CBOR tag-42 links, 0x71 codec). Commits carry a
+  `parents` **vector** — a real commit DAG (merges representable), not a
+  linear chain.
+- **`kotoba-git.refs`**: `refs/heads/main`-style mutable pointers as quads
+  in an `arrangement` db (`arrangement.core`/`arrangement.query`), the same
+  mutable-pointer-over-immutable-DAG pattern Datomic itself uses. Persisted
+  via `arrangement.core/commit!` with identity blind/encrypt functions
+  (refs are public repo metadata; no privacy semantics needed here).
+- **`kotoba-git.log`**: `ancestors` (full DAG reachability, not just
+  first-parent), `log` (first-parent history), `missing-since` (the
+  object-negotiation primitive a push/pull exchange needs).
+- **`kotoba-rad.identity`**: RID = CID of a repo's own genesis block
+  (`{did, created}`), via `io-ipld` — the **same** CID scheme `kotoba-git`
+  uses for objects, unifying the two-CID-scheme fragmentation flagged above.
+- **`kotoba-rad.journal`**: an append-only, hash-chained log of identity
+  events, built **directly on `kotoba-lang/chain`** — chain's single-parent,
+  opaque-state design is exactly a linear identity journal (as distinct
+  from `kotoba-git`'s N-parent commit DAG, which chain's shape cannot
+  represent — this is why the two repos use different underlying
+  primitives for their respective histories).
+- **`kotoba-rad.delegate`**: folds the journal into the current
+  authorized-delegate set. Owner is always authorized; every
+  `delegate-add`/`delegate-remove` entry must itself carry a valid Ed25519
+  signature from an already-authorized did:key (`org-ietf-ed25519`) — so
+  authority only ever flows forward from the genesis owner.
+- **`kotoba-rad.sigref`** + **`kotoba-rad.push-gate`**: signed
+  ref→commit-cid attestations and `authorize-push?`, a pure-function
+  reimplementation of the deleted Rust `push_gate`/`RadRegistry` — callable
+  from either a client or a server, unlike the original's server-only
+  middleware form.
+
+### Why two decoupled repos, not one
+
+`kotoba-rad` only ever handles plain CID strings for refs/commits — it
+never imports a `kotoba-git` object directly. This means `authorize-push?`
+can gate any content-addressed system's ref updates, not only
+`kotoba-git`'s, and either repo can evolve independently.
+
+### Why not real Datomic, real git, or the deleted Rust code
+
+Consistent with `kotobase-peer` itself (ADR-2607032430/2607032500):
+`arrangement`/`chain` borrow Datomic's *vocabulary*, not Datomic-the-
+product. Likewise `kotoba-git` borrows git's *concepts* (blob/tree/commit,
+refs, DAG history) but its content-addressing is CID-based (multiformats/
+DAG-CBOR), not SHA-1/packfile — there is no requirement to be byte-
+compatible with real `git`, and no external consumer depends on that. The
+deleted Rust implementation attempted git-CLI wire compatibility; this ADR
+deliberately does not re-attempt that scope (see "What this ADR does NOT
+decide").
+
+## What this ADR does NOT decide
+
+- **No git-CLI wire compatibility.** No smart-HTTP bridge, no SHA-1 hashing,
+  no binary packfile format. If real `git` interop is ever needed, that is
+  a distinct translation layer on top of these primitives, not a rewrite.
+- **No transport/replication wiring.** `kotoba-git.log/missing-since` gives
+  the object diff a sync protocol needs, but neither repo depends on
+  `kotoba-lang/p2p` directly — that repo's `deps.edn` currently points at a
+  renamed-away `commit-dag` coordinate and needs a patch first, and its
+  `:head-announce` message has no signature field yet. Wiring
+  `kotoba-rad.push-gate/authorize-push?` into a signed head-announce is the
+  natural next step, not attempted here.
+- **No CACAO/SIWE delegation chains.** `kotoba-rad.delegate` uses direct
+  Ed25519 did:key signing, not `cacao.core/verify-chain`-style root-first/
+  leaf-last delegation. A reasonable future enhancement, deliberately
+  deferred to keep the crypto surface small and directly testable.
+- **No ref-policy** (protected branches, fast-forward-only, etc) —
+  `authorize-push?` checks *who* signed, not policy about what ref updates
+  are allowed once authorized.
+- **No restore-from-persisted-snapshot for `kotoba-git.refs`.**
+  `arrangement.core/commit!` is confirmed and used; a public "rehydrate a
+  db from a snapshot CID" counterpart is not currently exposed by
+  `arrangement` (that logic lives inside `kotobase-peer`'s own `fold!`/
+  `cold-datoms`, not as a standalone reusable API).
+
+## Consequences
+
+- `etzhayyim/root/70-tools/src/etzhayyim/kotoba_rad.cljc`'s hand-rolled CID
+  scheme is now a divergent, superseded prototype relative to `kotoba-rad`'s
+  `io-ipld`-based RID; migrating it (or the actor identity journals under
+  `etzhayyim/root/80-data/kotoba-rad/`) onto this ADR's scheme is a
+  follow-up, not done here.
+- Both new repos depend on the actively-churning `kotobase-peer` stack
+  (three renames in the week before this ADR: `quad-store`+`kqe`→
+  `arrangement`, `commit-dag`→`chain`, `kotobase-engine`→`kotobase-peer`).
+  `deps.edn` pins exact `:git/sha`s (not floating refs) for this reason;
+  expect to re-verify upstream API shapes before extending either repo.
+- Neither repo is wired into any production surface (`kotobase.net`,
+  `kotobase.aozora.app`) — this ADR only establishes the primitives.
+
+## Verification
+
+- `kotoba-git`: `clojure -M:test` — 12 tests / 25 assertions, passing
+  against both pinned `:git/sha` deps and local sibling checkouts
+  (`clojure -M:local:test`). Covers blob/tree/commit round-trip, merge
+  commits (multi-parent), tree entry ordering, DAG ancestor reachability,
+  first-parent log, `missing-since` object negotiation, and ref set/move/
+  list/persist.
+- `kotoba-rad`: `clojure -M:test` — 19 tests / 29 assertions, passing
+  against both pinned `:git/sha` deps and local sibling checkouts. Covers
+  RID genesis + content-addressing, journal append/read/hash-chain-tamper
+  detection, delegate add/remove with real Ed25519 signature verification
+  (including rejecting an unauthorized signer and honoring revocation),
+  sigref sign/verify (including tamper detection), and end-to-end
+  `authorize-push?` (owner push, delegated push, outsider rejection,
+  mismatched-target rejection, revoked-delegate rejection).
+- No `wrangler deploy` / production wiring attempted for either repo.
