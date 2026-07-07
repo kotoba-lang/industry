@@ -37,7 +37,16 @@
     write (archive-put.cljc: base32/raw-sha256 検証 + web CSP-sandbox 配信、
     Bearer token + digest fail-closed。GET retrieval は
     KOTOBASE_IPFS_GATEWAY_URL で live。実 B2 書込は writable public-web
-    bucket の ops 前提)"]
+    bucket の ops 前提)"
+   "Addendum 2 (同日): kind=actor — kototama wasm actor のブラウザ実行 live。
+    kotoba.protocol.app/cap->wasm-import + atprotocol.profile の appWasm
+    投影 (CID→url解決) + yoro-ui.interop.wasm-actor (vendored
+    wasm-webcomponent actor-host.js を run-actor! で HostCaps 検証付き
+    instantiate)。Closure :advanced の property-renaming が vendor JS の
+    内部 dot アクセス (grants/sha256_hex 等) と cljs 側の書込みで食い違う罠を
+    externs/actor-host.js で解決 (rename 対象外に固定)。wasmdemo.aozora.app
+    で main() → sha256_hex(\"hello\") 正解ハッシュ + log_write(\"hello\") を
+    live 確認"]
   :related
   ["90-docs/adr/2607062330-kototama-tender-chicory-execution-runtime.md"
    "90-docs/adr/2607062400-kototama-actor-host-browser-native-and-tender-module-fix.md"
