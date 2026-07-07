@@ -37,7 +37,12 @@
   :spa "keyed router で server profile (本 ADR)"
   :mesh "murakumo fleet 常駐 (ADR-2607071500)"}
 
+ :addendum-2607071600
+ {:create-account "minidrama.aozora/create-account! (self-CACAO → com.atproto.server.createAccount)。minidrama 95fe036c、operator 実行済み"
+  :pds-bug-fix "PER_ACTOR_DB=1 で getAccount が per-actor graph のみ読み常に AccountNotFound (本番実測)。operator db fallback を実装 (app-aozora 647b542a、tests 280/1208)。PDS worker e486d080 デプロイ"
+  :verified "getAccount handle/did 両照会が {did, handle, createdAt} を返す (本番)"}
+
  :follow-ups
  ["animeka / dougaka の flip は同じ3点セットの複製 (実 records が先、フラグが後)"
   "registry projection の縮退検討 (server profile 充実後)"
-  "createAccount 昇格 (account store 整合、ADR-2607070400 系列)"]}
+  "✅ createAccount 昇格 (addendum-2607071600 で完了)"]}
