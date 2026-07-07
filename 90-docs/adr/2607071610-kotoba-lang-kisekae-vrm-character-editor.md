@@ -203,6 +203,42 @@ correctly left for a dedicated design decision (likely its own ADR) rather than
 improvised under the pressure of "one more fix might finish it," which is exactly how
 addendum 2's unreliable probe happened in the first place.
 
+### Addendum 4 (2026-07-08, later cycle): the multi-skin question resolved — Seed-san's own structure fully fixed; one different, precisely isolated blocker remains
+
+Addendum 3 deferred the multi-skin question as "a real architecture decision, not a
+bounded patch." Revisiting it with a concrete design (unify a document's own multiple
+skins into the SAME joint-set/growth machinery `compose` already built for cross-
+document donor merging, rather than treating single-skin and multi-skin documents as
+different code paths) showed it was smaller than expected — the JOINTS_0 remap
+machinery (addendum 2) was ALREADY skin-index-agnostic; only the joint-set/
+inverseBindMatrices *seeding* assumed one skin.
+
+**Fixed** (`kotoba-lang/org-vrmc-vrm#4`, pin advanced): `compose`'s joint-set seeding
+now unions the joints of EVERY skin any source document (base or donor) actually has,
+not just `(first (:skins doc))`. `ibm-plan` entries gained a `:skin-idx` so the
+inverseBindMatrices accessor build reads each joint's real matrix from whichever
+specific skin — any document, any index — it actually came from. A new regression test
+mirrors the exact real failure shape (a document's SOLE selected mesh using skin index
+1, not 0) and is confirmed to fail pre-fix with the identical error signature as the
+real Seed-san bug, and pass with the fix. Full suite: 46 tests / 164 assertions.
+
+**Verified against the real file** (direct JVM diagnostic, per addendum 3's own
+established method): composing Seed-san as a base **no longer fails on its own
+structure at all** — every one of its 5 skins is now handled correctly. Composing the
+full real-world pair (Seed-san + VRM1_Constraint_Twist_Sample) still throws, but now
+on a *different, single, precisely identified* issue entirely on the donor side:
+`J_Sec_Hair1_01`, a genuine hair-sway secondary/physics bone with a real 4.1% skinning
+weight, parented under `J_Bip_C_Head` rather than under the hair mesh's own node. This
+is invisible to `vrm.part/decompose`'s current node-indices heuristic (walks only the
+selected mesh's own node subtree), not a `compose` defect — a real, different, and
+narrower question than the one this addendum chain has been chasing: *should a
+decomposed part's node-indices also include secondary/spring-bone descendants of
+humanoid-bone ancestors, even when they're not descendants of the mesh's own node?*
+Left for its own follow-up (touches `vrm.part`, not `vrm.compose`) rather than
+conflated with this fix. `net-babiniku`'s part-swap UI remains unshipped until it
+resolves, but the blocker is now concrete, singular, and well-understood — not an
+open-ended architecture question anymore.
+
 ## Alternatives Considered
 
 1. **Store exported `.vrm` blobs as the artifact of record.** Rejected — opaque,

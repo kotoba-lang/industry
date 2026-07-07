@@ -177,7 +177,43 @@
    :lesson "the previous cycle's unreliable browser-script diagnosis was itself the
            obstacle -- switching to direct in-JVM calls against real bytes (no
            browser, no JS interop) resolved the ambiguity immediately and is the
-           right default tool for future org-vrmc-vrm diagnosis"}}
+           right default tool for future org-vrmc-vrm diagnosis"}
+  :addendum_2607080100
+  {:context "addendum 3 deferred the multi-skin question as 'a real architecture
+             decision, not a bounded patch' -- revisited with a concrete design and
+             found smaller than expected: the JOINTS_0 remap machinery (bug_2_fixed)
+             was ALREADY skin-index-agnostic, only joint-set/IBM seeding assumed one
+             skin per document"
+   :bug_5_fixed
+   {:what "kotoba-lang/org-vrmc-vrm#4 (pin advanced): joint-set seeding now unions
+           EVERY skin any source document (base or donor) actually has, not just
+           (first (:skins doc)); ibm-plan entries gained :skin-idx so the
+           inverseBindMatrices build reads each joint's real matrix from whichever
+           specific skin -- any document, any index -- it actually came from"
+    :verification "new regression test mirrors the exact real failure shape (a
+                   document's SOLE selected mesh using skin index 1, not 0) --
+                   confirmed to fail pre-fix with the identical error signature as
+                   the real Seed-san bug, pass with the fix. 46 tests/164 assertions.
+                   Verified against the real Seed-san file (direct JVM diagnostic):
+                   composing it as a base no longer fails on its own structure AT
+                   ALL -- every one of its 5 skins now handled correctly"}
+   :bug_6_open_narrower
+   {:what "composing the full real pair (Seed-san + VRM1_Constraint_Twist_Sample)
+           still throws, but now on ONE different, precisely identified issue
+           entirely on the donor side: J_Sec_Hair1_01, a genuine hair-sway
+           secondary/physics bone with a real 4.1% skinning weight, parented under
+           J_Bip_C_Head rather than under the hair mesh's own node"
+    :root_cause "invisible to vrm.part/decompose's current node-indices heuristic
+                (walks only the selected mesh's own node subtree) -- a vrm.part
+                question, not a vrm.compose defect"
+    :real_question "should a decomposed part's node-indices also include secondary/
+                    spring-bone descendants of humanoid-bone ancestors, even when
+                    they're not descendants of the mesh's own node? -- narrower and
+                    more concrete than the open-ended 'architecture decision' this
+                    addendum chain started with"
+    :blocks "net-babiniku M6 slice 2 part-swap UI remains unshipped, but the
+             blocker is now singular and well-understood, not an open architecture
+             question"}}}
 
  :alternatives
  [{:option "store exported .vrm blobs as the artifact of record"
