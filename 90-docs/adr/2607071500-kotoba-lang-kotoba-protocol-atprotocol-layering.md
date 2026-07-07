@@ -138,3 +138,35 @@ repo の中身:
 - (−) spec repo と実装 repo の drift リスク — layers/vocab を data にして
   テストから参照させることで軽減（宣言が壊れたらテストが落ちる）。
 - (−) 2 repo 追加分の west/manifest 管理コスト。
+
+## Addendum (2026-07-07 同日): follow-up 3 件 (IPNS / cap-bridge / bundle CID) 実装
+
+1. **:kotoba.app/latest = 鍵由来 IPNS — 実装・live**。`ipns.core/pubkey->name`
+   (既存の pure cljc、test-vector 付き) を studio publish に配線し、app actor
+   の did:key 公開鍵から署名済み更新チャネル IPNS を導出して manifest record に
+   刻む。mangaka.aozora.app 再公開で live 確認: `appLatest =
+   k51qzi5uqu5dk5inaqognid5ztll223iptppwgjuafx6jp3i7cfrhd1busbqss`。
+
+2. **cap-bridge (postMessage) — 契約 + host + round-trip 実証**。
+   `kotoba.protocol.bridge` (pure): hello/request/result の形、`grant` =
+   要求 caps ∩ host 対応、`validate-request` は unknown/未 grant を fail-closed。
+   host `yoro-ui.interop.app-bridge`: embed iframe を **opaque origin**
+   (sandbox から allow-same-origin 除去) で mount し、granted cap のみ host
+   代行 (graph/query = appview 読取 XRPC。net/transact/llm は署名・課金を伴い
+   未対応)。鍵も token も app に渡らない。harness 実証: guest が graph/query
+   だけ grant され、searchActors request → host 代行 → 実データ受信。
+
+3. **bundle CID 化 — PUT /ipfs/:cid コード完成 (B2 bucket は ops 依存)**。
+   kotobase.net に first-party content-addressed 書込
+   `PUT /ipfs/<raw-CIDv1>` を追加 (`archive-put.cljc` pure: base32 decode /
+   raw sha2-256 検証 / web content-type whitelist + CSP sandbox 配信)。
+   Bearer `KOTOBASE_ARCHIVE_TOKEN`、body sha256 = CID digest fail-closed。
+   web 系は **opaque origin (CSP sandbox)** で配信 — path gateway で任意 HTML を
+   kotobase.net origin では走らせない。GET retrieval (③ の gateway 経路) は
+   `KOTOBASE_IPFS_GATEWAY_URL` で live (200/hello world)、require-b2 の
+   sync-throw は gateway fallback へ degrade。auth 401 / digest 422 gate 検証済み。
+   **実 B2 書込は `KOTOBASE_B2_BUCKET` を writable な public-web bucket に
+   設定する ops が前提** (現行値は archive read 用で、m365 annex とは別に
+   立てる)。それが済めば `ipfs://<cid>` embed-url の app actor が完全に
+   content-addressed で live mount される (embed-url 解決 → cap-bridge round-trip
+   は既に実証済み)。
