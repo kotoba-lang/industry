@@ -194,11 +194,39 @@ fold を呼べる**（`authorized?` は issuer 非 nil のみ要求）。この�
   CLI が無く、S3 互換 API 抜きでは graph 単位に正確に切り分けられない）ため
   今回は見送り。retraction の永続性という定性的な核心は上記で確定済み。
 
+## Addendum 5: Phase 2 実装（as-of / :added false 表面化、2026-07-07）
+
+オーナー指示で Phase 2 に着手。実装中に発見: `kotobase-peer.core/history`
+（`since`/`commit-serialized!` 群と同時期に既に実装済みだった db 値返却の
+監査ビュー）は「a datom retracted later still appears here」と自身の
+docstring で明言していたが、**実際にはそうなっていなかった**ことを直接
+テストで確認（assert→retract した fact を `(eng/pull (eng/history …) e)`
+すると `{}` — 空。原因は `since -1` の再利用: `since` 自身の
+apply-quad ベース reduce が retract を内部で相殺してから `history` に
+渡っていた。`since` 自体は「ある時点以降の変更のみ」という自分の契約に
+対しては正しい（Datomic の `since` と同型）——バグは `history` が
+逆の性質（retract されたものも残る）を必要とする用途にそれを転用していた点。
+
+`kotobase-peer.core/audit-replay`（新規、private）で修正: 全 commit の
+新規 novelty のみを逐次 replay し、`:retract-entity` の展開に必要な
+current-state 追跡と、決して retract しない audit db を分離。`history`
+の公開シグネチャ・契約（db 値を返す、tip の indexed snapshot と union）は
+不変、正しさだけを修正。
+
+**`kotobase-peer.core/history-datoms`**（新規）: `history` 自身の
+docstring が "Phase 2 of that ADR" と予告していた、Datomic
+`(d/datoms (d/history db) …)` 形の `:added true/false` イベントログ。
+`entity` オプションで単一エンティティの履歴（最も一般的な `d/history` の
+用途）に絞れる。`snapshot!` シード分に assert 履歴が無い honest な限界も
+明記。
+
+kotobase-peer `6aa746d`、87 tests / 181 assertions / 0 failures（history
+のバグを再現する回帰テスト1本 + history-datoms の新規テスト6本）。
+superproject pin 前進: `777545f4cbd5`。worker/consumer 配線は現行需要が
+無いため見送り（library 層の実装・検証まで）。
+
 ## Follow-ups
 
-- Phase 2: as-of / :added false 表面化（kotobase-peer） — 現行消費者が
-  current-state のみ必要とする限り、具体的な要求が出るまで先送りでよい
-  （投機的実装を避ける）
 - retract の firehose 表現（:atproto.firehose/action "delete" は既にある —
   substrate イベントとの対応付け）
 - fold の GC 指標の定量化（S3 互換 API 経由でグラフ単位のブロック数を数える

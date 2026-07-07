@@ -103,9 +103,20 @@
    計測は R2 flat 空間の graph 単位切り分けツールが無く見送り — 定性的な
    永続性確認で follow-up の核心は充足"}
 
+ :addendum-5
+ {:date "2026-07-07"
+  :phase-2-landed
+  "kotobase-peer 6aa746d。既存 history (db 値返却) は自身の docstring
+   ('retracted 後も見える') に反し実際には見えていなかった (since -1 の
+   apply-quad ベース reduce が内部で相殺、直接テストで確認)。audit-replay
+   (新規 private) で修正 -- history の公開契約は不変、正しさのみ修正。
+   history-datoms (新規) で history 自身が予告していた :added true/false
+   イベントログを追加、entity フィルタ付き。87 tests / 181 assertions /
+   0 failures。superproject pin 777545f4cbd5。worker/consumer 配線は
+   現行需要が無いため見送り (library 層まで)"}
+
  :follow-ups
- ["Phase 2: as-of / :added false 表面化 (kotobase-peer) — 現行消費者は
-   current-state のみ必要とするため、具体的要求が出るまで先送り"
-  "retract の firehose 表現との対応付け"
+ ["retract の firehose 表現との対応付け"
   "fold GC 指標の定量化 (S3 互換 API 経由の graph 単位ブロック数計測ツールが
-   あればより精密に)"]}
+   あればより精密に)"
+  "history-datoms を実際に消費する worker/XRPC 配線 (具体的需要が出たら)"]}
