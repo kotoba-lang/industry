@@ -22,8 +22,16 @@
     将来 murakumo.cloud、公開 reader は現状維持"
    "studio v1 は完全 client-side: 作品 dashboard + storyboard editor
     (メタ/ページ title/パネル visual)、localStorage draft、manga-viewer
-    での live preview、編集済み tx EDN 書き出し。work-actor 鍵での mint・
-    生成直結・外部 3 作品の編集は follow-up"]
+    での live preview、編集済み tx EDN 書き出し"
+   "Addendum (同日): kotobase transact 治癒を再検査で確認し follow-up 実装 —
+    ①公開 mint (yoro-ui.studio.publish、4 work actor に did:key 発行・
+    profile+work post mint 済み、seed は Keychain
+    aozora-studio-actor-key-<slug> に退避、dispatcher は resolveHandle →
+    did:key でサーバ profile 昇格) ②生成契約の studio 半分 (生成 job 書き出し
+    + panel image url 取り込み。murakumo /infer/dispatch relay は 1033 で
+    直結は fleet ops 待ち) ③mangaka-reader source を CF API から回収し正本化
+    + /api/works・POST /api/work/:rkey (Bearer MANGAKA_ADMIN_TOKEN、
+    Keychain mangaka-admin-token) + aozora /studio/ext/<rkey> メタ編集"]
   :related
   ["90-docs/adr/2607062130-gftdcojp-dispatcher-gftd-ai-retirement-org-wide.md"
    "90-docs/adr/2607062200-gftdcojp-legacy-gftd-ai-hosts-retirement-wave2.md"
