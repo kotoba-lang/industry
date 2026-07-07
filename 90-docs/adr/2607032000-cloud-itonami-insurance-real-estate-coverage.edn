@@ -94,4 +94,18 @@
   :fleet-maturity-before {:implemented 11 :blueprint 86 :spec 546 :total 643}
   :fleet-maturity-after {:implemented 12 :blueprint 85 :spec 546 :total 643}
   :test-status-6520 "36 tests / 171 assertions, lint clean, demo verified end-to-end (two clean lifecycles + five HARD-hold cases, all correct on the first run)"
-  :remaining-blueprint-from-original-batch ["cloud-itonami-6530 (pension funding)" "cloud-itonami-6820 (real estate on a fee/contract basis)"]}}
+  :remaining-blueprint-from-original-batch ["cloud-itonami-6530 (pension funding)" "cloud-itonami-6820 (real estate on a fee/contract basis)"]}
+
+ :addendum-6
+ {:date "2026-07-07"
+  :deepened-to-implemented "cloud-itonami-isic-6530"
+  :pattern-6530 "sealed Pension-LLM advisor + independent Pension Governor + append-only audit ledger, modeled closely on siblings cloud-itonami-isic-6511/6512/6621/6622/6629/6520; MEMBER entity folds the role a separate policyholder/party record plays in every sibling -- no distinct insured-property or counterparty"
+  :distinctive-check-6530 "disbursement-exceeds-entitlement -- independently recomputes a member's max entitlement (lump-sum remaining balance, or period-certain annuity-installment division) and refuses if the requested amount EXCEEDS it, blending 6629's/6520's independent-recompute discipline with an upper-bound cap shape (like casualty's claim-exceeds-coverage); member's own :disbursed-to-date running balance advances after each lump-sum payment"
+  :new-actuation-shape-6530 ":payout/continue authorizes a RECURRING benefit-payout continuation past a periodic proof-of-life check, deliberately with NO double-guard -- unlike every prior sibling's one-time second-actuation event (claim settlement, recovery payment, commission booking), each proof-of-life cycle is its own independent authorization event by domain design"
+  :bug-found-and-fixed-6530 "spec-basis-violations (scoped to :jurisdiction/assess + :disbursement/pay, mirroring casualty's :policy/bind scoping) spuriously co-fired with disbursement-missing-violations on a nonexistent disbursement (empty :cites for the WRONG reason) -- fixed by guarding the :disbursement/pay branch on the disbursement actually existing; disposition was always correctly :hold, an audit-trail-accuracy bug not a governance failure; the FIRST bug in this fleet caused by bundling more HARD checks onto one actuation op than any predecessor"
+  :dual-actuation-6530 "two actuation events (:actuation/pay-disbursement, :actuation/continue-payout), matching 6512's/6622's/6520's dual-actuation shape, not 6511's/6621's/6629's single-actuation one"
+  :fleet-maturity-before {:implemented 12 :blueprint 85 :spec 546 :total 643}
+  :fleet-maturity-after {:implemented 13 :blueprint 84 :spec 546 :total 643}
+  :test-status-6530 "40 tests / 195 assertions, lint clean, demo verified end-to-end (two clean lifecycles + seven HARD-hold cases, all correct on the SECOND run after the spec-basis/missing-entity overlap was found and fixed)"
+  :closes-all-seven-original-insurance-classes true
+  :remaining-blueprint-from-original-batch ["cloud-itonami-6820 (real estate on a fee/contract basis)"]}}

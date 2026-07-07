@@ -386,6 +386,82 @@ and `6520` reinsurance, implemented by Addenda 1-5). ONE remains at
 division entirely). Both are candidates for a future addendum, not
 silently forgotten.
 
+## Addendum 6 (2026-07-07, owner-directed): `cloud-itonami-isic-6530` deepened to `:implemented`
+
+Continuing the SAME "pick a new ISIC blueprint vertical" direction that
+produced Addenda 1-5, `6530` (pension funding) was selected next -- the
+seventh and LAST insurance class from THIS ADR's own original 8-repo
+batch to receive this treatment.
+
+- `cloud-itonami-isic-6530` gains **Pension-LLM ⊣ Pension Governor** --
+  `pension.*` namespaces, modeled closely on `6511`/`6512`/`6621`/
+  `6622`/`6629`/`6520`'s Store/Registry/Governor/Phase/Advisor/
+  Operation/Sim shape and the SAME generic langgraph-clj StateGraph.
+  Unlike every insurance-adjacent sibling, the MEMBER entity folds the
+  role a separate policyholder/party record plays elsewhere -- there is
+  no distinct insured-property or counterparty to track apart from the
+  member themselves.
+- **A CAP check blending two established patterns**:
+  `disbursement-exceeds-entitlement-violations` independently recomputes
+  a member's maximum entitlement (a lump-sum-remaining-balance formula,
+  or a period-certain annuity-installment division) and refuses if a
+  requested amount EXCEEDS it -- the "never trust a claimed number,
+  independently re-derive it" discipline `6629`'s/`6520`'s checks
+  established, but expressed as an upper-bound cap (like `casualty.
+  governor/claim-exceeds-coverage-violations`) rather than an exact-
+  match. The member's own running `:disbursed-to-date` balance advances
+  after every lump-sum payment commits, verified directly in the demo:
+  a second disbursement against the same member correctly holds against
+  the REMAINING entitlement, not the original balance.
+- **A genuinely NEW kind of actuation, not another one-time bind/pay**:
+  `:payout/continue` authorizes a benefit payout stream to CONTINUE past
+  a periodic proof-of-life check -- explicitly RECURRING, with
+  deliberately NO double-guard (unlike every prior sibling's one-time
+  second-actuation event, each protected by a double-payment/double-
+  booking check). Each proof-of-life cycle is its own independent
+  authorization event, by domain design.
+- **A real bug caught during demo verification -- a NEW one, arising
+  from a check combination no sibling had tried**: `spec-basis-
+  violations` (scoped to `:jurisdiction/assess` + `:disbursement/pay`,
+  mirroring `casualty.governor`'s `:policy/bind` scoping) spuriously
+  co-fired with `disbursement-missing-violations` on a nonexistent
+  disbursement, since a not-found disbursement's proposal naturally has
+  empty `:cites` -- muddying the audit trail with a rule that didn't
+  describe what actually went wrong (the disposition was always
+  correctly `:hold` either way -- an audit-trail-accuracy bug, not a
+  governance failure). Fixed by guarding the `:disbursement/pay` branch
+  on the disbursement actually existing first. Unlike `6512`'s and
+  `6622`'s bugs (each a single check misfiring alone), this is the
+  FIRST bug in this fleet caused by bundling MORE HARD checks onto ONE
+  actuation op than any predecessor did.
+- `kotoba-lang/industry`'s registry: `:maturity :blueprint` →
+  `:implemented` for `"6530"`, fleet-wide maturity counts move from 12
+  implemented / 85 blueprint / 546 spec to 13 implemented / 84 blueprint /
+  546 spec (out of 643 total), `test/kotoba/industry_test.clj`'s
+  `maturity-summary` assertion updated to match.
+- `test/pension/*` -- 40 tests / 195 assertions, lint-clean, demo
+  (`clojure -M:dev:run`) runs end-to-end: two clean lifecycles (a
+  disbursement-payment cycle, and a proof-of-life-screened payout-
+  continuation cycle) plus seven HARD-hold cases (no spec-basis, an
+  unvested member's disbursement filing, an entitlement-exceeding
+  disbursement, a failed proof-of-life check, a continuation attempt
+  for a never-in-payout member, a nonexistent disbursement, a double
+  payment) that never reach a human at all -- all correct on the
+  SECOND demo run, after the spec-basis/missing-entity overlap above
+  was found and fixed. See `cloud-itonami-isic-6530`'s own ADR-0001 for
+  the full design.
+
+Of the 7 insurance classes (division 65/662) this ADR originally
+published, ALL SEVEN are now `:implemented` (`6511` life insurance,
+implemented before this addendum sequence began; `6512` non-life,
+`6621` loss adjustment, `6622` intermediation, `6629` insurance-
+auxiliary services, `6520` reinsurance and `6530` pension funding,
+implemented by Addenda 1-6). This closes out every insurance class this
+ADR originally published at `:blueprint`. ONE candidate remains from
+the original 8-repo batch outside insurance proper -- `6820` (real
+estate on a fee/contract basis, ISIC division 68, a separate division
+entirely) -- a candidate for a future addendum, not silently forgotten.
+
 ## References
 
 - ADR-2607011000 (cloud-itonami robotics premise + ISIC 21/21 section
