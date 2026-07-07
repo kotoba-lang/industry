@@ -209,6 +209,69 @@ neither `6511` nor `6512` has any concept of.
   incomplete) that never reach a human at all. See `cloud-itonami-isic-
   6621`'s own ADR-0001 for the full design.
 
+## Addendum 3 (2026-07-07, owner-directed): `cloud-itonami-isic-6622` deepened to `:implemented`
+
+Continuing the SAME "pick a new ISIC blueprint vertical" direction that
+produced Addenda 1-2, `6622` (activities of insurance agents and
+brokers) was selected next: the fourth and, for the time being, last
+insurance-adjacent class from THIS ADR's own original 8-repo batch to
+receive this treatment. Its blueprint already named the exact actor
+shape to build (Broker-LLM ⊣ Insurance Intermediation Governor) and its
+own Trust Controls already named an undisclosed-conflict-of-interest
+check as central to the business.
+
+- `cloud-itonami-isic-6622` gains **Broker-LLM ⊣ Insurance
+  Intermediation Governor** -- `intermediation.*` namespaces, modeled
+  closely on `6511`/`6512`/`6621`'s Store/Registry/Governor/Phase/
+  Advisor/Operation/Sim shape and the SAME generic langgraph-clj
+  StateGraph. TWO actuation events (`:placement/bind`, `:commission/
+  book`), matching `6512`'s dual-actuation shape rather than
+  `6511`'s/`6621`'s single-actuation one.
+- **A genuinely new check, not borrowed from any sibling**:
+  `insufficient-quotes-violations` verifies the broker actually compared
+  at least two insurers' quotes before binding -- a best-interest/
+  shopping-duty check none of `6511`/`6512`/`6621` have any analog to
+  (their "document-complete"/"evidence-incomplete" checks verify
+  paperwork completeness, not that genuine options were compared).
+- **The conflict-of-interest check reused `6621`'s already-corrected
+  shape a SECOND time** (unconditional `hit-in-proposal?`, on-file check
+  scoped to the real acts) -- reinforcing that this is now a load-bearing
+  convention for this actor family, not a one-off fix.
+- **A DIFFERENT real bug, caught the same way**: `placement-not-bound-
+  violations` initially checked `:status :bound` directly, which broke
+  on the double-booking demo scenario once a successful commission
+  booking legitimately advances status to `:commission-booked`
+  (re-triggering the "not bound" check alongside the correct "double-
+  booking" one). Fixed by checking `:placement-number` (set once at
+  binding, never cleared) instead. Caught by running the demo and
+  reading the actual ledger output -- the SAME verification discipline
+  `6512`'s and `6621`'s own ADRs established, applied to a genuinely NEW
+  kind of bug (a status-lifecycle assumption, not an op-scoping guard),
+  showing the discipline generalizes rather than only catching the one
+  specific mistake it was first written down for.
+- `kotoba-lang/industry`'s registry: `:maturity :blueprint` →
+  `:implemented` for `"6622"`, fleet-wide maturity counts move from 9
+  implemented / 88 blueprint / 546 spec to 10 implemented / 87 blueprint /
+  546 spec (out of 643 total), `test/kotoba/industry_test.clj`'s
+  `maturity-summary` assertion updated to match.
+- `test/intermediation/*` -- 33 tests / 169 assertions, lint-clean, demo
+  (`clojure -M:dev:run`) runs end-to-end: one clean placement-bind
+  lifecycle + one clean commission-booking lifecycle (both escalate →
+  approve → commit) plus six HARD-hold cases (conflict of interest, no
+  spec-basis, insufficient quotes, placement not bound, commission rate
+  exceeding cap, double-booking) that never reach a human at all. See
+  `cloud-itonami-isic-6622`'s own ADR-0001 for the full design.
+
+Of the 7 insurance classes (division 65/662) this ADR originally
+published, 4 are now `:implemented` (`6511` life insurance, implemented
+before this addendum sequence began; `6512` non-life, `6621` loss
+adjustment and `6622` intermediation, implemented by Addenda 1-3). THREE
+remain at `:blueprint` from the original 8-repo batch -- `6520`
+(reinsurance), `6530` (pension funding) and `6629` (other insurance
+auxiliary activities) -- plus `6820` (real estate on a fee/contract
+basis, a separate division entirely). All four are candidates for a
+future addendum, not silently forgotten.
+
 ## References
 
 - ADR-2607011000 (cloud-itonami robotics premise + ISIC 21/21 section
