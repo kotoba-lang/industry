@@ -659,6 +659,56 @@ now answered above, not still open:
   key-derived, self-mint is structurally authorized" pattern this document's
   key-management section ties into rather than reinventing.
 
+## Addendum: adoption attempt + confirmed migration gate (2026-07-07)
+
+`kotobase-cljc-worker` first ADOPTED this seam a full day after acceptance
+(the worker was never redeployed in the interim) — surfacing two real,
+previously-latent issues at actual deploy time, not synthetically:
+
+1. **Arity crash on first deploy**: `handler.cljc`'s `do-datoms`/`do-transact`/
+   `do-q`/`do-pull`/`do-fold` never passed the (already-required, no-silent-
+   default) `blind-fn`/`encrypt-fn`/`decrypt-fn` params this document added
+   to `kotobase-peer.core`'s public API — a straight oversight, since no
+   consumer had actually adopted the new peer API in production before now.
+   Fixed (`kotobase-cljc-worker` `f9454dbf`, merged to main): an explicit
+   plaintext-passthrough crypto profile (`kotobase.cljc-worker.crypto` —
+   behaviorally identical to pre-seam, real per-graph keys remain this
+   document's own follow-up) + threading every handler response through the
+   engine's sync-JVM/Promise-cljs split. Verified against `wrangler dev
+   --local` (mint→transact→retractEntity→datoms/pull→fold→datoms) and 79
+   node-test assertions, 0 failures.
+2. **This document's own Migration section was designed but never
+   executed** — confirmed live 2026-07-07: deploying the arity-fixed build
+   to `kotobase.aozora.app` broke reading `kotobase/cljc-v2`'s real,
+   already-accumulated data (`cbor: unexpected end of input` reading
+   pre-existing plaintext novelty tx blocks under the new `{"ct": ...}`-
+   wrapped `read-tx-block` format — no backward-compat fallback exists,
+   matching this section's own "re-transact, not in-place re-encrypt"
+   framing). **Immediately rolled back** to the last-known-good deploy
+   (confirmed healthy: `com.etzhayyim.yoro.feed.getVideoFeed`/`getTimeline`
+   both serving real data again). Real data volume as of this writing:
+   **2,743 datoms** on the operator `yoro-social` graph — squarely in this
+   section's anticipated "real, if small" range, confirming the planned
+   re-transact-to-a-fresh-prefix migration (step 2 of Migration, above) is
+   still the right shape, just not yet executed.
+
+**Current state**: `kotobase-cljc-worker` git main (`f9454dbf`) has the
+crypto-seam adoption merged and is pinned in the superproject manifest, but
+**production `kotobase.aozora.app` deliberately still runs the prior,
+pre-adoption deploy** — the git pin and the live Cloudflare deployment are
+intentionally decoupled here until the migration below executes. Cutting
+over without it silently breaks every existing actor's persisted data.
+
+**Follow-up (blocking further deploys of this worker)**: execute this
+document's Migration section for real — export the operator `yoro-social`
+graph's current datoms from the live (safe) deploy, `transact` them into a
+fresh `KOTOBASE_B2_PREFIX` (e.g. `kotobase/cljc-v3`) via the ciphertext-
+adoption build, parity-diff old vs. new, then cut the custom-domain route
+over — the exact pattern already proven for this repo's WASM→CLJC migration.
+Given it is a real-production-data cutover (not a reversible-in-place
+change), this is left as an explicit, deliberately-not-rushed follow-up
+rather than executed inline in the same pass that found the gap.
+
 ## One-line summary
 
 **Proposes closing ADR-2607050500's "plaintext-first persistence" gap with
