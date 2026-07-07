@@ -173,10 +173,33 @@ failures は、追調査の結果 **別バグではなく ADR-2607051000（crypt
 worktree で `pnpm test` 実行: 22 tests / 79 assertions / **0 failures**、
 2026-07-07 時点の worker main `7c0e3d7` で確認）。追加の別調査は不要。
 
+## Addendum 4: 実 FOLD_CRON サイクルで retraction の永続性を確認（2026-07-07）
+
+`datomic.fold` は `:graph` を body で直接指定する方式（transact と違い署名者
+DID から導出しない）なので、staging の「空 allowlist = 任意の有効署名者を
+許可」規約により、**運用オペレーターの鍵を持たなくても任意の有効な CACAO で
+fold を呼べる**（`authorized?` は issuer 非 nil のみ要求）。この特性を使い、
+使い捨て鍵で署名した CACAO で yoro-social-v2 の fold を能動的に試みたところ
+`{"folded": false}`（novelty 0 = 直前に **本物の FOLD_CRON が既に fold 済み**）
+だった — 手動での GC 計測は不要になった代わりに、より強い証拠が得られた:
+
+- Phase 3 addendum 2 の smoke-test entity（retractEntity 済み）を、
+  novelty からではなく **fold 済みの cold snapshot 経由**で `pull` — 結果は
+  変わらず `:atproto.record/deleted` + `:atproto.record/deletedAt` の 2 属性
+  のみ。実コンテンツは実運用の FOLD_CRON サイクルを経ても復活せず、
+  indexed snapshot から本当に消えていることを確認（novelty 側の一時的な
+  キャンセルではなく、fold 後の永続状態としての retraction）。
+- ブロック/ノード数の精密な before/after 計測は、R2 の flat オブジェクト
+  空間が複数グラフのブロックを共有する（`wrangler r2 object list` 相当の
+  CLI が無く、S3 互換 API 抜きでは graph 単位に正確に切り分けられない）ため
+  今回は見送り。retraction の永続性という定性的な核心は上記で確定済み。
+
 ## Follow-ups
 
-- Phase 2: as-of / :added false 表面化（kotobase-peer）
+- Phase 2: as-of / :added false 表面化（kotobase-peer） — 現行消費者が
+  current-state のみ必要とする限り、具体的な要求が出るまで先送りでよい
+  （投機的実装を避ける）
 - retract の firehose 表現（:atproto.firehose/action "delete" は既にある —
   substrate イベントとの対応付け）
-- fold の GC 指標（retract 適用で node 数がどれだけ縮むか計測。fold 自体は
-  CACAO 認証が必要で本セッションでは未実行 — 次の FOLD_CRON 起動時に確認）
+- fold の GC 指標の定量化（S3 互換 API 経由でグラフ単位のブロック数を数える
+  ツールがあれば、より精密な before/after 計測が可能）
