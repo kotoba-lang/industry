@@ -10,13 +10,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # deps.edn depends on io.github.kotoba-lang/technology via
-      # :local/root "../technology" -- must land as a sibling checkout
-      # (RUNNER_WORKSPACE/industry/technology) or classpath resolution
-      # fails before any test/lint step runs.
-      - uses: actions/checkout@v4
-        with:
-          repository: kotoba-lang/technology
-          path: technology
+      # :local/root "../technology" -- must land as a TRUE sibling of this
+      # checkout (one level up from $GITHUB_WORKSPACE). actions/checkout's
+      # own `path:` input refuses any path that resolves outside
+      # $GITHUB_WORKSPACE (see actions/checkout's input-helper.ts), so a
+      # plain `git clone` into "../technology" is used instead -- verified
+      # against actions/checkout's own path-under-workspace guard, and
+      # locally by reproducing this exact sibling layout.
+      - run: git clone --depth 1 https://github.com/kotoba-lang/technology.git ../technology
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
