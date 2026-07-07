@@ -1,0 +1,282 @@
+{:frontmatter
+ {:id "adr-2607071610-kotoba-lang-kisekae-vrm-character-editor"
+  :title "ADR-2607071610: kotoba-lang/kisekae -- VRM character editor as a domain library
+          (spec-as-artifact, org-vrmc-vrm engine, kotobase persistence)"
+  :status "accepted"
+  :doc_type "adr"
+  :topic "kotoba-lang-kisekae"
+  :authoritative true
+  :last_verified "2026-07-07"
+  :authoritative_for
+  ["the VRM character editor lives at kotoba-lang/kisekae as a pure-.cljc DOMAIN library
+    (no UI) over org-vrmc-vrm's existing decompose/compose/export engine -- the editor
+    layer was the missing piece, not the engine"
+   "the character spec (small plain EDN: base URL, part overrides, material edits, user
+    meta) is the artifact of record; the .vrm is deterministically rebuilt from it on
+    demand, never stored as the truth"
+   "dress-up semantics: one override per part kind (replace, not stack); :body is never
+    overridable (the base's skeleton is compose's :skeleton-base); part vocabulary
+    derives from vrm.part/part-categories, never a parallel list"
+   "edits are data ({:op/type ...}), applied by one pure fn; unknown ops / unfetched URLs
+    / missing donor parts THROW -- never silent no-ops or substitutions"
+   "persistence is a SpecStore protocol with MemSpecStore built+tested now, plus the pure
+    kotobase datom mapping (spec->tx/entity->spec, document-as-datom); the kotobase-backed
+    record via the :db-api map is follow-up wiring, not design"
+   "runtime priority honestly applied: interop-free .cljc, cljs-executable today,
+    kototama-subset by construction, zero #?(:kototama) branches (the feature doesn't
+    exist); .kotoba numeric cores are recorded aspiration only"
+   "UI belongs to consumers: canvaskit viewport + kami-webgpu preview + kotoba-lang/editor
+    controls; first app is babiniku.net's create-your-character flow (ADR-2607071600 M6)"]
+  :related
+  ["90-docs/adr/2607071600-net-babiniku-service-completion-design.md"
+   "90-docs/adr/2607071130-kotoba-lang-canvaskit-scroll-view-consolidation.md"
+   "90-docs/adr/2607021330 (kotoba-lang org visibility = public)"]
+  :supersedes []
+  :superseded_by []}
+
+ :problem
+ {:source "user direction 2026-07-07: 'vrm character editor なども kotoba-lang として、
+           ユーザーが使いやすいものを再設計して. kotoba wasm, cljc, kotobase datomic' --
+           confirmed 'do it'"
+  :engine_already_exists
+  {:what "kotoba-lang/org-vrmc-vrm (restored from the deleted kami-vrm Rust crate,
+          ADR-2607010930): vrm.part/decompose (parts classified #{:body :hair :face
+          :outfit :accessory :other}, production-hardened name heuristic),
+          vrm.compose/compose (cross-document merge onto a unified :skeleton-base),
+          vrm.export/export-glb (VRM 1.0 GLB out, via kotoba-lang/glb), plus mtoon/
+          expressions/springs/humanoid and zero-dep JSON+math"
+   :missing "everything AROUND the engine: persisted document model of user choices,
+             pure edit ops + undo/redo, selection logic into compose inputs, storage
+             contract"}
+  :adjacent_blocks "canvaskit (viewport gestures), editor (walk-EDN controls), webgpu
+                    (preview), kotobase :db-api (persistence) -- compose, don't rebuild"}
+
+ :decision
+ {:library "kotoba-lang/kisekae (着せ替え) -- pure .cljc, one dep (org-vrmc-vrm), no UI;
+            public repo, pushed @ adc47d0, 33-check bb gate, clj-kondo clean"
+  :namespaces
+  {:kisekae.spec "character-spec EDN + problem-list validation + overridable-kinds
+                  derived from vrm.part/part-categories (minus :body :other) +
+                  part-urls fetch-list"
+   :kisekae.edit "ops (:op/rename :op/set-meta :op/add-part[replace-per-kind]
+                  :op/remove-part :op/set-base-color), op-log history with undo/redo and
+                  redo-tail truncation; unknown op throws"
+   :kisekae.build "effective-sources (base minus overridden kinds + donor parts,
+                   :skeleton-base tracked) -> compose -> apply-material-edits
+                   (baseColorFactor) -> apply-meta (USER's name/authors/license) ->
+                   export-glb; pure given docs-by-url, caller does I/O; missing anything
+                   throws"
+   :kisekae.store "SpecStore protocol + MemSpecStore (tested), spec->tx/entity->spec pure
+                   datom mapping ({:kisekae/id :kisekae/name :kisekae/spec-edn},
+                   document-as-datom) for the future kotobase-backed record via the
+                   :db-api map"}
+  :invariants
+  ["spec is the artifact; .vrm is derived cache"
+   ":body never overridable -- skeleton swapping is a rigging problem this editor does
+     not pretend to solve"
+   "fail loudly: no silent op drops, no silent part substitution"
+   "license meta is first-class at export; base/donor license compatibility is the
+    consuming app's concern to surface, not build's to fake-check"]
+  :runtime_priority "interop-free .cljc; cljs today; kototama-subset by construction; no
+                     #?(:kototama); .kotoba aspiration recorded, not claimed"}
+
+ :consequences
+ {:shipped "repo scaffolded/pushed/registered (west.yml, this landing commit); 33 checks"
+  :followups ["compose->export integration test against a real fixture .vrm (synthetic
+               docs cover selection/transforms; buffer merge rides the engine's own
+               116-assertion suite meanwhile)"
+              "kotobase-backed SpecStore (:db-api wiring)"
+              "the editor app inside babiniku (ADR-2607071600 M6)"
+              "expression/texture/spring-bone ops -- engine supports them; additive"]
+  :first_consumer "net-babiniku gains the kisekae dependency at ADR-2607071600 M6"
+  :addendum_2607071700
+  {:context "building net-babiniku's actual cross-avatar part-swap UI (M6 slice 2)
+             surfaced two real org-vrmc-vrm/vrm.compose bugs, invisible in every prior
+             compose test/usage because those all composed parts from the SAME source
+             document"
+   :bug_1_fixed
+   {:what "compose's skin rebuild grew a skin's :joints with donor joints but reused
+           the base's own (shorter) inverseBindMatrices accessor unchanged -- real
+           avatars threw 'No item N in vector of length N' loading the composed GLB"
+    :fix "kotoba-lang/org-vrmc-vrm#1 (pin advanced): build a genuinely new IBM
+          accessor spanning the grown joint list when growth occurs; regression test
+          on a synthetic fixture confirmed to fail pre-fix with the same exception"}
+   :bug_2_open
+   {:what "compose's mesh/attribute remap only redirects which ACCESSOR a :JOINTS_0
+           attribute points to, never remaps the per-vertex joint-index VALUES inside
+           it -- those stay 'position in the donor's OWN original skin joint array',
+           wrong once every mesh binds to the ONE unified skin's different joint order.
+           Symptom: composed avatar loads (bug 1 fixed) but renders visibly distorted"
+    :real_fix_scope "reorder compose's phases (joint-set/node-remap must resolve
+                     BEFORE mesh merge, not after) + component-type-aware
+                     decode/remap/re-encode of every donor mesh's JOINTS_0 data --
+                     materially larger and riskier than bug 1, correctly deferred
+                     rather than attempted blind in the cycle that found it"
+    :blocks "net-babiniku M6 slice 2 (cross-avatar part-swap); M6 slice 1 (reuse base
+             avatar as-is, no cross-document compose) is unaffected and remains
+             what's shipped"}
+   :consequence "the part-swap UI built this cycle was NOT shipped (reverted, no PR)
+                rather than ship a visibly broken character -- this ADR's own
+                fail-loudly invariant applied to itself"}
+  :addendum_2607071730
+  {:bug_2_fixed
+   {:what "kotoba-lang/org-vrmc-vrm#2 (pin advanced): joint-set computation moved
+           before mesh merge so it can build joint-index-of and rewrite every
+           skinned mesh's JOINTS_0 data with real remapped values"
+    :tolerance "a JOINTS_0 slot referencing an unmappable joint no longer throws
+               unconditionally -- only when its paired WEIGHTS_0 is genuinely
+               non-zero; real content commonly leaves harmless arbitrary indices
+               in zero-weight slots from a whole-file shared skin"
+    :verification "two new regression tests with unambiguous right/wrong answers
+                  (reversed joint order; unmappable+zero-weight vs.
+                  unmappable+real-weight), both confirmed to distinguish pre-fix
+                  from post-fix behavior, not just non-crash. 44 tests/158
+                  assertions"}
+   :bug_3_open
+   {:what "composing the ACTUAL real-world pair (Seed-san base + VRM1_
+           Constraint_Twist_Sample donor hair) still throws, now on a DIFFERENT
+           unmappable joint -- a full non-zero weight on a node whose name
+           resolves to a leg-related bone, implausible for a hair vertex"
+    :diagnosis_status "inconclusive this cycle -- an ad-hoc browser probe script
+                       (hand-rolled cljs.core interop) produced CONTRADICTORY
+                       results across two attempts about which of the donor's 3
+                       skins the hair mesh's node actually references, meaning
+                       the PROBE ITSELF is suspect, not necessarily compose"
+    :next_step "add direct in-code diagnostics (a deftest against the actual
+               Seed-san/VRM1_Constraint_Twist_Sample bytes) rather than more
+               hand-rolled browser-script JS interop, so the diagnosis tool is
+               held to the same rigor as the fixes"
+    :blocks "net-babiniku M6 slice 2 part-swap UI remains unshipped"}}
+  :addendum_2607071800
+  {:method "a direct clojure -M -e script against the actual downloaded .vrm bytes
+            (vrm.parse/vrm.part/vrm.compose called directly, JVM ex-data inspected) --
+            addendum 2's own recommendation, followed this time. Immediately caught
+            that addendum 2's browser probe had read the WRONG skin (donor has 3
+            skins; hair mesh uses skin 2; probe inspected skin 0) and reported a
+            bogus node/bone name as a result"
+   :bug_4_fixed
+   {:what "the real unmappable-joint case carries weight 0.00266 (~0.27%), an
+           ordinary blend-smoothing residual -- addendum 2's 1e-4 tolerance was too
+           strict for real content"
+    :fix "kotoba-lang/org-vrmc-vrm#3 (pin advanced): raised to 1e-2 (1%), with a test
+         locking in the exact real-world value"}
+   :bug_5_confirmed_bigger
+   {:what "Seed-san has 5 SEPARATE skins, one per mesh (hair=23 joints,
+           hair_tail=7, head=1, robo_arm=21, wear=80) -- compose's whole design
+           assumes ONE shared skin per document (base-skin = first skin). A mesh
+           using any other skin has joints joint-index-of doesn't contain, so even
+           Seed-san's OWN wear/body mesh fails the unmappable-joint check against
+           its OWN base document -- not a donor issue at all"
+    :confidence "CONFIRMED with certainty this time (not addendum 2's
+                'inconclusive') -- verified via the reliable direct-JVM method"
+    :real_fix_scope "unify a document's own multiple skins into one before donor
+                     merging, or extend composed output to support multiple skins --
+                     a genuine architecture decision (likely its own ADR), not a
+                     bounded patch"
+    :blocks "net-babiniku M6 slice 2 part-swap UI remains unshipped"}
+   :lesson "the previous cycle's unreliable browser-script diagnosis was itself the
+           obstacle -- switching to direct in-JVM calls against real bytes (no
+           browser, no JS interop) resolved the ambiguity immediately and is the
+           right default tool for future org-vrmc-vrm diagnosis"}
+  :addendum_2607080100
+  {:context "addendum 3 deferred the multi-skin question as 'a real architecture
+             decision, not a bounded patch' -- revisited with a concrete design and
+             found smaller than expected: the JOINTS_0 remap machinery (bug_2_fixed)
+             was ALREADY skin-index-agnostic, only joint-set/IBM seeding assumed one
+             skin per document"
+   :bug_5_fixed
+   {:what "kotoba-lang/org-vrmc-vrm#4 (pin advanced): joint-set seeding now unions
+           EVERY skin any source document (base or donor) actually has, not just
+           (first (:skins doc)); ibm-plan entries gained :skin-idx so the
+           inverseBindMatrices build reads each joint's real matrix from whichever
+           specific skin -- any document, any index -- it actually came from"
+    :verification "new regression test mirrors the exact real failure shape (a
+                   document's SOLE selected mesh using skin index 1, not 0) --
+                   confirmed to fail pre-fix with the identical error signature as
+                   the real Seed-san bug, pass with the fix. 46 tests/164 assertions.
+                   Verified against the real Seed-san file (direct JVM diagnostic):
+                   composing it as a base no longer fails on its own structure AT
+                   ALL -- every one of its 5 skins now handled correctly"}
+   :bug_6_open_narrower
+   {:what "composing the full real pair (Seed-san + VRM1_Constraint_Twist_Sample)
+           still throws, but now on ONE different, precisely identified issue
+           entirely on the donor side: J_Sec_Hair1_01, a genuine hair-sway
+           secondary/physics bone with a real 4.1% skinning weight, parented under
+           J_Bip_C_Head rather than under the hair mesh's own node"
+    :root_cause "invisible to vrm.part/decompose's current node-indices heuristic
+                (walks only the selected mesh's own node subtree) -- a vrm.part
+                question, not a vrm.compose defect"
+    :real_question "should a decomposed part's node-indices also include secondary/
+                    spring-bone descendants of humanoid-bone ancestors, even when
+                    they're not descendants of the mesh's own node? -- narrower and
+                    more concrete than the open-ended 'architecture decision' this
+                    addendum chain started with"
+    :blocks "net-babiniku M6 slice 2 part-swap UI remains unshipped, but the
+             blocker is now singular and well-understood, not an open architecture
+             question"}}
+  :addendum_2607080800
+  {:context "addendum 4 narrowed the remaining blocker to one precise question:
+             should a decomposed part's node-indices also include secondary/
+             spring-bone descendants of humanoid-bone ancestors, even when they're
+             not descendants of the mesh's own node? -- answered yes, fixed in
+             vrm.part (decompose defines what a part touches), not vrm.compose"
+   :bug_7_fixed
+   {:what "kotoba-lang/org-vrmc-vrm#5 (pin advanced): decompose now seeds a part's
+           node-indices with every node the part's own mesh's JOINTS_0 vertex data
+           genuinely resolves to (decoded the same way
+           vrm.compose/remap-joints-accessor! does), on top of the existing pure
+           descendant-walk"
+    :self_caught_bug "an earlier draft seeded a whole skin's DECLARED :joints
+                      palette unconditionally (not just the joints a mesh's own
+                      vertices actually reference) -- wrong, since a skin is a
+                      shared glTF object; this over-grew the unified skeleton with
+                      joints no vertex in that mesh ever binds to. Caught via 5
+                      real test regressions, diagnosed to the exact mechanism,
+                      corrected to decode actual per-vertex JOINTS_0 values instead"
+    :test_premise_updated "compose-still-throws-on-genuinely-weighted-unmappable-
+                           joint's old fixture (a joint reachable via neither
+                           humanoid-mapping nor node-indices) is now legitimately
+                           resolved by this fix -- correctly so. Redesigned around
+                           what remains a genuine defect: an out-of-range JOINTS_0
+                           local-pos with no entry in the skin's own :joints array
+                           at all (malformed data, not reachability)"
+    :verification "new regression test (decompose-seeds-secondary-bone-not-a-
+                   structural-descendant) reproduces the exact real-world topology
+                   (secondary bone under Head, sibling to the mesh's own node, ~4%
+                   weight matching J_Sec_Hair1_01's real ~4.1%) and is confirmed to
+                   fail pre-fix with the identical error signature as the real bug
+                   (ExceptionInfo ... no place in the unified skeleton, weight
+                   0.04). Full suite: 47 tests/169 assertions, 0 failures"}
+   :real_world_result
+   {:what "composing the FULL real Seed-san (base, all 4 of its own decomposed
+           parts) + VRM1_Constraint_Twist_Sample's real hair as donor now succeeds
+           end to end -- compose, GLB export, and reparse all complete without
+           error (1 unified skin, 363 joints, 6 meshes, 424 nodes)"
+    :method "re-downloaded both real files fresh from vrm-c/vrm-specification,
+             direct JVM diagnostic (same established method as addenda 3-4)"
+    :significance "the exact real-world avatar pair this addendum chain set out to
+                   support composes cleanly for the first time -- the compose/
+                   decompose engine investigation this ADR has tracked across 5
+                   addenda is now closed"}
+   :unblocks "net-babiniku M6 slice 2 part-swap UI can be revisited on the
+              strength of an engine proven against real, unmodified Consortium
+              content, not synthetic fixtures alone"}}
+
+ :alternatives
+ [{:option "store exported .vrm blobs as the artifact of record"
+   :rejected_because "opaque, undiffable, storage-heavy, hostile to kotobase-datomic; the
+                      rebuild is deterministic so the blob is cache, not truth"}
+  {:option "full mesh-modeling editor (VRoid Studio class)"
+   :rejected_because "the engine does decompose/compose/recolor, not sculpting --
+                      claiming otherwise is vaporware; dress-up composition is what the
+                      engine supports and babiniku needs"}
+  {:option "build the editor inside net-babiniku"
+   :rejected_because "explicit user direction (kotoba-lang として); private vendor repo is
+                      the wrong home for a reusable public lib; network-isekai is an
+                      obvious second consumer"}
+  {:option "name it vrm-editor"
+   :rejected_because "editor is already the generic EDN-editor lib; Japanese product-name
+                      family (murakumo/giemon/kenchi/itonami) is the org convention"}
+  {:option "wire kotobase persistence now"
+   :rejected_because "tested pure mapping makes the follow-up mechanical; blocking a pure
+                      scaffold on live service wiring couples the wrong things"}]}
