@@ -91,6 +91,50 @@ checks, `bb kisekae`):
   specs/ops are additive).
 - `net-babiniku` gains its first kisekae dependency at ADR-2607071600 M6.
 
+### Addendum (2026-07-07): two real `org-vrmc-vrm/vrm.compose` bugs found building the babiniku part-swap UI, one fixed, one still blocking
+
+Building net-babiniku's actual cross-avatar part-swap flow (M6 slice 2 — swap a
+donor's hair/face/outfit/accessory onto a different base avatar, real composition
+against real license-clear VRMs, not a reused-base shortcut) surfaced two genuine
+engine bugs in `vrm.compose`, neither exercised by the existing test suite because
+every prior compose test/usage composed parts from the SAME source document (base
+== donor doc), where these bugs are invisible by construction:
+
+1. **Fixed** (`kotoba-lang/org-vrmc-vrm#1`, pin advanced): `compose`'s skin rebuild
+   grew a skin's `:joints` list with every new joint a donor part contributed, but
+   kept reusing the base skin's own (shorter) `inverseBindMatrices` accessor
+   unchanged — real avatars then threw `"No item N in vector of length N"` loading
+   the composed GLB (babiniku's joint-palette builder walking past the accessor's
+   end). Fixed by building a genuinely new IBM accessor spanning the full grown
+   joint list when growth occurs; regression-tested on a synthetic fixture that
+   fails with the exact same exception shape pre-fix.
+2. **Not yet fixed, blocks cross-avatar part-swap**: with (1) fixed, composing
+   Seed-san (base) + a donor's hair no longer crashes, but the RENDERED MESH IS
+   VISIBLY DISTORTED — `compose`'s mesh/attribute remap (`remap-attr-map`) only
+   redirects which accessor a `:JOINTS_0` attribute POINTS TO (via
+   `accessor-remap`); it never remaps the per-vertex joint-index VALUES stored in
+   that accessor's data. Those raw ints are copied byte-for-byte from the donor
+   document, so they still mean "position in the DONOR's own original skin joint
+   array" — but after compose, every mesh is bound to the ONE unified skin, whose
+   joint array order is base's joints followed by newly-appended donor joints, a
+   different order/indexing entirely. A donor vertex's joint index is therefore
+   read against the wrong palette entry (a different bone) whenever its unified
+   position differs from its original local position — which is the common case,
+   not the exception, for two independently-authored avatars. Real fix requires
+   reordering `compose`'s phases (joint-set/node-remap must be fully resolved
+   BEFORE mesh merge, not after, as today) and a component-type-aware
+   decode/remap/re-encode of every donor mesh's `JOINTS_0` (and, by the same
+   argument, any per-vertex data indexed by a remapped table) — a materially
+   larger, higher-risk change to a 450-line, well-tested core function, correctly
+   judged out of scope to attempt blind in the cycle that found it.
+- **Consequence for net-babiniku**: the cross-avatar part-swap UI built this cycle
+  was NOT shipped (reverted, no PR) rather than ship a visibly broken/distorted
+  character — consistent with this very ADR's fail-loudly invariant ("no silent
+  part substitution"). `net-babiniku`'s character creator remains at M6 slice 1
+  (base avatar reused as-is; no cross-document compose) until the joint-index
+  remap fix lands. That fix is the concrete, precisely-diagnosed prerequisite for
+  M6 slice 2 — not a vague "make part-swap work" task.
+
 ## Alternatives Considered
 
 1. **Store exported `.vrm` blobs as the artifact of record.** Rejected — opaque,

@@ -88,7 +88,36 @@
               "kotobase-backed SpecStore (:db-api wiring)"
               "the editor app inside babiniku (ADR-2607071600 M6)"
               "expression/texture/spring-bone ops -- engine supports them; additive"]
-  :first_consumer "net-babiniku gains the kisekae dependency at ADR-2607071600 M6"}
+  :first_consumer "net-babiniku gains the kisekae dependency at ADR-2607071600 M6"
+  :addendum_2607071700
+  {:context "building net-babiniku's actual cross-avatar part-swap UI (M6 slice 2)
+             surfaced two real org-vrmc-vrm/vrm.compose bugs, invisible in every prior
+             compose test/usage because those all composed parts from the SAME source
+             document"
+   :bug_1_fixed
+   {:what "compose's skin rebuild grew a skin's :joints with donor joints but reused
+           the base's own (shorter) inverseBindMatrices accessor unchanged -- real
+           avatars threw 'No item N in vector of length N' loading the composed GLB"
+    :fix "kotoba-lang/org-vrmc-vrm#1 (pin advanced): build a genuinely new IBM
+          accessor spanning the grown joint list when growth occurs; regression test
+          on a synthetic fixture confirmed to fail pre-fix with the same exception"}
+   :bug_2_open
+   {:what "compose's mesh/attribute remap only redirects which ACCESSOR a :JOINTS_0
+           attribute points to, never remaps the per-vertex joint-index VALUES inside
+           it -- those stay 'position in the donor's OWN original skin joint array',
+           wrong once every mesh binds to the ONE unified skin's different joint order.
+           Symptom: composed avatar loads (bug 1 fixed) but renders visibly distorted"
+    :real_fix_scope "reorder compose's phases (joint-set/node-remap must resolve
+                     BEFORE mesh merge, not after) + component-type-aware
+                     decode/remap/re-encode of every donor mesh's JOINTS_0 data --
+                     materially larger and riskier than bug 1, correctly deferred
+                     rather than attempted blind in the cycle that found it"
+    :blocks "net-babiniku M6 slice 2 (cross-avatar part-swap); M6 slice 1 (reuse base
+             avatar as-is, no cross-document compose) is unaffected and remains
+             what's shipped"}
+   :consequence "the part-swap UI built this cycle was NOT shipped (reverted, no PR)
+                rather than ship a visibly broken character -- this ADR's own
+                fail-loudly invariant applied to itself"}}
 
  :alternatives
  [{:option "store exported .vrm blobs as the artifact of record"
