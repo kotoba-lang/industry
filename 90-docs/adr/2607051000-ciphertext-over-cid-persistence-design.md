@@ -709,6 +709,55 @@ Given it is a real-production-data cutover (not a reversible-in-place
 change), this is left as an explicit, deliberately-not-rushed follow-up
 rather than executed inline in the same pass that found the gap.
 
+## Addendum 2: migration executed, real cutover live (2026-07-07)
+
+Owner authorized the real-data migration in the same session. Executed as:
+
+1. **Not** via the CACAO-gated `datomic.transact` endpoint — that derives
+   the write graph from the CACAO signer (`canonical-graph(issuer,
+   db_name)`), so it structurally cannot target an existing DID's graph
+   without that DID's actual private key (confirmed by a first attempt that
+   landed on the WRONG, self-signed throwaway graph). Instead: an offline
+   JVM Clojure script (no HTTP, no CACAO) built the full hot db from an
+   exported-datoms JSON via `eng/transact`, then called
+   `kotobase-peer.core/snapshot!` — its own documented "one-shot cold-start
+   entry point for... backfill/migration tooling" — with the identity
+   crypto profile (matching `kotobase.cljc-worker.crypto`'s plaintext-
+   passthrough exactly), producing IPLD blocks uploaded directly to R2
+   (`wrangler r2 object put`) under `kotobase/cljc-v3/`.
+2. **First attempt targeted the wrong graph.** `canonical-graph` is keyed
+   by `(operator-did, db-name)`, and this document had been assuming
+   db-name `"yoro-social"` — but `app-aozora-appview`/`-pds`'s own
+   `wrangler.jsonc` name it `YORO_DB_NAME = "yoro-social-v2"` (the name
+   changed 2026-07-03, before this document's own Context section was
+   written, and it wasn't re-checked at migration time). Migrating and
+   cutting over `"yoro-social"` (2,743 datoms — a real, but superseded,
+   legacy graph) left the REAL live graph unmigrated; the custom-domain
+   route briefly served an EMPTY feed in production
+   (`getTimeline`/`getVideoFeed` both `{"feed":[]}` despite the legacy
+   graph's datoms reading back correctly) until caught within the same
+   pass and corrected.
+3. **Corrected**: re-derived the graph from `"yoro-social-v2"` (458
+   datoms), re-ran the same offline snapshot!+upload procedure, parity-
+   diffed byte-for-byte (`{e,a,v_edn}` set-equality, 0 missing/extra) against
+   a fresh export taken immediately before cutover (confirming zero writes
+   landed in the export→migrate window), then redeployed
+   `kotobase-cljc-worker` with `KOTOBASE_B2_PREFIX=kotobase/cljc-v3`. Both
+   graphs (`yoro-social` legacy + `yoro-social-v2` real) now live under v3;
+   both v2 prefixes stay untouched in R2 as rollback. Production confirmed
+   healthy post-cutover: real posts (including the minidrama actor's video
+   post) served correctly via `getTimeline`/`getVideoFeed`, `aozora.app` SPA
+   200.
+4. **Lesson for future migrations of this kind**: always re-derive the
+   target graph from whatever `wrangler.jsonc`/config a REAL current
+   consumer actually names *at migration time* — don't reuse an assumed
+   db-name from an earlier document/session without re-checking it
+   against the consumers that will read the migrated data.
+
+`kotobase-cljc-worker` git main (`7c0e3d7`) now matches the live deploy;
+manifest pin advanced accordingly. This document's Migration section is
+executed; the crypto seam is live in production.
+
 ## One-line summary
 
 **Proposes closing ADR-2607050500's "plaintext-first persistence" gap with
