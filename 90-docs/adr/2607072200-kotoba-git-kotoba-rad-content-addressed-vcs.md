@@ -290,3 +290,46 @@ recurring cadence rather than stopping after the initial ADR; each
 iteration's manifest pin advance and test-count delta is in the
 superproject's own commit history for `manifest/west.yml` around this
 date, not restated per-bullet here.
+
+## Addendum (2026-07-07, later same day): a real cross-repo verification pass, and a real bug it found
+
+A `/verify`-style pass loaded `kotoba-git` + `kotoba-rad` + `kotoba-lang/
+p2p` together in one process (a real downstream consumer's classpath),
+rather than trusting each repo's own isolated test suite. `set-ref-
+guarded!` and the CACAO delegation chain (previous addendum) verified
+cleanly this way. The signed head-announce integration did not:
+
+- **Finding**: `kotoba-lang/p2p`'s `chain` pin predated ADR-2607050800's
+  internal `commit-dag`→`chain` rename (it still required
+  `commit-dag.core`). This looked harmless in every isolated check this
+  session ran on `p2p` alone — its own test suite pinned the same stale
+  SHA consistently, so nothing ever contradicted it. The moment a real
+  consumer also depended on `chain` at a *current* SHA (`kotoba-rad`
+  does), tools.deps resolved one version for the whole classpath, and
+  picking the newer one broke `p2p`'s own `commit-dag.core` require —
+  confirmed directly (`(require 'chain.core)` failed, `(require
+  'commit-dag.core)` succeeded, on the merged classpath; the reverse held
+  before the fix). This silently blocked the exact integration
+  `kotoba-rad.announce` + `kotoba-lang/p2p`'s hooks were built for — no
+  amount of testing either repo in isolation could have caught it.
+- **Fix** (`kotoba-lang/p2p` PR #2, merged after CI green on both JVM and
+  real ClojureScript): pinned `chain` to the same SHA `kotoba-rad` uses;
+  changed the require from `commit-dag.core` to `chain.core` (API
+  unchanged by the rename — pure coordinate/require update).
+- **Re-verified after the fix, end-to-end, for real** (not the contract-
+  level workaround the initial verification pass had to fall back to): a
+  delegate signed a real 2-node `chain.core` commit history via
+  `kotoba-rad.announce`'s hooks; the receiving node fully converged
+  (bitswap/hydrate genuinely ran, not just message-passing) to the signed
+  head; the same receiver correctly *rejected* a real, valid,
+  further-ahead but **unsigned** announce from the same peer, leaving its
+  head unchanged.
+- kotoba-rad: 40→41 assertions unchanged (docs-only update recording the
+  now-verified integration). p2p: 9 tests / 19 assertions, unchanged
+  count, green on the corrected pin.
+
+The lesson generalizes past this one bug: this session's per-repo test
+suites (and even the first cross-repo `/verify` pass's unit-level checks)
+were each internally consistent and each green, and none of that
+surfaced the conflict — only actually loading the repos a real consumer
+would combine, together, in one process, did.
