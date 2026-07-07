@@ -1776,6 +1776,15 @@
    "orgs/kotoba-lang/org-si2-openaccess"
    "orgs/kotoba-lang/org-ieee-upf"
    "orgs/kotoba-lang/org-accellera-uvm"
+   ;; New 2026-07-07 (ADR-2607072500/2607072600 follow-up): reference/demo
+   ;; repo proving the semiconductor-standards-substrate family's cross-repo
+   ;; wiring (rtl->eda->pnr<-pdk, signal-integrity<-org-ibis,
+   ;; org-accellera-uvm->rtl) genuinely composes end to end on one concrete
+   ;; circuit (2-bit counter): parse->synthesize->SDC-timing->place->
+   ;; route->3-way export(GDSII/DEF/OpenAccess)->UPF validation->IBIS SI
+   ;; check->UVM-style driver/monitor verification. Not a new capability --
+   ;; a proof that the prior integration batch actually works together.
+   "orgs/kotoba-lang/eda-flow-demo"
    ;; KAMI WebGPU DSL/runtime semantic split repos. These are the CLJ/CLJC
    ;; authority homes tracked by 90-docs/migration/kami-webgpu-dsl-runtime-split.edn.
    "orgs/kotoba-lang/atom"
