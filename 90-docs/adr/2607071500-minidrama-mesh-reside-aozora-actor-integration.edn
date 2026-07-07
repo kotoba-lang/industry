@@ -1,0 +1,50 @@
+{:frontmatter
+ {:id "adr-2607071500-minidrama-mesh-reside-aozora-actor-integration"
+  :title "minidrama mesh reside 配線 — aozora actor の profile×deploy 統合の最初の実配線"
+  :status "accepted"
+  :date "2026-07-07"
+  :authoritative true
+  :repos ["orgs/etzhayyim/com-etzhayyim-minidrama"
+          "orgs/kotoba-lang/murakumo"]
+  :related ["90-docs/adr/2607022300-actor-deploy-3-substrate-topology.md"
+            "90-docs/adr/2607071300-aozora-creator-actors-minidrama.md"
+            "90-docs/adr/2607071400-murakumo-family-k8s-wasmcloud-wadm-positioning.md"]}
+
+ :decision
+ {:pattern :kenchi-split-of-duties
+  :rationale "governor が拒否しうる能力 (LLM 提案・生成・PDS 認証・publish) は off-mesh JVM actor に残し、mesh には identity/liveness の2 component のみ置く。"
+  :on-mesh
+  [{:component "drama-profile"
+    :trigger {:type :http :route "/minidrama/profile"}
+    :does "actor identity record (handle/did/registry) を応答 + profile datom assert"}
+   {:component "drama-heartbeat"
+    :trigger {:type :tick :every "1h"}
+    :does "resident-liveness datom append + identity anchor 再 assert"}]
+  :off-mesh "DramaLLM ⊣ DramaGovernor / generate / assemble / aozora publish+announce (minidrama.operation/publisher/announce, JVM)"}
+
+ :implemented
+ {:com-etzhayyim-minidrama
+  {:merge "fc6b0c78" :pin-advanced-to "93e73ec8 (announce レグ込み)"
+   :files ["mesh/minidrama.app.edn"
+           "mesh/drama_profile.clj"
+           "mesh/drama_heartbeat.clj"
+           "test/minidrama/mesh_manifest_test.clj"]
+   :tests "lint 0/0, 20 tests / 69 assertions green"}
+  :murakumo
+  {:merge "8861d89b"
+   :change "murakumo.app.edn に fleet app minidrama を登録 (:replicas 1, edge/jp)"
+   :tests "bb test 176/810 green"}
+  :wasm-build-verified
+  {:drama-profile "bafyreic2knpq3reapdplo4fqp3iztkydaubxxt7fr2pfzop7pffbdw6wci"
+   :drama-heartbeat "bafyreicafih2mt2k2cnmkhd73zemrrywiaov5vnmqfrxtlngibcuvx466u"
+   :note "kotoba component build (kotoba-runtime wit)。deploy 時 CID と一致確認の上 :cid に採用"}}
+
+ :integration-loop
+ {:identify "✅ CACAO did:key 自己発行 + 実 Publisher + announce レグ (b07e2e5 / 93e73ec8)"
+  :reside "✅ 本 ADR (mesh guests + murakumo.app.edn 登録)"
+  :pin "✅ component build が CID 発行 (deploy 時に pin)"}
+
+ :follow-ups
+ ["実 fleet 配置 (operator: bb murakumo deploy … または bb reconcile --apply) → 観測 CID を :cid に記入"
+  "registry :keyed? false→true flip は PDS account/did 昇格と合わせ別 follow-up (ADR-2607070400 系列)"
+  "animeka / dougaka / work actors への横展開 (本 ADR の型を複製)"]}
