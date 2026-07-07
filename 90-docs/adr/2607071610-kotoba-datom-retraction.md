@@ -140,13 +140,32 @@ assert し、AppView scan が drop）で deleteRecord を復旧した（app-aozo
   Phase 3（PDS tombstone+retractEntity 併発行）着地と同時に行い、throwaway
   graph での live 検証（FOLD_CRON 前例）を挟む。
 
+## Addendum 2: Phase 3 着地・本番検証済み（2026-07-07）
+
+- **kotobase-cljc-worker 本番デプロイ完了**（別件 ADR-2607051000 の
+  crypto-seam 採用と同時に実施 — `kotobase.aozora.app` は現在 `main` 相当を
+  ct-wrapped v3 prefix で稼働、実データ migration 済み）。
+- **app-aozora `10ddccb`**: `aozora.pds.encode/retract-entity-form` 追加
+  （`[:db/retractEntity uri]` の EDN 文字列を生成）。`repo/delete-record` /
+  `write-op`（applyWrites#delete）が **retractEntity を先、tombstone assert
+  を後** の順で同一 tx に積む（順序が重要 — 同一 novelty block 内は quad が
+  順次適用されるため、この順なら retraction 後に tombstone マーカーだけが
+  残り、AppView scan の既存ロジック互換を保ったまま実コンテンツが index から
+  消える）。
+- **本番 E2E 検証済み**（minidrama の登録済み identity で
+  `com.etzhayyim.apps.minidrama.smoketest` の使い捨てレコードを
+  createRecord→pull→deleteRecord→pull）: 削除前は 5 属性
+  （uri/collection/did/cid/jsonB64）、削除後は `:atproto.record/deleted` +
+  `:atproto.record/deletedAt` の 2 属性のみ — 実コンテンツが hot read から
+  完全に消えることを確認（tombstone のみのソフト削除ではなく本当の retraction）。
+- app-aozora 側テスト: 281 tests / 1213 assertions / 0 failures（retraction
+  順序を検証する新規アサーション込み）。
+
 ## Follow-ups
 
 - Phase 2: as-of / :added false 表面化（kotobase-peer）
-- Phase 3: PDS deleteRecord = tombstone + retractEntity 併発行（app-aozora）
-  — **このタイミングで kotobase-cljc-worker を本番デプロイ + throwaway graph
-  live 検証**
 - retract の firehose 表現（:atproto.firehose/action "delete" は既にある —
   substrate イベントとの対応付け）
-- fold の GC 指標（retract 適用で node 数がどれだけ縮むか計測）
+- fold の GC 指標（retract 適用で node 数がどれだけ縮むか計測。fold 自体は
+  CACAO 認証が必要で本セッションでは未実行 — 次の FOLD_CRON 起動時に確認）
 - worker 既存 18 failures（pre-existing、roundtrip/async 系）の別途調査
