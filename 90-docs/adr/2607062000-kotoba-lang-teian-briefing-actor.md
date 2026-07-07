@@ -1,10 +1,36 @@
 # ADR-2607062000: kotoba-lang/teian — 資料作成 actor（deck-LLM ⊣ BriefingGovernor）
 
-**Status**: closed(実行完了。scaffold + 独立レビューで見つかった2件の修正まで完了。
-cloud-itonami 側 UI 配線・実 Distributor 接続は明記済みの follow-up）
+**Status**: closed(実行完了。scaffold + 独立レビューで見つかった2件の修正、
+および ichiran のレビューで判明した3件目の遡及修正まで完了。cloud-itonami 側
+UI 配線・実 Distributor 接続は明記済みの follow-up）
 **Date**: 2026-07-06
 **Closed**: 2026-07-06
+**Amended**: 2026-07-07(ADR-2607062030 ichiran のレビューで発見された
+teian 由来のバグの遡及修正)
 **Deciders**: Jun Kawasaki
+
+## Addendum(2026-07-07): 3件目のバグ — publish 配信の TOCTOU
+
+ADR-2607062030（ichiran）の独立レビューが、teian からコピーされた
+`commit-effects!` の `:deck/publish` 分岐に **同型の TOCTOU** が残っていた
+ことを発見した: 2026-07-06 の修正は `teian.governor` の `:deck/publish`
+hard-check が「govern 時点で」store の現在値を再検証するようにしたが、
+`:request-approval` interrupt で人間承認を待つ間に store の draft が
+変更された場合、`commit-effects!` 自身が **配信直前にもう一度独立に
+store を再読込**しており、その再読込は governor を一切通らない
+（`:govern` ノードは resume 時に再実行されない — langgraph の resume は
+`:request-approval`→`:commit` に直行するため）。koyomi/shoko の
+`:event/share`/`:file/share` は最初から checkpoint 済み content のみを
+使う設計だったため影響を受けなかったが、teian（とそれをコピーした
+ichiran）の `:deck/publish`/`:tally/publish` は govern-time の再検証を
+追加しただけで、delivery 自体の再読込は温存されたままだった。
+
+commit `1bafac1` で修正: `commit-effects!` は checkpoint 済みの
+`(:content proposal)` のみを `deckport/publish!` に渡し、store の
+再読込を行わない（koyomi/shoko と同型）。regression test
+`publish-uses-governed-content-not-a-stale-commit-time-store-read` を
+`test/teian/governor_contract_test.clj` に追加。30 tests / 108 assertions
+（新規1件）、lint clean。
 
 ## Context
 

@@ -1,9 +1,10 @@
 # ADR-2607062030: kotoba-lang/ichiran — 集計表生成 actor（tally-LLM ⊣ TallyGovernor）
 
-**Status**: proposed(2026-07-06 の scaffold-only 決定を撤回し、フル実装へ
-昇格。teian と同等の完成度を目指す — 2026-07-07 オーナー指示)
+**Status**: closed(実行完了。フル実装 + 独立レビューで見つかった2件の修正まで
+完了。cloud-itonami 側 UI 配線・実 Distributor 接続は明記済みの follow-up)
 **Date**: 2026-07-06
 **Amended**: 2026-07-07
+**Closed**: 2026-07-07
 **Deciders**: Jun Kawasaki
 
 ## Context
@@ -84,15 +85,17 @@ follow-up）。
   mock-tallyport による決定的 sim で動く。
 - (−) cloud-itonami 側の実配線・UI は本 ADR の範囲外（別 PR）。
 
-## Execution
+## Execution(closing, 2026-07-07)
 
 | 項目 | 状態 | 備考 |
 |---|---|---|
-| repo scaffold(README/deps.edn/namespace骨組み/smokeテスト) | ✅ 完了 | 2026-07-06、scaffold-only 版として |
-| フル実装への昇格(TallyTarget port・統一データモデル・StateGraph・governor・phase・store・CACAO 自己発行) | ⏳ 進行中 | |
-| 独立レビュー | ⏳ 未着手 | |
-| manifest pin 前進 | ⏳ 未着手 | |
-| superproject `main` 反映 | ⏳ 未着手 | |
+| repo scaffold(README/deps.edn/namespace骨組み/smokeテスト) | ✅ 完了 | 2026-07-06、scaffold-only 版として。commit `976b07c` |
+| フル実装への昇格(TallyTarget port・統一データモデル・StateGraph・governor・phase・store・CACAO 自己発行) | ✅ 完了 | commit `2cefa75`。32 tests / 105 assertions |
+| 独立レビュー(governor/publish delivery 中心の敵対的レビュー) | ✅ 完了 | confirmed 2 件: `:tally/publish` の実配信(`commit-effects!`)が govern 時点で検証済みの内容ではなく commit 時点で store を再読込する TOCTOU（teian にも同型のバグが存在することが本レビューで判明——teian 側も遡って修正）／phase が欠落/未知の値のとき最も寛容な phase 3 へ fail-open（本来は最も保守的な phase 0 へ fail-closed すべき） |
+| 上記 2 件の修正 + regression test 追加 | ✅ 完了 | commit `bed2f41`。34 tests / 117 assertions(新規2件)、lint clean。修正前に戻して回帰テストが実際に落ちることまで確認 |
+| manifest pin 前進(`976b07c`→`2cefa75`→`bed2f41`) | ✅ 完了 | `--entry ichiran` 最小 diff、サーバ側検証 OK |
+| superproject `main` 反映 | ✅ 完了 | 4actor 一括 pin 前進コミット |
+| teian への遡及修正(同型 TOCTOU) | ✅ 完了 | 本 ADR のレビュー中に発見。ADR-2607062000 参照、teian commit `1bafac1` |
 
 ## References
 
