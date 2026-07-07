@@ -234,6 +234,30 @@
                                   "系統が分岐しています — pin の見直しが必要です。")))))))))))))
 
 (doseq [w @warnings] (binding [*out* *err*] (println w)))
+
+;; CI 実行時(GitHub Actions)だけ、WARN を stderr ログの奥に埋もれさせず表に出す:
+;; ::warning:: アノテーション(Checks/Files タブに出る、ログを開かなくても見える)と
+;; $GITHUB_STEP_SUMMARY(実行のサマリページに残る)。green run でも見落とされない
+;; ようにする — 検証不能 = fail-open で通す設計自体は変えない(private org の子リポは
+;; github.token では見えず、これは token 権限の問題であって pin 自体は無罪の可能性が
+;; 高い。厳密化するには WEST_PIN_VERIFY_TOKEN secret。ワークフロー先頭のコメント参照)。
+(when (and (seq @warnings) (= "true" (System/getenv "GITHUB_ACTIONS")))
+  (doseq [w @warnings]
+    (println (str "::warning::" w)))
+  (when-let [summary-path (System/getenv "GITHUB_STEP_SUMMARY")]
+    (try
+      (spit summary-path
+            (str "\n### ⚠️ west-pin-verify: " (count @warnings)
+                 " 件が検証不能で素通し(fail-open)\n\n"
+                 "private org(gftdcojp / com-junkawasaki)の子リポは `github.token` では"
+                 "見えず、pin 自体の正否ではなく **権限不足で検証できなかった** だけの可能性が"
+                 "高い — `WEST_PIN_VERIFY_TOKEN` secret(org read 権限の PAT)を設定すると"
+                 "厳密化できる。\n\n"
+                 (str/join "\n" (map #(str "- " %) @warnings))
+                 "\n")
+            :append true)
+      (catch Throwable _ nil))))
+
 (if (seq @failures)
   (do (binding [*out* *err*]
         (println)
