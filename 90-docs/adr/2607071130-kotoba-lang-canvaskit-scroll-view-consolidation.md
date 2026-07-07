@@ -80,8 +80,21 @@ AppKit の語彙をこの領域の standard vocabulary として採用する下�
   (18 tests/117 assertions)。両者とも public API と `{:x :y :zoom}` doc 形は
   不変、`canvaskit.viewport` ブリッジ経由で委譲。freeboard は
   `:local/root "../canvaskit"`、kami-genko は `:git/sha` 依存)。
-- aozora.app `/studio`(ADR-2607071100)の storyboard editor は viewport を
-  自作せず canvaskit を使うこと。
+- **採用第2ラウンド(2026-07-07 同日)**: `slides`(zoom clamp、`1163df4`)、
+  `engineer-render`(EngViewport の screen↔world / zoom-to-fit、no-clamp 維持、
+  `b1118dd`)、`kami-engine-app-sdk`(LabelOverlay 投影、`d2461a9`。ローカル
+  `orgs/kotoba-lang/kami-ui-sdk` は rename 前の stale clone で同一 GitHub repo)、
+  `freeboard` hit-test + rubber-band(`c464ea8`。canvaskit に `rect-intersects?`
+  = CGRectIntersectsRect を追加 `2e8ab2a`)、`kami-genko` app 層 hit-test
+  (`e9f49c1`。on-wheel の固定 ±1.1 ズームは UX 維持のため意図的に非移行)。
+  非適合と確定: `map`(球面 pan)、`sprite2d`+`webgpu` 内コピー(操作なしの
+  follow-cam render layout)、`network-isekai`(WebGPU 3D)、
+  `etzhayyim-project-maps`(kami-map GPU camera)。TS/Svelte 側の残候補:
+  `etzhayyim-project-pptx`(教科書的適合、要 JS バンドル基盤)・同 xlsx
+  (zoom ヘルパのみ)— canvaskit の `globalThis` バンドル整備が前提の follow-up。
+- aozora.app `/studio`(ADR-2607071100)の storyboard editor が canvas 面を
+  持つ時は viewport を自作せず canvaskit を使うこと(現 v1 は DOM フォームで
+  canvas 面なし)。
 - 将来 graph topology visual editor を作る場合の既定構成:
   **canvaskit(相互作用)+ freeboard(document/connector)+ dot(グラフモデル・
   アルゴリズム)+ svgraph/graphml(シリアライズ)**。
