@@ -72,4 +72,19 @@
   ["clojure -M:test (cloud-itonami-isic-6492) : 34 tests, 131 assertions, 0 failures/errors"
    "clojure -M:lint (cloud-itonami-isic-6492) : errors 0, warnings 0"
    "node wasm/verify_node.mjs (approve/reject/zero-income) : ローカルと実murakumo fleetノード(asher)で全シナリオ一致確認"
-   "gh push: orgs/cloud-itonami/cloud-itonami-isic-6492 main (da59057..36729d3)"]}}
+   "gh push: orgs/cloud-itonami/cloud-itonami-isic-6492 main (da59057..36729d3)"]}
+
+ :addendum-2026-07-07-cljs-port
+ {:summary "wasm/verify_node.mjs(素のJS)をwasm/verify_node.cljs(nbb — ビルド不要ClojureScript-on-Node)へ移植。root CLAUDE.mdのkotoba-wasm > clojurewasm > cljs > nbbランタイム優先順位に整合(svgraph/bin/svgraph.cljs等と同型)。"
+  :sci-constraints
+  ["nbbはSCI(インタプリタ)ベースのためjs*特殊形式・bigint?/goog.typeOfが使えない"
+   "main のresult-typeは元々:i32のみ(:i64/bigintを返すことは無い)と判明、.mjs側にあったbigint->Number変換ガードは不要と確認し削除"]
+  :changes
+  ["wasm/package.json: nbbをlocal devDependencyとして固定(wasm/node_modulesは.gitignore)"
+   "wasm/verify_node.cljs: 名前付きシナリオ/生3引数の受け取り、DataView.setInt32、WebAssembly.instantiateをClojureScript化"
+   "wasm/verify_node.mjsは削除"]
+  :verification
+  ["clojure -M:test (cloud-itonami-isic-6492) : 34 tests, 131 assertions, 0 failures/errors(JVM側は変更なし)"
+   "nbb verify_node.cljs (approve/reject/zero-income、生3引数、bad usage) : ローカルで.mjs版と同一結果を確認"
+   "実murakumo fleetノード(asher)へnbb+node_modulesごと再配備、全シナリオ一致確認"
+   "gh push: orgs/cloud-itonami/cloud-itonami-isic-6492 main (36729d3..d7cc1fa)"]}}

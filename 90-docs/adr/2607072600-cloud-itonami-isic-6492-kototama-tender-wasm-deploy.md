@@ -92,9 +92,15 @@ superseded_by: []
 
 これにより、cloud-itonami-isic-6492 の DTI affordability check は「本物の申込者数値をホストが渡せば実際に呼び出せる決定サービス」になった(ワイヤー越しの公開はまだ無い——下記follow-up参照)。
 
+## Addendum 3 (2026-07-07, same day): `verify_node.mjs` を ClojureScript(nbb) へ移植
+
+オーナー指摘「mjs? cljc, cljs にして」を受け、`wasm/verify_node.mjs`（素のJS）を `wasm/verify_node.cljs`（`nbb` — ビルド不要の ClojureScript-on-Node）へ移植した。root CLAUDE.md の「`kotoba wasm` > `clojurewasm` > `ClojureScript` > `nbb`」ランタイム優先順位に、この種の軽量 Node スクリプティングは `nbb` を使うのが整合的（`svgraph/bin/svgraph.cljs`・`kototama/web/generate.cljs` 等、モノレポ内の同種スクリプトは全て `.cljs`/`nbb`）。
+
+`nbb` は SCI(インタプリタ)ベースのため `js*` 特殊形式や `bigint?`/`goog.typeOf` は使えない——`main` の result-type は元々 `:i32` のみ(`:i64`/bigint を返すことは無い)なので、`.mjs` 側にあった bigint→Number 変換ガードはそもそも不要と判明し、単純に削除した。`wasm/package.json` に `nbb` を local devDependency として固定(`wasm/node_modules` は `.gitignore`)。承認/却下/ゼロ収入の3シナリオを移植後も再検証し、ローカルおよび実 murakumo fleet ノード(asher)への再配備で `.mjs` 版と同一の結果を確認した。
+
 ## References
 
-- `orgs/cloud-itonami/cloud-itonami-isic-6492/wasm/affordability.kotoba`, `wasm/affordability.wasm`, `wasm/README.md`, `wasm/verify_node.mjs`
+- `orgs/cloud-itonami/cloud-itonami-isic-6492/wasm/affordability.kotoba`, `wasm/affordability.wasm`, `wasm/README.md`, `wasm/verify_node.cljs`
 - `orgs/cloud-itonami/cloud-itonami-isic-6492/test/wasm/affordability_test.clj`
 - `orgs/kotoba-lang/kotoba/src/kotoba/runtime.clj`（`compile-wasm-expr`、実際のWASMコード生成対象演算子）
 - `orgs/kotoba-lang/wasm-webcomponent/src/actor-host.js`（Node.jsホスト実装）
