@@ -168,6 +168,85 @@ kotoba-server 節）は Phase 3 で導入し、v1 は匿名 announce とする�
 | 2 | `num` に非同期 `IGpuDevice`（`navigator.gpu`）実装、`wgsl_backend.cljc` の async 化、`ops.cljc` を `num.core` 経由に書き換え、`:num/webgpu` を Tauri webview 内で実 dispatch | follow-up（別 ADR/セッション） |
 | 3 | murakumo fleet への compute worker 参加（`murakumo.infer.engine` adapter 呼び出し）、did:key/CACAO 自己 mint、credits 精算表示 | follow-up |
 
+### 7. モデル選定の実測比較（2026-07-05 追記）
+
+murakumo-studio の既定/推奨モデルを検討するため、LM Studio（Apple M4、物理RAM
+32GB）でローカル実行可能な候補モデルを実際にロードし、同一の `.cljc` 実装課題
+（`kotodama.inference.kv-cache` 相当の KV キャッシュ ring buffer + `clojure.test`）
+を与えて実装能力を比較した。生成コードはモデル自身の自己申告テストを鵜呑みに
+せず、独立に書いた `clojure.test` ハーネスで JVM 上で実際にコンパイル・実行して
+検証した。
+
+#### 7.1 候補と Artificial Analysis Intelligence Index（参考値、OpenRouter 各モデル
+ページが参照する指標）
+
+| モデル | Intelligence Index | Output tok/s | Params |
+|---|---|---|---|
+| MiniMax M2.7 | 38 | 51.3 | 230B/10B active MoE |
+| Qwen3.6 35B A3B | 32 | 163.0 | 36B/3B active MoE |
+| Gemma 4 26B A4B | 26 | N/A | 25.2B/3.8B active MoE |
+| Nemotron 3 Nano Omni 30B A3B | 15 | 288.5 | 30B/3B active MoE |
+
+#### 7.2 ハードウェア制約の発見
+
+MiniMax M2.7（Q4_K_M, 138GB）は MoE の全 230B パラメータを常時保持する必要が
+あり（推論時の active パラメータ数 10B とは無関係。どのトークンでどのエキスパート
+が選ばれるか事前に分からないため、ルーティング対象の全エキスパートをメモリ
+または mmap 経由でディスクに保持する必要がある）、**物理RAM 32GB のマシンでは
+どの量子化でもロード不可能**と判明した。LM Studio のカタログが "Staff Pick" /
+"Best Match" として提示していても、この総パラメータ量に基づくハードウェア
+適合性までは保証されない点に注意（active params ベースの簡易判定に見える）。
+オーナー指示によりダウンロード自体は検証目的で継続したが、実運用のデフォルト
+モデル候補からは除外する。より大きな RAM を持つノード（murakumo fleet の他
+ノード等）での追試は follow-up。
+
+#### 7.3 実測結果（同一プロンプト、独立テストハーネスで検証）
+
+- **Qwen3.6 35B A3B**: 主要実装（`create-cache`/`append!`/`window`/`cache-size`）
+  は独立テスト 10 アサーション全合格。ring buffer の index 計算・`ex-info` に
+  よるエラー契約・ホスト依存コードなしの完全な portability、すべて要件通り。
+  ただし **reasoning token を極端に消費**する（prompt 556 tokens に対し
+  completion 12000 tokens 中 11381 が reasoning。モデル自身が書いたテスト
+  コードは token 上限で `finish_reason: length` となり途中で打ち切られたが、
+  主要実装自体は先に完成していたため実害はなかった）。context window を
+  既定の 8192 から 16384 に引き上げないと実用的な応答が得られなかった。
+- **Gemma 4 26B A4B**: `finish_reason: stop` で完走（reasoning token 消費は
+  Qwen ほどではない）。しかし `create-cache` が
+  `(vec (repeat n-layers (atom [])))` という典型的な Clojure の罠を含む —
+  `repeat` は引数を **1 回だけ評価**してから複製するため、**全レイヤーが
+  同一の atom インスタンスを共有**してしまい、要件の核心である「レイヤー
+  分離」が壊れている（独立テストで実際に再現: layer 1 への append がレイヤー
+  0 の window/size を変化させた）。モデル自身が書いたテストコードは
+  この bug とは無関係な構文エラーを2件含み（`doseq` の不正な束縛形式
+  `(doseq [i 1 2 3 4 5] ...)`、`try`/`catch` の不正なネスト）**コンパイル
+  すら通らない**ため、このレイヤー分離バグは自己テストでは検出されずに
+  出荷されていたことになる。
+- **Nemotron 3 Nano Omni 30B A3B**: `(ns kotodama.inference.kv-cache ...)` の
+  閉じ括弧が欠落しており、名前空間そのものが **コンパイル不能**
+  （`Syntax error reading source ... EOF while reading, starting at line 1`）。
+  加えてソースを読む限り `append!`/`window`/`cache-size` は `(dec layer)` で
+  1 始まりインデックスとして実装している一方、`validate-layer!` は 0 を
+  含む 0 始まりの `layer` を有効値として通すため、**構文エラーが無かった
+  としても `layer=0`（要件の主たる呼び出し方）で `nth` に `-1` を渡す
+  致命的なオフバイワンが存在**した。tok/s は候補中最速（AA 実測値
+  288.5 t/s）だが、今回の cljc 実装課題では実用に耐えない結果だった。
+- **MiniMax M2.7**: §7.2 の通り 32GB 機ではロード不能のため未検証
+  （follow-up）。
+
+#### 7.4 結論・推奨
+
+**Qwen3.6 35B A3B を murakumo-studio v1 の既定/推奨モデルとする。** 実測で
+cljc 実装が唯一「独立検証済みで正しい」結果を出したため。ただし reasoning
+token の消費が非常に大きいモデルであるため、Model Manager のデフォルト
+`max_tokens`/context length は reasoning model を前提に十分大きく取る
+設計にする（本検証でも context 8192→16384 への引き上げが必須だった）。
+Gemma 4 26B A4B は応答速度・完走性では優れるが、**テストだけに頼ると見逃す
+実装バグ（shared-atom 等）がある**点は Gemma 固有の弱点というより、コード
+生成モデル全般の生成物を「自己申告テストのみで signed off しない」運用上の
+教訓として明記する（murakumo-studio の Model Manager が将来コード生成用途の
+model recommendation を出す場合、この検証パターン=独立テストハーネスでの
+再現を標準手順にすべき）。
+
 ## Consequences
 
 - (+) `kotoba-lang/inference` を実際に「使う」最初のプロダクトができ、

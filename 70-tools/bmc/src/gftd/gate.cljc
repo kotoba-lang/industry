@@ -164,6 +164,11 @@
 
 (defn- block-id [product suffix] (keyword (str (name product) "." suffix)))
 
+(defn- block-items-set [idx block-id]
+  "Get current canvas items for a block as a set for dedup."
+  (let [block (get-in idx [:blocks block-id])]
+    (if block (set (:canvas/items block)) #{})))
+
 (defn proposals
   "Given the folded index, a product, and its metrics, return governor-ready
    proposals that advance the BMC cycle:
@@ -185,16 +190,22 @@
              :event/evidence (:evidence r)
              :proposal/reason "gate 到達 (機械測定) — 仮説を validated に昇格"}]
            :blocked
-           (for [need (:needs r)
-                 :let [txt (str "準備 (" (name hid) "): " need)]]
-             {:proposal/action :canvas/add-item
-              :canvas/id (block-id product "solution")
-              :event/value txt
-              :proposal/reason "gate 測定に必要な計器/前提が未整備 — 準備項目として提案"})
+           (let [solution-items (block-items-set idx (block-id product "solution"))]
+             (for [need (:needs r)
+                   :let [txt (str "準備 (" (name hid) "): " need)]
+                   :when (not (contains? solution-items txt))]
+               {:proposal/action :canvas/add-item
+                :canvas/id (block-id product "solution")
+                :event/value txt
+                :proposal/reason "gate 測定に必要な計器/前提が未整備 — 準備項目として提案"}))
            :measuring
-           [{:proposal/action :canvas/add-item
-             :canvas/id (block-id product "metrics")
-             :event/value (str "gate 距離 (" (name hid) "): " (:distance r))
-             :proposal/reason "gate は機械測定可能・未到達 — 距離を運用指標に反映"}]
+           (let [metrics-items (block-items-set idx (block-id product "metrics"))
+                 txt (str "gate 距離 (" (name hid) "): " (:distance r))]
+             (if (contains? metrics-items txt)
+               []
+               [{:proposal/action :canvas/add-item
+                 :canvas/id (block-id product "metrics")
+                 :event/value txt
+                 :proposal/reason "gate は機械測定可能・未到達 — 距離を運用指標に反映"}]))
            [])))))
      hyps)))

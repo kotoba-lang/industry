@@ -85,9 +85,23 @@
   {:alt "LLaDA 系 diffusion student"
    :why "ローカル MPS 非実用 (長 prompt)。P2P block 復号としては有望なので T3 設計のみ保持"}]
 
+ :execution-record
+ {:date "2026-07-06..07"
+  :total-cost-usd 38
+  :completed
+  {:benchmark "18 タスク (easy 4 / medium 10 / hard 4、5 repo 横断、両方向オラクル検証済み)"
+   :trajectories "66 本生成 / 40 本実テスト PASS。$2.50 (見積 $300-600 の 1/100)"
+   :sft-dataset "train 37 / val 3 (chat JSONL)"
+   :training "Modal H200 bf16 + attention-only LoRA r=16、24 分 ~$2.5、eval loss 1.637→1.399、アダプタ 13.8MB"
+   :b200-bench "GLM-5.2-NVFP4 vLLM 4×B200 = 28.9 tok/s。自前 ~$0.5/traj vs OpenRouter $0.007 (~70x) — 中規模は API が正"
+   :eval "18 タスク単発: base 7/18 vs LoRA 6/18 — v1 では効果測定できず (+2/−3)"}
+  :findings
+  ["M4/32GB ローカル 35B QLoRA は不可能 (Metal OOM、最小構成でも backward 不成立) — 本 ADR の想定を反証"
+   "bitsandbytes 4bit は Qwen3.6 MoE の 3D packed expert tensor に効かない (bf16 72GB のままロード)"
+   "reasoning model の code-eval は最初の fence 抽出だと thinking 中の引用を誤採点 — 最後の defn ブロックを採る"
+   "訓練データ (GLM-5.2 非 thinking 形式) と Qwen3.6 推論時 thinking の形式不一致が v1 無効果の主因候補"
+   "scratchpad 内 git worktree は並行セッション prune で消失しうる"]}
  :follow-ups
- ["B200×4 GLM-5.2-NVFP4 serving ベンチの完了と実測 tok/s・単価の記録"
-  "Stage 1: 評価タスクを実 ADR/PR/バグ修正履歴から 10-20 件へ拡張"
-  "Stage 2: trajectory 蒸留の実行 (予算項目 #1)"
-  "T1 expert-paging のブラウザ実証 (WGSL int4 LUT + OPFS、コンピュート無料・工数のみ)"
+ ["v2 蒸留: trajectory 10-20 倍スケール ($25-50) + thinking 形式整合 + epoch/rank 増 → 同 18 タスク再評価"
+  "効果確認後: T1 expert-paging ブラウザ実証 (WGSL int4 LUT + OPFS) + voice/image パッケージング (#5 #6)"
   "hot-expert プロファイル (router activation) の採取 — 将来の Tier B/A 昇格時の資産"]}
