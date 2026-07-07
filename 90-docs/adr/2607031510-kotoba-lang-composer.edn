@@ -1,6 +1,6 @@
 {:adr/id "2607031510"
  :adr/title "kotoba-lang/composer: AI music composition request/pipeline as pure data contracts"
- :adr/status :proposed
+ :adr/status :accepted
  :adr/date "2026-07-03"
  :context
  {:gap "yukkuri's composer actor (did:web:yukkuri.gftd.ai:actor:composer) cross-invokes ai.gftd.ongakuka.compose inline; no shared reusable model of the ongakuka lexicon shapes exists outside the raw lexicon JSON, so any other composing actor (yukkuri's other 3 channels, or a future non-yukkuri actor) would re-derive it from scratch"
@@ -47,4 +47,8 @@
   "the actual XRPC call to ai.gftd.ongakuka.compose/regenerate (network I/O, auth, retry) stays in the app-level actor owning deployment (yukkuri's did:web:yukkuri.gftd.ai:actor:composer) -- library performs no cross-project invoke itself, matching kotoba-lang/webrtc's host-injects-transport precedent"
   "intentionally schema-coupled to the ongakuka lexicon (mirrors, does not generalize to any-audio-pipeline) -- a lexicon shape change requires a matching library update; avoids speculative generality"
   "deps.edn: no cross-kotoba-lang deps for core namespaces; kotoba.composer.ui depends on kotoba-lang/html + kotoba-lang/css if included; :test/:lint aliases match house convention (cognitect test-runner + clj-kondo)"
-  "does not touch yukkuri's live composer actor wiring -- adopting the library into yukkuri is a separate follow-up, not bundled here"]}
+  "does not touch yukkuri's live composer actor wiring -- adopting the library into yukkuri is a separate follow-up, not bundled here"]
+ :addendum-2026-07-07
+ {:landed "kotoba-lang/composer created + registered (repos.edn :extra-projects, west pin server-verified). core namespaces implemented: composer/track/stem/style/generation/pipeline, matching design 1:1"
+  :tests "22 tests / 140 assertions, 0 failures; clj-kondo 0 warnings; CI green"
+  :deferred [:kotoba.composer.ui :kotoba.composer.export "yukkuri actor adoption -- per this ADR's own P0/P1/P2 staging"]}}
