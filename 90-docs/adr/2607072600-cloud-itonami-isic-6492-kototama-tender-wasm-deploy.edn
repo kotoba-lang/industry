@@ -1,0 +1,50 @@
+{:frontmatter
+ {:id "adr-2607072600-cloud-itonami-isic-6492-kototama-tender-wasm-deploy"
+  :title "ADR-2607072600: cloud-itonami-isic-6492 の DTI affordability check を .kotoba へ移植し kototama.tender(JVM/Chicory) 経由で実行確認"
+  :status "accepted"
+  :doc_type "adr"
+  :topic "cloud-itonami-isic-6492-kototama-tender-wasm-deploy"
+  :authoritative true
+  :last_verified "2026-07-07"
+  :authoritative_for
+  ["cloud-itonami-isic-6492(与信)の credit.registry/compute-debt-to-income-ratio + affordability-ceiling(0.43) を .kotoba wasm-compilable subset へ移植した実例が orgs/cloud-itonami/cloud-itonami-isic-6492/wasm/ に存在すること"
+   "kotoba wasm emit の実際のWASMコード生成対象(compile-wasm-expr)が対応する演算子: 特殊形式 do/let/if + - * quot / rem mod = < > <= >= zero? not inc dec のみ — pos?/neg?/and/or/when は非対応(unsupported-op)"
+   "kototama.tender(JVM/Chicory)経由で、kotoba-lang/kototama自身のデモfixture以外の他repoの実business logicをホストした初の実例"
+   "host importを一切要求しない(純粋演算のみの).kotobaモジュールが実際にコンパイル・実行できることの実測確認"]
+  :related
+  ["90-docs/adr/2607062330-kototama-tender-chicory-execution-runtime.md"
+   "90-docs/adr/2607072530-cloud-itonami-kototama-wasm-llm-infer-poc-isic-6511.md"
+   "90-docs/adr/2607071320-cloud-itonami-credit-6492-coverage.md"]
+  :supersedes []
+  :superseded_by []}
+
+ :problem
+ {:source "オーナー指示「cloud-itonami の kototama wasm デプロイ」(前段の調査で cloud-itonami は実コードありだが.kotoba/wasm/kototama実績ゼロと判明していた)"
+  :facts
+  ["作業中、並行セッションがADR-2607072530(isic-6511, llm-infer capability新設, murakumo fleet実機asherへNode.js経由配備)を並行してmainへ着地させていた(2026-07-07 17:04)"
+   "cloud-itonami-isic-6511自身のdeps.ednにkototama依存は無く、そのrepo自身のテストにkototama.tender経由の実行確認は含まれない(kototama側31 testsは新設capability自体の単体テスト)"
+   ".kotobaコンパイラのpos?/neg?/and/or/whenがwasm生成側でunsupported-opになるバグを独立に発見——ADR-2607072530のand/or/when発見と一致(2セッション独立確証)"]}
+
+ :decision
+ {:summary "credit.registry/compute-debt-to-income-ratio + affordability-ceiling(0.43)を.kotobaのwasm-compilable subsetへ移植し、kotoba wasm emitで実WASMバイナリへコンパイル、kototama.tender(JVM/Chicory)でホストして実行確認した。"
+  :porting-changes
+  ["map destructuringを素の位置引数3つに変更(wasm生成側はmapを扱えない)"
+   "(pos? annual-income)を(> annual-income 0)に変更(pos?はunsupported-op)"
+   "throw/ex-info の3つのprecondition guardを削除し falsy値0を返す形に変更(WASM exportはJVM例外を投げられない)"
+   "比率計算+0.43比較を100*(existing-debt+requested-amount) <= 43*annual-incomeの整数相互乗算に変更(除算・浮動小数点を回避、kotoba-card/kotoba-bankingの整数金額規約と整合)"]
+  :verification-steps
+  ["kotoba wasm run で main が1を返すことを確認(143バイト実WASM、host import 0件)"
+   "orgs/cloud-itonami/cloud-itonami-isic-6492/test/wasm/affordability_test.clj でkototama.tender/run-main([] import, 空host-caps)を使い同じ結果を確認。既存32 tests(credit.* 5 namespaces)含め全green(129 assertions)"
+   "clojure -M:lint(clj-kondo) errors 0/warnings 0"]
+  :manifest-registration "cloud-itonami-isic-6492はmanifest/repos.edn line 1284の通りwest projectではない(他のcloud-itonami-* blueprint repoと同様)ため、west.yml/repos.ednへの変更は無し"}
+
+ :consequences
+ ["kototama.tender(JVM/Chicory)経由でkototama自身のfixture以外の実business logicが動くことを実測確認——ADR-2607062330 addendum5の限定を別repoのactorロジックについて初めて破った"
+  "host import ゼロ(純粋演算のみ)の.kotobaモジュールが実際にコンパイル・実行できることを確認——ADR-2607072530のllm-infer capability経由の事例とは独立したcapability不要パスの実証"
+  ".kotobaコンパイラのpos?/neg?/and/or/when非対応はADR-2607072530との独立発見により再現性確認済みの実バグ(本ADRでは修正しない)"]
+
+ :verification
+ ["clojure -M:test (cloud-itonami-isic-6492) : 32 tests, 129 assertions, 0 failures/errors"
+  "clojure -M:lint (cloud-itonami-isic-6492) : errors 0, warnings 0"
+  "kotoba wasm emit / kotoba wasm run (kotoba-lang/kotoba CLI) : binary-emitted / run-completed, value=1"
+  "gh push: orgs/cloud-itonami/cloud-itonami-isic-6492 main (ba1deef..e862464)"]}
