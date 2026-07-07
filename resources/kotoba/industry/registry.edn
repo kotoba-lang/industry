@@ -94,7 +94,35 @@
    :name "Card Transaction Processing and Settlement"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6619"
    :business-id "cloud-itonami-isic-6619"
-  :maturity :blueprint
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as a card-processing actor
+   ;; (Card Advisor ⊣ Card Settlement Governor), the twenty-sixth
+   ;; build outside ADR-2607032000's original insurance/real-estate
+   ;; batch (after 6612, 6492, 6920, 6611, 7120, 8620, 8530, 9200,
+   ;; 7500, 9603, 9521, 9321, 8730, 9102, 9103, 9602, 9000, 8890,
+   ;; 8610, 9311, 8510, 9412, 6491, 8720, 8521), a THIRD financial-
+   ;; services vertical alongside 6492's credit granting and 6491's
+   ;; financial leasing, modeled closely on siblings 6511/6512/6621/
+   ;; 6622/6629/6520/6530/6820/6612/6492/6920/6611/7120/8620/8530/
+   ;; 9200/7500/9603/9521/9321/8730/9102/9103/9602/9000/8890/8610/
+   ;; 9311/8510/9412/6491/8720/8521.
+   ;; Distinctive check: settlement-amount-exceeds-authorized? is the
+   ;; THIRD non-temporal instance of the MAXIMUM-ceiling check family
+   ;; (facility/school established the first two), directly
+   ;; implementing this blueprint's own "partial approvals never
+   ;; over-charge the granted amount" Trust Control. Also reuses the
+   ;; unconditional-evaluation screening discipline for a twenty-
+   ;; fourth distinct grounding (fraud-flag-unresolved-violations,
+   ;; the FIRST specifically for a fraud-flag concept), tested via
+   ;; the screening op directly for a fourteenth consecutive vertical
+   ;; (after eldercare/museum/conservation/salon/entertainment/
+   ;; casework/hospital/facility/school/association/leasing/
+   ;; behavioral/secondary). Dual actuation (:settlement/finalize,
+   ;; :chargeback/release) on the same transaction entity;
+   ;; double-finalization guarded via dedicated booleans per the 6492
+   ;; lesson. Cites kotoba-lang/card, banking and swift as related-
+   ;; but-not-required capability contracts. See
+   ;; cloud-itonami-isic-6619/docs/adr/0001-architecture.md.
    :required-technologies [:robotics :card :banking :swift :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
    :operating-states [:intake :authorize :clear :settle :reconcile :chargeback :audit]}
