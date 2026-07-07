@@ -1570,6 +1570,16 @@
    "orgs/kotoba-lang/cron"
    "orgs/kotoba-lang/org-ietf-cbor" ; renamed from dag-cbor 2026-07-06
    "orgs/kotoba-lang/datom"
+
+   ;; kotoba-protocol — 基底プロトコルの正本 (spec-first pure cljc):
+   ;; L0 multiformats/CID/IPLD → L1 datom → L2 graph DAG → L3 did:key/CACAO/
+   ;; 鍵由来 IPNS → L4 IPFS/B2 配布 → L5 app (kototama ABI + manifest/
+   ;; appview/embedUrl)。層表・語彙は data、実装は既存 repo 群 (ADR-2607071500)
+   "orgs/kotoba-lang/kotoba-protocol"
+   ;; atprotocol — atproto 互換を kotoba-protocol の上の投影層として定義。
+   ;; owns: lexicon/record-codec/xrpc/handle/repo-wire。delegates: 鍵/datom/
+   ;; CID/IPNS/配布。W-Protocol fields は deprecated alias (ADR-2607071500)
+   "orgs/kotoba-lang/atprotocol"
    "orgs/kotoba-lang/ddl"
    "orgs/kotoba-lang/org-omg-dmn" ; renamed from dmn 2026-07-06
    "orgs/kotoba-lang/dot"

@@ -1,0 +1,80 @@
+{:frontmatter
+ {:id "adr-2607071500-kotoba-lang-kotoba-protocol-atprotocol-layering"
+  :title "ADR-2607071500: kotoba-protocol 層設計の正本化 + atprotocol 投影層分離 + appview/embedUrl (W-Protocol 退役)"
+  :status "accepted"
+  :doc_type "adr"
+  :topic "kotoba-protocol-layering"
+  :authoritative true
+  :last_verified "2026-07-07"
+  :authoritative_for
+  ["基底プロトコルの正本は kotoba-lang/kotoba-protocol (spec-first, pure cljc):
+    L0 address (multiformats/CID/IPLD) → L1 fact (datom EAVT) → L2 graph
+    (Merkle DAG → graph CID) → L3 authority (Ed25519 did:key, 鍵由来 IPNS =
+    graph 名, CACAO chain — サーバは authority ではない) → L4 distribution
+    (IPFS/IPNS/B2, kotobase) → L5 application (kototama actor:host ABI +
+    app manifest datoms + appview + embedUrl)。層表と語彙は data
+    (kotoba.protocol.layers / vocab) でありテストが同 data を検証する"
+   "app 提供の protocol 概念は appview (graph を描画する全画面 app) と
+    embedUrl (host が文脈内に mount する URL — https|ipfs|ipns) の 2 つ。
+    manifest は actor 自身の graph の :kotoba.app/* datoms (署名済み・履歴付き)。
+    :kotoba.app/latest = actor 鍵由来 IPNS = 署名済み更新チャネル。
+    iframe/web-component 等の mount 手段は host 実装詳細で protocol 外
+    (ActorFrame は廃語)"
+   "atproto 互換は kotoba-lang/atprotocol — kotoba-protocol の上に立つ投影層。
+    owns: handle 解決 / lexicon・record 形 / record⇄datom codec / XRPC / repo・
+    MST wire。delegates: 鍵・datom 真実・graph CID・IPNS head・配布。参照実装 =
+    aozora.pds.encode / aozora.appview.scan (既に本番稼働、移植しない)"
+   "W-Protocol (performerType/contentMode/uiType/service/system + ActorFrame)
+    は退役 — atprotocol.profile の deprecated compat alias にのみ残る。
+    正は :kotoba.app/kind と :kotoba.app/embed-url"]
+  :related
+  ["90-docs/adr/2607062330-kototama-tender-chicory-execution-runtime.md"
+   "90-docs/adr/2607062400-kototama-actor-host-browser-native-and-tender-module-fix.md"
+   "90-docs/adr/2607070400-app-aozora-manga-work-actor-profiles.md"
+   "90-docs/adr/2607071100-gftdcojp-mangaka-retirement-wave3-aozora-studio.md"
+   "orgs/gftdcojp/app-aozora-svelte/IPFS-DEPLOY.md (CID 配信 PoC)"]
+  :supersedes ["W-Protocol profile 拡張 (com.etzhayyim.yoro.actor.getProfile の
+                performerType/contentMode/uiType 群) の新規利用"]
+  :superseded_by []}
+
+ :problem
+ {:source "オーナー指示 (2026-07-07): W-Protocol は古い。kotoba-protocol として
+           設計し直し (datomic/ipld/ipns/ipfs 統合)、atproto は kotoba-protocol
+           の上に立つ protocol として責任境界を分離。ActorFrame でなく
+           appview / embedUrl として設計"
+  :facts
+  ["基盤要素は io-multiformats/io-ipld/dag-cbor/datom/kotobase-*/chain/
+    prolly-tree/mst/kotoba-auth/kototama に実装済みだが層宣言の正本が無い"
+   "W-Protocol は view field 羅列 + svelte ActorFrame 実装込み規約で、
+    データの正・配布・認可の層を持たない"
+   "aozora PDS は record⇄datom 双方向投影を既に本番実装 (encode/scan) —
+    『atproto = 投影層』は実態が先行"
+   "外部前例: atproto lexicon-as-record (DNS _lexicon)、Matrix widgets
+    (URL+iframe+cap 交渉)、Farcaster signed manifest、Nostr NIP-89+nsite"]}
+
+ :decision
+ {:chosen
+  ["kotoba-lang/kotoba-protocol 新設 (public): layers/vocab/app を pure cljc +
+    data で正本化"
+   "kotoba-lang/atprotocol 新設 (public): boundary/projection/profile —
+    W fields は deprecated alias 表として封じ込め"
+   "mangaka miniapp 設計の語彙を :kotoba.app/* に差し替え (manifest lexicon は
+    投影形に降格)"]
+  :rejected
+  [{:option "W-Protocol を拡張して使い続ける"
+    :why "層を持たない view-field 規約で、CID/IPNS/capability を後付けすると
+          さらに歪む。オーナー判断でも旧式"}
+   {:option "kotoba-protocol に実装も集約 (mono-lib 化)"
+    :why "実装は既存 repo で稼働中。spec repo は宣言と検証だけを持ち、
+          drift はテストで検出する"}
+   {:option "atproto 互換を kotoba-protocol 内の 1 モジュールにする"
+    :why "境界が曖昧になる。『上に立つ別 protocol』という責務分離が指示の核"}]}
+
+ :consequences
+ {:positive
+  ["基盤の層表・語彙が 1 箇所に — 新規設計が層で会話できる"
+   "atproto 互換 = 投影の明文化 (encode/scan を契約の実装と再定義)"
+   "W-Protocol 資産は alias で温存、新規は :kotoba.app/* のみ"]
+  :negative
+  ["spec と実装の drift リスク (data 化 + テスト参照で軽減)"
+   "repo 2 つ分の管理コスト"]}}

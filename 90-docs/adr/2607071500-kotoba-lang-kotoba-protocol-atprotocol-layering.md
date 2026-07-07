@@ -1,0 +1,140 @@
+# ADR-2607071500: kotoba-protocol — 層設計の正本化（datom/IPLD/IPNS/IPFS 統合）+ atprotocol を「上に立つ投影層」として分離 + appview / embedUrl モデル（W-Protocol 退役）
+
+**Status**: accepted (scaffold implemented this session)
+**Date**: 2026-07-07
+**Deciders**: Jun Kawasaki
+
+## Context
+
+- オーナー指示（2026-07-07）: 「W-Protocol の設計は古い。**kotoba-protocol**
+  （`kotoba-lang/kotoba-protocol`）として設計し直し、Datomic・IPLD・IPNS・IPFS
+  を設計統合する。atproto は **`kotoba-lang/atprotocol`** として、あくまで
+  kotoba-protocol の上に立つ protocol として責任・境界を分ける。UI 提供は
+  ActorFrame（W-Protocol の実装概念）ではなく **appview / embedUrl** として
+  設計する。」
+- 現状、基底プロトコルの構成要素は repo 群に**実装として散在**しているが、
+  層と責務を宣言する正本が無い:
+  - bytes/addressing: `io-multiformats` / `io-ipld` / `dag-cbor`（CID, IPLD）
+  - fact: `datom`（EAVT+tx、Datomic モデル）
+  - graph: `kotobase-*` / `chain` / `prolly-tree` / `mst`（append-only datom
+    log の Merkle DAG、graph CID）
+  - authority: `kotobase.cacao` / `kotoba-auth`（Ed25519 did:key、CACAO/SIWE
+    capability chain、**鍵由来 IPNS 名 = actor の graph 名。AUTHORITY は
+    鍵由来 IPNS 名への署名であってサーバではない**）
+  - distribution: kotobase（IPFS/Kubo wrapper + B2）、`tech-ipfs-specs-ipns`
+  - execution: `kototama`（`actor:host` ABI 8 imports、HostCaps/RuntimeLimits、
+    JVM/Chicory + browser-native actor-host.js、ADR-2607062330/2607062400）
+- 一方 **W-Protocol** は旧 yoro/svelte 期の産物で、profile view に
+  `performerType / contentMode / uiType / embedUrl / service / system` を生やし、
+  svelte の `ActorFrame` が iframe を mount する**実装込みの規約**だった
+  （lexicon `com.etzhayyim.yoro.actor.getProfile`、実装は archive の
+  app-aozora-svelte のみ。現行 cljs SPA には未移植）。データの正・配布・認可の
+  層を持たず、view field の羅列になっている点が「古い」。
+- atproto 側の前例: lexicon スキーマ自体を record として repo に公開し
+  DNS TXT `_lexicon` → DID → PDS record で解決する（「契約 = actor の repo 内の
+  署名済み record」）。miniapp 標準は無い。Matrix widgets は URL + iframe +
+  capability 交渉、Farcaster Mini Apps は signed manifest、Nostr は NIP-89 +
+  content-addressed nsite（前턴の調査、ADR 外部参照）。
+- aozora PDS は既に **record→datom / datom→view の双方向投影**を実装している
+  （`aozora.pds.encode` / `aozora.appview.scan`）— つまり「atproto は kotoba
+  graph の投影層」という構図は**実態として既に動いており**、宣言だけが無い。
+
+## Decision
+
+### 1. `kotoba-lang/kotoba-protocol` — 基底プロトコルの正本（新規 repo、public）
+
+主権データ基盤の**層と責務を宣言する spec-first repo**。実装 repo 群の上位に
+立つのは「定義」であって実装の複製ではない（実装は既存 repo に残る）。
+
+| 層 | 責務 | 実装 repo（参照） |
+|---|---|---|
+| **L0 address** | bytes → CID（multihash/multibase/multicodec、IPLD dag-cbor） | io-multiformats / io-ipld / dag-cbor |
+| **L1 fact** | datom `[e a v tx added?]`（Datomic モデル、append-only、retraction は事実） | datom |
+| **L2 graph** | datom log の Merkle DAG 化 → **graph CID**（chain/prolly-tree/MST）、db 名前空間 `kotobase/db/<did>/<name>` | kotobase-peer / chain / prolly-tree / mst |
+| **L3 authority** | Ed25519 **did:key**、**graph 名 = 鍵由来 IPNS 名**、書込認可 = CACAO capability chain（自分の graph へは depth-1 自己 mint）。サーバは authority ではない | kotobase.cacao / kotobase.cid / kotoba-auth / tech-ipfs-specs-ipns |
+| **L4 distribution** | CID 実体の配布（IPFS retrieval/pinning、B2 offload）と IPNS head の公開 | kotobase(.net) / ipfs-pinner |
+| **L5 application** | **actor 実行**（kototama `actor:host` ABI + HostCaps/RuntimeLimits）と **app 配布/提供**（manifest datoms、appview、embedUrl — 下記） | kototama / wasm-webcomponent |
+
+repo の中身（pure cljc、zero runtime deps）:
+- `kotoba.protocol.layers` — 上表を **data として**保持（`layers` / `owner-of`）。
+  ドキュメントとテストが同じ data から導出される。
+- `kotoba.protocol.vocab` — datom 語彙 registry:
+  `:kotoba.actor/*`（did / ipns / app）、`:kotoba.graph/*`（cid / head / name）、
+  `:kotoba.app/*`（下記）。各属性に doc + 値述語。
+- `kotoba.protocol.app` — L5 の app モデル:
+  - **manifest** = actor 自身の graph に置く datoms（＝署名済み・履歴付き。
+    Farcaster の signed manifest / Matrix の state event / NIP-89 に相当する
+    ものを「graph 内の事実」で表す）:
+    `:kotoba.app/id`（reverse-dns）、`:kotoba.app/version`、
+    `:kotoba.app/kind`（`"appview"` | `"embed"` | `"actor"`）、
+    `:kotoba.app/bundle-cid`（静的バンドルの root CID）、`:kotoba.app/entry`、
+    `:kotoba.app/embed-url`、`:kotoba.app/appview-of`（描画対象 graph/属性
+    selector）、`:kotoba.app/wasm`（`[{:cid :imports}]`）、
+    `:kotoba.app/caps`（要求 capability）、`:kotoba.app/limits`、
+    `:kotoba.app/latest`（**actor の鍵由来 IPNS = 署名済み更新チャネル**）。
+  - **appview** = 「graph を描画する app」。全画面サーフェス。aozora の
+    /manga viewer も mangaka editor も appview（描画対象が違うだけ）。
+  - **embedUrl** = 「host アプリが文脈内に mount できる URL」。スキームは
+    `https://` | `ipfs://<cid>[/path]` | `ipns://<name>[/path]` を認め、
+    `resolve-embed-url` が解決規則（CID 検証可否・gateway 化）を返す。
+    **iframe か web component かは host の実装詳細で、protocol は関知しない**
+    （ここが ActorFrame との決別点）。
+  - capability 名の正本はこの repo（kototama の 8 imports を registry 化し、
+    kototama.contract は「実装」と位置付ける）+ bridge caps
+    （`net/http-post` の同期 ABI 制約を回避する host 代行呼び出し）。
+
+### 2. `kotoba-lang/atprotocol` — kotoba-protocol の上に立つ投影層（新規 repo、public）
+
+**atproto 互換は「kotoba graph の別 encoding」**。責務境界を data で宣言する:
+
+| | owns（atprotocol） | delegates（kotoba-protocol へ） |
+|---|---|---|
+| identity | handle ↔ DID 解決、did:web ドキュメント配信 | 鍵（did:key）、CACAO 検証 |
+| data | lexicon NSID / record 形、record ⇄ datom **codec** | datom の真実、graph CID |
+| mutability | repo commit / MST / firehose の wire encoding | IPNS head |
+| transport | XRPC、PDS/AppView エンドポイント | 配布（IPFS/B2） |
+| app 提供 | profile view への投影（embedUrl / appview flag） | manifest datoms、bundle CID、caps |
+
+repo の中身:
+- `atprotocol.boundary` — 上表 as data + `delegated?` 述語。
+- `atprotocol.projection` — record⇄datom codec の**契約**
+  （`{:record->datoms f :datoms->view f}` の protocol map。参照実装 =
+  `aozora.pds.encode` / `aozora.appview.scan` — 既に本番で動いているものを
+  この契約の実装と再定義する。移植はしない）。
+- `atprotocol.profile` — `:kotoba.app/*` → atproto profile view への投影。
+  **W-Protocol の `performerType / contentMode / uiType` はこの層の
+  deprecated compat alias に降格**（mapping 表 as data、`:deprecated true`）。
+  正は `:kotoba.app/kind` と `:kotoba.app/embed-url`。新規実装は
+  `embedUrl` + `appKind` のみを読む。
+
+### 3. mangaka miniapp（前ターンの設計）の語彙差し替え
+
+- mangaka actor の profile 拡張（W-Protocol fields）→ **actor 自身の graph の
+  `:kotoba.app/*` datoms** が正。atproto から見える `embedUrl` は
+  atprotocol.profile の投影出力。
+- app manifest record（`net.kotoba.app.manifest` lexicon 案）→ lexicon は
+  atprotocol 側の**投影形**であり、正は `:kotoba.app/*` datoms。
+- ActorFrame → 廃語。host（aozora SPA）は「profile の投影に embedUrl があれば
+  mount する」だけで、mount 実装（iframe / wasm-webcomponent）は host 実装詳細。
+
+### 意図的に scaffold に入れないもの（follow-up）
+
+- kotobase の公開 IPFS retrieval（既知ギャップ）— `ipfs://` embed-url の実配信
+  はこれ待ち。それまで `https://` embed-url + `:kotoba.app/bundle-cid` で
+  integrity を先に刻む。
+- aozora SPA への embedUrl mount 実装（cljs 版 appview/embed ホスト）。
+- lexicon `_lexicon` DNS 公開、firehose、MST encoding の kotoba graph 導出。
+- kototama bridge caps の実装（postMessage 契約は vocab のみ先行定義）。
+
+## Consequences
+
+- (+) 散在していた基盤（datom/IPLD/IPNS/IPFS/CACAO/kototama）が**1 つの層表**
+  で名指しされ、新規設計（miniapp 等）が「どの層の話か」で会話できる。
+- (+) atproto 互換が「投影」だと宣言され、aozora PDS の encode/scan が既に
+  その実装であることが明文化される。Bluesky 互換を壊さず kotoba 側を進化
+  させられる。
+- (+) W-Protocol は互換 alias として残るため既存 archive を壊さない。
+  新規コードは `:kotoba.app/*` だけを見ればよい。
+- (−) spec repo と実装 repo の drift リスク — layers/vocab を data にして
+  テストから参照させることで軽減（宣言が壊れたらテストが落ちる）。
+- (−) 2 repo 追加分の west/manifest 管理コスト。
