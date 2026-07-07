@@ -1256,6 +1256,14 @@
    ;; calls this a Peer (ADR-2607050700, `kotoba : kotobase = Clojure : Datomic`
    ;; per ADR-2607032500).
    "orgs/kotoba-lang/kotobase-peer"
+   ;; platform-independent XRPC handler + async/sync storage bridge for a
+   ;; kotobase-peer-backed worker, extracted 2026-07-07 from
+   ;; kotobase-cljc-worker's handler.cljc/r2.cljc so a Cloudflare deployment
+   ;; (net-kotobase) and any other consumer share ONE implementation instead
+   ;; of independently re-deriving it (net-kotobase/kotobase-cf-wasm had
+   ;; done exactly that, unknowingly duplicating kotobase-cljc-worker's more
+   ;; mature, already-in-production implementation). No deploy surface.
+   "orgs/kotoba-lang/kotobase-server"
    ;; kotoba-lang foundational stdlib P1 (ADR-kotoba-lang-foundational-stdlib)
    "orgs/kotoba-lang/fs"
    "orgs/kotoba-lang/http"
