@@ -74,8 +74,16 @@ Addendum（2026-07-07 同日）: cloud-itonami 配線も完了 — `cloud_itonam
 :message/draft、:read-only）/ `:chat/post-message`（→ denrei :message/post、
 :external-send、denrei 自身の :request-approval interrupt を real resume、
 HARD hold は override しない）を追加（cloud-itonami `1f27ceb`、350 tests /
-2719 assertions 全緑）。実 kaisha host への live ChannelTarget
-（kotoba-server XRPC）は引き続き follow-up。
+2719 assertions 全緑）。
+
+Addendum 2（2026-07-07 同日）: live ChannelTarget も完了 — `denrei.pod`
+（`db-channelport` = langchain.db :db-api 契約のみで喋る ChannelTarget、
+`fleet-channelport` = murakumo fleet node の実測方言 pre-wire、
+`messages-since`/`follow!` = kotobase / kotoba-peer と共通の datom 面
+cursor tail）。murakumo fleet 実ノード（asher）で post!/fetch-message/
+channel-messages の e2e 実測成功（denrei `69a3f5d`、38 tests / 149
+assertions 全緑）。deploy 方針と fleet 方言の詳細・KSE 不採用の理由は
+ADR-2607072400（+ addendum 1/2）が正本。
 
 ## References
 

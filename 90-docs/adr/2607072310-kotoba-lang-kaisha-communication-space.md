@@ -59,9 +59,10 @@ EDN-native surface model として実装する。
   で返す。calendar.validate と同型。
 - **Identity**: member に `:kaisha/did` slot（kotoba CACAO did:key 前提の置き場。
   model は強制しない）。
-- **v1 スコープ外（follow-up）**: transport（kotoba-server XRPC lexicon、KSE
-  realtime fan-out）、persistence（datom 投影、`kotoba-lang/crdt` による
-  message body の共同編集）、UI。**AI のチャンネル投稿は必ず governed actor
+- **v1 スコープ外（follow-up）**: transport（kotoba-server XRPC lexicon。
+  realtime は当初「KSE fan-out」と書いたが撤回 — datom 面共通の :db-api 契約に
+  一本化、下記 addendum と ADR-2607072400 addendum 2）、persistence（datom
+  投影、`kotoba-lang/crdt` による message body の共同編集）、UI。**AI のチャンネル投稿は必ず governed actor
   （post-LLM ⊣ Governor、send は人間承認）経由**とし、tayori/teian と同型の
   独立 actor として別 ADR で起こす（model へ直書きさせない）。
 
@@ -74,7 +75,24 @@ pure functions」の形で手に入り、Datomic/kotoba への永続・XRPC 公�
 
 実行状況（2026-07-07）: repo scaffold（model/validate/test、5 tests 16
 assertions 全緑）、GitHub 作成（public）+ push（`21766b9`）、west 登録、本 ADR。
-transport / persistence / actor / UI は未着手の follow-up。
+
+Addendum（2026-07-07 同日、follow-up の消化状況）:
+- **AI 投稿 actor — 完了。** `kotoba-lang/denrei`（ADR-2607072330、post-LLM ⊣
+  MembershipGovernor、post は常に人間承認）。
+- **cloud-itonami 配線 — 完了。** `cloud_itonami.workspace` の
+  `:chat/draft-message` / `:chat/post-message`（teian/koyomi 同型）。
+- **persistence（投稿面）— 完了。** 人間承認済み投稿は murakumo fleet 上の
+  kotoba-server datom graph（kaisha pod、ADR-2607072400）に channel index 付き
+  で永続。asher で e2e 実測済み（denrei.pod、denrei `69a3f5d`）。
+- **realtime — 完了、ただし本文の「KSE realtime fan-out」という表現は撤回。**
+  KSE は kotoba-server runtime 固有で kotobase / kotoba-peer engine に存在せず
+  datomic tail は ephemeral のため、realtime 追従は datom 面共通の :db-api
+  契約（denrei.pod の messages-since / follow!、cursor tail）に一本化
+  （ADR-2607072400 addendum 2）。
+- **残 follow-up**: kaisha 専用 XRPC lexicon（現状は datomic.* 汎用面のみ）、
+  space 全体の datom 投影（現状永続されるのは投稿 delivery record であって
+  members/channels の space ground fact は actor store 側にのみ存在）、
+  `kotoba-lang/crdt` による message body 共同編集、UI。
 
 ## References
 

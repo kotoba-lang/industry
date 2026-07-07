@@ -34,16 +34,21 @@ space（会社ごとに1つ）/ channel（:public/:private）/ message（thread 
 Slack 準拠）、post/reply/react/join/leave/mark-read、mentions/visible-channels/
 unread、kaisha.validate（unknown-author/orphan-reply/nested-thread/
 private-without-members）。member に :kaisha/did slot（CACAO did:key 前提）。
-v1 は model のみ; transport（XRPC/KSE）・persistence（datom/CRDT）・UI・AI 投稿
-actor（post-LLM ⊣ Governor、send 人間承認、tayori/teian 同型）は follow-up で、
-AI は model へ直書きさせない。詳細は同名 .md 参照。
+v1 は model のみ; transport（XRPC。realtime は当初 KSE と書いたが撤回、下記
+参照）・persistence（datom/CRDT）・UI・AI 投稿 actor（post-LLM ⊣ Governor、
+send 人間承認、tayori/teian 同型）は follow-up で、AI は model へ直書きさせ
+ない。詳細は同名 .md 参照。
 
 ## Consequences
 
 Slack/Teams 相当の社内空間が他 surface と同じ pure EDN + pure functions で
 手に入る。実行状況（2026-07-07）: scaffold + test 全緑（5 tests / 16
-assertions）、GitHub 作成 + push（21766b9）、west 登録、本 ADR。transport/
-persistence/actor/UI は未着手。
+assertions）、GitHub 作成 + push（21766b9）、west 登録、本 ADR。addendum
+同日: AI 投稿 actor（denrei、ADR-2607072330）・cloud-itonami 配線
+（:chat/*）・投稿の datom 永続（kaisha pod on murakumo fleet、
+ADR-2607072400、asher e2e 実測）・realtime（KSE 撤回 — datom 面共通の
+:db-api cursor tail、messages-since/follow!）まで完了。残: kaisha 専用
+XRPC lexicon、space 全体の datom 投影、CRDT 共同編集、UI。
 
 ## References
 

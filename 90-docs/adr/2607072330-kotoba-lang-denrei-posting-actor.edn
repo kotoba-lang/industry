@@ -47,8 +47,12 @@ kaisha への AI 投稿が governor の型で構造的に強制される。実�
 （2026-07-07）: scaffold + 31 tests / 129 assertions 全緑 + lint 0/0 + sim
 完動、GitHub 作成 + push（99a85ba）、west 登録、本 ADR。addendum 同日:
 cloud-itonami 配線も完了（workspace.cljc :chat/draft-message /
-:chat/post-message、cloud-itonami 1f27ceb、350 tests 全緑）。live
-ChannelTarget（kotoba-server XRPC）は follow-up。
+:chat/post-message、cloud-itonami 1f27ceb、350 tests 全緑）。addendum 2
+同日: live ChannelTarget も完了 — denrei.pod（db-channelport /
+fleet-channelport / messages-since / follow!、kotobase・kotoba-peer 共通の
+:db-api cursor tail、KSE 不採用）。murakumo fleet 実ノード asher で e2e
+実測成功（denrei 69a3f5d、38 tests / 149 assertions 全緑）。正本は
+ADR-2607072400（+ addendum 1/2）。
 
 ## References
 
