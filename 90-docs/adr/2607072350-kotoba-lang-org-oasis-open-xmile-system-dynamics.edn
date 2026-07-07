@@ -66,3 +66,18 @@
  ["orgs/kotoba-lang/org-oasis-open-xmile の clojure -M:test が34 tests/105 assertions all green、clojure -M:lint(clj-kondo) errors 0/warnings 0"
   "gh repo create kotoba-lang/org-oasis-open-xmile --public + push済み"
   "manifest/repos.edn :extra-projects への登録 + bb scripts/gen-west-manifest.bb --entry org-oasis-open-xmile で最小diff生成、--check でcanonical一致を確認"]}
+
+ :addenda
+ [{:date "2026-07-07"
+   :title "sec 3.5.3 DELAY1/DELAY3/SMTH1/SMTH3/TREND を隠しstock化して実装（ユーザー指示「成熟度を向上」）"
+   :summary "v2スコープアウト項目のうち最も価値が高く仕様が明確なsec 3.5.3を実装。RANDOM等のstochastic系、DELAY/DELAYN/SMTHN/FORCST、conveyor/queue輸送、配列、unit次元解析は引き続きv2のまま。"
+   :implementation
+   ["xmile.execute/desugar-delays(新設): DELAY1/DELAY3/SMTH1/SMTH3/TRENDの呼び出しを隠しstock/flow/auxへの参照に書き換える正規化パス、runの先頭で一度だけ実行。隠し変数名は:xmile/seriesに一切現れない"
+    "OASIS仕様書に明示式が無いためVensim Reference Manualのequivalent equationsを一次資料として検証: DELAY1/SMTH1=dH/dt=(input-H)/T、DELAY3/SMTH3=T/3ずつの3段カスケード(同一初期条件共有)、TRENDの隠しLevel=INTEG((input-Level)/T, input/(1+g0*T))、出力=(input-Level)/(T*Level)"
+    "xmile.expr/unsupported-buitinsからDELAY1/DELAY3/SMTH1/SMTH3/TRENDを分離しhidden-stock-builtinsとして新設(eval-exprに直接渡された場合は明確なエラー)"
+    "xmile.validateにdelay-smooth-problems追加。algebraic-loop-problemsは隠しstockが介在する遅延結合を誤検出しないようsame-tick-free-varsに切り替え"
+    "解析解検証: DELAY1/SMTH1のステップ応答(指数関数)、DELAY3のステップ応答(Erlang-3、Sterman理論と一致)+定常収束、TRENDの定数入力ゼロ+ランプ入力の厳密閉形式"]
+   :bug-found "JVM Clojureの/は正確な0.0/0.0でArithmeticExceptionを投げる(isZeroを先にチェックするため)。TRENDの除算がこれを踏みやすく、Vensim自身のZIDZガードと同じ方式で修正(新しい式木ノード種は増やさず既存の:if/:eqで実装)"
+   :tests "53 tests / 184 assertions all green(+19 tests/+79 assertions)、lint errors 0/warnings 0"
+   :commit "19018e9d960bb95d6de2e50ebc918e428e532ddc (3930c70から fast-forward)"
+   :not-decided ["conveyor/queue輸送(隠しstockのODEとは根本的に異なる離散スラッグキュー方式が必要、中途半端な実装よりv2のまま維持)" "stochastic系" "配列" "unit次元解析" "サブモデル/マクロ" "rk2/rk45/gear"]}]}

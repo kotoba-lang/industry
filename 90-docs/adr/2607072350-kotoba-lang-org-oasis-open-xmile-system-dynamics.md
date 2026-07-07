@@ -88,3 +88,40 @@ conveyor・queue 輸送 / sec 4.5 配列 / sec 3.7.4 サブモデル・マクロ
 - `gh repo create kotoba-lang/org-oasis-open-xmile --public` + push 済み。
 - `manifest/repos.edn` の `:extra-projects` への登録 + `bb scripts/gen-west-manifest.bb --entry
   org-oasis-open-xmile` で最小 diff 生成、`--check` で canonical 一致を確認。
+
+## 追記1（2026-07-07）: sec 3.5.3 DELAY1/DELAY3/SMTH1/SMTH3/TREND を隠し stock 化して実装
+
+ユーザー指示「成熟度を向上」を受け、v2 スコープアウト項目のうち最も価値が高く仕様が明確な
+sec 3.5.3（DELAY1/DELAY3/SMTH1/SMTH3/TREND）を実装した（`RANDOM`/`NORMAL` 等の stochastic 系、
+`DELAY`/`DELAYN`/`SMTHN`/`FORCST`、conveyor/queue 輸送、配列、unit 次元解析は引き続き v2 のまま）。
+
+- **`xmile.execute/desugar-delays`（新設）** — モデルの全equationを走査し、DELAY1/DELAY3/SMTH1/
+  SMTH3/TREND の呼び出しを、自動生成された隠し stock/flow/aux への参照に書き換える正規化パスを
+  `run` の先頭（既存の topo-order/initial-stocks/Euler-RK4 ループの前）で一度だけ実行する。隠し変数名は
+  `:xmile/series` の出力には一切現れない（フィルタ済み）。
+- 実装した ODE は OASIS 仕様書自体には明示式が無かったため、Vensim Reference Manual の
+  「equivalent equations」（`fn_delay1.html`/`fn_delay3.html`/`fn_smooth3.html`/`fn_trend.html`）を
+  一次資料として検証: DELAY1/SMTH1 = `dH/dt=(input-H)/T`、DELAY3/SMTH3 = T/3 ずつの3段カスケード
+  （3段とも同一の初期条件を共有）、TREND の隠し Level = `INTEG((input-Level)/T, input/(1+g0*T))`、
+  出力 = `(input-Level)/(T*Level)`。
+- `xmile.expr/unsupported-builtins` から DELAY1/DELAY3/SMTH1/SMTH3/TREND を分離し
+  `hidden-stock-builtins` として新設（`eval-expr` に直接渡された場合はモデルレベルの desugaring を
+  経由していない旨の明確なエラーを投げる、という正しい別挙動を維持）。
+- `xmile.validate` に `delay-smooth-problems`（引数個数2-3・delay/smoothing/averaging-time が
+  リテラル定数の場合の正値チェック）を追加。`algebraic-loop-problems` は
+  `A = DELAY1(B, 5)` / `B = A + 1` のような「隠し stock が介在する遅延結合」を不正な同tickループと
+  誤検出しないよう、依存計算を `same-tick-free-vars` に切り替えて修正。
+- 解析解による検証: DELAY1/SMTH1 のステップ応答（指数関数）、DELAY3 のステップ応答
+  （Erlang-3、Sterman の material-delay理論と一致）+ 定常収束、TREND の「定数入力では0」+
+  ランプ入力の厳密閉形式。
+- 実装中に発見した実バグ: JVM Clojure の `/` は正確な `0.0/0.0` で `ArithmeticException` を投げる
+  （`clojure.lang.Numbers.divide` は除数の `isZero` を先にチェックするため、プリミティブ double 除算とは
+  挙動が異なる）。TREND の除算がこれを踏みやすい（入力が静止状態から始まる場合、非常によくある）ため、
+  Vensim 自身の参照実装（`TREND=ZIDZ(...)`）と同じガードを、新しい式木ノード種を増やさず既存の
+  `:if`/`:eq` で実装して修正。
+- テスト: 53 tests / 184 assertions all green（+19 tests / +79 assertions）、lint errors 0/warnings 0。
+- commit `19018e9d960bb95d6de2e50ebc918e428e532ddc`（`3930c70` から fast-forward）。
+  `bb scripts/gen-west-manifest.bb --entry org-oasis-open-xmile` で pin 前進、サーバ側検証 OK。
+- 未着手のまま: conveyor/queue 輸送（隠し stock の ODE とは根本的に異なる離散スラッグキュー方式が
+  必要なため、中途半端な実装より v2 のまま維持する判断）、stochastic 系、配列、unit 次元解析、
+  サブモデル/マクロ、rk2/rk45/gear。
