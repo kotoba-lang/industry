@@ -4757,8 +4757,15 @@
    :business-id "cloud-itonami-isic-6622"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :insurance]
    :optional-technologies []
-   :maturity :blueprint
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as an insurance-intermediation actor
+   ;; (Broker-LLM ⊣ Insurance Intermediation Governor), modeled closely
+   ;; on siblings 6511/6512/6621. Two actuation events (:placement/bind,
+   ;; :commission/book), neither ever auto at any phase. Introduces a
+   ;; best-interest/shopping-duty check (insufficient-quotes) with no
+   ;; analog in any sibling -- comparing quotes, not paperwork
+   ;; completeness, is this actor's central duty.
    :operating-states [:intake :place :bind :endorse :audit]},
   {:id "6629"
    :name "Other activities auxiliary to insurance and pension funding"
