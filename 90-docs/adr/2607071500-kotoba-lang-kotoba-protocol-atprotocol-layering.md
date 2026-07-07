@@ -170,3 +170,37 @@ repo の中身:
    立てる)。それが済めば `ipfs://<cid>` embed-url の app actor が完全に
    content-addressed で live mount される (embed-url 解決 → cap-bridge round-trip
    は既に実証済み)。
+
+## Addendum 2 (2026-07-07 同日): kind=actor — kototama WASM actor のブラウザ実行 live
+
+前回 Addendum の「残る発展系」だった `:kotoba.app/kind "actor"` の browser-host
+実行を実装・本番稼働させた。
+
+- **manifest 投影**: `:kotoba.app/wasm [{:cid :imports}]` を atprotocol.profile
+  が `appWasm [{:cid :url :imports}]` に投影（`:url` は既存の embed-url 解決
+  経路で CID → kotobase.net gateway）。`kotoba.protocol.app/cap->wasm-import`
+  / `wasm-import->cap` で cap 名 (kebab) ⇄ wasm import 関数名 (snake) を変換。
+- **host 実行**: `kotoba-lang/wasm-webcomponent` の `actor-host.js`
+  （ADR-2607062400 の browser-native 実装、7/8 imports・ed25519 のみ
+  `@noble/curves` へ差し替え）を vendor。`yoro-ui.interop.wasm-actor/run-actor!`
+  が CID URL から wasm を fetch → manifest 要求 imports ∩ host 対応で
+  HostCaps 構築 → `WebAssembly.instantiate` → export 実行 → memory から
+  result/log を読む。profile の `wasm-actor-panel`（`kind=actor` の時に
+  `app-embed-panel` の代わりに dispatch）が granted/denied import chip と
+  実行ボタンを表示。
+- **重要なハマりどころ（根本原因特定・修正済み）**: vendor した JS が SPA と
+  **同じ Closure `:advanced` コンパイルパスに載る**ため、JS 内部の dot 記法
+  プロパティアクセス（`m.grants`・`fns.sha256_hex` 等）が cljs 側の出力と
+  **同じ property-renaming** を受ける。しかし cljs 側から object literal を
+  組み立てて渡す書込みは、その rename 決定に載らず**別の mangled 名**になり、
+  HostCaps の grant が全て「missing」と読めたり、`WebAssembly.instantiate`
+  の native import lookup（wasm バイナリに焼き込まれた文字列で行われる）が
+  renamed 済みの関数名を見つけられず失敗した。**externs ファイル**
+  （`externs/actor-host.js`）で `grants`/`limits`/`store`/`memory` と
+  host 関数名（`sha256_hex` 等 snake_case）を明示的に rename 対象外にして
+  解決 — vendor JS を Closure :advanced と併用する際の一般的な罠として記録。
+- **live 実証**: `wasmdemo.aozora.app` の profile で `main()` を実行し
+  `sha256_hex("hello")` が正しいハッシュ値
+  `2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824` を返し、
+  `log_write` が `"hello"` を記録。CID 配信の wasm → HostCaps 検証付き
+  ブラウザ実行という L5 の最後のピースが本番で一周した。
