@@ -302,7 +302,13 @@
  ;; 生成時に既存 path 群と union される（一度 west.yml に載れば自動追従、distinct で重複排除）。
  ;; clone 済みの working tree（orgs/<org>/<repo>）が存在し HEAD を持つこと。
  :extra-projects
- #{;; kotoba-composer — AI music composition request/pipeline as pure data
+ #{;; kagitaba — 1Password-compatible keychain data model (.cljc):
+   ;; category/field/item shapes + 1PUX import. Existed as a clean, tested
+   ;; local checkout with no GitHub remote (flagged unresolved in
+   ;; ADR-2607022800 as "kagi はビルド不能" -- kagi's own :local/root dep on
+   ;; this repo couldn't build in CI with nothing to fetch); pushed now.
+   "orgs/kotoba-lang/kagitaba"
+   ;; kotoba-composer — AI music composition request/pipeline as pure data
    ;; contracts, mirroring ai.gftd.ongakuka.*'s compose/track/stem/style/
    ;; generation lexicons 1:1 + a pure pipeline-status reducer
    ;; (ADR-2607031510). Same webrtc-precedent scope test: models records,
