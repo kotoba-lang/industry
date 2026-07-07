@@ -5,7 +5,7 @@
   :doc_type "adr"
   :topic "kotoba-git-kotoba-rad-content-addressed-vcs"
   :authoritative true
-  :last_verified "2026-07-07"
+  :last_verified "2026-07-07 (addendum same day: object model redesigned onto native arrangement datoms)"
   :authoritative_for
   ["kotoba-lang/kotoba-git owns the content-addressed git object model
     (blob/tree/commit) and mutable ref store for this ecosystem"
@@ -149,3 +149,58 @@
    authorize-push? (owner push, delegated push, outsider rejection,
    mismatched-target rejection, revoked-delegate rejection)."
   "No wrangler deploy / production wiring attempted for either repo."]}
+
+ :addendum-2607072330-datom-native-object-model
+ {:owner-instruction "「git は外部化するのではなく、kotoba-git で git 自体を
+                       Datomic、kotoba で再設計実装してください」-- don't
+                       externalize git as a side store; redesign git itself
+                       on Datomic/kotoba, inside kotoba-git."
+  :what-changed
+  ["Original decision stored blob/tree/commit as io-ipld content-addressed
+    DAG-CBOR blocks -- a store sitting NEXT TO arrangement (which only held
+    refs). That is a git object store riding alongside the Datomic-shaped
+    foundation, not git redesigned as part of it. Corrected."
+   "kotoba-git.object's write-blob/write-tree/write-commit (trailing ! now
+    dropped -- pure) assert blob/tree/commit content directly as
+    arrangement quads whose SUBJECT is the object's own content hash:
+    {cid \"blob/bytes\" bytes}, {cid \"tree/entries\" [...]}, {cid
+    \"commit/tree\" (ipld/link tree)} + commit/parents/commit/author/
+    commit/message/commit/ts. Every write fn is now (fn [db ...] -> [db'
+    cid]), matching kotoba-git.refs's pre-existing db-in/db-out style, so
+    object writes and ref updates thread the SAME db value."
+   "io-multiformats/org-ietf-cbor/io-ipld now used ONLY for their pure
+    canonical-encoding/hashing functions (cidv1-raw, encode+cid) to derive
+    each object's content-addressed identity -- nothing persisted through
+    them anymore. Persisting a repo to durable storage is one operation
+    over the whole db (new kotoba-git.repo/persist!, wrapping
+    arrangement.core/commit!), covering objects+refs together, the same
+    path every other kotobase-peer domain uses."
+   "Concrete Datomic-native payoff, not just a storage-location change:
+    commit/tree asserted as a real ipld/link, so arrangement.core/refs-to
+    answers 'which commits reference this tree' with zero extra code -- a
+    reverse graph query the prior side-content-store design could not
+    offer for free."
+   "Trade-off accepted, stated plainly: commit/parents stored as one
+    literal vector-of-links (not decomposed per-parent) to preserve parent
+    order (first-parent history matters for log); cost is individual
+    parents are not reverse-indexed via refs-to. ancestors/log/
+    missing-since still walk the DAG procedurally, not as one Datalog
+    query -- arrangement.datalog is conjunctive-join only, not (yet)
+    transitive-closure/fixpoint (ADR-2607022600 already flags this as an
+    open follow-up for the whole stack, not resolved here)."
+   "kotoba-rad untouched: it never depended on kotoba-git's object
+    representation (only plain CID strings) -- the decoupling from the
+    original decision paid off exactly as intended when this half of the
+    design changed underneath it."]
+  :verification
+  ["kotoba-git suite grew 12->14 tests / 25->28 assertions (added
+    kotoba-git.repo-test + an arrangement.core/refs-to reverse-lookup
+    test), all green against both pinned :git/sha deps and local sibling
+    checkouts."
+   "Full cross-repo integration script from this ADR's original
+    Verification section (RID -> delegate -> object write -> sigref ->
+    authorize-push? -> ref move -> second commit -> revoke ->
+    outsider-rejection) re-run end-to-end against the new API, identical
+    pass/fail results, plus a new step showing arrangement.core/refs-to
+    resolving tree-2's referencing commit with no kotoba-git-specific
+    code."]}}
