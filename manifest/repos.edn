@@ -1881,6 +1881,12 @@
    "orgs/kotoba-lang/appkit"
    "orgs/kotoba-lang/uikit"
 
+   ;; Apple HIG/UIKit 用語 (UIScrollView/UICoordinateSpace/hitTest/
+   ;; UIGestureRecognizer) で統一した canvas/viewport 相互作用数学の共通純CLJC
+   ;; lib — freeboard/kami-genko に重複していた viewport 数学の正本。Skia の
+   ;; CanvasKit とは無関係 (ADR-2607071130)
+   "orgs/kotoba-lang/canvaskit"
+
    ;; manga viewer — 正規化 work model + RTL 見開き pagination + css 文字列 +
    ;; pure-hiccup views (works-grid/reader)。zero runtime deps、状態/handler は
    ;; consumer 注入 (liquid-glass-ui 型)。consumer: app-aozora /manga
