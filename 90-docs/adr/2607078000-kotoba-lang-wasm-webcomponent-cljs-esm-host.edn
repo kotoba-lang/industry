@@ -1,0 +1,22 @@
+{:frontmatter
+ {:id "adr-2607078000-kotoba-lang-wasm-webcomponent-cljs-esm-host"
+  :title "ADR-2607078000: wasm-webcomponent's zero-build-step hand-JS host policy is superseded — kotoba/kototama WASM hosts are authored in ClojureScript, compiled once, run everywhere (browser + Node)"
+  :status "accepted"
+  :date "2026-07-07"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "kotoba-lang-wasm-webcomponent-cljs-esm-host"
+  :authoritative true
+  :authoritative_for
+  ["kotoba-lang/wasm-webcomponent: new policy -- kotoba/kototama WASM hosts needing more than a trivial hand-port are authored in ClojureScript and compiled via shadow-cljs :target :esm to a single ES module that runs identically in browser and Node, instead of hand-written per-platform JS. Existing hand-JS modules (actor-host.js/kgraph.js/has-capability.js/kotoba-wasm-element.js) are grandfathered, not retrofitted."
+   "kotoba-lang/wasm-webcomponent src-cljs/kotoba/kami_engine_host.cljs (+ shadow-cljs.edn, compiled src/kami-engine-host.js, test/verify-kami-engine-host.mjs, examples/kami-engine-host/): first implementation under the new policy -- 1:1 port of kami-script-runtime-rs's HostState/EcsStore/KamiHost (14 kami:engine/* host-imports across 4 WASM import modules), parity-verified in Node against the real isekai-network-01-netsurvivors.wasm fixture for 300 ticks (entities=16 shiro-pico=1 ghost=14 beat-spark=1, exact match with kami-script-runtime-rs's own documented Rust/wasmtime trace)."
+   "clojurewasm (cljw) ruled out for WASM-host-providing-imports roles: (1) native-binary-only, does not run in a browser; (2) its WebAssembly FFI is Clojure-calls-wasm only (wasm/load + wasm/call), no documented capability for cljw to provide host-import functions a guest wasm module calls into. Verified via its own README, not assumed."]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607072700-kotoba-lang-kami-solar-helix-scene"
+            "adr-2607061630-kototama-browser-wasm-aot-webcomponent"
+            "adr-2607061850-kotoba-lang-wasm-webcomponent-library-extraction"]
+  :last_verified "2026-07-07"
+  :artifacts
+  {:wasm-webcomponent "kotoba-lang/wasm-webcomponent -- kami-engine-host cljs/esm port, 6/6 Node parity checks green (node test/verify-kami-engine-host.mjs)"}}
+ :body "see 2607078000-kotoba-lang-wasm-webcomponent-cljs-esm-host.md"}
