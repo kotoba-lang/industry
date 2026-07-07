@@ -160,6 +160,65 @@ P2P パッケージング」を採る。**
    短縮できたが、ローカル MPS では長 prompt 非実用。P2P 文脈では block 復号の hop 償却
    （設計原則 6）として理論的に有望なので、T3 パターンとして設計のみ保持。
 
+## Execution record（2026-07-06〜07 実施。addendum）
+
+route③ を一気通貫で実行した。**総費用 ~$35-40（予算 $3,000 の ~1.3%）**。
+
+### 実施内容と成果物（scratchpad `kotoba-distill-stage0/`）
+
+1. **ベンチマーク拡張（#7 完了）**: 3→**18 タスク**（easy 4 / medium 10 / hard 4、
+   kotoba / kotoba-lang / datom-clj / did / ical-clj の 5 repo 横断）。全タスクを
+   「stub で FAIL・原本で PASS」の両方向オラクル検証済み。prep 自動化
+   （`prep_tasks.py`: 変則 splice をやめ、Clojure の last-defn-wins を利用した
+   append-override 方式）。RAG は per-task で自答ファイルのみ除外する方式に変更。
+2. **teacher trajectory 蒸留（#1 完了）**: GLM-5.2 (OpenRouter) の agentic loop
+   （提案→実テスト→エラー feedback→修正、`gen_trajectory.py`）で 66 本生成、
+   **40 本が実テスト PASS**（= 検証済み正解 trace）。variant: RAG+t0.2 / RAG+t0.8×2 /
+   no-RAG(エラー回復)。**費用 $2.50**（見積 $300-600 の 1/100 — 実測で大幅過大見積り
+   と判明。スケール余地大）。SFT データセット: train 37 / val 3（`sft/`）。
+3. **student QLoRA（#2 完了、経路変更あり）**: **M4/32GB ローカル学習は不可能と実証**
+   （Metal OOM — num-layers 2 / seq 4096 の最小構成でも backward が収まらない。
+   本 ADR の「M1 Max ローカルで QLoRA」想定は 35B に対しては反証された）。
+   Modal H200 (141GB, $4.54/hr) に切替え、bf16 + attention-only LoRA r=16 で
+   **24 分・~$2.5**。eval loss 1.637→**1.399**（6 epoch 単調減少）。
+   アダプタ 13.8MB（`adapters/kotoba-qlora-v1-final/`）。
+4. **B200 ベンチ（#8 完了）**: GLM-5.2-NVFP4 を vLLM/4×B200 で実測 —
+   28.9 tok/s（単一 stream、6.1K prompt）、RAG 付きで正解生成。
+   **自前ホストは ~$0.5/trajectory 換算で OpenRouter($0.007) の ~70 倍** —
+   「中規模バッチは API が正、自前は大規模 logit 蒸留時のみ」を実測で確定。
+5. **効果測定（18 タスク単発 eval、vLLM/H200 で base と LoRA を同一サーバ比較）**:
+   **base 7/18 vs LoRA 6/18 — v1 では蒸留効果は測定できず**（LoRA で +2
+   [kgraph-query(hard) / datom-entity] / −3 [did-web-helpers / did-key-document /
+   kgraph-get-objects]）。
+
+### v1 で効果が出なかった原因（次版への改善点）
+
+- 37 例 × 60 optimizer steps × attention-only r=16 は軽すぎる（容量・データ両方）。
+- **形式不一致**: 訓練データの assistant 応答は GLM-5.2 の非 thinking 形式だが、
+  Qwen3.6 は推論時に thinking を挟む — 蒸留データは thinking 込み形式で再生成するか、
+  student の thinking を無効化して整合させるべき。
+- 単発 eval n=18 はノイズが大きい（複数サンプル/topk 評価が必要）。
+
+### 実務知見（再利用価値のあるもの）
+
+- **bitsandbytes 4bit は Qwen3.6 MoE に効かない**: expert が grouped-GEMM 用の
+  3D packed tensor（nn.Linear でない）ため素通りし bf16 のまま 72GB ロードされる
+  （H100 OOM で発覚）。同アーキの量子化学習は別手段が要る。
+- **reasoning model の code-eval は「最初の fence ブロック抽出」だと thinking 中の
+  引用（テストコード等）を拾って誤採点する** — 最後の defn 含有ブロックを採る。
+  `max_tokens` も thinking 分を見込む（4K では本回答が切れた）。
+- vLLM `--enable-lora --lora-modules` で base/adapter を同一サーバから A/B 比較
+  できる構成は評価に便利（`modal_serve_eval.py`）。
+- scratchpad 内の git worktree は並行セッションの prune に巻き込まれうる —
+  eval 中に消失し 10 run が落ちた。長時間ジョブの worktree は再作成前提で書く。
+
+### 残作業（follow-up）
+
+- v2 蒸留: trajectory を 10-20 倍にスケール（$25-50）+ thinking 形式整合 +
+  epoch/rank 増で再学習 → 同 18 タスクで再評価。
+- 効果確認後に P2P パッケージング（#5: expert CID 化・WGSL int4・OPFS）と
+  voice/image パッケージング（#6）へ。
+
 ## References
 
 - Stage 0 実験一式: scratchpad `kotoba-distill-stage0/`（BM25 index / run_model.py /
