@@ -4939,8 +4939,22 @@
    :business-id "cloud-itonami-isic-7120"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :blueprint
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as a technical-testing/analysis actor
+   ;; (TestLab-LLM ⊣ Test Integrity Governor), the fifth build outside
+   ;; ADR-2607032000's original insurance/real-estate batch (after
+   ;; 6612, 6492, 6920, 6611), the first ISIC division 71 vertical in
+   ;; this fleet, modeled closely on siblings 6511/6512/6621/6622/6629/
+   ;; 6520/6530/6820/6612/6492/6920/6611.
+   ;; Distinctive check: within-tolerance? is the FIRST check in this
+   ;; fleet to combine a MINIMUM and a MAXIMUM bound in one comparison
+   ;; (measured-value must satisfy protocol-min <= value <=
+   ;; protocol-max), synthesizing this fleet's prior single-direction
+   ;; threshold checks (marketadmin's MINIMUM floor, casualty's/
+   ;; realty's/credit's MAXIMUM caps) into one two-sided range check.
+   ;; Single actuation (:certification/issue), never auto at any
+   ;; phase; like 6920, no bespoke capability lib.
    :operating-states [:intake :test :certify :report :audit]},
   {:id "7210"
    :name "Research and experimental development on natural sciences a..."
