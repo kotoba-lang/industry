@@ -34,4 +34,14 @@
   :out-of-scope ["central banking 6411" "holding companies 6420/642" "financial leasing 6491/6492"
                  "fund management 663/6630" "financial market administration 6611"
                  "securities brokerage 6612"]
-  :manifest-registration "kotoba-lang/insurance registered (real capability lib, same as property/labor); the 8 cloud-itonami-* repos stay standalone per existing convention"}}
+  :manifest-registration "kotoba-lang/insurance registered (real capability lib, same as property/labor); the 8 cloud-itonami-* repos stay standalone per existing convention"}
+
+ :addendum-1
+ {:date "2026-07-07"
+  :deepened-to-implemented "cloud-itonami-isic-6512"
+  :pattern-6512 "sealed Underwriter-LLM advisor + independent Non-Life Insurance Governor + append-only audit ledger, modeled closely on the sibling cloud-itonami-isic-6511 (life insurance)"
+  :new-lifecycle-6512 "claim filing (:claim/file, HARD-gated on the referenced policy actually being bound) and claim settlement (:claim/settle, a second actuation event independently checked against the policy's own coverage limit and double-settlement-protected) -- a lifecycle 6511 never modeled"
+  :actuation-invariant-6512 ":policy/bind and :claim/settle are never members of any casualty.phase phase's :auto set, and casualty.governor's high-stakes check (two members) always escalates them to human sign-off"
+  :fleet-maturity-before {:implemented 7 :blueprint 90 :spec 546 :total 643}
+  :fleet-maturity-after {:implemented 8 :blueprint 89 :spec 546 :total 643}
+  :test-status-6512 "34 tests / 172 assertions, lint clean, demo verified end-to-end"}}
