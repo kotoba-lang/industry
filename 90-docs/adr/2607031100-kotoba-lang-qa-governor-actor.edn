@@ -14,13 +14,13 @@
   :supersedes []
   :superseded_by []
   :related ["adr-2607023200"]
-  :last_verified "2026-07-03"
+  :last_verified "2026-07-07"
   :artifacts
-  {:qa-governor "orgs/kotoba-lang/qa-governor — 本ADRで新規scaffold（pure .cljc rubric/governor/ledger + test のみ、langgraph-clj配線・実LLMノード未実装）"
-   :ghosthacker-flow "orgs/com-junkawasaki/ghosthacker-flow — 最初のconsumer想定（ADR-2607023200）"}}
+  {:qa-governor "orgs/kotoba-lang/qa-governor — pure .cljc rubric/governor/ledger + 5決定論的collector + qa_governor.operation(langgraph-clj StateGraph配線、2026-07-07追加)。実LLM採点ノード未実装"
+   :ghosthacker-flow "orgs/com-junkawasaki/ghosthacker-flow — 最初のconsumer。qa_governor.operationの実E2E検証先(2026-07-07、correctness/consistency/stability/documentation=100、robustness=0)"}}
  :body "# ADR-2607031100: kotoba-lang/qa-governor — 「Nintendoクオリティ」ルーブリックを共通のQA governor actorに（proposed・pure core のみ scaffold 実装）
 
-**Status**: proposed（pure `.cljc` のルーブリック/governor/台帳ロジックのみ scaffold 実装済み。langgraph-clj StateGraphへの実配線・実LLMノードは未実装）
+**Status**: proposed（pure `.cljc` のルーブリック/governor/台帳ロジック + 5決定論的collector + langgraph-clj StateGraph配線まで実装済み。実LLM採点ノードは依然未実装 — 下記 Addendum 参照）
 **Date**: 2026-07-03
 **Deciders**: Jun Kawasaki
 
@@ -79,11 +79,43 @@ evidence収集ホストアダプタは対象外——`ghosthacker-flow.core`と�
 
 - evidence検証のルール（何が「証拠として妥当」かの判定基準）は現状シンプルな
   パターンマッチのみ。実運用では、governorがテスト実行ログ/CI結果を実際に
-  parseして突き合わせる、より厳密な検証ロジックへ強化する必要がある。
-- langgraph-clj StateGraphへの実配線（QA-LLMノード、interrupt-before による
-  人間承認等）は別PRで行う。
+  parseして突き合わせる、より厳密な検証ロジックへ強化する必要がある
+  （単純な文字列マッチの既知の弱点を`qa-governor.operation`のテスト作成中に
+  実際に踏んだ — 下記Addendum参照）。
+- ~~langgraph-clj StateGraphへの実配線~~ **完了（下記Addendum）**。実LLM
+  採点ノード（QA-LLM proposal）・interrupt-before人間承認は引き続き未実装。
 - `ghosthacker-flow`以外のconsumer（kami-engine、kotoba-lang自身等）への適用は
   今回のスコープ外。
+
+## Addendum（2026-07-07）: `qa-governor.operation` — StateGraph配線を実装
+
+Open Questionsが残していたStateGraph配線を実装した。`intake → collect →
+govern → decide → commit | hold`（`minidrama.operation`等の既存Actorsと
+同型）。`:collect`ノードは既存の5決定論的collector
+（`qa-governor.collectors.repo/collect`、LLM無し）を呼ぶ——実LLM採点ノードは
+引き続き未実装だが、governorのevidence/score整合性チェックは決定論的
+collectorに対しても有効（collector自体のバグ検知）で、将来の実LLMノードは
+同じ`:govern`ノードへの追加proposal源として差し込むだけでよい設計にした。
+
+`ghosthacker-flow`に対する実行（本物のcollector、モック無し）:
+correctness=100/consistency=100/stability=100/documentation=100/
+**robustness=0**（README作成時の2026-07-03は100だった——thrown?/guard系
+deftestが現在のtest sourceに0件、リポジトリ側の変化であって配線側の
+バグではないことを`qa-governor.collectors.repo/collect`を直接呼んで
+evidence文言まで確認済み）、総合スコア80.0（グレードB）、`:disposition
+:commit`でledgerに正しく記録。
+
+**テスト作成中に踏んだ実バグ**（governor.cljc自体ではなく、テスト側の
+evidence文言の書き方の問題として）: `:stability`カテゴリのcontradiction
+patternが`#\"(?i)\\bhang|...\"`で、evidence文言に\"no **hang**\"と書くと
+\"hang\"の部分文字列にマッチして矛盾判定される（否定文脈を読めない、
+Open Questionsが最初から明記していた簡易パターンマッチの限界の実例）。
+テスト用evidenceの文言を\"exits cleanly...\"に直して解消——governor.cljc
+自体は変更していない（この限界は既知・記録済みの設計上の制約のまま）。
+
+24 tests / 86 assertions（新規`qa-governor.operation-test`込み）、
+lint 0 warnings。`ghosthacker-flow`以外のconsumerへの適用、実LLM採点
+ノード、interrupt-before承認は引き続きスコープ外。
 
 ## Consequences
 
@@ -94,7 +126,9 @@ evidence収集ホストアダプタは対象外——`ghosthacker-flow.core`と�
   転用でき、アーキテクチャの一貫性が保たれる。
 
 **Negative / 制約（honest）**
-- 本ADR時点でLLMノード・langgraph-clj配線は未実装（pure決定ロジックのみ）。
-  実際に「AIが採点する」動作はまだ無い。
-- evidence検証は簡易実装で、実運用に耐える厳密さにはまだ達していない。
+- StateGraph配線は実装済み（Addendum参照）だが、実LLM採点ノードは依然
+  未実装——「AIが質的にコードを評価する」動作はまだ無く、決定論的
+  collectorが機械的に測れる範囲に限られる。
+- evidence検証は簡易パターンマッチのままで、実運用に耐える厳密さにはまだ
+  達していない（否定文脈を読めない等の実例をAddendumで確認済み）。
 "}
