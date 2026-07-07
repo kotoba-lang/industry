@@ -5544,7 +5544,37 @@
    :business-id "cloud-itonami-isic-8720"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :blueprint
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as a behavioral-care actor
+   ;; (BehavioralOps-LLM ⊣ Behavioral Care Governor), the twenty-
+   ;; fourth build outside ADR-2607032000's original insurance/real-
+   ;; estate batch (after 6612, 6492, 6920, 6611, 7120, 8620, 8530,
+   ;; 9200, 7500, 9603, 9521, 9321, 8730, 9102, 9103, 9602, 9000,
+   ;; 8890, 8610, 9311, 8510, 9412, 6491), a SECOND human-health
+   ;; vertical alongside 8610's hospital and 8620's clinic, but for
+   ;; residential behavioral-health care rather than acute medical
+   ;; care, modeled closely on siblings 6511/6512/6621/6622/6629/
+   ;; 6520/6530/6820/6612/6492/6920/6611/7120/8620/8530/9200/7500/
+   ;; 9603/9521/9321/8730/9102/9103/9602/9000/8890/8610/9311/8510/
+   ;; 9412/6491.
+   ;; Distinctive check: supervision-ratio-insufficient? is the
+   ;; SECOND ratio-based instance in this fleet's check-family
+   ;; taxonomy (leasing's collateral-coverage-ratio-insufficient?
+   ;; established the first, for a MINIMUM required ratio; this
+   ;; validates the MAXIMUM direction). Also reuses the unconditional-
+   ;; evaluation screening discipline for a twenty-second distinct
+   ;; grounding (medication-adherence-flag-unresolved-violations, the
+   ;; FIRST specifically for a medication-adherence-flag concept,
+   ;; deliberately scoped to only one of two actuations per the same
+   ;; domain-reasoning leasing's ADR-0001 established), tested via the
+   ;; screening op directly for a twelfth consecutive vertical (after
+   ;; eldercare/museum/conservation/salon/entertainment/casework/
+   ;; hospital/facility/school/association/leasing). Dual actuation
+   ;; (:treatment-plan/finalize, :crisis-response/finalize) on the
+   ;; same resident entity; double-finalization guarded via dedicated
+   ;; booleans per the 6492 lesson. See
+   ;; cloud-itonami-isic-8720/docs/adr/0001-architecture.md.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :triage :treat :review :follow-up :audit]}
   {:id "8730"
