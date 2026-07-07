@@ -1,11 +1,25 @@
 # ADR-2607062030: kotoba-lang/ichiran — 集計表生成 actor（tally-LLM ⊣ TallyGovernor）
 
-**Status**: closed(実行完了。フル実装 + 独立レビューで見つかった2件の修正まで
-完了。cloud-itonami 側 UI 配線・実 Distributor 接続は明記済みの follow-up)
+**Status**: closed(実行完了。フル実装 + 独立レビューで見つかった2件の修正、
+実 Resend/Slack Distributor 配線まで完了。cloud-itonami 側 UI 配線は follow-up)
 **Date**: 2026-07-06
 **Amended**: 2026-07-07
 **Closed**: 2026-07-07
 **Deciders**: Jun Kawasaki
+
+## Addendum(2026-07-07): 実チャネル接続(Resend / Slack)
+
+`ichiran.tallyport` に実配布実装を追加した:
+
+- **Resend**（`ichiran.resend/resend-tallyport`、commit `821a1fc`）:
+  `kotoba-lang/sheets` に CSV/xlsx export が無いため、本文にワークブックの
+  人間可読サマリ、添付に `sheets.wire/workbook-envelope`（Kotoba Transit
+  JSON）を採用。**実際に1通ライブ送信し、Resend message id を確認、
+  ledger に記録済み**（API キー自体は非出力）。
+- **Slack**（`ichiran.tallyport/slack-tallyport`）: `chat.postMessage`
+  通知の実装コードは用意。Slack アプリ登録はオーナー側作業（README に
+  手順明記）。
+- `mock-tallyport` は既定のまま。43 tests / 147 assertions。
 
 ## Context
 
