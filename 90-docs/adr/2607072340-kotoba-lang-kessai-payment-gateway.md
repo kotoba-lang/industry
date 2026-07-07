@@ -1,6 +1,6 @@
 ---
-id: adr-2607072330-kotoba-lang-kessai-payment-gateway
-title: "ADR-2607072330: kotoba-lang/kessai — rail-agnostic 決済ゲートウェイ抽象（ISO 8583 card / ISO 20022 SWIFT wire）を新設"
+id: adr-2607072340-kotoba-lang-kessai-payment-gateway
+title: "ADR-2607072340: kotoba-lang/kessai — rail-agnostic 決済ゲートウェイ抽象（ISO 8583 card / ISO 20022 SWIFT wire）を新設"
 status: accepted
 doc_type: adr
 topic: kotoba-lang-kessai-payment-gateway
@@ -19,7 +19,7 @@ supersedes: []
 superseded_by: []
 ---
 
-# ADR-2607072330: kotoba-lang/kessai — rail-agnostic 決済ゲートウェイ抽象
+# ADR-2607072340: kotoba-lang/kessai — rail-agnostic 決済ゲートウェイ抽象
 
 **Status**: accepted
 **Date**: 2026-07-07
