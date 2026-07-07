@@ -14,7 +14,34 @@
    :name "Community Water Safety Operations"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3600"
    :business-id "cloud-itonami-isic-3600"
-  :maturity :blueprint
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as a water-utility actor
+   ;; (Water Advisor ⊣ Water Safety Governor), the twenty-seventh
+   ;; build outside ADR-2607032000's original insurance/real-estate
+   ;; batch (after 6612, 6492, 6920, 6611, 7120, 8620, 8530, 9200,
+   ;; 7500, 9603, 9521, 9321, 8730, 9102, 9103, 9602, 9000, 8890,
+   ;; 8610, 9311, 8510, 9412, 6491, 8720, 8521, 6619), the FIRST
+   ;; infrastructure/utility vertical built in this fleet, modeled
+   ;; closely on siblings 6511/6512/6621/6622/6629/6520/6530/6820/
+   ;; 6612/6492/6920/6611/7120/8620/8530/9200/7500/9603/9521/9321/
+   ;; 8730/9102/9103/9602/9000/8890/8610/9311/8510/9412/6491/8720/
+   ;; 8521/6619.
+   ;; Distinctive check: contaminant-level-out-of-range? is the THIRD
+   ;; instance of this fleet's two-sided range check family (testlab/
+   ;; conservation established the first two). Also reuses the
+   ;; unconditional-evaluation screening discipline for a twenty-
+   ;; fifth distinct grounding (threshold-breach-unresolved-
+   ;; violations, the FIRST specifically for a threshold-breach
+   ;; concept), tested via the screening op directly for a fifteenth
+   ;; consecutive vertical (after eldercare/museum/conservation/
+   ;; salon/entertainment/casework/hospital/facility/school/
+   ;; association/leasing/behavioral/secondary/card). Dual actuation
+   ;; (:report/publish, :alert/suppress) on the same site entity --
+   ;; :actuation/suppress-alert is the FIRST negative actuation
+   ;; (withholding a notification rather than issuing a record) this
+   ;; fleet has modeled. Double-finalization guarded via dedicated
+   ;; booleans per the 6492 lesson. See
+   ;; cloud-itonami-isic-3600/docs/adr/0001-architecture.md.
    :required-technologies [:robotics :telemetry :dmn :bpmn :audit-ledger :forms]
    :optional-technologies [:cfd :cae]
    :operating-states [:intake :sample :alert :maintain :publish :audit]}
