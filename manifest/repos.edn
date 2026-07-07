@@ -302,7 +302,14 @@
  ;; 生成時に既存 path 群と union される（一度 west.yml に載れば自動追従、distinct で重複排除）。
  ;; clone 済みの working tree（orgs/<org>/<repo>）が存在し HEAD を持つこと。
  :extra-projects
- #{;; kotoba-document-contracts — shared .cljc data-shape contract (DOM tree /
+ #{;; kotoba-composer — AI music composition request/pipeline as pure data
+   ;; contracts, mirroring ai.gftd.ongakuka.*'s compose/track/stem/style/
+   ;; generation lexicons 1:1 + a pure pipeline-status reducer
+   ;; (ADR-2607031510). Same webrtc-precedent scope test: models records,
+   ;; not the wire format; the actual XRPC call stays with the app-level
+   ;; actor (yukkuri's composer actor) that owns the deployment.
+   "orgs/kotoba-lang/composer"
+   ;; kotoba-document-contracts — shared .cljc data-shape contract (DOM tree /
    ;; resolved style / draw-ops) for kotoba's document-rendering pipeline,
    ;; stub-only, split out so kotoba-lang/browser's htmldom+cssom and a future
    ;; aiueos-side "mainuiux" renderer can conform to the same interchange
