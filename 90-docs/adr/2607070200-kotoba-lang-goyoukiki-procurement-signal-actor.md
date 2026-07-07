@@ -1,10 +1,11 @@
 # ADR-2607070200: kotoba-lang/goyoukiki — JP 政府調達 signal + bidder-matching actor（match-LLM ⊣ ProcurementGovernor）
 
-**Status**: closed（実行完了。repo scaffold + tests green + manifest 登録まで完了。
-実データ取得(JP e-Gov/入札情報公開システム・全省庁統一資格)・US/EU/中国拡張・
-teian/tayori 側の応答文書ドラフト配線は明記済みの follow-up）
+**Status**: closed（実行完了。repo scaffold + tests green + manifest 登録 +
+実データingestion(ADR-2607070300) + cloud-itonami配線(PR #34、レビュー待ち)
+まで完了。US/EU/中国拡張・candidate側実データ取得・teian/tayori 側の応答
+文書ドラフト配線は明記済みの follow-up）
 **Date**: 2026-07-06
-**Closed**: 2026-07-06
+**Closed**: 2026-07-07
 **Deciders**: Jun Kawasaki
 
 ## Context
@@ -131,7 +132,7 @@ public repo を作る。またこれを提案可能な団体を発見する iton
 - (−) 米国/EU/中国への展開、teian/tayory 側の応答文書ドラフト配線は
   本 ADR の範囲外（別 PR/別 ADR）。
 
-## Execution(closing, 2026-07-06)
+## Execution(closing, 2026-07-07)
 
 | 項目 | 状態 | 備考 |
 |---|---|---|
@@ -142,9 +143,14 @@ public repo を作る。またこれを提案可能な団体を発見する iton
 | demo sim 実行確認（ingest→propose自動commit→share人間承認→phase0無効化→沈黙期間でshareのみ block→DatomicStore差し替え） | ✅ 完了 | 全経路期待通り動作確認 |
 | manifest 登録（`repos.edn` + `west.yml --entry goyoukiki`、pin検証） | ✅ 完了 | pin == repo HEAD をサーバ側検証で確認 |
 | superproject `main` 反映 | ✅ 完了 | feature branch 経由のサーバサイド merge |
+| 実データ ingestion（kkj.go.jp 全省庁+団体ライブ入札公告、GEPS 全53府省コード落札実績） | ✅ 完了 | 別ADR。詳細は ADR-2607070300 参照（41 tests/150 assertions green、実データで動作確認済み） |
+| `cloud-itonami` への実配線（`cloud_itonami.workspace` 投影層に `:procurement/propose-match`/`:procurement/share-match` 追加、teian/koyomi と同型） | 🟡 PRオープン・マージ待ち | `gftdcojp/cloud-itonami` PR #34（https://github.com/gftdcojp/cloud-itonami/pull/34）。cloud-itonami側テストは429 tests/2983 assertions green（追加前422/2949）。GitHub Actions が同repoで無効化されているためローカル実行で確認、CIには乗らない。本番相当の `itonami.cloud` へ影響するため自動mergeせずレビュー待ちとした |
 
 ## References
 
+- `90-docs/adr/2607070300-kotoba-lang-goyoukiki-jp-real-ingestion-connectors.md`
+  （実データ ingestion — kkj.go.jp 全省庁+団体ライブ入札公告、GEPS 全53府省
+  コード落札実績オープンデータ）
 - `90-docs/adr/2607032330-cloud-itonami-iso3166-market-entry-compliance-blueprints.md`
   （役割分担: あちらは市場参入コンプライアンスの静的blueprint、goyoukikiは
   案件⟷候補のライブなmatching control plane）
