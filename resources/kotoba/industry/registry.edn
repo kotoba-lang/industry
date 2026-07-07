@@ -4723,8 +4723,19 @@
    :business-id "cloud-itonami-isic-6530"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :insurance]
    :optional-technologies []
-   :maturity :blueprint
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as a pension-funding actor (Pension-LLM
+   ;; ⊣ Pension Governor), modeled closely on siblings 6511/6512/6621/
+   ;; 6622/6629/6520. Distinctive check: disbursement-exceeds-
+   ;; entitlement blends 6629's/6520's independent-recompute pattern
+   ;; with an upper-bound cap (casualty's claim-exceeds-coverage
+   ;; shape), backed by a member running-balance that advances after
+   ;; each payment. A genuinely new recurring-actuation shape:
+   ;; :payout/continue (proof-of-life-gated) has deliberately NO
+   ;; double-guard, unlike every prior one-time second-actuation event.
+   ;; Dual actuation (:disbursement/pay, :payout/continue), neither
+   ;; ever auto at any phase.
    :operating-states [:intake :enroll :accrue :claim :settle :audit]},
   {:id "6611"
    :name "Administration of financial markets"
