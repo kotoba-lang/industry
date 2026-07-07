@@ -4650,8 +4650,19 @@
    :business-id "cloud-itonami-isic-6492"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :banking]
    :optional-technologies []
-   :maturity :blueprint
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as a credit-granting actor (Credit-LLM
+   ;; ⊣ Credit Governor), the first LENDING vertical in this fleet and
+   ;; the second built outside ADR-2607032000's original insurance/
+   ;; real-estate batch (after 6612), modeled closely on siblings
+   ;; 6511/6512/6621/6622/6629/6520/6530/6820/6612. Distinctive check:
+   ;; affordability-exceeded-violations is a pure ground-truth
+   ;; debt-to-income-ratio recompute needing no proposal/stored-verdict
+   ;; lookup at all. A real status-lifecycle bug (application-not-
+   ;; approved firing after disbursement advances status past
+   ;; :approved) was found and fixed via a status-value set. Single
+   ;; actuation (:loan/disburse), never auto at any phase.
    :operating-states [:intake :underwrite :fund :collect :audit]},
   {:id "6499"
    :name "Other financial service activities, except insurance and pe..."
