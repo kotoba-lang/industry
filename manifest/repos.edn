@@ -2077,4 +2077,11 @@
    ;; Governed, precomputed multi-agent choreography (drone light shows are
    ;; the flagship use case), layered on kami-autodrive + robotics + org-ros
    ;; (ADR-2607052300). Pure .cljc, no I/O, no choreography-design UI.
-   "orgs/kotoba-lang/swarm-choreo"}}
+   "orgs/kotoba-lang/swarm-choreo"
+   ;; org-oasis-open-xmile -- OASIS XMILE 1.0 (System Dynamics) stock/flow/aux
+   ;; model as EDN: equation micro-language parser+evaluator, structural
+   ;; validation, Euler/RK4 simulator (ADR-2607072350). Same org-<body>-<spec>
+   ;; naming rule as org-w3-webauthn/org-ietf-oauth2/org-oasis-saml, but
+   ;; reflecting oasis-open.org's actual domain per user instruction. Pure
+   ;; .cljc, no XML-parser dep (host supplies already-parsed XML), no I/O.
+   "orgs/kotoba-lang/org-oasis-open-xmile"}}
