@@ -4741,8 +4741,15 @@
    :business-id "cloud-itonami-isic-6621"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :insurance]
    :optional-technologies []
-   :maturity :blueprint
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as an independent loss-adjustment actor
+   ;; (Adjuster-LLM ⊣ Loss Adjustment Governor), modeled closely on
+   ;; siblings 6511/6512. Its distinctive HARD check is conflict-of-
+   ;; interest screening on the ASSIGNED ADJUSTER (not a sanctions
+   ;; blocklist check on a party) -- independence from underwriting/
+   ;; claims-payment authority is the entire premise of this business.
+   ;; One actuation event (:valuation/finalize), never auto at any phase.
    :operating-states [:intake :inspect :evaluate :report :audit]},
   {:id "6622"
    :name "Activities of insurance agents and brokers"
