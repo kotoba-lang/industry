@@ -1182,6 +1182,10 @@
    ;; v1 は model のみ; transport/persistence/AI 投稿 actor は follow-up
    ;; (ADR-2607072310)
    "orgs/kotoba-lang/kaisha"
+   ;; denrei (伝令) — kaisha への投稿 actor、post-LLM ⊣ MembershipGovernor。
+   ;; propose→draft only、post は常に人間承認。not-a-member/consent-blocked
+   ;; mention/model-invalid は HARD (ADR-2607072330)
+   "orgs/kotoba-lang/denrei"
    ;; fleet coordination — 20-agent lease/governor substrate (ADR-2606302000)
    "orgs/kotoba-lang/kotoba-fleet"
    "orgs/etzhayyim/com-etzhayyim-fleet"
