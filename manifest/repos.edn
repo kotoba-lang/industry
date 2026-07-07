@@ -2132,4 +2132,13 @@
    "orgs/kotoba-lang/org-sbml"          ; SBML (Systems Biology Markup Language): compartment/species/reaction model, Content MathML kinetic-law parser+evaluator, Euler/RK4 simulator
    "orgs/kotoba-lang/org-w3-owl2"       ; OWL 2 (Web Ontology Language) Functional-Style Syntax: entities/class-expressions/axioms as EDN, structural validation, tractable (non-DL) subclass/property closure -- explicitly not a full reasoner
    "orgs/kotoba-lang/org-omg-uml"       ; OMG UML 2.5.1, scoped to the Classes package only (structural/class-diagram metamodel); behavior diagrams incl. StateMachine deliberately deferred to kotoba-lang/statechart
-   "orgs/kotoba-lang/org-omg-sysmlv2"}} ; OMG SysML v2 kernel (KerML Type/Feature/Specialization + SysML Part/Attribute/Port/Requirement Definition/Usage), EDN-builder only -- no textual concrete-syntax parser
+   "orgs/kotoba-lang/org-omg-sysmlv2"   ; OMG SysML v2 kernel (KerML Type/Feature/Specialization + SysML Part/Attribute/Port/Requirement Definition/Usage), EDN-builder only -- no textual concrete-syntax parser
+   ;; com-etzhayyim-yosoku (予測 = forecast) -- governed System-Dynamics
+   ;; scenario-simulation actor: SD-Advisor proposes an XMILE model/scenario
+   ;; patch (kotoba-lang/org-oasis-open-xmile), ScenarioGovernor independently
+   ;; re-runs xmile.validate/xmile.execute (never trusts advisor self-report)
+   ;; and gates commit/hold/escalate-to-human via interrupt-before. Mirrors
+   ;; gftd-talent-actor's langgraph-clj StateGraph + Store(:db-api) shape.
+   ;; Mock advisor only in v1 (real LLM wiring is follow-up, same precedent
+   ;; as kotoba-lang/kessai's mock-adapter-only payment port).
+   "orgs/etzhayyim/com-etzhayyim-yosoku"}}
