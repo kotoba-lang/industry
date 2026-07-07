@@ -118,6 +118,53 @@ and `6810`'s `:maturity` flips from `:blueprint` to `:implemented`.
   The 8 `cloud-itonami-*` blueprint/actor repos stay unregistered
   (standalone), per the existing convention (ADR-2607011000/2607012100).
 
+## Addendum 1 (2026-07-07, owner-directed): `cloud-itonami-isic-6512` deepened to `:implemented`
+
+After the three-actor VC-fund system (`cloud-itonami-isic-6499`/`6430`/
+`6630`, ADR-2607061700) reached its own documented gaps' saturation
+point, the owner was asked where the recurring coverage-improvement loop
+should look next and chose "pick a new ISIC blueprint vertical." `6512`
+(non-life/property-casualty insurance) was selected as the natural next
+candidate: its sibling `6511` (life insurance) was already `:implemented`
+(the same insurance-batch this ADR published), giving a close
+architectural reference to model against, and `6512` still sat at
+`:blueprint` with zero code.
+
+- `cloud-itonami-isic-6512` gains **Underwriter-LLM ⊣ Non-Life Insurance
+  Governor** -- `casualty.*` namespaces, modeled closely on `6511`'s
+  `underwriting.*`: the same Store/Registry/Governor/Phase/Advisor/
+  Operation/Sim shape, the same langgraph-clj StateGraph (copied
+  verbatim, since that shape is fully generic), the same "no fabricated
+  international numbering standard" and "honest, non-exhaustive
+  per-jurisdiction spec-basis catalog" discipline.
+- **A genuinely new lifecycle beyond `6511`'s own scope**: property/
+  casualty insurance is claims-driven (a policyholder files a claim
+  citing a loss event; life insurance has no analog -- it pays out once,
+  at maturity or death). `6512` adds `:claim/file` (HARD-gated on the
+  referenced policy actually being bound) and `:claim/settle` (a SECOND
+  actuation event alongside `:policy/bind`, independently checked
+  against the policy's own coverage limit and double-settlement-
+  protected) -- checks `6511` has no concept of at all.
+- A real bug (an overly-broad op-guard on the ported `sanctions-
+  violations` check, silently preventing a `:kyc/screen` proposal from
+  ever being HARD-held on its own sanctions finding) was caught by
+  running the demo and reading the actual audit-ledger output, not by
+  trusting lint/compile success alone -- documented in `cloud-itonami-
+  isic-6512`'s own ADR-0001.
+- `kotoba-lang/industry`'s registry: `:maturity :blueprint` →
+  `:implemented` for `"6512"`, fleet-wide maturity counts move from 7
+  implemented / 90 blueprint / 546 spec to 8 implemented / 89 blueprint /
+  546 spec (out of 643 total), `test/kotoba/industry_test.clj`'s
+  `maturity-summary` assertion updated to match.
+- `test/casualty/*` -- 34 tests / 172 assertions, lint-clean, demo
+  (`clojure -M:dev:run`) runs end-to-end: one clean policy-bind lifecycle
+  + one clean claim-settlement lifecycle (both escalate → approve →
+  commit) plus six HARD-hold cases (sanctions hit, no spec-basis, claim
+  against an unbound policy, claim exceeding the policy's coverage
+  limit, a nonexistent claim, a double-settlement) that never reach a
+  human at all. See `cloud-itonami-isic-6512`'s own ADR-0001 for the full
+  design.
+
 ## References
 
 - ADR-2607011000 (cloud-itonami robotics premise + ISIC 21/21 section
