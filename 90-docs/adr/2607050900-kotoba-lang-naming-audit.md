@@ -193,6 +193,46 @@ org-wide census.
 - Revisit `witness-quorum`'s org placement (`kotoba-lang` vs
   `etzhayyim`) against ADR-2606302300's taxonomy.
 
+## Follow-up (2026-07-08) — scaffold-repo status investigated
+
+Investigated whether `kotoba-adapter-contracts`, `kototama-cljc-contract`,
+and `kotoba-lang-cli-contract` are still live migration targets:
+
+- All three exist as their own correctly-named GitHub repos, but each is
+  `"size":0` — nothing beyond the identical placeholder README was ever
+  pushed. No `deps.edn`, no `src`.
+- The placeholder text cites "KAMI clj-wgsl migration Phase 4... Wave-2
+  port lands here" (ADR-2607010930), but none of the three repo names
+  appears anywhere in that ADR's `.md` or `.edn` (grepped both), and
+  "Wave-2" as a term doesn't appear in it either — the only "wave"
+  language there is Phase 7's unrelated "ambitious-scope wave closed:
+  113/116 kami-engine crates restored." The migration that ADR tracks has
+  since progressed through Phase 7 by a different route, without ever
+  populating these three.
+- `kotoba-adapter-contracts`'s naming pattern (`kotoba-*-contracts`) is a
+  real, live convention elsewhere in the org — `kotoba-core-contracts` and
+  `kotoba-selfhost-contracts` are both real, populated CLJC/EDN-authority
+  repos — so this one specifically reads as a legitimate scaffold that
+  simply never got filled in, not a naming mistake.
+- **Found and fixed a real, separate bug while investigating**: the local
+  west checkouts for `kototama-cljc-contract` and `kotoba-lang-cli-contract`
+  had their git `origin` remotes misconfigured to point at `kotoba-lang/
+  kototama.git` and `kotoba-lang/kotoba-lang.git` respectively (unrelated,
+  actively-developed repos) instead of their own repos. The checked-out
+  content itself was correct (verified identical to each repo's real
+  `origin/main`), so no data was at risk from this session's use, but a
+  future `git push` from either directory would have silently pushed
+  scaffold content into the wrong (real, active) repo. Corrected both
+  remote URLs; re-verified fetch and content match.
+
+**Recommendation (not executed here): retire all three** — archiving or
+deleting a GitHub repo is a more consequential, less reversible action
+than this pass's fixes, so it's left as an explicit, owner-confirmable
+follow-up rather than done unilaterally. If the `adapter-contracts` /
+`cli-contract` scopes are still wanted, they should be re-scaffolded
+fresh against the *current* migration plan rather than reusing these
+empty, stale-citation placeholders.
+
 ## One-line summary
 
 **A scoped naming sweep of `kotoba-lang`'s IPLD/Datomic/IPNS/IPFS/
