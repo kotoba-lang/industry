@@ -1,0 +1,119 @@
+{:frontmatter
+ {:id "adr-2607072000-gftdcojp-net-kotobase-ipfs-gateway-split"
+  :title "ADR-2607072000: gftdcojp — net-kotobase-ipfs, dedicated IPFS/IPNS retrieval Worker (replaces net-kotobase MIGRATION.md Phase 3's dead-Kubo-pod plan)"
+  :status "accepted"
+  :doc_type "adr"
+  :topic "net-kotobase-ipfs-gateway-split"
+  :authoritative true
+  :last_verified "2026-07-07"
+  :authoritative_for
+  ["ipfs.gftd.ai / ipfs.kotobase.net public IPFS retrieval surface: owned by
+    the new gftdcojp/net-kotobase-ipfs repo/Worker, not net-kotobase itself
+    and not any Vultr-hosted Kubo pod"
+   "net-kotobase/MIGRATION.md Phase 3 is superseded by this ADR: the
+    original Phase 3 (reuse the ipfs-origin-proxy -> kubo backend behind
+    ipfs.gftd.ai) assumed a backend that no longer exists"]
+  :related
+  ["90-docs/adr/2606120930-murakumo-fleet-stateless-k3s-vultr-winddown.md (lives in ai-gftd-apps-gftdcojp/90-docs/adr/, not this superproject)"]
+  :supersedes []
+  :superseded_by []}
+
+ :problem
+ {:source "オーナー指示: \"ipfs は gftcojp/net-kotobase-ipfs として ipfs に統合\" — consolidate
+           IPFS retrieval as gftdcojp/net-kotobase-ipfs, integrated with the
+           kotobase.net IPFS surface"
+  :facts
+  ["ipfs.gftd.ai was served by Cloudflare Worker ai-gftd-ipfs-proxy (source
+    repo gftdcojp/ai-gftd-ipfs-proxy no longer exists at all); its GET
+    /ipfs/<cid> already returned HTTP 530 — backend was a self-hosted Kubo
+    pod on the Vultr VKE cluster, permanently decommissioned org-wide
+    (ai-gftd-apps-gftdcojp ADR-2606120930). Dead route + Worker script
+    deleted directly this session."
+   "net-kotobase (kotobase.net) does NOT currently serve public IPFS
+    retrieval: GET /ipfs/:cid -> 404 \"not archived and no gateway
+    configured\" in production (KOTOBASE_STORAGE_MODE=backend,
+    KOTOBASE_IPFS_GATEWAY_URL unset)"
+   "net-kotobase/docs/USING-AS-A-PIN-SERVICE.md names
+    https://ipfs.gftd.ai/ipfs/<cid> as the retrieval gateway (\"backed by the
+    same store\") -- currently false in production"
+   "net-kotobase/MIGRATION.md Phase 3 already planned an
+    ipfs.gftd.ai -> ipfs.kotobase.net cutover, but assumed reusing the SAME
+    ipfs-origin-proxy -> kubo backend the now-deleted Vultr cluster hosted.
+    That backend is permanently gone; Phase 3 as originally written cannot
+    be executed."
+   "net-kotobase's own Worker already has a genuinely working, tested
+    Worker-native B2 archive mode (KOTOBASE_STORAGE_MODE=b2,
+    net-kotobase ADR-2606110003): GET /ipfs/* and GET /ipns/* serve CAR/raw
+    objects from the same B2 bucket net-kotobase uses for CAR-on-B2 pin
+    durability (net-kotobase ADR-2606042100), gateway-fallback. Never
+    promoted to production -- net-kotobase docs/ENVIRONMENT.md requires an
+    explicit ADR + release entry before production leaves
+    KOTOBASE_STORAGE_MODE=backend, because that flip also switches the
+    tenant/pin/account control plane off the kotoba backend -- a bigger,
+    separate decision than \"make IPFS retrieval work\""]}
+
+ :decision
+ {:summary "Split IPFS/IPNS retrieval into its own repo/Worker,
+            gftdcojp/net-kotobase-ipfs, rather than resurrecting the dead
+            Kubo-pod plan or flipping net-kotobase's whole production
+            Worker to KOTOBASE_STORAGE_MODE=b2."
+  :rationale
+  ["Blast-radius / privilege separation: ipfs.kotobase.net's only job is a
+    public unauthenticated GET; it should only ever need read-only B2
+    credentials, separate from net-kotobase's write-capable B2 creds, CACAO
+    verification, Stripe billing, and tenant quota state"
+   "Doesn't require the ADR-gated whole-Worker mode flip in net-kotobase
+    itself -- a dedicated retrieval-only Worker can go live without
+    touching net-kotobase's production storage mode at all"
+   "Matches the existing sibling-repo convention for kotobase components
+    split out of the monolith for a single responsibility
+    (kotoba-lang/kotobase-cljc-worker, kotoba-lang/kotobase-browser-worker,
+    kotoba-lang/kotobase-peer)"
+   "Matches the owner's explicit naming instruction (gftcojp/net-kotobase-ipfs)"]
+  :implementation
+  ["gftdcojp/net-kotobase-ipfs (private, created 2026-07-07):
+    src/kotobase_ipfs/{sigv4,b2,gateway,worker}.cljc -- a faithful,
+    read-only-scoped PORT (copied, not depended-on) of net-kotobase's own
+    clj-edge/src/kotobase/{sigv4,proxy,b2,b2_write}.cljc archive-serving
+    logic (B2-CAR -> B2-raw -> gateway-fallback -> 404 dispatch, SigV4
+    signing, content-type sanitization allowlist, gateway SSRF guard).
+    Copied rather than depended-on so this repo doesn't need net-kotobase's
+    CACAO/tenant/graph dependency chain just to serve GET /ipfs/*; if the
+    two drift, net-kotobase's copy (larger test suite) is canonical."
+   "Reads from the SAME B2 bucket/prefix net-kotobase already archives (or
+    will archive) into (KOTOBASE_B2_PREFIX default kotobase/worker-archive)
+    -- no separate ingestion path"
+   "test/kotobase_ipfs/gateway_test.cljc mirrors net-kotobase's own
+    worker/test/archive_response_boundary_test.cljc scenarios: 9 tests / 28
+    assertions, faked global fetch, no network or live B2 calls -- all
+    passing"
+   "shadow-cljs + wrangler.jsonc, CLJC-first per repo-wide runtime priority
+    convention -- structural template mirrors kotoba-lang/kotobase-cljc-worker"]
+  :not-decided
+  ["Whether/when to actually turn on archiving in net-kotobase
+    (KOTOBASE_B2_ARCHIVE_CIDS=0 as of this writing -- no CID has ever been
+    archived into B2 by net-kotobase's production Worker). Needs its own
+    ADR-gate in that repo per its docs/ENVIRONMENT.md. Without it this new
+    Worker has nothing real to serve yet."
+   "DNS/route cutover for net-kotobase-ipfs: wrangler.jsonc routes left
+    empty/commented on purpose; no B2 credentials exist for this Worker; no
+    wrangler deploy has been run."]}
+
+ :consequences
+ ["net-kotobase/MIGRATION.md Phase 3 marked superseded-by-this-ADR
+   (pointing here) instead of describing the dead Kubo-pod plan as
+   actionable"
+  "net-kotobase/docs/USING-AS-A-PIN-SERVICE.md retrieval section corrected
+   to describe actual current state (not yet live)"
+  "ai-gftd-apps-gftdcojp's now-doubly-dead 50-infra/vultr/ipfs/ and
+   ipfs-raw/ Helm charts removed, plus any docs describing them as live"
+  "Follow-up needed (separate task, operator with B2 console access, its
+   own ADR in net-kotobase) before ipfs.kotobase.net serves real content:
+   B2 read-only credentials, archiving turned on or backfilled, route
+   cutover"]
+
+ :verification
+ ["net-kotobase-ipfs: pnpm test (9 tests / 28 assertions, faked fetch, no
+   network) and pnpm run build (shadow-cljs release worker) both pass"
+  "wrangler deploy --dry-run validates the config without deploying"
+  "no wrangler deploy run for net-kotobase-ipfs (never live)"]}
