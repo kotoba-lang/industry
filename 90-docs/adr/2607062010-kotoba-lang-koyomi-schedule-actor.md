@@ -1,10 +1,27 @@
 # ADR-2607062010: kotoba-lang/koyomi — 予定共有 actor（schedule-LLM ⊣ ComplianceGovernor）
 
-**Status**: closed(実行完了。scaffold + 独立レビューで見つかった4件の修正まで完了。
-cloud-itonami 側 UI 配線・実 Distributor 接続は明記済みの follow-up）
+**Status**: closed(実行完了。scaffold + 独立レビューで見つかった4件の修正、
+実 Resend/Slack Distributor 配線まで完了。cloud-itonami 側 UI 配線は follow-up）
 **Date**: 2026-07-06
 **Closed**: 2026-07-06
+**Amended**: 2026-07-07(実チャネル接続)
 **Deciders**: Jun Kawasaki
+
+## Addendum(2026-07-07): 実チャネル接続(Resend / Slack)
+
+`koyomi.scheduleport` に実配布実装を追加した:
+
+- **Resend**（`koyomi.distribute/resend-scheduleport`、commit `3db453c`）:
+  `koyomi.scheduleport/ics-string` が生成する ICS を `text/calendar` 添付
+  として実送信。attendee は email アドレスそのものとして扱う設計
+  （プレースホルダ id を使う demo データでは fail-closed で `:invalid-
+  recipient` になることを確認済み）。**実際に1通ライブ送信し、Resend の
+  message id を確認、ledger に `:tool "resend:<id>"` として記録済み**
+  （API キー自体は非出力）。
+- **Slack**（`koyomi.scheduleport/slack-scheduleport`）: `chat.postMessage`
+  通知の実装コードは用意（ICS 自体の代替ではなく一報として）。Slack
+  アプリ登録はオーナー側作業（README に手順明記）。
+- `mock-scheduleport` は既定のまま。37 tests / 146 assertions。
 
 ## Context
 

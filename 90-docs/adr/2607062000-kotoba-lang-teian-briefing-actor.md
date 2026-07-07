@@ -1,13 +1,31 @@
 # ADR-2607062000: kotoba-lang/teian — 資料作成 actor（deck-LLM ⊣ BriefingGovernor）
 
 **Status**: closed(実行完了。scaffold + 独立レビューで見つかった2件の修正、
-および ichiran のレビューで判明した3件目の遡及修正まで完了。cloud-itonami 側
-UI 配線・実 Distributor 接続は明記済みの follow-up）
+ichiran のレビューで判明した3件目の遡及修正、実 Resend/Slack Distributor
+配線まで完了。cloud-itonami 側 UI 配線は follow-up）
 **Date**: 2026-07-06
 **Closed**: 2026-07-06
 **Amended**: 2026-07-07(ADR-2607062030 ichiran のレビューで発見された
-teian 由来のバグの遡及修正)
+teian 由来のバグの遡及修正、実チャネル接続)
 **Deciders**: Jun Kawasaki
+
+## Addendum(2026-07-07): 実チャネル接続(Resend / Slack)
+
+`teian.deckport` に実配布実装を追加した:
+
+- **Resend**（`teian.distribute/resend-distribute-fn`、commit `4c674f6`→
+  merge `97161d2`）: `kotoba-lang/mailer` 経由で Resend API へ実送信。
+  `slides.office` による pptx export は実際に動作することを確認
+  （5769-byte の有効な pptx を生成）し、添付として送信。**実際に1通
+  ライブ送信し、Resend が `delivered` を返すことまで確認済み**
+  （message id は監査目的で ledger の `:tool` フィールドに記録。
+  APIキー自体はログ・コミットに一切出力していない）。
+- **Slack**（`teian.deckport/slack-deckport`、commit `844d435`）:
+  `chat.postMessage` によるテキスト通知の実装コードは用意したが、
+  Slack アプリ登録・bot token 発行はオーナー側作業のため未実行
+  （README に手順を明記）。
+- `mock-deckport` は既定のまま変更なし。実 Distributor はどちらも
+  明示的な注入でのみ有効化される。46 tests / 154 assertions。
 
 ## Addendum(2026-07-07): 3件目のバグ — publish 配信の TOCTOU
 

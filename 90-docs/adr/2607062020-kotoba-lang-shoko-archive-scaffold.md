@@ -1,11 +1,24 @@
 # ADR-2607062020: kotoba-lang/shoko — 保管ガバナンス actor（archive-LLM ⊣ ArchiveGovernor）
 
-**Status**: closed(実行完了。フル実装 + 独立レビューで見つかった2件の修正まで
-完了。cloud-itonami 側 UI 配線・実 Distributor 接続は明記済みの follow-up)
+**Status**: closed(実行完了。フル実装 + 独立レビューで見つかった2件の修正、
+実 R2 ArchiveTarget 配線まで完了。cloud-itonami 側 UI 配線は follow-up)
 **Date**: 2026-07-06
 **Amended**: 2026-07-07
 **Closed**: 2026-07-07
 **Deciders**: Jun Kawasaki
+
+## Addendum(2026-07-07): 実 drive I/O(Cloudflare R2)
+
+`shoko.archiveport` に実装した `r2-archiveport`（commit `ef8e3c7`）:
+Cloudflare R2 の S3 互換 API に対する JVM SigV4 署名クライアント
+（`gftdcojp/net-kotobase` の実装から関数単位で移植、golden vector で
+検証済み）。専用の新規バケット `cloud-itonami-shoko-archive` を作成
+（既存バケット・bindingには一切触れていない）。認証情報は
+`scripts/r2-creds.bb`（`gftd-r2/*` 1Password vault、`mail-creds.bb` と
+同型）で解決。**実際に share!→fetch-file の実往復を実行し、236バイト
+送信・236バイト受信・バイト完全一致を確認、テスト用オブジェクトは
+削除して後片付け済み。** `mock-archiveport` は既定のまま変更なし。
+46 tests / 194 assertions。
 
 ## Context
 
