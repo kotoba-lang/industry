@@ -1,0 +1,60 @@
+{:frontmatter
+ {:id "adr-2607071610-kotoba-datom-retraction"
+  :title "ADR-2607071610: kotoba substrate — datom retraction（novelty block :op + fold retract + 読み経路）の設計"
+  :status "proposed"
+  :doc_type "adr"
+  :topic "kotoba-datom-retraction"
+  :authoritative true
+  :last_verified "2026-07-07"
+  :authoritative_for
+  ["kotobase chain 書込経路 (novelty block) への retraction op の追加設計"
+   "fold / hot-datoms / cold-datoms の retraction 適用規則"
+   "[:db/retract e a v] / [:db/retractEntity e] の tx-data 受理
+    (peer ->quad / worker tx parser)"
+   "app 層 tombstone (app-aozora deleteRecord) と substrate retraction の役割分担"]
+  :related
+  ["orgs/kotoba-lang/kotobase-peer/src/kotobase_peer/core.cljc"
+   "orgs/kotoba-lang/arrangement/src/arrangement/core.cljc"
+   "orgs/kotoba-lang/kotobase-cljc-worker/src/kotobase/cljc_worker/handler.cljc"
+   "orgs/kotoba-lang/datom/src/datom/core.cljc"]
+  :supersedes []
+  :superseded_by []}
+
+ :problem
+ {:source "成熟ループ (2026-07-07): app-aozora deleteRecord 修理 (tombstone 方式,
+           app-aozora 9a558634) 時に記録した substrate follow-up の履行"
+  :facts
+  ["chain 書込は assert 専用: ->quad は retract 形式を受けず、novelty quad に
+    op/added 概念が無く、hot/cold-datoms は :added true をハードコード"
+   "worker tx parser は datom.core/eavt (map 専用) — retract vector で 500
+    (deleteRecord が作成以来一度も成功していなかった根因、JVM 再現済み)"
+   "hot-db 層には arrangement.core/retract-quad が既に存在 (fold 未使用)"
+   "tombstone は見えなくするには十分だが、真の消去に応えられず index も縮まない"]}
+
+ :decision
+ {:chosen
+  ["novelty quad に :op :assert|:retract|:retract-entity を追加 (省略時
+    :assert = 旧 block 互換、migration 不要、transport 変更なし)"
+   "->quad に [:db/retract e a v] / [:db/retractEntity e] を追加。worker は
+    eavt の前段で vector/retract 形式を分岐 (eavt 自体は純 map 用のまま)"
+   "fold は :op で assert-quad / retract-quad / entity 全 quad retract に分岐
+    — fold 後の index から実際に消え graph が縮む。hot-datoms は novelty
+    replay で同分岐 (Phase 1 は current-state 正しさに限定、:added false の
+    履歴表面化は Phase 2)"
+   "tombstone は app 層ソフト削除として併存。PDS deleteRecord は Phase 3 で
+    tombstone + retractEntity 併発行に進化 (読み手互換のまま実体も消す)"
+   "Phasing: 1 = peer/worker current-state (contract tests 付き)、
+    2 = as-of/:added false、3 = PDS 併用"]
+  :rejected
+  [{:option "datom-clj eavt に retract 形式を足す"
+    :why "eavt は言語 (kgraph) と共有する最小純関数 — op 概念で共有表現を
+          濁さない。分岐は consumer 側"}
+   {:option "tombstone で恒久対応"
+    :why "index が縮まない・真の消去要請に応えられない"}
+   {:option "Datomic excision 相当 (履歴物理抹消)"
+    :why "content-addressed append-only chain と非両立 — 非目標と明記"}]}
+
+ :follow-ups
+ ["kotoba-lang 側 Phase 1 実装 (着手時に本 ADR を accepted へ)"
+  "retract の firehose 表現との対応付け"
+  "fold GC 指標 (retract 適用での node 数縮小の計測)"]}
