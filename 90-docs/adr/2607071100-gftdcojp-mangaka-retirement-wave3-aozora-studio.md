@@ -91,8 +91,46 @@
   viewer と editor が manga-viewer の同一モデルを共有する。
 - (+) 生成・公開の集約方針（murakumo / aozora）と整合。
 - (−) v1 の「公開」は EDN 書き出し + git/deploy の手動フロー（サーバ書込は
-  kotobase 復旧待ち）。
+  kotobase 復旧待ち）。→ **Addendum で解消**
 - (−) 編集対象は aozora-native 作品（ghosthacker）のみ。外部 3 作品の編集は
-  D1 書込経路の設計が必要（follow-up）。
+  D1 書込経路の設計が必要（follow-up）。→ **Addendum でメタ編集まで解消**
 - (−) `/studio` は認可ゲート無し（書込先が無い client-local 編集のため実害
   無しだが、公開 mint を実装する時点で actor 鍵所持 = 認可になる）。
+
+## Addendum (2026-07-07 同日): follow-up ①②③ 実装
+
+オーナー指示「1, 2, 3」で本 ADR の follow-up を同日実装した。
+
+1. **公開（mint）— 実装済み**。前提だった kotobase transact 障害
+   （ADR-2607021700「Invalid array buffer length」）を再検査: 使い捨て CACAO
+   アカウントの createRecord が実 uri/cid を返し**治癒を確認**（probe アカウント
+   2 件 + 検証投稿 1 件が graph に残存、使い捨て）。`yoro-ui.studio.publish` が
+   作品ごとに Ed25519 seed を発行（localStorage custody + macOS Keychain
+   `aozora-studio-actor-key-<slug>` に退避済み）、CACAO で
+   `<work>.manga.aozora.app` の account を作成し、profile（rkey `self`）+
+   作品 post（rkey `work-<slug>`）を mint — 決定的 rkey で再公開は同 record
+   更新。**4 actor 全て公開実施済み**（did:key 発行済み）。profile dispatcher は
+   resolveHandle → did:key の場合のみサーバ profile へ昇格（fail-open の
+   did:web は registry 表示のまま）。appview の getProfile は DID キーなので
+   handle を先に解決する（#48 と同型）。
+2. **生成契約 — 半分実装、dispatch は fleet ops 待ち**。実測: `*.edge.murakumo.cloud`
+   は依然 NXDOMAIN だが **api.murakumo.cloud は稼働**（/health ok、/nodes に
+   実フリート登録あり）。ただし `/infer/dispatch` の relay 経路が 1033 で死んで
+   おり ComfyUI ノード未登録 — 直結はブロックのまま。studio 側は契約の半分を
+   実装: editor の **生成 job 書き出し**（`edit/generation-job` — 全 page/panel の
+   prompt EDN、fleet CLJ runtime の入力）と **panel image url 取り込み欄**
+   （成果物 URL の貼り込み）。
+3. **外部 3 作品の編集 — メタ編集まで実装**。mangaka-reader Worker の source が
+   repo から失われていた（wrangler.jsonc のみ、main は実在しない index.cljc 参照）
+   ため、**deployed script を Cloudflare API から回収して
+   `reader/src/index.js` として正本化**し拡張: `GET /api/works`（一覧 JSON）、
+   `GET /api/work/:rkey`（genre/logline/pageCount 追加 + CORS）、
+   `POST /api/work/:rkey`（title/author/series/genre/logline を D1 work row へ。
+   Bearer `MANGAKA_ADMIN_TOKEN` — wrangler secret、ローカル控えは Keychain
+   `mangaka-admin-token`）。aozora 側は `/studio/ext/<rkey>` メタ編集ページ。
+   ページ画像/blob の書込は従来どおり fleet publish フロー（RUNBOOK）。
+
+live 検証済み: 4 profile のサーバ昇格（1 投稿 + フォローボタン表示）、外部メタ
+editor の実 D1 読込、401 ゲート、認可付き同値書込、reader HTML 無変化。
+残 follow-up: murakumo relay 復旧後の生成直結、外部作品のページ単位編集、
+studio への actor 鍵 import UI（Keychain からの復元）。
