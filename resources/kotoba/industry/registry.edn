@@ -4773,8 +4773,17 @@
    :business-id "cloud-itonami-isic-6629"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :insurance]
    :optional-technologies []
-   :maturity :blueprint
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as an insurance-auxiliary actor
+   ;; (Claims-LLM ⊣ Insurance Auxiliary Governor), modeled closely on
+   ;; siblings 6511/6512/6621/6622. Covers TWO bundled activities under
+   ;; ONE actuation op (:recommendation/finalize, case-type-conditional):
+   ;; outsourced claims administration (evidence-completeness check) and
+   ;; marine general-average adjustment (an arithmetic-verification
+   ;; check -- independently recomputes the pro-rata-by-value-at-risk
+   ;; apportionment, reusing the cross-repo 6499/6430 "never trust a
+   ;; claimed figure" pattern WITHIN one repo).
    :operating-states [:intake :administer :evaluate :report :audit]},
   {:id "6630"
    :name "Fund management activities"
