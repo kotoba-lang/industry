@@ -5813,7 +5813,35 @@
    :business-id "cloud-itonami-isic-9412"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :blueprint
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as an association actor (AssocOps-LLM
+   ;; ⊣ Association Governance Governor), the twenty-second build outside
+   ;; ADR-2607032000's original insurance/real-estate batch (after
+   ;; 6612, 6492, 6920, 6611, 7120, 8620, 8530, 9200, 7500, 9603,
+   ;; 9521, 9321, 8730, 9102, 9103, 9602, 9000, 8890, 8610, 9311,
+   ;; 8510), the FIRST membership/professional-body-governance
+   ;; vertical (ISIC division 94) in this fleet, modeled closely on
+   ;; siblings 6511/6512/6621/6622/6629/6520/6530/6820/6612/6492/
+   ;; 6920/6611/7120/8620/8530/9200/7500/9603/9521/9321/8730/9102/
+   ;; 9103/9602/9000/8890/8610/9311/8510.
+   ;; Distinctive check: continuing-education-hours-insufficient? is
+   ;; the FIRST non-temporal instance of this fleet's MINIMUM-
+   ;; threshold sufficiency family (veterinary/funeral/hospital
+   ;; established the first three, all temporal), reusing the same
+   ;; ground-truth-comparison shape generalized to a numeric-hours
+   ;; concept. Also reuses the unconditional-evaluation screening
+   ;; discipline for a twentieth distinct grounding (complaint-
+   ;; unresolved-violations, the FIRST specifically for the
+   ;; professional-ethics/conduct-complaint concept, deliberately
+   ;; scoped to gate only certification issuance, not disciplinary
+   ;; referral), tested via the screening op directly for a tenth
+   ;; consecutive vertical (after eldercare/museum/conservation/salon/
+   ;; entertainment/casework/hospital/facility/school). Dual actuation
+   ;; (:certification/issue, :discipline/finalize) on the same member
+   ;; entity; double-finalization guarded via dedicated booleans per
+   ;; the 6492 lesson. See
+   ;; cloud-itonami-isic-9412/docs/adr/0001-architecture.md.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :enroll :represent :report :audit]}
   {:id "9420"
