@@ -75,8 +75,11 @@ AppKit の語彙をこの領域の standard vocabulary として採用する下�
 ## Consequences
 
 - freeboard(`board.cljc` viewport 節)と kami-genko(`genko_render.cljc`
-  viewport 節)は canvaskit 依存への置換候補(**follow-up、本 ADR では未着手**。
-  genko は `canvaskit.viewport` ブリッジで doc 非破壊に移行可能)。
+  viewport 節)は canvaskit 依存への置換候補(**→ 完了 2026-07-07 同日**:
+  freeboard `cea1bbe`(19 tests/98 assertions)・kami-genko `2a19bca`
+  (18 tests/117 assertions)。両者とも public API と `{:x :y :zoom}` doc 形は
+  不変、`canvaskit.viewport` ブリッジ経由で委譲。freeboard は
+  `:local/root "../canvaskit"`、kami-genko は `:git/sha` 依存)。
 - aozora.app `/studio`(ADR-2607071100)の storyboard editor は viewport を
   自作せず canvaskit を使うこと。
 - 将来 graph topology visual editor を作る場合の既定構成:
