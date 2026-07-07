@@ -1,0 +1,110 @@
+---
+id: adr-2607082000-cloud-itonami-isic-6492-cljc-resident-fleet-deploy
+title: "ADR-2607082000: cloud-itonami-isic-6492 の affordability.wasm を asher 上で cljc/nbb 常駐 HTTP デーモンとして稼働 — Rust kotoba-server を置換した初の常駐 wasm デプロイ"
+status: accepted
+doc_type: adr
+topic: cloud-itonami-isic-6492-cljc-resident-fleet-deploy
+authoritative: true
+last_verified: 2026-07-08
+authoritative_for:
+  - "cloud-itonami-isic-6492 の affordability.wasm を、一回きりの動作確認(ADR-2607072600)ではなく、murakumo fleet ノード asher 上で真に常駐(launchd LaunchDaemon、KeepAlive で自己修復)する HTTP デーモンとしてホストした初の実例であること"
+  - "この常駐デーモンが JVM を一切使わず、nbb(ClojureScript-on-Node)経由で動作すること — root CLAUDE.md の kotoba-wasm > clojurewasm > cljs > nbb > jvm ランタイム優先順位に従い、asher に JDK が無い制約(ADR-2607072530で確認済み)を回避する設計判断"
+  - "asher 上で従来常駐していた Rust kotoba-server(com.murakumo.kotoba-mesh、libp2p gossipsub mesh + KSE 等を提供)を停止し、cljc/nbb デーモン(com.murakumo.cljc-isic-6492)に置換したこと — フリート10ノード中 asher の1ノードのみが対象で、他9ノードは無変更"
+  - "nbb の SCI インタプリタに、ネストした Promise チェーンで `.then().catch()` が実行時に `Could not find instance method: catch` で失敗するバグが再現すること(単純な再現コードでは再現せず、実際の入れ子HTTPハンドラ形状でのみ発生 — 根本原因は未特定)。回避策として `.then(onFulfilled, onRejected)` の2引数形式を全面採用したこと"
+related:
+  - 90-docs/adr/2607072530-cloud-itonami-kototama-wasm-llm-infer-poc-isic-6511.md
+  - 90-docs/adr/2607072600-cloud-itonami-isic-6492-kototama-tender-wasm-deploy.md
+  - 90-docs/adr/2607072400-kaisha-pod-murakumo-fleet-deployment.md
+supersedes: []
+superseded_by: []
+---
+
+# ADR-2607082000: cloud-itonami-isic-6492 を asher 上で cljc/nbb 常駐 HTTP デーモンとして稼働
+
+**Status**: accepted
+**Date**: 2026-07-08
+**Deciders**: Jun Kawasaki（オーナー指示「deploy を進めて、rust 版ではなく cljc 版」を受けて着手）
+
+## Context
+
+ADR-2607072530/2607072600 は cloud-itonami の `.kotoba`→WASM actor を murakumo fleet 実機(asher)で**動作確認**したが、いずれも SSH 経由の一回きりのスクリプト実行（`node wasm/verify_node.mjs` 等）であり、実行後に一時ファイルを削除する形だった。常駐(resident)プロセスとして継続稼働するものではなかった。
+
+オーナーから「deploy を進めて」と明示的に指示された。合わせて、常駐先を JVM ベース（`kototama.tender`、ADR-2607072530/2607072600 が使った経路）ではなく **cljc 版**にする方針を確認した。調査の結果:
+
+- `kotoba.wasm-exec`（`kotoba-lang/kotoba`）も `kototama.tender`（`kotoba-lang/kototama`）も、常駐用の HTTP リスナー・tick スケジューラ・lattice/gossipsub 配線を一切持たない、単発実行ライブラリであることを確認（`grep` で `on-http`/`on-tick`/`on-kse`/`ring.`/`http-kit`/`jetty` はゼロヒット）。
+- `murakumo` の deploy tooling（`bin/BUILD.edn`、`src/murakumo/provision/plan.cljc`、`deploy/*.plist.tmpl`）は Rust バイナリ専用で、JVM/cljc 版の常駐経路は一切配線されていない。
+- フリート全ノード（asher/naphtali/judah/zebulun/issachar 等）に JDK は未インストール（ADR-2607072530 で確認済み）。JDK を新規導入せず「cljc 版」を成立させるには、`orgs/kotoba-lang/wasm-webcomponent` の `actor-host.js`（プレーン Node.js ホスト）+ `nbb`（ClojureScript-on-Node、ビルド不要）の組み合わせが root CLAUDE.md のランタイム優先順位（kotoba wasm > clojurewasm > **cljs > nbb** > jvm）に整合し、かつ asher には既に Node.js v26.4.0 が残置されている（ADR-2607072530 の副産物）。
+
+オーナーへの事前確認（AskUserQuestion）で以下を明確化した:
+1. **Rust 版を置換する**（別ポートで共存ではなく）— kaisha realtime pod(ADR-2607072400)等の既存依存が壊れるリスクを明示した上で選択された。
+2. 対象 actor は **isic-6492 affordability**（isic-6511 underwriting は llm-infer capability の host 側実装が別途必要でスコープが大きいため見送り）。
+3. **JDK を使わない設計**。
+
+実機調査で、asher の Rust `kotoba-server`（`com.murakumo.kotoba-mesh`、pid 67421、port 8077）が実際に稼働中で、`/health` が `kse_journal`/`kse_shelf`/`wasm_executor`/`udf_executor`/`invoke_router` すべて `"ready"` と応答し、9 ノード分の bootstrap peer を持つ libp2p gossipsub mesh の一員である（実測時点で `peer_count:0` — 現在メッシュには接続していない）ことを確認した。この事実を提示した上で最終確認を取り、実施に進んだ。
+
+## Decision
+
+**`orgs/cloud-itonami/cloud-itonami-isic-6492/wasm/server.cljs` を新設し、asher 上の Rust `kotoba-server` LaunchDaemon を置換する形で常駐デプロイした。**
+
+### server.cljs の設計
+
+`verify_node.cljs`（既存、nbb 経由で `actor-host.js` の ABI を使い affordability.wasm を一回実行する CLI）と同じ ABI 配線を再利用し、`node:http` の永続リスナーへ変換した:
+
+- `GET /health` — liveness probe。
+- `POST /isic-6492/affordability` — body `{existingDebt, requestedAmount, annualIncome}`(セント単位 i32) → WASM の export 済み linear memory のオフセット 0/4/8 へ書き込み、`main()` を呼び出し `{ok, result, affordable, input}` を返す。
+- リクエストごとに `WebAssembly.instantiate` を新規実行（121 バイトの小さい module のため軽量。インスタンス間の状態リークを避ける最も単純な設計）。
+
+### nbb の `.catch` ランタイムバグ
+
+実装中、`(-> promise (.then f) (.catch g))` 形の chaining が実際の入れ子 HTTP ハンドラ内で `Could not find instance method: catch` という実行時エラーで落ちることを発見した。5 パターンの最小再現コード（`js/Promise.resolve` 直後の chaining、手動構築 `js/Promise.` + chaining、二重ネストした `cond`/`->`、`try`/`catch` 特殊形式との共存、`WebAssembly.instantiate` を挟んだ chaining）はいずれも**再現しなかった**——実際の `server.cljs` の形（`node:http` のコールバック内で `read-body` の Promise を `.then` し、その中の `cond` 分岐でさらに別の Promise を `.then`/`.catch` する）でのみ発生する。根本原因は未特定のまま、`.then(onFulfilled, onRejected)` の2引数形式（`.catch` を一切使わない）に全面書き換えることで回避した。これは新規の `.kotoba` コンパイラ制約バグ（ADR-2607072530/2607072600 の `pos?`/`neg?`/`and`/`or`/`when` 非対応）とは別種の、**nbb ランタイム自体**のバグとして記録する。
+
+### 常駐デプロイ手順
+
+1. `orgs/kotoba-lang/wasm-webcomponent/src/`（21ファイル）と `cloud-itonami-isic-6492/wasm/`（`server.cljs`/`affordability.wasm`/`node_modules`/`package.json` 等）を、sibling-checkout レイアウトを保ったまま `$HOME/.murakumo-cljc/orgs/...` という安定パス（`/tmp` ではない — 再起動後も残る）へ rsync。
+2. ローカルおよび asher 自身の localhost で全エンドポイント（health / approve / reject / zero-income / missing-field / invalid-json / 404 / 状態リーク無し確認の再実行）を動作確認。
+3. `sudo launchctl bootout system/com.murakumo.kotoba-mesh-watchdog` → `sudo launchctl bootout system/com.murakumo.kotoba-mesh`（Rust 版停止。plist ファイル自体は `/Library/LaunchDaemons/` に残置——復元は再 bootstrap するだけ）。
+4. 新設 `/Library/LaunchDaemons/com.murakumo.cljc-isic-6492.plist`（`ProgramArguments = [/opt/homebrew/bin/node, .../node_modules/.bin/nbb, server.cljs, 8479]`、`RunAtLoad`+`KeepAlive`、`WorkingDirectory` = wasm dir）を作成・`launchctl bootstrap`+`kickstart`。
+5. tailnet 経由（`100.96.122.69:8479`）で operator machine から health/approve/reject を実行し、ローカル実行と一致することを確認。
+6. **KeepAlive の実証**: 稼働中の nbb プロセスを `sudo kill -9` で強制終了し、数秒後に launchd が自動再起動、`/health` が再び 200 を返すことを確認 — 真に「常駐」（一回きりの検証ではなく、プロセス死亡から自己修復する）であることの実測証拠。
+
+## Consequences
+
+- **cloud-itonami の wasm actor が初めて、真の意味で「常駐」した。** ADR-2607072530/2607072600 が明示的に残していた follow-up（「No wire transport puts a host in front of this ABI yet」）を解消した。
+- **asher は libp2p gossipsub mesh から外れ、ADR-2607072400 の kaisha/denrei realtime pod は asher 上で機能しなくなる。** 実測時点で `peer_count:0`（メッシュに実際には接続していなかった）だったとはいえ、mesh 参加可能な状態ではなくなった。フリートの他 9 ノードは Rust kotoba-server のまま無変更。
+- **`murakumo` 自身の provisioning tooling(`bb murakumo provision`/`mesh`)はこの変更を認識しない。** 将来誰かが asher に対して同ツールを実行すると、`render-plist` は無条件に Rust 版 plist を再生成するため、**黙って cljc 版から Rust 版に戻る**（意図的なフェイルセーフとして許容 — 恒久的な fleet 運用変更ではなく実験的デプロイという位置付け）。
+- 新設 HTTP エンドポイントは平文・無認証（実験目的として許容、本番運用には不十分）。
+- 単一 actor（isic-6492）専用の固定ルーティングであり、汎用 dispatcher ではない。
+
+## What this ADR does NOT decide
+
+- フリート全体（他9ノード）への cljc/nbb ロールアウト。
+- asher 上での mesh 参加・kaisha pod 機能の復元（両立させる設計、例えば別ポートでの共存や、Rust 版のメッシュ機能だけを別途起動し続ける構成は today 検討していない）。
+- nbb の `.catch` バグの根本原因特定・upstream 報告。
+- 認証・TLS 等、本番運用に必要な硬化。
+
+## Revert 手順
+
+```sh
+ssh asher "sudo launchctl bootout system/com.murakumo.cljc-isic-6492 2>/dev/null; \
+  sudo launchctl bootstrap system /Library/LaunchDaemons/com.murakumo.kotoba-mesh.plist && \
+  sudo launchctl kickstart -k system/com.murakumo.kotoba-mesh && \
+  sudo launchctl bootstrap system /Library/LaunchDaemons/com.murakumo.kotoba-mesh-watchdog.plist && \
+  sudo launchctl kickstart -k system/com.murakumo.kotoba-mesh-watchdog"
+```
+
+## Verification
+
+- ローカル: `nbb server.cljs <port>` を起動し、health/approve/reject/zero-income/missing-field/invalid-json/404/繰り返し呼び出し（状態リーク無し）を全て確認。
+- asher localhost: 同上を全て確認。
+- asher tailnet（`100.96.122.69:8479`）: operator machine から health/approve/reject を実行し、ローカル実行と同一結果を確認。
+- KeepAlive 自己修復: `sudo kill -9 <pid>` 後、launchd が自動的にプロセスを再起動し `/health` が復帰することを確認。
+- `gh push`: `orgs/cloud-itonami/cloud-itonami-isic-6492` main（`d7cc1fa..d598e26` — `wasm/server.cljs` 新設、`wasm/README.md` 更新）。
+
+## References
+
+- `orgs/cloud-itonami/cloud-itonami-isic-6492/wasm/server.cljs`, `wasm/README.md`
+- `orgs/kotoba-lang/wasm-webcomponent/src/actor-host.js`
+- `orgs/kotoba-lang/murakumo/deploy/com.murakumo.kotoba-mesh.plist.tmpl`（置換元 Rust 版テンプレート）
+- ADR-2607072530（llm-infer capability、murakumo fleet 実機配備の先例、JDK 不在の実測）
+- ADR-2607072600（kototama.tender 経由の一回きり動作確認、本 ADR が「常駐」へ発展させた対象）
+- ADR-2607072400（kaisha realtime pod、asher の Rust kotoba-server 依存 — 本 ADR で影響を受ける）
