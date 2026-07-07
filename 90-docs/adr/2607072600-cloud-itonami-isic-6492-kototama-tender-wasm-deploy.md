@@ -11,6 +11,7 @@ authoritative_for:
   - "kotoba wasm emit の実際のWASMコード生成対象(compile-wasm-expr)が対応する演算子の確定リスト: 特殊形式 do/let/if、および + - * quot / rem mod = < > <= >= zero? not inc dec のみ — pos?/neg?/and/or/when は非対応(unsupported-op)。tree-walking interpreter(eval-form)は pos?/neg?/not をサポートするが、wasm生成側とは異なるサブセットであることの実測確認"
   - "kototama.tender(JVM/Chicory)経由で、kotoba-lang/kototama自身のデモfixture(sha256-hex/gen-keypair)以外の、他repoの実business logicをホストした初の実例であること(ADR-2607062330 addendum 5 の対象範囲を拡張)"
   - "host import を一切要求しない(純粋演算のみの).kotoba モジュールが実際にコンパイル・実行できることの実測確認(ADR-2607072530のllm-infer capability経由の事例とは異なる、capability不要パスの実証)"
+  - "同一の .kotoba 成果物(affordability.wasm)が kototama.tender(JVM/Chicory)と wasm-webcomponent(Node.js)の両ホストで動作し、かつ実 murakumo fleet ノード(asher)上での実行確認も得ていること(Addendum参照)"
 related:
   - 90-docs/adr/2607062330-kototama-tender-chicory-execution-runtime.md
   - 90-docs/adr/2607072530-cloud-itonami-kototama-wasm-llm-infer-poc-isic-6511.md
@@ -66,13 +67,23 @@ superseded_by: []
 
 - `.kotoba` コンパイラの `pos?`/`neg?`/`and`/`or`/`when` 対応化（follow-up、ADR-2607072530 と共通）。
 - パラメータ化された呼び出しABI（現状は2シナリオをハードコードした自己検証のみ）。
-- murakumo fleet 実機への配備（本ADRはJVM/Chicoryホストのみを検証。実機はJVM不在のためADR-2607072530と同じくNode.js経路が必要——未着手）。
 - cloud-itonami-isic-6492 の他のgovernorロジック（HARD違反チェック等、mapを扱う複雑な部分）のwasm化。
+
+## Addendum (2026-07-07, same day): murakumo fleet 実機(asher)への配備、完了
+
+上記「What this ADR does NOT decide」に記載していた「murakumo fleet 実機への配備は未着手」を解消した。
+
+`orgs/cloud-itonami/cloud-itonami-isic-6492/wasm/verify_node.mjs` として、ADR-2607072530 が確立した経路（`kotoba-lang/wasm-webcomponent` の `actor-host.js`、plain Node.js、JVM不要）を踏襲したスクリプトを作成。`affordability.wasm` は host import ゼロのため、ADR-2607072530 の `underwriting_decision.wasm`（`log-write`+`llm-infer` 要求、5バイトのシナリオ入力をメモリに書き込む）より単純——capability grant無し、入力バイト書き込み無しで `main()` を直接呼ぶだけで済んだ。
+
+手順: ローカルで `orgs/kotoba-lang/wasm-webcomponent/src/`（21ファイル）と本ADRの成果物一式を west と同じ sibling-checkout レイアウトのまま `rsync` で `asher:/tmp/` へ転送（`ssh asher "node --version"` で v26.4.0 稼働中——ADR-2607072530 が残置した Node.js が今も生きていることを確認済み）→ `ssh asher "node wasm/verify_node.mjs"` を実行 → ローカル実行と完全一致する `{"result": 1, "ok": true}` を得た → 転送した一時ファイルのみ削除（Node.js自体は前ADRの方針を継続し残置）。
+
+これにより、本ADRの kototama.tender(JVM) 側の実行確認と合わせて、cloud-itonami-isic-6492 の同一 `.kotoba` 成果物が **JVM/Chicory ホストと Node.js/wasm-webcomponent ホストの両方、かつ実 murakumo fleet ノード上** で動くことを確認した。
 
 ## References
 
-- `orgs/cloud-itonami/cloud-itonami-isic-6492/wasm/affordability.kotoba`, `wasm/affordability.wasm`, `wasm/README.md`
+- `orgs/cloud-itonami/cloud-itonami-isic-6492/wasm/affordability.kotoba`, `wasm/affordability.wasm`, `wasm/README.md`, `wasm/verify_node.mjs`
 - `orgs/cloud-itonami/cloud-itonami-isic-6492/test/wasm/affordability_test.clj`
 - `orgs/kotoba-lang/kotoba/src/kotoba/runtime.clj`（`compile-wasm-expr`、実際のWASMコード生成対象演算子）
+- `orgs/kotoba-lang/wasm-webcomponent/src/actor-host.js`（Node.jsホスト実装）
 - ADR-2607062330（kototama.tender、Chicory実行基盤）
-- ADR-2607072530（cloud-itonami-isic-6511、llm-infer capability、murakumo fleet実機配備）
+- ADR-2607072530（cloud-itonami-isic-6511、llm-infer capability、murakumo fleet実機配備の先例）

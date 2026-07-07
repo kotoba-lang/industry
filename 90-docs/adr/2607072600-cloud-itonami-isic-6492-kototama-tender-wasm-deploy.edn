@@ -10,7 +10,8 @@
   ["cloud-itonami-isic-6492(与信)の credit.registry/compute-debt-to-income-ratio + affordability-ceiling(0.43) を .kotoba wasm-compilable subset へ移植した実例が orgs/cloud-itonami/cloud-itonami-isic-6492/wasm/ に存在すること"
    "kotoba wasm emit の実際のWASMコード生成対象(compile-wasm-expr)が対応する演算子: 特殊形式 do/let/if + - * quot / rem mod = < > <= >= zero? not inc dec のみ — pos?/neg?/and/or/when は非対応(unsupported-op)"
    "kototama.tender(JVM/Chicory)経由で、kotoba-lang/kototama自身のデモfixture以外の他repoの実business logicをホストした初の実例"
-   "host importを一切要求しない(純粋演算のみの).kotobaモジュールが実際にコンパイル・実行できることの実測確認"]
+   "host importを一切要求しない(純粋演算のみの).kotobaモジュールが実際にコンパイル・実行できることの実測確認"
+   "同一の.kotoba成果物(affordability.wasm)がkototama.tender(JVM/Chicory)とwasm-webcomponent(Node.js)の両ホストで動作し、実murakumo fleetノード(asher)上での実行確認も得ていること"]
   :related
   ["90-docs/adr/2607062330-kototama-tender-chicory-execution-runtime.md"
    "90-docs/adr/2607072530-cloud-itonami-kototama-wasm-llm-infer-poc-isic-6511.md"
@@ -47,4 +48,14 @@
  ["clojure -M:test (cloud-itonami-isic-6492) : 32 tests, 129 assertions, 0 failures/errors"
   "clojure -M:lint (cloud-itonami-isic-6492) : errors 0, warnings 0"
   "kotoba wasm emit / kotoba wasm run (kotoba-lang/kotoba CLI) : binary-emitted / run-completed, value=1"
-  "gh push: orgs/cloud-itonami/cloud-itonami-isic-6492 main (ba1deef..e862464)"]}
+  "gh push: orgs/cloud-itonami/cloud-itonami-isic-6492 main (ba1deef..e862464)"]
+
+ :addendum-2026-07-07-fleet-deploy
+ {:summary "murakumo fleet実機(asher)へのNode.js/wasm-webcomponent経由デプロイを完了。ADR-2607072530が確立した経路をhost importゼロのため単純化して踏襲。"
+  :steps
+  ["ssh asher \"node --version\" でv26.4.0稼働確認(ADR-2607072530が残置したNode.js)"
+   "orgs/kotoba-lang/wasm-webcomponent/src/(21ファイル)+affordability.wasm+verify_node.mjsをsibling-checkoutレイアウトのままrsyncでasher:/tmpへ転送(232K)"
+   "ssh asher \"node wasm/verify_node.mjs\" 実行、ローカルと同一の{\"result\":1,\"ok\":true}を得た"
+   "転送した一時ファイルのみ削除(Node.js自体は残置、再インストール・削除なし)"]
+  :verification
+  ["gh push: orgs/cloud-itonami/cloud-itonami-isic-6492 main (e862464..da59057) -- wasm/verify_node.mjs, wasm/README.md"]}}
