@@ -1,6 +1,6 @@
 # ADR-2607031510: `kotoba-lang/composer` — AI music composition request/pipeline as pure data contracts
 
-Status: Proposed
+Status: Accepted, core contract implemented (2026-07-07)
 
 Date: 2026-07-03
 
@@ -132,3 +132,22 @@ concrete capability" split for the actual network call.
   library into yukkuri (replacing its inline request-building with
   `kotoba.composer`'s validated constructors) is a separate follow-up, not
   bundled into this ADR.
+
+## Addendum (2026-07-07): core contract implemented
+
+`kotoba-lang/composer` created and registered (`manifest/repos.edn
+:extra-projects`, west pin verified server-side). Implemented: `kotoba.composer`
+(compose-request), `.track`/`.stem`/`.style`/`.generation` (response-side
+records mirroring the corresponding lexicons exactly), `.pipeline`
+(`apply-event : track × event → {:track :effects}`, mirroring
+`kotoba.webrtc.session`'s shape — `:vocal` status requests both
+`:request-vocal` and `:request-arrangement`, matching ongakuka's own
+parallel `vocalist‖arranger` stage). `kotoba.composer.style` enforces the
+copyright invariant as designed: `publishable?` rejects an `:embedding`-kind
+style whose license is `:unknown` **or absent** (never defaults to
+permitted) — a `:prompt`-kind style has no license gate.
+
+22 tests / 140 assertions, 0 failures; clj-kondo 0 warnings; CI green.
+`kotoba.composer.ui`/`.export` (optional operator dashboard/CSV export) and
+adopting the library into yukkuri's live actor wiring remain deferred
+follow-ups, per this ADR's own P0/P1/P2 staging and Consequences section.
