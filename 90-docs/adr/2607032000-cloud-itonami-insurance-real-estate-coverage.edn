@@ -55,4 +55,17 @@
   :actuation-invariant-6621 ":valuation/finalize is the ONE real actuation event (unlike 6512's two), never a member of any adjustment.phase phase's :auto set, and adjustment.governor's single-member high-stakes check always escalates it to human sign-off"
   :fleet-maturity-before {:implemented 8 :blueprint 89 :spec 546 :total 643}
   :fleet-maturity-after {:implemented 9 :blueprint 88 :spec 546 :total 643}
-  :test-status-6621 "24 tests / 106 assertions, lint clean, demo verified end-to-end"}}
+  :test-status-6621 "24 tests / 106 assertions, lint clean, demo verified end-to-end"}
+
+ :addendum-3
+ {:date "2026-07-07"
+  :deepened-to-implemented "cloud-itonami-isic-6622"
+  :pattern-6622 "sealed Broker-LLM advisor + independent Insurance Intermediation Governor + append-only audit ledger, modeled closely on siblings cloud-itonami-isic-6511/6512/6621"
+  :distinctive-check-6622 "insufficient-quotes (best-interest/shopping-duty check verifying at least two insurers' quotes were compared before binding) -- has no analog in 6511/6512/6621, whose document/evidence-completeness checks verify paperwork, not genuine option comparison"
+  :dual-actuation-6622 "TWO actuation events (:placement/bind, :commission/book), matching 6512's dual-actuation shape rather than 6511's/6621's single-actuation one"
+  :lesson-reused-from-6621 "conflict-of-interest screening reused 6621's already-corrected shape (hit-in-proposal? unconditional) a SECOND time, reinforcing it as a load-bearing convention for this actor family"
+  :new-bug-caught-6622 "placement-not-bound-violations initially checked :status :bound directly, which broke on double-booking once status legitimately advances to :commission-booked after a successful booking (a status-lifecycle assumption, a DIFFERENT kind of bug from 6512's op-scoping one); fixed by checking :placement-number instead (set once, never cleared); caught via the same demo/ledger verification discipline 6512's/6621's ADRs established"
+  :fleet-maturity-before {:implemented 9 :blueprint 88 :spec 546 :total 643}
+  :fleet-maturity-after {:implemented 10 :blueprint 87 :spec 546 :total 643}
+  :test-status-6622 "33 tests / 169 assertions, lint clean, demo verified end-to-end"
+  :remaining-blueprint-from-original-batch ["cloud-itonami-6520 (reinsurance)" "cloud-itonami-6530 (pension funding)" "cloud-itonami-6629 (other insurance auxiliary)" "cloud-itonami-6820 (real estate on a fee/contract basis)"]}}
