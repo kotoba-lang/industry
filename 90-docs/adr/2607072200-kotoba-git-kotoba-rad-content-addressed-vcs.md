@@ -5,7 +5,7 @@ status: accepted
 doc_type: adr
 topic: kotoba-git-kotoba-rad-content-addressed-vcs
 authoritative: true
-last_verified: 2026-07-07 (addendum same day: object model redesigned onto native arrangement datoms)
+last_verified: 2026-07-07 (addenda same day: datom-native object model, ref-policy, signed head-announce, CACAO delegation chains)
 authoritative_for:
   - "kotoba-lang/kotoba-git owns the content-addressed git object model (blob/tree/commit) and mutable ref store for this ecosystem"
   - "kotoba-lang/kotoba-rad owns sovereign repo identity (RID), delegate authorization, and signed refs (the Radicle-equivalent layer)"
@@ -239,3 +239,54 @@ commit → revoke → outsider-rejection) was re-run end-to-end against the
 new API and produced identical pass/fail results, plus a new step
 demonstrating `arrangement.core/refs-to` resolving `tree-2`'s referencing
 commit with no `kotoba-git`-specific code.
+
+## Addendum (2026-07-07, later same day): ref-policy, signed head-announce, CACAO delegation chains
+
+Three follow-on iterations closed gaps this ADR's original "What this
+ADR does NOT decide" section named, each verified with real tests
+(`clojure -M:test`, pinned deps and local sibling checkouts) before
+landing:
+
+- **`kotoba-git.ref-policy`** (new namespace): `fast-forward?` (is a
+  proposed ref move a fast-forward — old target nil, equal, or an
+  ancestor of the new one, via `kotoba-git.log/ancestors`) and
+  `set-ref-ff-only!` (throws, leaving the ref untouched, on a
+  non-fast-forward). This is *shape* policy, independent of and
+  composable with `kotoba-rad`'s *identity* policy — no single function
+  combines both yet. 23→32 tests / 51→68 assertions.
+- **Signed head-announce**, split across two repos to keep them
+  decoupled: `kotoba-lang/p2p` gained an optional `new-node` 3-arity opts
+  map (`:sign-announce`/`:verify-announce?`, both defaulting to a no-op
+  so existing 2-arity callers are unaffected — kotoba-lang/p2p PR #1,
+  merged after CI (JVM + real ClojureScript) passed) closing that
+  namespace's own docstring note that "head-record signing is CACAO's
+  job and a tracked follow-up". New `kotoba-rad.announce` namespace
+  provides the concrete hooks: a p2p head-announce
+  (`{:graph :head-cid :seq ...}`) turned out to be exactly a sigref shape
+  (ref-name=graph, commit=head-cid, ts=seq), so no new signing primitive
+  was needed, only this adapter. p2p: 9 tests / 19 assertions (5 new).
+  kotoba-rad: 34→40 tests / 55→62 assertions. In the process, corrected a
+  standing inaccuracy in both READMEs claiming p2p's `deps.edn` needed a
+  `commit-dag`→`chain` patch — that had already been fixed upstream,
+  independently, before this was checked.
+- **`kotoba-rad.cacao-delegate`** + **`push-gate/authorize-push-cacao?`**
+  (new dependency: `org-chainagnostic-cacao`): a second, journal-free
+  authorization scheme alongside `kotoba-rad.delegate`'s ledger — the
+  owner mints a CACAO (CAIP-122/SIWE) capability chain (root-first,
+  leaf-last, `cacao.core/verify-chain`) granting a push-resource string
+  to a delegate's did:key; the delegate presents that chain (or a further
+  sub-delegated link) to prove authorization with no journal lookup.
+  Verified: single-link exact/wildcard grants, two-link sub-delegation to
+  a third party, sub-delegation cannot escalate resources beyond what the
+  delegator holds (`cacao.core`'s own `covers?` constraint), wrong root
+  issuer / wrong claimed holder rejected, expiry enforced when checked.
+  Known gap, documented rather than solved: no revocation without an
+  expiry (unlike the journal's `remove-delegate!`). 40→50 tests / 62→76
+  assertions.
+
+All three were driven by the owner's explicit direction to keep
+iterating on "成熟度, coverageを向上" (maturity, improve coverage) on a
+recurring cadence rather than stopping after the initial ADR; each
+iteration's manifest pin advance and test-count delta is in the
+superproject's own commit history for `manifest/west.yml` around this
+date, not restated per-bullet here.
