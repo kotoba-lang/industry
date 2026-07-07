@@ -87,3 +87,20 @@ mesh    : murakumo fleet に常駐 (reside facet)                             AD
 - ADR-2607071300（creator actors 登録 + minidrama 設計）
 - ADR-2607071500（minidrama mesh reside 配線）
 - ADR-2606251700（app-aozora-pds self-sovereign CACAO auth: session DID == repo DID）
+
+## 追記 (2026-07-07): createAccount 昇格完了 + PDS getAccount バグ修正
+
+- **createAccount**: `minidrama.aozora/create-account!`（fresh self-CACAO proof →
+  `com.atproto.server.createAccount`）を追加し operator 実行
+  （minidrama `95fe036c`）。actor の `:atproto.account/*` datom が PDS に永続。
+- **PDS バグ修正（app-aozora `647b542a`）**: PER_ACTOR_DB=1 下で `getAccount` の
+  entity read は actor 自身の graph に federate するが、`create-account` は
+  account entity（= handle-registry entity）を GLOBAL operator db に書くため、
+  **fallback なしでは createAccount 直後の getAccount が常に AccountNotFound**
+  （本番実測）。per-actor read が空の時だけ operator db を再読する fallback を
+  実装（tests 280/1208 green）。PDS worker 本番デプロイ（Version `e486d080`）。
+- **本番検証**: `getAccount?handle=minidrama.aozora.app` /
+  `?did=did:key:z6MkfF8…` の両照会が
+  `{did, handle, createdAt 2026-07-07T06:50:07Z}` を返す。
+- これで follow-up 3 点のうち「createAccount 昇格」が完了。残りは
+  animeka/dougaka の flip 複製と registry projection の縮退検討。
