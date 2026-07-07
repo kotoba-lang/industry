@@ -44,4 +44,15 @@
   :actuation-invariant-6512 ":policy/bind and :claim/settle are never members of any casualty.phase phase's :auto set, and casualty.governor's high-stakes check (two members) always escalates them to human sign-off"
   :fleet-maturity-before {:implemented 7 :blueprint 90 :spec 546 :total 643}
   :fleet-maturity-after {:implemented 8 :blueprint 89 :spec 546 :total 643}
-  :test-status-6512 "34 tests / 172 assertions, lint clean, demo verified end-to-end"}}
+  :test-status-6512 "34 tests / 172 assertions, lint clean, demo verified end-to-end"}
+
+ :addendum-2
+ {:date "2026-07-07"
+  :deepened-to-implemented "cloud-itonami-isic-6621"
+  :pattern-6621 "sealed Adjuster-LLM advisor + independent Loss Adjustment Governor + append-only audit ledger, modeled closely on siblings cloud-itonami-isic-6511/6512"
+  :distinctive-check-6621 "conflict-of-interest screening on the ASSIGNED ADJUSTER (not a sanctions blocklist check on a party) -- independence from underwriting/claims-payment authority is the entire premise of this business; same code shape as 6511/6512's KYC check, different and equally load-bearing semantics"
+  :lesson-applied-from-6512 "6512's own ADR recorded a real bug (an overly-broad op-guard silently defeating its sanctions-violations check, caught via demo verification); 6621's conflict-violations was written from scratch with that lesson already in hand (hit-in-proposal? evaluated unconditionally) -- demo and tests passed on the first run with no equivalent bug"
+  :actuation-invariant-6621 ":valuation/finalize is the ONE real actuation event (unlike 6512's two), never a member of any adjustment.phase phase's :auto set, and adjustment.governor's single-member high-stakes check always escalates it to human sign-off"
+  :fleet-maturity-before {:implemented 8 :blueprint 89 :spec 546 :total 643}
+  :fleet-maturity-after {:implemented 9 :blueprint 88 :spec 546 :total 643}
+  :test-status-6621 "24 tests / 106 assertions, lint clean, demo verified end-to-end"}}

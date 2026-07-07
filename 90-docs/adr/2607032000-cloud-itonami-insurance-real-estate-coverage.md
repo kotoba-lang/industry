@@ -165,6 +165,50 @@ architectural reference to model against, and `6512` still sat at
   human at all. See `cloud-itonami-isic-6512`'s own ADR-0001 for the full
   design.
 
+## Addendum 2 (2026-07-07, owner-directed): `cloud-itonami-isic-6621` deepened to `:implemented`
+
+Continuing the SAME "pick a new ISIC blueprint vertical" direction that
+produced Addendum 1's `6512`, `6621` (risk and damage evaluation --
+independent loss adjusting) was selected next: it is another insurance-
+adjacent class from THIS ADR's own original 8-repo batch, its blueprint
+already named the exact actor shape to build (Adjuster-LLM ⊣ Loss
+Adjustment Governor), and it offered a genuinely distinctive HARD check
+neither `6511` nor `6512` has any concept of.
+
+- `cloud-itonami-isic-6621` gains **Adjuster-LLM ⊣ Loss Adjustment
+  Governor** -- `adjustment.*` namespaces, modeled closely on
+  `6511`/`6512`'s Store/Registry/Governor/Phase/Advisor/Operation/Sim
+  shape and the SAME generic langgraph-clj StateGraph.
+- **The distinctive check**: independent loss adjustment's entire
+  business premise is INDEPENDENCE -- the adjuster evaluating a matter
+  must have no undisclosed conflict of interest with the party
+  requesting the evaluation. `adjustment.governor`'s `conflict-
+  violations` screens the ASSIGNED ADJUSTER against the matter, not a
+  party against a sanctions blocklist (`6511`/`6512`'s KYC check) --
+  same code shape, different and equally load-bearing semantics.
+  `:valuation/finalize` is the ONE real actuation event (unlike `6512`'s
+  two), matching `6511`'s original single-actuation-event scope.
+- **A lesson applied, not just documented**: `6512`'s own ADR recorded a
+  real bug (an overly-broad op-guard on its ported sanctions-violations
+  check, caught by reading the demo's actual ledger output). `6621`'s
+  `conflict-violations` was written from scratch with that lesson
+  already in hand (the `hit-in-proposal?` branch evaluated
+  UNCONDITIONALLY, not scoped to a specific op) -- the demo and full
+  test suite passed on the FIRST run with no equivalent bug, a direct
+  payoff of writing down what went wrong rather than only fixing it in
+  place.
+- `kotoba-lang/industry`'s registry: `:maturity :blueprint` →
+  `:implemented` for `"6621"`, fleet-wide maturity counts move from 8
+  implemented / 89 blueprint / 546 spec to 9 implemented / 88 blueprint /
+  546 spec (out of 643 total), `test/kotoba/industry_test.clj`'s
+  `maturity-summary` assertion updated to match.
+- `test/adjustment/*` -- 24 tests / 106 assertions, lint-clean, demo
+  (`clojure -M:dev:run`) runs end-to-end: one clean intake-through-
+  finalization lifecycle (escalate → approve → commit) plus three
+  HARD-hold cases (conflict of interest, no spec-basis, evidence
+  incomplete) that never reach a human at all. See `cloud-itonami-isic-
+  6621`'s own ADR-0001 for the full design.
+
 ## References
 
 - ADR-2607011000 (cloud-itonami robotics premise + ISIC 21/21 section
