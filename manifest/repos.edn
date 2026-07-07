@@ -110,6 +110,11 @@
   "orgs/kotoba-lang/activitystreams" "orgs/kotoba-lang/org-w3-activitystreams"
   "orgs/kotoba-lang/rdf"             "orgs/kotoba-lang/org-w3-rdf"
   "orgs/kotoba-lang/turtle"          "orgs/kotoba-lang/org-w3-turtle"
+  ;; semiconductor/EDA standards batch, renamed 2026-07-07 (ADR-2607072500):
+  ;; same org-<body>-<spec> precedent, extended with a new edu-<institution>
+  ;; variant for university-originated (not formal-standards-body) specs.
+  "orgs/kotoba-lang/spice"           "orgs/kotoba-lang/edu-berkeley-spice"
+  "orgs/kotoba-lang/verilog"         "orgs/kotoba-lang/org-ieee-verilog"
   ;; follow-up batch, renamed 2026-07-06 (ADR-2607061613): ipfs joins the
   ;; io-<domain> family (io-libp2p/io-ipld/io-multiformats, ipfs.tech-governed);
   ;; svg is a W3C Recommendation, same org-w3-* precedent as the batch above.
@@ -1726,7 +1731,12 @@
    ;; exists as an unrelated OpenSTA/OpenROAD-class timing/routing kernel.
    "orgs/kotoba-lang/pcb"
    "orgs/kotoba-lang/dft"
-   "orgs/kotoba-lang/spice"
+   ;; renamed to edu-berkeley-spice 2026-07-07 (ADR-2607072500): reverse-domain
+   ;; external-spec name -- SPICE's base spec is UC Berkeley's SPICE3
+   ;; documentation (berkeley.edu), same org-<body>-<spec> naming rule as
+   ;; org-w3-*/org-ietf-*/org-khronos-*, extended to a new edu- prefix for
+   ;; university-originated (not formal-standards-body) specs.
+   "orgs/kotoba-lang/edu-berkeley-spice"
    ;; KAMI WebGPU DSL/runtime semantic split repos. These are the CLJ/CLJC
    ;; authority homes tracked by 90-docs/migration/kami-webgpu-dsl-runtime-split.edn.
    "orgs/kotoba-lang/atom"
@@ -1790,7 +1800,9 @@
    ;; OpenUSD (openusd.org) ASCII interchange — reverse-domain named, same
    ;; ADR-2607041500-precedent rename as org-materialx/org-khronos-{gltf,glb}.
    "orgs/kotoba-lang/org-openusd"
-   "orgs/kotoba-lang/verilog"
+   ;; renamed to org-ieee-verilog 2026-07-07 (ADR-2607072500): Verilog is
+   ;; IEEE 1364, same org-<body>-<spec> naming rule as org-w3-*/org-ietf-*.
+   "orgs/kotoba-lang/org-ieee-verilog"
    "orgs/kotoba-lang/dom-gpu" ; renamed from wasm-ui 2026-07-04, ADR-2607051200
    "orgs/kotoba-lang/wgsl"
    "orgs/kotoba-lang/xml"
