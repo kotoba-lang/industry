@@ -1,45 +1,57 @@
 {:frontmatter
  {
   :id "adr-2607062030-kotoba-lang-ichiran-tally-scaffold"
-  :title "ADR-2607062030: kotoba-lang/ichiran — 集計表生成 actor（雛形のみ）"
+  :title "ADR-2607062030: kotoba-lang/ichiran — 集計表生成 actor（tally-LLM ⊣ TallyGovernor）"
   :status "proposed"
   :date "2026-07-06"
+  :amended "2026-07-07"
   :deciders ["Jun Kawasaki"]
   :doc_type "adr"
   :topic "kotoba-lang-ichiran-tally-scaffold"
   :authoritative true
-  :authoritative_for ["ichiran repo の scaffold-only スコープ判断（governor/operation 実装は follow-up）" "将来の TallyGovernor / TallyPort 設計方向のプレースホルダ"]
+  :authoritative_for ["ichiran actor の設計（tally-LLM ⊣ TallyGovernor、二流路 StateGraph、Phase 0→3、teian とほぼ同型）" "kotoba-lang/sheets の workbook EDN を content として保持する TallyTarget port 契約（fetch-workbook/propose-revision!/publish!）" "TallyGovernor の HARD 不変条件（no-actuation/missing-subject/redaction-required/tenant-isolation、publish 直前の再検証）" "teian/koyomi のレビューで見つかったバグクラスの設計段階での回避"]
   :supersedes []
   :superseded_by []
   :related ["adr-2607062000-kotoba-lang-teian-briefing-actor" "adr-2607062010-kotoba-lang-koyomi-schedule-actor" "adr-2607062020-kotoba-lang-shoko-archive-scaffold"]
-  :last_verified "2026-07-06"}
+  :last_verified "2026-07-07"}
  :body
- "# ADR-2607062030: kotoba-lang/ichiran — 集計表生成 actor（雛形のみ）
+ "# ADR-2607062030: kotoba-lang/ichiran — 集計表生成 actor（tally-LLM ⊣ TallyGovernor）
 
-**Status**: proposed(scaffold-only)
+**Status**: proposed(2026-07-06 の scaffold-only 決定を撤回し、フル実装へ
+昇格 — 2026-07-07 オーナー指示)
 **Date**: 2026-07-06
+**Amended**: 2026-07-07
 **Deciders**: Jun Kawasaki
 
 ## Context
 
 ADR-2607062000（teian）と同じ依頼のうち「表」面。`kotoba-lang/sheets` は
 workbook/tab/cell/formula/named-range/chart を持つ pure data model
-（実測確認済み）。今回のスコープは資料作成・予定共有を優先し、表面は ADR
-起票 + repo 雛形のみに留める。
+（実測確認済み）。当初 scaffold-only としたが、2026-07-07 にフル実装へ
+昇格。teian/koyomi のレビューで見つかったバグクラス（subject存在チェック
+欠落・publish時再検証欠落・seed! の per-id upsert 契約違反）を設計に
+あらかじめ織り込む。
 
 ## Decision
 
-新規 repo `kotoba-lang/ichiran`（一覧）を scaffold のみ作成する。README・
-deps.edn（sheets 依存 + langgraph/ed25519/ipns 先行登録）・namespace 骨組み
-（governor/operation は宣言のみ、'Status: proposed — 雛形のみ' と明記）・
-smoke テスト1本。TallyGovernor（no-actuation/redaction-required/
-tenant-isolation）・TallyPort（fetch-workbook/propose-revision!/publish!）の
-設計方向のみ記録し、実装は follow-up。
+新規 repo `kotoba-lang/ichiran`（一覧）を起こし、tally-LLM ⊣ TallyGovernor
+型の集計表生成 actor として実装する（teian とほぼ同型、content が deck では
+なく sheets の workbook）。TallyTarget port（fetch-workbook/
+propose-revision!/publish!、content は sheets.model EDN そのまま）、統一
+データモデル（draft: activity-id/workbook-id/content/confidence/cites/
+redactions/status）、二流路 StateGraph（ingest=artifact/register、
+assess=tally/draft→govern→decide→commit|escalate|hold、tally/publish は
+常に人間承認）、TallyGovernor の HARD 不変条件（no-actuation/
+missing-subject(独立・無条件)/redaction-required/tenant-isolation、
+publish 直前に redaction/tenant を再検証）、Phase 0→3、CACAO 自己発行
+（.ichiran/identity.edn）、append-only 台帳、MemStore.seed! は最初から
+per-id upsert で実装。詳細は同名 .md 参照。
 
 ## Consequences
 
-repo/manifest/deps.edn は先に確定するが、実装が無いため cloud-itonami からは
-呼び出せない。
+集計表生成が横断 actor に集約され、sheets の既存 EDN モデルを再利用できる。
+teian/koyomi のレビューで見つかったバグクラスを設計段階で回避。実
+Distributor・実 export の live 結合、cloud-itonami 配線は follow-up。
 
 ## References
 

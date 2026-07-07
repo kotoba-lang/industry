@@ -1,46 +1,59 @@
 {:frontmatter
  {
   :id "adr-2607062020-kotoba-lang-shoko-archive-scaffold"
-  :title "ADR-2607062020: kotoba-lang/shoko — 保管ガバナンス actor（雛形のみ）"
+  :title "ADR-2607062020: kotoba-lang/shoko — 保管ガバナンス actor（archive-LLM ⊣ ArchiveGovernor）"
   :status "proposed"
   :date "2026-07-06"
+  :amended "2026-07-07"
   :deciders ["Jun Kawasaki"]
   :doc_type "adr"
   :topic "kotoba-lang-shoko-archive-scaffold"
   :authoritative true
-  :authoritative_for ["shoko repo の scaffold-only スコープ判断（governor/operation 実装は follow-up）" "将来の ArchiveGovernor / ArchivePort 設計方向のプレースホルダ"]
+  :authoritative_for ["shoko actor の設計（archive-LLM ⊣ ArchiveGovernor、二流路 StateGraph、Phase 0→3）" "kotoba-lang/drive の file/folder EDN を content として保持する ArchiveTarget port 契約（fetch-file/propose-revision!/share!）" "shoko 自身が持つ grant(ACL) 台帳による deny-by-default 判定" "ArchiveGovernor の HARD 不変条件（no-actuation/missing-subject/share-requires-acl/tenant-isolation）" "teian/koyomi のレビューで見つかったバグクラス（subject存在チェック欠落・TOCTOU・publish時再検証欠落）の設計段階での回避"]
   :supersedes []
   :superseded_by []
   :related ["adr-2607062000-kotoba-lang-teian-briefing-actor" "adr-2607062010-kotoba-lang-koyomi-schedule-actor"]
-  :last_verified "2026-07-06"}
+  :last_verified "2026-07-07"}
  :body
- "# ADR-2607062020: kotoba-lang/shoko — 保管ガバナンス actor（雛形のみ）
+ "# ADR-2607062020: kotoba-lang/shoko — 保管ガバナンス actor（archive-LLM ⊣ ArchiveGovernor）
 
-**Status**: proposed(scaffold-only)
+**Status**: proposed(2026-07-06 の scaffold-only 決定を撤回し、フル実装へ
+昇格 — 2026-07-07 オーナー指示)
 **Date**: 2026-07-06
+**Amended**: 2026-07-07
 **Deciders**: Jun Kawasaki
 
 ## Context
 
 ADR-2607062000（teian）と同じ依頼のうち「保管」面。`kotoba-lang/drive` は
-ACL・共有・監査の概念が無い pure data model（実測確認済み）。今回のスコープは
-資料作成・予定共有を優先し、保管面は ADR 起票 + repo 雛形のみに留める。
+ACL・共有・監査の概念が無い pure data model（実測確認済み）。当初
+scaffold-only としたが、2026-07-07 にフル実装へ昇格。teian/koyomi のレビュー
+で見つかったバグクラス（subject存在チェック欠落・TOCTOU・publish時再検証
+欠落）を設計にあらかじめ織り込む。
 
 ## Decision
 
-新規 repo `kotoba-lang/shoko`（書庫）を scaffold のみ作成する。README・
-deps.edn（drive 依存 + langgraph/ed25519/ipns 先行登録）・namespace 骨組み
-（governor/operation は宣言のみ、'Status: proposed — 雛形のみ' と明記）・
-smoke テスト1本。ArchiveGovernor（no-actuation/share-requires-acl/
-tenant-isolation）・ArchivePort（fetch-file/propose-revision!/share!）の
-設計方向のみ記録し、実装は follow-up。
+新規 repo `kotoba-lang/shoko`（書庫）を起こし、archive-LLM ⊣
+ArchiveGovernor 型の保管ガバナンス actor として実装する。ArchiveTarget port
+（fetch-file/propose-revision!/share!、content は drive.model EDN そのまま）、
+統一データモデル（draft + grant(ACL)）、二流路 StateGraph（ingest=
+file/register、assess=file/draft→govern→decide→commit|escalate|hold、
+file/share は常に人間承認）、ArchiveGovernor の HARD 不変条件
+（no-actuation/missing-subject(独立・無条件)/share-requires-acl
+(deny-by-default)/tenant-isolation、share は commit 時点で checkpoint 済み
+content を使い store 再読込しない、ただし ACL/tenant は共有直前に再評価）、
+Phase 0→3、CACAO 自己発行（.shoko/identity.edn）、append-only 台帳。詳細は
+同名 .md 参照。
 
 ## Consequences
 
-repo/manifest/deps.edn は先に確定するが、実装が無いため cloud-itonami からは
-呼び出せない。
+保管・共有ガバナンスが横断 actor に集約され、drive の既存 EDN モデルを
+再利用できる。teian/koyomi のレビューで見つかったバグクラスを設計段階で
+回避。実 Distributor・実 drive I/O の live 結合、cloud-itonami 配線は
+follow-up。
 
 ## References
 
-ADR-2607062000(teian)、ADR-2607062010(koyomi)、`orgs/kotoba-lang/kekkai`、
-`orgs/kotoba-lang/tayori`。"}
+ADR-2607062000(teian)、ADR-2607062010(koyomi)、`orgs/kotoba-lang/kekkai`
+（deny-by-default ACL の手本）、`orgs/kotoba-lang/tayori`（draft/publish の
+手本）。"}
