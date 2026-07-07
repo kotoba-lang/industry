@@ -46,7 +46,21 @@
     内部 dot アクセス (grants/sha256_hex 等) と cljs 側の書込みで食い違う罠を
     externs/actor-host.js で解決 (rename 対象外に固定)。wasmdemo.aozora.app
     で main() → sha256_hex(\"hello\") 正解ハッシュ + log_write(\"hello\") を
-    live 確認"]
+    live 確認"
+   "Addendum 3 (同日): cap-bridge 書込み系 capability — graph/transact 実装。
+    yoro-ui.interop.app-bridge/run-cap に graph/transact 分岐追加 — app は
+    生 nsid でなく {:action :collection :rkey :record} を渡し、host が
+    action→procedure nsid (createRecord/putRecord/deleteRecord) を解決
+    (app に任意 nsid 実行はさせない)。collection は com.etzhayyim. 名前空間
+    のみ許可。新設 yoro-ui.interop.atproto/at-write-record が既存
+    :atproto/procedure fx と同じ no-server-key ルーティング
+    (repo-signer/write-record! on-device 署名 or server-signed at-procedure
+    フォールバック) を再利用、鍵/token は embed app に渡さない。
+    kotoba.protocol.app の bridge-caps には元々 graph/transact/llm/complete
+    両方が登録済みだったため protocol 層の変更は不要、host 側対応表を
+    埋めただけ。llm/complete は proxy 先 backend が無く未実装のまま。
+    実 shadow-cljs :test build で 174 ファイルコンパイル成功で検証
+    (ブラウザ round-trip デモは持ち越し)"]
   :related
   ["90-docs/adr/2607062330-kototama-tender-chicory-execution-runtime.md"
    "90-docs/adr/2607062400-kototama-actor-host-browser-native-and-tender-module-fix.md"
@@ -106,15 +120,16 @@
   ["spec と実装の drift リスク (data 化 + テスト参照で軽減)"
    "repo 2 つ (kotoba-protocol/atprotocol) + vendor JS (actor-host.js) +
     externs ファイルの追加管理コスト"
-   "cap-bridge は graph/query (読取専用) のみ、wasm actor は 7/8 imports
-    (http-post 不可) — 書込み系 capability の host 代行は未実装のまま
-    open follow-up として持ち越し"]}
+   "cap-bridge は graph/query (読取専用) + graph/transact (書込み、
+    Addendum 3) 対応。wasm actor は 7/8 imports (http-post 不可)。
+    llm/complete は proxy 先 backend が無く未実装のまま open follow-up
+    として持ち越し"]}
 
  :open-follow-up
  ["lexicon _lexicon DNS 公開・firehose・MST encoding の kotoba graph 導出
    (atprotocol の wire 互換を深める話、miniapp モデル自体には不要)"
-  "cap-bridge の書込み系 capability (graph/transact・llm/complete) の host
-   代行実装 (現状は grant registry に名前があるだけ)"
+  "graph/transact は実装済み (Addendum 3)。llm/complete は proxy 先の LLM
+   completion XRPC/backend 自体がまだ存在しないため未実装のまま持ち越し"
   "studio への actor 鍵 import UI の汎用化 (現状 mangaka-app 専用)"
   ":kotoba.app/bundle-cid の appview 側 integrity 検証 (現状 embed-url の
    resolve のみで配信内容との一致は未検証)"]}
