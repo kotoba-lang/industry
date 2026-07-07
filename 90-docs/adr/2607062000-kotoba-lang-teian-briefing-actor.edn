@@ -5,21 +5,32 @@
   :status "closed"
   :date "2026-07-06"
   :closed "2026-07-06"
+  :amended "2026-07-07"
   :deciders ["Jun Kawasaki"]
   :doc_type "adr"
   :topic "kotoba-lang-teian-briefing-actor"
   :authoritative true
-  :authoritative_for ["teian actor の設計（deck-LLM ⊣ BriefingGovernor、二流路 StateGraph、Phase 0→3）" "kotoba-lang/slides の deck/doc/sheet EDN を content として保持する DeckTarget port 契約（fetch-deck/propose-revision!/publish!）" "BriefingGovernor の HARD 不変条件（no-actuation/redaction-required/tenant-isolation、publish は常に人間承認）" "cloud-itonami からの消費経路（deps.edn local/root、cloud_itonami.workspace 投影層経由）" "文書作成は kotoba-lang/tayori の DocTarget に委譲し、teian は資料(デッキ)専用とするスコープ判断" "実行完了: repo scaffold + 独立レビューで見つかった2件（MemStore.seed! の per-id upsert 契約違反、publish 時 redaction/tenant 再検証欠落）の修正 + regression test（commit 5fdd8e7）+ manifest 登録 + cloud-itonami workspace.cljc 配線、いずれも完了"]
+  :authoritative_for ["teian actor の設計（deck-LLM ⊣ BriefingGovernor、二流路 StateGraph、Phase 0→3）" "kotoba-lang/slides の deck/doc/sheet EDN を content として保持する DeckTarget port 契約（fetch-deck/propose-revision!/publish!）" "BriefingGovernor の HARD 不変条件（no-actuation/redaction-required/tenant-isolation、publish は常に人間承認）" "cloud-itonami からの消費経路（deps.edn local/root、cloud_itonami.workspace 投影層経由）" "文書作成は kotoba-lang/tayori の DocTarget に委譲し、teian は資料(デッキ)専用とするスコープ判断" "実行完了: repo scaffold + 独立レビューで見つかった2件（MemStore.seed! の per-id upsert 契約違反、publish 時 redaction/tenant 再検証欠落）の修正 + regression test（commit 5fdd8e7）+ manifest 登録 + cloud-itonami workspace.cljc 配線、いずれも完了" "2026-07-07 追記: ADR-2607062030(ichiran)のレビューで発見された3件目のバグ（:deck/publish 配信が checkpoint 済み content ではなく commit 時点で store を再読込する TOCTOU）を遡及修正（commit 1bafac1）"]
   :supersedes []
   :superseded_by []
-  :related ["adr-2607061500-kotoba-lang-tayori-correspondence-actor" "adr-2607031100-kotoba-lang-gijiroku-meeting-actor" "adr-2606302300-org-taxonomy-4-orgs"]
-  :last_verified "2026-07-06"}
+  :related ["adr-2607061500-kotoba-lang-tayori-correspondence-actor" "adr-2607031100-kotoba-lang-gijiroku-meeting-actor" "adr-2606302300-org-taxonomy-4-orgs" "adr-2607062030-kotoba-lang-ichiran-tally-scaffold"]
+  :last_verified "2026-07-07"}
  :body
  "# ADR-2607062000: kotoba-lang/teian — 資料作成 actor（deck-LLM ⊣ BriefingGovernor）
 
-**Status**: proposed
+**Status**: closed(実行完了。scaffold + 独立レビューで見つかった2件の修正、
+および ichiran のレビューで判明した3件目の遡及修正まで完了)
 **Date**: 2026-07-06
+**Closed**: 2026-07-06
+**Amended**: 2026-07-07
 **Deciders**: Jun Kawasaki
+
+## Addendum(2026-07-07)
+
+ADR-2607062030（ichiran）の独立レビューが、`commit-effects!` の
+`:deck/publish` 分岐に同型の TOCTOU（配信が checkpoint 済み content では
+なく commit 時点で store を再読込していた）が残っていたことを発見し、
+commit `1bafac1` で修正した。詳細は同名 .md の Addendum 節を参照。
 
 ## Context
 

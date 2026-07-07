@@ -2,14 +2,15 @@
  {
   :id "adr-2607062020-kotoba-lang-shoko-archive-scaffold"
   :title "ADR-2607062020: kotoba-lang/shoko — 保管ガバナンス actor（archive-LLM ⊣ ArchiveGovernor）"
-  :status "proposed"
+  :status "closed"
   :date "2026-07-06"
   :amended "2026-07-07"
+  :closed "2026-07-07"
   :deciders ["Jun Kawasaki"]
   :doc_type "adr"
   :topic "kotoba-lang-shoko-archive-scaffold"
   :authoritative true
-  :authoritative_for ["shoko actor の設計（archive-LLM ⊣ ArchiveGovernor、二流路 StateGraph、Phase 0→3）" "kotoba-lang/drive の file/folder EDN を content として保持する ArchiveTarget port 契約（fetch-file/propose-revision!/share!）" "shoko 自身が持つ grant(ACL) 台帳による deny-by-default 判定" "ArchiveGovernor の HARD 不変条件（no-actuation/missing-subject/share-requires-acl/tenant-isolation）" "teian/koyomi のレビューで見つかったバグクラス（subject存在チェック欠落・TOCTOU・publish時再検証欠落）の設計段階での回避"]
+  :authoritative_for ["shoko actor の設計（archive-LLM ⊣ ArchiveGovernor、二流路 StateGraph、Phase 0→3）" "kotoba-lang/drive の file/folder EDN を content として保持する ArchiveTarget port 契約（fetch-file/propose-revision!/share!）" "shoko 自身が持つ grant(ACL) 台帳による deny-by-default 判定（テナントスコープ化済み）" "ArchiveGovernor の HARD 不変条件（no-actuation/missing-subject/share-requires-acl/tenant-isolation）" "teian/koyomi のレビューで見つかったバグクラス（subject存在チェック欠落・TOCTOU・publish時再検証欠落）の設計段階での回避" "実行完了: フル実装(commit 123c4c8) + 独立レビューで見つかった2件（クロステナント権限昇格、granted-atのデモ時刻fallback）の修正(commit fa03d3c) + manifest 登録、いずれも完了"]
   :supersedes []
   :superseded_by []
   :related ["adr-2607062000-kotoba-lang-teian-briefing-actor" "adr-2607062010-kotoba-lang-koyomi-schedule-actor"]

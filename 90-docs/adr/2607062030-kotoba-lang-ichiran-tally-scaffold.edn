@@ -2,14 +2,15 @@
  {
   :id "adr-2607062030-kotoba-lang-ichiran-tally-scaffold"
   :title "ADR-2607062030: kotoba-lang/ichiran — 集計表生成 actor（tally-LLM ⊣ TallyGovernor）"
-  :status "proposed"
+  :status "closed"
   :date "2026-07-06"
   :amended "2026-07-07"
+  :closed "2026-07-07"
   :deciders ["Jun Kawasaki"]
   :doc_type "adr"
   :topic "kotoba-lang-ichiran-tally-scaffold"
   :authoritative true
-  :authoritative_for ["ichiran actor の設計（tally-LLM ⊣ TallyGovernor、二流路 StateGraph、Phase 0→3、teian とほぼ同型）" "kotoba-lang/sheets の workbook EDN を content として保持する TallyTarget port 契約（fetch-workbook/propose-revision!/publish!）" "TallyGovernor の HARD 不変条件（no-actuation/missing-subject/redaction-required/tenant-isolation、publish 直前の再検証）" "teian/koyomi のレビューで見つかったバグクラスの設計段階での回避"]
+  :authoritative_for ["ichiran actor の設計（tally-LLM ⊣ TallyGovernor、二流路 StateGraph、Phase 0→3、teian とほぼ同型）" "kotoba-lang/sheets の workbook EDN を content として保持する TallyTarget port 契約（fetch-workbook/propose-revision!/publish!）" "TallyGovernor の HARD 不変条件（no-actuation/missing-subject/redaction-required/tenant-isolation、publish 直前の再検証）" "teian/koyomi のレビューで見つかったバグクラスの設計段階での回避" "実行完了: フル実装(commit 2cefa75) + 独立レビューで見つかった2件（publish配信のTOCTOU、phase fail-open）の修正(commit bed2f41) + manifest 登録、いずれも完了。本 ADR のレビューが teian の同型 TOCTOU バグを発見し、teian 側も遡って修正（teian commit 1bafac1）"]
   :supersedes []
   :superseded_by []
   :related ["adr-2607062000-kotoba-lang-teian-briefing-actor" "adr-2607062010-kotoba-lang-koyomi-schedule-actor" "adr-2607062020-kotoba-lang-shoko-archive-scaffold"]

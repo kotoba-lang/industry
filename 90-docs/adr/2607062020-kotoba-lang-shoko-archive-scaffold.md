@@ -1,9 +1,10 @@
 # ADR-2607062020: kotoba-lang/shoko — 保管ガバナンス actor（archive-LLM ⊣ ArchiveGovernor）
 
-**Status**: proposed(2026-07-06 の scaffold-only 決定を撤回し、フル実装へ
-昇格。teian/koyomi と同等の完成度を目指す — 2026-07-07 オーナー指示)
+**Status**: closed(実行完了。フル実装 + 独立レビューで見つかった2件の修正まで
+完了。cloud-itonami 側 UI 配線・実 Distributor 接続は明記済みの follow-up)
 **Date**: 2026-07-06
 **Amended**: 2026-07-07
+**Closed**: 2026-07-07
 **Deciders**: Jun Kawasaki
 
 ## Context
@@ -96,15 +97,16 @@ deny-by-default に判定する。
   mock-archiveport による決定的 sim で動く。
 - (−) cloud-itonami 側の実配線・UI は本 ADR の範囲外（別 PR）。
 
-## Execution
+## Execution(closing, 2026-07-07)
 
 | 項目 | 状態 | 備考 |
 |---|---|---|
-| repo scaffold(README/deps.edn/namespace骨組み/smokeテスト) | ✅ 完了 | 2026-07-06、scaffold-only 版として |
-| フル実装への昇格(ArchiveTarget port・統一データモデル・StateGraph・governor・phase・store・CACAO 自己発行) | ⏳ 進行中 | |
-| 独立レビュー | ⏳ 未着手 | |
-| manifest pin 前進 | ⏳ 未着手 | |
-| superproject `main` 反映 | ⏳ 未着手 | |
+| repo scaffold(README/deps.edn/namespace骨組み/smokeテスト) | ✅ 完了 | 2026-07-06、scaffold-only 版として。commit `9f71db2` |
+| フル実装への昇格(ArchiveTarget port・統一データモデル・StateGraph・governor・phase・store・CACAO 自己発行) | ✅ 完了 | commit `123c4c8`。30 tests / 138 assertions |
+| 独立レビュー(governor/ACL 中心の敵対的レビュー) | ✅ 完了 | confirmed 2 件: `share-requires-acl` がテナントに紐付いておらず、一方のテナントでのみ known な principal が別テナントのファイルへ「違反ゼロ」で共有されてしまうクロステナント権限昇格／`:granted-at` が `:now` 省略時にハードコードされたデモ時刻へ silent fallback（台帳の時刻整合性を損なう） |
+| 上記 2 件の修正 + regression test 追加 | ✅ 完了 | commit `fa03d3c`。33 tests / 154 assertions(新規3件)、lint clean。`principal-known?`/`unregistered-principal-violations` をテナントスコープ化（principalの既存grantが対象ファイルと同一テナントかを store 参照で判定）、`:granted-at` は `:now` 省略時に実時刻(`store/real-now`)へフォールバック |
+| manifest pin 前進(`9f71db2`→`123c4c8`→`fa03d3c`) | ✅ 完了 | `--entry shoko` 最小 diff、サーバ側検証 OK |
+| superproject `main` 反映 | ✅ 完了 | 4actor 一括 pin 前進コミット |
 
 ## References
 
