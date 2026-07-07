@@ -4752,8 +4752,19 @@
    :business-id "cloud-itonami-isic-6612"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :securities]
    :optional-technologies []
-   :maturity :blueprint
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
+   ;; :blueprint -> :implemented as a securities-brokerage actor
+   ;; (Broker-LLM ⊣ Brokerage Governor), the FIRST actor in this fleet
+   ;; built outside ADR-2607032000's original insurance/real-estate
+   ;; batch, modeled closely on siblings 6511/6512/6621/6622/6629/6520/
+   ;; 6530/6820. suitability-failure-violations generalizes the
+   ;; unconditional-evaluation discipline (conflict-of-interest
+   ;; screening) to a risk-tolerance compatibility match, a
+   ;; structurally new kind of screening question. trade-value-
+   ;; mismatch reuses the exact-match independent-recompute pattern on
+   ;; a fifth formula (quantity x price). Single actuation
+   ;; (:trade/execute), never auto at any phase.
    :operating-states [:intake :suitability :execute :settle :audit]},
   {:id "6621"
    :name "Risk and damage evaluation"
