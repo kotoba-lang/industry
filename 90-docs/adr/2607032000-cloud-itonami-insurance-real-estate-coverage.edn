@@ -68,4 +68,17 @@
   :fleet-maturity-before {:implemented 9 :blueprint 88 :spec 546 :total 643}
   :fleet-maturity-after {:implemented 10 :blueprint 87 :spec 546 :total 643}
   :test-status-6622 "33 tests / 169 assertions, lint clean, demo verified end-to-end"
-  :remaining-blueprint-from-original-batch ["cloud-itonami-6520 (reinsurance)" "cloud-itonami-6530 (pension funding)" "cloud-itonami-6629 (other insurance auxiliary)" "cloud-itonami-6820 (real estate on a fee/contract basis)"]}}
+  :remaining-blueprint-from-original-batch ["cloud-itonami-6520 (reinsurance)" "cloud-itonami-6530 (pension funding)" "cloud-itonami-6629 (other insurance auxiliary)" "cloud-itonami-6820 (real estate on a fee/contract basis)"]}
+
+ :addendum-4
+ {:date "2026-07-07"
+  :deepened-to-implemented "cloud-itonami-isic-6629"
+  :pattern-6629 "sealed Claims-LLM advisor + independent Insurance Auxiliary Governor + append-only audit ledger, modeled closely on siblings cloud-itonami-isic-6511/6512/6621/6622"
+  :distinctive-check-6629 "apportionment-mismatch -- independently recomputes a general-average apportionment (pro-rata by value-at-risk) and compares it against the case's claimed figures, reusing the CROSS-REPO cloud-itonami-isic-6499/6430 'never trust a claimed number' pattern WITHIN one repo; a pure arithmetic-verification check, unlike 6511's/6512's sanctions or 6621's/6622's conflict-of-interest party-screening checks"
+  :single-op-dual-activity-6629 "ONE actuation op (:recommendation/finalize) serves TWO bundled activities (outsourced claims administration, marine general-average adjustment), dispatching its HARD checks by the case's own :case-type rather than duplicating StateGraph wiring per activity"
+  :no-party-concept-6629 "this actor deliberately has NO party/conflict-of-interest Store concept at all -- its core failure mode is arithmetic, not identity-based, so adding an unused KYC-shaped collection just to match sibling shape would be premature abstraction"
+  :first-run-clean-6629 "unlike 6512's and 6622's own ADRs (each recording a real bug caught during demo verification), 6629's apportionment-mismatch check passed the demo and full test suite on the FIRST run -- new territory rather than a ported pattern with a known failure mode already lurking in it"
+  :fleet-maturity-before {:implemented 10 :blueprint 87 :spec 546 :total 643}
+  :fleet-maturity-after {:implemented 11 :blueprint 86 :spec 546 :total 643}
+  :test-status-6629 "30 tests / 125 assertions, lint clean, demo verified end-to-end"
+  :remaining-blueprint-from-original-batch ["cloud-itonami-6520 (reinsurance)" "cloud-itonami-6530 (pension funding)" "cloud-itonami-6820 (real estate on a fee/contract basis)"]}}
