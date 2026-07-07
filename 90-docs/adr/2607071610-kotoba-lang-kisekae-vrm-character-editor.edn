@@ -260,7 +260,52 @@
                    addenda is now closed"}
    :unblocks "net-babiniku M6 slice 2 part-swap UI can be revisited on the
               strength of an engine proven against real, unmodified Consortium
-              content, not synthetic fixtures alone"}}
+              content, not synthetic fixtures alone"}
+  :addendum_2607080900
+  {:context "addendum 5 closed the last engine blocker; this addendum ships the
+             consumer UI it unblocked -- kisekae.build/kisekae.edit/kisekae.spec
+             already had a complete, tested API, net-babiniku just never called it
+             from the create-your-character form"
+   :shipped
+   {:what "jk-luxury/net-babiniku#38: swap-parts picker (one row per
+           kisekae.spec/overridable-kind) wired to kisekae.spec's :op/add-part via
+           kisekae.edit, compose happens ON DEMAND at stage-select time (not
+           creation time) via a new babiniku.web/ensure-composed-avatar!, cached
+           by character-id"
+    :design_rationale "the character record stores only the small kisekae.spec
+                       (base + overrides), not an eagerly-built blob -- matches
+                       kisekae.spec's own 'not a .vrm file in a bucket' design.
+                       An eager blob URL would not survive page reload
+                       (URL.createObjectURL dies with the browsing context) and
+                       would blow past localStorage's quota for multi-MB avatars"
+    :perf_note "the composed VrmDocument feeds straight into
+               vrmb/load-avatar-meshes, skipping export-bytes + reparse entirely
+               -- compose already produces a real VrmDocument in memory"}
+   :verification
+   {:method "live browser verification, twice -- NOT a mock, NOT a local dev
+             server (this session's browser-automation tool runs in a different
+             network namespace than the sandbox that builds the code, discovered
+             mid-verification when localhost was unreachable from the browser).
+             Used a real Cloudflare Pages preview deploy first, then production
+             itself after merge"
+    :real_pair "created a character with Aoi (Seed-san) as base + Yui's
+               (VRM1_Constraint_Twist_Sample) hair as an override -- the exact
+               real-world pair addendum 5 verified via direct JVM diagnostic, now
+               verified through the full browser UI/engine/render pipeline"
+    :confirmed "selecting it on stage showed 'building your character's avatar...'
+               (proves the compose branch, not plain-fetch, was taken) then
+               '(triangle) live VRM avatar'; the composed avatar rendered as a
+               full, correctly-posed, textured humanoid with hair visibly distinct
+               from Aoi's own short black hair -- confirmed by direct side-by-side
+               comparison. No console errors. The plain no-override fast path
+               re-verified unaffected"}
+   :bug_caught_before_landing
+   {:what "the swap-parts picker's .selected CSS class had no matching style rule
+           (only .base-picker button.selected existed) -- every row looked
+           unselected even though the underlying re-frame state was correct"
+    :how_caught "screenshot inspection during verification, not code review"
+    :fix "extended the existing CSS rule to also cover .part-swap-row
+         button.selected; rebuilt, redeployed, reverified"}}}
 
  :alternatives
  [{:option "store exported .vrm blobs as the artifact of record"

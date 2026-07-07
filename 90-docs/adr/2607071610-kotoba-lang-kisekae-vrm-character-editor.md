@@ -285,6 +285,48 @@ UI (built then deliberately unshipped pending this engine work, per addendum 2) 
 now be revisited on the strength of an engine that has been proven against real,
 unmodified Consortium content rather than synthetic fixtures alone.
 
+### Addendum 6 (2026-07-08): M6 slice 2 shipped — net-babiniku's part-swap UI wires
+the already-built kisekae library end to end, verified live in production
+
+Addendum 5 closed the last engine blocker; this addendum ships the consumer UI it
+unblocked. `kisekae.build`/`kisekae.edit`/`kisekae.spec` already had a complete,
+tested API (`effective-sources`, `build-document`, `export-bytes`, `:op/add-part`) —
+what was missing was net-babiniku actually calling it from the "create your
+character" form (`jk-luxury/net-babiniku#38`).
+
+**Design**: compose happens on demand, not at character-creation time. The
+character record stores only the small `kisekae.spec` (base + per-kind part
+overrides); `babiniku.web` recomposes fresh from that spec the first time the
+character is put on stage (fetch base + donor VRM bytes, `vrm.part/decompose` +
+`vrm.compose/compose`, feed the resulting `VrmDocument` straight into the existing
+mesh-upload path — no export/reparse round-trip), cached by character-id. A
+character with no part overrides is unaffected — same plain fetch-by-URL path as
+before, zero added engine work for the common case. This matches kisekae.spec's own
+docstring design ("a character is not a `.vrm` file in a bucket") rather than
+eagerly building and storing a blob URL, which would not survive a page reload
+(`URL.createObjectURL` blobs die with the browsing context) and would blow past
+localStorage's quota for multi-megabyte avatar files.
+
+**Verified live, twice** (not a mock, not a local dev server — this session's
+browser-automation tooling runs in a different network namespace than the sandbox
+that builds the code, so verification used a real Cloudflare Pages preview deploy,
+then production itself after merge): created a character with Aoi (Seed-san) as
+base and Yui's (VRM1_Constraint_Twist_Sample) hair as an override; selecting it on
+stage showed "building your character's avatar…" (confirming the compose branch,
+not the plain-fetch branch, was taken) then "▶ live VRM avatar"; the composed
+avatar rendered as a full, correctly-posed, textured humanoid with hair visibly
+distinct from Aoi's own short black hair (Yui's long brown hair swapped in
+correctly) — confirmed by direct side-by-side comparison against Aoi's own
+unswapped avatar. No console errors. The plain (no-override) fast path was
+re-verified unaffected.
+
+**A real mid-flight defect, caught and fixed before landing**: the swap-parts
+picker's `.selected` CSS class had no matching style rule (only
+`.base-picker button.selected` existed) — every row LOOKED unselected even when the
+underlying re-frame state was correct, caught by screenshot inspection during
+verification, not by code review. Fixed by extending the existing rule to cover
+`.part-swap-row button.selected` too, rebuilt, redeployed, reverified.
+
 ## Alternatives Considered
 
 1. **Store exported `.vrm` blobs as the artifact of record.** Rejected — opaque,
