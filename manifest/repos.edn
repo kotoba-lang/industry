@@ -1302,7 +1302,14 @@
    ;; as an unrelated camera-rig repo from the same broader migration effort)
    "orgs/kotoba-lang/cnc"
    "orgs/kotoba-lang/groot"
-   "orgs/kotoba-lang/si"
+   ;; "orgs/kotoba-lang/si" removed 2026-07-07 (ADR-2607072500): this Wave-1
+   ;; listing was the actual live registration keeping the mistaken si
+   ;; scaffold alive in west.yml the whole time -- the "deleted 2026-07-02"
+   ;; comment near signal-integrity below only ever applied to a separate
+   ;; listing, this one was overlooked. si's superior implementation (more
+   ;; complete than signal-integrity's) was merged into signal-integrity
+   ;; before this removal so nothing was lost; si repo itself deleted from
+   ;; GitHub 2026-07-07.
    "orgs/kotoba-lang/kami-app-car-sim"
    ;; ADR-2607031200 — EDN-native VRM character creator, Phase 1 (CharacterDoc ->
    ;; kotoba-lang/{vrm,character} -> real .vrm export). Depends on both via :local/root.
@@ -1737,6 +1744,21 @@
    ;; org-w3-*/org-ietf-*/org-khronos-*, extended to a new edu- prefix for
    ;; university-originated (not formal-standards-body) specs.
    "orgs/kotoba-lang/edu-berkeley-spice"
+   ;; Semiconductor/EDA standards-substrate batch, new 2026-07-07
+   ;; (ADR-2607072500): org-<standards-body>-<spec> reverse-domain repos
+   ;; implementing real external standards not previously covered by any
+   ;; kotoba-lang repo (org-synopsys-liberty/org-si2-lef are extractions
+   ;; out of pdk, see pdk's own entry above; the other 8 are new).
+   "orgs/kotoba-lang/org-synopsys-liberty"
+   "orgs/kotoba-lang/org-si2-lef"
+   "orgs/kotoba-lang/org-ibis"
+   "orgs/kotoba-lang/org-ieee-systemverilog"
+   "orgs/kotoba-lang/org-ieee-vhdl"
+   "orgs/kotoba-lang/org-synopsys-sdc"
+   "orgs/kotoba-lang/org-si2-def"
+   "orgs/kotoba-lang/org-si2-openaccess"
+   "orgs/kotoba-lang/org-ieee-upf"
+   "orgs/kotoba-lang/org-accellera-uvm"
    ;; KAMI WebGPU DSL/runtime semantic split repos. These are the CLJ/CLJC
    ;; authority homes tracked by 90-docs/migration/kami-webgpu-dsl-runtime-split.edn.
    "orgs/kotoba-lang/atom"
@@ -1821,7 +1843,12 @@
    ;; kami-si restored as "signal-integrity" (not "si") — the ledger's short
    ;; hand "SI units" note was ambiguous/wrong; this is Signal Integrity (EDA
    ;; discipline: transmission lines, eye diagrams, crosstalk, S-parameters).
-   ;; The mistaken kotoba-lang/si scaffold was deleted 2026-07-02.
+   ;; The mistaken kotoba-lang/si scaffold was believed deleted 2026-07-02 but
+   ;; was actually still registered elsewhere in this file (see removal note
+   ;; near kami-app-car-sim above) and stayed live in west.yml until
+   ;; 2026-07-07 (ADR-2607072500), when its implementation (more complete
+   ;; than this repo's -- separate math/constants modules, CI, LICENSE) was
+   ;; merged in here before si was actually deleted from GitHub.
    "orgs/kotoba-lang/signal-integrity"
    ;; kami-pkg restored as "ic-packaging" (not "pkg") — "pkg" is a generic
    ;; term (software/npm/Debian package) that would have been confusing.
