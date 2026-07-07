@@ -4,7 +4,9 @@
 #   壊れた pin が main に入ったら即検知して issue を起こす(数時間放置 → 数分に短縮)。
 # 注意: github.token では private org(gftdcojp / com-junkawasaki)の子リポが見えず、
 # その entry は WARN(素通し)になる。厳密化するには org read 権限の PAT を
-# WEST_PIN_VERIFY_TOKEN secret に設定する。
+# WEST_PIN_VERIFY_TOKEN secret に設定する。この WARN は green run でも
+# ::warning:: アノテーション + $GITHUB_STEP_SUMMARY で可視化される(2026-07-07 —
+# 以前は stderr ログの奥に埋もれ、green check を見た人が気付けない盲点だった)。
 name: west-pin-verify
 
 on:
