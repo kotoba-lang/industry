@@ -6139,7 +6139,33 @@
    :business-id "cloud-itonami-isic-8790"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :blueprint
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as a residential-care actor
+   ;; (ResidentialOps-LLM ⊣ Residential Care Governor), the fifty-
+   ;; third build outside ADR-2607032000's original insurance/real-
+   ;; estate batch (after 6612, 6492, 6920, 6611, 7120, 8620, 8530,
+   ;; 9200, 7500, 9603, 9521, 9321, 8730, 9102, 9103, 9602, 9000, 8890,
+   ;; 8610, 9311, 8510, 9412, 6491, 8720, 8521, 6619, 3600, 6190, 3030,
+   ;; 3830, 7020, 9420, 9491, 2610, 3512, 8810, 8691, 8569, 6419, 7310,
+   ;; 7320, 7210, 7410, 8710, 8541, 8690, 9601, 6420, 7420, 9609, 8550,
+   ;; 7010), modeled closely on siblings 6511/6512/6621/6622/6629/6520/
+   ;; 6530/6820/6612/6492/6920/6611/7120/8620/8530/9200/7500/9603/9521/
+   ;; 9321/8730/9102/9103/9602/9000/8890/8610/9311/8510/9412/6491/8720/
+   ;; 8521/6619/3600/6190/3030/3830/7020/9420/9491/2610/3512/8810/8691/
+   ;; 8569/6419/7310/7320/7210/7410/8710/8541/8690/9601/6420/7420/9609/
+   ;; 8550/7010.
+   ;; Dual-actuation-on-one-entity shape (finalize-care-plan / finalize-
+   ;; incident-response), following nursing/8710's, laundry/9601's and
+   ;; holdco/6420's precedent -- the blueprint's own Offer lists both
+   ;; as separate items.
+   ;; Distinctive check: mandatory-reporting-obligation-unresolved? is
+   ;; a GENUINELY NEW concept (grep-verified), the 51st unconditional-
+   ;; eval grounding overall, grounded in US CAPTA/Japan's Child Abuse
+   ;; Prevention Act/Germany's SGB VIII. background-check-not-cleared
+   ;; is an honest FIFTH literal reuse of school's/sports's/
+   ;; personalservice's/edsupport's concept, the 52nd unconditional-
+   ;; eval grounding overall, not claimed as new. See cloud-itonami-
+   ;; isic-8790/docs/adr/0001-architecture.md.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :triage :treat :review :follow-up :audit]}
   {:id "8890"
