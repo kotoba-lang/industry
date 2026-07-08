@@ -1583,6 +1583,25 @@
    "orgs/etzhayyim/com-etzhayyim-tomoshibi" ; ADR-2607061700 (etzhayyim/root, Open Question 4): invitational evangelism publication actor (EvangelismGovernor genuinely wired to etzhayyim_organism.sensors.evangelism-gate); R0 governor-only, no StateGraph/publisher yet
    "orgs/etzhayyim/com-google-ads" ; ADR-2606292130: charter-clean outreach & performance-marketing actor
    "orgs/kotoba-lang/kasane"         ; ADR-2606272100: Adobe(AI/PSD/PDF) 純cljc+EDN ライブラリ
+   ;; kasane/utsushi の DSL 分解バッチ (2026-07-08, com-junkawasaki/root ADR
+   ;; 前例2607072500と同型): 各バイナリフォーマット仕様を org-<標準化団体>-<spec>
+   ;; reverse-domain repoへ抽出。org-iso-h264/org-iso-aac/org-ietf-opusは
+   ;; utsushi.bitstreamが未実装TODO stubだったための新規実装。
+   "orgs/kotoba-lang/org-ietf-deflate"   ; DEFLATE(RFC1951)+zlib(RFC1950)、kasane.codec.inflateから抽出
+   "orgs/kotoba-lang/org-adobe-tiff"     ; TIFF 6.0、kasane.tiffから抽出
+   "orgs/kotoba-lang/org-iso-jpeg"       ; JPEG(ISO/IEC 10918-1)、kasane.jpeg+jpeg.decodeから抽出
+   "orgs/kotoba-lang/org-iso-opentype"   ; TrueType/OpenType(ISO/IEC 14496-22)、kasane.ttfから抽出
+   "orgs/kotoba-lang/org-w3-epub"        ; EPUB 3(W3C)、kasane.normalize/epub->docから抽出
+   "orgs/kotoba-lang/org-oasis-odf"      ; ODF(OASIS/ISO 26300)、kasane.normalize/odf->docから抽出
+   "orgs/kotoba-lang/org-w3-png"         ; PNG(W3C)、kasane.pngから抽出、org-ietf-deflate依存
+   "orgs/kotoba-lang/org-compuserve-gif" ; GIF89a、kasane.gifから抽出
+   "orgs/kotoba-lang/org-pkware-zip"     ; ZIP(PKWARE APPNOTE)、kasane.zipから抽出、org-ietf-deflate依存
+   "orgs/kotoba-lang/org-iso-pdf"        ; PDF/COS(ISO 32000)、kasane.cosから抽出、org-ietf-deflate依存
+   "orgs/kotoba-lang/org-w3-woff"        ; WOFF 1.0(W3C)、kasane.woffから抽出、org-iso-opentype+org-ietf-deflate依存
+   "orgs/kotoba-lang/org-iso-isobmff"    ; ISOBMFF(ISO/IEC 14496-12)、kasane.isobmff+utsushiのcontainer/demux/mux/remuxを統合
+   "orgs/kotoba-lang/org-iso-h264"       ; H.264 Annex B framing+SPS(ITU-T/ISO/IEC 14496-10)、新規実装
+   "orgs/kotoba-lang/org-iso-aac"        ; AAC ADTS framing(ISO/IEC 13818-7/14496-3)、新規実装
+   "orgs/kotoba-lang/org-ietf-opus"      ; Opus packet framing(RFC 6716)、新規実装
    ;; KAMI provider split targets. Rust implementation crates move here only as
    ;; Wasm Component providers checked by CLJC/EDN contracts.
    ;; NOTE(2026-07-02 stash rescue): GitHub repos not yet created — entries stay
