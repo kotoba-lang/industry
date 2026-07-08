@@ -388,3 +388,81 @@ correctly colored/sized/ordered).
   a deliberate safety margin, not a proven-correct value).
 - No guest-controlled camera or per-body color/radius — both are still a
   fixed host-side palette/camera.
+
+## Addendum 7 (2026-07-08): maturity/coverage pass — direct unit tests for solar-render-host/gpu-clear-host's pure logic, docs backfilled
+
+Track B Phase 0/1 (Addenda 4/6) shipped both browser hosts and verified
+them end-to-end via GitHub Pages screenshots, but the two `.cljs` modules
+had **zero direct unit-test coverage** of their own — every mat4/vec3/
+sphere-mesh/bit-unpacking helper was `defn-` (private) and only ever
+exercised transitively through a live WebGPU render, which is real
+verification but not a regression-catching unit test a CI run (no GPU)
+can execute. `wasm-webcomponent/README.md` also never gained `## Files`/
+`## Run the tests` entries for either module or their `examples/gpu-clear/`
+`examples/solar-helix/` dirs, despite both having shipped in Addenda 4/6.
+
+**What changed** (`kotoba-lang/wasm-webcomponent` commit `1a74d4e`, merged
+to main as `ac0db24`):
+- `gpu_clear_host.cljs`'s `unpack-rgba8` and `solar_render_host.cljs`'s
+  `mat4-multiply`/`mat4-perspective`/`mat4-look-at`/`mat4-translation-scale`/
+  `vec3-normalize`/`vec3-sub`/`vec3-cross`/`vec3-dot`/`build-sphere-mesh`
+  promoted from `defn-` to `defn` (public) specifically so they're
+  reachable from a Node test without a GPU.
+- `mat4-identity` deleted — a grep confirmed it was defined but never
+  called anywhere in the file (dead code, not wired to anything after the
+  `mat4-look-at`/`mat4-translation-scale` refactor that replaced it).
+- `build-sphere-mesh`'s return value changed from a Clojure map
+  (`{:vertices ... :indices ...}`) to a plain JS object
+  (`#js {"vertices" ... "indices" ...}`) — under `:advanced` Closure
+  optimization a Clojure map's keyword-dispatch keys aren't inspectable as
+  plain JS properties from outside the compiled module, so a Node test
+  couldn't read `mesh.vertices`/`mesh.indices` without this change. The two
+  internal call sites in `setup-solar-render-host` were updated to
+  `unchecked-get` accordingly (consistent with the rest of the file's
+  WebGPU interop convention).
+- `shadow-cljs.edn`'s `:gpu-clear-host`/`:solar-render-host` build configs
+  gained `:exports` entries for all of the above so they're reachable as
+  named ESM exports (`unpackRgba8`, `mat4Multiply`, `mat4Perspective`,
+  `mat4LookAt`, `mat4TranslationScale`, `vec3Normalize`, `vec3Sub`,
+  `vec3Cross`, `vec3Dot`, `buildSphereMesh`) — both rebuilt via `npx
+  shadow-cljs release gpu-clear-host solar-render-host`, 0 warnings.
+- `test/verify-gpu-clear-host.mjs` (7 assertions: bit-unpacking across the
+  full byte range, including sign-bit-set i32 patterns a naive shift
+  without `>>> 0` would get wrong) and `test/verify-solar-render-host.mjs`
+  (17 assertions: mat4 identity laws, vec3 algebra against hand-worked
+  values, `mat4Perspective`/`mat4LookAt` checked against their closed-form
+  formulas independently re-derived in the test rather than just re-running
+  the same code, and `build-sphere-mesh` vertex-count/index-bounds/
+  unit-sphere-radius checks) — both added to `package.json`'s new `npm
+  test` runner (`for f in test/verify-*.mjs; do node "$f" || exit 1; done`)
+  alongside the 6 pre-existing `verify-*.mjs` files, all 8 confirmed green
+  together.
+- `package.json` gained `compile:`/`release:` scripts for `gpu-clear-host`
+  and `solar-render-host` (previously only `kami-engine-host` had them,
+  despite all three builds existing in `shadow-cljs.edn` since Addenda 4/6).
+- `README.md`'s `## Files` section gained entries for
+  `gpu_clear_host.cljs`/`solar_render_host.cljs` and both `examples/` dirs;
+  `## Run the tests` documents `npm test` plus the two new `verify-*.mjs`
+  invocations.
+
+**What this does and doesn't close**: the pure math/mesh-generation logic
+now has fast, GPU-free regression coverage a CI runner without WebGPU
+support can execute. The actual WebGPU draw path (pipeline creation, bind
+groups, `queue.submit` timing — where both real bugs Addendum 6 documents
+were actually found) still has no automated coverage and still requires a
+real browser to verify, same as before this pass; that gap is unchanged
+and is not what this addendum claims to fix.
+
+Landed via isolated worktree (`/tmp/root-worktrees/wasm-webcomponent-
+maturity`, outside the superproject root per this repo's worktree-topdir
+guidance) + `gh api .../merges` server-side merge, not a direct commit to
+the shared `orgs/kotoba-lang/wasm-webcomponent` checkout — that checkout
+was edited directly at first (in a detached-HEAD state matching
+`origin/main`), then `git stash push -u` moved the in-progress work out
+before committing anywhere, reconciled into the worktree via the stash's
+diff plus its untracked-files parent commit, and the stash was dropped
+only after the worktree's own copy was confirmed complete and pushed —
+this is the shared-checkout risk this repo's CLAUDE.md documents
+(concurrent sessions branch-switching a shared west checkout can silently
+discard another session's uncommitted edits), sidestepped here rather
+than triggered by one.
