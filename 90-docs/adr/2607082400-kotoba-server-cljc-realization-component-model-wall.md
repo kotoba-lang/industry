@@ -167,6 +167,45 @@ ADR に課された責務の履行そのものである。
   `kqe-query` 相当 capability の kototama への追加設計、③murakumo →
   cljc ノードの HTTP 契約（deploy/route-table 登録）の具体設計。
 
+## 追記（2026-07-08）: 3つの follow-up を実装完了
+
+オーナー指示「ok, do it」に基づき、上記①②③を全て実行に移した
+（`kotoba-lang/kotoba` merge `7f3f78f6`）:
+
+- **①最初の移植先**: `drama-profile` を選定・実装（想定どおり）。
+  `src/mesh_drama_profile.kotoba` が minidrama の
+  `mesh/drama_profile.clj`（handle/did/registry の3 datom を assert し、
+  handle を query して返す）を `.kotoba` に移植。
+- **②kqe 相当 capability**: **新設せず、既存の `kotoba.wasm-exec`
+  （`kotoba-lang/kotoba` 自身）の `kgraph-assert!`/`kgraph-query` を
+  そのまま採用**。CLAUDE.md 自身が「旧称 KQE は現行実装では kgraph に
+  改称した」と明記するとおり同一概念であり、kototama の actor:host ABI
+  （crypto/http/llm/log という別語彙）に重複実装するのは
+  ADR-2607022700「semantic authority の重複禁止」に反する。ポート対象を
+  kototama ではなく `kotoba-lang/kotoba`（既に kgraph 実装済み）に定めた
+  ことが、この判断の実質。
+- **③murakumo→cljc ノードの HTTP 契約**: `src/kotoba/mesh_node.clj`
+  として設計・実装。`GET /health` / `POST /mesh/http/<route>` —
+  kotoba-server 自身の mesh route と**同じ URL 形状**にし、operator/
+  murakumo がどちらのランタイムが応答しているか意識しなくて済むように
+  した。新規依存なし（JDK 標準 `com.sun.net.httpserver.HttpServer`）。
+  route は起動時に1回だけ compile、リクエストごとに Chicory Instance を
+  fresh に作る（kototama.tender の `instantiate` 設計方針と同じ）。
+
+**検証**: `test/kotoba/mesh_drama_profile_test.clj`（compile→emit→実
+Chicory 実行→assert→query の round trip、スタブでない実データを確認）+
+`test/kotoba/mesh_node_test.clj`（`java.net.http.HttpClient` ↔ 実
+`HttpServer` の実 HTTP round trip、`GET /health`・
+`POST /mesh/http/drama-profile`・未 bind route の 404 を確認）。
+`clojure -M:test` **150 tests / 796 assertions green**（追加前 146/786）。
+`clojure -M:lint` 0 errors / 0 warnings。
+
+**意図的にやっていないこと**: この cljc mesh node をどの fleet ノードにも
+**deploy していない**。これは reference 実装 + ローカル実証であり、本番
+ロールアウトは別スコープの follow-up（strangler-fig の「新規容量」を
+実際に fleet へ展開する段階— murakumo 側の deploy/reconcile 対応も含めて
+別途決める）。
+
 ## Related
 
 - ADR-2607072000（Rust 回避の標準方針 + kotoba-server 未着手の名指し）:

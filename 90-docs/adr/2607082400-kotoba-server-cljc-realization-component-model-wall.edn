@@ -4,7 +4,7 @@
   :status "accepted"
   :date "2026-07-08"
   :authoritative true
-  :repos ["orgs/kotoba-lang/kototama" "orgs/kotoba-lang/io-libp2p"]
+  :repos ["orgs/kotoba-lang/kototama" "orgs/kotoba-lang/io-libp2p" "orgs/kotoba-lang/kotoba"]
   :related ["90-docs/adr/2607072000-kotoba-rust-avoidance-policy-and-kotoba-server-gap.md"
             "90-docs/adr/2607071900-murakumo-cross-node-apply-cljc-auction-gap-closed.md"
             "90-docs/adr/2607062330-kototama-tender-chicory-execution-runtime.md"
@@ -33,4 +33,13 @@
   "murakumoをcoordination authorityとしたstrangler-fig方向性と次の一歩(kqe相当capability新設、最初の.kotoba移植対象アプリ選定)を明示"
   "kototama export dispatch汎用化は小さいが本番リスクゼロの実質的改善"
   "kotoba-server自体はRustのまま -- 方針転換ではなく事実に基づく判断 (JVM側にcomponent model/gossipsub実装が存在しない以上)"
-  "follow-up優先度: ①最初の.kotoba移植対象app選定 (drama-profile/drama-heartbeat等の検閲対象外の薄いcomponentが候補) ②kqe-assert!/kqe-query相当capability設計 ③murakumo→cljcノードのHTTP契約設計"]}
+  "follow-up優先度: ①最初の.kotoba移植対象app選定 (drama-profile/drama-heartbeat等の検閲対象外の薄いcomponentが候補) ②kqe-assert!/kqe-query相当capability設計 ③murakumo→cljcノードのHTTP契約設計"]
+
+ :addendum-2607080900
+ {:owner-instruction "ok, do it -- 3 follow-ups"
+  :repo "kotoba-lang/kotoba" :merge "7f3f78f6"
+  :1-app-selected-and-ported "src/mesh_drama_profile.kotoba: minidrama mesh/drama_profile.clj (handle/did/registry 3 datom assert + handle query) の .kotoba 移植"
+  :2-kqe-capability-not-duplicated "kotoba.wasm-exec の既存 kgraph-assert!/kgraph-query を採用 (kototama に新設せず)。CLAUDE.md 'KQEはkgraphに改称' と同一概念、ADR-2607022700 semantic authority 重複禁止に整合。ポート対象を kototama でなく kotoba-lang/kotoba に定めた判断そのもの"
+  :3-http-contract-implemented "src/kotoba/mesh_node.clj: GET /health + POST /mesh/http/<route> (kotoba-server と同じ URL 形状)。JDK標準 HttpServer のみ、新規依存なし。route は起動時1回compile、Instance はrequestごとfresh"
+  :tests "mesh_drama_profile_test.clj (compile→emit→実Chicory→assert→query round trip) + mesh_node_test.clj (実HttpClient↔実HttpServer round trip)。clojure -M:test 150/796 green (was 146/786)。clojure -M:lint 0/0"
+  :deliberately-not-done "cljc mesh nodeはどのfleetノードにもdeployしていない -- reference実装+ローカル実証のみ。本番rolloutは別スコープfollow-up"}}
