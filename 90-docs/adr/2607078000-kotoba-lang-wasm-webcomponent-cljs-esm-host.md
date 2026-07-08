@@ -298,3 +298,93 @@ status-out` conventions `gpu-clear` established), porting
 `galactic-frame-position-au` arithmetic to `.kotoba`, and the 9-body
 (Sun + 8 planets) vertical-slice render — spheres, heliocentric/galactic
 frame toggle, verified against a real browser per Phase 0's precedent.
+
+## Addendum 6 (2026-07-08): Track B Phase 1 — CLOSED, 9/9 bodies rendered and browser-verified
+
+The vertical slice landed: a compiled `.kotoba` guest computes all 9
+bodies' positions via real orbital math and a host-side WebGPU pipeline
+renders them as spheres, confirmed in a live browser (all 9 visible,
+correctly colored/sized/ordered).
+
+**What actually shipped, vs. the plan sketched in Addendum 5**:
+
+- **`.kotoba` gained real `f32` support** (`kotoba-lang/kotoba` commit
+  `05088a18`) — `wasm-valtypes`/`f32`-literal/`f32+`/`f32-`/`f32*`/`f32div`/
+  `f32sqrt`/`f32neg`/f32-comparisons/`^:f32` fn-metadata. Not in the
+  original Phase 1 sketch — discovered mid-implementation that
+  `kotoba-lang/kotoba`'s host-import ABI was i32/i64-only (zero `f32`
+  anywhere), which would have forced a fixed-point-i64 workaround for
+  orbital math; owner chose "add real f32 to the compiler" over the
+  workaround. Also fixed a latent `wasm-exec/call-main`/`run-main` bug this
+  surfaced: Chicory's raw `long[]` return slot was always read as i64,
+  silently wrong for f32 (`4.0` came back as `1082130432`, its raw bit
+  pattern) — both fns now take an optional result-type. 152 tests/801
+  assertions green.
+- **Capabilities**: `math/cos`/`math/sin` (`cos`/`sin(radians: f32) ->
+  f32`) and `gpu/set-position`/`gpu/draw-frame` — **not**
+  `gpu-set-instance-transform`/`gpu-set-camera` as Addendum 5 sketched.
+  `gpu-set-position(body-id, x, y, z)` is deliberately scalar-only, no
+  guest-constructed matrix and no guest-controlled camera: `.kotoba` has no
+  vector/matrix type or loops-beyond-recursion yet, so the guest computes
+  *where* each body goes (real `cos`/`sin` orbital math) and the host owns
+  *how* it's drawn (mesh/camera/pipeline/matrices) — same "guest computes,
+  host renders" split ADR-2607078000's Decision already established for
+  `kami-engine-host`, just made explicit here. `kotoba-core-contracts`
+  commit `3e60ae6`, `kotoba-lang/kotoba` pin bumped to it (commit
+  `b7f8427c`, 152 tests still green).
+- **Guest**: `wasm-webcomponent/examples/solar-helix/demo_solar_helix.kotoba`
+  — a **static single-frame render** (t=45 days fixed), not the animated
+  heliocentric/galactic-frame-toggle Addendum 5 sketched. Sqrt-scaled
+  orbital radii (linear AU scale would crush Mercury invisibly close to
+  the Sun relative to Neptune) computed via real `cos`/`sin`/`f32sqrt` from
+  the same semi-major-axis/period data as `kami-solar-helix-scene`'s
+  `resources/solar-helix.edn`. The galactic-frame view and animation are
+  explicitly deferred, not silently dropped — see Follow-up.
+- **Host**: `src-cljs/kotoba/solar_render_host.cljs` — procedural UV
+  sphere mesh, hand-written mat4 perspective/lookAt/multiply/
+  translate-scale (no external dep), one draw call per body (not true
+  GPU instancing — 9 is small enough it isn't worth the complexity), fixed
+  elevated camera, WGSL Lambertian shader. `cullMode: "none"` deliberately
+  (sphere winding order untested — avoided an entire bug class rather than
+  risk it for this first slice).
+- **Two real bugs found only via live-browser verification** (both would
+  have passed any structural/compile-time check):
+  1. The host initially wired only `gpu_set_position`/`gpu_draw_frame`,
+     forgetting `cos`/`sin` — `WebAssembly.instantiate` failed with a
+     `LinkError` ("function import requires a callable") before `main()`
+     ever ran.
+  2. After fixing that: `main()` succeeded but the canvas stayed empty.
+     Root cause: `queue.writeBuffer` executes immediately, but
+     `pass.drawIndexed` calls only *record* into the command encoder and
+     don't run until `queue.submit()` at the very end — a single shared
+     uniform buffer written 9x in a row before any of the 9 recorded draws
+     executes means every draw referenced only the *last* write (Neptune).
+     Fixed with one dedicated uniform buffer + bind group per body slot.
+  Also needed a camera pull-back/FOV-widen after an initial verified
+  render showed only 7/9 bodies (Uranus/Neptune clipped by the frustum).
+  Each fix was verified via a fresh screenshot before moving on, not
+  assumed from the code change alone.
+- **Verification**: GitHub Pages (same technique Phase 0 established —
+  this sandboxed session can't reach a local static server, and a
+  claude.ai Artifact preview's iframe sandboxing blocks scroll/DOM
+  inspection), with explicit cache-bust query params and forced Pages
+  rebuilds (`POST .../pages/builds`) once CDN edge-caching was found to
+  serve stale JS after a push despite a "built" status. Final screenshot:
+  all 9 bodies visible, correctly colored (Sun gold, Mercury grey, Venus
+  pale, Earth blue, Mars red, Jupiter/Saturn tan, Uranus cyan, Neptune deep
+  blue) and correctly ordered inner-to-outer.
+
+## Follow-up (not done, explicitly deferred, not dropped silently)
+
+- Galactic-frame view / helical toggle (`kami-solar-helix-scene`'s actual
+  headline feature) — this slice only ports the flat heliocentric position
+  math, not `galactic-frame-position-au`.
+- Animation (continuous tick loop via `requestAnimationFrame` calling the
+  guest repeatedly) — this slice is one static frame at a fixed t.
+  `kami-engine-host`'s existing `tick`-loop pattern is the template.
+  `main()` would need to become a per-frame `tick(dt)` export instead of a
+  single one-shot `main()`.
+  cullMode "back" once sphere winding order is verified (currently "none",
+  a deliberate safety margin, not a proven-correct value).
+- No guest-controlled camera or per-body color/radius — both are still a
+  fixed host-side palette/camera.
