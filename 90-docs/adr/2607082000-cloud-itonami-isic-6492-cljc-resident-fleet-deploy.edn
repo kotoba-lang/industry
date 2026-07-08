@@ -63,4 +63,32 @@
   "asher localhost: 同上を全て確認"
   "asher tailnet(100.96.122.69:8479): operator machineからhealth/approve/rejectを実行、ローカルと同一結果を確認"
   "KeepAlive自己修復: sudo kill -9 <pid>後、launchdが自動的にプロセスを再起動し/healthが復帰することを確認"
-  "gh push: orgs/cloud-itonami/cloud-itonami-isic-6492 main (d7cc1fa..d598e26) -- wasm/server.cljs 新設, wasm/README.md 更新"]}
+  "gh push: orgs/cloud-itonami/cloud-itonami-isic-6492 main (d7cc1fa..d598e26) -- wasm/server.cljs 新設, wasm/README.md 更新"]
+
+ :addendum-2026-07-08-fleet-rollout-and-prune
+ {:summary "オーナー指示「rust関係はprune してok、他のmac mini fleetも同様に」を受けて、fleet.edn全10ノード中到達可能な残り4ノード(naphtali/judah/zebulun/issachar)にも同じcljc/nbb常駐デーモンを配備し、5ノード全てで置換済みのRust資産(plist+バイナリ)を実際に削除した。"
+  :reachability
+  ["配備完了(5/10): asher(初回)/naphtali/judah/zebulun/issachar"
+   "到達不可・SSHタイムアウト(4/10): simeon/levi/joseph/dan -- 電源/ネットワーク状態未調査"
+   "到達するが配備不可(1/10): benjamin -- SSH認証・セッション確立は成功するがリモートログインシェル起動時にエラー、echoすら標準出力が返らず終了ステータス1。原因未調査"]
+  :deploy-diff
+  ["Node.js未導入だった3ノード(judah/zebulun/issachar)にbrew install nodeで新規導入(v26.4.0)。naphtaliは既にv22.22.2導入済み"
+   "他はasherと同一手順(rsync→com.murakumo.kotoba-mesh(+watchdog、存在するノードのみ)をbootout→per-node plistをレンダリングしbootstrap+kickstart)"
+   "4ノード全てでtailnet経由の/health(200)とPOST /isic-6492/affordability(approve、asherと同一結果)を確認。KeepAlive再実証はasherで既済のため省略"]
+  :issachar-note "fleet.ednのコメントは issacharが:8077でkotoba-server稼働中(yabai CTI persistence)と記すが、実機確認では:8077は現在何もリッスンしておらずcom.murakumo.kotoba-meshラベルのmeshプロセスのみ稼働。ラベル指定bootoutのため安全性に影響なし。"
+  :prune
+  {:found "各ノードの~/.murakumo/bin/にRustのkotoba-server/kotobaバイナリだけでなく、別件のllama.cpp分散推論RPCサーバー一式(rpc-server/libggml-*.dylib/libllama-*.dylib/libmtmd*.dylib/murakumo-rpc-bin.tgz/prewarm-fetch.sh)が同居していることを実機確認で発見。後者は無関係な現役設備(murakumo-exo-distributed-inference系統)のため削除対象から明確に除外。"
+   :pruned-per-node
+   ["/Library/LaunchDaemons/com.murakumo.kotoba-mesh.plist"
+    "/Library/LaunchDaemons/com.murakumo.kotoba-mesh-watchdog.plist(存在するノードのみ -- asherとzebulun)"
+    "~/.murakumo/bin/kotoba-server(65MB), ~/.murakumo/bin/kotoba(35MB)"]
+   :not-touched
+   ["~/.murakumo/bin/内のllama.cpp RPC関連一式"
+    "~/.murakumo/store(datomログ), ~/.murakumo/*.log"
+    "ai.gftd.murakumo.plist.bak.*(全ノードに残る古いバックアップ)"
+    "naphtaliのai.gftd.murakumo.system.plist(別ラベル・現役稼働中、本ADRと無関係)"]
+   :revert-note "plistファイルとRustバイナリ自体を削除したため単純なlaunchctl bootstrapでは戻せない。Rust版に戻すにはorgs/kotoba-lang/murakumoのprovisioningフロー(BUILD.ednのバイナリ再取得+plan.cljcのrender-plistによるテンプレート再生成)を再実行する必要がある -- 本ADRの対象外(prune指示は不可逆な選択として明示的に指示されたもの)"}
+  :verification
+  ["brew install node(judah/zebulun/issachar) -- 全てv26.4.0"
+   "naphtali/judah/zebulun/issachar全てでtailnet経由の/health(200)とPOST /isic-6492/affordability(approve、{result:1,affordable:true,ok:true})を確認"
+   "5ノード全て(asher/naphtali/judah/zebulun/issachar)でcom.murakumo.kotoba-mesh*.plistと~/.murakumo/bin/{kotoba-server,kotoba}の削除を確認、prune後も5ノード全てで/healthがHTTP 200"]}}
