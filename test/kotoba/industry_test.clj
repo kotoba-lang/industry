@@ -32,7 +32,7 @@
   (testing "the reference actor is implemented"
     (is (= :implemented (industry/maturity "6310"))))
   (testing "a published blueprint repo is :blueprint"
-    (is (= :blueprint (industry/maturity "8522"))))
+    (is (= :blueprint (industry/maturity "8549"))))
   (testing "a registry-only group entry is :spec"
     (is (= :spec (industry/maturity "011"))))
   (testing "a second implemented actor (cloud-itonami-isic-6810) is also :implemented"
@@ -191,12 +191,14 @@
     (is (= :implemented (industry/maturity "7220"))))
   (testing "an eightieth implemented actor (cloud-itonami-isic-9411, business-employer-membership-organization actor) is also :implemented"
     (is (= :implemented (industry/maturity "9411"))))
+  (testing "an eighty-first implemented actor (cloud-itonami-isic-8522, technical-vocational-secondary-education actor) is also :implemented"
+    (is (= :implemented (industry/maturity "8522"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
       (is (pos? (:spec m)))
       (is (pos? (:blueprint m)))
-      (is (= 80 (:implemented m))))))
+      (is (= 81 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
@@ -205,7 +207,7 @@
       (is (nil? (:next-step r)))
       (is (= "at maturity ceiling" (:next-action r)))))
   (testing "a blueprint entry's next step is implemented"
-    (let [r (industry/maturity-roadmap "8522")]
+    (let [r (industry/maturity-roadmap "8549")]
       (is (= :blueprint (:maturity r)))
       (is (= :implemented (:next-step r)))
       (is (true? (:has-repo r)))))
@@ -217,7 +219,7 @@
 
 (deftest execution-plan-reports-ui-export-readiness
   (testing "a vertical backed by a capability lib reports ui+export ready"
-    (let [p (industry/execution-plan "8522")]
+    (let [p (industry/execution-plan "8549")]
       (is (true? (:ui-ready? p)))
       (is (true? (:export-ready? p)))
       (is (some :ui? (:technology-stack p)))))
