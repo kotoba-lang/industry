@@ -182,6 +182,19 @@ concrete native-desktop-without-Rust implementation (e.g. wrapping
 `kami-engine-host`/`dom-gpu` in a webview shell) remains unbuilt — follow-up,
 not resolved by this addendum.
 
+## Addendum 2 (2026-07-08): Track A closed, proceeding to Track B
+
+Track A (removing `kami-engine`'s Rust dependency) is now closed: the
+headless WASM-host role is ported and parity-verified (Decision, above),
+and the org-direction notice on `kami-script-runtime-rs` (Addendum 1)
+resolves the concurrent-session conflict without disrupting that session's
+work. No further Track A action is planned.
+
+Proceeding to Track B (the original ask this ADR chain serves: rendering
+`kami-solar-helix-scene`'s solar helical model via kotoba wasm runtime,
+guest-driven WebGPU, per the plan at `curious-zooming-sifakis.md` — Phase
+0's `.kotoba` + browser-host WebGPU spike is next).
+
 ## References
 
 - ADR-2607072700 (`kami-solar-helix-scene`, this work's immediate
