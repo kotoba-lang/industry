@@ -204,3 +204,95 @@ bb scripts/gen-west-manifest.bb --entry <17名>              # OK、全件サー
   設計）、ADR-2606280010（kasane JPEG DCT decode）
 - 大容量バイナリ規律: CLAUDE.md「大容量バイナリの扱い」（本バッチはfixtureが
   数KB級のため対象外、通常git管理）
+
+## Addendum（2026-07-08）— Consequences記載の2件のfollow-upを両方完了
+
+本ADR初版のConsequences節（下記(−)2件）は、その後の同日中の作業ですべて解消
+された。両READMEの「follow-up」記録も対応するpush済みcommitへ更新済み。
+
+1. **`kasane.gltf`/`kasane.svg`/`kasane.json`/OOXML投影の既存repoへの統合**:
+   完了。`kasane.gltf`→`org-khronos-glb`(`glb/parse-glb`+`glb.json/parse`)、
+   `kasane.svg`→`org-w3-svg`（read側を新設`svg.reader` nsへ追加、write側
+   `svg.core/attrs`とのシグネチャ衝突を回避）、`kasane.json`→
+   `kotoba-lang/json`(`json.core/decode`+keywordizeラッパ)へそれぞれ薄い
+   adapterとして委譲。OOXML投影は`kotoba-lang/ooxml`(`package-kind`/
+   `office-parts`)+`kotoba-lang/office`(`office.graph/part-graph`、Word本文
+   抽出)を**JVM専用関数`office.opc/open-package`を一切呼ばずに**呼び出す形で
+   統合（xlsx共有文字列/pptxシェイプ幾何はkasane自前ロジックのまま — 対応
+   する既存repo側に等価実装が無いため）。
+   - 副次的に判明した誤情報を訂正: `kasane.gltf`のdocstring/READMEが
+     「org-khronos-glbはaccessor/mesh decodeまで含む完全実装」と主張して
+     いたが、org-khronos-glb自身のREADMEを再確認したところ「no glTF-JSON
+     schema knowledge (accessors, meshes, materials, ...)」と明記されており
+     誤りだった（`kasane.normalize/gltf->doc`自体がnode/mesh/scene個数+
+     transformしか読まないため実害は無い）。表記を訂正した。
+2. **H.264/AAC/Opusのutsushi filtergraphへの配線**: H.264のみ配線完了 —
+   `utsushi.codec/decode`が`:h264` video trackに対し、MP4のavcC box
+   （AVCDecoderConfigurationRecord, ISO/IEC 14496-15）に埋め込まれた
+   SPSを`org-iso-h264`でパースし、実width/height/profile-idc/level-idcを
+   `:params`として付与するようになった（実libx264エンコードMP4で
+   96x64を検証）。AAC/Opusは**意図的に配線しない**と結論: ADTS/Opus TOCの
+   framingはMP4コンテナへの格納時点で既に解決済み（demux後のsampleは
+   境界確定済みバイト列そのもの）であり、`utsushi.codec`の役割である
+   「post-demuxのbitstream framing」が適用対象を持たないため。
+
+### 追加で完了した成熟度向上作業（本ADRのスコープを超えるがkasane/utsushi
+本体に対する変更のため、ここに記録する）
+
+- **kasaneのテストランナーをbabashka(bb)からnbb(ClojureScript-on-Node)へ
+  移行**（CLAUDE.md「`.cljc`/`.kotoba`ランタイム優先順位」でnbbがJVM単体
+  より優先されるため）。移行の過程で`kasane.bytes/sint!`の実バグを発見・
+  修正: `bit-shift-left`ベースの32-bit符号拡張がJVM(64-bit Long)では安全
+  だがcljs/JS（32-bit符号付きbitwise、shift量mod-32）では壊れていた
+  （`1 << 32` = `1`になる等）。乗算ベースの`pow2`ヘルパへ置き換え。
+  同種のバグを`kotoba-lang/json`の`\u`エスケープデコードにも発見したが、
+  別repoのため対象外・READMEに記録のみ。
+- **WASM(`kotoba wasm emit`)コンパイル検証**: `org-ietf-deflate`を実際に
+  コンパイルしようとしたところ、`kotoba.runtime/check`がClassCastException
+  でクラッシュした（`decode-sym`のmap-destructuring引数が一因の一つと
+  判明したが、修正後も同種のクラッシュが別箇所で再発 — 根本原因は未特定）。
+  対応方針はオーナー確認の上「READMEの表記修正のみ」（kasane側の
+  `kotoba wasm`欄を「未検証*」+脚注に変更、`kotoba-lang/kotoba`自体は
+  修正しない）に決定・実施済み。
+- **real-file fixtureによる検証強化**（6repo、いずれも実際のツールが
+  生成したファイルで検証、synthetic hand-builtデータではない）:
+  PSD(kasane, ImageMagick生成)、PNG(org-w3-png, Pillow生成)、
+  TIFF Adobe Deflate(org-adobe-tiff, Pillow生成)、PDF(org-iso-pdf,
+  qpdf/pikepdf生成 — `/Type /ObjStm`圧縮object streamと、classic
+  trailerキーワードを持たない純粋な`/Type /XRef`構造の両方を初めて検証)、
+  H.264 PPS(org-iso-h264, 実libx264エンコード)、ISOBMFF(org-iso-isobmff,
+  実ffmpeg AV MP4 — video+audio 2トラックをffprobeの`nb_frames`と
+  突き合わせ)、EPUB(org-w3-epub, pandoc生成)、ODF(org-oasis-odf,
+  pandoc生成)、SVG(org-w3-svg, Graphviz `dot -Tsvg`生成)、OOXML
+  docx/xlsx/pptx(`ooxml`本体 + kasane、pandoc/xlsxwriter生成 — xlsxは
+  openpyxlのデフォルトinline-string出力ではなくxlsxwriterの
+  `xl/sharedStrings.xml`出力を意図的に選択)。kasaneのOOXML統合について
+  は、既存の`.clj`専用テスト（`java.util.zip.ZipOutputStream`でfixtureを
+  実行時生成するためJVM専用）に加え、実docx/xlsx/pptxファイルを
+  `org-pkware-zip`の`zip.core/parse`（純cljc、読み専用）で読む新規`.cljc`
+  テストを追加し、nbb/cljsランタイム上でOOXML統合を初めて検証した。
+- **PDF `/Type /ObjStm` object stream対応**（ISO 32000 §7.5.7）:
+  header table解析・offset順object抽出・generation-0マージを実装。
+- **H.264 PPS実装**: 共通ケース(`num_slice_groups_minus1 == 0`)を
+  カバー（FMOは非対応でthrow）。entropy-coding-modeがCAVLC（baseline
+  プロファイルはCABAC禁止という制約との整合性）をクロス検証。
+- **17repo（kasane/utsushi含む）すべてにGitHub Actions CIを追加**
+  （clj-kondo lintではなくtest-runner、JDK 17/21マトリクス）。この過程で
+  `org-khronos-gltf`（ローカルディレクトリ名`gltf`のまま、正規パスは
+  `org-khronos-gltf`）の`deps.edn`が`:local/root`で兄弟チェックアウトに
+  依存しており、CI/独立cloneの両方でビルド不能だったバグを発見・修正
+  （`:git/sha`座標へ変更、ディレクトリ名もrename）。同じ調査の過程で
+  `kotoba-lang/office`/`office-style`のCIが「`node bin/<name>.js`を
+  smoke-testで実行するが、そのファイルは存在せず`bin/<name>.cljs`
+  （nbb実行）のみが実在する」という理由で作成時から一貫してredだった
+  ことを発見・修正（`npm install`+`npx nbb <実パス>`へ変更）。
+
+このaddendumの範囲を超えて、`:local/root`非移植バグと同種のパターンを
+`kotoba-lang` org全体（EDA/semiconductor standards batch、OASIS/W3C/OMG
+standards batch等、本ADRと直接関係しない別batch）に対しても横断的に
+調査・修正した（`org-materialx`/`org-oasis-saml`/`org-vrmc-vrm`/
+`eda`→`rtl`→`org-accellera-uvm`の依存chain、計70件の`org-*` repo全件で
+CI健全性を確認）。これは本ADRの決定事項の適用範囲外（kasane/utsushiの
+アーキテクチャ判断ではなく、既存パターンの機械的横展開）のため、ここでは
+概要のみ記録し、個別のADR化はしない。各repoのcommit履歴に十分な文脈を
+記載済み。
