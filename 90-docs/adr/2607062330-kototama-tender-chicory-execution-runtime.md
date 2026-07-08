@@ -329,6 +329,38 @@ own signature-authenticity check, ADR-0003) is what `kototama.tender`'s
 own pre-flight rejects. No test-hardcoded `HostCaps` anywhere in either
 path. 25 tests/50 assertions green.
 
+## Addendum 8 (2026-07-08, documenting 2026-07-07 work): a 9th import — `llm-infer` — landed, full detail in ADR-2607072530
+
+`kototama.contract`'s import surface grew a 9th member: `llm-infer`
+(`llm_infer`, capability id 225 in `kotoba-core-contracts`'
+`capability_contract.edn`). `(prompt-ptr prompt-len out-ptr out-cap) ->
+bytes-written|-1`, gated `#{:network}` like `http-post`, metered against
+a new `:max-llm-infers` limit (default 0, same "fully denied unless a
+caller's HostCaps explicitly raises the limit" convention every other
+metered import here uses). Unlike every other host-fn in this
+namespace, it's built with an injectable `llm-client`
+(`{:infer-fn (fn [prompt] text-or-nil)}`) rather than calling
+`HttpClient` inline directly — `default-llm-client` resolves an API key
+from the same env-var chain `cloud_itonami.runtime/model-config` uses
+and calls the real Anthropic Messages API in production; tests inject a
+fake `:infer-fn`, never touching the real network. A missing API key,
+non-2xx response, network error, or malformed reply are all
+indistinguishable in-band `-1` (fail-closed, same as every other quota/
+overflow case here) — a well-behaved guest can't tell WHY it was
+denied, which is the point (it never gets to probe the host's
+credential state).
+
+This landed as part of a larger, business-context-driven effort
+(cloud-itonami's `isic-6511` underwriting governor compiled to a real
+`.kotoba` decision module and deployed — without a JVM — to a real
+`murakumo` fleet node) documented in full in its own ADR rather than
+duplicated here: see **ADR-2607072530** for the complete story,
+including the parallel browser/Node `wasm-webcomponent` `actor-host.js`
+implementation, the real fleet deployment, and the `.kotoba` compiler
+bug it found (`and`/`or`/`when` pass the safety gate but fail WASM code
+generation with `unsupported-op` — worked around with nested `if`,
+compiler fix tracked as follow-up there, not here).
+
 ## One-line summary
 
 **`kototama.tender` is the Chicory/JVM execution layer ADR-2607022400/

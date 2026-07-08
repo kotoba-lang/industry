@@ -195,6 +195,39 @@ Proceeding to Track B (the original ask this ADR chain serves: rendering
 guest-driven WebGPU, per the plan at `curious-zooming-sifakis.md` — Phase
 0's `.kotoba` + browser-host WebGPU spike is next).
 
+## Addendum 3 (2026-07-08): Track B Phase 0 — the ABI half landed; the browser-verified half is still open
+
+Phase 0's gate (per `curious-zooming-sifakis.md`) is a technical-risk
+spike: prove a guest-driven WebGPU call can work as a genuinely
+*synchronous* Wasm host-import, since the browser's `requestAdapter`/
+`requestDevice` are async but every per-frame WebGPU call
+(`beginRenderPass`/`draw`/`queue.submit`, ...) is synchronous per spec
+— the same async/sync wall that ruled `http-post` out of the browser
+`actor:host` surface (ADR-2607062400) does NOT apply here, *if* device/
+adapter setup happens once, host-side, before the guest ever runs.
+
+**Landed: the capability contract.** `gpu-clear` registered in
+`kotoba-core-contracts` (id 226, `kotoba-core-contracts#5`) —
+`gpu-clear(rgba8: i32) -> 0|-1`, one packed `0xRRGGBBAA` `i32` rather
+than the plan's sketched `gpu-clear(r,g,b)` three-param shape (simpler
+ABI, same `(scalar-in) -> status-out` convention every non-buffer
+import here already uses; a deliberate refinement during
+implementation, not a plan deviation worth blocking on). 9 tests/93
+assertions green, `clj-kondo` clean.
+
+**NOT yet landed, and this addendum does not claim otherwise:** the
+actual browser host implementation (device/adapter/canvas setup +
+the `gpu_clear` `HostFunction`, per this ADR's own Decision authored in
+ClojureScript compiled to an ESM host — Track A's `kami-engine-host`
+pattern is the template to follow, not `actor-host.js` hand-JS), a
+minimal `.kotoba` guest calling it, and Phase 0's actual acceptance
+criterion: a real `claude-in-chrome` screenshot confirming the canvas
+genuinely clears to the requested color in a live browser tab. The
+capability contract existing is a necessary precondition for that work,
+not a substitute for it — Phase 0 is open until the synchronous-call
+risk is verified against a real browser, not just declared in an EDN
+table.
+
 ## References
 
 - ADR-2607072700 (`kami-solar-helix-scene`, this work's immediate
