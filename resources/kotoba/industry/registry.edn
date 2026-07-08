@@ -6472,7 +6472,31 @@
    :business-id "cloud-itonami-isic-9601"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :blueprint
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as a garment-care actor
+   ;; (LaundryOps-LLM ⊣ Garment Care Governor), the forty-seventh
+   ;; build outside ADR-2607032000's original insurance/real-estate
+   ;; batch (after 6612, 6492, 6920, 6611, 7120, 8620, 8530, 9200, 7500,
+   ;; 9603, 9521, 9321, 8730, 9102, 9103, 9602, 9000, 8890, 8610, 9311,
+   ;; 8510, 9412, 6491, 8720, 8521, 6619, 3600, 6190, 3030, 3830, 7020,
+   ;; 9420, 9491, 2610, 3512, 8810, 8691, 8569, 6419, 7310, 7320, 7210,
+   ;; 7410, 8710, 8541, 8690), modeled closely on siblings 6511/6512/
+   ;; 6621/6622/6629/6520/6530/6820/6612/6492/6920/6611/7120/8620/8530/
+   ;; 9200/7500/9603/9521/9321/8730/9102/9103/9602/9000/8890/8610/9311/
+   ;; 8510/9412/6491/8720/8521/6619/3600/6190/3030/3830/7020/9420/9491/
+   ;; 2610/3512/8810/8691/8569/6419/7310/7320/7210/7410/8710/8541/8690.
+   ;; Dual-actuation shape (apply-cleaning-process + return-garment) on
+   ;; one entity -- the blueprint's own text names both real-world
+   ;; acts.
+   ;; Distinctive check: cleaning-process-forbidden-by-care-label? is
+   ;; a GENUINELY NEW concept (grep-verified), the 6th set-membership/
+   ;; conflict family instance, returning to the "presence-in-
+   ;; forbidden-set" polarity for a new domain (after alliedhealth's
+   ;; first inverse-polarity instance). certification-not-current is
+   ;; a concept reuse renamed for this domain (operator-level cert vs.
+   ;; individual professional license), the 45th unconditional-eval
+   ;; grounding overall. See cloud-itonami-isic-9601/docs/adr/
+   ;; 0001-architecture.md.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :book :service :deliver :audit]}
   {:id "9602"
