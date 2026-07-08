@@ -98,3 +98,14 @@ kotoba-shell の `ui-substrate-specs` が :browser 側に要求していた以�
 ## Closing addendum(2026-07-08)
 
 オーナー指示「update adr, closing」を受けて本ADRを起票と同時にcloseする。当初スコープ(Rust監査 → kotoba-shellのdom-gpu参照修正 → kotoba-lang/browserのvisual/webgpu smoke gate実装 → manifest pin前進)は全て完了・検証済み。murakumo-studioのTauri/Rust撤去とkotoba-shellのネイティブホスト本実装は、オーナー判断により明示的に別スコープのfollow-upとして残し、本ADR自体はここでclose。
+
+## Reverify + closing addendum(2026-07-08、二度目)
+
+オーナー指示「closing」を再度受け、着地内容が変化していないか再検証した。
+
+- `orgs/kotoba-lang/browser`: HEAD は依然 `1c65fc8`。`clojure -M:test` 617 tests / 3012 assertions / 0 failures を再確認。
+- `orgs/kotoba-lang/shell`: HEAD は依然 `b78655e`。`clojure -M:test` 24 tests / 246 assertions / 0 failures を再確認。`bin/kotoba-shell ui check --strict --json` → `ui-ready`、`ready-count: 2` を再確認。
+- `manifest/west.yml`: shell/browser エントリの revision が上記2 HEADと一致することを再確認。
+- superproject: `git status`(追跡ファイルの差分無し)、直近 commit は `b2ce7a8`(本ADR自体の追加)であることを確認。
+
+状態変化なし。本ADRは close のまま維持する。
