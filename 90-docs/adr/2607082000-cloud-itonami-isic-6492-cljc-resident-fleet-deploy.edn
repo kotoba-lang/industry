@@ -91,4 +91,10 @@
   :verification
   ["brew install node(judah/zebulun/issachar) -- 全てv26.4.0"
    "naphtali/judah/zebulun/issachar全てでtailnet経由の/health(200)とPOST /isic-6492/affordability(approve、{result:1,affordable:true,ok:true})を確認"
-   "5ノード全て(asher/naphtali/judah/zebulun/issachar)でcom.murakumo.kotoba-mesh*.plistと~/.murakumo/bin/{kotoba-server,kotoba}の削除を確認、prune後も5ノード全てで/healthがHTTP 200"]}}
+   "5ノード全て(asher/naphtali/judah/zebulun/issachar)でcom.murakumo.kotoba-mesh*.plistと~/.murakumo/bin/{kotoba-server,kotoba}の削除を確認、prune後も5ノード全てで/healthがHTTP 200"]}
+
+ :addendum-2026-07-08-reverify
+ {:summary "上記addendumの直後に再検証を実施。状態変化なし。"
+  :findings
+  ["prune済み5ノード全て(asher/naphtali/judah/zebulun/issachar)で/healthがHTTP 200を継続、sudo launchctl listでcom.murakumo.cljc-isic-6492が稼働中であることを再確認"
+   "未到達だった5ノード(simeon/levi/joseph/dan/benjamin)を再確認したが状態に変化なし: simeon/levi/joseph/danは依然SSHタイムアウト、benjaminは依然SSHセッションは確立するがログインシェル起動時のエラーでコマンド実行不可。原因調査・復旧は未着手のまま"]}}

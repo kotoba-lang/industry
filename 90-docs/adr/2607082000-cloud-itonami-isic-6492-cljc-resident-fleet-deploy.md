@@ -143,6 +143,13 @@ plist ファイルと Rust バイナリ自体を削除したため、単純な `
 - 配備: naphtali/judah/zebulun/issachar 全てで tailnet 経由の `/health`(200) と `POST /isic-6492/affordability`(approve、`{"result":1,"affordable":true,"ok":true}`)を確認。
 - Prune: 5ノード全て(asher/naphtali/judah/zebulun/issachar)で `com.murakumo.kotoba-mesh*.plist` と `~/.murakumo/bin/{kotoba-server,kotoba}` の削除を確認、prune後も5ノード全てで `/health` が HTTP 200。
 
+## Addendum 2 (2026-07-08, 同日): 再検証 — 状態変化なし
+
+上記 addendum の直後に再検証を実施した。
+
+- **prune 済み5ノード全て**（asher/naphtali/judah/zebulun/issachar）で `curl .../health` が HTTP 200 を継続していることを再確認。`sudo launchctl list | grep cljc-isic-6492` でも全ノードで `com.murakumo.cljc-isic-6492` が稼働中（pid は前回確認時と異なり、KeepAlive によるものか単純な継続稼働かは未区別）。
+- **未到達だった5ノード**（simeon/levi/joseph/dan/benjamin）を再度確認したが**状態に変化なし**: simeon/levi/joseph/dan は依然 SSH タイムアウト、benjamin は依然 SSH セッションは確立するがログインシェル起動時のエラーでコマンドが実行できない。原因調査・復旧はまだ行っていない。
+
 ## References
 
 - `orgs/cloud-itonami/cloud-itonami-isic-6492/wasm/server.cljs`, `wasm/README.md`
