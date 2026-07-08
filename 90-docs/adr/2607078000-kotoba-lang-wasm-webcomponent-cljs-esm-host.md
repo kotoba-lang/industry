@@ -146,6 +146,42 @@ specifically to avoid.
   (matches `kami-script-runtime-rs`'s own documented scope — the original
   crate never wired them either).
 
+## Addendum (2026-07-08): direction widened to "Rust-free including native"
+
+Owner clarified the direction is not limited to the browser/Node path this
+ADR's Decision covers — it extends to **native/windowed targets too**
+("Rust はやめましょう"). Context that prompted this: while the above was
+being implemented, a concurrent session independently pushed real,
+verified new work to `kami-script-runtime-rs`'s `main` — a `wasmi` no-JIT
+backend (bit-for-bit parity tested against `wasmtime`) and `kami_clj_play`,
+a native `winit`+`wgpu` windowed player that runs isekai-network's real
+compiled game through `KamiHost` at ~60fps with real screenshot-verified
+character rendering. That work is **not Rust-free** (needs native code for
+OS windowing, which browsers/Node structurally cannot do).
+
+**Decision on that conflict**: do not touch or revert the concurrent
+session's code (real, verified, in-progress work by another session — not
+this ADR's to disrupt). Instead, add a **documentation-only** notice to
+`kotoba-lang/kami-script-runtime-rs`'s `README.md`/`Cargo.toml` recording
+the org's actual direction (native desktop targets should eventually go
+through a Chromium-shell/webview wrapper around the same browser-proven
+`dom-gpu`/`kami-engine-host` ClojureScript path — e.g. Electron/Tauri-style
+— not hand-written `wgpu`/`winit`, since a webview shell is genuinely not
+Rust even though it produces a native window) — landed at commit
+`4f08f5b42ae7bd4ac0ff91ab0e9c0f80e1b0c068`. No `.rs` file was modified,
+deleted, or disabled; `KamiHost`'s headless-host role (this ADR's actual
+replacement target) was and remains unaffected by the concurrent session's
+additions either way (verified via `git diff` before writing the notice —
+only a `wasmi_host` module registration and one new error variant touched
+`src/lib.rs`, the file `kami-engine-host.cljs` ports).
+
+**Consequence**: the "Rust-free" scope for `kami-engine`/kotoba-lang going
+forward now explicitly includes native desktop, not just browser — this is
+a widening of this ADR's Decision, not a correction of an error in it. A
+concrete native-desktop-without-Rust implementation (e.g. wrapping
+`kami-engine-host`/`dom-gpu` in a webview shell) remains unbuilt — follow-up,
+not resolved by this addendum.
+
 ## References
 
 - ADR-2607072700 (`kami-solar-helix-scene`, this work's immediate
@@ -153,6 +189,7 @@ specifically to avoid.
 - ADR-2607061630 / ADR-2607061850 (`wasm-webcomponent`'s original browser
   WASM AOT + WebComponent PoC and library extraction — this ADR revises,
   not reverts, that lineage)
-- `kotoba-lang/kami-script-runtime-rs` (the Rust crate this replaces)
+- `kotoba-lang/kami-script-runtime-rs` (the Rust crate this replaces;
+  addendum commit `4f08f5b42ae7bd4ac0ff91ab0e9c0f80e1b0c068`)
 - `kotoba-lang/wasm-webcomponent` (`src-cljs/kotoba/kami_engine_host.cljs`,
   `shadow-cljs.edn`, `test/verify-kami-engine-host.mjs`)
