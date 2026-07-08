@@ -2253,4 +2253,12 @@
    ;; on the wire. 27 tests/54 assertions incl. real socket-level UDP tests;
    ;; dig-verified manually (ADR-2607083100).
    "orgs/kotoba-lang/org-ietf-dns" ; renamed from nameserver 2026-07-08 (reverse-domain: RFC 1035 is an IETF RFC, same org-ietf-* precedent as org-ietf-turn/org-ietf-ical)
+   ;; All-Photonics Network (APN) topology + Routing-and-Wavelength-
+   ;; Assignment (RWA): photonic nodes/DWDM links/lightpaths as EDN,
+   ;; structural validation (wavelength continuity enforced structurally,
+   ;; not by a rule), Dijkstra + single-link-deviation alternate routing,
+   ;; first-fit wavelength assignment, pure provisioning lifecycle. dcs/ddl/
+   ;; dmn-shaped zero-dep .cljc domain kernel. Consumed by cloud-itonami-
+   ;; isic-6110 (ADR-2607084700).
+   "orgs/kotoba-lang/apn"
    }}
