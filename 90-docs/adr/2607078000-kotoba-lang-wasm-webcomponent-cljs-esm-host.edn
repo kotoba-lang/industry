@@ -10,13 +10,15 @@
   :authoritative_for
   ["kotoba-lang/wasm-webcomponent: new policy -- kotoba/kototama WASM hosts needing more than a trivial hand-port are authored in ClojureScript and compiled via shadow-cljs :target :esm to a single ES module that runs identically in browser and Node, instead of hand-written per-platform JS. Existing hand-JS modules (actor-host.js/kgraph.js/has-capability.js/kotoba-wasm-element.js) are grandfathered, not retrofitted."
    "kotoba-lang/wasm-webcomponent src-cljs/kotoba/kami_engine_host.cljs (+ shadow-cljs.edn, compiled src/kami-engine-host.js, test/verify-kami-engine-host.mjs, examples/kami-engine-host/): first implementation under the new policy -- 1:1 port of kami-script-runtime-rs's HostState/EcsStore/KamiHost (14 kami:engine/* host-imports across 4 WASM import modules), parity-verified in Node against the real isekai-network-01-netsurvivors.wasm fixture for 300 ticks (entities=16 shiro-pico=1 ghost=14 beat-spark=1, exact match with kami-script-runtime-rs's own documented Rust/wasmtime trace)."
-   "clojurewasm (cljw) ruled out for WASM-host-providing-imports roles: (1) native-binary-only, does not run in a browser; (2) its WebAssembly FFI is Clojure-calls-wasm only (wasm/load + wasm/call), no documented capability for cljw to provide host-import functions a guest wasm module calls into. Verified via its own README, not assumed."]
+   "clojurewasm (cljw) ruled out for WASM-host-providing-imports roles: (1) native-binary-only, does not run in a browser; (2) its WebAssembly FFI is Clojure-calls-wasm only (wasm/load + wasm/call), no documented capability for cljw to provide host-import functions a guest wasm module calls into. Verified via its own README, not assumed."
+   "Addendum 2026-07-08: direction widened to Rust-free including native/windowed targets, not just browser/Node. Concurrent-session work on kotoba-lang/kami-script-runtime-rs (wasmi backend + kami_clj_play native winit+wgpu player) left untouched/unreverted (real, verified, another session's in-progress work), but a documentation-only org-direction notice was added to that crate's README.md/Cargo.toml (commit 4f08f5b42ae7bd4ac0ff91ab0e9c0f80e1b0c068) recording that native desktop targets should go through a webview/Chromium-shell wrapper around the same kami-engine-host/dom-gpu ClojureScript path going forward, not hand-written wgpu/winit. KamiHost's headless-host role (this ADR's actual replacement target, src/lib.rs) verified unaffected by the concurrent session's additions."]
   :supersedes []
   :superseded_by []
   :related ["adr-2607072700-kotoba-lang-kami-solar-helix-scene"
             "adr-2607061630-kototama-browser-wasm-aot-webcomponent"
             "adr-2607061850-kotoba-lang-wasm-webcomponent-library-extraction"]
-  :last_verified "2026-07-07"
+  :last_verified "2026-07-08"
   :artifacts
-  {:wasm-webcomponent "kotoba-lang/wasm-webcomponent -- kami-engine-host cljs/esm port, 6/6 Node parity checks green (node test/verify-kami-engine-host.mjs)"}}
+  {:wasm-webcomponent "kotoba-lang/wasm-webcomponent -- kami-engine-host cljs/esm port, 6/6 Node parity checks green (node test/verify-kami-engine-host.mjs)"
+   :kami-script-runtime-rs "kotoba-lang/kami-script-runtime-rs -- docs-only org-direction notice, commit 4f08f5b42ae7bd4ac0ff91ab0e9c0f80e1b0c068, no code changed"}}
  :body "see 2607078000-kotoba-lang-wasm-webcomponent-cljs-esm-host.md"}
