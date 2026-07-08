@@ -1,0 +1,42 @@
+{:frontmatter
+ {:id "adr-2607078100-club-shinshi-receive-only-usdc-rail-creator-payout-deferred"
+  :title "ADR-2607078100: club-shinshi V1 monetization -- receive-only USDC rail (buyer -> gftd), creator payout deferred"
+  :status "accepted"
+  :doc_type "adr"
+  :topic "shinshi-crypto-payout-rail"
+  :authoritative true
+  :last_verified "2026-07-07"
+  :authoritative_for
+  ["decision: club-shinshi's V1 crypto monetization is receive-only (buyer -> gftd,
+    one-directional, gftd as ordinary merchant) -- NOT creator payout. Creator payout
+    (buyer -> gftd -> creator) is explicitly deferred to a future ADR/task"
+   "reason for the narrowing: a code-level check of the existing etzhayyim ERC-4337
+    actor infra (EtzhayyimActorRegistry.sol, EtzhayyimPaymaster.sol) found it unsafe to
+    build creator payout on yet -- registry activate() has no access control (DID
+    front-running/hijack), paymaster allowlist doesn't enforce function selector or
+    recipient (contradicts its own README policy), and the deployed self-custody wallet
+    pair lives on etzhayyim's private single-sealer chain, not the public Base L2 the
+    payments policy targets. Paymaster itself is undeployed/unaudited stub v0.0.0"
+   "implementation: 0008_crypto_pay.sql (pay_run ledger) + shinshi.worker.payments
+    (buyer-facing quote/claim/status) + shinshi.worker.d1-gateway ops
+    (list_pending_pay_runs, confirm_pay_run) + bb.edn/tools/verify-payments.clj, all
+    reusing kotoba-lang/treasury (treasury.core) directly -- club-shinshi's OWN separate
+    treasury address, never local-murakumo's (ADR-2607052100 commingling finding applies
+    to receive-only rails too)"
+   "build verified in an isolated west worktree: shadow-cljs worker build succeeds,
+    npm test 24/24 tests (1078 assertions) pass, babashka verifier safely no-ops with
+    secrets unset. SHINSHI_TREASURY_ADDR is unset by default -- no real wallet
+    provisioned, no mainnet transaction, no legal/compliance certification in this pass"]
+  :depends_on
+  ["90-docs/adr/2607052100-shinshi-crypto-payout-rail-regulatory-design-review.md.edn"
+   "orgs/kotoba-lang/treasury 90-docs/adr/2607051621-treasury-core-extraction.md.edn"
+   "orgs/etzhayyim/root 90-docs/adr/2605172100-etzhayyim-payments-on-chain-only.md.edn"
+   "orgs/gftdcojp/ai-gftd-apps-gftdcojp 90-docs/adr/2606011400-consensys-pattern-etzhayyim-product-gftd-infra-vendor.md.edn"]
+  :related
+  ["90-docs/adr/2607021900-portfolio-add-isekai-club-shinshi.md.edn"
+   "orgs/gftdcojp/club-shinshi 90-docs/adr/2606010100-shinshi-ad-monetization-bmc.md.edn"
+   "orgs/gftdcojp/local-murakumo/tools/verify-payments.clj"
+   "orgs/etzhayyim/root/50-infra/etzhayyim-paymaster/README.md"
+   "orgs/etzhayyim/root/50-infra/vultr/geth-private/contracts/src/EtzhayyimActorRegistry.sol"]
+  :supersedes []
+  :superseded_by []}}
