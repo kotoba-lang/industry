@@ -82,7 +82,7 @@ ADR-2607072530/2607072600 は cloud-itonami の `.kotoba`→WASM actor を murak
 - nbb の `.catch` バグの根本原因特定・upstream 報告。
 - 認証・TLS 等、本番運用に必要な硬化。
 
-## Revert 手順
+## Revert 手順（asher 初回配備時点。Addendum のプルーン後は末尾参照）
 
 ```sh
 ssh asher "sudo launchctl bootout system/com.murakumo.cljc-isic-6492 2>/dev/null; \
@@ -100,11 +100,55 @@ ssh asher "sudo launchctl bootout system/com.murakumo.cljc-isic-6492 2>/dev/null
 - KeepAlive 自己修復: `sudo kill -9 <pid>` 後、launchd が自動的にプロセスを再起動し `/health` が復帰することを確認。
 - `gh push`: `orgs/cloud-itonami/cloud-itonami-isic-6492` main（`d7cc1fa..d598e26` — `wasm/server.cljs` 新設、`wasm/README.md` 更新）。
 
+## Addendum (2026-07-08, same day): フリート残り4ノードへのロールアウト + Rust 資産の prune
+
+オーナー指示「rust 関係は prune してok、他の mac mini fleet も同様に」を受けて、`orgs/kotoba-lang/murakumo/fleet.edn` の全10ノード中、到達可能な残り4ノード（naphtali/judah/zebulun/issachar）にも同じ cljc/nbb 常駐デーモンを配備し、5ノード全てで置換済みの Rust 資産を実際に削除（prune）した。
+
+### 到達性
+
+- 到達・配備完了: asher（初回）、naphtali、judah、zebulun、issachar（計5/10）。
+- 到達不可（SSH タイムアウト）: simeon、levi、joseph、dan（4/10）— 電源/ネットワーク状態は未調査、後日再試行が必要。
+- 到達するが配備不可: benjamin（1/10）— SSH 認証・セッション確立は成功するが、リモートログインシェルの起動時に何らかのエラーが発生し、単純な `echo` すら標準出力が返らず終了ステータス1になる。原因未調査（`.zshrc`/`.zprofile` 等のシェル起動スクリプト起因の可能性が高い）。
+
+### 配備差分（naphtali/judah/zebulun/issachar）
+
+- **Node.js が無かった3ノード（judah/zebulun/issachar）に `brew install node` で新規導入**（naphtali は既に v22.22.2 が導入済みだった）。3ノードとも `brew` 自体は既存（v26.4.0 がインストールされた）。
+- 他はasherと全く同じ手順（`wasm-webcomponent/src` + `cloud-itonami-isic-6492/wasm` を `$HOME/.murakumo-cljc/orgs/...` へ rsync、`com.murakumo.kotoba-mesh`(+watchdog、存在するノードのみ)を bootout、`com.murakumo.cljc-isic-6492.plist` を各ノードの `$HOME`/`UserName` に合わせてレンダリングし bootstrap+kickstart）。
+- 4ノード全てで tailnet 経由の `/health` と `POST /isic-6492/affordability`(approve シナリオ)を実行し、asher と同一の結果を確認。KeepAlive の再実証（kill -9）は asher で既に確認済みのため省略。
+
+### issachar の固有事情
+
+`fleet.edn` のコメントは「issachar は既に :8077 で kotoba-server を稼働中(yabai CTI persistence)のため、murakumo mesh ノードは別ポート(8076)を使う」と記していたが、実機確認では issachar の :8077 は現在何もリッスンしておらず(yabai CTI 用途の kotoba-server は現状稼働していない)、`com.murakumo.kotoba-mesh` ラベルの mesh 用プロセスのみが稼働していた。ラベル指定での bootout のため、この点は配備の安全性に影響しない。
+
+### Rust 資産の prune（5ノード全て）
+
+各ノードの `~/.murakumo/bin/` には Rust の `kotoba-server`/`kotoba` バイナリだけでなく、**別件の llama.cpp 分散推論 RPC サーバー一式**（`rpc-server`、`libggml-*.dylib`、`libllama-*.dylib`、`libmtmd*.dylib`、`murakumo-rpc-bin.tgz`、`prewarm-fetch.sh`）が同居していることを実機確認で発見した。後者は本 ADR の対象と無関係な現役設備（murakumo-exo-distributed-inference 系統）であり、削除対象から明確に除外した。
+
+prune した対象（5ノード全て）:
+- `/Library/LaunchDaemons/com.murakumo.kotoba-mesh.plist`
+- `/Library/LaunchDaemons/com.murakumo.kotoba-mesh-watchdog.plist`（存在するノードのみ — asher と zebulun）
+- `~/.murakumo/bin/kotoba-server`（65MB）、`~/.murakumo/bin/kotoba`（35MB）
+
+prune 後、5ノード全てで `curl .../health` が HTTP 200 を返すことを再確認し、cljc/nbb デーモンの稼働に影響が無いことを確認した。
+
+**触れていないもの**: `~/.murakumo/bin/` 内の llama.cpp RPC 関連一式、`~/.murakumo/store`（datom ログ）、`~/.murakumo/*.log`、`ai.gftd.murakumo.plist.bak.*`（全ノードに残る古いバックアップ）、naphtali の `ai.gftd.murakumo.system.plist`（別ラベル・現役稼働中、本 ADR と無関係）。
+
+### Revert 手順（prune 後 — 上記の単純な plist 再 bootstrap は使えない）
+
+plist ファイルと Rust バイナリ自体を削除したため、単純な `launchctl bootstrap` では戻せない。Rust 版に戻すには、`orgs/kotoba-lang/murakumo` の provisioning フロー（`bin/BUILD.edn` のバイナリ再取得 + `src/murakumo/provision/plan.cljc` の `render-plist` によるテンプレートからの再生成）を当該ノードに対して再実行する必要がある — 本 ADR の対象外（"prune してok" は不可逆な選択として明示的に指示されたもの）。
+
+### Verification（Addendum）
+
+- Node.js 導入: `brew install node`(judah/zebulun/issachar) → 全て `v26.4.0`。
+- 配備: naphtali/judah/zebulun/issachar 全てで tailnet 経由の `/health`(200) と `POST /isic-6492/affordability`(approve、`{"result":1,"affordable":true,"ok":true}`)を確認。
+- Prune: 5ノード全て(asher/naphtali/judah/zebulun/issachar)で `com.murakumo.kotoba-mesh*.plist` と `~/.murakumo/bin/{kotoba-server,kotoba}` の削除を確認、prune後も5ノード全てで `/health` が HTTP 200。
+
 ## References
 
 - `orgs/cloud-itonami/cloud-itonami-isic-6492/wasm/server.cljs`, `wasm/README.md`
 - `orgs/kotoba-lang/wasm-webcomponent/src/actor-host.js`
 - `orgs/kotoba-lang/murakumo/deploy/com.murakumo.kotoba-mesh.plist.tmpl`（置換元 Rust 版テンプレート）
+- `orgs/kotoba-lang/murakumo/fleet.edn`（10ノードのフリート inventory SSoT）
 - ADR-2607072530（llm-infer capability、murakumo fleet 実機配備の先例、JDK 不在の実測）
 - ADR-2607072600（kototama.tender 経由の一回きり動作確認、本 ADR が「常駐」へ発展させた対象）
 - ADR-2607072400（kaisha realtime pod、asher の Rust kotoba-server 依存 — 本 ADR で影響を受ける）
