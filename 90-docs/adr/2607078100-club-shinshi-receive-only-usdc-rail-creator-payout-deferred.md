@@ -180,6 +180,29 @@ here automatically). Follow-up, not done here: once this repo has real
 `deps.edn`/git-dependency resolution wired up, replace the vendored copy
 with a pinned git dependency.
 
+## Amendment (2026-07-08) — Phase 2: treasury address configured
+
+Landed as `jk-luxury/club-shinshi#7`, merge commit
+`57f117c6efa81693851952a526db3341aedd4be1`: `SHINSHI_TREASURY_ADDR` is now set
+in `wrangler.jsonc` `vars` to the operator-provisioned address
+`0xf1592811063554e2EDfC137964aE181C830967Ac` — club-shinshi's own, separate
+from local-murakumo's treasury. `DISPATCHER_INTERNAL_SECRET` was already live
+as a Worker secret (confirmed via `wrangler secret list`) — no action needed
+there. `ETHERSCAN_API_KEY` for the babashka verifier now resolves via a new
+`shinshi`-scoped Keychain entry (copied from the existing `murakumo`-scoped
+key — a read-only block-explorer API key, not a custody credential, so
+reuse across the account's own products carries none of the treasury-address
+commingling risk ADR-2607052100 flagged). Verified with `wrangler deploy
+--dry-run` before merging — config parses, binds correctly, nothing
+deployed.
+
+**Not done in this pass**: an actual `wrangler deploy`/`gftd deploy` to
+production. This repo has no CI auto-deploy on merge to main (confirmed —
+`.github/workflows/` only has `actors-test.yml`/`repo-checks.yml`), so the
+address is not yet live/reachable anywhere. Deploying is the point at which
+this rail could actually start receiving real funds, so it's held as a
+separate, explicit go-live decision rather than folded into this merge.
+
 ## References
 
 - ADR-2607052100 (crypto payout rail regulatory review — commingling finding,
