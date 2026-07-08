@@ -88,6 +88,17 @@
   "orgs/kotoba-lang/clc"                "orgs/kotoba-lang/office-style"
   "orgs/com-junkawasaki/utsushi"        "orgs/kotoba-lang/utsushi"
   "orgs/com-junkawasaki/vehicle-design-actor" "orgs/kotoba-lang/kami-engine-vehicle-designer"
+  ;; kami-engine-* rename batch (2026-07-08): align the 6 vehicle-CAE reduced-order
+  ;; libs with sibling kami-engine-cfd / kami-engine-vehicle-designer naming
+  ;; (ADR-2606301100 precedent). Not reverse-domain (no external spec/regulatory
+  ;; body governs these clean-room solvers, confirmed before renaming) -- see
+  ;; ADR-2607080100.
+  "orgs/kotoba-lang/aero"       "orgs/kotoba-lang/kami-engine-aero"
+  "orgs/kotoba-lang/crash"      "orgs/kotoba-lang/kami-engine-crash"
+  "orgs/kotoba-lang/motor"      "orgs/kotoba-lang/kami-engine-motor"
+  "orgs/kotoba-lang/vphysics"   "orgs/kotoba-lang/kami-engine-vphysics"
+  "orgs/kotoba-lang/echem"      "orgs/kotoba-lang/kami-engine-echem"
+  "orgs/kotoba-lang/cae-solver" "orgs/kotoba-lang/kami-engine-cae-solver"
   "orgs/com-junkawasaki/manimani"       "orgs/gftdcojp/manimani" ; GitHub-transferred to gftdcojp 2026-07-01 (private; mobile/ iOS+Android app, fastlane App Store pipeline in progress)
   "orgs/gftdcojp/manimani"              "orgs/gftdcojp/local-manimani" ; renamed on GitHub 2026-07-05 (ADR-2607051600): mirrors the cloud-manimani/local-murakumo taxonomy — this is the on-device client vs. cloud-manimani's Cloudflare Worker API, so "local-" names the same local/cloud contrast as local-murakumo vs. cloud-murakumo
   "orgs/com-junkawasaki/cloud-manimani" "orgs/gftdcojp/cloud-manimani" ; GitHub-transferred to gftdcojp 2026-07-02 (private; Cloudflare Worker API for manimani triage Decision Ledger)
@@ -1626,16 +1637,16 @@
    "orgs/kotoba-lang/com-vultr"           ; portable .cljc Vultr API v2 client (account/billing/instances, read-focused; no auto-pay toggle -- not exposed by the API) (2607061450)
    "orgs/kotoba-lang/atproto-client" ; AT Protocol client facade + PDS read/write helpers over @atproto/api; relocated from etzhayyim-sdk per ADR-2607011940
    "orgs/kotoba-lang/arxiv"          ; ADR-0023: arXiv organism actor + yorishiro automation
-   "orgs/kotoba-lang/aero"
+   "orgs/kotoba-lang/kami-engine-aero"
    "orgs/kotoba-lang/org-omg-bpmn" ; renamed from bpmn 2026-07-06
    "orgs/kotoba-lang/briefing"
    "orgs/kotoba-lang/org-chainagnostic-cacao" ; renamed from cacao 2026-07-06
-   "orgs/kotoba-lang/cae-solver"
+   "orgs/kotoba-lang/kami-engine-cae-solver"
    "orgs/kotoba-lang/calendar"
    "orgs/kotoba-lang/ci"
    "orgs/kotoba-lang/org-omg-cmmn" ; renamed from cmmn 2026-07-06
    "orgs/kotoba-lang/contacts"
-   "orgs/kotoba-lang/crash"
+   "orgs/kotoba-lang/kami-engine-crash"
    "orgs/kotoba-lang/cron"
    "orgs/kotoba-lang/org-ietf-cbor" ; renamed from dag-cbor 2026-07-06
    "orgs/kotoba-lang/datom"
@@ -1654,7 +1665,7 @@
    "orgs/kotoba-lang/dot"
    "orgs/kotoba-lang/docs"
    "orgs/kotoba-lang/drive"
-   "orgs/kotoba-lang/echem"
+   "orgs/kotoba-lang/kami-engine-echem"
    "orgs/kotoba-lang/org-ietf-ed25519" ; renamed from ed25519 2026-07-06
    "orgs/kotoba-lang/eth-crypto"
    "orgs/kotoba-lang/forms"
@@ -1674,7 +1685,7 @@
    "orgs/kotoba-lang/kotodama-py"
    "orgs/kotoba-lang/kudaki"
    "orgs/kotoba-lang/org-anthropic-mcp" ; renamed from mcp 2026-07-06
-   "orgs/kotoba-lang/motor"
+   "orgs/kotoba-lang/kami-engine-motor"
    "orgs/kotoba-lang/io-multiformats" ; renamed from multiformats 2026-07-06
    "orgs/kotoba-lang/nagare"
    "orgs/kotoba-lang/num"
@@ -1697,7 +1708,7 @@
    "orgs/kotoba-lang/svgraph"
    "orgs/kotoba-lang/torch"
    "orgs/kotoba-lang/vllm"
-   "orgs/kotoba-lang/vphysics"
+   "orgs/kotoba-lang/kami-engine-vphysics"
    "orgs/kotoba-lang/zone"
    "orgs/kotoba-lang/browser-agent"
    "orgs/kotoba-lang/freeboard"
