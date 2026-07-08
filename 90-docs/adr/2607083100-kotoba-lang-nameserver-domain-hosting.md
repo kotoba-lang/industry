@@ -147,3 +147,38 @@ ANY/TCPフォールバック/カスタムTLD TXT・CNAME を目視確認。
 - **次段**: `godaddy-dns-clj` との実結線(実際にサブドメイン委任を1件通す
   end-to-end 検証)、custom-tld ブリッジの実クライアント側resolver設定手順の
   ドキュメント化、EDNS0/レート制限は将来の別ADR。
+
+## 追記 1（2026-07-08）: リポジトリ rename
+
+初期実装後、`kotoba-lang/nameserver` を `kotoba-lang/org-ietf-dns` へ改名した
+（RFC 1035 は IETF RFC、既存 `org-ietf-turn`/`org-ietf-ical` 等と同じ
+reverse-domain 命名precedent）。詳細は独立 ADR
+`90-docs/adr/2607084500-nameserver-org-ietf-dns-rename.md` を参照。
+
+## 追記 2（2026-07-08）: 実運用エントリポイント + 「次段」項目の一部解消
+
+「実際にネームサーバーとして動かすには」という follow-up 質問を受け、
+`kotoba-lang/org-ietf-dns` に以下を追加した（詳細は
+`orgs/kotoba-lang/org-ietf-dns/docs/adr/0001-architecture.md` の
+「7. 実運用エントリポイント」節）:
+
+- **`nameserver.main`** — config.edn 駆動の CLI エントリポイント
+  （`:host`/`:port`/`:zones-dir`/`:custom-tld`）。本 org 既存の
+  env-var-config + shutdown-hook + `@(promise)` blocking パターン
+  （`murakumo/relay_server.clj` 等）と同型。
+- **`deploy/org-ietf-dns.service`**（systemd unit、`AmbientCapabilities=
+  CAP_NET_BIND_SERVICE` で port 53 を root 無しに bind）。
+- **`Dockerfile`**（ソースを Clojure CLI で直接動かす形 — 本 org 全体を
+  調査した結果 `tools.build`/uberjar の前例が皆無だったため、新規導入せず
+  既存の `ai-gftd-syosetsuka` 等と同じ形に合わせた。**Docker build 自体は
+  作業環境に daemon が無く未検証** — README に明記済み）。
+- README「Running for real」節に port 53 bind の3方法、NS委任への導線、
+  および **custom-tld ブリッジの実クライアント側 resolver 設定手順**
+  （`systemd-resolved`/`dnsmasq` の split-horizon 転送例）を追加。
+
+これにより上記「次段」のうち「custom-tld ブリッジの実クライアント側resolver
+設定手順のドキュメント化」は解消。残る次段は `godaddy-dns-clj` との実結線
+end-to-end 検証と EDNS0/レート制限（引き続き将来の別ADR）。
+
+`clojure -M -m nameserver.main examples/config.edn` を実際に起動し実 `dig`
+で A/CNAME/カスタムTLD dnslink を再確認、`SIGTERM` での正常終了も確認済み。
