@@ -1,7 +1,7 @@
 {:frontmatter
  {:id "adr-2607082000-cloud-itonami-isic-6492-cljc-resident-fleet-deploy"
   :title "ADR-2607082000: cloud-itonami-isic-6492 の affordability.wasm を asher 上で cljc/nbb 常駐 HTTP デーモンとして稼働 — Rust kotoba-server を置換した初の常駐 wasm デプロイ"
-  :status "accepted"
+  :status "closed"
   :doc_type "adr"
   :topic "cloud-itonami-isic-6492-cljc-resident-fleet-deploy"
   :authoritative true
@@ -97,4 +97,11 @@
  {:summary "上記addendumの直後に再検証を実施。状態変化なし。"
   :findings
   ["prune済み5ノード全て(asher/naphtali/judah/zebulun/issachar)で/healthがHTTP 200を継続、sudo launchctl listでcom.murakumo.cljc-isic-6492が稼働中であることを再確認"
-   "未到達だった5ノード(simeon/levi/joseph/dan/benjamin)を再確認したが状態に変化なし: simeon/levi/joseph/danは依然SSHタイムアウト、benjaminは依然SSHセッションは確立するがログインシェル起動時のエラーでコマンド実行不可。原因調査・復旧は未着手のまま"]}}
+   "未到達だった5ノード(simeon/levi/joseph/dan/benjamin)を再確認したが状態に変化なし: simeon/levi/joseph/danは依然SSHタイムアウト、benjaminは依然SSHセッションは確立するがログインシェル起動時のエラーでコマンド実行不可。原因調査・復旧は未着手のまま"]}
+
+ :addendum-2026-07-08-closing
+ {:summary "オーナー指示「update adr, closing」を受けた最終再検証。状態変化なしを確認しADRをcloseする。"
+  :findings
+  ["配備済み5ノード全て(asher/naphtali/judah/zebulun/issachar)でtailnet経由/healthが200、com.murakumo.cljc-isic-6492がlaunchctl list上で稼働中(last exit statusはKeepAliveによる過去の再起動履歴で現状には無関係)"
+   "未到達5ノード(simeon/levi/joseph/dan/benjamin)も状態変化なし"]
+  :close-rationale "当初スコープ(オーナー指示「deploy を進めて、rust 版ではなく cljc 版」「他の mac mini fleet も同様に」= フリート10ノード中到達可能な5ノードへのcljc/nbb常駐デプロイ)は完了・安定稼働を再確認した。残り5ノードへの展開・murakumo provisioning toolingへの正式統合・nbb .catchバグの根本原因調査・本番硬化は、いずれも本ADRの:not-decidedに明示済みの別スコープfollow-upとして残し、本ADR自体はここでclose。"}}

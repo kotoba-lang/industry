@@ -1,7 +1,7 @@
 ---
 id: adr-2607082000-cloud-itonami-isic-6492-cljc-resident-fleet-deploy
 title: "ADR-2607082000: cloud-itonami-isic-6492 の affordability.wasm を asher 上で cljc/nbb 常駐 HTTP デーモンとして稼働 — Rust kotoba-server を置換した初の常駐 wasm デプロイ"
-status: accepted
+status: closed
 doc_type: adr
 topic: cloud-itonami-isic-6492-cljc-resident-fleet-deploy
 authoritative: true
@@ -21,7 +21,7 @@ superseded_by: []
 
 # ADR-2607082000: cloud-itonami-isic-6492 を asher 上で cljc/nbb 常駐 HTTP デーモンとして稼働
 
-**Status**: accepted
+**Status**: closed（2026-07-08、Addendum 3 でclose）
 **Date**: 2026-07-08
 **Deciders**: Jun Kawasaki（オーナー指示「deploy を進めて、rust 版ではなく cljc 版」を受けて着手）
 
@@ -149,6 +149,15 @@ plist ファイルと Rust バイナリ自体を削除したため、単純な `
 
 - **prune 済み5ノード全て**（asher/naphtali/judah/zebulun/issachar）で `curl .../health` が HTTP 200 を継続していることを再確認。`sudo launchctl list | grep cljc-isic-6492` でも全ノードで `com.murakumo.cljc-isic-6492` が稼働中（pid は前回確認時と異なり、KeepAlive によるものか単純な継続稼働かは未区別）。
 - **未到達だった5ノード**（simeon/levi/joseph/dan/benjamin）を再度確認したが**状態に変化なし**: simeon/levi/joseph/dan は依然 SSH タイムアウト、benjamin は依然 SSH セッションは確立するがログインシェル起動時のエラーでコマンドが実行できない。原因調査・復旧はまだ行っていない。
+
+## Addendum 3 (2026-07-08, 同日): 最終再検証 — closing
+
+オーナー指示「update adr, closing」を受け、最終確認を行いこの ADR を close する。
+
+- **配備済み5ノード全て**（asher/naphtali/judah/zebulun/issachar）で `curl .../health`（tailnet 経由、port 8479）を再実行し、全ノードで `{"ok":true,"service":"cloud-itonami-isic-6492-affordability","runtime":"nbb/node (no JVM)",...}` の200応答を確認。`sudo launchctl list | grep cljc-isic-6492` でも全ノードで `com.murakumo.cljc-isic-6492` が起動中（"last exit status" 列は `-9`(asher)/`-15`(他4台) — KeepAlive による過去の再起動履歴であり、現在の稼働状態には影響しない）。Addendum 2 からの状態変化なし。
+- **未到達5ノードも状態変化なし**: simeon/levi/joseph/dan は依然 SSH タイムアウト。benjamin は依然 SSH セッション自体は確立するがログインシェル起動時に無出力・exit status 1 で失敗し、コマンド実行に至らない（原因未調査のまま）。
+
+**Close の判断**: フリート10ノード中5ノードへの cljc/nbb 常駐デプロイという当初スコープ（オーナー指示「deploy を進めて、rust 版ではなく cljc 版」「他の mac mini fleet も同様に」）は完了・安定稼働を再確認した。残り5ノード（未到達4 + benjamin）への展開、フリート全体の provisioning tooling（`murakumo` 側）への正式統合、nbb `.catch` バグの根本原因調査、認証/TLS 等の本番硬化は、いずれも本 ADR が「What this ADR does NOT decide」で明示済みの別スコープの follow-up として残し、本 ADR 自体はここで close する。
 
 ## References
 
