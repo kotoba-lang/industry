@@ -1,0 +1,36 @@
+{:frontmatter
+ {:id "adr-2607082400-kotoba-server-cljc-realization-component-model-wall"
+  :title "kotoba-server の cljc 実現を検討 — component model の壁と gossipsub の壁を実証し、drop-in 置換を却下する"
+  :status "accepted"
+  :date "2026-07-08"
+  :authoritative true
+  :repos ["orgs/kotoba-lang/kototama" "orgs/kotoba-lang/io-libp2p"]
+  :related ["90-docs/adr/2607072000-kotoba-rust-avoidance-policy-and-kotoba-server-gap.md"
+            "90-docs/adr/2607071900-murakumo-cross-node-apply-cljc-auction-gap-closed.md"
+            "90-docs/adr/2607062330-kototama-tender-chicory-execution-runtime.md"
+            "90-docs/adr/2607071500-minidrama-mesh-reside-aozora-actor-integration.md"
+            "90-docs/adr/2607072400-aiueos-kototama-decision-execution-boundary.md"]}
+
+ :owner-instruction "rust が必要な実装は全て cljc で設計実装 -- kotoba-server に対して実現せよ"
+
+ :empirical-findings
+ {:wall-1-component-model
+  {:claim "Chicory (kototama の唯一の WASM engine) は既存 mesh guest (WASM Component, kotoba-clj コンパイル) を読めない"
+   :verification "drama_profile.clj を kotoba component build で再ビルド → バイナリ先頭 [0x0d,0,1,0] (component layer-1 preamble) を確認 → Chicory Parser.parse に通す → MalformedException 'unknown binary version, found: [13, 0, 1, 0] expected: [1, 0, 0, 0]' を実測"
+   :capability-mismatch "kototama の9 imports (crypto/http/log/llm) は mesh guest が要求する kqe-assert!/kqe-query を一切カバーしない -- 別用途 (cloud-itonami isic actor) のために作られたシステム"}
+  :wall-2-gossipsub
+  {:claim "cljc/JVM 側に real libp2p-gossipsub 実装が存在しない"
+   :verification "kotoba-lang/io-libp2p の gossip.cljc/bitswap.cljc (215行) を全文確認 -- 自身の docstring が 'does not open sockets, dial peers, or perform any cryptographic handshake' と明記。純粋なルーティング数学のみ、peer接続・mesh維持(heartbeat/graft/prune)は皆無"
+   :rust-contract "kotoba-lattice/protocol.rs: Heartbeat/Auction/Bid/Award/LatticeMessage (CBOR, PutTriggers/PutRoutes) を gossipsub 予約トピック上でやり取り -- cljc での相互運用実装はlibp2p-gossipsub仕様全体の新規実装に相当"}}
+
+ :decision
+ {:1-reject-drop-in "既存mesh app無変更・既存Rustノードとgossipsub相互運用、という意味でのdrop-in置換は着手しない。実現不可能な計画を書かないことがADR-2607072000の原則の履行"
+  :2-strangler-fig "既存fleet/mesh app (minidrama/kenchi/kotodama-bot) は当面Rust kotoba-serverのまま (ゼロリスク)。新規容量はmurakumoをcoordination authorityとし (ADR-2607071900で既に centralized 運用実証済み)、murakumo→各cljcノードへのplain HTTP (murakumo/dash.clj の bb+http-kit+loop パターン流用)。guest言語は.kotoba、既存component移植ではなくapp単位の新規/書き直し判断"
+  :3-implemented "kototama.tender に call-export/has-export?/dispatch-trigger を追加 (main決め打ちを汎用化、kotoba-server の trigger_name mapping #{:run :http :tick :kse} → run/on-http/on-tick/on-kse)。mesh guest実行可能になったという意味ではない -- tender自身のAPI汎用化のみ。テスト追加、bb test/clojure -M:dev:test green"}
+
+ :consequences
+ ["実現不可能な計画で着手し後で頓挫する最悪の結果を回避。2つの壁は実機検証で確定事実になった"
+  "murakumoをcoordination authorityとしたstrangler-fig方向性と次の一歩(kqe相当capability新設、最初の.kotoba移植対象アプリ選定)を明示"
+  "kototama export dispatch汎用化は小さいが本番リスクゼロの実質的改善"
+  "kotoba-server自体はRustのまま -- 方針転換ではなく事実に基づく判断 (JVM側にcomponent model/gossipsub実装が存在しない以上)"
+  "follow-up優先度: ①最初の.kotoba移植対象app選定 (drama-profile/drama-heartbeat等の検閲対象外の薄いcomponentが候補) ②kqe-assert!/kqe-query相当capability設計 ③murakumo→cljcノードのHTTP契約設計"]}
