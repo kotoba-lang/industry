@@ -4833,7 +4833,36 @@
    :business-id "cloud-itonami-isic-6411"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :banking]
    :optional-technologies []
-   :maturity :blueprint
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as a central-banking actor
+   ;; (ReserveOps-LLM ⊣ Central Bank Reserve Governor), the fifty-
+   ;; fifth build outside ADR-2607032000's original insurance/real-
+   ;; estate batch (after 6612, 6492, 6920, 6611, 7120, 8620, 8530,
+   ;; 9200, 7500, 9603, 9521, 9321, 8730, 9102, 9103, 9602, 9000, 8890,
+   ;; 8610, 9311, 8510, 9412, 6491, 8720, 8521, 6619, 3600, 6190, 3030,
+   ;; 3830, 7020, 9420, 9491, 2610, 3512, 8810, 8691, 8569, 6419, 7310,
+   ;; 7320, 7210, 7410, 8710, 8541, 8690, 9601, 6420, 7420, 9609, 8550,
+   ;; 7010, 8790, 8542), modeled closely on siblings 6511/6512/6621/
+   ;; 6622/6629/6520/6530/6820/6612/6492/6920/6611/7120/8620/8530/9200/
+   ;; 7500/9603/9521/9321/8730/9102/9103/9602/9000/8890/8610/9311/8510/
+   ;; 9412/6491/8720/8521/6619/3600/6190/3030/3830/7020/9420/9491/2610/
+   ;; 3512/8810/8691/8569/6419/7310/7320/7210/7410/8710/8541/8690/9601/
+   ;; 6420/7420/9609/8550/7010/8790/8542.
+   ;; Dual-actuation-on-one-entity shape (open-reserve-account /
+   ;; release-settlement-batch), the 5th such instance in this fleet
+   ;; (after nursing/8710, laundry/9601, holdco/6420, residential/8790).
+   ;; Distinctive checks: correspondent-banking-due-diligence-
+   ;; unresolved? is a GENUINELY NEW concept (grep-verified), the 54th
+   ;; unconditional-eval grounding overall, grounded in FATF/Basel
+   ;; Committee correspondent-banking guidance and US Bank Secrecy Act
+   ;; 31 CFR 1010.610. reserve-ratio-insufficient? is an honest TENTH
+   ;; MINIMUM-threshold instance (gates account-opening only);
+   ;; settlement-batch-exceeds-available-reserve-balance? is an honest
+   ;; ELEVENTH MAXIMUM-ceiling instance (gates settlement-release
+   ;; only), neither claimed as new. No real kotoba-lang/banking
+   ;; dependency added, following banking/6419's and holdco/6420's
+   ;; precedent. See cloud-itonami-isic-6411/docs/adr/
+   ;; 0001-architecture.md.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :open-account :settle :issue :audit]},
   {:id "6420"
