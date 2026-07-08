@@ -7074,7 +7074,22 @@
    :business-id "cloud-itonami-isic-9529"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :blueprint
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as an other-personal-and-
+   ;; household-goods-repair actor (RepairOps-LLM ⊣ Repair Shop
+   ;; Governor), the eighty-fourth build outside ADR-2607032000's
+   ;; original insurance/real-estate batch. Shares the
+   ;; :repair-shop-governor keyword with repairshop/9521,
+   ;; commrepair/9512, applianceshop/9522 and furniture/9524 -- the
+   ;; EIGHTH confirmation of commrepair/9512's own governor-name-reuse
+   ;; precedent, and the SECOND time it applies within the ORIGINAL
+   ;; :repair-shop-governor family for a FOURTH sibling. Adds a
+   ;; genuinely new precious-metal-hallmark-integrity check (UK
+   ;; Hallmarking Act 1973 / US National Stamping Act / Germany's
+   ;; Feingehaltsgesetz, honestly absent for Japan) -- the first
+   ;; material-integrity check in the unconditional-evaluation
+   ;; discipline, distinct from both subject-fact and assessor-
+   ;; credential checks.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :diagnose :quote :repair :return :audit]}
   {:id "9601"
