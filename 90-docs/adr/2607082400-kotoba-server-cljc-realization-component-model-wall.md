@@ -1,11 +1,15 @@
 # ADR-2607082400: kotoba-server の cljc 実現を検討 — component model の壁と gossipsub の壁を実証し、drop-in 置換を却下する
 
-**Status**: accepted (design decision; one small, zero-risk implementation slice included)
+**Status**: closed (2026-07-08) — 設計判断は確定・名指しした3 follow-up は
+全て実装完了（下記追記）。残る「cljc mesh node の実 fleet 展開」は意図的に
+本 ADR の対象外のままで、着手する場合は別途スコープした follow-up ADR を
+起票する（本 ADR は再オープンしない）。
 **Date**: 2026-07-08
 **Deciders**: Jun Kawasaki（指示: 「rust が必要な実装は全て cljc で設計実装」を
 `kotoba-server` に対して実現せよ）
-**Scope**: `orgs/kotoba-lang/kototama`, `orgs/kotoba-lang/io-libp2p`
-（設計判断。実装は kototama の小改修1件のみ）
+**Scope**: `orgs/kotoba-lang/kototama`, `orgs/kotoba-lang/io-libp2p`,
+`orgs/kotoba-lang/kotoba`（設計判断 + kototama の小改修1件 + 3 follow-up
+の実装一式）
 
 ## Context
 
@@ -159,15 +163,16 @@ ADR に課された責務の履行そのものである。
   ではなく**事実に基づく判断**——JVM 側に component model 実装も
   gossipsub 実装も存在しない以上、無理に「cljc で全部やる」を掲げるのは
   ADR-2607072000 自身が戒めた「無計画な wholesale rewrite」と同じ轍。
-- 今後の follow-up（優先度順）: ①どの mesh app を最初に `.kotoba` へ
-  移植するか（governor-gated な単純用途の app が候補、例えば
-  identity/liveness だけの `drama-profile`/`drama-heartbeat` — 既に
-  kenchi/minidrama の split-of-duties パターンでこの手の component は
-  「検閲対象にならない薄い層」として切り出し済み）、②`kqe-assert!`/
-  `kqe-query` 相当 capability の kototama への追加設計、③murakumo →
-  cljc ノードの HTTP 契約（deploy/route-table 登録）の具体設計。
+- 今後の follow-up（優先度順、**全て実装完了 — 下記「追記」参照**）:
+  ①どの mesh app を最初に `.kotoba` へ移植するか（governor-gated な単純
+  用途の app が候補、例えば identity/liveness だけの
+  `drama-profile`/`drama-heartbeat` — 既に kenchi/minidrama の
+  split-of-duties パターンでこの手の component は「検閲対象にならない
+  薄い層」として切り出し済み）、②`kqe-assert!`/`kqe-query` 相当
+  capability の kototama への追加設計、③murakumo → cljc ノードの
+  HTTP 契約（deploy/route-table 登録）の具体設計。
 
-## 追記（2026-07-08）: 3つの follow-up を実装完了
+## 追記（2026-07-08）: 3つの follow-up を実装完了 — 本 ADR を closed とする
 
 オーナー指示「ok, do it」に基づき、上記①②③を全て実行に移した
 （`kotoba-lang/kotoba` merge `7f3f78f6`）:
@@ -205,6 +210,14 @@ Chicory 実行→assert→query の round trip、スタブでない実データ�
 ロールアウトは別スコープの follow-up（strangler-fig の「新規容量」を
 実際に fleet へ展開する段階— murakumo 側の deploy/reconcile 対応も含めて
 別途決める）。
+
+**本 ADR の closing 判定**: 名指しした3 follow-up（①app 選定・②capability
+設計・③HTTP 契約）は全て実装・テスト済みで、これが本 ADR のスコープ全体
+だった。残る「fleet への実配備」は本 ADR が最初から意図的に対象外とした
+別スコープの決断（本文 Decision §2、Consequences 参照）であり、本 ADR の
+未完了項目ではない。着手する場合は新規の follow-up ADR
+（段階的カットオーバー・性能実測・ロールバック手段を伴う、
+ADR-2607072000 が課した条件と同型）を起票する。本 ADR はここで close する。
 
 ## Related
 
