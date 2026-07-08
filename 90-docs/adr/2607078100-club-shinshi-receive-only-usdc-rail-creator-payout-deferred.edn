@@ -29,8 +29,14 @@
     the original relative-sibling-path approach broke CI (club-shinshi's CI and deploy
     both check out this repo alone, not the full west workspace). Re-verified green in a
     standalone clone matching CI's checkout shape, then on CI itself, before merging"
-   "SHINSHI_TREASURY_ADDR is unset by default -- no real wallet provisioned, no mainnet
-    transaction, no legal/compliance certification performed"]
+   "Phase 2 landed: jk-luxury/club-shinshi#7, merge commit
+    57f117c6efa81693851952a526db3341aedd4be1 (2026-07-08). SHINSHI_TREASURY_ADDR
+    configured (operator-provisioned, own/separate address); DISPATCHER_INTERNAL_SECRET
+    already live as a Worker secret; ETHERSCAN_API_KEY resolves via a new
+    shinshi-scoped Keychain entry (reused read-only block-explorer key, not a
+    custody credential). NOT done: actual wrangler/gftd deploy to production --
+    no CI auto-deploy on merge exists, so nothing is live/reachable yet and no
+    mainnet transaction has occurred; no legal/compliance certification performed"]
   :depends_on
   ["90-docs/adr/2607052100-shinshi-crypto-payout-rail-regulatory-design-review.md.edn"
    "orgs/kotoba-lang/treasury 90-docs/adr/2607051621-treasury-core-extraction.md.edn"
