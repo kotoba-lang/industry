@@ -179,7 +179,13 @@
   ;; GitHub-org boundary (PSP/compliance audit surface, access control)
   ;; distinct from gftdcojp's other business lines. Both remain private.
   "orgs/gftdcojp/club-shinshi" "orgs/jk-luxury/club-shinshi"
-  "orgs/gftdcojp/net-babiniku" "orgs/jk-luxury/net-babiniku"}
+  "orgs/gftdcojp/net-babiniku" "orgs/jk-luxury/net-babiniku"
+  ;; renamed 2026-07-08: RFC 1035 (DNS) is an IETF RFC, same org-ietf-*
+  ;; precedent as org-ietf-turn/org-ietf-ical/org-ietf-cbor/org-ietf-opus/
+  ;; org-ietf-ed25519. This repo (nameserver.wire/store/resolver/custom-tld
+  ;; + JVM server.clj, ADR-2607083100) implements the RFC 1035 wire protocol
+  ;; directly, so it gets the same treatment as those.
+  "orgs/kotoba-lang/nameserver" "orgs/kotoba-lang/org-ietf-dns"}
 
  ;; 全 project 共通の既定
  :defaults
@@ -2240,11 +2246,12 @@
    ;; Mock advisor only in v1 (real LLM wiring is follow-up, same precedent
    ;; as kotoba-lang/kessai's mock-adapter-only payment port).
    "orgs/etzhayyim/com-etzhayyim-yosoku"
-   ;; nameserver -- RFC 1035 authoritative DNS wire-protocol server (.cljc
-   ;; wire/store/resolver/custom-tld + JVM-only server.clj socket listener)
-   ;; plus an IPNS alt-root bridge for made-up TLDs (e.g. .hogehoge) via the
-   ;; dnslink convention. Closes the gap zone-clj (zonefile-as-EDN) and
-   ;; godaddy-dns-clj (registrar API client) leave open: neither actually
-   ;; answers DNS queries on the wire. 27 tests/54 assertions incl. real
-   ;; socket-level UDP tests; dig-verified manually (ADR-2607083100).
-   "orgs/kotoba-lang/nameserver"}}
+   ;; RFC 1035 authoritative DNS wire-protocol server (.cljc wire/store/
+   ;; resolver/custom-tld + JVM-only server.clj socket listener) plus an
+   ;; IPNS alt-root bridge for made-up TLDs (e.g. .hogehoge) via the dnslink
+   ;; convention. Closes the gap zone-clj (zonefile-as-EDN) and godaddy-dns-clj
+   ;; (registrar API client) leave open: neither actually answers DNS queries
+   ;; on the wire. 27 tests/54 assertions incl. real socket-level UDP tests;
+   ;; dig-verified manually (ADR-2607083100).
+   "orgs/kotoba-lang/org-ietf-dns" ; renamed from nameserver 2026-07-08 (reverse-domain: RFC 1035 is an IETF RFC, same org-ietf-* precedent as org-ietf-turn/org-ietf-ical)
+   }}
