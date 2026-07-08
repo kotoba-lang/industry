@@ -286,3 +286,15 @@ the 9-body vertical-slice render.
   `e5bc820b77288964f4aa3fc6f13965955b6a6437`)
 - `kotoba-lang/kotoba` (pin bump, commit
   `3ba5f607e08f626db679d987a5416100e49e0774`)
+
+## Addendum 5 (2026-07-08): proceeding to Track B Phase 1
+
+Phase 0 closed (Addendum 4). Starting Phase 1 per
+`curious-zooming-sifakis.md`: `.kotoba` `cos`/`sin` builtins, the
+`gpu-set-instance-transform`/`gpu-set-camera`/`gpu-draw-frame` capability
+set (closed, synchronous, same `(scalar-in) -> status-out`/`(ptr) ->
+status-out` conventions `gpu-clear` established), porting
+`kami-solar-helix-scene`'s `heliocentric-position-au`/
+`galactic-frame-position-au` arithmetic to `.kotoba`, and the 9-body
+(Sun + 8 planets) vertical-slice render — spheres, heliocentric/galactic
+frame toggle, verified against a real browser per Phase 0's precedent.
