@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L1 LLM 推論 — infra（Civitai × exo）  
-**As-of**: 2026-07-06  
+**As-of**: 2026-07-08  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -40,6 +40,7 @@
 - B2 weight storage / memory-weighted shard plan
 - 準備 (murakumo-tok-price): run ledger の原価/tok export (node別 tok/s × 電力)
 - 準備 (murakumo-tok-price): 社内3アプリ推論の fleet 移管で原価比較
+- 実行済み (2026-07-06): US/EU blog posts 公開完了 (2026-bonus-depreciation-idle-gpu-cloud.md, 2026-eu-ai-act-audit-ledger.md)
 
 > QA発見+修正 (2026-07-06): navの"Source"リンクがprivate repo(gftdcojp/cloud-murakumo)への404だった。gftdcojp/local-murakumo(オーナーがpublic化予定)へ変更。技術者コミュニティ投稿前の必須チェック項目として記録
 

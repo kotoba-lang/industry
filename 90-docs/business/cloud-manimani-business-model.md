@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L5 personal wellbecoming OS  
-**As-of**: 2026-07-04  
+**As-of**: 2026-07-08  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -16,6 +16,7 @@
 - 観測 (signal): manimani.cloud 実測 443 req/7d・1 uniques(日次和)
 - 観測 (signal): manimani.cloud 実測 559 req/7d・46 uniques(日次和)
 - 観測 (signal): manimani.cloud 実測 2091 req/7d・159 uniques(日次和)
+- 観測 (signal): manimani.cloud 実測 2060 req/7d・197 uniques(日次和)
 
 ## Customer Segments
 
@@ -67,6 +68,7 @@
 - retention (ledger が伸び続けているか)
 - 次の検証 (manimani-ledger-pay): OSS active user → cloud 転換率が Obsidian Sync 水準 (~数%)
 - funnel (cloud-manimani): OSS install=2 → cloud signup=2 → cloud paid=2 | 転換 OSS install→cloud signup 100% / cloud signup→cloud paid 100%
+- gate 距離 (manimani-ledger-pay): OSS→cloud 転換率 = 0 (gate 未到達)
 
 ## Unfair Advantage
 
