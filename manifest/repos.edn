@@ -99,6 +99,14 @@
   "orgs/kotoba-lang/vphysics"   "orgs/kotoba-lang/kami-engine-vphysics"
   "orgs/kotoba-lang/echem"      "orgs/kotoba-lang/kami-engine-echem"
   "orgs/kotoba-lang/cae-solver" "orgs/kotoba-lang/kami-engine-cae-solver"
+  ;; ISO-conformance renames (2026-07-08, ADR-2607084000): cnc's G/M-code
+  ;; vocabulary is ISO 6983-1(RS274D); brep's vertex/edge/face/shell/solid
+  ;; topology + new brep.step STEP-file I/O is ISO 10303-42/-21 -- same
+  ;; org-iso-* bar as org-iso-jpeg/org-iso-h264 (real format conformance,
+  ;; not just borrowed vocabulary, which is why the earlier CAE-solver
+  ;; batch above did NOT get reverse-domain names).
+  "orgs/kotoba-lang/cnc"  "orgs/kotoba-lang/org-iso-6983"
+  "orgs/kotoba-lang/brep" "orgs/kotoba-lang/org-iso-10303"
   "orgs/com-junkawasaki/manimani"       "orgs/gftdcojp/manimani" ; GitHub-transferred to gftdcojp 2026-07-01 (private; mobile/ iOS+Android app, fastlane App Store pipeline in progress)
   "orgs/gftdcojp/manimani"              "orgs/gftdcojp/local-manimani" ; renamed on GitHub 2026-07-05 (ADR-2607051600): mirrors the cloud-manimani/local-murakumo taxonomy — this is the on-device client vs. cloud-manimani's Cloudflare Worker API, so "local-" names the same local/cloud contrast as local-murakumo vs. cloud-murakumo
   "orgs/com-junkawasaki/cloud-manimani" "orgs/gftdcojp/cloud-manimani" ; GitHub-transferred to gftdcojp 2026-07-02 (private; Cloudflare Worker API for manimani triage Decision Ledger)
@@ -1347,7 +1355,7 @@
    ;; clj-wgsl migration Phase 4 (ADR-2607010930) — Wave 1 subagent porting
    ;; (kami-cam restored as "cnc", not "cam" — kotoba-lang/cam already exists
    ;; as an unrelated camera-rig repo from the same broader migration effort)
-   "orgs/kotoba-lang/cnc"
+   "orgs/kotoba-lang/org-iso-6983"
    "orgs/kotoba-lang/groot"
    ;; "orgs/kotoba-lang/si" removed 2026-07-07 (ADR-2607072500): this Wave-1
    ;; listing was the actual live registration keeping the mistaken si
@@ -1797,7 +1805,7 @@
    ;; restoration pending.
    ;; kami-cad restored as "brep" (not "cad") — kotoba-lang/cad already exists
    ;; as an unrelated industrial CAD/CAM workbench (artifact registry + runner).
-   "orgs/kotoba-lang/brep"
+   "orgs/kotoba-lang/org-iso-10303"
    ;; kami-cae restored as "fea" (not "cae-solver") — kotoba-lang/cae-solver
    ;; already exists as an unrelated ROM/LBM CFD solve-dispatch contract.
    "orgs/kotoba-lang/fea"
