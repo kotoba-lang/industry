@@ -6714,7 +6714,45 @@
    :business-id "cloud-itonami-isic-9499"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :blueprint
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as an other-membership-
+   ;; organization-governance actor (MemberOrgOps-LLM ⊣ Membership
+   ;; Governance Governor), the sixty-first build outside
+   ;; ADR-2607032000's original insurance/real-estate batch (after
+   ;; 6612, 6492, 6920, 6611, 7120, 8620, 8530, 9200, 7500, 9603,
+   ;; 9521, 9321, 8730, 9102, 9103, 9602, 9000, 8890, 8610, 9311,
+   ;; 8510, 9412, 6491, 8720, 8521, 6619, 3600, 6190, 3030, 3830,
+   ;; 7020, 9420, 9491, 2610, 3512, 8810, 8691, 8569, 6419, 7310,
+   ;; 7320, 7210, 7410, 8710, 8541, 8690, 9601, 6420, 7420, 9609,
+   ;; 8550, 7010, 8790, 8542, 6411, 7490, 9319, 9329, 9312, 9492),
+   ;; modeled closely on siblings 6511/6512/6621/6622/6629/6520/
+   ;; 6530/6820/6612/6492/6920/6611/7120/8620/8530/9200/7500/9603/
+   ;; 9521/9321/8730/9102/9103/9602/9000/8890/8610/9311/8510/9412/
+   ;; 6491/8720/8521/6619/3600/6190/3030/3830/7020/9420/9491/2610/
+   ;; 3512/8810/8691/8569/6419/7310/7320/7210/7410/8710/8541/8690/
+   ;; 9601/6420/7420/9609/8550/7010/8790/8542/6411/7490/9319/9329/
+   ;; 9312/9492 -- structurally closest to 9492 (partyops, "publish a
+   ;; position" shape), genuinely distinct domain (tax-exempt-status
+   ;; risk for civic/consumer/advocacy nonprofits, not campaign-
+   ;; finance disclaimers for political parties).
+   ;; Single-actuation shape -- the blueprint's own README text names
+   ;; only ONE real-world act (publishing a public position on the
+   ;; organization's behalf). Distinctive check: tax-exempt-status-
+   ;; risk-unresolved? is a GENUINELY NEW concept (grep-verified,
+   ;; including against partyops.facts itself), the 60th
+   ;; unconditional-eval grounding overall, grounded in US IRC
+   ;; §501(c)(3)/(c)(4), UK Charity Commission CC9, Japan's public-
+   ;; interest-corporation political-activity restrictions, Germany's
+   ;; AO §52 Gemeinnützigkeit. position-review-overdue? is an honest
+   ;; reuse of eldercare/8730's own care-plan-review-overdue? temporal
+   ;; shape (the 14th MAXIMUM-ceiling instance) -- not claimed as new.
+   ;; This build EXHAUSTS the fleet-wide governor-name-collision
+   ;; survey first recorded in sportsclub/9312's own ADR-0001: as of
+   ;; this promotion, ALL remaining :blueprint-tier candidates (7220,
+   ;; 8522, 8549, 9411, 9512, 9522, 9523, 9524, 9529) are confirmed
+   ;; blocked by an exact governor-name collision with an already-
+   ;; implemented sibling. See
+   ;; cloud-itonami-isic-9499/docs/adr/0001-architecture.md.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :enroll :represent :report :audit]}
   {:id "9512"
