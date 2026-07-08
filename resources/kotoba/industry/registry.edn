@@ -4739,12 +4739,18 @@
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "6110"
    :name "Wired telecommunications activities"
-   :repo "https://github.com/gftdcojp/cloud-itonami-J6110"
-   :business-id "cloud-itonami-J6110"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6110"
+   :business-id "cloud-itonami-isic-6110"
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as a wired-network-operator actor
+   ;; (Network Advisor ⊣ Network Provisioning Governor) wrapping
+   ;; kotoba-lang/apn (All-Photonics Network topology + RWA), mirroring
+   ;; cloud-itonami-isic-6190 op-for-op (ADR-2607084700). Repo/business-id
+   ;; corrected from the stale ISIC-Rev.4 J-prefix placeholder
+   ;; (gftdcojp/cloud-itonami-J6110) to the ISIC-Rev.5 cloud-itonami-isic-*
+   ;; naming this fleet's other implemented actors already use.
+   :required-technologies [:optimization :identity :forms :dmn :bpmn :audit-ledger]
+   :optional-technologies [:robotics]
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "6120"
    :name "Wireless telecommunications activities"

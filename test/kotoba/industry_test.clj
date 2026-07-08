@@ -178,7 +178,7 @@
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
       (is (pos? (:spec m)))
       (is (pos? (:blueprint m)))
-      (is (= 70 (:implemented m))))))
+      (is (= 71 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
