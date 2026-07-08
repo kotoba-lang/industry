@@ -1,8 +1,14 @@
 # ADR-2607022200: aiueos を「CLJC 意味論 + Wasm Component Model 境界 + kernel（native adapter）」の三層として固定し、kotoba-lang 言語設計への準拠を明文化する
 
-**Status**: accepted
+**Status**: superseded by ADR-2607085500
 **Date**: 2026-07-02
 **Deciders**: Jun Kawasaki
+
+> **2026-07-08 追記**: このADRが固定した aiueos/aiueos-cljc-contract の repo
+> 分割は ADR-2607085500 により取り消された（aiueos-cljc-contract は
+> kotoba-lang/aiueos へ merge され archived）。「decides never executes」の
+> 原則自体はコード境界として引き続き有効——撤回されたのは「この境界には
+> 別repoが必要」という部分のみ。本文は当時の決定記録としてそのまま残す。
 
 ## Context
 
