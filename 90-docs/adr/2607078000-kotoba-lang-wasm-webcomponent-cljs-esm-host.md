@@ -466,3 +466,138 @@ this is the shared-checkout risk this repo's CLAUDE.md documents
 (concurrent sessions branch-switching a shared west checkout can silently
 discard another session's uncommitted edits), sidestepped here rather
 than triggered by one.
+
+## Addendum 8 (2026-07-08): Track B Phase 1 follow-up CLOSED — animation + heliocentric/galactic view toggle, both real-GPU-verified
+
+Follow-up's first two deferred items (Addendum 6's Follow-up section) are
+now shipped and verified: `demo_solar_helix.kotoba` animates continuously
+and toggles between the flat heliocentric view and
+`kami-solar-helix-scene`'s real galactic-frame (tilt + Sun's own forward
+drift) transform.
+
+**Two new capabilities** (`kotoba-core-contracts` commit `2d6983a`,
+ids 231/232): `time/now-days() -> f32` (a host-owned, wrapped simulated
+day count — the host recomputes it from wall-clock time and just calls
+the guest's 0-arity `main` again every `requestAnimationFrame` tick, no
+guest-side clock/loop or new wasm export needed) and
+`render/galactic-frame() -> i32` (a host-owned view-toggle boolean, wired
+to a page checkbox; an i32 works directly as a wasm `if` condition).
+`kotoba-lang/kotoba` pin bumped to it (commit `610f80f`, 184 tests still
+green — neither capability needed a dedicated `.kotoba` fixture in that
+repo, matching the existing pattern for cos/sin/gpu-set-position).
+
+**A real, previously-latent compiler bug found and fixed en route**
+(`kotoba-lang/kotoba` commit `edb768f`): `compile-wasm-expr`'s `if`
+hardcoded the WASM `if` block's own result-type byte to `0x7f` (i32)
+regardless of what the branches actually compiled to. Every prior
+`if`-using fixture in that repo only ever branched on/to i32 values, so
+this went undetected since i64/f32 support was added — but the new guest
+code's `(if gal (f32* ...) (f32 0.0))` (branching to decide the
+tilt/forward transform) is an f32-typed `if`, and hit it immediately:
+Chicory's validator rejected the emitted bytecode with a stack
+type-mismatch (declares an i32 block, pushes an f32 value). Fixed by
+reading the block-type byte from the then-branch's actual
+`compiled-result-type` via `wasm-valtypes` instead of hardcoding it;
+confirmed the same latent bug affected i64-typed `if` too (same fix,
+same test coverage added: `demo_f32_if.kotoba`/`demo_i64_if.kotoba`,
+186 tests green). A second, related bug surfaced reproducing the first
+one: `kotoba.wasm-exec/stub-host-function`'s `valtype` map had no `:f32`
+entry (only `:i32`/`:i64`), so `kotoba wasm run` on any program calling
+an f32-result host-import without an explicit override
+NullPointerException'd deep inside Chicory's `FunctionType/of` — fixed
+alongside the `if` bug in the same commit.
+
+**Guest** (`demo_solar_helix.kotoba`): `main` reads `(now-days)` and
+`(galactic-frame?)` once per call via `let`, computes a shared
+`(theta t period)`/`sin`/`cos` per body, and branches per-body y/z on the
+galactic-frame flag — ports `galactic-frame-position-au`'s tilt
+(`cos-tilt`/`sin-tilt`, baked-in 0-arg fns for cos(60°)/sin(60°) since the
+tilt angle never varies) and forward-drift (`forward-per-day`, an
+illustrative — not literal-AU — constant calibrated so Earth's own
+pitch/circumference ratio matches `kami-solar-helix-scene`'s real ~7.4x;
+other bodies' ratios drift from their exact real values since
+sqrt-compressing radius but not forward can't preserve every body's ratio
+simultaneously with one shared linear rate, but the qualitative
+"farther/slower stretches out more" trend still holds).
+`forward-per-day` is negative, not positive — the fixed camera sits at
+z=+2.7 looking toward the origin, so positive z moves bodies *toward* the
+camera (clipping past the near plane); this was a real bug found via
+live-browser verification (see below) and fixed before landing.
+
+**Host** (`solar_render_host.cljs`): `now_days`/`galactic_frame`
+host-imports backed by a `performance.now()`-derived, JS-`%`-wrapped
+clock (`days-per-second`=8.0, `wrap-days`=80.0 — a 10-second loop) and a
+`galactic-frame?` atom; `setGalacticFrame`/`setFixedNowDays` exposed on
+`setup-solar-render-host`'s return value (the latter a test-only
+determinism hook, see below). The page (`index.html`) owns instantiating
+the guest and the `requestAnimationFrame` loop that calls
+`instance.exports.main()` again every tick — `.kotoba` has no clock or
+loop beyond recursion, so this is the only place animation can live.
+
+**Verification — three independent lines of evidence, after a real
+investigation, not a single screenshot**:
+1. **GPU-free numerical soundness**: `test/verify-solar-helix-guest.mjs`
+   (Node's native `WebAssembly`) sweeps the guest's own computed
+   positions across the *entire* `now-days` wrap range in both view
+   modes — finite, bounded, correctly signed. Independently re-verified
+   via `com.dylibso.chicory` from `kotoba-lang/kotoba`'s own JVM tooling
+   (a genuinely different WASM engine) with identical results.
+2. **Interactive real-browser screenshots** (GitHub Pages +
+   claude-in-chrome, same technique Phase 0/1 established): confirmed
+   correct rendering at page load and immediately after toggling
+   galactic frame. But *sustained* multi-second live animation
+   intermittently produced a solid-black canvas in both view modes, with
+   `main()` still returning success and the frame counter still
+   advancing. A real investigation (not a shrug) ruled out the guest math
+   (line 1 above), ruled out the host/pipeline code in isolation (a
+   fresh, DOM-attached canvas driven through the identical compiled host,
+   in the same tab, after the page's own canvas had already gone black,
+   rendered correctly for hundreds of frames), and reproduced from a
+   clean single-tab session with no prior WebGPU activity (ruling out
+   pure test-pollution as the *sole* explanation). Working conclusion:
+   browser/GPU-process-level flakiness specific to the sandboxed
+   browser-*automation-tool* used for interactive verification, not the
+   shipped code — consistent with this repo's own already-documented
+   history of similar sandboxed-environment tooling dead-ends.
+3. **Headless real-GPU CI** (`test/render/verify-render-solar-helix.mjs`,
+   built on a concurrent session's new `test/render/` Playwright
+   harness — real macOS Metal GPU, not Linux/SwiftShader, per that
+   harness's own findings): settles the question a still frame *can*
+   answer. Added `setFixedNowDays` + `?test_fixed_t=<days>
+   &test_galactic=<0|1>` query-param wiring so the render stays fully
+   deterministic (the original test's fixed-t=45 determinism came from a
+   hardcoded guest constant that no longer exists now that `main` is
+   animated) — one scenario recovers the pre-existing heliocentric
+   landmarks/colors exactly, a new second scenario (landmarks computed by
+   projecting the guest's own Chicory-verified t=45 galactic positions
+   through `solar_render_host.cljs`'s exported camera-math functions)
+   verifies the galactic-frame view for the first time via CI-style real
+   pixels. Both pass cleanly.
+
+None of this directly re-runs the sustained-multi-second-animation
+scenario line 2 found flaky (CI has no "watch it animate for 30 seconds
+and take periodic screenshots" primitive) — that specific gap is
+documented honestly in `README.md`'s "sustained-animation verification
+gap" section, not swept under the rug. But three independent angles now
+point at the code being correct and zero point at it specifically; if a
+real, un-sandboxed browser left animating for an extended period ever
+reproduces the blank-canvas symptom, the next place to look is WebGPU
+device/resource lifecycle over a long `requestAnimationFrame` run, not
+the position math.
+
+**Consequence**: 2 of 4 Addendum 6 Follow-up items are closed (animation;
+heliocentric/galactic toggle). Remaining: `cullMode` "back" (still
+"none", untested triangle winding order) and guest-controlled
+camera/color (still a fixed host-side palette/camera) — both explicitly
+still deferred, not attempted this pass.
+
+Landed across three repos, each via isolated worktree + `gh api .../merges`
+server-side merge: `kotoba-core-contracts` (capability registration,
+commit `2d6983a`), `kotoba-lang/kotoba` (pin bump `610f80f`; `if`
+blocktype + stub valtype fix `edb768f`), `wasm-webcomponent` (guest/host/
+test changes, merged as `39692cd` — this merge itself landed on top of a
+concurrent session's `test/render/` infrastructure that arrived mid-session,
+requiring a real (non-trivial) merge-conflict resolution in `README.md`
+and calibrating the concurrent session's solar-helix render test, which
+had been written against the old fixed-t=45 guest, to the new
+animated/toggle-based one).
