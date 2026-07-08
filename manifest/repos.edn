@@ -2223,4 +2223,12 @@
    ;; gftd-talent-actor's langgraph-clj StateGraph + Store(:db-api) shape.
    ;; Mock advisor only in v1 (real LLM wiring is follow-up, same precedent
    ;; as kotoba-lang/kessai's mock-adapter-only payment port).
-   "orgs/etzhayyim/com-etzhayyim-yosoku"}}
+   "orgs/etzhayyim/com-etzhayyim-yosoku"
+   ;; nameserver -- RFC 1035 authoritative DNS wire-protocol server (.cljc
+   ;; wire/store/resolver/custom-tld + JVM-only server.clj socket listener)
+   ;; plus an IPNS alt-root bridge for made-up TLDs (e.g. .hogehoge) via the
+   ;; dnslink convention. Closes the gap zone-clj (zonefile-as-EDN) and
+   ;; godaddy-dns-clj (registrar API client) leave open: neither actually
+   ;; answers DNS queries on the wire. 27 tests/54 assertions incl. real
+   ;; socket-level UDP tests; dig-verified manually (ADR-2607083100).
+   "orgs/kotoba-lang/nameserver"}}
