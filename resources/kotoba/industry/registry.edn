@@ -6761,7 +6761,41 @@
    :business-id "cloud-itonami-isic-9512"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :blueprint
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as a communication-
+   ;; equipment-repair actor (RepairOps-LLM ⊣ Repair Shop Governor),
+   ;; the sixty-second build outside ADR-2607032000's original
+   ;; insurance/real-estate batch (after 6612, 6492, 6920, 6611, 7120,
+   ;; 8620, 8530, 9200, 7500, 9603, 9521, 9321, 8730, 9102, 9103,
+   ;; 9602, 9000, 8890, 8610, 9311, 8510, 9412, 6491, 8720, 8521,
+   ;; 6619, 3600, 6190, 3030, 3830, 7020, 9420, 9491, 2610, 3512,
+   ;; 8810, 8691, 8569, 6419, 7310, 7320, 7210, 7410, 8710, 8541,
+   ;; 8690, 9601, 6420, 7420, 9609, 8550, 7010, 8790, 8542, 6411,
+   ;; 7490, 9319, 9329, 9312, 9492, 9499). This is a DELIBERATE
+   ;; departure from this fleet's prior vertical-selection discipline:
+   ;; ISIC 9512's own :itonami.blueprint/governor keyword
+   ;; (:repair-shop-governor) is IDENTICAL to repairshop/9521's own
+   ;; (consumer electronics) -- an honest reuse of the SAME business
+   ;; archetype for a different repair-item category (no governor-
+   ;; name-uniqueness constraint exists anywhere in this codebase,
+   ;; confirmed via direct grep before this decision was made), NOT a
+   ;; naming error. See cloud-itonami-isic-9512/docs/adr/0001-
+   ;; architecture.md Decision 1 for the full reasoning -- this
+   ;; reopens 9522/9523/9524/9529 (the remaining repair-shop
+   ;; candidates) as potentially buildable, provided each brings its
+   ;; own genuinely differentiated check.
+   ;; Dual-actuation shape (:actuation/complete-repair +
+   ;; :actuation/return-device), mirroring repairshop/9521's own
+   ;; architecture closely. Distinctive check: customer-data-consent-
+   ;; unconfirmed? is a GENUINELY NEW concept (grep-verified,
+   ;; including against repairshop.facts itself), the 61st
+   ;; unconditional-eval grounding overall, grounded in the US FTC's
+   ;; 2021 "Nixing the Fix" report, UK GDPR/Data Protection Act 2018,
+   ;; Germany's DSGVO Art. 6/7, Japan's 個人情報保護法.
+   ;; parts-cost-matches-claim?/safety-test-not-passed are honest,
+   ;; literal reuses of repairshop/9521's own checks for the SAME
+   ;; real-world concerns -- not claimed as new. See
+   ;; cloud-itonami-isic-9512/docs/adr/0001-architecture.md.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :diagnose :quote :repair :return :audit]}
   {:id "9521"
