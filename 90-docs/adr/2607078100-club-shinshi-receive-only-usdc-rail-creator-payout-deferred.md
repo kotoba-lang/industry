@@ -1,6 +1,6 @@
 # ADR-2607078100: club-shinshi V1 monetization — receive-only USDC rail (buyer → gftd), creator payout deferred
 
-**Status**: accepted
+**Status**: implemented (landed 2026-07-08 — see Amendment)
 **Date**: 2026-07-07
 **Deciders**: Jun Kawasaki
 
@@ -148,6 +148,37 @@ safely no-ops with secrets unset.
   that larger surface.
 - (−) Nothing here executes until the operator provisions a real treasury
   address and configures the env vars — this ADR ships code, not revenue.
+
+## Amendment (2026-07-08) — landing evidence + a build-portability fix
+
+Landed as `jk-luxury/club-shinshi#6`, merge commit `d7f83c2a2e9d8e73afbf53531ba43693c594b9c3`.
+
+CI (`repo-checks.yml` / `appview-cljs`) initially **failed** on the first push:
+`the required namespace "treasury.core" is not available`. The original
+Decision (#4 above) had `shadow-cljs.edn` reference `kotoba-lang/treasury/src`
+via a relative sibling-repo source-path — that only resolves inside a full
+west multi-repo checkout. club-shinshi's CI, and its production deploy
+pipeline, both check out this repo **alone**, so the sibling path was never
+on the classpath there; it only happened to work in the isolated west
+worktree used to verify the original implementation, which is not
+representative of how this repo actually builds elsewhere.
+
+Fix (same PR, second commit): **vendored** `treasury.core` at
+`60-apps/.../cljs/src/treasury/core.cljc` — byte-identical to
+`kotoba-lang/treasury` pinned at commit `e87e1299fe8562c98ef4b6044a1ad025dd493258`,
+with a header comment recording provenance and the reason it's a vendored
+copy rather than a live cross-repo reference. `bb.edn` was repointed at the
+same vendored copy. Re-verified in a clean standalone clone of just
+`club-shinshi` (matching CI's own checkout shape): `shadow-cljs release app
+worker` succeeds, `npm test` — 24/24, `bb tools/verify-payments.clj
+--dry-run` no-ops safely — then confirmed green on CI itself before merging.
+
+This narrows one claim in the original Decision: club-shinshi's reuse of
+`treasury.core` is no longer a *live* dependency on `kotoba-lang/treasury`
+(so it can drift — future upstream fixes to that library won't propagate
+here automatically). Follow-up, not done here: once this repo has real
+`deps.edn`/git-dependency resolution wired up, replace the vendored copy
+with a pinned git dependency.
 
 ## References
 
