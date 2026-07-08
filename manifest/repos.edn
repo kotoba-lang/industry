@@ -213,7 +213,11 @@
   "orgs/gftdcojp/mangaka-data"
   {:annex-remote "b2"
    :group        "datalad"
-   :note "ai-gftd-mangaka の data/ 分離 dataset (ADR-2607023000)。バイナリは B2 (fileprefix=mangaka-data/)、テキストは text2git。"}}
+   :note "ai-gftd-mangaka の data/ 分離 dataset (ADR-2607023000)。バイナリは B2 (fileprefix=mangaka-data/)、テキストは text2git。"}
+  "orgs/kotoba-lang/emr-claims-primary-sources"
+  {:annex-remote "b2"
+   :group        "datalad"
+   :note "EMR/claims (電子カルテ/レセプト) 実装の正確性を担保する各国一次資料アーカイブ (ADR-2607084000)。JP MHLW PDF (保険者番号/医療機関コード check-digit spec) 収録、US/EU は今後拡張予定。バイナリは B2 (fileprefix=emr-claims-primary-sources/、gftdcojp-m365-annex バケットを共有)、テキストは text2git。"}}
 
  ;; B2 (S3 互換) special remote 設定(非機密)。
  ;; 認証は scripts/b2-creds.bb が下記 :credentials の順で解決する(env→1Password→Keychain)。
@@ -1309,6 +1313,10 @@
    ;; insurance capability lib for cloud-itonami 6511/6512/6520/6530/6621/
    ;; 6622/6629 (ADR-2607032000 insurance/real-estate coverage push)
    "orgs/kotoba-lang/insurance"
+   ;; EMR/claims 実装の正確性を担保する一次資料アーカイブ(DataLad+B2)、
+   ;; ADR-2607084000。JP MHLW PDF (保険者番号/医療機関コード check-digit spec)
+   ;; を収録、今後 US/EU にも拡張予定。実体は :datalad map (下記) 参照。
+   "orgs/kotoba-lang/emr-claims-primary-sources"
    ;; securities/fund capability lib for cloud-itonami 6420/6430/6611/6612/
    ;; 6630 (ADR-2607032000 follow-up: division 64/66 financial-services batch)
    "orgs/kotoba-lang/securities"
