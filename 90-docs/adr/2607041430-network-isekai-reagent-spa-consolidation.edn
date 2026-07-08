@@ -1,11 +1,11 @@
 {:frontmatter
  {:id "adr-2607041430-network-isekai-reagent-spa-consolidation"
   :title "ADR-2607041430: network-isekai — consolidate to a single reagent/re-frame SPA shell; retire per-route static HTML + the missing _worker.js"
-  :status "proposed"
+  :status "superseded"
   :doc_type "adr"
   :topic "network-isekai-spa-reagent"
   :authoritative true
-  :last_verified "2026-07-04"
+  :last_verified "2026-07-08"
   :authoritative_for
   ["gftdcojp/network-isekai's public/_worker.js does not exist on main (verified via
     production HTTP behavior + git log --all) -- every /<org>/<game> pretty URL
@@ -22,7 +22,8 @@
   :related
   ["90-docs/adr/2607032400-network-isekai-primary-consolidation.md"]
   :supersedes []
-  :superseded_by []}
+  :superseded_by
+  ["adr-2607022800-kotoba-lang-default-uiux-appkit-uikit-interface-fundamentals"]}
 
  :problem
  {:source "user report: isekai.network individual org/repo pages (e.g. /gftd/drive)
@@ -123,4 +124,61 @@
             inside each independently"
    :rejected_because "doesn't fix the routing bug (still depends on a working Worker
                        to route to the right static document); keeps N separate
-                       bootstrap entry points instead of one shell"}]}
+                       bootstrap entry points instead of one shell"}]
+
+ :addendum-2026-07-08-maturity-audit-superseded
+ {:trigger "maturity audit re-checked this ADR's own Decision items against
+            gftdcojp/network-isekai's origin/main @ b7388f1, after a prior pass had
+            flagged it as still :proposed despite apparently substantial reagent
+            work landing (commit 4cedf3e / PR #110)"
+  :finding
+  ["public/index.html, play.html, dance.html, assets.html, generate.html,
+    studio.html are still six separate static HTML documents in production --
+    no single SPA shell, no :view/route dispatch anywhere (grep -rn ':view'
+    src/isekai/ finds only unrelated WebGPU texture-view keys); the reagent apps
+    that do exist (src/isekai/ui/{app,db,events,subs,views,modes}.cljs) implement
+    ADR-0003's separate multimode CAD/game/modeling/animation editor, not this
+    ADR's page router"
+   "the multi-document architecture was formalized further, not retired:
+    src/isekai/site/build.cljc (`bb render-site`) code-generates every
+    public/*.html shell from its own .cljc source, citing ADR-2607022800 -- a
+    different ADR (kotoba-lang UI/UX design system), not this one"
+   "public/_redirects still lists explicit per-org-prefix rewrite rules
+    (/gftd/* /play 200, /itonami/* /play 200, /studio/gftd/* /studio 200,
+    /studio/itonami/* /studio 200) with a comment instructing future maintainers
+    to add a line per new org -- exactly the manual-routing-config burden this
+    ADR's :extensibility consequence set out to eliminate via a universal
+    `/* /index.html 200` fallback, which does not exist"
+   "the routing bug was fixed by PR #106 (`fix(routing): restore /<org>/<game>
+    pretty-URL routing`, commit 1eeb2e6, branch feat/spa-reagent-consolidation)
+    via those scoped per-org _redirects rules, not the universal client-router
+    fallback this ADR called for; PR #106's own description states the
+    play.html/dance.html/studio.html bootstraps were 'plain inline JS (not
+    re-frame)' and isekai.web/isekai.stage were 'plain CLJS (direct DOM
+    manipulation), not re-frame' at that point -- i.e. the multi-document,
+    non-reagent architecture was deliberately kept"
+   "commit 4cedf3e (PR #110, 'convert every page's UI chrome to reagent
+    (ADR-2607022800)') converts each static page's widgets in place
+    (rdom/render mounting status-view/editor-view/buttons-view into fixed DOM
+    ids the still-separate static HTML documents declare -- see
+    isekai/web.cljc:38-39 and isekai/stage.cljc:487-488, both commented
+    'Mounted once at boot into <page>.html's static containers/ids') -- this
+    satisfies ADR-2607022800's reagent-adoption mandate while implementing
+    this ADR's own explicitly rejected Alternative 2 (multi-document
+    architecture + reagent views inside each), not its actual spa_shell
+    Decision"]
+  :disposition
+  "not retroactively implementing the spa_shell/router decision: the routing
+   bug is already fixed in production (PR #106), the team has since invested
+   further in the opposite direction (per-page codegen + widget-level reagent
+   mounts, each with its own bb.edn CI gate, under ADR-2607022800), and a
+   repo-wide single-SPA rewrite of a live production site (isekai.network)
+   would conflict with all of that subsequent work for uncertain benefit.
+   Marked :superseded (by ADR-2607022800 for the reagent-adoption goal, by
+   PR #106 for the routing-bug goal) rather than :accepted, since the
+   architecture this ADR actually prescribed was never built."
+  :known_remaining_gap
+  "public/_redirects still needs a manually-added line per new org namespace
+   (2 total to date: gftd, itonami) -- the one concrete shortfall versus this
+   ADR's stated :extensibility benefit. Left as an explicit, undone,
+   low-value-at-current-scale follow-up rather than bundled into this audit."}}
