@@ -6516,7 +6516,37 @@
    :business-id "cloud-itonami-isic-9329"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :blueprint
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as a recreation-venue-safety
+   ;; actor (RecOps-LLM ⊣ Recreation Safety Governor), the fifty-
+   ;; eighth build outside ADR-2607032000's original insurance/real-
+   ;; estate batch (after 6612, 6492, 6920, 6611, 7120, 8620, 8530,
+   ;; 9200, 7500, 9603, 9521, 9321, 8730, 9102, 9103, 9602, 9000, 8890,
+   ;; 8610, 9311, 8510, 9412, 6491, 8720, 8521, 6619, 3600, 6190, 3030,
+   ;; 3830, 7020, 9420, 9491, 2610, 3512, 8810, 8691, 8569, 6419, 7310,
+   ;; 7320, 7210, 7410, 8710, 8541, 8690, 9601, 6420, 7420, 9609, 8550,
+   ;; 7010, 8790, 8542, 6411, 7490, 9319), modeled closely on siblings
+   ;; 6511/6512/6621/6622/6629/6520/6530/6820/6612/6492/6920/6611/
+   ;; 7120/8620/8530/9200/7500/9603/9521/9321/8730/9102/9103/9602/
+   ;; 9000/8890/8610/9311/8510/9412/6491/8720/8521/6619/3600/6190/
+   ;; 3030/3830/7020/9420/9491/2610/3512/8810/8691/8569/6419/7310/
+   ;; 7320/7210/7410/8710/8541/8690/9601/6420/7420/9609/8550/7010/
+   ;; 8790/8542/6411/7490/9319 -- structurally closest to 9321
+   ;; (parksafety, "resume after safety hold" shape), genuinely
+   ;; distinct domain (arcades/escape-rooms/recreational-fishing-
+   ;; hunting, not fixed amusement rides).
+   ;; Single-actuation shape -- the blueprint's own README text names
+   ;; only ONE real-world act (resuming operation after a safety-
+   ;; flagged condition). Distinctive check: emergency-egress-
+   ;; obstructed? is a GENUINELY NEW concept (grep-verified), the 57th
+   ;; unconditional-eval grounding overall, grounded in NFPA 101 Life
+   ;; Safety Code (Means of Egress) and Germany's
+   ;; Versammlungsstättenverordnung. occupancy-exceeds-capacity? is an
+   ;; honest, LITERAL reuse of facility.registry's own specific
+   ;; MAXIMUM-ceiling check (ISIC 9311's origin), the 13th instance of
+   ;; that family, applied to a second venue type for the first time
+   ;; -- not claimed as new. See
+   ;; cloud-itonami-isic-9329/docs/adr/0001-architecture.md.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :book :operate :maintain :audit]}
   {:id "9411"
