@@ -1348,11 +1348,6 @@ manifest:
       revision: 38f3275a9baa6dddaf82cc973fd672760d427513
       path: orgs/kotoba-lang/actor-ipc
       groups: [kotoba-lang]
-    - name: aero
-      remote: kotoba-lang
-      revision: 7151ae056b8dcd8338c9717d932e347c1817ba66
-      path: orgs/kotoba-lang/aero
-      groups: [kotoba-lang]
     - name: aiueos
       remote: kotoba-lang
       revision: 6403a66203140864f2e859d5d3c9b64471c14351
@@ -1497,11 +1492,6 @@ manifest:
       remote: kotoba-lang
       revision: 9700676a81e874e69aef46bc7c53992fe1bdc787
       path: orgs/kotoba-lang/cad
-      groups: [kotoba-lang]
-    - name: cae-solver
-      remote: kotoba-lang
-      revision: 53e27f18ddcf10615a8a17adbb78018b1ab64a17
-      path: orgs/kotoba-lang/cae-solver
       groups: [kotoba-lang]
     - name: calendar
       remote: kotoba-lang
@@ -5573,11 +5563,6 @@ manifest:
       revision: 9c11cd4b96ce7fc72f8b83b1238f5bf2023901fb
       path: orgs/kotoba-lang/contacts
       groups: [kotoba-lang]
-    - name: crash
-      remote: kotoba-lang
-      revision: fa29f4e0282c5ab00741084dc9492b5fe76e5b1a
-      path: orgs/kotoba-lang/crash
-      groups: [kotoba-lang]
     - name: crdt
       remote: kotoba-lang
       revision: 839cb70ac13d4ab5e2d8aeb881b11e6bea3e180b
@@ -5702,11 +5687,6 @@ manifest:
       remote: kotoba-lang
       revision: 49bd63123b0a0a2948823fa340433a9f9e8f339e
       path: orgs/kotoba-lang/dxf
-      groups: [kotoba-lang]
-    - name: echem
-      remote: kotoba-lang
-      revision: 2a6b330a876515c8625bac70edd44a6dc8960c6e
-      path: orgs/kotoba-lang/echem
       groups: [kotoba-lang]
     - name: eda
       remote: kotoba-lang
@@ -6170,6 +6150,16 @@ manifest:
       revision: c606ae9393a9a7a76f2ae61d3bebb87c56820b0e
       path: orgs/kotoba-lang/kami-genre-base-systems
       groups: [kotoba-lang]
+    - name: kami-engine-aero
+      remote: kotoba-lang
+      revision: 79a66f90db0f23579898aad68076c4e73d5ceb98
+      path: orgs/kotoba-lang/kami-engine-aero
+      groups: [kotoba-lang]
+    - name: kami-engine-cae-solver
+      remote: kotoba-lang
+      revision: c4fbab7627a6874e71b44116beffae1e54c9c780
+      path: orgs/kotoba-lang/kami-engine-cae-solver
+      groups: [kotoba-lang]
     - name: kami-engine-cfd
       remote: kotoba-lang
       revision: 2958ba88f2b30a616c3191454a25af4e9c3960b9
@@ -6180,6 +6170,16 @@ manifest:
       revision: eadfd7a0cb97aecfdac38d5e7e8838e4bbfdae2f
       path: orgs/kotoba-lang/kami-engine-core
       groups: [kotoba-lang]
+    - name: kami-engine-crash
+      remote: kotoba-lang
+      revision: fa70dad7c5f83a261542658bd4680843cbb6cb22
+      path: orgs/kotoba-lang/kami-engine-crash
+      groups: [kotoba-lang]
+    - name: kami-engine-echem
+      remote: kotoba-lang
+      revision: 021c0a59144fef5ebfe5d1dc10dac3a78a87141c
+      path: orgs/kotoba-lang/kami-engine-echem
+      groups: [kotoba-lang]
     - name: kami-engine-engine
       remote: kotoba-lang
       revision: 1129de2cdd74c05fb1e789db290e0733542036a9
@@ -6189,6 +6189,11 @@ manifest:
       remote: kotoba-lang
       revision: ea22679aa8ec1bad476d5f65191fb79262286b05
       path: orgs/kotoba-lang/kami-engine-io
+      groups: [kotoba-lang]
+    - name: kami-engine-motor
+      remote: kotoba-lang
+      revision: 3ba9e7fc6b20965a7f665a9351af437048b148ff
+      path: orgs/kotoba-lang/kami-engine-motor
       groups: [kotoba-lang]
     - name: kami-engine-render
       remote: kotoba-lang
@@ -6212,8 +6217,13 @@ manifest:
       groups: [kotoba-lang]
     - name: kami-engine-vehicle-designer
       remote: kotoba-lang
-      revision: fe4e42ff4f4bc0913612b961053723e8b396530d
+      revision: c48e8d3e4e10ae034a579ba27c6463ef4f5bd9f4
       path: orgs/kotoba-lang/kami-engine-vehicle-designer
+      groups: [kotoba-lang]
+    - name: kami-engine-vphysics
+      remote: kotoba-lang
+      revision: cf5e5179ff12647db23d2f6e7c227c5e9b442a41
+      path: orgs/kotoba-lang/kami-engine-vphysics
       groups: [kotoba-lang]
     - name: kami-engine-web
       remote: kotoba-lang
@@ -6718,11 +6728,6 @@ manifest:
       remote: kotoba-lang
       revision: 7595e47d44caec9600f260261cc8cab4c1a30a7e
       path: orgs/kotoba-lang/model-checking
-      groups: [kotoba-lang]
-    - name: motor
-      remote: kotoba-lang
-      revision: d49a16e7563ef230531b3b0c7f3152f5f9d2ce8c
-      path: orgs/kotoba-lang/motor
       groups: [kotoba-lang]
     - name: mst
       remote: kotoba-lang
@@ -7629,11 +7634,6 @@ manifest:
       remote: kotoba-lang
       revision: ae7ec88c7e2988f8b8a00bc3af6403abe6918288
       path: orgs/kotoba-lang/voxel
-      groups: [kotoba-lang]
-    - name: vphysics
-      remote: kotoba-lang
-      revision: 32c2329ed6bd1074b2d0d3dab17f3440477cbbc3
-      path: orgs/kotoba-lang/vphysics
       groups: [kotoba-lang]
     - name: wallet
       remote: kotoba-lang
