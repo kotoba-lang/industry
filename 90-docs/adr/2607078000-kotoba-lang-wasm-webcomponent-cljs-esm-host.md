@@ -228,6 +228,48 @@ not a substitute for it — Phase 0 is open until the synchronous-call
 risk is verified against a real browser, not just declared in an EDN
 table.
 
+## Addendum 4 (2026-07-08): Track B Phase 0 — closed, browser-verified
+
+Addendum 3's "NOT yet landed" half is now landed and verified, closing
+Phase 0's actual acceptance criterion (a real browser confirming the
+canvas clears, not just the capability contract existing).
+
+- **Browser host**: `kotoba-lang/wasm-webcomponent`
+  `src-cljs/kotoba/gpu_clear_host.cljs` → `src/gpu-clear-host.js`
+  (`shadow-cljs :target :esm`, `:optimizations :advanced`) — one-time
+  async `requestAdapter`/`requestDevice`/canvas-context setup, then a
+  synchronous `gpu_clear` `HostFunction` (`createCommandEncoder` →
+  `beginRenderPass` load-clear → `end` → `queue.submit`), exactly the
+  `kami-engine-host` ClojureScript-authored pattern this ADR's Decision
+  specifies (not hand-JS). `:advanced` optimization required switching
+  every WebGPU property/method access to `unchecked-get`/`js-invoke`
+  (Closure's property renaming silently breaks bare `.method`/`.-prop`
+  interop against externs-less browser APis otherwise — caught via
+  `:infer-warning`s during compilation, not at runtime).
+- **Guest**: `demo_gpu_clear.kotoba` — `(gpu-clear -16776961)` (signed-i32
+  bit pattern of packed RGBA8 `0xFF0000FF`, opaque red). Compiled via
+  `kotoba-lang/kotoba`'s real `kotoba wasm emit` after bumping its
+  `kotoba-core-contracts` pin to the commit carrying `gpu-clear`
+  (`kotoba-lang/kotoba` commit `3ba5f607e08f626db679d987a5416100e49e0774`,
+  146 tests / 786 assertions green against the bumped pin).
+- **Real browser verification**: `claude-in-chrome` against
+  `https://kotoba-lang.github.io/wasm-webcomponent/examples/gpu-clear/`
+  (GitHub Pages enabled on this repo specifically to get a real,
+  non-sandboxed browser tab — the sandboxed session environment couldn't
+  reach a local `python3 -m http.server`, the same documented gap this
+  repo's README already records, and separately a claude.ai Artifact
+  preview's own iframe sandboxing blocked scroll/DOM inspection). Screenshot
+  confirms: canvas fully opaque red, `#out` reads `main() -> 0 (0 =
+  gpu_clear succeeded)`. Phase 0's core risk — a guest-driven WebGPU call
+  works as a genuinely synchronous host-import — is confirmed, not just
+  argued from the spec.
+
+**Consequence**: Track B Phase 1 (per `curious-zooming-sifakis.md`) is
+unblocked — `cos`/`sin` in `.kotoba`'s builtin-fns, the
+`gpu-set-instance-transform`/`gpu-set-camera`/`gpu-draw-frame` capability
+set, porting `kami-solar-helix-scene`'s position math to `.kotoba`, and
+the 9-body vertical-slice render.
+
 ## References
 
 - ADR-2607072700 (`kami-solar-helix-scene`, this work's immediate
@@ -238,4 +280,9 @@ table.
 - `kotoba-lang/kami-script-runtime-rs` (the Rust crate this replaces;
   addendum commit `4f08f5b42ae7bd4ac0ff91ab0e9c0f80e1b0c068`)
 - `kotoba-lang/wasm-webcomponent` (`src-cljs/kotoba/kami_engine_host.cljs`,
-  `shadow-cljs.edn`, `test/verify-kami-engine-host.mjs`)
+  `src-cljs/kotoba/gpu_clear_host.cljs`, `shadow-cljs.edn`,
+  `examples/gpu-clear/`, `test/verify-kami-engine-host.mjs`)
+- `kotoba-lang/kotoba-core-contracts` (`gpu-clear` capability, commit
+  `e5bc820b77288964f4aa3fc6f13965955b6a6437`)
+- `kotoba-lang/kotoba` (pin bump, commit
+  `3ba5f607e08f626db679d987a5416100e49e0774`)
