@@ -134,6 +134,41 @@
   pre-existing drift は未解消のまま——今後この generator を素朴に
   `bb render-site` すると退行する状態が残る。
 
+## Addendum (2026-07-09, production deploy)
+
+両 repo を本番 deploy する過程で、本 ADR のスコープ外の pre-existing 問題を
+1件検出・最小限で回避した:
+
+- **network-isekai の `:app` release build が 2026-07-02（`71104cc`）以来
+  壊れていた**: `isekai/play_ai.cljs`（AI co-design panel）の
+  `(js* "import(~{})" ...)` 動的 import を Closure が `:goog`
+  （classic-script）module format へ transpile できず
+  （`Dynamic import expressions cannot be transpiled`）、`shadow-cljs
+  release app` が fail していた。本 ADR の `?embed=1` 実装（d40a2c5）とは
+  無関係——`71104cc` 自身が「本当の修正には `:module-format` 変更が要る」と
+  follow-up 化していた既知の別問題。
+- 正攻法（shadow-cljs の `:esm` build target への切替）を検証したが、
+  実際には単なる compiler-options の変更ではなく **build target 自体の
+  切替**（real ES-module 出力・chunk 分割）で、`window.isekai.*`
+  グローバル経由で起動している 6 ページ全ての boot script パターンに
+  影響しうる、本 ADR のスコープを大きく超える migration と判明——
+  今回は着手しなかった。
+- 代わりに **`isekai.play-ai` を `:app` の `:modules :entries` から一時
+  除外**（`fix/app-build-esm-dynamic-import`、network-isekai main
+  `b1795f82`）。AI co-design panel のマウント呼び出しは既に
+  `window.isekai?.play_ai?.mount?.(...)` と optional-chain 済みなので、
+  安全に no-op へ縮退する（`#ai-mount` が空のまま残るだけ、build 全体や
+  他ページは無傷）。
+- この状態で `shadow-cljs release app` → `wrangler pages deploy` を実行し、
+  **isekai.network に本番 deploy 済み**（`?embed=1` 動作確認済み）。
+  同時に app-aozora も `wrangler deploy` 済み（`aozora.app` 上で
+  `/games` 動作確認済み）。
+- **Follow-up（本 ADR のスコープ外、要 dedicated セッション）**: AI
+  co-design panel を復旧するには shadow-cljs `:esm` target への正式な
+  migration が必要——6 ページ（index/play/dance/assets/generate/preview）
+  の boot script が `window.isekai.*` を読む前提を、real ESM
+  `import`/`export` ベースの起動へ書き換える設計が要る。
+
 ## References
 
 - ADR-2607070400（manga work actor profile — 本 ADR が games へ一般化
