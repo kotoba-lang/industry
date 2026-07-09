@@ -48,8 +48,15 @@
 (defn cf-token [] (or (System/getenv "CF_API_TOKEN") (keychain "gftd.cf")))
 (defn stripe-key []
   (or (System/getenv "STRIPE_SECRET_KEY")
-      ;; op は並行セッションと session token を取り合うと一時失敗する
-      ;; (2026-07-09 実測: tick 内で fail → 直後の手動実行は成功)。2回 retry。
+      ;; Keychain ミラー (service gftd.stripe) を op より先に見る。op は並行
+      ;; セッションと session を取り合うと "authorization timeout" で分単位に
+      ;; 落ちる (2026-07-09 実測) — b2/cf と同じ Keychain ミラー方式に揃えた。
+      ;; sk_ 検証必須: 2026-07-09 に op の field 解決が publishable key
+      ;; (pk_live_) を返しミラーが汚染された実事故 — secret key 以外は捨てる。
+      ;; ミラー更新: op が生きている時に sk_ を確認してから
+      ;;   security add-generic-password -U -s gftd.stripe -a stripe -w "$KEY"
+      (when-let [k (keychain "gftd.stripe")]
+        (when (str/starts-with? k "sk_") k))
       (let [item (or (System/getenv "STRIPE_OP_ITEM") "b2g2dkwnlfyl3sik6naptrmjyq")]
         (some (fn [attempt]
                 (let [{:keys [exit out]} (sh "op" "item" "get" item "--fields" "STRIPE_SECRET_KEY" "--reveal")]
