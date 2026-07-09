@@ -1,6 +1,6 @@
 # ADR-2607092345: extract the aozora messenger as `kotoba-lang/kotobase-messenger`
 
-**Status**: accepted — in progress (Phase A: backend)
+**Status**: accepted — implemented (Phase A + Phase B complete)
 **Date**: 2026-07-09
 **Deciders**: Jun Kawasaki
 **Scope**: `orgs/gftdcojp/app-aozora` messenger PDS/AppView/UI code → new `orgs/kotoba-lang/kotobase-messenger`
