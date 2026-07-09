@@ -55,6 +55,7 @@
 - 観測 (signal): manimani.cloud 実測 2128 req/7d・211 uniques(日次和)・うち4xx probe 78%(24h)
 - 観測 (signal): manimani.cloud 実測 2139 req/7d・213 uniques(日次和)・うち4xx probe 78%(24h)
 - 観測 (signal): manimani.cloud 実測 2143 req/7d・215 uniques(日次和)・うち4xx probe 78%(24h)
+- 観測 (signal): manimani.cloud 実測 2145 req/7d・215 uniques(日次和)・うち4xx probe 77%(24h)
 
 ## Customer Segments
 
@@ -121,6 +122,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 47 · /robots.txt 7 | 4xx(probe) 78% · 5xx 0%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 48 · /robots.txt 7 | 4xx(probe) 78% · 5xx 0%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 49 · /robots.txt 8 | 4xx(probe) 78% · 5xx 0%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 50 · /robots.txt 8 | 4xx(probe) 77% · 5xx 0%
 
 ## Revenue Streams
 
