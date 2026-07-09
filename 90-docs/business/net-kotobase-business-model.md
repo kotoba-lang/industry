@@ -50,6 +50,7 @@
 - 観測 (signal): kotobase.net 実測 5256 req/7d・342 uniques(日次和)・うち4xx probe 86%(24h)、workers 5293 inv/7d、Stripe active subs 0
 - 観測 (signal): kotobase.net 実測 5272 req/7d・346 uniques(日次和)・うち4xx probe 85%(24h)、workers 5319 inv/7d、Stripe active subs 0
 - 観測 (signal): kotobase.net 実測 5279 req/7d・348 uniques(日次和)・うち4xx probe 85%(24h)、workers 5326 inv/7d、Stripe active subs 0
+- 観測 (signal): kotobase.net 実測 5293 req/7d・349 uniques(日次和)・うち4xx probe 85%(24h)、workers 5339 inv/7d、Stripe active subs 0
 
 ## Customer Segments
 
@@ -111,6 +112,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /llms-full.txt 28 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 20 · /llms.txt 18 · /kotobase-cf-wasm-production/ipns/bafyre… 17 · /.well-known/did.json 16 | 4xx(probe) 86% · 5xx 1%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /llms-full.txt 30 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 21 · /llms.txt 19 · /kotobase-cf-wasm-production/ipns/bafyre… 17 · /.well-known/did.json 17 | 4xx(probe) 85% · 5xx 1%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /llms-full.txt 30 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 21 · /llms.txt 20 · /.well-known/did.json 18 · /kotobase-cf-wasm-production/ipns/bafyre… 17 | 4xx(probe) 85% · 5xx 1%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /llms-full.txt 31 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 22 · /llms.txt 21 · /.well-known/did.json 19 · /kotobase-cf-wasm-production/ipns/bafyre… 17 | 4xx(probe) 85% · 5xx 1%
 
 ## Revenue Streams
 
