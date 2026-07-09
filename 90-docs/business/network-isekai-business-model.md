@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L6 UGC game / creator platform（Roblox 型）  
-**As-of**: 2026-07-09  
+**As-of**: 2026-07-10  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -25,6 +25,7 @@
 - 観測 (signal): isekai.network 実測 7370 req/7d・272 uniques(日次和)・うち4xx probe 0%(24h)
 - 観測 (signal): isekai.network 実測 7373 req/7d・274 uniques(日次和)・うち4xx probe 0%(24h)
 - 観測 (signal): isekai.network 実測 7382 req/7d・274 uniques(日次和)・うち4xx probe 0%(24h)
+- 観測 (signal): isekai.network 実測 6545 req/7d・239 uniques(日次和)・うち4xx probe 0%(24h)
 
 ## Customer Segments
 
@@ -64,6 +65,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 45 · /inputs.php 20 · /wander.php 15 · /chosen.php 15 · /ccou.php 14 | 4xx(probe) 0% · 5xx 2%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 48 · /inputs.php 20 · /wander.php 15 · /chosen.php 15 · /ccou.php 14 | 4xx(probe) 0% · 5xx 2%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 49 · /inputs.php 20 · /wander.php 15 · /chosen.php 15 · /ccou.php 14 | 4xx(probe) 0% · 5xx 3%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 52 · /inputs.php 20 · /wander.php 15 · /chosen.php 15 · /robots.txt 15 | 4xx(probe) 0% · 5xx 3%
 
 ## Revenue Streams
 

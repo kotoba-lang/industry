@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L1 LLM 推論 — app（Proton 型）  
-**As-of**: 2026-07-09  
+**As-of**: 2026-07-10  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -41,6 +41,7 @@
 - 観測 (signal): gftd.ai 実測 237765 req/7d・5066 uniques(日次和)・うち4xx probe 12%(24h)、workers 8805 inv/7d
 - 観測 (signal): gftd.ai 実測 238810 req/7d・5094 uniques(日次和)・うち4xx probe 13%(24h)、workers 8819 inv/7d
 - 観測 (signal): gftd.ai 実測 239376 req/7d・5097 uniques(日次和)・うち4xx probe 13%(24h)、workers 8824 inv/7d
+- 観測 (signal): gftd.ai 実測 193693 req/7d・4673 uniques(日次和)・うち4xx probe 13%(24h)、workers 4880 inv/7d
 
 ## Customer Segments
 
@@ -84,6 +85,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 1193 · /favicon.ico 137 · /index.php 47 · /sbhu.php 23 · /ws.php 20 | 4xx(probe) 12% · 5xx 69%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 1180 · /favicon.ico 134 · /sbhu.php 23 · /ws.php 20 · /inputs.php 19 | 4xx(probe) 13% · 5xx 69%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 1165 · /favicon.ico 134 · /sbhu.php 23 · /ws.php 20 · /inputs.php 19 | 4xx(probe) 13% · 5xx 69%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 1146 · /favicon.ico 133 · /sbhu.php 23 · /ws.php 20 · /inputs.php 19 | 4xx(probe) 13% · 5xx 69%
 
 ## Revenue Streams
 
