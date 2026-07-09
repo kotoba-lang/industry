@@ -39,7 +39,15 @@
                      :health "https://itonami.cloud/health.json"}
    :etzhayyim       {:zone "54dece4ac787807d4c3410243916a1e6" :zone-name "etzhayyim.com"
                      :workers #{"etzhayyim-did-web" "etzhayyim-xrpc-proxy"}
-                     :health "https://etzhayyim.com/"}})
+                     :health "https://etzhayyim.com/"}
+   ;; 2026-07-09 追加: どちらも zone 実在 (API 確認済) だが products 未登録で
+   ;; collect が回らず、metrics が 07-02 の手動 snapshot のまま stale だった。
+   ;; network-isekai は gate-emitters の fork-stats (live 稼働確認済) もこれで
+   ;; 初めて毎 tick fetch される。
+   :network-isekai  {:zone "3bb094bac1fffdb9c61a60093eb267c5" :zone-name "isekai.network"
+                     :health "https://isekai.network/"}
+   :club-shinshi    {:zone "1527fa6d84bd5c216029c20b4f4810e1" :zone-name "shinshi.club"
+                     :health "https://shinshi.club/"}})
 
 (defn keychain [service]
   (let [{:keys [exit out]} (sh "security" "find-generic-password" "-s" service "-w")]
