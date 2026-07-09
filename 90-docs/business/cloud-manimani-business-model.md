@@ -60,6 +60,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 14 · /robots.txt 3 | 4xx(probe) 90%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 15 · /robots.txt 4 | 4xx(probe) 90%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 16 · /robots.txt 4 | 4xx(probe) 88%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 17 · /robots.txt 3 | 4xx(probe) 88%
 
 ## Revenue Streams
 
