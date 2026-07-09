@@ -1,0 +1,133 @@
+{:frontmatter
+ {:id "adr-2607100100-kotoba-lang-realtime-archviz-twinmotion-equivalent"
+  :title "ADR-2607100100: kotoba-lang 版リアルタイム・アーキビジュアライゼーション設計（Twinmotion 相当）"
+  :status "proposed"
+  :doc_type "adr"
+  :topic "kami-app-amenominaka-archviz-pipeline"
+  :authoritative true
+  :last_verified "2026-07-09"
+  :authoritative_for
+  ["Twinmotion 相当（CAD/BIM取り込み→実時間ウォークスルー）の全体設計は本ADRが正本。
+    実装先は kami-app-amenominaka 一本（新規repoは起こさない、2026-07-09 owner合意）"
+   "入力層(bim/kami-cad-import/cad/dxf/step/scad)と環境演出層
+    (kami-atmosphere-scene/kami-vegetation-scene/kami-terrain-scene/kami-postfx-scene)
+    はそのまま再利用、変更なし"
+   "シーン合成(bim+cad-import + 環境presetを1本のscene.ednへ)は
+    kami-app-amenominaka 内の新規namespace kotoba.amenominaka.scene が担う
+    — kami-scene-contracts は provenance検証専用であり合成層ではないことを確認済み"
+   "レンダリング実行はkami-webgpu/webgpuの既存CLJS(shadow-cljs :target :esm)を
+    拡張する。kotoba-core-contracts の閉じたcapability tableにGPU/描画系
+    capabilityを新設しない(D6-a、明示的非採用)"
+   "ADR-2605261800(etzhayyim/root)のCouncil Lv6+ native-Rust-fallback gateは
+    本設計では一切トリガしない — kami-usd-native/kami-rtx-native/
+    kami-physics-solversのpath reservationは無変更のまま"]
+  :related
+  ["2605261800-nvidia-omniverse-stack-api-compat (etzhayyim/root, parent charter)"
+   "2607010930-clj-wgsl-migration"
+   "2607010000-kotoba-runtime-sdk-cljc-migration"
+   "2607078000-kotoba-lang-wasm-webcomponent-cljs-esm-host"
+   "2607062330-kototama-actor-host-abi"
+   "2607062400-wasm-webcomponent-actor-host"
+   "2607100030-kotoba-kami-engine-host-imports"]
+  :supersedes []
+  :superseded_by []}
+
+ :problem
+ "Twinmotion（CAD/BIM取り込み→実時間植生/天候/ポストFX演出→ウォークスルー）に
+  相当するものがkotoba-lang にあるか調査した結果、入力・環境演出の部品
+  (bim/kami-cad-import/kami-*-scene群/usd/materialx)は揃っているが、
+  (1) それらを1本のシーンに束ねる合成層が存在せず、
+  (2) 実際にGPUで絵を出す実行層がscaffold止まりで存在しない。
+  kami-app-amenominaka は'Omniverse Kit相当のapp shell'を自称するが
+  実装は5個のpub const移植のみ(R1.0 path reservation)。"
+
+ :decision
+ {:d1-scope-vs-parent-adr
+  "ADR-2605261800のD10 fallback gate(WebGPU+WASM viability未達→Council Lv6+
+   attestation→native Rust fallback発動)の外側、non-fallbackティアの内側に
+   本設計は完全に収まる。フルフィデリティUSD合成やpath tracingを要求しない
+   ため、kami-usd-native/kami-rtx-native/kami-physics-solversのpath
+   reservationには一切触れない。"
+
+  :d2-authoring-tier
+  "新しいauthoring tierを発明しない。ADR-2607078000が実証した通りclojurewasm
+   はhost-providing-imports役には使えない(native-only + FFI方向が逆)ため、
+   host-providing-importsが要る browser側ホストはClojureScript
+   (shadow-cljs :target :esm)が正式tier。kami-webgpu/webgpuは既にこのtier
+   で実装済み(scaffoldでなく動くコード)なので、それを拡張する。"
+
+  :d3-input-layer
+  "bim / kami-cad-import / cad / dxf / step / scad をそのまま再利用。
+   新規repo・新規実装なし。"
+
+  :d4-scene-composition
+  "実際に欠けている層。新規namespace kotoba.amenominaka.scene を
+   kami-app-amenominaka 内に実装(新規repoは起こさない、owner合意)。
+   bim/kami-cad-import の建物モデル + kami-atmosphere-scene/
+   kami-vegetation-scene/kami-terrain-scene/kami-postfx-scene の
+   環境presetを1本のwalkthrough-ready scene.ednへ合成する純粋CLJC
+   (ADR-2607010000の4層構成の第1-2層のみで完結、GPU/native不関与)。"
+
+  :d5-rendering-two-tracks
+  {:track1-usd-export
+   "scene.edn → usd + materialx + ocio で .usdz/.gltf書き出し。既存USD
+    ビューア/Blenderで確認。新規レンダリングエンジン不要、最速で'見える'
+    マイルストーン(M1)。omni.usdパリティをここで満たす。"
+   :track2-webgpu-walkthrough
+   "kami-webgpu/webgpuに3D scene render-IR(camera/instances/materials/
+    lights)を追加(D5のスケッチ参照、実装時に精緻化前提)。ClojureScript+
+    shadow-cljs :target :esm(ADR-2607078000方針)。GPU hot loopはADR-
+    2607010930の原則通りWGSL側が本則だが、MVPはCPU側instance展開で足りる
+    ためwgslの@compute未着手(D6-b)はブロッカーにしない。
+    omni.kit.viewport/omni.timelineパリティをここで満たす(M2)。"}
+
+  :d6-explicit-non-adoption
+  {:a-no-new-gpu-capability
+   "kotoba-core-contractsの閉じたhost-import table(現状31件、id 201-225 +
+    233 kami/engine ECS)にGPU/描画系capabilityを新設しない。
+    kami-app-amenominakaはbrowser上のCLJS SPAでありサンドボックス化された
+    .kotoba guestではないため、kototamaのguest→host capability経路が
+    不要。ADR-2607100030が示した'必要な時は決まった経路で足せる'先例は
+    認識しつつ、本設計ではその経路を使わないと明示。"
+   :b-wgsl-compute-deferred
+   "wgsl repoの@compute/@workgroup_size対応(ADR-2607010930 Phase 2、
+    未着手)は本ADRのスコープ外。M2のCPU instancingが性能上限に
+    ぶつかった場合のみM4(stretch)として着手。"}
+
+  :d7-amenominaka-r14-closure
+  {:extension-loader "EDN native extension.edn を第一級、kotoba-lang/toml
+                       (既存repo)でリテラル.toml互換パーサを薄く被せる"
+   :lifecycle "depends_onの位相ソートによる起動順決定"
+   :magatama-pregel-mapping "未解決 — Open Questions参照、M3着手前に別途
+                              スコーピングが必要"
+   :omni-usd "D5 Track1(USD/glTF書き出し)"
+   :omni-kit-viewport "D5 Track2(ウォークスルーカメラ)"
+   :omni-kit-app "拡張ローダそのもの"
+   :omni-timeline "最小限のキーフレーム/カメラパス(M3 stretch)"
+   :omni-replicator-core "対象外(合成データ/ドメインランダマイゼーションは
+                           将来別ADR)"}}
+
+ :milestones
+ [{:id "M0" :name "scene合成コントラクト" :detail "kotoba.amenominaka.scene、pure CLJC、レンダリング皆無"}
+  {:id "M1" :name "USD/glTF書き出し" :detail "scene.edn → .usdz/.gltf、既存USDビューアで確認、新規レンダリングエンジン不要"}
+  {:id "M2" :name "3D render-IR + kami-webgpuブラウザMVP" :detail "静的シーンのブラウザ内ウォークスルー、CPU-authored instancing、native Rust不使用"}
+  {:id "M3" :name "kami-app-amenominaka拡張シェル" :detail "extensionローダ+lifecycle実装、M0-M2を最初の実拡張として包む"}
+  {:id "M4" :name "GPU側instancing(stretch/条件付き)" :detail "wgsl @compute対応後。M2が性能上限にぶつかった場合のみ着手"}]
+
+ :non-goals
+ ["photorealistic path tracing (Mitsuba3 / kami-rtx-native)"
+  "from-scratch USD合成エンジン (kami-usd-native)"
+  "omni.replicator.core相当(合成データ/ドメインランダマイゼーション)"
+  "物理・車両シミュレーション統合(kami-vehicle, Genesis)"
+  "kotoba-core-contractsへのGPU/描画capability新設"]
+
+ :open-questions
+ ["magatama Pregel cellの具体的配線(D7) — M3着手前に別途スコーピング必要、本ADRでは未解決のまま"
+  "M2の3D render-IRの詳細スキーマ — 実装着手時に短いfollow-up ADR/設計ノートで確定"
+  "実ブラウザWebGPU動作確認 — ADR-2607078000が記録済みのsandboxed browser-automation環境の既知ギャップにM2でも再度ぶつかる可能性、Node/V8等価確認で代替し最終確認は開発者環境に委ねる"]
+
+ :next-steps
+ "本ADRはstatus=proposed(設計のみ)。実装はこのADR確定後、別セッション/別作業として
+  M0から順に着手する。kami-app-amenominakaは既にrepos.edn/west.ymlに登録済み
+  (ADR-2607010930 Phase 4)のため、実装開始にあたって新規manifest登録は不要
+  — 通常のchild-repo commit/push運用(CLAUDE.mdのstanding authorization)に従う。"}
