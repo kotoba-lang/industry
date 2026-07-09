@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L4 social network（atproto SNS）  
-**As-of**: 2026-07-08  
+**As-of**: 2026-07-09  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -17,6 +17,7 @@
 - 観測 (signal): aozora.app 実測 21828 req/7d・615 uniques(日次和)、workers 8575 inv/7d
 - 観測 (signal): aozora.app 実測 21883 req/7d・606 uniques(日次和)、workers 11313 inv/7d
 - 観測 (signal): aozora.app 実測 22015 req/7d・546 uniques(日次和)、workers 12248 inv/7d
+- 観測 (signal): aozora.app 実測 24036 req/7d・714 uniques(日次和)、workers 8169 inv/7d
 
 ## Customer Segments
 

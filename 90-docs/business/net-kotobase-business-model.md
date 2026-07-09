@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L2 storage hosting（graph BaaS + map / git / search）  
-**As-of**: 2026-07-08  
+**As-of**: 2026-07-09  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -17,6 +17,7 @@
 - 観測 (signal): kotobase.net 実測 3631 req/7d・314 uniques(日次和)、workers 7550 inv/7d、Stripe active subs 0
 - 観測 (signal): kotobase.net 実測 3653 req/7d・336 uniques(日次和)、workers 7475 inv/7d、Stripe active subs 0
 - 観測 (signal): kotobase.net 実測 863 req/7d・291 uniques(日次和)、workers 4093 inv/7d
+- 観測 (signal): kotobase.net 実測 1505 req/7d・336 uniques(日次和)、workers 1627 inv/7d、Stripe active subs 0
 
 ## Customer Segments
 

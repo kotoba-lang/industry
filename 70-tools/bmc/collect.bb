@@ -103,7 +103,14 @@
 (defn- sub-price-ids [sub]
   (set (keep #(get-in % [:price :id]) (get-in sub [:items :data]))))
 
-(defn stripe-summary [sk]
+(defn stripe-summary
+  "「:active-subscriptions は PAID のみ」(2026-07-09 修正)。status=active でも
+  latest_invoice が未払い (open/amount_paid 0) の subscription は収益ではない —
+  実測で 4 件の社内テスト sub (hello@gftd.co.jp / jun@gftd.group、2026-07-02
+  作成、全 invoice 未払い) が gate kotobase-graph-arpu を誤 validate しかけた。
+  paid 判定は latest_invoice の paid フラグを個別 GET で確認する
+  (subscription 一覧の latest_invoice は id 文字列のみ)。"
+  [sk]
   (let [get* (fn [ep] (-> (curl/get (str "https://api.stripe.com/v1/" ep)
                                     {:basic-auth [sk ""] :throw false})
                           :body (json/parse-string true)))
@@ -113,8 +120,14 @@
       (let [all-active (:data subs)
             kotobase-active (filter #(seq (clojure.set/intersection
                                             (sub-price-ids %) kotobase-price-ids))
-                                    all-active)]
-        {:active-subscriptions (count kotobase-active)   ; ← kotobase price のみ (gate)
+                                    all-active)
+            invoice-paid? (fn [sub]
+                            (let [inv-id (:latest_invoice sub)]
+                              (and inv-id
+                                   (true? (:paid (get* (str "invoices/" inv-id)))))))
+            kotobase-paid (filter invoice-paid? kotobase-active)]
+        {:active-subscriptions (count kotobase-paid)     ; ← kotobase price かつ PAID のみ (gate)
+         :active-subscriptions-unpaid (- (count kotobase-active) (count kotobase-paid)) ; 参考: 未払い (テスト/滞納)
          :active-subscriptions-account-wide (count all-active) ; 参考: 全体 (レガシー含む)
          :charges-total (count (:data charges))
          :last-charge-epoch (some-> (first (:data charges)) :created)}))))

@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L1 LLM 推論 — infra（Civitai × exo）  
-**As-of**: 2026-07-08  
+**As-of**: 2026-07-09  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -21,6 +21,7 @@
 - 観測 (2026-07-06): wrangler secret list が空 — STRIPE_SECRET_KEY 未設定のため #store/* checkout は現状 503 fail-closed(実収益ゼロの直接原因、docs/stripe-go-live-checklist.md)
 - 観測 (signal): murakumo.cloud 実測 22414 req/7d・341 uniques(日次和)、workers 108395 inv/7d
 - 観測 (2026-07-06 QA): 公開ブログ2本のpublic/blog/*.htmlが作業ツリー上で生markdownに上書きされ本番で配信される事故が2回発生(原因不明、build scriptでの同期処理は存在せず)。加えてUS記事のCTAがcurl murakumo.cloud/join|sh(404、未実装のPhase2/3導線)を誤って案内していた。両方とも検知・修正・再デプロイ済み
+- 観測 (signal): murakumo.cloud 実測 51867 req/7d・384 uniques(日次和)、workers 73144 inv/7d
 
 ## Customer Segments
 

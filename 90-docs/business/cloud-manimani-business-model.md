@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L5 personal wellbecoming OS  
-**As-of**: 2026-07-08  
+**As-of**: 2026-07-09  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -17,6 +17,7 @@
 - 観測 (signal): manimani.cloud 実測 559 req/7d・46 uniques(日次和)
 - 観測 (signal): manimani.cloud 実測 2091 req/7d・159 uniques(日次和)
 - 観測 (signal): manimani.cloud 実測 2060 req/7d・197 uniques(日次和)
+- 観測 (signal): manimani.cloud 実測 2192 req/7d・238 uniques(日次和)
 
 ## Customer Segments
 
