@@ -6669,11 +6669,38 @@
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "8220"
    :name "Activities of call centres"
-   :repo "https://github.com/gftdcojp/cloud-itonami-N8220"
-   :business-id "cloud-itonami-N8220"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-8220"
+   :business-id "cloud-itonami-8220"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Promoted :spec -> :blueprint (see `kotoba.industry/maturity-of`).
+   ;; The legacy placeholder :repo (gftdcojp/cloud-itonami-N8220) never
+   ;; actually existed (confirmed 404 before this edit) -- replaced with
+   ;; the real repo, following the SAME cloud-itonami/cloud-itonami-isic-####
+   ;; naming convention as every other actor in this fleet rather than the
+   ;; legacy N-prefixed scheme. Fresh BPO/customer-service domain,
+   ;; deliberately diversifying away from the printing family (1811/1812)
+   ;; just closed. Scoped to the customer-contact SERVICE business
+   ;; (staffing, scripting, quality assurance, data handling for client
+   ;; businesses' inbound/outbound calls and chats), distinct from the
+   ;; fleet's telecom-infrastructure verticals (mobile network operation,
+   ;; VoIP reselling) which provide the underlying communications
+   ;; carriage. Richly regulated: PCI-DSS where payment-card data is
+   ;; handled over the phone; ISO 18295 international customer-contact-
+   ;; centre quality standard; COPC certification; telemarketing-
+   ;; specific regulation (US TCPA, FTC Telemarketing Sales Rule,
+   ;; national Do-Not-Call registries); GDPR/CCPA data-protection
+   ;; obligations given the volume of customer PII processed. grep -rli
+   ;; "call.centre|call.center|customer.service.outsourc|bpo" across the
+   ;; fleet returned completely empty. Governor keyword
+   ;; :call-centre-governor is grep-verified UNIQUE fleet-wide. Robotics
+   ;; premise interpreted as automated voice/chat first-line-triage
+   ;; "bots" (the industry's own colloquial usage) ahead of human-agent
+   ;; handoff, gated by the same governor pattern as every physical-robot
+   ;; vertical. Reuses the SAME labor-dispatch operating-states shape as
+   ;; securityops/8010, securitysystemsops/8020, landscapeops/8130 and
+   ;; buildingcleaningops/8121 -- fifth instance of this shape. See
+   ;; ADR-2607104400.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "8230"
