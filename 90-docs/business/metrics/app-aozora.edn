@@ -1,13 +1,27 @@
-{:as-of "2026-07-09",
- :sources [:cloudflare :health],
- :zone
- {:requests-7d 24143,
-  :pageviews-7d 9502,
-  :uniques-7d-sum 724,
-  :zone "aozora.app"},
+{:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 3351, "app-aozora-appview" 4844},
- :health-status 200,
+ {"app-aozora-pds" 3356, "app-aozora-appview" 4844},
+ :zone
+ {:requests-7d 24155,
+  :pageviews-7d 9507,
+  :uniques-7d-sum 727,
+  :zone "aozora.app"},
+ :sources [:cloudflare :health],
+ :paths
+ {:ok
+  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 288}
+   {:path "/aws/buckets", :requests 52}
+   {:path "/.github/ISSUE_TEMPLATE", :requests 52}
+   {:path "/API.md", :requests 50}
+   {:path "/home/*/.gitconfig", :requests 48}
+   {:path "/developer/.env", :requests 48}
+   {:path "/rest/workflows", :requests 35}
+   {:path "/app/.git/config", :requests 33}],
+  :status-mix {:client-error 1250, :ok 1670},
+  :window "24h"},
+ :as-of "2026-07-09",
+ :top-paths
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · /aws/buckets 52 · /.github/ISSUE_TEMPLATE 52 · /API.md 50 · /home/*/.gitconfig 48 | 4xx(probe) 43%",
  :signal
- "aozora.app 実測 24143 req/7d・724 uniques(日次和)、workers 8195 inv/7d"}
+ "aozora.app 実測 24155 req/7d・727 uniques(日次和)、workers 8200 inv/7d"}

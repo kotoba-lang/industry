@@ -20,6 +20,8 @@
 - 観測 (signal): kotobase.net 実測 1505 req/7d・336 uniques(日次和)、workers 1627 inv/7d、Stripe active subs 0
 - 観測 (signal): kotobase.net 実測 1642 req/7d・348 uniques(日次和)、workers 1769 inv/7d、Stripe active subs 0
 - 観測 (signal): kotobase.net 実測 2235 req/7d・349 uniques(日次和)、workers 2277 inv/7d、Stripe active subs 0
+- 観測 (signal): kotobase.net 実測 2235 req/7d・349 uniques(日次和)、workers 2280 inv/7d、Stripe active subs 0
+- 観測 (signal): kotobase.net 実測 2242 req/7d・351 uniques(日次和)、workers 2283 inv/7d、Stripe active subs 0
 
 ## Customer Segments
 
@@ -50,6 +52,8 @@
 - OSS kotoba 開発者
 - 全社内プロダクトが tenant
 - GTM (awareness→acquisition): landing 訪問→signup 転換 0% < 目標 3% — landing の価値提案/CTA と価格ページの A/B、SEO・技術コンテンツ、既存導線からの招待
+- 観測 (paths): 上位 path (24h): / 65 · /config.js 48 · /.env.backup 34 · /.ssh/authorized_keys 33 · /.next/build-manifest.json 33
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 59 · /robots.txt 20 · /llms-full.txt 19 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 19 · /health 18 | 4xx(probe) 69% · 5xx 1%
 
 ## Revenue Streams
 

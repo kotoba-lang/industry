@@ -89,6 +89,60 @@
                               (get-in g [:sum :requests] 0)))
             {} (get-in r [:data :viewer :accounts 0 :workersInvocationsAdaptive]))))
 
+(defn zone-top-paths
+  "実際に user がどのpageにアクセスしているか (直近24h)。edgeResponseStatus で
+   「実際に配信された page (2xx/3xx)」とスキャナ probe (4xx) を分離する —
+   kotobase.net の初回実測で上位 path の大半が /.env.backup 等の bot probe
+   だったため、status 混在のままだと channels 観測が導線として読めない。
+   httpRequestsAdaptiveGroups は free plan だと概ね1日分しか引けないので
+   window は 24h 固定。→ {:ok [{:path :requests}…8] :status-mix {:ok n :client-error n :server-error n}}
+   取れなければ nil (捏造ゼロ: 出力に入れない)。"
+  [token zone-tag]
+  (try
+    (let [now (java.time.Instant/now)
+          q (str "{ viewer { zones(filter: {zoneTag: \"" zone-tag "\"})"
+                 " { httpRequestsAdaptiveGroups(limit: 500, filter: {datetime_geq: \""
+                 (.minusSeconds now 86400) "\", datetime_leq: \"" now "\"})"
+                 " { count dimensions { clientRequestPath edgeResponseStatus } } } } }")
+          r (cf-graphql token q)
+          groups (get-in r [:data :viewer :zones 0 :httpRequestsAdaptiveGroups])]
+      (when (seq groups)
+        (let [status-of (fn [g] (let [s (get-in g [:dimensions :edgeResponseStatus] 0)]
+                                  (cond (< s 400) :ok
+                                        (< s 500) :client-error
+                                        :else :server-error)))
+              mix (reduce (fn [m g] (update m (status-of g) (fnil + 0) (:count g 0)))
+                          {} groups)
+              ok-paths (->> groups
+                            (filter #(= :ok (status-of %)))
+                            (reduce (fn [m g] (update m (get-in g [:dimensions :clientRequestPath])
+                                                      (fnil + 0) (:count g 0)))
+                                    {})
+                            (sort-by val >)
+                            (take 8)
+                            (mapv (fn [[path n]] {:path path :requests n})))]
+          {:ok ok-paths :status-mix mix})))
+    (catch Exception _ nil)))
+
+(defn top-paths-summary
+  "2xx/3xx (実配信 page) の上位のみを導線観測として要約し、probe (4xx) 率を
+   併記する。governor の 300 chars 上限に収まるよう上位5件・path は40字で切る。"
+  [{:keys [ok status-mix]}]
+  (when (seq ok)
+    (let [total (reduce + (vals status-mix))
+          probe (get status-mix :client-error 0)
+          err (get status-mix :server-error 0)]
+      (str "上位 page (24h, 2xx/3xx): "
+           (str/join " · "
+                     (map (fn [{:keys [path requests]}]
+                            (str (if (> (count path) 40) (str (subs path 0 40) "…") path)
+                                 " " requests))
+                          (take 5 ok)))
+           (when (pos? total)
+             (str " | 4xx(probe) " (Math/round (* 100.0 (/ probe total))) "%"
+                  (when (pos? err)
+                    (str " · 5xx " (Math/round (* 100.0 (/ err total))) "%"))))))))
+
 ;; kotobase 課金 product の price_id (ADR-2607022200)。gate kotobase-graph-arpu は
 ;; 「kotobase の初 paid tenant」を測るので、アカウント全体の active-subscriptions を
 ;; 数えると 2017 年レガシーの無関係サブスク (price=group_monthly, ¥0) を誤カウントし
@@ -198,6 +252,10 @@
                        :sources (vec (remove nil? [:cloudflare (when (and (:stripe cfg) stripe) :stripe)
                                                    (when health :health)]))}
                 zone (assoc :zone (assoc (get zt zone) :zone zone-name) :zone-name zone-name)
+                zone (as-> m' (let [tp (zone-top-paths tok zone)]
+                                (cond-> m'
+                                  tp (assoc :paths (assoc tp :window "24h")
+                                            :top-paths (top-paths-summary tp)))))
                 (seq workers) (assoc :workers-invocations-7d
                                      (into {} (filter (fn [[k _]] (contains? workers k)) wi)))
                 (and (:stripe cfg) stripe) (assoc :stripe stripe)

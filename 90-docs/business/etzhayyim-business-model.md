@@ -20,6 +20,8 @@
 - 観測 (signal): etzhayyim.com 実測 45731 req/7d・865 uniques(日次和)、workers 17947 inv/7d
 - 観測 (signal): etzhayyim.com 実測 46238 req/7d・896 uniques(日次和)、workers 18113 inv/7d
 - 観測 (signal): etzhayyim.com 実測 46413 req/7d・899 uniques(日次和)、workers 18168 inv/7d
+- 観測 (signal): etzhayyim.com 実測 46413 req/7d・899 uniques(日次和)、workers 18170 inv/7d
+- 観測 (signal): etzhayyim.com 実測 46491 req/7d・899 uniques(日次和)、workers 18171 inv/7d
 
 ## Beneficiaries
 
@@ -46,6 +48,8 @@
 - OSS / 研究コミュニティ
 - itonami 経由の商用利用
 - 公共・アカデミア共同
+- 観測 (paths): 上位 path (24h): /feed.php 16 · /zoo.php 16 · /mh.php 14 · /packsin1.php 12 · /a332.php 10
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /organism/pulse.json 22 · /organism/health.json 19 · /robots.txt 19 · /_shell/home-feed.js 5 · /sitemaps/actors/hash/04e7.xml 3 | 4xx(probe) 11% · 5xx 84%
 
 ## Funding
 

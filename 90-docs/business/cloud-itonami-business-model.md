@@ -69,6 +69,8 @@
 - 業種 blueprint 直販
 - kotobase/murakumo 顧客への cross-sell
 - 士業・SIer パートナー
+- 観測 (paths): 上位 path (24h): /robots.txt 15 · /sitemap.xml 12 · / 8 · /itonami/verticals 3 · /site/wp-includes/wlwmanifest.xml 2
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 15 · /itonami/verticals 3 · /itonami 2 · /join/browser 2 | 4xx(probe) 63%
 
 ## Revenue Streams
 
