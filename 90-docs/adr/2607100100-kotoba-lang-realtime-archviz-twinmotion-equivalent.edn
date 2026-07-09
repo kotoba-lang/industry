@@ -120,7 +120,15 @@
    :status "実測で条件成立確認、ただしD6-b想定と異なる真因を特定・修正 (2026-07-10, kotoba-lang/webgpu@a0bf438,
             kami-app-amenominaka@518c7e9)"
    :detail "wgsl @compute(当初想定)ではなく、kami.webgpu/draw!のinstance bufferキャッシュ欠如が真因と判明・修正。
-            15,000要素で34.0ms→0.85ms/frame(約40倍)。M0-M4全マイルストーン完了"}]
+            15,000要素で34.0ms→0.85ms/frame(約40倍)。M0-M4全マイルストーン完了"}
+  {:id "M5" :name "インタラクティブUIシェル(本ADR原案に無い、オーナー追加リクエスト)"
+   :status "done (2026-07-09, kami-app-amenominaka@165918b)"
+   :detail "org既定UI/UXデザインシステム(ADR-2607022800: shitsuke+liquid-glass-ui+kotoba-ui+appkit)上に
+            環境プリセット4種(weather/terrain/postfx/vegetation)+orbit/zoomカメラ+USD export。
+            kotoba-uiの実バグ2件(menu-select uncontrolled、buttonに:on-click無し)をmurakumo-studio
+            実装済みワークアラウンドの移植で回避。M4のinstance bufferキャッシュを維持する
+            カメラのみ更新設計。実ブラウザ検証で検証ハーネス自身の実バグ(静的サーバーの.css
+            MIME-type欠落)も発見・修正"}]
 
  :non-goals
  ["photorealistic path tracing (Mitsuba3 / kami-rtx-native)"
@@ -273,4 +281,48 @@
   :remaining-gaps
   "MAX-INST(16384)を超えるinstanceはdraw!が無警告で切り捨てる — パフォーマンスでなく正確性のギャップ
    (大規模都市スケールのシーンで実在しうる、既知として明記のみ)。omni.timeline(M3 stretch)、
-   インタラクティブなorbit/flyカメラ操作も引き続き未着手。"}}
+   インタラクティブなorbit/flyカメラ操作も引き続き未着手。"}
+
+ :addendum-m5-2026-07-09
+ {:trigger
+  "本ADR原案にM5は無い。オーナーから「twinmotion の uiux は設計されている?」と問われ調査した結果、
+   専用UI/UXは未設計(それまでの成果物は静的単発デモページ経由でしか見られなかった)だが、org既定の
+   UI/UXデザインシステム(ADR-2607022800)は実在すると報告 — オーナーの「ok, do it」でM5として着手。"
+  :landed {:kami-app-amenominaka "518c7e9→165918b (feat/m5-ui-shell, server-side merge)"
+           :west-yml-pin "518c7e949f1f→165918b0e973 (--entry kami-app-amenominaka, verify-west-pins OK,
+                           fast-forward)"
+           :verification "29 tests / 122 assertions green(無変更), clj-kondo 0 errors/0 warnings、
+                           実ブラウザ(nbb+Playwright フルChromium)でDOM形状確認+controlled-select
+                           の実挙動確認+orbit drag確認+コンソールエラー無し、GitHub Actions macOS
+                           (webgpu-smoke job)でも同一検証green、スクリーンショットartifact化"}
+  :design-basis
+  "ADR-2607022800(org既定UI/UX: shitsuke+liquid-glass-ui+kotoba-ui+appkit/uikit)をそのまま採用。
+   liquid-glass-ui自身のADR/design docsを読み、liquid-glass.gpu(canvas内蔵ガラス質感描画)が
+   明示的に未来課題(未実装)であることを確認した上で、DOM chromeがcanvas leafを囲む構成を採用
+   — kami-engine-hud(無関係な既存WebGPU HUDオーバーレイ)に同型の前例があることも確認済み。
+   panel/toolbar/dropdown中心のデスクトップ的UIのためappkit(uikitでなく)を選択 — 両者の差分は
+   panel/list-viewのデフォルトのみと実ソースで確認。"
+  :discovered-and-worked-around-bugs
+  ["kotoba-uiのmenu-selectはReactでuncontrolled(<select>に:valueなし、<option>に:keyなし) — 実ソース
+    直読で確認した実バグ。murakumo-studio/src/murakumo_studio/ui.cljsが同一バグに対して確立済みの、
+    同一DOM形状を保つ手書きcontrolled-component代替(preset-select)をそのまま移植して回避、
+    upstreamへのパッチはしなかった。"
+   "kotoba-uiのbuttonは:on-clickを一切サポートしない(shitsukeのSSR専用:act契約のみ) — 同じく
+    murakumo-studioの確立済みワークアラウンド(btn)を移植。"
+   "検証ハーネス(test/render/lib/webgpu_harness.cljs)の静的サーバーにmime-typesの.cssエントリが
+    無く、Chromiumがvendor/kotoba-ui.cssをapplication/octet-streamとして受け取りスタイルシート
+    適用を無言拒否していた — document.styleSheetsのルール数(実際は132件のはずが1件)の異常で発見、
+    text/css; charset=utf-8を追加して修正。検証対象自身でなく検証ハーネス側の実バグだった。"]
+  :camera-design
+  "apply-camera!は既存render-IRへ:eye/:targetをassoc-inするのみで:instancesに触れない設計 —
+   カメラのみのフレーム(マウスドラッグ/ホイール)ではM4のinstance bufferキャッシュ(identical?判定)
+   がヒットし続ける。実際のプリセット変更(recompute-scene!)時のみ:instancesを再構築しキャッシュを
+   意図的に無効化する。"
+  :preset-ids-source
+  "weather(overcast/clear)、terrain(plains/quarry/desert/tundra)、vegetation(grass/fern/palm/
+   conifer/bush/cactus/moss)、postfx(nintendo/retro/final-fantasy/baminiku-character) — 各
+   kami-*-scene repo自身の出荷済みEDNを直読して採取、推測なし。"
+  :closes-m4-remaining-gap
+  "M4 addendumの:remaining-gapsに記載の「インタラクティブなorbit/flyカメラ操作、引き続き未着手」を
+   本M5で解消(orbit+zoomのみ実装、flyカメラは未着手のまま — orbitで実用上十分と判断)。
+   MAX-INST上限とomni.timelineはM5のスコープ外、引き続き未解決。"}}
