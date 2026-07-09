@@ -32,6 +32,7 @@
 - 観測 (signal): gftd.ai 実測 230256 req/7d・4934 uniques(日次和)・うち4xx probe 13%(24h)、workers 8688 inv/7d
 - 観測 (signal): gftd.ai 実測 231434 req/7d・4964 uniques(日次和)・うち4xx probe 13%(24h)、workers 8696 inv/7d
 - 観測 (signal): gftd.ai 実測 231989 req/7d・4974 uniques(日次和)・うち4xx probe 13%(24h)、workers 8702 inv/7d
+- 観測 (signal): gftd.ai 実測 232570 req/7d・4974 uniques(日次和)・うち4xx probe 13%(24h)、workers 8709 inv/7d
 
 ## Customer Segments
 
@@ -67,6 +68,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /error_log.php 101 · /.github/workflows/ci.yml 36 · /.env.int 36 · /ws.php 20 · /test11.php 18 | 4xx(probe) 13% · 5xx 77%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /error_log.php 101 · /.github/workflows/ci.yml 36 · /.env.int 36 · /ws.php 20 · /test11.php 18 | 4xx(probe) 13% · 5xx 78%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /error_log.php 101 · /.github/workflows/ci.yml 36 · /.env.int 36 · /ws.php 20 · /8573.php 18 | 4xx(probe) 13% · 5xx 78%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /error_log.php 101 · /.github/workflows/ci.yml 36 · /.env.int 36 · /ws.php 19 · /8573.php 18 | 4xx(probe) 13% · 5xx 78%
 
 ## Revenue Streams
 

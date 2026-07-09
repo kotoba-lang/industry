@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 1767, "kotobase-cf-wasm-staging" 768},
+ {"net-kotobase" 1786, "kotobase-cf-wasm-staging" 780},
  :zone
- {:requests-7d 2435,
+ {:requests-7d 2453,
   :pageviews-7d 295,
   :uniques-7d-sum 366,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 63}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact", :requests 55}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 46}
+  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact", :requests 68}
+   {:path "/", :requests 63}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 59}
    {:path "/health", :requests 39}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.q", :requests 33}
    {:path "/api/funnel", :requests 26}
    {:path "/llms-full.txt", :requests 22}
    {:path "/robots.txt", :requests 21}],
-  :status-mix {:ok 788, :client-error 1006, :server-error 18},
+  :status-mix {:ok 875, :client-error 1013, :server-error 18},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -27,9 +27,9 @@
   :charges-total 11,
   :last-charge-epoch 1718681591},
  :as-of "2026-07-09",
- :traffic-quality {:window "24h", :probe-4xx-pct 56, :error-5xx-pct 1},
+ :traffic-quality {:window "24h", :probe-4xx-pct 53, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 63 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 55 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 46 · /health 39 · /xrpc/ai.gftd.apps.kotobase.datomic.q 33 | 4xx(probe) 56% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.tran… 68 · / 63 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 59 · /health 39 · /xrpc/ai.gftd.apps.kotobase.datomic.q 33 | 4xx(probe) 53% · 5xx 1%",
  :funnel {:visitors 248, :signups 0, :checkouts 0},
  :signal
- "kotobase.net 実測 2435 req/7d・366 uniques(日次和)・うち4xx probe 56%(24h)、workers 2535 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 2453 req/7d・366 uniques(日次和)・うち4xx probe 53%(24h)、workers 2566 inv/7d、Stripe active subs 0"}
