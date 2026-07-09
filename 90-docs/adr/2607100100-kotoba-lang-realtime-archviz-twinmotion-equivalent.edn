@@ -116,7 +116,11 @@
    :detail "静的シーンのブラウザ内render-IR bridge、CPU-authored instancing、native Rust不使用。webgpuは既存の実働3Dレンダラーだったと判明(D5前提の訂正)"}
   {:id "M3" :name "kami-app-amenominaka拡張シェル" :status "done (2026-07-10, kami-app-amenominaka@e63446a)。omni.timeline stretch分は未着手"
    :detail "extensionローダ+lifecycle実装(kami-nv-compatから正本移植)、M0/M2をscene/render-ir extensionとして配線。magatama Pregel cellマッピングは概念として撤回(D7記載の親ADR由来という帰属自体が誤りと判明)"}
-  {:id "M4" :name "GPU側instancing(stretch/条件付き)" :detail "wgsl @compute対応後。M2が性能上限にぶつかった場合のみ着手"}]
+  {:id "M4" :name "GPU側instancing(stretch/条件付き)"
+   :status "実測で条件成立確認、ただしD6-b想定と異なる真因を特定・修正 (2026-07-10, kotoba-lang/webgpu@a0bf438,
+            kami-app-amenominaka@518c7e9)"
+   :detail "wgsl @compute(当初想定)ではなく、kami.webgpu/draw!のinstance bufferキャッシュ欠如が真因と判明・修正。
+            15,000要素で34.0ms→0.85ms/frame(約40倍)。M0-M4全マイルストーン完了"}]
 
  :non-goals
  ["photorealistic path tracing (Mitsuba3 / kami-rtx-native)"
@@ -226,4 +230,47 @@
   :r14-gate-final-status
   "omni.usd(M1)/omni.kit.viewport(M2)/omni.kit.app(M3ローダ自体)の3/5実装済み。omni.timeline
    (D7が'M3 stretch'と明記)は未実装。omni.replicator.coreは最初から対象外(D6明記)。
-   ゲートは構造的に完全には閉じない。"}}
+   ゲートは構造的に完全には閉じない。"}
+
+ :addendum-m4-2026-07-10
+ {:landed {:kotoba-lang-webgpu "6f4d04f→a0bf438 (fix/m4-instance-buffer-cache, server-side merge,
+                                CI green: test job + main branch gates/render-verify jobs)"
+           :kami-app-amenominaka "e63446a→518c7e9 (chore/m4-perf-benchmark, server-side merge,
+                                  CI green: test+webgpu-smoke)"
+           :west-yml-pins ["webgpu: 6f4d04f6ad23→a0bf438cb7c0 (--entry webgpu)"
+                           "kami-app-amenominaka: e63446a4aafa→518c7e949f1f (--entry kami-app-amenominaka)"]
+           :verification "実測ベンチマーク(Playwright+フルChromium、静的シーン60フレーム)で修正前後を比較。
+                           5000要素 11.4ms→0.47ms、15000要素 34.0ms→0.85ms、20000要素 36.3ms→1.03ms
+                           (高負荷域で約30-40倍)。M2の既存スクリーンショット検証を無変更で再実行し
+                           同一の正しい描画を確認。bb testの.cljcスイート(無影響)もgreen"}
+  :process
+  "オーナーとの事前合意により、まずM2が実際に性能上限にぶつかるか実測してから着手を判断する方針で進めた
+   (D6-bの条件を文字通り検証)。実測で本物の壁(8000要素で60fps割れ)を発見しトリガ条件は成立、
+   ただし真因診断がD6-b/D7の想定(GPU側compute shaderでのinstance生成不足)と異なると判明したため、
+   再度オーナーに方針確認した上で実際のボトルネック(kami.webgpu/draw!の毎フレーム冗長
+   sort/marshal/upload)を修正する方向へ切り替えた。"
+  :root-cause-correction
+  "本ADRのD6-b/D7が想定していた'GPU側instancing不足'という診断は実測データと合わなかった —
+   kotoba.amenominaka.render-ir(CPU側ブリッジ)は2万要素でも約25msの一度きりのコストで問題ではなく、
+   kotoba-lang/webgpuのdraw!が静的シーンでも毎フレーム無条件にinstanceを再ソート・再グルーピング・
+   再マーシャリング・GPU再アップロードしていたことがdraw!のソース直読で判明。wgsl @computeの
+   GPU側instancing実装はこの具体的ボトルネックを解消しないため見送り、instance bufferの
+   dirty-trackingキャッシュ(identical?で(:instances ir)を比較)を実装して対応。"
+  :reusable-tooling
+  "kotoba.amenominaka.render-stress-demo + test/render/verify_m4_stress.cljsを単発調査で終わらせず
+   kami-app-amenominakaに正式landし、CIに回帰ガード(15000要素でavgFrameMs>5msならfail)として組込み。
+   一度uncommittedのままworktreeごとrm -rfして紛失する運用ミスがあったが、実際の修正(webgpu側)は
+   既にlanded済みだったため実害なし。ベンチマークtooling自体は再構築して正式landした。"
+  :unrelated-blocker
+  "verify-west-pins.bbは--entry指定時も無関係な全entryのサーバ側検証を行うため、無関係な既存issue
+   (scene2dのpinが3コミット分stale、gh api compareで確認 — 本作業とは無関係)に一度ブロックされた。
+   --no-verify-remoteを使用し理由をcommit messageに記録(CLAUDE.mdの規定通り)。"
+  :github-outage
+  "着地作業中にGitHub側でminor→major(Partial System Outage)の障害が発生、CI queueが詰まる・
+   git fetch/worktree操作が断続的にタイムアウトする事象があったが、該当PRのCI自体は障害悪化前に
+   green完了しmergeも成功。ローカルshared checkoutの完全同期は後回しにし、GitHub API側での
+   着地確認を優先した。"
+  :remaining-gaps
+  "MAX-INST(16384)を超えるinstanceはdraw!が無警告で切り捨てる — パフォーマンスでなく正確性のギャップ
+   (大規模都市スケールのシーンで実在しうる、既知として明記のみ)。omni.timeline(M3 stretch)、
+   インタラクティブなorbit/flyカメラ操作も引き続き未着手。"}}

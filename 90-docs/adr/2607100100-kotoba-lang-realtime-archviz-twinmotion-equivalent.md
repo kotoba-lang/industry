@@ -183,3 +183,18 @@ M3（`kotoba.amenominaka.application`/`.extension`/`.extensions`）を `kami-app
 - **R1.4ゲートの最終状態**: `omni.usd`(M1)・`omni.kit.viewport`(M2)・`omni.kit.app`(M3のローダ自体)の3/5は実装済み。`omni.timeline`（キーフレーム/カメラパス、D7が"M3 stretch"と明記）は未実装のまま。`omni.replicator.core`（合成データ）は最初から対象外（D6明記）— ゲートは構造的に完全には閉じない。
 - **検証**: 29 tests / 122 assertions green（M0-M2込み、67の新規テスト追加）、clj-kondo clean。CI green（`test`/`webgpu-smoke`両ジョブ、main上でも確認）。
 - **未解決のまま**: `omni.timeline`（M3 stretch、未着手）、`wgsl`の`@compute`対応（M4）、インタラクティブなorbit/flyカメラ操作。
+
+## Addendum (2026-07-10): M4 実装 — 実測で真因を特定、D6-bの想定を訂正して着地
+
+M4（stretch/条件付き）はオーナーとの合意により、まず**実際にM2のCPU-authored instancingが性能上限にぶつかるかを実測してから着手を判断**する方針で進めた（D6-bの「M2が性能上限にぶつかった場合のみ着手」を文字通り検証）。
+
+- **実測（実ブラウザ、Playwright+フルChromium、静的シーン60フレーム描画）で本物の壁を発見**: 1,000要素=3.4ms/frame、5,000要素=11.4ms/frame、**8,000要素で60fps割れ（18.0ms/frame）**、15,000要素=34.0ms/frame(≈29fps)。M4のトリガ条件は満たされた。
+- **真因診断がD6-bの想定と異なっていた（重要）**: CPU側の`kotoba.amenominaka.render-ir`ブリッジ自体は2万要素でも約25msで完了する一度きりのコストであり、実際のボトルネックは**`kotoba-lang/webgpu`の`draw!`が静的シーンでも毎フレーム全instanceを再ソート・再グルーピング・再マーシャリング・GPUへ再アップロードしていた**こと（`draw!`のソースを直読して確認 — sort-by/partition-by/reduce/Float32Array確保+dotimesマーシャル+write-buffer!が全て条件なしで毎フレーム実行）。**「GPU側compute shaderでのinstance生成が不足している」というD6-b/D7のADR自身の想定は実測データと合わなかった** — GPU容量の限界ではなく、CPU側の冗長な毎フレーム再アップロードだった。
+- **対応方針をオーナーに確認の上、実際のボトルネックを修正**: `wgsl @compute`のGPU側instancing実装（当初のM4想定）はこの具体的なボトルネックを解消しないため見送り、代わりに`kotoba-lang/webgpu`（`kami-app-amenominaka`ではなく共有依存先）の`draw!`にinstance bufferのdirty-trackingキャッシュを実装（`init!`が返すcontextに`:instance-cache`atomを追加、`(:instances ir)`を`identical?`で比較しキャッシュヒット時はsort/marshal/uploadを丸ごとスキップ）。後方互換（`:instance-cache`が無いcontextは常にcache-miss経路、既存動作と同じ）。
+- **修正の実測効果**: 同一ベンチマークで、5,000要素 11.4ms→0.47ms、15,000要素 34.0ms→0.85ms、20,000要素(`MAX-INST`16,384で頭打ち) 36.3ms→1.03ms — **高負荷域で約30〜40倍高速化**。M2の既存スクリーンショット検証（`verify_m2_render.cljs`）を無変更で再実行し同一の正しい描画を確認、`bb test`の`.cljc`スイート（この変更の影響を受けない）もgreenのまま。
+- **`kami-app-amenominaka`側にも再利用可能なベンチマーク一式を着地**（`kotoba.amenominaka.render-stress-demo` + `test/render/verify_m4_stress.cljs`）: 単発の調査で終わらせず、CIに回帰ガードとして組み込み（15,000要素でavgFrameMsが5msを超えたら fail — 修正後の実測約0.9msに対し十分な余裕を持たせつつ、O(n)per-frameへの退行は検知できる閾値）。
+- **worktree運用上のミス**: 最初に構築したベンチマークharnessをuncommittedのままworktreeごと`rm -rf`してしまい紛失 — 実際の修正（webgpu側）は既にlandedだったため実害は無かったが、ベンチマークtooling自体は再構築して正式にlandした。
+- **副産物の発見**: `verify-west-pins.bb`は`--entry`指定時も無関係な全entryの整合性を検証するため、無関係な既存issue（`scene2d`のpinが3コミット分stale、GitHub API比較で確認 — 私の変更とは無関係）に一度ブロックされた。`--no-verify-remote`を使用し理由をcommit messageに記録（CLAUDE.mdの規定通り）。
+- **未解決のまま**: `MAX-INST`（16,384）を超えるinstanceはdraw!が無警告で切り捨てる — これはパフォーマンスでなく**正確性**のギャップ（大規模都市スケールのシーンでは実在しうる）。`omni.timeline`（M3 stretch）、インタラクティブなorbit/flyカメラ操作も引き続き未着手。
+
+これでADR-2607100100のM0〜M4全マイルストーンが完了（M4は「見送り」ではなく実測に基づく代替修正という形で完了）。
