@@ -1,4 +1,4 @@
-# ADR-2607100800: ghosthacker アニメは shiropico 先行、旧 Web パイプラインは cljs へ、game/anime 生成 workflow は cljc kotoba 前提
+# ADR-2607100900: ghosthacker アニメは shiropico 先行、旧 Web パイプラインは cljs へ、game/anime 生成 workflow は cljc kotoba 前提
 
 - **Status**: accepted（オーナー指示 2026-07-10）
 - **Related**: ADR-2607100100（app 第一 runtime 優先順位 kotoba wasm >
