@@ -1,0 +1,135 @@
+{:frontmatter
+ {:id "adr-2607071500-kotoba-lang-kotoba-protocol-atprotocol-layering"
+  :title "ADR-2607071500: kotoba-protocol 層設計の正本化 + atprotocol 投影層分離 + appview/embedUrl (W-Protocol 退役)"
+  :status "closed"
+  :doc_type "adr"
+  :topic "kotoba-protocol-layering"
+  :authoritative true
+  :last_verified "2026-07-07"
+  :authoritative_for
+  ["基底プロトコルの正本は kotoba-lang/kotoba-protocol (spec-first, pure cljc):
+    L0 address (multiformats/CID/IPLD) → L1 fact (datom EAVT) → L2 graph
+    (Merkle DAG → graph CID) → L3 authority (Ed25519 did:key, 鍵由来 IPNS =
+    graph 名, CACAO chain — サーバは authority ではない) → L4 distribution
+    (IPFS/IPNS/B2, kotobase) → L5 application (kototama actor:host ABI +
+    app manifest datoms + appview + embedUrl)。層表と語彙は data
+    (kotoba.protocol.layers / vocab) でありテストが同 data を検証する"
+   "app 提供の protocol 概念は appview (graph を描画する全画面 app) と
+    embedUrl (host が文脈内に mount する URL — https|ipfs|ipns) の 2 つ。
+    manifest は actor 自身の graph の :kotoba.app/* datoms (署名済み・履歴付き)。
+    :kotoba.app/latest = actor 鍵由来 IPNS = 署名済み更新チャネル。
+    iframe/web-component 等の mount 手段は host 実装詳細で protocol 外
+    (ActorFrame は廃語)"
+   "atproto 互換は kotoba-lang/atprotocol — kotoba-protocol の上に立つ投影層。
+    owns: handle 解決 / lexicon・record 形 / record⇄datom codec / XRPC / repo・
+    MST wire。delegates: 鍵・datom 真実・graph CID・IPNS head・配布。参照実装 =
+    aozora.pds.encode / aozora.appview.scan (既に本番稼働、移植しない)"
+   "W-Protocol (performerType/contentMode/uiType/service/system + ActorFrame)
+    は退役 — atprotocol.profile の deprecated compat alias にのみ残る。
+    正は :kotoba.app/kind と :kotoba.app/embed-url"
+   "Addendum (同日): follow-up 3 件 live 実装 — (1) :kotoba.app/latest =
+    ipns.core/pubkey->name で actor 鍵由来 IPNS を導出し manifest に刻む
+    (mangaka appLatest=k51qzi5uqu5dk5in… 確認)。(2) cap-bridge:
+    kotoba.protocol.bridge (hello/request/result, grant=要求∩対応,
+    validate-request fail-closed) + yoro-ui.interop.app-bridge host
+    (embed を opaque origin で mount、graph/query のみ host 代行、鍵/token
+    は app に渡さない、round-trip 実証)。(3) PUT /ipfs/:cid content-addressed
+    write (archive-put.cljc: base32/raw-sha256 検証 + web CSP-sandbox 配信、
+    Bearer token + digest fail-closed。GET retrieval は
+    KOTOBASE_IPFS_GATEWAY_URL で live。実 B2 書込は writable public-web
+    bucket の ops 前提)"
+   "Addendum 2 (同日): kind=actor — kototama wasm actor のブラウザ実行 live。
+    kotoba.protocol.app/cap->wasm-import + atprotocol.profile の appWasm
+    投影 (CID→url解決) + yoro-ui.interop.wasm-actor (vendored
+    wasm-webcomponent actor-host.js を run-actor! で HostCaps 検証付き
+    instantiate)。Closure :advanced の property-renaming が vendor JS の
+    内部 dot アクセス (grants/sha256_hex 等) と cljs 側の書込みで食い違う罠を
+    externs/actor-host.js で解決 (rename 対象外に固定)。wasmdemo.aozora.app
+    で main() → sha256_hex(\"hello\") 正解ハッシュ + log_write(\"hello\") を
+    live 確認"
+   "Addendum 3 (同日): cap-bridge 書込み系 capability — graph/transact 実装。
+    yoro-ui.interop.app-bridge/run-cap に graph/transact 分岐追加 — app は
+    生 nsid でなく {:action :collection :rkey :record} を渡し、host が
+    action→procedure nsid (createRecord/putRecord/deleteRecord) を解決
+    (app に任意 nsid 実行はさせない)。collection は com.etzhayyim. 名前空間
+    のみ許可。新設 yoro-ui.interop.atproto/at-write-record が既存
+    :atproto/procedure fx と同じ no-server-key ルーティング
+    (repo-signer/write-record! on-device 署名 or server-signed at-procedure
+    フォールバック) を再利用、鍵/token は embed app に渡さない。
+    kotoba.protocol.app の bridge-caps には元々 graph/transact/llm/complete
+    両方が登録済みだったため protocol 層の変更は不要、host 側対応表を
+    埋めただけ。llm/complete は proxy 先 backend が無く未実装のまま。
+    実 shadow-cljs :test build で 174 ファイルコンパイル成功で検証
+    (ブラウザ round-trip デモは持ち越し)"]
+  :related
+  ["90-docs/adr/2607062330-kototama-tender-chicory-execution-runtime.md"
+   "90-docs/adr/2607062400-kototama-actor-host-browser-native-and-tender-module-fix.md"
+   "90-docs/adr/2607070400-app-aozora-manga-work-actor-profiles.md"
+   "90-docs/adr/2607071100-gftdcojp-mangaka-retirement-wave3-aozora-studio.md"
+   "orgs/gftdcojp/app-aozora-svelte/IPFS-DEPLOY.md (CID 配信 PoC)"]
+  :supersedes ["W-Protocol profile 拡張 (com.etzhayyim.yoro.actor.getProfile の
+                performerType/contentMode/uiType 群) の新規利用"]
+  :superseded_by []}
+
+ :problem
+ {:source "オーナー指示 (2026-07-07): W-Protocol は古い。kotoba-protocol として
+           設計し直し (datomic/ipld/ipns/ipfs 統合)、atproto は kotoba-protocol
+           の上に立つ protocol として責任境界を分離。ActorFrame でなく
+           appview / embedUrl として設計"
+  :facts
+  ["基盤要素は io-multiformats/io-ipld/dag-cbor/datom/kotobase-*/chain/
+    prolly-tree/mst/kotoba-auth/kototama に実装済みだが層宣言の正本が無い"
+   "W-Protocol は view field 羅列 + svelte ActorFrame 実装込み規約で、
+    データの正・配布・認可の層を持たない"
+   "aozora PDS は record⇄datom 双方向投影を既に本番実装 (encode/scan) —
+    『atproto = 投影層』は実態が先行"
+   "外部前例: atproto lexicon-as-record (DNS _lexicon)、Matrix widgets
+    (URL+iframe+cap 交渉)、Farcaster signed manifest、Nostr NIP-89+nsite"]}
+
+ :decision
+ {:chosen
+  ["kotoba-lang/kotoba-protocol 新設 (public): layers/vocab/app を pure cljc +
+    data で正本化"
+   "kotoba-lang/atprotocol 新設 (public): boundary/projection/profile —
+    W fields は deprecated alias 表として封じ込め"
+   "mangaka miniapp 設計の語彙を :kotoba.app/* に差し替え (manifest lexicon は
+    投影形に降格)"]
+  :rejected
+  [{:option "W-Protocol を拡張して使い続ける"
+    :why "層を持たない view-field 規約で、CID/IPNS/capability を後付けすると
+          さらに歪む。オーナー判断でも旧式"}
+   {:option "kotoba-protocol に実装も集約 (mono-lib 化)"
+    :why "実装は既存 repo で稼働中。spec repo は宣言と検証だけを持ち、
+          drift はテストで検出する"}
+   {:option "atproto 互換を kotoba-protocol 内の 1 モジュールにする"
+    :why "境界が曖昧になる。『上に立つ別 protocol』という責務分離が指示の核"}]}
+
+ :consequences
+ {:positive
+  ["基盤の層表・語彙が 1 箇所に — 新規設計が層で会話できる"
+   "atproto 互換 = 投影の明文化 (encode/scan を契約の実装と再定義)"
+   "W-Protocol 資産は alias で温存、新規は :kotoba.app/* のみ"
+   "L0–L5 の全層が単一 miniapp で貫通して本番稼働する状態を実証
+    (mangaka/bridge-demo/wasm-demo の 3 app actor が aozora.app profile で
+    live 動作。CID/IPLD→datom→graph→did:key/鍵由来IPNS→IPFS配布+実B2書込→
+    cap-bridge mount / WASM actor 実行まで通し)"
+   "副産物の一般則: vendor JS を Closure :advanced と併用する際、cljs↔JS
+    境界の object literal はプロパティ名 renaming が食い違いうる — externs
+    ファイルで固定するのが解 (Addendum 2)。今後の vendor 作業に適用可能"]
+  :negative
+  ["spec と実装の drift リスク (data 化 + テスト参照で軽減)"
+   "repo 2 つ (kotoba-protocol/atprotocol) + vendor JS (actor-host.js) +
+    externs ファイルの追加管理コスト"
+   "cap-bridge は graph/query (読取専用) + graph/transact (書込み、
+    Addendum 3) 対応。wasm actor は 7/8 imports (http-post 不可)。
+    llm/complete は proxy 先 backend が無く未実装のまま open follow-up
+    として持ち越し"]}
+
+ :open-follow-up
+ ["lexicon _lexicon DNS 公開・firehose・MST encoding の kotoba graph 導出
+   (atprotocol の wire 互換を深める話、miniapp モデル自体には不要)"
+  "graph/transact は実装済み (Addendum 3)。llm/complete は proxy 先の LLM
+   completion XRPC/backend 自体がまだ存在しないため未実装のまま持ち越し"
+  "studio への actor 鍵 import UI の汎用化 (現状 mangaka-app 専用)"
+  ":kotoba.app/bundle-cid の appview 側 integrity 検証 (現状 embed-url の
+   resolve のみで配信内容との一致は未検証)"]}

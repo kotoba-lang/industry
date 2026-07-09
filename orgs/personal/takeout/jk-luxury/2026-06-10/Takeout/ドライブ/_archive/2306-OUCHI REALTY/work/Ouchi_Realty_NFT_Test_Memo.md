@@ -1,0 +1,2 @@
+# Ouchi Realty NFT Test Memo
+- Test DAI: 0x8cC088c0DE7Dc01935cCb4796a9F350807668BD5

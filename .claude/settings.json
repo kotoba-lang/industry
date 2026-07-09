@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bb \"$CLAUDE_PROJECT_DIR/.claude/hooks/git-push-main-sync-guard.bb\"",
+            "timeout": 30,
+            "statusMessage": "Checking branch is in sync with main before push…"
+          },
+          {
+            "type": "command",
+            "command": "bb \"$CLAUDE_PROJECT_DIR/.claude/hooks/west-pin-verify-guard.bb\"",
+            "timeout": 90,
+            "statusMessage": "Verifying west.yml pins against upstream (server-side)…"
+          },
+          {
+            "type": "command",
+            "command": "bb \"$CLAUDE_PROJECT_DIR/.claude/hooks/git-pull-west-sync-guard.bb\"",
+            "timeout": 15,
+            "statusMessage": "Checking git pull uses depth+west-update sequence…"
+          }
+        ]
+      }
+    ]
+  }
+}

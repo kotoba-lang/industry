@@ -1,0 +1,59 @@
+{:frontmatter
+ {
+  :id "adr-2607072400-kaisha-pod-murakumo-fleet-deployment"
+  :title "ADR-2607072400: kaisha realtime pod は murakumo fleet の kotoba-server に deploy する（到達は tailnet → murakumo.cloud overlay、公開 HTTP は kotobase.net）"
+  :status "accepted"
+  :date "2026-07-07"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "kaisha-pod-murakumo-fleet-deployment"
+  :authoritative true
+  :authoritative_for ["kaisha communication space の realtime pod（space graph + KSE fan-out）のホスト先が murakumo fleet 上の kotoba-server であること" "pod への到達経路の段階方針（当面 tailnet、murakumo.cloud overlay 完成後に移行）" "公開 HTTP / 静的面 / auth-gated datom endpoint が kotobase.net（gftdcojp/net-kotobase）に残るハイブリッド分担" "denrei/koyomi 等の kotoba-store（:url 注入 + CACAO 自己発行）が deploy 先に依存しない契約であること"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607072310-kotoba-lang-kaisha-communication-space" "adr-2607072330-kotoba-lang-denrei-posting-actor" "adr-2607041302-murakumo-family-naming" "adr-2607072000-gftdcojp-net-kotobase-ipfs-gateway-split"]
+  :last_verified "2026-07-07"}
+ :body
+ "# ADR-2607072400: kaisha realtime pod は murakumo fleet の kotoba-server に deploy する
+
+**Status**: accepted
+**Date**: 2026-07-07
+**Deciders**: Jun Kawasaki
+
+## Context
+
+kaisha の live 化に要る pod の deploy 先候補は ①kotobase.net（Cloudflare
+Worker 系、realtime の口なし）② murakumo fleet（各 Mac-mini が kotoba-server
+LaunchAgent 常駐、lattice で on-kse trigger をホスト、到達は今日 Tailscale、
+murakumo.cloud は構築中の DID/CID overlay）。方針が未明文化だった。
+
+## Decision
+
+ハイブリッド分担: ①kaisha realtime pod（space graph + KSE fan-out）=
+murakumo fleet 上の kotoba-server（on-kse と噛み合う・鍵由来 IPNS graph 思想が
+overlay と同一・fleet は既に kotoba-server 常駐）。②到達は当面 tailnet、
+murakumo.cloud overlay 実用化後に移行（pod 側変更なし）。③公開 HTTP/静的面/
+auth-gated datom endpoint は kotobase.net に残す。④denrei/koyomi の
+kotoba-store は :url 注入 + CACAO 自己発行のまま deploy 先非依存を保つ。
+詳細は同名 .md 参照。
+
+## Consequences
+
+live ChannelTarget は murakumo fleet 上の kaisha pod を対象に実装。
+murakumo.cloud 完成を live 化のブロッカーにしない。addendum 同日実装完了:
+denrei.pod（dc59f13）が実 fleet node (asher) で e2e 実測成功
+（transact/pull/q）。kaisha graph は actor private graph の初回 write
+自動登録で成立（provision 不要）。fleet 方言（aud=node did / multi-cap /
+dual scope / 秒精度 / :db/id）は fleet-channelport が pre-wire。addendum 2
+（KSE 訂正、オーナー指摘）: 当初 follow-up の on-kse component は撤回し
+KSE 依存を除去 — KSE は kotoba-server runtime 固有（kotobase/kotoba-peer
+engine に不在）で datomic tail は ephemeral・catch-up 不能。realtime 正本は
+datom 面共通の :db-api 契約とし、denrei 69a3f5d の messages-since/follow!
+（cursor tail、loss-free）で実装済み。kotoba-server 本体の KSE は mesh
+用途で現役のため除去は主張しない。
+
+## References
+
+orgs/kotoba-lang/murakumo、orgs/gftdcojp/net-kotobase、
+orgs/kotoba-lang/denrei src/denrei/kotoba.clj、ADR-2607072310、
+ADR-2607072330、ADR-2607041302、ADR-2607072000。"}

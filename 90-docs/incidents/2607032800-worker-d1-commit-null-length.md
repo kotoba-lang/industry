@@ -1,0 +1,32 @@
+# INCIDENT 2607032800: worker D1 `commit!` — `Cannot read properties of null (reading 'length')`
+
+**Status**: OPEN（本番 write path down）。**Owner**: D1 worker（並行セッション、`kotobase-cljc-worker` + `kotobase-engine/commit!`）。
+**Reads は健全**（getBackup/getAccount/datoms 全て 200, sub-second）。**Writes（transact/commitSigned/fold-with-novelty）が全滅**。
+
+## 症状
+`POST …datomic.transact` が `{"ok":false,"error":"InternalError","message":"Cannot read properties of null (reading 'length')"}`。
+mint→transact で PDS を完全バイパスしても再現 → **worker 側**。fresh graph でも失敗。
+
+## timeline
+- worker `9b76e276`(=`cf7f0b7`) deploy 直後は E2E **green**（commitSigned persist + getRepo CAR）。
+- その後（fold cron `0eb423ff` deploy 前後）に write が全滅。**worker の再 deploy なし**（同一コードで green→broken）→ **runtime/state 起因**。
+
+## 切り分け（何が原因でないか）
+- **datafy 無罪**: `tx-edn->quads` を元の for-loop に revert しても同じエラー（revert-test）。
+- **read/state 無罪**: `fold`（no-op、novelty=0、head 書込なし）は **成功**。reads は decode 経路で健全。
+- **quad-encode 無罪**: **空 tx（quads=[]）でも失敗** → 特定 quad の encode でない。
+- → **write の encode/put 経路**（`eng/commit!` → `put-tx-block!` / `cd/commit!`、put! が呼ばれる時）に局在。
+
+## 静的に確認済み（正しく見える）
+- `ipld/put-node!` は CID を返す（put! 結果でない）。`encode`=`(cbor/encode (->cbor-data node))`。
+- `eng/commit!`/`state-at`/`normalize-state`/`novelty-cids` は null-safe。
+- run-write の put! = `(swap! buffer assoc cid bytes)`。
+
+## 次の一手（runtime アクセスを持つ owner へ）
+- worker で `commit!`/`cd/commit!`/`ipld/node->block` の write 経路を runtime トレースし、`.length` を読む null の実体（null bytes / null CID / null link）を特定。
+- 「green→broken（同一コード）」なので、fold cron が書いた state か、並行セッションの D1 iteration が migrate した R2 state の format 不整合が疑わしい。fresh graph でも失敗する点が謎（fresh は prior state を読まないはず）→ global に読む何か（operator genesis / schema block）が変わった可能性を確認。
+
+## 私(別セッション)側の状態
+- PDS は green 版 `e594747b` に rollback（reads 健全）。worker は main `cf7f0b7`(=`a02fa8df`) に一致。
+- fold cron（task #21 Phase 1）は **未 land（held）** — write 復旧が前提。
+- datom 統一 3層 + ADR は landed・consistent（engine→kqe pin だけ並行セッションの kqe 前進で 1 遅れ、彼らが re-pin）。

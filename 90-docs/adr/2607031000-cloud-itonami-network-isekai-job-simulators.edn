@@ -1,0 +1,34 @@
+{:frontmatter
+ {:id "adr-2607031000-cloud-itonami-network-isekai-job-simulators"
+  :title "ADR-2607031000: cloud-itonami × network-isekai — occupation/business job-simulator games"
+  :status "accepted"
+  :date "2026-07-03"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "cloud-itonami-network-isekai-job-simulators"
+  :authoritative true
+  :authoritative_for
+  ["8 cloud-itonami blueprints (plumbing isco-7126, construction F4211,
+    freight-driving isco-8332, freight-transport H4920, home-nursing
+    isco-2221, care-coordination Q8810, market-gardening isco-6112, retail
+    G4711) each get a standalone network-isekai game under
+    public/games/itonami/<slug>/ (game.edn + scene.edn + logic.cljc,
+    kami-clj guest subset, auto-discovered by isekai.feed-index)"
+   "shared 'depot loop' mechanic maps the blueprint's intake→propose→
+    approve→execute→audit operating-states onto network-isekai primitives:
+    depot touch = governor approval (defatom equipped flag), job-site touch
+    while equipped = execute (spawns done/score/picked markers, resets
+    equipped), touch while unequipped = governor violation (docks a life
+    marker, cooldown-gated), :flow :victory :when-picked <job-count> = audit
+    close-out, :flow :gameover :when-missing player on 0 lives"
+   "sprites stay hand-composed kami.sprite2d primitives (drive/orbs/
+    goriketsu convention), not kami-isekai-assets chargen — different genre
+    register (trade/care/logistics sim vs isekai/tensei RPG)"
+   "pilot scope only: 8 of 111 cloud-itonami repos, not a batch job over the
+    full registry; prototypes are uncommitted in the working tree pending
+    review before push"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607011000" "adr-2607012000" "adr-2607021900" "adr-2607022340"]
+  :last_verified "2026-07-03"}
+ :body "see 2607031000-cloud-itonami-network-isekai-job-simulators.md"}

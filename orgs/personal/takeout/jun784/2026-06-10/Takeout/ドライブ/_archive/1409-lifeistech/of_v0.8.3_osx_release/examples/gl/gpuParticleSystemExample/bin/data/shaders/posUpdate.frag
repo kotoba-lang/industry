@@ -1,0 +1,1 @@
+../../../../../../../../../../../../../../../../.git/annex/objects/06/k3/MD5E-s694--af2b48e1424797fcfc38b79c022ac5cb.frag/MD5E-s694--af2b48e1424797fcfc38b79c022ac5cb.frag

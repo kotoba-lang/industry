@@ -1,0 +1,105 @@
+{:frontmatter
+ {:id "adr-2606280300-kotoba-rad-git-sovereign-repo"
+  :title "ADR-2606280300: kotoba-rad / kotoba-git sovereign repository maturity"
+  :status "proposed"
+  :doc_type "adr"
+  :topic "kotoba-rad"
+  :authoritative true
+  :last_verified "2026-06-28"
+  :authoritative_for
+  ["kotoba-git R0 byte-exact Git object bridge"
+   "kotoba-rad R1+ sovereign repository identity/ref/private-grant layer"
+   "private repo secrecy via object encryption, not selective replication"
+   "R0-R4 maturity roadmap for Radicle-equivalent role"]
+  :related
+  ["orgs/com-junkawasaki/kotoba/docs/ADR-kotoba-rad-git-sovereign-repo.md"
+   "90-docs/adr/2606271600-kotoba-stack-equivalences.md"
+   "orgs/com-junkawasaki/kotoba/crates/kotoba-git"
+   "orgs/com-junkawasaki/kotoba/crates/kotoba-dht"
+   "orgs/com-junkawasaki/kotoba/crates/kotoba-crypto"]
+  :supersedes []
+  :superseded_by []}
+
+ :layering
+ [{:layer :git-object-fidelity
+   :crate "kotoba-git"
+   :responsibility ["framed Git object codec" "SHA-1 oid <-> CID bridge" "pack/loose import" "refs projection"]
+   :trust_boundary "verifies Git object bytes"}
+  {:layer :repository-identity
+   :crate-or-module "kotoba-rad"
+   :responsibility ["RID" "identity journal" "delegates" "visibility" "policies" "epoch keys"]
+   :trust_boundary "signed identity journal"}
+  {:layer :authority
+   :crate "kotoba-auth"
+   :responsibility ["DID parsing" "CACAO grants" "signature verification"]
+   :trust_boundary "signer authority"}
+  {:layer :source-chain
+   :crate "kotoba-dht"
+   :responsibility ["append-only journal" "warrants" "neighborhood accountability"]
+   :trust_boundary "peer accountability"}
+  {:layer :object-encryption
+   :crate "kotoba-crypto"
+   :responsibility ["AEAD" "HPKE-like wrapping" "future hybrid PQ envelopes"]
+   :trust_boundary "confidentiality"}
+  {:layer :distribution
+   :crate "kotoba-net/read-plane"
+   :responsibility ["CID-over-HTTP" "gossipsub" "bitswap-style replication"]
+   :trust_boundary "transport untrusted"}]
+
+ :maturity
+ [{:stage :R0
+   :name "Git object bridge"
+   :deliverable ["byte-exact object codec" "Datom projection" "pack import" "snapshot manifest"]
+   :status :implemented
+   :location "orgs/com-junkawasaki/kotoba/crates/kotoba-git"}
+  {:stage :R1
+   :name "Signed repo identity"
+   :deliverable ["RepoIdentity" "RepoRid" "RepoEvent" "delegate validation" "ref authorization"]
+   :status :next}
+  {:stage :R2
+   :name "Private object store"
+   :deliverable ["encrypted Git framed blocks" "RecipientGrant" "epoch rotation" "ciphertext-cid replication"]
+   :status :planned}
+  {:stage :R3
+   :name "P2P accountability"
+   :deliverable ["Source Chain publication" "Warrant mapping" "reputation/replication policy"]
+   :status :partial-primitives-exist}
+  {:stage :R4
+   :name "PQ-ready suite"
+   :deliverable ["hybrid KEM" "hybrid signatures" "algorithm migration tooling"]
+   :status :future}]
+
+ :repo_identity
+ {:rid "cid(canonical-cbor(repo.identity))"
+  :genesis_doc_keys
+  [:kotoba.rad/type :kotoba.rad/version :repo/name :repo/visibility :repo/default-branch
+   :repo/git-hash-suite :repo/block-hash-suite :repo/delegates :repo/created-at]
+  :event_kinds
+  [:identity.update :ref.create :ref.update :ref.delete :object.publish :grant.add :grant.revoke :warrant.issue]}
+
+ :ref_authorization
+ {:rules
+  ["actor DID must be current delegate at parent journal state"
+   "actor capability must cover event kind"
+   "event/prev must match current journal head unless explicitly importing a fork"
+   "ref.update is fast-forward by default; force update requires policy"
+   "ref/new must resolve to a Git commit in kotoba-git projection"
+   "all reachable objects must have git oid <-> CID bridge"
+   "private repos gossip only encrypted objects or availability proofs to non-recipient peers"]}
+
+ :privacy
+ {:principle "peer allow-list is availability/routing policy, not secrecy boundary"
+  :replication_key "ciphertext-cid = hash(ciphertext)"
+  :verification_metadata ["plaintext-cid" "git oid"]
+  :access ["capability datom" "recipient set" "epoch key"]
+  :revocation "epoch rotation; already distributed ciphertext is not erased"
+  :current_crypto "X25519 HPKE-like wrapping available in kotoba-crypto"
+  :pq_target {:kem [:x25519 :ml-kem-768]
+              :signature [:ed25519 :ml-dsa :slh-dsa]
+              :metadata [:alg :hash :sig :kem :key-id :recipient-set :epoch :created-at]}}
+
+ :implementation_next
+ {:module_choice ["new crate kotoba-rad" "or kotoba-git::rad module"]
+  :types ["RepoIdentity" "RepoRid" "RepoEvent" "Delegate" "RefPolicy" "RecipientGrant" "RadRepo"]
+  :methods ["RadRepo::apply_event" "RadRepo::authorize_ref_update" "RadRepo::publish_manifest" "RadRepo::import_git_dir"]
+  :reuse ["kotoba-git for object materialization" "kotoba-dht for source-chain/warrant semantics" "kotoba-crypto for recipient grants"]}}

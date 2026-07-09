@@ -1,0 +1,24 @@
+{:frontmatter
+ {:id "adr-2607022400-cljs-worker-build-reproducibility"
+  :title "ADR-2607022400: gftd cljs Worker/Pages repo の build 再現性を必須にする"
+  :status "accepted"
+  :date "2026-07-02"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "cljs-worker-build-reproducibility"
+  :authoritative true
+  :authoritative_for
+  ["gftd cljs Worker/Pages repo は clean checkout から wrangler/Pages deploy が
+    再現可能であること (必須要件): shadow-cljs 依存の明示宣言 + package.json/lockfile
+    commit / sibling local-root の git dep 化 / wrangler entry の commit /
+    生成物方針の gitignore 一致 / CI が clean build まで検証"
+   "deploy が開発者マシン依存だった根本原因の記録と、net-kotobase(#141/#142)・
+    cloud-manimani(#2) を exemplar とする修正パターン"
+   "build 再現性の要修正 repo audit (network-isekai 未修正・app-aozora/apex 要 audit)"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607022200-per-product-gate-instruments"
+            "adr-2606241000"]
+  :last_verified "2026-07-02"}
+ :body
+ "# ADR-2607022400\n\n**Status**: accepted **Date**: 2026-07-02\n\n## Context\n\nBMC gate emitter を各 product repo に deploy しようとした際、gft d の cljs CF\nWorker/Pages repo が clean checkout から再現可能に build できないことが横断判明。\nこれが agent/CI が deploy を回せない根本原因で、deploy が開発者ローカルに暗黙依存\nしていた。実測パターン: net-kotobase (package.json/lockfile が git に無い + entry\nedge-app.cljc/DO durable-objects.cljc 未コミット + worker/js 未コミット) /\ncloud-manimani (shadow-cljs.edn が shadow-cljs 未宣言 + deps.edn ../kotobase-clj\nlocal-root) / network-isekai (public/js gitignore + _redirects SPA fallback、live サイト)。\n\n## Decision\n\n全 cljs Worker/Pages repo に「clean checkout から deploy 再現可能」を必須化:\n1. shadow-cljs を deps alias に明示 pin、package.json+lockfile を commit。\n2. sibling local-root を git dep 化 (or monorepo build CI 明示)。\n3. wrangler main の entry を commit、生成 bundle 方針と .gitignore を一致。\n4. 生成物は commit or CI build を repo ごとに宣言。\n5. CI が clean checkout から bundle 生成まで検証 (syntax-check だけでは欠落が漏れる)。\n\n## Consequences\n\n(+) deploy がマシン非依存に。実証: net-kotobase(94ca7947)/cloud-manimani(2fad35f1)\nを本番 deploy 済。(+) exemplar = net-kotobase #141/#142・cloud-manimani #2。\n(−) 各 repo に build fix PR が要る。(−) network-isekai は live Pages で慎重な\n開発者 build 環境 deploy 推奨 (blind redeploy はサイト破壊リスク)。\n\n## Audit\n\nnet-kotobase ✅修正済/deploy済、cloud-manimani ✅修正済/deploy済、\nnetwork-isekai ⚠️未修正(public/js gitignore・_redirects・live)、\napp-aozora 要audit、ai-gftd-apex 要audit、club-shinshi(TS/SvelteKit)は別系統。\n\nペアの .md が正。"}

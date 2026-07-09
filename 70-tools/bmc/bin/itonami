@@ -1,0 +1,6 @@
+#!/usr/bin/env bb
+;; itonami cli — thin wrapper over gftd.cli (.cljc). ADR-2607021600.
+(require '[babashka.fs :as fs] '[babashka.classpath :as cp])
+(cp/add-classpath (str (fs/parent (fs/parent (fs/real-path *file*))) "/src"))
+(require '[gftd.cli :as cli])
+(cli/-main-for :itonami *command-line-args*)

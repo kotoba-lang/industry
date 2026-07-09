@@ -1,0 +1,88 @@
+{:frontmatter
+ {
+  :id "adr-2607072530-cloud-itonami-kototama-wasm-llm-infer-poc-isic-6511"
+  :title "ADR-2607072530: cloud-itonami-isic-6511 の governor 決定ロジックを .kotoba/actor:host wasm 化し、新設 llm-infer capability 経由で murakumo fleet の1ノード(asher)へ JVM 無しで実配備した(kototama wasm PoC)"
+  :status "accepted"
+  :date "2026-07-07"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "cloud-itonami-kototama-wasm-llm-infer-poc"
+  :authoritative true
+  :authoritative_for ["kotoba-core-contracts の llm/infer capability（id 225）の存在と ABI 形状" "kototama.tender（JVM）および wasm-webcomponent（Node、JVM 不要）の2系統の llm-infer 実装が存在すること" "cloud-itonami-isic-6511 の governor 決定ロジックを .kotoba へ縮約する際の設計方針（Store/StateGraph/EDN マップは対象外）" "murakumo fleet の実行系が Rust（フリーズ済み）/JVM（kotoba.wasm-exec）/kototama.tender（JVM）の3系統に分裂しており、かつ全ノードに JVM が存在しないという実測事実" "本 ADR 時点で murakumo の正式な mesh/auction 配布経路（bb murakumo deploy）は未修復のままであること（フォローアップ課題）"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607062330-kototama-tender-chicory-execution-runtime" "adr-2607062400-wasm-webcomponent-actor-host-browser" "adr-2607071250-cloud-itonami-brokerage-6612-coverage" "adr-2607071320-cloud-itonami-credit-6492-coverage" "adr-2607070900-cloud-itonami-core-business-domains-testing" "adr-2607072400-kaisha-pod-murakumo-fleet-deployment" "adr-2607071400-murakumo-family-k8s-wasmcloud-wadm-positioning"]
+  :last_verified "2026-07-07"}
+ :body
+ "# ADR-2607072530: cloud-itonami の kototama wasm PoC — llm-infer capability 新設 + murakumo fleet 実機(JVM無し)への配備
+
+**Status**: accepted
+**Date**: 2026-07-07
+**Deciders**: Jun Kawasaki
+
+## Context
+
+オーナー指示「cloud-itonami の成熟度・coverage を向上させ、各actorを murakumo
+fleet に kototama wasm としてデプロイする」を受けて着手。cloud-itonami は
+ISIC/ISO3166/COFOG/UNSPSC 等約900エントリのblueprint群を持つが implemented
+はISICの16件のみ。`.kotoba` にはLLM呼び出し用capabilityが無く、既存の
+langgraph-clj+langchain-clj製actorをそのままwasm化することは不可能と判明。
+さらにmurakumo fleet（Mac mini 10台、常時XMRig稼働の共有インフラ）が実際に
+動かす `kotoba-server` は2026-07-01に本体から削除された旧Rustのフリーズ
+バイナリで、現行JVM実装・kototama.tenderを含め実行系が3系統に分裂して
+おり、かつ**全ノードにJVMが一切インストールされていない**ことを実機確認
+（asher/naphtali/judah/zebulun/issachar）で発見した。
+
+オーナーは対話中、llm-infer丸ごとwasm化・小バッチPoC・murakumoのRust退役
+＋cljc一本化・JVM非依存（kotoba wasm/clojurewasm/cljs/nbbの枠内）を明示的
+に選択した。
+
+## Decision
+
+PoC対象は`cloud-itonami-isic-6511`（生命保険underwriting、最小構成）。
+
+1. **llm/infer capability新設（id 225）**: kotoba-core-contractsに登録。
+   kototama.tender（JVM、http-post-host-fnを雛形）とwasm-webcomponent
+   （Node.js、`opts.llmInfer`同期関数を注入する形。ブラウザと異なりNode
+   のchild_processは同期ネットワークI/Oが可能なため実装可能と判断）の
+   2系統のホスト実装を用意。APIキー解決は`cloud_itonami.runtime`と同一の
+   env var chain、未設定/失敗は全て-1でfail-closed。PR3本（kotoba-core-
+   contracts#4, kototama#25, wasm-webcomponent#4）としてレビュー・テスト
+   green確認の上マージ。
+
+2. **`.kotoba`決定モジュール**: `wasm/underwriting_decision.kotoba`として
+   governorの3 HARD違反チェック+confidence閾値+llm-infer advisor consult
+   を`.kotoba`の極小文法（if/let/do/算術/比較のみ）へ縮約。Store/EDNマップ/
+   StateGraphは対象外と明記。副産物として`.kotoba`コンパイラの実バグ
+   （and/or/whenがソース安全性チェックは通るがWASMコード生成で
+   unsupported-opになる）を発見、nested ifで回避。
+
+3. **murakumo fleet実機（asher）への配備**: JVM不在のためkototama.tender
+   ではなくNode.js経由のwasm-webcomponent/actor-host.jsを選定。asherへ
+   `brew install node`（~92MB、可逆）し、6シナリオ（auto-ok/HOLD×3/
+   escalate×2）を実行、ローカルと完全一致する結果を確認——このモノレポ
+   初の、実fleetノード上での`.kotoba`→wasmコンパイル成果物の実行確認。
+   一時ファイルは削除、Node.jsは今後の土台として残置。
+
+   murakumoリポ自体（Rust/WIT依存のbuild/deployコード）は変更していない。
+   同日付ADR-2607072400（kaisha）がmurakumo fleetの現行Rustベース
+   kotoba-server常駐プロセスへの実デプロイを決定しており、並行して中核
+   コードを書き換える衝突リスクを避けたため。
+
+## Consequences
+
+llm/infer capability・.kotobaモジュール・実fleet実行確認の3点は完了。
+cloud-itonami本体のtest coverageも並行して向上（350→361 tests、PR
+gftdcojp/cloud-itonami#36）。未実施・フォローアップ: 実Anthropic API
+キーでの応答検証、murakumoの正式mesh/auction配布経路の修復（Rust WIT
+参照の断絶、kaisha依存との調整含む）、`.kotoba`コンパイラのand/or/when
+バグ修正、ISIC以外のimplemented化と本PoCパターンの横展開、
+wasm-webcomponent側http-postの非同期対応（Node文脈のみ）。
+
+## References
+
+orgs/kotoba-lang/kotoba-core-contracts（PR#4）、orgs/kotoba-lang/kototama
+（PR#25）、orgs/cloud-itonami/cloud-itonami-isic-6511（PR#1, PR#2,
+wasm/README.md）、orgs/kotoba-lang/wasm-webcomponent（PR#4）、
+orgs/gftdcojp/cloud-itonami（PR#36）、ADR-2607062330、ADR-2607062400、
+ADR-2607072400。"}

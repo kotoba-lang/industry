@@ -1,0 +1,184 @@
+{:frontmatter
+ {:id "adr-2607041430-network-isekai-reagent-spa-consolidation"
+  :title "ADR-2607041430: network-isekai — consolidate to a single reagent/re-frame SPA shell; retire per-route static HTML + the missing _worker.js"
+  :status "superseded"
+  :doc_type "adr"
+  :topic "network-isekai-spa-reagent"
+  :authoritative true
+  :last_verified "2026-07-08"
+  :authoritative_for
+  ["gftdcojp/network-isekai's public/_worker.js does not exist on main (verified via
+    production HTTP behavior + git log --all) -- every /<org>/<game> pretty URL
+    (e.g. /gftd/drive) currently serves the marketing landing page instead of
+    play.html's game view"
+   "the fix direction is NOT to resurrect _worker.js -- it is to consolidate to a
+    single reagent/re-frame SPA shell with client-side routing, formalize Cloudflare
+    Pages' already-observed 200-fallback-to-index.html via an explicit
+    `/* /index.html 200` _redirects rule, and retire the per-route static HTML +
+    server-side content-rewrite architecture entirely"
+   "game/stage rendering loop (kotoba-lang/kami-engine + kami-webgpu, render-IR, WASM
+    compile) is unaffected by this ADR and stays as-is -- only the web/UI shell layer
+    is being unified onto reagent/re-frame"]
+  :related
+  ["90-docs/adr/2607032400-network-isekai-primary-consolidation.md"]
+  :supersedes []
+  :superseded_by
+  ["adr-2607022800-kotoba-lang-default-uiux-appkit-uikit-interface-fundamentals"]}
+
+ :problem
+ {:source "user report: isekai.network individual org/repo pages (e.g. /gftd/drive)
+            don't show the game"
+  :investigated
+  ["curl diff: https://isekai.network/gftd/drive returns 200 with content
+    byte-identical to https://isekai.network/ (the marketing landing page); any
+    nonexistent path (e.g. /totally-nonexistent-path-xyz123) returns the same;
+    https://isekai.network/play alone correctly serves play.html's content
+    (canvas/editor). All referenced static assets (kototama.js/.wasm, js/app.js,
+    games/gftd/drive/{game.edn,logic.cljc,scene.edn}) individually return 200."
+   "public/_redirects' own comment says routing is handled by public/_worker.js; that
+    file does not exist anywhere in main's history (git log --all -- public/_worker.js
+    only finds it on `manifest-rev`, a branch never merged into main, and only in a
+    commit that DELETES it). wrangler.toml still documents a StageRoom Durable Object
+    class as living in that nonexistent file."
+   "network-isekai's web layer is several independent static HTML documents
+    (index.html marketing LP, play.html editor, dance.html VRM stage, assets.html
+    Asset Hub, generate.html, studio.html) glued together by that one Worker file --
+    a single point of failure for every current and future game/stage route, silently
+    broken with nothing catching it"
+   "the web/UI layer is already partially reagent/re-frame (deps.edn: re-frame 1.4.3 +
+    reagent 1.2.0; src/isekai/ui/{db,events,subs,views,app}.cljs is a standard
+    re-frame split; segment_toggle.cljs / play_ai.cljs are reagent components mounted
+    into specific DOM ids) but play.html's own inline boot script and
+    dance.html/isekai.stage.cljc (defonce atom + raw getElementById/querySelector) are
+    still vanilla DOM bootstraps"
+   "user direction 2026-07-04: kami-engine/kami-webgpu render loop is architecturally
+    correct and untouched; the web/UI layer should be reagent end-to-end (\"web部分は
+    全画面をreagent\")"]
+  :risk "network-isekai is a live production site (isekai.network) -- this is a
+         cross-cutting web-layer migration touching every page's bootstrap, not an
+         additive change. Canvas/WebGPU ownership must not fight reagent's virtual-DOM
+         re-renders."}
+
+ :decision
+ {:spa_shell
+  {:what "collapse index.html/play.html/dance.html/assets.html/generate.html/
+          studio.html into one SPA shell (single public/index.html, or the minimum
+          shadow-cljs build output requires) mounting one reagent root"
+   :router "client-side re-frame router reads window.location.pathname at boot,
+            dispatches an event setting :view in app-db to one of
+            :home | :play | :dance | :assets | :generate | :studio (+ :org/:game
+            params for :play), generalizing the /<org>/<game> parsing already inline
+            in play.html's boot script"}
+  :view_migration
+  {:play "wrap the existing kototama-load + isekai.web/boot sequence in a reagent
+          :component-did-mount / :component-will-unmount, replacing play.html's
+          inline <script type=module>"
+   :dance "wrap isekai.stage.cljc's loop the same way, replacing dance.html's direct
+           DOM script; kami.dance/kami.webgpu render loop stays outside re-frame per
+           deps.edn's existing UI-state/render-state split"
+   :home_assets_generate_studio "become reagent components fed by re-frame subs,
+                                   replacing current static-HTML + vanilla-script
+                                   hydration"}
+  :worker_js
+  {:action "NOT resurrected"
+   :replacement "public/_redirects gets an explicit `/* /index.html 200` SPA-fallback
+                 rule, formalizing the behavior Cloudflare Pages was already observed
+                 applying by default -- every pretty URL serves the same SPA shell,
+                 client router renders the right view, no server-side routing config
+                 to keep in sync per new game/stage"}
+  :stage_room_followup
+  {:what "wrangler.toml's StageRoom Durable Object (documented as living in the now-
+          nonexistent public/_worker.js) needs a new home -- Cloudflare Pages Function
+          under functions/, or the standalone-worker sketch already in wrangler.toml's
+          comments"
+   :blocking false
+   :interim_behavior "live-presence falls back to BroadcastChannel-only, the already-
+                       documented behavior when /api/stage-room 501s"}}
+
+ :consequences
+ {:bug_fix "individual org/repo pages not showing the game is fixed as a structural
+            side effect of the architecture simplification, not a standalone patch --
+            the class of bug (Worker silently missing/wrong) becomes impossible once
+            routing is client-side"
+  :extensibility "future game/stage/page additions become \"add a reagent view + a
+                  route table entry\", no server-side routing file to update"
+  :migration_cost "one-time port of play.html/dance.html/assets.html/generate.html/
+                    studio.html's vanilla bootstrap logic into reagent lifecycles
+                    without regressions; play_ai.cljs/segment_toggle.cljs already
+                    reagent, least rework; isekai.stage.cljc's live-presence
+                    (BroadcastChannel/WS) and play.html's kototama/kami-webgpu boot
+                    sequence need care"
+  :canvas_ownership_convention "canvas/WebGPU surface owned entirely by a
+                                 :component-did-mount (reagent renders it once,
+                                 kami-webgpu writes to it every frame, reagent never
+                                 re-renders that subtree)"}
+
+ :alternatives
+ [{:option "resurrect/rewrite public/_worker.js to restore the old per-route
+            content-rewrite behavior"
+   :rejected_because "treats the symptom, not the structural fragility -- one worker
+                       file was a silent single point of failure for every existing
+                       and future game route, and nothing caught it breaking; also
+                       doesn't address the separate reagent-unification direction"}
+  {:option "keep the multi-static-HTML-document architecture and add reagent views
+            inside each independently"
+   :rejected_because "doesn't fix the routing bug (still depends on a working Worker
+                       to route to the right static document); keeps N separate
+                       bootstrap entry points instead of one shell"}]
+
+ :addendum-2026-07-08-maturity-audit-superseded
+ {:trigger "maturity audit re-checked this ADR's own Decision items against
+            gftdcojp/network-isekai's origin/main @ b7388f1, after a prior pass had
+            flagged it as still :proposed despite apparently substantial reagent
+            work landing (commit 4cedf3e / PR #110)"
+  :finding
+  ["public/index.html, play.html, dance.html, assets.html, generate.html,
+    studio.html are still six separate static HTML documents in production --
+    no single SPA shell, no :view/route dispatch anywhere (grep -rn ':view'
+    src/isekai/ finds only unrelated WebGPU texture-view keys); the reagent apps
+    that do exist (src/isekai/ui/{app,db,events,subs,views,modes}.cljs) implement
+    ADR-0003's separate multimode CAD/game/modeling/animation editor, not this
+    ADR's page router"
+   "the multi-document architecture was formalized further, not retired:
+    src/isekai/site/build.cljc (`bb render-site`) code-generates every
+    public/*.html shell from its own .cljc source, citing ADR-2607022800 -- a
+    different ADR (kotoba-lang UI/UX design system), not this one"
+   "public/_redirects still lists explicit per-org-prefix rewrite rules
+    (/gftd/* /play 200, /itonami/* /play 200, /studio/gftd/* /studio 200,
+    /studio/itonami/* /studio 200) with a comment instructing future maintainers
+    to add a line per new org -- exactly the manual-routing-config burden this
+    ADR's :extensibility consequence set out to eliminate via a universal
+    `/* /index.html 200` fallback, which does not exist"
+   "the routing bug was fixed by PR #106 (`fix(routing): restore /<org>/<game>
+    pretty-URL routing`, commit 1eeb2e6, branch feat/spa-reagent-consolidation)
+    via those scoped per-org _redirects rules, not the universal client-router
+    fallback this ADR called for; PR #106's own description states the
+    play.html/dance.html/studio.html bootstraps were 'plain inline JS (not
+    re-frame)' and isekai.web/isekai.stage were 'plain CLJS (direct DOM
+    manipulation), not re-frame' at that point -- i.e. the multi-document,
+    non-reagent architecture was deliberately kept"
+   "commit 4cedf3e (PR #110, 'convert every page's UI chrome to reagent
+    (ADR-2607022800)') converts each static page's widgets in place
+    (rdom/render mounting status-view/editor-view/buttons-view into fixed DOM
+    ids the still-separate static HTML documents declare -- see
+    isekai/web.cljc:38-39 and isekai/stage.cljc:487-488, both commented
+    'Mounted once at boot into <page>.html's static containers/ids') -- this
+    satisfies ADR-2607022800's reagent-adoption mandate while implementing
+    this ADR's own explicitly rejected Alternative 2 (multi-document
+    architecture + reagent views inside each), not its actual spa_shell
+    Decision"]
+  :disposition
+  "not retroactively implementing the spa_shell/router decision: the routing
+   bug is already fixed in production (PR #106), the team has since invested
+   further in the opposite direction (per-page codegen + widget-level reagent
+   mounts, each with its own bb.edn CI gate, under ADR-2607022800), and a
+   repo-wide single-SPA rewrite of a live production site (isekai.network)
+   would conflict with all of that subsequent work for uncertain benefit.
+   Marked :superseded (by ADR-2607022800 for the reagent-adoption goal, by
+   PR #106 for the routing-bug goal) rather than :accepted, since the
+   architecture this ADR actually prescribed was never built."
+  :known_remaining_gap
+  "public/_redirects still needs a manually-added line per new org namespace
+   (2 total to date: gftd, itonami) -- the one concrete shortfall versus this
+   ADR's stated :extensibility benefit. Left as an explicit, undone,
+   low-value-at-current-scale follow-up rather than bundled into this audit."}}

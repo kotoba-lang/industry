@@ -1,0 +1,38 @@
+{:adr/id "0024"
+ :adr/title "kotoba stack accountability boundaries"
+ :adr/status :accepted
+ :adr/date "2026-06-29"
+ :adr/context-tags
+ #{:accountability
+   :authority
+   :kotoba
+   :kotoba-lang
+   :kototama
+   :aiueos
+   :kotodama
+   :murakumo
+   :kami-engine
+   :app-aozora
+   :clj-libraries}
+ :adr/related
+ ["0020-three-org-taxonomy-agent-enterprise-library"
+  "0021-rust-clj-wasm-layering-substrate"
+  "0023-organism-actor-first-service-app-yorishiro"]
+ :accountability/authority-chain
+ [:kotoba-lang
+  :kotoba-clj
+  :kototama
+  :aiueos
+  :kotodama
+  :app-or-murakumo]
+ :accountability/admission-rule
+ {:kotoba "Only when the change protects or exposes a substrate invariant."
+  :kotoba-lang "Language grammar, profile, conformance."
+  :kotoba-clj "CLJ subset compilation or safe analysis."
+  :kototama "Host capability facade or Wasm import contract."
+  :aiueos "Capability graph, broker, grant/deny, audit."
+  :kotodama "Organism lifecycle, actor loop, skill routing."
+  :murakumo "Compute scheduling, GPU spend, serverless placement."
+  :kami-engine "Engine loop, render, physics, input."
+  :product-repo "Product workflow, UX, tenant data policy."
+  :shared-clj "Portable Clojure API with no deployment authority."}}

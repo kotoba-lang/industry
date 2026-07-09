@@ -1,0 +1,49 @@
+name: kotoba migration parity
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  parity:
+    name: kotoba migration parity
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Clojure and Babashka
+        uses: DeLaGuardo/setup-clojure@13.0
+        with:
+          cli: latest
+          bb: latest
+
+      - name: Setup python + west
+        run: |
+          python -m pip install --upgrade pip
+          pip install west
+
+      - name: west.yml canonical (--check)
+        run: bb scripts/gen-west-manifest.bb --check
+
+      - name: west init + update
+        run: |
+          west init -l manifest
+          west update --fetch smart
+
+      - name: kotoba boundary audit
+        run: bb scripts/kotoba-boundary-audit.bb
+
+      - name: CLJ/CLJC migration gates
+        run: bash scripts/verify-clj-everywhere.sh

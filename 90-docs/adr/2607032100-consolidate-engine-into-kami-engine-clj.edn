@@ -1,0 +1,157 @@
+{:frontmatter
+ {:id "adr-2607032100-consolidate-engine-into-kami-engine-clj"
+  :title "ADR-2607032100: consolidate kotoba-lang/engine into kami-engine/kami-engine-clj"
+  :status "accepted"
+  :doc_type "adr"
+  :topic "kami-engine-clj-consolidation"
+  :authoritative true
+  :last_verified "2026-07-03"
+  :authoritative_for
+  ["the CLJ->WASM compiler (built this session, ADR-2607031700) now lives at
+    orgs/kotoba-lang/kami-engine/kami-engine-clj, not at a standalone
+    orgs/kotoba-lang/engine repo -- that repo is archived (read-only, not
+    deleted) and its manifest/repos.edn + manifest/west.yml entries removed"
+   "kami-clj-play and kami-script-runtime-rs (both contain real Rust source)
+    remain separate standalone kotoba-lang repos, unaffected by this move --
+    kami-engine's CI-enforced no-Rust guard is the reason they cannot join
+    kami-engine-clj there"
+   "dependents' forward-pointing documentation (kami-script-runtime-rs,
+    kami-genre-base-systems, gftdcojp/isekai-network READMEs) now cite
+    kami-engine/kami-engine-clj; historical PR links (kotoba-lang/engine#1,
+    #2) are left unchanged since they remain valid, viewable citations on the
+    archived repo"]
+  :related
+  ["CLAUDE.md"
+   "90-docs/adr/2607010930-clj-wgsl-migration.md"
+   "90-docs/adr/2607031700-kotoba-lang-engine-wasm-emission-and-host-runtime.md"
+   "90-docs/adr/2607031800-kami-genre-base-systems.md"
+   "manifest/repos.edn"
+   "manifest/west.yml"
+   "orgs/kotoba-lang/kami-engine PR #92 (merged)"
+   "orgs/kotoba-lang/engine (archived)"]
+  :supersedes []
+  :superseded_by []}
+
+ :problem
+ {:source "user request 2026-07-03: 'engine だけだと game engine とわからないので、kami-engine として整理したいかな' (the bare name 'engine' doesn't read as a game engine, wants it organized under kami-engine), then, after being shown that the literal name kami-engine already exists as a different repo, clarified via AskUserQuestion: consolidate only the Rust-free piece into kami-engine as a subdirectory, leave the Rust-containing repos (kami-clj-play, kami-script-runtime-rs) separate"
+  :investigated
+  ["kami-engine's own CI enforces a repo-wide no-Rust guard (confirmed via
+    its CLAUDE.md and the passing 'WIT single-source + no-rust guard' check
+    on the landing PR) -- this guard is the direct reason kami-script-
+    runtime-rs (real Rust, wasmtime/wgpu) had to become its own standalone
+    repo in the first place, per this session's earlier recovery work"
+   "kotoba-lang/engine (this session's ADR-2607031700 compiler) contains
+    zero Rust source -- verified by inspection before the move, and by the
+    landing PR's own CI passing the no-rust guard check unmodified"
+   "kami-engine already hosts a mix of real kami-*-clj CLJC subdirectories
+    (kami-app-sip-clj, kami-mangaka-*-clj, etc.) and thin fixture-only
+    directories with the same historical name as a since-extracted crate
+    (kami-script-runtime/ inside kami-engine holds only tests/survivors.clj,
+    a conformance fixture, not the real implementation which lives in the
+    separate kami-script-runtime and kami-script-runtime-rs repos) -- no
+    kami-engine-clj/ path existed yet, so this consolidation is a clean
+    landing, not a collision with existing fixture content"
+   "the compiler's own pre-migration name (per kami-engine's historical
+    CLAUDE.md crate table, already in this session's context) was literally
+    kami-engine-clj -- consolidating back under that name restores the
+    original, unambiguous naming this session's clj-wgsl-migration-driven
+    extraction had temporarily lost"]
+  :risk "kotoba-lang/engine was a live, public, already-integrated-with repo
+         (kami-script-runtime-rs and kami-genre-base-systems both compile
+         against it, isekai-network's README documented it) -- archiving it
+         without first landing the content elsewhere and updating dependents
+         would have broken those integrations; sequenced as copy-and-verify
+         first, archive last, to avoid that"}
+
+ :decision
+ {:new_path {:repo "orgs/kotoba-lang/kami-engine"
+             :subdir "kami-engine-clj/"
+             :method "plain copy of kotoba-lang/engine's full content (src/,
+                      test/, deps.edn, README.md, LICENSE) at its final
+                      commit e8bb9afc7fd85f8ae044026f5a20c986d0bae42c,
+                      matching this session's established plain-copy
+                      precedent for repo moves (not history-preserving).
+                      Provenance + source commit SHA recorded in
+                      kami-engine-clj/PROVENANCE.md."
+             :verified "clojure -M:test in the new location: 51 tests / 213
+                        assertions, 0 failures -- identical to the standalone
+                        repo's own count, confirming the move changed nothing
+                        about the code itself"
+             :landed_via "orgs/kotoba-lang/kami-engine PR #92, CI green (the
+                          no-rust guard check specifically), merged"}
+  :old_repo {:repo "orgs/kotoba-lang/engine"
+             :action "README updated to point at the new location, then
+                      archived via the GitHub API (archived=true) -- NOT
+                      deleted. Archiving is read-only and reversible
+                      (unarchive), preserving full history including PR #1/#2
+                      for citation."
+             :unaffected "kami-clj-play and kami-script-runtime-rs -- both
+                          contain real Rust and correctly remain separate
+                          standalone repos, respecting kami-engine's no-Rust
+                          CI guard. Not moved, not touched beyond a doc-link
+                          update in kami-script-runtime-rs's README."}
+  :manifest_update
+  {:repos_edn "removed the \"orgs/kotoba-lang/engine\" line via GitHub
+               Contents API single-entry PUT (blob-sha-matched against
+               origin/main tip), commit 1619e2d52c4a546da97f7f6ec73ab1f2c19290d3"
+   :west_yml "removed the 'engine' project entry (name/remote/revision/path/
+              groups, 5 lines) via the same API method, commit
+              ed2f00acfd4382a2bfc45e900bde9ba1c4dfdcbf"
+   :kami_engine_entry "kami-engine's own existing west.yml/repos.edn
+                       registration needed no change -- it was already
+                       registered from the original clj-wgsl migration; this
+                       consolidation only adds a subdirectory to its existing
+                       tree, not a new top-level project"}
+  :dependent_docs_updated
+  ["orgs/kotoba-lang/kami-script-runtime-rs README.md (forward-pointing intro
+    reference; historical PR #1/#2 links left as accurate citations)"
+   "orgs/kotoba-lang/kami-genre-base-systems README.md (forward-pointing
+    verification-provenance reference; historical 'finding from this pass'
+    narrative left as-is)"
+   "orgs/gftdcojp/isekai-network README.md (updated the now-stale 'WASM
+    compile status' section, which had predated this session's compiler
+    discovery/build/verification work entirely -- also fixed the outdated
+    kami-clj-play wiring note in the 'Not yet done' section)"]}
+
+ :consequences
+ {:unambiguous_naming "the compiler is once again named kami-engine-clj,
+                        matching its pre-migration identity and removing the
+                        'engine' vs 'kami-engine' vs 'kotoba-lang/engine'
+                        naming confusion the user flagged"
+  :respects_no_rust_guard "kami-engine's CI-enforced Rust-free invariant is
+                            preserved -- this consolidation only works
+                            because the compiler is genuinely Rust-free;
+                            kami-clj-play/kami-script-runtime-rs's continued
+                            separation is not incidental, it's required by
+                            that same invariant"
+  :zero_broken_integrations "kami-script-runtime-rs and kami-genre-base-
+                              systems both still compile against the
+                              (relocated) compiler; sequencing (copy+verify,
+                              then update dependents, then archive old repo)
+                              meant no window where a dependent pointed at a
+                              dead/missing location"
+  :reversible_if_wrong "archiving (not deleting) the old repo means this
+                        decision can be cleanly reverted (unarchive, revert
+                        the kami-engine PR, re-register in manifest) if it
+                        turns out wrong, without any data loss"}
+
+ :alternatives
+ [{:option "rename kotoba-lang/engine to kami-engine (literal)"
+   :rejected_because "collides with the existing orgs/kotoba-lang/kami-engine
+                       repo (the original clj-wgsl-migration asset/contract
+                       home) -- not a valid name"}
+  {:option "consolidate everything (including kami-clj-play and
+            kami-script-runtime-rs, both real Rust) into kami-engine"
+   :rejected_because "would require relaxing/removing kami-engine's CI-
+                       enforced no-Rust guard, reversing a deliberate,
+                       carefully-executed migration decision (ADR-2607010930)
+                       -- explicitly declined by the user via AskUserQuestion
+                       in favour of the Rust-free-only option"}
+  {:option "rename only, without physically moving the content (e.g. a repo-
+            level GitHub rename kotoba-lang/engine -> kotoba-lang/kami-engine-clj)"
+   :rejected_because "would leave the compiler as a fourth top-level
+                       kotoba-lang repo alongside kami-engine, kami-clj-play,
+                       kami-script-runtime-rs, rather than actually
+                       organizing it under kami-engine as the user asked --
+                       doesn't address the underlying 'where does this
+                       belong' question, only the label"}]}

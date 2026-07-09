@@ -1,0 +1,47 @@
+{:frontmatter
+ {:id "adr-2607051500-kotoba-lang-standard-model-field-theory-library"
+  :title "ADR-2607051500: kotoba-lang/standard-model — gauge/tensor/vector/spinor field library computing classical Standard Model field content in .cljc"
+  :status "accepted"
+  :date "2026-07-05"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "kotoba-lang-standard-model"
+  :authoritative true
+  :authoritative_for
+  ["new kotoba-lang repo `standard-model`: zero-dep .cljc, six namespaces
+    kotoba.sm.{complex,tensor,vector-field,spinor,gauge,standard-model}"
+   "complex.cljc is the shared complex-scalar + complex-matrix algebra layer
+    (add/mul/conj/dagger/commutator/trace) that spinor.cljc and gauge.cljc both
+    build their fixed-size matrices (gamma, Pauli, Gell-Mann) on top of"
+   "tensor.cljc fixes the Minkowski metric convention as mostly-minus
+    diag(1,-1,-1,-1) (Bjorken-Drell), documented explicitly since mostly-plus is
+    the other common QFT-textbook convention"
+   "gauge.cljc derives structure constants f^abc generically for any generator
+    set via f^abc = -2i Tr([T^a,T^b] T^c), not hard-coded, checked against
+    textbook SU(2)/SU(3) values"
+   "standard-model.cljc composes: fermion generation table checked against
+    Gell-Mann-Nishijima Q=T3+Y/2, electroweak mixing (Weinberg angle, W/Z/photon,
+    M_W=M_Z cos(theta_W) derived not assumed), Higgs potential+vev+Yukawa masses,
+    CKM matrix (Wolfenstein) with unitarity check, full 3-factor covariant
+    derivative, Lagrangian-density term assembly (Yang-Mills+Dirac+Higgs+Yukawa)"
+   "scope is the CLASSICAL field algebra only: equations of motion and defining
+    algebraic relations, evaluated numerically. Quantization, renormalization/RGE,
+    scattering amplitudes, lattice simulation, and PMNS/neutrino-oscillation are
+    explicitly deferred (not implemented this pass)"
+   "distinct domain from existing kotoba-lang physics/physics-2d/vphysics (those
+    are game-engine rigid-body and vehicle physics, no QFT/particle content) and
+    from kotoba-lang/num (N-D array/WGSL ML tensor engine, different abstraction
+    level, ADR-2607051400) -- no overlap/duplication"
+   "follows CLAUDE.md standing 'new project' authorization (2026-06-28): ADR ->
+    scaffold -> git init+commit -> gh repo create kotoba-lang/standard-model
+    --public + push -> repos.edn + gen-west-manifest.bb --entry standard-model
+    -> this ADR + manifest reflected in superproject"
+   "landed 2026-07-05: github.com/kotoba-lang/standard-model (public), 22 tests /
+    85 assertions passing, CI green (JDK 17+21); manifest registration verified
+    via gen-west-manifest.bb --entry standard-model (minimal diff, server-side
+    pin check OK)"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607051400" "adr-2606302300"]
+  :last_verified "2026-07-05"}
+ :body "see 2607051500-kotoba-lang-standard-model-field-theory-library.md"}

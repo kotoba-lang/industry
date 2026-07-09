@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+# git-annex external special remote for IPFS.
+#
+# git-annex performs encryption (encryption=hybrid) BEFORE calling this remote,
+# so the bytes we hand to `ipfs add` are already gpg-encrypted ciphertext.
+# Only ciphertext is ever pinned to IPFS.
+#
+# Per-key IPFS CID is persisted via git-annex SETSTATE/GETSTATE (stored in the
+# git-annex branch), so no external mapping file is needed.
+#
+# Protocol: https://git-annex.branchable.com/design/external_special_remote_protocol/
+set -u
+
+IPFS_BIN="${IPFS_BIN:-ipfs}"
+
+reply() { printf '%s\n' "$*"; }
+dbg()   { printf 'DEBUG %s\n' "$*"; }
+
+# Send a request to git-annex and read exactly one reply line into $REPLY_LINE.
+ask() {
+  printf '%s\n' "$*"
+  IFS= read -r REPLY_LINE || REPLY_LINE=""
+}
+
+# Get the CID stored for a key (sets $CID; empty if none).
+get_cid() {
+  ask "GETSTATE $1"
+  # git-annex replies: VALUE <cid>   (VALUE with empty arg => no state)
+  CID="${REPLY_LINE#VALUE }"
+  [ "$REPLY_LINE" = "VALUE" ] && CID=""
+  [ "$REPLY_LINE" = "$CID" ] && CID=""   # reply was not a VALUE line
+}
+
+# Announce protocol version first (unprompted), per spec.
+reply "VERSION 1"
+
+while IFS= read -r line; do
+  set -- $line
+  cmd="${1:-}"
+  case "$cmd" in
+    EXTENSIONS)
+      # We need no protocol extensions.
+      reply "EXTENSIONS"
+      ;;
+    INITREMOTE)
+      if command -v "$IPFS_BIN" >/dev/null 2>&1; then
+        reply "INITREMOTE-SUCCESS"
+      else
+        reply "INITREMOTE-FAILURE ipfs binary not found"
+      fi
+      ;;
+    PREPARE)
+      if "$IPFS_BIN" --version >/dev/null 2>&1; then
+        reply "PREPARE-SUCCESS"
+      else
+        reply "PREPARE-FAILURE cannot run ipfs"
+      fi
+      ;;
+    TRANSFER)
+      direction="$2"; key="$3"; file="$4"
+      if [ "$direction" = "STORE" ]; then
+        cid="$("$IPFS_BIN" add -q --cid-version=1 --pin=true -- "$file" 2>/dev/null | tail -n1)"
+        if [ -n "$cid" ]; then
+          reply "SETSTATE $key $cid"   # SETSTATE is fire-and-forget (no reply from git-annex)
+          reply "TRANSFER-SUCCESS STORE $key"
+        else
+          reply "TRANSFER-FAILURE STORE $key ipfs add failed"
+        fi
+      elif [ "$direction" = "RETRIEVE" ]; then
+        get_cid "$key"
+        if [ -n "$CID" ] && "$IPFS_BIN" cat -- "$CID" > "$file" 2>/dev/null; then
+          reply "TRANSFER-SUCCESS RETRIEVE $key"
+        else
+          reply "TRANSFER-FAILURE RETRIEVE $key no CID / ipfs cat failed"
+        fi
+      fi
+      ;;
+    CHECKPRESENT)
+      key="$2"
+      get_cid "$key"
+      if [ -z "$CID" ]; then
+        reply "CHECKPRESENT-FAILURE $key"
+      elif "$IPFS_BIN" pin ls --type=recursive -- "$CID" >/dev/null 2>&1; then
+        reply "CHECKPRESENT-SUCCESS $key"
+      elif "$IPFS_BIN" block stat -- "$CID" >/dev/null 2>&1; then
+        reply "CHECKPRESENT-SUCCESS $key"
+      else
+        reply "CHECKPRESENT-UNKNOWN $key not pinned and not reachable"
+      fi
+      ;;
+    REMOVE)
+      key="$2"
+      get_cid "$key"
+      [ -n "$CID" ] && "$IPFS_BIN" pin rm -- "$CID" >/dev/null 2>&1
+      # Unpinning is best-effort; content may persist on the network.
+      reply "REMOVE-SUCCESS $key"
+      ;;
+    GETCOST)
+      reply "COST 200"
+      ;;
+    GETAVAILABILITY)
+      reply "AVAILABILITY GLOBAL"
+      ;;
+    *)
+      reply "UNSUPPORTED-REQUEST"
+      ;;
+  esac
+done

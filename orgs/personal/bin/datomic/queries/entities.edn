@@ -1,0 +1,32 @@
+;; queries/entities.edn — 組織・アカウント・契約・関係グラフのビュー (ADR-0015 + 整理)。
+
+{:org/by-role
+ {:doc "組織を関係種別 (own-corp/equity/counterparty/...) 別に。"
+  :query [:find ?role ?name ?status
+          :where [?o :org/role ?role] [?o :org/name ?name] [?o :org/status ?status]]}
+
+ :account/reachability
+ {:doc "メールアカウントの到達性マトリクス (ADR-0004)。pending = ingest プロセス対象。"
+  :query [:find ?id ?reach ?status ?role
+          :where [?a :account/reach ?reach] [?a :account/id ?id]
+                 [?a :account/status ?status] [?a :account/role ?role]]}
+
+ :contract/active
+ {:doc "係争連動を含む全契約と状態。"
+  :query [:find ?title ?kind ?status
+          :where [?c :contract/id] [?c :contract/title ?title]
+                 [?c :contract/kind ?kind] [?c :contract/status ?status]]}
+
+ :person/org-graph
+ {:doc "人物 → 所属組織 (org/people 経由) の関係エッジ。"
+  :query [:find ?person ?org ?role
+          :where [?o :org/people ?p] [?p :person/name ?person]
+                 [?o :org/name ?org] [?o :org/role ?role]]}
+
+ :contract/disputed
+ {:doc "係争中・確定判決の契約 (litigation 連動)。"
+  :query [:find ?title ?status ?case
+          :where [?c :contract/status ?status]
+                 [(contains? #{:disputed :enforced} ?status)]
+                 [?c :contract/title ?title]
+                 [?c :contract/case ?cs] [?cs :case/id ?case]]}}

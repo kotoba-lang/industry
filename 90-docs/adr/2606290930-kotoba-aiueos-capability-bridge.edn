@@ -1,0 +1,81 @@
+{:frontmatter
+ {:id "adr-2606290930-kotoba-aiueos-capability-bridge"
+  :title "ADR-2606290930: kotoba CID <-> aiueos hash resource mapping and Kotoba Grant normalization bridge"
+  :status "proposed"
+  :doc_type "adr"
+  :topic "kotoba-aiueos-security"
+  :authoritative true
+  :last_verified "2026-06-29"
+  :authoritative_for
+  ["bridge kotoba(CID-addressed) and aiueos(sha256-hex pinned) artifact identity"
+   "define resource(kotoba://...) to aiueos typed capability mapping table"
+   "normalize external CACAO/UCAN envelope into Kotoba Grant then aiueos local grant"
+   "normalization is intersection: external AND local-policy AND manifest AND surface AND limits"]
+  :related
+  ["90-docs/adr/2606290900-kotoba-aiueos-key-lifecycle-revocation.md"
+   "orgs/com-junkawasaki/kotoba/crates/kotoba-auth"
+   "orgs/com-junkawasaki/kotoba/crates/kotoba-clj/src/policy.rs"
+   "orgs/com-junkawasaki/aiueos/src/policy.rs"
+   "orgs/com-junkawasaki/aiueos/src/broker.rs"
+   "orgs/com-junkawasaki/aiueos/src/surface.rs"]
+  :supersedes []
+  :superseded_by []}
+
+ :gap
+ {:source "audit 2026-06-29"
+  :artifact-identity {:kotoba "KotobaCid sha2-256 dag-cbor"
+                      :aiueos ":aiueos/wasm-sha256 lowercase hex (hash pin, not CID)"
+                      :issue "no bridge between the two"}
+  :resource-mapping {:kotoba-cacao "kotoba://can/{cap}, kotoba://graph/{cid}"
+                     :aiueos "typed strings graph/read, topic/publish, net/fetch"
+                     :issue "ambiguous URL->net/fetch/* widening is a hole"}
+  :bridge {:issue "normalize-external-into-kotoba-grant exists implicitly, split across two layers, no single path"}}
+
+ :decision
+ {:single-path "external authz -> Kotoba Grant -> aiueos local grant -> Wasm imports; each stage shrinks only"
+  :artifact-bridge {:add ":aiueos/wasm-cid (optional)"
+                    :verify "bidirectional wasm-cid <-> wasm-sha256 at broker load"
+                    :canonical :cid :compat :hex}
+  :intersection "effective = kotoba_grant ∩ aiueos_policy.grants ∩ manifest.imports ∩ surface.offered ∩ limits"
+  :no-union "addition forbidden (no capability mushroom growth)"}
+
+ :resource-capability-table
+ {:deny-by-default true
+  :no-wildcard-url "never collapse a URL to *; bind origin+path-prefix+method"
+  :rows
+  [{:resource ["kotoba://can/graph-read" "kotoba://graph/{cid}"] :cap "graph/read" :constraints [:cid :max-rows]}
+   {:resource ["kotoba://can/graph-write" "kotoba://graph/{cid}"] :cap "graph/write" :constraints [:cid]}
+   {:resource ["kotoba://can/infer" "kotoba://model/{cid}"] :cap "llm/infer" :constraints [:cid :max-tokens]}
+   {:resource ["kotoba://can/net-fetch" "https://host/path/*"] :cap "net/fetch" :constraints [:origin :prefix :methods]}
+   {:resource ["kotoba://can/topic-pub" "topic/{system}/{id}"] :cap "topic/publish" :constraints [:system :topic]}]}
+
+ :kotoba-grant
+ {:fields [:id :issuer :subject :audience :component :manifest-cid :wasm-cid
+           :capabilities :limits :nbf :exp :parent :proof]
+  :capability-shape {:cap "typed" :resource "cid-or-origin" :constraints "normalized"}
+  :limits [:fuel :memory-pages :host-calls :output-bytes]
+  :validity-checked-by "ADR-2606290900 trust decision (signature ∧ expiry ∧ revocation)"}
+
+ :pipeline
+ {:stages
+  [{:layer "DID" :role "who" :where "kotoba-auth"}
+   {:layer "CACAO/UCAN-like" :role "who signed what" :where "envelope"}
+   {:layer "Kotoba Grant" :role "what it means" :where "normalization bridge"}
+   {:layer "aiueos local grant" :role "allowed here" :where "intersection"}
+   {:layer "Wasm import table" :role "what can happen" :where "aiueos:host gate"}
+   {:layer "Audit receipt" :role "what happened" :where "CommitDag / EDN log"}]
+  :attenuation ["child.cap subset-of parent.cap" "child.resource subset-of parent.resource"
+                "child.exp <= parent.exp" "child.aud = parent.aud"]}
+
+ :maturity
+ [{:stage :B0 :deliverable ["kotoba CACAO/typed CapClass" "aiueos verify_component intersection"] :status :implemented :note "separate impls in both layers"}
+  {:stage :B1 :deliverable [":aiueos/wasm-cid" "CID<->hex bidirectional verify"] :status :next}
+  {:stage :B2 :deliverable ["resource->capability normalization table" "deny-by-default"] :status :next}
+  {:stage :B3 :deliverable ["Kotoba Grant type" "single normalization path kotoba-auth -> aiueos broker"] :status :after-b1-b2}
+  {:stage :B4 :deliverable ["run receipt CID-addressed DAG" "source/compiler/policy/grant/input/output"] :status :future}]
+
+ :consequences
+ ["aiueos manifest gains optional :aiueos/wasm-cid; sha256-only manifests still accepted (back-compat)"
+  "normalization table is one authoritative EDN referenced by both kotoba and aiueos"
+  "table edits guarded by ADR-2606290900 signer authority"
+  "B4 run receipt DAG links kotoba CommitDag author_sig with aiueos EDN audit log"]}

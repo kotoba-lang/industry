@@ -1,0 +1,33 @@
+node_modules/
+*.pyc
+__pycache__/
+tsconfig.tsbuildinfo
+playwright-report/
+.pytest_cache/
+.coverage
+*.log
+
+# Large dataset files (Git LFS causes push issues)
+dataset/sumstats/
+dataset/*.duckdb
+dataset/*.gz
+dataset/*.tgz
+dataset/*.zip
+dataset/baselineLF_v2.2.UKB
+dataset/ldref_hm3_plus
+
+# Large output files
+temp/
+figures_output/
+
+# Analysis outputs that can be regenerated
+
+
+# Environment and virtual environments
+analysis/environment/
+analysis/new_env/
+.venv/
+venv/
+env/
+
+analysis/reference_data/

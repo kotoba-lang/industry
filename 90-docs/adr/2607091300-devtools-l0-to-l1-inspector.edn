@@ -1,0 +1,20 @@
+{:adr/id "2607091300"
+ :adr/title "DevTools L0 (absent) -> L1 (pure-data inspector) -- devtools.inspect + browser.devtools"
+ :adr/status :accepted
+ :adr/date "2026-07-09"
+ :adr/deciders ["Jun Kawasaki"]
+ :adr/scope ["orgs/kotoba-lang/devtools (new devtools.inspect namespace)"
+             "orgs/kotoba-lang/browser (new browser.devtools adapter + quickjs_runner console persistence)"
+             "manifest/west.yml pin advance (devtools + browser)"]
+ :adr/related ["2607051200-kotoba-lang-ui-family-rename"]
+ :level-before {:devtools :L0}
+ :level-after {:devtools :L1}
+ :L2-deferred "CDP-compatible subset / HTTP inspector transport over inspection-input (transport-agnostic boundary already in place)"
+ :decision "L1 = a reliably-verifiable pure-data inspector. devtools.inspect (zero-dep, 6 panels + render + inspect-node, duck-typed plain-data shapes) + browser.devtools (thin adapter reusing document-snapshot/draw-ops/audit/console-messages) + quickjs_runner persists :console/messages (accumulates within a page generation, cleared on navigation = real browser console lifetime)"
+ :test-status "devtools.inspect-test 22 tests (plain-data, engine-free); browser.devtools-test 5 integration tests (scriptless HTML, no QuickJS WASM); browser full suite 675/3176/0 fail; devtools 27/103/0 fail; lint 0 errors"
+ :regression "none -- browser 675 tests incl. 5 new; devtools 27 incl. 22 new"
+ :pins-advanced {:devtools "4361006f3007b8d65395e1f16986cd676c22f156 -> 709c17bf6a80b766ce8c19ef5dce3ce9d68fc964"
+                 :browser  "7d5adee087c5efc13989ffbae2c7e8299def8da6 -> 65b6cd027cc1daad149dc9b90925abb2dd8adbc2"}
+ :superproject-west-commit "6746bc29fc838d04700f534a822bcd369cba213f"
+ :child-merge-commits {:devtools "709c17bf6a80b766ce8c19ef5dce3ce9d68fc964"
+                       :browser  "65b6cd027cc1daad149dc9b90925abb2dd8adbc2"}}

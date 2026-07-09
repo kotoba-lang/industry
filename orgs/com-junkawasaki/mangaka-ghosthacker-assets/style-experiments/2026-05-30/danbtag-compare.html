@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>Animagine XL 4.0 — Danbooru-tag A/B/C</title>
+<style>
+:root { color-scheme: dark; --bg:#0e0e10; --panel:#1a1a1f; --fg:#e8e8ec;
+        --muted:#8b8b95; --accent:#4cb5ff; --border:#2a2a32; }
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,"Hiragino Sans",sans-serif}
+header{padding:16px 24px;border-bottom:1px solid var(--border)}
+h1{font-size:18px} h1 small{color:var(--muted);font-weight:400;margin-left:8px}
+main{padding:20px;max-width:1500px;margin:0 auto}
+.grid{display:grid;grid-template-columns:60px repeat(2,1fr);gap:14px;align-items:start}
+.col-head{padding:10px;text-align:center;font-weight:600;color:var(--accent);
+          border-bottom:1px solid var(--border)}
+.col-head small{display:block;color:var(--muted);font-weight:400;font-size:11px;margin-top:4px}
+.row-head{padding:12px 4px;text-align:center;font-weight:700;writing-mode:vertical-rl;
+          transform:rotate(180deg);color:var(--muted);
+          border-right:1px solid var(--border)}
+.cell{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px}
+.cell img{width:100%;height:auto;border-radius:4px;background:#fff;cursor:zoom-in}
+.cell .meta{margin-top:6px;font-size:11px;color:var(--muted);font-family:ui-monospace,monospace;
+            word-break:break-all;line-height:1.4}
+.cell .vote{margin-top:6px;display:flex;gap:4px}
+.cell .vote button{flex:1;background:transparent;color:var(--muted);
+                    border:1px solid var(--border);border-radius:4px;padding:4px;
+                    cursor:pointer;font:inherit;font-size:11px}
+.cell .vote button:hover{background:var(--border);color:var(--fg)}
+.cell .vote button.on{background:var(--accent);color:#000;border-color:var(--accent)}
+#lb{position:fixed;inset:0;background:rgba(0,0,0,0.92);display:none;
+    align-items:center;justify-content:center;z-index:99;cursor:zoom-out}
+#lb.on{display:flex}
+#lb img{max-width:95vw;max-height:95vh}
+.summary{margin-top:24px;padding:16px;background:var(--panel);border-radius:8px}
+.summary h2{font-size:14px;margin-bottom:8px;color:var(--accent)}
+.summary pre{font:11px/1.5 ui-monospace,monospace;color:var(--muted)}
+.legend{margin-top:24px;padding:16px;background:var(--panel);border-radius:8px;font-size:12px;color:var(--muted)}
+.legend h2{color:var(--accent);font-size:14px;margin-bottom:8px}
+.legend code{background:#000;padding:2px 6px;border-radius:3px;font-size:11px}
+</style></head><body>
+<header><h1>Animagine XL 4.0 — Danbooru-tag A/B/C
+<small>p17 同シーン (Yuto in bedroom) · B = Danbooru tags · C = B + year + very aesthetic</small></h1></header>
+<main>
+<div class="grid">
+  <div></div>
+  <div class="col-head">B<small>masterpiece, best quality, monochrome, manga, [artist], [media], [scene]</small></div>
+  <div class="col-head">C<small>B + year XXXX + very aesthetic + absurdres</small></div>
+
+  <div class="row-head">shokugeki</div>
+  <div class="cell" data-k="shokugeki-B">
+    <img src="file:///tmp/danbtag-shokugeki-B.png">
+    <div class="meta">shokugeki / B<br>shounen_manga, speed_lines, motion_lines, intense_expression, dramatic_angle</div>
+    <div class="vote"><button data-v="best">Best</button><button data-v="good">Good</button><button data-v="meh">Meh</button></div>
+  </div>
+  <div class="cell" data-k="shokugeki-C">
+    <img src="file:///tmp/danbtag-shokugeki-C.png">
+    <div class="meta">shokugeki / C<br>year 2018, very aesthetic, absurdres + B</div>
+    <div class="vote"><button data-v="best">Best</button><button data-v="good">Good</button><button data-v="meh">Meh</button></div>
+  </div>
+
+  <div class="row-head">ishida</div>
+  <div class="cell" data-k="ishida-B">
+    <img src="file:///tmp/danbtag-ishida-B.png">
+    <div class="meta">ishida / B<br>ishida_sui, crosshatch, deep_shadow, dutch_angle, moody, asymmetric_composition</div>
+    <div class="vote"><button data-v="best">Best</button><button data-v="good">Good</button><button data-v="meh">Meh</button></div>
+  </div>
+  <div class="cell" data-k="ishida-C">
+    <img src="file:///tmp/danbtag-ishida-C.png">
+    <div class="meta">ishida / C<br>year 2014, very aesthetic, absurdres + B</div>
+    <div class="vote"><button data-v="best">Best</button><button data-v="good">Good</button><button data-v="meh">Meh</button></div>
+  </div>
+
+  <div class="row-head">amano</div>
+  <div class="cell" data-k="amano-B">
+    <img src="file:///tmp/danbtag-amano-B.png">
+    <div class="meta">amano / B<br>thin_lines, gentle, soft_shading, peaceful, delicate_linework, ample_white_space</div>
+    <div class="vote"><button data-v="best">Best</button><button data-v="good">Good</button><button data-v="meh">Meh</button></div>
+  </div>
+  <div class="cell" data-k="amano-C">
+    <img src="file:///tmp/danbtag-amano-C.png">
+    <div class="meta">amano / C<br>year 2005, very aesthetic, absurdres + B</div>
+    <div class="vote"><button data-v="best">Best</button><button data-v="good">Good</button><button data-v="meh">Meh</button></div>
+  </div>
+</div>
+
+<div class="summary"><h2>Tally (localStorage)</h2><pre id="tally">no votes yet</pre></div>
+
+<div class="legend"><h2>What this tests</h2>
+<p><b>B</b> = pure Danbooru tags only. If Animagine reacts strongly to <code>ishida_sui</code>,
+<code>shounen_manga</code>, <code>thin_lines</code>, we expect distinct, recognizable style per row.</p>
+<p><b>C</b> = B + <code>year XXXX</code> (era anchor) + <code>very aesthetic, absurdres</code>
+(quality boost). The year tag controls aesthetic generation era and can sharpen specific-period style.</p>
+<p>vs prior description-prompted runs (<code>style-compare-3x3.html</code>): if B/C win, we should
+switch the v11 style profiles to Danbooru-tag format.</p>
+</div>
+
+</main>
+<div id="lb" onclick="this.classList.remove('on')"><img id="lbimg"></div>
+<script>
+const SK='animagine-danbtag-vote';
+const v=JSON.parse(localStorage.getItem(SK)||'{}');
+function render(){
+  document.querySelectorAll('.cell').forEach(c=>{
+    const k=c.dataset.k;
+    c.querySelectorAll('.vote button').forEach(b=>b.classList.toggle('on',b.dataset.v===v[k]));
+  });
+  const cnt={shokugeki:{best:0,good:0,meh:0},ishida:{best:0,good:0,meh:0},amano:{best:0,good:0,meh:0}};
+  for(const[k,vv]of Object.entries(v)){const s=k.split('-')[0];if(cnt[s])cnt[s][vv]=(cnt[s][vv]||0)+1;}
+  document.getElementById('tally').textContent=Object.entries(cnt).map(([s,c])=>
+    `${s.padEnd(12)}  best=${c.best}  good=${c.good}  meh=${c.meh}  score=${c.best*3+c.good*1-c.meh*1}`
+  ).join('\n')||'no votes yet';
+}
+document.querySelectorAll('.vote button').forEach(b=>b.addEventListener('click',e=>{
+  const cell=e.target.closest('.cell'),k=cell.dataset.k;
+  v[k]=v[k]===e.target.dataset.v?null:e.target.dataset.v;
+  if(!v[k])delete v[k];
+  localStorage.setItem(SK,JSON.stringify(v));render();
+}));
+document.querySelectorAll('.cell img').forEach(img=>img.addEventListener('click',()=>{
+  document.getElementById('lbimg').src=img.src;
+  document.getElementById('lb').classList.add('on');
+}));
+render();
+</script>
+</body></html>

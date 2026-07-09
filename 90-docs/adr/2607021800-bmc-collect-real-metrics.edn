@@ -1,0 +1,25 @@
+{:frontmatter
+ {:id "adr-2607021800-bmc-collect-real-metrics"
+  :title "ADR-2607021800: bmc collect — Cloudflare/Stripe 実測を business loop に接続"
+  :status "accepted"
+  :date "2026-07-02"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "bmc-collect-real-metrics"
+  :authoritative true
+  :authoritative_for
+  ["実測 metrics の SSoT = 90-docs/business/metrics/<product>.edn
+    (collect.bb が Cloudflare GraphQL 7d + Stripe + health から生成、秘密は書かない)"
+   "operating cadence: collect.bb → 全 product react loop → canvas md --all →
+    score md → commit が 1 運転"
+   "2026-07-02 実測による facts/スコア改訂 (yoro 52/40, murakumo 64/52,
+    aozora 64/47, apex 60/45, etzhayyim 64/60 参考, kotobase 76/58,
+    manimani 56/43, itonami 56/43)。Stripe 実測 active subs 0"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607021500-portfolio-seven-layer-business-model-lean-canvas"
+            "adr-2607021600-portfolio-bmc-cli-react-loop"
+            "adr-2607021700-portfolio-maturity-scoring"]
+  :last_verified "2026-07-02"}
+ :body
+ "# ADR-2607021800\n\n**Status**: accepted **Date**: 2026-07-02\n\n## Decision\n\n1. 70-tools/bmc/collect.bb: Cloudflare GraphQL (httpRequests1dGroups 7d /\n   workersInvocationsAdaptive 7d) + Stripe (subscriptions/charges) + health を\n   90-docs/business/metrics/<product>.edn へ集計数値のみ書く。creds は\n   env → Keychain gftd.cf / 1Password STRIPE_SECRET_KEY。秘密はファイルに書かない。\n2. operating cadence: collect → react loop (全 product) → canvas md → score md。\n3. 実測 facts 改訂の要点: gftd.ai 422,889 req/7d・uniques 4,644 (apex 3/2/4)、\n   murakumo worker 158,768 inv/7d (3/-/5)、etzhayyim 136,214 req + 85,862 inv\n   (launched 4)、aozora.app 14,313 req・PV 6,960 (3/2/4)、yoro workers 1,673\n   inv/7d で「設計のみ」を訂正 (2/1/3)、manimani.cloud 443 req (launched 3)、\n   kotobase Stripe active subs 0 (revenue 1 据置)、itonami.cloud 6 req (据置)。\n4. スコア: yoro 52/40、murakumo 64/52、aozora 64/47、apex 60/45、\n   etzhayyim 64/60(参考)、kotobase 76/58、manimani 56/43、itonami 56/43。\n   validation 全 0・revenue 0–1 が引き続き律速。\n\n## Consequences\n\n(+) facts が実測根拠つき、canvas に実測観測が ledger 経由で蓄積。\n(−) Keychain StripeCLI 鍵は期限切れ (1Password が有効)。定期運転は未設定。\nペアの .md が正。"}

@@ -1,0 +1,33 @@
+{:frontmatter
+ {:id "adr-2607041300-cloud-itonami-iso3166-country-maturity-promotion-batch8"
+  :title "ADR-2607041300: cloud-itonami-iso3166 — country maturity promotion, batch 8 (Thailand / Colombia / Spain)"
+  :status "accepted"
+  :date "2026-07-04"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "cloud-itonami-iso3166-country-maturity-promotion-batch8"
+  :authoritative true
+  :authoritative_for ["cloud-itonami-iso3166-{tha,col,esp} blueprint scope"
+                      "kotoba-lang/iso3166 registry.edn :kotoba.registry/note field format going forward"]
+  :related ["adr-2607032330-cloud-itonami-iso3166-market-entry-compliance-blueprints"
+            "adr-2607041200-cloud-itonami-iso3166-country-maturity-promotion-batch7"]
+  :supersedes []
+  :superseded_by []
+  :amends []}
+
+ :decision-summary
+ {:updated-lib "kotoba-lang/iso3166"
+  :new-blueprints ["cloud-itonami-iso3166-tha" "cloud-itonami-iso3166-col" "cloud-itonami-iso3166-esp"]
+  :org "cloud-itonami"
+  :visibility :public
+  :license "AGPL-3.0-or-later"
+  :registry-coverage {:total 212 :blueprint 45 :spec 167
+                       :countries {:total 193 :blueprint 26 :spec 167}
+                       :jpn-agencies {:total 19 :blueprint 19 :spec 0}}
+  :promoted {:THA "e-GP + DBD business registration"
+             :COL "SECOP II + RUT/RUP registration"
+             :ESP "PLACSP + Registro Mercantil/NIF registration"}
+  :registry-note-trimmed "kotoba.registry/note no longer lists every batch's country codes verbatim; points to ADR history + README instead"
+  :robotics false
+  :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+  :manifest-registration "no new kotoba-lang/* repo -- extends existing kotoba-lang/iso3166; west.yml pin advances. The 3 blueprint repos remain standalone."}}

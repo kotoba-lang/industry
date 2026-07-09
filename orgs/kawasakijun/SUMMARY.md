@@ -1,0 +1,221 @@
+# 河崎純真 — 統合スナップショット (2026-05-17 時点)
+
+公開情報 + Gmail + Calendar から再構成。Drive は要 OAuth。
+
+## 基本
+
+| | |
+|---|---|
+| 生年月日 | 1991-10-16 |
+| 出身 | 大分県国東市 |
+| 神経特性 | ADHD (本人) / 母: アスペルガー (アニメーター「ルパン三世 カリオストロの城」等) |
+| 家族 | **離婚済 (single)** / 結婚 2020-01-06 → 離婚 / 娘 **のどか** (受験準備中) / 再婚および子供あと 2–3 人希望 |
+| 宗教背景 | エホバの証人家庭 → 比叡山延暦寺出家 (2018, 27歳) |
+| 学歴 | 中卒認定 → 慶應義塾大学 (科学哲学) |
+| 居住 | 渋谷区神宮前2-2-39 ザコート神宮外苑804 |
+| 通院 | 渋谷こころのクリニック (院長 渡辺) 月1–2回 |
+
+## 現職 (兼任)
+
+- **Gftd Japan 株式会社 代表取締役社長 / CISO / サイバーセキュリティビジネスリード**
+  住所: 千代田区丸の内1-9-2 グラントウキョウサウスタワー11階
+- **JK株式会社 代表** (秘書 山田 / バーチャルオフィス: サーブコープ ヤンマー東京)
+- **大宗寺 僧侶代表役員**
+- **一般財団法人高IQ者認定支援機構 理事**
+- **Commons生協組合 管理組合員**
+- **Metaverse Japan 第5期会員**
+
+## キャリア年表
+
+| 年 | 出来事 |
+|---|---|
+| 2004 | 13歳でプログラミング開始 |
+| 2006 | 15歳で家を出る → 大工/工場/飲食/エンジニア |
+| 2008 | 17歳 Q&Aなう 参画 |
+| 2009 | OKWave へ 3,000万円で事業売却 → 慶応進学 |
+| 〜2014 | ミチシルベ CTO / ディグナ / Tokyo Otaku Mode / 洪庵会 |
+| 2014 | **Gifted Agent 合同会社 設立** |
+| 2015 | 高橋優 と協働 |
+| 2016 | 株式会社化 |
+| 2018 | NEM 流出事件追跡 / 比叡山延暦寺出家 |
+| 2019 | **Gftd Works / Gftd Japan 株式会社** へ再編 |
+| 〜 | オランダで **01(Zen)** 宗教法人設立 (post-religion) |
+
+## 重要な過去判決・受賞 (Drive から)
+
+- **2025-08 DEF CON 33 Car Hacking Village CTF — 世界 2 位 / 総合 9 位 (1 人チーム)**
+- **2024-10-21 水谷翔太事件 勝訴**: 元天王寺区区長 水谷翔太 が河崎の名称を無断使用してイーサリアム・ステーキング事業悪用 → 実刑判決 (令和5年第374号) + 民事で **5,208万5,084円** 損害賠償認容 (東京地裁民事第12部 神吉康二裁判官)。問合せ: case20241021@gftd.co.jp
+- **Rokes Exchange / HEC ハッキング被害** → MetaX Pro 移行で 7 名分対応 (CTO 仙立博己 / 本野航平)
+- **2025-01-20 トランプ大統領就任式典 招待・参加** (2025-02-10 公式発表)
+- **TV出演**: カズレーザーと学ぶ (2022-11) / NHKスペシャル (2023-02) / 世界一受けたい授業 (2024-03) / THE TIME (2025-02)
+- **資格**: CEH (認定ホワイトハッカー) / ARMORIS DOJO
+- **特許**: New touch Interface and interaction communication on smart phone
+
+## グループ会社 / 信用情報
+
+- **Gftd Japan株式会社** 設立 2019-01 / 資本金 ¥2,000万 / 11名 / みずほ・PayPay
+- 主要顧客: **厚労省 / Google Asia Pacific / Apple / 電通 / 鹿児島大 / 理研**
+- 登録: **経産省 SSS 024-0013-20** (国内 159 社のみ) / ISO 9001:2015 / ISO/IEC 27001:2022 / Pマーク 17004887
+- グループ: Gftd Works / レヴィアス / COMMONS → **JK Wellness Research Lab** / JK株式会社 / **JunKawasaki Limited (UK, London EC4R 2SU)**
+- 借入: 西武信金 500+2000万 / 第一勧信 1000万 / 政策金融公庫 2900+1100万 / みずほ 2000万 / 福祉医療機構 3000万×3拠点
+
+## 進行中の戦線 (2025-2026)
+
+| 戦線 | 状況 |
+|---|---|
+| **LingLing 訴訟** | ステーキング・マイニング預かり資金 + アイシステム送金履歴争点 / ZeLo (水野・神尾・竹下) 担当 / 2025-07 第1回弁論準備 → 2026-01 準備書面 |
+| **オランダ不動産 Liendenhof 275** | Amsterdam 共同持分49%取得 / 共同オーナー: 近藤・三塚春美 / 法務: Kunal Bakshi / Notary 選定中 |
+| **gftd.ai DID/PDS** | did:web:ml1nb0nd.gftd.ai / Cloudflare Email Routing + Worker (2026-04 verify) |
+| **物理形式化 (Lean 4)** | Verlinde → BlackHoleComputer → GenerativeStructure 5層 (2026-04) |
+| **Ghost Hacker** | Vol.1 Ch.2 KDP化 (FXLコミック) / 全8巻構造 |
+| **Spirit-in-Physics** | Kuzu + Inngest 感情解析パイプライン (2025-09) |
+
+## 関係資本マップ
+
+- **法務**: ZeLo / Kunal Bakshi / 税理士法人TOTAL 水鳥智仁
+- **共同経営履歴**: 高橋優 (旧 Gifted Agent) / 榊裕介
+- **海外パートナー**: 近藤 / 三塚春美 / Sterelcs / Hartman LMH
+- **投資先**: eumo / esse-sense (FUNDOOR) / Metaverse Japan
+- **寄付先**: DxP 月1万円
+
+## 健康・生活
+
+- 睡眠/エアコン3台メンテ (2026-05) / 月次通院
+- 旅行: 小田原 (2026-01) / 桑名 (2026-05) / 名古屋移動 (2026-05)
+- 海外出張: 7月末〜8月中旬 (LingLing 訴訟期間中)
+
+## Apple Photos 由来の地理・タイムライン (50,747 枚)
+
+| 地域 | 枚数 | メモ |
+|---|---:|---|
+| 東京・関東 | 10,460 | 中心拠点 |
+| 大阪・京都 | 2,144 | |
+| 石垣島・八重山 | 783 | 定期リトリート? |
+| 大分・故郷 | 734 | 帰省 |
+| サウジ リヤド | 491 | 中東出張 (サイバー案件?) |
+| UAE ドバイ | 476 | |
+| ヨルダン アンマン | 463 | |
+| ハワイ | 346 | |
+| スリランカ | 321 | |
+| サンディエゴ | 286 | |
+
+**主要アルバム**: 201703-エストニア / 201807-宗教法人大宗寺 / 201903-オランダライフ / **202001-Wedding** / 202201-Mexico / 202304-パークコート渋谷1216 / 202304-スカイダイビング
+
+**活動異常検知**:
+- **2021 ディップ** (月 130 枚平均): コロナ + 結婚直後 / 育児初期推定
+- **2022-06 スパイク** (2,150 枚): 大規模イベント未特定
+- **2024 通年低調**: 離婚プロセス期と推定
+
+## 思想軸
+
+> 「いい感じの社会をつくる」 (社是) / 非分離 / post-religion / ギフテッド支援
+
+- 障害 = マイナスでなくスキル
+- ブロックチェーン × 仏教 (01 Zen)
+- Elias の bug = 孤独 → 非分離コードの探求 (Ghost Hacker 投影)
+
+## 未確認・本人が埋めるべき項目
+
+- 高校相当期間 (15–17歳) の詳細
+- ミチシルベ / ディグナ / Tokyo Otaku Mode の在籍時期
+- 01(Zen) オランダ宗教法人 設立日
+- 家族構成 (のどか の関係 / パートナー)
+- 健康指標 (心拍 / 睡眠 / 運動)
+- 投資ポートフォリオの完全リスト
+- Drive 内ドキュメント (要 OAuth)
+
+## Drive 認証手順
+
+Claude Code のチャット欄で:
+
+```
+/mcp
+```
+
+→ `claude.ai Google Drive` を選択 → 認証完了後、再度「Drive から取得して」と指示してください。Drive 認証後は以下が取得可能:
+- 共有フォルダ (ZeLo訴訟関連: `1MSyjtsp0pLgtFwuI6LhHuXkOyGyFdvET` 等)
+- 過去の契約書/プレゼン/ノート
+
+## 財務スナップショット (2026-05)
+
+| 項目 | 金額 |
+|---|---:|
+| Gftd Japan 借入 (公的+民間) | **¥167,000,000** |
+| ├ 西武信金 | 5M + 20M |
+| ├ 第一勧業信用組合 | 10M |
+| ├ 日本政策金融公庫 | 29M + 11M |
+| ├ みずほ銀行 | 20M |
+| └ 福祉医療機構 (3拠点 × 30M) | 90M |
+| **河崎 → COMMONS 貸付金 (R5/12/31)** | **¥133,876,442** |
+| 河崎の Gftd Japan 給与 | **ゼロ** (借金返済として処理) |
+| Paidy 小口滞納 | 6 ヶ月継続 (¥250–¥7,667) |
+
+## 係争スナップショット
+
+| 案件 | 役割 | 状態 |
+|---|---|---|
+| 水谷翔太 | 被害者 → 原告勝訴 | 解決済 (¥52M 認容) |
+| **LingLing → COMMONS** | **被告** | **継続中** (ZeLo + AMT 河合先生) |
+| 鹿児島大学 vs Gftd | 請求者 | 抗議書段階 (¥4,811,457) |
+| Rokes / HEC ハッキング | 被害者 | 対応済 |
+| 離婚 | 当事者 | 成立済 |
+
+## 現状 → 理想の 20 ノード DAG (逆トポロジカル順)
+
+`gap_analysis.md` 参照。実行順 (末端から):
+
+1. アイシステム送金履歴開示 → 2. 2021 預かり資金突合 → 3-4. Lean4 互換 / 経理整合性証明 →
+5-6. ADR-0003 / LingLing 準備書面 → 7-8. arXiv / Gftd 黒字化 → 9-10. Ghost Hacker / COMMONS 宿泊 →
+11-12. 健康定常 / 訴訟移譲 → 13-14. 出会い / 借入返済加速 → 15-16. 再婚 / 子 +2-3 →
+17-18. 内部統制 / IPO → 19-20. 映像化 / 01 Zen OSS
+
+## Phase 2 — 実行支援スタック
+
+| ファイル | 役割 | 実行コマンド |
+|---|---|---|
+| `phase2_critical_path.py` | CPM 解析 (ES/EF/LS/LF/Slack) → クリティカル経路 | `python phase2_critical_path.py --out critical_path.md` |
+| `phase2_acceleration.py` | エッジ削除 / ノード短縮で何年縮むか | `python phase2_acceleration.py --out acceleration.md` |
+| `phase2_monthly_board.md` | 直近 12 ヶ月のアクションボード | (手動レビュー) |
+| `phase2_bottleneck_aishi.md` | #1 ボトルネック (アイシステム送金履歴) 攻略 | (手動実行) |
+| `phase2_kpi_sensors.py` | Gmail/Calendar/git からの自動 KPI 取得 | `python phase2_kpi_sensors.py --out kpi_report.md` |
+
+### Phase 2 で見えた数値 (Phase 2.3 で IPO 撤回 + Family Office 化反映)
+
+| Phase | 理論最短 | クリティカル経路 |
+|---|---:|---|
+| 2.0 (初期 DAG) | 19.25 年 | 8 ノード (全て social/relations) |
+| 2.1 (過剰ブロッカー除去) | 17.50 年 | 4 ノード (売上経由) |
+| 2.2 (COMMONS 削除 / law+anime 分割) | 19.50 年 | 5 ノード (Ghost→アニメ→Gftd→借入→IPO) |
+| **2.3 (IPO 撤回 / Family Office / animeka 復旧 / lawfirm 既存)** | **12.00 年** | **4 ノード (Ghost→animeka→Gftd→借入)** |
+| シナリオ S1/S2/S3 | **10.00 年** | (生物学的下限: 出会い→再婚→子供 = 10y) |
+
+**Phase 2.3 のキー発見**:
+- **IPO 削除** + Family Office 化 (ADR-2605111000) で 7y ノード消失 → **-7.50y**
+- **animeka は復旧フォーカス** (vendor monorepo で 2026-04-22 から offline, ~15% completion)
+- **lawfirm.gftd.ai 既に live** (12 actor DIDs, 9-actor 拡大方針 ADR-0016)
+- **Gftd の vendor 性質** (corp #9007-2846, did:web:gftd.co.jp) が明確化
+- **10 年下限**: 出会い (2y) → 再婚 (3y) → 子供 (5y) の生物学的 path
+- 再婚 ES=2y → EF=5y (河崎氏 39 歳)、子供 EF=10y (44 歳)
+
+### 直近 12 ヶ月のクリティカル (Phase 2.2 実態版)
+
+```
+2026-06: Ghost Hacker 第3巻シナリオ + Gftd law/anime 案件提案
+         + Etzhayyim 9 領域運用継続 + Cyber Treaty 経産省窓口
+         + JK ガバナンス整理 + アイシステム送金依頼
+2026-07: Ghost Hacker 作画 + Gftd 法律事務所案件クローズ
+         + Gftd アニメ制作委員会組成 + Etzhayyim baien/ameno/atproto 進捗
+2026-08-12: Gftd 月次黒字化 + LingLing 期日対応 + のどか受験
+2027-Q1: LingLing 結審期 + Gftd 法律事務所バーティカル軌道に
+2027-Q2-Q4: アニメ事業立ち上げ + 借入返済加速着手 + 再婚出会い設計
+```
+
+### 次のアクション (Phase 2.1)
+
+- `python orgs/kawasakijun/reverse_topo_pregel.py --budget-years 12` で 12 年経路 (19/24 達成)
+- `python orgs/kawasakijun/phase2_critical_path.py` で新 CP (売上経由) を可視化
+- `python orgs/kawasakijun/phase2_acceleration.py` で S1/S2/S3 シナリオを確認
+- **売上 4 軸を 6 月から並走着手** (Gftd 営業 + Etzhayyim + JK Wellness + Cyber Treaty)
+- `phase2_bottleneck_aishi.md` のメールで TOTAL 水鳥に正式依頼 (並走)
+- `python orgs/kawasakijun/phase2_kpi_sensors.py` を日次 cron に
+- Paidy 自動引き落とし設定 (秘書 山田 へ移管)

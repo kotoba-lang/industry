@@ -1,0 +1,60 @@
+{:frontmatter
+ {:id "adr-2607022200-com-etzhayyim-tashikame-factcheck-aozora-actor-r0"
+  :title "ADR-2607022200: com-etzhayyim-tashikame — fact-check verdict publisher → app-aozora (R0 scaffold)"
+  :status "accepted"
+  :doc_type "adr"
+  :topic "actor-registration"
+  :authoritative true
+  :last_verified "2026-07-02"
+  :authoritative_for
+  ["news/social の fact-check を行い app-aozora に自律投稿する actor を、独立 FactGovernor + append-only 評定台帳で新設する判断"
+   "publication は ADR-2606281500（種をまく）で autonomous by default — FactGovernor の HARD violation のみ publish を withheld"
+   "tashikame は assess のみ（:effect :assessment）。actuation は行わない（publication ≠ actuation）"]
+  :related
+  ["orgs/etzhayyim/com-etzhayyim-tashikame"
+   "orgs/etzhayyim/com-etzhayyim-tashikame/docs/adr/0001-architecture.md"
+   "90-docs/adr/2606290000-sng-standalone-actor-r0.md"]
+  :supersedes []
+  :superseded_by []}
+
+ :problem
+ {:source "owner directive 2026-07-02"
+  :gap "news/social の fact-check を行い app-aozora に投稿する一本の actor がなかった（kawaraban=mirror-only/verdict不可, danjo=discrepancy観測のみ, ake=Council-gated community-edit, yomi=自台帳)"
+  :risk "fact-check なしの情報拡散 / per-post 人間 gating だと scope が広がらず立たない / governor なしだと hallucinated な評定が流通する"}
+
+ :decision
+ {:actor {:name "tashikame"
+          :kanji "確かめ"
+          :repo "github.com/etzhayyim/com-etzhayyim-tashikame"
+          :path "orgs/etzhayyim/com-etzhayyim-tashikame"
+          :did-web "did:web:etzhayyim.github.io:com-etzhayyim-tashikame"
+          :namespace "com.etzhayyim.apps.tashikame.*"
+          :pattern "containment + independent FactGovernor + append-only verdict ledger (langgraph-clj StateGraph, autonomous publication)"}
+  :intelligence-node {:name "factllm" :effect :assessment :proposal-only true}
+  :governor {:name "FactGovernor" :separate-system true}
+  :publish {:target "app-aozora"
+            :collection "com.etzhayyim.apps.tashikame.factCheck"
+            :xrpc "com.atproto.repo.createRecord"
+            :auth "depth-1 self-minted CACAO (self did:key) + revocable member CACAO leash (off-switch)"
+            :doctrine "ADR-2606281500 (種をまく) — autonomous by default; publication ≠ actuation"}
+  :seams {:store "MemStore ‖ DatomicStore ‖ kotoba-server"
+          :advisor "mock ‖ langchain.model on Murakumo + read-only web gather"
+          :publisher "MockPublisher ‖ app-aozora createRecord"
+          :phase "0 observe → 1 autonomous-publish (default)"}}
+
+ :gates
+ {:hard-hold {:no-actuation "proposal :effect ≠ :assessment"
+              :uncited-conclusive "conclusive rating (:supported/:refuted/:misleading) with 0 cites"
+              :malformed-citation "cite is not an absolute http(s) URL"
+              :catastrophe-veto "Rider §2 catastrophe-veto scan hit"
+              :person-targeting "doxing a private person (not public-figure claim-checking)"}
+  :soft-tag {:low-confidence "overall confidence < floor; publishes with :low-confidence tag"}}
+
+ :phases
+ [{:phase :r0 :state "landed 2026-07-02"
+   :scope "pure .cljc core (operation/governor/advisor/publisher/phase/store) + cacao/aozora JVM I/O + contract tests; repo + west + RAD registration"}]
+
+ :honesty
+ {:r0-advisor "mock-advisor is heuristic (cited→:supported, uncited→:unverifiable). Real LLM assessment + read-only web gather is a deploy follow-up, not faked at R0."
+  :r0-governor "catastrophe-veto denylist is illustrative until canonical etzhayyim_organism.sensors.charter_rider.scan is wired; :person-targeting is an R0 heuristic marker."
+  :west-yml "single-entry add only (not full regen) — west.yml is pre-existing STALE on other drifted children; full regen would silently repin them (sng precedent)."}}

@@ -1,0 +1,50 @@
+{
+  "_meta": {
+    "purpose": "cyber-drill industrial-cyber-incident scene distillation dataset",
+    "target": "worldlabs Marble API (marble-1.1) — panoramic 3D scenes",
+    "count": 25,
+    "already_generated": ["op-room", "scada", "server-room", "chemical-yard", "cleanroom"],
+    "to_generate": 20,
+    "domain_coverage": [
+      "energy (power grid, oil/gas, nuclear)",
+      "water + chemical",
+      "manufacturing (auto, semi, pharma)",
+      "transport (rail, air, port)",
+      "telecom + datacenter",
+      "healthcare + finance",
+      "incident states (alert/breach/dark)"
+    ],
+    "style_constraint": "photoreal industrial, no people foreground, panoramic equirectangular composition, varied lighting (bright/dim/night/red-alert), varied surface (clean/dusty/wet/rust)"
+  },
+  "scenes": [
+    {"id": "op-room", "domain": "control", "prompt": "industrial operating control room, panels with blinking indicators, dim cyan and amber lighting, cables, dust, photoreal", "status": "done"},
+    {"id": "scada", "domain": "control", "prompt": "SCADA monitoring station, multiple CRT and LCD screens showing process diagrams and pipe flow, beige industrial chairs, fluorescent overhead lighting, dust on monitors, photoreal", "status": "done"},
+    {"id": "server-room", "domain": "datacenter", "prompt": "server room with parallel server racks, cold blue LED indicators, raised floor with cable management, light vapor, dark industrial photoreal", "status": "done"},
+    {"id": "chemical-yard", "domain": "chemical", "prompt": "outdoor chemical processing yard with tall steel storage tanks, exposed pipes and valves, yellow hazard warning signs, gravel ground, overcast grey sky, weathered rust, photoreal industrial site", "status": "done"},
+    {"id": "cleanroom", "domain": "semi", "prompt": "semiconductor cleanroom, white epoxy floor and walls, FFU ceiling, technicians in white bunny suits in background, equipment racks with HEPA filters, fluorescent bright lighting, photoreal", "status": "done"},
+
+    {"id": "power-substation", "domain": "energy", "prompt": "high-voltage electrical substation, transformer banks, lattice steel structures, ceramic insulators, copper busbars, gravel ground, blue hour twilight, distant city glow, photoreal industrial"},
+    {"id": "water-treatment", "domain": "water", "prompt": "municipal water treatment plant interior, large circular sedimentation tanks with rotating arms, blue painted steel railings, concrete catwalks, fluorescent lighting, wet floor reflections, photoreal"},
+    {"id": "oil-refinery-night", "domain": "energy", "prompt": "oil refinery at night, towering distillation columns, sodium vapor amber lighting, flare stacks burning orange, complex pipe networks, condensation steam, photoreal industrial nightscape"},
+    {"id": "gas-compressor", "domain": "energy", "prompt": "natural gas compressor station, large reciprocating compressor units, blue and yellow painted machinery, exposed piping with red valves, indoor concrete bay, fluorescent lighting, photoreal industrial"},
+    {"id": "nuclear-control", "domain": "energy", "prompt": "nuclear power plant control room, vintage analog control panels with hundreds of dials and indicator lights, beige consoles, fluorescent flat lighting, no people, photoreal industrial heritage interior"},
+
+    {"id": "rail-control", "domain": "transport", "prompt": "railway traffic control center, large illuminated track diagram board on wall, multiple operator workstations with screens, dimmed ambient lighting, photoreal industrial control"},
+    {"id": "airport-tower", "domain": "transport", "prompt": "air traffic control tower interior, 360-degree windows overlooking runways at dusk, radar displays glowing green, multiple consoles, runway lights in distance, photoreal aviation interior"},
+    {"id": "port-crane-yard", "domain": "transport", "prompt": "container port terminal at dusk, gigantic blue gantry cranes, stacked rainbow shipping containers, wet asphalt reflections, orange sodium dock lighting, photoreal industrial logistics"},
+    {"id": "warehouse-robotics", "domain": "logistics", "prompt": "automated warehouse interior, orange shelving racks rising high, autonomous mobile robots on polished concrete floor, LED ceiling strips, conveyor belts, photoreal industrial automation"},
+    {"id": "assembly-line", "domain": "manufacturing", "prompt": "automotive assembly line, white-painted robotic arms in motion, partially assembled car bodies on overhead conveyor, polished concrete floor with yellow safety markings, bright industrial lighting, photoreal manufacturing"},
+
+    {"id": "pharma-lab", "domain": "pharma", "prompt": "pharmaceutical manufacturing clean lab, stainless steel reactors and tablet press machines, glass observation panels, white walls, ISO cleanroom lighting, photoreal industrial pharma"},
+    {"id": "hospital-icu", "domain": "healthcare", "prompt": "hospital ICU ward at night, patient bays with vital sign monitors glowing blue and green, IV stands, dimmed corridor lights, polished vinyl floor, photoreal medical interior"},
+    {"id": "telco-mdf", "domain": "telecom", "prompt": "telecom main distribution frame room, rows of vertical jumper frames with colorful cross-connect wires, fluorescent lighting, raised floor, photoreal industrial telecom infrastructure"},
+    {"id": "broadcast-master", "domain": "telecom", "prompt": "television broadcast master control room, wall of monitors showing different program feeds, audio mixing consoles, low ambient lighting with screen glow, photoreal broadcast interior"},
+    {"id": "datacenter-cold-aisle", "domain": "datacenter", "prompt": "datacenter cold aisle between server cabinet rows, perforated tile floor with cold air rising, dense LED indicator constellations, slight blue tint lighting, perspective vanishing point, photoreal industrial datacenter"},
+
+    {"id": "coal-plant-control", "domain": "energy", "prompt": "coal-fired power plant control room interior, large mimic panel showing boiler and turbine schematics, vintage analog meters, beige consoles, slight haze, fluorescent flat lighting, photoreal industrial"},
+    {"id": "mine-control", "domain": "mining", "prompt": "underground mining operations control room, ruggedized monitors showing tunnel cameras and ventilation status, hardhat hooks on wall, dim warm lighting, dusty surfaces, photoreal industrial"},
+    {"id": "noc-alert-red", "domain": "incident", "prompt": "network operations center during a security incident, rows of operator workstations, large overhead displays showing world map with red alert markers, red ambient warning lighting, photoreal industrial cyber-incident"},
+    {"id": "dark-noc-breach", "domain": "incident", "prompt": "network operations center after lights-out breach event, screens displaying error red kernel panic and dropped connection diagrams, emergency exit signs glowing, deep shadows, photoreal industrial cyber-incident interior"},
+    {"id": "ot-field-cabinet", "domain": "control", "prompt": "industrial OT field cabinet open, PLC modules with status LEDs, terminal blocks, ferrules, exposed wiring with labels, mounted in equipment room, fluorescent overhead lighting, photoreal industrial close interior"}
+  ]
+}

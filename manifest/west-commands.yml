@@ -1,0 +1,12 @@
+# west 拡張コマンド（このワークスペース固有）。
+# DataLad / git-annex の実体(B2)を west から get/drop する統合コマンド。
+# self(manifest) からの相対パスで west_annex.py を読み込む。
+west-commands:
+  - file: west_annex.py
+    commands:
+      - name: annex-get
+        class: AnnexGet
+        help: fetch git-annex/DataLad content from B2 for datalad-tagged projects
+      - name: annex-drop
+        class: AnnexDrop
+        help: drop local git-annex content (keep the B2 copy)

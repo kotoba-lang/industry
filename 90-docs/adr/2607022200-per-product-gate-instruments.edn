@@ -1,0 +1,24 @@
+{:frontmatter
+ {:id "adr-2607022200-per-product-gate-instruments"
+  :title "ADR-2607022200: 各 product の gate 計器を並列実装 + superproject reader 配線"
+  :status "accepted"
+  :date "2026-07-02"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "per-product-gate-instruments"
+  :authoritative true
+  :authoritative_for
+  ["各 child repo の gate emitter (network-isekai fork-stats / net-kotobase Stripe
+    webhook fulfillment / cloud-murakumo cost.cljc+/infer/cost / club-shinshi
+    creator_billing_daily / cloud-manimani install ping / yukkuri channelStats)
+    を per-repo 隔離 clone で並列実装し draft PR で提出"
+   "superproject gftd.gate の reader 配線: :compare {:lhs :op :rhs} 形式追加、
+    isekai/murakumo/club-shinshi/manimani gate を measurable-with-fallback 化"
+   "emitter deploy → metrics 反映 → routine が自動で hyp validated 昇格、の両端配線"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607022100-bmc-gate-evaluator-llm-advisor"
+            "adr-2607021800-bmc-collect-real-metrics"]
+  :last_verified "2026-07-02"}
+ :body
+ "# ADR-2607022200\n\n**Status**: accepted **Date**: 2026-07-02\n\n## Context\n\nADR-2607022100 の gate 評価器が surface する各 BMC の不足計器を、subagent で並列・\nper-repo 隔離 (各 child repo 独立 clone) で実装。11 product を read-only スカウトで\n実地調査 → gate を測定可能にする最小コード + emit metrics 形式を確定 → 純コードで\n実装可能なものを並列実装エージェント (clone→実装→テスト→draft PR) に回した。\n\n## emitter (child repo, draft PR)\n\n- network-isekai#15: fork_stats.cljc + feed index fork fold → public/feed/fork-stats.edn (bb gate green)\n- net-kotobase: Stripe webhook fulfillment (checkout.session.completed→tenant paid KV) + tenant 従量\n- cloud-murakumo: cost.cljc (run ledger→¥/Mtok) + GET /infer/cost + run body node/elapsed\n- club-shinshi: creator_billing_daily D1 migration + rollup + read\n- cloud-manimani: POST /telemetry/install (opt-out 匿名) + signup + 転換 metrics\n- ai-gftd-yukkuri: analyze_youtube API キー経路 (subscribers/views OAuth 不要) + channelStats + cron\n全て純コードのみ (secret/OAuth/課金/PSP は人間残作業として PR 明記)、main 非push・draft。\n\n## reader (superproject gftd.gate, 本 PR)\n\ngate-spec を measurable-with-fallback 化 + :compare {:lhs :op :rhs} 形式追加:\nisekai [:fork :viral-coefficient]>=1.0 / murakumo compare fleet<=spot ¥/Mtok /\nclub-shinshi compare creator-gmv>ad-revenue / manimani [:conversion :pct]>=0.04。\n既存 kotobase active-subscriptions>=1、yukkuri :all(1000/4000h)。:needs-when-unmeasurable\n保持で emitter deploy まで不足計器 surface、キー到着した朝に自動 validated 昇格。\ntests 9/37 green。\n\n## Consequences\n\n(+) 6 product の emitter が draft PR 着地/着地中、superproject は 5 product 分の gate を\n機械測定可能に配線。emitter deploy→metrics→自動昇格 の両端そろった。(+) :compare で\nA>B 型 gate 対応。(−) collect.bb の各 emitter read 配線は deploy 後 follow-up。\n(−) apex(Stripe price=人間)/itonami(vertical 経営判断+Pages Functions 未実装)/\napp-aozora(PDS 書込権限+OCEL 空スタブ)/yoro(child repo 未分離)/etzhayyim(主観 gate+\nrefs/west/main) は emitter が重い/人間依存で次ラウンド。ペアの .md が正。"}

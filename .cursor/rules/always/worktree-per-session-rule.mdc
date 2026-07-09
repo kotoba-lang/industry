@@ -1,0 +1,31 @@
+---
+name: Worktree Per Session (west checkout isolation)
+description: Each concurrent session/agent must use its own git worktree instead of editing a shared west checkout directly
+alwaysApply: true
+---
+
+# セッションごとに git worktree を切る
+
+複数セッション/エージェントが並行作業する可能性がある時は、共有の west checkout
+（`orgs/<org>/<repo>`）を直接編集せず、セッションごとに `git worktree` を切る。
+
+west が管理するパスは1つの共有 working tree なので、別セッションがそこで
+`git checkout`（ブランチ切替）すると、自分がまだコミットしていない編集が
+working tree 上で**黙って巻き戻される**（実例: 2026-07-01、`orgs/kotoba-lang/
+kami-engine` で `sip.render`/`sip.world` への未コミット編集が、並行していた別
+セッションの `kami-isaac-sim-wasm` 作業のブランチ切替で失われかけた）。
+
+作業前に一時 worktree を切って、そこで完結させる:
+
+```bash
+git worktree add -B <session-branch> <path> origin/main   # 独立 working tree
+# ... <path> で編集 / commit / test ...
+git push origin <session-branch>
+gh api repos/<org>/<repo>/merges -f base=main -f head=<session-branch> \
+  -f commit_message="..."                                 # サーバ側マージ（ローカル merge/rebase を戦わない）
+git worktree remove <path>                                 # 使い終わったら片付ける
+```
+
+共有 checkout（west 管理パス）には直接 commit/push しない。worktree 経由で main
+に着地させたあと、共有 checkout 側は `git fetch` と（内容一致を `shasum` で確認
+した上での）重複ファイルの削除だけで追従させる。

@@ -1,0 +1,29 @@
+;; Compatibility stub.
+;;
+;; The original draft described a mixed Rust-provider / CLJC-authority split.
+;; The active migration has advanced past that shape: individual DSL/runtime
+;; repos are registered in manifest/repos.edn, kotoba-lang runtime source is
+;; kotoba/EDN/CLJC only, and provider-family metadata is centralized.
+{:id :kami-kotoba-repo-split
+ :status :superseded
+ :date "2026-07-01"
+ :superseded-by
+ ["90-docs/migration/kami-webgpu-dsl-runtime-split.edn"
+  "90-docs/migration/kotoba-only-runtime-ledger.edn"
+  "90-docs/migration/kami-provider-catalog.edn"]
+ :current-authority
+ {:dsl-runtime-split "90-docs/migration/kami-webgpu-dsl-runtime-split.edn"
+  :kotoba-only-runtime "90-docs/migration/kotoba-only-runtime-ledger.edn"
+  :provider-catalog "90-docs/migration/kami-provider-catalog.edn"
+  :manifest-source "manifest/repos.edn"}
+ :policy
+ {:source-of-truth #{:kotoba :edn :cljc}
+  :repo-split-unit :semantic-domain
+  :native-runtime-authority? false
+  :node-runtime-authority? false}
+ :replacement-commands
+ ["bb scripts/kami-webgpu-dsl-runtime-split-audit.bb --strict"
+  "bb scripts/kotoba-only-runtime-audit.bb --strict"
+  "bb scripts/kami-provider-split-audit.bb --strict"
+  "bb scripts/kami-provider-split-sync.bb --check"
+  "bb scripts/gen-west-manifest.bb --check"]}

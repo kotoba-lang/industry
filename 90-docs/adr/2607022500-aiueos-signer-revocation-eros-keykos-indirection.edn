@@ -1,0 +1,130 @@
+{:frontmatter
+ {:id "adr-2607022500-aiueos-signer-revocation-eros-keykos-indirection"
+  :title "ADR-2607022500: microkernel capability revocation の事例調査、および EROS/KeyKOS indirection パターンで aiueos signer trust store を実装する（ADR-2606290900 K1/K3 の一部を実装完了）"
+  :status "accepted"
+  :date "2026-07-02"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "aiueos-signer-revocation-eros-keykos-indirection"
+  :authoritative true
+  :authoritative_for ["microkernel(seL4/EROS-KeyKOS/Zircon/Genode/L4系)の capability revocation 事例調査結果"
+                       "aiueos signer registry の revocation に EROS/KeyKOS indirection パターンを採用し、seL4型(CDT+Revoke)を不採用とする判断"
+                       "aiueos.policy/aiueos.signing/aiueos.broker への signer trust store 実装（完全後方互換）"
+                       "ADR-2606290900 の K1(signer trust store)とK3(trust式のnot_expired/not_revoked節)が実装完了したことの記録"
+                       "K2(cross-system revocation registry)・issuer_trusted_for・K4(rotation-chain/PQ)が依然未実装であることの明記"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2606290900-kotoba-aiueos-key-lifecycle-revocation"
+            "adr-2607022400-kototama-unikernel-tender-runtime-vocabulary"
+            "adr-2607022200-aiueos-cljc-wasm-component-kernel-architecture"
+            "com-junkawasaki/orgs/kotoba-lang/aiueos-cljc-contract/src/aiueos/policy.cljc"
+            "com-junkawasaki/orgs/kotoba-lang/aiueos-cljc-contract/src/aiueos/signing.cljc"
+            "com-junkawasaki/orgs/kotoba-lang/aiueos-cljc-contract/src/aiueos/broker.cljc"]
+  :last_verified "2026-07-02"}
+
+ :microkernel-survey
+ [{:project "seL4" :mechanism "Capability Derivation Tree(CDT) + Revoke。badged endpointで細粒度失効。WasmEdge on seL4実例あり"
+   :adopted false :reason "hardware capability slotに紐づくlive機構。CLJC pure dataで模倣するにはCDTエンジン再実装が必要で過大"}
+  {:project "EROS/KeyKOS/CapROS" :mechanism "indirection/gatekeeper object。対象へのcapabilityでなく転送用の小さな不透明オブジェクトGへのcapabilityを渡す。失効=Gの無効化のみ"
+   :adopted true :reason "最初からpure dataパターン。「対象は触らず間接層だけ無効化」がADR-2606290900の『失効=不採用、消去ではない』と完全一致"}
+  {:project "Zircon(Fuchsia)" :mechanism "Handle + rights bitmask。DFv2でdriverをcomponent化" :adopted false :reason "rightsは静的減衰でrevocation機構そのものではない。Wasm統合実例なし"}
+  {:project "Genode" :mechanism "親子間session routing、明示的capability配線、resource quota" :adopted false :reason "階層的capability委譲の将来参考。今回のrevocationギャップの直接解ではない"}
+  {:project "L4系(NOVA/Fiasco.OC)" :mechanism "高速同期IPCを唯一のプリミティブにする設計哲学" :adopted false :reason "aiueosの非同期pub/subとは異なる選択だが、hard real-time非対象(ADR-0006)なので優劣の問題ではない"}]
+
+ :implementation
+ {:trust-formula "signature_valid ∧ not_expired ∧ not_revoked ∧ issuer_trusted_for (ADR-2606290900)"
+  :implemented #{:not_expired :not_revoked}
+  :not-implemented #{:issuer_trusted_for "K2 cross-system revocation registry" "K4 rotation-chain/PQ"}
+  :functions
+  [{:ns "aiueos.policy" :fn "signer-entry" :purpose "flat hex string OR structured map -> normalized trust-store entry。後方互換"}
+   {:ns "aiueos.policy" :fn "signer-status-ok?" :purpose ":active のみtrue。:revoked/:rotatedはfalse"}
+   {:ns "aiueos.policy" :fn "signer-in-window?" :purpose "valid-from/valid-until範囲判定。nowがnilならスキップ(revocationは無条件で効く)"}
+   {:ns "aiueos.policy" :fn "signer-trusted?" :purpose "上記の合成判定"}
+   {:ns "aiueos.signing" :fn "signer-public-key-hex" :purpose "registry値が文字列でも構造化mapでもpublic key抽出。暗号検証ロジックは無変更"}
+   {:ns "aiueos.broker" :fn "authenticate/verify-one/verify-system/verify-admission"
+    :purpose "任意のnow(epoch秒)を受ける多重アリティに拡張。暗号的に正しい署名でもsignerがrevoked/rotated/期限切れならdeny"}]
+  :backward-compatible true
+  :test-counts {:before 117 :after 147 :new-tests 30}}
+
+ :body
+ "# ADR-2607022500: microkernel capability revocation の事例調査、および EROS/KeyKOS indirection パターンで aiueos signer trust store を実装する（ADR-2606290900 K1/K3 の一部を実装完了）
+
+**Status**: accepted
+**Date**: 2026-07-02
+**Deciders**: Jun Kawasaki
+
+## Context
+
+ADR-2607022400 で unikernel を調査し kototama の runtime 設計に反映した。続けて
+microkernel（capability model・IPC・driver 分離）の事例調査を行った。狙いは
+ADR-2606290900（aiueos signer registry が flat list のままで失効・ローテーション・
+有効期限を表現できない既知の穴）に対し、具体的で CLJC で表現可能な revocation
+パターンを見つけることだった。
+
+## Decision
+
+### 1. microkernel 事例調査の結論
+
+seL4 は Capability Derivation Tree（CDT）+ Revoke で派生 capability を木構造で
+辿って破棄する強力な機構だが、hardware capability slot に紐づく live なメカニズム。
+EROS/KeyKOS/CapROS は indirection/gatekeeper object パターン — 対象への直接
+capability でなく、転送する小さな不透明オブジェクト G への capability を渡し、
+失効は G を無効化するだけで対象自体は触らない。Zircon は Handle+rights bitmask
+（rightsは静的減衰でrevocation機構ではない）。Genode は親子間 session routing
+（階層的委譲の参考にはなるが今回の直接解ではない）。L4系は高速同期IPCの設計哲学
+（aiueosの非同期pub/subとは異なるがhard real-time非対象なので優劣の問題ではない）。
+
+EROS/KeyKOS の indirection/gatekeeper パターンを採用する。seL4 の CDT+Revoke は
+不採用 — CLJC の pure data で模倣するには CDT エンジンごと再実装することになり、
+「意味論は CLJC pure data であるべき」という ADR-2607022200 の方針と噛み合わない。
+KeyKOS 型は最初から pure data パターンであり、「対象は触らず間接層だけ無効化」は
+ADR-2606290900 の「失効=不採用、消去ではない」と完全に一致する: signer の public
+key エントリ自体は変更せず、エントリに status を持たせて不採用を表現する。
+
+### 2. aiueos.policy/aiueos.signing/aiueos.broker に signer trust store を実装
+
+ADR-2606290900 の trust 式のうち not_expired と not_revoked を実装した
+（signature_valid は既存のaiueos.signing/verify、issuer_trusted_forは未実装）。
+`aiueos.policy/signer-entry` が registry の値（flat hex文字列 or 構造化map）を
+正規化（完全後方互換）。`signer-status-ok?`（:active のみtrue）、
+`signer-in-window?`（valid-from/valid-until、nowがnilならスキップ、revocationは
+無条件で効く）、`signer-trusted?`（合成判定）を追加。`aiueos.signing/verify`は
+public key抽出のみ最小限拡張、暗号検証ロジックは無変更。`aiueos.broker`の
+`authenticate`/`verify-one`/`verify-system`/`verify-admission`は任意のnowを受ける
+多重アリティに拡張し、暗号的に正しい署名でもsignerがrevoked/rotated/期限切れなら
+deny する（bad signatureがunsignedに降格しない原則をrevocationにも適用）。
+
+全既存テスト（117件）を無変更のまま green に保ったうえで、revocation/expiry
+専用の新規テストを30件追加（実際のed25519鍵ペアで「暗号的に有効な署名だが
+signerがrevoked/rotated/期限切れ」を再現）。合計147テスト/417assertion green。
+
+## Consequences
+
+- (+) ADR-2606290900のK1（signer trust store）とK3（trust式のnot_expired/
+  not_revoked節）が実装完了。SECURITY.mdの既知の穴（policy編集でしか対処できない）
+  はもう正確ではない。
+- (+) 完全後方互換。既存のflat signer registryを使うあらゆるpolicy/manifest/test
+  は無変更で動作する。
+- (+) revocation statusのチェックはclock無しでも効く。
+- (−) K2（kotoba正本のcross-system revocation registry、warrant列）は未実装。
+- (−) issuer_trusted_for（authority scoping）は未実装。trust式4条件のうち3つを実装。
+- (−) K4（rotation-chain追跡、PQ署名移行）は未実装、maturity表どおり将来課題。
+- (−) resources/aiueos/policy_contract.edn の:signer-statusesが6状態を宣言する
+  一方、本実装はADR-2606290900の3状態（active/rotated/revoked）のみ対応。
+  validate-policy-contractはkeyword setであることしか検証しないため実害なしだが
+  語彙の不一致を認識のうえ残す（follow-up）。
+- (−) seL4型（CDT+Revoke）を明示的に不採用。high-assuranceプロファイルで形式検証
+  済みcapability revocationが本当に必要になった場合は再検討すること。
+
+## References
+
+- ADR-2606290900（本ADRがK1/K3の一部を実装完了させる対象）
+- ADR-2607022400（unikernel調査。本ADRはその続きのmicrokernel調査）
+- ADR-2607022200（三層アーキテクチャ。CLJC pure data方針がseL4 CDT不採用の根拠）
+- aiueos-cljc-contract/src/aiueos/policy.cljc, signing.cljc, broker.cljc
+- seL4: https://sel4.systems
+- WasmEdge on seL4: https://github.com/second-state/wasmedge-seL4
+- EROS/KeyKOS indirection: http://www.cap-lore.com/CapTheory/Segregate.html
+- Zircon: https://fuchsia.dev/fuchsia-src/concepts/kernel
+- Genode: https://genode.org/documentation/genode-foundations/22.05/architecture/Recursive_system_structure.html
+- L4 family: https://trustworthy.systems/publications/nicta_full_text/8988.pdf"}

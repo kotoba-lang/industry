@@ -1,0 +1,98 @@
+;; financial_state.edn — グループ財務スナップショット (financial_state.jsonld から移行, ADR-0010)
+;; 元 @context: @vocab=schema.org, kj=junkawasaki.com/ns#, currency=JPY
+;; 変換: @id→:id, @type→:type(schema.orgクラスはkeyword), kj:X→:kj/X, schema.org語彙→:X, 日本語ラベルキーは文字列
+{
+  :id "kj:financial_state"
+  :type :MonetaryAmount
+  :description "河崎個人 + Gftd Japan / COMMONS / JK株式会社 のグループ財務スナップショット (Gmail/Drive 由来、概算)。"
+  :kj/as_of "2026-05"
+  :kj/scope "個人+グループ会社"
+  :kj/liabilities_borrowings {
+    :Gftd_Japan_borrowings {
+      :total_estimated 167000000
+      :breakdown [
+        {
+          :lender "西武信用金庫"
+          :amount 5000000
+          :year 2018}
+        {
+          :lender "西武信用金庫"
+          :amount 20000000
+          :year 2020}
+        {
+          :lender "第一勧業信用組合"
+          :amount 10000000}
+        {
+          :lender "日本政策金融公庫"
+          :amount 29000000}
+        {
+          :lender "日本政策金融公庫"
+          :amount 11000000}
+        {
+          :lender "みずほ銀行"
+          :amount 20000000}
+        {
+          :lender "福祉医療機構"
+          :amount 30000000
+          :branch "渋谷拠点"
+          :year 2020}
+        {
+          :lender "福祉医療機構"
+          :amount 30000000
+          :branch "天神拠点"
+          :year 2020}
+        {
+          :lender "福祉医療機構"
+          :amount 30000000
+          :branch "東海拠点"
+          :year 2020}]}
+    :Gftd_Japan_shareholder_loan_from_kawasaki {
+      :title "令和7年 河﨑代表よりの借入金"
+      :contract_date "2026-02-12"
+      :type "金銭消費貸借"
+      :note "Gftd Japan ← 河崎個人。短期借入金として保管"}}
+  :kj/receivables {
+    :COMMONS_loan_from_kawasaki {
+      :balance_as_of "2023-12-31"
+      :amount 133876442
+      :note "河崎個人 → COMMONS 株式会社 への貸付金 残高 約 1.34 億円。給与支給はゼロ、借金返済として処理。"}}
+  :kj/overdue_micro_debts {
+    :Paidy {
+      :status "複数月滞納継続 (2025-11 〜 2026-04)"
+      :monthly_amounts [250 500 750 1000 7417 7667]
+      :note "金額は小さいが繰り返しのリマインダ → 自動引き落とし設定要"}
+    :Servcorp {
+      :status "クレカ決済失敗 → 再請求対応 (2026-04)"
+      :owner "JK株式会社 (秘書 山田 経由)"}}
+  :kj/operating_metrics_2025_plan {
+    :monthly_revenue_jpy {
+      :Jan 3278000
+      :Dec 12806000
+      :trend "段階的増加"}
+    :monthly_sga 4737000
+    :breakeven_month "不明 (Gftdグループ事業計画 0317 より)"}
+  :kj/bank_relations {
+    :primary "みずほ銀行"
+    :secondary "PayPay銀行"
+    :shinkin ["西武信用金庫" "第一勧業信用組合"]
+    :public_finance ["日本政策金融公庫" "福祉医療機構"]}
+  :kj/counterparties_finance {
+    :tax {
+      :firm "税理士法人TOTAL"
+      :contact "水鳥智仁 (tomohito_mizutori@total-office.jp)"}
+    :kessan {
+      :firm "佐藤公認会計士事務所"
+      :contact "福本 (zeimu19@yashin.co.jp)"}
+    :commons_accounting {
+      :contact "加田密 (kada@ouchi.earth / kada@focus-ad.jp)"}
+    :judicial_scrivener {
+      :contact "松本かずえ (matsumoto@araso.jp)"}}
+  :kj/cashflow_focus_areas [
+    "Gftd Japan の月次黒字化 → 借入返済原資確保"
+    "COMMONS への貸付金 1.34 億の回収 (宿泊業展開で営業 CF を生む計画)"
+    "Paidy 等小口滞納の自動化 (秘書 山田 へ移管)"
+    "JK株式会社 経費の自動分離 (root@jk.luxury への切替済)"]
+  :kj/net_position_rough_estimate {
+    :individual_loans_out 133876442
+    :corp_borrowings_total 167000000
+    :note "河崎個人としては COMMONS への債権 +1.34億 / Gftd の連帯保証や個人保証の存在は要確認"}}

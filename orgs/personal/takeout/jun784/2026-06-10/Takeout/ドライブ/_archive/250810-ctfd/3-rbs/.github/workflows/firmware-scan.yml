@@ -1,0 +1,30 @@
+name: Firmware scan
+
+on:
+  pull_request:
+    branches: [ main, master ]
+  push:
+    branches: [ main, master ]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip cpio gzip file binutils
+          curl -fsSL https://github.com/BurntSushi/ripgrep/releases/download/14.1.0/ripgrep_14.1.0-1_amd64.deb -o rg.deb
+          sudo dpkg -i rg.deb || sudo apt-get -y -f install
+      - name: Run firmware scan
+        run: |
+          chmod +x tools/firmware_scan.sh
+          # Adjust artifact path as needed; default to latest built artifact
+          ARTIFACT="${{ github.workspace }}/firmware.fixed.bin"
+          if [[ ! -f "$ARTIFACT" ]]; then
+            echo "::warning::firmware.fixed.bin not found; set ARTIFACT env to your zip"
+            exit 0
+          fi
+          tools/firmware_scan.sh "$ARTIFACT"

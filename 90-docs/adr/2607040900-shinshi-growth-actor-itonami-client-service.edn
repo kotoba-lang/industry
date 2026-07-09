@@ -1,0 +1,31 @@
+{:frontmatter
+ {:id "adr-2607040900-shinshi-growth-actor-itonami-client-service"
+  :title "ADR-2607040900: shinshi-growth-actor — itonami が club-shinshi に提供する growth-loop-as-a-service"
+  :status "accepted"
+  :date "2026-07-04"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "shinshi-growth-actor-itonami-client-service"
+  :authoritative true
+  :authoritative_for
+  ["shinshi-growth-actor (gftdcojp/shinshi-growth-actor, private) = growth-LLM ⊣
+    MarketingGovernor actor: itonami (Gftd Japan株式会社, cloud-itonami) が
+    club-shinshi (JK株式会社) に growth-loop-as-a-service を提供する新規クライアント
+    関係。既存3 actor (com-etzhayyim-kyoninka / gftd-talent-actor / cloud-itonami
+    自身) と同型の containment (sealed LLM ⊣ 独立 governor ⊣ 不変台帳)"
+   "MarketingGovernor 不変条件: HARD=charter-clean(ダークパターン ヒューリスティック
+    床)・年齢確認/同意コピー不可侵・未知effect。SOFT=クリエイター取り分保護
+    (:ppv-terms-change またはGMV split示唆は常にescalate、confidence不問)・
+    high-stakes gate(#{:pricing-experiment :ad-spend-change :ppv-terms-change})・
+    confidence floor 0.7 (low-stakes auto-commitはPhase 3のみ)"
+   "本ADRはPhase 0 (mock advisor + MemStore、ライブデータなし、実行なし) のみを
+    カバーする。Phase 1はai-gftd-shinshi内部D1 dispatch APIとのsecrets-sharing決定、
+    Phase 3の前段としてcloud-itonami ADR-0009のテナント/外部オンボーディングgap拡張が
+    それぞれ必要 — いずれも本ADRでは未解決のfollow-upとして明記するのみ"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607021500-portfolio-seven-layer-business-model-lean-canvas"
+            "adr-2607021900-portfolio-add-isekai-club-shinshi"]
+  :last_verified "2026-07-04"}
+ :body
+ "# ADR-2607040900\n\n**Status**: accepted **Date**: 2026-07-04\n\n## Decision\n\n`gftdcojp/shinshi-growth-actor`(private) を growth-LLM ⊣ MarketingGovernor\nactor として新規作成。既存3 actor (kyoninka/talent/itonami自身) と同型の\ncontainment: growth-LLM は langgraph-clj StateGraph の単一ノードに封じ込め、\n提案は必ず独立 MarketingGovernor 経由でのみ SSoT へコミットされる。\n\nHARD invariants (人間でも上書き不可 → HOLD): (1) charter-clean\n(ダークパターン/誇大な緊急性・希少性/隠れ手数料/誤解を招く自動更新の\nヒューリスティック検出、完全なNLP分類器ではない床)。(2) 年齢確認/同意コピー\n不可侵 (ExoClick/アダルトコンテンツ コンプライアンス)。(3) 未知effect\n(スキーマ逸脱のfail closed拒否)。\n\nSOFT invariants (人間が判断、auto-commitには乗らない): (4) クリエイター取り分\n保護 — `:ppv-terms-change` またはGMV split変更を示唆する提案は confidence 不問で\n常にescalate。(5) high-stakes gate — `#{:pricing-experiment :ad-spend-change\n:ppv-terms-change}` は常に人間承認。(6) confidence floor 0.7 — low-stakes\n(`#{:content-experiment :marketing-copy :creator-outreach}`) のみ、違反なし\nかつconfidence>=0.7の場合に限りPhase 3でauto-commit対象。\n\nPhase 0→3 (`growth.phase`): 本ADRがカバーするのはPhase 0のみ(mock advisor +\nMemStore、ライブデータなし、実行なし)。Phase 1(読み取り専用ライブメトリクス)・\nPhase 2(実LLM、人間承認維持)・Phase 3(governor承認済みlow-stakesのauto-commit)\nはいずれも未実装のfollow-up。\n\nStoreは`MemStore`(既定)/`DatomicStore`(`langchain.db`の`:db-api`駆動)の2\nバックエンドを同一protocolで実装し contract testでMemStore≡DatomicStoreを保証。\n全レコードに`:growth.tenant/id \"club-shinshi\"`をタグ付け(スキーマレベルのみ、\n完全なテナントレジストリではない)。\n\n13 tests / 44 assertions / 0 failures、clj-kondo clean。\n\n## Consequences\n\n(+) growth-loopドメインにcontainmentパターンを拡張、Phase 0 scaffoldとして\n実データ・実secrets・実実行を一切含まず完結。(−) cloud-itonami ADR-0009の\nテナント/外部オンボーディングgapを解決しない限りclub-shinshiを本物のitonami\nホスト型テナントにはできない — 未解決のfollow-up。(−) Phase 1はai-gftd-shinshi\nの内部D1 dispatch API (`read_metric`/`read_revenue_gate`、`x-internal-trust`=\n`DISPATCHER_INTERNAL_SECRET`ゲート) とのcross-repo secrets-sharing決定が前提 —\n本ADRでは決定せず`growth.facts`はドキュメント化されたスタブのまま。\n\n## References\n\n- ADR-2607021500 (club-shinshi/itonami別法人の正本)\n- ADR-2607021900 (club-shinshi riskiest gate = creator-GMV-exceeds-ad-revenue)\n- `orgs/gftdcojp/ai-gftd-shinshi/docs/260613-bmc-lean.datoms.edn` (H1/H2 backlog)\n- `orgs/gftdcojp/cloud-itonami/docs/adr/0002-*.md` / `0009-*.md` (テナント分離・\n  外部オンボーディングgap)\n- 新規repo: https://github.com/gftdcojp/shinshi-growth-actor"}

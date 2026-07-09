@@ -1,0 +1,37 @@
+{:frontmatter
+ {:id "adr-2607031500-cloud-itonami-m6910-global-incorporation-actor"
+  :title "ADR-2607031500: cloud-itonami-M6910 — 全世界の法人設立代行を実行する actor を独立 open business blueprint として新設"
+  :status "accepted"
+  :date "2026-07-03"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "cloud-itonami-m6910-global-incorporation-actor"
+  :authoritative true
+  :authoritative_for ["cloud-itonami-M6910 actor scope (global company-incorporation execution)"
+                      "liability/custody/settlement 配置判断 (etzhayyim vs cloud-itonami 本体 vs cloud-itonami-{ISIC} blueprint)"
+                      "実アクチュエーション不変条件 (:filing/submit は governor + phase の2層で常に人間専用)"]
+  :related ["adr-2607011000-cloud-itonami-robotics-premise-and-isic-21-21"
+            "adr-2607012100-cloud-itonami-org-split"
+            "adr-2606271700-cloud-itonami-business-os"
+            "adr-2607012000-cloud-itonami-isco-occupation-blueprints"]
+  :supersedes []
+  :superseded_by []
+  :amends []}
+
+ :decision-summary
+ {:new-actor "cloud-itonami-M6910"
+  :isic-rev5 "6910"
+  :org "cloud-itonami"
+  :visibility :public
+  :license "AGPL-3.0-or-later"
+  :pattern "sealed Registrar-LLM advisor + independent RegistrarGovernor + append-only audit ledger (same shape as cloud-itonami-6310 / ai-gftd-itonami / robotaxi-actor)"
+  :rejected-placements
+  [{:placement "etzhayyim matsurigoto/corp-registry" :reason "G1/G3 constitutional constraints scope principal to etzhayyim-council or an adopting nation-state, not an unbounded commercial customer base"}
+   {:placement "cloud-itonami base repo (gftdcojp internal business-os)" :reason "activity/decision/effect/audit model is for gftdcojp's OWN operations, not a customer-facing regulated service"}
+   {:placement "private gftdcojp vendor repo" :reason "centralizes liability in a single vendor, defeats the worldwide-scale requirement"}]
+  :actuation-invariant "`:filing/submit` (a real government submission or fee payment) is never a member of any `formation.phase` phase's `:auto` set, and `formation.governor`'s `:actuation` high-stakes check always escalates it -- two independent layers enforce the same structural fact"
+  :reused-from "matsurigoto corp-registry module (etzhayyim/root, ADR-2606062300) -- ISO 17442 LEI + ISO 7064 MOD 97-10 arithmetic, ported as spec math shared across principals"
+  :r0-scope {:jurisdictions-with-spec-basis ["JPN" "USA-DE" "GBR" "DEU" "EST" "KOR" "IND" "SGP" "NZL" "CAN"]
+             :store-backend "MemStore only (Datomic/kotoba-server backend is a planned seam, not implemented)"
+             :tests "25 tests / 111 assertions, lint clean"}
+  :manifest-registration "none -- standalone, per the existing cloud-itonami-{ISIC} blueprint convention (ADR-2607011000/2607012000/2607012100)"}}

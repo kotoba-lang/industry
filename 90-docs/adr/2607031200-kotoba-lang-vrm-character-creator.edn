@@ -1,0 +1,76 @@
+{:frontmatter
+ {
+  :id "adr-2607031200-kotoba-lang-vrm-character-creator"
+  :title "ADR-2607031200: kotoba-lang/kami-app-character-creator — EDN-native VRM キャラクターメイキング"
+  :status "accepted"
+  :date "2026-07-03"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "kotoba-lang-vrm-character-creator"
+  :authoritative true
+  :authoritative_for ["ユーザー向け VRM character creator の CharacterDoc EDN スキーマ" "生成パイプライン配線（character/generate-character → vrm.part/compose/humanoid/export）" "VRM 表情プリセット(18) ⇄ ARKit ブレンドシェイプ(52) ブリッジテーブルの置き場所と方針" "Phase 1〜4 のスコープ切り（procedural生成→ライブ3D→kotobase.net保存→UI部品）" "Phase 5: procedural生成の質的限界とVRM-first（ユーザー持ち込み素体+マルチパーツミキシング）へのアーキテクチャ転換"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607010930"]
+  :last_verified "2026-07-03"}
+ :body
+ "# ADR-2607031200: kotoba-lang/kami-app-character-creator — EDN-native VRM キャラクターメイキング
+
+**Status**: accepted（Phase 1〜4 実装完了 + Phase 5 でアーキテクチャ転換）
+**Date**: 2026-07-03
+**Deciders**: Jun Kawasaki
+
+## Context
+
+オンラインゲームのキャラクターメイキングを VRM アバターに対して用意したいという
+オーナー要求。設計前に実体調査を行った結果、生成側のデータ/ロジック層は
+`kotoba-lang/vrm`（VRM 1.0 parse/decompose/compose/export、CLJC 1:1移植）と
+`kotoba-lang/character`（MetaHuman互換パラメトリック生成SDK、CLJC 1:1移植）に
+ほぼ全て既に実在することが判明した。ギャップは (1) ブラウザGPU実行系が
+skin/morphを描画しない (2) VRM表情プリセット⇄ARKitブレンドシェイプの対応表が
+無い (3) kotobase.net への書き込み経路が無い (4) スライダー/カラースウォッチ等
+のUI部品が無い、の4点。詳細は本 ADR とペアの .md を参照。
+
+## Decision
+
+新規 repo `kotoba-lang/kami-app-character-creator` を、既存の
+vrm/character/webgpu/skeleton/kami-isekai-assets を土台に4フェーズで実装する。
+Phase 1（CharacterDoc スキーマ + 生成パイプライン配線 + 表情ブリッジEDN +
+ローカル保存/.vrmエクスポート）は新規エンジン作業ゼロで完結させ、Phase 2
+（ライブ3Dプレビュー、kotoba-lang/webgpu への additive 変更）・Phase 3
+（kotobase.net保存、kotoba-client の write path 実装待ち）・Phase 4
+（kami-ui-sdk への Slider/ColorSwatch/Carousel 追加）は独立した follow-up として
+明示的にスコープする。詳細は本 ADR とペアの .md を参照。
+
+Phase 1〜4は同日中に当初計画を超えて実装完了（procedural生成の全身スキニング・
+表情モーフィング・アクセサリー等をライブ3D描画まで含め実現、複数の実バグも
+副産物として発見・修正）。
+
+## Phase 5（同日）— procedural生成の質的限界とVRM-firstへの転換
+
+procedural生成（プリミティブ形状の押し出し）を作り込んだ後、オーナーが実機で
+確認し「頭部が怖い」と指摘。調査の結果、技術的にMetaHumanとは無関係だが、
+procedural生成が**そもそも本物のキャラクターアートだったことがない**という
+本質的な限界が判明。クリーンなCC0素体の調達にも難航したため、オーナーは
+「VRMバイナリは一切コミットせず、ユーザーが自分のVRMを持ち込む」方式へ転換を
+決定（`M3-org/CharacterStudio`のUXパターンを参考、コードは移植せず設計思想のみ
+踏襲）。`vrm.part/decompose`+`vrm.compose`によるマルチVRM・パーツミキシングを
+実装し、本当に異なる2つの実VRM（ローカル検証限定・非コミット）でクロス
+アバター・ミキシングを実ブラウザ操作で検証（バグなし）。副産物として
+sparse accessor対応・メッシュ分類改善・vrm.compose のバッファ重複排除バグ
+（2.5倍サイズ膨張）も発見・修正。procedural生成はVRMを持たないユーザー向けの
+フォールバックとして存置。詳細は本 ADR とペアの .md を参照。
+
+## Consequences
+
+Phase 1単独で「パラメータ編集→プレビュー→.vrmエクスポート」の character
+creator ループが成立する。Phase 5で VRM-first（ユーザー持ち込み素体+マルチ
+パーツミキシング）が主役アーキテクチャとして採用され、procedural生成は
+副次的フォールバックに位置づけが変わった。kotobase.net保存は引き続き
+kotoba-client の write path 待ちで未着手。詳細は本 ADR とペアの .md を参照。
+
+## References
+
+本 ADR とペアの .md 参照（`M3-org/CharacterStudio`、`vrm-c/vrm-specification`
+samples 等の Phase 5 参照先を含む）。
+"}

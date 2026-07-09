@@ -1,0 +1,23 @@
+{:adr/id "2607011600"
+ :adr/title "Clojure code organization: use library/namespace, not package"
+ :adr/status :accepted
+ :adr/date "2026-07-01"
+ :context
+ {:ambiguity "growing set of kotoba-lang .cljc capability libraries (banking, card, swift, eth-crypto, cacao, did, vc, ...) needed a fixed vocabulary for 'what do we call this unit'"
+  :collision "kotoba-lang/ooxml already uses :package correctly for the OOXML container concept (ooxml/package-kind, ooxml/ensure-content-type, ...); reusing 'package' for Clojure code organization would collide with that legitimate domain term"}
+ :decision
+ {:distribution-unit
+  {:term :library
+   :aka "lib"
+   :examples ["deps.edn :deps entries" "Clojars group/artifact coordinates" "git deps" "west projects (kotoba-lang/banking, kotoba-lang/card, ...)"]}
+  :code-organization-unit
+  {:term :namespace
+   :aka "ns"
+   :note "(ns foo.bar) -> foo.bar is a namespace; JVM package mapping after compilation is a gen-class/interop implementation detail, not user-facing Clojure vocabulary"}
+  :package-usage
+  {:rule "reserve 'package' for contexts where it is the correct domain term (OOXML package, ISO 8583 message package, ...); never use it for a Clojure/CLJC code-organization unit"
+   :legitimate-examples ["kotoba-lang/ooxml :package (OOXML container structure)" "kotoba-lang/card ISO 8583 message package"]}}
+ :consequences
+ ["new ADRs/README/code comments referring to a Clojure distribution or code-organization unit must say library/namespace, never package"
+  "existing legitimate :package domain usages (ooxml, card) are unchanged by this ADR"
+  "gives contributors and agents a fixed vocabulary, preventing naming drift"]}

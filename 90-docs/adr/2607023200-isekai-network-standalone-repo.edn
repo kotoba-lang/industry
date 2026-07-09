@@ -1,0 +1,124 @@
+{:frontmatter
+ {:id "adr-2607023200-isekai-network-standalone-repo"
+  :title "ADR-2607023200: isekai-network (Ghost Hacker: Shiro & Pico game) as a standalone repo, not nested in kami-engine"
+  :status "accepted"
+  :doc_type "adr"
+  :topic "isekai-network-split"
+  :authoritative true
+  :last_verified "2026-07-02"
+  :authoritative_for
+  ["Ghost Hacker: Shiro & Pico (game project codename isekai-network) lives at
+    orgs/gftdcojp/isekai-network, not nested under kotoba-lang/kami-engine's
+    kami-clj-play/games/"
+   "kotoba-lang/kami-engine PR #91 (the initial kami-clj-play/games/isekai-network/
+    placement) was closed unmerged, superseded by this split -- kami-engine has
+    zero net footprint from this game project"
+   "the 5-concept EDN game bible (design/00-game-bible.edn + 01..05) and the
+    concept-1 prototype (author.clj/logic.clj, clojure -M author.clj verified
+    working end-to-end) moved verbatim into the new repo's design/ and
+    games/01-netsurvivors/ -- no content changes, only relocation"
+   "the WASM-compile blocker found while authoring the kami-engine PR (kami-engine-clj
+    deleted upstream in kotoba-lang/kotoba PR #259, part of the in-progress
+    clj-wgsl migration, ADR-2607010930) is orthogonal to this repo-placement
+    decision and remains open regardless of where the game code lives"]
+  :related
+  ["CLAUDE.md"
+   "90-docs/adr/2607011816-ghosthacker-shiropico-standalone-repo.md"
+   "90-docs/adr/2607010930-clj-wgsl-migration.md"
+   "manifest/repos.edn"
+   "orgs/kotoba-lang/kami-engine PR #91 (closed, superseded)"
+   "orgs/gftdcojp/isekai-network"]
+  :supersedes []
+  :superseded_by []}
+
+ :problem
+ {:source "user request 2026-07-02: '個別のゲームは isekai-network repo にまとめてね' (consolidate the individual games into the isekai-network repo), sent while kotoba-lang/kami-engine PR #91 was open for review"
+  :investigated
+  ["PR #91 held the full deliverable so far: design/00-game-bible.edn (title
+    'Ghost Hacker: Shiro & Pico', cast, bestiary, shared controls/tone/rating)
+    + design/01..05.edn (one per concept variant) + a real concept-1 prototype
+    (author.clj/logic.clj, a faithful rename+recolour of
+    kami-clj-play/games/survivors onto the shiro-pico/ghost cast) -- review
+    found it clean (CI green, mergeable) with no correctness issues"
+   "ADR-2607011816 already resolved the identical structural question for
+    this franchise's narrative content: ai-gftd-ghosthacker-shiropico was
+    split out of ai-gftd-mangaka specifically to decouple an independently-
+    lifecycled IP from an unrelated engine/infra repo's churn, and to match
+    the standalone-repo symmetry Ren's Ghost Hacker line already has
+    (orgs/com-junkawasaki/ghosthacker). The same reasoning transfers directly
+    to the game project: kami-engine is mid an active internal migration
+    (ADR-2607010930, clj-wgsl, which had already deleted the kami-engine-clj
+    Rust crate PR #91's own README depended on) -- coupling a product-shaped
+    game's lifecycle to that churn is the same mistake ADR-2607011816 already
+    named and rejected once for this franchise"
+   "west.yml's own kami-app-{game} convention (ARCHITECTURE.md) already
+    treats new games as separate per-game crates/repos, not nested paths --
+    a standalone isekai-network repo is consistent with that convention too,
+    not just with the shiropico content-split precedent"]
+  :risk "PR #91 was clean and mergeable; closing it unmerged rather than
+         merging-then-deleting avoids ever landing content in kami-engine's
+         history that would need a follow-up removal commit"}
+
+ :decision
+ {:new_repo {:path "orgs/gftdcojp/isekai-network"
+             :remote "gftdcojp"
+             :visibility :private
+             :org_default_visibility_source "repos.edn :orgs :visibility (gftdcojp = private, per CLAUDE.md standing policy, ADR-2607021330)"
+             :method "plain copy of the 12 git-tracked files from kami-engine's
+                      kami-clj-play/games/isekai-network/ -> new repo, restructured
+                      as design/*.edn (unchanged) + games/01-netsurvivors/* (unchanged
+                      content, author.clj re-verified with `clojure -M author.clj`
+                      from the new location), git init, one commit, gh repo create
+                      --source=. --push (same pattern as ADR-2607011816's
+                      ai-gftd-ghosthacker-shiropico split)"}
+  :source_pr_change {:repo "orgs/kotoba-lang/kami-engine"
+                      :action "PR #91 closed unmerged (not merged-then-reverted) -- superseded by orgs/gftdcojp/isekai-network"
+                      :unaffected "kami-clj-play/games/{survivors,waves} and all other kami-engine content -- PR #91 only ever touched the new isekai-network/ subtree"}
+  :manifest_registration
+  {:repos_edn "add \"orgs/gftdcojp/isekai-network\" to :extra-projects via GitHub
+               Contents API single-entry commit (blob-sha-matched PUT against
+               origin/main tip), not a local edit -- same method ADR-2607011816
+               used, for the same reason: this superproject checkout has
+               concurrent-fleet pin drift and shallow-clone '(forced update)'
+               noise that make a local edit + full regen risky"
+   :west_yml "add one project entry (name/remote/revision/path/groups),
+              alphabetically placed, mirroring the ai-gftd-ghosthacker-shiropico
+              entry's shape, via the same API method"
+   :why_api_not_local "identical rationale to ADR-2607011816: avoids a stale-base
+                        3-way merge against a moving main tip, and avoids bundling
+                        unrelated drifted child-repo pins into a one-line
+                        registration commit (the 'pin regression trap' repos.edn's
+                        :manifest-workflow warns about)"
+   :verify "pin == orgs/gftdcojp/isekai-network@main HEAD confirmed before commit;
+            bb scripts/gen-west-manifest.bb --check run after to confirm the
+            hand-placed entries match canonical generator output"}}
+
+ :consequences
+ {:symmetry "Ghost Hacker's three living surfaces now each have the standalone
+             repo shape ADR-2607011816 established as this franchise's norm:
+             Ren's line (orgs/com-junkawasaki/ghosthacker), SHIRO & PICO's
+             narrative content (orgs/gftdcojp/ai-gftd-ghosthacker-shiropico),
+             and now the game project (orgs/gftdcojp/isekai-network)"
+  :decoupled_from_engine_churn "isekai-network's lifecycle (design iteration,
+                                 future concept prototypes) no longer shares a
+                                 repo, issue tracker, or commit history with
+                                 kami-engine's in-progress clj-wgsl Rust-removal
+                                 migration (ADR-2607010930)"
+  :engine_dependency_unchanged "isekai-network still depends on kami-engine as an
+                                 external engine (a west sibling project) for
+                                 anything beyond `clojure -M author.clj` --
+                                 concept 1's WASM compile remains blocked on that
+                                 migration landing a working kamiclj-equivalent
+                                 entry point, tracked as it was in PR #91, now
+                                 tracked from isekai-network's own README instead"
+  :zero_kami_engine_footprint "kami-engine's git history has no isekai-network
+                                commits at all (PR closed unmerged, not merged
+                                then reverted) -- clean separation"}
+
+ :alternatives
+ [{:option "merge PR #91 as-is, keep the game nested in kami-engine's kami-clj-play/games/isekai-network/"
+   :rejected_because "explicit user direction to consolidate into a dedicated repo; also repeats the exact coupling-to-unrelated-engine-churn mistake ADR-2607011816 already identified and rejected for this franchise's narrative content"}
+  {:option "name the new repo ai-gftd-isekai-network, matching gftdcojp's ai-gftd-* naming convention (ai-gftd-mangaka, ai-gftd-animeka, ai-gftd-ghosthacker-shiropico)"
+   :rejected_because "user explicitly requested the literal name 'isekai-network repo' -- honoring the exact requested name over imposing an unrequested naming convention"}
+  {:option "merge PR #91 into kami-engine first, then separately create isekai-network and delete the kami-engine copy in a follow-up commit"
+   :rejected_because "would leave a needless detour through kami-engine's git history; closing the clean, unmerged PR directly is simpler and leaves zero trace, matching how ADR-2607012000's abandoned michibiki-repo detour was handled (deleted before ever landing, no trace in history)"}]}

@@ -1,0 +1,76 @@
+;; queries/attention.edn — ADR-0010 L3: named Datalog views.
+;; 原則: 人間が見るのはこれらのクエリ結果だけ。受信箱は見ない。
+;; 実行: (d/q (:query view) db (java.util.Date.)) 等。todo: warehouse.views ns でラップ。
+
+{:attention/queue
+ {:doc "今日見るべきもの全て、重要度順。これ以外は存在しないものとして扱う。"
+  :query [:find ?title ?due ?severity ?case-name
+          :in $ ?now ?horizon-days
+          :where
+          [?o :obligation/status :open]
+          [?o :obligation/title ?title]
+          [?o :obligation/due ?due]
+          [?o :obligation/severity ?severity]
+          [(.getTime ?due) ?due-ms] [(.getTime ?now) ?now-ms]
+          [(- ?due-ms ?now-ms) ?delta]
+          [(* ?horizon-days 86400000) ?horizon-ms]
+          [(< ?delta ?horizon-ms)]
+          (or-join [?o ?case-name]
+                   (and [?o :obligation/case ?c] [?c :case/name ?case-name])
+                   (and [(missing? $ ?o :obligation/case)] [(ground "-") ?case-name]))]}
+
+ :attention/family-signals
+ {:doc ":family クラスの人物が絡む直近メール。SLO=即時、自動アーカイブ禁止。"
+  :query [:find ?date ?subject ?from-name
+          :in $ ?since
+          :where
+          [?p :person/attention-class :family]
+          [?e :email/from ?p]
+          [?p :person/name ?from-name]
+          [?e :email/date ?date]
+          [(>= ?date ?since)]
+          [?e :email/subject ?subject]]}
+
+ :attention/money-anomalies
+ {:doc "決済失敗・延滞・残高警告を vendor 単位で集約(同一業者の連打は1行)。SLO=日次1ダイジェスト。"
+  :query [:find ?vendor (count ?e) (max ?date)
+          :in $ ?since
+          :where
+          [?e :email/labels "money-anomaly"]
+          [?e :email/date ?date]
+          [(>= ?date ?since)]
+          [?e :email/mentions ?org]
+          [?org :org/name ?vendor]]}
+
+ :relationship/decay
+ {:doc "関係クラス別・最終接触からの経過。R(τ)の床割れ検出。family/friend で閾値超えは attention/queue 行きにする。"
+  :query [:find ?person ?relation (max ?date)
+          :where
+          [?p :person/relation ?relation]
+          [(contains? #{:family :co-parent :friend} ?relation)]
+          [?p :person/name ?person]
+          (or-join [?p ?date]
+                   (and [?e :email/from ?p] [?e :email/date ?date])
+                   (and [?e :email/to ?p]   [?e :email/date ?date])
+                   (and [?ev :event/people ?p] [?ev :event/start ?date]))]}
+
+ :goal/blocked-critical-path
+ {:doc "ガードレール以外で、open obligation に塞がれている active goal。今週の minimax 配分の入力。"
+  :query [:find ?goal-title ?ob-title ?due
+          :where
+          [?g :goal/status :active]
+          [?g :goal/title ?goal-title]
+          [?ob :obligation/goal ?g]
+          [?ob :obligation/status :open]
+          [?ob :obligation/title ?ob-title]
+          [?ob :obligation/due ?due]]}
+
+ :guardrail/nodoka-floor
+ {:doc "直近4週の nodoka.time。床(週1接触)を割った週があれば全クエリに優先して表示する。"
+  :query [:find ?at ?value
+          :in $ ?since
+          :where
+          [?k :kpi/metric :nodoka.time]
+          [?k :kpi/at ?at]
+          [(>= ?at ?since)]
+          [?k :kpi/value ?value]]}}

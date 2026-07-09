@@ -1,0 +1,40 @@
+{:frontmatter
+ {:id "adr-2607011345-agent-worktree-west-topdir-fix"
+  :title "ADR-2607011345: Agent worktrees must fix west topdir (outside superproject root + west init -l manifest)"
+  :status "accepted"
+  :doc_type "adr"
+  :topic "west-worktree-topdir"
+  :authoritative true
+  :last_verified "2026-07-01"
+  :authoritative_for
+  ["how an agent isolates west child-repo checkouts: create the git worktree OUTSIDE the superproject root and run `west init -l manifest` inside it to fix topdir"
+   "the failure mode of worktrees under .claude/worktrees/ (inside super): west walks up to the superproject's .west/ and treats the superproject as topdir, so west update lands in the shared orgs/ and collides with other agents' WIP"
+   "WEST_TOPDIR env-var override does NOT fix this (.west/ discovery wins); only outside-root + init -l works"]
+  :related
+  ["CLAUDE.md"
+   "90-docs/adr/2606241600-shallow-depth1-git-default.md"
+   "90-docs/adr/2606272237-manifest-workflow-single-entry-commit.md"
+   "90-docs/adr/2607010930-clj-wgsl-migration.md"]
+  :supersedes []
+  :superseded_by []}
+
+ :problem
+ {:source "clj-wgsl migration session 2026-07-01: west update in a .claude/worktrees/ worktree did not check out child repos into the worktree; instead it hit another agent's WIP in the superproject-main checkout"
+  :root_cause "west resolves topdir by walking up from CWD for a .west/ dir; a worktree under .claude/worktrees/ is a subdirectory of the superproject, so the walk finds the superproject's .west/ and west treats the superproject as topdir — all west operations target the shared orgs/"
+  :non_fixes ["WEST_TOPDIR env-var override (returned super root anyway)" "west init -l manifest inside nested worktree (refuses: already initialized in super)"]
+  :risk "agent worktrees give false isolation; west work silently lands in the shared superproject checkout, colliding with other agents' WIP and making west update skip/fail on dirty repos"}
+
+ :decision
+ {:rule "agent worktrees that run west must be created OUTSIDE the superproject root (sibling path) and run `west init -l manifest` inside to mint a worktree-local .west/ fixing topdir"
+  :recipe ["git worktree add -b <branch> /tmp/root-<agent> origin/main"
+           "cd /tmp/root-<agent>"
+           "west init -l manifest"
+           "west update --fetch smart <repos>"]
+  :nested_worktree_scope "worktrees under .claude/worktrees/ are OK for doc/script/manifest-only edits that never invoke west; never for child-repo work"
+  :verified
+  {:inside_super "west topdir = superproject root; west update lands in shared orgs/ (WRONG)"
+   :outside_super_plus_init "west topdir = the worktree; west update lands in worktree orgs/ (CORRECT)"}}
+ :consequences
+ {:isolation "per-agent child-repo checkouts fully isolated; one agent's WIP cannot block another's west update"
+  :cost "child repos duplicated per agent (disk/bandwidth) — mitigated by --fetch smart + shallow + DataLad/B2 for heavy"
+  :cannot_fix "upstream force-push effects (origin/main force-rewrite, child-remote force-rewrite pin rollback) — worktree layout cannot prevent these; requires the CLAUDE.md force-push ban upstream"}}}

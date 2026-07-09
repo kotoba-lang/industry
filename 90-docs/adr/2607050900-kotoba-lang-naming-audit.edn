@@ -1,0 +1,269 @@
+{:frontmatter
+ {:id "adr-2607050900-kotoba-lang-naming-audit"
+  :title "ADR-2607050900: kotoba-lang org naming audit -- IPLD/Datomic/IPNS/IPFS/Clojure-stdlib clusters"
+  :status "accepted"
+  :date "2026-07-05"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "kotoba-lang-naming-audit"
+  :authoritative true
+  :authoritative_for
+  ["Scoped naming/duplication audit of kotoba-lang org repos centered on IPLD/Datomic/IPNS/IPFS/Clojure-stdlib conventions, as of 2026-07-05"
+   "Confirms no functional/dependency-level duplication found in any investigated cluster -- every confusable-name pair turned out to be genuinely distinct in scope once its own README was read"
+   "Confirms the kotodama/kototama romanization split is real, undocumented on either side, and is the clearest naming-drift finding"
+   "Confirms kotoba-client/kotobase-client/kotobase are three genuinely distinct, correctly-scoped repos with a naming-surface collision (no repo cross-references the other two)"
+   "No renames or documentation edits executed by this document -- audit only, follow-up items listed but not authorized"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607050700" "adr-2607050800" "adr-2607050500" "adr-2606302300"]
+  :last_verified "2026-07-05"
+  :artifacts {}}
+
+ :clusters
+ {:healthy
+  [{:repos ["ipld" "dag-cbor" "multiformats" "prolly-tree" "arrangement" "datom" "kotobase-peer" "chain"]
+    :why "Content-addressing + Datomic-parallel core; already covered by ADR-2607050700/2607050800. Consistent vocabulary, no RDF-flavored residue, no overlap."}
+   {:repos ["ipns" "did"]
+    :why "ipns's README explicitly states it's \"the naming half of the same discipline kotoba-lang/did covers for did:key -- siblings derived from the same raw pubkey, kept separate because they are different specs,\" and notes it replaced duplicated derivation code previously in kekkai/cacao.clj and kagi/identity.clj. Exemplary cross-documentation."}
+   {:repos ["lint" "lint-kotoba"]
+    :why "lint-kotoba's README states directly: lint formats/parses, lint-kotoba is the source-level static analysis between lint and wit's over-grant checking, and depends on lint. Zero ambiguity despite near-identical names."}
+   {:repos ["mst" "atproto"]
+    :why "mst explicitly scopes to pure MST primitives only, stating the byte/CID/CAR layer belongs in atproto."}
+   {:repos ["ipfs" "atproto-client"]
+    :why "atproto-client's README explicitly contrasts its own IHttp port design against ipfs's (single -request vs -get/-post/-post-file; string vs byte bodies), reasoned from XRPC vs Kubo needs -- a stated design comparison, not silent duplication."}
+   {:repos ["witness-quorum"]
+    :why "Positive precedent, not a problem: README states it was deliberately named witness-quorum instead of echoing its original directory name kotoba-datomic, \"to describe what it actually does and avoid echoing the name of the now-deleted Rust crate\" it was mistakenly assumed to reimplement. Same naming discipline as ADR-2607050700/2607050800, evidence the practice already exists elsewhere."}]
+
+  :naming-drift
+  [{:repos ["kotodama" "kotodama-cells" "kotodama-holochain" "kotodama-host" "kotodama-mcp" "kotodama-py" "kototama" "kototama-cljc-contract"]
+    :issue "Undocumented romanization split: kotodama and kototama are two different romanizations of 言霊 (\"word-spirit\"), thematically on-brand for \"kotoba\" (言葉, \"word/language\") -- which makes confusion MORE likely, not less."
+    :evidence "kotodama's README mentions \"kototama\" exactly once, as etzhayyim/kototama (a DIFFERENT GitHub org's repo), cited as historical origin only. kotoba-lang/kototama's own README never mentions kotodama at all. Neither side explains why both spellings persist as separate, non-cross-referenced families."
+    :severity :high
+    :recommendation "Add a short cross-reference note to both READMEs (mirror ipns's own pattern) explaining the spelling split and each repo's actual scope relative to the other."}
+   {:repos ["kotoba-client" "kotobase-client" "kotobase"]
+    :issue "Three similarly named, genuinely different repos with no explicit disambiguation between them."
+    :evidence "kotobase = server-side IStore port seam. kotobase-client = CACAO-authed client for the kotobase.net tenant Datom plane (de-forks code formerly hand-copied into app-aozora/app-aozora-boundary/kami-genko). kotoba-client = generic, non-CACAO CID-verified block ingest/hydrate client over kotoba's content graph, consumed by p2p. None of the three READMEs names or contrasts itself against the other two."
+    :severity :high
+    :recommendation "Add a one-line disambiguation section to all three READMEs cross-referencing each other, same pattern atproto-client already uses against ipfs."}]
+
+  :stale-or-low-value
+  [{:repos ["kotoba-v2025"]
+    :issue "Self-described \"Legacy Reference\" -- historical Rust workspace (JSON-LD + OWL inference via a \"fukurow\" reasoner, Kernel/Actor/Mediator \"semanticos\" pattern), an abandoned design distinct from the active CLJC substrate. Own README correctly redirects to kotoba-lang/kotoba and kotoba-lang/kotoba-lang."
+    :evidence "Appears TWICE in manifest/repos.edn's :extra-projects list (line ~79 and line ~563) -- harmless today (render() de-duplicates via distinct) but a repos.edn hygiene bug."
+    :severity :low
+    :recommendation "Dedupe the repeated line next time repos.edn is touched for an unrelated reason; no urgency."}
+   {:repos ["kotoba-adapter-contracts" "kototama-cljc-contract" "kotoba-lang-cli-contract"]
+    :issue "Three scaffold repos share the EXACT SAME one-line placeholder README: \"KAMI clj-wgsl migration Phase 4 home (ADR-2607010930) -- scaffold, Wave-2 port lands here.\""
+    :evidence "May be intentional (three genuinely distinct landing zones for the same migration wave, not yet populated) or may indicate scaffolds created ahead of need that never got differentiated -- can't tell from the outside which, if any, is still an active target."
+    :severity :low
+    :recommendation "Confirm whether all three are still live migration targets or can be retired/merged."
+    :investigated-2026-07-08
+    {:finding "All three are size:0 GitHub repos (nothing beyond the placeholder README ever pushed). None of the three names, nor the term \"Wave-2,\" appears anywhere in ADR-2607010930's .md/.edn -- that migration has since progressed through Phase 7 (113/116 kami-engine crates restored) by a different route, never populating these three. kotoba-adapter-contracts's naming pattern IS a real, live convention elsewhere (kotoba-core-contracts, kotoba-selfhost-contracts are both real populated repos) -- reads as a legitimate scaffold that never got filled in, not a naming mistake."
+     :bug-found-and-fixed "kototama-cljc-contract's and kotoba-lang-cli-contract's local west checkouts had git origin misconfigured to kotoba-lang/kototama.git and kotoba-lang/kotoba-lang.git respectively (unrelated active repos) -- a future push from either directory would have silently landed scaffold content in the wrong repo. Checked-out content itself was verified correct (identical to each repo's real origin/main); only the remote URL was wrong. Corrected both."
+     :recommendation "Retire all three -- not executed here (repo archival/deletion is more consequential and less reversible than this pass's fixes; left as an explicit owner-confirmable follow-up). Re-scaffold fresh against the current migration plan if the scopes are still wanted."}}]
+
+  :placement-questions
+  [{:repos ["witness-quorum"]
+    :issue "Own README self-identifies as @etzhayyim/witness-quorum, relocated from etzhayyim/root. Per repos.edn's org taxonomy (ADR-2606302300): kotoba-lang=language-substrate/platform, etzhayyim=agent-centric/public-interest. Deterministic witness selection + quorum + Ed25519 attestation reads as agent-centric/public-interest infra, not core language substrate."
+    :severity :medium
+    :recommendation "Revisit org placement (kotoba-lang vs etzhayyim) against ADR-2606302300's taxonomy -- independent of the repo's (good) name, which is not in question."
+    :resolved-2026-07-08
+    {:conclusion "No move needed -- kotoba-lang placement is correct."
+     :reasoning "ADR-2606302300's actual test is genericity/parameterization (\"language substrate, consumed by all orgs\"), not domain-name intuition. witness-quorum's own README already states \"Zero etzhayyim-specific coupling beyond an NSID string constant and a 'council' escalation label -- every fleet topology, membrane rule, and signer is a caller-supplied parameter,\" and its real target consumer is kotoba-lang/murakumo (Murakumo babashka cell-runners), not an etzhayyim actor -- matching the reasoning that justified its original 2026-07-01 relocation FROM etzhayyim TO kotoba-lang. Surface-level domain vibes don't override the taxonomy's actual criterion."}}]
+
+  :noted-not-a-problem
+  [{:repos ["kotoba-lang"]
+    :note "Repo shares its name with the org itself. README explains the split clearly (\"split from kotoba-lang/kotoba so the language surface can be reviewed independently from the current compiler/runtime/server/mesh implementation\") -- documented, not accidental. Flagged only as a standing minor discoverability friction (searching \"kotoba-lang\" can land on the wrong result), not a naming-quality defect."}
+   {:repos ["kotoba-topology"]
+    :note "An arXiv-style LaTeX paper (\"Languages as Graph Topologies,\" cross-linguistic syntax analysis) sharing kotoba/topology-adjacent naming with the software org. No stated relationship to any other repo -- reads as an unrelated academic artifact, not a naming conflict with any specific software component."}
+   {:repos ["sql"]
+    :note "\"Kotoba DSL package for kotoba.sql... a compatibility facade\" over sql.core. Exists alongside rdf/sparql/shacl as another query-vocabulary member; not mis-named given SQL is its own real, distinct vocabulary (not competing with the Datomic-over-RDF priority), but worth remembering next time query-layer naming is revisited."}]}
+
+ :body "# ADR-2607050900: kotoba-lang org naming audit — IPLD/Datomic/IPNS/IPFS/Clojure-stdlib clusters
+
+**Status**: accepted (audit; no renames executed by this document)
+**Date**: 2026-07-05 (session-numbered; see repos.edn ADR numbering convention)
+**Deciders**: Jun Kawasaki
+
+## Context
+
+Following ADR-2607050700/2607050800's rename work (RDF-flavored/generic
+names → Datomic vocabulary), the owner asked for a wider sweep: across
+the whole `kotoba-lang` GitHub org (415 registered repos as of this
+audit), are there other repos whose naming has drifted from the
+IPLD/Datomic/IPNS/IPFS/Clojure conventions this substrate has been
+converging on, or that duplicate/overlap each other?
+
+Method: every repo's own README was fetched and read directly (not
+inferred from the name alone) for the candidate clusters below — the
+content-addressing core, the Datomic-parallel database layer, the
+identity/naming layer, and the foundational Clojure stdlib. The ~350
+remaining repos (3D/robotics `kami-*` engine family, ISIC industry-
+vertical libs, format/codec libs unrelated to any of the five themes)
+were **not** individually audited — this is a scoped sweep, not an
+org-wide census.
+
+## Findings
+
+See the `:clusters` map above this body for the structured data. In
+prose:
+
+### Healthy — no action needed
+
+Content-addressing core (`ipld`/`dag-cbor`/`multiformats`/`prolly-tree`/
+`arrangement`/`datom`/`kotobase-peer`/`chain`), `ipns`↔`did`,
+`lint`↔`lint-kotoba`, `mst`↔`atproto`, `ipfs`↔`atproto-client`, and
+`witness-quorum` (a positive precedent for deliberate naming discipline)
+all show either clean vocabulary alignment or exemplary cross-
+documentation between neighbors.
+
+### Naming drift / confusability (real, not yet acted on)
+
+`kotodama*` vs `kototama*` — an undocumented romanization split of 言霊
+across 7 repos, unexplained on either side. `kotoba-client` /
+`kotobase-client` / `kotobase` — three genuinely distinct, correctly-
+scoped repos with a naming-surface collision and zero cross-referencing.
+
+### Likely stale / low-value duplication
+
+`kotoba-v2025` (correctly self-labeled legacy, but duplicated as a
+manifest list entry). Three scaffold repos sharing identical placeholder
+README text.
+
+### Placement question
+
+`witness-quorum`'s residence in `kotoba-lang` vs its self-identified
+`@etzhayyim/` scope, against the org's own role/scope taxonomy
+(ADR-2606302300).
+
+### Noted but not a problem
+
+`kotoba-lang` (repo) sharing a name with the org itself (documented,
+just an ergonomic friction). `kotoba-topology` (an unrelated academic
+paper repo). `sql` (a legitimate, distinct query vocabulary alongside
+`rdf`/`sparql`/`shacl`).
+
+## Consequences
+
+- (+) Two exemplary cross-documentation patterns already exist in the
+  org (`ipns`↔`did`, `lint`↔`lint-kotoba`) — the fix for the
+  `kotodama`/`kototama` and `kotoba-client`/`kotobase-client`/`kotobase`
+  findings isn't a new practice, it's applying an existing one.
+- (+) No functional/dependency-level duplication was found — every
+  cluster investigated turned out to implement genuinely different
+  scope once its README was actually read, including the ones with
+  confusable names. This audit found a *documentation* gap, not a
+  *duplicated-effort* gap.
+- (−) `kotodama`/`kototama` is a real, unresolved point of confusion for
+  anyone new to the org — this audit does not resolve it (no rename
+  executed), it only confirms the drift and that neither side explains
+  it.
+- (±) The `kotoba-v2025` duplicate list entry and the three identical-
+  boilerplate scaffold repos are low-severity hygiene items, not naming
+  decisions — left as noted findings rather than acted on, since fixing
+  them wasn't the ask.
+
+## Follow-up (recommended, not yet authorized)
+
+- Add a short cross-reference note to `kotodama`'s and `kototama`'s
+  READMEs (mirroring `ipns`'s own pattern) explaining the spelling
+  split and each repo's actual scope relative to the other.
+- Add a one-line disambiguation section to `kotobase`, `kotobase-client`,
+  and `kotoba-client`'s READMEs cross-referencing the other two (same
+  pattern `atproto-client` already uses against `ipfs`).
+- Dedupe the `kotoba-v2025` line in `manifest/repos.edn`'s
+  `:extra-projects` (minimal diff, `--entry` not needed since it's a
+  pure list-hygiene fix, not a pin change).
+- Confirm whether the three identical-boilerplate scaffold repos
+  (`kotoba-adapter-contracts`, `kototama-cljc-contract`,
+  `kotoba-lang-cli-contract`) are still live migration targets or can be
+  retired/merged.
+- Revisit `witness-quorum`'s org placement (`kotoba-lang` vs
+  `etzhayyim`) against ADR-2606302300's taxonomy.
+
+## Follow-up (2026-07-08) — scaffold-repo status investigated
+
+Investigated whether `kotoba-adapter-contracts`, `kototama-cljc-contract`,
+and `kotoba-lang-cli-contract` are still live migration targets:
+
+- All three exist as their own correctly-named GitHub repos, but each is
+  `\"size\":0` — nothing beyond the identical placeholder README was ever
+  pushed. No `deps.edn`, no `src`.
+- The placeholder text cites \"KAMI clj-wgsl migration Phase 4... Wave-2
+  port lands here\" (ADR-2607010930), but none of the three repo names
+  appears anywhere in that ADR's `.md` or `.edn` (grepped both), and
+  \"Wave-2\" as a term doesn't appear in it either — the only \"wave\"
+  language there is Phase 7's unrelated \"ambitious-scope wave closed:
+  113/116 kami-engine crates restored.\" The migration that ADR tracks has
+  since progressed through Phase 7 by a different route, without ever
+  populating these three.
+- `kotoba-adapter-contracts`'s naming pattern (`kotoba-*-contracts`) is a
+  real, live convention elsewhere in the org — `kotoba-core-contracts` and
+  `kotoba-selfhost-contracts` are both real, populated CLJC/EDN-authority
+  repos — so this one specifically reads as a legitimate scaffold that
+  simply never got filled in, not a naming mistake.
+- **Found and fixed a real, separate bug while investigating**: the local
+  west checkouts for `kototama-cljc-contract` and `kotoba-lang-cli-contract`
+  had their git `origin` remotes misconfigured to point at `kotoba-lang/
+  kototama.git` and `kotoba-lang/kotoba-lang.git` respectively (unrelated,
+  actively-developed repos) instead of their own repos. The checked-out
+  content itself was correct (verified identical to each repo's real
+  `origin/main`), so no data was at risk from this session's use, but a
+  future `git push` from either directory would have silently pushed
+  scaffold content into the wrong (real, active) repo. Corrected both
+  remote URLs; re-verified fetch and content match.
+
+**Recommendation (not executed here): retire all three** — archiving or
+deleting a GitHub repo is a more consequential, less reversible action
+than this pass's fixes, so it's left as an explicit, owner-confirmable
+follow-up rather than done unilaterally. If the `adapter-contracts` /
+`cli-contract` scopes are still wanted, they should be re-scaffolded
+fresh against the *current* migration plan rather than reusing these
+empty, stale-citation placeholders.
+
+## Follow-up (2026-07-08) — witness-quorum org-placement question resolved
+
+Re-examined `witness-quorum`'s residence in `kotoba-lang` against
+ADR-2606302300's actual placement criteria, rather than domain-name
+intuition:
+
+- ADR-2606302300 defines `kotoba-lang` as "language substrate, consumed
+  by all orgs" — the decisive test is genericity/parameterization, not
+  whether a library's *subject matter* (witness selection, quorum,
+  attestation) sounds agent-flavored.
+- `witness-quorum`'s own README already states this directly: "Zero
+  etzhayyim-specific coupling beyond an NSID string constant and a
+  "council" escalation label — every fleet topology, membrane rule,
+  and signer is a caller-supplied parameter." `WitnessTransport` is
+  "a documented plain map of functions," and the production HTTP/PDS
+  transport was *deliberately not ported* so the package doesn't
+  hard-code any one deployment's shape.
+- Its stated real target consumer is "Murakumo babashka cell-runners" —
+  `kotoba-lang/murakumo`, itself a `kotoba-lang` cross-cutting
+  infra repo, not an `etzhayyim` actor.
+- This matches — and was the actual justification for — its 2026-07-01
+  relocation *from* `etzhayyim/root` *to* `kotoba-lang` in the first
+  place (per the README's own "Provenance" section), applying
+  ADR-2606302300's rule as designed.
+
+**Conclusion: no move needed.** The naming-audit ADR's placement
+question is resolved as "already correctly placed" — surface-level
+domain vibes (witness/quorum/attestation "sounds" agent-centric) don't
+override the taxonomy's actual test (generic + parameterized + already
+consumed by kotoba-lang's own infra). This closes the last open
+follow-up from this ADR.
+
+## One-line summary
+
+**A scoped naming sweep of `kotoba-lang`'s IPLD/Datomic/IPNS/IPFS/
+Clojure-stdlib clusters found no functional duplication — every
+confusable-looking pair, once its README was actually read, turned out
+to be genuinely distinct — but two real documentation gaps: the
+undocumented `kotodama`/`kototama` romanization split, and the
+`kotoba-client`/`kotobase-client`/`kotobase` naming-surface collision,
+neither of which cross-references its neighbors the way `ipns`↔`did` and
+`lint`↔`lint-kotoba` already exemplarily do. A `kotoba-v2025` duplicate
+manifest entry, three identically-boilerplated scaffold repos, and
+`witness-quorum`'s org placement are noted as minor, lower-priority
+hygiene items.**
+"}

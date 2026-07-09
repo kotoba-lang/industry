@@ -1,0 +1,61 @@
+(ns mfa.adapters.orchestrator-test
+  (:require [clojure.test :refer [deftest is]]
+            [mfa.adapters.orchestrator :as orchestrator]
+            [mfa.adapters.risk-planner :as risk-planner]
+            [mfa.model :as m]))
+
+(defn- factor [request ok?]
+  {:authn.factor/id (:authn.factor-request/id request)
+   :authn.factor/type (:authn.factor-request/type request)
+   :authn.factor/subject (:authn.factor-request/subject request)
+   :authn.factor/ok? ok?})
+
+(deftest orchestrates-primary-factor-providers
+  (let [policy (m/policy "mfa-o1" #{:totp :webauthn}
+                         {:preferences [:webauthn :totp]})
+        providers (orchestrator/provider-map
+                   :totp (orchestrator/provider (fn [request _ _] (factor request true)))
+                   :webauthn (orchestrator/provider (fn [request _ _] (factor request true))))
+        out (orchestrator/orchestrate (risk-planner/risk-planner)
+                                      providers
+                                      policy
+                                      "did:web:example.com:alice"
+                                      {:risk :low}
+                                      {}
+                                      {})]
+    (is (:mfa.result/ok? out))
+    (is (= [:webauthn :totp]
+           (mapv :authn.factor/type (:mfa.result/factors out))))
+    (is (false? (:mfa.result/fallback-used? out)))))
+
+(deftest falls-back-when-primary-provider-fails
+  (let [policy (m/policy "mfa-o2" #{:totp}
+                         {:fallbacks [:recovery-code]
+                          :fallback-for {:totp #{:recovery-code}}})
+        providers (orchestrator/provider-map
+                   :totp (orchestrator/provider (fn [request _ _] (factor request false)))
+                   :recovery-code (orchestrator/provider (fn [request _ _] (factor request true))))
+        out (orchestrator/orchestrate (risk-planner/risk-planner)
+                                      providers
+                                      policy
+                                      "did:web:example.com:alice"
+                                      {:risk :low}
+                                      {}
+                                      {})]
+    (is (:mfa.result/ok? out))
+    (is (true? (:mfa.result/fallback-used? out)))
+    (is (= [:totp :recovery-code]
+           (mapv :authn.factor/type (:mfa.result/factors out))))))
+
+(deftest records-missing-provider-as-failed-factor
+  (let [policy (m/policy "mfa-o3" #{:totp} {})
+        out (orchestrator/orchestrate (risk-planner/risk-planner)
+                                      {}
+                                      policy
+                                      "did:web:example.com:alice"
+                                      {:risk :low}
+                                      {}
+                                      {})]
+    (is (false? (:mfa.result/ok? out)))
+    (is (= :missing-provider
+           (:authn.factor/error (first (:mfa.result/factors out)))))))

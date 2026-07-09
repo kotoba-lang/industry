@@ -1,0 +1,31 @@
+{:frontmatter
+ {:id "adr-2607040400-cloud-itonami-iso3166-jpn-agency-maturity-promotion-batch4"
+  :title "ADR-2607040400: cloud-itonami-iso3166-jpn — agency maturity promotion, batch 4 (MOFA / MOD / Board of Audit)"
+  :status "accepted"
+  :date "2026-07-04"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "cloud-itonami-iso3166-jpn-agency-maturity-promotion-batch4"
+  :authoritative true
+  :authoritative_for ["cloud-itonami-iso3166-jpn-{mofa,mod,audit} blueprint scope"]
+  :related ["adr-2607040100-cloud-itonami-iso3166-jpn-agency-level-extension"
+            "adr-2607040200-cloud-itonami-iso3166-jpn-agency-maturity-promotion-batch2"
+            "adr-2607040300-cloud-itonami-iso3166-jpn-agency-maturity-promotion-batch3"]
+  :supersedes []
+  :superseded_by []
+  :amends []}
+
+ :decision-summary
+ {:updated-lib "kotoba-lang/iso3166"
+  :new-blueprints ["cloud-itonami-iso3166-jpn-mofa" "cloud-itonami-iso3166-jpn-mod" "cloud-itonami-iso3166-jpn-audit"]
+  :org "cloud-itonami"
+  :visibility :public
+  :license "AGPL-3.0-or-later"
+  :registry-coverage {:total 212 :blueprint 19 :spec 193
+                       :jpn-agencies {:total 19 :blueprint 14 :spec 5}}
+  :promoted {:JPN-MOFA "gov.jpn.mofa (ministry) -- ODA/JICA tender-eligibility"
+             :JPN-MOD "gov.jpn.mod (ministry) -- defense-equipment transfer (防衛装備移転三原則) + security clearance"
+             :JPN-AUDIT "gov.jpn.audit (independent commission) -- Board of Audit (会計検査院) readiness compliance"}
+  :robotics false
+  :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+  :manifest-registration "no new kotoba-lang/* repo -- extends existing kotoba-lang/iso3166; west.yml pin advances. The 3 blueprint repos remain standalone."}}
