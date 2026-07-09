@@ -356,6 +356,22 @@
    :business-id "cloud-itonami-4711"
    :required-technologies [:robotics :retail :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as a community-retail actor
+   ;; (RetailOps-LLM ⊣ Retail Governor), the eighty-seventh build
+   ;; outside ADR-2607032000's original insurance/real-estate batch.
+   ;; This blueprint's own :retail-governor keyword is UNIQUE
+   ;; fleet-wide -- no naming-collision precedent needed. FIRST
+   ;; vertical in this fleet built on top of a real, pre-existing
+   ;; bespoke domain capability library (kotoba-lang/retail) rather
+   ;; than self-contained domain logic. Implements the ALREADY-
+   ;; PUBLISHED :retail-governor Decision Rule from this repo's own
+   ;; business-model.md faithfully. Adds ean13-invalid? (capability-
+   ;; library-validated-fact reuse) and price-band-violation? (the
+   ;; flagship new check, grounded in the US NIST Handbook 130, UK
+   ;; Price Marking Order 2004, Germany's Preisangabenverordnung and
+   ;; Japan's Measurement Act -- all four jurisdictions covered
+   ;; honestly).
    :operating-states [:intake :stock :sell :reconcile :reorder :audit]}
   {:id "4920" ; H — Transportation and storage
    :name "Community Freight Transport"
