@@ -50,6 +50,7 @@
 - 準備 (manimani-ledger-pay): OSS install テレメトリ
 - 準備 (manimani-ledger-pay): cloud signup funnel
 - 準備 (manimani-ledger-pay): 価格設計
+- 解消: 準備 (manimani-ledger-pay) 価格設計 → live price 作成済。残: OSS install テレメトリ / cloud signup funnel / checkout 配線
 
 ## Channels
 
@@ -74,6 +75,7 @@
 - Pro (agent 実行時間・rules 高度化)
 - family plan
 - itonami seat バンドル (B2B2C)
+- 価格設計済 (2026-07-09): Manimani Cloud Personal ¥500/月 — Stripe live price_1TrEVqBcblPoapUJNrOOKtIH (prod_UqwO2EhiAaIuGi)。Obsidian Sync 個人月額アンカー。checkout 配線は未 (次の準備項目)
 
 ## Cost Structure
 
