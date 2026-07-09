@@ -1,0 +1,42 @@
+{:adr/id "2607100030"
+ :adr/title "kami:engine vocabulary as kotoba host imports — the first game authored in a .kotoba file"
+ :adr/status :accepted
+ :adr/date "2026-07-10"
+ :adr/related ["2607078000-kototama-wasm-gpu-track-b"
+               "2607062330-kototama-actor-host-abi"
+               "2607062400-wasm-webcomponent-actor-host"
+               "2607022700-aiueos-kernel-capabilities"
+               "2607082400-mesh-drama-profile-kotoba-port"]
+
+ :gap "docs/DEMONSTRATIONS.md (kotoba-lang/kotoba) ended on: playable game logic ran only in the kotoba-clj subset (netsurvivors, kami-genre-base-systems) against kami-script-runtime-rs's 4-module kami:engine/* import shape; no game had ever been authored in a .kotoba file because kotoba-core-contracts' closed host-import table had no game-engine vocabulary"
+
+ :decision "expose a minimal kami:engine ECS vocabulary through kotoba's own single (module \"kotoba\") capability-guarded ABI (NOT the kami-clj 4-module shape), following the gpu/math Track B registration path (guest computes, host executes)"
+
+ :registration
+ {:kotoba-core-contracts {:sha "9a2f45e333908603b52689479572ba9d4acdf1fa"
+                          :capability "kami/engine" :capability-id 233
+                          :ops '[kami-tick-n kami-spawn kami-despawn
+                                 kami-set-position! kami-set-velocity!
+                                 kami-get-x kami-get-y kami-count-tagged
+                                 kami-nearest-tagged kami-move-tagged-toward!
+                                 kami-despawn-within! kami-axis kami-rand]
+                          :notes "one shared capability for the family (graph/kotoba precedent); batch ops stand in for per-entity iteration the language deliberately doesn't have; kami-rand = host's SEEDED xorshift64 (deterministic replay), never the OS RNG"}
+  :kotoba-lang {:sha "bed42bc6c6598e02e3dfcbba316dfd5666fa2c1d"
+                :change ":host/kami-engine in effect-for-kind, registered simultaneously so guard-call can't reproduce the aiueos/actor:host :unsupported-kind runtime-denial gap"}
+  :kotoba {:sha "a2c692082f9dd4b45f463061990c97a984f9e71e"
+           :changes ["op->kind entries for the kami-* family"
+                     "wasm-exec: generic guarded-host-functions factored out of real-host-functions"
+                     "kotoba.kami-host: deterministic host-owned ECS (entity table, fixed-step Euler 1/60s, tick counter, input axes, seeded xorshift64), 'host steps then calls the guest's 0-arg main once per tick' (now-days loop convention)"
+                     "src/kami_survivors.kotoba + policy granting only :kami/engine — THE FIRST GAME AUTHORED DIRECTLY IN A .kotoba FILE (ring spawns every 20 ticks to a 12 cap, 30 u/s chase, 90-tick nova burst, axis-steered player)"
+                     "test/kotoba/kami_game_test.clj: 300 real Chicory ticks, exact pinned entity counts 12→8→10 (netsurvivors' parity-by-counts method), axis steering, static admission, fail-closed runtime denial without the grant"]}}
+
+ :verification {:kotoba-suite "192 tests / 945 assertions, 0 failures; clj-kondo errors 0 warnings 0"
+                :kotoba-core-contracts-suite "14 tests / 209 assertions, 0 failures"
+                :kotoba-lang-suite "33 tests / 237 assertions, 0 failures"
+                :determinism "seeded xorshift64 + fixed-step integration -> same run every time; counts pinned exactly, not flaky"}
+
+ :follow-up ["browser port of kotoba.kami-host's ECS in wasm-webcomponent (hand-JS, kgraph.js/actor-host.js family) so the same compiled .wasm ticks on the browser's native engine like netsurvivors"]
+
+ :west-pins-advanced {:kotoba "1dbcc2eb→a2c69208"
+                      :kotoba-core-contracts "bc327f29→9a2f45e3"
+                      :kotoba-lang "ec360a80→bed42bc6"}}
