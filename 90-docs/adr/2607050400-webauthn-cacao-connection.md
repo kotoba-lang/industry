@@ -1,6 +1,7 @@
 # ADR-2607050400: WebAuthn ↔ CACAO — already peers, missing a real verifier, and a genuine repo-graduation gap found along the way
 
-**Status**: accepted (implemented, partial — see Follow-up)
+**Status**: accepted (implemented; repo-graduation follow-up completed
+2026-07-09 — see Addendum; one sub-item of that follow-up still open)
 **Date**: 2026-07-05 (session-numbered; see repos.edn ADR numbering convention)
 **Deciders**: Jun Kawasaki
 
@@ -156,6 +157,72 @@ record.
 - WebAuthn-backed CACAO signing keys (point 4) — design the new wire
   signature-type as its own ADR against `cacao.core`, if/when an actual
   caller wants hardware-backed actor identity keys.
+
+## Addendum (2026-07-09) — repo-graduation follow-up carried out
+
+The first Follow-up bullet above is now done. `kotoba-lang/authentication`
+and all 7 of its embedded-in-root dependencies each got a real `.git init`,
+a pushed GitHub repo, and a `manifest/west.yml` entry:
+
+| repo | HEAD (pushed) |
+|---|---|
+| `webauthn` | `001fa11` |
+| `faceid` | `4bebc9e` |
+| `touchid` | `c2ef9a1` |
+| `onetime` | `011b3c4` |
+| `oauth` | `e47999a` |
+| `oidc` | `b224d19` |
+| `saml` | `7f04362` |
+| `authentication` | `e5ee5ec` |
+
+Beyond the graduation this ADR called for, 6 of the 7 leaves (every one
+except `onetime`) went a step further and split off a **raw
+external-spec-substrate** sibling repo, following the
+`org-materialx`/`org-w3-webgpu` precedent (ADR-2607051400) rather than
+something invented for this ADR:
+
+- `oauth` → `org-ietf-oauth2` (RFC 6749/PKCE)
+- `oidc` → `org-openid-oidc` (OpenID Connect Core)
+- `saml` → `org-oasis-saml` (OASIS SAML 2.0)
+- `webauthn` → `org-w3-webauthn` (W3C WebAuthn)
+- `faceid` → `com-apple-faceid` (LocalAuthentication FaceID protocol)
+- `touchid` → `com-apple-touchid` (LocalAuthentication TouchID protocol)
+
+Each pair now cross-references both directions in its README: the raw-spec
+repo says it's the zero-deps "spec as data" layer consumed by the
+result-shape repo, and the result-shape repo says it's consumed in turn by
+`kotoba-lang/authentication`. `onetime` did not need a new sibling — its own
+README already states TOTP/HOTP (RFC 4226/6238) generation lives in the
+pre-existing `kotoba-lang/authenticator` repo, so the raw-spec/result-shape
+split for one-time codes already existed before this ADR. All 6 new sibling
+repos are pushed and west-registered alongside the 8 graduated repos (14
+`manifest/west.yml` entries total for this cluster).
+
+**Still open, not done in this pass**:
+
+- The Follow-up text said to convert `authentication`'s `:local/root` deps
+  on the 7 leaves to real git-sha coordinates "as each lands" (the same
+  treatment its `cacao` dependency already got in Decision point 3).
+  `authentication/deps.edn` still reads `{:local/root "../faceid"}` etc. for
+  all 7 — it happens to work because west checks every kotoba-lang project
+  out as a sibling directory under `orgs/kotoba-lang/`, but that's an
+  accident of layout, not the git-sha pin this ADR decided on. Left as an
+  open item rather than done silently in an ADR-documentation pass.
+- `manifest/west.yml`'s recorded pin for `saml`, `webauthn`, `touchid`,
+  `authentication`, and `onetime` is behind each repo's actual (pushed)
+  HEAD shown in the table above (`oauth`/`oidc`/`faceid`'s pins already
+  match). Needs the usual `bb scripts/gen-west-manifest.bb --entry <name>`
+  pin-advance pass; not done here to keep this addendum scoped to the ADR
+  record itself.
+- `com-junkawasaki/root`'s own git history still carries these 8 repos'
+  `README.md` (and, for the 6 that gained `.github/`/`LICENSE`/`.gitignore`
+  during graduation, those files too) as directly-committed content from
+  before graduation — the same "embedded, not west-managed" state this
+  ADR's Context originally flagged. Now that all 8 have real `.git`
+  identity and a west entry, whether to `git rm --cached` the superproject's
+  duplicate copies (matching how every other `kotoba-lang/*` project is
+  untracked-by-design in the superproject) is a separate decision, not made
+  here.
 
 ## One-line summary
 
