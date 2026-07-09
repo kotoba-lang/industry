@@ -53,6 +53,7 @@
 - 観測 (signal): etzhayyim.com 実測 39416 req/7d・817 uniques(日次和)・うち4xx probe 11%(24h)、workers 13423 inv/7d
 - 観測 (signal): etzhayyim.com 実測 39510 req/7d・821 uniques(日次和)・うち4xx probe 11%(24h)、workers 13426 inv/7d
 - 観測 (signal): etzhayyim.com 実測 39599 req/7d・821 uniques(日次和)・うち4xx probe 11%(24h)、workers 13426 inv/7d
+- 観測 (signal): etzhayyim.com 実測 39710 req/7d・822 uniques(日次和)・うち4xx probe 11%(24h)、workers 13453 inv/7d
 
 ## Beneficiaries
 
@@ -103,6 +104,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 95 · /robots.txt 23 · /_shell/home-feed.js 6 · /organism/health.json 5 · /organism/pulse.json 5 | 4xx(probe) 11% · 5xx 83%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 97 · /robots.txt 23 · /_shell/home-feed.js 6 · /organism/health.json 5 · /organism/pulse.json 5 | 4xx(probe) 11% · 5xx 82%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 95 · /robots.txt 20 · /_shell/home-feed.js 6 · /xrpc/com.etzhayyim.apps.kotoba.stats 4 · /organism/health.json 4 | 4xx(probe) 11% · 5xx 83%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 99 · /robots.txt 20 · /_shell/home-feed.js 6 · /xrpc/com.etzhayyim.apps.kotoba.stats 4 · /organism/health.json 4 | 4xx(probe) 11% · 5xx 82%
 
 ## Funding
 
