@@ -379,6 +379,23 @@
    :business-id "cloud-itonami-4920"
    :required-technologies [:robotics :logistics :identity :forms :dmn :bpmn :audit-ledger :optimization]
    :optional-technologies [:telemetry]
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as a community-freight actor
+   ;; (FreightOps-LLM ⊣ Freight Governor), the eighty-eighth build
+   ;; outside ADR-2607032000's original insurance/real-estate batch.
+   ;; This blueprint's own :freight-governor keyword is UNIQUE
+   ;; fleet-wide -- no naming-collision precedent needed. SECOND
+   ;; vertical in this fleet built on top of a real, pre-existing
+   ;; bespoke domain capability library (kotoba-lang/logistics) after
+   ;; retailops/4711's own kotoba-lang/retail integration. Implements
+   ;; the ALREADY-PUBLISHED :freight-governor Decision Rule from this
+   ;; repo's own business-model.md faithfully. Adds tracking-number-
+   ;; invalid? (capability-library-validated-fact reuse),
+   ;; pod-chain-integrity-broken? and cargo-liability-disclosure-
+   ;; unconfirmed? (the flagship new check, grounded in the US Carmack
+   ;; Amendment, UK Carriage of Goods by Road Act 1965, Germany's HGB
+   ;; and Japan's Commercial Code -- all four jurisdictions covered
+   ;; honestly).
    :operating-states [:intake :book :pick-up :transit :deliver :reconcile :audit]}
   {:id "5510" ; I — Accommodation and food service
    :name "Community Accommodation Operations"
