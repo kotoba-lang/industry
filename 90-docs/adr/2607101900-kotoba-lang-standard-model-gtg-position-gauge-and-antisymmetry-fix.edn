@@ -1,0 +1,81 @@
+{:frontmatter
+ {:id "adr-2607101900-kotoba-lang-standard-model-gtg-position-gauge-and-antisymmetry-fix"
+  :title "ADR-2607101900: kotoba-lang/standard-model — GTG position-gauge sector (Phase 0b), curvature quadratic invariant (Phase 0c), and a field-strength antisymmetry fix found by an independent review loop"
+  :status "accepted"
+  :date "2026-07-09"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "kotoba-lang-standard-model"
+  :authoritative true
+  :authoritative_for
+  ["direct continuation of ADR-2607101700 (Phase 0a rotation-gauge sector + gauge fix);
+    covers 4 more merged PRs from a self-paced /loop generate->verify->adversarially-
+    review->fix cycle run 2026-07-09"
+   "kotoba-lang/standard-model#3 merged as 9689fb877a961611a44d171b6614e45ca2f9c163:
+    Phase 0b -- position gauge field h_mu (4x4 real matrix, row mu = physical
+    four-vector h_mu) and derived metric g_munu=h_mu.h_nu via kotoba.sm.tensor/dot
+    unmodified; flat-limit check is EXACT integer equality against
+    kotoba.sm.tensor/metric, not epsilon-close; consistency with pre-existing
+    global SO(3,1)+ (kotoba.sm.vector-field boosts/rotations) proven algebraically
+    (Lambda^T eta Lambda=eta => Lambda eta Lambda^T=eta) and checked against 7
+    concrete transformations. No general matrix inverse implemented (deferred)."
+   "kotoba-lang/standard-model#4 merged as cc10dcb6a571451f20a5f328b7ca9d7aff0d8d62:
+    test-only edge-case coverage hardening (generator antisymmetry, field-strength
+    antisymmetry, covariant-derivative linearity, diagonal-Gram guards,
+    derived-metric symmetry) that SURFACED A REAL BUG: kotoba.sm.gauge/field-strength's
+    self-interaction term g*f^abc*A_mu^b*A_nu^c is antisymmetric under mu<->nu only
+    when excited gauge-field components share the same trace-Gram sign -- true
+    automatically for compact SU(2)/SU(3) (uniform K=1/2) but false for so(1,3)'s
+    mixed boost(-1)/rotation(+1) components. Recorded honestly as a passing test
+    documenting current (broken) behavior per this repo's practice, not silently
+    patched; fix filed as separate follow-up rather than rushed inline."
+   "kotoba-lang/standard-model#5 merged as 9e94650961ef1792a46c77a3fb8bc307b29f64db:
+    Phase 0c -- curvature-quadratic-invariant, I = sum_k K[k][k]*(R_munu^k R^munu_k),
+    built from Phase 0a's R_munu alone, scoped to h=position-gauge-identity only
+    (the one case needing no matrix inverse). Explicitly documented as NOT the LDG
+    curvature scalar R=h^mu^h^nu.R(hbar_nu,hbar_mu) (that is LINEAR in R_munu; this
+    is QUADRATIC, same relationship Kretschmann scalar has to Riemann tensor in GR).
+    Implementing agent declined to guess at the true linear contraction's index-
+    pairing convention without an independent literature value to check against --
+    filed as named follow-up (Phase 0d) rather than risking a silently-wrong result.
+    Not guaranteed non-negative (K is indefinite)."
+   "independent adversarial review (a dedicated task, no code changed, not itself a
+    PR): re-derived so(1,3) commutation relations, Gram-matrix signs (boost=-1,
+    rotation=+1, verified by hand from Dirac-representation gamma matrices), and the
+    generalized structure-constant formula from Peskin&Schroeder BEFORE reading the
+    implementation, then checked for divergence -- found existing algebra correct,
+    but identified the EXACT root cause of PR #4's antisymmetry bug: self-interaction-term
+    indexed structure-constants as f-abc[a][b][c] (output index FIRST) where
+    structure-constants' own definition [T_A,T_B]=if^ABD*T_D puts the output/target
+    index THIRD; verified the fix (swap to f-abc[b][c][a]) three independent ways
+    (re-indexed reimplementation, direct matrix ground truth via -ig[A_0,A_1],
+    bit-identical SU(2) regression) before any production code touched"
+   "kotoba-lang/standard-model#6 merged as 6ed2ca0d9a881d8a8126328001dabb2bc394ff2a:
+    implements exactly the review's diagnosed fix (get-in f-abc [a b cc] ->
+    [b cc a]); SU(2)/SU(3) proven bit-identical via independent-oracle regression
+    test; so(1,3) antisymmetry recovery proven via PR #4's own counterexample
+    flipping from equal (+0.35/+0.35, broken) to negated (-0.35/+0.35, correct)
+    plus 3 additional mixed boost/rotation excitation patterns"
+   "test suite grew 22 tests/85 assertions (ADR-2607051500 original) -> 30/428
+    (Phase 0a, ADR-2607101700) -> 47 tests/2065 assertions (end of this pass),
+    CI green (JDK 17+21) at every merged step, zero regressions"
+   "superproject manifest/west.yml pin advanced through each merge via sanctioned
+    GitHub API single-entry commit path; final state
+    6ed2ca0d9a881d8a8126328001dabb2bc394ff2a, superproject commit
+    b4300522aa098f8d0d963e1542c201e114441483"
+   "explicitly out of scope, deferred (extends not replaces ADR-2607101700 boundary):
+    general (non-identity) h_mu / reciprocal frame h-bar (needs matrix inverse, not
+    implemented anywhere in this codebase), the true linear LDG curvature scalar
+    (needs matrix inverse + literature-verified index-pairing convention),
+    Einstein multivector, GTG action/field equations, GR-equivalence proof,
+    dark-matter/dark-energy/de-Sitter extension, combined h_mu+Omega_mu covariant
+    derivative, quantization/RGE/scattering/lattice (unchanged from ADR-2607051500)"
+   "does not claim gravity or unification is implemented -- the review-finds-a-real-
+    bug-in-already-merged-code outcome is the intended product of investing in
+    adversarial test coverage and independent review, not a failure of the earlier
+    passes"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607101700" "adr-2607051500"]
+  :last_verified "2026-07-09"}
+ :body "see 2607101900-kotoba-lang-standard-model-gtg-position-gauge-and-antisymmetry-fix.md"}
