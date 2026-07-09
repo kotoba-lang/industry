@@ -4887,11 +4887,30 @@
    :operating-states [:intake :book :transit :deliver :reconcile :audit]},
   {:id "5110"
    :name "Passenger air transport"
-   :repo "https://github.com/gftdcojp/cloud-itonami-H5110"
-   :business-id "cloud-itonami-H5110"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-5110"
+   :business-id "cloud-itonami-5110"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Published as a :blueprint repo (business-model.md + operator-guide.md +
+   ;; blueprint.edn + governance docs, no src/test yet -- the OSS blueprint
+   ;; stage, not yet :implemented). :maturity :spec explicitly removed so
+   ;; maturity-of/maturity now auto-derive :blueprint from the real :repo
+   ;; above (see `kotoba.industry/maturity-of`). The legacy placeholder
+   ;; :repo (gftdcojp/cloud-itonami-H5110) never actually existed (confirmed
+   ;; 404 before this edit) -- replaced with the real repo, following the
+   ;; SAME cloud-itonami/cloud-itonami-isic-#### naming convention as every
+   ;; other actor in this fleet rather than the legacy H-prefixed scheme.
+   ;; First fresh-blueprint pick this scope with no flagged deferral
+   ;; predecessor -- all prior deferrals resolved at ADR-2607102000.
+   ;; Governor keyword :aviation-safety-governor is grep-verified UNIQUE
+   ;; fleet-wide. No redundancy with any existing transport vertical
+   ;; (freightops/4920 is road freight; this is scheduled/charter passenger
+   ;; air carrier operations, a genuinely distinct, independently regulated
+   ;; business). No bespoke capability library exists for airline
+   ;; operations specifically; :logistics is required for booking/transit/
+   ;; delivery/reconciliation contracts, the SAME shared capability
+   ;; freightops/4920 and travel-agency-shaped verticals already use. See
+   ;; ADR-2607102100.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :book :transit :deliver :reconcile :audit]},
   {:id "5120"
