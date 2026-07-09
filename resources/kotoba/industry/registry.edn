@@ -413,6 +413,23 @@
    :business-id "cloud-itonami-9511"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as an ICT-equipment-repair
+   ;; actor (RepairOps-LLM ⊣ Repair Governor), the eighty-sixth build
+   ;; outside ADR-2607032000's original insurance/real-estate batch.
+   ;; This blueprint's own :repair-governor keyword is UNIQUE
+   ;; fleet-wide (unlike the :repair-shop-governor family) -- no
+   ;; naming-collision precedent needed, a fresh independent build.
+   ;; Adds a genuinely new media-sanitization/data-destruction check
+   ;; for replaced storage components (NIST SP 800-88, UK GDPR,
+   ;; Germany's DSGVO/BDSG, Japan's APPI -- all four jurisdictions
+   ;; covered honestly), explicitly distinguished from commrepair/9512's
+   ;; own customer-data-consent check (consent to access data during
+   ;; repair vs. secure destruction of removed media afterward). First
+   ;; build in the newly-approved gftdcojp-origin-registry scope
+   ;; extension (the 13 entries whose :repo field was stale, pointing
+   ;; at the old gftdcojp org before the repos were renamed/
+   ;; transferred to cloud-itonami/cloud-itonami-isic-*).
    :operating-states [:intake :diagnose :quote :repair :return :audit]}
   {:id "9700" ; T — Activities of households as employers of domestic personnel
    :name "Community Domestic Employment"
