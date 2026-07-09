@@ -203,6 +203,42 @@ address is not yet live/reachable anywhere. Deploying is the point at which
 this rail could actually start receiving real funds, so it's held as a
 separate, explicit go-live decision rather than folded into this merge.
 
+## Amendment (2026-07-09) — go-live: deployed, migrations applied, smoke-tested
+
+Deployed from a clean clone of `main` (`57f117c` — both #6 and #7):
+`wrangler deploy` — Version ID `802adc09-8deb-4fef-b3bf-06709162135d`, live at
+`shinshi.club` (custom domain), account `ai-gftd-cloud`.
+
+Discovered and fixed a real gap before declaring this live: **migrations
+0007 (`creator_billing_daily`) and 0008 (`pay_run`) had never been applied to
+the production D1 database** (`ai-gftd-shinshi`) — this repo has no
+`migrations_dir` wired into `wrangler.jsonc`, so `d1/migrations/*.sql` files
+are not auto-applied on deploy; confirmed by querying
+`sqlite_master` before touching anything (neither table existed, alongside
+several other older migrations also never applied — a pre-existing gap
+unrelated to this ADR, not fully audited/fixed here). Without this, the
+first real `confirm_pay_run` call would have thrown trying to write to a
+nonexistent `creator_billing_daily`. Applied both via
+`wrangler d1 execute ai-gftd-shinshi --remote --file=...`, in order (0007
+before 0008, since confirm depends on 0007's table).
+
+Smoke-tested live against `https://shinshi.club` after deploy:
+- `GET /pay/quote?usd=10&kind=sub` → correct quote (`treasury` = the real
+  address, `net`/`fee` = 8/2 on the 80/20 split, correct mainnet USDC
+  contract) — the full quote → claim → confirm pipeline is reachable
+  end-to-end for the first time.
+- `GET /pay/status` (no `payer`) → 422; `?payer=<x>` → `{"runs":[]}` (honest
+  empty, no fabricated data).
+- `POST /pay/claim` with an invalid `kind` → 422.
+- `GET /` (homepage) → 200 — no regression from the deploy.
+
+No real USDC transaction has occurred and none was needed for this
+verification — every check above exercises validation/quoting logic only.
+`tools/verify-payments.clj` has not been run against production (that's the
+operator's own recurring task once real traffic exists, not part of this
+pass). club-shinshi's crypto rail is now genuinely live for Phase 4
+(measuring `:hyp/club-shinshi-creator-take`) once Phase 3 (UI wiring) ships.
+
 ## References
 
 - ADR-2607052100 (crypto payout rail regulatory review — commingling finding,

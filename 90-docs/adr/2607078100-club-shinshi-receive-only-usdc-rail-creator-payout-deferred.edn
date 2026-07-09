@@ -5,7 +5,7 @@
   :doc_type "adr"
   :topic "shinshi-crypto-payout-rail"
   :authoritative true
-  :last_verified "2026-07-08"
+  :last_verified "2026-07-09"
   :authoritative_for
   ["decision: club-shinshi's V1 crypto monetization is receive-only (buyer -> gftd,
     one-directional, gftd as ordinary merchant) -- NOT creator payout. Creator payout
@@ -34,9 +34,20 @@
     configured (operator-provisioned, own/separate address); DISPATCHER_INTERNAL_SECRET
     already live as a Worker secret; ETHERSCAN_API_KEY resolves via a new
     shinshi-scoped Keychain entry (reused read-only block-explorer key, not a
-    custody credential). NOT done: actual wrangler/gftd deploy to production --
-    no CI auto-deploy on merge exists, so nothing is live/reachable yet and no
-    mainnet transaction has occurred; no legal/compliance certification performed"]
+    custody credential)"
+   "LIVE (2026-07-09): deployed via wrangler deploy, Version ID
+    802adc09-8deb-4fef-b3bf-06709162135d, shinshi.club. Found + fixed a real gap
+    first: migrations 0007 (creator_billing_daily) and 0008 (pay_run) had never
+    been applied to production D1 (no migrations_dir wired into wrangler.jsonc,
+    confirmed via sqlite_master query before touching anything) -- applied both
+    via `wrangler d1 execute --remote --file=...`, 0007 before 0008. Smoke-tested
+    live: GET /pay/quote returns a correct quote against the real treasury
+    address (80/20 split verified: net=8/fee=2 on usd=10); /pay/status and
+    /pay/claim validation paths return correct 422s; homepage still 200 (no
+    deploy regression). No real USDC transaction has occurred; no legal/
+    compliance certification performed. Phase 3 (wire subscription.cljs/
+    points.cljs UI to /pay/quote+/pay/claim) is the remaining step before
+    Phase 4 (measure :hyp/club-shinshi-creator-take against ExoClick ad revenue)"]
   :depends_on
   ["90-docs/adr/2607052100-shinshi-crypto-payout-rail-regulatory-design-review.md.edn"
    "orgs/kotoba-lang/treasury 90-docs/adr/2607051621-treasury-core-extraction.md.edn"
