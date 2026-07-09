@@ -587,6 +587,21 @@
    :business-id "cloud-itonami-9700"
    :required-technologies [:robotics :labor :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as a community-domestic-
+   ;; employment actor (DomesticOps-LLM ⊣ Domestic Employment
+   ;; Governor), the ninety-seventh build outside ADR-2607032000's
+   ;; original insurance/real-estate batch. This blueprint's own
+   ;; :domestic-employment-governor keyword is UNIQUE fleet-wide -- no
+   ;; naming-collision precedent needed. THIRD capability-library-
+   ;; wrapping vertical (kotoba-lang/labor -- contracts, timesheets,
+   ;; wages, payroll), after retailops/4711 (kotoba-lang/retail) and
+   ;; freightops/4920 (kotoba-lang/logistics). Two new HARD checks:
+   ;; household-employment-unregistered? (flagship, 90th unconditional-
+   ;; evaluation-discipline grounding, household-employer-registration
+   ;; law) and vulnerable-person-safeguarding-check-missing? (91st
+   ;; grounding, the fifteenth conditional variant, full four-
+   ;; jurisdiction safeguarding coverage). See ADR-2607100200.
    :operating-states [:intake :contract :schedule :work :pay :audit]}
   {:id "9900" ; U — Activities of extraterritorial organizations and bodies
    :name "Community Mission Operations Support"
