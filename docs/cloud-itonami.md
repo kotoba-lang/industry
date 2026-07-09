@@ -44,7 +44,7 @@ Current state (ISIC Rev.4 class coverage 100%):
 
 - Total entries: 643 (425 classes + 218 groups)
 - Sections: 21/21, groups: 238/238
-- `:implemented` 95 · `:blueprint` 3 · `:spec` 545
+- `:implemented` 96 · `:blueprint` 2 · `:spec` 545
 - UI+export ready (backed by a capability lib with `:ui?`/`:export?`): 643/643
 
 Every entry requires `:robotics` (ADR-2607011000 robotics-premise): a robot
