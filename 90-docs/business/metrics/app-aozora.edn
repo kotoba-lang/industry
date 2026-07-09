@@ -1,28 +1,28 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 2002, "app-aozora-appview" 4132},
+ {"app-aozora-pds" 2008, "app-aozora-appview" 4133},
  :zone
- {:requests-7d 21111,
-  :pageviews-7d 8338,
-  :uniques-7d-sum 686,
+ {:requests-7d 21136,
+  :pageviews-7d 8342,
+  :uniques-7d-sum 688,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
   [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 287}
-   {:path "/robots.txt", :requests 41}
+   {:path "/robots.txt", :requests 44}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact", :requests 16}
    {:path "/index/index/updateUserInfo", :requests 16}
    {:path "/css/tailwind.css", :requests 16}
+   {:path "/css/liquid-glass.css", :requests 15}
    {:path "/h5/", :requests 15}
-   {:path "/css/liquid-glass.css", :requests 14}
    {:path "/static/css/style.css", :requests 14}],
-  :status-mix {:ok 1337, :client-error 880},
+  :status-mix {:ok 1326, :client-error 874},
   :window "24h"},
  :as-of "2026-07-10",
  :traffic-quality {:window "24h", :probe-4xx-pct 40, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 287 · /robots.txt 41 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 16 · /index/index/updateUserInfo 16 · /css/tailwind.css 16 | 4xx(probe) 40%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 287 · /robots.txt 44 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 16 · /index/index/updateUserInfo 16 · /css/tailwind.css 16 | 4xx(probe) 40%",
  :signal
- "aozora.app 実測 21111 req/7d・686 uniques(日次和)・うち4xx probe 40%(24h)、workers 6134 inv/7d"}
+ "aozora.app 実測 21136 req/7d・688 uniques(日次和)・うち4xx probe 40%(24h)、workers 6141 inv/7d"}

@@ -45,6 +45,7 @@
 - 観測 (signal): aozora.app 実測 21087 req/7d・684 uniques(日次和)・うち4xx probe 40%(24h)、workers 6123 inv/7d
 - 観測 (signal): aozora.app 実測 21101 req/7d・686 uniques(日次和)・うち4xx probe 40%(24h)、workers 6129 inv/7d
 - 観測 (signal): aozora.app 実測 21111 req/7d・686 uniques(日次和)・うち4xx probe 40%(24h)、workers 6134 inv/7d
+- 観測 (signal): aozora.app 実測 21136 req/7d・688 uniques(日次和)・うち4xx probe 40%(24h)、workers 6141 inv/7d
 
 ## Customer Segments
 
@@ -86,6 +87,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 287 · /robots.txt 40 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 16 · /index/index/updateUserInfo 16 · /css/tailwind.css 16 | 4xx(probe) 38%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 287 · /robots.txt 40 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 16 · /index/index/updateUserInfo 16 · /css/tailwind.css 16 | 4xx(probe) 40%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 287 · /robots.txt 41 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 16 · /index/index/updateUserInfo 16 · /css/tailwind.css 16 | 4xx(probe) 40%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 287 · /robots.txt 44 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 16 · /index/index/updateUserInfo 16 · /css/tailwind.css 16 | 4xx(probe) 40%
 
 ## Revenue Streams
 
