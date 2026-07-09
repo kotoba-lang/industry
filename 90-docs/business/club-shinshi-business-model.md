@@ -89,6 +89,7 @@
 - marketplace GMV
 - organic PV growth (H1 telemetry)
 - 次の検証 (club-shinshi-creator-take): PSP/crypto rail 解禁後、creator 課金 GMV が ad 収益 (ExoClick) を上回る
+- walk 実測 (2026-07-09): 5xx 31% は現行 stack で再現せず (主要 GET/POST 全 2xx、cljs rewrite 後)。/_metrics/revenue 実測: creator GMV null (正直未発生)、ExoClick 7d 再構成 = USD 0 — live 収益が直近窓ゼロ、要調査
 
 ## Unfair Advantage
 
