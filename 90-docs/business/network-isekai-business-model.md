@@ -20,6 +20,7 @@
 - 観測 (signal): isekai.network 実測 7246 req/7d・270 uniques(日次和)・うち4xx probe 0%(24h)
 - 観測 (signal): isekai.network 実測 7253 req/7d・272 uniques(日次和)・うち4xx probe 0%(24h)
 - 観測 (signal): isekai.network 実測 7255 req/7d・272 uniques(日次和)・うち4xx probe 0%(24h)
+- 観測 (signal): isekai.network 実測 7262 req/7d・272 uniques(日次和)・うち4xx probe 0%(24h)
 
 ## Customer Segments
 
@@ -54,6 +55,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 42 · /inputs.php 20 · /test.php 14 · /wp-lvminl.php 12 · /chosen.php 12 | 4xx(probe) 0% · 5xx 1%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 44 · /inputs.php 20 · /test.php 14 · /wp-lvminl.php 12 · /chosen.php 12 | 4xx(probe) 0% · 5xx 2%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 45 · /inputs.php 20 · /test.php 14 · /wp-lvminl.php 12 · /chosen.php 12 | 4xx(probe) 0% · 5xx 2%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 47 · /inputs.php 20 · /test.php 14 · /wp-lvminl.php 12 · /chosen.php 12 | 4xx(probe) 0% · 5xx 2%
 
 ## Revenue Streams
 
