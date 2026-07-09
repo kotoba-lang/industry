@@ -3579,11 +3579,29 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2660"
    :name "Manufacture of irradiation, electromedical and electrothera..."
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2660"
-   :business-id "cloud-itonami-C2660"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2660"
+   :business-id "cloud-itonami-2660"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Published as a :blueprint repo (business-model.md + operator-guide.md +
+   ;; blueprint.edn + governance docs, no src/test yet -- the OSS blueprint
+   ;; stage, not yet :implemented). :maturity :spec explicitly removed so
+   ;; maturity-of/maturity now auto-derive :blueprint from the real :repo
+   ;; above (see `kotoba.industry/maturity-of`). The legacy placeholder
+   ;; :repo (gftdcojp/cloud-itonami-C2660) never actually existed (confirmed
+   ;; 404 before this edit) -- replaced with the real repo, following the
+   ;; SAME cloud-itonami/cloud-itonami-isic-#### naming convention as every
+   ;; other actor in this fleet rather than the legacy C-prefixed scheme.
+   ;; Governor keyword :medical-device-governor is grep-verified UNIQUE
+   ;; fleet-wide -- distinct from cloud-itonami-isic-8690/8691's own
+   ;; healthcare-SERVICE governors (allied-health/health-access), this is
+   ;; device MANUFACTURING, not a service. FIRST manufacturing-sector (not
+   ;; services/dispatch) :spec-authoring pick this scope, following the
+   ;; design->produce->inspect->package->audit lifecycle rather than the
+   ;; intake->dispatch->report shape of prior picks. No bespoke capability
+   ;; library exists for medical device manufacturing specifically
+   ;; (kotoba-lang/device is Kotoba's own generic hardware-capability
+   ;; layer for aiueos apps, unrelated). See ADR-2607100800.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2670"
