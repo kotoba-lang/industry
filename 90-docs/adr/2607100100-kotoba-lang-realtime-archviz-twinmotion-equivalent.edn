@@ -114,7 +114,8 @@
    :detail "scene.edn → .usda(実装済み)/.gltf(未着手)、既存USDビューアで確認、新規レンダリングエンジン不要"}
   {:id "M2" :name "3D render-IR + kami-webgpuブラウザMVP" :status "render-IR bridge done, 実ブラウザ検証済み (2026-07-10, kami-app-amenominaka@f6e8f0d)。interactive camera未着手"
    :detail "静的シーンのブラウザ内render-IR bridge、CPU-authored instancing、native Rust不使用。webgpuは既存の実働3Dレンダラーだったと判明(D5前提の訂正)"}
-  {:id "M3" :name "kami-app-amenominaka拡張シェル" :detail "extensionローダ+lifecycle実装、M0-M2を最初の実拡張として包む"}
+  {:id "M3" :name "kami-app-amenominaka拡張シェル" :status "done (2026-07-10, kami-app-amenominaka@e63446a)。omni.timeline stretch分は未着手"
+   :detail "extensionローダ+lifecycle実装(kami-nv-compatから正本移植)、M0/M2をscene/render-ir extensionとして配線。magatama Pregel cellマッピングは概念として撤回(D7記載の親ADR由来という帰属自体が誤りと判明)"}
   {:id "M4" :name "GPU側instancing(stretch/条件付き)" :detail "wgsl @compute対応後。M2が性能上限にぶつかった場合のみ着手"}]
 
  :non-goals
@@ -197,4 +198,32 @@
   :node-verification-authoring
   "検証ハーネスは当初wasm-webcomponentの既存.mjsをコピーして書いたが、owner指摘によりnbb(.cljs)に
    翻訳して書き直した — CLAUDE.mdに'Node側検証ハーネスも新規はnbb限定、既存.mjsは前例にしない'
-   ルールを追記(2026-07-10)。"}}
+   ルールを追記(2026-07-10)。"}
+
+ :addendum-m3-2026-07-10
+ {:landed {:kami-app-amenominaka "f6e8f0d→e63446a (feat/m3-extension-loader, server-side merge)"
+           :west-yml-pin "f6e8f0d5e148→e63446a4aafa (--entry kami-app-amenominaka, verify-west-pins OK)"
+           :verification "29 tests / 122 assertions green (was 20/86 after M2), clj-kondo clean,
+                           CI green(test+webgpu-smoke両ジョブ、main上でも確認)"}
+  :magatama-resolution
+  "D7の'extension → magatama Pregel cellマッピング、親ADR-2605261800由来の要求' という記述自体が
+   誤りだった — 親ADRを全565行読み直した結果'magatama'/'Pregel'いずれも一致ゼロ。実際の経路は
+   kami-app-amenominakaのpre-M0 README草稿が創作したフレーズを本ADR D7が誤って親ADR由来と
+   引用しただけ。'magatama'はモノレポ内で3つの無関係システム(gftdcojp MagatamaApp/etzhayyim
+   資本フローactor/pymagatama-keiei)に独立再利用されておりPregel関連の技術的定義は無い。
+   組織の実在Pregel-cellシステムはkotodama(ADR-2605192415)だが無関係。対応: マッピングを
+   'ギャップ'でなく'概念として撤回'として扱い、依存順序lifecycleを magatama 抜きで実装。"
+  :ported-from-kami-nv-compat
+  "kotoba.lang.kami-nv-compat.amenominaka.{application,extension}(クリーンルームomni.kit.app.IApp/
+   omni.ext.IExtミラー、ADR-2605261800 D6/D10.4)を発見 — Kahn位相ソートによるstartup-all/
+   shutdown-allと実働parse-extension-tomlが既に実装・テスト済みだった。ADR-2605261800自身の
+   N10(nv-compat内でcanonical機能拡張禁止)に従い、ロジック無変更でkami-app-amenominaka側へ
+   正本として移植(kami-nv-compat側は未変更、thin facade化は別スコープ)。"
+  :toml-direction-correction
+  "D7当初計画の'kotoba-lang/tomlで.toml互換薄層'は実行不可能と判明 — toml.core/tomlは
+   EDN→TOML専用でパーサが無い(実ソース確認)。kami-nv-compatの手書きTOMLサブセットパーサを
+   そのまま移植して対応。"
+  :r14-gate-final-status
+  "omni.usd(M1)/omni.kit.viewport(M2)/omni.kit.app(M3ローダ自体)の3/5実装済み。omni.timeline
+   (D7が'M3 stretch'と明記)は未実装。omni.replicator.coreは最初から対象外(D6明記)。
+   ゲートは構造的に完全には閉じない。"}}
