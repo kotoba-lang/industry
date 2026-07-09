@@ -21,6 +21,8 @@
 - 観測 (signal): manimani.cloud 実測 2201 req/7d・243 uniques(日次和)
 - 観測 (signal): manimani.cloud 実測 2208 req/7d・245 uniques(日次和)
 - 観測 (signal): manimani.cloud 実測 2213 req/7d・246 uniques(日次和)
+- 観測 (signal): manimani.cloud 実測 2223 req/7d・246 uniques(日次和)
+- 観測 (signal): manimani.cloud 実測 2228 req/7d・249 uniques(日次和)
 
 ## Customer Segments
 
@@ -52,6 +54,8 @@
 - 観測 (paths): 上位 path (24h): /wp-admin/install.php 86 · / 34 · /metrics 7 · /.git/config 5 · /wp-login.php 5
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 8 · /robots.txt 2 | 4xx(probe) 94%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 10 · /robots.txt 2 | 4xx(probe) 93%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 13 · /robots.txt 2 | 4xx(probe) 91%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 14 · /robots.txt 3 | 4xx(probe) 90%
 
 ## Revenue Streams
 

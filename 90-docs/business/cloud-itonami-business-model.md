@@ -37,6 +37,7 @@
 - 観測 (signal): itonami.cloud 実測 3736 req/7d・122 uniques(日次和)
 - 観測 (signal): itonami.cloud 実測 3766 req/7d・134 uniques(日次和)
 - 観測 (signal): itonami.cloud 実測 3769 req/7d・135 uniques(日次和)
+- 観測 (signal): itonami.cloud 実測 3771 req/7d・135 uniques(日次和)
 
 ## Customer Segments
 
@@ -71,6 +72,8 @@
 - 士業・SIer パートナー
 - 観測 (paths): 上位 path (24h): /robots.txt 15 · /sitemap.xml 12 · / 8 · /itonami/verticals 3 · /site/wp-includes/wlwmanifest.xml 2
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 15 · /itonami/verticals 3 · /itonami 2 · /join/browser 2 | 4xx(probe) 63%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 15 · /itonami/verticals 2 · /itonami 2 · /join/browser 2 | 4xx(probe) 64%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 15 · /itonami/verticals 2 · /itonami 2 · /join/browser 2 | 4xx(probe) 51%
 
 ## Revenue Streams
 
