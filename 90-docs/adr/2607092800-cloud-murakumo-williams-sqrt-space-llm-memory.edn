@@ -1,0 +1,31 @@
+{:adr
+ {:id "adr-2607092800-cloud-murakumo-williams-sqrt-space-llm-memory"
+  :title "ADR-2607092800: cloud-murakumo LLM memory via Williams √t-space + co-scientist tournament"
+  :status :accepted
+  :date "2026-07-09"
+  :supersedes []
+  :related
+  ["adr-2606272300-cloud-murakumo-gpu-cloud"
+   "adr-2607012300-sha256d-clj-portable-cosci-tournament"
+   "adr-2607022000-murakumo-exo-distributed-inference"]
+  :paths
+  ["orgs/gftdcojp/cloud-murakumo/src/cloud_murakumo/sqrt_space.cljc"
+   "orgs/gftdcojp/cloud-murakumo/src/cloud_murakumo/cosci.cljc"
+   "orgs/gftdcojp/cloud-murakumo/src/cloud_murakumo/kv_policy.cljc"
+   "orgs/gftdcojp/cloud-murakumo/docs/sqrt-space-cosci.md"
+   "orgs/gftdcojp/cloud-murakumo/resources/murakumo.edn"]
+  :decision
+  ["honest transfer of Williams TIME[t]⊆SPACE[√(t log t)] as block-recompute + √S checkpoint balancing, not TM simulation of Transformers"
+   "closed strategy catalog + co-scientist Elo tournament with hard exactness gates"
+   "opt-in :serve :kv-policy; dense→:sqrt-checkpoint, MoE→:sqrt-plus-page"
+   "tournament winner 2026-07-09: :sqrt-plus-page (~1.4% KV cells vs full at S=65536)"]
+  :paper
+  {:title "Simulating Time With Square-Root Space"
+   :author "R. Ryan Williams"
+   :venue "STOC 2025 Best Paper"
+   :arxiv "2502.17779"
+   :url "https://people.csail.mit.edu/rrw/time-vs-space.pdf"}
+  :risk
+  "serve extras currently express intent (prefix-caching / batch tokens / profile); without a real recompute kernel, measured VRAM savings will not match the cost model — follow-up is required before billing claims"
+  :source
+  "user request 2026-07-09 (JP): MIT CSAIL R. Ryan Williams Simulating Time With Square-Root Space を活用して cloud-murakumo で llm の推論の memory 効率を効率化する設計、実装を coscientist のアプローチで検証"}}
