@@ -1,0 +1,61 @@
+{:frontmatter
+ {:id "adr-2607102300-kotoba-lang-standard-model-gtg-phase1-field-equations-scope"
+  :title "ADR-2607102300: kotoba-lang/standard-model — opening Phase 1 (GTG field equations / the h-Omega relation), superseding the action-principle-out-of-scope boundary for this one item"
+  :status "accepted"
+  :date "2026-07-09"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "kotoba-lang-standard-model"
+  :authoritative true
+  :authoritative_for
+  ["opens Phase 1 (GTG field equations) as a deliberate, scoped exception to
+    ADR-2607051500/ADR-2607101700's 'action principle and field equations out
+    of scope' boundary -- narrowly for the source-free Omega-field equation of
+    motion (GTG's vanishing-torsion / first-Cartan-structure-equation analogue)
+    and, contingent on that, the true LDG linear curvature scalar"
+   "context: Phase 0d (PR #7) and Phase 0e (PR #8) independently hit the same
+    wall from different angles while chasing the curvature scalar -- Phase 0d
+    found unresolved index/sign risk translating R_munu into a scalar; Phase 0e
+    found there is NO h_mu(x)->Omega_mu(x) correspondence anywhere in this
+    codebase (GTG's h is not an ordinary-GR tetrad, both indices live in the
+    same flat background space, tetrad-postulate formula does not transfer
+    verbatim). Root cause: h and Omega are independent gauge potentials in GTG
+    by construction; their relation only appears as the equation of motion from
+    varying the action w.r.t. Omega -- unreachable without touching the action
+    principle"
+   "Phase 1 scope: (1) GTG gravitational action, vacuum/source-free only, no
+    matter coupling/cosmological-constant/Yang-Mills-Dirac-Higgs terms folded
+    in; (2) the Omega-field equation of motion from varying that action w.r.t.
+    Omega, giving Omega algebraically in terms of h and its derivatives in the
+    source-free case; (3) only after (1)-(2) land with independent numeric
+    verification, revisit the true curvature scalar R"
+   "explicitly STILL out of scope, unchanged: matter coupling to gravity, the
+    Einstein multivector/stress-energy sourcing, any GR-equivalence proof (cited
+    as established 1998 literature result, not re-derived), quantization/RGE/
+    scattering/lattice, dark-sector/de-Sitter extension -- Phase 1 is bounded to
+    source-free Omega(h) + contingent curvature scalar only"
+   "verification bar for any Phase 1 PR (given PR #6's real slot-order bug and
+    Phase 0d/0e's honest declines on exactly this class of derivation): at least
+    2 independent mutually-corroborating primary/secondary literature sources
+    for the exact equation, AND a genuine independent numeric check (reproduce a
+    literature worked example, or cross-check against linearized-GR
+    vanishing-torsion in a simple case) -- not merely 'the formula matches the
+    PDF on one read'. If the bar cannot be cleared, the correct outcome is
+    another honest non-implementation writeup (same as Phase 0d/0e), not a
+    lowered bar"
+   "this ADR changes no code by itself -- a follow-up landing-record ADR should
+    document what actually merges, mirroring the ADR-2607101700 ->
+    ADR-2607101900 scope-then-landing pattern; if Phase 1 succeeds it would be
+    the first genuine GTG FIELD EQUATION (not just field-content algebra) in
+    this repo, a qualitative change from every prior ADR's framing that should
+    be revisited explicitly in the landing ADR, not left stale"
+   "if Phase 1 fails to clear the verification bar (a live possibility -- two
+    prior adjacent-angle attempts both failed), the curvature-scalar chase
+    should not be reopened a further time without a materially new approach
+    (literature worked-example cross-check, independent expert consultation),
+    not another literature re-read"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607101900" "adr-2607101700" "adr-2607051500"]
+  :last_verified "2026-07-09"}
+ :body "see 2607102300-kotoba-lang-standard-model-gtg-phase1-field-equations-scope.md"}
