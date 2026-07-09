@@ -3916,11 +3916,36 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3020"
    :name "Manufacture of railway locomotives and rolling stock"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C3020"
-   :business-id "cloud-itonami-C3020"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3020"
+   :business-id "cloud-itonami-3020"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   ;; Promoted :spec -> :blueprint (see `kotoba.industry/maturity-of`).
+   ;; The legacy placeholder :repo (gftdcojp/cloud-itonami-C3020) never
+   ;; actually existed (confirmed 404 before this edit) -- replaced with
+   ;; the real repo, following the SAME cloud-itonami/cloud-itonami-isic-####
+   ;; naming convention as every other actor in this fleet rather than the
+   ;; legacy C-prefixed scheme. First non-transport, non-"transport
+   ;; support" pick this pass (following securityops/8020's own): a
+   ;; genuine MANUFACTURING vertical, distinct from cloud-itonami-isic-
+   ;; 4911/4912 (rail OPERATORS -- their own docs mention "rolling-stock
+   ;; maintenance" only as an OPERATOR'S OWN upkeep of vehicles already
+   ;; owned and run in service, never manufacturing) -- directly read
+   ;; and confirmed non-redundant before selection. Rolling-stock
+   ;; manufacturing has its own independent design-authority/type-
+   ;; approval regime (EU's Technical Specifications for Interoperability
+   ;; under Directive (EU) 2016/797; Japan's 鉄道車両の設計認可 rolling-
+   ;; stock design authorization, distinct from the operator-facing
+   ;; 鉄道事業法 licensing that governs 4911/4912; the US FRA's rolling-
+   ;; stock approval under 49 CFR Parts 238/239). Governor keyword
+   ;; :rolling-stock-manufacturing-governor is grep-verified UNIQUE
+   ;; fleet-wide. Reuses the SAME manufacturing-lifecycle shape as
+   ;; meddevice/2660 and basicchem/2011 (registry's own pre-existing
+   ;; value for '3020'). No bespoke capability library exists for
+   ;; rolling-stock manufacturing specifically; :eda/:cae required for
+   ;; design-authority artifacts and structural/crashworthiness
+   ;; simulation evidence, same pattern as meddevice/2660's own. See
+   ;; ADR-2607103700.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3040"
