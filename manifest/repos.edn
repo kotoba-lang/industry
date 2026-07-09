@@ -1763,14 +1763,17 @@
    "orgs/kotoba-lang/authentication"
    "orgs/kotoba-lang/authorization"
    ;; webauthn/oauth/oidc/saml/faceid/touchid were registered here as bare
-   ;; slugs but never actually scaffolded (no GitHub repo, no west.yml pin —
-   ;; 2026-07-05 audit). Implemented for real under the correct reverse-domain
-   ;; names instead of scaffolding-then-renaming: org-w3-webauthn (W3C),
-   ;; org-ietf-oauth2 (RFC 6749+7636), org-openid-oidc (OpenID Foundation),
-   ;; org-oasis-saml (OASIS) — same org-<body>-<spec> rule as org-materialx/
-   ;; org-khronos-{gltf,glb}; com-apple-touchid/com-apple-faceid — Apple's
-   ;; proprietary LocalAuthentication framework, so the vendor com-<vendor>
-   ;; scheme (ADR-2607041500), not the standards-body org-<body> one.
+   ;; slugs but not yet scaffolded as of the 2026-07-05 audit (no GitHub repo,
+   ;; no west.yml pin). The reverse-domain external-spec/vendor substrate was
+   ;; implemented first: org-w3-webauthn (W3C), org-ietf-oauth2 (RFC
+   ;; 6749+7636), org-openid-oidc (OpenID Foundation), org-oasis-saml (OASIS)
+   ;; — same org-<body>-<spec> rule as org-materialx/org-khronos-{gltf,glb};
+   ;; com-apple-touchid/com-apple-faceid — Apple's proprietary
+   ;; LocalAuthentication framework, so the vendor com-<vendor> scheme
+   ;; (ADR-2607041500), not the standards-body org-<body> one. All six bare
+   ;; names were later implemented for real too and both layers coexist
+   ;; intentionally -- see the design-principle comment ~20 lines down, right
+   ;; above the bare oauth/oidc/saml/webauthn/faceid/touchid list.
    "orgs/kotoba-lang/org-w3-webauthn"
    "orgs/kotoba-lang/session"
    "orgs/kotoba-lang/onetime"
@@ -1783,19 +1786,29 @@
    "orgs/kotoba-lang/ekyc"
    "orgs/kotoba-lang/aml"
    "orgs/kotoba-lang/ctf"
-   ;; oauth/oidc/saml/webauthn: real, load-bearing siblings of the thinner
-   ;; org-ietf-oauth2/org-openid-oidc/org-oasis-saml/org-w3-webauthn substrate
-   ;; above (this list, ~9 lines up) -- authentication/deps.edn's :local/root
-   ;; deps reference these bare names directly (not the reverse-domain ones),
-   ;; and each ships full R2-maturity adapters (Java HttpClient/JWKS/JWT
-   ;; RSA+HMAC/XML signature/production ceremony verifiers) the reverse-domain
-   ;; repos deliberately don't carry. Registered 2026-07-09; reconciling the
-   ;; two families (merge vs. keep both as intentionally different layers) is
-   ;; an open owner decision, not resolved by this registration.
+   ;; Two intentional, coexisting layers per pair -- not a naming collision to
+   ;; reconcile; resolved 2026-07-09 by this registration (see ADR-2607090100).
+   ;; Bare (oauth/oidc/saml/webauthn/faceid/touchid) is the result-shape/
+   ;; substrate layer: host-port injected, zero-network, composed together by
+   ;; kotoba-lang/authentication's :local/root deps, each shipping full
+   ;; R2-maturity adapters (Java HttpClient/JWKS/JWT RSA+HMAC/XML signature/
+   ;; production LocalAuthentication bridges, replay-prevention, device
+   ;; registries) that the reverse-domain siblings deliberately don't carry.
+   ;; Reverse-domain (org-ietf-oauth2/org-openid-oidc/org-oasis-saml/
+   ;; org-w3-webauthn/com-apple-faceid/com-apple-touchid, ~9 lines up) is the
+   ;; raw external spec/vendor-SDK substrate: spec-as-data only, zero
+   ;; third-party deps, no network/crypto calls, named for the standards
+   ;; body/vendor that owns the spec (org-<body>-<spec> / com-<vendor>-
+   ;; <product>, same rule as org-materialx/org-khronos-{gltf,glb}). Each
+   ;; pair's READMEs cross-reference the other side. Treat this comment as
+   ;; the single SSoT for the pattern -- don't duplicate this rationale
+   ;; elsewhere in this file.
    "orgs/kotoba-lang/oauth"
    "orgs/kotoba-lang/oidc"
    "orgs/kotoba-lang/saml"
    "orgs/kotoba-lang/webauthn"
+   "orgs/kotoba-lang/faceid"
+   "orgs/kotoba-lang/touchid"
    "orgs/kotoba-lang/kagi"
    "orgs/kotoba-lang/kobo"
    "orgs/kotoba-lang/kotoba"
