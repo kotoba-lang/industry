@@ -14,6 +14,7 @@
 - NSFW は主要決済・広告・SNS が封鎖され収益化と集客が困難
 - AI 生成アダルトは大量供給できるが provenance・年齢/同意コンプラが弱い
 - 観測 (signal): shinshi.club 実測 29397 req/7d・PV 3859・540 uniques(日次和)
+- 観測 (signal): shinshi.club 実測 5399 req/7d・596 uniques(日次和)・うち4xx probe 1%(24h)
 
 ## Customer Segments
 
@@ -48,6 +49,7 @@
 - Bluesky/AT firehose (viral, !ad federate)
 - aozora クロスプロモ
 - Web-only/PWA (app store 不可 = NSFW)
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 71 · /robots.txt 47 · /sitemap.xml 31 · /wp-admin/install.php 15 · /search 14 | 4xx(probe) 1% · 5xx 31%
 
 > NSFW は paid 集客が全封鎖 → organic のみ。集客が事業の律速。
 

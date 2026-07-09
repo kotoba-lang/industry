@@ -32,6 +32,7 @@
 - 観測 (signal): kotobase.net 実測 2386 req/7d・360 uniques(日次和)・うち4xx probe 56%(24h)、workers 2494 inv/7d
 - 観測 (signal): kotobase.net 実測 2386 req/7d・360 uniques(日次和)・うち4xx probe 56%(24h)、workers 2509 inv/7d、Stripe active subs 0
 - 観測 (signal): kotobase.net 実測 2426 req/7d・366 uniques(日次和)・うち4xx probe 56%(24h)、workers 2526 inv/7d、Stripe active subs 0
+- 観測 (signal): kotobase.net 実測 2426 req/7d・366 uniques(日次和)・うち4xx probe 56%(24h)、workers 2528 inv/7d、Stripe active subs 0
 
 ## Customer Segments
 
@@ -55,6 +56,7 @@
 - 計器 (funnel): landing 訪問 の計測（funnel emitter で funnel/visitors を出力）
 - 計器 (funnel): signup の計測（funnel emitter で funnel/signups を出力）
 - 計器 (funnel): checkout 開始 の計測（funnel emitter で funnel/checkouts を出力）
+- 解消確認 (2026-07-09): signup→checkout 配線は実装・live 済 (/signup 200, POST /billing/checkout 401=auth gate 稼働, STRIPE_SECRET_KEY+WEBHOOK_SECRET 設定済, webhook we_1Tofdp… enabled)。残る bottleneck は acquisition: visitors 246→signups 0
 
 ## Channels
 
@@ -74,6 +76,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 62 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 53 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 45 · /xrpc/ai.gftd.apps.kotobase.datomic.q 33 · /health 33 | 4xx(probe) 56% · 5xx 1%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 62 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 55 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 46 · /health 35 · /xrpc/ai.gftd.apps.kotobase.datomic.q 33 | 4xx(probe) 56% · 5xx 1%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 64 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 55 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 46 · /health 37 · /xrpc/ai.gftd.apps.kotobase.datomic.q 33 | 4xx(probe) 56% · 5xx 1%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 64 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 55 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 46 · /health 38 · /xrpc/ai.gftd.apps.kotobase.datomic.q 33 | 4xx(probe) 56% · 5xx 1%
 
 ## Revenue Streams
 

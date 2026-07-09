@@ -14,6 +14,7 @@
 - Roblox/UGC platform は作品もアバターも platform に人質 (可搬性ゼロ・BAN=全喪失)
 - AI 生成 3D/アバター資産に provenance と再編集性がない
 - 観測 (signal): isekai.network 実測 12186 req/7d・PV 7819・316 uniques(日次和)
+- 観測 (signal): isekai.network 実測 7225 req/7d・266 uniques(日次和)・うち4xx probe 0%(24h)
 
 ## Customer Segments
 
@@ -42,6 +43,7 @@
 - CodePen 型 build-in-public / OSS
 - aozora SNS への作品・dance stage 投稿導線
 - AI 生成デモ (generate.html)
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 35 · /inputs.php 20 · /test.php 14 · /wp-lvminl.php 12 · /chosen.php 12 | 4xx(probe) 0% · 5xx 1%
 
 ## Revenue Streams
 
@@ -68,6 +70,7 @@
 - creator payout 総額
 - marketplace GMV
 - 次の検証 (isekai-fork-viral): fork 由来の新規作品比率と週次 fork 数の伸び (viral 係数 > 1 に近づくか)
+- gate 距離 (isekai-fork-viral): fork viral 係数 = 0.0 (gate 未到達)
 
 ## Unfair Advantage
 
