@@ -33,6 +33,7 @@
 - 観測 (signal): aozora.app 実測 24405 req/7d・741 uniques(日次和)・うち4xx probe 42%(24h)、workers 8252 inv/7d
 - 観測 (signal): aozora.app 実測 24489 req/7d・750 uniques(日次和)・うち4xx probe 41%(24h)、workers 8258 inv/7d
 - 観測 (signal): aozora.app 実測 24503 req/7d・752 uniques(日次和)・うち4xx probe 41%(24h)、workers 8264 inv/7d
+- 観測 (signal): aozora.app 実測 24519 req/7d・752 uniques(日次和)・うち4xx probe 41%(24h)、workers 8272 inv/7d
 
 ## Customer Segments
 
