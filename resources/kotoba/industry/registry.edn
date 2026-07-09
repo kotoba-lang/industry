@@ -4067,11 +4067,37 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3312"
    :name "Repair of machinery"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C3312"
-   :business-id "cloud-itonami-C3312"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3312"
+   :business-id "cloud-itonami-3312"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   ;; Promoted :spec -> :blueprint (see `kotoba.industry/maturity-of`).
+   ;; The legacy placeholder :repo (gftdcojp/cloud-itonami-C3312) never
+   ;; actually existed (confirmed 404 before this edit) -- replaced with
+   ;; the real repo, following the SAME cloud-itonami/cloud-itonami-isic-####
+   ;; naming convention as every other actor in this fleet rather than the
+   ;; legacy C-prefixed scheme. Scoped to diagnostic, overhaul and
+   ;; certified repair of EXISTING industrial equipment (pumps,
+   ;; compressors, turbines, manufacturing machinery), distinct from
+   ;; cloud-itonami-isic-3020 and other manufacturing verticals (which
+   ;; build NEW equipment). Screened first against cloud-itonami-isic-
+   ;; 8129 (other building/industrial cleaning), which was deferred after
+   ;; finding a genuine overlap risk: cloud-itonami-unspsc-73
+   ;; ("Independent Industrial Cleaning & Certification Robotics")
+   ;; already covers industrial equipment/facility CLEANING with
+   ;; certification -- directly read and confirmed this is a materially
+   ;; different scope of work (cleaning/contamination-certification vs.
+   ;; functional repair/return-to-service). Machinery repair carries its
+   ;; own certification regime distinct from original manufacture (the
+   ;; ASME "R" stamp for authorized pressure-vessel/boiler repair in the
+   ;; US; EU Pressure Equipment Directive (PED)-compliant repair
+   ;; procedures; OEM certified-service-provider programs gating
+   ;; warranty validity on an authorized repair process). Governor
+   ;; keyword :machinery-repair-governor is grep-verified UNIQUE
+   ;; fleet-wide. Reuses the SAME manufacturing-lifecycle shape as
+   ;; rollingstockops/3020, meddeviceops/2660 and basicchemops/2011
+   ;; (registry's own pre-existing value for '3312'). See
+   ;; ADR-2607104000.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3313"
