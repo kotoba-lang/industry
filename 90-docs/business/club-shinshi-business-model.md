@@ -35,6 +35,7 @@
 - 観測 (signal): shinshi.club 実測 1917 req/7d・491 uniques(日次和)・うち4xx probe 7%(24h)
 - 観測 (signal): shinshi.club 実測 1922 req/7d・492 uniques(日次和)・うち4xx probe 7%(24h)
 - 観測 (signal): shinshi.club 実測 1927 req/7d・495 uniques(日次和)・うち4xx probe 7%(24h)
+- 観測 (signal): shinshi.club 実測 1928 req/7d・495 uniques(日次和)・うち4xx probe 7%(24h)
 
 ## Customer Segments
 
