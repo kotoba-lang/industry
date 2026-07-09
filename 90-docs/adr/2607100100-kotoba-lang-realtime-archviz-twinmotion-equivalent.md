@@ -148,3 +148,13 @@ M0（`kotoba.amenominaka.scene`）を `kami-app-amenominaka` に実装・着地�
 - **将来**: 建築/BIM 向けの汎用 STEP/glTF 取り込みが必要になったら、`kami-cad-import` を車両専用のまま残し、別途 `bim` 側に取り込みパスを足すか、`cad-import.ingest.gltf` を車両アノテーション必須でない形に一般化するかは、その時点で別 ADR として判断する（本 ADR ではどちらか確定しない）。
 
 `kami-*-scene` 4 repo（atmosphere/vegetation/terrain/postfx）は D4 の想定通り、いずれも `shipped-*`（例: `atmosphere-scene/shipped-weather "overcast"`）1関数呼び出しで実データを取得でき、`bim/project` 出力と合わせて `{:scene/building ... :scene/atmosphere ... :scene/vegetation {...} :scene/terrain ... :scene/postfx ...}` への合成は想定通り軽量だった（7 tests / 32 assertions green, clj-kondo clean）。M1 以降は未着手のまま。
+
+## Addendum (2026-07-10): M1 実装、幾何フィデリティの限界を明記
+
+M1（`kotoba.amenominaka.usd-export`）を `kami-app-amenominaka` に実装・着地（`47cfe0d`、west pin 前進 `652d2d7→47cfe0d`）。D5 Track1（USD/glTF書き出し）のうちUSDのみ実装、glTFは未着手のまま据え置き。
+
+- **`usd`/`materialx` の実API確認**: `usd.core/usda`+`prim`+`attr`+`rel` はスキーマ非依存の汎用USDA text emitter（"hiccup for USD"）— `Mesh`固有ヘルパーは無いが `point3f[]`/`int[] faceVertexIndices` 等は型付きattrとして問題なく書ける（`val*` の `:array`/vector-of-vectors/plain-vector 分岐をソース直読で確認）。`materialx.core` も同型の薄いXML hiccupエミッタ。`ocio` はOpenColorIO YAML config生成器で幾何/マテリアルとは無関係と判明 — M1では意図的にスキップ（D5に反しない、将来の色管理設定という別関心事）。
+- **`bim` の幾何フィデリティの限界を発見**: `bim/element` の `ElementGeometry`（brep/axis-sweep/mesh-ref/none）と、storey-scene側の実三角形データ`SceneGeom`/`triangles-geom`は**`bim.cljc`内で一切橋渡しされていない**（全148行を読んで確認 — BREPテッセレータ/sweep→mesh変換関数が存在しない）。したがってM0の `:scene/building`（生の`bim/project`）は実三角形を持たない。
+- **対応**: BREPテッセレータを新規実装する（CADカーネルの実装に相当し明らかにM1のスコープ外）のではなく、正直に限定した — `axis-sweep` + `rectangle`profile の要素（壁/梁の典型ケース）だけ実boxメッシュを計算し、それ以外（brep/mesh-ref/非矩形profile/no-geometry）は `kotobaGeometryKind` 属性を持つ `Xform` プレースホルダとして書き出す（フェイクメッシュにしない）。環境プリセット（atmosphere/vegetation/terrain/postfx）はM0のscene EDNに配置/heightfield/instanceデータが無いため、`Environment` Scope prim上に `pr-str` した custom string attr として記録（geometryの捏造はしない）。マテリアルは `bim` が色/PBR値を持たないため、`materialx.core` で中立グレーの `standard_surface` を1つだけ companion `.mtlx` として生成 — USD stageへの `material:binding` 結線（UsdMtlx schema）は未検証のため意図的に見送り、既知のギャップとして明記した。
+- **検証**: 手計算した壁のboxメッシュ8頂点座標と生成された `.usda` 出力が一致することをテストで確認、さらに実際の生成出力（`.usda`/`.mtlx`）を目視確認して構文の妥当性（ネストしたXform階層、`point3f[]`/`faceVertexIndices`/`faceVertexCounts`、balanced braces）を確認した。13 tests / 66 assertions green（M0の7/32から増加）、clj-kondo clean。
+- **未解決のまま**: glTF書き出し、USD<->MaterialX の正式binding、`usdcat`/`usdchecker`等の外部USDツールによる実ツール検証（サンドボックス内に無いため）。
