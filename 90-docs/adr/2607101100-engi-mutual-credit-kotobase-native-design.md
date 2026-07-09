@@ -1,8 +1,39 @@
 # ADR-2607101100: ENGI/EN 相互信用通貨 — kotobase-native 再設計(v1、推奨)
 
-**Status**: proposed
+**Status**: accepted(v1 実装・main着地・本番kotobase.netへのライブ検証済み)
 **Date**: 2026-07-10
 **Deciders**: Jun Kawasaki
+
+> **2026-07-10 追記(v1 実装完了 + 本番で判明した実制約)**: `kotoba-lang/engi`
+> (新規リポジトリ、公開、west登録済み)として実装した。スキーマ・ハンドシェイク
+> (propose/validate/counter-commit/finalize)・fold残高計算・fork検知は本ADRの
+> 設計どおり。テスト: pure fnユニットテスト18本(JVM)+フェイクkotobaseクライアント
+> でのハンドシェイク統合テスト29本(0失敗)+**本番 `kotobase.net` への実ライブ
+> 検証**(使い捨て did:key の2エージェントで実際に propose→validate→
+> counter-commit→finalize の全サイクルを実行し、サーバから読み直した残高が
+> alice=-15・bob=+15・net-zero・違反なしであることを確認)。
+>
+> **本番で判明した重要な実制約(§3「検証」の前提を弱める)**: `validate-proposal!`
+> は「受信者が送信者のグラフを独立に読んで検証する」設計だが、**本番
+> kotobase.net の apex は他者のグラフへの未認証読取り(`:public-reads?`)に
+> 対して 401 を返す**(2026-07-09/10実測。グラフ所有者本人の鍵でしか
+> 満たせない CACAO を全呼出しに要求するため)。つまり **現時点では
+> クロスエージェント検証が機能せず**、実装は「自分自身のグラフを自分の鍵で
+> 読む自己検証」に後退している(フェイククライアントでは設計どおりの
+> クロスエージェント検証を完全にテスト済み — 本番インフラのギャップであり
+> ENGI設計自体の欠陥ではない)。
+>
+> **この制約の解消は ADR-2607022600 Wave 4(CACAO depth-2 delegation /
+> multi-graph grants)に直接依存する** — kotobase.net 側に「他者のグラフを
+> 読む権限を委任された CACAO」または「グラフの公開読取り登録」機能が
+> 実装されるまで、ENGI の二重支払い防止は実質的に自己申告ベースに留まる。
+> **Wave 4 が本ADRの実運用上の前提条件になったことを、ここに明記する。**
+> それまでの間、ENGI を「価値のある決済」に使うのは推奨しない(内部の
+> 実験的な貢献記録としての利用に限定する)。
+>
+> 副次的な発見(実装で対処済み): kotobase.net は tx_edn の裸の数値リテラルを
+> JSON引用済み文字列として返す(genko の `:gh.genko/rev` と同じ既知の癖) —
+> `engi.store/fold-entities` で数値強制変換パスを追加して対処。
 
 ## Context
 
