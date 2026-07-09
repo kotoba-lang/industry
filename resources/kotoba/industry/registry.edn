@@ -5133,11 +5133,40 @@
    :operating-states [:intake :book :transit :deliver :reconcile :audit]},
   {:id "5229"
    :name "Other transportation support activities"
-   :repo "https://github.com/gftdcojp/cloud-itonami-H5229"
-   :business-id "cloud-itonami-H5229"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-5229"
+   :business-id "cloud-itonami-5229"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Promoted :spec -> :blueprint (see `kotoba.industry/maturity-of`).
+   ;; The legacy placeholder :repo (gftdcojp/cloud-itonami-H5229) never
+   ;; actually existed (confirmed 404 before this edit) -- replaced with
+   ;; the real repo, following the SAME cloud-itonami/cloud-itonami-isic-####
+   ;; naming convention as every other actor in this fleet rather than the
+   ;; legacy H-prefixed scheme. Fifth and final "transport support" pick
+   ;; in this specific family (after cloud-itonami-isic-5224/5223/5222/
+   ;; 5221), scoped to the real-world standard interpretation of this
+   ;; ISIC class: freight forwarding and customs brokerage (the US
+   ;; Customs Broker License under 19 CFR Part 111; Japan's 通関業法
+   ;; Customs Business Act licensing 通関士 separately from carriers and
+   ;; terminal operators; the EU's Union Customs Code requiring
+   ;; Authorised Economic Operator / customs representative status;
+   ;; freight forwarders' own professional liability/bonding regimes
+   ;; distinct from carrier cargo liability, e.g. FIATA-model forwarder
+   ;; liability terms). Distinct from every CARRIER vertical this scope
+   ;; (4911/4912/4920/5110/5011/5020) and from cloud-itonami-isic-5224
+   ;; (cargo handling, a terminal SERVICE): a freight forwarder ARRANGES
+   ;; carriage across multiple carriers/modes and clears customs, without
+   ;; owning transport assets or operating a terminal. grep -rli
+   ;; "freight.forward|customs.broker|customs.clearance" across the
+   ;; entire fleet returned completely empty. NOTE: cloud-itonami-isic-
+   ;; 4920's own README explicitly claims "last-mile carrier" scope --
+   ;; this is why '5310'/'5320' (postal/courier) remain deliberately
+   ;; deferred (would need careful scoping against 4920's own last-mile
+   ;; claim), while '5229' (forwarding/brokerage, no such overlap) was
+   ;; picked instead. Governor keyword :freight-forwarding-governor is
+   ;; grep-verified UNIQUE fleet-wide. No bespoke capability library
+   ;; exists for freight-forwarding operations specifically. See
+   ;; ADR-2607103400.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :book :transit :deliver :reconcile :audit]},
   {:id "5310"
