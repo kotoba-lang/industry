@@ -31,4 +31,13 @@
              "ai-gftd-animeka 生成グラフの cljc kotoba化とComfyUI/LLM接続経路の確定"]
 
  :implementation-status :not-started
- :note "本ADRは方針決定のみ。実装はfollow-up tickで行う"}
+ :note "本ADRは方針決定のみ。実装はfollow-up tickで行う"
+
+ :addendum-1
+ {:date "2026-07-10"
+  :trigger "follow-up (a) 実施結果(ghosthacker/apps/web の cljs 移行スコープ調査)"
+  :finding "決定②の前提が誤り。apps/web・apps/server・260123-jump/ 全体を wattpad/video(gen|render)/neo4j で grep してもヒットはREADME.mdのみ(node_modulesノイズ除く)。README記載のWattpad自動投稿✅/動画生成☐チェックリストとアーキ図はアスピレーショナルなドキュメントで実装コードは存在しない(git log --all でも痕跡なし)。唯一の物証は.auth/wattpad.json(Playwright storage-state形式のcookie/originsのみ、自動投稿コードは無い)。'Neo4jストーリーグラフ'の実体はapps/web/src/lib/jsonld-cypher/{graph-store.ts,cypher.ts}(Neo4j不使用のin-memory JSON-LDプロパティグラフ+自前Cypherサブセット)で、manga/storyboard編集(components/Storyboard/*.svelte, apps/server/internal/service/storyboard.go)向け — 既にkami-app-sip-clj移行(DEPRECATED範囲)でカバー済み。"
+  :legacy-web-refactor-revised :no-op
+  :ren-nei-anime-decision "Wattpad自動投稿・動画生成をRen/Neiトラックで本当に作る場合も今は着手せず、shiropico(ai-gftd-animeka)のComfyUI/LLM接続基盤が固まるまで先送り。作るとしても cljs 移行ではなく決定③のcljc-kotoba-first前提での新規実装として設計する。"
+  :readme-correction-needed "orgs/com-junkawasaki/ghosthacker/README.md の機能チェックリストを実態(未実装)に合わせて訂正するfollow-upを追加"
+  :unaffected-follow-ups ["game portfolio host adapter 選定(b)" "ai-gftd-animeka cljc kotoba化+ComfyUI/LLM接続(c)"]}}
