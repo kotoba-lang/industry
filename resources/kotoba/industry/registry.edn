@@ -4759,11 +4759,29 @@
    :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
   {:id "4911"
    :name "Passenger rail transport, interurban"
-   :repo "https://github.com/gftdcojp/cloud-itonami-H4911"
-   :business-id "cloud-itonami-H4911"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4911"
+   :business-id "cloud-itonami-4911"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Published as a :blueprint repo (business-model.md + operator-guide.md +
+   ;; blueprint.edn + governance docs, no src/test yet -- the OSS blueprint
+   ;; stage, not yet :implemented). :maturity :spec explicitly removed so
+   ;; maturity-of/maturity now auto-derive :blueprint from the real :repo
+   ;; above (see `kotoba.industry/maturity-of`). The legacy placeholder
+   ;; :repo (gftdcojp/cloud-itonami-H4911) never actually existed (confirmed
+   ;; 404 before this edit) -- replaced with the real repo, following the
+   ;; SAME cloud-itonami/cloud-itonami-isic-#### naming convention as every
+   ;; other actor in this fleet rather than the legacy H-prefixed scheme.
+   ;; Second transport-mode pick after cloud-itonami-isic-5110's own
+   ;; (passenger air), reusing the SAME booking/transit/delivery/
+   ;; reconciliation shape for a genuinely distinct, independently
+   ;; regulated transport mode (rail safety law: Japan's 鉄道事業法 with MLIT
+   ;; oversight, the US's FRA under 49 CFR Parts 200-299, the UK's ORR under
+   ;; the Railways and Other Guided Transport Systems (Safety) Regulations
+   ;; 2006, Germany's EBA under the AEG). Governor keyword
+   ;; :rail-safety-governor is grep-verified UNIQUE fleet-wide. No bespoke
+   ;; capability library exists for rail operations specifically. See
+   ;; ADR-2607102200.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :book :transit :deliver :reconcile :audit]},
   {:id "4912"
