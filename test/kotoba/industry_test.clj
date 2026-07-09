@@ -39,7 +39,7 @@
     ;; blueprints are published and existing ones are implemented (it
     ;; briefly reached zero fleet-wide as of cloud-itonami-isic-9900's
     ;; own promotion, ADR-2607100300, before cloud-itonami-isic-8010
-    ;; was freshly published, ADR-2607100400).
+    ;; was freshly published, ADR-2607100500).
     (is (= :blueprint (industry/maturity-of {:repo "https://example.invalid/still-blueprint-fixture"}))))
   (testing "cloud-itonami-isic-8010, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "8010"))))
@@ -246,7 +246,7 @@
       ;; reached zero fleet-wide as of cloud-itonami-isic-9900's own
       ;; promotion (ADR-2607100300), then became 1 again with
       ;; cloud-itonami-isic-8010's own fresh publication
-      ;; (ADR-2607100400). This is not asserted as a fixed invariant;
+      ;; (ADR-2607100500). This is not asserted as a fixed invariant;
       ;; see `industry/maturity-of`/`industry/maturity-roadmap-of` for
       ;; how the :blueprint branch logic itself stays unit-tested
       ;; without depending on a specific live count.
