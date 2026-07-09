@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L0 artificial organism platform（非営利・公益）  
-**As-of**: 2026-07-09  
+**As-of**: 2026-07-10  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -40,6 +40,7 @@
 - 観測 (signal): etzhayyim.com 実測 48205 req/7d・910 uniques(日次和)・うち4xx probe 15%(24h)、workers 18490 inv/7d
 - 観測 (signal): etzhayyim.com 実測 48301 req/7d・910 uniques(日次和)・うち4xx probe 15%(24h)、workers 18505 inv/7d
 - 観測 (signal): etzhayyim.com 実測 48398 req/7d・912 uniques(日次和)・うち4xx probe 15%(24h)、workers 18509 inv/7d
+- 観測 (signal): etzhayyim.com 実測 38424 req/7d・809 uniques(日次和)・うち4xx probe 15%(24h)、workers 13368 inv/7d
 
 ## Beneficiaries
 
@@ -78,6 +79,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 94 · /robots.txt 22 · /_shell/home-feed.js 5 · /organism/health.json 4 · /sitemap.xml 4 | 4xx(probe) 15% · 5xx 80%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 94 · /robots.txt 23 · /_shell/home-feed.js 6 · /organism/health.json 5 · /organism/pulse.json 5 | 4xx(probe) 15% · 5xx 79%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 96 · /robots.txt 24 · /_shell/home-feed.js 6 · /organism/health.json 5 · /organism/pulse.json 5 | 4xx(probe) 15% · 5xx 79%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 96 · /robots.txt 23 · /_shell/home-feed.js 6 · /organism/health.json 5 · /organism/pulse.json 5 | 4xx(probe) 15% · 5xx 79%
 
 ## Funding
 
