@@ -33,6 +33,7 @@
 - 観測 (signal): kotobase.net 実測 2386 req/7d・360 uniques(日次和)・うち4xx probe 56%(24h)、workers 2509 inv/7d、Stripe active subs 0
 - 観測 (signal): kotobase.net 実測 2426 req/7d・366 uniques(日次和)・うち4xx probe 56%(24h)、workers 2526 inv/7d、Stripe active subs 0
 - 観測 (signal): kotobase.net 実測 2426 req/7d・366 uniques(日次和)・うち4xx probe 56%(24h)、workers 2528 inv/7d、Stripe active subs 0
+- 観測 (signal): kotobase.net 実測 2435 req/7d・366 uniques(日次和)・うち4xx probe 56%(24h)、workers 2535 inv/7d、Stripe active subs 0
 
 ## Customer Segments
 
@@ -77,6 +78,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 62 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 55 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 46 · /health 35 · /xrpc/ai.gftd.apps.kotobase.datomic.q 33 | 4xx(probe) 56% · 5xx 1%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 64 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 55 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 46 · /health 37 · /xrpc/ai.gftd.apps.kotobase.datomic.q 33 | 4xx(probe) 56% · 5xx 1%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 64 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 55 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 46 · /health 38 · /xrpc/ai.gftd.apps.kotobase.datomic.q 33 | 4xx(probe) 56% · 5xx 1%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 63 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 55 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 46 · /health 39 · /xrpc/ai.gftd.apps.kotobase.datomic.q 33 | 4xx(probe) 56% · 5xx 1%
 
 ## Revenue Streams
 
