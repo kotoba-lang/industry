@@ -1,7 +1,7 @@
 {:health-status 404,
  :zone-name "manimani.cloud",
  :zone
- {:requests-7d 2239,
+ {:requests-7d 2243,
   :pageviews-7d 0,
   :uniques-7d-sum 251,
   :zone "manimani.cloud"},
@@ -9,13 +9,15 @@
  :cloud {:signups 1},
  :paths
  {:ok
-  [{:path "/metrics", :requests 15}
+  [{:path "/metrics", :requests 16}
    {:path "/robots.txt", :requests 4}],
-  :status-mix {:client-error 170, :ok 19},
+  :status-mix {:client-error 150, :ok 20},
   :window "24h"},
  :as-of "2026-07-09",
+ :traffic-quality {:window "24h", :probe-4xx-pct 88, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /metrics 15 · /robots.txt 4 | 4xx(probe) 90%",
+ "上位 page (24h, 2xx/3xx): /metrics 16 · /robots.txt 4 | 4xx(probe) 88%",
  :conversion {:oss-active 0, :cloud-paid 0, :pct 0},
  :oss {:installs 0},
- :signal "manimani.cloud 実測 2239 req/7d・251 uniques(日次和)"}
+ :signal
+ "manimani.cloud 実測 2243 req/7d・251 uniques(日次和)・うち4xx probe 88%(24h)"}

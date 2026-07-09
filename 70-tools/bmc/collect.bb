@@ -234,12 +234,23 @@
       m)
     m))
 
+(defn traffic-quality
+  "24h の status-mix から probe(4xx)/5xx 率を % で。zone の uniques/requests を
+   「見込み顧客」と読ませないための補正係数 (実測比、推定ではない)。"
+  [{:keys [status-mix]}]
+  (let [total (reduce + (vals (or status-mix {})))]
+    (when (pos? total)
+      {:window "24h"
+       :probe-4xx-pct (Math/round (* 100.0 (/ (get status-mix :client-error 0) total)))
+       :error-5xx-pct (Math/round (* 100.0 (/ (get status-mix :server-error 0) total)))})))
+
 (defn signal [p m]
-  (let [z (:zone m) w (:workers-invocations-7d m)]
+  (let [z (:zone m) w (:workers-invocations-7d m) tq (:traffic-quality m)]
     (str/join "、"
               (remove nil?
                       [(when z (str (:zone-name m) " 実測 " (:requests-7d z) " req/7d・"
-                                    (:uniques-7d-sum z) " uniques(日次和)"))
+                                    (:uniques-7d-sum z) " uniques(日次和)"
+                                    (when tq (str "・うち4xx probe " (:probe-4xx-pct tq) "%(24h)"))))
                        (when (seq w) (str "workers " (reduce + (vals w)) " inv/7d"))
                        (when-let [s (:stripe m)]
                          (str "Stripe active subs " (:active-subscriptions s)))
@@ -261,7 +272,8 @@
                 zone (as-> m' (let [tp (zone-top-paths tok zone)]
                                 (cond-> m'
                                   tp (assoc :paths (assoc tp :window "24h")
-                                            :top-paths (top-paths-summary tp)))))
+                                            :top-paths (top-paths-summary tp))
+                                  (traffic-quality tp) (assoc :traffic-quality (traffic-quality tp)))))
                 (seq workers) (assoc :workers-invocations-7d
                                      (into {} (filter (fn [[k _]] (contains? workers k)) wi)))
                 (and (:stripe cfg) stripe) (assoc :stripe stripe)

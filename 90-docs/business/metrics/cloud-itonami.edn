@@ -1,11 +1,11 @@
-{:as-of "2026-07-09",
- :sources [:cloudflare :health],
+{:health-status 200,
+ :zone-name "itonami.cloud",
  :zone
  {:requests-7d 3772,
   :pageviews-7d 190,
   :uniques-7d-sum 136,
   :zone "itonami.cloud"},
- :zone-name "itonami.cloud",
+ :sources [:cloudflare :health],
  :paths
  {:ok
   [{:path "/robots.txt", :requests 15}
@@ -14,7 +14,9 @@
    {:path "/join/browser", :requests 2}],
   :status-mix {:ok 21, :client-error 23},
   :window "24h"},
+ :as-of "2026-07-09",
+ :traffic-quality {:window "24h", :probe-4xx-pct 52, :error-5xx-pct 0},
  :top-paths
  "上位 page (24h, 2xx/3xx): /robots.txt 15 · /itonami/verticals 2 · /itonami 2 · /join/browser 2 | 4xx(probe) 52%",
- :health-status 200,
- :signal "itonami.cloud 実測 3772 req/7d・136 uniques(日次和)"}
+ :signal
+ "itonami.cloud 実測 3772 req/7d・136 uniques(日次和)・うち4xx probe 52%(24h)"}
