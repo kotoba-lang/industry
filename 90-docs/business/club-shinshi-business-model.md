@@ -37,6 +37,7 @@
 - 観測 (signal): shinshi.club 実測 1927 req/7d・495 uniques(日次和)・うち4xx probe 7%(24h)
 - 観測 (signal): shinshi.club 実測 1928 req/7d・495 uniques(日次和)・うち4xx probe 7%(24h)
 - 観測 (signal): shinshi.club 実測 1931 req/7d・495 uniques(日次和)・うち4xx probe 7%(24h)
+- 観測 (signal): shinshi.club 実測 1936 req/7d・497 uniques(日次和)・うち4xx probe 7%(24h)
 
 ## Customer Segments
 
@@ -99,6 +100,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 106 · /robots.txt 50 · /js/app.js 32 · /app.css 29 · /sitemap.xml 24 | 4xx(probe) 7% · 5xx 17%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 108 · /robots.txt 50 · /js/app.js 32 · /app.css 29 · /sitemap.xml 25 | 4xx(probe) 7% · 5xx 17%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 106 · /robots.txt 47 · /js/app.js 32 · /app.css 29 · /sitemap.xml 24 | 4xx(probe) 7% · 5xx 17%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 109 · /robots.txt 48 · /js/app.js 32 · /app.css 29 · /sitemap.xml 23 | 4xx(probe) 7% · 5xx 16%
 
 > NSFW は paid 集客が全封鎖 → organic のみ。集客が事業の律速。
 
