@@ -138,3 +138,13 @@ README が既に宣言している R1.4 deliverable を、以下の対応で満�
 ## Related
 
 `kami-app-amenominaka`（実装先）、`kami-scene-contracts`（provenance検証のみ、合成層ではないことを確認済み）、`kami-render-provider`（`repos.edn` に予約済みだが未作成 — 本設計は当面これに依存しない。将来 render provider family として `kami-webgpu`/`webgpu` を吸収する構想は ADR-2607010000 のまま維持）。
+
+## Addendum (2026-07-09): M0 実装、D3 の訂正（`kami-cad-import` は使わない）
+
+M0（`kotoba.amenominaka.scene`）を `kami-app-amenominaka` に実装・着地（`652d2d7`、west pin 前進 `5a2f6a7→652d2d7`）。実装前に各入力/環境層の実ソースを読んで検証した結果、D3 の前提に1点誤りがあった:
+
+- **`kami-cad-import` は汎用CAD取り込みではなく、車両パーツグラフ専用**であることが実装時にソースレベルで判明した（README のみでなく `cad_import.part/VehicleAssembly` の実装を確認）。`part-kinds`(`:chassis`/`:body`/`:powertrain`/…)・`material`（steel/aluminium/glass等の車両材料固定集合）・`hardpoints`（bolt/weld/hinge等のJBeamソフトボディ概念）に閉じており、glTF ingest (`cad-import.ingest.gltf/from-gltf-map`) は `gftd_vehicle`/`gftd_part` アノテーション必須・幾何ペイロードは AABB のみ（実三角形/頂点データなし）。STEP経路もFreeCAD script文字列生成のみで実パースなし。**建築/BIM入力には使えない。**
+- **対応**: M0 の建物入力は `bim`（IFC相当、実ジオメトリコンストラクタ `brep-geometry`/`axis-sweep-geometry`/`mesh-ref-geometry` を持つ）のみとした。`kami-cad-import` は M0 実装に含めていない。D3「入力層 — 既存をそのまま使う」は `bim`/`cad`/`dxf`/`step`/`scad` については変更なしで有効、`kami-cad-import` の部分のみ本 Addendum で撤回する。
+- **将来**: 建築/BIM 向けの汎用 STEP/glTF 取り込みが必要になったら、`kami-cad-import` を車両専用のまま残し、別途 `bim` 側に取り込みパスを足すか、`cad-import.ingest.gltf` を車両アノテーション必須でない形に一般化するかは、その時点で別 ADR として判断する（本 ADR ではどちらか確定しない）。
+
+`kami-*-scene` 4 repo（atmosphere/vegetation/terrain/postfx）は D4 の想定通り、いずれも `shipped-*`（例: `atmosphere-scene/shipped-weather "overcast"`）1関数呼び出しで実データを取得でき、`bim/project` 出力と合わせて `{:scene/building ... :scene/atmosphere ... :scene/vegetation {...} :scene/terrain ... :scene/postfx ...}` への合成は想定通り軽量だった（7 tests / 32 assertions green, clj-kondo clean）。M1 以降は未着手のまま。
