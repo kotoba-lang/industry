@@ -542,6 +542,20 @@
    :business-id "cloud-itonami-9101"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as a community-library/
+   ;; archive actor (LibraryOps-LLM ⊣ Library Governor), the ninety-
+   ;; sixth build outside ADR-2607032000's original insurance/real-
+   ;; estate batch. This blueprint's own :library-governor keyword is
+   ;; UNIQUE fleet-wide -- no naming-collision precedent needed. No
+   ;; bespoke domain capability library exists (kotoba-lang org search
+   ;; for library/archive/ils/catalog/marc/preservation returned zero
+   ;; hits). Two new HARD checks: lending-restricted-item? (flagship,
+   ;; 88th unconditional-evaluation-discipline grounding, legal-
+   ;; deposit/non-circulating-collection law) and conservator-sign-
+   ;; off-missing? (89th grounding, the fourteenth conditional
+   ;; variant, full four-jurisdiction professional-conservation-
+   ;; standards coverage). See ADR-2607092600.
    :operating-states [:intake :catalog :lend :preserve :exhibit :audit]}
   {:id "9511" ; S — Other service activities
    :name "Community ICT Equipment Repair"
