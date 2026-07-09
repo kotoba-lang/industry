@@ -95,6 +95,7 @@
 - 次の検証 (club-shinshi-creator-take): PSP/crypto rail 解禁後、creator 課金 GMV が ad 収益 (ExoClick) を上回る
 - walk 実測 (2026-07-09): 5xx 31% は現行 stack で再現せず (主要 GET/POST 全 2xx、cljs rewrite 後)。/_metrics/revenue 実測: creator GMV null (正直未発生)、ExoClick 7d 再構成 = USD 0 — live 収益が直近窓ゼロ、要調査
 - 原因特定と復旧 (2026-07-09): ExoClick 途絶 (30日で imp 1件) の原因 = atproto.gftd.ai 全 522 → サイト全画像死。PR #12 で cdn.gftd.ai 直配信に切替、本番復旧を実測確認。imp 回復は日次監視、write path (pod→PDS) は未修理
+- walk #4 (2026-07-09): 所有ターゲット (shinshi mount/画像/bundle, babiniku config) 全て生存・上書きなし。ExoClick 回復は遅行 (修正<1日、7/6 imp1 が最新)。verifier 0 pending。L3 murakumo.cloud/kotobase.net 共に 200 = x402 per-request 課金の接続先が稼働中
 
 ## Unfair Advantage
 
