@@ -4786,11 +4786,33 @@
    :operating-states [:intake :book :transit :deliver :reconcile :audit]},
   {:id "4912"
    :name "Freight rail transport"
-   :repo "https://github.com/gftdcojp/cloud-itonami-H4912"
-   :business-id "cloud-itonami-H4912"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4912"
+   :business-id "cloud-itonami-4912"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Promoted :spec -> :blueprint (see `kotoba.industry/maturity-of`).
+   ;; The legacy placeholder :repo (gftdcojp/cloud-itonami-H4912) never
+   ;; actually existed (confirmed 404 before this edit) -- replaced with
+   ;; the real repo, following the SAME cloud-itonami/cloud-itonami-isic-####
+   ;; naming convention as every other actor in this fleet rather than the
+   ;; legacy H-prefixed scheme. Fourth transport-mode pick, extending the
+   ;; now-closed passenger air/rail/water family into a freight variant:
+   ;; distinct from cloud-itonami-isic-4911 (passenger rail — freight rail
+   ;; is frequently regulated by a SEPARATE economic regulator, e.g. the
+   ;; US Surface Transportation Board's own freight-specific economic
+   ;; oversight distinct from the FRA's passenger-focused safety rules;
+   ;; Japan's 鉄道事業法 covers both but freight carries its own
+   ;; 貨物利用運送事業法 licensing) and distinct from cloud-itonami-isic-4920
+   ;; (road freight — a different transport mode entirely, already
+   ;; :implemented). Freight rail also carries its own hazardous-
+   ;; materials-by-rail transport regime not applicable to passenger
+   ;; service (US 49 CFR Part 174, Germany's EBA safety oversight +
+   ;; Bundesnetzagentur economic regulation of freight track access, the
+   ;; UK ORR's economic regulation of freight access). Governor keyword
+   ;; :rail-freight-governor is grep-verified UNIQUE fleet-wide (distinct
+   ;; from cloud-itonami-isic-4911's own :rail-safety-governor). Reuses
+   ;; the SAME booking/transit/delivery/reconciliation shape as
+   ;; 5110/4911/5011. See ADR-2607102800.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :book :transit :deliver :reconcile :audit]},
   {:id "4921"
