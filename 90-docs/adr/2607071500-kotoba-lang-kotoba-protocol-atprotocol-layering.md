@@ -160,6 +160,12 @@ repo の中身:
 - (−) cap-bridge は `graph/query`（読取専用）+ `graph/transact`（書込み、
   Addendum 3）。wasm actor は 7/8 imports（`http-post` 不可）、`llm/complete`
   は proxy 先 backend が無く未実装（下記 open follow-up）。
+- (−) bundle-cid integrity 検証（Addendum 4）は raw codec の単一バイナリ
+  （wasm module）専用 — dag-pb 等の UnixFS ディレクトリ CID（複数ファイルの
+  embed バンドル）はこの sha256 一致検証では扱えない。iframe mount
+  （`app-embed-panel`）は host がレスポンス bytes を見ないため、同じ方式の
+  検証は構造的に不可（host-fetch→blob/srcdoc mount への設計変更が必要 —
+  下記 open follow-up）。
 
 ## Open follow-up（本 ADR クローズ後も残る）
 
@@ -169,8 +175,13 @@ repo の中身:
   実装済み（Addendum 3）。`llm/complete` は proxy 先の LLM completion
   XRPC/backend 自体がまだ存在しないため未実装のまま持ち越し。
 - studio への actor 鍵 import UI の汎用化（現状 mangaka-app 専用）。
-- `:kotoba.app/bundle-cid` の appview 側 integrity 検証（現状 `embed-url`
-  の resolve のみで、配信内容と bundle-cid の一致は未検証）。
+- ~~`:kotoba.app/bundle-cid` の appview 側 integrity 検証~~ → wasm actor
+  （raw codec 単一バイナリ）は実装済み（Addendum 4）。**残る範囲**:
+  (a) `app-embed-panel` の iframe mount は host が bytes を見ないため
+  同方式では検証不可 — host-fetch→blob:/srcdoc mount への切替が要る
+  （bigger design change、別 follow-up）。
+  (b) dag-pb/UnixFS ディレクトリ CID（複数ファイル embed バンドル）の
+  検証は sha256 一致では扱えず、別スキーム（IPLD DAG 検証）が要る。
 
 ## Addendum (2026-07-07 同日): follow-up 3 件 (IPNS / cap-bridge / bundle CID) 実装
 
@@ -267,3 +278,43 @@ repo の中身:
   で 174 ファイルがコンパイル成功（既存の無関係な `:infer-warning` 1 件のみ）。
   実ブラウザでの round-trip デモ（bridge-demo-app からの実書込み）は
   持ち越し — 次に embed app を書き込みテストするときに確認する。
+
+## Addendum 4 (2026-07-09): bundle-cid integrity 検証 — wasm actor 実装
+
+open follow-up の `:kotoba.app/bundle-cid` integrity 検証（「配信内容と
+bundle-cid の一致は未検証」）に着手。調査の結果、`:kotoba.app/bundle-cid`
+は実運用ではほぼ未使用（唯一 `bridge-demo-app` が手で `embed-url` と同じ
+CID 文字列を重複させているだけ）で、実際に検証すべき CID は
+`:kotoba.app/wasm[].cid`（kind=actor）に一番具体的な形で存在すると判明 —
+そこに scope を絞った。
+
+- **`kotoba.protocol.cid`（新規 ns、kotoba-protocol）**: `parse-raw-cid` /
+  `digest-matches?` — CIDv1/raw/sha2-256 の digest 抽出 + 比較。
+  `kotobase.archive-put`（net-kotobase、本番で稼働中の同一ロジック）から
+  移植（byte-exact）。ハッシュ計算自体は host の仕事（`crypto.subtle.digest`
+  等）で、この ns は CID⇄digest bytes の変換のみを持つ pure 関数。
+- **`kotoba.protocol.app/bundle-cid-consistent?`**: manifest が
+  `:kotoba.app/bundle-cid` と ipfs:// scheme の `:kotoba.app/embed-url` を
+  両方持つ場合、同じ CID を指すことを検証（`validate-manifest` に組込み）。
+  手で 2 箇所に同じ CID を書く現行運用が desync しても検出できなかった穴を
+  塞いだ。
+- **`yoro-ui.interop.wasm-actor/run-actor!`**（app-aozora）: `:cid` opt を
+  追加。fetch した ArrayBuffer を `js/crypto.subtle.digest "SHA-256"` で
+  ハッシュし、`kotoba.protocol.cid/digest-matches?` で manifest の CID と
+  比較 — 不一致なら `WebAssembly.instantiate` の**前**に reject (fail-closed)。
+  `wasm-actor-panel` が module の `:cid` を forward し、成功時に
+  「✓ CID 一致検証済み (sha256)」badge を表示。
+- **scope の明示的な線引き**: raw codec の単一バイナリ（wasm module）専用。
+  (a) `app-embed-panel` の iframe mount（embed kind）は host が iframe の
+  fetch レスポンス bytes を一切見ないため、同じ「fetch→hash→compare」方式
+  では検証できない — host 自身が fetch して blob:/srcdoc で mount する
+  方式への切替が要る、より大きな設計変更（open follow-up に明記）。
+  (b) dag-pb/UnixFS ディレクトリ CID（複数ファイルの embed バンドル）は
+  単純な sha256 一致では検証できない（IPLD DAG 構造の検証が要る）—
+  同じく open follow-up に明記。
+- **検証**: kotoba-protocol は実 `clojure -M:test`（13 tests / 81
+  assertions、既存 68 + 新規 13）+ `clojure -M:lint`（clj-kondo、0
+  errors/warnings）で確認。app-aozora は実 shadow-cljs `:test` build
+  （214 ファイルコンパイル成功、Addendum 3 と同じノーコミット overlay
+  手法）で確認。ブラウザでの実 CID 不一致 reject デモ（意図的に壊れた
+  CID を manifest に入れて fail-closed を目視確認）は持ち越し。
