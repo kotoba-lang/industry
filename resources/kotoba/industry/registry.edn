@@ -4849,11 +4849,28 @@
    :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "5011"
    :name "Sea and coastal passenger water transport"
-   :repo "https://github.com/gftdcojp/cloud-itonami-H5011"
-   :business-id "cloud-itonami-H5011"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-5011"
+   :business-id "cloud-itonami-5011"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Published as a :blueprint repo (business-model.md + operator-guide.md +
+   ;; blueprint.edn + governance docs, no src/test yet -- the OSS blueprint
+   ;; stage, not yet :implemented). :maturity :spec explicitly removed so
+   ;; maturity-of/maturity now auto-derive :blueprint from the real :repo
+   ;; above (see `kotoba.industry/maturity-of`). The legacy placeholder
+   ;; :repo (gftdcojp/cloud-itonami-H5011) never actually existed (confirmed
+   ;; 404 before this edit) -- replaced with the real repo, following the
+   ;; SAME cloud-itonami/cloud-itonami-isic-#### naming convention as every
+   ;; other actor in this fleet rather than the legacy H-prefixed scheme.
+   ;; Third and final transport-mode pick in the family opened at
+   ;; ADR-2607102100 (after passenger air/5110 and passenger rail/4911).
+   ;; No redundancy with cloud-itonami-isic-5020's own marine-cargo/tanker
+   ;; scope (:marine-cargo-governor) -- passenger-vessel safety
+   ;; certification is a materially different regime from cargo-vessel
+   ;; certification in every jurisdiction checked. Governor keyword
+   ;; :maritime-safety-governor is grep-verified UNIQUE fleet-wide. No
+   ;; bespoke capability library exists for ferry operations specifically.
+   ;; See ADR-2607102400.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :book :transit :deliver :reconcile :audit]},
   {:id "5012"
