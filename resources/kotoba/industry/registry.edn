@@ -6660,11 +6660,34 @@
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "8219"
    :name "Photocopying, document preparation and other specialized of..."
-   :repo "https://github.com/gftdcojp/cloud-itonami-N8219"
-   :business-id "cloud-itonami-N8219"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-8219"
+   :business-id "cloud-itonami-8219"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Promoted :spec -> :blueprint (see `kotoba.industry/maturity-of`).
+   ;; The legacy placeholder :repo (gftdcojp/cloud-itonami-N8219) never
+   ;; actually existed (confirmed 404 before this edit) -- replaced with
+   ;; the real repo, following the SAME cloud-itonami/cloud-itonami-isic-####
+   ;; naming convention as every other actor in this fleet rather than the
+   ;; legacy N-prefixed scheme. Flagged in ADR-2607104400's own
+   ;; Alternatives section as a comparable BPO-adjacent candidate.
+   ;; Scoped to retail office/business-support services (copy shops,
+   ;; document-typing/preparation services, mailing/business-support
+   ;; services), distinct from cloud-itonami-isic-1812 (industrial
+   ;; print-support/bindery services serving print shops). Document-
+   ;; preparation services carry their own distinct compliance regime:
+   ;; unauthorized-practice-of-law statutes restrict document preparers
+   ;; from giving legal advice (several US states, e.g. California,
+   ;; require registration as a Legal Document Assistant for fee-based
+   ;; legal-document preparation); copyright/fair-use compliance for
+   ;; photocopying published works; data-privacy obligations for
+   ;; customer documents. grep -rli "photocopy|document.preparation|
+   ;; office.support" across the fleet returned completely empty.
+   ;; Governor keyword :office-support-governor is grep-verified UNIQUE
+   ;; fleet-wide. Reuses the SAME labor-dispatch operating-states shape
+   ;; as securityops/8010, securitysystemsops/8020, landscapeops/8130,
+   ;; buildingcleaningops/8121 and callcentreops/8220 -- sixth instance
+   ;; of this shape. See ADR-2607104500.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "8220"
