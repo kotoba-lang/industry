@@ -4102,11 +4102,34 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3313"
    :name "Repair of electronic and optical equipment"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C3313"
-   :business-id "cloud-itonami-C3313"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3313"
+   :business-id "cloud-itonami-3313"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   ;; Promoted :spec -> :blueprint (see `kotoba.industry/maturity-of`).
+   ;; The legacy placeholder :repo (gftdcojp/cloud-itonami-C3313) never
+   ;; actually existed (confirmed 404 before this edit) -- replaced with
+   ;; the real repo, following the SAME cloud-itonami/cloud-itonami-isic-####
+   ;; naming convention as every other actor in this fleet rather than the
+   ;; legacy C-prefixed scheme. Low-friction sibling of machineryrepair/
+   ;; 3312 (ADR-2607104000's own flagged next pick): scoped to diagnostic,
+   ;; calibration and certified repair of electronic/optical equipment
+   ;; (test/measurement instruments, optical devices), distinct from
+   ;; 3312's own mechanical industrial-machinery scope and from the
+   ;; fleet's manufacturing verticals (which build NEW equipment).
+   ;; Calibration services frequently require ISO/IEC 17025 laboratory
+   ;; accreditation; component-level rework follows IPC/WHMA-A-620 and
+   ;; IPC-7711/7721 industry rework/repair standards; right-to-repair
+   ;; legislation (various US state acts, the EU's Right to Repair
+   ;; Directive 2024/1799) increasingly shapes access to parts,
+   ;; diagnostics and service documentation for this equipment class.
+   ;; grep -rli "electronic.equipment.repair|optical.equipment.repair|
+   ;; repair.of.electronic|calibration.service" across the fleet
+   ;; returned completely empty. Governor keyword
+   ;; :electronic-repair-governor is grep-verified UNIQUE fleet-wide.
+   ;; Reuses the SAME manufacturing-lifecycle shape as machineryrepair/
+   ;; 3312, rollingstockops/3020, meddeviceops/2660 and basicchemops/
+   ;; 2011. See ADR-2607104100.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3314"
