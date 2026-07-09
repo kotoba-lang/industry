@@ -41,6 +41,7 @@
 - 観測 (signal): kotobase.net 実測 2772 req/7d・371 uniques(日次和)・うち4xx probe 61%(24h)、workers 2894 inv/7d、Stripe active subs 0
 - 観測 (signal): kotobase.net 実測 2777 req/7d・374 uniques(日次和)・うち4xx probe 61%(24h)、workers 2897 inv/7d、Stripe active subs 0
 - 観測 (signal): kotobase.net 実測 4057 req/7d・378 uniques(日次和)・うち4xx probe 76%(24h)、workers 4175 inv/7d、Stripe active subs 0
+- 観測 (signal): kotobase.net 実測 4070 req/7d・380 uniques(日次和)・うち4xx probe 76%(24h)、workers 4181 inv/7d、Stripe active subs 0
 
 ## Customer Segments
 
@@ -93,6 +94,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 63 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 57 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 55 · /health 44 · /api/funnel 29 | 4xx(probe) 61% · 5xx 1%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 63 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 57 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 55 · /health 46 · /api/funnel 30 | 4xx(probe) 61% · 5xx 1%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 68 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 57 · /health 48 · /api/funnel 31 · /llms-full.txt 25 | 4xx(probe) 76% · 5xx 1%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 69 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 57 · /health 49 · /api/funnel 32 · /llms-full.txt 25 | 4xx(probe) 76% · 5xx 1%
 
 ## Revenue Streams
 
