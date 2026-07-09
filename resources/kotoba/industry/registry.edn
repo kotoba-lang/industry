@@ -4096,11 +4096,33 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3510"
    :name "Electric power generation, transmission and distribution"
-   :repo "https://github.com/gftdcojp/cloud-itonami-D3510"
-   :business-id "cloud-itonami-D3510"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3510"
+   :business-id "cloud-itonami-3510"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Published as a :blueprint repo (business-model.md + operator-guide.md +
+   ;; blueprint.edn + governance docs, no src/test yet -- the OSS blueprint
+   ;; stage, not yet :implemented). :maturity :spec explicitly removed so
+   ;; maturity-of/maturity now auto-derive :blueprint from the real :repo
+   ;; above (see `kotoba.industry/maturity-of`). The legacy placeholder
+   ;; :repo (gftdcojp/cloud-itonami-D3510) never actually existed (confirmed
+   ;; 404 before this edit) -- replaced with the real repo, following the
+   ;; SAME cloud-itonami/cloud-itonami-isic-#### naming convention as every
+   ;; other actor in this fleet rather than the legacy D-prefixed scheme.
+   ;; Deferred at ADR-2607101400/2607101500/2607101600 pending careful
+   ;; distinguishing framing from cloud-itonami-isic-3512's own community
+   ;; renewable-GENERATION vertical; resolved this build by scoping this
+   ;; blueprint explicitly to grid TRANSMISSION/DISTRIBUTION operations
+   ;; (the wires business), a distinct regulated value-chain stage from
+   ;; generation in most jurisdictions. Governor keyword
+   ;; :grid-transmission-governor is grep-verified UNIQUE fleet-wide,
+   ;; distinct from 3512's own :grid-policy-governor. FOURTH distinct
+   ;; operating-states shape in this fleet (this vertical's own registry-
+   ;; declared intake->observe->recommend->dispatch->settle->audit, a
+   ;; grid-operations/market-settlement lifecycle) after the earlier
+   ;; service-dispatch, manufacturing and permit-based-trade shapes. No
+   ;; bespoke capability library exists for grid transmission/distribution
+   ;; specifically. See ADR-2607101800.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :observe :recommend :dispatch :settle :audit]},
   {:id "3520"
