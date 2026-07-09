@@ -32,7 +32,7 @@
   (testing "the reference actor is implemented"
     (is (= :implemented (industry/maturity "6310"))))
   (testing "a published blueprint repo is :blueprint"
-    (is (= :blueprint (industry/maturity "9511"))))
+    (is (= :blueprint (industry/maturity "9101"))))
   (testing "a registry-only group entry is :spec"
     (is (= :spec (industry/maturity "011"))))
   (testing "a second implemented actor (cloud-itonami-isic-6810) is also :implemented"
@@ -201,12 +201,14 @@
     (is (= :implemented (industry/maturity "9529"))))
   (testing "an eighty-fifth implemented actor (cloud-itonami-isic-9523, leather-goods-repair actor) is also :implemented"
     (is (= :implemented (industry/maturity "9523"))))
+  (testing "an eighty-sixth implemented actor (cloud-itonami-isic-9511, ICT-equipment-repair actor) is also :implemented"
+    (is (= :implemented (industry/maturity "9511"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
       (is (pos? (:spec m)))
       (is (pos? (:blueprint m)))
-      (is (= 85 (:implemented m))))))
+      (is (= 86 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
@@ -215,7 +217,7 @@
       (is (nil? (:next-step r)))
       (is (= "at maturity ceiling" (:next-action r)))))
   (testing "a blueprint entry's next step is implemented"
-    (let [r (industry/maturity-roadmap "9511")]
+    (let [r (industry/maturity-roadmap "9101")]
       (is (= :blueprint (:maturity r)))
       (is (= :implemented (:next-step r)))
       (is (true? (:has-repo r)))))
@@ -227,7 +229,7 @@
 
 (deftest execution-plan-reports-ui-export-readiness
   (testing "a vertical backed by a capability lib reports ui+export ready"
-    (let [p (industry/execution-plan "9511")]
+    (let [p (industry/execution-plan "9101")]
       (is (true? (:ui-ready? p)))
       (is (true? (:export-ready? p)))
       (is (some :ui? (:technology-stack p)))))
