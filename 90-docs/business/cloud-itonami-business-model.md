@@ -40,6 +40,7 @@
 - 観測 (signal): itonami.cloud 実測 3771 req/7d・135 uniques(日次和)
 - 観測 (signal): itonami.cloud 実測 3772 req/7d・136 uniques(日次和)
 - 観測 (signal): itonami.cloud 実測 3772 req/7d・136 uniques(日次和)・うち4xx probe 52%(24h)
+- 観測 (signal): itonami.cloud 実測 3774 req/7d・136 uniques(日次和)・うち4xx probe 52%(24h)
 
 ## Customer Segments
 
