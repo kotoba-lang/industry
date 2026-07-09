@@ -1,24 +1,28 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 1837, "kotobase-cf-wasm-staging" 1060},
+ {"net-kotobase" 1851, "kotobase-cf-wasm-staging" 2324},
  :zone
- {:requests-7d 2777,
-  :pageviews-7d 301,
-  :uniques-7d-sum 374,
+ {:requests-7d 4057,
+  :pageviews-7d 302,
+  :uniques-7d-sum 378,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 63}
+  [{:path "/", :requests 68}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact", :requests 57}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 55}
-   {:path "/health", :requests 46}
-   {:path "/api/funnel", :requests 30}
-   {:path "/llms-full.txt", :requests 24}
-   {:path "/robots.txt", :requests 20}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.q", :requests 19}],
-  :status-mix {:client-error 1225, :ok 763, :server-error 22},
+   {:path "/health", :requests 48}
+   {:path "/api/funnel", :requests 31}
+   {:path "/llms-full.txt", :requests 25}
+   {:path
+    "/ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapcbsx3yrg7xzj3jrxm3q4mzz2nu",
+    :requests 18}
+   {:path
+    "/kotobase-cf-wasm-production/ipns/bafyreig3pxykmmyttoyenqwzg72agibsphfvigy6ufmpvtrqh522e5e2aa.json",
+    :requests 17}
+   {:path "/llms.txt", :requests 16}],
+  :status-mix {:client-error 2132, :ok 638, :server-error 22},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -27,9 +31,9 @@
   :charges-total 11,
   :last-charge-epoch 1718681591},
  :as-of "2026-07-09",
- :traffic-quality {:window "24h", :probe-4xx-pct 61, :error-5xx-pct 1},
+ :traffic-quality {:window "24h", :probe-4xx-pct 76, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 63 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 57 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 55 · /health 46 · /api/funnel 30 | 4xx(probe) 61% · 5xx 1%",
- :funnel {:visitors 254, :signups 0, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): / 68 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 57 · /health 48 · /api/funnel 31 · /llms-full.txt 25 | 4xx(probe) 76% · 5xx 1%",
+ :funnel {:visitors 257, :signups 0, :checkouts 0},
  :signal
- "kotobase.net 実測 2777 req/7d・374 uniques(日次和)・うち4xx probe 61%(24h)、workers 2897 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 4057 req/7d・378 uniques(日次和)・うち4xx probe 76%(24h)、workers 4175 inv/7d、Stripe active subs 0"}
