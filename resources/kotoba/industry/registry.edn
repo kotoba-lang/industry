@@ -5931,11 +5931,28 @@
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "8030"
    :name "Investigation activities"
-   :repo "https://github.com/gftdcojp/cloud-itonami-N8030"
-   :business-id "cloud-itonami-N8030"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-8030"
+   :business-id "cloud-itonami-8030"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Published as a :blueprint repo (business-model.md + operator-guide.md +
+   ;; blueprint.edn + governance docs, no src/test yet -- the OSS blueprint
+   ;; stage, not yet :implemented). :maturity :spec explicitly removed so
+   ;; maturity-of/maturity now auto-derive :blueprint from the real :repo
+   ;; above (see `kotoba.industry/maturity-of`). The legacy placeholder
+   ;; :repo (gftdcojp/cloud-itonami-N8030) never actually existed (confirmed
+   ;; 404 before this edit) -- replaced with the real repo, following the
+   ;; SAME cloud-itonami/cloud-itonami-isic-#### naming convention as every
+   ;; other actor in this fleet rather than the legacy N-prefixed scheme.
+   ;; Governor keyword :private-investigation-governor is grep-verified
+   ;; UNIQUE fleet-wide -- distinct from cloud-itonami-isic-8010's own
+   ;; private-security-guard-licensing domain (same ISIC section N, a
+   ;; different licensing regime and regulatory concern). No bespoke
+   ;; capability library exists for investigation activities specifically;
+   ;; :labor is required for investigator shift/timesheet management
+   ;; (kotoba-lang/labor), a candidate capability-library-wrap at
+   ;; implementation time, same pattern as cloud-itonami-isic-8010's own.
+   ;; See ADR-2607100700.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "8110"
