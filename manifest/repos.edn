@@ -107,6 +107,18 @@
   ;; batch above did NOT get reverse-domain names).
   "orgs/kotoba-lang/cnc"  "orgs/kotoba-lang/org-iso-6983"
   "orgs/kotoba-lang/brep" "orgs/kotoba-lang/org-iso-10303"
+  ;; NVIDIA vendor-API-compat renames (2026-07-09, ADR-2607086600):
+  ;; kami-genesis is a clean-room facade for NVIDIA Isaac Sim's real,
+  ;; documented isaacsim.core.api (World/Articulation) + PhysX 5
+  ;; (spatial rigid-body dynamics, GJK/EPA contact); kami-shugyo targets
+  ;; isaaclab.envs.ManagerBasedRLEnv -- both verified against NVIDIA's
+  ;; own API docs, same com-nvidia-* vendor-compat convention as the
+  ;; existing com-nvidia-isaac/-cosmos/-drive/-nvml pilot batch
+  ;; (ADR-2607041500), distinguished by product line (Isaac Sim vs.
+  ;; Isaac Lab) since "com-nvidia-isaac" was already taken by a
+  ;; smaller, unrelated schema-CRUD actor.
+  "orgs/kotoba-lang/kami-genesis" "orgs/kotoba-lang/com-nvidia-isaac-sim"
+  "orgs/kotoba-lang/kami-shugyo"  "orgs/kotoba-lang/com-nvidia-isaac-lab"
   "orgs/com-junkawasaki/manimani"       "orgs/gftdcojp/manimani" ; GitHub-transferred to gftdcojp 2026-07-01 (private; mobile/ iOS+Android app, fastlane App Store pipeline in progress)
   "orgs/gftdcojp/manimani"              "orgs/gftdcojp/local-manimani" ; renamed on GitHub 2026-07-05 (ADR-2607051600): mirrors the cloud-manimani/local-murakumo taxonomy — this is the on-device client vs. cloud-manimani's Cloudflare Worker API, so "local-" names the same local/cloud contrast as local-murakumo vs. cloud-murakumo
   "orgs/com-junkawasaki/cloud-manimani" "orgs/gftdcojp/cloud-manimani" ; GitHub-transferred to gftdcojp 2026-07-02 (private; Cloudflare Worker API for manimani triage Decision Ledger)
@@ -2143,7 +2155,7 @@
    "orgs/kotoba-lang/kami-vehicle-scene"
    "orgs/kotoba-lang/kami-skeleton-scene"
    "orgs/kotoba-lang/kami-game-scene"
-   "orgs/kotoba-lang/kami-genesis"
+   "orgs/kotoba-lang/com-nvidia-isaac-sim"
 
    ;; kotoba-lang org repos not yet west-registered (2026-07-02 gap sweep):
    ;; unrelated to the kami-cad/kami-eda restoration comments above (those
@@ -2153,7 +2165,7 @@
    "orgs/kotoba-lang/genome"
    "orgs/kotoba-lang/mst-projector"
    "orgs/kotoba-lang/lab"
-   "orgs/kotoba-lang/kami-shugyo"
+   "orgs/kotoba-lang/com-nvidia-isaac-lab"
    "orgs/kotoba-lang/kami-vehicle"
    "orgs/kotoba-lang/kami-autodrive"
    "orgs/kotoba-lang/kami-usd-native"
