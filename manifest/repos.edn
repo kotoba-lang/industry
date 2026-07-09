@@ -1783,6 +1783,19 @@
    "orgs/kotoba-lang/ekyc"
    "orgs/kotoba-lang/aml"
    "orgs/kotoba-lang/ctf"
+   ;; oauth/oidc/saml/webauthn: real, load-bearing siblings of the thinner
+   ;; org-ietf-oauth2/org-openid-oidc/org-oasis-saml/org-w3-webauthn substrate
+   ;; above (this list, ~9 lines up) -- authentication/deps.edn's :local/root
+   ;; deps reference these bare names directly (not the reverse-domain ones),
+   ;; and each ships full R2-maturity adapters (Java HttpClient/JWKS/JWT
+   ;; RSA+HMAC/XML signature/production ceremony verifiers) the reverse-domain
+   ;; repos deliberately don't carry. Registered 2026-07-09; reconciling the
+   ;; two families (merge vs. keep both as intentionally different layers) is
+   ;; an open owner decision, not resolved by this registration.
+   "orgs/kotoba-lang/oauth"
+   "orgs/kotoba-lang/oidc"
+   "orgs/kotoba-lang/saml"
+   "orgs/kotoba-lang/webauthn"
    "orgs/kotoba-lang/kagi"
    "orgs/kotoba-lang/kobo"
    "orgs/kotoba-lang/kotoba"
