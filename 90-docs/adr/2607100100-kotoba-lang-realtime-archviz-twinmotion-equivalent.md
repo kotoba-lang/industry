@@ -198,3 +198,16 @@ M4（stretch/条件付き）はオーナーとの合意により、まず**実�
 - **未解決のまま**: `MAX-INST`（16,384）を超えるinstanceはdraw!が無警告で切り捨てる — これはパフォーマンスでなく**正確性**のギャップ（大規模都市スケールのシーンでは実在しうる）。`omni.timeline`（M3 stretch）、インタラクティブなorbit/flyカメラ操作も引き続き未着手。
 
 これでADR-2607100100のM0〜M4全マイルストーンが完了（M4は「見送り」ではなく実測に基づく代替修正という形で完了）。
+
+## Addendum (2026-07-09): M5 実装 — インタラクティブUIシェル（オーナー確認: 「twinmotion の uiux は設計されている?」→未設計と回答した上で「ok, do it」）
+
+M0-M4完了後、オーナーから「Twinmotion相当のUI/UXは設計されているか」と問われ調査した結果、**専用のUI/UXは一切存在しない**（それまでの成果物は全て単発の静的デモページ経由でしか見られなかった）一方、org全体の**default UI/UXデザインシステム**（ADR-2607022800: `shitsuke`+`liquid-glass-ui`+`kotoba-ui`+`appkit`/`uikit`）は実在し、実デプロイ済みの参照実装（`murakumo-studio`、`local-manimani`）もあると報告、「ok, do it」の指示でM5として実装した。
+
+- **設計判断の根拠を全て実ソース確認**: `liquid-glass-ui`は`liquid-glass.gpu`（canvas内での真のガラス質感描画）が明示的に未来課題であることをADR/design docsで確認 — このappの実際の形（「DOM chromeがcanvas leafを囲む」）はミスマッチでなく、`kami-engine-hud`（既存の無関係なWebGPU HUDオーバーレイ）で既に前例のある形と一致することを確認した上で採用。デスクトップ向けpanel/toolbar/dropdown中心のappなので`appkit`（`uikit`ではなく）を選択 — 両者の差分は`panel`/`list-view`のデフォルトのみと実ソースで確認済み。
+- **`kotoba-ui`の実バグ2件を発見、upstreamにパッチせず回避**: `menu-select`はReactでuncontrolled（`<select>`に`:value`なし、`<option>`に`:key`なし）、`button`は`:on-click`を一切サポートしない（shitsukeのSSR専用`:act`契約のみ）。両方とも実ソースを直読して確認した実バグ。`murakumo-studio/src/murakumo_studio/ui.cljs`が同一バグに対して既に確立していた、同一DOM形状を保つ手書きcontrolled-component代替（`preset-select`/`btn`）をそのまま移植 — CSSのターゲティングを壊さずに機能させた。
+- **カメラ設計はM4のキャッシュを意識**: `apply-camera!`は既存render-IRへ`:eye`/`:target`を`assoc-in`するだけで`:instances`に触れない — マウスドラッグ/ホイールによるカメラのみのフレームでは`kotoba-lang/webgpu`のinstance bufferキャッシュ（M4、`identical?`判定）がヒットし続ける。実際にプリセット変更（`recompute-scene!`）があった時だけ`:instances`を再構築する設計。
+- **実ブラウザ検証（`test/render/verify_m5_ui.cljs`、nbb+Playwrightフルchromium）が検証対象自身のバグでなく検証ハーネス側の実バグを発見**: 静的CSSサーバー（`test/render/lib/webgpu_harness.cljs`）の`mime-types`マップに`.css`エントリが無く、Chromiumが`vendor/kotoba-ui.css`を`application/octet-stream`として受け取り**スタイルシートとして無言で適用拒否**していた（`document.styleSheets`のルール数が実際の132件でなく1件だったことで発見）。`".css" "text/css; charset=utf-8"`を追加して修正、再検証でliquid-glassのダークテーマ・パネル・specular装飾が正しく適用されることを実スクリーンショットで目視確認。
+- **検証項目**: 環境プリセット4種のdropdown（`#field-weather`等）と`#viewport`canvasがDOM上に存在、初期状態が`#debug-state`（M2/M4の`#out`と同じ「実DOM経由でしか読める状態がない」ためのidiom — WebGPU canvasのpixel readbackはM2で既に信頼性なしと判明済み）に反映、`page.selectOption`で天候をclearに変更すると実際にReactの`onChange`→`recompute-scene!`→`#debug-state`まで反映される（controlled-component代替が実際に機能する具体的証拠）、`#viewport`のドラッグで実際に描画フレームが変化する（pixel readbackでなく2枚の実Chromiumスクリーンショットの比較）、コンソールエラーなし — 全てgreen。GitHub Actions macOS（`webgpu-smoke` job）でも同一検証がgreen、スクリーンショットをartifactとしてアップロード。
+- **プリセットidは全て実ソースから採取**: weather（overcast/clear）、terrain（plains/quarry/desert/tundra）、vegetation（grass/fern/palm/conifer/bush/cactus/moss）、postfx（nintendo/retro/final-fantasy/baminiku-character） — 各`kami-*-scene`リポ自身の出荷済みEDNを直読し、推測なし。
+- **M4 Addendumの「未解決のまま」の一項目を解消**: 「インタラクティブなorbit/flyカメラ操作」は本M5で実装完了（orbit+zoom。flyカメラは未着手のまま — orbitのみで実用上十分と判断）。`omni.timeline`・`MAX-INST`上限は引き続き未解決（M5のスコープ外）。
+- **CI/manifest反映**: `clojure -M:test`（29/29, 122 assertions）・`-M:lint`（0/0）は無変更、`kami-app-amenominaka`のCIに`appkit`/`kotoba-ui`/`shitsuke`/`liquid-glass-ui`（+`css`、babashkaのローカル`:paths`解決専用）のsibling checkoutと`bb ui-css`+`shadow-cljs compile shell`+M5検証ステップを追加、両job green確認後にmainへサーバーサイドmerge。superprojectのwest.ymlも`--entry kami-app-amenominaka`でpin前進（サーバー側pin検証OK、fast-forward）。
