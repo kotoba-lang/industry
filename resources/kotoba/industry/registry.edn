@@ -6483,11 +6483,33 @@
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "8121"
    :name "General cleaning of buildings"
-   :repo "https://github.com/gftdcojp/cloud-itonami-N8121"
-   :business-id "cloud-itonami-N8121"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-8121"
+   :business-id "cloud-itonami-8121"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Promoted :spec -> :blueprint (see `kotoba.industry/maturity-of`).
+   ;; The legacy placeholder :repo (gftdcojp/cloud-itonami-N8121) never
+   ;; actually existed (confirmed 404 before this edit) -- replaced with
+   ;; the real repo, following the SAME cloud-itonami/cloud-itonami-isic-####
+   ;; naming convention as every other actor in this fleet rather than the
+   ;; legacy N-prefixed scheme. Scoped to routine janitorial/floor-care
+   ;; service for buildings (vacuuming, mopping, floor scrubbing/waxing,
+   ;; restroom/common-area servicing, supply restocking) -- deliberately
+   ;; distinct from cloud-itonami-isic-8129 (specialized/industrial
+   ;; cleaning) and cloud-itonami-isic-8130 (landscape care). Building-
+   ;; cleaning carries its own safety/compliance regime (OSHA's
+   ;; Bloodborne Pathogens Standard and Hazard Communication Standard for
+   ;; chemical handling; ISSA's Cleaning Industry Management Standard as
+   ;; the common industry certification framework; prevailing-wage/
+   ;; living-wage rules many jurisdictions apply specifically to
+   ;; janitorial contracts on public buildings). grep -rli "janitorial|
+   ;; building.clean|floor.clean|commercial.clean" across the fleet
+   ;; returned completely empty. Governor keyword
+   ;; :building-cleaning-governor is grep-verified UNIQUE fleet-wide.
+   ;; Reuses the SAME labor-dispatch operating-states shape as
+   ;; securityops/8010, securitysystemsops/8020 and landscapeops/8130
+   ;; (registry's own pre-existing value for '8121', identical to all
+   ;; three). See ADR-2607103900.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "8129"
