@@ -520,14 +520,28 @@ PolicyGovernor）/ **cloud-itonami**（ops-LLM ⊣ CertGovernor）。
   gitignore（git に絶対コミットしない）**。`kotoba-store {:identity me}` で graph 既定
   ＝鍵由来 IPNS ＋ 自己 mint。設定参照は `manifest/repos.edn` の `:kotoba`。
 
-## `.cljc` / `.kotoba` ランタイム優先順位（2026-07-07 改訂。初版は2026-07-06）
+## `.cljc` / `.kotoba` ランタイム優先順位（2026-07-10 改訂。2026-07-07 改訂・初版は2026-07-06）
 
-- **設計・実装の優先順位は `kotoba wasm` > `clojurewasm` > `ClojureScript` >
-  `nbb` とする（JVM 単体は最後の手段）。** 2026-07-06 初版の「kototama >
-  cljs > nbb > jvm」を、`kototama` 自身の実行ランタイムが実在するようになった
-  ことと `clojurewasm` という新選択肢の登場を踏まえて改訂したもの。repowide の
-  ルールで、今後書く `.cljc`/`.kotoba` の設計・reader-conditional 分岐・
-  依存選定はこの順序を意識する。
+- **repo wide のルール: app の互換性と「第一の runtime」の順序は
+  `kotoba wasm runtime` > `clojurewasm` > `ClojureScript` > `nbb` とし、
+  `JVM` と `bb`（babashka）はその下に降格する（どちらも最後の手段。
+  2026-07-10 オーナー指示）。** 新しく書く app / library / `.cljc` /
+  `.kotoba` は、この順で「どの runtime を第一級に据えるか」を決め、
+  reader-conditional 分岐・依存選定・テストの正本もこの順序に合わせる。
+  上位 runtime で動くものを JVM / bb 前提で書かない。JVM / bb にしか無い
+  経路（Chicory テストハーネス、既存 JVM 専用 lib への互換層など）は
+  「互換 (compat) 層」として明示的に隔離し、設計の前提にしない。
+  実例（この規則の模範実装）: `kotoba.kami-host`（ADR-2607100030
+  addendum 2）— ECS core を portable `.cljc` に置き、第一の実行経路は
+  ClojureScript（browser ESM / nbb ネイティブ WebAssembly）、`:clj`/
+  Chicory 層は互換スイート専用と docstring に明記。
+- **`bb` の降格は「app の runtime として」の話。** リポジトリ運用ツール
+  （`scripts/*.bb`・`.claude/hooks/*.bb`・west 拡張等）は app ではなく
+  インフラ tooling で、現状 bb が正本 — これらを一斉移行はしない（移行
+  するなら対象を決めて ADR 化。個別の新規スクリプトは nbb で書けるなら
+  nbb を優先）。2026-07-06 初版の「kototama > cljs > nbb > jvm」→
+  2026-07-07 改訂に続く 3 度目の改訂で、変更点は (1) app 互換性の順序と
+  しての明文化、(2) `bb` を JVM と並ぶ最下位に明示、の 2 点。
 - **`kotoba wasm`** — `.kotoba` 拡張子（kotoba 言語の極小サブセット —
   `def`/`defn`/`ns`/`if`/`when`/`let`/`do`/算術/比較/`and`/`or`/`not`/
   文字列基本操作 + 再帰のみ、Java/JS interop 一切なし、サードパーティ lib
@@ -553,17 +567,25 @@ PolicyGovernor）/ **cloud-itonami**（ops-LLM ⊣ CertGovernor）。
   push されている活発なプロジェクト（確認日 2026-07-07）。**ただし
   Issues/PR は現在受け付けていない**（小規模チームのため。EPL-2.0）ので、
   このリポジトリへの直接貢献はできず「利用する」側の依存としてのみ扱う。
-  **2026-07-07 時点でこのモノレポ内に `clojurewasm`/`cljw` の利用例・
-  ビルド・統合は一切無い**（新規導入。既存 `.cljc` を勝手に `cljw` 前提に
-  書き換えない — 導入する場合は対象を決めてから着手する）。
+  **2026-07-10 時点でもこのモノレポ内に `clojurewasm`/`cljw` の利用例・
+  ビルド・統合は無い**（既存 `.cljc` を勝手に `cljw` 前提に書き換えない —
+  導入する場合は対象を決めてから着手する）。2026-07-10 に実適用を検討した
+  実測: cljw v1.0.1 の FFI は `wasm/load`+`wasm/call`（import-free module
+  専用）で、**Clojure 製 host import の提供は upstream 自身が「Phase-16 の
+  fuller FFI surface」として将来に明示**（`docs/examples/wasm/README.md`）。
+  host import を要する guest（例: kami-survivors の 12 imports）は現状
+  ホストできないため ClojureScript に落ちる（ADR-2607100030 addendum 2）。
+  Phase-16 が landed したら再評価する。
 - **`ClojureScript`（cljs）** — ブラウザ/Node 向け。次点。
 - **`nbb`** — ClojureScript-on-Node の高速スクリプティング。静的サイト生成
   など軽量タスク向け（実例: `kototama/web/generate.cljs`）。
-- **JVM 単体は最後の手段。** 既存の JVM(`:clj`)専用ライブラリ
-  （`kotoba-lang/ed25519`・`kotoba-lang/cacao`・`kotoba-lang/tech-ipfs-specs-
-  ipns` 等）は、実装当時「唯一動く経路が JVM だった」という正しい判断の結果
-  なので、上位の選択肢が実在するようになった今もリトロアクティブに書き直さ
-  ない（移行する場合は対象を決めて ADR 化してから着手する）。
+- **JVM 単体と bb は最後の手段（app runtime として）。** 既存の JVM(`:clj`)
+  専用ライブラリ（`kotoba-lang/ed25519`・`kotoba-lang/cacao`・`kotoba-lang/
+  tech-ipfs-specs-ipns` 等）は、実装当時「唯一動く経路が JVM だった」という
+  正しい判断の結果なので、上位の選択肢が実在するようになった今も
+  リトロアクティブに書き直さない（移行する場合は対象を決めて ADR 化して
+  から着手する）。bb も同様: 既存の repo 運用スクリプト群は温存し、app を
+  bb 前提で新規に書かない。
 - `#?(:kototama ...)` / `#?(:clojurewasm ...)` という reader-conditional は
   **コードベース全体を検索してゼロ**——Clojure 標準は `:clj`/`:cljs`/
   `:cljr`/`:default` しか認識せず、これらを feature として認識させるカスタム
@@ -571,7 +593,7 @@ PolicyGovernor）/ **cloud-itonami**（ops-LLM ⊣ CertGovernor）。
   reader-conditional を書かない**（無言でどちらの分岐も評価されない dead
   branch になる）。
 - 新しい `.cljc`/`.kotoba` を書く／既存の `:clj`/`:cljs` 分岐を拡張する判断に
-  迷ったら、上記の順序（kotoba wasm → clojurewasm → cljs → nbb → jvm）で
-  「今実際に動く経路はどれか」を確認してから選ぶ——ただし目の前のタスクを
-  止めてまで存在しない統合（例: `clojurewasm` の新規導入）を今から作ることは
-  しない（別スコープの ADR とプロジェクトとして切り出す）。
+  迷ったら、上記の順序（kotoba wasm → clojurewasm → cljs → nbb →（降格:
+  jvm / bb））で「今実際に動く経路はどれか」を確認してから選ぶ——ただし
+  目の前のタスクを止めてまで存在しない統合（例: `clojurewasm` の新規導入）を
+  今から作ることはしない（別スコープの ADR とプロジェクトとして切り出す）。
