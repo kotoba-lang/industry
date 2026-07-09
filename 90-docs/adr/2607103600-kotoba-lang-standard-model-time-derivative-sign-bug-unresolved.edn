@@ -1,0 +1,86 @@
+{:frontmatter
+ {:id "adr-2607103600-kotoba-lang-standard-model-time-derivative-sign-bug-unresolved"
+  :title "ADR-2607103600: kotoba-lang/standard-model — a confirmed, currently-unresolved sign bug in Phase 1's field-equation pipeline for time-dependent position-gauge fields"
+  :status "accepted"
+  :date "2026-07-09"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "kotoba-lang-standard-model"
+  :authoritative true
+  :authoritative_for
+  ["honest record of an OPEN, UNRESOLVED defect in kotoba.sm.gtg's Phase 1
+    field-equation pipeline (omega-from-h/riemann-map/riemann-basis-pair/
+    curvature-scalar) -- not a fix. Documented prominently in code (PR #14,
+    docstring-only, no behavior change) rather than left as a latent trap"
+   "BUG: curvature-scalar returns EXACTLY 7x the correct value for any h-field
+    with genuinely time-varying expansion rate (Hdot!=0) -- e.g. Einstein-de
+    Sitter matter-dominated dust, H(t)=2/(3t). Independently reproduced by 2
+    people (investigating agent + requester in a fresh REPL), ratio stable at
+    7.00000000 (7-8 sig figs) across fd-h in [5e-5,1e-3] and t in [1.5,10] --
+    a clean algebraic sign error, not FD truncation noise"
+   "correct answer independently confirmed GTG-FREE: ordinary Christoffel-symbol
+    computation on the metric this h-bar represents gives R=-12*H^2-6*Hdot
+    (standard FRW textbook result); this pipeline computes -12*H^2+6*Hdot --
+    ONLY the Hdot (time-derivative) term has wrong sign, H^2 term is exactly
+    correct"
+   "why undetected by 2 prior independent reviews: BOTH existing regression
+    solutions (Schwarzschild=static, de Sitter=constant H) have Hdot=0
+    identically, structurally cannot exercise the time-derivative channel.
+    FOURTH instance of silently-wrong-result-surviving-review in this repo's
+    GTG work (after PR #6 slot order, Phase 1 first-attempt wrong covariant
+    derivative, PR #11 double-h bug) -- first that 2 independent multi-hour
+    investigations could NOT resolve to a confident root cause"
+   "what was checked and found individually correct in isolation: H-field
+    (symbolic general H(t), structurally zero Hdot-dependence by construction),
+    omega-from-h (checked against eq 4.50 directly + independent Python GA
+    engine, exact match), L-a-omega (eq 4.42 identity a.hbar(grad)F=h(a).grad F
+    verified on a PLAIN SCALAR test function F(x)=t,a=e_0, no bivector/GA
+    machinery -- exact match; commutator eq 4.44 also checked directly,
+    matched to 1e-13), riemann-basis-pair (eq 4.44->4.46->4.47->4.48 chain
+    re-derived by hand, line-by-line match). YET end-to-end composition is
+    measurably wrong specifically in the time-derivative channel. Symbolic
+    isolation: code computes R(e0^e1)=-H^2+H', correct tetrad value is
+    -H^2-H'"
+   "declined patch: negating L-a-omega's rho=0 (time-direction) contribution
+    only numerically fixes the dust case and provably doesn't affect
+    Schwarzschild/de-Sitter (both structurally zero rho=0 contribution) --
+    but DELIBERATELY NOT APPLIED because it contradicts the simpler,
+    independent scalar-function identity check (a.hbar(grad)F=h(a).grad F on
+    F(x)=t) -- applying the patch would make THAT more fundamental check
+    fail. Symptom suppression, not a verified fix; would reintroduce exactly
+    the tests-pass-code-is-wrong failure mode this investigative lineage
+    exists to prevent"
+   "decision: do not land any fix without confident independently-verified
+    root cause. Document prominently instead (CONFIRMED UNRESOLVED BUG notice
+    in namespace docstring PHASE 1 SCOPE NOTE + curvature-scalar's own
+    docstring): Schwarzschild (static) and de Sitter (Hdot=0) remain verified
+    and safe; any h-field with Hdot!=0 is NOT safe to trust through this
+    pipeline until resolved. No new test added for dust case (would either
+    fail, or misleadingly signal resolved). No existing test/code modified --
+    79 tests/2911 assertions unchanged"
+   "recommended next steps for future work: (1) GTG/geometric-algebra domain
+    expert consultation beyond what iterative independent re-derivation from
+    the primary paper alone achieved; (2) cross-check against a THIRD
+    independent exact time-dependent solution from literature (PDF page
+    images, not pdftotext); (3) consider whether bug is not in any single
+    named function but in an INTERACTION between H-field's INNER finite
+    difference (differentiating hbar^-1) and L-a-omega's OUTER finite
+    difference (differentiating omega-from-h itself) when both differentiate
+    along the SAME coordinate (t) -- a 'finite difference of a finite
+    difference' structure unique to this pipeline neither investigation
+    fully ruled out"
+   "methodological consequence extending ADR-2607103000: fourth instance of
+    silently-wrong-invisible-to-tests failure mode, first that resisted 2
+    genuine independent resolution attempts. Response is NOT to force a fix,
+    guess-and-check against the one failing test, or lower the verification
+    bar -- document honestly, decline the unverified patch, leave the defect
+    visible. Future GTG regression solutions should be maximally DIFFERENT IN
+    KIND from what's covered (a genuinely time-VARYING rate, not just
+    'another named solution' -- de Sitter's own limitation despite being
+    literally time-dependent in its metric, Hdot=0 made it insufficient,
+    teaches this lesson)"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607103000" "adr-2607102700" "adr-2607102300"]
+  :last_verified "2026-07-09"}
+ :body "see 2607103600-kotoba-lang-standard-model-time-derivative-sign-bug-unresolved.md"}
