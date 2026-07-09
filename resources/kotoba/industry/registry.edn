@@ -3244,11 +3244,33 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1812"
    :name "Service activities related to printing"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C1812"
-   :business-id "cloud-itonami-C1812"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1812"
+   :business-id "cloud-itonami-1812"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   ;; Promoted :spec -> :blueprint (see `kotoba.industry/maturity-of`).
+   ;; The legacy placeholder :repo (gftdcojp/cloud-itonami-C1812) never
+   ;; actually existed (confirmed 404 before this edit) -- replaced with
+   ;; the real repo, following the SAME cloud-itonami/cloud-itonami-isic-####
+   ;; naming convention as every other actor in this fleet rather than the
+   ;; legacy C-prefixed scheme. Low-friction sibling of printingops/1811
+   ;; (ADR-2607104200's own flagged next pick): scoped to independent
+   ;; pre-press (plate-making, color proofing) and independent post-press/
+   ;; bindery services (cutting, folding, binding, laminating) frequently
+   ;; serving MULTIPLE print shops, distinct from 1811's own integrated
+   ;; in-house press-production business -- the same "service serving
+   ;; multiple X" pattern established by cargo handling (5224) vs
+   ;; carriers. Bindery/cutting equipment carries its own well-documented
+   ;; machine-guarding hazard category under OSHA and equivalent
+   ;; international workplace-safety frameworks, distinct from press-line
+   ;; safety concerns; pre-press proofing follows the same ISO 12647
+   ;; process-control standards as press production but applied at the
+   ;; proofing stage. grep -rli "pre.press|plate.making|book.bind|print.
+   ;; finishing" across the fleet found only the printingops/1811 README's
+   ;; own scope note (expected, not real overlap) -- directly read and
+   ;; confirmed clean. Governor keyword :print-support-governor is
+   ;; grep-verified UNIQUE fleet-wide. Reuses the SAME manufacturing-
+   ;; lifecycle shape as printingops/1811. See ADR-2607104300.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1820"

@@ -97,6 +97,8 @@
     (is (= :blueprint (industry/maturity "3313"))))
   (testing "cloud-itonami-isic-1811, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "1811"))))
+  (testing "cloud-itonami-isic-1812, freshly published, is also :blueprint (live-state corroboration)"
+    (is (= :blueprint (industry/maturity "1812"))))
   (testing "a registry-only group entry is :spec"
     (is (= :spec (industry/maturity "011"))))
   (testing "a second implemented actor (cloud-itonami-isic-6810) is also :implemented"
@@ -341,13 +343,14 @@
       ;; cloud-itonami-isic-8130's own (ADR-2607103800), 25 with
       ;; cloud-itonami-isic-8121's own (ADR-2607103900), 26 with
       ;; cloud-itonami-isic-3312's own (ADR-2607104000), 27 with
-      ;; cloud-itonami-isic-3313's own (ADR-2607104100), then 28 with
-      ;; cloud-itonami-isic-1811's own (ADR-2607104200). This is not
+      ;; cloud-itonami-isic-3313's own (ADR-2607104100), 28 with
+      ;; cloud-itonami-isic-1811's own (ADR-2607104200), then 29 with
+      ;; cloud-itonami-isic-1812's own (ADR-2607104300). This is not
       ;; asserted as a fixed invariant; see `industry/maturity-of`/
       ;; `industry/maturity-roadmap-of` for how the :blueprint branch
       ;; logic itself stays unit-tested without depending on a
       ;; specific live count.
-      (is (= 28 (:blueprint m)))
+      (is (= 29 (:blueprint m)))
       (is (= 106 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
