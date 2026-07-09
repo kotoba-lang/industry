@@ -25,6 +25,7 @@
 - 観測 (signal): aozora.app 実測 24155 req/7d・727 uniques(日次和)、workers 8202 inv/7d
 - 観測 (signal): aozora.app 実測 24183 req/7d・728 uniques(日次和)、workers 8207 inv/7d
 - 観測 (signal): aozora.app 実測 24203 req/7d・733 uniques(日次和)、workers 8217 inv/7d
+- 観測 (signal): aozora.app 実測 24230 req/7d・735 uniques(日次和)、workers 8224 inv/7d
 
 ## Customer Segments
 
@@ -56,6 +57,7 @@
 - gftd media (shinshi/yukkuri) 導線
 - 観測 (paths): 上位 path (24h): /infos.php 88 · /developer/.env 48 · /admin-app/.env 36 · /shared/.env 36 · /gcp/.env 24
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · /aws/buckets 52 · /.github/ISSUE_TEMPLATE 52 · /API.md 50 · /home/*/.gitconfig 48 | 4xx(probe) 43%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · /aws/buckets 52 · /.github/ISSUE_TEMPLATE 52 · /API.md 50 · /home/*/.gitconfig 48 | 4xx(probe) 42%
 
 ## Revenue Streams
 
