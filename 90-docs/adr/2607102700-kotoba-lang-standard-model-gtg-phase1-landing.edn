@@ -1,0 +1,77 @@
+{:frontmatter
+ {:id "adr-2607102700-kotoba-lang-standard-model-gtg-phase1-landing"
+  :title "ADR-2607102700: kotoba-lang/standard-model — Phase 1 landing: the vacuum Omega(h) field equation, covariant Riemann map, and the true LDG Ricci scalar"
+  :status "accepted"
+  :date "2026-07-09"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "kotoba-lang-standard-model"
+  :authoritative true
+  :authoritative_for
+  ["landing-record ADR for ADR-2607102300's Phase 1 (GTG field equations),
+    mirroring the ADR-2607101700 -> ADR-2607101900 scope-then-landing pattern"
+   "landed 2026-07-09: kotoba-lang/standard-model#9 merged as
+    3710b427ed90b0a7afce3a08b00212bda8b7bcd8, 68 tests/2740 assertions
+    (up from 58/2465 at ADR-2607101900's close), CI green JDK 17+21;
+    superproject pin advanced via API single-entry commit
+    d8bb964afa3555a7ba691790ebdd08049d56d7a1"
+   "three-pass history: (1) literature research cross-verified LDG 1998 primary
+    (gr-qc/0405033) + independent author Francis-Kosowsky (gr-qc/0311007) on the
+    vacuum action, Omega-field equation (eq 4.37/4.40), closed-form solution
+    (eq 4.49-4.53), and LDG's own Schwarzschild worked example (eq 6.79/6.73);
+    (2) a first standalone numeric verification FAILED and correctly diagnosed
+    why -- pdftotext extraction of eq 4.28/4.49-4.53 was garbled, AND the wrong
+    covariant derivative was used (Phase 0a's flat rotation-gauge-only D_mu
+    instead of the calligraphic D from Table 2 using hbar(grad) and
+    omega(a)=Omega(h(a))) -- reusing the wrong operator builds a teleparallel
+    connection with IDENTICALLY ZERO curvature by construction, a structurally
+    wrong equation not a sign slip; (3) reading actual PDF PAGE IMAGES (not text
+    extraction) resolved this, and a standalone Python/numpy verification
+    reproduced LDG's closed-form Schwarzschild curvature (eq 6.73) to ~1e-13,
+    Ricci=0 to 1e-17 to 1e-19 at 3 points -- clearing ADR-2607102300's
+    verification bar, independently re-run and confirmed by the requester before
+    Clojure implementation began"
+   "Clojure port (PR #9) landed: frame-adjoint (eq 2.46, self-inverse h<->hbar
+    adjoint), minimal new GA primitives on existing kotoba.sm.tensor
+    (bivector<->matrix, wedge-vectors, vector-dot-bivector, bivector-commutator,
+    outermorphism -- no from-scratch GA engine), H-field+omega-from-h (eq
+    4.49/4.53, vacuum spin-free closed-form Omega(h)), L-a-omega+riemann-basis-pair
+    +riemann-map-matrix+riemann-map (eq 4.48, the COVARIANT Riemann map using
+    position-gauge-covariant L_a, not Phase 0a's flat derivative), curvature-scalar
+    (true LDG Ricci scalar R=sum_ab gamma^a.(gamma^b.R(h_b^h_a)), using the FIXED
+    background frame's own trivial reciprocal per Phase 0d's 2-source literature
+    finding -- reachable only because riemann-map supplies the previously-missing
+    bilinear extension to general bivectors)"
+   "before merge, requester independently re-derived Schwarzschild regression
+    numbers in a live Clojure REPL session -- caught and corrected a mistake in
+    that independent re-derivation itself (forgot the hbar->h frame-adjoint
+    conversion on first attempt, giving spuriously near-zero results), landing
+    on values matching committed tests to the same tolerance after correction"
+   "verification landed WITH the code: Schwarzschild regression at 2 independent
+    points/masses (error ~1e-9 to 1e-10, within FD tolerance), curvature-scalar
+    approx 0 at both (expected vacuum result) and EXACTLY 0.0 at flat limit
+    (h=position-gauge-identity, every derivative vanishes identically)"
+   "QUALITATIVE SCOPE CHANGE from every prior ADR: ADR-2607051500 through
+    ADR-2607101900 all framed this repo as classical field algebra only, NOT an
+    action/field-equation engine -- that framing no longer fully applies, this
+    repo now contains a genuine field EQUATION (vacuum Omega(h)) and its
+    physical consequence (curvature scalar verified against an exact solution).
+    What has NOT changed: still bounded to vacuum/spin-free, verified against
+    exactly ONE exact solution (Schwarzschild) not a general GR-equivalence
+    proof, and every ADR-2607102300 boundary (matter coupling, Einstein
+    multivector/stress-energy sourcing i.e. non-vacuum G(a)=kappa*T(a),
+    spin/torsion via full eq 4.28, quantization/RGE/scattering/lattice,
+    dark-sector/de-Sitter) remains out of scope, not implicitly widened"
+   "methodological note: this is the SECOND time in this repo's history (after
+    PR #6's self-interaction-term slot-order bug) that a seemingly-thorough
+    single pass produced a confidently-wrong result that failed SILENTLY
+    (identically-zero curvature, no error thrown) rather than loudly -- caught
+    only because the success criterion was an independent numeric match against
+    a known closed-form result, not merely 'does the code run' or 'does the
+    formula resemble the paper'. Not license to relax this discipline for
+    future phases."]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607102300" "adr-2607101900" "adr-2607101700" "adr-2607051500"]
+  :last_verified "2026-07-09"}
+ :body "see 2607102700-kotoba-lang-standard-model-gtg-phase1-landing.md"}
