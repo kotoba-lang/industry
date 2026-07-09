@@ -4803,11 +4803,26 @@
    :operating-states [:intake :reserve :serve :checkout :audit]},
   {:id "5610"
    :name "Restaurants and mobile food service activities"
-   :repo "https://github.com/gftdcojp/cloud-itonami-I5610"
-   :business-id "cloud-itonami-I5610"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-5610"
+   :business-id "cloud-itonami-5610"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Published as a :blueprint repo (business-model.md + operator-guide.md +
+   ;; blueprint.edn + governance docs, no src/test yet -- the OSS blueprint
+   ;; stage, not yet :implemented). :maturity :spec explicitly removed so
+   ;; maturity-of/maturity now auto-derive :blueprint from the real :repo
+   ;; above (see `kotoba.industry/maturity-of`). The legacy placeholder
+   ;; :repo (gftdcojp/cloud-itonami-I5610) never actually existed (confirmed
+   ;; 404 before this edit) -- replaced with the real repo, following the
+   ;; SAME cloud-itonami/cloud-itonami-isic-#### naming convention as every
+   ;; other actor in this fleet rather than the legacy I-prefixed scheme.
+   ;; Governor keyword :food-service-governor is grep-verified UNIQUE
+   ;; fleet-wide. Distinct from cloud-itonami-isic-5510's own accommodation
+   ;; vertical (same ISIC section I, different subsector). No bespoke
+   ;; capability library exists for food-service specifically (kotoba-lang
+   ;; org search returned zero hits for food/restaurant/kitchen/catering/
+   ;; nutrition), self-contained at implementation time, matching the
+   ;; majority of this fleet's actors. See ADR-2607100600.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :reserve :serve :checkout :audit]},
   {:id "5621"
