@@ -3210,11 +3210,36 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1811"
    :name "Printing"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C1811"
-   :business-id "cloud-itonami-C1811"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1811"
+   :business-id "cloud-itonami-1811"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   ;; Promoted :spec -> :blueprint (see `kotoba.industry/maturity-of`).
+   ;; The legacy placeholder :repo (gftdcojp/cloud-itonami-C1811) never
+   ;; actually existed (confirmed 404 before this edit) -- replaced with
+   ;; the real repo, following the SAME cloud-itonami/cloud-itonami-isic-####
+   ;; naming convention as every other actor in this fleet rather than the
+   ;; legacy C-prefixed scheme. First printing/publishing-adjacent
+   ;; vertical this fleet, deliberately diversifying away from the
+   ;; repair-services micro-family (3312/3313) just closed. Scoped to
+   ;; the press-production business itself -- operating printing
+   ;; presses and integrated finishing/binding equipment -- distinct
+   ;; from cloud-itonami-isic-1812 ("Service activities related to
+   ;; printing", still :spec, untouched: independent third-party pre-
+   ;; press/post-press services, not an in-house press operation).
+   ;; Printing carries its own quality/compliance regime: ISO 12647
+   ;; process-control standards for color management; G7 Master
+   ;; Certification from Idealliance for print-quality qualification;
+   ;; OSHA machine-guarding requirements specific to printing-press
+   ;; operation; environmental/VOC regulations governing ink/solvent
+   ;; handling (EPA and EU industrial-emissions frameworks); FSC
+   ;; chain-of-custody certification for sustainably sourced paper
+   ;; stock. grep -rli "commercial.print|printing.press|print.
+   ;; production" across the fleet returned completely empty. Governor
+   ;; keyword :printing-governor is grep-verified UNIQUE fleet-wide.
+   ;; Reuses the SAME manufacturing-lifecycle shape as basicchemops/
+   ;; 2011, meddeviceops/2660, rollingstockops/3020 and the repair-
+   ;; services pair (3312/3313). See ADR-2607104200.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1812"
