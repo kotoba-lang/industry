@@ -35,8 +35,19 @@
                 :kotoba-lang-suite "33 tests / 237 assertions, 0 failures"
                 :determinism "seeded xorshift64 + fixed-step integration -> same run every time; counts pinned exactly, not flaky"}
 
- :follow-up ["browser port of kotoba.kami-host's ECS in wasm-webcomponent (hand-JS, kgraph.js/actor-host.js family) so the same compiled .wasm ticks on the browser's native engine like netsurvivors"]
+ :follow-up []
 
- :west-pins-advanced {:kotoba "1dbcc2eb→a2c69208"
+ :addendum-browser-port
+ {:date "2026-07-10"
+  :wasm-webcomponent {:sha "fe04bd697ce3d0e8e5894a32868bf593c4270ccc"
+                      :changes ["src/kami-ecs.js — hand-JS port of kotoba.kami-host (kgraph.js/actor-host.js family, no build step); xorshift64 in BigInt 64-bit math, bit-exact with the JVM long math"
+                                "examples/kami-survivors/ — the exact kotoba wasm emit binary (756 bytes, 12 imports, package-admission verified) on canvas + requestAnimationFrame, arrow keys/WASD wired to the host-owned MoveX/MoveY axes"
+                                "test/verify-kami-survivors.mjs — replays the same 300-tick run (seed 7) on native WebAssembly (V8) and asserts the SAME pinned counts kotoba's Chicory test pins: 12→8→10, player at origin, 15 spawned, x=59 axis check — count-for-count cross-engine parity on the first run"]}
+  :kotoba-docs {:sha "31263fa81e16cf1ac3f02b9c93a8b44ff7c4a337"
+                :change "DEMONSTRATIONS.md: browser demo recorded, follow-up sentence replaced"}
+  :verification "npm test green (all 9 verify-*.mjs). Real-browser DOM/rAF rendering remains outside the Node test's reach (the repo's documented gap; Chrome extension unavailable this session)"}
+
+ :west-pins-advanced {:kotoba "1dbcc2eb→a2c69208→31263fa8"
                       :kotoba-core-contracts "bc327f29→9a2f45e3"
-                      :kotoba-lang "ec360a80→bed42bc6"}}
+                      :kotoba-lang "ec360a80→bed42bc6"
+                      :wasm-webcomponent "ee8d4ea4→fe04bd69"}}
