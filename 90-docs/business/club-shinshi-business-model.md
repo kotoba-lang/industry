@@ -57,6 +57,7 @@
 - 法務確認済 (club-shinshi-creator-take): アダルト×crypto 決済の法務ゲートをオーナー確認 (2026-07-09)。creator 課金解禁の残タスクは UI 導線のみ
 - x402 統合 (ADR-2607093100): L0 shinshi /x402/premium 本番稼働 (402 実測)。L3 per-request USDC 課金は murakumo PR#9 (推論) + kotobase PR#184 (storage) が OPEN/MERGEABLE、deploy+treasury 設定調整待ち。循環が per-request 粒度で技術的に閉じた
 - x402 全層稼働実測 (walk): L0 shinshi + L3 murakumo/kotobase + nexus gateway 全て 402 quote 正常。ただし on-chain 検証が Basescan V1 (deprecated) 経路 — 実決済前に Etherscan V2 (要 API key = #1) へ移行が堅牢化に必要。treasury 0xA00366… 受金 0 件 (決済未発生)
+- walk 実測: Etherscan V2 は Base(chainid 8453) を有料プラン限定 = #1 の「V2+key」は無料では不可。V1 は deprecated。堅牢な解は Base JSON-RPC (eth_getTransactionReceipt + Transfer log 解析、keyless/無料) への検証経路移行。決済未発生ゆえ緊急性は低いが実決済前に対応。ExoClick 7/8-10 なお imp 0
 
 ## Channels
 
