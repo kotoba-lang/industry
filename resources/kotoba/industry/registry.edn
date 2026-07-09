@@ -5209,11 +5209,34 @@
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "6020"
    :name "Television programming and broadcasting activities"
-   :repo "https://github.com/gftdcojp/cloud-itonami-J6020"
-   :business-id "cloud-itonami-J6020"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6020"
+   :business-id "cloud-itonami-6020"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Published as a :blueprint repo (business-model.md + operator-guide.md +
+   ;; blueprint.edn + governance docs, no src/test yet -- the OSS blueprint
+   ;; stage, not yet :implemented). :maturity :spec explicitly removed so
+   ;; maturity-of/maturity now auto-derive :blueprint from the real :repo
+   ;; above (see `kotoba.industry/maturity-of`). The legacy placeholder
+   ;; :repo (gftdcojp/cloud-itonami-J6020) never actually existed (confirmed
+   ;; 404 before this edit) -- replaced with the real repo, following the
+   ;; SAME cloud-itonami/cloud-itonami-isic-#### naming convention as every
+   ;; other actor in this fleet rather than the legacy J-prefixed scheme.
+   ;; First fresh-domain pick after closing out the transport-mode family
+   ;; at ADR-2607102400. No redundancy with cloud-itonami-iso3166-jpn-mic
+   ;; (a SEPARATE ISO3166 market-entry-compliance-service sub-fleet, not
+   ;; an ISIC-numbered actor, :robotics false) or cloud-itonami-isic-9000
+   ;; (Creative, arts and entertainment activities -- performance/booking,
+   ;; not broadcast-STATION-operator content transmission). Governor
+   ;; keyword :broadcast-license-governor is grep-verified UNIQUE fleet-
+   ;; wide. Reuses the same telecom-service operating-states shape already
+   ;; used by cloud-itonami-isic-6120/6190 (:intake :provision :route
+   ;; :bill :support :audit) for a genuinely distinct, independently
+   ;; regulated content-broadcasting business rather than a communication-
+   ;; service business. No bespoke capability library exists for
+   ;; broadcasting specifically; :phone is the SAME shared telephony-
+   ;; records capability every telecom-adjacent vertical already uses. See
+   ;; ADR-2607102500.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "6110"

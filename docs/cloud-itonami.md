@@ -46,7 +46,7 @@ note below):
 
 - Total entries: 646 (428 classes + 218 groups)
 - Sections: 21/21, groups: 238/238
-- `:implemented` 106 · `:blueprint` 13 · `:spec` 527
+- `:implemented` 106 · `:blueprint` 14 · `:spec` 526
 - UI+export ready (backed by a capability lib with `:ui?`/`:export?`): 646/646
 
 ADR-2607100400 (petroleum supply-chain fleet) added 3 entries with no real
