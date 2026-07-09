@@ -5009,11 +5009,38 @@
    :operating-states [:intake :book :transit :deliver :reconcile :audit]},
   {:id "5222"
    :name "Service activities incidental to water transportation"
-   :repo "https://github.com/gftdcojp/cloud-itonami-H5222"
-   :business-id "cloud-itonami-H5222"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-5222"
+   :business-id "cloud-itonami-5222"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Promoted :spec -> :blueprint (see `kotoba.industry/maturity-of`).
+   ;; The legacy placeholder :repo (gftdcojp/cloud-itonami-H5222) never
+   ;; actually existed (confirmed 404 before this edit) -- replaced with
+   ;; the real repo, following the SAME cloud-itonami/cloud-itonami-isic-####
+   ;; naming convention as every other actor in this fleet rather than the
+   ;; legacy H-prefixed scheme. Third "transport support" pick after
+   ;; cloud-itonami-isic-5224 (cargo handling) and cloud-itonami-isic-
+   ;; 5223 (airport operations): scoped to port authority and harbor
+   ;; operations -- navigation-safety authority governing vessel
+   ;; movement, berthing and pilotage within a port, independent of any
+   ;; single vessel operator or cargo terminal (IMO SOLAS Chapter V
+   ;; vessel traffic services; the International Convention on Salvage
+   ;; 1989; Japan's 港湾法 Port and Harbor Law licensing port authorities
+   ;; separately from shipping lines and terminal operators; the UK's
+   ;; Harbours Act 1964 and Port Marine Safety Code; the US Ports and
+   ;; Waterways Safety Act giving the Coast Guard Captain of the Port
+   ;; authority independent of any carrier; pilotage licensed as its own
+   ;; profession, e.g. the UK's Pilotage Act 1987). Distinct from
+   ;; cloud-itonami-isic-5011/5020 (marine CARRIERS) and cloud-itonami-
+   ;; isic-5224 (cargo handling, a terminal SERVICE) -- grep -rli
+   ;; 'pilotage|harbor.master|port.authority|salvage|lighthouse' across
+   ;; the fleet found exactly one unrelated hit (cloud-itonami-isic-6629's
+   ;; own insurance-claims 'salvage deductions', a general-average
+   ;; accounting term, not maritime salvage) -- directly read and
+   ;; confirmed non-redundant. Governor keyword :port-authority-governor
+   ;; is grep-verified UNIQUE fleet-wide. No bespoke capability library
+   ;; exists for port-authority operations specifically. See
+   ;; ADR-2607103200.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :book :transit :deliver :reconcile :audit]},
   {:id "5223"
