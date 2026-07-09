@@ -57,9 +57,22 @@ gpu/math Track B imports proved (guest computes, host executes):
   entry instead of a future-work sentence.
 - Full kotoba suite green (192 tests / 945 assertions), clj-kondo clean;
   kotoba-core-contracts and kotoba-lang suites green with the additions.
-- Follow-up (recorded in DEMONSTRATIONS.md): a browser port of
+- ~~Follow-up (recorded in DEMONSTRATIONS.md): a browser port of
   `kotoba.kami-host`'s ECS in wasm-webcomponent (hand-JS, `kgraph.js` /
   `actor-host.js` family) so the same compiled `.wasm` ticks on the
-  browser's native engine the way netsurvivors already does.
+  browser's native engine the way netsurvivors already does.~~
+  **Done — addendum (same day):** wasm-webcomponent `fe04bd69` ships
+  `src/kami-ecs.js` (hand-JS port; BigInt 64-bit xorshift64 bit-exact
+  with the JVM's long math), `examples/kami-survivors/` (the exact
+  `kotoba wasm emit` binary — 756 bytes, 12 imports, admission-verified —
+  on canvas + requestAnimationFrame, arrow keys/WASD → host axes), and
+  `test/verify-kami-survivors.mjs`, which replays the same 300-tick run
+  on native WebAssembly (V8) and asserts the SAME pinned counts
+  (12 → 8 → 10, player at origin, 15 spawned, x=59 axis check) kotoba's
+  Chicory test pins — count-for-count cross-engine parity on the first
+  run. Full `npm test` (9 verify-*.mjs) green. Real-browser DOM/rAF
+  rendering remains outside the Node test's reach (the repo's documented
+  gap; the Chrome extension was unavailable in this session).
+  kotoba `31263fa8` updates DEMONSTRATIONS.md accordingly.
 - West pins advanced for kotoba / kotoba-core-contracts / kotoba-lang in
   the same landing.
