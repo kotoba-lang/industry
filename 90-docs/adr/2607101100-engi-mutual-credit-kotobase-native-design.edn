@@ -1,0 +1,48 @@
+{:frontmatter
+ {:id "adr-2607101100-engi-mutual-credit-kotobase-native-design"
+  :title "ADR-2607101100: ENGI/EN 相互信用通貨 — kotobase-native 再設計(v1、推奨)"
+  :status "proposed"
+  :doc_type "adr"
+  :topic "engi-mutual-credit"
+  :authoritative true
+  :last_verified "2026-07-10"
+  :authoritative_for
+  ["ENGI/EN v1 は kotobase.net 上に直接実装する。エージェントごとの
+    グラフ kotobase/db/<did:key>/engi が Source Chain の代替。genesis
+    (信用限度宣言) + debit/credit エントリ(:engi/seq, :engi/prev-hash,
+    :engi/transfer-id, :engi/self-sig, :engi/counter-sig)を各自のグラフに
+    のみ書く(kotobase.net apexのCACAO制約: グラフスコープ=発行者DID一致、
+    他者グラフへの書込み不可、のため双方が独立に相関エントリを書く設計)"
+   "Transferは提案→検証→相手側確定→自分側確定の非同期ハンドシェイク
+    (側路経路は本ADRで規定せず、既存メッセージング機能への相乗りか
+    専用エンドポイント新設は実装時に決定)。片側だけの credit は
+    双方向相関確認が取れるまで使用可能残高に算入しない"
+   "残高は都度チェーンをdatoms(:eavt)経由でfoldして導出するプロジェクション。
+    不正検知はpull型監査(取引前に相手のwarrant状態を確認)— push型gossip
+    伝播は無し(ADR-2607101200のDHT基盤復活で強化するfollow-up)"
+   "EN は murakumo推論クレジット・kotobase.net Stripe課金とは別の通貨圏。
+    manga chat統合ではエージェント間の創作貢献への相互信用に限定使用"]
+  :related
+  ["orgs/kotoba-lang/kotoba/docs/ADR-engi-mutual-credit-on-chain.md"
+   "90-docs/adr/2607101000-kotoba-orphaned-rust-crates-migration-roadmap-addendum.md"
+   "90-docs/adr/2607101200-engi-mutual-credit-dht-substrate-revival.md"
+   "90-docs/adr/2607091800-genko-kotobase-datomic-persistence.md"
+   "90-docs/adr/2607022600-kotoba-database-crates-cljc-migration-roadmap.md"]
+  :supersedes []
+  :superseded_by []}
+
+ :decision
+ {:schema {:graph "kotobase/db/<did:key>/engi"
+           :genesis {:engi/kind "genesis" :engi/credit-limit "negative int"}
+           :entry {:engi/kind "debit|credit" :engi/seq "monotonic int"
+                   :engi/prev-hash "string" :engi/counterparty "did:key"
+                   :engi/amount "int" :engi/transfer-id "CID of TransferBody"
+                   :engi/self-sig "Ed25519" :engi/counter-sig "Ed25519"}
+           :warrant {:engi/kind "warrant" :engi/evidence-tx-a "eid"
+                     :engi/evidence-tx-b "eid" :engi/detector "did:key"
+                     :engi/detector-sig "Ed25519"}}
+  :constraints-driving-design
+  ["own-graph-write-only (apex CACAO graph-scope==issuer, 実測2026-07-09)"
+   "q find/where returns empty rows (実測), read via :datoms + client fold"
+   "no cardinality-one, append-only reads fit mutual-credit naturally"
+   "no global CAS/consensus, matches original design's non-total-order posture"]}}
