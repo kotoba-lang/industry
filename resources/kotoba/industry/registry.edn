@@ -2733,22 +2733,31 @@
    :operating-states [:intake :survey :extract :grade :ship :audit]},
   {:id "0610"
    :name "Extraction of crude petroleum"
-   :repo "https://github.com/gftdcojp/cloud-itonami-B0610"
-   :business-id "cloud-itonami-B0610"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0610"
+   :business-id "cloud-itonami-isic-0610"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :survey :extract :grade :ship :audit]},
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as the petroleum upstream reference
+   ;; actor (CrudeAdvisor ⊣ Well Safety Governor), ADR-2607100400 -- the
+   ;; reference build for the 8-actor petroleum supply-chain wave
+   ;; (0610/0620/1920/4950/5210/5020/4671/4730, upstream->downstream).
+   ;; HSE-critical HARD checks grounded in BSEE 30 CFR 250 / OSHA PSM /
+   ;; UK HSE OSD / Norwegian PSA / METI 鉱山保安.
+   :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "0620"
    :name "Extraction of natural gas"
-   :repo "https://github.com/gftdcojp/cloud-itonami-B0620"
-   :business-id "cloud-itonami-B0620"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0620"
+   :business-id "cloud-itonami-isic-0620"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :survey :extract :grade :ship :audit]},
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented (GasFieldAdvisor ⊣ Gas Well Safety
+   ;; Governor), ADR-2607100400 petroleum-fleet wave. Shares wellhead +
+   ;; well-safety physics (H2S/MAASP/blowout) with the 0610 crude
+   ;; sibling; associated gas is reinjected/flared/diverted rather than
+   ;; feeding a separate city-gas-distribution chain (3520 out of scope).
+   :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "0710"
    :name "Mining of iron ores"
    :repo "https://github.com/gftdcojp/cloud-itonami-B0710"
@@ -3237,13 +3246,16 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1920"
    :name "Manufacture of refined petroleum products"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C1920"
-   :business-id "cloud-itonami-C1920"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1920"
+   :business-id "cloud-itonami-isic-1920"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented (RefiningAdvisor ⊣ Refinery Safety
+   ;; Governor), ADR-2607100400 petroleum-fleet wave, midstream tier.
+   ;; flare-system-inoperational HARD check is the Texas City BP
+   ;; explosion root-cause overpressure-relief-path gate.
+   :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "2011"
    :name "Manufacture of basic chemicals"
    :repo "https://github.com/gftdcojp/cloud-itonami-C2011"
@@ -4396,6 +4408,25 @@
    :maturity :spec
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
+  {:id "4671"
+   :name "Wholesale of solid, liquid and gaseous fuels and related products"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4671"
+   :business-id "cloud-itonami-isic-4671"
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+   :optional-technologies []
+   :maturity :implemented
+   ;; NEW entry (no prior :spec placeholder) -- FuelTradeAdvisor ⊣ Fuel
+   ;; Trading Governor, ADR-2607100400 petroleum-fleet wave, downstream
+   ;; wholesale tier. credit-uncleared / contract-missing /
+   ;; counterparty-sanctions-flag-unresolved (OFAC) HARD checks.
+   ;; NOTE: real ISIC Rev.4 already assigns this exact description to
+   ;; class 4661 (registered separately below, still :spec) -- this
+   ;; actor's own blueprint.edn declares itself under a project-
+   ;; internal "isic-rev5" code 4671 instead (see ADR-2607100400);
+   ;; registered here under its built/published code, not 4661, so
+   ;; :repo / GitHub naming / registry :id stay consistent with each
+   ;; other.
+   :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "4690"
    :name "Non-specialized wholesale trade"
    :repo "https://github.com/gftdcojp/cloud-itonami-G4690"
@@ -4443,13 +4474,18 @@
    :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
   {:id "4730"
    :name "Retail sale of automotive fuel in specialized stores"
-   :repo "https://github.com/gftdcojp/cloud-itonami-G4730"
-   :business-id "cloud-itonami-G4730"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4730"
+   :business-id "cloud-itonami-isic-4730"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented (ForecourtAdvisor ⊣ Forecourt
+   ;; Safety Governor), ADR-2607100400 petroleum-fleet wave, downstream
+   ;; retail tier. Self-contained (no kotoba-lang/forecourt capability
+   ;; lib exists); meter-uncertified / price-anomaly / overfill-risk /
+   ;; vapor-recovery-inoperational HARD checks are self-contained pure
+   ;; fns in forecourt.registry.
+   :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "4741"
    :name "Retail sale of computers, peripheral units, software and te..."
    :repo "https://github.com/gftdcojp/cloud-itonami-G4741"
@@ -4675,6 +4711,24 @@
    :maturity :spec
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :book :transit :deliver :reconcile :audit]},
+  {:id "4950"
+   :name "Transport via pipeline (petroleum)"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4950"
+   :business-id "cloud-itonami-isic-4950"
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
+   :optional-technologies [:telemetry]
+   :maturity :implemented
+   ;; NEW entry (no prior :spec placeholder) -- PipelineAdvisor ⊣
+   ;; Pipeline Integrity Governor, ADR-2607100400 petroleum-fleet wave,
+   ;; transport tier. pod-chain-integrity / integrity-assessment-stale
+   ;; (ILI/pigging/hydrotest, PHMSA 49 CFR 195) HARD checks.
+   ;; NOTE: real ISIC Rev.4 already assigns "Transport via pipeline" to
+   ;; class 4930 (registered above, still :spec) -- this actor's own
+   ;; blueprint.edn declares itself under a project-internal "isic-
+   ;; rev5" code 4950 instead (see ADR-2607100400); registered here
+   ;; under its built/published code, not 4930, so :repo / GitHub
+   ;; naming / registry :id stay consistent with each other.
+   :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "5011"
    :name "Sea and coastal passenger water transport"
    :repo "https://github.com/gftdcojp/cloud-itonami-H5011"
@@ -4693,6 +4747,26 @@
    :maturity :spec
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :book :transit :deliver :reconcile :audit]},
+  {:id "5020"
+   :name "Water freight transport (petroleum tanker)"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-5020"
+   :business-id "cloud-itonami-isic-5020"
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
+   :optional-technologies [:telemetry]
+   :maturity :implemented
+   ;; NEW entry (no prior :spec placeholder) -- TankerAdvisor ⊣ Marine
+   ;; Cargo Governor, ADR-2607100400 petroleum-fleet wave, transport
+   ;; tier. imo-number-check-digit (self-contained pure fn) and
+   ;; inert-gas-o2-excessive (SOLAS-mandatory IGS, O2 < 8 vol%) HARD
+   ;; checks.
+   ;; NOTE: real ISIC Rev.4 splits sea/coastal vs inland freight water
+   ;; transport into classes 5012/5022 (registered above/below, still
+   ;; :spec) -- this actor's own blueprint.edn declares itself under a
+   ;; project-internal "isic-rev5" code 5020 instead (see ADR-
+   ;; 2607100400); registered here under its built/published code, not
+   ;; 5012/5022, so :repo / GitHub naming / registry :id stay
+   ;; consistent with each other.
+   :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "5021"
    :name "Inland passenger water transport"
    :repo "https://github.com/gftdcojp/cloud-itonami-H5021"
@@ -4731,13 +4805,23 @@
    :operating-states [:intake :book :transit :deliver :reconcile :audit]},
   {:id "5210"
    :name "Warehousing and storage"
-   :repo "https://github.com/gftdcojp/cloud-itonami-H5210"
-   :business-id "cloud-itonami-H5210"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-5210"
+   :business-id "cloud-itonami-isic-5210"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :book :transit :deliver :reconcile :audit]},
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as the petroleum terminal/depot
+   ;; custody-transfer actor (TerminalAdvisor ⊣ Terminal Storage
+   ;; Governor), ADR-2607100400 petroleum-fleet wave, midstream custody
+   ;; tier -- added beyond the ADR's initial 7-actor scope because
+   ;; terminal receipt/gauge/custody hand-off is where fraud/loss
+   ;; concentrates. overfill-risk (Buncefield-type) and tank-integrity-
+   ;; assessment-stale (API 653) are the flagship HARD checks.
+   ;; NOTE: this class is generic "Warehousing and storage" in ISIC
+   ;; Rev.4 -- this actor specializes it to petroleum terminal storage;
+   ;; a future general-warehousing actor would need a different ISIC
+   ;; interpretation or a Rev.5-style split code.
+   :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "5221"
    :name "Service activities incidental to land transportation"
    :repo "https://github.com/gftdcojp/cloud-itonami-H5221"

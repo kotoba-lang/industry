@@ -243,6 +243,22 @@
     (is (= :implemented (industry/maturity "9700"))))
   (testing "a ninety-eighth implemented actor (cloud-itonami-isic-9900, mission-operations actor) is also :implemented"
     (is (= :implemented (industry/maturity "9900"))))
+  (testing "a ninety-ninth implemented actor (cloud-itonami-isic-0610, crude-petroleum-extraction actor; the petroleum-fleet reference build) is also :implemented"
+    (is (= :implemented (industry/maturity "0610"))))
+  (testing "a hundredth implemented actor (cloud-itonami-isic-0620, natural-gas-extraction actor) is also :implemented"
+    (is (= :implemented (industry/maturity "0620"))))
+  (testing "a hundred-first implemented actor (cloud-itonami-isic-1920, petroleum-refining actor) is also :implemented"
+    (is (= :implemented (industry/maturity "1920"))))
+  (testing "a hundred-second implemented actor (cloud-itonami-isic-5210, petroleum-terminal-storage actor) is also :implemented"
+    (is (= :implemented (industry/maturity "5210"))))
+  (testing "a hundred-third implemented actor (cloud-itonami-isic-4730, forecourt/automotive-fuel-retail actor) is also :implemented"
+    (is (= :implemented (industry/maturity "4730"))))
+  (testing "a hundred-fourth implemented actor (cloud-itonami-isic-4950, petroleum-pipeline actor; project-internal isic-rev5 code, distinct from real Rev.4 4930) is also :implemented"
+    (is (= :implemented (industry/maturity "4950"))))
+  (testing "a hundred-fifth implemented actor (cloud-itonami-isic-5020, petroleum-tanker actor; project-internal isic-rev5 code, distinct from real Rev.4 5012/5022) is also :implemented"
+    (is (= :implemented (industry/maturity "5020"))))
+  (testing "a hundred-sixth implemented actor (cloud-itonami-isic-4671, fuel-wholesale-trading actor; project-internal isic-rev5 code, distinct from real Rev.4 4661) is also :implemented"
+    (is (= :implemented (industry/maturity "4671"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -260,7 +276,7 @@
       ;; logic itself stays unit-tested without depending on a
       ;; specific live count.
       (is (= 4 (:blueprint m)))
-      (is (= 98 (:implemented m))))))
+      (is (= 106 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
