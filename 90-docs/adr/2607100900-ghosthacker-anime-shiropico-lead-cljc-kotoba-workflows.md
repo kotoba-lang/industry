@@ -69,3 +69,41 @@
 - CLAUDE.md の runtime 優先順位節・repo 構成に対する追加変更は無し
   （既存 ADR-2607100100 の適用範囲を game/anime 生成 workflow に対して
   明示しただけ）。
+
+## Addendum 1（2026-07-10 — 決定②の前提訂正、follow-up (a) の調査結果）
+
+follow-up (a)（`ghosthacker/apps/web` の cljs 移行スコープ策定）を実施した
+結果、**決定②の前提が誤りだったと判明した**。
+
+- `apps/web`・`apps/server`・`260123-jump/` 全体を `wattpad`/`video`
+  (gen|render)/`neo4j` で grep しても、ヒットは `README.md` のみ
+  （node_modules 内のアイコン名ノイズを除く）。README 記載の機能
+  チェックリスト（`[x] Wattpad automated publishing`, `[ ] Video
+  generation (Sora)`）とアーキテクチャ図は **アスピレーショナルな
+  ドキュメントであり、対応する実装コードは現チェックアウトに存在しない**
+  （`git log --all` でも痕跡なし）。
+- 唯一の物証は `.auth/wattpad.json`（`cookies`/`origins` キーのみ —
+  Playwright の storage-state 形式）。過去にログインセッションを取得した
+  痕跡はあるが、それを使う自動投稿コードは無い。
+- 「Neo4j ストーリーグラフ」の実装も同様に実体が異なる: 実際にあるのは
+  `apps/web/src/lib/jsonld-cypher/{graph-store.ts, cypher.ts}`（Neo4j
+  不使用、JSON-LD から構築する in-memory プロパティグラフ + 自前
+  Cypher サブセットパーサ）。これは **manga/storyboard 編集
+  （`components/Storyboard/*.svelte`, `apps/server/internal/service/
+  storyboard.go`）向け**であり、既に `kami-app-sip-clj` への移行対象
+  （DEPRECATED 範囲）に含まれる — 対象外ではなく対応済み。
+
+**訂正後の扱い**: 決定②（旧 Web パイプラインのアニメ固有機能を cljs へ
+移行）は、**移行すべき実コードが存在しないため実質 no-op**。
+`ghosthacker/README.md` の機能チェックリストは実態と乖離しているため
+follow-up で訂正する（実装済み/未実装の区別を明確化）。
+
+Ren/Nei 本編向けの Wattpad 自動投稿・動画生成を今後本当に作る場合は
+（オーナー判断 2026-07-10）、**今は着手せず shiropico 先行に集中する**。
+shiropico（`ai-gftd-ghosthacker-shiropico` / `ai-gftd-animeka`）の
+ComfyUI/LLM 接続基盤が固まった後に、Ren/Nei トラックとの共通化を
+改めて検討する（cljs 移行ではなく新規実装として、決定③の
+cljc-kotoba-first 前提で設計する）。
+
+follow-up (b)（game portfolio host adapter 選定）・(c)（`ai-gftd-animeka`
+cljc kotoba 化 + ComfyUI/LLM 接続）は本 addendum の影響を受けず続行。
