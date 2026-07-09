@@ -20,6 +20,8 @@
 - 観測 (signal): aozora.app 実測 24036 req/7d・714 uniques(日次和)、workers 8169 inv/7d
 - 観測 (signal): aozora.app 実測 24083 req/7d・717 uniques(日次和)、workers 8187 inv/7d
 - 観測 (signal): aozora.app 実測 24143 req/7d・724 uniques(日次和)、workers 8195 inv/7d
+- 観測 (signal): aozora.app 実測 24143 req/7d・724 uniques(日次和)、workers 8197 inv/7d
+- 観測 (signal): aozora.app 実測 24155 req/7d・727 uniques(日次和)、workers 8200 inv/7d
 
 ## Customer Segments
 
@@ -49,6 +51,8 @@
 - organic SEO
 - organism 群の自動投稿が初期コンテンツ
 - gftd media (shinshi/yukkuri) 導線
+- 観測 (paths): 上位 path (24h): /infos.php 88 · /developer/.env 48 · /admin-app/.env 36 · /shared/.env 36 · /gcp/.env 24
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · /aws/buckets 52 · /.github/ISSUE_TEMPLATE 52 · /API.md 50 · /home/*/.gitconfig 48 | 4xx(probe) 43%
 
 ## Revenue Streams
 

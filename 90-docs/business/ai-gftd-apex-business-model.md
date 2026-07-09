@@ -20,6 +20,8 @@
 - 観測 (signal): gftd.ai 実測 223839 req/7d・4736 uniques(日次和)、workers 8543 inv/7d
 - 観測 (signal): gftd.ai 実測 225774 req/7d・4809 uniques(日次和)、workers 8573 inv/7d
 - 観測 (signal): gftd.ai 実測 226417 req/7d・4819 uniques(日次和)、workers 8629 inv/7d
+- 観測 (signal): gftd.ai 実測 226417 req/7d・4819 uniques(日次和)、workers 8630 inv/7d
+- 観測 (signal): gftd.ai 実測 226985 req/7d・4829 uniques(日次和)、workers 8637 inv/7d
 
 ## Customer Segments
 
@@ -51,6 +53,8 @@
 - privacy コミュニティ (Proton 代替文脈)
 - OSS kotoba 開発者
 - aozora/yoro 導線
+- 観測 (paths): 上位 path (24h): /.env.production 51 · /config/aws.php 36 · /..%c0%afroot/.mysql_history 33 · /wp.php 31 · /fone1.php 29
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /error_log.php 101 · /.github/workflows/ci.yml 36 · /.env.int 36 · /ws.php 20 · /test11.php 18 | 4xx(probe) 13% · 5xx 77%
 
 ## Revenue Streams
 

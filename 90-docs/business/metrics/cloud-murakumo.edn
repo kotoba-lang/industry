@@ -1,12 +1,26 @@
-{:as-of "2026-07-09",
- :sources [:cloudflare :health],
- :zone
- {:requests-7d 52710,
-  :pageviews-7d 6009,
-  :uniques-7d-sum 389,
-  :zone "murakumo.cloud"},
+{:health-status 200,
  :zone-name "murakumo.cloud",
- :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 74082},
- :health-status 200,
+ :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 74264},
+ :zone
+ {:requests-7d 52867,
+  :pageviews-7d 6012,
+  :uniques-7d-sum 390,
+  :zone "murakumo.cloud"},
+ :sources [:cloudflare :health],
+ :paths
+ {:ok
+  [{:path "/infer/hwmetrics", :requests 7864}
+   {:path "/infer/runs", :requests 1412}
+   {:path "/v1/messages", :requests 235}
+   {:path "/v1/chat/completions", :requests 235}
+   {:path "/", :requests 51}
+   {:path "/robots.txt", :requests 15}
+   {:path "/js/main.js", :requests 2}
+   {:path "/cdn-cgi/rum", :requests 2}],
+  :status-mix {:client-error 250, :ok 9818},
+  :window "24h"},
+ :as-of "2026-07-09",
+ :top-paths
+ "上位 page (24h, 2xx/3xx): /infer/hwmetrics 7864 · /infer/runs 1412 · /v1/messages 235 · /v1/chat/completions 235 · / 51 | 4xx(probe) 2%",
  :signal
- "murakumo.cloud 実測 52710 req/7d・389 uniques(日次和)、workers 74082 inv/7d"}
+ "murakumo.cloud 実測 52867 req/7d・390 uniques(日次和)、workers 74264 inv/7d"}

@@ -69,6 +69,22 @@
           {:keys [approved]} (react/tick {:idx idx :product :cloud-itonami})]
       (is (some #(= :cloud-itonami.uvp (:canvas/id %)) approved)))))
 
+(def base+channels
+  (conj base
+        {:canvas/kind :lean :canvas/product :cloud-itonami :canvas/layer :business-operator
+         :canvas/id :cloud-itonami.channels :canvas/block :lean/channels :canvas/label "Channels"
+         :canvas/items ["c1"]}))
+
+(deftest top-paths-observation-lands-in-channels
+  (testing ":top-paths metric (実 page アクセス内訳) → channels block へ観測、dedup で収束"
+    (let [idx (canvas/index base+channels)
+          metrics {:top-paths "上位 path (24h): / 1200 · /pricing 88 · /docs 41"}
+          run (react/run-ticks {:idx idx :product :cloud-itonami :metrics metrics :max-ticks 5})]
+      (is (:dry? run))
+      (let [items (get-in (:idx run) [:blocks :cloud-itonami.channels :canvas/items])]
+        (is (= 1 (count (filter #(re-find #"観測 \(paths\)" %) items))))
+        (is (some #(re-find #"/pricing 88" %) items))))))
+
 (deftest scoring
   (let [idx (canvas/index base)
         facts {:as-of "t" :products {:cloud-itonami {:pricing 2 :grounding 3

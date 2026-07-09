@@ -69,7 +69,16 @@
        {:proposal/action :canvas/add-item
         :canvas/id (block-id product "problem")
         :event/value text
-        :proposal/reason "実測 metric を課題仮説へ反映"}))))
+        :proposal/reason "実測 metric を課題仮説へ反映"})
+     ;; :top-paths (user が実際にアクセスしている page の内訳、collect.bb 2026-07-09)
+     ;; は「どの導線が生きているか」の実測なので channels block へ反映
+     (for [[k v] metrics
+           :let [text (str "観測 (paths): " v)]
+           :when (and (= k :top-paths) (not (contains? (items-of "channels") text)))]
+       {:proposal/action :canvas/add-item
+        :canvas/id (block-id product "channels")
+        :event/value text
+        :proposal/reason "実測 page アクセス内訳を獲得チャネルの観測として反映"}))))
 
 (defn gate-aware-advisor
   "Default advisor: mock-advisor + gate evaluator (ADR-2607022100).

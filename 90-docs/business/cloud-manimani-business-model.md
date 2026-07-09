@@ -20,6 +20,7 @@
 - 観測 (signal): manimani.cloud 実測 2192 req/7d・238 uniques(日次和)
 - 観測 (signal): manimani.cloud 実測 2201 req/7d・243 uniques(日次和)
 - 観測 (signal): manimani.cloud 実測 2208 req/7d・245 uniques(日次和)
+- 観測 (signal): manimani.cloud 実測 2213 req/7d・246 uniques(日次和)
 
 ## Customer Segments
 
@@ -48,6 +49,8 @@
 - OSS 配布 (GitHub/brew) → cloud connect upsell
 - itonami 職場導線 (個人↔法人 funnel)
 - apex/aozora ユーザーへの cross-sell
+- 観測 (paths): 上位 path (24h): /wp-admin/install.php 86 · / 34 · /metrics 7 · /.git/config 5 · /wp-login.php 5
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 8 · /robots.txt 2 | 4xx(probe) 94%
 
 ## Revenue Streams
 
