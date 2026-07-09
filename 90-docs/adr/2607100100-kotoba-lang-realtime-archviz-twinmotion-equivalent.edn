@@ -108,7 +108,8 @@
                            将来別ADR)"}}
 
  :milestones
- [{:id "M0" :name "scene合成コントラクト" :detail "kotoba.amenominaka.scene、pure CLJC、レンダリング皆無"}
+ [{:id "M0" :name "scene合成コントラクト" :status "done (2026-07-09, kami-app-amenominaka@652d2d7)"
+   :detail "kotoba.amenominaka.scene、pure CLJC、レンダリング皆無"}
   {:id "M1" :name "USD/glTF書き出し" :detail "scene.edn → .usdz/.gltf、既存USDビューアで確認、新規レンダリングエンジン不要"}
   {:id "M2" :name "3D render-IR + kami-webgpuブラウザMVP" :detail "静的シーンのブラウザ内ウォークスルー、CPU-authored instancing、native Rust不使用"}
   {:id "M3" :name "kami-app-amenominaka拡張シェル" :detail "extensionローダ+lifecycle実装、M0-M2を最初の実拡張として包む"}
@@ -130,4 +131,18 @@
  "本ADRはstatus=proposed(設計のみ)。実装はこのADR確定後、別セッション/別作業として
   M0から順に着手する。kami-app-amenominakaは既にrepos.edn/west.ymlに登録済み
   (ADR-2607010930 Phase 4)のため、実装開始にあたって新規manifest登録は不要
-  — 通常のchild-repo commit/push運用(CLAUDE.mdのstanding authorization)に従う。"}
+  — 通常のchild-repo commit/push運用(CLAUDE.mdのstanding authorization)に従う。"
+
+ :addendum-m0-2026-07-09
+ {:landed {:kami-app-amenominaka "5a2f6a7→652d2d7 (feat/m0-scene-composition, server-side merge)"
+           :west-yml-pin "5a2f6a7eea78→652d2d777b45 (--entry kami-app-amenominaka, verify-west-pins OK)"
+           :verification "7 tests / 32 assertions green, clj-kondo 0 errors/0 warnings"}
+  :d3-correction
+  "kami-cad-importは実装着手時のソース読解でVehicleAssembly専用(part-kinds/material/
+   hardpointsが車両ドメインに閉じ、glTF ingestはgftd_vehicle/gftd_partアノテーション必須、
+   幾何ペイロードはAABBのみ)と判明 — 汎用CAD取り込みではないため建築/BIM入力には使えない。
+   D3の「入力層は既存をそのまま使う」はbim/cad/dxf/step/scadについては有効のまま、
+   kami-cad-importの部分のみ本addendumで撤回。M0の建物入力はbimのみで構成した。"
+  :d4-confirmed
+  "kami-*-scene 4repo(atmosphere/vegetation/terrain/postfx)は想定通りshipped-*
+   1関数呼び出しで実データ取得でき、bim/project出力との合成は軽量だった — D4の設計通り。"}}
