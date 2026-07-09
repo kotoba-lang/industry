@@ -4281,11 +4281,29 @@
    :operating-states [:intake :design :permit :build :inspect :audit]},
   {:id "4322"
    :name "Plumbing, heat and air-conditioning installation"
-   :repo "https://github.com/gftdcojp/cloud-itonami-F4322"
-   :business-id "cloud-itonami-F4322"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4322"
+   :business-id "cloud-itonami-4322"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Published as a :blueprint repo (business-model.md + operator-guide.md +
+   ;; blueprint.edn + governance docs, no src/test yet -- the OSS blueprint
+   ;; stage, not yet :implemented). :maturity :spec explicitly removed so
+   ;; maturity-of/maturity now auto-derive :blueprint from the real :repo
+   ;; above (see `kotoba.industry/maturity-of`). The legacy placeholder
+   ;; :repo (gftdcojp/cloud-itonami-F4322) never actually existed (confirmed
+   ;; 404 before this edit) -- replaced with the real repo, following the
+   ;; SAME cloud-itonami/cloud-itonami-isic-#### naming convention as every
+   ;; other actor in this fleet rather than the legacy F-prefixed scheme.
+   ;; Governor keyword :plumbing-trade-governor is grep-verified UNIQUE
+   ;; fleet-wide -- distinct from cloud-itonami-isic-4321's own
+   ;; :electrical-trade-governor (a different licensed trade, a different
+   ;; licensing body/regime in every jurisdiction checked). Second permit-
+   ;; based construction/trade pick, following the SAME operating-states
+   ;; shape as cloud-itonami-isic-4321's own (a genuinely distinct
+   ;; regulatory domain reusing an already-established shape, matching
+   ;; investigationops/8030's own precedent of reusing securityops/8010's
+   ;; shape). No bespoke capability library exists for plumbing/HVAC trade
+   ;; licensing specifically. See ADR-2607101600.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :design :permit :build :inspect :audit]},
   {:id "4329"
