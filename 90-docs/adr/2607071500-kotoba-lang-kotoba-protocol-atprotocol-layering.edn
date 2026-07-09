@@ -5,7 +5,7 @@
   :doc_type "adr"
   :topic "kotoba-protocol-layering"
   :authoritative true
-  :last_verified "2026-07-07"
+  :last_verified "2026-07-09"
   :authoritative_for
   ["基底プロトコルの正本は kotoba-lang/kotoba-protocol (spec-first, pure cljc):
     L0 address (multiformats/CID/IPLD) → L1 fact (datom EAVT) → L2 graph
@@ -60,7 +60,24 @@
     両方が登録済みだったため protocol 層の変更は不要、host 側対応表を
     埋めただけ。llm/complete は proxy 先 backend が無く未実装のまま。
     実 shadow-cljs :test build で 174 ファイルコンパイル成功で検証
-    (ブラウザ round-trip デモは持ち越し)"]
+    (ブラウザ round-trip デモは持ち越し)"
+   "Addendum 4 (2026-07-09): bundle-cid integrity 検証 — wasm actor 実装。
+    調査の結果 :kotoba.app/bundle-cid は実運用でほぼ未使用と判明し、実際に
+    検証すべき CID は :kotoba.app/wasm[].cid (kind=actor) にあるため scope を
+    そこに絞った。新設 kotoba.protocol.cid (parse-raw-cid/digest-matches?、
+    kotobase.archive-put から byte-exact 移植、ハッシュ計算自体は host の
+    仕事) + app/bundle-cid-consistent? (bundle-cid と ipfs:// embed-url を
+    両方持つ manifest は同一 CID を要求、validate-manifest に組込み)。
+    yoro-ui.interop.wasm-actor/run-actor! が :cid opt を追加し、fetch した
+    bytes を crypto.subtle.digest でハッシュして manifest の CID と比較 —
+    不一致なら WebAssembly.instantiate 前に fail-closed reject。
+    wasm-actor-panel に「CID 一致検証済み」badge。scope 外として明示:
+    (a) app-embed-panel の iframe mount は host が bytes を見ないため同方式
+    では検証不可 (host-fetch→blob/srcdoc mount への設計変更が要る)、
+    (b) dag-pb/UnixFS ディレクトリ CID は sha256 一致では検証できない。
+    kotoba-protocol は実 clojure -M:test (13 tests/81 assertions) + -M:lint
+    (0 errors) で検証、app-aozora は実 shadow-cljs :test build (214 ファイル
+    コンパイル成功) で検証。ブラウザでの実 CID 不一致 reject デモは持ち越し"]
   :related
   ["90-docs/adr/2607062330-kototama-tender-chicory-execution-runtime.md"
    "90-docs/adr/2607062400-kototama-actor-host-browser-native-and-tender-module-fix.md"
@@ -123,7 +140,12 @@
    "cap-bridge は graph/query (読取専用) + graph/transact (書込み、
     Addendum 3) 対応。wasm actor は 7/8 imports (http-post 不可)。
     llm/complete は proxy 先 backend が無く未実装のまま open follow-up
-    として持ち越し"]}
+    として持ち越し"
+   "bundle-cid integrity 検証 (Addendum 4) は raw codec の単一バイナリ
+    (wasm module) 専用 — dag-pb 等の UnixFS ディレクトリ CID は同方式では
+    検証できない。iframe mount (app-embed-panel) は host が response bytes
+    を見ないため構造的に同方式の検証が不可 (host-fetch→blob/srcdoc mount
+    への設計変更が要る、open follow-up)"]}
 
  :open-follow-up
  ["lexicon _lexicon DNS 公開・firehose・MST encoding の kotoba graph 導出
@@ -131,5 +153,8 @@
   "graph/transact は実装済み (Addendum 3)。llm/complete は proxy 先の LLM
    completion XRPC/backend 自体がまだ存在しないため未実装のまま持ち越し"
   "studio への actor 鍵 import UI の汎用化 (現状 mangaka-app 専用)"
-  ":kotoba.app/bundle-cid の appview 側 integrity 検証 (現状 embed-url の
-   resolve のみで配信内容との一致は未検証)"]}
+  ":kotoba.app/bundle-cid の appview 側 integrity 検証は wasm actor
+   (raw codec 単一バイナリ) について実装済み (Addendum 4)。残る範囲: (a)
+   app-embed-panel の iframe mount は host-fetch→blob/srcdoc mount への
+   切替が要る (bigger design change)、(b) dag-pb/UnixFS ディレクトリ CID
+   は IPLD DAG 検証が要る (sha256 一致では扱えない)"]}
