@@ -48,9 +48,15 @@
 (defn cf-token [] (or (System/getenv "CF_API_TOKEN") (keychain "gftd.cf")))
 (defn stripe-key []
   (or (System/getenv "STRIPE_SECRET_KEY")
-      (let [item (or (System/getenv "STRIPE_OP_ITEM") "b2g2dkwnlfyl3sik6naptrmjyq")
-            {:keys [exit out]} (sh "op" "item" "get" item "--fields" "STRIPE_SECRET_KEY" "--reveal")]
-        (when (zero? exit) (str/trim out)))))
+      ;; op は並行セッションと session token を取り合うと一時失敗する
+      ;; (2026-07-09 実測: tick 内で fail → 直後の手動実行は成功)。2回 retry。
+      (let [item (or (System/getenv "STRIPE_OP_ITEM") "b2g2dkwnlfyl3sik6naptrmjyq")]
+        (some (fn [attempt]
+                (let [{:keys [exit out]} (sh "op" "item" "get" item "--fields" "STRIPE_SECRET_KEY" "--reveal")]
+                  (if (zero? exit)
+                    (str/trim out)
+                    (do (when (< attempt 3) (Thread/sleep 2000)) nil))))
+              [1 2 3]))))
 
 (defn date-days-ago [n] (str (.minusDays (java.time.LocalDate/now) n)))
 

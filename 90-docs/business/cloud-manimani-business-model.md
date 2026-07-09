@@ -51,6 +51,7 @@
 - apex/aozora ユーザーへの cross-sell
 - 観測 (paths): 上位 path (24h): /wp-admin/install.php 86 · / 34 · /metrics 7 · /.git/config 5 · /wp-login.php 5
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 8 · /robots.txt 2 | 4xx(probe) 94%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 10 · /robots.txt 2 | 4xx(probe) 93%
 
 ## Revenue Streams
 

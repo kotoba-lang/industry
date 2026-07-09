@@ -26,6 +26,7 @@
 - 観測 (signal): murakumo.cloud 実測 52710 req/7d・389 uniques(日次和)、workers 74082 inv/7d
 - 観測 (signal): murakumo.cloud 実測 52710 req/7d・389 uniques(日次和)、workers 74161 inv/7d
 - 観測 (signal): murakumo.cloud 実測 52867 req/7d・390 uniques(日次和)、workers 74264 inv/7d
+- 観測 (signal): murakumo.cloud 実測 52867 req/7d・390 uniques(日次和)、workers 74331 inv/7d
 
 ## Customer Segments
 
@@ -59,6 +60,7 @@
 - CN: Stripe決済(USD建てAlipay/WeChat Pay)の限界と規制ギャップを理由に、能動広告出稿は保留(watchのみ)
 - 観測 (paths): 上位 path (24h): /infer/hwmetrics 7864 · /infer/runs 1413 · /v1/messages 241 · /v1/chat/completions 240 · /wp-admin/install.php 88
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /infer/hwmetrics 7864 · /infer/runs 1412 · /v1/messages 235 · /v1/chat/completions 235 · / 51 | 4xx(probe) 2%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /infer/hwmetrics 7863 · /infer/runs 1413 · /v1/messages 234 · /v1/chat/completions 234 · / 53 | 4xx(probe) 2%
 
 > 実行済み (2026-07-06 tick4): US HN/X投稿コピー下書き + GTM launch runbook作成(Stripe未設定の間はGate 0で投稿ブロック、docs/gtm-launch-runbook.md)
 
