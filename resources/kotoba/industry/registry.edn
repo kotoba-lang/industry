@@ -342,6 +342,23 @@
    :business-id "cloud-itonami-0810"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies [:optimization :cae]
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as a community-quarry actor
+   ;; (QuarryOps-LLM ⊣ Quarry Governor), the eighty-ninth build outside
+   ;; ADR-2607032000's original insurance/real-estate batch. This
+   ;; blueprint's own :quarry-governor keyword is UNIQUE fleet-wide --
+   ;; no naming-collision precedent needed. No bespoke domain
+   ;; capability library exists for this vertical (kotoba-lang/
+   ;; robotics is the generic cross-cutting robotics contract, not
+   ;; quarry-specific) -- returns to self-contained domain logic.
+   ;; Adds extraction-permit-invalid? (the flagship new check,
+   ;; grounded in the US Mine Act/MSHA, UK Quarries Regulations
+   ;; 1999/HSE, Germany's Bundesberggesetz and Japan's Mine Safety
+   ;; Act) and blast-safety-clearance-unconfirmed? (CONDITIONAL,
+   ;; grounded in US 30 CFR Part 56 Subpart E, UK Quarries
+   ;; Regulations 1999/Explosives Regulations 2014, Germany's
+   ;; Sprengstoffgesetz and Japan's Explosives Control Act -- all
+   ;; four jurisdictions covered honestly).
    :operating-states [:intake :survey :extract :grade :ship :audit]}
   {:id "4211" ; F — Construction
    :name "Community Building Construction"
