@@ -6457,11 +6457,37 @@
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "7911"
    :name "Travel agency activities"
-   :repo "https://github.com/gftdcojp/cloud-itonami-N7911"
-   :business-id "cloud-itonami-N7911"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-7911"
+   :business-id "cloud-itonami-7911"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Promoted :spec -> :blueprint (see `kotoba.industry/maturity-of`).
+   ;; The legacy placeholder :repo (gftdcojp/cloud-itonami-N7911) never
+   ;; actually existed (confirmed 404 before this edit) -- replaced with
+   ;; the real repo, following the SAME cloud-itonami/cloud-itonami-isic-####
+   ;; naming convention as every other actor in this fleet rather than the
+   ;; legacy N-prefixed scheme. Fresh travel/tourism domain, deliberately
+   ;; diversifying away from the labor-dispatch-shape services thread
+   ;; (8010/8020/8130/8121/8220/8219). Scoped to booking and selling
+   ;; third-party travel products (flights, accommodation, transfers) as
+   ;; an intermediary, distinct from the fleet's transport CARRIERS
+   ;; (5110/4911/4912/5011/5020, which operate the transport itself) and
+   ;; from cloud-itonami-isic-7912 ("Tour operator activities", still
+   ;; :spec, untouched): a travel agent RETAILS third-party travel
+   ;; products bearing intermediary liability, while a tour operator
+   ;; DESIGNS/ASSEMBLES package tours under its own brand bearing
+   ;; organizer liability -- a distinction the EU's Package Travel
+   ;; Directive (2015/2302) makes explicit, and one that "Seller of
+   ;; Travel" statutes (California, Florida, Washington, Iowa, Hawaii)
+   ;; also require separate registration/bonding to reflect. Agencies
+   ;; issuing airline tickets typically require ARC (US) or IATA
+   ;; (international) accreditation. grep -rli "travel.agency|tour.
+   ;; operator|travel.booking|excursion" across the fleet returned
+   ;; completely empty. Governor keyword :travel-agency-governor is
+   ;; grep-verified UNIQUE fleet-wide. Reuses the SAME labor-dispatch
+   ;; operating-states shape as the six prior labor-dispatch builds
+   ;; (registry's own pre-existing value for '7911'). See
+   ;; ADR-2607104600.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "7912"
