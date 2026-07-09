@@ -1,9 +1,9 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 1685, "kotobase-cf-wasm-staging" 677},
+ {"net-kotobase" 1692, "kotobase-cf-wasm-staging" 691},
  :zone
- {:requests-7d 2288,
+ {:requests-7d 2305,
   :pageviews-7d 287,
   :uniques-7d-sum 356,
   :zone "kotobase.net"},
@@ -11,18 +11,16 @@
  :paths
  {:ok
   [{:path "/", :requests 60}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 28}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact", :requests 27}
-   {:path "/health", :requests 25}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 32}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact", :requests 31}
+   {:path "/health", :requests 26}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.q", :requests 22}
    {:path "/llms-full.txt", :requests 20}
    {:path "/robots.txt", :requests 20}
    {:path
-    "/kotobase-cf-wasm-production/ipns/bafyreiesazxtqrrkdkzuxaidee4jcytkxl6wkhy64dgkhu6gzxurzfsqvu.json",
-    :requests 16}
-   {:path
-    "/kotobase-cf-wasm-production/blocks/bafyreiesazxtqrrkdkzuxaidee4jcytkxl6wkhy64dgkhu6gzxurzfsqvu/bafyreiganxt7ozwbvgxhkxnzgalpoi766fguiqaqk73pfnzeteub6ppc74",
-    :requests 15}],
-  :status-mix {:ok 485, :client-error 928, :server-error 14},
+    "/kotobase-cf-wasm-production/ipns/bafyreig3pxykmmyttoyenqwzg72agibsphfvigy6ufmpvtrqh522e5e2aa.json",
+    :requests 17}],
+  :status-mix {:ok 548, :client-error 934, :server-error 14},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,7 +30,7 @@
   :last-charge-epoch 1718681591},
  :as-of "2026-07-09",
  :top-paths
- "上位 page (24h, 2xx/3xx): / 60 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 28 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 27 · /health 25 · /llms-full.txt 20 | 4xx(probe) 65% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): / 60 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 32 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 31 · /health 26 · /xrpc/ai.gftd.apps.kotobase.datomic.q 22 | 4xx(probe) 62% · 5xx 1%",
  :funnel {:visitors 240, :signups 0, :checkouts 0},
  :signal
- "kotobase.net 実測 2288 req/7d・356 uniques(日次和)、workers 2362 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 2305 req/7d・356 uniques(日次和)、workers 2383 inv/7d、Stripe active subs 0"}
