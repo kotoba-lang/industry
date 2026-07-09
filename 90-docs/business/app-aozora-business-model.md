@@ -28,6 +28,7 @@
 - 観測 (signal): aozora.app 実測 24230 req/7d・735 uniques(日次和)、workers 8224 inv/7d
 - 観測 (signal): aozora.app 実測 24271 req/7d・738 uniques(日次和)・うち4xx probe 42%(24h)、workers 8230 inv/7d
 - 観測 (signal): aozora.app 実測 24271 req/7d・738 uniques(日次和)・うち4xx probe 42%(24h)、workers 8231 inv/7d
+- 観測 (signal): aozora.app 実測 24333 req/7d・739 uniques(日次和)・うち4xx probe 41%(24h)、workers 8241 inv/7d
 
 ## Customer Segments
 
@@ -60,6 +61,7 @@
 - 観測 (paths): 上位 path (24h): /infos.php 88 · /developer/.env 48 · /admin-app/.env 36 · /shared/.env 36 · /gcp/.env 24
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · /aws/buckets 52 · /.github/ISSUE_TEMPLATE 52 · /API.md 50 · /home/*/.gitconfig 48 | 4xx(probe) 43%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · /aws/buckets 52 · /.github/ISSUE_TEMPLATE 52 · /API.md 50 · /home/*/.gitconfig 48 | 4xx(probe) 42%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · /aws/buckets 52 · /.github/ISSUE_TEMPLATE 52 · /API.md 50 · /home/*/.gitconfig 48 | 4xx(probe) 41%
 
 ## Revenue Streams
 

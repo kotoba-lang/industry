@@ -28,6 +28,7 @@
 - 観測 (signal): gftd.ai 実測 228872 req/7d・4891 uniques(日次和)、workers 8670 inv/7d
 - 観測 (signal): gftd.ai 実測 229494 req/7d・4914 uniques(日次和)・うち4xx probe 13%(24h)、workers 8671 inv/7d
 - 観測 (signal): gftd.ai 実測 229494 req/7d・4914 uniques(日次和)・うち4xx probe 13%(24h)、workers 8672 inv/7d
+- 観測 (signal): gftd.ai 実測 230256 req/7d・4934 uniques(日次和)・うち4xx probe 13%(24h)、workers 8685 inv/7d
 
 ## Customer Segments
 
@@ -61,6 +62,7 @@
 - aozora/yoro 導線
 - 観測 (paths): 上位 path (24h): /.env.production 51 · /config/aws.php 36 · /..%c0%afroot/.mysql_history 33 · /wp.php 31 · /fone1.php 29
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /error_log.php 101 · /.github/workflows/ci.yml 36 · /.env.int 36 · /ws.php 20 · /test11.php 18 | 4xx(probe) 13% · 5xx 77%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /error_log.php 101 · /.github/workflows/ci.yml 36 · /.env.int 36 · /ws.php 20 · /test11.php 18 | 4xx(probe) 13% · 5xx 78%
 
 ## Revenue Streams
 

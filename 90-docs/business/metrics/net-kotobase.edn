@@ -1,35 +1,29 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 1710, "kotobase-cf-wasm-staging" 718},
+ {"net-kotobase" 1738, "kotobase-cf-wasm-staging" 756},
  :zone
- {:requests-7d 2331,
+ {:requests-7d 2386,
   :pageviews-7d 289,
-  :uniques-7d-sum 358,
+  :uniques-7d-sum 360,
   :zone "kotobase.net"},
- :sources [:cloudflare :stripe :health :emitter],
+ :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 61}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact", :requests 37}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 34}
-   {:path "/health", :requests 29}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.q", :requests 27}
+  [{:path "/", :requests 62}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact", :requests 53}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 45}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.q", :requests 33}
+   {:path "/health", :requests 33}
    {:path "/llms-full.txt", :requests 21}
-   {:path "/robots.txt", :requests 21}
-   {:path "/api/funnel", :requests 17}],
-  :status-mix {:ok 635, :client-error 959, :server-error 16},
+   {:path "/api/funnel", :requests 21}
+   {:path "/robots.txt", :requests 21}],
+  :status-mix {:client-error 986, :ok 753, :server-error 16},
   :window "24h"},
- :stripe
- {:active-subscriptions 0,
-  :active-subscriptions-unpaid 4,
-  :active-subscriptions-account-wide 4,
-  :charges-total 11,
-  :last-charge-epoch 1718681591},
  :as-of "2026-07-09",
- :traffic-quality {:window "24h", :probe-4xx-pct 60, :error-5xx-pct 1},
+ :traffic-quality {:window "24h", :probe-4xx-pct 56, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 61 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 37 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 34 · /health 29 · /xrpc/ai.gftd.apps.kotobase.datomic.q 27 | 4xx(probe) 60% · 5xx 1%",
- :funnel {:visitors 242, :signups 0, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): / 62 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 53 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 45 · /xrpc/ai.gftd.apps.kotobase.datomic.q 33 · /health 33 | 4xx(probe) 56% · 5xx 1%",
+ :funnel {:visitors 243, :signups 0, :checkouts 0},
  :signal
- "kotobase.net 実測 2331 req/7d・358 uniques(日次和)・うち4xx probe 60%(24h)、workers 2428 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 2386 req/7d・360 uniques(日次和)・うち4xx probe 56%(24h)、workers 2494 inv/7d"}
