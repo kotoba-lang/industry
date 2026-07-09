@@ -71,20 +71,33 @@
      :technology-stack (mapv #(select-keys % [:id :name :layer :capabilities :repos :contracts :ui? :export?])
                              stack)}))
 
-(defn maturity
-  "Return the maturity level of an ISIC entry: :spec (registry only),
-  :blueprint (blueprint repo published), or :implemented (source actor exists).
+(defn maturity-of
+  "Pure: compute the maturity tier from an industry entry map directly
+  (no registry lookup). Split out of `maturity` (2607100600) so the
+  :blueprint branch stays unit-testable against a synthetic fixture
+  map even once every REAL registry entry with a published blueprint
+  repo has been implemented (as of cloud-itonami-isic-9900's own
+  promotion, the fleet-wide :blueprint tier count reached zero -- see
+  `maturity-summary`'s own doc). :spec (registry only), :blueprint
+  (blueprint repo published), or :implemented (source actor exists).
   Defaults to :spec when unset."
+  [industry]
+  (or (:maturity industry)
+      (cond
+        (:implemented? industry) :implemented
+        (:repo industry)         :blueprint
+        :else                    :spec)))
+
+(defn maturity
+  "Return the maturity level of an ISIC entry -- see `maturity-of`."
   [isic]
-  (let [industry (get-industry isic)]
-    (or (:maturity industry)
-        (cond
-          (:implemented? industry) :implemented
-          (:repo industry)         :blueprint
-          :else                    :spec))))
+  (maturity-of (get-industry isic)))
 
 (defn maturity-summary
-  "Aggregate maturity counts across all industries."
+  "Aggregate maturity counts across all industries. NOTE: :blueprint
+  legitimately reaching zero is an expected, desirable fleet state (it
+  means every published blueprint has been implemented), not a bug --
+  see `kotoba.industry-test`'s own `maturity-summary-counts-tiers`."
   []
   (let [inds (industries)]
     {:total      (count inds)
@@ -92,18 +105,19 @@
      :blueprint  (count (filter #(= :blueprint (maturity (:id %))) inds))
      :implemented (count (filter #(= :implemented (maturity (:id %))) inds))}))
 
-(defn maturity-roadmap
-  "Return the next maturity step for an ISIC entry: :spec→:blueprint→:implemented,
-  with the action required to advance and whether a capability lib with UI/export
-  already backs it (so the spec entry can be promoted cheaply)."
-  [isic]
-  (let [industry (get-industry isic)
-        level (maturity isic)
-        stack (technology-stack isic)
+(defn maturity-roadmap-of
+  "Pure: compute the maturity roadmap from an industry entry map plus
+  its already-resolved technology stack directly (no registry
+  lookup). Split out of `maturity-roadmap` (2607100600) for the same
+  reason as `maturity-of` -- lets the :blueprint branch stay unit-
+  testable against a synthetic fixture even with zero real :blueprint-
+  tier entries left in the registry."
+  [industry stack]
+  (let [level (maturity-of industry)
         ui? (some :ui? stack)
         export? (some :export? stack)
         has-repo (boolean (:repo industry))]
-    {:isic (str isic)
+    {:isic (:id industry)
      :maturity level
      :next-step (condp = level
                   :spec       :blueprint
@@ -116,3 +130,11 @@
      :ui-ready? ui?
      :export-ready? export?
      :has-repo has-repo}))
+
+(defn maturity-roadmap
+  "Return the next maturity step for an ISIC entry: :spec→:blueprint→:implemented,
+  with the action required to advance and whether a capability lib with UI/export
+  already backs it (so the spec entry can be promoted cheaply). See `maturity-roadmap-of`."
+  [isic]
+  (-> (maturity-roadmap-of (get-industry isic) (technology-stack isic))
+      (assoc :isic (str isic))))

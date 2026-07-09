@@ -32,7 +32,12 @@
   (testing "the reference actor is implemented"
     (is (= :implemented (industry/maturity "6310"))))
   (testing "a published blueprint repo is :blueprint"
-    (is (= :blueprint (industry/maturity "9900"))))
+    ;; No REAL registry entry sits at :blueprint tier any more (the
+    ;; fleet-wide backlog was fully cleared as of cloud-itonami-isic-
+    ;; 9900's own promotion, ADR-2607100300) -- unit-test the pure
+    ;; branch logic directly via a synthetic fixture map instead of a
+    ;; live example, see `industry/maturity-of`.
+    (is (= :blueprint (industry/maturity-of {:repo "https://example.invalid/still-blueprint-fixture"}))))
   (testing "a registry-only group entry is :spec"
     (is (= :spec (industry/maturity "011"))))
   (testing "a second implemented actor (cloud-itonami-isic-6810) is also :implemented"
@@ -225,12 +230,21 @@
     (is (= :implemented (industry/maturity "9101"))))
   (testing "a ninety-seventh implemented actor (cloud-itonami-isic-9700, domestic-employment actor) is also :implemented"
     (is (= :implemented (industry/maturity "9700"))))
+  (testing "a ninety-eighth implemented actor (cloud-itonami-isic-9900, mission-operations actor) is also :implemented"
+    (is (= :implemented (industry/maturity "9900"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
       (is (pos? (:spec m)))
-      (is (pos? (:blueprint m)))
-      (is (= 97 (:implemented m))))))
+      ;; cloud-itonami-isic-9900 was the LAST published-but-
+      ;; unimplemented blueprint repo anywhere in this registry
+      ;; (confirmed via a direct fleet-wide scan before promoting it,
+      ;; ADR-2607100300) -- the backlog reaching zero is a real,
+      ;; desirable fleet milestone, not a bug. See `industry/maturity-
+      ;; of`/`industry/maturity-roadmap-of` for how the :blueprint
+      ;; branch logic itself stays unit-tested without a live example.
+      (is (zero? (:blueprint m)))
+      (is (= 98 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
@@ -239,7 +253,11 @@
       (is (nil? (:next-step r)))
       (is (= "at maturity ceiling" (:next-action r)))))
   (testing "a blueprint entry's next step is implemented"
-    (let [r (industry/maturity-roadmap "9900")]
+    ;; No REAL registry entry sits at :blueprint tier any more (see
+    ;; `maturity-tier`'s own comment above) -- unit-test the pure
+    ;; roadmap logic directly via a synthetic fixture map + an empty
+    ;; technology stack instead of a live example.
+    (let [r (industry/maturity-roadmap-of {:repo "https://example.invalid/still-blueprint-fixture"} [])]
       (is (= :blueprint (:maturity r)))
       (is (= :implemented (:next-step r)))
       (is (true? (:has-repo r)))))
@@ -251,6 +269,11 @@
 
 (deftest execution-plan-reports-ui-export-readiness
   (testing "a vertical backed by a capability lib reports ui+export ready"
+    ;; "9900" is now :implemented (see `maturity-tier`'s own comment
+    ;; above) rather than :blueprint, but this assertion is maturity-
+    ;; independent -- ui-ready?/export-ready? are pure functions of
+    ;; :required-technologies via `technology-stack`, unaffected by
+    ;; promotion -- so no swap is needed here.
     (let [p (industry/execution-plan "9900")]
       (is (true? (:ui-ready? p)))
       (is (true? (:export-ready? p)))
