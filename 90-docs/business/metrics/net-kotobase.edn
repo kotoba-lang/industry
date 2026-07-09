@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 3017, "kotobase-cf-wasm-staging" 2327},
+ {"net-kotobase" 3030, "kotobase-cf-wasm-staging" 2328},
  :zone
- {:requests-7d 5296,
-  :pageviews-7d 278,
-  :uniques-7d-sum 351,
+ {:requests-7d 5312,
+  :pageviews-7d 279,
+  :uniques-7d-sum 352,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
@@ -14,7 +14,7 @@
    {:path
     "/ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapcbsx3yrg7xzj3jrxm3q4mzz2nu",
     :requests 23}
-   {:path "/llms.txt", :requests 21}
+   {:path "/llms.txt", :requests 22}
    {:path "/.well-known/did.json", :requests 20}
    {:path "/_app/meta", :requests 17}
    {:path
@@ -26,7 +26,7 @@
    {:path
     "/kotobase-cf-wasm-production/ipns/bafyreifxcavwrggfepiicezvesb3ctkq22p346iyo2yj5jiufkst3uhz3y.json",
     :requests 12}],
-  :status-mix {:client-error 2110, :ok 353, :server-error 28},
+  :status-mix {:client-error 2109, :ok 354, :server-error 29},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -37,7 +37,7 @@
  :as-of "2026-07-10",
  :traffic-quality {:window "24h", :probe-4xx-pct 85, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /llms-full.txt 32 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 23 · /llms.txt 21 · /.well-known/did.json 20 · /_app/meta 17 | 4xx(probe) 85% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): /llms-full.txt 32 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 23 · /llms.txt 22 · /.well-known/did.json 20 · /_app/meta 17 | 4xx(probe) 85% · 5xx 1%",
  :funnel {:visitors 274, :signups 0, :checkouts 0},
  :signal
- "kotobase.net 実測 5296 req/7d・351 uniques(日次和)・うち4xx probe 85%(24h)、workers 5344 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 5312 req/7d・352 uniques(日次和)・うち4xx probe 85%(24h)、workers 5358 inv/7d、Stripe active subs 0"}
