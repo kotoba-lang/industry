@@ -31,6 +31,7 @@
 - 根本原因判明 (2026-07-09): gftd.ai 5xx 85%の98%は fleet の MeshHeartbeat/PollTask。Worker の MCP router が mcp.gftd.ai へ転送するが DNS 専用レコード無く wildcard *.gftd.ai=192.0.2.1(黒穴)に落ち 19s 待ち 522。mcp 用 tunnel は存在せず murakumo-fleet tunnel も down — mesh 制御面の origin が消失
 - 観測 (signal): murakumo.cloud 実測 53353 req/7d・392 uniques(日次和)、workers 74818 inv/7d
 - 観測 (signal): murakumo.cloud 実測 53525 req/7d・393 uniques(日次和)、workers 75025 inv/7d
+- 観測 (signal): murakumo.cloud 実測 53740 req/7d・393 uniques(日次和)・うち4xx probe 2%(24h)、workers 75236 inv/7d
 
 ## Customer Segments
 
@@ -68,6 +69,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /infer/hwmetrics 7861 · /infer/runs 1413 · /v1/messages 202 · /v1/chat/completions 202 · / 56 | 4xx(probe) 2%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /infer/hwmetrics 7860 · /infer/runs 1414 · /v1/messages 199 · /v1/chat/completions 199 · / 58 | 4xx(probe) 2%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /infer/hwmetrics 7860 · /infer/runs 1414 · /v1/chat/completions 219 · /v1/messages 218 · / 58 | 4xx(probe) 2% · 5xx 0%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /infer/hwmetrics 7859 · /infer/runs 1413 · /v1/chat/completions 236 · /v1/messages 233 · / 59 | 4xx(probe) 2% · 5xx 0%
 
 > 実行済み (2026-07-06 tick4): US HN/X投稿コピー下書き + GTM launch runbook作成(Stripe未設定の間はGate 0で投稿ブロック、docs/gtm-launch-runbook.md)
 
