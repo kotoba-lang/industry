@@ -18,6 +18,7 @@
 - 観測 (signal): manimani.cloud 実測 2091 req/7d・159 uniques(日次和)
 - 観測 (signal): manimani.cloud 実測 2060 req/7d・197 uniques(日次和)
 - 観測 (signal): manimani.cloud 実測 2192 req/7d・238 uniques(日次和)
+- 観測 (signal): manimani.cloud 実測 2201 req/7d・243 uniques(日次和)
 
 ## Customer Segments
 

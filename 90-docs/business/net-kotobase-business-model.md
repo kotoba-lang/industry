@@ -18,6 +18,7 @@
 - 観測 (signal): kotobase.net 実測 3653 req/7d・336 uniques(日次和)、workers 7475 inv/7d、Stripe active subs 0
 - 観測 (signal): kotobase.net 実測 863 req/7d・291 uniques(日次和)、workers 4093 inv/7d
 - 観測 (signal): kotobase.net 実測 1505 req/7d・336 uniques(日次和)、workers 1627 inv/7d、Stripe active subs 0
+- 観測 (signal): kotobase.net 実測 1642 req/7d・348 uniques(日次和)、workers 1769 inv/7d、Stripe active subs 0
 
 ## Customer Segments
 

@@ -18,6 +18,7 @@
 - 観測 (signal): gftd.ai 実測 369449 req/7d・4875 uniques(日次和)、workers 31676 inv/7d
 - 観測 (signal): gftd.ai 実測 274601 req/7d・4504 uniques(日次和)、workers 21898 inv/7d
 - 観測 (signal): gftd.ai 実測 223839 req/7d・4736 uniques(日次和)、workers 8543 inv/7d
+- 観測 (signal): gftd.ai 実測 225774 req/7d・4809 uniques(日次和)、workers 8573 inv/7d
 
 ## Customer Segments
 
