@@ -23,6 +23,7 @@
 - 観測 (2026-07-06 QA): 公開ブログ2本のpublic/blog/*.htmlが作業ツリー上で生markdownに上書きされ本番で配信される事故が2回発生(原因不明、build scriptでの同期処理は存在せず)。加えてUS記事のCTAがcurl murakumo.cloud/join|sh(404、未実装のPhase2/3導線)を誤って案内していた。両方とも検知・修正・再デプロイ済み
 - 観測 (signal): murakumo.cloud 実測 51867 req/7d・384 uniques(日次和)、workers 73144 inv/7d
 - 観測 (signal): murakumo.cloud 実測 52512 req/7d・389 uniques(日次和)、workers 73865 inv/7d
+- 観測 (signal): murakumo.cloud 実測 52710 req/7d・389 uniques(日次和)、workers 74082 inv/7d
 
 ## Customer Segments
 

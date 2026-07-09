@@ -19,6 +19,7 @@
 - 観測 (signal): etzhayyim.com 実測 55909 req/7d・726 uniques(日次和)、workers 18948 inv/7d
 - 観測 (signal): etzhayyim.com 実測 45731 req/7d・865 uniques(日次和)、workers 17947 inv/7d
 - 観測 (signal): etzhayyim.com 実測 46238 req/7d・896 uniques(日次和)、workers 18113 inv/7d
+- 観測 (signal): etzhayyim.com 実測 46413 req/7d・899 uniques(日次和)、workers 18168 inv/7d
 
 ## Beneficiaries
 
