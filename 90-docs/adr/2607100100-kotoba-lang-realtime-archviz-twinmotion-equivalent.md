@@ -170,3 +170,16 @@ M2（`kotoba.amenominaka.render-ir`）を `kami-app-amenominaka` に実装・着
 - **副産物として発見・修正した実バグ**: (1) `kami-app-amenominaka` のCIは **M0着地以来ずっと失敗していた**（`gh run list` で確認 — `deps.edn` の `:local/root` 兄弟依存がCIの単一repo checkoutでは解決できないため）。M2の一環でCI設定を全面修正（兄弟repoを `$GITHUB_WORKSPACE` 直下の子として並列checkoutし、`working-directory` で本体に切り替える構成 — `actions/checkout` は `path:` が `$GITHUB_WORKSPACE` を跨ぐ `../` を許可しないため実測で判明）。(2) ローカルの `orgs/kotoba-lang/webgpu` checkout が stale で、実際のGitHub上の最新版は `org-w3-webgpu`/`expr` という新たな `:local/root` 依存を追加していた（ADR-2607051400/2607051500）— `kami.webgpu.ir`自体は無変更（diff確認済み）だったが、これらのsibling checkoutが無いとtools.depsのclasspath解決が失敗するため追加。
 - **検証**: 20 tests / 66→86 assertions green（M0/M1込み）、clj-kondo clean（`.cljc`/`.cljs`/nbbの`.cljs`全て）。
 - **未解決のまま**: インタラクティブなorbit/flyカメラ操作（render-IRは静止フレームのカメラのみ）、`wgsl` の `@compute` 対応（M4のまま）、M3（`kami-app-amenominaka` 拡張シェル自体）は未着手。
+
+## Addendum (2026-07-10): M3 実装 — 「extension → magatama Pregel cell」の解決（=撤回）と拡張ローダの実装
+
+M3（`kotoba.amenominaka.application`/`.extension`/`.extensions`）を `kami-app-amenominaka` に実装・着地（`e63446a`、west pin 前進 `f6e8f0d→e63446a`）。M0着手前からの宿題だった「extension → magatama Pregel cell マッピング — 未解決、M3着手前に別途スコーピングが必要」（D7 Open Questions）を実際に調査・解決した。
+
+- **「magatama」の出典を検証した結果、本ADR D7 の記述自体が誤りだった**: D7は「親ADR-2605261800由来の要求」としていたが、`etzhayyim/root/90-docs/adr/2605261800-nvidia-omniverse-stack-api-compat.md` を全565行読み直したところ **"magatama"/"Pregel" いずれも一致ゼロ**。実際の経路は「`kami-app-amenominaka`のpre-M0 README草稿がこのフレーズを創作 → 本ADRのD7がそれを親ADR由来と誤って引用 → 親ADR自体は何も述べていない」。**"magatama" という語はモノレポ内で少なくとも3つの無関係なシステム**（gftdcojpのCloudflare Workerアプリ規約`MagatamaApp`、etzhayyimの資本フロー監視actor、gftdcojpの`pymagatama`/`keiei`デーモン）に独立して再利用されており、Pregel関連の技術的定義はどこにも無い。組織内の実在するPregel-cellシステムは`kotodama`の永続デーモンカタログ（ADR-2605192415）だが、extension loadingとは無関係。
+- **対応**: このマッピングを「未実装のギャップ」ではなく**「概念として撤回」**として扱った — 存在しない定義を推測で作らず、依存順序付きlifecycleを"magatama"抜きで実装。
+- **拡張ローダは`kami-nv-compat`から正本として移植**: `kotoba.lang.kami-nv-compat.amenominaka.{application,extension}`（クリーンルームの`omni.kit.app.IApp`/`omni.ext.IExt`ミラー、ADR-2605261800 D6/D10.4）を発見 — Kahn位相ソートによる`startup-all`/`shutdown-all`（親→子の順で起動、逆順で停止、循環はthrow）と、実働する`extension.toml`サブセットパーサ`parse-extension-toml`が既に実装・テスト済みだった。ADR-2605261800自身のN10（「nv-compat namespace内でcanonical機能拡張... 禁止」）に従い、ロジックは変更せず`kami-app-amenominaka`側へ正本として移植した（`kami-nv-compat`側は変更せず、将来thin facade化する余地を残す — 別スコープ）。
+- **`kotoba-lang/toml`は使えないと確認**: D7の当初計画は「`kotoba-lang/toml`で`.toml`互換薄層」だったが、実ソースを読んだ結果 `toml.core/toml` は **EDN→TOML専用**（パーサ無し）と判明。リテラル`.toml`読み込みには使えないため、`kami-nv-compat`の手書きパーサをそのまま移植した。
+- **M0/M2をextensionとして配線**: `kotoba.amenominaka.extensions`が新規で実装した部分 — `scene`(M0、依存なし)と`render-ir`(M2、`scene`に依存)を`extension.edn`（ファイルではなくコード内EDNデータ — 単一アプリでプラグインディレクトリのスキャン需要が無いため）として登録し、依存順（`["scene" "render-ir"]`）で起動することをテストで確認。
+- **R1.4ゲートの最終状態**: `omni.usd`(M1)・`omni.kit.viewport`(M2)・`omni.kit.app`(M3のローダ自体)の3/5は実装済み。`omni.timeline`（キーフレーム/カメラパス、D7が"M3 stretch"と明記）は未実装のまま。`omni.replicator.core`（合成データ）は最初から対象外（D6明記）— ゲートは構造的に完全には閉じない。
+- **検証**: 29 tests / 122 assertions green（M0-M2込み、67の新規テスト追加）、clj-kondo clean。CI green（`test`/`webgpu-smoke`両ジョブ、main上でも確認）。
+- **未解決のまま**: `omni.timeline`（M3 stretch、未着手）、`wgsl`の`@compute`対応（M4）、インタラクティブなorbit/flyカメラ操作。
