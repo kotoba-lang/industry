@@ -39,6 +39,7 @@
 - 観測 (signal): etzhayyim.com 実測 48111 req/7d・910 uniques(日次和)・うち4xx probe 16%(24h)、workers 18489 inv/7d
 - 観測 (signal): etzhayyim.com 実測 48205 req/7d・910 uniques(日次和)・うち4xx probe 15%(24h)、workers 18490 inv/7d
 - 観測 (signal): etzhayyim.com 実測 48301 req/7d・910 uniques(日次和)・うち4xx probe 15%(24h)、workers 18505 inv/7d
+- 観測 (signal): etzhayyim.com 実測 48398 req/7d・912 uniques(日次和)・うち4xx probe 15%(24h)、workers 18509 inv/7d
 
 ## Beneficiaries
 
@@ -76,6 +77,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 21 · /_shell/home-feed.js 5 · /organism/health.json 4 · /sitemap.xml 4 · /organism/pulse.json 4 | 4xx(probe) 16% · 5xx 81%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 94 · /robots.txt 22 · /_shell/home-feed.js 5 · /organism/health.json 4 · /sitemap.xml 4 | 4xx(probe) 15% · 5xx 80%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 94 · /robots.txt 23 · /_shell/home-feed.js 6 · /organism/health.json 5 · /organism/pulse.json 5 | 4xx(probe) 15% · 5xx 79%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 96 · /robots.txt 24 · /_shell/home-feed.js 6 · /organism/health.json 5 · /organism/pulse.json 5 | 4xx(probe) 15% · 5xx 79%
 
 ## Funding
 
