@@ -32,12 +32,17 @@
   (testing "the reference actor is implemented"
     (is (= :implemented (industry/maturity "6310"))))
   (testing "a published blueprint repo is :blueprint"
-    ;; No REAL registry entry sits at :blueprint tier any more (the
-    ;; fleet-wide backlog was fully cleared as of cloud-itonami-isic-
-    ;; 9900's own promotion, ADR-2607100300) -- unit-test the pure
-    ;; branch logic directly via a synthetic fixture map instead of a
-    ;; live example, see `industry/maturity-of`.
+    ;; Unit-test the pure branch logic directly via a synthetic fixture
+    ;; map (see `industry/maturity-of`) so this assertion never depends
+    ;; on which, if any, REAL registry entry currently sits at
+    ;; :blueprint tier -- that count legitimately fluctuates as new
+    ;; blueprints are published and existing ones are implemented (it
+    ;; briefly reached zero fleet-wide as of cloud-itonami-isic-9900's
+    ;; own promotion, ADR-2607100300, before cloud-itonami-isic-8010
+    ;; was freshly published, ADR-2607100400).
     (is (= :blueprint (industry/maturity-of {:repo "https://example.invalid/still-blueprint-fixture"}))))
+  (testing "cloud-itonami-isic-8010, freshly published, is also :blueprint (live-state corroboration)"
+    (is (= :blueprint (industry/maturity "8010"))))
   (testing "a registry-only group entry is :spec"
     (is (= :spec (industry/maturity "011"))))
   (testing "a second implemented actor (cloud-itonami-isic-6810) is also :implemented"
@@ -236,14 +241,16 @@
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
       (is (pos? (:spec m)))
-      ;; cloud-itonami-isic-9900 was the LAST published-but-
-      ;; unimplemented blueprint repo anywhere in this registry
-      ;; (confirmed via a direct fleet-wide scan before promoting it,
-      ;; ADR-2607100300) -- the backlog reaching zero is a real,
-      ;; desirable fleet milestone, not a bug. See `industry/maturity-
-      ;; of`/`industry/maturity-roadmap-of` for how the :blueprint
-      ;; branch logic itself stays unit-tested without a live example.
-      (is (zero? (:blueprint m)))
+      ;; :blueprint legitimately fluctuates as new blueprints are
+      ;; published and existing ones are implemented -- it briefly
+      ;; reached zero fleet-wide as of cloud-itonami-isic-9900's own
+      ;; promotion (ADR-2607100300), then became 1 again with
+      ;; cloud-itonami-isic-8010's own fresh publication
+      ;; (ADR-2607100400). This is not asserted as a fixed invariant;
+      ;; see `industry/maturity-of`/`industry/maturity-roadmap-of` for
+      ;; how the :blueprint branch logic itself stays unit-tested
+      ;; without depending on a specific live count.
+      (is (= 1 (:blueprint m)))
       (is (= 98 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
