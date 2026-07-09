@@ -474,6 +474,24 @@
    :business-id "cloud-itonami-7110"
    :required-technologies [:robotics :cae :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:cfd :optimization]
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as a community-architectural/
+   ;; engineering-practice actor (PracticeOps-LLM ⊣ Design Governor),
+   ;; the ninety-third build outside ADR-2607032000's original
+   ;; insurance/real-estate batch. This blueprint's own governor
+   ;; keyword was originally :practice-governor, which COLLIDED with
+   ;; cloud-itonami-isic-8620's own (clinical practice) -- the first
+   ;; governor-name collision in this build sequence -- so it was
+   ;; renamed to :design-governor (grep-verified unique fleet-wide).
+   ;; No bespoke domain capability library exists (kotoba-lang/cad,
+   ;; kami-cad-import, kami-engine-cae-solver and drawingml are
+   ;; generic CAE/CAD technology substrate, not domain-specific
+   ;; business logic). Two new HARD checks: design-outside-scope?
+   ;; (flagship, 82nd unconditional-evaluation-discipline grounding,
+   ;; building/engineering-code law) and professional-seal-invalid?
+   ;; (83rd grounding, the eleventh conditional variant, professional-
+   ;; licensure law, full four-jurisdiction coverage). See
+   ;; ADR-2607092300.
    :operating-states [:intake :scope :design :verify :deliver :audit]}
   {:id "7810" ; N — Administrative and support service
    :name "Community Employment Agency"
