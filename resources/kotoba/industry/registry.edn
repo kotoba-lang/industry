@@ -4122,11 +4122,31 @@
    :operating-states [:intake :observe :treat :publish :audit]},
   {:id "3812"
    :name "Collection of hazardous waste"
-   :repo "https://github.com/gftdcojp/cloud-itonami-E3812"
-   :business-id "cloud-itonami-E3812"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3812"
+   :business-id "cloud-itonami-3812"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Published as a :blueprint repo (business-model.md + operator-guide.md +
+   ;; blueprint.edn + governance docs, no src/test yet -- the OSS blueprint
+   ;; stage, not yet :implemented). :maturity :spec explicitly removed so
+   ;; maturity-of/maturity now auto-derive :blueprint from the real :repo
+   ;; above (see `kotoba.industry/maturity-of`). The legacy placeholder
+   ;; :repo (gftdcojp/cloud-itonami-E3812) never actually existed (confirmed
+   ;; 404 before this edit) -- replaced with the real repo, following the
+   ;; SAME cloud-itonami/cloud-itonami-isic-#### naming convention as every
+   ;; other actor in this fleet rather than the legacy E-prefixed scheme.
+   ;; Governor keyword :hazardous-waste-governor is grep-verified UNIQUE
+   ;; fleet-wide -- distinct from cloud-itonami-isic-3830's own materials-
+   ;; recovery/recycling vertical (:traceability-governor, :implemented) and
+   ;; cloud-itonami-cofog-05.1's own municipal-waste-collection vertical (a
+   ;; SEPARATE COFOG-classified sub-fleet, :waste-operations-governor):
+   ;; hazardous industrial/medical/chemical waste carries a materially
+   ;; stricter manifest/chain-of-custody regime than either general
+   ;; recyclables or municipal garbage. This was deferred at ADR-2607100700
+   ;; to avoid a third waste-adjacent pick in a row; picked up now after
+   ;; diversifying with a manufacturing-sector pick (ADR-2607100800). No
+   ;; bespoke capability library exists for hazardous-waste manifest
+   ;; management specifically. See ADR-2607101300.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :observe :treat :publish :audit]},
   {:id "3821"
