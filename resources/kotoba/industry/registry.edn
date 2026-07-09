@@ -379,6 +379,15 @@
    :name "Community Building Construction"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4211"
    :business-id "cloud-itonami-4211"
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented (the ninety-first build) on
+   ;; completing the robot-dispatch (build/handover) slice of the same
+   ;; :construction-governor that already carried the disaster/severe-
+   ;; weather SAFETY slice (ADR-0001). The genuinely-new governor HARD
+   ;; check 'permit-and-inspection-required' (建築基準法 第6条/第7条,
+   ;; IBC §105/§111, BauO+EU CPR 305/2011) gates the physical build
+   ;; actuation. See cloud-itonami-isic-4211/docs/adr/0002-robot-
+   ;; dispatch-slice.md.
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization :cae]
    :operating-states [:intake :design :permit :build :inspect :handover :audit]}
