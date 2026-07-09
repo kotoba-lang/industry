@@ -52,6 +52,7 @@
 - 計器 (funnel): 課金/creator GMV の計測（funnel emitter で funnel/paying を出力）
 - 配線済 (club-shinshi-creator-take): crypto USDC rail 着地 — kotoba-lang/pay+treasury (ADR-2607092700, 決済主体=JK株式会社) + /pay claim→verifier→confirm_pay_run→creator_billing_daily (ADR-2607071900)。残 = UI 導線 + 法務、GMV 実測ゼロ
 - 法務確認済 (club-shinshi-creator-take): アダルト×crypto 決済の法務ゲートをオーナー確認 (2026-07-09)。creator 課金解禁の残タスクは UI 導線のみ
+- x402 統合 (ADR-2607093100): L0 shinshi /x402/premium 本番稼働 (402 実測)。L3 per-request USDC 課金は murakumo PR#9 (推論) + kotobase PR#184 (storage) が OPEN/MERGEABLE、deploy+treasury 設定調整待ち。循環が per-request 粒度で技術的に閉じた
 
 ## Channels
 
