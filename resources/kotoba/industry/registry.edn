@@ -444,6 +444,21 @@
    :business-id "cloud-itonami-5510"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:optimization]
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as a community-accommodation
+   ;; actor (HospitalityOps-LLM ⊣ Hospitality Governor), the ninety-
+   ;; second build outside ADR-2607032000's original insurance/real-
+   ;; estate batch (on top of the concurrent 4211 robot-dispatch-slice
+   ;; promotion). This blueprint's own :hospitality-governor keyword is
+   ;; UNIQUE fleet-wide -- no naming-collision precedent needed. No
+   ;; bespoke domain capability library exists (kotoba-lang/com-opera-
+   ;; pms and kotoba-lang/com-shares-pms are clean-room PMS-protocol
+   ;; vendor-compatibility shims, not domain logic). Two new HARD
+   ;; checks: guest-registration-incomplete? (flagship, 80th
+   ;; unconditional-evaluation-discipline grounding, guest-registration
+   ;; law -- honest single-jurisdiction gap for the US) and guest-
+   ;; disclosure-authorization-unconfirmed? (81st grounding, the tenth
+   ;; conditional variant). See ADR-2607092000.
    :operating-states [:intake :reserve :check-in :serve :check-out :audit]}
   {:id "6810" ; L — Real estate activities
    :name "Community Real-Estate Agency"
