@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 5137, "ai-gftd-chat-shell" 3621},
+ {"magatama-sh1n5h1x" 5162, "ai-gftd-chat-shell" 3622},
  :zone
- {:requests-7d 234861,
-  :pageviews-7d 4287,
-  :uniques-7d-sum 5018,
+ {:requests-7d 235471,
+  :pageviews-7d 4293,
+  :uniques-7d-sum 5029,
   :zone "gftd.ai"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/error_log.php", :requests 101}
-   {:path "/.github/workflows/ci.yml", :requests 36}
-   {:path "/.env.int", :requests 36}
+  [{:path "/", :requests 1205}
+   {:path "/favicon.ico", :requests 140}
+   {:path "/index.php", :requests 59}
+   {:path "/sbhu.php", :requests 21}
    {:path "/ws.php", :requests 19}
-   {:path "/8573.php", :requests 18}
+   {:path "/inputs.php", :requests 17}
    {:path "/lib.php", :requests 16}
-   {:path "/wp-scr1pts.php", :requests 15}
-   {:path "/we.php", :requests 13}],
-  :status-mix {:ok 878, :client-error 1335, :server-error 7334},
+   {:path "/wp-admin/install.php", :requests 15}],
+  :status-mix {:ok 1990, :client-error 1494, :server-error 7376},
   :window "24h"},
  :as-of "2026-07-09",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 14, :error-5xx-pct 77},
+ {:window "24h", :probe-4xx-pct 14, :error-5xx-pct 68},
  :top-paths
- "上位 page (24h, 2xx/3xx): /error_log.php 101 · /.github/workflows/ci.yml 36 · /.env.int 36 · /ws.php 19 · /8573.php 18 | 4xx(probe) 14% · 5xx 77%",
+ "上位 page (24h, 2xx/3xx): / 1205 · /favicon.ico 140 · /index.php 59 · /sbhu.php 21 · /ws.php 19 | 4xx(probe) 14% · 5xx 68%",
  :signal
- "gftd.ai 実測 234861 req/7d・5018 uniques(日次和)・うち4xx probe 14%(24h)、workers 8758 inv/7d"}
+ "gftd.ai 実測 235471 req/7d・5029 uniques(日次和)・うち4xx probe 14%(24h)、workers 8784 inv/7d"}
