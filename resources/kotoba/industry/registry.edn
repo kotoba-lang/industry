@@ -5200,11 +5200,29 @@
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "6010"
    :name "Radio broadcasting"
-   :repo "https://github.com/gftdcojp/cloud-itonami-J6010"
-   :business-id "cloud-itonami-J6010"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6010"
+   :business-id "cloud-itonami-6010"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Published as a :blueprint repo (business-model.md + operator-guide.md +
+   ;; blueprint.edn + governance docs, no src/test yet -- the OSS blueprint
+   ;; stage, not yet :implemented). :maturity :spec explicitly removed so
+   ;; maturity-of/maturity now auto-derive :blueprint from the real :repo
+   ;; above (see `kotoba.industry/maturity-of`). The legacy placeholder
+   ;; :repo (gftdcojp/cloud-itonami-J6010) never actually existed (confirmed
+   ;; 404 before this edit) -- replaced with the real repo, following the
+   ;; SAME cloud-itonami/cloud-itonami-isic-#### naming convention as every
+   ;; other actor in this fleet rather than the legacy J-prefixed scheme.
+   ;; Low-friction sibling pick of cloud-itonami-isic-6020's own (television
+   ;; broadcasting), following the SAME pattern plumbingops/4322
+   ;; established for electricalops/4321 -- reuses the identical
+   ;; operating-states shape and license-domain flavor for a distinct,
+   ;; separately-licensed medium (radio spectrum vs. television spectrum,
+   ;; each carrying their own MIC/FCC/Ofcom/Landesmedienanstalten license
+   ;; class). Governor keyword :radio-broadcast-governor is grep-verified
+   ;; UNIQUE fleet-wide, distinct from cloud-itonami-isic-6020's own
+   ;; :broadcast-license-governor. No bespoke capability library exists for
+   ;; radio broadcasting specifically. See ADR-2607102600.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "6020"
