@@ -3258,11 +3258,30 @@
    :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "2011"
    :name "Manufacture of basic chemicals"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2011"
-   :business-id "cloud-itonami-C2011"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2011"
+   :business-id "cloud-itonami-2011"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae :cfd]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Published as a :blueprint repo (business-model.md + operator-guide.md +
+   ;; blueprint.edn + governance docs, no src/test yet -- the OSS blueprint
+   ;; stage, not yet :implemented). :maturity :spec explicitly removed so
+   ;; maturity-of/maturity now auto-derive :blueprint from the real :repo
+   ;; above (see `kotoba.industry/maturity-of`). The legacy placeholder
+   ;; :repo (gftdcojp/cloud-itonami-C2011) never actually existed (confirmed
+   ;; 404 before this edit) -- replaced with the real repo, following the
+   ;; SAME cloud-itonami/cloud-itonami-isic-#### naming convention as every
+   ;; other actor in this fleet rather than the legacy C-prefixed scheme.
+   ;; Governor keyword :chemical-safety-governor is grep-verified UNIQUE
+   ;; fleet-wide. Weapons manufacturing (ISIC 2520) and tobacco manufacturing
+   ;; (ISIC 1200) were both explicitly avoided as candidates in this scope
+   ;; for dual-use/public-health-harm concerns disproportionate to this
+   ;; fleet's community-operator mission; basic chemicals manufacturing
+   ;; carries none of that disproportionate harm profile (a mainstream,
+   ;; heavily regulated industrial input, not a product engineered to harm
+   ;; its own end user). Second manufacturing-lifecycle
+   ;; (design->produce->inspect->package) pick after cloud-itonami-isic-
+   ;; 2660's own. No bespoke capability library exists for chemical
+   ;; manufacturing specifically. See ADR-2607101400.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2012"
