@@ -8,14 +8,14 @@
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/robots.txt", :requests 15}
-   {:path "/itonami/verticals", :requests 2}
-   {:path "/itonami", :requests 2}],
-  :status-mix {:ok 19, :client-error 20},
+  [{:path "/robots.txt", :requests 14}
+   {:path "/itonami", :requests 2}
+   {:path "/itonami/verticals", :requests 1}],
+  :status-mix {:ok 17, :client-error 20},
   :window "24h"},
  :as-of "2026-07-10",
- :traffic-quality {:window "24h", :probe-4xx-pct 51, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 54, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /robots.txt 15 · /itonami/verticals 2 · /itonami 2 | 4xx(probe) 51%",
+ "上位 page (24h, 2xx/3xx): /robots.txt 14 · /itonami 2 · /itonami/verticals 1 | 4xx(probe) 54%",
  :signal
- "itonami.cloud 実測 2942 req/7d・95 uniques(日次和)・うち4xx probe 51%(24h)"}
+ "itonami.cloud 実測 2942 req/7d・95 uniques(日次和)・うち4xx probe 54%(24h)"}
