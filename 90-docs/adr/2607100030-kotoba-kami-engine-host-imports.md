@@ -76,3 +76,34 @@ gpu/math Track B imports proved (guest computes, host executes):
   kotoba `31263fa8` updates DEMONSTRATIONS.md accordingly.
 - West pins advanced for kotoba / kotoba-core-contracts / kotoba-lang in
   the same landing.
+
+## Addendum 2 (2026-07-10) — runtime-priority realignment: the host premise is ClojureScript, not the JVM
+
+Owner directive: premise the kami host on kotoba wasm runtime /
+clojurewasm / ClojureScript — not the JVM (the 2026-07-07 repo-wide
+runtime priority). Walking the ladder: the **guest** is already kotoba
+wasm; a **host** cannot be expressed in the `.kotoba` subset (N/A by
+design). **clojurewasm is blocked today** — cljw v1.0.1's FFI is
+`wasm/load`+`wasm/call` for import-free modules, with Clojure-provided
+host imports explicitly deferred to its "fuller Phase-16 FFI surface"
+(upstream `docs/examples/wasm/README.md`, checked 2026-07-10), and this
+guest needs 12 host imports; revisit when Phase-16 lands. **ClojureScript
+adopted**:
+
+- kotoba `367b4a14` — `kami_host.clj` → **`kami_host.cljc`**: fully
+  portable ECS core; xorshift64 reimplemented as ONE 32-bit-pair
+  implementation, bit-identical on JVM longs / cljs int32 ops / nbb SCI;
+  `:cljs` wire layer (`kami-host-imports` for the native
+  `js/WebAssembly` engine); `:clj` Chicory layer kept for the compat
+  suite only. `scripts/verify_kami_survivors_nbb.cljs` (nbb, **no JVM**)
+  drives the checked-in fixture for the same 300 ticks and pins the same
+  counts — green. Also caught: `test_runner.clj`'s fixed namespace list
+  had never included `kotoba.kami-game-test` (the kami suite silently
+  never ran under `-M:test`); registered — now 198 tests / 975
+  assertions, 0 failures.
+- wasm-webcomponent `06316562` — the hand-JS `kami-ecs.js` is retired;
+  it is now **compiled by shadow-cljs** from a thin
+  `src-cljs/kotoba/kami_ecs.cljs` adapter over the **vendored**
+  `kami_host.cljc` (file-for-file from kotoba@367b4a14, `src/vendor`
+  ed25519 convention). One `.cljc` source now serves the JVM compat
+  suite, the nbb script, and the browser/Node ESM. `npm test` green.
