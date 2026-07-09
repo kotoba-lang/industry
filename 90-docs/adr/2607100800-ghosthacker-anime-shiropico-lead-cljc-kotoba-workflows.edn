@@ -1,0 +1,34 @@
+{:adr/id "2607100800"
+ :adr/title "ghosthacker アニメは shiropico 先行、旧 Web パイプラインは cljs へ、game/anime 生成 workflow は cljc kotoba 前提"
+ :adr/status :accepted
+ :adr/date "2026-07-10"
+ :adr/related ["2607100100-runtime-priority-apps-jvm-bb-demoted"
+               "2607011816-ghosthacker-shiropico-standalone-repo"
+               "2607012000-shiropico-publish-actor"
+               "2607023200-ghosthacker-game-portfolio-flow"
+               "2607021700-manga-as-social-post-embed-external"]
+
+ :directive "オーナー指示 2026-07-10: anime は shiropico が先行してOK、nextjs 版は cljs にリファクタ、ゲームと anime の生成 workflow を cljc kotoba で"
+
+ :context "ghosthacker IP 3トラックの棚卸し(本セッション)で判明: 漫画は aozora.app で公開済み(kami-app-sip-clj)。ゲームは10タイトル中3本のみ実装(JVM CLIプロトタイプ)。アニメは Ren/Nei本編・shiropico の2系統ともレンダリング/公開未到達。ghosthacker/README.md 記載の旧 Web パイプライン(apps/web=SvelteKit+vite、apps/server=Go)は2026-06に漫画用途はDEPRECATED済みだが、動画生成/Wattpad自動投稿/Neo4jストーリーグラフ等アニメ固有機能はまだこのスタックに残存。オーナー呼称『nextjs版』は技術的にはSvelteKitの誤称(口語表現として扱う)。shiropicoは台本/多言語資産は充実だがai-gftd-animekaの生成グラフはComfyUI/LLM未接続。"
+
+ :decision
+ {:anime-lead :shiropico
+  :anime-lead-note "Ren/Nei本編アニメはshiropicoの後追い。レンダリング接続(ComfyUIゲートウェイ)・kotobase実投稿の優先実装/検証はai-gftd-ghosthacker-shiropico/ai-gftd-animeka側から着手"
+  :legacy-web-refactor {:target ["orgs/com-junkawasaki/ghosthacker/apps/web (SvelteKit)"
+                                 "orgs/com-junkawasaki/ghosthacker/apps/server (Go)"
+                                 "関連フロントエンド全般(mangaka-ghosthacker-assets 等の周辺リポに残るNext.js/React/SvelteKit実装を含む)"]
+                        :to :clojurescript
+                        :scope-excl "漫画出力は既にkami-app-sip-clj移行済みで対象外。リファクタ対象は残存するアニメ固有機能(動画生成トリガー・Wattpad自動投稿・Neo4jストーリーグラフ閲覧/編集UI)"}
+  :game-anime-generation-workflow {:lang :cljc
+                                    :runtime-order-ref "ADR-2607100100 (kotoba-wasm-runtime > clojurewasm > clojurescript > nbb, jvm/bb demoted)"
+                                    :targets ["game portfolio (ghosthacker-flow/harmony/echoes 実装済み3本 + 未着手7タイトルの生成/ビルドworkflow)"
+                                              "anime生成workflow (ai-gftd-animeka の cut単位パイプライン)"]
+                                    :compat-layer "既存FLOW/HARMONY/ECHOESのterminal.clj(JVM CLI)は互換層として残す。host-importを要する形(clojurewasmの現行制約、ADR-2607100030 addendum 2)はClojureScriptに落とす"}}
+
+ :follow-up ["ghosthacker/apps/web の cljs 移行スコープ策定(Wattpad投稿・Neo4jグラフ閲覧のcljs実装調査)"
+             "game portfolio 未着手7本の host adapter を kotoba wasm 前提で選定(kami-engine-sdk 流用可否検証)"
+             "ai-gftd-animeka 生成グラフの cljc kotoba化とComfyUI/LLM接続経路の確定"]
+
+ :implementation-status :not-started
+ :note "本ADRは方針決定のみ。実装はfollow-up tickで行う"}
