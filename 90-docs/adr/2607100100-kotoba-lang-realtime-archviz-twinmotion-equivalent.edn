@@ -112,7 +112,8 @@
    :detail "kotoba.amenominaka.scene、pure CLJC、レンダリング皆無"}
   {:id "M1" :name "USD/glTF書き出し" :status "USD部分done (2026-07-10, kami-app-amenominaka@47cfe0d)。glTF未着手"
    :detail "scene.edn → .usda(実装済み)/.gltf(未着手)、既存USDビューアで確認、新規レンダリングエンジン不要"}
-  {:id "M2" :name "3D render-IR + kami-webgpuブラウザMVP" :detail "静的シーンのブラウザ内ウォークスルー、CPU-authored instancing、native Rust不使用"}
+  {:id "M2" :name "3D render-IR + kami-webgpuブラウザMVP" :status "render-IR bridge done, 実ブラウザ検証済み (2026-07-10, kami-app-amenominaka@f6e8f0d)。interactive camera未着手"
+   :detail "静的シーンのブラウザ内render-IR bridge、CPU-authored instancing、native Rust不使用。webgpuは既存の実働3Dレンダラーだったと判明(D5前提の訂正)"}
   {:id "M3" :name "kami-app-amenominaka拡張シェル" :detail "extensionローダ+lifecycle実装、M0-M2を最初の実拡張として包む"}
   {:id "M4" :name "GPU側instancing(stretch/条件付き)" :detail "wgsl @compute対応後。M2が性能上限にぶつかった場合のみ着手"}]
 
@@ -165,4 +166,35 @@
   :materialx-gap
   "bimは材質の色/PBR値を持たないため、中立グレーstandard_surfaceを1つcompanion .mtlxとして
    生成するのみ。USD<->MaterialXのmaterial:binding(UsdMtlx schema)は未検証のため意図的に
-   見送り — 既知のギャップとして明記(推測でschemaを書いて壊れたbindingを埋め込むより正直)。"}}
+   見送り — 既知のギャップとして明記(推測でschemaを書いて壊れたbindingを埋め込むより正直)。"}
+
+ :addendum-m2-2026-07-10
+ {:landed {:kami-app-amenominaka "47cfe0d→f6e8f0d (feat/m2-render-ir, server-side merge)"
+           :west-yml-pin "47cfe0dd6aba→f6e8f0d5e148 (--entry kami-app-amenominaka, verify-west-pins OK)"
+           :verification "20 tests / 86 assertions green, clj-kondo clean, 実ブラウザ(Playwright+full
+                           Chromium)でnavigator.gpu取得成功+スクリーンショットで正しい描画を目視確認、
+                           GitHub Actions macOS runner上のwebgpu-smoke jobでも再現(green)"}
+  :d5-premise-correction
+  "本ADRのD5「render-IRは2D/UI形状のみ」は誤りだった — kotoba-lang/webgpu(kami-webgpuはADR-2607051400で
+   リネーム済みのstale entry)のkami.webgpu.ir/kami.webgpu.cljsは実ソース読解の結果、カメラ・シャドウ
+   マップ・PBR・インスタンシングを備えた実働3Dレンダラーだと判明(2D専用なのはdom-gpuという別repo)。
+   M2の実質的新規作業はレンダラー実装でなくEDNブリッジのみだった。"
+  :ir-instance-constraint
+  "ir/instance の:sizeは[footprint-width height]の正方形フットプリントのみ(矩形boxは存在しない、
+   ir.cljcソース直読で確認)。bimの細長い壁を正確表現できないが、ir.cljc自身のdocstring例
+   ';; a building'も同じ正方形massing block表現を採用しており、それに倣った(壁のrun lengthを
+   footprintとして使う早期マッシング表現。未検証の:geoカスタムレジストリ拡張はしなかった)。"
+  :discovered-and-fixed-bugs
+  ["kami-app-amenominakaのCIはM0着地(2026-07-09)以来ずっと失敗していた(gh run listで確認) —
+    deps.ednの:local/root兄弟依存をCIの単一repo checkoutでは解決できないため。actions/checkoutは
+    path:がGITHUB_WORKSPACEを跨ぐ../を許可しない(実測で判明)ため、全repoをGITHUB_WORKSPACE直下の
+    子として並列checkoutしworking-directoryで本体に切り替える構成に修正、macOS専用
+    webgpu-smoke jobも追加(Linux/SwiftShaderはADR-2607078000で不安定と既知のため)。"
+   "ローカルのorgs/kotoba-lang/webgpu checkoutがstaleで、実際のGitHub最新版はorg-w3-webgpu/expr
+    という新規:local/root依存を追加済みだった(ADR-2607051400/2607051500)。kami.webgpu.ir自体は
+    無変更(diff確認済み)だが、これらのsibling checkoutが無いとtools.depsのclasspath解決が失敗
+    するためCI/ローカル両方に追加。"]
+  :node-verification-authoring
+  "検証ハーネスは当初wasm-webcomponentの既存.mjsをコピーして書いたが、owner指摘によりnbb(.cljs)に
+   翻訳して書き直した — CLAUDE.mdに'Node側検証ハーネスも新規はnbb限定、既存.mjsは前例にしない'
+   ルールを追記(2026-07-10)。"}}
