@@ -542,6 +542,17 @@ PolicyGovernor）/ **cloud-itonami**（ops-LLM ⊣ CertGovernor）。
   nbb を優先）。2026-07-06 初版の「kototama > cljs > nbb > jvm」→
   2026-07-07 改訂に続く 3 度目の改訂で、変更点は (1) app 互換性の順序と
   しての明文化、(2) `bb` を JVM と並ぶ最下位に明示、の 2 点。
+- **Node 側の検証/テストハーネス（Playwright driver、静的サーバ、E2E
+  スクリプト等）も新規に書く場合は nbb（`.cljs`）で書く — 生 JS の
+  `.mjs`/`.cjs` を新規に書かない。** 既存 repo に `.mjs` の先行実装
+  （例: `wasm-webcomponent/test/render/lib/webgpu-harness.mjs`）があっ
+  ても、それは「対象を決めて ADR 化してから移行する既存資産」（既存の
+  JVM 専用ライブラリを書き直さない原則と同型）であって、新規タスクで
+  それをコピー/踏襲してよい前例にはならない — 中身のロジック（技術的
+  knowledge: full Chromium 実行パス解決・静的サーバ・`navigator.gpu`
+  可用性チェック等）は参照してよいが、新規に書く実装は必ず nbb に翻訳
+  する（実例: ADR-2607100100 M2、2026-07-10 owner 指摘で `.mjs` harness
+  を nbb 版に置き換え）。
 - **`kotoba wasm`** — `.kotoba` 拡張子（kotoba 言語の極小サブセット —
   `def`/`defn`/`ns`/`if`/`when`/`let`/`do`/算術/比較/`and`/`or`/`not`/
   文字列基本操作 + 再帰のみ、Java/JS interop 一切なし、サードパーティ lib
