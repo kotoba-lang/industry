@@ -65,6 +65,7 @@
 - 準備 (murakumo-tok-price): run ledger の原価/tok export (node別 tok/s × 電力)
 - 準備 (murakumo-tok-price): 社内3アプリ推論の fleet 移管で原価比較
 - 実行済み (2026-07-06): US/EU blog posts 公開完了 (2026-bonus-depreciation-idle-gpu-cloud.md, 2026-eu-ai-act-audit-ledger.md)
+- 実行済み (2026-07-09): LPをblockchain-native decentralized GPU platform positioningに刷新(EN-first+JA toggle)。decentralization技術解説blog公開(/blog/2026-how-murakumo-decentralization-works-today、CIDv1/did:key-CACAO/on-chain未実装を明記)。marketing-strategy.mdのPhase 1 gate充足、Phase 2はオーナー判断待ち
 
 > QA発見+修正 (2026-07-06): navの"Source"リンクがprivate repo(gftdcojp/cloud-murakumo)への404だった。gftdcojp/local-murakumo(オーナーがpublic化予定)へ変更。技術者コミュニティ投稿前の必須チェック項目として記録
 
