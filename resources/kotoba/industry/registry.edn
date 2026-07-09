@@ -6388,11 +6388,37 @@
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "8020"
    :name "Security systems service activities"
-   :repo "https://github.com/gftdcojp/cloud-itonami-N8020"
-   :business-id "cloud-itonami-N8020"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-8020"
+   :business-id "cloud-itonami-8020"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Promoted :spec -> :blueprint (see `kotoba.industry/maturity-of`).
+   ;; The legacy placeholder :repo (gftdcojp/cloud-itonami-N8020) never
+   ;; actually existed (confirmed 404 before this edit) -- replaced with
+   ;; the real repo, following the SAME cloud-itonami/cloud-itonami-isic-####
+   ;; naming convention as every other actor in this fleet rather than the
+   ;; legacy N-prefixed scheme. First non-transport pick after closing the
+   ;; "transport support" family: scoped to ELECTRONIC security systems
+   ;; (alarm/CCTV/access-control installation and monitoring), distinct
+   ;; from cloud-itonami-isic-8010 (private security, PERSONNEL-based
+   ;; guard/patrol services) -- 8010's own blueprint.edn and docs contain
+   ;; no mention of alarms, CCTV or access-control systems, directly read
+   ;; and confirmed non-redundant before selection. Distinctly licensed
+   ;; in every jurisdiction checked: California BSIS issues a separate
+   ;; "Alarm Company Operator" license distinct from "Private Patrol
+   ;; Operator"; the UK's SIA licenses "Public Space Surveillance (CCTV)"
+   ;; separately from "Door Supervisor"/"Security Guarding"; Japan's
+   ;; 警備業法 treats 機械警備業務 (mechanical/systems security) as its own
+   ;; registration category (機械警備業務開始届出書) with its own statutory
+   ;; response-time requirements distinct from ordinary guarding under
+   ;; the same law. Governor keyword :security-systems-governor is
+   ;; grep-verified UNIQUE fleet-wide. Reuses cloud-itonami-isic-8010's
+   ;; own labor-dispatch operating-states shape (registry's own
+   ;; pre-existing value for '8020', identical to '8010''s). No bespoke
+   ;; capability library exists for security-systems dispatch
+   ;; specifically; :labor is required for technician dispatch/timesheet
+   ;; management, same pattern as securityops/8010's own. See
+   ;; ADR-2607103500.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "8030"
