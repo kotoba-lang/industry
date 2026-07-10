@@ -1,0 +1,140 @@
+{:frontmatter
+ {:id "adr-2607110200-kawaraban-r0-r1-cloud-itonami-isco-3521-media-broadcast"
+  :title "ADR-2607110200: kawaraban R0→R1 (live RSS ingest + aozora publish) + cloud-itonami-isco-3521 media/broadcast actor"
+  :status "accepted"
+  :doc_type "adr"
+  :topic "actor-registration"
+  :authoritative true
+  :last_verified "2026-07-10"
+  :authoritative_for
+  ["news actor / media actor requested for aozora.app resolves to: advance the existing
+    non-profit kawaraban (etzhayyim) news medium R0->R1, plus a NEW commercial
+    cloud-itonami-isco-3521 media/broadcast blueprint downstream of kawaraban's public output --
+    not two brand-new actors built from scratch"
+   "kawaraban's own charter (G2 no-ads/no-engagement-rank) structurally conflicts with an ISCO
+    business-model blueprint, so commercialization stays outside kawaraban entirely"
+   "live RSS/Atom ingest reuses kawaraban's existing ingest.cljc gates (normalize-record /
+    normalize-batch) unchanged -- no new gate-bypass path. KAWARABAN_ALLOW_LIVE_INGEST default
+    (unset = refused) is unchanged; flipping it for a real deployment is a separate, explicit,
+    out-of-scope operational step"
+   "cloud-itonami never becomes kawaraban's governance authority -- etzhayyim decision-making is
+    etzhayyim-only (root CLAUDE.md); cloud-itonami's role is strictly downstream commercial
+    consumer of kawaraban's already-public output"]
+  :related
+  ["orgs/etzhayyim/com-etzhayyim-kawaraban"
+   "90-docs/adr/2607022200-com-etzhayyim-tashikame-factcheck-aozora-actor-r0.md"
+   "90-docs/adr/2607032300-aozora-per-actor-authority-firehose-appview.md"
+   "90-docs/adr/2607110100-cloud-itonami-adnetwork-advertiser-ops.edn"
+   "orgs/etzhayyim/root/80-data/kotoba-rad/kawaraban.identity.journal.edn"
+   "orgs/cloud-itonami/cloud-itonami-isco-3521"
+   "orgs/kotoba-lang/occupation/resources/kotoba/occupation/registry.edn"]
+  :supersedes []
+  :superseded_by []}
+
+ :problem
+ {:source "owner request 2026-07-10: collect/organize world news at aozora.app 'as cloud-itonami',
+           design+integrate a news actor and a media actor"
+  :investigated
+  ["kawaraban (orgs/etzhayyim/com-etzhayyim-kawaraban) already IS a mature news-medium actor:
+    mirrors real outlets as headline+link+<=280char excerpt only (never full body), wires
+    first-party actor events into matching 面 sections, G1-G11 charter gates pinned in lexicon
+    const/enum, 54 tests green -- but stuck at R0 (offline-only; live RSS/firehose ingest and
+    aozora publish both explicitly Council-ADR-gated per the cells' own solve() comments)"
+   "kawaraban's RAD identity journal (kawaraban.identity.journal.edn) already carries
+    :rad/aozora-pds 'https://pds.aozora.app' and :rad/aozora-collection
+    'com.etzhayyim.apps.kawaraban' (tx 4) -- aozora wiring was already intended, just unbuilt"
+   "tashikame (orgs/etzhayyim/com-etzhayyim-tashikame) is the concrete precedent for publishing to
+    aozora: com.atproto.server.createSession -> com.atproto.repo.createRecord with a depth-1
+    self-minted CACAO; the custom com.etzhayyim.* lexicon is only the record collection name"
+   "cloud-itonami-isco-* (org cloud-itonami) is a fleet of ~80 documentation-only 'Open Occupation
+    Blueprint' repos (no code) for forkable commercial businesses; ISCO 2642 Journalists and 3521
+    Broadcasting and Audiovisual Technicians exist as unpublished :spec stubs in
+    kotoba-lang/occupation's registry.edn"
+   "owner explicitly wants the cloud-itonami side to be commercially viable, but kawaraban's own
+    G2 gate makes ads/sponsored-placement/engagement-ranking unrepresentable at the lexicon level
+    -- a straight ISCO business-model wrapper around kawaraban itself would conflict with its own
+    charter"]
+  :risk "building a brand-new isco-2642 Journalists commercial blueprint from scratch would
+         duplicate kawaraban's already-built, charter-vetted, 54-test-covered pipeline, and would
+         either fork the charter (weakening G1-G11) or produce a redundant parallel system; folding
+         kawaraban itself under cloud-itonami would be a cross-org governance category error since
+         etzhayyim's decision-making is constitutionally etzhayyim-only"}
+
+ :decision
+ {:split
+  "two-layer design: kawaraban (etzhayyim, unchanged charter) = the news actor, advanced R0->R1.
+   cloud-itonami-isco-3521 (new, public, blueprint-only) = the commercial media/broadcast actor,
+   downstream consumer of kawaraban's public output. kawaraban's lex/*.edn and cell logic are not
+   touched by this ADR."
+  :kawaraban-r0-r1
+  {:live-fetch
+   {:file "methods/live_fetch.cljc (new)"
+    :design "fetches + parses RSS/Atom, then feeds records through the EXISTING
+             ingest/normalize-record + normalize-batch -- G1/G3/G4 gates inherited, not
+             reimplemented. fetch fn is injectable; this session's tests use local fixtures only,
+             no live internet calls made"
+    :allowlist "data/outlets/allowlist.edn (new): state/public-broadcaster + non-profit press only
+                (NHK World-Japan, BBC News World, Deutsche Welle, France 24, RTHK, CBC News, ABC
+                News Australia, NPR, PBS NewsHour, AP, Al Jazeera, UN News), each already
+                :access :open per outlet.edn lexicon"
+    :gate "KAWARABAN_ALLOW_LIVE_INGEST semantics and default (unset = refused) unchanged. This ADR
+           IS the Council-ADR ratification the cells' own solve() comments ask for, but ratifying
+           != flipping the env var against real internet endpoints in a real deployment -- that
+           remains a separate, explicit, out-of-scope operational step for the founder/Council
+           (currently 1/1 = the owner)"}
+   :aozora-publish
+   {:files ["src/kawaraban/cacao.clj (new, port of tashikame.cacao)"
+            "src/kawaraban/aozora.clj (new, port of tashikame.aozora, collection
+             com.etzhayyim.apps.kawaraban per the pre-recorded RAD entry)"
+            "src/kawaraban/publisher.cljc (new, port of tashikame.publisher, MockPublisher default)"]
+    :gating "publication itself follows ADR-2606281500 (autonomous-by-default, no per-post
+             Council/operator prior restraint) -- gated only by the existing structural checks
+             (G1/G3/G4/G7/G9/G11 via route/validate + cell state machines), not by a new approval
+             step"}
+   :maturity-doc "MATURITY.md updated to record R1: live-fetch code-complete + tested, default off"}
+  :cloud-itonami-isco-3521
+  {:repo "orgs/cloud-itonami/cloud-itonami-isco-3521 (new, public, AGPL-3.0-or-later)"
+   :template "exact cloud-itonami-isco-* sibling template (README/GOVERNANCE/CONTRIBUTING/
+              SECURITY/CODE_OF_CONDUCT/LICENSE/docs/business-model.md/docs/operator-guide.md/
+              docs/samples/operator-console.html/blueprint.edn) -- documentation only, no code,
+              matching every sibling repo"
+   :business "consumes kawaraban's already-public headline+link+excerpt output to produce daily
+              video/audio news-digest, a syndication API (attribution-required news-ticker
+              widget), white-label editorial curation -- never touches kawaraban's lexicon/cells,
+              never reproduces full text, Media Broadcast Governor refuses misattribution/
+              fabrication"
+   :governance-boundary "cloud-itonami is NOT kawaraban's governance authority -- etzhayyim
+                          decision-making stays etzhayyim-only; cloud-itonami's role is strictly
+                          the downstream commercial consumer"
+   :registration "not west-managed (matches sibling isco-* convention: blueprint repos are
+                  standalone); no RAD identity (not an actor, a business blueprint)"}}
+
+ :consequences
+ {:kawaraban "stays non-profit/public-good; ads/engagement-optimization remain structurally
+              unrepresentable inside it"
+  :cloud-itonami "gets a legitimate commercial vertical without forking or reimplementing
+                  kawaraban"
+  :isco-2642 "left as an unpublished :spec stub -- deliberately not built as a duplicate
+              commercial-journalism blueprint since kawaraban already fills that role
+              non-commercially"
+  :real-production-gate "actually flipping KAWARABAN_ALLOW_LIVE_INGEST=1 against real internet
+                          endpoints, and actually publishing real posts to the live aozora.app
+                          PDS, are both explicitly OUT OF SCOPE for this ADR -- deferred to a
+                          separate, explicitly-confirmed step, same precedent as ADR-2607110100's
+                          adnetwork :real-production-gate"
+  :no-changes-to ["kawaraban lex/*.edn" "kawaraban cells/*/state_machine.cljc pure logic"
+                   "kawaraban's G1-G11 charter"]}
+
+ :alternatives
+ [{:option "build a new cloud-itonami-isco-2642 (Journalists) commercial blueprint from scratch"
+   :rejected_because "directly duplicates kawaraban's already-built, charter-vetted pipeline and
+                      would either weaken kawaraban's own G1-G11 charter or produce a redundant
+                      parallel news-collection system"}
+  {:option "fold kawaraban itself under cloud-itonami / gftdcojp ownership"
+   :rejected_because "cross-org governance category error -- etzhayyim's decision-making is
+                      constitutionally etzhayyim-only (root CLAUDE.md), not transferable to a
+                      gftdcojp business-OS actor"}
+  {:option "leave kawaraban at R0 and only build the cloud-itonami side"
+   :rejected_because "isco-* blueprints are documentation-only by convention; without kawaraban's
+                      R1 advance there is no actual collection pipeline feeding aozora, so the
+                      'collect and organize world news' request goes unfulfilled"}]}
