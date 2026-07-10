@@ -4660,13 +4660,26 @@
    :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "4690"
    :name "Non-specialized wholesale trade"
-   :repo "https://github.com/gftdcojp/cloud-itonami-G4690"
-   :business-id "cloud-itonami-G4690"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4690"
+   :business-id "cloud-itonami-isic-4690"
+   ;; No :robotics -- a general-trading (sogo-shosha style) actor's
+   ;; :shipment/dispatch is a logistics-coordination referral handing
+   ;; goods to a licensed freight forwarder/customs broker, not a
+   ;; robot-operated act; same exemption class as cloud-itonami-6310/
+   ;; -isic-6910/-isic-8291.
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger :optimization]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
+   :maturity :implemented
+   ;; real actor: shosha.{facts,governor,phase,sim,operation,
+   ;; shoshaadvisor,registry,store}.cljc -- ShoshaAdvisor ⊣
+   ;; :shosha-trading-governor. 8 HARD checks (7 from the fueltrade
+   ;; precedent + export-license-uncleared, new); :shipment/dispatch
+   ;; and :invoice/settle never auto-commit at any phase. 4-jurisdiction
+   ;; export-control/sanctions catalog (JPN 外為法/輸出貿易管理令,
+   ;; USA EAR 15 CFR 730-774 + OFAC, GBR Export Control Order 2008 SI
+   ;; 2008/3231 + OFSI, DEU/EU Reg. 2021/821 + BAFA/AWG/AWV). 36 tests /
+   ;; 174 assertions, lint clean, demo (clojure -M:dev:run) verified.
+   :operating-states [:order/intake :contract/verify :shipment/dispatch :invoice/settle :audit]},
   {:id "4719"
    :name "Other retail sale in non-specialized stores"
    :repo "https://github.com/gftdcojp/cloud-itonami-G4719"
