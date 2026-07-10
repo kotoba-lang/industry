@@ -3920,14 +3920,31 @@
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2824"
-   :name "Manufacture of machinery for mining, quarrying and construc..."
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2824"
-   :business-id "cloud-itonami-C2824"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :name "Manufacture of machinery for mining, quarrying and construction"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2824"
+   :business-id "cloud-itonami-isic-2824"
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as a mining/quarrying/
+   ;; construction-machinery actor (Heavy Equipment Advisor ⊣ Heavy
+   ;; Equipment Governor). Legacy gftdcojp/cloud-itonami-C2824
+   ;; placeholder replaced with real cloud-itonami/cloud-itonami-
+   ;; isic-2824. Continues the classic heavy-industry manufacturing
+   ;; cluster after basic iron and steel (2410), engines/turbines
+   ;; (2811), motor vehicles (2910), shipbuilding (3011), structural
+   ;; metal products (2511) and metal-forming machinery/machine tools
+   ;; (2822) -- another entry in the capital-equipment sub-cluster
+   ;; alongside 2822 (mining/construction machinery, distinct from the
+   ;; transport-equipment sub-cluster of 2811/2910/3011/3030). ISO 3450
+   ;; braking-performance test + ISO 10262 hydraulic-excavator
+   ;; stability test screen, design-rules/conformity verify, dual
+   ;; actuation (dispatch-unit + issue-stability-certificate),
+   ;; jurisdiction facts catalog (JPN METI/MLIT/JIS-A8403/A8411 / USA
+   ;; OSHA-29CFR1926/ANSI-SAE-J1040-ROPS / GBR HSE-UKCA-BSEN474 / DEU
+   ;; EU-Machinery-Directive-EN474), all four referencing ISO 3450/
+   ;; 10262 as the shared international baseline.
+   :required-technologies [:robotics :cae :dmn :bpmn :audit-ledger]
+   :optional-technologies [:telemetry :optimization]
+   :operating-states [:intake :design-rules-verify :stability-brake-test-screen :approve :dispatch-unit :issue-stability-certificate :audit]},
   {:id "2825"
    :name "Manufacture of machinery for food, beverage and tobacco pro..."
    :repo "https://github.com/gftdcojp/cloud-itonami-C2825"
