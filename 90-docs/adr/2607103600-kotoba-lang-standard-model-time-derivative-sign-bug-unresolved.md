@@ -161,3 +161,72 @@ time-varying rate, not just "a solution with a different name" — the
 lesson de Sitter's own limitation as a regression case, despite being
 literally time-dependent in its metric, teaches: $\dot H=0$ made it
 insufficient to catch this).
+
+## Addendum (2026-07-09, same day): two further investigations narrow the search space, still unresolved
+
+Following the user's explicit direction to continue narrowing the search (one
+scoped diagnostic, then one final term-level attempt), two more investigations
+ran after this ADR's initial acceptance:
+
+**Investigation 3 (diagnostic, not a fix attempt): the nested-finite-difference
+hypothesis is refuted.** `H-field`'s inner finite difference (the curl of
+$\bar h^{-1}(a)$) was replaced with an exact, closed-form analytic expression
+for the dust case — zero finite-difference error at that level, leaving only
+`L-a-omega`'s outer finite difference in the pipeline. The bug persisted
+bit-for-bit identical (same factor of 7, same wrong sign on the
+$\dot H$-dependent component, agreement between the fully-finite-difference
+and inner-analytic pipelines to ~$10^{-8}$, i.e. to the residual outer-FD
+truncation only). This clears `H-field` completely — not merely "verified
+correct in isolation" as before, but proven that even a zero-error version of
+it does not change the outcome — and rules out any interaction between the
+inner and outer finite-difference levels as the cause.
+
+**Investigation 4 (term-by-term isolation): `L-a-omega` and `riemann-basis-pair`
+are also cleared, by the strongest method used yet.** A from-scratch,
+independent reimplementation (sympy, no calls into the Clojure code)
+of eq (4.42)'s directional derivative and eq (4.48)'s combination formula
+$R(a\wedge b)=L_a\omega(b)-L_b\omega(a)+\omega(a)\times\omega(b)-\omega(c(a,b))$
+was built directly from the docstrings' stated formulas, then compared
+term-by-term against the actual Clojure functions — for **all 6 basis-bivector
+pairs**, not just the one pair examined in earlier passes. Every individual
+term matched to finite-difference tolerance, and hand-reconstructing
+`curvature-scalar`'s full double sum from these independently-verified
+per-pair values reproduces the code's actual (wrong) output bit-for-bit. This
+is a materially stronger clearance than "the formula looks right when
+inspected": an *independently authored, differently-implemented* version of
+the identical documented math reproduces the identical wrong answer, which
+rules out coding-level bugs (index/loop/sign-transcription errors) in these
+two functions specifically, not merely their high-level derivation.
+
+**Where this leaves the search, after four investigations**: `H-field`,
+`L-a-omega`, and `riemann-basis-pair` are now cleared with strong,
+independent, non-code-reading evidence (exact analytic substitution for the
+first; from-scratch independent reimplementation matching the wrong answer
+for the other two). The only remaining candidates are (a) `omega-from-h`'s
+closed-form derivation of eq (4.53) itself — i.e. a possible error in how
+the codebase's own re-derivation of the closed form (`omega-from-h`'s own
+docstring shows the a·(u∧B)=(a·u)B-u∧(a·B) identity-based rewrite) was
+carried out, distinct from `omega-from-h` merely being "self-consistent with
+eq (4.50)" as verified in earlier passes — or (b) a conceptual gap in how
+eq (4.48) needs to be applied to genuinely time-evolving connections that
+is not visible from re-deriving the formula alone, i.e. a physics/math-level
+question rather than a code-level one. The fourth investigation's own
+speculative side-lead (a candidate nonzero correction to $\omega(e_0)$,
+suggested by comparing against an independently-built ordinary-GR tetrad
+dictionary) was tested and explicitly discarded — it broke the already-
+verified de Sitter case, so was not applied and is not treated as a finding.
+
+**Status unchanged: this remains a confirmed, unresolved, documented bug.**
+No code was changed by either investigation (`git status` clean at each
+pass' conclusion); the "CONFIRMED, UNRESOLVED BUG" docstring warnings (PR #14)
+remain accurate and in place. Four independent investigations, each
+progressively narrower and more rigorous, have not found a code-level fix —
+the remaining candidates point toward a physics/derivation-level question
+(possibly requiring the same kind of external GTG expertise the original
+ADR's "recommended next steps" already suggested) rather than something a
+fifth code-level probing pass is likely to resolve differently from the
+first four. Further attempts should change *method* (e.g. genuine external
+consultation, or a fifth independent literature solution with $\dot H\neq0$)
+rather than repeat the term-isolation approach that has now been applied at
+increasing granularity three times (whole-function, then all-terms-one-pair,
+then all-terms-all-pairs) without success.
