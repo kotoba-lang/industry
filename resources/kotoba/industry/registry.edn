@@ -4565,13 +4565,33 @@
    :operating-states [:mandate/intake :mandate/verify :deal/confirm :commission/invoice :audit]},
   {:id "4620"
    :name "Wholesale of agricultural raw materials and live animals"
-   :repo "https://github.com/gftdcojp/cloud-itonami-G4620"
-   :business-id "cloud-itonami-G4620"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4620"
+   :business-id "cloud-itonami-isic-4620"
+   ;; :robotics true (unlike the general-trade/brokerage siblings) --
+   ;; grain-elevator conveyance (augers/belts/weighbridge loadout) is a
+   ;; real automation claim analogous to fueltrade's rack robot;
+   ;; livestock loadout automation (chute/gate control) is real but
+   ;; always human-attended (real animal-welfare transport law), not a
+   ;; full unattended-robot claim -- asymmetry documented in README.
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :optimization]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
+   :maturity :implemented
+   ;; real actor: agritrade.{facts,governor,phase,sim,operation,
+   ;; agritradeadvisor,registry,store}.cljc -- AgriTradeAdvisor ⊣
+   ;; :agri-trading-governor. Principal trading model (like fueltrade/
+   ;; shosha), regulatory backbone is biosecurity/food-safety rather
+   ;; than fuel-excise/export-control: :consignment-kind (:plant/
+   ;; :animal) drives two SEPARATE HARD checks --
+   ;; phytosanitary-certificate-missing (:plant) and
+   ;; animal-health-certificate-missing (:animal), kept distinct rather
+   ;; than one generic check so the audit ledger records which regime
+   ;; failed. 4-jurisdiction catalog with both plant+animal citations
+   ;; per jurisdiction (JPN 植物防疫法/家畜伝染病予防法 MAFF, USA Plant
+   ;; Protection Act 7 U.S.C. §7701/Animal Health Protection Act 7
+   ;; U.S.C. §8301 APHIS, GBR Plant Health Regs/Animal Health Act 1981
+   ;; APHA, EU Reg. 2016/2031/Reg. 2016/429). 41 tests / 212 assertions,
+   ;; lint clean, demo (clojure -M:dev:run) verified.
+   :operating-states [:order/intake :biosecurity/verify :delivery/dispatch :invoice/settle :audit]},
   {:id "4630"
    :name "Wholesale of food, beverages and tobacco"
    :repo "https://github.com/gftdcojp/cloud-itonami-G4630"
