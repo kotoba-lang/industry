@@ -5094,12 +5094,25 @@
    :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
   {:id "4772"
    :name "Retail sale of pharmaceutical and medical goods, cosmetic a..."
-   :repo "https://github.com/gftdcojp/cloud-itonami-G4772"
-   :business-id "cloud-itonami-G4772"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4772"
+   :business-id "cloud-itonami-isic-4772"
+   ;; No :robotics -- this actor decides whether a dispense/refill is
+   ;; allowed and records that it happened; order-fulfillment/shipping
+   ;; logistics are outside its boundary. Same exemption class as
+   ;; cloud-itonami-6310/-isic-6910/-isic-8291/-isic-4690/-isic-4610/
+   ;; -isic-6311/-isic-7820.
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; real actor: pharmacy.{facts,store,policy,llm,phase,operation,
+   ;; report,sim}.cljc -- PharmacyOrder-LLM sealed advisor ⊣
+   ;; PharmacyGovernor. prescription-verification-gate and
+   ;; restricted-quantity-gate (controlled-substance schedule ceilings +
+   ;; restricted-OTC age/quantity limits) are the two checks with no
+   ;; analog in sibling actors. :rx/dispense and :rx/refill never
+   ;; auto-commit at any phase -- a licensed pharmacist's sign-off is
+   ;; structural, not a rollout-maturity gate. ADR-2607113000
+   ;; (com-junkawasaki/root superproject).
    :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
   {:id "4773"
    :name "Other retail sale of new goods in specialized stores"
