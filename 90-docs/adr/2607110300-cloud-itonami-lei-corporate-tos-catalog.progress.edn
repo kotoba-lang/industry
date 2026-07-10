@@ -1,6 +1,6 @@
 [
  {:progress/schema-note "cloud-itonami-lei rollout progress tracker, per ADR-2607110300. One row per cloud-itonami-isic-<code> industry. :industry/applicable? true means a coherent real global/listed top-3-company concept exists for this ISIC vertical; false means fragmented/local/non-corporate and this vertical is deliberately skipped for the lei-catalog family (the isic blueprint itself is unaffected). This file is the resume point for the next /loop iteration."
-  :progress/resume-from "isic-6010 (radio broadcasting) -- first :industry/status :pending row after isic-0610 through isic-5610, all now :done (isic-5221/5222/5223/5224/5229 skipped, public-authority/fragmented). This tick (single-execution fork, no sub-forking) did isic-5110 (Delta Air Lines -- 1/3), isic-5210 (0/3, several candidates acquired/merged with dead legacy domains), isic-5510 (0/3, major hotel chains all bot-protected), isic-5610 (McDonald's + Starbucks -- 2/3, Yum! Brands WebSphere-portal-shell-only). Cumulative company-repo count must be recomputed fresh each tick via gh repo list cloud-itonami --limit 300 --json name filtered to cloud-itonami-lei-* -- do not trust a prior tick's stated running total. Open retry candidates needing a JS-capable fetch path or better entity resolution, all optional, not blocking: isic-0610 Shell plc + Saudi Aramco; isic-0620 Cheniere Energy; isic-1920 Marathon Petroleum + HF Sinclair + PBF Energy; isic-2011 Dow Inc.; isic-2610 TSMC + Samsung Electronics + Intel + Qualcomm + Micron + NXP + onsemi + STMicroelectronics; isic-2660 Koninklijke Philips N.V.; isic-3011 Samsung Heavy Industries + Hanwha Ocean; isic-3020 CRRC Corporation Limited (no parent LEI) + Stadler Rail AG; isic-3030 Airbus SE; isic-3510 National Grid plc + Duke Energy Corporation; isic-3812 Waste Management Inc. + Stericycle Inc. + Republic Services Inc.; isic-4711 Costco + Kroger + Target + Tesco + Ahold Delhaize; isic-4730 Couche-Tard + Caseys + Murphy USA; isic-4911 SNCF; isic-4912 Union Pacific + CSX; isic-5020 Frontline plc + International Seaways; isic-5110 American Airlines Group + Southwest Airlines; isic-5210 Vopak + Buckeye Partners + NuStar/Magellan (all merger-orphaned domains); isic-5510 Marriott + Hilton + IHG; isic-5610 Yum! Brands (WebSphere portal, needs JS rendering)."
+  :progress/resume-from "isic-6411 (central banking) is :applicable? false, skipped -- the actual next :applicable? true :pending row after isic-6310 is isic-6419 (other monetary intermediation, i.e. commercial banking), verified by scanning forward in this file. This tick (single-execution fork continuing from a nested-fork directive, no sub-forking) did isic-6010 (iHeartCommunications, SiriusXM, Cumulus Media -- 3/3), isic-6020 (Fox Corporation, Nexstar Media Group -- 2/3, Paramount Global 403-blocked), isic-6110 (AT&T, Verizon -- 2/3, Lumen Technologies nav-hub-only), isic-6120 (0/3, T-Mobile US + Vodafone Group + America Movil all blocked/404), isic-6310 (Workday -- 1/3, ADP + Paychex blocked/404). Cumulative company-repo count must be recomputed fresh each tick via gh repo list cloud-itonami --limit 300 --json name filtered to cloud-itonami-lei-* -- do not trust a prior ticks stated running total (freshly verified this tick: 52). Open retry candidates needing a JS-capable fetch path or better entity resolution, all optional, not blocking: isic-0610 Shell plc + Saudi Aramco; isic-0620 Cheniere Energy; isic-1920 Marathon Petroleum + HF Sinclair + PBF Energy; isic-2011 Dow Inc.; isic-2610 TSMC + Samsung Electronics + Intel + Qualcomm + Micron + NXP + onsemi + STMicroelectronics; isic-2660 Koninklijke Philips N.V.; isic-3011 Samsung Heavy Industries + Hanwha Ocean; isic-3020 CRRC Corporation Limited (no parent LEI) + Stadler Rail AG; isic-3030 Airbus SE; isic-3510 National Grid plc + Duke Energy Corporation; isic-3812 Waste Management Inc. + Stericycle Inc. + Republic Services Inc.; isic-4711 Costco + Kroger + Target + Tesco + Ahold Delhaize; isic-4730 Couche-Tard + Caseys + Murphy USA; isic-4911 SNCF; isic-4912 Union Pacific + CSX; isic-5020 Frontline plc + International Seaways; isic-5110 American Airlines Group + Southwest Airlines; isic-5210 Vopak + Buckeye Partners + NuStar/Magellan (all merger-orphaned domains); isic-5510 Marriott + Hilton + IHG; isic-5610 Yum! Brands (WebSphere portal, needs JS rendering); isic-6020 Paramount Global; isic-6110 Lumen Technologies; isic-6120 T-Mobile US + Vodafone Group + America Movil (all 3 failed this industry, worth a JS-capable retry pass); isic-6310 ADP + Paychex."
   :db/id -1}
  {:industry/code "isic-0162"
   :industry/description ""
@@ -810,23 +810,101 @@
  {:industry/code "isic-6010"
   :industry/description "Open Business Blueprint for ISIC Rev.5 6010: radio broadcasting (robotics-premised)"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/companies
+  [{:company/legal-name "iHeartCommunications, Inc."
+    :company/lei "54930076J6KDZL504O62"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[fulltext]=iHeartCommunications"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-54930076j6kdzl504o62"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.iheart.com/terms/"
+    :company/note "operating subsidiary of iHeartMedia, Inc. (NASDAQ: IHRT); the public parent holding company itself has no separate GLEIF record findable via fulltext search"}
+   {:company/legal-name "Sirius XM Radio LLC"
+    :company/lei "WP5O65E6BMU84LNO4227"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[fulltext]=Sirius%20XM%20Radio"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-wp5o65e6bmu84lno4227"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.siriusxm.com/sxm-web-terms-of-use"}
+   {:company/legal-name "Cumulus Media New Holdings Inc."
+    :company/lei "5493001D9VBAVY1OKJ46"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[fulltext]=Cumulus%20Media"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-5493001d9vbavy1okj46"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.cumulusmedia.com/privacy-policy/"
+    :company/note "CUMULUS MEDIA INC. (original parent) is GLEIF status INACTIVE (post-restructuring); used the ACTIVE successor entity Cumulus Media New Holdings Inc. instead. No dedicated Terms of Use page discoverable; archived the Privacy Policy instead, labeled :privacy-policy honestly"}]}
  {:industry/code "isic-6020"
   :industry/description "Open Business Blueprint for ISIC Rev.5 6020: television programming and broadcasting activities (robotics-premised)"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/companies
+  [{:company/legal-name "Fox Corporation"
+    :company/lei "549300DDU6FDRBIELS05"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=FOX%20CORPORATION"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300ddu6fdrbiels05"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.fox.com/terms-of-use"}
+   {:company/legal-name "Nexstar Media Group, Inc."
+    :company/lei "52990083ZRR5UT591988"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[fulltext]=Nexstar%20Media%20Group"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-52990083zrr5ut591988"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.nexstar.tv/terms-of-use/"}
+   {:company/legal-name "Paramount Global"
+    :company/lei "5KYC8KF17ROCY24M3H09"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=PARAMOUNT%20GLOBAL"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but www.paramount.com/terms-of-use and /legal both return HTTP 403; legal.paramount.com/us/terms-of-use returns 404; no repo created"}]}
  {:industry/code "isic-6110"
   :industry/description ""
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "ISIC Rev.5 6110 = wired telecommunications activities (GitHub repo description blank, standard ISIC taxonomy meaning used)"
+  :industry/companies
+  [{:company/legal-name "AT&T Inc."
+    :company/lei "549300Z40J86GGSTL398"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=AT%26T%20INC"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300z40j86ggstl398"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.att.com/legal/terms.consumerServiceAgreement.html"}
+   {:company/legal-name "Verizon Communications Inc."
+    :company/lei "2S72QS2UO2OESLG6Y829"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=VERIZON%20COMMUNICATIONS%20INC"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-2s72qs2uo2oeslg6y829"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.verizon.com/about/terms-conditions/terms-of-use"
+    :company/note "the /about/terms-conditions/overview hub page is nav-shell only with no legal text; the actual document lives at /terms-of-use"}
+   {:company/legal-name "Lumen Technologies, Inc."
+    :company/lei "8M3THTGWLTYZVE6BBY25"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=LUMEN%20TECHNOLOGIES%20INC"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but /en-us/about/legal/terms-of-use.html returns 404, and /en-us/about/legal.html is a mega-menu nav page with no substantive legal text server-rendered; no repo created"}]}
  {:industry/code "isic-6120"
   :industry/description "Open Business Blueprint for ISIC Rev.5 6120: wireless telecommunications / mobile network operator infrastructure (robotics-premised)"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/companies
+  [{:company/legal-name "T-Mobile US, Inc."
+    :company/lei "549300QHIJYOHPACPG31"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=T-MOBILE%20US%2C%20INC"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but entire site (including homepage) returns HTTP 403 to a plain HTTP client; no repo created"}
+   {:company/legal-name "Vodafone Group Public Limited Company"
+    :company/lei "213800TB53ELEUKM7Q61"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=VODAFONE%20GROUP%20PUBLIC%20LIMITED%20COMPANY"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified (disambiguated from a DUPLICATE-registration-status record with the same name, 549300MSQV80HSATBG53); but /legal and /terms-and-conditions both return HTTP 404; no repo created"}
+   {:company/legal-name "America Movil, S.A.B. de C.V."
+    :company/lei "5493000FNR3UCEAONM59"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=AMERICA%20MOVIL"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but /en/legal-notices returns HTTP 403; no repo created"}]}
  {:industry/code "isic-6190"
   :industry/description ""
   :industry/applicable? false
@@ -836,8 +914,27 @@
  {:industry/code "isic-6310"
   :industry/description "Open Business Blueprint for ISIC Rev.5 6310: OSS HR/talent SaaS replacement with PolicyGovernor and audit ledger"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "real-company top-3 for the HR SaaS market this blueprint targets, distinct from the cloud-itonami-6310 blueprint repo itself"
+  :industry/companies
+  [{:company/legal-name "Workday, Inc."
+    :company/lei "549300J0DYC0N31V7G13"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=WORKDAY%20INC"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300j0dyc0n31v7g13"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.workday.com/en-us/legal/site-terms.html"
+    :company/note "terms-of-use.html (404) and legal.html (nav hub only) both failed first; the real document is at legal/site-terms.html, found via the hub page's own links"}
+   {:company/legal-name "Automatic Data Processing, Inc."
+    :company/lei "HGBOLILQXWER4SAL2I23"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=AUTOMATIC%20DATA%20PROCESSING%2C%20INC"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but www.adp.com/legal.aspx returns HTTP 403; no repo created"}
+   {:company/legal-name "Paychex, Inc."
+    :company/lei "529900K900DW6SUBM174"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=PAYCHEX%20INC"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but www.paychex.com/terms-of-use returns HTTP 404 despite being self-referentially linked from paychex.com's own footer; no repo created"}]}
  {:industry/code "isic-6411"
   :industry/description "Open Business Blueprint for ISIC Rev.5 6411: central banking"
   :industry/applicable? false
