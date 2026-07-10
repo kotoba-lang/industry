@@ -33,7 +33,10 @@
     (is (some #{:cae} (industry/required-technologies "2910"))))
   (testing "structural metal products manufacturing requires robotics and CAE"
     (is (some #{:robotics} (industry/required-technologies "2511")))
-    (is (some #{:cae} (industry/required-technologies "2511")))))
+    (is (some #{:cae} (industry/required-technologies "2511"))))
+  (testing "machine-tool manufacturing requires robotics and CAE"
+    (is (some #{:robotics} (industry/required-technologies "2822")))
+    (is (some #{:cae} (industry/required-technologies "2822")))))
 
 (deftest readiness-reports-missing-tech
   (let [r (industry/readiness "8691" #{:identity :forms})]
@@ -350,6 +353,8 @@
     (is (= :implemented (industry/maturity "2910"))))
   (testing "a hundred-eighteenth implemented actor (cloud-itonami-isic-2511, structural-metal-products actor; fifth classic heavy-industry manufacturing vertical after 2410/2811/2910/3011) is also :implemented"
     (is (= :implemented (industry/maturity "2511"))))
+  (testing "a hundred-nineteenth implemented actor (cloud-itonami-isic-2822, machine-tool actor; first machine-tool/capital-equipment vertical in the classic heavy-industry cluster, distinct from the transport-equipment sub-cluster of 2811/2910/3011) is also :implemented"
+    (is (= :implemented (industry/maturity "2822"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -411,7 +416,12 @@
       ;; cloud-itonami-isic-2511, promoted directly from :spec --
       ;; structural-steel-fabrication actor, fifth classic
       ;; heavy-industry manufacturing vertical after 2410/2811/2910/3011.
-      (is (= 118 (:implemented m))))))
+      ;; 119 = 118 + cloud-itonami-isic-2822, promoted directly from
+      ;; :spec -- machine-tool-manufacturing actor, the classic
+      ;; heavy-industry cluster's first machine-tool/capital-equipment
+      ;; vertical (distinct from the transport-equipment sub-cluster of
+      ;; 2811/2910/3011).
+      (is (= 119 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
