@@ -1,6 +1,8 @@
 (ns gftd.cli
-  "Shared CLI core for the 7 portfolio CLIs (ADR-2607021600):
-   itonami / manimani / murakumo / kotoba / aozora / e7m / gftd.
+  "Shared CLI core for the 8 portfolio CLI binaries (ADR-2607021600, nexus bin added
+   ADR-2607105200): itonami / manimani / murakumo / kotoba / aozora / e7m / nexus / gftd.
+   (isekai/club/yukkuri are registry-only entries, reachable via `gftd`, without a
+   dedicated bin/ wrapper — ADR-2607021900 / ADR-2607022000.)
 
    Each CLI is the same .cljc engine bound to its product(s); `gftd` is the
    umbrella over all products. すべての書込（人手の canvas add/retract/note・
@@ -39,6 +41,7 @@
    :club     {:products [:club-shinshi]                 :desc "adult creator platform (L4, PornHub/OnlyFans/FANZA 型)"}
    :yukkuri  {:products [:ai-gftd-yukkuri]              :desc "AI video content channel (L7, YouTube 収益型)"}
    :e7m      {:products [:etzhayyim]                    :desc "artificial organism platform (L0, 非営利)"}
+   :nexus    {:products [:nexus-x402]                   :desc "payment facilitator/gateway (Lx cross-cutting, 鍵ゼロ x402 facilitator)"}
    :gftd     {:products :all                            :desc "umbrella — 全 product + ai-gftd-apex"}})
 
 (def base-rel   "90-docs/adr/2607021500-portfolio-bmc-lean.datoms.edn")

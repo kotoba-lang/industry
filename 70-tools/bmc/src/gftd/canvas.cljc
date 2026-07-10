@@ -59,7 +59,8 @@
    :personal-wellbecoming-os     "L5 personal wellbecoming OS"
    :ugc-game-platform            "L6 UGC game / creator platform（Roblox 型）"
    :video-content-channel        "L7 AI video content channel（YouTube 収益型）"
-   :artificial-organism-platform "L0 artificial organism platform（非営利・公益）"})
+   :artificial-organism-platform "L0 artificial organism platform（非営利・公益）"
+   :payment-facilitator-infra    "Lx cross-cutting: payment facilitator/gateway（Cloudflare Monetization Gateway 型）"})
 
 (def block-order
   [:lean/problem :lean/customer-segments :lean/uvp :lean/solution :lean/channels
