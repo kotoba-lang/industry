@@ -1,6 +1,6 @@
 [
  {:progress/schema-note "cloud-itonami-lei rollout progress tracker, per ADR-2607110300. One row per cloud-itonami-isic-<code> industry. :industry/applicable? true means a coherent real global/listed top-3-company concept exists for this ISIC vertical; false means fragmented/local/non-corporate and this vertical is deliberately skipped for the lei-catalog family (the isic blueprint itself is unaffected). This file is the resume point for the next /loop iteration."
-  :progress/resume-from "isic-3030 (manufacture of air and spacecraft and related machinery) -- first :industry/status :pending row after isic-0610/isic-0620/isic-1920/isic-2011/isic-2610/isic-2660/isic-3011/isic-3020, all now :done. Open retry candidates needing a JS-capable fetch path or better entity resolution, all optional, not blocking: isic-0610 Shell plc + Saudi Aramco; isic-0620 Cheniere Energy; isic-1920 Marathon Petroleum + HF Sinclair + PBF Energy; isic-2011 Dow Inc.; isic-2610 TSMC + Samsung Electronics + Intel + Qualcomm + Micron + NXP + onsemi + STMicroelectronics; isic-2660 Koninklijke Philips N.V.; isic-3011 Samsung Heavy Industries + Hanwha Ocean; isic-3020 CRRC Corporation Limited (no parent LEI) + Stadler Rail AG (JS-rendered)."
+  :progress/resume-from "isic-3510 (electric power grid transmission and distribution operations) -- first :industry/status :pending row after isic-0610/isic-0620/isic-1920/isic-2011/isic-2610/isic-2660/isic-3011/isic-3020/isic-3030, all now :done (isic-3312/isic-3313 in between are :skipped, fragmented/local repair operations, not pending). Open retry candidates needing a JS-capable fetch path or better entity resolution, all optional, not blocking: isic-0610 Shell plc + Saudi Aramco; isic-0620 Cheniere Energy; isic-1920 Marathon Petroleum + HF Sinclair + PBF Energy; isic-2011 Dow Inc.; isic-2610 TSMC + Samsung Electronics + Intel + Qualcomm + Micron + NXP + onsemi + STMicroelectronics; isic-2660 Koninklijke Philips N.V.; isic-3011 Samsung Heavy Industries + Hanwha Ocean; isic-3020 CRRC Corporation Limited (no parent LEI) + Stadler Rail AG (JS-rendered); isic-3030 Airbus SE (Incapsula bot-challenge)."
   :db/id -1}
  {:industry/code "isic-0162"
   :industry/description ""
@@ -310,8 +310,36 @@
  {:industry/code "isic-3030"
   :industry/description ""
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Manufacture of air and spacecraft and related machinery. Top-3 by global aerospace/defense revenue intended (Boeing, Airbus, Lockheed Martin), but Airbus SE's entire site (airbus.com) is behind an Incapsula bot-challenge to a plain HTTP client (both homepage and /en/legal-notice returned only a JS iframe redirect shell, no server-rendered body). Substituted RTX Corporation (formerly Raytheon Technologies) as the third real company, verified via GLEIF fulltext search which returned the exact parent-entity LEI directly."
+  :industry/companies
+  [{:company/legal-name "The Boeing Company"
+    :company/lei "RVHJWBXLJ1RFUBSY1F30"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter%5Bfulltext%5D=The%20Boeing%20Company"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-rvhjwbxlj1rfubsy1f30"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.boeing.com/terms-of-submission-and-privacy-policy/site-terms"}
+   {:company/legal-name "RTX Corporation"
+    :company/lei "I07WOS4YJ0N7YRFE7309"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.legalName%5D=RTX%20Corporation"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-i07wos4yj0n7yrfe7309"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.rtx.com/terms-of-use"}
+   {:company/legal-name "Lockheed Martin Corporation"
+    :company/lei "DPRBOZP0K5RM2YE8UU08"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.legalName%5D=Lockheed%20Martin%20Corporation"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-dprbozp0k5rm2ye8uu08"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.lockheedmartin.com/en-us/contact/privacy-center.html"
+    :company/note "doc-type :privacy-policy, not :terms-of-service -- the privacy notice was the substantive legal document reachable server-side; a dedicated general ToS page was not located"}
+   {:company/legal-name "Airbus SE"
+    :company/lei "MINO79WLOO247M1IL051"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter%5Bfulltext%5D=Airbus%20SE"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but entire airbus.com site returns an Incapsula bot-challenge JS iframe shell to a plain HTTP client, no server-rendered body reachable"}]}
  {:industry/code "isic-3312"
   :industry/description "Community Industrial Machinery Repair Operations — OSS Open Business Blueprint (ISIC 3312)"
   :industry/applicable? false
