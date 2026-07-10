@@ -59,6 +59,7 @@
 - 観測 (signal): gftd.ai 実測 204030 req/7d・4793 uniques(日次和)・うち4xx probe 10%(24h)、workers 5518 inv/7d
 - 観測 (signal): gftd.ai 実測 204587 req/7d・4793 uniques(日次和)・うち4xx probe 10%(24h)、workers 5549 inv/7d
 - 観測 (signal): gftd.ai 実測 205140 req/7d・4796 uniques(日次和)・うち4xx probe 10%(24h)、workers 5558 inv/7d
+- 観測 (signal): gftd.ai 実測 206078 req/7d・4803 uniques(日次和)・うち4xx probe 10%(24h)、workers 5567 inv/7d
 
 ## Customer Segments
 
@@ -113,6 +114,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /stg/.env 52 · /software/update.cgi 37 · /8573.php 20 · /server/backend/.env 18 · /sitemap.xml 14 | 4xx(probe) 10% · 5xx 82%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /stg/.env 52 · /software/update.cgi 37 · /8573.php 20 · /server/backend/.env 18 · /sitemap.xml 15 | 4xx(probe) 10% · 5xx 82%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /stg/.env 52 · /software/update.cgi 37 · /server/backend/.env 18 · /sitemap.xml 15 · /config/mail.production.php 8 | 4xx(probe) 10% · 5xx 82%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /stg/.env 52 · /software/update.cgi 37 · /server/backend/.env 18 · /cc13.php 16 · //w1px.php 15 | 4xx(probe) 10% · 5xx 82%
 
 ## Revenue Streams
 
