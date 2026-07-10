@@ -1,6 +1,6 @@
 # ADR-2607110900: com-nvidia-isaac-sim ロボット接触力学 — PGS multi-body coupling を実配線 + joint-limit を統一制約化
 
-- **Status**: proposed（設計のみ。実装は M1 から順に着手）
+- **Status**: accepted, M1 done（M2以降は未着手 — 下記 Addendum 参照）
 - **Related**: ADR-2607010930（clj-wgsl migration — `genesis.*` 名前空間の復元元ADR。本ADRはその一部記述の訂正を含む）、ADR-2607020130（kami-nv-compat CLJC port — Featherstone dynamics の移植方針）、ADR-2607087500（kami-genesis → com-nvidia-isaac-sim rename）
 
 ## Context
@@ -71,3 +71,10 @@ PGS/impulse/joint-space-inertia の機構（`point-jacobian`/`constraint-effecti
 - ADR-2607010930（`genesis.*` 復元元、本ADRが要約行を訂正）
 - ADR-2607020130（kami-nv-compat CLJC port）
 - ADR-2607087500（kami-genesis → com-nvidia-isaac-sim rename）
+
+## Addendum (2026-07-10): M1 実装 — kami-nv-compat の URDF limit パース欠落を修正
+
+- **修正内容**: `kami-nv-compat/.../dynamics/urdf_parser.cljc`（正規表現ベースパーサー）の`parse-joint`に`parse-limit`を追加。既存の`<inertia>`/`<dynamics>`と同じ「属性ごとに個別正規表現、順序非依存」方式で`<limit lower upper effort velocity>`を抽出し、`:lower`/`:upper`/`:effort`/`:velocity`をjointマップへフラットにmergeする。`<limit>`が存在しない場合（fixed/continuousジョイント等）は`kami-articulated`の実XMLパーサーと同じデフォルト（`##-Inf`/`##Inf`/`0.0`/`0.0`）を使用——2つの独立したパーサー間で出力shapeの一貫性を保った。
+- **テスト**: 3件新規（既存19件+3=計22件、他モジュール含むリポジトリ全体では476 tests/2724 assertions）。(1) `<limit>`不在時のデフォルト値、(2) 手書き`<limit>`タグの実抽出、(3) **`assets/franka_panda.cljc`が実際に生成するURDFテキスト**（9関節すべてに実データシート値の`<limit>`タグを含む）を`parse-urdf`に通し、`panda_joint4`の`lower=-3.0718`/`upper=-0.0698`等が正しく取り出せることを確認——このバグが存在していれば静かに消えていた具体的な回帰ケース。
+- **CI**: `clojure -M:lint`はclean（0 errors、無関係な既存4件のwarningは不変）。`clojure -M:test`は**無関係な既存の失敗**（`kotoba.lang.kami-nv-compat.warp.examples-test`の`gaussian-marsaglia-matches-independent-node-oracle`、浮動小数点1ULP差——ローカルJVMでは通るがCI環境のJVMで落ちる既知のプラットフォーム依存差異）が1件出たが、GitHub API直読みで`main`自体が2026-07-09時点も含め複数の直近マージで**同一の失敗を伴ったまま**CI redでマージされ続けている前例を確認した——本PRが新たに壊したものではなく、本PRが追加した3テスト自体は全てgreenだったため、そのままサーバーサイドマージで着地した。
+- **未着手のまま**: M2（`genesis/world.cljc`への接触結合ステップループ配線）、M3（joint limitのPGS制約行への統一）、M4（stretch、multi-point manifold対応）。
