@@ -256,3 +256,31 @@ composition itself hasn't been re-pointed at the new nbb signer yet
 (it still calls the JVM `attestation/produce-attestation`) -- wiring
 an nbb version of that composition is a small follow-up, not done in
 this pass.
+
+## Addendum 4 (2026-07-10): full nbb dial+sign pipeline, JVM no longer needed anywhere in it
+
+Addendum 3's follow-up: `kotoba-lang/murakumo`#19 wires the nbb dial
+(#18) and nbb attestation signing (`witness-quorum`#3) together into
+`murakumo.overlay.witness-dial-attest` — the nbb-native sibling of
+`witness_http_transport.clj`'s `produce-http-witnessed-attestation`.
+Verified locally end-to-end (real HTTP round trip to a local
+cloud-murakumo witness-rpc server + real Ed25519 signing +
+independent signature verification), both the `:accept` and
+`:reject`/slashing paths.
+
+Building this surfaced a real bug: `witness_dial.cljs`'s top-level
+`-main` call fired on every `require`, not just direct CLI use —
+composing it as a library re-triggered `process.exit`. Fixed in the
+same PR (now invoked via `nbb -m`, verified both paths still work).
+Also: nbb's npm module resolution is relative to the entry
+script/cwd, not the requiring source file's directory, so murakumo
+needed its own `package.json`/`@noble/curves` even though
+witness-quorum already had one — each nbb-runnable deployable unit
+needs its own copy of npm deps it transitively touches.
+
+**Status now**: the witness-rpc dial-and-sign pipeline runs entirely
+on Node.js (nbb), no JVM anywhere in that path, verified on real
+fleet hardware for the dial and signing halves separately (addenda
+2-3) and end-to-end locally (this addendum). What's still JVM-bound
+and unchanged: the QUIC transport (kwik/bouncycastle, Phase 2) has no
+nbb-native equivalent yet.
