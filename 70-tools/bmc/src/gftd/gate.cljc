@@ -96,7 +96,32 @@
    {:all [{:metric [:channel :subscribers] :op :>= :threshold 1000}
           {:metric [:channel :watch-hours] :op :>= :threshold 4000}]
     :evidence-label "YouTube 登録者/総再生"
-    :needs-when-unmeasurable ["YouTube Data API OAuth 復活" "投稿本数の量産"]}})
+    :needs-when-unmeasurable ["YouTube Data API OAuth 復活" "投稿本数の量産"]}
+
+   :hyp/nexus-x402-adoption
+   ;; machine-measurable via public GET /catalog census (collect.bb :nexus-x402
+   ;; gate-emitter, no admin auth needed): 最低1 seller が nexus 経由で live 稼働
+   ;; (「最低1つが…移行」の :hyp/gate 文言に忠実な proxy — 個別ゲート「廃止」まで
+   ;; は問わない。廃止の有無は README/ADR に別途明記し続ける)。
+   {:metric [:catalog :count] :op :>= :threshold 1
+    :evidence-label "nexus /catalog 登録 seller 数"
+    :needs-when-unmeasurable ["seller registry 実装 (ADR-0001 landed)" "seller 登録 (SELLERS_JSON/KV)"]}
+
+   :hyp/nexus-x402-agent-demand
+   ;; NOT machine-measurable today: public /catalog is static seller config, not
+   ;; real settlement data, and SETTLEMENTS_KV entries (ADR-0001) don't yet tag
+   ;; payer as agent-vs-human. needs-only until both land.
+   {:needs ["SETTLEMENTS_KV に実決済が記録される運用開始 (現状 GMV 0 — 未計測)"
+            "settlement record への agent-originated 属性追加 (現状 :payer のみ、human/agent 区別なし)"
+            "/admin/settlements/<seller> を gate-emitter が読める形で集計 (ADMIN_TOKEN 委譲が要る)"]}
+
+   :hyp/nexus-x402-external-seller
+   ;; machine-measurable via the same /catalog census: known internal family is
+   ;; exactly {murakumo, kotobase, shinshi} (3) — count > 3 necessarily means a
+   ;; non-family (external) seller registered.
+   {:metric [:catalog :count] :op :> :threshold 3
+    :evidence-label "nexus /catalog 登録 seller 数 (内部3社超)"
+    :needs-when-unmeasurable ["self-serve onboarding (docs/adr/0002 ステップ2)" "外部 seller 1件以上の登録"]}})
 
 ;; ---- predicate evaluation ---------------------------------------------------
 

@@ -47,7 +47,12 @@
    :network-isekai  {:zone "3bb094bac1fffdb9c61a60093eb267c5" :zone-name "isekai.network"
                      :health "https://isekai.network/"}
    :club-shinshi    {:zone "1527fa6d84bd5c216029c20b4f4810e1" :zone-name "shinshi.club"
-                     :health "https://shinshi.club/"}})
+                     :health "https://shinshi.club/"}
+   ;; 2026-07-10 追加 (ADR-2607105200): 横断決済 facilitator。ページ無し API-only
+   ;; Worker のため zone 無し (app-aozora-yoro と同型) — workers invocation +
+   ;; health のみ。seller/agent-demand 実測は gate-emitters (:catalog) 経由。
+   :nexus-x402      {:workers #{"nexus-x402"}
+                      :health "https://x402.nexus/health"}})
 
 (defn keychain [service]
   (let [{:keys [exit out]} (sh "security" "find-generic-password" "-s" service "-w")]
@@ -225,7 +230,11 @@
    :cloud-itonami  {:url "https://itonami.cloud/api/metrics"          :fmt :json :merge true}
    ;; 外部獲得 funnel テレメトリ (net-kotobase #150): {"funnel":{visitors/signups/checkouts}}
    ;; を top-level merge → funnel spec (ADR-2607022600) の [:funnel …] が実データ化。
-   :net-kotobase   {:url "https://kotobase.net/api/funnel"            :fmt :json :merge true}})
+   :net-kotobase   {:url "https://kotobase.net/api/funnel"            :fmt :json :merge true}
+   ;; nexus-x402 (ADR-2607105200): public /catalog is the seller-registry census
+   ;; (no admin auth needed) — {:count N :items [...]}. :catalog :count feeds the
+   ;; adoption/external-seller gate-specs in gate.cljc.
+   :nexus-x402     {:url "https://x402.nexus/catalog"                 :fmt :json :key :catalog}})
 
 (defn fetch-emitter
   "→ parsed emitter map, or nil if unreachable/unparseable (no-op)."
