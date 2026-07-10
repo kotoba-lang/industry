@@ -1,6 +1,6 @@
 [
  {:progress/schema-note "cloud-itonami-lei rollout progress tracker, per ADR-2607110300. One row per cloud-itonami-isic-<code> industry. :industry/applicable? true means a coherent real global/listed top-3-company concept exists for this ISIC vertical; false means fragmented/local/non-corporate and this vertical is deliberately skipped for the lei-catalog family (the isic blueprint itself is unaffected). This file is the resume point for the next /loop iteration."
-  :progress/resume-from "isic-6520 (reinsurance) -- first :industry/status :pending row after isic-6511/isic-6512, both now :done. This tick (single-execution fork, no sub-forking) did isic-6511 life insurance (MetLife, Prudential Financial, AIA Group -- 3/3, Manulife bot-blocked/excluded) and isic-6512 non-life insurance (Travelers, Chubb -- 2/3, Allstate JS-SPA-shell + Progressive terms-link-undiscoverable both excluded, substituted Travelers). Cumulative company-repo count must be recomputed fresh each tick via gh repo list cloud-itonami --limit 300 --json name filtered to cloud-itonami-lei-* -- do not trust a prior ticks stated running total (freshly verified this tick: 63)."
+  :progress/resume-from "isic-6612 (security and commodity contracts brokerage) -- first :industry/status :pending row after isic-6520/isic-6611, both now :done. This tick (single-execution fork per user directive, no sub-forking) did isic-6520 reinsurance (Munich Re only, 1/3 -- Swiss Re bot-blocked, SCOR terms page undiscoverable) and isic-6611 administration of financial markets (ICE + Nasdaq, 2/3 -- CME Group bot-blocked). Cumulative company-repo count must be recomputed fresh each tick via gh repo list cloud-itonami --limit 300 --json name filtered to cloud-itonami-lei-* -- do not trust a prior ticks stated running total (freshly verified this tick: 66)."
   :db/id -1}
  {:industry/code "isic-0162"
   :industry/description ""
@@ -1122,8 +1122,30 @@
  {:industry/code "isic-6520"
   :industry/description "Open Business Blueprint for ISIC Rev.5 6520: reinsurance"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Top-3 intended: Munich Re, Swiss Re, SCOR SE (Hannover Rueck's listed parent entity
+    not found in GLEIF under several name variants, substituted SCOR). Swiss Re AG site-wide 403
+    (bot-blocked, 2 URL attempts); SCOR SE terms/legal page undiscoverable (3 URL attempts, all 404).
+    Landed 1/3 rather than force-fit."
+  :industry/companies
+  [{:company/legal-name "M\u00fcnchener R\u00fcckversicherungs-Gesellschaft Aktiengesellschaft in M\u00fcnchen"
+    :company/lei "529900MUF4C20K50JS49"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Munchener Ruckversicherungs"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-529900muf4c20k50js49"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.munichre.com/en/general/legal-notice.html"
+    :company/note "archived as :legal-notice, no dedicated general ToS page found"}
+   {:company/legal-name "Swiss Re AG"
+    :company/lei "529900PS9YW3YY29F326"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Swiss Re"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but swissre.com site-wide 403 (bot-protected) on both /legal.html and /our-business/legal-information.html"}
+   {:company/legal-name "SCOR SE"
+    :company/lei "96950056ULJ4JI7V3752"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=SCOR SE"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but no legal/terms page discoverable on scor.com after 3 URL-pattern attempts (all 404)"}]}
  {:industry/code "isic-6530"
   :industry/description "Open Business Blueprint for ISIC Rev.5 6530: pension funding"
   :industry/applicable? false
@@ -1133,8 +1155,31 @@
  {:industry/code "isic-6611"
   :industry/description "Open Business Blueprint for ISIC Rev.5 6611: administration of financial markets"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Top-3 intended: ICE/NYSE, Nasdaq, CME Group. CME Group site-wide 403 on both
+    /terms-of-use.html and /tools-information/legal-notices.html (bot-protected, 2 attempts).
+    Landed 2/3."
+  :industry/companies
+  [{:company/legal-name "Intercontinental Exchange, Inc."
+    :company/lei "5493000F4ZO33MV32P92"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Intercontinental Exchange"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-5493000f4zo33mv32p92"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.ice.com/terms-of-use"}
+   {:company/legal-name "Nasdaq, Inc."
+    :company/lei "549300L8X1Q78ERXFD06"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Nasdaq Inc"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300l8x1q78erxfd06"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.nasdaq.com/legal"
+    :company/note "dedicated /terms-of-use path 404'd; archived the /legal hub page instead as :legal-hub"}
+   {:company/legal-name "CME Group Inc."
+    :company/lei "LCZ7XYGSLJUHFXXNXD88"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=CME Group Inc"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but cmegroup.com site-wide 403 (bot-protected) on both /terms-of-use.html and /tools-information/legal-notices.html"}]}
  {:industry/code "isic-6612"
   :industry/description "Open Business Blueprint for ISIC Rev.5 6612: security and commodity contracts brokerage"
   :industry/applicable? true
