@@ -64,6 +64,7 @@
 - 観測 (signal): manimani.cloud 実測 2163 req/7d・219 uniques(日次和)・うち4xx probe 76%(24h)
 - 観測 (signal): manimani.cloud 実測 2166 req/7d・220 uniques(日次和)・うち4xx probe 76%(24h)
 - 観測 (signal): manimani.cloud 実測 2168 req/7d・220 uniques(日次和)・うち4xx probe 76%(24h)
+- 観測 (signal): manimani.cloud 実測 2170 req/7d・220 uniques(日次和)・うち4xx probe 76%(24h)
 
 ## Customer Segments
 
@@ -138,6 +139,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 56 · /robots.txt 7 | 4xx(probe) 76% · 5xx 0%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 57 · /robots.txt 7 | 4xx(probe) 76% · 5xx 0%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 58 · /robots.txt 7 | 4xx(probe) 76% · 5xx 0%
+- GTM (acquisition→revenue): cloud signup→cloud paid 転換 0% < 目標 4% — trial→paid の nudge（使用量到達通知）・価格 tier 見直し・年額/上位 tier の提示
 
 ## Revenue Streams
 
@@ -163,6 +165,7 @@
 - 次の検証 (manimani-ledger-pay): OSS active user → cloud 転換率が Obsidian Sync 水準 (~数%)
 - funnel (cloud-manimani): OSS install=2 → cloud signup=2 → cloud paid=2 | 転換 OSS install→cloud signup 100% / cloud signup→cloud paid 100%
 - gate 距離 (manimani-ledger-pay): OSS→cloud 転換率 = 0 (gate 未到達)
+- funnel (cloud-manimani): OSS install=0 → cloud signup=1 → cloud paid=0 | 転換 cloud signup→cloud paid 0%
 
 ## Unfair Advantage
 
