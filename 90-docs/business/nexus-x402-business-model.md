@@ -31,13 +31,14 @@
 ## Solution
 
 - ゲートウェイ核: kotoba-lang/pay の pay.facilitator (rules engine / seller registry / verify / settle / gate / discovery、zero-dep・zero-I/O・zero-key-custody)
-- nexus-x402 Cloudflare Worker: HTTP エンベロープ + on-chain I/O (Basescan verify via treasury.core) のみ追加
 - Facilitator API (薄い委譲): POST /verify・POST /settle・GET /.well-known/x402
 - Gateway proxy (前段配置): ANY /gateway/<seller>/<path> — 402 challenge → on-chain 検証 → origin へプロキシ + X-PAYMENT-RESPONSE
 - SELLERS_JSON config (公開 treasury アドレスのみ、鍵は一切含まない)。honest default: 未知 seller → 404、未検証 payment → 402
 - 準備 (follow-up): EIP-3009 exact スキームの gasless relay (現状は transaction スキームのみ実効)
 - LIVE (2026-07-10): x402.nexus custom domain 稼働中 — /health /catalog /.well-known/x402 実応答確認済み
-- seller 登録済み (2026-07-10): murakumo (USD 0.01/POST /v1/messages)・kotobase (USD 0.001/GET /ipfs/) が SELLERS_JSON に live 登録。club-shinshi が唯一の未登録 first customer
+- nexus-x402 Cloudflare Worker: HTTP エンベロープ + on-chain I/O (keyless Base RPC verify via treasury.core、Basescan API 依存は2026-07-10に撤廃) のみ追加
+- seller 登録完了 (2026-07-10): murakumo (USD 0.01/POST /v1/messages)・kotobase (USD 0.001/GET /ipfs/)・shinshi (USD 0.50/GET /x402/premium/) の3社が全て SELLERS_JSON に live 登録・稼働確認済み — gftdcojp/kotoba-lang family の全 first customer が揃った
+- ADR-0001 実装・デプロイ済み (2026-07-10): SELLERS_KV 動的レジストリ + SETTLEMENTS_KV 決済台帳 (PUT/DELETE /admin/sellers/<seller>)。SELLERS_JSON は fallback として継続動作
 
 ## Channels
 
@@ -67,10 +68,10 @@
 - 検証成功率 / honest-default 遵守率 (未検証 payment が一件も配信されないこと)
 - facilitator 経由の決済総額 (GMV、seller 別内訳)
 - 個別ゲートから nexus 委譲へ移行した seller 数
-- 稼働確認 (2026-07-10): /health /catalog /.well-known/x402 実応答、seller 2件登録 (murakumo/kotobase)
 - 次の検証 (nexus-x402-adoption): shinshi/murakumo/kotobase のうち最低 1 つが個別ゲートを Facilitator API 委譲へ移行
 - 次の検証 (nexus-x402-agent-demand): facilitator 経由の agent-originated payment 件数 > 0 (人間フロー以外)
 - 次の検証 (nexus-x402-external-seller): 外部 seller 登録 1 件以上
+- 稼働確認 (2026-07-10): /health /catalog /.well-known/x402 実応答、seller 3件登録 (murakumo/kotobase/shinshi、全 first customer 揃う)。/gateway/shinshi/x402/premium/<id> の 402 challenge を price/payTo/network 一致で確認
 
 ## Unfair Advantage
 
