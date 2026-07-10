@@ -1,6 +1,6 @@
 [
  {:progress/schema-note "cloud-itonami-lei rollout progress tracker, per ADR-2607110300. One row per cloud-itonami-isic-<code> industry. :industry/applicable? true means a coherent real global/listed top-3-company concept exists for this ISIC vertical; false means fragmented/local/non-corporate and this vertical is deliberately skipped for the lei-catalog family (the isic blueprint itself is unaffected). This file is the resume point for the next /loop iteration."
-  :progress/resume-from "isic-4711 (retail sale in non-specialized stores with food/beverages predominating -- supermarkets/grocery) -- first :industry/status :pending row after isic-0610/0620/1920/2011/2610/2660/3011/3020/3030/3510/3812, all now :done (isic-3512/3600/3830/4211/4321/4322/4671 in between are :skipped, fragmented/local, not pending). Open retry candidates needing a JS-capable fetch path or better entity resolution, all optional, not blocking: isic-0610 Shell plc + Saudi Aramco; isic-0620 Cheniere Energy; isic-1920 Marathon Petroleum + HF Sinclair + PBF Energy; isic-2011 Dow Inc.; isic-2610 TSMC + Samsung Electronics + Intel + Qualcomm + Micron + NXP + onsemi + STMicroelectronics; isic-2660 Koninklijke Philips N.V.; isic-3011 Samsung Heavy Industries + Hanwha Ocean; isic-3020 CRRC Corporation Limited (no parent LEI) + Stadler Rail AG (JS-rendered); isic-3030 Airbus SE (Incapsula bot-challenge); isic-3510 National Grid plc + Duke Energy Corporation (bot-blocked); isic-3812 Waste Management Inc. + Stericycle Inc. (bot-blocked) + Republic Services Inc. (JS-rendered SPA)."
+  :progress/resume-from "isic-4911 (passenger rail transport, interurban) -- first :industry/status :pending row after isic-0610/0620/1920/2011/2610/2660/3011/3020/3030/3510/3812/4711/4730, all now :done. isic-4711 (grocery/supermarket) and isic-4730 (automotive fuel retail) were unusually bot-hostile consumer-retail verticals: isic-4711 landed 1/7 real candidates (only Walmart's corporate.walmart.com/policies hub was fetchable; Costco/Kroger/Target/Tesco/Ahold Delhaize all failed, Carrefour SA excluded for no parent-entity GLEIF record), isic-4730 landed 0/3 (Couche-Tard/Casey's/Murphy USA all bot-blocked or 404). Future ticks hitting consumer-retail/e-commerce ISIC codes should expect a similarly low hit rate with plain curl and may want to budget for a JS-capable fetch path rather than repeating plain-curl retries. Open retry candidates needing a JS-capable fetch path or better entity resolution, all optional, not blocking: isic-0610 Shell plc + Saudi Aramco; isic-0620 Cheniere Energy; isic-1920 Marathon Petroleum + HF Sinclair + PBF Energy; isic-2011 Dow Inc.; isic-2610 TSMC + Samsung Electronics + Intel + Qualcomm + Micron + NXP + onsemi + STMicroelectronics; isic-2660 Koninklijke Philips N.V.; isic-3011 Samsung Heavy Industries + Hanwha Ocean; isic-3020 CRRC Corporation Limited (no parent LEI) + Stadler Rail AG (JS-rendered); isic-3030 Airbus SE (Incapsula bot-challenge); isic-3510 National Grid plc + Duke Energy Corporation (bot-blocked); isic-3812 Waste Management Inc. + Stericycle Inc. (bot-blocked) + Republic Services Inc. (JS-rendered SPA); isic-4711 Costco + Kroger + Target + Tesco + Ahold Delhaize; isic-4730 Couche-Tard + Casey's + Murphy USA."
 
   :db/id -1}
  {:industry/code "isic-0162"
@@ -482,15 +482,68 @@
   :industry/status :skipped
   :industry/companies []}
  {:industry/code "isic-4711"
-  :industry/description ""
+  :industry/description "Retail sale in non-specialized stores with food/beverages predominating (supermarkets/grocery), ISIC Rev.5 4711."
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Unusually bot-hostile vertical -- 7 real candidates attempted (Walmart, Costco, Kroger, Target, Tesco, Ahold Delhaize, plus Carrefour SA excluded for no parent-entity GLEIF record like Chevron/CRRC before it), only 1 yielded verbatim-capturable text. Landed with 1/3 rather than fabricate or force-fit; this may be a systematic pattern for consumer e-commerce/grocery-retail sites vs. the industrial/B2B sites earlier industries mostly involved."
+  :industry/companies
+  [{:company/legal-name "Walmart Inc."
+    :company/lei "Y87794H0US1R65VBXU25"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Walmart Inc"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-y87794h0us1r65vbxu25"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://corporate.walmart.com/policies"
+    :company/note "consumer-facing walmart.com terms pages returned bot-detection ('Robot or human?') challenges; the corporate.walmart.com/policies hub was reachable and contains real, verbatim, currently-published Walmart policy content, honestly recorded as :tos/doc-type :policies-and-guidelines rather than :terms-of-service"}
+   {:company/legal-name "Costco Wholesale Corporation"
+    :company/lei "29DX7H14B9S6O3FD6V18"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Costco Wholesale Corporation"
+    :company/status :tos-fetch-failed
+    :company/note "costco.com/terms-and-conditions.html returned HTTP 403 (bot-blocked); customerservice.costco.com alternate returned a generic help-center navigation shell, not terms text"}
+   {:company/legal-name "The Kroger Co."
+    :company/lei "6CPEOKI6OYJ13Q6O7870"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=The Kroger Co"
+    :company/status :tos-fetch-failed
+    :company/note "kroger.com/i/terms-of-use and 2 alternate paths (kroger.com/terms, kroger.com/policies/terms, thekrogerco.com/terms-of-use) all failed: connection failures or 404s"}
+   {:company/legal-name "Target Corporation"
+    :company/lei "8WDDFXB5T1Z6J0XC1L66"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Target Corporation"
+    :company/status :tos-fetch-failed
+    :company/note "target.com/c/terms-conditions page is a JS-rendered React SPA shell (357KB of app-config JSON, no server-rendered terms text)"}
+   {:company/legal-name "Tesco PLC"
+    :company/lei "2138002P5RNKC5W2JZ46"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Tesco PLC"
+    :company/status :tos-fetch-failed
+    :company/note "tesco.com/help/terms-and-conditions returned HTTP 403 Access Denied (Akamai edge block)"}
+   {:company/legal-name "Koninklijke Ahold Delhaize N.V."
+    :company/lei "724500C9GNBV20UYRX36"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Ahold Delhaize"
+    :company/status :tos-fetch-failed
+    :company/note "aholddelhaize.com/terms-of-use/ and /legal-notice/ both 404'd"}
+   {:company/legal-name "Carrefour SA"
+    :company/status :lei-lookup-failed
+    :company/note "GLEIF has no record for the French parent entity itself -- only subsidiaries (Carrefour Romania SA, Centros Comerciales Carrefour SA, Servicios Financieros Carrefour EFC SA); not fabricated, not substituted with a subsidiary LEI, same policy as Chevron/CRRC exclusions in earlier industries"}]}
  {:industry/code "isic-4730"
   :industry/description "Retail sale of automotive fuel (ISIC Rev.5 4730) — ForecourtAdvisor ⊣ Forecourt Safety Governor. Open Business Blueprint, cloud-itonami fleet."
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "0/3: all 3 real convenience/fuel-retail candidates (LEI-verified) failed ToS fetch after 2 attempts each (bot-blocked or 404). Landed with 0 rather than fabricate -- second consecutive consumer-retail vertical (after isic-4711) where fetch success rate was far lower than the industrial/B2B verticals earlier in this rollout; flagging for future ticks that consumer-retail/convenience-store ISIC codes may be systematically harder and could warrant a JS-capable fetch tool before further attempts, rather than repeating plain-curl retries."
+  :industry/companies
+  [{:company/legal-name "Alimentation Couche-Tard Inc."
+    :company/lei "549300OSW32RVX8CCZ87"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Alimentation Couche-Tard"
+    :company/status :tos-fetch-failed
+    :company/note "corpo.couche-tard.com/terms-of-use/ and /legal-notice/ both 404"}
+   {:company/legal-name "Casey's General Stores, Inc."
+    :company/lei "549300CAFWSI86V66Q65"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Casey's General Stores"
+    :company/status :tos-fetch-failed
+    :company/note "caseys.com/terms-of-use (with and without trailing slash) returned HTTP 403"}
+   {:company/legal-name "Murphy USA Inc."
+    :company/lei "549300Y081F8XIKQIO72"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Murphy USA"
+    :company/status :tos-fetch-failed
+    :company/note "murphyusa.com/terms-of-use/ and /terms both returned HTTP 403"}]}
  {:industry/code "isic-4911"
   :industry/description "Open Business Blueprint for ISIC Rev.5 4911: passenger rail transport, interurban (robotics-premised)"
   :industry/applicable? true
