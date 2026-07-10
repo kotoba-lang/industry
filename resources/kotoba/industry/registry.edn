@@ -5664,12 +5664,28 @@
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "6311"
    :name "Data processing, hosting and related activities"
-   :repo "https://github.com/gftdcojp/cloud-itonami-J6311"
-   :business-id "cloud-itonami-J6311"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6311"
+   :business-id "cloud-itonami-isic-6311"
+   ;; No :robotics -- a market-data actor only collects, holds and serves
+   ;; prices; it never routes an order, takes custody, or executes a trade.
+   ;; Same exemption class as cloud-itonami-6310/-isic-6910/-isic-8291/
+   ;; -isic-4690/-isic-4610.
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger :securities]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; real actor: marketdata.{facts,policy,phase,llm,operation,report,
+   ;; store,sim}.cljc -- MarketData-LLM sealed advisor ⊣ MarketDataGovernor.
+   ;; Narrowed from the generic ISIC 6311 (data processing/hosting) to
+   ;; multi-asset market-data aggregation & hosting (equities/FX/
+   ;; commodities/crypto/real-estate indices), same narrowing move as
+   ;; -isic-4610 (Wholesale on a fee/contract basis → commission-broker).
+   ;; tolerance-gate (fat-finger/stale-print HARD check) and
+   ;; source-provenance-gate (real free-source catalog + operator
+   ;; feed-license, kotoba-lang/securities' operator-supplies-own-feed
+   ;; boundary) are the two checks with no analog in the trading/brokerage
+   ;; siblings. halted-instrument gate always escalates ingestion/
+   ;; disclosure for a halted or circuit-broken instrument to a human.
+   ;; ADR-2607111500 (com-junkawasaki/root superproject).
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "6312"
    :name "Web portals"
