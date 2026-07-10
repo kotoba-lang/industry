@@ -398,8 +398,10 @@
       ;; :spec (never a :blueprint) -- agricultural/live-animal
       ;; wholesale trading actor. 115 = 114 + cloud-itonami-isic-2910,
       ;; promoted directly from :spec (never a :blueprint) --
-      ;; motor-vehicle-manufacturing actor.
-      (is (= 115 (:implemented m))))))
+      ;; motor-vehicle-manufacturing actor. 116 = 115 +
+      ;; cloud-itonami-isic-4630, promoted directly from :spec --
+      ;; food/beverage/tobacco wholesale trading actor.
+      (is (= 116 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
