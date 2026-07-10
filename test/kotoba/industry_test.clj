@@ -42,7 +42,10 @@
     (is (some #{:cae} (industry/required-technologies "2824"))))
   (testing "pump/compressor/valve manufacturing requires robotics and CAE"
     (is (some #{:robotics} (industry/required-technologies "2813")))
-    (is (some #{:cae} (industry/required-technologies "2813")))))
+    (is (some #{:cae} (industry/required-technologies "2813"))))
+  (testing "lifting/handling-equipment manufacturing requires robotics and CAE"
+    (is (some #{:robotics} (industry/required-technologies "2816")))
+    (is (some #{:cae} (industry/required-technologies "2816")))))
 
 (deftest readiness-reports-missing-tech
   (let [r (industry/readiness "8691" #{:identity :forms})]
@@ -365,6 +368,8 @@
     (is (= :implemented (industry/maturity "2824"))))
   (testing "a hundred-twenty-second implemented actor (cloud-itonami-isic-2813, pump/compressor/valve actor; third capital-equipment/general-purpose-machinery vertical in the classic heavy-industry cluster alongside 2822/2824, distinct from the transport-equipment sub-cluster of 2811/2910/3011) is also :implemented"
     (is (= :implemented (industry/maturity "2813"))))
+  (testing "a hundred-twenty-fourth implemented actor (cloud-itonami-isic-2816, lifting/handling-equipment actor; fourth capital-equipment/general-purpose-machinery vertical in the classic heavy-industry cluster alongside 2822/2824/2813, distinct from the transport-equipment sub-cluster of 2811/2910/3011) is also :implemented"
+    (is (= :implemented (industry/maturity "2816"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -443,8 +448,13 @@
       ;; 2824 in the classic heavy-industry cluster (distinct from the
       ;; transport-equipment sub-cluster of 2811/2910/3011). 123 = 122 +
       ;; cloud-itonami-isic-4641, promoted directly from :spec --
-      ;; textile/clothing/footwear wholesale trading actor.
-      (is (= 123 (:implemented m))))))
+      ;; textile/clothing/footwear wholesale trading actor. 124 = 123 +
+      ;; cloud-itonami-isic-2816, promoted directly from :spec --
+      ;; lifting/handling-equipment-manufacturing actor, a fourth
+      ;; capital-equipment/general-purpose-machinery vertical alongside
+      ;; 2822/2824/2813 in the classic heavy-industry cluster (distinct
+      ;; from the transport-equipment sub-cluster of 2811/2910/3011).
+      (is (= 124 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
