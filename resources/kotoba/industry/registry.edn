@@ -4752,13 +4752,42 @@
    :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
   {:id "4651"
    :name "Wholesale of computers, computer peripheral equipment and s..."
-   :repo "https://github.com/gftdcojp/cloud-itonami-G4651"
-   :business-id "cloud-itonami-G4651"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4651"
+   :business-id "cloud-itonami-isic-4651"
+   ;; :robotics true, path-specific (fleet first): applies only to
+   ;; :delivery/dispatch (AS/RS goods-to-person robotic shuttle,
+   ;; ESD-safe electronics handling); :technology/release has no
+   ;; physical act at all.
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :optimization]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
+   :maturity :implemented
+   ;; real actor: techtrade.{facts,governor,phase,sim,operation,
+   ;; techtradeadvisor,registry,store}.cljc -- TechTradeAdvisor ⊣
+   ;; :tech-export-governor. Dual-use/encryption technology export-
+   ;; control classification backbone -- deliberately more technical
+   ;; than isic-4690 shosha's coarse jurisdiction-citation export
+   ;; check: splits into two distinct HARD checks
+   ;; (eccn-classification-missing = never classified at all vs.
+   ;; license-required-unauthorized = classified but no valid license/
+   ;; exception for the destination/end-user), plus
+   ;; denied-party-list-flag-unresolved (BIS Entity/Denied Persons List
+   ;; screening, distinct from generic OFAC sanctions). Fleet-first
+   ;; THREE-member high-stakes actuation set
+   ;; #{:delivery/dispatch :technology/release :invoice/settle} --
+   ;; :technology/release models the deemed-export doctrine (15 C.F.R.
+   ;; §734.13: release of controlled tech/source code to a foreign
+   ;; national is legally an export to that person's home country even
+   ;; with no physical shipment), resolving :effective-destination to
+   ;; the recipient's nationality rather than the order's own
+   ;; destination-country for such orders. Cites EAR/BIS (CCL Cat 4 +
+   ;; Cat 5 Pt 2, ECCN 5A002/5D002 non-mass-market + 5A992/5D992
+   ;; mass-market, License Exception ENC §740.17, Entity List Supp.4 to
+   ;; Part 744, Denied Persons List Part 764, deemed-export §734.13),
+   ;; Japan METI 該非判定/キャッチオール規制/輸出貿易管理令別表第一, EU
+   ;; Reg. 2021/821 Annex I Cat 4/5 Pt 2 + Art.5 cyber-surveillance
+   ;; catch-all/BAFA, UK Export Control Order 2008/ECJU. 46 tests / 265
+   ;; assertions, lint clean, demo verified.
+   :operating-states [:order/intake :classification/verify :delivery/dispatch :technology/release :invoice/settle :audit]},
   {:id "4652"
    :name "Wholesale of electronic and telecommunications equipment an..."
    :repo "https://github.com/gftdcojp/cloud-itonami-G4652"
