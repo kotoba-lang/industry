@@ -1,0 +1,76 @@
+{:frontmatter
+ {:id "adr-2607105000-kotoba-lang-standard-model-hypercharge-generator-bug-fix"
+  :title "ADR-2607105000: kotoba-lang/standard-model — extending independent-review discipline to the original 6 namespaces finds and fixes a real hypercharge-normalization bug"
+  :status "accepted"
+  :date "2026-07-10"
+  :deciders ["Jun Kawasaki"]
+  :doc_type "adr"
+  :topic "kotoba-lang-standard-model"
+  :authoritative true
+  :authoritative_for
+  ["extends this session's GTG-proven independent-adversarial-review
+    discipline (re-derive from physics literature before reading code) to
+    the ORIGINAL 6 namespaces (kotoba.sm.complex/tensor/vector-field/spinor/
+    gauge/standard-model, ADR-2607051500), which had never received this
+    intensity of review despite predating and being independent of GTG"
+   "landed 2026-07-09/10: kotoba-lang/standard-model#15 merged as
+    519e5da8daff98692a720538e50506ea8848c50f, 80 tests/2918 assertions
+    (up from 79/2911), CI green JDK17+21; superproject pin advanced via API
+    single-entry commit df6500d3629421e57c5f2741d48def5af1d52b65"
+   "BUG: covariant-derivative-sm built the U(1)_Y gauge generator from raw
+    fermion hypercharge :Y, not :Y/2. This namespace's own GMN convention
+    (Q=T3+Y/2, already correctly checked by gell-mann-nishijima-ok?) requires
+    Y/2. After electroweak mixing (via this namespace's own mixing-matrix/
+    photon-Z inverted), photon coupling = e*(T3+Y_eff) since
+    e=g*sin(theta_W)=g'*cos(theta_W) (independently satisfied by this
+    namespace's own mass/mixing functions) -- equals required e*Q=e*(T3+Y/2)
+    only for Y_eff=Y/2. Raw Y gives e*(T3+Y), wrong for every charged
+    fermion with T3!=0 -- 50% too large in magnitude for e_L specifically
+    (T3=-1/2,Y=-1: (T3+Y)/(T3+Y/2)=1.5)"
+   "why undetected at original landing: the only test of
+    covariant-derivative-sm exercised exclusively the fields-off case, where
+    U(1) generator normalization cannot matter. No test decomposed the
+    combined SU(2)/U(1) output into the physical photon direction and
+    checked against e*Q -- classic each-piece-verified-in-isolation gap"
+   "requester independently re-verified before merge: re-derived
+    e*(T3+Y_eff)=e*Q algebra from scratch, and while building an even
+    stronger regression test caught+fixed a coupling-constant argument-order
+    mistake in that test's OWN first draft (passing gw=1.0 instead of g)
+    before it could land a subtly-wrong passing test -- same
+    verify-the-verification discipline applied throughout this session"
+   "fix: (gauge/u1-generators (:Y fermion) dim) ->
+    (gauge/u1-generators (/ (:Y fermion) 2.0) dim). Added
+    covariant-derivative-sm-photon-coupling-matches-e-times-Q: pure-photon
+    field config (Z-component exactly zero), checks e_L coupling against
+    -i*e*Q*psi exactly plus explicit check pre-fix value would be 1.5x too
+    large -- regression strong enough to have caught this at original landing"
+   "no other bugs found: complex/tensor core algebra, spinor's gamma
+    matrices/Dirac equation, gauge's SU(2)/SU(3) generators+structure
+    constants (self-interaction slot-order pattern independently reconfirmed
+    correct for the ORIGINAL compact-group case too), CKM matrix (checked
+    via independent 3-rotation matrix product, matched to floating-point
+    noise), Higgs sector -- all matched independent derivation from physics
+    literature"
+   "coverage gaps noted but NOT fixed (not bugs, thin tests around
+    already-correct code): gell-mann-nishijima-ok? tautological for 18/21
+    fermion-table entries (only 3 independently spot-checked); photon-Z/
+    mixing-matrix only tested for norm preservation (would not catch sign
+    flip or A/Z swap); M_W=M_Z*cos(theta_W) and CKM unitarity tested at only
+    1 fixed point each; covariant-derivative-sm's :color/:weak fermion-map
+    shape never wired to fermion-content's :multiplet shape (part of why the
+    hypercharge bug went unexercised against the real table); yang-mills-density
+    test mislabels its n=0 branch as U(1) (real U(1) always has n=1)"
+   "methodological consequence: THIRD real bug this session's independent-
+    review discipline found in this repo (after PR #6, PR #11), and the
+    first found in code that was NOT freshly-written -- the presumption that
+    older/settled code is comparatively low-risk was wrong. This discipline
+    (re-derive before reading, decompose combined systems and check the
+    combination not just isolated pieces, independently re-verify proposed
+    regression tests before trusting them) generalizes and should be
+    considered for the rest of this repo's surface area, not treated as
+    GTG-specific tooling"]
+  :supersedes []
+  :superseded_by []
+  :related ["adr-2607051500" "adr-2607103000" "adr-2607103600"]
+  :last_verified "2026-07-10"}
+ :body "see 2607105000-kotoba-lang-standard-model-hypercharge-generator-bug-fix.md"}
