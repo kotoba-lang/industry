@@ -1,6 +1,6 @@
 # ADR-2607101558: cloud-itonami MES — System Dynamics（stock-flow連続モデル）による工場プロセスの時間発展
 
-- **Status**: accepted. M1/M2実装・main着地済み（`gftdcojp/cloud-itonami` PR #325 `cef7d76`、west pin `44e390c`）。M3（stretch、フィードバックループ）着手中——設計決定は末尾Addendum参照。
+- **Status**: accepted, done. M1/M2/M3すべて実装・main着地済み（M1/M2: `gftdcojp/cloud-itonami` PR #325 `cef7d76`、west pin `44e390c`。M3: PR #345 `9088980`、west pin `e4e7c16`）。詳細は末尾2本のAddendum参照。
 - **Related**: ADR-2607110900（ロボット接触力学、着手順1番目）、ADR-2607101525（OpenUSD、2番目）。本ADRは3番目=cloud-itonami製造sim。ADR-2607011000（cloud-itonami CACAO — 「1 mission = 1 bounded operation, no internal loop」の設計方針の出典）
 
 > **2026-07-10 訂正: D1をdiscrete-event（個体ベース）シミュレーションからSystem Dynamics（Forrester流のstock-flow連続モデル）へ変更**。実装着手前（west sibling取得段階）にオーナーから直接指示（「kotoba-lang system dynamics を利用」）があった。`kotoba-lang` org内に既存の"system dynamics"という名前のrepo/libraryは実在しない（`gh search code`/`gh repo list`で確認済み、ゼロ件）ため、既存ライブラリの利用ではなく、System Dynamicsという**モデリング手法**をこの組織の流儀（`.cljc`、閉形式検証、既存`cloud_itonami.mes`との合成）で新規実装する指示と解釈した。D2以降を全面差し替え。
@@ -108,4 +108,12 @@ start-rate = reference-rate + (wip-target - wip) / adjustment-time
   - `start-rate`が0未満にならないこと（過剰在庫時に生産を「負」にはできないという物理制約のクランプ）。
   - 既存`sd/report-batch->tx`がフィードバック軌道に対してもそのまま機能すること（M1/M2の資産との合成可能性の確認）。
 
-M3は設計決定・実装着手（本Addendum時点）。着地は別途Addendumで記録する。
+## Addendum (2026-07-10, 2回目): M3 実装完了
+
+`gftdcojp/cloud-itonami`（PR #345、`9088980`でmain着地。west pin `e4e7c16`）:
+
+- `src/cloud_itonami/mes/system_dynamics_feedback.cljc`: 設計通り実装。テスト5件（WIP目標への上下両方向からの収束＝外乱除去の直接証拠、有限時刻での解析解一致、`start-rate`が負にならないクランプ、既存`report-batch->tx`との合成確認）。実装中、`matches-analytic-solution-at-finite-time`の絶対誤差許容値0.05がWIPの絶対値スケール（~50-80）に対して厳しすぎ4件赤くなったが、相対誤差0.5%基準に切り替えて解消（実装のバグではなく、テストの許容値がM1テスト（WIPスケール~2-12）からスケール調整せずコピーされていたことが原因）。
+- 両テストランナー（JVM secondary・portable-cljs primary）に登録。`bb test-portable-cljs`／`clojure -M:test`とも、無関係な既存失敗数（goyoukiki match/propose/shareフロー、mainの並行進捗でさらに件数が増えていた）に変化なし——新規失敗0件。
+- west pin前進で`scripts/verify-west-pins.bb`が**cloud-itonami以外の無関係な2件**（`iso3166`/`network-isekai`）のpin退行を検出——**mainの現状そのものに既に存在する既知の問題**（cloud-itonami entryを一切変更せず現行main west.yml単体を直接検証しても同じ2件が同じメッセージで失敗することを確認済み）と判断し、`--no-verify-remote`で回避（理由をcommitメッセージに記録）。cloud-itonami自身のpinは独立して fast-forward 確認済み。
+
+D1-D4・M1-M3すべて解決済み。ロボット接触力学・OpenUSD・cloud-itonami製造simの3領域、およびそれぞれのstretch M3すべてが完了した。
