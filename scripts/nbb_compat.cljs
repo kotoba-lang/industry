@@ -62,6 +62,11 @@
      :err (or (.-stderr result) "")}))
 
 (defn exit [status] (.exit js/process status))
+(defn sleep!
+  "`(Thread/sleep ms)` の nbb 版。nbb はシングルスレッド同期スクリプトなので
+   Atomics.wait でブロッキング待機する(Promise/setTimeout は非同期で
+   同期スクリプトの制御フローに割り込めない)。"
+  [ms] (js/Atomics.wait (js/Int32Array. (js/SharedArrayBuffer. 4)) 0 0 ms))
 (defn getenv [k] (aget (.-env js/process) k))
 (defn getenv-all
   "`(System/getenv)`(0-arity)の nbb 版。プロセス環境変数全体を map で返す。

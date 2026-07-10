@@ -43,11 +43,11 @@
 
 (defn enable-b2! [dir remote env]
   (run! dir env "git" "annex" "init")
-  (if (run! dir env "git" "annex" "enableremote" remote)
+  (if (zero? (run! dir env "git" "annex" "enableremote" remote))
+    true
     (do (binding [*out* *err*]
           (println (str "enableremote " remote " に失敗。初回は scripts/datalad-b2-init.cljs で initremote 済みか確認。")))
-        false)
-    true))
+        false)))
 
 (defn datalad? [] (zero? (:exit (sh "which" "datalad"))))
 
