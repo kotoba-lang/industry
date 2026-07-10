@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 1796, "ai-gftd-chat-shell" 3797},
+ {"magatama-sh1n5h1x" 1799, "ai-gftd-chat-shell" 3799},
  :zone
- {:requests-7d 207153,
-  :pageviews-7d 4531,
-  :uniques-7d-sum 4819,
+ {:requests-7d 207994,
+  :pageviews-7d 4537,
+  :uniques-7d-sum 4848,
   :zone "gftd.ai"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/stg/.env", :requests 52}
-   {:path "/software/update.cgi", :requests 37}
+  [{:path "/", :requests 1041}
+   {:path "/favicon.ico", :requests 130}
+   {:path "/api/node/config.js", :requests 52}
+   {:path "/signup", :requests 36}
    {:path "/server/backend/.env", :requests 18}
-   {:path "/cc13.php", :requests 16}
-   {:path "//w1px.php", :requests 15}
-   {:path "/sitemap.xml", :requests 15}
-   {:path "/config/mail.production.php", :requests 8}
-   {:path "/assets/index-CVjKE9gm.js", :requests 8}],
-  :status-mix {:client-error 908, :ok 759, :server-error 7379},
+   {:path "//w1px.php", :requests 16}
+   {:path "/sitemap.xml", :requests 16}
+   {:path "/camara.php", :requests 13}],
+  :status-mix {:ok 1954, :client-error 1090, :server-error 7482},
   :window "24h"},
  :as-of "2026-07-10",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 10, :error-5xx-pct 82},
+ {:window "24h", :probe-4xx-pct 10, :error-5xx-pct 71},
  :top-paths
- "上位 page (24h, 2xx/3xx): /stg/.env 52 · /software/update.cgi 37 · /server/backend/.env 18 · /cc13.php 16 · //w1px.php 15 | 4xx(probe) 10% · 5xx 82%",
+ "上位 page (24h, 2xx/3xx): / 1041 · /favicon.ico 130 · /api/node/config.js 52 · /signup 36 · /server/backend/.env 18 | 4xx(probe) 10% · 5xx 71%",
  :signal
- "gftd.ai 実測 207153 req/7d・4819 uniques(日次和)・うち4xx probe 10%(24h)、workers 5593 inv/7d"}
+ "gftd.ai 実測 207994 req/7d・4848 uniques(日次和)・うち4xx probe 10%(24h)、workers 5598 inv/7d"}
