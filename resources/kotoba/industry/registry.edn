@@ -5112,12 +5112,25 @@
    :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
   {:id "4774"
    :name "Retail sale of second-hand goods"
-   :repo "https://github.com/gftdcojp/cloud-itonami-G4774"
-   :business-id "cloud-itonami-G4774"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4774"
+   :business-id "cloud-itonami-isic-4774"
+   ;; No :robotics -- this actor mediates listing/authentication/sale
+   ;; DECISIONS only (a digital marketplace), it never handles physical
+   ;; goods movement, custody, or payment. Same exemption class as
+   ;; cloud-itonami-6310/-isic-6910/-isic-8291/-isic-6311.
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; real actor: resale.{facts,store,policy,llm,phase,operation,report,
+   ;; sim}.cljc -- ResaleAdvisor-LLM sealed advisor ⊣ ResaleGovernor.
+   ;; stolen-goods-reporting-gate and counterfeit-flag-gate are two HARD
+   ;; checks with no analog in sibling actors: structural defenses against
+   ;; the two risks unique to secondhand retail (fenced goods, counterfeit
+   ;; sales), mirroring real US secondhand-dealer statutes (CA Business &
+   ;; Professions Code §21625 et seq., NY General Business Law Art. 5
+   ;; §§60-70). condition-misrepresentation-gate blocks a sale when
+   ;; claimed/verified condition grades diverge by more than one step.
+   ;; ADR-2607113000 (com-junkawasaki/root superproject).
    :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
   {:id "4781"
    :name "Retail sale via stalls and markets of food, beverages and t..."
@@ -5920,12 +5933,22 @@
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "6312"
    :name "Web portals"
-   :repo "https://github.com/gftdcojp/cloud-itonami-J6312"
-   :business-id "cloud-itonami-J6312"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6312"
+   :business-id "cloud-itonami-isic-6312"
+   ;; No :robotics -- a web-portal actor only aggregates, curates and
+   ;; discloses third-party content references; it never handles physical
+   ;; delivery or order-fulfillment. Same exemption class as
+   ;; cloud-itonami-6310/-isic-6910/-isic-8291/-isic-4690/-isic-4610/
+   ;; -isic-6311/-isic-7820.
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; real actor: portal.{facts,policy,phase,llm,operation,report,store,
+   ;; sim}.cljc -- PortalCurator-LLM sealed advisor ⊣ PortalGovernor.
+   ;; license-scope-gate (17 U.S.C. §107 fair-use excerpt cap) and
+   ;; disclosure-gate (FTC native-advertising, 16 CFR Part 255) are the
+   ;; two checks with no analog in sibling actors. default-phase=1 from
+   ;; initial implementation (isic-7820's conservative-default precedent).
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "6391"
    :name "News agency activities"
@@ -7214,11 +7237,25 @@
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "8299"
    :name "Other business support service activities n.e.c."
-   :repo "https://github.com/gftdcojp/cloud-itonami-N8299"
-   :business-id "cloud-itonami-N8299"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-8299"
+   :business-id "cloud-itonami-isic-8299"
+   ;; No :robotics/:labor -- this actor matches business-support tasks to
+   ;; independent contracted operators (VA/BPO dispatch); it never
+   ;; extends employer-of-record labor responsibility, unlike
+   ;; cloud-itonami-isic-7820. Narrowed from the generic n.e.c. code to
+   ;; virtual-assistant/BPO task-matching specifically, same narrowing
+   ;; move as -isic-6311/-isic-4610.
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; real actor: bizsupport.{facts,store,policy,llm,phase,operation,
+   ;; report,sim}.cljc -- TaskRouter-LLM sealed advisor ⊣ RoutingGovernor.
+   ;; Two domain-unique HARD checks: clearance-tier-gate (operator must
+   ;; hold every certification a task requires, from a closed R0 catalog
+   ;; of 5 real standards: HIPAA/PCI-DSS/SOC2/GDPR-processor/ISO27001) and
+   ;; capacity-gate (assignment can never push an operator past their
+   ;; stated weekly capacity). default-phase=1 from initial implementation
+   ;; (fail-open fix already applied, not retrofitted).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "8412"
