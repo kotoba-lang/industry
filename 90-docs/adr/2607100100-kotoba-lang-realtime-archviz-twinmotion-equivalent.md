@@ -1,6 +1,6 @@
 # ADR-2607100100: kotoba-lang 版リアルタイム・アーキビジュアライゼーション設計（Twinmotion 相当）— CAD/BIM 取り込み → シーン合成 → WebGPU 実行層 → `kami-app-amenominaka` 拡張シェル
 
-- **Status**: proposed（設計のみ。実装未着手 — 下記 Milestones 参照）
+- **Status**: accepted（M0/M2/M3/M5 done、M1 は USD 部分のみ done(glTF 未着手)、M4 は実測に基づく代替修正で完了 — 下記 Milestones 参照。`omni.timeline`（M3 stretch）と `MAX-INST` 上限は未解決のまま残る）
 - **Related**: ADR-2605261800（`etzhayyim/root`。NVIDIA Omniverse Stack API-Compat の親 charter — `kami-app-amenominaka` の authoritative parent、本 ADR が従う D10 fallback-gate 枠組み）、ADR-2607010930（clj-wgsl migration — WGSL-compute hot-loop 規則、kami-engine Rust workspace 撤去）、ADR-2607010000（kotoba-runtime-sdk-cljc-migration — 4層 authority/provider 構成、`kami-provider-catalog.edn` の render provider family）、ADR-2607078000（wasm-webcomponent CLJS ESM host policy — browser-host の正式な authoring tier、`clojurewasm` は host-providing-imports 役には使えないと実証済み）、ADR-2607062330/2607062400（kototama actor:host ABI）、ADR-2607100030（kami:engine ECS host imports — 閉じた capability table を本当に必要な時だけ拡張する先例）
 
 ## Context

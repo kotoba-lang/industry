@@ -1,11 +1,11 @@
 {:frontmatter
  {:id "adr-2607100100-kotoba-lang-realtime-archviz-twinmotion-equivalent"
   :title "ADR-2607100100: kotoba-lang 版リアルタイム・アーキビジュアライゼーション設計（Twinmotion 相当）"
-  :status "proposed"
+  :status "accepted"
   :doc_type "adr"
   :topic "kami-app-amenominaka-archviz-pipeline"
   :authoritative true
-  :last_verified "2026-07-09"
+  :last_verified "2026-07-10"
   :authoritative_for
   ["Twinmotion 相当（CAD/BIM取り込み→実時間ウォークスルー）の全体設計は本ADRが正本。
     実装先は kami-app-amenominaka 一本（新規repoは起こさない、2026-07-09 owner合意）"
@@ -138,15 +138,25 @@
   "kotoba-core-contractsへのGPU/描画capability新設"]
 
  :open-questions
- ["magatama Pregel cellの具体的配線(D7) — M3着手前に別途スコーピング必要、本ADRでは未解決のまま"
-  "M2の3D render-IRの詳細スキーマ — 実装着手時に短いfollow-up ADR/設計ノートで確定"
-  "実ブラウザWebGPU動作確認 — ADR-2607078000が記録済みのsandboxed browser-automation環境の既知ギャップにM2でも再度ぶつかる可能性、Node/V8等価確認で代替し最終確認は開発者環境に委ねる"]
+ ["[resolved, addendum-m3-2026-07-10] magatama Pregel cellの具体的配線(D7) — 親ADR-2605261800を
+   全文読み直した結果'magatama'/'Pregel'いずれも一致ゼロと判明、帰属自体が誤りだったため
+   ギャップでなく概念として撤回。extensionのdependency-orderedライフサイクルはmagatama無しで実装済み"
+  "[resolved, addendum-m2-2026-07-10] M2の3D render-IRの詳細スキーマ — kotoba-lang/webgpuの
+   kami.webgpu.ir/kami.webgpu.cljsが既存の実働3Dレンダラーだったため、新規follow-up ADRは不要
+   だった(EDNブリッジのみが新規作業)"
+  "[resolved, addendum-m2-2026-07-10] 実ブラウザWebGPU動作確認 — chromium.executablePath()で
+   headless-shellでなくフル版Chromiumを明示起動する手法(ADR-2607078000 Addendum 8由来)で
+   navigator.gpuの実取得に成功、M2/M4/M5すべてでGitHub Actions macOS runner上のgreen CIとして
+   再現済み。当初懸念していたsandboxed browser-automation環境の既知ギャップは実際には
+   ぶつからなかった"]
 
  :next-steps
- "本ADRはstatus=proposed(設計のみ)。実装はこのADR確定後、別セッション/別作業として
-  M0から順に着手する。kami-app-amenominakaは既にrepos.edn/west.ymlに登録済み
-  (ADR-2607010930 Phase 4)のため、実装開始にあたって新規manifest登録は不要
-  — 通常のchild-repo commit/push運用(CLAUDE.mdのstanding authorization)に従う。"
+ "本ADRはstatus=accepted。M0(scene合成)/M2(render-IRブリッジ)/M3(extensionローダ)/
+  M5(インタラクティブUIシェル)はdone、M1はUSD部分のみdone(glTF未着手)、M4は実測に基づく
+  代替修正(instance bufferキャッシュ)で完了 — 各addendum参照。残る未着手項目:
+  omni.timeline(M3 stretch)、MAX-INST(16384)上限を超えるinstanceの正確性ギャップ、
+  fly camera(M5はorbit+zoomのみ)、glTF書き出し(M1)。いずれも新規追加リクエストが
+  あった時点で個別addendumとして着手する、恒久的な未実装枠として残す。"
 
  :addendum-m0-2026-07-09
  {:landed {:kami-app-amenominaka "5a2f6a7→652d2d7 (feat/m0-scene-composition, server-side merge)"
