@@ -141,3 +141,41 @@ licensed 契約を通じて問い合わせる — 「産業SaaSごとに情報�
   (`:safety-boundary` パターンの参照元)
 - `orgs/kotoba-lang/industry/resources/kotoba/industry/registry.edn`(id "8291"
   エントリ)
+
+## Addendum 1 (2026-07-10): `:corporate-intelligence` 10-repo パイロット配線
+
+§5 で「本ADRのスコープ外」としたフォローアップのうち、まず小規模パイロットを
+実施した(オーナー選択: 288 repo 一斉ではなく 5〜10 repo で先に検証)。
+
+**選定基準**: KYC/デューデリジェンス/カウンターパーティ確認が実際に業務ロジック
+上意味を持つ、既に `:implemented`(scaffold のみでなく実actor)な金融・不動産・
+保険系 vertical のみを選んだ(投機的に全 vertical へばら撒かない)。
+
+| repo | 用途 |
+|---|---|
+| `cloud-itonami-isic-6810`(不動産仲介) | 買主/賃貸人の法人・受益所有者確認 |
+| `cloud-itonami-isic-6910`(法人設立代行、M6910) | 申請者のKYC/制裁スクリーニング強化 |
+| `cloud-itonami-isic-6499`(VCファンド) | 投資先/カウンターパーティのデューデリジェンス |
+| `cloud-itonami-isic-6430`(信託/ファンド器) | カウンターパーティ/投資家確認 |
+| `cloud-itonami-isic-6630`(ファンド運用) | 投資家/カウンターパーティ確認 |
+| `cloud-itonami-isic-6512`(損害保険) | 商業契約者の引受デューデリジェンス |
+| `cloud-itonami-isic-6621`(損害査定) | 請求者/カウンターパーティの法人確認 |
+| `cloud-itonami-isic-6622`(保険仲介) | 商業顧客オンボーディング確認 |
+| `cloud-itonami-isic-6420`(持株会社) | 子会社/資本構成の確認 |
+| `cloud-itonami-isic-6419`(銀行) | 商業口座のKYC/AMLスクリーニング |
+
+**実施内容**: 各 repo 自身の `blueprint.edn` の
+`:itonami.blueprint/optional-technologies` に `:corporate-intelligence` を追記
+し、当該 repo の `main` へ直接 commit+push(288 repo 一斉スイープではなく
+10 repo の個別最小差分)。`kotoba-lang/industry` の registry.edn 側 10
+エントリも同じ内容で追随させ(worktree+サーバ側マージ)、`industry_test.clj`
+7 tests / 193 assertions・lint clean を確認済み。
+
+**あくまで宣言のみ**: `:optional-technologies` への追記は「この capability を
+使い得る」という宣言であり、各blueprint側のコード実装(実際に
+`cloud-itonami-isic-8291` の XRPC/契約を呼ぶ統合コード)は行っていない —
+それは各blueprintの実装フェーズでの独立作業。
+
+**残り約278 repo への展開判断**: このADRでは判断しない。10 repoパイロットの
+運用実績(実際にこのcapabilityが使われるか、宣言だけで終わるか)を見てから、
+必要な業種だけ個別に追加するか、改めて一斉展開のADRを起票するかを判断する。
