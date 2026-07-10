@@ -4596,12 +4596,21 @@
    :operating-states [:intake :design :permit :build :inspect :audit]},
   {:id "4510"
    :name "Sale of motor vehicles"
-   :repo "https://github.com/gftdcojp/cloud-itonami-G4510"
-   :business-id "cloud-itonami-G4510"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4510"
+   :business-id "cloud-itonami-isic-4510"
+   ;; No :robotics -- this actor lists/discloses/confirms sale DECISIONS
+   ;; only, never physical vehicle handover, payment or escrow. Same
+   ;; exemption class as cloud-itonami-isic-4774.
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; real actor: vehiclesale.{facts,store,policy,llm,phase,operation,
+   ;; report,sim}.cljc -- VehicleSale-LLM sealed advisor ⊣
+   ;; VehicleSaleGovernor. lien-clearance-gate and odometer-disclosure-gate
+   ;; (49 U.S.C. Chapter 327) are domain-unique HARD checks with no analog
+   ;; in sibling actors. R0 source catalog: NMVTIS DOJ gateway + NHTSA
+   ;; recalls (free federal) + operator-licensed-dmv-feed (structural,
+   ;; state-by-state lien records).
    :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
   {:id "4520"
    :name "Maintenance and repair of motor vehicles"
