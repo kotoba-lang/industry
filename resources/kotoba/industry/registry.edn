@@ -4955,13 +4955,40 @@
    :operating-states [:order/intake :provenance/verify :delivery/dispatch :invoice/settle :audit]},
   {:id "4663"
    :name "Wholesale of construction materials, hardware, plumbing and..."
-   :repo "https://github.com/gftdcojp/cloud-itonami-G4663"
-   :business-id "cloud-itonami-G4663"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4663"
+   :business-id "cloud-itonami-isic-4663"
+   ;; :robotics true -- bulk lumber/pipe/rebar racking/stacking/gantry-
+   ;; crane automation, palletized hardware/fixtures/heating equipment
+   ;; suited to AS/RS, unlike self-propelled machinery driven off a
+   ;; lot by a human (contrast isic-4653 :robotics false).
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :optimization]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
+   :maturity :implemented
+   ;; real actor: buildmattrade.{facts,governor,phase,sim,operation,
+   ;; buildmattradeadvisor,registry,store}.cljc -- BuildMatTradeAdvisor
+   ;; ⊣ :potable-water-safety-governor. lead-free-certification-missing
+   ;; HARD check, type-gated on :potable-water-contact? (folds two
+   ;; evidentiary arms -- NSF/372 lead-content test + NSF/61 cert on
+   ;; file -- into one rule, dispatch-only, since a certification
+   ;; doesn't "un-happen" the way a discovered recall does, unlike the
+   ;; isic-4649 sibling's re-checked recall enum). Type-gating proven
+   ;; with TWO no-op controls (construction material AND heating
+   ;; equipment), covering both non-potable categories this ISIC code
+   ;; itself names. A second check for heating-equipment safety
+   ;; certification (ANSI Z21/CSA/UL-NRTL) was deliberately NOT added
+   ;; -- reasoned as flowing through a patchwork of state/local
+   ;; model-code adoption rather than one precisely-citable federal
+   ;; statute like SDWA §1417, unlike this actor's primary check.
+   ;; Cites USA Reduction of Lead in Drinking Water Act of 2011 (Pub.
+   ;; L. 111-380)/SDWA §1417/42 U.S.C. §300g-6 (0.25% weighted-average
+   ;; lead-free, effective 2014-01-04), NSF/ANSI/CAN 372+61; Japan 水道法
+   ;; + 給水装置の構造及び材質の基準に関する省令 -- corrected at
+   ;; registration time from the implementing agent's originally-cited
+   ;; 厚生労働省 sole authority to the current 国土交通省+環境省 joint
+   ;; authority (2024 jurisdictional reorganization, independently
+   ;; confirmed via WebSearch). 39 tests / 200 assertions, lint clean,
+   ;; demo verified.
+   :operating-states [:order/intake :certification/verify :delivery/dispatch :invoice/settle :audit]},
   {:id "4669"
    :name "Wholesale of waste and scrap and other products n.e.c."
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4669"
