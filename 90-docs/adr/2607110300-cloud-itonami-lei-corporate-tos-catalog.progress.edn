@@ -1,6 +1,6 @@
 [
  {:progress/schema-note "cloud-itonami-lei rollout progress tracker, per ADR-2607110300. One row per cloud-itonami-isic-<code> industry. :industry/applicable? true means a coherent real global/listed top-3-company concept exists for this ISIC vertical; false means fragmented/local/non-corporate and this vertical is deliberately skipped for the lei-catalog family (the isic blueprint itself is unaffected). This file is the resume point for the next /loop iteration."
-  :progress/resume-from "isic-5011 (sea and coastal passenger water transport) -- first :industry/status :pending row after isic-0610 through isic-4950 plus isic-4912, all now :done (isic-4920 remains :skipped as before). This tick did isic-4911, isic-4912, isic-4950 (8 new company repos total this tick: Deutsche Bahn AG, Trenitalia S.p.A., Canadian National Railway, Enbridge, Kinder Morgan, Williams Companies -- 6 done + 2 tos-fetch-failed exclusions already counted in their industry blocks). isic-5020 (water freight tanker) is still :pending and comes right after isic-5011 in ISIC-ascending order -- do isic-5011 then isic-5020 next, in that order, before moving further down the list. Cumulative company-repo count must be recomputed fresh each tick (do not trust a prior tick's stated running total -- verify via gh repo list cloud-itonami --limit 300 --json name filtered to cloud-itonami-lei-*). Open retry candidates needing a JS-capable fetch path or better entity resolution, all optional, not blocking: isic-0610 Shell plc + Saudi Aramco; isic-0620 Cheniere Energy; isic-1920 Marathon Petroleum + HF Sinclair + PBF Energy; isic-2011 Dow Inc.; isic-2610 TSMC + Samsung Electronics + Intel + Qualcomm + Micron + NXP + onsemi + STMicroelectronics; isic-2660 Koninklijke Philips N.V.; isic-3011 Samsung Heavy Industries + Hanwha Ocean; isic-3020 CRRC Corporation Limited (no parent LEI) + Stadler Rail AG (JS-rendered); isic-3030 Airbus SE (Incapsula bot-challenge); isic-3510 National Grid plc + Duke Energy Corporation (bot-blocked); isic-3812 Waste Management Inc. + Stericycle Inc. (bot-blocked) + Republic Services Inc. (JS-rendered SPA); isic-4711 Costco + Kroger + Target + Tesco + Ahold Delhaize; isic-4730 Couche-Tard + Casey's + Murphy USA; isic-4911 SNCF (403 bot-blocked); isic-4912 Union Pacific (terms page undiscoverable) + CSX (site-wide 403)."
+  :progress/resume-from "isic-5110 (passenger air transport) -- first :industry/status :pending row after isic-0610 through isic-5020, all now :done (isic-5221/5222/5223/5224/5229 remain :skipped, public-authority/fragmented). This tick did isic-5011 (Carnival, Royal Caribbean, NCL Corporation -- 3/3) and isic-5020 (Scorpio Tankers, Teekay Tankers -- 2/3, Frontline plc + International Seaways both Cloudflare-blocked). Cumulative company-repo count must be recomputed fresh each tick via gh repo list cloud-itonami --limit 300 --json name filtered to cloud-itonami-lei-* -- do not trust a prior ticks stated running total. Open retry candidates needing a JS-capable fetch path or better entity resolution, all optional, not blocking: isic-0610 Shell plc + Saudi Aramco; isic-0620 Cheniere Energy; isic-1920 Marathon Petroleum + HF Sinclair + PBF Energy; isic-2011 Dow Inc.; isic-2610 TSMC + Samsung Electronics + Intel + Qualcomm + Micron + NXP + onsemi + STMicroelectronics; isic-2660 Koninklijke Philips N.V.; isic-3011 Samsung Heavy Industries + Hanwha Ocean; isic-3020 CRRC Corporation Limited (no parent LEI) + Stadler Rail AG; isic-3030 Airbus SE; isic-3510 National Grid plc + Duke Energy Corporation; isic-3812 Waste Management Inc. + Stericycle Inc. + Republic Services Inc.; isic-4711 Costco + Kroger + Target + Tesco + Ahold Delhaize; isic-4730 Couche-Tard + Caseys + Murphy USA; isic-4911 SNCF; isic-4912 Union Pacific + CSX; isic-5020 Frontline plc + International Seaways."
 
   :db/id -1}
  {:industry/code "isic-0162"
@@ -632,13 +632,62 @@
  {:industry/code "isic-5011"
   :industry/description "Open Business Blueprint for ISIC Rev.5 5011: sea and coastal passenger water transport (robotics-premised)"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/companies
+  [{:company/legal-name "Carnival Corporation Ltd."
+    :company/lei "F1OF2ZSX47CR0BCWA982"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Carnival Corporation"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-f1of2zsx47cr0bcwa982"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.carnival.com/about-carnival/legal-notice.aspx"}
+   {:company/legal-name "Royal Caribbean Cruises Ltd."
+    :company/lei "K2NEH8QNVW44JIWK7Z55"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Royal Caribbean"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-k2neh8qnvw44jiwk7z55"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.royalcaribbean.com/legal"
+    :company/note "Digital Terms of Use and End User License Agreement"}
+   {:company/legal-name "NCL Corporation Ltd."
+    :company/lei "UNZWILHE4KMRP9K2L524"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=NCL Corporation"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-unzwilhe4kmrp9k2l524"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.ncl.com/terms-and-conditions"
+    :company/note "page served in Japanese due to geo-IP localization at fetch time; same NCL Corporation legal entity, not a separate subsidiary -- archived verbatim as-served, not translated"}]}
  {:industry/code "isic-5020"
   :industry/description "Water freight transport (tanker) (ISIC Rev.5 5020) — TankerAdvisor ⊣ Marine Cargo Governor. Open Business Blueprint, cloud-itonami fleet."
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "top-3 by fleet/market-cap intended (Frontline plc, Scorpio Tankers, International Seaways); Frontline plc and International Seaways both excluded (site-wide Cloudflare/JS-challenge, no server-rendered terms/privacy page reachable after 2 attempts each); Teekay Tankers Ltd. substituted for Frontline"
+  :industry/companies
+  [{:company/legal-name "Scorpio Tankers Inc."
+    :company/lei "549300NVJUH16NXG8K87"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Scorpio Tankers"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300nvjuh16nxg8k87"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.scorpiotankers.com/terms-conditions/"}
+   {:company/legal-name "Teekay Tankers Ltd."
+    :company/lei "549300DE8ZAIYS2T6Q22"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Teekay Tankers"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300de8zaiys2t6q22"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.teekay.com/terms-use/"
+    :company/note "parent Teekay Group Terms of Use page; Teekay Tankers Ltd. is the publicly listed entity under the Teekay corporate umbrella"}
+   {:company/legal-name "Frontline plc"
+    :company/lei "5493004BCIKYU1YL3H63"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Frontline plc"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but no terms-of-use/privacy page discoverable on frontlineplc.cy after 2 URL attempts; homepage nav has no visible legal/privacy link in server-rendered HTML"}
+   {:company/legal-name "International Seaways, Inc."
+    :company/lei "549300YUFDGFRNGBWF46"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/549300YUFDGFRNGBWF46"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified (active record; a duplicate/superseded LEI 549300MI01MRJ8M0CI86 also exists for the same legal name, not used) but intlseas.com is Cloudflare JS-challenge protected on both attempted URLs"}]}
  {:industry/code "isic-5110"
   :industry/description "Open Business Blueprint for ISIC Rev.5 5110: passenger air transport (robotics-premised)"
   :industry/applicable? true
