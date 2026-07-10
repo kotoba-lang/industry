@@ -20,6 +20,7 @@
 | cloud-manimani | 88.0 | 43.3 | 5.0 | revenue=0.0, users=1.0 |
 | cloud-itonami | 56.0 | 43.3 | 0.0 | revenue=0.0, validation=0.0 |
 | app-aozora-yoro | 52.0 | 40.0 | 0.0 | revenue=0.0, validation=0.0 |
+| nexus-x402 | 40.0 | 0.0 | 0.0 | defensibility=0.0, revenue=0.0 |
 
 ## 次元別詳細
 
@@ -88,4 +89,9 @@
 - BMC: completeness=5.0, hypothesis=5.0, validation=0.0, pricing=1.0, grounding=4.0
 - YC: acute-problem=3.0, wedge=3.0, tenx=4.0, founder-fit=4.0, distribution=2.0, defensibility=4.0, launched=3.0, users=2.0, revenue=0.0
 - note: Roblox 型 UGC ゲーム/creator platform。実測: isekai.network 12,186 req/7d・PV 7,819・uniques 316 — 公開稼働 (launched 3, users 2)。play/fork/share + kami WASM renderer + AI 生成 backend 実装済 (grounding 4)。creator 経済圏 (DevEx/marketplace) は未収益化 (revenue 0)、価格未定義。tenx=4 は「作品=データで fork/可搬」の Roblox に無い独自性。
+
+### nexus-x402
+
+- BMC: completeness=5.0, hypothesis=5.0, validation=0.0, pricing=0.0, grounding=0.0
+- YC: acute-problem=0.0, wedge=0.0, tenx=0.0, founder-fit=0.0, distribution=0.0, defensibility=0.0, launched=0.0, users=0.0, revenue=0.0
 
