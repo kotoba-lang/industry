@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 3233, "kotobase-cf-wasm-staging" 2344},
+ {"net-kotobase" 3237, "kotobase-cf-wasm-staging" 2344},
  :zone
- {:requests-7d 5509,
-  :pageviews-7d 301,
-  :uniques-7d-sum 386,
+ {:requests-7d 5524,
+  :pageviews-7d 302,
+  :uniques-7d-sum 389,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
@@ -30,14 +30,14 @@
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
-  :active-subscriptions-unpaid 0,
-  :active-subscriptions-account-wide 2,
-  :charges-total 90,
-  :last-charge-epoch 1604224274},
+  :active-subscriptions-unpaid 4,
+  :active-subscriptions-account-wide 4,
+  :charges-total 11,
+  :last-charge-epoch 1718681591},
  :as-of "2026-07-10",
  :traffic-quality {:window "24h", :probe-4xx-pct 82, :error-5xx-pct 2},
  :top-paths
  "上位 page (24h, 2xx/3xx): /llms.txt 32 · /_app/meta 22 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 21 · /llms-full.txt 21 · /.well-known/did.json 21 | 4xx(probe) 82% · 5xx 2%",
  :funnel {:visitors 297, :signups 0, :checkouts 0},
  :signal
- "kotobase.net 実測 5509 req/7d・386 uniques(日次和)・うち4xx probe 82%(24h)、workers 5577 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 5524 req/7d・389 uniques(日次和)・うち4xx probe 82%(24h)、workers 5581 inv/7d、Stripe active subs 0"}
