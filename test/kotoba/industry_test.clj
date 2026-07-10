@@ -39,7 +39,10 @@
     (is (some #{:cae} (industry/required-technologies "2822"))))
   (testing "mining/construction-machinery manufacturing requires robotics and CAE"
     (is (some #{:robotics} (industry/required-technologies "2824")))
-    (is (some #{:cae} (industry/required-technologies "2824")))))
+    (is (some #{:cae} (industry/required-technologies "2824"))))
+  (testing "pump/compressor/valve manufacturing requires robotics and CAE"
+    (is (some #{:robotics} (industry/required-technologies "2813")))
+    (is (some #{:cae} (industry/required-technologies "2813")))))
 
 (deftest readiness-reports-missing-tech
   (let [r (industry/readiness "8691" #{:identity :forms})]
@@ -360,6 +363,8 @@
     (is (= :implemented (industry/maturity "2822"))))
   (testing "a hundred-twentieth implemented actor (cloud-itonami-isic-2824, mining/construction-machinery actor; second machine-tool/capital-equipment vertical in the classic heavy-industry cluster alongside 2822, distinct from the transport-equipment sub-cluster of 2811/2910/3011) is also :implemented"
     (is (= :implemented (industry/maturity "2824"))))
+  (testing "a hundred-twenty-second implemented actor (cloud-itonami-isic-2813, pump/compressor/valve actor; third capital-equipment/general-purpose-machinery vertical in the classic heavy-industry cluster alongside 2822/2824, distinct from the transport-equipment sub-cluster of 2811/2910/3011) is also :implemented"
+    (is (= :implemented (industry/maturity "2813"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -431,8 +436,13 @@
       ;; alongside 2822 in the classic heavy-industry cluster (distinct
       ;; from the transport-equipment sub-cluster of 2811/2910/3011).
       ;; 121 = 120 + cloud-itonami-isic-4662, promoted directly from
-      ;; :spec -- metal/metal-ore wholesale trading actor.
-      (is (= 121 (:implemented m))))))
+      ;; :spec -- metal/metal-ore wholesale trading actor. 122 = 121 +
+      ;; cloud-itonami-isic-2813, promoted directly from :spec --
+      ;; pump/compressor/valve-manufacturing actor, a third capital-
+      ;; equipment/general-purpose-machinery vertical alongside 2822/
+      ;; 2824 in the classic heavy-industry cluster (distinct from the
+      ;; transport-equipment sub-cluster of 2811/2910/3011).
+      (is (= 122 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
