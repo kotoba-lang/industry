@@ -5994,12 +5994,22 @@
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "6209"
    :name "Other information technology and computer service activities"
-   :repo "https://github.com/gftdcojp/cloud-itonami-J6209"
-   :business-id "cloud-itonami-J6209"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6209"
+   :business-id "cloud-itonami-isic-6209"
+   ;; No :robotics/:phone -- narrowed from the generic n.e.c. code to
+   ;; IT managed-services/helpdesk ticket-routing specifically, same
+   ;; narrowing move as -isic-6311/-isic-4610/-isic-8299. Never processes
+   ;; payroll or holds employer-of-record responsibility.
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; real actor: ticketrouter.{facts,store,policy,llm,phase,operation,
+   ;; report,sim}.cljc -- TicketRouter-LLM sealed advisor ⊣ TicketGovernor.
+   ;; access-tier-clearance-gate (NIST SP 800-53 AC-6 least-privilege
+   ;; ordering) and security-incident-misrouting-gate (closed catalog of
+   ;; 3 real incident-response certifications: GIAC GCIH, CISSP, CHFI) are
+   ;; domain-unique HARD checks. default-phase=1 from initial
+   ;; implementation.
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "6311"
    :name "Data processing, hosting and related activities"
