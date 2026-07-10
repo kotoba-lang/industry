@@ -1,6 +1,6 @@
 [
  {:progress/schema-note "cloud-itonami-lei rollout progress tracker, per ADR-2607110300. One row per cloud-itonami-isic-<code> industry. :industry/applicable? true means a coherent real global/listed top-3-company concept exists for this ISIC vertical; false means fragmented/local/non-corporate and this vertical is deliberately skipped for the lei-catalog family (the isic blueprint itself is unaffected). This file is the resume point for the next /loop iteration."
-  :progress/resume-from "isic-0620 (natural gas extraction) -- first :industry/status :pending row after isic-0610, which is now :done. isic-0610 itself has 2 open retry candidates (Shell plc, Saudi Aramco -- LEI verified, ToS fetch failed on JS-rendering/timeout) that a future iteration could revisit with a JS-capable fetch path before moving further down the list, but this is optional, not blocking."
+  :progress/resume-from "isic-2011 (manufacture of basic chemicals) -- first :industry/status :pending row after isic-0610/isic-0620/isic-1920, all now :done. Open retry candidates needing a JS-capable fetch path (not curl-reachable as plain HTTP): isic-0610 Shell plc + Saudi Aramco, isic-0620 Cheniere Energy (ToS page undiscoverable, not JS-specifically), isic-1920 Marathon Petroleum + HF Sinclair + PBF Energy. All optional revisits, not blocking forward progress."
   :db/id -1}
  {:industry/code "isic-0162"
   :industry/description ""
@@ -53,8 +53,38 @@
  {:industry/code "isic-0620"
   :industry/description "Natural gas extraction (ISIC Rev.5 0620) — GasFieldAdvisor ⊣ Gas Well Safety Governor. Open Business Blueprint, cloud-itonami fleet."
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Top-3 by natural gas production intended among US majors; Gazprom (largest global producer) excluded -- GLEIF has no self-registered LEI for the PJSC parent itself, only foreign subsidiaries (Gazprom Austria, Gazprom Italia, Gazprom Holding Cooperatie [inactive]), same no-fabrication policy as isic-0610 Chevron exclusion. Cheniere Energy Inc. considered but its Terms-of-Use page could not be located (only a third-party quotemedia.com stock-quote ToS was discoverable), so it was not used."
+  :industry/companies
+  [{:company/legal-name "EQT Corporation"
+    :company/lei "4NT01YGM4X7ZX86ISY52"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=EQT Corporation"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-4nt01ygm4x7zx86isy52"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.eqt.com/terms"}
+   {:company/legal-name "Coterra Energy Inc."
+    :company/lei "FCNMH6O7VWU7LHXMK351"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Coterra Energy"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-fcnmh6o7vwu7lhxmk351"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.coterra.com/legal-notice/"}
+   {:company/legal-name "Antero Resources Corporation"
+    :company/lei "APVBKPOULHUX7YZLKU17"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Antero Resources"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-apvbkpoulhux7yzlku17"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.anteroresources.com/terms-and-conditions"}
+   {:company/legal-name "Gazprom PJSC (parent)"
+    :company/status :lei-lookup-failed
+    :company/note "no GLEIF record for the parent entity itself, only foreign subsidiaries (Gazprom Austria GmbH 529900CN8RY2Z01K0V60 active, Gazprom Italia S.p.A. 8156005D2CA1602FE115 active, Gazprom Holding Cooperatie U.A. 724500M3ZGNKQ8Y95460 inactive); not fabricated, not substituted with a subsidiary LEI"}
+   {:company/legal-name "Cheniere Energy, Inc."
+    :company/lei "MIHC87W9WTYSYZWV1J40"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Cheniere Energy"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but no dedicated website Terms-of-Use/Terms-and-Conditions page could be located via homepage-footer scan or common URL-pattern guesses (only a third-party quotemedia.com stock-ticker ToS link was discoverable in the footer); no repo created rather than guess the wrong document"}]}
  {:industry/code "isic-0810"
   :industry/description ""
   :industry/applicable? false
@@ -76,8 +106,44 @@
  {:industry/code "isic-1920"
   :industry/description "Petroleum refining (ISIC Rev.5 1920) — Refinery Safety Governor. Open Business Blueprint, cloud-itonami fleet."
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Top-3 by US refining capacity intended (Marathon Petroleum, Valero, Phillips 66); Marathon Petroleum, HF Sinclair, PBF Energy, CVR Energy, and Delek US Holdings were all excluded -- their entire public websites (not just the terms page) return Cloudflare/Akamai bot-challenge responses (403, or a JS challenge page) to a plain HTTP client, so no verbatim capture was possible without fabricating a JS-rendering step this session does not have. Substituted Par Pacific Holdings, Inc. (a real, smaller independent refiner, NYSE:PARR) as the third company since its site is reachable."
+  :industry/companies
+  [{:company/legal-name "Valero Energy Corporation"
+    :company/lei "549300XTO5VR8SKV1V74"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Valero Energy Corporation"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300xto5vr8skv1v74"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.valero.com/legal-notice"
+    :company/note "page text identifies the operating signatory as Valero Marketing and Supply Company and its affiliates under the Valero Energy Corporation LEI/website; attributed at the public-parent level, same convention as the isic-0610 majors"}
+   {:company/legal-name "Phillips 66"
+    :company/lei "5493005JBO5YSIGK1814"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Phillips 66"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-5493005jbo5ysigk1814"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.phillips66.com/terms-and-conditions/"}
+   {:company/legal-name "Par Pacific Holdings, Inc."
+    :company/lei "549300BTNS7MHSHRLR55"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Par Pacific Holdings"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300btns7mhshrlr55"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.parpacific.com/terms-use"}
+   {:company/legal-name "Marathon Petroleum Corporation"
+    :company/lei "3BNYRYQHD39K4LCKQF12"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Marathon Petroleum"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but entire site (including /robots.txt) is behind a Cloudflare JS challenge (Just a moment interstitial) to a plain HTTP client; no repo created"}
+   {:company/legal-name "HF Sinclair Corporation"
+    :company/lei "2549009G116AM01XHN24"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but entire site returns HTTP 403 to a plain HTTP client (bot-protected); no repo created"}
+   {:company/legal-name "PBF Energy Inc."
+    :company/lei "2549003PBEDCSZMZIY02"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but entire site returns HTTP 403 to a plain HTTP client (bot-protected); no repo created"}]}
  {:industry/code "isic-2011"
   :industry/description "Open Business Blueprint for ISIC Rev.5 2011: manufacture of basic chemicals (robotics-premised)"
   :industry/applicable? true
