@@ -6492,11 +6492,35 @@
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "7912"
    :name "Tour operator activities"
-   :repo "https://github.com/gftdcojp/cloud-itonami-N7912"
-   :business-id "cloud-itonami-N7912"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-7912"
+   :business-id "cloud-itonami-7912"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Promoted :spec -> :blueprint (see `kotoba.industry/maturity-of`).
+   ;; The legacy placeholder :repo (gftdcojp/cloud-itonami-N7912) never
+   ;; actually existed (confirmed 404 before this edit) -- replaced with
+   ;; the real repo, following the SAME cloud-itonami/cloud-itonami-isic-####
+   ;; naming convention as every other actor in this fleet rather than the
+   ;; legacy N-prefixed scheme. Low-friction sibling of travelagencyops/
+   ;; 7911 (ADR-2607104600's own flagged next pick): scoped to DESIGNING
+   ;; and ASSEMBLING package tours from multiple travel components
+   ;; (flights, accommodation, transfers, excursions) sold under the
+   ;; operator's own brand, bearing organizer liability -- distinct from
+   ;; travelagencyops/7911's own booking-intermediary business bearing
+   ;; intermediary liability. The EU's Package Travel Directive
+   ;; (2015/2302) makes this distinction explicit and imposes package-
+   ;; organizer-specific obligations (insolvency protection for prepaid
+   ;; amounts, liability for the proper performance of all travel
+   ;; services in the package). UK tour operators selling flight-
+   ;; inclusive packages require ATOL bonding; several US states' Seller
+   ;; of Travel statutes also distinguish package organizers from retail
+   ;; agents for registration/bonding purposes. grep -rli "tour.
+   ;; operator|package.tour|excursion" across the fleet found only
+   ;; travelagencyops/7911's own README, which explicitly names '7912' in
+   ;; its own Scope note -- expected, not real overlap. Governor keyword
+   ;; :tour-operator-governor is grep-verified UNIQUE fleet-wide. Reuses
+   ;; the SAME labor-dispatch operating-states shape as
+   ;; travelagencyops/7911. See ADR-2607104700.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "7990"
