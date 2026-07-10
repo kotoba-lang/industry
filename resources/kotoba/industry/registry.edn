@@ -4737,13 +4737,38 @@
    :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
   {:id "4662"
    :name "Wholesale of metals and metal ores"
-   :repo "https://github.com/gftdcojp/cloud-itonami-G4662"
-   :business-id "cloud-itonami-G4662"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4662"
+   :business-id "cloud-itonami-isic-4662"
+   ;; :robotics true -- bulk ore handling (stacker-reclaimer/conveyor
+   ;; automation at bulk terminals) and refined metal handling
+   ;; (overhead-crane/AGV-forklift automation at LME-style warehouses),
+   ;; both terminating at the wholesaler's own dispatch point.
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :optimization]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
+   :maturity :implemented
+   ;; real actor: metaltrade.{facts,governor,phase,sim,operation,
+   ;; metaltradeadvisor,registry,store}.cljc -- MetalTradeAdvisor ⊣
+   ;; :metal-trading-governor. Principal trading with a chain-of-
+   ;; custody/provenance regulatory backbone distinct from every prior
+   ;; sibling's jurisdiction-of-trade focus:
+   ;; conflict-minerals-provenance-unverified HARD check, gated purely
+   ;; on :metal-type ∈ {tin/tantalum/tungsten/gold/cobalt} ("3TG +
+   ;; cobalt", cobalt an explicit policy extension beyond strict legal
+   ;; 3TG scope), unconditional across jurisdiction, requiring BOTH
+   ;; chain-of-custody-to-mine documentation AND conflict-free-smelter
+   ;; certification; NO-OP for base metals (copper/iron ore/aluminum
+   ;; etc, proven via a copper-vs-gold control pair in tests). General
+   ;; trade catalog: JPN 関税法/輸出貿易管理令 MOF/METI, USA Tariff Act
+   ;; of 1930 CBP+OFAC, GBR Taxation (Cross-border Trade) Act 2018
+   ;; HMRC+SAMLA 2018/OFSI, DEU/EU Union Customs Code Reg.(EU)952/2013
+   ;; Zoll/BMF. Separate conflict-minerals catalog: only USA (Dodd-Frank
+   ;; §1502, 15 U.S.C. §78m note, SEC Rule 13p-1) and EU (Regulation
+   ;; (EU) 2017/821) have binding statute; other jurisdictions fall back
+   ;; to OECD Due Diligence Guidance (3rd ed., 2016) as non-statutory
+   ;; baseline. BAFA's role as Germany's EU 2017/821 competent authority
+   ;; is unverified (flagged, not asserted). 41 tests / 208 assertions,
+   ;; lint clean, demo verified.
+   :operating-states [:order/intake :provenance/verify :delivery/dispatch :invoice/settle :audit]},
   {:id "4663"
    :name "Wholesale of construction materials, hardware, plumbing and..."
    :repo "https://github.com/gftdcojp/cloud-itonami-G4663"
