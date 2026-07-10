@@ -32,7 +32,7 @@ ADR-2607021500 の 7 レイヤー lean canvas を CLI で扱い、進化・成�
 70-tools/bmc/bin/gftd score                           # BMC/YC bench 成熟度スコア表
 70-tools/bmc/bin/gftd score md                        # maturity-scores.md 再生成
 70-tools/bmc/bin/gftd ledger show --tail 20
-bb 70-tools/bmc/run-tests.bb                          # tests
+nbb 70-tools/bmc/run-tests.cljs                       # tests
 ```
 
 スコア（ADR-2607021700）: BMC 成熟度 = completeness/hypothesis/validation
@@ -64,7 +64,7 @@ src/gftd/canvas.cljc   # datoms index / event fold / md・text render（純 cljc
 src/gftd/ledger.cljc   # append-only ledger（1 行 1 EDN event）
 src/gftd/react.cljc    # observe→think→act、advisor ⊣ governor、run-ticks
 src/gftd/cli.cljc      # 共有 dispatch + 7 CLI registry
-bin/{itonami,manimani,murakumo,kotoba,aozora,e7m,gftd}   # bb wrapper
+bin/{itonami,manimani,murakumo,kotoba,aozora,e7m,gftd}   # nbb wrapper
 test/gftd/bmc_test.cljc
 ```
 
@@ -72,14 +72,14 @@ test/gftd/bmc_test.cljc
 （例 `bmc-clj`）へ split し、各 product repo の CLI から deps 参照する（follow-up、
 ADR-2607021600）。
 
-## 実測収集（collect.bb, ADR-2607021800）
+## 実測収集（collect.cljs, ADR-2607021800）
 
 ```bash
-bb 70-tools/bmc/collect.bb        # Cloudflare/Stripe/health → 90-docs/business/metrics/*.edn
+nbb 70-tools/bmc/collect.cljs      # Cloudflare/Stripe/health → 90-docs/business/metrics/*.edn
 # creds: env CF_API_TOKEN / STRIPE_SECRET_KEY → Keychain gftd.cf / 1Password
 ```
 
-business を回す 1 運転 = `collect.bb` → 各 product `react loop` → `canvas md --all` → `score md` → commit。
+business を回す 1 運転 = `collect.cljs` → 各 product `react loop` → `canvas md --all` → `score md` → commit。
 
 ## gate 評価器 + LLM advisor (ADR-2607022100)
 

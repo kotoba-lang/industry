@@ -14,7 +14,7 @@ on:
   workflow_dispatch: {}
   push:
     branches: [main]
-    paths: [scripts/check-foundation-deps.bb, .github/workflows/foundation-deps-verify.yml]
+    paths: [scripts/check-foundation-deps.cljs, .github/workflows/foundation-deps-verify.yml]
 
 permissions:
   contents: read
@@ -26,15 +26,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install babashka
-        run: |
-          curl -sLO https://raw.githubusercontent.com/babashka/babashka/master/install
-          chmod +x install && sudo ./install
+      - name: Install nbb
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
 
       - name: Check foundation deps pin drift (server-side)
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bb scripts/check-foundation-deps.bb
+        run: npx nbb scripts/check-foundation-deps.cljs
 
       - name: Open issue on drift
         if: failure() && github.event_name != 'pull_request'
@@ -47,7 +50,7 @@ jobs:
           if [ "$EXISTING" = "0" ]; then
             gh issue create --repo "$GITHUB_REPOSITORY" \
               --title "$MARKER" \
-              --body "$(printf 'A kotobase/kotoba foundation repo pins a dependency BELOW that dep HEAD — a lower-layer fix is not reaching consumers (e.g. prolly-tree pruning not reaching kotobase-engine, ADR-2607032300).\n\nRun locally:\n\n    bb scripts/check-foundation-deps.bb\n\nBump the drifted pins BOTTOM-UP (deps.edn via GitHub Contents API single-entry commit), verify tests at each level, then advance the matching west.yml pins.\n\nSee the failed run: %s/%s/actions/runs/%s' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")"
+              --body "$(printf 'A kotobase/kotoba foundation repo pins a dependency BELOW that dep HEAD — a lower-layer fix is not reaching consumers (e.g. prolly-tree pruning not reaching kotobase-engine, ADR-2607032300).\n\nRun locally:\n\n    nbb scripts/check-foundation-deps.cljs\n\nBump the drifted pins BOTTOM-UP (deps.edn via GitHub Contents API single-entry commit), verify tests at each level, then advance the matching west.yml pins.\n\nSee the failed run: %s/%s/actions/runs/%s' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")"
           else
             echo "open issue already exists — not duplicating"
           fi

@@ -8,7 +8,8 @@
     :canvas/id … :hyp/id … :event/value … :event/evidence … :event/reason … :event/tick …}"
   (:require [clojure.string :as str]
             #?(:clj [clojure.edn :as edn]
-               :cljs [cljs.reader :as edn])))
+               :cljs [cljs.reader :as edn])
+            #?(:cljs [scripts.nbb-compat :as nc])))
 
 (defn parse-events
   "Parse ledger file content (string) → vector of event maps."
@@ -42,4 +43,21 @@
              f (java.io.File. ^String path)]
          (when-let [p (.getParentFile f)] (.mkdirs p))
          (spit f (apply str (map #(str (pr-str %) "\n") stamped)) :append true)
+         stamped)))
+
+   :cljs
+   (do
+     (defn read-events [path]
+       (let [f (nc/file path)]
+         (if (.exists f) (parse-events (nc/slurp f)) [])))
+
+     (defn append!
+       "Stamp and append events to the ledger file. Returns the stamped events."
+       [path events]
+       (let [existing (read-events path)
+             at (.toISOString (js/Date.))
+             stamped (stamp existing at events)
+             f (nc/file path)]
+         (some-> (.getParentFile f) .mkdirs)
+         (nc/spit-append f (apply str (map #(str (pr-str %) "\n") stamped)))
          stamped))))
