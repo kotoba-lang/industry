@@ -472,3 +472,49 @@ Canvas2D `kami.sprite2d` painter, `kami.pipelines`, game harness
 | webgpu | `a34418a6b244fe20b4fc126510c69865e40b48a3` |
 | network-isekai | `ac50081f07834be83eab5053b9e1d55deb5d0d8f` |
 
+## Addendum 7 (2026-07-10) — physics / fsm / netsync / pipelines / sprite2d Canvas2D SSoT
+
+### Problem
+
+After addendum 6, pure **game-domain** modules still lived in `webgpu`, and
+several sibling packages still **re-exported from webgpu** (inverted dep):
+
+| package | pre-state | issue |
+|---|---|---|
+| `physics` | `kotoba.physics` → `kami.physics` in webgpu | inverted; `host` depended on whole webgpu for collision |
+| `fsm` | full `kotoba.fsm` copy | drift risk vs webgpu `kami.fsm` |
+| `netsync` | fuller package (prediction) vs thinner webgpu | two SSoTs |
+| `pipelines` | package validation helpers; webgpu had `parse-rust` | split surface |
+| `sprite2d` | layout already extracted; Canvas2D painter still in webgpu | incomplete extract |
+
+### Decision
+
+| package | SSoT ns | notes |
+|---|---|---|
+| **physics** | `kami.physics` | collision layers/matrix; pure `.cljc` |
+| **fsm** | `kami.fsm` | EDN state machines; pure `.cljc` |
+| **netsync** | `kami.netsync` | schema + snapshot/interp + **pred-*** (package superset) |
+| **pipelines** | `kami.pipelines` | EDN table + `valid?`/`spec` + `parse-rust` |
+| **sprite2d** | `kami.sprite2d` + layout | Canvas2D painter (`.cljs`) + pure layout |
+| **webgpu** | executor + glue | depends on the above; no reverse edge |
+| **host** | — | depends on `physics` directly (not webgpu) |
+
+`kotoba.*` remain thin facades. Edge is always **consumer → SSoT package**.
+
+### Left in webgpu (browser host / staging)
+
+`kami.webgpu*` executor, `kami.host`/`input`/`ui`/`audio`, `kami.level`,
+`kami.cartpole-math`, `kami.playwright`, `kotoba.webgpu-rs` staging.
+
+### Pins landed
+
+| repo | tip |
+|---|---|
+| physics | `83d2cfcb732e28efaf9b03f9bb472f1e4bd7ef30` |
+| fsm | `23f7b817ea6b9b2c6660dc98f37bdfc47586a82a` |
+| netsync | `4c3f8045f76cd18eeae5ff231089a1dd336b4351` |
+| pipelines | `0e2aaf67e306c8942a5b5d12cb9dafb783ec3c7e` |
+| sprite2d | `ca031b0f5611c611557b4ed4daccbe024baad2d7` |
+| webgpu | `27f384184c141c1a5d0ed7928128d160225ee9dc` |
+| host | `5d6c858d8083ddca6d128a4630586c331304db28` |
+
