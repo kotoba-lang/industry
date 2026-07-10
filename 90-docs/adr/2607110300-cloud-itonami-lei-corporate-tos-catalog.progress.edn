@@ -1,6 +1,6 @@
 [
  {:progress/schema-note "cloud-itonami-lei rollout progress tracker, per ADR-2607110300. One row per cloud-itonami-isic-<code> industry. :industry/applicable? true means a coherent real global/listed top-3-company concept exists for this ISIC vertical; false means fragmented/local/non-corporate and this vertical is deliberately skipped for the lei-catalog family (the isic blueprint itself is unaffected). This file is the resume point for the next /loop iteration."
-  :progress/resume-from "isic-2011 (manufacture of basic chemicals) -- first :industry/status :pending row after isic-0610/isic-0620/isic-1920, all now :done. Open retry candidates needing a JS-capable fetch path (not curl-reachable as plain HTTP): isic-0610 Shell plc + Saudi Aramco, isic-0620 Cheniere Energy (ToS page undiscoverable, not JS-specifically), isic-1920 Marathon Petroleum + HF Sinclair + PBF Energy. All optional revisits, not blocking forward progress."
+  :progress/resume-from "isic-3011 (shipbuilding) -- first :industry/status :pending row after isic-0610/isic-0620/isic-1920/isic-2011/isic-2610/isic-2660, all now :done. Open retry candidates needing a JS-capable fetch path (not curl-reachable as plain HTTP), all optional, not blocking: isic-0610 Shell plc + Saudi Aramco; isic-0620 Cheniere Energy; isic-1920 Marathon Petroleum + HF Sinclair + PBF Energy; isic-2011 Dow Inc.; isic-2610 TSMC + Samsung Electronics + Intel + Qualcomm + Micron + NXP + onsemi + STMicroelectronics (this vertical is unusually bot-hostile -- only 1/9 candidates succeeded); isic-2660 Koninklijke Philips N.V. (geo-redirect artifact, not bot-blocking)."
   :db/id -1}
  {:industry/code "isic-0162"
   :industry/description ""
@@ -147,18 +147,106 @@
  {:industry/code "isic-2011"
   :industry/description "Open Business Blueprint for ISIC Rev.5 2011: manufacture of basic chemicals (robotics-premised)"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Dow Inc. excluded -- entire site returns HTTP 403 to a plain HTTP client (bot-protected). Substituted Eastman Chemical Company (real, NYSE:EMN)."
+  :industry/companies
+  [{:company/legal-name "BASF SE"
+    :company/lei "529900PM64WH8AF1E917"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=BASF SE"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-529900pm64wh8af1e917"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.basf.com/jp/en/legal/disclaimer.html"
+    :company/note "global.basf.com terms-of-use path 404'd; used the reachable jp/en disclaimer page instead"}
+   {:company/legal-name "LyondellBasell Industries N.V."
+    :company/lei "BN6WCCZ8OVP3ITUUVN49"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=LyondellBasell Industries"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-bn6wccz8ovp3ituuvn49"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.lyondellbasell.com/en/terms-of-use/"}
+   {:company/legal-name "Eastman Chemical Company"
+    :company/lei "FDPVHDGJ1IQZFK9KH630"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Eastman Chemical Company"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-fdpvhdgj1iqzfk9kh630"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.eastman.com/en/legal-information"}
+   {:company/legal-name "Dow Inc."
+    :company/lei "5493003S21INSLK2IP73"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but entire site returns HTTP 403 to a plain HTTP client (bot-protected); no repo created"}]}
  {:industry/code "isic-2610"
-  :industry/description ""
+  :industry/description "manufacture of electronic components (semiconductors) -- gh description blank, ISIC Rev.5 2610"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "The 3 largest logic-chip makers (TSMC, Samsung Electronics, Intel) plus 5 other candidates (Qualcomm, Micron, NXP, onsemi, STMicroelectronics) were ALL bot-blocked/JS-rendered/unreachable to a plain HTTP client -- this vertical is dominated by heavily bot-protected corporate sites. Only Texas Instruments succeeded. Landed with 1 company rather than force-fitting fabricated data for the other 2 slots."
+  :industry/companies
+  [{:company/legal-name "Texas Instruments Incorporated"
+    :company/lei "WDJNR2L6D8RWOEB8T652"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[fulltext]=Texas Instruments Incorporated"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-wdjnr2l6d8rwoeb8t652"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.ti.com/legal/terms-of-use.html"}
+   {:company/legal-name "Taiwan Semiconductor Manufacturing Co. Ltd."
+    :company/lei "549300KB6NK5SBD14S87"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified (parent entity, not the US ADR-hedged entity) but tsmc.com returns HTTP 403 to a plain HTTP client"}
+   {:company/legal-name "Samsung Electronics Co., Ltd."
+    :company/lei "9884007ER46L6N7EI764"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified (Korean parent) but samsung.com/us legal hub page is a JS-driven shop/nav shell with no discoverable inline ToS text via plain HTTP"}
+   {:company/legal-name "Intel Corporation"
+    :company/lei "KNX4USFCNGPY45LOCE31"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but intel.com returns HTTP 403 to a plain HTTP client"}
+   {:company/legal-name "Qualcomm Incorporated"
+    :company/status :tos-fetch-failed
+    :company/note "qualcomm.com/site/terms-of-use returns HTTP 200 but is a client-side-rendered SPA shell with zero body text server-side; LEI not looked up since fetch failed"}
+   {:company/legal-name "Micron Technology, Inc."
+    :company/status :tos-fetch-failed
+    :company/note "micron.com/legal is gated behind a login/registration wall, not a public ToS page; LEI not looked up since fetch failed"}
+   {:company/legal-name "NXP Semiconductors N.V."
+    :company/status :tos-fetch-failed
+    :company/note "nxp.com root and terms-of-use paths both 404/unreachable to a plain HTTP client; LEI not looked up since fetch failed"}
+   {:company/legal-name "onsemi (ON Semiconductor Corporation)"
+    :company/status :tos-fetch-failed
+    :company/note "onsemi.com returns HTTP 403 to a plain HTTP client; LEI not looked up since fetch failed"}
+   {:company/legal-name "STMicroelectronics N.V."
+    :company/status :tos-fetch-failed
+    :company/note "st.com connection failed outright to a plain HTTP client; LEI not looked up since fetch failed"}]}
  {:industry/code "isic-2660"
   :industry/description "Open Business Blueprint for ISIC Rev.5 2660: manufacture of irradiation, electromedical and electrotherapeutic equipment (robotics-premised)"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Koninklijke Philips N.V. excluded -- philips.com geo-redirects to a Dutch B.V. healthcare subsidiary terms page (Dutch language, PDF-download list only, not the parent's inline English ToS) regardless of URL path tried; no English inline ToS reachable via plain HTTP. Substituted Hologic, Inc. (real, Nasdaq:HOLX, same ISIC vertical -- diagnostic/imaging electromedical equipment)."
+  :industry/companies
+  [{:company/legal-name "Siemens Healthineers AG"
+    :company/lei "529900QBVWXMWANH7H45"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[fulltext]=Siemens Healthineers AG"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-529900qbvwxmwanh7h45"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.siemens-healthineers.com/corporate/terms-of-use"}
+   {:company/legal-name "GE HealthCare Technologies Inc."
+    :company/lei "549300OI9J7XOWZMUN85"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[fulltext]=GE HealthCare Technologies"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300oi9j7xowzmun85"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.gehealthcare.com/en-us/about/terms-and-conditions"}
+   {:company/legal-name "Hologic, Inc."
+    :company/lei "549300DYP6F5ZJL0LB74"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[fulltext]=Hologic Inc"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300dyp6f5zjl0lb74"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.hologic.com/terms-conditions"}
+   {:company/legal-name "Koninklijke Philips N.V."
+    :company/lei "H1FJE8H61JGM1JSGM897"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified (global parent) but every philips.com/philips.co.jp URL path tried geo-redirects to a Dutch-language subsidiary PDF-list page, not the parent's English inline ToS"}]}
  {:industry/code "isic-3011"
   :industry/description "ISIC 3011 shipbuilding open business blueprint — Shipyard Advisor ⊣ Shipyard Governor"
   :industry/applicable? true
