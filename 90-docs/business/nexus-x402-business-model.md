@@ -16,6 +16,7 @@
 - 中小 seller / 新規 worker は on-chain 検証・treasury 管理の実装コストを個別に負いたくない
 - 観測 (signal): workers 322 inv/7d
 - 観測 (signal): workers 340 inv/7d
+- 観測 (signal): workers 345 inv/7d
 
 ## Customer Segments
 
