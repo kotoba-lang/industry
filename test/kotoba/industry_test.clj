@@ -379,9 +379,9 @@
       ;; logic itself stays unit-tested without depending on a
       ;; specific live count.
       (is (= 36 (:blueprint m)))
-      ;; 109 = 108 + cloud-itonami-isic-4690, promoted directly from :spec
-      ;; (never a :blueprint) -- general-trading (sogo-shosha) actor.
-      (is (= 109 (:implemented m))))))
+      ;; 110 = 109 + cloud-itonami-isic-4610, promoted directly from :spec
+      ;; (never a :blueprint) -- commission-broker/agency actor.
+      (is (= 110 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

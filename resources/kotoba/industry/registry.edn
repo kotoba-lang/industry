@@ -4528,13 +4528,31 @@
    :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
   {:id "4610"
    :name "Wholesale on a fee or contract basis"
-   :repo "https://github.com/gftdcojp/cloud-itonami-G4610"
-   :business-id "cloud-itonami-G4610"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4610"
+   :business-id "cloud-itonami-isic-4610"
+   ;; No :robotics -- a commission broker never takes title to goods;
+   ;; its entire actuation surface is arranging/confirming a deal on
+   ;; paper, delivery and payment settle directly between the two
+   ;; principals outside the actor's boundary. Same exemption class as
+   ;; cloud-itonami-6310/-isic-6910/-isic-8291/-isic-4690.
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger :optimization]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
+   :maturity :implemented
+   ;; real actor: commtrade.{facts,governor,phase,sim,operation,
+   ;; commtradeadvisor,registry,store}.cljc -- CommTradeAdvisor ⊣
+   ;; :commission-broker-governor. Agency/brokerage model (broker never
+   ;; a principal), distinct from the two principal-trading siblings
+   ;; (fueltrade/shosha): mandate-missing, principal-identity-unverified
+   ;; (both sides), conflict-of-interest-undisclosed (dual-agency, the
+   ;; brokerage-specific check with no analog in the principal-trading
+   ;; siblings), counterparty-sanctions-flag-unresolved (both sides),
+   ;; already-confirmed/already-invoiced. No credit-uncleared analog --
+   ;; a broker never extends credit or takes a position. 4-jurisdiction
+   ;; broker/agency-law catalog (JPN 商法543条仲立営業, GBR Commercial
+   ;; Agents Regs 1993 SI 1993/3053, DEU HGB §§84-92c Handelsvertreter,
+   ;; USA PACA 7 U.S.C. §499a commission merchants/brokers). 36 tests /
+   ;; 179 assertions, lint clean, demo (clojure -M:dev:run) verified.
+   :operating-states [:mandate/intake :mandate/verify :deal/confirm :commission/invoice :audit]},
   {:id "4620"
    :name "Wholesale of agricultural raw materials and live animals"
    :repo "https://github.com/gftdcojp/cloud-itonami-G4620"
