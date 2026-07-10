@@ -66,3 +66,17 @@ lying about fidelity.
 2. Fold √S vs full-KV into BMC `cost.cljc` fleet ¥/tok gate from run ledger.
 3. Optional Cook–Mertz multipoint evaluation for multi-head shared tape blocks
    (`:block-respecting` beyond the space proxy).
+
+## Addendum 1 — real-model validation + paper + arXiv submit (2026-07-09→10)
+
+| Step | Outcome |
+|---|---|
+| Mac M4 MLX (135M / 0.5B) | KV save **93–97%**; recompute-no-cache **worse** peak |
+| Modal A100 (7B / 14B bf16) | same save ratio; 14B@16k **3.22 GB → 86.5 MB** |
+| Attention | host-paged online-softmax numerically exact (\(\max\|\Delta\|\sim 10^{-5}\)) |
+| Results home | public [`com-junkawasaki/sqrt-space-kv`](https://github.com/com-junkawasaki/sqrt-space-kv) (ADR-2607101000) |
+| arXiv | **submitted** 2026-07-10 · draft **7807366** · primary **cs.CL** · N24 (ADR-2607101010) |
+| Public arXiv id | *pending announce* |
+
+Paper does **not** claim TM simulation of Transformers; it transfers block-size
+balancing to KV residency with measured storage savings.
