@@ -270,3 +270,48 @@ L0 contracts     kami-engine / kami-contracts
 
 Pruned: `kami-engine-sdk-svelte`, `kami-engine-host-rs`.
 
+## Addendum 2 (2026-07-10) — merge `kami-engine-hud` into `kami-engine-app-sdk`
+
+Owner: "do it" on consolidating the DOM-overlay split.
+
+### Decision
+
+**`kami-engine-hud` is merged into `kami-engine-app-sdk`.** One package owns
+browser app chrome for kami-engine WebGPU apps:
+
+| Namespace | Origin | Role |
+|---|---|---|
+| `kotoba.ui` | ex-`kami-engine-hud` | EDN hiccup HUD (`:panel`/`:bar`/`:minimap`/`:text`, `mount!`/`render!`) |
+| `kami-ui-sdk.*` | ex-`kami-ui-sdk` JS | motion / effect / sound / rtc / widgets math (+ DOM widgets) |
+
+### Why merge (not keep two repos)
+
+The previous split ("data IR" vs "chrome behavior") was correct as layers
+inside one product surface, but wrong as **two GitHub repos** — consumers could
+not tell which to depend on, and `kotoba.ui` is itself a browser DOM executor
+(same host class as `kami-ui-sdk.widgets`). Authority is one: **app chrome over
+the WebGPU canvas**.
+
+Still separate (do not merge):
+
+- **`kami-engine-sdk`** — ECS / scene / render-IR (brain, not chrome)
+- **`kotoba-ui` / `uikit` / `appkit`** — product design system, not 3D canvas
+- **`kami-engine-hud-gpu`** — optional GPU HUD backend; stays sibling for now
+  (README notes the merge)
+
+### Execution
+
+1. Copy `kotoba.ui` + tests into `kami-engine-app-sdk` (51→ tests green including HUD).
+2. `kami-engine-hud` → deps-only shim re-exporting `kami-engine-app-sdk`, then **archived**.
+3. Prefer `kami-engine-app-sdk` in all new deps; old `:local/root "../kami-engine-hud"` still resolves via shim until clones drop it.
+
+### Updated L3 chrome row
+
+```
+L3 chrome        kami-engine-app-sdk   … HUD (kotoba.ui) + motion/sound/effect/rtc/widgets
+                 kami-engine-input-map … stick/deadzone
+L3 brain         kami-engine-sdk       … ECS / scene / render-IR
+```
+
+Pruned/archived: `kami-engine-hud` (shim remains on GitHub for redirect + legacy path).
+
