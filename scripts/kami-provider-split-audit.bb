@@ -23,11 +23,24 @@
 (def central
   (:kami/provider-split-repos (read-edn central-path)))
 
+;; ledger-path/repos-path (但し central-path は対象外 — orgs/ 配下、Phase 3 で扱う)
+;; は manifest/edn-datomize.bb により tx-data 形式に変換済み。元のトップレベル map
+;; を復元する。
+(defn- unblob [v]
+  (if (string? v)
+    (try (let [parsed (edn/read-string v)] (if (coll? parsed) parsed v))
+         (catch Exception _ v))
+    v))
+
+(defn- reconstitute-entity [tx-data]
+  (into {} (map (fn [[k v]] [(keyword (name k)) (unblob v)]))
+        (dissoc (first tx-data) :db/id)))
+
 (def ledger
-  (read-edn ledger-path))
+  (reconstitute-entity (read-edn ledger-path)))
 
 (def repos
-  (read-edn repos-path))
+  (reconstitute-entity (read-edn repos-path)))
 
 (def west-path
   "manifest/west.yml")

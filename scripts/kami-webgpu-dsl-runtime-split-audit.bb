@@ -22,11 +22,24 @@
 (defn read-edn-file [file]
   (edn/read-string (slurp file)))
 
+;; ledger-path/repos-path は manifest/edn-datomize.bb により tx-data 形式
+;; [{:db/id -1 :ledger.kami-webgpu-split/... ...}] に変換済み。元のトップレベル
+;; map を復元する: 名前空間を剥がし、非scalar値は pr-str blob なので読み戻す。
+(defn- unblob [v]
+  (if (string? v)
+    (try (let [parsed (edn/read-string v)] (if (coll? parsed) parsed v))
+         (catch Exception _ v))
+    v))
+
+(defn- reconstitute-entity [tx-data]
+  (into {} (map (fn [[k v]] [(keyword (name k)) (unblob v)]))
+        (dissoc (first tx-data) :db/id)))
+
 (def ledger
-  (read-edn ledger-path))
+  (reconstitute-entity (read-edn ledger-path)))
 
 (def repos
-  (read-edn repos-path))
+  (reconstitute-entity (read-edn repos-path)))
 
 (def required-verification-commands
   #{"bb scripts/kami-webgpu-dsl-runtime-split-audit.bb --strict"

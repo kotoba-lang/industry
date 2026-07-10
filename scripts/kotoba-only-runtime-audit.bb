@@ -16,8 +16,20 @@
 (def west-path
   "manifest/west.yml")
 
+;; ledger-path/repos-path は manifest/edn-datomize.bb により tx-data 形式に
+;; 変換済み。元のトップレベル map を復元する。
+(defn- unblob [v]
+  (if (string? v)
+    (try (let [parsed (edn/read-string v)] (if (coll? parsed) parsed v))
+         (catch Exception _ v))
+    v))
+
+(defn- reconstitute-entity [tx-data]
+  (into {} (map (fn [[k v]] [(keyword (name k)) (unblob v)]))
+        (dissoc (first tx-data) :db/id)))
+
 (def ledger
-  (edn/read-string (slurp (io/file root ledger-path))))
+  (reconstitute-entity (edn/read-string (slurp (io/file root ledger-path)))))
 
 (def source-exts (:source-extensions ledger))
 (def non-kotoba-exts (:non-kotoba-extensions ledger))
@@ -31,7 +43,7 @@
 (def repos (:repos ledger))
 
 (def manifest-repos
-  (edn/read-string (slurp (io/file root repos-path))))
+  (reconstitute-entity (edn/read-string (slurp (io/file root repos-path)))))
 
 (def west-paths
   (->> (str/split-lines (slurp (io/file root west-path)))
