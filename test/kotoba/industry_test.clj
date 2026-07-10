@@ -18,7 +18,10 @@
     (is (some #{:eda} (industry/required-technologies "2610"))))
   (testing "aerospace enablement can require CFD/CAE"
     (is (some #{:cfd} (industry/required-technologies "3030")))
-    (is (some #{:cae} (industry/required-technologies "3030")))))
+    (is (some #{:cae} (industry/required-technologies "3030"))))
+  (testing "shipbuilding requires robotics and CAE"
+    (is (some #{:robotics} (industry/required-technologies "3011")))
+    (is (some #{:cae} (industry/required-technologies "3011")))))
 
 (deftest readiness-reports-missing-tech
   (let [r (industry/readiness "8691" #{:identity :forms})]
@@ -323,6 +326,8 @@
     (is (= :implemented (industry/maturity "5020"))))
   (testing "a hundred-sixth implemented actor (cloud-itonami-isic-4671, fuel-wholesale-trading actor; project-internal isic-rev5 code, distinct from real Rev.4 4661) is also :implemented"
     (is (= :implemented (industry/maturity "4671"))))
+  (testing "a hundred-seventh implemented actor (cloud-itonami-isic-3011, shipbuilding actor; first classic heavy-industry manufacturing vertical after aerospace 3030 and semiconductor 2610) is also :implemented"
+    (is (= :implemented (industry/maturity "3011"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -372,7 +377,7 @@
       ;; logic itself stays unit-tested without depending on a
       ;; specific live count.
       (is (= 36 (:blueprint m)))
-      (is (= 106 (:implemented m))))))
+      (is (= 107 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

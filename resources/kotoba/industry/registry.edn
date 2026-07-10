@@ -3944,14 +3944,24 @@
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3011"
-   :name "Building of ships and floating structures"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C3011"
-   :business-id "cloud-itonami-C3011"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :name "Building of Ships and Floating Structures"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3011"
+   :business-id "cloud-itonami-isic-3011"
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as a shipbuilding actor
+   ;; (Shipyard Advisor ⊣ Shipyard Governor). The legacy placeholder
+   ;; :repo (gftdcojp/cloud-itonami-C3011) never actually existed --
+   ;; replaced with the real cloud-itonami/cloud-itonami-isic-3011
+   ;; repo, following the SAME naming convention as 3030/2610/0810.
+   ;; First classic heavy-industry manufacturing vertical (ships and
+   ;; floating structures) after aerospace (3030) and semiconductor
+   ;; fab (2610); discrete hull-block fabrication with dual actuation
+   ;; (dispatch-block + issue-class-evidence), class-society facts
+   ;; catalog (JPN/USA/GBR/DEU), and the fleet two-sided range-check
+   ;; family for block dimensional tolerance.
+   :required-technologies [:robotics :cae :dmn :bpmn :audit-ledger]
+   :optional-technologies [:cfd :telemetry :optimization]
+   :operating-states [:intake :class-rules-verify :ndt-screen :approve :dispatch-block :issue-class-evidence :audit]},
   {:id "3012"
    :name "Building of pleasure and sporting boats"
    :repo "https://github.com/gftdcojp/cloud-itonami-C3012"
