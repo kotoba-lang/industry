@@ -18,7 +18,20 @@
          '[clojure.java.io :as io])
 
 (def root (-> (sh "git" "rev-parse" "--show-toplevel") :out str/trim))
-(def cfg  (-> (slurp (io/file root "manifest" "repos.edn")) edn/read-string))
+
+;; repos.edn は manifest/edn-datomize.bb により tx-data 形式に変換済み。
+;; 元のトップレベル map(:b2 等)を復元する。
+(defn- unblob [v]
+  (if (string? v)
+    (try (let [parsed (edn/read-string v)] (if (coll? parsed) parsed v))
+         (catch Exception _ v))
+    v))
+
+(defn- reconstitute-entity [tx-data]
+  (into {} (map (fn [[k v]] [(keyword (name k)) (unblob v)]))
+        (dissoc (first tx-data) :db/id)))
+
+(def cfg  (reconstitute-entity (-> (slurp (io/file root "manifest" "repos.edn")) edn/read-string)))
 (def cred (get-in cfg [:b2 :credentials]))
 (def order (or (:order cred) [:env :1password :keychain]))
 (def fields [:key-id :app-key :bucket])

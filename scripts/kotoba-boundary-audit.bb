@@ -5,7 +5,20 @@
          '[clojure.string :as str])
 
 (def root (-> (sh "git" "rev-parse" "--show-toplevel") :out str/trim))
-(def cfg (edn/read-string (slurp (io/file root "manifest" "kotoba-boundaries.edn"))))
+
+;; kotoba-boundaries.edn は manifest/edn-datomize.bb により tx-data 形式に変換済み。
+;; 元のトップレベル map(:owners :wgsl-ownership 等)を復元する。
+(defn- unblob [v]
+  (if (string? v)
+    (try (let [parsed (edn/read-string v)] (if (coll? parsed) parsed v))
+         (catch Exception _ v))
+    v))
+
+(defn- reconstitute-entity [tx-data]
+  (into {} (map (fn [[k v]] [(keyword (name k)) (unblob v)]))
+        (dissoc (first tx-data) :db/id)))
+
+(def cfg (reconstitute-entity (edn/read-string (slurp (io/file root "manifest" "kotoba-boundaries.edn")))))
 (def kotoba-root (io/file root "orgs/kotoba-lang/kotoba"))
 (def legacy-root (io/file kotoba-root "crates/kotoba-kotodama"))
 

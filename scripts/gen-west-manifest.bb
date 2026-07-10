@@ -31,7 +31,22 @@
 (def root (-> (sh "git" "rev-parse" "--show-toplevel") :out str/trim))
 (def manifest-dir (io/file root "manifest"))
 (def out-file (io/file manifest-dir "west.yml"))
-(def cfg (edn/read-string (slurp (io/file manifest-dir "repos.edn"))))
+
+;; repos.edn は manifest/edn-datomize.bb により [{:db/id -1 :manifest.repos/orgs ...}]
+;; という Datomic/Datascript tx-data 形式に変換済み。元のトップレベル map(:orgs :b2 等)を
+;; 復元する: 名前空間を剥がし、非scalar値は pr-str された blob 文字列なので
+;; edn/read-string で元の入れ子構造に戻す。
+(defn- unblob [v]
+  (if (string? v)
+    (try (let [parsed (edn/read-string v)] (if (coll? parsed) parsed v))
+         (catch Exception _ v))
+    v))
+
+(defn- reconstitute-entity [tx-data]
+  (into {} (map (fn [[k v]] [(keyword (name k)) (unblob v)]))
+        (dissoc (first tx-data) :db/id)))
+
+(def cfg (reconstitute-entity (edn/read-string (slurp (io/file manifest-dir "repos.edn")))))
 
 (defn paths-from-west-yml []
   (when (.exists out-file)
