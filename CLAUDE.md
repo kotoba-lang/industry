@@ -474,6 +474,18 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
   vault、ADR-2606272330）。`bin/kagi ls`（vault: `./.kagi/`、gitignore 済み）
   で一覧、`bin/kagi get <name>` で取得。1Password から個別 item を持ち込みたい
   時は `bin/kagi import onepassword <file.1pux>`。
+- **`gftd.kotobase/CLOUD_ITONAMI_LEI_INGEST_IDENTITY_SEED`（1Password
+  `gftdcojp` vault）** — ADR-2607113500（cloud-itonami-lei kotobase.net
+  ingestion job）の自己主権 CACAO identity（Ed25519 seed, 32-byte hex）。
+  ローカルミラーは `scripts/.kotobase-ingest-cloud-itonami-lei-identity.hex`
+  （`scripts/.gitignore` 済み、git に一切コミットしない）。**kagi への複製は
+  未完了**（本セッション環境に `.kagi` vault が一度も無く、`kagi init` は
+  非対話モードで `KAGI_MASTER` を必須とするため実行できなかった — 新規に
+  master passphrase を自分で生成して vault を初期化することは、1件の secret
+  保管を超えた判断（この環境の kagi sovereign identity 自体の新規作成）にあたる
+  ため、勝手に行わず保留した。オーナーが対話端末で `kagi init` するか、
+  明示的にブートストラップを指示したら `kagi add
+  net-kotobase/cloud-itonami-lei-ingest-identity` で追記する）。
 
 ## Actors（langgraph-clj StateGraph アクター）
 
