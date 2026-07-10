@@ -4767,13 +4767,36 @@
    :operating-states [:order/intake :supply-chain/verify :delivery/dispatch :invoice/settle :audit]},
   {:id "4649"
    :name "Wholesale of other household goods"
-   :repo "https://github.com/gftdcojp/cloud-itonami-G4649"
-   :business-id "cloud-itonami-G4649"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4649"
+   :business-id "cloud-itonami-isic-4649"
+   ;; :robotics true -- housewares/small-appliances/toys are carton/
+   ;; pallet-scale goods with real AS/RS/robotic case-picking apparatus
+   ;; in commercial distribution-center practice (unlike ag-mach's
+   ;; self-propelled/towed large equipment with no fixed automatable
+   ;; apparatus).
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :optimization]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
+   :maturity :implemented
+   ;; real actor: housewaretrade.{facts,governor,phase,sim,operation,
+   ;; housewaretradeadvisor,registry,store}.cljc -- HousewareTradeAdvisor
+   ;; ⊣ :consumer-product-safety-governor. Two genuinely different check
+   ;; shapes deliberately NOT force-fit into one mold:
+   ;; childrens-product-certificate-missing is a PRE-shipment gate
+   ;; (type-gated on :childrens-product?, folds lead/phthalate testing +
+   ;; CPC-on-file into one rule), evaluated only at :delivery/dispatch;
+   ;; active-recall-unresolved is a re-checked ENUM (:recall-status
+   ;; :none/:open/:resolved, not a boolean) evaluated at BOTH
+   ;; :delivery/dispatch and :invoice/settle, reasoned as a "keep
+   ;; monitoring" duty (CPSA §15(b)) rather than a "prove clean once"
+   ;; duty -- explicitly documented as distinct from a double-actuation
+   ;; :status guard. Cites USA CPSIA/15 U.S.C. §1278a (100ppm lead),
+   ;; 16 CFR 1303/1307 (lead paint/phthalates), CPC under CPSA §14/16
+   ;; CFR 1107+1110, CPSA §15(b)/15 U.S.C. §2064(b) 24h recall
+   ;; reporting, 16 CFR 1632/1633 mattress flammability; Japan 消費生活
+   ;; 用製品安全法 (PSCマーク, 重大製品事故10日以内報告). 41 tests / 217
+   ;; assertions, lint clean, demo verified (full recall open→resolved
+   ;; lifecycle proven on the same SKU).
+   :operating-states [:order/intake :safety/verify :delivery/dispatch :invoice/settle :audit]},
   {:id "4651"
    :name "Wholesale of computers, computer peripheral equipment and s..."
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4651"

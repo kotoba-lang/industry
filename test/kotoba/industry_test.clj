@@ -480,8 +480,10 @@
       ;; promoted directly from :spec -- hazardous waste treatment/
       ;; disposal actor. 137 = 136 + cloud-itonami-isic-6209, promoted
       ;; directly from :spec -- IT managed-services/helpdesk
-      ;; ticket-routing actor.
-      (is (= 137 (:implemented m))))))
+      ;; ticket-routing actor. 138 = 137 + cloud-itonami-isic-4649,
+      ;; promoted directly from :spec -- household-goods wholesale
+      ;; trading actor.
+      (is (= 138 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
