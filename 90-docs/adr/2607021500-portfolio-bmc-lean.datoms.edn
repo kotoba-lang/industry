@@ -531,4 +531,71 @@
  {:hyp/id :hyp/yukkuri-ypp-then-rpm :hyp/product :ai-gftd-yukkuri :hyp/risk :riskiest :hyp/status :untested
   :hyp/claim "全自動量産チャンネルが YPP 要件を越え、RPM × 視聴時間が生成原価を上回る収益になる"
   :hyp/gate "YPP 加入 (登録者1,000 + 総再生4,000h) 到達、その後 RPM 実測が原価を上回る"}
+
+ ;; ==================================================================================
+ ;; Lx cross-cutting: nexus-x402 — payment facilitator/gateway（Cloudflare Monetization Gateway 型）
+ ;; (ADR-2607105200 で追加。鍵ゼロ・マルチ seller の自前 x402 facilitator。ゲートウェイ核 = kotoba-lang/pay)
+ ;; ==================================================================================
+ {:canvas/kind :lean :canvas/product :nexus-x402 :canvas/layer :payment-facilitator-infra
+  :canvas/id :nexus-x402.problem :canvas/block :lean/problem :canvas/label "Problem"
+  :canvas/items ["各 seller worker (club-shinshi/murakumo/kotobase) が pay.x402 + treasury.core を個別 vendor し、Basescan verify・challenge/authorize 配線を毎回重複実装している"
+                 "自律 AI agent が per-request でマイクロペイメントする「エージェント経済」に対応できる決済ゲートが自前レールに無かった (既存 /pay/* は帯域外・人間向け)"
+                 "Cloudflare Monetization Gateway は closed waitlist + facilitator をベンダーに委ねる設計"
+                 "中小 seller / 新規 worker は on-chain 検証・treasury 管理の実装コストを個別に負いたくない"]}
+ {:canvas/kind :lean :canvas/product :nexus-x402 :canvas/layer :payment-facilitator-infra
+  :canvas/id :nexus-x402.segments :canvas/block :lean/customer-segments :canvas/label "Customer Segments"
+  :canvas/items ["内部 seller (first customers): club-shinshi (L0 PPV ゲート)、cloud-murakumo (L1 推論従量課金)、net-kotobase (L2 storage GET 従量課金)"
+                 "将来: 外部 seller — gftdcojp/kotoba-lang 外で x402 標準に乗りたい任意の HTTP API 事業者"
+                 "買い手側: 自律 AI agent (per-request で USDC を払う消費者、人間ウォレットも可)"
+                 "kotoba-lang エコシステム開発者 (pay.facilitator を自 worker に埋め込みたい層)"]}
+ {:canvas/kind :lean :canvas/product :nexus-x402 :canvas/layer :payment-facilitator-infra
+  :canvas/id :nexus-x402.uvp :canvas/block :lean/uvp :canvas/label "Unique Value Proposition"
+  :canvas/items ["鍵ゼロ・マルチ seller の自前 facilitator — 各 seller は自分の treasury に直接着金、nexus は検証のみでカストディを一切持たない"
+                 "x402 標準ワイヤ準拠でロックインしない — Cloudflare facilitator を併用したくなっても移行コストが小さい"
+                 "統合モードを seller が選べる (薄い委譲 API で既存ゲートを温存 / フル gateway proxy で前段に置く) — 強制的な中央化ではなく段階移行"]}
+ {:canvas/kind :lean :canvas/product :nexus-x402 :canvas/layer :payment-facilitator-infra
+  :canvas/id :nexus-x402.solution :canvas/block :lean/solution :canvas/label "Solution"
+  :canvas/items ["ゲートウェイ核: kotoba-lang/pay の pay.facilitator (rules engine / seller registry / verify / settle / gate / discovery、zero-dep・zero-I/O・zero-key-custody)"
+                 "nexus-x402 Cloudflare Worker: HTTP エンベロープ + on-chain I/O (Basescan verify via treasury.core) のみ追加"
+                 "Facilitator API (薄い委譲): POST /verify・POST /settle・GET /.well-known/x402"
+                 "Gateway proxy (前段配置): ANY /gateway/<seller>/<path> — 402 challenge → on-chain 検証 → origin へプロキシ + X-PAYMENT-RESPONSE"
+                 "SELLERS_JSON config (公開 treasury アドレスのみ、鍵は一切含まない)。honest default: 未知 seller → 404、未検証 payment → 402"
+                 "準備 (follow-up): Cloudflare デプロイ (custom domain 例 nexus.gftd.ai)"
+                 "準備 (follow-up): shinshi/murakumo/kotobase の個別ゲートから委譲への移行"
+                 "準備 (follow-up): EIP-3009 exact スキームの gasless relay (現状は transaction スキームのみ実効)"]}
+ {:canvas/kind :lean :canvas/product :nexus-x402 :canvas/layer :payment-facilitator-infra
+  :canvas/id :nexus-x402.channels :canvas/block :lean/channels :canvas/label "Channels"
+  :canvas/items ["gftdcojp 内部 seller (shinshi/murakumo/kotobase) への直接展開 (build in public、既存ゲートとの併存から段階移行)"
+                 "kotoba-lang OSS 公開 (Apache-2.0) による開発者 channel — pay.facilitator 単体でも他 seller が vendor 可能"
+                 "x402 標準を軸にしたエージェント経済コミュニティ (Cloudflare Monetization Gateway 文脈の代替選択肢として)"]}
+ {:canvas/kind :lean :canvas/product :nexus-x402 :canvas/layer :payment-facilitator-infra
+  :canvas/id :nexus-x402.revenue :canvas/block :lean/revenue-streams :canvas/label "Revenue Streams"
+  :canvas/items ["現状: 内部 seller 向けは無償 — 目的は決済ゲート重複実装の排除 (コストセンターとしてのインフラ共有化)"
+                 "将来: 外部 seller 向け take rate (verify/settle 従量、決済額の一定%)"
+                 "将来: managed gateway proxy の enterprise tier (専用 domain・SLA)"
+                 "将来: facilitator-as-a-service (Cloudflare Monetization Gateway の主権的代替として外部提供)"]
+  :canvas/note "Worker 未デプロイのため全て仮説段階。内部 seller 無償運用が floor で、外部化は agent 経済の実需 (hyp/nexus-x402-agent-demand) 検証後。"}
+ {:canvas/kind :lean :canvas/product :nexus-x402 :canvas/layer :payment-facilitator-infra
+  :canvas/id :nexus-x402.cost :canvas/block :lean/cost-structure :canvas/label "Cost Structure"
+  :canvas/items ["Cloudflare Workers 実行費" "Basescan API 呼び出しコスト (on-chain verify、seller/agent 増加に比例)"
+                 "secret 管理 (BASESCAN_API_KEY 等、wrangler secret)" "kotoba-lang/pay + treasury.core の保守 (vendor drift 監視)"
+                 "将来: EIP-3009 gasless relay 実装・監査コスト (nonce/replay 保護レビュー要)"]}
+ {:canvas/kind :lean :canvas/product :nexus-x402 :canvas/layer :payment-facilitator-infra
+  :canvas/id :nexus-x402.metrics :canvas/block :lean/key-metrics :canvas/label "Key Metrics"
+  :canvas/items ["/verify /settle リクエスト数" "検証成功率 / honest-default 遵守率 (未検証 payment が一件も配信されないこと)"
+                 "facilitator 経由の決済総額 (GMV、seller 別内訳)" "個別ゲートから nexus 委譲へ移行した seller 数"]}
+ {:canvas/kind :lean :canvas/product :nexus-x402 :canvas/layer :payment-facilitator-infra
+  :canvas/id :nexus-x402.unfair :canvas/block :lean/unfair-advantage :canvas/label "Unfair Advantage"
+  :canvas/items ["kotoba-lang/pay + treasury の自前スタックが既に確立 (zero-dep/zero-I/O/zero-key-custody、19 tests/112 assertions で landed)"
+                 "x402 標準準拠だがベンダーロックなし — Cloudflare facilitator への依存を必要としない主権性 (closed waitlist を待たない)"
+                 "shinshi(L0)/murakumo・kotobase(L1/L2) の 3 実例が既に同一 facilitator を共有できる構造を持つ (横展開の初期需要がポートフォリオ内で自足する)"]}
+ {:hyp/id :hyp/nexus-x402-adoption :hyp/product :nexus-x402 :hyp/risk :riskiest :hyp/status :untested
+  :hyp/claim "中央 facilitator への委譲は「強制でない」ため、seller が実際に個別ゲートの vendor をやめて nexus 委譲へ移行する"
+  :hyp/gate "shinshi/murakumo/kotobase のうち最低 1 つが個別ゲートを Facilitator API 委譲へ移行"}
+ {:hyp/id :hyp/nexus-x402-agent-demand :hyp/product :nexus-x402 :hyp/risk :high :hyp/status :untested
+  :hyp/claim "自律 AI agent による per-request 決済 (x402 帯域内フロー) が実需として発生する"
+  :hyp/gate "facilitator 経由の agent-originated payment 件数 > 0 (人間フロー以外)"}
+ {:hyp/id :hyp/nexus-x402-external-seller :hyp/product :nexus-x402 :hyp/risk :speculative :hyp/status :untested
+  :hyp/claim "gftdcojp/kotoba-lang 外の外部 seller が closed Cloudflare Monetization Gateway でなく nexus-x402 を選ぶ"
+  :hyp/gate "外部 seller 登録 1 件以上"}
 ]

@@ -65,6 +65,7 @@
 - 観測 (signal): aozora.app 実測 21352 req/7d・705 uniques(日次和)・うち4xx probe 16%(24h)、workers 6240 inv/7d
 - 観測 (signal): aozora.app 実測 21364 req/7d・707 uniques(日次和)・うち4xx probe 15%(24h)、workers 6246 inv/7d
 - 観測 (signal): aozora.app 実測 21373 req/7d・707 uniques(日次和)・うち4xx probe 15%(24h)、workers 6252 inv/7d
+- 観測 (signal): aozora.app 実測 21408 req/7d・714 uniques(日次和)・うち4xx probe 14%(24h)、workers 6257 inv/7d
 
 ## Customer Segments
 
@@ -124,6 +125,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · / 98 · /robots.txt 39 · /js/main.js 17 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 16 | 4xx(probe) 16%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · / 99 · /robots.txt 41 · /js/main.js 17 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 16 | 4xx(probe) 15%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · / 100 · /robots.txt 40 · /js/main.js 17 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 16 | 4xx(probe) 15%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · / 105 · /robots.txt 47 · /js/main.js 21 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 16 | 4xx(probe) 14%
 
 ## Revenue Streams
 
