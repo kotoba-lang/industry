@@ -170,6 +170,7 @@
 - walk #4 (2026-07-09): 所有ターゲット (shinshi mount/画像/bundle, babiniku config) 全て生存・上書きなし。ExoClick 回復は遅行 (修正<1日、7/6 imp1 が最新)。verifier 0 pending。L3 murakumo.cloud/kotobase.net 共に 200 = x402 per-request 課金の接続先が稼働中
 - system dynamics 介入 (BMC ReAct): 最速 income loop = R1 広告 (買い手不要・受動) が回っていなかった真因を発見・修正 — ad-slot 呼び出しがマップを渡し文字列キー期待で広告が一度も描画されず + 配置1ページのみ。scene/actress 面に ExoClick zone 設置、本番で <ins> 注入確認。既存 traffic で impressions 発生見込み
 - supply unlock (2026-07-10): companion brain 本番配線 (shinshi.worker.companion→murakumo Qwen-35b)。agentChat/requestScene の 410 蘇生・persona は D1 modelProfile 解決・safety floor + honest degrade。validation=0.0 律速への具体 unlock、有効化は owner secret 1件 (MURAKUMO_PROXY_TOKEN) 待ち
+- funnel (club-shinshi): 訪問=762 → 登録=? → 課金/creator GMV=0 | 転換 
 
 ## Unfair Advantage
 
