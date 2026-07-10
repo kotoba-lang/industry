@@ -456,3 +456,40 @@ KYCと無関係)・`6611`(市場監視フラグ、取引パターン異常でPEP
 上記9候補・その他の非implemented(scaffold段階)blueprint・残り約278 repo
 全体への展開は、引き続きこのADRでは判断しない。4 repoの実統合コード配線
 (パイロットと同じパターンが機械的に適用できる可能性が高い)も未着手。
+
+## Addendum 7 (2026-07-10): サーベイで見つけた4 repoも実統合完了
+
+「next」の指示で、Addendum 6 で宣言のみだった4 repo(`6411`・`6511`・
+`6612`・`6920`)を実統合した。
+
+### 8291側の追加拡張: `:disclosure/query` の `:company-name` 対応
+
+配線着手前に、`6920`(会計/監査、クライアント法人名で照会)・`6411`
+(中央銀行、コルレス銀行名で照会)の2 repoには8291のid не持たない「名前
+だけ知っている」ケースが必要と判明。既存の `:disclosure/screen-name`/
+`:disclosure/ownership-chain`/`:disclosure/relationship-check` が既に
+持つ「`*-by-name` 解決」パターンを `:disclosure/query`(企業プロファイル
+照会)にも拡張: `:company-id` に加え `:company-name`(`company-by-name`
+経由)を受理し、返り値に `:value {:company-id :flags}` を追加(従来
+`:disclosure/query` の proposal には `:value` が無かった — `report/
+render-profile` の別経路の列描画は無変更のまま追加)。70 tests/257
+assertions、commit `b8adf8c`。
+
+### 4 repoの実統合結果
+
+| repo | 統合先op | 照会対象 | 語彙 | 実測結果 |
+|---|---|---|---|---|
+| `cloud-itonami-isic-6511`(生命保険) | `:disclosure/screen-name` | party.name | 3値(hit/incomplete/clear) | `6512`と同型、そのまま複製。30 tests/118 assertions、commit `233dcfd` |
+| `cloud-itonami-isic-6612`(証券仲介) | `:disclosure/screen-name` | account.client(個人名) | 3値 | 実測: Jane Smith(デモ、co-200役員)への照会が実際にescalate(`:high-stakes`)→ `:incomplete` へ着地(サイレントに`:clear`にはならない)。42 tests/180 assertions、commit `586abfa` |
+| `cloud-itonami-isic-6920`(会計/監査) | `:disclosure/query`(company-name) | engagement.client(法人名) | 3値 | 実測で判明した重要な階層区別: **8291自身**の監査理由は `:high-stakes`(sanctions-flagを検出したため)だが、**6920自身**のgovernorはその提案の confidence 0.5 のみを見て独立に `:low-confidence` と判定 — 2層は別々の根拠で escalate する、意図した設計どおり。44 tests/189 assertions、commit `5e8d1e1` |
+| `cloud-itonami-isic-6411`(中央銀行) | `:disclosure/query`(company-name) | member.member-name(コルレス銀行名) | 2値(true/false のみ、中間状態なし) | 実測: 8291自身はescalateするが、6411自身のgovernorは無条件hard-checkのため**即時hold(interrupt無し)** — `6419`/`6420`と同じ collapse。47 tests/205 assertions、commit `8a2339b` |
+
+### 現状タリー(更新)
+
+サーベイで特定した14 repo(パイロット元10 + Addendum 6の4)のうち、
+**12 repoが実統合済み**(6910・6810・6499・6512・6419・6420・6621・6622・
+6511・6612・6920・6411)。残る2 repo(`6430`・`6630`)は統合すべき箇所が
+構造的に存在しないため対象外のまま(Addendum 3の判断を維持)。
+
+Addendum 6で除外した9候補・その他の非implemented blueprint・残り約278
+repo全体への展開は、引き続きこのADRでは判断しない。
