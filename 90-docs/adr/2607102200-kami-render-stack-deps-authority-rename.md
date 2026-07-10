@@ -598,3 +598,33 @@ src/kami/webgpu/{geometry,ir,mesh}.cljc/cljs
 | kami-engine-core | `b61a29ba734bcc1dbffb6a44cc37daba396253e6` |
 | kami-engine-script-runtime | `001c4e3f150621680e0838e344ebebcdb8be41cb` |
 
+## Addendum 10 (2026-07-10) — kami-engine-clj standalone + consumer rewire
+
+### Problem
+
+Guest game compiler (`kotoba.engine-clj`) still lived only as
+`kami-engine/kami-engine-clj` nested path. Consumers:
+
+- `kami-app-isekai` `:cljs-game` alias
+- `network-isekai` deps.edn
+
+…hard-coded the nested path, violating "nested monorepo path は deps に書かない".
+
+### Decision
+
+| action | detail |
+|---|---|
+| **New** `kotoba-lang/kami-engine-clj` | standalone SSoT; 52 tests green |
+| Consumers | `../kami-engine-clj` (or `../../kotoba-lang/kami-engine-clj`) |
+| Nested | replaced with README shim only |
+| `kami-ui-sdk` (nested JS) | `MOVED.md` retirement path → `kami-engine-app-sdk` / `host` |
+
+### Pins
+
+| repo | tip |
+|---|---|
+| kami-engine-clj | `6ebf42078ae7e5017f27405509abba6f0e8a5fda` |
+| kami-engine | `6136628d7517b4f0ddb4f9fa70f760dd484a94af` |
+| kami-app-isekai | `df573cc4c08c0e8c99a8bf524224ddcaa5f2acd7` |
+| network-isekai | `67f53a2e7ab3d92c676a3a0a6cf87663782ced54` |
+
