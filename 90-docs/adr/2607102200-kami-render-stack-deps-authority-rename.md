@@ -375,3 +375,38 @@ downward without deleting the code.
 Aligned with addendum 3 / ADR-2607100100: first path = `.kotoba` wasm AOT
 + native WASM (wasm-webcomponent); clojurewasm next; Chicory demoted.
 
+## Addendum 5 (2026-07-10) — webgpu mini-monorepo dedup (extract SSoT)
+
+### Policy
+
+**`webgpu` is the GPU executor + browser harness, not a grab-bag of domain modules.**
+Render-domain pure data (`kami.*` shader/quad/scene assembly) lives in sibling
+packages. `webgpu` depends on them; consumers that only need quads/scene2d
+depend on the thin package.
+
+### Ownership table (post-extract)
+
+| Namespace | Package (SSoT) | Notes |
+|---|---|---|
+| `kami.wgsl` / `kotoba.wgsl` | **wgsl** | hiccup→WGSL (addendum 4) |
+| `kami.sprite-gpu` / `kotoba.sprite-gpu` | **sprite-gpu** | rect half-extents fix |
+| `kami.sky` / `kotoba.sky` | **sky** | gradient pass |
+| `kami.shaders` / `kotoba.shaders` | **shaders** | lit/shadow EDN |
+| `kami.render-shaders` / `kotoba.render-shaders` | **render-shaders** | open-world EDN |
+| `kami.scene2d` / `kotoba.scene2d` | **scene2d** | frame assembly |
+| `kami.text` | **scene2d** | GPU 7-segment (≠ `kotoba-lang/text` string utils) |
+| `kami.sprite2d.layout` | **sprite2d** | pure layout |
+| `kami.webgpu*` / `kami.webgl*` / `kami.gpu` / `kami.pipelines` / harness | **webgpu** | stays |
+
+### Left in webgpu on purpose (not extracted this pass)
+
+`kami.sprite2d` (Canvas2D cljs), `kami.ui`, `kami.input`, `kami.audio`,
+`kami.dance`, `kami.fsm`, `kami.level`, `kami.physics`, `kami.netsync`,
+`kami.host`, `kami.playwright`, `kotoba.webgpu-rs.*` — either browser-only
+harness, still staging, or not near-duplicate of a live standalone SSoT.
+
+### Verification
+
+- Per-package unit tests green for extracted packages where present
+- `bb test` in webgpu green after deps rewiring
+
