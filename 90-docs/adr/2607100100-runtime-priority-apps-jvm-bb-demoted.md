@@ -63,3 +63,23 @@ Ghost Hacker ゲームポートフォリオ（ADR-2607023200）のFLOW向け実�
 「Rust を新規に書く」ことで穴を埋めない。スコープを絞る（例: 当面は
 DOM/CSS の視覚表現に留める）か、対象を決めて別途 ADR 化しオーナー判断を
 仰ぐ。CLAUDE.md 当該節に同日中に同内容を追記済み。
+
+## Addendum（2026-07-10、運用 tooling の実装完了）
+
+Decision §3 で別 ADR 化を要した運用 tooling の対象を、オーナー指示により
+**ルートの `scripts/`、`manifest/`、`70-tools/bmc/`** に確定した。対象の
+`sh`/`bb` スクリプトは `.cljs` へ移し、固定版 `nbb` を `package.json` と CI
+で導入した。Babashka/JVM 固有の process・filesystem・JSON・curl 操作は
+`scripts/nbb_compat` の Node.js 互換層に集約した。
+
+West の Python 拡張 `west_annex.py` は `WestCommand` API に縛られるため、
+Python のまま温存せず `manifest/west_annex.cljs` に置換した。従来の
+`west annex-get/drop` は廃止し、等価な明示 CLI
+`nbb manifest/west_annex.cljs annex-get|annex-drop [project …]` を正規経路と
+する。`manifest/west-commands.yml` は Python 拡張を登録しない。
+
+例外として `70-tools/scripts/rsi/` は PyTorch/TRL/PEFT と GPU 学習を実行する
+Python ML パイプラインであり、Node/nbb への置換は同等性のある単純な runtime
+移行ではない。オーナー指示により、この RSI パイプラインとその Python tests は
+Python のまま維持する。これは app runtime の例外ではなく、外部 ML runtime を
+明示的に必要とする運用 workload のスコープ除外である。

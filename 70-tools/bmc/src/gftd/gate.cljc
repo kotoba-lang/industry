@@ -19,7 +19,7 @@
             [gftd.canvas :as canvas]))
 
 ;; ---- per-hypothesis gate specs ----------------------------------------------
-;; Grounded in what collect.bb can measure today (Cloudflare zone / Stripe /
+;; Grounded in what collect.cljs can measure today (Cloudflare zone / Stripe /
 ;; health / product-supplied metrics edn) vs. the product-repo instruments still
 ;; missing (ADR-2607021900/2607022000 の診断)。
 
@@ -99,7 +99,7 @@
     :needs-when-unmeasurable ["YouTube Data API OAuth 復活" "投稿本数の量産"]}
 
    :hyp/nexus-x402-adoption
-   ;; machine-measurable via public GET /catalog census (collect.bb :nexus-x402
+   ;; machine-measurable via public GET /catalog census (collect.cljs :nexus-x402
    ;; gate-emitter, no admin auth needed): 最低1 seller が nexus 経由で live 稼働
    ;; (「最低1つが…移行」の :hyp/gate 文言に忠実な proxy — 個別ゲート「廃止」まで
    ;; は問わない。廃止の有無は README/ADR に別途明記し続ける)。
