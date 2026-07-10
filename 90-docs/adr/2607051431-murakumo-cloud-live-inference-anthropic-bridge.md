@@ -708,3 +708,95 @@ session's own record) — but confirms the write-then-verify order matters:
 Verified live: `api.murakumo.cloud/infer/model-map` and `/infer/model-map/ui`
 both reflect the real fleet state, `/infer/hwmetrics` unaffected (separate
 KV doc, no regression).
+
+## Addendum (2026-07-10, part 9): production drift — docs said qwen3.6 was live, the head was still serving qwen-agentworld
+
+`gftdcojp/local-murakumo`'s `catalog.cljc` already documented (commit
+`3c83aed`, 2026-07-09, "vision-live") that qwen3.6-35b-a3b had been promoted
+to the fleet's live default and that vision worked end-to-end via two
+solid-color test PNGs. Independently of that, this session was asked to
+switch the fleet to qwen3.6-35b-a3b — starting from the assumption that this
+was still open work (part 7 had left qwen3.6 as `:registered-not-serving`,
+a benchmarked-but-not-promoted candidate, then explicitly reverted the fleet
+back to qwen-agentworld after that comparison run).
+
+**Found a real discrepancy, not a duplicate task.** `pgrep -x llama-server`
+on the head showed the OLD `qwen-agentworld-35b-a3b` process still resident
+and serving — despite catalog.cljc's landed docs claiming the 2026-07-09
+switch was live. Root cause not established (no reboot/crash log was
+checked); the observation stands as-is: **documentation and registry state
+can drift from the actual resident process independently of any commit
+landing**, on a fleet with no supervisor that reconciles the two. `bb
+murakumo infer serve-standalone qwen3.6-35b-a3b ...` (the documented,
+scripted path) was tried first and silently no-op'd — it printed a
+constructed command and a connection-info line but neither killed the old
+process nor started a new one (`pgrep` still showed the same PID, unchanged
+start time, afterward). Root cause not diagnosed (suspected SSH/nohup
+backgrounding quirk in the tool's `ssh/sh` helper) — logged as an open
+follow-up, not fixed here. Worked around with direct manual SSH: `pgrep -x
+llama-server | xargs -r kill -9` (confirmed dead), then a manual `nohup
+llama-server -m <path> --mmproj <path> -ngl 999 -c 262144 --parallel 1 -fa
+on --host 0.0.0.0 --port 8090 & disown` reproducing `cmd-serve-standalone`'s
+exact flag construction.
+
+**Re-verified live, independently of the prior session's PNG test**: server
+log showed the Qwen-VL architecture recognized ("Qwen-VL models require...")
+and the mmproj vision projector loaded; a real photographic-content
+`image_url` block (not a synthetic solid-color swatch) sent to
+`infer.murakumo.cloud/v1/chat/completions` came back with a correct visual
+description; confirmed the same result through the public
+`murakumo.cloud/api/v1/chat/completions` proxy layer too.
+
+**Cloud registry (`api.murakumo.cloud/infer/models`) was also stale in the
+same direction** — still listing `qwen-agentworld-35b-a3b` as `"status":
+"serving"` and carrying no entry at all for `qwen3.6-35b-a3b`, unrelated to
+catalog.cljc (a separate KV doc/service, `local-murakumo`'s own registry vs.
+`gftdcojp/local-murakumo`'s catalog page — same naming-collision risk noted
+in part 8 for `hwmetrics`/`model-map`/`placement`). Corrected both entries
+via direct `PUT`: `qwen-agentworld-35b-a3b` → `"registered-not-serving"`
+(weights explicitly left on disk, not deleted — reversible), and added the
+previously-missing `qwen3.6-35b-a3b` entry as `"serving"` with `vision:true`
+and the mmproj filename, matching catalog.cljc's shape.
+
+**Downstream consumer fix, not yet landed.** `kotoba-lang/computer-use`'s
+`examples/jvm_host.clj` (an LLM=murakumo ChatModel adapter for the
+screenshot-driven `computer` tool) carried a documented `KNOWN LIMITATION`
+docstring asserting murakumo had no vision-capable model — accurate when
+written, stale after this addendum. Updated `default-murakumo-model` from
+`"qwen-agentworld-35b-a3b"` to `"qwen3.6-35b-a3b"` and rewrote the docstring
+(same file, and the caller `examples/announce_x402_nexus.clj`, ADR-2607093300/
+ADR-2607110600's announcement-draft script) to reflect vision now working.
+**These edits exist only in a local scratchpad clone, not pushed to
+`kotoba-lang/computer-use` on GitHub** — the superproject's own west-managed
+checkout at `orgs/kotoba-lang/computer-use` is unaffected (still main
+`2bd5b43`). Also found, while debugging why every example in that repo
+raised `No such var: model/openai-model`: `deps.edn` used a bare `:sha` key
+instead of tools.deps' `:git/sha`, which tools.deps silently ignores,
+falling back to `:git/tag "v0.2.0"` alone — an old, pre-org-rename
+`kotoba-lang/langgraph` commit still depending on `com-junkawasaki/
+langchain-clj`, which shadowed `kotoba-lang/langchain`'s `openai-model`.
+Fixed locally by pinning an explicit current `:git/sha`. **Also not yet
+landed** — the checked-out repo's own `deps.edn` still has the same bare
+`:sha` key today (commit `e18e922` fixed the *org* the dependency pointed
+at, not this key-name bug), so it is very likely still silently falling
+back to the same stale pin. Landing both fixes (`deps.edn` key + the
+vision-caveat docstring update) to the real `kotoba-lang/computer-use` repo
+is an open follow-up, not done as part of this addendum.
+
+**Separately checked and ruled out as unrelated**: `x402.nexus/gateway/
+murakumo/v1/messages` returning 404 for a bare GET — nexus-x402's seller
+rule for `murakumo` requires `POST`, so a GET 404 is the gateway's honest
+"no matching rule" response (`docs/adr/0001`'s pass-through-404 default,
+ADR-2607093300), not a regression from this model swap.
+
+**Not done in this addendum** (explicit user decision, deferred rather than
+skipped): a real end-to-end x402 settlement through nexus-x402 (the
+$0.001 `kotobase` seller was chosen as the cheapest test; the `"transaction"`
+scheme 402 challenge was fetched and the exact payer-side parameters
+prepared — recipient, USDC-on-Base contract, amount, resource — but actually
+signing/broadcasting the transfer is the owner's own wallet action per the
+safety floor on fund movement, and was deferred rather than executed); and
+running `announce_x402_nexus.clj` for real (draft-fill only, never submits)
+against HN/Reddit/Base, deferred pending a browser session already logged
+into those sites (none was open at the time — Chrome/Safari were running
+with zero visible windows).
