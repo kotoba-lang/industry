@@ -228,3 +228,31 @@ witness-rpc *dial* capability specifically no longer requires a JVM
 anywhere in its critical path on the client side, and that is now
 proven on real fleet hardware rather than asserted from the session
 host alone.
+
+## Addendum 3 (2026-07-10): attestation signing ported to nbb too
+
+Addendum 2 closed the witness-rpc dial-only gap for nbb but left
+attestation *signing* JVM-bound (needed witness-quorum's JVM-only
+Ed25519 signer). kotoba-lang/witness-quorum#3 adds nbb siblings
+(`signer.cljs`/`selector.cljs`/`attestation.cljs`, using
+`@noble/curves/ed25519`) to the existing JVM files, same public API,
+same namespaces (selected by file extension, not `.cljc` -- the
+existing per-concern-per-file convention this repo already uses).
+
+Cross-platform compatibility was verified, not assumed: for a fixed
+seed and message, the JVM signer, the nbb signer run locally, and the
+nbb signer run on real fleet hardware (naphtali, over SSH, cleaned up
+after) all produced the **exact same public key and signature bytes**.
+`produce-attestation`'s full pipeline (validate -> sign -> format) was
+also verified end-to-end under nbb, including independent signature
+verification of the result.
+
+**What now works via nbb (no JVM) on a fleet node**: dialing a
+witness-rpc endpoint (murakumo#18) AND producing a signed
+witness-quorum attestation over the result (this PR). **What remains
+JVM-bound**: the QUIC transport (kwik/bouncycastle have no nbb-native
+equivalent) and murakumo's `produce-http-witnessed-attestation`
+composition itself hasn't been re-pointed at the new nbb signer yet
+(it still calls the JVM `attestation/produce-attestation`) -- wiring
+an nbb version of that composition is a small follow-up, not done in
+this pass.
