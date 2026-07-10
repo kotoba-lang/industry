@@ -1,6 +1,6 @@
 [
  {:progress/schema-note "cloud-itonami-lei rollout progress tracker, per ADR-2607110300. One row per cloud-itonami-isic-<code> industry. :industry/applicable? true means a coherent real global/listed top-3-company concept exists for this ISIC vertical; false means fragmented/local/non-corporate and this vertical is deliberately skipped for the lei-catalog family (the isic blueprint itself is unaffected). This file is the resume point for the next /loop iteration."
-  :progress/resume-from "isic-6630 (fund management activities) -- first :industry/status :pending row after isic-6612/isic-6622, both now :done. This tick (single-execution fork per user directive, no sub-forking) did isic-6612 security and commodity contracts brokerage (Charles Schwab + Interactive Brokers, 2/3 -- LPL Financial bot-blocked) and isic-6622 insurance agents and brokers (Marsh & McLennan + Aon, 2/3 -- Willis Towers Watson rate-limited/LEI-ambiguous). Cumulative company-repo count must be recomputed fresh each tick via gh repo list cloud-itonami --limit 300 --json name filtered to cloud-itonami-lei-* -- do not trust a prior ticks stated running total (freshly verified this tick: 70)."
+  :progress/resume-from "isic-6920 (accounting, bookkeeping and auditing activities; tax consultancy) -- first :industry/applicable? true :industry/status :pending row after isic-6630/isic-6810/isic-6820 (all now :done); isic-6910 is skipped (:applicable? false, already its own dedicated actor per cloud-itonami-M6910). This tick (single-execution fork per user directive, no sub-forking) did isic-6630 fund management (BlackRock + T. Rowe Price, 2/3 -- Vanguard/State Street ToS pages undiscoverable), isic-6810 real estate own-account (Simon Property Group + Public Storage, 2/3 -- Prologis bot-blocked), and isic-6820 real estate fee/contract basis (JLL + Cushman & Wakefield, 2/3 -- CBRE bot-blocked). Cumulative company-repo count must be recomputed fresh each tick via gh repo list cloud-itonami --limit 300 --json name filtered to cloud-itonami-lei-* -- do not trust a prior ticks stated running total (freshly verified this tick: 76)."
   :db/id -1}
  {:industry/code "isic-0162"
   :industry/description ""
@@ -1251,18 +1251,79 @@
  {:industry/code "isic-6630"
   :industry/description "Open Business Blueprint for ISIC Rev.5 6630: fund management activities"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Vanguard (2 URL attempts, both 404/homepage-shell) and State Street (2 URL attempts, both 404) both undiscoverable; substituted T. Rowe Price Group. FMR LLC/Fidelity excluded: ambiguous duplicate active GLEIF records, not disambiguated."
+  :industry/companies
+  [{:company/legal-name "BlackRock, Inc."
+    :company/lei "529900VBK42Y5HHRMD23"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=BlackRock, Inc."
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-529900vbk42y5hhrmd23"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.blackrock.com/corporate/compliance/terms-and-conditions"}
+   {:company/legal-name "T. Rowe Price Group, Inc."
+    :company/lei "549300SIV6FPS9Y7IH33"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=T. Rowe Price Group, Inc."
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300siv6fps9y7ih33"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.troweprice.com/en/jp/terms-of-use"}
+   {:company/legal-name "The Vanguard Group, Inc."
+    :company/lei "5493002789CX3L0CJP65"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but no dedicated Terms of Use page discoverable (2 URL attempts, both 404/homepage-shell)"}
+   {:company/legal-name "State Street Corporation"
+    :company/lei "549300ZFEEJ2IP5VME73"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but no dedicated Terms of Use page discoverable (2 URL attempts, both 404)"}]}
  {:industry/code "isic-6810"
-  :industry/description ""
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6810: real estate activities with own or leased property"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Prologis excluded: site-wide 403 bot-block, 2 attempts."
+  :industry/companies
+  [{:company/legal-name "Simon Property Group, Inc."
+    :company/lei "529900GQL5X8H7AO3T64"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Simon Property Group, Inc."
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-529900gql5x8h7ao3t64"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.simon.com/legal"}
+   {:company/legal-name "Public Storage"
+    :company/lei "254900GLQZAD4N7N5Q19"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Public Storage"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-254900glqzad4n7n5q19"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.publicstorage.com/terms-and-conditions/terms-and-conditions.html"}
+   {:company/legal-name "Prologis, L.P."
+    :company/lei "GL16H1DHB0QSHP25F723"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but site-wide 403 bot-block, 2 attempts, not evaded"}]}
  {:industry/code "isic-6820"
   :industry/description "Open Business Blueprint for ISIC Rev.5 6820: real estate on a fee or contract basis"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "CBRE Group excluded: site-wide 403 bot-block, 2 attempts, not evaded."
+  :industry/companies
+  [{:company/legal-name "Jones Lang LaSalle Incorporated"
+    :company/lei "6SYKCME112RT8TQUO411"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Jones Lang LaSalle Incorporated"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-6sykcme112rt8tquo411"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.us.jll.com/en/terms-of-use"}
+   {:company/legal-name "Cushman & Wakefield, Inc."
+    :company/lei "549300O7PRTLVBF2ZE53"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Cushman & Wakefield, Inc."
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300o7prtlvbf2ze53"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.cushmanwakefield.com/en/terms-of-use"}
+   {:company/legal-name "CBRE Group, Inc."
+    :company/lei "52990016II9MJ2OSWA10"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified (registration LAPSED but entity ACTIVE, used per no-fabrication policy) but site-wide 403 bot-block, 2 attempts, not evaded"}]}
  {:industry/code "isic-6910"
   :industry/description "Global company-incorporation execution actor (Registrar-LLM + independent RegistrarGovernor + audit ledger) -- ISIC Rev.5 6910 open business blueprint"
   :industry/applicable? false
