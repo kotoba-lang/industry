@@ -179,3 +179,60 @@ licensed 契約を通じて問い合わせる — 「産業SaaSごとに情報�
 **残り約278 repo への展開判断**: このADRでは判断しない。10 repoパイロットの
 運用実績(実際にこのcapabilityが使われるか、宣言だけで終わるか)を見てから、
 必要な業種だけ個別に追加するか、改めて一斉展開のADRを起票するかを判断する。
+
+## Addendum 2 (2026-07-10): cloud-itonami-isic-6910 が最初の実統合(宣言のみでない)consumer になった
+
+Addendum 1 の10 repoは `:optional-technologies` への**宣言のみ**だったが、
+そのうち `cloud-itonami-isic-6910`(法人設立代行)について、実際に
+`cloud-itonami-isic-8291` を呼ぶ統合コードを実装した。
+
+### 統合内容
+
+6910 の `formation.registrarllm/screen-kyc`(officer の KYC/制裁スクリーニング
+draft)は、従来ローカルの自己申告フラグ `:sanctions-hit?` のみを見ていた
+(実質デモ用のダミーフィールドで、どこからも裏取りされていなかった)。これに
+新設の `formation.corporate-intel.cljc` を通じて 8291 の
+`:disclosure/screen-name` を追加照会するよう配線した:
+
+- 呼び出しは 8291 の**同じ** DisclosureGovernor ゲートを通る(6910側からの
+  バイパスは無い)。8291 が実際にヒットを検出した場合、8291 **自身**の
+  high-stakes gate が常に escalate する(8291 の人間レビュアーが確認するまで
+  確定しない)ため、6910 側は 8291 の未承認の Dossier-LLM 生draftを覗き見せず
+  `:pending-human-review?` をそのまま「不確定」信号として扱う。
+- 結果として実際に得られる保証は「**サイレントに :clear にはならない**」で
+  あり、「即座に hard-hold になる」ではない(8291自身が確定的な :hit を返す
+  唯一のケースは、8291側の人間が既に承認済みの場合のみ)。この設計上の帰結は
+  実装中に統合テストで発見され、それに合わせて8291の `propose-name-screen`
+  自体も1点修正した(下記)。
+- `formation.registrarllm/mock-advisor` は新オプション
+  `:corporate-intel-screen`(officer名 → 8291照会結果の関数)を受け取る。
+  既定値は no-op(`{:found? false :hit? false}` 固定)なので、**明示的に
+  opt-in しない限り既存の全呼び出し元の挙動は一切変わらない**。
+
+### 8291側の修正(統合テストで発見)
+
+`propose-name-screen` の「未収載(not found)」結果が当初 confidence 0.5
+(低確信・escalate)だったが、これは実世界の与信/制裁スクリーニング製品の
+挙動と整合しない: 「自社データベースに一致なし」は確信度の低い推論ではなく、
+**確定的で処理可能な陰性結果**である。低確信のままだと、R0の狭いカタログ
+(officialが3件のみ)の外にいる、ごく普通の(何のリスクも無い)人物を
+スクリーニングするたび毎回 escalate してしまい、自動化可能なスクリーニング
+opの意味が無くなる。confidence を 0.85 に修正し、カバレッジの狭さは
+`dossier.facts/coverage` 側の特性として別途正直に報告する(個々のクエリの
+確信度を下げる理由にはしない)方針にした。8291 の既存テストも
+この設計変更に合わせて更新(37 tests / 164 assertions、lint clean)。
+
+### 実測結果
+
+`cloud-itonami-isic-6910` の demo officer `o-4`("Jane Smith (demo)"、8291側
+のsanctions-flagged demo officialと同名)は、ローカルのフィールドは全てクリーン
+(`:sanctions-hit? false`、id-doc あり)——統合前は `:clear` として通っていた。
+統合後は 8291 照会が pending-human-review を返し、6910 側も `:incomplete` に
+留まる(`:clear` には決してならない)。69 tests / 311 assertions(6件新規)、
+lint clean、demo (`clojure -M:dev:run`) で実際にこのフローを再現可能。
+
+### 残り9 repo・約278 repo への展開判断
+
+引き続き判断しない。まず6910の実運用(実際にこの照会が意味のある区別を
+生むか)を見てから、他の9 repo(不動産・VC/信託/ファンド運用の三点セット・
+損保三点セット・持株会社・銀行)への統合を個別に検討する。
