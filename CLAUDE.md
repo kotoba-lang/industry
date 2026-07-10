@@ -61,6 +61,15 @@ west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独�
 - 大容量 repo は worktree ごとに重複取得される。`--fetch smart` + shallow 既定で
   軽減、heavy は DataLad/B2 経路（`nbb manifest/west_annex.cljs annex-get`）。
 
+
+## Repo naming — no `-clj` suffix (2026-07-10)
+
+**Do not create or register repos whose name ends in `-clj`.** Language is not
+the package identity. Use the short domain name, or a **role** suffix when the
+short name is taken (e.g. `kami-engine-guest`, `kami-mangaka-scene-author`).
+See ADR-2607102200 addendum 14. Historical GitHub redirects from old `*-clj`
+names remain; new west entries must use the new names only.
+
 ## 標準作業の常時許可（standing authorization）
 
 - **次の「新規 project を起こして登録する」一連の流れは、毎回の確認なしに実行してよい**
