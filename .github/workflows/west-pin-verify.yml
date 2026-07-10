@@ -26,10 +26,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install babashka
-        run: |
-          curl -sLO https://raw.githubusercontent.com/babashka/babashka/master/install
-          chmod +x install && sudo ./install
+      - name: Install nbb
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
 
       - name: Fetch baseline west.yml
         env:
@@ -52,7 +55,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.WEST_PIN_VERIFY_TOKEN != '' && secrets.WEST_PIN_VERIFY_TOKEN || github.token }}
         run: |
-          bb scripts/verify-west-pins.bb \
+          npx nbb scripts/verify-west-pins.cljs \
             --baseline /tmp/west-baseline.yml \
             --candidate manifest/west.yml
 
@@ -67,7 +70,7 @@ jobs:
           if [ "$EXISTING" = "0" ]; then
             gh issue create --repo "$GITHUB_REPOSITORY" \
               --title "$MARKER (${GITHUB_SHA:0:12})" \
-              --body "$(printf 'Commit %s introduced west.yml pins that fail server-side verification (missing upstream / not reachable from default branch / regression).\n\nRun locally:\n\n    bb scripts/verify-west-pins.bb --baseline <prev-commit> --candidate manifest/west.yml\n\nSee the failed run: %s/%s/actions/runs/%s\n\nPolicy: CLAUDE.md "Git operations" / manifest/repos.edn :manifest-workflow :pin-verification (ADR-2607022900).' "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")"
+              --body "$(printf 'Commit %s introduced west.yml pins that fail server-side verification (missing upstream / not reachable from default branch / regression).\n\nRun locally:\n\n    nbb scripts/verify-west-pins.cljs --baseline <prev-commit> --candidate manifest/west.yml\n\nSee the failed run: %s/%s/actions/runs/%s\n\nPolicy: CLAUDE.md "Git operations" / manifest/repos.edn :manifest-workflow :pin-verification (ADR-2607022900).' "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")"
           else
             echo "open issue already exists — not duplicating"
           fi

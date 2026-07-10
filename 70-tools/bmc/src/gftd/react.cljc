@@ -70,7 +70,7 @@
         :canvas/id (block-id product "problem")
         :event/value text
         :proposal/reason "実測 metric を課題仮説へ反映"})
-     ;; :top-paths (user が実際にアクセスしている page の内訳、collect.bb 2026-07-09)
+     ;; :top-paths (user が実際にアクセスしている page の内訳、collect.cljs 2026-07-09)
      ;; は「どの導線が生きているか」の実測なので channels block へ反映
      (for [[k v] metrics
            :let [text (str "観測 (paths): " v)]

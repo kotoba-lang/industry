@@ -1,0 +1,90 @@
+(ns scripts.nbb-compat
+  "Small synchronous Node.js bridge for the workspace's nbb maintenance scripts."
+  (:require [clojure.string :as str]))
+
+(def fs (js/require "node:fs"))
+(def path (js/require "node:path"))
+(def child-process (js/require "node:child_process"))
+
+(defn file-path [f]
+  (cond
+    (string? f) f
+    (some? f) (.-path f)
+    :else ""))
+
+(defn file [x & xs]
+  (let [p (.apply (.-resolve path) path (to-array (map file-path (cons x xs))))]
+    (js-obj
+     "path" p
+     "exists" #(try (.existsSync fs p) (catch :default _ false))
+     "isFile" #(try (.isFile (.statSync fs p)) (catch :default _ false))
+     "isDirectory" #(try (.isDirectory (.statSync fs p)) (catch :default _ false))
+     "getPath" #(str p)
+     "getCanonicalPath" #(str (.realpathSync fs p))
+     "getCanonicalFile" #(file (.realpathSync fs p))
+     "getName" #(.basename path p)
+     "getParent" #(.dirname path p)
+     "getParentFile" #(file (.dirname path p))
+     "mkdirs" #(do (.mkdirSync fs p #js {:recursive true}) true)
+     "listFiles" (fn []
+                   (if (.existsSync fs p)
+                     (to-array (map (fn [name] (file (.join path p name))) (.readdirSync fs p)))
+                     #js []))
+     "toPath" #js {"toAbsolutePath" (fn [] #js {"normalize" (fn [] p)})}
+     "toURI" #(str "file://" p)
+     "toString" (fn [] p))))
+
+(defn slurp [f] (.readFileSync fs (file-path f) "utf8"))
+(defn spit [f s] (do (.mkdirSync fs (.dirname path (file-path f)) #js {:recursive true})
+                      (.writeFileSync fs (file-path f) (str s))))
+(defn spit-append
+  "`(spit f s :append true)` の nbb 版。"
+  [f s] (do (.mkdirSync fs (.dirname path (file-path f)) #js {:recursive true})
+            (.appendFileSync fs (file-path f) (str s))))
+(defn read-stdin
+  "`(slurp *in*)` の nbb 版。stdin を EOF まで同期読み込みする(fd 0)。"
+  [] (try (.readFileSync fs 0 "utf8") (catch :default _ "")))
+
+(defn file-seq [dir]
+  (letfn [(walk [f]
+            (lazy-seq
+             (cons f (when (.isDirectory f)
+                       (mapcat walk (array-seq (.listFiles f)))))))]
+    (walk (if (string? dir) (file dir) dir))))
+
+(defn sh [& args]
+  (let [options (when (map? (last args)) (last args))
+        command (if options (butlast args) args)
+        result (.spawnSync child-process (first command) (to-array (rest command))
+                           (clj->js (merge {:encoding "utf8"} options)))]
+    {:exit (or (.-status result) 1)
+     :out (or (.-stdout result) "")
+     :err (or (.-stderr result) "")}))
+
+(defn exit [status] (.exit js/process status))
+(defn sleep!
+  "`(Thread/sleep ms)` の nbb 版。nbb はシングルスレッド同期スクリプトなので
+   Atomics.wait でブロッキング待機する(Promise/setTimeout は非同期で
+   同期スクリプトの制御フローに割り込めない)。"
+  [ms] (js/Atomics.wait (js/Int32Array. (js/SharedArrayBuffer. 4)) 0 0 ms))
+(defn getenv [k] (aget (.-env js/process) k))
+(defn getenv-all
+  "`(System/getenv)`(0-arity)の nbb 版。プロセス環境変数全体を map で返す。
+   `js->clj` は process.env(プレーンな JS object ではない)を変換できないため、
+   Object.keys で手動収集する。"
+  [] (let [env (.-env js/process)]
+       (into {} (map (fn [k] [k (aget env k)]) (js/Object.keys env)))))
+(defn get-property [k] (when (= k "babashka.file") *file*))
+(defn format [template & values]
+  (reduce (fn [s v]
+            (str/replace-first s #"%[-+0-9.]*[sd]" (str v)))
+          template values))
+(defn relative-path [base target]
+  (.relative path (file-path base) (file-path target)))
+(defn parent-path [f] (.dirname path (file-path f)))
+(defn canonical-path [f] (.realpathSync fs (file-path f)))
+
+(set! (.-System js/globalThis)
+      #js {"getenv" getenv
+           "getProperty" get-property
+           "exit" exit})

@@ -4,7 +4,7 @@
 の manifest で管理する。**plain な git submodule は廃止**（`.gitmodules` は無い）。
 
 - **source of truth = `manifest/repos.edn`**（ポリシー: remote / 既定 / group-filter /
-  DataLad / B2）。`manifest/west.yml` は **手書きせず** `scripts/gen-west-manifest.bb`
+  DataLad / B2）。`manifest/west.yml` は **手書きせず** `scripts/gen-west-manifest.cljs`
   が EDN + git の事実（各 working tree HEAD）から生成する。
 - **35 project を west 管理**。うち **34 は通常の git repo**、**1 は DataLad dataset**
   （`m365-archive`、git-annex + B2）。
@@ -18,7 +18,7 @@
 │   ├── repos.edn           ← ★ source of truth（人が編集する）
 │   ├── west.yml            ← 生成物（self.path: manifest）
 │   ├── west-commands.yml   ← west 拡張コマンド登録
-│   ├── west_annex.py       ← `west annex-get/annex-drop`（DataLad/B2 統合）
+│   ├── west_annex.cljs     ← `nbb manifest/west_annex.cljs`（DataLad/B2 統合）
 │   └── README.md           ← これ
 └── orgs/<org>/<repo>/      ← project 展開先（= 旧 submodule と同一パス）
 ```
@@ -43,13 +43,13 @@ Backblaze B2 に置く。git には annex キー（ポインタ）だけが入�
 # git/annex スケルトンを取得（opt-in グループ）
 west update --group-filter +datalad m365-archive
 # 実体を B2 から取得 / 破棄
-west annex-get         # 認証は自動解決（下記）。実体を B2 から取得
-west annex-drop        # ローカル実体を捨てて B2 のコピーだけ残す
+nbb manifest/west_annex.cljs annex-get   # 認証は自動解決（下記）。実体を B2 から取得
+nbb manifest/west_annex.cljs annex-drop  # ローカル実体を捨てて B2 のコピーだけ残す
 ```
 
 ### B2 認証の解決（env → 1Password → Keychain）
 
-`west annex-get/annex-drop` は `scripts/b2-creds.bb` で B2 認証を解決する。順序と
+`nbb manifest/west_annex.cljs annex-get|annex-drop` は `scripts/b2-creds.cljs` で B2 認証を解決する。順序と
 参照先は `manifest/repos.edn` の `:b2 :credentials`（既定
 `[:env :1password :keychain]`）。**秘密はリポジトリに置かず**、参照先（`op://` パス /
 Keychain service 名）だけを EDN に書く。初回は自分の保管先に合わせて `★` を編集する。
@@ -58,8 +58,8 @@ Keychain service 名）だけを EDN に書く。初回は自分の保管先に�
 # 1Password: op に signin 済みなら op read で解決
 # Apple Keychain: security find-generic-password で解決（macOS ローカル）
 # CI 等: B2_KEY_ID / B2_APP_KEY / B2_BUCKET を環境変数で渡せば env が最優先
-eval "$(bb scripts/b2-creds.bb)"     # 手元の環境に流し込む（任意）
-bb scripts/b2-creds.bb --json        # プログラム用（west_annex.py が利用）
+eval "$(nbb scripts/b2-creds.cljs)"     # 手元の環境に流し込む（任意）
+nbb scripts/b2-creds.cljs --json        # プログラム用（west_annex.cljs が利用）
 ```
 
 ## 日常運用
@@ -68,8 +68,8 @@ bb scripts/b2-creds.bb --json        # プログラム用（west_annex.py が利
 west init -l manifest                                   # 初回（非破壊）
 west list -f '{name}' | grep -v '^manifest$' | xargs west update --fetch smart
 west list ; west status
-bb scripts/gen-west-manifest.bb                         # pin 前進後に再生成（手書き禁止）
-bb scripts/gen-west-manifest.bb --check                 # CI: 乖離で exit 1
+nbb scripts/gen-west-manifest.cljs                         # pin 前進後に再生成（手書き禁止）
+nbb scripts/gen-west-manifest.cljs --check                 # CI: 乖離で exit 1
 ```
 
 > west 1.5 の `west update` は `-j` 非対応（直列）。fetch は `smart` で差分のみ。
@@ -86,7 +86,7 @@ skill で参照する。
 
 1. その repo を作って push（origin に存在させる）。
 2. ローカルに `orgs/<org>/<repo>` として clone（または `west` で取得）。
-3. `bb scripts/gen-west-manifest.bb` で再生成（working HEAD を pin）。
+3. `nbb scripts/gen-west-manifest.cljs` で再生成（working HEAD を pin）。
 4. `.gitignore` に `/orgs/<org>/<repo>/` を追加し、`manifest/west.yml` をコミット。
 
 remote(org) が新規なら `manifest/repos.edn` の `:remotes` に追記する。

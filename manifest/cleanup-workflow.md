@@ -121,7 +121,7 @@ git diff --stat -- <paths>
 
 Resolve by file class:
 
-- `manifest/west.yml`: resolve `manifest/repos.edn`, generator code, and child repo checkouts first; then run `bb scripts/gen-west-manifest.bb`.
+- `manifest/west.yml`: resolve `manifest/repos.edn`, generator code, and child repo checkouts first; then run `nbb scripts/gen-west-manifest.cljs`.
 - EDN files: keep both logically distinct additions and validate by running the relevant babashka/Clojure reader or generator.
 - Markdown policy files: preserve current `main` policy and add only the missing procedure/reference text.
 - Stash conflicts: do not drop the stash; inspect `git stash show --stat` and `git show 'stash@{0}' -- <paths>`.
@@ -130,13 +130,13 @@ After resolving:
 
 ```bash
 rg -n '<<<<<<<|=======|>>>>>>>' <changed-files> || true
-bb scripts/gen-west-manifest.bb --check
+nbb scripts/gen-west-manifest.cljs --check
 ```
 
 Run any domain-specific verification touched by the change, for example:
 
 ```bash
-bb scripts/kotoba-boundary-audit.bb
+nbb scripts/kotoba-boundary-audit.cljs
 ```
 
 ## Stash Pop Failures

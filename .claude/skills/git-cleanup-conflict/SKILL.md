@@ -38,7 +38,7 @@ you're confident is exactly the failure mode this note exists to catch.
 - Do not force-push shared branches. Do not rebase to resolve staleness — branch fresh
   from `origin/main` and replay/cherry-pick the needed commits instead.
 - `manifest/west.yml` is generated. Resolve `manifest/repos.edn` + generator + child
-  repo checkouts first, then regenerate (`bb scripts/gen-west-manifest.bb --check`) —
+  repo checkouts first, then regenerate (`nbb scripts/gen-west-manifest.cljs --check`) —
   never hand-edit conflict markers in it.
 - If `git stash pop` fails because local changes would be overwritten, that's a safe
   stop: leave the stash intact, inspect both the current diff and the stash patch
@@ -61,7 +61,7 @@ you're confident is exactly the failure mode this note exists to catch.
    :rescue`.
 5. Resolve any real merge conflicts by file class (`:resolve-conflicts` in the edn),
    regenerating `manifest/west.yml` rather than editing markers.
-6. Verify: conflict-marker search, `bb scripts/gen-west-manifest.bb --check`, and any
+6. Verify: conflict-marker search, `nbb scripts/gen-west-manifest.cljs --check`, and any
    domain-specific script touched by the change.
 7. Create/merge PRs when mergeable; report external CI failures (billing/spending
    limits) as external to the code.

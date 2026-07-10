@@ -6,15 +6,15 @@
 [west](https://docs.zephyrproject.org/latest/develop/west/) manifest
 （`manifest/west.yml`）で管理する。** plain な submodule は廃止済み（gitlink は
 撤去・`.gitmodules` は無い）。source of truth は **`manifest/repos.edn`**（ポリシー）
-で、`manifest/west.yml` は `scripts/gen-west-manifest.bb` が生成する（手書き禁止）。
+で、`manifest/west.yml` は `scripts/gen-west-manifest.cljs` が生成する（手書き禁止）。
 
 - 取得/同期は `git submodule update` ではなく **`west update`** を使う。
 - 各 project は `manifest/west.yml` の `path:`（= 旧 submodule と同一パス
   `orgs/<org>/<repo>`）に展開される。topdir は superproject ルート。
 - 大容量データの **DataLad dataset（`m365-archive`）だけは west project にしつつ
   git-annex + Backblaze B2 で実体を扱う**（`userdata.datalad: true` / `datalad`
-  グループに隔離し既定では取得しない）。取得/破棄は `west annex-get` /
-  `west annex-drop`。詳細は `manifest/README.md`。
+  グループに隔離し既定では取得しない）。取得/破棄は `nbb manifest/west_annex.cljs annex-get` /
+  `nbb manifest/west_annex.cljs annex-drop`。詳細は `manifest/README.md`。
 
 ```bash
 # 初回
@@ -23,9 +23,9 @@ west init -l manifest
 west update --fetch smart
 west list -f '{name}' | grep -v '^manifest$' | xargs west update --fetch smart
 # DataLad の実体だけ別途（B2 creds は環境変数）
-west update --group-filter +datalad m365-archive && west annex-get
+west update --group-filter +datalad m365-archive && nbb manifest/west_annex.cljs annex-get
 # pin を進めたら manifest 再生成（手書き禁止 / CI は --check）
-bb scripts/gen-west-manifest.bb
+nbb scripts/gen-west-manifest.cljs
 ```
 
 ### agent 専用 worktree で west を動かすときの topdir 固定（重要）
@@ -59,7 +59,7 @@ west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独�
   子 repo remote の force-rewrite による pin 退行）。worktree 分離は作業 tree の
   WIP 衝突しか防ぐ。force-push は上流の運用で撲滅するしかない。
 - 大容量 repo は worktree ごとに重複取得される。`--fetch smart` + shallow 既定で
-  軽減、heavy は DataLad/B2 経路（`west annex-get`）。
+  軽減、heavy は DataLad/B2 経路（`nbb manifest/west_annex.cljs annex-get`）。
 
 ## 標準作業の常時許可（standing authorization）
 
@@ -71,7 +71,7 @@ west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独�
 
 - 上記に含まれる個別操作で都度確認が不要なもの: 子リポの `gh repo create` + `git push`
   （子リポは plain-git。下記 `repos.edn :manifest-workflow :child-repos`）、
-  `bb scripts/gen-west-manifest.bb` による west.yml 再生成、superproject への
+  `nbb scripts/gen-west-manifest.cljs` による west.yml 再生成、superproject への
   `chore(manifest)+docs(adr)` コミット、新規 ADR（md+edn ペア）の作成。
 
 - **外部への影響を伴う操作も agent 判断で都度確認なしに実行してよい**（恒久承認。
@@ -165,35 +165,35 @@ west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独�
 
 - **`manifest/west.yml` への変更（登録 / rename / pin 前進）は GitHub API の
   サーバ側 single-entry commit を「唯一の正経路」にする。** west.yml は生成物
-  （`repos.edn` ＋ 各子repo HEAD → `gen-west-manifest.bb`、手書き禁止 / `--check`）
+  （`repos.edn` ＋ 各子repo HEAD → `gen-west-manifest.cljs`、手書き禁止 / `--check`）
   なので、行指向 pin を textual 3-way merge するのはアンチパターンで、conflict
   marker の手編集は **pin を静かに壊す**。代わりに: tip の west.yml と blob SHA を
   取得（dir listing から SHA を採ると巨大 base64 を避けられる）→ **当該 entry の
   行だけ**編集 → blob SHA 一致で PUT（`branch=` `sha=`）。**tip がずれれば 409**
   で弾かれる（取得し直してリトライ）ので **conflict が構造的に発生しない**。
   commit 前に **pin == 子repo HEAD を検証**。API 手編集は生成器を通らないので、
-  落ち着いたら `bb scripts/gen-west-manifest.bb --check` で canonical 一致を確認。
+  落ち着いたら `nbb scripts/gen-west-manifest.cljs --check` で canonical 一致を確認。
   やむを得ずローカル merge する場合のみ、west.yml の衝突は **marker 手編集でなく
   再生成で解決**: superset 側採用 → `west update` で子を目的 pin に揃える
   （⚠ 再生成はローカル working HEAD で pin するので、子が遅れていると黙って
-  ロールバックする＝pin 退行の罠）→ `gen-west-manifest.bb` → `--check`。子repo
+  ロールバックする＝pin 退行の罠）→ `gen-west-manifest.cljs` → `--check`。子repo
   自体は普通の git（branch/PR/push）。詳細は ADR-2606272237 / `repos.edn`
   `:manifest-workflow`。実例: PR #61/#62/#86、kenchi-actor→kenchi-clj rename
   （`34988dd`、diff は当該 entry のみ）。
 
-- **west.yml の pin 変更はサーバ側 pin 検証を必ず通す（`scripts/verify-west-pins.bb`、
+- **west.yml の pin 変更はサーバ側 pin 検証を必ず通す（`scripts/verify-west-pins.cljs`、
   ADR-2607022900）。** pin に許されるのは「上流 repo の default branch から到達可能な
   commit」だけ: ①存在（= push 済み。未 push のローカル HEAD の pin 化は禁止）、
   ②default branch 到達性（rewrite されうる未 merge branch 上の commit は不可）、
   ③旧 pin からの前進（behind = 静かな pin 退行 / diverged を弾く）。判定はすべて
   GitHub API（サーバ側 full 履歴）で行い、**ローカル shallow の ancestry を信用しない**。
-  `gen-west-manifest.bb` は生成時に自動でこの検証を行い、失敗したら west.yml を
+  `gen-west-manifest.cljs` は生成時に自動でこの検証を行い、失敗したら west.yml を
   書かない（緊急スキップ: `--no-verify-remote` / `WEST_PIN_VERIFY_SKIP=1`。使ったら
   理由を commit message に残す）。**登録・rename・pin 前進は `--entry <name>` で当該
   entry のみの最小 diff を生成する — wholesale 再生成 commit は禁止**（1件の登録の
   つもりが未 push HEAD 由来の壊れた pin を 44 件 main に流した実事故 `90852b86` の
   再発防止）。CI（`.github/workflows/west-pin-verify.yml`）と PreToolUse hook
-  （`.claude/hooks/west-pin-verify-guard.bb`。`git push` と `gh api PUT` の両経路）が
+  （`.claude/hooks/west-pin-verify-guard.cljs`。`git push` と `gh api PUT` の両経路）が
   同じ検証を強制する。
 
 - **`git push` / `git pull` / `west update` の前に、manifest の pin が upstream
@@ -201,7 +201,7 @@ west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独�
   は west.yml に**既に書かれている** pin へ checkout を合わせるだけで、GitHub 側の
   新しいコミットを pin に反映するコマンドではない（pin 自体の前進は別操作。
   「`west update` すれば GitHub 最新に追従する」と誤解しないこと）。実測
-  （2026-07-03）: `bb scripts/gen-west-manifest.bb`（引数なし dry-run）で kotoba-lang
+  （2026-07-03）: `nbb scripts/gen-west-manifest.cljs`（引数なし dry-run）で kotoba-lang
   org 配下の character / comfyui / kami-engine / kotoba / kotobase / murakumo 等
   多数の project で、ローカル checkout が **既存 pin より遅れている**状態を検出
   （気付かず push すると stale checkout や古い pin が他 clone / CI に伝播する）。
@@ -214,8 +214,8 @@ west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独�
   # 2) 先行していたら該当 project の checkout を最新化
   cd orgs/<org>/<repo> && git fetch origin && git merge --ff-only origin/<default-branch>
   # 3) manifest の pin を前進（当該 entry のみ最小 diff。wholesale 再生成は禁止）
-  bb scripts/gen-west-manifest.bb --entry <repo-name>
-  bb scripts/gen-west-manifest.bb --check
+  nbb scripts/gen-west-manifest.cljs --entry <repo-name>
+  nbb scripts/gen-west-manifest.cljs --check
   ```
 
   これを終えてから本来の `git push` / `git pull` / `west update` を実行する。
@@ -241,7 +241,7 @@ west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独�
   git merge --ff-only origin/main      # FF 不可なら停止。rebase しない
   ```
 
-  これは PreToolUse フック `.claude/hooks/git-push-main-sync-guard.bb`（babashka）で強制される
+  これは PreToolUse フック `.claude/hooks/git-push-main-sync-guard.cljs`（babashka）で強制される
   （遅れた状態の `git push` は deny され、同期を促すメッセージが返る）。フックは
   破壊的な自動マージはしない（判定と指示のみ、fail-open）。
 
@@ -293,12 +293,12 @@ west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独�
   git fetch --depth 1 origin                       # origin/main 他を取得
   git merge --ff-only origin/main                  # superproject を main に同期（FF 不可なら停止。rebase しない）
   west update --fetch smart                        # 子リポ群を manifest の pin に合わせて同期
-  bb scripts/gen-west-manifest.bb --check          # west.yml が canonical か（生成器と一致か）確認
+  nbb scripts/gen-west-manifest.cljs --check          # west.yml が canonical か（生成器と一致か）確認
   ```
 
   これらを飛ばして push/PR すると、main 乖離・west.yml の pin 退行・子リポの
   checkout 不一致が他者 clone や CI に伝播する。`west.yml` は生成物（手書き禁止）
-  なので、`--check` が STALE なら **ローカル pin 退行の罠**（`gen-west-manifest.bb`
+  なので、`--check` が STALE なら **ローカル pin 退行の罠**（`gen-west-manifest.cljs`
   はローカル working HEAD で pin する＝子が遅れていると黙ってロールバック）に注意しつつ
   再生成し、`--check` が通ってから push/PR する。子リポ単位の push/PR も同様に、
   その子リポの `origin/<default-branch>` との遅れを解消してから行う。
@@ -402,11 +402,11 @@ WIP を並行セッションが約40分間隔で退避し続け stash が20個�
   ```bash
   B2_KEY_ID=... B2_APP_KEY=... B2_BUCKET=... \
   B2_ENDPOINT=s3.us-west-004.backblazeb2.com \
-    scripts/datalad-b2-init.bb <dataset-dir> [remote-name]
+    scripts/datalad-b2-init.cljs <dataset-dir> [remote-name]
   # 以後: datalad save → datalad push --to b2 → datalad drop / datalad get
   ```
 
-  B2 認証は **`scripts/b2-creds.bb`** が解決する（既定の順 env→1Password→Keychain。
+  B2 認証は **`scripts/b2-creds.cljs`** が解決する（既定の順 env→1Password→Keychain。
   参照先は `manifest/repos.edn` の `:b2 :credentials`）。`op`(1Password CLI) /
   `security`(Keychain) / 環境変数のどれでも同じコマンドで動く。**秘密情報は
   リポジトリに一切コミットしない**（EDN に置くのは `op://` パスや Keychain service 名
@@ -416,8 +416,8 @@ WIP を並行セッションが約40分間隔で退避し続け stash が20個�
   に登録した project は `manifest/west.yml` で `userdata.datalad: true` + `datalad`
   グループ（既定 `group-filter` の `-datalad` で off）になる。git/annex スケルトンの
   取得は `west update --group-filter +datalad <name>`、実体の取得/破棄は west 拡張
-  コマンド `west annex-get` / `west annex-drop`（B2 special remote を環境変数の
-  creds で有効化して get/drop）。実装は `manifest/west_annex.py`。
+  コマンド `nbb manifest/west_annex.cljs annex-get` / `nbb manifest/west_annex.cljs annex-drop`（B2 special remote を環境変数の
+  creds で有効化して get/drop）。実装は `manifest/west_annex.cljs`。
 
 - **既存の重い project は shallow（clone-depth: 1）で運用する。** west は
   clone-depth: 1 を既定にしてある（実績: ai-gftd-apps 16G→305M, ghosthacker
@@ -439,7 +439,7 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
   - `com-junkawasaki.b2/annex`（1Password `gftdcojp` vault）— `manifest/repos.edn`
     の `:b2 :credentials` が参照する M365 archive 用（bucket:
     `gftdcojp-m365-annex`）。Keychain 側ミラーは `security add-generic-password
-    -s b2:gftdcojp-m365-annex`（`scripts/b2-creds.bb` が解決）。
+    -s b2:gftdcojp-m365-annex`（`scripts/b2-creds.cljs` が解決）。
   - `gftd.b2/*`（1Password `gftdcojp` vault、フィールド分割: `BUCKET_NAME` /
     `ENDPOINT` / `ENDPOINT_URL` / `REGION` / `APPLICATION_KEY_ID` /
     `ACCESS_KEY_ID` / `SECRET_ACCESS_KEY`）— bucket `ai-gftd-cdn` 専用。
@@ -516,7 +516,7 @@ PolicyGovernor）/ **cloud-itonami**（ops-LLM ⊣ CertGovernor）。
   同じ actor identity を登録するまでを完了条件にする。west は `manifest/repos.edn` を
   SSoT とし、GitHub API の単一 entry クリーン commit で登録 / pin 前進する
   （`manifest/west.yml` は生成物、手書き禁止）。diff は当該 entry のみ、
-  `bb scripts/gen-west-manifest.bb --check` と **pin == repo HEAD** を確認。RAD は
+  `nbb scripts/gen-west-manifest.cljs --check` と **pin == repo HEAD** を確認。RAD は
   etzhayyim/root の `80-data/kotoba-rad/{name}.identity.journal.edn`（または同等の
   RAD identity ledger）に `:rad/repo "github.com/etzhayyim/com-etzhayyim-{name}"`、
   `:rad/did-web "did:web:etzhayyim.github.io:com-etzhayyim-{name}"`、署名 /
@@ -570,7 +570,7 @@ PolicyGovernor）/ **cloud-itonami**（ops-LLM ⊣ CertGovernor）。
   書く」ことで穴を埋めない**。スコープを絞る（例: 当面は DOM/CSS の視覚
   表現に留める）か、対象を決めて別途 ADR 化しオーナー判断を仰ぐ。
 - **`bb` の降格は「app の runtime として」の話。** リポジトリ運用ツール
-  （`scripts/*.bb`・`.claude/hooks/*.bb`・west 拡張等）は app ではなく
+  （`scripts/*.cljs`・`.claude/hooks/*.cljs`・west 拡張等）は app ではなく
   インフラ tooling で、現状 bb が正本 — これらを一斉移行はしない（移行
   するなら対象を決めて ADR 化。個別の新規スクリプトは nbb で書けるなら
   nbb を優先）。2026-07-06 初版の「kototama > cljs > nbb > jvm」→

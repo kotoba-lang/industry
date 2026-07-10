@@ -23,7 +23,9 @@
      funnel analyze [--product P|--all]           — bottleneck に GTM 提案（governor 経由 ledger）
      ledger show [--tail N]"
   (:require [clojure.string :as str]
-            #?(:clj [clojure.edn :as edn])
+            #?(:clj [clojure.edn :as edn]
+               :cljs [cljs.reader :as edn])
+            #?(:cljs [scripts.nbb-compat :as nc])
             [gftd.canvas :as canvas]
             [gftd.ledger :as ledger]
             [gftd.react :as react]
@@ -324,4 +326,228 @@
              (println (help-text cli-key nil)))
            (catch clojure.lang.ExceptionInfo e
              (println "error:" (ex-message e))
-             (System/exit 1)))))))))
+             (System/exit 1))))))))
+
+   :cljs
+   (do
+     ;; ---- paths ---------------------------------------------------------------
+     (defn find-root
+       "GFTD_ROOT env か、cwd から上方向に base datoms を探して repo root を決める。"
+       []
+       (or (nc/getenv "GFTD_ROOT")
+           (loop [d (.getCanonicalFile (nc/file ".")) n 0]
+             (cond
+               (.exists (nc/file d base-rel)) (.getPath d)
+               (or (nil? (.getParentFile d)) (>= n 8))
+               (throw (ex-info (str "repo root not found (looked for " base-rel
+                                    "). run from repo root or set GFTD_ROOT.") {}))
+               :else (recur (.getParentFile d) (inc n))))))
+
+     (defn paths []
+       (let [root (find-root)
+             j (fn [rel] (str root "/" rel))]
+         {:root root :base (j base-rel) :ledger (j ledger-rel)
+          :md-out (j md-out-rel) :metrics (j metrics-rel) :facts (j facts-rel)}))
+
+     (defn load-idx [{:keys [base ledger]}]
+       (canvas/load-index base (ledger/read-events ledger)))
+
+     ;; ---- product resolution ----------------------------------------------------
+     (defn cli-products [cli-key idx]
+       (let [ps (get-in registry [cli-key :products])]
+         (if (= :all ps) (vec (:products idx)) ps)))
+
+     (defn resolve-product
+       "単一 product が必要なコマンド用。CLI が 1 product ならそれ、複数なら --product 必須。"
+       [cli-key idx flags]
+       (let [ps (cli-products cli-key idx)]
+         (cond
+           (:product flags) (let [p (->kw (:product flags))]
+                              (if (some #{p} ps)
+                                p
+                                (throw (ex-info (str p " is not managed by this cli (allowed: " ps ")") {}))))
+           (= 1 (count ps)) (first ps)
+           :else (throw (ex-info (str "--product required (one of " (str/join ", " (map name ps)) ")") {})))))
+
+     ;; ---- governed writes ---------------------------------------------------------
+     (defn governed-append!
+       "proposals → governor → 可決分+拒否記録を ledger へ。拒否があれば表示して exit 1。"
+       [cli-key {:keys [ledger] :as ps} idx proposals]
+       (let [{:keys [approved rejected]} (react/governor idx proposals)
+             actor (str "cli:" (name cli-key))
+             events (concat (map #(react/proposal->event 0 actor %) approved)
+                            (for [{:keys [proposal reason]} rejected]
+                              {:event/type :governor/rejected :event/actor "governor"
+                               :event/value (select-keys proposal [:proposal/action :canvas/id :hyp/id :event/value])
+                               :event/reason reason}))]
+         (ledger/append! ledger events)
+         (doseq [p approved]
+           (println "ok:" (name (:proposal/action p)) (or (:canvas/id p) (:hyp/id p)) (pr-str (:event/value p))))
+         (doseq [{:keys [proposal reason]} rejected]
+           (println "REJECTED by governor:" reason "--" (pr-str (:event/value proposal))))
+         (when (seq rejected) (nc/exit 1))))
+
+     ;; ---- commands ---------------------------------------------------------------
+     (defn cmd-canvas-md [cli-key ps idx [_ _] flags]
+       (let [products (if (:all flags) (cli-products cli-key idx) [(resolve-product cli-key idx flags)])
+             out-dir (or (:out-dir flags) (:md-out ps))
+             as-of (subs (.toISOString (js/Date.)) 0 10)]
+         (doseq [p products]
+           (let [f (nc/file (str out-dir "/" (name p) "-business-model.md"))]
+             (.mkdirs (.getParentFile f))
+             (nc/spit f (canvas/render-md idx p {:as-of as-of}))
+             (println "wrote" (.getPath f))))))
+
+     (defn read-metrics [ps product flags]
+       (let [f (nc/file (str (:metrics ps) "/" (name product) ".edn"))
+             file-m (when (.exists f) (edn/read-string (nc/slurp f)))
+             flag-m (when-let [m (:metrics flags)]
+                      (into {} (for [kv (str/split m #",")
+                                     :let [[k v] (str/split kv #"=" 2)]]
+                                 [(keyword k) v])))]
+         (merge file-m flag-m)))
+
+     (defn cmd-react [cli-key ps idx sub flags]
+       (let [product (resolve-product cli-key idx flags)
+             metrics (read-metrics ps product flags)
+             actor "advisor:gate"
+             run (case sub
+                   "tick" (let [r (react/tick {:idx idx :product product :metrics metrics :actor actor})]
+                            {:ticks [r]})
+                   "loop" (react/run-ticks {:idx idx :product product :metrics metrics :actor actor
+                                            :max-ticks (parse-long (str (or (:max-ticks flags) "5")))}))]
+         (doseq [[i r] (map-indexed vector (:ticks run))]
+           (ledger/append! (:ledger ps) (:events r))
+           (println (str "tick " (inc i) ": " (count (:proposals r)) " proposal(s), "
+                         (count (:approved r)) " approved, " (count (:rejected r)) " rejected"))
+           (doseq [p (:approved r)] (println "  +" (:canvas/id p) (pr-str (:event/value p))))
+           (doseq [{:keys [proposal reason]} (:rejected r)]
+             (println "  x governor:" reason "--" (pr-str (:event/value proposal)))))
+         (when (:dry? run) (println "loop went dry (no more proposals) — 進化は収束"))))
+
+     (defn cmd-gate [cli-key ps idx flags]
+       (let [products (if (or (:all flags) (not (:product flags)))
+                        (cli-products cli-key idx)
+                        [(resolve-product cli-key idx flags)])]
+         (doseq [p products]
+           (let [metrics (read-metrics ps p flags)]
+             (doseq [h (canvas/product-hyps idx p)
+                     :let [r (gate/evaluate-hyp metrics (get gate/gate-specs (:hyp/id h)))]]
+               (println (name p) (:hyp/id h)
+                        (str "[" (name (:status r)) "]")
+                        (or (:evidence r) (:distance r)
+                            (when (:needs r) (str "需: " (str/join " / " (:needs r)))))))))))
+
+     (defn cmd-funnel [cli-key ps idx sub flags]
+       (let [products (if (or (:all flags) (not (:product flags)))
+                        (cli-products cli-key idx)
+                        [(resolve-product cli-key idx flags)])]
+         (case sub
+           "show"
+           (doseq [p products]
+             (let [metrics (read-metrics ps p flags)]
+               (println (funnel/render-text p metrics))))
+           "analyze"
+           ;; sales/marketing motion: bottleneck→GTM 提案を governor に通して ledger へ。
+           ;; schedule で反復するので dedup 拒否は正常 — react と同じく exit しない。
+           (doseq [p products
+                   :let [metrics (read-metrics ps p flags)
+                         props (funnel/proposals p metrics)]
+                   :when (seq props)]
+             (let [{:keys [approved rejected]} (react/governor idx props)
+                   actor (str "advisor:funnel")
+                   events (concat (map #(react/proposal->event 0 actor %) approved)
+                                  (for [{:keys [proposal reason]} rejected]
+                                    {:event/type :governor/rejected :event/actor "governor"
+                                     :event/value (select-keys proposal [:proposal/action :canvas/id :hyp/id :event/value])
+                                     :event/reason reason}))]
+               (ledger/append! (:ledger ps) events)
+               (println (name p) "funnel:" (count approved) "approved," (count rejected) "rejected")
+               (doseq [a approved] (println "  +" (:canvas/id a) (pr-str (:event/value a))))
+               (doseq [{:keys [proposal reason]} rejected]
+                 (println "  x governor:" reason "--" (pr-str (:event/value proposal)))))))))
+
+     (defn -main-for
+       "Entry point shared by the 7 wrappers. `--help` / `help` (グローバルまたは
+        `<cmd> --help` / `help <cmd>`) は repo root 解決や datoms 読込より前に
+        処理し、help-text を印字するだけで終える。"
+       [cli-key args]
+       (let [[pos flags] (parse-args args)
+             [c1 c2 c3 c4] pos
+             help? (or (:help flags) (= c1 "help") (= c1 "--help"))
+             help-topic (cond (and (= c1 "help") c2) c2
+                              (= c1 "help") nil
+                              help? c1
+                              :else nil)]
+        (if help?
+          (println (help-text cli-key help-topic))
+          (let [ps (paths)
+                idx (load-idx ps)]
+           (try
+           (case [c1 c2]
+             ["products" nil]
+             (doseq [p (cli-products cli-key idx)]
+               (println (name p) "\t" (get canvas/layer-labels (canvas/product-layer idx p))))
+
+             ["canvas" "show"]
+             (println (canvas/render-text idx (resolve-product cli-key idx flags)))
+
+             ["canvas" "md"] (cmd-canvas-md cli-key ps idx pos flags)
+
+             ["canvas" "add"]
+             (governed-append! cli-key ps idx
+                               [{:proposal/action :canvas/add-item :canvas/id (->kw c3)
+                                 :event/value c4 :proposal/reason "manual edit"}])
+             ["canvas" "retract"]
+             (governed-append! cli-key ps idx
+                               [{:proposal/action :canvas/retract-item :canvas/id (->kw c3)
+                                 :event/value c4 :proposal/reason "manual edit"}])
+             ["canvas" "note"]
+             (governed-append! cli-key ps idx
+                               [{:proposal/action :canvas/note :canvas/id (->kw c3)
+                                 :event/value c4 :proposal/reason "manual edit"}])
+
+             ["hyp" "list"]
+             (let [p (resolve-product cli-key idx flags)]
+               (doseq [{:keys [hyp/id hyp/status hyp/claim]} (canvas/product-hyps idx p)]
+                 (println id (str "[" (name status) "]") claim)))
+             ["hyp" "pass"]
+             (governed-append! cli-key ps idx
+                               [{:proposal/action :hyp/status :hyp/id (->kw c3) :event/value :validated
+                                 :event/evidence (:evidence flags) :proposal/reason "gate passed"}])
+             ["hyp" "fail"]
+             (governed-append! cli-key ps idx
+                               [{:proposal/action :hyp/status :hyp/id (->kw c3) :event/value :refuted
+                                 :event/evidence (:evidence flags) :proposal/reason "gate failed"}])
+
+             ["react" "tick"] (cmd-react cli-key ps idx "tick" flags)
+             ["react" "loop"] (cmd-react cli-key ps idx "loop" flags)
+
+             ["gate" nil] (cmd-gate cli-key ps idx flags)
+
+             ["funnel" "show"] (cmd-funnel cli-key ps idx "show" flags)
+             ["funnel" "analyze"] (cmd-funnel cli-key ps idx "analyze" flags)
+
+             ["score" nil]
+             (let [facts (edn/read-string (nc/slurp (:facts ps)))
+                   products (if (or (:all flags) (not (:product flags)))
+                              (cli-products cli-key idx)
+                              [(resolve-product cli-key idx flags)])]
+               (print (score/render-table (score/score-all idx facts products))))
+             ["score" "md"]
+             (let [facts (edn/read-string (nc/slurp (:facts ps)))
+                   scores (score/score-all idx facts (cli-products :gftd idx))
+                   f (nc/file (str (:md-out ps) "/maturity-scores.md"))]
+               (nc/spit f (score/render-md scores facts))
+               (println "wrote" (.getPath f)))
+
+             ["ledger" "show"]
+             (let [es (ledger/read-events (:ledger ps))
+                   n (parse-long (str (or (:tail flags) "20")))]
+               (doseq [e (take-last n es)] (println (pr-str e))))
+
+             ;; default: help
+             (println (help-text cli-key nil)))
+           (catch :default e
+             (println "error:" (ex-message e))
+             (nc/exit 1)))))))))
