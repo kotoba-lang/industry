@@ -468,8 +468,10 @@
       ;; governed pharmacy dispensing actor. 131 = 130 +
       ;; cloud-itonami-isic-5590, promoted directly from :spec --
       ;; alternative-accommodation (hostel/guesthouse/camping-cabin/
-      ;; dormitory) booking actor.
-      (is (= 131 (:implemented m))))))
+      ;; dormitory) booking actor. 132 = 131 + cloud-itonami-isic-4653,
+      ;; promoted directly from :spec -- agricultural machinery/
+      ;; equipment wholesale trading actor.
+      (is (= 132 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
