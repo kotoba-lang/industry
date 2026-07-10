@@ -430,7 +430,9 @@
       ;; manufacturing actor, another capital-equipment vertical
       ;; alongside 2822 in the classic heavy-industry cluster (distinct
       ;; from the transport-equipment sub-cluster of 2811/2910/3011).
-      (is (= 120 (:implemented m))))))
+      ;; 121 = 120 + cloud-itonami-isic-4662, promoted directly from
+      ;; :spec -- metal/metal-ore wholesale trading actor.
+      (is (= 121 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
