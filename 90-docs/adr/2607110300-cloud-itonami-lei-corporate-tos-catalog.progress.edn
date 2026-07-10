@@ -1,6 +1,7 @@
 [
  {:progress/schema-note "cloud-itonami-lei rollout progress tracker, per ADR-2607110300. One row per cloud-itonami-isic-<code> industry. :industry/applicable? true means a coherent real global/listed top-3-company concept exists for this ISIC vertical; false means fragmented/local/non-corporate and this vertical is deliberately skipped for the lei-catalog family (the isic blueprint itself is unaffected). This file is the resume point for the next /loop iteration."
-  :progress/resume-from "isic-3510 (electric power grid transmission and distribution operations) -- first :industry/status :pending row after isic-0610/isic-0620/isic-1920/isic-2011/isic-2610/isic-2660/isic-3011/isic-3020/isic-3030, all now :done (isic-3312/isic-3313 in between are :skipped, fragmented/local repair operations, not pending). Open retry candidates needing a JS-capable fetch path or better entity resolution, all optional, not blocking: isic-0610 Shell plc + Saudi Aramco; isic-0620 Cheniere Energy; isic-1920 Marathon Petroleum + HF Sinclair + PBF Energy; isic-2011 Dow Inc.; isic-2610 TSMC + Samsung Electronics + Intel + Qualcomm + Micron + NXP + onsemi + STMicroelectronics; isic-2660 Koninklijke Philips N.V.; isic-3011 Samsung Heavy Industries + Hanwha Ocean; isic-3020 CRRC Corporation Limited (no parent LEI) + Stadler Rail AG (JS-rendered); isic-3030 Airbus SE (Incapsula bot-challenge)."
+  :progress/resume-from "isic-4711 (retail sale in non-specialized stores with food/beverages predominating -- supermarkets/grocery) -- first :industry/status :pending row after isic-0610/0620/1920/2011/2610/2660/3011/3020/3030/3510/3812, all now :done (isic-3512/3600/3830/4211/4321/4322/4671 in between are :skipped, fragmented/local, not pending). Open retry candidates needing a JS-capable fetch path or better entity resolution, all optional, not blocking: isic-0610 Shell plc + Saudi Aramco; isic-0620 Cheniere Energy; isic-1920 Marathon Petroleum + HF Sinclair + PBF Energy; isic-2011 Dow Inc.; isic-2610 TSMC + Samsung Electronics + Intel + Qualcomm + Micron + NXP + onsemi + STMicroelectronics; isic-2660 Koninklijke Philips N.V.; isic-3011 Samsung Heavy Industries + Hanwha Ocean; isic-3020 CRRC Corporation Limited (no parent LEI) + Stadler Rail AG (JS-rendered); isic-3030 Airbus SE (Incapsula bot-challenge); isic-3510 National Grid plc + Duke Energy Corporation (bot-blocked); isic-3812 Waste Management Inc. + Stericycle Inc. (bot-blocked) + Republic Services Inc. (JS-rendered SPA)."
+
   :db/id -1}
  {:industry/code "isic-0162"
   :industry/description ""
@@ -355,8 +356,44 @@
  {:industry/code "isic-3510"
   :industry/description "Open Business Blueprint for ISIC Rev.5 3510: electric power grid transmission and distribution operations (robotics-premised)"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "National Grid plc and Duke Energy Corporation both bot-blocked (HTTP 403,
+                  no evasion attempted per CLAUDE.md safety floor); substituted The Southern
+                  Company and NextEra Energy, Inc."
+  :industry/companies
+  [{:company/legal-name "American Electric Power Company, Inc."
+    :company/lei "1B4S6S7G0TW5EE83BO58"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=American Electric Power Company"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-1b4s6s7g0tw5ee83bo58"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.aep.com/terms/"}
+   {:company/legal-name "The Southern Company"
+    :company/lei "549300FC3G3YU2FBZD92"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=The Southern Company"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300fc3g3yu2fbzd92"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.southerncompany.com/terms-and-conditions.html"}
+   {:company/legal-name "NextEra Energy, Inc."
+    :company/lei "254900RHL9MEUS5NKX63"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=NextEra Energy, Inc."
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-254900rhl9meus5nkx63"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.nexteraenergy.com/legal-notice.html"}
+   {:company/legal-name "National Grid plc"
+    :company/lei "8R95QZMKZLJX5Q2XR704"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=National Grid plc"
+    :company/status :tos-fetch-failed
+    :company/note "site-wide bot-challenge (HTTP 403) on both /terms-and-conditions and
+                   /website-terms-conditions; no evasion attempted"}
+   {:company/legal-name "Duke Energy Corporation"
+    :company/lei "I1BZKREC126H0VB1BL91"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Duke Energy Corporation"
+    :company/status :tos-fetch-failed
+    :company/note "site-wide bot-challenge (HTTP 403) on /legal/terms-of-use; no evasion
+                   attempted"}]}
  {:industry/code "isic-3512"
   :industry/description "Open Business Blueprint for ISIC Rev.5 3512: community renewable-energy operations"
   :industry/applicable? false
@@ -372,8 +409,48 @@
  {:industry/code "isic-3812"
   :industry/description "Open Business Blueprint for ISIC Rev.5 3812: collection of hazardous waste (robotics-premised)"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Waste Management, Inc. and Stericycle, Inc. both bot-blocked (Cloudflare
+                  challenge, no evasion attempted); Republic Services, Inc. is a JS-rendered
+                  Angular SPA with no server-rendered body text (genuine fetch limitation, not
+                  bot-block). Substituted Waste Connections, Inc. and Casella Waste Systems, Inc."
+  :industry/companies
+  [{:company/legal-name "Clean Harbors, Inc."
+    :company/lei "5493000SJVZVZJKHJF48"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Clean Harbors, Inc."
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-5493000sjvzvzjkhjf48"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.cleanharbors.com/terms-of-service"}
+   {:company/legal-name "Waste Connections, Inc."
+    :company/lei "549300HDLRTPBQU69P29"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Waste Connections, Inc."
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300hdlrtpbqu69p29"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.wasteconnections.com/terms-of-use"}
+   {:company/legal-name "Casella Waste Systems, Inc."
+    :company/lei "8EU0XUFVJ48U37IIDH51"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Casella Waste Systems, Inc."
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-8eu0xufvj48u37iidh51"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.casella.com/terms"}
+   {:company/legal-name "Waste Management, Inc."
+    :company/lei "549300YX8JIID70NFS41"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Waste Management, Inc."
+    :company/status :tos-fetch-failed
+    :company/note "site-wide Cloudflare bot-challenge (HTTP 403); no evasion attempted"}
+   {:company/legal-name "Republic Services, Inc."
+    :company/lei "NKNQHM6BLECKVOQP7O46"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Republic Services, Inc."
+    :company/status :tos-fetch-failed
+    :company/note "JS-rendered Angular SPA, server response has no body text (not bot-block)"}
+   {:company/legal-name "Stericycle, Inc."
+    :company/lei "B8PTJH2P0AXSWSMP2136"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Stericycle, Inc."
+    :company/status :tos-fetch-failed
+    :company/note "site-wide bot-challenge (HTTP 403); no evasion attempted"}]}
  {:industry/code "isic-3830"
   :industry/description "Open Business Blueprint for ISIC Rev.5 3830: local materials recovery"
   :industry/applicable? false
