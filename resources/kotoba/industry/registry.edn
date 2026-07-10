@@ -6385,11 +6385,33 @@
    :operating-states [:intake :diagnose :treat :prescribe :audit]},
   {:id "7710"
    :name "Renting and leasing of motor vehicles"
-   :repo "https://github.com/gftdcojp/cloud-itonami-N7710"
-   :business-id "cloud-itonami-N7710"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-7710"
+   :business-id "cloud-itonami-7710"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Promoted :spec -> :blueprint (see `kotoba.industry/maturity-of`).
+   ;; The legacy placeholder :repo (gftdcojp/cloud-itonami-N7710) never
+   ;; actually existed (confirmed 404 before this edit) -- replaced with
+   ;; the real repo, following the SAME cloud-itonami/cloud-itonami-isic-####
+   ;; naming convention as every other actor in this fleet rather than the
+   ;; legacy N-prefixed scheme. Fresh vehicle-rental domain, diversifying
+   ;; away from the just-closed travel family (7911/7912). Scoped to
+   ;; self-drive rental of cars/vans/light trucks to consumers and
+   ;; businesses, distinct from cloud-itonami-isic-4920 (road-freight
+   ;; CARRIER, :implemented -- moves goods aboard its own vehicles under
+   ;; its own drivers) and cloud-itonami-unspsc-27 (independent tool-
+   ;; fleet rental, not motor vehicles). Recalled vehicles must be
+   ;; repaired before re-rental in the US under the Raechel and
+   ;; Jacqueline Houck Safe Rental Car Act of 2015 (enforced by NHTSA);
+   ;; the US Graves Amendment shields rental companies from vicarious-
+   ;; liability claims arising solely from vehicle ownership; state-
+   ;; specific rental-agreement consumer-protection and damage-waiver-
+   ;; disclosure statutes also apply. grep -rli "vehicle.rental|car.
+   ;; rental|renting.and.leasing.of.motor" across the fleet returned
+   ;; completely empty. Governor keyword :vehicle-rental-governor is
+   ;; grep-verified UNIQUE fleet-wide. Reuses the SAME labor-dispatch
+   ;; operating-states shape as the seven prior labor-dispatch builds
+   ;; this window. See ADR-2607104800.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "7721"
