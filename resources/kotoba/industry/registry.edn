@@ -3932,13 +3932,22 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2910"
    :name "Manufacture of motor vehicles"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2910"
-   :business-id "cloud-itonami-C2910"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2910"
+   :business-id "cloud-itonami-isic-2910"
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as an automotive actor
+   ;; (Automotive Advisor ⊣ Automotive Governor). Legacy
+   ;; gftdcojp/cloud-itonami-C2910 placeholder replaced with real
+   ;; cloud-itonami/cloud-itonami-isic-2910. Third classic heavy-industry
+   ;; manufacturing vertical after basic iron and steel (2410) and
+   ;; engines/turbines (2811): vehicle assembly, type-approval/
+   ;; homologation rules verify, end-of-line quality screen, dual
+   ;; actuation (dispatch-vehicle + issue-conformity-certificate),
+   ;; jurisdiction facts catalog (JPN MLIT / USA NHTSA FMVSS / GBR DVSA
+   ;; UNECE WVTA / DEU KBA EU WVTA).
+   :required-technologies [:robotics :cae :dmn :bpmn :audit-ledger]
+   :optional-technologies [:cfd :telemetry :optimization]
+   :operating-states [:intake :type-approval-rules-verify :end-of-line-quality-screen :approve :dispatch-vehicle :issue-conformity-certificate :audit]},
   {:id "2920"
    :name "Manufacture of bodies"
    :repo "https://github.com/gftdcojp/cloud-itonami-C2920"

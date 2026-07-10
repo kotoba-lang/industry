@@ -27,7 +27,10 @@
     (is (some #{:cae} (industry/required-technologies "2811"))))
   (testing "basic iron and steel require robotics and CAE"
     (is (some #{:robotics} (industry/required-technologies "2410")))
-    (is (some #{:cae} (industry/required-technologies "2410")))))
+    (is (some #{:cae} (industry/required-technologies "2410"))))
+  (testing "motor vehicle manufacturing requires robotics and CAE"
+    (is (some #{:robotics} (industry/required-technologies "2910")))
+    (is (some #{:cae} (industry/required-technologies "2910")))))
 
 (deftest readiness-reports-missing-tech
   (let [r (industry/readiness "8691" #{:identity :forms})]
@@ -340,6 +343,8 @@
     (is (= :implemented (industry/maturity "2811"))))
   (testing "a hundred-tenth implemented actor (cloud-itonami-isic-2410, basic-iron-steel actor) is also :implemented"
     (is (= :implemented (industry/maturity "2410"))))
+  (testing "a hundred-eleventh implemented actor (cloud-itonami-isic-2910, motor-vehicle actor) is also :implemented"
+    (is (= :implemented (industry/maturity "2910"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -391,8 +396,10 @@
       (is (= 36 (:blueprint m)))
       ;; 114 = 113 + cloud-itonami-isic-4620, promoted directly from
       ;; :spec (never a :blueprint) -- agricultural/live-animal
-      ;; wholesale trading actor.
-      (is (= 114 (:implemented m))))))
+      ;; wholesale trading actor. 115 = 114 + cloud-itonami-isic-2910,
+      ;; promoted directly from :spec (never a :blueprint) --
+      ;; motor-vehicle-manufacturing actor.
+      (is (= 115 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
