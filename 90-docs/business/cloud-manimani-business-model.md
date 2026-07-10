@@ -67,6 +67,7 @@
 - 観測 (signal): manimani.cloud 実測 2170 req/7d・220 uniques(日次和)・うち4xx probe 76%(24h)
 - 観測 (signal): manimani.cloud 実測 2174 req/7d・220 uniques(日次和)・うち4xx probe 75%(24h)
 - 観測 (signal): manimani.cloud 実測 2177 req/7d・220 uniques(日次和)・うち4xx probe 75%(24h)
+- 観測 (signal): manimani.cloud 実測 2192 req/7d・224 uniques(日次和)・うち4xx probe 74%(24h)
 
 ## Customer Segments
 
@@ -144,6 +145,7 @@
 - GTM (acquisition→revenue): cloud signup→cloud paid 転換 0% < 目標 4% — trial→paid の nudge（使用量到達通知）・価格 tier 見直し・年額/上位 tier の提示
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 59 · /robots.txt 7 | 4xx(probe) 75% · 5xx 0%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 62 · /robots.txt 7 | 4xx(probe) 75% · 5xx 0%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 65 · /robots.txt 7 | 4xx(probe) 74% · 5xx 0%
 
 ## Revenue Streams
 

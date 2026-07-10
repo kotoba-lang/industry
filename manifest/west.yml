@@ -21,6 +21,16 @@ manifest:
   group-filter: [+com-junkawasaki, +kotoba-lang, +gftdcojp, +etzhayyim, +jk-luxury, -datalad]
 
   projects:
+    - name: com-etzhayyim-narashi
+      remote: etzhayyim
+      revision: f53bff2b5f3514313cf22a0b4d9232c2d456507c
+      path: orgs/etzhayyim/com-etzhayyim-narashi
+      groups: [etzhayyim]
+    - name: global-legislation-datoms
+      remote: etzhayyim
+      revision: 85eaee3c4879bcb63a7b1faa20e2987bcdd40621
+      path: orgs/etzhayyim/global-legislation-datoms
+      groups: [etzhayyim]
     - name: adserver
       remote: gftdcojp
       revision: 3242aa57dc9e563883a38194e7f85c52b6179a40
@@ -511,7 +521,7 @@ manifest:
       groups: [etzhayyim]
     - name: com-etzhayyim-kawaraban
       remote: etzhayyim
-      revision: 5dafdc7175429af38efb2f4ccb9c35cb723091c7
+      revision: 85cd47ae00e5f30077f51282748db9aa6f6c53a1
       path: orgs/etzhayyim/com-etzhayyim-kawaraban
       groups: [etzhayyim]
     - name: com-etzhayyim-kawase-yui
@@ -1310,8 +1320,13 @@ manifest:
       groups: [gftdcojp]
     - name: cloud-itonami
       remote: gftdcojp
-      revision: 56355fb8beffe9056d3ac4fdf945e9d4a33770ff
+      revision: 91ff41617cd1148de5f7bcc53b0321241155d0a0
       path: orgs/gftdcojp/cloud-itonami
+      groups: [gftdcojp]
+    - name: cloud-mamori
+      remote: gftdcojp
+      revision: ff10527464e0b86ab5ab16fdc8c6f2873f516eba
+      path: orgs/gftdcojp/cloud-mamori
       groups: [gftdcojp]
     - name: cloud-manimani
       remote: gftdcojp
@@ -1320,7 +1335,7 @@ manifest:
       groups: [gftdcojp]
     - name: cloud-murakumo
       remote: gftdcojp
-      revision: a2e9a6fb7255fb241bb0bd1d629f1fde3382b108
+      revision: 1536a861cc216266dd2d6c9ab0c822a481a39f9c
       path: orgs/gftdcojp/cloud-murakumo
       groups: [gftdcojp]
     - name: net-kotobase-ipfs
@@ -1340,7 +1355,7 @@ manifest:
       groups: [gftdcojp]
     - name: club-shinshi
       remote: jk-luxury
-      revision: 6ace8dbf79f8ca65b565eb926fd5be0d90ccf3ec
+      revision: 729e73ace7c73ac7eefa563f53b646d395ddf240
       path: orgs/jk-luxury/club-shinshi
       groups: [jk-luxury]
     - name: gftd-talent-actor
@@ -1350,7 +1365,7 @@ manifest:
       groups: [gftdcojp]
     - name: local-manimani
       remote: gftdcojp
-      revision: dc1f240f505697cc123ba4ae881191827ae67747
+      revision: 8864d64add0cd9ef01e9449204bb549f1e89b8a8
       path: orgs/gftdcojp/local-manimani
       clone-depth: 1
       groups: [gftdcojp]
@@ -1383,13 +1398,13 @@ manifest:
       groups: [jk-luxury]
     - name: net-kotobase
       remote: gftdcojp
-      revision: c97a039f2c16fef3ae8db35ab3edbe739ff9bb5e
+      revision: 45c97ae52c5966ad35cf3efd94cfcdac20a38364
       path: orgs/gftdcojp/net-kotobase
       groups: [gftdcojp]
       submodules: true
     - name: network-isekai
       remote: gftdcojp
-      revision: a70fbfe4772b3eceb6e2474b55caa3625f68c91d
+      revision: fe473490e645704e2b5fefae19b5c2cf40317def
       path: orgs/gftdcojp/network-isekai
       clone-depth: 1
       groups: [gftdcojp]
@@ -1515,7 +1530,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-nvidia-isaac-sim
       remote: kotoba-lang
-      revision: 3a061cfbc0c59ef8e5e1966a98cf119362d62c13
+      revision: 68ee153e2bf9a259efe00a333578cfb3a6227629
       path: orgs/kotoba-lang/com-nvidia-isaac-sim
       groups: [kotoba-lang]
     - name: com-rocket-lab
@@ -1705,7 +1720,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-shodan
       remote: kotoba-lang
-      revision: 3fdde3643f72593e54cba2ab3f81b2413b082c46
+      revision: 56bed0082cf7d373aed9edda47ddb632758e760d
       path: orgs/kotoba-lang/com-shodan
       groups: [kotoba-lang]
     - name: com-shopee
@@ -1715,7 +1730,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-shopify
       remote: kotoba-lang
-      revision: 11dbdbcf5d40eeaa4de78bc9a750e20a9601e31e
+      revision: 716df5bce293e6f3d3042689c8c7a5e832e9f46d
       path: orgs/kotoba-lang/com-shopify
       groups: [kotoba-lang]
     - name: com-sic-codes
@@ -1780,7 +1795,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-smpp-gw
       remote: kotoba-lang
-      revision: 0284699ee914658c2e0a4416694815ac8071fcb8
+      revision: 9495359eea571f193dbb98943a5b6205b50a3b7c
       path: orgs/kotoba-lang/com-smpp-gw
       groups: [kotoba-lang]
     - name: com-sncf-france
@@ -2010,67 +2025,67 @@ manifest:
       groups: [kotoba-lang]
     - name: com-8th-wall
       remote: kotoba-lang
-      revision: 4cf7fd3ab9d90cd782c3f2037b1d990b4dc1f097
+      revision: c03ec7bfeefd820bbb9951ce547f13a4649a20c2
       path: orgs/kotoba-lang/com-8th-wall
       groups: [kotoba-lang]
     - name: com-aadhaar
       remote: kotoba-lang
-      revision: a4b8358d1d76bb88953ad1fab30c9f057bb072fa
+      revision: 10c10c7d8a795da078f9ab4963ba5108ff03ff3c
       path: orgs/kotoba-lang/com-aadhaar
       groups: [kotoba-lang]
     - name: com-aave
       remote: kotoba-lang
-      revision: 1b62a9d2a01b1ae1f6422824922dff5250088cd2
+      revision: 4a2d3d3a68893c3dbef9db4c830f40f13628f3e3
       path: orgs/kotoba-lang/com-aave
       groups: [kotoba-lang]
     - name: com-abb-800xa
       remote: kotoba-lang
-      revision: 7fee8a19982234a437ce4a0ae80d78024b93571f
+      revision: 61cfc892a4bcd7bf08837899c9e6cd126ee1bd6d
       path: orgs/kotoba-lang/com-abb-800xa
       groups: [kotoba-lang]
     - name: com-abb-robotics
       remote: kotoba-lang
-      revision: 7272bd19aad71fff708cd08d44bb043131026451
+      revision: d0ae0f7b9062de48024d41c83fc734652d2baf98
       path: orgs/kotoba-lang/com-abb-robotics
       groups: [kotoba-lang]
     - name: com-accela
       remote: kotoba-lang
-      revision: 0c945aa34c32025cfcebe298504462d2c66f2697
+      revision: 3e31091a240d4e971e1a525a68f8a61d4126e409
       path: orgs/kotoba-lang/com-accela
       groups: [kotoba-lang]
     - name: com-accelbyte
       remote: kotoba-lang
-      revision: 2ba98bc052c2827889855810e349f1d9a548a25a
+      revision: 733bebc4818e56c2195c2c63f6d37f1082b6d514
       path: orgs/kotoba-lang/com-accelbyte
       groups: [kotoba-lang]
     - name: com-ach-network
       remote: kotoba-lang
-      revision: bdf949219057bad310e21493c1dbc5fe1493aa1f
+      revision: 7fc0d4ddca3dad68088a9f4b579a28b63e66f1a9
       path: orgs/kotoba-lang/com-ach-network
       groups: [kotoba-lang]
     - name: com-acorrd-standards
       remote: kotoba-lang
-      revision: 805c2ceb4edd12bb1a401462be2af7ea6bbf7dbd
+      revision: 9a396eda1b261856e4d9f0d643a1f6270bbdda2c
       path: orgs/kotoba-lang/com-acorrd-standards
       groups: [kotoba-lang]
     - name: com-acquia
       remote: kotoba-lang
-      revision: 619f0fd3f7e7569d8354d6e4fcd6dd5457e29087
+      revision: 6f0e4ed9a8ca734da3e284a86ec4a7dad7d2a1d7
       path: orgs/kotoba-lang/com-acquia
       groups: [kotoba-lang]
     - name: com-adobe
       remote: kotoba-lang
-      revision: dd88b03ddf4801082155931347549ce17bfb39f8
+      revision: fb653828dc6d9cee9465bd4b47f51349d0230960
       path: orgs/kotoba-lang/com-adobe
       groups: [kotoba-lang]
     - name: com-ads-b-aviation
       remote: kotoba-lang
-      revision: 9b2c2f3a4adbc7d287b40ded6921df978841c72e
+      revision: bb7ce9db48370ff685bc7ba4f72dbd1188a6ee7d
       path: orgs/kotoba-lang/com-ads-b-aviation
       groups: [kotoba-lang]
     - name: com-adyen
       remote: kotoba-lang
-      revision: 69fee3e20c0d4cf2a6c99b1b1c2070865a900709
+      revision: 88bceed1c5dd93ba5cb2326fc7321975ae9792b5
       path: orgs/kotoba-lang/com-adyen
       groups: [kotoba-lang]
     - name: com-aftership
@@ -2080,22 +2095,22 @@ manifest:
       groups: [kotoba-lang]
     - name: com-agleader
       remote: kotoba-lang
-      revision: 2d6c0d28879f518506a1fed825afe9c9c4e0142f
+      revision: 8bb06f7b29233819741f6b3299885ac1569a9d27
       path: orgs/kotoba-lang/com-agleader
       groups: [kotoba-lang]
     - name: com-agones
       remote: kotoba-lang
-      revision: ac75105d6a36749cf742cc559312ef96fa779bd3
+      revision: 6e416645ce726c5b4e75c0850c3ab7df0730920e
       path: orgs/kotoba-lang/com-agones
       groups: [kotoba-lang]
     - name: com-agora
       remote: kotoba-lang
-      revision: 96b0b02135231780f7bc6d39efac28fa2f782c5a
+      revision: 5d402855c96fc79ed33094656892bfe8fb7e7cec
       path: orgs/kotoba-lang/com-agora
       groups: [kotoba-lang]
     - name: com-airbus-analytx
       remote: kotoba-lang
-      revision: 5cf0abd5c56872127fb68bc39374350456b4176d
+      revision: 1afd352f14f3303993afd3b22781c848f700e80b
       path: orgs/kotoba-lang/com-airbus-analytx
       groups: [kotoba-lang]
     - name: com-airbyte
@@ -2220,42 +2235,42 @@ manifest:
       groups: [kotoba-lang]
     - name: com-apollo-gds
       remote: kotoba-lang
-      revision: 96ae7cbb8dad1d7459a9a353c334c3cb9988b1cf
+      revision: 7c24161908beb07cdf91c77b4d6bafc550cba841
       path: orgs/kotoba-lang/com-apollo-gds
       groups: [kotoba-lang]
     - name: com-appdynamics
       remote: kotoba-lang
-      revision: bde5ded89153d37b80521a4ed5becd6d168949a2
+      revision: a3196ce332e3ee87ac6ddc7c749e2b82ee12655d
       path: orgs/kotoba-lang/com-appdynamics
       groups: [kotoba-lang]
     - name: com-appfolio
       remote: kotoba-lang
-      revision: e2b94da1aa7428f7dd9dfa40069081afc5e65f9d
+      revision: c341a10fe1e6f38928c25c8689955ea55bc840b7
       path: orgs/kotoba-lang/com-appfolio
       groups: [kotoba-lang]
     - name: com-apple-visionos
       remote: kotoba-lang
-      revision: 9e0c54c44413992a8ee2d1ca91f83d4b9528fa3a
+      revision: 9104849dec03fdd6e0c74dc9638884933e64e2d7
       path: orgs/kotoba-lang/com-apple-visionos
       groups: [kotoba-lang]
     - name: com-applovin
       remote: kotoba-lang
-      revision: b9216f3da8e679c852fd70d6c9ffc100c5f9c37a
+      revision: f50c6ebe454e1d9b995f126a90e38a0c0f975f6f
       path: orgs/kotoba-lang/com-applovin
       groups: [kotoba-lang]
     - name: com-appsflyer
       remote: kotoba-lang
-      revision: 9b38ec2527b71c0728481ff58e8ad88962864218
+      revision: 47f03133f94b258215b2cafdc8512e2e3a0ca23e
       path: orgs/kotoba-lang/com-appsflyer
       groups: [kotoba-lang]
     - name: com-aptos-pos
       remote: kotoba-lang
-      revision: d0aef9e2d95fd98a6c95c5eefe127e1caebeeda7
+      revision: 15d2187cf9dcd9ed4cb8162245777a96020cdc6c
       path: orgs/kotoba-lang/com-aptos-pos
       groups: [kotoba-lang]
     - name: com-argo-ocean-floats
       remote: kotoba-lang
-      revision: d89ef96b2e15321a1907d8082b0f94e64b2595de
+      revision: c199df545d41f935eee2ad94fb505676c7c4a811
       path: orgs/kotoba-lang/com-argo-ocean-floats
       groups: [kotoba-lang]
     - name: com-argus-media
@@ -2350,7 +2365,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-autodesk
       remote: kotoba-lang
-      revision: 5bb640fc7e4bab45523347cfcd8a9bf5b8746744
+      revision: 117cf3454d8b4db0d76cef7f1ccbb08899c3602d
       path: orgs/kotoba-lang/com-autodesk
       groups: [kotoba-lang]
     - name: com-autogpt-forge
@@ -2475,7 +2490,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-bgp-routing
       remote: kotoba-lang
-      revision: ddc2a4447e8a5494d46b980b894df14cdb156909
+      revision: c6c584838fe2a0fa8246b3c15cd24109489d2a95
       path: orgs/kotoba-lang/com-bgp-routing
       groups: [kotoba-lang]
     - name: com-bgp-rpki
@@ -2540,7 +2555,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-bizzabo
       remote: kotoba-lang
-      revision: 671e698d3177bf0cac62b5d14a16228ec85ef30e
+      revision: fabe9f23d5b1c189f08cc8578d22a8561fd05ded
       path: orgs/kotoba-lang/com-bizzabo
       groups: [kotoba-lang]
     - name: com-blackboard
@@ -2550,7 +2565,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-blacksky
       remote: kotoba-lang
-      revision: 05526bd957e89e380ba90bc43526761ca3290840
+      revision: 115af5fd879ac500cb9f2770771d186e4edbeeae
       path: orgs/kotoba-lang/com-blacksky
       groups: [kotoba-lang]
     - name: com-blend
@@ -2630,7 +2645,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-bolt
       remote: kotoba-lang
-      revision: a5c8149e406dc61424568fe4842ecd8a65fd46e3
+      revision: 5a989cbbfe66faa26a3960d6457755809a9f72b9
       path: orgs/kotoba-lang/com-bolt
       groups: [kotoba-lang]
     - name: com-boomi
@@ -2900,7 +2915,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-clearstream
       remote: kotoba-lang
-      revision: 60711043f612c1a4a98f2dc2c1d61525cd42ba36
+      revision: c7b7b8e415fd3efb17d19bb802d265cf710cb015
       path: orgs/kotoba-lang/com-clearstream
       groups: [kotoba-lang]
     - name: com-clearwater
@@ -3065,7 +3080,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-covermymeds
       remote: kotoba-lang
-      revision: 6f16a79ffa1647f112fad855d18e8162d87606dd
+      revision: 318f27f34df94f97e1a2463f607288680112fb1e
       path: orgs/kotoba-lang/com-covermymeds
       groups: [kotoba-lang]
     - name: com-cowin
@@ -3090,12 +3105,12 @@ manifest:
       groups: [kotoba-lang]
     - name: com-crossref
       remote: kotoba-lang
-      revision: a512de0825e767ac8f6d0ecdde2243887e1dc39e
+      revision: 4d343add01541677f7e5b6b112ce4b1f09ebe8a0
       path: orgs/kotoba-lang/com-crossref
       groups: [kotoba-lang]
     - name: com-crowdstrike
       remote: kotoba-lang
-      revision: 21dcb9813d0703d1fb398591d75253341774c65e
+      revision: c61cd6db6c856d68caec8035ab6c104fade57020
       path: orgs/kotoba-lang/com-crowdstrike
       groups: [kotoba-lang]
     - name: com-cruise-api
@@ -3165,7 +3180,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-dailyco
       remote: kotoba-lang
-      revision: af1691eb2bdaba524e6928d7366f04833b5f5f23
+      revision: 21fa7f46ac84546e0bd43374baec41a08372ed16
       path: orgs/kotoba-lang/com-dailyco
       groups: [kotoba-lang]
     - name: com-dana-indonesia
@@ -3700,7 +3715,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-figma
       remote: kotoba-lang
-      revision: a49d17504186d74c35107171100baab2fb4530e6
+      revision: f367a0465073320ec5d85dbd4e832c05f9f43b0b
       path: orgs/kotoba-lang/com-figma
       groups: [kotoba-lang]
     - name: com-finra
@@ -3735,7 +3750,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-fivetran
       remote: kotoba-lang
-      revision: 43b06aee7ed145705e837ab436319441827527ec
+      revision: 8670e4fe107c01a93d11e61e2b0e1eccc0116db1
       path: orgs/kotoba-lang/com-fivetran
       groups: [kotoba-lang]
     - name: com-fix-fast-protocol
@@ -3760,7 +3775,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-flexport
       remote: kotoba-lang
-      revision: f492fa26e89ebb38fdc9325e8fca74dd80b966e9
+      revision: ee6ef81b1e0afb76d1d4585fd45d4ac736f424d1
       path: orgs/kotoba-lang/com-flexport
       groups: [kotoba-lang]
     - name: com-flightstats
@@ -4005,7 +4020,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-grafana
       remote: kotoba-lang
-      revision: 6b1741fb7fceeea624aec244ca2d44beb8638040
+      revision: e09f2f682a0fea3f921e47b39da0d7081fd9d79d
       path: orgs/kotoba-lang/com-grafana
       groups: [kotoba-lang]
     - name: com-granicus
@@ -4520,7 +4535,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-kajabi
       remote: kotoba-lang
-      revision: 54cc4ae3b6390a301102d81262e8b4c9d21d433b
+      revision: 40997a178c8adfb075bd68708b168e261340cbe5
       path: orgs/kotoba-lang/com-kajabi
       groups: [kotoba-lang]
     - name: com-kakao-cert
@@ -4600,7 +4615,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-kuka
       remote: kotoba-lang
-      revision: e294139f73116c0fc0270642d7d85d6059c5e45d
+      revision: 1d14dbe49e58be018898b1bf9e8b9e6e7f072273
       path: orgs/kotoba-lang/com-kuka
       groups: [kotoba-lang]
     - name: com-kustomer
@@ -4925,7 +4940,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-midjourney
       remote: kotoba-lang
-      revision: 640f242aa3c1cc9d6f9e4f111a14d76e808997dc
+      revision: 62e4942dbe79387a04fb3724f927b71a9e8bc093
       path: orgs/kotoba-lang/com-midjourney
       groups: [kotoba-lang]
     - name: com-mightynetworks
@@ -5110,7 +5125,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-naver-cert
       remote: kotoba-lang
-      revision: e9c760c611cd675f986dadab328a17e1a7dba2f2
+      revision: 3e719de67aa9ad9605b810fbabbff0d992996c67
       path: orgs/kotoba-lang/com-naver-cert
       groups: [kotoba-lang]
     - name: com-naver
@@ -5130,7 +5145,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-ncic
       remote: kotoba-lang
-      revision: f66436fdd61650e65793819a92e7b5f698145020
+      revision: 09949bd47fb8ae547a35fd937dde44155bdc5096
       path: orgs/kotoba-lang/com-ncic
       groups: [kotoba-lang]
     - name: com-ncino
@@ -5300,7 +5315,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-oag-flights
       remote: kotoba-lang
-      revision: 4f47619c12e14d6debbdb99a9ca99d368d1003f4
+      revision: b51487235250c1920eb347875b170ed941b1b72f
       path: orgs/kotoba-lang/com-oag-flights
       groups: [kotoba-lang]
     - name: com-occ
@@ -5325,7 +5340,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-ofac
       remote: kotoba-lang
-      revision: 37d38c87cfa48570ee78538bd9b6b1564fc62308
+      revision: b65f829d4422eaa687171166b3d8137cf049ba76
       path: orgs/kotoba-lang/com-ofac
       groups: [kotoba-lang]
     - name: com-ola-cabs
@@ -5855,7 +5870,7 @@ manifest:
       groups: [kotoba-lang]
     - name: com-retool
       remote: kotoba-lang
-      revision: e5cab8e5f1bf52070972ea02866eff358650644a
+      revision: 87a0e81796748755606b63a692e274f197f23389
       path: orgs/kotoba-lang/com-retool
       groups: [kotoba-lang]
     - name: com-rets-mls
@@ -5950,7 +5965,7 @@ manifest:
       groups: [kotoba-lang]
     - name: computer-use
       remote: kotoba-lang
-      revision: 2bd5b43d1bae3e6ce32dcf52c6097b67f2a0eb8a
+      revision: 3aff0b9d9bc3f1e45a40617800d0584f3dd3e6bd
       path: orgs/kotoba-lang/computer-use
       groups: [kotoba-lang]
     - name: contacts
@@ -6193,12 +6208,12 @@ manifest:
       groups: [kotoba-lang]
     - name: genome
       remote: kotoba-lang
-      revision: c055b895eae2210db89b2d9015c90c40112fca7b
+      revision: 00fbb34ad6bf4996520aa672d97bb75386522ccc
       path: orgs/kotoba-lang/genome
       groups: [kotoba-lang]
     - name: geo
       remote: kotoba-lang
-      revision: 8c22faa2ffc97e8ab60858dc38ef4099699444c4
+      revision: 67269f4c220ce5245dad3db5a80c80b71ddf7a79
       path: orgs/kotoba-lang/geo
       groups: [kotoba-lang]
     - name: geojson
@@ -6228,7 +6243,7 @@ manifest:
       groups: [kotoba-lang]
     - name: goyoukiki
       remote: kotoba-lang
-      revision: 5aea6292c91d701460695c6b6c9c8defbd71ad87
+      revision: 6a5d7be7e46a49be9bb8562b600b99d9f79379ce
       path: orgs/kotoba-lang/goyoukiki
       groups: [kotoba-lang]
     - name: gpu
@@ -6313,7 +6328,7 @@ manifest:
       groups: [kotoba-lang]
     - name: industry
       remote: kotoba-lang
-      revision: eebe613162f10231a1256f676f0a4b39a757db64
+      revision: 8f2fda42ca8b281056af01a6c16cc61c36dac8de
       path: orgs/kotoba-lang/industry
       groups: [kotoba-lang]
     - name: inference
@@ -6368,7 +6383,7 @@ manifest:
       groups: [kotoba-lang]
     - name: iso3166
       remote: kotoba-lang
-      revision: 999b078725d3f84bb90763bad77e31138462fc2c
+      revision: 1c6e7f01d39e0c4e7a86896b9077d34570bd3c26
       path: orgs/kotoba-lang/iso3166
       groups: [kotoba-lang]
     - name: jp-hiroshiba-voicevox
@@ -6575,7 +6590,7 @@ manifest:
       groups: [kotoba-lang]
     - name: kami-engine-aero
       remote: kotoba-lang
-      revision: 5ef0bfbfebbf39e03b548efdf95706cdc9e49d0c
+      revision: fdc890ad368f820b37d5074e59142161df64b059
       path: orgs/kotoba-lang/kami-engine-aero
       groups: [kotoba-lang]
     - name: kami-engine-cae-solver
@@ -6770,7 +6785,7 @@ manifest:
       groups: [kotoba-lang]
     - name: kekkai
       remote: kotoba-lang
-      revision: 75a7e27bada590804e73afdf00e8cced066e0017
+      revision: bb0c39c116fc26ead36c2428c46b9734053a49f5
       path: orgs/kotoba-lang/kekkai
       groups: [kotoba-lang]
     - name: kenchi
@@ -7159,7 +7174,7 @@ manifest:
       groups: [kotoba-lang]
     - name: murakumo
       remote: kotoba-lang
-      revision: 179945def5b58b6ba45b315f4023e542e6dc4784
+      revision: e6781162bd2bf12bbed5d24d21704c3d7e17c460
       path: orgs/kotoba-lang/murakumo
       groups: [kotoba-lang]
     - name: murakumo-studio
@@ -7444,7 +7459,7 @@ manifest:
       groups: [kotoba-lang]
     - name: org-openusd
       remote: kotoba-lang
-      revision: fe3fc0e4247830355820cb93cf5d4beee0353660
+      revision: 2f1f2b4e3b5cf48413751c1ea5e70b0e898eef76
       path: orgs/kotoba-lang/org-openusd
       groups: [kotoba-lang]
     - name: org-pkware-zip
@@ -7679,7 +7694,7 @@ manifest:
       groups: [kotoba-lang]
     - name: product-party
       remote: kotoba-lang
-      revision: 9cf7f9c4ef2ee8d9e88b253d11ec1278fd5b7f60
+      revision: c450968cd70e4e5d6d1096d024d9ff455a724c1e
       path: orgs/kotoba-lang/product-party
       groups: [kotoba-lang]
     - name: prolly-tree
@@ -7799,7 +7814,7 @@ manifest:
       groups: [kotoba-lang]
     - name: securities
       remote: kotoba-lang
-      revision: 13728ffeab515165283f14cdf7e3531b6f23ccd9
+      revision: 86317e4abbb491e6d877704c742abe214f0764cc
       path: orgs/kotoba-lang/securities
       groups: [kotoba-lang]
     - name: security
@@ -8125,8 +8140,13 @@ manifest:
       groups: [kotoba-lang]
     - name: witness-quorum
       remote: kotoba-lang
-      revision: b9e2cea27cf7e0867e6d958823917e72f1d62c2f
+      revision: e6fe9b7aa99a53d2fe162faa3f3f9e7330e52aa8
       path: orgs/kotoba-lang/witness-quorum
+      groups: [kotoba-lang]
+    - name: x402-directory
+      remote: kotoba-lang
+      revision: ab5580d8820fbe495796b06a8d7ed0f0abc2e603
+      path: orgs/kotoba-lang/x402-directory
       groups: [kotoba-lang]
     - name: xml
       remote: kotoba-lang

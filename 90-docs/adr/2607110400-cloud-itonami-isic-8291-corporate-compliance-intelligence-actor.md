@@ -179,3 +179,183 @@ licensed 契約を通じて問い合わせる — 「産業SaaSごとに情報�
 **残り約278 repo への展開判断**: このADRでは判断しない。10 repoパイロットの
 運用実績(実際にこのcapabilityが使われるか、宣言だけで終わるか)を見てから、
 必要な業種だけ個別に追加するか、改めて一斉展開のADRを起票するかを判断する。
+
+## Addendum 2 (2026-07-10): cloud-itonami-isic-6910 が最初の実統合(宣言のみでない)consumer になった
+
+Addendum 1 の10 repoは `:optional-technologies` への**宣言のみ**だったが、
+そのうち `cloud-itonami-isic-6910`(法人設立代行)について、実際に
+`cloud-itonami-isic-8291` を呼ぶ統合コードを実装した。
+
+### 統合内容
+
+6910 の `formation.registrarllm/screen-kyc`(officer の KYC/制裁スクリーニング
+draft)は、従来ローカルの自己申告フラグ `:sanctions-hit?` のみを見ていた
+(実質デモ用のダミーフィールドで、どこからも裏取りされていなかった)。これに
+新設の `formation.corporate-intel.cljc` を通じて 8291 の
+`:disclosure/screen-name` を追加照会するよう配線した:
+
+- 呼び出しは 8291 の**同じ** DisclosureGovernor ゲートを通る(6910側からの
+  バイパスは無い)。8291 が実際にヒットを検出した場合、8291 **自身**の
+  high-stakes gate が常に escalate する(8291 の人間レビュアーが確認するまで
+  確定しない)ため、6910 側は 8291 の未承認の Dossier-LLM 生draftを覗き見せず
+  `:pending-human-review?` をそのまま「不確定」信号として扱う。
+- 結果として実際に得られる保証は「**サイレントに :clear にはならない**」で
+  あり、「即座に hard-hold になる」ではない(8291自身が確定的な :hit を返す
+  唯一のケースは、8291側の人間が既に承認済みの場合のみ)。この設計上の帰結は
+  実装中に統合テストで発見され、それに合わせて8291の `propose-name-screen`
+  自体も1点修正した(下記)。
+- `formation.registrarllm/mock-advisor` は新オプション
+  `:corporate-intel-screen`(officer名 → 8291照会結果の関数)を受け取る。
+  既定値は no-op(`{:found? false :hit? false}` 固定)なので、**明示的に
+  opt-in しない限り既存の全呼び出し元の挙動は一切変わらない**。
+
+### 8291側の修正(統合テストで発見)
+
+`propose-name-screen` の「未収載(not found)」結果が当初 confidence 0.5
+(低確信・escalate)だったが、これは実世界の与信/制裁スクリーニング製品の
+挙動と整合しない: 「自社データベースに一致なし」は確信度の低い推論ではなく、
+**確定的で処理可能な陰性結果**である。低確信のままだと、R0の狭いカタログ
+(officialが3件のみ)の外にいる、ごく普通の(何のリスクも無い)人物を
+スクリーニングするたび毎回 escalate してしまい、自動化可能なスクリーニング
+opの意味が無くなる。confidence を 0.85 に修正し、カバレッジの狭さは
+`dossier.facts/coverage` 側の特性として別途正直に報告する(個々のクエリの
+確信度を下げる理由にはしない)方針にした。8291 の既存テストも
+この設計変更に合わせて更新(37 tests / 164 assertions、lint clean)。
+
+### 実測結果
+
+`cloud-itonami-isic-6910` の demo officer `o-4`("Jane Smith (demo)"、8291側
+のsanctions-flagged demo officialと同名)は、ローカルのフィールドは全てクリーン
+(`:sanctions-hit? false`、id-doc あり)——統合前は `:clear` として通っていた。
+統合後は 8291 照会が pending-human-review を返し、6910 側も `:incomplete` に
+留まる(`:clear` には決してならない)。69 tests / 311 assertions(6件新規)、
+lint clean、demo (`clojure -M:dev:run`) で実際にこのフローを再現可能。
+
+### 残り9 repo・約278 repo への展開判断
+
+引き続き判断しない。まず6910の実運用(実際にこの照会が意味のある区別を
+生むか)を見てから、他の9 repo(不動産・VC/信託/ファンド運用の三点セット・
+損保三点セット・持株会社・銀行)への統合を個別に検討する。
+
+## Addendum 3 (2026-07-10): パイロット10 repo中5 repoが実統合完了、残り5 repoは機械的横展開が不適と判明
+
+オーナーの指示で「残り9 repoにも同様の実統合を順次展開」を実行した。
+Addendum 2 の 6910 に続き、既存の `screen-kyc` 相当コードを詳細に読んだ
+結果、9 repo は均質ではなく**2群に分かれる**ことが判明した:
+
+### A群(4 repo): 6910と同型、機械的に横展開 — 並列4エージェントで実施
+
+| repo | namespace | party概念 | 結果 |
+|---|---|---|---|
+| `cloud-itonami-isic-6810`(不動産仲介) | `realty` | party(buyer/seller) | commit `9ba0967`、30 tests/118 assertions |
+| `cloud-itonami-isic-6499`(VCファンド) | `vcfund` | party(founder) | commit `8055f7e`、176 tests/661 assertions |
+| `cloud-itonami-isic-6512`(損害保険) | `casualty` | party(policyholder) | commit `1158aa9`、40 tests/187 assertions |
+| `cloud-itonami-isic-6419`(銀行) | `banking` | account(holder-name) | commit `12665c0`、44 tests/191 assertions |
+
+いずれも `<ns>/corporate_intel.cljc` 新設 + `screen-kyc`/`screen-sanctions`
+相当関数の `:else` 分岐にのみ `screen-fn` を追加注入(既存 `mock-advisor` の
+無引数呼び出しは全て挙動不変を確認済み)、6910 と同じ「サイレントに clear/
+resolved にはならない」保証。全4 repo で 0 failures/0 errors、`clojure -M:lint`
+clean、`clojure -M:dev:run` 正常終了を確認。
+
+`cloud-itonami-isic-6419` のみ語彙が異なる(`:unresolved`/`:resolved` のみで
+`:incomplete` 相当が無い): governor の `sanctions-violations` が
+`:verdict :unresolved` を**無条件・即時 HARD hold**として扱うため、8291側の
+pending-human-review/held は(他3 repoのような soft escalate ではなく)
+そのまま即時 hold に収束する — 銀行/AML ドメインとしてより保守的な、正当な
+設計判断(意図的な仕様、バグではない)。
+
+**副産物の不整合(低リスク、要調整)**: 4エージェントがそれぞれ独立に
+「対象repoにCI workflowが無い場合どうするか」を判断した結果が割れた
+(6512/6499=作成せず・欠落を明記、6810/6419=6910相当のci.ymlを新規作成)。
+実害は無いが一貫性の観点で後日どちらかに統一する余地がある。
+
+### B群(5 repo): 6910型パターンが構造的に不適合 — 今回は見送り
+
+調査の結果、以下5 repoは「officer/party の名前を制裁/PEPリストと照合する」
+という8291の `:disclosure/screen-name` の形と、そもそも噛み合わないことが
+判明した:
+
+- **`cloud-itonami-isic-6430`(信託/ファンド器)・`cloud-itonami-isic-6630`
+  (ファンド運用)**: バックオフィス系actor(capital call・NAV・fee・carry の
+  再計算・突合)で、そもそも人物名をスクリーニングする概念自体が無い
+  (`sanctions`/`kyc`/`screen` のいずれも governor.cljc に一切出現しない)。
+  統合すべき箇所が存在しない。
+- **`cloud-itonami-isic-6420`(持株会社)**: `screen-beneficial-ownership` が
+  あるが、これは子会社ポジションの「実質的支配者(UBO)情報が確認済みか」
+  という**真偽フラグの検証状態**をスクリーニングするもので、人物名の
+  制裁/PEP照合ではない。8291の `:relationship/edge`(ownership)データは
+  概念的に近いが、`:disclosure/screen-name` とは別の新規クエリ形状
+  (UBOチェーンの照会)が要る。
+- **`cloud-itonami-isic-6621`(損害査定)・`cloud-itonami-isic-6622`
+  (保険仲介)**: `conflict-of-interest` チェックがあるが、これは
+  **査定人/仲介人自身**(claimant/insurerとの利益相反)をスクリーニングする
+  もので、外部カウンターパーティのPEP/制裁照合ではない。8291の関係性グラフ
+  (`:relationship/edge`)を使えば「この査定人はこの保険会社/請求者と
+  役員/株主等の関係を持つか」を問えそうだが、これも `:disclosure/screen-
+  name` とは別の新規クエリ(二者間関係の照会)の設計が要る。
+
+この3 repo(6420/6621/6622)への統合は、8291側に**新しいクエリ機能
+(UBOチェーン確認・二者間関係照会)を設計してから**でないと、
+`:disclosure/screen-name` を無理に当てはめる誤った統合になる — 今回は
+実施しない。6430/6630 は統合すべき箇所が無いため対象外。
+
+### 現状まとめ
+
+パイロット10 repo中: **5 repo が実統合済み**(6910・6810・6499・6512・6419)、
+**2 repo は対象外**(6430・6630、統合箇所が無い)、**3 repo は新規8291
+capability設計待ち**(6420・6621・6622、UBOチェーン/二者間関係照会)。
+残り約278 repo・上記3 repoへの新capability設計は、いずれも本ADRでは
+判断しない — 次のADRまたはフォローアップに委ねる。
+
+## Addendum 4 (2026-07-10): 新規2 op を設計・実装し、残り3 repo も実統合完了 — パイロット10 repo中8 repoが実統合済み
+
+オーナーの指示で、Addendum 3 が「8291側に新capability設計待ち」とした
+`6420`(UBOチェーン)・`6621`/`6622`(二者間関係)を実際に設計・実装し、
+パイロット10 repoの残り作業を完了させた。
+
+### 8291側: 2つの新規 governed read op
+
+`src/dossier/llm.cljc`/`policy.cljc`/`phase.cljc`/`store.cljc` に追加(いずれも
+`:tier/graph` 必須、DisclosureGovernorの同じ licensed-disclosure ゲートを通る):
+
+- **`:disclosure/ownership-chain`**(`{:company-id|:company-name ..}` →
+  `{:owners [{:owner-id :pct :source :as-of} ..] :has-sourced-ownership-data?
+  bool}`)— 対象法人へ向かう `:ownership` edge を1 hop 辿る。出典データが無い
+  ことは「所有者がいない」ではなく「未収載」——清潔判定として扱わない。
+- **`:disclosure/relationship-check`**(`{:person-name .. :company-id|
+  :company-name|:target-person-name|:target-name ..}` → `{:related? bool
+  :kind kw|nil}`)— 名前一致した official の `:org` 一致、または関係edge
+  (1 hop)で判定。設計途中で判明した重要な一般化: `:target-name` は
+  company-by-name→official-by-name の順で両方試すため、呼び出し側は
+  カウンターパーティが法人か個人か知らなくてよい(`cloud-itonami-isic-
+  6621`/`6622` の `party` レコードは両方を同じ形で保持するため必須だった)。
+
+新規 `dossier.store/company-by-name`(`official-by-name` と対称)+ demo
+relationship edge を2本追加(co-200→co-300 所有60%、of-1→co-200 役員兼務、
+of-2→of-1 business-contact)。8291自体: 55 tests / 213 assertions、lint
+clean、demo op7/op8 追加。commit `c91691c` → `2152c07` → `448151b`。
+
+### 残り3 repoの実統合
+
+| repo | 統合先 | 検証結果 |
+|---|---|---|
+| `cloud-itonami-isic-6420`(持株会社) | `:disclosure/ownership-chain`(subsidiary-name で照会) | co-300 の実所有者(制裁フラグ付きco-200、60%)を検出 → `:beneficial-ownership-verified? false` → **即時 HARD hold**(このrepoの検証語彙は真偽2値のみで中間状態が無く、governor が無条件hardなため。40 tests/195 assertions、commit `4109e99`) |
+| `cloud-itonami-isic-6621`(損害査定) | `:disclosure/relationship-check`(`:matter-id` 任意追加、adjuster名×counterparty名) | エージェントが実行して判明: 山田一郎↔Jane Smithの直接edgeは`related?=true`を返すが、どちらも個人としては制裁フラグを持たないため8291は即時commit(escalateしない)→ 6621自身のunconditional hard-hold(`:verdict :hit`)へ着地。pending-review/heldの2経路はスタブで別途決定的に検証。30 tests/123 assertions、commit `4c628f9` |
+| `cloud-itonami-isic-6622`(保険仲介) | `:disclosure/relationship-check`(`:placement-id` 任意追加、broker名×customer名) | エージェントが6621と異なる、より的確なペアリングを選択: 山田一郎(co-200役員)×Northwind社(co-200、制裁フラグ付き法人そのもの)→ **実際に8291側でescalateが発火**(`:reason :high-stakes`)→ 6622側も`:incomplete`でescalate。40 tests/193 assertions、commit `b61854d` |
+
+**2つのエージェントが独立に、ブリーフ執筆時の私の想定(どのデモペアリングが
+8291のescalateを発火させるか)が誤りだったことを実行して発見し、正しく
+補正した**(6621は代替のスタブ検証で、6622はより的確な法人ターゲットへの
+差し替えで)——スクリプト通りに進めるのではなく、実行結果で検証する姿勢が
+機能した実例。
+
+`:matter-id`/`:placement-id` はどちらも既存リクエスト形状への**後方互換な
+オプション追加**(省略時は完全に元の挙動)。
+
+### 現状まとめ(更新)
+
+パイロット10 repo中: **8 repo が実統合済み**(6910・6810・6499・6512・6419・
+6420・6621・6622)、**2 repo が対象外のまま**(6430・6630、統合すべき箇所が
+構造的に存在しない)。残り約278 repoへの展開判断は引き続きこのADRでは
+行わない。

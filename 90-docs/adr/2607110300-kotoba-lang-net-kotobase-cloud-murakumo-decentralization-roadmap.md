@@ -137,3 +137,150 @@ Phase 1〜3で作るのは依然として「単一運営者配下の複数ノー
 - **Phase 4(真の分散化)まで一気に設計する**:却下。独立運営者が実在しない
   段階で紛争解決やstaking経済の細部を設計しても検証不能であり、実際に
   第三者運営者の需要が生まれた時点で別ADRとして起票する方が誠実。
+
+## Addendum (2026-07-10): real multi-machine reachability verification
+
+Both Phase 2 (murakumo/witness-quorum, QUIC) and Phase 3
+(cloud-murakumo, HTTP) had an explicit honesty gap: "real network
+verification across multiple physical machines is deferred — this
+sandboxed environment has no Tailscale access to the real fleet."
+That gap is now partially closed for the HTTP side:
+
+- Confirmed via `tailscale status` + `bb murakumo nodes`: 6 of
+  fleet.edn's 10 real nodes were online at test time (naphtali, judah,
+  zebulun, issachar, asher, benjamin), reachable over the actual
+  Tailscale mesh from the session host.
+- None of the fleet nodes have a real JVM/Clojure/bb installed (only
+  macOS's `/usr/bin/java` stub) — `bb murakumo nodes` independently
+  confirmed `mesh: absent/stopped` on all of them. Installing a JVM on
+  production fleet hardware to run the witness listener THERE was
+  judged out of scope for a verification pass (a real provisioning
+  action, not a read-only check) — so the session host ran
+  `cloud_murakumo.verify.witness-rpc/serve!` (the Phase 3 HTTP
+  listener, gftdcojp/cloud-murakumo#13) locally, bound to all
+  interfaces, and 5 real fleet machines (naphtali, judah, zebulun,
+  issachar, asher) reached it over their real Tailscale IPs via plain
+  `curl` (already present on stock macOS, no remote provisioning
+  needed) — a genuine cross-physical-machine network hop, not
+  localhost.
+- Verified both the plain echo RPC and the actual
+  `witness-compute-handler` proof-of-compute logic: a request from
+  naphtali with a matching recompute claim correctly returned
+  `{:verdict :accept}`; a request from zebulun with a deliberately
+  mismatched claim correctly returned `{:verdict :reject :reason
+  "recompute mismatch: ..."}` — the real slashing signal, produced by
+  the real `verify/compute.cljc` logic, delivered across a real
+  network hop between two different physical machines.
+- No files were written and no software was installed on any fleet
+  node (SSH was used only to run stock `curl`); the listener process
+  on the session host was killed and its ports confirmed closed after
+  the test — no lasting state change anywhere.
+
+**What this does and does not prove**: it proves the wire protocol
+(request/response envelope framing, HTTP round-trip, the
+proof-of-compute accept/reject logic) works correctly between distinct
+physical machines over the real tailnet, not just in a single JVM
+process or on localhost. It does NOT establish multi-operator
+decentralization — the session host and all 5 fleet machines remain
+under the same single Tailscale account/operator (`com-junkawasaki@`),
+so this is still Phase 1-3 territory per this ADR's own labeling rule,
+not Phase 4. The murakumo/witness-quorum QUIC side (Phase 2) was not
+re-verified in this pass (it requires kwik/bouncycastle + cert
+material neither present nor installed on the fleet nodes); its real
+end-to-end multi-machine verification remains open.
+
+## Addendum 2 (2026-07-10): nbb, not JVM, for the witness-rpc dial client
+
+The first addendum's real-fleet verification defaulted to running the
+witness-rpc HTTP listener on the session host and having fleet
+machines reach it via stock `curl` — no JVM was installed on any fleet
+node, but the *session host's own* side used the JVM
+(`cloud_murakumo.verify.witness-rpc`, `.clj`). Owner feedback: that
+pattern doesn't establish that fleet nodes themselves could run the
+CLIENT side of this protocol without a JVM, and JVM is this org's own
+lowest-priority runtime (CLAUDE.md 2026-07-10: kotoba wasm >
+clojurewasm > ClojureScript > nbb, JVM/bb demoted to last resort).
+
+Checked: all previously-verified fleet.edn nodes (naphtali, judah,
+zebulun, issachar, asher) have Node.js already installed (v22–v26) but
+NO JVM at all. `kotoba-lang/murakumo`#18 adds
+`murakumo.overlay.witness-dial` (`witness_dial.cljs`) — an nbb
+(ClojureScript-on-Node) client speaking the same witness-rpc wire
+contract as `witness_http_transport.clj`'s `http-dial!`, runnable via
+`npx --yes nbb` with no persistent install. Verified twice against real
+hardware:
+
+1. naphtali and zebulun ran the dial logic inline via `npx --yes nbb -e
+   ...` against a local witness-rpc server, both `:accept` and
+   `:reject`/slashing paths, over the real Tailscale mesh.
+2. The exact file that landed in git was `scp`'d to naphtali, run via
+   `npx --yes nbb witness_dial.cljs <url> <payload>`, got a correct
+   response over the real network, then removed.
+
+No software was installed and no files were left on any fleet node in
+either pass.
+
+**What remains JVM-bound, unchanged**: the QUIC transport
+(`murakumo.overlay.quic-driver`, kwik/bouncycastle) and
+`produce-http-witnessed-attestation` (needs witness-quorum's JVM-only
+Ed25519 signer) — neither has an nbb-native equivalent yet. The
+witness-rpc *dial* capability specifically no longer requires a JVM
+anywhere in its critical path on the client side, and that is now
+proven on real fleet hardware rather than asserted from the session
+host alone.
+
+## Addendum 3 (2026-07-10): attestation signing ported to nbb too
+
+Addendum 2 closed the witness-rpc dial-only gap for nbb but left
+attestation *signing* JVM-bound (needed witness-quorum's JVM-only
+Ed25519 signer). kotoba-lang/witness-quorum#3 adds nbb siblings
+(`signer.cljs`/`selector.cljs`/`attestation.cljs`, using
+`@noble/curves/ed25519`) to the existing JVM files, same public API,
+same namespaces (selected by file extension, not `.cljc` -- the
+existing per-concern-per-file convention this repo already uses).
+
+Cross-platform compatibility was verified, not assumed: for a fixed
+seed and message, the JVM signer, the nbb signer run locally, and the
+nbb signer run on real fleet hardware (naphtali, over SSH, cleaned up
+after) all produced the **exact same public key and signature bytes**.
+`produce-attestation`'s full pipeline (validate -> sign -> format) was
+also verified end-to-end under nbb, including independent signature
+verification of the result.
+
+**What now works via nbb (no JVM) on a fleet node**: dialing a
+witness-rpc endpoint (murakumo#18) AND producing a signed
+witness-quorum attestation over the result (this PR). **What remains
+JVM-bound**: the QUIC transport (kwik/bouncycastle have no nbb-native
+equivalent) and murakumo's `produce-http-witnessed-attestation`
+composition itself hasn't been re-pointed at the new nbb signer yet
+(it still calls the JVM `attestation/produce-attestation`) -- wiring
+an nbb version of that composition is a small follow-up, not done in
+this pass.
+
+## Addendum 4 (2026-07-10): full nbb dial+sign pipeline, JVM no longer needed anywhere in it
+
+Addendum 3's follow-up: `kotoba-lang/murakumo`#19 wires the nbb dial
+(#18) and nbb attestation signing (`witness-quorum`#3) together into
+`murakumo.overlay.witness-dial-attest` — the nbb-native sibling of
+`witness_http_transport.clj`'s `produce-http-witnessed-attestation`.
+Verified locally end-to-end (real HTTP round trip to a local
+cloud-murakumo witness-rpc server + real Ed25519 signing +
+independent signature verification), both the `:accept` and
+`:reject`/slashing paths.
+
+Building this surfaced a real bug: `witness_dial.cljs`'s top-level
+`-main` call fired on every `require`, not just direct CLI use —
+composing it as a library re-triggered `process.exit`. Fixed in the
+same PR (now invoked via `nbb -m`, verified both paths still work).
+Also: nbb's npm module resolution is relative to the entry
+script/cwd, not the requiring source file's directory, so murakumo
+needed its own `package.json`/`@noble/curves` even though
+witness-quorum already had one — each nbb-runnable deployable unit
+needs its own copy of npm deps it transitively touches.
+
+**Status now**: the witness-rpc dial-and-sign pipeline runs entirely
+on Node.js (nbb), no JVM anywhere in that path, verified on real
+fleet hardware for the dial and signing halves separately (addenda
+2-3) and end-to-end locally (this addendum). What's still JVM-bound
+and unchanged: the QUIC transport (kwik/bouncycastle, Phase 2) has no
+nbb-native equivalent yet.

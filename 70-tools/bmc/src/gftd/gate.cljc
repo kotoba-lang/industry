@@ -108,12 +108,17 @@
     :needs-when-unmeasurable ["seller registry 実装 (ADR-0001 landed)" "seller 登録 (SELLERS_JSON/KV)"]}
 
    :hyp/nexus-x402-agent-demand
-   ;; NOT machine-measurable today: public /catalog is static seller config, not
-   ;; real settlement data, and SETTLEMENTS_KV entries (ADR-0001) don't yet tag
-   ;; payer as agent-vs-human. needs-only until both land.
-   {:needs ["SETTLEMENTS_KV に実決済が記録される運用開始 (現状 GMV 0 — 未計測)"
-            "settlement record への agent-originated 属性追加 (現状 :payer のみ、human/agent 区別なし)"
-            "/admin/settlements/<seller> を gate-emitter が読める形で集計 (ADMIN_TOKEN 委譲が要る)"]}
+   ;; machine-measurable since nexus-x402 shipped GET /stats (2026-07-10):
+   ;; aggregate-only settlement census, :agent-hint classified by
+   ;; nexus.settlements/classify-user-agent (a HONEST HEURISTIC, not proof --
+   ;; User-Agent is spoofable by either side; this gate tracks "settlements
+   ;; that didn't present a browser fingerprint", not "verified autonomous
+   ;; agents"). collect.bb's :nexus-x402 emitter now fetches /stats (superset
+   ;; of /catalog) into :catalog, so :catalog :settlements :agent-hint :agent
+   ;; is the real path.
+   {:metric [:catalog :settlements :agent-hint :agent] :op :> :threshold 0
+    :evidence-label "nexus /stats agent-hint 決済件数 (heuristic)"
+    :needs-when-unmeasurable ["SETTLEMENTS_KV に実決済が記録される運用開始 (現状 GMV 0 — 未計測)"]}
 
    :hyp/nexus-x402-external-seller
    ;; machine-measurable via the same /catalog census: known internal family is

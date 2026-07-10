@@ -54,6 +54,7 @@
 - 観測 (signal): shinshi.club 実測 2125 req/7d・514 uniques(日次和)・うち4xx probe 10%(24h)
 - 観測 (signal): shinshi.club 実測 2138 req/7d・516 uniques(日次和)・うち4xx probe 10%(24h)
 - 観測 (signal): shinshi.club 実測 2139 req/7d・516 uniques(日次和)・うち4xx probe 10%(24h)
+- 観測 (signal): shinshi.club 実測 2163 req/7d・522 uniques(日次和)・うち4xx probe 11%(24h)
 
 ## Customer Segments
 
@@ -134,6 +135,7 @@
 - GTM 律速の再定義: club-shinshi は BMC 68 で validation=0.0/distribution=2.0。広告出稿でなく『動くコンパニオン体験』が需要エンジン (candy.ai と同型: 供給の魅力が pull を作る)。companion chat が live 化したら次は ① 生成画像の kotobase 永続化 ② /chat 導線を top/actress ページから強調 ③ 1メッセージ=x402 少額課金で validation を実測 — この順で回す
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 136 · /js/app.js 50 · /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 45 · /app.css 38 · /robots.txt 30 | 4xx(probe) 10% · 5xx 3%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 142 · /js/app.js 50 · /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 45 · /app.css 38 · /robots.txt 29 | 4xx(probe) 10% · 5xx 2%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 140 · /js/app.js 50 · /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 45 · /app.css 38 · /robots.txt 31 | 4xx(probe) 11% · 5xx 2%
 
 > NSFW は paid 集客が全封鎖 → organic のみ。集客が事業の律速。
 
