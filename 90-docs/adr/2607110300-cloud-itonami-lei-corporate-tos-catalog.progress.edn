@@ -1,0 +1,809 @@
+[
+ {:progress/schema-note "cloud-itonami-lei rollout progress tracker, per ADR-2607110300. One row per cloud-itonami-isic-<code> industry. :industry/applicable? true means a coherent real global/listed top-3-company concept exists for this ISIC vertical; false means fragmented/local/non-corporate and this vertical is deliberately skipped for the lei-catalog family (the isic blueprint itself is unaffected). This file is the resume point for the next /loop iteration."
+  :db/id -1}
+ {:industry/code "isic-0162"
+  :industry/description ""
+  :industry/applicable? false
+  :industry/skip-reason "not yet classified this iteration"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-0610"
+  :industry/description "Crude petroleum extraction (ISIC Rev.5 0610) — CrudeAdvisor ⊣ Well Safety Governor. Open Business Blueprint, cloud-itonami fleet."
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-0620"
+  :industry/description "Natural gas extraction (ISIC Rev.5 0620) — GasFieldAdvisor ⊣ Gas Well Safety Governor. Open Business Blueprint, cloud-itonami fleet."
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-0810"
+  :industry/description ""
+  :industry/applicable? false
+  :industry/skip-reason "quarrying/mining of stone-sand-clay, fragmented local operators, no coherent global top-3 brand"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-1811"
+  :industry/description "Community Printing Operations — OSS Open Business Blueprint (ISIC 1811)"
+  :industry/applicable? false
+  :industry/skip-reason "printing, fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-1812"
+  :industry/description "Community Print Support Services Operations — OSS Open Business Blueprint (ISIC 1812)"
+  :industry/applicable? false
+  :industry/skip-reason "print support services, fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-1920"
+  :industry/description "Petroleum refining (ISIC Rev.5 1920) — Refinery Safety Governor. Open Business Blueprint, cloud-itonami fleet."
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-2011"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 2011: manufacture of basic chemicals (robotics-premised)"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-2610"
+  :industry/description ""
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-2660"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 2660: manufacture of irradiation, electromedical and electrotherapeutic equipment (robotics-premised)"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-3011"
+  :industry/description "ISIC 3011 shipbuilding open business blueprint — Shipyard Advisor ⊣ Shipyard Governor"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-3020"
+  :industry/description "Community Railway Rolling Stock Manufacturing — OSS Open Business Blueprint (ISIC 3020)"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-3030"
+  :industry/description ""
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-3312"
+  :industry/description "Community Industrial Machinery Repair Operations — OSS Open Business Blueprint (ISIC 3312)"
+  :industry/applicable? false
+  :industry/skip-reason "industrial machinery repair, fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-3313"
+  :industry/description "Community Electronic and Optical Equipment Repair Operations — OSS Open Business Blueprint (ISIC 3313)"
+  :industry/applicable? false
+  :industry/skip-reason "electronic/optical equipment repair, fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-3510"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 3510: electric power grid transmission and distribution operations (robotics-premised)"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-3512"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 3512: community renewable-energy operations"
+  :industry/applicable? false
+  :industry/skip-reason "labeled 'community renewable-energy operations' -- fragmented/local by design"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-3600"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 3600: community water safety operations"
+  :industry/applicable? false
+  :industry/skip-reason "labeled 'community water safety operations' -- fragmented/local municipal utilities"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-3812"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 3812: collection of hazardous waste (robotics-premised)"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-3830"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 3830: local materials recovery"
+  :industry/applicable? false
+  :industry/skip-reason "labeled 'local materials recovery' -- fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-4211"
+  :industry/description ""
+  :industry/applicable? false
+  :industry/skip-reason "construction of roads/railways, fragmented/regional contractors"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-4321"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 4321: electrical installation (robotics-premised)"
+  :industry/applicable? false
+  :industry/skip-reason "electrical installation, fragmented/local trades"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-4322"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 4322: plumbing, heat and air-conditioning installation (robotics-premised)"
+  :industry/applicable? false
+  :industry/skip-reason "plumbing/HVAC installation, fragmented/local trades"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-4671"
+  :industry/description "Wholesale of solid, liquid and gaseous fuels (ISIC Rev.5 4671) — :fuel-trading-governor. Open Business Blueprint, cloud-itonami fleet."
+  :industry/applicable? false
+  :industry/skip-reason "fuel wholesale/trading, ambiguous entity boundaries (traders vs producers already covered by 0610/1920)"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-4711"
+  :industry/description ""
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-4730"
+  :industry/description "Retail sale of automotive fuel (ISIC Rev.5 4730) — ForecourtAdvisor ⊣ Forecourt Safety Governor. Open Business Blueprint, cloud-itonami fleet."
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-4911"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 4911: passenger rail transport, interurban (robotics-premised)"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-4912"
+  :industry/description "Community Freight Rail Transport — OSS Open Business Blueprint (ISIC 4912)"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-4920"
+  :industry/description ""
+  :industry/applicable? false
+  :industry/skip-reason "other passenger land transport, fragmented/local (taxis/buses)"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-4950"
+  :industry/description "Transport via pipeline (ISIC Rev.5 4950) — :pipeline-integrity-governor. Open Business Blueprint, cloud-itonami fleet."
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-5011"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 5011: sea and coastal passenger water transport (robotics-premised)"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-5020"
+  :industry/description "Water freight transport (tanker) (ISIC Rev.5 5020) — TankerAdvisor ⊣ Marine Cargo Governor. Open Business Blueprint, cloud-itonami fleet."
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-5110"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 5110: passenger air transport (robotics-premised)"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-5210"
+  :industry/description "Storage (terminal/depot) (ISIC Rev.5 5210) — :terminal-storage-governor. Open Business Blueprint, cloud-itonami fleet."
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-5221"
+  :industry/description "Community Land Transport Support Operations — OSS Open Business Blueprint (ISIC 5221)"
+  :industry/applicable? false
+  :industry/skip-reason "community land transport support, fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-5222"
+  :industry/description "Community Port Authority and Harbor Operations — OSS Open Business Blueprint (ISIC 5222)"
+  :industry/applicable? false
+  :industry/skip-reason "community port authority/harbor operations, mostly public-authority operated not listed companies"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-5223"
+  :industry/description "Community Airport Operations and Ground Handling — OSS Open Business Blueprint (ISIC 5223)"
+  :industry/applicable? false
+  :industry/skip-reason "community airport operations, mostly public-authority operated not listed companies"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-5224"
+  :industry/description "Community Cargo Handling Operations — OSS Open Business Blueprint (ISIC 5224)"
+  :industry/applicable? false
+  :industry/skip-reason "community cargo handling, fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-5229"
+  :industry/description "Community Freight Forwarding and Customs Brokerage — OSS Open Business Blueprint (ISIC 5229)"
+  :industry/applicable? false
+  :industry/skip-reason "community freight forwarding/customs brokerage, fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-5510"
+  :industry/description ""
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-5610"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 5610: restaurants and mobile food service activities (robotics-premised)"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-6010"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6010: radio broadcasting (robotics-premised)"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-6020"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6020: television programming and broadcasting activities (robotics-premised)"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-6110"
+  :industry/description ""
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-6120"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6120: wireless telecommunications / mobile network operator infrastructure (robotics-premised)"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-6190"
+  :industry/description ""
+  :industry/applicable? false
+  :industry/skip-reason "'other telecommunications activities' -- unclear category boundary vs 6110/6120"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-6310"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6310: OSS HR/talent SaaS replacement with PolicyGovernor and audit ledger"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-6411"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6411: central banking"
+  :industry/applicable? false
+  :industry/skip-reason "central banking -- government/monetary authorities, not companies"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-6419"
+  :industry/description ""
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-6420"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6420: holding companies"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-6430"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6430: trusts, funds and similar financial entities"
+  :industry/applicable? false
+  :industry/skip-reason "trusts/funds/similar financial entities -- too generic an entity shape, no coherent top-3"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-6491"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6491: financial leasing"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-6492"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6492: other credit granting"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-6499"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6499: other financial service activities n.e.c."
+  :industry/applicable? false
+  :industry/skip-reason "'other financial service activities n.e.c.' -- too generic"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-6511"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6511: life insurance"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-6512"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6512: non-life insurance"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-6520"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6520: reinsurance"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-6530"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6530: pension funding"
+  :industry/applicable? false
+  :industry/skip-reason "pension funding -- mostly quasi-public/occupational schemes, not open-market companies"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-6611"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6611: administration of financial markets"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-6612"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6612: security and commodity contracts brokerage"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-6619"
+  :industry/description ""
+  :industry/applicable? false
+  :industry/skip-reason "'other activities auxiliary to financial services' -- too generic"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-6621"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6621: risk and damage evaluation"
+  :industry/applicable? false
+  :industry/skip-reason "risk and damage evaluation, niche/fragmented"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-6622"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6622: insurance agents and brokers"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-6629"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6629: other insurance auxiliary activities"
+  :industry/applicable? false
+  :industry/skip-reason "'other insurance auxiliary activities' -- too generic"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-6630"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6630: fund management activities"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-6810"
+  :industry/description ""
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-6820"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6820: real estate on a fee or contract basis"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-6910"
+  :industry/description "Global company-incorporation execution actor (Registrar-LLM + independent RegistrarGovernor + audit ledger) -- ISIC Rev.5 6910 open business blueprint"
+  :industry/applicable? false
+  :industry/skip-reason "company-incorporation execution -- already its own dedicated actor (cloud-itonami-M6910/isic-6910), not a per-company-analysis target"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-6920"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 6920: accounting, bookkeeping and auditing activities"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-7010"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 7010: activities of head offices"
+  :industry/applicable? false
+  :industry/skip-reason "'activities of head offices' -- too generic, not a service vertical"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-7020"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 7020: management consultancy activities"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-7110"
+  :industry/description ""
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-7120"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 7120: technical testing and analysis"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-7210"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 7210: R&D on natural sciences and engineering"
+  :industry/applicable? false
+  :industry/skip-reason "R&D on natural sciences/engineering -- mostly institutional/in-house, no coherent top-3 open-market company"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-7220"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 7220: R&D on social sciences and humanities"
+  :industry/applicable? false
+  :industry/skip-reason "R&D on social sciences/humanities -- mostly institutional, no coherent top-3"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-7310"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 7310: advertising"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-7320"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 7320: market research and public opinion polling"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-7410"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 7410: specialized design activities"
+  :industry/applicable? false
+  :industry/skip-reason "specialized design activities, fragmented/local studios"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-7420"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 7420: photographic activities"
+  :industry/applicable? false
+  :industry/skip-reason "photographic activities, fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-7490"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 7490: other professional/scientific/technical activities n.e.c."
+  :industry/applicable? false
+  :industry/skip-reason "'other professional/scientific/technical n.e.c.' -- too generic"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-7500"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 7500: veterinary activities"
+  :industry/applicable? false
+  :industry/skip-reason "veterinary activities, mostly fragmented/local practices"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-7710"
+  :industry/description "Community Vehicle Rental Operations — OSS Open Business Blueprint (ISIC 7710)"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-7721"
+  :industry/description "Community Recreational and Sports Goods Rental Operations — OSS Open Business Blueprint (ISIC 7721)"
+  :industry/applicable? false
+  :industry/skip-reason "labeled 'community' recreational/sports goods rental -- fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-7729"
+  :industry/description "Community Household Goods Rental Operations — OSS Open Business Blueprint (ISIC 7729)"
+  :industry/applicable? false
+  :industry/skip-reason "labeled 'community' household goods rental -- fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-7810"
+  :industry/description ""
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-7911"
+  :industry/description "Community Travel Agency Operations — OSS Open Business Blueprint (ISIC 7911)"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-7912"
+  :industry/description "Community Tour Operator Operations — OSS Open Business Blueprint (ISIC 7912)"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-8010"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 8010: private security activities (robotics-premised)"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-8020"
+  :industry/description "Community Security Systems Service Operations — OSS Open Business Blueprint (ISIC 8020)"
+  :industry/applicable? false
+  :industry/skip-reason "labeled 'community' security systems service -- fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8030"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 8030: investigation activities (robotics-premised)"
+  :industry/applicable? false
+  :industry/skip-reason "investigation activities, fragmented/local/niche"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8121"
+  :industry/description "Community Building Cleaning Operations — OSS Open Business Blueprint (ISIC 8121)"
+  :industry/applicable? false
+  :industry/skip-reason "labeled 'community' building cleaning -- fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8130"
+  :industry/description "Community Landscape Care and Maintenance Operations — OSS Open Business Blueprint (ISIC 8130)"
+  :industry/applicable? false
+  :industry/skip-reason "labeled 'community' landscape care -- fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8219"
+  :industry/description "Community Office Support Services Operations — OSS Open Business Blueprint (ISIC 8219)"
+  :industry/applicable? false
+  :industry/skip-reason "labeled 'community' office support services -- fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8220"
+  :industry/description "Community Call Centre Operations — OSS Open Business Blueprint (ISIC 8220)"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-8291"
+  :industry/description "Corporate/compliance intelligence actor (ISIC 8291) — Dossier-LLM sealed advisor + DisclosureGovernor, Palantir-style hold-internally/disclose-to-contracted-users only"
+  :industry/applicable? false
+  :industry/skip-reason "corporate/compliance intelligence -- already its own dedicated actor (Dossier-LLM), not a per-company-analysis target"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8411"
+  :industry/description ""
+  :industry/applicable? false
+  :industry/skip-reason "general public administration -- government, not companies"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8510"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 8510: pre-primary and primary education"
+  :industry/applicable? false
+  :industry/skip-reason "pre-primary/primary education -- overwhelmingly public/non-profit"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8521"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 8521: general secondary education"
+  :industry/applicable? false
+  :industry/skip-reason "general secondary education -- overwhelmingly public/non-profit"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8522"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 8522: technical and vocational secondary education"
+  :industry/applicable? false
+  :industry/skip-reason "technical/vocational secondary education -- overwhelmingly public/non-profit"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8530"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 8530: higher education"
+  :industry/applicable? false
+  :industry/skip-reason "higher education -- overwhelmingly public/non-profit universities"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8541"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 8541: sports and recreation education"
+  :industry/applicable? false
+  :industry/skip-reason "sports/recreation education, fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8542"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 8542: cultural education"
+  :industry/applicable? false
+  :industry/skip-reason "cultural education, fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8549"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 8549: other education n.e.c."
+  :industry/applicable? false
+  :industry/skip-reason "'other education n.e.c.' -- too generic"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8550"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 8550: educational support activities"
+  :industry/applicable? false
+  :industry/skip-reason "educational support activities, fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8569"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 8569: community learning support"
+  :industry/applicable? false
+  :industry/skip-reason "labeled 'community learning support' -- fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8610"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 8610: hospital activities"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-8620"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 8620: medical and dental practice activities"
+  :industry/applicable? false
+  :industry/skip-reason "medical/dental practice, overwhelmingly fragmented/local practices"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8690"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 8690: other human health activities"
+  :industry/applicable? false
+  :industry/skip-reason "'other human health activities' -- too generic"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8691"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 8691: health access navigation"
+  :industry/applicable? false
+  :industry/skip-reason "health access navigation, niche/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8710"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 8710: residential nursing care facilities"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-8720"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 8720: residential care for mental health/disability/substance abuse"
+  :industry/applicable? false
+  :industry/skip-reason "residential care for mental health/disability/substance abuse, fragmented/regional providers"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8730"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 8730: residential care for the elderly and disabled"
+  :industry/applicable? false
+  :industry/skip-reason "residential care for elderly/disabled, fragmented/regional providers"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8790"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 8790: other residential care activities"
+  :industry/applicable? false
+  :industry/skip-reason "'other residential care activities' -- too generic"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8810"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 8810: community care coordination"
+  :industry/applicable? false
+  :industry/skip-reason "community care coordination, fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-8890"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 8890: other social work activities without accommodation"
+  :industry/applicable? false
+  :industry/skip-reason "'other social work activities without accommodation' -- too generic"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9000"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9000: creative, arts and entertainment activities"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-9101"
+  :industry/description ""
+  :industry/applicable? false
+  :industry/skip-reason "libraries/archives, mostly public"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9102"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9102: museums and historical sites"
+  :industry/applicable? false
+  :industry/skip-reason "museums/historical sites, mostly non-profit/public"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9103"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9103: botanical/zoological gardens and nature reserves"
+  :industry/applicable? false
+  :industry/skip-reason "botanical/zoological gardens, mostly non-profit/public"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9200"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9200: gambling and betting activities"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-9311"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9311: operation of sports facilities"
+  :industry/applicable? false
+  :industry/skip-reason "operation of sports facilities, fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9312"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9312: activities of sports clubs"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-9319"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9319: other sports activities"
+  :industry/applicable? false
+  :industry/skip-reason "'other sports activities' -- too generic"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9321"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9321: amusement parks and theme parks"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-9329"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9329: other amusement and recreation activities n.e.c."
+  :industry/applicable? false
+  :industry/skip-reason "'other amusement and recreation n.e.c.' -- too generic"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9411"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9411: business and employers membership organizations"
+  :industry/applicable? false
+  :industry/skip-reason "business/employers membership organizations -- non-profit associations, not companies"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9412"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9412: professional membership organizations"
+  :industry/applicable? false
+  :industry/skip-reason "professional membership organizations -- non-profit associations, not companies"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9420"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9420: trade unions"
+  :industry/applicable? false
+  :industry/skip-reason "trade unions -- not companies"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9491"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9491: religious organizations"
+  :industry/applicable? false
+  :industry/skip-reason "religious organizations -- not companies, out of scope per this org's own etzhayyim-vs-cloud-itonami boundary"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9492"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9492: political organizations"
+  :industry/applicable? false
+  :industry/skip-reason "political organizations -- not companies"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9499"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9499: other membership organizations n.e.c."
+  :industry/applicable? false
+  :industry/skip-reason "'other membership organizations n.e.c.' -- not companies"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9511"
+  :industry/description ""
+  :industry/applicable? false
+  :industry/skip-reason "not yet classified this iteration"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9512"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9512: repair of communication equipment"
+  :industry/applicable? false
+  :industry/skip-reason "repair of communication equipment, fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9521"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9521: repair of consumer electronics"
+  :industry/applicable? false
+  :industry/skip-reason "repair of consumer electronics, fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9522"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9522: repair of household appliances and home/garden equipment"
+  :industry/applicable? false
+  :industry/skip-reason "repair of household appliances, fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9523"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9523: repair of footwear and leather goods"
+  :industry/applicable? false
+  :industry/skip-reason "repair of footwear/leather goods, fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9524"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9524: repair of furniture and home furnishings"
+  :industry/applicable? false
+  :industry/skip-reason "repair of furniture/home furnishings, fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9529"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9529: repair of other personal and household goods"
+  :industry/applicable? false
+  :industry/skip-reason "'other repair of personal/household goods n.e.c.' -- too generic"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9601"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9601: washing and dry-cleaning of textile and fur products"
+  :industry/applicable? false
+  :industry/skip-reason "washing/dry-cleaning, fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9602"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9602: hairdressing and other beauty treatment"
+  :industry/applicable? false
+  :industry/skip-reason "hairdressing/beauty treatment, overwhelmingly fragmented/local"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9603"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9603: funeral and related activities"
+  :industry/applicable? true
+  :industry/status :pending
+  :industry/companies []}
+ {:industry/code "isic-9609"
+  :industry/description "Open Business Blueprint for ISIC Rev.5 9609: other personal service activities n.e.c."
+  :industry/applicable? false
+  :industry/skip-reason "'other personal service activities n.e.c.' -- too generic"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9700"
+  :industry/description ""
+  :industry/applicable? false
+  :industry/skip-reason "activities of households as employers -- not companies"
+  :industry/status :skipped
+  :industry/companies []}
+ {:industry/code "isic-9900"
+  :industry/description ""
+  :industry/applicable? false
+  :industry/skip-reason "activities of extraterritorial organizations (e.g. UN) -- not companies"
+  :industry/status :skipped
+  :industry/companies []}
+]
