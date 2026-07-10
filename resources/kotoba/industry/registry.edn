@@ -6865,14 +6865,19 @@
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "8291"
-   :name "Activities of collection agencies and credit bureaus"
-   :repo "https://github.com/gftdcojp/cloud-itonami-N8291"
-   :business-id "cloud-itonami-N8291"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :register :match :dispatch :follow-up :audit]},
+   :name "Corporate/Compliance Intelligence Actor"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-8291"
+   :business-id "cloud-itonami-isic-8291"
+   ;; No :robotics -- corporate/compliance data intake, relationship-graph
+   ;; drafting and governed disclosure are a digital/data service with no
+   ;; physical domain work, the same exemption class as cloud-itonami-6310/
+   ;; -isic-6910 (ADR-2607110400).
+   :required-technologies [:identity :forms :audit-ledger]
+   :optional-technologies [:dmn :bpmn]
+   :maturity :implemented
+   ;; real actor: dossier.{store,facts,llm,policy,phase,operation,report,
+   ;; sim}.cljc, 30 tests / 144 assertions, lint clean, demo (clojure -M:dev:run)
+   :operating-states [:record/upsert :relationship/draft :disclosure/query :correction/request :audit]},
   {:id "8292"
    :name "Packaging activities"
    :repo "https://github.com/gftdcojp/cloud-itonami-N8292"
