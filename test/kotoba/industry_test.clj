@@ -328,6 +328,8 @@
     (is (= :implemented (industry/maturity "4671"))))
   (testing "a hundred-seventh implemented actor (cloud-itonami-isic-3011, shipbuilding actor; first classic heavy-industry manufacturing vertical after aerospace 3030 and semiconductor 2610) is also :implemented"
     (is (= :implemented (industry/maturity "3011"))))
+  (testing "a hundred-eighth implemented actor (cloud-itonami-isic-8291, corporate/compliance-intelligence actor; promoted directly from :spec, not via :blueprint -- ADR-2607110400) is also :implemented"
+    (is (= :implemented (industry/maturity "8291"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -377,7 +379,9 @@
       ;; logic itself stays unit-tested without depending on a
       ;; specific live count.
       (is (= 36 (:blueprint m)))
-      (is (= 107 (:implemented m))))))
+      ;; 108 = 107 + cloud-itonami-isic-8291, promoted directly from :spec
+      ;; (never a :blueprint) -- ADR-2607110400.
+      (is (= 108 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
