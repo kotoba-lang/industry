@@ -3507,14 +3507,19 @@
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2410"
-   :name "Manufacture of basic iron and steel"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2410"
-   :business-id "cloud-itonami-C2410"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :name "Manufacture of Basic Iron and Steel"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2410"
+   :business-id "cloud-itonami-isic-2410"
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as a steelworks actor
+   ;; (Steelworks Advisor ⊣ Steelworks Governor). Legacy
+   ;; gftdcojp/cloud-itonami-C2410 placeholder replaced with real
+   ;; cloud-itonami/cloud-itonami-isic-2410. Classic heavy-industry
+   ;; continuous/process manufacturing vertical (heats, chemistry
+   ;; deviation, quality screen, mill-cert dual actuation).
+   :required-technologies [:robotics :cae :dmn :bpmn :audit-ledger]
+   :optional-technologies [:telemetry :optimization]
+   :operating-states [:intake :mill-rules-verify :quality-screen :approve :dispatch-heat :issue-mill-cert :audit]},
   {:id "2420"
    :name "Manufacture of basic precious and other non-ferrous metals"
    :repo "https://github.com/gftdcojp/cloud-itonami-C2420"
@@ -3777,14 +3782,19 @@
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2811"
-   :name "Manufacture of engines and turbines, except aircraft, vehic..."
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2811"
-   :business-id "cloud-itonami-C2811"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :name "Manufacture of Engines and Turbines"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2811"
+   :business-id "cloud-itonami-isic-2811"
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as a turbine/engine actor
+   ;; (Turbine Advisor ⊣ Turbine Governor). Legacy
+   ;; gftdcojp/cloud-itonami-C2811 placeholder replaced with real
+   ;; cloud-itonami/cloud-itonami-isic-2811. Classic heavy-industry
+   ;; discrete manufacturing vertical (units, type-rules, NDT,
+   ;; type-evidence dual actuation).
+   :required-technologies [:robotics :cae :dmn :bpmn :audit-ledger]
+   :optional-technologies [:cfd :eda :telemetry :optimization]
+   :operating-states [:intake :type-rules-verify :ndt-screen :approve :dispatch-unit :issue-type-evidence :audit]},
   {:id "2812"
    :name "Manufacture of fluid power equipment"
    :repo "https://github.com/gftdcojp/cloud-itonami-C2812"
