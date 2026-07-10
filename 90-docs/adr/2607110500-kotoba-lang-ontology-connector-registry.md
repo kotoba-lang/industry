@@ -317,3 +317,82 @@ Still open: `teian` (briefing decks) remains unconnected to either
 consumes any of this; `:tender` is still the only ontology object type; no
 other `gftdcojp/cloud-itonami` effect kind besides `:procurement/*` carries
 ontology provenance.
+
+## Addendum 4 (2026-07-10): connect teian — an internal briefing, not outreach
+
+Owner asked to connect `teian` after all (Addendum 2/3 had deliberately left
+it unconnected, reasoning its briefing-deck charter was a weaker fit for
+the per-match *outreach* flow `tayori` already covers). Re-examined
+`gftdcojp/cloud-itonami`'s own `src/cloud_itonami/workspace.cljc` first
+(not `teian`'s README, whose own "out of scope here" note about a
+`cloud_itonami.workspace` teian bridge turned out to be **stale** —
+`effect->teian-request`/`generate-deck!`/`publish-deck!` already exist,
+wired to a *different*, pre-existing `:document/generate-deck` effect kind
+unrelated to procurement). This reframed the fit: teian's actual niche
+here is an **internal** sales/management review deck about the decision to
+share a match — genuinely distinct from `tayori`'s **external** outreach
+draft, not a forced reuse of the same seam.
+
+**Decision**: `share-match!` now also drives a new
+`run-goyoukiki-teian-briefing!`, called ONLY after the share is confirmed
+to have reached `:shared` (a held/escalated share never gets a briefing
+drafted about it — checked explicitly, not implied). It registers a teian
+`:artifact` and runs `:deck/draft` (phase 3, auto-commit, mirroring
+`tayori`'s draft autonomy) — never `:deck/publish`, which stays a separate,
+always-human effect. The artifact's `:title` carries the opportunity's
+ontology provenance the same way `goyoukiki.matchport.tayori`'s
+`system-note` does, since that is the one piece of content teian's mock
+deck-LLM actually renders from. Result surfaced as `:goyoukiki/teian-deck`
+on the effect's own `:itonami.effect/tool` payload, alongside the existing
+`:goyoukiki/tayori-draft` — same effect, two independently-governed real
+downstream drafts for two genuinely different purposes. No new dependency
+(teian already required in this ns). 684 tests / 5293 assertions green,
+plus the PRIMARY portable-cljs gate (277/2466, its `pre-push` lefthook)
+also green. Landed via isolated worktree + server-side merge, same pattern
+as every other change in this ADR.
+
+## Addendum 5 (2026-07-10): a real per-blueprint `:ontology` connection
+
+Owner asked to connect an individual `cloud-itonami-*` business blueprint
+next. Searched all `orgs/cloud-itonami/*` for a genuine (non-speculative)
+domain overlap with `goyoukiki`'s own real domain (JP government
+procurement tender matching) rather than picking one arbitrarily. Found
+`cloud-itonami-iso3166-jpn` (`:implemented`, the first running actor in the
+`iso3166-*` family, `src/marketentry/*`) — its own `docs/business-model.md`
+names **GEPS** and **全省庁統一資格** by their real names, the exact same
+systems `goyoukiki`'s own README documents its `jp.kkj`/`jp.geps`
+connectors against verbatim. Two agency-leaf siblings
+(`cloud-itonami-iso3166-jpn-mlit`, `-jpn-digital`) were also real but
+sector-narrower forks under it, not the primary fit.
+
+**Decision**: added `:ontology` to `blueprint.edn`'s
+`:required-technologies`, and — since a bare metadata label without a real
+consumer would repeat exactly the mistake corrected in Addendum 2 — added
+`src/marketentry/goyoukiki.cljc`
+(`marketentry.goyoukiki/opportunity-assessment-context`): a pure fn that
+takes a real procurement-tender fact tagged by `kotoba-lang/goyoukiki`'s
+connectors and, ONLY once verified via
+`kotoba.ontology.connector/tagged-conforms?`, combines
+`marketentry.facts`'s generic per-country evidence checklist with that
+SPECIFIC opportunity's own eligibility floor (`:min-rank`/
+`:required-categories`) — grounding "you will need these documents to
+register" in a concrete, verifiably-sourced real case ("here is the tender
+you actually want to bid on") rather than only the abstract catalog. Fails
+closed (`nil`) on an untagged or mistagged fact, mirroring this blueprint's
+own charter of never fabricating a jurisdiction's requirements, applied to
+the opportunity-input side too. Added `kotoba-lang/ontology` as a
+`:local/root` sibling dependency (matching this repo's existing
+`kotoba-lang/langgraph` convention) and documented the new capability in
+both the README's "Implementation" table and "Capability layer" list. 27
+tests / 88 assertions green (was 24/79), clj-kondo clean (no new warnings
+in the added files). Left an unrelated concurrent session's uncommitted
+`blueprint.edn`/`organization.edn` WIP in the shared checkout untouched —
+worked from an isolated worktree based on `origin/main` instead. Landed via
+server-side merge, same pattern as every other change in this ADR.
+
+Still open: no OTHER `cloud-itonami-*` blueprint references `:ontology`;
+`marketentry.goyoukiki`'s bridge is a pure fn, not yet wired into
+`marketentry.operation`'s own `:jurisdiction/assess` request flow (a caller
+must invoke it explicitly and feed its output in, e.g. as engagement
+context) -- that deeper wiring is a further follow-up, not done here;
+`:tender` is still the only ontology object type.
