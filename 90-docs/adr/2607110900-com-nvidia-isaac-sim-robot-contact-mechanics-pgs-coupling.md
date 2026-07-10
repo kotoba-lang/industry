@@ -1,6 +1,6 @@
 # ADR-2607110900: com-nvidia-isaac-sim ロボット接触力学 — PGS multi-body coupling を実配線 + joint-limit を統一制約化
 
-- **Status**: accepted, M1 done, M2 done（最小スコープに再設計して実装済み — 末尾 Addendum (2026-07-10, 3回目) 参照）; **D1-D3/Context/元M2-M4 は前提が虚偽と判明したため撤回**（2026-07-10訂正、末尾の Addendum (2026-07-10, 2回目) を参照。読者は Context/Decision 本文より先にその訂正を読むこと）
+- **Status**: accepted, M1 done, M2 done（最小スコープに再設計して実装済み — 末尾 Addendum (2026-07-10, 3回目) 参照）; 新M3 proposed（joint limitをM(q)経由の統一PGS制約として`genesis.double-pendulum`に実装 — 末尾 Addendum (2026-07-10, 4回目) 参照）; **D1-D3/Context/元M2-M4 は前提が虚偽と判明したため撤回**（2026-07-10訂正、末尾の Addendum (2026-07-10, 2回目) を参照。読者は Context/Decision 本文より先にその訂正を読むこと）
 - **Related**: ADR-2607010930（clj-wgsl migration — `genesis.*` 名前空間の復元元ADR。**当初「本ADRはその一部記述の訂正を含む」としていたが、これも誤り — 下記訂正参照**）、ADR-2607020130（kami-nv-compat CLJC port — Featherstone dynamics の移植方針）、ADR-2607087500（kami-genesis → com-nvidia-isaac-sim rename）
 
 > **⚠️ 2026-07-10 訂正: 以下の Context / Decision (D1-D3, D5) / Milestones (M2-M4) は、着手前の調査エージェントが実在しないコード（関数名・行番号・テスト名を含む具体的な報告）を報告したことに基づいて書かれており、**その報告は実際にはハルシネーション（捏造）だったことが M2 実装着手時の一次ソース直接確認で判明した**。D4/M1（`kami-nv-compat` の URDF limit パース修正）のみは別途一次ソースを直接読んで独立に検証済みで、正しく実装・着地している。詳細は末尾の Addendum (2026-07-10, 2回目) を参照。以下の本文は「何が誤って報告されたか」の記録として意図的に残してあり、書き換えていない。**
@@ -108,3 +108,21 @@ M2着手前の最終確認として、Decisionが「既に実装・テスト済�
 - **テスト**: `test/genesis/rigid_body_test.cljc` に新規7件（自由落下の速度がsemi-implicit Eulerの厳密解と一致／落下した球が地面に沈み込まず静止する／静止後もドリフトしない／restitution=0.8で跳ね返り速度が理論値と一致／穏やかな落下で貫入が小さい範囲に収まる／地面+壁の角に押し付けた球がPGSの複数回反復で両方に貫入せず収束する＝Gauss-Seidelが同時接触で機能する検証／摩擦がタンジェント方向の運動エネルギーを増やさず単調減速させる）。いずれも実測の閉形式物理（この組織の一貫した検証手法）で、IsaacSimとのtrace diffingは行っていない（Non-goalsのまま）。
 - **CI**: `kotoba-lang/com-nvidia-isaac-sim` PR #1、`clojure -M:test`（JDK 17/21両方）green（117 tests/2980 assertions、既存110テストに影響なし）、`clojure -M:lint` 0 errors（既存の無関係な10件のwarningは不変）。サーバーサイドマージで着地（`094af5f`）。
 - **未着手のまま**: 元のM3（joint limitのPGS制約行への統一）は前提（`articulation3d.cljc`内の`step`/clamp-and-zero）自体が存在しないため**このADRからは削除**（articulationが実在するようになった時点で、必要なら新しいマイルストーンとして再起票する）。元のM4（multi-point manifold対応）も同様に、articulation実装が先行しない限り優先度なし。
+
+## Addendum (2026-07-10, 4回目): 新M3 — joint limitをM(q)経由の統一PGS制約として`genesis.double-pendulum`に実装
+
+オーナー指示で本ADRの深化に再着手。前回撤回した元M3（`articulation3d.cljc`のstep/clamp-and-zeroを前提とする）は依然として不成立——`articulation3d.cljc`は全58行のデータコンストラクタのみで`step`関数自体が無いことを2026-07-10時点で再確認済み（新規cloneのgit logで`094af5f`＝M2着地コミットが最新、それ以降の変更なし）。**N体Featherstoneソルバーをゼロから作らずに「joint limitを統一制約として扱う」を実際に検証可能な形にする**ため、既存の`genesis.double-pendulum`（Spong/Hutchinson/Vidyasagarの2-linkマニピュレータ方程式、実在するmass matrix M(q)・Coriolis項・重力項を持つ、本物のcoupled 2-DOF系）を土台にする——これがこのrepoで実在する唯一の「複数関節が結合したdynamics」であり、M2の`genesis.rigid-body`（自由剛体、joint無し）の次の自然なステップになる。
+
+**設計**: joint limitを、`genesis.rigid-body`のCartesian接触制約と同じ「有効質量→sequential impulse」の数式構造で、**joint空間**に定式化する。Cartesian接触の法線方向`n`の代わりに、joint空間の単位基底ベクトル`e_i`（joint iのみを instant的に動かす方向）を使い、有効"質量"は`M(q)`の逆行列`M(q)^-1`から取る（`e_i^T M^-1 e_i`が対角項、`e_i^T M^-1 e_j`が非対角の連成項）。これにより、joint 1がlimitに達した時のimpulseは、joint 1自身の速度だけでなく**M12の非対角項を通じてjoint 2の速度にも実際に伝播する**——素朴な「q1だけを止める」clamp-and-zeroとの本質的な違いはここ（連成を無視するか、質量行列を通じて正しく連成させるか）。restitution付き反発・Baumgarte位置補正はM2と同型。
+
+**実装**: `orgs/kotoba-lang/com-nvidia-isaac-sim`に`src/genesis/double_pendulum_joint_limits.cljc`（新規）。`genesis.double-pendulum/mass-matrix`を`defn-`から`defn`に変更（1文字、公開が必要なため）、`step`自体は変更しない（既存の無制約積分はそのまま、新規モジュールがpost-stepの制約解決パスとして合成される）。
+
+**テスト方針**（すべて閉形式/代数的に検証可能）:
+  - 連成の実在性: joint 1のlimit制約が発火した時、joint 2の角速度が実際に変化する（=非対角項M12がゼロでない限り、単純な「q1だけ止める」実装では起こらないはずの効果が起きている）ことを確認——これが「統一制約」であって「素朴なclamp」でないことの直接証拠。
+  - limitを十分広く（実質無制約）設定した場合、新規モジュールを通した軌道が既存`dp/step`だけの軌道とbit-exactに一致する（新規コードが無制約時に一切副作用を持たないことの回帰確認）。
+  - joint 1のlimitに実際に到達する初期条件で長時間積分し、q1がlimit（+slop許容）を超えないことを確認。
+  - restitution=0（完全非弾性のjoint stop）で、limit到達時に力学的エネルギー（`dp/energy`、既存の実装済み関数）が増加しないことを確認（散逸のみ、M2の摩擦テストと同型の手法）。
+
+## Milestones（新M3）
+
+- **新M3**: 上記設計を実装。既存`genesis.double-pendulum`のtest/実装は変更しない（`mass-matrix`の可視性変更のみ）。
