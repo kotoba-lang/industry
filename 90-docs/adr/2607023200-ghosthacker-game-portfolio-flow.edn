@@ -14,10 +14,13 @@
   :supersedes []
   :superseded_by []
   :related []
-  :last_verified "2026-07-03"
+  :last_verified "2026-07-10"
   :artifacts
   {:ghosthacker "orgs/com-junkawasaki/ghosthacker — 既存カノン（Ren/Nei、情報場、Ghost Battle/Daemon Battle、教育監修）"
-   :ghosthacker-flow "orgs/com-junkawasaki/ghosthacker-flow — 本ADRで新規scaffold（pure .cljc groove-sync core + test のみ、host adapter未実装）"}}
+   :ghosthacker-flow "orgs/com-junkawasaki/ghosthacker-flow — pure .cljc groove-sync core + terminal + browser host(reagent+Web Audio、ADR-2607100900 follow-up (b))"
+   :ghosthacker-harmony "orgs/com-junkawasaki/ghosthacker-harmony — battle.cljc(ASYMMETRY/HARMONY) + terminal + browser host"
+   :ghosthacker-echoes "orgs/com-junkawasaki/ghosthacker-echoes — dialogue-tree core + terminal + browser host(reagent、Web Audio不要)"
+   :ghosthacker-tuning "orgs/com-junkawasaki/ghosthacker-tuning — Addendum 2で新規scaffold(dial-vs-target整合core + terminal + browser host)"}}
  :body "# ADR-2607023200: Ghost Hacker ゲームポートフォリオ — FreeTEMPOのグルーヴ感を軸にした10ジャンル展開、および GHOST HACKER: FLOW の起票（proposed・FLOWのみ scaffold 実装）
 
 **Status**: proposed（ポートフォリオ設計は proposed。GHOST HACKER: FLOW のみ pure .cljc core を scaffold 実装済み）
@@ -156,6 +159,37 @@ FLOWの核と**同一の判定・crossfadeモデル**を前提にしている。
 固定しておくこと。実装（repo分割・manifest更新）は本ADRの対象外で、
 HARMONY起票時の別作業とする。
 
+## Addendum 2（2026-07-10、ADR-2607100900 follow-up (b) 実施 — host adapter決定 + 3本目着手）
+
+ADR-2607100900（ghosthackerアニメ/ゲーム方針決定）follow-up (b)（game
+portfolio host adapter選定）の結果、host adapterは **ClojureScript**
+に決定した（`kami-engine-sdk`は実体がwasm-bindgen Rustエンジンを包む
+Svelte/TS SDKで、cljsからも同じwasmモジュールを直接呼べるため新規host
+ABI設計が不要と判明。FLOW/HARMONYが必要とする音声/タイミングは
+host-importで、ADR-2607100030 addendum 2の制約によりkotoba wasm/
+clojurewasmではなくClojureScriptが第一候補になる）。
+
+この決定を受け、**FLOW・HARMONY・ECHOESの3タイトルに実プレイ可能な
+ブラウザhostアダプタを実装**（reagent + shadow-cljs。FLOW/HARMONYは
+Web Audioでビートクロック+合成メトロノーム音を追加、ECHOES/TUNINGは
+リアルタイム判定が無いためWeb Audio不要）。いずれもheadless DOM上での
+実クリック/キー入力による通しプレイで検証済み:
+- `com-junkawasaki/ghosthacker-flow@d1e48c7`
+- `com-junkawasaki/ghosthacker-harmony@22c3a0d`
+- `com-junkawasaki/ghosthacker-echoes@b67f151`
+
+続けて**GHOST HACKER: TUNING（#6、パズル、Nei単独）を2本目のフル
+scaffold対象として着手**（`com-junkawasaki/ghosthacker-tuning`、private、
+west登録済み）。ECHOESと同じ「pure core → terminal prototype → browser
+host」の一気通貫パターンで、`core.cljc`（dial-vs-target整合判定、
+`ghosthacker-groove-core`とは独立実装 — ビートグリッド前提ではないため）
++ `terminal.clj`（nudge&lock REPL、目標値は`static`近接度のみで隠す）+
+`web.cljs`（reagent、ECHOES同様Web Audio不要）。11 tests/51 assertions、
+clj-kondo 0 errors/warnings、headless DOM実クリック検証済み。
+
+残り6本（TIME MACHINE/FAMILY/メモライズ/DUET/VAMOS A BAILAR/LIGHTNING）は
+依然として設計のみ・未着手。
+
 ## Consequences
 
 **Positive**
@@ -164,11 +198,16 @@ HARMONY起票時の別作業とする。
 - 10本のジャンル/主人公/出典曲がすべて確定し、以降の着手判断が速い。
 - FLOWのcore判定ロジックはpure `.cljc` かつテスト付きで、JVM/CLJS/WASM
   いずれのホストにも移植可能な状態で着地している。
+- （Addendum 2）FLOW/HARMONY/ECHOES/TUNINGの4タイトルが実プレイ可能な
+  ブラウザhostアダプタまで到達し、判定モデルの多様性（ビート同期
+  crossfade、勝敗フレーミング、ダイアログ分岐、精度パズル）を実装
+  レベルで検証できた。
 
 **Negative / 制約（honest）**
-- 本ADR時点でFLOW以外の9本は未実装（設計のみ）。
-- FLOWもレンダリング/入力/音声のホストアダプタが無く、実際に「遊べる」状態
-  ではない（判定ロジックのみ）。
+- 本ADR時点でFLOW/HARMONY/ECHOES/TUNING以外の6本は未実装（設計のみ）。
+- レンダリングは全タイトルともDOM/CSSのみ（`kami-engine-sdk`のような
+  キャンバス/wasm描画は未着手）。FLOW/HARMONYの`:groove`crossfadeは
+  作曲済み楽曲が無いため音声ではなく視覚的な表現に留まる。
 - 「情報場が2065年ネオ東京ビジュアルを持つ」という統合解釈は、ghosthacker本体
   のカノンとして正式に確定していない（本ADRのゲームポートフォリオ文脈限定の
   暫定解釈）。
