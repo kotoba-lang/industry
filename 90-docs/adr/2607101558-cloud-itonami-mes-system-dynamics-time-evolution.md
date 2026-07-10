@@ -1,6 +1,6 @@
 # ADR-2607101558: cloud-itonami MES — System Dynamics（stock-flow連続モデル）による工場プロセスの時間発展
 
-- **Status**: accepted, done. M1/M2実装・main着地済み（`gftdcojp/cloud-itonami` PR #325 `cef7d76`、west pin `44e390c`）。M3は未着手（stretch、現時点で不要と判断）。詳細は末尾Addendum参照。
+- **Status**: accepted. M1/M2実装・main着地済み（`gftdcojp/cloud-itonami` PR #325 `cef7d76`、west pin `44e390c`）。M3（stretch、フィードバックループ）着手中——設計決定は末尾Addendum参照。
 - **Related**: ADR-2607110900（ロボット接触力学、着手順1番目）、ADR-2607101525（OpenUSD、2番目）。本ADRは3番目=cloud-itonami製造sim。ADR-2607011000（cloud-itonami CACAO — 「1 mission = 1 bounded operation, no internal loop」の設計方針の出典）
 
 > **2026-07-10 訂正: D1をdiscrete-event（個体ベース）シミュレーションからSystem Dynamics（Forrester流のstock-flow連続モデル）へ変更**。実装着手前（west sibling取得段階）にオーナーから直接指示（「kotoba-lang system dynamics を利用」）があった。`kotoba-lang` org内に既存の"system dynamics"という名前のrepo/libraryは実在しない（`gh search code`/`gh repo list`で確認済み、ゼロ件）ため、既存ライブラリの利用ではなく、System Dynamicsという**モデリング手法**をこの組織の流儀（`.cljc`、閉形式検証、既存`cloud_itonami.mes`との合成）で新規実装する指示と解釈した。D2以降を全面差し替え。
@@ -84,4 +84,28 @@ IsaacSim/実際のMESシステムとのライブ差分比較は行わない（�
 - **判明した事実（着手前には把握していなかった）**: 本repoの品質ゲートはGitHub Actionsではない——`gh api repos/gftdcojp/cloud-itonami/actions/permissions`で確認したところ`enabled:false`（repo単位でAction無効化済み）。実際のゲートはlocalの`lefthook` `pre-push`フック（`bb test-portable-cljs`＝ClojureScript版がprimary、`clojure -M:test`はsecondary、docs/adr/0016-runtime-priority-cljs-first.mdより）。両方を手動実行して確認: 変更前後で失敗数が完全に同一（12 failures/4 errors、すべて`workspace-test`のgoyoukiki match/propose/shareフロー、本変更と無関係）——新規追加0件。またこのrepoは`post-merge`/`post-checkout`フックで実際のCloudflare Pagesデプロイをトリガーする設定になっている（ローカルcheckoutがmainに追従した時点で発火）ため、着地はGitHub API単独マージのみで行い、ローカルでの`git pull`/`checkout main`は行っていない。
 - 新規モジュールは`cloud_itonami.test_runner`（JVM secondary）と`cloud_itonami.portable_cljs_test_runner`（primary）の両方に登録した（既存`mes-test`と同じ扱い）。
 
-D1-D4・M1-M2すべて解決済み。M3（フィードバックループ付き在庫管理ポリシー）は現時点で着手不要と判断——本ADRはこれで完了。ロボット接触力学・OpenUSD・cloud-itonami製造simの3領域すべてが完了した。
+D1-D4・M1-M2すべて解決済み。
+
+## Addendum (2026-07-10): M3 — Sterman "stock management structure" フィードバックループ
+
+オーナー指示でstretch項目に着手。
+
+**設計**: `start-rate`（生産開始レート）を固定`inflow-rate`でなく、**WIPの目標水準（`wip-target`）とのギャップに比例して自動調整するフィードバック制御**にする（Sterman *Business Dynamics* の "stock management structure"）:
+
+```
+start-rate = reference-rate + (wip-target - wip) / adjustment-time
+```
+
+`reference-rate`（アンカー/基準レート）を`wip-target / cycle-time`——Littleの法則に整合する「目標WIPを維持するのに必要な定常スループット」——に選ぶと、系全体が**依然として一次線形ODE**（`dWIP/dt = b - k*WIP`、`k = 1/adjustment-time + 1/cycle-time`、`b = reference-rate + wip-target/adjustment-time`）のままであることが導出できる（`completion-rate = WIP/cycle-time`も`start-rate`もWIPの線形関数のため）。この特別な`reference-rate`の選び方により**平衡点が厳密に`wip-target`と一致する**——M1の閉形式検証手法（`analytic-wip`と同型の解析解比較）をそのまま流用できる。
+
+**スコープの明示的な限定（Non-goal追加）**: Sterman本が論じる"stock management structureの発振"現象は、コントローラが**知覚WIP**（実WIPに対して独自の平滑化遅延を持つ、別の状態変数）に反応する**2次系**でのみ起こる。本M3は知覚遅延を追加しない単純な1次フィードバック（実WIPに直接反応）に留める——発振しない、閉形式で厳密に検証可能な系にとどめるのが目的で、2次系への拡張は別途必要性が出た場合のみ検討する。
+
+**実装**: `gftdcojp/cloud-itonami`に`cloud_itonami/mes/system_dynamics_feedback.cljc`（新規、`cloud_itonami.mes.system-dynamics`の`completion-rate`を再利用、既存`step`/`run`/`report-batch`/`report-batch->tx`は無変更）。
+
+**テスト方針**（すべて閉形式）:
+  - WIPが目標を上回る初期値・下回る初期値の両方から`wip-target`へ収束すること（外乱除去の直接証拠——M1の単なる開ループ平衡点到達との違いはここ）。
+  - 有限時刻でのWIP軌道が解析解と一致すること（M1と同型の検証）。
+  - `start-rate`が0未満にならないこと（過剰在庫時に生産を「負」にはできないという物理制約のクランプ）。
+  - 既存`sd/report-batch->tx`がフィードバック軌道に対してもそのまま機能すること（M1/M2の資産との合成可能性の確認）。
+
+M3は設計決定・実装着手（本Addendum時点）。着地は別途Addendumで記録する。
