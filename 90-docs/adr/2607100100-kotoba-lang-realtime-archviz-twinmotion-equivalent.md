@@ -1,6 +1,6 @@
 # ADR-2607100100: kotoba-lang 版リアルタイム・アーキビジュアライゼーション設計（Twinmotion 相当）— CAD/BIM 取り込み → シーン合成 → WebGPU 実行層 → `kami-app-amenominaka` 拡張シェル
 
-- **Status**: accepted（M0/M2/M3/M5 done、M1 は USD 部分のみ done(glTF 未着手)、M4 は実測に基づく代替修正で完了 — 下記 Milestones 参照。`omni.timeline`（M3 stretch）と `MAX-INST` 上限は未解決のまま残る）
+- **Status**: accepted（M0-M9 全マイルストーン完了 — M1 は USD/glTF 両方 done、M3 の R1.4 ゲートは `omni.replicator.core`（明示的非ゴール）を除く全項目 done、M4 は実測に基づく代替修正で完了、M6 の `MAX-INST` 上限修正・M8 の fly camera・M9 の `omni.timeline` パリティはいずれも本ADR原案に無くオーナーの「next」選択で追加着手・完了。詳細は下記 Milestones/各 Addendum 参照）
 - **Related**: ADR-2605261800（`etzhayyim/root`。NVIDIA Omniverse Stack API-Compat の親 charter — `kami-app-amenominaka` の authoritative parent、本 ADR が従う D10 fallback-gate 枠組み）、ADR-2607010930（clj-wgsl migration — WGSL-compute hot-loop 規則、kami-engine Rust workspace 撤去）、ADR-2607010000（kotoba-runtime-sdk-cljc-migration — 4層 authority/provider 構成、`kami-provider-catalog.edn` の render provider family）、ADR-2607078000（wasm-webcomponent CLJS ESM host policy — browser-host の正式な authoring tier、`clojurewasm` は host-providing-imports 役には使えないと実証済み）、ADR-2607062330/2607062400（kototama actor:host ABI）、ADR-2607100030（kami:engine ECS host imports — 閉じた capability table を本当に必要な時だけ拡張する先例）
 
 ## Context
@@ -246,3 +246,12 @@ M7完了後、引き続きオーナーが「next」で選択した残り2項目�
 - **設計**: WASD移動はyaw方向のみを基準にした水平面相対移動（pitch方向は無視——見下ろしながら前進しても地面に突っ込まない、標準的なFPSカメラの挙動）、Space/Shiftで垂直移動、マウスドラッグでyaw/pitchのlook操作（pitchは±90°手前でclampしジンバルフリップを回避）。移動はrequestAnimationFrameループが「現在押されているキーの集合」を毎フレーム読む方式（per-keydownイベントの単発デルタでなく）——キーを押しっぱなしにしている間、滑らかでフレームレート非依存に移動し、camera-modeがfly以外に切り替わったら自己終了する。orbit→fly切替時は現在のeye/targetからpos/yaw/pitchをシードし、視点がジャンプしないようにハンドオフする。
 - **実ブラウザ検証（`test/render/verify_m8_fly_camera.cljs`）で実タイミングバグを発見・対処**: 実装中に、React 18の自動イベントハンドラbatchingにより、Reagentの`:on-click`内`swap!`の結果がPlaywrightの`.click()`プロミス解決前にDOMへflushされるとは限らないという実タイミング問題を発見した（1回目のorbit→fly切替は直後の読み取りでも偶然成功したが、2回目のfly→orbit切替では失敗し「got fly」のまま——continuous re-renderの負荷差が原因と推定）。`#debug-state`を1回読むのでなく期待値になるまでpollingする形（既存の`verify_m4_stress.cljs`の`poll-out-text`と同じidiom）に修正して解決した。実際の`w`キー600ms押下（Playwright `keyboard.down`/`up`——本物のkeydown/keyupイベント、状態の直接書き換えではない）による実移動（`:fly :pos`がZ軸方向に約5units移動）と実レンダリングフレーム変化（2枚の実Chromiumスクリーンショット比較）を確認、GitHub Actions macOS（`webgpu-smoke` job）でもgreen。
 - **未解決のまま**: `omni.timeline`（M3 stretch）——引き続きM9として着手する。
+
+## Addendum (2026-07-10): M9 実装 — omni.timelineパリティ（オーナー「next」で選択した4項目の最後）
+
+M8完了後、引き続きオーナーが「next」で選択した最後の項目（omni.timeline）に着手した——これでM5完了時に提示した4項目（MAX-INST上限修正/glTF書き出し/fly camera/omni.timeline）すべてに着手完了。
+
+- **D7自身のスコープを厳密に踏襲**: D7が「最小限のキーフレーム/カメラパス」と明記しており、フルのUSD-stageアニメーションタイムライン（任意プロパティのスクラビング、レイヤー等）は最初からスコープ外（M1のMaterialXバインディングギャップと同じ「推測実装より明記済みギャップ」方針）。`kotoba.amenominaka.timeline`は依存ゼロの純粋な`.cljc`——キーフレーム列`[{:t :eye :target} ...]`、`add-keyframe`（2秒間隔で自動追加）/`duration`/`eval-at`（境界2キーフレーム間の線形補間、範囲外はclamp）のみ。
+- **設計**: 「Record Keyframe」は現在のカメラが何であれ（orbitでもflyでも、M8が既に両方とも同じ`:eye`/`:target`を生成することを確立済み）その時点のrender-IRから直接キャプチャする。「Play」は実`requestAnimationFrame`ループで`eval-at`を毎フレーム呼びrender-IRへ`:eye`/`:target`を直接書き込む——意図的に`apply-camera!`/`:camera-mode`を経由しない設計（再生は現在のカメラが何をしていようと一時的に上書きするものであって、永続的なモード切替ではないため）。orbit/fly状態自体は再生中も変更されず、再生・スクラブが止まればそのまま再開する。
+- **実ブラウザ検証（`test/render/verify_m9_timeline.cljs`）で実バグ2件を発見・対処、いずれもアプリ本体でなく検証手法自体のバグ**: (1) Playwrightの`locator.fill()`は`type=range` inputを未サポート（実行時に「Malformed value」エラー）——直接`.value`書き込み+`input`/`change`イベントdispatchで代替した。(2) M8で発見済みのReact 18自動batchingによる実タイミングレースが「Record Keyframe」ボタンでも非決定的に再発することを確認——同じ対処法（`#debug-state`をpollingする）を一貫して適用して解決。実際に2つの異なる位置でのキーフレーム記録（fly modeでの実`d`キー押下による実移動を挟む）、中点（t=1.0）へのスクラブでrender-IRの`:eye`が2つの記録eyeの算術平均と完全精度で一致することを確認、実時間再生で自動停止（playhead≈duration）と実レンダリングフレーム変化を確認、GitHub Actions macOS（`webgpu-smoke` job）でもgreen。
+- **本ADRの全マイルストーン完了**: M0-M9で、Milestonesに記載された全項目（M0-M3+M5はオリジナル設計通り、M4は実測ベース代替修正、M6-M9はオーナー追加リクエスト）が完了。R1.4ゲートの5項目中4項目（`omni.usd`/`omni.kit.viewport`/`omni.kit.app`/`omni.timeline`）が実装済み、`omni.replicator.core`のみ最初から対象外（D6明記の非ゴール）。着地作業中、無関係な並行セッションの活動（`manifest/repos.edn`への一時的なgit conflict marker混入と自己解決、ADR `.edn`ファイル群のDatomic-queryable形式への一括移行）に2回遭遇したが、いずれも実害なく確認・対応した（詳細はM7 addendum参照）。
