@@ -1,27 +1,28 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 6704,
-  :pageviews-7d 4052,
-  :uniques-7d-sum 278,
+ {:requests-7d 6788,
+  :pageviews-7d 4058,
+  :uniques-7d-sum 280,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 77}
-   {:path "/feed/fork-stats.edn", :requests 48}
-   {:path "/vanta.php", :requests 12}
-   {:path "/robots.txt", :requests 11}
-   {:path "/wander.php", :requests 9}
-   {:path "/echkm.php", :requests 8}
-   {:path "/2.php", :requests 8}
-   {:path "/sql.php", :requests 6}],
-  :status-mix {:ok 295, :server-error 62, :client-error 2},
+  [{:path "/", :requests 81}
+   {:path "/feed/fork-stats.edn", :requests 47}
+   {:path "/robots.txt", :requests 14}
+   {:path "/games/itonami/market-garden/thumbnail.svg", :requests 6}
+   {:path "/assets.html", :requests 5}
+   {:path "/games/itonami/care-coordination/thumbnail.svg",
+    :requests 4}
+   {:path "/games/gftd/orbs/thumbnail.svg", :requests 4}
+   {:path "/games/gftd/soshite-fune/thumbnail.svg", :requests 4}],
+  :status-mix {:ok 262, :server-error 59, :client-error 2},
   :window "24h"},
  :as-of "2026-07-10",
- :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 17},
+ :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 18},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 77 · /feed/fork-stats.edn 48 · /vanta.php 12 · /robots.txt 11 · /wander.php 9 | 4xx(probe) 1% · 5xx 17%",
+ "上位 page (24h, 2xx/3xx): / 81 · /feed/fork-stats.edn 47 · /robots.txt 14 · /games/itonami/market-garden/thumbnail.s… 6 · /assets.html 5 | 4xx(probe) 1% · 5xx 18%",
  :signal
- "isekai.network 実測 6704 req/7d・278 uniques(日次和)・うち4xx probe 1%(24h)",
+ "isekai.network 実測 6788 req/7d・280 uniques(日次和)・うち4xx probe 1%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}
