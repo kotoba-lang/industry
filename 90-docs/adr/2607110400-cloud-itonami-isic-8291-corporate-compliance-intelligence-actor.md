@@ -236,3 +236,74 @@ lint clean、demo (`clojure -M:dev:run`) で実際にこのフローを再現可
 引き続き判断しない。まず6910の実運用(実際にこの照会が意味のある区別を
 生むか)を見てから、他の9 repo(不動産・VC/信託/ファンド運用の三点セット・
 損保三点セット・持株会社・銀行)への統合を個別に検討する。
+
+## Addendum 3 (2026-07-10): パイロット10 repo中5 repoが実統合完了、残り5 repoは機械的横展開が不適と判明
+
+オーナーの指示で「残り9 repoにも同様の実統合を順次展開」を実行した。
+Addendum 2 の 6910 に続き、既存の `screen-kyc` 相当コードを詳細に読んだ
+結果、9 repo は均質ではなく**2群に分かれる**ことが判明した:
+
+### A群(4 repo): 6910と同型、機械的に横展開 — 並列4エージェントで実施
+
+| repo | namespace | party概念 | 結果 |
+|---|---|---|---|
+| `cloud-itonami-isic-6810`(不動産仲介) | `realty` | party(buyer/seller) | commit `9ba0967`、30 tests/118 assertions |
+| `cloud-itonami-isic-6499`(VCファンド) | `vcfund` | party(founder) | commit `8055f7e`、176 tests/661 assertions |
+| `cloud-itonami-isic-6512`(損害保険) | `casualty` | party(policyholder) | commit `1158aa9`、40 tests/187 assertions |
+| `cloud-itonami-isic-6419`(銀行) | `banking` | account(holder-name) | commit `12665c0`、44 tests/191 assertions |
+
+いずれも `<ns>/corporate_intel.cljc` 新設 + `screen-kyc`/`screen-sanctions`
+相当関数の `:else` 分岐にのみ `screen-fn` を追加注入(既存 `mock-advisor` の
+無引数呼び出しは全て挙動不変を確認済み)、6910 と同じ「サイレントに clear/
+resolved にはならない」保証。全4 repo で 0 failures/0 errors、`clojure -M:lint`
+clean、`clojure -M:dev:run` 正常終了を確認。
+
+`cloud-itonami-isic-6419` のみ語彙が異なる(`:unresolved`/`:resolved` のみで
+`:incomplete` 相当が無い): governor の `sanctions-violations` が
+`:verdict :unresolved` を**無条件・即時 HARD hold**として扱うため、8291側の
+pending-human-review/held は(他3 repoのような soft escalate ではなく)
+そのまま即時 hold に収束する — 銀行/AML ドメインとしてより保守的な、正当な
+設計判断(意図的な仕様、バグではない)。
+
+**副産物の不整合(低リスク、要調整)**: 4エージェントがそれぞれ独立に
+「対象repoにCI workflowが無い場合どうするか」を判断した結果が割れた
+(6512/6499=作成せず・欠落を明記、6810/6419=6910相当のci.ymlを新規作成)。
+実害は無いが一貫性の観点で後日どちらかに統一する余地がある。
+
+### B群(5 repo): 6910型パターンが構造的に不適合 — 今回は見送り
+
+調査の結果、以下5 repoは「officer/party の名前を制裁/PEPリストと照合する」
+という8291の `:disclosure/screen-name` の形と、そもそも噛み合わないことが
+判明した:
+
+- **`cloud-itonami-isic-6430`(信託/ファンド器)・`cloud-itonami-isic-6630`
+  (ファンド運用)**: バックオフィス系actor(capital call・NAV・fee・carry の
+  再計算・突合)で、そもそも人物名をスクリーニングする概念自体が無い
+  (`sanctions`/`kyc`/`screen` のいずれも governor.cljc に一切出現しない)。
+  統合すべき箇所が存在しない。
+- **`cloud-itonami-isic-6420`(持株会社)**: `screen-beneficial-ownership` が
+  あるが、これは子会社ポジションの「実質的支配者(UBO)情報が確認済みか」
+  という**真偽フラグの検証状態**をスクリーニングするもので、人物名の
+  制裁/PEP照合ではない。8291の `:relationship/edge`(ownership)データは
+  概念的に近いが、`:disclosure/screen-name` とは別の新規クエリ形状
+  (UBOチェーンの照会)が要る。
+- **`cloud-itonami-isic-6621`(損害査定)・`cloud-itonami-isic-6622`
+  (保険仲介)**: `conflict-of-interest` チェックがあるが、これは
+  **査定人/仲介人自身**(claimant/insurerとの利益相反)をスクリーニングする
+  もので、外部カウンターパーティのPEP/制裁照合ではない。8291の関係性グラフ
+  (`:relationship/edge`)を使えば「この査定人はこの保険会社/請求者と
+  役員/株主等の関係を持つか」を問えそうだが、これも `:disclosure/screen-
+  name` とは別の新規クエリ(二者間関係の照会)の設計が要る。
+
+この3 repo(6420/6621/6622)への統合は、8291側に**新しいクエリ機能
+(UBOチェーン確認・二者間関係照会)を設計してから**でないと、
+`:disclosure/screen-name` を無理に当てはめる誤った統合になる — 今回は
+実施しない。6430/6630 は統合すべき箇所が無いため対象外。
+
+### 現状まとめ
+
+パイロット10 repo中: **5 repo が実統合済み**(6910・6810・6499・6512・6419)、
+**2 repo は対象外**(6430・6630、統合箇所が無い)、**3 repo は新規8291
+capability設計待ち**(6420・6621・6622、UBOチェーン/二者間関係照会)。
+残り約278 repo・上記3 repoへの新capability設計は、いずれも本ADRでは
+判断しない — 次のADRまたはフォローアップに委ねる。
