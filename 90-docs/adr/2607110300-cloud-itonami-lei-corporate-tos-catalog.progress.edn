@@ -1,6 +1,6 @@
 [
  {:progress/schema-note "cloud-itonami-lei rollout progress tracker, per ADR-2607110300. One row per cloud-itonami-isic-<code> industry. :industry/applicable? true means a coherent real global/listed top-3-company concept exists for this ISIC vertical; false means fragmented/local/non-corporate and this vertical is deliberately skipped for the lei-catalog family (the isic blueprint itself is unaffected). This file is the resume point for the next /loop iteration."
-  :progress/resume-from "isic-6492 (other credit granting) -- first :industry/status :pending row after isic-6419/isic-6420/isic-6491, all now :done. This tick (single-execution fork, no sub-forking) did isic-6419 (JPMorgan Chase, Bank of America, Wells Fargo -- 0/3, all 404 or JS nav-shell), isic-6420 (Berkshire Hathaway -- 1/3, archived as :legal-disclaimer since no dedicated ToS page exists; Loews 403, Jardine Matheson explicit bot-challenge), isic-6491 (AerCap Holdings + GATX Corporation -- 2/3, Air Lease Corporation has no parent-entity GLEIF record, Willis Lease Finance ToS 404'd). Cumulative company-repo count must be recomputed fresh each tick via gh repo list cloud-itonami --limit 300 --json name filtered to cloud-itonami-lei-* -- do not trust a prior tick's stated running total (freshly verified this tick: 55). Open retry candidates needing a JS-capable fetch path or better entity resolution, all optional, not blocking, carried forward from prior ticks plus this one: isic-6419 JPMorgan Chase + Bank of America + Wells Fargo (all need JS-capable fetch); isic-6420 Loews Corporation + Jardine Matheson Holdings (explicit bot-challenge); isic-6491 Air Lease Corporation (no parent LEI, would need manual entity-resolution research, not a fetch retry) + Willis Lease Finance Corporation (terms URL undiscovered, needs footer-link scan); plus the full carried-forward list from every prior tick (isic-0610 Shell/Aramco, isic-0620 Cheniere, isic-1920 Marathon/HFSinclair/PBF, isic-2011 Dow, isic-2610 TSMC/Samsung/Intel/Qualcomm/Micron/NXP/onsemi/STMicro, isic-2660 Philips, isic-3011 SamsungHeavy/HanwhaOcean, isic-3020 CRRC/StadlerRail, isic-3030 Airbus, isic-3510 NationalGrid/DukeEnergy, isic-3812 WasteManagement/Stericycle/RepublicServices, isic-4711 Costco/Kroger/Target/Tesco/AholdDelhaize, isic-4730 CoucheTard/Caseys/MurphyUSA, isic-4911 SNCF, isic-4912 UnionPacific/CSX, isic-5020 Frontline/IntlSeaways, isic-5110 AmericanAirlines/Southwest, isic-5210 Vopak/Buckeye/NuStarMagellan, isic-5510 Marriott/Hilton/IHG, isic-5610 YumBrands, isic-6020 ParamountGlobal, isic-6110 LumenTechnologies, isic-6120 TMobile/Vodafone/AmericaMovil, isic-6310 ADP/Paychex)."
+  :progress/resume-from "isic-6511 (life insurance) -- first :industry/status :pending row after isic-6492 (isic-6499 is :applicable? false, skipped). This tick did isic-6492/other-credit-granting (American Express Company, Synchrony Financial, Discover Financial Services -- 3/3; Capital One Financial Corporation LEI-verified but ToS page undiscoverable after 5 URL guesses). Cumulative company-repo count must be recomputed fresh each tick via gh repo list cloud-itonami --limit 300 --json name filtered to cloud-itonami-lei-* -- do not trust a prior tick's stated running total (freshly verified this tick: 58). Open retry candidates needing a JS-capable fetch path or better entity resolution, all optional, not blocking, carried forward from prior ticks plus this one: isic-6492 Capital One Financial Corporation (needs footer-link scan or JS-capable fetch); isic-6419 JPMorgan Chase + Bank of America + Wells Fargo (all need JS-capable fetch); isic-6420 Loews Corporation + Jardine Matheson Holdings (explicit bot-challenge); isic-6491 Air Lease Corporation (no parent LEI, would need manual entity-resolution research, not a fetch retry) + Willis Lease Finance Corporation (terms URL undiscovered, needs footer-link scan); plus the full carried-forward list from every prior tick (isic-0610 Shell/Aramco, isic-0620 Cheniere, isic-1920 Marathon/HFSinclair/PBF, isic-2011 Dow, isic-2610 TSMC/Samsung/Intel/Qualcomm/Micron/NXP/onsemi/STMicro, isic-2660 Philips, isic-3011 SamsungHeavy/HanwhaOcean, isic-3020 CRRC/StadlerRail, isic-3030 Airbus, isic-3510 NationalGrid/DukeEnergy, isic-3812 WasteManagement/Stericycle/RepublicServices, isic-4711 Costco/Kroger/Target/Tesco/AholdDelhaize, isic-4730 CoucheTard/Caseys/MurphyUSA, isic-4911 SNCF, isic-4912 UnionPacific/CSX, isic-5020 Frontline/IntlSeaways, isic-5110 AmericanAirlines/Southwest, isic-5210 Vopak/Buckeye/NuStarMagellan, isic-5510 Marriott/Hilton/IHG, isic-5610 YumBrands, isic-6020 ParamountGlobal, isic-6110 LumenTechnologies, isic-6120 TMobile/Vodafone/AmericaMovil, isic-6310 ADP/Paychex)."
   :db/id -1}
  {:industry/code "isic-0162"
   :industry/description ""
@@ -1023,8 +1023,36 @@
  {:industry/code "isic-6492"
   :industry/description "Open Business Blueprint for ISIC Rev.5 6492: other credit granting"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Capital One Financial Corporation excluded -- LEI verified (ZUE8T73ROZOF6FLBAR73, ISSUED) but its Terms-of-Use page could not be located via footer scan or 5 common URL-pattern guesses (all 404). Substituted Discover Financial Services (parent LEI has GLEIF registration.status LAPSED but is still a real, GLEIF-issued, entity-verified LEI -- not fabricated, just not annually renewed)."
+  :industry/companies
+  [{:company/legal-name "American Express Company"
+    :company/lei "R4PP93JZOLY261QX3811"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=American Express Company"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-r4pp93jzoly261qx3811"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.americanexpress.com/us/legal-disclosures/website-rules-and-regulations.html"}
+   {:company/legal-name "Synchrony Financial"
+    :company/lei "549300RS7EWPM9MA6C78"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Synchrony Financial"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300rs7ewpm9ma6c78"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.synchrony.com/terms-of-use.html"}
+   {:company/legal-name "Discover Financial Services"
+    :company/lei "Z1YLO2USPORE63VVUL20"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Discover Financial Services"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-z1ylo2uspore63vvul20"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.discover.com/discover-terms-of-use/"
+    :company/note "GLEIF registration.status is LAPSED (not annually renewed) but the LEI record itself is real and entity.status is ACTIVE -- used as-is, not fabricated"}
+   {:company/legal-name "Capital One Financial Corporation"
+    :company/lei "ZUE8T73ROZOF6FLBAR73"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Capital One Financial Corporation"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified (ISSUED) but no Terms-of-Use page discoverable via footer scan or 5 URL-pattern guesses (/legal/terms/, /legal-notices/, /digital/privacy/website-terms-of-use/, /applications/terms/, /online-terms-of-use/ -- all 404)"}]}
  {:industry/code "isic-6499"
   :industry/description "Open Business Blueprint for ISIC Rev.5 6499: other financial service activities n.e.c."
   :industry/applicable? false
