@@ -158,6 +158,57 @@ adult content declared) — tracked under the same follow-up task as store submi
   (works / needs a fallback renderer / needs a native plugin) once built — the single
   biggest technical risk this ADR identifies but does not resolve.
 
+## Addendum (2026-07-10, same day): Tauri 2 mobile shell scaffolded; on-device WebGPU verification NOT completed
+
+Following the web redesign above (merged/deployed, PR #60), `cargo tauri init` +
+`cargo tauri android init` + `cargo tauri ios init` were run against net-babiniku's
+existing shadow-cljs build (`src-tauri/`, identifier `cloud.gftd.babiniku`,
+`frontendDist: "../public"`, `beforeDevCommand: npx shadow-cljs watch app`,
+`beforeBuildCommand: npx shadow-cljs release app`) — both native projects
+(`src-tauri/gen/android`, `src-tauri/gen/apple/app.xcodeproj`) generated successfully.
+Full toolchain was installed and confirmed present: Android NDK 27, all four Android Rust
+targets (`aarch64`/`armv7`/`i686`/`x86_64`-linux-android*), all three iOS Rust targets
+(`aarch64-apple-ios`, `aarch64-apple-ios-sim`, `x86_64-apple-ios`), `ios-deploy`, and a
+freshly-downloaded iOS 26.5 Simulator runtime. This is real, durable progress — not just
+a stub — and is the honest state of this repo's mobile scaffold as of this addendum.
+
+**What could NOT be verified this session, and why (environment, not app):** the actual
+question this ADR's "biggest open risk" section asks — does kami-webgpu's WebGPU render
+loop work inside Tauri's iOS WKWebView / Android System WebView — was not answered.
+Attempting to answer it hit three separate failures, all traced to the SAME root cause
+(confirmed via `top`: this session's host machine was under extreme concurrent load —
+`Load Avg: 141.76, 320.77, 459.08`, "90 stuck" processes system-wide — consistent with
+this repo's own documented parallel-agent/fleet operating model running many other
+sessions on the same physical machine at the same time, not a fault in net-babiniku, Tauri,
+or this scaffold):
+
+1. An iOS Simulator device was created and reported `(Booted)`, but subsequent
+   `xcrun simctl`/`CoreSimulator` XPC calls (even a plain `simctl list devices`) hung
+   indefinitely and left several `simctl` client processes stuck in uninterruptible sleep
+   — `cargo tauri ios dev` blocked on exactly this XPC call and was killed after being
+   unresponsive for 10+ minutes.
+2. The Android emulator (`Kotoba_Runtime_API_35` AVD, system image reinstalled clean after
+   an earlier corrupted/partial install was found and fixed) booted far enough to report
+   GPU vendor/renderer info (SwiftShader/ANGLE software rendering) but then crash-looped
+   on `Failed to create window surface for DisplaySurfaceGl` and the emulator process
+   itself died before Android's `sys.boot_completed` ever went true, in both windowed and
+   `-no-window` headless modes.
+3. `cargo check --target aarch64-apple-ios-sim` for the new `src-tauri` crate itself (a
+   much lower bar than actually booting anything — pure cross-compilation) spawned dozens
+   of `rustc`/`sccache` child processes that sat at 0% CPU for 10+ minutes even with the
+   sandbox disabled for that one call — the CPU-starvation explanation above, not a
+   toolchain defect (`sccache --show-stats` showed zero requests executed, i.e. nothing
+   had even reached the compiler yet).
+
+**Conclusion:** the scaffold is real and structurally complete; the toolchain is real and
+fully installed; but this ADR still cannot claim WebGPU-in-Tauri-mobile-WebView works or
+doesn't — that verification needs to be re-attempted on a less-contended machine (or a
+dedicated CI runner / a real physical device, which sidesteps simulator/emulator
+virtualization entirely). This is the single most important remaining unknown before any
+app-store submission work is worth starting, and it is explicitly **not resolved** by this
+addendum — do not treat the scaffold's existence as evidence the render path works on
+mobile.
+
 ## Related
 
 - `90-docs/adr/2607051800-net-babiniku-vrm-vtuber-design.md`
