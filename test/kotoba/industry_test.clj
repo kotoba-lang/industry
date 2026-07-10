@@ -420,8 +420,9 @@
       ;; :spec -- machine-tool-manufacturing actor, the classic
       ;; heavy-industry cluster's first machine-tool/capital-equipment
       ;; vertical (distinct from the transport-equipment sub-cluster of
-      ;; 2811/2910/3011).
-      (is (= 119 (:implemented m))))))
+      ;; 2811/2910/3011). 120 = 119 + cloud-itonami-isic-4662, promoted
+      ;; directly from :spec -- metal/metal-ore wholesale trading actor.
+      (is (= 120 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
