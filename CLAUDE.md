@@ -471,21 +471,29 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
   `wrangler secret put` で個別プロジェクトへ投入するもので、これとは別物。
 - **kagi（`kotoba-lang/kagi`）**: net-kotobase / kotoba-lang 系の新規プロジェクト
   向け secrets は、1Password ではなく **こちらを正**にしていく方針（自己主権
-  vault、ADR-2606272330）。`bin/kagi ls`（vault: `./.kagi/`、gitignore 済み）
-  で一覧、`bin/kagi get <name>` で取得。1Password から個別 item を持ち込みたい
-  時は `bin/kagi import onepassword <file.1pux>`。
+  vault、ADR-2606272330）。**実在する vault の実体は
+  `orgs/kotoba-lang/kagi/.kagi/`**（`bin/kagi` が実行時に自身のリポジトリ
+  ルートへ `cd` するため、どのディレクトリから叩いても常にここを見る —
+  2026-07-10 のセッションでこれを見落として「vault が無い」と誤判定した
+  実例があるので注記）。unlock は **OS Keychain（`kagi unlock-status` で
+  確認可能、`:method :os-keychain`）が既定で通る**ため、通常は
+  `KAGI_MASTER` を設定しなくても `bin/kagi add`/`bin/kagi get` がそのまま
+  動く（passphrase はKeychainが使えない場合の recovery 経路として残っている
+  のみ）。`bin/kagi ls` で一覧、`bin/kagi get <name>` で取得。1Password から
+  個別 item を持ち込みたい時は `bin/kagi import onepassword <file.1pux>`。
+  既存 item 例: `net-kotobase` compartment に `KOTOBA_SEED_PRODUCTION`/
+  `KOTOBA_SEED_TESTNET`/`KOTOBASE_B2_*` 等。
 - **`gftd.kotobase/CLOUD_ITONAMI_LEI_INGEST_IDENTITY_SEED`（1Password
-  `gftdcojp` vault）** — ADR-2607113500（cloud-itonami-lei kotobase.net
-  ingestion job）の自己主権 CACAO identity（Ed25519 seed, 32-byte hex）。
-  ローカルミラーは `scripts/.kotobase-ingest-cloud-itonami-lei-identity.hex`
-  （`scripts/.gitignore` 済み、git に一切コミットしない）。**kagi への複製は
-  未完了**（本セッション環境に `.kagi` vault が一度も無く、`kagi init` は
-  非対話モードで `KAGI_MASTER` を必須とするため実行できなかった — 新規に
-  master passphrase を自分で生成して vault を初期化することは、1件の secret
-  保管を超えた判断（この環境の kagi sovereign identity 自体の新規作成）にあたる
-  ため、勝手に行わず保留した。オーナーが対話端末で `kagi init` するか、
-  明示的にブートストラップを指示したら `kagi add
-  net-kotobase/cloud-itonami-lei-ingest-identity` で追記する）。
+  `gftdcojp` vault）+ kagi `CLOUD_ITONAMI_LEI_INGEST_IDENTITY_SEED`
+  （compartment `net-kotobase`）— 両方に保管済み** — ADR-2607113500
+  （cloud-itonami-lei kotobase.net ingestion job）の自己主権 CACAO identity
+  （Ed25519 seed, 32-byte hex）。ローカルミラーは
+  `scripts/.kotobase-ingest-cloud-itonami-lei-identity.hex`
+  （`scripts/.gitignore` 済み、git に一切コミットしない）。kagi 側は
+  上記の既存 vault（OS Keychain unlock）にそのまま `bin/kagi add` で追記
+  ——新規 vault や新規 master passphrase の生成は不要だった（オーナーへの
+  「新規生成の許可」確認は、vault 未存在という誤った前提に基づいていたことが
+  判明したため、実際には生成した passphrase は未使用のまま破棄した）。
 
 ## Actors（langgraph-clj StateGraph アクター）
 
