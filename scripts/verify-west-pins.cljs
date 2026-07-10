@@ -27,10 +27,13 @@
 ;;
 ;; 環境変数 WEST_PIN_VERIFY_SKIP=1 で無条件 skip(緊急用)。
 
-(require '[scripts.nbb-compat :refer [slurp spit-append file-seq format]]
-         '[clojure.string :as str]
-         '[babashka.process :as p]
-         '[clojure.java.io :as io])
+;; babashka.process/clojure.java.io are unavailable under nbb (ClojureScript-
+;; on-Node) -- scripts.nbb-compat provides `sh`/`file` with the same shape,
+;; aliased as `io` too so the existing `io/file` call-sites below keep
+;; working unchanged. (A local `sh` wrapper is defined below, so `sh` itself
+;; is deliberately NOT :refer'd here -- it's called as `io/sh`.)
+(require '[scripts.nbb-compat :as io :refer [slurp spit-append file-seq format]]
+         '[clojure.string :as str])
 
 (when (= "1" (scripts.nbb-compat/getenv "WEST_PIN_VERIFY_SKIP"))
   (println "WEST_PIN_VERIFY_SKIP=1 — pin verification skipped.")
@@ -49,7 +52,7 @@
 (def opts (parse-args *command-line-args*))
 
 (defn- sh [& args]
-  (try (let [{:keys [exit out err]} (p/sh (mapv str args))]
+  (try (let [{:keys [exit out err]} (apply io/sh args)]
          {:exit exit :out (str/trim (or out "")) :err (str/trim (or err ""))})
        (catch :default e {:exit -1 :out "" :err (str e)})))
 
