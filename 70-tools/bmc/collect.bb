@@ -236,10 +236,12 @@
    ;; chatters = 1:1 companion chat messages = the validation signal the live
    ;; chat (murakumo fleet) now produces.
    :club-shinshi   {:url "https://shinshi.club/api/funnel"            :fmt :json :merge true}
-   ;; nexus-x402 (ADR-2607105200): public /catalog is the seller-registry census
-   ;; (no admin auth needed) — {:count N :items [...]}. :catalog :count feeds the
-   ;; adoption/external-seller gate-specs in gate.cljc.
-   :nexus-x402     {:url "https://x402.nexus/catalog"                 :fmt :json :key :catalog}})
+   ;; nexus-x402 (ADR-2607105200): public /stats is a superset of /catalog (no
+   ;; admin auth needed) — {:count N :items [...] :settlements {:count :usd-total
+   ;; :agent-hint {:agent :human :unknown}}}. :catalog :count feeds the
+   ;; adoption/external-seller gate-specs; :catalog :settlements :agent-hint :agent
+   ;; feeds :hyp/nexus-x402-agent-demand (added when nexus-x402 shipped /stats).
+   :nexus-x402     {:url "https://x402.nexus/stats"                   :fmt :json :key :catalog}})
 
 (defn fetch-emitter
   "→ parsed emitter map, or nil if unreachable/unparseable (no-op)."

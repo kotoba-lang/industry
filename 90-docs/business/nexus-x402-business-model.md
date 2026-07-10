@@ -15,6 +15,7 @@
 - Cloudflare Monetization Gateway は closed waitlist + facilitator をベンダーに委ねる設計
 - 中小 seller / 新規 worker は on-chain 検証・treasury 管理の実装コストを個別に負いたくない
 - 観測 (signal): workers 322 inv/7d
+- 観測 (signal): workers 340 inv/7d
 
 ## Customer Segments
 
@@ -77,6 +78,7 @@
 - 次の検証 (nexus-x402-external-seller): 外部 seller 登録 1 件以上
 - 稼働確認 (2026-07-10): /health /catalog /.well-known/x402 実応答、seller 3件登録 (murakumo/kotobase/shinshi、全 first customer 揃う)。/gateway/shinshi/x402/premium/<id> の 402 challenge を price/payTo/network 一致で確認
 - gate 距離 (nexus-x402-external-seller): nexus /catalog 登録 seller 数 (内部3社超) = 3 (gate 未到達)
+- gate 距離 (nexus-x402-agent-demand): nexus /stats agent-hint 決済件数 (heuristic) = 0 (gate 未到達)
 
 ## Unfair Advantage
 
