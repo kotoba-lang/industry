@@ -1,7 +1,8 @@
 # ADR-2607110500: kotoba-lang/ontology — object-type + connector provenance registry
 
-**Status**: proposed
+**Status**: closed（Addendum 1 で実統合まで完了・検証済み）
 **Date**: 2026-07-10
+**Closed**: 2026-07-10
 **Deciders**: Jun Kawasaki
 
 ## Context
@@ -120,3 +121,40 @@ it. `blueprint.edn` already has a stable shape
   (the tenant namespace this ontology projects into)
 - `kotoba-lang/technology`'s `resources/kotoba/technology/registry.edn` (the
   fleet-wide technology-keyword SSoT this ADR adds one entry to)
+
+## Addendum 1 (2026-07-10): real integration into kotoba-lang/goyoukiki
+
+Owner asked to raise maturity further. Checked `teian`/`tayori` (goyoukiki's
+downstream `match` consumers per its own docstring) as candidates for a
+`:required-technologies [:ontology]` declaration — both are still spec-only
+(no `src/` at all), so wiring either would not be a real adoption. Chose a
+more substantive integration instead: `kotoba-lang/goyoukiki` itself now
+depends on `kotoba-lang/ontology` and calls
+`kotoba.ontology.connector/tag` on the opportunity map inside both
+`jp.kkj/ingest!` and `jp.geps/ingest!`, right before `operation/register!` —
+every fact registered from either connector now carries `:ontology/type
+:tender` and `:ontology/source (:jp.kkj or :jp.geps)`.
+
+`->opportunity` itself (the directly unit-tested mapping fn in both
+namespaces) is untouched — tagging happens only at the `ingest!` boundary,
+which was already documented as real-network-only and outside the existing
+test suite, so this is non-breaking by construction. Added one new test per
+connector (`ingest-tags-opportunity-with-ontology-provenance`) verifying the
+composed `connector/tag` output against the same real captured fixtures the
+existing tests already use, and asserting
+`kotoba.ontology.connector/tagged-conforms?` is true. Full suite: 45 tests /
+170 assertions green (was 41/150 before goyoukiki's own maturity work since
+ADR-2607070300 added more; this addendum adds 2 tests / 20 assertions to
+that count), clj-kondo clean. Landed via isolated worktree + server-side
+merge (`gh api repos/kotoba-lang/goyoukiki/merges`), same as the rest of
+this ADR's changes.
+
+This resolves the "no blueprint anywhere declares `:required-technologies
+[:ontology]`" gap in a stronger form than originally scoped: not a business
+blueprint's declarative metadata, but the connector library itself
+consuming the ontology tag in real, tested code. Moves `kotoba-lang/ontology`
+from "registered, zero real consumers" to "registered, one real consumer".
+Still open: `teian`/`tayori` remain spec-only so cannot yet declare
+`:required-technologies [:ontology]` themselves; no `cloud-itonami-*`
+blueprint or `kotoba-lang/industry` entry references `:ontology` yet;
+`:tender` is still the only object type.
