@@ -1,0 +1,139 @@
+# ADR-2607110300: kotoba-lang / net-kotobase / cloud-murakumo — 「分散型経済/ブロックチェーン」を名乗るための統合ロードマップ
+
+**Status**: accepted（設計のみ。実装は後続タスク）
+**Date**: 2026-07-11
+**Deciders**: Jun Kawasaki
+
+## Context
+
+2026-07-10 に3リポジトリ横断で成熟度調査を実施した結果、共通パターンが見つかった:
+**自己主権ID(CACAO/did:key/IPNS)は実装・テスト済みで本物だが、合意形成・経済的
+強制力・複数独立ノードは依然として設計/ADR段階**。具体的なギャップ:
+
+- `kotoba-lang/witness-quorum`: N-of-M閾値署名ロジックは実装+テスト済み(26 tests/
+  77 assertions)だが、「書込み後にオペレータ管理下fleetが後追いでcosignする」
+  Certificate Transparency型パターンで、**本番ネットワークトランスポートが
+  未移植**(post-hoc、pre-commit quorumではない)。
+- `kotoba-lang/murakumo/src/murakumo/overlay/`: QUICドライバ・relay・cert等、
+  実働する P2P トランスポート層が既に存在する(`quic_driver.clj`/`transport.clj`/
+  `dial.clj`/`forward.clj`等、177 tests/811 assertions)。**witness-quorumとは
+  接続されていない** — 車輪の再発明を避けられる既存資産。
+- `gftdcojp/net-kotobase`: 単一K8s pod(Cloudflare Workerがフロント)の本番SaaS。
+  ADR-2607021700で「外部有料テナント0」と自認。CACAOによるテナント別グラフ
+  自己主権書込みは実装済みだが、単一運営者インフラの認可用途に留まる。
+- `gftdcojp/cloud-murakumo`: **経済フェーズの計画自体はADR-2607030030に既にある**
+  (Phase1=単一テナント企業fleet[済]、Phase2=fleet連邦+credits相互運用+overlayの
+  QUIC/WebRTC結線[未]、Phase3=公開マーケット+proof-of-compute+chain gateway[未])。
+  `pay/core.cljc`の決済実行部は「honest default」で全操作`:hold`止まりの未接続
+  実装。
+- `kotoba-lang/kekkai`: `governor.cljc`を持つゼロトラストACL(19 tests/66 assertions、
+  CLAUDE.mdのActorパターンのGovernor相当)だが、**ネットワーク到達性の統治のみ**
+  で価値(資金・信用)の統治権限は無い。
+- `kotoba-lang/engi`(ADR-2607101100): 相互信用通貨v1は実装+本番kotobase.netへの
+  実ライブ検証済みだが、クロスエージェント検証がkotobase.netの`:public-reads?`
+  401制約で機能せず自己申告に後退。解消はADR-2607022600 Wave4(CACAO depth-2
+  delegation、`kotoba-lang/cacao`と`kekkai/cacao.cljc`の統合、現状**未着手**)に
+  依存すると明記済み。
+
+**本ADRが新たに決定する余地は狭い** — 経済面の大方針(新L1を作らない、
+proof-of-computeがPhase3ゲート、Rustを拡張せずcljcで閉じる)は既にADR-2607030030
+/ADR-2607071900で確定済みであり、本ADRはそれを覆さない。本ADRの役割は
+**identity層(kotoba-lang)・storage層(net-kotobase)・economy層(cloud-murakumo)を
+繋ぐ、今まで誰も明示していなかった接続点**を設計することに限定する。
+
+## Decision
+
+既存のPhase語彙(ADR-2607030030)をそのまま使い、そこに識別/台帳/統治の接続を
+追加する形で拡張する。
+
+### Phase 1（現状。ほぼ完了 — 変更なし）
+自己主権ID(CACAO/did:key/IPNS、実装・テスト済み) + 単一書き込み者の改ざん検知
+台帳(`kotoba-ledger-clj`/`kotoba`のhash-chain) + witness-quorumの事後cosign +
+net-kotobaseの単一pod SaaS + cloud-murakumoの単一テナントfleet課金。
+
+### Phase 2（本ADRの主眼 — witness-quorumとmurakumo overlayを接続する）
+
+1. **witness-quorumの本番トランスポートを新規実装しない。既存の
+   `murakumo/overlay`(QUICドライバ)をそのまま流用する。** 理由: ADR-2607030030の
+   Phase2ゲート自体が「overlayのQUIC/WebRTC結線」を要求しており、witness-quorum
+   が必要とするトランスポートと完全に同じものを別々に作る必要が無い。
+   `overlay/transport.clj`に witness-quorum の提案(propose)/署名収集
+   (collect-sig)メッセージ種別を追加するだけで済む。
+2. **post-hoc cosignから pre-commit quorum へ変更する。** 書き込み者は
+   エントリをコミットする前に witness群へ提案をbroadcastし、M-of-N署名を
+   収集してからコミットする。これで「書いてから後追い証明」ではなく
+   「書く前の合意」になる。ただし fork-choice/view-changeは対象外(下記
+   「やらないこと」参照) — 対立する提案の解決アルゴリズムは無く、witness
+   全員が同一fleetの運営者管理下にある間は Byzantine fault tolerance では
+   なく crash fault tolerance相当と正直に呼ぶ。
+3. **net-kotobaseの単一pod SPOFを解消する。** 同一Cloudflare Worker配下に
+   2つ目以降のpodを追加し、テナントグラフのMerkle rootをPhase2のwitness-quorum
+   機構で相互署名させる。これは「単一マシン故障への耐性」であり、「複数
+   独立運営者による分散」ではない — 運営主体は引き続き1社。
+4. **経済台帳(cloud-murakumoのgpu-seconds課金エントリ)も同じwitness-quorum
+   機構で証人署名させる。** これによりADR-2607030030 Phase2の「ノード自己署名
+   feed」要件を、witness-quorumの再利用という具体的な機構で満たす。identity
+   台帳と経済台帳が同じ改ざん検知強度を持つようになる(現状は別物)。
+5. **ENGI(ADR-2607101100)のクロスエージェント検証は本ADRでは解決しない。**
+   ADR-2607022600 Wave4(CACAO depth-2 delegation)が前提条件のままであり、
+   Wave4着手は別タスクとする。
+
+### Phase 3（ADR-2607030030のPhase3を継承・具体化 — kekkaiを価値統治へ拡張）
+
+1. **proof-of-computeの検証者はPhase2で作ったwitness-quorumをそのまま使う。**
+   M-of-N witnessがサンプル再計算し、一致/不一致の署名付き verdict を出す
+   (ADR-2607030030が既に設計として示した「決定論的等価性によるサンプリング
+   再計算+不一致でcredits没収」の具体的な実行機構)。
+2. **kekkaiを「ネットワーク到達性の統治」から「価値の統治」へ拡張する。**
+   `kekkai/governor.cljc`(既存のGovernor抽象)にslashing verdict(上記1の
+   witness-quorum合議結果)を入力させ、`kekkai/acl.cljc`のdeny/allowと同じ
+   型で「treasury releaseを許可/拒否」を判定させる。新しいコンポーネントを
+   増やすのではなく既存Governorのスコープを広げる形にする。
+3. **chain mint/burn gatewayは既存方針どおり(新L1は作らない)。** 変更なし。
+
+### Phase 4（新規 — 本ADRで初めて明示する。実装は伴わない）
+Phase 1〜3で作るのは依然として「単一運営者配下の複数ノード」に留まる。
+**真に「分散型」を名乗るには、witnessを他社(独立した第三者運営者)に開放し、
+その第三者が経済的な参加コスト(stake)を負う必要がある。** これは:
+- 設計の形だけ示す: reputation加重witness選定 + stakingボンド(ENGIまたは
+  chain gatewayが提供する外部担保、いずれもPhase2/3が前提条件)。
+- 紛争解決: 現状どこにも無い「slashing verdictへの異議申立て」機構。kekkaiの
+  Governorをさらに拡張する形で置く想定だが、設計は本ADRのスコープ外とし、
+  実際に第三者運営者が現れる段階で別ADRを起票する。
+- **Phase 4に到達するまでは、対外的に「分散型経済/ブロックチェーン」と
+  名乗らない。** Phase 1〜3が完成しても実態は「複数ノードで耐障害性のある、
+  自己主権IDと接続された改ざん検知台帳＋経済的支払いレール」であり、これは
+  今日より大きく前進した状態だが、まだ「単一運営者への信頼」を前提にしている。
+
+## やらないこと（既存決定を上書きしない）
+
+- 新しいL1・独自コンセンサスチェーンを作らない(ADR-2607030030を継承)。
+- witness-quorumの本番化をRust側(kotoba-lattice)で実装しない。cljc/clj
+  (murakumo control plane)で閉じる(ADR-2607071900の先例を継承)。
+- witness全員が単一運営者配下である間のfork-choice/view-change設計はしない
+  (Byzantine前提を持ち込まない — crash fault tolerance相当と呼ぶ)。
+- ENGI Wave4(CACAO depth-2 delegation)の実装は本ADRの範囲外。
+
+## Consequences
+
+- Phase2完了時点で「identity台帳」と「経済台帳」が同一のwitness-quorum機構で
+  改ざん検知されるようになり、kotoba-lang / net-kotobase / cloud-murakumoの
+  3リポジトリが技術的に1本の信頼チェーンで繋がる。
+- 新規インフラを増やさず、既存の実働資産(murakumo overlayのQUIC、
+  witness-quorumの署名ロジック、kekkaiのGovernor抽象)を接続するだけなので、
+  実装コストは相対的に小さい。
+- 「分散型経済/ブロックチェーン」という言葉を対外的に使ってよいのは
+  Phase 4(独立第三者運営者+経済的skin-in-the-game)以降と明確化される —
+  Phase 1〜3の完成をもって早期にその言葉を名乗ることを本ADRは意図的に禁じる。
+
+## Alternatives
+
+- **witness-quorum用に新しいP2Pトランスポートを実装する**: 却下。
+  `murakumo/overlay`に実働QUIC実装が既にあり、ADR-2607030030 Phase2の
+  ゲート自体が同じ結線を要求しているため、車輪の再発明になる。
+- **proof-of-computeとkekkaiの統治を無関係な別システムとして新設する**:
+  却下。`kekkai/governor.cljc`という既存のGovernor抽象があるので、それを
+  拡張する方がActorパターン(封じ込め+独立Governor+台帳、CLAUDE.md)と整合する。
+- **Phase 4(真の分散化)まで一気に設計する**:却下。独立運営者が実在しない
+  段階で紛争解決やstaking経済の細部を設計しても検証不能であり、実際に
+  第三者運営者の需要が生まれた時点で別ADRとして起票する方が誠実。
