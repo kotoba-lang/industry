@@ -1,6 +1,6 @@
 # ADR-2607110900: com-nvidia-isaac-sim ロボット接触力学 — PGS multi-body coupling を実配線 + joint-limit を統一制約化
 
-- **Status**: accepted, M1 done, M2 done（最小スコープに再設計して実装済み — 末尾 Addendum (2026-07-10, 3回目) 参照）; 新M3 proposed（joint limitをM(q)経由の統一PGS制約として`genesis.double-pendulum`に実装 — 末尾 Addendum (2026-07-10, 4回目) 参照）; **D1-D3/Context/元M2-M4 は前提が虚偽と判明したため撤回**（2026-07-10訂正、末尾の Addendum (2026-07-10, 2回目) を参照。読者は Context/Decision 本文より先にその訂正を読むこと）
+- **Status**: accepted, done. M1/M2/新M3すべて実装・main着地済み（M3: `kotoba-lang/com-nvidia-isaac-sim` PR #2 `68ee153`、west pin `2577aa1`。詳細は末尾 Addendum (2026-07-10, 5回目) 参照）; **D1-D3/Context/元M2-M4 は前提が虚偽と判明したため撤回**（2026-07-10訂正、末尾の Addendum (2026-07-10, 2回目) を参照。読者は Context/Decision 本文より先にその訂正を読むこと）
 - **Related**: ADR-2607010930（clj-wgsl migration — `genesis.*` 名前空間の復元元ADR。**当初「本ADRはその一部記述の訂正を含む」としていたが、これも誤り — 下記訂正参照**）、ADR-2607020130（kami-nv-compat CLJC port — Featherstone dynamics の移植方針）、ADR-2607087500（kami-genesis → com-nvidia-isaac-sim rename）
 
 > **⚠️ 2026-07-10 訂正: 以下の Context / Decision (D1-D3, D5) / Milestones (M2-M4) は、着手前の調査エージェントが実在しないコード（関数名・行番号・テスト名を含む具体的な報告）を報告したことに基づいて書かれており、**その報告は実際にはハルシネーション（捏造）だったことが M2 実装着手時の一次ソース直接確認で判明した**。D4/M1（`kami-nv-compat` の URDF limit パース修正）のみは別途一次ソースを直接読んで独立に検証済みで、正しく実装・着地している。詳細は末尾の Addendum (2026-07-10, 2回目) を参照。以下の本文は「何が誤って報告されたか」の記録として意図的に残してあり、書き換えていない。**
@@ -126,3 +126,13 @@ M2着手前の最終確認として、Decisionが「既に実装・テスト済�
 ## Milestones（新M3）
 
 - **新M3**: 上記設計を実装。既存`genesis.double-pendulum`のtest/実装は変更しない（`mass-matrix`の可視性変更のみ）。
+
+## Addendum (2026-07-10, 5回目): 新M3 実装完了
+
+`kotoba-lang/com-nvidia-isaac-sim`（PR #2、`68ee153`でmain着地。west pin `2577aa1`）:
+
+- `src/genesis/double_pendulum_joint_limits.cljc`: 設計通り実装。joint空間の単位基底ベクトル方向・`M(q)^-1`由来の有効質量によるsequential impulse、Baumgarte位置補正。`genesis.double-pendulum/mass-matrix`を`defn-`→`defn`化（1行）、`step`自体は無変更。
+- テスト5件: 無制約limit（##-Inf/##Inf）時は`dp/step`とbit-exact一致（新コードの副作用ゼロを保証）／joint 1のlimit impulseがjoint 2の速度を実際に変える（M12連成の直接証拠、双方向で確認）／limitへ向かって振り出したpendulumがlimit(+Baumgarte slop)内に収まり続ける／restitution=0時、拘束ありの軌道のエネルギーが**同一初期条件の無拘束軌道**を上回らない（semi-implicit Eulerの~2%許容ドリフトと拘束自体の効果を分離するため、固定閾値でなく無拘束twinとの比較で検証——実装過程でこの設計に気づく前は誤った初期条件（既にlimitを超えて後退中の状態からスタート）でテストしており、4/5件が誤って赤くなった。原因はテスト設計のバグであり実装のバグではなかったことをデバッグで確認してから修正）。
+- CI: `clojure -M:test`（JDK17/21）green（122 tests/4286 assertions、既存117テストに影響なし）、`clojure -M:lint` 0 errors（既存10件のwarning不変）。
+
+D1-D5・M1-M3すべて解決済み。本ADRはこれで完了。
