@@ -454,7 +454,9 @@
       ;; capital-equipment/general-purpose-machinery vertical alongside
       ;; 2822/2824/2813 in the classic heavy-industry cluster (distinct
       ;; from the transport-equipment sub-cluster of 2811/2910/3011).
-      (is (= 124 (:implemented m))))))
+      ;; 125 = 124 + cloud-itonami-isic-4669, promoted directly from
+      ;; :spec -- waste/scrap wholesale trading actor.
+      (is (= 125 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
