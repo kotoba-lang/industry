@@ -1,6 +1,6 @@
 [
  {:progress/schema-note "cloud-itonami-lei rollout progress tracker, per ADR-2607110300. One row per cloud-itonami-isic-<code> industry. :industry/applicable? true means a coherent real global/listed top-3-company concept exists for this ISIC vertical; false means fragmented/local/non-corporate and this vertical is deliberately skipped for the lei-catalog family (the isic blueprint itself is unaffected). This file is the resume point for the next /loop iteration."
-  :progress/resume-from "isic-6920 (accounting, bookkeeping and auditing activities; tax consultancy) -- first :industry/applicable? true :industry/status :pending row after isic-6630/isic-6810/isic-6820 (all now :done); isic-6910 is skipped (:applicable? false, already its own dedicated actor per cloud-itonami-M6910). This tick (single-execution fork per user directive, no sub-forking) did isic-6630 fund management (BlackRock + T. Rowe Price, 2/3 -- Vanguard/State Street ToS pages undiscoverable), isic-6810 real estate own-account (Simon Property Group + Public Storage, 2/3 -- Prologis bot-blocked), and isic-6820 real estate fee/contract basis (JLL + Cushman & Wakefield, 2/3 -- CBRE bot-blocked). Cumulative company-repo count must be recomputed fresh each tick via gh repo list cloud-itonami --limit 300 --json name filtered to cloud-itonami-lei-* -- do not trust a prior ticks stated running total (freshly verified this tick: 76)."
+  :progress/resume-from "isic-7310 (advertising) -- first :industry/applicable? true :industry/status :pending row after isic-6920/isic-7020/isic-7110/isic-7120 (all now :done); isic-7010/isic-7210/isic-7220 correctly skipped (:applicable? false). This tick (single-execution fork, no sub-forking) did isic-6920 accounting/tax (Xero only, 1/3 -- Big Four excluded as ambiguous member-firm networks, Intuit/H&R Block/Wolters Kluwer/Thomson Reuters/Sage all failed), isic-7020 management consultancy (Booz Allen Hamilton only, 1/3 -- Big Three are private partnerships not attempted, Accenture excluded as ambiguous/retired GLEIF record, FTI/Korn Ferry ToS undiscoverable), isic-7110 architecture/engineering (AECOM + Jacobs Solutions Inc., 2/3 -- WSP Global Cloudflare-blocked), and isic-7120 technical testing (Bureau Veritas only via :legal-notice doc-type, 1/3 -- SGS excluded as a PDF-directory not a single document, Intertek 404'd). Cumulative company-repo count must be recomputed fresh each tick via gh repo list cloud-itonami --limit 300 --json name filtered to cloud-itonami-lei-* -- do not trust a prior tick's stated running total (freshly verified this tick: 81)."
   :db/id -1}
  {:industry/code "isic-0162"
   :industry/description ""
@@ -1333,8 +1333,20 @@
  {:industry/code "isic-6920"
   :industry/description "Open Business Blueprint for ISIC Rev.5 6920: accounting, bookkeeping and auditing activities"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Big Four (Deloitte/PwC/KPMG/EY) excluded -- GLEIF-searchable 'bare name' records are all local
+  member-firm subsidiaries (FR/MT/etc.), not a single unambiguous global parent entity, same category as the
+  Chevron/CRRC exclusion precedent. Intuit (JS-rendered SPA, no server-rendered ToS text), H&R Block (403),
+  Wolters Kluwer N.V. (403), Thomson Reuters Corporation (ToS page undiscoverable after 2 attempts), Sage Group plc
+  (Cloudflare-blocked) all excluded. Landed 1/3 with Xero Limited only."
+  :industry/companies
+  [{:company/legal-name "Xero Limited"
+    :company/lei "254900UG5D8YST164N14"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Xero"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-254900ug5d8yst164n14"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.xero.com/legal/terms/"}]}
  {:industry/code "isic-7010"
   :industry/description "Open Business Blueprint for ISIC Rev.5 7010: activities of head offices"
   :industry/applicable? false
@@ -1344,18 +1356,59 @@
  {:industry/code "isic-7020"
   :industry/description "Open Business Blueprint for ISIC Rev.5 7020: management consultancy activities"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Big Three strategy consultancies (McKinsey/BCG/Bain) are private partnerships with no clean
+  public parent-entity GLEIF record, not attempted. Accenture's GLEIF 'bare name' records are all
+  LAPSED/local subsidiaries or the historical Accenture plc entity which is INACTIVE/RETIRED -- excluded, same
+  ambiguous-parent-entity category as isic-6920's Big Four exclusion. FTI Consulting (ToS page undiscoverable) and
+  Korn Ferry (only a stale 2012 PDF, current redirect broken) both excluded. Landed 1/3 with Booz Allen Hamilton
+  Holding Corporation only."
+  :industry/companies
+  [{:company/legal-name "Booz Allen Hamilton Holding Corporation"
+    :company/lei "529900JPV47PIUWMA015"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Booz Allen Hamilton"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-529900jpv47piuwma015"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.boozallen.com/tools/footer-navigation/terms-of-use.html"}]}
  {:industry/code "isic-7110"
-  :industry/description ""
+  :industry/description "Architectural and engineering activities and related technical consultancy (ISIC Rev.5 7110)"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "WSP Global (Groupe WSP Global Inc., real clean GLEIF parent) excluded -- Cloudflare JS-challenge
+  blocked, not evaded. Landed 2/3 with AECOM and Jacobs Solutions Inc. (verified current legal name post rename
+  from Jacobs Engineering Group Inc., confirmed by the ToS text itself)."
+  :industry/companies
+  [{:company/legal-name "AECOM"
+    :company/lei "0EEB8GF0W0NPCIHZX097"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=AECOM"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-0eeb8gf0w0npcihzx097"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.aecom.com/terms-use"}
+   {:company/legal-name "Jacobs Solutions Inc."
+    :company/lei "254900E3KHXCC2C8K272"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Jacobs Solutions"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-254900e3khxcc2c8k272"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.jacobs.com/policies/privacy-policy"}]}
  {:industry/code "isic-7120"
   :industry/description "Open Business Blueprint for ISIC Rev.5 7120: technical testing and analysis"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "SGS SA excluded -- its terms page is a directory of dozens of per-country/per-service PDF
+  documents, not a single coherent document to archive. Intertek Group plc excluded (404, no discoverable terms
+  path). Landed 1/3 with Bureau Veritas, archived as :legal-notice (the fetched page is Bureau Veritas' genuine
+  legal-notice document with real company registration/SIRET info, not a dedicated consumer ToS)."
+  :industry/companies
+  [{:company/legal-name "Bureau Veritas"
+    :company/lei "969500TPU5T3HA5D1F11"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Bureau Veritas"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-969500tpu5t3ha5d1f11"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.bureauveritas.com/legal-notice"}]}
  {:industry/code "isic-7210"
   :industry/description "Open Business Blueprint for ISIC Rev.5 7210: R&D on natural sciences and engineering"
   :industry/applicable? false
