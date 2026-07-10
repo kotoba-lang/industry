@@ -1,6 +1,6 @@
 [
  {:progress/schema-note "cloud-itonami-lei rollout progress tracker, per ADR-2607110300. One row per cloud-itonami-isic-<code> industry. :industry/applicable? true means a coherent real global/listed top-3-company concept exists for this ISIC vertical; false means fragmented/local/non-corporate and this vertical is deliberately skipped for the lei-catalog family (the isic blueprint itself is unaffected). This file is the resume point for the next /loop iteration."
-  :progress/resume-from "isic-3011 (shipbuilding) -- first :industry/status :pending row after isic-0610/isic-0620/isic-1920/isic-2011/isic-2610/isic-2660, all now :done. Open retry candidates needing a JS-capable fetch path (not curl-reachable as plain HTTP), all optional, not blocking: isic-0610 Shell plc + Saudi Aramco; isic-0620 Cheniere Energy; isic-1920 Marathon Petroleum + HF Sinclair + PBF Energy; isic-2011 Dow Inc.; isic-2610 TSMC + Samsung Electronics + Intel + Qualcomm + Micron + NXP + onsemi + STMicroelectronics (this vertical is unusually bot-hostile -- only 1/9 candidates succeeded); isic-2660 Koninklijke Philips N.V. (geo-redirect artifact, not bot-blocking)."
+  :progress/resume-from "isic-3030 (manufacture of air and spacecraft and related machinery) -- first :industry/status :pending row after isic-0610/isic-0620/isic-1920/isic-2011/isic-2610/isic-2660/isic-3011/isic-3020, all now :done. Open retry candidates needing a JS-capable fetch path or better entity resolution, all optional, not blocking: isic-0610 Shell plc + Saudi Aramco; isic-0620 Cheniere Energy; isic-1920 Marathon Petroleum + HF Sinclair + PBF Energy; isic-2011 Dow Inc.; isic-2610 TSMC + Samsung Electronics + Intel + Qualcomm + Micron + NXP + onsemi + STMicroelectronics; isic-2660 Koninklijke Philips N.V.; isic-3011 Samsung Heavy Industries + Hanwha Ocean; isic-3020 CRRC Corporation Limited (no parent LEI) + Stadler Rail AG (JS-rendered)."
   :db/id -1}
  {:industry/code "isic-0162"
   :industry/description ""
@@ -250,13 +250,63 @@
  {:industry/code "isic-3011"
   :industry/description "ISIC 3011 shipbuilding open business blueprint — Shipyard Advisor ⊣ Shipyard Governor"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Top-3 by global shipbuilding scale intended (HD Hyundai Heavy Industries, Samsung Heavy Industries, Hanwha Ocean -- the Korean 'Big Three'), but the latter two's official domains (shi.samsung.co.kr / samsungshi.com, hanwhaocean.com) were unreachable or JS-rendered-empty from this environment. Substituted Mitsubishi Heavy Industries, Ltd. (Japan) as the second real company. Neither company publishes a general consumer ToS -- both landed as :privacy-policy doc-type, the only public legal document their sites expose (B2B heavy industry)."
+  :industry/companies
+  [{:company/legal-name "HD Hyundai Heavy Industries Co., Ltd."
+    :company/lei "988400CAR8W9URQLGF30"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[fulltext]=Hyundai Heavy Industries"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-988400car8w9urqlgf30"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://hd-hhi.com/en/etc/privacy-policy"
+    :company/note "doc-type :privacy-policy, not :terms-of-service -- no general ToS page discoverable"}
+   {:company/legal-name "Mitsubishi Heavy Industries, Ltd."
+    :company/lei "353800TJ98PCAZROVE69"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[fulltext]=Mitsubishi Heavy Industries"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-353800tj98pcazrove69"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.mhi.com/privacy.html"
+    :company/note "doc-type :privacy-policy, not :terms-of-service -- no general ToS page discoverable"}
+   {:company/legal-name "Samsung Heavy Industries Co., Ltd."
+    :company/lei "988400OSK0T9LDTWNC20"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[fulltext]=Samsung Heavy Industries"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but shi.samsung.co.kr connection unreachable and samsungshi.com homepage has no server-rendered terms/privacy link (JS-rendered nav)"}
+   {:company/legal-name "Hanwha Ocean Co., Ltd."
+    :company/lei "984500ACAD2B57CCT437"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[fulltext]=Hanwha Ocean"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but hanwhaocean.com homepage has no server-rendered terms/privacy link (JS-rendered nav); common URL-path guesses all 404"}]}
  {:industry/code "isic-3020"
   :industry/description "Community Railway Rolling Stock Manufacturing — OSS Open Business Blueprint (ISIC 3020)"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Top-3 by global rolling-stock scale intended (CRRC, Alstom, Stadler Rail), but CRRC Corporation Limited (China A+H listed parent) has no GLEIF-registered parent-entity LEI (only a subsidiary, Zhuzhou CRRC Times Electric Co. Ltd., is registered) so it was excluded per this catalog's no-subsidiary-substitution policy; Stadler Rail AG's legal-notice page is a JS-rendered SPA shell (no server-rendered body text). Landed with 2/3: Alstom SA, Westinghouse Air Brake Technologies Corporation (Wabtec)."
+  :industry/companies
+  [{:company/legal-name "Westinghouse Air Brake Technologies Corporation"
+    :company/lei "06BTX5UWZD0GQ5N5Y745"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Westinghouse Air Brake Technologies"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-06btx5uwzd0gq5n5y745"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.wabteccorp.com/terms-of-use"}
+   {:company/legal-name "Alstom SA"
+    :company/lei "96950032TUYMW11FB530"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Alstom"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-96950032tuymw11fb530"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.alstom.com/legal-notice"}
+   {:company/legal-name "CRRC Corporation Limited"
+    :company/status :lei-lookup-failed
+    :company/note "no GLEIF record for the parent entity itself, only Zhuzhou CRRC Times Electric Co. Ltd. (529900PLNH7NQLN00B53, a subsidiary) and trading/regional subsidiaries; not fabricated, not substituted with a subsidiary LEI"}
+   {:company/legal-name "Stadler Rail AG"
+    :company/lei "506700781XDET0A89669"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[fulltext]=Stadler Rail"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but /legal-notice page returned only a JS-rendered SPA shell (title only, no body text)"}]}
  {:industry/code "isic-3030"
   :industry/description ""
   :industry/applicable? true
