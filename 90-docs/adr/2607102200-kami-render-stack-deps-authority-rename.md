@@ -734,3 +734,54 @@ resolve; no content rewire needed this wave.
 | kami-mangaka-page | `3e5ccbf6cf8ca28f9cafda6c6cb28b70fb4b59a5` |
 | kami-mangaka-render | `3777d04d88071ab118f0623553a3ecfe52e33d26` |
 | com-etzhayyim-sip | `44bdf25fba664907d67ab78b925d5a17ed553d1f` |
+
+## Addendum 14 (2026-07-10) — never suffix repo names with `-clj`
+
+### Rule (standing)
+
+**Do not put `-clj` at the end of a GitHub repo / west project / package name.**
+
+Clojure is the default language of this ecosystem; encoding it in the repo
+name is noise and collides with the real role of the package. Prefer a
+**role** name when the short name is already taken:
+
+| bad (language tag) | good (role / domain) |
+|---|---|
+| `foo-clj` | `foo` |
+| `kami-engine-clj` | `kami-engine-guest` (guest WASM compiler; `kami-engine` is the asset monorepo) |
+| `kami-mangaka-scene-clj` | `kami-mangaka-scene-author` (EDN authoring; `kami-mangaka-scene` is the facade port) |
+
+Allowed related forms that are **not** this rule:
+
+- file extensions: `.clj` / `.cljc` / `.cljs`
+- Clojure namespaces that already use a historical token (e.g. `kotoba.engine-clj`) — rename only when touching that API
+- contract packages that literally mean **CLJC** portability (`*-cljc-contract`) — different token
+
+New repos created without this rule are a process bug; fix before west register.
+
+### Renames this wave (GitHub redirect kept)
+
+| before | after |
+|---|---|
+| `kami-engine-clj` | **`kami-engine-guest`** |
+| `kami-mangaka-scene-clj` | **`kami-mangaka-scene-author`** |
+| `kotoba-issue-clj` | **`kotoba-issue`** |
+| `kotoba-ledger-clj` | **`kotoba-ledger`** |
+| `kotoba-procedure-clj` | **`kotoba-procedure`** |
+| `sha256d-clj` | **`sha256d`** |
+
+Consumers updated: `local-manimani`, `cloud-itonami` (deps coords).  
+`path-overrides` maps old paths → new for west/local checkouts.
+
+### Pins
+
+| repo | tip |
+|---|---|
+| kami-engine-guest | `86a9b795ceac9c064f364727802d9901319b58b1` |
+| kami-mangaka-scene-author | `8abd2668baa51060ae301b2b8e6f051b3d684430` |
+| kotoba-issue | `676aee4514df90c9313578de9688bdf230021941` |
+| kotoba-ledger | `11b1ab84a1dcb4c0594944d5d82ab732aa62f031` |
+| kotoba-procedure | `5a7a0493cfb1cc7b91b56af6be27971070ffb410` |
+| sha256d | `0ebf167fb19b45175b1fa84c989db5ecb624b302` |
+| local-manimani | `10509a44b9082fe1cec2b6c54236b5abfafd4832` |
+| cloud-itonami | `e1366d9e43d30a0ba8537afeb32979ef8a506cdb` |
