@@ -441,8 +441,10 @@
       ;; pump/compressor/valve-manufacturing actor, a third capital-
       ;; equipment/general-purpose-machinery vertical alongside 2822/
       ;; 2824 in the classic heavy-industry cluster (distinct from the
-      ;; transport-equipment sub-cluster of 2811/2910/3011).
-      (is (= 122 (:implemented m))))))
+      ;; transport-equipment sub-cluster of 2811/2910/3011). 123 = 122 +
+      ;; cloud-itonami-isic-4641, promoted directly from :spec --
+      ;; textile/clothing/footwear wholesale trading actor.
+      (is (= 123 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
