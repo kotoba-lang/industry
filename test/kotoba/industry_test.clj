@@ -30,7 +30,10 @@
     (is (some #{:cae} (industry/required-technologies "2410"))))
   (testing "motor vehicle manufacturing requires robotics and CAE"
     (is (some #{:robotics} (industry/required-technologies "2910")))
-    (is (some #{:cae} (industry/required-technologies "2910")))))
+    (is (some #{:cae} (industry/required-technologies "2910"))))
+  (testing "structural metal products manufacturing requires robotics and CAE"
+    (is (some #{:robotics} (industry/required-technologies "2511")))
+    (is (some #{:cae} (industry/required-technologies "2511")))))
 
 (deftest readiness-reports-missing-tech
   (let [r (industry/readiness "8691" #{:identity :forms})]
@@ -345,6 +348,8 @@
     (is (= :implemented (industry/maturity "2410"))))
   (testing "a hundred-eleventh implemented actor (cloud-itonami-isic-2910, motor-vehicle actor) is also :implemented"
     (is (= :implemented (industry/maturity "2910"))))
+  (testing "a hundred-eighteenth implemented actor (cloud-itonami-isic-2511, structural-metal-products actor; fifth classic heavy-industry manufacturing vertical after 2410/2811/2910/3011) is also :implemented"
+    (is (= :implemented (industry/maturity "2511"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -402,8 +407,11 @@
       ;; cloud-itonami-isic-4630, promoted directly from :spec --
       ;; food/beverage/tobacco wholesale trading actor. 117 = 116 +
       ;; cloud-itonami-isic-7820, promoted directly from :spec --
-      ;; temporary-employment-agency actor.
-      (is (= 117 (:implemented m))))))
+      ;; temporary-employment-agency actor. 118 = 117 +
+      ;; cloud-itonami-isic-2511, promoted directly from :spec --
+      ;; structural-steel-fabrication actor, fifth classic
+      ;; heavy-industry manufacturing vertical after 2410/2811/2910/3011.
+      (is (= 118 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
