@@ -1,6 +1,6 @@
 [
  {:progress/schema-note "cloud-itonami-lei rollout progress tracker, per ADR-2607110300. One row per cloud-itonami-isic-<code> industry. :industry/applicable? true means a coherent real global/listed top-3-company concept exists for this ISIC vertical; false means fragmented/local/non-corporate and this vertical is deliberately skipped for the lei-catalog family (the isic blueprint itself is unaffected). This file is the resume point for the next /loop iteration."
-  :progress/resume-from "isic-4911 (passenger rail transport, interurban) -- first :industry/status :pending row after isic-0610/0620/1920/2011/2610/2660/3011/3020/3030/3510/3812/4711/4730, all now :done. isic-4711 (grocery/supermarket) and isic-4730 (automotive fuel retail) were unusually bot-hostile consumer-retail verticals: isic-4711 landed 1/7 real candidates (only Walmart's corporate.walmart.com/policies hub was fetchable; Costco/Kroger/Target/Tesco/Ahold Delhaize all failed, Carrefour SA excluded for no parent-entity GLEIF record), isic-4730 landed 0/3 (Couche-Tard/Casey's/Murphy USA all bot-blocked or 404). Future ticks hitting consumer-retail/e-commerce ISIC codes should expect a similarly low hit rate with plain curl and may want to budget for a JS-capable fetch path rather than repeating plain-curl retries. Open retry candidates needing a JS-capable fetch path or better entity resolution, all optional, not blocking: isic-0610 Shell plc + Saudi Aramco; isic-0620 Cheniere Energy; isic-1920 Marathon Petroleum + HF Sinclair + PBF Energy; isic-2011 Dow Inc.; isic-2610 TSMC + Samsung Electronics + Intel + Qualcomm + Micron + NXP + onsemi + STMicroelectronics; isic-2660 Koninklijke Philips N.V.; isic-3011 Samsung Heavy Industries + Hanwha Ocean; isic-3020 CRRC Corporation Limited (no parent LEI) + Stadler Rail AG (JS-rendered); isic-3030 Airbus SE (Incapsula bot-challenge); isic-3510 National Grid plc + Duke Energy Corporation (bot-blocked); isic-3812 Waste Management Inc. + Stericycle Inc. (bot-blocked) + Republic Services Inc. (JS-rendered SPA); isic-4711 Costco + Kroger + Target + Tesco + Ahold Delhaize; isic-4730 Couche-Tard + Casey's + Murphy USA."
+  :progress/resume-from "isic-5011 (sea and coastal passenger water transport) -- first :industry/status :pending row after isic-0610 through isic-4950 plus isic-4912, all now :done (isic-4920 remains :skipped as before). This tick did isic-4911, isic-4912, isic-4950 (8 new company repos total this tick: Deutsche Bahn AG, Trenitalia S.p.A., Canadian National Railway, Enbridge, Kinder Morgan, Williams Companies -- 6 done + 2 tos-fetch-failed exclusions already counted in their industry blocks). isic-5020 (water freight tanker) is still :pending and comes right after isic-5011 in ISIC-ascending order -- do isic-5011 then isic-5020 next, in that order, before moving further down the list. Cumulative company-repo count must be recomputed fresh each tick (do not trust a prior tick's stated running total -- verify via gh repo list cloud-itonami --limit 300 --json name filtered to cloud-itonami-lei-*). Open retry candidates needing a JS-capable fetch path or better entity resolution, all optional, not blocking: isic-0610 Shell plc + Saudi Aramco; isic-0620 Cheniere Energy; isic-1920 Marathon Petroleum + HF Sinclair + PBF Energy; isic-2011 Dow Inc.; isic-2610 TSMC + Samsung Electronics + Intel + Qualcomm + Micron + NXP + onsemi + STMicroelectronics; isic-2660 Koninklijke Philips N.V.; isic-3011 Samsung Heavy Industries + Hanwha Ocean; isic-3020 CRRC Corporation Limited (no parent LEI) + Stadler Rail AG (JS-rendered); isic-3030 Airbus SE (Incapsula bot-challenge); isic-3510 National Grid plc + Duke Energy Corporation (bot-blocked); isic-3812 Waste Management Inc. + Stericycle Inc. (bot-blocked) + Republic Services Inc. (JS-rendered SPA); isic-4711 Costco + Kroger + Target + Tesco + Ahold Delhaize; isic-4730 Couche-Tard + Casey's + Murphy USA; isic-4911 SNCF (403 bot-blocked); isic-4912 Union Pacific (terms page undiscoverable) + CSX (site-wide 403)."
 
   :db/id -1}
  {:industry/code "isic-0162"
@@ -547,13 +547,53 @@
  {:industry/code "isic-4911"
   :industry/description "Open Business Blueprint for ISIC Rev.5 4911: passenger rail transport, interurban (robotics-premised)"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Landed 2/3: Deutsche Bahn AG, Trenitalia S.p.A. SNCF (Societe Nationale SNCF, real parent-entity LEI verified) excluded -- sncf.com/sncf-connect.com returned 403 on every attempted terms/legal-mentions URL (bot-blocked), one alternate URL tried, not fabricated. Note: Amtrak (US) and East Japan/Central Japan Railway searched but no matching parent-entity GLEIF record found via name search (only unrelated same-named entities for Amtrak; JR East/JR Central returned zero GLEIF matches) -- not substituted with a guess."
+  :industry/companies
+  [{:company/legal-name "Deutsche Bahn AG"
+    :company/lei "52990063S23N13HU4E98"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Deutsche Bahn"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-52990063s23n13hu4e98"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.bahn.de/agb"
+    :company/note "doc-type :terms-of-carriage (Befoerderungsbedingungen), not a generic consumer ToS -- honestly labeled"}
+   {:company/legal-name "Trenitalia S.p.A."
+    :company/lei "549300M8OMBYLAW8P692"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Trenitalia"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300m8ombylaw8p692"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.trenitalia.com/it/informazioni/condizioni-generali-di-trasporto.html"
+    :company/note "doc-type :terms-of-carriage (Condizioni Generali di Trasporto)"}
+   {:company/legal-name "Societe Nationale SNCF"
+    :company/lei "969500A4MXJ3ESPHK698"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=SNCF"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but sncf.com/en/terms-of-use redirects to a generic group homepage and every sncf-connect.com legal/CGU URL tried returned HTTP 403 (bot-blocked); no repo created, no bypass attempted"}]}
  {:industry/code "isic-4912"
   :industry/description "Community Freight Rail Transport — OSS Open Business Blueprint (ISIC 4912)"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Landed 1/3: Canadian National Railway Company only. Union Pacific Corporation (LEI verified) excluded -- terms page undiscoverable via direct-guess or homepage-footer scan (only a /about-us/privacy link found). CSX Corporation (LEI verified) excluded -- entire site (including homepage) returns HTTP 403 bot-block. Canadian Pacific Kansas City had no matching parent-entity GLEIF record via name search and no terms link discoverable either -- not substituted with a guess."
+  :industry/companies
+  [{:company/legal-name "Canadian National Railway Company"
+    :company/lei "3SU7BEP7TH9YEQOZCS77"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Canadian National Railway"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-3su7bep7th9yeqozcs77"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.cn.ca/en/terms-conditions/"}
+   {:company/legal-name "Union Pacific Corporation"
+    :company/lei "549300LMMRSZZCZ8CL11"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Union Pacific"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but no terms-of-use page discoverable via direct guess (404) or homepage-footer scan (only privacy link found); no repo created"}
+   {:company/legal-name "CSX Corporation"
+    :company/lei "549300JVQR4N1MMP3Q88"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=CSX Corporation"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but entire site including homepage returns HTTP 403 bot-block; no bypass attempted, no repo created"}]}
  {:industry/code "isic-4920"
   :industry/description ""
   :industry/applicable? false
@@ -563,8 +603,32 @@
  {:industry/code "isic-4950"
   :industry/description "Transport via pipeline (ISIC Rev.5 4950) — :pipeline-integrity-governor. Open Business Blueprint, cloud-itonami fleet."
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Landed 3/3: Enbridge Inc., Kinder Morgan Inc., The Williams Companies Inc. -- all real parent-entity GLEIF-verified LEIs, all real fetchable policy/terms pages found via homepage footer scan after direct-guessed URLs 404'd."
+  :industry/companies
+  [{:company/legal-name "Enbridge Inc."
+    :company/lei "98TPTUM4IVMFCZBCUR27"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Enbridge Inc"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-98tptum4ivmfczbcur27"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.enbridge.com/termsofuse"}
+   {:company/legal-name "Kinder Morgan, Inc."
+    :company/lei "549300WR7IX8XE0TBO16"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Kinder Morgan"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300wr7ix8xe0tbo16"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.kindermorgan.com/Legal"
+    :company/note "source page is titled Legal Disclaimer, closest genuinely-published general terms document; labeled :terms-of-service honestly as the closest real category, not a guess at content"}
+   {:company/legal-name "The Williams Companies, Inc."
+    :company/lei "D71FAKCBLFS2O0RBPG08"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Williams Companies"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-d71fakcblfs2o0rbpg08"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.williams.com/vendor-terms-conditions/"
+    :company/note "only a Vendor Terms & Conditions page was discoverable (no general consumer ToS on this B2B/infrastructure site); doc-type recorded as :vendor-terms-and-conditions, not mislabeled as general ToS"}]}
  {:industry/code "isic-5011"
   :industry/description "Open Business Blueprint for ISIC Rev.5 5011: sea and coastal passenger water transport (robotics-premised)"
   :industry/applicable? true
