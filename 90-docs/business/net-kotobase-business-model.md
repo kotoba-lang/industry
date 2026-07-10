@@ -71,6 +71,7 @@
 - 観測 (signal): kotobase.net 実測 5475 req/7d・381 uniques(日次和)・うち4xx probe 83%(24h)、workers 5521 inv/7d、Stripe active subs 0
 - 観測 (signal): kotobase.net 実測 5486 req/7d・383 uniques(日次和)・うち4xx probe 84%(24h)、workers 5531 inv/7d、Stripe active subs 0
 - 観測 (signal): kotobase.net 実測 5494 req/7d・383 uniques(日次和)・うち4xx probe 84%(24h)、workers 5540 inv/7d、Stripe active subs 0
+- 観測 (signal): kotobase.net 実測 5509 req/7d・386 uniques(日次和)・うち4xx probe 82%(24h)、workers 5573 inv/7d、Stripe active subs 0
 
 ## Customer Segments
 
@@ -148,6 +149,7 @@
 - GTM 再定義: 実測 top page は /llms.txt・/.well-known/did.json・/ipfs/* (4xx probe 83%) = 観衆は human でなく AI agent/crawler。human signup funnel (0/295=0%) は category error。正しい転換は agent-originated x402 payment (nexus facilitator 経由) — llms.txt に x402 catalog を明示し agent 決済を計測せよ
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /llms-full.txt 35 · /llms.txt 33 · /_app/meta 22 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 21 · /.well-known/did.json 21 | 4xx(probe) 84% · 5xx 1%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /llms-full.txt 34 · /llms.txt 32 · /_app/meta 22 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 21 · /.well-known/did.json 20 | 4xx(probe) 84% · 5xx 1%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /llms.txt 32 · /_app/meta 22 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 21 · /llms-full.txt 21 · /.well-known/did.json 21 | 4xx(probe) 82% · 5xx 2%
 
 ## Revenue Streams
 
