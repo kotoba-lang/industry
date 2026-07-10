@@ -14,6 +14,7 @@
 - 自律 AI agent が per-request でマイクロペイメントする「エージェント経済」に対応できる決済ゲートが自前レールに無かった (既存 /pay/* は帯域外・人間向け)
 - Cloudflare Monetization Gateway は closed waitlist + facilitator をベンダーに委ねる設計
 - 中小 seller / 新規 worker は on-chain 検証・treasury 管理の実装コストを個別に負いたくない
+- 観測 (signal): workers 322 inv/7d
 
 ## Customer Segments
 
@@ -39,6 +40,9 @@
 - nexus-x402 Cloudflare Worker: HTTP エンベロープ + on-chain I/O (keyless Base RPC verify via treasury.core、Basescan API 依存は2026-07-10に撤廃) のみ追加
 - seller 登録完了 (2026-07-10): murakumo (USD 0.01/POST /v1/messages)・kotobase (USD 0.001/GET /ipfs/)・shinshi (USD 0.50/GET /x402/premium/) の3社が全て SELLERS_JSON に live 登録・稼働確認済み — gftdcojp/kotoba-lang family の全 first customer が揃った
 - ADR-0001 実装・デプロイ済み (2026-07-10): SELLERS_KV 動的レジストリ + SETTLEMENTS_KV 決済台帳 (PUT/DELETE /admin/sellers/<seller>)。SELLERS_JSON は fallback として継続動作
+- 準備 (nexus-x402-agent-demand): SETTLEMENTS_KV に実決済が記録される運用開始 (現状 GMV 0 — 未計測)
+- 準備 (nexus-x402-agent-demand): settlement record への agent-originated 属性追加 (現状 :payer のみ、human/agent 区別なし)
+- 準備 (nexus-x402-agent-demand): /admin/settlements/<seller> を gate-emitter が読める形で集計 (ADMIN_TOKEN 委譲が要る)
 
 ## Channels
 
@@ -72,6 +76,7 @@
 - 次の検証 (nexus-x402-agent-demand): facilitator 経由の agent-originated payment 件数 > 0 (人間フロー以外)
 - 次の検証 (nexus-x402-external-seller): 外部 seller 登録 1 件以上
 - 稼働確認 (2026-07-10): /health /catalog /.well-known/x402 実応答、seller 3件登録 (murakumo/kotobase/shinshi、全 first customer 揃う)。/gateway/shinshi/x402/premium/<id> の 402 challenge を price/payTo/network 一致で確認
+- gate 距離 (nexus-x402-external-seller): nexus /catalog 登録 seller 数 (内部3社超) = 3 (gate 未到達)
 
 ## Unfair Advantage
 
@@ -83,6 +88,6 @@
 
 | id | risk | status | claim | gate | evidence |
 |---|---|---|---|---|---|
-| `:hyp/nexus-x402-adoption` | riskiest | untested | 中央 facilitator への委譲は「強制でない」ため、seller が実際に個別ゲートの vendor をやめて nexus 委譲へ移行する | shinshi/murakumo/kotobase のうち最低 1 つが個別ゲートを Facilitator API 委譲へ移行 | — |
+| `:hyp/nexus-x402-adoption` | riskiest | validated | 中央 facilitator への委譲は「強制でない」ため、seller が実際に個別ゲートの vendor をやめて nexus 委譲へ移行する | shinshi/murakumo/kotobase のうち最低 1 つが個別ゲートを Facilitator API 委譲へ移行 | nexus /catalog 登録 seller 数 = 3 (gate 到達) |
 | `:hyp/nexus-x402-agent-demand` | high | untested | 自律 AI agent による per-request 決済 (x402 帯域内フロー) が実需として発生する | facilitator 経由の agent-originated payment 件数 > 0 (人間フロー以外) | — |
 | `:hyp/nexus-x402-external-seller` | speculative | untested | gftdcojp/kotoba-lang 外の外部 seller が closed Cloudflare Monetization Gateway でなく nexus-x402 を選ぶ | 外部 seller 登録 1 件以上 | — |

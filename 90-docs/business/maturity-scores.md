@@ -20,7 +20,7 @@
 | cloud-manimani | 88.0 | 43.3 | 5.0 | revenue=0.0, users=1.0 |
 | cloud-itonami | 56.0 | 43.3 | 0.0 | revenue=0.0, validation=0.0 |
 | app-aozora-yoro | 52.0 | 40.0 | 0.0 | revenue=0.0, validation=0.0 |
-| nexus-x402 | 40.0 | 0.0 | 0.0 | defensibility=0.0, revenue=0.0 |
+| nexus-x402 | 70.7 | 40.0 | 1.7 | revenue=0.0, users=0.0 |
 
 ## 次元別詳細
 
@@ -92,6 +92,7 @@
 
 ### nexus-x402
 
-- BMC: completeness=5.0, hypothesis=5.0, validation=0.0, pricing=0.0, grounding=0.0
-- YC: acute-problem=0.0, wedge=0.0, tenx=0.0, founder-fit=0.0, distribution=0.0, defensibility=0.0, launched=0.0, users=0.0, revenue=0.0
+- BMC: completeness=5.0, hypothesis=5.0, validation=1.7, pricing=1.0, grounding=5.0
+- YC: acute-problem=4.0, wedge=4.0, tenx=3.0, founder-fit=5.0, distribution=1.0, defensibility=3.0, launched=2.0, users=0.0, revenue=0.0
+- note: 自前 x402 決済 facilitator/gateway (x402.nexus、鍵ゼロ・マルチ seller)。実測 (2026-07-10): /health /catalog 実応答、murakumo・kotobase・shinshi の gftdcojp/kotoba-lang family 全 3 first-customer seller が live 登録・稼働確認済み (grounding 5)。ゲートウェイ核 pay.facilitator は landed (19 tests)、ADR-0001 (SELLERS_KV 動的レジストリ + SETTLEMENTS_KV 決済台帳) も実装・デプロイ済み。ただし launched=2 (internal): repo は private、self-serve onboarding 未実装、外部 seller/agent はゼロ (users 0)。`nexus.worker/verdict` は :fee-frac 0.0 固定 — facilitator 自身の収益機構が存在しない (revenue 0、pricing 1 = 個別 seller の単価は確定済みだが facilitator の take-rate は未定義)。distribution=1 は docs/adr/0002 (外部 GTM 計画) が proposed のまま未実行 (self-serve/content/outbound いずれも未着手) を正直に反映。defensibility=3: no-custody+audit-ledger+x402標準の設計は信頼の源だが、ロックインしない設計思想そのものが強い技術的 moat にはならない。wedge=4 (「自社 family の決済ゲート」という極めて狭い初期スコープ)。
 
