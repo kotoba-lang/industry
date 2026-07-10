@@ -457,8 +457,10 @@
       ;; 125 = 124 + cloud-itonami-isic-4669, promoted directly from
       ;; :spec -- waste/scrap wholesale trading actor. 126 = 125 +
       ;; cloud-itonami-isic-4651, promoted directly from :spec --
-      ;; computer/peripheral/software wholesale trading actor.
-      (is (= 126 (:implemented m))))))
+      ;; computer/peripheral/software wholesale trading actor. 127 = 126
+      ;; + cloud-itonami-isic-3811, promoted directly from :spec --
+      ;; non-hazardous waste collection dispatch actor.
+      (is (= 127 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

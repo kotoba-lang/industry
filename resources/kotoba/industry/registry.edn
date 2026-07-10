@@ -4385,12 +4385,20 @@
    :operating-states [:intake :observe :treat :publish :audit]},
   {:id "3811"
    :name "Collection of non-hazardous waste"
-   :repo "https://github.com/gftdcojp/cloud-itonami-E3811"
-   :business-id "cloud-itonami-E3811"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3811"
+   :business-id "cloud-itonami-isic-3811"
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; real actor: wastecollect.{facts,store,policy,llm,phase,operation,
+   ;; report,sim}.cljc -- WasteDispatch-LLM sealed advisor ⊣
+   ;; WasteDispatchGovernor. hazard-misclassification-gate (any hazard
+   ;; flag -> unconditional HARD reject, this actor is structurally
+   ;; non-hazardous-collection-only) and facility-permit-capacity-gate
+   ;; (real environmental-permit daily intake cap per waste-class) are
+   ;; the two checks with no analog in sibling actors. bulk-volume gate
+   ;; always escalates a large pickup to a human. ADR-2607113200
+   ;; (com-junkawasaki/root superproject).
    :operating-states [:intake :observe :treat :publish :audit]},
   {:id "3812"
    :name "Collection of hazardous waste"
