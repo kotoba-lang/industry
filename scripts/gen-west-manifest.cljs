@@ -23,11 +23,13 @@
 ;; 登録/rename/pin 前進は --entry で当該 entry のみの最小 diff にすること
 ;; (wholesale 再生成 commit は禁止 — CLAUDE.md / repos.edn :manifest-workflow)。
 
-(require '[scripts.nbb-compat :refer [slurp spit file-seq format]]
+;; clojure.java.shell/clojure.java.io are JVM-only and unavailable under nbb
+;; (ClojureScript-on-Node) -- scripts.nbb-compat provides `sh`/`file` with the
+;; same shape, aliased as `io` too so the existing `io/file` call-sites below
+;; keep working unchanged.
+(require '[scripts.nbb-compat :as io :refer [slurp spit file-seq format sh]]
          '[clojure.string :as str]
-         '[clojure.edn :as edn]
-         '[clojure.java.shell :refer [sh]]
-         '[clojure.java.io :as io])
+         '[clojure.edn :as edn])
 
 (def root (-> (sh "git" "rev-parse" "--show-toplevel") :out str/trim))
 (def manifest-dir (io/file root "manifest"))
