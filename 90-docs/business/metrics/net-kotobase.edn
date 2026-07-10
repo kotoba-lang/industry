@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 3466, "kotobase-cf-wasm-staging" 2520},
+ {"net-kotobase" 3488, "kotobase-cf-wasm-staging" 2520},
  :zone
- {:requests-7d 5915,
-  :pageviews-7d 325,
-  :uniques-7d-sum 421,
+ {:requests-7d 5929,
+  :pageviews-7d 326,
+  :uniques-7d-sum 423,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
@@ -19,11 +19,11 @@
     "/kotobase-cf-wasm-production/ipns/bafyreih4sbvmqm4k26depcsw66r3ch4q4vpg7ve72hm3jy7ggv67kutlaa.json",
     :requests 127}
    {:path "/", :requests 64}
-   {:path "/health", :requests 64}
-   {:path "/api/funnel", :requests 42}
+   {:path "/health", :requests 63}
+   {:path "/api/funnel", :requests 41}
    {:path "/llms.txt", :requests 33}
    {:path "/_app/meta", :requests 23}],
-  :status-mix {:ok 1813, :server-error 43, :client-error 386},
+  :status-mix {:ok 1812, :server-error 43, :client-error 386},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -34,7 +34,7 @@
  :as-of "2026-07-10",
  :traffic-quality {:window "24h", :probe-4xx-pct 17, :error-5xx-pct 2},
  :top-paths
- "上位 page (24h, 2xx/3xx): /kotobase-cf-wasm-production/ipns/bafyre… 347 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 157 · /kotobase-cf-wasm-production/ipns/bafyre… 127 · / 64 · /health 64 | 4xx(probe) 17% · 5xx 2%",
- :funnel {:visitors 319, :signups 0, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /kotobase-cf-wasm-production/ipns/bafyre… 347 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 157 · /kotobase-cf-wasm-production/ipns/bafyre… 127 · / 64 · /health 63 | 4xx(probe) 17% · 5xx 2%",
+ :funnel {:visitors 320, :signups 0, :checkouts 0},
  :signal
- "kotobase.net 実測 5915 req/7d・421 uniques(日次和)・うち4xx probe 17%(24h)、workers 5986 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 5929 req/7d・423 uniques(日次和)・うち4xx probe 17%(24h)、workers 6008 inv/7d、Stripe active subs 0"}
