@@ -1,6 +1,6 @@
 [
  {:progress/schema-note "cloud-itonami-lei rollout progress tracker, per ADR-2607110300. One row per cloud-itonami-isic-<code> industry. :industry/applicable? true means a coherent real global/listed top-3-company concept exists for this ISIC vertical; false means fragmented/local/non-corporate and this vertical is deliberately skipped for the lei-catalog family (the isic blueprint itself is unaffected). This file is the resume point for the next /loop iteration."
-  :progress/resume-from "isic-7310 (advertising) -- first :industry/applicable? true :industry/status :pending row after isic-6920/isic-7020/isic-7110/isic-7120 (all now :done); isic-7010/isic-7210/isic-7220 correctly skipped (:applicable? false). This tick (single-execution fork, no sub-forking) did isic-6920 accounting/tax (Xero only, 1/3 -- Big Four excluded as ambiguous member-firm networks, Intuit/H&R Block/Wolters Kluwer/Thomson Reuters/Sage all failed), isic-7020 management consultancy (Booz Allen Hamilton only, 1/3 -- Big Three are private partnerships not attempted, Accenture excluded as ambiguous/retired GLEIF record, FTI/Korn Ferry ToS undiscoverable), isic-7110 architecture/engineering (AECOM + Jacobs Solutions Inc., 2/3 -- WSP Global Cloudflare-blocked), and isic-7120 technical testing (Bureau Veritas only via :legal-notice doc-type, 1/3 -- SGS excluded as a PDF-directory not a single document, Intertek 404'd). Cumulative company-repo count must be recomputed fresh each tick via gh repo list cloud-itonami --limit 300 --json name filtered to cloud-itonami-lei-* -- do not trust a prior tick's stated running total (freshly verified this tick: 81)."
+  :progress/resume-from "isic-7911 (travel agency activities) -- first :industry/applicable? true :industry/status :pending row after isic-7310/isic-7320/isic-7710/isic-7810 (all now :done this tick). This tick (single-execution fork, no sub-forking) did isic-7310 advertising (WPP + Publicis, 2/3 -- Omnicom Cloudflare-blocked), isic-7320 market research (Ipsos + YouGov, 2/3 -- Nielsen JS-shell-only), isic-7710 vehicle rental (Avis + Europcar substituted, 2/3 -- Hertz JS-shell/404, Sixt 403), and isic-7810 employment placement (Recruit Holdings + Randstad + Adecco, 3/3). Cumulative company-repo count must be recomputed fresh each tick via gh repo list cloud-itonami --limit 300 --json name filtered to cloud-itonami-lei-* -- do not trust a prior tick's stated running total (freshly verified this tick: 90)."
   :db/id -1}
  {:industry/code "isic-0162"
   :industry/description ""
@@ -1424,13 +1424,57 @@
  {:industry/code "isic-7310"
   :industry/description "Open Business Blueprint for ISIC Rev.5 7310: advertising"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "2/3 -- Omnicom Group Inc. excluded (site-wide Cloudflare 403, not evaded)"
+  :industry/companies
+  [{:company/legal-name "WPP plc"
+    :company/lei "549300LSGBXPYHXGDT93"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=WPP plc"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300lsgbxpyhxgdt93"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.wpp.com/en/terms-and-conditions"
+    :company/tos-doc-type :terms-of-service}
+   {:company/legal-name "Publicis Groupe SA"
+    :company/lei "2138004KW8BV57III342"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Publicis Groupe"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-2138004kw8bv57iii342"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.publicisgroupe.com/fr/mentions-legales"
+    :company/tos-doc-type :legal-notice
+    :company/note "disambiguated from a second duplicate LEI (a BNP Paribas AM Europe trust vehicle) via headquarters address match to Publicis's real HQ, 133 Avenue des Champs-Elysees"}
+   {:company/legal-name "Omnicom Group Inc."
+    :company/lei "HKUPACFHSSASQK8HLS17"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Omnicom Group"
+    :company/status :tos-fetch-failed
+    :company/note "site-wide Cloudflare 403 (Attention Required interstitial); not evaded"}]}
  {:industry/code "isic-7320"
   :industry/description "Open Business Blueprint for ISIC Rev.5 7320: market research and public opinion polling"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "2/3 -- Nielsen excluded (terms-of-use page is JS-rendered nav-shell only, no server-rendered legal text after 2 URL attempts)"
+  :industry/companies
+  [{:company/legal-name "Ipsos SA"
+    :company/lei "9695002OY2X35E9X8W87"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Ipsos"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-9695002oy2x35e9x8w87"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.ipsos.com/en/legal-mentions"
+    :company/tos-doc-type :legal-notice}
+   {:company/legal-name "YouGov plc"
+    :company/lei "213800MZGBGCJIPOBB41"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=YouGov"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-213800mzgbgcjipobb41"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://yougov.com/about/terms/website"
+    :company/tos-doc-type :terms-of-service}
+   {:company/legal-name "Nielsen (The Nielsen Company (US), LLC)"
+    :company/lei "254900QPZS54FU2J9C09"
+    :company/status :tos-fetch-failed
+    :company/note "terms-of-use page requires JavaScript (server response is nav-shell only, 'Notice: JavaScript is required for this content'); not fabricated"}]}
  {:industry/code "isic-7410"
   :industry/description "Open Business Blueprint for ISIC Rev.5 7410: specialized design activities"
   :industry/applicable? false
@@ -1458,8 +1502,33 @@
  {:industry/code "isic-7710"
   :industry/description "Community Vehicle Rental Operations — OSS Open Business Blueprint (ISIC 7710)"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "2/3 -- Hertz Global Holdings excluded (homepage + terms pages all JS-shell, no discoverable server-rendered terms after 4 URL/scan attempts); Sixt SE excluded (site-wide 403); substituted Europcar Mobility Group SA as third company"
+  :industry/companies
+  [{:company/legal-name "Avis Budget Group, Inc."
+    :company/lei "529900E95812SYWMCE44"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Avis Budget Group"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-529900e95812sywmce44"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.avisbudgetgroup.com/home/terms-of-use"
+    :company/tos-doc-type :terms-of-service}
+   {:company/legal-name "Europcar Mobility Group SA"
+    :company/lei "969500XCGTMV08D76N87"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Europcar Mobility"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-969500xcgtmv08d76n87"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.europcar-mobility-group.com/legal-information"
+    :company/tos-doc-type :legal-notice}
+   {:company/legal-name "Hertz Global Holdings, Inc."
+    :company/lei "549300NBK3K85MH1EX16"
+    :company/status :tos-fetch-failed
+    :company/note "homepage and 3 guessed terms-page URLs all returned 404/500/JS-shell with no discoverable legal footer links; not fabricated"}
+   {:company/legal-name "Sixt SE"
+    :company/lei "5299004ZME6CSBR7WP07"
+    :company/status :tos-fetch-failed
+    :company/note "site-wide 403; not evaded"}]}
  {:industry/code "isic-7721"
   :industry/description "Community Recreational and Sports Goods Rental Operations — OSS Open Business Blueprint (ISIC 7721)"
   :industry/applicable? false
@@ -1473,10 +1542,35 @@
   :industry/status :skipped
   :industry/companies []}
  {:industry/code "isic-7810"
-  :industry/description ""
+  :industry/description "Open Business Blueprint for ISIC Rev.5 7810: activities of employment placement agencies"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "3/3"
+  :industry/companies
+  [{:company/legal-name "Recruit Holdings Co., Ltd."
+    :company/lei "353800R2LRSMVVC4I806"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[fulltext]=Recruit Holdings"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-353800r2lrsmvvc4i806"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://recruit-holdings.com/en/termsofuse/"
+    :company/tos-doc-type :terms-of-service}
+   {:company/legal-name "Randstad N.V."
+    :company/lei "7245009EAAUUQJ0U4T57"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Randstad"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-7245009eaauuqj0u4t57"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.randstad.com/terms-and-conditions/"
+    :company/tos-doc-type :terms-of-service}
+   {:company/legal-name "Adecco Group AG"
+    :company/lei "NI14Y5UMU60O7JE9P611"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Adecco Group"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-ni14y5umu60o7je9p611"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.adeccogroup.com/terms-of-use"
+    :company/tos-doc-type :terms-of-service}]}
  {:industry/code "isic-7911"
   :industry/description "Community Travel Agency Operations — OSS Open Business Blueprint (ISIC 7911)"
   :industry/applicable? true
