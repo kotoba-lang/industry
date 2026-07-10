@@ -307,3 +307,55 @@ pending-human-review/held は(他3 repoのような soft escalate ではなく)
 capability設計待ち**(6420・6621・6622、UBOチェーン/二者間関係照会)。
 残り約278 repo・上記3 repoへの新capability設計は、いずれも本ADRでは
 判断しない — 次のADRまたはフォローアップに委ねる。
+
+## Addendum 4 (2026-07-10): 新規2 op を設計・実装し、残り3 repo も実統合完了 — パイロット10 repo中8 repoが実統合済み
+
+オーナーの指示で、Addendum 3 が「8291側に新capability設計待ち」とした
+`6420`(UBOチェーン)・`6621`/`6622`(二者間関係)を実際に設計・実装し、
+パイロット10 repoの残り作業を完了させた。
+
+### 8291側: 2つの新規 governed read op
+
+`src/dossier/llm.cljc`/`policy.cljc`/`phase.cljc`/`store.cljc` に追加(いずれも
+`:tier/graph` 必須、DisclosureGovernorの同じ licensed-disclosure ゲートを通る):
+
+- **`:disclosure/ownership-chain`**(`{:company-id|:company-name ..}` →
+  `{:owners [{:owner-id :pct :source :as-of} ..] :has-sourced-ownership-data?
+  bool}`)— 対象法人へ向かう `:ownership` edge を1 hop 辿る。出典データが無い
+  ことは「所有者がいない」ではなく「未収載」——清潔判定として扱わない。
+- **`:disclosure/relationship-check`**(`{:person-name .. :company-id|
+  :company-name|:target-person-name|:target-name ..}` → `{:related? bool
+  :kind kw|nil}`)— 名前一致した official の `:org` 一致、または関係edge
+  (1 hop)で判定。設計途中で判明した重要な一般化: `:target-name` は
+  company-by-name→official-by-name の順で両方試すため、呼び出し側は
+  カウンターパーティが法人か個人か知らなくてよい(`cloud-itonami-isic-
+  6621`/`6622` の `party` レコードは両方を同じ形で保持するため必須だった)。
+
+新規 `dossier.store/company-by-name`(`official-by-name` と対称)+ demo
+relationship edge を2本追加(co-200→co-300 所有60%、of-1→co-200 役員兼務、
+of-2→of-1 business-contact)。8291自体: 55 tests / 213 assertions、lint
+clean、demo op7/op8 追加。commit `c91691c` → `2152c07` → `448151b`。
+
+### 残り3 repoの実統合
+
+| repo | 統合先 | 検証結果 |
+|---|---|---|
+| `cloud-itonami-isic-6420`(持株会社) | `:disclosure/ownership-chain`(subsidiary-name で照会) | co-300 の実所有者(制裁フラグ付きco-200、60%)を検出 → `:beneficial-ownership-verified? false` → **即時 HARD hold**(このrepoの検証語彙は真偽2値のみで中間状態が無く、governor が無条件hardなため。40 tests/195 assertions、commit `4109e99`) |
+| `cloud-itonami-isic-6621`(損害査定) | `:disclosure/relationship-check`(`:matter-id` 任意追加、adjuster名×counterparty名) | エージェントが実行して判明: 山田一郎↔Jane Smithの直接edgeは`related?=true`を返すが、どちらも個人としては制裁フラグを持たないため8291は即時commit(escalateしない)→ 6621自身のunconditional hard-hold(`:verdict :hit`)へ着地。pending-review/heldの2経路はスタブで別途決定的に検証。30 tests/123 assertions、commit `4c628f9` |
+| `cloud-itonami-isic-6622`(保険仲介) | `:disclosure/relationship-check`(`:placement-id` 任意追加、broker名×customer名) | エージェントが6621と異なる、より的確なペアリングを選択: 山田一郎(co-200役員)×Northwind社(co-200、制裁フラグ付き法人そのもの)→ **実際に8291側でescalateが発火**(`:reason :high-stakes`)→ 6622側も`:incomplete`でescalate。40 tests/193 assertions、commit `b61854d` |
+
+**2つのエージェントが独立に、ブリーフ執筆時の私の想定(どのデモペアリングが
+8291のescalateを発火させるか)が誤りだったことを実行して発見し、正しく
+補正した**(6621は代替のスタブ検証で、6622はより的確な法人ターゲットへの
+差し替えで)——スクリプト通りに進めるのではなく、実行結果で検証する姿勢が
+機能した実例。
+
+`:matter-id`/`:placement-id` はどちらも既存リクエスト形状への**後方互換な
+オプション追加**(省略時は完全に元の挙動)。
+
+### 現状まとめ(更新)
+
+パイロット10 repo中: **8 repo が実統合済み**(6910・6810・6499・6512・6419・
+6420・6621・6622)、**2 repo が対象外のまま**(6430・6630、統合すべき箇所が
+構造的に存在しない)。残り約278 repoへの展開判断は引き続きこのADRでは
+行わない。
