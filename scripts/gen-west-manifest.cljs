@@ -9,6 +9,8 @@
 ;;
 ;; DataLad dataset(:datalad)は west project にしつつ `datalad` グループへ隔離し
 ;; userdata に印を付ける(実体取得は `nbb manifest/west_annex.cljs annex-get`)。
+;; Archived package(:archived)は `archived` グループへ隔離し既定 group-filter の
+;; `-archived` で west update 対象外にする(ADR-2607102200 addendum 6)。
 ;;
 ;; 使い方:
 ;;   nbb scripts/gen-west-manifest.cljs                    ; west.yml を更新(pin 検証つき)
@@ -124,8 +126,12 @@
   (let [existing (get existing-projects path)
         sha     (or (working-head path) (:revision existing))
         dl      (get-in cfg [:datalad path])
+        arch    (get-in cfg [:archived path])
         depth   (when (heavy? path) (get-in cfg [:defaults :clone-depth]))
-        groups  (if dl [(:group dl)] [(org-of path)])
+        groups  (cond
+                  dl   [(:group dl)]
+                  arch [(:group arch "archived")]
+                  :else [(org-of path)])
         recurse (or (contains? (:force-recurse-submodules cfg) path)
                     (nested? path)
                     (:submodules existing))
@@ -150,7 +156,10 @@
              recurse "      submodules: true\n")
            (when dl (str "      userdata:\n"
                          "        datalad: true\n"
-                         "        annex-remote: " (:annex-remote dl) "\n"))))))
+                         "        annex-remote: " (:annex-remote dl) "\n"))
+           (when (and arch (not dl))
+             (str "      userdata:\n"
+                  "        archived: true\n"))))))
 
 (defn render []
   (let [paths (->> (concat (or (seq (paths-from-west-yml)) (paths-from-gitlinks))
