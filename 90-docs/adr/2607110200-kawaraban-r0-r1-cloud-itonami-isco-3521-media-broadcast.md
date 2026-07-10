@@ -151,3 +151,45 @@ news actor / media actor を設計・統合せよ。
 - **fulfills** kawaraban RAD identity journal tx 4 の既記録意図
   （`:rad/aozora-pds` / `:rad/aozora-collection`）。
 - **does not modify** kawaraban の lexicon（`lex/*.edn`）・憲章ゲート・G1–G11。
+
+## Addendum (2026-07-10, 共有 operator graph の CPU 時間制限読み込み障害の解消)
+
+本ADRに従い live RSS ingest + aozora publish を実際に有効化した結果（同日オーナー承認
+「1, 2」「生成された news を https://aozora.app/ に actor ごとに投稿して」）、kawaraban の
+per-outlet mirror actor 群と cloud-itonami の media actor が共有の operator graph
+（`yoro-social-v2`、`YORO_OPERATOR_DID`＋`YORO_DB_NAME` から導出）へ数百件規模の
+`com.atproto.repo.createRecord` を同日中に集中発行した。これにより novelty（未 fold の
+tx-block）が急増し、`pds.aozora.app` の `listRecords`/`getRecord` が 15–40 秒超でハング、
+直接 `kotobase.aozora.app` を叩くと Cloudflare error 1102（CPU time exceeded）で 503 する
+状態になった——「今日の大量書き込みによって現在の実装の CPU 時間制限内では読み込めない
+サイズ/状態になっている」というオーナー指摘のとおり。
+
+3層にわたる根因と対処:
+
+1. **`kotobase-peer/src/kotobase_peer/core.cljc`**（library、`kotobase-cljc-worker` の
+   source-path 依存）: `pmap-async`（novelty tx-block の並行 R2 fetch ヘルパー）が
+   無制限の単一 `js/Promise.all` で全件を同時発火していた（数百 fetch が同時に飛ぶ）。
+   24件ずつのバッチに区切るよう変更。実装中に reader-conditional の構文ミス
+   （`#?(:cljs form1 form2)` は `:cljs` を `form1` とだけ対にし `form2` を未知の
+   feature key として無言で drop する）で一度 `pmap-async` が未定義になる回帰を作ったが
+   `npm run test:cljs`（78 tests / 165 assertions）で検出・修正。
+2. **`kotobase-cljc-worker/wrangler.jsonc`**: 実測すると真のボトルネックは
+   R2 I/O 待ち（wall-clock）ではなく同期的な decode/merge の **CPU 時間**だった
+   （batching だけでは直らず、engineから見て正しい graph CID への直叩きが
+   Cloudflare error 1102 で 503）。`limits.cpu_ms` が未設定（プラン既定）だったのを
+   Workers Standard usage model の上限 `300000`（5分）へ明示設定。
+3. **fold cron**（`app-aozora-pds`、既存の `*/5 * * * *` Cron Trigger、
+   `FOLD_CRON_ENABLED=1`・`OPERATOR_SECRET` 設定済み・変更なし）: 2 の CPU 予算拡張後、
+   次回定期実行で novelty backlog を新しい cold snapshot に fold できることを確認
+   （operator secret へのアクセスや手動 fold トリガーは不要——既存の自動運用がそのまま
+   機能した）。
+
+検証（fold cron 実行後）: `kotobase.aozora.app` への graph 直読みが 129秒（fold 前、
+拡張後 CPU 予算の範囲内でギリギリ完走）→ **7.2秒**、`pds.aozora.app` の
+`listRecords`（kawaraban bbc-world mirror）が ハング（15–40秒超）→ **4.4秒**まで復帰。
+実データ（BBC-World の実記事）が失われていないことも確認済み。
+
+- **does not modify**: kawaraban/cloud-itonami media actor のいずれの lexicon・
+  governor・charter ゲートも変更なし——本addendumは純粋に基盤（kotobase-peer /
+  kotobase-cljc-worker の性能・容量特性）の修正であり、G1–G11 や Media Governor の
+  意味論には触れていない。
