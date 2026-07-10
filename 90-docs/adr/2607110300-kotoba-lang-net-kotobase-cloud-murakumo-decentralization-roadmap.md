@@ -137,3 +137,54 @@ Phase 1〜3で作るのは依然として「単一運営者配下の複数ノー
 - **Phase 4(真の分散化)まで一気に設計する**:却下。独立運営者が実在しない
   段階で紛争解決やstaking経済の細部を設計しても検証不能であり、実際に
   第三者運営者の需要が生まれた時点で別ADRとして起票する方が誠実。
+
+## Addendum (2026-07-10): real multi-machine reachability verification
+
+Both Phase 2 (murakumo/witness-quorum, QUIC) and Phase 3
+(cloud-murakumo, HTTP) had an explicit honesty gap: "real network
+verification across multiple physical machines is deferred — this
+sandboxed environment has no Tailscale access to the real fleet."
+That gap is now partially closed for the HTTP side:
+
+- Confirmed via `tailscale status` + `bb murakumo nodes`: 6 of
+  fleet.edn's 10 real nodes were online at test time (naphtali, judah,
+  zebulun, issachar, asher, benjamin), reachable over the actual
+  Tailscale mesh from the session host.
+- None of the fleet nodes have a real JVM/Clojure/bb installed (only
+  macOS's `/usr/bin/java` stub) — `bb murakumo nodes` independently
+  confirmed `mesh: absent/stopped` on all of them. Installing a JVM on
+  production fleet hardware to run the witness listener THERE was
+  judged out of scope for a verification pass (a real provisioning
+  action, not a read-only check) — so the session host ran
+  `cloud_murakumo.verify.witness-rpc/serve!` (the Phase 3 HTTP
+  listener, gftdcojp/cloud-murakumo#13) locally, bound to all
+  interfaces, and 5 real fleet machines (naphtali, judah, zebulun,
+  issachar, asher) reached it over their real Tailscale IPs via plain
+  `curl` (already present on stock macOS, no remote provisioning
+  needed) — a genuine cross-physical-machine network hop, not
+  localhost.
+- Verified both the plain echo RPC and the actual
+  `witness-compute-handler` proof-of-compute logic: a request from
+  naphtali with a matching recompute claim correctly returned
+  `{:verdict :accept}`; a request from zebulun with a deliberately
+  mismatched claim correctly returned `{:verdict :reject :reason
+  "recompute mismatch: ..."}` — the real slashing signal, produced by
+  the real `verify/compute.cljc` logic, delivered across a real
+  network hop between two different physical machines.
+- No files were written and no software was installed on any fleet
+  node (SSH was used only to run stock `curl`); the listener process
+  on the session host was killed and its ports confirmed closed after
+  the test — no lasting state change anywhere.
+
+**What this does and does not prove**: it proves the wire protocol
+(request/response envelope framing, HTTP round-trip, the
+proof-of-compute accept/reject logic) works correctly between distinct
+physical machines over the real tailnet, not just in a single JVM
+process or on localhost. It does NOT establish multi-operator
+decentralization — the session host and all 5 fleet machines remain
+under the same single Tailscale account/operator (`com-junkawasaki@`),
+so this is still Phase 1-3 territory per this ADR's own labeling rule,
+not Phase 4. The murakumo/witness-quorum QUIC side (Phase 2) was not
+re-verified in this pass (it requires kwik/bouncycastle + cert
+material neither present nor installed on the fleet nodes); its real
+end-to-end multi-machine verification remains open.
