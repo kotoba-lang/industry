@@ -1,0 +1,73 @@
+# ADR-2607110900: com-nvidia-isaac-sim ロボット接触力学 — PGS multi-body coupling を実配線 + joint-limit を統一制約化
+
+- **Status**: proposed（設計のみ。実装は M1 から順に着手）
+- **Related**: ADR-2607010930（clj-wgsl migration — `genesis.*` 名前空間の復元元ADR。本ADRはその一部記述の訂正を含む）、ADR-2607020130（kami-nv-compat CLJC port — Featherstone dynamics の移植方針）、ADR-2607087500（kami-genesis → com-nvidia-isaac-sim rename）
+
+## Context
+
+オーナーから「OpenUSD・URDFロボティクス・cloud-itonami製造simの完成度」を問われ調査した結果、3領域とも「制御・データ構造層は本物、物理的リアリズムに踏み込む部分は未着手」という共通パターンが見つかった。オーナーの指示で、まず**ロボット接触力学**から着手する（ADR駆動・順次実装、他の2領域は後続ADRで扱う）。
+
+当初の認識（前回調査の要約、および `genesis/contact.cljc` 自身の docstring・ADR-2607010930 の summary 行）は「PGS multi-body coupling は除外されている」だったが、**この認識は古い**。実際に本ADR着手前の詳細調査で判明した実態:
+
+- `orgs/kotoba-lang/com-nvidia-isaac-sim/src/genesis/contact.cljc` には **`resolve-static-contacts`（複数静的接触への決定論的PGSスイープ、デフォルト12反復）と `resolve-articulation-contact`（2つのarticulation間の等大反対impulse）が実装済み・テスト済み**（`test/genesis/contact_test.cljc`: `static-contact-pgs-solves-a-contact-list-over-multiple-sweeps`、`warm-start-reapplies-cached-contact-impulses`、`articulation-contact-applies-equal-and-opposite-impulses` が green）。これらは `genesis/articulation3d.cljc` の `point-jacobian`/`constraint-effective-mass`（`J M⁻¹ Jᵀ` を LDL^T で解く）/`apply-velocity-impulse` に依存しており、これらも実装済み。
+- **しかし、この PGS ソルバーはどの毎フレームシミュレーションループからも呼ばれていない**。`genesis/world.cljc` の `step-articulations` は `(a3d/step cfg state efforts)` のみを呼び、`a3d/step` 自身が「**contact-less** semi-implicit Euler step」と明記している（`articulation3d.cljc:417`）。つまり `genesis.contact` は正しく動く**孤立したライブラリ**であり、接触検出→接触リスト構築→PGS解決→状態への反映、を毎フレーム回す呼び出し元が存在しない。
+- `genesis/contact.cljc` 自身の namespace docstring、`contact_test.cljc` の docstring、ADR-2607010930 の**要約行**（104-106行目）はいずれも「PGS multi-body coupling は除外」という**古い記述のまま**——しかし同じADRの**詳細ステータス表（140行目）は実は正確**（"partial: static PGS + articulated point contact"）。ドキュメントの矛盾自体が本ADRの発端。
+- **joint limit は3箇所で扱いがバラバラ**:
+  - `kami-articulated/src/kami_articulated/urdf.cljc:291-307` は `<limit lower upper effort velocity>` を正しくパースする（`cartpole.urdf`のスライダー±2.4がテストで検証済み）。
+  - `kami-nv-compat/.../dynamics/urdf_parser.cljc:60-74`（正規表現ベースの別パーサー）は `<limit>` を**一切パースしない**——docstringは「limit をカバーする」と主張しているにも関わらず、実際には抽出コードが存在しない（実バグ）。しかもこのパーサーが `kami-nv-compat/dynamics/articulated_dynamics.cljc`（Featherstone RNEA/ABA/CRBA実装）の入力になっているため、Featherstone系には limit が一切届かない。
+  - `genesis/articulation3d.cljc` の `from-articulated-system`（88-130行目）は limit を正しく carry through し、`step` 関数（416-430行目）内で**素朴な clamp-and-zero**（位置をclampし、limit到達時に速度を0にする）を行っている——しかしこれは `genesis.contact` の PGS ソルバーとは**完全に分離**しており、同じ制約解決パスに乗っていない。
+- `kami-articulated` / `kami-nv-compat` / `com-nvidia-isaac-sim` は**互いに依存しない、独立した3つのスタック**（`deps.edn` で相互依存なしを確認済み）。`articulation3d.cljc` は `kami-articulated` の出力shapeを「duck typing」で消費するのみで、真のライブラリ依存はない。
+
+## Decision
+
+### D1. 統合ターゲットは `genesis.*`（`com-nvidia-isaac-sim`）— `kami-nv-compat` の Featherstone スタックには手を入れない
+
+PGS/impulse/joint-space-inertia の機構（`point-jacobian`/`constraint-effective-mass`/`apply-velocity-impulse`/`resolve-static-contacts`）は**既に `genesis.*` に実装・テスト済み**。`kami-nv-compat/dynamics/articulated_dynamics.cljc`（Featherstone ABA/RNEA/CRBA）には contact/joint-limit の足場が一切無く、ゼロから同等機構を再実装するのは車輪の再発明かつ誤ったレイヤーへの重複実装になる。本ADRのコア作業は `genesis.*` に限定し、`kami-nv-compat` 側は D4（URDFパースの実バグ修正のみ）に留める。
+
+### D2. `genesis/world.cljc` に実際の接触結合シミュレーションループを配線する
+
+現状 `step-articulations` は contact-less な `a3d/step` のみを呼ぶ。これを「(1) 既存の broad/narrow-phase 接触検出（`genesis.convex`/`genesis.obb`/`genesis.ccd`）で接触を検出 → (2) 接触リストを構築 → (3) 既存の `resolve-static-contacts`/`resolve-articulation-contact`（PGS）で解決 → (4) 解決後の速度を articulation state へ反映してから積分」という毎フレームループに置き換える。**新規の数値解法は実装しない**（既存の実装・テスト済みPGSソルバーをそのまま呼ぶだけ）— 本ADRの核心は「配線」であって「新規実装」ではない。
+
+### D3. joint limit を独立クランプでなく、contact と同じ PGS 制約行として統一する
+
+`articulation3d.cljc` の `step` 内にある素朴な clamp-and-zero を廃止し、joint limit を「片側制約（one-sided constraint）」として `resolve-static-contacts` と同じ制約行の抽象化に載せる（limit到達時に法線方向impulse相当の行を1本追加する形——contactの法線制約と数学的に同型）。これにより、joint limit と接触が**同時に**（例えば「limitに達した状態でさらに外部から押される」ケース）矛盾なく解決される、既存の素朴な実装では扱えなかったケースに対応する。
+
+### D4. `kami-nv-compat` の URDF limit パース欠落を直す（独立した小さな実バグ修正）
+
+`kami-nv-compat/.../dynamics/urdf_parser.cljc`（正規表現パーサー）に `<limit>` の抽出を追加する。D1-D3 とは独立した作業（Featherstoneスタックには影響しない・別のリスク面）だが、実際に発見した実バグであり、`franka_panda.cljc`/`ur10.cljc`/`anymal_c.cljc` が生成するURDF文字列（すべて `<limit .../>` タグを含む）がこのパーサーを通ると limit が消えるという具体的な回帰ケースが既にfixture上に存在するため、合わせて修正する。
+
+### D5. ADR-2607010930 の古い要約記述を訂正する
+
+「`genesis.contact`（data + obstacle-contact geometry, **PGS multi-body coupling excluded**）」という要約行（104-106行目）を、同ADR自身の詳細表（140行目、実態を正しく記述）と整合する形に更新する——ドキュメントの自己矛盾を放置しない。
+
+## Milestones
+
+- **M1**: `kami-nv-compat` の URDF limit パース欠落を修正（D4）。既存の franka/ur10/anymal fixture で回帰確認。
+- **M2**: `genesis/world.cljc` に接触結合ステップループを配線（D2）。既存の `resolve-static-contacts`/`resolve-articulation-contact` をそのまま呼ぶ形。cartpole/hizukueなど実fixtureでの質的ロールアウトテスト（NaN/発散しない、非貫通が成立する等）。
+- **M3**: joint limit を PGS 制約行として統一（D3）。franka の実limit（例: `panda_joint4` `-3.0718..-0.0698`）を使い、「limitに達しても発散しない」「同時接触との整合」をテスト。
+- **M4**（stretch、必要なら別ADRに切り出し）: 単一点（sphere-obstacle）接触でなく `genesis/obb.cljc` の `obb-manifold`（複数点接触）を `genesis.contact` の入力として使えるようにする——本ADRのスコープ外、M1-M3完了後に実際に必要性が出た場合のみ着手判断。
+
+## Non-goals（明示的にやらないこと）
+
+- MPM/SPH/FEM/PBD 等、rigid以外のsolver実装（`genesis.cljc` の `solvers` リストにある他手法）——本ADRは rigid-body PGS contact のみ。
+- Lemke法等、真のLCPソルバーの実装——既存のPGS（反復法）を数値解法として維持する（既存実装と整合、本ADRは新しい数値解法の導入ではない）。
+- IsaacLab/PhysXの実行トレースとのライブ差分比較ハーネス構築——この組織の物理コードは一貫して「定数比較」（実データシート値との突き合わせ）を検証手法としており、ライブシミュレータとの trace diffing は前例が無く、本ADRでも行わない。
+- `kami-nv-compat` の Featherstone dynamics コア（RNEA/ABA/CRBA）自体の変更——既に正しく実装・テスト済み（`aba-rnea-consistency`/`crba-symmetric`）、D4のURDFパース修正以外は触らない。
+- `kami-articulated`（URDFパーサー）自体の変更——既に `<limit>` を正しくパースしている、変更不要。
+
+## Consequences
+
+- `genesis.*` に閉じた変更のため、`kami-app-amenominaka`（ADR-2607100100）や他のconsumerには影響しない。
+- D4は独立した小さな修正のため、M1単体でも価値がある（他のMilestoneの着手判断を待たずに先行して着地できる）。
+- D2/D3は「新規の数値解法を作る」のでなく「既存の検証済みコードを正しく配線し直す」性質のため、実装リスクは主に積分ループの結合順序（接触解決→積分の順序、warm-startingの扱い）にある。
+
+## Open Questions / Follow-up
+
+- M2のcontact detection→resolve呼び出しの正確な頻度（1フレーム1回のPGSスイープで十分か、sub-steppingが必要か）は実装・実測してから判断する。
+- M4（multi-point manifold対応）の要否は、M1-M3が実際のロボットモデルでどこまで自然に動くか確認してから決める。
+
+## Related
+
+- ADR-2607010930（`genesis.*` 復元元、本ADRが要約行を訂正）
+- ADR-2607020130（kami-nv-compat CLJC port）
+- ADR-2607087500（kami-genesis → com-nvidia-isaac-sim rename）
