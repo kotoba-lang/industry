@@ -1,7 +1,6 @@
 [
  {:progress/schema-note "cloud-itonami-lei rollout progress tracker, per ADR-2607110300. One row per cloud-itonami-isic-<code> industry. :industry/applicable? true means a coherent real global/listed top-3-company concept exists for this ISIC vertical; false means fragmented/local/non-corporate and this vertical is deliberately skipped for the lei-catalog family (the isic blueprint itself is unaffected). This file is the resume point for the next /loop iteration."
-  :progress/resume-from "isic-5110 (passenger air transport) -- first :industry/status :pending row after isic-0610 through isic-5020, all now :done (isic-5221/5222/5223/5224/5229 remain :skipped, public-authority/fragmented). This tick did isic-5011 (Carnival, Royal Caribbean, NCL Corporation -- 3/3) and isic-5020 (Scorpio Tankers, Teekay Tankers -- 2/3, Frontline plc + International Seaways both Cloudflare-blocked). Cumulative company-repo count must be recomputed fresh each tick via gh repo list cloud-itonami --limit 300 --json name filtered to cloud-itonami-lei-* -- do not trust a prior ticks stated running total. Open retry candidates needing a JS-capable fetch path or better entity resolution, all optional, not blocking: isic-0610 Shell plc + Saudi Aramco; isic-0620 Cheniere Energy; isic-1920 Marathon Petroleum + HF Sinclair + PBF Energy; isic-2011 Dow Inc.; isic-2610 TSMC + Samsung Electronics + Intel + Qualcomm + Micron + NXP + onsemi + STMicroelectronics; isic-2660 Koninklijke Philips N.V.; isic-3011 Samsung Heavy Industries + Hanwha Ocean; isic-3020 CRRC Corporation Limited (no parent LEI) + Stadler Rail AG; isic-3030 Airbus SE; isic-3510 National Grid plc + Duke Energy Corporation; isic-3812 Waste Management Inc. + Stericycle Inc. + Republic Services Inc.; isic-4711 Costco + Kroger + Target + Tesco + Ahold Delhaize; isic-4730 Couche-Tard + Caseys + Murphy USA; isic-4911 SNCF; isic-4912 Union Pacific + CSX; isic-5020 Frontline plc + International Seaways."
-
+  :progress/resume-from "isic-6010 (radio broadcasting) -- first :industry/status :pending row after isic-0610 through isic-5610, all now :done (isic-5221/5222/5223/5224/5229 skipped, public-authority/fragmented). This tick (single-execution fork, no sub-forking) did isic-5110 (Delta Air Lines -- 1/3), isic-5210 (0/3, several candidates acquired/merged with dead legacy domains), isic-5510 (0/3, major hotel chains all bot-protected), isic-5610 (McDonald's + Starbucks -- 2/3, Yum! Brands WebSphere-portal-shell-only). Cumulative company-repo count must be recomputed fresh each tick via gh repo list cloud-itonami --limit 300 --json name filtered to cloud-itonami-lei-* -- do not trust a prior tick's stated running total. Open retry candidates needing a JS-capable fetch path or better entity resolution, all optional, not blocking: isic-0610 Shell plc + Saudi Aramco; isic-0620 Cheniere Energy; isic-1920 Marathon Petroleum + HF Sinclair + PBF Energy; isic-2011 Dow Inc.; isic-2610 TSMC + Samsung Electronics + Intel + Qualcomm + Micron + NXP + onsemi + STMicroelectronics; isic-2660 Koninklijke Philips N.V.; isic-3011 Samsung Heavy Industries + Hanwha Ocean; isic-3020 CRRC Corporation Limited (no parent LEI) + Stadler Rail AG; isic-3030 Airbus SE; isic-3510 National Grid plc + Duke Energy Corporation; isic-3812 Waste Management Inc. + Stericycle Inc. + Republic Services Inc.; isic-4711 Costco + Kroger + Target + Tesco + Ahold Delhaize; isic-4730 Couche-Tard + Caseys + Murphy USA; isic-4911 SNCF; isic-4912 Union Pacific + CSX; isic-5020 Frontline plc + International Seaways; isic-5110 American Airlines Group + Southwest Airlines; isic-5210 Vopak + Buckeye Partners + NuStar/Magellan (all merger-orphaned domains); isic-5510 Marriott + Hilton + IHG; isic-5610 Yum! Brands (WebSphere portal, needs JS rendering)."
   :db/id -1}
  {:industry/code "isic-0162"
   :industry/description ""
@@ -691,13 +690,47 @@
  {:industry/code "isic-5110"
   :industry/description "Open Business Blueprint for ISIC Rev.5 5110: passenger air transport (robotics-premised)"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Delta Air Lines succeeded (real Contract of Carriage, 79.7KB verbatim). American Airlines Group (site-wide 403 bot-block, 2 URLs tried) and Southwest Airlines Co. (404 on both /legal/ and /help/legal, 2 URLs tried) both failed -- landed 1/3."
+  :industry/companies
+  [{:company/legal-name "Delta Air Lines, Inc."
+    :company/lei "Q2CCMS6R0AS67HJMBN42"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Delta Air Lines"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-q2ccms6r0as67hjmbn42"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.delta.com/us/en/legal/contract-of-carriage-dgr"
+    :company/note "doc-type :contract-of-carriage (not a generic ToS -- airlines publish this instead)"}
+   {:company/legal-name "American Airlines Group Inc."
+    :company/lei "IWUQB36BXD6OWD6X4T14"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=American Airlines Group"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but entire aa.com site returns HTTP 403 to a plain HTTP client (bot-protected), 2 URLs tried"}
+   {:company/legal-name "Southwest Airlines Co."
+    :company/lei "UDTZ87G0STFETI6HGH41"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Southwest Airlines"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified but both /legal/customer-service-commitment/ and /help/legal returned 404 (geo-IP localized to Japan region, no matching path found), 2 URLs tried"}]}
  {:industry/code "isic-5210"
   :industry/description "Storage (terminal/depot) (ISIC Rev.5 5210) — :terminal-storage-governor. Open Business Blueprint, cloud-itonami fleet."
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "0/3 -- genuinely difficult vertical, several candidate companies have been acquired/merged and their old domains now redirect elsewhere. No repos created, not fabricated."
+  :industry/companies
+  [{:company/legal-name "Koninklijke Vopak N.V."
+    :company/lei "724500UL634GFV1KYF10"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Koninklijke Vopak"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified, /terms-of-use and /disclaimer both 404 on vopak.com, 2 URLs tried"}
+   {:company/legal-name "Buckeye Partners, L.P."
+    :company/lei "549300C1PQJLVEIUBK50"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Buckeye Partners"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified, www.buckeye.com connection failed outright, buckeye.com (no www) returned 500, 2 URLs tried"}
+   {:company/legal-name "NuStar Energy LLC / Magellan Midstream Partners, L.P."
+    :company/lei "5493003BMLTUIEG2LG44 / MZF5TI8NFVZZNUSKDL39"
+    :company/status :tos-fetch-failed
+    :company/note "both companies were acquired (NuStar by Sunoco LP 2024, Magellan by ONEOK 2023); their legacy domains (nustarenergy.com, magellanlp.com) now redirect to the acquirer's site/404 with no equivalent terms page reachable, 2 URLs tried across both"}]}
  {:industry/code "isic-5221"
   :industry/description "Community Land Transport Support Operations — OSS Open Business Blueprint (ISIC 5221)"
   :industry/applicable? false
@@ -731,13 +764,49 @@
  {:industry/code "isic-5510"
   :industry/description ""
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "0/3 -- major hotel chains (Marriott, Hilton, IHG) are all bot-protected/JS-rendered on their public terms pages, consistent with the consumer-retail/hospitality pattern flagged in an earlier tick. No repos created, not fabricated."
+  :industry/companies
+  [{:company/legal-name "Marriott International, Inc."
+    :company/lei "225YDZ14ZO8E1TXUSU86"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Marriott International"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified, /about/terms-of-use.mi returned 403, /en-us/terms-of-use.mi returned a genuine 404 page (verified, not real content despite 217KB nav bloat), 2 URLs tried"}
+   {:company/legal-name "Hilton Worldwide Holdings Inc."
+    :company/lei "549300HVGPK36ICB0B89"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Hilton Worldwide Holdings"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified, /en/corporate/terms-of-use/ and /en/terms-of-use/ both 404, 2 URLs tried"}
+   {:company/legal-name "InterContinental Hotels Group PLC"
+    :company/lei "2138007ZFQYRUSLU3J98"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=InterContinental Hotels Group"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified, two ihg.com terms URLs both returned site-wide 403 (bot-protected), 2 URLs tried"}]}
  {:industry/code "isic-5610"
   :industry/description "Open Business Blueprint for ISIC Rev.5 5610: restaurants and mobile food service activities (robotics-premised)"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "McDonald's and Starbucks succeeded (real terms text). Yum! Brands failed -- its site is a WebSphere Portal that serves only nav-shell content (no real terms body) to a plain HTTP client across 3 URL variants tried. Landed 2/3."
+  :industry/companies
+  [{:company/legal-name "McDonald's Corporation"
+    :company/lei "UE2136O97NLB5BYP9H04"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=McDonald's Corporation"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-ue2136o97nlb5byp9h04"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.mcdonalds.com/us/en-us/terms-and-conditions.html"}
+   {:company/legal-name "Starbucks Corporation"
+    :company/lei "OQSJ1DU9TAOC51A47K68"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Starbucks Corporation"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-oqsj1du9taoc51a47k68"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.starbucks.com/terms/"}
+   {:company/legal-name "YUM! Brands, Inc."
+    :company/lei "549300JE8XHZZ7OHN517"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Yum! Brands"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified, yum.com is a WebSphere Portal that serves only navigation-shell content (no terms body) to a plain HTTP client across 3 distinct URL/link variants tried"}]}
  {:industry/code "isic-6010"
   :industry/description "Open Business Blueprint for ISIC Rev.5 6010: radio broadcasting (robotics-premised)"
   :industry/applicable? true
