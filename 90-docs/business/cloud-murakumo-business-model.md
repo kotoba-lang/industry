@@ -64,6 +64,7 @@
 - 観測 (signal): murakumo.cloud 実測 53684 req/7d・352 uniques(日次和)・うち4xx probe 4%(24h)、workers 64922 inv/7d
 - 観測 (signal): murakumo.cloud 実測 53881 req/7d・353 uniques(日次和)・うち4xx probe 4%(24h)、workers 65152 inv/7d
 - 観測 (signal): murakumo.cloud 実測 54079 req/7d・353 uniques(日次和)・うち4xx probe 3%(24h)、workers 65369 inv/7d
+- 観測 (signal): murakumo.cloud 実測 54318 req/7d・358 uniques(日次和)・うち4xx probe 3%(24h)、workers 65638 inv/7d
 
 ## Customer Segments
 
@@ -135,6 +136,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /infer/hwmetrics 7865 · /infer/runs 1404 · /v1/messages 319 · /v1/chat/completions 315 · / 100 | 4xx(probe) 4% · 5xx 2%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /infer/hwmetrics 7865 · /infer/runs 1404 · /v1/messages 319 · /v1/chat/completions 315 · / 99 | 4xx(probe) 4% · 5xx 2%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /infer/hwmetrics 7865 · /infer/runs 1404 · /v1/messages 319 · /v1/chat/completions 315 · / 100 | 4xx(probe) 3% · 5xx 2%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /infer/hwmetrics 7864 · /infer/runs 1404 · /v1/messages 324 · /v1/chat/completions 320 · / 100 | 4xx(probe) 3% · 5xx 2%
 
 > 実行済み (2026-07-06 tick4): US HN/X投稿コピー下書き + GTM launch runbook作成(Stripe未設定の間はGate 0で投稿ブロック、docs/gtm-launch-runbook.md)
 

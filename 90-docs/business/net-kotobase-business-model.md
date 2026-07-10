@@ -61,6 +61,7 @@
 - 観測 (signal): kotobase.net 実測 5367 req/7d・363 uniques(日次和)・うち4xx probe 84%(24h)、workers 5412 inv/7d、Stripe active subs 0
 - 観測 (signal): kotobase.net 実測 5380 req/7d・363 uniques(日次和)・うち4xx probe 84%(24h)、workers 5425 inv/7d、Stripe active subs 0
 - 観測 (signal): kotobase.net 実測 5394 req/7d・365 uniques(日次和)・うち4xx probe 84%(24h)、workers 5440 inv/7d、Stripe active subs 0
+- 観測 (signal): kotobase.net 実測 5406 req/7d・366 uniques(日次和)・うち4xx probe 84%(24h)、workers 5453 inv/7d、Stripe active subs 0
 
 ## Customer Segments
 
@@ -130,6 +131,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /llms-full.txt 34 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 26 · /llms.txt 26 · /.well-known/did.json 22 · /_app/meta 21 | 4xx(probe) 84% · 5xx 1%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /llms-full.txt 35 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 27 · /llms.txt 27 · /.well-known/did.json 23 · /_app/meta 22 | 4xx(probe) 84% · 5xx 1%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /llms-full.txt 36 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 28 · /llms.txt 28 · /.well-known/did.json 24 · /_app/meta 23 | 4xx(probe) 84% · 5xx 1%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /llms-full.txt 38 · /llms.txt 30 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 29 · /_app/meta 24 · /.well-known/did.json 24 | 4xx(probe) 84% · 5xx 2%
 
 ## Revenue Streams
 
