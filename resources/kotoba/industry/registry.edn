@@ -4807,13 +4807,37 @@
    :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
   {:id "4653"
    :name "Wholesale of agricultural machinery, equipment and supplies"
-   :repo "https://github.com/gftdcojp/cloud-itonami-G4653"
-   :business-id "cloud-itonami-G4653"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4653"
+   :business-id "cloud-itonami-isic-4653"
+   ;; No :robotics -- unlike fueltrade's loading-rack valve or
+   ;; techtrade's AS/RS cartons, the entity :delivery/dispatch actually
+   ;; gates (a tractor/combine/implement) is driven or towed off the
+   ;; lot by a human operator in real practice; no fixed apparatus
+   ;; exists to gate a robot command against. Automated parts-inventory
+   ;; retrieval was explicitly considered and rejected as a basis for
+   ;; :robotics true, since it gates a different entity than this
+   ;; actor's governed op.
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger :optimization]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
+   :maturity :implemented
+   ;; real actor: agmachtrade.{facts,governor,phase,sim,operation,
+   ;; agmachtradeadvisor,registry,store}.cljc -- AgMachTradeAdvisor ⊣
+   ;; :ag-equipment-governor. Product-COMPLIANCE regulatory backbone
+   ;; (not commodity provenance/trade sanctions): two genuinely
+   ;; INDEPENDENT type-gated HARD checks, each on its own boolean
+   ;; (:engine-powered? / :ride-on?) rather than one enum or one folded
+   ;; rule -- emissions-certificate-missing (EPA nonroad diesel Tier
+   ;; standards) and rops-certification-missing (rollover-protection
+   ;; safety), proven independent via a stationary-engine-driven
+   ;; (engine-powered but not ride-on) fixture that holds on emissions
+   ;; only, plus a towed-implement (neither) fixture that is a true
+   ;; NO-OP on both. Cites USA EPA 40 CFR Part 1039 (Tier 1-4 Final,
+   ;; Engine Family cert) + OSHA 29 CFR 1928.51 (ROPS on tractors mfd
+   ;; after 1976-10-25, SAE J2194/ASABE S519) + OFAC, EU Reg. 2016/1628
+   ;; (Stage V) + Machinery Regulation (EU) 2023/1230 (repeals
+   ;; Directive 2006/42/EC from 2027-01-20). 38 tests / 192 assertions,
+   ;; lint clean, demo verified.
+   :operating-states [:order/intake :certification/verify :delivery/dispatch :invoice/settle :audit]},
   {:id "4659"
    :name "Wholesale of other machinery and equipment"
    :repo "https://github.com/gftdcojp/cloud-itonami-G4659"
