@@ -396,3 +396,45 @@ Still open: no OTHER `cloud-itonami-*` blueprint references `:ontology`;
 must invoke it explicitly and feed its output in, e.g. as engagement
 context) -- that deeper wiring is a further follow-up, not done here;
 `:tender` is still the only ontology object type.
+
+## Addendum 6 (2026-07-10): wire the bridge into the real `:jurisdiction/assess` flow
+
+Addendum 5 left `marketentry.goyoukiki/opportunity-assessment-context` as a
+standalone pure fn a caller must invoke explicitly. Closed that gap: an
+engagement can now declare `:motivating-opportunity` (a real,
+ontology-tagged tender fact) + `:motivating-connector` via
+`:engagement/intake`'s ordinary patch mechanism (no schema change needed —
+`marketentry.store`'s `:engagement/upsert` already merges arbitrary keys).
+`marketentryllm/assess-jurisdiction` now calls the bridge when one is
+present, grounding the generic JPN evidence checklist in that specific
+opportunity's own eligibility floor (`:min-rank`/`:required-categories`) in
+the proposal's `:summary`/`:rationale`/`:cites`/`:value`.
+
+Added an eighth governor HARD check,
+`motivating-opportunity-unverified-violations`: when the proposal claims a
+motivating opportunity (`:motivating-opportunity-claimed? true`) but
+`kotoba.ontology.connector/tagged-conforms?` could not verify it
+(`:motivating-opportunity-verified? false`), that is precisely the
+fabricated-regulatory-claim case this governor's own charter names as an
+unoverridable HARD hold — mirroring the existing `spec-basis-violations`
+pattern (don't invent a jurisdiction's requirements) applied to the
+opportunity-input side.
+
+Caught a real bug while writing the test for the unverified case: the
+first attempt patched `:motivating-opportunity`/`:motivating-connector`
+onto an engagement's intake WITHOUT an `:id` key in the patch map, and the
+assertions read back `nil` — `marketentry.store`'s `:engagement/upsert`
+merges onto `[:engagements (:id value)]` (the patch's OWN `:id`, not the
+request's `:subject`), so an intake patch missing `:id` silently merges
+onto a bogus `nil` key instead of the intended engagement. Fixed by
+including `:id "eng-1"` in the patch, matching the convention the repo's
+own existing `clean-intake-auto-commits` test already used but this
+addendum's first draft missed.
+
+29 tests / 97 assertions green (was 27/88), clj-kondo clean (no new
+warnings in touched files). Landed via isolated worktree + server-side
+merge, same pattern as every other change in this ADR.
+
+Still open: no other `cloud-itonami-*` blueprint references `:ontology`;
+`:tender` is still the only object type; the `:motivating-opportunity`
+convention is specific to this one blueprint, not a fleet-wide pattern.
