@@ -35,9 +35,9 @@
 - Facilitator API (薄い委譲): POST /verify・POST /settle・GET /.well-known/x402
 - Gateway proxy (前段配置): ANY /gateway/<seller>/<path> — 402 challenge → on-chain 検証 → origin へプロキシ + X-PAYMENT-RESPONSE
 - SELLERS_JSON config (公開 treasury アドレスのみ、鍵は一切含まない)。honest default: 未知 seller → 404、未検証 payment → 402
-- 準備 (follow-up): Cloudflare デプロイ (custom domain 例 nexus.gftd.ai)
-- 準備 (follow-up): shinshi/murakumo/kotobase の個別ゲートから委譲への移行
 - 準備 (follow-up): EIP-3009 exact スキームの gasless relay (現状は transaction スキームのみ実効)
+- LIVE (2026-07-10): x402.nexus custom domain 稼働中 — /health /catalog /.well-known/x402 実応答確認済み
+- seller 登録済み (2026-07-10): murakumo (USD 0.01/POST /v1/messages)・kotobase (USD 0.001/GET /ipfs/) が SELLERS_JSON に live 登録。club-shinshi が唯一の未登録 first customer
 
 ## Channels
 
@@ -52,15 +52,14 @@
 - 将来: managed gateway proxy の enterprise tier (専用 domain・SLA)
 - 将来: facilitator-as-a-service (Cloudflare Monetization Gateway の主権的代替として外部提供)
 
-> Worker 未デプロイのため全て仮説段階。内部 seller 無償運用が floor で、外部化は agent 経済の実需 (hyp/nexus-x402-agent-demand) 検証後。
+> LIVE (2026-07-10、x402.nexus): murakumo・kotobase 登録済みだが実決済トラフィックは未計測。内部 seller 無償運用が floor で、外部化は agent 経済の実需 (hyp/nexus-x402-agent-demand) 検証後。
 
 ## Cost Structure
 
 - Cloudflare Workers 実行費
-- Basescan API 呼び出しコスト (on-chain verify、seller/agent 増加に比例)
-- secret 管理 (BASESCAN_API_KEY 等、wrangler secret)
 - kotoba-lang/pay + treasury.core の保守 (vendor drift 監視)
 - 将来: EIP-3009 gasless relay 実装・監査コスト (nonce/replay 保護レビュー要)
+- Base RPC 呼び出しコスト (keyless、2026-07-10 に Basescan/Etherscan explorer API 依存を撤廃)
 
 ## Key Metrics
 
@@ -68,6 +67,7 @@
 - 検証成功率 / honest-default 遵守率 (未検証 payment が一件も配信されないこと)
 - facilitator 経由の決済総額 (GMV、seller 別内訳)
 - 個別ゲートから nexus 委譲へ移行した seller 数
+- 稼働確認 (2026-07-10): /health /catalog /.well-known/x402 実応答、seller 2件登録 (murakumo/kotobase)
 
 ## Unfair Advantage
 
