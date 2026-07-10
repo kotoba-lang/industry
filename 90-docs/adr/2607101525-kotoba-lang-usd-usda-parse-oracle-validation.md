@@ -1,7 +1,9 @@
 # ADR-2607101525: kotoba-lang/usd — USDA読み込み(parse-usda)+ usdcat/usdchecker実オラクル検証
 
-- **Status**: proposed
+- **Status**: proposed; **D1/D2/M1（USDAパーサー本体の新規実装）は着手時点で不要と判明 — 下記 Addendum (2026-07-10) 参照。D3/D4/M2/M3（実オラクル検証・CI配線）は引き続き有効**
 - **Related**: ADR-2607110900（ロボット接触力学 — 同じ「物理的リアリズムの成熟度を上げる」取り組みの一環、着手順として1番目。本ADRは2番目=OpenUSD）
+
+> **2026-07-10 訂正（ハルシネーションではなく並行作業の追い越し）**: 本ADR起票時に読んだ`orgs/kotoba-lang/usd/src/usd/core.cljc`は書き込み専用95行だったが、M1着手のため改めてclone した時点で**別セッションが既にADR-0048という別ADRの下で本格的なパーサー（`parse`/`parse-prim`、トークナイザ、コメント対応、round-tripテスト8件を含む計10 deftest）を実装・main着地させていた**ことが判明した。ADR-2607110900のケース（実在しないコードを報告するエージェントのハルシネーション）とは異なり、今回は**実際に実在する、より完成度の高い実装**——単に着手前の事前調査から実装着手までの間に他セッションに追い越された、という健全な並行開発の帰結。詳細は末尾のAddendum参照。
 
 ## Context
 
@@ -67,3 +69,11 @@ USDA仕様は非常に広い（layer offset、sublayerサブ構文、時系列�
 ## Related
 
 - ADR-2607110900（ロボット接触力学 — 同じ物理的リアリズム向上の取り組みの1番目、本ADRは2番目）
+
+## Addendum (2026-07-10): D1/D2/M1は着手前に他セッションの並行作業で既に満たされていた
+
+M1着手のため`kotoba-lang/usd`（**2026-07-05にADR-2607041500の命名慣行に沿って`kotoba-lang/org-openusd`へrename済み**——本ADR起票時の呼称のまま残す）を改めてcloneしたところ、`src/usd/core.cljc`が95行の書き込み専用から**435行**（`parse`/`parse-prim`本体、`tokenize`によるトークナイザ、コメント・list-edit演算子・`uniform`/`custom`/`varying`修飾子・属性レベルmetadataのスキップ・`true`/`false`/`None`リテラル対応）へ、`test/usd/core_test.clj`が63行/4 deftest（文字列比較のみ）から**189行/10 deftest**（既存4件＋round-tripテスト8件、うち実際のOpenUSD公式サンプルを模した手書き`.usda`スニペットのparse検証・コメント耐性・スコープ外構文への明示的エラーの3件を含む）へ、それぞれ拡張されていたことが判明した。実装は`ADR-0048`という別ADRを参照している。
+
+**ADR-0048の所在確認**: `com-junkawasaki/root`の`90-docs/adr/`配下にはこのID・タイトルのファイルは存在しない（`grep -rl "ADR-0048"`は6件ヒットするが、いずれも「ADR-0048を参照する側」の文書——`2607031600-cloud-murakumo-gpu-fleet-requirements.md`のautorig/kami-engine言及、`2607051400-kotoba-ml-engine-tensor-gpu-weights-kernels.md`のGPU kernel方針言及、`2607100100-kotoba-lang-realtime-archviz-twinmotion-equivalent.md`のglTF rename系譜言及——で、ADR-0048自身の本文はどこにも見つからなかった）。ただし、複数の独立したセッション/時期にまたがって一貫して同じID・章番号（§1/§2/§4）で参照されている点は、ADR-2607110900のケース（単一エージェントの単発ハルシネーション）とは性質が異なり、**この組織で実際に存在する（が本checkout範囲外にある)確度の高い先行ADR**と判断し、深追いはしない。
+
+**結論**: D1（スコープ限定方針）・D2（既存書き込みEDN形へ双方向にする方針）は、既存実装が**既に同じ方針で、かつより広いカバレッジ**（コメント・list-edit演算子等、本ADRのD5で想定していたより広いサブセット）で満たしている。M1は**実装不要**——重複実装は避ける。D3（実オラクル検証）・D4（CI配線）・M2・M3は、既存実装にも`.github/workflows/ci.yml`にもusdcat/usdchecker/usd-core/pxrへの言及が一切なく（`clojure -M:test`＋`clojure -M:lint`のみ）、`test/usd/core_test.clj`のnamespace docstring（「usdcat/usdcheckerが`bb gate`で検証」）は新実装後も**訂正されずに残っている虚偽記述のまま**——引き続き有効な、未着手の作業として続行する。M2/M3は新規パーサーでなく既存の実`usd.core/parse`/`parse-prim`APIを対象に実装する。
