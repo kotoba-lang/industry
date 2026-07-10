@@ -4691,13 +4691,38 @@
    :operating-states [:order/intake :regulatory/verify :delivery/dispatch :invoice/settle :audit]},
   {:id "4641"
    :name "Wholesale of textiles, clothing and footwear"
-   :repo "https://github.com/gftdcojp/cloud-itonami-G4641"
-   :business-id "cloud-itonami-G4641"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4641"
+   :business-id "cloud-itonami-isic-4641"
+   ;; :robotics true -- garment-on-hanger sortation conveyors for
+   ;; hanging apparel + pick-to-light/AS-RS for footwear and folded
+   ;; textiles, terminating at the wholesaler's own dispatch point.
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :optimization]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
+   :maturity :implemented
+   ;; real actor: textiletrade.{facts,governor,phase,sim,operation,
+   ;; textiletradeadvisor,registry,store}.cljc -- TextileTradeAdvisor ⊣
+   ;; :textile-trading-governor. Principal trading with a forced-labor
+   ;; supply-chain regulatory backbone, distinct in SHAPE from the
+   ;; isic-4662 metals sibling's provenance check:
+   ;; forced-labor-presumption-unrebutted fires only when BOTH (a) the
+   ;; order's jurisdiction has a binding forced-labor import-ban
+   ;; statute (today: USA only) AND (b) origin-region/entity-list is
+   ;; flagged (Xinjiang / UFLPA Entity List / CAATSA §321(b) North
+   ;; Korea) -- jurisdiction-GATED (unlike 4662's jurisdiction-
+   ;; unconditional check), reasoned from UFLPA being a US border-
+   ;; detention mechanism not a floating disclosure obligation.
+   ;; Requires BOTH supply-chain-traceability-documented? AND
+   ;; forced-labor-rebuttal-evidence-on-file? to clear -- proven
+   ;; genuinely rebuttable (not a blanket regional ban) via a same-
+   ;; origin with/without-evidence control pair, and proven
+   ;; jurisdiction-gated (not a blanket regional ban) via a same-origin
+   ;; USA-vs-JPN control pair. Cites UFLPA (Pub. L. 117-78) + 19 U.S.C.
+   ;; §1307 + CAATSA §321(b), USA textile-specific Textile Fiber
+   ;; Products Identification Act (15 U.S.C. §70)/Flammable Fabrics Act
+   ;; (15 U.S.C. §1191), EU Reg. 2024/3015 seeded but :binding? false
+   ;; (main rules apply from 2027-12-14, correctly not yet gating).
+   ;; 44 tests / 202 assertions, lint clean, demo verified.
+   :operating-states [:order/intake :supply-chain/verify :delivery/dispatch :invoice/settle :audit]},
   {:id "4649"
    :name "Wholesale of other household goods"
    :repo "https://github.com/gftdcojp/cloud-itonami-G4649"
