@@ -6416,11 +6416,34 @@
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "7721"
    :name "Renting and leasing of recreational and sports goods"
-   :repo "https://github.com/gftdcojp/cloud-itonami-N7721"
-   :business-id "cloud-itonami-N7721"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-7721"
+   :business-id "cloud-itonami-7721"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   ;; Promoted :spec -> :blueprint (see `kotoba.industry/maturity-of`).
+   ;; The legacy placeholder :repo (gftdcojp/cloud-itonami-N7721) never
+   ;; actually existed (confirmed 404 before this edit) -- replaced with
+   ;; the real repo, following the SAME cloud-itonami/cloud-itonami-isic-####
+   ;; naming convention as every other actor in this fleet rather than the
+   ;; legacy N-prefixed scheme. Flagged in ADR-2607104800's own
+   ;; Alternatives section as a comparable rental-family candidate.
+   ;; Scoped to renting recreational/sports gear (skis, bicycles,
+   ;; kayaks, camping equipment) to individual consumers, distinct from
+   ;; vehiclerentalops/7710 (motor vehicles) and cloud-itonami-unspsc-27
+   ;; (construction tools). Recreational-equipment rental carries its
+   ;; own distinct compliance concerns: safety-critical gear (ski
+   ;; bindings, climbing/watersports equipment) is subject to product-
+   ;; specific safety standards (ASTM/DIN ski-binding standards, CPSC
+   ;; bicycle safety standards); many jurisdictions have recreational-
+   ;; activity liability statutes specifically addressing equipment-
+   ;; rental waivers and assumption-of-risk disclosures (several US
+   ;; states have ski-industry-specific liability limitation laws).
+   ;; grep -rli "recreational.goods.rental|sports.goods.rental|
+   ;; equipment.rental" across the fleet returned completely empty.
+   ;; Governor keyword :recreational-rental-governor is grep-verified
+   ;; UNIQUE fleet-wide. Reuses the SAME labor-dispatch operating-states
+   ;; shape as the eight prior labor-dispatch builds this window --
+   ;; ninth instance. See ADR-2607104900.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "7722"
