@@ -355,3 +355,23 @@ for new work.
 Historical note: ADR-2607022900 / 2607062330 landed Chicory as the then-
 working tender. ADR-2607100100 and this addendum **re-rank** that path
 downward without deleting the code.
+
+## Addendum 4 (2026-07-10) — wgsl SSoT + kototama README alignment
+
+### `kotoba-lang/wgsl` is the hiccup→WGSL SSoT
+
+| Namespace | Home | Role |
+|---|---|---|
+| `kami.wgsl` | **`wgsl`** package | Implementation |
+| `kotoba.wgsl` | **`wgsl`** package | Facade re-export (legacy require) |
+| `kami.wgsl-emit` | `kami-engine-sdk` | Different dialect (map IR → WGSL for WIT) |
+
+`webgpu` no longer vendors `src/kami/wgsl.cljc`; it depends on `../wgsl`
+(deps.edn + bb.edn classpath). Domain packages (`sprite-gpu`, `shaders`,
+`sky`, `render-shaders`) keep requiring `kotoba.wgsl` via the facade.
+
+### kototama README
+
+Aligned with addendum 3 / ADR-2607100100: first path = `.kotoba` wasm AOT
++ native WASM (wasm-webcomponent); clojurewasm next; Chicory demoted.
+
