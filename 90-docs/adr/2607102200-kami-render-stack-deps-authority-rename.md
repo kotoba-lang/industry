@@ -213,11 +213,18 @@ Owner review of the first landing:
 **Do not use a Rust/wasmtime host for kami game guests going forward.**
 Canonical host paths:
 
-1. **Browser** — `wasm-webcomponent` (native `WebAssembly` engine + host imports)
-2. **Portable ECS host** — `kotoba.kami-host` (`.cljc`; Chicory/nbb/browser wire)
-3. **JVM tender (non-kami-game)** — `kototama.tender` (Chicory; `actor:host` ABI)
+1. **Guest binary** — `.kotoba` → `kotoba wasm emit` → real `.wasm` AOT (first path)
+2. **Host / tender runtime** — **kototama** on the runtime ladder
+   `kotoba wasm AOT` → `clojurewasm` → ClojureScript → nbb
+   (ADR-2607100100). **JVM/Chicory (`kototama.tender` :clj) is a demoted
+   compat suite only**, not the design premise.
+3. **Browser packaging** — `wasm-webcomponent` (extracted from kototama `web/`)
+   runs the same AOT `.wasm` on the browser's native `WebAssembly` engine.
+4. **Portable ECS host vocabulary** — `kotoba.kami-host` (`.cljc`; first wire
+   is ClojureScript / native WASM, not Chicory)
 
 `kami-engine-host-rs` is archived. Do not reintroduce a parallel rs host.
+Do not teach "kototama = JVM/Chicory" — that inverts ADR-2607100100.
 
 ### DOM overlay family — who is who (clarified)
 
@@ -243,23 +250,27 @@ out of scope for this addendum (no merge yet; names already differ by role).
 
 | | **wasm-webcomponent** | **kototama** |
 |---|---|---|
-| Role | Thin **browser packaging** library | Full **Wasm tender / execution runtime** |
-| Runs | Browser native `WebAssembly` | Primarily **JVM/Chicory** (`kototama.tender`); browser via its `web/` which *imports* wasm-webcomponent |
-| Guest ABI focus | `kotoba` module imports (kgraph, actor:host ports, kami-ecs, gpu clear, …) as small JS host files | `actor:host` contract + caps + limits + tender; unikernel-style host |
-| Scope | Drop-in WebComponent + host-import helpers; zero JVM | Contract validation, capability grants, RuntimeLimits, fuel, memory limits, deploy story |
-| Origin | Extracted *from* kototama's `web/` PoC (ADR-2607061630 / 2607061850) so apps do not depend on the whole tender | Parent runtime of that extraction |
+| Role | Thin **browser packaging** for AOT `.wasm` | **Wasm tender runtime** — hosts `kotoba wasm emit` guests under caps/limits |
+| First runtime | Browser native `WebAssembly` (always) | **`.kotoba` wasm AOT** on native WASM; next **clojurewasm**; cljs/nbb as needed |
+| Demoted | — | **JVM/Chicory** (`kototama.tender` :clj) = compat / CI harness only (ADR-2607100100) |
+| Guest ABI | `kotoba` module imports as small host files (kgraph, actor:host ports, kami-ecs, …) | Same family: `kototama.contract` caps + tender vocabulary; unikernel-style host |
+| Scope | Drop-in WebComponent + host-import helpers | Contract, grants, RuntimeLimits, fleet, deploy; **not** "the JVM product" |
+| Origin | Extracted *from* kototama `web/` so apps do not pull the whole tender | Parent tender of that extraction; browser path *consumes* wasm-webcomponent |
 
-**Use wasm-webcomponent** when you only need "load this `.wasm` in a page and bind host imports."
-**Use kototama** when you need the tender (caps, limits, JVM host, actor lifecycle) —
-not as a second browser game host next to wasm-webcomponent.
+**Use wasm-webcomponent** to put an AOT `.wasm` on a page with host imports.
+**Use kototama** as the tender/runtime that defines how guests are hosted
+(caps, limits, fleet) — first on **wasm AOT / clojurewasm**, not Chicory.
+They are not competing JVM vs browser products: guest is AOT wasm; packaging
+for the browser is wasm-webcomponent; tender policy is kototama.
 
 ### Updated canonical map (post-addendum)
 
 ```
 L5 apps          kami-app-* / freeboard / …
-L4 hosts         wasm-webcomponent          … browser (only wasm host for games)
-                 kotoba.kami-host           … portable ECS host
-                 kototama.tender            … JVM actor:host tender (non-rs)
+L4 hosts         kototama                   … tender runtime (first: .kotoba wasm AOT / clojurewasm;
+                                              JVM/Chicory demoted compat)
+                 wasm-webcomponent          … browser packaging of AOT .wasm (from kototama web/)
+                 kotoba.kami-host           … portable ECS host (cljs/native WASM first)
 L3 authoring     kami-engine-sdk            … was -clj; ECS / scene / render-IR
                  kami-engine-app-sdk        … browser chrome helpers
                  kami-engine-hud            … HUD widget data IR
@@ -308,6 +319,8 @@ Still separate (do not merge):
 ### Updated L3 chrome row
 
 ```
+L4 hosts         kototama / wasm-webcomponent / kotoba.kami-host
+                 (wasm AOT first; Chicory demoted — addendum 3)
 L3 chrome        kami-engine-app-sdk   … HUD (kotoba.ui) + motion/sound/effect/rtc/widgets
                  kami-engine-input-map … stick/deadzone
 L3 brain         kami-engine-sdk       … ECS / scene / render-IR
@@ -315,3 +328,30 @@ L3 brain         kami-engine-sdk       … ECS / scene / render-IR
 
 Pruned/archived: `kami-engine-hud` (shim remains on GitHub for redirect + legacy path).
 
+## Addendum 3 (2026-07-10) — kototama is .kotoba wasm AOT / clojurewasm, not JVM/Chicory
+
+Owner correction: framing kototama as "primarily JVM/Chicory" was wrong and
+conflicts with the repo-wide runtime priority (ADR-2607100100 / CLAUDE.md):
+
+```
+kotoba wasm runtime > clojurewasm > ClojureScript > nbb
+(JVM is demoted — last resort / explicit compat only)
+```
+
+### Correct authority
+
+| Layer | What | First path | Demoted |
+|---|---|---|---|
+| **Guest** | game/app logic | `.kotoba` → `kotoba wasm emit` → AOT `.wasm` | interpreting CLJ on JVM as the product path |
+| **Tender (kototama)** | host guest under caps/limits | native WASM host of that AOT binary; **clojurewasm** when host-import FFI allows | `kototama.tender` Chicory `:clj` suite |
+| **Browser package** | put `.wasm` on a page | **wasm-webcomponent** (from kototama `web/`) | hand-rolled JS hosts |
+| **ECS host lib** | kami:engine vocabulary | `kotoba.kami-host` portable `.cljc` (cljs / native WASM wire) | Chicory-only host |
+
+`kototama.tender` (Chicory) remains useful as a **compat / verification**
+harness (bit-exact fixtures, CI) — the same pattern as ADR-2607100030
+addendum 2 for `kami-host` — but it is **not** what "using kototama" means
+for new work.
+
+Historical note: ADR-2607022900 / 2607062330 landed Chicory as the then-
+working tender. ADR-2607100100 and this addendum **re-rank** that path
+downward without deleting the code.
