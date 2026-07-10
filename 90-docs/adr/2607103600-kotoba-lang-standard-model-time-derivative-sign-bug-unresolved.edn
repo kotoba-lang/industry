@@ -81,6 +81,39 @@
     teaches this lesson)"]
   :supersedes []
   :superseded_by []
+  :addendum-2026-07-09
+  ["investigation 3 (nested-FD diagnostic, not a fix attempt): H-field's
+    inner finite difference replaced with an EXACT analytic closed-form
+    curl for the dust case -- bug persisted bit-for-bit identical. This
+    REFUTES the nested-finite-difference-interaction hypothesis and clears
+    H-field with proof (not just in-isolation verification): even a
+    zero-FD-error version does not change the outcome"
+   "investigation 4 (term-by-term isolation, strongest method used yet): an
+    independent, from-scratch sympy reimplementation of eq (4.42)'s
+    directional derivative and eq (4.48)'s combination formula (built
+    directly from docstrings, no calls into the Clojure code) matched the
+    actual code term-by-term for ALL 6 basis-bivector pairs (not just one),
+    and hand-reconstructing curvature-scalar's full double sum from these
+    independently-verified values reproduces the wrong answer bit-for-bit.
+    This CLEARS L-a-omega and riemann-basis-pair as coding-level bugs (an
+    independently-authored, differently-implemented version of the same
+    documented math reproduces the identical wrong answer) -- a materially
+    stronger clearance than formula inspection alone. A speculative side-lead
+    (nonzero omega(e_0) correction) was tested and explicitly discarded --
+    broke the already-verified de Sitter case, not applied, not a finding"
+   "after 4 independent investigations: H-field, L-a-omega, riemann-basis-pair
+    all cleared with strong non-code-reading evidence. Remaining candidates:
+    (a) omega-from-h's closed-form DERIVATION of eq (4.53) itself (distinct
+    from its eq-4.50 self-consistency, already verified), or (b) a conceptual
+    gap in applying eq (4.48) to genuinely time-evolving connections not
+    visible from formula re-derivation alone -- i.e. now a physics/derivation-
+    level question, not a code-level one. Status UNCHANGED: confirmed,
+    unresolved, documented (PR #14 docstring warnings remain accurate). Further
+    attempts should change METHOD (external GTG expertise, or a 5th
+    independent time-dependent solution from literature) rather than repeat
+    term-isolation at yet finer granularity -- already applied at 3
+    increasing levels (whole-function, all-terms-one-pair, all-terms-all-pairs)
+    without success"]
   :related ["adr-2607103000" "adr-2607102700" "adr-2607102300"]
   :last_verified "2026-07-09"}
  :body "see 2607103600-kotoba-lang-standard-model-time-derivative-sign-bug-unresolved.md"}
