@@ -188,3 +188,43 @@ not Phase 4. The murakumo/witness-quorum QUIC side (Phase 2) was not
 re-verified in this pass (it requires kwik/bouncycastle + cert
 material neither present nor installed on the fleet nodes); its real
 end-to-end multi-machine verification remains open.
+
+## Addendum 2 (2026-07-10): nbb, not JVM, for the witness-rpc dial client
+
+The first addendum's real-fleet verification defaulted to running the
+witness-rpc HTTP listener on the session host and having fleet
+machines reach it via stock `curl` — no JVM was installed on any fleet
+node, but the *session host's own* side used the JVM
+(`cloud_murakumo.verify.witness-rpc`, `.clj`). Owner feedback: that
+pattern doesn't establish that fleet nodes themselves could run the
+CLIENT side of this protocol without a JVM, and JVM is this org's own
+lowest-priority runtime (CLAUDE.md 2026-07-10: kotoba wasm >
+clojurewasm > ClojureScript > nbb, JVM/bb demoted to last resort).
+
+Checked: all previously-verified fleet.edn nodes (naphtali, judah,
+zebulun, issachar, asher) have Node.js already installed (v22–v26) but
+NO JVM at all. `kotoba-lang/murakumo`#18 adds
+`murakumo.overlay.witness-dial` (`witness_dial.cljs`) — an nbb
+(ClojureScript-on-Node) client speaking the same witness-rpc wire
+contract as `witness_http_transport.clj`'s `http-dial!`, runnable via
+`npx --yes nbb` with no persistent install. Verified twice against real
+hardware:
+
+1. naphtali and zebulun ran the dial logic inline via `npx --yes nbb -e
+   ...` against a local witness-rpc server, both `:accept` and
+   `:reject`/slashing paths, over the real Tailscale mesh.
+2. The exact file that landed in git was `scp`'d to naphtali, run via
+   `npx --yes nbb witness_dial.cljs <url> <payload>`, got a correct
+   response over the real network, then removed.
+
+No software was installed and no files were left on any fleet node in
+either pass.
+
+**What remains JVM-bound, unchanged**: the QUIC transport
+(`murakumo.overlay.quic-driver`, kwik/bouncycastle) and
+`produce-http-witnessed-attestation` (needs witness-quorum's JVM-only
+Ed25519 signer) — neither has an nbb-native equivalent yet. The
+witness-rpc *dial* capability specifically no longer requires a JVM
+anywhere in its critical path on the client side, and that is now
+proven on real fleet hardware rather than asserted from the session
+host alone.
