@@ -194,3 +194,79 @@ standalone `wgsl`（`kotoba.wgsl`）は hiccup 方言の薄い re-export とし�
 - ADR-2607051510 重複整理（webgpu 済・kami-engine nested 未）
 - ADR-2607051200 ui family rename
 - ADR-2607100030 kami host imports
+
+## Addendum 1 (2026-07-10) — naming correction + prune
+
+Owner review of the first landing:
+
+### Rename / prune table (this addendum)
+
+| before (post first landing) | after | action |
+|---|---|---|
+| `kami-engine-sdk-clj` | **`kami-engine-sdk`** | rename; drop `-clj` (only engine SDK left) |
+| `kami-engine-sdk-svelte` | — | **archived / pruned** (Svelte path retired) |
+| `kami-engine-host-rs` | — | **archived / pruned** (rs wasm host unused; browser path only) |
+| `kami-input-map` | **`kami-engine-input-map`** | rename into `kami-engine-*` family |
+
+### WASM host policy (corrected)
+
+**Do not use a Rust/wasmtime host for kami game guests going forward.**
+Canonical host paths:
+
+1. **Browser** — `wasm-webcomponent` (native `WebAssembly` engine + host imports)
+2. **Portable ECS host** — `kotoba.kami-host` (`.cljc`; Chicory/nbb/browser wire)
+3. **JVM tender (non-kami-game)** — `kototama.tender` (Chicory; `actor:host` ABI)
+
+`kami-engine-host-rs` is archived. Do not reintroduce a parallel rs host.
+
+### DOM overlay family — who is who (clarified)
+
+Three things looked similar; they are not the same layer:
+
+| repo | layer | owns | does NOT own |
+|---|---|---|---|
+| **`kami-engine-hud`** | **data IR** | declarative HUD widget *description* (`:panel`/`:bar`/`:minimap`/`:text`) as EDN/CLJC over the WebGPU canvas | browser DOM construction, motion/sound/RTC |
+| **`kami-engine-app-sdk`** | **browser app chrome** | pure/portable math for motion/easing/spring, particle trajectories, sound presets, RTC spatialize, plus optional DOM widgets (`Slider`/…) | the game HUD *data model* (that is hud); engine ECS/render-IR (that is `kami-engine-sdk`) |
+| **`kotoba-ui` / `uikit` / `appkit`** | **product UI design system** | app/web product screens (SwiftUI-like) | anything 3D/WebGPU |
+
+Rule of thumb:
+
+- **Author "what HUD shows"** → `kami-engine-hud` data
+- **Run "how the browser chrome behaves"** (tweens, toasts, pickers, audio cues) → `kami-engine-app-sdk`
+- **Ship a website/app shell unrelated to the 3D canvas** → `kotoba-ui` family
+
+If those two engine pieces still feel too close in practice, a future
+follow-up may fold pure math from `app-sdk` under `hud` or vice versa —
+out of scope for this addendum (no merge yet; names already differ by role).
+
+### `wasm-webcomponent` vs `kototama` Wasm runtime
+
+| | **wasm-webcomponent** | **kototama** |
+|---|---|---|
+| Role | Thin **browser packaging** library | Full **Wasm tender / execution runtime** |
+| Runs | Browser native `WebAssembly` | Primarily **JVM/Chicory** (`kototama.tender`); browser via its `web/` which *imports* wasm-webcomponent |
+| Guest ABI focus | `kotoba` module imports (kgraph, actor:host ports, kami-ecs, gpu clear, …) as small JS host files | `actor:host` contract + caps + limits + tender; unikernel-style host |
+| Scope | Drop-in WebComponent + host-import helpers; zero JVM | Contract validation, capability grants, RuntimeLimits, fuel, memory limits, deploy story |
+| Origin | Extracted *from* kototama's `web/` PoC (ADR-2607061630 / 2607061850) so apps do not depend on the whole tender | Parent runtime of that extraction |
+
+**Use wasm-webcomponent** when you only need "load this `.wasm` in a page and bind host imports."
+**Use kototama** when you need the tender (caps, limits, JVM host, actor lifecycle) —
+not as a second browser game host next to wasm-webcomponent.
+
+### Updated canonical map (post-addendum)
+
+```
+L5 apps          kami-app-* / freeboard / …
+L4 hosts         wasm-webcomponent          … browser (only wasm host for games)
+                 kotoba.kami-host           … portable ECS host
+                 kototama.tender            … JVM actor:host tender (non-rs)
+L3 authoring     kami-engine-sdk            … was -clj; ECS / scene / render-IR
+                 kami-engine-app-sdk        … browser chrome helpers
+                 kami-engine-hud            … HUD widget data IR
+                 kami-engine-input-map      … stick/deadzone
+L2 render        webgpu + org-w3-webgpu + render
+L0 contracts     kami-engine / kami-contracts
+```
+
+Pruned: `kami-engine-sdk-svelte`, `kami-engine-host-rs`.
+
