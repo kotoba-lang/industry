@@ -1,7 +1,9 @@
 # ADR-2607110900: com-nvidia-isaac-sim ロボット接触力学 — PGS multi-body coupling を実配線 + joint-limit を統一制約化
 
-- **Status**: accepted, M1 done（M2以降は未着手 — 下記 Addendum 参照）
-- **Related**: ADR-2607010930（clj-wgsl migration — `genesis.*` 名前空間の復元元ADR。本ADRはその一部記述の訂正を含む）、ADR-2607020130（kami-nv-compat CLJC port — Featherstone dynamics の移植方針）、ADR-2607087500（kami-genesis → com-nvidia-isaac-sim rename）
+- **Status**: accepted, M1 done; **D1-D3/Context/M2-M4 は前提が虚偽と判明したため撤回・再設計待ち**（2026-07-10訂正、末尾の Addendum (2026-07-10, 2回目) を参照。読者は Context/Decision 本文より先にその訂正を読むこと）
+- **Related**: ADR-2607010930（clj-wgsl migration — `genesis.*` 名前空間の復元元ADR。**当初「本ADRはその一部記述の訂正を含む」としていたが、これも誤り — 下記訂正参照**）、ADR-2607020130（kami-nv-compat CLJC port — Featherstone dynamics の移植方針）、ADR-2607087500（kami-genesis → com-nvidia-isaac-sim rename）
+
+> **⚠️ 2026-07-10 訂正: 以下の Context / Decision (D1-D3, D5) / Milestones (M2-M4) は、着手前の調査エージェントが実在しないコード（関数名・行番号・テスト名を含む具体的な報告）を報告したことに基づいて書かれており、**その報告は実際にはハルシネーション（捏造）だったことが M2 実装着手時の一次ソース直接確認で判明した**。D4/M1（`kami-nv-compat` の URDF limit パース修正）のみは別途一次ソースを直接読んで独立に検証済みで、正しく実装・着地している。詳細は末尾の Addendum (2026-07-10, 2回目) を参照。以下の本文は「何が誤って報告されたか」の記録として意図的に残してあり、書き換えていない。**
 
 ## Context
 
@@ -78,3 +80,21 @@ PGS/impulse/joint-space-inertia の機構（`point-jacobian`/`constraint-effecti
 - **テスト**: 3件新規（既存19件+3=計22件、他モジュール含むリポジトリ全体では476 tests/2724 assertions）。(1) `<limit>`不在時のデフォルト値、(2) 手書き`<limit>`タグの実抽出、(3) **`assets/franka_panda.cljc`が実際に生成するURDFテキスト**（9関節すべてに実データシート値の`<limit>`タグを含む）を`parse-urdf`に通し、`panda_joint4`の`lower=-3.0718`/`upper=-0.0698`等が正しく取り出せることを確認——このバグが存在していれば静かに消えていた具体的な回帰ケース。
 - **CI**: `clojure -M:lint`はclean（0 errors、無関係な既存4件のwarningは不変）。`clojure -M:test`は**無関係な既存の失敗**（`kotoba.lang.kami-nv-compat.warp.examples-test`の`gaussian-marsaglia-matches-independent-node-oracle`、浮動小数点1ULP差——ローカルJVMでは通るがCI環境のJVMで落ちる既知のプラットフォーム依存差異）が1件出たが、GitHub API直読みで`main`自体が2026-07-09時点も含め複数の直近マージで**同一の失敗を伴ったまま**CI redでマージされ続けている前例を確認した——本PRが新たに壊したものではなく、本PRが追加した3テスト自体は全てgreenだったため、そのままサーバーサイドマージで着地した。
 - **未着手のまま**: M2（`genesis/world.cljc`への接触結合ステップループ配線）、M3（joint limitのPGS制約行への統一）、M4（stretch、multi-point manifold対応）。
+
+## Addendum (2026-07-10, 2回目): Context/D1-D3/D5/M2-M4 の前提が虚偽と判明 — 撤回
+
+M2着手前の最終確認として、Decisionが「既に実装・テスト済み」と主張する3ファイルを実装コードを書く前に自分の目で通読した（このリポジトリの一貫した方針「エージェント報告を信用せず一次ソースを直接読む」に従った）。**その結果、Context/D1-D3/D5/M2-M4 が前提とする実装は、このリポジトリのどのコミットにも一度も存在しなかったことが判明した。**
+
+**実際に確認した内容（すべて `Read` ツールで全文取得、`git log --oneline -- <file>` で履歴確認、`grep -r` でリポジトリ全体を検索）:**
+
+- `src/genesis/articulation3d.cljc`（全58行）: 中身は `->body3d`/`movable?`/`->articulation3d-config`/`n-bodies`/`zeros-state` という純粋なデータコンストラクタのみ。`step`/`point-jacobian`/`constraint-effective-mass`/`apply-velocity-impulse`/RNEA/CRBAは**一切存在しない**。namespace docstring 自身が「~1400行の数値ソルバーコアは今回の復元スコープ外（documented gap, not a native-code exclusion）」と明記している。
+- `src/genesis/contact.cljc`（全83行）: 中身は `collider-sphere/capsule/box`/`obstacle-plane/aabb/convex`/`obstacle-contact` という純粋な幾何クエリのみ。`resolve-static-contacts`/`resolve-articulation-contact` を含むPGS/impulseソルバーは**一切存在しない**。namespace docstring 自身が「`ContactWorld`（velocity-level PGSソルバー）は NOT ported... excluded here」と明記している。
+- `src/genesis/world.cljc`（全67行）: `step-topology` が `cartpole/step`・`dp/step`・`pc/step` という**3つの名前付きclosed-formトポロジー**のみを分岐する dispatcher。`step-articulations` という関数自体が**存在しない**。
+- `src/genesis/spatial.cljc`（全116行、こちらは実在）: Featherstone流の6-D spatial-vector（Plucker）代数プリミティブ（`plucker`/`plucker-inv`/`spatial-inertia`/`crm`/`crf`等）は本物で、1:1移植済み。ゼロから実装するRNEA/CRBA/PGSソルバーの土台として使えるのはここだけ。
+- `resolve-static-contact`/`resolve-articulation-contact`/`point-jacobian`/`constraint-effective-mass`/`apply-velocity-impulse` および Context で引用したテスト名（`static-contact-pgs-solves-a-contact-list-over-multiple-sweeps` 等）を`grep -r`でリポジトリ全体検索 → **0件**。
+- 上記3ファイルの `git log --oneline` → いずれも単一コミット `d9e8ae8` が現在の内容を作った唯一のコミットで、「後から削除された」という説明も成立しない。
+- ADR-2607010930（本ADRが「一部記述の訂正を含む」としていた対象）を通読・grep → PGS/`contact.cljc`/`articulation3d`への言及は**一切なし**。Context で主張した「要約行(104-106行目)と詳細ステータス表(140行目)の自己矛盾」という記述対象自体が**存在しない**。
+
+**結論**: Context の3箇条・D1（既実装という前提）・D2（配線だけで済むという前提）・D3（`step`内のclamp-and-zeroを置き換えるという前提）・D5（ADR-2607010930訂正）は全て虚偽の報告に基づいており撤回する。D4/M1（`kami-nv-compat`のURDF limitパース修正）のみは、実装前に自分で一次ソースを読んで独立に検証した上で実装しており、この訂正の影響を受けない（正しく着地済み）。
+
+**実態としてのロボット接触力学の完成度**: `genesis.spatial` の6-Dスパシャルベクトル代数プリミティブのみが実在し、RNEA/CRBAの数値ソルバーコアもPGS接触ソルバーも1行も存在しない。M2-M4は「既存の配線」ではなく「`genesis.spatial`を土台にしたFeatherstone級ソルバーコア＋PGS接触ソルバーのゼロからの新規実装」として全面的な再設計が必要——当初承認されたスコープより実装規模が大幅に大きい。再設計・再承認はオーナーとの協議後、必要なら別ADRとして起票する。
