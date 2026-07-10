@@ -558,3 +558,43 @@ src/kami/cartpole_math.cljc   ; compute-golden harness
 | webgpu-rs | `d63532a775c4a174f06528779d6beae2bf62d321` |
 | webgpu | `67e0f5479f4d15ff80cc973e1b4c8379920eaa95` |
 
+## Addendum 9 (2026-07-10) — pure executor + nested monorepo cleanup + cartpole-math
+
+### webgpu is now pure executor
+
+```
+src/kami/webgpu.cljs
+src/kami/webgpu/{geometry,ir,mesh}.cljc/cljs
+```
+
+| moved out | to |
+|---|---|
+| `kotoba.webgpu-rs.*` | `kotoba-lang/webgpu-rs` (already SSoT; vendored copy removed) |
+| `kami.cartpole-math` | **new** `kotoba-lang/cartpole-math` |
+
+### kami-engine nested cleanup (executed)
+
+| nested | action |
+|---|---|
+| `kami-engine-sdk-clj/` | **deleted** — SSoT `kami-engine-sdk` |
+| `kami-webgpu-rs/` | **deleted** — SSoT `webgpu-rs` |
+| `kami-script-runtime/` | fixture → `fixtures/script-runtime/survivors.clj`, nested **deleted** |
+| tiny `kami-*-scene/` stubs | EDN → `fixtures/scenes/*`, stubs **deleted** |
+| `kami-engine-clj/`, `kami-ui-sdk/`, `kami-render` shaders, `kami-game-scene` | **kept** |
+
+### Scaffold retirement READMEs
+
+`kami-engine-render` / `core` / `script-runtime` README now point to live packages
+(west group already `archived` from addendum 8).
+
+### Pins
+
+| repo | tip |
+|---|---|
+| cartpole-math | `3934359eb9bfb4667d8d54921700b90a8e3fba75` |
+| webgpu | `fa8394cd4a214a53011f40cc64d4833e1153c4d7` |
+| kami-engine | `0462a89cf521fcf938e02a141d2073f45167c83b` |
+| kami-engine-render | `8aa316c7a9ac622f67585d0057bcfedbee62b80e` |
+| kami-engine-core | `b61a29ba734bcc1dbffb6a44cc37daba396253e6` |
+| kami-engine-script-runtime | `001c4e3f150621680e0838e344ebebcdb8be41cb` |
+
