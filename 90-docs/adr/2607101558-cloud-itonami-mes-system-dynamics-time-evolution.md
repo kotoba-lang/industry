@@ -1,6 +1,6 @@
 # ADR-2607101558: cloud-itonami MES — System Dynamics（stock-flow連続モデル）による工場プロセスの時間発展
 
-- **Status**: proposed
+- **Status**: accepted, done. M1/M2実装・main着地済み（`gftdcojp/cloud-itonami` PR #325 `cef7d76`、west pin `44e390c`）。M3は未着手（stretch、現時点で不要と判断）。詳細は末尾Addendum参照。
 - **Related**: ADR-2607110900（ロボット接触力学、着手順1番目）、ADR-2607101525（OpenUSD、2番目）。本ADRは3番目=cloud-itonami製造sim。ADR-2607011000（cloud-itonami CACAO — 「1 mission = 1 bounded operation, no internal loop」の設計方針の出典）
 
 > **2026-07-10 訂正: D1をdiscrete-event（個体ベース）シミュレーションからSystem Dynamics（Forrester流のstock-flow連続モデル）へ変更**。実装着手前（west sibling取得段階）にオーナーから直接指示（「kotoba-lang system dynamics を利用」）があった。`kotoba-lang` org内に既存の"system dynamics"という名前のrepo/libraryは実在しない（`gh search code`/`gh repo list`で確認済み、ゼロ件）ため、既存ライブラリの利用ではなく、System Dynamicsという**モデリング手法**をこの組織の流儀（`.cljc`、閉形式検証、既存`cloud_itonami.mes`との合成）で新規実装する指示と解釈した。D2以降を全面差し替え。
@@ -74,3 +74,14 @@ IsaacSim/実際のMESシステムとのライブ差分比較は行わない（�
 - ADR-2607110900（ロボット接触力学、着手順1番目 — 同型の「最小スコープ」判断の先例）
 - ADR-2607101525（OpenUSD、2番目）
 - ADR-2607011000（cloud-itonami CACAO — 「1 mission = 1 bounded operation」設計方針の出典）
+
+## Addendum (2026-07-10): M1/M2 実装完了
+
+`gftdcojp/cloud-itonami`（PR #325、`cef7d76`でmain着地。west pin `44e390c`）:
+
+- `src/cloud_itonami/mes/system_dynamics.cljc`: D1-D4の設計通り実装。3-stock（raw/wip/finished）・2-flow（start-rate/completion-rate）・固定dtのEuler `step`/`run`、解析解`analytic-wip`、期間バッチ変換`report-batch`/`report-batch->tx`（M2、既存`kyber-completion->tx`をそのまま呼ぶ）。
+- テスト7件、すべて閉形式検証（D3通り）: 定常状態収束、有限時刻での解析解一致、Euler法の一次収束（dt半分で誤差がおおよそ半分）、質量保存則、原材料枯渇時の非負制約、report-batchの区間集計の正しさ、実`kyber-completion->tx`呼び出しでactivity/effect/audit tx-dataが生成されること。
+- **判明した事実（着手前には把握していなかった）**: 本repoの品質ゲートはGitHub Actionsではない——`gh api repos/gftdcojp/cloud-itonami/actions/permissions`で確認したところ`enabled:false`（repo単位でAction無効化済み）。実際のゲートはlocalの`lefthook` `pre-push`フック（`bb test-portable-cljs`＝ClojureScript版がprimary、`clojure -M:test`はsecondary、docs/adr/0016-runtime-priority-cljs-first.mdより）。両方を手動実行して確認: 変更前後で失敗数が完全に同一（12 failures/4 errors、すべて`workspace-test`のgoyoukiki match/propose/shareフロー、本変更と無関係）——新規追加0件。またこのrepoは`post-merge`/`post-checkout`フックで実際のCloudflare Pagesデプロイをトリガーする設定になっている（ローカルcheckoutがmainに追従した時点で発火）ため、着地はGitHub API単独マージのみで行い、ローカルでの`git pull`/`checkout main`は行っていない。
+- 新規モジュールは`cloud_itonami.test_runner`（JVM secondary）と`cloud_itonami.portable_cljs_test_runner`（primary）の両方に登録した（既存`mes-test`と同じ扱い）。
+
+D1-D4・M1-M2すべて解決済み。M3（フィードバックループ付き在庫管理ポリシー）は現時点で着手不要と判断——本ADRはこれで完了。ロボット接触力学・OpenUSD・cloud-itonami製造simの3領域すべてが完了した。
