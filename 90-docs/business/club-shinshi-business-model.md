@@ -52,6 +52,7 @@
 - 観測 (signal): shinshi.club 実測 2113 req/7d・513 uniques(日次和)・うち4xx probe 9%(24h)
 - 観測 (signal): shinshi.club 実測 2119 req/7d・513 uniques(日次和)・うち4xx probe 10%(24h)
 - 観測 (signal): shinshi.club 実測 2125 req/7d・514 uniques(日次和)・うち4xx probe 10%(24h)
+- 観測 (signal): shinshi.club 実測 2138 req/7d・516 uniques(日次和)・うち4xx probe 10%(24h)
 
 ## Customer Segments
 
@@ -129,6 +130,8 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 126 · /js/app.js 46 · /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 45 · /app.css 38 · /robots.txt 32 | 4xx(probe) 9% · 5xx 5%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 127 · /js/app.js 50 · /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 45 · /app.css 38 · /robots.txt 32 | 4xx(probe) 10% · 5xx 4%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 133 · /js/app.js 50 · /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 45 · /app.css 38 · /robots.txt 30 | 4xx(probe) 10% · 5xx 3%
+- GTM 律速の再定義: club-shinshi は BMC 68 で validation=0.0/distribution=2.0。広告出稿でなく『動くコンパニオン体験』が需要エンジン (candy.ai と同型: 供給の魅力が pull を作る)。companion chat が live 化したら次は ① 生成画像の kotobase 永続化 ② /chat 導線を top/actress ページから強調 ③ 1メッセージ=x402 少額課金で validation を実測 — この順で回す
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 136 · /js/app.js 50 · /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 45 · /app.css 38 · /robots.txt 30 | 4xx(probe) 10% · 5xx 3%
 
 > NSFW は paid 集客が全封鎖 → organic のみ。集客が事業の律速。
 
@@ -162,6 +165,7 @@
 - 原因特定と復旧 (2026-07-09): ExoClick 途絶 (30日で imp 1件) の原因 = atproto.gftd.ai 全 522 → サイト全画像死。PR #12 で cdn.gftd.ai 直配信に切替、本番復旧を実測確認。imp 回復は日次監視、write path (pod→PDS) は未修理
 - walk #4 (2026-07-09): 所有ターゲット (shinshi mount/画像/bundle, babiniku config) 全て生存・上書きなし。ExoClick 回復は遅行 (修正<1日、7/6 imp1 が最新)。verifier 0 pending。L3 murakumo.cloud/kotobase.net 共に 200 = x402 per-request 課金の接続先が稼働中
 - system dynamics 介入 (BMC ReAct): 最速 income loop = R1 広告 (買い手不要・受動) が回っていなかった真因を発見・修正 — ad-slot 呼び出しがマップを渡し文字列キー期待で広告が一度も描画されず + 配置1ページのみ。scene/actress 面に ExoClick zone 設置、本番で <ins> 注入確認。既存 traffic で impressions 発生見込み
+- supply unlock (2026-07-10): companion brain 本番配線 (shinshi.worker.companion→murakumo Qwen-35b)。agentChat/requestScene の 410 蘇生・persona は D1 modelProfile 解決・safety floor + honest degrade。validation=0.0 律速への具体 unlock、有効化は owner secret 1件 (MURAKUMO_PROXY_TOKEN) 待ち
 
 ## Unfair Advantage
 
