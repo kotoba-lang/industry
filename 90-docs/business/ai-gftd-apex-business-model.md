@@ -64,6 +64,7 @@
 - 観測 (signal): gftd.ai 実測 207153 req/7d・4819 uniques(日次和)・うち4xx probe 10%(24h)、workers 5591 inv/7d
 - 観測 (signal): gftd.ai 実測 207994 req/7d・4848 uniques(日次和)・うち4xx probe 10%(24h)、workers 5598 inv/7d
 - 観測 (signal): gftd.ai 実測 208688 req/7d・4884 uniques(日次和)・うち4xx probe 10%(24h)、workers 5611 inv/7d
+- 観測 (signal): gftd.ai 実測 209360 req/7d・4911 uniques(日次和)・うち4xx probe 11%(24h)、workers 5657 inv/7d
 
 ## Customer Segments
 
@@ -122,6 +123,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /stg/.env 52 · /software/update.cgi 37 · /server/backend/.env 18 · /sitemap.xml 16 · /cc13.php 16 | 4xx(probe) 10% · 5xx 82%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 1041 · /favicon.ico 130 · /api/node/config.js 52 · /signup 36 · /server/backend/.env 18 | 4xx(probe) 10% · 5xx 71%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 1045 · /favicon.ico 135 · /api/node/config.js 52 · /signup 36 · /server/backend/.env 18 | 4xx(probe) 10% · 5xx 71%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 1039 · /favicon.ico 142 · /api/node/config.js 52 · /signup 36 · /server/backend/.env 18 | 4xx(probe) 11% · 5xx 71%
 
 ## Revenue Streams
 
