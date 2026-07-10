@@ -68,6 +68,9 @@
 - facilitator 経由の決済総額 (GMV、seller 別内訳)
 - 個別ゲートから nexus 委譲へ移行した seller 数
 - 稼働確認 (2026-07-10): /health /catalog /.well-known/x402 実応答、seller 2件登録 (murakumo/kotobase)
+- 次の検証 (nexus-x402-adoption): shinshi/murakumo/kotobase のうち最低 1 つが個別ゲートを Facilitator API 委譲へ移行
+- 次の検証 (nexus-x402-agent-demand): facilitator 経由の agent-originated payment 件数 > 0 (人間フロー以外)
+- 次の検証 (nexus-x402-external-seller): 外部 seller 登録 1 件以上
 
 ## Unfair Advantage
 
