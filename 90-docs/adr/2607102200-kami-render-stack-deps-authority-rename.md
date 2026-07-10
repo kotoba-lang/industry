@@ -518,3 +518,43 @@ several sibling packages still **re-exported from webgpu** (inverted dep):
 | webgpu | `27f384184c141c1a5d0ed7928128d160225ee9dc` |
 | host | `5d6c858d8083ddca6d128a4630586c331304db28` |
 
+## Addendum 8 (2026-07-10) — thin webgpu executor + host surface + webgpu-rs restore
+
+### Problem
+
+After addendum 7, `webgpu` still bundled **game browser surface** and **retired-rs
+domain**, so apps that only need collision/host still dragged the GPU executor (or
+vice versa). `webgpu-rs` had been archived after a temporary merge into webgpu.
+
+### Decision
+
+| package | owns | notes |
+|---|---|---|
+| **host** | `kami.host` + `kami.input` + `kami.ui` + `kami.audio` | browser game surface; **no webgpu dep** |
+| **level** | `kami.level` | spawns/zone/objective EDN |
+| **playwright** | `kami.playwright` | headless Chromium eval harness |
+| **webgpu-rs** | `kotoba.webgpu-rs.*` | pure-CLJC retired-rs domain; **unarchived** as SSoT |
+| **webgpu** | `kami.webgpu*` + `kami.cartpole-math` | **thin browser executor** only |
+
+Scaffold packages (empty clj-wgsl placeholders) join the **archived** west group:
+
+- `kami-engine-render`, `kami-engine-core`, `kami-engine-io`,
+  `kami-engine-engine`, `kami-engine-script-runtime`
+
+### webgpu remaining tree
+
+```
+src/kami/webgpu.cljs + webgpu/{geometry,ir,mesh}
+src/kami/cartpole_math.cljc   ; compute-golden harness
+```
+
+### Pins
+
+| repo | tip |
+|---|---|
+| level | `d63ad49c14f2dd935ca9cf54cc4971e180527fe7` |
+| playwright | `7019358de0ddccbbc20735e578dcc65ee2f11c44` |
+| host | `86928e771266f4f788c0cf4ca738884c58e02767` |
+| webgpu-rs | `d63532a775c4a174f06528779d6beae2bf62d321` |
+| webgpu | `67e0f5479f4d15ff80cc973e1b4c8379920eaa95` |
+
