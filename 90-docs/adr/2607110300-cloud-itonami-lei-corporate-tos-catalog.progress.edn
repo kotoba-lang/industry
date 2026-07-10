@@ -1,6 +1,6 @@
 [
  {:progress/schema-note "cloud-itonami-lei rollout progress tracker, per ADR-2607110300. One row per cloud-itonami-isic-<code> industry. :industry/applicable? true means a coherent real global/listed top-3-company concept exists for this ISIC vertical; false means fragmented/local/non-corporate and this vertical is deliberately skipped for the lei-catalog family (the isic blueprint itself is unaffected). This file is the resume point for the next /loop iteration."
-  :progress/resume-from "isic-6612 (security and commodity contracts brokerage) -- first :industry/status :pending row after isic-6520/isic-6611, both now :done. This tick (single-execution fork per user directive, no sub-forking) did isic-6520 reinsurance (Munich Re only, 1/3 -- Swiss Re bot-blocked, SCOR terms page undiscoverable) and isic-6611 administration of financial markets (ICE + Nasdaq, 2/3 -- CME Group bot-blocked). Cumulative company-repo count must be recomputed fresh each tick via gh repo list cloud-itonami --limit 300 --json name filtered to cloud-itonami-lei-* -- do not trust a prior ticks stated running total (freshly verified this tick: 66)."
+  :progress/resume-from "isic-6630 (fund management activities) -- first :industry/status :pending row after isic-6612/isic-6622, both now :done. This tick (single-execution fork per user directive, no sub-forking) did isic-6612 security and commodity contracts brokerage (Charles Schwab + Interactive Brokers, 2/3 -- LPL Financial bot-blocked) and isic-6622 insurance agents and brokers (Marsh & McLennan + Aon, 2/3 -- Willis Towers Watson rate-limited/LEI-ambiguous). Cumulative company-repo count must be recomputed fresh each tick via gh repo list cloud-itonami --limit 300 --json name filtered to cloud-itonami-lei-* -- do not trust a prior ticks stated running total (freshly verified this tick: 70)."
   :db/id -1}
  {:industry/code "isic-0162"
   :industry/description ""
@@ -1183,8 +1183,29 @@
  {:industry/code "isic-6612"
   :industry/description "Open Business Blueprint for ISIC Rev.5 6612: security and commodity contracts brokerage"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Landed 2/3. LPL Financial Holdings Inc. excluded (site-wide 403, bot-blocked)."
+  :industry/companies
+  [{:company/legal-name "The Charles Schwab Corporation"
+    :company/lei "549300VSGCJ7E698NM85"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Charles Schwab Corporation"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300vsgcj7e698nm85"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.schwab.com/legal/terms"}
+   {:company/legal-name "Interactive Brokers Group, Inc."
+    :company/lei "5493004DT6DCDUZNDM53"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Interactive Brokers Group"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-5493004dt6dcduzndm53"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.interactivebrokers.com/en/general/homepage-disclosures.php"
+    :company/note "no dedicated website ToS page discoverable; archived as :risk-disclosures instead"}
+   {:company/legal-name "LPL Financial Holdings Inc."
+    :company/lei "549300XROQ4Y8G2L7682"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=LPL Financial Holdings"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified (registration LAPSED but entity ACTIVE) but site-wide 403 bot-block; excluded"}]}
  {:industry/code "isic-6619"
   :industry/description ""
   :industry/applicable? false
@@ -1200,8 +1221,27 @@
  {:industry/code "isic-6622"
   :industry/description "Open Business Blueprint for ISIC Rev.5 6622: insurance agents and brokers"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Landed 2/3. Willis Towers Watson excluded (GLEIF-verified LEI candidates ambiguous, terms page 429 rate-limited on 2 attempts)."
+  :industry/companies
+  [{:company/legal-name "Marsh & McLennan Companies, Inc."
+    :company/lei "549300XMP3KDCKJXIU47"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Marsh & McLennan Companies, Inc."
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300xmp3kdckjxiu47"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.marshmclennan.com/terms-of-use.html"}
+   {:company/legal-name "AON GLOBAL HOLDINGS PLC (trading as Aon plc)"
+    :company/lei "549300KJ06GHJLM4Z895"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Aon"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300kj06ghjlm4z895"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.aon.com/en/about/leadership-and-governance/legal-notice"
+    :company/note "no GLEIF record under exact name Aon plc; AON GLOBAL HOLDINGS PLC is closest verified match, used as-is; archived as :legal-notice not :terms-of-service"}
+   {:company/legal-name "Willis Towers Watson Public Limited Company"
+    :company/status :tos-fetch-failed
+    :company/note "two candidate LEI records under the same name (GB and BE registrations) left undisambiguated; terms-of-use page returned HTTP 429 on 2 fetch attempts with different user agents"}]}
  {:industry/code "isic-6629"
   :industry/description "Open Business Blueprint for ISIC Rev.5 6629: other insurance auxiliary activities"
   :industry/applicable? false
