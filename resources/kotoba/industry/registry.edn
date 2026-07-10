@@ -6644,12 +6644,29 @@
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "7820"
    :name "Temporary employment agency activities"
-   :repo "https://github.com/gftdcojp/cloud-itonami-N7820"
-   :business-id "cloud-itonami-N7820"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-7820"
+   :business-id "cloud-itonami-isic-7820"
+   ;; No :robotics -- the agency's entire actuation surface is placement/
+   ;; extension/timesheet-approval/report paperwork; the labor itself
+   ;; happens at the client site, outside the actor's boundary. Same
+   ;; exemption class as cloud-itonami-6310/-isic-6910/-isic-8291/
+   ;; -isic-4690/-isic-4610/-isic-6311.
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger :labor]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; real actor: staffing.{facts,store,policy,llm,phase,operation,report,
+   ;; sim}.cljc -- TempStaffing-LLM sealed advisor ⊣ StaffingGovernor.
+   ;; Distinct from -isic-7810 (Community Employment Agency, one-time
+   ;; placement-fee model, agency never employer of record): here the
+   ;; agency IS the employer of record, which is what generates the two
+   ;; domain-unique HARD checks with no analog in any sibling actor --
+   ;; tenure-limit-gate (real statutory continuous-assignment caps: JPN
+   ;; 労働者派遣法第40条の2 3yr, DEU AÜG §1 Abs.1b 18mo, GBR AWR 2010 12wk
+   ;; qualifying period; USA deliberately has no entry -- no general
+   ;; federal cap exists to cite) and wage-compliance-gate (effective
+   ;; hourly rate vs. an operator-maintained wage floor, statutory basis
+   ;; USA FLSA / JPN 最低賃金法, never a hardcoded numeric rate).
+   ;; ADR-2607111600 (com-junkawasaki/root superproject).
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "7830"
    :name "Other human resources provision"
