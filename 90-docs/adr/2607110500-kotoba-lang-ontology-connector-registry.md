@@ -158,3 +158,68 @@ Still open: `teian`/`tayori` remain spec-only so cannot yet declare
 `:required-technologies [:ontology]` themselves; no `cloud-itonami-*`
 blueprint or `kotoba-lang/industry` entry references `:ontology` yet;
 `:tender` is still the only object type.
+
+## Addendum 2 (2026-07-10): teian/tayori correction + real goyoukiki→tayori wiring
+
+**Correction to Addendum 1**: the claim that `teian`/`tayori` are
+"spec-only" was wrong — it was checked against this session's stale local
+`orgs/kotoba-lang/{teian,tayori}` checkouts (pin drift: `west update` only
+syncs to whatever pin is already in `west.yml`, it does not fetch upstream's
+latest — exactly the "pin鮮度" hazard `CLAUDE.md` already warns about).
+Fresh clones from GitHub showed both are fully implemented (`teian` pushed
+2026-07-10, `tayori` pushed 2026-07-09): full model/store/policy/advisor/
+governor/phase/operation/port/cacao/kotoba/query/sim/cli layout each,
+matching `goyoukiki`'s own shape, "Scaffold + runnable" per `teian`'s own
+README with live-verified pptx export + Resend email delivery.
+
+Checked whether `goyoukiki` and `teian`/`tayori` already reference each
+other in code: zero hits either direction. The "teian/tayori consume
+goyoukiki's match" framing in `goyoukiki.model`'s own docstring was a
+forward-looking design note, not yet-built wiring. Owner asked to build it
+as new feature work.
+
+**Decision**: added `kotoba-lang/goyoukiki`'s `src/goyoukiki/matchport/tayori.cljc`
+— a real `MatchTarget` (the protocol `goyoukiki.matchport` already defines
+for exactly this seam) that, on `share!` (called once, only after a human
+has ALREADY approved sharing a match), drives a real `tayori`
+`CorrespondenceActor` to `:reply/draft` an outreach message to the
+candidate — never `:reply/send`, which stays tayori's own separate,
+always-human step. `fetch-match`/`propose-match!` mirror
+`goyoukiki.matchport/mock-matchport`'s bookkeeping exactly (deterministic,
+no I/O); only `share!` differs. The seeded thread's one message
+(`system-note`) carries the underlying opportunity's `:ontology/type`/
+`:ontology/source` when tagged by a registered connector, so tayori's own
+audit ledger (and a human reviewing the draft) can see whether a match
+being shared originated from a real external feed (`jp.kkj`/`jp.geps`) or
+an internally-proposed opportunity, without a side channel.
+
+**Framing caveat, disclosed rather than hidden**: tayori's actual charter is
+drafting *replies* to inbound correspondence; a goyoukiki share is really
+the *first* outbound contact about a new match, not a reply. This reuses
+tayori's reply-drafting machinery (a thread + one seeded system-context
+message standing in for the "incoming" side) for that first-contact case —
+a reasonable reuse, not a perfect semantic fit. `tayori.replyllm/mock-advisor`
+produces slightly reply-flavored canned Japanese phrasing regardless
+("ご連絡ありがとうございます…"); a real `llm-advisor` given these same facts
+would generate genuinely first-contact-appropriate text since its system
+prompt only says "propose based on the given facts", not "always reply".
+
+Verified: two independent StateGraph governors compose without either
+short-circuiting the other — `goyoukiki`'s `ProcurementGovernor` already
+gated the `:match/share` that triggers this; `tayori`'s own
+`ComplianceGovernor`/phase-3 auto-commit gates the resulting `:reply/draft`
+(clean + confident → auto-commit; the follow-up `:reply/send` this
+namespace never calls would separately need its own human sign-off, `tayori`'s
+existing, unmodified high-stakes rule). 50 tests / 180 assertions green
+(was 45/170 after Addendum 1; this adds 5 tests / 10 assertions), clj-kondo
+clean. Landed via isolated worktree + server-side merge
+(`gh api repos/kotoba-lang/goyoukiki/merges`), same as every other change
+in this ADR.
+
+Still open: the reverse direction (`teian` briefing decks summarizing
+matches) was considered and NOT built — it is a weaker semantic fit for
+this specific flow (board/sales-review decks, not per-match outreach) and
+forcing it would repeat the mistake this addendum just corrected out of;
+`kotoba-lang/industry`/`cloud-itonami-*` blueprint adoption of
+`:required-technologies [:ontology]` is still untouched; `:tender` is still
+the only ontology object type.
