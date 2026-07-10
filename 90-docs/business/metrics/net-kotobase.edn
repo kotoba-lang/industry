@@ -1,16 +1,19 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 3351, "kotobase-cf-wasm-staging" 2478},
+ {"net-kotobase" 3368, "kotobase-cf-wasm-staging" 2520},
  :zone
- {:requests-7d 5735,
-  :pageviews-7d 314,
-  :uniques-7d-sum 403,
+ {:requests-7d 5821,
+  :pageviews-7d 315,
+  :uniques-7d-sum 407,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/llms.txt", :requests 31}
+  [{:path
+    "/kotobase-cf-wasm-production/ipns/bafyreih4sbvmqm4k26depcsw66r3ch4q4vpg7ve72hm3jy7ggv67kutlaa.json",
+    :requests 127}
+   {:path "/llms.txt", :requests 31}
    {:path "/llms-full.txt", :requests 22}
    {:path
     "/ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapcbsx3yrg7xzj3jrxm3q4mzz2nu",
@@ -18,15 +21,12 @@
    {:path "/_app/meta", :requests 20}
    {:path "/.well-known/did.json", :requests 20}
    {:path
-    "/kotobase-cf-wasm-production/blocks/bafyreifq6p445b472n6qbutttfaa3fegq5bbjnnxcmrogi5y6ksw46qwty/bafyreibifkejxlw2fzlbicjchqpk6tiktxafs2nfolx7idmnn5y4sjvmkm",
-    :requests 9}
+    "/kotobase-cf-wasm-production/blocks/bafyreih4sbvmqm4k26depcsw66r3ch4q4vpg7ve72hm3jy7ggv67kutlaa/bafyreighqpcgjrxroxsmboly4kjvw6syl76d5awe7umzpirk2mwwuyzpsy",
+    :requests 14}
    {:path
-    "/kotobase-cf-wasm-production/blocks/bafyreifq6p445b472n6qbutttfaa3fegq5bbjnnxcmrogi5y6ksw46qwty/bafyreicy74s26nlwmgdfyfy5nlkqcefdzzxgiq67bjwo652oizcsk5wa34",
-    :requests 8}
-   {:path
-    "/kotobase-cf-wasm-production/blocks/bafyreifq6p445b472n6qbutttfaa3fegq5bbjnnxcmrogi5y6ksw46qwty/bafyreid36mtvhmaauy2pfgpaxhypajf3fmdzi3mdkoa57ahy5a46wzxnwu",
-    :requests 8}],
-  :status-mix {:client-error 1517, :ok 488, :server-error 34},
+    "/kotobase-cf-wasm-production/nonces/f715f0328f229d0a6395bf8d52e9020fd788213468d889a2d71fdad6f3b20428.json",
+    :requests 10}],
+  :status-mix {:client-error 1449, :ok 745, :server-error 33},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -35,9 +35,9 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-10",
- :traffic-quality {:window "24h", :probe-4xx-pct 74, :error-5xx-pct 2},
+ :traffic-quality {:window "24h", :probe-4xx-pct 65, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /llms.txt 31 · /llms-full.txt 22 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 21 · /_app/meta 20 · /.well-known/did.json 20 | 4xx(probe) 74% · 5xx 2%",
- :funnel {:visitors 308, :signups 0, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /kotobase-cf-wasm-production/ipns/bafyre… 127 · /llms.txt 31 · /llms-full.txt 22 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 21 · /_app/meta 20 | 4xx(probe) 65% · 5xx 1%",
+ :funnel {:visitors 309, :signups 0, :checkouts 0},
  :signal
- "kotobase.net 実測 5735 req/7d・403 uniques(日次和)・うち4xx probe 74%(24h)、workers 5829 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 5821 req/7d・407 uniques(日次和)・うち4xx probe 65%(24h)、workers 5888 inv/7d、Stripe active subs 0"}
