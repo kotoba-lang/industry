@@ -1,5 +1,6 @@
 [
  {:progress/schema-note "cloud-itonami-lei rollout progress tracker, per ADR-2607110300. One row per cloud-itonami-isic-<code> industry. :industry/applicable? true means a coherent real global/listed top-3-company concept exists for this ISIC vertical; false means fragmented/local/non-corporate and this vertical is deliberately skipped for the lei-catalog family (the isic blueprint itself is unaffected). This file is the resume point for the next /loop iteration."
+  :progress/resume-from "isic-0620 (natural gas extraction) -- first :industry/status :pending row after isic-0610, which is now :done. isic-0610 itself has 2 open retry candidates (Shell plc, Saudi Aramco -- LEI verified, ToS fetch failed on JS-rendering/timeout) that a future iteration could revisit with a JS-capable fetch path before moving further down the list, but this is optional, not blocking."
   :db/id -1}
  {:industry/code "isic-0162"
   :industry/description ""
@@ -10,8 +11,45 @@
  {:industry/code "isic-0610"
   :industry/description "Crude petroleum extraction (ISIC Rev.5 0610) — CrudeAdvisor ⊣ Well Safety Governor. Open Business Blueprint, cloud-itonami fleet."
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Top-3 by crude oil production intended (Saudi Aramco / ExxonMobil / Chevron), but 2 of those 3 hit real fetch failures documented below and were substituted with the next-ranked real majors (ConocoPhillips, TotalEnergies) rather than fabricating data."
+  :industry/companies
+  [{:company/legal-name "Exxon Mobil Corporation"
+    :company/lei "J3WHBG0MTS7O8ZVMDC91"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Exxon Mobil Corporation"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-j3whbg0mts7o8zvmdc91"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://corporate.exxonmobil.com/global-legal-pages/terms-and-conditions"}
+   {:company/legal-name "ConocoPhillips"
+    :company/lei "WPTL2Z3FIYTHSP5V2253"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=ConocoPhillips"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-wptl2z3fiythsp5v2253"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.conocophillips.com/terms-and-conditions/"
+    :company/note "substituted in after Chevron Corporation (the NYSE:CVX Delaware parent) had no discoverable self-registered LEI in GLEIF -- only subsidiaries (Chevron U.S.A. Inc., Chevron Transport Corporation Ltd., etc.) were found, so Chevron was not used rather than guessing which subsidiary LEI to attribute to the parent"}
+   {:company/legal-name "TotalEnergies SE"
+    :company/lei "529900S21EQ1BO4ESM68"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=TotalEnergies SE"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-529900s21eq1bo4esm68"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://totalenergies.com/legal"
+    :company/note "substituted in after Shell plc's and Saudi Aramco's ToS pages both failed to yield verbatim-fidelity text (see below) -- LEI was verified for both but no repo was created for either since the ADR requires full-text, not partial/failed capture"}
+   {:company/legal-name "Chevron Corporation"
+    :company/status :lei-lookup-failed
+    :company/note "GLEIF has no record for the NYSE:CVX Delaware parent entity itself under this or fulltext-variant queries -- only 9+ subsidiaries/pension trusts were found (Chevron U.S.A. Inc. VA8TZDWPEZYU430RZ444, Chevron Pipe Line Company 549300SE9F33952GNP12, etc.); not fabricated, not substituted with a subsidiary LEI"}
+   {:company/legal-name "Shell plc"
+    :company/lei "21380068P1DRHMJ8KU70"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Shell plc"
+    :company/status :tos-fetch-failed
+    :company/note "shell.com/terms-of-use.html is a JS-rendered SPA -- WebFetch (AI-summarizing) returned only the page title with no body text, and raw curl+html2text extraction also failed to surface the terms body (client-side rendered). No repo created; LEI is verified and on record for a future retry with a JS-capable fetch path"}
+   {:company/legal-name "Saudi Arabian Oil Company (Saudi Aramco)"
+    :company/lei "5586006WD91QHB7J4X50"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Saudi Arabian Oil Company"
+    :company/status :tos-fetch-failed
+    :company/note "aramco.com/en/terms-and-conditions timed out (60s) on both WebFetch attempts. No repo created; LEI is verified and on record for a future retry"}]}
  {:industry/code "isic-0620"
   :industry/description "Natural gas extraction (ISIC Rev.5 0620) — GasFieldAdvisor ⊣ Gas Well Safety Governor. Open Business Blueprint, cloud-itonami fleet."
   :industry/applicable? true
