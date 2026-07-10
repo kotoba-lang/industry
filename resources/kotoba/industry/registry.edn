@@ -4903,13 +4903,42 @@
    :operating-states [:order/intake :certification/verify :delivery/dispatch :invoice/settle :audit]},
   {:id "4659"
    :name "Wholesale of other machinery and equipment"
-   :repo "https://github.com/gftdcojp/cloud-itonami-G4659"
-   :business-id "cloud-itonami-G4659"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4659"
+   :business-id "cloud-itonami-isic-4659"
+   ;; No :robotics -- heavy precision machine tools are irregular in
+   ;; mass distribution and require bespoke, load-specific rigging
+   ;; plans, unlike metal-wholesale's uniform bulk stock suited to
+   ;; automated crane/grapple systems.
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger :optimization]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
+   :maturity :implemented
+   ;; real actor: machtooltrade.{facts,governor,phase,sim,operation,
+   ;; machtooltradeadvisor,registry,store}.cljc -- MachToolTradeAdvisor
+   ;; ⊣ :precision-machinery-export-governor. Fleet-first genuinely
+   ;; PARALLEL two-axis check design (not sequential like isic-4651's
+   ;; classify-then-license, not two-properties-of-one-item like
+   ;; isic-4653's engine/ride-on pair): capability-threshold-uncertified
+   ;; independently RECOMPUTES (never trusts an advisor claim) whether
+   ;; simultaneous-axes/positioning-accuracy cross an ECCN-2B001-style
+   ;; threshold via a genuine pure range-check function (the first in
+   ;; the fleet's principal-trading cluster, mirroring the crude-
+   ;; extraction sibling's physical range checks); military-end-use-
+   ;; unresolved reads only end-use/end-user facts with zero fact
+   ;; overlap, modeling the EAR Military End User Rule (15 C.F.R.
+   ;; §744.21) catch-all that applies even to BELOW-threshold machines.
+   ;; Proven independent via a below-threshold+flagged-end-user fixture
+   ;; that holds on end-use alone (capability explicitly does NOT
+   ;; fire), plus an above-threshold+ordinary-end-user fixture that
+   ;; holds on capability alone. Cites USA EAR/BIS CCL Category 2
+   ;; "Materials Processing", ECCN 2B001, 15 C.F.R. §744.21 MEU Rule
+   ;; (high confidence); Wassenaar Arrangement (1996, COCOM successor)
+   ;; lineage for DEU/GBR/JPN equivalents (high confidence on category
+   ;; existence, explicitly LOW confidence on precise numeric axis-
+   ;; count/accuracy thresholds, honestly flagged as an illustrative
+   ;; simplified composite not a verified reproduction of 2B001's real
+   ;; per-machine-type structure). 43 tests / 233 assertions, lint
+   ;; clean, demo verified.
+   :operating-states [:order/intake :contract/verify :delivery/dispatch :invoice/settle :audit]},
   {:id "4661"
    :name "Wholesale of solid, liquid and gaseous fuels and related pr..."
    :repo "https://github.com/gftdcojp/cloud-itonami-G4661"
