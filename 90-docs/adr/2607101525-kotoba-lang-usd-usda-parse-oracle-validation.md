@@ -1,6 +1,6 @@
 # ADR-2607101525: kotoba-lang/usd — USDA読み込み(parse-usda)+ usdcat/usdchecker実オラクル検証
 
-- **Status**: accepted, done. D1/D2/M1（USDAパーサー本体の新規実装）は着手時点で不要と判明（他セッションの並行作業がADR-0048で既に実装済み）。D3/D4/M2/M3（実オラクル検証・CI配線）を実装・main着地済み（`kotoba-lang/org-openusd` PR #1 `44d4d8a`、west pin `161aff0`）。詳細は下記2本のAddendum参照。
+- **Status**: accepted, done. D1/D2/M1（USDAパーサー本体の新規実装）は着手時点で不要と判明（他セッションの並行作業がADR-0048で既に実装済み）。D3/D4/M2/M3（実オラクル検証・CI配線）を実装・main着地済み（`kotoba-lang/org-openusd` PR #1 `44d4d8a`、west pin `161aff0`）。M4（stretch、`.usdc`/`.usdz`バイナリのオラクル経由ブリッジ）も実装・着地済み（PR #2 `2f1f2b4`、west pin `67e5f43`）。詳細は下記3本のAddendum参照。
 - **Related**: ADR-2607110900（ロボット接触力学 — 同じ「物理的リアリズムの成熟度を上げる」取り組みの一環、着手順として1番目。本ADRは2番目=OpenUSD）
 
 > **2026-07-10 訂正（ハルシネーションではなく並行作業の追い越し）**: 本ADR起票時に読んだ`orgs/kotoba-lang/usd/src/usd/core.cljc`は書き込み専用95行だったが、M1着手のため改めてclone した時点で**別セッションが既にADR-0048という別ADRの下で本格的なパーサー（`parse`/`parse-prim`、トークナイザ、コメント対応、round-tripテスト8件を含む計10 deftest）を実装・main着地させていた**ことが判明した。ADR-2607110900のケース（実在しないコードを報告するエージェントのハルシネーション）とは異なり、今回は**実際に実在する、より完成度の高い実装**——単に着手前の事前調査から実装着手までの間に他セッションに追い越された、という健全な並行開発の帰結。詳細は末尾のAddendum参照。
@@ -89,4 +89,16 @@ M1着手のため`kotoba-lang/usd`（**2026-07-05にADR-2607041500の命名慣�
 
 west pin: `com-junkawasaki/root`側`manifest/west.yml`の`org-openusd` entryを`fe3fc0e`→`44d4d8a`に前進（`161aff0`でmain着地）。
 
-D1-D4・M1-M3すべて解決済み。本ADRはこれで完了。
+D1-D4・M1-M3すべて解決済み。
+
+## Addendum (2026-07-10, 3回目): M4（stretch）— `.usdc`/`.usdz`バイナリ対応をオラクル経由ブリッジで実装
+
+オーナー指示でstretch項目に着手。D1で最初から想定されていた通り（「バイナリが必要な場面は、実オラクル（usdcat/usd-core）に変換を委譲すればよい——自前でバイナリパーサを書く必要はない」）、自前crateフォーマット実装ではなく**実オラクル経由の変換ブリッジ**として実装した。
+
+- `kotoba-lang/org-openusd`（PR #2、`2f1f2b4`でmain着地。west pin `67e5f43`）:
+  - `tools/usd_oracle.py`に`convert <in> <out>`サブコマンドを追加（`Usd.Stage.Open` + `Export`、出力拡張子からフォーマットをUsd自身が推論——`usdcat -o`と同じ挙動）。
+  - `src/usd/usdc_bridge.clj`（JVM専用、`usd.oracle-test`と同じ理由で`.clj`）: `read-usdc`/`write-usdc!`が、既存の実`usd.core/parse`/`usda`（ASCII側）とオラクル変換（バイナリ↔ASCII）を組み合わせてバイナリファイルを読み書きする。`usd.core`自体は無変更（ASCII専用のまま）。
+  - テスト2件（実オラクルで確認済み）: write→readで実バイナリを経由したround-tripが成立すること、書き出したファイルの先頭バイトが実際に`#usda`ASCIIでなく本物のcrateバイナリであること（誤って中身がASCIIのままでないことの確認）。オラクル未検出環境ではskip（同じ規約）。
+  - READMEの「バイナリは対象外」という記述を訂正——対象外なのは`usd.core`自体（自前パーサー）のみで、repo全体としては`usd.usdc-bridge`経由でバイナリを扱える。
+
+D1-D4・M1-M4すべて解決済み。本ADRはこれで完了。
