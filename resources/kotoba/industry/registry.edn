@@ -4798,13 +4798,37 @@
    :operating-states [:order/intake :classification/verify :delivery/dispatch :technology/release :invoice/settle :audit]},
   {:id "4652"
    :name "Wholesale of electronic and telecommunications equipment an..."
-   :repo "https://github.com/gftdcojp/cloud-itonami-G4652"
-   :business-id "cloud-itonami-G4652"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4652"
+   :business-id "cloud-itonami-isic-4652"
+   ;; :robotics true, uniform (not path-split) -- this vertical trades
+   ;; physical hardware exclusively: AS/RS + ESD-safe handling for
+   ;; router/switch/base-station/radio cartons, same precedent as
+   ;; fuel/metal wholesale siblings.
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :optimization]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
+   :maturity :implemented
+   ;; real actor: telecomtrade.{facts,governor,phase,sim,operation,
+   ;; telecomtradeadvisor,registry,store}.cljc -- TelecomTradeAdvisor ⊣
+   ;; :telecom-supply-chain-governor. Fourth distinct HARD-check
+   ;; "shape" in the fleet: covered-manufacturer-buyer-restricted is a
+   ;; CONJUNCTION of two structurally unrelated, independently-true-or-
+   ;; false facts (manufacturer on FCC Covered List/NDAA §889(f)(3) ×
+   ;; buyer-category in {federal-agency, federal-contractor,
+   ;; fcc-usf-funded-carrier}) -- unlike isic-4651's sequential
+   ;; classify-then-license split, and unlike isic-4653's two fully
+   ;; independent gates. Proven via a control quadruple: covered-
+   ;; manufacturer + commercial-unrestricted buyer dispatches cleanly;
+   ;; non-covered manufacturer + federal-agency buyer also dispatches
+   ;; cleanly; only covered-manufacturer + restricted-buyer-category
+   ;; holds (two separate restricted-category fixtures). Only 2
+   ;; jurisdictions seeded (USA high confidence, GBR moderate) --
+   ;; deliberately smaller catalog than most siblings, JPN/EU excluded
+   ;; for insufficient citation confidence rather than padded to a
+   ;; quota. Cites Secure and Trusted Communications Networks Act 2019/
+   ;; FCC Covered List, NDAA FY2019 §889 Parts A/B/FAR 52.204-25, UK
+   ;; Telecommunications (Security) Act 2021 + Huawei designated-vendor
+   ;; direction. 45 tests / 251 assertions, lint clean, demo verified.
+   :operating-states [:order/intake :sourcing/verify :delivery/dispatch :invoice/settle :audit]},
   {:id "4653"
    :name "Wholesale of agricultural machinery, equipment and supplies"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4653"

@@ -472,8 +472,10 @@
       ;; promoted directly from :spec -- non-hazardous waste collection
       ;; dispatch actor. 133 = 132 + cloud-itonami-isic-4653, promoted
       ;; directly from :spec -- agricultural machinery/equipment
-      ;; wholesale trading actor.
-      (is (= 133 (:implemented m))))))
+      ;; wholesale trading actor. 134 = 133 + cloud-itonami-isic-4652,
+      ;; promoted directly from :spec -- electronic/telecommunications
+      ;; equipment wholesale trading actor.
+      (is (= 134 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
