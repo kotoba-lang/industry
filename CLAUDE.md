@@ -535,6 +535,22 @@ PolicyGovernor）/ **cloud-itonami**（ops-LLM ⊣ CertGovernor）。
   addendum 2）— ECS core を portable `.cljc` に置き、第一の実行経路は
   ClojureScript（browser ESM / nbb ネイティブ WebAssembly）、`:clj`/
   Chicory 層は互換スイート専用と docstring に明記。
+- **Rust（`kami-render`/`kami-app` 等の既存エンジン）を、個別 app/game の
+  描画要件を満たすために新規 crate として書き足さない（2026-07-10 追記、
+  オーナー指示: 「rust は使わないで、これはちゃんと rule に」）。** 上記の
+  runtime 優先順位はいずれも「app/game 側」コードの選び方であり、Rust
+  エンジン本体は所与のインフラとして**消費するだけ**の対象——個別アプリの
+  描画ニーズのために新しい Rust crate（`#[wasm_bindgen]` エントリポイント
+  + カスタムレンダーパイプライン等）を書き起こす選択肢は、この優先順位
+  チェーンに含まれない。実例: `kami-app-animeka-timeline`
+  （`orgs/etzhayyim/root/40-engine/kami-apps/`）は Rust crate を新規に
+  書いた先行実装だが、これは本規則の明文化前のパターンであり、以後の
+  新規タスクでこれを模倣しない。描画が要る app/game は、既存 Rust エンジン
+  が既に露出済みの WASM/JS 境界があればそれをそのまま呼ぶだけに留め、
+  無ければ上記 kotoba wasm → clojurewasm → ClojureScript → nbb の範囲内で
+  実現方法を探す——それでも描画ニーズを満たせない場合、**「Rust を新規に
+  書く」ことで穴を埋めない**。スコープを絞る（例: 当面は DOM/CSS の視覚
+  表現に留める）か、対象を決めて別途 ADR 化しオーナー判断を仰ぐ。
 - **`bb` の降格は「app の runtime として」の話。** リポジトリ運用ツール
   （`scripts/*.bb`・`.claude/hooks/*.bb`・west 拡張等）は app ではなく
   インフラ tooling で、現状 bb が正本 — これらを一斉移行はしない（移行

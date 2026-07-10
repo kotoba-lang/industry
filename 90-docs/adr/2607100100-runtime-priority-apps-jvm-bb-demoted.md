@@ -41,3 +41,25 @@ JVM `.clj` + Chicory 前提で書いてしまい、事後に ClojureScript 前�
   ClojureScript に落ちる。
 - 模範実装: `kotoba.kami-host`（portable `.cljc` core、第一経路 =
   ClojureScript（browser ESM / nbb）、`:clj`/Chicory は互換専用と明記）。
+
+## Addendum（2026-07-10、オーナー指示「rust は使わないで、これはちゃんと
+rule に」— スコープ境界の明記）
+
+Ghost Hacker ゲームポートフォリオ（ADR-2607023200）のFLOW向け実描画統合を
+調査した際、既存の参考実装 `kami-app-animeka-timeline`
+（`orgs/etzhayyim/root/40-engine/kami-apps/`）が「新規 Rust crate を書き、
+`#[wasm_bindgen]` エントリポイント + カスタムレンダーパイプラインを
+実装する」形だったため、同型の新規 Rust crate 作成が当然の次の一手のように
+見えた。オーナーはこれを明確に却下: **本ADRの runtime 優先順位
+（kotoba wasm → clojurewasm → ClojureScript → nbb）はいずれも「app/game
+側」コードの選び方であり、Rust エンジン本体（`kami-render`/`kami-app`等）は
+所与のインフラとして消費するだけの対象。個別アプリの描画要件を満たすために
+新しい Rust crate を書き起こす選択肢は、この優先順位チェーンに含まれない。**
+
+`kami-app-animeka-timeline` は本規則の明文化前のパターンであり、以後の
+新規タスクでこれを模倣しない。描画が要る app/game は、既存 Rust エンジンが
+既に露出済みの WASM/JS 境界があればそれをそのまま呼ぶだけに留め、無ければ
+上記優先順位の範囲内で実現方法を探す——それでも描画ニーズを満たせない場合、
+「Rust を新規に書く」ことで穴を埋めない。スコープを絞る（例: 当面は
+DOM/CSS の視覚表現に留める）か、対象を決めて別途 ADR 化しオーナー判断を
+仰ぐ。CLAUDE.md 当該節に同日中に同内容を追記済み。
