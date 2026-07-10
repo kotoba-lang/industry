@@ -696,3 +696,41 @@ Serve demos: `python -m http.server --directory demos`.
 | kami-app-isekai | `e335e5807aa39c7c3e45c8d1f6f0aa72a98891af` |
 | net-babiniku | `015e7e38e9525212b27ec77bee008f8489b4642a` |
 
+
+## Addendum 13 (2026-07-10) — nested mangaka-*-clj shims + consumer deps
+
+### Nested monorepo → standalone (mangaka lettering/DTP/render)
+
+| nested (README shim only) | SSoT |
+|---|---|
+| `kami-engine/kami-mangaka-text-clj` | `kotoba-lang/kami-mangaka-text` |
+| `kami-engine/kami-mangaka-page-clj` | `kotoba-lang/kami-mangaka-page` |
+| `kami-engine/kami-mangaka-render-clj` | `kotoba-lang/kami-mangaka-render` |
+| `kami-engine/kami-mangaka-expression-clj` | `kotoba-lang/kami-mangaka-expression` (addendum 12) |
+
+Standalone tips already held the live source (page: komawari tilt / effectLines;
+render: datomize reconstitution). Nested copies were stale or monorepo-local only.
+
+### Consumer deps.edn
+
+| consumer | change |
+|---|---|
+| **kami-genko** | `:test` expression dep → `kami-mangaka-expression` repo (drop `kami-engine` + `:deps/root`) |
+| **com-etzhayyim-sip** | `kami-engine-sdk` (rename from `-clj`) + fresh `kami-mangaka-{render,page}` SHAs; README documents git coords |
+| **kami-mangaka-page** | advance `kami-mangaka-text` pin to main tip |
+
+### Amenominaka
+
+`kami-app-amenominaka` `:local/root` scene siblings (`kami-atmosphere-scene`,
+`kami-vegetation-scene`, `kami-terrain-scene`, `kami-postfx-scene`, …) all
+resolve; no content rewire needed this wave.
+
+### Pins
+
+| repo | tip |
+|---|---|
+| kami-engine | `1aa94d700d67a4bcd50e66c01859e87044962110` |
+| kami-genko | `3fb00e686156926e9e62d0fa0fa5f003a5eeaf34` |
+| kami-mangaka-page | `3e5ccbf6cf8ca28f9cafda6c6cb28b70fb4b59a5` |
+| kami-mangaka-render | `3777d04d88071ab118f0623553a3ecfe52e33d26` |
+| com-etzhayyim-sip | `44bdf25fba664907d67ab78b925d5a17ed553d1f` |
