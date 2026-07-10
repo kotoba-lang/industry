@@ -7,7 +7,8 @@
    Portable .cljc: pure data in the core, io only behind #?(:clj)."
   (:require [clojure.string :as str]
             #?(:clj [clojure.edn :as edn]
-               :cljs [cljs.reader :as edn])))
+               :cljs [cljs.reader :as edn])
+            #?(:cljs [scripts.nbb-compat :as nc])))
 
 ;; ---- base datoms -----------------------------------------------------------
 
@@ -126,5 +127,12 @@
      "Read base datoms file + ledger events (seq) → folded index."
      [base-path events]
      (-> (parse-datoms (slurp base-path))
+         index
+         (fold events)))
+   :cljs
+   (defn load-index
+     "Read base datoms file + ledger events (seq) → folded index."
+     [base-path events]
+     (-> (parse-datoms (nc/slurp base-path))
          index
          (fold events))))
