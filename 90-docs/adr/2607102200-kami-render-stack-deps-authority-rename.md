@@ -628,3 +628,32 @@ Guest game compiler (`kotoba.engine-clj`) still lived only as
 | kami-app-isekai | `df573cc4c08c0e8c99a8bf524224ddcaa5f2acd7` |
 | network-isekai | `67f53a2e7ab3d92c676a3a0a6cf87663782ced54` |
 
+## Addendum 11 (2026-07-10) — nested kami-ui-sdk JS retired + scaffold READMEs
+
+### kami-ui-sdk nested JS
+
+| | |
+|---|---|
+| **SSoT** | `kami-engine-app-sdk` (`kami-ui-sdk.*` + `kotoba.ui`) |
+| **Demo-only JS** | `kami-engine/kami-web/vendor/kami-ui-sdk/*.js` |
+| **Nested path** | README shim only (`kami-engine/kami-ui-sdk/README.md`) |
+
+`graph.html` updated to load vendor scripts. Live apps must not depend on
+nested `kami-ui-sdk/*.js`.
+
+### Scaffold retirement READMEs (complete set)
+
+All clj-wgsl empty scaffolds now document archived status:
+
+`kami-engine-render`, `core`, `io`, `engine`, `script-runtime`
+
+(west group already `-archived` for these from earlier addenda; pins advanced.)
+
+### Pins
+
+| repo | tip |
+|---|---|
+| kami-engine | `d8198ccd131336bf907c2e3da760e80c343949dd` |
+| kami-engine-io | `e8f1d58d1425e97b6d62743ae50cc8574d3ed2cb` |
+| kami-engine-engine | `bd7ca8b34690ed35f45d759c8313942480aab854` |
+
