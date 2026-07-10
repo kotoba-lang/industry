@@ -657,3 +657,42 @@ All clj-wgsl empty scaffolds now document archived status:
 | kami-engine-io | `e8f1d58d1425e97b6d62743ae50cc8574d3ed2cb` |
 | kami-engine-engine | `bd7ca8b34690ed35f45d759c8313942480aab854` |
 
+## Addendum 12 (2026-07-10) — demos / kami-web / consumer deps.edn sync
+
+### kami-web authority
+
+| layer | package / path |
+|---|---|
+| CLJC (`kotoba.web.*`) | `kotoba-lang/kami-web` `src/` |
+| Static demos (graph/play/vendor UI JS) | `kotoba-lang/kami-web` `demos/` |
+| Nested `kami-engine/kami-web` | README **shim only** |
+
+Serve demos: `python -m http.server --directory demos`.
+
+`deps.edn` gains optional `:demos` alias → webgpu / host / app-sdk / sdk.
+
+### Consumer deps.edn updates
+
+| consumer | change |
+|---|---|
+| **network-isekai** | `:deps` + `host` + `dance`; bb classpath lists domain SSoTs |
+| **kami-app-isekai** | `:cljs-game` + `host`; webgpu coordinate rename |
+| **ai-gftd-mangaka** | `kami-engine-sdk` + **new** `kami-mangaka-expression` (no nested) |
+| **net-babiniku** | webgpu coordinate/docs only |
+
+### New standalone
+
+`kotoba-lang/kami-mangaka-expression` — patterns + `kami.mangaka.expression` (104 assertions green).
+
+### Pins
+
+| repo | tip |
+|---|---|
+| kami-web | `982a73488d70aab74d7f42a9c2aacee585fb0282` |
+| kami-engine | `74b29738cfc19d4c66a8b56df07096990642c48e` |
+| kami-mangaka-expression | `1fe312c6cdeb0d6aef3c20403d8748f9d4244795` |
+| network-isekai | `7ab833408eb257426c98d775e84b6dc3cbe3005a` |
+| ai-gftd-mangaka | `c90e9633d832ad63b2117a649e3f6a6178926869` |
+| kami-app-isekai | `e335e5807aa39c7c3e45c8d1f6f0aa72a98891af` |
+| net-babiniku | `015e7e38e9525212b27ec77bee008f8489b4642a` |
+
