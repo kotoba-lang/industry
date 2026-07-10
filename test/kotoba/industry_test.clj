@@ -476,8 +476,10 @@
       ;; promoted directly from :spec -- electronic/telecommunications
       ;; equipment wholesale trading actor. 135 = 134 +
       ;; cloud-itonami-isic-4510, promoted directly from :spec -- motor
-      ;; vehicle sales actor.
-      (is (= 135 (:implemented m))))))
+      ;; vehicle sales actor. 136 = 135 + cloud-itonami-isic-3822,
+      ;; promoted directly from :spec -- hazardous waste treatment/
+      ;; disposal actor.
+      (is (= 136 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

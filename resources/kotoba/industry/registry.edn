@@ -4440,12 +4440,19 @@
    :operating-states [:intake :observe :treat :publish :audit]},
   {:id "3822"
    :name "Treatment and disposal of hazardous waste"
-   :repo "https://github.com/gftdcojp/cloud-itonami-E3822"
-   :business-id "cloud-itonami-E3822"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3822"
+   :business-id "cloud-itonami-isic-3822"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; real actor: hazwaste.{facts,store,policy,llm,phase,operation,report,
+   ;; sim}.cljc -- HazWasteTreatment-LLM sealed advisor ⊣ HazWasteGovernor.
+   ;; Sibling of -isic-3811 (non-hazardous waste collection) but a
+   ;; deliberately distinct business: 3811 dispatches NON-hazardous
+   ;; streams, 3822 treats/disposes HAZARDOUS waste itself under US RCRA
+   ;; Subtitle C / EU Waste Shipment Regulation / Basel Convention.
+   ;; manifest-chain-of-custody-gate and treatment-method-authorization-
+   ;; gate are domain-unique HARD checks. ADR-2607116100 (com-junkawasaki/root superproject).
    :operating-states [:intake :observe :treat :publish :audit]},
   {:id "3900"
    :name "Remediation activities and other waste management services"
