@@ -464,9 +464,11 @@
       ;; :spec -- virtual-assistant/BPO task-matching actor.
       ;; 129 = 128 + cloud-itonami-isic-6312, promoted directly from :spec
       ;; -- web-portal content curation & placement actor. 130 = 129 +
+      ;; cloud-itonami-isic-4772, promoted directly from :spec --
+      ;; governed pharmacy dispensing actor. 131 = 130 +
       ;; cloud-itonami-isic-3811, promoted directly from :spec --
       ;; non-hazardous waste collection dispatch actor.
-      (is (= 130 (:implemented m))))))
+      (is (= 131 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
