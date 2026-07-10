@@ -223,3 +223,97 @@ forcing it would repeat the mistake this addendum just corrected out of;
 `kotoba-lang/industry`/`cloud-itonami-*` blueprint adoption of
 `:required-technologies [:ontology]` is still untouched; `:tender` is still
 the only ontology object type.
+
+## Addendum 3 (2026-07-10): live end-to-end run + real wiring into gftdcojp/cloud-itonami
+
+Owner asked whether this actually runs, and whether `cloud-itonami` itself
+is connected — not just unit tests. Ran a real, unscripted end-to-end demo
+(no synthetic data): `goyoukiki.jp.kkj/ingest!` against the live kkj.go.jp
+API pulled 3 real, currently-open government tenders (参議院/House of
+Councillors, 法務省/Ministry of Justice, 東京都町田市/Machida City), each
+registered with `:ontology/type :tender :ontology/source :jp.kkj`. Ran the
+real `:match/propose → :match/share` flow (human-approval interrupt/resume,
+not stubbed) against one of them; `goyoukiki.matchport.tayori/match-target`
+then drove a real `tayori` `CorrespondenceActor` that produced a genuine
+`:reply/draft` whose seeded message read "新規マッチ通知: 図書情報システム用
+サーバ等の賃貸借及び保守業務一式(参議院) [出所: jp.kkj, 種別: tender]" —
+the real government tender's provenance, visible in the actual draft text.
+Two independent audit ledgers (goyoukiki's own, tayori's own) both recorded
+the run. Separately ran `gftdcojp/cloud-itonami`'s full JVM test suite
+(674 tests / 5238 assertions, 0 failures) and confirmed it already has its
+own real, tested `goyoukiki` integration (`cloud_itonami.workspace`'s
+`effect->goyoukiki-request`/`propose-match!`/`share-match!`) — but that
+layer built its own `opportunity` fresh from each effect's payload fields
+and had no path for a live-ingested, ontology-tagged fact to reach it, and
+used `goyoukiki.matchport/mock-matchport` (no real downstream effect) for
+`:match/share`. Two real, tested layers existed; they were not connected.
+
+**Decision**: connected them, in `gftdcojp/cloud-itonami`'s
+`src/cloud_itonami/workspace.cljc`.
+
+1. `effect->goyoukiki-request` now optionally reads `:ontology-type`/
+   `:ontology-source` from the effect payload and assocs them onto the
+   built opportunity as `:ontology/type`/`:ontology/source` (via `cond->`,
+   so an internally-proposed opportunity with neither key present carries
+   neither key — verified by a dedicated test, not just an implicit nil).
+2. `run-goyoukiki-share!`/`share-match!` now build the actor with
+   `goyoukiki.matchport.tayori/match-target` instead of
+   `goyoukiki.matchport/mock-matchport` — a real, human-approved
+   `:procurement/share-match` effect now actually drives a `tayori`
+   `CorrespondenceActor` to draft (never send) outreach, and the resulting
+   draft is surfaced on the effect's own `:itonami.effect/tool` payload as
+   `:goyoukiki/tayori-draft` (no side channel — a human reviewing the
+   effect's audit trail sees it directly). `tayori`'s own
+   `ComplianceGovernor` stays in control of the real `:reply/send` via a
+   separate, later human approval this handler never triggers.
+3. No new dependency needed in `cloud-itonami`'s `deps.edn` — it already
+   carries plain `:local/root` sibling deps on both `kotoba-lang/goyoukiki`
+   and `kotoba-lang/tayori` (used elsewhere in `workspace.cljc` for its own
+   `teian`/`koyomi`-style integrations); only the two local sibling
+   checkouts needed fast-forwarding to pick up this ADR's earlier
+   `goyoukiki` commits (clean trees, straight fast-forwards, verified via
+   `git status --short` before touching either).
+4. Added 3 tests to `cloud_itonami.workspace-test`: ontology carry-through
+   (present and absent cases) and a full propose→share round trip against a
+   payload carrying `:ontology-type :tender :ontology-source :jp.kkj`,
+   asserting the real tayori draft text contains both. `cloud-itonami`'s
+   full suite: 677 tests / 5243 assertions green (was 674/5238), plus its
+   own PRIMARY portable-cljs gate (274 tests / 2451 assertions, triggered
+   automatically by its `pre-push` lefthook) also green — confirming the
+   change is cljs-compatible, not just JVM-compat-tested.
+5. **Verification method note**: `cloud-itonami`'s `deps.edn` declares 18
+   sibling `kotoba-lang/*` dependencies via `:local/root`, making a fully
+   isolated worktree impractical to test in (every sibling path must exist
+   for classpath resolution even if unused by the changed file). Tested via
+   a git worktree placed at a path whose `kotoba-lang` sibling directory
+   was a **symlink to the real, already-existing** `orgs/kotoba-lang`
+   checkouts (read-only reference, not a copy) — after first confirming via
+   `git status --short` that the two specific checkouts this change
+   actually touches (`goyoukiki`, `tayori`) were clean, then fast-forwarding
+   only those two to pick up this ADR's own already-pushed-to-main commits.
+   Landed the actual code change via the usual isolated worktree (this one
+   moved into the symlink structure via `git worktree move`, not a second
+   copy) + server-side merge (`gh api repos/gftdcojp/cloud-itonami/merges`),
+   same as every other change in this ADR.
+6. **Side effect disclosed**: `gftdcojp/cloud-itonami` runs its own
+   continuous-deployment replacement for the disabled GitHub Actions
+   workflow via `lefthook` `post-checkout`/`post-merge` hooks
+   (`scripts/deploy-if-main-advanced.sh`) — any local checkout (including a
+   freshly-created `git worktree`) that lands exactly on `main`'s current
+   tip triggers a real `wrangler pages deploy` to the production
+   `cloud-itonami.pages.dev` (custom domain `itonami.cloud`), idempotent via
+   a SHA marker in the shared `.git` dir. Creating the isolated worktree for
+   this change triggered one such deploy of the *already-merged* main tip
+   (not this ADR's own WIP) before any edit was made; merging this ADR's
+   change to main will trigger another, this time deploying the change
+   itself — confirmed with the owner mid-session as the repo's intended,
+   already-standard behavior (observed multiple other sessions' deploys in
+   `wrangler pages deployment list` within the same few minutes) before
+   continuing.
+
+Still open: `teian` (briefing decks) remains unconnected to either
+`goyoukiki` or this cloud-itonami flow, by choice (Addendum 2); no
+`cloud-itonami-*` business blueprint (as opposed to `cloud-itonami` itself)
+consumes any of this; `:tender` is still the only ontology object type; no
+other `gftdcojp/cloud-itonami` effect kind besides `:procurement/*` carries
+ontology provenance.
