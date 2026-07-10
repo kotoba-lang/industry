@@ -128,7 +128,15 @@
             kotoba-uiの実バグ2件(menu-select uncontrolled、buttonに:on-click無し)をmurakumo-studio
             実装済みワークアラウンドの移植で回避。M4のinstance bufferキャッシュを維持する
             カメラのみ更新設計。実ブラウザ検証で検証ハーネス自身の実バグ(静的サーバーの.css
-            MIME-type欠落)も発見・修正"}]
+            MIME-type欠落)も発見・修正"}
+  {:id "M6" :name "MAX-INST無警告切り捨ての修正(本ADR原案に無い、オーナー「next」で選択)"
+   :status "done (2026-07-10, org-w3-webgpu@54407e6, kotoba-lang/webgpu@4ead0a3,
+            kami-app-amenominaka@7253c21)"
+   :detail "kami.webgpu/draw!がGPU instance bufferを固定16,384容量で確保しdraw!内部で
+            無警告take-truncationしていた正確性ギャップを修正。org-w3-webgpuにdestroy-buffer!、
+            kotoba-lang/webgpuにensure-inst-buffer!(doubling方式の動的成長)を追加。
+            n=20,000でinstBufferCapacityが16,384→32,768へ成長し切り捨てなしと実測確認、
+            M4のO(1)per-frameコストは維持(cache-miss frameのみ成長)"}]
 
  :non-goals
  ["photorealistic path tracing (Mitsuba3 / kami-rtx-native)"
@@ -152,11 +160,11 @@
 
  :next-steps
  "本ADRはstatus=accepted。M0(scene合成)/M2(render-IRブリッジ)/M3(extensionローダ)/
-  M5(インタラクティブUIシェル)はdone、M1はUSD部分のみdone(glTF未着手)、M4は実測に基づく
-  代替修正(instance bufferキャッシュ)で完了 — 各addendum参照。残る未着手項目:
-  omni.timeline(M3 stretch)、MAX-INST(16384)上限を超えるinstanceの正確性ギャップ、
-  fly camera(M5はorbit+zoomのみ)、glTF書き出し(M1)。いずれも新規追加リクエストが
-  あった時点で個別addendumとして着手する、恒久的な未実装枠として残す。"
+  M5(インタラクティブUIシェル)/M6(instance buffer動的成長)はdone、M1はUSD部分のみ
+  done(glTF未着手)、M4は実測に基づく代替修正(instance bufferキャッシュ)で完了
+  — 各addendum参照。オーナーが2026-07-10「next」で残り3項目(glTF書き出し/fly camera/
+  omni.timeline)全てを選択、M7-M9として順次着手中。恒久的な未実装枠ではなく、
+  この3件は着手が既に決定済み(旧記述を訂正)。"
 
  :addendum-m0-2026-07-09
  {:landed {:kami-app-amenominaka "5a2f6a7→652d2d7 (feat/m0-scene-composition, server-side merge)"
@@ -335,4 +343,60 @@
   :closes-m4-remaining-gap
   "M4 addendumの:remaining-gapsに記載の「インタラクティブなorbit/flyカメラ操作、引き続き未着手」を
    本M5で解消(orbit+zoomのみ実装、flyカメラは未着手のまま — orbitで実用上十分と判断)。
-   MAX-INST上限とomni.timelineはM5のスコープ外、引き続き未解決。"}}
+   MAX-INST上限とomni.timelineはM5のスコープ外、引き続き未解決。"}
+
+ :addendum-m6-2026-07-10
+ {:trigger
+  "本ADR原案にM6は無い。M5完了後、オーナーに残る4項目(MAX-INST上限修正/glTF書き出し/
+   fly camera/omni.timeline)をAskUserQuestionで提示したところ全て選択された。
+   MAX-INST(M4/M5 addendumが繰り返し「未解決のまま」と記録していた正確性ギャップ、
+   パフォーマンスではない)から着手。"
+  :landed {:org-w3-webgpu "69ecef9→54407e6 (feat/m6-destroy-buffer, PR#1, server-side merge)"
+           :kotoba-lang-webgpu "a0bf438→4ead0a3 (fix/m6-instance-buffer-growth, server-side merge)"
+           :kami-app-amenominaka "53612e7→7253c21 (chore/m6-max-inst-verify, server-side merge)"
+           :west-yml-pins "3件を1コミットで前進 (--entry org-w3-webgpu,webgpu,kami-app-amenominaka
+                            のカンマ区切り複数entry指定、verify-west-pins OK、全てfast-forward)"
+           :verification "org-w3-webgpu: PR CI green(push:branches:[main]のみでbranch push単独では
+                           起動しないと判明しPRを作成)。kotoba-lang/webgpu: bb test green(4件の
+                           .cljc suite、webgpu.cljs自体はCLJSでbb testの対象外)。
+                           kami-app-amenominaka: clojure -M:test 29/29(122 assertions)、
+                           clj-kondo 0/0、実ブラウザ(nbb+Playwright フルChromium)で
+                           n=20000のinstBufferCapacity 16384→32768成長を実測確認、
+                           M4 perf回帰チェック(n=15000, <5ms/frame)は1.2ms/frameで
+                           green維持、M2/M5の既存検証も無変更で再実行しgreen、
+                           GitHub Actions両job(test/webgpu-smoke)green"}
+  :root-cause
+  "kami.webgpu/draw!がGPU instance bufferを固定16384容量で確保し、compute-instance-dataが
+   `(take MAX-INST raw-instances)`で無警告に切り捨てていた。kami-app-amenominaka自身の
+   M4ベンチマーク(render-stress-demo)はscene->render-irが生成したinstanceCount(入力側、
+   常に正しいn)しか報告しておらず、draw!内部の切り捨てはこのベンチマーク自身の出力からは
+   一切見えなかった — M4 addendumの「20000要素はMAX-INST 16384で頭打ち」という記述は
+   実測でなくソースコードを読んで得た知識だったと判明、本addendumで訂正。"
+  :fix
+  "固定16384バッファをdoubling方式で動的成長するバッファに変更。org-w3-webgpuに
+   destroy-buffer!(GPUBuffer.destroy()の薄いラッパー、既存create-buffer!と対の操作が
+   無かった)を追加。kotoba-lang/webgpuのinit!は:inst(固定バッファ)でなく:inst-buffer
+   ({:buf :capacity}のatom、初期容量は従来と同じ16384で典型シーンの挙動を変えない)を
+   返すよう変更、新規ensure-inst-buffer!がdraw!の中で毎フレーム容量を確認し、必要なら
+   capacity×2ずつ倍化して旧バッファをdestroy-buffer!してから新バッファを作る。
+   compute-instance-dataの(take MAX-INST ...)は削除(無制限)。M4のinstance-cacheとの
+   整合: バッファが新規作成された(grew?)frameは、たとえCPU側instanceデータがcache-hit
+   でもGPUバッファの中身は未定義なので強制的に再アップロードする分岐を追加 — cache-hit
+   とgrow?が両立する経路は現状発生しないが、防御的に正しくしてある。新規observability
+   フックkami.webgpu/inst-buffer-capacityも追加(呼び出し側が切り捨てられていないか
+   確認できる一般的な診断フック)。"
+  :multi-repo-landing
+  "M0-M5は基本1リポジトリのみだったのに対し、本milestoneはorg-w3-webgpu→
+   kotoba-lang/webgpu→kami-app-amenominakaの順に3件のPR/mergeが必要だった。
+   org-w3-webgpuはCIが`push: branches:[main]`+`pull_request:`のみでbranch push単独
+   では起動しないと判明したためPRを作成してCI確認(webgpu/kami-app-amenominakaは
+   素のbranch pushでCIが起動する設定だったため従来通り)。3リポジトリとも個別に
+   green確認後この順でサーバーサイドmerge。"
+  :process-mistake-self-corrected
+  "destroy-buffer!の最初の実装を誤って共有checkout(orgs/kotoba-lang/org-w3-webgpu本体)に
+   直接書いてしまい、CLAUDE.mdの「共有checkoutは閲覧/統合専用」規定に反した — 気づいた
+   時点でgit checkout --で即座にrevertし、正しく独立worktreeで再実装した(実害なし、
+   共有checkoutは編集前の状態のまま)。"
+  :remaining-gaps
+  "glTF書き出し(M1残り)、fly camera(M5残り)、omni.timeline(M3 stretch) —
+   いずれもオーナーが2026-07-10「next」で着手を選択済み、M7-M9として続けて着手する。"}}
