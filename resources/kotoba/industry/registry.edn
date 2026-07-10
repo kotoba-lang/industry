@@ -5605,12 +5605,22 @@
    :operating-states [:intake :reserve :serve :checkout :audit]},
   {:id "5590"
    :name "Other accommodation"
-   :repo "https://github.com/gftdcojp/cloud-itonami-I5590"
-   :business-id "cloud-itonami-I5590"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-5590"
+   :business-id "cloud-itonami-isic-5590"
+   ;; No :robotics -- this actor registers properties and confirms
+   ;; bookings, it never handles physical delivery, custody, or a
+   ;; door/key-code credential. Same exemption class as
+   ;; cloud-itonami-6310/-isic-6910/-isic-8291/-isic-6311/-isic-7820.
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; real actor: stay.{facts,store,policy,llm,phase,operation,report,
+   ;; sim}.cljc -- StayBooking-LLM sealed advisor ⊣ StayGovernor.
+   ;; capacity-overbooking-gate (real interval-overlap occupancy
+   ;; arithmetic) and license-lapsed-gate (safety-cert-expiry vs.
+   ;; check-in) are two HARD checks with no analog in sibling actors.
+   ;; default-phase=1 from initial implementation (isic-7820's
+   ;; conservative-default precedent).
    :operating-states [:intake :reserve :serve :checkout :audit]},
   {:id "5610"
    :name "Restaurants and mobile food service activities"
