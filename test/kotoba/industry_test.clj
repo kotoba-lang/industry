@@ -21,7 +21,13 @@
     (is (some #{:cae} (industry/required-technologies "3030"))))
   (testing "shipbuilding requires robotics and CAE"
     (is (some #{:robotics} (industry/required-technologies "3011")))
-    (is (some #{:cae} (industry/required-technologies "3011")))))
+    (is (some #{:cae} (industry/required-technologies "3011"))))
+  (testing "engines/turbines require robotics and CAE"
+    (is (some #{:robotics} (industry/required-technologies "2811")))
+    (is (some #{:cae} (industry/required-technologies "2811"))))
+  (testing "basic iron and steel require robotics and CAE"
+    (is (some #{:robotics} (industry/required-technologies "2410")))
+    (is (some #{:cae} (industry/required-technologies "2410")))))
 
 (deftest readiness-reports-missing-tech
   (let [r (industry/readiness "8691" #{:identity :forms})]
@@ -330,6 +336,10 @@
     (is (= :implemented (industry/maturity "3011"))))
   (testing "a hundred-eighth implemented actor (cloud-itonami-isic-8291, corporate/compliance-intelligence actor; promoted directly from :spec, not via :blueprint -- ADR-2607110400) is also :implemented"
     (is (= :implemented (industry/maturity "8291"))))
+  (testing "a hundred-ninth implemented actor (cloud-itonami-isic-2811, engines-turbines actor) is also :implemented"
+    (is (= :implemented (industry/maturity "2811"))))
+  (testing "a hundred-tenth implemented actor (cloud-itonami-isic-2410, basic-iron-steel actor) is also :implemented"
+    (is (= :implemented (industry/maturity "2410"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -379,9 +389,9 @@
       ;; logic itself stays unit-tested without depending on a
       ;; specific live count.
       (is (= 36 (:blueprint m)))
-      ;; 110 = 109 + cloud-itonami-isic-4610, promoted directly from :spec
-      ;; (never a :blueprint) -- commission-broker/agency actor.
-      (is (= 110 (:implemented m))))))
+      ;; 112 = 110 + cloud-itonami-isic-2811 (engines/turbines) +
+      ;; cloud-itonami-isic-2410 (basic iron and steel).
+      (is (= 112 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
