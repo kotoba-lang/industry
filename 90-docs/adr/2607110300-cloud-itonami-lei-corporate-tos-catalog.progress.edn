@@ -1,6 +1,6 @@
 [
  {:progress/schema-note "cloud-itonami-lei rollout progress tracker, per ADR-2607110300. One row per cloud-itonami-isic-<code> industry. :industry/applicable? true means a coherent real global/listed top-3-company concept exists for this ISIC vertical; false means fragmented/local/non-corporate and this vertical is deliberately skipped for the lei-catalog family (the isic blueprint itself is unaffected). This file is the resume point for the next /loop iteration."
-  :progress/resume-from "isic-6511 (life insurance) -- first :industry/status :pending row after isic-6492 (isic-6499 is :applicable? false, skipped). This tick did isic-6492/other-credit-granting (American Express Company, Synchrony Financial, Discover Financial Services -- 3/3; Capital One Financial Corporation LEI-verified but ToS page undiscoverable after 5 URL guesses). Cumulative company-repo count must be recomputed fresh each tick via gh repo list cloud-itonami --limit 300 --json name filtered to cloud-itonami-lei-* -- do not trust a prior tick's stated running total (freshly verified this tick: 58). Open retry candidates needing a JS-capable fetch path or better entity resolution, all optional, not blocking, carried forward from prior ticks plus this one: isic-6492 Capital One Financial Corporation (needs footer-link scan or JS-capable fetch); isic-6419 JPMorgan Chase + Bank of America + Wells Fargo (all need JS-capable fetch); isic-6420 Loews Corporation + Jardine Matheson Holdings (explicit bot-challenge); isic-6491 Air Lease Corporation (no parent LEI, would need manual entity-resolution research, not a fetch retry) + Willis Lease Finance Corporation (terms URL undiscovered, needs footer-link scan); plus the full carried-forward list from every prior tick (isic-0610 Shell/Aramco, isic-0620 Cheniere, isic-1920 Marathon/HFSinclair/PBF, isic-2011 Dow, isic-2610 TSMC/Samsung/Intel/Qualcomm/Micron/NXP/onsemi/STMicro, isic-2660 Philips, isic-3011 SamsungHeavy/HanwhaOcean, isic-3020 CRRC/StadlerRail, isic-3030 Airbus, isic-3510 NationalGrid/DukeEnergy, isic-3812 WasteManagement/Stericycle/RepublicServices, isic-4711 Costco/Kroger/Target/Tesco/AholdDelhaize, isic-4730 CoucheTard/Caseys/MurphyUSA, isic-4911 SNCF, isic-4912 UnionPacific/CSX, isic-5020 Frontline/IntlSeaways, isic-5110 AmericanAirlines/Southwest, isic-5210 Vopak/Buckeye/NuStarMagellan, isic-5510 Marriott/Hilton/IHG, isic-5610 YumBrands, isic-6020 ParamountGlobal, isic-6110 LumenTechnologies, isic-6120 TMobile/Vodafone/AmericaMovil, isic-6310 ADP/Paychex)."
+  :progress/resume-from "isic-6520 (reinsurance) -- first :industry/status :pending row after isic-6511/isic-6512, both now :done. This tick (single-execution fork, no sub-forking) did isic-6511 life insurance (MetLife, Prudential Financial, AIA Group -- 3/3, Manulife bot-blocked/excluded) and isic-6512 non-life insurance (Travelers, Chubb -- 2/3, Allstate JS-SPA-shell + Progressive terms-link-undiscoverable both excluded, substituted Travelers). Cumulative company-repo count must be recomputed fresh each tick via gh repo list cloud-itonami --limit 300 --json name filtered to cloud-itonami-lei-* -- do not trust a prior ticks stated running total (freshly verified this tick: 63)."
   :db/id -1}
  {:industry/code "isic-0162"
   :industry/description ""
@@ -1062,13 +1062,63 @@
  {:industry/code "isic-6511"
   :industry/description "Open Business Blueprint for ISIC Rev.5 6511: life insurance"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Manulife Financial Corporation excluded -- site-wide bot-block (403) on both homepage and direct terms-of-use URL guess, no evasion attempted."
+  :industry/companies
+  [{:company/legal-name "MetLife, Inc."
+    :company/lei "C4BXATY60WC6XEOZDX54"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=MetLife, Inc."
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-c4bxaty60wc6xeozdx54"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.metlife.com/about-us/terms-and-conditions/"}
+   {:company/legal-name "Prudential Financial, Inc."
+    :company/lei "5PRBRS5FEH7NREC8OR45"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Prudential Financial, Inc."
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-5prbrs5feh7nrec8or45"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.prudential.com/links/terms-conditions"}
+   {:company/legal-name "AIA Group Limited"
+    :company/lei "ZP5ILWVSYE4LJGMMVD57"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=AIA Group Limited"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-zp5ilwvsye4ljgmmvd57"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.aia.com/en/terms-of-use"}
+   {:company/legal-name "Manulife Financial Corporation"
+    :company/lei "5493007GBX87QOZACS27"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Manulife Financial Corporation"
+    :company/status :tos-fetch-failed
+    :company/note "site-wide 403 bot-block on homepage and direct terms-of-use URL guess; excluded, not fabricated"}]}
  {:industry/code "isic-6512"
   :industry/description "Open Business Blueprint for ISIC Rev.5 6512: non-life insurance"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "The Allstate Corporation and The Progressive Corporation both excluded -- Allstate homepage is a near-empty JS SPA shell (1 <a> tag in 742KB of HTML), Progressive homepage has real links but none to a terms/legal page discoverable by scan; neither evaded. Substituted The Travelers Companies, Inc. as the third company."
+  :industry/companies
+  [{:company/legal-name "The Travelers Companies, Inc."
+    :company/lei "549300Y650407RU8B149"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=The Travelers Companies, Inc."
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300y650407ru8b149"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.travelers.com/about-travelers/legal"}
+   {:company/legal-name "Chubb Limited"
+    :company/lei "E0JAN6VLUDI1HITHT809"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Chubb Limited"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-e0jan6vludi1hitht809"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.chubb.com/us-en/terms-of-use.html"}
+   {:company/legal-name "The Allstate Corporation"
+    :company/lei "OBT0W1ED8G0NWVOLOJ77"
+    :company/status :tos-fetch-failed
+    :company/note "homepage is a near-empty JS SPA shell (1 <a> tag found in 742KB HTML), no server-rendered terms link discoverable; not evaded"}
+   {:company/legal-name "The Progressive Corporation"
+    :company/lei "529900TACNVLY9DCR586"
+    :company/status :tos-fetch-failed
+    :company/note "homepage has 136 real links but none to a terms/legal page found by footer scan; direct URL guess 404'd"}]}
  {:industry/code "isic-6520"
   :industry/description "Open Business Blueprint for ISIC Rev.5 6520: reinsurance"
   :industry/applicable? true
