@@ -3549,13 +3549,24 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2511"
    :name "Manufacture of structural metal products"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2511"
-   :business-id "cloud-itonami-C2511"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2511"
+   :business-id "cloud-itonami-isic-2511"
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as a structural-steel-fabrication
+   ;; actor (Structural Fabrication Advisor ⊣ Structural Fabrication
+   ;; Governor). Legacy gftdcojp/cloud-itonami-C2511 placeholder
+   ;; replaced with real cloud-itonami/cloud-itonami-isic-2511. Fifth
+   ;; classic heavy-industry manufacturing vertical after basic iron
+   ;; and steel (2410), engines/turbines (2811), motor vehicles (2910)
+   ;; and ships/floating structures (3011): structural-steel assembly
+   ;; fabrication, welding-procedure-qualification rules verify,
+   ;; NDE-inspection screen, dual actuation (dispatch-assembly +
+   ;; issue-fabrication-certificate), jurisdiction facts catalog (JPN
+   ;; Building Center of Japan / USA AISC 207 + AWS D1.1 / GBR BSI
+   ;; UKCA+CE BS EN 1090 / DEU DIN EN 1090-1 CE marking).
+   :required-technologies [:robotics :cae :dmn :bpmn :audit-ledger]
+   :optional-technologies [:telemetry :optimization]
+   :operating-states [:intake :welding-procedure-verify :nde-inspection-screen :approve :dispatch-assembly :issue-fabrication-certificate :audit]},
   {:id "2512"
    :name "Manufacture of tanks, reservoirs and containers of metal"
    :repo "https://github.com/gftdcojp/cloud-itonami-C2512"
