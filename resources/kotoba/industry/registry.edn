@@ -5996,7 +5996,10 @@
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6411"
    :business-id "cloud-itonami-isic-6411"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :banking]
-   :optional-technologies []
+   ;; :corporate-intelligence added as a licensed wholesale consumer of
+   ;; cloud-itonami-isic-8291 (ADR-2607110400 addendum 6): correspondent-
+   ;; banking counterparty due-diligence.
+   :optional-technologies [:corporate-intelligence]
    :maturity :implemented
    ;; Promoted :blueprint -> :implemented as a central-banking actor
    ;; (ReserveOps-LLM ⊣ Central Bank Reserve Governor), the fifty-
@@ -6169,7 +6172,11 @@
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6511"
    :business-id "cloud-itonami-isic-6511"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :insurance]
-   :optional-technologies []
+   ;; :corporate-intelligence added as a licensed wholesale consumer of
+   ;; cloud-itonami-isic-8291 (ADR-2607110400 addendum 6): policyholder/
+   ;; beneficiary PEP/sanctions screening, same shape as cloud-itonami-
+   ;; isic-6512.
+   :optional-technologies [:corporate-intelligence]
    :maturity :implemented
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :underwrite :bind :endorse :claim :settle :audit]},
@@ -6257,7 +6264,11 @@
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6612"
    :business-id "cloud-itonami-isic-6612"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :securities]
-   :optional-technologies []
+   ;; :corporate-intelligence added as a licensed wholesale consumer of
+   ;; cloud-itonami-isic-8291 (ADR-2607110400 addendum 6): broker's own
+   ;; conflict-of-interest check against a client/counterparty, same shape
+   ;; as cloud-itonami-isic-6621/6622.
+   :optional-technologies [:corporate-intelligence]
    :maturity :implemented
    ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
    ;; :blueprint -> :implemented as a securities-brokerage actor
@@ -6389,7 +6400,11 @@
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6920"
    :business-id "cloud-itonami-isic-6920"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
-   :optional-technologies []
+   ;; :corporate-intelligence added as a licensed wholesale consumer of
+   ;; cloud-itonami-isic-8291 (ADR-2607110400 addendum 6): auditor
+   ;; independence check against the client engagement, same shape as
+   ;; cloud-itonami-isic-6612/6621/6622.
+   :optional-technologies [:corporate-intelligence]
    :maturity :implemented
    ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
    ;; :blueprint -> :implemented as an accounting/auditing actor
