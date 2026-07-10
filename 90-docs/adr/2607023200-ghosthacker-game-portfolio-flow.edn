@@ -20,7 +20,13 @@
    :ghosthacker-flow "orgs/com-junkawasaki/ghosthacker-flow — pure .cljc groove-sync core + terminal + browser host(reagent+Web Audio、ADR-2607100900 follow-up (b))"
    :ghosthacker-harmony "orgs/com-junkawasaki/ghosthacker-harmony — battle.cljc(ASYMMETRY/HARMONY) + terminal + browser host"
    :ghosthacker-echoes "orgs/com-junkawasaki/ghosthacker-echoes — dialogue-tree core + terminal + browser host(reagent、Web Audio不要)"
-   :ghosthacker-tuning "orgs/com-junkawasaki/ghosthacker-tuning — Addendum 2で新規scaffold(dial-vs-target整合core + terminal + browser host)"}}
+   :ghosthacker-tuning "orgs/com-junkawasaki/ghosthacker-tuning — Addendum 2で新規scaffold(dial-vs-target整合core + terminal + browser host)"
+   :ghosthacker-timemachine "orgs/com-junkawasaki/ghosthacker-timemachine — Addendum 3で新規scaffold(RPG、log-depth探索+Ghost recruit core + terminal + browser host)"
+   :ghosthacker-family "orgs/com-junkawasaki/ghosthacker-family — Addendum 3で新規scaffold(シム、5日制リスニングバー経営core + terminal + browser host)"
+   :ghosthacker-memorize "orgs/com-junkawasaki/ghosthacker-memorize — Addendum 3で新規scaffold(カード、神経衰弱flip-pair core + terminal + browser host)"
+   :ghosthacker-duet "orgs/com-junkawasaki/ghosthacker-duet — Addendum 3で新規scaffold(スポーツ、ghosthacker-groove-core再利用のrival対抗戦 + terminal + browser host)"
+   :ghosthacker-vamos "orgs/com-junkawasaki/ghosthacker-vamos — Addendum 3で新規scaffold(パーティ、3ミニゲーム+4人rosterリーダーボード core + terminal + browser host)"
+   :ghosthacker-lightning "orgs/com-junkawasaki/ghosthacker-lightning — Addendum 3で新規scaffold(シューティング、5wave制flash-timing core + terminal + browser host)"}}
  :body "# ADR-2607023200: Ghost Hacker ゲームポートフォリオ — FreeTEMPOのグルーヴ感を軸にした10ジャンル展開、および GHOST HACKER: FLOW の起票（proposed・FLOWのみ scaffold 実装）
 
 **Status**: proposed（ポートフォリオ設計は proposed。GHOST HACKER: FLOW のみ pure .cljc core を scaffold 実装済み）
@@ -190,6 +196,70 @@ clj-kondo 0 errors/warnings、headless DOM実クリック検証済み。
 残り6本（TIME MACHINE/FAMILY/メモライズ/DUET/VAMOS A BAILAR/LIGHTNING）は
 依然として設計のみ・未着手。
 
+## Addendum 3（2026-07-10、オーナー指示で残り6本を並行scaffold — ポートフォリオ全10本が実装完了）
+
+オーナー指示「残り6タイトルも進めて」を受け、6並列エージェントで残る
+全タイトルを同時にscaffold（各タイトル: pure `.cljc` core →
+terminal.clj → reagent web.cljs、headless DOM実クリック/キー検証済み、
+GitHub private repoとしてpush、west登録済み）。全リポジトリ・commit
+存在をAPI経由で個別に実在確認済み。
+
+- **GHOST HACKER: TIME MACHINE**（#4、RPG、Ren&Nei共同、
+  `com-junkawasaki/ghosthacker-timemachine@82cc725`、18 tests/78
+  assertions）— 父の遺したサーバの過去ログを\"log-depth\"として順に遡る。
+  パーティは単一集約値`:power`のみを持ち、各depthの`:difficulty`との差
+  (margin)から`descend`が一つの明確な状態遷移を行う（TUNINGの`lock-in`
+  と同型）。margin次第で`:recruited`（Ghost仲間化+power増）/
+  `:cleared`（仲間化せず小幅経験値）/`:retreat`（power消耗、それでも
+  次のdepthへ進むかはhost側の関心事）に分岐。
+- **GHOST HACKER: FAMILY**（#5、シミュレーション、Ren&Nei共同、
+  `com-junkawasaki/ghosthacker-family@0f470e8`、12 tests/57
+  assertions）— 事務所併設リスニングバーを5営業日にわたって経営する。
+  毎日、限られたattention point(10)を`:drinks`/`:music`/`:staff-care`
+  へ配分し、見せない`:need`との差から`:thriving`/`:steady`/
+  `:struggling`を判定、`:funds`と`:family-bond`（\"Family\"というテーマ
+  そのものの数値化）に反映。黒字でなければ`:family-bond`が高くても
+  最高gradeにはならない優先順位。
+- **GHOST HACKER: メモライズ**（#7、カードゲーム、Nei主導、
+  `com-junkawasaki/ghosthacker-memorize@c187ede`、16 tests/57
+  assertions）— 事件の記憶=Ghostをカード化した8枚(4ペア)の固定グリッド
+  で神経衰弱。`flip-pair`ひとつが核の状態遷移。同一index・collected済み
+  index・完了後の呼び出しは無効(TUNINGの`lock-in`ガードと同型)。
+  攻略効率(attempts対total-pairs)からgradeが決まる。
+- **GHOST HACKER: DUET**（#8、スポーツ、Ren単独、
+  `com-junkawasaki/ghosthacker-duet@e27ee4c`、12 tests/31
+  assertions）— **`ghosthacker-groove-core`を複製せず再利用**（ADR-
+  2607032600の踏襲）。プレイヤーはFLOW/HARMONYと同じ`chart-play-run`/
+  `judge-chart-input`で判定され、rival（決定的なoffset pattern、新規
+  キャラクターは追加せず「堅実型」「エース」の難易度プロファイルとして
+  扱う）も同じ譜面・同じAPIで走行。両者の最終`:score`を比較し
+  WIN/LOSE/DRAWを決める。
+- **GHOST HACKER: VAMOS A BAILAR**（#9、パーティゲーム、Ren&Nei+
+  事務所メンバー総出演、`com-junkawasaki/ghosthacker-vamos@852ded8`、
+  22 tests/63 assertions）— Ren・Nei・Kota・Mei（既存カノンキャラクター
+  のみ、新規オリジナルキャラクター追加なし）の4人rosterが、
+  reaction-tap（数当て近似判定）・quick-pick（本物のURL選別、実在の
+  フィッシング教育が題材）・sequence-recall（アカウント乗っ取り対応
+  手順、これも実在の教育内容）の3ミニゲームを順にこなし、共有tallyで
+  リーダーボード/勝者を決める。ブラウザhostはpass-the-device方式。
+- **GHOST HACKER: LIGHTNING**（#10、シューティング、Ren単独、
+  `com-junkawasaki/ghosthacker-lightning@5ce0ab4`、27 tests/111
+  assertions）— 連続弾幕エンジンではなく5wave固定シーケンスの軽量抽象化。
+  周期的なtarget flashに合わせて1発ずつ撃ち、flashからの経過時間が
+  wave毎に狭まる窓以内ならhit。弾切れ時に残るDaemon数ぶん`:health`が
+  減る。タイミング判定は`ghosthacker-groove-core`とは独立の自前
+  ヘルパー（`flash-schedule`/`judge-shot-timing`）— TUNING同様、
+  ビートグリッド前提ではない別ジャンルとして意図的に非依存。
+
+**これでGhost Hackerゲームポートフォリオ10本全てが「pure core →
+terminal prototype → 実プレイ可能なブラウザhost」まで到達し、
+headless DOM実操作で検証済みの状態になった。** レンダリングは全タイトル
+ともDOM/CSSのみ（`kami-engine-sdk`のようなキャンバス/wasm描画は依然
+未着手、follow-up）。各新規repoの GitHub Actions CI は本セッション時点で
+**GitHubアカウントの支払い問題により起動できていない**（\"recent account
+payments have failed\"、コード側の問題ではない — オーナー対応待ち）。
+ローカルでの`clojure -M:test`/`clj-kondo`は全リポジトリで green。
+
 ## Consequences
 
 **Positive**
@@ -198,16 +268,19 @@ clj-kondo 0 errors/warnings、headless DOM実クリック検証済み。
 - 10本のジャンル/主人公/出典曲がすべて確定し、以降の着手判断が速い。
 - FLOWのcore判定ロジックはpure `.cljc` かつテスト付きで、JVM/CLJS/WASM
   いずれのホストにも移植可能な状態で着地している。
-- （Addendum 2）FLOW/HARMONY/ECHOES/TUNINGの4タイトルが実プレイ可能な
-  ブラウザhostアダプタまで到達し、判定モデルの多様性（ビート同期
-  crossfade、勝敗フレーミング、ダイアログ分岐、精度パズル）を実装
-  レベルで検証できた。
+- （Addendum 2/3）**ポートフォリオ10本全てが実プレイ可能なブラウザhost
+  アダプタまで到達**し、判定モデルの多様性（ビート同期crossfade、勝敗
+  フレーミング、ダイアログ分岐、精度パズル、RPG探索、経営シム、神経衰弱、
+  1v1対抗戦、パーティミニゲーム集、wave制シューティング）を実装レベルで
+  検証できた。
 
 **Negative / 制約（honest）**
-- 本ADR時点でFLOW/HARMONY/ECHOES/TUNING以外の6本は未実装（設計のみ）。
 - レンダリングは全タイトルともDOM/CSSのみ（`kami-engine-sdk`のような
-  キャンバス/wasm描画は未着手）。FLOW/HARMONYの`:groove`crossfadeは
+  キャンバス/wasm描画は未着手）。FLOW/HARMONY/DUETの`:groove`crossfadeは
   作曲済み楽曲が無いため音声ではなく視覚的な表現に留まる。
+- 各新規6リポジトリのGitHub Actions CIはアカウントの支払い問題で未起動
+  （コード自体はローカル検証green、follow-up: オーナーのbilling対応後に
+  再確認）。
 - 「情報場が2065年ネオ東京ビジュアルを持つ」という統合解釈は、ghosthacker本体
   のカノンとして正式に確定していない（本ADRのゲームポートフォリオ文脈限定の
   暫定解釈）。
