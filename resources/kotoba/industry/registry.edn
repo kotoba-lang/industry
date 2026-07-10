@@ -4840,13 +4840,39 @@
    :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
   {:id "4669"
    :name "Wholesale of waste and scrap and other products n.e.c."
-   :repo "https://github.com/gftdcojp/cloud-itonami-G4669"
-   :business-id "cloud-itonami-G4669"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4669"
+   :business-id "cloud-itonami-isic-4669"
+   ;; :robotics true -- robotic sorting arms, magnetic/eddy-current
+   ;; separators, automated baling at the wholesaler's own yard
+   ;; dispatch point (scoped away from downstream recycling/shredding/
+   ;; disposal processing, a separate ISIC activity).
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :optimization]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
+   :maturity :implemented
+   ;; real actor: wastetrade.{facts,governor,phase,sim,operation,
+   ;; wastetradeadvisor,registry,store}.cljc -- WasteTradeAdvisor ⊣
+   ;; :waste-trading-governor. First fleet actor with an ENVIRONMENTAL
+   ;; (not trade-sanctions/biosecurity/food-safety/human-rights)
+   ;; regulatory backbone: prior-informed-consent-missing HARD check,
+   ;; gated on whether :waste-stream-type is classified hazardous
+   ;; (Basel Convention PIC), requiring BOTH
+   ;; :transboundary-notification-filed? AND
+   ;; :destination-country-consent-documented? (a genuinely BILATERAL
+   ;; government-to-government consent pair, unlike any prior
+   ;; sibling's unilateral certificate). Evaluated UNCONDITIONALLY
+   ;; across jurisdictions including the seeded Basel non-Party (USA,
+   ;; which has its own parallel RCRA destination-consent regime) --
+   ;; deliberate departure from isic-4641's jurisdiction-gated shape,
+   ;; reasoned in the ADR against both the 4662/4641 precedents. NO-OP
+   ;; for non-hazardous/green-list waste streams (proven via ferrous-
+   ;; scrap vs. lead-acid-battery control pair in tests). Cites Basel
+   ;; Convention (1989/1992, Art.6 PIC, USA non-Party) for JPN/GBR/DEU,
+   ;; RCRA 40 CFR Part 262 Subpart H for USA, EU Reg. 2024/1157
+   ;; (recast, replaces EC 1013/2006), Japan バーゼル法, UK SI
+   ;; 2007/1711. R2v3/e-Stewards surfaced as informational-only
+   ;; (voluntary private certification, explicitly not gating a HARD
+   ;; check). 46 tests / 228 assertions, lint clean, demo verified.
+   :operating-states [:order/intake :consent/verify :delivery/dispatch :invoice/settle :audit]},
   {:id "4671"
    :name "Wholesale of solid, liquid and gaseous fuels and related products"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4671"
