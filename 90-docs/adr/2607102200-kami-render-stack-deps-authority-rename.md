@@ -410,3 +410,65 @@ harness, still staging, or not near-duplicate of a live standalone SSoT.
 - Per-package unit tests green for extracted packages where present
 - `bb test` in webgpu green after deps rewiring
 
+## Addendum 6 (2026-07-10) — dance / webgl / gpu SSoT + archived west group
+
+### Problem
+
+Addendum 5 extracted pure render data packages (`wgsl`, `sprite-gpu`, `sky`, …)
+but left **`kami.dance` / `kami.webgl` / `kami.gpu` vendored in `webgpu`**.
+
+Meanwhile the sibling packages `dance` / `webgl` / `gpu` already had **thin
+`kotoba.*` facades that re-exported `kami.*` from webgpu** — an inverted
+dependency (facade package → monorepo). That:
+
+1. Created a cycle risk if webgpu ever depended on those packages
+2. Left standalone consumers of `kotoba-lang/gpu` etc. broken without webgpu
+3. Kept the WebGL2 executor and dance frame-ir inside the WebGPU executor repo
+
+Also, archived shims (`kami-engine-hud`, `kami-engine-host-rs`,
+`kami-engine-sdk-svelte`) still lived in the default `+kotoba-lang` west group,
+so every `west update` tried to fetch retired paths.
+
+### Decision
+
+| package | SSoT ns | role | deps |
+|---|---|---|---|
+| **`gpu`** | `kami.gpu` | capability-gated pipeline IR (`resolve-graph` / tiers) | none (pure) |
+| **`webgl`** | `kami.webgl` (+ `kami.webgl.glsl`) | WebGL2 executor for the same render-IR | `gpu`, `sprite-gpu` |
+| **`dance`** | `kami.dance` | pure dance stage → frame-ir | none (pure) |
+| **`webgpu`** | `kami.webgpu` (+ harness) | WebGPU executor + game domains | + `gpu`, `webgl`, `dance` |
+
+- `kotoba.gpu` / `kotoba.webgl` / `kotoba.dance` remain **thin facades**.
+- Dependency edge is **webgpu → siblings**, never reverse.
+- Live consumer `network-isekai` bb classpath points at `kotoba-lang/dance`
+  (and gpu/webgl/sprite-gpu/wgsl/expr as needed), not only `webgpu/src`.
+
+### Archived west group
+
+`manifest/repos.edn` gains `:archived` (same shape as `:datalad`):
+
+| path | reason |
+|---|---|
+| `orgs/kotoba-lang/kami-engine-hud` | merged into app-sdk (addendum 2); deps shim only |
+| `orgs/kotoba-lang/kami-engine-host-rs` | rs host retired (addendum 1) |
+| `orgs/kotoba-lang/kami-engine-sdk-svelte` | Svelte path retired (addendum 1) |
+
+`group-filter` includes **`-archived`**. `gen-west-manifest.cljs` emits
+`groups: [archived]` + `userdata.archived: true`. Default `west update` skips
+them; opt-in with `west update --group-filter +archived <name>`.
+
+### Left in webgpu (not this wave)
+
+Canvas2D `kami.sprite2d` painter, `kami.pipelines`, game harness
+(`physics`/`fsm`/`netsync`/…), `kotoba.webgpu-rs` staging, Playwright harness.
+
+### Pins landed (child mains)
+
+| repo | tip |
+|---|---|
+| gpu | `20bdb945ba1916a4d11caabfbf62778f6a293b1e` |
+| webgl | `7ca96c7f1afc2e4df81ecbdcb0ad04ba5c084e02` |
+| dance | `4b6d263047530961a0960ad9fc9bd6d870e760f4` |
+| webgpu | `a34418a6b244fe20b4fc126510c69865e40b48a3` |
+| network-isekai | `ac50081f07834be83eab5053b9e1d55deb5d0d8f` |
+

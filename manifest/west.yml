@@ -18,7 +18,7 @@ manifest:
   defaults:
     revision: main
 
-  group-filter: [+com-junkawasaki, +kotoba-lang, +gftdcojp, +etzhayyim, +jk-luxury, -datalad]
+  group-filter: [+com-junkawasaki, +kotoba-lang, +gftdcojp, +etzhayyim, +jk-luxury, -datalad, -archived]
 
   projects:
     - name: com-etzhayyim-kumi
@@ -1414,7 +1414,7 @@ manifest:
       submodules: true
     - name: network-isekai
       remote: gftdcojp
-      revision: fe473490e645704e2b5fefae19b5c2cf40317def
+      revision: ac50081f07834be83eab5053b9e1d55deb5d0d8f
       path: orgs/gftdcojp/network-isekai
       clone-depth: 1
       groups: [gftdcojp]
@@ -6020,7 +6020,7 @@ manifest:
       groups: [kotoba-lang]
     - name: dance
       remote: kotoba-lang
-      revision: 382c73b31b444a8d4531c3ddf1203bf4e42d10e3
+      revision: 4b6d263047530961a0960ad9fc9bd6d870e760f4
       path: orgs/kotoba-lang/dance
       groups: [kotoba-lang]
     - name: datom
@@ -6258,7 +6258,7 @@ manifest:
       groups: [kotoba-lang]
     - name: gpu
       remote: kotoba-lang
-      revision: 28ae44a7bd58b58eb95a89bcc013faf5771f8300
+      revision: 20bdb945ba1916a4d11caabfbf62778f6a293b1e
       path: orgs/kotoba-lang/gpu
       groups: [kotoba-lang]
     - name: graph
@@ -6552,7 +6552,9 @@ manifest:
       remote: kotoba-lang
       revision: 0aa0b84d92a3ee656b9630aa9e169f574fe960a4
       path: orgs/kotoba-lang/kami-engine-hud
-      groups: [kotoba-lang]
+      groups: [archived]
+      userdata:
+        archived: true
     - name: kami-engine-hud-gpu
       remote: kotoba-lang
       revision: 00cbed37112a1157ff42f40ff7189642dbcc3a28
@@ -6592,7 +6594,9 @@ manifest:
       remote: kotoba-lang
       revision: 143b3dbb42f853f7e958ac04e55ee36fb106a37c
       path: orgs/kotoba-lang/kami-engine-host-rs
-      groups: [kotoba-lang]
+      groups: [archived]
+      userdata:
+        archived: true
     - name: kami-genre-base-systems
       remote: kotoba-lang
       revision: c606ae9393a9a7a76f2ae61d3bebb87c56820b0e
@@ -6657,7 +6661,9 @@ manifest:
       remote: kotoba-lang
       revision: 7211a408fffe1b45f5cf5f585aece6d1fa15a6be
       path: orgs/kotoba-lang/kami-engine-sdk-svelte
-      groups: [kotoba-lang]
+      groups: [archived]
+      userdata:
+        archived: true
     - name: kami-engine-sdk
       remote: kotoba-lang
       revision: a3824ff59abcc1c87d76d291be7ed573412bc99c
@@ -8125,12 +8131,12 @@ manifest:
       groups: [kotoba-lang]
     - name: webgl
       remote: kotoba-lang
-      revision: 12fe7ab9a6f10581ee75054f7c3a84b8df3276d2
+      revision: 7ca96c7f1afc2e4df81ecbdcb0ad04ba5c084e02
       path: orgs/kotoba-lang/webgl
       groups: [kotoba-lang]
     - name: webgpu
       remote: kotoba-lang
-      revision: 185dc75a52df56a8b231ad13134eba860a7c3f0d
+      revision: a34418a6b244fe20b4fc126510c69865e40b48a3
       path: orgs/kotoba-lang/webgpu
       groups: [kotoba-lang]
     - name: webrtc
