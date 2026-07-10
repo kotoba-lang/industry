@@ -1,0 +1,22 @@
+[{:adr/authoritative_for ["cloud-itonami-isic-8291 actor scope (worldwide corporate/compliance intelligence, professional/official-capacity data only)"
+                          "情報スコープ境界 (職務上の公開情報のみ。私生活・家族・思想信条・所在地追跡・SNS推論は構造的にスキーマ外)"
+                          "Dossier-LLM ⊣ DisclosureGovernor の単一不変条件 (書き込み・開示・訂正確定の3つとも governor が拒否すれば actor は行わない)"
+                          "cloud-itonami 産業SaaS群への :corporate-intelligence capability 卸しパターン (宣言のみ、配線はフォローアップ)"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/topic "cloud-itonami-isic-8291-corporate-compliance-intelligence-actor"
+  :adr/related ["adr-2607031500-cloud-itonami-m6910-global-incorporation-actor"
+                "adr-2607051300-cross-org-capability-map"
+                "adr-2607012100-cloud-itonami-org-split"
+                "adr-2606081510-arms-public-defense-industrial-and-satellite-osint-data"
+                "cloud-itonami-6310 ADR-0001 (gftd-talent-actor, 封じ込め+governor+台帳パターンの原型)"]
+  :adr/status "accepted"
+  :adr/id "adr-2607110400-cloud-itonami-isic-8291-corporate-compliance-intelligence-actor"
+  :adr/doc_type "adr"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/date "2026-07-10"
+  :adr/amends []
+  :db/id -1
+  :adr/decision-summary "{:pattern \"sealed Dossier-LLM advisor + independent DisclosureGovernor + append-only audit ledger (same shape as cloud-itonami-6310 / cloud-itonami-M6910 / robotaxi-actor)\", :new-actor \"cloud-itonami-isic-8291\", :org \"cloud-itonami\", :visibility :public, :license \"AGPL-3.0-or-later\", :isic-rev4 \"8291\", :isic-name \"Activities of collection agencies and credit bureaus\", :registry-promotion \"kotoba-lang/industry registry.edn id 8291: :maturity :spec -> real repo (2nd promotion after cloud-itonami-M6910's 6910)\", :scope-boundary {:included [:company-registry-facts :officers-directors-ubo-where-legally-disclosed :government-official-in-official-role :disclosed-ownership-directorship-jv-edges :business-contact-info] :excluded [:private-life :family-outside-disclosed-shareholding :political-religious-health-orientation :realtime-location :social-media-inference] :owner-confirmed \"narrow scope option chosen via AskUserQuestion, 2026-07-10\"}, :governor-checks [{:check :scope-gate :severity :hard :note \"schema itself has no field for excluded categories -- structural, not just runtime\"} {:check :source-basis :severity :hard :note \"every fact/edge must cite an allowed source-class; uncited LLM inference rejected outright\"} {:check :licensed-disclosure :severity :hard :note \"disclosure/query only serves an active contracted tenant+tier+purpose; no anonymous/public query op exists\"} {:check :confidence-floor :severity :soft-escalate} {:check :high-stakes-gate :severity :soft-escalate :note \"government-official or sanctions/PEP-flagged subject always escalates\"} {:check :correction-request :severity :hard-always-escalate :note \"data-subject dispute never auto-resolves at any phase, FCRA-style dispute right\"}], :actuation-invariant \":correction/request and government-official/sanctions-flagged :disclosure/query|:relationship/draft are never members of any phase's :auto set -- structural permanent human gate, same shape as M6910's :filing/submit\", :r0-scope {:source-catalog [\"JPN houjin-bangou (法人番号公表サイト)\" \"GBR Companies House (officers/PSC free API)\" \"DEU Unternehmensregister\" \"EST e-Business Register\" \"USA SEC EDGAR (public companies only)\" \"EU consolidated financial sanctions list (public government data, not private surveillance)\"], :store-backend \"MemStore + DatomicStore (langchain.db), same swap-seam as cloud-itonami-6310\"}, :wholesale-fleet-wiring \"NOT done in this ADR -- :corporate-intelligence capability keyword declared conceptually only; wiring into the 175+ cloud-itonami-{ISIC} blueprint fleet's required-technologies is an explicit follow-up, not bundled here\", :manifest-registration \"none -- standalone, per the existing cloud-itonami-{ISIC} blueprint convention (ADR-2607011000/2607012000/2607012100/2607031500)\"}"
+  :adr/authoritative true
+  :adr/title "ADR-2607110400: cloud-itonami-isic-8291 — 全世界の企業・役職者(職務上)・関係性を Dossier-LLM ⊣ DisclosureGovernor で保持し契約者限定開示する corporate/compliance intelligence actor を新設"}]
