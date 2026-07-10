@@ -270,7 +270,9 @@
    ;; dedicated booleans per the 6492 lesson. See cloud-itonami-isic-
    ;; 6419/docs/adr/0001-architecture.md.
    :required-technologies [:robotics :banking :swift :identity :forms :dmn :bpmn :audit-ledger]
-   :optional-technologies [:optimization]
+   ;; :corporate-intelligence added as a licensed wholesale consumer of
+   ;; cloud-itonami-isic-8291 (ADR-2607110400 §5 pilot batch of 10).
+   :optional-technologies [:optimization :corporate-intelligence]
    :operating-states [:intake :onboard :transact :clear :settle :audit]}
   {:id "6190"
    :name "Community Telecommunications Access"
@@ -465,7 +467,9 @@
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6810"
    :business-id "cloud-itonami-isic-6810"
    :required-technologies [:robotics :property :identity :forms :dmn :bpmn :audit-ledger]
-   :optional-technologies [:optimization]
+   ;; :corporate-intelligence added as a licensed wholesale consumer of
+   ;; cloud-itonami-isic-8291 (ADR-2607110400 §5 pilot batch of 10).
+   :optional-technologies [:optimization :corporate-intelligence]
    :maturity :implemented
    :operating-states [:intake :list :show :lease :manage :audit]}
   {:id "7110" ; M — Professional, scientific and technical
@@ -5709,7 +5713,9 @@
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6420"
    :business-id "cloud-itonami-isic-6420"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :securities]
-   :optional-technologies []
+   ;; :corporate-intelligence added as a licensed wholesale consumer of
+   ;; cloud-itonami-isic-8291 (ADR-2607110400 §5 pilot batch of 10).
+   :optional-technologies [:corporate-intelligence]
    :maturity :implemented
    ;; Promoted :blueprint -> :implemented as a holding-company actor
    ;; (HoldCo-LLM ⊣ Holding Structure Governor), the forty-eighth
@@ -5742,7 +5748,9 @@
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6430"
    :business-id "cloud-itonami-isic-6430"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :securities]
-   :optional-technologies []
+   ;; :corporate-intelligence added as a licensed wholesale consumer of
+   ;; cloud-itonami-isic-8291 (ADR-2607110400 §5 pilot batch of 10).
+   :optional-technologies [:corporate-intelligence]
    :maturity :implemented
    ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
    ;; :blueprint -> :implemented as the fund-vehicle actor (TrustAdmin-LLM
@@ -5819,7 +5827,9 @@
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6499"
    :business-id "cloud-itonami-isic-6499"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :securities]
-   :optional-technologies []
+   ;; :corporate-intelligence added as a licensed wholesale consumer of
+   ;; cloud-itonami-isic-8291 (ADR-2607110400 §5 pilot batch of 10).
+   :optional-technologies [:corporate-intelligence]
    :maturity :implemented
    ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
    ;; :blueprint -> :implemented as a venture-capital-fund actor (DD-LLM ⊣
@@ -5847,7 +5857,9 @@
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6512"
    :business-id "cloud-itonami-isic-6512"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :insurance]
-   :optional-technologies []
+   ;; :corporate-intelligence added as a licensed wholesale consumer of
+   ;; cloud-itonami-isic-8291 (ADR-2607110400 §5 pilot batch of 10).
+   :optional-technologies [:corporate-intelligence]
    :maturity :implemented
    ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
    ;; :blueprint -> :implemented as a property/casualty actor
@@ -5944,7 +5956,9 @@
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6621"
    :business-id "cloud-itonami-isic-6621"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :insurance]
-   :optional-technologies []
+   ;; :corporate-intelligence added as a licensed wholesale consumer of
+   ;; cloud-itonami-isic-8291 (ADR-2607110400 §5 pilot batch of 10).
+   :optional-technologies [:corporate-intelligence]
    :maturity :implemented
    ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
    ;; :blueprint -> :implemented as an independent loss-adjustment actor
@@ -5960,7 +5974,9 @@
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6622"
    :business-id "cloud-itonami-isic-6622"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :insurance]
-   :optional-technologies []
+   ;; :corporate-intelligence added as a licensed wholesale consumer of
+   ;; cloud-itonami-isic-8291 (ADR-2607110400 §5 pilot batch of 10).
+   :optional-technologies [:corporate-intelligence]
    :maturity :implemented
    ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
    ;; :blueprint -> :implemented as an insurance-intermediation actor
@@ -5994,7 +6010,9 @@
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6630"
    :business-id "cloud-itonami-isic-6630"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :securities]
-   :optional-technologies []
+   ;; :corporate-intelligence added as a licensed wholesale consumer of
+   ;; cloud-itonami-isic-8291 (ADR-2607110400 §5 pilot batch of 10).
+   :optional-technologies [:corporate-intelligence]
    :maturity :implemented
    ;; ISIC Rev.4 class (4-digit) — full coverage extension. Promoted
    ;; :blueprint -> :implemented as the management-company actor
@@ -6038,7 +6056,9 @@
    ;; service with no physical domain work, the same exemption class as
    ;; cloud-itonami-6310 (ADR-2607031500 Addendum, ADR-2607031800).
    :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
-   :optional-technologies []
+   ;; :corporate-intelligence added as a licensed wholesale consumer of
+   ;; cloud-itonami-isic-8291 (ADR-2607110400 §5 pilot batch of 10).
+   :optional-technologies [:corporate-intelligence]
    :maturity :implemented
    ;; real actor: formation.{store,registry,facts,registrarllm,governor,
    ;; phase,operation}.cljc, 32 tests / 172 assertions, CI green (lint+test)
