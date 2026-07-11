@@ -1,28 +1,28 @@
 {:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 10252, "etzhayyim-xrpc-proxy" 103},
+ {"etzhayyim-did-web" 10299, "etzhayyim-xrpc-proxy" 104},
  :zone
- {:requests-7d 40229,
-  :pageviews-7d 1204,
-  :uniques-7d-sum 1068,
+ {:requests-7d 40459,
+  :pageviews-7d 1221,
+  :uniques-7d-sum 1081,
   :zone "etzhayyim.com"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/", :requests 76}
-   {:path "/robots.txt", :requests 21}
+  [{:path "/", :requests 75}
+   {:path "/robots.txt", :requests 19}
    {:path "/system-dynamics", :requests 7}
    {:path "/organism/health.json", :requests 5}
    {:path "/sitemap.xml", :requests 5}
    {:path "/gov", :requests 4}
-   {:path "/_shell/liquid-glass.css", :requests 4}
+   {:path "/organism", :requests 4}
    {:path "/.well-known/did.json", :requests 4}],
-  :status-mix {:client-error 123, :ok 308, :server-error 4456},
+  :status-mix {:client-error 154, :ok 312, :server-error 4475},
   :window "24h"},
  :as-of "2026-07-11",
  :traffic-quality {:window "24h", :probe-4xx-pct 3, :error-5xx-pct 91},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 76 · /robots.txt 21 · /system-dynamics 7 · /organism/health.json 5 · /sitemap.xml 5 | 4xx(probe) 3% · 5xx 91%",
+ "上位 page (24h, 2xx/3xx): / 75 · /robots.txt 19 · /system-dynamics 7 · /organism/health.json 5 · /sitemap.xml 5 | 4xx(probe) 3% · 5xx 91%",
  :signal
- "etzhayyim.com 実測 40229 req/7d・1068 uniques(日次和)・うち4xx probe 3%(24h)、workers 10355 inv/7d"}
+ "etzhayyim.com 実測 40459 req/7d・1081 uniques(日次和)・うち4xx probe 3%(24h)、workers 10403 inv/7d"}
