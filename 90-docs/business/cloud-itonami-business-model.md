@@ -150,6 +150,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 14 · /itonami/verticals 1 · /itonami 1 · /join/browser 1 | 4xx(probe) 51%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 13 · /itonami/verticals 1 · /itonami 1 · /join/browser 1 | 4xx(probe) 52%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 14 · /itonami/verticals 1 · /itonami 1 · /join/browser 1 | 4xx(probe) 50%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 12 · /itonami/verticals 1 · /itonami 1 · /join/browser 1 | 4xx(probe) 50%
 
 ## Revenue Streams
 
