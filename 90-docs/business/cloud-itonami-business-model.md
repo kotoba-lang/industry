@@ -98,6 +98,7 @@
 - 観測 (signal): itonami.cloud 実測 323 req/7d・99 uniques(日次和)・うち4xx probe 44%(24h)
 - 観測 (signal): itonami.cloud 実測 324 req/7d・100 uniques(日次和)・うち4xx probe 42%(24h)
 - 観測 (signal): itonami.cloud 実測 327 req/7d・101 uniques(日次和)・うち4xx probe 41%(24h)
+- 観測 (signal): itonami.cloud 実測 329 req/7d・101 uniques(日次和)・うち4xx probe 43%(24h)
 
 ## Customer Segments
 
@@ -178,6 +179,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 14 · /itonami 4 · /itonami/verticals 2 · /join/browser 2 | 4xx(probe) 42%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 15 · /itonami 5 · /itonami/verticals 2 · /join/browser 2 | 4xx(probe) 41%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 14 · /itonami 5 · /itonami/verticals 2 · /join/browser 2 | 4xx(probe) 41%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 14 · /itonami 5 · /itonami/verticals 2 · /join/browser 2 | 4xx(probe) 43%
 
 ## Revenue Streams
 

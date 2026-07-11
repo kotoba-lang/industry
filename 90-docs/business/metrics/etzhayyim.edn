@@ -1,28 +1,28 @@
 {:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 10350, "etzhayyim-xrpc-proxy" 104},
+ {"etzhayyim-did-web" 10375, "etzhayyim-xrpc-proxy" 104},
  :zone
- {:requests-7d 41053,
-  :pageviews-7d 1262,
-  :uniques-7d-sum 1110,
+ {:requests-7d 41270,
+  :pageviews-7d 1281,
+  :uniques-7d-sum 1128,
   :zone "etzhayyim.com"},
  :sources [:cloudflare :health],
  :paths
  {:ok
   [{:path "/", :requests 81}
-   {:path "/robots.txt", :requests 19}
-   {:path "/system-dynamics", :requests 7}
-   {:path "/organism/health.json", :requests 5}
+   {:path "/robots.txt", :requests 18}
+   {:path "/organism/health.json", :requests 6}
+   {:path "/system-dynamics", :requests 6}
    {:path "/organism", :requests 5}
    {:path "/.well-known/did.json", :requests 5}
    {:path "/gov", :requests 4}
    {:path "/donate", :requests 4}],
-  :status-mix {:client-error 153, :ok 342, :server-error 4476},
+  :status-mix {:client-error 161, :ok 361, :server-error 4481},
   :window "24h"},
  :as-of "2026-07-11",
  :traffic-quality {:window "24h", :probe-4xx-pct 3, :error-5xx-pct 90},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 81 · /robots.txt 19 · /system-dynamics 7 · /organism/health.json 5 · /organism 5 | 4xx(probe) 3% · 5xx 90%",
+ "上位 page (24h, 2xx/3xx): / 81 · /robots.txt 18 · /organism/health.json 6 · /system-dynamics 6 · /organism 5 | 4xx(probe) 3% · 5xx 90%",
  :signal
- "etzhayyim.com 実測 41053 req/7d・1110 uniques(日次和)・うち4xx probe 3%(24h)、workers 10454 inv/7d"}
+ "etzhayyim.com 実測 41270 req/7d・1128 uniques(日次和)・うち4xx probe 3%(24h)、workers 10479 inv/7d"}
