@@ -1,30 +1,31 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 2194, "ai-gftd-chat-shell" 3342},
+ {"magatama-sh1n5h1x" 2200, "ai-gftd-chat-shell" 3344},
  :zone
- {:requests-7d 206456,
-  :pageviews-7d 4129,
-  :uniques-7d-sum 4911,
+ {:requests-7d 207603,
+  :pageviews-7d 4133,
+  :uniques-7d-sum 4954,
   :zone "gftd.ai"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/", :requests 1229}
+  [{:path "/", :requests 1217}
    {:path "/prompt", :requests 722}
    {:path "/view", :requests 721}
    {:path "/favicon.ico", :requests 127}
+   {:path "/index.php", :requests 47}
    {:path "/wp-content/plugins/hellopress/wp_filemanager.php",
-    :requests 43}
-   {:path "/index.php", :requests 27}
+    :requests 42}
    {:path "/robots.txt", :requests 25}
-   {:path "/0xD.php", :requests 18}],
-  :status-mix {:client-error 5537, :server-error 7939, :ok 4601},
+   {:path "/history/9881f046-0eb8-406b-b4c7-f721780f62c9",
+    :requests 17}],
+  :status-mix {:client-error 5488, :server-error 7828, :ok 4617},
   :window "24h"},
  :as-of "2026-07-11",
  :traffic-quality
  {:window "24h", :probe-4xx-pct 31, :error-5xx-pct 44},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 1229 · /prompt 722 · /view 721 · /favicon.ico 127 · /wp-content/plugins/hellopress/wp_filema… 43 | 4xx(probe) 31% · 5xx 44%",
+ "上位 page (24h, 2xx/3xx): / 1217 · /prompt 722 · /view 721 · /favicon.ico 127 · /index.php 47 | 4xx(probe) 31% · 5xx 44%",
  :signal
- "gftd.ai 実測 206456 req/7d・4911 uniques(日次和)・うち4xx probe 31%(24h)、workers 5536 inv/7d"}
+ "gftd.ai 実測 207603 req/7d・4954 uniques(日次和)・うち4xx probe 31%(24h)、workers 5544 inv/7d"}
