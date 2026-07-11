@@ -1,28 +1,26 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 3603, "kotobase-cf-wasm-staging" 2525},
+ {"net-kotobase" 3628, "kotobase-cf-wasm-staging" 2525},
  :zone
- {:requests-7d 6075,
-  :pageviews-7d 326,
-  :uniques-7d-sum 436,
+ {:requests-7d 6100,
+  :pageviews-7d 329,
+  :uniques-7d-sum 441,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path
-    "/kotobase-cf-wasm-production/ipns/bafyreih4sbvmqm4k26depcsw66r3ch4q4vpg7ve72hm3jy7ggv67kutlaa.json",
-    :requests 127}
-   {:path "/", :requests 50}
-   {:path "/health", :requests 49}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact", :requests 46}
-   {:path "/llms.txt", :requests 31}
+  [{:path "/", :requests 53}
+   {:path "/health", :requests 51}
+   {:path "/llms.txt", :requests 33}
    {:path
     "/ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapcbsx3yrg7xzj3jrxm3q4mzz2nu",
-    :requests 28}
+    :requests 29}
+   {:path "/llms-full.txt", :requests 28}
    {:path "/.well-known/did.json", :requests 28}
-   {:path "/_app/meta", :requests 27}],
-  :status-mix {:ok 705, :server-error 52, :client-error 204},
+   {:path "/_app/meta", :requests 27}
+   {:path "/pins", :requests 27}],
+  :status-mix {:ok 348, :server-error 54, :client-error 141},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -31,9 +29,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-11",
- :traffic-quality {:window "24h", :probe-4xx-pct 21, :error-5xx-pct 5},
+ :traffic-quality
+ {:window "24h", :probe-4xx-pct 26, :error-5xx-pct 10},
  :top-paths
- "上位 page (24h, 2xx/3xx): /kotobase-cf-wasm-production/ipns/bafyre… 127 · / 50 · /health 49 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 46 · /llms.txt 31 | 4xx(probe) 21% · 5xx 5%",
- :funnel {:visitors 352, :signups 0, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): / 53 · /health 51 · /llms.txt 33 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 29 · /llms-full.txt 28 | 4xx(probe) 26% · 5xx 10%",
+ :funnel {:visitors 355, :signups 0, :checkouts 0},
  :signal
- "kotobase.net 実測 6075 req/7d・436 uniques(日次和)・うち4xx probe 21%(24h)、workers 6128 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 6100 req/7d・441 uniques(日次和)・うち4xx probe 26%(24h)、workers 6153 inv/7d、Stripe active subs 0"}
