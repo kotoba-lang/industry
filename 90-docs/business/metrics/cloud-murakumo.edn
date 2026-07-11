@@ -1,27 +1,27 @@
 {:health-status 200,
  :zone-name "murakumo.cloud",
- :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 68596},
+ :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 69036},
  :zone
- {:requests-7d 64251,
-  :pageviews-7d 976,
-  :uniques-7d-sum 380,
+ {:requests-7d 64645,
+  :pageviews-7d 979,
+  :uniques-7d-sum 384,
   :zone "murakumo.cloud"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/infer/hwmetrics", :requests 7870}
-   {:path "/infer/runs", :requests 1387}
+  [{:path "/infer/hwmetrics", :requests 7873}
+   {:path "/infer/runs", :requests 1389}
    {:path "/", :requests 59}
    {:path "/v1/chat/completions", :requests 17}
    {:path "/robots.txt", :requests 13}
    {:path "/v1/messages", :requests 12}
    {:path "/api/v1/chat/completions", :requests 6}
    {:path "/cdn-cgi/rum", :requests 5}],
-  :status-mix {:ok 9376, :client-error 62},
+  :status-mix {:ok 9383, :client-error 61},
   :window "24h"},
  :as-of "2026-07-11",
  :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /infer/hwmetrics 7870 · /infer/runs 1387 · / 59 · /v1/chat/completions 17 · /robots.txt 13 | 4xx(probe) 1%",
+ "上位 page (24h, 2xx/3xx): /infer/hwmetrics 7873 · /infer/runs 1389 · / 59 · /v1/chat/completions 17 · /robots.txt 13 | 4xx(probe) 1%",
  :signal
- "murakumo.cloud 実測 64251 req/7d・380 uniques(日次和)・うち4xx probe 1%(24h)、workers 68596 inv/7d"}
+ "murakumo.cloud 実測 64645 req/7d・384 uniques(日次和)・うち4xx probe 1%(24h)、workers 69036 inv/7d"}
