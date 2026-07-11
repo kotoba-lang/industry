@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L4 social network（atproto SNS）  
-**As-of**: 2026-07-10  
+**As-of**: 2026-07-11  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -72,6 +72,7 @@
 - 観測 (signal): aozora.app 実測 21556 req/7d・722 uniques(日次和)・うち4xx probe 45%(24h)、workers 7021 inv/7d
 - 観測 (signal): aozora.app 実測 23024 req/7d・729 uniques(日次和)・うち4xx probe 33%(24h)、workers 7098 inv/7d
 - 観測 (signal): aozora.app 実測 25012 req/7d・798 uniques(日次和)・うち4xx probe 36%(24h)、workers 8690 inv/7d
+- 観測 (signal): aozora.app 実測 24460 req/7d・788 uniques(日次和)・うち4xx probe 48%(24h)、workers 7959 inv/7d
 
 ## Customer Segments
 
@@ -138,6 +139,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · / 115 · /robots.txt 48 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 30 · /js/main.js 22 | 4xx(probe) 45%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 63 · /robots.txt 46 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 36 · /xrpc/com.atproto.server.createSession 27 | 4xx(probe) 33%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.tran… 681 · /xrpc/com.atproto.server.createSession 343 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 242 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 63 · /robots.txt 38 | 4xx(probe) 36% · 5xx 2%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · / 65 · /robots.txt 35 · /db.sql 20 · /wp-content/uploads/pentest_proof_037744… 20 | 4xx(probe) 48%
 
 ## Revenue Streams
 
