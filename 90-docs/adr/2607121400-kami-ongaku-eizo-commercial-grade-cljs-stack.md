@@ -177,8 +177,8 @@ quantize、EDL diff 等 import なしのロジック）は `kotoba wasm` 対象�
 | `kami-eizo-timeline` | eizo | L3 | **Wave 1・完了・landed** |
 | `kami-eizo-grade` | eizo | L3 | **Wave 3・完了・landed** |
 | `kami-eizo-compositor` | eizo | L3 | **Wave 3・完了・landed** |
-| `utsushi` | eizo | L2 | 未変更（encode path は `org-iso-h264` 側に実装済み・Wave 2、`utsushi.codec` の配線は Task #15 として未着手） |
-| `douga` / `anime` | eizo | L3 | 既存・入力 IR を `kami-eizo-timeline` に統一 |
+| `utsushi` | eizo | L2 | **Wave 2 encode実装 + Wave 4 配線完了**（`org-iso-h264` の encode 関数を `utsushi.codec` から呼び出し、encode→decode round-trip 検証済み。パラメータセット層のみ） |
+| `douga` / `anime` | eizo | L3 | **Wave 4・完了・landed**（`kami-eizo-timeline` 入力 IR 追加。douga は既存 ad hoc shape と並存、anime は adapter 追加） |
 | `kami-mangaka-*` | eizo | L0/L3 | 既存・変更なし |
 
 ### 5. プロ用途市販品との parity checklist（"commercial grade" の具体化）
@@ -290,8 +290,33 @@ quantize、EDL diff 等 import なしのロジック）は `kotoba wasm` 対象�
   - ついでに LICENSE 欠落を修正: `kami-ongaku-sequencer`・
     `org-w3-webaudio`・`org-w3-webcodecs` に Apache-2.0 LICENSE を追加
     （Wave 1/2 の scaffold で漏れていた）
-- **Wave 4（app 統合）**: `douga`/`anime` を `kami-eizo-timeline` ベースへ
-  再配線、将来の `kami-app-daw`/`kami-app-nle`（本 ADR の範囲外、別 ADR）。
+- **Wave 4（app 統合）— 完了（2026-07-12）**: `douga`/`anime` を
+  `kami-eizo-timeline` ベースへ再配線 + `utsushi.codec` の H.264 encode
+  配線（Wave 2 の follow-up）。push・テスト green・west manifest 登録済み:
+  - https://github.com/kotoba-lang/douga — `kami-eizo-timeline` EDL を
+    受け取る新entry point `douga.eizo-timeline/render-plan` を追加（既存の
+    ad hoc shape 版は yukkuri 実運用パイプライン ADR-2607051600 を壊さない
+    ため**並存維持**、置き換えでなく追加）。video track の transition は
+    未対応のため明示的に reject（サイレント無視ではなく `ex-info`）。
+    11 tests / 40 assertions green（commit `8a06155`）
+  - https://github.com/kotoba-lang/anime — `anime.timeline/cut-sequence->
+    timeline` adapter を追加。12 工程ステージ・8層は timeline 上の意味を
+    持たないため**意図的に非マッピング**（工程ボードは並列であり再生位置
+    ではない、レイヤーはcutの逐次生産状態でありコンポジット同時レイヤー
+    ではない）、retake cut のみ実際に marker 化。出力は
+    `kami.eizo.timeline/validate-timeline` を通過確認済み。11 tests /
+    85 assertions green（commit `00ec484f951c`）
+  - `utsushi.codec` の H.264 encode 配線（Task #15、Wave 2 の follow-up）
+    — https://github.com/kotoba-lang/utsushi の既存 decode 配線
+    （avcC box → SPS parse）と対称的な encode path（SPS+PPS encode →
+    avcC/avc1/stsd 構築）を追加。encode→decode round-trip で
+    width/height/profile-idc/level-idc の一致を確認。副産物として
+    `utsushi` の `org-iso-h264` pin が 7 commit 遅れていたのを発見・
+    前進（`a6ed8581` の encode 関数を含む版に）。パラメータセット層
+    （SPS+PPS）のみ、マクロブロック/画素/CAVLC/CABAC encode は未実装
+    （`org-iso-h264` 自体のスコープ限定と同じ）。12 tests / 31
+    assertions green（commit `bb7bf20282a6`）
+  - 将来の `kami-app-daw`/`kami-app-nle` は本 ADR の範囲外（別 ADR）
 
 ## Consequences
 
