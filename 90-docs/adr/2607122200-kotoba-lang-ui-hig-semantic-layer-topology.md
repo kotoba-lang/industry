@@ -179,6 +179,12 @@ ADR-2607022800 のまま（platform trait 既定値のみ）。docs から agent
 | appkit | agent-guide への docs リンク | `17ff4db` | `e26c7afa` |
 | uikit | agent-guide への docs リンク | `e637761` | `3710c98` |
 
+net-babiniku の実移行（D7 の follow-up 第 1 号）は同日完了: PR #148（main
+`d4f648d`、pin `07f43990`）で index.html `<style>` 420→115 行、views.cljs は
+kotoba-ui.core + uikit.core のみ、theme は nbb build-time 静的生成、実 Chromium
+19/19 検証、本番 https://net-babiniku.pages.dev/ 反映済み（詳細は
+ADR-2607101000 の 2026-07-12 migration-landed addendum）。
+
 shitsuke 側 follow-up（liquid-glass PR #3 が記録）: `shitsuke.components/input|textarea` に
 同じ `:on-input` バグが残存、`shitsuke.hiccup/->html` は textarea `:value` を content として
 SSR すべき。main の west-pin-verify CI は本件以前から全 commit で failure（既知の
