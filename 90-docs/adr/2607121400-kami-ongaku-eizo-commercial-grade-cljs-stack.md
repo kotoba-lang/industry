@@ -367,6 +367,30 @@ quantize、EDL diff 等 import なしのロジック）は `kotoba wasm` 対象�
     規約に準拠、生 `.mjs` は使わない）という共通パターンを確立し、以降の
     ドメイン（サンプラー・プラグインホスト・シーケンサー等）にも再利用可能
   - west manifest 登録済み（4 pin 前進、`50c96fd54650`）
+- **Wave 6（残りドメインへの実証拡大）— 完了（2026-07-13）**: Wave 5 で
+  確立した「実 org-w3-webaudio AudioWorklet 経由で実オーディオを検証する」
+  パターンを、まだ 2/5 だった `kami-ongaku-sampler`・`kami-ongaku-plugin-host`
+  に適用。
+  - https://github.com/kotoba-lang/kami-ongaku-sampler（commit `6d2abf0a6f34`）
+    — 実サンプルファイルの代わりに `audio` の実 oscillator を割り当てた
+    代替サンプルマップで trigger/lookup を実証。14入力で実測周波数
+    （440/445/220/225/494.4413Hz）がゼロ交差カウント法で期待値と4桁まで
+    一致、round-robin 交互切替・velocity/key境界の正確な判定を確認。
+    副産物: Closure `:advanced` の**別コンパイル単位間でのプロパティ名
+    衝突**（`.decision` が送信側と受信側で別々に `.bc` 等へリネームされ
+    `undefined` になる）という新種のバグを発見・`aget` 文字列キーアクセス
+    で修正
+  - https://github.com/kotoba-lang/kami-ongaku-plugin-host（commit `a85ee94e8dc2`）
+    — PDC（plugin delay compensation）を実オーディオで実証。200サンプルの
+    実遅延（`audio` の実 delay-line）を持つパスと持たないパスについて、
+    補正なしでは実測200サンプルのズレ、`compute-pdc` の補正値適用後は
+    実測0サンプル（ピーク位置・相互相関の両方で確認）— 数式が実際の
+    ズレを解消することを実証（synthetic な整数ではなく実信号で）
+  - west manifest 登録済み（2 pin 前進、`e773f1c98d7f`）
+  - 残る 2/5 領域: `kami-ongaku-notation`/`kami-ongaku-sequencer`（記譜/
+    シーケンサーの実再生証明は未着手）、`kami-ongaku-project`（session
+    全体の実レンダー未証明）、`douga`/`anime`（`kami-eizo-timeline` 統合は
+    済んだが実ffmpegレンダーとの結合証明は未）
 
 ## Consequences
 
