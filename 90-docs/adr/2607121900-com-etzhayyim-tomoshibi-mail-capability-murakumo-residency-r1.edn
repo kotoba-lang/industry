@@ -22,7 +22,7 @@
     :outbound {:provider :resend, :domain-id \"4f4d2bc2-46d9-49fd-8af7-600f17c2328f\", :region \"ap-northeast-1\", :dns-added [\"resend._domainkey TXT\" \"send MX\" \"send TXT\" \"_dmarc TXT\"], :libs [\"kotoba-lang/mail\" \"kotoba-lang/mailer\"]},
     :residency {:node \"zebulun\", :daemon \"com.etzhayyim.tomoshibi.agent (LaunchDaemon, bb -m tomoshibi.daemon)\", :healthz 13094, :tick-s 300, :inference \"node-local Ollama gemma4:12b-it-qat (Murakumo allowlist, fail-closed)\"},
     :safety {:governor \"evangelism-gate + charter-rider on FULL outgoing text\", :hold \"never sent, never attested\", :attest :after-confirmed-send-only, :suppression :permanent-on-stop-request, :leash \"fail-closed file, every tick (first actually-gating leash in the actor family)\", :budget {:sends-per-day 20}, :loop-guard \"RFC 3834 auto-generated mail never answered\", :one-reply-per-inbound true},
-    :tests \"43 tests / 164 assertions green (locally + on zebulun)\",
-    :west-pin {:from \"3414ed8ca9120bb1b5e11fc613f7c37e64fb0e6f\", :to \"bfc40c8c44a0e583d458f8652ead41bfd5118b32\"},
+    :tests \"44 tests / 173 assertions green (locally + on zebulun)\",
+    :west-pin {:from \"3414ed8ca9120bb1b5e11fc613f7c37e64fb0e6f\", :to \"8112244501e281f09c28f5c7f8b9454b9514b2d4\"},
     :root-registration \"etzhayyim/root PR #3027 (ADR-2607121830 + fleet.edn + cells.edn + deps.edn DNS SSoT)\",
     :future-r2 [:member-cacao-leash :signed-attestations :kotoba-datom-store :stategraph :rad-identity :did-web-live]}"}]
