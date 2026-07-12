@@ -1,7 +1,7 @@
 # ADR-2607121600: local-manimani ネイティブアプリ(desktop/mobile)の Rust データ層を kotobase スタックへ移行
 
-**Status**: proposed
-**Date**: 2026-07-12
+**Status**: accepted(即時修正は実装済み。長期方針は引き続き proposed)
+**Date**: 2026-07-12(2026-07-12 追記あり)
 **Deciders**: Jun Kawasaki
 
 ## Context
@@ -109,6 +109,93 @@
 - (−) 本 ADR はコードを一切変更しない。実装は範囲を確定した個別 ADR
   (desktop 用 companion 配線・CACAO Rust 実装・mobile 側の ingest/queue
   移行)に分割して着手する。
+
+## 追記(2026-07-12、同日中): 即時修正は「rev pin」を採用、長期方針(companion 一本化)は保留
+
+上記 Decision(`server/` companion への一本化)は長期方針として残すが、**即時の
+ビルド復旧は別の、はるかに軽いパターンを採用・実装済み**。
+
+### 採用した即時修正: 削除直前 commit への `git + rev` pin
+
+`orgs/gftdcojp/local-manimani`(desktop の `mobile/src-tauri/Cargo.toml`)と
+`orgs/gftdcojp/cloud-itonami*`(jobs-meta-search/current/pp-next2〜5)が、
+**独自にこのパターンで既にビルドを復旧させていた**ことが repo 横断監査
+(本 ADR 追記のきっかけ)で判明した:
+
+```toml
+# kotoba-lang/kotoba が正本。crates/ は upstream #259 で撤去(Rust 実装は git
+# history に残す方針)のため、撤去直前 commit を rev pin した git 依存で参照する。
+kotoba-datomic = { git = "https://github.com/kotoba-lang/kotoba.git", rev = "eddac3f538cf3ab1b35a33bd1afe8f737bad64b4" }
+```
+
+`eddac3f538cf3ab1b35a33bd1afe8f737bad64b4` は PR #259 削除の直前 commit
+(`crates/kotoba-datomic`/`kotoba-core`/`kotoba-edn`/`kotoba-ipfs`/
+`kotoba-auth`/`kotoba-ipns-record`/`kotoba-kotodama` 等、必要な crate を
+全て含むことを GitHub API で確認済み)。ローカル checkout の存在に依存せず、
+Cargo が GitHub から直接その historical commit を fetch するので、companion
+配線や CACAO 再実装を待たずに即座にビルドが通る。
+
+この ADR で提案した Rust 撤去そのものには反する(凍結された Rust 実装への
+依存が残る)が、**動くものを直近で確保する現実解**として同一パターンを
+`tauri/src-tauri/Cargo.toml`(desktop、これまで `path =` で唯一未対応
+だった箇所)にも適用した。`kotoba-datomic`/`kotoba-core`/`kotoba-edn`/
+`kotoba-ipfs`/`kotoba-auth`(dependencies)+ `kotoba-ipns-record`
+(dev-dependencies)の6行を同じ `rev` pin に変更、ビルド成功を確認済み
+(`cargo build` が `kotoba_auth`/`kotoba_core`/`kotoba_datomic`/`kotoba_edn`/
+`kotoba_ipfs` の `.rlib` をリンクして `manimani` バイナリをコンパイル完了)。
+
+上記 Decision(companion 一本化・CACAO 純 Rust 再実装)は**長期方針として
+維持**するが、着手は別途需要が具体化してから(ADR-2607022600 と同じ
+「先回りして作らない」精神)。
+
+### 訂正: kami-engine は対象外だった(west 管理外の stale mirror を誤検知)
+
+repo 横断監査で当初「`orgs/com-junkawasaki/kami-engine` の6 crate
+(`kami-scene`/`kami-live`/`kami-clj-play3d`/`kami-engine-clj`/
+`kami-webgpu-rs`/`kami-clj-play`)が同じ `kotoba-edn` path 参照で壊れている」
+と報告されたが、精査の結果:
+
+- `orgs/com-junkawasaki/kami-engine` は **`manifest/west.yml` に未登録**
+  (west が管理するのは `orgs/kotoba-lang/kami-engine`)。GitHub 上の
+  `com-junkawasaki/kami-engine` と `kotoba-lang/kami-engine` は同一
+  `pushedAt` を持つミラーで、内容は同一と見られる。
+- この west 管理外ディレクトリは **170 commit stale**(west pin ではなく
+  ローカルの野良 checkout なので、そもそも同期対象外)。fast-forward で
+  最新化したところ、upstream は**その間に Rust を完全撤去して
+  kotoba-clj/wasm へ全面移行済み**(`find . -name Cargo.toml` が repo
+  全体で 0 件)であることが判明 — 「壊れた Cargo.toml が6個」という当初の
+  検知自体が、古い stale checkout を見ていたことによる誤報だった。
+- west 管理側 `orgs/kotoba-lang/kami-engine` も同じく Rust 無しで、こちらは
+  **west pin(`aaec8e8c...`)が現在の GitHub `main` から 18 commit
+  behind**(`ahead_by: 18, behind_by: 0` — 純粋な fast-forward 遅れ)。
+  本 ADR の対象ではないが、west pin 鮮度チェックの follow-up 候補として
+  記録しておく(CLAUDE.md の pin 鮮度確認手順に従い、別途 `--entry
+  kami-engine` で最小 diff 更新するかはオーナー判断)。
+
+**結論: kami-engine は本 ADR のスコープ外 — 対応不要。**
+
+### 保留: watashi-host は名前不一致で即断できず
+
+`orgs/etzhayyim/root/60-apps/etzhayyim-project-watashi/native/watashi-host/
+Cargo.toml` の
+
+```toml
+kotodama-kami-host = { path = "../../../../40-engine/kotoba/crates/kotoba-kotodama/hosts/kotodama-kami-host" }
+```
+
+も同種の壊れた `path =` 参照だが、`eddac3f5` 時点のツリーを確認したところ
+該当パッケージは `crates/kotoba-kotodama/hosts/kotoba-kotodama-kami-host`
+という**別名**(`kotodama-kami-host` ではなく `kotoba-kotodama-kami-host`)
+で存在する。単純に他2件と同じ `rev` pin を当てても名前不一致でビルドが
+通らない可能性が高く、次のいずれかを確認してから対応する必要がある
+(未着手):
+
+1. `package = "kotoba-kotodama-kami-host"` を明示して alias する
+2. `hosts/kotodama-kami-host`(prefix無し版)は `eddac3f5` より後に
+   追加/rename された可能性があるので、実際に必要なコミットが
+   `eddac3f5` そのもので合っているか再確認する
+3. そもそもこの依存が現時点で本当に必要か(watashi-host 側の利用実態)を
+   確認する
 
 ## References
 
