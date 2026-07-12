@@ -131,6 +131,49 @@ This addendum does not change Phase 2/3 status (still not implemented) or
 the cloud-itonami tenant/external-onboarding gap noted above (still
 unresolved, still a separate follow-up).
 
+## Addendum (2026-07-12, later same day): Phase 2 live-facts wiring + real aozora Publisher landed
+
+Two more pieces landed the same day, independently of each other:
+
+**Phase 2 — live facts wired into the OperationActor graph** (`src/growth/
+live.clj`, commit range `e2f8442` on `main`, landed by a separate concurrent
+session working the same repo): `growth.facts/live-facts` results now flow
+through a `facts->store-metrics` adapter into `growth.store/with-metrics`,
+so the OperationActor (mock advisor still — see below) reasons over real
+club-shinshi numbers instead of `demo-data`. This is an explicit, separate
+opt-in entry point (`clojure -M:dev:run-live`) — `growth.sim`'s own demo and
+`growth.phase/default-phase` (still `0`) are untouched.
+
+**Real aozora Publisher, wired into `:commit`** (`src/growth/{cacao,aozora,
+publisher}.clj(c)`, commit `06e86bc`/`7c85372`): ported faithfully from
+club-shinshi's own working `shinshi.cacao`/`shinshi.aozora`
+(`orgs/jk-luxury/club-shinshi/20-actors/shinshi/`) — per-actor Ed25519
+identity + depth-1 self-minted CACAO, exchanged at the real aozora PDS
+(`https://pds.aozora.app`) `createSession` for a session JWT, then
+`createRecord` to actually publish. `growth.operation/build` gained a
+`:publisher` opt (default: `mock-publisher`, so every existing/default run
+is unaffected); the `:commit` node now calls `publish!` for governor-cleared
+`:marketing-copy`/`:creator-outreach` proposals only (this actor's own
+SPEECH, not `:content-experiment` or the three high-stakes ops), recording
+`growth.audit/published` or `growth.audit/publish-failed` either way without
+ever throwing out of `:commit`. Collection: `com.gftdcojp.apps.itonami.
+growthPost` — a distinct namespace from club-shinshi's own
+`com.etzhayyim.apps.shinshi.socialPost`, since shinshi-growth-actor is a
+separate actor/DID (itonami's, not club-shinshi's) publishing on
+club-shinshi's behalf, not as club-shinshi.
+
+**Not done, deliberately**: no real LLM was wired in as the advisor (`growth.
+growthllm/llm-advisor` exists and is a drop-in swap, but choosing/funding a
+model backend is a separate decision, not made here) — live facts currently
+feed the same mock advisor `growth.sim` always used. No real post has been
+published to `pds.aozora.app` — every test uses a fake `http-fn`/`Publisher`,
+no production `.growth/identity.edn` was generated or persisted anywhere,
+and nothing in this landing calls the network. Actually publishing something
+real (or generating the actor's real production identity) is a deliberate
+follow-up action, not a side effect of this addendum. Governor gating is
+completely unchanged by either landing — every proposal still needs human
+approval except in a Phase-3 context this repo's own default never uses.
+
 ## References
 
 - `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
