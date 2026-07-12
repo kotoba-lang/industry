@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L1 LLM 推論 — infra（Civitai × exo）  
-**As-of**: 2026-07-11  
+**As-of**: 2026-07-12  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -78,6 +78,7 @@
 - 観測 (signal): murakumo.cloud 実測 56768 req/7d・369 uniques(日次和)・うち4xx probe 4%(24h)、workers 68218 inv/7d
 - 観測 (signal): murakumo.cloud 実測 63224 req/7d・405 uniques(日次和)・うち4xx probe 2%(24h)、workers 75382 inv/7d
 - 観測 (signal): murakumo.cloud 実測 69508 req/7d・404 uniques(日次和)・うち4xx probe 3%(24h)、workers 74533 inv/7d
+- 観測 (signal): murakumo.cloud 実測 64382 req/7d・375 uniques(日次和)・うち4xx probe 3%(24h)、workers 69134 inv/7d
 
 ## Customer Segments
 
@@ -163,6 +164,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /infer/hwmetrics 7862 · /infer/runs 1403 · /v1/chat/completions 345 · /v1/messages 339 · / 115 | 4xx(probe) 4% · 5xx 3%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /infer/hwmetrics 7866 · /infer/runs 1376 · /v1/chat/completions 147 · /v1/messages 118 · / 85 | 4xx(probe) 2% · 5xx 0%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /infer/hwmetrics 7860 · /infer/runs 1400 · / 45 · /robots.txt 8 · /js/main.js 6 | 4xx(probe) 3%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /infer/hwmetrics 7861 · /infer/runs 1390 · / 48 · /robots.txt 10 · /js/main.js 6 | 4xx(probe) 3%
 
 > 実行済み (2026-07-06 tick4): US HN/X投稿コピー下書き + GTM launch runbook作成(Stripe未設定の間はGate 0で投稿ブロック、docs/gtm-launch-runbook.md)
 

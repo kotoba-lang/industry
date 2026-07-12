@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L4 adult creator platform（PornHub / OnlyFans / FANZA 型）  
-**As-of**: 2026-07-11  
+**As-of**: 2026-07-12  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -55,6 +55,7 @@
 - 観測 (signal): shinshi.club 実測 2138 req/7d・516 uniques(日次和)・うち4xx probe 10%(24h)
 - 観測 (signal): shinshi.club 実測 2139 req/7d・516 uniques(日次和)・うち4xx probe 10%(24h)
 - 観測 (signal): shinshi.club 実測 2163 req/7d・522 uniques(日次和)・うち4xx probe 11%(24h)
+- 観測 (signal): shinshi.club 実測 2997 req/7d・532 uniques(日次和)・うち4xx probe 4%(24h)
 
 ## Customer Segments
 
@@ -136,6 +137,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 136 · /js/app.js 50 · /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 45 · /app.css 38 · /robots.txt 30 | 4xx(probe) 10% · 5xx 3%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 142 · /js/app.js 50 · /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 45 · /app.css 38 · /robots.txt 29 | 4xx(probe) 10% · 5xx 2%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 140 · /js/app.js 50 · /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 45 · /app.css 38 · /robots.txt 31 | 4xx(probe) 11% · 5xx 2%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 91 · /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 33 · /sitemap.xml 27 · /robots.txt 23 · /api/funnel 22 | 4xx(probe) 4%
 
 > NSFW は paid 集客が全封鎖 → organic のみ。集客が事業の律速。
 
@@ -172,6 +174,7 @@
 - supply unlock (2026-07-10): companion brain 本番配線 (shinshi.worker.companion→murakumo Qwen-35b)。agentChat/requestScene の 410 蘇生・persona は D1 modelProfile 解決・safety floor + honest degrade。validation=0.0 律速への具体 unlock、有効化は owner secret 1件 (MURAKUMO_PROXY_TOKEN) 待ち
 - funnel (club-shinshi): 訪問=762 → 登録=? → 課金/creator GMV=0 | 転換 
 - funnel (club-shinshi): 訪問=622 → 登録=? → 課金/creator GMV=0 | 転換 
+- funnel (club-shinshi): 訪問=492 → 登録=? → 課金/creator GMV=0 | 転換 
 
 ## Unfair Advantage
 
