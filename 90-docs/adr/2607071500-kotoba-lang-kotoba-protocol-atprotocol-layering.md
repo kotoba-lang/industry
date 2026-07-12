@@ -160,12 +160,12 @@ repo の中身:
 - (−) cap-bridge は `graph/query`（読取専用）+ `graph/transact`（書込み、
   Addendum 3）。wasm actor は 7/8 imports（`http-post` 不可）、`llm/complete`
   は proxy 先 backend が無く未実装（下記 open follow-up）。
-- (−) bundle-cid integrity 検証（Addendum 4）は raw codec の単一バイナリ
-  （wasm module）専用 — dag-pb 等の UnixFS ディレクトリ CID（複数ファイルの
-  embed バンドル）はこの sha256 一致検証では扱えない。iframe mount
-  （`app-embed-panel`）は host がレスポンス bytes を見ないため、同じ方式の
-  検証は構造的に不可（host-fetch→blob/srcdoc mount への設計変更が必要 —
-  下記 open follow-up）。
+- (−) bundle-cid integrity 検証は raw codec の単一 HTML/バイナリ blob 専用
+  （Addendum 4: wasm module、Addendum 5: embed iframe の host-fetch→srcDoc
+  mount）+ Addendum 6 で dag-pb/UnixFS ディレクトリの再帰検証も実装。ただし
+  検証済みディレクトリツリーを実際に mount する（相対パス解決込みの複数
+  ファイル embed 提供）には Service Worker 等の virtual filesystem が要る —
+  未実装のまま下記 open follow-up に持ち越し。
 
 ## Open follow-up（本 ADR クローズ後も残る）
 
@@ -174,14 +174,18 @@ repo の中身:
 - ~~cap-bridge の書込み系 capability（`graph/transact`）の host 代行実装~~ →
   実装済み（Addendum 3）。`llm/complete` は proxy 先の LLM completion
   XRPC/backend 自体がまだ存在しないため未実装のまま持ち越し。
-- studio への actor 鍵 import UI の汎用化（現状 mangaka-app 専用）。
+- ~~studio への actor 鍵 import UI の汎用化~~ → 再調査の結果、記載自体が
+  誤りだったと判明（Addendum 5）。`ensure-key!`/`import-key!`/
+  `key-import-form`/`publish-status` は元から `slug` 引数で汎用化済みで、
+  `studio-page` は `publish/app-actors` の全件を無条件 iterate している —
+  mangaka-app 専用ではなく 3 app actor すべてで動く。コード上の確認のみ
+  （ブラウザでの目視確認は未実施）。
 - ~~`:kotoba.app/bundle-cid` の appview 側 integrity 検証~~ → wasm actor
-  （raw codec 単一バイナリ）は実装済み（Addendum 4）。**残る範囲**:
-  (a) `app-embed-panel` の iframe mount は host が bytes を見ないため
-  同方式では検証不可 — host-fetch→blob:/srcdoc mount への切替が要る
-  （bigger design change、別 follow-up）。
-  (b) dag-pb/UnixFS ディレクトリ CID（複数ファイル embed バンドル）の
-  検証は sha256 一致では扱えず、別スキーム（IPLD DAG 検証）が要る。
+  （Addendum 4）+ embed iframe（Addendum 5、host-fetch→`srcDoc` mount）+
+  dag-pb/UnixFS ディレクトリの再帰検証（Addendum 6）まで実装済み。
+  **残る範囲**: 検証済みディレクトリツリーを実際に mount する（相対パス
+  解決込みの複数ファイル embed 提供）には Service Worker 等の virtual
+  filesystem が要る — mount 自体は未実装のまま持ち越し。
 
 ## Addendum (2026-07-07 同日): follow-up 3 件 (IPNS / cap-bridge / bundle CID) 実装
 
@@ -318,3 +322,114 @@ CID 文字列を重複させているだけ）で、実際に検証すべき CID
   （214 ファイルコンパイル成功、Addendum 3 と同じノーコミット overlay
   手法）で確認。ブラウザでの実 CID 不一致 reject デモ（意図的に壊れた
   CID を manifest に入れて fail-closed を目視確認）は持ち越し。
+
+## Addendum 5 (2026-07-10): iframe embed の CID 検証 + actor 鍵 import UI 汎用化の再確認
+
+open follow-up の残り 2 件に着手。1 件は実装、もう 1 件は**調査の結果
+記載が誤りだったと判明**（コードは既に汎用化済み）。
+
+### iframe embed（kind=embed）の CID 検証 — 実装
+
+Addendum 4 の wasm actor 検証と同じ「fetch した bytes の sha256 を CID と
+比較」を、`app-embed-panel` の iframe mount にも拡張。wasm actor と違い
+iframe は `<iframe src=url>` にすると **host がレスポンス bytes を一切
+見られない**（ブラウザが iframe 内部で直接 fetch する）ため、host が
+先に自分で fetch する方式に切り替える必要があった:
+
+- **`atprotocol.profile/project-app`**（atprotocol）: `:kotoba.app/embed-url`
+  が `ipfs://` scheme のとき、`resolve-embed-url` が既に持っている raw CID
+  を `:embedCid` として view に追加。`:kotoba.app/bundle-cid` は manifest
+  作者が別途セットしないと出ない（実運用ではほぼ未使用と Addendum 4 で判明
+  済み）のに対し、`:embedCid` は embed-url 自体から常に導出できる — こちら
+  を検証の一次ソースにした。
+- **`yoro-ui.interop.embed-fetch/fetch-verified-html!`**（新規 ns、
+  app-aozora）: `wasm-actor/run-actor!` の CID 検証と同型（fetch →
+  `crypto.subtle.digest` → `kotoba.protocol.cid/digest-matches?`）。
+  一致すれば `{:html <string>}`、不一致/fetch 失敗なら `{:error}`。
+- **`app-embed-panel`**: `embedCid` があるときは `<iframe src>` で直接
+  mount せず、`r/with-let` で一度だけ `fetch-verified-html!` を呼び、
+  検証中は「CID 検証中…」、不一致/失敗時は「mount しない: `<error>`」を
+  表示して**iframe を一切 mount しない**（fail-closed）、一致したときだけ
+  `<iframe srcDoc=html>` で mount する。`embedCid` が無い（https scheme 等、
+  検証不能）embed は従来どおり `<iframe src=embedUrl>` のまま変更なし。
+- **scope**: raw codec の単一 HTML blob 専用（`kotoba.protocol.cid` と
+  同じ制約）。dag-pb/UnixFS ディレクトリ CID（複数ファイル bundle）はこの
+  方式では検証できない — Addendum 6 で再帰検証を実装（mount 自体は別
+  follow-up、下記参照）。
+- **検証**: atprotocol は実 `clojure -M:test`（7 tests / 48 assertions、
+  既存 46 + 新規 2）+ `clojure -M:lint`（0 errors）で確認。app-aozora は
+  実 shadow-cljs `:test` build（231 ファイルコンパイル成功）で確認。
+  ブラウザでの実 mount 確認（bridge-demo-app の実 profile page で
+  「✓ CID 一致検証済み」表示 → srcDoc 経由で実際に描画されることの目視
+  確認）は持ち越し。
+
+### studio actor 鍵 import UI 汎用化 — 「未実装」は誤りだったと判明
+
+open follow-up リストに残っていた「studio への actor 鍵 import UI の
+汎用化（現状 mangaka-app 専用）」を実装しようと `yoro-ui.studio.publish`
+と `yoro-ui.pages.studio` を精査した結果、**この記載自体が誤り**だったと
+判明した:
+
+- `ensure-key!` / `import-key!` / `actor-did` / `storage-key`
+  （`studio/publish.cljc`）はすべて元から `slug` 引数でパラメータ化されて
+  おり、mangaka 固有のリテラル文字列は一切無い（`localStorage` key は
+  `"aozora-studio-actor-key-" + slug` で actor ごとに独立）。
+  `git log -p` で履歴を辿ると、`app-actor-row` 追加時（ADR-2607071500 本体
+  実装コミット）から既存の `publish-status`/`key-import-form`
+  （`pages/studio.cljc`）をそのまま再利用しており、mangaka 専用にコピペ
+  された形跡も無い。
+- `studio-page` は `(for [actor publish/app-actors] [app-actor-row actor])`
+  で `app-actors` の**全件を無条件 iterate**しており、`bridge-demo-app` /
+  `wasm-demo-app` も `mangaka-app` と同じ「鍵あり `<did>`」/「鍵 import
+  フォーム」を独立して表示する。
+- 結論: **コード変更は不要**。open follow-up のこの項目は「未実装だった
+  こと」ではなく「クローズ時点の記載ミス（実際には既に汎用化済みだった）」
+  として訂正する。
+- **限界**: この確認はコード読解のみ（`clj-kondo`/`shadow-cljs` の静的
+  検証は通っている既存コードの再読）で、ブラウザで実際に `/studio` を開き
+  `bridge-demo-app`/`wasm-demo-app` 行に鍵 import フォームが描画されることの
+  目視確認は本セッションでは未実施（ブラウザ拡張が未接続だったため）。
+
+## Addendum 6 (2026-07-10): dag-pb/UnixFS ディレクトリ CID の再帰検証
+
+Addendum 4/5 の「fetch した bytes の sha256 を CID と比較」を、複数
+block からなる dag-pb Merkle DAG（UnixFS directory）全体に拡張した。
+単一 blob と違い、ディレクトリツリーはノードごと（ディレクトリノード
+自身・各ファイルの leaf・大きいファイルの chunk）に別々の CID を持つ
+独立した block の集まりなので、host は block を 1 個ずつ個別に fetch し、
+block ごとに sha256 を declared CID と照合してから dag-pb を decode する
+— 途中のどれか 1 block でも digest が合わなければ再帰全体を reject する
+（fail-closed。部分的に検証できた結果を「検証済み」として返さない）。
+
+- **`kotoba.protocol.cid`（kotoba-protocol）拡張**: `parse-cid` /
+  `digest-matches-cid?`（Addendum 4 の raw-only `parse-raw-cid`/
+  `digest-matches?` を一般化 — raw/dag-pb/dag-cbor いずれの multicodec でも
+  digest 位置は同じなので codec を問わず比較できる）。`base32-encode` /
+  `parse-cid-bytes` / `cid-bytes->string`（dag-pb ノードの `Link.Hash` は
+  生 CID bytes で来るので、fetch 可能な CID 文字列に戻すのに使う）。
+- **`yoro-ui.interop.dagpb-verify`（新規 ns、app-aozora）**: root CID から
+  再帰的に fetch+検証し、`{:type :file :bytes …}` | `{:type :directory
+  :entries {name → tree}}` の verified tree を返す。dag-pb の protobuf
+  decode は公式 `@ipld/dag-pb` の `pb-decode.js` を byte-exact に移植した
+  もの（フィールド番号・wireType 検証・エラーメッセージまで同一）—
+  `@ipld/dag-pb` npm package 自体は ESM-only で package.json exports に
+  `require`/`module-sync` 条件が無く、shadow-cljs の `:node-test` target
+  （Node CJS 経由）からは解決できなかったため直接依存はせず、ロジックだけ
+  移植した（同じ手法は kotoba-lang エコシステム内の別リポジトリ
+  `etzhayyim/root` の `car.ts` でも前例あり）。UnixFS Data の Type
+  判別（raw/directory/file/…）は dag-pb 自体の scope 外なので、Type
+  field（1 個の varint）だけを最小限に自前 decode する。
+- **検証**: 実 dag-pb encode（テスト内の最小 protobuf encoder）+
+  `multiformats`（module-sync 条件があり node-test で解決可能）で実際に
+  組み立てた fixture に通した実 round-trip テスト — 2 ファイルディレクトリ
+  の検証、chunked file（複数 block に分割されたファイル）の順序どおり
+  再結合、単一 raw CID の扱い、そして **fail-closed tamper test**（tree
+  構築後に 1 block の内容だけ差し替えて全体が reject されることを確認）。
+  kotoba-protocol は実 `clojure -M:test`（15 tests / 95 assertions）+
+  `clojure -M:lint`（0 errors）、app-aozora は実 `node out/node-tests.js`
+  （259 tests / 830 assertions、0 failures）で確認 — モック無しの実データ
+  round-trip。
+- **scope**: 検証のみ。検証済みツリーを実際に mount する（相対パス解決
+  込みの複数ファイル embed 提供）には Service Worker 等の virtual
+  filesystem が要る — 別 follow-up（mount 未実装。`app-embed-panel` は
+  raw codec の単一 HTML blob のみ Addendum 5 で対応済み）。

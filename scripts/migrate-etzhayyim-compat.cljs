@@ -18,6 +18,26 @@
                        (str "\n## Provenance\n\nRelocated " (.slice (.toISOString (js/Date.)) 0 10)
                             " from `etzhayyim/root/20-actors/" old "` to `kotoba-lang/" new
                             "` per ADR-" adr ".\n"))
+      ;; Best-effort test run before push: find the test namespace via its own
+      ;; (ns ...) form (not inferred from the file path — vendor names can
+      ;; contain literal underscores) and run it via bb before ever pushing —
+      ;; a real test failure must not become a new public repo.
+      (let [find-r (sh "find" test-dir "-name" "*_test.cljc" "-o" "-name" "*-test.cljc" {:cwd workdir})
+            ns-file (first (remove clojure.string/blank? (clojure.string/split-lines (:out find-r))))]
+        (if-not ns-file
+          (binding [*out* *err*] (println (str "WARNING: no *_test.cljc found for " old "; skipping test run")))
+          (let [content (slurp (str workdir "/" ns-file))
+                ns-name (second (re-find #"\(ns\s+([A-Za-z0-9_.-]+)" content))
+                bb? (zero? (:exit (sh "which" "bb")))]
+            (if (and ns-name bb?)
+              (let [r (sh "bb" "--classpath" (str "src:" test-dir) "-e"
+                          (str "(require 'clojure.test) (require (symbol \"" ns-name "\")) "
+                               "(let [r (clojure.test/run-tests (symbol \"" ns-name "\"))] "
+                               "(System/exit (if (zero? (+ (:fail r) (:error r))) 0 1)))")
+                          {:cwd workdir})]
+                (when-not (zero? (:exit r))
+                  (fail (str "TEST FAILED for " new " (" ns-name ") — not pushing\n" (:err r) (:out r)))))
+              (binding [*out* *err*] (println (str "WARNING: could not determine test namespace for " old "; skipping test run")))))))
       (doseq [args [["git" "init" "-q" "-b" "main"]
                     ["git" "add" "-A"]
                     ["git" "commit" "-q" "-m" (str "Relocate " old " to kotoba-lang/" new " (clean-room API-compat cljc actor)")]]
