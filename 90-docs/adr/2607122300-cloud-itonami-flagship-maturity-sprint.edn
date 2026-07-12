@@ -1,0 +1,19 @@
+[{:adr/authoritative_for ["fleet demo-page architecture rule (compliance claims computed by the actor's own .cljc at build time, never hand-typed)"
+                          "cloud-itonami flagship (isic-6399/isic-6310) governed-op coverage and operator-path state as of 2026-07-12"
+                          "cloud-itonami public discovery surface (org profile, cloud-itonami.github.io registry-generated catalog)"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/topic "cloud-itonami-flagship-maturity-sprint"
+  :adr/related ["adr-2607121700-cloud-itonami-isic-6399-meta-jobsearch-venture"
+                "cloud-itonami/cloud-itonami-isic-6399 docs/adr/0002-posting-correction.md"
+                "cloud-itonami/cloud-itonami.github.io docs/adr/0001-catalog-surface.md"]
+  :adr/status "accepted"
+  :adr/id "adr-2607122300-cloud-itonami-flagship-maturity-sprint"
+  :adr/doc_type "adr"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/date "2026-07-12"
+  :adr/amends []
+  :db/id -1
+  :adr/decision-summary "{:directive \"実際に indeed 置き換え, kaonavi 置き換えの成熟度を向上, uiux も公開, business として成立するように (owner /loop, 12 iterations 2026-07-12)\", :sticking-rule \"fleet demo pages are build-time actor executions: nbb generator runs the full OperationActor StateGraph and renders post-run store + real verdicts + real ledger; scittle for in-browser cljs; headless DOM-stub harness + headless-chromium verification\", :ops-added {:isic-6399 \":posting/correct (訂正, 職安法5条の4; same content gates as publish + posting-not-live guard; corrections repeat with numbered records; repo ADR-0002)\", :isic-6310 \":assignment/propose (配置転換; HRBP-only RBAC, fairness gate, always human, from/to+approver queryable) + sim :phase 3 fix\"}, :jurisdictions \"6399 facts 4->6 (+FRA Code du travail L5331-1/L1132-1 + CPI L341-1ff; +KOR 채용절차법4조 + 남녀고용평등법7조 + 저작권법91-98조), all six with real consent sub-citations\", :operator-path {:quickstarts :both, :own-data-generator \"6399 generate.cljs postings.edn -> operator's governed board\", :standalone-validated true, :freshness-automation \"nightly regenerate workflows (6399 board + fleet catalog), commit-on-change, runs verified green\"}, :public-surface {:org-profile \"github.com/cloud-itonami (.github repo)\", :catalog \"https://cloud-itonami.github.io/ generated from kotoba-lang/industry registry.edn (144 implemented / 646, honest maturity breakdown); itonami.cloud cockpit integration deferred -- must consume the same registry\"}, :upstream-fixes [\"langchain 9f4453d3 (db: quoted $ in or-expansion, nbb-unloadable)\" \"langchain 0f966d06 (runnable/model: SCI-safe protocol extension branch)\" \"html f26595df (RAWTEXT [:hiccup/raw] unwrap regression)\" \"industry implemented-count reconciliation to 144 after 3-way promotion race\"], :test-state {:isic-6399 \"49 tests / 225 assertions\", :isic-6310 \"32 tests / 118 assertions\"}, :known-not-done [:real-feed-and-index-integrations :6310-real-data-seeding :itonami-cloud-marketplace-adr :jurisdictions-beyond-6]}"
+  :adr/authoritative true
+  :adr/title "ADR-2607122300: flagship maturity sprint — Indeed/kaonavi replacements to operable, discoverable businesses"}]
