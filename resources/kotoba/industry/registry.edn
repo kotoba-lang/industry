@@ -1,6 +1,6 @@
 {:kotoba.registry/id :kotoba/industry
  :kotoba.registry/version 1
- :kotoba.registry/updated "2026-07-04"
+ :kotoba.registry/updated "2026-07-12"
  :industries
  [{:id "3512"
    :name "Community Renewable Energy Operations"
@@ -2845,13 +2845,17 @@
    :operating-states [:intake :survey :extract :grade :ship :audit]},
   {:id "1010"
    :name "Processing and preserving of meat"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C1010"
-   :business-id "cloud-itonami-C1010"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1010"
+   :business-id "cloud-itonami-isic-1010"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :maturity :blueprint
+   ;; Promoted :spec -> :blueprint in the 衣食住 scaffold batch
+   ;; (ADR-2607122200): blueprint repo published (Community Meat
+   ;; Processing, :meat-processing-governor), no actor implementation
+   ;; claimed — wave-3 robotics-gated per ADR-2607121000. Stale
+   ;; gftdcojp C-prefix :repo URL replaced by the real satellite.
+   :operating-states [:intake :design :produce :inspect :package :audit]},
   {:id "1020"
    :name "Processing and preserving of fish, crustaceans and molluscs"
    :repo "https://github.com/gftdcojp/cloud-itonami-C1020"
@@ -3016,13 +3020,17 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1311"
    :name "Preparation and spinning of textile fibres"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C1311"
-   :business-id "cloud-itonami-C1311"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1311"
+   :business-id "cloud-itonami-isic-1311"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :maturity :blueprint
+   ;; Promoted :spec -> :blueprint in the 衣食住 scaffold batch
+   ;; (ADR-2607122200): blueprint repo published (Community Textile
+   ;; Spinning, :textile-spinning-governor), no actor implementation
+   ;; claimed — wave-3 robotics-gated per ADR-2607121000. Stale
+   ;; gftdcojp C-prefix :repo URL replaced by the real satellite.
+   :operating-states [:intake :design :produce :inspect :package :audit]},
   {:id "1312"
    :name "Weaving of textiles"
    :repo "https://github.com/gftdcojp/cloud-itonami-C1312"
@@ -3088,13 +3096,17 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1410"
    :name "Manufacture of wearing apparel, except fur apparel"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C1410"
-   :business-id "cloud-itonami-C1410"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1410"
+   :business-id "cloud-itonami-isic-1410"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :maturity :blueprint
+   ;; Promoted :spec -> :blueprint in the 衣食住 scaffold batch
+   ;; (ADR-2607122200): blueprint repo published (Community Apparel
+   ;; Manufacturing, :apparel-governor), no actor implementation
+   ;; claimed — wave-3 robotics-gated per ADR-2607121000. Stale
+   ;; gftdcojp C-prefix :repo URL replaced by the real satellite.
+   :operating-states [:intake :design :produce :inspect :package :audit]},
   {:id "1420"
    :name "Manufacture of articles of fur"
    :repo "https://github.com/gftdcojp/cloud-itonami-C1420"
@@ -4465,12 +4477,17 @@
    :operating-states [:intake :observe :treat :publish :audit]},
   {:id "4100"
    :name "Construction of buildings"
-   :repo "https://github.com/gftdcojp/cloud-itonami-F4100"
-   :business-id "cloud-itonami-F4100"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4100"
+   :business-id "cloud-itonami-isic-4100"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :blueprint
+   ;; Promoted :spec -> :blueprint in the 衣食住 scaffold batch
+   ;; (ADR-2607122200): blueprint repo published (Community Building
+   ;; Construction, :building-construction-governor), no actor
+   ;; implementation claimed — wave-3 robotics-gated per
+   ;; ADR-2607121000. Stale gftdcojp F-prefix :repo URL replaced by
+   ;; the real satellite.
    :operating-states [:intake :design :permit :build :inspect :audit]},
   {:id "4210"
    :name "Construction of roads and railways"
