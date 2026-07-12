@@ -165,19 +165,19 @@ quantize、EDL diff 等 import なしのロジック）は `kotoba wasm` 対象�
 
 | repo | domain | layer | 状態 |
 |---|---|---|---|
-| `org-w3-webaudio` | ongaku | L1 | **新規**（Wave 2、未着手） |
+| `org-w3-webaudio` | ongaku | L1 | **Wave 2・完了・landed** |
 | `kami-ongaku-notation` | ongaku | L3 | **Wave 1・完了・landed** |
 | `kami-ongaku-sequencer` | ongaku | L3 | **Wave 1・完了・landed** |
 | `kami-ongaku-project` | ongaku | L3 | **Wave 1・完了・landed** |
 | `kami-ongaku-plugin-host` | ongaku | L3 | **新規**（Wave 3、未着手） |
-| `kami-ongaku-sampler` | ongaku | L2 | **新規**（Wave 2、未着手） |
-| `audio` | ongaku | L2 | 既存拡張（DSP合成・effects chain・mixer bus を追加、Wave 2 未着手） |
+| `kami-ongaku-sampler` | ongaku | L2 | **Wave 2・完了・landed** |
+| `audio` | ongaku | L2 | **Wave 2・完了・landed**（DSP合成・effects chain・mixer bus 追加） |
 | `composer` / `ongaku` | ongaku | L0 | 既存・変更なし |
-| `org-w3-webcodecs` | eizo | L1 | **新規**（Wave 2、未着手） |
+| `org-w3-webcodecs` | eizo | L1 | **Wave 2・完了・landed** |
 | `kami-eizo-timeline` | eizo | L3 | **Wave 1・完了・landed** |
 | `kami-eizo-grade` | eizo | L3 | **新規** |
 | `kami-eizo-compositor` | eizo | L3 | **新規** |
-| `utsushi` | eizo | L2 | 既存拡張（encode path 追加） |
+| `utsushi` | eizo | L2 | 未変更（encode path は `org-iso-h264` 側に実装済み・Wave 2、`utsushi.codec` の配線は Task #15 として未着手） |
 | `douga` / `anime` | eizo | L3 | 既存・入力 IR を `kami-eizo-timeline` に統一 |
 | `kami-mangaka-*` | eizo | L0/L3 | 既存・変更なし |
 
@@ -230,9 +230,32 @@ quantize、EDL diff 等 import なしのロジック）は `kotoba wasm` 対象�
     pin で実依存。8 tests / 22 assertions green）
   - https://github.com/kotoba-lang/kami-eizo-timeline — EDL/timeline IR +
     SMPTE drop-frame timecode（14 tests / 122 assertions green）
-- **Wave 2（DSP/codec 実行層）**: `audio` 拡張（synth/effects/mixer bus）、
-  `kami-ongaku-sampler`、`utsushi` の encode path、`org-w3-webaudio`、
-  `org-w3-webcodecs`。
+- **Wave 2（DSP/codec 実行層）— 完了（2026-07-12）**: `audio` 拡張
+  （synth/effects/mixer bus）、`kami-ongaku-sampler`、H.264 encode path、
+  `org-w3-webaudio`、`org-w3-webcodecs`。全 5 項目 push・テスト green・
+  west manifest 登録済み:
+  - https://github.com/kotoba-lang/audio — oscillator(sine/square/saw/
+    triangle)・ADSR envelope・one-pole filter・delay line + compressor・
+    offline mixer bus graph（サイクル検出付き）。実バグ1件（delay-line の
+    `long-array`/`double`型不一致）をテストで発見・修正。30 tests / 180
+    assertions green（commit `cf2f56a4b41`）
+  - https://github.com/kotoba-lang/kami-ongaku-sampler — key/velocity
+    layer + round-robin + streaming lifecycle state machine。11 tests /
+    40 assertions green
+  - https://github.com/kotoba-lang/org-w3-webaudio — Web Audio API 境界層
+    （`org-w3-webgpu` と同型）。4 tests / 17 assertions green
+  - **H.264 encode は `utsushi` でなく `org-iso-h264` に実装**（agent が
+    ブリーフィングの想定を修正: `utsushi.codec` は既に `org-iso-h264` へ
+    NAL/SPS/PPS framing を委譲する設計だったため、境界を破らずそちらに
+    実装）— https://github.com/kotoba-lang/org-iso-h264 に Exp-Golomb
+    writer・RBSP escape・SPS/PPS encode・NAL/Annex-B bitstream writer を
+    追加。24 tests / 143 assertions green（commit `a6ed8581fb83`）。
+    slice header・macroblock/pixel/CAVLC/CABAC encode は未実装（decode側と
+    同じスコープ限定）。**follow-up**: `utsushi.codec` を新 encode 関数に
+    配線するタスクは未着手（Wave 3 候補）
+  - https://github.com/kotoba-lang/org-w3-webcodecs — WebCodecs API 境界層
+    （`org-w3-webgpu` と同型）+ AVC codec-string(`avc1.PPCCLL`) parse/
+    format。5 tests / 118 assertions green
 - **Wave 3（グレーディング/コンポジティング/プラグイン）**: `kami-eizo-grade`、
   `kami-eizo-compositor`、`kami-ongaku-plugin-host`（`comfyui` node-graph
   executor 再利用）。

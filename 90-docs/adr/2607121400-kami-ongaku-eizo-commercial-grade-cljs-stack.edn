@@ -52,7 +52,8 @@
    :distribution "manimani"
    :note "composer/ongaku は生成モデル呼び出しを持たない設計のまま。本 ADR はエンジン層（DSP/codec/data-model）のみ厚くする。"}
   :adr/new-repo-roster
-  [{:repo "org-w3-webaudio" :domain :ongaku :layer :l1 :status :new :wave 2}
+  [{:repo "org-w3-webaudio" :domain :ongaku :layer :l1 :status :landed :wave 2
+    :url "https://github.com/kotoba-lang/org-w3-webaudio" :landed-on "2026-07-12"}
    {:repo "kami-ongaku-notation" :domain :ongaku :layer :l3 :status :landed :wave 1
     :url "https://github.com/kotoba-lang/kami-ongaku-notation" :landed-on "2026-07-12"}
    {:repo "kami-ongaku-sequencer" :domain :ongaku :layer :l3 :status :landed :wave 1
@@ -60,14 +61,21 @@
    {:repo "kami-ongaku-project" :domain :ongaku :layer :l3 :status :landed :wave 1
     :url "https://github.com/kotoba-lang/kami-ongaku-project" :landed-on "2026-07-12"}
    {:repo "kami-ongaku-plugin-host" :domain :ongaku :layer :l3 :status :new :wave 3}
-   {:repo "kami-ongaku-sampler" :domain :ongaku :layer :l2 :status :new :wave 2}
-   {:repo "audio" :domain :ongaku :layer :l2 :status :extend :wave 2}
-   {:repo "org-w3-webcodecs" :domain :eizo :layer :l1 :status :new :wave 2}
+   {:repo "kami-ongaku-sampler" :domain :ongaku :layer :l2 :status :landed :wave 2
+    :url "https://github.com/kotoba-lang/kami-ongaku-sampler" :landed-on "2026-07-12"}
+   {:repo "audio" :domain :ongaku :layer :l2 :status :landed :wave 2
+    :url "https://github.com/kotoba-lang/audio" :landed-on "2026-07-12" :commit "cf2f56a4b41"}
+   {:repo "org-w3-webcodecs" :domain :eizo :layer :l1 :status :landed :wave 2
+    :url "https://github.com/kotoba-lang/org-w3-webcodecs" :landed-on "2026-07-12"}
    {:repo "kami-eizo-timeline" :domain :eizo :layer :l3 :status :landed :wave 1
     :url "https://github.com/kotoba-lang/kami-eizo-timeline" :landed-on "2026-07-12"}
    {:repo "kami-eizo-grade" :domain :eizo :layer :l3 :status :new :wave 3}
    {:repo "kami-eizo-compositor" :domain :eizo :layer :l3 :status :new :wave 3}
-   {:repo "utsushi" :domain :eizo :layer :l2 :status :extend :wave 2}
+   {:repo "utsushi" :domain :eizo :layer :l2 :status :unchanged :wave 2
+    :note "encode path implemented in org-iso-h264 instead (utsushi.codec already delegates NAL/SPS/PPS framing there); wiring utsushi.codec to it is a follow-up, not yet done"}
+   {:repo "org-iso-h264" :domain :eizo :layer :l2 :status :landed :wave 2
+    :url "https://github.com/kotoba-lang/org-iso-h264" :landed-on "2026-07-12" :commit "a6ed8581fb83"
+    :note "H.264 encode: expgolomb writer, RBSP escape, SPS/PPS encode, NAL/Annex-B bitstream writer. Not implemented: slice header, macroblock/pixel/CAVLC/CABAC encode"}
    {:repo "douga" :domain :eizo :layer :l3 :status :rewire :wave 4}
    {:repo "anime" :domain :eizo :layer :l3 :status :rewire :wave 4}]
   :adr/commercial-parity-checklist
@@ -91,6 +99,7 @@
   :adr/roadmap-waves
   [{:wave 1 :focus "data-model foundation" :status :landed :landed-on "2026-07-12"
     :repos ["kami-ongaku-notation" "kami-ongaku-sequencer" "kami-ongaku-project" "kami-eizo-timeline"]}
-   {:wave 2 :focus "dsp/codec execution" :repos ["audio(extend)" "kami-ongaku-sampler" "utsushi(encode)" "org-w3-webaudio" "org-w3-webcodecs"]}
+   {:wave 2 :focus "dsp/codec execution" :status :landed :landed-on "2026-07-12"
+    :repos ["audio(extend)" "kami-ongaku-sampler" "org-iso-h264(encode, not utsushi)" "org-w3-webaudio" "org-w3-webcodecs"]}
    {:wave 3 :focus "grading/compositing/plugin-host" :repos ["kami-eizo-grade" "kami-eizo-compositor" "kami-ongaku-plugin-host"]}
    {:wave 4 :focus "app integration" :repos ["douga(rewire)" "anime(rewire)" "kami-app-daw(future)" "kami-app-nle(future)"]}]}]
