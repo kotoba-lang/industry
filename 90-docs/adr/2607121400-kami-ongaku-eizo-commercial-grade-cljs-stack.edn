@@ -125,4 +125,11 @@
             {:repo "org-w3-webaudio" :commit "e554d853d640" :note "hardest task: audio's sine+ADSR DSP proven running inside a real AudioWorkletProcessor, captured PCM matched offline reference within 2.98e-8. Root-caused and fixed two real bugs: cljs.main REPL-bootstrap touching `document` in AudioWorkletGlobalScope, and `self` undeclared there breaking Closure's goog.global detection under :advanced optimization."}]
     :incidental-bugs-found ["org-w3-webaudio new-audio-context! constructor-call pattern threw in every real browser since Wave 2, undetected because the repo has no JVM test suite"
                              "audioWorklet.addModule requires a secure context (localhost works, about:blank does not)"]
-    :reusable-pattern "deps.edn :e2e alias (pinned git dep on org-w3-webcodecs) + test/e2e/ (nbb + Playwright, no raw .mjs per CLAUDE.md) -- established across 4 repos, reusable for remaining domains (sampler, plugin-host, sequencer/notation playback)"}]}]
+    :reusable-pattern "deps.edn :e2e alias (pinned git dep on org-w3-webcodecs) + test/e2e/ (nbb + Playwright, no raw .mjs per CLAUDE.md) -- established across 4 repos, reusable for remaining domains (sampler, plugin-host, sequencer/notation playback)"}
+   {:wave 6 :focus "extend real I/O proof to remaining 2/5 domains" :status :landed :landed-on "2026-07-13"
+    :repos [{:repo "kami-ongaku-sampler" :commit "6d2abf0a6f34" :note "trigger/lookup driving real audio via substitute oscillator-frequency sample map; 14 inputs, measured frequency matched expected to 4 decimals via zero-crossing counting; round-robin and velocity/key boundaries verified"}
+            {:repo "kami-ongaku-plugin-host" :commit "a85ee94e8dc2" :note "PDC proven on real audio: measured 200-sample misalignment before compensation, 0 after, via a real audio/delay-line 200-sample latency path"}]
+    :incidental-bugs-found ["cross-Closure-compilation-unit property-name collision: `.decision` silently renamed differently on writer vs reader side under separate :advanced cljs.main invocations, causing undefined reads -- fixed via aget/string-keyed access"]
+    :remaining-2-of-5-domains ["kami-ongaku-notation/kami-ongaku-sequencer (no real playback proof yet)"
+                                "kami-ongaku-project (no full-session real render proof yet)"
+                                "douga/anime (kami-eizo-timeline integration landed Wave 4, but no real ffmpeg-render integration proof yet)"]}]}]
