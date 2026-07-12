@@ -87,6 +87,10 @@
    ;; the actual actor (web/generate.cljs, nbb) at page build.
    :demo "https://cloud-itonami.github.io/cloud-itonami-isic-6310/"
   :maturity :implemented
+   ;; governed ops now include :assignment/propose (配置転換 -- HRBP-only
+   ;; RBAC, fairness gate refuses protected-attribute grounds, always
+   ;; human-approved, from/to+approver kept queryable; kaonavi 配置 gap
+   ;; closed 2026-07-12).
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies [:telemetry]
    :operating-states [:intake :advise :govern :approve :commit :audit]}
@@ -6284,9 +6288,11 @@
    ;; reapplied to ad content: Title VII §704(b)/ADEA §4(e)/均等法5条/
    ;; AGG §11) and displayed-compensation-mismatch (ground-truth
    ;; recompute) are honest reapplications, documented as such.
-   ;; Dual actuation publish→delist, SEQUENTIAL on the same posting,
-   ;; never auto at any phase. ADR-2607121700 (com-junkawasaki/root
-   ;; superproject).
+   ;; Actuations publish→delist plus :posting/correct (訂正 -- the other
+   ;; half of 職業安定法5条の4; repo ADR-0002: same content gates as a
+   ;; fresh publication + posting-not-live guard, corrections repeat with
+   ;; numbered records), never auto at any phase. ADR-2607121700
+   ;; (com-junkawasaki/root superproject).
    :operating-states [:ingest :assess :publish :refresh :delist :audit]},
   {:id "6411"
    :name "Central banking"
