@@ -76,13 +76,18 @@
    {:repo "kami-eizo-compositor" :domain :eizo :layer :l3 :status :landed :wave 3
     :url "https://github.com/kotoba-lang/kami-eizo-compositor" :landed-on "2026-07-12" :commit "2753b53"
     :note "comfyui-registry-shape-compatible node data, deliberately no code dependency (GPL-3.0 avoidance)"}
-   {:repo "utsushi" :domain :eizo :layer :l2 :status :unchanged :wave 2
-    :note "encode path implemented in org-iso-h264 instead (utsushi.codec already delegates NAL/SPS/PPS framing there); wiring utsushi.codec to it is a follow-up, not yet done"}
+   {:repo "utsushi" :domain :eizo :layer :l2 :status :landed :wave 4
+    :url "https://github.com/kotoba-lang/utsushi" :landed-on "2026-07-12" :commit "bb7bf20282a6"
+    :note "utsushi.codec wired to org-iso-h264 encode (SPS+PPS -> avcC/avc1/stsd), encode->decode round-trip verified. Parameter-set layer only. Also found+fixed a stale org-iso-h264 pin (7 commits behind)."}
    {:repo "org-iso-h264" :domain :eizo :layer :l2 :status :landed :wave 2
     :url "https://github.com/kotoba-lang/org-iso-h264" :landed-on "2026-07-12" :commit "a6ed8581fb83"
     :note "H.264 encode: expgolomb writer, RBSP escape, SPS/PPS encode, NAL/Annex-B bitstream writer. Not implemented: slice header, macroblock/pixel/CAVLC/CABAC encode"}
-   {:repo "douga" :domain :eizo :layer :l3 :status :rewire :wave 4}
-   {:repo "anime" :domain :eizo :layer :l3 :status :rewire :wave 4}]
+   {:repo "douga" :domain :eizo :layer :l3 :status :landed :wave 4
+    :url "https://github.com/kotoba-lang/douga" :landed-on "2026-07-12" :commit "8a06155"
+    :note "kami-eizo-timeline entry point added alongside (not replacing) the legacy ad hoc shape, to avoid breaking the live yukkuri production pipeline (ADR-2607051600). Video-track transitions explicitly rejected (unsupported), not silently ignored."}
+   {:repo "anime" :domain :eizo :layer :l3 :status :landed :wave 4
+    :url "https://github.com/kotoba-lang/anime" :landed-on "2026-07-12" :commit "00ec484f951c"
+    :note "cut-sequence->timeline adapter. 12 production stages and 8 layers deliberately NOT mapped to timeline markers/tracks (not timeline-position facts); retake cuts are. Output verified against kami-eizo-timeline's own validate-timeline."}]
   :adr/commercial-parity-checklist
   [{:domain :notation :reference ["Sibelius" "Dorico" "MuseScore"] :target "pitch/duration/dynamics/articulation IR + MusicXML import/export"}
    {:domain :sequencing :reference ["Logic Pro" "Cubase" "FL Studio"] :target "piano-roll IR, quantize/groove, pattern/clip"}
@@ -109,4 +114,5 @@
    {:wave 3 :focus "grading/compositing/plugin-host" :status :landed :landed-on "2026-07-12"
     :repos ["kami-eizo-grade" "kami-eizo-compositor" "kami-ongaku-plugin-host"]
     :note "comfyui reuse downgraded from code dependency to data-shape compatibility only (GPL-3.0)"}
-   {:wave 4 :focus "app integration" :repos ["douga(rewire)" "anime(rewire)" "kami-app-daw(future)" "kami-app-nle(future)"]}]}]
+   {:wave 4 :focus "app integration" :status :landed :landed-on "2026-07-12"
+    :repos ["douga(rewire)" "anime(rewire)" "utsushi.codec(encode wiring, task-15 follow-up)" "kami-app-daw(future)" "kami-app-nle(future)"]}]}]
