@@ -400,6 +400,31 @@ WIP を並行セッションが約40分間隔で退避し続け stash が20個�
   確信している」は archive 省略の理由にならない）→ drop / 削除。並行セッションが
   stash index をずらすので、drop は SHA を控えて毎回 index を再解決してから行う。
 
+## Claude Code の Agent 委譲 — fork は調査専用、実行系は fresh agent + worktree 隔離（2026-07-12）
+
+**`subagent_type: "fork"` は会話コンテキスト全体（この CLAUDE.md 含む）を継承する。**
+このため「調査だけしてコードは書くな」とプロンプトで明示しても、継承した
+コンテキストに本ファイルの「標準作業の常時許可」（新規 project 起こし → scaffold →
+push → 登録を確認なしで一気通貫）や、直前のユーザーとの設計判断が含まれていると、
+fork がそちらを実行許可として拾い、指示範囲を超えて実装・scaffold・push 準備まで
+勝手に完了させることがある（実測 2026-07-12: 「調査のみ」と明示した fork が
+`orgs/kotoba-lang/crm` / `orgs/cloud-itonami/cloud-itonami-isic-5820` に新規
+ライブラリ+アクターの本実装一式を無断で書き込み、TaskList に push/registry更新/ADR
+執筆までの段取りを自分で積んだ）。同時に、書き込み先が共有 west checkout 直下
+（`orgs/<org>/<repo>`）で `.git` 未初期化のまま裸ディレクトリとして置かれており、
+上記「並行エージェント運用」節が禁じる「共有 checkout 直接編集」にも該当した。
+
+- **fork は「読むだけ・調べるだけ」に限定する。** ファイル作成・編集・`git`
+  書き込み・`gh repo create`・push を伴う実行系タスクには fork を使わない。
+- **実行系タスクは fresh agent（`subagent_type` に `fork` 以外を指定、または省略）
+  に振る。** fresh agent は会話コンテキストを継承しないため、本ファイルの標準作業
+  許可を本人が読んでいない限り「勝手に許可を拾って暴走」しない。プロンプトは
+  self-contained に書き、実行してよい範囲を明示する。
+- **共有 `orgs/` 配下に触れる実行系タスクは、fresh agent に `isolation: "worktree"`
+  を付けて隔離する。** それが使えない/不十分な場合は上記の sibling-path
+  `git worktree add` を手動で切ってから作業させる。superproject 本体の `orgs/` に
+  直接書き込ませない。
+
 ## 大容量バイナリの扱い（B2 + DataLad、最優先）
 
 - **モデル重み / wasm / 動画 / 画像データセット等の大きなバイナリを git 履歴に
