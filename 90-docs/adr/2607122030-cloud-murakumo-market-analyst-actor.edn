@@ -1,0 +1,47 @@
+[{:adr/id "adr-2607122030-cloud-murakumo-market-analyst-actor"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607122030: gftdcojp/cloud-murakumo-market-analyst — a governed market-analysis actor over cloud-murakumo-market-intel"
+  :adr/status "accepted"
+  :adr/date "2026-07-12"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/last_verified "2026-07-12"
+  :adr/topic "cloud-murakumo-market-analyst-actor"
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["新規リポジトリ gftdcojp/cloud-murakumo-market-analyst を、robotaxi-actor/
+    gftd-talent-actor/cloud-itonami と同型（LLM proposer ⊣ 独立 Governor ⊣
+    append-only ledger、langgraph-clj StateGraph、Phase 0→3）の market
+    分析 actor の正本と定める"
+   "Governor(MarketGovernor)は grounding gate が中心: 数値主張は必ず
+    cloud-murakumo-market-intel の実在 :market/id を :cites で引用しなければ
+    ならない（HARD、人間承認でも覆せない）。:derived/:estimated な事実を
+    :measured であるかのように提示するのも HARD 違反"
+   "staleness(:market/as-of 陳腐化)と confidence floor は SOFT(human
+    escalate)。:effect :publish-report は常に human approval 必須
+    (high-stakes、robotaxi の Minimal Risk Condition と同型)"
+   "cloud-murakumo-market-intel を sibling west checkout への
+    {:local/root ...} 依存として参照する消費者であり、自身の ledger は
+    別グラフに持つ（データセットと ledger を混在させない）"
+   "本ADRは Phase 0（mock advisor + MemStore のみ）の設計決定。実 LLM 配線・
+    実 Datomic/kotoba-server 接続・実 publish は follow-up"]
+  :adr/related
+  ["2607122000-cloud-murakumo-market-intel-dataset (このactorの一次知識源)"
+   "gftdcojp/gftd-talent-actor (Store/Advisor/Governor/Phase/StateGraph 分割の直接の手本)"
+   "cloud-itonami (ops-LLM ⊣ CertGovernor)"
+   "robotaxi-actor (AR1 ⊣ SafetyGovernor, Minimal Risk Condition の由来)"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/corrections []
+  :adr/governor-checks
+  ["1 grounding(HARD): 数値主張は実在 :market/id を cite しているか"
+   "2 confidence-transparency(HARD): :derived/:estimated な事実を measured 扱いしていないか"
+   "3 staleness(SOFT→escalate): 引用事実の :market/as-of が鮮度窓を超えていないか"
+   "4 confidence-floor(SOFT→escalate): proposal :confidence が閾値未満でないか"
+   "5 publish-gate(HARD, always-escalate): :effect :publish-report は常に human approval"]
+  :adr/follow-up
+  ["gh repo create gftdcojp/cloud-murakumo-market-analyst --private + push"
+   "nbb scripts/gen-west-manifest.cljs --entry cloud-murakumo-market-analyst"
+   "nbb scripts/gen-west-manifest.cljs --check"
+   "Phase 1+: real langchain.model advisor wiring, real Datomic Local/kotoba-server backend, :effect :publish-report end-to-end demo"]
+  :adr/body "# ADR-2607122030: `gftdcojp/cloud-murakumo-market-analyst` — a governed market-analysis actor over `cloud-murakumo-market-intel`\n\nSee the paired .md file in this same directory for the full prose ADR (Context / Decision / Consequences / Related). This .edn is the queryable/authoritative-fact companion, not a duplicate."
+  :db/id -1}]
