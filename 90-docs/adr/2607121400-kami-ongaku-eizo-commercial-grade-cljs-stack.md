@@ -87,7 +87,7 @@ L4 hosts         wasm-webcomponent (browser AudioWorklet host, kotoba emit)
 L3 authoring     kami-ongaku-project    … DAW セッション: track/bus/clip/automation/plugin-chain SSoT
                  kami-ongaku-sequencer  … MIDI相当イベント/パターン/ピアノロール IR、quantize/groove
                  kami-ongaku-notation   … 記譜 IR（pitch/duration/dynamics/articulation）、MusicXML互換import/export contract
-                 kami-ongaku-plugin-host … VST/AU相当プラグイン contract + node-graph host（`comfyui` node-graph executor を再利用）
+                 kami-ongaku-plugin-host … VST/AU相当プラグイン contract + node-graph host（`comfyui` node-registry contract 形に互換。GPL-3.0 のため実装コードは自前、§7 Wave 3 訂正参照）
                    │
 L2 render(=DSP) executor
                  audio (KAMI Audio 拡張)  … oscillator/envelope/filter/effects(reverb/delay/EQ/compressor)/mixer bus graph/PCM16 render（primary DSP executor、3D の `webgpu` に相当）
@@ -110,7 +110,7 @@ L4 hosts         wasm-webcomponent (browser WebCodecs/WebGPU host)
                    │
 L3 authoring     kami-eizo-timeline      … EDL/タイムライン data model: track/clip/transition/effect-stack/marker（NLE の欠落部分の本体）
                  kami-eizo-grade         … カラーグレーディング: primary wheels/curves/LUT(.cube) apply、waveform/vectorscope data model
-                 kami-eizo-compositor    … node-based VFX compositing graph（keying/roto/tracking data model、`comfyui` node-graph executor を再利用）
+                 kami-eizo-compositor    … node-based VFX compositing graph（keying/roto/tracking data model、`comfyui` node-registry contract 形に互換。GPL-3.0 のため実装コードは自前、§7 Wave 3 訂正参照）
                  douga                   … timeline→ffmpeg render-plan（既存。入力 IR を `kami-eizo-timeline` に統一）
                  anime                   … アニメ制作ボキャブラリ（既存、`kami-eizo-timeline` へのアダプタとして位置づけ）
                    │
@@ -169,14 +169,14 @@ quantize、EDL diff 等 import なしのロジック）は `kotoba wasm` 対象�
 | `kami-ongaku-notation` | ongaku | L3 | **Wave 1・完了・landed** |
 | `kami-ongaku-sequencer` | ongaku | L3 | **Wave 1・完了・landed** |
 | `kami-ongaku-project` | ongaku | L3 | **Wave 1・完了・landed** |
-| `kami-ongaku-plugin-host` | ongaku | L3 | **新規**（Wave 3、未着手） |
+| `kami-ongaku-plugin-host` | ongaku | L3 | **Wave 3・完了・landed**（comfyui GPL依存を除去済み） |
 | `kami-ongaku-sampler` | ongaku | L2 | **Wave 2・完了・landed** |
 | `audio` | ongaku | L2 | **Wave 2・完了・landed**（DSP合成・effects chain・mixer bus 追加） |
 | `composer` / `ongaku` | ongaku | L0 | 既存・変更なし |
 | `org-w3-webcodecs` | eizo | L1 | **Wave 2・完了・landed** |
 | `kami-eizo-timeline` | eizo | L3 | **Wave 1・完了・landed** |
-| `kami-eizo-grade` | eizo | L3 | **新規** |
-| `kami-eizo-compositor` | eizo | L3 | **新規** |
+| `kami-eizo-grade` | eizo | L3 | **Wave 3・完了・landed** |
+| `kami-eizo-compositor` | eizo | L3 | **Wave 3・完了・landed** |
 | `utsushi` | eizo | L2 | 未変更（encode path は `org-iso-h264` 側に実装済み・Wave 2、`utsushi.codec` の配線は Task #15 として未着手） |
 | `douga` / `anime` | eizo | L3 | 既存・入力 IR を `kami-eizo-timeline` に統一 |
 | `kami-mangaka-*` | eizo | L0/L3 | 既存・変更なし |
@@ -256,9 +256,40 @@ quantize、EDL diff 等 import なしのロジック）は `kotoba wasm` 対象�
   - https://github.com/kotoba-lang/org-w3-webcodecs — WebCodecs API 境界層
     （`org-w3-webgpu` と同型）+ AVC codec-string(`avc1.PPCCLL`) parse/
     format。5 tests / 118 assertions green
-- **Wave 3（グレーディング/コンポジティング/プラグイン）**: `kami-eizo-grade`、
-  `kami-eizo-compositor`、`kami-ongaku-plugin-host`（`comfyui` node-graph
-  executor 再利用）。
+- **Wave 3（グレーディング/コンポジティング/プラグイン）— 完了（2026-07-12）**:
+  `kami-eizo-grade`、`kami-eizo-compositor`、`kami-ongaku-plugin-host`。
+  push・テスト green・west manifest 登録済み:
+  - https://github.com/kotoba-lang/kami-eizo-grade — ASC CDL lift/gamma/
+    gain + saturation、monotone cubic Hermite tone curve、Adobe `.cube`
+    LUT parser + trilinear補間、waveform/vectorscope データ計算
+    （`kami-eizo-timeline` の effect-instance 互換）。22 tests / 68
+    assertions green（commit `f77f6bb`）
+  - https://github.com/kotoba-lang/kami-eizo-compositor — chroma-key・
+    roto(ray-casting point-in-polygon)・2D tracking・blend mode。
+    24 tests / 58 assertions green（commit `2753b53`）
+  - https://github.com/kotoba-lang/kami-ongaku-plugin-host — VST/AU相当
+    plugin descriptor/instance contract、plugin delay compensation
+    （並列パスのレイテンシ補正、実グラフアルゴリズム）、automation→
+    parameter 解決。11 tests / 38 assertions green（commit `51ecb7f`）
+  - **重要な訂正: `comfyui` node-graph executor の再利用は撤回**
+    （2026-07-12 実装中に判明）。`kotoba-lang/comfyui` は **GPL-3.0**
+    ライセンスであり、そこへの実 `deps.edn` 依存は組み合わせ成果物を
+    GPL に引き込む。`kami-eizo-compositor` は最初からハード依存を避け、
+    comfyui の node-registry contract 形（`:type`/`:inputs`/`:outputs`/
+    `:fn`）に**互換なプレーンデータ**を生成するだけに留めた。
+    `kami-ongaku-plugin-host` は当初 comfyui へのハード git 依存を
+    誤って取り込んでいたため、follow-up タスクで検出・修正
+    （registry/topo-sort/validate を自前実装に置き換え、テストは同一
+    カバレッジを維持したまま green、Apache-2.0 LICENSE 追加）。
+    **今後 comfyui を参照する場合は、この「データ形のみ互換・コード
+    依存なし」パターンを踏襲する**（実行したいアプリ側が GPL 条項を
+    別途受諾した上で自分で配線する）。§1 の依存レイヤ図・§2.1 の
+    concern 表にある「`comfyui` node-graph executor 再利用」という
+    表現は、実装としては「executor**コード**の再利用」ではなく
+    「executor**が消費できるデータ形**への準拠」と読み替える。
+  - ついでに LICENSE 欠落を修正: `kami-ongaku-sequencer`・
+    `org-w3-webaudio`・`org-w3-webcodecs` に Apache-2.0 LICENSE を追加
+    （Wave 1/2 の scaffold で漏れていた）
 - **Wave 4（app 統合）**: `douga`/`anime` を `kami-eizo-timeline` ベースへ
   再配線、将来の `kami-app-daw`/`kami-app-nle`（本 ADR の範囲外、別 ADR）。
 
