@@ -513,7 +513,13 @@
       ;; the ledger comment stopped at 141 -- attribution verified by
       ;; diffing the implemented-id set between the 141-era commit
       ;; 5ffdc774 and main.)
-      (is (= 144 (:implemented m))))))
+      ;; 144 -> 146: registry<->repo drift sync (ADR-2607131000) — 5320
+      ;; courier/delivery and 7830 human-resources-provision satellites
+      ;; existed with src+test while the registry still said :spec with
+      ;; no :repo link (the isco-3521 drift pattern, full-org scan).
+      ;; Both suites were RUN green before claiming :implemented
+      ;; (5320: 40 tests/200 assertions; 7830: 33/115).
+      (is (= 146 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
