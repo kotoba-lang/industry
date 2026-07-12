@@ -9,9 +9,10 @@
   (delay (apply compat/sh (into (vec command) [(process-options opts)]))))
 
 (defn shell [opts & command]
-  (let [opts (if (map? opts) opts {})
-        command (if (map? opts) command (cons opts command))]
-    (apply compat/sh (concat command [(process-options opts)]))))
+  (let [opts-map? (map? opts)
+        options (if opts-map? opts {})
+        cmd (if opts-map? command (cons opts command))]
+    (apply compat/sh (concat cmd [(process-options options)]))))
 
 (defn sh [command]
   (apply compat/sh command))

@@ -27,7 +27,7 @@
 ;;
 ;; 環境変数 WEST_PIN_VERIFY_SKIP=1 で無条件 skip(緊急用)。
 
-(require '[scripts.nbb-compat :refer [slurp spit file-seq format]]
+(require '[scripts.nbb-compat :refer [slurp spit spit-append file-seq format]]
          '[clojure.string :as str]
          '[babashka.process :as p]
          '[clojure.java.io :as io])
@@ -247,16 +247,15 @@
     (println (str "::warning::" w)))
   (when-let [summary-path (scripts.nbb-compat/getenv "GITHUB_STEP_SUMMARY")]
     (try
-      (spit summary-path
-            (str "\n### ⚠️ west-pin-verify: " (count @warnings)
-                 " 件が検証不能で素通し(fail-open)\n\n"
-                 "private org(gftdcojp / com-junkawasaki)の子リポは `github.token` では"
-                 "見えず、pin 自体の正否ではなく **権限不足で検証できなかった** だけの可能性が"
-                 "高い — `WEST_PIN_VERIFY_TOKEN` secret(org read 権限の PAT)を設定すると"
-                 "厳密化できる。\n\n"
-                 (str/join "\n" (map #(str "- " %) @warnings))
-                 "\n")
-            :append true)
+      (spit-append summary-path
+                   (str "\n### ⚠️ west-pin-verify: " (count @warnings)
+                        " 件が検証不能で素通し(fail-open)\n\n"
+                        "private org(gftdcojp / com-junkawasaki)の子リポは `github.token` では"
+                        "見えず、pin 自体の正否ではなく **権限不足で検証できなかった** だけの可能性が"
+                        "高い — `WEST_PIN_VERIFY_TOKEN` secret(org read 権限の PAT)を設定すると"
+                        "厳密化できる。\n\n"
+                        (str/join "\n" (map #(str "- " %) @warnings))
+                        "\n"))
       (catch :default _ nil))))
 
 (if (seq @failures)

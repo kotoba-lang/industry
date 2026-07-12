@@ -3,7 +3,7 @@
 ;; Replaces the former Python West extension. Run directly:
 ;;   nbb manifest/west_annex.cljs annex-get [project ...]
 ;;   nbb manifest/west_annex.cljs annex-drop [project ...]
-(require '[scripts.nbb-compat :refer [slurp sh exit getenv]])
+(require '[scripts.nbb-compat :refer [slurp sh exit getenv getenv-all]])
 
 (def root (clojure.string/trim (:out (sh "git" "rev-parse" "--show-toplevel"))))
 (def fs (js/require "node:fs"))
@@ -43,11 +43,11 @@
 
 (defn enable-b2! [dir remote env]
   (run! dir env "git" "annex" "init")
-  (if (run! dir env "git" "annex" "enableremote" remote)
+  (if (zero? (run! dir env "git" "annex" "enableremote" remote))
+    true
     (do (binding [*out* *err*]
           (println (str "enableremote " remote " に失敗。初回は scripts/datalad-b2-init.cljs で initremote 済みか確認。")))
-        false)
-    true))
+        false)))
 
 (defn datalad? [] (zero? (:exit (sh "which" "datalad"))))
 
@@ -55,7 +55,7 @@
   (when-not (#{"annex-get" "annex-drop"} action) (fail "usage: nbb manifest/west_annex.cljs annex-get|annex-drop [project ...]"))
   (let [targets (cond->> (projects) (seq wanted) (filter #(contains? (set wanted) (:name %))))]
     (when (empty? targets) (fail "対象となる DataLad project がありません。"))
-    (let [env (merge (js->clj (.-env js/process)) (resolve-b2))]
+    (let [env (merge (getenv-all) (resolve-b2))]
       (doseq [{:keys [name path remote]} targets]
         (let [dir (str root "/" path)]
           (println (str "== " action ": " name " =="))

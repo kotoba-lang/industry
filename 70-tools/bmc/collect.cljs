@@ -131,7 +131,7 @@
     (let [now (iso-now)
           q (str "{ viewer { zones(filter: {zoneTag: \"" zone-tag "\"})"
                  " { httpRequestsAdaptiveGroups(limit: 500, filter: {datetime_geq: \""
-                 (let [d (js/Date.)] (.setUTCSeconds d (- (.getUTCSeconds d) 86400)) (iso-now)) "\", datetime_leq: \"" now "\"})"
+                 (let [d (js/Date.)] (.setUTCSeconds d (- (.getUTCSeconds d) 86400)) (.toISOString d)) "\", datetime_leq: \"" now "\"})"
                  " { count dimensions { clientRequestPath edgeResponseStatus } } } } }")
           r (cf-graphql token q)
           groups (get-in r [:data :viewer :zones 0 :httpRequestsAdaptiveGroups])]
