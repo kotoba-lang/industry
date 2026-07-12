@@ -56,6 +56,7 @@
 - 観測 (signal): shinshi.club 実測 2139 req/7d・516 uniques(日次和)・うち4xx probe 10%(24h)
 - 観測 (signal): shinshi.club 実測 2163 req/7d・522 uniques(日次和)・うち4xx probe 11%(24h)
 - 観測 (signal): shinshi.club 実測 2997 req/7d・532 uniques(日次和)・うち4xx probe 4%(24h)
+- 観測 (signal): shinshi.club 実測 3142 req/7d・584 uniques(日次和)・うち4xx probe 6%(24h)
 
 ## Customer Segments
 
@@ -138,6 +139,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 142 · /js/app.js 50 · /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 45 · /app.css 38 · /robots.txt 29 | 4xx(probe) 10% · 5xx 2%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 140 · /js/app.js 50 · /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 45 · /app.css 38 · /robots.txt 31 | 4xx(probe) 11% · 5xx 2%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 91 · /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 33 · /sitemap.xml 27 · /robots.txt 23 · /api/funnel 22 | 4xx(probe) 4%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 95 · /robots.txt 30 · /sitemap.xml 27 · /api/funnel 22 · /wp-admin/install.php 15 | 4xx(probe) 6%
 
 > NSFW は paid 集客が全封鎖 → organic のみ。集客が事業の律速。
 
@@ -175,6 +177,7 @@
 - funnel (club-shinshi): 訪問=762 → 登録=? → 課金/creator GMV=0 | 転換 
 - funnel (club-shinshi): 訪問=622 → 登録=? → 課金/creator GMV=0 | 転換 
 - funnel (club-shinshi): 訪問=492 → 登録=? → 課金/creator GMV=0 | 転換 
+- funnel (club-shinshi): 訪問=522 → 登録=? → 課金/creator GMV=0 | 転換 
 
 ## Unfair Advantage
 

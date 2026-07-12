@@ -74,6 +74,7 @@
 - 観測 (signal): aozora.app 実測 25012 req/7d・798 uniques(日次和)・うち4xx probe 36%(24h)、workers 8690 inv/7d
 - 観測 (signal): aozora.app 実測 24460 req/7d・788 uniques(日次和)・うち4xx probe 48%(24h)、workers 7959 inv/7d
 - 観測 (signal): aozora.app 実測 23413 req/7d・740 uniques(日次和)・うち4xx probe 3%(24h)、workers 8342 inv/7d
+- 観測 (signal): aozora.app 実測 25137 req/7d・799 uniques(日次和)・うち4xx probe 7%(24h)、workers 8544 inv/7d
 
 ## Customer Segments
 
@@ -142,6 +143,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.tran… 681 · /xrpc/com.atproto.server.createSession 343 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 242 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 63 · /robots.txt 38 | 4xx(probe) 36% · 5xx 2%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · / 65 · /robots.txt 35 · /db.sql 20 · /wp-content/uploads/pentest_proof_037744… 20 | 4xx(probe) 48%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.tran… 1333 · /xrpc/com.atproto.server.createSession 668 · /xrpc/com.atproto.repo.createRecord 667 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 245 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 79 | 4xx(probe) 3% · 5xx 0%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.tran… 1336 · /xrpc/com.atproto.server.createSession 668 · /xrpc/com.atproto.repo.createRecord 667 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 97 · / 87 | 4xx(probe) 7% · 5xx 0%
 
 ## Revenue Streams
 

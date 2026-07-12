@@ -1,26 +1,26 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 4217, "kotobase-cf-wasm-staging" 2575},
+ {"net-kotobase" 4240, "kotobase-cf-wasm-staging" 2575},
  :zone
- {:requests-7d 6744,
-  :pageviews-7d 385,
-  :uniques-7d-sum 537,
+ {:requests-7d 6766,
+  :pageviews-7d 387,
+  :uniques-7d-sum 539,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 59}
+  [{:path "/", :requests 58}
    {:path "/health", :requests 52}
-   {:path "/llms.txt", :requests 40}
-   {:path "/llms-full.txt", :requests 36}
+   {:path "/llms.txt", :requests 41}
    {:path
     "/ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapcbsx3yrg7xzj3jrxm3q4mzz2nu",
     :requests 34}
+   {:path "/_app/meta", :requests 34}
+   {:path "/llms-full.txt", :requests 34}
    {:path "/pins", :requests 34}
-   {:path "/_app/meta", :requests 33}
    {:path "/.well-known/did.json", :requests 31}],
-  :status-mix {:ok 503, :server-error 68, :client-error 226},
+  :status-mix {:ok 501, :server-error 68, :client-error 227},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -29,9 +29,9 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-12",
- :traffic-quality {:window "24h", :probe-4xx-pct 28, :error-5xx-pct 9},
+ :traffic-quality {:window "24h", :probe-4xx-pct 29, :error-5xx-pct 9},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 59 · /health 52 · /llms.txt 40 · /llms-full.txt 36 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 34 | 4xx(probe) 28% · 5xx 9%",
- :funnel {:visitors 438, :signups 0, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): / 58 · /health 52 · /llms.txt 41 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 34 · /_app/meta 34 | 4xx(probe) 29% · 5xx 9%",
+ :funnel {:visitors 440, :signups 0, :checkouts 0},
  :signal
- "kotobase.net 実測 6744 req/7d・537 uniques(日次和)・うち4xx probe 28%(24h)、workers 6792 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 6766 req/7d・539 uniques(日次和)・うち4xx probe 29%(24h)、workers 6815 inv/7d、Stripe active subs 0"}
