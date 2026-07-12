@@ -132,4 +132,10 @@
     :incidental-bugs-found ["cross-Closure-compilation-unit property-name collision: `.decision` silently renamed differently on writer vs reader side under separate :advanced cljs.main invocations, causing undefined reads -- fixed via aget/string-keyed access"]
     :remaining-2-of-5-domains ["kami-ongaku-notation/kami-ongaku-sequencer (no real playback proof yet)"
                                 "kami-ongaku-project (no full-session real render proof yet)"
+                                "douga/anime (kami-eizo-timeline integration landed Wave 4, but no real ffmpeg-render integration proof yet)"]}
+   {:wave 7 :focus "notation/sequencer real playback proof" :status :landed :landed-on "2026-07-13"
+    :repos [{:repo "kami-ongaku-sequencer" :commit "17c0ec4607b1" :note "5-note pattern through real SMF export/import round-trip (byte-identical), rendered as one continuous multi-note buffer via a real AudioWorkletProcessor; onsets within 6-16 samples (tol 200), all 5 frequencies matched expected to 4 decimals"}
+            {:repo "kami-ongaku-notation" :commit "0a61b700a331" :note "4-note phrase through real MusicXML export/import round-trip, rendered via real AudioWorkletProcessor; frequencies matched to 4 decimals, ff peak amplitude measured 3.394x pp peak (exact expected gain ratio) -- proves dynamics markings measurably affect real output. Found and fixed a real double-unit-conversion bug in the ADSR envelope call (seconds vs. samples), which had made every note ~1000x too quiet before the fix."}
+            {:repo "audio" :commit "03966413bfd9" :note "Apache-2.0 LICENSE added (was missing despite being a real dependency of 4+ repos by this point)"}]
+    :remaining-2-of-5-domains ["kami-ongaku-project (no full-session real render proof yet -- notation/sequencer individually proven, multi-track bus-graph integration render is the natural next step)"
                                 "douga/anime (kami-eizo-timeline integration landed Wave 4, but no real ffmpeg-render integration proof yet)"]}]}]

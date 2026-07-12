@@ -387,10 +387,26 @@ quantize、EDL diff 等 import なしのロジック）は `kotoba wasm` 対象�
     実測0サンプル（ピーク位置・相互相関の両方で確認）— 数式が実際の
     ズレを解消することを実証（synthetic な整数ではなく実信号で）
   - west manifest 登録済み（2 pin 前進、`e773f1c98d7f`）
-  - 残る 2/5 領域: `kami-ongaku-notation`/`kami-ongaku-sequencer`（記譜/
-    シーケンサーの実再生証明は未着手）、`kami-ongaku-project`（session
-    全体の実レンダー未証明）、`douga`/`anime`（`kami-eizo-timeline` 統合は
-    済んだが実ffmpegレンダーとの結合証明は未）
+- **Wave 7（記譜・シーケンサーの実再生証明）— 完了（2026-07-13）**:
+  - https://github.com/kotoba-lang/kami-ongaku-sequencer（commit `17c0ec4607b1`）
+    — 5音パターンを SMF export→import 往復（バイト完全一致確認）させた後、
+    実 `AudioWorkletProcessor` 内の**1つの連続バッファ**に5音を同時
+    スケジュールしてレンダー。オンセット位置は許容200サンプルに対し実測
+    6〜16サンプルのズレ、周波数は5音すべて期待値と4桁一致
+  - https://github.com/kotoba-lang/kami-ongaku-notation（commit `0a61b700a331`）
+    — 4音のフレーズを MusicXML export→import 往復させた後、実オーディオ
+    レンダー。周波数4桁一致に加え、**`ff`のピーク振幅が`pp`の3.394倍
+    （期待されるgain比と正確に一致）**— 強弱記号が実際の音量に反映される
+    ことを実証。実バグ発見・修正: ADSR envelope 呼び出しで秒/サンプル
+    単位を二重変換していた（音量が約1000倍小さくなっていた）
+  - https://github.com/kotoba-lang/audio に Apache-2.0 LICENSE を追加
+    （commit `03966413bfd9`。Wave 5-7 で複数repoの実依存先になったにも
+    関わらず LICENSE が欠落していたのを Wave 7 中に発見）
+  - west manifest 登録済み（3 pin 前進、`dc52c46c0cb3`）
+  - 残る 2/5 領域: `kami-ongaku-project`（session全体の実レンダー未証明。
+    notation/sequencer個別の実再生は証明済みなので、次はbusグラフ経由の
+    複数トラック統合レンダーが自然な次ステップ）、`douga`/`anime`
+    （`kami-eizo-timeline` 統合は済んだが実ffmpegレンダーとの結合証明は未）
 
 ## Consequences
 
