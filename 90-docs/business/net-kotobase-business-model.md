@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L2 storage hosting（graph BaaS + map / git / search）  
-**As-of**: 2026-07-10  
+**As-of**: 2026-07-12  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -73,6 +73,9 @@
 - 観測 (signal): kotobase.net 実測 5494 req/7d・383 uniques(日次和)・うち4xx probe 84%(24h)、workers 5540 inv/7d、Stripe active subs 0
 - 観測 (signal): kotobase.net 実測 5509 req/7d・386 uniques(日次和)・うち4xx probe 82%(24h)、workers 5573 inv/7d、Stripe active subs 0
 - 観測 (signal): kotobase.net 実測 5524 req/7d・389 uniques(日次和)・うち4xx probe 82%(24h)、workers 5586 inv/7d、Stripe active subs 0
+- 観測 (signal): kotobase.net 実測 5969 req/7d・433 uniques(日次和)・うち4xx probe 17%(24h)、workers 6049 inv/7d、Stripe active subs 0
+- 観測 (signal): kotobase.net 実測 6357 req/7d・505 uniques(日次和)・うち4xx probe 27%(24h)、workers 6397 inv/7d、Stripe active subs 0
+- 観測 (signal): kotobase.net 実測 6449 req/7d・491 uniques(日次和)・うち4xx probe 29%(24h)、workers 6474 inv/7d、Stripe active subs 0
 
 ## Customer Segments
 
@@ -151,6 +154,9 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /llms-full.txt 35 · /llms.txt 33 · /_app/meta 22 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 21 · /.well-known/did.json 21 | 4xx(probe) 84% · 5xx 1%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /llms-full.txt 34 · /llms.txt 32 · /_app/meta 22 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 21 · /.well-known/did.json 20 | 4xx(probe) 84% · 5xx 1%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /llms.txt 32 · /_app/meta 22 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 21 · /llms-full.txt 21 · /.well-known/did.json 21 | 4xx(probe) 82% · 5xx 2%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /kotobase-cf-wasm-production/ipns/bafyre… 347 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 157 · /kotobase-cf-wasm-production/ipns/bafyre… 127 · / 65 · /health 64 | 4xx(probe) 17% · 5xx 2%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 61 · /health 58 · /llms-full.txt 45 · /llms.txt 43 · /.well-known/did.json 39 | 4xx(probe) 27% · 5xx 10%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 57 · /health 55 · /llms-full.txt 42 · /llms.txt 41 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 35 | 4xx(probe) 29% · 5xx 10%
 
 ## Revenue Streams
 
@@ -178,6 +184,9 @@
 - funnel (net-kotobase): landing 訪問=? → signup=? → checkout 開始=? → paid(active sub)=0 | 転換 
 - funnel (net-kotobase): landing 訪問=63 → signup=0 → checkout 開始=0 → paid(active sub)=0 | 転換 landing 訪問→signup 0%
 - funnel (net-kotobase): landing 訪問=295 → signup=0 → checkout 開始=0 → paid(active sub)=0 | 転換 landing 訪問→signup 0%
+- funnel (net-kotobase): landing 訪問=326 → signup=0 → checkout 開始=0 → paid(active sub)=0 | 転換 landing 訪問→signup 0%
+- funnel (net-kotobase): landing 訪問=384 → signup=0 → checkout 開始=0 → paid(active sub)=0 | 転換 landing 訪問→signup 0%
+- funnel (net-kotobase): landing 訪問=400 → signup=0 → checkout 開始=0 → paid(active sub)=0 | 転換 landing 訪問→signup 0%
 
 ## Unfair Advantage
 

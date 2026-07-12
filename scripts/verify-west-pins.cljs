@@ -16,9 +16,13 @@
 ;;
 ;; 使い方:
 ;;   nbb scripts/verify-west-pins.cljs                        ; baseline=origin/main(無ければ HEAD), candidate=working tree
-;;   nbb scripts/verify-west-pins.cljs --baseline <ref|file> --candidate <ref|file> [--dir <repo>]
+;;   nbb scripts/verify-west-pins.cljs --baseline <ref|file> --candidate <ref|file> [--dir <repo>] [--only <name>]
 ;;     <ref|file>: 実在ファイルはそのまま読む。それ以外は git show <ref>:manifest/west.yml
 ;;                 (":" を含む値は git show <値> をそのまま実行)。
+;;     --only <name>: 検証対象をその entry 名に絞る(繰り返し/カンマ区切り可)。
+;;                    gen-west-manifest.cljs --entry の最小 diff ワークフロー用 —
+;;                    ローカル west.yml が main と乖離した checkout(WIP branch 等)でも
+;;                    無関係 entry の大量 API 検証で timeout しない。
 ;;
 ;; exit 0: 変更 pin なし / 全 pin 検証 OK(検証不能 entry は WARN で fail-open)
 ;; exit 1: 検証 FAIL あり(理由を列挙)
@@ -27,10 +31,13 @@
 ;;
 ;; 環境変数 WEST_PIN_VERIFY_SKIP=1 で無条件 skip(緊急用)。
 
-(require '[scripts.nbb-compat :refer [slurp spit-append file-seq format]]
-         '[clojure.string :as str]
-         '[babashka.process :as p]
-         '[clojure.java.io :as io])
+;; babashka.process/clojure.java.io are unavailable under nbb (ClojureScript-
+;; on-Node) -- scripts.nbb-compat provides `sh`/`file` with the same shape,
+;; aliased as `io` too so the existing `io/file` call-sites below keep
+;; working unchanged. (A local `sh` wrapper is defined below, so `sh` itself
+;; is deliberately NOT :refer'd here -- it's called as `io/sh`.)
+(require '[scripts.nbb-compat :as io :refer [slurp spit-append file-seq format]]
+         '[clojure.string :as str])
 
 (when (= "1" (scripts.nbb-compat/getenv "WEST_PIN_VERIFY_SKIP"))
   (println "WEST_PIN_VERIFY_SKIP=1 — pin verification skipped.")
@@ -43,13 +50,17 @@
         "--baseline"  (recur (rest more) (assoc opts :baseline (first more)))
         "--candidate" (recur (rest more) (assoc opts :candidate (first more)))
         "--dir"       (recur (rest more) (assoc opts :dir (first more)))
+        "--only"      (recur (rest more)
+                             (update opts :only (fnil into #{})
+                                     (->> (str/split (or (first more) "") #",")
+                                          (map str/trim) (remove str/blank?))))
         (recur more opts))
       opts)))
 
 (def opts (parse-args *command-line-args*))
 
 (defn- sh [& args]
-  (try (let [{:keys [exit out err]} (p/sh (mapv str args))]
+  (try (let [{:keys [exit out err]} (apply io/sh args)]
          {:exit exit :out (str/trim (or out "")) :err (str/trim (or err ""))})
        (catch :default e {:exit -1 :out "" :err (str e)})))
 
@@ -144,12 +155,20 @@
 
 ;; --- 変更検出 ---------------------------------------------------------------
 (def changed
-  (->> (vals (:entries candidate))
-       (keep (fn [{:keys [name revision] :as e}]
-               (let [old (get-in baseline [:entries name :revision])]
-                 (when (and revision (not= revision old))
-                   (assoc e :old old)))))
-       (sort-by :name)))
+  (let [all (->> (vals (:entries candidate))
+                 (keep (fn [{:keys [name revision] :as e}]
+                         (let [old (get-in baseline [:entries name :revision])]
+                           (when (and revision (not= revision old))
+                             (assoc e :old old)))))
+                 (sort-by :name))]
+    (if-let [only (not-empty (:only opts))]
+      (let [scoped (filterv #(contains? only (:name %)) all)
+            dropped (- (count all) (count scoped))]
+        (when (pos? dropped)
+          (println (str "verify-west-pins: --only " (str/join "," (sort only))
+                        " — 対象外の変更 pin " dropped " 件は検証しません(呼び出し側が書き込む entry のみ検証)。")))
+        scoped)
+      all)))
 
 (when (empty? changed)
   (println "verify-west-pins: 変更された pin はありません。OK.")

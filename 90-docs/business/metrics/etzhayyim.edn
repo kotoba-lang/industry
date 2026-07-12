@@ -1,29 +1,28 @@
 {:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 13483, "etzhayyim-xrpc-proxy" 92},
+ {"etzhayyim-did-web" 6170, "etzhayyim-xrpc-proxy" 95},
  :zone
- {:requests-7d 41342,
-  :pageviews-7d 886,
-  :uniques-7d-sum 854,
+ {:requests-7d 34603,
+  :pageviews-7d 1241,
+  :uniques-7d-sum 1074,
   :zone "etzhayyim.com"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/", :requests 119}
-   {:path "/robots.txt", :requests 23}
-   {:path "/system-dynamics", :requests 6}
-   {:path "/xrpc/com.etzhayyim.apps.kotoba.stats", :requests 4}
-   {:path "/organism/health.json", :requests 4}
-   {:path "/organism/pulse.json", :requests 4}
-   {:path "/_shell/liquid-glass.css", :requests 3}
-   {:path "/_shell/home-feed.js", :requests 3}],
-  :status-mix {:ok 196, :client-error 614, :server-error 4710},
+  [{:path "/", :requests 66}
+   {:path "/robots.txt", :requests 18}
+   {:path "/_shell/home-feed.js", :requests 8}
+   {:path "/actor/kanjo/did.json", :requests 7}
+   {:path "/.well-known/did.json", :requests 6}
+   {:path "/organism/health.json", :requests 5}
+   {:path "/actor/tsumugi/did.json", :requests 5}
+   {:path "/organism/pulse.json", :requests 5}],
+  :status-mix {:client-error 77, :ok 312, :server-error 4383},
   :window "24h"},
- :as-of "2026-07-10",
- :traffic-quality
- {:window "24h", :probe-4xx-pct 11, :error-5xx-pct 85},
+ :as-of "2026-07-12",
+ :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 92},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 119 · /robots.txt 23 · /system-dynamics 6 · /xrpc/com.etzhayyim.apps.kotoba.stats 4 · /organism/health.json 4 | 4xx(probe) 11% · 5xx 85%",
+ "上位 page (24h, 2xx/3xx): / 66 · /robots.txt 18 · /_shell/home-feed.js 8 · /actor/kanjo/did.json 7 · /.well-known/did.json 6 | 4xx(probe) 2% · 5xx 92%",
  :signal
- "etzhayyim.com 実測 41342 req/7d・854 uniques(日次和)・うち4xx probe 11%(24h)、workers 13575 inv/7d"}
+ "etzhayyim.com 実測 34603 req/7d・1074 uniques(日次和)・うち4xx probe 2%(24h)、workers 6265 inv/7d"}

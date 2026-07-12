@@ -1,6 +1,6 @@
 [
  {:progress/schema-note "cloud-itonami-lei rollout progress tracker, per ADR-2607110300. One row per cloud-itonami-isic-<code> industry. :industry/applicable? true means a coherent real global/listed top-3-company concept exists for this ISIC vertical; false means fragmented/local/non-corporate and this vertical is deliberately skipped for the lei-catalog family (the isic blueprint itself is unaffected). This file is the resume point for the next /loop iteration."
-  :progress/resume-from "isic-7911 (travel agency activities) -- first :industry/applicable? true :industry/status :pending row after isic-7310/isic-7320/isic-7710/isic-7810 (all now :done this tick). This tick (single-execution fork, no sub-forking) did isic-7310 advertising (WPP + Publicis, 2/3 -- Omnicom Cloudflare-blocked), isic-7320 market research (Ipsos + YouGov, 2/3 -- Nielsen JS-shell-only), isic-7710 vehicle rental (Avis + Europcar substituted, 2/3 -- Hertz JS-shell/404, Sixt 403), and isic-7810 employment placement (Recruit Holdings + Randstad + Adecco, 3/3). Cumulative company-repo count must be recomputed fresh each tick via gh repo list cloud-itonami --limit 300 --json name filtered to cloud-itonami-lei-* -- do not trust a prior tick's stated running total (freshly verified this tick: 90)."
+  :progress/resume-from "ROLLOUT COMPLETE -- isic-9603 (funeral and related activities) was the LAST :industry/applicable? true :industry/status :pending row in the entire 144-row cloud-itonami-isic-* fleet; it is now :done (0/3, all fetch-failed, honestly recorded). This tick did isic-8610 hospital activities (HCA Healthcare 1/3, Community Health Systems' 200-status page was actually a soft-404 error page on inspection and UHS was 403-blocked), isic-8710 residential nursing care (Brookdale Senior Living 1/3, Ensign Group + National HealthCare Corporation both terms-page-undiscoverable), isic-9000 creative/arts/entertainment (0/3 -- Endeavor Group Holdings and TKO Group Holdings have no discoverable parent-entity GLEIF record so were substituted with Cinemark Holdings + AMC Entertainment Holdings, but Live Nation's terms page was a JS-rendered Next.js shell with zero server-rendered text and both substitutes were 403-blocked), isic-9200 gambling/betting (Flutter Entertainment 1/3, Las Vegas Sands returned HTTP 400 and MGM Resorts' domain would not connect), isic-9312 sports clubs (Manchester United plc + Borussia Dortmund 2/3, Juventus terms page undiscoverable), isic-9321 amusement/theme parks (The Walt Disney Company + Six Flags Entertainment 2/3, Comcast Corporation terms page undiscoverable), isic-9603 funeral (0/3 -- Carriage Services, Inc. itself has no parent-entity GLEIF record (only a subsidiary, Carriage Services Investment Advisors, Inc.), Service Corporation International was 403-blocked on both sci-corp.com and its dignitymemorial.com consumer brand, Matthews International's domains would not connect). Every remaining cloud-itonami-isic-* row is now either :done or :skipped (:applicable? false) -- there is no further isic-family resume point. A genuinely new tick would need either (a) revisiting one of the many exhausted-list companies with a JS-capable fetch tool this environment never had, or (b) the owner directing a new scope (e.g. isco-<code> occupation blueprints, or expanding an already-:done industry beyond its top-3)."
   :db/id -1}
  {:industry/code "isic-0162"
   :industry/description ""
@@ -1574,18 +1574,70 @@
  {:industry/code "isic-7911"
   :industry/description "Community Travel Agency Operations — OSS Open Business Blueprint (ISIC 7911)"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/companies
+  [{:company/legal-name "Booking Holdings Inc."
+    :company/lei "FXM8FAOHMYDIPD38UZ17"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Booking Holdings"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-fxm8faohmydipd38uz17"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.booking.com/content/terms.html"
+    :company/tos-doc-type :terms-of-service
+    :company/note "operating signatory in the served text is Booking.com B.V. (subsidiary), attributed at the public-parent LEI level per this catalog's established convention"}
+   {:company/legal-name "Expedia Group, Inc."
+    :company/lei "2549009GW3Z3DQCB8H87"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Expedia Group"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-2549009gw3z3dqcb8h87"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.expediagroup.com/en-us/terms-of-use"
+    :company/tos-doc-type :terms-of-use}
+   {:company/legal-name "Trip.com Group Limited"
+    :company/lei "2549004RMYDSRQL4KW41"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Trip.com Group"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-2549004rmydsrql4kw41"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://us.trip.com/contents/service-guideline/terms.html"
+    :company/tos-doc-type :terms-and-conditions
+    :company/note "GLEIF registration.status LAPSED but entity ACTIVE -- used per no-fabrication policy of accepting lapsed-but-real LEI records"}]}
  {:industry/code "isic-7912"
   :industry/description "Community Tour Operator Operations — OSS Open Business Blueprint (ISIC 7912)"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "landed 0/3 -- all three candidate top tour operators failed fetch, none evaded bot/JS protection"
+  :industry/companies
+  [{:company/legal-name "TUI AG"
+    :company/lei "529900SL2WSPV293B552"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified; /agb.html 404, tuigroup.com/en-en/legal-notice redirects to a JS-rendered homepage nav-shell with no legal body text"}
+   {:company/legal-name "On the Beach Group plc"
+    :company/lei "213800K51Y9BZY7F9R69"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified; terms-and-conditions page returns 403"}
+   {:company/legal-name "Jet2 plc"
+    :company/lei "I72RQ3PNLDPW8R7JIJ56"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified; site connection failed outright (curl exit 000) on 2 attempts"}]}
  {:industry/code "isic-8010"
   :industry/description "Open Business Blueprint for ISIC Rev.5 8010: private security activities (robotics-premised)"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "landed 0/3 -- all three candidates failed fetch, none evaded bot/JS protection"
+  :industry/companies
+  [{:company/legal-name "Securitas AB"
+    :company/lei "635400TTYKE8EIWDS617"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified; /en/legal-notice/ 404, the discoverable Digital Trust Center page is JS-rendered nav-shell only, no legal body text reached plain HTTP client"}
+   {:company/legal-name "G4S Limited"
+    :company/lei "549300L3KWKK8X35QR12"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified; terms-and-conditions page served an explicit bot-challenge script (Radware-style), not evaded"}
+   {:company/legal-name "Prosegur Compañia de Seguridad, S.A."
+    :company/lei "549300N94L4D5NDBFG97"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified; /aviso-legal resolved to a JS-rendered nav-shell/geo-redirect banner only, no legal body text reached plain HTTP client"}]}
  {:industry/code "isic-8020"
   :industry/description "Community Security Systems Service Operations — OSS Open Business Blueprint (ISIC 8020)"
   :industry/applicable? false
@@ -1619,8 +1671,21 @@
  {:industry/code "isic-8220"
   :industry/description "Community Call Centre Operations — OSS Open Business Blueprint (ISIC 8220)"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "landed 0/3 -- all three candidates failed fetch, none evaded bot/JS protection"
+  :industry/companies
+  [{:company/legal-name "Teleperformance SE"
+    :company/lei "9695004GI61FHFFNRG61"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified; legal-statement page (teleperformance.com redirects to tp.com) is a JS-rendered nav-shell with no legal body text reached by plain HTTP client (grep for governing-law/effective-date markers found none)"}
+   {:company/legal-name "Concentrix Corporation"
+    :company/lei "5493000EAJN1KMPVA737"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified; terms-of-use page returned 200 but only a JS-rendered nav-shell (footer link text present, no body text)"}
+   {:company/legal-name "TTEC Holdings, Inc."
+    :company/lei "GTJS1N8S8I28A7L4WG97"
+    :company/status :tos-fetch-failed
+    :company/note "LEI verified; terms-of-use and /legal both return 403"}]}
  {:industry/code "isic-8291"
   :industry/description "Corporate/compliance intelligence actor (ISIC 8291) — Dossier-LLM sealed advisor + DisclosureGovernor, Palantir-style hold-internally/disclose-to-contracted-users only"
   :industry/applicable? false
@@ -1690,8 +1755,24 @@
  {:industry/code "isic-8610"
   :industry/description "Open Business Blueprint for ISIC Rev.5 8610: hospital activities"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Landed 1/3. Universal Health Services 403-blocked; Community Health Systems returned HTTP 200 but the body was actually a soft-404 error page (caught by content inspection, not trusted from status code alone) -- neither fabricated as a substitute."
+  :industry/companies
+  [{:company/legal-name "HCA Healthcare, Inc."
+    :company/lei "529900PH4ZGUH2MNEU89"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=HCA Healthcare"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-529900ph4zguh2mneu89"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.hcahealthcare.com/legal/terms-of-use"}
+   {:company/legal-name "Universal Health Services, Inc."
+    :company/lei "549300YGMGQDO0NMJD09"
+    :company/status :tos-fetch-failed
+    :company/note "site returns HTTP 403 to a plain HTTP client"}
+   {:company/legal-name "Community Health Systems, Inc."
+    :company/lei "549300BQWM4WENQ3YW73"
+    :company/status :tos-fetch-failed
+    :company/note "chs.net/terms-of-use/ returns HTTP 200 but the body is actually the site's soft-404 error template, not real terms content -- caught by inspecting extracted text, not fabricated as a success"}]}
  {:industry/code "isic-8620"
   :industry/description "Open Business Blueprint for ISIC Rev.5 8620: medical and dental practice activities"
   :industry/applicable? false
@@ -1713,8 +1794,24 @@
  {:industry/code "isic-8710"
   :industry/description "Open Business Blueprint for ISIC Rev.5 8710: residential nursing care facilities"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Landed 1/3. Ensign Group and National HealthCare Corporation both had no discoverable Terms-of-Use page after 2 URL attempts each."
+  :industry/companies
+  [{:company/legal-name "Brookdale Senior Living Inc."
+    :company/lei "LH7MQB13NWY7CJ9VC445"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Brookdale Senior Living"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-lh7mqb13nwy7cj9vc445"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.brookdale.com/en/privacy-policy/terms-of-use.html"}
+   {:company/legal-name "The Ensign Group, Inc."
+    :company/lei "5493003K4HEEA8Q0BC72"
+    :company/status :tos-fetch-failed
+    :company/note "no Terms-of-Use page discoverable after 2 URL attempts"}
+   {:company/legal-name "National HealthCare Corporation"
+    :company/lei "254900PTS11LS1JS2752"
+    :company/status :tos-fetch-failed
+    :company/note "no Terms-of-Use/Terms-Conditions page discoverable after 2 URL attempts"}]}
  {:industry/code "isic-8720"
   :industry/description "Open Business Blueprint for ISIC Rev.5 8720: residential care for mental health/disability/substance abuse"
   :industry/applicable? false
@@ -1748,8 +1845,27 @@
  {:industry/code "isic-9000"
   :industry/description "Open Business Blueprint for ISIC Rev.5 9000: creative, arts and entertainment activities"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Landed 0/3. Original top-3 intent (Live Nation Entertainment, Endeavor Group Holdings, TKO Group Holdings) hit two structural GLEIF gaps -- Endeavor and TKO have no discoverable parent-entity LEI record under any reasonable name variant -- so Cinemark Holdings and AMC Entertainment Holdings were substituted; all attempts still failed on fetch, none evaded bot/JS protection."
+  :industry/companies
+  [{:company/legal-name "Live Nation Entertainment, Inc."
+    :company/lei "5493007B9BM9ZXJINO78"
+    :company/status :tos-fetch-failed
+    :company/note "terms page is a JS-rendered Next.js SPA shell with zero server-rendered body text"}
+   {:company/legal-name "Endeavor Group Holdings, Inc."
+    :company/status :lei-lookup-failed
+    :company/note "no parent-entity GLEIF record found under several name variants; not fabricated, not substituted with a subsidiary LEI"}
+   {:company/legal-name "TKO Group Holdings, Inc."
+    :company/status :lei-lookup-failed
+    :company/note "no GLEIF record found"}
+   {:company/legal-name "Cinemark Holdings, Inc."
+    :company/lei "549300LL2QMPTYIE0K55"
+    :company/status :tos-fetch-failed
+    :company/note "site returns HTTP 403 to a plain HTTP client; substituted for Endeavor"}
+   {:company/legal-name "AMC Entertainment Holdings, Inc."
+    :company/lei "549300ZO77UNR6NRBR11"
+    :company/status :tos-fetch-failed
+    :company/note "site returns HTTP 403 to a plain HTTP client; substituted for TKO"}]}
  {:industry/code "isic-9101"
   :industry/description ""
   :industry/applicable? false
@@ -1771,8 +1887,24 @@
  {:industry/code "isic-9200"
   :industry/description "Open Business Blueprint for ISIC Rev.5 9200: gambling and betting activities"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Landed 1/3. Las Vegas Sands Corp's terms page returned HTTP 400; MGM Resorts' domain would not establish a connection."
+  :industry/companies
+  [{:company/legal-name "Flutter Entertainment Public Limited Company"
+    :company/lei "635400EG4YIJLJMZJ782"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Flutter Entertainment"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-635400eg4yijljmzj782"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.flutter.com/terms-of-use"}
+   {:company/legal-name "Las Vegas Sands Corp."
+    :company/lei "549300DUOO1KXOHPM605"
+    :company/status :tos-fetch-failed
+    :company/note "sands.com/terms-of-use.html returns HTTP 400"}
+   {:company/legal-name "MGM Resorts International"
+    :company/lei "54930066VBP7DZEGGJ87"
+    :company/status :tos-fetch-failed
+    :company/note "mgmresorts.com would not establish a connection (2 attempts)"}]}
  {:industry/code "isic-9311"
   :industry/description "Open Business Blueprint for ISIC Rev.5 9311: operation of sports facilities"
   :industry/applicable? false
@@ -1782,8 +1914,27 @@
  {:industry/code "isic-9312"
   :industry/description "Open Business Blueprint for ISIC Rev.5 9312: activities of sports clubs"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Landed 2/3. Juventus terms page undiscoverable after 2 URL attempts. Manchester United's GLEIF entity used is the NYSE-listed public parent (Manchester United plc, Cayman Islands, ticker MANU) not the UK football-club operating subsidiary."
+  :industry/companies
+  [{:company/legal-name "Manchester United plc"
+    :company/lei "529900GWGZPE83MJOV59"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Manchester United"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-529900gwgzpe83mjov59"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.manutd.com/en/help/website-terms-of-use"}
+   {:company/legal-name "Borussia Dortmund GmbH & Co. Kommanditgesellschaft auf Aktien"
+    :company/lei "529900XO0YTOOKCLQB44"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Borussia Dortmund"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-529900xo0ytookclqb44"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.bvb.de/de/en/general/terms-of-use.html"}
+   {:company/legal-name "Juventus Football Club S.p.A."
+    :company/lei "815600A253A0AF58C166"
+    :company/status :tos-fetch-failed
+    :company/note "no discoverable legal/terms page after 2 URL attempts"}]}
  {:industry/code "isic-9319"
   :industry/description "Open Business Blueprint for ISIC Rev.5 9319: other sports activities"
   :industry/applicable? false
@@ -1793,8 +1944,27 @@
  {:industry/code "isic-9321"
   :industry/description "Open Business Blueprint for ISIC Rev.5 9321: amusement parks and theme parks"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Landed 2/3 with two large diversified media/entertainment conglomerates that operate major theme-park divisions (same pattern as using Fox Corporation/AT&T for broadcasting/telecom verticals earlier in this rollout), plus a pure-play theme-park operator. Comcast Corporation's terms page (representing its Universal Parks business) was undiscoverable."
+  :industry/companies
+  [{:company/legal-name "The Walt Disney Company"
+    :company/lei "549300GZKULIZ0WOW665"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=The Walt Disney Company"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300gzkuliz0wow665"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://disneytermsofuse.com/english/"}
+   {:company/legal-name "Six Flags Entertainment Corporation"
+    :company/lei "529900AS2CYWYFHRS781"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Six Flags Entertainment"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-529900as2cywyfhrs781"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/tos-source-url "https://www.sixflags.com/terms-of-use"}
+   {:company/legal-name "Comcast Corporation"
+    :company/lei "51M0QTTNCGUN7KFCFZ59"
+    :company/status :tos-fetch-failed
+    :company/note "no discoverable terms-of-use page after 2 URL attempts"}]}
  {:industry/code "isic-9329"
   :industry/description "Open Business Blueprint for ISIC Rev.5 9329: other amusement and recreation activities n.e.c."
   :industry/applicable? false
@@ -1894,8 +2064,22 @@
  {:industry/code "isic-9603"
   :industry/description "Open Business Blueprint for ISIC Rev.5 9603: funeral and related activities"
   :industry/applicable? true
-  :industry/status :pending
-  :industry/companies []}
+  :industry/status :done
+  :industry/note "Landed 0/3, the final industry in the entire ISIC queue. Carriage Services, Inc. (NYSE:CSV, the actual publicly traded parent) has no parent-entity GLEIF record itself -- only a subsidiary, Carriage Services Investment Advisors, Inc. -- so it was excluded rather than substituted with the subsidiary's LEI (same policy as Chevron/CRRC/Gazprom/Air Lease earlier in this rollout). Service Corporation International and Matthews International Corporation both have verified GLEIF LEIs but both fetch attempts failed."
+  :industry/companies
+  [{:company/legal-name "Carriage Services, Inc."
+    :company/status :lei-lookup-failed
+    :company/note "no parent-entity GLEIF record; only a subsidiary (Carriage Services Investment Advisors, Inc., 549300GSBMHE90NLKL62) found -- not substituted, per this catalog's no-subsidiary-substitution policy"}
+   {:company/legal-name "Service Corporation International"
+    :company/lei "549300RKVM2ME20JHZ15"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Service Corporation International"
+    :company/status :tos-fetch-failed
+    :company/note "403-blocked on both sci-corp.com/terms-of-use and its dignitymemorial.com consumer-facing brand (2 attempts, same corporate entity)"}
+   {:company/legal-name "Matthews International Corporation"
+    :company/lei "549300ZVC5O0ATML6U61"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Matthews International"
+    :company/status :tos-fetch-failed
+    :company/note "matw.com terms page 404'd and matthewsinternational.com would not establish a connection (2 attempts)"}]}
  {:industry/code "isic-9609"
   :industry/description "Open Business Blueprint for ISIC Rev.5 9609: other personal service activities n.e.c."
   :industry/applicable? false

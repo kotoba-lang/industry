@@ -49,12 +49,20 @@
       (subs s 1 (dec (count s)))
       s)))
 
+(defn- nbb-bin
+  "裸の \"nbb\" は PATH に無い環境(repo-local install のみ)で spawn が即失敗し、
+  exit -1 → fail-open で検証が黙って素通りする。repo-local の
+  node_modules/.bin/nbb を優先し、無ければ PATH に頼る。"
+  [top]
+  (let [local (io/file top "node_modules" ".bin" "nbb")]
+    (if (.exists local) (.getPath local) "nbb")))
+
 (defn- verify!
   "verify-west-pins.cljs を実行し、exit 1 なら deny。それ以外は allow 側に倒す。"
   [top & extra-args]
   (let [vscript (io/file top "scripts" "verify-west-pins.cljs")]
     (when-not (.exists vscript) (allow!))
-    (let [{:keys [exit out err]} (apply run "nbb" (.getPath vscript) "--dir" top extra-args)]
+    (let [{:keys [exit out err]} (apply run (nbb-bin top) (.getPath vscript) "--dir" top extra-args)]
       (when (= 1 exit)
         (let [msg (str/join "\n" (remove str/blank? [out err]))]
           (deny! (str "west.yml の pin 検証に失敗しました(未 push commit / main 非到達 / pin 退行)。"
@@ -75,7 +83,13 @@
                           second strip-quotes)
             body  (when (and input (.exists (io/file input)))
                     (try (json/parse-string (compat/slurp input) true) (catch :default _ nil)))
-            b64   (:content body)]
+            ;; -F/--field content=@<file> 経路(repos.edn :manifest-workflow の正経路が
+            ;; この形。file は raw base64)。path が $VAR 等で解決できない場合は従来通り
+            ;; fail-open(hook はシェル展開前のコマンド文字列しか見えない)。
+            field-b64 (some-> (re-find (re-pattern (str "(?:-F|--field)[=\\s]+content=@(" path-tok-src ")")) cmd)
+                              second strip-quotes
+                              ((fn [f] (when (and f (.exists (io/file f))) (compat/slurp f)))))
+            b64   (or (:content body) field-b64)]
         (if-not b64
           (allow!)   ; content を取り出せない形は fail-open
           (let [decoded (try (.toString (.from js/Buffer (str/replace b64 #"\s" "") "base64") "utf8")

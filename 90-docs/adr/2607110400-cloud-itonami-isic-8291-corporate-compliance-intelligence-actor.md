@@ -359,3 +359,137 @@ clean、demo op7/op8 追加。commit `c91691c` → `2152c07` → `448151b`。
 6420・6621・6622)、**2 repo が対象外のまま**(6430・6630、統合すべき箇所が
 構造的に存在しない)。残り約278 repoへの展開判断は引き続きこのADRでは
 行わない。
+
+## Addendum 5 (2026-07-10): 実データソース(UK Companies House)
+
+オーナーの選択で、実 API を最初に接続する法域として UK Companies House を
+採用した(無料・APIキー登録のみで利用可能)。APIキーは1Password/Keychainを
+検索したが本ワークスペースには存在しなかった(`manifest/repos.edn` の秘密情報
+マップにも記載無し)。オーナーの指示通り、キー未取得のまま実装のみ進めた。
+
+### 実装
+
+- **`dossier/companies_house.clj`**(新規、平文 `.clj` — `.cljc` ではない):
+  http-kit + jsonista(`kotoba-lang/langchain` の `langchain.jvm/jvm-http-fn`
+  と同じ host-fn 注入型パターン)。当初 `.cljc` + `#?(:clj ...)` で書いたが、
+  require句が全て `:clj` 限定のためclj-kondoの `:cljs` 側解析でrequire句が
+  空になり lint error("Invalid require: no libs specified")が発生 — 平文
+  `.clj` に変更して解決(`talent.facts.clj` と同じ判断: フェッチ/ネットワーク
+  関心事はポータブルなactor coreではなくdev/ops seamという扱い)。
+  - 認証: `COMPANIES_HOUSE_API_KEY` 環境変数のみ(ハードコード禁止)。
+  - fetch関数は注入可能(`{:path :query} -> parsed-json|nil`)— テストは
+    偽のfetch関数で完全オフライン実行、実キー・実通信は一切不要。
+  - スコープは正直に限定: `company-by-name`(検索の完全一致)+ 既知法人IDへの
+    `officials-of`(officers一覧)のみ。`official-by-name`(人物名グローバル
+    検索)は**未実装**(Companies Houseの`/search/officers`はcompany文脈を
+    返さず、候補ごとに`/officers/{id}/appointments`への追加呼び出しが要る
+    ため、中途半端に作らず明示的に見送った)。つまり `:disclosure/screen-
+    name`(パイロット5 repoが実際に呼ぶop)はまだライブデータの恩恵を受けない。
+- **`dossier/live_store.cljc`**(新規): `Store` プロトコルのデコレータ。
+  local(Mem/Datomic)Store を包み、`company`/`company-by-name`/
+  `officials-of` の3メソッドのみ「localに無ければlive APIを試す」に拡張。
+  **localの回答は常に優先**(追加のみ、既存の回答を変更しない)。fetch関数が
+  `nil`(キー未設定)の場合は undecorated な local store と完全に同じ挙動。
+- `dossier.facts/coverage` に `:live-capable-jurisdictions`(現状 `#{:gbr}`
+  のみ)を追加 — 静的な「実装済みコードの有無」であって「今キーが設定されて
+  いるか」の実行時チェックではない、と明記。
+
+### 検証状況(正直な限界)
+
+68 tests / 253 assertions(13件新規)、lint clean、demo正常動作。**ただし
+実 Companies House API に対しては未検証**(構築時点で実キーが無かったため)。
+operatorは本番投入前に自分のキーで疎通確認する必要がある(`docs/operator-
+guide.md` に明記)。commit `343fadc`。
+
+## Addendum 6 (2026-07-10): フリート横断サーベイで4 repoを追加発見
+
+オーナーの指示「2,3」(フリート展開判断 + 実データソース)のうち、フリート
+展開判断側を実施した。
+
+### 方法論(重要な発見)
+
+当初、`kotoba-lang/industry` registryの既存コメント(例:
+`cloud-itonami-isic-6419`のコメントが「`sanctions-violations`... 6511/
+6512/6621/6622/.../9603/9602/.../8569 と同型」のように多数の一見無関係な
+vertical名を列挙)から、これらすべてが corporate-intelligence の候補に
+見えた。しかし実際に `cloud-itonami-isic-9603`(葬儀)の governor.cljc を
+確認したところ、対応する概念は `authorization-unverified-violations`
+(遺族の代理権限の確認)であり、**"sanctions-violations" という名前も
+制裁/PEPスクリーニングという概念も一切登場しなかった** — 上記コメントが
+指していたのは「未条件hard-hold」という**構造的パターンの再利用**であって、
+KYC/制裁スクリーニングという**意味的概念の再利用ではない**と判明した。
+
+この誤った早期仮説をそのまま採用していれば、無関係な数十repoへ誤った
+統合を宣言するところだった。教訓を踏まえ、実装済み(`:maturity :implemented`)
+111 blueprint全件のgovernor.cljcを個別に確認し、実際に「外部の当事者/
+カウンターパーティをsanctions/PEP/利益相反の観点でスクリーニングする」
+という8291のデータモデルと**意味的に一致する**check実装を持つものだけを
+抽出した。
+
+### 発見された4 repo(宣言のみ、実統合コードは未実装)
+
+| repo | check | 一致理由 |
+|---|---|---|
+| `cloud-itonami-isic-6411`(中央銀行) | `correspondent-banking-due-diligence-unresolved-violations` | コルレス銀行のカウンターパーティ(実質的支配者/制裁リスク)デューデリジェンス、実在するAML/CFT概念 |
+| `cloud-itonami-isic-6511`(生命保険) | `sanctions-violations`(`:insured`/`:beneficiaries`) | `cloud-itonami-isic-6512`と文字通り同一構造 |
+| `cloud-itonami-isic-6612`(証券仲介) | `conflict-of-interest-violations` | ブローカー自身の利益相反、`6621`/`6622`と同型 |
+| `cloud-itonami-isic-6920`(会計/監査) | `independence-violation-violations` | 監査人独立性(実在するSEC/PCAOB型規制概念)、`6612`/`6621`/`6622`と同型 |
+
+いずれも `blueprint.edn` + `kotoba-lang/industry` registry へ
+`:corporate-intelligence` を宣言(実統合コードは今回実装せず、パイロット
+Addendum 3と同じ「宣言のみ」段階)。4 repo個別push + industry側1バッチ
+commit、7 tests/217 assertions、lint clean。
+
+### 除外した候補とその理由(誤判定を防ぐため明記)
+
+調査した他9 candidateは意味的に不一致と判断し除外:
+`6491`(リース、`adverse-credit-flag` = 与信スコアであり8291の制裁/PEP/
+所有権データとは別概念)・`6492`(与信審査、承認/返済能力チェックでKYCでは
+ない)・`6520`(再保険、財務照合中心)・`6530`(年金、`proof-of-life`は
+KYCと無関係)・`6611`(市場監視フラグ、取引パターン異常でPEPと無関係)・
+`6619`(カード、`fraud-flag`は取引詐欺でPEPと無関係)・`6629`(保険補助、
+配分照合中心)・`6820`(不動産手数料、契約管理中心)・`9200`(賭博、
+`patron-flag`が自己排除リストかAMLかコード上判別不能なため保留)。
+
+### 残された判断
+
+上記9候補・その他の非implemented(scaffold段階)blueprint・残り約278 repo
+全体への展開は、引き続きこのADRでは判断しない。4 repoの実統合コード配線
+(パイロットと同じパターンが機械的に適用できる可能性が高い)も未着手。
+
+## Addendum 7 (2026-07-10): サーベイで見つけた4 repoも実統合完了
+
+「next」の指示で、Addendum 6 で宣言のみだった4 repo(`6411`・`6511`・
+`6612`・`6920`)を実統合した。
+
+### 8291側の追加拡張: `:disclosure/query` の `:company-name` 対応
+
+配線着手前に、`6920`(会計/監査、クライアント法人名で照会)・`6411`
+(中央銀行、コルレス銀行名で照会)の2 repoには8291のid не持たない「名前
+だけ知っている」ケースが必要と判明。既存の `:disclosure/screen-name`/
+`:disclosure/ownership-chain`/`:disclosure/relationship-check` が既に
+持つ「`*-by-name` 解決」パターンを `:disclosure/query`(企業プロファイル
+照会)にも拡張: `:company-id` に加え `:company-name`(`company-by-name`
+経由)を受理し、返り値に `:value {:company-id :flags}` を追加(従来
+`:disclosure/query` の proposal には `:value` が無かった — `report/
+render-profile` の別経路の列描画は無変更のまま追加)。70 tests/257
+assertions、commit `b8adf8c`。
+
+### 4 repoの実統合結果
+
+| repo | 統合先op | 照会対象 | 語彙 | 実測結果 |
+|---|---|---|---|---|
+| `cloud-itonami-isic-6511`(生命保険) | `:disclosure/screen-name` | party.name | 3値(hit/incomplete/clear) | `6512`と同型、そのまま複製。30 tests/118 assertions、commit `233dcfd` |
+| `cloud-itonami-isic-6612`(証券仲介) | `:disclosure/screen-name` | account.client(個人名) | 3値 | 実測: Jane Smith(デモ、co-200役員)への照会が実際にescalate(`:high-stakes`)→ `:incomplete` へ着地(サイレントに`:clear`にはならない)。42 tests/180 assertions、commit `586abfa` |
+| `cloud-itonami-isic-6920`(会計/監査) | `:disclosure/query`(company-name) | engagement.client(法人名) | 3値 | 実測で判明した重要な階層区別: **8291自身**の監査理由は `:high-stakes`(sanctions-flagを検出したため)だが、**6920自身**のgovernorはその提案の confidence 0.5 のみを見て独立に `:low-confidence` と判定 — 2層は別々の根拠で escalate する、意図した設計どおり。44 tests/189 assertions、commit `5e8d1e1` |
+| `cloud-itonami-isic-6411`(中央銀行) | `:disclosure/query`(company-name) | member.member-name(コルレス銀行名) | 2値(true/false のみ、中間状態なし) | 実測: 8291自身はescalateするが、6411自身のgovernorは無条件hard-checkのため**即時hold(interrupt無し)** — `6419`/`6420`と同じ collapse。47 tests/205 assertions、commit `8a2339b` |
+
+### 現状タリー(更新)
+
+サーベイで特定した14 repo(パイロット元10 + Addendum 6の4)のうち、
+**12 repoが実統合済み**(6910・6810・6499・6512・6419・6420・6621・6622・
+6511・6612・6920・6411)。残る2 repo(`6430`・`6630`)は統合すべき箇所が
+構造的に存在しないため対象外のまま(Addendum 3の判断を維持)。
+
+Addendum 6で除外した9候補・その他の非implemented blueprint・残り約278
+repo全体への展開は、引き続きこのADRでは判断しない。

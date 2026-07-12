@@ -49,7 +49,7 @@
   (letfn [(walk [f]
             (lazy-seq
              (cons f (when (.isDirectory f)
-                       (mapcat walk (array-seq (.listFiles f)))))))]
+                       (mapcat walk (seq (.listFiles f)))))))]
     (walk (if (string? dir) (file dir) dir))))
 
 (defn sh [& args]

@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L1 LLM 推論 — app（Proton 型）  
-**As-of**: 2026-07-10  
+**As-of**: 2026-07-12  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -71,6 +71,9 @@
 - 観測 (signal): gftd.ai 実測 211986 req/7d・4981 uniques(日次和)・うち4xx probe 11%(24h)、workers 5698 inv/7d
 - 観測 (signal): gftd.ai 実測 212341 req/7d・4991 uniques(日次和)・うち4xx probe 11%(24h)、workers 5706 inv/7d
 - 観測 (signal): gftd.ai 実測 213453 req/7d・5015 uniques(日次和)・うち4xx probe 11%(24h)、workers 5752 inv/7d
+- 観測 (signal): gftd.ai 実測 235787 req/7d・5304 uniques(日次和)・うち4xx probe 30%(24h)、workers 6492 inv/7d
+- 観測 (signal): gftd.ai 実測 232867 req/7d・5308 uniques(日次和)・うち4xx probe 38%(24h)、workers 6641 inv/7d
+- 観測 (signal): gftd.ai 実測 220600 req/7d・4988 uniques(日次和)・うち4xx probe 18%(24h)、workers 6255 inv/7d
 
 ## Customer Segments
 
@@ -137,6 +140,9 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 1032 · /favicon.ico 132 · /api/node/config.js 52 · /signup 36 · /server/backend/.env 18 | 4xx(probe) 11% · 5xx 71%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 1017 · /favicon.ico 138 · /api/node/config.js 52 · /signup 36 · /server/backend/.env 18 | 4xx(probe) 11% · 5xx 71%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 1034 · /favicon.ico 145 · /api/node/config.js 52 · /signup 36 · /server/backend/.env 18 | 4xx(probe) 11% · 5xx 71%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 1257 · /prompt 722 · /view 721 · /favicon.ico 133 · /robots.txt 26 | 4xx(probe) 30% · 5xx 44%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 1189 · /robots.txt 211 · /favicon.ico 140 · /index.php 36 · /aws/autoscaling-config.json 24 | 4xx(probe) 38% · 5xx 48%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 1069 · /favicon.ico 141 · /aws/autoscaling-config.json 24 · /.env.dev.local 24 · /aws-batch/job-config.json 24 | 4xx(probe) 18% · 5xx 68%
 
 ## Revenue Streams
 

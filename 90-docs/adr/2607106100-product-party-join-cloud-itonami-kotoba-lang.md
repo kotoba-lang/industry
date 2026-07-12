@@ -109,3 +109,49 @@ In `gftdcojp/cloud-itonami`:
 - ADR-2607031800 — GTIN functional blueprints (not code-keyed)
 - ADR-2606302300 — org taxonomy (kotoba-lang libs / etzhayyim actors / gftdcojp apps)
 - etzhayyim product-bom-ontology / public-company-ontology (uchiwake ⊣ kabuto)
+- cloud-itonami ADR-0020 — catalog → match → share lifecycle (implementation)
+
+---
+
+## Addendum 1 (2026-07-10) — catalog procurement maturity loop closed
+
+A recurring maturity pass (cockpit + edge + CLI) landed the operator path
+that was only sketched in the Decision/Consequences of this ADR.
+
+### Landed chain (gftdcojp/cloud-itonami)
+
+| Stage | What |
+|---|---|
+| Catalog UI | keiei 製品・当事者 tab: coverage, goyoukiki candidates, procurement draft |
+| Propose match | `POST …/procurement/propose-match` → `:procurement/propose-match` (`:read-only`) |
+| Approve match | goyoukiki `:match/propose`; tool holds `:goyoukiki/match` |
+| Propose share | `POST …/procurement/propose-share` from executed match; fail-closed on re-propose |
+| Approve share | `:external-send`; tayori draft (never-sent) + delivered? |
+| State contract | `matchedEffects` / `sharedEffects` on `GET …/state` |
+| Overlay fix | client `:product-party` preserved across `fetch-state!` on catalog tab |
+| CLI / doctor | `ops-commands` SSoT; `bb procurement-match-and-share`; readiness next-action |
+| Phase-1 resume | draft runners resume after outer approve (no stuck escalate) |
+
+Representative SHAs (main history; pins advanced on superproject west.yml):
+
+- share outcome + full-loop e2e → earlier series through `528d6339`
+- state GET matched/shared tests → `029cd921`
+- catalog overlay preserve → `15cf7d3b`
+
+### SSoT surfaces
+
+- `cloud-itonami.product-party/ops-commands`, `share-lifecycle`,
+  `share-outcome-view`, `share-effect-id-for-match`
+- Implementation ADR: **cloud-itonami ADR-0020**
+
+### Still open (not part of this addendum)
+
+- `:product-party/bind` workspace projection (unchanged from original (−))
+- Doctor staged next-actions (match vs share separately)
+- Hosted live E2E with real CACAO (unit/edge/portable gates only)
+
+### Loop closure
+
+Product-party maturity `/loop` (30m `next`) **stopped** 2026-07-10 after
+catalog overlay + ADR documentation. Further work is on-demand, not
+scheduled.

@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L3 business operator（全業種・職種 SaaS + investment platform）  
-**As-of**: 2026-07-10  
+**As-of**: 2026-07-12  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -70,6 +70,43 @@
 - 観測 (signal): itonami.cloud 実測 2976 req/7d・105 uniques(日次和)・うち4xx probe 60%(24h)
 - 観測 (signal): itonami.cloud 実測 2978 req/7d・106 uniques(日次和)・うち4xx probe 60%(24h)
 - 観測 (signal): itonami.cloud 実測 2980 req/7d・107 uniques(日次和)・うち4xx probe 60%(24h)
+- 観測 (signal): itonami.cloud 実測 2984 req/7d・107 uniques(日次和)・うち4xx probe 60%(24h)
+- 観測 (signal): itonami.cloud 実測 2990 req/7d・109 uniques(日次和)・うち4xx probe 58%(24h)
+- 観測 (signal): itonami.cloud 実測 2990 req/7d・109 uniques(日次和)・うち4xx probe 57%(24h)
+- 観測 (signal): itonami.cloud 実測 2992 req/7d・109 uniques(日次和)・うち4xx probe 57%(24h)
+- 観測 (signal): itonami.cloud 実測 2994 req/7d・109 uniques(日次和)・うち4xx probe 57%(24h)
+- 観測 (signal): itonami.cloud 実測 2996 req/7d・112 uniques(日次和)・うち4xx probe 58%(24h)
+- 観測 (signal): itonami.cloud 実測 2999 req/7d・113 uniques(日次和)・うち4xx probe 59%(24h)
+- 観測 (signal): itonami.cloud 実測 2999 req/7d・113 uniques(日次和)・うち4xx probe 58%(24h)
+- 観測 (signal): itonami.cloud 実測 3001 req/7d・113 uniques(日次和)・うち4xx probe 60%(24h)
+- 観測 (signal): itonami.cloud 実測 3003 req/7d・113 uniques(日次和)・うち4xx probe 60%(24h)
+- 観測 (signal): itonami.cloud 実測 3004 req/7d・114 uniques(日次和)・うち4xx probe 60%(24h)
+- 観測 (signal): itonami.cloud 実測 291 req/7d・91 uniques(日次和)・うち4xx probe 64%(24h)
+- 観測 (signal): itonami.cloud 実測 293 req/7d・91 uniques(日次和)・うち4xx probe 51%(24h)
+- 観測 (signal): itonami.cloud 実測 293 req/7d・91 uniques(日次和)・うち4xx probe 52%(24h)
+- 観測 (signal): itonami.cloud 実測 295 req/7d・91 uniques(日次和)・うち4xx probe 50%(24h)
+- 観測 (signal): itonami.cloud 実測 299 req/7d・91 uniques(日次和)・うち4xx probe 53%(24h)
+- 観測 (signal): itonami.cloud 実測 301 req/7d・91 uniques(日次和)・うち4xx probe 53%(24h)
+- 観測 (signal): itonami.cloud 実測 303 req/7d・92 uniques(日次和)・うち4xx probe 56%(24h)
+- 観測 (signal): itonami.cloud 実測 305 req/7d・92 uniques(日次和)・うち4xx probe 56%(24h)
+- 観測 (signal): itonami.cloud 実測 306 req/7d・92 uniques(日次和)・うち4xx probe 58%(24h)
+- 観測 (signal): itonami.cloud 実測 310 req/7d・94 uniques(日次和)・うち4xx probe 54%(24h)
+- 観測 (signal): itonami.cloud 実測 311 req/7d・95 uniques(日次和)・うち4xx probe 53%(24h)
+- 観測 (signal): itonami.cloud 実測 313 req/7d・95 uniques(日次和)・うち4xx probe 53%(24h)
+- 観測 (signal): itonami.cloud 実測 318 req/7d・97 uniques(日次和)・うち4xx probe 49%(24h)
+- 観測 (signal): itonami.cloud 実測 320 req/7d・98 uniques(日次和)・うち4xx probe 44%(24h)
+- 観測 (signal): itonami.cloud 実測 323 req/7d・99 uniques(日次和)・うち4xx probe 44%(24h)
+- 観測 (signal): itonami.cloud 実測 324 req/7d・100 uniques(日次和)・うち4xx probe 42%(24h)
+- 観測 (signal): itonami.cloud 実測 327 req/7d・101 uniques(日次和)・うち4xx probe 41%(24h)
+- 観測 (signal): itonami.cloud 実測 329 req/7d・101 uniques(日次和)・うち4xx probe 43%(24h)
+- 観測 (signal): itonami.cloud 実測 275 req/7d・82 uniques(日次和)・うち4xx probe 42%(24h)
+- 観測 (signal): itonami.cloud 実測 277 req/7d・82 uniques(日次和)・うち4xx probe 43%(24h)
+- 観測 (signal): itonami.cloud 実測 277 req/7d・82 uniques(日次和)・うち4xx probe 42%(24h)
+- 観測 (signal): itonami.cloud 実測 279 req/7d・82 uniques(日次和)・うち4xx probe 43%(24h)
+- 観測 (signal): itonami.cloud 実測 279 req/7d・82 uniques(日次和)・うち4xx probe 42%(24h)
+- 観測 (signal): itonami.cloud 実測 281 req/7d・82 uniques(日次和)・うち4xx probe 43%(24h)
+- 観測 (signal): itonami.cloud 実測 281 req/7d・82 uniques(日次和)・うち4xx probe 42%(24h)
+- 観測 (signal): itonami.cloud 実測 305 req/7d・83 uniques(日次和)・うち4xx probe 59%(24h)
 
 ## Customer Segments
 
@@ -126,6 +163,33 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 15 · /itonami 3 · /itonami/verticals 1 · /join/browser 1 | 4xx(probe) 61%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 16 · /itonami 3 · /itonami/verticals 1 · /join/browser 1 | 4xx(probe) 60%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 15 · /itonami 3 · /itonami/verticals 1 · /join/browser 1 | 4xx(probe) 60%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 14 · /itonami 3 · /itonami/verticals 1 · /join/browser 1 | 4xx(probe) 60%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 14 · /itonami 4 · /itonami/verticals 2 · /join/browser 2 | 4xx(probe) 58%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 14 · /itonami 4 · /itonami/verticals 2 · /join/browser 2 | 4xx(probe) 57%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 14 · /itonami 4 · /itonami/verticals 2 · /join/browser 2 | 4xx(probe) 59%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 13 · /itonami 3 · /itonami/verticals 2 · /join/browser 2 | 4xx(probe) 60%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 13 · /itonami/verticals 1 · /itonami 1 · /join/browser 1 | 4xx(probe) 64%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 14 · /itonami/verticals 1 · /itonami 1 · /join/browser 1 | 4xx(probe) 51%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 13 · /itonami/verticals 1 · /itonami 1 · /join/browser 1 | 4xx(probe) 52%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 14 · /itonami/verticals 1 · /itonami 1 · /join/browser 1 | 4xx(probe) 50%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 12 · /itonami/verticals 1 · /itonami 1 · /join/browser 1 | 4xx(probe) 50%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 12 · /itonami/verticals 1 · /itonami 1 · /join/browser 1 | 4xx(probe) 53%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 13 · /itonami/verticals 1 · /itonami 1 · /join/browser 1 | 4xx(probe) 53%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 12 · /itonami/verticals 1 · /itonami 1 · /join/browser 1 | 4xx(probe) 56%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 13 · /itonami/verticals 1 · /itonami 1 · /join/browser 1 | 4xx(probe) 56%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 13 | 4xx(probe) 58%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 14 · /itonami 2 | 4xx(probe) 54%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 13 · /itonami 2 · /join/browser 1 | 4xx(probe) 53%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 14 · /itonami 2 · /join/browser 1 | 4xx(probe) 53%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 14 · /itonami 3 · /itonami/verticals 1 · /join/browser 1 | 4xx(probe) 49%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 13 · /itonami 4 · /join/browser 2 · /itonami/verticals 1 | 4xx(probe) 44%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 15 · /itonami 4 · /join/browser 2 · /itonami/verticals 1 | 4xx(probe) 44%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 14 · /itonami 4 · /itonami/verticals 2 · /join/browser 2 | 4xx(probe) 42%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 15 · /itonami 5 · /itonami/verticals 2 · /join/browser 2 | 4xx(probe) 41%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 14 · /itonami 5 · /itonami/verticals 2 · /join/browser 2 | 4xx(probe) 41%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 14 · /itonami 5 · /itonami/verticals 2 · /join/browser 2 | 4xx(probe) 43%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 13 · /itonami 5 · /itonami/verticals 2 · /join/browser 2 | 4xx(probe) 42%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 14 · /itonami 5 · /itonami/verticals 2 · /join/browser 2 | 4xx(probe) 59%
 
 ## Revenue Streams
 

@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L6 UGC game / creator platform（Roblox 型）  
-**As-of**: 2026-07-10  
+**As-of**: 2026-07-12  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -55,6 +55,7 @@
 - 観測 (signal): isekai.network 実測 6639 req/7d・263 uniques(日次和)・うち4xx probe 0%(24h)
 - 観測 (signal): isekai.network 実測 6641 req/7d・263 uniques(日次和)・うち4xx probe 0%(24h)
 - 観測 (signal): isekai.network 実測 6667 req/7d・268 uniques(日次和)・うち4xx probe 0%(24h)
+- 観測 (signal): isekai.network 実測 6105 req/7d・338 uniques(日次和)・うち4xx probe 1%(24h)
 
 ## Customer Segments
 
@@ -124,6 +125,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 71 · /feed/fork-stats.edn 42 · /robots.txt 12 · /vanta.php 12 · /wander.php 9 | 4xx(probe) 0% · 5xx 15%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 75 · /feed/fork-stats.edn 47 · /vanta.php 12 · /robots.txt 11 · /wander.php 9 | 4xx(probe) 0% · 5xx 16%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 84 · /feed/fork-stats.edn 53 · /vanta.php 12 · /robots.txt 10 · /wander.php 9 | 4xx(probe) 0% · 5xx 17%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 74 · /console/* 54 · /front/.env 52 · /package-updates/yum.cgi 52 · /src/constant.js 50 | 4xx(probe) 1% · 5xx 2%
 
 ## Revenue Streams
 
@@ -151,6 +153,7 @@
 - marketplace GMV
 - 次の検証 (isekai-fork-viral): fork 由来の新規作品比率と週次 fork 数の伸び (viral 係数 > 1 に近づくか)
 - gate 距離 (isekai-fork-viral): fork viral 係数 = 0.0 (gate 未到達)
+- gate 距離 (isekai-fork-viral): fork viral 係数 = 0 (gate 未到達)
 
 ## Unfair Advantage
 

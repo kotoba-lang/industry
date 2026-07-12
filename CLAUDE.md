@@ -61,6 +61,15 @@ west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独�
 - 大容量 repo は worktree ごとに重複取得される。`--fetch smart` + shallow 既定で
   軽減、heavy は DataLad/B2 経路（`nbb manifest/west_annex.cljs annex-get`）。
 
+
+## Repo naming — no `-clj` suffix (2026-07-10)
+
+**Do not create or register repos whose name ends in `-clj`.** Language is not
+the package identity. Use the short domain name, or a **role** suffix when the
+short name is taken (e.g. `kami-engine-guest`, `kami-mangaka-scene-author`).
+See ADR-2607102200 addendum 14. Historical GitHub redirects from old `*-clj`
+names remain; new west entries must use the new names only.
+
 ## 標準作業の常時許可（standing authorization）
 
 - **次の「新規 project を起こして登録する」一連の流れは、毎回の確認なしに実行してよい**
@@ -391,6 +400,31 @@ WIP を並行セッションが約40分間隔で退避し続け stash が20個�
   確信している」は archive 省略の理由にならない）→ drop / 削除。並行セッションが
   stash index をずらすので、drop は SHA を控えて毎回 index を再解決してから行う。
 
+## Claude Code の Agent 委譲 — fork は調査専用、実行系は fresh agent + worktree 隔離（2026-07-12）
+
+**`subagent_type: "fork"` は会話コンテキスト全体（この CLAUDE.md 含む）を継承する。**
+このため「調査だけしてコードは書くな」とプロンプトで明示しても、継承した
+コンテキストに本ファイルの「標準作業の常時許可」（新規 project 起こし → scaffold →
+push → 登録を確認なしで一気通貫）や、直前のユーザーとの設計判断が含まれていると、
+fork がそちらを実行許可として拾い、指示範囲を超えて実装・scaffold・push 準備まで
+勝手に完了させることがある（実測 2026-07-12: 「調査のみ」と明示した fork が
+`orgs/kotoba-lang/crm` / `orgs/cloud-itonami/cloud-itonami-isic-5820` に新規
+ライブラリ+アクターの本実装一式を無断で書き込み、TaskList に push/registry更新/ADR
+執筆までの段取りを自分で積んだ）。同時に、書き込み先が共有 west checkout 直下
+（`orgs/<org>/<repo>`）で `.git` 未初期化のまま裸ディレクトリとして置かれており、
+上記「並行エージェント運用」節が禁じる「共有 checkout 直接編集」にも該当した。
+
+- **fork は「読むだけ・調べるだけ」に限定する。** ファイル作成・編集・`git`
+  書き込み・`gh repo create`・push を伴う実行系タスクには fork を使わない。
+- **実行系タスクは fresh agent（`subagent_type` に `fork` 以外を指定、または省略）
+  に振る。** fresh agent は会話コンテキストを継承しないため、本ファイルの標準作業
+  許可を本人が読んでいない限り「勝手に許可を拾って暴走」しない。プロンプトは
+  self-contained に書き、実行してよい範囲を明示する。
+- **共有 `orgs/` 配下に触れる実行系タスクは、fresh agent に `isolation: "worktree"`
+  を付けて隔離する。** それが使えない/不十分な場合は上記の sibling-path
+  `git worktree add` を手動で切ってから作業させる。superproject 本体の `orgs/` に
+  直接書き込ませない。
+
 ## 大容量バイナリの扱い（B2 + DataLad、最優先）
 
 - **モデル重み / wasm / 動画 / 画像データセット等の大きなバイナリを git 履歴に
@@ -471,9 +505,29 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
   `wrangler secret put` で個別プロジェクトへ投入するもので、これとは別物。
 - **kagi（`kotoba-lang/kagi`）**: net-kotobase / kotoba-lang 系の新規プロジェクト
   向け secrets は、1Password ではなく **こちらを正**にしていく方針（自己主権
-  vault、ADR-2606272330）。`bin/kagi ls`（vault: `./.kagi/`、gitignore 済み）
-  で一覧、`bin/kagi get <name>` で取得。1Password から個別 item を持ち込みたい
-  時は `bin/kagi import onepassword <file.1pux>`。
+  vault、ADR-2606272330）。**実在する vault の実体は
+  `orgs/kotoba-lang/kagi/.kagi/`**（`bin/kagi` が実行時に自身のリポジトリ
+  ルートへ `cd` するため、どのディレクトリから叩いても常にここを見る —
+  2026-07-10 のセッションでこれを見落として「vault が無い」と誤判定した
+  実例があるので注記）。unlock は **OS Keychain（`kagi unlock-status` で
+  確認可能、`:method :os-keychain`）が既定で通る**ため、通常は
+  `KAGI_MASTER` を設定しなくても `bin/kagi add`/`bin/kagi get` がそのまま
+  動く（passphrase はKeychainが使えない場合の recovery 経路として残っている
+  のみ）。`bin/kagi ls` で一覧、`bin/kagi get <name>` で取得。1Password から
+  個別 item を持ち込みたい時は `bin/kagi import onepassword <file.1pux>`。
+  既存 item 例: `net-kotobase` compartment に `KOTOBA_SEED_PRODUCTION`/
+  `KOTOBA_SEED_TESTNET`/`KOTOBASE_B2_*` 等。
+- **`gftd.kotobase/CLOUD_ITONAMI_LEI_INGEST_IDENTITY_SEED`（1Password
+  `gftdcojp` vault）+ kagi `CLOUD_ITONAMI_LEI_INGEST_IDENTITY_SEED`
+  （compartment `net-kotobase`）— 両方に保管済み** — ADR-2607113500
+  （cloud-itonami-lei kotobase.net ingestion job）の自己主権 CACAO identity
+  （Ed25519 seed, 32-byte hex）。ローカルミラーは
+  `scripts/.kotobase-ingest-cloud-itonami-lei-identity.hex`
+  （`scripts/.gitignore` 済み、git に一切コミットしない）。kagi 側は
+  上記の既存 vault（OS Keychain unlock）にそのまま `bin/kagi add` で追記
+  ——新規 vault や新規 master passphrase の生成は不要だった（オーナーへの
+  「新規生成の許可」確認は、vault 未存在という誤った前提に基づいていたことが
+  判明したため、実際には生成した passphrase は未使用のまま破棄した）。
 
 ## Actors（langgraph-clj StateGraph アクター）
 
@@ -537,6 +591,21 @@ PolicyGovernor）/ **cloud-itonami**（ops-LLM ⊣ CertGovernor）。
   で actor 鍵を 初回生成→永続→再読込。**秘密鍵は `.<actor>/identity.edn` に置き
   gitignore（git に絶対コミットしない）**。`kotoba-store {:identity me}` で graph 既定
   ＝鍵由来 IPNS ＋ 自己 mint。設定参照は `manifest/repos.edn` の `:kotoba`。
+
+## UI/UX 標準 — frontend を書く前に skill `kotoba-uiux` を読む（2026-07-12）
+
+**このリポジトリ群で web / local app の UI（新規サイト・画面・redesign・landing・
+console）を書く時は、コードを書き始める前に Skill ツールで `kotoba-uiux` を呼ぶ。**
+kotoba-lang の design system スタック（`shitsuke.hig` HIG semantic tokens →
+`liquid-glass-ui` material → `kotoba-ui` 単一エントリ（shell/theme/`->page`）→
+`appkit`/`uikit` platform traits）が正で、正典レシピは
+`orgs/kotoba-lang/kotoba-ui/docs/agent-guide.md`。要点: app は `kotoba-ui.core`
+（+ `appkit.core` | `uikit.core`）だけを require する（`liquid-glass.*`/`shitsuke.*`
+直 require は理由必須の opt-out）、raw hex / ad-hoc font-size を app に書かない
+（token / theme map 経由のみ）、ライブラリ CSS は `@layer kotoba.hig, kotoba.glass`
+内にあるので app CSS は unlayered のままで常に勝つ（compound-selector での上書き
+戦争をしない）、layout は `kotoba-ui.shell` から組む（`.layout`/`.hero` 手書き禁止）。
+詳細は ADR-2607122200。
 
 ## `.cljc` / `.kotoba` ランタイム優先順位（2026-07-10 改訂。2026-07-07 改訂・初版は2026-07-06）
 

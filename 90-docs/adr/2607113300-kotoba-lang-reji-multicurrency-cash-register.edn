@@ -1,0 +1,18 @@
+[{:adr/authoritative_for ["till-tally + minimal-piece change-making として新設した kotoba-lang/reji の設計方針(整数の最小通貨単位のみ、float禁止)"
+                          "汎用基盤 OSS ライブラリの新規登録先は com-junkawasaki でなく kotoba-lang とする適用実例(ADR-2606302300 移行方針)"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/topic "kotoba-lang-reji-multicurrency-cash-register"
+  :adr/related ["orgs/kotoba-lang/reji"
+                "orgs/kotoba-lang/banking"
+                "90-docs/adr/2606302300-org-taxonomy-4-orgs.md"]
+  :adr/status "accepted"
+  :adr/id "adr-2607113300-kotoba-lang-reji-multicurrency-cash-register"
+  :adr/doc_type "adr"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/date "2026-07-10"
+  :adr/amends []
+  :db/id -1
+  :adr/decision-summary "{:question \"日本のレジで小銭を数えるシステムをOSSで設計・実装し、インド/中国/ブラジル/メキシコ/アラビア圏通貨に対応せよという依頼をどう実装/登録するか\", :money-representation \"全金額をその通貨の最小流通単位(minor unit)の整数で表現、floatを一切使わない。subdivision(major->minor倍率)をテーブルに持たせるだけで3進数通貨(KWD/BHD/OMR=1000)も型変更なしに追加可能\", :currencies [\"JPY\" \"INR\" \"CNY\" \"BRL\" \"MXN\" \"SAR\" \"AED\"], :arabia-interpretation \"『アラビア』は国名でないため、湾岸協力会議の代表としてSAR(サウジ・リヤル)とAED(UAEディルハム)の2通貨を収録\", :functions {:tally \"無制限枚数の集計(till-close reconciliation)\" :make-change \"unbounded coin-change DPによる最小枚数の釣銭計算。割り切れない金額は例外でなく最大実現可能額+remainderを返す\"}, :rejected-scope [\"bounded/stock-limited change-making(釣銭在庫上限)\" \"フルWeb UI/kotoba wasm化\"], :org-placement {:chosen \"kotoba-lang\" :visibility :public :reason \"ADR-2606302300でcom-junkawasakiは:transitional-foundation(汎用基盤-cljは最終的にkotoba-lang全移行予定)と明記済み。新規はcom-junkawasakiを経由せず直接kotoba-langに登録。副次的にkotoba-lang既定visibility=publicがオーナーの明示的なOSS依頼を満たす\" :scaffold-template \"orgs/kotoba-lang/banking(deps.edn/Apache-2.0 LICENSE/README/.cljc src+test)\"}, :verification {:jvm-test \"clojure -M:test: 16 tests / 771 assertions green\" :lint \"clojure -M:lint(clj-kondo): 0 errors/0 warnings\" :nbb-smoke \"npx nbb -cp src script/cli.cljs currencies/tally/change を JPY/INR/MXN/AED で手動確認、MXN 7centavos->5+remainder2 等の非整除ケース含む\"}, :manifest-registration {:repos-edn \":manifest.repos/extra-projects += orgs/kotoba-lang/reji\" :method \"gen-west-manifest.cljs --entry reji による最小diff生成、--check で canonical 確認\"}}"
+  :adr/authoritative true
+  :adr/title "ADR-2607113300: kotoba-lang/reji — multi-currency cash-register coin counter (till tally + minimal-change calculator), integer minor units only, no floats"}]

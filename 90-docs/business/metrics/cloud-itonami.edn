@@ -1,22 +1,22 @@
 {:health-status 200,
  :zone-name "itonami.cloud",
  :zone
- {:requests-7d 2980,
-  :pageviews-7d 16,
-  :uniques-7d-sum 107,
+ {:requests-7d 305,
+  :pageviews-7d 21,
+  :uniques-7d-sum 83,
   :zone "itonami.cloud"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/robots.txt", :requests 16}
-   {:path "/itonami", :requests 3}
-   {:path "/itonami/verticals", :requests 1}
-   {:path "/join/browser", :requests 1}],
-  :status-mix {:ok 21, :client-error 31},
+  [{:path "/robots.txt", :requests 14}
+   {:path "/itonami", :requests 5}
+   {:path "/itonami/verticals", :requests 2}
+   {:path "/join/browser", :requests 2}],
+  :status-mix {:client-error 33, :ok 23},
   :window "24h"},
- :as-of "2026-07-10",
- :traffic-quality {:window "24h", :probe-4xx-pct 60, :error-5xx-pct 0},
+ :as-of "2026-07-12",
+ :traffic-quality {:window "24h", :probe-4xx-pct 59, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /robots.txt 16 · /itonami 3 · /itonami/verticals 1 · /join/browser 1 | 4xx(probe) 60%",
+ "上位 page (24h, 2xx/3xx): /robots.txt 14 · /itonami 5 · /itonami/verticals 2 · /join/browser 2 | 4xx(probe) 59%",
  :signal
- "itonami.cloud 実測 2980 req/7d・107 uniques(日次和)・うち4xx probe 60%(24h)"}
+ "itonami.cloud 実測 305 req/7d・83 uniques(日次和)・うち4xx probe 59%(24h)"}

@@ -53,6 +53,31 @@ nexus-x402 自体は private repo のまま（ADR-0002 の決定を維持）だ�
   repo と同型のため追加設計は不要、GitHub Actions ワークフロー雛形の追加のみ
   follow-up）。
 
+## Addendum (2026-07-10): follow-ups landed, and an LLM-friendly design pass
+
+Decision items 3 and 4 (marked "follow-up" above) are done: `nexus-x402`'s
+`src/nexus/directory.cljc` now depends on `kotoba-lang/x402-directory`
+(vendored at `src/x402/directory.cljc`) instead of duplicating it — same
+tests pass, behavior unchanged — and `orgs/kotoba-lang/x402-directory` is
+west-registered (`--entry x402-directory`, pin == repo HEAD verified).
+
+Separately, per an owner instruction to make the LP itself more polished
+and specifically **LLM-friendly** (not just human-readable), extended
+`x402.directory/page`'s `:branding` map with `:page-title`
+`:meta-description` `:badge-label` `:nav-links` `:extra-sections-html`, and
+added a new `x402.directory/llms-txt` function — a plain-markdown summary
+of the same live `/catalog` data per the [llms.txt](https://llmstxt.org)
+convention, so an LLM reading the site gets a parseable document instead of
+extracting facts from HTML. `nexus-x402`'s `worker.cljs` wires this up as
+`GET /llms.txt` (content-negotiated alongside the existing HTML page), and
+adds a `GET /stats` endpoint — an aggregate-only settlement census
+(`{count, usd-total, agent-hint: {agent, human, unknown}}`, no per-payment
+payer/tx/timestamp, no auth needed) built on new `nexus.settlements`
+functions `classify-user-agent` and `agent-hint-breakdown`, wired at both
+settlement call sites via User-Agent sniffing. All of this stays inside the
+existing "never fabricates" invariant — `/stats`/`llms.txt` report only
+what `/catalog` and the real settlement ledger already contain.
+
 ## References
 
 - ADR-2607093300（nexus-x402 設計）/ nexus-x402 `docs/adr/0002`（外部 GTM

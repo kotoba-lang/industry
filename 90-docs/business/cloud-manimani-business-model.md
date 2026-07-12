@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L5 personal wellbecoming OS  
-**As-of**: 2026-07-10  
+**As-of**: 2026-07-12  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -68,6 +68,9 @@
 - 観測 (signal): manimani.cloud 実測 2174 req/7d・220 uniques(日次和)・うち4xx probe 75%(24h)
 - 観測 (signal): manimani.cloud 実測 2177 req/7d・220 uniques(日次和)・うち4xx probe 75%(24h)
 - 観測 (signal): manimani.cloud 実測 2192 req/7d・224 uniques(日次和)・うち4xx probe 74%(24h)
+- 観測 (signal): manimani.cloud 実測 2273 req/7d・261 uniques(日次和)・うち4xx probe 81%(24h)
+- 観測 (signal): manimani.cloud 実測 1020 req/7d・285 uniques(日次和)・うち4xx probe 86%(24h)
+- 観測 (signal): manimani.cloud 実測 928 req/7d・269 uniques(日次和)・うち4xx probe 73%(24h)
 
 ## Customer Segments
 
@@ -146,6 +149,9 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 59 · /robots.txt 7 | 4xx(probe) 75% · 5xx 0%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 62 · /robots.txt 7 | 4xx(probe) 75% · 5xx 0%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 65 · /robots.txt 7 | 4xx(probe) 74% · 5xx 0%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 38 · /robots.txt 4 | 4xx(probe) 81% · 5xx 0%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 23 · /robots.txt 5 | 4xx(probe) 86% · 5xx 0%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 23 · /robots.txt 3 | 4xx(probe) 73% · 5xx 1%
 
 ## Revenue Streams
 

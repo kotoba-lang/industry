@@ -137,4 +137,38 @@
   {:option "leave kawaraban at R0 and only build the cloud-itonami side"
    :rejected_because "isco-* blueprints are documentation-only by convention; without kawaraban's
                       R1 advance there is no actual collection pipeline feeding aozora, so the
-                      'collect and organize world news' request goes unfulfilled"}]}
+                      'collect and organize world news' request goes unfulfilled"}]
+
+ :addendum
+ {:date "2026-07-10"
+  :trigger "same-day go-live (owner-approved live RSS ingest + real aozora publish, per-actor
+            posting) drove hundreds of com.atproto.repo.createRecord writes from kawaraban's
+            per-outlet mirror actors plus cloud-itonami's media actor onto the SHARED operator
+            graph (yoro-social-v2, derived from YORO_OPERATOR_DID+YORO_DB_NAME) in one day, far
+            outrunning the 5-minute fold cron's steady-state assumption"
+  :symptom "pds.aozora.app listRecords/getRecord hung 15-40s+; a direct read against
+            kotobase.aozora.app's datoms endpoint for the same graph 503'd with Cloudflare
+            error 1102 (CPU time exceeded) at ~49s -- confirmed CPU-bound decode/merge of a
+            large unfolded novelty backlog, not just R2 I/O wait"
+  :fixes
+  {:kotobase-peer "src/kotobase_peer/core.cljc pmap-async (the novelty tx-block concurrent-fetch
+                   helper) fired ALL blocks via one unbounded js/Promise.all -- capped to
+                   24-in-flight batches. A reader-conditional syntax slip while editing
+                   (#?(:cljs form1 form2) only pairs :cljs with form1; form2 -- the defn itself
+                   -- silently drops from compilation as an unrecognized feature key) briefly
+                   regressed pmap-async to undefined, caught by npm run test:cljs (78 tests /
+                   165 assertions) before deploy"
+   :kotobase-cljc-worker "wrangler.jsonc had no explicit limits.cpu_ms (plan default). Batching
+                          alone didn't fix the 1102 -- the real ceiling was synchronous CPU
+                          decode/merge time, not concurrency. Raised to 300000 (the documented
+                          Workers Standard usage-model max)"
+   :fold-cron "no code/config change -- app-aozora-pds's existing */5 * * * * Cron Trigger
+              (FOLD_CRON_ENABLED=1, OPERATOR_SECRET already configured) simply needed the
+              raised CPU budget to complete a catch-up fold of the backlog into a fresh cold
+              snapshot on its next scheduled run. No manual secret access or one-off fold
+              trigger was needed"}
+  :verified "post-fold: direct kotobase.aozora.app graph read 129s (pre-fold, just inside the
+             raised budget) -> 7.2s; pds.aozora.app listRecords (kawaraban bbc-world mirror)
+             hanging (15-40s+) -> 4.4s, real article data intact (no data loss)"
+  :scope "infrastructure-only -- no change to kawaraban's or cloud-itonami media actor's
+         lexicon, Media/Charter Governor semantics, or G1-G11 gates"}}
