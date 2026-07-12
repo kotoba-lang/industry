@@ -241,7 +241,16 @@
       (str (str/join "\n" (concat (:prefix ex) (mapcat second with-new) (:suffix ex))) "\n"))))
 
 ;; --- pin のサーバ側検証(scripts/verify-west-pins.cljs に委譲) ---
-(defn- verify-remote! [content]
+(defn- nbb-bin
+  "検証の子プロセスに使う nbb を解決する。裸の \"nbb\" は PATH に無い環境
+  (repo-local install のみの checkout)で spawn が即失敗し、pin 検証が
+  常時 FAIL 扱い → west.yml を一切書けなくなる実障害があったため、
+  repo-local の node_modules/.bin/nbb を優先し、無ければ PATH に頼る。"
+  []
+  (let [local (io/file root "node_modules" ".bin" "nbb")]
+    (if (.exists local) (str local) "nbb")))
+
+(defn- verify-remote! [content entry-names]
   (let [self    (scripts.nbb-compat/get-property "babashka.file")
         vscript (io/file (scripts.nbb-compat/parent-path self) "verify-west-pins.cljs")]
     (if-not (.exists vscript)
@@ -249,7 +258,11 @@
       (let [tmp (io/file (str "/tmp/west-candidate-" (.now js/Date) ".yml"))]
         (try
           (spit tmp content)
-          (let [{:keys [exit out err]} (sh "nbb" (str vscript) "--dir" root "--candidate" (str tmp))]
+          ;; --entry 指定時は検証もその entry に絞る(--only)。ローカル west.yml が
+          ;; main と乖離した checkout では、絞らないと無関係 entry の大量 API 検証で
+          ;; 数分単位の timeout になる(書き込むのは当該 entry だけなので検証もそこだけでよい)。
+          (let [{:keys [exit out err]} (apply sh (nbb-bin) (str vscript) "--dir" root "--candidate" (str tmp)
+                                              (mapcat (fn [n] ["--only" n]) entry-names))]
             (print out) (binding [*out* *err*] (print err)) (flush)
             (when (= 1 exit)
               (binding [*out* *err*]
@@ -276,7 +289,7 @@
       (do (println "west.yml is up to date.") (scripts.nbb-compat/exit 0))
       (do (binding [*out* *err*] (println "west.yml is STALE. run: nbb scripts/gen-west-manifest.cljs"))
           (scripts.nbb-compat/exit 1)))
-    (do (when verify? (verify-remote! content))
+    (do (when verify? (verify-remote! content entries))
         (.mkdirs manifest-dir)
         (spit out-file content)
         (println (str "wrote " (.getPath out-file)
