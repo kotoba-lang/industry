@@ -16,7 +16,8 @@
 (defn- do-request [base-args opts]
   (let [args (cond-> base-args
                (:headers opts) (into (mapcat (fn [[k v]] ["-H" (str k ": " v)]) (:headers opts)))
-               (:basic-auth opts) (into (auth-args opts)))
+               (:basic-auth opts) (into (auth-args opts))
+               (:raw-args opts) (into (:raw-args opts)))
         r (apply compat/sh args)
         [body status-str] (split-status (:out r))
         status (js/parseInt status-str 10)]
