@@ -15,7 +15,11 @@
 (defn projects []
   ;; west.yml is generated and uses a stable block layout. Only retain projects
   ;; explicitly marked `userdata: datalad: true`; this avoids a YAML dependency.
-  (->> (re-seq #"(?ms)^\s+- name:\s*([^\n]+)(.*?)(?=^\s+- name:|\z)" (slurp "manifest/west.yml"))
+  ;; lookahead terminator: JS regex has no \z ("end of input") anchor — it silently
+  ;; matches a literal 'z', truncating any block whose text contains one (verified:
+  ;; 185/1624 blocks lose their `path:` line this way, e.g. any project path containing
+  ;; "z"). (?![\s\S]) is the portable "true end of string" idiom across regex engines.
+  (->> (re-seq #"(?ms)^\s+- name:\s*([^\n]+)(.*?)(?=^\s+- name:|(?![\s\S]))" (slurp "manifest/west.yml"))
        (keep (fn [[_ name block]]
                (when (re-find #"(?m)^\s+datalad:\s*true\s*$" block)
                  (when-let [[_ path] (re-find #"(?m)^\s+path:\s*([^\s]+)\s*$" block)]

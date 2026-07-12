@@ -55,11 +55,17 @@
 (defn sh [& args]
   (let [options (when (map? (last args)) (last args))
         command (if options (butlast args) args)
+        ;; Node's spawnSync default maxBuffer is ~1MB; beyond that it returns
+        ;; status:null + truncated output (ENOBUFS in .error) instead of throwing,
+        ;; which this fn used to mask as a bare "exit 1" with no diagnostic. Raise
+        ;; the cap and surface the real spawn error when one occurred.
         result (.spawnSync child-process (first command) (to-array (rest command))
-                           (clj->js (merge {:encoding "utf8"} options)))]
+                           (clj->js (merge {:encoding "utf8" :maxBuffer (* 64 1024 1024)} options)))
+        spawn-err (.-error result)]
     {:exit (or (.-status result) 1)
      :out (or (.-stdout result) "")
-     :err (or (.-stderr result) "")}))
+     :err (cond-> (or (.-stderr result) "")
+            spawn-err (str "\n[nbb-compat/sh] " (.-message spawn-err)))}))
 
 (defn exit [status] (.exit js/process status))
 (defn sleep!
