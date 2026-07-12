@@ -6128,11 +6128,45 @@
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "6202"
    :name "Computer consultancy and computer facilities management act..."
-   :repo "https://github.com/gftdcojp/cloud-itonami-J6202"
-   :business-id "cloud-itonami-J6202"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6202"
+   :business-id "cloud-itonami-isic-6202"
+   ;; No :robotics/:phone -- narrowed from the generic "computer
+   ;; consultancy/facilities management" code to a CRM/subscription-
+   ;; integrated customer-service-hub SaaS platform actor specifically
+   ;; (HubSpot Service Hub/Salesforce Service Cloud-class), grounded in
+   ;; the UNSD ISIC Rev.4 explanatory note's "provision of on-site
+   ;; management and operation of clients' computer systems ... plus
+   ;; related support services" clause. The sibling #2 of 2 that
+   ;; cloud-itonami-isic-5820's own docs/business-model.md sibling-actor
+   ;; roadmap names by description ("Customer-service hub (support
+   ;; cases, SLAs, knowledge base)"). Distinct from -isic-6209
+   ;; (IT-helpdesk ticket routing by technician access-tier/
+   ;; certification, NO account/subscription entity at all) and
+   ;; -isic-8220 (call-centre staffing/BPO, not a software product).
+   ;; Never processes payroll, employer-of-record, or spectrum/telephony.
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; real actor: svcdesk.{facts,store,policy,llm,phase,operation,report,
+   ;; sim}.cljc -- SupportOps-LLM sealed advisor ⊣ ServiceGovernor.
+   ;; sla-tier-gate (a case status transition must not itself commit a
+   ;; response-time promise faster than the account's active
+   ;; subscription/SLA tier entitles) and case-status-sequence-gate (no
+   ;; skipping/reversing the case lifecycle) are domain-unique HARD
+   ;; checks, new check kinds for this fleet -- direct analogs of
+   ;; -isic-5820's entitlement-scope-gate/stage-sequence-gate.
+   ;; case-status-sequence-gate reuses kotoba-lang/crm's
+   ;; kotoba.crm.pipeline (2nd consumer after -isic-5820, proving the
+   ;; shared-technical-commons design intent). double-close-gate uses a
+   ;; dedicated :closed? boolean rather than a :status value (same
+   ;; ADR-2607071351 lesson -isic-5820 applied). kb-embargo-gate (SOFT,
+   ;; always-escalate -- a new check kind: an embargoed knowledge-base
+   ;; article publish always reaches a human) and refund-commitment-gate
+   ;; (SOFT, always-escalate -- a case commitment implying a
+   ;; refund/credit always reaches a human) round out the governor.
+   ;; default-phase=1 from initial implementation. 33 tests/110
+   ;; assertions, clj-kondo clean. See cloud-itonami-isic-6202's own
+   ;; docs/adr/0001-architecture.md.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "6209"
