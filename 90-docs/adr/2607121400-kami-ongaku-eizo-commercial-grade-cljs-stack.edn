@@ -60,7 +60,9 @@
     :url "https://github.com/kotoba-lang/kami-ongaku-sequencer" :landed-on "2026-07-12"}
    {:repo "kami-ongaku-project" :domain :ongaku :layer :l3 :status :landed :wave 1
     :url "https://github.com/kotoba-lang/kami-ongaku-project" :landed-on "2026-07-12"}
-   {:repo "kami-ongaku-plugin-host" :domain :ongaku :layer :l3 :status :new :wave 3}
+   {:repo "kami-ongaku-plugin-host" :domain :ongaku :layer :l3 :status :landed :wave 3
+    :url "https://github.com/kotoba-lang/kami-ongaku-plugin-host" :landed-on "2026-07-12" :commit "51ecb7f"
+    :note "comfyui GPL-3.0 hard dep removed and reimplemented natively (registry/topo-sort/validate); node data stays comfyui-registry-shape-compatible, no code dependency"}
    {:repo "kami-ongaku-sampler" :domain :ongaku :layer :l2 :status :landed :wave 2
     :url "https://github.com/kotoba-lang/kami-ongaku-sampler" :landed-on "2026-07-12"}
    {:repo "audio" :domain :ongaku :layer :l2 :status :landed :wave 2
@@ -69,8 +71,11 @@
     :url "https://github.com/kotoba-lang/org-w3-webcodecs" :landed-on "2026-07-12"}
    {:repo "kami-eizo-timeline" :domain :eizo :layer :l3 :status :landed :wave 1
     :url "https://github.com/kotoba-lang/kami-eizo-timeline" :landed-on "2026-07-12"}
-   {:repo "kami-eizo-grade" :domain :eizo :layer :l3 :status :new :wave 3}
-   {:repo "kami-eizo-compositor" :domain :eizo :layer :l3 :status :new :wave 3}
+   {:repo "kami-eizo-grade" :domain :eizo :layer :l3 :status :landed :wave 3
+    :url "https://github.com/kotoba-lang/kami-eizo-grade" :landed-on "2026-07-12" :commit "f77f6bb"}
+   {:repo "kami-eizo-compositor" :domain :eizo :layer :l3 :status :landed :wave 3
+    :url "https://github.com/kotoba-lang/kami-eizo-compositor" :landed-on "2026-07-12" :commit "2753b53"
+    :note "comfyui-registry-shape-compatible node data, deliberately no code dependency (GPL-3.0 avoidance)"}
    {:repo "utsushi" :domain :eizo :layer :l2 :status :unchanged :wave 2
     :note "encode path implemented in org-iso-h264 instead (utsushi.codec already delegates NAL/SPS/PPS framing there); wiring utsushi.codec to it is a follow-up, not yet done"}
    {:repo "org-iso-h264" :domain :eizo :layer :l2 :status :landed :wave 2
@@ -101,5 +106,7 @@
     :repos ["kami-ongaku-notation" "kami-ongaku-sequencer" "kami-ongaku-project" "kami-eizo-timeline"]}
    {:wave 2 :focus "dsp/codec execution" :status :landed :landed-on "2026-07-12"
     :repos ["audio(extend)" "kami-ongaku-sampler" "org-iso-h264(encode, not utsushi)" "org-w3-webaudio" "org-w3-webcodecs"]}
-   {:wave 3 :focus "grading/compositing/plugin-host" :repos ["kami-eizo-grade" "kami-eizo-compositor" "kami-ongaku-plugin-host"]}
+   {:wave 3 :focus "grading/compositing/plugin-host" :status :landed :landed-on "2026-07-12"
+    :repos ["kami-eizo-grade" "kami-eizo-compositor" "kami-ongaku-plugin-host"]
+    :note "comfyui reuse downgraded from code dependency to data-shape compatibility only (GPL-3.0)"}
    {:wave 4 :focus "app integration" :repos ["douga(rewire)" "anime(rewire)" "kami-app-daw(future)" "kami-app-nle(future)"]}]}]
