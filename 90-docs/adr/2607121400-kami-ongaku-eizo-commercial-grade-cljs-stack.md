@@ -461,6 +461,31 @@ quantize、EDL diff 等 import なしのロジック）は `kotoba wasm` 対象�
     `kami-eizo-timeline` 経由の新 entry point のみを対象とした）、
     `kami-ongaku-plugin-host` の実VSTロード（範囲外と明記済み）、
     リアルタイム対話制御（現状は全て offline/prerender proof）
+- **Wave 10（wipe トランジション + legacy path 実証）— 完了（2026-07-13）**:
+  - https://github.com/kotoba-lang/douga（commit `4b0bb2d58a01`。同一
+    repo 内で2タスクが直列着地）
+    - **wipe トランジション実装** — `xfade` の `wipeleft` モードで実装。
+      5 x座標 × 3時点のサンプリングで **dissolve との明確な対比**を実証:
+      dissolve は1点が時間とともに連続的にR/Bブレンド、wipe は**シャープな
+      2領域分割**が右→左へ実際に掃引（blue判定ピクセル数が1→2→4と単調
+      増加）。16/16チェック合格。`{:dissolve :wipe}` 以外の種別は引き続き
+      明示的 reject
+    - **legacy scene/lines/assets path の実ffmpeg証明** — **実運用中の
+      yukkuriパイプラインが実際に使う経路**（`kami-eizo-timeline` 経由の
+      新 entry point ではない）を、本番コードを一切変更せず読み取り専用で
+      検証。複数音声テイクの連結・無音シーン・bgmミックスを含む構成で
+      実ffmpeg実行、34/34チェック合格。気になる挙動（duration が
+      `-shortest` に完全依存する emergent な値であること、無音シーンの
+      自動音声合成が無いこと）は**修正せず** README の「Known
+      limitations」に事実として記録（本番への無断介入を避けた）
+  - west manifest 登録済み（1 pin 前進、`2bd3232580e2`）
+  - **音楽・映像とも、当面の主要な実I/Oギャップは解消**。残るのは:
+    `:wipe`/`:dissolve` 以外の transition 種別、複数 transition の連結、
+    `kami-ongaku-plugin-host` の実VSTロード（範囲外と明記済み）、
+    リアルタイム対話制御（現状は全て offline/prerender proof）。これらは
+    いずれも「自動化エージェントによるコード生成だけでは埋めにくい」
+    性質のギャップ（実運用パイプラインとの調整判断、対話的性能検証等）
+    であり、次に着手する場合は個別に方向性を確認するのが望ましい
 
 ## Consequences
 
