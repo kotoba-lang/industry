@@ -486,8 +486,11 @@
       ;; directly from :spec -- construction materials/plumbing
       ;; wholesale trading actor. 140 = 139 + cloud-itonami-isic-4659,
       ;; promoted directly from :spec -- precision machinery/machine-
-      ;; tool wholesale trading actor.
-      (is (= 140 (:implemented m))))))
+      ;; tool wholesale trading actor. 141 = 140 +
+      ;; cloud-itonami-isic-6399, promoted directly from :spec -- meta
+      ;; job-search (job-posting aggregation/publication/delisting, the
+      ;; Indeed-shaped business, ISIC 6399 narrowed; ADR-2607121700).
+      (is (= 141 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
