@@ -1,13 +1,29 @@
-{:as-of "2026-07-12",
- :sources [:cloudflare :health],
- :zone
- {:requests-7d 241161,
-  :pageviews-7d 4716,
-  :uniques-7d-sum 5136,
-  :zone "gftd.ai"},
+{:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 2847, "ai-gftd-chat-shell" 3563},
- :health-status 200,
+ {"magatama-sh1n5h1x" 2860, "ai-gftd-chat-shell" 4190},
+ :zone
+ {:requests-7d 245014,
+  :pageviews-7d 5350,
+  :uniques-7d-sum 5153,
+  :zone "gftd.ai"},
+ :sources [:cloudflare :health],
+ :paths
+ {:ok
+  [{:path "/.git/refs/remotes/origin/HEAD", :requests 48}
+   {:path "/portal/.env", :requests 48}
+   {:path "/__nextjs_action", :requests 48}
+   {:path "/appsettings.Test.json", :requests 41}
+   {:path "/s3.properties", :requests 33}
+   {:path "/wp-json/gravitysmtp/v1/tests/mock-data", :requests 28}
+   {:path "/backend/config/constants.js", :requests 14}
+   {:path "/sitemap.xml", :requests 10}],
+  :status-mix {:client-error 1484, :server-error 9793, :ok 554},
+  :window "24h"},
+ :as-of "2026-07-12",
+ :traffic-quality
+ {:window "24h", :probe-4xx-pct 13, :error-5xx-pct 83},
+ :top-paths
+ "上位 page (24h, 2xx/3xx): /.git/refs/remotes/origin/HEAD 48 · /portal/.env 48 · /__nextjs_action 48 · /appsettings.Test.json 41 · /s3.properties 33 | 4xx(probe) 13% · 5xx 83%",
  :signal
- "gftd.ai 実測 241161 req/7d・5136 uniques(日次和)、workers 6410 inv/7d"}
+ "gftd.ai 実測 245014 req/7d・5153 uniques(日次和)・うち4xx probe 13%(24h)、workers 7050 inv/7d"}
