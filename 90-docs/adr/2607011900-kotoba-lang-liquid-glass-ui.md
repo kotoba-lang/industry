@@ -126,3 +126,28 @@ orgs/kotoba-lang/liquid-glass-ui/
 - `orgs/kotoba-lang/liquid-glass-ui/docs/adr/0001-liquid-glass-ui.md`（per-repo 設計 SSoT）
 
 Co-Authored-By: Claude Opus 4.8 (1M context)
+
+## Addendum (2026-07-12): @layer kotoba.glass 格納 + text-field keystroke バグ根治（ADR-2607122200）
+
+ADR-2607122200（UI HIG semantic layer topology）により本 repo は以下を実装した
+（main `b85af88`、PR #3、59 tests / 632 assertions）:
+
+- **cascade-layer 契約**: 生成 CSS 一式を `@layer kotoba.glass { ... }` に格納する
+  `layered-css` を追加し、`inline-style`/`inline-style-hiccup` は layer 順宣言
+  `@layer kotoba.hig, kotoba.glass;` + layered bundle を emit する。app CSS は
+  unlayered のまま常に勝つ（consumer が `.liquid-glass__*` への compound-selector
+  上書きで specificity 戦争をする必要が構造的に消滅）。`component-rules`（EDN
+  データ）と raw の `root-css`/`component-css` は不変。
+- **text-field/text-area/search-field の keystroke 喪失バグ根治**（net-babiniku が
+  本番で踏み手書き `<input>` へフォークしていた）。根本原因はブラウザ実証で特定:
+  reagent の async-rendering-safe controlled-input 機構は props が `:value`+
+  `:on-change` の時だけ作動し、`:value`+`:on-input`（旧実装が shitsuke.components
+  経由で emit していた形）では毎 input 後に DOM が stale 値へ巻き戻り、次 render
+  前の打鍵が失われる。修正: 3 コンポーネントは `[:input attrs]`/`[:textarea attrs]`
+  を直接構築（DOM 形状・class 契約は不変）、caller の `:on-input` は `:on-change`
+  として付け替え、textarea の `:value` は content でなく属性で渡す（外部状態への
+  追随停止バグも同時修正）。attr passthrough（`:disabled`/`:aria-*`/`:maxLength`
+  等）も拡充。shitsuke 側の同型バグ（`shitsuke.components/input|textarea`、
+  `shitsuke.hiccup/->html` の textarea SSR）は follow-up として PR #3 に記録。
+- demo.clj の `clojure.java.io` require 欠落と、実在しない
+  `resources/liquid_glass/specular.js` への stale コメント参照を修正。

@@ -126,3 +126,19 @@ import-export, localStorage, 選択モデル）を回帰テストで保全。
 - `orgs/kotoba-lang/shitsuke/docs/design.md`（層ごとの API）
 
 Co-Authored-By: Claude Opus 4.8 (1M context)
+
+## Addendum (2026-07-12): shitsuke.hig — 「dark mode / typography は extension point」の実装（ADR-2607122200）
+
+v1 が明示的に先送りしていた extension point を `shitsuke.hig` として実装した
+（main `3010910`、PR #3、52 tests / 251 assertions）: Apple HIG 公表値の 11 text
+styles（large-title 34/41 … caption2 11/13、SF+Hiragino/Noto JP スタック）、
+semantic colors light+dark（label 4 階層 / background 3+grouped 3 / separator /
+fill 4 階層 / tint）、system palette 18 色、4pt spacing、radius、hairline。emit は
+`--hig-*` CSS vars（`prefers-color-scheme` + `data-appearance` 強制切替）+
+element 既定の `base-css` + `.hig-*` utility classes、すべて cascade layer
+`@layer kotoba.hig` 内（layer 順 `@layer kotoba.hig, kotoba.glass;`、app CSS は
+unlayered で常勝 — ADR-2607122200 の契約）。既存 `shitsuke.tokens` v1 は不変
+（additive）。**既知の follow-up**: `shitsuke.components/input|textarea` は
+`:value`+`:on-input` を emit し reagent の controlled-input 安全機構を外す
+keystroke 喪失バグが残存（liquid-glass-ui PR #3 が根本原因と修正パターンを記録 —
+`:on-change` 契約への揃えと、`->html` での textarea `:value`-as-content SSR 対応）。

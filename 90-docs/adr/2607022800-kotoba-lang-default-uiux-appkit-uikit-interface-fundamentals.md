@@ -252,3 +252,24 @@ UIKit（タッチ）と AppKit（デスクトップ）をプラットフォー�
 - `https://developer.apple.com/documentation/technologyoverviews/app-design-and-ui`
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+
+## Addendum (2026-07-12): ADR-2607122200 による契約更新 — kotoba-ui は純 facade から実エントリへ
+
+ADR-2607122200（kotoba-lang UI HIG semantic layer topology）が本 ADR の 2 点を更新した:
+
+1. **§3 の「kotoba-ui は独自ロジックを一切持たない」契約を範囲限定で更新**。
+   kotoba-ui は `kotoba-ui.shell`（page/app-shell/hero/section/stack/grid —
+   HIG "Layout" の実装）、`kotoba-ui.theme`（単一 override map。app に raw hex を
+   書かせない唯一の theming 入口）、`kotoba-ui.core/->page`（one-call SSR）を持つ
+   実エントリになった（main `2494990`、PR #1）。既存 32 alias の再 export 契約は
+   不変。正典レシピは `kotoba-ui/docs/agent-guide.md`、agent 向けトリガーは
+   superproject skill `.claude/skills/kotoba-uiux/`。
+2. **§2 の Interface Fundamentals 対応表の更新**: Layout 行は `kotoba-ui.shell`、
+   Typography 行と Color & Materials 行の token 正本は `shitsuke.hig`（11 text
+   styles / semantic colors light+dark / system palette、`--hig-*` vars）になった。
+   liquid-glass.tokens は material（surface/elevation/specular/lens）の正本のまま。
+   全ライブラリ CSS は `@layer kotoba.hig, kotoba.glass` 内に emit され、app CSS は
+   unlayered で常に勝つ（specificity 戦争の恒久解）。
+
+appkit / uikit の役割（platform trait 既定値のみ、panel/list-view の 2 ラップ）は
+不変。両 README は agent-guide への誘導を追記済み（`17ff4db` / `e637761`）。
