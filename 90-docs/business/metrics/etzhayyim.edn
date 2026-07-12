@@ -1,13 +1,28 @@
-{:as-of "2026-07-12",
- :sources [:cloudflare :health],
- :zone
- {:requests-7d 37542,
-  :pageviews-7d 1281,
-  :uniques-7d-sum 1132,
-  :zone "etzhayyim.com"},
+{:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 6484, "etzhayyim-xrpc-proxy" 102},
- :health-status 200,
+ {"etzhayyim-did-web" 6485, "etzhayyim-xrpc-proxy" 102},
+ :zone
+ {:requests-7d 37853,
+  :pageviews-7d 1282,
+  :uniques-7d-sum 1135,
+  :zone "etzhayyim.com"},
+ :sources [:cloudflare :health],
+ :paths
+ {:ok
+  [{:path "/", :requests 60}
+   {:path "/robots.txt", :requests 19}
+   {:path "/actor/kanjo/did.json", :requests 7}
+   {:path "/_shell/home-feed.js", :requests 5}
+   {:path "/actor/tsumugi/did.json", :requests 5}
+   {:path "/.well-known/did.json", :requests 5}
+   {:path "/system-dynamics", :requests 4}
+   {:path "/organism/pulse.json", :requests 4}],
+  :status-mix {:client-error 254, :server-error 5248, :ok 241},
+  :window "24h"},
+ :as-of "2026-07-12",
+ :traffic-quality {:window "24h", :probe-4xx-pct 4, :error-5xx-pct 91},
+ :top-paths
+ "上位 page (24h, 2xx/3xx): / 60 · /robots.txt 19 · /actor/kanjo/did.json 7 · /_shell/home-feed.js 5 · /actor/tsumugi/did.json 5 | 4xx(probe) 4% · 5xx 91%",
  :signal
- "etzhayyim.com 実測 37542 req/7d・1132 uniques(日次和)、workers 6586 inv/7d"}
+ "etzhayyim.com 実測 37853 req/7d・1135 uniques(日次和)・うち4xx probe 4%(24h)、workers 6587 inv/7d"}
