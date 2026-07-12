@@ -6144,14 +6144,46 @@
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "6399"
-   :name "Other information service activities n.e.c."
-   :repo "https://github.com/gftdcojp/cloud-itonami-J6399"
-   :business-id "cloud-itonami-J6399"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
+   :name "Meta Job Search"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6399"
+   :business-id "cloud-itonami-isic-6399"
+   ;; No :robotics -- a meta-job-search actor only aggregates, verifies
+   ;; and publishes third-party job-posting references into a public
+   ;; search index; it never handles physical work. Same exemption class
+   ;; as cloud-itonami-6310/-isic-6910/-isic-8291/-isic-4690/-isic-4610/
+   ;; -isic-6311/-isic-7820/-isic-6312. Repo/business-id corrected from
+   ;; the stale ISIC-Rev.4 J-prefix placeholder (repo never created).
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :provision :route :bill :support :audit]},
+   :maturity :implemented
+   ;; real actor: jobsearchops.{facts,store,registry,governor,phase,
+   ;; jobsearchopsllm,operation,sim}.cljc -- JobSearch-LLM sealed advisor
+   ;; ⊣ Job Search Portal Governor (:job-search-portal-governor, UNIQUE
+   ;; fleet-wide). Narrowed from the generic ISIC 6399 (other information
+   ;; services n.e.c., whose official notes include information search
+   ;; services) to job-posting META-SEARCH/aggregation -- the Indeed-
+   ;; shaped business -- same narrowing move as -isic-6311 (data
+   ;; processing → market-data aggregation) and -isic-4610 (wholesale →
+   ;; commission broker). Distinct from -isic-6312 (generic web-portal
+   ;; content curation) and -isic-7810 (employment placement agency --
+   ;; this actor never matches or places a candidate; 7810 never
+   ;; aggregates postings). Flagship HARD check: stale-vacancy gate
+   ;; (publishing a posting whose source vacancy is already closed is
+   ;; blocked -- 職業安定法5条の4 的確表示義務, the 令和4年 provision
+   ;; written for 募集情報等提供事業者 by name / FTC Act §5 / GBR Conduct
+   ;; Regs 2003 reg 27 genuine-vacancy / UWG §5; staleness DISCIPLINE
+   ;; kinship to -isic-6311's stale-print acknowledged, the genuine-
+   ;; vacancy grounding is new). Conditional check: source-consent gate
+   ;; (a new member of the consent-check family, conditional on
+   ;; :requires-source-consent?; database-right/copyright + 特定募集情報
+   ;; 等提供事業者届出). ad-content-discriminatory (7810's discipline
+   ;; reapplied to ad content: Title VII §704(b)/ADEA §4(e)/均等法5条/
+   ;; AGG §11) and displayed-compensation-mismatch (ground-truth
+   ;; recompute) are honest reapplications, documented as such.
+   ;; Dual actuation publish→delist, SEQUENTIAL on the same posting,
+   ;; never auto at any phase. ADR-2607121700 (com-junkawasaki/root
+   ;; superproject).
+   :operating-states [:ingest :assess :publish :refresh :delist :audit]},
   {:id "6411"
    :name "Central banking"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6411"
