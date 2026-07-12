@@ -1,0 +1,19 @@
+[{:adr/authoritative_for ["fleet rule: HARD gates read structured data; free text gets at most SOFT escalation (one-human-review cost), scoped out with documented+tested reason where clean text contains trigger vocabulary"
+                          "record of the live-model defense cycle (iterations 19-29): ADR-0022 discovery/positioning, ADR-0023 §3 + §2-currency implementations, real-LLM verification, rationale-suspect across three actors, public surfacing"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/topic "live-model-defense-cycle"
+  :adr/related ["adr-2607122300-cloud-itonami-flagship-maturity-sprint"
+                "adr-2607131500-flagship-sprint-addendum-stack-seams"
+                "gftdcojp/cloud-itonami docs/adr/0022-jobs-meta-search-public-lane.md"
+                "gftdcojp/cloud-itonami docs/adr/0023-jobs-lane-6399-venture-marketplace.md"]
+  :adr/status "accepted"
+  :adr/id "adr-2607131900-live-model-defense-cycle"
+  :adr/doc_type "adr"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/date "2026-07-13"
+  :adr/amends ["adr-2607131500-flagship-sprint-addendum-stack-seams"]
+  :db/id -1
+  :adr/decision-summary "{:discovery \"cockpit ADR-0022 live jobs lane found in production (built independently, days apart from isic-6399); positioned as complementary in ADR-0023 (sourcing-legality vs posting-content-legality); §3 /marketplace (registry-fed static) + §2 currency gate (60d, 的確表示) implemented and deployed; §2 discrimination screen owner-gated\", :real-llm-verification \"dev/real_advisor_check.clj over murakumo fleet Ollama (keyless): gemma4-class does not reliably emit schema-conformant proposals; every deviation degraded safely; store-ground-truth holds fired regardless of model output\", :gap \"all three actors' llm docstrings claimed :rationale is scanned; no governor read it -- live model can keep structured cites/flags clean and write bias into free text\", :rule \"HARD gates read structured data; free text -> at most SOFT escalation (false-positive cost = one human review); scope out (7810: assess exempt) or omit (6399: statute names in clean rationales) with documented+tested reason -- three actors, three resolutions, deliberately\", :surfacing \"both HR-side demos run a biased advisor at page build: escalate -> 人間が却下 -> HOLD with ledger fact public\", :steady-state \"nightly automations unattended 2 nights; 144->146 registry drift followed via catalog workflow dispatch + marketplace regenerate/deploy\", :known-open [:adr-0023-s2-screen :6310-real-data-seed :benjamin-ollama :west-pin-verify-ci :cockpit-checkout-divergence]}"
+  :adr/authoritative true
+  :adr/title "ADR-2607131900: live-model defense cycle — real-LLM verification and the HARD/SOFT division for free text"}]
