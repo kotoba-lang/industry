@@ -433,6 +433,34 @@ quantize、EDL diff 等 import なしのロジック）は `kotoba wasm` 対象�
     トランジション（dissolve/wipe）レンダー未実装、`douga` legacy
     scene/lines/assets path（実運用中のyukkuriパイプラインが使う経路）は
     今回のE2E対象外のまま
+- **Wave 9（anime パイプライン統合 + dissolve トランジション）— 完了
+  （2026-07-13）**:
+  - https://github.com/kotoba-lang/anime（commit `9de3495420600`）—
+    **`anime` → `kami-eizo-timeline` → `douga` → 実ffmpeg** の3repo
+    パイプラインを初めて end-to-end 実証。4カット（うち1つ retake
+    マーカー付き）を実際に動画化、カット境界前後含む9箇所のピクセル
+    サンプリングで29/29チェック合格（誤差1〜3/255）。**重要な発見を
+    隠さず橋渡し**: `anime` の adapter 出力（`:clip/source-id` が
+    レンダー可能パスでない、`:douga/scene-index` 欠落）と `douga` が
+    要求する形の間に実際のギャップがあり、`attach-douga-keys` という
+    明示的なブリッジ関数として実装・README に正直に記録（隠蔽や
+    設計変更での回避をしなかった）
+  - https://github.com/kotoba-lang/douga（commit `1cc48e4de049`）—
+    dissolve トランジションの実クロスフェードレンダーを実装
+    （`xfade` フィルタ、`kami-eizo-timeline` の overlap 意味論と直接
+    対応）。赤→青の実dissolveで25/50/75%地点のRGB値が単調に変化
+    （R: 252→188→125→61→0、B: 0→61→125→190→253、G=0終始）—
+    ハードカットでも壊れたフレームでもない本物のブレンドであることを
+    ピクセルレベルで実証。17/17チェック合格。`:wipe` 等それ以外の
+    transition種別は引き続き明示的に reject（サイレント無視ではない）
+  - west manifest 登録済み（2 pin 前進、`3268044ed9be`）
+  - **これで音楽・映像両ドメインとも、主要な実I/Oギャップはほぼ解消**。
+    残るのは: `kami-eizo-timeline` の `:wipe` 等その他 transition 種別、
+    複数 dissolve の連結、`douga` legacy scene/lines/assets path
+    （実運用中の yukkuri パイプラインが使う経路。今回のE2E群は
+    `kami-eizo-timeline` 経由の新 entry point のみを対象とした）、
+    `kami-ongaku-plugin-host` の実VSTロード（範囲外と明記済み）、
+    リアルタイム対話制御（現状は全て offline/prerender proof）
 
 ## Consequences
 
