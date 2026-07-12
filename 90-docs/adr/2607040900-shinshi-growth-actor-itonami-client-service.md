@@ -85,6 +85,52 @@ Store は `MemStore`（既定）/ `DatomicStore`（`langchain.db` の `:db-api` 
 - (+) 本 ADR は Phase 0 のみで完結する scaffold であり、実データ・実 secrets・
   実実行は一切含まない。
 
+## Addendum (2026-07-12): Phase 1 landed — scoped read-only credential, not a copied secret
+
+The Consequences section above left one question open: should itonami hold a
+copy of club-shinshi's `DISPATCHER_INTERNAL_SECRET` (full read/write trust,
+the lg-shinshi pod's level), or should club-shinshi mint a separate
+itonami-only scoped read-only credential? **Resolved as the latter** —
+least-privilege, and the only option compatible with Cloudflare Secrets
+Store's write-only semantics (an existing secret's value cannot be read back
+to "copy" it even if we wanted to).
+
+Landed on the club-shinshi side (`60-apps/ai-gftd-project-shinshi/appview/
+ai-gftd-wasm-shinshi-sh1n5h1x/cljs/src/shinshi/worker/{metrics,d1_gateway}.cljs`,
+commit `baa8551`): a new env var `GROWTH_ACTOR_READONLY_SECRET`, checked
+alongside (not replacing) `DISPATCHER_INTERNAL_SECRET` on `x-internal-trust`.
+`/_metrics/revenue` accepts either (it was already read-only). `/_d1` accepts
+either but restricts `GROWTH_ACTOR_READONLY_SECRET` to exactly `{read_metric,
+read_revenue_gate}` — every write op, and every read op outside that
+allow-list (`list_actresses`, `scene_counts`, etc.), is rejected 403 before
+`dispatch-op`/D1 is ever touched. Deployed to the production Worker
+(`magatama-sh1n5h1x` / `shinshi.club`) and verified live: `read_metric` /
+`read_revenue_gate` return real data, `list_actresses` and `write_hypotheses`
+both 403 under the scoped secret.
+
+Landed on the shinshi-growth-actor side (`src/growth/facts.cljc`, commit
+`ab7fe80`): `growth.facts/live-facts` + `fetch-live-facts!` are no longer a
+stub — they call the two endpoints above via an injected `http-fn` (this
+namespace performs no I/O itself), resolving the secret once from env var
+`SHINSHI_GROWTH_READONLY_SECRET`. Honest-null preserved end-to-end: an
+upstream `null` passes through as `nil`; a transport failure or an upstream
+`{ok: false}` becomes an explicit `{:growth.fact/status :error ...}` marker,
+never a fabricated number. `growth.phase` gained a `:live-facts?` flag (true
+from Phase 1) — `:writes`/`:auto` are unchanged at every phase, so this is
+strictly additive: no write/auto-commit gating changed, `growth.operation`'s
+OperationActor graph does not call `growth.facts`, and `growth.governor`/
+`growth.publisher`/`growth.aozora` are untouched. `default-phase` stays `0`
+in this build; Phase 1 is a reachable capability, not yet the default.
+
+Secret value: generated once, stored in kagi (`kotoba-lang/kagi`, item
+`SHINSHI_GROWTH_ACTOR_READONLY_SECRET`, compartment `shinshi-growth`) per the
+CLAUDE.md secrets-storage policy, and deployed to the club-shinshi Worker via
+`wrangler secret put`. Never committed to either repo.
+
+This addendum does not change Phase 2/3 status (still not implemented) or
+the cloud-itonami tenant/external-onboarding gap noted above (still
+unresolved, still a separate follow-up).
+
 ## References
 
 - `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
