@@ -1,6 +1,6 @@
 # ADR-2607071200: local-murakumo — relay.gftd.ai は operator-run 分散推論 relay（main-2 fleet node）。恒久退役ではなく現在ダウン中 + `/infer/dispatch` の失敗系を明確化
 
-**Status**: accepted (implemented this session)
+**Status**: superseded by ADR-2607120000 (2026-07-11 — owner directive: "relay.gftd.ai is deprecated, prune it. Use murakumo-cloud instead.")
 **Date**: 2026-07-07
 **Deciders**: Jun Kawasaki
 **Scope**: `orgs/gftdcojp/local-murakumo`
@@ -34,7 +34,7 @@ Vultr wind-down」）。relay.gftd.ai がこの同じ退役波の一部（＝恒
 `/infer/dispatch` はブラウザ/WASM ワーカー swarm へジョブを配る**分散推論
 ディスパッチ**の一部。relay 自体は:
 
-- `deploy/relay.md`: 「fleet node で `bb murakumo infer relay 8091` を起動 →
+- `deploy/relay.md`: 「fleet node で `nbb murakumo infer relay 8091` を起動 →
   `cloudflared tunnel --url http://localhost:8091`（または named tunnel）で
   公開。ジョブは `POST /enqueue` で受け、`RELAY_URL` 経由で
   cloud 側の `/infer/dispatch` から転送される」
