@@ -391,7 +391,13 @@
      (defn cmd-canvas-md [cli-key ps idx [_ _] flags]
        (let [products (if (:all flags) (cli-products cli-key idx) [(resolve-product cli-key idx flags)])
              out-dir (or (:out-dir flags) (:md-out ps))
-             as-of (subs (.toISOString (js/Date.)) 0 10)]
+             ;; local-time calendar date, matching the :clj branch's
+             ;; java.time.LocalDate/now (system-local) — UTC would silently
+             ;; stamp a different day near local midnight in non-UTC zones.
+             now (js/Date.)
+             as-of (str (.getFullYear now) "-"
+                        (.padStart (str (inc (.getMonth now))) 2 "0") "-"
+                        (.padStart (str (.getDate now)) 2 "0"))]
          (doseq [p products]
            (let [f (nc/file (str out-dir "/" (name p) "-business-model.md"))]
              (.mkdirs (.getParentFile f))
@@ -548,6 +554,9 @@
 
              ;; default: help
              (println (help-text cli-key nil)))
-           (catch :default e
+           ;; ExceptionInfo only, matching the :clj branch — catching :default
+           ;; here silently swallowed every unexpected bug (TypeErrors etc.)
+           ;; into a generic "error: ..." + exit 1 instead of surfacing them.
+           (catch ExceptionInfo e
              (println "error:" (ex-message e))
              (nc/exit 1)))))))))
