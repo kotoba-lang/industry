@@ -1,0 +1,13 @@
+[{:adr/id "2607124900"
+  :adr/title "cloud-itonami-isic-6201 gains real disk persistence (FileStore); confirms same DatomicStore mislabeling as cloud-itonami-isic-5820"
+  :adr/status :accepted
+  :adr/date "2026-07-12"
+  :db/id -1
+  :adr/related ["2607124800-cloud-itonami-isic-5820-file-store-persistence" "2607124700-cloud-itonami-isic-6201-http-service-layer"]
+  :adr/loop-context "Fourth cycle of the /loop dynamic-mode self-paced 'raise maturity toward live production operation' task."
+  :adr/confirmed-not-assumed "Directly checked (not assumed by analogy) that marketing.store/DatomicStore has the SAME non-durability issue as cloud-itonami-isic-5820's crm.store/DatomicStore: constructor (->DatomicStore (langchain.db/create-conn schema)) resolves to a plain in-process atom, no connection/socket/file. This actor's marketing.http/-main docstring, prior to this fix, actively told operators wanting persistence to instantiate DatomicStore themselves -- the exact same inaccurate advice 5820 had, now corrected in both."
+  :adr/decision "Added src/marketing/file_store.clj mirroring cloud-itonami-isic-5820's crm.file-store (write-then-rename EDN snapshot, load-or-seed), adapted to marketing.store/Store's own method list. marketing.http/-main wired to $ISIC6201_STORE_FILE with the same loud stderr warning on ephemeral fallback."
+  :adr/verification-rigor "Same end-to-end rigor as 5820: real OS process started, real HTTP write (POST /advance-stage lead->mql) committed, on-disk EDN confirmed changed, process kill -9'd, fresh process restarted against the same file, restoration confirmed via GET /dashboard's changed stage-counts AND an independent governance check (stage-sequence-gate's rejection message explicitly referencing the restored :mql stage, which a fresh seed could not produce)."
+  :adr/test-status "56 tests / 202 assertions (up from 52/188 pre-existing), 0 failures, lint 0 errors/0 warnings, commit 7c26335, pushed."
+  :adr/remaining-gaps "No real Datomic/kotoba-server-backed durable option for either actor; cloud-itonami-isic-6202 (customer-service, built by a separate concurrent session) still has neither an HTTP layer nor persistence, and whether its own DatomicStore (if any) carries the same mislabeling remains unchecked and out of scope; no real LLM, no TLS/observability, no deployment for any of the three actors."
+  :adr/scope-note "New ADR (not an addendum to 2607124800) as a separate actor repo's own infrastructure fix, though it directly confirms and mirrors the prior ADR's finding and design"}]
