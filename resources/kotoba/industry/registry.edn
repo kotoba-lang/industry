@@ -5888,11 +5888,32 @@
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "5820"
    :name "Software publishing"
-   :repo "https://github.com/gftdcojp/cloud-itonami-J5820"
-   :business-id "cloud-itonami-J5820"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-5820"
+   :business-id "cloud-itonami-isic-5820"
+   ;; No :robotics/:phone -- narrowed from the broad "Software publishing"
+   ;; n.e.c. code to a commercial CRM/subscription-commerce SaaS platform
+   ;; actor specifically (Salesforce/HubSpot-class), the SAME narrowing
+   ;; move as -isic-6209/-isic-6311/-isic-4610/-isic-8299. Never processes
+   ;; payroll, employer-of-record, or spectrum/telephony.
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; real actor: crm.{facts,store,policy,llm,phase,operation,report,
+   ;; sim}.cljc -- RevOps-LLM sealed advisor ⊣ SubscriptionGovernor.
+   ;; entitlement-scope-gate (closed-won must not activate features/seats
+   ;; beyond the account's paid subscription tier) and stage-sequence-gate
+   ;; (no skipping/reversing pipeline stages) are domain-unique HARD
+   ;; checks, new check kinds for this fleet. double-close-gate uses a
+   ;; dedicated :closed? boolean rather than a :stage value (lesson from
+   ;; cloud-itonami-isic-6920's status-lifecycle bug, ADR-2607071351).
+   ;; revenue-mismatch-imminent (SOFT, always-escalate) recomputes ASC 606/
+   ;; IFRS 15 straight-line revenue recognition as ground truth. First
+   ;; build to factor out a shared technical-commons library,
+   ;; kotoba-lang/crm (kotoba.crm.pipeline generic stage-transition
+   ;; validator + kotoba.crm.revrec recompute), for future
+   ;; marketing-automation/customer-service sibling actors to reuse rather
+   ;; than re-derive. default-phase=1 from initial implementation. See
+   ;; cloud-itonami-isic-5820's own docs/adr/0001-architecture.md.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "5911"

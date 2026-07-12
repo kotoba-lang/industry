@@ -370,6 +370,8 @@
     (is (= :implemented (industry/maturity "2813"))))
   (testing "a hundred-twenty-fourth implemented actor (cloud-itonami-isic-2816, lifting/handling-equipment actor; fourth capital-equipment/general-purpose-machinery vertical in the classic heavy-industry cluster alongside 2822/2824/2813, distinct from the transport-equipment sub-cluster of 2811/2910/3011) is also :implemented"
     (is (= :implemented (industry/maturity "2816"))))
+  (testing "cloud-itonami-isic-5820 (narrowed from the broad 'Software publishing' ISIC class to a commercial CRM/subscription-commerce SaaS platform actor, Salesforce/HubSpot-class; RevOps-LLM sealed advisor ⊣ SubscriptionGovernor, first CRM/marketing/service-hub vertical in this fleet) is also :implemented"
+    (is (= :implemented (industry/maturity "5820"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -490,7 +492,7 @@
       ;; cloud-itonami-isic-6399, promoted directly from :spec -- meta
       ;; job-search (job-posting aggregation/publication/delisting, the
       ;; Indeed-shaped business, ISIC 6399 narrowed; ADR-2607121700).
-      (is (= 141 (:implemented m))))))
+      (is (= 142 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
