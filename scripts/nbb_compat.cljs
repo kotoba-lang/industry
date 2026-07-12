@@ -82,8 +82,20 @@
        (into {} (map (fn [k] [k (aget env k)]) (js/Object.keys env)))))
 (defn get-property [k] (when (= k "babashka.file") *file*))
 (defn format [template & values]
+  ;; matched the whole specifier and substituted (str v) verbatim, discarding any
+  ;; width/flag (e.g. "%-18s") — every column-aligned CLI/CI table using this fn
+  ;; printed unpadded, ragged output. Now applies width + `-`/`0` padding for real.
   (reduce (fn [s v]
-            (str/replace-first s #"%[-+0-9.]*[sd]" (str v)))
+            (if-let [[whole flag width] (re-find #"%([-+0]?)(\d*)[sd]" s)]
+              (let [text (str v)
+                    w (when (seq width) (js/parseInt width 10))
+                    padded (cond
+                             (nil? w) text
+                             (= flag "-") (.padEnd text w " ")
+                             (= flag "0") (.padStart text w "0")
+                             :else (.padStart text w " "))]
+                (str/replace-first s whole padded))
+              s))
           template values))
 (defn relative-path [base target]
   (.relative path (file-path base) (file-path target)))

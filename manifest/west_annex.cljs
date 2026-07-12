@@ -46,12 +46,20 @@
     exit))
 
 (defn enable-b2! [dir remote env]
-  (run! dir env "git" "annex" "init")
-  (if (zero? (run! dir env "git" "annex" "enableremote" remote))
-    true
+  ;; deleted west_annex.py's _enable_b2 checked AWS_ACCESS_KEY_ID before ever
+  ;; calling enableremote, as a defense-in-depth guard against resolve-b2
+  ;; soft-failing into an incomplete creds map; this port dropped that
+  ;; local check, relying entirely on resolve-b2's own hard-exit on failure.
+  (if-not (get env "AWS_ACCESS_KEY_ID")
     (do (binding [*out* *err*]
-          (println (str "enableremote " remote " に失敗。初回は scripts/datalad-b2-init.cljs で initremote 済みか確認。")))
-        false)))
+          (println "B2 creds 未解決(AWS_ACCESS_KEY_ID 無し)。manifest/repos.edn の :b2 :credentials を確認。"))
+        false)
+    (do (run! dir env "git" "annex" "init")
+        (if (zero? (run! dir env "git" "annex" "enableremote" remote))
+          true
+          (do (binding [*out* *err*]
+                (println (str "enableremote " remote " に失敗。初回は scripts/datalad-b2-init.cljs で initremote 済みか確認。")))
+              false)))))
 
 (defn datalad? [] (zero? (:exit (sh "which" "datalad"))))
 
