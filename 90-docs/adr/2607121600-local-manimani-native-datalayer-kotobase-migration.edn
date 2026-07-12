@@ -1,0 +1,23 @@
+[{:adr/id "adr-2607121600-local-manimani-native-datalayer-kotobase-migration"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607121600: local-manimani ネイティブアプリ(desktop/mobile)の Rust データ層を kotobase スタックへ移行"
+  :adr/status "proposed"
+  :adr/last_verified "2026-07-12"
+  :adr/topic "local-manimani-native-datalayer-migration"
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["local-manimani の tauri/(desktop)・mobile/(Android/iOS)Tauri アプリの\n    Cargo.toml が参照する kotoba-core/kotoba-datomic/kotoba-edn/kotoba-ipfs/\n    kotoba-auth/kotoba-ipns-record が2026-07-01のRustワークスペース削除\n    (PR #259, 604896171b)で現存しないこと、および現在の正しいCLJC後継\n    (datom/arrangement/commit-dag/kotobase-peer, multiformats/dag-cbor/\n    prolly-tree, io-ipfs, cacao/ed25519, ipns)"
+   "com-junkawasaki/kotoba はCargo.tomlコメントの主張(canonical Rust workspace)\n    に反し、実際にはCargo.toml/crates/を持たない別種のリポジトリであること"
+   "desktop(tauri/)は companion プロキシパターンを一切持たず embedded store\n    に直結、mobile(mobile/)は run_triage/run_insights のみ companion_url\n    経由でingest_items/queueは embedded store 直結、という現状の非対称性"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related
+  ["90-docs/adr/2607022600-kotoba-database-crates-cljc-migration-roadmap.md"
+   "90-docs/adr/2607050700-datomic-terminology-repo-rename.md"
+   "90-docs/adr/2607072000-kotoba-rust-avoidance-policy-and-kotoba-server-gap.md"
+   "90-docs/adr/2607101000-kotoba-orphaned-rust-crates-migration-roadmap-addendum.md"]
+  :adr/problem
+  "{:summary \"local-manimani の tauri/src-tauri と mobile/src-tauri が、\n    2026-07-01に削除済みの kotoba-datomic/kotoba-core/kotoba-edn/kotoba-ipfs/\n    kotoba-auth/kotoba-ipns-record Rust crateへ相対パス参照しており、両\n    ネイティブアプリ(desktop/mobile)がビルド不能になっている\"}"
+  :adr/decision
+  "{:proposal \"embedded Rust Datalog store (kotoba_datomic) を廃止し、既に\n    動作確認済みの server/(TS/Hono、/api/queue等)companion APIへ desktop/\n    mobile 双方を一本化する。identity/CACAO(kotoba-auth相当)のみ\n    ed25519-dalek/ciborium/base64 を使った Rust 純正実装に縮小する\n    (kotoba-lang/cacao のwire formatを仕様として参照)。\", :status \"提案のみ、実装は個別ADRに分割\", :open-questions [\"オフラインファースト要件(ADR-0013/0018)との整合 — companion sidecar自動起動 / 機能制限モード / 要件撤回のいずれか\" \"kotoba_datomic::distributed(9738行)がdesktopで実際に呼ばれているか\" \"CACAO検証をRust純正実装するかserver/にエンドポイント追加してプロキシするか\"]}"
+  :db/id -1}]
