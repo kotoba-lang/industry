@@ -499,7 +499,18 @@
       ;; cloud-itonami-isic-6399, promoted directly from :spec -- meta
       ;; job-search (job-posting aggregation/publication/delisting, the
       ;; Indeed-shaped business, ISIC 6399 narrowed; ADR-2607121700).
-      (is (= 143 (:implemented m))))))
+      ;; 142 = 141 + cloud-itonami-isic-5820, promoted directly from
+      ;; :spec -- CRM platform actor, the fleet's first CRM/marketing/
+      ;; service-hub sibling. 143 = 142 + cloud-itonami-isic-6201,
+      ;; promoted directly from :spec -- marketing-automation SaaS
+      ;; platform actor. 144 = 143 + cloud-itonami-isic-6202, promoted
+      ;; directly from :spec -- customer-service-hub actor. (This entry
+      ;; reconciles a counter race: three concurrent sessions promoted
+      ;; 5820/6201/6202 while the assertion was bumped only to 143 and
+      ;; the ledger comment stopped at 141 -- attribution verified by
+      ;; diffing the implemented-id set between the 141-era commit
+      ;; 5ffdc774 and main.)
+      (is (= 144 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
