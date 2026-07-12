@@ -2,6 +2,7 @@
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.set :as set]
+            [kotoba.industry.wave :as wave]
             [kotoba.technology :as technology]))
 
 (def registry-resource "kotoba/industry/registry.edn")
@@ -59,6 +60,7 @@
      :business-id (:business-id industry)
      :industry (:name industry)
      :maturity (:maturity industry)
+     :wave (wave/wave-of isic)
      :required-technologies (:required-technologies industry)
      :optional-technologies (:optional-technologies industry)
      :operating-states (:operating-states industry)
@@ -115,6 +117,7 @@
         has-repo (boolean (:repo industry))]
     {:isic (:id industry)
      :maturity level
+     :wave (wave/wave-of (:id industry))
      :next-step (condp = level
                   :spec       :blueprint
                   :blueprint  :implemented
@@ -134,3 +137,18 @@
   [isic]
   (-> (maturity-roadmap-of (get-industry isic) (technology-stack isic))
       (assoc :isic (str isic))))
+
+(defn wave-maturity-summary
+  "Aggregate maturity counts per reverse-topological rollout wave
+  (ADR-2607121000, `kotoba.industry.wave`): for each wave 0-4, how
+  many registry entries sit at :spec / :blueprint / :implemented.
+  This is the plan's progress gauge -- value capture is on-order when
+  lower-numbered waves reach :implemented first."
+  []
+  (into (sorted-map)
+        (map (fn [[w entries]]
+               [w {:total       (count entries)
+                   :spec        (count (filter #(= :spec (maturity-of %)) entries))
+                   :blueprint   (count (filter #(= :blueprint (maturity-of %)) entries))
+                   :implemented (count (filter #(= :implemented (maturity-of %)) entries))}]))
+        (group-by #(wave/wave-of (:id %)) (industries))))
