@@ -1,26 +1,26 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 3859, "kotobase-cf-wasm-staging" 2529},
+ {"net-kotobase" 3863, "kotobase-cf-wasm-staging" 2541},
  :zone
- {:requests-7d 6368,
-  :pageviews-7d 339,
-  :uniques-7d-sum 482,
+ {:requests-7d 6383,
+  :pageviews-7d 340,
+  :uniques-7d-sum 483,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 66}
+  [{:path "/", :requests 67}
    {:path "/health", :requests 57}
-   {:path "/llms-full.txt", :requests 44}
-   {:path "/llms.txt", :requests 41}
-   {:path "/.well-known/did.json", :requests 37}
+   {:path "/llms-full.txt", :requests 43}
+   {:path "/llms.txt", :requests 40}
+   {:path "/.well-known/did.json", :requests 36}
    {:path
     "/ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapcbsx3yrg7xzj3jrxm3q4mzz2nu",
-    :requests 36}
-   {:path "/pins", :requests 36}
-   {:path "/_app/meta", :requests 34}],
-  :status-mix {:server-error 72, :client-error 190, :ok 434},
+    :requests 35}
+   {:path "/pins", :requests 35}
+   {:path "/_app/meta", :requests 33}],
+  :status-mix {:server-error 70, :client-error 196, :ok 429},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,9 +30,9 @@
   :last-charge-epoch 1604224274},
  :as-of "2026-07-12",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 27, :error-5xx-pct 10},
+ {:window "24h", :probe-4xx-pct 28, :error-5xx-pct 10},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 66 · /health 57 · /llms-full.txt 44 · /llms.txt 41 · /.well-known/did.json 37 | 4xx(probe) 27% · 5xx 10%",
- :funnel {:visitors 393, :signups 0, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): / 67 · /health 57 · /llms-full.txt 43 · /llms.txt 40 · /.well-known/did.json 36 | 4xx(probe) 28% · 5xx 10%",
+ :funnel {:visitors 394, :signups 0, :checkouts 0},
  :signal
- "kotobase.net 実測 6368 req/7d・482 uniques(日次和)・うち4xx probe 27%(24h)、workers 6388 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 6383 req/7d・483 uniques(日次和)・うち4xx probe 28%(24h)、workers 6404 inv/7d、Stripe active subs 0"}
