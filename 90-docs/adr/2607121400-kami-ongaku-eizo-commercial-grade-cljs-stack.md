@@ -407,6 +407,32 @@ quantize、EDL diff 等 import なしのロジック）は `kotoba wasm` 対象�
     notation/sequencer個別の実再生は証明済みなので、次はbusグラフ経由の
     複数トラック統合レンダーが自然な次ステップ）、`douga`/`anime`
     （`kami-eizo-timeline` 統合は済んだが実ffmpegレンダーとの結合証明は未）
+- **Wave 8（session統合レンダー + 実ffmpeg実行証明）— 完了（2026-07-13）**:
+  - https://github.com/kotoba-lang/kami-ongaku-project（commit `6a14e1814a89`）
+    — notation/sequencer 実依存の複数トラックを実バスグラフ経由でミックス。
+    drumsバス（gain 0.5 vs 1.0）のピーク比が**正確に2.0倍**、instruments
+    バス（gain 1.0固定）は**正確に1.0倍**（無変化）を実測。オフライン
+    計算とbit単位で一致（diff 5.79e-8）。これで音楽ドメインの主要5repo
+    （notation/sequencer/sampler/plugin-host/project）すべてが実オーディオ
+    実証済みになった
+  - https://github.com/kotoba-lang/douga（commit `6c9799951c90`）— **初めて
+    本物のffmpegバイナリを実行**（8.1.1、macOS/Homebrew、libx264+aac）。
+    3シーン（赤/黄緑/青、24fps、ハードカットのみ）の EDL を douga の実
+    コマンドビルダーに通し、生成されたコマンドをそのまま実行、ffprobe で
+    長さ/解像度確認 + 9箇所のピクセルサンプリングでカット境界前後含め
+    23/23チェック合格（色誤差は数/255のH.264圧縮由来のみ）。副産物として
+    ffmpeg 8.1.1 の `crop` フィルタの罠（`exact=0`既定で1×1指定が暗黙に
+    0×0に丸められエラーになる）を発見・回避
+  - west manifest 登録済み（2 pin 前進、`14f5f94ce8f6`）
+  - **音楽ドメイン(ongaku)は主要5領域すべてが実I/O実証済み**（notation/
+    sequencer/sampler/plugin-host/project）。残るは `kami-ongaku-plugin-host`
+    の実VSTロード相当（範囲外と明記済み）と `org-w3-webaudio` のリアルタイム
+    インタラクティブ制御（現状はoffline/prerender proofのみ）
+  - **映像ドメイン(eizo)の残課題**: `anime` の実ffmpegレンダー結合証明
+    （`douga` で確立したパターンを流用可能）、`kami-eizo-timeline` の
+    トランジション（dissolve/wipe）レンダー未実装、`douga` legacy
+    scene/lines/assets path（実運用中のyukkuriパイプラインが使う経路）は
+    今回のE2E対象外のまま
 
 ## Consequences
 
