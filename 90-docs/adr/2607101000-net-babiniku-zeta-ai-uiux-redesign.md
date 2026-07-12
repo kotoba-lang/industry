@@ -237,3 +237,33 @@ ADR-2607122200 が liquid-glass-ui / shitsuke / kotoba-ui 側に本 ADR 実装�
 **net-babiniku の実移行（index.html の 412 行インライン CSS 解体 → kotoba-ui
 shell/theme への載せ替え）は ADR-2607122200 D7 の follow-up として未着手**。着手時は
 `kotoba-ui/docs/agent-guide.md` を正典とする。
+
+## Addendum (2026-07-12, 同日): 実移行完了 — kotoba-ui shell/theme 載せ替え・本番デプロイ済み（ADR-2607122200 D7）
+
+PR #148（main `d4f648d`、サーバ側マージ）で実移行が完了し、本番
+https://net-babiniku.pages.dev/ に反映された:
+
+- **index.html の `<style>` 420 行 → 115 行**。`.liquid-glass__*` compound-selector
+  上書き・`--pop-*`・手発明 hex（`#0b0c10`/`#7ee787`/`#f0883e`）・手書き
+  `.hero`/`.top-nav`/nav-tab/element 既定はすべて削除。残した app CSS は 2 ペイン
+  stage レイアウト・状態色（`--hig-palette-green`/`--hig-palette-orange`）・brand
+  wordmark flourish 等の app 固有分のみ（`--hig-*` var 経由、unlayered で常勝）。
+- **views.cljs は `kotoba-ui.core` + `uikit.core` のみを require**。
+  `glass-text-field`/`glass-text-area` フォークと `ensure-liquid-glass-style!`
+  runtime 注入を retire、layout は `ui/app-shell`/`ui/hero`/`ui/section`/`ui/grid`/
+  `ui/stack`、px font-size は `.hig-*` utility classes へ。
+- **theme は build-time 静的生成**: `scripts/gen-theme-css.cljs`（nbb）が
+  `{:accent "#FF3CAC" :appearance :dark}` から `public/css/theme.css`（600 行、
+  `@layer kotoba.hig, kotoba.glass`）を生成し render-blocking `<link>` で読み込み
+  （FOUC なし）。`npm run theme-css`、deploy チェーンに配線済み。
+- **検証**: lint 0/0・bb domain gates 10/10・cljs 137/137・PR CI 4 jobs green。
+  実ブラウザ（Playwright/実 Chromium）19/19 — 320px 全タブ横スクロールなし
+  （scrollWidth==320）、active nav tab コントラスト 6.49:1、高速タイピング
+  keystroke 喪失ゼロ（5ms/char まで確認）、dark `--hig` tokens 適用。
+  本番反映確認済み（style 115 行・`data-appearance="dark"`・theme.css 56KB 配信）。
+- 唯一の可視コピー追加: `ui/hero` の要求する h1 として brand 文字列
+  「net-babiniku」（従来 h1 なし）。他のコピーは byte 同一。
+- 注記: Playwright の headless *shell* は RAF を絞り reagent のバッチ再描画を
+  飢餓させるため keystroke 喪失の偽陽性を出す — E2E は実 Chromium
+  （`channel: "chromium"`）で行うこと。
+- west pin 前進済み（`07f43990`、verify OK）。
