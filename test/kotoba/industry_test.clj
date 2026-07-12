@@ -417,17 +417,20 @@
       ;; cloud-itonami-isic-7912's own (ADR-2607104700), 34 with
       ;; cloud-itonami-isic-7710's own (ADR-2607104800), 35 with
       ;; cloud-itonami-isic-7721's own (ADR-2607104900), 36 with
-      ;; cloud-itonami-isic-7729's own (ADR-2607105100), then 40 with
+      ;; cloud-itonami-isic-7729's own (ADR-2607105100), 40 with
       ;; the 衣食住 scaffold batch (ADR-2607122200): 1010 meat
       ;; processing, 1311 textile spinning, 1410 apparel, 4100
       ;; building construction — the FIRST four entries promoted
       ;; :spec -> :blueprint explicitly (blueprint repo published, no
-      ;; actor claimed; wave-3 robotics-gated per ADR-2607121000).
+      ;; actor claimed; wave-3 robotics-gated per ADR-2607121000) —
+      ;; then 41 with 2100 pharmaceutical manufacturing
+      ;; (ADR-2607122600, scaffold batch #2: the last gap from
+      ;; ADR-2607121000's follow-up list).
       ;; This is not asserted as a fixed invariant; see
       ;; `industry/maturity-of`/`industry/maturity-roadmap-of` for how
       ;; the :blueprint branch logic itself stays unit-tested without
       ;; depending on a specific live count.
-      (is (= 40 (:blueprint m)))
+      (is (= 41 (:blueprint m)))
       ;; 114 = 113 + cloud-itonami-isic-4620, promoted directly from
       ;; :spec (never a :blueprint) -- agricultural/live-animal
       ;; wholesale trading actor. 115 = 114 + cloud-itonami-isic-2910,

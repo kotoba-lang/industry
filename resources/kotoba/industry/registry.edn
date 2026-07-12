@@ -3419,13 +3419,20 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2100"
    :name "Manufacture of pharmaceuticals, medicinal chemical and bota..."
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2100"
-   :business-id "cloud-itonami-C2100"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2100"
+   :business-id "cloud-itonami-isic-2100"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae :cfd]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :maturity :blueprint
+   ;; Promoted :spec -> :blueprint in scaffold batch #2 (ADR-2607122600):
+   ;; blueprint repo published (Community Pharmaceutical Manufacturing,
+   ;; :pharma-manufacturing-governor), no actor implementation claimed —
+   ;; wave-3 robotics-gated per ADR-2607121000, batch release always
+   ;; :safety-critical. Closes the last scaffold gap from that ADR's
+   ;; follow-up list (食/衣/住 = ADR-2607122200; 6201/6311 own-sector
+   ;; shipped separately as :implemented). Stale gftdcojp C-prefix
+   ;; :repo URL replaced by the real satellite.
+   :operating-states [:intake :design :produce :inspect :package :audit]},
   {:id "2211"
    :name "Manufacture of rubber tyres and tubes"
    :repo "https://github.com/gftdcojp/cloud-itonami-C2211"
