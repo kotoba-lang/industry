@@ -1,0 +1,91 @@
+[{:adr/id "adr-2607121400-kami-ongaku-eizo-commercial-grade-cljs-stack"
+  :adr/title "kotoba-lang 音楽制作(ongaku)・映像制作(eizo) commercial-grade engine stack — cljs canonical"
+  :adr/status "accepted"
+  :adr/topic "kotoba-lang-repo-boundaries"
+  :adr/last-verified "2026-07-12"
+  :adr/authoritative_for
+  ["kotoba-lang 音楽制作 / 映像制作系統の canonical 依存レイヤと責任境界"
+   "repo-wide 音楽・映像実装で kami-ongaku-* / kami-eizo-* stack を必須にする規則と完了条件"
+   "音楽・映像 DSP/codec/data-model 実装の言語優先順位（.cljc / cljs canonical）"
+   "kotoba-lang（engine/code）と gftdcojp（business/actor）の境界の再確認"]
+  :adr/related
+  ["adr-2607102200-kami-render-stack-deps-authority-rename"
+   "adr-2607010930-clj-wgsl-migration"
+   "adr-2607023000-ka-creative-craft-libs-isco-decomposition"
+   "adr-2607031510-kotoba-lang-composer"
+   "adr-2606272200-utsushi-video-edn-filtergraph"
+   "adr-2607082500-kotoba-lang-kasane-utsushi-reverse-domain-decomposition"
+   "adr-2606282100-mangaka-render-commons-vs-sip-work-split"
+   "adr-2606282101-mangaka-multilingual-text-layer-cljc-hiccup-reader"
+   "adr-2607051600-yukkuri-real-production-stack-live"
+   "adr-2607100030-kotoba-kami-engine-host-imports"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/ongaku-layer-map
+  {:l0-contracts ["kotoba-lang/composer" "kotoba-lang/ongaku"]
+   :l1-raw-api ["kotoba-lang/org-w3-webaudio"]
+   :l2-dsp-executor ["kotoba-lang/audio" "kotoba-lang/kami-ongaku-sampler"]
+   :l3-authoring ["kotoba-lang/kami-ongaku-project"
+                  "kotoba-lang/kami-ongaku-sequencer"
+                  "kotoba-lang/kami-ongaku-notation"
+                  "kotoba-lang/kami-ongaku-plugin-host"]
+   :l4-hosts ["wasm-webcomponent(AudioWorklet)" "kotoba-wasm(offline PCM)"]
+   :l5-apps ["kami-app-daw(future)"]}
+  :adr/eizo-layer-map
+  {:l0-contracts ["kotoba-lang/kami-mangaka-*"]
+   :l1-raw-api ["kotoba-lang/org-w3-webcodecs"]
+   :l2-codec-executor ["kotoba-lang/utsushi"]
+   :l3-authoring ["kotoba-lang/kami-eizo-timeline"
+                  "kotoba-lang/kami-eizo-grade"
+                  "kotoba-lang/kami-eizo-compositor"
+                  "kotoba-lang/douga"
+                  "kotoba-lang/anime"]
+   :l4-hosts ["wasm-webcomponent(WebCodecs/WebGPU)" "kotoba-wasm(offline transcode)"]
+   :l5-apps ["kami-app-nle(future)"]}
+  :adr/language-priority
+  {:order [:kotoba-wasm :clojurewasm :clojurescript :nbb :jvm-or-bb]
+   :note "host import 多用部分（AudioWorklet port/WebCodecs frame/node-graph 実行）は ClojureScript が第一級。純関数は kotoba wasm へ切り出し優先。JVM/bb は既存 lib のみ、新規には使わない。"}
+  :adr/org-boundary-unchanged
+  {:code "kotoba-lang"
+   :profession "cloud-itonami-isco"
+   :business "gftdcojp"
+   :distribution "manimani"
+   :note "composer/ongaku は生成モデル呼び出しを持たない設計のまま。本 ADR はエンジン層（DSP/codec/data-model）のみ厚くする。"}
+  :adr/new-repo-roster
+  [{:repo "org-w3-webaudio" :domain :ongaku :layer :l1 :status :new}
+   {:repo "kami-ongaku-notation" :domain :ongaku :layer :l3 :status :new}
+   {:repo "kami-ongaku-sequencer" :domain :ongaku :layer :l3 :status :new}
+   {:repo "kami-ongaku-project" :domain :ongaku :layer :l3 :status :new}
+   {:repo "kami-ongaku-plugin-host" :domain :ongaku :layer :l3 :status :new}
+   {:repo "kami-ongaku-sampler" :domain :ongaku :layer :l2 :status :new}
+   {:repo "audio" :domain :ongaku :layer :l2 :status :extend}
+   {:repo "org-w3-webcodecs" :domain :eizo :layer :l1 :status :new}
+   {:repo "kami-eizo-timeline" :domain :eizo :layer :l3 :status :new}
+   {:repo "kami-eizo-grade" :domain :eizo :layer :l3 :status :new}
+   {:repo "kami-eizo-compositor" :domain :eizo :layer :l3 :status :new}
+   {:repo "utsushi" :domain :eizo :layer :l2 :status :extend}
+   {:repo "douga" :domain :eizo :layer :l3 :status :rewire}
+   {:repo "anime" :domain :eizo :layer :l3 :status :rewire}]
+  :adr/commercial-parity-checklist
+  [{:domain :notation :reference ["Sibelius" "Dorico" "MuseScore"] :target "pitch/duration/dynamics/articulation IR + MusicXML import/export"}
+   {:domain :sequencing :reference ["Logic Pro" "Cubase" "FL Studio"] :target "piano-roll IR, quantize/groove, pattern/clip"}
+   {:domain :mixing :reference ["Pro Tools" "Waves" "iZotope Neutron"] :target "channel strip, bus, automation, EQ/comp/reverb/delay"}
+   {:domain :plugin-host :reference ["VST3" "Audio Unit"] :target "node-graph plugin contract, latency compensation"}
+   {:domain :sampling :reference ["Kontakt"] :target "velocity layer, round-robin, key-map, streaming"}
+   {:domain :nle-timeline :reference ["Premiere Pro" "DaVinci Resolve" "Avid Media Composer"] :target "track/clip/transition/effect-stack/marker EDL"}
+   {:domain :grading :reference ["DaVinci Resolve Color page"] :target "primary wheels/curves/LUT(.cube), waveform/vectorscope"}
+   {:domain :compositing :reference ["Nuke" "After Effects" "Fusion"] :target "node-based keying/roto/tracking data model"}
+   {:domain :codec :reference ["ffmpeg"] :target "H.264 decode complete + encode, AAC/Opus wired"}]
+  :adr/completion-gates
+  [:domain-data-roundtrip-assertion
+   :cljc-portable-core-tests-green
+   :wasm-host-contract-parity
+   :real-browser-audioworklet-or-webcodecs-e2e
+   :github-pages-smoke
+   :explicit-degraded-state-on-capability-unavailable
+   :no-screenshot-only-completion-claims]
+  :adr/roadmap-waves
+  [{:wave 1 :focus "data-model foundation" :repos ["kami-ongaku-notation" "kami-ongaku-sequencer" "kami-ongaku-project" "kami-eizo-timeline"]}
+   {:wave 2 :focus "dsp/codec execution" :repos ["audio(extend)" "kami-ongaku-sampler" "utsushi(encode)" "org-w3-webaudio" "org-w3-webcodecs"]}
+   {:wave 3 :focus "grading/compositing/plugin-host" :repos ["kami-eizo-grade" "kami-eizo-compositor" "kami-ongaku-plugin-host"]}
+   {:wave 4 :focus "app integration" :repos ["douga(rewire)" "anime(rewire)" "kami-app-daw(future)" "kami-app-nle(future)"]}]}]
