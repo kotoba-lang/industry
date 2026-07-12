@@ -217,3 +217,23 @@ mobile.
 - `90-docs/adr/2607062210-net-babiniku-giemon-humanoid-embodiment-procurement.md`
 - `90-docs/adr/2607070800-net-babiniku-llm-backend-claude-sonnet-5.md`
 - `orgs/jk-luxury/net-babiniku/90-docs/adr/0001-net-babiniku-architecture.md`
+
+## Addendum (2026-07-12): 上流トポロジー整備により本 ADR の CSS 戦術群は陳腐化予定（ADR-2607122200）
+
+ADR-2607122200 が liquid-glass-ui / shitsuke / kotoba-ui 側に本 ADR 実装中に露見した
+構造問題の恒久解を実装した:
+
+- 本 ADR 実装が堆積させた **compound-selector 上書き
+  （`.liquid-glass__toolbar.app-toolbar` 等）と「後注入ライブラリ CSS に負ける」
+  問題は、ライブラリ CSS の `@layer kotoba.hig, kotoba.glass` 格納で構造的に不要**
+  になった（app の unlayered CSS が常勝）。
+- 本 ADR 実装が踏んだ **`lg/text-field` keystroke 喪失バグは上流で根治**
+  （根本原因: `:value`+`:on-input` は reagent の controlled-input 安全機構を外す。
+  liquid-glass-ui PR #3）。views.cljs の手書き `glass-text-field`/`glass-text-area`
+  フォークは移行時に retire できる。
+- hex 直書き（`#0b0c10`/`#7ee787`/`--pop-gradient` 等）は `shitsuke.hig` semantic
+  tokens + `kotoba-ui.theme`（accent 1 map）で置換可能になった。
+
+**net-babiniku の実移行（index.html の 412 行インライン CSS 解体 → kotoba-ui
+shell/theme への載せ替え）は ADR-2607122200 D7 の follow-up として未着手**。着手時は
+`kotoba-ui/docs/agent-guide.md` を正典とする。
