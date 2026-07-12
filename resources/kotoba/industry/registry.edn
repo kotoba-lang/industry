@@ -6093,11 +6093,37 @@
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "6201"
    :name "Computer programming activities"
-   :repo "https://github.com/gftdcojp/cloud-itonami-J6201"
-   :business-id "cloud-itonami-J6201"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6201"
+   :business-id "cloud-itonami-isic-6201"
+   ;; No :robotics/:phone -- narrowed from the broad "Computer programming
+   ;; activities" n.e.c. code to a marketing-automation SaaS platform actor
+   ;; specifically (HubSpot Marketing Hub/Salesforce Marketing Cloud-class),
+   ;; the SAME narrowing move as -isic-5820/-isic-6209/-isic-6311/-isic-4610/
+   ;; -isic-8299. Distinct from -isic-7310 (an advertising-AGENCY services
+   ;; actor, AdOps-LLM ⊣ Campaign Governor) and from -isic-5820 (sales/
+   ;; subscription-commerce CRM, a separate business-model sibling per the
+   ;; owner's per-business-model actor-split directive).
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; real actor: marketing.{facts,store,policy,llm,phase,operation,sim}.cljc
+   ;; -- MarketingOps-LLM sealed advisor ⊣ ConsentGovernor.
+   ;; consent-revoked-send-gate (rejects sending to a contact whose consent
+   ;; is revoked/expired or who has unsubscribed) is a domain-unique HARD
+   ;; check, a genuinely new "authorization-to-contact" validity check kind
+   ;; for this fleet, citing CAN-SPAM Act 15 U.S.C. §7704, EU GDPR Art.
+   ;; 6(1)(a)+7, and Canada's CASL S.C. 2010 c.23. stage-sequence-gate reuses
+   ;; kotoba-lang/crm's kotoba.crm.pipeline for the lead lifecycle
+   ;; ([:subscriber :lead :mql :sql :customer], exit #{:unsubscribed :bounced
+   ;; :disqualified}). double-send-gate uses a dedicated :sent? boolean per
+   ;; (campaign, contact) pairing rather than a :status value (lesson from
+   ;; cloud-itonami-isic-6920's status-lifecycle bug, ADR-2607071351).
+   ;; lead-score-mismatch (SOFT, always-escalate) recomputes ground truth via
+   ;; kotoba-lang/crm's new kotoba.crm.leadscore weighted-point model.
+   ;; Second build to reuse the kotoba-lang/crm technical commons after
+   ;; cloud-itonami-isic-5820. customer-service (Service Cloud/Service Hub-
+   ;; class) remains an unbuilt future sibling. See cloud-itonami-isic-6201's
+   ;; own docs/adr/0001-architecture.md.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "6202"
