@@ -317,6 +317,56 @@ quantize、EDL diff 等 import なしのロジック）は `kotoba wasm` 対象�
     （`org-iso-h264` 自体のスコープ限定と同じ）。12 tests / 31
     assertions green（commit `bb7bf20282a6`）
   - 将来の `kami-app-daw`/`kami-app-nle` は本 ADR の範囲外（別 ADR）
+- **Wave 5（実ブラウザ I/O 実証）— 完了（2026-07-12、当初計画外の追加 wave）**:
+  Wave 1-4 は「アルゴリズムは正しいが実際に音も映像も出せない」状態だった
+  （成熟度評価で音楽・映像とも総合2/5 — 90-docs/adr の成熟度評価参照）。
+  この gap を埋めるため、ADR §6 の完了ゲート（実ブラウザ E2E・WASM host/guest
+  parity）を実際に満たす wave を追加した。
+
+  **戦略転換（重要）**: 当初「H.264 のマクロブロック/DCT/CAVLC/CABAC を
+  `org-iso-h264` に自前実装する」方向を検討したが、これは x264/libavcodec
+  相当の非現実的な工数であり却下。代わりに、3D が生 WebGPU を `org-w3-webgpu`
+  経由でブラウザ実装に委譲するのと同じ考え方で、**ピクセルレベルの実
+  codec 処理はブラウザ内蔵の WebCodecs（`VideoDecoder`/`VideoEncoder`）に
+  委譲**し、`org-iso-h264`/`utsushi` は container/parameter-set 層に留める
+  方針を確定した。この転換が Wave 5 全体を成立させた。
+
+  - https://github.com/kotoba-lang/org-w3-webcodecs（commit `b14dc397e248`）
+    — 実ヘッドレスChromiumで実H.264（`avc1.42001f`）encode→decode round-trip
+    を実施、復号ピクセルが元色と誤差1〜4/255で一致。**これが Wave 5 全体の
+    基盤**（以降の全タスクがこの実 codec I/O の上に構築された）
+  - https://github.com/kotoba-lang/kami-eizo-timeline（commit `c0116940f19eb`）
+    — `clip-at-frame` を追加し、3クリップのタイムラインを実際に
+    WebCodecs 経由でレンダー。カット境界（frame 5, frame 10）がピクセル
+    単位で正確に一致（フレーム精度の実証）
+  - https://github.com/kotoba-lang/kami-eizo-grade（commit `a19d4ea81b03`）
+    — ASC CDL grading を実デコード済みピクセルに適用。ブラウザ計算と
+    オフライン(nbb)計算が完全一致、再encode→decode後も許容誤差内
+  - https://github.com/kotoba-lang/kami-eizo-compositor（commit `2f6838662dc1`）
+    — chroma-key + blend を実デコード済みピクセルに適用。key領域は
+    alpha 0、subject領域は alpha 1 に正しく判定、ブラウザ/オフライン完全一致
+  - https://github.com/kotoba-lang/org-w3-webaudio（commit `e554d853d640`）
+    — **最難関だった課題を解決**: `kotoba-lang/audio` の sine+ADSR DSP を
+    実ブラウザの `AudioWorkletProcessor` 内で実行し、キャプチャした PCM が
+    オフライン参照実装と最大誤差 2.98e-8（実質完全一致）で一致することを
+    実証。2つの実バグを特定・修正: ① `cljs.main` の既定ビルドが dev REPL
+    接続用ブートストラップを同梱し、`AudioWorkletGlobalScope` に存在しない
+    `document` に触れて無言で失敗（`:optimizations :advanced` で dead-code
+    除去して解消）② `^:export` 境界越え呼び出しで Closure の `goog.global`
+    判定（`this || self`）が `self` 未定義の worklet scope で例外
+    （1行の `self` polyfill で解消）。また `audio`/`org-w3-webaudio` 双方の
+    既存 offline テストスイートは無変更のまま green を維持
+  - **副産物のバグ発見・修正**（全 Wave 5 タスク共通で見られたパターン:
+    「実データ・実環境で動かして初めて見つかる」バグ）: `org-w3-webaudio`
+    の `new-audio-context!` コンストラクタ呼び出しが Wave 2 から全ブラウザで
+    例外を投げていた（JVM テストが無いため未検出だった）。`audioWorklet.
+    addModule` は secure context 必須（`about:blank` 不可、`localhost` 可）
+    という発見も得た
+  - 各リポジトリとも `deps.edn` に `:e2e` alias（org-w3-webcodecs への
+    pinned git dep）+ `test/e2e/`（nbb + Playwright、CLAUDE.md の nbb
+    規約に準拠、生 `.mjs` は使わない）という共通パターンを確立し、以降の
+    ドメイン（サンプラー・プラグインホスト・シーケンサー等）にも再利用可能
+  - west manifest 登録済み（4 pin 前進、`50c96fd54650`）
 
 ## Consequences
 
