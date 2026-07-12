@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 4454, "app-aozora-appview" 4023},
+ {"app-aozora-pds" 4475, "app-aozora-appview" 4023},
  :zone
- {:requests-7d 23700,
-  :pageviews-7d 7586,
-  :uniques-7d-sum 777,
+ {:requests-7d 23720,
+  :pageviews-7d 7590,
+  :uniques-7d-sum 780,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
@@ -14,16 +14,16 @@
     :requests 1336}
    {:path "/xrpc/com.atproto.server.createSession", :requests 668}
    {:path "/xrpc/com.atproto.repo.createRecord", :requests 667}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 144}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 132}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 79}
    {:path "/", :requests 71}
-   {:path "/robots.txt", :requests 39}
-   {:path "/db.sql", :requests 20}],
-  :status-mix {:ok 3602, :client-error 296, :server-error 12},
+   {:path "/robots.txt", :requests 40}
+   {:path "/wordpress/wp-includes/wlwmanifest.xml", :requests 7}],
+  :status-mix {:ok 3108, :client-error 289, :server-error 12},
   :window "24h"},
  :as-of "2026-07-12",
  :traffic-quality {:window "24h", :probe-4xx-pct 8, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.tran… 1336 · /xrpc/com.atproto.server.createSession 668 · /xrpc/com.atproto.repo.createRecord 667 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 144 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 79 | 4xx(probe) 8% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.tran… 1336 · /xrpc/com.atproto.server.createSession 668 · /xrpc/com.atproto.repo.createRecord 667 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 132 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 79 | 4xx(probe) 8% · 5xx 0%",
  :signal
- "aozora.app 実測 23700 req/7d・777 uniques(日次和)・うち4xx probe 8%(24h)、workers 8477 inv/7d"}
+ "aozora.app 実測 23720 req/7d・780 uniques(日次和)・うち4xx probe 8%(24h)、workers 8498 inv/7d"}
