@@ -1,16 +1,16 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 2815, "ai-gftd-chat-shell" 3556},
+ {"magatama-sh1n5h1x" 2826, "ai-gftd-chat-shell" 3557},
  :zone
- {:requests-7d 233557,
-  :pageviews-7d 4697,
-  :uniques-7d-sum 5115,
+ {:requests-7d 236090,
+  :pageviews-7d 4700,
+  :uniques-7d-sum 5122,
   :zone "gftd.ai"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/wp-json/gravitysmtp/v1/tests/mock-data", :requests 42}
+  [{:path "/wp-json/gravitysmtp/v1/tests/mock-data", :requests 41}
    {:path "/aws/autoscaling-config.json", :requests 24}
    {:path "/aws-cpp-sdk-config.json", :requests 21}
    {:path "/config/framework/database.php.save", :requests 21}
@@ -19,12 +19,12 @@
    {:path "/config/autoload/global.php.backup", :requests 12}
    {:path "/yii/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php",
     :requests 10}],
-  :status-mix {:client-error 1789, :server-error 8471, :ok 340},
+  :status-mix {:client-error 1773, :server-error 8854, :ok 325},
   :window "24h"},
  :as-of "2026-07-12",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 17, :error-5xx-pct 80},
+ {:window "24h", :probe-4xx-pct 16, :error-5xx-pct 81},
  :top-paths
- "上位 page (24h, 2xx/3xx): /wp-json/gravitysmtp/v1/tests/mock-data 42 · /aws/autoscaling-config.json 24 · /aws-cpp-sdk-config.json 21 · /config/framework/database.php.save 21 · /.env.save 18 | 4xx(probe) 17% · 5xx 80%",
+ "上位 page (24h, 2xx/3xx): /wp-json/gravitysmtp/v1/tests/mock-data 41 · /aws/autoscaling-config.json 24 · /aws-cpp-sdk-config.json 21 · /config/framework/database.php.save 21 · /.env.save 18 | 4xx(probe) 16% · 5xx 81%",
  :signal
- "gftd.ai 実測 233557 req/7d・5115 uniques(日次和)・うち4xx probe 17%(24h)、workers 6371 inv/7d"}
+ "gftd.ai 実測 236090 req/7d・5122 uniques(日次和)・うち4xx probe 16%(24h)、workers 6383 inv/7d"}
