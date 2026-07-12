@@ -592,6 +592,64 @@ PolicyGovernor）/ **cloud-itonami**（ops-LLM ⊣ CertGovernor）。
   gitignore（git に絶対コミットしない）**。`kotoba-store {:identity me}` で graph 既定
   ＝鍵由来 IPNS ＋ 自己 mint。設定参照は `manifest/repos.edn` の `:kotoba`。
 
+## BMC / Lean Loop 反復トラッキング（business loop、2026-07-12）
+
+**新しく BMC (Business Model Canvas) / Lean Loop (build-measure-learn) の反復トラッキングを
+作ろうとする前に、`70-tools/bmc/` に既に本番稼働中の共有システムが無いか必ず確認する。**
+実測: 2026-07-12、9 プロダクト分の BMC/Lean Loop スケジューラを「ゼロから設計」しようとして
+調査した結果、うち 5 つ（cloud-itonami・cloud-manimani・cloud-murakumo・net-kotobase・
+app-aozora）は既にクラウド常駐 routine（`itonami-react-growth-hourly` 毎時 /
+`bmc-business-operate-daily` 毎日）で自動運転中、さらに 3 つ（network-isekai・
+ai-gftd-yukkuri・club-shinshi）も base datoms / canvas-ledger / metrics には既に完全登録
+済みで、routine 側の `--product` ハードコードリストへの反映漏れがあっただけだった。この
+確認を怠ると、既存システムと衝突・重複する独自ログを 9 個作りかねない実害があった
+（ADR-2607124500）。
+
+- **正本は `90-docs/adr/2607021500-portfolio-bmc-lean.datoms.edn`（base、書き換え禁止）+
+  `90-docs/business/canvas-ledger.edn`（append-only events）。** md
+  （`90-docs/business/<product>-business-model.md`）・`maturity-scores.md` は生成物、
+  手編集禁止（`gftd canvas md --all` / `gftd score md` で再生成）。設計 ADR:
+  2607021600（CLI/ReAct loop）・2607021700（成熟度スコア）・2607021800（collect/運転）・
+  2607022100（gate 評価器）・2607022200（per-product gate 計器）。使い方は
+  `70-tools/bmc/README.md`。
+- **`70-tools/bmc/` と `90-docs/business/` はこの superproject の既定 sparse-checkout から
+  除外されている。** 通常の checkout では存在自体が `find`/`ls` に映らない（実測でこれが
+  上記の見落としの一因になった）。触る前に
+  `git sparse-checkout add 70-tools/bmc 70-tools/scripts scripts 90-docs/business 90-docs/adr`
+  で明示的に取得する（既に含まれていれば no-op）。
+- **ツールチェーンは 2026-07-10 に babashka(bb) → nbb(cljs) へ移行済み**（commit
+  `b073ea7da12`）。`bb 70-tools/bmc/collect.bb` のような古い記法は存在しない — 正しくは
+  `nbb 70-tools/bmc/collect.cljs` / `nbb 70-tools/bmc/bin/gftd.cljs <args>` /
+  `nbb 70-tools/bmc/run-tests.cljs`。稼働中の cloud routine の中にもこの移行前の古い
+  記法が残っているものがある（`itonami-react-growth-hourly` は 2026-07-12 時点で未修正、
+  follow-up）— CCR agent が実行時に自己修復して動いてしまうため気付きにくい。routine の
+  prompt を編集する機会があれば直す。
+- **既存 canvas/仮説の有無は `gftd products` / `gftd canvas show --product <p>` /
+  `90-docs/business/maturity-scores.md` で確認できる**（`GFTD_ROOT=<superproject root>
+  nbb 70-tools/bmc/bin/gftd.cljs products` 等）。登録済みなのに daily routine の
+  `--product` ループに載っていないだけ、というギャップが起点になりやすい —
+  その場合は新規登録でなく routine の対象リスト追加で足りる。
+- **この共有システムのスコープは `gftdcojp` org の 11 プロダクト**（`gftd products` の
+  出力が正）。**別 org（`jk-luxury` の `club-shinshi`/`net-babiniku` 等）や、対象外の
+  プロダクト（`local-murakumo` 等）は意図的にこのシステムに登録しない** — base datoms
+  への新規登録は人間レビューを要する大きな決定で routine が自動でやることではない
+  （`90-docs/adr/2607021600` 「書き換え禁止」）。これらは代わりに **standalone パターン**
+  （`local-murakumo`: ADR-2607121600、`net-babiniku`: ADR-2607122300 が先例）を使う:
+  - 対象 repo 自身に `docs/bmc-lean-loop-log.md` を作り、そこに append-only で
+    `## Iteration N — <date>` を積む（既存 iteration は編集・削除しない）。
+  - superproject（`com-junkawasaki/root`）側に、その反復トラッキングを開始する決定を
+    記録する ADR（md+edn ペア）を作る。
+  - 対象 repo が独自の `90-docs/adr/` 番号体系を持つ場合（`jk-luxury` 系リポジトリの
+    慣習。`club-shinshi`/`net-babiniku` とも `90-docs/adr/0001…` から始まる連番）は、
+    superproject 側 ADR への **local mirror**（短いポインタ ADR、既存 `0001` が
+    superproject 側の設計 ADR を mirror する形に揃える）をそのリポジトリ側にも追加する。
+  - claude.ai routine（`RemoteTrigger`）で日次反復させる場合、捏造ゼロ（不明な値は
+    「unknown」と明記）を prompt に明記し、その repo に無関係な既存の反復ログ
+    （例: `club-shinshi` 自身の repo-local な H1/H2 kaizen loop
+    `60-apps/ai-gftd-project-shinshi/docs/260613-*.datoms.edn`、これは telemetry
+    配線待ちで長期 untested、outcome/metric を LLM が捏造することを明示的に禁止する
+    固有の不変条件を持つ）には触れないことを明記する。
+
 ## UI/UX 標準 — frontend を書く前に skill `kotoba-uiux` を読む（2026-07-12）
 
 **このリポジトリ群で web / local app の UI（新規サイト・画面・redesign・landing・
