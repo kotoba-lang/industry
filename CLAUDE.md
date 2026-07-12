@@ -592,6 +592,21 @@ PolicyGovernor）/ **cloud-itonami**（ops-LLM ⊣ CertGovernor）。
   gitignore（git に絶対コミットしない）**。`kotoba-store {:identity me}` で graph 既定
   ＝鍵由来 IPNS ＋ 自己 mint。設定参照は `manifest/repos.edn` の `:kotoba`。
 
+## UI/UX 標準 — frontend を書く前に skill `kotoba-uiux` を読む（2026-07-12）
+
+**このリポジトリ群で web / local app の UI（新規サイト・画面・redesign・landing・
+console）を書く時は、コードを書き始める前に Skill ツールで `kotoba-uiux` を呼ぶ。**
+kotoba-lang の design system スタック（`shitsuke.hig` HIG semantic tokens →
+`liquid-glass-ui` material → `kotoba-ui` 単一エントリ（shell/theme/`->page`）→
+`appkit`/`uikit` platform traits）が正で、正典レシピは
+`orgs/kotoba-lang/kotoba-ui/docs/agent-guide.md`。要点: app は `kotoba-ui.core`
+（+ `appkit.core` | `uikit.core`）だけを require する（`liquid-glass.*`/`shitsuke.*`
+直 require は理由必須の opt-out）、raw hex / ad-hoc font-size を app に書かない
+（token / theme map 経由のみ）、ライブラリ CSS は `@layer kotoba.hig, kotoba.glass`
+内にあるので app CSS は unlayered のままで常に勝つ（compound-selector での上書き
+戦争をしない）、layout は `kotoba-ui.shell` から組む（`.layout`/`.hero` 手書き禁止）。
+詳細は ADR-2607122200。
+
 ## `.cljc` / `.kotoba` ランタイム優先順位（2026-07-10 改訂。2026-07-07 改訂・初版は2026-07-06）
 
 - **repo wide のルール: app の互換性と「第一の runtime」の順序は

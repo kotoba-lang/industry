@@ -1,0 +1,44 @@
+[{:db/id -1
+  :adr/id "adr-2607122200-kotoba-lang-ui-hig-semantic-layer-topology"
+  :adr/title "ADR-2607122200: kotoba-lang UI スタックに HIG semantic 層・cascade-layer 契約・shell/theme 層を追加し、普通の agent でも洗練された UI を既定で出せるトポロジーに整える"
+  :adr/status "accepted"
+  :adr/date "2026-07-12"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/doc_type "adr"
+  :adr/topic "kotoba-lang-ui-design-system"
+  :adr/authoritative true
+  :adr/last_verified "2026-07-12"
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related ["adr-2607022800-kotoba-lang-default-uiux-appkit-uikit-interface-fundamentals"
+                "adr-2607011900-kotoba-lang-liquid-glass-ui"
+                "adr-2606301900-kotoba-lang-shitsuke-design-system"
+                "adr-2607101000-net-babiniku-zeta-ai-uiux-redesign"]
+  :adr/authoritative_for
+  ["shitsuke.hig(Apple HIG semantic token層 — 11 text styles/semantic colors light+dark/system palette/spacing/radius/base CSS)をkotoba-lang UIのtypography・colorのSSoTとすること"
+   "CSS cascade-layer契約(@layer kotoba.hig, kotoba.glass; にライブラリCSSを格納し、app CSSはunlayeredのまま常に勝つ)をspecificity戦争の恒久解とすること"
+   "kotoba-uiを再export facadeからshell(page/app-shell/hero/section/stack/grid)+theme(単一override map)+->page(one-call SSR)を持つ実エントリに昇格すること"
+   "agent向けpaved road(kotoba-ui/docs/agent-guide.md + .claude/skills/kotoba-uiux/)を新規frontend作業の必読契約とすること"
+   "appコードにraw hex/ad-hoc font-size/liquid-glass__*へのcompound-selector上書きを書かないというreview基準"]
+  :adr/problem
+  "net-babiniku.pages.dev等のデザインが洗練されない構造的原因: 層構造(ADR-2607022800)は正しいが、(1)HIG級のtypography scale/semantic color(light+dark)/spacing体系がどこにも無くappがhexを発明する (2)page/layout層が無く.layout/.hero CSSを手書きする (3)cascade契約が無くライブラリCSSとのspecificity戦争が堆積(net-babinikuのindex.htmlは412行のインラインCSS、.top-navが一度もマッチしていなかった事故を含む) (4)kotoba-uiのconsumerゼロでエントリが機能していない (5)lg/text-fieldのkeystroke喪失バグでappが手書きinputへフォーク (6)agent向け正典レシピが無い。洗練が既定値として出てこないトポロジーの問題。"
+  :adr/decision-layers
+  "[{:layer \"L0\", :repos [\"css\" \"html\"], :role \"substrate(EDN→CSS/hiccup→HTML)、org全体~23/~20 consumer、不変\"}
+    {:layer \"L1\", :repos [\"shitsuke\"], :role \"構造+dual-render+新設shitsuke.hig(HIG semantic tokens SSoT: 11 text styles/semantic colors light+dark/system palette 18色/4pt spacing/radius/hairline/--hig-* vars/base-css/data-appearance強制/@layer kotoba.hig)\"}
+    {:layer \"L2\", :repos [\"liquid-glass-ui\"], :role \"material skin。全CSSを@layer kotoba.glassにemit。component-rules(EDNデータ)は不変。text-field/text-area keystrokeバグ修正\"}
+    {:layer \"L3\", :repos [\"kotoba-ui\"], :role \"単一エントリ昇格: 既存32 alias再export+新設kotoba-ui.shell(page/app-shell/hero/section/stack/grid)+kotoba-ui.theme(単一map→token override)+kotoba-ui.core/->page(one-call SSR)+docs/agent-guide.md(正典レシピ)\"}
+    {:layer \"L4\", :repos [\"appkit\" \"uikit\"], :role \"platform traits、役割不変(ADR-2607022800)、docsリンクのみ追加\"}
+    {:layer \"L5\", :repos [\"apps\"], :role \"kotoba-ui(+appkit|uikit)のみをrequire。raw hex禁止。app CSSはunlayered少量\"}]"
+  :adr/cascade-contract
+  "@layer kotoba.hig, kotoba.glass; にライブラリCSSを格納。app CSSはunlayeredのままにする(CSS仕様: unlayered > layered)ことで注入順・specificityに関係なく常にappが勝つ。compound-selector上書き(.liquid-glass__toolbar.app-toolbar等)は構造的に不要になる。@layerはSafari 15.4+/Chrome 99+/Firefox 97+。"
+  :adr/agent-paved-road
+  "{:skill \".claude/skills/kotoba-uiux/SKILL.md\", :canonical-recipe \"orgs/kotoba-lang/kotoba-ui/docs/agent-guide.md\", :claude-md \"UI/UX標準節を追加\", :rules [\"apps require kotoba-ui.core(+appkit|uikit)のみ — liquid-glass.*/shitsuke.*直requireはopt-out(理由必須)\" \"raw hex/px font-size/font-family をappに書かない — token/theme経由のみ\" \"specificity戦争禁止 — app CSSはunlayeredで常勝\" \"layoutはkotoba-ui.shellから — .layout/.hero手書き禁止\" \"theme=単一map\" \"typographyはHIG 11 text stylesのみ\" \"a11y(ARIA/contrast/focus-visible/reduced-motion)は部品既定を壊さない\" \"SSR-first dual-render(.cljc hiccup)\"]}"
+  :adr/scope-boundary
+  "net-babinikuの実移行(shell/themeへの載せ替え・412行CSS解体)はfollow-up(新契約のドッグフーディング第1号、別PR)。css/html直接使用の既存~23 consumerへの強制移行はしない。browser-engine系(cssom/htmldom/dom-gpu/browser)は別系統のまま対象外。"
+  :adr/alternatives-rejected
+  ["各appの手書きCSSを都度磨く(net-babinikuで51ラウンドのkaizenでも構造問題は解けなかった)"
+   "HIGトークンをliquid-glass-uiに置く(typography/semantic colorはmaterial非依存の構造層資産。flat skinでも使えるべき。shitsukeが正位置)"
+   "新repo higを切る(shitsuke READMEがdark mode/typographyをextension pointと明記、charter内。repo増殖はエントリ曖昧化に逆行)"
+   "!importantや注入順制御(@layerが仕様上の正解)"
+   "Tailwind等外部CSSフレームワーク(EDN-native css.core + zero-dep .cljc原則と衝突)"]
+  :adr/body "正本は同名.mdを参照(90-docs/adr/2607122200-kotoba-lang-ui-hig-semantic-layer-topology.md)。"}]
