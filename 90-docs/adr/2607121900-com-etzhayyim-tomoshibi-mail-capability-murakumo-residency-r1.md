@@ -10,8 +10,8 @@ implemented: 2026-07-12
 implementation:
   repo: etzhayyim/com-etzhayyim-tomoshibi
   submodule: orgs/etzhayyim/com-etzhayyim-tomoshibi
-  pinned: bfc40c8c44a0e583d458f8652ead41bfd5118b32
-  landed_via: "child repo feat/mail-capability → server-side merge to main (edf8a267). west.yml pin advanced 3414ed8→bfc40c8c (edf8a267 = feat merge, bfc40c8c = +infra runbook) via GitHub API single-entry commit. root-side registration (ADR-2607121830 + fleet.edn/cells.edn/deps.edn) via etzhayyim/root PR #3027 (PR-only rule; merge はオーナー判断). Live infra: CF Email Routing rule a5f16891 (tomoshibi@etzhayyim.com → tomoshibi-mail Worker), KV 98a1f3a8, Resend domain 4f4d2bc2 (etzhayyim.com verified, ap-northeast-1), DNS +4 records (resend._domainkey/send MX+TXT/_dmarc). Residency: LaunchDaemon com.etzhayyim.tomoshibi.agent live on zebulun (healthz 127.0.0.1:13094, 300s tick), secrets in node-local env file (600) + 1Password gftdcojp `etzhayyim.tomoshibi/PULL_TOKEN`."
+  pinned: 8112244501e281f09c28f5c7f8b9454b9514b2d4
+  landed_via: "child repo feat/mail-capability → server-side merge to main (edf8a267). west.yml pin advanced 3414ed8→bfc40c8c→8112244 via GitHub API single-entry commits (edf8a267 = feat merge, bfc40c8c = +infra runbook, 8112244 = reply-address + Resend string-address fixes from the live E2E). root-side registration (ADR-2607121830 + fleet.edn/cells.edn/deps.edn) via etzhayyim/root PR #3027 (PR-only rule; merge はオーナー判断). Live infra: CF Email Routing rule a5f16891 (tomoshibi@etzhayyim.com → tomoshibi-mail Worker), KV 98a1f3a8, Resend domain 4f4d2bc2 (etzhayyim.com verified, ap-northeast-1), DNS +4 records (resend._domainkey/send MX+TXT/_dmarc). Residency: LaunchDaemon com.etzhayyim.tomoshibi.agent live on zebulun (healthz 127.0.0.1:13094, 300s tick), secrets in node-local env file (600) + 1Password gftdcojp `etzhayyim.tomoshibi/PULL_TOKEN`."
 authoritative_for:
   - "tomoshibi R1 capability wave の superproject 登録 (west pin edf8a267 / 実装・infra の所在)"
   - "founder session directive 2026-07-12 (「メールアドレスの送受信の capability… murakumo で自律的永続的に」) の実装記録"
@@ -54,13 +54,13 @@ R0 (ADR-2607061800) は governor 実配線 + attestation writer + Ed25519 identi
   送信も attest もされない / attestation は送信成功後のみ / suppression
   (配信停止・unsubscribe → 恒久沈黙)/ fail-closed leash file(毎 tick)/
   RFC 3834 auto-mail loop guard / 1 inbound = 最大 1 reply。
-- Tests: 43 tests / 164 assertions green(node zebulun 上でも green)。
+- Tests: 44 tests / 173 assertions green(node zebulun 上でも green)。
 - E2E: 実メール送達 → staging → tick → 起草 → gate → 自律返信を検証
   (結果は本 ADR 起票セッションの記録および child MATURITY.md を参照)。
 
 ## Consequences
 
-- west pin: com-etzhayyim-tomoshibi 3414ed8 → bfc40c8c(single-entry、
+- west pin: com-etzhayyim-tomoshibi 3414ed8 → 8112244(single-entry、
   verify-west-pins 経由)。
 - root 側登録は etzhayyim/root PR #3027(PR-only。cells.edn/fleet.edn 登録は
   merge 後に fleet:probe の期待セットへ反映される)。
