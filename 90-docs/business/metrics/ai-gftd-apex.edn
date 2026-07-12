@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 2639, "ai-gftd-chat-shell" 3509},
+ {"magatama-sh1n5h1x" 2646, "ai-gftd-chat-shell" 3513},
  :zone
- {:requests-7d 209770,
-  :pageviews-7d 4596,
-  :uniques-7d-sum 4826,
+ {:requests-7d 210946,
+  :pageviews-7d 4600,
+  :uniques-7d-sum 4848,
   :zone "gftd.ai"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/", :requests 1250}
-   {:path "/robots.txt", :requests 267}
-   {:path "/favicon.ico", :requests 149}
-   {:path "/index.php", :requests 25}
+  [{:path "/", :requests 1221}
+   {:path "/robots.txt", :requests 287}
+   {:path "/favicon.ico", :requests 142}
    {:path "/aws/autoscaling-config.json", :requests 24}
    {:path "/.env.dev.local", :requests 24}
    {:path "/aws-batch/job-config.json", :requests 24}
-   {:path "/.env.docker", :requests 24}],
-  :status-mix {:server-error 7815, :client-error 6066, :ok 2255},
+   {:path "/.env.docker", :requests 24}
+   {:path "/aws-cpp-sdk-config.json", :requests 21}],
+  :status-mix {:server-error 7813, :client-error 6062, :ok 2216},
   :window "24h"},
  :as-of "2026-07-12",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 38, :error-5xx-pct 48},
+ {:window "24h", :probe-4xx-pct 38, :error-5xx-pct 49},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 1250 · /robots.txt 267 · /favicon.ico 149 · /index.php 25 · /aws/autoscaling-config.json 24 | 4xx(probe) 38% · 5xx 48%",
+ "上位 page (24h, 2xx/3xx): / 1221 · /robots.txt 287 · /favicon.ico 142 · /aws/autoscaling-config.json 24 · /.env.dev.local 24 | 4xx(probe) 38% · 5xx 49%",
  :signal
- "gftd.ai 実測 209770 req/7d・4826 uniques(日次和)・うち4xx probe 38%(24h)、workers 6148 inv/7d"}
+ "gftd.ai 実測 210946 req/7d・4848 uniques(日次和)・うち4xx probe 38%(24h)、workers 6159 inv/7d"}
