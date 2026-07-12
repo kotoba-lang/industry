@@ -115,4 +115,14 @@
     :repos ["kami-eizo-grade" "kami-eizo-compositor" "kami-ongaku-plugin-host"]
     :note "comfyui reuse downgraded from code dependency to data-shape compatibility only (GPL-3.0)"}
    {:wave 4 :focus "app integration" :status :landed :landed-on "2026-07-12"
-    :repos ["douga(rewire)" "anime(rewire)" "utsushi.codec(encode wiring, task-15 follow-up)" "kami-app-daw(future)" "kami-app-nle(future)"]}]}]
+    :repos ["douga(rewire)" "anime(rewire)" "utsushi.codec(encode wiring, task-15 follow-up)" "kami-app-daw(future)" "kami-app-nle(future)"]}
+   {:wave 5 :focus "real browser I/O proof (completion-gate closure)" :status :landed :landed-on "2026-07-12"
+    :note "unplanned addition wave. strategic pivot: pixel-level codec work delegated to browser-native WebCodecs (VideoDecoder/VideoEncoder) instead of hand-rolling H.264 macroblock/DCT/CAVLC in org-iso-h264 (unrealistic scope) -- same pattern as 3D delegating to native WebGPU instead of reimplementing a GPU."
+    :repos [{:repo "org-w3-webcodecs" :commit "b14dc397e248" :note "foundation: real H.264 avc1.42001f encode/decode round-trip proven in headless Chromium, decoded pixels within 1-4/255 of originals. All other Wave-5 tasks build on this."}
+            {:repo "kami-eizo-timeline" :commit "c0116940f19eb" :note "clip-at-frame added; frame-accurate render proven via WebCodecs, pixel-exact cut boundaries at frames 5 and 10"}
+            {:repo "kami-eizo-grade" :commit "a19d4ea81b03" :note "CDL grading applied to real decoded pixels; browser vs. offline(nbb) computation matched exactly"}
+            {:repo "kami-eizo-compositor" :commit "2f6838662dc1" :note "chroma-key + blend applied to real decoded pixels; key region alpha 0, subject region alpha 1, browser/offline exact match"}
+            {:repo "org-w3-webaudio" :commit "e554d853d640" :note "hardest task: audio's sine+ADSR DSP proven running inside a real AudioWorkletProcessor, captured PCM matched offline reference within 2.98e-8. Root-caused and fixed two real bugs: cljs.main REPL-bootstrap touching `document` in AudioWorkletGlobalScope, and `self` undeclared there breaking Closure's goog.global detection under :advanced optimization."}]
+    :incidental-bugs-found ["org-w3-webaudio new-audio-context! constructor-call pattern threw in every real browser since Wave 2, undetected because the repo has no JVM test suite"
+                             "audioWorklet.addModule requires a secure context (localhost works, about:blank does not)"]
+    :reusable-pattern "deps.edn :e2e alias (pinned git dep on org-w3-webcodecs) + test/e2e/ (nbb + Playwright, no raw .mjs per CLAUDE.md) -- established across 4 repos, reusable for remaining domains (sampler, plugin-host, sequencer/notation playback)"}]}]
