@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 4387, "app-aozora-appview" 4022},
+ {"app-aozora-pds" 4400, "app-aozora-appview" 4022},
  :zone
- {:requests-7d 23517,
-  :pageviews-7d 7547,
-  :uniques-7d-sum 753,
+ {:requests-7d 23540,
+  :pageviews-7d 7555,
+  :uniques-7d-sum 758,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
@@ -14,16 +14,16 @@
     :requests 1333}
    {:path "/xrpc/com.atproto.server.createSession", :requests 668}
    {:path "/xrpc/com.atproto.repo.createRecord", :requests 667}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 204}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 192}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 79}
-   {:path "/", :requests 62}
-   {:path "/robots.txt", :requests 39}
+   {:path "/", :requests 64}
+   {:path "/robots.txt", :requests 40}
    {:path "/db.sql", :requests 20}],
-  :status-mix {:ok 3650, :client-error 168, :server-error 12},
+  :status-mix {:ok 3630, :client-error 179, :server-error 12},
   :window "24h"},
  :as-of "2026-07-12",
- :traffic-quality {:window "24h", :probe-4xx-pct 4, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 5, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.tran… 1333 · /xrpc/com.atproto.server.createSession 668 · /xrpc/com.atproto.repo.createRecord 667 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 204 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 79 | 4xx(probe) 4% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.tran… 1333 · /xrpc/com.atproto.server.createSession 668 · /xrpc/com.atproto.repo.createRecord 667 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 192 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 79 | 4xx(probe) 5% · 5xx 0%",
  :signal
- "aozora.app 実測 23517 req/7d・753 uniques(日次和)・うち4xx probe 4%(24h)、workers 8409 inv/7d"}
+ "aozora.app 実測 23540 req/7d・758 uniques(日次和)・うち4xx probe 5%(24h)、workers 8422 inv/7d"}
