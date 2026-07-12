@@ -165,16 +165,16 @@ quantize、EDL diff 等 import なしのロジック）は `kotoba wasm` 対象�
 
 | repo | domain | layer | 状態 |
 |---|---|---|---|
-| `org-w3-webaudio` | ongaku | L1 | **新規** |
-| `kami-ongaku-notation` | ongaku | L3 | **新規** |
-| `kami-ongaku-sequencer` | ongaku | L3 | **新規** |
-| `kami-ongaku-project` | ongaku | L3 | **新規** |
-| `kami-ongaku-plugin-host` | ongaku | L3 | **新規** |
-| `kami-ongaku-sampler` | ongaku | L2 | **新規** |
-| `audio` | ongaku | L2 | 既存拡張（DSP合成・effects chain・mixer bus を追加） |
+| `org-w3-webaudio` | ongaku | L1 | **新規**（Wave 2、未着手） |
+| `kami-ongaku-notation` | ongaku | L3 | **Wave 1・完了・landed** |
+| `kami-ongaku-sequencer` | ongaku | L3 | **Wave 1・完了・landed** |
+| `kami-ongaku-project` | ongaku | L3 | **Wave 1・完了・landed** |
+| `kami-ongaku-plugin-host` | ongaku | L3 | **新規**（Wave 3、未着手） |
+| `kami-ongaku-sampler` | ongaku | L2 | **新規**（Wave 2、未着手） |
+| `audio` | ongaku | L2 | 既存拡張（DSP合成・effects chain・mixer bus を追加、Wave 2 未着手） |
 | `composer` / `ongaku` | ongaku | L0 | 既存・変更なし |
-| `org-w3-webcodecs` | eizo | L1 | **新規** |
-| `kami-eizo-timeline` | eizo | L3 | **新規** |
+| `org-w3-webcodecs` | eizo | L1 | **新規**（Wave 2、未着手） |
+| `kami-eizo-timeline` | eizo | L3 | **Wave 1・完了・landed** |
 | `kami-eizo-grade` | eizo | L3 | **新規** |
 | `kami-eizo-compositor` | eizo | L3 | **新規** |
 | `utsushi` | eizo | L2 | 既存拡張（encode path 追加） |
@@ -214,9 +214,22 @@ quantize、EDL diff 等 import なしのロジック）は `kotoba wasm` 対象�
 
 ### 7. Phased roadmap
 
-- **Wave 1（データモデル基盤）**: `kami-ongaku-notation` / `kami-ongaku-
-  sequencer` / `kami-ongaku-project` / `kami-eizo-timeline` — 他すべてが
-  依存する SSoT。最優先。
+- **Wave 1（データモデル基盤）— 完了（2026-07-12）**: `kami-ongaku-notation` /
+  `kami-ongaku-sequencer` / `kami-ongaku-project` / `kami-eizo-timeline` —
+  他すべてが依存する SSoT。最優先。4 repo とも public kotoba-lang org に
+  実装済み・テスト green・west manifest 登録済み（`manifest/repos.edn`
+  extra-projects + `west.yml`、pin 検証 OK）:
+  - https://github.com/kotoba-lang/kami-ongaku-notation — 記譜 IR + MusicXML
+    import/export（exact-fraction `kami.ongaku.notation.rational` 型を追加、
+    cljs にネイティブ ratio 型が無いことへの対処。25 tests / 134 assertions green）
+  - https://github.com/kotoba-lang/kami-ongaku-sequencer — MIDI相当イベント/
+    パターン IR + quantize/groove + SMF import/export（整数tickで exact 演算。
+    18 tests / 60 assertions green）
+  - https://github.com/kotoba-lang/kami-ongaku-project — DAW セッション SSoT
+    （track/bus/automation/clip placement、notation・sequencer repo に git SHA
+    pin で実依存。8 tests / 22 assertions green）
+  - https://github.com/kotoba-lang/kami-eizo-timeline — EDL/timeline IR +
+    SMPTE drop-frame timecode（14 tests / 122 assertions green）
 - **Wave 2（DSP/codec 実行層）**: `audio` 拡張（synth/effects/mixer bus）、
   `kami-ongaku-sampler`、`utsushi` の encode path、`org-w3-webaudio`、
   `org-w3-webcodecs`。
