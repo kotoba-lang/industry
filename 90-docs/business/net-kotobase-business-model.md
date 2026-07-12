@@ -76,6 +76,7 @@
 - 観測 (signal): kotobase.net 実測 5969 req/7d・433 uniques(日次和)・うち4xx probe 17%(24h)、workers 6049 inv/7d、Stripe active subs 0
 - 観測 (signal): kotobase.net 実測 6357 req/7d・505 uniques(日次和)・うち4xx probe 27%(24h)、workers 6397 inv/7d、Stripe active subs 0
 - 観測 (signal): kotobase.net 実測 6449 req/7d・491 uniques(日次和)・うち4xx probe 29%(24h)、workers 6474 inv/7d、Stripe active subs 0
+- 観測 (signal): kotobase.net 実測 6766 req/7d・539 uniques(日次和)・うち4xx probe 29%(24h)、workers 6815 inv/7d、Stripe active subs 0
 
 ## Customer Segments
 
@@ -157,6 +158,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /kotobase-cf-wasm-production/ipns/bafyre… 347 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 157 · /kotobase-cf-wasm-production/ipns/bafyre… 127 · / 65 · /health 64 | 4xx(probe) 17% · 5xx 2%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 61 · /health 58 · /llms-full.txt 45 · /llms.txt 43 · /.well-known/did.json 39 | 4xx(probe) 27% · 5xx 10%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 57 · /health 55 · /llms-full.txt 42 · /llms.txt 41 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 35 | 4xx(probe) 29% · 5xx 10%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 58 · /health 52 · /llms.txt 41 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 34 · /_app/meta 34 | 4xx(probe) 29% · 5xx 9%
 
 ## Revenue Streams
 
@@ -187,6 +189,7 @@
 - funnel (net-kotobase): landing 訪問=326 → signup=0 → checkout 開始=0 → paid(active sub)=0 | 転換 landing 訪問→signup 0%
 - funnel (net-kotobase): landing 訪問=384 → signup=0 → checkout 開始=0 → paid(active sub)=0 | 転換 landing 訪問→signup 0%
 - funnel (net-kotobase): landing 訪問=400 → signup=0 → checkout 開始=0 → paid(active sub)=0 | 転換 landing 訪問→signup 0%
+- funnel (net-kotobase): landing 訪問=440 → signup=0 → checkout 開始=0 → paid(active sub)=0 | 転換 landing 訪問→signup 0%
 
 ## Unfair Advantage
 

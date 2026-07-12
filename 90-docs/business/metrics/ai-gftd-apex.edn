@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 2860, "ai-gftd-chat-shell" 4190},
+ {"magatama-sh1n5h1x" 2871, "ai-gftd-chat-shell" 4191},
  :zone
- {:requests-7d 245014,
-  :pageviews-7d 5350,
+ {:requests-7d 247557,
+  :pageviews-7d 5354,
   :uniques-7d-sum 5153,
   :zone "gftd.ai"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/.git/refs/remotes/origin/HEAD", :requests 48}
-   {:path "/portal/.env", :requests 48}
-   {:path "/__nextjs_action", :requests 48}
-   {:path "/appsettings.Test.json", :requests 41}
-   {:path "/s3.properties", :requests 33}
-   {:path "/wp-json/gravitysmtp/v1/tests/mock-data", :requests 28}
-   {:path "/backend/config/constants.js", :requests 14}
-   {:path "/sitemap.xml", :requests 10}],
-  :status-mix {:client-error 1484, :server-error 9793, :ok 554},
+  [{:path "/", :requests 778}
+   {:path "/favicon.ico", :requests 134}
+   {:path "/blog/[year]/[month]/[slug]", :requests 42}
+   {:path "/appsettings.Test.json", :requests 33}
+   {:path "/s3.secret", :requests 33}
+   {:path "/wp-admin/install.php", :requests 14}
+   {:path "/sitemap.xml", :requests 10}
+   {:path "/API/config/constants.js", :requests 8}],
+  :status-mix {:client-error 1485, :server-error 10021, :ok 1334},
   :window "24h"},
  :as-of "2026-07-12",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 13, :error-5xx-pct 83},
+ {:window "24h", :probe-4xx-pct 12, :error-5xx-pct 78},
  :top-paths
- "上位 page (24h, 2xx/3xx): /.git/refs/remotes/origin/HEAD 48 · /portal/.env 48 · /__nextjs_action 48 · /appsettings.Test.json 41 · /s3.properties 33 | 4xx(probe) 13% · 5xx 83%",
+ "上位 page (24h, 2xx/3xx): / 778 · /favicon.ico 134 · /blog/[year]/[month]/[slug] 42 · /appsettings.Test.json 33 · /s3.secret 33 | 4xx(probe) 12% · 5xx 78%",
  :signal
- "gftd.ai 実測 245014 req/7d・5153 uniques(日次和)・うち4xx probe 13%(24h)、workers 7050 inv/7d"}
+ "gftd.ai 実測 247557 req/7d・5153 uniques(日次和)・うち4xx probe 12%(24h)、workers 7062 inv/7d"}

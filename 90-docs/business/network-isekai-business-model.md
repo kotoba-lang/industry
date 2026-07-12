@@ -56,6 +56,7 @@
 - 観測 (signal): isekai.network 実測 6641 req/7d・263 uniques(日次和)・うち4xx probe 0%(24h)
 - 観測 (signal): isekai.network 実測 6667 req/7d・268 uniques(日次和)・うち4xx probe 0%(24h)
 - 観測 (signal): isekai.network 実測 6105 req/7d・338 uniques(日次和)・うち4xx probe 1%(24h)
+- 観測 (signal): isekai.network 実測 7765 req/7d・355 uniques(日次和)・うち4xx probe 2%(24h)
 
 ## Customer Segments
 
@@ -126,6 +127,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 75 · /feed/fork-stats.edn 47 · /vanta.php 12 · /robots.txt 11 · /wander.php 9 | 4xx(probe) 0% · 5xx 16%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 84 · /feed/fork-stats.edn 53 · /vanta.php 12 · /robots.txt 10 · /wander.php 9 | 4xx(probe) 0% · 5xx 17%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 74 · /console/* 54 · /front/.env 52 · /package-updates/yum.cgi 52 · /src/constant.js 50 | 4xx(probe) 1% · 5xx 2%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 65 · /.git 49 · /config/config.php 48 · /Dockerfile 48 · /config/nexmo.php 48 | 4xx(probe) 2% · 5xx 2%
 
 ## Revenue Streams
 

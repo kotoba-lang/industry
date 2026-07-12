@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 4501, "app-aozora-appview" 4026},
+ {"app-aozora-pds" 4514, "app-aozora-appview" 4030},
  :zone
- {:requests-7d 25101,
-  :pageviews-7d 8868,
-  :uniques-7d-sum 797,
+ {:requests-7d 25137,
+  :pageviews-7d 8872,
+  :uniques-7d-sum 799,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
@@ -14,16 +14,16 @@
     :requests 1336}
    {:path "/xrpc/com.atproto.server.createSession", :requests 668}
    {:path "/xrpc/com.atproto.repo.createRecord", :requests 667}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 108}
-   {:path "/", :requests 96}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 97}
+   {:path "/", :requests 87}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 79}
    {:path "/.cache", :requests 49}
    {:path "/backend/node/common.js", :requests 48}],
-  :status-mix {:ok 4376, :client-error 331, :server-error 12},
+  :status-mix {:ok 4356, :client-error 351, :server-error 12},
   :window "24h"},
  :as-of "2026-07-12",
  :traffic-quality {:window "24h", :probe-4xx-pct 7, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.tran… 1336 · /xrpc/com.atproto.server.createSession 668 · /xrpc/com.atproto.repo.createRecord 667 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 108 · / 96 | 4xx(probe) 7% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.tran… 1336 · /xrpc/com.atproto.server.createSession 668 · /xrpc/com.atproto.repo.createRecord 667 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 97 · / 87 | 4xx(probe) 7% · 5xx 0%",
  :signal
- "aozora.app 実測 25101 req/7d・797 uniques(日次和)・うち4xx probe 7%(24h)、workers 8527 inv/7d"}
+ "aozora.app 実測 25137 req/7d・799 uniques(日次和)・うち4xx probe 7%(24h)、workers 8544 inv/7d"}
