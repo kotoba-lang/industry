@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L3 business operator（全業種・職種 SaaS + investment platform）  
-**As-of**: 2026-07-12  
+**As-of**: 2026-07-13  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -117,6 +117,7 @@
 - 観測 (signal): itonami.cloud 実測 324 req/7d・89 uniques(日次和)・うち4xx probe 75%(24h)
 - 観測 (signal): itonami.cloud 実測 325 req/7d・90 uniques(日次和)・うち4xx probe 75%(24h)
 - 観測 (signal): itonami.cloud 実測 327 req/7d・90 uniques(日次和)・うち4xx probe 75%(24h)
+- 観測 (signal): itonami.cloud 実測 288 req/7d・78 uniques(日次和)・うち4xx probe 72%(24h)
 
 ## Customer Segments
 
@@ -209,6 +210,7 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 13 · /itonami 1 | 4xx(probe) 72%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 12 | 4xx(probe) 74%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 13 | 4xx(probe) 75%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 14 · /itonami 1 | 4xx(probe) 72%
 
 ## Revenue Streams
 
