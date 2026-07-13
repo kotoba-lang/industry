@@ -1,26 +1,26 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 4211, "kotobase-cf-wasm-staging" 2575},
+ {"net-kotobase" 4221, "kotobase-cf-wasm-staging" 2575},
  :zone
- {:requests-7d 6750,
-  :pageviews-7d 365,
-  :uniques-7d-sum 508,
+ {:requests-7d 6767,
+  :pageviews-7d 371,
+  :uniques-7d-sum 511,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 58}
-   {:path "/health", :requests 54}
-   {:path "/llms.txt", :requests 44}
+  [{:path "/", :requests 60}
+   {:path "/health", :requests 53}
+   {:path "/llms.txt", :requests 45}
    {:path
     "/ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapcbsx3yrg7xzj3jrxm3q4mzz2nu",
     :requests 34}
+   {:path "/llms-full.txt", :requests 34}
    {:path "/pins", :requests 34}
    {:path "/_app/meta", :requests 33}
-   {:path "/llms-full.txt", :requests 33}
-   {:path "/.well-known/did.json", :requests 32}],
-  :status-mix {:ok 505, :server-error 68, :client-error 233},
+   {:path "/.well-known/did.json", :requests 33}],
+  :status-mix {:ok 509, :server-error 68, :client-error 221},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -29,9 +29,9 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-13",
- :traffic-quality {:window "24h", :probe-4xx-pct 29, :error-5xx-pct 8},
+ :traffic-quality {:window "24h", :probe-4xx-pct 28, :error-5xx-pct 9},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 58 · /health 54 · /llms.txt 44 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 34 · /pins 34 | 4xx(probe) 29% · 5xx 8%",
- :funnel {:visitors 453, :signups 0, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): / 60 · /health 53 · /llms.txt 45 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 34 · /llms-full.txt 34 | 4xx(probe) 28% · 5xx 9%",
+ :funnel {:visitors 456, :signups 0, :checkouts 0},
  :signal
- "kotobase.net 実測 6750 req/7d・508 uniques(日次和)・うち4xx probe 29%(24h)、workers 6786 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 6767 req/7d・511 uniques(日次和)・うち4xx probe 28%(24h)、workers 6796 inv/7d、Stripe active subs 0"}
