@@ -234,3 +234,40 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
   なし、isekai.network は WebGPU+collab 結合で高リスク・uikit 重複。
 - upstream 改善メモ: `kotoba-ui.shell/grid` が `:id` opt を受けないため JS 対象
   グリッドで app-CSS ミラーが要った — shell 側で opts passthrough を広げる余地。
+
+## Addendum (2026-07-13, 第2弾): EDA workbench + slides 移行完了 — 7 サイト計画の主要 appkit 群が全て paved road 上に
+
+前 addendum の次候補①②と upstream 改善を一括実施した:
+
+- **kotoba-ui.shell に `:id`/`:class`/`:attrs` root-attr passthrough**（PR #2、main
+  `423d292`、pin `8be66e94`）: 全 scaffold で JS/enhancer フックを app-CSS ミラー
+  なしで付与可能に。後方互換は pre-change 出力との byte-identical テストで担保。
+  agent-guide 更新済み。
+- **slides editor 移行**（PR #5、main `b4d9d6e`、pin `7e780aed`、Pages 反映済み）:
+  chrome hex 36+2→0、appkit/panel thick+flat、theme `{:accent "#496B9A"(brand
+  steel blue) :accent-dark "#7FA3CF" :appearance :auto}`、theme は既存 `:pages`
+  生成で docs/main.css へ。実 Chromium 25/25（SSR marker + 19 data-act + 21 id
+  保全、8連打 keystroke 喪失ゼロ、320px OK）。副修正: `[hidden]` display guard
+  （EDN モードで visual pane が残る既存バグ）。**発見**: この repo の
+  `data-kotoba-render="ssr"` は静的 marker で cljs hydration adapter は org 内に
+  未実在（no-JS artifact が仕様。selftest が main.js 不在を assert）— dual-render
+  の browser 側は host-adapter 待ちが正しい現状。
+- **EDA workbench 移行**（eda PR #1 → main `644ff3f`、pin `e0eb0416`；kotoba
+  PR #302 → main `1ab3c9d`、pin `29fc5034`、Pages 反映済み）: **調査時の source
+  map の訂正** — workbench SPA の正本は eda repo でなく kotoba repo の
+  `docs/eda/`（`kotoba_eda_app.cljs` 1176 行 + build）で、eda repo の site.cljc は
+  別の docs ページ。両方移行した。chrome hex 34→0、`:root` 手書き 13 props→0
+  （`--eda-*` 4 個は HIG token 上の color-mix 派生のみ）、canvas 描画色は 1 つの
+  `canvas-colors` map に集約（描画ドメイン色として exempt、flow highlight は
+  `--hig-color-tint` を live 参照）。theme `{:accent "#2563eb" :accent-dark
+  "#60A5FA" :appearance :auto}`。実 Chromium 28/28（4 canvas タブ非空描画、
+  policy-gate/run-full-flow/file-intake 実操作、light の dense text は
+  secondary-label 3.44:1 → color-mix 補正で ≥4.5:1）。artifact/source 乖離は
+  byte-identical で無し。shadow-cljs は `:deps {:aliases [:cljs]}` 化で kotoba-ui
+  `.cljc` を browser bundle と共有（dual-render 一本化）。
+- **これで paved road 上の実証: uikit=net-babiniku、appkit=itonami cockpit +
+  slides + EDA workbench の 4 プロダクト**。残 follow-up: kotobase.net
+  landing（小・低優先）、isekai.network（WebGPU 結合・要別判断）、gftd.ai
+  （greenfield）、cloud-itonami scoped routes、slides の browser hydration
+  adapter（新機能扱い）、mono font token の追加（slides が opt-out で手書きした
+  `#deck-edn` の font stack を token 化する）。
