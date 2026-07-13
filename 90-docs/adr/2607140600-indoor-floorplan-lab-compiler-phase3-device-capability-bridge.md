@@ -1,6 +1,8 @@
 # ADR-2607140600: 建物内部構造（floorplan）推定lab のための kotoba-lang/compiler Phase 3a capability bridge（motion/audio-io/ble-scan/wifi-info）設計 + kotoba-lang/device 統合提案
 
-**Status**: proposed（未承認——実装前にオーナーレビュー必須）
+**Status**: proposed（設計提案としては未承認のまま——ただしオーナー指示により
+Phase 3a ソフトウェア層 + 実機iOS shim + 3D可視化の実装は完了・実機検証中。
+下記「Addendum」参照）
 **Date**: 2026-07-13
 **Deciders**: 未確定（提案者: Claude、オーナー承認待ち）
 **Related**:
@@ -167,3 +169,71 @@ scaffoldは本ADR承認後に別コミットで着手する。
 - ADR-2607100030（kami:engine host imports）
 - ADR-2607030900（aiueos privileged device-access tender design）
 - CLAUDE.md「`.cljc` / `.kotoba` ランタイム優先順位」節
+
+## Addendum（2026-07-13、実装状況）
+
+上記「Open decisions for owner」はオーナーの都度確認を経て「進めてよい」との
+返答を得たため、`proposed` の設計をベースに以下まで実装が進んだ（各リポの
+main HEADに着地済み、west manifestにも反映済み）。
+
+### 実装済み（Phase 3a ソフトウェア層）
+
+- `kotoba-lang/kotoba-core-contracts`（`adb221f`）: capability id 234-237
+  （`motion/read`/`audio/io`/`ble/scan`/`wifi/info`）登録。
+- `kotoba-lang/kotoba-lang`（`9c3f1b7`）: `effect-for-kind` に4 capability追加。
+- `kotoba-lang/kotoba`（`c7ca33a`）: `src/kotoba/sensing_host.cljc` —
+  5 opの決定論的stub host実装（実機ドライバ未注入時）。
+- `kotoba-lang/device`（`7bbe30d`）: capability token
+  `:motion`/`:audio-io`/`:ble-scan`/`:wifi-info` を追加。既存surfaceと同様、
+  driver実体は持たず、host-injected driver（呼び出し側が注入）のまま。
+- manifest登録: 上記4リポのpin前進 + `kotoba-lang/floorplan-lab`（新規、
+  public）の登録が `com-junkawasaki/root` main（`dc8f871`）に着地。
+
+### 実装済み（`kotoba-lang/floorplan-lab`、実機センサー検証済み）
+
+- `.cljc`アルゴリズム: dead-reckoning（`motion.cljc`）、chirp-echo音響sonar
+  （`sonar.cljc`）、BLE RSSI三辺測量（`ble.cljc`）、センサーフュージョン→
+  凸包で部屋輪郭推定（`fusion.cljc`）。26テスト/54アサーション全パス。
+- `ios/`: `SensingBridge.swift`（CoreMotion/CoreBluetooth/AVAudioEngine/
+  NEHotspotNetworkを呼ぶ薄いnative shim）。**実機（iPhone Air, iOS 26.1,
+  `17AIR`）で5/5 capability全て動作確認済み**（`motionRead`/`audioPlay`/
+  `audioRecord`/`bleScan`/`wifiInfo`、`wifi-info`はiOSの制約通り`nil`が
+  期待通りの結果）。実機検証中に見つけた2バグ（マイク権限未リクエスト、
+  `AVAudioEngine`のinput node format 0）を修正済み（`d7a241f`, `0f6ad27`）。
+  署名はjun784@gmail.comの個人チーム（`3A5CBTEBFP`、free provisioning）。
+
+### 実装済み・実機検証が未完了（3D可視化）
+
+- `web/`: `kotoba-lang/webgpu`（既存の再利用可能なcljs製WebGPU/WebGL2
+  render-IR executor）をそのまま使い、`floorplan-lab.viewer`（`web/src/
+  floorplan_lab/viewer.cljs`）が壁点群/部屋輪郭をinstance列に変換して描画。
+  ingestのたびに`floorplan-lab.motion/sonar/ble/fusion`をフル再計算して
+  redrawするため、設計上はリアルタイム更新（motion ~20Hz、sonar 3秒毎、
+  ble 5秒毎）になっている。
+- `ios/FloorplanLabApp/FloorplanMapView.swift`: WKWebViewの薄いホスト
+  （`UIViewRepresentable`）。判定/フュージョン/レンダリングロジックは
+  一切持たず、`SensingBridge`の生データを`evaluateJavaScript`でcljs側に
+  渡すだけ（ADR-2607078000 addendumの「ネイティブラッパーは既存の
+  ブラウザ実証済みcljs経路をwebviewで包む、新規native描画コードを
+  書かない」方針に準拠）。
+- Simulatorビルド・実機ビルドともに成功、アプリはクラッシュせず起動する
+  ことを確認済み。**しかし実機で3D画面自体が表示されない（`表示されません`
+  という実測報告あり、2026-07-13時点で原因未特定）。** デバッグのため
+  WKWebViewのconsole.log/warn/errorをSwift側にforwardする一時的な
+  `WKScriptMessageHandler`ブリッジを追加（`a4db495`）。60秒のコンソール
+  キャプチャを試みたが、実機操作者が3D画面へのnavigation自体を行う前に
+  キャプチャ枠が終了し、`[WebConsole]`ログを一件も取得できなかった——
+  **WKWebViewの初期化/レンダリング自体が失敗しているのか、単に画面遷移が
+  行われなかっただけなのか、まだ切り分けできていない。** 次回セッションで
+  実機操作者と時間を合わせてconsoleキャプチャを再試行するか、Safari Web
+  Inspector（`webView.isInspectable = true`済み）で直接デバッグするのが
+  follow-up。
+
+### 未着手のまま
+
+- `web/`側の3D描画結果とSwift側のセンサー生データの実際の整合性
+  （`sampleIndex`近似の妥当性等）は実機で未検証。
+- `manifest/west.yml`の`floorplan-lab` pinはiOS shim/3D viewer追加後の
+  複数commit分進んでおり、最新（`a4db495`）まで反映するには
+  `nbb scripts/gen-west-manifest.cljs --entry floorplan-lab` の再実行が
+  必要（本addendum時点でまだ実行していない、follow-up）。

@@ -1,6 +1,8 @@
-[{:adr/authoritative_for [], :adr/note "This is a PROPOSAL, not an accepted decision. No implementation work has started on kotoba-lang/compiler, kotoba-lang/device, or a new lab repo. Requires owner review before status can change to accepted.", :adr/supersedes [], :adr/proposal-summary "{\"problem\": \"iPhoneセンサー(motion)+audio(speaker/mic)+BLE RSSI+WiFi情報を使って建物内部構造(floorplan)を推定するlabがmonorepoに存在しない。実現にはネイティブAPI境界が必要だが、CLAUDE.mdのruntime優先順位(kotoba wasm > clojurewasm > cljs > nbb、appのため新規Rust/nativeを安易に書かない)との整合が課題\", \"investigation-findings\": {\"kotoba-lang/compiler\": \"'.kotoba'は整数演算のみ・FFIなし・OS API呼び出しなしのdeny-by-default設計。aarch64-iosターゲットは検証済み機械語のMach-O埋め込みのみでネイティブAPI codegenではない。センサー/カメラcapability bridgeはdocs/adr/0001のPhase3ロードマップに明記されているが完全に未着手\", \"kotoba-lang/device\": \"bluetooth/wifi/display/geolocation/cameraをcapability tokenとして抽象化するcljc層は存在するが、driverはhost-injectedで未実装\"}, \"proposed-design\": {\"scope\": \"Phase3の汎用範囲(lifecycle/network/storage/sensors/camera/notifications全て)ではなく、labが必要とする4 capabilityに絞った'Phase 3a'として定義\", \"capabilities\": [{\"name\": \"motion\", \"content\": \"加速度計/ジャイロ/磁力計のサンプルストリーム取得(固定レート・固定小数点)\", \"api\": \"CoreMotion CMDeviceMotion\"}, {\"name\": \"audio-io\", \"content\": \"指定周波数パターンの再生+同時録音バッファ取得(固定小数点PCM)\", \"api\": \"AVAudioEngine\"}, {\"name\": \"ble-scan\", \"content\": \"近傍BLEペリフェラルのRSSI読み取りのみ(ペアリング/GATT書き込み等は含まない)\", \"api\": \"CoreBluetooth central scan\"}, {\"name\": \"wifi-info\", \"content\": \"接続中ネットワークの信号強度等、位置情報許可下で公開される範囲のみ(生スキャン不可という制約を機能に織り込む)\", \"api\": \"NEHotspotNetwork等\"}], \"registration-pipeline\": \"ADR-2607100030のkami:engine host imports precedentと同型(kotoba-core-contracts capability id+import descriptor -> kotoba-lang effect-for-kind -> kotoba runtime op->kind/guarded-host-functions)、deny-by-default(read-only・能動操作なし・network egressなし・個別metered/gate可能)を継承\", \"privilege-pattern\": \"ADR-2607030900のaiueos-device-provider design踏襲。判定ロジックは.kotoba/CLJC側に残し、実機OS API呼び出しは判断を一切行わない薄いSwift native shimに閉じ込める。native shimはcompilerが自動生成せず、本ADRのスコープ外(人間または別途承認を得たagentが実装)\", \"device-integration\": \"4 capabilityをkotoba-lang/deviceのcapability token語彙に追加登録し、host-injected driverとしてcompilerが生成するiOSターゲット向けnative shimを接続する\", \"lab-followup\": \"新規repo案 kotoba-lang/floorplan-lab で、motion(dead-reckoning)+audio-io(acoustic sonar/chirp echo)+ble-scan(RSSI三辺測量)をセンサーフュージョンしfloorplanを推定・可視化。UIはkotoba-ui/shitsuke.higのPWA。repo scaffoldは本ADR承認後の別タスク\"}, \"alternatives-considered\": [\"純PWAのみ(motion+audio-ioのみ、WiFi/BT無し) -- 最速だが要求機能(WiFi/Bluetooth測距)を満たせず不採用\", \"完全ネイティブSwiftアプリ(compiler経由なし) -- 開発最速だがCLAUDE.mdのruntime優先順位ポリシーに反するため不採用\", \"kotoba-lang/compilerのフルPhase3を一気に実装 -- スコープが巨大すぎるため、4 capabilityに絞ったPhase3aを採用\"], \"open-decisions-for-owner\": [\"本Phase3a設計方針の承認/却下\", \"native shim(Swift)実装をagentに任せるか人間が書くか\", \"lab repo名(kotoba-lang/floorplan-lab案)の承認\", \"wifi-info capabilityのスコープ(位置情報許可前提を受け入れるか、dropしてble-scan+audio-ioだけにするか)\"]}", :adr/superseded_by [], :adr/topic "indoor-floorplan-lab-compiler-phase3-device-capability-bridge", :adr/related ["adr-2607100030-kotoba-kami-engine-host-imports", "adr-2607030900-aiueos-privileged-device-access-tender-design"], :adr/status "proposed", :adr/id "adr-2607140600-indoor-floorplan-lab-compiler-phase3-device-capability-bridge", :adr/doc_type "adr", :adr/last_verified "2026-07-13", :adr/body "# ADR-2607140600: 建物内部構造（floorplan）推定lab のための kotoba-lang/compiler Phase 3a capability bridge（motion/audio-io/ble-scan/wifi-info）設計 + kotoba-lang/device 統合提案
+[{:adr/authoritative_for [], :adr/note "This is a PROPOSAL, not a formally accepted decision -- but the owner directed implementation to proceed on 2026-07-13 (see Addendum). Phase 3a software layer + iOS native shim (5/5 real-device verified) + 3D WebGPU viewer scaffolding are implemented and landed; on-device 3D rendering is not yet visually confirmed (open follow-up).", :adr/supersedes [], :adr/proposal-summary "{\"problem\": \"iPhoneセンサー(motion)+audio(speaker/mic)+BLE RSSI+WiFi情報を使って建物内部構造(floorplan)を推定するlabがmonorepoに存在しない。実現にはネイティブAPI境界が必要だが、CLAUDE.mdのruntime優先順位(kotoba wasm > clojurewasm > cljs > nbb、appのため新規Rust/nativeを安易に書かない)との整合が課題\", \"status-2026-07-13-addendum\": {\"phase3a-software-layer\": \"implemented and landed on all 4 repos' main (kotoba-core-contracts adb221f, kotoba-lang 9c3f1b7, kotoba c7ca33a, device 7bbe30d), manifest registered (root dc8f871)\", \"ios-native-shim\": \"implemented, real-device verified 5/5 capabilities on 17AIR (iPhone Air, iOS 26.1), 2 bugs found+fixed (mic permission, AVAudioEngine input format 0)\", \"3d-visualization\": \"implemented (kotoba-lang/webgpu reused via WKWebView per ADR-2607078000 addendum's no-new-native-rendering-code policy), simulator+device build succeed and app launches without crash, but ON-DEVICE VISUAL RENDERING IS UNCONFIRMED as of this addendum -- user reported nothing displays; a debug WKScriptMessageHandler console-forwarding bridge was added (a4db495) but a 60s capture window closed before the operator navigated to the 3D screen, so root cause (WKWebView init failure vs. navigation not happening) is not yet isolated\", \"follow-up\": \"retry console capture coordinated with device operator, or use Safari Web Inspector (webView.isInspectable=true already set); also re-run gen-west-manifest.cljs --entry floorplan-lab to advance the pin past a4db495\"}, \"investigation-findings\": {\"kotoba-lang/compiler\": \"'.kotoba'は整数演算のみ・FFIなし・OS API呼び出しなしのdeny-by-default設計。aarch64-iosターゲットは検証済み機械語のMach-O埋め込みのみでネイティブAPI codegenではない。センサー/カメラcapability bridgeはdocs/adr/0001のPhase3ロードマップに明記されているが完全に未着手\", \"kotoba-lang/device\": \"bluetooth/wifi/display/geolocation/cameraをcapability tokenとして抽象化するcljc層は存在するが、driverはhost-injectedで未実装\"}, \"proposed-design\": {\"scope\": \"Phase3の汎用範囲(lifecycle/network/storage/sensors/camera/notifications全て)ではなく、labが必要とする4 capabilityに絞った'Phase 3a'として定義\", \"capabilities\": [{\"name\": \"motion\", \"content\": \"加速度計/ジャイロ/磁力計のサンプルストリーム取得(固定レート・固定小数点)\", \"api\": \"CoreMotion CMDeviceMotion\"}, {\"name\": \"audio-io\", \"content\": \"指定周波数パターンの再生+同時録音バッファ取得(固定小数点PCM)\", \"api\": \"AVAudioEngine\"}, {\"name\": \"ble-scan\", \"content\": \"近傍BLEペリフェラルのRSSI読み取りのみ(ペアリング/GATT書き込み等は含まない)\", \"api\": \"CoreBluetooth central scan\"}, {\"name\": \"wifi-info\", \"content\": \"接続中ネットワークの信号強度等、位置情報許可下で公開される範囲のみ(生スキャン不可という制約を機能に織り込む)\", \"api\": \"NEHotspotNetwork等\"}], \"registration-pipeline\": \"ADR-2607100030のkami:engine host imports precedentと同型(kotoba-core-contracts capability id+import descriptor -> kotoba-lang effect-for-kind -> kotoba runtime op->kind/guarded-host-functions)、deny-by-default(read-only・能動操作なし・network egressなし・個別metered/gate可能)を継承\", \"privilege-pattern\": \"ADR-2607030900のaiueos-device-provider design踏襲。判定ロジックは.kotoba/CLJC側に残し、実機OS API呼び出しは判断を一切行わない薄いSwift native shimに閉じ込める。native shimはcompilerが自動生成せず、本ADRのスコープ外(人間または別途承認を得たagentが実装)\", \"device-integration\": \"4 capabilityをkotoba-lang/deviceのcapability token語彙に追加登録し、host-injected driverとしてcompilerが生成するiOSターゲット向けnative shimを接続する\", \"lab-followup\": \"新規repo案 kotoba-lang/floorplan-lab で、motion(dead-reckoning)+audio-io(acoustic sonar/chirp echo)+ble-scan(RSSI三辺測量)をセンサーフュージョンしfloorplanを推定・可視化。UIはkotoba-ui/shitsuke.higのPWA。repo scaffoldは本ADR承認後の別タスク\"}, \"alternatives-considered\": [\"純PWAのみ(motion+audio-ioのみ、WiFi/BT無し) -- 最速だが要求機能(WiFi/Bluetooth測距)を満たせず不採用\", \"完全ネイティブSwiftアプリ(compiler経由なし) -- 開発最速だがCLAUDE.mdのruntime優先順位ポリシーに反するため不採用\", \"kotoba-lang/compilerのフルPhase3を一気に実装 -- スコープが巨大すぎるため、4 capabilityに絞ったPhase3aを採用\"], \"open-decisions-for-owner\": [\"本Phase3a設計方針の承認/却下 -- オーナー指示により実装続行、addendum参照\", \"native shim(Swift)実装をagentに任せるか人間が書くか -- agentが実装、実機で5/5検証済み\", \"lab repo名(kotoba-lang/floorplan-lab案)の承認 -- 承認され登録済み\", \"wifi-info capabilityのスコープ(位置情報許可前提を受け入れるか、dropしてble-scan+audio-ioだけにするか) -- 位置情報許可前提のまま実装、実機ではnil(期待通り)\"]}", :adr/superseded_by [], :adr/topic "indoor-floorplan-lab-compiler-phase3-device-capability-bridge", :adr/related ["adr-2607100030-kotoba-kami-engine-host-imports", "adr-2607030900-aiueos-privileged-device-access-tender-design"], :adr/status "proposed", :adr/id "adr-2607140600-indoor-floorplan-lab-compiler-phase3-device-capability-bridge", :adr/doc_type "adr", :adr/last_verified "2026-07-13", :adr/body "# ADR-2607140600: 建物内部構造（floorplan）推定lab のための kotoba-lang/compiler Phase 3a capability bridge（motion/audio-io/ble-scan/wifi-info）設計 + kotoba-lang/device 統合提案
 
-**Status**: proposed（未承認——実装前にオーナーレビュー必須）
+**Status**: proposed（設計提案としては未承認のまま——ただしオーナー指示により
+Phase 3a ソフトウェア層 + 実機iOS shim + 3D可視化の実装は完了・実機検証中。
+下記「Addendum」参照）
 **Date**: 2026-07-13
 **Deciders**: 未確定（提案者: Claude、オーナー承認待ち）
 **Related**:
@@ -167,4 +169,72 @@ scaffoldは本ADR承認後に別コミットで着手する。
 - ADR-2607100030（kami:engine host imports）
 - ADR-2607030900（aiueos privileged device-access tender design）
 - CLAUDE.md「`.cljc` / `.kotoba` ランタイム優先順位」節
+
+## Addendum（2026-07-13、実装状況）
+
+上記「Open decisions for owner」はオーナーの都度確認を経て「進めてよい」との
+返答を得たため、`proposed` の設計をベースに以下まで実装が進んだ（各リポの
+main HEADに着地済み、west manifestにも反映済み）。
+
+### 実装済み（Phase 3a ソフトウェア層）
+
+- `kotoba-lang/kotoba-core-contracts`（`adb221f`）: capability id 234-237
+  （`motion/read`/`audio/io`/`ble/scan`/`wifi/info`）登録。
+- `kotoba-lang/kotoba-lang`（`9c3f1b7`）: `effect-for-kind` に4 capability追加。
+- `kotoba-lang/kotoba`（`c7ca33a`）: `src/kotoba/sensing_host.cljc` —
+  5 opの決定論的stub host実装（実機ドライバ未注入時）。
+- `kotoba-lang/device`（`7bbe30d`）: capability token
+  `:motion`/`:audio-io`/`:ble-scan`/`:wifi-info` を追加。既存surfaceと同様、
+  driver実体は持たず、host-injected driver（呼び出し側が注入）のまま。
+- manifest登録: 上記4リポのpin前進 + `kotoba-lang/floorplan-lab`（新規、
+  public）の登録が `com-junkawasaki/root` main（`dc8f871`）に着地。
+
+### 実装済み（`kotoba-lang/floorplan-lab`、実機センサー検証済み）
+
+- `.cljc`アルゴリズム: dead-reckoning（`motion.cljc`）、chirp-echo音響sonar
+  （`sonar.cljc`）、BLE RSSI三辺測量（`ble.cljc`）、センサーフュージョン→
+  凸包で部屋輪郭推定（`fusion.cljc`）。26テスト/54アサーション全パス。
+- `ios/`: `SensingBridge.swift`（CoreMotion/CoreBluetooth/AVAudioEngine/
+  NEHotspotNetworkを呼ぶ薄いnative shim）。**実機（iPhone Air, iOS 26.1,
+  `17AIR`）で5/5 capability全て動作確認済み**（`motionRead`/`audioPlay`/
+  `audioRecord`/`bleScan`/`wifiInfo`、`wifi-info`はiOSの制約通り`nil`が
+  期待通りの結果）。実機検証中に見つけた2バグ（マイク権限未リクエスト、
+  `AVAudioEngine`のinput node format 0）を修正済み（`d7a241f`, `0f6ad27`）。
+  署名はjun784@gmail.comの個人チーム（`3A5CBTEBFP`、free provisioning）。
+
+### 実装済み・実機検証が未完了（3D可視化）
+
+- `web/`: `kotoba-lang/webgpu`（既存の再利用可能なcljs製WebGPU/WebGL2
+  render-IR executor）をそのまま使い、`floorplan-lab.viewer`（`web/src/
+  floorplan_lab/viewer.cljs`）が壁点群/部屋輪郭をinstance列に変換して描画。
+  ingestのたびに`floorplan-lab.motion/sonar/ble/fusion`をフル再計算して
+  redrawするため、設計上はリアルタイム更新（motion ~20Hz、sonar 3秒毎、
+  ble 5秒毎）になっている。
+- `ios/FloorplanLabApp/FloorplanMapView.swift`: WKWebViewの薄いホスト
+  （`UIViewRepresentable`）。判定/フュージョン/レンダリングロジックは
+  一切持たず、`SensingBridge`の生データを`evaluateJavaScript`でcljs側に
+  渡すだけ（ADR-2607078000 addendumの「ネイティブラッパーは既存の
+  ブラウザ実証済みcljs経路をwebviewで包む、新規native描画コードを
+  書かない」方針に準拠）。
+- Simulatorビルド・実機ビルドともに成功、アプリはクラッシュせず起動する
+  ことを確認済み。**しかし実機で3D画面自体が表示されない（`表示されません`
+  という実測報告あり、2026-07-13時点で原因未特定）。** デバッグのため
+  WKWebViewのconsole.log/warn/errorをSwift側にforwardする一時的な
+  `WKScriptMessageHandler`ブリッジを追加（`a4db495`）。60秒のコンソール
+  キャプチャを試みたが、実機操作者が3D画面へのnavigation自体を行う前に
+  キャプチャ枠が終了し、`[WebConsole]`ログを一件も取得できなかった——
+  **WKWebViewの初期化/レンダリング自体が失敗しているのか、単に画面遷移が
+  行われなかっただけなのか、まだ切り分けできていない。** 次回セッションで
+  実機操作者と時間を合わせてconsoleキャプチャを再試行するか、Safari Web
+  Inspector（`webView.isInspectable = true`済み）で直接デバッグするのが
+  follow-up。
+
+### 未着手のまま
+
+- `web/`側の3D描画結果とSwift側のセンサー生データの実際の整合性
+  （`sampleIndex`近似の妥当性等）は実機で未検証。
+- `manifest/west.yml`の`floorplan-lab` pinはiOS shim/3D viewer追加後の
+  複数commit分進んでおり、最新（`a4db495`）まで反映するには
+  `nbb scripts/gen-west-manifest.cljs --entry floorplan-lab` の再実行が
+  必要（本addendum時点でまだ実行していない、follow-up）。
 ", :adr/deciders [], :adr/date "2026-07-13", :db/id -1, :adr/authoritative false, :adr/title "ADR-2607140600: 建物内部構造（floorplan）推定lab のための kotoba-lang/compiler Phase 3a capability bridge（motion/audio-io/ble-scan/wifi-info）設計 + kotoba-lang/device 統合提案"}]
