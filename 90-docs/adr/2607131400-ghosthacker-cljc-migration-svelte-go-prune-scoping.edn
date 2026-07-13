@@ -43,4 +43,10 @@
    {:date \"2026-07-13\"
     :trigger \"follow-up close-out: verify the cuelang vestigial-dependency suspicion flagged in the original decision\"
     :finding \"cuelang is NOT vestigial — real, direct (non-indirect) go.mod dep, actually imported and used. internal/schema/storyboard.cue.go embeds the CUE schema as a Go string literal (StoryboardSchema, GetSchema() cue.Value) rather than a standalone .cue file — that's why the original 'zero .cue files' check found nothing; it checked the wrong artifact. internal/service/storyboard.go's validateAndLoad genuinely runs cueCtx.CompileBytes -> Unify(schema) -> Validate(cue.Final()) on storyboard JSON at runtime.\"
-    :correction \"do NOT remove cuelang / do NOT run go mod tidy on this dep — would break the build and remove real schema validation. Follow-up item closed.\"}]}]
+    :correction \"do NOT remove cuelang / do NOT run go mod tidy on this dep — would break the build and remove real schema validation. Follow-up item closed.\"}
+   {:date \"2026-07-13\"
+    :trigger \"owner request: 'next, 移行を進めて, cue も除去して, edn, cljs のみで ok' — replace cuelang (confirmed real, not vestigial) with EDN+cljs rather than leaving it in place\"
+    :implementation \"ported all 15+ CUE type defs (#Storyboard/#Episode/#Panel/#Dialogue/etc.) to kotoba-lang/spec (EDN data + pure cljs/cljc validate/explain, no clojure.spec/malli dep, portable to kotoba-WASM) as apps/server/scripts/validate_storyboard.cljs (nbb-run); validateAndLoad now shells out to it instead of calling cuelang in-process; cuelang.org/go removed via go mod tidy, storyboard.cue.go deleted\"
+    :union-types \"kotoba-lang/spec has no :or/:union primitive yet — modeled #Panel and #BilingualText via the :fn predicate escape hatch (try each shape, valid if either passes)\"
+    :documented-simplifications \"#Context's pinned CUE string-literal values (JSON-LD namespace URIs) validate as plain :string (structural) rather than exact-literal; CUE 2-tuples ([int,int]) validate element type via :vector/:of but not fixed arity=2 — kotoba-lang/spec has no fixed-length vector primitive\"
+    :verified \"go build + go vet clean; go mod tidy removed cuelang with no other usage found; two new Go tests (storyboard_validate_test.go) exercise the real nbb subprocess against valid/invalid fixtures, both pass\"}]}]
