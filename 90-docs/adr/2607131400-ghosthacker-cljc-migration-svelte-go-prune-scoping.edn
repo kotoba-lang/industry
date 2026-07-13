@@ -32,4 +32,11 @@
     :decision {:do-now \"migrate apps/image-gen (3 python files) to cljc + cloud-murakumo; remove those 3 .py files only after migration lands\",
                :do-not \"delete apps/server (Go) or apps/web (Svelte) wholesale — no working cljc replacement exists for Dapr actors/workflows, ConnectRPC service, or Lexical editor; deleting now would destroy working storyboard-editor backend+frontend with no replacement\",
                :follow-up \"a future ADR must first settle (a) cljc-native Dapr actor/workflow replacement and (b) Lexical-equivalent rich-text editing, before any further Go/Svelte pruning is considered\",
-               :side-note \"apps/server's cuelang dependency has zero .cue files in-repo — flagged as possibly vestigial, not itself a decision of this ADR\"}}"}]
+               :side-note \"apps/server's cuelang dependency has zero .cue files in-repo — flagged as possibly vestigial, not itself a decision of this ADR\"}}",
+  :adr/addenda
+  [{:date \"2026-07-13\"
+    :trigger \"owner request: 'apps image gen も kotoba-lang orgs に共通 lib として設計, 移行'\"
+    :discovery \"kotoba-lang/murakumo (the murakumo-family common lib, ADR-2607041302) already has murakumo.infer.media + murakumo.infer.gateway implementing exactly this — SSH-dispatched ComfyUI render farm with real crash-recovery (consecutive-miss detection, /queue cross-check for a crashed-and-respawned ComfyUI process that lost its in-memory queue/history — the same class of gad crash diagnosed live this same day in the ai-gftd-mangaka session)\"
+    :corrected-decision \"apps/image-gen-clj now delegates fleet dispatch to kotoba-lang/murakumo (murakumo.infer.media/.gateway/.fleet/.schedule) instead of calling gftdcojp/cloud-murakumo directly — removes duplicated retry/job-building logic\"
+    :fleet-change \"registered gad in kotoba-lang/murakumo's fleet.edn (wasn't a fleet member before; scheduler would have picked a Mac mini at ~3min/image instead of gad's ~20s) and fixed a comfyui/ vs ComfyUI/ scp path-casing bug specific to gad's case-sensitive Linux filesystem (symlink fix on gad itself, no code change)\"
+    :verified \"murakumo.infer.gateway/generate-image! end-to-end: scheduler correctly picked gad, 21s, real image, correct dims/style composition\"}]}]
