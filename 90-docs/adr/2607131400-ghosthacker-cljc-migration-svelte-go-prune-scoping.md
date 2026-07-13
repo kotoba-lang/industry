@@ -80,3 +80,27 @@ ROCmノード、~20秒/枚）が `kotoba-lang/murakumo` の `fleet.edn`（mesh 1
 21秒で実画像生成に成功。`apps/image-gen-clj/generator.clj` は現在、スタイルプリセット/アスペクト比の
 合成（Ghost Hacker固有のプロダクト関心）のみを持ち、フリートディスパッチ自体は一切実装しない
 （`kotoba-lang/murakumo` に委譲）。
+
+## Addendum 2（2026-07-13 同日）— `cuelang` も除去、EDN + cljs へ移行
+
+オーナー指示「next, 移行を進めて, cue も除去して, edn, cljs のみで ok」。上記の「vestigial ではない、
+削除しない」という訂正結果を踏まえた上で、**cuelang 自体を EDN+cljs で置き換える**方向での除去を実施
+（「使われていないから消す」ではなく「使われているものを別の技術で置き換えて消す」）。
+
+- `internal/schema/storyboard.cue.go` の CUE スキーマ（`#Storyboard`/`#Episode`/`#Panel` 等、
+  15個超の型定義）を `kotoba-lang/spec`（EDN データ + 純関数の validate/explain、clojure.spec/malli
+  依存なし、kotoba-WASM でも動く同モノレポの foundational stdlib）へ全フィールド移植。
+- `apps/server/scripts/validate_storyboard.cljs`（nbb実行、CLAUDE.mdのNode側検証ハーネスは.mjs禁止
+  nbb推奨方針に準拠）として実装。Union型（`#Panel = #StoryboardPanel | #GraphicNovelPanel` 等）は
+  `kotoba-lang/spec` に `:or` 型が無いため `:fn` predicate（両方の spec を試して片方が valid なら通す）
+  で表現。
+- `internal/service/storyboard.go` の `validateAndLoad` は CUE のインプロセス呼び出しをやめ、
+  `nbb scripts/validate_storyboard.cljs <path>` をサブプロセス実行する形に変更（返す data 自体は
+  従来通り Go 自身の `encoding/json` で独立にパースしたもの、バリデータの解析結果とは無関係）。
+- `cuelang.org/go` を `go mod tidy` で完全除去、`storyboard.cue.go` を削除。
+- 新規Goテスト（`storyboard_validate_test.go`）で有効/無効フィクスチャに対する実サブプロセス呼び出しを
+  検証、`go build`/`go vet` もクリーン。
+
+既知の簡略化（ドキュメント化済み、CUEとの厳密な等価ではない）: `#Context` のリテラル文字列値ピン
+（JSON-LD名前空間URI）は構造的な `:string` として検証（正確なリテラル一致はチェックしない）。CUEの
+2要素タプル `[int, int]` は要素の型のみ検証し、要素数=2の制約は強制しない。
