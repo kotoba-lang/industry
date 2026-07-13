@@ -303,3 +303,45 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
   GitHub HEAD の registry を正とすること。
 - pin 検証 4/4 OK（shitsuke/slides/net-kotobase/cloud-itonami、+ mono 分含め
   本 batch 計 5 commit）。
+
+## Addendum (2026-07-13, 第4弾): 未反映棚卸しの上位3件を消化 — kotobase 全ルート・murakumo.cloud 全面・x402 ライブラリ fan-out
+
+2026-07-13 の 6 リポ監査（cloud-itonami / cloud-manimani / ai-gftd-apex /
+net-kotobase / cloud-murakumo / nexus-x402）で判明した未反映 surface のうち
+推奨順 1〜3 を実施:
+
+- **net-kotobase の off-road HTML 3 ルート**（PR #194、main `ef9a438`、pin
+  `ef986dc5`、Worker デプロイ・live 検証済み）: `/signup`（獲得導線。funnel/
+  authn/checkout JS は verbatim 保全 + `{{AUTHN_URL}}` slot）、`/admin`
+  （= ADR-2607022800 の「kotobase.net console」の実体）、`/explore`（動的部は
+  既存 escape-html 経路のまま静的 shell に slot 挿入。XSS プローブが escape
+  されたまま描画されることを実ブラウザで確認）。theme map を `site_theme.cljc`
+  に一本化し landing 含む 4 ページが同期。hex 36→0。**a11y 実測修正**: HIG
+  secondary-label は light で ~3.4:1（AA 未満）— token 由来 `color-mix` で
+  ≥4.69:1 化し landing も再生成（この修正パターンは EDA・x402 でも独立に
+  必要になった = HIG 公表値の既知の罠として記録）。
+- **cloud-murakumo（murakumo.cloud）全面移行**（PR #20、main `49eb919` + parse
+  fix `5f9d6d4`、pin `75ff1854`、Worker+assets デプロイ・live 検証済み）:
+  docs/blog 4 面を生成ページ化 + SPA は renderer 温存の token 載せ替え
+  （cljc UI IR + DOM adapter・Stripe/x402 配線は byte 不変）。hex 66→0、
+  重複 stylesheet 6→1 bundle、dark 専用→light/dark `:auto`。uikit binding、
+  theme `{:accent "#3D5CCC"(brand indigo #7c9cff は white 上 2.6:1 で AA 落ち
+  のため同 hue 暗色化) :accent-dark "#7C9CFF"}`。実 Chromium 80/80（slider
+  操作でコスト再計算、320px 全 6 面 scrollWidth==320）。**発見**: main の
+  `wrangler.jsonc` が移行以前から parse 不能（treasury var 削除時の孤立カンマ）
+  で deploy 構成が壊れたままだった — 最小修正で解消（`5f9d6d4`）。
+- **x402-directory ライブラリの HIG 化**（lib PR #1、main `97c5543`、pin
+  `0745b82e`；nexus-x402 PR #2、main `a621ba0`、pin `d6c79a23`→`75ff…` 系列、
+  x402.nexus デプロイ・live 検証済み）: runtime zero-dep 制約を維持したまま、
+  `default-page-css` のパレットを shitsuke.hig から**生成**する方式
+  （`scripts/gen_default_css.clj` + `:gen` alias、`;; gen:begin/end` marker に
+  splice、`--check` で検証、WCAG レポート付き）。brand cyan `#0891b2` は
+  white 上 3.7:1 で AA 落ち → 同 hue `#0E7490` に暗色化（dark は既存
+  `#22C3E6` 10.0:1 のまま）。`:branding :css` seam・class 名・DOM 形状は不変
+  なので全 facilitator が無変更で継承。
+- 共有 `orgs/gftdcojp/cloud-murakumo` checkout には並行セッションの WIP
+  （generation endpoint 配線 + 同カンマ修正）があり rule 通り温存
+  （先方着地時に整合）。
+- 残 gap（棚卸しより）: ai-gftd-apex（liquid-glass 直載せ→kotoba-ui 化、L +
+  viewer S）、cloud-itonami `/local/` shell+keiei 画面（M、operator 面）、
+  cloud-manimani landing（greenfield、要否オーナー判断）。
