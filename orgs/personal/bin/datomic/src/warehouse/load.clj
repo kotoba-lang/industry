@@ -22,9 +22,24 @@
                     (remove str/blank?)
                     (keep #(try (json/read-str % :key-fn keyword) (catch Exception _ nil)))))))))
 
+(defn- warn-unreadable [f e]
+  (println (format "  [skip] %s: %s (unfetched annex content? run: git annex get %s)"
+                    (.getPath f) (.getMessage e) (.getPath f))))
+
 (defn rd-json [rel]
   (let [f (io/file base rel)]
-    (when (.exists f) (json/read-str (slurp f) :key-fn keyword))))
+    (when (.exists f)
+      (try (json/read-str (slurp f) :key-fn keyword)
+           (catch Exception e (warn-unreadable f e) nil)))))
+
+(defn- safe-edn
+  "Read+parse an edn file, but skip (warn, return nil) instead of aborting the
+   whole load when content isn't actually fetched (git-annex pointer file: the
+   working-tree bytes are a path string, not the EDN they point to)."
+  [f]
+  (when (.exists f)
+    (try (edn/read-string (slurp f))
+         (catch Exception e (warn-unreadable f e) nil))))
 
 ;; ---------- helpers ----------
 (defn month [d] (when (and d (>= (count d) 7)) (subs d 0 7)))
@@ -162,8 +177,7 @@
 
 ;; ---------- life graph (ADR-0010: goals.edn + facts/obligations.jsonl) ----------
 (def goals-edn
-  (let [f (io/file base "../kawasakijun/goals.edn")]
-    (when (.exists f) (edn/read-string (slurp f)))))
+  (safe-edn (io/file base "../kawasakijun/goals.edn")))
 
 (defn goal-tx []
   (vec (:goals goals-edn)))
@@ -181,8 +195,7 @@
 ;; the same entity). Pass 2 = alias addresses as thin entities pointing to
 ;; canonical via :person/canonical (entity resolution, ADR-0010).
 (def people-edn
-  (let [f (io/file base "facts/people.edn")]
-    (when (.exists f) (edn/read-string (slurp f)))))
+  (safe-edn (io/file base "facts/people.edn")))
 
 (defn people-tx []
   (vec (for [p people-edn]
@@ -191,8 +204,7 @@
 
 ;; dyads.edn: power-dynamics edges + falsifiable hypotheses (ADR-0012).
 (def dyads-edn
-  (let [f (io/file base "facts/dyads.edn")]
-    (when (.exists f) (edn/read-string (slurp f)))))
+  (safe-edn (io/file base "facts/dyads.edn")))
 
 (defn dyad-tx []
   (vec (for [d (:dyads dyads-edn)]
@@ -219,7 +231,7 @@
 
 ;; orgs.edn / accounts.edn / contracts.edn — curated entity registries (ADR-0015 + 整理)
 (defn- rd-edn-facts [rel]
-  (let [f (io/file base rel)] (when (.exists f) (edn/read-string (slurp f)))))
+  (safe-edn (io/file base rel)))
 
 (defn channel-tx []
   (vec (rd-edn-facts "facts/channels.edn")))
@@ -253,7 +265,9 @@
              (seq (:not m))         (assoc :rule/match-not (vec (:not m))))))))
 
 (defn curated-org-tx []
-  (vec (rd-edn-facts "facts/orgs.edn")))
+  ;; :org/repo-taxonomy はネスト map (ADR-0020) → account2-tx の :account/blocker と同じ理由で文字列化
+  (vec (for [o (rd-edn-facts "facts/orgs.edn")]
+         (cond-> o (map? (:org/repo-taxonomy o)) (update :org/repo-taxonomy pr-str)))))
 
 (defn account2-tx []
   ;; refs are already lookup-refs; :account/blocker はネスト map → Datomic 用に文字列化
@@ -470,8 +484,7 @@
 
 ;; processes.edn: handoff state machine + capability policy (ADR-0015)
 (def processes-edn
-  (let [f (io/file base "facts/processes.edn")]
-    (when (.exists f) (edn/read-string (slurp f)))))
+  (safe-edn (io/file base "facts/processes.edn")))
 
 (defn capability-tx [] (vec (:capabilities processes-edn)))
 
@@ -496,12 +509,10 @@
 
 ;; engi.edn: tie-release evaluations (ADR-0013)
 (defn engi-tx []
-  (let [f (io/file base "facts/engi.edn")]
-    (when (.exists f)
-      (vec (for [e (edn/read-string (slurp f))]
-             (if-let [pid (:engi/person e)]
-               (assoc e :engi/person [:person/id pid])
-               e))))))
+  (vec (for [e (safe-edn (io/file base "facts/engi.edn"))]
+         (if-let [pid (:engi/person e)]
+           (assoc e :engi/person [:person/id pid])
+           e))))
 
 ;; thread_id -> latest cid (for obligation source resolution via index.jsonl)
 (defn thread->cid []

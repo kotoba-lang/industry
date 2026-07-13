@@ -114,6 +114,7 @@
  {:db/ident :org/status       :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/doc ":active :dormant :dissolved :disputed"}
  {:db/ident :org/people       :db/valueType :db.type/ref     :db/cardinality :db.cardinality/many :db/doc "org -> 主要関係者"}
  {:db/ident :org/note         :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :org/repo-taxonomy :db/valueType :db.type/string :db/cardinality :db.cardinality/one :db/doc "制作物/repo の三組織分類 (ADR-0020)。ネスト map は load.clj で pr-str 文字列化して格納"}
 
  {:db/ident :contract/id      :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
  {:db/ident :contract/title   :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
