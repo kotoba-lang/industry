@@ -50,6 +50,19 @@ your app                   L5
    shitsuke's reagent seam. Runtime order per repo rule: kotoba wasm > clojurewasm >
    ClojureScript > nbb (JVM/bb are compat-only).
 
+## Measure it (unmeasured UI quality is theater)
+
+After building or changing a page, score the rendered HTML with the deterministic
+HIG/WCAG audit (`kotoba-lang/design-quality`, ADR-2607132300):
+
+```bash
+cd orgs/kotoba-lang/design-quality && bb score /path/to/rendered.html --min 95
+```
+
+(or `nbb -m design-quality.cli score ...`). Exit 1 below `--min` — wire it as a CI
+gate like kotoba-ui's self-scoring test. The LLM-judge layer
+(`.claude/workflows/design-quality-score.js`) is the complementary subjective arm.
+
 ## Review checklist (when auditing UI code)
 
 - [ ] requires only kotoba-ui/appkit/uikit  - [ ] zero raw hex / px font sizes
