@@ -16,10 +16,31 @@
 ;;
 ;; 使い方:
 ;;   nbb manifest/edn-datomize.cljs wrap-map <path> <ns>     — map 1個のファイルを変換
+;;   nbb manifest/edn-datomize.cljs wrap-map-glob <parent-dir> <filename> <ns>
+;;                                                            — <parent-dir> 直下の
+;;                                                              各子ディレクトリにある
+;;                                                              <filename>（同一 ns の
+;;                                                              map 1個ファイル）を一括変換。
+;;                                                              例: 380個の
+;;                                                              cloud-itonami-*/blueprint.edn
+;;                                                              を一度に変換する。
+;;   nbb manifest/edn-datomize.cljs tx-entities <in-path> <out-path>
+;;                                                            — 既に名前空間付きキーを
+;;                                                              持つフラット map のベクタ
+;;                                                              （:db/id 無し）を in-path
+;;                                                              から読み、各要素に負の
+;;                                                              tempid を振り、属性を
+;;                                                              schema.edn にマージし、
+;;                                                              tx-data を out-path に書く。
+;;                                                              呼び出し側が集めた複数
+;;                                                              entity（例: fleet監査の
+;;                                                              1リポジトリ1エンティティ）
+;;                                                              をまとめて transact 可能に
+;;                                                              する用途。
 ;;   nbb manifest/edn-datomize.cljs adr-dir  <dir>            — ADR frontmatter/body を変換
 ;;   nbb manifest/edn-datomize.cljs adr-file <path>           — ADR 1ファイルを変換
 
-(require '[scripts.nbb-compat :refer [slurp spit file-seq format]]
+(require '[scripts.nbb-compat :refer [slurp spit file-seq format relative-path]]
          '[clojure.edn :as edn]
          '[clojure.java.io :as io]
          '[clojure.java.shell :as shell]
@@ -113,6 +134,77 @@
         (merge-schema! attrs)
         (println "wrapped" rel-path "->" (count entity) "attrs, ns=" ns-name)))))
 
+(defn wrap-map-glob!
+  "parent-dir 直下の各子ディレクトリにある filename（同一 ns の map 1個ファイル、
+   例: 380個の cloud-itonami-*/blueprint.edn）を一括で wrap-map! する。子リポごとに
+   別 git repo なので、この関数はワーキングツリーを書き換えるだけ — commit/push は
+   呼び出し側の責務（大量の別リポへの一括 push は blast radius が大きいため、
+   このスクリプト自身は絶対に commit/push しない)。"
+  [parent-dir filename ns-name]
+  (let [base (io/file root parent-dir)
+        children (->> (.listFiles base)
+                      (filter #(.isDirectory %))
+                      (sort-by #(.getName %)))
+        report (atom {:wrapped [] :skipped [] :missing [] :errors []})]
+    (doseq [child children]
+      (let [f (io/file child filename)]
+        (cond
+          (not (.exists f))
+          (swap! report update :missing conj (relative-path root child))
+
+          :else
+          (try
+            (let [content (slurp-edn f)]
+              (if (already-tx-data? content)
+                (swap! report update :skipped conj (relative-path root f))
+                (let [entity (entity-from-map content ns-name)
+                      attrs (schema-attrs content ns-name)]
+                  (spit f (pr-str [entity]))
+                  (merge-schema! attrs)
+                  (swap! report update :wrapped conj (relative-path root f)))))
+            (catch :default e
+              (swap! report update :errors conj [(relative-path root f) (ex-message e)]))))))
+    (println "wrap-map-glob:" (count (:wrapped @report)) "wrapped,"
+             (count (:skipped @report)) "already tx-data,"
+             (count (:missing @report)) (str "missing " filename ",")
+             (count (:errors @report)) "errors.")
+    (when (seq (:errors @report))
+      (println "=== ERRORS ===")
+      (doseq [[f m] (:errors @report)] (println " " f "->" m)))
+    @report))
+
+(defn schema-attrs-raw
+  "schema-attrs と同じ classify ベースだが、キーは既に名前空間付きなので
+   re-namespace しない(tx-entities! 用 — entity-from-map/schema-attrs は
+   まだ裸のキーを前提にした wrap-map! 系専用)。"
+  [content]
+  (for [[k v] content]
+    (let [{:keys [type card]} (classify v)]
+      {:db/ident k :db/valueType type :db/cardinality card})))
+
+(defn tx-entities!
+  "in-path の EDN(既に名前空間付きキーを持つフラット map のベクタ、:db/id 無し)を
+   読み、各要素に負の tempid を振り、属性を schema.edn にマージし、tx-data ベクタを
+   out-path に書き出す。呼び出し側(例: scripts/itonami-fleet-audit.cljs)が集めた
+   多数の同種 entity をまとめて Datomic/Datascript transact 可能にする。"
+  [in-path out-path]
+  (let [raw (edn/read-string (slurp (io/file root in-path)))
+        _ (assert (and (vector? raw) (every? map? raw))
+                  "tx-entities expects a vector of maps at in-path")
+        attrs (distinct (mapcat schema-attrs-raw raw))
+        entities (into []
+                       (map-indexed
+                        (fn [i m]
+                          (into {:db/id (- (inc i))}
+                                (map (fn [[k v]] [k (attr-value v)]))
+                                m)))
+                       raw)]
+    (merge-schema! attrs)
+    (spit (io/file root out-path) (pr-str entities))
+    (println "tx-entities:" (count entities) "entities ->" out-path
+             "(" (count attrs) "distinct attrs merged into schema.edn)")
+    entities))
+
 ;; ---------- ADR (90-docs/adr/*.edn) ----------
 ;;
 ;; 実測(2026-07-10): 458 ファイル中、トップレベル shape は :frontmatter+:body の
@@ -182,15 +274,17 @@
     @report))
 
 (defn -main [& args]
-  (let [[mode a b] args]
+  (let [[mode a b c] args]
     (case mode
       "wrap-map" (wrap-map! a b)
+      "wrap-map-glob" (wrap-map-glob! a b c)
+      "tx-entities" (tx-entities! a b)
       "adr-dir"  (adr-dir! a)
       "adr-file" (let [report (atom {:ok [] :skipped [] :errors [] :attrs []})]
                    (adr-file! (io/file root a) report)
                    (merge-schema! (:attrs @report))
                    (println @report))
-      (do (println "usage: nbb manifest/edn-datomize.cljs [wrap-map <path> <ns> | adr-dir <dir> | adr-file <path>]")
+      (do (println "usage: nbb manifest/edn-datomize.cljs [wrap-map <path> <ns> | wrap-map-glob <parent-dir> <filename> <ns> | tx-entities <in-path> <out-path> | adr-dir <dir> | adr-file <path>]")
           (scripts.nbb-compat/exit 1)))))
 
 (apply -main *command-line-args*)
