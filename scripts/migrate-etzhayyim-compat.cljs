@@ -7,9 +7,17 @@
   (when-not (and old new adr) (fail "usage: migrate-etzhayyim-compat.cljs <old-compat-dir> <new-kotoba-lang-repo> <adr-id>"))
   (let [root (clojure.string/trim (:out (sh "git" "rev-parse" "--show-toplevel")))
         source (str root "/orgs/etzhayyim/root/20-actors/" old)
-        workdir (str (or (getenv "MIGRATE_WORKDIR") (.tmpdir (js/require "node:os"))) "/" new)]
+        explicit-workdir (getenv "MIGRATE_WORKDIR")
+        ;; A fixed os.tmpdir()+new path collides across concurrent invocations
+        ;; targeting the same target repo name (this repo's normal multi-agent
+        ;; workflow) — one run's rmSync/cpSync can clobber another's in-progress
+        ;; checkout. mkdtempSync gives each unset-MIGRATE_WORKDIR run a private
+        ;; dir; an explicit MIGRATE_WORKDIR is left as a reusable debug path.
+        workdir (if explicit-workdir
+                  (do (.rmSync fs explicit-workdir #js {:recursive true :force true})
+                      explicit-workdir)
+                  (.mkdtempSync fs (str (.join path (.tmpdir (js/require "node:os")) new) "-")))]
     (when-not (.existsSync fs source) (fail (str "no such source dir: " source)))
-    (.rmSync fs workdir #js {:recursive true :force true})
     (.cpSync fs source workdir #js {:recursive true})
     (let [test-dir (if (.existsSync fs (str workdir "/tests")) "tests" "test")
           deps (str "{:paths [\"src\" \"" test-dir "\"]\n :deps {org.clojure/clojure {:mvn/version \"1.11.1\"}}}\n")]

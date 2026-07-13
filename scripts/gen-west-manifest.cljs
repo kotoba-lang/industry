@@ -255,7 +255,13 @@
         vscript (io/file (scripts.nbb-compat/parent-path self) "verify-west-pins.cljs")]
     (if-not (.exists vscript)
       (binding [*out* *err*] (println "WARN: verify-west-pins.cljs が無いため pin 検証をスキップ"))
-      (let [tmp (io/file (str "/tmp/west-candidate-" (.now js/Date) ".yml"))]
+      ;; mkdtempSync でユニークな tmp dir を切る — Date.now() ms 分解能だけだと、この
+      ;; リポの並行 agent 運用下では同一 ms 内の2回起動が同一パスへ衝突しうる。
+      (let [node-fs  (js/require "node:fs")
+            node-os  (js/require "node:os")
+            node-path (js/require "node:path")
+            tmp-dir  (.mkdtempSync node-fs (.join node-path (.tmpdir node-os) "west-candidate-"))
+            tmp      (io/file tmp-dir "west.yml")]
         (try
           (spit tmp content)
           ;; --entry 指定時は検証もその entry に絞る(--only)。ローカル west.yml が
@@ -270,7 +276,7 @@
               (scripts.nbb-compat/exit 1))
             (when (contains? #{2 3} exit)
               (binding [*out* *err*] (println "WARN: pin 検証を実行できず fail-open で続行"))))
-          (finally (.unlinkSync (js/require "node:fs") (scripts.nbb-compat/file-path tmp))))))))
+          (finally (.rmSync node-fs tmp-dir #js {:recursive true :force true})))))))
 
 (let [args     *command-line-args*
       check?   (some #{"--check"} args)

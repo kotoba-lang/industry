@@ -81,8 +81,17 @@
               [1 2 3]))))
 
 (defn iso-now [] (.toISOString (js/Date.)))
-(defn date-days-ago [n]
-  (let [d (js/Date.)] (.setUTCDate d (- (.getUTCDate d) n)) (.slice (.toISOString d) 0 10)))
+(defn date-days-ago
+  "The bb original used java.time.LocalDate/now (system-local calendar date).
+   UTC Date methods here would silently shift the date for ~9h after local
+   midnight in JST, feeding a wrong day into the CF date_gt filters and the
+   :as-of metrics stamp — use local-time getters/setters instead."
+  [n]
+  (let [d (js/Date.)]
+    (.setDate d (- (.getDate d) n))
+    (str (.getFullYear d) "-"
+         (.padStart (str (inc (.getMonth d))) 2 "0") "-"
+         (.padStart (str (.getDate d)) 2 "0"))))
 
 (defn cf-graphql [token query]
   (-> (curl/post "https://api.cloudflare.com/client/v4/graphql"

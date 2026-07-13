@@ -15,7 +15,11 @@
 (defn projects []
   ;; west.yml is generated and uses a stable block layout. Only retain projects
   ;; explicitly marked `userdata: datalad: true`; this avoids a YAML dependency.
-  (->> (re-seq #"(?ms)^\s+- name:\s*([^\n]+)(.*?)(?=^\s+- name:|\z)" (slurp "manifest/west.yml"))
+  ;; lookahead terminator: JS regex has no \z ("end of input") anchor — it silently
+  ;; matches a literal 'z', truncating any block whose text contains one (verified:
+  ;; 185/1624 blocks lose their `path:` line this way, e.g. any project path containing
+  ;; "z"). (?![\s\S]) is the portable "true end of string" idiom across regex engines.
+  (->> (re-seq #"(?ms)^\s+- name:\s*([^\n]+)(.*?)(?=^\s+- name:|(?![\s\S]))" (slurp "manifest/west.yml"))
        (keep (fn [[_ name block]]
                (when (re-find #"(?m)^\s+datalad:\s*true\s*$" block)
                  (when-let [[_ path] (re-find #"(?m)^\s+path:\s*([^\s]+)\s*$" block)]
@@ -42,12 +46,20 @@
     exit))
 
 (defn enable-b2! [dir remote env]
-  (run! dir env "git" "annex" "init")
-  (if (zero? (run! dir env "git" "annex" "enableremote" remote))
-    true
+  ;; deleted west_annex.py's _enable_b2 checked AWS_ACCESS_KEY_ID before ever
+  ;; calling enableremote, as a defense-in-depth guard against resolve-b2
+  ;; soft-failing into an incomplete creds map; this port dropped that
+  ;; local check, relying entirely on resolve-b2's own hard-exit on failure.
+  (if-not (get env "AWS_ACCESS_KEY_ID")
     (do (binding [*out* *err*]
-          (println (str "enableremote " remote " に失敗。初回は scripts/datalad-b2-init.cljs で initremote 済みか確認。")))
-        false)))
+          (println "B2 creds 未解決(AWS_ACCESS_KEY_ID 無し)。manifest/repos.edn の :b2 :credentials を確認。"))
+        false)
+    (do (run! dir env "git" "annex" "init")
+        (if (zero? (run! dir env "git" "annex" "enableremote" remote))
+          true
+          (do (binding [*out* *err*]
+                (println (str "enableremote " remote " に失敗。初回は scripts/datalad-b2-init.cljs で initremote 済みか確認。")))
+              false)))))
 
 (defn datalad? [] (zero? (:exit (sh "which" "datalad"))))
 

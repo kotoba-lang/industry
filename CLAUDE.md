@@ -233,7 +233,7 @@ skill `new-project-scaffold` を参照。
   git merge --ff-only origin/main      # FF 不可なら停止。rebase しない
   ```
 
-  これは PreToolUse フック `.claude/hooks/git-push-main-sync-guard.cljs`（babashka）で強制される
+  これは PreToolUse フック `.claude/hooks/git-push-main-sync-guard.cljs`（nbb）で強制される
   （遅れた状態の `git push` は deny され、同期を促すメッセージが返る）。フックは
   破壊的な自動マージはしない（判定と指示のみ、fail-open）。
 
