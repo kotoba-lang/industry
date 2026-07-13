@@ -1,27 +1,27 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 7126,
-  :pageviews-7d 3781,
-  :uniques-7d-sum 322,
+ {:requests-7d 7399,
+  :pageviews-7d 3831,
+  :uniques-7d-sum 323,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
   [{:path "/", :requests 77}
+   {:path "/cdn-cgi/rum", :requests 51}
    {:path "/.git", :requests 49}
    {:path "/config/config.php", :requests 48}
    {:path "/Dockerfile", :requests 48}
    {:path "/config/nexmo.php", :requests 48}
    {:path "/aws/s3/credentials", :requests 41}
-   {:path "/_next/static/*", :requests 36}
-   {:path "/user/.env", :requests 36}],
-  :status-mix {:ok 1910, :server-error 46, :client-error 44},
+   {:path "/_next/static/*", :requests 36}],
+  :status-mix {:ok 2054, :server-error 75, :client-error 43},
   :window "24h"},
  :as-of "2026-07-13",
- :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 2},
+ :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 3},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 77 · /.git 49 · /config/config.php 48 · /Dockerfile 48 · /config/nexmo.php 48 | 4xx(probe) 2% · 5xx 2%",
+ "上位 page (24h, 2xx/3xx): / 77 · /cdn-cgi/rum 51 · /.git 49 · /config/config.php 48 · /Dockerfile 48 | 4xx(probe) 2% · 5xx 3%",
  :signal
- "isekai.network 実測 7126 req/7d・322 uniques(日次和)・うち4xx probe 2%(24h)",
+ "isekai.network 実測 7399 req/7d・323 uniques(日次和)・うち4xx probe 2%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}
