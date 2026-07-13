@@ -1,0 +1,35 @@
+[{:adr/id "adr-2607131400-ghosthacker-cljc-migration-svelte-go-prune-scoping"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607131400: Ghost Hacker cljc 移行スコーピング — Svelte/Go は「古い」ではない、段階移行を提案"
+  :adr/topic "ghosthacker-cljc-migration-svelte-go-prune-scoping"
+  :adr/status "proposed"
+  :adr/date "2026-07-13"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for ["ghosthacker apps/* migration scope decision (image-gen only, first pass)"
+                          "verdict on svelte5/go1.25 being current, not legacy"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related ["adr-2607022400"]
+  :db/id -1
+  :adr/decision-summary
+  "{:trigger \"owner request: 'svelte, go は古いので prune, typescript, python は cljc に移行して, py, ts は除去'\",
+    :fact-check {:svelte \"5.0.0 (@sveltejs/kit ^2.0.0) — current major, not legacy\",
+                 :go \"1.25.0 — current stable, not legacy\",
+                 :verdict \"'古いので' premise does not hold; framed as architecture-unification decision instead\"},
+    :inventory {:apps-server \"Go, ConnectRPC (proto/storyboard.proto + storyboardpbconnect), real Dapr actors/workflows/activities (internal/dapr/{actors,workflows,activities}.go) — cuelang declared in go.mod but zero .cue files found (vestigial?)\",
+                :apps-web \"Svelte 5 + SvelteKit 2, ConnectRPC-web client, Lexical rich-text editor, Skeleton UI, Melt UI\",
+                :apps-image-gen \"Python, 3 files\",
+                :dir-260122-presentation \"Svelte/Vite presentation app, purpose unaudited\",
+                :dir-260123-jump \".edn x142, pure story/character data, not executable code — out of scope\",
+                :cljc-clj-cljs-count 0 :datascript-datomic-count 0},
+    :feasibility {:image-gen \"HIGH — direct precedent this session: mangaka.comfy/render-via-murakumo (cloud-murakumo native ComfyUI protocol), merged gftdcojp/ai-gftd-mangaka PR\",
+                  :dapr-actors-workflows \"LOW/UNKNOWN — no cljc-native distributed actor/workflow runtime exists in this monorepo; langgraph-clj StateGraph is single-process graph exec, not Dapr's distributed/sidecar model\",
+                  :connectrpc \"no cljc/ClojureScript ConnectRPC implementation precedent in this monorepo\",
+                  :lexical-richtext \"no cljc/ClojureScript equivalent exists\",
+                  :skeleton-melt-ui \"theoretically replaceable by kotoba-ui, but moot while Lexical dependency remains\"},
+    :decision {:do-now \"migrate apps/image-gen (3 python files) to cljc + cloud-murakumo; remove those 3 .py files only after migration lands\",
+               :do-not \"delete apps/server (Go) or apps/web (Svelte) wholesale — no working cljc replacement exists for Dapr actors/workflows, ConnectRPC service, or Lexical editor; deleting now would destroy working storyboard-editor backend+frontend with no replacement\",
+               :follow-up \"a future ADR must first settle (a) cljc-native Dapr actor/workflow replacement and (b) Lexical-equivalent rich-text editing, before any further Go/Svelte pruning is considered\",
+               :side-note \"apps/server's cuelang dependency has zero .cue files in-repo — flagged as possibly vestigial, not itself a decision of this ADR\"}}"}]
