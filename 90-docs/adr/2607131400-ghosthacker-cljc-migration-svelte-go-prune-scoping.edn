@@ -18,7 +18,7 @@
     :fact-check {:svelte \"5.0.0 (@sveltejs/kit ^2.0.0) — current major, not legacy\",
                  :go \"1.25.0 — current stable, not legacy\",
                  :verdict \"'古いので' premise does not hold; framed as architecture-unification decision instead\"},
-    :inventory {:apps-server \"Go, ConnectRPC (proto/storyboard.proto + storyboardpbconnect), real Dapr actors/workflows/activities (internal/dapr/{actors,workflows,activities}.go) — cuelang declared in go.mod but zero .cue files found (vestigial?)\",
+    :inventory {:apps-server \"Go, ConnectRPC (proto/storyboard.proto + storyboardpbconnect), real Dapr actors/workflows/activities (internal/dapr/{actors,workflows,activities}.go), cuelang used for real (see addenda — corrected from initial vestigial-suspicion)\",
                 :apps-web \"Svelte 5 + SvelteKit 2, ConnectRPC-web client, Lexical rich-text editor, Skeleton UI, Melt UI\",
                 :apps-image-gen \"Python, 3 files\",
                 :dir-260122-presentation \"Svelte/Vite presentation app, purpose unaudited\",
@@ -39,4 +39,8 @@
     :discovery \"kotoba-lang/murakumo (the murakumo-family common lib, ADR-2607041302) already has murakumo.infer.media + murakumo.infer.gateway implementing exactly this — SSH-dispatched ComfyUI render farm with real crash-recovery (consecutive-miss detection, /queue cross-check for a crashed-and-respawned ComfyUI process that lost its in-memory queue/history — the same class of gad crash diagnosed live this same day in the ai-gftd-mangaka session)\"
     :corrected-decision \"apps/image-gen-clj now delegates fleet dispatch to kotoba-lang/murakumo (murakumo.infer.media/.gateway/.fleet/.schedule) instead of calling gftdcojp/cloud-murakumo directly — removes duplicated retry/job-building logic\"
     :fleet-change \"registered gad in kotoba-lang/murakumo's fleet.edn (wasn't a fleet member before; scheduler would have picked a Mac mini at ~3min/image instead of gad's ~20s) and fixed a comfyui/ vs ComfyUI/ scp path-casing bug specific to gad's case-sensitive Linux filesystem (symlink fix on gad itself, no code change)\"
-    :verified \"murakumo.infer.gateway/generate-image! end-to-end: scheduler correctly picked gad, 21s, real image, correct dims/style composition\"}]}]
+    :verified \"murakumo.infer.gateway/generate-image! end-to-end: scheduler correctly picked gad, 21s, real image, correct dims/style composition\"}
+   {:date \"2026-07-13\"
+    :trigger \"follow-up close-out: verify the cuelang vestigial-dependency suspicion flagged in the original decision\"
+    :finding \"cuelang is NOT vestigial — real, direct (non-indirect) go.mod dep, actually imported and used. internal/schema/storyboard.cue.go embeds the CUE schema as a Go string literal (StoryboardSchema, GetSchema() cue.Value) rather than a standalone .cue file — that's why the original 'zero .cue files' check found nothing; it checked the wrong artifact. internal/service/storyboard.go's validateAndLoad genuinely runs cueCtx.CompileBytes -> Unify(schema) -> Validate(cue.Final()) on storyboard JSON at runtime.\"
+    :correction \"do NOT remove cuelang / do NOT run go mod tidy on this dep — would break the build and remove real schema validation. Follow-up item closed.\"}]}]
