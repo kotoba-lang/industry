@@ -9,7 +9,7 @@
 
 `com-junkawasaki/ghosthacker`（Ghost Hacker、既存IP、本セッションのmanga量産作業とは別スコープ）の技術構成を調査した結果:
 
-- `apps/server/`: **Go 1.25**（最新安定版）。ConnectRPC（`proto/storyboard.proto` + 生成済み `storyboardpbconnect`）+ **Dapr Actors/Workflows/Activities**（`internal/dapr/actors.go` / `workflows.go` / `activities.go` —実際に使われている、名前だけの依存ではない）。`cuelang` は go.mod に依存宣言があるが `.cue` ファイルは repo 内にゼロ（vestigial/未使用の可能性）。
+- `apps/server/`: **Go 1.25**（最新安定版）。ConnectRPC（`proto/storyboard.proto` + 生成済み `storyboardpbconnect`）+ **Dapr Actors/Workflows/Activities**（`internal/dapr/actors.go` / `workflows.go` / `activities.go` —実際に使われている、名前だけの依存ではない）。`cuelang` も go.mod に直接依存として宣言・実使用（`internal/schema/storyboard.cue.go` にGo文字列リテラルで埋め込んだスキーマを `internal/service/storyboard.go` がJSONバリデーションに使用、後日追跡調査で確認——初回調査時は standalone `.cue` ファイルの有無だけを見て vestigial 疑いと誤判定していた）。
 - `apps/web/`: **Svelte 5.0 + SvelteKit 2.0**（最新）。ConnectRPC-web クライアント + **Lexical**（リッチテキストエディタ）+ **Skeleton UI** + **Melt UI**。
 - `apps/image-gen/`: Python 3ファイル、画像生成サービス。
 - `260122-presentation/`: Svelte/Vite プレゼンテーションアプリ。
@@ -43,7 +43,13 @@ CLAUDE.md 既存原則「既存の専用実装は後から書き直さない。�
 1. **`apps/image-gen/` の Python 3ファイルを cljc + `cloud-murakumo` 経由に移行する**（第1弾、実現可能性が確認済みのスコープのみ）。移行後、この3ファイルのみ `.py` を除去する。
 2. **`apps/server`（Go 全体）と `apps/web`（Svelte 全体）は削除しない。** Dapr actor/workflow・ConnectRPC・Lexical の cljc 代替が実在しない状態で削除すれば、動いている storyboard editor（バックエンド全体・エディタ機能）が失われる。
 3. Go/Svelte を将来的にどうしても cljc へ統一したい場合は、**Dapr actor/workflow の cljc 代替方針**と**Lexical 相当のリッチテキスト編集の代替方針**を別ADRで先に決定してから着手する（今回のADRのスコープ外）。
-4. `apps/server` の `cuelang` 依存（`.cue` ファイル実体ゼロ）は移行と無関係に vestigial dependency の疑いがあるため、別途確認・報告する（本ADRの決定事項ではない、次アクションとして記録のみ）。
+4. ~~`apps/server` の `cuelang` 依存（`.cue` ファイル実体ゼロ）は vestigial dependency の疑い~~ →
+   **訂正（追跡調査済み）**: `cuelang` は実際に使われている。`.cue` 拡張子のファイルが無いのは、
+   CUEスキーマが `internal/schema/storyboard.cue.go` にGo文字列リテラルとして埋め込まれている
+   ためで（standalone `.cue` ファイルではない、という単純な見落とし）、`internal/service/
+   storyboard.go` の `validateAndLoad`（`cueCtx.CompileBytes` → `Unify` → `Validate(cue.Final())`）
+   がストーリーボードJSONの実スキーマ検証に使っている。go.mod でも indirect マーク無しの直接依存。
+   **vestigialではない、削除しない（`go mod tidy` 禁止）。** この follow-up 項目は解決済みでクローズ。
 
 ## Consequences
 
