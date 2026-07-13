@@ -445,3 +445,34 @@ net-kotobase / cloud-murakumo / nexus-x402）で判明した未反映 surface �
   不可）— owner 判断は「CI 不要」（2026-07-13）。local bb gates が正式な検証経路。
 - 一連の UI/UX トポロジー整備はこれで完遂: 基盤（hig tokens / @layer / shell /
   theme / paved road docs+skill）+ 13 surface の本番反映 + gftd.ai 世代交代。
+
+## Addendum (2026-07-14): refresh sweep — 本番ポートフォリオ 73.8 → 98.6（13/14 surface が 100.0）
+
+design-quality CLI による本番スコアカード（2026-07-13）が示した「移行時点の旧ライブラリ
+で生成されたまま」のギャップ（viewport-fit / all-edge safe-area / dvh / theme-color /
+44px tap-targets）を、全 surface の再生成+再デプロイで解消した:
+
+- **着地 9 repo**: net-babiniku(100.0)・net-kotobase 4面(100.0)・cloud-manimani(100.0)・
+  cloud-itonami 4面(100.0、4ソースに viewport-fit + media-gated theme-color pair を追記)・
+  slides(100.0、docs shell を ->page 化 + 不要な html 直依存を除去)・ai-gftd-apex 2面
+  (100.0)・network-isekai 7 shell(100.0)・nexus-x402(+x402-directory template に
+  viewport-fit/theme-color pair/safe-area/overflow guard/≤480px responsive を追加、
+  100.0)。すべて deploy 済み・live 再スコアで確認。**aggregate 73.8 → 98.6**。
+- **残 1**: kotoba EDA workbench（80.6）— 箱の load average 200-800 が続き
+  shadow-cljs の par-compile が繰り返しタイムアウトするため defer（再生成手順は
+  確立済み: kotoba repo docs/eda の shadow build + `clojure -M:build`、head ソースに
+  同じ meta 追記）。murakumo.cloud は並行セッションの本番上書き（別 landing を
+  deploy）が未解決のため対象外のまま — repo main は移行版、live は非移行版という
+  乖離が継続中（owner 調整待ち）。
+- **インシデント記録（正直に）**: pin 前進時、merge 結果の短縮 SHA (8桁) から残り
+  32 桁を**捏造した full SHA を 2 件 main に書いた**（network-isekai /
+  x402-directory）。`verify-west-pins` が「pin が上流に存在しない」で即検出し、
+  実 SHA で 5 分以内に修正（`6dbc5846`/`ba75771c`）。教訓: 短縮 SHA は必ず
+  `gh api .../commits/main --jq .sha` で full 化する。検証 gate が
+  ADR-2607022900 の設計意図どおり機能した実例でもある。
+- **運用知見**: 並列 5 agent × JVM/shadow/Playwright はこの箱では load 800 に達し
+  stall/TLS timeout を誘発 → 途中から直列化 + 完成品先行着地に切替。agent が
+  「background 待ち」で turn を終える無限待ちパターンには「foreground で完遂せよ」
+  の再指示が必要（3 agent で発生）。shadow-cljs の
+  `aborted par-compile ... still waiting` は負荷起因で、`--config-merge
+  '{:build-options {:par-timeout 300000}}'` で回避できた。
