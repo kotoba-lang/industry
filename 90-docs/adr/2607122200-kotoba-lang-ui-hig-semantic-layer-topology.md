@@ -271,3 +271,35 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
   （greenfield）、cloud-itonami scoped routes、slides の browser hydration
   adapter（新機能扱い）、mono font token の追加（slides が opt-out で手書きした
   `#deck-edn` の font stack を token 化する）。
+
+## Addendum (2026-07-13, 第3弾): 残 follow-up 消化 — mono token・kotobase.net landing・itonami scoped routes
+
+- **`--hig-font-*` トークン**（shitsuke PR #5、main `35099a7`、pin `d56e171a`）:
+  text/display/mono の 3 スタックを `:hig/font` token group として CSS vars 化、
+  base-css は var 参照へ（resolved 値同一をテストで担保）、`.hig-mono` utility 追加。
+  slides の opt-out 手書きを retire（PR #6、main `bbbb180`、pin `c15b4615`）。
+- **kotobase.net landing 移行**（net-kotobase PR #193、main `6769173`、pin
+  `8662df15`、Worker デプロイ・live 検証済み）: 手書き 122 行/15 hex →
+  `->page` + shell 生成（chrome hex 0）、uikit binding、theme
+  `{:accent "#0f766e" :accent-dark "#5eead4" :appearance :auto}`。in-flight branch
+  `feat/kotobase-site-cljc-html-css` は既 merge（PR #144）と判明し、その
+  pipeline 構造は継承・styling 層は paved road で置換。**drift 修正**: 廃止済み
+  ipfs.gftd.ai gateway を宣伝し続けていた production copy を、`site_page.cljc` の
+  修正済みソースから再生成して解消。これで ADR-2607022800 の 7 サイト計画のうち
+  実移行可能な対象はすべて paved road 上（残: isekai=WebGPU 要別判断、
+  gftd.ai=greenfield、manimani=frontend なし）。
+- **cloud-itonami scoped routes**（PR #395、main `0385f05`、pin `2ac1185b`、
+  Pages デプロイ・live 検証済み）: `/isco-1212` は手書き HTML → `:site` 生成へ
+  昇格（WebAuthn/CACAO スクリプトは byte-identical 抽出、23 の getElementById
+  契約保全）、`/marketplace` は markup を `site/marketplace.cljc` に共有化
+  （nbb 生成者の役割は data のみに）。chrome hex 15+16→0。`local/index.html` の
+  乖離は一方向（未コミットのソース編集）と判明し union-merge で
+  `local_shell.cljc` を byte-identical に整合（テーマ移行はせず — dev-http 静的
+  root で theme.css 経路なし、理由付き現状維持）。**ブラウザ検証が実バグ 2 件を
+  検出・修正**（`#authed-sections` の id specificity が `.hidden` toggle に勝ち
+  サインイン前にゲート区画が見えていた / `box-sizing` 欠落）。
+  **危険な罠も記録**: 共有 `industry` checkout が 3 entries 遅れており、ローカル
+  registry からの再生成は ISIC 3 件を静かに落とすところだった — 生成系は
+  GitHub HEAD の registry を正とすること。
+- pin 検証 4/4 OK（shitsuke/slides/net-kotobase/cloud-itonami、+ mono 分含め
+  本 batch 計 5 commit）。
