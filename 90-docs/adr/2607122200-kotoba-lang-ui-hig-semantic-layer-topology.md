@@ -345,3 +345,34 @@ net-kotobase / cloud-murakumo / nexus-x402）で判明した未反映 surface �
 - 残 gap（棚卸しより）: ai-gftd-apex（liquid-glass 直載せ→kotoba-ui 化、L +
   viewer S）、cloud-itonami `/local/` shell+keiei 画面（M、operator 面）、
   cloud-manimani landing（greenfield、要否オーナー判断）。
+
+## Addendum (2026-07-13, 第5弾): apex chat + itonami local shell — 棚卸しの移行可能 surface を完遂
+
+- **ai-gftd-apex（gftd.ai apex chat）移行**（PR #7、main `2d139e8`、pin
+  `54e4de0a`、Pages デプロイ・live 検証済み）: liquid-glass 直載せ（opt-out 構成）
+  → kotoba-ui + uikit 単一エントリへ。style.css 290→84 行、hex 7+13→0、runtime
+  CSS 注入 → 静的 theme.css、手維持 dark パレット削除（`:auto` tokens が代替）。
+  theme `{:accent "#1a56db"(既存 brand) :accent-dark "#0a84ff"}`。**main に潜んで
+  いた実バグ 5 件を発見・修正**（送信/ストリーム済みメッセージが一切表示されない
+  create-class の deref 位置バグ / panel 子要素の IFn 誤呼び出しクラッシュ / cljs
+  `str/split` の capture-group 重複 / model-picker handler 未接続 / React 18
+  createRoot + 非同期 dispatch での交互 keystroke 喪失 → `dispatch-sync` 化）。
+  実 Chromium 26/26。共有 checkout の並行 WIP（viewer.js、未 commit）は deploy
+  時に補完して本番から消さないよう保全。
+- **cloud-itonami `/local/` shell + keiei 運営画面移行**（PR #396、main
+  `41223c61`、pin `ae3c7cf9`。`public/` 出力は byte 同一のため再デプロイ不要）:
+  手書きパレット 30 hex → 0（cockpit と同一 theme map を共有）。`local/` は独立
+  静的 root（dev-http / file:// / Tauri）のため theme bundle は**インライン**
+  （単一生成ファイルパターン）。`.keiei-screen__*` 等の class 契約・CLJS app の
+  id ターゲットは全て不変。status 色は cockpit と同じ HIG palette 意味論
+  （approve=green / reject=red / warn=orange）。実 Chromium で shell + keiei
+  両画面 boot・light/dark・320px・20 サンプル ≥4.5:1 を確認。
+- **sibling 鮮度修正**: `kotoba-lang/unspsc` の共有 checkout が 28 commits 遅れで
+  cloud-itonami の `bb test` を壊していた（`kotoba.unspsc.product` 不在）→
+  checkout 最新化 + pin 前進（`061432ed`、verify OK）。
+- **これで 2026-07-13 の 6 リポ監査で挙がった「移行可能な未反映 surface」は
+  すべて paved road 上**。残るのは意図的除外のみ: cloud-manimani landing
+  （frontend 自体が不在 = greenfield、作る/作らないはオーナー判断待ち）、
+  isekai.network（WebGPU+collab 結合、要別スコープ判断）、gftd.ai chat の
+  custom domain 切替（apex は pages.dev 稼働中、ドメイン移行は別作業）、
+  slides browser hydration adapter（新機能扱い）。
