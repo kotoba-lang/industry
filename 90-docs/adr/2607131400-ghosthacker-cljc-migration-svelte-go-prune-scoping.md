@@ -50,3 +50,27 @@ CLAUDE.md 既存原則「既存の専用実装は後から書き直さない。�
 - Ghost Hacker の Go バックエンド・Svelte フロントエンドは現状維持——「動いているものを、代替手段のないまま壊す」を回避する。
 - image-gen のみ、本セッションで確立した `cloud-murakumo` 連携パターンをそのまま再利用でき、低リスクで cljc 化できる。
 - Dapr/ConnectRPC/Lexical の cljc 代替が無いという事実がこのADRで明文化されたことで、将来「なぜ全面移行しなかったか」を再調査する必要がなくなる。
+
+## Addendum（2026-07-13 同日）— 共通lib化: `kotoba-lang/murakumo` へ委譲
+
+オーナー指示「apps image gen も kotoba-lang orgs に共通 lib として設計、移行」を受けて実装に着手したところ、
+`apps/image-gen-clj`（この ADR の初版で作成）が `gftdcojp/cloud-murakumo` を直接叩く実装だったのに対し、
+**`kotoba-lang/murakumo`（murakumo ファミリーの共通lib、ADR-2607041302で位置づけ済み）に、まさにこの用途の
+既存実装 `murakumo.infer.media` / `murakumo.infer.gateway` が既に存在すること**が判明した。しかも
+「ComfyUIプロセスがクラッシュして `/history` が空を返す」という、本セッションで実機デバッグして発見した
+不具合への対処（consecutive-miss検出、`/queue`とのクロスチェック、fast/slowポーリングバックオフ）が
+**既に本番レベルで実装済み**だった（コメント上に "observed live 2026-07-13" とあり、まさに同日発生した
+現象と一致）。
+
+**訂正した決定**: `apps/image-gen-clj` は `cloud-murakumo` への直接依存を止め、`kotoba-lang/murakumo` の
+`murakumo.infer.media`/`.gateway`/`.fleet`/`.schedule` に委譲する（重複実装の解消）。実機で `gad`（高速
+ROCmノード、~20秒/枚）が `kotoba-lang/murakumo` の `fleet.edn`（mesh 12ノードの棟）に未登録だったため、
+同リポジトリに登録した（既存ノードは Mac mini/MPS で ~3分/枚、9倍遅い）。登録の過程で
+`run-job!`/`run-custom-workflow!` が想定するリモートパス `comfyui/output/`（小文字）と gad の実際の
+インストールパス `~/ComfyUI`（大文字、Linuxは大文字小文字を区別）の不一致も発見・解消済み（gad側に
+シンボリックリンクを追加、コード変更なし）。
+
+検証済み: `murakumo.infer.gateway/generate-image!` 経由で実行 → スケジューラが正しく `gad` を選択 →
+21秒で実画像生成に成功。`apps/image-gen-clj/generator.clj` は現在、スタイルプリセット/アスペクト比の
+合成（Ghost Hacker固有のプロダクト関心）のみを持ち、フリートディスパッチ自体は一切実装しない
+（`kotoba-lang/murakumo` に委譲）。
