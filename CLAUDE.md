@@ -503,6 +503,60 @@ kotoba-lang の design system スタック（`shitsuke.hig` HIG semantic tokens 
 戦争をしない）、layout は `kotoba-ui.shell` から組む（`.layout`/`.hero` 手書き禁止）。
 詳細は ADR-2607122200。
 
+## UI/UX 品質の数値化 — design-quality-score（2026-07-13、ADR-2607132300）
+
+**`uikit`/`appkit`/`kotoba-ui`/`liquid-glass-ui` の UI/UX 品質を数値で把握・比較したい
+ときは、新しい仕組みをゼロから作る前に `90-docs/design-quality/` の既存 EDN を必ず
+確認する。** 正本は `90-docs/design-quality/design-quality.datoms.edn`（schema +
+`:lib/*`/`:axis/*`/`:sample/*` catalog、DataScript/Datomic にそのまま transact/query
+可能）+ `90-docs/design-quality/design-quality-ledger.edn`（append-only スコアイベント、
+BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記のみ）。両ファイルは
+既定の sparse-checkout から除外されている可能性がある —
+`git sparse-checkout add 90-docs/design-quality` で明示的に取得してから触る。
+
+- **3層スコアリング**: (1) `:lint` 層（0–1、grepベース決定論的 — token-compliance /
+  dark-mode-coverage / single-entry-discipline）(2) `:llm-judge` 層（1–5、Apple HIG
+  由来 clarity/deference/depth + consistency + token-discipline、**3体の独立judgeの
+  平均+標準偏差**を記録 — 単一judgeは合意の弱い箇所を隠す、実際 liquid-glass-ui の
+  deference 軸で judge 間 stdev 0.50 の disagreement が実測された）(3)
+  `:sample-visual` 層（1–5、`90-docs/design-quality/samples/` の実レンダリング済み
+  サンプルページをスクリーンショットして視認採点。初回は3-judge panelでなく
+  オーケストレータ単発1パス・hero/nav部分のみ視認という限界あり、ledger note に
+  明記済み — 数値を見るときはこの層の note を必ず読み、library score 層と同等の
+  厳密さがあるかのように扱わない）。
+- **再実行**: `Workflow({name: 'design-quality-score'})`（`.claude/workflows/
+  design-quality-score.js` に保存済み、lib score 層のみ再実行し ledger に追記する。
+  sample-visual 層は現状ワークフロー化されておらず手動パス — 3-judge visual panel
+  化は follow-up、ADR-2607132300 Alternatives 参照）。
+- **サンプルページの再生成**: `nbb --classpath "orgs/kotoba-lang/shitsuke/src:
+  orgs/kotoba-lang/css/src:orgs/kotoba-lang/liquid-glass-ui/src:orgs/kotoba-lang/
+  kotoba-ui/src:orgs/kotoba-lang/uikit/src:orgs/kotoba-lang/appkit/src"
+  90-docs/design-quality/samples/generate-samples.cljs`（`kototama/web/generate.cljs`
+  と同型の nbb multi-dir `--classpath` パターン。ライブラリの `.cljc` を編集も破壊も
+  しない、読み取り専用の消費者として使う）。
+- **この macOS 環境でブラウザを操作するときの既知ハザード**: 多数の並行 Claude Code
+  セッションが同一マシン上でフォーカスを奪い合う（`computer-use` skill既知）。
+  Chrome は既定で「Apple Events からの JavaScript の実行」が無効なので
+  `execute javascript` 経由のスクロールは失敗する — キー入力に頼らず
+  `set URL of active tab of front window` / `target_app` screenshot の
+  app-scripting 経路のみで完結させる。
+- **Co-Scientist kaizen loop（2026-07-13追記）**: `:llm-judge` 層（主観採点、単一judge
+  やLLM panelは「計測されないメトリクス＝劇場」になりうる — 実測: liquid-glass-ui等の
+  4ライブラリを3-judge panelが clarity/deference/depth等で軒並み4.0–5.0/5と採点した裏で、
+  tap-target min-height欠如・dvhフォールバック欠如・safe-area片側未対応・theme-color
+  meta欠如という4つの具体的ギャップを3体とも一つも指摘していなかった）を補う
+  **決定論的 fitness function** が `90-docs/design-quality/audit.cljc`（LLM/browser不要、
+  regexベース、`orgs/gftdcojp/network-isekai` の `isekai.ux.audit`／ADR-0007 からの移植）
+  として存在する。Co-Scientist loop 本体（Generate→Reflect→Rank(Elo)→Evolve→Meta）は
+  `90-docs/design-quality/coscientist.cljc`（同 `isekai.ux.coscientist` 移植、
+  langchain-clj依存なしのoffline/heuristic版）で、`bb`から `kaizen-cycle` を呼ぶと
+  `90-docs/design-quality/coscientist/iteration-NN.md` を生成する。この co-scientist
+  パターン自体の原典は `90-docs/adr/2606141500-keiei-arbor-coscientist-engine.md`。
+  **UI/UXに限らず「品質を測って改善ループを回したい」タスクでは、まず
+  `orgs/gftdcojp/network-isekai` の `90-docs/coscientist/` と `ADR-0007` 系（同type の
+  ADRが `ai-gftd-shinshi`/`ai-gftd-yukkuri`/`ai-gftd-apps-gftdcojp` 等にも複数存在、
+  `grep -rl coscientist 90-docs/adr` で一覧できる）を確認し、ゼロから設計しない。**
+
 ## `.cljc` / `.kotoba` ランタイム優先順位（2026-07-10 改訂。2026-07-07 改訂・初版は2026-07-06）
 
 - **repo wide のルール: app の互換性と「第一の runtime」の順序は
