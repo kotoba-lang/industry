@@ -409,3 +409,39 @@ net-kotobase / cloud-murakumo / nexus-x402）で判明した未反映 surface �
   display-scale type tokens（>34px の hero clamp 用）、gftd.ai custom domain の
   apex 切替、slides hydration adapter、network-isekai repo の GitHub Actions
   有効化（bb-gates が CI で走らない — repo 設定判断）。
+
+## Addendum (2026-07-13, 第7弾・最終): display tokens・slides live editor・isekai re-key・gftd.ai 世代交代 — 全 follow-up 完遂
+
+- **`.hig-display1/2/3` fluid display tokens**（shitsuke PR #6、main `73a68a1`、
+  pin `bd8b0d7f`）: `clamp()` ベースの流体 display scale（64/48/40px max、
+  min=62.5%、line-height `calc(1em+4px)` で流体追従）。Apple 11-style 契約は不変
+  （別 map で合成）。
+- **slides browser hydration adapter**（PR #7、main `a579a07`、pin `1f66c87b`、
+  Pages 反映済み — **本番の editor が実際に操作可能に**）: `slides.web.client`
+  （React 18 createRoot replace-render、marker `ssr`→`live`）+ delegated
+  `data-act` dispatch（`dispatch.cljc`、JVM 100% coverage）+ `enhance.cljc`
+  （`:value` controlled fields に `:on-change` を client 側で付与 — SSR は fn attr
+  を見ない）。keystroke 完全性は `dispatch-sync` + `r/flush` で 5ms burst 喪失ゼロ
+  （plain dispatch と dispatch-sync 単体の両方が実測で欠落 — 記録）。drag/resize/
+  nudge/Delete/undo/redo/zoom/EDN apply/DL/import まで配線。bundle 466KB
+  (:advanced)。旧「no-JS artifact」設計の逆転は owner 指示によるものとして
+  test/commit に明記。本番 E2E 20/20。
+- **network-isekai chrome deep re-key**（PR #150、main `776c6e2`、pin `d472bef4`、
+  Pages 反映済み）: studio tabs/docks・play AI panel 等の reagent chrome を
+  kotoba-ui components + `.hig-*` に、hero は新 `.hig-display` へ。renderer/
+  collab/canvas 不変 — baseline-vs-after 28 runs × 2 で canvas rect byte 同一、
+  console 404 は baseline 再実行でも再現する既存 flaky と実証、`bb ux-audit`
+  100.0/100・findings 0。（作業 agent が session/weekly limit で 2 度中断 →
+  main session が worktree を引き継ぎ、harness の typo（`.type'` interop）を
+  修正して監査・着地まで完遂。）
+- **gftd.ai 世代交代（owner 指示）**: apex（kotoba-ui 版 chat）が gftd.ai 本番に。
+  方式: wrangler OAuth が zone DNS 書込 scope を持たないため、**プロキシ Worker
+  `ai-gftd-apex-shell`**（ai-gftd-apex.pages.dev へ転送）を deploy し、既存
+  zone route `gftd.ai/*` を旧 `ai-gftd-chat-shell`（Vite 版、
+  ai-gftd-apps-gftdcojp 内にソース残存）から付け替え。DNS 不変・ロールバック =
+  route の script を戻すだけ（route id `5dcd78ea…`）。以後 apex の Pages deploy
+  がそのまま gftd.ai に反映。旧 Vite bundle の配信停止を live 確認。
+- **network-isekai の GitHub Actions は org レベルで無効**（repo API では変更
+  不可）— owner 判断は「CI 不要」（2026-07-13）。local bb gates が正式な検証経路。
+- 一連の UI/UX トポロジー整備はこれで完遂: 基盤（hig tokens / @layer / shell /
+  theme / paved road docs+skill）+ 13 surface の本番反映 + gftd.ai 世代交代。
