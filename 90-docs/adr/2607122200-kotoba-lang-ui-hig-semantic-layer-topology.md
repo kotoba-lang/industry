@@ -376,3 +376,36 @@ net-kotobase / cloud-murakumo / nexus-x402）で判明した未反映 surface �
   isekai.network（WebGPU+collab 結合、要別スコープ判断）、gftd.ai chat の
   custom domain 切替（apex は pages.dev 稼働中、ドメイン移行は別作業）、
   slides browser hydration adapter（新機能扱い）。
+
+## Addendum (2026-07-13, 第6弾・完結): manimani.cloud landing 新設 + isekai.network chrome 移行 — 対象 surface 全消化
+
+- **cloud-manimani landing（greenfield、オーナー指示 2026-07-13）**（PR #10、main
+  `3cd0223`、pin `58343720`、Worker デプロイ・live 検証済み）: `manimani.cloud/` が
+  JSON 404 → `->page` + shell + uikit の landing に。wrangler `[assets]` 追加で
+  static 優先 → API fallthrough（`wrangler dev` で / = HTML、/health = JSON を実証）。
+  llms.txt（kotobase 慣例の markdown twin）も新設。**コピーの誠実性**: 全主張を
+  README/実 route に紐付け、`routes.cljc` にあるが `worker.cljs` 未配線の
+  proposals/reviews は route 表に載せず Status で開示（`:site-test` が「live 9
+  routes のみ掲載」+ 生成物鮮度を assert）。accent は local-manimani の実 UI が
+  使う systemBlue 系（light は AA のため #0A66C2 に暗色化 / dark #0A84FF）。
+- **network-isekai chrome 移行（旧 opt-out のオーナー逆転指示 2026-07-13）**
+  （PR #148、main `6acff2c`、pin `43d2cff4`、Pages デプロイ・live 検証済み）:
+  7 ページ shell（index/play/studio/dance/assets/generate/preview）の hex
+  32/32/37/25/15/14/15 → 各2（`<meta theme-color>` のみ、var() 不可のため token
+  値ミラー）。theme `{:accent "#0071e3" :accent-dark "#2997ff" :appearance :auto}`
+  （light-first だった現デザインを維持しつつ dark を token で実装）。
+  **canvas 安全性を baseline diff で実証**: 全ページ × light/dark × 1440/320 で
+  canvas rect が移行前と byte 同一、canvas の祖先に backdrop-filter/filter/
+  transform ゼロ、新規 console エラーゼロ（/js/app.js 404 は main と同一の
+  既存事象）。deps.edn の「not the shitsuke/liquid-glass-ui」opt-out コメントは
+  逆転の記録に書き換え。副修正: `#seg button.on` の white-on-white と studio
+  非アクティブタブの2件のコントラストバグ。ux-audit gate 11/11 (100/100)。
+- **これで 2026-07-12 の当初依頼から始まる一連の UI/UX トポロジー整備は、監査で
+  特定した全 surface（12 プロダクト面）が paved road 上**: net-babiniku /
+  itonami cockpit+scoped+local / slides / EDA workbench / kotobase.net 4 ルート /
+  murakumo.cloud 全面 / x402.nexus(+lib fan-out) / apex chat+viewer /
+  manimani.cloud（新設）/ isekai.network 7 ページ。
+- 残 follow-up（小・別スコープ）: isekai の reagent chrome views の deep re-key、
+  display-scale type tokens（>34px の hero clamp 用）、gftd.ai custom domain の
+  apex 切替、slides hydration adapter、network-isekai repo の GitHub Actions
+  有効化（bb-gates が CI で走らない — repo 設定判断）。
