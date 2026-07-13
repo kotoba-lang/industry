@@ -203,3 +203,34 @@ github.token 制約）— ローカル `verify-west-pins.cljs` で 5/5 OK を確
 - net-babiniku/src/babiniku/ui/views.cljs 51-87 行（lg/text-field keystroke バグの実録）
 
 Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
+## Addendum (2026-07-13): appkit 実証例 landed — itonami.cloud cockpit 移行 + shitsuke 上流バグ根治
+
+- **shitsuke の同型 keystroke バグを根治**（PR #4、main `15b5337`、pin `dd8085f7`）:
+  `shitsuke.components` の form control 群を `:on-change` 契約へ（caller の `:on-input`
+  API は維持・reattach）、textarea `:value` を属性化、`shitsuke.hiccup/->html` は
+  textarea の `:value` 属性を escaped content として SSR する特殊処理を追加。
+  これで ADR-2607101000 系で記録した keystroke バグ族は上流・下流とも全て解消。
+- **appkit（desktop-dense）実証例第 1 号: itonami.cloud public cockpit 移行完了**
+  （gftdcojp/cloud-itonami PR #393、main `64f85c4`、pin `fcb96bde`、本番デプロイ・
+  live 検証済み — HTML 中 raw hex 0、theme.css 配信）: index.html 820→485 行、
+  raw hex 34→0、`kotoba-ui.core`+`appkit.core` 単一エントリ（appkit/panel
+  thick/flat ×16）、theme `{:accent "#0f766e"(既存 brand teal) :accent-dark
+  "#14b8a6" :appearance :auto}`（light/dark 両対応）、theme.css は既存 JVM `:site`
+  生成エントリポイントから emit（生成の原子性優先。nbb 別スクリプトより適合）。
+  実 Chromium 36/36（light/dark × 1440/320px、320px 横スクロールなし、glass +
+  HIG typography、hydration、JS エラー 0）。
+  net-babiniku（uikit/dark SPA）と合わせて **uikit・appkit 両バインディングの
+  実証が完了**。
+- 移行中の発見: checked-in の public/index.html と cljc ソースが**双方向に乖離**
+  していた（live のみに mamori case-room、ソースのみに ADR-0022 jobs 節）。union
+  merge で両方保全し、live 側 JS の `data.mamori-effects`（減算としてパースされ
+  ReferenceError）も実 API キー `mamoriEffects` へ修正。`local/index.html` の同種
+  stale と scoped routes（`public/isco-1212/`・`public/marketplace/` の独自 chrome）
+  は follow-up として PR #393 に記録。
+- 次候補（2026-07-13 調査のランキング）: ①kotoba EDA workbench（最高インパクト、
+  2D canvas + reagent 結合で大）②slides（既に shitsuke tokens、最小コスト）。
+  gftd.ai chat は greenfield（移行対象ではない）、manimani.cloud は frontend 実体
+  なし、isekai.network は WebGPU+collab 結合で高リスク・uikit 重複。
+- upstream 改善メモ: `kotoba-ui.shell/grid` が `:id` opt を受けないため JS 対象
+  グリッドで app-CSS ミラーが要った — shell 側で opts passthrough を広げる余地。
