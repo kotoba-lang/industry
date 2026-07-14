@@ -80,8 +80,8 @@
     (is (= :blueprint (industry/maturity "3812"))))
   (testing "cloud-itonami-isic-2011, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "2011"))))
-  (testing "cloud-itonami-isic-4321, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "4321"))))
+  (testing "cloud-itonami-isic-4321, now implemented, is :implemented (live-state corroboration)"
+    (is (= :implemented (industry/maturity "4321"))))
   (testing "cloud-itonami-isic-4322, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "4322"))))
   (testing "cloud-itonami-isic-5110, freshly published, is also :blueprint (live-state corroboration)"
