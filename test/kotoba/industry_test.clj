@@ -114,14 +114,14 @@
     (is (= :blueprint (industry/maturity "8130"))))
   (testing "cloud-itonami-isic-8121, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "8121"))))
-  (testing "cloud-itonami-isic-3312, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "3312"))))
+  (testing "a hundred-and-sixty-seventh implemented actor (cloud-itonami-isic-3312, machinery-repair actor) is also :implemented"
+    (is (= :implemented (industry/maturity "3312"))))
   (testing "cloud-itonami-isic-3313, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "3313"))))
   (testing "cloud-itonami-isic-1811, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "1811"))))
-  (testing "cloud-itonami-isic-1812, implemented, is :implemented (live-state corroboration)"
-    (is (= :implemented (industry/maturity "1812"))))
+  (testing "cloud-itonami-isic-1812, freshly published, is also :blueprint (live-state corroboration)"
+    (is (= :blueprint (industry/maturity "1812"))))
   (testing "cloud-itonami-isic-8220, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "8220"))))
   (testing "cloud-itonami-isic-8219, freshly published, is also :blueprint (live-state corroboration)"
@@ -447,11 +447,10 @@
       ;; 42 -> 41: cloud-itonami-isic-6120 promoted :blueprint ->
       ;; :implemented (spectrum-licensed mobile-network-operator actor,
       ;; mirroring cloud-itonami-isic-6190's module shape).
-      ;; 41 -> 40: cloud-itonami-isic-3510 promoted :blueprint ->
-      ;; :implemented (Grid Distribution Advisor ⊣ Grid Transmission
-      ;; Governor, electric-power transmission/distribution actor).
-      ;; 40 -> 39: cloud-itonami-isic-1812 promoted :blueprint ->
-      ;; :implemented (Print Support Services, pre-press/bindery actor).
+      ;; 41 -> 40 -> 39: cloud-itonami-isic-3510, then cloud-itonami-isic-3312
+      ;; promoted :blueprint -> :implemented (Grid Distribution Advisor ⊣
+      ;; Grid Transmission Governor, electric-power transmission/distribution
+      ;; actor; Machinery Repair Coordinator ⊣ Machinery Repair Governor).
       (is (= 39 (:blueprint m)))
       ;; 114 = 113 + cloud-itonami-isic-4620, promoted directly from
       ;; :spec (never a :blueprint) -- agricultural/live-animal
@@ -629,8 +628,7 @@
       ;; per ADR-2607142600. 2394/2620/2930/4741 promoted to :implemented
       ;; per ADR-2607142800's robotics-process-simulation value-chain
       ;; build-out (auto-parts/cement-mill/device-assembly/computer-retail).
-      ;; 166 -> 167: cloud-itonami-isic-1812 promoted :blueprint ->
-      ;; :implemented (Print Support Services, pre-press/bindery services actor).
+      ;; 3312 (Machinery Repair Coordinator) promoted to :implemented.
       (is (= 167 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step

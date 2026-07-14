@@ -3046,15 +3046,12 @@
    :business-id "cloud-itonami-isic-1311"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :implemented
-   ;; Promoted :blueprint -> :implemented as textile-mill operations actor
-   ;; (Textile Operations Advisor ⊣ Textile Mill Governor), wave-3 production
-   ;; complete: Governor with hard/soft gates (spec-basis, plant/batch verification,
-   ;; process-control block, quality-defect escalation), Advisor proposals (batch-logging,
-   ;; schedule-maintenance, flag-quality-defect, coordinate-shipment), state machine,
-   ;; regulatory facts, comprehensive test suite (36 tests). Domain boundary: logistics &
-   ;; compliance paperwork around textile production, NOT process engineering (spinning/
-   ;; carding control, fibre parameters remain engineer-exclusive). Modeled on 1910.
+   :maturity :blueprint
+   ;; Promoted :spec -> :blueprint in the 衣食住 scaffold batch
+   ;; (ADR-2607122200): blueprint repo published (Community Textile
+   ;; Spinning, :textile-spinning-governor), no actor implementation
+   ;; claimed — wave-3 robotics-gated per ADR-2607121000. Stale
+   ;; gftdcojp C-prefix :repo URL replaced by the real satellite.
    :operating-states [:intake :design :produce :inspect :package :audit]},
   {:id "1312"
    :name "Weaving of textiles"
@@ -3253,10 +3250,9 @@
    :name "Printing"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1811"
    :business-id "cloud-itonami-1811"
-   :maturity :implemented
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   ;; Promoted :blueprint -> :implemented (see `kotoba.industry/maturity-of`).
+   ;; Promoted :spec -> :blueprint (see `kotoba.industry/maturity-of`).
    ;; The legacy placeholder :repo (gftdcojp/cloud-itonami-C1811) never
    ;; actually existed (confirmed 404 before this edit) -- replaced with
    ;; the real repo, following the SAME cloud-itonami/cloud-itonami-isic-####
@@ -3290,8 +3286,7 @@
    :business-id "cloud-itonami-1812"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :implemented? true
-   ;; Promoted :spec -> :blueprint -> :implemented (see `kotoba.industry/maturity-of`).
+   ;; Promoted :spec -> :blueprint (see `kotoba.industry/maturity-of`).
    ;; The legacy placeholder :repo (gftdcojp/cloud-itonami-C1812) never
    ;; actually existed (confirmed 404 before this edit) -- replaced with
    ;; the real repo, following the SAME cloud-itonami/cloud-itonami-isic-####
@@ -3446,12 +3441,15 @@
    :business-id "cloud-itonami-isic-2100"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae :cfd]
    :optional-technologies []
-   :maturity :implemented
-   ;; Actor implementation shipped: gov.pharma-manufacturing with GMP compliance gates,
-   ;; batch registration validation, deviation escalation, and QP batch-release review
-   ;; coordination. Wave-3 robotics-gated (ADR-2607121000). Pharmaceutical manufacturing
-   ;; operations coordination (production logging, maintenance scheduling, deviation handling)
-   ;; with hard blocks on batch release (QP exclusive) and GMP certification (QP exclusive).
+   :maturity :blueprint
+   ;; Promoted :spec -> :blueprint in scaffold batch #2 (ADR-2607122600):
+   ;; blueprint repo published (Community Pharmaceutical Manufacturing,
+   ;; :pharma-manufacturing-governor), no actor implementation claimed —
+   ;; wave-3 robotics-gated per ADR-2607121000, batch release always
+   ;; :safety-critical. Closes the last scaffold gap from that ADR's
+   ;; follow-up list (食/衣/住 = ADR-2607122200; 6201/6311 own-sector
+   ;; shipped separately as :implemented). Stale gftdcojp C-prefix
+   ;; :repo URL replaced by the real satellite.
    :operating-states [:intake :design :produce :inspect :package :audit]},
   {:id "2211"
    :name "Manufacture of rubber tyres and tubes"
@@ -4304,7 +4302,8 @@
    :business-id "cloud-itonami-3312"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   ;; Promoted :spec -> :blueprint (see `kotoba.industry/maturity-of`).
+   :maturity :implemented
+   ;; Promoted :spec -> :blueprint -> :implemented (see `kotoba.industry/maturity-of`).
    ;; The legacy placeholder :repo (gftdcojp/cloud-itonami-C3312) never
    ;; actually existed (confirmed 404 before this edit) -- replaced with
    ;; the real repo, following the SAME cloud-itonami/cloud-itonami-isic-####
