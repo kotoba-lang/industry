@@ -440,3 +440,34 @@ seed はすべて vault 内に封緘され、このセッションのどこに�
   billing-head + keiei-head の実鍵・実 chain で成立する。残 follow-up:
   merge 署名 UI(WebAuthn)、chain の失効前再 mint 運用(≈2026-10-12)、
   kotobase replica、runner 常駐化(nbb)。
+
+## Addendum (2026-07-14, same day): M8 — runtime を JVM clojure から nbb/cljs へ(オーナー指示)
+
+オーナー指示「clojure じゃなくて nbb, cljs を想定」により、ops workflow の
+第一級 runtime を nbb(ClojureScript on Node)へ。ブロッカーだった署名検証
+スタックを upstream から cljc 化した:
+
+- **org-ietf-ed25519 `e96c4d03`** — core.clj → core.cljc。:clj は従来どおり
+  (pure BigInteger 導出 + JCA、bb 互換)。:cljs は node:crypto の**同期**
+  Ed25519(手組み PKCS8/SPKI DER + sign/verify(nil digest)) — Promise 感染
+  なし・npm 依存なし。b58 は BigInt を使わず古典 long-division(nbb の SCI に
+  `js*` が無いため)。**JVM と nbb が同一 seed/msg でバイト同一の決定論署名を
+  生成し相互検証**(committed `test/nbb_smoke.cljs`)。
+- **org-chainagnostic-cacao `b56f2431`** — core.clj → core.cljc(base64 =
+  Buffer / utf8 = TextEncoder / NonceStore を cljs.core/Atom にも extend)。
+  **JVM mint の 2-link 委任 chain が nbb の verify-chain で valid**、nbb mint
+  が JVM で valid、expiry / nonce-replay / resource-escalation はすべて nbb 側
+  でも拒否(committed `test/nbb_smoke.cljs`)。ed25519 pin も bump。
+- **cloud-itonami `6aa3bf01`** — ops-store(:cljs = Node sync fs、JVM と同一
+  ファイル形式で相互 load 可)、ops-keys 完全 portable(kagi = execFileSync)、
+  **`scripts/ops-cli.cljs`(nbb エントリ)+ `scripts/ops-classpath.sh`**:
+  propose / pending / merge / run-dry / receipts / keygen / mint-chain。
+  nbb 実 E2E: propose → PR ref → **nbb が mint した chain での署名 merge
+  (検証は nbb 上の node:crypto で本物)** → verified runner → receipt →
+  再実行 no-op、および owner 署名 + head chain(holder 不一致)の merge 拒否
+  (lane main 不動)まで確認。`@noble/hashes` は io-multiformats 自身の宣言済み
+  cljs 依存(sha256 CID)。
+- **残り(JVM に留まるもの)**: 実 Resend 送信と Datom store 投影は当面 JVM
+  runner コマンド(Node の fetch は Promise-only で、runner の同期契約を
+  意図的に維持しているため)。nbb 側での async 送信統合は follow-up。
+  kotoba-rad 自身の deps pin(ed25519 旧 sha)も機会あるとき bump。
