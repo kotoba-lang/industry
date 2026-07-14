@@ -3746,11 +3746,16 @@
    :business-id "cloud-itonami-2660"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies [:optimization]
-   ;; Published as a :blueprint repo (business-model.md + operator-guide.md +
-   ;; blueprint.edn + governance docs, no src/test yet -- the OSS blueprint
-   ;; stage, not yet :implemented). :maturity :spec explicitly removed so
-   ;; maturity-of/maturity now auto-derive :blueprint from the real :repo
-   ;; above (see `kotoba.industry/maturity-of`). The legacy placeholder
+   :maturity :implemented
+   ;; Published as an :implemented actor (full src/test, all governance gates,
+   ;; langgraph-clj StateGraph, append-only audit ledger, phase gates, Advisor ⊣
+   ;; Governor pattern). Operations coordination layer for medical device mfg:
+   ;; batch intake, maintenance scheduling, safety deviation escalation,
+   ;; device-release review requests (the qualified person performs actual review).
+   ;; CRITICAL SCOPE: Device release and regulatory certification are NEVER in
+   ;; this actor's authority; those are the qualified person's exclusive domain.
+   ;; All safety deviations escalate to human management; batches with unresolved
+   ;; deviations are permanently blocked. The legacy placeholder
    ;; :repo (gftdcojp/cloud-itonami-C2660) never actually existed (confirmed
    ;; 404 before this edit) -- replaced with the real repo, following the
    ;; SAME cloud-itonami/cloud-itonami-isic-#### naming convention as every
@@ -3761,10 +3766,10 @@
    ;; device MANUFACTURING, not a service. FIRST manufacturing-sector (not
    ;; services/dispatch) :spec-authoring pick this scope, following the
    ;; design->produce->inspect->package->audit lifecycle rather than the
-   ;; intake->dispatch->report shape of prior picks. No bespoke capability
-   ;; library exists for medical device manufacturing specifically
-   ;; (kotoba-lang/device is Kotoba's own generic hardware-capability
-   ;; layer for aiueos apps, unrelated). See ADR-2607100800.
+   ;; intake->dispatch->report shape of prior picks. Governance: 5 hard blocks
+   ;; (device release, regulatory cert, spec-basis, batch record, safety deviation)
+   ;; + 3 soft escalations (safety flagging, device-release review, low confidence).
+   ;; See ADR-2607100800.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2670"
