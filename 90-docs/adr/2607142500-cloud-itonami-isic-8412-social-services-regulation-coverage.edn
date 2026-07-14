@@ -1,0 +1,65 @@
+{:adr/id "2607142500"
+ :adr/title "Cloud-Itonami ISIC 8412 (Social Services Regulatory Administration) Coverage Implementation"
+ :adr/status :implemented
+ :adr/timestamp #inst "2026-07-15T01:00:00Z"
+ :adr/domain :cloud-itonami
+ :adr/context
+ {:problem "Regulatory agencies (health, education, social services licensing) manage hundreds of providers with manual spreadsheets or expensive closed SaaS"
+  :scope "ISIC Rev.5 8412 — regulation of health care, education, cultural services, social service providers"
+  :is-actor? true}
+ :adr/decision
+ {:langgraph-cljc-stategraph true
+  :advisor-protocol "swappable: mock-advisor (deterministic) or llm-advisor (LLM-backed)"
+  :governor-function "pure function, separate :govern node, hard invariants + escalation invariants"
+  :store-protocol "MemStore (in-memory) or Datomic/kotoba-server-backed"
+  :hardcoded-safeguards
+  {:provider-registration-required true
+   :no-actuation-only-propose true
+   :license-decisions-forever-forbidden true
+   :no-binding-determinations true
+   :no-protected-data-access true}
+  :escalation-invariants
+  #{:violation-flag :licensing-application :low-confidence}
+  :closed-allowlist
+  #{:register-provider
+    :schedule-inspection
+    :log-compliance-report
+    :draft-licensing-application
+    :flag-violation}}
+ :adr/reference-implementation
+ {:repo "cloud-itonami/cloud-itonami-isic-8412"
+  :url "https://github.com/cloud-itonami/cloud-itonami-isic-8412"
+  :maturity :implemented
+  :status :public-oss
+  :license "AGPL-3.0-or-later"
+  :src-paths ["src/regulation/store.cljc"
+              "src/regulation/advisor.cljc"
+              "src/regulation/governor.cljc"
+              "src/regulation/actor.cljc"]
+  :tests-paths ["test/regulation/governor_test.clj"
+                "test/regulation/actor_test.clj"]
+  :test-count 12
+  :test-assertions 41
+  :test-status :passing}
+ :adr/integration
+ {:registry "kotoba-lang/industry"
+  :isic "8412"
+  :entry-key "8412"
+  :entry-repo "cloud-itonami/cloud-itonami-isic-8412"
+  :entry-maturity :implemented}
+ :adr/design-principles
+ [:closed-allowlist
+  :advisor-governor-separation
+  :append-only-audit-ledger
+  :human-in-the-loop
+  :swappable-backend
+  :robotics-premise]
+ :adr/scope-boundaries
+ {:out-of-scope
+  #{:license-issuance
+    :license-suspension
+    :license-revocation
+    :binding-regulatory-determinations
+    :confidential-personal-data-access
+    :facility-inspections}}
+ :adr/addenda []}

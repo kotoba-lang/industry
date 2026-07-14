@@ -1,0 +1,62 @@
+{:adr/id "2607141100"
+ :adr/title "Cloud-itonami ISIC-08 0990 Mining Services Contractor Coordination Actor"
+ :adr/date "2026-07-14T11:00:00Z"
+ :adr/status :accepted
+ :adr/authors ["Jun Kawasaki" "Claude Sonnet 5"]
+ :adr/domain :cloud-itonami/occupation-blueprint
+ :adr/references ["ADR-2607011000" "ADR-2607062330" "ADR-2607062400" "ADR-2607100030"]
+ :blueprint/isic-08 "0990"
+ :blueprint/name "Mining Services Contractor Coordination"
+ :blueprint/id "cloud-itonami-isic-0990"
+ :blueprint/repo "https://github.com/cloud-itonami/cloud-itonami-isic-0990"
+ :blueprint/maturity :implemented
+ :blueprint/status :public-oss
+ :blueprint/license "AGPL-3.0-or-later"
+ :blueprint/social-impact [:safety :equipment-coordination :logistics-support]
+ :blueprint/domain :mining/support-services
+ :blueprint/robotics true
+ :blueprint/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
+ :governor/name "mining-services-governor"
+ :scope/in-scope
+ [:service-order-intake
+  :crew-dispatch-scheduling
+  :site-logistics-coordination
+  :safety-incident-logging]
+ :scope/out-of-scope
+ [:blasting-decisions
+  :extraction-sequencing
+  :mine-safety-authority
+  :equipment-operation
+  :hazmat-handling-authorization
+  :subsurface-geology-interpretation]
+ :governor/hard-invariants
+ [{:id :contractor-provenance
+   :description "contractor-id must be registered"}
+  {:id :site-provenance
+   :description "mine-site must be registered for dispatch/logistics ops"}
+  {:id :no-actuation
+   :description "effect must be :propose; no direct store writes"}
+  {:id :no-operator-class-ops
+   :description "any op in {:blast :extract :mine-safety-auth :excavate-sequence :ore-grade-assess :ventilation-auth :hazmat-handle :equipment-operation} instantly routes to :hold"}]
+ :governor/escalation-invariants
+ [{:id :safety-incident-logging
+   :description "all :log-safety-incident ops escalate to human"}
+  {:id :high-risk-site-dispatch
+   :description "dispatch to site with :risk-level :high escalates"}
+  {:id :low-confidence
+   :description "advisor confidence < 0.6 (LLM parse failures = 0.0) escalates"}]
+ :test-results
+ {:total-tests 10
+  :total-assertions 34
+  :failures 0
+  :errors 0
+  :test-namespaces
+  [{:name "mining-services.actor-test"
+    :tests 4}
+   {:name "mining-services.governor-test"
+    :tests 6}]}
+ :deployment
+ {:repository "cloud-itonami/cloud-itonami-isic-0990"
+  :visibility :public
+  :revision "main:cc903a6"
+  :pushed-at "2026-07-14T11:00:00Z"}}

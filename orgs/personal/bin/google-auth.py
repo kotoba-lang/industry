@@ -26,6 +26,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 BIN = os.path.dirname(os.path.abspath(__file__))
 SCOPES = " ".join([
     "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.compose",
     "https://www.googleapis.com/auth/calendar.readonly",
     "https://www.googleapis.com/auth/drive.readonly",
 ])

@@ -1,0 +1,41 @@
+{:adr/id "2607142400"
+ :adr/title "ISIC 8430 Social Security Administration Coverage"
+ :adr/date "2026-07-14"
+ :adr/status :decided
+ :adr/context
+ "Social security administration is a high-impact domain where automation must be exceptionally disciplined about safety and scope boundaries. ISIC 8430 encompasses benefits intake, eligibility documentation, payment record logging, and appeal intake. The pattern from ISIC 8422 (Defence Procurement) demonstrates how to build an actor that is operationally useful while maintaining strict hard invariants on what it does NOT do."
+ :adr/decision
+ {:summary "Adopt ISIC 8430 as an open occupation blueprint and cloud-itonami actor vertical"
+  :operations {:closed-allowlist [:intake-benefits-application
+                                   :verify-eligibility-checklist
+                                   :log-payment-record
+                                   :intake-appeal]
+               :permanently-forbidden [:claim-approval-denial
+                                       :benefit-amount-calculation-disbursement
+                                       :eligibility-determination
+                                       :appeal-decisions
+                                       :policy-decisions]}
+  :implementation {:advisor "proposes only four administrative operations from closed allowlist"
+                   :governor "enforces hard invariants (unregistered claimant, non-:propose effect, determination/disbursement proposals)"
+                   :store "append-only ledger, registered claimants, committed records"
+                   :actor "langgraph StateGraph with human-in-the-loop interrupt for appeals/low-confidence"}
+  :repository "https://github.com/cloud-itonami/cloud-itonami-isic-8430"
+  :maturity :implemented
+  :blueprint {:id "cloud-itonami-isic-8430"
+              :isic-rev5 "8430"
+              :domain :social-security/administration
+              :status :public-oss}}
+ :adr/rationale
+ ["Safety discipline: benefits delivery affects real livelihood; every determination must be human"
+  "Legal authority: only designated benefits officers can approve/deny benefits"
+  "No hidden bias: decisions must be explainable to the claimant"
+  "Auditability: appeals require a clear human decision-maker"]
+ :adr/consequences
+ ["Cloud-itonami now covers ISIC 8430"
+  "Hard invariants prevent claim approval/benefit determination (structural blocks)"
+  "Operators must maintain human approval process for appeals and low-confidence intakes"
+  "Actor is simpler and safer than eligibility-determining systems (pure gains)"]
+ :adr/reference-adrs ["2607142000-cloud-itonami-isic-8422-defence-procurement-actor"]
+ :adr/registry-entry {:isic-8430 {:maturity :implemented
+                                  :repo "cloud-itonami/cloud-itonami-isic-8430"
+                                  :domain :social-security/administration}}}
