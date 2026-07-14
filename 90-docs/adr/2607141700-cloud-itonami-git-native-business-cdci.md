@@ -313,3 +313,33 @@ ops-repo 自体の永続化・配布（現状は in-memory arrangement db。`rep
 block store 選定と kotobase replica 接続は M3）、cron/launchd での runner 常駐、
 lefthook deploy hook の runner 統合。org root key custody / merge 署名 UI も
 引き続き follow-up。
+
+## Addendum (2026-07-14, same day): M3 前半 — ops-repo のローカル永続化と mail-drain の git-first 切替
+
+cloud-itonami `28d6fb80`。
+
+- **`cloud-itonami.ops-store`** — kotoba-git の arrangement db(plain な
+  4-index 値)を 1 つの EDN ファイルへ round-trip(ipld Link と blob byte
+  array を walk でタグ化)。`store.cljc` と同じ file-backed local store 慣習。
+  **content-addressed 経路(`kotoba-git.repo/persist!` = ciphertext-over-CID
+  snapshot + block store + kotobase replica)は意図的に採らず M3 後半の
+  follow-up のまま** — drain ループに今日必要なのはローカル耐久性で、
+  後から save/load の差し替えで移行できる。
+- **`cloud-itonami.ops-drain`（`clojure -M:ops-drain <ops-repo.edn> <store.edn>
+  <records.json>`）** — drained KV records を git-first で処理する一気通貫:
+  propose-inbound!（受信=PR。**既存 proposal ref がある id は skip = 再 drain
+  冪等**）→ `:read-only` auto-merge（decision record 付き）→ verified/receipted
+  runner → store 投影（`mail/record->inbound` を `ingest-file!` から抽出して
+  同一変換を共有）。summary の `:failed` 非ゼロで exit 1（KV 鍵は温存）。
+- **`scripts/mail-drain.bb` を切替** — `-M:mail ingest`（store 直行）から
+  `-M:ops-drain`（git-first）へ。ops repo ファイルは `ITONAMI_OPS_REPO_PATH`
+  （既定 `<store>.ops-repo.edn`）。これで **本文 §1 の「メール受信 = PR の受信」
+  が実運用経路（Cloudflare KV → drain）で成立**。
+- テスト: ops-store round-trip（refs / decision / receipts / blob が生存、
+  load 後も dedupe 維持）+ drain E2E（2 records → PR×2 → merge → executed×2 →
+  store 投影一致 → 再 drain no-op）+ `drain!` のファイル永続化と冪等性。
+  3 tests / 23 assertions、スイート全体は baseline と同一（regression ゼロ）。
+
+**未達（M3 後半以降）**: content-addressed persist + kotobase private tenant
+replica、runner/drain の常駐化（cron/launchd routine 化）、org root key mint と
+custody、merge 署名 UI、read-only 以外の lane の実運用委任 chain mint。
