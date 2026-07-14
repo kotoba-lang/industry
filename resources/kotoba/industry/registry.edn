@@ -2785,13 +2785,17 @@
    :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "0710"
    :name "Mining of iron ores"
-   :repo "https://github.com/gftdcojp/cloud-itonami-B0710"
-   :business-id "cloud-itonami-B0710"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0710"
+   :business-id "cloud-itonami-0710"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :survey :extract :grade :ship :audit]},
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as an iron-ore-mining operations
+   ;; coordinator (IronOps-LLM ⊣ Iron Ore Governor), the ninetieth build
+   ;; in the cloud-itonami fleet. Scope: coordination only (logging,
+   ;; scheduling, flagging, shipment coordination), NOT extraction/blasting/
+   ;; safety-authority decisions. See ADR-2607141200.
+   :operating-states [:intake :verify :propose :resolved :hold]},
   {:id "0721"
    :name "Mining of uranium and thorium ores"
    :repo "https://github.com/gftdcojp/cloud-itonami-B0721"
