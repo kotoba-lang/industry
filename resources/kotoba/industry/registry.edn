@@ -7761,14 +7761,26 @@
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :register :decide :notify :appeal :audit]},
   {:id "8422"
-   :name "Defence activities"
-   :repo "https://github.com/gftdcojp/cloud-itonami-O8422"
-   :business-id "cloud-itonami-O8422"
+   :name "Defence procurement and logistics administration"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-8422"
+   :business-id "cloud-itonami-isic-8422"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :register :decide :notify :appeal :audit]},
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented: Defence Procurement Advisor ⊣
+   ;; Defence Procurement Governor actor (src/defence/*.cljc,
+   ;; test/defence/*), covering vendor verification, procurement request
+   ;; drafting, equipment maintenance scheduling, logistics coordination.
+   ;; Hard invariants: vendor registration, no direct actuation,
+   ;; scope boundary (weapons/personnel/classified operations permanently
+   ;; forbidden, structured via closed allowlist). Escalation invariants:
+   ;; budget commitment, procurement drafting, low confidence. 12 tests/33
+   ;; assertions run green before claiming :implemented, clj-kondo clean.
+   ;; See ADR-2607142000 for this repo's implementation details and
+   ;; cloud-itonami-isic-8422/docs/adr/0001-architecture.md for the
+   ;; closed-allowlist design rationale.
+   ;; ISIC Rev.5 class (4-digit) — procurement/logistics focus
+   :operating-states [:intake :advise :govern :decide :hold :commit :request-approval]},
   {:id "8423"
    :name "Public order and safety activities"
    :repo "https://github.com/gftdcojp/cloud-itonami-O8423"
