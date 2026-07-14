@@ -775,7 +775,26 @@
       ;; count-drift caution: 199 -> 200 confirmed by the test runner
       ;; itself (`expected: (= 199 (:implemented m)) actual: (not (= 199
       ;; 200))`), not by a static grep.
-      (is (= 200 (:implemented m))))))
+      ;; 200 -> 201: cloud-itonami-isic-0112 (Growing of rice) fresh
+      ;; from-scratch scaffold (entry pointed at a never-created
+      ;; gftdcojp/cloud-itonami-A0112 placeholder). RiceOpsAdvisor <->
+      ;; PaddyOperationsGovernor rice-paddy-operations-coordination actor
+      ;; mirroring cloud-itonami-isic-0111's [Growing of cereals, except
+      ;; rice] verified module shape, with a paddy-specific water-level
+      ;; validity check (water-level-invalid, mirrors 0111's
+      ;; field-record-invalid for acreage) and an :operate-irrigation-
+      ;; equipment hard block (flooding/drainage valves, pumps) added
+      ;; alongside the mirrored :operate-field-equipment /
+      ;; :finalize-pesticide-application blocks; 35 tests / 107
+      ;; assertions green, independently re-verified against a fresh
+      ;; clone; promoted :spec -> :implemented, superproject
+      ;; ADR-2607152600 (cloud-itonami-isic-0112-rice-growing-coverage.md).
+      ;; Live-recomputed via `(industry/maturity-summary)` immediately
+      ;; before this edit on a freshly re-fetched origin/main (201, after
+      ;; a first landing attempt hit a 409 because a sibling
+      ;; cloud-itonami-isic-0113 promotion landed first and bumped the
+      ;; baseline from 199 to 200).
+      (is (= 201 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
