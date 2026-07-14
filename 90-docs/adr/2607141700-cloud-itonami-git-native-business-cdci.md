@@ -627,3 +627,24 @@ cloud-itonami `a78e8d50`。live loop の唯一の「黙って死ぬ」経路 —
   週次)。運用は「10 月に通知が来たら rotate を打つ」だけ。
 - 成熟度表: 「expiry check の自動アラート化」follow-up を **完了**に。
   残 gap: kotobase replica / rad R2、merge 署名 UI、残 lane 委任、nbb 実送信。
+
+## Addendum (2026-07-14, same day): kotoba-rad R2 の暗号コアが着地 — private replica への道が開いた
+
+kotoba-rad `403d2b05`(ADR-2606280300 addendum 参照)。本 ADR の §2/§5 が
+「R2(object encryption)landed 後に暗号化 replication を解禁」と明記していた、
+その R2 の暗号コアが実装された:
+
+- `kotoba-rad.recipient-grant`: X25519 sealed box で epoch key を recipient
+  の X25519 pubkey に wrap、`rotate` で失効(= epoch rotation)。
+- `kotoba-rad.private-object`: AES-256-GCM で object bytes を封緘、
+  replication id = ciphertext CID(grant 無き peer は複製できても読めない)。
+- fully cljc、JVM⇄nbb クロス検証済み。
+
+これで ops-repo の private replica(§2 の kotobase private tenant を
+authoritative replica にしつつ P2P へ暗号化 object を配布)を組む土台ができた。
+**まだ残っているのは「本 ops-repo の各 object を private-object で封緘し、
+ciphertext を kotobase/P2P に置く storage-layer の配線」**(RecipientGrant を
+どの capability datom に紐付けるか含む)— R2 暗号プリミティブは揃ったので、
+これは crypto ではなく storage 統合の作業。成熟度表: 「kotoba-rad R2」を
+**部分達成**(暗号コア V、repo 統合は未着手)。残 gap: R2 storage 配線、
+merge 署名 UI、残 lane 委任、nbb 実送信、R4 PQ hybrid。
