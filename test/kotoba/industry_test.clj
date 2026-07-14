@@ -650,8 +650,12 @@
       ;; real test failures, or unlanded registry commits) despite claiming
       ;; green -- reverted those 11 back to :spec with reasons recorded on
       ;; each entry. Genuinely verified good: 0321/0891/1020/1050/1200/1312.
-      ;; 181 -> 187.
-      (is (= 187 (:implemented m))))))
+      ;; 181 -> 187. cloud-itonami-isic-0311 (Marine fishing) redone from
+      ;; scratch (fishing.governor/store/llm-advisor/operation/sim, 20
+      ;; tests / 31 assertions green, independently re-verified against a
+      ;; fresh clone) after its own prior docs-only/fabricated-report
+      ;; revert; promoted :spec -> :implemented, ADR-2607151700. 187 -> 188.
+      (is (= 188 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
