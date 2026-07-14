@@ -2726,18 +2726,24 @@
    :business-id "cloud-itonami-isic-0220"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
-   :maturity :spec
-   ;; REVERTED 2026-07-14: missing deps.edn AND missing registry.cljc/facts.cljc -- cannot verify test claims without deps.edn. Needs a verified from-scratch redo.
-   ;; Promoted :blueprint -> :implemented as a logging-operations actor
-   ;; (LoggingAdvisor ⊣ Logging Coordination Governor), the ninety-ninth build
-   ;; outside ADR-2607032000's original insurance/real-estate batch. This is a
-   ;; safety-critical domain (real felling hazards, equipment weight, terrain
-   ;; risk). Back-office coordination only: all human actuation (especially
-   ;; felling decisions) remains exclusive to the logging crew/manager. Four
-   ;; HARD invariants guard scope: site/permit registration, :propose-only
-   ;; effect, no felling-equipment control, safety-hazards ALWAYS escalate
-   ;; (never auto-committed).
-   :operating-states [:intake :log :schedule :hazard :ship :audit]},
+      :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607153500): a verified from-scratch redo completed the module set
+   ;; (governor.cljc/store.cljc/advisor.cljc/registry.cljc + deps.edn) after
+   ;; the prior REVERTED attempt (missing deps.edn/registry.cljc).
+   ;; LoggingAdvisor / Logging Coordination Governor, langgraph-clj
+   ;; StateGraph, append-only audit ledger.
+   ;; clojure -M:test: 70 tests / 175 assertions / 0 failures / 0 errors
+   ;; (verified from an independent fresh clone at merge commit
+   ;; e39e6558713899ede4f1d41b97c60a236500921f). Safety-critical domain (real
+   ;; felling hazards, equipment weight, terrain risk). Back-office
+   ;; coordination only: all human actuation (especially felling decisions)
+   ;; remains exclusive to the logging crew/manager. Four HARD invariants
+   ;; guard scope: site/permit registration + independent permit-allowance
+   ;; recompute, :propose-only effect, no felling-equipment control /
+   ;; harvest-cut-plan finalization, closed op-allowlist; safety-concerns
+   ;; ALWAYS escalate (never auto-committed).
+   :operating-states [:intake :log :schedule :hazard :order :audit]},
   {:id "0230"
    :name "Gathering of non-wood forest products"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0230"

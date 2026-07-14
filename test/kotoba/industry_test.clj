@@ -873,7 +873,23 @@
       ;; confirmed by the test runner itself, `expected: (= 203
       ;; (:implemented m)) actual: (not (= 203 204))`, not by a static
       ;; grep.
-      (is (= 204 (:implemented m))))))
+      ;; 204 -> 205: cloud-itonami-isic-0220 (Logging) verified
+      ;; from-scratch redo (LoggingAdvisor vs Logging Coordination
+      ;; Governor) superseding a prior REVERTED attempt that shipped no
+      ;; deps.edn and no registry.cljc/store.cljc, mirroring
+      ;; cloud-itonami-isic-0210's [Silviculture] verified module shape
+      ;; (logging.* in place of forestry.*, site/permit in place of
+      ;; stand, plus a logging-specific independent permit-allowance
+      ;; recompute for felling volume in place of stand-maturity); 70
+      ;; tests / 175 assertions green, independently re-verified against
+      ;; a fresh clone at merge commit
+      ;; e39e6558713899ede4f1d41b97c60a236500921f; promoted
+      ;; :spec -> :implemented, superproject ADR-2607153500.
+      ;; Live-recomputed via `(industry/maturity-summary)` on a freshly
+      ;; re-fetched origin/main immediately before this edit (concurrent-
+      ;; agent count-drift caution -- not an assumed fixed number):
+      ;; 204 -> 205.
+      (is (= 205 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
