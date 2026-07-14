@@ -595,7 +595,9 @@
       ;; distinct, always-human-signoff act. 37 tests/94 assertions run
       ;; green before claiming :implemented. Closes ISIC Wave 0's LAST
       ;; class-level gap -- ISIC Wave 0 is now 100% :implemented at the
-      ;; class level. See superproject ADR-2607142100.
+      ;; class level. See superproject ADR-2607142200 (renumbered from
+      ;; 2607142100: a concurrent session claimed that slot before this
+      ;; ADR landed, mirroring 6130's own same-day renumbering).
       (is (= 150 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
