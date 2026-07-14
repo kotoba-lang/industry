@@ -294,6 +294,24 @@ M4b `8c37ac7`。すべて design/testnet-only、実資金・実鍵・実チェ�
 follow-up（未着手）: 公開 JSON を消費する self-contained ブラウザ検証ページ
 （第 4 の独立実装）と、artifact を配信する discovery surface。
 
+## Addendum 10（2026-07-14）: real Ethereum WYSIWYS デコーダ（kotoba-lang/eth-crypto 活用）
+
+Addendum 9（BTC）の ETH 版（衛星 `a0dd379`）。`cryptoexchange.wysiwys-eth` が
+**実際の raw unsigned ETH tx（legacy / EIP-2930 / EIP-1559）をパース**して
+`(to address, value)` を復元。`kotoba-lang/eth-crypto` に無い **RLP デコード方向**を
+足し、アドレス整形は eth-crypto の `eip55-checksum` を再利用。`verify` が custody
+kernel の verifier-match flag を駆動（Bybit 型 → flag 0 → code 6）。contract 作成
+（to 空）・value/address 改竄・不正バイトはすべて fail-closed。
+
+- **JVM 専用（`.clj`）**、wysiwys-btc と同じ actuation 境界 compat 層。CLJS primary は
+  eth-crypto を巻き込まないことを検証済み。テストは実 tx を eth-crypto 自身の
+  rlp-encode + eip55-checksum に対して round-trip 検証。
+- **残る follow-up**: Safe multisig の `execTransaction`（実宛先が calldata 内の
+  SafeTx 構造体ハッシュにある）経路。それまでは fail-closed。
+- 検証: JVM 87 tests / 16,993 assertions（+4）、CLJS primary 71、clj-kondo 0 errors。
+- これで BTC/ETH 両鎖に実 WYSIWYS デコーダが揃った（cold=BTC descriptor multisig /
+  ETH Safe、custody ADR §1 の 2 鎖）。
+
 ## Addendum 9（2026-07-14）: real Bitcoin WYSIWYS デコーダ（kotoba-lang/btc-crypto 活用）
 
 wysiwys の意味論スタンドインを、BTC については実装に置き換えた（衛星 `2bef035`）。
