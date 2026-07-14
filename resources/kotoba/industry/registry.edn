@@ -2943,13 +2943,24 @@
    :operating-states [:intake :survey :extract :grade :ship :audit]},
   {:id "0893"
    :name "Extraction of salt"
-   :repo "https://github.com/gftdcojp/cloud-itonami-B0893"
-   :business-id "cloud-itonami-B0893"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0893"
+   :business-id "cloud-itonami-isic-0893"
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :survey :extract :grade :ship :audit]},
+   :maturity :implemented
+   ;; Fresh from-scratch scaffold, 2026-07-15 (ADR-2607152700): no
+   ;; prior actor existed (the entry pointed at a never-created
+   ;; gftdcojp/cloud-itonami-B0893 placeholder). SaltOpsAdvisor ⊣
+   ;; SaltExtractionGovernor operations-coordination actor, module shape
+   ;; mirroring cloud-itonami-isic-0520's verified scaffold (advisor/
+   ;; governor/phase/operation/store/sim, langgraph-clj StateGraph),
+   ;; domain-adapted for salt extraction: covers both rock-salt dry/
+   ;; underground mining and solution mining/evaporation (subsidence/
+   ;; brine-containment safety-concern flagging). clojure -M:test: 45
+   ;; tests/136 assertions, 0 failures/errors, independently re-run
+   ;; from a fresh clone.
+   ;; ISIC Rev.4 class (4-digit) — salt-extraction operations-coordination actor (Wave 3)
+   :operating-states [:intake :advise :govern :decide :commit]},
   {:id "0899"
    :name "Other mining and quarrying n.e.c."
    :repo "https://github.com/gftdcojp/cloud-itonami-B0899"

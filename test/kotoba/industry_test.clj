@@ -817,7 +817,24 @@
       ;; freshly re-fetched origin/main (201, not assumed), after a first
       ;; landing attempt against a now-stale base hit a 409 because the
       ;; sibling cloud-itonami-isic-0112/0113 promotions landed first.
-      (is (= 202 (:implemented m))))))
+      ;; 202 -> 203: cloud-itonami-isic-0893 (Extraction of salt) fresh
+      ;; from-scratch scaffold (no prior actor existed -- the entry
+      ;; pointed at a never-created gftdcojp/cloud-itonami-B0893
+      ;; placeholder; a sibling agent originally assigned neighboring
+      ;; class 0892 verified the registry first, found 0892 is actually
+      ;; "Extraction of peat", halted, and identified 0893 as the true
+      ;; salt slot). SaltOpsAdvisor <-> SaltExtractionGovernor
+      ;; operations-coordination actor mirroring cloud-itonami-isic-0520's
+      ;; [Mining of lignite] verified module shape (saltops.* in place of
+      ;; ligniteops.*), domain-adapted to cover both rock-salt dry/
+      ;; underground mining and solution mining/evaporation; 45 tests /
+      ;; 136 assertions green, independently re-verified against a fresh
+      ;; clone; promoted :spec -> :implemented, superproject
+      ;; ADR-2607152700. Live-recomputed via
+      ;; `(industry/maturity-summary)` immediately before this edit on a
+      ;; freshly re-fetched origin/main (202, not assumed) after a first
+      ;; landing attempt against a now-stale base hit a 409.
+      (is (= 203 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
