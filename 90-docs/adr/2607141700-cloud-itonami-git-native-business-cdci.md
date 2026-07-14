@@ -412,3 +412,31 @@ clojure -M:ops-send keygen itonami-<dept>-head  # 部門ごと
 clojure -M:ops-send mint-chain kagi:itonami-org-root <head-did> <dept>-chain.edn <lane>
 ```
 実行後、skill `secrets-location-map` に kagi item 名を追記すること(follow-up)。
+
+## Addendum (2026-07-14, same day): 実鍵 bootstrap 完了(kagi vault、オーナー指示「do it」)
+
+kagi vault(`orgs/kotoba-lang/kagi/.kagi/`、OS Keychain unlock)へ**実鍵を mint 済み**。
+seed はすべて vault 内に封緘され、このセッションのどこにも露出していない
+(keygen の出力は公開 did のみ)。
+
+| kagi item | 公開 did / 内容 |
+|---|---|
+| `itonami-org-root` | `did:key:z6MkqN7wed8dfK7qbB3rEQFuoDUrRWR7fytwNHBLhDqzCKQt` |
+| `itonami-sales-head` | `did:key:z6Mkvyz2SWVcbxNwAzrdRjvV6oTEJH99bpJDDJe4cCK3w5KM`(lanes: sales) |
+| `itonami-billing-head` | `did:key:z6MkeaC5zGnxrYB787PgT8e8frhjP1RmvsfjA2bDLygYkhFo`(lanes: billing) |
+| `itonami-keiei-head` | `did:key:z6MkppkpV8bZfniDNYweXeWwTUWLexeoU7nnHMc8TTLij1fL`(lanes: keiei,billing) |
+| `itonami-<dept>-head-chain` ×3 | org root 発行の CACAO 委任 chain(**expiry ≈ 2026-10-12、要再 mint**) |
+
+- sales chain は mint 直後に実 `authorized-by-chain?`(expiry 込み)で検証済み。
+- 公開 identity は `resources/ops-identity.edn` として cloud-itonami にコミット
+  (`fe82e33a`)。`ops-keys/ops-identity` が env → この resource → dev default の
+  優先順で解決し、ops-send / ops-drain が共有。
+- 参照先は skill `secrets-location-map` に追記済み。
+- 実行時メモ: 並行セッションが `orgs/kotoba-lang/langchain` を編集中で共有
+  checkout が一時コンパイル不能だったため、langchain の committed HEAD を
+  worktree に切った隔離 sibling layout で実行した(CLAUDE.md の
+  worktree-per-agent 原則の実適用)。
+- これで §3 の権限モデルは実鍵で運用可能。financial(2 署名 + keiei)も
+  billing-head + keiei-head の実鍵・実 chain で成立する。残 follow-up:
+  merge 署名 UI(WebAuthn)、chain の失効前再 mint 運用(≈2026-10-12)、
+  kotobase replica、runner 常駐化(nbb)。
