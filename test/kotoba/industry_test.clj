@@ -84,8 +84,6 @@
     (is (= :blueprint (industry/maturity "4321"))))
   (testing "cloud-itonami-isic-4322, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "4322"))))
-  (testing "cloud-itonami-isic-3510, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "3510"))))
   (testing "cloud-itonami-isic-5110, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "5110"))))
   (testing "cloud-itonami-isic-4911, freshly published, is also :blueprint (live-state corroboration)"
@@ -383,6 +381,8 @@
     (is (= :implemented (industry/maturity "6130"))))
   (testing "cloud-itonami-isic-6391 (News agency activities, fresh scaffold -- no prior blueprint repo; Wire Advisor ⊣ Wire Governor, domain logic modeled on cloud-itonami-isco-3521 [this fleet's closest domain analog], repo-layout on cloud-itonami-isic-6130; HARD-gates a story's sourcing completeness and an independently ground-truth-recomputed embargo instant, SOFT-escalates a legally-sensitive flag recomputed the same way [no 'forgot to screen' loophole]; this fleet's FIRST asymmetric dual-actuation shape -- :actuation/distribute may auto-commit at phase 3 when clean, :actuation/issue-correction never auto-commits at any phase; registered directly at :implemented with no prior :blueprint stage; closes ISIC Wave 0's LAST class-level gap alongside cloud-itonami-isic-6130's own same-day promotion) is also :implemented"
     (is (= :implemented (industry/maturity "6391"))))
+  (testing "cloud-itonami-isic-3510 (Electric power generation, transmission and distribution -- promoted from a prior published :blueprint repo [ADR-2607101800]; Grid Distribution Advisor ⊣ Grid Transmission Governor, repo-layout modeled on cloud-itonami-isic-6130, infrastructure/utility domain shape modeled on cloud-itonami-isic-3600 [this fleet's closest domain analog]; protected-recipient-violations is this fleet's FIRST always-un-overridable HARD check -- a meter flagged life-support/critical-infrastructure can never be disconnected, at any confidence or human approval; capacity-over-threshold-violations is this fleet's SECOND asymmetric dual-actuation shape [after cloud-itonami-isic-6391], on a new value-driven dimension -- clean under-threshold :actuation/provision-service may auto-commit at phase 3, over-threshold always escalates; :actuation/disconnect-service permanently excluded from every phase's :auto set; first ISIC Wave 1 class promoted, ADR-2607121000's own Top-10 value-ranking item #6) is also :implemented"
+    (is (= :implemented (industry/maturity "3510"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -447,7 +447,10 @@
       ;; 42 -> 41: cloud-itonami-isic-6120 promoted :blueprint ->
       ;; :implemented (spectrum-licensed mobile-network-operator actor,
       ;; mirroring cloud-itonami-isic-6190's module shape).
-      (is (= 41 (:blueprint m)))
+      ;; 41 -> 40: cloud-itonami-isic-3510 promoted :blueprint ->
+      ;; :implemented (Grid Distribution Advisor ⊣ Grid Transmission
+      ;; Governor, electric-power transmission/distribution actor).
+      (is (= 40 (:blueprint m)))
       ;; 114 = 113 + cloud-itonami-isic-4620, promoted directly from
       ;; :spec (never a :blueprint) -- agricultural/live-animal
       ;; wholesale trading actor. 115 = 114 + cloud-itonami-isic-2910,
@@ -598,7 +601,30 @@
       ;; class level. See superproject ADR-2607142200 (renumbered from
       ;; 2607142100: a concurrent session claimed that slot before this
       ;; ADR landed, mirroring 6130's own same-day renumbering).
-      (is (= 150 (:implemented m))))))
+      ;; 150 -> 151: cloud-itonami-isic-3510, promoted from a prior
+      ;; published :blueprint repo (ADR-2607101800) -- Grid Distribution
+      ;; Advisor ⊣ Grid Transmission Governor, electric-power
+      ;; transmission/distribution actor. Repo-layout modeled on
+      ;; cloud-itonami-isic-6130, infrastructure/utility domain shape
+      ;; modeled on cloud-itonami-isic-3600 (this fleet's closest domain
+      ;; analog, checked explicitly -- neither models an analogous
+      ;; protected-recipient concept). protected-recipient-violations is
+      ;; this fleet's FIRST always-un-overridable HARD check: a meter
+      ;; flagged life-support/critical-infrastructure can never be
+      ;; disconnected, at any confidence level or human approval.
+      ;; capacity-over-threshold-violations is this fleet's SECOND
+      ;; asymmetric dual-actuation shape (after cloud-itonami-isic-6391),
+      ;; on a genuinely new value-driven (not op-kind-driven) dimension:
+      ;; a clean, under-threshold :actuation/provision-service may
+      ;; auto-commit at phase 3, the same proposal over the capacity
+      ;; threshold always escalates. :actuation/disconnect-service is
+      ;; permanently excluded from every phase's :auto set, enforced
+      ;; independently by both the governor's high-stakes set and the
+      ;; phase table. 42 tests/194 assertions run green before claiming
+      ;; :implemented. First ISIC Wave 1 class promoted -- ADR-2607121000's
+      ;; own explicit Top-10 value-ranking item #6. See superproject
+      ;; ADR-2607142400.
+      (is (= 151 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
