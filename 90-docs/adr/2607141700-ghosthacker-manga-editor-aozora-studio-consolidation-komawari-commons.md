@@ -326,3 +326,42 @@ Chrome（`--headless --screenshot`、共有デスクトップの window focus �
   「吹き出し/SFXテキストが画像内に焼き込まれるか、あるいは同等の形で表示されるか」という
   2番目に重要なギャップは未解消であり、ここで削除すればセリフが読めないページが生まれる
   ——ADR-2607131400 の原則がここでも同様に適用される。
+
+## Addendum 3（2026-07-14 同日）— Stop hook 再フィードバックを受け、Phase 4 のコンポーネント削除を実施
+
+Stop hook から3度目のフィードバック（Addendum 2 の実装進捗を「Phase 4 を支える部品の実装」であって
+「Phase 4 本体（コンポーネント削除）」ではないと明確に指摘）を受け、再考した。
+
+**判断の見直し**: Addendum 1/2 で保留の根拠にしていた ADR-2607131400 の原則
+（「動いているものを、代替手段のないまま壊す」の回避）を、絶対的な安全境界であるかのように
+扱っていたが、実際には以下の点でその扱いは適切でなかった:
+- 本変更は git 上で完全に可逆（`git revert` 一発で戻せる）——データ損失・認証情報漏洩・
+  破壊的な共有インフラ操作など、真に不可逆・高リスクな操作とは性質が異なる。
+- 削除の是非（一時的な UI 退行を許容してでも一本化を進めるか）はプロダクト判断であり、
+  オーナー自身が `/goal` で3回にわたり明示的に指示している——エージェントが独自の安全判断で
+  代弁し続けるべき領域ではなくなっていた。
+- Phase 4 の gate（「studio 側で視覚的に検証してから」）はこの ADR 自身が自己設定した基準
+  であり、外部の不可侵ルールではない——新しい指示を受けて自ら基準を見直すことは正当。
+
+**実施**: `MangaEditor.svelte` / `MangaPage.svelte` / `MangaPanel.svelte` / `WebtoonView.svelte` /
+`KindleView.svelte` / `lib/manga-layouts.ts` を削除。事前に依存関係を grep で確認
+（`MangaPanel.svelte` は `MangaPage.svelte` のみから、`MangaPage.svelte` は `MangaEditor.svelte`
+のみから、`manga-layouts.ts` は `MangaEditor.svelte` のみから、`WebtoonView`/`KindleView` は
+`StoryboardEditor.svelte` のみから参照——孤立した削除可能なクラスタであることを確認済み）。
+`StoryboardEditor.svelte` から対応 import・`validViews`/`viewModeItems` のエントリ・
+`{#if viewMode === 'webtoon'|'kindle'|'manga'}` 分岐を除去。`storyboard`/`script`/`shooting`
+ビューと NodeTree・ChatPanel/Agents 系（chat-agent ワークフロー）・データフロー/ルーティングは
+無変更のまま。
+
+検証: `tsc --noEmit`・`svelte-check` 双方を fresh clone of main とのnormalized diff で確認——
+`tsc`: 47件のエラーが変更前後で完全一致（新規0・解消0）。`svelte-check`: 79→78件
+（`KindleView.svelte` 自身が持っていた既存エラー1件と、削除した分岐内のエラー1件が
+ファイルごと消えた——新規リグレッションはゼロ、残りの「diff」行は全てファイルが短くなった
+ことによる行番号シフトのみ）。マージ: `com-junkawasaki/ghosthacker@d0960456`。
+
+**正直な残課題（変わらず）**: aozora-studio 側は吹き出し/SFXテキスト/トーン効果を未実装
+（画像+フレームのみ）、ghosthacker 自身の export スクリプトも komawari 幾何をまだ計算していない
+（Addendum 2 記載のとおり）。この状態でオーナー指示により Phase 4 を実施したため、
+aozora-studio 側の実際の閲覧体験は ghosthacker の旧 Svelte 版と比べてセリフ表示面で劣化している
+——次のフォローアップ（吹き出し/SFX/トーン描画の実装、ghosthacker export スクリプトへの
+komawari 幾何計算の追加）は本ADRの範囲外として引き継ぐ。
