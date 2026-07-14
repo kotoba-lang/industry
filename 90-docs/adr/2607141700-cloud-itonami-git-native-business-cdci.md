@@ -524,3 +524,36 @@ cloud-itonami `e17f5fa9`(`cloud-itonami.ops-governor`)。成熟度表の
   全ゲート baseline 同一。
 - これで auto-merge tier(:read-only)も「governor pass のみで merge」という
   §1 の表の記述どおりに動く。残 gap の先頭は ②常駐化 → ③初の実運転。
+
+## Addendum (2026-07-14, same day): gap ②③ 解消 — 常駐化 + 双方向の本番初運転
+
+cloud-itonami `f5a5d084`。**この ADR の loop は本番運転に入った。**
+
+- **② 常駐化(受信側)**: launchd LaunchAgent
+  `com.gftdcojp.itonami.mail-drain`(template:
+  `scripts/launchd/com.gftdcojp.itonami.mail-drain.plist`)が **15 分間隔で
+  稼働中**(このマシン、tick 実測 exit 0)。認証は wrangler の **OAuth
+  セッション**に切替 — 実測で 1Password の CLOUDFLARE_API_TOKEN は
+  analytics 狭 scope で KV に届かず(error 10000)、drain 経路から 1Password
+  依存を排除した。あわせて廃止済み `kv key delete --force` フラグを修正。
+- **③-受信の本番初運転**: KV に staged されていた**実メール 1 通**
+  (SES 検証メール)が git-first 経路を完走 — proposal ref → governor
+  `:pass` → auto-merge → verified runner → `:executed` receipt → store 投影。
+  再 drain は `:already-proposed` skip(冪等実証)、KV 鍵削除まで完了。
+  本番 ops repo / store の所在: **`~/.itonami/store.edn(.ops-repo.edn)`**
+  (このマシン。logs は `~/.itonami/logs/`)。
+- **③-送信の本番初運転**: 実 draft(`mail:send:live-first-run`、
+  ops@mail.itonami.cloud → root@junkawasaki.com)を nbb CLI で PR 化 →
+  governor pass → **kagi 実鍵(itonami-sales-head)+ 実 chain による署名
+  merge** → JVM runner が **実 Resend 送信**(provider-message-id
+  `426c6dff-067f-4b3d-8986-d6b5c04b37af`)。直後の再 run は results 空
+  (at-most-once を本番 repo で実証)。
+- 成熟度表の更新: 受信=PR **P**(常駐 + 実運転)/ 送信 **K→P 初回達成**
+  (送信トリガーは手動 CLI のまま — 送信側の常駐は要らない設計: merge が
+  トリガー)/ runner **V→P**(本番 repo で稼働)。
+- 副次修正: M8c の package.json 追加が旧 package-lock(空 stub)を痩身化した
+  件を確認 — 消えたのはローカル一時 node_modules のみで追跡物の損失なし、
+  wrangler は npx 解決で健在(4.103.0)。
+- 残 gap(優先順): chain 再 mint 運用(≈2026-10-12)、runner bot の
+  execute-only 鍵、kotobase replica / rad R2、merge 署名 UI、残 lane 委任、
+  nbb での実送信(async fetch)。
