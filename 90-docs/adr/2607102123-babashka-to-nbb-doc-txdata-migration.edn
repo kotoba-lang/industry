@@ -1,0 +1,16 @@
+[{:db/id -1
+  :adr/id "adr-2607102123-babashka-to-nbb-doc-txdata-migration"
+  :adr/title "ADR-2607102123: Babashka を nbb へ統一し、ADR／migration EDN を tx-data 化する"
+  :adr/status "accepted"
+  :adr/date "2026-07-10"
+  :adr/doc_type "adr"
+  :adr/topic "bb-to-nbb-doc-txdata-migration"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for ["Repository-wide Babashka-to-nbb documentation migration"
+                          "Datomic/DataScript transaction-data representation for ADR and migration EDN"]
+  :adr/related ["CLAUDE.md" "manifest/edn-datomize.cljs"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/decision-summary "{:runtime :nbb, :documentation-scope [\"90-docs/adr\" \"90-docs/migration\"], :edn-shape \"vector of entity maps with :db/id\", :malformed-edn :raw-preserved, :schema \"manifest/schema.edn\"}"
+  :adr/verification "{:remaining-babashka-command-in-90-docs 0, :adr-edn 517, :migration-edn 5, :normalization-errors 0}"}]
