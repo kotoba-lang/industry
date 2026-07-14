@@ -2396,11 +2396,11 @@
    :operating-states [:intake :schedule :work :pay :audit]},
   {:id "0111"
    :name "Growing of cereals"
-   :repo "https://github.com/gftdcojp/cloud-itonami-A0111"
-   :business-id "cloud-itonami-A0111"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0111"
+   :business-id "cloud-itonami-isic-0111"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
-   :optional-technologies []
-   :maturity :spec
+   :optional-technologies [:optimization]
+   :maturity :implemented
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :survey :advise :treat :record :audit]},
   {:id "0112"
