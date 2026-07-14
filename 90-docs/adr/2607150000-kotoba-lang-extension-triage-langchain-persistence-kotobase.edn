@@ -539,6 +539,76 @@
     (compiler/ destructuring/vector-as-data/loop-recur) -> Addendum 5
     (cloud-itonami governor ported to .kotoba, realizing the safety
     motivation that opened this whole ADR)."}
+  :adr/compiler-assoc-remove-fix-2026-07-14
+  {:summary "Fixed a known limitation documented in addenda 2/4: assoc only
+             ever prepended a new entry, relying on get's first-match-wins
+             scan to make the shadowed VALUE correct while the old entry
+             stayed as dead weight in the pair-chain -- unbounded growth
+             under repeated re-assoc of the same key. Adds
+             __kotoba_map_without (same inject-only-when-used pattern as
+             __kotoba_map_get) which filters out the old entry before
+             assoc prepends the new one."
+   :verification
+   {:oracle-entry-count
+    "wrote a plain count-entries recursion IN .kotoba source itself and
+     confirmed a 2-distinct-key map stays at 2 entries after 3 re-assocs of
+     the same key (not 5) -- verifies actual dedup, not just that get
+     still returns the correct shadowed value (which the OLD buggy code
+     already got right)"
+    :real-chicory-execution "same scenario re-verified via real Chicory execution (scratch)"
+    :test-suite "clojure -M:test: 141 tests / 2841 assertions, 0 failures
+                 (includes 6 tests from a concurrently-merged
+                 aiueos-freestanding-targets PR, unrelated to this fix)"
+    :existing-fuel-test-still-passes-for-a-different-reason
+    "map-get-recursion-shares-the-existing-fuel-budget (300x re-assoc ->
+     fuel-exhausted) still passes post-fix, but the exhaustion now comes
+     from __kotoba_map_without's O(map-size) cost PER assoc call, not from
+     get's final scan walking an unboundedly-grown chain -- the assertion
+     is unchanged, the underlying mechanism is not"}
+   :honest-tradeoff-not-a-pareto-improvement
+   "ir.clj/backend/wasm.clj's heap is allocate-only (pair cells are never
+    freed/GC'd) -- __kotoba_map_without REBUILDS every surviving entry via
+    a fresh (pair (pair-first m) (recurse...)) call, consuming ONE NEW
+    heap cell per surviving entry on every single assoc call. This trades
+    O(1) heap-cost-per-assoc-call (old, unbounded read-time scan cost) for
+    O(map-size) heap-cost-per-assoc-call (new, bounded read-time cost) --
+    correct for realistic workloads (occasional writes, frequent reads,
+    like the cloud-itonami governor's own access pattern) but NOT a
+    strict improvement for a write-heavy-on-a-large-map-with-few-reads
+    workload, which could reach heap capacity (pair-capacity, default
+    4096) sooner than before. Documented honestly, not silently claimed
+    as a pure win."
+   :cross-backend-test-adjustment
+   "assoc's fix introduces its own gensym'd let-local temp names (assoc-k__/
+    assoc-v__) -- same JVM-process-global-counter non-determinism already
+    documented for destructuring's temps (addendum 4). The existing
+    map-get-assoc-produce-one-shared-kir-across-all-backends test had to
+    split: a get-only source still produces byte-identical :kir across all
+    4 backends (kept as-is), but an assoc-involving source's raw :kir is
+    no longer expected to be identical across backends -- its own new test
+    checks :oracle-value consistency instead, same honest pattern as
+    addendum 4's destructuring test."
+   :cljs-backend-interaction
+   "assoc's desugar is a frontend-level change, so it automatically applies
+    to the cljs backend added in ADR-2607151500 with zero backend-specific
+    code -- re-verified the same entry-count scenario via real nbb
+    execution to confirm."
+   :landed
+   {:repo "kotoba-lang/compiler" :commits "4bd4a23 -> 4e06992"
+    :method "sibling worktree outside superproject (after an earlier
+             mis-step editing directly in the shared orgs/ checkout was
+             caught and corrected before landing -- diff was preserved via
+             /tmp copies, replayed cleanly in a fresh worktree, no data
+             lost), gh api merges server-side merge, branch+worktree
+             cleanup"
+    :west-pin "compiler 0ab557e8b899 -> 4e06992a0e92 (--entry minimal diff,
+               verify-west-pins OK)"
+    :files ["src/kotoba/compiler/frontend.clj (map-without-helper-name,
+             map-without-helper, uses-map-without?, assoc desugar rewrite,
+             analyze's parsed injection)"
+            "test/kotoba/compiler/frontend_extensions_test.clj (4 new
+             deftest, 1 existing test split into 2 for the :kir-identity
+             adjustment)"]}}
   :adr/decision-not-made
   ["general first-class functions/closures in .kotoba -- rejected on T2 soundness grounds"
    "defprotocol/defrecord/multimethod in .kotoba -- rejected, fix the 3 affected
