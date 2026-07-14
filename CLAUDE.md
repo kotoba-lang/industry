@@ -599,7 +599,9 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   しての明文化、(2) `bb` を JVM と並ぶ最下位に明示、の 2 点。
 - **Node 側の検証/テストハーネス（Playwright driver、静的サーバ、E2E
   スクリプト等）も新規に書く場合は nbb（`.cljs`）で書く — 生 JS の
-  `.mjs`/`.cjs` を新規に書かない。** 既存 repo に `.mjs` の先行実装
+  `.mjs`/`.cjs` を新規に書かない。** シェルスクリプト（`.sh`）も同様に
+  **新規作成禁止 — nbb で書く**（2026-07-14 オーナー指示「sh は prohibit, nbb にして」。
+  既存の実例移行: itad `tools/subset_font.cljs`、jp-go-dds `scripts/vendor.cljs`）。 既存 repo に `.mjs` の先行実装
   （例: `wasm-webcomponent/test/render/lib/webgpu-harness.mjs`）があっ
   ても、それは「対象を決めて ADR 化してから移行する既存資産」（既存の
   JVM 専用ライブラリを書き直さない原則と同型）であって、新規タスクで
