@@ -1,0 +1,86 @@
+{:adr-id "2607154500"
+ :title "cloud-itonami-isic-0114 (growing of sugar cane) sugar-cane-plantation-operations-coordination actor"
+ :status :accepted
+ :date "2026-07-15"
+ :deciders ["Jun Kawasaki (agent-executed, standing authorization)"]
+ :related ["ADR-2607122200" "ADR-2607011000" "ADR-2607152600" "ADR-2607152500"]
+
+ :context
+ "cloud-itonami-isic-0114 did not exist prior to this ADR (gh api
+  repos/cloud-itonami/cloud-itonami-isic-0114 returned a GraphQL 404 before
+  scaffold) -- a fresh scaffold, not a repair of a prior stray artifact.
+  Built from cloud-itonami-isic-0112 (growing of rice) as the
+  module-structure template, adapted to sugar cane's perennial,
+  ratoon-cropping specifics (ratoon-cycle logging/validation replacing
+  0112's paddy water-level check, pre-harvest-burn scheduling and its own
+  finalize-burn-decision hard block, borer-pest crop-health concerns),
+  with clojure -M:test independently re-run before and after every push."
+
+ :scope-exclusions
+ ["direct field-equipment operation (grower's exclusive authority)"
+  "finalizing a pre-harvest-burn decision (grower/agronomist authority)"
+  "finalizing a pesticide-application decision (agronomist/grower authority)"
+  "agronomic decision authority -- what/when/how much to plant, fertilize, burn, harvest (remains human authority)"]
+
+ :decision
+ "Implement cloud-itonami-isic-0114 with Governor, Facts, Registry, Store, Advisor,
+  Phase, Operation, Sim (mirrors cloud-itonami-isic-0112 module-for-module,
+  caneops.* namespace in place of riceops.*):
+  - Governor (CaneOperationsGovernor): 6 hard checks (field-not-registered,
+    no-execution, equipment-or-decision-blocked [now covers
+    :operate-field-equipment, :finalize-burn-decision (NEW), and
+    :finalize-pesticide-application], op-not-allowed, field-record-invalid,
+    ratoon-cycle-invalid [NEW, perennial-crop-specific]) + 3 escalation gates
+    (always-escalate crop-health concern, cost-threshold supply orders,
+    low confidence < 0.7)
+  - Facts: supply categories with cost thresholds (seed-cane/fertilizer/equipment
+    including harvest machinery/irrigation pumps), sugar-cane varieties
+    (hybrid/noble/energy-cane/chewing-cane), field-operation-types
+    reference set (planting/fertilizing/pre-harvest-burn/harvest/ratooning)
+  - Registry: independent pure predicates (cost-exceeds-threshold?,
+    acreage-non-positive?, ratoon-cycle-invalid? [NEW], confidence-below-floor?)
+  - Store: Store protocol + MemStore (registered-field lookup, cane field)
+  - Advisor: Advisor protocol + MockAdvisor (4 ops, log-field-record now
+    also carries :ratoon-cycle, :yield, :brix)
+  - Phase: 0->3 rollout gate
+  - Operation: composes advisor -> governor -> phase-gate (langgraph-clj wiring
+    deferred, matching 0111/0112's own stub)
+  - Sim: demo runner with a working -main
+  - Operations: log-field-record, schedule-field-operation,
+    flag-crop-health-concern, order-supplies (closed allowlist, :effect :propose)
+  - Tests: 35 tests / 107 assertions (facts, governor, phase, registry, store), all green
+  - All .cljc (portable, no JVM interop), AGPL-3.0-or-later
+  - README/business-model/operator-guide describe the real API, plus a
+    dedicated Perennial crop / ratoon-cropping README section"
+
+ :consequences
+ {:positive
+  ["Sugar-cane growing (0114) now genuinely implemented and fully tested"
+   "Scope boundaries (field-equipment operation, pre-harvest-burn decisions,
+    pesticide-application decisions) hardcoded in governor checks, not just
+    asserted in prose"
+   "Crop-health escalation (flag-crop-health-concern, covers borer infestation,
+    always human) is a core design invariant"
+   "Ratoon-cycle is a first-class, independently validated field (mirrors 0111's
+    acreage validation and 0112's water-level validation), reflecting
+    ratoon-cropping as sugar cane's operational trait distinguishing it from
+    the annual crops covered by its 0111/0112 siblings"
+   "Portable .cljc, zero JVM-only constructs, clj-kondo 0 errors / 0 warnings"]
+  :negative
+  ["Real persistent store (Datomic/kotoba-server) is a follow-up (in-memory for now)"
+   "langgraph-clj StateGraph wiring (real interrupt-before/checkpoint resume) is
+    deferred scaffolding, matching 0111/0112's own stub status"
+   "Brix (sugar-content) is logged as advisor payload data but not independently
+    governor-range-validated in this pass -- possible follow-up"]}
+
+ :verification
+ {:test-count 35
+  :assertion-count 107
+  :test-status "0 failures, 0 errors"
+  :lint-status "0 errors, 0 warnings"
+  :commit "2382d72e9b29e0416a3b56c4fb785d8ecaf38a89"
+  :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0114"
+  :registry-update "kotoba-lang/industry: 0114 maturity :spec -> :implemented; :repo/:business-id set to cloud-itonami/cloud-itonami-isic-0114; implemented-count pinned assertion bumped 205 -> 206, live-recomputed via (industry/maturity-summary)"
+  :registry-merge-commit "e50597b84e2fc1397297aa34fe69fc81734b0f30"
+  :registry-merge-retries 0
+  :registry-post-merge-verification "fresh clone (+ fresh ../technology sibling) of kotoba-lang/industry main: Ran 15 tests containing 942 assertions. 0 failures, 0 errors. clj-kondo: 0 errors, 0 warnings. grep -c \"â\" registry.edn: 0 (no mojibake). git merge-base --is-ancestor confirmed the merge commit landed on origin/main."}}
