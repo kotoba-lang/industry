@@ -1,0 +1,246 @@
+---
+id: adr-2607141700-cloud-itonami-git-native-business-cdci
+title: "ADR-2607141700: cloud-itonami の会社経営を PR/merge 駆動の CD/CI workflow にする — GitHub ではなく kotoba-git/kotoba-rad + kotobase + DataLad backend、部署/社員の CACAO capability で ref 権限を制御"
+status: proposed
+doc_type: adr
+topic: cloud-itonami-git-native-business-cdci
+authoritative: true
+last_verified: 2026-07-14
+authoritative_for:
+  - "cloud-itonami の business operation(受信→提案→承認→実行→監査)を git-native な PR/merge workflow として表現する設計(受信 = proposal ref 到着、承認 = 署名付き merge、実行 = post-merge executor)"
+  - "その git backend を GitHub ではなく kotoba-git/kotoba-rad(sovereign refs + push-gate)+ kotobase private tenant + kotoba-ledger-clj file-git/kotobase backend に置く判断"
+  - "部署・社員の権限を CACAO delegation chain(did:key)+ ref namespace policy + risk tier で制御する CD/CI 権限モデル"
+  - "大容量物(メール添付・m365 facts・帳票)は DataLad/git-annex + B2 参照とし git object に入れない判断"
+related:
+  - 90-docs/adr/2606271700-cloud-itonami-business-os.md
+  - 90-docs/adr/2606301200-kotoba-mail-mailer.md
+  - 90-docs/adr/2607061600-kotoba-issue-ledger-shared-libs.md
+  - 90-docs/adr/2607072200-kotoba-git-kotoba-rad-content-addressed-vcs.md
+  - 90-docs/adr/2607022300-itonami-gftdcojp-private-tenant-kotoba-rad-git-storage.md
+  - 90-docs/adr/2607050400-webauthn-cacao-connection.md
+  - 90-docs/adr/2607125300-cloud-itonami-crm-fleet-docker-ci.md
+  - 90-docs/adr/2607012000-cloud-itonami-isco-occupation-blueprints.md
+supersedes: []
+superseded_by: []
+---
+
+# ADR-2607141700: cloud-itonami — 会社経営を sovereign git 上の PR/merge 駆動 CD/CI にする
+
+**Status**: proposed
+**Date**: 2026-07-14
+**Deciders**: Jun Kawasaki（指示: 「business を PR/merge 駆動に。メール受信は PR の受信、送信は PR merge 後に CD/CI actions で発火。会社のビジネス運営全体を git workflow に。GitHub というよりは kotoba-lang/kotobase の git backend、DataLad の backend などで動くように。部署や社員の権限なども制御できる CD/CI workflow モデルを設計」）
+
+## Context — 現状は PR/merge 駆動では *ない*（2026-07-14 実査）
+
+`orgs/gftdcojp/cloud-itonami` の business loop は **in-process / store-native** であり、
+git-native ではない。
+
+- **propose→govern→approve→execute** は `business_loop.cljc` → `business_governor.cljc`
+  → `approval.cljc` の in-process 遷移で、承認は EDN Datom store 内の effect status
+  （`:proposed`→`:approved`→`:executed`）の書き換え。`approval.cljc` の
+  「a proposal's 'PR' merges」という語は**比喩**であり、実 PR/merge は存在しない
+  （語彙自体は ADR-2607061600 の `kotoba-issue-clj` 由来で、既に PR 型に揃っている）。
+- **メール受信**は Cloudflare Email Worker（`workers/mail-inbound/index.js`）→
+  `ITONAMI_DATA` KV staging → `scripts/mail-drain.bb` → `mail.cljc ingest-file!` →
+  store。git には一切触れない。
+- **メール送信**は approval 済み `:mail/send` effect を `send-via-resend!` handler が
+  実行。merge や CI とは無関係。
+- **GitHub Actions は 2 本とも inert**（repo-level disabled。`ci.yml` は
+  continue-on-error、`deploy.yml` は一度も発火実績なし）。merge トリガの自動化は
+  ローカル lefthook の静的サイト deploy のみ。さらに ADR-2607125300 のとおり
+  agent の OAuth token には `workflow` scope が無く、GitHub Actions は agent 運用と
+  相性が悪いことが実証済み。
+- **監査台帳**は ADR-0011（repo 内）で意図的に「git commit から store へ」移した
+  append-only Datom store。
+
+一方、必要な building block は**すべて既に存在する**。本 ADR は新規発明ではなく
+既存決定の合成である:
+
+| block | 実体 | 状態 |
+|---|---|---|
+| PR 語彙のゲート | `kotoba-lang/kotoba-issue-clj`（issue/proposal/review/merge/audit） | 実装済み・cloud-itonami が採用済み（ADR-2607061600） |
+| git 台帳 backend | `kotoba-lang/kotoba-ledger-clj` の `file-git`（decision ごとに git commit）/ kotobase（CID-pinned）backend | 実装済み・未配線 |
+| sovereign git | `kotoba-lang/kotoba-git`（CID object/refs/DAG/ref-policy ff-only）+ `kotoba-lang/kotoba-rad`（RID/delegate/sigref/push-gate/署名付き head-announce） | 実装・テスト済み（ADR-2607072200 + addenda） |
+| capability 認証 | CACAO delegation chain（`authorize-push-cacao?`、covers? で権限昇格不可、root-first leaf-last）+ did:key + WebAuthn 接続 | 実装済み（ADR-2607072200 addendum / 2607050400） |
+| private tenant | `itonami/org/{org}/repo/{repo}` + `:itonami.repo/visibility :private` + CACAO 必須 edge（`edge/cacao.cljc`、本番稼働） | 実装済み（ADR-2607022300） |
+| 大容量 backend | DataLad + git-annex + B2（m365-archive で運用中） | 運用中 |
+| 部署/職務の語彙 | ISCO occupation blueprints（`orgs/cloud-itonami/cloud-itonami-isco-*`） | 登録済み（ADR-2607012000） |
+
+## Decision
+
+### 1. 業務イベント ↔ git workflow の対応（正本マッピング）
+
+gftdcojp tenant ごとに **ops-repo**（kotoba-rad RID を持つ sovereign repo、GitHub には
+置かない）を 1 つ持ち、業務オブジェクト（kotoba-issue 語彙の proposal/review/merge/
+audit を EDN で serialize したもの）を commit として積む。
+
+| 業務イベント | git-native 表現 |
+|---|---|
+| メール受信 | mail-drain が `refs/itonami/proposals/inbox/<msg-id>` に **proposal commit を作る = 「PR が届く」**。本文が閾値超・添付は annex key/CID 参照のみ |
+| agent/advisor の提案（effect proposal） | `refs/itonami/proposals/<lane>/<id>` に proposal commit（rationale = PR description、risk tier 付き） |
+| governor（機械 censor） | **pre-merge required check**。hold 判定の proposal は merge 不可（fail-closed） |
+| 人間の承認 | 承認者の did:key で**署名された ff-only merge** を `refs/itonami/<lane>/main` へ。push-gate が署名 + capability + ref-policy を検証 |
+| request-changes / reject | review object の commit（proposal ref に積む）。main には入らない |
+| 実行（mail 送信・課金・外部 API） | **post-merge executor（itonami-runner、後述）が merge された approved effect を handler 実行 = 「merge 後に CD/CI actions で発火」** |
+| 実行結果・receipt | `refs/itonami/audit/main` へ append-only の audit commit（mail receipt は ADR-2606301200 の `mail.receipt` をそのまま serialize） |
+
+lane（`:inbox` `:sales` `:contract` `:billing` `:legal` `:procedure` `:employee`
+`:plm` `:erp` `:mes` `:keiei` — ADR-2606271700 の既存 lane catalog）ごとに
+`main` を分け、部署権限の単位とする。
+
+既存 Datom store は**廃止しない**。CQRS: 署名付き git DAG が write-model
+（authorization + 監査の正本）、store は read-model（Datalog query 面、
+`business_loop` の observe はこちらを読む）。runner が merge/audit commit を
+store へ投影する（方向は git → store の一方向。移行完了までは逆に store → git
+の dual-write、§4）。
+
+### 2. backend — GitHub ではなく kotoba/kotobase + DataLad
+
+- **git 実体**: `kotoba-git`（CID-addressed objects/refs）。refs の移動は
+  `kotoba-rad.push-gate` を通してのみ行う。ADR-2607072200 addendum が「shape policy
+  （ff-only）と identity policy（CACAO）を合成する単一関数はまだ無い」と明記して
+  いる gap を本 ADR の M1 で埋める（`authorize-ref-update?` =
+  `ref-policy/fast-forward?` ∧ `push-gate/authorize-push-cacao?` ∧ risk-tier 検査）。
+- **replication / hosting**: kotobase private tenant（`itonami.cloud/gftdcojp/gftdcojp`、
+  CACAO 必須、ADR-2607022300）を authoritative replica とする。kotoba-rad R2
+  （object encryption）が未実装の間、ops-repo を P2P 公開**しない**（replication は
+  自社管理 node 間のみ）。R2 が landed したら暗号化 object で公開 replication を解禁。
+- **ローカル台帳**: `kotoba-ledger-clj` の `file-git` backend（decision ごとに
+  git commit）。オフラインでも decision が積め、kotobase 復帰時に announce で同期。
+- **大容量物**: メール添付・m365 facts・帳票・生成物は DataLad/git-annex + B2
+  （skill `large-binary-datalad` の既存経路）。git object には annex key / CID 参照
+  だけを入れる。**business data を GitHub に置かない**。GitHub は従来どおり
+  code repo の public mirror に格下げ（ADR-2607022300 Decision 2 と同一方針）。
+- **secrets**: commit / proposal / effect に secret 値を入れない。alias のみ
+  （ADR-2606301200 と同じ）。runner だけが host capability 経由で解決する。
+
+### 3. 権限モデル — 部署/社員の CACAO capability で ref を制御する CD/CI
+
+**Identity**: 社員 = did:key（WebAuthn から導出可、ADR-2607050400）。
+org root key（gftdcojp）→ 部署 delegate → 社員、と CACAO delegation chain で委任する
+（`cacao.core/verify-chain`。`covers?` により**部下は上長の持つ resource を超えて
+昇格できない**ことがテスト済み — ADR-2607072200 addendum）。
+
+**Resource / ability**（CACAO resource string）:
+
+```
+resource: itonami://<org>/<repo>/<lane>
+ability:  itonami/propose | itonami/review | itonami/merge | itonami/execute | itonami/read
+```
+
+**部署 = lane 集合 + ISCO blueprint**。部署 delegate が持つ resource は担当 lane に
+限定され、社員へはその部分集合だけを再委任できる。職種の職務範囲は ISCO blueprint
+（`cloud-itonami-isco-*` の `blueprint.edn`）を根拠として lane/ability 既定値を導出する。
+
+**risk tier → merge 要件**（既存の risk gate を branch protection に写像）:
+
+| risk | merge 要件（push-gate が強制） |
+|---|---|
+| `:read-only` | governor check pass のみで **auto-merge**（bot merge 可）。既存の「read-only は自動実行」を維持 |
+| `:external-send`（mail 送信・外部 API） | 当該 lane の `itonami/merge` 保持者 1 名の署名 merge |
+| `:financial` | **2 署名**（当該 lane + `:keiei` lane の merge 保持者。self-approve 禁止 = proposer ≠ approver） |
+| `:destructive` | org root（owner）署名のみ |
+
+**職務分掌（separation of duties）を鍵で強制する**: proposer（agent/社員）、
+approver（merge capability 保持者）、executor（runner bot）は**別の did:key** とし、
+runner bot には `itonami/execute` だけを委任する — runner は merge できず、
+approver は execute できない。agent（advisor）には `itonami/propose` しか
+委任しない（現行の「advisor は proposals-only」の鍵レベルでの強制）。
+
+**失効**: CACAO は expiry 必須（上限 90 日、退職・異動は期限切れ + 部署 delegate の
+journal `remove-delegate!` の併用）。ADR-2607072200 が明記する「expiry なし CACAO は
+revoke 不能」という既知 gap を、運用ルール（expiry 必須）で塞ぐ。
+
+**read 権限**: lane 単位。`:employee`（人事）や `:legal` lane の read は当該部署 +
+keiei のみ。private tenant なので anonymous read パスは存在しない（fail-closed、
+ADR-2607022300 の incident の教訓を踏襲）。
+
+### 4. CD/CI runner — 「GitHub Actions」の代替
+
+**`itonami-runner`**: kotoba-server 側（または launchd/cron）の決定論的 executor。
+
+1. 署名付き head-announce（`kotoba-rad.announce` + `kotoba-lang/p2p`、検証済み経路）
+   を subscribe、または poll。
+2. `refs/itonami/<lane>/main` の新 merge commit を検証（sigref → CACAO chain →
+   risk tier 署名数）。**検証に失敗した merge は実行せず alert**（fail-closed）。
+3. merge に含まれる approved effect を per-kind handler（`send-via-resend!` /
+   Stripe / deploy 等、既存 handler 群）で実行。effect id で dedupe（at-most-once、
+   再実行は明示の再 proposal）。
+4. receipt/audit commit を `refs/itonami/audit/main` へ append し、store へ投影。
+
+handler が無い effect kind は `:failed`（既存 approval runner と同じ fail-closed）。
+governor は pre-merge check として runner とは独立に走る（censor は merge 前、
+runner は merge 後 — 二重ゲート構造は現行のまま）。
+
+### 5. 移行ステージ
+
+- **M0（即着手可、既存コードの配線のみ）**: `approval.cljc` の decision/audit を
+  `kotoba-ledger-clj` `file-git` backend へ **dual-write**。store 正本のまま、
+  「decision ごとに git commit」の監査面だけ先に得る。
+- **M1**: ops-repo 実体化。proposal/review/merge を kotoba-git/kotoba-rad の signed
+  refs で表現。`authorize-ref-update?`（shape ∧ identity ∧ risk の合成 push-gate）を
+  実装。gftdcojp org root key 生成、部署 delegate chain の初回 mint。
+- **M2**: itonami-runner 稼働（post-merge 実行）。mail-drain を「KV → store 直行」から
+  「KV → proposal commit」へ切替（**受信 = PR の成立**）。lefthook の deploy hook 等、
+  既存の merge トリガも runner へ統合。
+- **M3**: kotobase XRPC replica を authoritative に昇格、git DAG を write-model の
+  正本に（store は read-model）。kotoba-rad R2 landed 後に暗号化 replication 解禁。
+
+各ステージは独立に価値があり、途中で止まっても現行運用は壊れない
+（M0 は純追加、M1-M2 は lane 単位で段階切替できる）。
+
+## Alternatives considered
+
+| 案 | 判定 | 理由 |
+|---|---|---|
+| GitHub PR + GitHub Actions で実現 | ❌ | 機密 business data（人事・契約・請求）を GitHub に置けない（private tenant 方針、ADR-2607022300）。Actions は repo-level disabled + agent token に workflow scope が無い実害（ADR-2607125300）。主権方針（GitHub は public mirror）に反する |
+| 現状維持（store-native のみ） | ❌ | 承認の暗号学的帰属（誰がいつ何を承認したかの署名）・改ざん耐性・オフライン分散が store file には無い。「PR/merge 駆動」というオーナー要求も満たさない |
+| Radicle 本家 / Gitea 等の既製 forge | ❌ | 外部スタック依存。kotoba-rad が同等物として実装・テスト済みで、CACAO/kotobase と同一 CID 体系で統合済み |
+| git を正本にして Datom store を廃止 | ❌ | Datalog query 面（queue summary・doctor・BMC collect）が失われる。CQRS（git = write-model、store = read-model）で両立する |
+| 権限を kotobase 側 ACL だけで制御（git 層は素通し） | ❌ | merge 署名に capability が紐付かず「誰の権限で承認されたか」が commit から検証できない。push-gate + CACAO は既にあるのに使わないことになる |
+
+## Consequences
+
+- (+) 会社運営の全遷移が「PR → review → 署名付き merge → post-merge 実行 → audit
+  commit」になり、GitHub 的な開発体験と同型のまま、backend は自社主権
+  （kotoba-git/kotoba-rad + kotobase + DataLad/B2）に載る。
+- (+) 部署・社員・agent・bot の権限が**鍵と capability で**強制され（ACL 設定ファイル
+  ではなく署名検証）、職務分掌（propose/review/merge/execute の分離)が構造的になる。
+- (+) 既存資産の合成で済む: kotoba-issue 語彙は採用済み、ledger backend は実装済み、
+  push-gate/CACAO chain はテスト済み。新規実装の中心は合成 push-gate と
+  itonami-runner の 2 点。
+- (−) kotoba-rad R2（object encryption)まで ops-repo の replication は自社 node に
+  限定される。
+- (−) 鍵運用（org root の保管、部署 delegate の mint/rotation、退職時失効）という
+  新しい運用負担が生まれる。expiry 必須ルールで緩和するが、鍵紛失 = merge 不能の
+  リスクは残る（org root の recovery 手順は follow-up）。
+- (−) merge 署名 UI（承認者が実際に押すボタン）が必要。既存 cockpit
+  （itonami.cloud）+ WebAuthn→did:key 経路の拡張として実装する。
+- 既存データの破壊的移行はしない（store・KV・handler 群は全て存置。dual-write →
+  投影方向の反転、という追加のみ）。
+
+## Follow-up
+
+- M0 配線（approval.cljc → kotoba-ledger file-git dual-write）の実装 PR。
+- 合成 push-gate `authorize-ref-update?` を `kotoba-rad` へ（ADR-2607072200 の
+  既知 gap の解消として upstream に置く）。
+- org root key の生成・保管手順（secrets-location-map に参照を追記)と recovery 設計。
+- 部署 → lane / ISCO blueprint → 既定 capability の対応表を
+  `cloud-itonami.operating/lane-catalog` に隣接して EDN 化。
+- merge 署名 UI（cockpit + WebAuthn）の設計 ADR。
+- kotoba-rad R2 進捗の追跡（ADR-2606280300 のロードマップ）。
+
+## References
+
+- ADR-2606271700（business-os、lane catalog / effect lifecycle）
+- ADR-2606301200（mail/mailer、draft → approval → send effect → receipt）
+- ADR-2607061600（kotoba-issue-clj / kotoba-ledger-clj、PR 語彙と file-git backend）
+- ADR-2607072200（kotoba-git/kotoba-rad、push-gate / ref-policy / CACAO delegation / signed head-announce）
+- ADR-2607022300（private tenant、GitHub mirror 格下げ、CACAO edge 認証）
+- ADR-2607050400（WebAuthn → CACAO）
+- ADR-2607125300（GitHub Actions の workflow scope 実害）
+- ADR-2607012000（ISCO occupation blueprints）
+- 実査結果: `orgs/gftdcojp/cloud-itonami` の `business_loop.cljc` /
+  `business_governor.cljc` / `approval.cljc` / `mail.cljc` / `tick.cljc` /
+  `workers/mail-inbound/index.js` / `scripts/mail-drain.bb` /
+  `.github/workflows/{ci,deploy}.yml`（両方 inert）/ `lefthook.yml`（2026-07-14）
