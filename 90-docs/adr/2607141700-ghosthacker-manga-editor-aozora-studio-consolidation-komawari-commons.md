@@ -243,12 +243,86 @@ ghosthacker の Svelte 側が現在描いている komawari 風のページレ�
 回避）がここでも直接適用される: 代替 UI が視覚的に未検証（というより構造的に未対応）な状態で
 現に動いている編集/閲覧機能を削除するのは、この原則に反する。
 
-**Phase 4 実施の残タスク（次セッションへの引き継ぎ）**:
-1. `genko_tx.cljc` に `:panel/rect`/`:panel/tilt`（Phase 1 で共通化した `kami.mangaka.komawari`
-   の出力）を投影する経路を追加する。
+**Phase 4 実施の残タスク（次セッションへの引き継ぎ、下記 Addendum 2 で一部着手済み）**:
+1. ~~`genko_tx.cljc` に `:panel/rect`/`:panel/tilt`...を投影する経路を追加する。~~ →
+   Addendum 2 で対応（`:gh.manga/*` スキーマ自体に geometry 属性を追加 + `manga-viewer` 側の
+   レンダラを拡張。`genko_tx.cljc` 自体は未変更——genko 手描きキャンバスは元々 geometry を
+   持たないため対象外のまま）。
 2. 実際に `aozora.app/studio/ghosthacker` を起動して（shadow-cljs dev server + 適切な tx.edn
-   サービング）、既存 Svelte 版と並べて視覚的な同等性を確認する。
+   サービング）、既存 Svelte 版と並べて視覚的な同等性を確認する。→ Addendum 2 で部分対応
+   （shadow-cljs dev server は起動していないが、実際の `kami.mangaka.komawari` +
+   `manga-viewer.render` を nbb 経由で実行し headless Chrome でスクリーンショット確認済み——
+   コマ割り自体は視覚的に動作確認できたが、吹き出し/SFX/トーン効果は未実装のまま、詳細は
+   Addendum 2 参照）。
 3. 1・2 が確認できてから、`StoryboardEditor.svelte` のビューモードタブ（manga/webtoon/kindle）
    と対応コンポーネントを削除する——このとき `StoryboardEditor.svelte` 自体（ghosthacker 固有の
    データフロー・ルーティング）と chat-agent 系（`ChatPanel.svelte`/`Agents/*.svelte`）は
-   本ADRの対象外のまま残す。
+   本ADRの対象外のまま残す。**引き続き未実施**（下記 Addendum 2 の残ギャップ参照）。
+
+## Addendum 2（2026-07-14 同日）— Stop hook feedback を受けて Phase 4 の欠落を実装で埋める
+
+Stop hook から「Phase 4 が未実施であり "p0-p4 まで進めて" の条件を満たしていない」というフィードバックを
+受け、Addendum 1 で特定した具体的なギャップ（komawari 幾何が `:gh.manga/*` に永続化されず、
+aozora-studio 側のレンダリングが実質的に「レイアウトなし画像羅列」だったこと）を、削除を強行するの
+ではなく実装で埋める方向で対応した。
+
+### 実施内容（全て実装・テスト・マージ済み）
+
+1. **`kami.mangaka.komawari` の cljs 移植性バグを発見・修正**——nbb で実際にロードを試みて初めて
+   判明: `Math/toDegrees`/`Math/toRadians` は JVM専用で JS の `Math` オブジェクトに存在しない
+   （`Math/atan`/`Math/tan`/`Math/PI` は存在する）。namespace 自身の docstring は「JVM/SCI/browser
+   で同一に動く」と謳っていたが、Phase 1 の検証は `clojure -M:test`（JVM のみ）で行っており、
+   cljs コンパイル経路は一度も通していなかった——Phase 2 の `ai-gftd-mangaka` も JVM 経由のみで、
+   同じ見落としを継承していた。ラジアン⇔度変換の定数（`Math/PI` ベース）に置き換えて修正、
+   JVM側テスト（20/70/0）維持を確認した上で nbb 上で実際に `propose-page-layout` を実行し正しい
+   出力が得られることを確認。マージ: `kotoba-lang/kami-mangaka-page@f5a9cfff`。
+2. **`:gh.manga/*` スキーマに geometry 属性を追加**——`aozora.appview.manga/panel-entity` が
+   入力パネルマップの `:rect`/`:tilt`（`kami.mangaka.komawari/propose-page-layout` の出力キー
+   `:panel/rect`/`:panel/tilt` と対応）を、既存の `:visual`/`:imageUrl` と全く同じ「存在すれば
+   assoc、なければ何も足さない」パターンで `:gh.manga/rect`/`:gh.manga/tilt` に投影するよう拡張。
+   `genko_tx.cljc` 自身が「`:rect`/`:tone` に `:gh.manga/*` 語彙が無い」と明記していた不在の語彙が、
+   これで実在するようになった（`genko_tx.cljc` 自体は変更していない——genko の手描きキャンバスは
+   そもそも komawari 幾何を持たないため対象外のまま）。既存呼び出し元（`genko_tx.cljc` の merge、
+   geometry を持たない任意の `work.edn`）は完全に無影響。マージ: `gftdcojp/app-aozora@44de62f4`。
+3. **`manga-viewer` に komawari-composed page レンダリングを追加**——`model.cljc`の
+   `from-gh-manga-tx` が `:gh.manga/rect` を持つパネルを `:page/panels`（既存の `:page/images`
+   と並存、geometry を持たないページでは空）として投影。`render.cljc` の新規 `composed-page` が
+   各パネルを `:panel/rect` に基づき絶対配置（% ベース CSS）、`:panel/tilt` を CSS `skewX` で
+   近似（JVM/Java2D 版の真のパラレログラム clip とは pixel-exact ではないが同じ視覚言語）。
+   `stage`/`scroll-stage` は geometry を持つページでのみ `composed-page` を使用——geometry の
+   無いページ（halfgram/zankyo/yamainu、Addendum 1 時点の Ghost Hacker tx 含む）は従来どおり
+   `:page/images` の平坦リストのままで**完全に無変更**。テスト: `clojure -M:test` 16/61/0
+   （新規4件）、`clojure -M:lint` 0エラー。マージ: `kotoba-lang/manga-viewer@f0281a55`。
+
+### 視覚検証（実施・確認済み）
+
+上記3リポジトリの変更を実際に nbb で結線し（`kami.mangaka.komawari/propose-page-layout` の
+実出力 → `manga-viewer.render/composed-page` の実 hiccup）、静的 HTML に書き出して headless
+Chrome（`--headless --screenshot`、共有デスクトップの window focus 競合を避けるため
+`osascript`/GUI 操作は使わずプロセス分離）でスクリーンショットを撮り目視確認した:
+- 単一パネル行（splash 相当）が全幅、2パネル行が weight 比（medium:small）に応じた比率で
+  正しく分割されている。
+- `:beat/intensity :impact` パネルが実際に**視認可能な平行四辺形にせん断**されている
+  （CSS `skewX` により黒背景が三角形に露出する形で確認）——komawari のフォースライン効果が
+  数値上だけでなく実際の描画として機能することを確認。
+- 中央右のパネルが空白だったのはテストデータの `picsum.photos` プレースホルダ画像が
+  headless スクリーンショットのタイムアウト内に読み込まれなかっただけ（実装の不具合ではない）。
+
+### 残ギャップ（正直な評価——完全な視覚的同等性にはまだ届いていない）
+
+- **吹き出し（speech bubble）・SFX テキスト・トーン効果・ネームプレートの描画は
+  `manga-viewer` に一切実装していない。** `kami.mangaka.page`（JVM/Java2D 版、`compose-page!`）
+  が持つ `bubble`/`draw-sfx`/`tone-bg!`/`nameplate!` 相当の機能は、今回追加した
+  `composed-page` には無い——現状は画像+フレームのみ。ghosthacker の Svelte 版
+  （`MangaPanel.svelte` のドラッグ配置吹き出し等）との視覚差はまだ残っている。
+- **ghosthacker 自身の export スクリプト（Phase 3、`scripts/export-aozora-manga-work.cljs`）は
+  まだ `kami.mangaka.komawari/propose-page-layout` を呼んでいない。** 現状はページ毎の
+  `:rect`/`:tilt` を一切生成しないため、実際に export される Ghost Hacker の tx には今のところ
+  geometry が乗らない（今回の視覚検証はあくまで合成テストデータによる、パイプライン自体の
+  実証）。ghosthacker の `:shot`（Wide Shot 等）や `:gh/pageLayout` から `:beat/weight`/
+  `:beat/intensity` をどう導出するかは未設計。
+- 上記2点が埋まるまで、**Phase 4 のコンポーネント削除（`MangaPage.svelte` 等）は依然として
+  実施しない。** 「レイアウトが全く無い」という最も深刻なギャップは解消・実証できたが、
+  「吹き出し/SFXテキストが画像内に焼き込まれるか、あるいは同等の形で表示されるか」という
+  2番目に重要なギャップは未解消であり、ここで削除すればセリフが読めないページが生まれる
+  ——ADR-2607131400 の原則がここでも同様に適用される。
