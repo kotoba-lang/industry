@@ -2728,13 +2728,13 @@
    :operating-states [:intake :survey :advise :treat :record :audit]},
   {:id "0510"
    :name "Mining of hard coal"
-   :repo "https://github.com/gftdcojp/cloud-itonami-B0510"
-   :business-id "cloud-itonami-B0510"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0510"
+   :business-id "cloud-itonami-isic-0510"
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :survey :extract :grade :ship :audit]},
+   :maturity :implemented
+   ;; ISIC Rev.4 class (4-digit) — hard coal mining operations-coordination actor (Wave 3)
+   :operating-states [:intake :advise :govern :decide :commit]},
   {:id "0520"
    :name "Mining of lignite"
    :repo "https://github.com/gftdcojp/cloud-itonami-B0520"
