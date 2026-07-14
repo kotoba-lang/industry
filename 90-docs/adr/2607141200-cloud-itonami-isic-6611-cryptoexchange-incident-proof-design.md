@@ -169,6 +169,43 @@
   負の残高集計を「broken でなく invalid」に分類（allow_negative 裏口の signature、
   A2）、conflict code は bit-sum（prop=1 / self-collateral=2 / bypass=4 / lending=8）。
 
+## Addendum 3（2026-07-14）: M2 完了（/loop self-paced 実行）
+
+オーナーの /loop 指示による self-paced 実行で、M2 の 4 切片を同日完遂。
+衛星 repo main: M2a `6718197` → M2b `331cdd6` → M2c `ae28fdb` → M2d `a8b6119`。
+
+- **M2a `cryptoexchange.ledger`**: append-only event log を唯一の状態層に
+  （INV-5）。残高は純 fold、mutation API 不存在、負残高は構造的に不可能
+  （overdraw を append 時拒否）、手動補正は dual-control `:adjustment` のみ。
+  改竄ログは replay が、ログ迂回の残高偽造は conservation kernel が検出
+  （defense in depth をテストで実証）。
+- **M2b `cryptoexchange.matching`**: 全順序 order log の純 fold（INV-11）。
+  price-time priority は複合キー `[price seq]` で sort stability 非依存、
+  maker 価格規則（執行価格にエンジン裁量なし、INV-4）、**reject-taker 型
+  自己約定防止**（crossing 領域に自 account の resting があれば 1 fill も
+  執行せず拒否 — wash trading をエンジンで拒絶、A9）、cancel は所有者のみ、
+  `replay-book` が第三者再計算経路。`fill->trade-event` で台帳に接続し
+  約定→決済→conservation 保持を実証。
+- **M2c `cryptoexchange.attest`**: Maxwell 型 Merkle-sum liability tree
+  （INV-7）。root `:sum` = 顧客負債総額、利用者 inclusion proof、負の中間
+  sum 拒否（sum-shrinking 対策）、奇数ノードは carry-up（複製は sum 二重
+  計上のため禁止）。**reserves-only の PoR は構造的に生成不能**（artifact は
+  liability root + solvency kernel 判定を必ず含む）。fixture root hash を
+  テストに pin し、JVM/CLJS がバイト一致で再現することを強制。自社発行
+  トークン準備金は額に関わらず insolvent（INV-3）、attestation 省略も同様。
+- **M2d `cryptoexchange.store`**: MemStore ≡ DatomicStore（langchain.db =
+  kotoba-datomic seam）。store は**イベントのみ**永続化し、残高・板・root は
+  常に protocol read 上の fold（どのバックエンドにも materialized balance が
+  存在しない = INV-5 が backend 横断で成立）。append は必ずドメイン fold の
+  検証を通過（無効イベントはどのバックエンドにも痕跡を残さない）。両バック
+  エンドが同一スクリプトから events/balances/book/fills/attestation root
+  まで完全一致することを contract test で証明。kotoba-server への retarget
+  は `:db-api` swap（langchain.kotoba-db）。
+- 検証: CLJS（primary）+ JVM（compat）**47 tests / 16,810 assertions
+  0 failures**（DatomicStore の CLJS 実行含む）、clj-kondo 0 errors。
+- maturity は `:blueprint` のまま（actor 未実装、INV-14 不変）。残る M3 =
+  custody 統合詳細設計（MPC 選定・鍵セレモニー・WYSIWYS 手順書、実資金なし）。
+
 ## References
 
 - ADR-2607121000（逆トポソート 5-wave — 6611/6612「取引台帳」注記）

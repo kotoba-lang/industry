@@ -38,7 +38,17 @@
     :design-notes ["custody deny ladder order: invalid -> hot-ratio -> quorum -> allowlist -> timelock -> verifier -> velocity"
                    "conservation classifies negative aggregate balances as invalid (allow_negative backdoor signature, A2), not merely broken"
                    "conflict code is a bit-sum: prop=1 self-collateral=2 bypass=4 lending=8"
-                   "maturity stays :blueprint — kernels are not an actor; no registry change; INV-14 unchanged"]}]
+                   "maturity stays :blueprint — kernels are not an actor; no registry change; INV-14 unchanged"]}
+   {:addendum 3
+    :date "2026-07-14"
+    :title "M2 complete (owner /loop, self-paced)"
+    :artifacts {:satellite-commits "M2a 6718197 -> M2b 331cdd6 -> M2c ae28fdb -> M2d a8b6119"
+                :ledger "cryptoexchange.ledger — append-only sole state layer (INV-5): balances=pure folds, no mutation API, no negative balances by construction, dual-control :adjustment only; tampered logs die on replay, forged balances die in the conservation kernel"
+                :matching "cryptoexchange.matching — deterministic fold of the total-order order log (INV-11): composite-key price-time priority, maker price rule (INV-4), reject-taker self-trade prevention (A9), owner-only cancel, replay-book third-party recomputation, fill->trade-event settles onto the ledger"
+                :attest "cryptoexchange.attest — Maxwell Merkle-sum PoR+PoL (INV-7): root sum == total customer liability, user inclusion proofs, negative-intermediate-sum rejection, carry-up odd nodes, reserves-only artifact unbuildable, fixture root hash pinned across JVM/CLJS, self-token reserves judge insolvent (INV-3)"
+                :store "cryptoexchange.store — MemStore ≡ DatomicStore over langchain.db (kotoba-datomic seam): events-only persistence, appends validate through domain folds, both backends fold-identical incl. attestation roots; kotoba-server retarget = :db-api swap"
+                :verification "CLJS primary + JVM compat both 47 tests / 16810 assertions 0 failures (DatomicStore under CLJS included); clj-kondo 0 errors"}
+    :note "maturity stays :blueprint (no actor claimed, INV-14 unchanged); remaining M3 = custody integration detailed design (MPC selection, key ceremony, WYSIWYS runbook, no real funds)"}]
   :adr/decision-summary
   "{:audit \"cloud-itonami に cryptoexchange 未設計を実測確認 (2026-07-14): 金融 Wave0 18repo/industry registry/5-wave 計画のいずれにも crypto exchange なし\",
     :incident-register {:A1 \"顧客資産流用・混蔵 (FTX/Celsius)\" :A2 \"帳簿裏口・特権口座 (FTX allow_negative/Alameda 清算免除)\" :A3 \"支払不能の隠蔽 (Mt.Gox)\" :A4 \"ホットウォレット侵害 (Coincheck/Zaif/BitPoint)\" :A5 \"署名運用侵害・blind signing (DMM 2024/WazirX/Bybit 2025 Safe UI 改ざん)\" :A6 \"単一人物リスク (QuadrigaCX)\" :A7 \"exit scam (Thodex/Africrypt)\" :A8 \"AML/KYC 不備 (Binance 2023/BitMEX)\" :A9 \"市場操作・利益相反 (wash trading/insider listing/front-running)\" :A10 \"レバレッジ増幅 (FTX デリバ・清算カスケード)\"},
