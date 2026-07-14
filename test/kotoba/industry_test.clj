@@ -624,8 +624,10 @@
       ;; :implemented. First ISIC Wave 1 class promoted -- ADR-2607121000's
       ;; own explicit Top-10 value-ranking item #6. See superproject
       ;; ADR-2607142400. 0910 (Petroleum Services) promoted to :implemented
-      ;; per ADR-2607142600.
-      (is (= 160 (:implemented m))))))
+      ;; per ADR-2607142600. 2394/2620/2930/4741 promoted to :implemented
+      ;; per ADR-2607142800's robotics-process-simulation value-chain
+      ;; build-out (auto-parts/cement-mill/device-assembly/computer-retail).
+      (is (= 166 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

@@ -3516,13 +3516,22 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2394"
    :name "Manufacture of cement, lime and plaster"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2394"
-   :business-id "cloud-itonami-C2394"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2394"
+   :business-id "cloud-itonami-isic-2394"
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as a cement-mill actor (Cement
+   ;; Mill Advisor ⊣ Kiln Governor). Legacy gftdcojp/cloud-itonami-C2394
+   ;; placeholder replaced with real cloud-itonami/cloud-itonami-isic-2394.
+   ;; Closes the construction value-chain mid-tier manufacturing gap
+   ;; between raw-material extraction (0810) and building construction
+   ;; (4211): cement-batch intake, cement-quality-standard rules verify
+   ;; (JIS R 5210 / ASTM C150 / EN 197-1 via BS EN 197-1 + DIN EN 197-1),
+   ;; kiln-emissions screen, robot quality-lab verification mission
+   ;; (ADR-2607142800 robotics-process-simulation pattern), dual
+   ;; actuation (ship-cement-batch + issue-mill-certificate).
+   :required-technologies [:robotics :cae :dmn :bpmn :audit-ledger]
+   :optional-technologies [:telemetry :optimization]
+   :operating-states [:intake :quality-standard-rules-verify :kiln-emissions-screen :approve :ship-cement-batch :issue-mill-certificate :audit]},
   {:id "2395"
    :name "Manufacture of articles of concrete, cement and plaster"
    :repo "https://github.com/gftdcojp/cloud-itonami-C2395"
@@ -3676,13 +3685,23 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2620"
    :name "Manufacture of computers and peripheral equipment"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2620"
-   :business-id "cloud-itonami-C2620"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2620"
+   :business-id "cloud-itonami-isic-2620"
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as a device-assembly actor (Device
+   ;; Assembly Advisor ⊣ Assembly Governor). Legacy gftdcojp/cloud-itonami-C2620
+   ;; placeholder replaced with real cloud-itonami/cloud-itonami-isic-2620.
+   ;; Closes the final-product-assembly gap (2026-07-14 computer/electronics
+   ;; value-chain survey) between component fab (2610) and downstream
+   ;; retail/distribution: device-unit final assembly, compliance-rules
+   ;; verify, end-of-line quality screen, robot burn-in-cell verification
+   ;; mission (ADR-2607142800 robotics-simulation pattern), dual actuation
+   ;; (ship-device-unit + issue-declaration-of-conformity), jurisdiction
+   ;; facts catalog (JPN VCCI/PSE / USA FCC Part 15 / GBR OPSS UKCA / DEU
+   ;; Bundesnetzagentur EU CE-EMC+RoHS).
+   :required-technologies [:robotics :cae :dmn :bpmn :audit-ledger]
+   :optional-technologies [:cfd :telemetry :optimization]
+   :operating-states [:intake :compliance-rules-verify :end-of-line-quality-screen :approve :ship-device-unit :issue-declaration-of-conformity :audit]},
   {:id "2630"
    :name "Manufacture of communication equipment"
    :repo "https://github.com/gftdcojp/cloud-itonami-C2630"
@@ -4080,13 +4099,24 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2930"
    :name "Manufacture of parts and accessories for motor vehicles"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2930"
-   :business-id "cloud-itonami-C2930"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2930"
+   :business-id "cloud-itonami-isic-2930"
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as an auto-parts actor
+   ;; (Auto-Parts Advisor ⊣ Auto-Parts Governor). Legacy
+   ;; gftdcojp/cloud-itonami-C2930 placeholder replaced with real
+   ;; cloud-itonami/cloud-itonami-isic-2930. Fills the auto-parts
+   ;; supplier tier directly upstream of isic-2910's OEM
+   ;; final-assembly tier in the automotive value chain (2026-07-14
+   ;; value-chain survey gap): part-lot intake, PPAP evidence-checklist
+   ;; verify, process-capability defect screen, robot CMM/torque/
+   ;; weld-inspection mission (kotoba.robotics, ADR-2607142800
+   ;; pattern delivered from day one), dual actuation (ship-part-lot +
+   ;; issue-ppap-certificate), PPAP facts catalog (USA AIAG / DEU VDA
+   ;; QMC / GBR SMMT / JPN JAPIA-JASO).
+   :required-technologies [:robotics :cae :dmn :bpmn :audit-ledger]
+   :optional-technologies [:cfd :telemetry :optimization]
+   :operating-states [:intake :ppap-evidence-verify :process-capability-screen :approve :ship-part-lot :issue-ppap-certificate :audit]},
   {:id "3011"
    :name "Building of Ships and Floating Structures"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3011"
@@ -5202,14 +5232,25 @@
    ;; fns in forecourt.registry.
    :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "4741"
-   :name "Retail sale of computers, peripheral units, software and te..."
-   :repo "https://github.com/gftdcojp/cloud-itonami-G4741"
-   :business-id "cloud-itonami-G4741"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :stock :sell :reconcile :reorder :audit]},
+   :name "Retail sale of computers, peripheral equipment and software in specialized stores"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4741"
+   :business-id "cloud-itonami-isic-4741"
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as a computer-retail-plus-trade-in
+   ;; actor (Retail Advisor ⊣ Retail Governor). Legacy
+   ;; gftdcojp/cloud-itonami-G4741 placeholder replaced with real
+   ;; cloud-itonami/cloud-itonami-isic-4741. Closes the downstream-retail
+   ;; gap in the computer/electronics value chain (after fab 2610 and
+   ;; final-assembly 2620): order intake, consumer-protection/distance-
+   ;; selling rules verify (JPN 特定商取引法 / USA FTC 16 CFR Part 435 /
+   ;; EU Directive 2011/83), trade-in-condition defect screen, robot
+   ;; certified data-wipe mission (NIST SP 800-88 Rev. 2), dual actuation
+   ;; (fulfill-order + issue-sanitization-certificate). First cloud-
+   ;; itonami vertical to make the robotics premise (ADR-2607011000)
+   ;; concrete in a RETAIL, not manufacturing, context (ADR-2607150400).
+   :required-technologies [:robotics :identity :dmn :bpmn :audit-ledger]
+   :optional-technologies [:forms :retail :optimization]
+   :operating-states [:intake :consumer-protection-rules-verify :trade-in-condition-screen :robotics-simulate-data-wipe :approve :fulfill-order :issue-sanitization-certificate :audit]},
   {:id "4742"
    :name "Retail sale of audio and video equipment in specialized stores"
    :repo "https://github.com/gftdcojp/cloud-itonami-G4742"
