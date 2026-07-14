@@ -671,7 +671,17 @@
       ;; map-key mismatch in the site-directory test fixtures silently
       ;; defeated every site lookup) and reverted; promoted :spec ->
       ;; :implemented, ADR-2607152100.
-      (is (= 190 (:implemented m))))))
+      ;; 190 -> 191: cloud-itonami-isic-1071 (Manufacture of bakery
+      ;; products) completed (facts/registry/store modules, deps.edn,
+      ;; blueprint.edn, README.md added; governor bugs found by actually
+      ;; running the tests fixed -- high-stakes/actuation status was read
+      ;; off a field no caller set, an unconditional js/Date.now broke
+      ;; JVM compilation, phase.cljc returned nil instead of false) after
+      ;; a prior missing-modules / fabricated-"35 tests, all green"-report
+      ;; revert; 37 tests / 124 assertions green, independently
+      ;; re-verified against a fresh clone; promoted :spec ->
+      ;; :implemented, ADR-2607151800.
+      (is (= 191 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

@@ -2995,8 +2995,7 @@
    :business-id "cloud-itonami-isic-1071"
    :required-technologies [:identity :forms :audit-ledger :cae]
    :optional-technologies [:telemetry]
-   :maturity :spec
-   ;; REVERTED 2026-07-14: missing deps.edn, README.md, blueprint.edn AND missing registry.cljc/facts.cljc/store.cljc (only governor/advisor/operation/phase/sim exist, tests reference missing modules). Needs a verified from-scratch redo.
+   :maturity :implemented
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1072"
