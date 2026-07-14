@@ -4391,13 +4391,15 @@
    :operating-states [:intake :observe :recommend :dispatch :settle :audit]},
   {:id "3520"
    :name "Manufacture of gas"
-   :repo "https://github.com/gftdcojp/cloud-itonami-D3520"
-   :business-id "cloud-itonami-D3520"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3520"
+   :business-id "cloud-itonami-isic-3520"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :observe :recommend :dispatch :settle :audit]},
+   :optional-technologies [:pressure-monitoring :leak-detection]
+   :maturity :implemented
+   ;; community gas-supply distribution operations with hard safety gates
+   ;; (life-support/critical-infrastructure protection from disconnection)
+   ;; ADR-2607142100, modeled on 3600/6190 (water/telecom negative-actuation)
+   :operating-states [:intake :verify :provision :suspend :audit]},
   {:id "3530"
    :name "Steam and air conditioning supply"
    :repo "https://github.com/gftdcojp/cloud-itonami-D3530"
