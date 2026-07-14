@@ -7754,14 +7754,28 @@
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :register :decide :notify :appeal :audit]},
   {:id "8421"
-   :name "Foreign affairs"
-   :repo "https://github.com/gftdcojp/cloud-itonami-O8421"
-   :business-id "cloud-itonami-O8421"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
+   :name "Foreign affairs and consular services administration"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-8421"
+   :business-id "cloud-itonami-isic-8421"
+   :required-technologies [:robotics :identity :forms :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :register :decide :notify :appeal :audit]},
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented: Foreign Consular Services Advisor ⊣
+   ;; Foreign Consular Governor actor (src/foreign/*.cljc, test/foreign/*),
+   ;; covering visa application intake and document verification, consular
+   ;; service scheduling (passport renewals, notarizations), diplomatic
+   ;; correspondence drafting, travel advisory logging. Hard invariants:
+   ;; applicant registration, no direct actuation, scope boundary (visa
+   ;; grant/deny decisions, binding diplomatic statements, policy setting,
+   ;; personnel command permanently forbidden, structured via closed
+   ;; allowlist). Escalation invariants: visa application intake, security
+   ;; concerns, low confidence. 11 tests/35 assertions run green before
+   ;; claiming :implemented, clj-kondo clean. See
+   ;; ADR-2607142200 for this repo's implementation details and
+   ;; cloud-itonami-isic-8421/docs/adr/0001-architecture.md for the
+   ;; closed-allowlist design rationale.
+   ;; ISIC Rev.5 class (4-digit) — consular/administrative focus
+   :operating-states [:intake :advise :govern :decide :hold :commit :request-approval]},
   {:id "8422"
    :name "Defence procurement and logistics administration"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-8422"
