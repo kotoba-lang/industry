@@ -1,6 +1,6 @@
 # ADR-2607141550: persona ベースの visual / user test と feedback react loop
 
-**Status**: accepted, first iteration executed
+**Status**: accepted, implemented (closing 2026-07-14 — persona layer 稼働、telemetry 較正は follow-up)
 **Date**: 2026-07-14
 **Deciders**: Jun Kawasaki
 

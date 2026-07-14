@@ -1,6 +1,6 @@
 # ADR-2607141753: 確認屋（kakuninya）— errand 業務の itonami.cloud（組織）/ manimani.cloud（個人）統合
 
-**Status**: accepted, design（M0 実装は follow-up）
+**Status**: accepted, M0+M1 implemented & operating (closing 2026-07-14)
 **Date**: 2026-07-14
 **Deciders**: Jun Kawasaki
 
@@ -184,6 +184,33 @@ store 副作用が先に実行**されていた → thunk 化 ②deploy 直後�
 - 実測バグ: default-http-fn が pr-str EDN を application/json として送り全 PUT が
   500（`:pushed 0`）→ JSON 直列化に修正（`ff6a3f1b`）。**stub http-fn の smoke は
   transport 直列化を検証できない** — live 検証を省略しない教訓がまた 1 つ。
+
+## Addendum 4 — closing（2026-07-14、オーナー指示）
+
+本 ADR と関連 4 ADR（2607141446 ITAD/LP・2607141550 persona loop・
+2607141620 kyoninka・2607141654 errand）を close する。**最終状態**:
+
+- **稼働中**: itad.gftd.ai（LP、audit 100.00）/ manimani.cloud per-user
+  （`/u/junkawasaki` 有効、owner DID `did:key:z6MkmCrDjqsUiHM4bK6zVyzuYGitMGjCVRb1eTrF122mxrNU`）/
+  確認屋 M0+M1（errand→effect 投影 + assignment push/evidence writeback、
+  実運転第 1 回済み — **個人 inbox に errand 2 件が evidence 待ちで live**）。
+- **本セッションで live/実測が捕まえた欠陥 7 件**（すべて修正済み。設計論より
+  実測を信じる根拠として記録）: cljs `:advanced` の property munge / screenshot
+  素撮りの偽見切れ（persona 偽陽性）/ 比較表の自社列切れ / `case` 束縛の macro
+  shadow / checkpointer thread-id 再開 / 認可 gate の副作用先行評価 /
+  EDN-as-JSON transport。
+
+**未了事項の集約（single list — 各 ADR の Follow-ups はここに統合）**:
+1. 【owner・今すぐ】inbox の errand 2 件の実行（丸の内署・東京都環境局の実値確認）
+   → 返信 or `POST /u/junkawasaki/decisions`。
+2. 【1 行】tick-loop launchd 常設化（`:license-ledger-path` + `:manimani` opts）。
+3. 【owner 決裁】行政書士相談（廃棄物該当性 = 収集運搬許可の要否）、JW 講習予約、
+   確定価格、gftd.co.jp 配置、BMC base datoms 登録、LINE 公式・広告 ID 投入。
+4. 【M2】kotobase graph 昇格 + CACAO 署名検証 + capability share（net-kotobase#153 後）。
+5. 【M3】errand 水平展開（2 個目の消費者で kotoba-lang 切り出し再評価）。
+6. 【小】persona panel 3-judge 化・:telemetry 較正、site raw-hex baseline 2 fail
+   （kotoba-ui theme-color meta の上流 drift）、claude.ai stand-up routine
+   （任意・GitHub 連携後）。
 
 ## Consequences
 

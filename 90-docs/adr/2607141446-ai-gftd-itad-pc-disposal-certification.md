@@ -1,6 +1,6 @@
 # ADR-2607141446: ai-gftd-itad — ITAD（PC 廃棄証明）事業と gftd.co.jp LP
 
-**Status**: accepted, scaffolded
+**Status**: accepted, deployed (itad.gftd.ai live — closing 2026-07-14, 残件は Follow-ups)
 **Date**: 2026-07-14
 **Deciders**: Jun Kawasaki
 
