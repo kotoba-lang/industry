@@ -651,7 +651,13 @@
       ;; green -- reverted those 11 back to :spec with reasons recorded on
       ;; each entry. Genuinely verified good: 0321/0891/1020/1050/1200/1312.
       ;; 181 -> 187.
-      (is (= 187 (:implemented m))))))
+      ;; 187 -> 188: cloud-itonami-isic-0141 promoted :spec -> :implemented
+      ;; (Raising of cattle and buffaloes; CattleOpsAdvisor ⊣
+      ;; RanchingOperationsGovernor ranch-operations-coordination actor,
+      ;; module structure mirrored from cloud-itonami-isic-1010. Reverts a
+      ;; prior same-day attempt that pushed docs+tests with no src/. 30
+      ;; tests/90 assertions run green before claiming :implemented).
+      (is (= 188 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

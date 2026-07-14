@@ -2559,10 +2559,15 @@
    :business-id "cloud-itonami-isic-0141"
    :required-technologies [:robotics :identity :forms :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; REVERTED 2026-07-14: the promoting agent pushed docs+tests only, no
-   ;; src/ or deps.edn -- there is no real actor here yet. Repo link kept
-   ;; (real repo exists, just empty); needs a proper from-scratch redo.
+   :maturity :implemented
+   ;; Wave-3 ranch-operations actor implementation complete (2026-07-14):
+   ;; CattleOpsAdvisor ⊣ RanchingOperationsGovernor pattern, closed op
+   ;; allowlist (log-herd-record/schedule-veterinary-visit/
+   ;; flag-animal-health-concern/order-supplies), direct treatment
+   ;; administration and slaughter/culling decisions permanently blocked.
+   ;; Scope: ranch back-office coordination only (no direct animal
+   ;; handling). Propose-only operations, animal health/welfare concerns
+   ;; always escalate. 30 tests / 90 assertions green.
    :operating-states [:intake :advise :govern :decide :commit :hold]},
   {:id "0142"
    :name "Raising of horses and other equines"
