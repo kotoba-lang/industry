@@ -49,7 +49,7 @@ merge conflicts in this superproject and its `orgs/` child repos.
 4. Commit cleanup work with:
 
    ```bash
-   git commit -m "cleanup" -m "Co-Authored-By: Claude Opus 4.8 (1M context)"
+   git commit -m "cleanup"   # Co-Authored-By trailer は実行中のハーネス既定の規約に従う
    ```
 
 5. Create, inspect, and merge the PR:
