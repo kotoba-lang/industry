@@ -148,6 +148,27 @@
 - west pin 前進: industry `c3999a72` → `50b7f732`（API single-entry commit
   `8bb9cdb8`、blob SHA 楽観ロック、diff は当該 revision 行のみ、純前進）。
 
+## Addendum 2（2026-07-14）: M1 実行済み
+
+オーナー指示「next」により同日実行。衛星 repo main `7bcb482`:
+
+- **safety kernel 4 本**（`cryptoexchange.kernels.{solvency,custody,conservation,
+  conflict}`）を safe-kotoba subset（integer-coded・fail-closed・named combinators、
+  ADR-2607121200 規律）で実装。battery + case-count lock は 14/22/12/13 cases、
+  独立 oracle との parity matrix は 90/15120/256/81 combos、定数 drift pin
+  （hot-cap 500bp == cold≥95%、min-quorum-m 2 == 単独人物禁止）。
+- **façade** `cryptoexchange.governor`: keyword↔wire-code 変換のみ（判定ロジックは
+  kernel 側）。boundary の boolean 変換も fail-closed — permission facts
+  （allowlisted?/timelock-ok?/verifier-match?）は明示 `true` のみ許可、attestation
+  facts（prop-trading? 等）は明示 `false` のみ clean（キー省略 = violation）。
+- **検証**: CLJS（primary gate、`cljs.main --target node`）**24 tests / 16,605
+  assertions 0 failures**、JVM（compat）同値、clj-kondo 0 errors。
+- maturity は `:blueprint` のまま（kernel ≠ actor。registry 変更なし、INV-14 不変）。
+- 設計上の追加確定: custody kernel の deny ladder 順序（invalid → hot-ratio →
+  quorum → allowlist → timelock → verifier → velocity）、conservation kernel は
+  負の残高集計を「broken でなく invalid」に分類（allow_negative 裏口の signature、
+  A2）、conflict code は bit-sum（prop=1 / self-collateral=2 / bypass=4 / lending=8）。
+
 ## References
 
 - ADR-2607121000（逆トポソート 5-wave — 6611/6612「取引台帳」注記）
