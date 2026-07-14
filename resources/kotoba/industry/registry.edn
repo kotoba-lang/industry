@@ -4628,15 +4628,16 @@
    :business-id "cloud-itonami-4321"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies [:optimization]
-   ;; Published as a :blueprint repo (business-model.md + operator-guide.md +
-   ;; blueprint.edn + governance docs, no src/test yet -- the OSS blueprint
-   ;; stage, not yet :implemented). :maturity :spec explicitly removed so
-   ;; maturity-of/maturity now auto-derive :blueprint from the real :repo
-   ;; above (see `kotoba.industry/maturity-of`). The legacy placeholder
-   ;; :repo (gftdcojp/cloud-itonami-F4321) never actually existed (confirmed
-   ;; 404 before this edit) -- replaced with the real repo, following the
-   ;; SAME cloud-itonami/cloud-itonami-isic-#### naming convention as every
-   ;; other actor in this fleet rather than the legacy F-prefixed scheme.
+   :maturity :implemented
+   ;; Implemented: electrical-trade coordination actor (Advisor + Governor,
+   ;; propose-only). Coordinates electrical installation projects
+   ;; (project intake, progress logging, crew dispatch scheduling, hazard
+   ;; flagging, inspection requests) with per-jurisdiction legal-basis
+   ;; gates (JPN/USA/DEU official sources). All operations are :propose
+   ;; (coordination suggestions); licensed electrician executes. Governor
+   ;; hard-blocks direct work attempts, ensures project registration before
+   ;; any operation, escalates hazards and inspection requests to human.
+   ;; See `src/electrical/` and `docs/adr/0001-architecture.md`.
    ;; Governor keyword :electrical-trade-governor is grep-verified UNIQUE
    ;; fleet-wide within the ISIC-numbered cloud-itonami-isic-* series
    ;; (distinct from :electrical-install-governor, used by the SEPARATE
@@ -4647,9 +4648,8 @@
    ;; operating-states shape in this fleet (permit-based
    ;; intake->design->permit->build->inspect->audit, matching the
    ;; registry entry's own existing operating-states) after the earlier
-   ;; service-dispatch and manufacturing-lifecycle shapes. No bespoke
-   ;; capability library exists for electrical trade licensing
-   ;; specifically. See ADR-2607101500.
+   ;; service-dispatch and manufacturing-lifecycle shapes. Bespoke
+   ;; capability library: kotoba-lang/industry (this registry).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :design :permit :build :inspect :audit]},
   {:id "4322"
