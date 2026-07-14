@@ -294,6 +294,24 @@ M4b `8c37ac7`。すべて design/testnet-only、実資金・実鍵・実チェ�
 follow-up（未着手）: 公開 JSON を消費する self-contained ブラウザ検証ページ
 （第 4 の独立実装）と、artifact を配信する discovery surface。
 
+## Addendum 9（2026-07-14）: real Bitcoin WYSIWYS デコーダ（kotoba-lang/btc-crypto 活用）
+
+wysiwys の意味論スタンドインを、BTC については実装に置き換えた（衛星 `2bef035`）。
+`cryptoexchange.wysiwys-btc` が**実際の raw unsigned Bitcoin tx をパース**して出力の
+`(destination address, value)` を復元（P2WPKH/P2WSH/P2TR/P2PKH/P2SH 分類）、
+script→address 変換に `kotoba-lang/btc-crypto` の bech32/base58 エンコーダを再利用
+（btc-crypto に無い「デコード方向」だけを足す）。未知スクリプトは fail-closed。
+`verify` が custody kernel の verifier-match flag を駆動し、Bybit 型攻撃
+（バイト列が intent と別アドレスを支払う）は flag 0 → kernel code 6。
+
+- **JVM 専用（`.clj`）**: btc-crypto は `byte-array` ベースなので、JVM の actuation
+  境界（actor broadcast 経路は JVM）に置く意図的な compat 層。portable CLJS kernel
+  経路には乗せない。CLJS primary gate は btc-crypto を一切巻き込まないことを検証済み。
+- テストは実 tx を btc-crypto 自身のエンコーダと実秘密鍵で round-trip 検証。
+- 正直な範囲: 「独立 2 ツールチェーン」は production 目標で、現状は実デコーダ 1 系統 +
+  portable スタンドインの byte-compare 規律。**ETH（RLP/EIP-712）は follow-up**。
+- 検証: JVM 83 tests / 16,971 assertions（+6）、CLJS primary 71、clj-kondo 0 errors。
+
 ## Addendum 8（2026-07-14）: 共通化 — Merkle-sum を kotoba-lang に抽出
 
 `cryptoexchange.attest` の Merkle-sum ツリー（tree/inclusion-proof/verify）を

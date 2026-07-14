@@ -88,7 +88,16 @@
                 :docs "verify-inclusion.md and README now reference the canonical .edn"
                 :verification "CLJS 71 tests + JVM 77 tests, 0 failures; clj-kondo 0 errors"}
     :rationale "fleet is EDN-first (registries/ADRs/blueprints all EDN) and a verifier in the repo runtime stack (kotoba wasm > clojurewasm > ClojureScript > nbb) reads EDN natively, so the addendum-6 JSON was an unnecessary second serialization / maintenance surface"
-    :note "supersedes the addendum-6 JSON claim; a public multi-language discovery surface, if ever needed, decides JSON deliberately then — not carried here. INV-14 unchanged; maturity :blueprint"}]
+    :note "supersedes the addendum-6 JSON claim; a public multi-language discovery surface, if ever needed, decides JSON deliberately then — not carried here. INV-14 unchanged; maturity :blueprint"}
+   {:addendum 9
+    :date "2026-07-14"
+    :title "real Bitcoin WYSIWYS decoder on kotoba-lang/btc-crypto"
+    :artifacts {:satellite-main "2bef035"
+                :module "cryptoexchange.wysiwys-btc — parses a real raw unsigned BTC tx to its (destination address, value) outputs (P2WPKH/P2WSH/P2TR/P2PKH/P2SH), reusing kotoba-lang/btc-crypto's bech32/base58 encoders for the script->address step btc-crypto lacks; unrecognized script fails closed; verify() feeds the custody kernel verifier-match flag (Bybit attack -> flag 0 -> code 6)"
+                :portability "JVM-only (.clj) — btc-crypto is byte-array-based; deliberate compat layer at the JVM actuation boundary (actor broadcast is JVM), NOT on the portable CLJS kernel path; CLJS primary gate verified to never pull in btc-crypto"
+                :tests "round-trip real txs against btc-crypto's own encoders + one real private key; JVM 83 tests / 16971 assertions (+6), CLJS primary 71, clj-kondo 0 errors"}
+    :scope-honesty "the two-independent-toolchain WYSIWYS requirement is the production goal; shipped = one real decoder + the portable wysiwys stand-in for the byte-compare discipline. ETH (RLP/EIP-712) is a follow-up"
+    :note "replaces the wysiwys semantic stand-in for BTC; INV-14 unchanged; maturity :blueprint"}]
   :adr/decision-summary
   "{:audit \"cloud-itonami に cryptoexchange 未設計を実測確認 (2026-07-14): 金融 Wave0 18repo/industry registry/5-wave 計画のいずれにも crypto exchange なし\",
     :incident-register {:A1 \"顧客資産流用・混蔵 (FTX/Celsius)\" :A2 \"帳簿裏口・特権口座 (FTX allow_negative/Alameda 清算免除)\" :A3 \"支払不能の隠蔽 (Mt.Gox)\" :A4 \"ホットウォレット侵害 (Coincheck/Zaif/BitPoint)\" :A5 \"署名運用侵害・blind signing (DMM 2024/WazirX/Bybit 2025 Safe UI 改ざん)\" :A6 \"単一人物リスク (QuadrigaCX)\" :A7 \"exit scam (Thodex/Africrypt)\" :A8 \"AML/KYC 不備 (Binance 2023/BitMEX)\" :A9 \"市場操作・利益相反 (wash trading/insider listing/front-running)\" :A10 \"レバレッジ増幅 (FTX デリバ・清算カスケード)\"},
