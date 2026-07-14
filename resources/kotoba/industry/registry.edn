@@ -2711,12 +2711,19 @@
    :operating-states [:intake :log :schedule :hazard :ship :audit]},
   {:id "0230"
    :name "Gathering of non-wood forest products"
-   :repo "https://github.com/gftdcojp/cloud-itonami-A0230"
-   :business-id "cloud-itonami-A0230"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0230"
+   :business-id "cloud-itonami-isic-0230"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-14 (see ADR-2607152400): fresh
+   ;; from-scratch scaffold (the prior gftdcojp/cloud-itonami-A0230 repo
+   ;; reference was never published) mirroring cloud-itonami-isic-0210's
+   ;; module shape. NwfpAdvisor ⊣ NWFP Gathering Coordination Governor,
+   ;; langgraph-clj StateGraph, append-only audit ledger. clojure -M:test:
+   ;; 66 tests / 161 assertions / 0 failures / 0 errors (verified from an
+   ;; independent fresh clone at commit db0a590). ISIC Rev.4 class
+   ;; (4-digit) — full coverage extension
    :operating-states [:intake :survey :advise :treat :record :audit]},
   {:id "0240"
    :name "Support services to forestry"
