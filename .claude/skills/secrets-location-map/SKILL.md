@@ -93,3 +93,8 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
   = `did:key:z6MkmCrDjqsUiHM4bK6zVyzuYGitMGjCVRb1eTrF122mxrNU`
 - **owner Ed25519 秘密鍵(seed)**: `orgs/gftdcojp/cloud-itonami/.junkawasaki/identity.edn`
   (gitignored。cloud-itonami.identity/load-or-create-identity! が正)
+  - `itonami-runner-bot` — **execute-only** runner bot Ed25519 seed
+    (did `did:key:z6MkvmMJxqz4iA3R2wuJ7mFQfJ9qh4HCe2o7vvjeXoxvFWmq`)。
+    receipt 署名専用。**merge chain は一切発行しない**(職務分掌の execute 側)。
+    runner はこれを `ITONAMI_OPS_RUNNER_SEED` か `kagi:itonami-runner-bot`
+    経由で読む。
