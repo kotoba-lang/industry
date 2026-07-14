@@ -623,8 +623,9 @@
       ;; phase table. 42 tests/194 assertions run green before claiming
       ;; :implemented. First ISIC Wave 1 class promoted -- ADR-2607121000's
       ;; own explicit Top-10 value-ranking item #6. See superproject
-      ;; ADR-2607142400.
-      (is (= 151 (:implemented m))))))
+      ;; ADR-2607142400. 0910 (Petroleum Services) promoted to :implemented
+      ;; per ADR-2607142600.
+      (is (= 160 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

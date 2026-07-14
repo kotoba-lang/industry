@@ -2837,13 +2837,19 @@
    :operating-states [:intake :survey :extract :grade :ship :audit]},
   {:id "0910"
    :name "Support activities for petroleum and natural gas extraction"
-   :repo "https://github.com/gftdcojp/cloud-itonami-B0910"
-   :business-id "cloud-itonami-B0910"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0910"
+   :business-id "cloud-itonami-isic-0910"
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as a petroleum services
+   ;; contractor coordination actor (Services Advisor ⊣ Services
+   ;; Governor), contractor-side field operations (service order
+   ;; intake, crew dispatch, logistics) with hard-blocked
+   ;; operator-class operations (drilling, well-control, hazmat).
+   ;; Scope narrowed to contractor authority per ADR-2607142600
+   ;; (scope-exclusion boundaries documented in architecture ADR).
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :survey :extract :grade :ship :audit]},
+   :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "0990"
    :name "Support activities for other mining and quarrying"
    :repo "https://github.com/gftdcojp/cloud-itonami-B0990"
