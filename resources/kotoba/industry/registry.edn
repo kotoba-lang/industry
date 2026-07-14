@@ -2871,13 +2871,14 @@
    :business-id "cloud-itonami-isic-1010"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :blueprint
-   ;; Promoted :spec -> :blueprint in the 衣食住 scaffold batch
-   ;; (ADR-2607122200): blueprint repo published (Community Meat
-   ;; Processing, :meat-processing-governor), no actor implementation
-   ;; claimed — wave-3 robotics-gated per ADR-2607121000. Stale
-   ;; gftdcojp C-prefix :repo URL replaced by the real satellite.
-   :operating-states [:intake :design :produce :inspect :package :audit]},
+   :maturity :implemented
+   ;; Wave-3 meat-processing actor implementation complete (2026-07-14):
+   ;; MeatProcessingAdvisor ⊣ MeatProcessingGovernor pattern, food-safety
+   ;; critical checks (cold-chain temperature, contamination flags,
+   ;; holding time, sanitation score, metal-detector pass). Scope:
+   ;; plant-operations coordination only (no direct equipment control).
+   ;; Propose-only operations, food-safety concerns always escalate.
+   :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "1020"
    :name "Processing and preserving of fish, crustaceans and molluscs"
    :repo "https://github.com/gftdcojp/cloud-itonami-C1020"
