@@ -4343,9 +4343,17 @@
    :name "Repair of electronic and optical equipment"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3313"
    :business-id "cloud-itonami-3313"
+   :maturity :implemented
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   ;; Promoted :spec -> :blueprint (see `kotoba.industry/maturity-of`).
+   ;; Promoted :spec -> :blueprint -> :implemented (ADR-2607142900).
+   ;; Electronic repair shop coordination actor (ElectronicRepairOps-LLM
+   ;; ⊣ Electronic Repair Governor); intake/dispatch/parts-logistics
+   ;; coordination only (hands-on repair work remains technician-exclusive).
+   ;; Six HARD-violation gates: client/equipment verification,
+   ;; safety-checklist completeness (conditional on equipment type),
+   ;; estimate validity, parts-cost matching, duplicate-dispatch prevention.
+   ;; High-stakes escalation: safety-concern flagging never auto-commits.
    ;; The legacy placeholder :repo (gftdcojp/cloud-itonami-C3313) never
    ;; actually existed (confirmed 404 before this edit) -- replaced with
    ;; the real repo, following the SAME cloud-itonami/cloud-itonami-isic-####
