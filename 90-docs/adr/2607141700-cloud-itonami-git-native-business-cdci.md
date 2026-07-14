@@ -648,3 +648,26 @@ ciphertext を kotobase/P2P に置く storage-layer の配線」**(RecipientGran
 これは crypto ではなく storage 統合の作業。成熟度表: 「kotoba-rad R2」を
 **部分達成**(暗号コア V、repo 統合は未着手)。残 gap: R2 storage 配線、
 merge 署名 UI、残 lane 委任、nbb 実送信、R4 PQ hybrid。
+
+## Addendum (2026-07-14, same day): R2 storage 配線 — ops repo が private ciphertext replica になった
+
+cloud-itonami `3e04db5c`。R2 の暗号コア(kotoba-rad)を消費して、§2 の
+「private replica」が実体化した:
+
+- `cloud-itonami.ops-private`: ops repo 全体(`ops-store/db->string`)を
+  1 つの private-object に epoch key で封緘し、その key を各 recipient の
+  X25519 pubkey に grant。replica(kotobase private tenant / B2 / P2P peer)は
+  ciphertext だけを持ち、grant 保持者のみが db を復元。rotate は reseal 時に
+  drop 対象 pub を外すだけ(= epoch rotation による失効)。
+- `ops-keys`: `recipient-keygen!`(X25519 鍵 → kagi、署名用 Ed25519 とは別)、
+  `recipient-priv` / `recipient-pubs`。`ops-identity.edn` に `:recipients`
+  (org-root + sales-head の X25519 pub、実 mint 済み)。
+- nbb CLI: `recipient-keygen` / `replica-seal` / `replica-open`。
+- **live 実証**: 本番 ops repo(`~/.itonami/store.edn.ops-repo.edn`)を
+  2-recipient の ciphertext bundle に封緘 → sales-head 鍵で開いて **元ファイルと
+  バイト一致**、ciphertext-cid ≠ plaintext。
+- 成熟度表: 「kotoba-rad R2」を **暗号コア + repo 統合とも達成(V/K)**に更新。
+  **残るのは storage の endpoint 配線のみ** — この ciphertext bundle を実際の
+  kotobase/B2 replica へ push/pull する経路(と、whole-repo でなく per-object
+  粒度への細分化)。crypto と repo 統合は完了、あとは転送層。
+  他の残 gap: merge 署名 UI、残 lane 委任、nbb 実送信、R4 PQ hybrid。
