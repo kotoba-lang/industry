@@ -381,6 +381,49 @@ west manifestに登録されていない（`gftdcojp`ではなく`cloud-itonami`
 配下の独立リポジトリ、ADR-2607150000 Addendum 5で既に記録済み）——
 今回もpin前進は不要、本ADRへの記録のみで完結する。
 
+## 2026-07-14 Addendum 5 — cljs backendのi64 wraparound gapを「黙って間違う」から「大声で失敗する」へ縮小
+
+Addendum 1着地時点で正直に記録していたi64 wraparoundの未対応ギャップ
+——「KIRの正規セマンティクス（2の補数オーバーフロー）をcljsのプレーン
+`+`/`-`/`*`は再現しない（bignumへ自動昇格）」——を、**厳密な再現**では
+なく**安全側への縮小**という形で対応した。
+
+**なぜBigIntによる厳密再現をしなかったか**: 真のi64 wraparound一致には
+全ての値（パラメータ・リテラル・中間結果）をJS BigIntとして最後まで
+持ち回る必要があり、このbackendの数値表現全体を作り直す、より大きく
+侵襲的な書き換えになる——既知のsafe-kotoba-subsetプログラムでこれを
+必要とするものは無いままであり、費用対効果が見合わないと判断した
+（Addendum 1と同じ判断を維持）。
+
+**代わりに実装したこと**: 全ての`+`/`-`/`*`の結果をJS自身のsafe-integer
+境界（2^53-1）と照合し、境界を超えたら黙って不正確な値のまま処理を
+続けるのではなく`:arithmetic-overflow`を投げるようにした
+（`kotoba$check-safe-int`）——このbackendが既にfuel枯渇・division-by-zero・
+capability-denialに対して取っている「fail-closed」姿勢と同じものを
+ここにも適用した形。境界値は`js/Number.isSafeInteger`ではなく**移植可能な
+数値リテラル**として書いた——これにより、実cljs環境でもこのbackend自身の
+既存テストスイートが採用する「プレーンJVM Clojureでeval」環境でも、
+チェックが同一に評価される。
+
+**検証**: 実`nbb`実行で3パターンを確認——(1)安全域内の演算（境界値
+ちょうど2^53-1に収まる`(+ 9007199254740990 1)`）は例外を投げず正しい
+値を返す、(2)安全域を超える演算（`(* 100000000 100000000)` = 10^16 >
+2^53-1）は`:arithmetic-overflow`を投げる、(3)境界ちょうどの値は
+false-positiveしない。新規テスト3件を含め`clojure -M:test`: 145 tests /
+2848 assertions、0 failures（`kotoba-lang/compiler`、`main`→`19275b7`、
+`gh api .../merges`でサーバ側マージ、sibling worktree、branch cleanup
+完了、west pin `--entry compiler`で前進: `1455568d4a3b`→`19275b772287`）。
+
+**正直に記録する残りの限界**: これは厳密なwraparound一致ではなく、
+「黙って間違った値を返す」ケースを「大声で失敗する」ケースへ変換した
+だけ——safe-kotoba-subsetの意味論上、wasm32/x86_64/aarch64バックエンドと
+cljsバックエンドの間で**値そのものが一致しないケースは依然として
+存在しうる**（2^53-1を超える演算を行うプログラムの場合）。ただし
+そのケースは今後「黙って発散した結果を返す」のではなく「即座に検出
+可能な例外」になる——safe-kotobaの「fail-closed」設計思想（unknown/
+invalidな入力はより少ない自律性へ、より多い自律性へは決して倒れない）
+と整合する形での縮小であり、真の等価性証明ではない。
+
 ## References
 
 - 90-docs/adr/2607150000-kotoba-lang-extension-triage-langchain-persistence-kotobase.md
