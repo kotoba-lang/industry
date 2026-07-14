@@ -3017,13 +3017,14 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1101"
    :name "Distilling, rectifying and blending of spirits"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C1101"
-   :business-id "cloud-itonami-C1101"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1101"
+   :business-id "cloud-itonami-isic-1101"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :maturity :implemented
+   ;; Plant operations coordination actor (proof/ABV, age-statement, tax-mark,
+   ;; labeling compliance per US TTB, JP 酒税法, EU 1601/2009)
+   :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "1102"
    :name "Manufacture of wines"
    :repo "https://github.com/gftdcojp/cloud-itonami-C1102"
