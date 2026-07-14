@@ -557,3 +557,29 @@ cloud-itonami `f5a5d084`。**この ADR の loop は本番運転に入った。*
 - 残 gap(優先順): chain 再 mint 運用(≈2026-10-12)、runner bot の
   execute-only 鍵、kotobase replica / rad R2、merge 署名 UI、残 lane 委任、
   nbb での実送信(async fetch)。
+
+## Addendum (2026-07-14, same day): chain 失効監視 + 再 mint(運用 gap 解消)
+
+cloud-itonami `4d4eeb22`。live 運転で最大の運用リスクだった「委任 chain が
+≈2026-10-12 に一斉失効 → merge が黙って通らなくなる」を塞ぐ:
+
+- `ops-keys/chain-status` / `delegate-status`: 各 delegate chain の鮮度
+  (valid? / expires / days-left / warn 窓内の expiring? / expired?)を kagi
+  item から読む(never-throw)。
+- `ops-keys/rotate-chain!`: org root から chain を再 mint し、**同じ kagi
+  item に上書き封緘**(upsert)。ops-identity は item 参照なので、rotate 後は
+  merge caller が設定変更なしで新 chain を拾う。
+- CLI 2 経路: `expiry [warn-days]`(nbb `ops-cli.cljs` / JVM `ops-send`。
+  期限接近 or 無効な chain があれば **exit 1** — cron/monitor 向き)と
+  `rotate <delegate-key> [days]`。
+- **live 実測(読み取りのみ、安全)**: 実 vault で sales/billing/keiei head
+  の 3 chain すべて valid・**89.9 日残**・exit 0。rotation は stub vault で
+  E2E(失効 chain → 再封緘後は実 now で valid かつ当該 lane を authorize)。
+- 運用手順: `~2026-10 初旬`に `nbb ... ops-cli.cljs expiry` が exit 1 を
+  返し始めたら、kagi unlock 済みで
+  `nbb ... ops-cli.cljs rotate sales-head`(billing-head / keiei-head も)を
+  実行するだけ。将来はこの expiry check を launchd 週次 tick に足せば
+  自動アラート化できる(follow-up)。
+- 成熟度表の更新: 「chain 再 mint 運用」gap を **D→V**(監視 + 再 mint とも
+  実装・検証済み、live で監視実測)。残 gap: runner bot の execute-only 鍵、
+  kotobase replica / rad R2、merge 署名 UI、残 lane 委任、nbb 実送信。
