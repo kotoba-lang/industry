@@ -27,7 +27,8 @@ gravity, or a derivation of physical time from dynamics.
 ## Verify
 
 ```bash
-bash verify.sh
+npx nbb verify.cljs               # full: cache get → lake build → marker scan → run
+npx nbb verify.cljs --scan-only   # unproved-marker scan only
 ```
 
 ## Next design layer

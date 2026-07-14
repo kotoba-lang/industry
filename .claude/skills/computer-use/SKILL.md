@@ -79,10 +79,14 @@ clojure -M:examples -m <example-ns>       # NOT :dev:examples
 ```
 
 `:dev` overrides `langgraph-clj`/`langchain-clj` to `../langgraph-clj` /
-`../langchain-clj` local roots — neither is checked out anywhere in this
-monorepo, so `:dev:examples` fails classpath resolution. Plain `:examples`
+`../langchain-clj` local roots — those sibling paths do not resolve under
+`orgs/kotoba-lang/` (the actual checkouts live at
+`orgs/com-junkawasaki/langgraph-clj` and `orgs/com-junkawasaki/langchain-clj`),
+so `:dev:examples` fails classpath resolution from this cwd. Plain `:examples`
 uses the `deps.edn` git-tag/sha coordinates (`io.github.com-junkawasaki/…`)
-resolved over the network, and works.
+resolved over the network, and works. (To develop against the local checkouts,
+point the `:dev` `:local/root`s at `../../com-junkawasaki/<repo>` instead —
+do not re-clone.)
 
 ## Building a new guardrailed task
 

@@ -14,32 +14,70 @@
 (def base "/Users/junkawasaki/github/com-junkawasaki/orgs/personal")
 
 ;; ---------- readers ----------
+;; annex 状態の判定は2形態を区別する:
+;;  - locked (symlink) mode: 未 fetch = broken symlink → (.exists f) が false
+;;  - unlocked (pointer) mode: working tree の実体は "/annex/objects/..." 1行の
+;;    小ファイル → parse は失敗するが、それは「未 fetch」であってデータ破損ではない
+;; どちらも warn+nil で load を続行する。それ以外の parse 失敗（fetch 済み・
+;; 通常ファイルの本物の EDN/JSON 構文エラー）は従来どおり fail-fast で abort する
+;; — 黙って registry が消えたり、離れた場所の lookup-ref transact エラーになるより、
+;; 壊れたファイルを指して止まる方が安全。
+
+(defn- broken-symlink? [^java.io.File f]
+  (and (java.nio.file.Files/isSymbolicLink (.toPath f)) (not (.exists f))))
+
+(defn- annex-pointer? [^java.io.File f]
+  (and (.isFile f) (< (.length f) 1024)
+       (str/starts-with? (slurp f) "/annex/objects/")))
+
+(defn- warn-unfetched [f]
+  (println (format "  [skip] %s: unfetched annex content — run: git annex get %s"
+                   (.getPath f) (.getPath f))))
+
+(defn- read-checked
+  "Read f with parse-fn. Unfetched annex content (broken locked symlink or
+   unlocked pointer file) → warn + nil. Missing plain file → nil. Genuine parse
+   error in fetched content → print the real error and rethrow (fail fast)."
+  [^java.io.File f parse-fn]
+  (cond
+    (broken-symlink? f) (do (warn-unfetched f) nil)
+    (not (.exists f))   nil
+    (annex-pointer? f)  (do (warn-unfetched f) nil)
+    :else (try (parse-fn (slurp f))
+               (catch Exception e
+                 (println (format "  [error] %s: %s" (.getPath f) (.getMessage e)))
+                 (throw e)))))
+
 (defn rd-jsonl [rel]
   (let [f (io/file base rel)]
-    (when (.exists f)
+    (cond
+      (broken-symlink? f) (do (warn-unfetched f) nil)
+      (not (.exists f))   nil
+      (annex-pointer? f)  (do (warn-unfetched f) nil)
+      :else
       (with-open [r (io/reader f)]
-        (doall (->> (line-seq r)
-                    (remove str/blank?)
-                    (keep #(try (json/read-str % :key-fn keyword) (catch Exception _ nil)))))))))
+        (let [lines  (into [] (remove str/blank?) (line-seq r))
+              parsed (into [] (keep #(try (json/read-str % :key-fn keyword)
+                                          (catch Exception _ nil)))
+                           lines)
+              dropped (- (count lines) (count parsed))]
+          (when (pos? dropped)
+            (println (format "  [warn] %s: %d/%d lines failed JSON parse"
+                             (.getPath f) dropped (count lines))))
+          parsed)))))
 
 (defn- warn-unreadable [f e]
   (println (format "  [skip] %s: %s (unfetched annex content? run: git annex get %s)"
                     (.getPath f) (.getMessage e) (.getPath f))))
 
 (defn rd-json [rel]
-  (let [f (io/file base rel)]
-    (when (.exists f)
-      (try (json/read-str (slurp f) :key-fn keyword)
-           (catch Exception e (warn-unreadable f e) nil)))))
+  (read-checked (io/file base rel) #(json/read-str % :key-fn keyword)))
 
 (defn- safe-edn
-  "Read+parse an edn file, but skip (warn, return nil) instead of aborting the
-   whole load when content isn't actually fetched (git-annex pointer file: the
-   working-tree bytes are a path string, not the EDN they point to)."
+  "Read+parse an edn file via read-checked: unfetched annex content is skipped
+   with a warning; genuine syntax errors abort the load (fail fast)."
   [f]
-  (when (.exists f)
-    (try (edn/read-string (slurp f))
-         (catch Exception e (warn-unreadable f e) nil))))
+  (read-checked f edn/read-string))
 
 ;; ---------- helpers ----------
 (defn month [d] (when (and d (>= (count d) 7)) (subs d 0 7)))
@@ -146,7 +184,15 @@
             items))))))
 
 ;; ---------- email (cid/eml) + case ----------
-(defn- addr [s] (when s (let [m (re-find #"<([^>]+)>" (str s))] (clean (if m (second m) s)))))
+(defn- normalize-email
+  "trim + lowercase + RFC サブアドレス +tag 除去（ADR-0009/0010: ingest 時に正規化。
+   jun784+<tag>@gmail.com / JUN784@GMAIL.COM を canonical jun784@gmail.com に揃え、
+   case/+tag 違いの spurious person entity を作らない）。"
+  [s]
+  (when-let [s (clean s)]
+    (-> (str/lower-case s) (str/replace #"\+[^@]*@" "@"))))
+
+(defn- addr [s] (when s (let [m (re-find #"<([^>]+)>" (str s))] (normalize-email (if m (second m) s)))))
 
 (defn- email->case [rec]
   (let [hay (str (:subject rec) " " (str/join " " (:labels rec)))]
@@ -200,7 +246,7 @@
 (defn people-tx []
   (vec (for [p people-edn]
          (cond-> (dissoc p :emails)
-           (seq (:emails p)) (assoc :person/email (first (:emails p)))))))
+           (seq (:emails p)) (assoc :person/email (normalize-email (first (:emails p))))))))
 
 ;; dyads.edn: power-dynamics edges + falsifiable hypotheses (ADR-0012).
 (def dyads-edn
@@ -265,9 +311,11 @@
              (seq (:not m))         (assoc :rule/match-not (vec (:not m))))))))
 
 (defn curated-org-tx []
-  ;; :org/repo-taxonomy はネスト map (ADR-0020) → account2-tx の :account/blocker と同じ理由で文字列化
-  (vec (for [o (rd-edn-facts "facts/orgs.edn")]
-         (cond-> o (map? (:org/repo-taxonomy o)) (update :org/repo-taxonomy pr-str)))))
+  ;; :org/repo-taxonomy はネスト構造 (ADR-0020)、schema は string → string 以外は形を
+  ;; 問わず文字列化（map? 限定だと vector-of-maps が素通りして transact で落ちる）
+  (vec (for [o (rd-edn-facts "facts/orgs.edn")
+             :let [v (:org/repo-taxonomy o)]]
+         (cond-> o (and (some? v) (not (string? v))) (update :org/repo-taxonomy pr-str)))))
 
 (defn account2-tx []
   ;; refs are already lookup-refs; :account/blocker はネスト map → Datomic 用に文字列化
@@ -462,7 +510,7 @@
 
 ;; people.edn から email/名前 → person-id の解決表
 (def email->pid
-  (into {} (for [p people-edn, e (:emails p)] [(str/lower-case e) (:person/id p)])))
+  (into {} (for [p people-edn, e (:emails p)] [(normalize-email e) (:person/id p)])))
 (def name->pid
   (into {} (for [p people-edn :when (:person/name p)]
              [(first (str/split (:person/name p) #"\s|\(")) (:person/id p)])))
@@ -470,7 +518,7 @@
 (defn contact-tx []
   ;; iMessage top-contacts → :contact。email一致で person 解決 (電話番号は people.edn に無く未解決)
   (vec (for [[handle cnt] (:imessage/top-contacts imessage-edn)
-             :let [pid (email->pid (str/lower-case (str handle)))]]
+             :let [pid (email->pid (normalize-email (str handle)))]]
          (cond-> {:contact/id (str "imsg/" handle) :contact/handle handle
                   :contact/msg-count cnt :contact/source :imessage}
            pid (assoc :contact/person [:person/id pid])))))
@@ -521,8 +569,14 @@
        (reduce (fn [m r] (if (:thread_id r) (assoc m (:thread_id r) (:cid r)) m)) {})))
 
 (defn people-alias-tx []
+  ;; 正規化で primary と同一になった alias（+tag 違い等）は除外 — 自己参照
+  ;; :person/canonical を canonical entity に upsert しないため
   (vec (for [p people-edn
-             alias (rest (:emails p))]
+             :let [primary (normalize-email (first (:emails p)))]
+             alias (->> (rest (:emails p))
+                        (keep normalize-email)
+                        (remove #{primary})
+                        distinct)]
          (cond-> {:person/email alias
                   :person/canonical [:person/id (:person/id p)]}
            (:person/relation p)        (assoc :person/relation (:person/relation p))

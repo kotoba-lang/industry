@@ -13,7 +13,11 @@ description: Standing-authorized flow for creating and registering a new project
 
 - 上記に含まれる個別操作で都度確認が不要なもの: 子リポの `gh repo create` + `git push`
   （子リポは plain-git。下記 `repos.edn :manifest-workflow :child-repos`）、
-  `nbb scripts/gen-west-manifest.cljs` による west.yml 再生成、superproject への
+  `nbb scripts/gen-west-manifest.cljs --entry <repo-name>` による west.yml 再生成
+  （**当該 entry のみの最小 diff。引数なしは dry-run で west.yml を書かない。
+  wholesale 再生成 commit は禁止** — 未 push HEAD 由来の壊れた pin を 44 件 main に
+  流した実事故 `90852b86` の再発防止。CLAUDE.md「Git operations」の west-pin 検証節 /
+  ADR-2607022900 が正本）、superproject への
   `chore(manifest)+docs(adr)` コミット、新規 ADR（md+edn ペア）の作成。
 
 - **ただしガードレールは常に守る**（恒久承認は手順の省略であって安全策の省略ではない）:
@@ -22,6 +26,8 @@ description: Standing-authorized flow for creating and registering a new project
     conflict marker を手編集しない・`--force` push しない。
   - **オーナーの未コミット WIP は破棄しない。** ブロック時は `git stash`（drop せず温存）。
     衝突は marker 手編集でなく **west.yml 再生成**で解く。
-  - コミットメッセージ末尾に `Co-Authored-By: Claude Opus 4.8 (1M context)`。
+  - コミットメッセージ末尾の `Co-Authored-By:` trailer は**実行中のハーネスの既定規約に
+    従う**（モデル名をこのファイルにハードコードしない — 陳腐化して harness 規約と
+    矛盾した実績があるため）。
   - 破壊的・取り返しのつかない操作（履歴書き換え・force-push・他者ブランチへの push・
     公開リポ化など）は従来どおり**事前確認**する。
