@@ -33,6 +33,21 @@ PolicyGovernor）/ **cloud-itonami**（ops-LLM ⊣ CertGovernor）。
   `langchain.kotoba-db/kotoba-api`（kotoba-server XRPC）が同マップを実装するので、
   同一 record が in-mem / 実 Datomic / kotoba pod を選ばず動く（contract test で
   `MemStore ≡ DatomicStore` を保証）。直呼びせず必ず `:db-api` を介す。
+- **Store の共通機構は `kotoba-lang/langchain-store` を使い、自前でハンドロールしない
+  （ADR-2607141600）。** EDN-blob コーデック（`enc`/`dec*`）・`:db.unique/identity`
+  schema・seq-keyed event-log の read/append・entity の `map<->tx<->pull` は
+  `langchain-store.core` に集約済み。新規 store はこれを require し、
+  `(defn- enc [v] (pr-str v))` 等の**自前コピーを書かない**（この 2 行は既に 190 repo
+  に complete-identical で複製されている＝止めるべき複製源）。使い分け:
+  - event-sourced store: `ls/identity-schema` + `ls/read-stream` / `ls/append-blob!`
+    （手本 `cryptoexchange.store`）。
+  - entity store: entity ごとに field-spec `{logical-key {:attr :ns/attr :blob?
+    :default :coerce}}` を書き、`ls/map->tx` / `ls/pull->map` / `ls/pull-pattern` で
+    駆動（手本 `underwriting.store` = 6511、reference entity adopter）。domain 固有の
+    field 列だけが per-store のデータになる。
+  - deps に `io.github.kotoba-lang/langchain-store {:local/root
+    "../../kotoba-lang/langchain-store"}` を足す。既存の hand-rolled store は
+    「触るついでに漸進移行」（一括書き換えはしない）。
 - **deps / lint / test。** `io.github.com-junkawasaki/langgraph-clj
   {:local/root "../../com-junkawasaki/langgraph-clj"}` ＋ `:dev` で langchain-clj を
   override（3 actor 同形の deps.edn）。`clojure -M:lint`（clj-kondo・errors fail）/
