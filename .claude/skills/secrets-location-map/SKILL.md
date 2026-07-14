@@ -71,3 +71,14 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
   ——新規 vault や新規 master passphrase の生成は不要だった（オーナーへの
   「新規生成の許可」確認は、vault 未存在という誤った前提に基づいていたことが
   判明したため、実際には生成した passphrase は未使用のまま破棄した）。
+- **cloud-itonami ops-repo の鍵(ADR-2607141700、kagi vault
+  `orgs/kotoba-lang/kagi/.kagi/`、compartment `personal`、2026-07-14 mint)**:
+  - `itonami-org-root` — org root Ed25519 seed(64 hex)。公開 did は
+    `orgs/gftdcojp/cloud-itonami/resources/ops-identity.edn` にコミット済み。
+  - `itonami-sales-head` / `itonami-billing-head` / `itonami-keiei-head` —
+    部門長 seed(同形式)。
+  - `itonami-sales-head-chain` / `itonami-billing-head-chain` /
+    `itonami-keiei-head-chain` — 各部門長への CACAO 委任 chain(EDN vector、
+    **expiry 90 日 ≈ 2026-10-12。失効前に `clojure -M:ops-send mint-chain
+    kagi:itonami-org-root ...` で再 mint**)。merge 時は
+    `bin/kagi get itonami-<dept>-head-chain > /tmp/chain.edn` で取り出す。
