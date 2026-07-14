@@ -27,7 +27,18 @@
     :artifacts {:satellite "https://github.com/cloud-itonami/cloud-itonami-isic-6611-cryptoexchange (initial 3ebc72f)"
                 :registry "kotoba-lang/industry main 50b7f732 — first role-suffix satellite entry :id 6611-cryptoexchange under an already-:implemented class, :blueprint tier 41->42, 15 tests/937 assertions green"
                 :west-pin "industry c3999a72 -> 50b7f732 via API single-entry commit 8bb9cdb8"}
-    :note "satellites themselves are not west projects (fleet convention, same as ishokuju/iso3166 satellites); the west action is the industry pin advance"}]
+    :note "satellites themselves are not west projects (fleet convention, same as ishokuju/iso3166 satellites); the west action is the industry pin advance"}
+   {:addendum 2
+    :date "2026-07-14"
+    :title "M1 executed (owner instruction)"
+    :artifacts {:satellite-main "7bcb482"
+                :kernels "cryptoexchange.kernels.{solvency,custody,conservation,conflict} — safe-kotoba subset, battery locks 14/22/12/13 cases, independent-oracle parity 90/15120/256/81 combos, drift pins hot-cap-bp=500 (cold>=95%) min-quorum-m=2"
+                :facade "cryptoexchange.governor — keyword<->wire-code only; fail-closed boolean boundary (permissions grant only on explicit true, attestations clean only on explicit false)"
+                :verification "CLJS primary gate + JVM compat both 24 tests / 16605 assertions 0 failures; clj-kondo 0 errors"}
+    :design-notes ["custody deny ladder order: invalid -> hot-ratio -> quorum -> allowlist -> timelock -> verifier -> velocity"
+                   "conservation classifies negative aggregate balances as invalid (allow_negative backdoor signature, A2), not merely broken"
+                   "conflict code is a bit-sum: prop=1 self-collateral=2 bypass=4 lending=8"
+                   "maturity stays :blueprint — kernels are not an actor; no registry change; INV-14 unchanged"]}]
   :adr/decision-summary
   "{:audit \"cloud-itonami に cryptoexchange 未設計を実測確認 (2026-07-14): 金融 Wave0 18repo/industry registry/5-wave 計画のいずれにも crypto exchange なし\",
     :incident-register {:A1 \"顧客資産流用・混蔵 (FTX/Celsius)\" :A2 \"帳簿裏口・特権口座 (FTX allow_negative/Alameda 清算免除)\" :A3 \"支払不能の隠蔽 (Mt.Gox)\" :A4 \"ホットウォレット侵害 (Coincheck/Zaif/BitPoint)\" :A5 \"署名運用侵害・blind signing (DMM 2024/WazirX/Bybit 2025 Safe UI 改ざん)\" :A6 \"単一人物リスク (QuadrigaCX)\" :A7 \"exit scam (Thodex/Africrypt)\" :A8 \"AML/KYC 不備 (Binance 2023/BitMEX)\" :A9 \"市場操作・利益相反 (wash trading/insider listing/front-running)\" :A10 \"レバレッジ増幅 (FTX デリバ・清算カスケード)\"},
