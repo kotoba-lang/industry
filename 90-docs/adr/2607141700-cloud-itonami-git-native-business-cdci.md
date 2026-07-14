@@ -343,3 +343,14 @@ cloud-itonami `28d6fb80`。
 **未達（M3 後半以降）**: content-addressed persist + kotobase private tenant
 replica、runner/drain の常駐化（cron/launchd routine 化）、org root key mint と
 custody、merge 署名 UI、read-only 以外の lane の実運用委任 chain mint。
+
+## Addendum (2026-07-14, same day): drain スクリプトを nbb 化(オーナー指示)
+
+cloud-itonami `38a9e266`。オーナー指示「bb じゃなくて nbb で」により、M3 の
+`scripts/mail-drain.bb` を `scripts/mail-drain.cljs`(nbb)へ置換。ロジック同一
+(KV list/get → `clojure -M:ops-drain` → 成功時のみ KV delete)。credential
+解決は既存資産 `scripts/mail-creds.bb`(env→1Password)への委譲を維持 —
+mail-creds 自体の nbb 化は既存 bb tooling の温存原則どおり別スコープ。
+fake-token smoke で env guard / creds env-passthrough / wrangler 呼び出し /
+fail-fast(KV 鍵温存)を実行確認。以後この ADR 系列で書く新規スクリプト・
+ハーネス(runner 常駐化含む)は nbb を正とする。
