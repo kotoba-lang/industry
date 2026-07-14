@@ -383,6 +383,8 @@
     (is (= :implemented (industry/maturity "6391"))))
   (testing "cloud-itonami-isic-3510 (Electric power generation, transmission and distribution -- promoted from a prior published :blueprint repo [ADR-2607101800]; Grid Distribution Advisor ⊣ Grid Transmission Governor, repo-layout modeled on cloud-itonami-isic-6130, infrastructure/utility domain shape modeled on cloud-itonami-isic-3600 [this fleet's closest domain analog]; protected-recipient-violations is this fleet's FIRST always-un-overridable HARD check -- a meter flagged life-support/critical-infrastructure can never be disconnected, at any confidence or human approval; capacity-over-threshold-violations is this fleet's SECOND asymmetric dual-actuation shape [after cloud-itonami-isic-6391], on a new value-driven dimension -- clean under-threshold :actuation/provision-service may auto-commit at phase 3, over-threshold always escalates; :actuation/disconnect-service permanently excluded from every phase's :auto set; first ISIC Wave 1 class promoted, ADR-2607121000's own Top-10 value-ranking item #6) is also :implemented"
     (is (= :implemented (industry/maturity "3510"))))
+  (testing "cloud-itonami-isic-1061 (Manufacture of grain mill products, fresh scaffold -- the entry pointed at a never-created gftdcojp/cloud-itonami-C1061 placeholder repo; MillOpsAdvisor ⊣ Mill Governor plant-operations-coordination actor mirroring cloud-itonami-isic-1071's [Bakery products] verified module shape; mycotoxin-level-exceeded-violations is a genuinely new independently-verified physical check for this fleet's food-manufacturing cluster [per-product-type ppb ceiling, e.g. corn meal's stricter 20ppb aflatoxin limit vs. wheat flour's 1000ppb DON limit]; foreign-material-detected-violations and magnet-calibration-overdue-violations [90-day interval] are likewise new; also fixes a latent JVM-only `.indexOf` interop bug present in the mirrored cloud-itonami-isic-1071/src/bakeryops/phase.cljc reference [ClojureScript's PersistentVector does not implement `.indexOf`] with a portable keep-indexed-based helper) is also :implemented"
+    (is (= :implemented (industry/maturity "1061"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -744,7 +746,21 @@
       ;; ADR). Live-recomputed via `(industry/maturity-summary)`
       ;; immediately before this edit, per the batch's concurrent-agent
       ;; count-drift caution.
-      (is (= 198 (:implemented m))))))
+      ;; 198 -> 199: cloud-itonami-isic-1061 (Manufacture of grain mill
+      ;; products) fresh from-scratch scaffold (no prior actor existed --
+      ;; the entry pointed at a never-created gftdcojp/cloud-itonami-C1061
+      ;; placeholder). MillOpsAdvisor <-> Mill Governor plant-operations-
+      ;; coordination actor mirroring cloud-itonami-isic-1071's [Bakery
+      ;; products] verified module shape; 49 tests / 160 assertions green,
+      ;; independently re-verified against a fresh clone; promoted
+      ;; :spec -> :implemented, superproject ADR-2607152400
+      ;; (cloud-itonami-isic-1061-grain-mill-products-coverage.md --
+      ;; NOTE: this same 2607152400 timestamp slot was independently
+      ;; claimed the same day by an unrelated ADR for a different ISIC
+      ;; class; both files exist under distinct full filenames with no
+      ;; path collision, left un-renumbered per this fleet's existing
+      ;; same-day-renumbering-is-normal precedent, e.g. ADR-2607142200).
+      (is (= 199 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
