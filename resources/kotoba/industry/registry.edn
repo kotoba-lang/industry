@@ -2955,12 +2955,11 @@
    :business-id "cloud-itonami-isic-1040"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies [:telemetry :optimization]
-   :maturity :spec
-   ;; REVERTED 2026-07-14: missing deps.edn AND missing governor.cljc/advisor.cljc/registry.cljc/store.cljc/facts.cljc (only operation/phase/sim exist, despite test files referencing the missing modules) -- agent itself admitted "12 minor assertion-logic issues" while claiming GREEN. Needs a verified from-scratch redo.
-   ;; Promoted :spec -> :implemented as an oils/fats manufacturing actor
-   ;; (OilsFatsOps-LLM ⊣ Oils/Fats Manufacturing Governor). Full blueprint +
-   ;; reference implementation in cloud-itonami-isic-1040. See
-   ;; superproject ADR-2607141400 for integration notes.
+   :maturity :implemented
+   ;; Oils/fats manufacturing plant-operations-coordination actor
+   ;; (OilsFatsOps-LLM ⊣ Oils/Fats Manufacturing Governor), verified: 56
+   ;; tests / 139 assertions green (clojure -M:test, re-verified from a
+   ;; fresh clone 2026-07-14). See superproject ADR-2607151800.
    :operating-states [:intake :assay :schedule :coordinate :package :audit]},
   {:id "1050"
    :name "Manufacture of dairy products"

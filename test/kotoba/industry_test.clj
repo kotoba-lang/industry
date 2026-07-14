@@ -681,7 +681,13 @@
       ;; revert; 37 tests / 124 assertions green, independently
       ;; re-verified against a fresh clone; promoted :spec ->
       ;; :implemented, ADR-2607151800.
-      (is (= 191 (:implemented m))))))
+      ;; 191 -> 192: cloud-itonami-isic-1040 (Manufacture of vegetable and
+      ;; animal oils and fats) redone from scratch (oilsfats.governor/
+      ;; advisor/registry/store/facts + deps.edn, 56 tests / 139 assertions
+      ;; green, independently re-verified against a fresh clone) after its
+      ;; own prior missing-modules revert; promoted :spec -> :implemented,
+      ;; ADR-2607151800.
+      (is (= 192 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
