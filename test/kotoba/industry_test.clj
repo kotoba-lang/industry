@@ -533,7 +533,7 @@
       ;; at :implemented -- unlike every entry above, this ISIC had NO
       ;; prior placeholder at ANY maturity tier in this registry (not
       ;; even :spec); confirmed via the official ISIC Rev.5 structure/
-      ;; explanatory-notes cross-check (superproject ADR-2607141000).
+      ;; explanatory-notes cross-check (superproject ADR-2607141700).
       ;; Factoring actor (Factoring-LLM ⊣ Factoring Governor), the third
       ;; division-649 vertical alongside 6491/6492/6499, with TWO
       ;; actuation events (advance/settle) and three first-class
