@@ -86,8 +86,6 @@
     (is (= :blueprint (industry/maturity "4322"))))
   (testing "cloud-itonami-isic-3510, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "3510"))))
-  (testing "cloud-itonami-isic-6120, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "6120"))))
   (testing "cloud-itonami-isic-5110, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "5110"))))
   (testing "cloud-itonami-isic-4911, freshly published, is also :blueprint (live-state corroboration)"
@@ -379,6 +377,8 @@
     (is (= :implemented (industry/maturity "6201"))))
   (testing "cloud-itonami-isic-6493 (Factoring activities, ISIC Rev.5 division 649 -- a genuine standalone class distinct from 6491/6492/6499/6494/6495; Factoring-LLM sealed advisor ⊣ Factoring Governor, two actuation events, registered directly at :implemented with no prior :spec placeholder) is also :implemented"
     (is (= :implemented (industry/maturity "6493"))))
+  (testing "cloud-itonami-isic-6120, promoted from :blueprint (spectrum-licensed mobile-network-operator actor, Network Operations Advisor ⊣ Mobile Network Governor, mirroring cloud-itonami-isic-6190's module shape -- same ISIC 61xx telecom industry) is also :implemented"
+    (is (= :implemented (industry/maturity "6120"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -440,7 +440,10 @@
       ;; `industry/maturity-of`/`industry/maturity-roadmap-of` for how
       ;; the :blueprint branch logic itself stays unit-tested without
       ;; depending on a specific live count.
-      (is (= 42 (:blueprint m)))
+      ;; 42 -> 41: cloud-itonami-isic-6120 promoted :blueprint ->
+      ;; :implemented (spectrum-licensed mobile-network-operator actor,
+      ;; mirroring cloud-itonami-isic-6190's module shape).
+      (is (= 41 (:blueprint m)))
       ;; 114 = 113 + cloud-itonami-isic-4620, promoted directly from
       ;; :spec (never a :blueprint) -- agricultural/live-animal
       ;; wholesale trading actor. 115 = 114 + cloud-itonami-isic-2910,
@@ -541,7 +544,13 @@
       ;; solvency attestation, distributed named-funder concentration
       ;; limits, a published/versioned fee schedule) -- see
       ;; cloud-itonami-isic-6493/docs/adr/0001-architecture.md.
-      (is (= 147 (:implemented m))))))
+      ;; 147 -> 148: cloud-itonami-isic-6120 promoted :blueprint ->
+      ;; :implemented -- spectrum-licensed mobile-network-operator actor
+      ;; (Network Operations Advisor ⊣ Mobile Network Governor), module
+      ;; shape mirrors cloud-itonami-isic-6190 (same ISIC 61xx telecom
+      ;; industry). 36 tests/173 assertions run green before claiming
+      ;; :implemented.
+      (is (= 148 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

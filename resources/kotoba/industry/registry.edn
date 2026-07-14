@@ -6073,18 +6073,23 @@
    :name "Wireless telecommunications activities"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6120"
    :business-id "cloud-itonami-6120"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
-   :optional-technologies [:optimization]
-   ;; Published as a :blueprint repo (business-model.md + operator-guide.md +
-   ;; blueprint.edn + governance docs, no src/test yet -- the OSS blueprint
-   ;; stage, not yet :implemented). :maturity :spec explicitly removed so
-   ;; maturity-of/maturity now auto-derive :blueprint from the real :repo
-   ;; above (see `kotoba.industry/maturity-of`). The legacy placeholder
-   ;; :repo (gftdcojp/cloud-itonami-J6120) never actually existed (confirmed
-   ;; 404 before this edit) -- replaced with the real repo, following the
-   ;; SAME cloud-itonami/cloud-itonami-isic-#### naming convention as every
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented: Network Operations Advisor ⊣
+   ;; Mobile Network Governor actor (langgraph-clj StateGraph, MemStore +
+   ;; DatomicStore parity, Phase 0->3 rollout), mirroring cloud-itonami-
+   ;; isic-6190's module shape (same ISIC 61xx telecom industry) while
+   ;; keeping this class's own already-published spectrum-licensed MOBILE
+   ;; NETWORK OPERATOR scope (docs/business-model.md/operator-guide.md).
+   ;; 36 tests / 173 assertions green, clj-kondo clean. See
+   ;; cloud-itonami-isic-6120's own docs/adr/0001-architecture.md.
+   ;; Previously: published as a :blueprint repo (business-model.md +
+   ;; operator-guide.md + blueprint.edn + governance docs, no src/test yet
+   ;; -- the OSS blueprint stage). The legacy placeholder :repo (gftdcojp/
+   ;; cloud-itonami-J6120) never actually existed (confirmed 404 before
+   ;; that edit) -- replaced with the real repo, following the SAME
+   ;; cloud-itonami/cloud-itonami-isic-#### naming convention as every
    ;; other actor in this fleet rather than the legacy J-prefixed scheme.
-   ;; Resolves the LAST candidate deferred at ADR-2607101400 (alongside
+   ;; Resolved the LAST candidate deferred at ADR-2607101400 (alongside
    ;; 3510, resolved separately at ADR-2607101800): scoped explicitly to a
    ;; spectrum-licensed MOBILE NETWORK OPERATOR (owning/operating the radio
    ;; access network -- towers, base stations, licensed spectrum), a
@@ -6097,6 +6102,8 @@
    ;; a shared cross-cutting telephony-records capability with 6190 (E.164/
    ;; SIP/CDR/SMS), the same sharing pattern as :robotics fleet-wide -- not
    ;; evidence of redundancy. See ADR-2607102000.
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
+   :optional-technologies [:optimization]
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "6130"
