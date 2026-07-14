@@ -2400,10 +2400,20 @@
    :business-id "cloud-itonami-isic-0111"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies [:optimization]
-   :maturity :spec
-   ;; REVERTED 2026-07-14: compile error: store.cljc uses malformed JVM interop `core/System/currentTimeMillis` (cljs-first violation) -- confirmed broken by direct clojure -M:test run. Needs a verified from-scratch redo.
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :survey :advise :treat :record :audit]},
+   :maturity :implemented
+   ;; Wave-3 field-operations actor implementation complete (2026-07-14,
+   ;; ADR-2607152500): CerealOpsAdvisor ⊣ FieldOperationsGovernor pattern,
+   ;; closed op allowlist (log-field-record/schedule-field-operation/
+   ;; flag-crop-health-concern/order-supplies), direct field-equipment
+   ;; operation and finalizing pesticide-application decisions permanently
+   ;; blocked. Scope: field back-office coordination only (no direct
+   ;; equipment operation or agronomic decision authority). Propose-only
+   ;; operations, crop-health concerns always escalate. 30 tests / 96
+   ;; assertions green. Reverts a prior broken same-day stray artifact
+   ;; (missing advisor.cljc, missing 3/5 test namespaces, unresolvable
+   ;; deps.edn local/root -- confirmed broken by direct clojure -M:test
+   ;; run, deleted and rebuilt from scratch).
+   :operating-states [:intake :advise :govern :decide :commit :hold]},
   {:id "0112"
    :name "Growing of rice"
    :repo "https://github.com/gftdcojp/cloud-itonami-A0112"
