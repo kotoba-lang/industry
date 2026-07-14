@@ -354,3 +354,32 @@ mail-creds 自体の nbb 化は既存 bb tooling の温存原則どおり別ス�
 fake-token smoke で env guard / creds env-passthrough / wrangler 呼び出し /
 fail-fast(KV 鍵温存)を実行確認。以後この ADR 系列で書く新規スクリプト・
 ハーネス(runner 常駐化含む)は nbb を正とする。
+
+## Addendum (2026-07-14, same day): outbound 完成 — 送信 = PR merge 後に発火
+
+cloud-itonami `7aed936a`。`cloud-itonami.ops-send` + `clojure -M:ops-send`
+(propose / pending / merge / run / run-dry)で ADR 本文のもう一つの主役
+「送信は PR merge 後に CD/CI actions で発火」が成立:
+
+- mail draft → `:external-send` proposal ref(outbound の PR。**proposal 時点
+  では何も送信されない**。pending queue = lane main に未到達な proposal refs)。
+- 部門長の署名 merge(lane 権者 1 署名、proposer 自身の approval は無効)で
+  着地 — **mail.draft 自体の approve gate は意図的に使わない**(git-native flow
+  では署名 merge が承認そのもの。draft/approved? 前提条件は置き換え対象の
+  store-native 経路の持ち物)。
+- merge 後、inbound と**同一の** verified/receipted ops-runner tick が
+  `mail/send-message-via-resend!` を発火。at-most-once(receipt dedupe、再送は
+  明示の新 proposal)、gate 迂回の raw ref move は `:unverified` で transport に
+  一切触れない。
+- E2E テスト(recording Resend stub): 未 merge proposal は runner に不可視 /
+  self-approve 拒否 / 署名 merge 後に **transport 呼び出しがちょうど 1 回**
+  (URL・Bearer header 実測)/ rerun no-op / 迂回 ref move は送信ゼロ。
+  2 tests / 16 assertions、全ゲート baseline 同一。
+- CLI の merge は「approver の 32-byte Ed25519 seed(hex ファイル)+ CACAO
+  chain(EDN)」を引数に取る — org root custody が決まるまでの local dev key
+  運用。merge 署名 UI(WebAuthn 経由)は引き続き follow-up。
+
+これで ADR §1 のマッピング表の主要行(受信=PR / 提案=PR / 承認=署名 merge /
+実行=post-merge runner / 監査=audit ref)がすべて実装・E2E 検証済みになった。
+残: kotobase replica / P2P 配布(rad R2 待ち)、runner・drain の常駐化、
+org root key custody、merge 署名 UI、BMC 等他 lane への展開。
