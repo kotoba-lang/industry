@@ -353,6 +353,108 @@
              merge, branch+worktree cleanup"
     :west-pin "kotoba ecadee870a73 -> dd2618067fe2 (--entry minimal diff,
                isolated from the unrelated cloud-itonami hunk, verify-west-pins OK)"}}
+  :adr/compiler-destructuring-vector-loop-implementation-2026-07-14
+  {:summary "Implemented the remaining :add-verdict items in kotoba-lang/
+             compiler's frontend.clj: destructuring (let + defn params,
+             one level only), vector-as-data (reuses desugar-list's
+             pair-chain encoding), and loop/recur (synthesized recursive
+             helper + purely-syntactic free-variable capture). Multi-arity
+             defn -- also :add in the triage -- explicitly deferred: unlike
+             every other item here it is NOT frontend-only (would require
+             changing signatures' shape, validate-expr's call-arity
+             resolution, AND all 3 backends' WASM export-naming, since WASM
+             has no function-name overloading)."
+   :bugs-found-and-fixed
+   [{:bug "let's generic default desugar case called desugar-expr on the
+           WHOLE bindings vector as one opaque arg -- vectors aren't seq?,
+           so it passed through unchanged, silently skipping map/keyword/
+           vector desugaring of binding VALUES"
+     :symptom "(let [m {:a 1}] (get m :a)) failed: \"value type is outside
+               the safe profile\" -- live-confirmed before the fix"
+     :fix "added a dedicated `let` case to desugar-expr's dispatch:
+           destructure-binding expands each pattern, each binding VALUE is
+           explicitly desugar-expr'd"}
+    {:bug "loop-helper's synthesized function name used gensym (a JVM-
+           process-global monotonic counter) -- safe for let-local temp
+           names (erased to WASM local indices, as and/or's gensym'd temps
+           already proved) but NOT for this exported top-level function
+           name, baked literally into the WASM export section"
+     :symptom "compiling the same loop-using source twice in one process
+               produced DIFFERENT bytes (oracle value correct and IDENTICAL
+               both times -- only the byte-level export name differed),
+               violating this compiler's byte-for-byte reproducible-build
+               gate. Live-confirmed before the fix."
+     :fix "replaced gensym with a deterministic *loop-counter* (a volatile!
+           dynamic var), bound ONCE per top-level analyze call, incremented
+           sequentially -- deterministic because the same source is always
+           desugared in the same left-to-right order"}
+    {:bug "surfaced while fixing the above: let's body used a bare (map
+           desugar-expr body), a lazy seq, passed as list*'s FINAL argument
+           -- list* never forces its tail. This deferred the actual
+           desugar-expr calls (and therefore the (vswap! *loop-counter*
+           inc) inside any nested loop) past the end of *loop-counter*'s
+           `binding` scope, to whenever something later happened to force
+           that lazy seq (e.g. uses-map-get?'s post-analyze tree walk)"
+     :symptom "NullPointerException: Cannot invoke Volatile.deref() because
+               the return value of Var.get() is null -- *loop-counter* back
+               at its nil default by the time the lazy seq was finally
+               forced. Live-confirmed before the fix, only reproducible
+               with a `loop` nested inside a `let` body."
+     :fix "replaced (map desugar-expr body) with (mapv desugar-expr body)
+           -- eager, forces immediately within the correct dynamic scope.
+           Manually audited every other map/mapcat/concat/cons combination
+           in frontend.clj for the same lazy-tail-into-list*/cons pattern;
+           found no other instance (desugar-list/desugar-map/the generic
+           default case's `apply list` all force eagerly already)"}]
+   :honest-limitations
+   ["destructuring's gensym'd let-local temp names (destr-map__NNN etc) are
+     a JVM-process-global counter, NOT reset per analyze call -- so raw
+     :kir data is NOT expected to be identical across separate analyze
+     calls when destructuring is used (confirmed live: compiling the same
+     destructuring-using source once per backend produced 3 distinct :kir
+     values). Harmless for actual compiled behavior (these are local-
+     variable names erased to WASM local indices; loop alone, which uses
+     the deterministic *loop-counter* instead of gensym, DOES produce
+     identical :kir across backends, verified separately) -- but it means
+     the existing cross-backend :kir-identity test pattern (established for
+     map/get/assoc) does not extend to destructuring as-is; the new test
+     suite checks :oracle-value consistency for destructuring instead of
+     :kir identity, and documents why"
+    "multi-arity defn deferred, not implemented -- see :summary"
+    "nested destructuring patterns ([[a] b], {:keys [a]} nested inside a
+     vector pattern, etc) are explicitly rejected, one level only, same
+     scope limit as documented in the design"]
+   :verification
+   {:oracle-interpreter "ir.clj's execute -- destructuring (vector/map, let
+                          + defn params), vector-as-data, loop/recur (basic,
+                          zero-iteration, free-variable capture, nested,
+                          cross-defn uniqueness), reproducibility all
+                          correct"
+    :real-chicory-execution
+    "scratch verification (uncommitted, matching compiler/'s existing
+     convention), real host-side pair HostFunctions, 8 scenarios: let+map
+     bugfix, loop/recur, vector destructuring, map destructuring, defn
+     param vector destructuring, defn param map destructuring, multi-loop,
+     vector-as-data -- all matched the oracle exactly"
+    :test-suite "clojure -M:test: 121 tests / 2764 assertions (96
+                 pre-existing + 25 new in
+                 frontend_destructuring_loop_test.clj), 0 failures/errors"}
+   :landed
+   {:repo "kotoba-lang/compiler" :commits "7d27613 -> 68c15a4"
+    :method "sibling worktree outside superproject, gh api merges server-side
+             merge, branch+worktree cleanup"
+    :west-pin "compiler 7d27613c9a32 -> 68c15a436333 (--entry minimal diff,
+               verify-west-pins OK, no unrelated pins swept in this time)"
+    :files ["src/kotoba/compiler/frontend.clj (destructure-binding,
+             nth-pair-second, form-free-symbols, replace-recur,
+             param-name+wrap, *pending-loop-helpers*/*loop-counter* dynamic
+             vars, let/loop desugar-expr cases, vector-as-data dispatch,
+             analyze's parsed construction: mapv->mapcat + destructuring-
+             aware params + loop-helper collection)"
+            "test/kotoba/compiler/frontend_destructuring_loop_test.clj
+             (new, 25 deftest)"
+            "test/kotoba/compiler/test_runner.clj (registered the new
+             namespace)"]}}
   :adr/decision-not-made
   ["general first-class functions/closures in .kotoba -- rejected on T2 soundness grounds"
    "defprotocol/defrecord/multimethod in .kotoba -- rejected, fix the 3 affected
