@@ -379,6 +379,49 @@ actor Store seam が 263 repo で複製されている構造課題（一括移�
 - 検証: CLJS 71 tests / JVM 77 tests、0 failures、clj-kondo 0 errors。INV-14 不変、
   maturity `:blueprint`。
 
+## Addendum 12（2026-07-15）: self-contained ブラウザ検証ページ（Addendum 6 の follow-up 解消）
+
+Addendum 6 が記録していた「未着手（follow-up）」の1つ、`公開 JSON/EDN を消費する
+self-contained ブラウザ検証ページ（第4の独立実装）」を実装した（衛星 repo main
+`27fccfd7`）。`docs/verify.html` — 依存ゼロの単一 HTML ファイル（vanilla JS、
+ビルドステップ無し）が、`docs/verify-inclusion.md` のハッシュウォークを完全に
+クライアントサイドで再現する: 自前の最小 EDN リーダー（このartifact形状に絞った
+スコープ）+ ブラウザ標準 Web Crypto API の SHA-256。ページ内にネットワーク
+リクエストは一切無く、どこにも送信しない。
+
+**Addendum 7 の提案からの意図的な逸脱を記録する**: Addendum 7 は「follow-up の
+『ブラウザ検証ページ』も cljc で EDN を読めば足りる」と述べていたが、実装は
+**あえて cljc/ClojureScript を使わず vanilla JS で独立に書いた**。理由:
+第三者検証の価値は「プロジェクト自身のツールチェーンを一切信用しない」ことに
+あり（本 ADR の worked example が素の `sha256sum` を使うのと同じ精神）、
+プロジェクト自身の EDN リーダー/ハッシュ実装を（cljc経由であっても）再利用する
+ことは、その独立性を弱める。vanilla JS + ブラウザ標準 Web Crypto は、
+"view-source" で誰でも監査できる最も疑わしくない実装であり、既存の
+「独立実装」基準（sha256sum by hand）と同じ格の「第4の独立実装」になる。
+
+**着地前の3段階の実検証**（「動きそう」で済ませない）:
+1. ページ自身の埋め込み `<script>` ロジックを抽出し、素の Node で
+   `docs/verify-inclusion.md` の worked example（alice/bob、root
+   `761d744d...`）に対して実行 → バイト完全一致。
+2. 同じ抽出ロジックを、**実際に `cryptoexchange.publish/build-artifact` を
+   呼んで生成した本物の attestation artifact**（手組みのfixtureではない、
+   alice/bob/carol/dave/erin 5アカウント）に対して実行 → 全員 PASS。改竄
+   シナリオ2件（金額改竄・他人のproofを騙る）は正しく FAIL。
+3. jsdom によるheadless DOM テストで、ページ自体の実際の file-input/
+   textarea/dropdown/button 配線（抽出ロジックの単体テストではなく）を
+   駆動 → parse・populate・verify・PASS/FAIL報告、および不正EDN/空
+   artifactのエラーパスも含めて正しく動作することを確認。
+
+`scripts/verify_docs_verify_html.cljs`（本 repo の慣習通りnbbスクリプト）を
+追加し、上記2番を実際の `test/fixtures/verify-html-fixture.edn`（本物の
+artifact）に対して再実行する回帰チェックとして checked-in——実 nbb 実行で
+確認済み。既存の cognitect-test-runner / portable-cljs-test-runner には
+配線していない（静的HTML成果物のテストであり、`.cljc` namespace 用の
+両ハーネスの契約に合わないため）。
+
+`README.md`・`docs/verify-inclusion.md` を新ページへの参照込みで更新。
+このsatelliteはwest非登録（fleet慣例通り）のため west pin前進は不要。
+
 ## References
 
 - ADR-2607121000（逆トポソート 5-wave — 6611/6612「取引台帳」注記）
