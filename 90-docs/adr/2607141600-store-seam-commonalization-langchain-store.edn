@@ -16,6 +16,19 @@
   :adr/related ["adr-2607141400-kotoba-lang-merkle-sum-extraction-store-seam-finding"
                 "adr-2607141200-cloud-itonami-isic-6611-cryptoexchange-incident-proof-design"]
   :db/id -1
+  :adr/addenda
+  [{:addendum 1
+    :date "2026-07-14"
+    :title "increment 2 done + first entity-store migration (6511)"
+    :field-spec-helpers {:lib-main "0a5298d (west pin advance f8acaab)"
+                         :api "map->tx / pull->map / pull-pattern driven by {logical-key {:attr :ns/attr :blob? :default :coerce}}; preserves hand-written semantics exactly (some? gate keeps false; nil identity -> nil; blob decode with default; :coerce on read)"
+                         :tests "specs mirroring 6511's application/party, round-trip through a real langchain.db conn; CLJS+JVM 8 tests / 22 assertions"}
+    :reference-adopter {:repo "cloud-itonami/cloud-itonami-isic-6511 (underwriting.store)"
+                        :main "952b098"
+                        :change "schema -> identity-schema; enc/dec* -> lib; app/party map<->tx<->pull -> field-spec + generic calls; kyc/assessment/ledger/binding/sequence custom-query sections keep own wiring (using shared enc/dec*)"
+                        :verification "behavior identical — CLJS primary + JVM both 37 tests / 462 assertions green (incl. MemStore≡DatomicStore store contract exercising app/party round-trips); clj-kondo 0"
+                        :note "first increment-3 on-touch migration; 6511 is a west-unregistered cloud-itonami actor (direct GitHub main), so no west pin advance"}
+    :remaining "increment 3 continues: new actors adopt by default (update build-actor skill), existing migrate gradually on touch, drift scan surfaces non-adopters"}]
   :adr/decision-summary
   "{:context {:from \"ADR-2607141400 recorded the 263-repo Store-seam duplication as a structural issue for a separate ADR; this is it\",
               :evidence {:identical-codec \"(defn- enc [v] (pr-str v)) and (defn- dec* [s] (when s (edn/read-string s))) are byte-identical in 190 store.cljc files\"

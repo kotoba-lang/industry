@@ -71,6 +71,28 @@ ADR-2607141400 で「actor Store seam（MemStore ≡ DatomicStore over `langchai
 - 衛星 `23f20c1`（cryptoexchange.store 採用）
 - 本 ADR とペアの `.edn`
 
+## Addendum 1（2026-07-14）: 増分2 実施 + entity-store 初移行（6511）
+
+増分2（field-spec 駆動の entity ヘルパー）を実装し、entity-store を初めて実移行した。
+
+- **lib に field-spec ヘルパー追加**（`langchain-store` main `0a5298d`、west pin 前進
+  `f8acaab`）: `map->tx` / `pull->map` / `pull-pattern`。field-spec
+  `{logical-key {:attr :ns/attr :blob? :default :coerce}}` で entity の
+  `x->tx`/`pull->x`/`x-pull` の三つ組をデータ駆動に畳む。hand-written store の意味論を
+  厳密保存（some? gate = false も present、nil identity → nil、blob は default 付き
+  decode、`:coerce` は read 時変換）。6511 の application/party を写した spec で実
+  `langchain.db` conn 往復テスト。CLJS+JVM 8 tests / 22 assertions green。
+- **6511（underwriting.store）を reference entity-store adopter として移行**
+  （6511 main `952b098`、増分3 の「触るついでに漸進移行」の第一号）: schema →
+  `identity-schema`、enc/dec* → lib 委譲、app/party の三つ組 → field-spec + generic
+  呼び出し。kyc/assessment/ledger/binding/sequence の custom-query 部は自前 wiring
+  維持（共有 enc/dec* は利用）。**挙動不変**（CLJS primary + JVM とも 37 tests /
+  462 assertions green、MemStore≡DatomicStore store contract の app/party 往復含む）、
+  clj-kondo 0。store.cljc の entity boilerplate が spec に集約。
+- これで増分2 は完了。増分3（新規 actor デフォルト採用 = build-actor skill 更新、
+  既存の on-touch 漸進移行、drift scan で未採用可視化）は継続タスク。6511 は
+  cloud-itonami actor で west 非登録のため west pin 前進は不要（GitHub main へ直接）。
+
 ## References
 
 - ADR-2607141400（Store seam 複製所見 — 本 ADR の出典）
