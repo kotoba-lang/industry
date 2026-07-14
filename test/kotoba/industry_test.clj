@@ -724,7 +724,14 @@
       ;; 66 tests / 161 assertions run green before claiming :implemented,
       ;; independently re-verified against a fresh clone; promoted :spec ->
       ;; :implemented, ADR-2607152400.
-      (is (= 196 (:implemented m))))))
+      ;; 196 -> 197: cloud-itonami-isic-0312 (Freshwater fishing) fresh
+      ;; scaffold (no prior repo), mirroring cloud-itonami-isic-0311
+      ;; (Marine fishing)'s verified pattern: freshwater-fishing.governor/
+      ;; store/llm-advisor/operation/sim, :water-body replacing 0311's
+      ;; :flag-state (no maritime-zone/EEZ concept for inland waters);
+      ;; 20 tests / 31 assertions green, independently re-verified against
+      ;; a fresh clone; promoted :spec -> :implemented, ADR-2607142230.
+      (is (= 197 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
