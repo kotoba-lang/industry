@@ -132,7 +132,52 @@
      (:require kotobase.store), added to a new :kotobase alias's :extra-deps in
      langchain/deps.edn, NOT the main :deps -- same isolation pattern langchain.jvm
      already uses for http-kit/jsonista"]
-   :status "design decided in this ADR; implementation follows in the same session"}
+   :status "implemented and landed same session -- see :adr/implementation-2026-07-14"}
+  :adr/implementation-2026-07-14
+  {:summary "Implemented as designed with 2 deviations from the original plan,
+             recorded honestly: (1) the adapter namespace ended up named
+             langchain.kotobase-persist, not langchain.kotobase-db (that name
+             was already taken by a pre-existing, unrelated remote-XRPC adapter
+             discovered during implementation); (2) kotobase was added to the
+             EXISTING :test alias's :extra-deps rather than a new :kotobase
+             alias -- simpler and matches the http-kit/jsonista precedent
+             directly."
+   :forward-reference-bug
+   "create-conn's new persist-replay branch calls `with`, defined later in the
+    file -- clojure -M:test failed to compile until (declare with) was added
+    right after the ns form. Caught by actually running the test suite, not
+    just by design review."
+   :known-limitation-not-fixed
+   "concurrent transact! calls on the same conn can append to persist in a
+    different order than their tx numbers were assigned in-memory (each call's
+    -append happens in a separate step after its own swap! resolves, not
+    atomically with tx-number assignment) -- documented as a limitation in
+    transact!'s docstring, not fixed in this pass"
+   :discovered-during-implementation
+   "langchain already has langchain.kotoba-db: a SEPARATE, pre-existing full
+    Datomic-shaped langchain.db/api implementation talking directly to a
+    kotoba-server's ai.gftd.apps.kotobase.datomic.* XRPC endpoints (thin
+    client, no local query engine at all). Does not conflict with this ADR's
+    integration (which instead persists langchain.db's own local Datalog
+    engine's tx log via kotobase.store/IStore) -- the two are complementary,
+    different architecture tradeoffs, both remain valid."
+   :verification
+   {:tests "clojure -M:test: 60 tests / 152 assertions, 0 failures/errors
+            (4 new tests in kotobase_persist_test.cljc: persist+replay,
+            distinct-stream isolation, no-persist backward-compat)"
+    :lint "clojure -M:lint: 0 errors, 10 pre-existing warnings unrelated to
+           the changed files"}
+   :landed
+   {:repo "kotoba-lang/langchain" :commits "27a479b -> cda206e"
+    :method "sibling worktree outside superproject, gh api merges server-side
+             merge, branch+worktree cleanup"
+    :west-pin "langchain 0f966d06c93d -> cda206ea2cbe (--entry minimal diff,
+               verify-west-pins OK)"
+    :files ["deps.edn (kotobase added to :test alias :extra-deps)"
+            "src/langchain/db.cljc (create-conn persist arg, transact! append hook,
+             (declare with) fix)"
+            "src/langchain/kotobase_persist.cljc (new, persist-for fn)"
+            "test/langchain/kotobase_persist_test.cljc (new, 4 deftest)"]}}
   :adr/decision-not-made
   ["general first-class functions/closures in .kotoba -- rejected on T2 soundness grounds"
    "defprotocol/defrecord/multimethod in .kotoba -- rejected, fix the 3 affected
