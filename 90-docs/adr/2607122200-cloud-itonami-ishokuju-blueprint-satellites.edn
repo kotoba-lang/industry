@@ -1,0 +1,38 @@
+[{:adr/id "adr-2607122200-cloud-itonami-ishokuju-blueprint-satellites"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607122200: 衣食住 scaffold 起票 — ISIC 1010/1311/1410/4100 blueprint 衛星 + registry :blueprint 昇格"
+  :adr/topic "cloud-itonami-ishokuju-blueprint-satellites"
+  :adr/status "accepted"
+  :adr/date "2026-07-12"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for ["ishokuju (衣食住) blueprint satellite scope: cloud-itonami-isic-1010/1311/1410/4100"
+                          "first explicit :spec->:blueprint promotions in kotoba-lang/industry registry"
+                          "honest-default rule for :blueprint satellites (no src/test, no actor claimed)"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related ["adr-2607122100-cloud-itonami-labor-liberation-sd-model"
+                "adr-2607121000-cloud-itonami-global-isic-isco-reverse-toposort-plan"
+                "adr-2607011000-cloud-itonami-robotics-premise-and-isic-21-21"
+                "adr-2607012100-cloud-itonami-blueprint-org-transfer"]
+  :db/id -1
+  :adr/decision-summary
+  "{:trigger \"ADR-2607122100 Track A: 衣食住は生産着手でなく scaffold 起票として L0 前倒し。ADR-2607121000 の scaffold 欠落 follow-up (C10-12 食品 / 4100 建築) + 衣 (C13-14)\",
+    :finding \"registry には 1010/1311/1410/4100 が :spec で存在したが :repo は実在しない旧 gftdcojp C/F-prefix repo への stale URL、ISIC 10-14/4100 の blueprint 衛星は 0 本、:blueprint tier は fleet-wide 0 件\",
+    :satellites [{:repo \"cloud-itonami/cloud-itonami-isic-1010\" :name \"Community Meat Processing\" :axis :食 :governor :meat-processing-governor :initial \"40cc7d2\"}
+                 {:repo \"cloud-itonami/cloud-itonami-isic-1311\" :name \"Community Textile Spinning\" :axis :衣 :governor :textile-spinning-governor :initial \"974470e\"}
+                 {:repo \"cloud-itonami/cloud-itonami-isic-1410\" :name \"Community Apparel Manufacturing\" :axis :衣 :governor :apparel-governor :initial \"e1eb811\"}
+                 {:repo \"cloud-itonami/cloud-itonami-isic-4100\" :name \"Community Building Construction\" :axis :住 :governor :building-construction-governor :initial \"cff24d7\"}],
+    :satellite-shape {:visibility :public :license \"AGPL-3.0-or-later\" :maturity :blueprint
+                      :contents [:blueprint-edn :readme :license :community-files]
+                      :honest-default \"actor 未実装を README/blueprint.edn で明示。src/test を持たない。wave-3 robotics-gated (ADR-2607011000) を明記\"},
+    :registry-promotion {:repo \"kotoba-lang/industry\" :entries [\"1010\" \"1311\" \"1410\" \"4100\"]
+                         :change \":spec -> :blueprint, stale URL -> 実在衛星, :business-id -> cloud-itonami-isic-<code>, operating-states :spec -> :intake\"
+                         :maturity-summary-blueprint {:before 36 :after 40}
+                         :tests \"15 tests / 933 assertions green, clj-kondo 0 errors\"
+                         :landed \"main 6ca68c92 (server-side merge, branch deleted)\"},
+    :west-pin {:entry \"industry\" :from \"5ffdc774\" :to \"6ca68c92\" :method \"API single-entry PUT, blob-sha optimistic lock, pin==child-main-tip verified, pure forward\" :commit \"2bf7896d\"},
+    :out-of-scope [\"actor 実装・robot 統合・EMS (gate.robotics 開門後 Track C)\"
+                   \"102-108/110/1312/1391 等の残り class 衛星化 (需要が見えたらこの 4 本のパターン複製)\"
+                   \"2100 医薬 / 6201/6311 自業種 scaffold (別 batch)\"]}"}]
