@@ -32,4 +32,66 @@
                  \"kotoba-lang/comfyui reimplementation (stays HTTP-orchestrating real Python ComfyUI via murakumo, unchanged)\"
                  \"any claim of PyTorch/ComfyUI maturity parity on completion\"],
     :not-urgent \"real diffusion-model inference speed already solved pragmatically this session (murakumo fix: ComfyUI 0.27.0 upgrade + dead-node detection + LaunchDaemon self-heal, ~3min/image on Metal/MPS, all 8 fleet nodes) — Phase 1 is a parallel foundation investment, not blocking anything\",
-    :implementation-status \"NOT started — this ADR is the scope fence only, a future session picks up the actual work\"}"}]
+    :implementation-status \"DONE, found already-complete upstream and independently verified 2026-07-15 (not implemented by this ADR itself) -- see :adr/addendum-1-2026-07-15\"}"
+  :adr/addendum-1-2026-07-15
+  {:summary "Phase 1 (torch.num-backend implementing torch.ports/IBackend,
+             conv2d in num, oracle-verified correctness, honest benchmark)
+             was found ALREADY COMPLETE and substantially exceeded, done by
+             other concurrent work in this monorepo, not by this addendum's
+             own session. Discovered via extreme west-pin staleness: num's
+             pin was 101 commits behind main, torch's 111 -- far beyond
+             ordinary single-commit drift, which is what prompted a closer
+             look instead of a routine pin bump."
+   :verified-not-implemented-here
+   {:torch-num-backend "src/torch/num_backend.cljc (764 lines) implements
+                        IBackend for :linear/:relu/:silu/:sigmoid/:tanh/
+                        :gelu/:softmax/:rmsnorm/:layernorm/:groupnorm, full
+                        NCHW :conv2d (groups/depthwise/dilation/bias/stride/
+                        padding), and learned multi-head attention with
+                        causal masking + KV-cache -- well beyond the ADR's
+                        minimal :linear/:relu/:conv2d/:softmax ask"
+    :oracle-tests "test/torch/num_backend_test.cljc, 512 lines, ~20 deftest,
+                   hand-computed-oracle correctness for conv2d/attention/
+                   multi-head-attention/groupnorm/KV-cache/GQA/paged-
+                   runtime/full-Llama-decoding"
+    :real-test-execution "num: 85 tests / 446 assertions, 0 failures; torch:
+                          140 tests / 615 assertions, 0 failures -- run for
+                          real in fresh clones, not assumed from reading code"
+    :honest-benchmark "torch/README.md: whole-graph Metal benchmark (2 Llama
+                       blocks, 256 hidden, 4q/2kv heads, Q4_K-packed linears,
+                       tied LM head, causal prefill, fixed-capacity KV-cache
+                       decode) with REAL measured numbers on Apple M4: cold
+                       42.806ms, warm prefill 23.815ms, cached decode
+                       8.852ms/token, 7.11x quantization compression -- not
+                       a claim, an actual reported number per the ADR's own
+                       discipline"
+    :run-still-fail-closed "torch.core/run still throws when no IBackend is
+                            bound -- correct, unchanged 'describe, dont
+                            execute' default; the ADR's actual complaint (no
+                            real backend existed to bind) is what's resolved"}
+   :not-touched
+   ["num's own S2 (native Apple MPS-API fast path) -- observed hints of
+     in-progress work (a local agent/cuda-backend branch with 8 real commits
+     on native CUDA/PCG/kernel-generation work, and a recent main commit
+     routing dense algebra through MPS) but out of this ADR's scope, not
+     investigated further"
+    "kotoba-lang/comfyui's pin is separately ~74 commits behind -- explicitly
+     out of THIS ADR's scope per its own Consequences section (comfyui stays
+     untouched, HTTP-orchestrating real Python ComfyUI); left as a distinct,
+     unaddressed west-pin fact, not folded into this addendum"
+    "orgs/kotoba-lang/num's shared checkout was left exactly as found (on
+     agent/cuda-backend, another session's fully-committed WIP branch) --
+     no need to touch it since all verification was done in isolated fresh
+     clones under /tmp, and the branch's own commits are safe regardless of
+     which ref the shared checkout happens to have checked out"]
+   :west-pin
+   {:num "60e38913 -> aa242ee5 (gh api compare: ahead_by=101, behind_by=0)"
+    :torch "86226f87 -> 4703ae17 (gh api compare: ahead_by=111, behind_by=0)"}
+   :honest-framing "this addendum did not write any implementation code --
+                    its entire contribution is noticing the extreme pin
+                    staleness, independently verifying (via real test
+                    execution, not just reading source) that the ADR's own
+                    Phase 1 success criteria are genuinely met, advancing
+                    the pins, and recording it honestly rather than either
+                    re-implementing already-done work or leaving the ADR's
+                    'NOT started' status silently stale"}}]
