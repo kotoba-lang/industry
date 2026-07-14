@@ -2852,13 +2852,19 @@
    :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "0990"
    :name "Support activities for other mining and quarrying"
-   :repo "https://github.com/gftdcojp/cloud-itonami-B0990"
-   :business-id "cloud-itonami-B0990"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0990"
+   :business-id "cloud-itonami-isic-0990"
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :survey :extract :grade :ship :audit]},
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as a mining services
+   ;; contractor coordination actor (Services Advisor ⊣ Services
+   ;; Governor), contractor-side field operations (service order
+   ;; intake, crew dispatch, logistics) with hard-blocked
+   ;; operator-class operations (blasting, extraction, mine-safety).
+   ;; Scope narrowed to contractor authority per ADR-2607141100
+   ;; (scope-exclusion boundaries documented in architecture ADR).
+   :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "1010"
    :name "Processing and preserving of meat"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1010"
