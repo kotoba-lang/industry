@@ -698,7 +698,15 @@
       ;; green, independently re-verified against a fresh clone) after its
       ;; own prior missing-modules revert; promoted :spec -> :implemented,
       ;; ADR-2607151800.
-      (is (= 193 (:implemented m))))))
+      ;; 193 -> 194: cloud-itonami-isic-0121 (Growing of grapes) fresh
+      ;; scaffold (vineyardops.governor/advisor/facts/registry/store/
+      ;; operation/phase/sim, VineyardOpsAdvisor <-> VineyardOperations
+      ;; Governor vineyard-operations-coordination actor, module structure
+      ;; mirrored from cloud-itonami-isic-0141). 30 tests / 90 assertions
+      ;; run green before claiming :implemented, independently
+      ;; re-verified against a fresh clone; promoted :spec ->
+      ;; :implemented, ADR-2607152200.
+      (is (= 194 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
