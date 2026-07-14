@@ -28,7 +28,14 @@
                         :change "schema -> identity-schema; enc/dec* -> lib; app/party map<->tx<->pull -> field-spec + generic calls; kyc/assessment/ledger/binding/sequence custom-query sections keep own wiring (using shared enc/dec*)"
                         :verification "behavior identical — CLJS primary + JVM both 37 tests / 462 assertions green (incl. MemStore≡DatomicStore store contract exercising app/party round-trips); clj-kondo 0"
                         :note "first increment-3 on-touch migration; 6511 is a west-unregistered cloud-itonami actor (direct GitHub main), so no west pin advance"}
-    :remaining "increment 3 continues: new actors adopt by default (update build-actor skill), existing migrate gradually on touch, drift scan surfaces non-adopters"}]
+    :remaining "increment 3 continues: new actors adopt by default (update build-actor skill), existing migrate gradually on touch, drift scan surfaces non-adopters"}
+   {:addendum 2
+    :date "2026-07-14"
+    :title "increment 3 visibility — adoption scan + baseline"
+    :scan {:script "scripts/langchain-store-adoption-scan.cljs (nbb, read-only)"
+           :buckets ":adopted (requires langchain-store.core) / :hand-rolled (local enc/dec* codec remains = migration backlog) / :other (MemStore-only etc., inspect manually)"
+           :baseline {:root "orgs/cloud-itonami" :date "2026-07-14" :total 334 :adopted 1 :hand-rolled 221 :other 112
+                      :note "the 221 hand-rolled are the increment-3 on-touch backlog; re-run the scan to track adopted rising / hand-rolled falling. build-actor skill now steers new stores to :adopted from the start. cryptoexchange.store is also an adopter but isn't checked out under orgs/cloud-itonami so it doesn't appear in the local scan"}}}]
   :adr/decision-summary
   "{:context {:from \"ADR-2607141400 recorded the 263-repo Store-seam duplication as a structural issue for a separate ADR; this is it\",
               :evidence {:identical-codec \"(defn- enc [v] (pr-str v)) and (defn- dec* [s] (when s (edn/read-string s))) are byte-identical in 190 store.cljc files\"

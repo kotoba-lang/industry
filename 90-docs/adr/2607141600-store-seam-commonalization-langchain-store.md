@@ -93,6 +93,20 @@ ADR-2607141400 で「actor Store seam（MemStore ≡ DatomicStore over `langchai
   既存の on-touch 漸進移行、drift scan で未採用可視化）は継続タスク。6511 は
   cloud-itonami actor で west 非登録のため west pin 前進は不要（GitHub main へ直接）。
 
+## Addendum 2（2026-07-14）: 増分3 可視化 — adoption scan + baseline
+
+増分3（漸進移行）の進捗を追跡する scan を追加した。
+
+- **`scripts/langchain-store-adoption-scan.cljs`**（nbb、read-only）: `store.cljc` を
+  走査し `:adopted`（`langchain-store.core` を require）/ `:hand-rolled`（自前の
+  `enc`/`dec*` コーデックが残存＝移行 backlog）/ `:other`（MemStore-only 等、要目視）に
+  分類。summary + hand-rolled backlog リスト（= 移行対象）を出力。`npx nbb` で実行確認。
+- **baseline スナップショット**（`orgs/cloud-itonami`、2026-07-14）: total 334 /
+  **adopted 1**（6511）/ **hand-rolled 221** / other 112。この 221 が increment-3 の
+  「触るついでに漸進移行」backlog で、scan を回すたびに adopted が増え hand-rolled が
+  減るのを追える（一括書き換えはしない方針は不変）。cryptoexchange.store も adopter
+  だが `orgs/cloud-itonami` 配下に checkout されていないため local scan には出ない。
+
 ## References
 
 - ADR-2607141400（Store seam 複製所見 — 本 ADR の出典）
