@@ -271,6 +271,29 @@ M4b `8c37ac7`。すべて design/testnet-only、実資金・実鍵・実チェ�
   運用は INV-14 ゲート（交換業登録 + owner 判断）の管轄で、`:implemented`
   昇格は別途 owner 判断による。
 
+## Addendum 6（2026-07-14）: PoR/PoL を第三者検証可能にする（JSON + 検証仕様）
+
+衛星 repo main `8368bee`。INV-7 の「利用者が自分で検証できる」を、プロジェクトの
+コードに依存せず成立させた:
+
+- `cryptoexchange.publish/render-json` — 決定論的 JSON 出力（キーソート・
+  keyword は name）。browser/CLI の検証器が EDN reader 無しで消費できる。nbb
+  シェルは `.json` も `.edn`/`.md` と併せて出力。
+- **重要な独立検証性の修正**: leaf preimage を colon 付き keyword 文字列
+  （`:alice`）から**公開名（`alice`）**に変更（`attest/pname`）。従来は JSON が
+  `"alice"` を公開する一方ハッシュは `:alice` を食っており、第三者が公開 JSON から
+  leaf を再構成すると不一致になる欠陥があった。修正で「JSON の文字列 = ハッシュ
+  対象」が成立。fixture root hash を再 pin。
+- `docs/verify-inclusion.md` — leaf/node ハッシュ preimage・検証ウォーク・
+  sum-shrinking 拒否を正確に規定。worked example は**プロジェクトコードを一切
+  使わず素の `sha256sum` で root まで再現**（`leaf|alice|btc|300` と node ハッシュ
+  が emit された artifact とバイト一致することを実測確認）。
+- 検証: CLJS 72 tests / 16,935 assertions、JVM 78 tests / 16,956 assertions、
+  0 failures、clj-kondo 0 errors。design/testnet-only、INV-14 不変。
+
+follow-up（未着手）: 公開 JSON を消費する self-contained ブラウザ検証ページ
+（第 4 の独立実装）と、artifact を配信する discovery surface。
+
 ## References
 
 - ADR-2607121000（逆トポソート 5-wave — 6611/6612「取引台帳」注記）
