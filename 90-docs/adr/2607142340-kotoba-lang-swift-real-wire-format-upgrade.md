@@ -112,6 +112,49 @@ removed rather than deprecated-and-kept.
   simpler, single-transaction builder that predates this upgrade and was
   out of scope; a follow-up could migrate it to `kotoba.swift.iso20022` but
   that wasn't done here to keep this change's blast radius to the one repo.
+  ~~Migrated in Addendum 1 (2026-07-15).~~
+
+## Addendum 1（2026-07-15、kessai migration）
+
+Migrated the one follow-up this ADR's own Consequences flagged:
+`kotoba-lang/kessai`'s `kotoba.kessai.wire/->pain001-xml` now delegates to
+`kotoba.swift.iso20022/pain001-doc` + `xml->str` instead of its own
+hand-rolled string-splicing builder.
+
+The migration surfaced two real, previously-silent gaps in the old
+hand-rolled version: `<CreDtTm/>` and `<Dbtr><Nm/></Dbtr>` both rendered
+**empty**, because `credit-transfer` never collected `creation-date-time`
+or `debtor-name` at all. `pain001-doc` correctly refuses to build an
+incomplete document (returns `nil` for a missing required field) — so
+`credit-transfer` now requires `debtor-name`, `creation-date-time`,
+`payment-info-id`, and `requested-execution-date` as well.
+
+Converting the amount from major units to the integer minor units
+`pain001-doc` requires introduces a NEW failure mode the old code never
+had: silent sub-cent precision loss (e.g. `12.567` → `1257`). Closed with
+a `representable-in-2-decimals?` guard that throws instead of silently
+rounding away money — verified empirically that `2.675` is correctly
+rejected (`2.675 * 100` evaluates to exactly `267.5` in double arithmetic,
+genuinely not a whole cent, not a false positive).
+
+Blast radius confirmed contained to `kotoba-lang/kessai` alone (its
+`wire` namespace has no external callers; `kotoba.kessai`'s own main
+namespace only mentions it in docstrings, never requires or calls it).
+
+Tests rewritten to use `parse-xml`/`xml-find`/`xml-text` for structural
+assertions (robust to the real emitter's pretty-printed whitespace)
+instead of raw string regex assuming compact XML, matching this
+namespace's own test conventions (`iso20022_test.cljc`). Full suite:
+10 tests / 87 assertions (was 66), 0 failures/errors. The README example
+was updated and independently re-run to confirm it still works end to
+end.
+
+Landed: `kotoba-lang/kessai`, `main` → `0c0f795761308c251821bc700368bfc4e4004974`,
+sibling worktree (with `swift`/`banking`/`card`/`html`/`css`/`xml` mirrored
+in via symlinks for `:local/root` dependency resolution) + `gh api
+.../merges` server-side merge + branch cleanup. West pin advanced
+(`kessai` `f530cdf5` → `0c0f7957`, verified via `gh api compare`:
+`ahead_by=2, behind_by=0, merge_base==old pin`).
 
 ## References
 
