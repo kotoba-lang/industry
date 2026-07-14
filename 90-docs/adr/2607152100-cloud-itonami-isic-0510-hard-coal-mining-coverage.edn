@@ -1,0 +1,65 @@
+{:adr-id "2607152100"
+ :title "cloud-itonami-isic-0510 — Hard Coal Mining Operations Coordination (verified redo)"
+ :date "2026-07-14"
+ :author "Cloud Itonami Contributors"
+ :status :accepted
+ :context
+ "ISIC Rev.4 0510 (Mining of hard coal) had an earlier same-day scaffold
+  promoted to :implemented on the promoting agent's own claim of 'all
+  tests green'; an independent audit re-ran clojure -M:test directly
+  and found 16 tests / 10 failures, reverted to :spec. Root cause:
+  mining.store MemStore test fixtures keyed the site directory with
+  keyword site-ids while every lookup used the string :site-id off the
+  proposal, so every site lookup silently returned nil and every
+  proposal (including intended-clean happy paths) was misclassified as
+  a HARD site-unregistered hold. This ADR documents a from-scratch,
+  independently re-verified redo, renamed mining.* -> coalops.*,
+  mirroring cloud-itonami-isic-0891's module shape and
+  cloud-itonami-isic-0710's coordination-only scope boundary."
+ :decision
+ {:scope-boundary
+  "Coordination-only actor. Closed four-op allowlist, all :effect
+   :propose: log-production-record, schedule-maintenance,
+   flag-safety-concern (always escalates), coordinate-shipment. An op
+   outside this set is the same failure mode as forbidden-scope
+   content, not a separate carve-out."
+  :governor-rules
+  "Three HARD, permanent, un-overridable checks: (1) site-unverified --
+   target site must be independently :registered?/:verified? in the
+   store, never trusted from the proposal's own claim; (2)
+   effect-not-propose -- any :effect other than :propose is a claim to
+   directly actuate outside governance; (3) scope-exclusion -- any
+   proposal (any op) touching blasting/drilling-pattern/cutting-
+   schedule/extraction-sequencing/ventilation-control/gas-monitoring-
+   override/mine-safety-authority territory, evaluated unconditionally
+   via a lower-cased EN+JA substring scan of the proposal's own
+   content. Escalation (soft): flag-safety-concern always, low
+   confidence (<0.6). coalops.phase independently agrees --
+   flag-safety-concern never auto-commits at any phase."
+  :root-cause-fix
+  "String-vs-keyword map-key mismatch in the prior mining.store test
+   fixtures silently defeated every site lookup. coalops.store keys the
+   site directory consistently on the string :site-id everywhere,
+   verified by coalops.store-contract-test."
+  :module-shape
+  "Renamed mining.* -> coalops.*: store (MemStore), advisor
+   (CoalOpsAdvisor, mock + real-LLM seam via langchain.model, plus an
+   :out-of-scope? test hook), governor (CoalMiningGovernor), phase
+   (0->3 rollout), operation (langgraph-clj StateGraph), sim (demo
+   driver)."}
+ :consequences
+ ["Registry entry corrected in place (exact-text edit of the existing"
+  " {:id \"0510\" ...} block): REVERTED comment removed, :maturity :implemented"
+  "Actor repo cloud-itonami/cloud-itonami-isic-0510 rewritten and pushed to main"
+  "Test suite run directly by this session: Ran 43 tests containing 133"
+  " assertions, 0 failures, 0 errors (both at push time and again from a"
+  " fresh post-merge clone). clj-kondo: 0 errors, 0 warnings."
+  "Checked-in example of the string-vs-keyword map-key-mismatch bug class"
+  " for future actor builds in this fleet to grep their own store"
+  " contract tests for"]
+ :references
+ ["cloud-itonami-isic-0891/src/chemmineops/ (module-shape mirror)"
+  "cloud-itonami-isic-0710/docs/adr/ (coordination-only scope-boundary precedent)"
+  "kotoba-lang/industry resources/kotoba/industry/registry.edn \"0510\" entry"
+  "Federal Mine Safety and Health Act (Mine Act), 30 U.S.C. Sec.801 et seq. (US, MSHA)"
+  "鉱山保安法 (Mine Safety Act) (Japan, METI)"]}
