@@ -224,12 +224,95 @@ Datalogエンジンを持たない thin-client 方式で、今回追加した
 全クエリを処理する薄いクライアント」か「ローカルで完結する永続化
 Datalogエンジン」かを選べる。
 
+## 2026-07-14 Addendum 2 — `.kotoba` 言語拡張を `kotoba-lang/compiler` に実装
+
+「では adr を設計実装」の指示を受け、§Decision 1 のトリアージ表で `:add`
+判定した項目のうち `and`/`or`/`when` の `compiler/` 移植と、map/keyword/
+`get`/`assoc` を実際に `kotoba-lang/compiler` の `src/kotoba/compiler/
+frontend.clj` に実装した（`7bb0905`→`7d27613`、`gh api .../merges`で
+サーバ側マージ、superproject外 sibling worktree、branch/worktree
+cleanup完了、`manifest/west.yml`の`compiler` pinを`--entry`最小diffで
+前進済み: `26ff5233b569`→`7d27613c9a32`）。
+
+**実装時に得た決定的な設計上の発見**: `compiler/`の`backend/wasm.clj`を
+実際に読んだところ、`pair`/`pair-first`/`pair-second`は**WASM線形メモリで
+guest自身が管理するものではなく、既にホストインポート済みcapability**
+（`kotoba:heap.pair`/`pair-first`/`pair-second`、`emit`関数の`imports`
+セクション）だと判明した。これは**バックエンド/codegenの変更が一切不要**
+であることを意味する——map/keywordは既存の`pair`/`pair-first`/
+`pair-second`/`list`プリミティブへの**フロントエンドのdesugarだけ**で
+実現でき、wasm32/x86_64/aarch64の3ターゲットすべてが（各々のバックエンドが
+既に同じ`pair`系ホストインジェクション機構を実装済みのため）自動的に
+恩恵を受けた。
+
+**着地内容**:
+
+- `and`/`or`/`when`: `kotoba-lang/kotoba`の`runtime.clj`の`desugar-and`/
+  `desugar-or`（今朝のsession中に live 再検証済み・実証済みの実装）を
+  そのまま移植。`when`は`compiler/`に`do`が無いため「test + 単一結果式」
+  のみ対応（Clojureの複数bodyフォームは非対応、正直に制約として明記）。
+- keyword literal: 決定論的 FNV-1a 64bit hash による i64定数への
+  interning（`clojure.core/hash`ではなく固定アルゴリズムを選択——この
+  compilerが持つ「byte-for-byte再現可能ビルド」ゲートと整合させるため）。
+- map literal: `{:k1 v1 :k2 v2}` → `(pair (pair k1' v1') (pair (pair k2'
+  v2') 0))`という既存`pair`/`list`desugarへの完全な再利用。エントリ順は
+  `pr-str`によるソースの正規化ソートで決定論性を担保。
+- `get`（2/3-arg）: コンパイラが自動生成する再帰ヘルパー
+  `__kotoba_map_get`（`get`が実際に使われたモジュールにのみ注入）で
+  pair-listを線形探索。既存の固定fuel予算（256 call、`ir.clj`/
+  `backend/wasm.clj`/`core.clj`で既に確立済み、今回変更していない）が
+  map探索の深さも自動的に制限する——新しい制限ではなく既存機構の
+  自然な拡張。
+- `assoc`（可変長k-v pair対応）: 純粋なO(1) desugar（`pair`で前置、
+  同一keyは`get`が先勝ちで返すことでシャドーイング、削除はしない
+  という設計上のトレードオフを明記）。
+
+**検証（3経路、独立）**:
+1. 既存のoracleインタプリタ（`ir.clj`の`execute`、`compile-source`の
+   `:oracle-value`）— and/or/when/map+get/assoc+get/assoc-shadowの
+   全シナリオで期待値と一致。
+2. **実際にコンパイルされたWASMバイトを実Chicoryで実行**（scratch
+   検証、コミットはしていない——`compiler/`自身の既存テストスイートが
+   Chicoryを使わない慣習に合わせた）: 本物のhost-side pairヒープ実装
+   （Chicory `HostFunction`/`ImportValues`）を用意し、`main` exportを
+   直接呼び出し。oracleと完全一致する結果を確認——「コンパイラ内部の
+   参照実装が自己整合的」なだけでなく「実際に生成されたバイナリが実際の
+   WASMランタイム上で正しく動く」ことを実証。
+3. `clojure -M:test`: **96 tests / 2725 assertions、0 failures**
+   （既存80テスト + 新規`frontend_extensions_test.clj`16テスト）。
+   既存のfuzz/property testスイート（`frontend-fuzz-test`/
+   `security-fuzz-test`/`property-test`）も無変更で通過——admission
+   grammarの拡張が既存のランダム生成プログラム群を壊していないことを
+   確認。
+
+**正直に記録する限界**（実装で判明、設計段階では見えていなかった詳細）:
+- `compiler/README.md`の「no when/do/and/or sugar」という記述が
+  古くなっていたため、実装と合わせて更新した（`do`は依然非対応、
+  `and`/`or`/`when`は対応——「2つの文法は未統合のまま」という結論
+  自体は変わらず、ギャップが狭まっただけ）。
+- `assoc`は同一keyへの重複割り当てで古い値を削除せず前置するだけ
+  （リストが単調成長する）——`get`は先頭一致を返すため意味論上は
+  正しいが、同じkeyへの`assoc`を繰り返すプログラムはメモリ効率が悪い。
+  v1のスコープとして許容し、ドキュメント化するに留めた。
+- map literalの最大エントリ数は既存の`max-list-items`（128）を流用
+  しており、`get`のfuel消費（1 call = 1 fuel）と組み合わせても
+  リテラルmapの範囲では実際にfuel枯渇に到達しない
+  （128 + 1 ≪ 256）——`assoc`による動的な成長を経由して初めて
+  fuel枯渇シナリオが構成可能であることをテストで確認した。
+- `kotoba-lang/kotoba`側（wasm_exec.clj）へのmap/keyword実装は
+  今回のスコープに含めていない——`kotoba/`は`compiler/`と違い
+  `pair`系のheapプリミティブ自体をまだ持たない（前セッションのA調査で
+  確認済み）ため、まず土台となるheapプリミティブの追加が前提になる、
+  より大きな別タスク。
+
 ## References
 
 - 90-docs/adr/2607141600-kotoba-kotoba-lang-compiler-kototama-aiueos-consolidation-experiment.md
 - 90-docs/adr/2607141900-cloud-itonami-cljc-actors-kotoba-incompatibility-narrow-slice-porting-policy.md
 - 90-docs/adr/2607072600-cloud-itonami-isic-6492-kototama-tender-wasm-deploy.md
-- orgs/kotoba-lang/kotoba/src/kotoba/runtime.clj（`compile-wasm-expr`、`and`/`or`/`when`/`pos?`/`neg?`が現在compile可能であることのソース）
-- orgs/kotoba-lang/compiler/src/kotoba/compiler/frontend.clj（`desugar-expr`、`and`/`or`/`when`が未対応のままであることのソース）
+- orgs/kotoba-lang/kotoba/src/kotoba/runtime.clj（`compile-wasm-expr`、`and`/`or`/`when`/`pos?`/`neg?`が現在compile可能であることのソース、`desugar-and`/`desugar-or`の移植元）
+- orgs/kotoba-lang/compiler/src/kotoba/compiler/frontend.clj（`desugar-expr`、`and`/`or`/`when`/keyword/map/`get`/`assoc`の実装先）
+- orgs/kotoba-lang/compiler/src/kotoba/compiler/backend/wasm.clj（`pair`/`pair-first`/`pair-second`がホストインポートであることの根拠）
+- orgs/kotoba-lang/compiler/test/kotoba/compiler/frontend_extensions_test.clj（新規16テスト）
 - orgs/kotoba-lang/langchain/src/langchain/db.cljc（統合対象、`api`マップのpluggable設計）
 - orgs/kotoba-lang/kotobase/src/kotobase/{store,local,kotobase}.cljc（`IStore`、`LocalStore`、`KotobaseStore`）

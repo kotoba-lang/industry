@@ -178,6 +178,95 @@
              (declare with) fix)"
             "src/langchain/kotobase_persist.cljc (new, persist-for fn)"
             "test/langchain/kotobase_persist_test.cljc (new, 4 deftest)"]}}
+  :adr/language-extension-implementation-2026-07-14
+  {:summary "Implemented the :add-verdict items from :adr/triage in
+             kotoba-lang/compiler's frontend.clj: and/or/when (ported from
+             kotoba-lang/kotoba's proven desugar-and/desugar-or) + keyword
+             literals + map literals + get/assoc. Destructuring/vectors/
+             multi-arity/loop-recur (also :add in the triage) NOT
+             implemented this pass -- scoped to the highest-value subset
+             plus the trivial and/or/when port."
+   :decisive-design-discovery
+   "backend/wasm.clj's `emit` already imports pair/pair-first/pair-second
+    as HOST FUNCTIONS (kotoba:heap.pair/pair-first/pair-second) -- they are
+    NOT guest-managed WASM linear memory. This means map/keyword required
+    ZERO backend/codegen changes: purely frontend desugaring to the
+    existing primitives, automatically working across all 3 target
+    backends (wasm32/x86_64/aarch64) since each already implements the
+    same pair-family host-injection mechanism on its own side."
+   :implementation
+   {:and-or-when "ported verbatim in spirit from kotoba-lang/kotoba's
+                   runtime.clj desugar-and/desugar-or (live-verified
+                   correct there earlier this session); when has no `do`
+                   in this profile (compiler/ never had one) -- test +
+                   exactly one result expression only"
+    :keyword "deterministic 64-bit FNV-1a hash of the keyword's string
+              form, interned as an i64 constant -- NOT clojure.core/hash
+              (unspecified long-term stability), chosen to match this
+              compiler's byte-for-byte reproducible-build gates"
+    :map "{:k1 v1 :k2 v2} desugars to (pair (pair k1' v1') (pair (pair k2'
+          v2') 0)) reusing the existing pair/list primitives entirely;
+          entries sorted by (pr-str k) for deterministic codegen
+          regardless of Clojure's own unordered map-literal iteration"
+    :get "compiler-synthesized recursive helper __kotoba_map_get, injected
+          into a module's function set ONLY when actually used (post-
+          desugar AST scan) -- linear-scans the pair-list; each recursive
+          step costs 1 unit of the EXISTING fixed 256-call fuel budget
+          (unmodified) -- map-walk depth is now bounded by that same
+          pre-existing mechanism, not a new limit"
+    :assoc "pure O(1) desugar: prepend (pair k' v') in front of the map
+            value; variadic k/v pairs supported; shadows (not removes) an
+            existing key -- get returns the newest via first-match, older
+            entries are dead weight, not corrected, documented tradeoff"}
+   :verification
+   {:oracle-interpreter "ir.clj's execute via compile-source's :oracle-value
+                          -- and/or/when, map+get (hit/miss/explicit-
+                          default), assoc+get, assoc-shadow all correct"
+    :real-chicory-execution
+    "scratch verification (not committed, matches compiler/'s own
+     convention of not depending on Chicory in its test suite): compiled
+     the SAME source strings to actual WASM bytes, built a real Chicory
+     Instance with genuine host-side HostFunction implementations of
+     kotoba:heap.pair/pair-first/pair-second, called the main export
+     directly. Results matched the oracle exactly for every scenario --
+     confirms the emitted binary is correct, not just the compiler's own
+     internal reference interpreter"
+    :test-suite "clojure -M:test: 96 tests / 2725 assertions (80
+                 pre-existing + 16 new in frontend_extensions_test.clj),
+                 0 failures. Existing fuzz/property test suites
+                 (frontend-fuzz-test/security-fuzz-test/property-test)
+                 unaffected -- grammar expansion did not break generative
+                 testing against the wider admission surface"}
+   :honest-limitations
+   ["assoc never removes shadowed entries -- monotonic growth under
+     repeated re-assoc of the same key, documented not fixed"
+    "map literal entry count reuses the existing max-list-items (128)
+     bound -- combined with get's 1-fuel-per-step cost this means a
+     LITERAL map's full miss-walk (128+1=129) never actually reaches the
+     256-fuel ceiling; fuel exhaustion via map operations is only
+     reachable through dynamic growth via repeated assoc in a recursive
+     helper, which the test suite demonstrates directly rather than via a
+     giant map literal (which the entry-count bound would reject first)"
+    "compiler/README.md's stale 'no when/do/and/or sugar' line corrected in
+     the same commit -- do remains unsupported, and/or/when now are"
+    "kotoba-lang/kotoba (wasm_exec.clj) was NOT given the same map/keyword
+     treatment in this pass -- unlike compiler/, it has no pair/heap
+     primitive at all yet (confirmed by this session's earlier grammar
+     survey), so adding map/keyword there is a larger prerequisite task,
+     explicitly deferred"]
+   :landed
+   {:repo "kotoba-lang/compiler" :commits "7bb0905 -> 7d27613"
+    :method "sibling worktree outside superproject, gh api merges server-side
+             merge, branch+worktree cleanup"
+    :west-pin "compiler 26ff5233b569 -> 7d27613c9a32 (--entry minimal diff,
+               verify-west-pins OK)"
+    :files ["README.md (Relationship section updated for the narrowed grammar gap)"
+            "src/kotoba/compiler/frontend.clj (logical-operations, map-operations,
+             desugar-and/or, fnv1a-i64/keyword->i64, desugar-map, map-get-helper,
+             uses-map-get?, desugar-expr keyword/map/and/or/when/get/assoc cases,
+             analyze helper injection)"
+            "test/kotoba/compiler/frontend_extensions_test.clj (new, 16 deftest)"
+            "test/kotoba/compiler/test_runner.clj (registered the new namespace)"]}}
   :adr/decision-not-made
   ["general first-class functions/closures in .kotoba -- rejected on T2 soundness grounds"
    "defprotocol/defrecord/multimethod in .kotoba -- rejected, fix the 3 affected
