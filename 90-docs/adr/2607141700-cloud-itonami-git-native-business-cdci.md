@@ -1,11 +1,11 @@
 ---
 id: adr-2607141700-cloud-itonami-git-native-business-cdci
 title: "ADR-2607141700: cloud-itonami の会社経営を PR/merge 駆動の CD/CI workflow にする — GitHub ではなく kotoba-git/kotoba-rad + kotobase + DataLad backend、部署/社員の CACAO capability で ref 権限を制御"
-status: proposed
+status: accepted — M0–M8 implemented same-day; pre-production (maturity addendum末尾参照)
 doc_type: adr
 topic: cloud-itonami-git-native-business-cdci
 authoritative: true
-last_verified: 2026-07-14
+last_verified: 2026-07-14 (maturity assessment, same day)
 authoritative_for:
   - "cloud-itonami の business operation(受信→提案→承認→実行→監査)を git-native な PR/merge workflow として表現する設計(受信 = proposal ref 到着、承認 = 署名付き merge、実行 = post-merge executor)"
   - "その git backend を GitHub ではなく kotoba-git/kotoba-rad(sovereign refs + push-gate)+ kotobase private tenant + kotoba-ledger-clj file-git/kotobase backend に置く判断"
@@ -26,7 +26,7 @@ superseded_by: []
 
 # ADR-2607141700: cloud-itonami — 会社経営を sovereign git 上の PR/merge 駆動 CD/CI にする
 
-**Status**: proposed
+**Status**: accepted — M0–M8 implemented same-day; pre-production(成熟度は末尾 addendum)
 **Date**: 2026-07-14
 **Deciders**: Jun Kawasaki（指示: 「business を PR/merge 駆動に。メール受信は PR の受信、送信は PR merge 後に CD/CI actions で発火。会社のビジネス運営全体を git workflow に。GitHub というよりは kotoba-lang/kotobase の git backend、DataLad の backend などで動くように。部署や社員の権限なども制御できる CD/CI workflow モデルを設計」）
 
@@ -471,3 +471,31 @@ seed はすべて vault 内に封緘され、このセッションのどこに�
   runner コマンド(Node の fetch は Promise-only で、runner の同期契約を
   意図的に維持しているため)。nbb 側での async 送信統合は follow-up。
   kotoba-rad 自身の deps pin(ed25519 旧 sha)も機会あるとき bump。
+
+## Addendum (2026-07-14, same day): 成熟度評価(オーナー照会「今の成熟度は?」)
+
+尺度: **D**(設計のみ)→ **I**(実装済み)→ **V**(E2E テストで検証済み)→
+**K**(実鍵・実データ・実経路まで配線済み)→ **P**(本番運転中)。
+
+| 領域 | 段階 | 事実 |
+|---|---|---|
+| 提案 → 署名 merge gate(risk tier / quorum / self-approve 禁止 / ff-only / fail-closed) | **K** | JVM + nbb 両 runtime で E2E 済み、実鍵(kagi)で今日から運用可能 |
+| 鍵 custody(kagi/kagitaba) | **K** | 実鍵 4 + 委任 chain 3 を vault 配備済み(kagi item 7 件)。**exp ≈ 2026-10-12 の再 mint は手動運用** |
+| post-merge runner(検証 fail-closed・at-most-once・receipt) | **V** | 迂回 ref move の不実行まで実証。**常駐化なし(手動 tick)** |
+| 受信 = PR(mail-drain git-first) | **V** | drain E2E + 実 wrangler 経路 smoke 済み。**実メールでの本番 drain は未実施** |
+| 送信 = merge 後発火 | **V** | recording stub で transport 1 回・URL/Bearer まで実証。**実 Resend 本番送信はゼロ** |
+| runtime = nbb/cljs 第一級 | **V** | core flow(propose/merge/run-dry/mint-chain)は nbb で本物の署名検証込みで動作。**実送信 + store 投影は JVM 残置** |
+| 監査面(audit ref + M0 file-git dual-write) | **V/I** | audit ref は runner 経路で常時。**M0 dual-write は既定 off(opt-in)**、store-native 旧経路(approval.cljc)が並存し CQRS の write-model 反転は未完 |
+| 永続化・配布 | **I** | local EDN のみ。content-addressed persist / kotobase private tenant replica / P2P(rad R2 待ち)未着手 |
+| **governor pre-merge check** | **D** | **§1 の表の「pre-merge required check」が ops 経路に未結線**(docstring 言及のみ)。現状の merge gate は署名/quorum のみで、machine censor は旧 in-process loop 側に残っている — 次の最重要 gap |
+| runner bot の execute-only 鍵(職務分掌の execute 側) | **D** | runner は鍵レスで動く。bot did の mint + execute 委任は未実施 |
+| merge 署名 UI(WebAuthn) | **D** | CLI のみ |
+| lane 展開 | 部分 | 委任済みは sales / billing / keiei(+ inbox auto)。procedure/legal/plm/erp/mes/employee は未委任 |
+
+**総括: pre-production(実装 3.5/5 相当)。** §1 マッピング表の全行が実装・E2E
+検証済み(12 領域中 V 以上 7、うち K 2)で、実鍵も配備済み — だが**本番運転は
+ゼロ**(実メール drain・実送信・常駐 tick のいずれも未実施)。設計からの残
+ギャップで重要な順: ①governor pre-merge 結線(machine censor が git 経路を
+まだ守っていない)②runner/drain の常駐化(nbb)③実運転の初回実施(実メール
+1 通を PR → merge → 実送信まで通す)④chain 再 mint 運用(≈2026-10-12)
+⑤kotobase replica / rad R2 ⑥merge 署名 UI ⑦残 lane への委任展開。
