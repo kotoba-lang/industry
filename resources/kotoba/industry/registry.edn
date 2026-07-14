@@ -6572,6 +6572,29 @@
    ;; double-lift guard. Dual actuation (:listing/admit,
    ;; :trade-halt/lift), neither ever auto at any phase.
    :operating-states [:intake :list :surveil :halt :audit]},
+  {:id "6611-cryptoexchange"
+   :name "Crypto-asset exchange (incident-proof, full-reserve)"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6611-cryptoexchange"
+   :business-id "cloud-itonami-isic-6611-cryptoexchange"
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger :securities]
+   :optional-technologies [:optimization]
+   :maturity :blueprint
+   ;; FIRST role-suffix satellite entry under an already-:implemented
+   ;; class: 6611 keeps the generic market-administration actor; this
+   ;; entry is a distinct business under the same ISIC class (wave-of
+   ;; resolves the "66" division prefix -> wave 0). Blueprint repo
+   ;; published 2026-07-14 (ADR-2607141200): incident-class-driven
+   ;; design — FTX commingling / Mt.Gox concealed insolvency /
+   ;; Coincheck hot-wallet / DMM+Bybit signing compromise /
+   ;; QuadrigaCX key-man / Thodex exit scam / AML / wash trading /
+   ;; leverage amplification map to HARD invariants INV-1..14
+   ;; (full-reserve solvency auto-halt, no rehypothecation, self-token
+   ;; excluded from reserves, append-only balances, PoR+PoL, quorum
+   ;; custody, WYSIWYS signing, deterministic matching, spot-only
+   ;; scope fence). No actor implementation claimed; real-funds
+   ;; operation permanently gated on jurisdiction licensing + owner
+   ;; decision (INV-14).
+   :operating-states [:intake :quote :match :settle :custody :attest :audit]},
   {:id "6612"
    :name "Security and commodity contracts brokerage"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6612"
