@@ -178,6 +178,52 @@ destructuringが最優先、HOF/protocolは意図的に見送り、その理由�
   等と同型）——過去のADRは訂正の必要が生じても本文を書き換えず、
   新しいADRから参照可能な形で訂正を記録する。
 
+## 2026-07-14 Addendum — langchain.db kotobase 永続化統合を実装
+
+§Decision 2 の設計をそのまま実装し、`kotoba-lang/langchain` main へ着地させた
+（`27a479b`→`cda206e`、`gh api .../merges`でサーバ側マージ、superproject 外
+sibling worktree で作業、branch/worktree cleanup 完了、`manifest/west.yml`
+の `langchain` pin を `--entry` 最小diffで前進済み: `0f966d06c93d`→`cda206ea2cbe`）。
+
+**着地内容**（設計からの変更点も含め正直に記録）:
+
+- `langchain.db/create-conn` に3引数形式 `(create-conn schema persist)`
+  を追加。`persist`は`{:append (fn [event]) :read (fn [since] -> [events])}`
+  という duck-typed map で、`langchain.db`自身は`kotobase.store`を
+  `:require`しない（設計通り）。
+- 実装時に見つけた**前方参照バグ**: `create-conn`が`with`（ファイル後方で
+  定義）を呼ぶため、`(declare with)`を`ns`直後に追加する必要があった
+  （設計段階では見落としていた、実装時に`clojure -M:test`のコンパイル
+  エラーで発覚・即修正）。
+- `transact!`の永続化呼び出しは設計通り`swap!`解決後に`@report`を使って
+  1回だけ実行。**実装時に正直に記録した未解決の既知の限界**:
+  同一connへの並行`transact!`下で、in-memory`:log`のtx順序（swap!内で
+  原子的に確定）とpersistへのappend順序（各callが自分のswap!成功後に
+  別ステップで呼ぶ）がずれうる——リプレイ時に稀に元と異なるtx順序で
+  `:db`が再構築される可能性がある。今回は対処せず、docstringに
+  limitationとして明記するに留めた。
+- 新規 `langchain.kotobase-persist`（`persist-for`関数1つ）が実際の
+  `kotobase.store/IStore`との接続を担う。`langchain/deps.edn`は
+  メイン`:deps`を変更せず、既存の`:test`aliasの`:extra-deps`に
+  `kotobase`を追加（`langchain.jvm`のhttp-kit/jsonista分離パターンを
+  踏襲）。
+- 新規テスト4件（`kotobase_persist_test.cljc`）: 永続化+リプレイ、
+  streamごとの分離、persist無し時の後方互換性。**実際に
+  `clojure -M:test`を実行**し、既存56テストと合わせ**60 tests /
+  152 assertions、0 failures/errors**を確認（新規4件含む）。
+  `clojure -M:lint`も実行し**エラー0**（既存の無関係な警告10件のみ、
+  今回変更したファイルに新規警告は無いことを確認済み）。
+
+**副産物として判明した事実**: `langchain`には既に`langchain.kotoba-db`
+という、リモートkotoba-server（`ai.gftd.apps.kotobase.datomic.*` XRPC）に
+接続する**別の**フルDatomic互換`api`実装が存在していた——クライアント側
+Datalogエンジンを持たない thin-client 方式で、今回追加した
+`langchain.kotobase-persist`（`db.cljc`自身のpure Datalogエンジンを
+維持したまま tx-log だけを`kotobase.store/IStore`で永続化する方式）とは
+アーキテクチャが異なる。両者は競合せず共存する——利用者は「サーバ側で
+全クエリを処理する薄いクライアント」か「ローカルで完結する永続化
+Datalogエンジン」かを選べる。
+
 ## References
 
 - 90-docs/adr/2607141600-kotoba-kotoba-lang-compiler-kototama-aiueos-consolidation-experiment.md
