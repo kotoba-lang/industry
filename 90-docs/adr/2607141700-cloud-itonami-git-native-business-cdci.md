@@ -282,3 +282,34 @@ runner は merge 後 — 二重ゲート構造は現行のまま）。
   proposal 化（KV → proposal commit）、org root key の実 mint と保管
   （現状テストは fixture seed のみ — 本番鍵の custody 手順は follow-up の
   まま）、merge 署名 UI、kotobase replica 接続。
+
+## Addendum (2026-07-14, same day): M2 implemented and landed — runner + 受信=PR
+
+cloud-itonami `51f99db8`。M2 の中核 3 点:
+
+- **decision record の永続化** — `ops-repo/merge-proposal!` は guarded ff move の
+  成功後に `refs/itonami/decisions/<lane>/<merged-commit-cid>`（merged commit CID
+  キー、直接 lookup 可能）へ decision commit（risk / proposer-did / approvals =
+  sigref + CACAO chain、全て plain EDN）を書く。`read-decision` で読み戻す。
+- **`cloud-itonami.ops-runner`（post-merge executor = 「Actions」相当の本体）** —
+  1 tick = ①各 lane main を走査し **audit chain（`refs/itonami/audit/main` の
+  receipt commit 連鎖）との突き合わせで at-most-once dedupe** ②実行前に
+  persisted decision を `authorize-merge?` で**再検証（fail-closed: decision 不在
+  = gate を迂回して動かされた ref は terminal `:unverified` receipt を積み、
+  handler を一切呼ばない — 実テストで raw `set-ref` 迂回を検証）** ③per-kind
+  handler 実行（missing/throwing → terminal `:failed` receipt、retry storm なし）
+  ④outcome ごとに receipt commit を audit ref へ append。runner は merge
+  capability を持たない（職務分掌: bot did には execute のみ委任する前提）。
+- **受信 = PR** — `inbound-record->proposal` + `propose-inbound!`: mail-inbound
+  worker が KV に stage した drained record を `:inbox` lane の proposal commit 化。
+  risk `:read-only` → auto-merge tier → runner の `:mail/ingest` handler が投影。
+  E2E テスト: 受信 → PR ref 成立 → auto-merge → runner 発火 → receipt →
+  再実行 no-op、を実 record 形で検証（計 5 tests / 25 assertions、スイート全体は
+  baseline と同一の既存 failure のみ）。
+
+**M2 の残り（未達のまま）**: 実 Cloudflare KV drain との結線（`scripts/mail-drain.bb`
+は今も store 直行 — proposal 経路への切替は ops-repo の永続化経路が決まってから）、
+ops-repo 自体の永続化・配布（現状は in-memory arrangement db。`repo/persist!` の
+block store 選定と kotobase replica 接続は M3）、cron/launchd での runner 常駐、
+lefthook deploy hook の runner 統合。org root key custody / merge 署名 UI も
+引き続き follow-up。
