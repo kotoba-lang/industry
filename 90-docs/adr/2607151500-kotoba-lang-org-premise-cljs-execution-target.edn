@@ -506,6 +506,102 @@
     needed the safe-integer guard from :adr/i64-overflow-guard-2026-07-14).
     Existing mem-i32-at-based .kotoba sources do not compile unchanged to
     this target."}
+  :adr/capability-cljc-port-reassessed-2026-07-15
+  {:summary "Re-investigated the capability.cljc port candidate this ADR's
+             own :adr/decision-not-made had flagged as identified/follow-up,
+             and REVERSED the earlier optimistic assessment before writing
+             any port code. Full read of kototama/clj/src/kototama/unspsc/
+             capability.cljc shows a 30-segment (string-keyed \"10\"..\"56\")
+             data-driven dispatch table, each segment embedding closures
+             over dozens of distinct domain-specific string field names
+             (cold_chain/provenance/sds/gmp_certificate/ghs_classification/
+             etc). This depends on three things the safe-kotoba subset does
+             not have: first-class strings, closures, and dynamic dispatch
+             keyed by string. Unlike credit.kernels.gate.cljc (integer-coded,
+             closure-free by original design specifically for this kind of
+             port), capability.cljc is shaped like the general-purpose
+             libraries (kotobase/langchain/etc) this ADR already ruled out
+             wholesale, not like a closed governor decision function."
+   :outcome "Full port NOT attempted -- wrong shape, same reasoning
+             ADR-2607141900 applied to credit.governor/check's facade.
+             No code written for this candidate."}
+  :adr/kotoba-cljs-emit-cli-2026-07-15
+  {:summary "cljs-source/compile-cljs-expr (addendum 6) was reachable only
+             from tests/REPL at landing time -- unlike wasm-binary, which
+             has full `wasm emit`/`wasm run` CLI plumbing, the new backend
+             had no CLI entry point at all. Added `kotoba cljs emit <source>
+             [--output path]` to src/kotoba/launcher.clj, mirroring
+             wasm-emit-result*'s structure: runs the same runtime/check
+             static gate wasm emit uses, then compiles via cljs-source."
+   :design
+   ["a passing runtime/check does NOT guarantee cljs-source succeeds -- the
+     general safe-kotoba analyzer has no notion of this backend's narrower
+     op support (addendum 6's i64/f32/bitwise/string/memory/capability
+     exclusions); cljs-source throwing (cljs-reject!) is caught and turned
+     into a clean :cljs/emit-unsupported result, not an uncaught exception,
+     mirroring wasm-run-result*'s handling of the distinct
+     :kotoba.host/denied capability-denial shape"
+    "same mandatory --package-lock admission gate (F-001) as wasm emit/run
+     applies to the new entry point"
+    "no `cljs run` subcommand -- the emitted source is meant to be required
+     by a real cljs host (nbb/browser/Node), not executed in-process by this
+     JVM launcher (no memory-based host ABI for this target, per addendum 6)"]
+   :pre-existing-wart-fixed
+   "adding the 3rd caller to admission-gated surfaced that it hardcoded
+    :kotoba.cli/code :wasm/package-rejected regardless of which backend's
+    emit was actually rejected -- a cljs emit rejection would have silently
+    borrowed wasm's namespace. Parameterized admission-gated with an explicit
+    reject-code argument; wasm-emit-result/wasm-run-result now pass
+    :wasm/package-rejected explicitly (unchanged behavior), cljs-emit-result
+    passes :cljs/package-rejected."
+   :verification
+   {:real-cli-process "clojure -M -m kotoba.launcher cljs emit src/demo.kotoba
+                       --package-lock ... --output <path>, run as an actual
+                       OS process (not just an in-process fn call), then the
+                       written file required and invoked under REAL nbb
+                       (ClojureScript-on-Node) -- not eval'd under plain JVM
+                       Clojure like the committed test suite -- confirming
+                       42 comes back, i.e. genuinely runnable cljs, not just
+                       plausible-looking text"
+    :committed-tests "7 new deftest in test/kotoba/launcher_test.clj"
+    :full-suite "clojure -M:test: 273 tests / 1325 assertions (was 266/1300
+                 at addendum 6), 0 failures/errors"}
+   :landed
+   {:repo "kotoba-lang/kotoba" :commits "6d7254ae4c99 -> fc7e98bec18b"
+    :method "sibling worktree outside superproject, gh api merges server-side
+             merge, branch+worktree cleanup"
+    :west-pin "kotoba 6d7254ae4c99 -> fc7e98bec18b: same gen-west-manifest.cljs
+               --entry kotoba false-rejection as addendum 6 (shared checkout's
+               main still stuck on the stale c7ca33a14163 dual-gitdir commit,
+               fix remains out of scope) -- verified via gh api compare
+               (ahead_by=2, behind_by=0, merge_base==old pin) then hand-edited
+               the single revision: line in manifest/west.yml"
+    :files ["src/kotoba/launcher.clj (cljs-emit-result*/cljs-emit-result/
+             cljs-result, admission-gated parameterized with reject-code)"
+            "test/kotoba/launcher_test.clj (7 new deftest)"
+            "README.md (documented `kotoba cljs emit` alongside `wasm emit`/
+             `wasm run`)"]}}
+  :adr/superproject-checkout-stale-head-fixed-2026-07-15
+  {:summary "While landing the above, discovered the superproject checkout's
+             (com-junkawasaki/root) own HEAD was detached and 4 commits
+             behind origin/main -- and that addendum 6's own landing-time
+             'verify shasum match then git checkout --' cleanup step had
+             actually been WRONG in this detached-HEAD state: git checkout --
+             restores from the local index/HEAD blob, not from origin/main,
+             so it silently reverted the working tree back to stale content
+             even though the shasum check had (correctly, at that moment)
+             confirmed a match against origin/main."
+   :diagnosis "git merge-base --is-ancestor HEAD origin/main reported false --
+               the same shallow-clone false-positive-divergence hazard this
+               repo's own CLAUDE.md documents (shallow re-fetch grafts shift
+               the ancestry boundary). Verified via gh api compare (server-
+               side, full history) that this was a pure fast-forward
+               (ahead_by=4, behind_by=0, merge_base==local HEAD exactly), not
+               a real divergence."
+   :fix "git fetch --deepen=20 origin main to repair the local shallow
+         ancestry gap, then git merge --ff-only origin/main -- HEAD now
+         correctly tracks origin/main's current tip and manifest/west.yml
+         (and the ADR md/edn) reflect the actually-landed content again."}
   :adr/decision-not-made
   ["rewriting kotoba-lang's general-purpose libraries (langchain/langgraph/
     kotobase/UI layer) into .kotoba -- wrong shape, rejected on the same
@@ -516,8 +612,10 @@
     governor-relevant subset"
    "exact i64 wraparound parity via BigInt in the cljs backend -- deferred,
     documented gap, no known program depends on it"
-   "actually porting kototama/unspsc/capability.cljc to .kotoba -- candidate
-    identified, implementation is follow-up work, not done in this ADR"
+   "actually porting kototama/unspsc/capability.cljc to .kotoba -- REASSESSED
+    and rejected (2026-07-15, :adr/capability-cljc-port-reassessed-2026-07-15)
+    -- wrong shape (string-keyed dynamic dispatch, closures), not a follow-up
+    to still implement"
    "flipping kototama.unspsc.organism's validate-node or cloud-itonami's
     credit.governor/credit.phase to call their WASM-backed drop-in
     equivalents in production -- both remain explicit owner decisions per
