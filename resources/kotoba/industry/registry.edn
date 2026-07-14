@@ -3354,6 +3354,7 @@
    :name "Manufacture of basic chemicals"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2011"
    :business-id "cloud-itonami-2011"
+   :maturity :implemented
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae :cfd]
    :optional-technologies [:optimization]
    ;; Published as a :blueprint repo (business-model.md + operator-guide.md +
@@ -4186,6 +4187,10 @@
    ;; simulation evidence, same pattern as meddevice/2660's own. See
    ;; ADR-2607103700.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   ;; Promoted :blueprint -> :implemented (rolling-stock manufacturing
+   ;; actor deployed; cloud-itonami-isic-3020 safety-of-life operations
+   ;; coordinator) per wave-3 manufacturing-operations build-out.
+   :maturity :implemented
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3040"
    :name "Manufacture of military fighting vehicles"
