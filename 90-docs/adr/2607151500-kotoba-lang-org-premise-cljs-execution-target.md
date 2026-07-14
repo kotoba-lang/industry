@@ -504,6 +504,92 @@ stale commitに固定されており、`--entry kotoba`がこれをpin退行と�
 west.ymlの該当1行のみ手動編集（`superproject`、`main`→サーバ側merge
 commit `a7ae6b366e18`）。
 
+## 2026-07-15 追記 — `kototama/unspsc/capability.cljc`移植候補の再調査（否定的結論）
+
+Addendum 1の`:decision-not-made`が「次の移植先」として挙げていた
+`kototama/clj/src/kototama/unspsc/capability.cljc`を実装前に再調査した
+結果、**当初の楽観的な評価を撤回する**——`credit.kernels.gate.cljc`と
+「同じsafe-kotoba-subset形状」という説明は精査すると成り立たない。
+
+実物を全読した結果: 30個のUNSPSCセグメント（`"10"`〜`"56"`の文字列キー）
+ごとに異なるドメイン固有フィールド名（数十種類の文字列——
+`cold_chain`/`provenance`/`sds`/`gmp_certificate`/`ghs_classification`
+等）に対する`present?`述語をclosureとして埋め込んだ巨大なdata-driven
+dispatchテーブルであり、`.kotoba`のsafe subsetが持たない3つの機構
+（文字列値の第一級扱い、closure、セグメント文字列による動的dispatch）
+に本質的に依存している。`credit.kernels.gate.cljc`が最初から
+整数コード・closureなしで設計されていたのとは対照的に、これは
+`kotobase`/`langchain`等と同じ「汎用ライブラリ」の側に属する形——
+ADR-2607141900が`credit.governor/check`の全体ファサードを対象外とした
+のと同じ理由がここにも当てはまる。全面移植は行わないと判断した。
+
+## 2026-07-15 Addendum 7 — `kotoba-lang/kotoba`のcljs backendをCLIから使えるように配線（`kotoba cljs emit`）
+
+Addendum 6で`compile-cljs-expr`/`cljs-source`を実装したが、着地直後の時点では
+**テスト/REPLからしか到達できないライブラリ関数のまま**だった——`wasm-binary`
+が`kotoba wasm emit`/`kotoba wasm run`という完全なCLI経路を持つのと非対称に、
+新backendにはCLIエントリポイントが一切無かった（`launcher.clj`の
+`dispatch`は`"selfhost"`/`"wasm"`/`"package"`しか認識しない）。この
+非対称性自体を今回のgapとして特定し、`kotoba cljs emit <source>
+[--output path]`を新設して埋めた。
+
+**実装**: `wasm-emit-result*`と同じ構造を踏襲する`cljs-emit-result*`/
+`cljs-emit-result`を追加——`wasm emit`と同じ`runtime/check`静的解析
+ゲートを先に通し、通過した場合のみ`runtime/cljs-source`でコンパイルする。
+**`runtime/check`通過は`cljs-source`自体の成功を保証しない**——safe-kotoba
+全体の静的解析はこのbackend固有の狭い対応範囲（i64/f32/bitwise/string/
+memory/capability操作はsafe-kotoba subsetとしては正当だがこのbackend
+では非対応、Addendum 6参照）を知らないため——`cljs-source`が投げる
+`cljs-reject!`をtry/catchで受け、`wasm-run-result*`が capability-denial
+の`ex-data`形状を区別して処理するのと同じ発想で、生の例外ではなく
+クリーンな`:cljs/emit-unsupported`結果に変換した。`wasm emit`/`wasm run`
+と同じ`--package-lock`必須のadmission gate（F-001）をこの新entry point
+にも適用した。
+
+**着手中に発見・修正した既存の小さな欠陥**: 3つ目の呼び出し元を追加した
+ことで、`admission-gated`が呼び出し元に関わらず`:kotoba.cli/code`を
+`:wasm/package-rejected`に**ハードコード**していたことが表面化した——
+`cljs emit`がpackage-lockで拒否されても`:wasm/...`という誤った
+namespaceで報告されてしまう。`admission-gated`に`reject-code`引数を
+追加してパラメータ化し（`wasm-emit-result`/`wasm-run-result`は
+明示的に`:wasm/package-rejected`を渡すよう更新、既存挙動を変えず）、
+`cljs-emit-result`は`:cljs/package-rejected`を報告するようにした——
+新しい呼び出し元を追加する際に、既存の共有ヘルパーの隠れた前提を
+そのまま継承しない、という一貫した姿勢。
+
+**検証**: 単体テストに加え、**実CLIプロセスとしての完全なend-to-end
+実行**を行った——`clojure -M -m kotoba.launcher cljs emit src/demo.kotoba
+--package-lock ... --output <path>`を実際に起動し、書き出された
+ファイルを実`nbb`（ClojureScript-on-Node、JVM Clojure evalではない）
+配下で`require`して`main`を呼び出し、`42`という正しい値が返ることを
+確認した——「それらしく見えるテキスト」ではなく本物のcljsとして実行
+可能であることの確認。新規7 deftest（`launcher_test.clj`）。
+`clojure -M:test`: 273 tests / 1325 assertions（Addendum 6着地時点の
+266/1300から+7/+25）、0 failures/errors。
+
+**着地**: `kotoba-lang/kotoba`、`main`→`fc7e98bec18b841825da64940aa5898505de56df`、
+sibling worktree + `gh api .../merges`サーバ側マージ + branch cleanup。
+west pin更新は`--entry kotoba`が再び共有checkoutのstale `main`（依然
+`c7ca33a14163`、Addendum 6と同じ既知のdual-gitdir問題、修復は引き続き
+スコープ外）を見てpin退行と誤判定したため、`gh api .../compare`
+（ahead_by=2, behind_by=0, merge_base==旧pin）で新pinを独立検証した上で
+west.ymlの該当1行のみ手動編集。
+
+**superproject checkout自体の同期漏れも合わせて修正**: この作業に着手する
+過程で、superproject本体checkout（`com-junkawasaki/root`）のHEADが
+detached状態のまま`origin/main`より4コミット遅れており、しかもAddendum 6
+着地直後に行った「shasum一致を確認してから`git checkout --`で破棄」という
+手順が、実は**detached HEADがorigin/mainより古いことを見落として**いて、
+`git checkout --`がorigin/mainの内容ではなく古いHEADの内容へ working tree
+を巻き戻していたことが判明した（shasum比較自体はその時点で一致していた
+が、その後の`checkout --`がその一致を壊した）。`git merge-base
+--is-ancestor HEAD origin/main`が偽（shallow graftの境界による偽陽性、
+上位CLAUDE.mdが文書化する既知のhazardと同型）だったため、`gh api
+.../compare`（サーバ側、full history）で純粋なfast-forward
+（ahead_by=4, behind_by=0, merge_base==HEAD）であることを確認した上で
+`git fetch --deepen=20`→`git merge --ff-only origin/main`でsuperproject
+checkoutを正しく最新化した。
+
 ## References
 
 - 90-docs/adr/2607150000-kotoba-lang-extension-triage-langchain-persistence-kotobase.md
@@ -516,3 +602,5 @@ commit `a7ae6b366e18`）。
 - orgs/kotoba-lang/kototama/clj/src/kototama/unspsc/capability.cljc（次の narrow-slice port 候補）
 - orgs/kotoba-lang/kotoba/src/kotoba/runtime.clj（Addendum 6: `compile-cljs-expr`/`cljs-source`、新backend本体）
 - orgs/kotoba-lang/kotoba/test/kotoba/cljs_backend_test.clj（Addendum 6: 新規16 deftest）
+- orgs/kotoba-lang/kotoba/src/kotoba/launcher.clj（Addendum 7: `cljs-emit-result*`/`cljs-emit-result`/`cljs-result`、`kotoba cljs emit`のCLI配線）
+- orgs/kotoba-lang/kotoba/test/kotoba/launcher_test.clj（Addendum 7: 新規7 deftest）
