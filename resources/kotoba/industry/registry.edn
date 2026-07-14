@@ -7747,14 +7747,26 @@
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :register :decide :notify :appeal :audit]},
   {:id "8413"
-   :name "Regulation of and contribution to more efficient operation ..."
-   :repo "https://github.com/gftdcojp/cloud-itonami-O8413"
-   :business-id "cloud-itonami-O8413"
+   :name "Economic regulation and business compliance administration"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-8413"
+   :business-id "cloud-itonami-isic-8413"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :register :decide :notify :appeal :audit]},
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented: Regulation Advisor ⊣ Regulation Governor
+   ;; actor (src/regulation/*.cljc, test/regulation/*), covering business
+   ;; registration verification, permit application intake, economic statistics
+   ;; logging, complaint escalation. Hard invariants: business registration,
+   ;; no direct actuation, scope boundary (permit grant/denial, tariff/rate/fee
+   ;; setting, binding rulings, enforcement, registration manipulation
+   ;; permanently forbidden, structured via closed allowlist). Escalation
+   ;; invariants: permit application intake, complaint flagging, low confidence.
+   ;; 11 tests/23 assertions run green before claiming :implemented, clj-kondo
+   ;; clean. See ADR-2607141810 for this repo's implementation details and
+   ;; cloud-itonami-isic-8413/docs/adr/0001-architecture.md for the
+   ;; closed-allowlist design rationale.
+   ;; ISIC Rev.5 class (4-digit) — regulatory support focus
+   :operating-states [:intake :advise :govern :decide :hold :commit :request-approval]},
   {:id "8421"
    :name "Foreign affairs and consular services administration"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-8421"
