@@ -82,3 +82,14 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
     **expiry 90 日 ≈ 2026-10-12。失効前に `clojure -M:ops-send mint-chain
     kagi:itonami-org-root ...` で再 mint**)。merge 時は
     `bin/kagi get itonami-<dept>-head-chain > /tmp/chain.edn` で取り出す。
+
+## 確認屋 / manimani per-user (ADR-2607141753、2026-07-14)
+
+- **manimani admin token**(org 側 push/pull 用、wrangler secret `MANIMANI_ADMIN_TOKEN` と同値):
+  macOS Keychain `security find-generic-password -a junkawasaki -s "manimani:admin-token" -w`
+- **manimani user token (junkawasaki)**(個人 triage 用 interim Bearer):
+  Keychain service `manimani:user-junkawasaki-token`
+- **owner DID**(非機密・公開値だが参照用): Keychain service `gftdcojp:owner-did`
+  = `did:key:z6MkmCrDjqsUiHM4bK6zVyzuYGitMGjCVRb1eTrF122mxrNU`
+- **owner Ed25519 秘密鍵(seed)**: `orgs/gftdcojp/cloud-itonami/.junkawasaki/identity.edn`
+  (gitignored。cloud-itonami.identity/load-or-create-identity! が正)

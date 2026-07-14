@@ -169,6 +169,22 @@ store 副作用が先に実行**されていた → thunk 化 ②deploy 直後�
 `PUT /u/junkawasaki {:did … :token …}`（admin token は wrangler secret
 `MANIMANI_ADMIN_TOKEN`）で即有効化できる。
 
+## Addendum 3 — owner DID 生成と実運転開始（2026-07-14 同日、オーナー指示「did を local で生成して ok」）
+
+- **owner identity をローカル生成**: `cloud-itonami.identity/load-or-create-identity!`
+  （actor `"junkawasaki"`、CREATE_NEW race 対策付きの既存 JVM 経路）。
+  **DID（公開値）**: `did:key:z6MkmCrDjqsUiHM4bK6zVyzuYGitMGjCVRb1eTrF122mxrNU`、
+  鍵由来 graph: `k51qzi5uqu5dioljl2f10ymemfn73q6ht6ebmvmpiudahsabg3mef8vruu9eyh`。
+  秘密鍵 seed は gitignored `.junkawasaki/identity.edn`（コミットされないことを確認済み）。
+- **manimani 実登録**: `PUT /u/junkawasaki` 200。token 類は macOS Keychain へ永続化
+  （参照は skill `secrets-location-map` — 値は書かない）。
+- **実運転第 1 回**: run-once!（:manimani 付き）→ `:errand/proposed` 2 件を org 台帳へ
+  commit、**assignment 2 件が live の個人 inbox に着信**
+  （`GET /u/junkawasaki/inbox` で実確認。返信フォーマット付き日本語 draft）。
+- 実測バグ: default-http-fn が pr-str EDN を application/json として送り全 PUT が
+  500（`:pushed 0`）→ JSON 直列化に修正（`ff6a3f1b`）。**stub http-fn の smoke は
+  transport 直列化を検証できない** — live 検証を省略しない教訓がまた 1 つ。
+
 ## Consequences
 
 - (+) 新しい UI をゼロから作らない: 組織 = 既存 cockpit approvals、個人 = 既存
