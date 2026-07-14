@@ -2540,13 +2540,17 @@
    :operating-states [:intake :survey :advise :treat :record :audit]},
   {:id "0130"
    :name "Plant propagation"
-   :repo "https://github.com/gftdcojp/cloud-itonami-A0130"
-   :business-id "cloud-itonami-A0130"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :survey :advise :treat :record :audit]},
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0130"
+   :business-id "cloud-itonami-isic-0130"
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger :telemetry]
+   :optional-technologies [:optimization]
+   :maturity :implemented
+   ;; Back-office coordination actor (Propagation Advisor ⊣ NurseryOperationsGovernor),
+   ;; promoted :spec → :implemented via ADR-2607151800. Operations: batch logging,
+   ;; scheduling, health escalation, supply ordering. HARD invariant: zero propagation-
+   ;; technique or plant-health treatment authority (remains human domain). Audit trail,
+   ;; phase-gated 0→3 rollout, scope-enforcement governor. Repo: 3d450370a28e.
+   :operating-states [:intake :propose :govern :approve :record :audit]},
   {:id "0141"
    :name "Raising of cattle and buffaloes"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0141"
