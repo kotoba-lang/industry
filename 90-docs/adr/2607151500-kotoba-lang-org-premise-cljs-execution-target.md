@@ -292,6 +292,55 @@ manifest.cljs --entry kototama`を実行したところ、**pin退行として�
 した——「登録・rename・pin前進は`--entry`で当該entryのみの最小diffを生成する」
 という原則の精神を、生成器が使えない状況でも手動で守った形。
 
+## 2026-07-14 Addendum 3 — `prior-shortcut?`の`.kotoba`/WASM実装を「呼び出し可能な関数」として配線（本番切替は非実施）
+
+Addendum 2で「compile+verifyのみ、`organism.cljc`の実呼び出し箇所には
+未配線」と正直に記録していたgapを一段進めた——ただし**本番の判定挙動を
+自律的には変更しない**という判断を維持したまま。
+
+`kototama.unspsc.prior-shortcut-kotoba/prior-shortcut?`という新規
+namespace（`clj/src/kototama/unspsc/prior_shortcut_kotoba.clj`）を追加
+した。これは元の`kototama.unspsc.life/prior-shortcut?`と**全く同じ契約**
+（`consensus`という1つのmapを受け取りboolean を返す）を持つ、実Chicory
+Instanceでコンパイル済み`.kotoba`/WASMモジュールをホストする**本物の
+drop-in代替関数**——文字列比較(`"authorized"`との等値判定)をこの関数内で
+行い、WASM側には4つのi32スカラーへ平坦化して渡す変換も含めて実装。
+
+**なぜ`organism.cljc`の`validate-node`を実際に切り替えなかったか**:
+`validate-node`は18,342体のfleet全体の判定ゲート——ライブラリコードでは
+なく**稼働中の共有システムの挙動そのもの**であり、これを自律的に
+（オーナーの明示的判断を経ずに）切り替えることは、この一連の作業の
+「安全性向上のため.kotobaを使いたい」という動機とは別の話——**本番挙動の
+変更**は取り返しが効きにくく、影響範囲が広い操作なので、ADR-2607141900
+以来一貫している「narrow-slice portの実装・検証」と「実運用への切替」を
+別ステップとして扱う方針をここでも維持した。関数は用意し、テストで
+既存実装との完全一致を証明したが、実際に呼ぶかどうかはオーナー判断に
+委ねる。
+
+**依存関係の隔離**: Chicoryを`clj/deps.edn`のメイン`:deps`には追加せず
+（`kototama.unspsc.life`/`.organism`をrequireするだけの消費者に強制しない
+ため）、`prior-shortcut-kotoba`という独立namespaceに閉じ込めた——
+`langchain.jvm`/`langchain.kotobase-persist`が確立した「オプショナル
+backendの隔離」パターンと同じ形。コンパイル済み`.wasm`実体は
+`wasm/`から`resources/`へ移動（`io/resource`経由でclasspathから読む、
+呼び出し側のcwdに依存しない）——`.kotoba`ソース自体は引き続き`wasm/`に残す。
+
+**検証**: `life-test`の`prior-consensus-parity`が持つ全oracleケースを
+**map引数のまま**（Addendum 2の生のスカラーABIテストとは異なり、変換
+ロジック自体も含めた完全なend-to-endパス）再利用し、`life/prior-shortcut?`
+と`prior-shortcut-kotoba/prior-shortcut?`が全ケースで一致することを確認。
+`clojure -M:test`: 44 tests / 234 assertions、0 failures
+（`kotoba-lang/kototama`、`main`→`65899de`、`gh api .../merges`でサーバ側
+マージ、sibling worktree、branch cleanup完了）。
+
+**west pin更新の実務注意（Addendum 2と同型の再発）**: 今回も
+`nbb scripts/gen-west-manifest.cljs --entry kototama`が共有checkout
+（引き続き`pds/aozora`という無関係な並行WIPブランチのまま）を見てpin
+退行として拒否した。実際の着地commit（`65899deed4fb`）を`gh api`で
+(1)実在(2)default branch到達可能(3)旧pinから前進、の3点を個別確認した
+上で、west.ymlの該当1行のみ手動編集——Addendum 2で確立した対処法を
+そのまま踏襲。
+
 ## References
 
 - 90-docs/adr/2607150000-kotoba-lang-extension-triage-langchain-persistence-kotobase.md
