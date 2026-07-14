@@ -1,7 +1,7 @@
 ---
 id: adr-2607141600-kotoba-kotoba-lang-compiler-kototama-aiueos-consolidation-experiment
 title: "ADR-2607141600: kotoba / kotoba-lang / compiler / kototama / aiueos の5リポジトリ責務境界を確定し、言語プロファイルと Chicory 実行系の重複を解消する実験的統合を行う"
-status: proposed — Phase 1 done
+status: accepted — closed（Phase 0/1 done, Phase 2 実験実施の上 negative-close, Phase 3 対象外）
 date: 2026-07-14
 deciders:
   - Jun Kawasaki（「今の kotoba-lang/kotoba, kototama, compiler の成熟度は? 今の cljc を
@@ -48,8 +48,9 @@ authoritative_for:
 
 # ADR-2607141600: kotoba / kotoba-lang / compiler / kototama / aiueos の5リポジトリ責務境界を確定し、言語プロファイルと Chicory 実行系の重複を解消する実験的統合を行う
 
-**Status**: proposed — Phase 0・Phase 1 完了。Phase 2〜3 は未着手（§Plan、末尾の
-Addendum 参照）。
+**Status**: accepted — closed。Phase 0/1 完了、Phase 2 は実際に3ファイルを精読比較する
+形で実施し negative-close（末尾 Addendum 参照）、Phase 3 は Phase 2 の gate 条件
+（「net-positive なら migrate」）が成立しなかったため対象外。
 **Date**: 2026-07-14
 **Deciders**: Jun Kawasaki
 
@@ -289,3 +290,70 @@ manifest 登録の有無と無関係に完了させたが、**正式登録は本
    2つは**意図的にではなく、そうと知らずに**別々に進化した——を実際に統合するか、
    明示的に「2つの異なる profile」として設計文書化するかの決定（今回は relationship を
    記録しただけで、統合の是非そのものはまだ決めていない）
+
+## 2026-07-14 Addendum 2 — Phase 2 実施（Chicory プラミング共有化: 精読比較の上 negative-close）
+
+「next」の指示を受け Phase 2（`aiueos.execute` を対象にした Chicory プラミング共有化の
+プロトタイプ、テストスイート green を確認）に着手した。3ファイル（`aiueos/src/aiueos/
+execute.cljc` 473行、`kototama/src/kototama/tender.clj` 609行、`kotoba/src/kotoba/
+wasm_exec.clj` 683行、合計1765行）を実際に全文精読し、Instance-building/host-import
+配線の実態を比較した。
+
+**発見1（決定的）: `kototama.tender` 自身の namespace docstring（18-28行目）が、
+まさにこの実験を過去に一度検討し、明示的に却下していた。** 「The generic Chicory
+wiring below (host-fn/instantiate/call-main/run-main/fuel-listener/memory
+ptr-len helpers) is written fresh here, not vendored from kotoba-lang/kotoba's
+wasm_exec.clj — that namespace is tightly coupled to kotoba's OWN kgraph/
+capability vocabulary...and pulling it in as a dependency would run a second,
+incompatible capability model next to kototama's own actor:host ABI (the
+'semantic authority duplication' ADR-2607022700 rules out). The Chicory API
+calls themselves are the same shape because there is only one sane way to
+wire a HostFunction — proof-of-pattern, not shared code.」
+
+**発見2（実測による定量評価）: 3ファイルとも `host-fn`/`valtype`/`write-bytes!`/
+`read-bytes!`（or `read-str`）/`fuel-listener`/`memory-limits-for` の6ヘルパーは
+関数名・実装とも酷似しているが、字面が同じ部分は各ファイル60〜90行程度
+（全体1765行の12〜15%）に留まり、しかも完全同一ではない**:
+
+- `host-fn` の引数規約が違う——`aiueos`は`params`をキーワードで受けて内部で
+  `valtype`マップ経由変換、`kototama`/`kotoba`は事前に解決済みの`ValType`
+  オブジェクトを直接受け取る。
+- エラー処理の哲学が3者3様——`aiueos`は例外(`ex-info`)を投げて`run-if-granted`が
+  中央で`catch`・翻訳、`kototama`は帯域内`-1`センチネル(quota/http系)と
+  `denied!`例外(構造違反系)を使い分け、`kotoba`はまた別の`capability-granted?`
+  ベースの拒否パターンを持つ。
+- `fuel-listener`のex-data語彙が3者バラバラ——`:aiueos.execute/fuel-exceeded`
+  vs `:kototama.tender/problem :fuel-exhausted` vs `:kotoba.wasm/problem
+  :fuel-exhausted`（それぞれ独自のドメイン語彙、ADR-2607022700が権威分離を
+  求める通りの結果）。
+- `memory-limits-for`の前提が違う——`aiueos`は「`.kotoba`コンパイル済みモジュールは
+  必ずmemory sectionを持つ」というドキュメント化済みの不変条件を前提に
+  `.get()`を無条件呼び出し、`kototama`は任意のChicoryゲストを想定して
+  `.isPresent()`を防御的にチェックする（**バグではなく、入力ドメインの
+  スコープが違う——`aiueos`は`.kotoba`専用、`kototama`は汎用**、と確認した）。
+
+**結論（Phase 2 の実験結果として記録）: 共有ライブラリの抽出は見送る
+（negative-close）。**
+
+1. `kototama.tender`の設計者は既に一度この判断を下しており（発見1）、その理由
+   （ADR-2607022700の「semantic authority duplication」原則）は今回の3ファイル
+   比較でも裏付けられた——3者のエラー語彙・引数規約は意図的にドメインごとに
+   独立しており、これは事故ではなく設計。
+2. 定量的に見ても割に合わない——3リポジトリ合計1765行のうち共有可能な部分は
+   多くて200行強、しかもそれすら完全同一ではなく共通APIに正規化する追加の
+   抽象化コストが発生する。新規共有repoを1つ作る場合のコスト（新規ADR・
+   新規GitHub repo・west登録・3リポジトリでの依存追加・3つのJVMテストスイート
+   [`clojure -M:test`]の再検証)は、削減できる重複行数に見合わない。
+3. ADR本文 §Plan が明記した Phase 3 のゲート条件（「if phase 2 proves
+   net-positive...if not, record negative result and close as 'tried, not
+   worth it'」）に従い、**Phase 3（実際の移行）は実施しない**。
+
+**この判断はコード変更を一切伴わない**（読解・比較のみ、3リポジトリとも
+無変更）——「試して、記録した」こと自体が本 Phase の成果である
+（ADR本文 §Consequences 参照）。
+
+以上でこの ADR が計画した実験（Phase 0〜3）は完了したため、ステータスを
+`accepted — closed` に更新する。今回の副産物として見つかった、まだ本 ADR の
+スコープに含めていない項目（`kotoba-lang/compiler` の west 正式登録、`kotoba/`
+と`compiler/`の2つの異なる文法をいつか統合するか否かの決定）は Phase 1
+Addendum の「引き継ぎ」節にある通り、別ADR/別セッションに委ねる。
