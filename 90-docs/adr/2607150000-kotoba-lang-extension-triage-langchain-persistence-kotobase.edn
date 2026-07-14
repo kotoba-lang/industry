@@ -1,0 +1,144 @@
+[{:db/id -1
+  :adr/id "adr-2607150000-kotoba-lang-extension-triage-langchain-persistence-kotobase"
+  :adr/title "ADR-2607150000: kotoba-lang language-extension triage + ADR-2607141900 correction + langchain.db kotobase persistence integration"
+  :adr/status "accepted"
+  :adr/date "2026-07-14"
+  :adr/last_verified "2026-07-14"
+  :adr/doc_type "adr"
+  :adr/topic "kotoba-lang-language-extension-triage"
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["the .kotoba language-extension triage table (:adr/triage) is the reference
+    for future add/do-not-add/fix-library decisions"
+   "ADR-2607141900's claim that and/or/when/pos?/neg? are unsupported in
+    kotoba-lang/kotoba is corrected as of 2026-07-14 (live re-verified: they
+    now compile) -- compiler/ remains unsupported for these"
+   "langchain.db.cljc's persistence integration with kotoba-lang/kotobase via a
+    duck-typed {:append :read} map (no hard kotobase dependency in langchain's
+    main :deps) is the reference design for this integration"]
+  :adr/related
+  ["adr-2607141600-kotoba-kotoba-lang-compiler-kototama-aiueos-consolidation-experiment"
+   "adr-2607141900-cloud-itonami-cljc-actors-kotoba-incompatibility-narrow-slice-porting-policy"
+   "adr-2607072600-cloud-itonami-isic-6492-kototama-tender-wasm-deploy"]
+  :adr/correction-adr-2607141900
+  {:claim "and/or/when/pos?/neg? are unsupported by kotoba wasm emit"
+   :original-source "adr-2607072600 (2026-07-07), repeated in adr-2607141900 (2026-07-14, same session earlier)"
+   :live-reverify-2026-07-14
+   {:method "clojure -Sdeps '{}' -e, requiring kotoba.runtime, calling compile-wasm-expr directly"
+    :results {"(and 1 2)" ":i32, success"
+              "(or 1 2)" ":i32, success"
+              "(when 1 2)" ":i32, success"
+              "(pos? 3)" "{:bytes [...]}, success"
+              "(neg? -3)" "{:bytes [...]}, success"}}
+   :verdict "kotoba-lang/kotoba's gap has closed since 2026-07-07 (active concurrent
+             development). kotoba-lang/compiler (independent implementation) still
+             does NOT desugar and/or/when in its frontend.clj -- confirmed by direct
+             code read of desugar-expr's case dispatch."
+   :not-modified ["adr-2607072600" "adr-2607141900"]
+   :correction-method "append-only: this ADR records the correction, prior ADRs' bodies unchanged"}
+  :adr/triage
+  [{:construct "map + keyword"
+    :usage-frequency "13-15/17 sampled libs, core (chobo/mise/spec data model)"
+    :safety-impact "orthogonal to T1/T2/T3; existing heap-pair desugar technique
+                     (already used for not/zero?/pos?/neg? in compiler/) extends directly"
+    :verdict :add :priority :highest}
+   {:construct "destructuring ({:keys []}, [a b & rest])"
+    :usage-frequency "14/17, core"
+    :safety-impact "pure syntax sugar over map/vector access, no new runtime capability"
+    :verdict :add :priority :after-map-keyword}
+   {:construct "and/or/when in compiler/"
+    :usage-frequency "n/a (kotoba/ already supports these safely)"
+    :safety-impact "zero -- kotoba/'s working implementation is the safety proof"
+    :verdict :add :priority :low-cost-port}
+   {:construct "vector-as-data"
+    :usage-frequency "10/17, mostly ordered tuples"
+    :safety-impact "same heap-pair desugar approach as maps"
+    :verdict :add :priority :medium}
+   {:construct "multi-arity defn"
+    :usage-frequency "13/17, core (default-argument pattern)"
+    :safety-impact "each arity compiles to a statically-known separate function"
+    :verdict :add :priority :medium}
+   {:construct "loop/recur"
+    :usage-frequency "7/17"
+    :safety-impact "kotoba/ already documents unbounded self-recursion StackOverflow
+                     as a known risk; loop compiles to a WASM loop instruction with
+                     no call-stack growth -- a SAFETY IMPROVEMENT, not just a feature"
+    :verdict :add :priority :safety-positive}
+   {:construct "general first-class functions / HOF (map/reduce with a passed lambda)"
+    :usage-frequency "15/17, core, BUT"
+    :safety-impact "infer-effects is a static fixpoint over KNOWN call sites; an
+                     arbitrary closure argument could carry an undeclared effect
+                     invisible to the analysis -- breaks T2 soundness, not just a
+                     missing feature"
+    :verdict :do-not-add-general-form
+    :alternative "bounded map/reduce accepting only references to known top-level defns,
+                  same design as kotoba/'s existing call-indirect (funcref table)"}
+   {:construct "defprotocol/defrecord/multimethod"
+    :usage-frequency "3/17 (mise/chobo strategy pattern), defmulti/defmethod 0/17"
+    :safety-impact "type-based dynamic dispatch has the same soundness problem as general HOF"
+    :verdict :do-not-add
+    :alternative "rewrite the 3 affected libraries to keyword-tagged data + case
+                  dispatch once map/keyword lands -- closed dispatch sets are also
+                  more in the spirit of safe-Kotoba's deny-by-default design than
+                  open protocol extension"}
+   {:construct "atom/ref/volatile!/set! (guest-side general mutable state)"
+    :usage-frequency "~1 genuinely load-bearing persistent-state use per library
+                       (registry/checkpoint/db-connection); host-side metering atoms
+                       (aiueos.execute/kototama.tender) are a DIFFERENT category"
+    :safety-impact "guest mutable state breaks the effect-fixpoint's referential-
+                     transparency assumption; host-side atoms IMPLEMENT the
+                     confinement boundary rather than eroding it"
+    :verdict :do-not-add-for-guest :host-side-unchanged true}
+   {:construct "try/catch/throw (guest-side)"
+    :usage-frequency "heavy, split between ordinary error reporting and
+                       security-relevant abort paths (aiueos.execute's ex-data
+                       vocabulary for quota/fuel/capability-denial)"
+    :safety-impact "a guest catching a quota/fuel-exceeded exception could swallow
+                     it and keep running, defeating resource limits"
+    :verdict :do-not-add}
+   {:construct "defmacro / runtime require/resolve / reflection"
+    :usage-frequency "near-zero (0 dynamic-require hits across 15 repos, 1 trivial
+                       sugar-only macro in the whole sample)"
+    :safety-impact "classic static-check-bypass attack surface"
+    :verdict :do-not-add}]
+  :adr/langchain-db-kotobase-integration
+  {:current-state "langchain.db/create-conn returns a bare (atom {:db ... :log []}),
+                    process-memory-only. Its own docstring already documents intent
+                    to swap in a real Datomic Local / DataScript backend via the
+                    langchain.db/api map."
+   :kotobase-api
+   {:protocol "kotobase.store/IStore: -put/-get/-list (doc space, last-writer-wins),
+               -append/-read (append-only stream, monotonic :seq cursor)"
+    :implementations ["kotobase.local/LocalStore (pure atom, OSS standalone + reference oracle)"
+                       "kotobase.kotobase/KotobaseStore (forwards to injected xrpc fn -> kotobase.net PDS)"]
+    :precedent "kotobase.store's own docstring: same injection pattern as the
+                actors' MemStore/DatomicStore and num-clj's IBackend -- this
+                exact swap is already an established ecosystem convention"}
+   :design-decision
+   ["langchain.db does NOT hard-depend on kotobase.store -- preserves ADR-0001's
+     zero-third-party-runtime-deps promise for the main :deps"
+    "create-conn gains an optional duck-typed persist map: {:append (fn [event] ...)
+     :read (fn [since] -> [events])} -- same method shapes as IStore's -append/-read,
+     no protocol :require needed in langchain.db itself"
+    "on conn creation with persist supplied: replay ((:read persist) 0) through the
+     existing pure `with` tx-application logic to rebuild the in-memory :db value"
+    "transact! calls ((:append persist) {:tx ... :tx-data ...}) exactly once, AFTER
+     the swap! resolves (using the winning @report), never inside the swap! fn body
+     -- avoids duplicate appends under CAS-retry contention (the existing transact!
+     docstring already documents a real concurrency bug this exact pattern must avoid)"
+    "q/pull/entid/db/datoms/api map: UNCHANGED -- langchain.memory and
+     langgraph.checkpoint (consumers of :db-api) are unaffected"
+    "the actual kotobase wiring lives in a NEW optional namespace langchain.kotobase-db
+     (:require kotobase.store), added to a new :kotobase alias's :extra-deps in
+     langchain/deps.edn, NOT the main :deps -- same isolation pattern langchain.jvm
+     already uses for http-kit/jsonista"]
+   :status "design decided in this ADR; implementation follows in the same session"}
+  :adr/decision-not-made
+  ["general first-class functions/closures in .kotoba -- rejected on T2 soundness grounds"
+   "defprotocol/defrecord/multimethod in .kotoba -- rejected, fix the 3 affected
+    libraries instead once map/keyword lands"
+   "atom/try/catch/throw for GUEST .kotoba code -- rejected on capability-confinement
+    and resource-limit-enforcement grounds; host-side use is unaffected"
+   "rewriting adr-2607072600/adr-2607141900 bodies -- correction recorded here,
+    append-only, prior ADR text unchanged"
+   "hard-depending langchain.db on kotobase -- duck-typed persist map chosen instead"]}]
