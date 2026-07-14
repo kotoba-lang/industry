@@ -1,0 +1,58 @@
+[{:adr/id "adr-2607141200-cloud-itonami-isic-6611-cryptoexchange-incident-proof-design"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607141200: cloud-itonami cryptoexchange 設計企画 — 事故クラス駆動 incident-proof 暗号資産取引所（design-only）"
+  :adr/topic "cloud-itonami-isic-6611-cryptoexchange-incident-proof-design"
+  :adr/status "accepted (design-only; scaffold=L1, implementation=M1+)"
+  :adr/date "2026-07-14"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for ["audit finding: cloud-itonami has NO cryptoexchange design as of 2026-07-14 (6611=generic market admin, 6612=securities brokerage, 6619=card settlement, 6499=vcfund; industry registry has zero crypto entries)"
+                          "cryptoexchange blueprint positioning: role-suffix satellite cloud-itonami-isic-6611-cryptoexchange, governor :cryptoexchange-governor (fleet-unique), maturity :blueprint"
+                          "incident register A1-A10 -> invariants INV-1..14 traceability (FTX, Mt.Gox, Coincheck, DMM, Bybit, QuadrigaCX, Thodex, Binance-AML, wash-trading, leverage-amplification)"
+                          "scope fence: spot-only full-reserve; margin/derivatives/lending/staking require separate ADR+satellite+governor"
+                          "hard operational gate INV-14: no real funds / real customers until jurisdiction license + explicit owner decision (aligned with standing-authorization safety floor #2)"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related ["adr-2607121000-cloud-itonami-global-isic-isco-reverse-toposort-plan"
+                "adr-2607121200-cloud-itonami-wave0-cljs-first-safety-kernel"
+                "adr-2607122500-cloud-itonami-market-entry-propose-assess-design"
+                "adr-2607122200-cloud-itonami-ishokuju-blueprint-satellites"
+                "adr-2607011000-cloud-itonami-robotics-premise-and-isic-21-21"]
+  :db/id -1
+  :adr/addenda
+  [{:addendum 1
+    :date "2026-07-14"
+    :title "L1 executed (owner instruction)"
+    :artifacts {:satellite "https://github.com/cloud-itonami/cloud-itonami-isic-6611-cryptoexchange (initial 3ebc72f)"
+                :registry "kotoba-lang/industry main 50b7f732 — first role-suffix satellite entry :id 6611-cryptoexchange under an already-:implemented class, :blueprint tier 41->42, 15 tests/937 assertions green"
+                :west-pin "industry c3999a72 -> 50b7f732 via API single-entry commit 8bb9cdb8"}
+    :note "satellites themselves are not west projects (fleet convention, same as ishokuju/iso3166 satellites); the west action is the industry pin advance"}]
+  :adr/decision-summary
+  "{:audit \"cloud-itonami に cryptoexchange 未設計を実測確認 (2026-07-14): 金融 Wave0 18repo/industry registry/5-wave 計画のいずれにも crypto exchange なし\",
+    :incident-register {:A1 \"顧客資産流用・混蔵 (FTX/Celsius)\" :A2 \"帳簿裏口・特権口座 (FTX allow_negative/Alameda 清算免除)\" :A3 \"支払不能の隠蔽 (Mt.Gox)\" :A4 \"ホットウォレット侵害 (Coincheck/Zaif/BitPoint)\" :A5 \"署名運用侵害・blind signing (DMM 2024/WazirX/Bybit 2025 Safe UI 改ざん)\" :A6 \"単一人物リスク (QuadrigaCX)\" :A7 \"exit scam (Thodex/Africrypt)\" :A8 \"AML/KYC 不備 (Binance 2023/BitMEX)\" :A9 \"市場操作・利益相反 (wash trading/insider listing/front-running)\" :A10 \"レバレッジ増幅 (FTX デリバ・清算カスケード)\"},
+    :positioning {:repo \"cloud-itonami-isic-6611-cryptoexchange\" :governor :cryptoexchange-governor :maturity :blueprint :license \"AGPL-3.0-or-later\" :naming \"役割接尾辞 (no -clj), 先例 jpn-fsa 衛星\"},
+    :invariants {:INV-1 \"full-reserve solvency: 資産別 attested 準備金>=顧客負債, 割れたら自動 halt (出金は継続)。HARD, 人間 approve で override 不可\"
+                 :INV-2 \"no-rehypothecation: 顧客資産の貸出/運用/担保化/関連会社移転ゼロ\"
+                 :INV-3 \"自社発行トークンは準備金にも担保にも不算入 (FTT 教訓)\"
+                 :INV-4 \"特権ゼロ: リスクチェックバイパス tier なし, 自己勘定取引ゼロ\"
+                 :INV-5 \"残高=append-only event log の純 fold, 手動 UPDATE 経路が存在しない, 補正は dual-control effect で台帳公開\"
+                 :INV-6 \"conservation: Σbalance==Σdeposit-Σwithdrawal-Σfee 常時検証\"
+                 :INV-7 \"PoR+PoL 日次公開: Merkle-sum liability tree (inclusion proof) + on-chain reserve attestation。reserves のみの PoR は不合格\"
+                 :INV-8 \"custody 分散: cold>=95%, M-of-N quorum, オペレータ/デバイス独立, 単一人物で資金移動不可\"
+                 :INV-9 \"出金ガード: allowlist + 大口 time-lock + velocity cap + hot 残高 cap\"
+                 :INV-10 \"WYSIWYS: 署名 payload を独立 2 系統で再構成し byte 照合, ウォレット UI を信頼しない\"
+                 :INV-11 \"決定論 matching (price-time) + 全順序公開監査ログ (第三者が wash-trade 検出可能)\"
+                 :INV-12 \"法域ゲート: spec-basis なき法域は 422 正直拒否 (jpn-fsa 衛星が citable source), KYC/travel-rule/sanctions は intake gate\"
+                 :INV-13 \"scope fence: spot-only full-reserve。信用/デリバ/貸暗号資産/ステーキングは別 ADR+衛星+governor でしか導入不可\"
+                 :INV-14 \"実資金ゲート: 交換業登録 + owner 明示判断まで実資金/実顧客は永久スコープ外 (安全床②と整合)\"},
+    :kernels {:discipline \"ADR-2607121200: safe-kotoba emit-ready subset, integer-coded (minor units), fail-closed, battery+case-count lock, façade parity, portable-cljs-test-runner\"
+              :solvency \"(reserve_minor liability_minor self_token_flag) -> 0 ok / 非0 halt-intake\"
+              :custody \"(hot_bp quorum_sigs quorum_m allowlist_flag timelock_ok verifier_match_flag window_outflow_minor velocity_cap_minor amount_minor) -> 0 allow / 非0 deny, 非0/1 flag は violation\"
+              :conservation \"(Σbalance Σdeposit Σwithdrawal Σfee) -> 0/1\"
+              :conflict \"(prop_trading self_token_collateral privileged_bypass lending) -> 非0 で HARD violation\"},
+    :architecture {:ledger \"kotoba-datomic append-only event sourcing 唯一の状態層, :db-api 境界, MemStore≡DatomicStore contract\"
+                   :withdrawal \"edge は propose-withdrawal effect enqueue まで (:external-send)。broadcast は actor StateGraph のみ (custody kernel + 大口 interrupt-before human sign-off), LLM→actuator 直結禁止\"
+                   :por-pol \"日次 Merkle-sum + attestation + solvency 判定コードを nbb で静的 emit\"},
+    :milestones {:L0 \"本 ADR (事故レジスタ + INV 固定)\" :L1 \"blueprint 衛星 scaffold + industry registry :blueprint + west 登録 (new-project-scaffold 常時許可範囲)\" :M1 \"kernels 4本 + battery + parity, CLJS green (6511 パターン)\" :M2 \"event-sourced 台帳 + 決定論 matching + store contract + PoR/PoL 生成器\" :M3 \"custody 統合詳細設計 (MPC 選定/鍵セレモニー/WYSIWYS 手順書), 実資金は扱わない\"},
+    :economics \"full-reserve + 自己勘定ゼロ + spot-only は手数料収入のみ = FTX 型収益 (運用/レバレッジ) の構造的放棄。意図であり bug ではない\"}"}]
