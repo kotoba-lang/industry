@@ -98,3 +98,9 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
     receipt 署名専用。**merge chain は一切発行しない**(職務分掌の execute 側)。
     runner はこれを `ITONAMI_OPS_RUNNER_SEED` か `kagi:itonami-runner-bot`
     経由で読む。
+  - `itonami-org-root-x25519` / `itonami-sales-head-x25519` — **X25519**
+    recipient private keys(R2 private-replica、ADR-2606280300)。公開 pub は
+    `resources/ops-identity.edn` の `:recipients`。署名用 Ed25519 とは別物
+    (key-agreement 専用)。ops-repo の暗号化 replica bundle はこの pub 集合に
+    seal され、priv で open する。recipient を rotate outするには reseal 時に
+    その pub を外す。
