@@ -5,7 +5,7 @@
   :adr/topic "cloud-itonami-git-native-business-cdci"
   :adr/status "accepted — M0–M8 implemented 2026-07-14; pre-production. Maturity: gate/custody=K(real keys), runner/mail-in/mail-out/nbb-runtime/audit=V(E2E), persistence=I(local EDN), governor-pre-merge/runner-bot-key/merge-ui=D. Zero production runs yet; top gap = governor not wired into the git merge path."
   :adr/date "2026-07-14"
-  :adr/last_verified "2026-07-14"
+  :adr/last_verified "2026-07-15"
   :adr/deciders ["Jun Kawasaki"]
   :adr/authoritative true
   :adr/authoritative_for
@@ -57,4 +57,79 @@
                :drop-store :keep-as-read-model,
                :acl-only :capability-must-bind-to-merge-signature}
     :new-implementation [:composed-push-gate :itonami-runner :merge-signing-ui]
-    :follow-ups [:m0-wiring-pr :authorize-ref-update?-upstream :org-root-key-ops :dept-lane-capability-edn :merge-ui-adr :rad-r2-tracking]}"}]
+    :follow-ups [:m0-wiring-pr :authorize-ref-update?-upstream :org-root-key-ops :dept-lane-capability-edn :merge-ui-adr :rad-r2-tracking]}"
+  :adr/addendum-2026-07-15-ops-drain-nbb-port
+  {:summary "Closed the follow-up the 2026-07-14 nbb-send addendum itself
+             flagged as the last remaining JVM-only entry point: 唯一残る
+             JVM-only は inbound mail の Datom store 投影 (-M:ops-drain).
+             scripts/mail-drain.cljs previously shelled out to `clojure
+             -M:ops-drain` as a subprocess for exactly this reason; it now
+             calls cloud-itonami.ops-drain/drain! directly in-process,
+             matching how ops-cli.cljs already calls the outbound send
+             path natively -- inbound now has no JVM in its path either."
+   :real-gaps-found-and-closed
+   ["cloud-itonami.store's open-file-conn/save-file-conn! had NO :cljs
+     branch at all (JVM-only java.io), unlike the near-identical
+     cloud-itonami.ops-store which already had one for the ops-repo db.
+     Added the same EDN-via-Node's-fs pattern; a .bin path now throws a
+     clear error under cljs (JVM ObjectOutputStream format has no cljs
+     counterpart) instead of being silently unreachable"
+    "cloud-itonami.mail had an unconditional (require [cheshire.core :as
+     json] ...) plus several functions already documented in a comment as
+     JVM-only (ingest-file!/jvm-http-fn/send-message-via-resend!/
+     send-via-resend!/send-marketing-outreach!/mail/-main) but never
+     actually reader-conditional-wrapped -- so the WHOLE namespace failed
+     to even compile under cljs, blocking ops-drain's own require of it.
+     Wrapped the documented JVM-only section in one #?(:clj (do ...))
+     block; record->inbound/inbound->tx (the only fns ops-drain calls)
+     were already portable"
+    "cloud-itonami.ops-keys turned out to already be FULLY portable
+     (ops-cli.cljs's outbound path already calls it under cljs) --
+     ops_drain.cljc's own #?(:clj [cloud-itonami.ops-keys :as ops-keys])
+     require wrapping was unnecessarily conservative, not a real blocker.
+     Removed it, and fixed a related small inconsistency: drain-records!
+     passed :runner-seed #?(:clj (ops-keys/runner-seed) :cljs nil), so an
+     inbound-drain receipt would go UNSIGNED under cljs while outbound
+     (which calls the same fn unconditionally) always signs -- now calls
+     it unconditionally too, matching outbound"]
+   :verification
+   {:full-suite "clojure -M:test: 834 tests / 6886 assertions, 6 failures
+                 (same 6 pre-existing, unrelated failures as a clean-clone
+                 baseline before this change -- doctor-test/isco-1212-test/
+                 marketplace-test, nothing to do with store/ops-drain/mail)"
+    :lint "clj-kondo: 0 errors/warnings in all 4 touched files (the repo's
+           1 pre-existing lint error is in an unrelated test file)"
+    :real-nbb-execution "ops-drain/drain! run for real under nbb against a
+                         real records.json in an isolated sandbox (never
+                         the production ledger): proposes, auto-merges,
+                         executes, and persists a real store projection
+                         (verified by reopening the saved file and checking
+                         datom counts), correctly no-ops (idempotent skip)
+                         on a second run of the same records. The identical
+                         JVM invocation (clojure -M:ops-drain) produces the
+                         same result, confirmed side by side. mail-drain.cljs
+                         itself loads and runs under real nbb end-to-end (a
+                         real read-only `wrangler kv key list` call
+                         confirming the ops-drain require and the rest of
+                         the script compile and execute correctly)"}
+   :landed
+   {:repo "gftdcojp/cloud-itonami" :commits "d6b307a5 -> e055ce9a"
+    :method "sibling worktree (with kotoba-lang's org tree + cloud-mamori
+             symlinked in for :local/root dependency resolution), gh api
+             merges server-side merge, branch+worktree cleanup"
+    :west-pin "cloud-itonami d6b307a5 -> e055ce9a (verified via gh api
+               compare: ahead_by=10 [8 unrelated commits + this change],
+               behind_by=0)"
+    :files ["src/cloud_itonami/store.cljc (open-file-conn/save-file-conn!
+             cljs branches)"
+            "src/cloud_itonami/mail.cljc (require + JVM-only section
+             properly reader-conditional-wrapped)"
+            "src/cloud_itonami/ops_drain.cljc (drain!/-main portable,
+             ops-keys require unwrapped, runner-seed always called)"
+            "scripts/mail-drain.cljs (direct in-process call, no more
+             subprocess shell-out)"]}
+   :honest-remaining-gap "R2 transport endpoint配線 (pushing/pulling the
+                          sealed ciphertext ops-repo bundle to a real
+                          kotobase/B2 replica) is untouched by this
+                          addendum -- separate, storage-credential-bearing
+                          work, not attempted here"}}]

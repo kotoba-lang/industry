@@ -5,7 +5,7 @@ status: accepted — M0–M8 implemented same-day; pre-production (maturity adde
 doc_type: adr
 topic: cloud-itonami-git-native-business-cdci
 authoritative: true
-last_verified: 2026-07-14 (maturity assessment, same day)
+last_verified: 2026-07-15 (ops-drain nbb port addendum)
 authoritative_for:
   - "cloud-itonami の business operation(受信→提案→承認→実行→監査)を git-native な PR/merge workflow として表現する設計(受信 = proposal ref 到着、承認 = 署名付き merge、実行 = post-merge executor)"
   - "その git backend を GitHub ではなく kotoba-git/kotoba-rad(sovereign refs + push-gate)+ kotobase private tenant + kotoba-ledger-clj file-git/kotobase backend に置く判断"
@@ -692,4 +692,66 @@ java.net.http 依存)が、これを portable 化した:
 - JVM の `-M:ops-send run` は第 2 ホストとして存置。**唯一残る JVM-only は
   inbound mail の Datom store 投影(`-M:ops-drain`)**。
 - 成熟度表: 「nbb 実送信」gap を **完了**。残 gap: R2 transport endpoint 配線、
-  merge 署名 UI、残 lane 委任、inbound の store 投影の nbb 化、R4 PQ hybrid。
+  merge 署名 UI、残 lane 委任、~~inbound の store 投影の nbb 化~~（2026-07-15
+  Addendum参照）、R4 PQ hybrid。
+
+## Addendum（2026-07-15）— inbound の store 投影も nbb 化（唯一残る JVM-only を解消）
+
+cloud-itonami `e055ce9a`。上記addendumが「唯一残るJVM-only」と記録した
+`inbound mail の Datom store 投影(-M:ops-drain)`を解消した。
+`scripts/mail-drain.cljs`は従来`clojure -M:ops-drain`をsubprocessとして
+shell outしていたが、今は`cloud-itonami.ops-drain/drain!`をin-processで
+直接呼ぶ——outboundの`ops-cli.cljs run`と同じ「経路にJVM無し」をinbound側
+でも達成した。
+
+**想定外だった3つの実gap**（実装前は「単にreader-conditionalを足すだけ」
+と思っていたが、掘ってみると想定より深かった）:
+
+- `cloud-itonami.store`の`open-file-conn`/`save-file-conn!`が`:cljs`分岐を
+  一切持っていなかった（JVM-only java.io）——ほぼ同じ役割の
+  `cloud-itonami.ops-store`（ops-repoのdb用）は既にcljs対応済みだったのと
+  非対称。同じ「EDN経由でNodeの`fs`」パターンを追加、`.bin`パスは
+  cljsでは明確なエラーを投げる（JVMの`ObjectOutputStream`形式にcljs側の
+  対応物は無いため）。
+- `cloud-itonami.mail`が無条件の`(require [cheshire.core :as json] ...)`
+  を持ち、かつ「JVM専用」とコメントで既に明記されていた複数関数
+  （`ingest-file!`/`jvm-http-fn`/`send-message-via-resend!`/
+  `send-via-resend!`/`send-marketing-outreach!`/`mail/-main`）が実際には
+  reader-conditionalで囲われていなかった——このため**namespace全体が
+  cljsではコンパイルすら通らず**、`ops-drain`自身のrequireをブロックして
+  いた。JVM専用と明記済みのセクション全体を1つの`#?(:clj (do ...))`
+  ブロックで包んだ。`ops-drain`が実際に使う`record->inbound`/
+  `inbound->tx`は既にportableで変更不要だった。
+- `cloud-itonami.ops-keys`は実は**既に完全にportable**だった
+  （outboundの`ops-cli.cljs`は既にcljs下でこれを呼んでいる）——
+  `ops_drain.cljc`自身の`#?(:clj [cloud-itonami.ops-keys :as ops-keys])`
+  というrequireの縛りは、本物のブロッカーではなく単に過度に慎重
+  だっただけ。これを外し、それが引き起こしていた小さな不整合も修正:
+  `drain-records!`は`:runner-seed #?(:clj (ops-keys/runner-seed) :cljs
+  nil)`としていたため、inbound-drainのreceiptはcljs下では**未署名**に
+  なる一方、outboundは同じ関数を無条件に呼び常に署名する、という非対称
+  があった——今はoutboundと同じく無条件に呼ぶよう修正。
+
+**検証**: `clojure -M:test`: 834 tests / 6886 assertions、6 failures
+（変更前のclean baselineと同じ6件の無関係な既存失敗——
+doctor-test/isco-1212-test/marketplace-test、store/ops-drain/mailとは
+無関係）。clj-kondo: 触った4ファイルとも0 errors/0 warnings（repo全体の
+1件の既存lint errorは無関係な別テストファイル）。実`nbb`実行で
+`ops-drain/drain!`を隔離sandbox内の実`records.json`に対して実行し
+（本番ledgerには一切触れず）、propose→auto-merge→execute→実store投影の
+永続化（保存後に再読込してdatom件数を確認）、同一recordsの2回目実行が
+正しくidempotentにskipされることを確認。同一のJVM実行
+（`clojure -M:ops-drain`）が同じ結果を出すことも並べて確認。
+`scripts/mail-drain.cljs`自体も実nbb経由でend-to-end実行を確認
+（実際の読み取り専用`wrangler kv key list`呼び出しが通ることまで含め、
+requireとスクリプト全体のコンパイル・実行を確認）。
+
+**着地**: `gftdcojp/cloud-itonami`、`main`→`e055ce9a34641ed2a41528c4955da2256b16b822`、
+sibling worktree + `gh api .../merges`サーバ側マージ + branch cleanup。
+west pin前進（`d6b307a5`→`e055ce9a`、`gh api compare`で`ahead_by=10`
+[無関係な8コミット+本変更]、`behind_by=0`を確認済み）。
+
+**正直に記録する残りgap**: R2 transport endpoint配線（封緘済み
+ciphertext ops-repo bundleを実kotobase/B2 replicaへpush/pullする経路）は
+本addendumでは未着手——storage credentialを伴う別作業であり、今回は
+着手していない。
