@@ -38,4 +38,47 @@
                          \"kotoba-lang/kessai's own separate hand-rolled single-transaction pain.001 XML builder (kotoba.kessai.wire/->pain001-xml) left untouched, out of scope for this change\"],
     :landing {:repo-commit \"kotoba-lang/swift main 00b51ce26e58878abff52e0db31bd05eb69c7e55 (server-side merge of feat/real-wire-format, branch deleted)\"
               :tests \"42 -> 207 assertions, all green; clj-kondo 0 errors 0 warnings\"
-              :west-pin \"manifest/west.yml swift entry 7290f20... -> 00b51ce... via single-entry GitHub API PUT (blob-SHA optimistic lock, diff limited to one revision: line), commit f99d649df0da28ff2f606c42ed5354ae2f1313b6, verified nbb scripts/gen-west-manifest.cljs --check == up to date from a topdir-isolated sibling worktree (removed after use)\"}}"}]
+              :west-pin \"manifest/west.yml swift entry 7290f20... -> 00b51ce... via single-entry GitHub API PUT (blob-SHA optimistic lock, diff limited to one revision: line), commit f99d649df0da28ff2f606c42ed5354ae2f1313b6, verified nbb scripts/gen-west-manifest.cljs --check == up to date from a topdir-isolated sibling worktree (removed after use)\"}}"
+  :adr/addendum-2026-07-15-kessai-migration
+  {:summary "Migrated the one follow-up this ADR's own Consequences flagged:
+             kotoba-lang/kessai's kotoba.kessai.wire/->pain001-xml now
+             delegates to kotoba.swift.iso20022/pain001-doc + xml->str
+             instead of its own hand-rolled string-splicing builder."
+   :gaps-surfaced-and-fixed
+   ["<CreDtTm/> and <Dbtr><Nm/></Dbtr> both rendered EMPTY in the old
+     hand-rolled builder -- credit-transfer never collected
+     creation-date-time or debtor-name at all. pain001-doc correctly
+     refuses to build an incomplete document (nil for a missing required
+     field), so credit-transfer now requires debtor-name,
+     creation-date-time, payment-info-id, and requested-execution-date"
+    "amount conversion (major units -> integer minor units, required by
+     pain001-doc) introduces a NEW failure mode the old code never had:
+     silent sub-cent precision loss (e.g. 12.567 -> 1257). Closed with a
+     representable-in-2-decimals? guard that throws instead of silently
+     rounding away money -- empirically verified 2.675 is correctly
+     rejected (2.675*100 == 267.5 exactly, genuinely not a whole cent)"]
+   :blast-radius "confirmed contained to kotoba-lang/kessai alone -- its
+                  wire namespace has no external callers; kotoba.kessai's
+                  own main namespace only mentions it in docstrings, never
+                  requires/calls it"
+   :verification
+   {:full-suite "clojure -M:test: 10 tests / 87 assertions (was 66), 0
+                 failures/errors; clj-kondo 0 errors 0 warnings"
+    :test-style "rewritten to use parse-xml/xml-find/xml-text for
+                 structural assertions (robust to the real emitter's
+                 pretty-printed whitespace) instead of raw string regex
+                 assuming compact XML, matching iso20022_test.cljc's own
+                 convention"
+    :readme-example "updated and independently re-run to confirm it still
+                      works end to end"}
+   :landed
+   {:repo "kotoba-lang/kessai" :commits "f530cdf5 -> 0c0f7957"
+    :method "sibling worktree, with swift/banking/card/html/css/xml
+             mirrored in via symlinks for :local/root dependency
+             resolution, gh api merges server-side merge, branch+worktree
+             cleanup"
+    :west-pin "kessai f530cdf56891 -> 0c0f795761308c25 (verified via gh api
+               compare: ahead_by=2, behind_by=0, merge_base==old pin)"
+    :files ["src/kotoba/kessai/wire.cljc"
+            "test/kotoba/kessai/wire_test.cljc"
+            "README.md"]}}}]
