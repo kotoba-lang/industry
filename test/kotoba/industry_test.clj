@@ -379,6 +379,8 @@
     (is (= :implemented (industry/maturity "6493"))))
   (testing "cloud-itonami-isic-6120, promoted from :blueprint (spectrum-licensed mobile-network-operator actor, Network Operations Advisor ⊣ Mobile Network Governor, mirroring cloud-itonami-isic-6190's module shape -- same ISIC 61xx telecom industry) is also :implemented"
     (is (= :implemented (industry/maturity "6120"))))
+  (testing "cloud-itonami-isic-6130 (Satellite telecommunications activities, fresh scaffold -- no prior blueprint repo; Satellite Operations Advisor ⊣ Satellite Network Governor, mirroring cloud-itonami-isic-6190's/6120's module shape -- same ISIC 61xx telecom industry -- while citing satellite-licensing/ITU-coordination spec-basis, a distinct regulatory regime; registered directly at :implemented with no prior :blueprint stage) is also :implemented"
+    (is (= :implemented (industry/maturity "6130"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -550,7 +552,23 @@
       ;; shape mirrors cloud-itonami-isic-6190 (same ISIC 61xx telecom
       ;; industry). 36 tests/173 assertions run green before claiming
       ;; :implemented.
-      (is (= 148 (:implemented m))))))
+      ;; 148 -> 149: cloud-itonami-isic-6130, registered directly at
+      ;; :implemented -- no prior :blueprint stage (unlike 6120's path);
+      ;; the legacy placeholder :repo (gftdcojp/cloud-itonami-J6130) was
+      ;; confirmed 404 before this edit. Satellite Operations Advisor ⊣
+      ;; Satellite Network Governor actor, module shape mirrors
+      ;; cloud-itonami-isic-6190/6120 (same ISIC 61xx telecom industry)
+      ;; while citing satellite-licensing/ITU frequency-and-orbital-slot-
+      ;; coordination spec-basis (a distinct regulatory regime from a
+      ;; terrestrial numbering plan or terrestrial mobile-spectrum
+      ;; license). satellite-number-invalid-format? is the THIRD
+      ;; application of this fleet's format/syntactic-validity check
+      ;; family (after 6190's e164-invalid-format? and 6120's
+      ;; msisdn-invalid-format?). 36 tests/173 assertions run green
+      ;; before claiming :implemented. Closes the last ISIC Wave 0
+      ;; class-level gap alongside "6391" (left untouched -- a possible
+      ;; concurrent sibling build). See superproject ADR-2607141500.
+      (is (= 149 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
