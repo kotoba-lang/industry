@@ -377,6 +377,8 @@
     (is (= :implemented (industry/maturity "5820"))))
   (testing "cloud-itonami-isic-6201 (narrowed from the broad 'Computer programming activities' ISIC class to a marketing-automation SaaS platform actor, HubSpot Marketing Hub/Salesforce Marketing Cloud-class; MarketingOps-LLM sealed advisor ⊣ ConsentGovernor, second CRM/marketing/service-hub sibling in this fleet after cloud-itonami-isic-5820) is also :implemented"
     (is (= :implemented (industry/maturity "6201"))))
+  (testing "cloud-itonami-isic-6493 (Factoring activities, ISIC Rev.5 division 649 -- a genuine standalone class distinct from 6491/6492/6499/6494/6495; Factoring-LLM sealed advisor ⊣ Factoring Governor, two actuation events, registered directly at :implemented with no prior :spec placeholder) is also :implemented"
+    (is (= :implemented (industry/maturity "6493"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -527,7 +529,19 @@
       ;; no :repo link (the isco-3521 drift pattern, full-org scan).
       ;; Both suites were RUN green before claiming :implemented
       ;; (5320: 40 tests/200 assertions; 7830: 33/115).
-      (is (= 146 (:implemented m))))))
+      ;; 147 = 146 + cloud-itonami-isic-6493, newly registered directly
+      ;; at :implemented -- unlike every entry above, this ISIC had NO
+      ;; prior placeholder at ANY maturity tier in this registry (not
+      ;; even :spec); confirmed via the official ISIC Rev.5 structure/
+      ;; explanatory-notes cross-check (superproject ADR-2607141000).
+      ;; Factoring actor (Factoring-LLM ⊣ Factoring Governor), the third
+      ;; division-649 vertical alongside 6491/6492/6499, with TWO
+      ;; actuation events (advance/settle) and three first-class
+      ;; anti-Zentoshin mitigations (publicly-queryable ledger-recomputed
+      ;; solvency attestation, distributed named-funder concentration
+      ;; limits, a published/versioned fee schedule) -- see
+      ;; cloud-itonami-isic-6493/docs/adr/0001-architecture.md.
+      (is (= 147 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

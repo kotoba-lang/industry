@@ -6459,6 +6459,40 @@
    ;; :approved) was found and fixed via a status-value set. Single
    ;; actuation (:loan/disburse), never auto at any phase.
    :operating-states [:intake :underwrite :fund :collect :audit]},
+  {:id "6493"
+   :name "Factoring activities"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6493"
+   :business-id "cloud-itonami-isic-6493"
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :banking]
+   :optional-technologies []
+   :maturity :implemented
+   ;; ISIC Rev.5 class (4-digit): "This class covers the activity of
+   ;; purchasing accounts receivable (i.e., invoices) from third parties
+   ;; at a discount. This class excludes: debt financing undertaken with
+   ;; account receivables as collateral, see 6495." (ISIC5_Exp_Notes_
+   ;; 11Mar2024.pdf, UN Statistics Division Task Team on ISIC). A
+   ;; genuine, distinct, standalone Rev.5 class (NOT a subset of 6499),
+   ;; correctly cited against the official Rev.5 structure/explanatory-
+   ;; notes documents (superproject ADR-2607141000). Registered directly
+   ;; as :implemented (a factoring actor, Factoring-LLM ⊣ Factoring
+   ;; Governor), one of many verticals built outside ADR-2607032000's
+   ;; original 8-ISIC insurance/real-estate batch (146 :implemented
+   ;; entries in this registry as of this build, of which 8 are that
+   ;; original batch), modeled closely on siblings 6492/6499. TWO
+   ;; actuation events (:advance/fund, :reserve/settle -- neither ever
+   ;; auto at any phase), unlike 6492's single actuation, the same
+   ;; multi-actuation shape 6499 established. Underwriting inverts
+   ;; credit risk to the ACCOUNT DEBTOR (not the client), matching UCC
+   ;; Article 9's client-side choice-of-law split for the legal
+   ;; spec-basis. Three first-class mitigations against the real-world
+   ;; 全東信 (Zentoshin) factoring-adjacent bankruptcy (JPY 115.1B
+   ;; liabilities, ~20yr alleged books falsification, ~200k merchants
+   ;; affected): a publicly-queryable, ledger-recomputed solvency
+   ;; attestation (never self-reported), distributed named-funder
+   ;; concentration limits, and a published/versioned fee schedule with
+   ;; an exact-match governor check. See
+   ;; cloud-itonami-isic-6493/docs/adr/0001-architecture.md.
+   :operating-states [:intake :verify :underwrite :advance :collect :settle :attest :audit]},
   {:id "6499"
    :name "Other financial service activities, except insurance and pe..."
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6499"
