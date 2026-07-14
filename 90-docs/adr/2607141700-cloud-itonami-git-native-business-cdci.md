@@ -499,3 +499,28 @@ seed はすべて vault 内に封緘され、このセッションのどこに�
 まだ守っていない)②runner/drain の常駐化(nbb)③実運転の初回実施(実メール
 1 通を PR → merge → 実送信まで通す)④chain 再 mint 運用(≈2026-10-12)
 ⑤kotobase replica / rad R2 ⑥merge 署名 UI ⑦残 lane への委任展開。
+
+## Addendum (2026-07-14, same day): 成熟度表の最重要 gap ①を解消 — governor を git merge 経路に結線
+
+cloud-itonami `e17f5fa9`(`cloud-itonami.ops-governor`)。成熟度表の
+「governor pre-merge check: **D**」→ **V** に更新する。
+
+- `merge-proposal!` が ctx `:governor-check` を取り、**署名検査より前に**
+  machine censor を実行 — `:hold` は `:reason :governor-hold` で merge 拒否
+  (ref 不動・decision 不記録)、`:pass` は verdict を decision record に永続化。
+  production 入口 3 箇所(nbb `ops-cli.cljs` / `ops-drain` / `ops-send` CLI)は
+  無条件で結線済み。
+- rule: `:mail/ingest`(provider message id 必須)/ `:mail/send`(実在する
+  message + from / 宛先 / subject / body 必須)は ops-governor 自身が検閲、
+  それ以外の kind は `business-governor/check` へ委譲(未知 kind hold =
+  end-to-end fail-closed。kind 無し/読めない proposal も hold)。
+- nbb で censor を動かすため、`business-governor` の唯一の funding 依存だった
+  `equity-blocklist` を `kernels.substance`(zero-dep SSoT)へ移設(funding は
+  旧名で再公開、既存 caller 不変)— これで censor のロードが store/langchain.db
+  連鎖を引かなくなった。
+- 検証: JVM 4 tests(hold が署名前に拒否・ref 不動・decision 無し / pass の
+  verdict 永続化 / mail rule 行列 / business kind 委譲 / fail-closed)+
+  **nbb 実 CLI で宛先なし send の merge 拒否と正常 send の merge→run-dry を実証**。
+  全ゲート baseline 同一。
+- これで auto-merge tier(:read-only)も「governor pass のみで merge」という
+  §1 の表の記述どおりに動く。残 gap の先頭は ②常駐化 → ③初の実運転。
