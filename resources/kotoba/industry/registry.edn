@@ -2793,13 +2793,23 @@
    :operating-states [:intake :advise :govern :decide :commit]},
   {:id "0520"
    :name "Mining of lignite"
-   :repo "https://github.com/gftdcojp/cloud-itonami-B0520"
-   :business-id "cloud-itonami-B0520"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0520"
+   :business-id "cloud-itonami-isic-0520"
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :survey :extract :grade :ship :audit]},
+   :maturity :implemented
+   ;; Fresh from-scratch scaffold, 2026-07-14 (ADR-2607152300): no
+   ;; prior actor existed (the entry pointed at a never-created
+   ;; gftdcojp/cloud-itonami-B0520 placeholder). LigniteOpsAdvisor ⊣
+   ;; LigniteMiningGovernor operations-coordination actor, module shape
+   ;; mirroring cloud-itonami-isic-0510's verified redo (advisor/
+   ;; governor/phase/operation/store/sim, langgraph-clj StateGraph),
+   ;; domain-adapted for surface/opencast lignite mining (subsidence/
+   ;; dust/groundwater safety-concern flagging). clojure -M:test: 45
+   ;; tests/136 assertions, 0 failures/errors, independently re-run
+   ;; from a fresh clone.
+   ;; ISIC Rev.4 class (4-digit) — lignite mining operations-coordination actor (Wave 3)
+   :operating-states [:intake :advise :govern :decide :commit]},
   {:id "0610"
    :name "Extraction of crude petroleum"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0610"
