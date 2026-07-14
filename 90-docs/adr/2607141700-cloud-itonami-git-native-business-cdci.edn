@@ -1,0 +1,60 @@
+[{:db/id -1
+  :adr/id "adr-2607141700-cloud-itonami-git-native-business-cdci"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607141700: cloud-itonami の会社経営を PR/merge 駆動の CD/CI workflow にする — kotoba-git/kotoba-rad + kotobase + DataLad backend、部署/社員の CACAO capability で ref 権限を制御"
+  :adr/topic "cloud-itonami-git-native-business-cdci"
+  :adr/status "proposed"
+  :adr/date "2026-07-14"
+  :adr/last_verified "2026-07-14"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["business operation(受信→提案→承認→実行→監査)の git-native 表現: メール受信 = proposal ref 到着(PR)、承認 = did:key 署名付き ff-only merge、実行 = post-merge itonami-runner、監査 = audit ref への append-only commit"
+   "backend は GitHub でなく kotoba-git/kotoba-rad(sovereign refs + push-gate) + kotobase private tenant + kotoba-ledger-clj file-git backend + DataLad/git-annex/B2(大容量)。GitHub は code repo の public mirror のみ"
+   "権限モデル: 社員 = did:key、org root → 部署 delegate → 社員の CACAO delegation chain、resource = itonami://<org>/<repo>/<lane>、ability = propose/review/merge/execute/read、risk tier ごとの merge 署名要件、proposer/approver/executor の鍵分離"
+   "CQRS: 署名付き git DAG = write-model、既存 Datom store = read-model(Datalog query 面)。store は廃止しない"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related
+  ["adr-2606271700-cloud-itonami-business-os"
+   "adr-2606301200-kotoba-mail-mailer"
+   "adr-2607061600-kotoba-issue-ledger-shared-libs"
+   "adr-2607072200-kotoba-git-kotoba-rad-content-addressed-vcs"
+   "adr-2607022300-itonami-gftdcojp-private-tenant-kotoba-rad-git-storage"
+   "adr-2607050400-webauthn-cacao-connection"
+   "adr-2607125300-cloud-itonami-crm-fleet-docker-ci"
+   "adr-2607012000-cloud-itonami-isco-occupation-blueprints"]
+  :adr/decision-summary
+  "{:mapping {:mail-inbound [:mail-drain :-> \"refs/itonami/proposals/inbox/<msg-id>\" :proposal-commit],
+              :agent-proposal [\"refs/itonami/proposals/<lane>/<id>\" :rationale :risk-tier],
+              :governor :pre-merge-required-check,
+              :approve [:signed-ff-only-merge :-> \"refs/itonami/<lane>/main\"],
+              :execute [:post-merge :itonami-runner :handler :dedupe-by-effect-id],
+              :audit [\"refs/itonami/audit/main\" :append-only]}
+    :backend {:git [:kotoba-git :kotoba-rad], :replica :kotobase-private-tenant,
+              :local-ledger :kotoba-ledger-file-git, :heavy [:datalad :git-annex :b2],
+              :github :public-code-mirror-only, :p2p-replication :blocked-until-rad-r2,
+              :secrets :alias-only}
+    :permissions {:identity :did-key, :chain [:org-root :dept-delegate :employee],
+                  :resource \"itonami://<org>/<repo>/<lane>\",
+                  :abilities [:propose :review :merge :execute :read],
+                  :dept [:lane-set :isco-blueprint],
+                  :risk-tiers {:read-only :auto-merge-after-governor,
+                               :external-send :one-lane-merge-signer,
+                               :financial :two-signers-lane+keiei-no-self-approve,
+                               :destructive :org-root-only},
+                  :separation-of-duties {:proposer :propose-only, :approver :merge-only, :runner-bot :execute-only},
+                  :revocation [:expiry-max-90d :journal-remove-delegate]}
+    :runner {:trigger [:signed-head-announce :poll], :verify [:sigref :cacao-chain :risk-signatures],
+             :fail-closed true, :receipt :audit-commit, :projection :git->store}
+    :stages {:m0 :approval-dual-write-to-file-git,
+             :m1 [:ops-repo :signed-refs :composed-push-gate-authorize-ref-update?],
+             :m2 [:itonami-runner :mail-drain-emits-proposals],
+             :m3 [:kotobase-authoritative :git-write-model :rad-r2-encrypted-replication]}
+    :rejected {:github-actions :private-data+workflow-scope+sovereignty,
+               :store-only :no-signed-attribution,
+               :radicle-proper :kotoba-rad-exists,
+               :drop-store :keep-as-read-model,
+               :acl-only :capability-must-bind-to-merge-signature}
+    :new-implementation [:composed-push-gate :itonami-runner :merge-signing-ui]
+    :follow-ups [:m0-wiring-pr :authorize-ref-update?-upstream :org-root-key-ops :dept-lane-capability-edn :merge-ui-adr :rad-r2-tracking]}"}]
