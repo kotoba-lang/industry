@@ -76,8 +76,8 @@
     (is (= :blueprint (industry/maturity "8030"))))
   (testing "cloud-itonami-isic-2660, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "2660"))))
-  (testing "cloud-itonami-isic-3812, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "3812"))))
+  (testing "cloud-itonami-isic-3812, now :implemented with real actor, was :blueprint (2026-07-14)"
+    (is (= :implemented (industry/maturity "3812"))))
   (testing "cloud-itonami-isic-2011, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "2011"))))
   (testing "cloud-itonami-isic-4321, freshly published, is also :blueprint (live-state corroboration)"
@@ -452,7 +452,10 @@
       ;; Governor, electric-power transmission/distribution actor).
       ;; 40 -> 39: cloud-itonami-isic-1812 promoted :blueprint ->
       ;; :implemented (Print Support Services, pre-press/bindery actor).
-      (is (= 39 (:blueprint m)))
+      ;; 39 -> 38: cloud-itonami-isic-3812 promoted :blueprint ->
+      ;; :implemented (Hazardous Waste Collection, HazardousWasteDispatch-LLM
+      ;; advisor, HazardousWasteGovernor, langgraph-clj StateGraph, 2026-07-14).
+      (is (= 38 (:blueprint m)))
       ;; 114 = 113 + cloud-itonami-isic-4620, promoted directly from
       ;; :spec (never a :blueprint) -- agricultural/live-animal
       ;; wholesale trading actor. 115 = 114 + cloud-itonami-isic-2910,
@@ -631,7 +634,9 @@
       ;; build-out (auto-parts/cement-mill/device-assembly/computer-retail).
       ;; 166 -> 167: cloud-itonami-isic-1812 promoted :blueprint ->
       ;; :implemented (Print Support Services, pre-press/bindery services actor).
-      (is (= 167 (:implemented m))))))
+      ;; 167 -> 168: cloud-itonami-isic-2011 promoted :blueprint ->
+      ;; :implemented (Basic Chemicals Manufacturing, operations coordinator actor).
+      (is (= 168 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
