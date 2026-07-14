@@ -1,6 +1,6 @@
 # ADR-2607141654: errand — human gate の next-action を agent react loop に定型化する
 
-**Status**: accepted
+**Status**: accepted, implemented (closing 2026-07-14 — kyoninka.errand + license-loop、運転は ADR-2607141753 M0/M1)
 **Date**: 2026-07-14
 **Deciders**: Jun Kawasaki
 

@@ -1,6 +1,6 @@
 # ADR-2607141620: kyoninka — ITAD 許認可取得手続きの as-code 化
 
-**Status**: accepted, scaffolded
+**Status**: accepted, implemented (closing 2026-07-14 — errand 拡張 d857836、確認屋 M0/M1 で運転中)
 **Date**: 2026-07-14
 **Deciders**: Jun Kawasaki
 
