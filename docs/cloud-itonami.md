@@ -47,7 +47,7 @@ note below):
 - Total entries: 647 (429 classes + 218 groups)
 - Sections: 21/21, groups: 238/238
 - `:implemented` 147 · `:blueprint` 5 · `:spec` 474 (as of `cloud-itonami-
-  isic-6493`'s registration, superproject ADR-2607141000 -- this line had
+  isic-6493`'s registration, superproject ADR-2607141700 -- this line had
   drifted from the live registry through many untracked promotion ADRs;
   refreshed to the actual current `kotoba.industry/maturity-summary`
   counts as part of that registration rather than perpetuating the stale
@@ -62,7 +62,7 @@ their built/published `cloud-itonami-isic-*` repo names rather than the
 real Rev.4 codes, so `:repo` / GitHub naming / registry `:id` stay
 consistent with each other. The real-Rev.4 entries (4661/4930/5012/5022)
 remain separately registered at `:spec`. `6493` (Factoring activities,
-superproject ADR-2607141000) is a SIMPLER case of the same "Rev.5-only,
+superproject ADR-2607141700) is a SIMPLER case of the same "Rev.5-only,
 beyond Rev.4" category: Rev.4's own division 649 only ever had three
 classes (`6491`/`6492`/`6499`) with no factoring-specific slot at all --
 Rev.5 split it into six (adding `6493`/`6494`/`6495`) -- so `6493` needed
