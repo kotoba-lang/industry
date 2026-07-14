@@ -127,8 +127,59 @@ synthetic user test の信頼性は「LLM の演技」より先に「入力画�
 
 ## Follow-ups
 
-1. persona panel の 3-judge 化(stdev 記録)と light/dark 両テーマ採点。
+1. ~~persona panel の 3-judge 化(stdev 記録)と light/dark 両テーマ採点。~~
+   → **機構（mechanism/runner）は Addendum 2（2026-07-15）で解消**。実際に
+   実機LP に対し3-judge×light/dark の live panel を運転する（実 LLM judge
+   呼び出し + 実スクリーンショット）のは、この session の環境にブラウザ
+   自動化が繋がっていないため引き続き未実施 — 下記 Addendum 2 参照。
 2. cloud-itonami routine 化(`itad-persona-react-daily` 等。Governor gate 付き)と
    ITAD_LEDGER/UTM telemetry の :telemetry 層 append。
 3. persona 較正(synthetic form-intent vs 実 CVR)、persona 自体の Evolve。
 4. design-quality README への :persona-visual 層の記載と他プロダクト展開。
+
+## Addendum 2（2026-07-15）— 3-judge / light-dark テーマの機構実装（運転は未実施）
+
+Follow-up 1 のうち、**機構側**（`kotoba-lang/design-quality` の
+`persona.cljc` + `ai-gftd-itad` の runner）を実装した。**実際にitad.gftd.ai
+に対して3-judge×light/dark のライブpanelを運転する（本物のLLM judge呼び出し
++ 本物のスクリーンショット取得）ことは今回実施していない** — この点を
+正直に記録する: 本ADRの3層設計（mechanism/catalog/operation）のうち今回
+触れたのは最初の2層（mechanism・catalog側runner）のみで、実運転
+（operation層、cloud-itonami routine化とセット）は follow-up 2 と合わせて
+別途になる。
+
+**mechanism（`kotoba-lang/design-quality`、main `fb766e2f`）**:
+`persona/score-events`・`persona/feedback-event` に任意の `:theme`
+（light/dark等）を追加——与えられれば全イベントに `:eval/theme` が付き、
+省略時は既存の（historicalな）イベント形状と完全に同一のまま（キー自体が
+存在しない）。`mean-by-axis` はそもそも `:eval/judge` の値の種類数に
+依存しない集計だと判明した——2judge・3judgeで挙動を変える必要は無く、
+既存実装が既に3-judge以上に対応済みだった。3人の判定が割れるケースで
+stdevが正しく非ゼロになることを確認するテストを追加。18 tests /
+190 assertions（従来16/181）、clj-kondo 0。
+
+**catalog側runner（`ai-gftd-itad`、main `8a7db51c`）**:
+`tools/append_persona_run.cljs` が (1) 1 personaにつき複数judgeの結果
+ファイル（`result-<id>.edn`=judge1、`result-<id>.j2.edn`/`.j3.edn`=
+追加judge、既存の1judge運用と完全後方互換）を受け付けるように、
+(2) 任意の第5引数 `<theme>` を受け付け全イベントに `:eval/theme` として
+付くように、それぞれ拡張した。**着地前に実際のbugを1件発見・修正**:
+runnerは既に `persona/mean-by-axis` でstdevを計算していたが、summary出力
+では `:mean`/`:n` だけ表示し `:stdev` を握りつぶしていた——「3-judge化で
+判定の割れを可視化する」という本ADR自身の目的にとって、計算していても
+表示しなければ意味がない欠陥。表示するよう修正。
+
+**検証**（本物の`docs/persona-visual-ledger.edn`には一切触れず、隔離
+sandboxで実施）: 実際にnbbスクリプトを実行し、(a) 1personaに3個の
+合成judge結果ファイル＋別1personaに1個の単一judge結果ファイルを与えて
+実行→ n=4での正しい集計・非ゼロstdevの表示を確認、(b) `isms-jimukyoku`
+という「jimu」を含むが本物のjudgeサフィックスではないpersona idが
+誤って判定されないことを確認、(c) 冪等性（同一run-idの二重追記拒否）と
+unknown persona id拒否が引き続き動作することを確認、(d) themeを省略
+した従来通りの4引数呼び出しが`:eval/theme`キーを一切追加しないことを
+確認——ただしこの過程でsummary行に余計な`nil`が表示される小さなバグを
+自分で発見し、着地前に修正した。
+
+**west pin**: `design-quality` `4d316cfa` → `fb766e2f`、`ai-gftd-itad`
+`e23c16e2` → `8a7db51c`（いずれも `gh api compare` で `ahead_by=2,
+behind_by=0` を確認済み）。
