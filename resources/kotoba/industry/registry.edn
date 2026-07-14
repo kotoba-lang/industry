@@ -1,6 +1,6 @@
 {:kotoba.registry/id :kotoba/industry
  :kotoba.registry/version 1
- :kotoba.registry/updated "2026-07-14"
+ :kotoba.registry/updated "2026-07-14T19:00:00Z"
  :industries
  [{:id "3512"
    :name "Community Renewable Energy Operations"
@@ -3316,13 +3316,16 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1910"
    :name "Manufacture of coke oven products"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C1910"
-   :business-id "cloud-itonami-C1910"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1910"
+   :business-id "cloud-itonami-isic-1910"
+   :required-technologies [:robotics :forms :dmn :bpmn :audit-ledger :telemetry :emissions-tracking]
+   :optional-technologies [:pressure-monitoring :temperature-monitoring :byproduct-quality-assurance]
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as a coke-oven operations coordinator actor
+   ;; (Coke Operations Advisor ⊣ Coke Operations Governor), ADR-2607142700.
+   ;; Hard gates: no furnace control (engineer-exclusive), emissions threshold
+   ;; exceedances always escalate. Portable .cljc / langgraph-clj.
+   :operating-states [:intake :propose :govern :approve :dispatch :audit]},
   {:id "1920"
    :name "Manufacture of refined petroleum products"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1920"
