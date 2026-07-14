@@ -107,6 +107,26 @@ root に置くか `/itad` 配下かを含め follow-up）。
   LP は placeholder を明示し、公開はその後。
 - (−) Worker の実 deploy・LINE 公式アカウント開設・広告アカウント接続は follow-up。
 
+## Addendum 1 — itad.gftd.ai で公開（2026-07-14 オーナー指示）
+
+「itad.gftd.ai でひとまず公開」の指示により、gftd.co.jp 配置の決裁を待たず
+**https://itad.gftd.ai/ で本番公開した**（Worker `ai-gftd-itad`、version
+`22fc4c52-6a6a-495c-8271-23dce16eac94`、custom domain 自動プロビジョン）。
+構成は local-murakumo と同型: shadow-cljs `:esm` で `worker.cljs` をビルドし、
+LP は assets（`dist/index.html`）、`POST /api/itad/lead` のみ Worker が受ける。
+KV は `ITAD_LEADS`（lead 本体）+ `ITAD_LEDGER`（append-only 台帳イベント）。
+
+実装知見: `:advanced` 最適化が `(.-ITAD_LEADS env)` / `(.put kv ...)` を munge
+していた（ビルド成果物に文字列が現れないことで実測検出）→ `unchecked-get` /
+`js-invoke` の文字列アクセスに変更して解決。
+
+Live 検証（2026-07-14）: `GET /` → 200 text/html、invalid POST → 400 +
+フィールド別エラー、valid POST → 200 `{ok true}` で KV に lead + 台帳イベントの
+書き込みを実確認（検証用テストレコードは確認後に削除）。LINE 通知はトークン
+未設定のため設計どおりスキップ（偽の成功を作らない）。
+
+Follow-up 1（gftd.co.jp 配置）は「itad.gftd.ai からの移設 or 併設の決裁」に読み替える。
+
 ## Follow-ups
 
 1. gftd.co.jp の配置決定（root 置換 or `/itad`）+ Cloudflare Pages/Workers deploy。

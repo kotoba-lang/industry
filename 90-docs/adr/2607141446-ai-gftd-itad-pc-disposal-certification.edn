@@ -3,13 +3,14 @@
   :adr/doc_type "adr"
   :adr/title "ADR-2607141446: ai-gftd-itad — ITAD（PC 廃棄証明）事業と gftd.co.jp LP"
   :adr/topic "ai-gftd-itad-pc-disposal-certification"
-  :adr/status "accepted, scaffolded"
+  :adr/status "accepted, deployed"
   :adr/date "2026-07-14"
   :adr/last_verified "2026-07-14"
   :adr/deciders ["Jun Kawasaki"]
   :adr/authoritative true
   :adr/authoritative_for
   ["gftdcojp/ai-gftd-itad の新設・west 登録（private、org 既定 visibility）"
+   "itad.gftd.ai 本番公開（Worker ai-gftd-itad, version 22fc4c52, KV ITAD_LEADS/ITAD_LEDGER, 2026-07-14 live 検証済み）"
    "ITAD 事業設計: 回収 + NIST SP 800-88 準拠データ消去/物理破壊 + 廃棄・消去証明書発行"
    "証明書 = append-only datoms 台帳の射影（cert 番号 GFTD-ITAD-<yymm>-<seq> + canonical EDN 検証ハッシュ）という data-first 差別化"
    "cljs 第一・Datomic 互換 datoms/schema（DataScript/Datomic 両対応、JVM は compat）という技術方針"
