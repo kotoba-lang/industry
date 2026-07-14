@@ -1,0 +1,151 @@
+[{:db/id -1
+  :adr/id "adr-2607151500-kotoba-lang-org-premise-cljs-execution-target"
+  :adr/title "ADR-2607151500: kotoba-lang org premised on .kotoba + new ClojureScript execution target"
+  :adr/status "accepted"
+  :adr/date "2026-07-14"
+  :adr/last_verified "2026-07-14"
+  :adr/doc_type "adr"
+  :adr/topic "kotoba-lang-org-premise-cljs-target"
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["the kotoba-lang org-wide .kotoba application policy (:adr/repo-policy) is
+    the reference for future similar decisions"
+   "the .kotoba -> ClojureScript backend design/semantics/known scope limits
+    (:adr/cljs-backend) are the reference, implementation in kotoba-lang/
+    compiler's src/kotoba/compiler/backend/cljs.clj"]
+  :adr/related
+  ["adr-2607150000-kotoba-lang-extension-triage-langchain-persistence-kotobase"
+   "adr-2607141900-cloud-itonami-cljc-actors-kotoba-incompatibility-narrow-slice-porting-policy"
+   "adr-2607141600-kotoba-kotoba-lang-compiler-kototama-aiueos-consolidation-experiment"]
+  :adr/investigation-findings
+  {:repo-inventory
+   "kotoba-lang org repos with .kotoba files: kotoba (67), kotoba-lang (5),
+    compiler (7), kototama (6), kotoba-v2025 (31, .kotoba-only),
+    wasm-webcomponent (4, hosts compiled WASM, doesn't compile .kotoba
+    itself). Every other major repo (kotobase/langchain/langgraph/css/
+    shitsuke/kotoba-ui/uikit/appkit/liquid-glass-ui/kotoba-rad-*/kotoba-*-
+    contracts) is ALREADY pure .cljc, JVM+cljs portable, none JVM-only --
+    these are general-purpose libraries (maps/protocols/atoms), not
+    pure-decision-logic in the safe-kotoba-subset shape, so the narrow-
+    slice port pattern doesn't apply to them wholesale."
+   :internal-port-candidate
+   "kototama/clj/src/kototama/unspsc/capability.cljc (check/present?/
+    risk-checks) -- no atom/defrecord/langchain/langgraph deps, pure
+    predicate/check-table logic, same safe-kotoba-subset shape as
+    cloud-itonami's credit.kernels.gate.cljc. First internal (not just
+    external-consumer) proof candidate for this pattern."
+   :cljs-execution-does-not-exist-today
+   "kotoba-lang/kotoba-lang's :cljs reader-target ONLY selects which
+    #?(:cljs ...) reader-conditional branch is read -- never changes the
+    execution engine. kotoba-lang/kotoba's launcher.clj (`kotoba run
+    --reader-target cljs`) always executes via the JVM interpreter or
+    WASM+Chicory regardless of reader-target (confirmed via
+    launcher_test.clj's dot-cljs-entry-file-runs-under-its-own-default-
+    reader-target test). Real cljs-on-Node execution DOES exist
+    (kototama/clj/src/kototama/node.cljs) but is an ordinary .cljc->cljs->
+    Node compile, fully independent of the .kotoba->WASM pipeline.
+    cloud-itonami-isic-6492's wasm/verify_node.cljs + wasm-webcomponent's
+    actor-host.js is a cljs/nbb HOST loading a PRECOMPILED wasm binary via
+    WebAssembly.instantiate -- not .kotoba compiling to cljs source. This
+    exact gap was already independently documented in adr-2607141600."}
+  :adr/repo-policy
+  {:decision
+   ["do NOT rewrite general-purpose kotoba-lang libraries (kotobase/
+     langchain/langgraph/UI layer) into .kotoba -- wrong shape (maps/
+     protocols/polymorphic dispatch), same reasoning ADR-2607141900 already
+     applied to credit.governor/check's facade"
+    "future PURE decision/validation/data-transform logic newly written
+     anywhere in kotoba-lang SHOULD be authored in the safe-kotoba-subset
+     style (like credit.kernels.gate.cljc pre-emptively was) when the logic
+     naturally fits that shape -- keeps future narrow-slice porting cheap"
+    "concrete next port target: kototama/clj/src/kototama/unspsc/
+     capability.cljc -- proves the pattern applies to kotoba-lang's OWN
+     code, not just external consumers like cloud-itonami. NOT implemented
+     in this ADR -- follow-up commit."]}
+  :adr/cljs-backend
+  {:where "kotoba-lang/compiler, not kotoba-lang/kotoba -- compiler/ already
+           has the frontend->HIR->KIR->backend separation a new backend
+           needs; kotoba/'s single-pass compile-wasm-expr does not."
+   :new-targets ["cljs-kotoba-v1 (generic)" "cljs-node-kotoba-v1" "cljs-browser-kotoba-v1"]
+   :design
+   ["KIR's :functions bodies are already a small closed Lisp (let/if/
+     cap-call/pair-family/arithmetic/comparison/named calls) -- 1:1
+     data->data rewrite to cljs s-expressions, no byte assembly needed"
+    "pair/pair-first/pair-second become plain 2-element vectors + nth
+     (cljs already has real heap-allocated persistent data structures) --
+     simpler than wasm32/x86_64/aarch64's hand-rolled linear-memory heap"
+    "KIR's if treats exactly 0 as false (cljs/clj's own if treats 0 as
+     truthy) -- every if wraps its test as (if (zero? test) else then)"
+    "KIR's comparison ops return integer 1/0, not boolean -- every
+     comparison wraps as (if (cljs-op ...) 1 0) to compose with the above"
+    "fuel: WASM's module-global, never-replenished 256-call counter
+     reproduced via a defonce atom -- same global-depletion semantics,
+     not 256-per-top-level-call"
+    "cap-call rejected at emit time (no cljs-side host-import wiring yet)
+     -- explicit compile error, not a silent stub"
+    "i64 wraparound (KIR's normative 2's-complement overflow semantics) is
+     NOT reproduced -- plain cljs +/-/* auto-promote to bignum. Documented,
+     unaddressed gap: every known safe-kotoba-subset program stays well
+     inside JS's 53-bit safe-integer range, so unreachable in practice, but
+     real for a hypothetical overflow-dependent program"]
+   :real-bug-found-and-fixed
+   {:bug "KIR's :functions order does not guarantee a synthesized loop/recur
+          helper is defined before the defn that calls it (the originating
+          defn is listed first, its own loop-helpers appended after, per
+          ADR-2607150000's addendum 4) -- plain defn forms do not forward-
+          hoist across a file in cljs OR JVM Clojure, unlike WASM/native
+          backends which resolve calls through a pre-built function-index
+          table before any body is assembled"
+    :symptom "confirmed live via REAL nbb execution (not just a hypothesis):
+              'Unable to resolve symbol: __kotoba_loop_1', identical failure
+              under plain JVM eval of the same emitted text"
+    :fix "emit a (declare fn1 fn2 ...) of every KIR function name ahead of
+          any defn -- handles arbitrary call order/mutual recursion"}
+   :verification
+   {:real-nbb-execution
+    "hand-verified before committing: nbb (ClojureScript-on-Node) actually
+     required and called the emitted namespace for every scenario (plain
+     arithmetic, pair round-trip, if-0-is-false, multi-defn calls,
+     loop/recur via the frontend's own desugar, quot-by-zero throwing,
+     the global fuel-depletion property across 256+ calls) -- this is what
+     caught the forward-reference bug above"
+    :committed-tests
+    "10 new deftest in test/kotoba/compiler/backend_cljs_test.clj, evaling
+     emitted source under PLAIN JVM CLOJURE (legitimate here specifically
+     because nothing backend.cljs ever emits is cljs-specific -- defn/let/
+     if/vector/nth/atom/swap!/throw/ex-info/a namespaced map literal are
+     valid, identical Clojure AND ClojureScript). Matches this compiler's
+     own established convention of NOT depending on an external runtime
+     (Chicory for wasm) in its committed suite."
+    :full-suite "clojure -M:test: 131 tests / 2786 assertions (121 pre-
+                 existing + 10 new), 0 failures/errors. :cljs-kotoba-v1
+                 added to compiler/targets (compatibility-targets), so
+                 every existing cross-backend consistency test now also
+                 exercises this backend."}
+   :landed
+   {:repo "kotoba-lang/compiler" :commits "68c15a4 -> 0ab557e"
+    :method "sibling worktree outside superproject, gh api merges server-side
+             merge, branch+worktree cleanup"
+    :west-pin "compiler 68c15a436333 -> 0ab557e8b899 (--entry minimal diff,
+               verify-west-pins OK)"
+    :files ["src/kotoba/compiler/backend/cljs.clj (new)"
+            "src/kotoba/compiler/target.clj (cljs-kotoba-v1 + node/browser
+             variants, compatibility-targets, backend dispatch)"
+            "src/kotoba/compiler/core.clj (compile-source cond branch for
+             the cljs backend, returns {:format :cljs/v1 :source ...})"
+            "test/kotoba/compiler/backend_cljs_test.clj (new, 10 deftest)"
+            "test/kotoba/compiler/test_runner.clj (registered the new
+             namespace)"
+            "README.md (documented the new target in the architecture
+             diagram + a new prose section)"]}}
+  :adr/decision-not-made
+  ["rewriting kotoba-lang's general-purpose libraries (langchain/langgraph/
+    kotobase/UI layer) into .kotoba -- wrong shape, rejected on the same
+    grounds as ADR-2607141900's facade decision"
+   "adding cljs backend support to kotoba-lang/kotoba itself -- compiler/ is
+    the architecturally correct home (frontend/HIR/KIR separation kotoba/
+    lacks); a kotoba/-side equivalent is a separate, unstarted follow-up"
+   "exact i64 wraparound parity via BigInt in the cljs backend -- deferred,
+    documented gap, no known program depends on it"
+   "actually porting kototama/unspsc/capability.cljc to .kotoba -- candidate
+    identified, implementation is follow-up work, not done in this ADR"]}]
