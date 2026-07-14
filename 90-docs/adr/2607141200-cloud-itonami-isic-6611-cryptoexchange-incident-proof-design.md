@@ -294,6 +294,15 @@ M4b `8c37ac7`。すべて design/testnet-only、実資金・実鍵・実チェ�
 follow-up（未着手）: 公開 JSON を消費する self-contained ブラウザ検証ページ
 （第 4 の独立実装）と、artifact を配信する discovery surface。
 
+## Addendum 8（2026-07-14）: 共通化 — Merkle-sum を kotoba-lang に抽出
+
+`cryptoexchange.attest` の Merkle-sum ツリー（tree/inclusion-proof/verify）を
+共有 lib **`kotoba-lang/merkle-sum`**（zero-dep portable `.cljc`、hasher 注入）へ
+抽出し west 登録、attest はそれに依存化（PoR ドメイン部分のみ保持、挙動不変・pin
+済み root 不変）。あわせて crypto/merkle プリミティブは既に kotoba-lang に在ること、
+actor Store seam が 263 repo で複製されている構造課題（一括移行は別スコープ）を記録。
+詳細は **ADR-2607141400**。
+
 ## Addendum 7（2026-07-14）: JSON レンダリング撤去 — EDN 単一正本に戻す
 
 オーナー指摘「json? データ自体は edn ですよね?」を受けた訂正（衛星 repo main

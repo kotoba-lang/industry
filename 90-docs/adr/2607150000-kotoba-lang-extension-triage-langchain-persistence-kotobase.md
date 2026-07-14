@@ -366,6 +366,110 @@ kotoba`の出力diffに、`--entry`で指定していない`cloud-itonami`のpin
 手動抽出してcommit——`cloud-itonami`側のpin前進はそのまま外部に残し、当該セッションの
 判断に委ねた（未検証のまま自分のcommitに含めない）。
 
+## 2026-07-14 Addendum 4 — `kotoba-lang/compiler` に destructuring/vector-as-data/loop-recur を実装、多重arity `defn` は明示的に見送り
+
+Addendum 2 で `compiler/` に実装した `and`/`or`/`when`/keyword/map/`get`/`assoc`
+に続き、§Decision 1 のトリアージ表で `:add` 判定した残り項目のうち
+destructuring・vector-as-data・`loop`/`recur` を実際に `frontend.clj` に実装した
+（`7d27613`→`68c15a4`、`gh api .../merges`でサーバ側マージ、superproject外
+sibling worktree、branch/worktree cleanup完了、`manifest/west.yml`の`compiler`
+pinを`--entry`最小diffで前進済み: `7d27613c9a32`→`68c15a436333`）。
+
+**多重arity `defn` は今回のスコープから明示的に除外した**（トリアージ表は
+「追加すべき」としていたが、実装検討の結果、他の項目と違いフロントエンドだけ
+では完結しないと判断した）: 複数arityは`signatures`のシェイプ変更（関数名→
+複数パラメータリスト）・`validate-expr`の呼び出しarity解決・そして**WASMには
+関数名オーバーロードが無い**ため3バックエンド（`backend/wasm.clj`・
+`backend/x86_64.clj`・`backend/aarch64.clj`）すべてのexport命名規則に触れる
+必要がある——他の全項目が「フロントエンドのdesugarだけで3バックエンドに
+自動的に恩恵が及ぶ」という同じ構造だったのに対し、これだけがバックエンド
+横断の変更を要求する。価値に対してリスクが不釣り合いと判断し、別タスクとして
+先送りした。
+
+**実装した3項目**:
+
+- **destructuring**（let + defn params、1段のみ）: `[a b & rest]`は
+  `pair-first`/`pair-second`チェーン（`nth-pair-second`）への展開、
+  `{:keys [a b]}`は`get`ベースの展開。`defn`パラメータの destructuring は
+  「パラメータを一時シンボルに置き換え、bodyを`(let [pattern tmp] body)`で
+  ラップする」ことで`let`側の実装をそのまま再利用（新しい機構を増やさない）。
+  ネストしたパターン（`[[a] b]`等）は明示的に非対応で reject。
+- **vector-as-data**: `[1 2 3]`は既存`desugar-list`のpair-chainエンコーディングを
+  そのまま再利用——`(list 1 2 3)`と実行時表現が完全に一致する。`let`の
+  bindings vectorと`defn`のparams vectorは、それぞれ専用のcase分岐/
+  `analyze`内での事前消費によりこの汎用dispatchに落ちないことを確認済み。
+- **`loop`/`recur`**: コンパイラが合成する再帰ヘルパー関数へのdesugar
+  （`get`の`__kotoba_map_get`と同じ「合成ヘルパーの注入」パターンだが、
+  1回限りの固定名ではなく**loop出現ごとに1つ**）。ループ本体が外側スコープの
+  変数を参照する場合は`form-free-symbols`という**純粋に構文的な**自由変数
+  スキャンでヘルパーの追加引数として捕捉する——環境/シグネチャ認識は不要:
+  過剰/過小キャプチャのミスがあっても`validate-expr`の既存チェック
+  （`:unbound-symbol`/arity不一致）が確実にハードエラーとして検出する
+  （黙って誤動作することは無い、という設計）。
+
+**実装時に見つけて修正した3つの実バグ**（設計時点では見えていなかった、
+正直に記録する）:
+
+1. **`let`のbindings desugarバグ**: 従来`desugar-expr`の汎用default分岐
+   `(apply list op (map desugar-expr args))`が`let`のbindings vector**全体**を
+   1個の不透明な引数として`desugar-expr`に渡していた——vectorは`seq?`で
+   ないため無変更のまま素通りし、binding **値**側のmap/keyword/nested-vector
+   desugarを黙ってスキップしていた。`(let [m {:a 1}] (get m :a))`が
+   "value type is outside the safe profile"で失敗することをlive確認して
+   発覚。修正: `let`専用のcase分岐を追加し、各bindingパターンを
+   `destructure-binding`で展開しつつ値を明示的に`desugar-expr`する。
+2. **loop-helper名の再現性バグ**: 合成ヘルパー関数名に`gensym`（JVM
+   プロセスグローバルな単調カウンタ）を使っていた——`and`/`or`の
+   `gensym`済み一時変数名は`let`-localでWASMローカル変数indexに消去される
+   ため安全（同一プロセス内で2回コンパイルしてバイト列が一致することを
+   実測確認済み）だが、loop-helperは**exportされるトップレベル関数名**で
+   あり、WASMのexportセクションに文字列として直接焼き込まれる。同一
+   ソースを同一プロセス内で2回コンパイルすると**異なるバイト列**になる
+   ことをlive確認（oracle値は両方とも正しく一致していたにも関わらず）。
+   このcompilerが持つ「byte-for-byte再現可能ビルド」ゲートに反するため、
+   決定論的な`*loop-counter*`（`volatile!`、`analyze`呼び出し1回につき
+   1回だけbind、ソース全体で連番）に置き換えて修正。
+3. **上記2の修正中に見つかった遅延評価バグ**: `let`のbody desugarに
+   `(map desugar-expr body)`という**遅延** seqを使い、それを`list*`の
+   末尾引数として渡していた——`list*`は末尾引数を強制評価しない。ソース
+   全体に対する`*loop-counter*`の`binding`が終わった**後**（例えば
+   `uses-map-get?`の`analyze`後のtree walkが初めてそのlazy seqを強制する
+   タイミング）まで`desugar-expr`呼び出しが遅延され、`loop`が`let`の
+   body内にネストされている場合に`*loop-counter*`が既定値`nil`のまま
+   `(vswap! *loop-counter* inc)`が呼ばれ`NullPointerException`になることを
+   live確認。`mapv`（即時評価）に置き換えて修正。同種の遅延化ミスが他に
+   残っていないか`frontend.clj`全体の`map`/`list*`/`concat`/`cons`の
+   組み合わせを目視で洗い出し、他に同じ形の脆弱箇所は無いことを確認した。
+
+**検証（3経路、独立、Addendum 2と同じ規律）**:
+1. oracleインタプリタ（`ir.clj`の`execute`）— destructuring/vector-as-data/
+   loop/reproducibility全シナリオで期待値と一致。
+2. **実Chicory実行**（scratch検証、host-side pairヒープ実装）— `let`+map
+   バグ修正・loop/recur・vector destructuring・map destructuring・defn
+   パラメータdestructuring・複数loop・vector-as-dataの8シナリオすべてで
+   oracle値と実行結果が一致することを確認。
+3. `clojure -M:test`: **121 tests / 2764 assertions、0 failures/errors**
+   （既存96テスト + 新規`frontend_destructuring_loop_test.clj`25テスト）。
+   既存のfuzz/property/frontend-extensionsテストも無変更で通過。
+
+**正直に記録する限界・発見**:
+- destructuringが導入する`gensym`済みlet-local一時変数名
+  （`destr-map__NNN`等）はJVMプロセスグローバルなカウンタで、`analyze`
+  呼び出しごとにリセットされない——そのため同一ソースを3バックエンド分
+  連続コンパイルすると、生の`:kir`データ（コード生成**前**のHIR/IR）は
+  シンボル名が異なり**バイト同一にならない**（実測: 3つの`:kir`が
+  すべて異なる値）。これは実行時挙動には無害（let-localはWASMローカル
+  変数indexに消去されるだけで、`loop`単体のバイト再現性テストは別途
+  pass済み）だが、Addendum 2で確立した「map/get/assocは3バックエンド間で
+  `:kir`が完全一致する」というテストパターンをdestructuringにそのまま
+  適用できないことを意味する。新規テストではこの発見を正直に反映し、
+  `loop`単体（gensymを使わない）の`:kir`一致テストと、destructuring込み
+  ソースの`:oracle-value`一致テスト（`:kir`一致は要求しない）を分けて
+  記述した。
+- `loop`は「bindings + 1個の本体式」のみ対応（このprofileに`do`が無い
+  ため、`when`と同じ制約）。ネストしたloop、外側の`let`からの自由変数
+  キャプチャ、複数defn間でのヘルパー名の一意性はすべてテストで確認済み。
+
 ## References
 
 - 90-docs/adr/2607141600-kotoba-kotoba-lang-compiler-kototama-aiueos-consolidation-experiment.md
