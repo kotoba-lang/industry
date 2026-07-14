@@ -2666,13 +2666,21 @@
    :operating-states [:intake :survey :advise :treat :record :audit]},
   {:id "0220"
    :name "Logging"
-   :repo "https://github.com/gftdcojp/cloud-itonami-A0220"
-   :business-id "cloud-itonami-A0220"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0220"
+   :business-id "cloud-itonami-isic-0220"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :survey :advise :treat :record :audit]},
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as a logging-operations actor
+   ;; (LoggingAdvisor ⊣ Logging Coordination Governor), the ninety-ninth build
+   ;; outside ADR-2607032000's original insurance/real-estate batch. This is a
+   ;; safety-critical domain (real felling hazards, equipment weight, terrain
+   ;; risk). Back-office coordination only: all human actuation (especially
+   ;; felling decisions) remains exclusive to the logging crew/manager. Four
+   ;; HARD invariants guard scope: site/permit registration, :propose-only
+   ;; effect, no felling-equipment control, safety-hazards ALWAYS escalate
+   ;; (never auto-committed).
+   :operating-states [:intake :log :schedule :hazard :ship :audit]},
   {:id "0230"
    :name "Gathering of non-wood forest products"
    :repo "https://github.com/gftdcojp/cloud-itonami-A0230"
