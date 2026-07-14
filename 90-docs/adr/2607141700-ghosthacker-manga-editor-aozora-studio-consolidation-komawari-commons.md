@@ -365,3 +365,45 @@ Stop hook から3度目のフィードバック（Addendum 2 の実装進捗を�
 aozora-studio 側の実際の閲覧体験は ghosthacker の旧 Svelte 版と比べてセリフ表示面で劣化している
 ——次のフォローアップ（吹き出し/SFX/トーン描画の実装、ghosthacker export スクリプトへの
 komawari 幾何計算の追加）は本ADRの範囲外として引き継ぐ。
+
+## Addendum 4（2026-07-14 同日）— 吹き出し/SFX/トーン描画を実装、Addendum 3 の残課題を解消
+
+オーナー指示「speech-bubble/SFX/tone に対応して」を受け、Addendum 3 が明示的に開示していた
+残課題（セリフ表示面での視覚的劣化）を実装で埋めた。
+
+**スキーマ拡張**（`aozora.appview.manga/panel-entity`）: 既存の `:visual`/`:imageUrl`/`:rect`/
+`:tilt` と全く同じ「存在すれば assoc」パターンで `:gh.manga/dialogue`（`{:speaker? :text}`
+構造化配列——既存の `:yoro.post/text` へのプローズ折り込みとは独立、両方とも保持）・
+`:gh.manga/sfx`（文字列配列）・`:gh.manga/tone`（キーワード、`kami.mangaka.page` の
+`tone-bg!` と同じ語彙）を追加。ghosthacker の実データに sfx/tone フィールドが1件も
+存在しないことを確認済み（スキーマのみ先行、コンテンツは別課題として残る）。
+マージ: `gftdcojp/app-aozora@ba49d478`。
+
+**レンダラ実装**（`manga-viewer`）: `model.cljc` の `page-panels` が
+`:panel/dialogue`/`:panel/sfx`/`:panel/tone` を（geometry の有無と独立に）投影。
+`render.cljc` に `kami.mangaka.page` の Java2D 実装（`bubble`/`draw-sfx`/`tone-bg!`）に
+対応する CSS 版を実装:
+- 吹き出し: 白丸角ボックス + 黒枠 + CSS三角形の tail、発話順に左右交互配置
+  （Java2D 版と同じ `(even? idx)` ヒューリスティック）、上から積み上げ
+- SFX: 太字白文字 + `-webkit-text-stroke` 黒縁取り + 4方向 text-shadow フォールバック、
+  -8度回転
+- トーン: `:focus-lines`/`:radial-burst`/`:flash` → `repeating-conic-gradient`、
+  `:vignette-dark` → `radial-gradient`、`:gradient` → `linear-gradient`、
+  `:dot`/`:hatching` → repeating パターン。`:crowd-silhouette` は CSS での安価な等価物が
+  無いため意図的に未実装（`:none`/`:flat-white` と同じ no-op）。
+
+検証: `clojure -M:test` 21テスト77アサーション0失敗（新規5件）、`clojure -M:lint` 0エラー。
+視覚検証を2回実施（headless Chrome スクリーンショット）: (1) 実際の吹き出しテキスト・
+話者ラベル・左右交互配置・SFX が写真パネル背景に対して正しく描画されることを確認、
+(2) トーン3種（vignette-dark/hatching/focus-lines）を単色背景に対して描画し、画像内容と
+独立に CSS が正しく適用されることをクリーンに確認（放射状の集中線・斜線ハッチング・
+放射状ビネットいずれも意図通り）。マージ: `kotoba-lang/manga-viewer@75379a81`。
+
+これで Addendum 3 が開示していた「セリフが読めないページが生まれる」という懸念のうち、
+**吹き出しレンダリング能力自体は解消**した。残る2点: (1) ghosthacker 自身の export
+スクリプトはまだ `kami.mangaka.komawari/propose-page-layout` を呼んでおらず、実際に
+export される Ghost Hacker のページには今のところ geometry も dialogue-as-bubble も
+乗らない（今回の視覚検証も Addendum 2 と同様、合成テストデータによるパイプライン実証）、
+(2) sfx/tone は ghosthacker に実データが無い。ghosthacker の export スクリプトを実際に
+komawari 幾何計算 + 構造化 dialogue 出力に対応させる作業は、引き続き本ADRのフォローアップ
+として残る。
