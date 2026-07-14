@@ -929,7 +929,29 @@
       ;; before this edit on a freshly re-fetched origin/main
       ;; (concurrent-agent count-drift caution -- not an assumed fixed
       ;; number): 206 -> 207.
-      (is (= 207 (:implemented m))))))
+      ;; 207 -> 208: cloud-itonami-isic-1610 (Sawmilling and planing of
+      ;; wood) fresh from-scratch scaffold (no prior repo or reverted
+      ;; attempt existed; the entry's old :repo/:business-id pointed at a
+      ;; never-created gftdcojp/cloud-itonami-C1610 placeholder).
+      ;; SawmillAdvisor <-> Sawmill Plant Operations Governor sawmill-
+      ;; plant-operations-coordination actor mirroring
+      ;; cloud-itonami-isic-0220's [Logging] verified module shape
+      ;; (sawmilling.* in place of logging.*), with a genuinely new
+      ;; two-entity-kind independent verification gate (equipment for
+      ;; `:schedule-maintenance`, batch for `:coordinate-shipment` --
+      ;; 0220 has only one, site/permit) plus a kiln-schedule-finalize
+      ;; permanent block (in place of harvest-cut-plan-finalize) and a
+      ;; moisture-content-plausibility check (in place of species
+      ;; validation); 71 tests / 197 assertions green, independently
+      ;; re-verified against a fresh clone at merge commit
+      ;; e528229eb7f842b363822b39a7919ccda7d1f639; promoted
+      ;; :spec -> :implemented, superproject ADR-2607154200
+      ;; (cloud-itonami-isic-1610-sawmilling-coverage.md).
+      ;; Live-recomputed via `(industry/maturity-summary)` immediately
+      ;; before this edit on a freshly re-fetched origin/main
+      ;; (concurrent-agent count-drift caution -- not an assumed fixed
+      ;; number): 207 -> 208.
+      (is (= 208 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

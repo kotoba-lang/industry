@@ -3348,13 +3348,30 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1610"
    :name "Sawmilling and planing of wood"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C1610"
-   :business-id "cloud-itonami-C1610"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1610"
+   :business-id "cloud-itonami-isic-1610"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607154200): fresh from-scratch scaffold (no prior repo or
+   ;; reverted attempt existed at cloud-itonami/cloud-itonami-isic-1610;
+   ;; the old :repo/:business-id above pointed at a never-created
+   ;; gftdcojp/cloud-itonami-C1610 placeholder). SawmillAdvisor / Sawmill
+   ;; Plant Operations Governor, langgraph-clj StateGraph, append-only
+   ;; audit ledger.
+   ;; clojure -M:test: 71 tests / 197 assertions / 0 failures / 0 errors
+   ;; (verified from an independent fresh clone at merge commit
+   ;; e528229eb7f842b363822b39a7919ccda7d1f639). Safety-critical domain
+   ;; (saw-blade injury risk, kiln-fire risk, airborne wood-dust hazard).
+   ;; Back-office plant-operations coordination only: all equipment
+   ;; actuation remains exclusive to the human plant supervisor. Four
+   ;; HARD invariants guard scope: equipment/batch independent
+   ;; verification+registration + independent shipment-volume recompute,
+   ;; :propose-only effect, no saw/planer/kiln-equipment control /
+   ;; kiln-schedule finalization, closed op-allowlist; safety-concerns
+   ;; ALWAYS escalate (never auto-committed).
+   :operating-states [:intake :log :schedule :hazard :ship :audit]},
   {:id "1621"
    :name "Manufacture of veneer sheets and wood-based panels"
    :repo "https://github.com/gftdcojp/cloud-itonami-C1621"
