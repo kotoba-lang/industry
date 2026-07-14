@@ -6108,11 +6108,32 @@
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "6130"
    :name "Satellite telecommunications activities"
-   :repo "https://github.com/gftdcojp/cloud-itonami-J6130"
-   :business-id "cloud-itonami-J6130"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6130"
+   :business-id "cloud-itonami-isic-6130"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Registered directly at :implemented -- no prior :blueprint stage (unlike
+   ;; 6120's blueprint->implemented path). The legacy placeholder :repo
+   ;; (gftdcojp/cloud-itonami-J6130) was confirmed 404 before this edit --
+   ;; replaced with the real repo, following the SAME cloud-itonami/
+   ;; cloud-itonami-isic-#### naming convention as every other actor in this
+   ;; fleet. Satellite Operations Advisor ⊣ Satellite Network Governor actor
+   ;; (langgraph-clj StateGraph, MemStore + DatomicStore parity, Phase 0->3
+   ;; rollout), module shape mirrors cloud-itonami-isic-6190/6120 (same ISIC
+   ;; 61xx telecom industry) while citing satellite-licensing/ITU frequency-
+   ;; and-orbital-slot-coordination spec-basis (distinct regulatory regime
+   ;; from a terrestrial numbering plan or terrestrial mobile-spectrum
+   ;; license). satellite-number-invalid-format? is the THIRD application of
+   ;; this fleet's format/syntactic-validity check family (after 6190's
+   ;; e164-invalid-format? and 6120's msisdn-invalid-format?). 36 tests / 173
+   ;; assertions green, clj-kondo clean. Direct :spec -> :implemented
+   ;; promotion, no intermediate :blueprint commit -- matches this fleet's
+   ;; existing direct-promotion precedent (e.g. 4620, 2910; ADR-2607131000).
+   ;; See cloud-itonami-isic-6130's own docs/adr/0001-architecture.md and
+   ;; superproject ADR-2607141500. Closes the last ISIC Wave 0 class-level
+   ;; gap alongside "6391" (left untouched -- a possible concurrent sibling
+   ;; build).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "6201"
