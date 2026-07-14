@@ -7835,13 +7835,20 @@
    :operating-states [:intake :advise :govern :decide :hold :commit :request-approval]},
   {:id "8430"
    :name "Compulsory social security activities"
-   :repo "https://github.com/gftdcojp/cloud-itonami-O8430"
-   :business-id "cloud-itonami-O8430"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-8430"
+   :business-id "cloud-itonami-isic-8430"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :register :decide :notify :appeal :audit]},
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as a social security administration
+   ;; actor (SocialSecurityAdvisor ⊣ SocialSecurityGovernor), modeled
+   ;; closely on 8422 (Defence Procurement). Governance and safety discipline:
+   ;; intake/documentation/logging/appeals only; claim approval/denial/benefit
+   ;; calculation are permanently forbidden (hard invariants). See
+   ;; cloud-itonami-isic-8430/docs/adr/0001-architecture.md for the
+   ;; closed-allowlist design rationale and emphatic operational scope exclusion.
+   ;; ISIC Rev.5 class (4-digit) — social protection administration
+   :operating-states [:intake :advise :govern :decide :hold :commit :request-approval]},
   {:id "8510"
    :name "Pre-primary and primary education"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-8510"
