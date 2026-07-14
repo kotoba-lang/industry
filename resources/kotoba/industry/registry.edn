@@ -4360,29 +4360,33 @@
    :business-id "cloud-itonami-3510"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies [:optimization]
-   ;; Published as a :blueprint repo (business-model.md + operator-guide.md +
-   ;; blueprint.edn + governance docs, no src/test yet -- the OSS blueprint
-   ;; stage, not yet :implemented). :maturity :spec explicitly removed so
-   ;; maturity-of/maturity now auto-derive :blueprint from the real :repo
-   ;; above (see `kotoba.industry/maturity-of`). The legacy placeholder
-   ;; :repo (gftdcojp/cloud-itonami-D3510) never actually existed (confirmed
-   ;; 404 before this edit) -- replaced with the real repo, following the
-   ;; SAME cloud-itonami/cloud-itonami-isic-#### naming convention as every
-   ;; other actor in this fleet rather than the legacy D-prefixed scheme.
-   ;; Deferred at ADR-2607101400/2607101500/2607101600 pending careful
-   ;; distinguishing framing from cloud-itonami-isic-3512's own community
-   ;; renewable-GENERATION vertical; resolved this build by scoping this
-   ;; blueprint explicitly to grid TRANSMISSION/DISTRIBUTION operations
-   ;; (the wires business), a distinct regulated value-chain stage from
-   ;; generation in most jurisdictions. Governor keyword
-   ;; :grid-transmission-governor is grep-verified UNIQUE fleet-wide,
-   ;; distinct from 3512's own :grid-policy-governor. FOURTH distinct
-   ;; operating-states shape in this fleet (this vertical's own registry-
-   ;; declared intake->observe->recommend->dispatch->settle->audit, a
-   ;; grid-operations/market-settlement lifecycle) after the earlier
-   ;; service-dispatch, manufacturing and permit-based-trade shapes. No
-   ;; bespoke capability library exists for grid transmission/distribution
-   ;; specifically. See ADR-2607101800.
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented: Grid Distribution Advisor ⊣
+   ;; Grid Transmission Governor actor (src/grid/*.cljc, test/grid/*),
+   ;; covering customer/meter intake, identity verification, billing/
+   ;; service-dispute screening, new-service provisioning and service
+   ;; disconnection. Repo-layout modeled on cloud-itonami-isic-6130
+   ;; (this fleet's most recent repo-layout precedent at the time this
+   ;; build started); infrastructure/utility domain shape modeled on
+   ;; cloud-itonami-isic-3600 (this fleet's closest domain analog,
+   ;; checked explicitly -- neither 3600 nor 6130 models an analogous
+   ;; protected-recipient concept). protected-recipient-violations is
+   ;; this fleet's FIRST always-un-overridable HARD check: a meter
+   ;; flagged life-support/critical-infrastructure can never be
+   ;; disconnected, at any confidence level or human approval.
+   ;; capacity-over-threshold-violations is this fleet's SECOND
+   ;; asymmetric dual-actuation shape (after cloud-itonami-isic-6391),
+   ;; on a genuinely new value-driven (not op-kind-driven) dimension: a
+   ;; clean, under-threshold :actuation/provision-service may
+   ;; auto-commit at phase 3, the same proposal over the capacity
+   ;; threshold always escalates. :actuation/disconnect-service is
+   ;; permanently excluded from every phase's :auto set, enforced
+   ;; independently by both the governor's high-stakes set and the
+   ;; phase table. 42 tests/194 assertions run green before claiming
+   ;; :implemented, clj-kondo clean. First ISIC Wave 1 class promoted --
+   ;; ADR-2607121000's own explicit Top-10 value-ranking item #6. See
+   ;; ADR-2607101800 for this repo's own prior :blueprint-stage history
+   ;; and superproject ADR-2607142400 for this promotion.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :observe :recommend :dispatch :settle :audit]},
   {:id "3520"
