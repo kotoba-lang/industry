@@ -3126,12 +3126,13 @@
    :business-id "cloud-itonami-isic-1410"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :blueprint
-   ;; Promoted :spec -> :blueprint in the 衣食住 scaffold batch
-   ;; (ADR-2607122200): blueprint repo published (Community Apparel
-   ;; Manufacturing, :apparel-governor), no actor implementation
-   ;; claimed — wave-3 robotics-gated per ADR-2607121000. Stale
-   ;; gftdcojp C-prefix :repo URL replaced by the real satellite.
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as apparel manufacturing plant-operations
+   ;; actor (Apparel Plant Coordinator ⊣ Compliance Governor), wave-3 robotics-gated
+   ;; per ADR-2607121000. Plant-operations coordination: batch logging, maintenance
+   ;; scheduling, quality-defect flagging (always escalates), shipment coordination.
+   ;; Scope exclusion: NOT direct equipment operation (cutting/sewing machines, etc.)
+   ;; Jurisdiction coverage: Vietnam, Bangladesh, USA with official spec-basis citations.
    :operating-states [:intake :design :produce :inspect :package :audit]},
   {:id "1420"
    :name "Manufacture of articles of fur"
