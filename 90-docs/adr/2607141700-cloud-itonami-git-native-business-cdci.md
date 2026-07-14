@@ -383,3 +383,32 @@ cloud-itonami `7aed936a`。`cloud-itonami.ops-send` + `clojure -M:ops-send`
 実行=post-merge runner / 監査=audit ref)がすべて実装・E2E 検証済みになった。
 残: kotobase replica / P2P 配布(rad R2 待ち)、runner・drain の常駐化、
 org root key custody、merge 署名 UI、BMC 等他 lane への展開。
+
+## Addendum (2026-07-14, same day): org root key custody = kotoba-lang/kagi + kagitaba(オーナー決定)
+
+オーナー指示「org root key は kotoba-lang/kagi, kagitaba」により、custody の
+follow-up を確定・実装した。cloud-itonami `82c3c9ce`(`cloud-itonami.ops-keys`)。
+
+- **本番 seed は kagi PQC vault(kagitaba item model)に封緘**。ops-send の
+  seed spec は `kagi:<item>`(`kagi get` で都度解決、このプロセスは seed を
+  ディスクに書かない)。hex ファイルは dev fixture 専用に降格。
+- **`clojure -M:ops-send keygen <kagi-item>`** — 32-byte Ed25519 seed を生成し
+  stdin 経由で `kagi add` に封緘、**戻り値は公開 did:key のみ**。
+- **`clojure -M:ops-send mint-chain <seed-spec> <delegate-did> <out.edn>
+  <lanes-csv> [base|-] [days=90]`** — CACAO 委任 chain の mint/延長。
+  **expiry 必須・既定 90 日**(§3 の revocation floor をコードで既定化)。
+  sub-delegation は base chain 引数で(covers? により昇格不可)。
+- **unlock は kagi 側の責務のまま**(KAGI_MASTER / Apple Keychain)。本コードは
+  passphrase に触れない。
+- テスト: stub kagi CLI(argv/stdin/stdout 契約のみ模擬)で vault 往復・
+  did 一致・kagi 産 chain での実 merge・**day-89/day-91 の expiry 境界**・
+  sub-delegation の cap を検証(2 tests / 13 assertions、全ゲート baseline 同一)。
+
+**実鍵の bootstrap はオーナー操作**(kagi vault の unlock を要するため):
+```bash
+cd <kagi-vault-dir> && bin/kagi init            # 済みなら不要
+clojure -M:ops-send keygen itonami-org-root     # → did:key を ITONAMI_OPS_OWNER_DID へ
+clojure -M:ops-send keygen itonami-<dept>-head  # 部門ごと
+clojure -M:ops-send mint-chain kagi:itonami-org-root <head-did> <dept>-chain.edn <lane>
+```
+実行後、skill `secrets-location-map` に kagi item 名を追記すること(follow-up)。
