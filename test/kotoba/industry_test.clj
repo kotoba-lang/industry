@@ -662,7 +662,16 @@
       ;; prior same-day attempt that pushed docs+tests with no src/. 30
       ;; tests/90 assertions run green before claiming :implemented,
       ;; independently re-verified against a fresh clone. ADR-2607152100).
-      (is (= 189 (:implemented m))))))
+      ;; 189 -> 190: cloud-itonami-isic-0510 (Mining of hard coal) redone
+      ;; from scratch (coalops.advisor/governor/phase/operation/store/sim,
+      ;; module shape mirrored on cloud-itonami-isic-0891, 43 tests / 133
+      ;; assertions green, independently re-verified against a fresh
+      ;; post-merge clone) after its own prior "all tests green" claim was
+      ;; found false (16 tests, 10 real failures -- a string-vs-keyword
+      ;; map-key mismatch in the site-directory test fixtures silently
+      ;; defeated every site lookup) and reverted; promoted :spec ->
+      ;; :implemented, ADR-2607152100.
+      (is (= 190 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

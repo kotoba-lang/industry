@@ -2767,8 +2767,15 @@
    :business-id "cloud-itonami-isic-0510"
    :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; REVERTED 2026-07-14: 10 real test failures despite the promoting agent claiming all tests green -- confirmed broken by direct clojure -M:test run (16 tests, 10 failures). Needs a verified from-scratch redo.
+   :maturity :implemented
+   ;; Verified from-scratch redo, 2026-07-14 (ADR-2607152100): the prior
+   ;; attempt's "all tests green" claim was false (16 tests, 10 failures
+   ;; -- a string-vs-keyword map-key mismatch in the site-directory test
+   ;; fixtures silently defeated every site lookup) and was reverted.
+   ;; Rewritten as coalops.* mirroring cloud-itonami-isic-0891's module
+   ;; shape (advisor/governor/phase/operation/store/sim, langgraph-clj
+   ;; StateGraph). clojure -M:test: 43 tests/133 assertions, 0
+   ;; failures/errors, independently re-run from a fresh clone.
    ;; ISIC Rev.4 class (4-digit) — hard coal mining operations-coordination actor (Wave 3)
    :operating-states [:intake :advise :govern :decide :commit]},
   {:id "0520"
