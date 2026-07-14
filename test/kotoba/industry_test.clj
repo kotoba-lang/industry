@@ -140,6 +140,9 @@
     (is (= :blueprint (industry/maturity "7721"))))
   (testing "cloud-itonami-isic-7729, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "7729"))))
+  (testing "cloud-itonami-isic-6611-cryptoexchange, freshly published, is also :blueprint (live-state corroboration; FIRST role-suffix satellite id under an already-:implemented class — wave-of still resolves via the 66 division prefix)"
+    (is (= :blueprint (industry/maturity "6611-cryptoexchange")))
+    (is (= 0 (:wave (industry/maturity-roadmap "6611-cryptoexchange")))))
   (testing "a registry-only group entry is :spec"
     (is (= :spec (industry/maturity "011"))))
   (testing "a second implemented actor (cloud-itonami-isic-6810) is also :implemented"
@@ -425,12 +428,17 @@
       ;; actor claimed; wave-3 robotics-gated per ADR-2607121000) —
       ;; then 41 with 2100 pharmaceutical manufacturing
       ;; (ADR-2607122600, scaffold batch #2: the last gap from
-      ;; ADR-2607121000's follow-up list).
+      ;; ADR-2607121000's follow-up list), then 42 with
+      ;; 6611-cryptoexchange (ADR-2607141200): the FIRST role-suffix
+      ;; satellite entry under an already-:implemented class —
+      ;; incident-proof full-reserve crypto-asset exchange blueprint,
+      ;; no actor claimed, real-funds operation permanently gated on
+      ;; jurisdiction licensing + owner decision (INV-14).
       ;; This is not asserted as a fixed invariant; see
       ;; `industry/maturity-of`/`industry/maturity-roadmap-of` for how
       ;; the :blueprint branch logic itself stays unit-tested without
       ;; depending on a specific live count.
-      (is (= 41 (:blueprint m)))
+      (is (= 42 (:blueprint m)))
       ;; 114 = 113 + cloud-itonami-isic-4620, promoted directly from
       ;; :spec (never a :blueprint) -- agricultural/live-animal
       ;; wholesale trading actor. 115 = 114 + cloud-itonami-isic-2910,
