@@ -142,6 +142,33 @@ propose 2 → 承認 merge → `:errand/sent` → 以後 propose 0 / 早期 nudg
 `:license-ledger-path resources/licenses/itad-license-ledger.edn` を渡すだけ
 （既存 tick-loop 運用に相乗り）。
 
+## Addendum 2 — M1 実装完了（2026-07-14 同日。manimani `1203feaf` / itonami `787616b6`、worker deploy 済み `1b5163f3`）
+
+**manimani per-user seam**（宣言済み TODO の解消）: `user.cljc` + `/u/<handle>/*`
+routes（登録は admin gate、inbox/decisions は self/admin。per-user collection
+`u:<handle>:*` で既存グローバル面と分離、2-arity handle は back-compat）。
+token は M1 interim transport auth（CACAO 署名検証への昇格は M2）。
+**live 検証済み**: 登録 200 / 無認証 401 / 他人 401 / admin の decision 投稿 403 /
+self 投稿 201 + admin since-pull 200（テストレコードは検証後削除）。
+
+**org 側同期**（`license_manimani.cljc`）: org 主導の push（最小投影 assignment）+
+pull（decisions?since=cursor）→ evidence は kyoninka 検証合格時のみ writeback
+（**`:by` に manimani user の DID — 「同一人物・同一 DID」の実配線**）。不合格は
+ask-back を inbox へ push-back（台帳無変更）、declined は `:errand/declined`、
+todo/waiting は台帳に触れない。`license_effects/run-once!` の opts `:manimani`
+で tick-loop からそのまま運転。JVM E2E smoke: push 2 → 不正 evidence → ask-back
+→ 訂正 → validated + `:case/step-done(:by did:key:…)`。
+
+実測バグ 2 件を修正: ①routes の認可 gate が response を引数評価し **403 でも
+store 副作用が先に実行**されていた → thunk 化 ②deploy 直後の edge cache 谷で
+旧版 404 が混じる（itad で既知の現象 — 検証は版切替を跨いで 2 回）。
+
+**残タスク（owner 入力待ち）**: 実 user `junkawasaki` の登録には owner の実 DID
+（itonami 側 `GFTDCOJP_OWNER_DID` と同じ値）と user token の発行が必要 —
+値を捏造しないため未登録のまま。DID を貰えば
+`PUT /u/junkawasaki {:did … :token …}`（admin token は wrangler secret
+`MANIMANI_ADMIN_TOKEN`）で即有効化できる。
+
 ## Consequences
 
 - (+) 新しい UI をゼロから作らない: 組織 = 既存 cockpit approvals、個人 = 既存
