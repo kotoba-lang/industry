@@ -2715,10 +2715,15 @@
    :business-id "cloud-itonami-0311"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry :quota-tracking]
    :optional-technologies [:weather-forecasting :sea-state-monitoring :catch-quality-assurance]
-   :maturity :spec
-   ;; REVERTED 2026-07-14: the promoting agent pushed docs/ only -- no src/,
-   ;; no test/, no deps.edn. There is no real actor here at all. Repo link
-   ;; kept (real repo exists, just empty); needs a proper from-scratch redo.
+   :maturity :implemented
+   ;; Fishing-fleet back-office operations coordination actor (FishingOps
+   ;; Advisor ⊣ MarineFishingOperationsGovernor), coordination-only with
+   ;; permanent hard blocks on navigation/vessel-command/catch-decision ops
+   ;; and on quota exceedance (human-exclusive vessel-captain authority).
+   ;; Implements catch-record/quota logging, maintenance scheduling, safety
+   ;; escalation, supply ordering. clojure -M:test: 20 tests / 31 assertions
+   ;; green. ADR-2607151700 (corrects a prior docs-only, fabricated-report
+   ;; attempt reverted 2026-07-14).
    :operating-states [:intake :survey :advise :treat :record :audit]},
   {:id "0312"
    :name "Freshwater fishing"
