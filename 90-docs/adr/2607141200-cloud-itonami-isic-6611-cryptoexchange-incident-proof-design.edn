@@ -110,7 +110,16 @@
                 :portability "JVM-only (.clj), like wysiwys-btc — actuation-boundary compat layer; CLJS primary never pulls in eth-crypto (verified)"
                 :tests "round-trip real txs against eth-crypto's own rlp-encode + eip55-checksum; JVM 87 tests / 16993 assertions (+4), CLJS primary 71, clj-kondo 0 errors"}
     :follow-up "Safe-multisig execTransaction SafeTx struct-hash path (real destination inside calldata) — fails closed until implemented"
-    :note "with addendum 9 (BTC), both custody chains (BTC descriptor multisig / ETH Safe, custody ADR §1) now have a real WYSIWYS decoder; INV-14 unchanged; maturity :blueprint"}]
+    :note "with addendum 9 (BTC), both custody chains (BTC descriptor multisig / ETH Safe, custody ADR §1) now have a real WYSIWYS decoder; INV-14 unchanged; maturity :blueprint"}
+   {:addendum 11
+    :date "2026-07-14"
+    :title "Gnosis Safe execTransaction WYSIWYS decoding (ETH cold complete)"
+    :artifacts {:satellite-main "6b02c19"
+                :module "wysiwys-eth/decode-safe — ABI-decodes a Safe execTransaction calldata (selector 0x6a761202, verified vs eth-crypto keccak256) to the REAL inner destination: native (to,value) or nested ERC-20 transfer(address,uint256) (0xa9059cbb) (token,to,amount); DELEGATECALL (operation 1) and unrecognized inner calls fail closed; verify-safe feeds the custody kernel verifier-match flag (Bybit -> flag 0 -> code 6)"
+                :rationale "a Safe withdrawal's outer tx pays the Safe contract; the true recipient is inside the calldata, so a signer must confirm the inner destination not the Safe address"
+                :portability "JVM-only (.clj) actuation-boundary layer; CLJS primary never pulls it in (verified)"
+                :tests "build real execTransaction calldata + round-trip decode native / ERC-20 / delegatecall / unknown-inner; JVM 91 tests / 17011 assertions (+4), CLJS 71, clj-kondo 0"}
+    :note "completes the ETH-cold (Safe multisig) half of custody ADR §1's WYSIWYS; with addenda 9/10 both BTC and ETH cold custody verify direct + multisig/Safe. INV-14 unchanged; maturity :blueprint"}]
   :adr/decision-summary
   "{:audit \"cloud-itonami に cryptoexchange 未設計を実測確認 (2026-07-14): 金融 Wave0 18repo/industry registry/5-wave 計画のいずれにも crypto exchange なし\",
     :incident-register {:A1 \"顧客資産流用・混蔵 (FTX/Celsius)\" :A2 \"帳簿裏口・特権口座 (FTX allow_negative/Alameda 清算免除)\" :A3 \"支払不能の隠蔽 (Mt.Gox)\" :A4 \"ホットウォレット侵害 (Coincheck/Zaif/BitPoint)\" :A5 \"署名運用侵害・blind signing (DMM 2024/WazirX/Bybit 2025 Safe UI 改ざん)\" :A6 \"単一人物リスク (QuadrigaCX)\" :A7 \"exit scam (Thodex/Africrypt)\" :A8 \"AML/KYC 不備 (Binance 2023/BitMEX)\" :A9 \"市場操作・利益相反 (wash trading/insider listing/front-running)\" :A10 \"レバレッジ増幅 (FTX デリバ・清算カスケード)\"},
