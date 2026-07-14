@@ -2674,9 +2674,14 @@
    :business-id "cloud-itonami-isic-0210"
    :required-technologies [:forest-ecology :identity :forms :dmn :audit-ledger :scheduling]
    :optional-technologies []
-   :maturity :spec
-   ;; REVERTED 2026-07-14: missing deps.edn AND missing governor.cljc/store.cljc/advisor.cljc/registry.cljc (only operation/phase/sim exist) -- no real safety-gated actor here. Needs a verified from-scratch redo.
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-14 (see ADR-2607142200): a verified
+   ;; from-scratch redo completed the module set (governor.cljc/store.cljc/
+   ;; advisor.cljc/registry.cljc + deps.edn) after the prior REVERTED attempt.
+   ;; ForestryAdvisor ⊣ Forest Coordination Governor, langgraph-clj StateGraph,
+   ;; append-only audit ledger. clojure -M:test: 64 tests / 160 assertions / 0
+   ;; failures / 0 errors (verified from an independent fresh clone at commit
+   ;; 980e651). ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :survey :advise :treat :record :audit]},
   {:id "0220"
    :name "Logging"

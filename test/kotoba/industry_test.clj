@@ -681,7 +681,18 @@
       ;; revert; 37 tests / 124 assertions green, independently
       ;; re-verified against a fresh clone; promoted :spec ->
       ;; :implemented, ADR-2607151800.
-      (is (= 191 (:implemented m))))))
+      ;; 191 -> 192: cloud-itonami-isic-0210 (Silviculture and other
+      ;; forestry activities) promoted :spec -> :implemented
+      ;; (ForestryAdvisor <-> Forest Coordination Governor back-office
+      ;; coordination actor). Reverts a prior same-day attempt that
+      ;; scaffolded operation.cljc/phase.cljc/sim.cljc/tests but shipped
+      ;; no deps.edn and never implemented governor.cljc/store.cljc/
+      ;; advisor.cljc/registry.cljc -- no real safety-gated actor existed.
+      ;; Redone from scratch mirroring cloud-itonami-isic-0891/1010's
+      ;; module shape; 64 tests/160 assertions run green before claiming
+      ;; :implemented, independently re-verified against a fresh clone.
+      ;; ADR-2607142200.
+      (is (= 192 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
