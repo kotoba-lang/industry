@@ -838,6 +838,17 @@ lovdata.no(ノルウェー公式法令情報システム)を直接WebFetchで照
 (JPN/USA/GBR/DEU/FRA/CAN/AUS/KOR/NLD/ITA/ESP/SWE/NOR)全てを横断
 取得できることを確認。
 
+**push時のwest-pin-verify-guard再発と改善策**: 前tick(29)で新規worktree
+切り直しをした直後にもかかわらず、このtickのpushも同じガードで
+ブロックされた(occupation pinが1件、branch作成後にmain側で前進)——
+新worktreeを切っても、次のtickまでにmainがさらに進めば同じ問題が
+再発することが判明した。今回は worktree を切り直す代わりに、
+`git fetch --deepen=50 origin main`(shallow cloneの`unrelated
+histories`偽陽性をCLAUDE.mdの手順どおり解消)→ `git merge origin/main`
+(west.ymlはconflictなくfast-forward的に取り込まれ、自分の3ファイルとは
+一切衝突しない)で解決。以後のtickは**まずこのmerge手順を試し**、それでも
+失敗する場合のみworktree切り直しにフォールバックする。
+
 現状: 国軸13件・業界団体軸14件(9業種)・自治体軸4件——31tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
