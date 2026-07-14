@@ -2693,12 +2693,11 @@
    :operating-states [:intake :survey :advise :treat :record :audit]},
   {:id "0311"
    :name "Marine fishing"
-   :repo "https://github.com/gftdcojp/cloud-itonami-A0311"
-   :business-id "cloud-itonami-A0311"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0311"
+   :business-id "cloud-itonami-0311"
+   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry :quota-tracking]
+   :optional-technologies [:weather-forecasting :sea-state-monitoring :catch-quality-assurance]
+   :maturity :implemented
    :operating-states [:intake :survey :advise :treat :record :audit]},
   {:id "0312"
    :name "Freshwater fishing"
