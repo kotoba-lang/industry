@@ -97,7 +97,11 @@
                 :portability "JVM-only (.clj) — btc-crypto is byte-array-based; deliberate compat layer at the JVM actuation boundary (actor broadcast is JVM), NOT on the portable CLJS kernel path; CLJS primary gate verified to never pull in btc-crypto"
                 :tests "round-trip real txs against btc-crypto's own encoders + one real private key; JVM 83 tests / 16971 assertions (+6), CLJS primary 71, clj-kondo 0 errors"}
     :scope-honesty "the two-independent-toolchain WYSIWYS requirement is the production goal; shipped = one real decoder + the portable wysiwys stand-in for the byte-compare discipline. ETH (RLP/EIP-712) is a follow-up"
-    :note "replaces the wysiwys semantic stand-in for BTC; INV-14 unchanged; maturity :blueprint"}]
+    :note "replaces the wysiwys semantic stand-in for BTC; INV-14 unchanged; maturity :blueprint"}
+   {:addendum 8
+    :date "2026-07-14"
+    :title "commonalization — Merkle-sum extracted to kotoba-lang (see ADR-2607141400)"
+    :note "cryptoexchange.attest's Merkle-sum tree extracted to the shared lib kotoba-lang/merkle-sum (zero-dep portable .cljc, injected hasher), west-registered, attest depends on it (behavior identical, pinned roots unchanged). Also records that crypto/merkle primitives already live in kotoba-lang and that the 263-repo actor Store seam is a structural duplication left to a separate ADR. Authoritative detail: ADR-2607141400. (This edn entry was added out of order — the .md addendum 8 landed first; kept as addendum 8 to match the .md.)"}]
   :adr/decision-summary
   "{:audit \"cloud-itonami に cryptoexchange 未設計を実測確認 (2026-07-14): 金融 Wave0 18repo/industry registry/5-wave 計画のいずれにも crypto exchange なし\",
     :incident-register {:A1 \"顧客資産流用・混蔵 (FTX/Celsius)\" :A2 \"帳簿裏口・特権口座 (FTX allow_negative/Alameda 清算免除)\" :A3 \"支払不能の隠蔽 (Mt.Gox)\" :A4 \"ホットウォレット侵害 (Coincheck/Zaif/BitPoint)\" :A5 \"署名運用侵害・blind signing (DMM 2024/WazirX/Bybit 2025 Safe UI 改ざん)\" :A6 \"単一人物リスク (QuadrigaCX)\" :A7 \"exit scam (Thodex/Africrypt)\" :A8 \"AML/KYC 不備 (Binance 2023/BitMEX)\" :A9 \"市場操作・利益相反 (wash trading/insider listing/front-running)\" :A10 \"レバレッジ増幅 (FTX デリバ・清算カスケード)\"},
