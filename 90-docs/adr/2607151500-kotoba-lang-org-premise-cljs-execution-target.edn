@@ -602,6 +602,73 @@
          ancestry gap, then git merge --ff-only origin/main -- HEAD now
          correctly tracks origin/main's current tip and manifest/west.yml
          (and the ADR md/edn) reflect the actually-landed content again."}
+  :adr/compiler-cli-cljs-output-bug-fixed-2026-07-15
+  {:summary "While auditing kotoba-lang/compiler's own CLI (kotoba.compiler.
+             cli) for the same emit-CLI asymmetry addendum 7 fixed in
+             kotoba-lang/kotoba, discovered `compile --target cljs-kotoba-v1`
+             was ALREADY reachable from the CLI (compile-source already had
+             a (= backend :cljs-kotoba-v1) branch returning {:format :cljs/v1
+             ... :source \"...\"}) but silently BROKEN: the CLI's `compile`
+             command branched only on :wasm/v1 vs everything-else, and
+             unconditionally wrote (:artifact result) via write-edn! for the
+             else branch. A :cljs/v1 result has no :artifact key -- so this
+             wrote the literal text \"nil\" to --output while still
+             reporting {:ok true ...}. Reproduced live BEFORE fixing:
+             `compile demo.kotoba --target cljs-kotoba-v1 --output demo.cljs
+             && cat demo.cljs` printed exactly `nil`. Worse than a crash --
+             it silently succeeds while producing garbage, unlike kotoba/'s
+             own :cljs/emit-unsupported which at least surfaces as ok?=false."
+   :also-fixed "the default --output extension logic only distinguished
+                :wasm execution (.wasm) from everything else (.kexe) -- a
+                cljs target with no explicit --output additionally got the
+                wrong .kexe extension on top of the wrong (nil) content"
+   :fix
+   ["added atomic-output/write-text! -- writes a string's raw UTF-8 bytes
+     verbatim, unlike write-edn! which would pr-str/escape it into a quoted
+     EDN string literal, corrupting cljs source text that must stay
+     directly readable by a cljs host"
+    "compile's write step now (case (:format result) :wasm/v1 write-bytes!
+     :cljs/v1 write-text! (default) write-edn!) instead of an if/else that
+     silently swallowed :cljs/v1 into the artifact branch"
+    "default-extension logic gained a :cljs -> \".cljs\" case"]
+   :self-caught-process-mistake
+   "the first implementation attempt was accidentally made directly in the
+    shared checkout (orgs/kotoba-lang/compiler) instead of a sibling
+    worktree -- caught before landing, the diff was saved, the shared
+    checkout was reset via git checkout --, and the same change was redone
+    cleanly in a sibling worktree. Recorded honestly rather than omitted."
+   :verification
+   {:real-cli-plus-real-nbb
+    "reproduced the bug live before fixing (cat'd the corrupted \"nil\"
+     output), then after fixing ran the actual CLI process end-to-end
+     (clojure -M -m kotoba.compiler.cli compile ... --target cljs-kotoba-v1
+     --output <path>), placed the written file at the namespace-matching
+     path, and required + invoked it under REAL nbb (ClojureScript-on-Node)
+     -- confirmed 42 comes back, the same real-execution verification
+     standard as addendum 7, not just eval under plain JVM Clojure"
+    :committed-tests "3 new deftest in test/kotoba/compiler/cli_test.clj:
+                      the exact regression (writes real source, not the
+                      corrupted nil text, and the written text parses as
+                      genuine cljs forms), the default-extension fix, and a
+                      wasm32-target sanity check that write-bytes! itself is
+                      untouched by this change"
+    :full-suite "clojure -M:test: 148 tests / 2860 assertions (was 145/2848),
+                 0 failures/errors"}
+   :landed
+   {:repo "kotoba-lang/compiler" :commits "19275b7 -> d1dd2275ec75"
+    :method "sibling worktree outside superproject, gh api merges server-side
+             merge, branch+worktree cleanup"
+    :west-pin "compiler 19275b7722873ae41eb40be586ec3c94bd8716cf ->
+               d1dd2275ec75ec80335a272da654ed29349a9e80 -- this shared
+               checkout, unlike kotoba-lang/kotoba's, has no dual-gitdir
+               staleness problem; git merge --ff-only origin/main succeeded
+               cleanly. Pin advanced via the same hand-edit-single-line
+               pattern as addenda 6/7 after gh api compare confirmed
+               ahead_by=2, behind_by=0"
+    :files ["src/kotoba/compiler/atomic_output.clj (write-text!)"
+            "src/kotoba/compiler/cli.clj (compile command's format dispatch
+             and default-extension logic)"
+            "test/kotoba/compiler/cli_test.clj (3 new deftest)"]}}
   :adr/decision-not-made
   ["rewriting kotoba-lang's general-purpose libraries (langchain/langgraph/
     kotobase/UI layer) into .kotoba -- wrong shape, rejected on the same

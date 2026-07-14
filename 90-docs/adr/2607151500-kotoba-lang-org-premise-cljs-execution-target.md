@@ -590,6 +590,62 @@ detached状態のまま`origin/main`より4コミット遅れており、しか�
 `git fetch --deepen=20`→`git merge --ff-only origin/main`でsuperproject
 checkoutを正しく最新化した。
 
+## 2026-07-15 Addendum 8 — `kotoba-lang/compiler`のCLI `compile --target cljs-kotoba-v1`が出力を静かに壊していたbugを修正
+
+Addendum 7でkotoba-lang/kotoba側のCLI非対称性（cljs backendがテスト/REPL
+からしか届かない）を埋めた流れで、姉妹repo `kotoba-lang/compiler`
+（Addendum 1〜5でcljs backendを実装した、より成熟している側）自身の
+CLI（`kotoba.compiler.cli`）も同様に確認したところ、こちらは**CLIから
+既に`--target cljs-kotoba-v1`が受理される**ことが分かった
+（`compiler.core/compile-source`が`(= backend :cljs-kotoba-v1)`分岐を
+既に持ち、`{:format :cljs/v1 ... :source "..."}`を返す）——一見すると
+配線済みに見えた。
+
+しかし実際に`clojure -M -m kotoba.compiler.cli compile demo.kotoba
+--target cljs-kotoba-v1 --output demo.cljs`を実行し`cat demo.cljs`した
+ところ、ファイルの中身は文字通り**`nil`という4文字**だった——CLIの
+`"compile"`コマンドは`(:format result)`を`:wasm/v1`かそれ以外かの
+2分岐でしか見ておらず、それ以外（`:cljs/v1`含む）は無条件で
+`(atomic-output/write-edn! output (:artifact result))`を書いていた。
+`:cljs/v1`の結果に`:artifact`キーは存在しない（`:source`という別の
+キーに文字列が入っている）ため、`(:artifact result)`は`nil`——それが
+`pr-str`されてファイルに書かれていた。**`{:ok true ...}`を返しながら
+中身は壊れている**という、raiseされない分だけ`wasm emit`の
+`:cljs/emit-unsupported`より発見しにくい類の欠陥。加えて`--output`
+省略時の既定拡張子ロジックも`:wasm`実行か否かの2分岐（`.wasm`/`.kexe`）
+のみで、cljs targetには誤って`.kexe`が付いていた。
+
+**修正**: `atomic-output.clj`に`write-text!`を追加（文字列の生UTF-8
+bytesをそのまま書く——`write-edn!`のように`pr-str`でエスケープしない。
+生成されたcljsソーステキストを`pr-str`すると引用符付きEDN文字列
+リテラルに壊れてしまうため）。`cli.clj`の`"compile"`コマンドを
+`(:format result)`の`case`（`:wasm/v1`→`write-bytes!`、`:cljs/v1`→
+`write-text!`、それ以外→従来通り`write-edn!`）に書き換え、既定拡張子
+ロジックにも`:cljs`→`.cljs`の分岐を追加した。
+
+**検証**: 修正前に実際にbugを再現してから修正し、修正後は実CLI
+プロセス経由で`--output`にファイル書き出し→そのファイルを実`nbb`
+（ClojureScript-on-Node）で`require`して`main`を呼び出し、正しい値
+`42`が返ることを確認（Addendum 7と同じ「JVM Clojure evalではなく本物
+のcljs実行」の検証水準）。新規3 deftest（bugの直接再現テスト・
+既定拡張子テスト・`wasm32` targetが今回の変更で壊れていないことの
+sanity check）。`clojure -M:test`: 148 tests / 2860 assertions
+（修正前145/2848から+3/+12）、0 failures/errors。
+
+**着地時の作業ミスと訂正**: 実装の初回試行を誤って共有checkout
+（`orgs/kotoba-lang/compiler`）へ直接編集してしまったが、着地前に
+気付き、diffを退避→共有checkoutを`git checkout --`で復元→sibling
+worktreeで作業をやり直した（本ADR Addendum群が繰り返し記録してきた
+「共有checkout直接編集の禁止」原則からの一時的逸脱を、実害が出る前に
+自己訂正した実例）。
+
+**着地**: `kotoba-lang/compiler`、`main`→`d1dd2275ec75ec80335a272da654ed29349a9e80`、
+sibling worktree + `gh api .../merges`サーバ側マージ + branch cleanup。
+west pin更新: この共有checkoutは（`kotoba-lang/kotoba`と異なり）
+dual-gitdir問題を抱えておらず、`git merge --ff-only origin/main`が
+素直に成功した。pinはAddendum 6/7と同じ手動1行編集パターンで前進
+（`gh api .../compare`でahead_by=2, behind_by=0を確認済み）。
+
 ## References
 
 - 90-docs/adr/2607150000-kotoba-lang-extension-triage-langchain-persistence-kotobase.md
@@ -604,3 +660,6 @@ checkoutを正しく最新化した。
 - orgs/kotoba-lang/kotoba/test/kotoba/cljs_backend_test.clj（Addendum 6: 新規16 deftest）
 - orgs/kotoba-lang/kotoba/src/kotoba/launcher.clj（Addendum 7: `cljs-emit-result*`/`cljs-emit-result`/`cljs-result`、`kotoba cljs emit`のCLI配線）
 - orgs/kotoba-lang/kotoba/test/kotoba/launcher_test.clj（Addendum 7: 新規7 deftest）
+- orgs/kotoba-lang/compiler/src/kotoba/compiler/cli.clj（Addendum 8: `"compile"`コマンドの`:cljs/v1`分岐追加）
+- orgs/kotoba-lang/compiler/src/kotoba/compiler/atomic_output.clj（Addendum 8: `write-text!`新設）
+- orgs/kotoba-lang/compiler/test/kotoba/compiler/cli_test.clj（Addendum 8: 新規3 deftest）
