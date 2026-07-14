@@ -820,6 +820,27 @@ Readツールで直接確認(Toronto Municipal Code Chapter 545, Licensing:
 現状: 国軸12件・業界団体軸14件(9業種)・自治体軸4件——30tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 31 — 国軸13件目(NOR))
+
+`cloud-itonami-iso3166-nor`(既存の`marketentry`実装済みリポ)に
+`statute.facts`を追加・push
+([commit](https://github.com/cloud-itonami/cloud-itonami-iso3166-nor/commit/583d19c))：
+実在3法令(Lov om aksjeselskaper (aksjeloven) 会社法・LOV-1997-06-13-44・
+1999-01-01施行／Act relating to the processing of personal data
+(The Personal Data Act)・LOV-2018-06-15-38・2018-07-20施行／Working
+Environment Act・LOV-2005-06-17-62・2006-01-01施行)——3件とも
+lovdata.no(ノルウェー公式法令情報システム)を直接WebFetchで照合
+(fedlex.admin.chのようなJS-onlyではなく直接レンダリングされた)。
+既存organization.edn(ooyake由来)の首都(Oslo/Q585)もP36バグの影響
+なしと確認済み。28 tests/90 assertions green。
+
+32リポジトリ・642 factを統合。`:data-protection`トピックで13か国
+(JPN/USA/GBR/DEU/FRA/CAN/AUS/KOR/NLD/ITA/ESP/SWE/NOR)全てを横断
+取得できることを確認。
+
+現状: 国軸13件・業界団体軸14件(9業種)・自治体軸4件——31tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
