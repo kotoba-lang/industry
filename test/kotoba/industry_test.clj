@@ -643,7 +643,15 @@
       ;; 3020/3312/3313/3812/4100/4321/4322 all landed :implemented (this
       ;; assertion's own count-tracking had fallen behind several concurrent
       ;; agents' individual landings); corrected to the actual final total: 181.
-      (is (= 181 (:implemented m))))))
+      ;; A second Wave-3 batch of 18 fresh-scaffold agriculture/forestry/
+      ;; fishing/mining/food agents landed the same day; a post-hoc audit
+      ;; (real `clojure -M:test` runs, not agents' self-reports) found 11 of
+      ;; the 18 were broken (missing src modules, JVM-only interop bugs,
+      ;; real test failures, or unlanded registry commits) despite claiming
+      ;; green -- reverted those 11 back to :spec with reasons recorded on
+      ;; each entry. Genuinely verified good: 0321/0891/1020/1050/1200/1312.
+      ;; 181 -> 187.
+      (is (= 187 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
