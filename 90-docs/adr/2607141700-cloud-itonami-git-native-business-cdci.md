@@ -608,3 +608,22 @@ cloud-itonami `e6437585`。§3 の職務分掌は propose/approve までは鍵�
 - 成熟度表: 「runner bot の execute-only 鍵」gap を **D→K**(実鍵配備 + 実運用
   検証)。残 gap: kotobase replica / rad R2、merge 署名 UI、残 lane 委任、
   nbb 実送信、expiry check の自動アラート化。
+
+## Addendum (2026-07-14, same day): chain 失効の週次自動アラーム
+
+cloud-itonami `a78e8d50`。live loop の唯一の「黙って死ぬ」経路 —
+委任 chain が ≈2026-10-12 に失効して merge が通らなくなる — を自動監視化:
+
+- `scripts/expiry-alert.cljs`(nbb、read-only): `delegate-status` を読み、
+  warn 窓内 or 無効な chain があれば `~/.itonami/logs/expiry-alert.log` に
+  ACTION NEEDED 行 + fire-and-forget(detached/unref、絶対にブロックしない)
+  macOS 通知を出し **exit 1**、健全なら静かな OK 行 1 本。**rotate はしない**
+  (org root seed が要る人手 `ops-cli.cljs rotate <delegate>` のまま)。
+- `scripts/launchd/com.gftdcojp.itonami.expiry-alert.plist`: 毎週月 09:00。
+  **このマシンにインストール済み・稼働確認済み**(launchd 経由の実行で
+  3 chain fresh の OK 行を確認、exit 0)。alarm 経路も warn-days 3650 で
+  全 delegate を rotate 対象として列挙し exit 1 することを実測。
+- これで cloud-itonami の常駐 agent は 2 本(mail-drain 15 分、expiry-alert
+  週次)。運用は「10 月に通知が来たら rotate を打つ」だけ。
+- 成熟度表: 「expiry check の自動アラート化」follow-up を **完了**に。
+  残 gap: kotobase replica / rad R2、merge 署名 UI、残 lane 委任、nbb 実送信。
