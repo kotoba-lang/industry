@@ -551,6 +551,57 @@ destructuring/vector-as-data/loop-recur）→ Addendum 5（cloud-itonami
 governorの`.kotoba`移植、本ADRの発端だった安全性目的の実現）という
 5段階すべてが着地した。
 
+## 2026-07-14 Addendum 6 — `compiler/`の`assoc`が既存entryを本当に削除するよう修正（既知gapの解消）
+
+Addendum 2/4で正直に記録していた既知の限界——「`assoc`は同一keyへの重複割り当てで
+古い値を削除せず前置するだけ（`get`は先頭一致を返すため意味論上は正しいが、
+同じkeyへの`assoc`を繰り返すプログラムはメモリ効率が悪い）」——を実際に修正した
+（`4bd4a23`→`4e06992`、`gh api .../merges`でサーバ側マージ、west pin
+`--entry compiler`で前進済み: `0ab557e8b899`→`4e06992a0e92`）。
+
+**実装**: `get`の`__kotoba_map_get`と同じ「使用時のみ注入」パターンで
+`__kotoba_map_without`ヘルパーを新設——mapのpair-chainを走査し、指定keyに
+一致する既存entryを取り除きながら残りを再構築する再帰関数。`assoc`のdesugar
+を、新しいpairを前置する**前**にこのヘルパーで古いentryを取り除くよう変更した
+（key/valueは`gensym`済みlet-local一時変数に1回だけ束縛——2箇所で参照される
+key式の二重評価を避けるため、`and`/`or`の一時変数と同じ安全な使い方）。
+
+**検証（正直な発見を含む）**:
+1. **oracleでentry数を直接確認**——`(defn count-entries [m] (if (= m 0) 0
+   (+ 1 (count-entries (pair-second m)))))`という素朴な再帰を実際に`.kotoba`
+   ソースへ書き、2distinct-keyのmapに同一keyを3回re-assocした後の
+   entry数が**2のまま**（5に増えない）であることを確認。他keyの値も
+   re-assocの影響を受けないことも確認。
+2. **実Chicory実行**でも同じシナリオが一致することを確認（scratch検証）。
+3. `clojure -M:test`: 既存の`map-get-recursion-shares-the-existing-fuel-budget`
+   テスト（300回re-assocでfuel枯渇を検証）は**修正後も変わらず成立**する
+   ことを確認したが、その**理由が変わった**ことに注意——修正前は
+   「`get`の最終スキャンが肥大化したmapを歩く」ことがfuel枯渇の原因、
+   修正後は「`assoc`呼び出しごとに`__kotoba_map_without`がO(map size)の
+   再帰コストを払う」ことが原因。141 tests / 2841 assertions、0 failures
+   （並行して別セッションがmergeした`agent/aiueos-freestanding-targets`
+   PR由来の6テストも含む）。
+
+**正直に記録するトレードオフ（単純な「改善」ではない）**: この修正は
+「read側のコスト」を「write側のコスト」へ付け替えるものであり、全ての
+アクセスパターンで無条件に有利になるわけではない。ir.clj/backend/wasm.clj
+のheap実装は`pair`セルをdelete/GCしない（monotonicなallocationのみ）ため、
+`__kotoba_map_without`による「生存entryの再構築」は生存entry 1つにつき
+新しいpair cellを1つ消費する——つまり**assoc 1回あたりのheap消費は
+修正前のO(1)からO(map size)へ悪化する**。一方で読み取り（`get`）側の
+コストは、再assocの累積回数ではなく「distinct keyの実数」に上限される
+ようになった。想定される実運用（cloud-itonami governor的な、設定/状態を
+たまに書きたまに読むワークロード）ではこのトレードオフは正しい方向だが、
+「大きなmapに対してほぼ読み取らず大量に書き込み続ける」ワークロードでは
+heap容量（`pair-capacity`、既定4096）へむしろ早く到達しうる——単純な
+Pareto改善ではなく、正直に両面を記録する。
+
+**cljs backendとの相互作用の確認**: `assoc`のdesugarはfrontend層の変更
+なので、ADR-2607151500で新設した4番目のbackend（cljs）にも自動的に
+波及する——実際に`nbb`で同じentry-count検証シナリオを再実行し、一致
+することを確認した（cljs backendが独自にmap/assocのロジックを持たない
+ことの再確認にもなった）。
+
 ## References
 
 - 90-docs/adr/2607141600-kotoba-kotoba-lang-compiler-kototama-aiueos-consolidation-experiment.md
