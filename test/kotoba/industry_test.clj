@@ -714,7 +714,17 @@
       ;; verified module shape; 45 tests / 136 assertions green,
       ;; independently re-verified against a fresh clone; promoted
       ;; :spec -> :implemented, ADR-2607152300.
-      (is (= 195 (:implemented m))))))
+      ;; 195 -> 196: cloud-itonami-isic-0230 (Gathering of non-wood forest
+      ;; products) fresh scaffold (nwfp.governor/advisor/registry/store/
+      ;; phase/operation/sim, NwfpAdvisor <-> NWFP Gathering Coordination
+      ;; Governor back-office coordination actor, module structure
+      ;; mirrored from cloud-itonami-isic-0210 -- this fleet's closest
+      ;; domain analog). The prior gftdcojp/cloud-itonami-A0230 repo
+      ;; reference was never published (confirmed: repo did not exist).
+      ;; 66 tests / 161 assertions run green before claiming :implemented,
+      ;; independently re-verified against a fresh clone; promoted :spec ->
+      ;; :implemented, ADR-2607152400.
+      (is (= 196 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
