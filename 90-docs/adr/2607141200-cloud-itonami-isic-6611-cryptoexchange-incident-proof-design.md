@@ -206,6 +206,35 @@
 - maturity は `:blueprint` のまま（actor 未実装、INV-14 不変）。残る M3 =
   custody 統合詳細設計（MPC 選定・鍵セレモニー・WYSIWYS 手順書、実資金なし）。
 
+## Addendum 4（2026-07-14）: M3 完了 — 本 ADR の全マイルストーン完遂
+
+衛星 repo main `7248356`（衛星内 `docs/adr/0001-custody-integration-design.md`）。
+design-only、実資金・実鍵・mainnet custody なし（INV-14 不変）。要点:
+
+- **方式選定**: cold は on-chain 検証可能な multisig（BTC descriptor/miniscript
+  3-of-5、ETH Safe 3-of-5）— quorum ポリシー自体が公開検証可能で、PoR の
+  `:reserve-refs` と併せて「単独人物では動かせない」ことをアドレス形式が証明する
+  （anti-QuadrigaCX を运用約束でなくチェーンに置く）。hot（≤5% cap）は per-chain
+  native 2-of-3。MPC-TSS は評価済み（ZF FROST / dfns cggmp21 / tss-lib）だが
+  採用は保留、closed-SaaS custody は設計前提にしない。
+- **鍵セレモニー**: 5 keyholder（組織・地理分散）、鍵は各自の air-gapped signer 上で
+  生成し**いかなる時点でも一箇所に集まらない**、SLIP-39/steel 分散バックアップ、
+  セレモニー記録（descriptor + firmware hash）を監査台帳へ。
+- **dead-man recovery**: miniscript timelock（〜6ヶ月不活性で代替 4-of-7 が有効化）/
+  Safe recovery module。**チェーンが強制する**dead-man switch で、発動 = incident
+  として intake halt に配線。
+- **WYSIWYS 手順書**: `verifier-match-flag` を 1 にできるのは「独立 2 実装が
+  raw unsigned bytes から payload を再構成し byte 一致」の手順のみ。UI/PSBT
+  メタデータからの導出は禁止、署名デバイス上で導出値を確認、broadcast は kernel
+  全行 0 + interrupt-before human sign-off の後のみ（Bybit/DMM/WazirX 対策）。
+- **kernel wire-code 対応表**: hot-bp（運用目標 ≤300 / HARD 500）、quorum、
+  allowlist（追加は 48h cooling の propose→approve）、timelock（大口 24h）、
+  velocity（台帳 fold の 24h rolling — DMM 型一括流出は署名が揃っても code 7）。
+
+これで本 ADR の L0→L1→M1→M2→M3 は全て完遂。以降の実装（actor 本体・testnet
+リハーサル・:implemented 昇格）と実運用は、新規スコープの ADR と INV-14 ゲート
+（交換業登録 + owner 判断）の管轄であり、本 ADR からは自動連鎖しない。
+
 ## References
 
 - ADR-2607121000（逆トポソート 5-wave — 6611/6612「取引台帳」注記）
