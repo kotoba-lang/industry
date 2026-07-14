@@ -234,6 +234,64 @@ dispatcher未インストール時に`capability-denied`が投げられること
 引き続き正直な未対応事項として`backend/cljs.clj`のdocstringに記載
 したまま。
 
+## 2026-07-14 Addendum 2 — kotoba-lang-org内部のnarrow-slice port候補を実際に着地（`kototama.unspsc.life/prior-shortcut?`）
+
+本ADR着地時点で挙げた候補`kototama/clj/src/kototama/unspsc/capability.cljc`
+を実際に移植しようとしたところ、**候補選定自体が誤りだった**ことが判明した
+——`segment-capabilities`テーブルは`:pred pred`という形でpredicate
+**closureをmapの値として保存し、後から動的に呼び出す**構造になっており、
+これはまさにADR-2607150000のトリアージ表が明示的に却下した「一般の
+第一級関数/HOF」パターン（`infer-effects`の静的fixpointが任意のクロージャの
+未申告effectを検知できない、T2健全性違反）そのものだった。前回のExplore
+agentの調査は「`atom`/`defrecord`依存が無い」ことだけを確認しており、
+closure-in-data/HOFパターンの有無を見ていなかった——確認不足による誤った
+候補選定を、実装着手時に発見・訂正した。
+
+**訂正した候補**: 同じ`kototama/clj/src/kototama/unspsc/life.cljc`内の
+`prior-shortcut?`関数——純粋な整数/真偽値判定（`and`/`>=`/`=`の合成のみ、
+closure・atom・defrecord・多相ディスパッチ一切無し）で、`credit.kernels.
+gate.cljc`と全く同じ「safe-kotoba subset適合済み」の形をしている。
+さらに重要な点として、この関数は**実際に呼び出されている**
+（`kototama.unspsc.organism.cljc`の68行目、`life/prior-shortcut?`）——
+先に断念した`capability.cljc`の候補が実は**どこからも呼ばれていない**
+コードだったのとは対照的に、こちらは実利用中の判定ロジックである。
+
+移植を実施（`kotoba-lang/kototama`、`main`→`3d317f1`、`gh api .../merges`
+でサーバ側マージ、sibling worktree、branch cleanup完了、west pin
+`--entry kototama`で前進を試みたが後述の理由で手動パッチに切替: `a850a8db1d19`
+→`3d317f11a3ae`）。
+
+**唯一必要だった適応**: 元の関数は`consensus`という1つのmapを受け取り
+`(:dominant-status consensus)`を文字列`"authorized"`と比較する——`.kotoba`
+の安全サブセットには文字列等価比較演算が無い。4つの位置引数へ平坦化し、
+文字列比較は**呼び出し側**へ押し出した（`dominant-status-authorized`という
+0/1フラグをホスト側で事前計算してから渡す）——`wasm/affordability.kotoba`や
+cloud-itonami governor portが既に確立した「map/文字列比較をホスト境界へ
+押し出す」変換パターンをそのまま踏襲。
+
+**検証**: `kototama.unspsc.life-test`自身の`prior-consensus-parity`テストが
+持つ3つのoracleケース（mixed-status/empty-priors/all-authorized）を
+そのまま流用し、加えて4つの閾値境界ケース（outcome-count/confidence-
+permille/input-match-count/authorized各々のちょうど閾値・閾値未満）を
+追加。**実Chicory実行**（`test/wasm/prior_shortcut_test.clj`、host import
+不要——このモジュールはcapability/heap opを一切使わず`mem-i32-at`/算術/
+比較のみ）で全8ケースが一致。`clojure -M:test`: 44 tests / 230 assertions、
+既存スイート無変更で通過（新規4 deftest含む）。
+
+**west pin更新時の実務上の注意（正直に記録）**: `nbb scripts/gen-west-
+manifest.cljs --entry kototama`を実行したところ、**pin退行として拒否
+された**——共有checkout（`orgs/kotoba-lang/kototama`）が別の並行セッションに
+よって`pds/aozora`という無関係なWIPブランチにcheckoutされたままだったため、
+生成器が「ローカル子リポのHEAD」を見て「既存pinより後退している」と正しく
+検知しfailした。これは生成器の設計どおりの安全装置（pin退行を機械的に検出
+する）であり、バグではない——ただし生成器はローカルcheckoutのHEADを信用する
+設計なので、共有checkoutが目的のブランチ/commitにいない状況では使えない。
+対応: 実際に着地したmerge commit（`3d317f11a3ae`）が(1)実在し(2)`main`
+（default branch）から到達可能で(3)旧pinから前進していることを`gh api`
+（サーバ側full履歴）で個別に確認した上で、west.yml の該当1行だけを手動編集
+した——「登録・rename・pin前進は`--entry`で当該entryのみの最小diffを生成する」
+という原則の精神を、生成器が使えない状況でも手動で守った形。
+
 ## References
 
 - 90-docs/adr/2607150000-kotoba-lang-extension-triage-langchain-persistence-kotobase.md
