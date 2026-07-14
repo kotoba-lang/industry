@@ -2710,13 +2710,17 @@
    :operating-states [:intake :survey :advise :treat :record :audit]},
   {:id "0321"
    :name "Marine aquaculture"
-   :repo "https://github.com/gftdcojp/cloud-itonami-A0321"
-   :business-id "cloud-itonami-A0321"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :survey :advise :treat :record :audit]},
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0321"
+   :business-id "cloud-itonami-isic-0321"
+   :required-technologies [:identity :audit-ledger :dmn :forms]
+   :optional-technologies [:telemetry :sustainability-metrics]
+   :maturity :implemented
+   ;; Marine facility operations coordination actor (Aquaculture Advisor ⊣
+   ;; AquacultureOperationsGovernor), coordination-only with permanent hard
+   ;; blocks on treatment/harvest decisions (human-exclusive authority).
+   ;; Wave 3 production/aquaculture, implements stock logging, maintenance
+   ;; scheduling, health escalation, supply ordering. ADR-2607141400.
+   :operating-states [:intake :survey :advise :record :escalate :audit]},
   {:id "0322"
    :name "Freshwater aquaculture"
    :repo "https://github.com/gftdcojp/cloud-itonami-A0322"
