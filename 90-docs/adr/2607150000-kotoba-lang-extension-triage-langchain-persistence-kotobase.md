@@ -305,12 +305,74 @@ guest自身が管理するものではなく、既にホストインポート済
   確認済み）ため、まず土台となるheapプリミティブの追加が前提になる、
   より大きな別タスク。
 
+## 2026-07-14 Addendum 3 — 「kotoba/にもmap/keywordを実装する」を実際に着地
+
+「やはり kotoba/ にも map/keyword を実装する」という指示（`.kotoba`に安全ゲートが
+無いことを説明した上での判断）を受け、`kotoba-lang/kotoba`（`kotoba.runtime/
+compile-wasm-expr`）に `pair`/`pair-first`/`pair-second` + keyword/map literal +
+`get`/`assoc` を実装した（`68de254d8`→`dd2618067`、`gh api .../merges`で
+サーバ側マージ、west pin `--entry kotoba` で前進済み: `ecadee870a73`→
+`dd2618067fe2`）。
+
+**アーキテクチャ上の発見（compiler/とは異なる実装方針が必要だった）**:
+`kotoba-lang/compiler`は`pair`をホストインポート capability として実装していたが
+（Phase 2 Addendumで発見済み）、`kotoba-lang/kotoba`は最初から生の線形メモリ操作
+（`alloc`/`i32-store!`/`mem-i32-at`、既存プリミティブ）を guest に直接公開している
+——なので `pair` は新しい opcode もホストインポートも一切不要で、既存プリミティブへの
+`let`+ストア/ロードの desugar だけで実装できた（8バイト確保、left を offset 0、
+right を offset 4 に格納）。
+
+**`get`の実装がcompiler/と異なる点（正直な設計判断）**: compiler/の`__kotoba_map_get`は
+「使われた時だけ注入される再帰ヘルパー関数」だったが、`kotoba/`では`function-defs`の
+消費箇所が4箇所に分散しており、compiler/の`analyze`のような単一注入点が無い。そのため
+`get`は**固定深度32の展開（bounded unroll）**として実装した——再帰やfuel限界を使わず、
+m/k/defaultをそれぞれ`let`で1回だけ束縛してから最大32段の`if`チェーンを静的に生成する。
+32段を超える深さのmapに対する`get`のミスは、trap ではなく黙ってdefaultを返す
+（compiler/の「fuel超過でtrap」とは異なる、正直に文書化した既存の制約）。
+
+**検証**: `kotoba.runtime/wasm-binary` + `kotoba.wasm-exec/run-main`という、この
+repo自身の既存テスト（`wasm-and-or-when-test`/`wasm-exec-test`）と同じ実コンパイル→
+実Chicory実行経路で検証（別立てのscratchスクリプトではなく）。新規テストファイル
+`wasm_map_keyword_test.clj`（6 deftest）+ 既存`wasm_exec_test.clj`の
+「bare keyword/map は`:unsupported-form`」という古いアサーションを
+「今はcompileできる」に更新。
+
+**実測（クリーンな比較——共有checkoutに別セッションの未コミットWIPが混在していたため、
+detached-HEADの隔離workspaceで正しいbaseline commitに対して再実測した）**:
+baseline（`ecadee870`）227 tests / 1088 assertions / 20 failures / 1 error →
+本変更後 233 tests / 1123 assertions / **同じ20 failures / 1 error**（新規6テスト・
+35アサーションすべてpass、既存の失敗——`rad_adapter_test.clj`、無関係——は不変）。
+`clojure -M:lint`: エラー0・警告0。
+
+**着地時の運用上の注意（正直に記録）**: `orgs/kotoba-lang/kotoba`の共有checkoutには
+2つの別セッションの未コミットWIPが同時に存在していた（1: `test/kotoba/test_runner.clj`
+への`kotoba.semantic-code-test`登録+新規`semantic_code.clj`/`semantic_code_test.clj`、
+2: `src/kotoba/launcher.clj`+`docs/ADR-repository-boundaries.md`の変更）。1番目は
+自分も同じファイル（`test_runner.clj`）を触るため`git stash push -u -- <対象3ファイル>`
+で退避してからpin更新のcheckoutを行い、`git stash pop`で復元（3-way mergeで両者の
+追加行が衝突なく共存することを確認済み）。2番目には触れていない。**stash退避の
+前後で、別セッションが書きかけていたと見られる未追跡ファイル
+`docs/ADR-aiueos-boot-kernel-os-integration.md`が消失していたことに気付いた**——
+自分のcheckout操作が原因か、並行セッション自身の作業（rename/再生成中）によるものか
+特定できていない。未追跡ファイルのため git 側に復元手段は無い。オーナーへの報告事項
+として記録する（本ADRのスコープ外の別セッションの作業状況のため、これ以上の調査・
+対応はしていない）。
+
+**west.yml pin更新時のもう一つの注意**: `nbb scripts/gen-west-manifest.cljs --entry
+kotoba`の出力diffに、`--entry`で指定していない`cloud-itonami`のpinも含まれていた
+（別セッションによるローカルcheckoutの前進、`--entry`はVERIFICATIONのみをそのentryに
+限定し、WRITEの対象は絞らないという生成器の既知の挙動）。CLAUDE.mdの
+「wholesale再生成 commit 禁止」原則に従い、`git apply`で`kotoba`エントリの1行diffだけを
+手動抽出してcommit——`cloud-itonami`側のpin前進はそのまま外部に残し、当該セッションの
+判断に委ねた（未検証のまま自分のcommitに含めない）。
+
 ## References
 
 - 90-docs/adr/2607141600-kotoba-kotoba-lang-compiler-kototama-aiueos-consolidation-experiment.md
 - 90-docs/adr/2607141900-cloud-itonami-cljc-actors-kotoba-incompatibility-narrow-slice-porting-policy.md
 - 90-docs/adr/2607072600-cloud-itonami-isic-6492-kototama-tender-wasm-deploy.md
-- orgs/kotoba-lang/kotoba/src/kotoba/runtime.clj（`compile-wasm-expr`、`and`/`or`/`when`/`pos?`/`neg?`が現在compile可能であることのソース、`desugar-and`/`desugar-or`の移植元）
+- orgs/kotoba-lang/kotoba/src/kotoba/runtime.clj（`compile-wasm-expr`、`and`/`or`/`when`/`pos?`/`neg?`が現在compile可能であることのソース、`desugar-and`/`desugar-or`の移植元、`pair`/`pair-first`/`pair-second`/keyword/map/`get`/`assoc`の実装先）
+- orgs/kotoba-lang/kotoba/test/kotoba/wasm_map_keyword_test.clj（新規6テスト）
 - orgs/kotoba-lang/compiler/src/kotoba/compiler/frontend.clj（`desugar-expr`、`and`/`or`/`when`/keyword/map/`get`/`assoc`の実装先）
 - orgs/kotoba-lang/compiler/src/kotoba/compiler/backend/wasm.clj（`pair`/`pair-first`/`pair-second`がホストインポートであることの根拠）
 - orgs/kotoba-lang/compiler/test/kotoba/compiler/frontend_extensions_test.clj（新規16テスト）
