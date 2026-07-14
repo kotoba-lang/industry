@@ -7738,14 +7738,18 @@
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :register :match :dispatch :follow-up :audit]},
   {:id "8412"
-   :name "Regulation of the activities of providing health care, educ..."
-   :repo "https://github.com/gftdcojp/cloud-itonami-O8412"
-   :business-id "cloud-itonami-O8412"
+   :name "Health Care, Education, Cultural Services, Social Services Regulatory Administration"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-8412"
+   :business-id "cloud-itonami-isic-8412"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :register :decide :notify :appeal :audit]},
+   :maturity :implemented
+   ;; Upgraded from :spec to :implemented (ADR-2607142500).
+   ;; Regulatory agency administrative support (provider registration,
+   ;; inspection scheduling, compliance reporting, violation logging).
+   ;; Hard invariants: provider must be registered, no license decisions,
+   ;; no binding regulatory determinations. Escalations: violations, low confidence.
+   :operating-states [:intake :advise :govern :decide :request-approval :commit :hold]},
   {:id "8413"
    :name "Economic regulation and business compliance administration"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-8413"
