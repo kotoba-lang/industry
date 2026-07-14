@@ -1,0 +1,35 @@
+[{:adr/id "adr-2607131500-kotoba-lang-num-torch-metal-phase1-scope"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607131500: kotoba-lang num/torch — Phase 1 toward real Metal execution (not PyTorch parity)"
+  :adr/topic "kotoba-lang-num-torch-metal-phase1-scope"
+  :adr/status "accepted"
+  :adr/date "2026-07-13"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for ["kotoba-lang/num + kotoba-lang/torch Phase 1 scope fence (torch.ports/IBackend backed by num, conv2d kernel, small-model forward pass on Metal)"
+                          "correction: num's WGSL backend already runs verified real compute on Metal (S1/S3 done) — narrower gap than 'no Metal'"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related ["adr-2607131000-cloud-itonami-registry-repo-drift-scan"]
+  :db/id -1
+  :adr/decision-summary
+  "{:trigger \"owner asked to bring num/torch/comfyui-clj to ComfyUI-py/PyTorch-equivalent maturity, same session that fixed+sped up the real Python ComfyUI on the murakumo fleet\",
+    :measured-gap {:num-lines 744 :torch-lines 626 :comfyui-clj-lines 1309
+                   :real-comfyui-py-lines 239926
+                   :note \"PyTorch's own ATen/MPS kernel library not counted — multi-million-line C++/CUDA/Metal, ~1000x gap total, not a single-ADR task\"},
+    :correction {:prior-claim \"num Metal backend S2/unimplemented, CPU+WGSL-reference only\"
+                :actual (str \"WRONG — verify/metal_contract.js: 13/13 BLAS ops verified on real Apple M4 Metal via wgpu; \"
+                              \"verify/metal_pcg.js: real Jacobi-PCG Poisson solver converges on-GPU. num ADR-0001 S1+S3 already done. \"
+                              \"Actual gap: no conv2d kernel, no torch<->num wiring, num's own S2 (native MPS fast-path) unstarted.\")},
+    :phase1-in [\"num.wgsl conv2d kernel (CPU-reference + contract test + live-Metal verification, same rigor as existing 13)\"
+                \"torch.num-backend implementing torch.ports/IBackend for :linear :relu :conv2d :softmax\"
+                \"correctness: f32-tolerance match vs num.cpu oracle for a small fixed model\"
+                \"honest benchmark: num-Metal forward pass vs real PyTorch MPS on the murakumo fleet, same shapes\"],
+    :phase1-out [\"attention/transformer ops, U-Net-scale architecture, diffusion samplers, safetensors loading, any SDXL-class model\"
+                 \"autograd/training (forward-pass inference only)\"
+                 \"num's own S2 native Apple MPS-API fast path\"
+                 \"kotoba-lang/comfyui reimplementation (stays HTTP-orchestrating real Python ComfyUI via murakumo, unchanged)\"
+                 \"any claim of PyTorch/ComfyUI maturity parity on completion\"],
+    :not-urgent \"real diffusion-model inference speed already solved pragmatically this session (murakumo fix: ComfyUI 0.27.0 upgrade + dead-node detection + LaunchDaemon self-heal, ~3min/image on Metal/MPS, all 8 fleet nodes) — Phase 1 is a parallel foundation investment, not blocking anything\",
+    :implementation-status \"NOT started — this ADR is the scope fence only, a future session picks up the actual work\"}"}]
