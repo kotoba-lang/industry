@@ -385,6 +385,8 @@
     (is (= :implemented (industry/maturity "3510"))))
   (testing "cloud-itonami-isic-1061 (Manufacture of grain mill products, fresh scaffold -- the entry pointed at a never-created gftdcojp/cloud-itonami-C1061 placeholder repo; MillOpsAdvisor ⊣ Mill Governor plant-operations-coordination actor mirroring cloud-itonami-isic-1071's [Bakery products] verified module shape; mycotoxin-level-exceeded-violations is a genuinely new independently-verified physical check for this fleet's food-manufacturing cluster [per-product-type ppb ceiling, e.g. corn meal's stricter 20ppb aflatoxin limit vs. wheat flour's 1000ppb DON limit]; foreign-material-detected-violations and magnet-calibration-overdue-violations [90-day interval] are likewise new; also fixes a latent JVM-only `.indexOf` interop bug present in the mirrored cloud-itonami-isic-1071/src/bakeryops/phase.cljc reference [ClojureScript's PersistentVector does not implement `.indexOf`] with a portable keep-indexed-based helper) is also :implemented"
     (is (= :implemented (industry/maturity "1061"))))
+  (testing "cloud-itonami-isic-0145 (Raising of swine/pigs, fresh scaffold -- no prior blueprint repo; corrected from a task assignment that mislabeled this ISIC class as 0144 [which this registry, matching the real UN ISIC Rev.4 standard, correctly assigns to 'Raising of sheep and goats' -- the 0144 entry itself is untouched by this promotion]; SwineOpsAdvisor ⊣ SwineFarmOperationsGovernor swine-farm-operations-coordination actor mirroring cloud-itonami-isic-0141's [Raising of cattle and buffaloes] verified module shape module-for-module -- barn/pen facility registration in place of pasture, breed reference data [landrace/duroc/yorkshire/berkshire] in place of species, and a biosecurity/notifiable-disease reference vocabulary [ASF/CSF/FMD/PRRS] in place of generic disease citation; flag-animal-health-concern always escalates regardless of confidence, matching 0141's own animal-welfare-escalation invariant; superproject ADR-2607154000) is also :implemented"
+    (is (= :implemented (industry/maturity "0145"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -951,7 +953,17 @@
       ;; before this edit on a freshly re-fetched origin/main
       ;; (concurrent-agent count-drift caution -- not an assumed fixed
       ;; number): 207 -> 208.
-      (is (= 208 (:implemented m))))))
+      ;; 208 -> 209: cloud-itonami-isic-0145 (Raising of swine/pigs)
+      ;; promoted :spec -> :implemented (see `maturity-tier`'s own
+      ;; comment above for the 0144/0145 code-correction note --
+      ;; the task assignment mislabeled this class as 0144, which this
+      ;; registry, matching the real UN ISIC Rev.4 standard, correctly
+      ;; assigns to "Raising of sheep and goats"; that entry is
+      ;; untouched); superproject ADR-2607154000. Live-recomputed via
+      ;; `(industry/maturity-summary)` on a freshly re-fetched origin/main
+      ;; immediately before this edit (concurrent-agent count-drift
+      ;; caution -- not an assumed fixed number): 208 -> 209.
+      (is (= 209 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
