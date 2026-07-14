@@ -74,16 +74,16 @@
     (is (= :blueprint (industry/maturity "5610"))))
   (testing "cloud-itonami-isic-8030, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "8030"))))
-  (testing "cloud-itonami-isic-2660, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "2660"))))
+  (testing "cloud-itonami-isic-2660, promoted to :implemented (medical-device actor deployed)"
+    (is (= :implemented (industry/maturity "2660"))))
   (testing "cloud-itonami-isic-3812, now :implemented with real actor, was :blueprint (2026-07-14)"
     (is (= :implemented (industry/maturity "3812"))))
-  (testing "cloud-itonami-isic-2011, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "2011"))))
+  (testing "cloud-itonami-isic-2011, promoted to :implemented (basic-chemicals actor deployed)"
+    (is (= :implemented (industry/maturity "2011"))))
   (testing "cloud-itonami-isic-4321, now implemented, is :implemented (live-state corroboration)"
     (is (= :implemented (industry/maturity "4321"))))
-  (testing "cloud-itonami-isic-4322, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "4322"))))
+  (testing "cloud-itonami-isic-4322, promoted to :implemented (plumbing/HVAC actor deployed)"
+    (is (= :implemented (industry/maturity "4322"))))
   (testing "cloud-itonami-isic-5110, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "5110"))))
   (testing "cloud-itonami-isic-4911, freshly published, is also :blueprint (live-state corroboration)"
@@ -118,8 +118,8 @@
     (is (= :implemented (industry/maturity "3312"))))
   (testing "cloud-itonami-isic-3313, promoted from :blueprint, is also :implemented (live-state corroboration)"
     (is (= :implemented (industry/maturity "3313"))))
-  (testing "cloud-itonami-isic-1811, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "1811"))))
+  (testing "cloud-itonami-isic-1811, promoted to :implemented (printing actor deployed)"
+    (is (= :implemented (industry/maturity "1811"))))
   (testing "cloud-itonami-isic-1812, implemented, is :implemented (live-state corroboration)"
     (is (= :implemented (industry/maturity "1812"))))
   (testing "cloud-itonami-isic-8220, freshly published, is also :blueprint (live-state corroboration)"
@@ -455,7 +455,10 @@
       ;; 39 -> 38: cloud-itonami-isic-3812 promoted :blueprint ->
       ;; :implemented (Hazardous Waste Collection, HazardousWasteDispatch-LLM
       ;; advisor, HazardousWasteGovernor, langgraph-clj StateGraph, 2026-07-14).
-      (is (= 38 (:blueprint m)))
+      ;; Wave-3 batch (2026-07-14): 1010/1311/1410/1811/1812/2011/2100/2660/
+      ;; 3020/3312/3313/3812/4100/4321/4322 all promoted :blueprint ->
+      ;; :implemented, clearing the remaining blueprint-tier backlog to 25.
+      (is (= 25 (:blueprint m)))
       ;; 114 = 113 + cloud-itonami-isic-4620, promoted directly from
       ;; :spec (never a :blueprint) -- agricultural/live-animal
       ;; wholesale trading actor. 115 = 114 + cloud-itonami-isic-2910,
@@ -636,7 +639,11 @@
       ;; :implemented (Print Support Services, pre-press/bindery services actor).
       ;; 167 -> 168: cloud-itonami-isic-2011 promoted :blueprint ->
       ;; :implemented (Basic Chemicals Manufacturing, operations coordinator actor).
-      (is (= 168 (:implemented m))))))
+      ;; Wave-3 batch (2026-07-14): 1010/1311/1410/1811/1812/2011/2100/2660/
+      ;; 3020/3312/3313/3812/4100/4321/4322 all landed :implemented (this
+      ;; assertion's own count-tracking had fallen behind several concurrent
+      ;; agents' individual landings); corrected to the actual final total: 181.
+      (is (= 181 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
