@@ -1,0 +1,25 @@
+[{:db/id -1
+  :adr/id "adr-2607141550-persona-visual-user-test-react-loop"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607141550: persona ベースの visual / user test と feedback react loop"
+  :adr/topic "persona-visual-user-test-react-loop"
+  :adr/status "accepted, first iteration executed"
+  :adr/date "2026-07-14"
+  :adr/last_verified "2026-07-14"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["persona-conditioned visual/user test の 3 層配置: mechanism=kotoba-lang/design-quality(persona.cljc、:persona-visual 層)、catalog=各 product repo(personas.edn + persona-visual-ledger.edn)、operation=cloud-itonami(routine + Governor gate)"
+   "react loop の形: 内側 synthetic(Capture→Panel→Ledger→Reflect→Rank→Evolve、決定論 audit が gate)+ 外側 real-user(:telemetry 層で CVR/CPA を合流し persona を較正)"
+   "採点軸 6 つ(first-view-comprehension/trust/cta-findability/anxiety-resolution/readability/form-intent、1-5)と ledger イベント拡張(:eval/persona :eval/page)"
+   "itad の初期 5 persona(soumu-tanaka/jousys-sato/keiei-suzuki/isms-jimukyoku/mobile-searcher)"
+   "捏造ゼロの継承: persona feedback 由来でも保有しない実績・認証・顧客の声は Evolve で追加しない"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related
+  ["adr-2607141446-ai-gftd-itad-pc-disposal-certification"
+   "adr-2607132300-design-quality-score"
+   "adr-2606141500-keiei-arbor-coscientist-engine"
+   "network-isekai adr-0007-ux-coscientist-kaizen"]
+  :adr/decision-summary
+  "{:placement {:mechanism \"kotoba-lang/design-quality src/design_quality/persona.cljc\", :catalog \"product repo resources/personas.edn + docs/persona-visual-ledger.edn\", :operation \"cloud-itonami routine (follow-up)\"}, :new-repos 0, :ledger {:format :design-quality-eval-events, :extra-keys [:eval/persona :eval/page], :layer :persona-visual, :append-only true}, :axes [:first-view-comprehension :trust :cta-findability :anxiety-resolution :readability :form-intent], :scale [1 5], :loop {:inner [:capture :panel :ledger :reflect :rank :evolve], :gate :deterministic-audit-min-95, :outer [:telemetry :calibrate], :convergence :dry-2-rounds}, :personas [:soumu-tanaka :jousys-sato :keiei-suzuki :isms-jimukyoku :mobile-searcher], :honesty :no-fabricated-social-proof, :follow-ups [:three-judge-stdev :itonami-routine :telemetry-merge :persona-calibration]}"}]
