@@ -794,7 +794,30 @@
       ;; a first landing attempt hit a 409 because a sibling
       ;; cloud-itonami-isic-0113 promotion landed first and bumped the
       ;; baseline from 199 to 200).
-      (is (= 201 (:implemented m))))))
+      ;; 201 -> 202: cloud-itonami-isic-0322 (Freshwater aquaculture)
+      ;; fresh from-scratch scaffold (no prior actor existed -- the
+      ;; entry pointed at a never-created gftdcojp/cloud-itonami-A0322
+      ;; placeholder). Freshwater Advisor <-> FreshwaterAquacultureOperations
+      ;; Governor pond/tank/raceway operations-coordination actor
+      ;; mirroring cloud-itonami-isic-0321's [Marine aquaculture] verified
+      ;; module shape (no maritime-zone/vessel concepts; water-quality/
+      ;; pond-registration concepts instead), with an explicit closed
+      ;; op-allowlist hard check (`:unknown-operation`) strengthening the
+      ;; 0321 reference's implicit `op->effect`-lookup gap; 23 tests / 34
+      ;; assertions green, independently re-verified against a fresh
+      ;; clone; promoted :spec -> :implemented, superproject
+      ;; ADR-2607152600 (cloud-itonami-isic-0322-freshwater-aquaculture-
+      ;; coverage.md -- NOTE: this same 2607152600 timestamp slot was
+      ;; independently claimed the same day by the unrelated
+      ;; cloud-itonami-isic-0112 promotion above; both files exist under
+      ;; distinct full filenames with no path collision, left
+      ;; un-renumbered per this fleet's existing
+      ;; same-day-renumbering-is-normal precedent). Live-recomputed via
+      ;; `(industry/maturity-summary)` immediately before this edit on a
+      ;; freshly re-fetched origin/main (201, not assumed), after a first
+      ;; landing attempt against a now-stale base hit a 409 because the
+      ;; sibling cloud-itonami-isic-0112/0113 promotions landed first.
+      (is (= 202 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
