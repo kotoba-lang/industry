@@ -908,7 +908,28 @@
       ;; agent count-drift caution -- confirmed by the test runner itself,
       ;; `expected: (= 205 (:implemented m)) actual: (not (= 205 206))`,
       ;; not by a static grep): 205 -> 206.
-      (is (= 206 (:implemented m))))))
+      ;; 206 -> 207: cloud-itonami-isic-3700 (Sewerage) fresh scaffold (the
+      ;; entry pointed at a never-created gftdcojp/cloud-itonami-E3700
+      ;; placeholder, :required-technologies wrongly carried :robotics/
+      ;; :telemetry for what is a non-robotics back-office coordination
+      ;; actor). SewerOpsAdvisor <-> SewerageOpsGovernor municipal-
+      ;; sewerage-operations-coordination actor mirroring
+      ;; cloud-itonami-isic-0510's [Mining of hard coal] verified module
+      ;; shape (sewerops.* in place of coalops.*, facility in place of
+      ;; site), plus a genuinely new supply-cost-threshold escalate gate
+      ;; on `:order-supplies` (a high-value procurement proposal always
+      ;; escalates for human budget sign-off, independent of rollout
+      ;; phase or confidence) alongside the mirrored pump/valve-control
+      ;; and public-health-authority-discharge-decision scope-exclusion
+      ;; blocks; 48 tests / 147 assertions green, independently
+      ;; re-verified against a fresh clone; promoted :spec -> :implemented,
+      ;; superproject ADR-2607153900
+      ;; (cloud-itonami-isic-3700-sewerage-coverage.md).
+      ;; Live-recomputed via `(industry/maturity-summary)` immediately
+      ;; before this edit on a freshly re-fetched origin/main
+      ;; (concurrent-agent count-drift caution -- not an assumed fixed
+      ;; number): 206 -> 207.
+      (is (= 207 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

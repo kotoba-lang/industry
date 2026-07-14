@@ -4648,11 +4648,19 @@
    :operating-states [:intake :verify :provision :suspend :audit]},
   {:id "3700"
    :name "Sewerage"
-   :repo "https://github.com/gftdcojp/cloud-itonami-E3700"
-   :business-id "cloud-itonami-E3700"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3700"
+   :business-id "cloud-itonami-isic-3700"
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Verified from-scratch build, 2026-07-15 (ADR-2607153900):
+   ;; SewerOpsAdvisor - SewerageOpsGovernor langgraph-clj StateGraph,
+   ;; back-office operations coordination only (never direct pump/valve
+   ;; actuation, never a public-health-authority discharge decision).
+   ;; Corrected :repo/:business-id from a stale gftdcojp/E3700 placeholder
+   ;; and dropped :robotics/:telemetry (this is a non-robotics
+   ;; back-office coordination actor, matching blueprint.edn's
+   ;; :itonami.blueprint/robotics false).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :observe :treat :publish :audit]},
   {:id "3811"
