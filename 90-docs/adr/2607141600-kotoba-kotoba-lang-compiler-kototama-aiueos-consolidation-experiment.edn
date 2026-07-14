@@ -188,6 +188,27 @@
                 attempted."
    :code-changed false
    :repos-touched []}
+  :adr/phase-3-2026-07-14
+  {:summary "Resolved Phase-1 follow-up item 1: kotoba-lang/compiler was still
+             unregistered in the west manifest. Found manifest/repos.edn's
+             :extra-projects already listed it (landed via a CONCURRENT
+             session's unrelated 'kyoninka' ITAD-licensing commit ed0e4a844473,
+             found via git log -S pickaxe search) -- but manifest/west.yml (the
+             generated artifact) had not caught up. Generated the missing
+             west.yml entry only; repos.edn needed no further edit."
+   :method "nbb scripts/gen-west-manifest.cljs --entry compiler (verify-west-pins
+            confirmed pin 26ff5233b569 reachable from main), sibling worktree
+            chore/west-register-kotoba-lang-compiler, gh api merges server-side
+            merge, branch+worktree cleanup -- same procedure as Phase 1/2"
+   :landed {:commit "8e775c6d4f0d" :entry {:name "compiler" :remote "kotoba-lang"
+                                            :path "orgs/kotoba-lang/compiler"
+                                            :revision "26ff5233b56950f8ae95390e35cb7e2d71aee87c"}}
+   :remaining-followup "item 3 from :adr/phase-1-2026-07-14's handoff note --
+                         whether kotoba/'s friendly surface grammar and
+                         compiler/'s gated KIR grammar should ever be
+                         reconciled -- is a language-design decision, not a
+                         mechanical task, and remains deferred to a future
+                         session/ADR."}
   :adr/decision-not-made
   ["no git repository merge across the 5 repos -- west/manifest keeps 5 independent entries"
    "no kotoba-lang/kotobascript repo -- reaffirms prior-turn analysis that .kotoba's

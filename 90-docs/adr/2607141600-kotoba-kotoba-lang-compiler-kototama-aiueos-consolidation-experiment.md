@@ -357,3 +357,36 @@ wire a HostFunction — proof-of-pattern, not shared code.」
 スコープに含めていない項目（`kotoba-lang/compiler` の west 正式登録、`kotoba/`
 と`compiler/`の2つの異なる文法をいつか統合するか否かの決定）は Phase 1
 Addendum の「引き継ぎ」節にある通り、別ADR/別セッションに委ねる。
+
+## 2026-07-14 Addendum 3 — `kotoba-lang/compiler` の west 正式登録（引き継ぎ項目1の解消）
+
+「次、どちらをやるか」を尋ねたところ「Register kotoba-lang/compiler in west」の指示を
+受け、Phase 1 Addendum が引き継ぎ項目としていた `kotoba-lang/compiler` の west manifest
+未登録状態を解消した。
+
+着手時点で判明した事実: `manifest/repos.edn` の `:manifest.repos/extra-projects` には
+既に `"orgs/kotoba-lang/compiler"` が含まれていた——`git log -S'"orgs/kotoba-lang/
+compiler"' -- manifest/repos.edn` で追跡すると、直前に着地していた**無関係な**
+`kyoninka`（ITAD許認可手続き, ADR-2607141620）commit（`ed0e4a844473`）が同時に追加して
+いた。並行セッションが同じギャップに気付き先に着手していたと見られる。一方
+`manifest/west.yml` 側にはまだ `name: compiler` エントリが生成されておらず（
+`repos.edn` は手書きポリシー、`west.yml` は生成物——前者の追加だけでは後者は自動で
+追従しない）、`nbb scripts/gen-west-manifest.cljs --entry compiler` は "新規 entry"
+として実行できる状態だった。
+
+実施: `--entry compiler` で最小 diff 生成（`verify-west-pins.cljs` が pin
+`26ff5233b569`（Phase 1 で押した README doc-fix merge commit と同一）を「main から
+到達可能」と検証済み）。superproject 外の sibling worktree
+（`chore/west-register-kotoba-lang-compiler`）で commit・push・`gh api .../merges`
+サーバ側マージ・branch/worktree cleanup、という Phase 1/2 と同じ手順。`repos.edn` 側は
+既に main にあったため無変更（重複追記していない）。
+
+**着地**: `manifest/west.yml` に `compiler`（`kotoba-lang/compiler`,
+`orgs/kotoba-lang/compiler`, `26ff5233b56950f8ae95390e35cb7e2d71aee87c`）が
+登録された（`8e775c6d4f0d`）。`west update` で他 project 群と同様に同期対象になる。
+
+**残る引き継ぎ項目**（Phase 1 Addendum 記載のまま、未着手）: `kotoba/` の友好的
+surface文法と `compiler/` のゲート付きKIR文法をいつか統合するか、明示的に「2つの
+異なる profile」として設計文書化するかの決定——これは west 登録のような機械的作業
+ではなく、言語設計判断そのものなので、引き続き別セッション・（必要なら）別 ADR に
+委ねる。
