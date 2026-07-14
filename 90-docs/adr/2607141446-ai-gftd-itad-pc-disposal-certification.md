@@ -127,6 +127,32 @@ Live 検証（2026-07-14）: `GET /` → 200 text/html、invalid POST → 400 +
 
 Follow-up 1（gftd.co.jp 配置）は「itad.gftd.ai からの移設 or 併設の決裁」に読み替える。
 
+## Addendum 2 — 日本型 CV 特化 LP への全面改稿 + SVG 画像（2026-07-14 オーナー指示）
+
+オーナー提示の参考 LP（恒栄 lp_03 / まもるくん pc-disposal / パソコン廃棄.com
+certificate）を実際に読み、日本の CV 特化 LP の型で全面改稿して再デプロイした
+（version `d64f7c11`）。採用した型: 不安→安心の心理遷移（悩みチェックリスト→
+選ばれる 3 つの理由）、セクション末尾ごとの CTA 反復（まもるくん式「課題→解決→
+根拠→CTA」モジュール）、○△× 比較表、対応機器グリッド、モバイル追従 CTA バー。
+**証明書見本の提示は参考 3 サイトのいずれも欠いており差別化点**として SVG モックで
+実装（記載項目 + 検証ハッシュ + 「見本」透かし）。**実績数値・認証バッジ・顧客の声は
+保有していないため一切使わない（捏造ゼロ）** — 使える正直な訴求（回収 0 円〜 /
+1 台から / NIST SP 800-88 / 検証可能な台帳）だけで構成。
+
+画像: 生成モデル API 不可（`api.murakumo.cloud` images 404/503 実測）のため、
+`art.cljc` に `--hig-*` トークン連動のインライン SVG（hero イラスト・証明書見本・
+ステップ / 機器アイコン・比較マーク）として実装。ダークモード自動追従・raw hex
+ゼロ・外部リクエストゼロ。
+
+実装知見: ①比較表は自社列（○ 列）を先頭に置く — モバイルの横スクロールで自社列が
+画面外に切れる実測。②liquid-glass checkbox の box（@layer 内 width:20px）が
+headless/dark 環境で潰れて描画される実測 → app 層（unlayered）でサイズ・背景・
+枠・間隔を明示する consumer fix。③Cloudflare 静的 assets はデプロイ直後に旧版
+cache HIT の谷がある — 描画検証はキャッシュ切替を跨いで 2 回撮る。
+
+design-quality audit 100.00 維持。live スクリーンショット（mobile 390px /
+desktop 1280px、headless Chrome — フォーカス非奪取）で全セクション視認済み。
+
 ## Follow-ups
 
 1. gftd.co.jp の配置決定（root 置換 or `/itad`）+ Cloudflare Pages/Workers deploy。
