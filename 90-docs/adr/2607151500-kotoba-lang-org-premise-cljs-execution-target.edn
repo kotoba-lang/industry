@@ -180,6 +180,79 @@
    :remaining-gap "i64 wraparound parity via BigInt remains deferred, out
                     of scope for this addendum -- still documented honestly
                     in backend/cljs.clj's own docstring"}
+  :adr/internal-narrow-slice-port-2026-07-14
+  {:summary "Landed the kotoba-lang-org-internal narrow-slice port
+             candidate this ADR named at initial landing. That original
+             candidate (kototama.unspsc.capability's segment-capabilities
+             table) turned out to be a WRONG candidate selection, discovered
+             at implementation time, not before: it stores predicate
+             CLOSURES AS DATA (keyed by UNSPSC segment) -- exactly the
+             general first-class-function/HOF pattern ADR-2607150000's
+             triage explicitly rejected (breaks infer-effects' static
+             fixpoint soundness). The earlier Explore agent's vetting only
+             checked for atom/defrecord absence, not closure-in-data/HOF
+             shape -- an incomplete candidate-selection process, corrected
+             here rather than hidden."
+   :corrected-candidate
+   "kototama.unspsc.life/prior-shortcut? (same file family, life.cljc) --
+    pure integer/boolean decision (and/>=/= composition only, no closures/
+    atoms/defrecords/polymorphic dispatch), same safe-kotoba-subset shape
+    as credit.kernels.gate.cljc. Additionally has a REAL call site today
+    (kototama.unspsc.organism.cljc line ~68) -- unlike the abandoned
+    capability.cljc candidate, which turned out to have NO call site
+    anywhere in the kototama codebase."
+   :adaptation
+   "the source function takes one consensus map and compares
+    :dominant-status against the string \"authorized\" -- .kotoba's safe
+    subset has no string-equality op. Flattened to 4 positional scalar
+    args, with the string comparison pushed to the CALLER as a precomputed
+    0/1 flag -- same map/string-to-host-boundary convention
+    wasm/affordability.kotoba and the cloud-itonami governor port already
+    established."
+   :verification
+   {:oracle-reuse "every case in kototama.unspsc.life-test's own
+                   prior-consensus-parity test (mixed-status/empty-priors/
+                   all-authorized) reused directly, translated to the
+                   flattened-scalar ABI, plus 4 new threshold-boundary
+                   cases"
+    :real-chicory-execution "test/wasm/prior_shortcut_test.clj hosts the
+                             compiled wasm directly via a real Chicory
+                             Instance (zero host imports needed -- this
+                             module only uses mem-i32-at/arithmetic/
+                             comparison, no capability/heap ops)"
+    :full-suite "clojure -M:test (clj/ subtree): 44 tests / 230 assertions,
+                 0 failures (existing suite unaffected)"}
+   :west-pin-hygiene-note
+   "nbb scripts/gen-west-manifest.cljs --entry kototama REJECTED the pin
+    advance as a regression -- the shared orgs/kotoba-lang/kototama
+    checkout was on an unrelated concurrent session's WIP branch
+    (pds/aozora) at the time, so the generator's local-checkout-HEAD-based
+    freshness check correctly (this is the generator's designed safety
+    behavior, not a bug) flagged what looked like backward movement.
+    Verified the actual landed merge commit (3d317f11a3ae) independently
+    via gh api (exists, reachable from main/default branch, ahead of the
+    old pin) before manually editing west.yml's single kototama line --
+    preserving the --entry minimal-diff principle by hand when the
+    generator itself couldn't be used."
+   :landed
+   {:repo "kotoba-lang/kototama" :commits "main -> 3d317f1"
+    :method "sibling worktree outside superproject (with sibling
+             kotoba-lang/langgraph and kotoba-lang/langchain mirrored via
+             symlink to satisfy clj/deps.edn's :local/root paths for a full
+             offline test run), gh api merges server-side merge, branch
+             cleanup"
+    :west-pin "kototama a850a8db1d19 -> 3d317f11a3ae (manual single-line
+               edit after independent gh api verification, generator's own
+               --entry check unusable this time -- see hygiene note above)"
+    :files ["clj/deps.edn (chicory added to :test alias :extra-deps)"
+            "clj/wasm/prior_shortcut.kotoba (new)"
+            "clj/wasm/prior_shortcut.wasm (new, compiled via bin/kotoba-clj)"
+            "clj/wasm/README.md (new)"
+            "clj/test/wasm/prior_shortcut_test.clj (new, 4 deftest)"]}
+   :honest-limitation "not wired into kototama.unspsc.organism's actual
+                        call site -- compile+verify only, mirroring how
+                        the cloud-itonami governor port kept those as
+                        separate steps"}
   :adr/decision-not-made
   ["rewriting kotoba-lang's general-purpose libraries (langchain/langgraph/
     kotobase/UI layer) into .kotoba -- wrong shape, rejected on the same
