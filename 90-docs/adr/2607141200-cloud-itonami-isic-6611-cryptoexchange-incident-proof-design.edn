@@ -101,7 +101,16 @@
    {:addendum 8
     :date "2026-07-14"
     :title "commonalization — Merkle-sum extracted to kotoba-lang (see ADR-2607141400)"
-    :note "cryptoexchange.attest's Merkle-sum tree extracted to the shared lib kotoba-lang/merkle-sum (zero-dep portable .cljc, injected hasher), west-registered, attest depends on it (behavior identical, pinned roots unchanged). Also records that crypto/merkle primitives already live in kotoba-lang and that the 263-repo actor Store seam is a structural duplication left to a separate ADR. Authoritative detail: ADR-2607141400. (This edn entry was added out of order — the .md addendum 8 landed first; kept as addendum 8 to match the .md.)"}]
+    :note "cryptoexchange.attest's Merkle-sum tree extracted to the shared lib kotoba-lang/merkle-sum (zero-dep portable .cljc, injected hasher), west-registered, attest depends on it (behavior identical, pinned roots unchanged). Also records that crypto/merkle primitives already live in kotoba-lang and that the 263-repo actor Store seam is a structural duplication left to a separate ADR. Authoritative detail: ADR-2607141400. (This edn entry was added out of order — the .md addendum 8 landed first; kept as addendum 8 to match the .md.)"}
+   {:addendum 10
+    :date "2026-07-14"
+    :title "real Ethereum WYSIWYS decoder on kotoba-lang/eth-crypto"
+    :artifacts {:satellite-main "a0dd379"
+                :module "cryptoexchange.wysiwys-eth — parses a real raw unsigned ETH tx (legacy / EIP-2930 / EIP-1559) to (to address, value); adds the RLP DECODE direction eth-crypto lacks, reuses eip55-checksum for address formatting; verify() feeds the custody kernel verifier-match flag (Bybit -> flag 0 -> code 6); contract-creation/tampered/malformed fail closed"
+                :portability "JVM-only (.clj), like wysiwys-btc — actuation-boundary compat layer; CLJS primary never pulls in eth-crypto (verified)"
+                :tests "round-trip real txs against eth-crypto's own rlp-encode + eip55-checksum; JVM 87 tests / 16993 assertions (+4), CLJS primary 71, clj-kondo 0 errors"}
+    :follow-up "Safe-multisig execTransaction SafeTx struct-hash path (real destination inside calldata) — fails closed until implemented"
+    :note "with addendum 9 (BTC), both custody chains (BTC descriptor multisig / ETH Safe, custody ADR §1) now have a real WYSIWYS decoder; INV-14 unchanged; maturity :blueprint"}]
   :adr/decision-summary
   "{:audit \"cloud-itonami に cryptoexchange 未設計を実測確認 (2026-07-14): 金融 Wave0 18repo/industry registry/5-wave 計画のいずれにも crypto exchange なし\",
     :incident-register {:A1 \"顧客資産流用・混蔵 (FTX/Celsius)\" :A2 \"帳簿裏口・特権口座 (FTX allow_negative/Alameda 清算免除)\" :A3 \"支払不能の隠蔽 (Mt.Gox)\" :A4 \"ホットウォレット侵害 (Coincheck/Zaif/BitPoint)\" :A5 \"署名運用侵害・blind signing (DMM 2024/WazirX/Bybit 2025 Safe UI 改ざん)\" :A6 \"単一人物リスク (QuadrigaCX)\" :A7 \"exit scam (Thodex/Africrypt)\" :A8 \"AML/KYC 不備 (Binance 2023/BitMEX)\" :A9 \"市場操作・利益相反 (wash trading/insider listing/front-running)\" :A10 \"レバレッジ増幅 (FTX デリバ・清算カスケード)\"},
