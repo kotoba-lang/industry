@@ -3026,12 +3026,15 @@
    :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "1030"
    :name "Processing and preserving of fruit and vegetables"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C1030"
-   :business-id "cloud-itonami-C1030"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1030"
+   :business-id "cloud-itonami-isic-1030"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; Fruit & vegetable processing plant-operations-coordination actor
+   ;; (FruitVegetableOps-LLM ⊣ Fruit & Vegetable Processing Governor),
+   ;; verified: 39 tests / 160 assertions green (clojure -M:test, fresh
+   ;; clone 2026-07-15). See superproject ADR-2607152800.
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1040"
    :name "Manufacture of vegetable and animal oils and fats"
