@@ -232,8 +232,18 @@ main HEADに着地済み、west manifestにも反映済み）。
 ### 未着手のまま
 
 - `web/`側の3D描画結果とSwift側のセンサー生データの実際の整合性
-  （`sampleIndex`近似の妥当性等）は実機で未検証。
-- `manifest/west.yml`の`floorplan-lab` pinはiOS shim/3D viewer追加後の
-  複数commit分進んでおり、最新（`a4db495`）まで反映するには
-  `nbb scripts/gen-west-manifest.cljs --entry floorplan-lab` の再実行が
-  必要（本addendum時点でまだ実行していない、follow-up）。
+  （`sampleIndex`近似の妥当性等）は実機で未検証（実機操作者との協調が
+  必要、引き続きfollow-up）。
+- ~~`manifest/west.yml`の`floorplan-lab` pinが最新に追従していない~~
+  → Addendum 2（2026-07-15）で解消。
+
+## Addendum 2（2026-07-15、west pin追従）
+
+前addendumが記録していたfollow-upのうち、west pinの追従だけを解消した
+（実機3D描画の検証は引き続き実機操作者待ち、対象外）。共有checkout
+（`orgs/kotoba-lang/floorplan-lab`）自体は既に最新`a4db495`にあったが、
+`manifest/west.yml`のpinだけが`e2b97ad0855c`（iOS shim/3D viewer追加前）
+のまま取り残されていた。`gh api`で新pinを検証（`ahead_by=14,
+behind_by=0, merge_base==旧pin`）した上で、west.ymlの該当1行のみ
+手動編集し、sibling worktree + `gh api .../merges`サーバ側マージで
+着地した。
