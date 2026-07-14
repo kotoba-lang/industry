@@ -294,6 +294,25 @@ M4b `8c37ac7`。すべて design/testnet-only、実資金・実鍵・実チェ�
 follow-up（未着手）: 公開 JSON を消費する self-contained ブラウザ検証ページ
 （第 4 の独立実装）と、artifact を配信する discovery surface。
 
+## Addendum 7（2026-07-14）: JSON レンダリング撤去 — EDN 単一正本に戻す
+
+オーナー指摘「json? データ自体は edn ですよね?」を受けた訂正（衛星 repo main
+`0af38ca`、上書き追加コミット）。Addendum 6 で足した JSON 出力は不要だった:
+
+- fleet は EDN-first（registry・ADR・blueprint すべて EDN）で、このリポの runtime
+  優先順位（kotoba wasm > clojurewasm > ClojureScript > nbb）で書く検証器は EDN を
+  ネイティブに読む。→ follow-up の「ブラウザ検証ページ」も cljc で EDN を読めば足り、
+  JSON を持つ必要が薄い。二重シリアライズは保守面の負債。
+- `cryptoexchange.publish/render-json` とそのテスト、nbb シェルの `.json` 出力を撤去。
+  `docs/verify-inclusion.md`・README は canonical `.edn` を参照するよう修正。
+- **維持（JSON と無関係な正しい修正）**: leaf preimage の colon 除去（`attest/pname`）。
+  EDN artifact のままでも、公開フィールド値から `docs/verify-inclusion.md` の手順で
+  独立検証でき、worked example は素の `sha256sum` で root を再現する。
+- 将来 public な多言語 discovery surface が要る場合の JSON 化は、その時点で
+  discovery-surface として**意図的に決める**ステップであり、ここに恒常的に持たない。
+- 検証: CLJS 71 tests / JVM 77 tests、0 failures、clj-kondo 0 errors。INV-14 不変、
+  maturity `:blueprint`。
+
 ## References
 
 - ADR-2607121000（逆トポソート 5-wave — 6611/6612「取引台帳」注記）

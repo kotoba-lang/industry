@@ -78,7 +78,17 @@
                 :spec "docs/verify-inclusion.md — precise leaf/node hashing + walk + sum-shrinking rejection; worked example reproduces the root with plain sha256sum, NO project code (verified: leaf|alice|btc|300 and the node hash match the emitted artifact byte-for-byte)"
                 :verification "CLJS 72 tests / 16935 assertions + JVM 78 tests / 16956 assertions, 0 failures; clj-kondo 0 errors"}
     :follow-up "self-contained browser verifier page consuming the JSON (a 4th independent verifier) + a discovery surface to serve the artifact"
-    :note "design/testnet-only; INV-14 unchanged; maturity :blueprint"}]
+    :note "design/testnet-only; INV-14 unchanged; maturity :blueprint"}
+   {:addendum 7
+    :date "2026-07-14"
+    :title "JSON rendering removed — EDN is the single canonical artifact (owner correction)"
+    :artifacts {:satellite-main "0af38ca (overwrite/additive commit, not a git revert)"
+                :removed "cryptoexchange.publish/render-json + its test + the nbb shell's .json output"
+                :kept "the colon-free leaf preimage (attest/pname) — independent of JSON; the artifact stays independently verifiable from its EDN field values via docs/verify-inclusion.md (worked example reproduces the root with plain sha256sum)"
+                :docs "verify-inclusion.md and README now reference the canonical .edn"
+                :verification "CLJS 71 tests + JVM 77 tests, 0 failures; clj-kondo 0 errors"}
+    :rationale "fleet is EDN-first (registries/ADRs/blueprints all EDN) and a verifier in the repo runtime stack (kotoba wasm > clojurewasm > ClojureScript > nbb) reads EDN natively, so the addendum-6 JSON was an unnecessary second serialization / maintenance surface"
+    :note "supersedes the addendum-6 JSON claim; a public multi-language discovery surface, if ever needed, decides JSON deliberately then — not carried here. INV-14 unchanged; maturity :blueprint"}]
   :adr/decision-summary
   "{:audit \"cloud-itonami に cryptoexchange 未設計を実測確認 (2026-07-14): 金融 Wave0 18repo/industry registry/5-wave 計画のいずれにも crypto exchange なし\",
     :incident-register {:A1 \"顧客資産流用・混蔵 (FTX/Celsius)\" :A2 \"帳簿裏口・特権口座 (FTX allow_negative/Alameda 清算免除)\" :A3 \"支払不能の隠蔽 (Mt.Gox)\" :A4 \"ホットウォレット侵害 (Coincheck/Zaif/BitPoint)\" :A5 \"署名運用侵害・blind signing (DMM 2024/WazirX/Bybit 2025 Safe UI 改ざん)\" :A6 \"単一人物リスク (QuadrigaCX)\" :A7 \"exit scam (Thodex/Africrypt)\" :A8 \"AML/KYC 不備 (Binance 2023/BitMEX)\" :A9 \"市場操作・利益相反 (wash trading/insider listing/front-running)\" :A10 \"レバレッジ増幅 (FTX デリバ・清算カスケード)\"},
