@@ -235,6 +235,42 @@ design-only、実資金・実鍵・mainnet custody なし（INV-14 不変）。�
 リハーサル・:implemented 昇格）と実運用は、新規スコープの ADR と INV-14 ゲート
 （交換業登録 + owner 判断）の管轄であり、本 ADR からは自動連鎖しない。
 
+## Addendum 5（2026-07-14）: actor 本体 + WYSIWYS ハーネス + PoR/PoL 公開パイプライン
+
+オーナー指示「ok, do it」（3 項目: ①actor 本体 ②testnet WYSIWYS リハーサル
+③PoR/PoL nbb 公開スクリプト）を同日実行。衛星 repo main: M4 `5534297` →
+M4b `8c37ac7`。すべて design/testnet-only、実資金・実鍵・実チェーンブロード
+キャストなし（INV-14 不変）。
+
+- **actor 本体（M4）** `cryptoexchange.actor` = langgraph-clj StateGraph:
+  advisor（封じ込め Exchange-LLM、proposal のみ）→ store evidence 組み立て →
+  **ExchangeGovernor**（`cryptoexchange.censor`、4 kernel を合成し
+  HARD>escalate>commit）→ rollout gate（`cryptoexchange.phase`）→
+  commit | hold | 人手サインオフ。`interrupt-before #{:request-signoff}` で
+  actuation op（出金ブロードキャスト・二重統制補正）はどの phase でも
+  auto-commit しない — 出金は必ず人手で一時停止し、HARD custody 拒否
+  （WYSIWYS mismatch 等）は人手にすら到達しない。commit ノードのみが store に
+  書き、その append はドメイン fold で再検証。censor/phase は pure + CLJS test、
+  graph は JVM 駆動（6511 と同型 — interrupt/resume を end-to-end 検証）。
+- **WYSIWYS ハーネス（②の自動化可能部分）** `cryptoexchange.wysiwys`:
+  custody ADR §4 の核を機械化。**独立 2 デコーダ**が raw unsigned tx バイトから
+  署名 payload を再構成し byte 比較 + operator intent と照合、全一致時のみ
+  custody kernel の verifier-match flag = 1。Bybit 型攻撃（intent は正しい
+  アドレス、バイト列は別アドレス）は intent-mismatch → flag 0 → kernel code 6。
+  物理儀式（air-gapped signer・鍵セレモニー）はテスト不能なので範囲外と明記し、
+  「raw バイトから再構成して byte 一致でしか flag を立てない」規律だけを固定。
+- **PoR/PoL 公開（③）** `cryptoexchange.publish` + `scripts/publish_attestation.cljs`:
+  日次 artifact を生成 — 台帳を資産別 Merkle-sum attestation + 全口座の
+  inclusion proof に fold し、canonical EDN + Markdown サマリを出力。
+  reserves-only artifact は構造的に生成不能（INV-7）。ロジックは portable
+  `.cljc`（両ゲート test 済み）、nbb シェルは I/O のみ（`npx nbb -cp` で
+  end-to-end 実行確認 — overall-solvent 判定 + EDN/MD 出力を検証）。
+- 検証: CLJS（primary）71 tests / 16,927 assertions、JVM（compat）77 tests /
+  16,951 assertions、いずれも 0 failures、clj-kondo 0 errors。
+- maturity は依然 `:blueprint`（registry 変更なし）。actor は存在するが実資金
+  運用は INV-14 ゲート（交換業登録 + owner 判断）の管轄で、`:implemented`
+  昇格は別途 owner 判断による。
+
 ## References
 
 - ADR-2607121000（逆トポソート 5-wave — 6611/6612「取引台帳」注記）
