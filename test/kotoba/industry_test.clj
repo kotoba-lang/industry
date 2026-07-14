@@ -889,7 +889,26 @@
       ;; re-fetched origin/main immediately before this edit (concurrent-
       ;; agent count-drift caution -- not an assumed fixed number):
       ;; 204 -> 205.
-      (is (= 205 (:implemented m))))))
+      ;; 205 -> 206: cloud-itonami-isic-0114 (Growing of sugar cane) fresh
+      ;; scaffold (no prior actor existed -- the entry pointed at a
+      ;; never-created gftdcojp/cloud-itonami-A0114 placeholder).
+      ;; CaneOpsAdvisor <-> CaneOperationsGovernor sugar-cane-plantation-
+      ;; operations-coordination actor mirroring cloud-itonami-isic-0112's
+      ;; [Growing of rice] verified module shape (caneops.* in place of
+      ;; riceops.*), with a perennial-crop ratoon-cycle validity check
+      ;; (ratoon-cycle-invalid, replacing 0112's paddy water-level-invalid)
+      ;; and a :finalize-burn-decision hard block (pre-harvest cane-field
+      ;; burning) added alongside the mirrored :operate-field-equipment /
+      ;; :finalize-pesticide-application blocks; 35 tests / 107 assertions
+      ;; green, independently re-verified against a fresh clone; promoted
+      ;; :spec -> :implemented, superproject ADR-2607154500
+      ;; (cloud-itonami-isic-0114-sugar-cane-growing-coverage.md).
+      ;; Live-recomputed via `(industry/maturity-summary)` immediately
+      ;; before this edit on a freshly re-fetched origin/main (concurrent-
+      ;; agent count-drift caution -- confirmed by the test runner itself,
+      ;; `expected: (= 205 (:implemented m)) actual: (not (= 205 206))`,
+      ;; not by a static grep): 205 -> 206.
+      (is (= 206 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
