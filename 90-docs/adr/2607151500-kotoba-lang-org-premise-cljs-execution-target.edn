@@ -3,7 +3,7 @@
   :adr/title "ADR-2607151500: kotoba-lang org premised on .kotoba + new ClojureScript execution target"
   :adr/status "accepted"
   :adr/date "2026-07-14"
-  :adr/last_verified "2026-07-14"
+  :adr/last_verified "2026-07-15"
   :adr/doc_type "adr"
   :adr/topic "kotoba-lang-org-premise-cljs-target"
   :adr/authoritative true
@@ -409,14 +409,117 @@
              prelude fn, wraparound-arith-ops dispatch in lower-expr)"
             "test/kotoba/compiler/backend_cljs_test.clj (3 new deftest)"
             "README.md (updated the cljs backend section)"]}}
+  :adr/kotoba-cljs-backend-2026-07-15
+  {:summary "Addressed (in narrowed form) the follow-up gap this same ADR's
+             :adr/decision-not-made had flagged: kotoba-lang/kotoba itself
+             gained its own compile-cljs-expr / cljs-source ClojureScript
+             backend in src/kotoba/runtime.clj, mirroring compiler/'s
+             backend/cljs.clj but scoped to only the ops the kototama/
+             cloud-itonami narrow-slice governor ports actually use
+             (arithmetic, comparison, and/or/not/zero?/pos?/neg?/inc/dec,
+             pair, map-literal get/assoc) -- NOT compile-wasm-expr's full
+             2000+-line op surface (i64/f32/bitwise/string/memory/capability
+             explicitly rejected at compile time via a closed
+             cljs-unsupported-ops set)."
+   :architectural-simplifications
+   ["no locals index-bookkeeping needed at all: compile-wasm-expr threads a
+     symbol->numeric-index locals map because WASM locals need indices;
+     cljs's own let/defn bind symbolic names natively so compile-cljs-expr
+     carries no locals context whatsoever"
+    "pair/pair-first/pair-second lower to plain vectors + nth (cljs has real
+     persistent data structures; no need for WASM's hand-rolled pair
+     encoding)"
+    "no memory-based host ABI: kotoba wasm's 0-arity main constraint (forcing
+     real args through mem-i32-at reads) does not exist for a cljs target --
+     defns keep their real declared parameters. Honest scope limit: existing
+     mem-i32-at-based .kotoba sources (e.g. the governor ports) do NOT
+     compile unchanged to this new target."]
+   :bugs-found-and-fixed-before-committing
+   ["fold-semantics mismatch: initial draft assumed cljs's own variadic
+      quot/rem/mod/comparison semantics matched compile-wasm-fold's, but
+      compile-wasm-fold is a strict LEFT-FOLD ((op a b c) -> ((a op b) op c)),
+      and (a) Clojure's quot/rem/mod are 2-arg only (arity error for 3+), (b)
+      WASM's comparison opcodes go through the same fold, giving non-monotonic
+      3+-arg comparison results ((< 3 1 2) folds to ((3<1)<2)=(0<2)=true, i.e.
+      1, not Clojure's monotonic-chain false). Fixed with a proper
+      cljs-fold-binary helper; verified live via nbb: (- 5)->5,
+      (quot 100 5 2)->10, (< 3 1 2)->1"
+    "missing division-by-zero guard: i32.div_s/i32.rem_s trap on a zero
+      divisor but plain cljs quot// on JS numbers silently produce
+      Infinity/NaN. Fixed with cljs-checked-divide (let-binds the divisor
+      once, throws :division-by-zero if zero), same reasoning as compiler/'s
+      established kotoba$quot precedent. Verified live via nbb"]
+   :test-writing-gotcha
+   "get's bounded-unroll uses gensym (get-m__/get-k__/get-d__), a
+    JVM-process-global counter -- two separate compiles of IDENTICAL source
+    produce different raw TEXT (though identical executed VALUES). A test
+    first written comparing raw source text failed for exactly this reason
+    (same class of issue already documented for compiler/'s destructuring/
+    assoc gensyms); fixed by comparing executed values via the run helper
+    instead."
+   :verification
+   {:new-tests "test/kotoba/cljs_backend_test.clj, 16 deftest, mirroring
+                compiler/'s backend_cljs_test.clj eval-cljs-source/
+                compile-cljs/call/run helper convention"
+    :clean-baseline-check "pre-existing ADR record for this repo noted 20
+                           failures / 1 error as a known baseline; re-verified
+                           by fresh-cloning the repo at the exact same base
+                           commit (55687281cc04) into an isolated scratch dir
+                           and running the identical test command there --
+                           confirmed the baseline is now actually clean (250
+                           tests / 1261 assertions, 0 failures / 0 errors;
+                           the previously-known failures were fixed by
+                           unrelated concurrent development in the interim)"
+    :full-suite "clojure -M:test on the feature branch: 266 tests / 1300
+                 assertions, 0 failures -- exactly 16 new tests / 39 new
+                 assertions versus the clean baseline, zero regressions"}
+   :landed
+   {:repo "kotoba-lang/kotoba"
+    :commits "main -> 6d7254ae4c99242a65d3bc78cc726fd17bad6c44 (merge:
+              feat/cljs-backend-core-subset)"
+    :method "sibling worktree outside superproject, gh api merges server-side
+             merge, branch+worktree cleanup"
+    :west-pin "kotoba dd2618067fe2 -> 6d7254ae4c992: gen-west-manifest.cljs
+               --entry kotoba falsely rejected this as a pin regression
+               (same class of hazard as addenda 2/3) because the shared
+               checkout's main branch is stuck on a stale, diverged commit
+               (c7ca33a14163) due to a confusing dual-gitdir artifact from
+               the old submodule era (.git/modules/orgs/com-junkawasaki/
+               kotoba) -- fixing that pre-existing local-checkout oddity was
+               ruled out of scope for this task (confirmed via git
+               branch -r --contains that the stale content is already safely
+               preserved on origin/docs/language-maturity-roadmap-2607131800,
+               so nothing is at risk of loss). Verified the real target via
+               gh api compare (ahead_by=45, behind_by=0, merge_base ==
+               old pin) and default_branch=main, then hand-edited the single
+               revision: line in manifest/west.yml, landed via sibling
+               worktree + gh api merges -> superproject main a7ae6b366e18"
+    :files ["src/kotoba/runtime.clj (compile-cljs-expr, cljs-source, new
+             trailing section)"
+            "test/kotoba/cljs_backend_test.clj (new, 16 deftest)"
+            "test/kotoba/test_runner.clj (registered the new test ns)"]}
+   :honest-remaining-limitation
+   "v1 scope only -- i64/f32/bitwise/string/memory/capability ops are
+    explicitly rejected at compile time, not silently mishandled; no i64
+    overflow guard was needed here since i64 ops are out of scope entirely
+    (unlike compiler/'s cljs backend, which does support +/-/* and thus
+    needed the safe-integer guard from :adr/i64-overflow-guard-2026-07-14).
+    Existing mem-i32-at-based .kotoba sources do not compile unchanged to
+    this target."}
   :adr/decision-not-made
   ["rewriting kotoba-lang's general-purpose libraries (langchain/langgraph/
     kotobase/UI layer) into .kotoba -- wrong shape, rejected on the same
     grounds as ADR-2607141900's facade decision"
-   "adding cljs backend support to kotoba-lang/kotoba itself -- compiler/ is
-    the architecturally correct home (frontend/HIR/KIR separation kotoba/
-    lacks); a kotoba/-side equivalent is a separate, unstarted follow-up"
+   "adding cljs backend support to kotoba-lang/kotoba itself -- ADDRESSED in
+    narrowed form by :adr/kotoba-cljs-backend-2026-07-15 (2026-07-15); the
+    full compile-wasm-expr op surface was NOT mirrored, only the narrow
+    governor-relevant subset"
    "exact i64 wraparound parity via BigInt in the cljs backend -- deferred,
     documented gap, no known program depends on it"
    "actually porting kototama/unspsc/capability.cljc to .kotoba -- candidate
-    identified, implementation is follow-up work, not done in this ADR"]}]
+    identified, implementation is follow-up work, not done in this ADR"
+   "flipping kototama.unspsc.organism's validate-node or cloud-itonami's
+    credit.governor/credit.phase to call their WASM-backed drop-in
+    equivalents in production -- both remain explicit owner decisions per
+    :adr/prior-shortcut-wired-2026-07-14 and
+    :adr/cloud-itonami-governor-wired-2026-07-14, not autonomously flipped"]}]

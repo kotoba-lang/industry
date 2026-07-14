@@ -424,6 +424,86 @@ cljsバックエンドの間で**値そのものが一致しないケースは�
 invalidな入力はより少ない自律性へ、より多い自律性へは決して倒れない）
 と整合する形での縮小であり、真の等価性証明ではない。
 
+## 2026-07-15 Addendum 6 — `kotoba-lang/kotoba`自身にもcljs backendを新設（Addendum 1で「別途follow-up」としていたgapを実施）
+
+Addendum 1着地時点で`:adr/decision-not-made`に明記していた「`kotoba-lang/kotoba`
+自身へのcljs backend追加は、compiler/がfrontend/HIR/KIR分離を持つ正しい
+アーキテクチャ上の置き場所であり、kotoba/側の同等物は別途未着手のfollow-up」
+というgapに、責任を持って**縮小した形で**着手した——compiler/の
+`compile-wasm-expr`が持つWASMの全op surface（i64/f32/bitwise/string/memory/
+capability含む2000行超）をそのまま鏡写しにするのは今回のiterationの範囲を
+超えると判断し、代わりに**kototama/cloud-itonami向けの narrow-slice governor
+port群が実際に使っている演算のみ**（算術・比較・`and`/`or`/`not`/`zero?`/
+`pos?`/`neg?`/`inc`/`dec`・`pair`系・`map`リテラルの`get`/`assoc`）に絞った
+v1として実装した。
+
+**アーキテクチャ上の単純化点**（compiler/のcljs backendとの対比）:
+- kotoba/自身の`compile-wasm-expr`はWASM localsが数値インデックスを要求する
+  ため、シンボル名→インデックスの`locals`マップを全再帰呼び出しに引き回す
+  必要があるが、cljs backendでは`let`/`defn`が自前でシンボル名を束縛するため
+  この機構は丸ごと不要——新しい`compile-cljs-expr`は`locals`コンテキストを
+  一切持たない、真の意味で単純な変換になっている。
+- `pair`/`pair-first`/`pair-second`はプレーンなvector + `nth`に落とす
+  （cljsは実persistent data structureを持つのでWASM側の手組みpair表現は
+  不要）。
+- WASMの`main` 0-arity制約（引数をlinear memoryへ`mem-i32-at`経由でmarshal
+  する必要があった）はcljs targetには存在しない——`defn`は自前の実引数を
+  そのまま受け取れる。**この結果、既存の`mem-i32-at`前提で書かれた.kotoba
+  ソース（例えばcloud-itonami governor移植群）はこの新targetへ無変更では
+  コンパイルできない**——正直に記録する、意図的なv1スコープ限界。
+
+**着地前に自分で発見・修正した2件の実バグ**（ユーザー指摘ではなく、
+`compile-wasm-fold`の実装を読み込んで発見）:
+1. **fold意味論の不一致**: 初稿は`quot`/`rem`/`mod`/比較演算子をcljs自身の
+   可変長引数セマンティクスにそのまま委ねていたが、`compile-wasm-fold`は
+   厳密な**左畳み込み**（`(op a b c)` → `((a op b) op c)`）であり、
+   (a) Clojureの`quot`/`rem`/`mod`はそもそも2引数専用（3引数以上はarity
+   error）、(b) WASMの比較opcodeも同じfoldを通るため、3引数以上の比較は
+   Clojure標準の単調連鎖比較と**異なる結果**になる
+   （`(< 3 1 2)`は`((3<1)<2)=(0<2)=true`即ち`1`——真の単調連鎖なら`false`）、
+   という2点を見落としていた。汎用`cljs-fold-binary`ヘルパーを実装し直し、
+   `nbb`で`(- 5)`→5、`(quot 100 5 2)`→10、`(< 3 1 2)`→1の3ケースを実行
+   確認。
+2. **division-by-zeroガード欠落**: 初稿はi32.div_s/i32.rem_sの
+   トラップ意味論をcljsの`quot`/`/`が無条件で再現すると誤って前提しており
+   （実際はJS numberに対する`quot`/`/`はInfinity/NaNを静かに返す）、
+   compiler/の`kotoba$quot`で確立済みの前例に倣い`cljs-checked-divide`
+   （除数を一度let束縛し0なら`:division-by-zero`を投げる）を追加、`nbb`で
+   確認。
+
+**テスト作成中に踏んだ既知の罠の再発**: `get`のbounded-unrollが使う
+`gensym`（`get-m__`/`get-k__`/`get-d__`）はJVMプロセスグローバルなカウンタ
+であるため、同一ソースの別々のcompileは**生テキストとしては非決定的**
+（実行時の値は同一）——実際にテストの初稿が生テキスト等価性を比較して
+落ち、compiler/側のdestructuring/assoc gensymで既に文書化済みの同クラスの
+問題だと確認した上で、実行値比較（`run`ヘルパー経由）へ書き換えて修正。
+
+**検証**: 新規`test/kotoba/cljs_backend_test.clj`（16 deftest、compiler/の
+`backend_cljs_test.clj`と同型の`eval-cljs-source`/`compile-cljs`/`call`/`run`
+ヘルパーを使用）に加え、既存スイート全体を実行。さらに、この
+repoについて過去に記録済みだった「20 failures / 1 error」というpre-existing
+baselineが依然有効かを疑い、同一base commit（`55687281cc04`）から
+`/tmp/kotoba-baseline-check`へ**独立にfresh clone**して同じテストコマンドを
+実行、baseline自体が既に250 tests / 1261 assertions / 0 failures / 0 errors
+（並行する無関係な開発で既に修正済み）とクリーンであることを確認した上で、
+自分のbranchが266 tests / 1300 assertions / 0 failures（新規16 tests /
+39 assertionsのみが差分、regressionゼロ）であることを確認した。
+
+**着地**: `kotoba-lang/kotoba`、`main`→`6d7254ae4c99242a65d3bc78cc726fd17bad6c44`
+（`Merge feat/cljs-backend-core-subset: new ClojureScript backend for
+.kotoba`）、sibling worktree + `gh api .../merges`サーバ側マージ + branch
+cleanup。**west pin更新でもAddendum 2/3と同型のgen-west-manifestハザードが
+再発**: 共有checkoutの`main`ブランチが（旧submodule時代の`.git/modules/...`
+という紛らわしいdual-gitdir artifactにより）`c7ca33a14163`という無関係な
+stale commitに固定されており、`--entry kotoba`がこれをpin退行として拒否
+した。この共有checkout自体のdual-gitdir状態の修復は本タスクのスコープ外と
+判断し（`git branch -f main origin/main`もworktree lockで失敗することを
+確認済み、当該コンテンツは`origin/docs/language-maturity-roadmap-2607131800`
+上に既に安全に存在することも確認済み）、`gh api .../compare`で新pin
+（実在・default branch到達可能・旧pinから前進の3点）を独立検証した上で
+west.ymlの該当1行のみ手動編集（`superproject`、`main`→サーバ側merge
+commit `a7ae6b366e18`）。
+
 ## References
 
 - 90-docs/adr/2607150000-kotoba-lang-extension-triage-langchain-persistence-kotobase.md
@@ -434,3 +514,5 @@ invalidな入力はより少ない自律性へ、より多い自律性へは決�
 - orgs/kotoba-lang/compiler/test/kotoba/compiler/backend_cljs_test.clj（新規10 deftest）
 - orgs/kotoba-lang/kotoba/src/kotoba/launcher.clj（`--reader-target cljs`が実行エンジンを変えないことの根拠）
 - orgs/kotoba-lang/kototama/clj/src/kototama/unspsc/capability.cljc（次の narrow-slice port 候補）
+- orgs/kotoba-lang/kotoba/src/kotoba/runtime.clj（Addendum 6: `compile-cljs-expr`/`cljs-source`、新backend本体）
+- orgs/kotoba-lang/kotoba/test/kotoba/cljs_backend_test.clj（Addendum 6: 新規16 deftest）
