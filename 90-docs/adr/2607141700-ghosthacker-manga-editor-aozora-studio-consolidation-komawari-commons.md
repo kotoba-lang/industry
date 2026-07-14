@@ -151,3 +151,104 @@ dialogue のフラットな `{:id :title :pages [{:panels [...]}]}`）とは大�
 - ADR-2607131400 の「Dapr/ConnectRPC/Lexical 無しに Go/Svelte を壊さない」という決定はそのまま有効——
   本ADRは manga 編集 UI という別の切り口からの決定であり、apps/server(Go) やそれ以外の apps/web 機能
   （chat-agent UI 等）の扱いを変更しない。
+
+## Addendum（2026-07-14）— Phase 0-3 実施・検証済み、Phase 4 は意図的に未実施
+
+オーナー指示「p0-p4 まで進めて」を受け、Open Questions への判断はオーナーの都度確認を待たず
+（instruction の性質上、都度確認せず判断を進める運用だったため）、本文の解決方針どおり進めた結果を記録する。
+
+### Phase 0（完了）
+
+`orgs/kotoba-lang/kami-mangaka-{page,reader,render,scene,text}-clj/` の5件、全て `git status` `??`
+（untracked、west.yml 未参照）を確認の上ローカル削除。manifest 変更なし。
+
+### Phase 1（完了・マージ済み）
+
+`kotoba-lang/kami-mangaka-page` に `kami.mangaka.komawari`（新規 `.cljc`、host 依存なし）を追加——
+`ai-gftd-mangaka` の golden-ratio/beat-weight/named-style/panel-in-panel-inset/governor 実装
+（`mangaka.layout.komawari`、340行）をそのまま移植。`page.clj` 既存の tilt-only API
+（`komawari-tilt`/`row-tilt`/`layout-page`/`template-for`、`kami-app-sip` の `sip.page` が依存）は無変更。
+テスト11件を ai-gftd-mangaka 側 `komawari_test.cljc` から1:1移植、`clojure -M:test` で
+`kami-mangaka-page` 全体20テスト70アサーション0失敗を確認。ついでに README の解消済み
+"known issue"（`kami-mangaka-text` 依存が実は既に git/sha 解決済みだった）と `-clj` 接尾辞の
+H1見出しも訂正。マージ: `kotoba-lang/kami-mangaka-page@25cdabc0`。
+
+### Phase 2（完了・マージ済み）
+
+`ai-gftd-mangaka/clj`: `deps.edn` に `io.github.kotoba-lang/kami-mangaka-page` を追加
+（`kami-mangaka-expression` と同じ `:local/root` パターン）。`mangaka.layout.komawari` を
+`kami.mangaka.komawari` への薄い re-export（`(def propose-page-layout k/propose-page-layout)` 等）
+に置換——`mangaka.graphs.compose-komawari` とこのリポジトリ自身の `komawari_test.cljc` は無改造で
+動作継続。検証: `clojure -M:dev:test` で97テスト589アサーション、失敗/エラー数は変更前ベースライン
+と完全一致（`git stash` で無変更版を実行し比較、`seed-present-after-boot` failure と
+`mangakaGeneratePanel` ISeq エラーは両方とも変更前から存在——本変更と無関係と確認）。
+`komawari_test` 自体は無エラーで通過。マージ: `gftdcojp/ai-gftd-mangaka@1b0a2a7b`。
+
+`app-aozora` 側は調査の結果、komawari 相当のコードが元から存在しない（studio 配下を
+`grep -rl "komawari\|golden.ratio\|beat.weight"` で検索し0件）ことを確認——重複解消の対象が
+存在しないため、Phase 2 の「app-aozora の書き換え」は該当なしと判断（実体のない依存追加は
+やらない）。
+
+### Phase 3（完了・マージ済み。ただし限定スコープ）
+
+Open Questions への判断（都度確認せず進めた）:
+- **キャラクター設定/`_vectors` データ**: aozora 側スキーマは拡張せず、ghosthacker 自身のリポジトリに
+  そのまま残す（何も削除しない）。エクスポートは `work->tx` が実際に持つスロット
+  （`:visual`/`:dialogue`/`:imageUrl`）のみを一方向で投影。
+- **`work-actors`/`manga-tx-path` のハードコード**: 一般化はせず、既存パターン
+  （`manga-tx-path` は既に `"ghosthacker"` 分岐を持っていた）を維持。
+- **komawari 幾何(`:rect`)の永続化**: 対象外のまま——`genko_tx.cljc` は今回も `:rect`/`:tone` を
+  tx へ投影しない（変更していない）。
+- **tx.edn vs episode.edn の正本**: `episode.edn`（ghosthacker 自身の生きたソース）を正本と確定。
+  `ghosthacker-manga-tx.edn` は派生物・再生成対象に格下げ——その生成元だった `app-aozora-svelte`
+  リポジトリはこのワークスペースにもう存在しないため、旧経路は事実上孤立していたと判明。
+
+実装: `com-junkawasaki/ghosthacker` に `scripts/export-aozora-manga-work.cljs`（nbb）を追加。
+`260123-jump/resources/episodes/*/episode.edn`（`:gh/episodeId` を持つもののみ——
+`ep1-komawari-redesign`はkomawari-beat形式の設計デモで実話数コンテンツではないため除外、
+`_archive/` も除外）を読み、`aozora.appview.manga/work->tx` が要求する
+`{:id :title :pages [{:pageNumber :title :panels [{:id :panelNumber :visual :imageUrl :dialogue}]}]}`
+形へ投影する。ページ番号は work 全体で0始まり通し番号に振り直し（aozora の tx モデルは
+episode 概念を持たない1つのフラットな page リストのため）。episode の並び順は `:gh/episodeId`
+文字列ソート——物語順のキュレーションではなく決定的なデフォルト。
+
+検証（`app-aozora` 側は無改造、nbb -cp でソース直読みして実行）: 実データ6エピソード・213ページ・
+968パネルを exportし、`aozora.appview.manga/work->tx`（本物、無改造）に通して1396エンティティ
+（全て `:db/id` あり）を生成、`tx->work` 相当のロジックで逆変換して元のページ数(213)・パネル数(968)
+が完全一致することを確認。さらに実際の `/studio/<slug>` 編集UI（`yoro_ui.studio.edit.cljc`）が
+実際に読む3フィールド（`:gh.manga/panelNumber` `:gh.manga/visual` `:gh.manga/imageUrl`）が
+生成データに揃っていることをソース確認。マージ: `com-junkawasaki/ghosthacker@4f7e7c44`。
+
+**未着手（意図的なスコープ外）**: 生成した `resources/aozora-manga-work.edn` から実際の
+`/kotoba/ghosthacker-manga-tx.edn` への反映（`aozora.appview.manga-export/-main` の実行 + その
+出力を実サービングパスへ配置するデプロイ手順）はこのADRのスコープに含めていない——配置先
+（R2/KV/ビルドパイプライン等）の実体を確認していない状態で本番相当のパスに書き込むのは
+避けた。
+
+### Phase 4 — 評価したが実施しない（安全ゲート未達）
+
+**判断: ghosthacker 自身の汎用 manga-engine 相当 Svelte コード（`MangaPage.svelte` /
+`MangaPanel.svelte` / `KindleView.svelte` / `WebtoonView.svelte` / `manga-layouts.ts`）は
+削除しない。** 本ADR冒頭で自ら設定した Phase 4 の前提条件「studio 側での編集・閲覧が実際に
+動くことを確認してから」が、今回の検証範囲では満たされていないため。
+
+具体的なギャップ: Phase 3 で確認できたのはデータパイプライン（episode.edn → work.edn →
+tx entities → edit.cljc が読むフィールド）が **構造的に** 正しく流れることのみ。一方で
+komawari のパネル幾何（`:panel/rect`/`:panel/tilt`）は `genko_tx.cljc` に一度も永続化された
+ことがなく（Context 節で既述、Phase 1-3 のどの変更でも変わっていない）、aozora-studio 側の
+実際のレンダリングは今のところ「レイアウトなしの画像+テキスト羅列」に留まる可能性が高い——
+ghosthacker の Svelte 側が現在描いている komawari 風のページレイアウト（`MangaPage.svelte`の
+デフォルトレイアウト表、`MangaPanel.svelte`のドラッグ配置された吹き出し等)と**視覚的に同等
+ではない**。ADR-2607131400 が確立した原則（「動いているものを、代替手段のないまま壊す」の
+回避）がここでも直接適用される: 代替 UI が視覚的に未検証（というより構造的に未対応）な状態で
+現に動いている編集/閲覧機能を削除するのは、この原則に反する。
+
+**Phase 4 実施の残タスク（次セッションへの引き継ぎ）**:
+1. `genko_tx.cljc` に `:panel/rect`/`:panel/tilt`（Phase 1 で共通化した `kami.mangaka.komawari`
+   の出力）を投影する経路を追加する。
+2. 実際に `aozora.app/studio/ghosthacker` を起動して（shadow-cljs dev server + 適切な tx.edn
+   サービング）、既存 Svelte 版と並べて視覚的な同等性を確認する。
+3. 1・2 が確認できてから、`StoryboardEditor.svelte` のビューモードタブ（manga/webtoon/kindle）
+   と対応コンポーネントを削除する——このとき `StoryboardEditor.svelte` 自体（ghosthacker 固有の
+   データフロー・ルーティング）と chat-agent 系（`ChatPanel.svelte`/`Agents/*.svelte`）は
+   本ADRの対象外のまま残す。
