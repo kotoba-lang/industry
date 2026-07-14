@@ -68,7 +68,17 @@
                 :wysiwys "cryptoexchange.wysiwys — automatable core of custody ADR §4 (INV-10): two independent decoders reconstruct the signing payload from RAW tx bytes + byte-compare + intent cross-check; verifier-match flag 1 only on full agreement; Bybit-style intent/bytes divergence -> flag 0 -> custody kernel code 6. Physical ceremony parts explicitly out of test scope"
                 :publish "cryptoexchange.publish + scripts/publish_attestation.cljs — daily PoR+PoL artifact (INV-7): ledger -> per-asset Merkle-sum attestation + every account's inclusion proof, canonical EDN + Markdown; reserves-only artifact structurally unbuildable. Logic in portable .cljc (gate-tested), nbb shell I/O-only (verified e2e via npx nbb -cp)"
                 :verification "CLJS primary 71 tests / 16927 assertions + JVM compat 77 tests / 16951 assertions, 0 failures; clj-kondo 0 errors"}
-    :note "maturity stays :blueprint (no registry change); the actor exists but real-funds operation remains behind the INV-14 gate (exchange-business registration + owner decision); :implemented promotion is a separate owner call"}]
+    :note "maturity stays :blueprint (no registry change); the actor exists but real-funds operation remains behind the INV-14 gate (exchange-business registration + owner decision); :implemented promotion is a separate owner call"}
+   {:addendum 6
+    :date "2026-07-14"
+    :title "PoR/PoL made independently verifiable (JSON artifact + verification spec)"
+    :artifacts {:satellite-main "8368bee"
+                :json "cryptoexchange.publish/render-json — deterministic JSON (sorted keys, keyword names); nbb shell emits .json alongside .edn/.md"
+                :preimage-fix "attest leaf preimage switched to colon-free published names (attest/pname): the published JSON string 'alice'/'btc' is exactly what was hashed, closing an independent-verifiability gap (JSON published 'alice' while the hash consumed ':alice'). Fixture root hash re-pinned"
+                :spec "docs/verify-inclusion.md — precise leaf/node hashing + walk + sum-shrinking rejection; worked example reproduces the root with plain sha256sum, NO project code (verified: leaf|alice|btc|300 and the node hash match the emitted artifact byte-for-byte)"
+                :verification "CLJS 72 tests / 16935 assertions + JVM 78 tests / 16956 assertions, 0 failures; clj-kondo 0 errors"}
+    :follow-up "self-contained browser verifier page consuming the JSON (a 4th independent verifier) + a discovery surface to serve the artifact"
+    :note "design/testnet-only; INV-14 unchanged; maturity :blueprint"}]
   :adr/decision-summary
   "{:audit \"cloud-itonami に cryptoexchange 未設計を実測確認 (2026-07-14): 金融 Wave0 18repo/industry registry/5-wave 計画のいずれにも crypto exchange なし\",
     :incident-register {:A1 \"顧客資産流用・混蔵 (FTX/Celsius)\" :A2 \"帳簿裏口・特権口座 (FTX allow_negative/Alameda 清算免除)\" :A3 \"支払不能の隠蔽 (Mt.Gox)\" :A4 \"ホットウォレット侵害 (Coincheck/Zaif/BitPoint)\" :A5 \"署名運用侵害・blind signing (DMM 2024/WazirX/Bybit 2025 Safe UI 改ざん)\" :A6 \"単一人物リスク (QuadrigaCX)\" :A7 \"exit scam (Thodex/Africrypt)\" :A8 \"AML/KYC 不備 (Binance 2023/BitMEX)\" :A9 \"市場操作・利益相反 (wash trading/insider listing/front-running)\" :A10 \"レバレッジ増幅 (FTX デリバ・清算カスケード)\"},
