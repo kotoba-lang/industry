@@ -1,7 +1,7 @@
 [{:db/id -1
   :adr/id "adr-2607141600-kotoba-kotoba-lang-compiler-kototama-aiueos-consolidation-experiment"
   :adr/title "ADR-2607141600: kotoba / kotoba-lang / compiler / kototama / aiueos 5リポジトリ責務境界確定 + 言語プロファイル/Chicory実行系の重複解消実験"
-  :adr/status "proposed -- phase 1 done"
+  :adr/status "accepted -- closed (phase 0/1 done, phase 2 negative-closed, phase 3 n/a)"
   :adr/date "2026-07-14"
   :adr/last_verified "2026-07-14"
   :adr/doc_type "adr"
@@ -86,12 +86,16 @@
                      who owns the safe-Kotoba three-gate CLJC-native successor"
     :status :done}
    {:phase 2 :desc "prototype shared Chicory plumbing extraction against ONE call site
-                     (aiueos.execute candidate); verify test suite green"
-    :status :not-started}
+                     (aiueos.execute candidate); verify test suite green. ACTUALLY
+                     EXECUTED as a full-text comparative read of all 3 files (1765
+                     lines total) rather than a throwaway code prototype -- see
+                     :adr/phase-2-2026-07-14. Concluded negative (not worth
+                     extracting): no code written, no repo touched."
+    :status :done}
    {:phase 3 :desc "if phase 2 proves net-positive (less code, same coverage, no perf
                      regression), migrate kotoba.wasm-exec + kototama.tender; if not,
                      record negative result and close as 'tried, not worth it'"
-    :status :not-started}]
+    :status :not-applicable-phase-2-was-negative}]
   :adr/phase-1-2026-07-14
   {:summary "Investigated the planned compiler/-vs-profile.edn diff and found the
              plan's premise wrong: profile.edn has no special-forms grammar at all.
@@ -140,6 +144,50 @@
                       gates) should ever be reconciled into one shared grammar --
                       this addendum only fixes the ownership documentation, it
                       does not decide or attempt that reconciliation"}
+  :adr/phase-2-2026-07-14
+  {:summary "Full-text comparative read of all 3 Chicory-execution files (no code
+             written, no repo touched) instead of a throwaway extraction
+             prototype -- concluded the shared-plumbing extraction is NOT worth
+             doing (negative result per the Phase-3 gate in :adr/plan)."
+   :files-read [{:repo "kotoba-lang/aiueos" :file "src/aiueos/execute.cljc" :lines 473}
+                {:repo "kotoba-lang/kototama" :file "src/kototama/tender.clj" :lines 609}
+                {:repo "kotoba-lang/kotoba" :file "src/kotoba/wasm_exec.clj" :lines 683}]
+   :finding-1-decisive
+   "kototama.tender's OWN namespace docstring (lines 18-28) already evaluated and
+    rejected this exact idea: 'the generic Chicory wiring...is written fresh
+    here, not vendored from kotoba-lang/kotoba's wasm_exec.clj...pulling it in
+    as a dependency would run a second, incompatible capability model next to
+    kototama's own actor:host ABI (the semantic authority duplication
+    ADR-2607022700 rules out)...proof-of-pattern, not shared code.'"
+   :finding-2-quantitative
+   {:shared-helpers ["host-fn" "valtype" "write-bytes!" "read-bytes!/read-str"
+                      "fuel-listener" "memory-limits-for"]
+    :shared-loc-per-file "~60-90 lines (12-15% of each file), and NOT byte-identical"
+    :divergences
+    ["host-fn param convention differs: aiueos takes keyword params + internal
+      valtype mapping; kototama/kotoba take pre-resolved ValType objects"
+     "error-handling philosophy differs per repo: aiueos throws ex-info caught
+      centrally in run-if-granted; kototama uses in-band -1 sentinels for
+      quota/http plus denied! exceptions for structural violations; kotoba uses
+      its own capability-granted? denial pattern"
+     "fuel-exceeded ex-data vocabulary differs per repo (deliberately, per
+      ADR-2607022700 authority separation): :aiueos.execute/fuel-exceeded vs
+      :kototama.tender/problem :fuel-exhausted vs :kotoba.wasm/problem
+      :fuel-exhausted"
+     "memory-limits-for assumption differs: aiueos assumes memory section always
+      present (documented invariant, .kotoba-only input domain) vs kototama
+      defensively checks .isPresent (generic Chicory-guest input domain) --
+      confirmed this is a scope difference, NOT a latent bug"]}
+   :conclusion "Extraction declined. (1) kototama.tender's authors already ran
+                this evaluation and rejected it for a still-valid reason.
+                (2) Quantitatively not worth it: ~200 shared-but-not-identical
+                lines across 1765 total, against the cost of a new shared repo
+                (new ADR + GitHub repo + west registration + 3 dependency bumps
+                + 3 JVM test-suite reverifications). Per :adr/plan phase 3's own
+                gate, recorded as negative and closed -- Phase 3 (migration) not
+                attempted."
+   :code-changed false
+   :repos-touched []}
   :adr/decision-not-made
   ["no git repository merge across the 5 repos -- west/manifest keeps 5 independent entries"
    "no kotoba-lang/kotobascript repo -- reaffirms prior-turn analysis that .kotoba's
