@@ -2811,13 +2811,19 @@
    :operating-states [:intake :survey :advise :record :escalate :audit]},
   {:id "0322"
    :name "Freshwater aquaculture"
-   :repo "https://github.com/gftdcojp/cloud-itonami-A0322"
-   :business-id "cloud-itonami-A0322"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :survey :advise :treat :record :audit]},
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0322"
+   :business-id "cloud-itonami-isic-0322"
+   :required-technologies [:identity :audit-ledger :dmn :forms]
+   :optional-technologies [:telemetry :sustainability-metrics]
+   :maturity :implemented
+   ;; Freshwater farm (pond/tank/raceway) operations coordination actor
+   ;; (Freshwater Advisor ⊣ FreshwaterAquacultureOperationsGovernor),
+   ;; mirroring cloud-itonami-isic-0321 (Marine aquaculture)'s verified
+   ;; pattern; coordination-only with permanent hard blocks on treatment
+   ;; administration and direct feeding/harvest equipment control
+   ;; (human-exclusive authority), plus an explicit closed op-allowlist
+   ;; hard check. ADR-2607152600.
+   :operating-states [:intake :advise :govern :decide :finalize]},
   {:id "0510"
    :name "Mining of hard coal"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0510"
