@@ -1,6 +1,6 @@
 {:kotoba.registry/id :kotoba/industry
  :kotoba.registry/version 1
- :kotoba.registry/updated "2026-07-12"
+ :kotoba.registry/updated "2026-07-14"
  :industries
  [{:id "3512"
    :name "Community Renewable Energy Operations"
@@ -7784,14 +7784,27 @@
    ;; ISIC Rev.5 class (4-digit) — procurement/logistics focus
    :operating-states [:intake :advise :govern :decide :hold :commit :request-approval]},
   {:id "8423"
-   :name "Public order and safety activities"
-   :repo "https://github.com/gftdcojp/cloud-itonami-O8423"
-   :business-id "cloud-itonami-O8423"
+   :name "Public order and safety administrative operations"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-8423"
+   :business-id "cloud-itonami-isic-8423"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :register :decide :notify :appeal :audit]},
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented: Public Safety Advisor ⊣ Public Safety
+   ;; Governor actor (src/safety/*.cljc, test/safety/*), covering administrative
+   ;; back-office only: incident report intake (clerical, not investigation),
+   ;; public records request processing, non-tactical resource scheduling,
+   ;; statistical anomaly flagging (always escalates). Hard invariants: requester
+   ;; registration, no direct actuation, scope boundary (arrest/use-of-force/
+   ;; investigation/evidence/dispatch permanently forbidden, structured via
+   ;; closed allowlist). Escalation invariants: records requests, anomaly flags,
+   ;; low confidence. 12 tests/33 assertions run green before claiming
+   ;; :implemented, clj-kondo clean. See ADR-2607142200 for this repo's
+   ;; implementation details and cloud-itonami-isic-8423/docs/adr/0001-
+   ;; architecture.md for the closed-allowlist design rationale and emphatic
+   ;; operational scope exclusion.
+   ;; ISIC Rev.5 class (4-digit) — public safety administrative focus
+   :operating-states [:intake :advise :govern :decide :hold :commit :request-approval]},
   {:id "8430"
    :name "Compulsory social security activities"
    :repo "https://github.com/gftdcojp/cloud-itonami-O8430"
