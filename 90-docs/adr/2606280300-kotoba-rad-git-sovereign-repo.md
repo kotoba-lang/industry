@@ -77,3 +77,30 @@ module with:
 
 The implementation must reuse `kotoba-git` for all object materialization and `kotoba-dht`
 for source-chain/warrant semantics.
+
+## Addendum (2026-07-14): R2 (Private object store) implemented in cljc kotoba-rad
+
+The R1/R2 roadmap above targeted a Rust `kotoba-rad` crate; the actual
+implementation is the cljc `kotoba-lang/kotoba-rad` (ADR-2607072200). R2 —
+"encrypted Git object blocks, recipient grants, epoch rotation" — landed
+there (`403d2b05`) as three portable namespaces:
+
+- `kotoba-rad.recipient-grant`: X25519 ephemeral-static sealed box
+  (ECDH → HKDF → AES-256-GCM) wrapping a symmetric **epoch key** to a
+  recipient's X25519 pubkey (distinct from their Ed25519 signing did:key).
+  `rotate` re-grants a fresh epoch key to the *current* recipient set only —
+  **revocation = epoch rotation, not deletion of distributed ciphertext**,
+  exactly this ADR's Security model.
+- `kotoba-rad.private-object`: AES-256-GCM of an object's bytes under the
+  epoch key. **replication key = ciphertext CID**; plaintext CID kept as
+  authority-scoped verification metadata (`open` re-hashes to it). A peer
+  without a grant replicates the ciphertext but never reads it.
+- `kotoba-rad.bytes`: the portable JVM/nbb crypto host seam.
+
+Fully cljc (X25519 + AES-256-GCM are synchronous on both JCA and
+node:crypto), cross-verified JVM⇄nbb (a grant/object sealed on one host
+opens on the other). The `RecipientGrant` datom + capability-datom binding
+into a live repo's object store, and the R4 PQ hybrid (X25519+ML-KEM over
+the same grant shape), remain future work. The R0/R1 (identity/journal/
+delegate/sigref/push-gate) primitives this ADR named already exist per
+ADR-2607072200.
