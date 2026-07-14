@@ -267,6 +267,92 @@
              analyze helper injection)"
             "test/kotoba/compiler/frontend_extensions_test.clj (new, 16 deftest)"
             "test/kotoba/compiler/test_runner.clj (registered the new namespace)"]}}
+  :adr/kotoba-lang-kotoba-implementation-2026-07-14
+  {:summary "Owner decided (after being told kotoba-lang/kotoba has no safety
+             gate) to implement map/keyword there too, for kotoba/'s own
+             expressiveness independent of the safety motivation. Implemented
+             pair/pair-first/pair-second + keyword/map literals + get/assoc
+             in kotoba.runtime/compile-wasm-expr."
+   :architectural-difference-from-compiler
+   "compiler/'s pair is a host-imported capability (established in the
+    language-extension-implementation addendum above). kotoba/ already
+    exposes raw linear memory to guest code directly (alloc/i32-store!/
+    mem-i32-at pre-exist) -- so pair needed ZERO new opcodes or host
+    imports, just a desugar to let+alloc+existing store/load ops. 8 bytes
+    per pair: left i32 @ offset 0, right i32 @ offset 4."
+   :get-implementation-difference-from-compiler
+   "compiler/'s get is a synthesized recursive helper injected once per
+    module. kotoba/'s function-defs is consumed from 4 separate call
+    sites with no single injection point analogous to compiler/'s
+    analyze -- so get here is a BOUNDED UNROLL (fixed depth 32, m/k/
+    default each let-bound once so the unrolled body only re-references
+    cheap locals) instead. A miss past that depth returns the default
+    silently rather than trapping (compiler/'s fuel-bounded recursive
+    version traps instead) -- a real, documented difference in failure
+    mode, not a bug."
+   :keyword-hash "32-bit FNV-1a (kotoba/'s default numeric domain is i32,
+                  vs compiler/'s i64) -- same deterministic-hash rationale
+                  as compiler/'s version"
+   :verification
+   {:method "kotoba.runtime/wasm-binary + kotoba.wasm-exec/run-main -- the
+             SAME real compile -> emit -> Chicory-execute path
+             wasm-and-or-when-test/wasm-exec-test already use, not a
+             separate scratch script"
+    :new-tests "test/kotoba/wasm_map_keyword_test.clj, 6 deftest"
+    :updated-tests "wasm_exec_test.clj's pre-existing bare-keyword/bare-map
+                     :unsupported-form assertions updated to reflect that
+                     they now legitimately compile"
+    :clean-baseline-comparison
+    "the shared checkout had another concurrent session's uncommitted WIP
+     at the time (see :shared-checkout-incident below), so a clean
+     baseline was taken via a separate detached-HEAD worktree at the exact
+     base commit (ecadee870) rather than trusting the contaminated shared
+     checkout's own test run"
+    :results {:baseline "227 tests / 1088 assertions / 20 failures / 1 error"
+              :this-branch "233 tests / 1123 assertions / SAME 20 failures / 1 error"
+              :verdict "6 new tests / 35 new assertions all pass; 0 regressions;
+                        the 20 pre-existing failures (rad_adapter_test.clj,
+                        unrelated to this change) are identical on both"}
+    :lint "clojure -M:lint: 0 errors, 0 warnings"}
+   :shared-checkout-incident
+   {:found "2 distinct concurrent sessions' uncommitted WIP in the shared
+            orgs/kotoba-lang/kotoba checkout: (1) test/kotoba/test_runner.clj
+            registering kotoba.semantic-code-test + new untracked
+            src/kotoba/semantic_code.clj + test/kotoba/semantic_code_test.clj,
+            (2) modified src/kotoba/launcher.clj + docs/ADR-repository-
+            boundaries.md + untracked docs/ADR-aiueos-boot-kernel-os-
+            integration.md"
+    :handling "(1) conflicted with this change on the same file
+               (test_runner.clj) -- stashed defensively with git stash push
+               -u -- <the 3 files>, checked out the merged commit, popped
+               the stash (3-way merge succeeded cleanly, no conflict
+               markers -- both sessions' insertions coexist). (2) untouched,
+               no path overlap with this change."
+    :anomaly-observed "the untracked docs/ADR-aiueos-boot-kernel-os-
+                        integration.md file was gone (ls: no such file)
+                        after the stash/checkout/pop sequence. Could not
+                        determine whether this session's git operations
+                        caused it or a concurrent session's own rename/
+                        rewrite did -- untracked files have no git-side
+                        recovery mechanism either way. Flagged to the
+                        owner as a reporting item, not investigated
+                        further (out of this ADR's scope, belongs to
+                        whichever session owned that file)."}
+   :west-pin-hygiene-note
+   "nbb scripts/gen-west-manifest.cljs --entry kotoba's output diff also
+    included an UNVERIFIED cloud-itonami pin advance (another concurrent
+    session's local checkout had moved forward) -- --entry only scopes
+    verify-west-pins's check to the named entry, not gen-west-manifest's
+    write scope. Per the no-wholesale-regen-commit rule, manually extracted
+    only the kotoba entry's 1-line diff via git apply and committed that;
+    left the cloud-itonami pin advance out, unverified, for whichever
+    session owns it."
+   :landed
+   {:repo "kotoba-lang/kotoba" :commits "68de254d8 -> dd2618067"
+    :method "sibling worktree outside superproject, gh api merges server-side
+             merge, branch+worktree cleanup"
+    :west-pin "kotoba ecadee870a73 -> dd2618067fe2 (--entry minimal diff,
+               isolated from the unrelated cloud-itonami hunk, verify-west-pins OK)"}}
   :adr/decision-not-made
   ["general first-class functions/closures in .kotoba -- rejected on T2 soundness grounds"
    "defprotocol/defrecord/multimethod in .kotoba -- rejected, fix the 3 affected
