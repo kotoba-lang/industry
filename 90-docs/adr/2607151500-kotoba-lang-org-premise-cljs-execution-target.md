@@ -341,6 +341,46 @@ backendの隔離」パターンと同じ形。コンパイル済み`.wasm`実体
 上で、west.ymlの該当1行のみ手動編集——Addendum 2で確立した対処法を
 そのまま踏襲。
 
+## 2026-07-14 Addendum 4 — cloud-itonami credit governorの`.kotoba`/WASM実装も同じ形で配線（本番切替は非実施）
+
+Addendum 3で確立した「呼び出し可能なdrop-in関数として配線するが、実際の
+呼び出し箇所は切り替えない」というパターンを、そのADRの主題だった
+kototama内部だけでなく、**この一連の作業の出発点だったcloud-itonami
+governor自身**（ADR-2607150000 Addendum 5）にも適用した——「主要な
+production facadeが未配線のまま」という残gapは、kototama側だけでなく
+cloud-itonami側にも対称的に存在していたため。
+
+`credit.kernels.gate-kotoba`という新規namespace
+（`src/credit/kernels/gate_kotoba.clj`）を追加し、`verdict-code`/
+`phase-disposition`/`phase-reason`を——`credit.kernels.gate`自身の
+in-process関数と**全く同じシグネチャ**で——`kototama.tender`経由の
+実Chicory実行によりコンパイル済み`credit_verdict.wasm`/`credit_phase.wasm`
+へ委譲する形で実装した。`credit.governor/check`（227行目付近で
+`gate/verdict-code`を直接呼ぶ）・`credit.phase/gate`（103-104行目付近で
+`kernel/phase-disposition`/`kernel/phase-reason`を呼ぶ）は、**他に何も
+変更せずにこの新namespaceの関数を指すよう切り替え可能**——ただし
+その切り替えは今回**実施していない**。実施すると`credit.governor/check`
+が評価する全てのproposalが実際のWASMインスタンス化境界を本番で通ることに
+なる——実稼働中の判定ゲートへの実挙動変更であり、Addendum 3で
+`kototama.unspsc.organism`について下したのと同じ理由で、オーナーの
+明示的判断に委ねた。
+
+**検証**: `test/credit/kernels/gate_kotoba_test.clj`が、
+`credit.kernels.gate.cljc`自身が持つ52ケースのbattery全体に対して
+`credit.kernels.gate`（in-process）と`credit.kernels.gate-kotoba`
+（WASM-backed）の両方を呼び、期待値・in-process・WASM-backedの三者一致を
+確認。`clojure -M:test`: 59 tests / 659 assertions、0 failures
+（`cloud-itonami/cloud-itonami-isic-6492`、`main`→`73d9815`、
+`gh api .../merges`でサーバ側マージ、sibling worktree、branch cleanup
+完了）。`kototama`（したがってChicory）はこのrepoのメイン`:deps`には
+追加せず——既存の`wasm.*-test`群と同じく`:test` alias限定のまま、
+`credit.governor`/`credit.phase`をrequireするだけの消費者に強制しない。
+
+**west pinへの影響なし**: `cloud-itonami-isic-6492`はこのsuperprojectの
+west manifestに登録されていない（`gftdcojp`ではなく`cloud-itonami` org
+配下の独立リポジトリ、ADR-2607150000 Addendum 5で既に記録済み）——
+今回もpin前進は不要、本ADRへの記録のみで完結する。
+
 ## References
 
 - 90-docs/adr/2607150000-kotoba-lang-extension-triage-langchain-persistence-kotobase.md
