@@ -4494,29 +4494,27 @@
    :name "Collection of hazardous waste"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3812"
    :business-id "cloud-itonami-3812"
+   :maturity :implemented
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies [:optimization]
-   ;; Published as a :blueprint repo (business-model.md + operator-guide.md +
-   ;; blueprint.edn + governance docs, no src/test yet -- the OSS blueprint
-   ;; stage, not yet :implemented). :maturity :spec explicitly removed so
-   ;; maturity-of/maturity now auto-derive :blueprint from the real :repo
-   ;; above (see `kotoba.industry/maturity-of`). The legacy placeholder
-   ;; :repo (gftdcojp/cloud-itonami-E3812) never actually existed (confirmed
-   ;; 404 before this edit) -- replaced with the real repo, following the
-   ;; SAME cloud-itonami/cloud-itonami-isic-#### naming convention as every
-   ;; other actor in this fleet rather than the legacy E-prefixed scheme.
-   ;; Governor keyword :hazardous-waste-governor is grep-verified UNIQUE
-   ;; fleet-wide -- distinct from cloud-itonami-isic-3830's own materials-
-   ;; recovery/recycling vertical (:traceability-governor, :implemented) and
-   ;; cloud-itonami-cofog-05.1's own municipal-waste-collection vertical (a
-   ;; SEPARATE COFOG-classified sub-fleet, :waste-operations-governor):
-   ;; hazardous industrial/medical/chemical waste carries a materially
-   ;; stricter manifest/chain-of-custody regime than either general
-   ;; recyclables or municipal garbage. This was deferred at ADR-2607100700
-   ;; to avoid a third waste-adjacent pick in a row; picked up now after
-   ;; diversifying with a manufacturing-sector pick (ADR-2607100800). No
-   ;; bespoke capability library exists for hazardous-waste manifest
-   ;; management specifically. See ADR-2607101300.
+   ;; NOW :implemented — full actor with src/test (2026-07-14). Was :blueprint
+   ;; (business-model.md + operator-guide.md + blueprint.edn + governance docs,
+   ;; published via ADR-2607101300). HazardousWasteDispatch-LLM advisor sealed
+   ;; behind independent HazardousWasteGovernor, langgraph-clj StateGraph,
+   ;; append-only audit ledger, rollout phases 0-3 (manual→autonomous). CRITICAL
+   ;; DESIGN: hazard-gate is inverted vs 3811 — ONLY accepts hazard-flagged
+   ;; streams, rejects non-hazard to routing to 3811. All ops are :effect
+   ;; :propose only; never issues disposal permits/certifications. Escalates
+   ;; hazard-concern flags always, low-confidence, bulk intakes. Governor
+   ;; keyword :hazardous-waste-governor is grep-verified UNIQUE fleet-wide --
+   ;; distinct from cloud-itonami-isic-3830's own materials-recovery/recycling
+   ;; vertical (:traceability-governor, :implemented) and cloud-itonami-cofog-
+   ;; 05.1's own municipal-waste-collection vertical (a SEPARATE COFOG-classified
+   ;; sub-fleet, :waste-operations-governor): hazardous industrial/medical/
+   ;; chemical waste carries a materially stricter manifest/chain-of-custody
+   ;; regime. This was deferred at ADR-2607100700 to avoid a third waste-
+   ;; adjacent pick in a row; picked up now after diversifying with a
+   ;; manufacturing-sector pick (ADR-2607100800).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :observe :treat :publish :audit]},
   {:id "3821"
@@ -4559,13 +4557,17 @@
    :business-id "cloud-itonami-isic-4100"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :blueprint
-   ;; Promoted :spec -> :blueprint in the 衣食住 scaffold batch
-   ;; (ADR-2607122200): blueprint repo published (Community Building
-   ;; Construction, :building-construction-governor), no actor
-   ;; implementation claimed — wave-3 robotics-gated per
-   ;; ADR-2607121000. Stale gftdcojp F-prefix :repo URL replaced by
-   ;; the real satellite.
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as site-operations-coordination
+   ;; actor (Building Advisor ⊣ Building Governor), the thirty-eighth
+   ;; build outside ADR-2607032000's original insurance/real-estate batch
+   ;; and the second in the construction/buildings vertical (after 4211's
+   ;; disaster/severe-weather safety). Implements site-operations
+   ;; coordination (trade dispatch, progress logging, safety hazard
+   ;; flagging, inspection scheduling), NOT direct construction work or
+   ;; building certification (exclusive to licensed
+   ;; inspector/engineer). Scope narrower than 4211 (no disaster-response
+   ;; specificity), uses 4211 as architecture template.
    :operating-states [:intake :design :permit :build :inspect :audit]},
   {:id "4210"
    :name "Construction of roads and railways"
