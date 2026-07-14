@@ -1,0 +1,40 @@
+[{:adr/id "adr-2607122400-cloud-itonami-market-entry-api"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607122400: GET /api/market-entry — iso3166 market-entry registry の API 化（P1 first slice）"
+  :adr/topic "cloud-itonami-market-entry-api"
+  :adr/status "accepted"
+  :adr/date "2026-07-12"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for ["itonami.cloud GET /api/market-entry endpoint shape and honest-coverage policy"
+                          "scripts/gen-market-entry-registry.cljs generator contract (satellites -> market_entry.cljc)"
+                          "fact: iso3166×223 = 188 countries + 35 agency repos (not 223 countries)"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related ["adr-2607121000-cloud-itonami-global-isic-isco-reverse-toposort-plan"
+                "adr-2607122100-cloud-itonami-labor-liberation-sd-model"
+                "adr-2607122300-kotoba-wasm-bool-op-completion"]
+  :db/id -1
+  :adr/decision-summary
+  "{:trigger \"ADR-2607121000 P1 'iso3166×223 を market-entry API 化' — Track A の非衝突アイテム (kernel 工場は fleet 進行中のため不介入)\",
+    :facts-found {:iso3166-223 \"223 = 衛星 repo 総数。実体 188 か国 + 35 省庁 agency repo\",
+                  :unpushed-scaffolds [\"kgz\" \"lao\" \"mmr\" \"tjk\" \"tkm\" \"uzb\" \"ind-clean-air\"],
+                  :unpushed-note \"ローカル dir のみ・.git 無し・GitHub 未存在 — 中断 batch。不介入、dead link を出さない\",
+                  :repo-architecture \"itonami.cloud API = shadow-cljs :edge-api (.cljc → ESM)、functions/api/*.js は shim のみ\"},
+    :implementation {:generator \"scripts/gen-market-entry-registry.cljs (nbb) — blueprint.edn + organization.edn 集約 → src/cloud_itonami/market_entry.cljc (GENERATED)。GitHub 実在リスト渡しで :repo リンクを実在衛星に限定\",
+                     :endpoint {:list \"GET /api/market-entry → {ok, count 188, agencyCount 35, countries[summary]}\",
+                                :detail \"GET /api/market-entry?country=JPN → full entry (agencies/governor/requiredTechnologies/headRole=役職のみ)\",
+                                :unknown \"404 JSON + alpha-3 hint\"},
+                     :discipline \"open-business と同じ 静的・公開・portable .cljc、no-KV/no-auth。coverage は正直に (facts namespace の流儀)\"},
+    :verification \"node ESM smoke: list 200/188・JPN agencies 19・ZZZ 404・KGZ repo無し200 → main 3cfdb934 サーバ側マージ → Pages 自動デプロイ → ライブ確認\",
+    :west-pin {:entry \"cloud-itonami\" :from \"25df3e05\" :to \"3cfdb934\" :commit \"24240ad3\" :verified \"ahead 2 / behind 0\"},
+    :out-of-scope [\"L2 protocol fee 連動\" \"7 未 push scaffold の repo 化\"],
+    :addendum-gateway-join {:landed \"main c6846bab (同日)\",
+                            :detail-sections {:incorporation \"6910 formation.facts per-法域カタログ (R0=29 法域、USA-DE exemplar variant 保持)\",
+                                              :complianceSources \"8291 dossier.facts closed source-basis カタログ (R0=5 法域、liveCapable flag)\",
+                                              :actors \"実行 actor repo リンク — API は report、実行は actor governor 経由\"},
+                            :summary-flags \"incorporation(bool) + complianceSources(count)\",
+                            :generator-change \"facts カタログ抽出は括弧バランサ方式 (ファイル全体 edn 読みは後方 def の #() で不可)\",
+                            :west-pin {:from \"3cfdb934\" :to \"c6846bab\" :commit \"a4847be5\"},
+                            :still-out-of-scope [\"POST 手続き実行 (edge から actor StateGraph 起動 — 状態/認可設計が要る、別 ADR)\" \":eu ソースの加盟国 attach (マッピング表なし=正直な非対応)\"]}}"}]
