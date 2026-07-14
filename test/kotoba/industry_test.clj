@@ -963,7 +963,29 @@
       ;; `(industry/maturity-summary)` on a freshly re-fetched origin/main
       ;; immediately before this edit (concurrent-agent count-drift
       ;; caution -- not an assumed fixed number): 208 -> 209.
-      (is (= 209 (:implemented m))))))
+      ;; 209 -> 210: cloud-itonami-isic-1072 (Manufacture of sugar) fresh
+      ;; from-scratch scaffold (no prior repo existed; the entry's old
+      ;; :repo/:business-id pointed at a never-created
+      ;; gftdcojp/cloud-itonami-C1072 placeholder). SugarOpsAdvisor <->
+      ;; Sugar Governor sugar-manufacturing plant-operations-coordination
+      ;; actor mirroring cloud-itonami-isic-1061's [Grain mill products]
+      ;; verified module shape (sugarops.* in place of millops.*), with
+      ;; polarization-below-minimum/color-exceeds-max/
+      ;; ash-content-exceeds-max/so2-residue-exceeded independently
+      ;; verified physical checks in place of mycotoxin/ash-range, a
+      ;; sulfite-label-mismatch check driven by an SO2-ppm declaration
+      ;; threshold (in place of a grain-source allergen table), and a
+      ;; batch-not-registered invariant generalized to every allowed op
+      ;; (not only :coordinate-shipment as in millops); 55 tests / 179
+      ;; assertions green, independently re-verified against a fresh
+      ;; clone; promoted :spec -> :implemented, superproject
+      ;; ADR-2607154600
+      ;; (cloud-itonami-isic-1072-sugar-manufacturing-coverage.md).
+      ;; Live-recomputed via `(industry/maturity-summary)` immediately
+      ;; before this edit on a freshly re-fetched origin/main
+      ;; (concurrent-agent count-drift caution -- not an assumed fixed
+      ;; number): 209 -> 210.
+      (is (= 210 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
