@@ -104,3 +104,77 @@ ROCmノード、~20秒/枚）が `kotoba-lang/murakumo` の `fleet.edn`（mesh 1
 既知の簡略化（ドキュメント化済み、CUEとの厳密な等価ではない）: `#Context` のリテラル文字列値ピン
 （JSON-LD名前空間URI）は構造的な `:string` として検証（正確なリテラル一致はチェックしない）。CUEの
 2要素タプル `[int, int]` は要素の型のみ検証し、要素数=2の制約は強制しない。
+
+## Addendum 3（2026-07-13〜14）— 決定の訂正: Dapr/ConnectRPC/Lexical を除去（cljs 移行ではなく退役）
+
+当初の決定（本文 #2/#3、「Dapr actor/workflow・ConnectRPC・Lexical の cljc 代替が実在しない状態で
+削除すれば、動いている storyboard editor が失われる」）を**訂正する**。オーナーからの追加調査指示を受け、
+実際に調べた結果、これらは調査前提が誤っていた（"動いている" という前提が成立しなかった）:
+
+- `apps/web` の実UIは、パネル編集/読み込み等の実際に動く機能を `apps/web/src/lib/server/*`
+  （TypeScript、localStorage ベース）で完結させており、`apps/server` の ConnectRPC サービスを
+  **そもそも経由していない**（fetch ベースの独自クライアントに既に置き換わっていた）。
+- `apps/server` の Dapr ワークフロー機能（"autopilot"/チャット自律生成）は、`ChatPanel.svelte` が
+  実クライアントに存在しないメソッド（`startAutonomousGeneration` 等6個）を呼んでおり、UIから
+  **到達不能**だった。
+- `apps/web` の Lexical リッチテキストエディタ（`LexicalSceneEditor.svelte`）はどこにもマウントされて
+  おらず、**参照ゼロ**（データは保存されず、`localStorage` にすら書かれていなかった）。
+
+オーナー指示「ok, では 移行済みであれば lexical, dapar, connect は除去してok」（cljs での再実装ではなく、
+すでに死んでいる/他所に移行済みなら単純除去でよい、という条件付き承認）に基づき、以下を実施:
+
+- `apps/server` の外部インターフェース全体を退役: `internal/dapr/{activities,actors,workflows}.go`、
+  `internal/service/*.go`（9ファイル）、`internal/mcp/server.go`、`internal/jsonld/`、
+  `proto/{storyboard.proto,storyboard.pb.go,storyboardpbconnect/}`、
+  `scripts/validate_storyboard.cljs`（唯一の呼び元が消えたため連鎖削除）、`cmd/server/main.go`、
+  `apps/dapr/components/statestore.yaml`。**残したもの**: `cmd/mcp-cursor`（独立MCPサーバー）、
+  `cmd/indexer`（`internal/index` のみに依存、無関係）——いずれも削除対象への依存ゼロ。
+  `go mod tidy` で `connectrpc.com/connect`・`github.com/dapr/go-sdk`・
+  `google.golang.org/protobuf` 等を除去、`go build`/`go vet`/`go test` クリーン。
+- `apps/web` から Lexical関連パッケージ7個・ConnectRPC関連2個を除去。ただし `@bufbuild/protobuf`
+  は**復元**——`manga-layouts.ts`（Storyboard系10コンポーネントが使用するローカルスキーマ構築、
+  RPCとは無関係）が実際に必要としていたため、一度除去してリグレッションを確認してから戻した。
+  `LexicalSceneEditor.svelte`/`lexical/KindleNodes.ts` は削除。
+- 検証: TypeScript の `tsc --noEmit` エラー件数・エラーコード集合が変更前後で完全一致（リグレッション
+  ゼロ）であることを2回（Dapr/ConnectRPC/Lexical除去後、下記Addendum 4の変更後）確認。
+- 副次的訂正: README の別の警告（2026-06、「`kami-app-sip-clj` に後継された」）も誤りと判明——
+  当該プロジェクトは `orgs/etzhayyim/com-etzhayyim-sip` に移動済みで、自身のREADME上も
+  read-only な storyboard *reader*（保存/編集/RPC/チャット/PDF/ジョブキュー無し）であり、この
+  パイプラインの編集機能を代替していない。実際の公開コンテンツ制作フローは
+  `orgs/com-junkawasaki/org-spirit-in-physics-comics/` の手編集EDN + babashka静的サイト生成で、
+  上記のいずれにも依存しない別経路。
+
+## Addendum 4（2026-07-14）— 残存クリーンアップ4件
+
+Addendum 3 の退役後もリポジトリに残っていた副産物4件を一括で清掃（オーナー指示「1,2,3,4」）:
+
+1. **`internal/resolver/hybrid.go` + `internal/vectors/store.go` を削除** — Addendum 3 の前後どちらの
+   時点でも `apps/server` 内に消費者ゼロだった既存の死んだコード（今回の退役の副産物ではない、
+   別経路で以前から孤立していたもの）。`go build`/`go vet`/`go test` クリーン、`go.mod`/`go.sum`
+   変更なし。
+2. **`ChatPanel.svelte` の壊れたUI呼び出しを除去** — 実クライアントに存在しない6メソッド
+   （`getChatSessions`/`saveChatSession`/`analyzeStructure`/`interactWithAI`/
+   `startAutonomousGeneration`/`terminateAutonomousGeneration`、呼べば実行時 `TypeError`）を呼ぶ
+   ボタン/ハンドラ一式を削除。実際に動く `/avatar <characterId>`（`generatePanelImage` 経由）と
+   メッセージ一覧UIのみ残す。`StoryboardEditor.svelte` が `bind:this` 経由で呼ぶ命令的メソッド
+   （`triggerAgent`/`addMessage`/`addContext`）は互換スタブとして維持（呼び元がクラッシュしないように。
+   機能自体は元から壊れていたAI連携なので no-op で十分）。存在しない `onApplyPatches` prop への
+   参照（`interactWithAI` が無いため元々到達不能だった patches 機能）も合わせて除去。
+3. **`storyboard_pb.ts`（2688行）を394行に縮小** — 元は退役済み27RPCメソッド分のprotobuf-es v2
+   生成コードだったが、`apps/web` が実際に使う型は7メッセージ（`Panel`/`PanelData`/`Dialogue`/
+   `GeneratedImage`/`MangaLayout`/`MangaPanelLayout`/`MangaText`、Storyboard系コンポーネントの
+   ローカルデータ型としてのみ使用、RPCとは無関係）のみ。元の`proto/storyboard.proto`から該当
+   メッセージ定義をフィールド名/番号/型を保ったまま抽出した最小proto（`manga_layout.proto`）を
+   スコープ限定の`buf.gen.yaml`（ES/TSプラグインのみ、Go/ConnectRPCプラグインは含めない）で
+   再生成。
+4. **README の Neo4j/producer/Wattpad 節を訂正** — 2026-07-10 addendum で「このチェックアウトに
+   実装が存在しない」と確認済みだったにもかかわらず本文がそのまま残っていた、存在しない
+   Next.js+Neo4j `producer/` アプリのアーキテクチャ図・技術スタック・プロジェクト構造・
+   クイックスタート・Wattpad自動投稿CLI手順・ロードマップchecklistを削除し、実際の構成
+   （`apps/web`/`apps/image-gen-clj`/`apps/server`（`cmd/mcp-cursor`,`cmd/indexer`のみ）/
+   `org-spirit-in-physics-comics`）の短い説明に置き換えた。
+
+検証: `go build`/`go vet`/`go test` クリーン。`tsc --noEmit` は変更前のmainと完全に同じエラー
+集合（20件、同ファイル・同コード）。`svelte-check` は変更前より8件少ない（ChatPanel.svelteの
+壊れた呼び出しに起因した既存エラーが解消）、新規エラーはゼロ（`StoryboardEditor.svelte`の
+`onApplyPatches` 参照削除も含めて file:line 差分で確認）。
