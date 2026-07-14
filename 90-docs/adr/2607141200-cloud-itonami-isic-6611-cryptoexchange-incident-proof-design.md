@@ -294,6 +294,27 @@ M4b `8c37ac7`。すべて design/testnet-only、実資金・実鍵・実チェ�
 follow-up（未着手）: 公開 JSON を消費する self-contained ブラウザ検証ページ
 （第 4 の独立実装）と、artifact を配信する discovery surface。
 
+## Addendum 11（2026-07-14）: Gnosis Safe execTransaction の WYSIWYS デコード（ETH cold 完成）
+
+Addendum 10（ETH 直接送金）の残タスク、Safe multisig 経路を実装（衛星 `6b02c19`）。
+Safe からの出金は直接送金でなく、外側 tx は Safe コントラクト宛で**実宛先は calldata
+内**にある。`wysiwys-eth/decode-safe` が Safe `execTransaction` calldata を ABI デコード
+して実 intent を復元:
+- selector `0x6a761202`（eth-crypto の keccak256 で検証）を確認 → head 10 word +
+  dynamic bytes を解析。
+- **native** move → `(to, value)`。**ERC-20** `transfer(address,uint256)`
+  （`0xa9059cbb`）→ `(token, to, amount)`。
+- **DELEGATECALL（operation 1）と未知の inner call は fail-closed**（宛先に還元できない
+  署名はしない）。
+- `verify-safe` が custody kernel の verifier-match flag を駆動 → Safe 署名者は Safe
+  アドレスでなく**真の受取人**を確認する。Bybit 型（外側は Safe 宛だが実宛先が intent と
+  相違）は flag 0 → code 6。
+- JVM 専用（`.clj`）、CLJS primary は非巻き込みを検証。テストは実 execTransaction
+  calldata を組み立て native / ERC-20 / delegatecall / 未知 inner を往復検証。
+- 検証: JVM 91 tests / 17,011 assertions（+4）、CLJS 71、clj-kondo 0。
+- これで custody ADR §1 の ETH cold（Safe multisig）の WYSIWYS が完成。BTC/ETH 両鎖の
+  cold custody 検証が直接送金 + Safe/multisig まで揃った。
+
 ## Addendum 10（2026-07-14）: real Ethereum WYSIWYS デコーダ（kotoba-lang/eth-crypto 活用）
 
 Addendum 9（BTC）の ETH 版（衛星 `a0dd379`）。`cryptoexchange.wysiwys-eth` が
