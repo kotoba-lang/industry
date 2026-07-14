@@ -3046,12 +3046,15 @@
    :business-id "cloud-itonami-isic-1311"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :blueprint
-   ;; Promoted :spec -> :blueprint in the 衣食住 scaffold batch
-   ;; (ADR-2607122200): blueprint repo published (Community Textile
-   ;; Spinning, :textile-spinning-governor), no actor implementation
-   ;; claimed — wave-3 robotics-gated per ADR-2607121000. Stale
-   ;; gftdcojp C-prefix :repo URL replaced by the real satellite.
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as textile-mill operations actor
+   ;; (Textile Operations Advisor ⊣ Textile Mill Governor), wave-3 production
+   ;; complete: Governor with hard/soft gates (spec-basis, plant/batch verification,
+   ;; process-control block, quality-defect escalation), Advisor proposals (batch-logging,
+   ;; schedule-maintenance, flag-quality-defect, coordinate-shipment), state machine,
+   ;; regulatory facts, comprehensive test suite (36 tests). Domain boundary: logistics &
+   ;; compliance paperwork around textile production, NOT process engineering (spinning/
+   ;; carding control, fibre parameters remain engineer-exclusive). Modeled on 1910.
    :operating-states [:intake :design :produce :inspect :package :audit]},
   {:id "1312"
    :name "Weaving of textiles"
