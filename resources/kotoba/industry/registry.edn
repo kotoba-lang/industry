@@ -6279,11 +6279,46 @@
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "6391"
    :name "News agency activities"
-   :repo "https://github.com/gftdcojp/cloud-itonami-J6391"
-   :business-id "cloud-itonami-J6391"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :phone]
-   :optional-technologies []
-   :maturity :spec
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6391"
+   :business-id "cloud-itonami-isic-6391"
+   ;; No :robotics/:phone -- narrowed from a generic telecom-shaped
+   ;; stub to a news-wire operator (story intake/sourcing/legal-
+   ;; sensitivity screening/distribution/correction), an information/
+   ;; media-content business, not a physical-dispatch or telephony one
+   ;; -- same "no robotics" exemption class as -isic-6310/-6910/-8291/
+   ;; -4690/-4610/-6311/-6312/-7820 (most directly -6312 "Web portals":
+   ;; an information actor that never handles physical delivery).
+   :required-technologies [:identity :forms :dmn :audit-ledger]
+   :optional-technologies [:bpmn]
+   :maturity :implemented
+   ;; real actor: newswire.{store,registry,advisor,governor,phase,
+   ;; actor,sim}.cljc -- Wire Advisor sealed advisor ⊣ Wire Governor
+   ;; (:wire-governor). Domain logic modeled on cloud-itonami-isco-3521
+   ;; (media.store/advisor/governor/actor, this fleet's closest domain
+   ;; analog -- media content moving from creation/verification to
+   ;; distribution); repo-layout/deps.edn/ADR convention modeled on
+   ;; cloud-itonami-isic-6130 (this fleet's most recent fresh-scaffold
+   ;; precedent, landed same day). source-not-verified-gate (a story
+   ;; must have a verified source record before distribution) and
+   ;; embargo-violated-gate (newswire.registry/embargo-violated?, a
+   ;; genuinely NEW temporal ground-truth-recompute check kind for this
+   ;; fleet -- independently recomputes whether `now` is still before
+   ;; the story's own recorded embargo instant) are HARD, un-
+   ;; overridable. legally-sensitive-gate (ongoing litigation/
+   ;; unverified criminal allegations) is SOFT/always-escalate,
+   ;; independently ground-truth-recomputed off the story's own field
+   ;; rather than gated behind a prior screening call (no "forgot to
+   ;; screen" loophole for a defamation/liability risk). This fleet's
+   ;; FIRST asymmetric dual-actuation shape: :actuation/distribute MAY
+   ;; auto-commit at phase 3 when clean/non-sensitive, but
+   ;; :actuation/issue-correction (issuing a correction or retraction
+   ;; for an already-distributed story) NEVER auto-commits at any
+   ;; phase -- a distinct, always-human-signoff act, enforced
+   ;; independently by both the governor's high-stakes set and the
+   ;; phase table. :effect is always the literal :propose -- the actor
+   ;; never itself pushes content to the wire. Closes ISIC Wave 0's
+   ;; LAST class-level gap (ADR-2607121000), alongside
+   ;; cloud-itonami-isic-6130's own same-day promotion.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :provision :route :bill :support :audit]},
   {:id "6399"

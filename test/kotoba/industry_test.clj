@@ -381,6 +381,8 @@
     (is (= :implemented (industry/maturity "6120"))))
   (testing "cloud-itonami-isic-6130 (Satellite telecommunications activities, fresh scaffold -- no prior blueprint repo; Satellite Operations Advisor ⊣ Satellite Network Governor, mirroring cloud-itonami-isic-6190's/6120's module shape -- same ISIC 61xx telecom industry -- while citing satellite-licensing/ITU-coordination spec-basis, a distinct regulatory regime; registered directly at :implemented with no prior :blueprint stage) is also :implemented"
     (is (= :implemented (industry/maturity "6130"))))
+  (testing "cloud-itonami-isic-6391 (News agency activities, fresh scaffold -- no prior blueprint repo; Wire Advisor ⊣ Wire Governor, domain logic modeled on cloud-itonami-isco-3521 [this fleet's closest domain analog], repo-layout on cloud-itonami-isic-6130; HARD-gates a story's sourcing completeness and an independently ground-truth-recomputed embargo instant, SOFT-escalates a legally-sensitive flag recomputed the same way [no 'forgot to screen' loophole]; this fleet's FIRST asymmetric dual-actuation shape -- :actuation/distribute may auto-commit at phase 3 when clean, :actuation/issue-correction never auto-commits at any phase; registered directly at :implemented with no prior :blueprint stage; closes ISIC Wave 0's LAST class-level gap alongside cloud-itonami-isic-6130's own same-day promotion) is also :implemented"
+    (is (= :implemented (industry/maturity "6391"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -568,7 +570,33 @@
       ;; before claiming :implemented. Closes the last ISIC Wave 0
       ;; class-level gap alongside "6391" (left untouched -- a possible
       ;; concurrent sibling build). See superproject ADR-2607141800.
-      (is (= 149 (:implemented m))))))
+      ;; 149 -> 150: cloud-itonami-isic-6391, registered directly at
+      ;; :implemented -- no prior :blueprint stage; the legacy
+      ;; placeholder :repo (gftdcojp/cloud-itonami-J6391) was confirmed
+      ;; 404 before this edit. Wire Advisor ⊣ Wire Governor news-wire-
+      ;; operator actor; domain logic (advisor/governor/store split, no
+      ;; DatomicStore) modeled on cloud-itonami-isco-3521 (this fleet's
+      ;; closest domain analog -- media content moving from creation/
+      ;; verification to distribution), repo-layout/deps.edn/ADR
+      ;; convention on cloud-itonami-isic-6130 (this fleet's most
+      ;; recent fresh-scaffold precedent, landed the same day).
+      ;; embargo-violated? (newswire.registry) is a genuinely NEW
+      ;; temporal ground-truth-recompute check kind for this fleet
+      ;; (independently recomputes whether `now` is still before the
+      ;; story's own recorded embargo instant); legally-sensitive-
+      ;; violations is likewise independently ground-truth-recomputed
+      ;; off the story's own field rather than gated behind a prior
+      ;; screening call. This fleet's FIRST asymmetric dual-actuation
+      ;; shape: :actuation/distribute may auto-commit at phase 3 when
+      ;; clean/non-sensitive, but :actuation/issue-correction never
+      ;; auto-commits at any phase (enforced independently by both the
+      ;; governor's high-stakes set and the phase table) -- issuing a
+      ;; correction/retraction for an already-distributed story is a
+      ;; distinct, always-human-signoff act. 37 tests/94 assertions run
+      ;; green before claiming :implemented. Closes ISIC Wave 0's LAST
+      ;; class-level gap -- ISIC Wave 0 is now 100% :implemented at the
+      ;; class level. See superproject ADR-2607142100.
+      (is (= 150 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
