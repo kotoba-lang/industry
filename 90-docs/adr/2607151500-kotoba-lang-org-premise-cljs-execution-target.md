@@ -203,6 +203,37 @@ cljs backendのi64 wraparound/cap-callは意図的な未対応スコープとし
   算術をBigInt化する複雑さに見合わない——正直な既知ギャップとして
   文書化する方を選んだ。
 
+## 2026-07-14 Addendum 1 — cljs backendの`cap-call`未対応gapを解消
+
+本ADR着地時点で正直に記録していた既知の限界——「`cap-call`はcljs側の
+host-import機構が無いためemit時にreject」——を実際に解消した
+（`kotoba-lang/compiler`、`4e06992`→`1455568`、`gh api .../merges`で
+サーバ側マージ、west pin `--entry compiler`で前進済み: `4e06992a0e92`→
+`1455568d4a3b`）。
+
+**実装**: emitされるモジュールが`set-cap-dispatch!`（`fn [cap-id value]
+-> i64`を受け取る関数）をexportするようにした——`kotoba$cap-dispatch`
+という`defonce` atomにインストールされ、WASM backendの`kotoba:cap` host
+importに相当するcljs側の等価物になる。hostは`main`を呼ぶ**前**に
+`set-cap-dispatch!`を呼ぶ——WASM/nativeバックエンドの「hostがmemoryに
+書き込んでから`main`を呼ぶ」規約と同じ形。dispatcherが未インストールの
+場合は全ての`cap-call`が`:capability-denied`で拒否される——fail-closed、
+`kotoba-lang/kotoba`自身の`has-capability-fn`（「no POLICY grants
+NOTHING」）と同じ設計判断に揃えた。
+
+**検証**: 実`nbb`実行で両方のシナリオを確認——(1)
+dispatcher未インストール時に`capability-denied`が投げられること、
+(2) `set-cap-dispatch!`でインストールした関数へcap-id/valueが正しく
+渡り、その戻り値が`main`の結果になること。コミット済みテストも
+既存の「emit時にreject」テストを置き換える形で2件追加
+（`cap-call-with-no-dispatcher-installed-is-denied-fail-closed`/
+`cap-call-dispatches-to-the-installed-host-function`）。
+`clojure -M:test`: 142 tests / 2842 assertions、0 failures。
+
+**残るgap**: i64 wraparoundの未対応は本Addendumのスコープ外——
+引き続き正直な未対応事項として`backend/cljs.clj`のdocstringに記載
+したまま。
+
 ## References
 
 - 90-docs/adr/2607150000-kotoba-lang-extension-triage-langchain-persistence-kotobase.md

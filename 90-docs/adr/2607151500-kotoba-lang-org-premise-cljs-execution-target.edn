@@ -138,6 +138,48 @@
              namespace)"
             "README.md (documented the new target in the architecture
              diagram + a new prose section)"]}}
+  :adr/cap-call-support-2026-07-14
+  {:summary "Closed the cap-call gap documented at initial landing: the
+             cljs backend previously rejected any KIR function body using
+             cap-call at emit time (no cljs-side host-import wiring). Now
+             emits an exported set-cap-dispatch! (a fn [cap-id value] ->
+             i64) the host installs before calling main -- this backend's
+             equivalent of WASM's kotoba:cap host import."
+   :design
+   ["defonce kotoba$cap-dispatch atom, defaults to nil"
+    "set-cap-dispatch! (public defn) installs the host's dispatch fn"
+    "kotoba$cap-call (private) looks up the dispatcher; throws
+     :capability-denied if none installed -- fail-closed, matching
+     kotoba-lang/kotoba's own has-capability-fn convention (no policy
+     grants nothing) rather than defaulting to permissive"
+    "cap-id is always a literal integer in [0,255] (validated by
+     frontend.clj's validate-expr, never itself an expression) -- passes
+     through lower-expr unchanged, only the value argument recurses"]
+   :verification
+   {:real-nbb-execution "hand-verified before committing: both the
+                         no-dispatcher-denies-fail-closed case and the
+                         dispatcher-installed-dispatches-correctly case,
+                         via real nbb (ClojureScript-on-Node) execution"
+    :committed-tests "the old cap-call-is-rejected-at-emit-time test
+                       replaced with 2 new deftest: cap-call-with-no-
+                       dispatcher-installed-is-denied-fail-closed and
+                       cap-call-dispatches-to-the-installed-host-function"
+    :full-suite "clojure -M:test: 142 tests / 2842 assertions, 0 failures"}
+   :landed
+   {:repo "kotoba-lang/compiler" :commits "4e06992 -> 1455568"
+    :method "sibling worktree outside superproject, gh api merges server-side
+             merge, branch+worktree cleanup"
+    :west-pin "compiler 4e06992a0e92 -> 1455568d4a3b (--entry minimal diff,
+               verify-west-pins OK)"
+    :files ["src/kotoba/compiler/backend/cljs.clj (removed reject-cap-call!,
+             added kotoba$cap-dispatch/set-cap-dispatch!/kotoba$cap-call
+             prelude fns, cap-call case in lower-expr)"
+            "test/kotoba/compiler/backend_cljs_test.clj (2 new deftest
+             replacing the old rejection test)"
+            "README.md (updated the cljs backend section)"]}
+   :remaining-gap "i64 wraparound parity via BigInt remains deferred, out
+                    of scope for this addendum -- still documented honestly
+                    in backend/cljs.clj's own docstring"}
   :adr/decision-not-made
   ["rewriting kotoba-lang's general-purpose libraries (langchain/langgraph/
     kotobase/UI layer) into .kotoba -- wrong shape, rejected on the same
