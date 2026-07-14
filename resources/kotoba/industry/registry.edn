@@ -4558,13 +4558,17 @@
    :business-id "cloud-itonami-isic-4100"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :blueprint
-   ;; Promoted :spec -> :blueprint in the 衣食住 scaffold batch
-   ;; (ADR-2607122200): blueprint repo published (Community Building
-   ;; Construction, :building-construction-governor), no actor
-   ;; implementation claimed — wave-3 robotics-gated per
-   ;; ADR-2607121000. Stale gftdcojp F-prefix :repo URL replaced by
-   ;; the real satellite.
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as site-operations-coordination
+   ;; actor (Building Advisor ⊣ Building Governor), the thirty-eighth
+   ;; build outside ADR-2607032000's original insurance/real-estate batch
+   ;; and the second in the construction/buildings vertical (after 4211's
+   ;; disaster/severe-weather safety). Implements site-operations
+   ;; coordination (trade dispatch, progress logging, safety hazard
+   ;; flagging, inspection scheduling), NOT direct construction work or
+   ;; building certification (exclusive to licensed
+   ;; inspector/engineer). Scope narrower than 4211 (no disaster-response
+   ;; specificity), uses 4211 as architecture template.
    :operating-states [:intake :design :permit :build :inspect :audit]},
   {:id "4210"
    :name "Construction of roads and railways"
