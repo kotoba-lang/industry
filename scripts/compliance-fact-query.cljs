@@ -124,7 +124,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-iso3166-swe/data/datascript-tx.edn"}
    {:label "cloud-itonami-assoc-6120-usa-ctia association.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-assoc-6120-usa-ctia/schema/association-rule.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-assoc-6120-usa-ctia/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6120-usa-ctia/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-can-toronto ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-can-toronto/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-can-toronto/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 

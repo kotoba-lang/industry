@@ -803,6 +803,23 @@ md/edn)の最終内容だけをそのまま持ち越してpush(west.ymlはmain�
 現状: 国軸12件・業界団体軸14件(9業種)・自治体軸3件——29tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 30 — 自治体軸4件目(トロント))
+
+`cloud-itonami-municipality-can-toronto`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-can-toronto/commit/2bad815))：
+実在2件、両方ともPDF本文(いずれもCity Clerk署名のcertified true copy)を
+Readツールで直接確認(Toronto Municipal Code Chapter 545, Licensing:
+現行版発効2025-01-01、Code自体の原始制定は検索で裏付けた2001-01-01施行を
+併記／Chapter 67, Fair Wage: 2024-05-23市議会採択・By-law 498-2024が
+2024-07-01施行、現行版発効2025-05-01——脚注のEditor's Noteで直接確認)。
+4 tests/11 assertions green。
+
+31リポジトリ・639 factを統合。`"ordinance/topic" "licensing"`での
+自治体横断queryでlondon(2件)とtoronto(1件)を横断取得できることを確認。
+
+現状: 国軸12件・業界団体軸14件(9業種)・自治体軸4件——30tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
