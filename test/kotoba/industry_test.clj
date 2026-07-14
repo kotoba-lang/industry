@@ -834,7 +834,46 @@
       ;; `(industry/maturity-summary)` immediately before this edit on a
       ;; freshly re-fetched origin/main (202, not assumed) after a first
       ;; landing attempt against a now-stale base hit a 409.
-      (is (= 203 (:implemented m))))))
+      ;; 203 -> 204: cloud-itonami-isic-1030 (Processing and preserving of
+      ;; fruit and vegetables), promoted :spec -> :implemented. The entry
+      ;; had pointed at a never-created gftdcojp/cloud-itonami-C1030
+      ;; placeholder. A prior attempt on this class had honestly
+      ;; self-reported that its own registry-promotion commit never
+      ;; landed (left correctly at :spec), but independent verification
+      ;; found the actor code it had pushed was itself genuinely broken,
+      ;; not just the registry step: `facts.cljc` still defined MEAT
+      ;; product types (fresh-beef/fresh-pork/fresh-poultry/processed-
+      ;; sausage) and FSIS citations left over from a copy-pasted
+      ;; meat-processing template, and `governor.cljc` read a
+      ;; `:storage-time-max-days` key those meat-domain jurisdictions
+      ;; never had, throwing a NullPointerException on a real
+      ;; `:log-production-batch` proposal (baseline `clojure -M:test`:
+      ;; 28 tests / 106 assertions / 4 failures / 2 errors). Rebuilt
+      ;; `facts`/`store`/`advisor` with real canned/frozen/dried
+      ;; fruit-and-vegetable domain content (FDA/EFSA/MHLW jurisdictions,
+      ;; harvest-lot/residue-screening/spoilage-flag evidence, a
+      ;; low-acid-canning botulism-risk scheduled-process citation), and
+      ;; closed a governance gap: the Governor was missing three of the
+      ;; domain design's explicit HARD invariants (closed op-allowlist,
+      ;; `:effect :propose`-only, plant/batch-must-be-registered) and
+      ;; read high-stakes/escalation off the advisor's self-reported
+      ;; `:stake` instead of `(:op request)`, which would have let
+      ;; `:flag-food-safety-concern` auto-commit instead of always
+      ;; escalating -- fixed by adopting cloud-itonami-isic-1071's more
+      ;; defensible op-based pattern (module shape otherwise mirrors
+      ;; cloud-itonami-isic-1050's MockAdvisor + StateGraph-stub + 0->3
+      ;; phase-gate shape). 39 tests / 160 assertions green, independently
+      ;; re-verified against a fresh clone; superproject
+      ;; ADR-2607152800 (cloud-itonami-isic-1030-fruit-vegetable-
+      ;; processing-coverage.md). Live-recomputed via
+      ;; `(industry/maturity-summary)` immediately before this edit on a
+      ;; freshly re-fetched origin/main (203, not assumed) after a first
+      ;; landing attempt against a now-stale base hit a 409 because the
+      ;; sibling cloud-itonami-isic-0893 promotion landed first --
+      ;; confirmed by the test runner itself, `expected: (= 203
+      ;; (:implemented m)) actual: (not (= 203 204))`, not by a static
+      ;; grep.
+      (is (= 204 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
