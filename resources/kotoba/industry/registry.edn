@@ -2808,13 +2808,17 @@
    :operating-states [:intake :survey :extract :grade :ship :audit]},
   {:id "0891"
    :name "Mining of chemical and fertilizer minerals"
-   :repo "https://github.com/gftdcojp/cloud-itonami-B0891"
-   :business-id "cloud-itonami-B0891"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0891"
+   :business-id "cloud-itonami-isic-0891"
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as a chemical-mineral-mining actor
+   ;; (ChemMine Advisor ⊣ ChemMine Governor), Wave 3 mining expansion.
+   ;; Supports back-office coordination: production logging, maintenance scheduling,
+   ;; safety escalation, shipment coordination. Explicitly excludes extraction/blasting/
+   ;; mine-safety-authority decisions. All .cljc portable, 44 tests/204 assertions.
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :survey :extract :grade :ship :audit]},
+   :operating-states [:intake :log-production :schedule-maintenance :flag-safety :coordinate-shipment :audit]},
   {:id "0892"
    :name "Extraction of peat"
    :repo "https://github.com/gftdcojp/cloud-itonami-B0892"
