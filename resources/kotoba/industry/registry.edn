@@ -2645,13 +2645,23 @@
    :operating-states [:intake :survey :advise :treat :record :audit]},
   {:id "0145"
    :name "Raising of swine/pigs"
-   :repo "https://github.com/gftdcojp/cloud-itonami-A0145"
-   :business-id "cloud-itonami-A0145"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0145"
+   :business-id "cloud-itonami-isic-0145"
+   :required-technologies [:robotics :identity :forms :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :survey :advise :treat :record :audit]},
+   :maturity :implemented
+   ;; Swine-farm-operations actor implementation complete (2026-07-15):
+   ;; SwineOpsAdvisor ⊣ SwineFarmOperationsGovernor pattern, closed op
+   ;; allowlist (log-herd-record/schedule-veterinary-visit/
+   ;; flag-animal-health-concern/order-supplies), direct treatment
+   ;; administration and slaughter/culling decisions permanently blocked.
+   ;; Scope: swine-farm back-office coordination only (no direct animal
+   ;; handling). Propose-only operations; animal health/biosecurity
+   ;; concerns (e.g. suspected ASF) always escalate. Mirrors
+   ;; cloud-itonami-isic-0141's (cattle-raising) module shape,
+   ;; module-for-module. Superproject ADR-2607154000. 31 tests / 99
+   ;; assertions green.
+   :operating-states [:intake :advise :govern :decide :commit :hold]},
   {:id "0146"
    :name "Raising of poultry"
    :repo "https://github.com/gftdcojp/cloud-itonami-A0146"
