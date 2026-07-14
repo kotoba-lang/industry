@@ -125,6 +125,23 @@ errand（ADR-2607141654: agent が準備し、人間が外界に触れ、その�
   follow-up）へ — この時点で ADR-2607141654 の「2 個目の消費者」条件が成立し、
   errand の kotoba-lang 切り出しを再評価。
 
+## Addendum 1 — M0 実装完了（2026-07-14 同日、cloud-itonami `2eca25c5`）
+
+`license_effects.cljc`（errand → activity/effect の薄い投影。effect id は
+case+step から決定的 + transact 前存在確認で upsert 巻き戻しを防止）、
+runtime-handlers に `:license.errand/dispatch`（**承認 = 実行を引き受けた記録。
+外部送信ゼロ — 台帳へ `:errand/sent` を追記するだけ**）、tick-loop に license
+pass（`:license-ledger-path` opt、drain! より前）。JVM E2E smoke 実測:
+propose 2 → 承認 merge → `:errand/sent` → 以後 propose 0 / 早期 nudge 0。
+
+実測で直した flow バグ: in-flight errand がある case が次 step まで起案されて
+いた → **1 case 1 in-flight** に修正（license-loop propose）。evidence は M0
+どおりチャット / CLI。suite 358 tests / 4041 assertions（既存 baseline 2 fail のみ）。
+
+運転開始は launchd/cron の `clojure -M:tick-loop` 呼び出しに
+`:license-ledger-path resources/licenses/itad-license-ledger.edn` を渡すだけ
+（既存 tick-loop 運用に相乗り）。
+
 ## Consequences
 
 - (+) 新しい UI をゼロから作らない: 組織 = 既存 cockpit approvals、個人 = 既存
