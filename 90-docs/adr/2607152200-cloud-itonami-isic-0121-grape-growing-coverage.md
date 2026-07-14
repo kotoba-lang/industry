@@ -135,5 +135,17 @@ integration pending.
   root-commit).
 - Registry entry (`kotoba-lang/industry`) updated in place: `"0121"`
   entry's `:maturity` `:spec` → `:implemented`, `:repo`/`:business-id`
-  set to `cloud-itonami-isic-0121` and this ADR referenced. See
-  verification block appended after the registry merge lands.
+  set to `cloud-itonami-isic-0121` and this ADR referenced. Landed via
+  GitHub API server-side merge commit
+  `848dc0cee59c0b0a1da1bfaafb453a85c72e7e68` onto `main` (no 409, landed
+  on first attempt). `industry_test.clj`'s `maturity-summary` assertion
+  bumped from 193 to 194 — the true count recomputed from a real
+  `clojure -M:test` run against the live `registry.edn` (a naive
+  `grep -c ':maturity :implemented'` undercounted by 1; the baseline run
+  at `HEAD` before this edit was already green at 193, and the run after
+  the edit failed with `actual: (not (= 193 194))`, giving the correct
+  bump target). Post-merge, `clojure -M:test` from a **completely fresh
+  clone** of `kotoba-lang/industry`'s `main` (with `kotoba-lang/technology`
+  re-cloned as its `../technology` sibling, per `industry`'s own
+  `deps.edn` local/root dependency) → "Ran 15 tests containing 941
+  assertions. 0 failures, 0 errors."
