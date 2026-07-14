@@ -311,6 +311,59 @@
                         version), unchanged -- flipping this to
                         prior-shortcut-kotoba/prior-shortcut? remains an
                         explicit owner decision, not done here"}
+  :adr/cloud-itonami-governor-wired-2026-07-14
+  {:summary "Applied addendum 3's same 'wire a verified drop-in function,
+             don't flip the live call site' pattern to the ORIGINAL
+             subject of this whole line of work: cloud-itonami's credit
+             governor (ADR-2607150000 addendum 5). The 'facade not wired'
+             gap existed symmetrically on both the kototama-internal port
+             and the cloud-itonami port; this closes it for the latter."
+   :new-namespace
+   "credit.kernels.gate-kotoba (src/credit/kernels/gate_kotoba.clj) --
+    verdict-code/phase-disposition/phase-reason with the EXACT SAME
+    signatures as credit.kernels.gate's own in-process functions, hosted
+    via kototama.tender against the compiled credit_verdict.wasm/
+    credit_phase.wasm. credit.governor/check (calls gate/verdict-code
+    directly, line ~227) and credit.phase/gate (calls kernel/phase-
+    disposition + kernel/phase-reason, lines ~103-104) could be pointed
+    at this namespace with no other change -- NOT done here. Flipping
+    either means every proposal credit.governor/check evaluates crosses
+    a real WASM instantiation boundary in production, a real behavior/
+    performance change to a live decision gate -- left for an explicit
+    owner decision, same reasoning as kototama.unspsc.organism's."
+   :verification
+   {:full-battery-three-way "test/credit/kernels/gate_kotoba_test.clj
+                              calls BOTH credit.kernels.gate's in-process
+                              functions and gate-kotoba's WASM-backed ones
+                              against credit.kernels.gate.cljc's own full
+                              52-case battery, asserting three-way
+                              agreement (expected == in-process ==
+                              WASM-backed) on every case"
+    :full-suite "clojure -M:test: 59 tests / 659 assertions, 0 failures
+                 (existing suite, including wasm.credit-verdict-test/
+                 wasm.credit-phase-test/credit.kernels.gate-test,
+                 unaffected)"}
+   :dependency-isolation
+   "kototama.tender (Chicory, transitively) kept out of this repo's main
+    :deps -- test-alias-only, same as the pre-existing wasm.*-test
+    namespaces, so requiring credit.governor/credit.phase never forces
+    it on a consumer who doesn't want the WASM-backed variant"
+   :landed
+   {:repo "cloud-itonami/cloud-itonami-isic-6492" :commits "main -> 73d9815"
+    :method "sibling worktree outside superproject (kototama/langgraph/
+             langchain mirrored via symlink for the offline test run), gh
+             api merges server-side merge, branch cleanup"
+    :west-pin "n/a -- cloud-itonami-isic-6492 is not west-registered in
+               this superproject (independent repo under the cloud-itonami
+               org, already noted in ADR-2607150000 addendum 5)"
+    :files ["src/credit/kernels/gate_kotoba.clj (new)"
+            "test/credit/kernels/gate_kotoba_test.clj (new, 2 deftest
+             covering the full 52-case battery)"
+            "wasm/README.md (new section documenting the wired function)"]}
+   :honest-limitation "credit.governor/check and credit.phase/gate still
+                        call the in-process credit.kernels.gate directly,
+                        unchanged -- flipping either to gate-kotoba
+                        remains an explicit owner decision, not done here"}
   :adr/decision-not-made
   ["rewriting kotoba-lang's general-purpose libraries (langchain/langgraph/
     kotobase/UI layer) into .kotoba -- wrong shape, rejected on the same
