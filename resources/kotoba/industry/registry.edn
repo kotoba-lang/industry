@@ -2922,13 +2922,16 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1040"
    :name "Manufacture of vegetable and animal oils and fats"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C1040"
-   :business-id "cloud-itonami-C1040"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1040"
+   :business-id "cloud-itonami-isic-1040"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :optional-technologies [:telemetry :optimization]
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as an oils/fats manufacturing actor
+   ;; (OilsFatsOps-LLM ⊣ Oils/Fats Manufacturing Governor). Full blueprint +
+   ;; reference implementation in cloud-itonami-isic-1040. See
+   ;; superproject ADR-2607141400 for integration notes.
+   :operating-states [:intake :assay :schedule :coordinate :package :audit]},
   {:id "1050"
    :name "Manufacture of dairy products"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1050"
@@ -3083,13 +3086,20 @@
    :operating-states [:intake :design :produce :inspect :package :audit]},
   {:id "1312"
    :name "Weaving of textiles"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C1312"
-   :business-id "cloud-itonami-C1312"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1312"
+   :business-id "cloud-itonami-isic-1312"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :maturity :implemented
+   ;; Promoted :blueprint -> :implemented as textile-mill operations actor
+   ;; (Textile Operations Advisor ⊣ Textile Mill Governor), Wave 3 production
+   ;; complete: Governor with hard/soft gates (spec-basis, plant/batch verification,
+   ;; loom-control block, quality-defect escalation), Advisor proposals (batch-logging,
+   ;; schedule-maintenance, flag-quality-defect, coordinate-shipment), state machine,
+   ;; regulatory facts, comprehensive test suite (30 tests). Domain boundary: logistics &
+   ;; compliance paperwork around textile production, NOT process engineering (loom/
+   ;; weave parameters remain engineer-exclusive). See ADR-2607141000.
+   :operating-states [:intake :design :produce :inspect :package :audit]},
   {:id "1313"
    :name "Finishing of textiles"
    :repo "https://github.com/gftdcojp/cloud-itonami-C1313"
