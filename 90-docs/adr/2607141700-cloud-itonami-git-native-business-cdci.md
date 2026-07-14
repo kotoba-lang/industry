@@ -244,3 +244,41 @@ runner は merge 後 — 二重ゲート構造は現行のまま）。
   `business_governor.cljc` / `approval.cljc` / `mail.cljc` / `tick.cljc` /
   `workers/mail-inbound/index.js` / `scripts/mail-drain.bb` /
   `.github/workflows/{ci,deploy}.yml`（両方 inert）/ `lefthook.yml`（2026-07-14）
+
+## Addendum (2026-07-14, same day): M0 + M1 implemented and landed
+
+- **M0 done** — `cloud-itonami.ops-ledger`（新規）+ `approval.cljc` hook:
+  approve!/reject!/request-changes! の review verdict と merge! の
+  merged/failed outcome を kotoba-ledger `file-git` backend へ dual-write
+  （1 decision = 1 git commit）。デフォルト無効（opts `:ops-ledger` /
+  `ITONAMI_OPS_REPO_DIR`）、fail-open、CLJS no-op、store は正本のまま。
+  cloud-itonami `e6eb2d1c`。テスト: dual-write 2-commit 化 / 失敗 outcome /
+  二重記録なし / fail-open の 4 本。
+- **M1 done（合成 push-gate + ops-repo）** —
+  - kotoba-rad `c71ee568`: `push-gate/authorized-signers-cacao` +
+    `authorize-push-multi-cacao?`（quorum、signer distinctness、
+    `:exclude-dids` による self-approve 禁止、min-signers 0 = auto-merge
+    tier、`:cacao-opts {:now}` で expiry 強制）。60 tests / 94 assertions。
+  - cloud-itonami `f1263424`: `cloud-itonami.ops-repo` —
+    `refs/itonami/<lane>/main` + `refs/itonami/proposals/<lane>/<id>` を
+    kotoba-git 上に実体化、`propose!`（lane main を親に持つ proposal
+    commit = PR 到着）、`merge-proposal!` =
+    `kotoba-git.ref-policy/set-ref-guarded!`（shape: ff-only）∧
+    `authorize-merge?`（identity/quorum: risk tier 表のとおり read-only 0 /
+    external-send 1 / financial 2+keiei / destructive owner-only、未知 risk
+    fail-closed）。実 Ed25519 鍵 + 実 CACAO delegation chain（org root →
+    部長 → 部員、sub-delegation は `covers?` で昇格不可）で permission
+    matrix を E2E 検証（9 tests）。capability resource は kotoba-rad の
+    `kotoba-rad://<rid>/push/<ref>` scheme をそのまま採用（本文の
+    `itonami://` 表記はこの scheme に写像される — code repo と ops repo で
+    委任語彙を分けない）。
+- 本文からの設計上の確定差分: 「合成 push-gate を kotoba-rad へ」は、
+  kotoba-git/kotoba-rad の decoupling を保つため 2 段構成にした —
+  quorum/identity 側を kotoba-rad（`authorize-push-multi-cacao?`）、
+  shape との合成点は既存の `kotoba-git.ref-policy/set-ref-guarded!`
+  （caller-supplied predicate）に置き、risk tier の結線は消費者
+  （`cloud-itonami.ops-repo/authorize-merge?`）が持つ。
+- **未達（M2 以降）**: itonami-runner（post-merge executor）、mail-drain の
+  proposal 化（KV → proposal commit）、org root key の実 mint と保管
+  （現状テストは fixture seed のみ — 本番鍵の custody 手順は follow-up の
+  まま）、merge 署名 UI、kotobase replica 接続。
