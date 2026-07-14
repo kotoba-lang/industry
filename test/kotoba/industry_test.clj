@@ -567,7 +567,7 @@
       ;; msisdn-invalid-format?). 36 tests/173 assertions run green
       ;; before claiming :implemented. Closes the last ISIC Wave 0
       ;; class-level gap alongside "6391" (left untouched -- a possible
-      ;; concurrent sibling build). See superproject ADR-2607141500.
+      ;; concurrent sibling build). See superproject ADR-2607141800.
       (is (= 149 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
