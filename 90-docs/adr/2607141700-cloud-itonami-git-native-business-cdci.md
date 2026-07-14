@@ -671,3 +671,25 @@ cloud-itonami `3e04db5c`。R2 の暗号コア(kotoba-rad)を消費して、§2 �
   kotobase/B2 replica へ push/pull する経路(と、whole-repo でなく per-object
   粒度への細分化)。crypto と repo 統合は完了、あとは転送層。
   他の残 gap: merge 署名 UI、残 lane 委任、nbb 実送信、R4 PQ hybrid。
+
+## Addendum (2026-07-14, same day): nbb 実送信 — outbound の JVM 残渣を解消
+
+cloud-itonami `d6b307a5`。オーナー方針「nbb, cljs を想定」の最後のピース。
+send は JVM に残っていた(mailer は cljc だが mail.cljc が cheshire/
+java.net.http 依存)が、これを portable 化した:
+
+- `cloud-itonami.mail-send`: Resend POST を `mailer.core`(cljc)だけから
+  組み、**両ホスト同期**の transport で送る — :clj は java.net.http、:cljs は
+  `child_process.execFileSync` 経由の **curl**(Node の fetch は Promise-only
+  なので、runner の sync 契約を守るため curl 同期。npm 依存なし)。
+  `send-handler` が runner の :mail/send handler。
+- `ops-cli.cljs` に実 `run` コマンド(classpath に mail/mailer 追加)。これで
+  **outbound の全経路が nbb で完結**: propose → governor → 署名 merge →
+  runner → **実 Resend 送信** → bot 署名 receipt。
+- **nbb live 実証**: 実 draft PR を kagi の sales-head 鍵で署名 merge →
+  `ops-cli.cljs run`(curl POST)で **実送信**(provider id 返却)、receipt の
+  bot 署名も verified。**経路に JVM 無し**。
+- JVM の `-M:ops-send run` は第 2 ホストとして存置。**唯一残る JVM-only は
+  inbound mail の Datom store 投影(`-M:ops-drain`)**。
+- 成熟度表: 「nbb 実送信」gap を **完了**。残 gap: R2 transport endpoint 配線、
+  merge 署名 UI、残 lane 委任、inbound の store 投影の nbb 化、R4 PQ hybrid。
