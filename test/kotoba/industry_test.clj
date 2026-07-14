@@ -731,7 +731,20 @@
       ;; :flag-state (no maritime-zone/EEZ concept for inland waters);
       ;; 20 tests / 31 assertions green, independently re-verified against
       ;; a fresh clone; promoted :spec -> :implemented, ADR-2607142230.
-      (is (= 197 (:implemented m))))))
+      ;; 197 -> 198: cloud-itonami-isic-0111 (Growing of cereals, except
+      ;; rice) rebuilt from scratch (cerealops.governor/store/advisor/
+      ;; facts/registry/operation/phase/sim, module structure mirrored
+      ;; from cloud-itonami-isic-0141, 30 tests / 96 assertions green,
+      ;; independently re-verified against a fresh clone) after deleting
+      ;; a broken same-day stray artifact (missing advisor.cljc, missing
+      ;; 3/5 test namespaces, unresolvable deps.edn local/root
+      ;; dependency); promoted :spec -> :implemented, superproject
+      ;; ADR-2607152500 (renumbered from an original 2607152200 slot,
+      ;; claimed first by a concurrent session's cloud-itonami-isic-0121
+      ;; ADR). Live-recomputed via `(industry/maturity-summary)`
+      ;; immediately before this edit, per the batch's concurrent-agent
+      ;; count-drift caution.
+      (is (= 198 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
