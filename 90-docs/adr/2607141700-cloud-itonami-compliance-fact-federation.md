@@ -787,6 +787,19 @@ Commitment: PDF埋め込みメタデータの作成日2016-07-26を確認)。4 t
 "consumer-protection"`での横断queryでCTIAの2件を含む9団体10件が
 取得できることを確認。
 
+**worktree/branch移行**: このtickのpush時、`loop-compliance-fact-federation`
+ブランチ(旧`chore/pin-kototama-fence-gated`から分岐した長寿命branch)が
+`west-pin-verify-guard`フックにブロックされた——west.ymlは本ADRの作業では
+一度も触っていないが、branch分岐後にmain側で他の並行セッションが
+数十リポジトリ分のpinを前進させており、その古いwest.ymlスナップショットを
+そのまま抱えたbranchをpushすると「pin退行」の偽陽性として検出される。
+west.ymlの大規模generatedファイルをローカルmerge/rebaseで戦うのは方針
+違反(rebase禁止)のため、代わりに現在のorigin/mainから新規worktree
+(`/tmp/root-compliance-fact-federation-2`、branch
+`loop-compliance-fact-federation-2`)を切り、この3ファイル(script+ADR
+md/edn)の最終内容だけをそのまま持ち越してpush(west.ymlはmain由来の
+正しい状態のまま無変更)。以後のtickはこの新worktreeで継続する。
+
 現状: 国軸12件・業界団体軸14件(9業種)・自治体軸3件——29tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
