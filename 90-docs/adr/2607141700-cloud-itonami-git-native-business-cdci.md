@@ -583,3 +583,28 @@ cloud-itonami `4d4eeb22`。live 運転で最大の運用リスクだった「委
 - 成熟度表の更新: 「chain 再 mint 運用」gap を **D→V**(監視 + 再 mint とも
   実装・検証済み、live で監視実測)。残 gap: runner bot の execute-only 鍵、
   kotobase replica / rad R2、merge 署名 UI、残 lane 委任、nbb 実送信。
+
+## Addendum (2026-07-14, same day): execute-only runner bot 鍵 — 職務分掌の execute 側を暗号学的に閉じた
+
+cloud-itonami `e6437585`。§3 の職務分掌は propose/approve までは鍵で強制
+されていたが、execute 側(runner)は鍵レスで receipt も無署名だった。これを塞ぐ:
+
+- runner が各 receipt を **execute-only bot 鍵**(kagi
+  `itonami-runner-bot`、did `z6MkvmMJ…FWmq`、`ITONAMI_OPS_RUNNER_SEED` でも可)
+  で署名 — `:runner-did` + `:runner-sig`(receipt の安定 identity =
+  merged-cid/lane/effect-id/kind/status/ts に対する Ed25519)。
+  `ops-runner/verify-receipt` が replay 検証。
+- **bot 鍵には merge chain を一切発行しない**(ops-identity の delegate に
+  ならない)。これで proposer / approver / executor が**3 つの相異なる鍵**に
+  なった — bot did を merge signer として提示しても authorize する chain が
+  無いので何も通らない。
+- opt-in: bot 鍵未設定なら receipt 無署名(後方互換)。exec 3 経路
+  (ops-drain / ops-send / ops-cli.cljs run)に配線、`ops-cli.cljs audit
+  <ops-repo> [expect-did]` で全 receipt の bot 署名を検証。
+- 検証: JVM 3 tests(署名 receipt の検証・改ざん検知・expect-did 一致/不一致・
+  無署名は attestation なし・bot did ≠ owner)+ **nbb 実運用**(kagi 実 bot 鍵で
+  署名 run-dry → `audit` が `runner-verified? true`)。ed25519 は cljc(M8a)
+  なので nbb でも署名・検証する。参照先は skill `secrets-location-map` に追記。
+- 成熟度表: 「runner bot の execute-only 鍵」gap を **D→K**(実鍵配備 + 実運用
+  検証)。残 gap: kotobase replica / rad R2、merge 署名 UI、残 lane 委任、
+  nbb 実送信、expiry check の自動アラート化。
