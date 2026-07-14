@@ -470,6 +470,87 @@ pinを`--entry`最小diffで前進済み: `7d27613c9a32`→`68c15a436333`）。
   ため、`when`と同じ制約）。ネストしたloop、外側の`let`からの自由変数
   キャプチャ、複数defn間でのヘルパー名の一意性はすべてテストで確認済み。
 
+## 2026-07-14 Addendum 5 — cloud-itonami isic-6492 の governor 判定ロジックを `.kotoba` へ narrow-slice port（最終ピース、本ADR完了）
+
+「んー、実際に安全性を高めて運用したいので .kotoba を使いたいんですよねぇ.
+できれば cloud-itonami は kotoba で動かしたい」（本ADRの発端の指示、message 4）
+から続く一連の作業の最後のピースとして、ADR-2607141900 が承認した
+narrow-slice porting パターンに従い、`cloud-itonami-isic-6492` の governor
+判定ロジック本体（`credit.kernels.gate/verdict-code` + `phase-disposition`/
+`phase-reason`、およびそれぞれの依存関数群）を実際に `.kotoba` へ移植した
+（`cloud-itonami/cloud-itonami-isic-6492`、`main`→`6383859`、`gh api
+.../merges`でサーバ側マージ、sibling worktree、branch cleanup完了）。
+
+`affordability.kotoba`（ADR-2607072600 の先行実装）は affordability
+サブチェックのみの移植だったが、今回は governor の**判定ロジック本体**
+（hard-violation 判定 + confidence 判定 + actuation escalation の合成、
+および phase gate の write/auto 可否判定）を移植した——`credit.governor/
+check`の全体ファサード（mutable `store`読み取り、文字列`:detail`メッセージ
+構築、fact catalog lookup）は ADR-2607141900 の決定どおり引き続き対象外。
+
+**発見: 移植コストがゼロに近かった理由**——`credit.kernels.gate.cljc`は
+そもそも「safe-kotoba subset」という設計方針で**既に**書かれていた
+（同ファイルのdocstringが明記: 純整数演算、ネストした`if`、`=`/`<`のみ、
+keyword/map/atom/host interop一切なし——`.kotoba`/wasm emission自体は
+2026-07-12時点でオーナー判断により意図的に未配線のままだった）。実装時に
+必要だった変更は「2つの named constant（`confidence-floor-x100`=60、
+`affordability-ceiling-x100`=43）をリテラルにinline化する」の1点のみ
+——`kotoba-lang/kotoba`の`wasm-binary`が top-level `def`を認識せず
+（`function-defs`は`defn`のみ拾う、`def`は黙って無視される——エラーにも
+ならない）、`affordability.kotoba`が既に確立していたのと同じ回避策。
+
+**ファイルが2つに分かれた理由**: `kotoba-lang/kotoba`のwasmモジュールは
+エントリポイントを`main`1つしかexportしない（`wasm-binary`のexport-section
+は常に`main`+`memory`のみ）ため、`verdict-code`（governor全体の verdict）
+と`phase-disposition`/`phase-reason`（phase gate）は別モジュールにする
+必要があった。`phase-disposition`/`phase-reason`は入力形状・分岐構造が
+完全に一対一で共有（`op-write-enabled`/`op-auto-enabled`という同じ依存
+関数を2つとも呼ぶ）なので、2モジュールに複製するのではなく、1つの
+`credit_phase.kotoba`の`main`が両方を`10*disposition + reason`に
+pack して返す設計にした（disposition/reasonは常に{0,1,2}なので
+losslessに`quot`/`rem`でunpack可能、hostがunpackする）。
+
+**検証（gate.cljc自身の実行可能な"battery"を ground truth として直接再利用
+——このADR系列で初めて、参照実装の既存テストケースをそのまま流用する形の
+検証ができた）**:
+1. `credit.kernels.gate.cljc`の`battery`（52ケース: verdict 21 + afford 10 +
+   phase 21）の**入力/期待値の組をそのまま**、コミット前に独立した
+   scratchスクリプトで`kotoba-lang/kotoba`自身の実`wasm-binary` +
+   実Chicory実行（`kototama`を経由しない直接パス）に流し、52/52 pass
+   （0 failures）を確認。
+2. `kototama.tender`経由の正式テスト（`test/wasm/credit_verdict_test.clj`/
+   `test/wasm/credit_phase_test.clj`、新規、既存`wasm/affordability_test.clj`
+   と同型）でも同じbatteryケースを全て再現、`clojure -M:test`:
+   **57 tests / 596 assertions、0 failures**（既存`credit.kernels.gate-test`
+   のin-process battery実行を含む既存スイートは無変更で通過）。
+   `clojure -M:lint`: エラー0・警告0。
+3. 実際の`bin/kotoba-clj wasm emit --package-lock kotoba.lock.edn --json`
+   （scratchの直接API呼び出しではなく、既存precedentと同じ実CLI経由）で
+   両ファイルをコンパイルし、`kotoba.package/receipt`の`:verified? true`
+   （package-lock検証込み）を確認した上でcheck-in。
+
+**正直に記録する限界**:
+- fleet deployment（`verify_node.cljs`/`server.cljs`配線、murakumo
+  LaunchDaemonへのロールアウト）は今回のスコープ外——affordability check
+  自身が「コンパイル+検証」（ADR-2607072600）と「fleet配備」
+  （ADR-2607082000）を別ステップにした前例と揃え、同じ切り分けを維持した。
+- `credit.governor/check`の全体ファサード（mutable store・文字列構築・
+  fact catalog lookup）は意図的に非移植のまま——ADR-2607141900の
+  narrow-slice方針どおり、判定ロジックの核だけが`.kotoba`側に存在し、
+  ファサード自身がこの先コンパイル済みWASMを呼び出す統合（今回は未実装、
+  affordability checkの既存パターンと同じ「hostが呼ぶ側」の対応）は
+  followupとして残る。
+- `cloud-itonami-isic-6492`はこのsuperprojectのwest manifestに登録
+  されていない（`gftdcojp`ではなく`cloud-itonami` org配下の独立リポジトリ
+  ——west pinの前進は不要、このADRへの記録のみで完結する）。
+
+**本ADR（ADR-2607150000）のスコープはこれで完了**——Addendum 1（langchain.db
+kotobase永続化）→ Addendum 2（compiler/へand/or/when+map/keyword/get/assoc）
+→ Addendum 3（kotoba/へ同等実装）→ Addendum 4（compiler/へ
+destructuring/vector-as-data/loop-recur）→ Addendum 5（cloud-itonami
+governorの`.kotoba`移植、本ADRの発端だった安全性目的の実現）という
+5段階すべてが着地した。
+
 ## References
 
 - 90-docs/adr/2607141600-kotoba-kotoba-lang-compiler-kototama-aiueos-consolidation-experiment.md

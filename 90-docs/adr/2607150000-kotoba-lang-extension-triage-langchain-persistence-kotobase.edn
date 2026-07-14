@@ -455,6 +455,90 @@
              (new, 25 deftest)"
             "test/kotoba/compiler/test_runner.clj (registered the new
              namespace)"]}}
+  :adr/cloud-itonami-isic-6492-governor-kotoba-port-2026-07-14
+  {:summary "Final piece of this ADR's original motivating request (message
+             4: owner wants cloud-itonami running on .kotoba for safety).
+             Narrow-slice ported credit.kernels.gate's governor DECISION
+             CORE (verdict-code + hard-violation/affordability-exceeded/
+             confidence-low/combinators, and phase-disposition/phase-reason
+             + op-write-enabled/op-auto-enabled) into .kotoba, per
+             ADR-2607141900's approved pattern. credit.governor/check's
+             full facade (mutable store, string :detail construction, fact
+             catalog lookups) remains correctly out of scope, unchanged."
+   :why-porting-was-nearly-free
+   "credit.kernels.gate.cljc was ALREADY written in the safe-kotoba subset
+    style (pure integer arithmetic, nested if, =, <, no keywords/maps/
+    atoms/host-interop) -- its own docstring states .kotoba/wasm emission
+    was deliberately not wired yet (owner decision 2026-07-12: ClojureScript
+    + kotoba-datomic first), specifically to keep this door open without a
+    rewrite. The only change needed: inlining its 2 named constants
+    (confidence-floor-x100=60, affordability-ceiling-x100=43) as literals,
+    since kotoba-lang/kotoba's wasm-binary silently ignores top-level def
+    (only ns/defn are recognized by function-defs) -- same workaround
+    affordability.kotoba already established."
+   :why-two-files
+   "a kotoba-lang/kotoba wasm module exports exactly one entry point
+    (main) -- verdict-code and phase-disposition/phase-reason had to be
+    separate modules. phase-disposition and phase-reason share input
+    shape and branch structure one-for-one (both call op-write-enabled/
+    op-auto-enabled), so rather than duplicate that dependency across 2
+    modules, credit_phase.kotoba's single main packs both into one
+    return value (10*disposition + reason, always losslessly unpackable
+    via quot/rem since both are always in {0,1,2})."
+   :verification
+   {:battery-reuse
+    "credit.kernels.gate.cljc's OWN executable battery (52 cases: 21
+     verdict + 10 afford + 21 phase) was reused directly as ground truth
+     -- the first time in this ADR's addenda that a reference
+     implementation's own existing test cases were reused verbatim
+     rather than hand-constructed"
+    :independent-pre-commit-check
+    "before committing, ran all 52 battery cases through kotoba-lang/
+     kotoba's own real wasm-binary + real Chicory execution directly (not
+     via kototama), 52/52 pass"
+    :kototama-tender-tests
+    "new test/wasm/credit_verdict_test.clj + credit_phase_test.clj (same
+     shape as the existing wasm/affordability_test.clj), same 52 battery
+     cases. clojure -M:test: 57 tests / 596 assertions, 0 failures
+     (existing suite, including credit.kernels.gate-test's own in-process
+     battery run, unaffected). clojure -M:lint: 0 errors, 0 warnings"
+    :real-cli-compile
+    "both .kotoba files compiled via the actual bin/kotoba-clj wasm emit
+     --package-lock kotoba.lock.edn --json CLI (not a programmatic
+     shortcut), :kotoba.package/verified? true confirmed before check-in"}
+   :honest-limitations
+   ["fleet deployment (verify_node.cljs/server.cljs wiring, murakumo
+     LaunchDaemon rollout) explicitly out of scope -- mirrors how
+     affordability's own compile+verify (ADR-2607072600) and fleet-deploy
+     (ADR-2607082000) were kept as separate steps"
+    "credit.governor/check's full facade remains unported by design --
+     only the pure decision core moves to .kotoba; the facade calling the
+     compiled WASM (rather than its own in-process logic) is unimplemented
+     follow-up work, same as affordability's own pattern"
+    "cloud-itonami-isic-6492 is not west-registered in this superproject
+     (independent repo under the cloud-itonami org, not gftdcojp) -- no
+     west pin to advance, this ADR entry is the only record"]
+   :landed
+   {:repo "cloud-itonami/cloud-itonami-isic-6492" :commits "main -> 6383859"
+    :method "sibling clone outside superproject (with sibling kotoba-lang/
+             kototama and com-junkawasaki/langgraph-clj mirrored via
+             symlink/shallow-clone to satisfy deps.edn :local/root paths
+             for a full offline test run), gh api merges server-side merge,
+             branch cleanup"
+    :files ["wasm/credit_verdict.kotoba (new)"
+            "wasm/credit_verdict.wasm (new, compiled via bin/kotoba-clj)"
+            "wasm/credit_phase.kotoba (new)"
+            "wasm/credit_phase.wasm (new, compiled via bin/kotoba-clj)"
+            "test/wasm/credit_verdict_test.clj (new, 5 deftest)"
+            "test/wasm/credit_phase_test.clj (new, 8 deftest)"
+            "wasm/README.md (documented the new port, ABI, rebuild steps)"]}
+   :adr-scope-complete
+   "This ADR's 5-addendum arc is now complete: Addendum 1 (langchain.db
+    kotobase persistence) -> Addendum 2 (compiler/ and/or/when + map/
+    keyword/get/assoc) -> Addendum 3 (kotoba/ same features) -> Addendum 4
+    (compiler/ destructuring/vector-as-data/loop-recur) -> Addendum 5
+    (cloud-itonami governor ported to .kotoba, realizing the safety
+    motivation that opened this whole ADR)."}
   :adr/decision-not-made
   ["general first-class functions/closures in .kotoba -- rejected on T2 soundness grounds"
    "defprotocol/defrecord/multimethod in .kotoba -- rejected, fix the 3 affected
