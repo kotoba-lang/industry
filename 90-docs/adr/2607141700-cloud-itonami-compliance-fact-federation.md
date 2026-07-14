@@ -263,6 +263,533 @@ association-rule)の3軸すべてに実データが揃った。次tickは各軸�
 2件目(例: Wave 0 municipality の USA/Washington D.C., 6511/6511生保等
 zenginkyo以外の業種)に進む。
 
+## Addendum (2026-07-14, /loop tick 4 — 国軸2件目(USA) + worktree隔離への移行)
+
+`cloud-itonami-iso3166-usa` に `statute.facts` を追加・push
+([commit](https://github.com/cloud-itonami/cloud-itonami-iso3166-usa/commit/98a83b6)):
+実在3法令(Sarbanes-Oxley Act of 2002/15 U.S.C. Ch.98・FTC Act Section 5/
+15 U.S.C. §45・Fair Labor Standards Act of 1938/29 U.S.C. Ch.8、いずれも
+uscode.house.gov(下院法制局)の公式URLを複数の独立ソース(Cornell LII、
+govinfo.gov、DOL.gov、Justia)で照合済み——uscode.house.gov自体への直接
+WebFetchはconnection refusedで失敗したため、tick 1のe-Gov同様、複数
+独立ソースの相互照合で代替)。28 tests/90 assertions green。
+`statute/topic`横断query(`:labor`)がJPN(労働基準法)・USA(FLSA)の両方を
+正しく返すことを確認——3リポジトリ以上に拡張しても cardinality-many
+queryが機能し続けることを実証。
+
+5リポジトリ・577 factが1つのDataScript dbに統合。
+
+**worktree隔離へ移行**: 本tick開始時、`chore/pin-kototama-fence-gated`
+ブランチ(前3 tickの作業ブランチ)が、私が触っていない間に`main`へ
+切り替わっている事象を発見(reflogで確認: 他の並行セッションによる
+`git checkout main`)。commit自体は無事だったが、CLAUDE.mdが警告する
+「共有checkoutでの並行セッションによるブランチ切替」が実際に発生した
+実例。これ以降、superproject側(90-docs/adr・scripts/)の編集は
+`git worktree add`でsuperproject外(`/tmp/root-compliance-fact-federation`)
+に切った専用worktree(`loop-compliance-fact-federation`ブランチ、
+`chore/pin-kototama-fence-gated`のtipから分岐)で行う。子リポ
+(`orgs/cloud-itonami/*`)側の編集は従来どおり共有checkoutパスで行うが、
+これはstandalone plain-gitであり今回のbranch-switch問題とは無関係。
+
+## Addendum (2026-07-14, /loop tick 5 — 業界団体軸2件目(sonpo))
+
+`cloud-itonami-assoc-6512-jpn-sonpo` を新規 scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-6512-jpn-sonpo)):
+一般社団法人日本損害保険協会(GIAJ、Wikidata Q11508145、設立1946-01-18)。
+実在2件の自主規制ルール(行動規範: 制定1991-10-17・最終改定2024-03-21／
+独占禁止法遵守のための指針: 2026年1月)——今回は検索スニペットや
+ページタイトルだけでなく、**実際にPDF本文をReadツールで読み込み**、
+表紙に印字された制定・改定日付そのものを確認するという、これまでで
+最も厳密な検証を行った。ISIC 6512(損害保険、cloud-itonami-isic-8291
+接続済み12業種の1つ)に対応。4 tests/11 assertions green、clj-kondo 0/0。
+
+`scripts/compliance-fact-query.cljs`の`SOURCES`に追加。6リポジトリ・
+579 factを統合。`association-rule/isic`での横断query(zenginkyo=6419・
+sonpo=6512)が両協会のルールを正しく返すことを確認——業界団体軸内での
+複数団体比較が機能することを実証。
+
+## Addendum (2026-07-14, /loop tick 6 — 国軸3件目(GBR))
+
+`cloud-itonami-iso3166-gbr`に`statute.facts`を追加・push
+([commit](https://github.com/cloud-itonami/cloud-itonami-iso3166-gbr/commit/885408c)):
+実在3法令(Companies Act 2006/2006 c.46・Data Protection Act 2018/
+2018 c.12・Employment Rights Act 1996/1996 c.18、いずれも
+legislation.gov.ukを直接WebFetchでタイトル・chapter番号を照合——
+e-Gov・uscode.house.govと違い正常にレンダリングされ、これまでで
+最も直接検証がしやすかった)。28 tests/90 assertions green。
+
+7リポジトリ・582 factを統合。`:labor`トピックでJPN・USA・GBRの
+3か国横断queryが正しく機能することを確認——2か国から3か国への
+拡張でも federation の仕組みがそのまま機能することを実証。
+
+現状: 国軸(JPN/USA/GBR、3 entries)・業界団体軸(zenginkyo/sonpo、
+2 entries)・自治体軸(Tokyoのみ、1 entry)。
+
+## Addendum (2026-07-14, /loop tick 7 — 業界団体軸3件目(JSDA) + worktree再作成の記録)
+
+`cloud-itonami-assoc-6612-jpn-jsda`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-6612-jpn-jsda)):
+日本証券業協会(JSDA、Wikidata Q11509109、設立1973-07-01)。実在2件の
+自主規制文書(定款／協会員の投資勧誘、顧客管理等に関する規則: 制定
+1975-02-19・最終改定2026-06-16)、いずれもjsda.or.jpをWebFetchで
+直接照合。ISIC 6612(証券仲介)に対応。4 tests/11 assertions green。
+
+途中、米UK Finance(ukfinance.org.uk)・米ABA(aba.com)の2団体を
+候補として調査したが、いずれもWebFetchが403 Forbiddenで拒否され
+(bot対策と推測)、内容を直接検証できなかったため見送った——
+.or.jp系サイト(zenginkyo/sonpo/jsda)は今のところ全て問題なく
+fetchできている一方、米国の商業団体.com/.org.ukサイトは検証が
+難しい傾向が見えてきた。次回以降、米国側の業界団体を追加する際は
+別の検証経路(一次資料PDFの直接URLなど)を探す必要がある。
+
+`scripts/compliance-fact-query.cljs`に追加。8リポジトリ・584 factを
+統合。association×isicの集計queryが3団体(zenginkyo/6419・sonpo/6512・
+jsda/6612)を正しく返すことを確認。
+
+**worktree再作成**: 本tick開始時、`/tmp/root-compliance-fact-federation`
+自体が(おそらくOSの/tmp定期clearにより)消失していたが、
+`loop-compliance-fact-federation`ブランチ自体はローカルref・
+リモート(tick 6でpush済み)の両方に無事残っており、データ損失なし。
+`git worktree add`で同じtipから再作成して続行した——ブランチ切替
+問題(tick 4)とは別の、worktreeという仕組み自体の一時ファイル性に
+起因する事象。
+
+## Addendum (2026-07-14, /loop tick 8 — 国軸4件目(DEU) + ooyakeバグの2件目確認)
+
+`cloud-itonami-iso3166-deu`に`statute.facts`を追加・push
+([commit](https://github.com/cloud-itonami/cloud-itonami-iso3166-deu/commit/bf8c4f9)):
+実在3法令(Aktiengesetz株式法・Bundesdatenschutzgesetz連邦データ保護法・
+Kündigungsschutzgesetz解雇制限法、いずれもgesetze-im-internet.de
+(連邦法務省)を直接WebFetchで照合——legislation.gov.ukと同様、
+問題なくレンダリングされた)。28 tests/90 assertions green。
+
+**ooyakeのP36バグ、2件目を確認・修正**: `cloud-itonami-iso3166-deu/
+organization.edn`の`:hq`が"Bonn"(西ドイツ時代の首都、Q586)になって
+いた——JPNの"Shigaraki Palace"(tick 4)と全く同型のバグ。Wikidataで
+直接照合しBerlin(Q64、統一後1990-10-03の首都)に修正・push。
+これでJPN・DEUの2か国で同型バグを確認したことになり、**ooyake本体の
+capitals.eduが系統的な問題を抱えている可能性が高まった**(首都が
+歴史的に変遷した国では同じ不具合が起きやすいと推測)。ooyake本体の
+修正は引き続きスコープ外——検出のたびにこのADRで記録し、まとまった
+件数になったらまとめて報告する方針とする。
+
+9リポジトリ・587 factを統合。`:corporate-governance`トピックで
+JPN・USA・GBR・DEUの4か国横断queryが正しく機能することを確認。
+
+## Addendum (2026-07-14, /loop tick 9 — 国軸5件目(FRA))
+
+`cloud-itonami-iso3166-fra`に`statute.facts`を追加・push
+([commit](https://github.com/cloud-itonami/cloud-itonami-iso3166-fra/commit/fa68ff6)):
+実在3法令(Code de commerce商法典・Loi n° 78-17情報自由法(1978)・
+Code du travail労働法典)、legifrance.gouv.frを引用。Code de commerceと
+Loi 78-17は直接WebFetch照合、Code du travailはページが大きすぎて
+(約3000頁)WebFetchのcontent-size上限を超過したため、同一ドメイン+
+複数独立ソースでの相互照合(tick 1のe-Gov・tick 4のuscode.house.govと
+同水準の確度)に留めた。28 tests/90 assertions green。
+
+10リポジトリ・590 factを統合。`:data-protection`トピックでJPN・USA・
+GBR・DEU・FRAの5か国横断queryが正しく機能することを確認。
+
+現状: 国軸5件・業界団体軸3件・自治体軸1件(Tokyoのみ、引き続き最も薄い)。
+
+## Addendum (2026-07-14, /loop tick 10 — 業界団体軸4件目(Bankenverband) — 初の非JPN団体)
+
+`cloud-itonami-assoc-6419-deu-bankenverband`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-6419-deu-bankenverband)):
+Bundesverband deutscher Banken(BdB、Wikidata Q1009084、設立1951年)。
+実在2件の文書(Statutes: 2024年4月改定・By-laws of the Deposit
+Protection Fund: 2023年10月、後者はPDF本文をReadツールで直接確認)。
+**意図的にISIC 6419(銀行業)——zenginkyo(JPN)と同じコード**を選び、
+同一業種の国際比較を可能にした(業種を広げるのではなく、既存軸を
+深める方向)。4 tests/11 assertions green。
+
+11リポジトリ・592 factを統合。同一ISIC(6419)での国横断query
+(`[:find ?country ?assoc ?title :where [?e "association-rule/isic"
+"6419"] ...]`)がzenginkyo(JPN)とbankenverband(DEU)の両方を
+正しく返すことを確認——業界団体軸で初めて「同業種を複数国で比較する」
+という、当初のADRが目指していたユースケースを実証できた。
+
+現状: 国軸5件・業界団体軸4件(JPN×3・DEU×1)・自治体軸1件
+(Tokyoのみ、依然として最も薄い)。
+
+## Addendum (2026-07-14, /loop tick 11 — 国軸6件目(CAN))
+
+`cloud-itonami-iso3166-can`に`statute.facts`を追加・push
+([commit](https://github.com/cloud-itonami/cloud-itonami-iso3166-can/commit/c296be4)):
+実在3法令(Canada Business Corporations Act・PIPEDA(個人情報保護)・
+Canada Labour Code)、laws-lois.justice.gc.caを直接WebFetchで照合。
+28 tests/90 assertions green。
+
+シンガポール(sso.agc.gov.sg)を先に検討したが3候補URLすべてが
+403 Forbiddenで拒否されたため見送り、カナダに切り替えた——
+米系・シンガポール系の一部公式サイトでbot対策に阻まれる一方、
+英連邦圏でもカナダの司法省サイトは問題なく機能した。
+
+12リポジトリ・595 factを統合。`:labor`トピックでJPN・USA・GBR・DEU・
+FRA・CANの6か国横断queryが正しく機能することを確認。
+
+現状: 国軸6件・業界団体軸4件・自治体軸1件(Tokyoのみ、依然として
+突出して薄い軸)。
+
+## Addendum (2026-07-14, /loop tick 12 — 業界団体軸5件目(FINRA) — 米サイト初のfetch成功)
+
+`cloud-itonami-assoc-6612-usa-finra`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-6612-usa-finra)):
+FINRA(Financial Industry Regulatory Authority、Wikidata Q387071、
+現組織としての成立2007-07-26)。実在2件の文書(FINRA Rules/Manual・
+By-Laws of the Corporation)、finra.orgを直接WebFetchで照合——
+**このADR作業で初めて成功した米国業界団体サイト**(tick 7のABA・
+tick 10のUK Financeはいずれも403で断念)。FINRAはSEC登録の
+self-regulatory organizationであり純粋な業界団体(trade association)
+ではなく準公的な位置づけであることが、fetch成功の違いに寄与した
+可能性がある。4 tests/11 assertions green。
+
+**意図的にISIC 6612(証券仲介)——jsda(JPN)と同じコード**を選び、
+tick 10のzenginkyo/bankenverband(6419)に続く2件目の「同一業種
+国際比較」ペアを作った。13リポジトリ・597 factを統合。ISIC 6612での
+国横断queryがjsda(JPN)とfinra(USA)の両方を正しく返すことを確認。
+
+現状: 国軸6件・業界団体軸5件(JPN×3・DEU×1・USA×1、うち2業種は
+2か国で比較可能)・自治体軸1件(Tokyoのみ、依然として突出して薄い)。
+
+## Addendum (2026-07-14, /loop tick 13 — 業界団体軸6件目(NAIC) — 3ペア目の同業種国際比較が完成)
+
+`cloud-itonami-assoc-6512-usa-naic`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-6512-usa-naic))：
+NAIC(National Association of Insurance Commissioners、Wikidata
+Q6970687、1871年設立)。実在2件(Model Laws - About・Unfair Trade
+Practices Act (Model #880、Spring 2024版)、後者はPDF本文をReadツールで
+直接確認)。4 tests/11 assertions green。
+
+**NAICの性質を誤魔化さず記録**: NAICはFINRAのような直接的な
+self-regulatory organizationではなく、州保険監督官で構成される
+非政府の標準策定団体で、各州が任意採用する「モデル法」を発行する。
+既存の`:self-regulatory-code`を使い回さず`:model-law`/
+`:governance-program`という別kindを用意して区別した。
+
+**意図的にsonpo(JPN)と同じISIC 6512(保険)**を選び、6419
+(zenginkyo/bankenverband)・6612(jsda/finra)に続く**3組目の
+同業種国際比較ペア**を完成させた——業界団体軸で使っている全3業種が
+JPN+他国の両方でカバーされたことになる。14リポジトリ・599 factを
+統合。
+
+現状: 国軸6件・業界団体軸6件(3業種×2か国のペアが3組完成)・
+自治体軸1件(Tokyoのみ)——今後の最も明確なギャップは自治体軸。
+
+## Addendum (2026-07-15, /loop tick 14 — 国軸7件目(AUS))
+
+`cloud-itonami-iso3166-aus`に`statute.facts`を追加・push
+([commit](https://github.com/cloud-itonami/cloud-itonami-iso3166-aus/commit/f83bdad)):
+実在3法令(Corporations Act 2001・Privacy Act 1988・Fair Work Act
+2009)、legislation.gov.au(Federal Register of Legislation)を直接
+WebFetchで照合。28 tests/90 assertions green。
+
+15リポジトリ・602 factを統合。`:corporate-governance`トピックで
+JPN・USA・GBR・DEU・FRA・CAN・AUSの7か国横断queryが正しく機能する
+ことを確認。
+
+現状: 国軸7件・業界団体軸6件・自治体軸1件(Tokyoのみ)——14tickを
+経て自治体軸が圧倒的に薄いままであることが明確になっている。
+
+## Addendum (2026-07-15, /loop tick 15 — 業界団体軸7件目(JICPA) — 新規ISIC業種)
+
+`cloud-itonami-assoc-6920-jpn-jicpa`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-6920-jpn-jicpa)):
+日本公認会計士協会(JICPA、Wikidata Q6158230、1949年設立)。実在2件
+(倫理規則: 制定1966-12-01・最終改正2019-07-22、PDF本文をReadツールで
+直接確認／自主規制の取り組み概要ページ)。4 tests/11 assertions green。
+
+**新規ISIC業種**: これまでの6419(銀行)・6512(保険)・6612(証券)に
+続き、初めてISIC 6920(会計・税務・監査)を追加——まだ他国とのペアは
+無く、将来的な同業種国際比較の候補として残る。
+
+16リポジトリ・604 factを統合。7団体すべてを(isic, country,
+association)で集計するqueryが正しく機能することを確認。
+
+現状: 国軸7件・業界団体軸7件(4業種×3か国)・自治体軸1件(Tokyoのみ)
+——15tickを経て自治体軸が最も明確なギャップであり続けている。
+
+## Addendum (2026-07-15, /loop tick 16 — 国軸8件目(KOR))
+
+`cloud-itonami-iso3166-kor`に`statute.facts`を追加・push
+([commit](https://github.com/cloud-itonami/cloud-itonami-iso3166-kor/commit/84987cc)):
+実在3法令(商法・個人情報保護法・労働基準法)、韓国法制研究院(KLRI)の
+公式英訳ポータル(elaw.klri.re.kr)を直接WebFetchで照合。KLRI自身が
+「この英訳は参考訳であり法的正本ではない(正本はlaw.go.kr)」と明記
+しているため、`:official-klri-reference-translation`という専用の
+provenance値で正直に記録し、英訳自体を法的正本であるかのように
+扱わなかった(シンガポール調査時のsso.agc.gov.sg 403断念を踏まえ、
+今回は英語公式ソースが存在する韓国を選定)。28 tests/90 assertions
+green。
+
+17リポジトリ・607 factを統合。`:data-protection`トピックでJPN・USA・
+GBR・DEU・FRA・CAN・AUS・KORの8か国横断queryが正しく機能することを
+確認。
+
+現状: 国軸8件・業界団体軸7件・自治体軸1件(Tokyoのみ)——16tickを
+経てなお自治体軸が突出して薄く、今後取り組むべき明確な対象。
+
+## Addendum (2026-07-15, /loop tick 17 — 業界団体軸8件目(AICPA) — 4組目の同業種ペアが完成)
+
+`cloud-itonami-assoc-6920-usa-aicpa`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-6920-usa-aicpa))：
+AICPA(American Institute of Certified Public Accountants、Wikidata
+Q465177、1887年設立)。実在2件(Code of Professional Conduct: 発効
+2014-12-15・2025年12月まで更新、PDF本文をReadツールで直接確認／
+AICPA Bylaws and Implementing Resolutions of Councilダウンロード
+ページ)。4 tests/11 assertions green。
+
+**意図的にjicpa(JPN)と同じISIC 6920(会計・税務・監査)**を選び、
+6419(zenginkyo/bankenverband)・6512(sonpo/naic)・6612(jsda/finra)に
+続く**4組目の同業種国際比較ペア**を完成させた——業界団体軸で使って
+いる4業種すべてがJPN+他国のペアで揃った。18リポジトリ・609 factを
+統合。
+
+現状: 国軸8件・業界団体軸8件(4業種×2か国のペアが4組すべて完成)・
+自治体軸1件(Tokyoのみ)——17tickを経て自治体軸が圧倒的に薄いままで
+あり、今後の最優先候補。
+
+## Addendum (2026-07-15, /loop tick 18 — 業界団体軸9件目(FBF) — ISIC 6419が3か国に拡大)
+
+`cloud-itonami-assoc-6419-fra-fbf`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-6419-fra-fbf))：
+Fédération Bancaire Française(FBF、Wikidata Q3091456、2000年11月設立)。
+実在2件(Règles professionnelles・Normes professionnelles(2006〜2025年
+の14件の拘束力ある基準))、fbf.frを直接WebFetchで照合。4 tests/11
+assertions green。
+
+**ISIC 6419(銀行業)が初めて3か国に拡大**: zenginkyo(JPN)・
+bankenverband(DEU)に続きfbf(FRA)を追加し、単純なペアを超えた
+初めての3か国比較が可能になった。19リポジトリ・611 factを統合。
+
+**このtickで断念した国軸調査を記録**: 9か国目を狙って
+インド(indiacode.nic.in、PDF直リンク含め全候補URLが403)・
+アイルランド(irishstatutebook.ie、HTMLは403・PDFはsocket hang up)・
+スイス(fedlex.admin.ch、e-Gov同様JSレンダリング必須)を試したが
+いずれも検証できず断念し、業界団体軸に切り替えた——次回同じ国を
+再挑戦する際は別の検証手段(複数ソース相互照合など)を検討する
+必要があることをここに記録しておく。
+
+現状: 国軸8件(変わらず)・業界団体軸9件・自治体軸1件(Tokyoのみ)。
+
+## Addendum (2026-07-15, /loop tick 19 — 自治体軸2件目(Washington D.C.) — 長らく指摘してきたギャップに着手)
+
+`cloud-itonami-municipality-usa-washington-dc`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-usa-washington-dc))：
+これは本ADRのWave 0で当初から計画していた「JPN/Tokyo + USA/Washington
+D.C.」の2件目そのもの——国軸・業界団体軸がそれぞれ8件・9件に伸びる中、
+何tickも「最も薄い軸」と指摘し続けてきたが、ようやく着手した。
+
+実在2件(Freedom of Information Act・Human Rights Law: 1977-12-13
+制定)、いずれもcode.dccouncil.gov(DC議会法律図書館)を直接WebFetchで
+照合。4 tests/10 assertions green。
+
+**今回もニュージーランドで9か国目を試みたが断念**: legislation.govt.nz
+(3候補すべて403)・nzlii.org(403)——tick 18に続き複数の政府ポータルで
+本日WebFetchが不調気味だったため、無理に国軸を進めず、代わりに
+code.dccouncil.gov(問題なくfetchできた)で自治体軸に着手する判断を
+した。
+
+20リポジトリ・613 factを統合。tokyo・washington-dcの両方で自治体
+queryが正しく機能することを確認。
+
+現状: 国軸8件・業界団体軸9件・**自治体軸2件**(ようやく複数化)——
+3軸すべてで実データによる横断比較が可能になった。
+
+## Addendum (2026-07-15, /loop tick 20 — 業界団体軸10件目(生命保険協会) — 生保/損保を区別)
+
+`cloud-itonami-assoc-6511-jpn-seiho`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-6511-jpn-seiho))：
+一般社団法人生命保険協会(LIAJ、Wikidata Q11574460、1908年設立)。
+実在2件(行動規範・指針・自主ガイドライン等 概要ページ／業務品質評価基準
+ガイドライン（A版）: 2026年度版・作成日2026-02-26、PDF本文をReadツール
+で直接確認)。4 tests/11 assertions green。
+
+**新規ISIC区別**: ISIC 6511(生命保険)を、sonpoが既に担当している
+ISIC 6512(損害保険)とは意図的に区別した——日本では生保と損保は別々の
+業界団体が規制しており、この区別を統合せずそのまま保持した。
+
+21リポジトリ・615 factを統合。6511と6512を区別するqueryがseiho(生保・
+JPN)をsonpo(損保・JPN)・naic(損保・USA)から正しく分離することを確認。
+
+現状: 国軸8件・業界団体軸10件(5業種)・自治体軸2件——20tickを経て
+3軸すべてが実データ・個別検証済みで着実に成長している。
+
+## Addendum (2026-07-15, /loop tick 21 — 国軸9件目(NLD))
+
+`cloud-itonami-iso3166-nld`に`statute.facts`を追加・push
+([commit](https://github.com/cloud-itonami/cloud-itonami-iso3166-nld/commit/7e6f2d4)):
+実在3法令(民法第2編(法人)・GDPR施行法・労働時間法)、
+wetten.overheid.nl(オランダ政府法令ポータル)を直接WebFetchで照合
+(最初に推測したBWBR番号は404となったため、WebSearchで正しいURLを
+再取得してから照合)。28 tests/90 assertions green。
+
+22リポジトリ・618 factを統合。`:labor`トピックで9か国全て
+(JPN/USA/GBR/DEU/FRA/CAN/AUS/KOR/NLD)を横断取得できることを確認。
+
+現状: 国軸9件・業界団体軸10件・自治体軸2件——21tickを経て3軸すべてが
+実データ・個別検証済み・捏造なしで着実に成長を続けている。
+
+## Addendum (2026-07-15, /loop tick 22 — 業界団体軸11件目(日弁連) — 法務業種を新規追加)
+
+`cloud-itonami-assoc-6910-jpn-nichibenren`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-6910-jpn-nichibenren))：
+日本弁護士連合会(JFBA/日弁連、Wikidata Q11508095、1949-09-01設立、
+弁護士法45〜50条に基づく強制加入団体)。実在2件(弁護士職務基本規程:
+2004-11-10制定(会規第70号)・2021-06-11最終改正・英訳版2022年6月付、
+PDF本文をReadツールで直接確認／JFBA組織概要ページ)。4 tests/11
+assertions green。
+
+**新規ISIC業種**: ISIC 6910(法務)を、jicpa/aicpaが担当する6920
+(会計・税務・監査)とは区別して初めて追加した。
+
+23リポジトリ・620 factを統合。isic別集計queryで業界団体軸が
+6業種(6419×6・6512×4・6612×4・6920×4・6511×2・6910×2)を
+カバーしていることを確認。
+
+現状: 国軸9件・業界団体軸11件(6業種)・自治体軸2件——22tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
+## Addendum (2026-07-15, /loop tick 23 — 国軸10件目(ITA))
+
+`cloud-itonami-iso3166-ita`に`statute.facts`を追加・push
+([commit](https://github.com/cloud-itonami/cloud-itonami-iso3166-ita/commit/7a28937)):
+実在3法令(民法(1942年勅令第262号)・個人データ保護法典(2003年立法命令
+第196号)・労働者憲章(1970年法律第300号))——normattiva.it(通常引用する
+統合テキストポータル)は今回のクエリパターンで内部エラーを返したため、
+同じく公式のgazzettaufficiale.it(官報原文ポータル)を直接WebFetchで
+照合した。28 tests/90 assertions green。
+
+24リポジトリ・623 factを統合。`:corporate-governance`トピックで10か国
+(JPN/USA/GBR/DEU/FRA/CAN/AUS/KOR/NLD/ITA)全てを横断取得できることを
+確認。
+
+現状: 国軸10件・業界団体軸11件・自治体軸2件——23tickを経て3軸すべてが
+実データ・個別検証済み・捏造なしで成長を継続している。
+
+## Addendum (2026-07-15, /loop tick 24 — 業界団体軸12件目(不動産協会) — 不動産業を新規追加)
+
+`cloud-itonami-assoc-6810-jpn-recaj`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-6810-jpn-recaj))：
+一般社団法人不動産協会(RECAJ、Wikidata Q11361630、1963-03-04設立)。
+実在2件(定款: PDF本文をReadツールで直接確認し、第1条に印字された
+英文正式名称"The Real Estate Companies Association of Japan (RECAJ)"
+そのものも確認／適正取引の推進に向けた自主行動計画: 2024-06-28)。
+4 tests/11 assertions green。
+
+**新規ISIC業種**: ISIC 6810(不動産業)を初めて追加した。
+
+25リポジトリ・625 factを統合。業界団体軸は7つの異なるISICコード
+(6419/6511/6512/6612/6810/6910/6920)をカバーするようになった。
+
+現状: 国軸10件・業界団体軸12件(7業種)・自治体軸2件——24tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
+## Addendum (2026-07-15, /loop tick 25 — 国軸11件目(ESP))
+
+`cloud-itonami-iso3166-esp`に`statute.facts`を追加・push
+([commit](https://github.com/cloud-itonami/cloud-itonami-iso3166-esp/commit/0ac534d)):
+実在3法令(資本会社法統合テキスト(RDL 1/2010)・個人データ保護及び
+デジタル権保障法(LO 3/2018)・労働者憲章統合テキスト(RDL 2/2015))、
+boe.es(スペイン官報)を直接WebFetchで照合。28 tests/90 assertions
+green。
+
+26リポジトリ・628 factを統合。`:labor`トピックでこれまでの11か国全て
+を横断取得できることを確認。
+
+現状: 国軸11件・業界団体軸12件・自治体軸2件——25tickを経て3軸すべてが
+実データ・個別検証済み・捏造なしで成長を継続している。
+
+## Addendum (2026-07-15, /loop tick 26 — 業界団体軸13件目(日本銀行) — 中央銀行業を新規追加)
+
+`cloud-itonami-assoc-6411-jpn-boj`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-6411-jpn-boj/commit/63e8d67))：
+日本銀行(BOJ、Wikidata Q333101、日本銀行条例1882-06-27施行)。実在2件
+(日本銀行業務方法書: 1998-04-01初制定・2026-04-01最終改正／日本銀行の
+「独立性」と「透明性」――新日本銀行法の概要: 新日銀法(1997年改正・
+1998-04-01施行)によるガバナンス枠組みの公式解説ページ)。両方とも
+WebFetchで直接レンダリング確認(PDFフォールバック不要)。4 tests/11
+assertions green。
+
+**新規ISIC業種**: ISIC 6411(中央銀行業)を初めて追加した。NAICの
+`:model-law`/`:governance-program`区分を踏襲し、法令解説ページ側は
+`:governance-program`とした(BOJ自体が制定した規則ではなく、新日銀法が
+定めたガバナンス枠組みの公式解説であるため)。
+
+27リポジトリ・630 factを統合。業界団体軸は8つの異なるISICコード
+(6411/6419/6511/6512/6612/6810/6910/6920)をカバーするようになった。
+`"association-rule/topic" "governance"`での横断queryで13団体全ての
+governanceトピックエントリ(recaj/bankenverband/finra/fbf/nichibenren/
+aicpa/jsda/seiho/jicpa/naic/boj×2)を取得できることを確認。
+
+現状: 国軸11件・業界団体軸13件(8業種)・自治体軸2件——26tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
+## Addendum (2026-07-15, /loop tick 27 — 自治体軸3件目(ロンドン))
+
+`cloud-itonami-municipality-gbr-london`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-gbr-london/commit/d165137))：
+london.gov.uk(The London Plan掲載元)はWebFetchで403を返したため
+(このファミリーで他の政府ポータルが403/JS-onlyで落ちたのと同じ症状)、
+検索スニペットからの捏造を避け、代わりにロンドンのもう一つの一次
+ソース経路——議会が制定する"London Local Authorities Act"シリーズ
+(legislation.gov.uk の UK Local Acts、`ukla`)——に切り替えた。実在2件
+(London Local Authorities Act 2007: 2007 c. ii・Royal Assent
+2007-07-19・Part 2公衆衛生と環境/Part 3ライセンシングの見出しまで
+WebFetchで直接確認／London Local Authorities Act 2012: 2012 c. ii・
+Royal Assent 2012-03-27・street trading/licensing改正内容を直接確認)。
+UK Local Actは日本の条例やD.C. Official Codeと法的性質が異なる
+(議会制定法だが地域限定適用)ため、既存の`:municipal-code`/`:ordinance`
+を流用せず新たに`:kind :local-act`を導入した。4 tests/11 assertions
+green。
+
+28リポジトリ・632 factを統合。自治体軸は東京・Washington D.C.に続き
+3件目となり、GBR(国軸で既にiso3166-gbrが存在)との継続性も確認できた。
+
+現状: 国軸11件・業界団体軸13件(8業種)・自治体軸3件——27tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
+## Addendum (2026-07-15, /loop tick 28 — 国軸12件目(SWE))
+
+`cloud-itonami-iso3166-swe`(既存の`marketentry`実装済みリポ)に
+`statute.facts`を追加・push
+([commit](https://github.com/cloud-itonami/cloud-itonami-iso3166-swe/commit/bb596ed))：
+実在3法令(Aktiebolagslag(2005:551) 会社法・Lag(2018:218) データ保護法・
+Arbetsmiljölag(1977:1160) 労働環境法)——government.se(当初想定した
+データ保護法引用元)はWebFetchで403を返したため、代わりに
+riksdagen.se(スウェーデン議会・Svensk författningssamlingデータベース)
+を3件とも直接WebFetchで照合した。既存のooyake由来`organization.edn`の
+首都(Stockholm/Q1754)はP36バグの影響を受けていないことも確認済み。
+28 tests/90 assertions green(既存marketentryテストと合算)。
+
+29リポジトリ・635 factを統合。`:labor`トピックで12か国(JPN/USA/GBR/
+DEU/FRA/CAN/AUS/KOR/NLD/ITA/ESP/SWE)全てを横断取得できることを確認。
+
+現状: 国軸12件・業界団体軸13件(8業種)・自治体軸3件——28tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
+## Addendum (2026-07-15, /loop tick 29 — 業界団体軸14件目(CTIA) — 新規ISIC業種(無線通信))
+
+`cloud-itonami-assoc-6120-usa-ctia`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-6120-usa-ctia/commit/388fd19))：
+CTIA - The Wireless Association(Wikidata Q5014574、1984年設立)。
+www.ctia.orgはWebFetchでTLS証明書エラー(このファミリーで初めて見る
+新しい失敗モード、既知の403/JS-onlyとは別種)を返したため、同団体の
+文書配信サブドメインapi.ctia.orgに切り替え、実在2件を両方ともPDF本文を
+Readツールで直接確認(Consumer Code for Wireless Service: URLパス自体に
+含まれる2020年3月アップロードを引用／Smartphone Anti-Theft Voluntary
+Commitment: PDF埋め込みメタデータの作成日2016-07-26を確認)。4 tests/
+11 assertions green。
+
+**新規ISIC業種**: ISIC 6120(無線通信業)を初めて追加した。
+
+30リポジトリ・637 factを統合。`"association-rule/topic"
+"consumer-protection"`での横断queryでCTIAの2件を含む9団体10件が
+取得できることを確認。
+
+現状: 国軸12件・業界団体軸14件(9業種)・自治体軸3件——29tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社

@@ -46,7 +46,85 @@
     :data "orgs/cloud-itonami/cloud-itonami-municipality-jpn-tokyo/data/datascript-tx.edn"}
    {:label "cloud-itonami-assoc-6419-jpn-zenginkyo association.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-assoc-6419-jpn-zenginkyo/schema/association-rule.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-jpn-zenginkyo/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-jpn-zenginkyo/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-usa statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-usa/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-usa/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6512-jpn-sonpo association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6512-jpn-sonpo/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6512-jpn-sonpo/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-gbr statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-gbr/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-gbr/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6612-jpn-jsda association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6612-jpn-jsda/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6612-jpn-jsda/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-deu statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-deu/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-deu/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-fra statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-fra/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-fra/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6419-deu-bankenverband association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6419-deu-bankenverband/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-deu-bankenverband/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-can statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-can/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-can/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6612-usa-finra association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6612-usa-finra/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6612-usa-finra/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6512-usa-naic association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6512-usa-naic/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6512-usa-naic/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-aus statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-aus/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-aus/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6920-jpn-jicpa association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6920-jpn-jicpa/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6920-jpn-jicpa/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-kor statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-kor/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-kor/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6920-usa-aicpa association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6920-usa-aicpa/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6920-usa-aicpa/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6419-fra-fbf association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6419-fra-fbf/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-fra-fbf/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-usa-washington-dc ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-usa-washington-dc/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-usa-washington-dc/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6511-jpn-seiho association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6511-jpn-seiho/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6511-jpn-seiho/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-nld statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-nld/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-nld/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6910-jpn-nichibenren association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6910-jpn-nichibenren/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6910-jpn-nichibenren/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-ita statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-ita/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-ita/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6810-jpn-recaj association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6810-jpn-recaj/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6810-jpn-recaj/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-esp statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-esp/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-esp/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6411-jpn-boj association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6411-jpn-boj/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6411-jpn-boj/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-gbr-london ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-gbr-london/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-gbr-london/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-swe statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-swe/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-swe/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6120-usa-ctia association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6120-usa-ctia/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6120-usa-ctia/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
