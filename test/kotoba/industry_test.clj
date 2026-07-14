@@ -760,7 +760,22 @@
       ;; class; both files exist under distinct full filenames with no
       ;; path collision, left un-renumbered per this fleet's existing
       ;; same-day-renumbering-is-normal precedent, e.g. ADR-2607142200).
-      (is (= 199 (:implemented m))))))
+      ;; 199 -> 200: cloud-itonami-isic-0113 (Growing of vegetables and
+      ;; melons, roots and tubers) fresh from-scratch scaffold (no prior
+      ;; actor existed -- the entry pointed at a never-created
+      ;; gftdcojp/cloud-itonami-A0113 placeholder). VegOpsAdvisor <->
+      ;; FieldOperationsGovernor field-operations-coordination actor
+      ;; mirroring cloud-itonami-isic-0111's [Growing of cereals]
+      ;; verified module shape (vegops.* in place of cerealops.*); 30
+      ;; tests / 99 assertions green, independently re-verified against
+      ;; a fresh clone; promoted :spec -> :implemented, superproject
+      ;; ADR-2607153000. Live-recomputed via `(industry/maturity-summary)`
+      ;; immediately before this edit (a clojure.test failure diff, not
+      ;; an assumed fixed number), per the batch's concurrent-agent
+      ;; count-drift caution: 199 -> 200 confirmed by the test runner
+      ;; itself (`expected: (= 199 (:implemented m)) actual: (not (= 199
+      ;; 200))`), not by a static grep.
+      (is (= 200 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
