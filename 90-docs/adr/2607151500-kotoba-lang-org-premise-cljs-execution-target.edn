@@ -364,6 +364,51 @@
                         call the in-process credit.kernels.gate directly,
                         unchanged -- flipping either to gate-kotoba
                         remains an explicit owner decision, not done here"}
+  :adr/i64-overflow-guard-2026-07-14
+  {:summary "Narrowed (not fully closed) the i64-wraparound gap
+             documented at initial landing: exact wraparound parity would
+             need every value represented as a JS BigInt end to end, a
+             much larger invasive rewrite of this backend's whole numeric
+             representation, not attempted (no known safe-kotoba-subset
+             program needs it). Instead, every +/-/* result is checked
+             against JS's own safe-integer bound (2^53-1) and throws
+             :arithmetic-overflow rather than silently continuing with an
+             imprecise value -- the same fail-closed posture this backend
+             already takes for fuel exhaustion, division by zero, and
+             capability denial."
+   :portable-bound-check
+   "the safe-integer bound is written as a portable numeric literal
+    (9007199254740991), not js/Number.isSafeInteger -- so the check
+    evaluates identically whether the emitted source runs under real cljs
+    or, as this backend's own committed test suite does, under plain JVM
+    Clojure"
+   :verification
+   {:real-nbb-execution "hand-verified before committing: a within-range
+                         computation at the exact boundary (2^53-1) stays
+                         silent and correct; an out-of-range computation
+                         (10^16 > 2^53-1) throws :arithmetic-overflow"
+    :committed-tests "3 new deftest in test/kotoba/compiler/
+                      backend_cljs_test.clj"
+    :full-suite "clojure -M:test: 145 tests / 2848 assertions, 0 failures"}
+   :honest-remaining-limitation
+   "this is NOT exact wraparound parity -- it converts a silently-wrong
+    value into a loudly-detected exception, narrowing the gap rather than
+    closing it. wasm32/x86_64/aarch64 and the cljs backend can still
+    disagree on the VALUE for a program whose arithmetic genuinely exceeds
+    2^53-1 -- but that disagreement now surfaces as an immediate,
+    catchable exception instead of a silent divergence, consistent with
+    safe-kotoba's fail-closed design (unknown/invalid inputs degrade
+    toward LESS autonomy, never more), not a claim of true equivalence"
+   :landed
+   {:repo "kotoba-lang/compiler" :commits "1455568 -> 19275b7"
+    :method "sibling worktree outside superproject, gh api merges server-side
+             merge, branch+worktree cleanup"
+    :west-pin "compiler 1455568d4a3b -> 19275b772287 (--entry minimal diff,
+               verify-west-pins OK)"
+    :files ["src/kotoba/compiler/backend/cljs.clj (kotoba$check-safe-int
+             prelude fn, wraparound-arith-ops dispatch in lower-expr)"
+            "test/kotoba/compiler/backend_cljs_test.clj (3 new deftest)"
+            "README.md (updated the cljs backend section)"]}}
   :adr/decision-not-made
   ["rewriting kotoba-lang's general-purpose libraries (langchain/langgraph/
     kotobase/UI layer) into .kotoba -- wrong shape, rejected on the same
