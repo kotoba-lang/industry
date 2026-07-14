@@ -706,7 +706,15 @@
       ;; run green before claiming :implemented, independently
       ;; re-verified against a fresh clone; promoted :spec ->
       ;; :implemented, ADR-2607152200.
-      (is (= 194 (:implemented m))))))
+      ;; 194 -> 195: cloud-itonami-isic-0520 (Mining of lignite) fresh
+      ;; from-scratch scaffold (no prior actor existed -- the entry
+      ;; pointed at a never-created gftdcojp/cloud-itonami-B0520
+      ;; placeholder). LigniteOpsAdvisor <-> LigniteMiningGovernor
+      ;; operations-coordination actor mirroring cloud-itonami-isic-0510's
+      ;; verified module shape; 45 tests / 136 assertions green,
+      ;; independently re-verified against a fresh clone; promoted
+      ;; :spec -> :implemented, ADR-2607152300.
+      (is (= 195 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
