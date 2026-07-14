@@ -655,7 +655,14 @@
       ;; tests / 31 assertions green, independently re-verified against a
       ;; fresh clone) after its own prior docs-only/fabricated-report
       ;; revert; promoted :spec -> :implemented, ADR-2607151700. 187 -> 188.
-      (is (= 188 (:implemented m))))))
+      ;; 188 -> 189: cloud-itonami-isic-0141 promoted :spec -> :implemented
+      ;; (Raising of cattle and buffaloes; CattleOpsAdvisor ⊣
+      ;; RanchingOperationsGovernor ranch-operations-coordination actor,
+      ;; module structure mirrored from cloud-itonami-isic-1010. Reverts a
+      ;; prior same-day attempt that pushed docs+tests with no src/. 30
+      ;; tests/90 assertions run green before claiming :implemented,
+      ;; independently re-verified against a fresh clone. ADR-2607152100).
+      (is (= 189 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
