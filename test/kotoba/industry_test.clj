@@ -1000,7 +1000,22 @@
       ;; (motor-vehicle bodies/coachwork, Stamping Governor) promoted
       ;; :spec -> :implemented, superproject ADR-2607160100/ADR-2607160200 --
       ;; both native real physics-2d time-stepped simulations from day one.
-      (is (= 213 (:implemented m))))))
+      ;; 213 -> 214: cloud-itonami-isic-0122 (Growing of tropical and
+      ;; subtropical fruits) promoted :spec -> :implemented, superproject
+      ;; ADR-2607152500 (cloud-itonami-isic-0122-tropical-fruit-growing-
+      ;; coverage.md). OrchardOpsAdvisor <-> OrchardOperationsGovernor
+      ;; orchard-operations-coordination actor mirroring
+      ;; cloud-itonami-isic-0121's [Growing of grapes] verified module
+      ;; shape (orchardops.* in place of vineyardops.*), covering
+      ;; mango/banana/papaya/avocado/pineapple orchards; 30 tests / 93
+      ;; assertions green, independently re-verified against a fresh
+      ;; clone. Fresh from-scratch scaffold (no prior repo existed; the
+      ;; entry's old :repo/:business-id pointed at a never-created
+      ;; gftdcojp/cloud-itonami-A0122 placeholder). Live-recomputed via
+      ;; `(industry/maturity-summary)` on a freshly re-fetched origin/main
+      ;; immediately before this edit (concurrent-agent count-drift
+      ;; caution -- not an assumed fixed number): 213 -> 214.
+      (is (= 214 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
