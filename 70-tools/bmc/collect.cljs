@@ -21,7 +21,11 @@
 (def account "4da88288dc30d9ee257f319d3c33ecf0") ; ai-gftd-cloud
 
 (def products
+  ;; ai-gftd-apex は :stripe true (2026-07-15): gate :hyp/apex-privacy-premium の
+  ;; 分子 (apex-active-subscriptions) を stripe-summary から得る。:conversion は
+  ;; -main 内の per-product 導出 (ai-gftd-apex PR #2 semantics) で付く。
   {:ai-gftd-apex    {:zone "63132931facb26812993527da9f85186" :zone-name "gftd.ai"
+                     :stripe true
                      :workers #{"ai-gftd-chat-shell" "magatama-sh1n5h1x"}
                      :health "https://gftd.ai/"}
    :app-aozora      {:zone "cf83e7590ebb6ff47a184866e9eddbe6" :zone-name "aozora.app"
@@ -189,6 +193,13 @@
 ;; 「kotobase の初 paid tenant」を測るので、アカウント全体の active-subscriptions を
 ;; 数えると 2017 年レガシーの無関係サブスク (price=group_monthly, ¥0) を誤カウントし
 ;; gate を false-validate する。kotobase price に紐づく active sub だけを数える。
+(def apex-price-ids
+  ;; ai-gftd-apex「Gftd AI Pro」(prod_SdVVTqTHT1Z206, $20/mo)。非機密識別子 —
+  ;; ai-gftd-apex PR #2 (subscription.cljc) の定数と同一。gate
+  ;; :hyp/apex-privacy-premium の分子 (paid Plus) を account-level Stripe から
+  ;; 実カウントする (kotobase-price-ids と同じ手口)。
+  #{"price_1RiEU5BcblPoapUJY3PfDspR"})
+
 (def kotobase-price-ids
   ;; live USD prices (2026-07-02 作成・livemode:true 確認済、ADR-2607023000)。
   ;; 旧 price_1TVVI7… は live に存在せず (test/誤り) 破棄。
@@ -225,6 +236,10 @@
             ;; cloud-murakumo: 単発 credits 購入 (subscription でない)。checkout が
             ;; charge へ伝播させる metadata.product で機械判定 (2026-07-15,
             ;; cloud-murakumo fcd317d)。paid かつ非 refund のみ数える。
+            apex-active (filter #(seq (clojure.set/intersection
+                                        (sub-price-ids %) apex-price-ids))
+                                all-active)
+            apex-paid (filter invoice-paid? apex-active)
             murakumo-paid (filter #(and (true? (:paid %))
                                         (not (:refunded %))
                                         (= "cloud-murakumo" (get-in % [:metadata :product])))
@@ -232,6 +247,7 @@
         {:active-subscriptions (count kotobase-paid)     ; ← kotobase price かつ PAID のみ (gate)
          :active-subscriptions-unpaid (- (count kotobase-active) (count kotobase-paid)) ; 参考: 未払い (テスト/滞納)
          :active-subscriptions-account-wide (count all-active) ; 参考: 全体 (レガシー含む)
+         :apex-active-subscriptions (count apex-paid)   ; ← ai-gftd-apex Free→Plus 分子 (PAID のみ)
          :murakumo-paid-charges (count murakumo-paid)   ; ← cloud-murakumo funnel revenue 段
          :murakumo-paid-amount-minor (reduce + 0 (map :amount murakumo-paid)) ; 参考: 額 (通貨 minor 単位混在に注意)
          :charges-total (count (:data charges))
@@ -341,6 +357,24 @@
                 (and (:stripe cfg) stripe) (assoc :stripe stripe)
                 health (assoc :health-status (http-status health)))
             m (merge-emitter m p)
+            ;; ai-gftd-apex: Free→Plus conversion (ai-gftd-apex PR #2
+            ;; subscription.cljc の定義に一致: pct = plus/(free+plus) 4dp、
+            ;; base 空は 0.0)。plus = Stripe 実カウント (apex price, PAID のみ)。
+            ;; free = 0 が現時点の真実 — apex は Privacy Contract により
+            ;; アカウント主キーを持たず「登録済み Free ユーザー」という母集団が
+            ;; まだ存在しない (checkout + actor-binding が載ったら records 経由で
+            ;; 実数化する)。
+            m (if (= p :ai-gftd-apex)
+                (let [plus (get-in m [:stripe :apex-active-subscriptions] 0)
+                      free 0
+                      base (+ free plus)
+                      pct (if (pos? base)
+                            (/ (js/Math.round (* 10000 (/ plus base))) 10000.0)
+                            0.0)]
+                  (assoc m
+                         :subscription {:free free :plus plus :conversion-pct pct}
+                         :conversion {:pct pct}))
+                m)
             m (assoc m :signal (signal p m))]
         (spit (str out-dir "/" (name p) ".edn") (with-out-str (pprint/pprint m)))
         (println "wrote" (name p) "-" (:signal m))))))
