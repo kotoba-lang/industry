@@ -106,3 +106,57 @@ funnel の最後の未計測段(revenue)を実計測化した。実は Stripe ch
 実測(2026-07-15): 訪問 419 → 実推論 run 4(1%)→ **paid 0(実購入ゼロ、正直な 0
 から計測開始)**。全 3 段が実データ化し「未計測段」は解消。実購入第 1 号は
 checklist どおり owner の手動アクション。
+
+## Addendum 2 (2026-07-15) — qwen3.6-35b-a3b 正式化と gap 台帳
+
+### 決定: 常駐モデルを qwen3.6-35b-a3b (vision 付き) に正式化
+
+2026-07-15 朝の障害復旧時に応急で Qwen-AgentWorld (text-only) を常駐させたが、
+07-09 以降の本来の常駐は qwen3.6-35b-a3b (--mmproj vision) であり、
+network-isekai の vision critic 等が degraded になっていた。オーナー指示により
+qwen3.6-35b-a3b を正式常駐に切替 (`bb murakumo infer serve-standalone
+qwen3.6-35b-a3b`、systemd unit murakumo-standalone)。
+
+検証: /v1/models = Qwen3.6-35B-A3B-Q4_K_M / 実マゼンタ PNG の vision 判定
+「Pink」(本物の画像認識) / club-shinshi chat 3/3 クリーン返信。
+
+切替で露見した 2 つの回帰も同時修復:
+1. **間欠空返信**: Qwen3.6 の thinking が max_tokens 900 を食い潰すと text
+   不到達 → 空返信。Anthropic bridge に chat_template_kwargs pass-through を
+   追加し (local-murakumo 77f1dc7)、companion chat は enable_thinking false を
+   復元 (club-shinshi 21f9487 — OpenAI 形式時代の挙動の復元)。
+2. **孤児 </think> 漏れ**: thinking off の Qwen3.6 が応答冒頭に閉じタグだけ
+   漏らす (実測 3 回中 2 回)。strip-think を強化。
+
+### gap 台帳 (as-of 2026-07-15、live 確認済み)
+
+cloud-murakumo loop:
+- [owner 手動] 実購入ゼロ — funnel revenue 段は計測稼働、値は正直な 0。
+  第 1 号購入は実カードでの owner アクション (checklist 方針)。
+- [未着手] funnel bottleneck: 訪問→実推論 run 転換 1% < 2%。GTM 提案
+  (onboarding 摩擦削減・価格/tier 明確化) は ledger 済み、サイト実施が未。
+- [owner 判断] 次仮説が空 — riskiest validated 後の検証対象なし。候補
+  「外部推論需要者が credits に払う」。base datoms 登録は人間レビュー要。
+- [任意] spot 参照 throughput 2000 tok/s は仮定 (不利側なので結論は頑健)。
+- [自動解消] gate evidence 文字列の旧数値 → 次回 daily routine で更新。
+
+fleet/infra:
+- [解消済 → 本 addendum] 常駐モデル text-only 問題。
+- [方針待ち] 画像生成経路 down (gateway.gftd.ai 404 / /v1/images/generations
+  502)。main-2 gateway 復旧 vs gad ComfyUI (:8188 稼働中) への向け直しが未決。
+  club-shinshi requestScene がこの経路に依存。
+- [未着手] RPC ring / worker ノードのプロセス管理は旧来 nohup (systemd 化は
+  standalone のみ)。
+- [owner 方針] mining と推論の GPU 配分。
+
+ポートフォリオ (gate --all 実測): validated は cloud-murakumo と nexus-x402
+(adoption) のみ。blocked 6 件は本 ADR の emitter→collect→gate パターン横展開
+候補 — apex (Stripe 配線+転換テレメトリ) / aozora (engagement) / itonami
+(per-seat billing) / club-shinshi (creator billing、PSP 凍結は owner 判断) /
+yoro (repo 分離) / etzhayyim (RAD hook)。measuring 4 件 (yukkuri/manimani/
+kotobase/isekai) は計器あり・実績待ち。
+
+housekeeping: 他セッション WIP 棚卸し (local-murakumo voice stash retire 可 /
+cloud-murakumo generation WIP / kotoba-lang/murakumo 07-10 stash×2 /
+orgs/kotoba-lang/industry 未コミット) は git-cleanup-conflict で。wrangler CLI
+token の kv スコープ根治は POST /infer/cost/coeffs 経路で回避済みのため低優先。
