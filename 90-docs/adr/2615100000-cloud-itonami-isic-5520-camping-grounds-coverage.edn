@@ -1,0 +1,56 @@
+[{:adr/id 2615100000
+  :adr/title "cloud-itonami-isic-5520 — Camping Grounds / RV Park / Trailer Park Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-14"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-5520]
+  :adr/references [2607152500 2607121000 2607152700]
+
+  ;; Wave 4 actor (human-facing/personal-services): campground / RV-park /
+  ;; trailer-park operations coordination-only (site-occupancy record
+  ;; logging, facility maintenance scheduling, supply-restock coordination,
+  ;; guest-safety-concern flagging).
+
+  :actor/id :cloud-itonami-isic-5520
+  :actor/name "Camping Grounds / RV Park Operations Coordinator"
+  :actor/isic-rev4 "5520"
+  :actor/domain :services/camping-rv-park-operations
+  :actor/wave 4
+  :actor/coordination? true
+  :actor/robotics? false
+
+  :actor/proposal-ops [:log-site-occupancy-record :schedule-facility-maintenance
+                       :coordinate-supply-restock :flag-guest-safety-concern]
+  :actor/always-escalate-ops [:flag-guest-safety-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-supply-restock 500}
+
+  :actor/hard-checks [:site-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["issue an evacuation order" "execute evacuation" "order evacuation"
+                                "call 911" "contact emergency services" "dispatch emergency medical"
+                                "contact law enforcement" "call the police" "dispatch police"
+                                "override guest safety authority" "override safety authority"
+                                "避難命令を発令" "緊急医療を実施" "警察に通報" "消防に通報"]
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-site-occupancy-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-site-occupancy-record :schedule-facility-maintenance
+                                               :coordinate-supply-restock}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-site-occupancy-record :schedule-facility-maintenance
+                                         :coordinate-supply-restock :flag-guest-safety-concern}
+      :auto #{:log-site-occupancy-record :schedule-facility-maintenance :coordinate-supply-restock}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 48 :assertions 134 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration :store-contract]
+  :test/simulator :campgroundops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-5520"
+  :registry/business-id "cloud-itonami-isic-5520"
+  :registry/required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
