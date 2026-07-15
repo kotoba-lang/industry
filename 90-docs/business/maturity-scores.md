@@ -12,7 +12,7 @@
 | club-shinshi | 68 | 68.3 | 0 | validation=0, distribution=2 |
 | etzhayyim | 64 | 60 | 0 | revenue=0, validation=0 |
 | net-kotobase | 76 | 58.3 | 0 | validation=0, revenue=1 |
-| cloud-murakumo | 64 | 51.7 | 0 | revenue=0, validation=0 |
+| cloud-murakumo | 84 | 51.7 | 5 | revenue=0, pricing=1 |
 | network-isekai | 60 | 50 | 0 | revenue=0, validation=0 |
 | app-aozora | 64 | 46.7 | 0 | revenue=0, validation=0 |
 | ai-gftd-apex | 60 | 45 | 0 | revenue=0, validation=0 |
@@ -62,7 +62,7 @@
 
 ### cloud-murakumo
 
-- BMC: completeness=5, hypothesis=5, validation=0, pricing=1, grounding=5
+- BMC: completeness=5, hypothesis=5, validation=5, pricing=1, grounding=5
 - YC: acute-problem=4, wedge=4, tenx=4, founder-fit=5, distribution=2, defensibility=4, launched=3, users=1, revenue=0
 - note: 実測: ai-gftd-murakumo worker 158,768 inv/7d — 社内推論需要は実在・常時運転 (grounding 4→5, launched 2→3)。murakumo.cloud zone は 536 req/7d・uniques 1 = 外部利用ゼロ (users 1 据置)。tok 単価は未実測 (riskiest gate 未通過)。
 

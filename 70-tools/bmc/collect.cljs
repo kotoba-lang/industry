@@ -249,6 +249,12 @@
    ;; chatters = 1:1 companion chat messages = the validation signal the live
    ;; chat (murakumo fleet) now produces.
    :club-shinshi   {:url "https://shinshi.club/api/funnel"            :fmt :json :merge true}
+   ;; cloud-murakumo cost 計器 (ADR-2607022200 の「CLI/file 型」を HTTP emitter 化、
+   ;; 2026-07-15): local-murakumo Worker が /v1/messages の実 run(llama.cpp timings)
+   ;; を KV ring に記録し、GET /infer/cost が ¥/Mtok 集計を返す。:key :cost →
+   ;; gftd.gate の :hyp/murakumo-tok-price compare ([:cost :fleet-yen-per-mtok] <=
+   ;; [:cost :spot-yen-per-mtok]) が機械測定可能になる。
+   :cloud-murakumo {:url "https://api.murakumo.cloud/infer/cost"      :fmt :json :key :cost}
    ;; nexus-x402 (ADR-2607105200): public /stats is a superset of /catalog (no
    ;; admin auth needed) — {:count N :items [...] :settlements {:count :usd-total
    ;; :agent-hint {:agent :human :unknown}}}. :catalog :count feeds the

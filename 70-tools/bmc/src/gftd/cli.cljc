@@ -196,7 +196,7 @@
            (ledger/append! (:ledger ps) (:events r))
            (println (str "tick " (inc i) ": " (count (:proposals r)) " proposal(s), "
                          (count (:approved r)) " approved, " (count (:rejected r)) " rejected"))
-           (doseq [p (:approved r)] (println "  +" (:canvas/id p) (pr-str (:event/value p))))
+           (doseq [p (:approved r)] (println "  +" (or (:canvas/id p) (:hyp/id p)) (pr-str (:event/value p))))
            (doseq [{:keys [proposal reason]} (:rejected r)]
              (println "  x governor:" reason "--" (pr-str (:event/value proposal)))))
          (when (:dry? run) (println "loop went dry (no more proposals) — 進化は収束"))))
@@ -426,7 +426,7 @@
            (ledger/append! (:ledger ps) (:events r))
            (println (str "tick " (inc i) ": " (count (:proposals r)) " proposal(s), "
                          (count (:approved r)) " approved, " (count (:rejected r)) " rejected"))
-           (doseq [p (:approved r)] (println "  +" (:canvas/id p) (pr-str (:event/value p))))
+           (doseq [p (:approved r)] (println "  +" (or (:canvas/id p) (:hyp/id p)) (pr-str (:event/value p))))
            (doseq [{:keys [proposal reason]} (:rejected r)]
              (println "  x governor:" reason "--" (pr-str (:event/value proposal)))))
          (when (:dry? run) (println "loop went dry (no more proposals) — 進化は収束"))))
