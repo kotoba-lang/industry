@@ -1915,7 +1915,16 @@
       ;; between this file's own last recorded number and this edit's
       ;; fresh clone are folded into the live-recomputed baseline
       ;; above, not individually re-narrated here).
-      (is (= 298 (:implemented m))))))
+      ;; 298 -> 299: this promotion's own +1 for cloud-itonami-isic-3099.
+      ;; Recomputed live via `(industry/maturity-summary)` immediately
+      ;; before this edit on a freshly re-fetched origin/main tip, not
+      ;; assumed (any further concurrent sibling promotions landed
+      ;; between this file's own last recorded number and this edit's
+      ;; fresh clone are folded into the live-recomputed baseline
+      ;; above, not individually re-narrated here).
+      (testing "cloud-itonami-isic-3099 (Manufacture of other transport equipment n.e.c., fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-C3099 placeholder or the real cloud-itonami org [gh api 404 confirmed]; identity ({:id \"3099\" :name \"Manufacture of other transport equipment n.e.c.\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; 3099 is a residual class covering animal-drawn vehicles (carts/wagons/carriages) and hand-propelled vehicles (hand-carts/hand-trucks/wheelbarrows/rickshaws/sledges/toboggans/pushcarts), distinct from cloud-itonami-isic-3092's [Manufacture of bicycles and invalid carriages]; OtherTransportAdvisor ⊣ Other Transport Equipment Plant Operations Governor plant-operations-COORDINATION actor, mirroring cloud-itonami-isic-3092's verified module shape module-for-module (otmfg.* in place of bikemfg.*) -- chassis/axle/wheel/body assembly-line equipment registration in place of welding/assembly/test-bench equipment, and product-category/weight-capacity-kg (0-3000, a wider ceiling than 3092's 0-300 to admit heavy-duty animal-drawn farm wagons)/assembly-defect-rate-percent production-batch fields in place of 3092's product-category/weight-capacity-kg (0-300)/weld-defect-rate-percent; :flag-safety-concern (materials-safety/structural-integrity concern) always escalates regardless of confidence, matching 3092's own safety-concern-escalation invariant; the proposal-effect allowlist plus a permanent equipment-actuate block (`:actuate-equipment? true`) structurally prevent any direct assembly-line-equipment control, with no human-approval override path; a further permanent certification-authority block (`:issue-certification? true`) prevents self-issuing a transport-equipment safety/roadworthiness certification mark, described generically rather than naming a specific standard since no single globally-recognized certification standard applies uniformly across this residual class's heterogeneous product set; 78 tests / 218 assertions green, independently re-verified against a fresh clone; registry.edn's own \"3099\" -> :implemented change landed via a Contents-API single-file PUT (commit 335ba6cd18159a3c95f06ec18a783cbb112b6f52), exact-block edit only, diff-verified single-block change; superproject ADR-2607993099) is also :implemented"
+        (is (= :implemented (industry/maturity "3099"))))
+      (is (= 299 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
