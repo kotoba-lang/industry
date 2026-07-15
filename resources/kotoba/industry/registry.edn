@@ -4719,11 +4719,36 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2818"
    :name "Manufacture of power-driven hand tools"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2818"
-   :business-id "cloud-itonami-C2818"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2818"
+   :business-id "cloud-itonami-isic-2818"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607201000): fresh from-scratch scaffold (no prior repo
+   ;; or reverted attempt; gh api 404 confirmed before starting).
+   ;; PowerToolAdvisor ⊣ Power-Driven Hand Tool Plant Operations
+   ;; Governor plant-operations-coordination actor mirroring
+   ;; cloud-itonami-isic-2710's [Manufacture of electric motors,
+   ;; generators, transformers and electricity distribution and
+   ;; control apparatus] verified module shape module-for-module
+   ;; (powertoolmfg.* in place of elecequipmfg.*) -- motor-assembly/
+   ;; housing-molding/test-bench equipment and drill/circular-saw/
+   ;; jigsaw/sander/angle-grinder production-batch (product-type/
+   ;; hipot-test-kv/defect-rate-percent) vocabulary in place of
+   ;; winding/assembly/test-bench equipment and product-type/
+   ;; dielectric-test-kv/defect-rate; :flag-safety-concern
+   ;; (electrical-safety/motor-overheat/UL-CE-compliance) always
+   ;; escalates regardless of confidence, matching 2710's own
+   ;; safety-concern-escalation invariant; the proposal-effect
+   ;; allowlist plus a permanent equipment-actuate block
+   ;; (`:actuate-equipment? true`) structurally prevent any direct
+   ;; motor-assembly/housing-molding/test-bench-equipment control,
+   ;; with no human-approval override path; a further permanent
+   ;; certification-authority block (`:issue-certification? true`)
+   ;; prevents self-issuing a UL/CE electrical-safety certification
+   ;; mark. 77 tests / 210 assertions green, independently
+   ;; re-verified against a fresh clone.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2819"
