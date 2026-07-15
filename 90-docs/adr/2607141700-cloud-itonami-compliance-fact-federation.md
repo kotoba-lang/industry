@@ -988,6 +988,24 @@ bankenverbandとvdaが別ISICコードで取得できることを確認。
 現状: 国軸15件・業界団体軸17件(12業種)・自治体軸5件——37tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 38 — 自治体軸6件目(パリ))
+
+`cloud-itonami-municipality-fra-paris`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-fra-paris/commit/41d00e2))：
+実在2件、両方ともPDF本文をReadツールで直接確認: 商業用不動産の民泊
+用途転用許可条件を定める市規則(パリ市議会2025-04-08〜11開催の
+délibération 2025 DLH 106で採択、2025-04-18公表——文書自身のヘッダーに
+会期・議決番号・公表日が明記)／Règlement des Terrasses et Étalages
+(テラス・陳列規則、原型は2011-06-11の市長命令、以降複数回の改正を経て
+現行版は2023-12-13時点——文書自身が全改正日を列挙)。4 tests/10
+assertions green。
+
+47リポジトリ・657 factを統合。`:licensing`トピックでの自治体横断query
+でlondon・toronto・parisの3自治体を取得できることを確認。
+
+現状: 国軸15件・業界団体軸17件(12業種)・自治体軸6件——38tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
