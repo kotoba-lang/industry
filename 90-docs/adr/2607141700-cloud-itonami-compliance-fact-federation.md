@@ -1167,6 +1167,28 @@ ooyake自体には触れていない(範囲外)。
 現状: 国軸18件・業界団体軸19件(14業種)・自治体軸8件——45tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 46 — 業界団体軸20件目(NRF) — 新規ISIC業種(小売))
+
+`cloud-itonami-assoc-4719-usa-nrf`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-4719-usa-nrf/commit/902705e))：
+IT/ソフトウェア業種を狙いBSA | The Software Allianceを最初に試した
+がbsa.orgは全ページで403を返したため捏造せず断念、National Retail
+Federation(NRF、Wikidata Q6978097、1911年設立)に切り替え。実在2件を
+両方とも直接WebFetchで確認(Five to Thrive: Loss Prevention: 小規模
+小売業者向けの実践ガイド——会員拘束的なコミットメントではなく実務
+ガイダンスなので新たに`:kind :best-practices-guide`を導入して区別
+／About Us: 組織概要ページ、1911年設立自体はWebSearch/Wikipedia
+裏付け、ページ自身は"over a century"としか述べていない)。4 tests/
+11 assertions green。
+
+**新規ISIC業種**: ISIC 4719(その他非専門店小売業)を初めて追加した。
+
+66リポジトリ・676 factを統合。`"association-rule/topic"
+"governance"`での横断queryでnrfを含む16団体が取得できることを確認。
+
+現状: 国軸18件・業界団体軸20件(15業種)・自治体軸8件——46tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
