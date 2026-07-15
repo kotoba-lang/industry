@@ -61,29 +61,31 @@ Local ISIC checkouts under `orgs/cloud-itonami/cloud-itonami-isic-*` (**n=165**)
 | **ISO3166 JPN agencies** | 4 | 0 | 1 | 0 | blueprint + docs; essentially no src |
 | **ISCO occupations** | 3 | 1 | 0 | 0 | Thin tests / partial modules |
 | **Catalog / org surface** | 4 | 4 | 4 | 1 | github.io from registry SSoT |
-| **itonami.cloud cockpit** | 3 | 2 | 2 | 1 | Live but probe-heavy traffic; not a wedge |
+| **itonami.cloud cockpit** | 4 | 3 | 4 | 1 | productSurface 7/7; free-tenant selfReg=1; paid blocked on Stripe secrets |
 
 ## Reading
 
 ```
 Design        ████████████████████  high across the factory
 Impl-core     ████████████████░░░░  ~77% of local ISIC full modules
-Impl-product  ████░░░░░░░░░░░░░░░░  concentrated on 2–3 repos
-Business      ██░░░░░░░░░░░░░░░░░░  thin everywhere (hyp untested)
+Impl-product  ██████░░░░░░░░░░░░░░  cockpit + flagships; thin elsewhere
+Business      ██░░░░░░░░░░░░░░░░░░  free-tenant ok; paid hyp untested
 ```
 
 **Design maturity and implementation maturity are not uncorrelated —
 implementation has split into core vs product.** Core was mass-produced;
-product was invested only in flagships; business has not cleared a gate on
-any vertical.
+product was invested in flagships + the itonami.cloud cockpit (now
+productSurface 7/7); business has not cleared a paid gate on any vertical.
 
 ## Priorities (from this table)
 
-1. Prefer **product → business** on 6399 / 6310 (+7810) over new verticals.
-2. Keep the portfolio wedge narrative on the flagship pair (`:wedge 3` in
+1. **Owner STRIPE_*** secrets → live `/isco-1212` checkout (only remaining
+   productSurface→business gate; see `/docs/stripe-billing-setup.md`).
+2. Prefer **product → business** on 6399 / 6310 (+7810) over new verticals.
+3. Keep the portfolio wedge narrative on the flagship pair (`:wedge 3` in
    maturity-facts; not “all industries” as the sales wedge).
-3. Treat ISO3166 agencies and ISCO as **design assets**; defer runtime spend.
-4. Portfolio `validation` / `revenue` stay 0 until
+4. Treat ISO3166 agencies and ISCO as **design assets**; defer runtime spend.
+5. Portfolio `validation` / `revenue` stay 0 until
    `:hyp/itonami-smb-pay` (10 external paid orgs).
 
 ## Related
