@@ -255,10 +255,27 @@
          :charges-total (count (:data charges))
          :last-charge-epoch (some-> (first (:data charges)) :created)}))))
 
+(def collect-ua
+  "gftd-bmc-collect/1.0 (+https://itonami.cloud/llms.txt; maturity loop)")
+
 (defn http-status [url]
   (when url
-    (try (:status (curl/get url {:throw false :raw-args ["--max-time" "8"]}))
+    (try (:status (curl/get url {:throw false
+                                 :raw-args ["--max-time" "8"
+                                            "-A" collect-ua]}))
          (catch :default _ nil))))
+
+(defn http-get-json
+  "GET url → parsed JSON map, or nil. Sends a non-empty User-Agent:
+  Cloudflare may return 403 error 1010 for signatures like Python-urllib/*."
+  [url]
+  (when url
+    (try
+      (let [r (curl/get url {:throw false
+                             :raw-args ["--max-time" "8" "-A" collect-ua]})]
+        (when (= 200 (:status r))
+          (json/parse-string (:body r) true)))
+      (catch :default _ nil))))
 
 ;; ---- gate-metric emitter fetch (ADR-2607022200/2607022100) -------------------
 ;; 各 product repo が deploy した emitter endpoint から gate 用 metric を取得し
@@ -296,7 +313,8 @@
   "→ parsed emitter map, or nil if unreachable/unparseable (no-op)."
   [{:keys [url fmt]}]
   (try
-    (let [r (curl/get url {:throw false :raw-args ["--max-time" "8"]})]
+    (let [r (curl/get url {:throw false
+                           :raw-args ["--max-time" "8" "-A" collect-ua]})]
       (when (= 200 (:status r))
         (case fmt
           :edn  (clojure.edn/read-string (:body r))
@@ -359,6 +377,16 @@
                 (and (:stripe cfg) stripe) (assoc :stripe stripe)
                 health (assoc :health-status (http-status health)))
             m (merge-emitter m p)
+            ;; cloud-itonami free path: fold /api/health freePath into metrics so
+            ;; portfolio ticks see tenants/selfReg/agentRuns (not just HTTP status).
+            m (if (= p :cloud-itonami)
+                (if-let [h (http-get-json "https://itonami.cloud/api/health")]
+                  (cond-> m
+                    true (assoc :health-live h)
+                    (:freePath h) (assoc :free-path (:freePath h))
+                    true (update :sources (fnil conj []) :itonami-free-path))
+                  m)
+                m)
             ;; ai-gftd-apex: Free→Plus conversion (ai-gftd-apex PR #2
             ;; subscription.cljc の定義に一致: pct = plus/(free+plus) 4dp、
             ;; base 空は 0.0)。plus = Stripe 実カウント (apex price, PAID のみ)。
