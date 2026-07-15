@@ -1320,7 +1320,16 @@
       ;; `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched origin/main
       ;; (confirmed HEAD's own pinned 234 assertion was still green pre-edit, ruling out drift from a
       ;; raw `grep -c` undercount before trusting the delta): 234 -> 235.
-      (is (= 235 (:implemented m))))))
+            ;; 235 -> 236: cloud-itonami-isic-1621 (Manufacture of veneer sheets and wood-based panels)
+      ;; promoted :spec -> :implemented, superproject ADR-2607181000
+      ;; (cloud-itonami-isic-1621-veneer-wood-panels-coverage.md). VeneerPanelAdvisor ⊣ Wood Panel Plant
+      ;; Operations Governor, fresh from-scratch scaffold (no prior repo existed; the old
+      ;; :repo/:business-id pointed at a never-created gftdcojp/cloud-itonami-C1621 placeholder), mirroring
+      ;; cloud-itonami-isic-1610's [Sawmilling and planing of wood] verified module shape module-for-module.
+      ;; 71 tests / 197 assertions green, independently re-verified against a fresh clone. Live-recomputed
+      ;; via `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched origin/main
+      ;; (confirmed HEAD's own pinned 235 assertion was still green pre-edit, ruling out drift): 235 -> 236.
+      (is (= 236 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

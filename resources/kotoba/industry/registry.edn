@@ -3510,13 +3510,39 @@
    :operating-states [:intake :log :schedule :hazard :ship :audit]},
   {:id "1621"
    :name "Manufacture of veneer sheets and wood-based panels"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C1621"
-   :business-id "cloud-itonami-C1621"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1621"
+   :business-id "cloud-itonami-isic-1621"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607181000): fresh from-scratch scaffold (no prior repo or
+   ;; reverted attempt existed at cloud-itonami/cloud-itonami-isic-1621;
+   ;; the old :repo/:business-id above pointed at a never-created
+   ;; gftdcojp/cloud-itonami-C1621 placeholder). VeneerPanelAdvisor ⊣
+   ;; Wood Panel Plant Operations Governor, langgraph-clj StateGraph,
+   ;; append-only audit ledger, mirroring cloud-itonami-isic-1610's
+   ;; [Sawmilling and planing of wood] verified module shape
+   ;; module-for-module -- veneer-lathe/hot-press/glue-spreader
+   ;; equipment registration in place of saw/planer/kiln,
+   ;; grade/thickness/output-quality production-batch fields in place
+   ;; of grade/volume/moisture-content, and a press-cycle-finalize
+   ;; permanent block in place of kiln-schedule-finalize.
+   ;; clojure -M:test: 71 tests / 197 assertions / 0 failures / 0 errors
+   ;; (verified from an independent fresh clone at commit
+   ;; 52c224cc809f4711afc339af61f71e16b8ace105). Safety-critical domain
+   ;; (veneer-lathe/rotary-knife injury risk, hot-press platen
+   ;; burn/crush risk, urea-/phenol-formaldehyde resin fume inhalation
+   ;; hazard, wood-dust fire/explosion hazard). Back-office
+   ;; plant-operations coordination only: all equipment actuation
+   ;; remains exclusive to the human plant supervisor. Four HARD
+   ;; invariants guard scope: equipment/batch independent
+   ;; verification+registration + independent shipment-volume
+   ;; recompute, :propose-only effect, no veneer-peeling/pressing-line-
+   ;; equipment control / press-cycle finalization, closed
+   ;; op-allowlist; safety-concerns (formaldehyde-emission/equipment-
+   ;; safety/fire-hazard) ALWAYS escalate (never auto-committed).
+   :operating-states [:intake :log :schedule :hazard :ship :audit]},
   {:id "1622"
    :name "Manufacture of builders' carpentry and joinery"
    :repo "https://github.com/gftdcojp/cloud-itonami-C1622"
