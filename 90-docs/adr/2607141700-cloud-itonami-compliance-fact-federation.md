@@ -1299,6 +1299,27 @@ Ley N° 19.628 sobre Protección de la Vida Privada(個人データ保護法、
 現状: 国軸20件・業界団体軸21件(16業種)・自治体軸10件——51tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 52 — 業界団体軸22件目(NAB) — 新規ISIC業種(放送))
+
+`cloud-itonami-assoc-6020-usa-nab`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-6020-usa-nab/commit/486b551))：
+National Association of Broadcasters(NAB、Wikidata Q1759624、1923年
+設立)。実在2件を検証(Political Broadcast Catechism (第16版):
+政治広告に関する実務ガイド、PDF表紙をReadツールで直接確認——正確な
+発行日はページ上で未確認のためWebSearch裏付けの2014年をlast-revised
+として記録／Our Mission (Celebrating 100 Years): 組織概要ページを
+直接WebFetchで確認、1923年設立(「16局が参加したシカゴでの最初の
+組織会合」)自体がページ本文に直接明記されている)。4 tests/11
+assertions green。
+
+**新規ISIC業種**: ISIC 6020(テレビ番組制作・放送業)を初めて追加した。
+
+78リポジトリ・690 factを統合。`"association-rule/topic"
+"governance"`での横断queryでnabを含む18団体が取得できることを確認。
+
+現状: 国軸20件・業界団体軸22件(17業種)・自治体軸10件——52tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
