@@ -4372,11 +4372,27 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2593"
    :name "Manufacture of cutlery, hand tools and general hardware"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2593"
-   :business-id "cloud-itonami-C2593"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2593"
+   :business-id "cloud-itonami-isic-2593"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607210100): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2593 placeholder).
+   ;; HardwareShopAdvisor, an advisor sealed behind an independent
+   ;; Hardware Shop Plant Operations Governor, langgraph-clj StateGraph,
+   ;; append-only audit ledger. Mirrors cloud-itonami-isic-2599's
+   ;; [Manufacture of other fabricated metal products n.e.c.] verified
+   ;; module shape, adapted to a cutlery/hand-tool/general-hardware shop
+   ;; (forging -> grinding -> heat-treatment -> finishing line)
+   ;; producing cutlery (knives/forks/spoons), hand tools (hammers/
+   ;; wrenches/screwdrivers/pliers) and general hardware (locks, hinges,
+   ;; fasteners, garden tools) rather than 2599's own stamped/pressed/
+   ;; wire-formed sheet-metal products.
+   ;; clojure -M:test: 71 tests / 195 assertions / 0 failures / 0
+   ;; errors (verified from an independent fresh clone).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2599"
