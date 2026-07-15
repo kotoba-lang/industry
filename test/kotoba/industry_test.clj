@@ -2091,7 +2091,17 @@
       ;; Live-recomputed via `(industry/maturity-summary)` on a freshly
       ;; re-fetched origin/main tip immediately before this edit, not
       ;; assumed.
-      (is (= 329 (:implemented m))))))
+            ;; 329 -> 330: this promotion's own +1 for
+      ;; cloud-itonami-isic-3240, plus any further concurrent sibling
+      ;; promotion(s) landed between this file's own last recorded
+      ;; number and this edit's freshly re-fetched registry.edn,
+      ;; folded into the live-recomputed baseline (not individually
+      ;; re-narrated here). Live-recomputed via
+      ;; `(industry/maturity-summary)` on a freshly re-fetched
+      ;; origin/main tip immediately before this edit, not assumed.
+      (testing "cloud-itonami-isic-3240 (Manufacture of games and toys, fresh scaffold -- the entry pointed at a never-created gftdcojp/cloud-itonami-C3240 placeholder repo, both this and the real cloud-itonami org target name independently confirmed 404 before scaffolding; identity ({:id \"3240\" :name \"Manufacture of games and toys\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; ToysGamesAdvisor ⊣ Toys & Games Plant Operations Governor plant-operations-COORDINATION actor, mirroring cloud-itonami-isic-3230's [Manufacture of sports goods] verified module shape module-for-module (toysmfg.* in place of sportsgoodsmfg.*) -- injection-molding/assembly/safety-test-line equipment registration in place of molding/assembly/finishing-line equipment, and plastic-toy/wooden-toy/board-game/puzzle production-batch (product-type/safety-test-pass-percent/weight-grams/defect-rate-percent) vocabulary in place of ball/racket/protective-gear/fitness-equipment vocabulary; a permanent toy-safety-certification-authority block (`:issue-safety-certification? true`, e.g. ASTM F963 / EN 71) mirrors 3230's own impact-protection-certification-authority block for the toy-safety regulatory regime; unlike 3230, carries an explicit CHILD-consumer-protection dimension since the finished products are used directly by children; :flag-safety-concern (choking-hazard/materials-safety -- lead paint, phthalate -- or small-parts concern) always escalates regardless of confidence, matching 3230's own safety-concern-escalation invariant; the proposal-effect allowlist plus a permanent equipment-actuate block (`:actuate-equipment? true`) structurally prevent any direct molding/assembly-line-equipment control, with no human-approval override path; thirteen HARD governor checks, same shape as 3230's own thirteen (propose-only effect, closed op allowlist, closed proposal-effect allowlist, permanent equipment-actuate block, permanent toy-safety-certification-authority block, independent equipment verified/registered gate, already-scheduled guard, independent batch verified/registered gate, independent shipment-quantity recompute, product-type validation, safety-test-pass-percent plausibility validation, weight-grams plausibility validation, defect-rate plausibility validation); fully portable .cljc with no JVM-only interop in src/; 82 tests / 222 assertions green, independently re-verified against a fresh clone; registry.edn's own \"3240\" -> :implemented change made via a GitHub Contents API single-file PUT (sha-checked optimistic concurrency), exact-block edit only, diff-verified single-block change; superproject ADR-2608000100) is also :implemented"
+        (is (= :implemented (industry/maturity "3240"))))
+      (is (= 330 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
