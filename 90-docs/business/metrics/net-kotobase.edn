@@ -1,26 +1,26 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 5029, "kotobase-cf-wasm-staging" 2186},
+ {"net-kotobase" 5036, "kotobase-cf-wasm-staging" 2186},
  :zone
- {:requests-7d 7103,
-  :pageviews-7d 446,
-  :uniques-7d-sum 583,
+ {:requests-7d 7110,
+  :pageviews-7d 447,
+  :uniques-7d-sum 584,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 52}
-   {:path "/health", :requests 43}
-   {:path "/llms-full.txt", :requests 27}
+  [{:path "/", :requests 48}
+   {:path "/health", :requests 44}
+   {:path "/llms-full.txt", :requests 25}
+   {:path "/api/funnel", :requests 24}
    {:path
     "/ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapcbsx3yrg7xzj3jrxm3q4mzz2nu",
-    :requests 25}
-   {:path "/pins", :requests 24}
-   {:path "/.well-known/did.json", :requests 23}
-   {:path "/llms.txt", :requests 21}
-   {:path "/api/funnel", :requests 21}],
-  :status-mix {:client-error 175, :server-error 44, :ok 303},
+    :requests 23}
+   {:path "/pins", :requests 21}
+   {:path "/.well-known/did.json", :requests 21}
+   {:path "/llms.txt", :requests 19}],
+  :status-mix {:ok 287, :client-error 166, :server-error 40},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -34,7 +34,7 @@
  :as-of "2026-07-15",
  :traffic-quality {:window "24h", :probe-4xx-pct 34, :error-5xx-pct 8},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 52 · /health 43 · /llms-full.txt 27 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 25 · /pins 24 | 4xx(probe) 34% · 5xx 8%",
- :funnel {:visitors 631, :signups 0, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): / 48 · /health 44 · /llms-full.txt 25 · /api/funnel 24 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 23 | 4xx(probe) 34% · 5xx 8%",
+ :funnel {:visitors 632, :signups 0, :checkouts 0},
  :signal
- "kotobase.net 実測 7103 req/7d・583 uniques(日次和)・うち4xx probe 34%(24h)、workers 7215 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 7110 req/7d・584 uniques(日次和)・うち4xx probe 34%(24h)、workers 7222 inv/7d、Stripe active subs 0"}

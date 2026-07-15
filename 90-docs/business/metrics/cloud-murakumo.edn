@@ -1,23 +1,23 @@
 {:health-status 200,
  :zone-name "murakumo.cloud",
- :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 126259},
+ :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 127430},
  :zone
- {:requests-7d 70809,
-  :pageviews-7d 610,
-  :uniques-7d-sum 513,
+ {:requests-7d 71171,
+  :pageviews-7d 618,
+  :uniques-7d-sum 520,
   :zone "murakumo.cloud"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/infer/hwmetrics", :requests 7856}
-   {:path "/infer/cost", :requests 4485}
-   {:path "/", :requests 157}
-   {:path "/api/v1/generation", :requests 79}
+  [{:path "/infer/hwmetrics", :requests 7855}
+   {:path "/infer/cost", :requests 4488}
+   {:path "/", :requests 164}
+   {:path "/api/v1/generation", :requests 115}
    {:path "/api/v1", :requests 35}
    {:path "/v1/chat/completions", :requests 35}
    {:path "/js/main.js", :requests 29}
    {:path "/v1/messages", :requests 27}],
-  :status-mix {:client-error 1653, :ok 13103, :server-error 104},
+  :status-mix {:client-error 1657, :ok 13244, :server-error 104},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -31,7 +31,7 @@
  :as-of "2026-07-15",
  :traffic-quality {:window "24h", :probe-4xx-pct 11, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /infer/hwmetrics 7856 · /infer/cost 4485 · / 157 · /api/v1/generation 79 · /api/v1 35 | 4xx(probe) 11% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): /infer/hwmetrics 7855 · /infer/cost 4488 · / 164 · /api/v1/generation 115 · /api/v1 35 | 4xx(probe) 11% · 5xx 1%",
  :cost
  {:fleet-yen-per-mtok 13.233423914538559,
   :spot-yen-per-mtok 40.55,
@@ -45,4 +45,4 @@
    :throughput-tok-s 2000,
    :fx-yen-per-usd 162.2}},
  :signal
- "murakumo.cloud 実測 70809 req/7d・513 uniques(日次和)・うち4xx probe 11%(24h)、workers 126259 inv/7d、Stripe active subs 0"}
+ "murakumo.cloud 実測 71171 req/7d・520 uniques(日次和)・うち4xx probe 11%(24h)、workers 127430 inv/7d、Stripe active subs 0"}
