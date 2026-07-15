@@ -4373,11 +4373,26 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2591"
    :name "Forging, pressing, stamping and roll-forming of metal"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2591"
-   :business-id "cloud-itonami-C2591"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2591"
+   :business-id "cloud-itonami-isic-2591"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607159500): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2591 placeholder).
+   ;; MetalFormingAdvisor, an advisor sealed behind an independent
+   ;; Metal Forming Plant Operations Governor, langgraph-clj StateGraph,
+   ;; append-only audit ledger. Mirrors cloud-itonami-isic-2593's
+   ;; [Manufacture of cutlery, hand tools and general hardware] verified
+   ;; module shape, adapted to a forging/pressing/stamping/roll-forming
+   ;; and powder-metallurgy job shop producing forged/pressed/stamped/
+   ;; roll-formed/powder-metallurgy parts and forging billets, the
+   ;; primary metal-forming process upstream of 2593's own downstream
+   ;; finishing shop.
+   ;; clojure -M:test: 71 tests / 195 assertions / 0 failures / 0
+   ;; errors (verified from an independent fresh clone).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2592"
