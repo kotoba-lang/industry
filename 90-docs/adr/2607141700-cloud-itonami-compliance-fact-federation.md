@@ -1467,6 +1467,31 @@ Q1757）は史実上一貫して首都であり、P36歴史的首都バグの対
 現状: 国軸22件・業界団体軸23件(18業種)・自治体軸13件——58tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 59 — 業界団体軸24件目(ATA) — 新規ISIC業種(道路貨物輸送))
+
+`cloud-itonami-assoc-4923-usa-ata`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-4923-usa-ata/commit/046054b))：
+American Trucking Associations(ATA、Wikidata Q4745283)。`trucking.org`
+の公式ページ2件を直接WebFetch検証: 「ATA: 90 Years and Rolling」
+（1933-09-23設立、ワシントンD.C.での法人化を記事本文で直接確認）／
+「Safety」ポリシーポジションページ（CSA・ELD・労働時間規制・薬物検査・
+運転免許基準に関するATAの公式な規制・立法への立場表明）。後者を
+きっかけに新しい`:kind`値`:policy-position`を導入——既存の
+`:self-regulatory-code`（会員拘束的コミットメント）とも
+`:governance-program`（組織プロフィール）とも異なる、団体の対外的な
+規制・立法ポジション表明という第3のカテゴリ。このpolicy positionページ
+自体には単一の制定日が明記されていなかったため、
+`:association-rule/established-date`は捏造せず意図的に省略した。
+4 tests/11 assertions green。
+
+**新規ISIC業種**: ISIC 4923(道路貨物輸送業)を初めて追加した。
+
+88リポジトリ・706 factを統合。`"association-rule/topic"
+"governance"`での横断queryでataを含む20団体が取得できることを確認。
+
+現状: 国軸22件・業界団体軸24件(19業種)・自治体軸13件——59tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
