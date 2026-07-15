@@ -61,10 +61,15 @@ Gemma-26B は 13.9 tok/s。H100 ファームの同クラス serving 単価に対
 - **需要**: (a) on-chain agent が消費できる**検証可能な推論証明** —
   receipt (settle + shard byte 検証 + hash chain + CACAO 署名) が
   attestation そのもの (b) compute へのトークン化アクセス。
-- **設計**: **新 L1 は作らない**。運用台帳は off-chain の actor 署名 feed
-  のまま、チェーンとの接続は **mint/burn gateway のみ**（receipt を
-  根拠に定期精算）。グローバル合意が必要になるまでコンセンサスを
-  持ち込まない、という ADR-2607022000 の立場を維持。
+- **設計**: **murakumo 推論経済専用の新 L1 は作らない**。運用台帳は off-chain
+  の actor 署名 feed のまま、チェーンとの接続は **mint/burn gateway のみ**
+  （receipt を根拠に定期精算）。グローバル合意が必要になるまでコンセンサスを
+  持ち込まない、という ADR-2607022000 の立場を維持。**2026-07-15 追記**:
+  この「新L1は作らない」は ADR-2607993000 により ENGI/EN スコープに限定して
+  撤回され、`kotoba-lang/engi` が chained HotStuff 型 BFT の L1 になった
+  （詳細は同ADR参照）。ただし murakumo 推論経済の chain gateway が
+  mint/burn 限定である本節の決定自体は不変 — engi/L1 は ENGI/EN 専用であり、
+  murakumo の gpu-seconds 経済台帳をそこに巻き込まない。
 - **前提条件（未実装、Phase 3 ゲート）**: proof-of-compute。
   proof-of-storage は shard 検証で実装済み。計算の証明は
   **決定論的等価性**（shard_test が示した double 完全一致）を使った
