@@ -3216,12 +3216,23 @@
    :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "1102"
    :name "Manufacture of wines"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C1102"
-   :business-id "cloud-itonami-C1102"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1102"
+   :business-id "cloud-itonami-isic-1102"
+   :required-technologies [:identity :forms :audit-ledger :cae]
+   :optional-technologies [:telemetry]
+   :maturity :implemented
+   ;; Wine-manufacturing plant-operations-coordination actor
+   ;; (WineOpsAdvisor ⊣ Wine Governor), fresh from-scratch scaffold (no
+   ;; prior repo existed; the old :repo/:business-id pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C1102 placeholder), mirroring
+   ;; cloud-itonami-isic-1072's [Manufacture of sugar] verified module
+   ;; shape (wineops.* in place of sugarops.*). ABV-tolerance/vintage-
+   ;; percent/residual-sugar/volatile-acidity/SO2-residue/fill-volume
+   ;; compliance per US TTB 27 CFR 4.36/4.27/4.72, EU Reg (EU) 2019/33 /
+   ;; 2019/934, and JP 酒税法 (国税庁). 54 tests / 180 assertions green,
+   ;; independently re-verified against a fresh clone; promoted
+   ;; :spec -> :implemented, superproject ADR-2607171000
+   ;; (cloud-itonami-isic-1102-wine-manufacturing-coverage.md).
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1103"
    :name "Manufacture of malt liquors and malt"

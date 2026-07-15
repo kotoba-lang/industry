@@ -1205,7 +1205,20 @@
       ;; value. Live-recomputed via `(industry/maturity-summary)` fresh at
       ;; fix time (concurrent-agent count-drift caution -- not an assumed
       ;; fixed number): 224 -> 224.
-      (is (= 224 (:implemented m))))))
+      ;; 224 -> 225: cloud-itonami-isic-1102 (Manufacture of wines)
+      ;; promoted :spec -> :implemented, superproject ADR-2607171000
+      ;; (cloud-itonami-isic-1102-wine-manufacturing-coverage.md).
+      ;; WineOpsAdvisor ⊣ Wine Governor, fresh from-scratch scaffold (no
+      ;; prior repo existed; the old :repo/:business-id pointed at a
+      ;; never-created gftdcojp/cloud-itonami-C1102 placeholder),
+      ;; mirroring cloud-itonami-isic-1072's [Manufacture of sugar]
+      ;; verified module shape. 54 tests / 180 assertions green,
+      ;; independently re-verified against a fresh clone.
+      ;; Live-recomputed via `(industry/maturity-summary)` immediately
+      ;; before this edit on a freshly re-fetched origin/main
+      ;; (concurrent-agent count-drift caution -- not an assumed fixed
+      ;; number): 224 -> 225.
+      (is (= 225 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
