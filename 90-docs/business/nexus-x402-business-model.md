@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: Lx cross-cutting: payment facilitator/gateway（Cloudflare Monetization Gateway 型）  
-**As-of**: 2026-07-12  
+**As-of**: 2026-07-15  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
