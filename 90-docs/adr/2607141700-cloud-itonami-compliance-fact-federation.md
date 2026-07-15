@@ -1712,6 +1712,33 @@ Q2841）は史実上一貫して首都であり、P36歴史的首都バグの対
 現状: 国軸24件・業界団体軸26件(21業種)・自治体軸18件——68tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 69 — 国軸25件目(コスタリカ))
+
+`cloud-itonami-iso3166-cri`に`statute.facts`を新規追加・push
+([commit 3065db3](https://github.com/cloud-itonami/cloud-itonami-iso3166-cri/commit/3065db3))：
+コスタリカ共和国。公式`pgrweb.go.cr`（SCIJ、Sistema Costarricense de
+Información Jurídica、Procuraduría General de la República運営）の
+3件を直接WebFetch検証: Código de Comercio（商法典、Ley N.º 3284、
+1964-04-30制定・2012-09-10最終改正版）／データ保護法（Ley N.º 8968、
+2011-07-07制定）／Código de Trabajo（労働法典、Ley N.º 2、
+1943-08-27制定・2026-04-07最終改正版）——いずれもページが完全に
+レンダリングされ制定日・施行日・改正版バージョンが明記されていた。
+
+ウルグアイと同様、このリポジトリも既存の`marketentry.facts`実装を
+持たないblueprint-onlyの状態だったため、`statute.facts`がこの
+リポジトリ初のコード実体となった（独自の`deps.edn`+`.gitignore`を
+新規作成、前tickの教訓を活かし`.cpcache/`混入は今回発生せず）。
+4 tests/11 assertions green。
+
+首都チェック: 既存のooyake由来organization.edn（San José、Wikidata
+Q3070）は史実上一貫して首都であり、P36歴史的首都バグの対象外と確認。
+
+98リポジトリ・729 factを統合。`"statute/topic" "labor"`での横断query
+でcriを含む25カ国すべてが取得できることを確認。
+
+現状: 国軸25件・業界団体軸26件(21業種)・自治体軸18件——69tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社

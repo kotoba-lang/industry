@@ -241,7 +241,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-assoc-2011-usa-acc/data/datascript-tx.edn"}
    {:label "cloud-itonami-municipality-col-bogota ordinance.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-municipality-col-bogota/schema/ordinance.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-municipality-col-bogota/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-col-bogota/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-cri statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-cri/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-cri/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
