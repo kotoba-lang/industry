@@ -2353,12 +2353,13 @@
    :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "900"
    :name "Creative, arts and entertainment activities"
-   :repo nil :business-id nil
-  :maturity :spec
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-900"
+   :business-id "cloud-itonami-isic-900"
+   :maturity :implemented
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
-   :operating-states [:intake :catalog :present :exhibit :audit]},
+   ;; ISIC Rev.4 group (3-digit) — venue administrative coordination actor
+   :operating-states [:intake :advise :govern :decide :commit :hold :escalate :audit]},
   {:id "920"
    :name "Gambling and betting activities"
    :repo nil :business-id nil
