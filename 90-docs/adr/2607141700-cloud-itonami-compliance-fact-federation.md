@@ -1586,6 +1586,31 @@ National Restaurant Association（NRA、Wikidata Q6978094——全米ライフ�
 現状: 国軸23件・業界団体軸25件(20業種)・自治体軸15件——63tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 64 — 自治体軸16件目(ブリュッセル))
+
+`cloud-itonami-municipality-bel-brussels`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-bel-brussels/commit/c28cee8))：
+ブリュッセル市。まずリスボン市を試みたが`lisboa.pt`がドメインルート
+自体でHTTP 403を返しWebFetchを完全にブロックしたため断念——
+今回のファミリーで初めての「ドメイン全体ブロック」パターン（個別
+ページの403や文字化けPDFとは異なる）。代わりにブリュッセル市公式
+`bruxelles.be`の「Règlements communaux」ページを直接WebFetch検証:
+Règlement d'ordre intérieur du Conseil communal（市議会議事規則、
+2018-01-22採択・2018-05-17掲示）／Code déontologique（倫理規程、
+2013-10-21採択・2014-01-25掲示）。ページが完全にレンダリングされ、
+両文書の採択日・掲示日が明記されていた。4 tests/10 assertions
+green。
+
+首都チェック: 既存のooyake由来organization.edn（Brussels、Wikidata
+Q239）は史実上一貫して首都であり、P36歴史的首都バグの対象外と確認。
+
+93リポジトリ・717 factを統合。`"ordinance/topic" "governance"`での
+横断queryでbrusselsがsydney/helsinki/copenhagen/osloと並んで
+取得できることを確認。
+
+現状: 国軸23件・業界団体軸25件(20業種)・自治体軸16件——64tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
