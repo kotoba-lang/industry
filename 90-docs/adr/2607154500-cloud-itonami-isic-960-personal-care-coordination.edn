@@ -1,0 +1,68 @@
+{:adr-id "2607154500"
+ :title "cloud-itonami-isic-960 — Personal-Care Salon/Service Operations Coordination"
+ :date "2026-07-15"
+ :author "Cloud Itonami Contributors"
+ :status :accepted
+ :context
+ "ISIC Rev.4 960 (Other personal service activities) -- laundry/dry-
+  cleaning, hairdressing/beauty salons, funeral/burial services, and
+  other personal-care services not elsewhere classified. Second and
+  final Wave 4 actor in the ISIC-95/96 personal-services cluster (after
+  isic-952 repair-shop coordination). Fresh scaffold under the
+  verified-redo discipline (ADR-2607152500), mirrored on isic-952's
+  module shape."
+ :decision
+ {:scope-boundary
+  "Coordination-only actor for personal-care salon/service back-office
+   administration. Closed five-op allowlist, all :effect :propose:
+   schedule-service-appointment, coordinate-service-status-update,
+   coordinate-supply-request, schedule-staff-shift-proposal,
+   flag-safety-concern (always escalates, no client-verification
+   required since it is facility-level). An op outside this set is the
+   SAME failure mode as forbidden-scope content, not a separate
+   carve-out."
+  :governor-rules
+  "Three HARD, permanent, un-overridable checks: (1) client/appointment-
+   record unverified -- target must be independently :registered?/
+   :verified? in the store, never trusted from the proposal's own
+   claim (exempt for :flag-safety-concern); (2) effect-not-propose --
+   any :effect other than :propose is a claim to directly actuate
+   outside governance; (3) scope-exclusion -- any proposal (any op)
+   touching service-technique/treatment decisions, health/sanitation-
+   compliance determinations, client health/allergy-risk clinical
+   judgments, or safety-authority territory, evaluated unconditionally
+   via a lower-cased EN+JA substring/regex scan combined into a single
+   explicit boolean (in-forbidden-territory) that is what the check
+   actually returns -- verified free of the isic-920 batch's dead-code
+   bug class where an English-language check was computed but its
+   result discarded. flag-safety-concern is exempt from the content
+   scan since it always escalates rather than auto-committing."
+  :module-shape
+  "personalcareops.store (MemStore, string-keyed client/service
+   directory, append-only ledger), advisor (mock + real-LLM seam),
+   governor (three HARD checks), phase (0->3 rollout), operation
+   (langgraph-clj StateGraph: intake->advise->govern->decide->
+   commit|hold|escalate), sim (demo driver, 5 scenarios)."}
+ :consequences
+ ["Registry entry corrected in place (exact-text edit of the existing"
+  " {:id \"960\" ...} block, independently EDN-parse-validated before"
+  " and after the edit via a fresh Contents API fetch): :repo/"
+  ":business-id updated to cloud-itonami/cloud-itonami-isic-960,"
+  " :maturity :implemented, :robotics stripped from"
+  " :required-technologies"
+  "Actor repo cloud-itonami/cloud-itonami-isic-960 scaffolded and"
+  " pushed to main, public, full governance file set present"
+  "Test suite (store/governor/operation/phase) and sim demo"
+  " independently re-verified against the live repo by this landing"
+  " session, not just the building session's self-report"
+  "Governor scope-exclusion check confirmed free of the isic-920"
+  " dead-code bug class"
+  "This ADR pair landed in a follow-up step after the building"
+  " session's claimed ADR path (2607161900, an out-of-sequence"
+  " tomorrow-dated number) was never actually pushed anywhere;"
+  " content reconstructed from the live actor repo source"]
+ :references
+ ["cloud-itonami-isic-952/ (module-shape mirror, ADR-2607154304, completes ISIC-95/96 cluster together)"
+  "kotoba-lang/industry resources/kotoba/industry/registry.edn \"960\" entry"
+  "ADR-2607152500 (Wave 4 rollout amendment, quality guardrails)"
+  "ADR-2607121000 (ISIC Wave rollout plan -- 960 is ISIC division 96, Wave 4)"]}
