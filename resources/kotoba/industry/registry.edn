@@ -5266,12 +5266,26 @@
    :operating-states [:intake :class-rules-verify :ndt-screen :approve :dispatch-block :issue-class-evidence :audit]},
   {:id "3012"
    :name "Building of pleasure and sporting boats"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C3012"
-   :business-id "cloud-itonami-C3012"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3012"
+   :business-id "cloud-itonami-isic-3012"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607993012): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C3012 placeholder).
+   ;; BoatAdvisor, an advisor sealed behind an independent Boat
+   ;; Building Plant Operations Governor, langgraph-clj StateGraph,
+   ;; append-only audit ledger. Mirrors cloud-itonami-isic-3092's
+   ;; [Manufacture of bicycles and invalid carriages] verified module
+   ;; shape closely (boatmfg.* in place of bikemfg.*), adapted to the
+   ;; hull-molding/rigging/final-assembly/water-test plant producing
+   ;; sailboats, motorboats, personal watercraft and other pleasure/
+   ;; sporting craft. Twelve concrete governor checks including
+   ;; permanent blocks on hull-molding/rigging/final-assembly/water-
+   ;; test-equipment actuation and ISO 12217/CE Recreational Craft
+   ;; Directive marine-classification-certification self-issuance.
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3020"
    :name "Manufacture of railway locomotives and rolling stock"
