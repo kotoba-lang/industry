@@ -97,3 +97,22 @@ Update `kotoba-lang/industry` registry.edn entry 920:
 - `LICENSE` (AGPL-3.0), README (HARM MINIMIZATION), CODE_OF_CONDUCT, CONTRIBUTING, GOVERNANCE, SECURITY
 - `kotoba-lang/industry` registry.edn: entry 920 updated to `:implemented`
 - This ADR (edn+md pair)
+
+## Addendum (2026-07-15): post-landing defects found and fixed by independent verification
+
+Direct code review (not self-report) of the landed `governor.cljc` found the
+EN-language half of `contains-forbidden-word?` was computed but its result
+discarded (dead code) — only the Japanese keyword list actually gated the
+scope-exclusion HARD check, so English forbidden terms like "wager"/"odds"/
+"payout" were not being blocked for non-legitimate ops. Real test execution
+(via `nbb`, not trusting the "16 tests, all green" self-report) then
+surfaced two more defects: `sim.cljc`/`test.cljc` used `clojure.core/format`,
+which does not exist under ClojureScript/nbb, breaking this `.cljc` module's
+portability; and `store/facility-verified?` returned `nil` instead of an
+explicit `false` for an unknown facility, failing a strict test assertion.
+All three fixed and independently re-verified (16/16 tests, 5/5 demo
+scenarios, both actually run). Also fixed separately: the registry entry's
+`:required-technologies` had not had `:robotics` stripped, unlike every
+sibling coordination-only actor. `:repo`/`:business-id`/`:maturity` were
+correct from the original landing. Registry EDN validity (648 industries)
+confirmed before and after every fix via a real EDN parser.
