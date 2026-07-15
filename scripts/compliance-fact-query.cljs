@@ -217,7 +217,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-assoc-4923-usa-ata/data/datascript-tx.edn"}
    {:label "cloud-itonami-municipality-dnk-copenhagen ordinance.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-municipality-dnk-copenhagen/schema/ordinance.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-municipality-dnk-copenhagen/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-dnk-copenhagen/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-col statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-col/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-col/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 

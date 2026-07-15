@@ -1517,6 +1517,32 @@ Regulativ for Erhvervsaffald（事業系廃棄物規則、2024-09-01施行——
 現状: 国軸22件・業界団体軸24件(19業種)・自治体軸14件——60tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 61 — 国軸23件目(コロンビア))
+
+`cloud-itonami-iso3166-col`に`statute.facts`を新規追加・push
+([commit b7311ec](https://github.com/cloud-itonami/cloud-itonami-iso3166-col/commit/b7311ec))：
+コロンビア共和国。まず通常の第一候補である`secretariasenado.gov.co`
+（コロンビア上院の公式法令ポータル）を試みたがTCPレベルで完全に
+到達不能（`connect ECONNREFUSED 200.7.106.227:443`、以前メキシコの
+diputados.gob.mxで遭遇したのと同じ障害クラス）だったため断念し、
+代わりに`funcionpublica.gov.co`（Departamento Administrativo de la
+Función Pública、コロンビア政府機関の公式Gestor Normativo）の3件を
+検証: Código de Comercio（商法典、Decreto 410 de 1971、1971-03-27制定）／
+Ley Estatutaria 1581 de 2012（データ保護法、2012-10-17制定）／
+Código Sustantivo del Trabajo（労働法典、Decreto 2663 de 1950、
+1950-08-05制定）。いずれもページが完全にレンダリングされ、制定日・
+施行日・官報番号まで明記されていた。28 tests/90 assertions green
+（既存marketentryスイートと合算）。
+
+首都チェック: 既存のooyake由来organization.edn（Bogotá、Wikidata
+Q2841）は史実上一貫して首都であり、P36歴史的首都バグの対象外と確認。
+
+90リポジトリ・711 factを統合。`"statute/topic" "labor"`での横断query
+でcolを含む23カ国すべてが取得できることを確認。
+
+現状: 国軸23件・業界団体軸24件(19業種)・自治体軸14件——61tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
