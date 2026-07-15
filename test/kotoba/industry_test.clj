@@ -1722,7 +1722,13 @@
       ;; already landed via a Contents-API single-file PUT; at least one
       ;; other sibling promotion may have landed concurrently -- the live
       ;; recompute, not an assumed +1, is the source of truth here): 262 -> 262.
-      (is (= 263 (:implemented m))))))
+      ;; 263 -> 265: cloud-itonami-isic-2720 (batteries, Cell-Safety
+      ;; Governor) and cloud-itonami-isic-2310 (glass, Tempering Governor)
+      ;; promoted :spec -> :implemented, superproject ADR-2607160500/
+      ;; ADR-2607160600 -- both native real physics-2d simulations from
+      ;; day one. Live-recomputed via `(industry/maturity-summary)` on
+      ;; this working tree immediately before this edit.
+      (is (= 265 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

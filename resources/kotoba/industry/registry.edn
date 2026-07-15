@@ -4078,39 +4078,52 @@
    :name "Manufacture of plastics products"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2220"
    :business-id "cloud-itonami-isic-2220"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae :cfd]
-   :optional-technologies []
    :maturity :implemented
-   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
-   ;; ADR-2607162200): fresh from-scratch scaffold (no prior repo or
-   ;; reverted attempt existed at cloud-itonami/cloud-itonami-isic-2220;
-   ;; the old :repo/:business-id above pointed at a never-created
-   ;; gftdcojp/cloud-itonami-C2220 placeholder). PlasticsAdvisor /
-   ;; Plastics Plant Operations Governor, langgraph-clj StateGraph,
-   ;; append-only audit ledger.
-   ;; clojure -M:test: 71 tests / 198 assertions / 0 failures / 0 errors
-   ;; (verified from an independent fresh clone at merge commit
-   ;; e43c3481ced5aae98b96360f73a2b4ac538a91d1). Safety-critical domain
-   ;; (injection-molding/extrusion/blow-molding thermal-and-pressure
-   ;; hazard, resin fume/VOC hazard). Back-office plant-operations
-   ;; coordination only: all equipment actuation remains exclusive to
-   ;; the human plant supervisor. Four HARD invariants guard scope:
-   ;; equipment/batch independent verification+registration + independent
-   ;; shipment-weight recompute, closed op allowlist, propose-only
-   ;; effect, permanent block on direct molding/extrusion-line-equipment
-   ;; control (including a dedicated permanent block on any proposal
-   ;; that would actuate the line directly).
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   ;; 2026-07-15: the PlasticsAdvisor/Plastics-Plant-Operations-Governor
+   ;; propose-only admin-coordination stub (first :implemented promotion,
+   ;; ADR-2607162200) was REPLACED (PR #1, "Replace admin-ops-coordination
+   ;; stub with real-physics Clamp-Force Governor actor", not force-pushed)
+   ;; with a Molding Advisor ⊣ Clamp-Force Governor actor (superproject
+   ;; ADR-2607160700), matching this session's real-engineering-simulation
+   ;; fleet standard (ADR-2607151600/ADR-2607152000). `moldworks.*`
+   ;; namespaces are now the only source in `src/`. Shared upstream
+   ;; plastics-manufacturing stage feeding BOTH cloud-itonami-isic-2630
+   ;; (smartphone housings/back-covers/internal chassis brackets) and
+   ;; cloud-itonami-isic-2910/cloud-itonami-isic-2920 (automotive bumper
+   ;; fascias/interior trim/dashboard components), mirroring the
+   ;; cloud-itonami-isic-2720 (battery)/cloud-itonami-isic-2310 (glass)
+   ;; shared-upstream pattern. Molding-run-batch intake, per-product-class
+   ;; material-spec-rules verify (AUTOMOTIVE: SAE J1545/J1885 + ASTM
+   ;; D638/D256 + ISO 3167 / ELECTRONICS HOUSING: UL 94 + ISO 294),
+   ;; end-of-line short-shot/flash/warpage quality screen, a REAL
+   ;; time-stepped physics-2d injection-mold clamping-force verification
+   ;; simulation (moving mold-half vs static mold-half collision, F=m*a,
+   ;; anchored against the real projected-area x cavity-pressure-factor
+   ;; clamp-tonnage heuristic), dual actuation (ship-molding-run-batch +
+   ;; issue-material-certificate). 45 tests / 236 assertions, 0 failures.
+   :required-technologies [:robotics :cae :dmn :bpmn :audit-ledger]
+   :optional-technologies [:cfd :telemetry :optimization]
+   :operating-states [:intake :material-spec-rules-verify :end-of-line-quality-screen :approve :ship-molding-run-batch :issue-material-certificate :audit]},
   {:id "2310"
    :name "Manufacture of glass and glass products"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2310"
-   :business-id "cloud-itonami-C2310"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2310"
+   :business-id "cloud-itonami-isic-2310"
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as a glass-and-glass-products actor
+   ;; (Glass Advisor ⊣ Tempering Governor). Legacy
+   ;; gftdcojp/cloud-itonami-C2310 placeholder replaced with real
+   ;; cloud-itonami/cloud-itonami-isic-2310. Upstream glass-manufacturing
+   ;; stage feeding BOTH cloud-itonami-isic-2910/-2920 (automotive safety
+   ;; glazing) and cloud-itonami-isic-2630 (cover glass): glass-panel-
+   ;; batch intake, glazing-standard-rules verify (ANSI/SAE Z26.1+ASTM
+   ;; C1036 USA / JIS R 3211 Japan / UNECE R43 multi-market / ASTM C158
+   ;; cover glass), end-of-line quality screen, robot flexural-bend-test
+   ;; (ASTM C158) REAL physics-2d simulation (ADR-2607151600/
+   ;; ADR-2607152000 pattern), dual actuation (ship-glass-panel-batch +
+   ;; issue-glazing-certificate). 46 tests / 236 assertions, 0 failures.
+   :required-technologies [:robotics :cae :dmn :bpmn :audit-ledger]
+   :optional-technologies [:cfd :telemetry :optimization]
+   :operating-states [:intake :glazing-standard-rules-verify :end-of-line-quality-screen :flexural-strength-test-simulate :approve :ship-glass-panel-batch :issue-glazing-certificate :audit]},
   {:id "2391"
    :name "Manufacture of refractory products"
    :repo "https://github.com/gftdcojp/cloud-itonami-C2391"
@@ -4501,13 +4514,27 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2720"
    :name "Manufacture of batteries and accumulators"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2720"
-   :business-id "cloud-itonami-C2720"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2720"
+   :business-id "cloud-itonami-isic-2720"
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as a battery cell/pack actor
+   ;; (Cell Advisor ⊣ Cell-Safety Governor). Legacy
+   ;; gftdcojp/cloud-itonami-C2720 placeholder replaced with real
+   ;; cloud-itonami/cloud-itonami-isic-2720. The missing upstream stage for
+   ;; BOTH cloud-itonami-isic-2630 (smartphone/communication-device
+   ;; assembly) and cloud-itonami-isic-2910/cloud-itonami-isic-2920 (motor-
+   ;; vehicle/body assembly, BEV/FCEV powertrain integration): cell-batch
+   ;; intake, battery-safety-certification-rules verify (UN 38.3 global
+   ;; transport / IEC 62133-2 international baseline / UL 2054 USA /
+   ;; GB 31241 China), end-of-line internal-resistance/capacity-fade
+   ;; quality screen, a REAL time-stepped physics-2d UN 38.3 T6 mechanical
+   ;; crush-test simulation (press-platen vs cylindrical-cell collision,
+   ;; ADR-2607151600/ADR-2607152000 pattern, 13kN cited crush-force
+   ;; ceiling), dual actuation (ship-cell-batch + issue-safety-certificate).
+   ;; 45 tests / 230 assertions, 0 failures.
+   :required-technologies [:robotics :cae :dmn :bpmn :audit-ledger]
+   :optional-technologies [:cfd :telemetry :optimization]
+   :operating-states [:intake :cell-safety-rules-verify :end-of-line-quality-screen :approve :ship-cell-batch :issue-safety-certificate :audit]},
   {:id "2731"
    :name "Manufacture of fibre optic cables"
    :repo "https://github.com/gftdcojp/cloud-itonami-C2731"
