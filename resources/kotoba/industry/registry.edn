@@ -4636,11 +4636,20 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2740"
    :name "Manufacture of electric lighting equipment"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2740"
-   :business-id "cloud-itonami-C2740"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2740"
+   :business-id "cloud-itonami-isic-2740"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607159000): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2740 placeholder).
+   ;; ElecLightingAdvisor, an advisor sealed behind an independent
+   ;; Electric Lighting Plant Operations Governor, mirroring
+   ;; cloud-itonami-isic-2750's verified module shape module-for-module
+   ;; (eleclighting.* in place of domappl.*); 77 tests / 210 assertions
+   ;; green, independently re-verified against a fresh clone.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2750"
