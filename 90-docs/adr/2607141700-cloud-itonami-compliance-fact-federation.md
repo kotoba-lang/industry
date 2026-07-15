@@ -1543,6 +1543,27 @@ Q2841）は史実上一貫して首都であり、P36歴史的首都バグの対
 現状: 国軸23件・業界団体軸24件(19業種)・自治体軸14件——61tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 62 — 自治体軸15件目(オスロ))
+
+`cloud-itonami-municipality-nor-oslo`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-nor-oslo/commit/29230cb))：
+オスロ市。`oslo.kommune.no`の公式HTMLページ2件を直接WebFetch検証:
+Reglement for bystyret（市議会議事規則、2023-08-30可決・2023-10-25
+施行）／Forskrift om serverings-, salgs- og skjenkebevillinger i Oslo
+kommune（飲食店営業・酒類販売免許時間規則、2025-04-30可決）。両方とも
+ページ本文に日付が明記され完全にレンダリングされた。4 tests/10
+assertions green。
+
+首都チェック: 既存のooyake由来organization.edn（Oslo、Wikidata Q585）
+は史実上一貫して首都であり、P36歴史的首都バグの対象外と確認。
+
+91リポジトリ・713 factを統合。`"ordinance/topic" "governance"`での
+横断queryでosloがsydney/helsinki/copenhagenと並んで取得できることを
+確認。
+
+現状: 国軸23件・業界団体軸24件(19業種)・自治体軸15件——62tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
