@@ -244,7 +244,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-municipality-col-bogota/data/datascript-tx.edn"}
    {:label "cloud-itonami-iso3166-cri statute.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-iso3166-cri/schema/statute.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-iso3166-cri/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-cri/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-cri-san-jose ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-cri-san-jose/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-cri-san-jose/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 

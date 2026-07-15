@@ -1739,6 +1739,31 @@ Q3070）は史実上一貫して首都であり、P36歴史的首都バグの対
 現状: 国軸25件・業界団体軸26件(21業種)・自治体軸18件——69tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 70 — 自治体軸19件目(サンホセ) — 70tick到達)
+
+`cloud-itonami-municipality-cri-san-jose`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-cri-san-jose/commit/ee63aff))：
+サンホセ市（Cantón Central、コスタリカ）。市公式`msj.go.cr`は
+ドメイン全体が接続拒否（`ECONNREFUSED 196.40.1.83:443`）で完全に
+到達不能だったため、直前のtickでコスタリカ国レベル統計に使った
+`pgrweb.go.cr`（SCIJ、国の法令情報システムだが自治体条例も索引化
+している）に切り替えて2件検証: Reglamento Autónomo de Organización
+y Servicio de la Municipalidad de San José（組織・サービス自治規則、
+1997-08-26制定・2009-03-03版）／Reglamento de Publicidad Exterior
+（屋外広告規則、サンホセ市都市開発規則群の一部、1995-01-24原公布・
+2023-12-21最終改正）。ページが完全にレンダリングされ制定日・改正
+履歴が明記されていた。4 tests/10 assertions green。
+
+首都チェック: 既存のooyake由来organization.edn（San José、Wikidata
+Q3070）は史実上一貫して首都であり、P36歴史的首都バグの対象外と確認。
+
+99リポジトリ・731 factを統合。`"ordinance/topic" "governance"`での
+横断queryでsan-joseがsydney/helsinki/copenhagen/oslo/brussels/bogota
+と並んで取得できることを確認。
+
+現状: 国軸25件・業界団体軸26件(21業種)・自治体軸19件——70tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
