@@ -1722,7 +1722,7 @@
       ;; already landed via a Contents-API single-file PUT; at least one
       ;; other sibling promotion may have landed concurrently -- the live
       ;; recompute, not an assumed +1, is the source of truth here): 262 -> 262.
-      (is (= 262 (:implemented m))))))
+      (is (= 263 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
