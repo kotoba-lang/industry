@@ -229,3 +229,16 @@ Day 1、bond している witness は com-junkawasaki 自身の1つだけ
 - `orgs/kotoba-lang/engi/src/engi/stake.cljc` — 実装。
 - `orgs/kotoba-lang/engi/docs/witness-recruitment.md` — 勧誘文書(姉妹文書、
   配布はしない)。
+
+## Addendum (2026-07-15): Decision #7(報酬モデル)を ADR-2607995000 が置換
+
+ADR-2607995000(三圏経済)により、Decision #7 の「transfer 1件あたり外部
+資産建て手数料」は**廃止**された — per-transfer 課金は EN の移動に外部価格を
+貼り、EN の非価格理念を裏口から破壊するため(三圏経済の緊張点2)。置換後の
+報酬モデル: witness の務め(block 検証・recompute 検証)は労働であり、
+ADR-2607030030 の労働裏付け発行を witness duty に拡張して **credits を
+mint する**(finalize された block 数への定額 — EN 移動量に比例させない)。
+外部資産での支払いが必要になった場合のみ、on-ramp 収益から kekkai release
+記録を経て governance 投票(Decision #8 の機構をそのまま再利用)でサービス
+対価の道を開ける。Decision #1〜#6・#8〜#10 は不変。equivocation-only 原則
+(Decision #5)は同ADR §4 で経済圏全体の slashing 原則に昇格した。
