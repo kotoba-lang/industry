@@ -391,6 +391,8 @@
     (is (= :implemented (industry/maturity "4311"))))
   (testing "cloud-itonami-isic-0146 (Raising of poultry, fresh scaffold -- no prior repository; identity ({:id \"0146\" :name \"Raising of poultry\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; PoultryOpsAdvisor ⊣ PoultryFarmOperationsGovernor poultry-farm-operations-coordination actor mirroring cloud-itonami-isic-0145's [Raising of swine/pigs] verified module shape module-for-module -- barn/house facility registration, broiler/layer breed reference data [Cobb 500/Ross 308/White Leghorn/ISA Brown] in place of swine breeds, and a biosecurity/notifiable-disease reference vocabulary [HPAI/Newcastle Disease/Infectious Bronchitis/Infectious Bursal Disease] in place of ASF/CSF/FMD/PRRS; flag-animal-health-concern always escalates regardless of confidence, matching 0145's own animal-welfare-escalation invariant; treatment-or-culling-blocked permanently blocks :administer-treatment and :order-culling; superproject ADR-2607160300) is also :implemented"
     (is (= :implemented (industry/maturity "0146"))))
+  (testing "cloud-itonami-isic-4210 (Construction of roads and railways, fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-F4210 placeholder or the real cloud-itonami org [gh api 404 confirmed]; identity ({:id \"4210\" :name \"Construction of roads and railways\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; Road-Rail Advisor ⊣ Road-Rail Governor road/railway-construction-project OPERATIONS COORDINATION actor structured after cloud-itonami-isic-4211's [Community Building Construction] robotics-premise module shape but deliberately NARROWED, same coordination-only shape as cloud-itonami-isic-4311 [Demolition] -- no heavy-equipment-control or engineering-design/grade-plan-finalization authority [permanent, un-overridable governor hard-blocks], every proposal's :effect is :propose only [governor HARD-holds anything else, defense-in-depth]; per-jurisdiction {JPN/USA/DEU} utility-strike-prevention/traffic-control legal-basis catalog citing real official sources [labor safety ordinance 労働安全衛生規則 第355条, road traffic act 道路交通法 第77条, construction recycling act 建設リサイクル法 第10条 in Japan; OSHA 29 CFR 1926.651, 23 CFR 630/645 in the USA; EU Directive 92/57/EEC, StVO §45 in Germany/EU]; schedule-construction-operation and flag-safety-concern always escalate to a human at every phase, unconditionally; DatomicStore uses langchain-store.core [ADR-2607141600] instead of hand-rolling the EDN-blob codec; 68 tests / 258 assertions green, independently re-verified against a fresh clone; superproject ADR-2607161700) is also :implemented"
+    (is (= :implemented (industry/maturity "4210"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -1090,7 +1092,14 @@
       ;; against a freshly re-fetched origin/main immediately before this
       ;; edit (concurrent-agent count-drift caution -- not an assumed
       ;; fixed number): 217 -> 218.
-      (is (= 218 (:implemented m))))))
+      ;; 218 -> 219: cloud-itonami-isic-4210 (Construction of roads and
+      ;; railways) promoted :spec -> :implemented, superproject
+      ;; ADR-2607161700 (cloud-itonami-isic-4210-roads-railways-
+      ;; construction-coverage.md). Live-recomputed via
+      ;; `(industry/maturity-summary)` immediately before this edit on a
+      ;; freshly re-fetched origin/main (concurrent-agent count-drift
+      ;; caution -- not an assumed fixed number).
+      (is (= 219 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
