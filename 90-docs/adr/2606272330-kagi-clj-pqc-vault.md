@@ -245,6 +245,6 @@ provider（kotoba-crypto Rust に ml-kem/ml-dsa 増設）、Shamir 復旧の実�
 ## west 登録
 
 新 repo は GitHub API の単一 entry クリーン commit で `manifest/west.yml` に登録し、pin 前進も
-API（手書き禁止＝再生成と byte 一致、**pin == repo HEAD を検証**）。`scripts/gen-west-manifest.bb`
+API（手書き禁止＝再生成と byte 一致、**pin == repo HEAD を検証**）。`scripts/gen-west-manifest.cljs`
 は west.yml の既存 path 群から projects を採るため、登録には **GitHub repo `com-junkawasaki/kagi-clj`
 の作成**が前提（未作成の間は west pin 保留）。本 ADR と同時にローカル雛形 + `git init` まで用意する。

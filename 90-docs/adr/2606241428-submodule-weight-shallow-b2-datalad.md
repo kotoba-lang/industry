@@ -9,9 +9,9 @@ last_verified: 2026-06-27
 authoritative_for:
   - superproject の重い submodule を縮小する手段 (shallow 運用 / force-push 禁止)
   - 大容量バイナリ (モデル重み / wasm / 動画 / 画像データセット) の保管方針 (B2 + DataLad)
-  - git-annex の Backblaze B2 (S3 互換) special remote 初期化手順 (scripts/datalad-b2-init.bb)
+  - git-annex の Backblaze B2 (S3 互換) special remote 初期化手順 (scripts/datalad-b2-init.cljs)
   - clone/pull 高速化のためのローカル git 設定 (submodule.<name>.shallow / submodule.fetchJobs)
-  - B2 creds の解決方式 (scripts/b2-creds.bb / repos.edn :b2 :credentials。Keychain 単一アイテム b2:<bucket> 方式)
+  - B2 creds の解決方式 (scripts/b2-creds.cljs / repos.edn :b2 :credentials。Keychain 単一アイテム b2:<bucket> 方式)
   - west annex-drop / annex-get による DataLad 実体の B2 退避・復元手順
 related: []
 supersedes: []
@@ -80,13 +80,13 @@ update を並列化する。**履歴書き換え/force-push は行わない**（
 push、git にはポインタ (annex キー) だけ残す。git-annex は B2 の S3 互換エンドポイントを
 `type=S3 host=<endpoint> signature=v4` で扱える（外部ヘルパー・`b2` CLI 不要）。
 
-初期化は `scripts/datalad-b2-init.bb`（babashka。既存 `.bb` フックと同じ `babashka.process`
+初期化は `scripts/datalad-b2-init.cljs`（babashka。既存 `.cljs` フックと同じ `babashka.process`
 スタイル）。**認証は環境変数のみで渡し、リポジトリに秘密情報を一切コミットしない**:
 
 ```bash
 B2_KEY_ID=... B2_APP_KEY=... B2_BUCKET=... \
 B2_ENDPOINT=s3.us-west-004.backblazeb2.com \
-  scripts/datalad-b2-init.bb <dataset-dir> [remote-name]
+  scripts/datalad-b2-init.cljs <dataset-dir> [remote-name]
 # 以後: datalad save → datalad push --to b2 → datalad drop / datalad get
 ```
 
@@ -102,7 +102,7 @@ B2_ENDPOINT=s3.us-west-004.backblazeb2.com \
 - (−) 現行ツリーに画像同梱の 260208-spirit-in-physics は shallow 不可のまま（縮小には force-push を
   伴う履歴書き換え＝B2+DataLad 移行が必要で、本 ADR では見送り）。将来オーナー判断で対応する
 - (−) B2 運用は資格情報（keyID/appKey/bucket/endpoint）の各マシン設定が前提。秘密の取り回しは
-  環境変数 + セッション直実行（`! VAR=… scripts/datalad-b2-init.bb …`）で会話・リポに残さない
+  環境変数 + セッション直実行（`! VAR=… scripts/datalad-b2-init.cljs …`）で会話・リポに残さない
 
 ## Update 2026-06-27: m365-archive の実 drop と B2 creds 解決の修正
 
@@ -118,7 +118,7 @@ B2_ENDPOINT=s3.us-west-004.backblazeb2.com \
 
 ### B2 creds 解決の不整合を修正（Keychain 単一アイテム方式を追加）
 
-`west annex-drop` が当初 creds 未解決で skip した。原因は **`scripts/b2-creds.bb` /
+`west annex-drop` が当初 creds 未解決で skip した。原因は **`scripts/b2-creds.cljs` /
 `manifest/repos.edn :b2 :credentials` の参照先がこのマシンの実体と不一致**だったこと:
 
 - repos.edn は `:1password "op://Private/Backblaze B2/..."` を指すが、その item は実在しない
@@ -130,7 +130,7 @@ B2_ENDPOINT=s3.us-west-004.backblazeb2.com \
   key-id/bucket を取り出せず解決に失敗していた。
 
 対応:
-- `scripts/b2-creds.bb` の Keychain 解決に **`:combined true` モード**を追加。単一アイテムから
+- `scripts/b2-creds.cljs` の Keychain 解決に **`:combined true` モード**を追加。単一アイテムから
   `account`(=`security -g` の `"acct"`)→key-id、`password`(=`-w`)→app-key、service 名の
   `b2:` 以降→bucket を導く。従来の 3-account 方式とは後方互換。
 - `manifest/repos.edn :b2 :credentials :keychain` を
@@ -145,7 +145,7 @@ B2_ENDPOINT=s3.us-west-004.backblazeb2.com \
 
 ## References
 
-- 実装: `scripts/datalad-b2-init.bb`（B2 + DataLad 初期化）/ `scripts/b2-creds.bb`（creds 解決）
+- 実装: `scripts/datalad-b2-init.cljs`（B2 + DataLad 初期化）/ `scripts/b2-creds.cljs`（creds 解決）
 - 実装: `manifest/west_annex.py`（west annex-get / annex-drop）
 - 方針: `CLAUDE.md` の「大容量バイナリの扱い（B2 + DataLad、最優先）」節
 - git-annex S3 special remote（B2 は S3 互換 API で接続）

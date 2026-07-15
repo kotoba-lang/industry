@@ -71,7 +71,7 @@ ADR-2607072530/2607072600 は cloud-itonami の `.kotoba`→WASM actor を murak
 
 - **cloud-itonami の wasm actor が初めて、真の意味で「常駐」した。** ADR-2607072530/2607072600 が明示的に残していた follow-up（「No wire transport puts a host in front of this ABI yet」）を解消した。
 - **asher は libp2p gossipsub mesh から外れ、ADR-2607072400 の kaisha/denrei realtime pod は asher 上で機能しなくなる。** 実測時点で `peer_count:0`（メッシュに実際には接続していなかった）だったとはいえ、mesh 参加可能な状態ではなくなった。フリートの他 9 ノードは Rust kotoba-server のまま無変更。
-- **`murakumo` 自身の provisioning tooling(`bb murakumo provision`/`mesh`)はこの変更を認識しない。** 将来誰かが asher に対して同ツールを実行すると、`render-plist` は無条件に Rust 版 plist を再生成するため、**黙って cljc 版から Rust 版に戻る**（意図的なフェイルセーフとして許容 — 恒久的な fleet 運用変更ではなく実験的デプロイという位置付け）。
+- **`murakumo` 自身の provisioning tooling(`nbb murakumo provision`/`mesh`)はこの変更を認識しない。** 将来誰かが asher に対して同ツールを実行すると、`render-plist` は無条件に Rust 版 plist を再生成するため、**黙って cljc 版から Rust 版に戻る**（意図的なフェイルセーフとして許容 — 恒久的な fleet 運用変更ではなく実験的デプロイという位置付け）。
 - 新設 HTTP エンドポイントは平文・無認証（実験目的として許容、本番運用には不十分）。
 - 単一 actor（isic-6492）専用の固定ルーティングであり、汎用 dispatcher ではない。
 

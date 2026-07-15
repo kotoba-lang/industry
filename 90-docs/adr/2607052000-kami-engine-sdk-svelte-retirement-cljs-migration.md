@@ -32,7 +32,7 @@ inline `allNodes`/`wouldCycle` logic was replaced, one function at a time, with 
 NOT replace the TS runtime — genko-embed.ts keeps running as-is; cljc is a parallel SSoT,
 with a follow-up to compile it to cljs and swap in the corresponding logic later."* Each
 increment was verified in a real browser (WebGPU Chrome) before landing, gated by
-`vitest`/`bb` tests.
+`vitest`/`nbb` tests.
 
 User-confirmed (this ADR): follow that exact established methodology — incremental
 delegation to cljc SSoT repos, one function/component at a time, verified before moving on
@@ -138,7 +138,7 @@ every subsequent increment; that research is not repeated here.
   it; do not create a second, competing implementation of the same protocol/logic.
 - **Verify before moving on.** Genko's increments were browser-verified (WebGPU Chrome) since
   they touched a live embedded runtime; increments with no live host yet (like this ADR's
-  `turn.ts`-adjacent first step) are JVM/`bb`-test-verified instead — pick whichever
+  `turn.ts`-adjacent first step) are JVM/`nbb`-test-verified instead — pick whichever
   verification is real and possible for that increment, but do not skip verification.
 - **Host/DOM/WASM stays host; only pure logic moves to cljc**, exactly as ADR-2607020200
   states for genko's oplog/tree/document-model vs. its WebGPU/DOM runtime.
@@ -188,7 +188,7 @@ full-module port is the right increment size when there's no live embedded-HTML 
 incrementally de-risk against — `webvr`'s only real consumer (`ai-gftd-cyber-drill`)
 supplies its own renderer via `onScene` and isn't touched by this port at all, unlike
 `genko-embed.ts`'s live production runtime. The bar stayed the same either way: every
-original test assertion ported 1:1 before landing (20/20 green — 9 JVM `bb test` for the
+original test assertion ported 1:1 before landing (20/20 green — 9 JVM `nbb test` for the
 pure `types.cljc`/`incident_pregel.cljc`, 11 CLJS `node-test` for `engine.cljs`/
 `cine_bridge.cljs`).
 

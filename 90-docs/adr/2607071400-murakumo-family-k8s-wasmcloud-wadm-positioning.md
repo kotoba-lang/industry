@@ -38,7 +38,7 @@ facade）を control plane と誤認しうる。
    `murakumo : kotoba ≅ wash + wadm : wasmCloud` を正とする。placement は
    中央 scheduler ではなく gossipsub lattice 上の **leaderless auction**、
    desired state は `murakumo.app.edn`（wadm manifest 相当）→
-   `bb murakumo reconcile` の収束ループ。Spin/SpinKube 型の「k8s 制御面に
+   `nbb murakumo reconcile` の収束ループ。Spin/SpinKube 型の「k8s 制御面に
    依存する分散」は no-central-master 原則と衝突するため不採用（同 ADR）。
    例外は etzhayyim 側 murakumo（k3s-on-Lima + Ansible、LangGraph/Pregel
    cells 用）のみで、これは本ファミリーの外。
@@ -69,7 +69,7 @@ facade）を control plane と誤認しうる。
 | k8s | wasmCloud/wadm | murakumo ファミリー | 状態 |
 |---|---|---|---|
 | manifest / Deployment | wadm manifest | `murakumo.app.edn`（apps × replicas × placement） | 実装済み |
-| controller / reconcile loop | wadm reconciler | `bb reconcile --dry-run/--apply/--watch` + pure core `reconcile/plan.cljc` | 実装済み（テスト有） |
+| controller / reconcile loop | wadm reconciler | `nbb reconcile --dry-run/--apply/--watch` + pure core `reconcile/plan.cljc` | 実装済み（テスト有） |
 | kube-scheduler | lattice auction | gossipsub **leaderless auction**（label/role/reach eligibility → least-loaded）＋ Sora の bin-pack / `infer/plan` のメモリ加重分割 | pure コア実装済み・**fleet 横断 auction は未配線** |
 | kubelet | host runtime | 各 node の `kotoba-server`（macOS LaunchAgent、RunAtLoad+KeepAlive） | 実装済み |
 | liveness probe / 自己修復 | health check | deep `/health` + watchdog（60s probe→kill→respawn）+ `reconcile --watch` | **node ローカルのみ**（fleet レベル再配置は未達、ADR-2607022000） |

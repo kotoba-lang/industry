@@ -2,7 +2,7 @@
 
 - **Status**: accepted（オーナー指示 2026-07-10）
 - **Related**: ADR-2607100100（app 第一 runtime 優先順位 kotoba wasm >
-  clojurewasm > ClojureScript > nbb、JVM/bb 降格 — 本 ADR の game/anime
+  clojurewasm > ClojureScript > nbb、JVM/nbb 降格 — 本 ADR の game/anime
   生成 workflow はこの順序に従う）、ADR-2607011816（shiropico standalone
   repo 化）、ADR-2607012000（shiropico publish actor）、ADR-2607023200
   （game portfolio flow）、ADR-2607021700（manga as social post — 旧
@@ -48,7 +48,7 @@
    トリガー、Wattpad 自動投稿、Neo4j ストーリーグラフ閲覧/編集 UI）。
 3. **ゲームおよびアニメの生成 workflow は `.cljc` で書き、
    ADR-2607100100 の app 第一 runtime 優先順位（kotoba wasm runtime →
-   clojurewasm → ClojureScript → nbb、JVM/bb は降格）に従う。** 対象:
+   clojurewasm → ClojureScript → nbb、JVM/nbb は降格）に従う。** 対象:
    game portfolio（`ghosthacker-flow` / `ghosthacker-harmony` /
    `ghosthacker-echoes` および未着手7タイトルの生成/ビルド workflow）、
    アニメ生成 workflow（`ai-gftd-animeka` の cut 単位パイプライン）。

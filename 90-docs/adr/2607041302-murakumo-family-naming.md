@@ -9,8 +9,8 @@
 
 `murakumo` を名乗るリポジトリが3つ存在し、関係が暗黙のままだった:
 
-1. **`kotoba-lang/murakumo`** — kotoba WASM lattice の制御面そのもの。bb/clj 製の
-   **OSS CLI**（`bb murakumo nodes/status/provision/mesh/deploy/reconcile/fleet/
+1. **`kotoba-lang/murakumo`** — kotoba WASM lattice の制御面そのもの。nbb/clj 製の
+   **OSS CLI**（`nbb murakumo nodes/status/provision/mesh/deploy/reconcile/fleet/
    cloud/overlay/infer`）で、standalone にローカル store 上で動く。Mac-mini fleet
    の provisioning・mesh 形成・leaderless auction を担う唯一の実行ツール。
 2. **`gftdcojp/cloud-murakumo`**（通称 Sora） — ADR-2606272300 で決定した
@@ -76,7 +76,7 @@ manifest反映）は破壊的/共有状態に影響する操作のため、別�
 1. `gh repo rename cloud-murakumo-fleet local-murakumo --repo gftdcojp/cloud-murakumo-fleet`
 2. `manifest/repos.edn` の該当 project 名 / `:path-overrides` に
    `"orgs/gftdcojp/cloud-murakumo-fleet" "orgs/gftdcojp/local-murakumo"` を追加
-   （west.yml は手書き禁止。`bb scripts/gen-west-manifest.bb --entry local-murakumo`
+   （west.yml は手書き禁止。`nbb scripts/gen-west-manifest.cljs --entry local-murakumo`
    で当該 entry のみ最小diffで再生成し `--check` で確認）
 3. リポジトリ内 README のタイトル（今も `# cloud-murakumo` のまま）と本文中の
    `cloud-murakumo (CF Worker, cljs)` 等の自称箇所を `local-murakumo` に更新

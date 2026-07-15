@@ -153,7 +153,7 @@ independently."
   ADR-0003's *different* multimode CAD/game/modeling/animation editor shell,
   not this ADR's page router.
 - The multi-document architecture was not just kept but *formalized*:
-  `src/isekai/site/build.cljc` (`bb render-site`) code-generates every
+  `src/isekai/site/build.cljc` (`nbb render-site`) code-generates every
   `public/*.html` shell from its own `.cljc` source
   (`isekai.site{,.assets,.generate,.studio,.play,.dance,.preview}`), citing
   ADR-2607022800 (kotoba-lang's UI/UX design-system ADR), not this one.
@@ -193,7 +193,7 @@ independently."
 **Disposition**: given (a) the routing bug is already fixed in production
 via the narrower PR #106 fix, (b) the team has since invested further in
 the opposite direction (per-page codegen + widget-level reagent mounts,
-each with its own CI gate — `bb visual`/`bb dance`/`bb assets`/etc. — under
+each with its own CI gate — `nbb visual`/`nbb dance`/`nbb assets`/etc. — under
 ADR-2607022800), and (c) a full retroactive rewrite into one SPA shell would
 be a repo-wide, high-risk rearchitecture of a live production site
 (isekai.network) that would conflict with all of that subsequent work, this

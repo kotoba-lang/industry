@@ -127,7 +127,7 @@ instance, from `cultural`/8542's own architecture).
   longer blueprint-tier after this promotion.
 - `manifest/west.yml`'s `industry` pin was advanced via the GitHub API
   single-entry-commit path and verified canonical via
-  `bb scripts/gen-west-manifest.bb --entry industry`.
+  `nbb scripts/gen-west-manifest.cljs --entry industry`.
 
 ## Scope note
 

@@ -95,7 +95,7 @@ kill は `~/.murakumo/watchdog.log` に記録。到達可能 5 台
 
 - fleet repo: `1c67399`（deps path fix）`f44908a`（api route）`b0c107c`
   （KV interim + deep health merge）。JVM route tests 27 assertions green。
-- murakumo repo: `01c4078`（watchdog merge）。bb tests 605 assertions green。
+- murakumo repo: `01c4078`（watchdog merge）。nbb tests 605 assertions green。
 - 検証: `https://murakumo.cloud/` 200、`https://api.murakumo.cloud/health` →
   `{"ok":true,…,"storage":{"backend":"kv","ok":true}}`、POST/GET /events
   round-trip、dash で 5/10 ノード ok・lattice 再形成をログで確認。

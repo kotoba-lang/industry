@@ -50,7 +50,7 @@ pure .cljc engine）:
   同じ actor パターンで全 product 共通に回せる。捏造ゼロ（実測 emitter 値のみ）。
 - (+) gate（1 仮説の validate）と funnel（獲得ファネルの growth）が分離・補完。
   net-kotobase の現 bottleneck が「acquisition（訪問はあるが signup 0）」と明示された。
-- 検証: `bb 70-tools/bmc/run-tests.bb` = 11 tests / 51 assertions green（funnel
+- 検証: `nbb 70-tools/bmc/run-tests.cljs` = 11 tests / 51 assertions green（funnel
   evaluation・bottleneck・missing・proposals cycle を追加）。
 - (−) follow-up: (a) 各 product の **funnel emitter**（signup/checkout/activation の
   実計測）を product repo に配線（net-kotobase は signup→checkout 導線 + telemetry）、

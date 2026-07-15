@@ -133,7 +133,7 @@ gh api repos/kotoba-lang/org-ieee-verilog --jq '.full_name'
 gh api repos/kotoba-lang/si                                      # 404 (deleted)
 cd orgs/kotoba-lang/signal-integrity && clojure -M:test           # 10 tests / 14 assertions, 0 failures
 cd orgs/kotoba-lang/pdk && clojure -M:test                        # 5 tests / 33 assertions, 0 failures
-bb scripts/gen-west-manifest.bb --entry org-synopsys-liberty,org-si2-lef,org-ibis,\
+nbb scripts/gen-west-manifest.cljs --entry org-synopsys-liberty,org-si2-lef,org-ibis,\
   org-ieee-systemverilog,org-ieee-vhdl,org-synopsys-sdc,org-si2-def,\
   org-si2-openaccess,org-ieee-upf,org-accellera-uvm,signal-integrity,pdk
 ```

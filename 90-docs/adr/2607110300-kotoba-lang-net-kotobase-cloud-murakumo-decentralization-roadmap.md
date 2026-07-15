@@ -146,12 +146,12 @@ verification across multiple physical machines is deferred — this
 sandboxed environment has no Tailscale access to the real fleet."
 That gap is now partially closed for the HTTP side:
 
-- Confirmed via `tailscale status` + `bb murakumo nodes`: 6 of
+- Confirmed via `tailscale status` + `nbb murakumo nodes`: 6 of
   fleet.edn's 10 real nodes were online at test time (naphtali, judah,
   zebulun, issachar, asher, benjamin), reachable over the actual
   Tailscale mesh from the session host.
-- None of the fleet nodes have a real JVM/Clojure/bb installed (only
-  macOS's `/usr/bin/java` stub) — `bb murakumo nodes` independently
+- None of the fleet nodes have a real JVM/Clojure/nbb installed (only
+  macOS's `/usr/bin/java` stub) — `nbb murakumo nodes` independently
   confirmed `mesh: absent/stopped` on all of them. Installing a JVM on
   production fleet hardware to run the witness listener THERE was
   judged out of scope for a verification pass (a real provisioning
@@ -199,7 +199,7 @@ node, but the *session host's own* side used the JVM
 pattern doesn't establish that fleet nodes themselves could run the
 CLIENT side of this protocol without a JVM, and JVM is this org's own
 lowest-priority runtime (CLAUDE.md 2026-07-10: kotoba wasm >
-clojurewasm > ClojureScript > nbb, JVM/bb demoted to last resort).
+clojurewasm > ClojureScript > nbb, JVM/nbb demoted to last resort).
 
 Checked: all previously-verified fleet.edn nodes (naphtali, judah,
 zebulun, issachar, asher) have Node.js already installed (v22–v26) but

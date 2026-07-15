@@ -11,7 +11,7 @@
 
 - `orgs/kotoba-lang/usd/src/usd/core.cljc`（全95行）: EDNをUSDA（ASCII テキスト）にコンパイルする**書き込み専用**のコンパイラ。`usda`/`prim`/`attr`/`rel`/variant-set。**パース関数は一切存在しない**（`parse`/`read`という名前の関数はゼロ）。
 - `test/usd/core_test.clj`（全63行、4 deftest・19 assertions）: すべて**文字列比較**（`str/starts-with?`/`str/includes?`/`=`）。round-tripテスト（出力をパースし直して元のEDNと比較）は無い。
-- `test/usd/core_test.clj`のnamespace docstringは「usdcat/usdcheckerが同じ出力を実際に検証する（`bb gate`で）」と主張しているが、**この主張は虚偽**——リポジトリ内に`bb gate`タスクの定義は存在せず（`bb.edn`自体が無い）、CI（`.github/workflows/ci.yml`）は`clojure -M:test`のみで、usdcat/usdcheckerの呼び出しは影も形もない。ADR-2607110900の教訓（ドキュメントの主張を鵜呑みにしない）を踏まえ、これも実装着手前に自分で検証して判明した。
+- `test/usd/core_test.clj`のnamespace docstringは「usdcat/usdcheckerが同じ出力を実際に検証する（`nbb gate`で）」と主張しているが、**この主張は虚偽**——リポジトリ内に`nbb gate`タスクの定義は存在せず（`nbb.edn`自体が無い）、CI（`.github/workflows/ci.yml`）は`clojure -M:test`のみで、usdcat/usdcheckerの呼び出しは影も形もない。ADR-2607110900の教訓（ドキュメントの主張を鵜呑みにしない）を踏まえ、これも実装着手前に自分で検証して判明した。
 - **一方、実在するPixar公式USDツールチェーンを実際にローカルで動かして確認した**:
   - macOSにはシステム同梱の`/usr/bin/usdcat`/`/usr/bin/usdchecker`（root所有、Mach-O universal binary、Apple製 — AR Quick Look/USDZ関連でmacOSに標準搭載）が実在し、動作確認済み（手書き`.usda`をparseして再emit、`.usda`↔`.usdc`バイナリのround-tripも成功、`usdchecker`は実際にmetersPerUnit/upAxis欠落を検出した）。ただしこれは**macOSローカル限定**でLinux CIランナーには無い。
   - PyPI `usd-core`（NVIDIA/Pixar公式配布のPython bindings、`pxr`モジュール）を実際に`pip install`して動作確認済み: install ~1.2秒・224MB、`Usd.Stage.Open(...).ExportToString()`（usdcat相当）と`UsdUtils.ComplianceChecker`（usdchecker相当、deprecation警告はあるが動作する）の両方が実際に機能することを確認した。これはLinux/macOS双方で配布されておりGitHub Actions（ubuntu-latest）でも`pip install usd-core`で入手可能——**CI上で実オラクル検証を組み込める**、ということも意味する。
@@ -46,7 +46,7 @@ USDA仕様は非常に広い（layer offset、sublayerサブ構文、時系列�
 
 - **M1**: `usd.core`に`parse-usda`（トップレベル）と`parse-prim`（再帰下降パーサーの本体）を追加。字句解析→構文木という2段構成にはせず、既存の`usd.core`のスタイル（純粋関数、外部依存なし）に合わせて手書き再帰下降で直接EDNへ。既存19件のgolden test出力全てをparse→re-emitしてbyte-exact一致することをテストで確認（D2のround-trip）。
 - **M2**: JVM専用の新規テストnamespace `usd.oracle-test`（`.clj`）を追加。Pythonドライバスクリプト（1ファイル、`subprocess`経由でJVMから呼ぶ）で D3 の3種類の検証（compliance/usdcat round-trip/parse-then-reemit-matches-usdcat）を実装。オラクル未検出環境はskip（理由をテスト出力に明記）。
-- **M3**: `.github/workflows/ci.yml`に`actions/setup-python@v5`+`pip install usd-core`ステップを追加し、M2のオラクルテストがCI上で実行されることを確認（グリーンになるまで）。`test/usd/core_test.clj`のnamespace docstringの「bb gate」という虚偽記述を、実態（このCIジョブ自身がusdcat/usdcheckerで検証する）に合わせて訂正する。
+- **M3**: `.github/workflows/ci.yml`に`actions/setup-python@v5`+`pip install usd-core`ステップを追加し、M2のオラクルテストがCI上で実行されることを確認（グリーンになるまで）。`test/usd/core_test.clj`のnamespace docstringの「nbb gate」という虚偽記述を、実態（このCIジョブ自身がusdcat/usdcheckerで検証する）に合わせて訂正する。
 
 ## Non-goals（明示的にやらないこと）
 
@@ -76,7 +76,7 @@ M1着手のため`kotoba-lang/usd`（**2026-07-05にADR-2607041500の命名慣�
 
 **ADR-0048の所在確認**: `com-junkawasaki/root`の`90-docs/adr/`配下にはこのID・タイトルのファイルは存在しない（`grep -rl "ADR-0048"`は6件ヒットするが、いずれも「ADR-0048を参照する側」の文書——`2607031600-cloud-murakumo-gpu-fleet-requirements.md`のautorig/kami-engine言及、`2607051400-kotoba-ml-engine-tensor-gpu-weights-kernels.md`のGPU kernel方針言及、`2607100100-kotoba-lang-realtime-archviz-twinmotion-equivalent.md`のglTF rename系譜言及——で、ADR-0048自身の本文はどこにも見つからなかった）。ただし、複数の独立したセッション/時期にまたがって一貫して同じID・章番号（§1/§2/§4）で参照されている点は、ADR-2607110900のケース（単一エージェントの単発ハルシネーション）とは性質が異なり、**この組織で実際に存在する（が本checkout範囲外にある)確度の高い先行ADR**と判断し、深追いはしない。
 
-**結論**: D1（スコープ限定方針）・D2（既存書き込みEDN形へ双方向にする方針）は、既存実装が**既に同じ方針で、かつより広いカバレッジ**（コメント・list-edit演算子等、本ADRのD5で想定していたより広いサブセット）で満たしている。M1は**実装不要**——重複実装は避ける。D3（実オラクル検証）・D4（CI配線）・M2・M3は、既存実装にも`.github/workflows/ci.yml`にもusdcat/usdchecker/usd-core/pxrへの言及が一切なく（`clojure -M:test`＋`clojure -M:lint`のみ）、`test/usd/core_test.clj`のnamespace docstring（「usdcat/usdcheckerが`bb gate`で検証」）は新実装後も**訂正されずに残っている虚偽記述のまま**——引き続き有効な、未着手の作業として続行する。M2/M3は新規パーサーでなく既存の実`usd.core/parse`/`parse-prim`APIを対象に実装する。
+**結論**: D1（スコープ限定方針）・D2（既存書き込みEDN形へ双方向にする方針）は、既存実装が**既に同じ方針で、かつより広いカバレッジ**（コメント・list-edit演算子等、本ADRのD5で想定していたより広いサブセット）で満たしている。M1は**実装不要**——重複実装は避ける。D3（実オラクル検証）・D4（CI配線）・M2・M3は、既存実装にも`.github/workflows/ci.yml`にもusdcat/usdchecker/usd-core/pxrへの言及が一切なく（`clojure -M:test`＋`clojure -M:lint`のみ）、`test/usd/core_test.clj`のnamespace docstring（「usdcat/usdcheckerが`nbb gate`で検証」）は新実装後も**訂正されずに残っている虚偽記述のまま**——引き続き有効な、未着手の作業として続行する。M2/M3は新規パーサーでなく既存の実`usd.core/parse`/`parse-prim`APIを対象に実装する。
 
 ## Addendum (2026-07-10, 2回目): M2/M3 実装完了
 
@@ -85,7 +85,7 @@ M1着手のため`kotoba-lang/usd`（**2026-07-05にADR-2607041500の命名慣�
 - **M2**: `test/usd/oracle_test.clj`（JVM専用）＋`tools/usd_oracle.py`（`pxr` Python bindings、`pip install -r tools/requirements.txt`）を新規追加。3テスト: (1) emitter出力がcompliance error 0件、(2) 自前emitter出力を実`Usd.Stage`でround-tripさせたものを自前parserで読み戻すと元のprimと一致、(3) 実際のOpenUSD公式サンプル相当の手書き`.usda`フィクスチャを自前parserと実オラクルの再emit経由の両方でparseして一致することを確認。
   - **実装中に判明した実オラクル由来の新事実**: `Usd.Stage`は属性/relの**宣言順序をテキスト通りに保持しない**（値と存在の集合のみ保証）——これは自前emitter/parserの不具合ではなく実際のUSDランタイムの挙動で、比較ヘルパー`prim-structurally=`（各ネストレベルで兄弟宣言順序に非依存な構造比較）を実装して対応した。自前emitter自身のround-trip（`core_test.clj`）は引き続き厳密な順序一致を要求——両者は別物であり、混同していない。
   - オラクル未検出環境（`python3`に`pxr`が無い等）では明示メッセージ付きでskip（0 assertion通過を「合格」と誤認しないようにする設計、`USD_ORACLE_PYTHON`で上書き可）。
-- **M3**: CI（`.github/workflows/ci.yml`）に`actions/setup-python@v5`＋`pip install -r tools/requirements.txt`を追加——初回pushは`actions/setup-python`の`cache: pip`が依存マニフェスト無しでエラーになり失敗、`tools/requirements.txt`（`usd-core`のみ）を追加して解消・再pushでgreen（JDK17/21両方）。`test/usd/core_test.clj`のnamespace docstringの「`bb gate`で検証」という虚偽記述を、実際にこのCIジョブが`usd.oracle-test`で検証する旨に訂正した。
+- **M3**: CI（`.github/workflows/ci.yml`）に`actions/setup-python@v5`＋`pip install -r tools/requirements.txt`を追加——初回pushは`actions/setup-python`の`cache: pip`が依存マニフェスト無しでエラーになり失敗、`tools/requirements.txt`（`usd-core`のみ）を追加して解消・再pushでgreen（JDK17/21両方）。`test/usd/core_test.clj`のnamespace docstringの「`nbb gate`で検証」という虚偽記述を、実際にこのCIジョブが`usd.oracle-test`で検証する旨に訂正した。
 
 west pin: `com-junkawasaki/root`側`manifest/west.yml`の`org-openusd` entryを`fe3fc0e`→`44d4d8a`に前進（`161aff0`でmain着地）。
 

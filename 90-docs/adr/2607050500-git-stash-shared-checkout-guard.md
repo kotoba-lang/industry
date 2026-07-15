@@ -41,8 +41,8 @@ branch に混入することはなかった）。しかし `git stash pop` は�
   文書化済み）と同型のクラスのバグである。stash スタックも例外ではない。
 
 なお、本事故対応の過程で、CLAUDE.md が「PreToolUse フックで強制される」と
-記述している `.claude/hooks/git-push-main-sync-guard.bb` /
-`west-pin-verify-guard.bb` が、本 checkout にも `~/.claude/settings.json`
+記述している `.claude/hooks/git-push-main-sync-guard.cljs` /
+`west-pin-verify-guard.cljs` が、本 checkout にも `~/.claude/settings.json`
 （`hooks: {}`）にも実在しないことを確認した。これらは現時点では**文書化された
 運用規約であって機械的な強制ではない**。本 ADR のスコープはこの既存 gap の
 解消ではなく git-stash 事故防止に限定するが、事実として記録しておく。
@@ -70,8 +70,8 @@ branch に混入することはなかった）。しかし `git stash pop` は�
    ADR-2607011345）で完結させ、共有 checkout の stash スタックには触れない。
 
 **機械的強制（follow-up、未実装）**: `.claude/hooks/` に
-`git-stash-guard.bb`（既存の `git-push-main-sync-guard.bb` /
-`west-pin-verify-guard.bb` と同型の PreToolUse hook）を追加し、
+`git-stash-guard.cljs`（既存の `git-push-main-sync-guard.cljs` /
+`west-pin-verify-guard.cljs` と同型の PreToolUse hook）を追加し、
 `git stash pop` / `git stash apply` / `git stash drop` が明示的な
 `stash@{N}` または SHA 引数なしで呼ばれた場合、および `git stash` /
 `git stash push` が `-m` メッセージなしで呼ばれた場合をブロックする。
@@ -86,7 +86,7 @@ branch に混入することはなかった）。しかし `git stash pop` は�
   `git stash store` によるサルベージ手順も本 ADR で記録し、同種事故が
   再発した場合の復旧手順として再利用可能）。
 - (−) 振る舞いルールのみでは徹底を個々のセッションの注意力に依存する。
-  機械的強制（`git-stash-guard.bb`）が実装されるまでは、本 ADR は運用規約
+  機械的強制（`git-stash-guard.cljs`）が実装されるまでは、本 ADR は運用規約
   レベルの是正に留まる。
 - (−) CLAUDE.md が記述する既存 2 guard hook（push-sync / pin-verify）も
   本 checkout には実在しないことが判明した。これは本 ADR のスコープ外の

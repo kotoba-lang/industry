@@ -126,7 +126,7 @@ from the blueprint's own list) — fixed as part of this promotion.
   currently-referenced example.
 - `manifest/west.yml`'s `industry` pin was advanced via the GitHub API
   single-entry-commit path and verified canonical via
-  `bb scripts/gen-west-manifest.bb --entry industry`.
+  `nbb scripts/gen-west-manifest.cljs --entry industry`.
 
 ## Scope note
 

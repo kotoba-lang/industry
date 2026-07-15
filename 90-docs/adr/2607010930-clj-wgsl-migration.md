@@ -54,7 +54,7 @@ Every Rust crate in the two big workspaces (`kotoba` 36+3+1, `kami-engine`
 
 - **Phase 0** (this ADR): ledger + guardrails — `verify-clj-everywhere.sh`
   gains a WGSL-authoring-parity surface (regenerate-from-CLJC + clean-tree
-  guard + `bb wgsl-parity --strict`); `kotoba-boundary-audit.bb` gains
+  guard + `nbb wgsl-parity --strict`); `kotoba-boundary-audit.cljs` gains
   `--clj-wgsl` mode classifying every `include_str!(".wgsl")` against the
   `:wgsl-ownership` map seeded in `manifest/kotoba-boundaries.edn`.
 - **Phase 1**: boundary-respecting wins — `kotoba-kotodama` migrate-out;
@@ -445,7 +445,7 @@ line-count-must-not-decrease guard before every `PUT`.
 - `90-docs/migration/clj-wgsl-ledger.edn` (the crate-by-crate ledger, SSoT for this migration)
 - `manifest/kotoba-boundaries.edn` `:wgsl-ownership` (shader ownership map)
 - `scripts/verify-clj-everywhere.sh` (WGSL-parity surface)
-- `scripts/kotoba-boundary-audit.bb --clj-wgsl` (WGSL ownership audit)
+- `scripts/kotoba-boundary-audit.cljs --clj-wgsl` (WGSL ownership audit)
 - `90-docs/adr/2606241700-kotoba-clj-runtime-kotoba-ext.md`
 - `90-docs/adr/2606302300-org-taxonomy-4-orgs.md`
 - kami-engine `90-docs/adr/0040`, `0042` (CLJ/EDN everywhere)

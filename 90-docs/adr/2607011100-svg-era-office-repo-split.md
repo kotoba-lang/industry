@@ -88,7 +88,7 @@ Both GitHub repos are public and use `main`:
 - `manifest/west.yml` was updated with a minimal two-entry patch. Full
   regeneration must still follow the pin-regression warning in
   ADR-2606272237: align child repo HEADs before running
-  `bb scripts/gen-west-manifest.bb`, otherwise unrelated checked-out repos may
+  `nbb scripts/gen-west-manifest.cljs`, otherwise unrelated checked-out repos may
   move their pins.
 
 ## Verification

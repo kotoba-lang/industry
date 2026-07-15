@@ -62,7 +62,7 @@ Giemon 固有のキネマティクス/製品データを robotics にリネー�
    ledger）。
 
 3. **manifest 登録**: `manifest/repos.edn` に `orgs/kotoba-lang/giemon` を
-   追加し `bb scripts/gen-west-manifest.bb` で `manifest/west.yml` を再生成。
+   追加し `nbb scripts/gen-west-manifest.cljs` で `manifest/west.yml` を再生成。
 
 ## Consequences
 

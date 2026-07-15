@@ -18,7 +18,7 @@ Anthropic key, use murakumo.cloud), and the observation that the deployed page s
 
 The containment architecture is real and tested (`babiniku.governor` HARD/SOFT gate +
 escalation, `babiniku.monetization` honest-default HARD-hold, `babiniku.embodiment`
-Otete-only gate, 65 bb checks) and a real chat pipeline exists end-to-end (persona system
+Otete-only gate, 65 nbb checks) and a real chat pipeline exists end-to-end (persona system
 prompts, structured-output schema, per-character transcripts, conversation history, thinking
 indicator — PRs #15–#21). But as a *service* it is incomplete in exactly four ways:
 
@@ -178,7 +178,7 @@ characters' `:kisekae/spec`) keeps `character-card-view`'s `created?` check
 correctly scoped — Rin/Mei get real composed avatars without gaining the
 Edit/Export/Delete UI meant only for what a visitor actually created. Verified live
 in production: both avatars render as full, correctly-posed, distinct humanoids;
-no console errors; `bb character`/`governor`/`monetization`/`embodiment`/`persona`
+no console errors; `nbb character`/`governor`/`monetization`/`embodiment`/`persona`
 all pass.
 
 Remaining open items unchanged: `MURAKUMO_PROXY_TOKEN` production state, `babiniku.net`

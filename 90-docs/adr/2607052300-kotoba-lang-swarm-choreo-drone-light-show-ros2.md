@@ -124,7 +124,7 @@ turn a small, well-scoped reactive-avoidance module into two unrelated concerns.
 ### Manifest registration
 
 `manifest/repos.edn` `:extra-projects` gains `orgs/kotoba-lang/swarm-choreo`;
-`west.yml` regenerated via `bb scripts/gen-west-manifest.bb --entry swarm-choreo`
+`west.yml` regenerated via `nbb scripts/gen-west-manifest.cljs --entry swarm-choreo`
 (minimal diff, per `:manifest-workflow`'s guardrail against wholesale-regen
 commits). `org-ros`'s new message shapes land as a normal commit/PR to the
 existing repo — no manifest change needed since that path is already registered.

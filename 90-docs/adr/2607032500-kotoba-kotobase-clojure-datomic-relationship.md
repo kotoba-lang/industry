@@ -109,7 +109,7 @@ kotobase-cljc-worker（edge runtime = kotobase.net PDS）
   「Datomic が Clojure データを使う」構図をコードでも実現する。これにより foundation
   repo 群に `kotoba`（言語）への依存が入る（現状 standalone）。段階移行。
 - kotobase 傘下 repo（engine/quad-store/kqe/…）の deps は ADR-2607032300 の
-  `check-foundation-deps.bb` で consistency を維持（この ADR の層構造がその DAG）。
+  `check-foundation-deps.cljs` で consistency を維持（この ADR の層構造がその DAG）。
 - query/transaction の kotoba 表現（Datalog-in-kotoba）を kqe の公開面に固める。
 
 ## 一行まとめ
@@ -132,7 +132,7 @@ follow-up「datom model の統一」の**具体化を開始・engine 側を着�
   - test: engine の entity datafication == canonical `[e a v]` モデル（18 tests/66 assertions green）。
 - これで **DB（kotobase-engine）が「private な entity→quad 再実装」でなく共有 datom model を
   consume** する（Datomic が Clojure データを使う構図のコード化）。依存 edge は
-  `check-foundation-deps.bb`（CI）が drift なく維持（engine → datom を追加）。
+  `check-foundation-deps.cljs`（CI）が drift なく維持（engine → datom を追加）。
 
 **残り（paired step）**:
 - **`kotoba.kgraph`（言語の in-mem view）も datom-clj を consume** させ、両側（言語の in-mem
@@ -165,7 +165,7 @@ kotoba.kgraph（言語の in-mem view）      kotobase-engine（DB の永続 vie
 
 言語（Clojure=kotoba）の in-mem datom store と データベース（Datomic=kotobase）の永続
 datom store が、**同一の datom model を共有**する（Datomic の db value が Clojure データで
-あるのと同型）。この shared 依存は `check-foundation-deps.bb`（CI）が drift なく維持する。
+あるのと同型）。この shared 依存は `check-foundation-deps.cljs`（CI）が drift なく維持する。
 
 **残り（最後の一歩）**: worker（`kotobase-cljc-worker/handler.tx-edn->quads`）の datafication
 を engine の `entities->datoms` に委譲。現在は並行セッションが handler.cljc を D1 novelty-log で
@@ -195,6 +195,6 @@ datom store が、**同一の datom model を共有**する（Datomic の db val
 **kotoba : kotobase = Clojure : Datomic** が、positioning（ADR/README）だけでなく **言語・
 データベース・transport の全層のコードで、唯一の共有 datom model として実体化**した。
 Datomic が Clojure データを db value・query・tx に使うのと同型。共有依存は
-`check-foundation-deps.bb`（CI）が drift なく維持する。
+`check-foundation-deps.cljs`（CI）が drift なく維持する。
 
 **この ADR の follow-up は全て着地**（残作業なし）。

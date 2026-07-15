@@ -58,7 +58,7 @@ AppKit の語彙をこの領域の standard vocabulary として採用する下�
 4. **境界**: 描画(render-IR/WebGPU)・document model(move-item/connector/
    group)・selection と undo/redo(shitsuke `kotoba.editor`)は持たない。
 5. west 登録: `manifest/repos.edn` `:projects` に `orgs/kotoba-lang/canvaskit` を
-   追加、`gen-west-manifest.bb --entry canvaskit` の最小 diff で west.yml へ。
+   追加、`gen-west-manifest.cljs --entry canvaskit` の最小 diff で west.yml へ。
 
 ## Rejected
 

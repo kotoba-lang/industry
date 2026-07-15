@@ -109,7 +109,7 @@ cljs-only).
 None outstanding specific to this rename — `manifest/repos.edn`/
 `manifest/west.yml` were updated in the same session
 (`orgs/kotoba-lang/commit-dag` → `orgs/kotoba-lang/chain`, pin verified
-server-side via `scripts/verify-west-pins.bb`).
+server-side via `scripts/verify-west-pins.cljs`).
 
 ## One-line summary
 

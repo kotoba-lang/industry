@@ -160,11 +160,11 @@ cd orgs/gftdcojp/cloud-itonami && clojure -M:test          # 408 tests, 2880 ass
 
 # Phase C
 cd orgs/gftdcojp/local-manimani && clojure -M:test         # 34 tests, 244 assertions, 0 failures
-# (triage/triage.bb の golden-set精度は diff 対象外のため無影響 — policy.cljc/
+# (triage/triage.cljs の golden-set精度は diff 対象外のため無影響 — policy.cljc/
 #  agent.cljc/ledger.cljc/tool.cljc は本変更で1行も触れていない)
 
 # Phase D
 cd orgs/gftdcojp/cloud-manimani && clojure -M:test         # 7 tests, 44 assertions, 0 failures
 
-bb scripts/gen-west-manifest.bb --entry <name>  # 各リポの pin前進、都度検証OK
+nbb scripts/gen-west-manifest.cljs --entry <name>  # 各リポの pin前進、都度検証OK
 ```

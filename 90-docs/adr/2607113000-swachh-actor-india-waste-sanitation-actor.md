@@ -110,7 +110,7 @@ actor も同じ分析を再利用できる。
   `orgs/etzhayyim/com-etzhayyim-swachh-actor` を追加 →
   `gen-west-manifest`（migration中のため `scripts/gen-west-manifest.cljs`
   (nbb) は `clojure.java.shell` 未対応で実行不可だったため、migration 前の
-  `scripts/gen-west-manifest.bb`（git 履歴 `7fecf3c7fb2f` 時点）を一時
+  `scripts/gen-west-manifest.cljs`（git 履歴 `7fecf3c7fb2f` 時点）を一時
   フォールバックとして使用し `--entry com-etzhayyim-swachh-actor` で最小
   diff 生成。pin 検証は新規 entry 自体は「main から到達可能」で正常通過した
   が、並行する他セッションの高頻度 pin 前進により同時に検証された無関係な

@@ -41,7 +41,7 @@ external deps) — an **EDN template generator**, not a binary asset pack:
   `kami` `:fx :burst` particle specs (fireball/ice-lance/holy-heal/curse/
   cheat-aura) — same "no asset files, synthesised" pattern the rest of the
   catalog uses for SFX.
-- `scripts/gen_presets.clj` (`bb gen-presets`) — writes a curated slice of
+- `scripts/gen_presets.clj` (`nbb gen-presets`) — writes a curated slice of
   the catalog as standalone `character.edn` files; this is what seeds
   network-isekai's Asset Hub defaults (`:asset/kind :scene`, format
   `:scene-edn`, under `public/assets/isekai/`).
@@ -56,7 +56,7 @@ sandbox.
 (+) Reusable across network-isekai and any other kami-engine project via
 `:local/root`; zero ongoing cost (no GPU calls); "view source + fork" stays
 true since every character is composed primitives, readable and forkable
-like the rest of the catalog. (+) `bb test` gates every race×class
+like the rest of the catalog. (+) `nbb test` gates every race×class
 combination (56) + all 4 monsters + all 5 skills structurally.
 (−) Character fidelity is deliberately low — a handful of primitives, not
 illustrated art; real images/3D meshes/voice need a separate `generate.html`

@@ -36,7 +36,7 @@ gestures, ADR-2607071130), `editor` (generic walk-EDN-and-surface-controls), `we
 
 **`kotoba-lang/kisekae`** (着せ替え, "dress-up") — a pure-`.cljc` domain library, one
 dependency (`org-vrmc-vrm`), no UI. Four namespaces, all scaffolded and tested (33
-checks, `bb kisekae`):
+checks, `nbb kisekae`):
 
 1. **The spec is the artifact** (`kisekae.spec`). A character is a small plain-EDN value
    — base VRM URL, part overrides, material edits, user meta — from which the `.vrm` is
@@ -82,7 +82,7 @@ checks, `bb kisekae`):
 
 ## Consequences
 
-- Repo scaffolded/pushed/registered: `spec`/`edit`/`build`/`store` + 33-check `bb`
+- Repo scaffolded/pushed/registered: `spec`/`edit`/`build`/`store` + 33-check `nbb`
   gate, clj-kondo clean, README documenting all invariants and the not-yet-built list.
 - Follow-ups, in rough order: full `compose`→`export-glb` integration test against a
   real fixture `.vrm` (synthetic-doc unit tests cover selection/transforms; buffer merge

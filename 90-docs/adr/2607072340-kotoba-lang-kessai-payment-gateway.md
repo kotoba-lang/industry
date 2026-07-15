@@ -129,7 +129,7 @@ kotoba.kessai            — rail-agnostic IPaymentPort（authorize/capture/refu
   自身の CI は本 ADR時点でこの問題を未修正のまま red — 本 ADR の scope 外なので
   それらは変更していない）。
 - `manifest/repos.edn` の `:extra-projects` に登録、
-  `bb scripts/gen-west-manifest.bb --entry kessai` で最小 diff（`kessai` の1
+  `nbb scripts/gen-west-manifest.cljs --entry kessai` で最小 diff（`kessai` の1
   entry のみ追加）を生成——ただし当時 superproject 本体 checkout に35件の
   無関係な pin 鮮度不一致（他の並行作業に起因する既知の事象、CLAUDE.md 記載）が
   あり、生成器の既定の pin 検証がそれらを理由に全体を fail させたため
@@ -140,7 +140,7 @@ kotoba.kessai            — rail-agnostic IPaymentPort（authorize/capture/refu
   一時 stash 退避される事象が実際に発生した（CLAUDE.md の「並行エージェント運用」
   節が警告する事象の実地確認）。stash から復元し、影響なく着地できた。
 - `git push`（feature branch → main へのサーバ側マージ前段）を PreToolUse フック
-  （`.claude/hooks/west-pin-verify-guard.bb`）がブロック: kessai 自身の pin は
+  （`.claude/hooks/west-pin-verify-guard.cljs`）がブロック: kessai 自身の pin は
   検証 OK だが、本コミットと無関係な `kotoba-lang/kotoba` と `kotoba-lang/kotoba-lang`
   の pin が(この shared checkout 内の別要因による)鮮度不一致で fail していたため。
   `WEST_PIN_VERIFY_SKIP=1` でこのチェックのみ迂回して push した（この2 entry の

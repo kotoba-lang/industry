@@ -97,7 +97,7 @@ larger」と明記して区別している。同名衝突を避けるため、NV
   あり`tools.deps`依存宣言ではなかった——偽陽性）。
 - `manifest/repos.edn`の`:path-overrides`に2エントリ追加、
   `:extra-projects`の該当2行を新名称へ更新。`manifest/west.yml`は
-  `bb scripts/gen-west-manifest.bb --entry com-nvidia-isaac-sim,
+  `nbb scripts/gen-west-manifest.cljs --entry com-nvidia-isaac-sim,
   com-nvidia-isaac-lab`で新entry生成（サーバ側pin検証green）後、
   旧2entryを手動削除（`--entry`は追加のみのため）——差分は
   10行追加/10行削除の最小diffを維持。

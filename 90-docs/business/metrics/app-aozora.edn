@@ -1,28 +1,28 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 4332, "app-aozora-appview" 3108},
+ {"app-aozora-pds" 4343, "app-aozora-appview" 3109},
  :zone
- {:requests-7d 15532,
-  :pageviews-7d 5575,
-  :uniques-7d-sum 651,
+ {:requests-7d 15557,
+  :pageviews-7d 5583,
+  :uniques-7d-sum 659,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
   [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 288}
-   {:path "/", :requests 109}
-   {:path "/robots.txt", :requests 42}
+   {:path "/", :requests 111}
+   {:path "/robots.txt", :requests 41}
    {:path "/test1.php", :requests 30}
    {:path "/js/main.js", :requests 21}
    {:path "/api/new-version/daily/rooms/1", :requests 21}
    {:path "//av.php", :requests 21}
    {:path "/config.json.php", :requests 21}],
-  :status-mix {:ok 1796, :client-error 1132},
+  :status-mix {:ok 1794, :client-error 1134},
   :window "24h"},
  :as-of "2026-07-15",
  :traffic-quality {:window "24h", :probe-4xx-pct 39, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · / 109 · /robots.txt 42 · /test1.php 30 · /js/main.js 21 | 4xx(probe) 39%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · / 111 · /robots.txt 41 · /test1.php 30 · /js/main.js 21 | 4xx(probe) 39%",
  :signal
- "aozora.app 実測 15532 req/7d・651 uniques(日次和)・うち4xx probe 39%(24h)、workers 7440 inv/7d"}
+ "aozora.app 実測 15557 req/7d・659 uniques(日次和)・うち4xx probe 39%(24h)、workers 7452 inv/7d"}

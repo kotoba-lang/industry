@@ -132,7 +132,7 @@ unresolved?` is likewise an honest reuse of `secondary`/8521's own
   longer blueprint-tier after this promotion.
 - `manifest/west.yml`'s `industry` pin was advanced via the GitHub API
   single-entry-commit path and verified canonical via
-  `bb scripts/gen-west-manifest.bb --entry industry`.
+  `nbb scripts/gen-west-manifest.cljs --entry industry`.
 
 ## Scope note
 

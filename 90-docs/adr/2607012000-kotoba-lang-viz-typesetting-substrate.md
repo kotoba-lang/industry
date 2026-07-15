@@ -48,7 +48,7 @@ nouns per the org naming convention (no `-clj` suffix).
 
 Manifest registration: `manifest/repos.edn` `:extra-projects` gained the four
 paths (`orgs/kotoba-lang/{tex,katex,force3d,d3}`), `manifest/west.yml` was
-regenerated with `bb scripts/gen-west-manifest.bb` in a clean worktree checked
+regenerated with `nbb scripts/gen-west-manifest.cljs` in a clean worktree checked
 out from `origin/main` tip (avoiding the local superproject checkout's
 unrelated in-progress `kami-provider-catalog` WIP on `repos.edn`), with the
 four new repos' working trees copied in so `working-head` could resolve their

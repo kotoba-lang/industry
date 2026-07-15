@@ -141,8 +141,8 @@ superproject level:
   (confirmed: absent from both `manifest/repos.edn` and
   `manifest/west.yml` -- the entire `orgs/cloud-itonami/*` ISIC
   blueprint fleet sits outside this superproject's west manifest), so
-  no `manifest/west.yml` pin-advance or `bb scripts/gen-west-
-  manifest.bb` step applies to this change.
+  no `manifest/west.yml` pin-advance or `nbb scripts/gen-west-
+  manifest.cljs` step applies to this change.
 - **Known follow-up, not fixed in this ADR:**
   `kotoba-lang/industry`'s `resources/kotoba/industry/registry.edn`
   entry for `"4211"` is stale (`:repo`/`:business-id` point at

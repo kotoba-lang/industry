@@ -66,7 +66,7 @@ cloud-murakumo (clj/cljc ライブラリ + CLI。GPU fleet 未 deploy)
     → cost.cljc(:tok-s/:elapsed-s → ¥/Mtok)→ gate emitter
 ```
 
-`scheduler`/`runtime`/`cost` は**副作用なしの純関数**（bb/JVM/kotoba-clj WASM
+`scheduler`/`runtime`/`cost` は**副作用なしの純関数**（nbb/JVM/kotoba-clj WASM
 で同一結果）。実 GPU との境界は `worker.cljc`/`executor.clj` の I/O 層
 （`--backend-url` / `KAMI_RENDER_URL` / `COMFY_URL` / `MURAKUMO_BACKEND_URL`）
 に閉じ込められており、GPU fleet を実装する作業は**この境界の下側だけ**を
@@ -159,7 +159,7 @@ GPU インスタンス/spot市場）を指す実装や契約情報は見つか�
 4. **`GET /infer/cost` emitter の実装**: `gateway.cljc` に `/infer/cost`
    ルートはまだ無い。`cli.cljc` の `cmd-cost` は `runs.edn` ファイルを
    引数で受ける read-only ローカルコマンドで、HTTP 経由で collector
-   （`per-product-gate-instruments` ADR が前提とする `bb gate` collector 系）
+   （`per-product-gate-instruments` ADR が前提とする `nbb gate` collector 系）
    が叩ける形にはなっていない。実装 PR では: run ledger の永続化先
    （kotoba XRPC 経由 `queue-kotoba.clj` の流儀に倣うのが自然）→
    `GET /infer/cost` が直近 run 群を集計 → `cost/cost-summary` の出力を

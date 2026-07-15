@@ -87,7 +87,7 @@ vector→shape / artboard・page→frame。**画素実体はインラインせ�
 
 **freeboard は WebGPU で実描画まで到達**（headless Chromium + browser-use-clj で検証）。
 ボードに付箋・図形・**実フォントのテキスト**・ベジェコネクタ・インク・**画像テクスチャ**が
-正色で同時描画されることを確認済み。**bb 19 tests / 98 assertions green**、shadow-cljs
+正色で同時描画されることを確認済み。**nbb 19 tests / 98 assertions green**、shadow-cljs
 `:advanced` クリーンコンパイル。
 
 ### 完了した機能（freeboard, public）
@@ -108,7 +108,7 @@ vector→shape / artboard・page→frame。**画素実体はインラインせ�
 - **取込**: kasane `:kasane/doc`→items（純粋、blob/CID 参照）。
 - **永続/共編**: `freeboard.snapshot`（kotoba QuadStore round-trip）+ `freeboard.collab`
   （収束 op ログ: push/pull/merge/replay、2-client 同期テスト green）。
-- **ビルド**: `scripts/build.sh` / `bb build`・`bb serve`（kami-clj-host wasm + shadow release）。
+- **ビルド**: `scripts/build.sh` / `nbb build`・`nbb serve`（kami-clj-host wasm + shadow release）。
 
 ### EDN データ形式の共通化（mangaka/kami と相互運用）
 - **render-IR**: `freeboard.render-ir` が board → **ADR-0044 render-IR EDN**

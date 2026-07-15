@@ -76,7 +76,7 @@ public であることでそのまま満たされる(`com-junkawasaki` は既定
 
 `.cljc` コアはランタイム非依存。ユーザーが実際に手で叩ける「システム」と
 して、`.cljc/.kotoba` ランタイム優先順位(kotoba wasm > clojurewasm > cljs
-> nbb > jvm/bb)に従い nbb 製 CLI を1本追加(`currencies`/`tally`/
+> nbb > jvm/nbb)に従い nbb 製 CLI を1本追加(`currencies`/`tally`/
 `change` サブコマンド)。ブラウザ UI や kotoba wasm 化は本 ADR の対象外
 (需要が出たら別途)。
 

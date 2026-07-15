@@ -59,10 +59,10 @@ new entry each via a GitHub Contents API single-entry commit (blob-SHA-matched
 PUT against `origin/main` tip) — the same method, and the same reason,
 ADR-2607011816 used: this superproject checkout has concurrent-fleet pin drift
 and shallow-clone `(forced update)` noise that make a local edit + full
-`bb scripts/gen-west-manifest.bb` regen risky (it would bundle unrelated
+`nbb scripts/gen-west-manifest.cljs` regen risky (it would bundle unrelated
 drifted child-repo pins into what should be a one-line registration). Pin is
 verified to equal `orgs/gftdcojp/isekai-network@main` HEAD before commit;
-`bb scripts/gen-west-manifest.bb --check` is run afterward to confirm the
+`nbb scripts/gen-west-manifest.cljs --check` is run afterward to confirm the
 hand-placed entries match canonical generator output.
 
 ## Consequences

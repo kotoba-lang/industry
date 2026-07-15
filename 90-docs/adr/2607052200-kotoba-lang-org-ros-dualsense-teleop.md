@@ -101,7 +101,7 @@ whichever host process actually drives a physical robot.
 ### Manifest registration
 
 `manifest/repos.edn` `:extra-projects` gains the 3 new paths; `west.yml` regenerated
-via `bb scripts/gen-west-manifest.bb --entry <name>` per repo (minimal diff per
+via `nbb scripts/gen-west-manifest.cljs --entry <name>` per repo (minimal diff per
 `:manifest-workflow`'s guardrail against wholesale-regen commits).
 
 ## Consequences

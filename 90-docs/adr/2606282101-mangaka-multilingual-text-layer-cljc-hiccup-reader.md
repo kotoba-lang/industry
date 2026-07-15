@@ -32,7 +32,7 @@ storyboard には `:dialogue`/`:narration` が既にあるのに、reader が画
 
 **テキスト(lettering)は画像と分離した locale-keyed データ層**とし、**画像は言語中立**の
 まま 1 回だけ render、**テキストだけ locale で差し替える**（焼き込まない）。レンダリングは
-**hiccup を共有データ表現**にして、静的 build は SSR(clj/bb)、ブラウザは reagent+re-frame
+**hiccup を共有データ表現**にして、静的 build は SSR(clj/nbb)、ブラウザは reagent+re-frame
 (cljs) が **同じ cljc コンポーネント**を描く。すべて kami-engine の `kami-mangaka-*` commons。
 
 ### 新 crate（kami-engine、ADR-2606282100 の family に追加）
@@ -59,7 +59,7 @@ storyboard には `:dialogue`/`:narration` が既にあるのに、reader が画
   render(page,seq)↔storyboard panel を対応づけ `text/panel->elements` で overlay 生成。
 - chapter 01 panels に **`:gh/sfx`（日英擬音）を新規 authoring**（6 パネル）。
 - 既存セリフ/ナレーション（JA 文字列）は coerce で `{:ja}` 化 → そのまま多言語対応 ready。
-  検証: `bb build` → ch01 に吹き出し/キャプション/SFX/言語スイッチ/縦書きが出力、
+  検証: `nbb build` → ch01 に吹き出し/キャプション/SFX/言語スイッチ/縦書きが出力、
   画像 src は JA/EN で不変。
 
 ## Consequences
@@ -68,7 +68,7 @@ storyboard には `:dialogue`/`:narration` が既にあるのに、reader が画
   新 locale はデータ追加のみ。SIP comics も ghosthacker jump も同一 commons で動く。
 - **解決済**: comics の commons 依存は **kami-engine が PUBLIC** なので **git dep**
   （pinned sha + `:deps/root`、transitive な text-clj は同一 checkout 内の
-  `:local/root` で解決）で消費。シークレット不要で `bb build` がローカル/CI とも解決
+  `:local/root` で解決）で消費。シークレット不要で `nbb build` がローカル/CI とも解決
   （2026-06-28 検証）。ローカル commons 作業時のみ `:local/root` で override。
 - **EN 翻訳 / bake 統一 (済)**: ch01 の全セリフ・ナレーション(37本)を locale マップ化、
   SFX も日英。`kami-mangaka-page-clj`(bake) は `MangaText`/locale + SFX 描画に統一済み
@@ -85,7 +85,7 @@ storyboard には `:dialogue`/`:narration` が既にあるのに、reader が画
   **`org-spirit-in-physics-comics`**（カスタムドメイン **comics.spirit-in-physics.org**
   をバインド済み）へ **Direct Upload**。本番反映を確認（chapter 01 = `#mk-app` +
   `window.__manga` + `reader.js` + 吹き出し + JA/EN payload + SFX、HTTP 200）。
-- **CI**: `.github/workflows/deploy.yml`（`bb build` → `cloudflare/wrangler-action`、
+- **CI**: `.github/workflows/deploy.yml`（`nbb build` → `cloudflare/wrangler-action`、
   PR comics#4）を追加。**auto-deploy は当面オフ**（option 2）— 有効化には repo secret
   `CLOUDFLARE_API_TOKEN`（+ `CLOUDFLARE_ACCOUNT_ID 4da88288dc30d9ee257f319d3c33ecf0`）
   が必要。1Password の既存 CF トークン3件（`gftd.cloudflare/API_TOKEN`・`/CF_API`・

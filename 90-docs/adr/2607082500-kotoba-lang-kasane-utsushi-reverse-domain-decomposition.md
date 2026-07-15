@@ -156,7 +156,7 @@ byte-cursor等の極小プリミティブも同様に各repoが自前で持つ�
   `:git/sha` 依存 + 薄いdelegate呼び出しに配線し直し。両方とも既存test
   スイートがgreenのまま（kasane: 13 tests/51 assertions、utsushi:
   6 tests/16 assertions）。
-- `manifest/repos.edn` に15新規repoを追加、`bb scripts/gen-west-manifest.bb
+- `manifest/repos.edn` に15新規repoを追加、`nbb scripts/gen-west-manifest.cljs
   --entry <17名>` でwest.yml最小diff生成（15新規 + kasane/utsushi pin前進、
   全17件サーバ側pin検証OK）。
 
@@ -172,7 +172,7 @@ cd orgs/kotoba-lang/kasane && clojure -M:test    # 13 tests / 51 assertions, 0 f
 cd orgs/kotoba-lang/utsushi && clojure -M:test   # 6 tests / 16 assertions, 0 failures（org-iso-isobmffへの実git依存越しに検証）
 
 gh api repos/kotoba-lang/org-iso-h264 --jq '.full_name'   # 実在確認（15repo分繰り返し）
-bb scripts/gen-west-manifest.bb --entry <17名>              # OK、全件サーバ側pin検証済み
+nbb scripts/gen-west-manifest.cljs --entry <17名>              # OK、全件サーバ側pin検証済み
 ```
 
 ## Consequences
@@ -239,7 +239,7 @@ bb scripts/gen-west-manifest.bb --entry <17名>              # OK、全件サー
 ### 追加で完了した成熟度向上作業（本ADRのスコープを超えるがkasane/utsushi
 本体に対する変更のため、ここに記録する）
 
-- **kasaneのテストランナーをbabashka(bb)からnbb(ClojureScript-on-Node)へ
+- **kasaneのテストランナーをbabashka(nbb)からnbb(ClojureScript-on-Node)へ
   移行**（CLAUDE.md「`.cljc`/`.kotoba`ランタイム優先順位」でnbbがJVM単体
   より優先されるため）。移行の過程で`kasane.bytes/sint!`の実バグを発見・
   修正: `bit-shift-left`ベースの32-bit符号拡張がJVM(64-bit Long)では安全

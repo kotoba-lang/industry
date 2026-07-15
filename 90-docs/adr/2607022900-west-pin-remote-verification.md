@@ -13,7 +13,7 @@
    kami-articulated」が、1 project の登録のつもりで west.yml を **wholesale 再生成**
    して commit しており、その環境の子リポ群にあった **未 push のローカル HEAD** を
    そのまま pin 化していた(子リポの push 漏れ。当該 commit はその後どこからも
-   取得不能)。`gen-west-manifest.bb` は「ローカル working HEAD で pin する」設計
+   取得不能)。`gen-west-manifest.cljs` は「ローカル working HEAD で pin する」設計
    なので、未 push / 遅れた子リポがあると壊れた pin / pin 退行を黙って生成する
    (CLAUDE.md で「pin 退行の罠」として警告済みだったが、規律頼みで強制が無かった)。
 2. **30 件: pin は正しいが fetch が一時失敗**(バッチ https fetch の rate limit 系)。
@@ -30,7 +30,7 @@ ancestry 判定」節と同じ原則)。
 
 ## Decision
 
-**pin 検証スクリプト `scripts/verify-west-pins.bb` を単一の正とし、生成器・CI・
+**pin 検証スクリプト `scripts/verify-west-pins.cljs` を単一の正とし、生成器・CI・
 hook の3層から同じ検証を強制する。**
 
 検証ルール(baseline との diff で revision が変わった / 新規の entry のみ対象):
@@ -49,14 +49,14 @@ WARN で素通し(fail-open)、検証**失敗**のみブロックする。緊急
 
 強制の3層:
 
-- **生成器** `gen-west-manifest.bb`: 生成時に自動検証、失敗したら west.yml を
+- **生成器** `gen-west-manifest.cljs`: 生成時に自動検証、失敗したら west.yml を
   書かない。併せて `--entry <name>` を追加し、登録 / rename / pin 前進は当該
   entry のみの最小 diff を生成する(**wholesale 再生成 commit の禁止**。
   `:manifest-workflow :never :wholesale-regen-commit`)。
 - **CI** `.github/workflows/west-pin-verify.yml`: PR と push to main で検証。
   API single-entry commit は pre-merge で止められないため、main 破損は即 issue
   起票で検知を数分に短縮する。
-- **hook** `.claude/hooks/west-pin-verify-guard.bb`(PreToolUse/Bash): `git push`
+- **hook** `.claude/hooks/west-pin-verify-guard.cljs`(PreToolUse/Bash): `git push`
   (HEAD の west.yml が origin/main と異なる時)と `gh api -X PUT
   contents/manifest/west.yml`(API single-entry 経路)の両方で push 前に検証する。
 

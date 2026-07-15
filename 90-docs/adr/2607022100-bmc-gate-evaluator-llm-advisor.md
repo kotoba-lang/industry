@@ -24,7 +24,7 @@ signal を貼ると 2 日目以降は dedup で dry になり、canvas が前進
 
 1. **`gftd.gate`** — riskiest hypothesis ごとに **gate-spec** を定義:
    - **機械測定**（`{:metric [path] :op :>= :threshold N}` / `:all` 連言）—
-     product の metrics edn（collect.bb が集める Cloudflare/Stripe/health/
+     product の metrics edn（collect.cljs が集める Cloudflare/Stripe/health/
      product 供給値）に対して評価。満たせば `hyp/status :validated` を evidence
      つきで提案（**自動昇格**）、測定可・未到達なら「gate 距離」観測を Key Metrics に。
    - **計器不足**（`{:needs [...]}`）— まだ測れないので、不足計器を **「準備:」項目**

@@ -56,7 +56,7 @@ ed25519(2607061620)・dag-cbor(2607061640)のrename完了後に実施した。
 |---|---|
 | `gftdcojp/cloud-itonami` | deps.edn |
 | `gftdcojp/local-manimani` | agents/deps.edn |
-| `gftdcojp/net-kotobase` | cli/deps.edn, cli/bb.edn |
+| `gftdcojp/net-kotobase` | cli/deps.edn, cli/nbb.edn |
 | `kotoba-lang/kotoba` | deps.edn(2箇所: git座標 + `:dev` alias の `:local/root`) |
 
 `etzhayyim/root` は ed25519/dag-cbor と同じ理由でスキップ。
@@ -72,7 +72,7 @@ ADR-2607061620/2607061640 と同一。
 gh api repos/kotoba-lang/org-chainagnostic-cacao --jq '.full_name'
 cd cloud-itonami && clojure -Spath   # (worktree外symlink制約で完全な-Spathは未実施、diffは目視確認)
 cd kotoba         && clojure -Spath  # 解決OK
-bb scripts/gen-west-manifest.bb --entry org-chainagnostic-cacao
+nbb scripts/gen-west-manifest.cljs --entry org-chainagnostic-cacao
 ```
 
 ## Consequences

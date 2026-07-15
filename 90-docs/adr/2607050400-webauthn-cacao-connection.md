@@ -211,7 +211,7 @@ repos are pushed and west-registered alongside the 8 graduated repos (14
 - `manifest/west.yml`'s recorded pin for `saml`, `webauthn`, `touchid`,
   `authentication`, and `onetime` is behind each repo's actual (pushed)
   HEAD shown in the table above (`oauth`/`oidc`/`faceid`'s pins already
-  match). Needs the usual `bb scripts/gen-west-manifest.bb --entry <name>`
+  match). Needs the usual `nbb scripts/gen-west-manifest.cljs --entry <name>`
   pin-advance pass; not done here to keep this addendum scoped to the ADR
   record itself.
 - `com-junkawasaki/root`'s own git history still carries these 8 repos'

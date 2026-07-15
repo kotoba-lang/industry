@@ -12,7 +12,7 @@ ADR-2607021700 の facts 初回値は自己評価で、実測の裏付けがな�
 
 ## Decision
 
-1. **`70-tools/bmc/collect.bb`** を追加。Cloudflare GraphQL（zone
+1. **`70-tools/bmc/collect.cljs`** を追加。Cloudflare GraphQL（zone
    `httpRequests1dGroups` 7 日 + `workersInvocationsAdaptive` 7 日）、Stripe
    （active subscriptions / charges）、本番 health を収集し、
    `90-docs/business/metrics/<product>.edn` に集計数値のみ書く（実測の SSoT）。
@@ -20,7 +20,7 @@ ADR-2607021700 の facts 初回値は自己評価で、実測の裏付けがな�
    **秘密は一切ファイルに書かない**。ReAct loop は各 metrics の `:signal` を
    観測として canvas に取り込む（advisor 提案 → governor 検閲 → ledger）。
 
-2. **operating cadence（business を回す最小形）**: `collect.bb` → 全 product
+2. **operating cadence（business を回す最小形）**: `collect.cljs` → 全 product
    `react loop` → `canvas md --all` → `score md` → commit。この列が 1 運転。
 
 3. **実測に基づく facts 改訂**（maturity-facts.edn、証拠は各 note に記載）:
@@ -47,7 +47,7 @@ ADR-2607021700 の facts 初回値は自己評価で、実測の裏付けがな�
 
 - (+) facts が実測根拠つきになり、canvas の Problem block に実測観測が
   ledger 経由で積まれた（8 product、全 loop 収束）。
-- (+) 収集は再実行可能（collect.bb、集計数値のみ・秘密なし）。
+- (+) 収集は再実行可能（collect.cljs、集計数値のみ・秘密なし）。
 - (−) Keychain `StripeCLI` の鍵は期限切れだった — 1Password
   `Stripe Live API Keys` が有効。Stripe telemetry の常設接続は kotobase
   billing worker 側の webhook/metrics 化が本筋（follow-up）。

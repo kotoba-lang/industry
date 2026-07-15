@@ -9,9 +9,9 @@ last_verified: 2026-06-27
 authoritative_for:
   - manifest repo 管理ツールの選定 (west vs vcstool / google repo / meta)
   - git submodule から west manifest への移行方針 (server-side clean commit)
-  - west の source of truth と生成 (manifest/repos.edn → scripts/gen-west-manifest.bb → west.yml)
+  - west の source of truth と生成 (manifest/repos.edn → scripts/gen-west-manifest.cljs → west.yml)
   - DataLad の west 統合 (userdata + datalad group + west annex-get/annex-drop)
-  - B2 認証の解決順 (env→1Password→Keychain, scripts/b2-creds.bb)
+  - B2 認証の解決順 (env→1Password→Keychain, scripts/b2-creds.cljs)
 related:
   - adr-2606241428-submodule-weight-shallow-b2-datalad
   - adr-2606241600-shallow-depth1-git-default
@@ -49,7 +49,7 @@ manifest repo 方式（宣言ファイルで複数リポを一括管理）への
 | 成熟度/保守 | 0.15 | 4 | **5** | 4 | 2 |
 | シンプルさ | 0.10 | **5** | 2 | 3 | 4 |
 | submodule からの移行性 | 0.10 | 4 | 3 | 3 | 4 |
-| エコシステム適合(bb 化等) | 0.05 | 4 | 4 | 4 | 4 |
+| エコシステム適合(nbb 化等) | 0.05 | 4 | 4 | 4 | 4 |
 | **加重合計** | 1.00 | **3.60** | **3.95** | **4.10** | **2.25** |
 
 決め手は、実際に運用で使い切った 3 機能:
@@ -78,7 +78,7 @@ manifest 側に全部持たせ続ける運用コストが発生する。階層�
 ### 採用構成
 
 - **source of truth = `manifest/repos.edn`**（ポリシー: remotes / 既定 / group-filter /
-  DataLad / B2）。`scripts/gen-west-manifest.bb`（babashka）が EDN + git の事実
+  DataLad / B2）。`scripts/gen-west-manifest.cljs`（babashka）が EDN + git の事実
   （各 working tree の HEAD）から `manifest/west.yml` を生成する（手書き禁止 / `--check` で CI）。
 - **トポロジ**: topdir = superproject ルート、manifest repo = `manifest/` サブディレクトリ
   （`self.path: manifest`）。project の `path:` は旧 submodule と同一（`orgs/<org>/<repo>`）で、
@@ -89,7 +89,7 @@ manifest 側に全部持たせ続ける運用コストが発生する。階層�
   opt-in）に隔離。git/annex スケルトンは `west update --group-filter +datalad <name>`、
   実体（B2）の取得/破棄は west 拡張コマンド `west annex-get` / `west annex-drop`
   （`manifest/west_annex.py`）。
-- **B2 認証は `scripts/b2-creds.bb` が解決**（順序 `env → 1Password(op) → Keychain(security)`、
+- **B2 認証は `scripts/b2-creds.cljs` が解決**（順序 `env → 1Password(op) → Keychain(security)`、
   参照先は `repos.edn :b2 :credentials`）。秘密はリポジトリに置かず、`op://` パスや
   Keychain service 名といった非機密の参照先だけを EDN に置く。CI は env を最優先。
 - **運用ルール（CLAUDE.md）を west 前提に改訂**（`git submodule update` → `west update`、
@@ -106,7 +106,7 @@ manifest 側に全部持たせ続ける運用コストが発生する。階層�
 |---|---|---|
 | #86 | 31 リポを west 化（gitlink 撤去・clone-depth:1・ネスト再帰） | ahead 1 / behind 0 |
 | #87 | 残り全リポを west 化 + `repos.edn` source of truth + DataLad 統合（**submodule 全廃**） | ahead 1 / behind 0 |
-| #88 | B2 認証の自動解決（env→1Password→Keychain, `b2-creds.bb`） | ahead 1 / behind 0 |
+| #88 | B2 認証の自動解決（env→1Password→Keychain, `b2-creds.cljs`） | ahead 1 / behind 0 |
 
 いずれも main の記録 pin を基準にしたため既存 submodule 更新の regression なし。
 ローカル未コミット/未push の作業が残るリポ（root / network-isekai）は pin を
@@ -124,15 +124,15 @@ main 記録値に固定し、west は untracked を消さず tracked 衝突時�
 - (−) west 1.5 の `west update` は `-j` 非対応（直列）。複数指定は zsh の単語分割に注意し
   `xargs` を使う。
 - (−) `west annex-get/drop` は実機（B2 creds + 実 clone）未検証のスキャフォールド。初回は
-  `repos.edn :b2 :credentials` の参照先編集と `scripts/datalad-b2-init.bb` での initremote 要確認。
+  `repos.edn :b2 :credentials` の参照先編集と `scripts/datalad-b2-init.cljs` での initremote 要確認。
 - (−) 将来「階層を浅くして簡素化」に方針転換するなら vcstool が有力。`west.yml → .repos` は
   機械変換できる。
 
 ## References
 
-- 生成/ポリシー: `manifest/repos.edn`, `scripts/gen-west-manifest.bb`, `manifest/west.yml`
+- 生成/ポリシー: `manifest/repos.edn`, `scripts/gen-west-manifest.cljs`, `manifest/west.yml`
 - DataLad 統合: `manifest/west_annex.py`, `manifest/west-commands.yml`
-- B2 認証解決: `scripts/b2-creds.bb`（env→1Password→Keychain）
+- B2 認証解決: `scripts/b2-creds.cljs`（env→1Password→Keychain）
 - 運用: `manifest/README.md`, `CLAUDE.md`（west 前提に改訂）
 - 関連: ADR-2606241428（肥大 submodule の shallow 運用 + B2/DataLad）,
   ADR-2606241600（shallow depth1 を git 既定に）
@@ -149,7 +149,7 @@ main 記録値に固定し、west は untracked を消さず tracked 衝突時�
   manifest に追加する運用が定着。
 - **改名の統合**: `drawingml-svg` は `svgraph` へ改名済み。旧名の重複エントリ
   (孤児 pin 0035b035、origin から消失)を manifest/.gitignore から除去した。
-- **B2 認証**: `scripts/b2-creds.bb` が env→1Password→Keychain で解決(PR #88)。
+- **B2 認証**: `scripts/b2-creds.cljs` が env→1Password→Keychain で解決(PR #88)。
 - **未 PR 作業の救済**: 各 project の未push 作業/stash は reconcile ブランチ・PR 化して
   消失を防止(stash は branch に移行)。機密(litigation)は push せずローカル branch で温存。
 - **残レガシー(無害)**: `.git/modules` に network-isekai/root の git 実体が gitfile 参照で
