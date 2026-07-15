@@ -1728,7 +1728,16 @@
       ;; ADR-2607160600 -- both native real physics-2d simulations from
       ;; day one. Live-recomputed via `(industry/maturity-summary)` on
       ;; this working tree immediately before this edit.
-      (is (= 265 (:implemented m))))))
+      (testing "cloud-itonami-isic-2750 (Manufacture of domestic appliances, fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-C2750 placeholder or the real cloud-itonami org [gh api 404 confirmed]; identity ({:id \"2750\" :name \"Manufacture of domestic appliances\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; DomApplAdvisor ⊣ Domestic Appliance Plant Operations Governor plant-operations-coordination actor mirroring cloud-itonami-isic-2640's [Manufacture of consumer electronics] verified module shape module-for-module (domappl.* in place of consumerelec.*) -- compressor/motor/wiring assembly and final-assembly/test-bench equipment and refrigerator/washing-machine/dishwasher/microwave-oven/vacuum-cleaner production-batch (product-type/dielectric-test-kv/defect-rate-percent) vocabulary in place of SMT/assembly/test-bench equipment and television/audio-device/video-device/smart-speaker/wearable-device vocabulary, with the dielectric-test-kv ceiling re-grounded in IEC 60335-1 (household appliances, 0-4 kV) rather than IEC 62368-1 (audio/video/ICT); :flag-safety-concern (electrical-safety/refrigerant-leak/UL-CE-compliance concern) always escalates regardless of confidence, matching 2640's own safety-concern-escalation invariant; the proposal-effect allowlist plus a permanent equipment-actuate block (`:actuate-equipment? true`) structurally prevent any direct assembly/test-bench-equipment control, with no human-approval override path; a further permanent certification-authority block (`:issue-certification? true`) prevents self-issuing a UL/CE/CSA domestic-appliance safety certification mark. 77 tests / 210 assertions green, independently re-verified against a fresh clone; superproject ADR-2607201200) is also :implemented"
+        (is (= :implemented (industry/maturity "2750"))))
+      ;; Live-recomputed via `(industry/maturity-summary)` on this
+      ;; working tree immediately before this edit (registry.edn's own
+      ;; "2750" -> :implemented change was made in this same working
+      ;; tree, not a separately-landed concurrent commit): 265 -> 270
+      ;; (at least four other sibling promotions landed concurrently
+      ;; before this one; the live recompute, not an assumed +1, is
+      ;; the source of truth here).
+      (is (= 270 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
