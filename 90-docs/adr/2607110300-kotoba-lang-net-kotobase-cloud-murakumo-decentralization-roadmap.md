@@ -257,28 +257,6 @@ composition itself hasn't been re-pointed at the new nbb signer yet
 an nbb version of that composition is a small follow-up, not done in
 this pass.
 
-## Addendum 5 (2026-07-15): 「やらないこと」項目1・項目3、ENGI/ENスコープに限定して撤回
-
-ADR-2607993000(engi-l1-byzantine-consensus-en-currency)により、本ADRの
-「やらないこと」節の以下2項目は **ENGI/EN というスコープに限定して**撤回された:
-
-> - 新しいL1・独自コンセンサスチェーンを作らない(ADR-2607030030を継承)。
-> - witness全員が単一運営者配下である間のfork-choice/view-change設計はしない
->   (Byzantine前提を持ち込まない — crash fault tolerance相当と呼ぶ)。
-
-オーナー判断(2026-07-15): 単一運営主体のままでも、コンセンサスアルゴリズム
-自体は今から Byzantine 耐性ありで設計し、実際に第三者 witness が参加する段階で
-プロトコルを書き直さずに済むようにする。`kotoba-lang/engi` を chained HotStuff
-型 BFT の L1 に、新規 `kotoba-lang/en` をその上のネイティブ通貨単位にする設計・
-最小プロトタイプは ADR-2607993000 参照。
-
-**温存される部分**(本Addendumでも変わらない): 運営主体は引き続き単一
-(`com-junkawasaki`)で、Phase 4(独立第三者運営者+経済的stake)に到達するまで
-外部に「分散型経済/ブロックチェーン」と名乗らないという本ADRの命名規律は不変。
-witness-quorum の本番化を Rust 側で実装しない方針、ENGI Wave4(CACAO depth-2
-delegation)が本ADRの範囲外である点も不変。「やらないこと」の項目2(Rust実装
-禁止)・項目4(Wave4範囲外)はそのまま有効。
-
 ## Addendum 4 (2026-07-10): full nbb dial+sign pipeline, JVM no longer needed anywhere in it
 
 Addendum 3's follow-up: `kotoba-lang/murakumo`#19 wires the nbb dial
@@ -306,3 +284,43 @@ fleet hardware for the dial and signing halves separately (addenda
 2-3) and end-to-end locally (this addendum). What's still JVM-bound
 and unchanged: the QUIC transport (kwik/bouncycastle, Phase 2) has no
 nbb-native equivalent yet.
+
+## Addendum 5 (2026-07-15): 「やらないこと」項目1・項目3、ENGI/ENスコープに限定して撤回
+
+ADR-2607993000(engi-l1-byzantine-consensus-en-currency)により、本ADRの
+「やらないこと」節の以下2項目は **ENGI/EN というスコープに限定して**撤回された:
+
+> - 新しいL1・独自コンセンサスチェーンを作らない(ADR-2607030030を継承)。
+> - witness全員が単一運営者配下である間のfork-choice/view-change設計はしない
+>   (Byzantine前提を持ち込まない — crash fault tolerance相当と呼ぶ)。
+
+オーナー判断(2026-07-15): 単一運営主体のままでも、コンセンサスアルゴリズム
+自体は今から Byzantine 耐性ありで設計し、実際に第三者 witness が参加する段階で
+プロトコルを書き直さずに済むようにする。`kotoba-lang/engi` を chained HotStuff
+型 BFT の L1 に、新規 `kotoba-lang/en` をその上のネイティブ通貨単位にする設計・
+最小プロトタイプは ADR-2607993000 参照。
+
+**温存される部分**(本Addendumでも変わらない): 運営主体は引き続き単一
+(`com-junkawasaki`)で、Phase 4(独立第三者運営者+経済的stake)に到達するまで
+外部に「分散型経済/ブロックチェーン」と名乗らないという本ADRの命名規律は不変。
+witness-quorum の本番化を Rust 側で実装しない方針、ENGI Wave4(CACAO depth-2
+delegation)が本ADRの範囲外である点も不変。「やらないこと」の項目2(Rust実装
+禁止)・項目4(Wave4範囲外)はそのまま有効。
+
+## Addendum 6 (2026-07-15): Phase 4 を ENGI/EN witness admission に限定して具体化(ADR-2607994000)
+
+Addendum 5 が撤回した「Byzantine前提を持ち込まない」の続き — オーナー
+指示「com-junkawasaki 単一でなく分散型が成立するように設計して」を受け、
+Phase 4(本ADR §「Phase 4」— 独立第三者運営者+経済的stake、従来「shape
+only、着手する場合は別ADR」としていたもの)を ADR-2607994000 が具体化した:
+permissionless staking(外部担保bond、EN自体ではない — ADR-2607101100 §4の
+既存のUSDC on Base L2境界を想定)、stake-weighted quorum、equivocation
+限定のスラッシング(異議申立て機構を新設せずに済む設計)。詳細は
+ADR-2607994000 参照。
+
+**Phase 4 の到達条件は不変**: 実際に独立した第三者組織が bond して witness
+として参加するまでは、本Addendumの設計が存在しても実質的な集中度は
+変わらない(Day1時点で bond witness は com-junkawasaki 1者のみ)。
+「分散型経済/ブロックチェーン」と対外的に名乗ってよいのは、実在する
+独立第三者が bond し、それが本ADRの命名規律の意味での Phase 4 に達した
+と確認できてから。
