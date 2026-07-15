@@ -2065,7 +2065,7 @@
       ;; :spec/:blueprint/:implemented counts sum correctly, EDN still
       ;; parses) -- this is a formatting/history regression only, not
       ;; a corruption; flagged for the repo owner, not reverted here.
-      (is (= 322 (:implemented m))))))
+      (is (= 323 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
