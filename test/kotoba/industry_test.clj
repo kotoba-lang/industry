@@ -1333,7 +1333,21 @@
       ;; :spec -> :implemented, superproject ADR-2607151145
       ;; (cloud-itonami-isic-2211-rubber-tyres-coverage.md). Live-recomputed via
       ;; `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched origin/main.
-      (is (= 237 (:implemented m))))))
+      ;; 237 -> 238: cloud-itonami-isic-0143 (Raising of camels and camelids) promoted
+      ;; :spec -> :implemented, superproject ADR-2607181100
+      ;; (cloud-itonami-isic-0143-camel-raising-coverage.md). Fresh scaffold -- no prior repo existed at
+      ;; either the stale gftdcojp/cloud-itonami-A0143 placeholder or the real cloud-itonami org (gh api
+      ;; 404 confirmed before any work began); identity ({:id "0143" :name "Raising of camels and
+      ;; camelids"}) independently verified against a fresh clone before scaffolding. CamelOpsAdvisor ⊣
+      ;; Camelid Facility Operations Governor camelid-facility-operations-coordination actor mirroring
+      ;; cloud-itonami-isic-0141's [Raising of cattle and buffaloes] verified module shape
+      ;; module-for-module -- dromedary/bactrian-camel/llama/alpaca species reference data in place of
+      ;; cattle/buffalo, dairy/fiber/pack-animal use classes, and a fiber-yield-invalid check (negative
+      ;; fiber yield rejected, zero valid) genuinely new to this fiber-producing vertical. 35 tests / 106
+      ;; assertions green, independently re-verified against a fresh clone. Live-recomputed via
+      ;; `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched origin/main
+      ;; (confirmed HEAD's own pinned 237 assertion was still green pre-edit, ruling out drift): 237 -> 238.
+      (is (= 238 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
