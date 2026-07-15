@@ -409,6 +409,8 @@
     (is (= :implemented (industry/maturity "0130"))))
   (testing "cloud-itonami-isic-3092 (Manufacture of bicycles and invalid carriages, fresh scaffold -- the entry pointed at a never-created gftdcojp/cloud-itonami-C3092 placeholder repo, both this and the real cloud-itonami org target name independently confirmed 404 before scaffolding; identity ({:id \"3092\" :name \"Manufacture of bicycles and invalid carriages\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; BikeAdvisor ⊣ Bicycle & Mobility Device Plant Operations Governor plant-operations-coordination actor mirroring cloud-itonami-isic-2211's [Manufacture of rubber tyres and tubes] verified module shape module-for-module (bikemfg.* in place of tyremfg.*) -- welding/assembly/test-bench equipment and bicycle/invalid-carriage production-batch (product-category/weight-capacity-kg/weld-defect-rate-percent) vocabulary in place of building/curing-line equipment and tyre-category/load-index/defect-rate; :flag-safety-concern (frame-weld-defect/brake-safety/structural-integrity) always escalates regardless of confidence, matching 2211's own safety-concern-escalation invariant; the proposal-effect allowlist plus a permanent equipment-actuate block (`:actuate-equipment? true`) structurally prevent any direct welding/assembly/test-bench-equipment control, with no human-approval override path; a further permanent certification-authority block (`:issue-certification? true`) prevents self-issuing an ISO 4210/ISO 7176 bicycle-or-wheelchair safety certification. 77 tests / 215 assertions green, independently re-verified against a fresh clone; superproject ADR-2607192000) is also :implemented"
     (is (= :implemented (industry/maturity "3092"))))
+  (testing "cloud-itonami-isic-2652 (Manufacture of watches and clocks, fresh scaffold -- the entry pointed at a never-created gftdcojp/cloud-itonami-C2652 placeholder repo, both this and the real cloud-itonami org target name independently confirmed 404 before scaffolding; identity ({:id \"2652\" :name \"Manufacture of watches and clocks\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; WatchOpsAdvisor ⊣ Watch & Clock Plant Operations Governor plant-operations-coordination actor mirroring cloud-itonami-isic-2710's [Manufacture of electric motors, generators, transformers and electricity distribution and control apparatus] verified module shape module-for-module (watchmfg.* in place of elecequipmfg.*) -- movement-assembly/casing/regulation/testing equipment and watch/clock production-batch (product-type/accuracy-test-seconds-per-day/defect-rate-percent) vocabulary in place of winding/assembly/test-bench equipment and product-type/dielectric-test-kv/defect-rate; :flag-safety-concern (materials-safety battery/mercury-cell hazard, precision-defect) always escalates regardless of confidence, matching 2710's own safety-concern-escalation invariant; the proposal-effect allowlist plus a permanent equipment-actuate block (`:actuate-equipment? true`) structurally prevent any direct movement-assembly/casing/regulation/testing-equipment control, with no human-approval override path; a further permanent certification-authority block (`:issue-certification? true`) prevents self-issuing a COSC/ISO 3159 chronometer/accuracy certification mark. 76 tests / 213 assertions green, independently re-verified against a fresh clone; superproject ADR-2607200500) is also :implemented"
+    (is (= :implemented (industry/maturity "2652"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -1695,11 +1697,15 @@
       ;; (registry.edn's own "3211" -> :implemented change already
       ;; landed via a Contents-API single-file PUT, this test-file edit
       ;; is the catch-up): 257 -> 258.
-            ;; Live-recomputed via `(industry/maturity-summary)` on a freshly
-      ;; re-fetched origin/main immediately before this edit -- at least
-      ;; one further sibling promotion landed concurrently under heavy
-      ;; fleet load (not individually itemized here; the live recompute,
-      ;; not an assumed +1, is the source of truth): 258 -> 259.
+      ;; cloud-itonami-isic-2652 (Manufacture of watches and clocks,
+      ;; superproject ADR-2607200500). This promotion's own
+      ;; registry.edn edit (Contents-API single-file PUT, commit
+      ;; d5abdbd625fbf7e6a318f6aac33f60ba7ba4ac05) landed cleanly
+      ;; against that entry ("2652" was untouched by any other
+      ;; concurrent promotion). Live-recomputed via
+      ;; `(industry/maturity-summary)` on a freshly re-fetched
+      ;; origin/main immediately before this test-file catch-up edit:
+      ;; 258 -> 259.
       (is (= 259 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
