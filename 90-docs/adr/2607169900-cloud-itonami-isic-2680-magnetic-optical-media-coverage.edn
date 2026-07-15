@@ -1,0 +1,54 @@
+{:adr-id "2607169900"
+ :title "cloud-itonami-isic-2680 — Manufacture of Magnetic and Optical Media Plant-Operations Coordination Actor"
+ :status :accepted
+ :date "2026-07-15"
+ :context
+ "ISIC 2680 (Manufacture of magnetic and optical media) had a
+  :spec-only placeholder pointing at a never-created
+  gftdcojp/cloud-itonami-C2680 repo (gh api 404 confirmed at both the
+  stale placeholder and the real cloud-itonami org before any work
+  began; registry :name independently re-verified against a fresh
+  clone). Closest verified sibling is cloud-itonami-isic-2640
+  (Manufacture of consumer electronics) -- same back-office
+  plant-operations coordination shape for a fixed processing plant
+  with electronics/precision-manufacturing equipment and a real
+  physical safety dimension."
+ :decision
+ "Implement cloud-itonami-isic-2680 mirroring cloud-itonami-isic-2640
+  module-for-module: MagOpticalMediaAdvisor ⊣ Magnetic and Optical
+  Media Plant Operations Governor + append-only audit ledger,
+  langgraph-clj StateGraph. Four ops (log-production-batch/
+  schedule-maintenance/flag-safety-concern/coordinate-shipment), all
+  :effect :propose only. Twelve HARD governor checks: propose-only
+  effect, closed op allowlist, closed proposal-effect allowlist,
+  permanent equipment-actuate block (:actuate-equipment?), permanent
+  content-replication licensing-authority block
+  (:issue-certification?, IFPI SID-style self-issuance), independent
+  equipment/batch verified+registered gates, independent
+  shipment-quantity recompute, double-schedule guard, product-type
+  validation (closed set cd/dvd/blu-ray/magnetic-tape/
+  magnetic-strip-card), substrate-thickness-mm plausibility validation
+  (0-1.5mm, grounded in ECMA-130/267/405 optical-disc thickness and
+  ISO/IEC 7810 magnetic-strip-card thickness), defect-rate
+  plausibility validation. flag-safety-concern (solvent-coating
+  chemical hazard, equipment-safety hazard) always escalates
+  regardless of confidence -- the domain-specific safety-concern
+  vocabulary and the substrate-thickness-mm physical-geometry
+  plausibility field (replacing 2640's dielectric-test-kv electrical
+  safety-test-voltage field) are the deliberate departures from 2640's
+  battery-safety/electrical-safety/RoHS-compliance vocabulary. Fully
+  portable .cljc, no JVM-only interop anywhere in src/; actor graph
+  invoked exclusively via langgraph.graph/run*."
+ :consequences
+ ["Certified magnetic-tape-coating and optical-disc-molding/stamping plant operators fork and deploy independently with auditable coordination records; direct coating/molding/stamping-line-equipment control, equipment actuation, and content-replication licensing self-issuance remain permanent, un-overridable HARD blocks"
+  "Safety-concern flagging is a circuit-breaker, not a threshold -- always escalates to a human plant supervisor regardless of confidence"
+  "kotoba-lang/industry registry entry \"2680\" promoted :spec -> :implemented, :repo/:business-id corrected from the stale gftdcojp/cloud-itonami-C2680 placeholder to cloud-itonami/cloud-itonami-isic-2680"
+  "Still a simulation/proposal layer, not a real plant-operations control system -- no integration with real plant-management databases (equipment telemetry, batch tracking, freight dispatch, licensing-body APIs)"]
+ :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2680"
+ :registry "https://github.com/kotoba-lang/industry"
+ :isic-rev5 "2680"
+ :domain :magnetic-optical-media/manufacturing
+ :status-in-registry :implemented
+ :governor :magnetic-optical-media-plant-operations-governor
+ :robotics true
+ :test-suite {:tests 77 :assertions 211 :failures 0 :errors 0}}
