@@ -399,6 +399,8 @@
     (is (= :implemented (industry/maturity "0123"))))
   (testing "cloud-itonami-isic-3320 (Installation of industrial machinery and equipment, fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-C3320 placeholder or the real cloud-itonami org [gh api 404 confirmed]; identity ({:id \"3320\" :name \"Installation of industrial machinery and equipment\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; Installation Advisor ⊣ Installation Governor industrial-machinery-installation-project OPERATIONS COORDINATION actor, coordination-only and narrower than the cloud-itonami-isic-4211 robotics-premise reference, same shape as cloud-itonami-isic-4311 [Demolition] and cloud-itonami-isic-4210 [Roads/railways construction]; closed op allowlist (log-installation-record/schedule-installation-operation/flag-safety-concern/order-supplies), all :effect :propose only; heavy-lift/rigging-equipment control and commissioning-energization sign-off permanently blocked; per-jurisdiction [JPN/USA/DEU] lift-plan/installation-notification legal-basis catalog citing real official sources (Japan's Industrial Safety and Health Act Art. 88 -- the sole :quantitative jurisdiction, 30-calendar-day lead-time; OSHA 29 CFR 1926 Subpart CC + 1910.147 for the USA; BetrSichV Sec.15 + EU Machinery Directive 2006/42/EC for Germany/EU -- USA/DEU honestly :qualitative); no JVM-only interop anywhere in src/ (mock-only notifier); 64 tests / 241 assertions green, independently re-verified against a fresh clone; superproject ADR-2607171900) is also :implemented"
     (is (= :implemented (industry/maturity "3320"))))
+  (testing "cloud-itonami-isic-1062 (Manufacture of starches and starch products, fresh scaffold -- the entry pointed at a never-created gftdcojp/cloud-itonami-C1062 placeholder repo, both this and the real cloud-itonami org target name independently confirmed 404 before scaffolding; identity ({:id \"1062\" :name \"Manufacture of starches and starch products\"}) independently verified against a fresh clone before any work began; StarchOpsAdvisor ⊣ Starch Governor plant-operations-coordination actor mirroring cloud-itonami-isic-1061's [Manufacture of grain mill products] verified module shape module-for-module -- raw-material intake (corn/potato/cassava/wheat) in place of grain intake, steep/extract/refine/dry phase split in place of a single :mill phase; sulfite-residue-exceeded-violations and microbial-load-exceeded-violations are this actor's independently-verified food-safety physical checks in place of 1061's single mycotoxin-level-exceeded-violations [18 hard-violation checks total, one more than 1061's 17, because sulfite-residue from steeping and microbial-load from extended slurry dwell time are genuinely distinct hazards]; detection-equipment-calibration-overdue-violations uses a 60-day interval, shorter than 1061's 90-day magnet-calibration interval, reflecting the higher fouling/drift rate of continuous wet-processing equipment; wheat starch retains a genuine :wheat/gluten allergen unlike corn/potato/cassava starch, mirroring 1061's oat/wheat shared-milling-line cross-contact hazard; 52 tests / 175 assertions green, independently re-verified against a fresh clone; superproject ADR-2607152500) is also :implemented"
+    (is (= :implemented (industry/maturity "1062"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -1312,7 +1314,13 @@
       ;; `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched origin/main
       ;; (confirmed HEAD's own pinned 233 assertion was still green pre-edit, ruling out drift from a
       ;; raw `grep -c` undercount before trusting the delta): 233 -> 234.
-      (is (= 234 (:implemented m))))))
+      ;; 234 -> 235: cloud-itonami-isic-1062 (Manufacture of starches and starch products) promoted
+      ;; :spec -> :implemented, superproject ADR-2607152500
+      ;; (cloud-itonami-isic-1062-starches-coverage.md). Live-recomputed via
+      ;; `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched origin/main
+      ;; (confirmed HEAD's own pinned 234 assertion was still green pre-edit, ruling out drift from a
+      ;; raw `grep -c` undercount before trusting the delta): 234 -> 235.
+      (is (= 235 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
