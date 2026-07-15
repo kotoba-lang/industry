@@ -1,0 +1,275 @@
+# ADR-2607992825: cloud-itonami-isic-2825 (Manufacture of machinery for food, beverage and tobacco processing) coverage
+
+**Status**: accepted
+**Date**: 2026-07-15
+**Deciders**: Jun Kawasaki (agent-executed, standing authorization)
+**Related**: ADR-2607231500 (cloud-itonami-isic-2826 Manufacture of machinery for textile, apparel and leather production coverage, closest domain analog)
+
+## Context
+
+`kotoba-lang/industry`'s registry carries `{:id "2825" ...}` for ISIC
+class **2825, "Manufacture of machinery for food, beverage and
+tobacco processing"** at `:maturity :spec` with a stale placeholder
+`:repo` (`https://github.com/gftdcojp/cloud-itonami-C2825`,
+`:business-id "cloud-itonami-C2825"`, an older pre-`isic-`-prefix
+naming scheme) and no actual implementation. A prior agent in this
+fleet was assigned this same class number but, per the fleet's
+mandatory registry-verification protocol, discovered the live
+`:name` value at `"2825"` actually did NOT match its requested domain
+and built `cloud-itonami-isic-2826` instead (see that repo's own ADR,
+`docs/adr/0001-architecture.md`: "task originally assigned as 2825,
+corrected to 2826 after verifying registry :name values against a
+fresh clone"). This ADR is the genuine 2825 build: a fresh clone of
+`kotoba-lang/industry` (verified via the GitHub Contents/git-data API,
+not `raw.githubusercontent.com`) confirms `{:id "2825" ...}`'s live
+`:name` is truncated as `"Manufacture of machinery for food, beverage
+and tobacco pro..."`, which matches "Manufacture of machinery for
+food, beverage and tobacco processing" exactly (the official ISIC
+Rev.4 title for class 2825) — no mismatch this time, and this build
+proceeds on the verified premise.
+
+ISIC class 2825 is a fresh scaffold — no prior repo or reverted
+attempt existed at `cloud-itonami/cloud-itonami-isic-2825` before this
+ADR (checked and confirmed 404 via `gh api
+repos/cloud-itonami/cloud-itonami-isic-2825` and `gh api
+repos/kotoba-lang/cloud-itonami-isic-2825` before starting). The
+pre-existing registry entry's `:repo`/`:business-id` pointed at a
+never-created `gftdcojp/cloud-itonami-C2825` placeholder, not a real
+prior attempt.
+
+The closest domain analog is `cloud-itonami-isic-2826` (Manufacture of
+machinery for textile, apparel and leather production): both are
+back-office coordination actors for a fixed manufacturing plant with
+electromechanically-assembled, test-bench-verified finished-goods
+output and a real physical/worker safety dimension, and both share the
+same four-op shape (`:log-production-batch`/`:schedule-maintenance`/
+`:flag-safety-concern`/`:coordinate-shipment`), the same two-entity
+verified/registered gate structure (equipment for maintenance
+scheduling, batch for shipment coordination), and the same permanent
+equipment-actuation and certification-authority blocks. This build
+mirrors 2826's architecture closely but adapts the hazard profile,
+equipment vocabulary, and product taxonomy to the food/beverage/
+tobacco processing-machinery plant: its finished goods are processing
+machinery FOR food/beverage/tobacco manufacturers (industrial mixers,
+filling machines, packaging machines, bottling lines, tobacco
+processing machines) rather than textile/apparel/leather production
+machinery, so its equipment kinds are `:mixing-equipment-assembly-line`
+and `:packaging-equipment-test-bench` rather than 2826's loom-assembly
+line and sewing-machine test bench, and its routine test-bench field
+`:no-load-run-speed-rpm` is plausibility-checked 0-3,000 rpm (informed
+by industrial food mixer drive shafts approximately 20-1,500 rpm,
+packaging-machine indexing/conveyor drive motors typically under 2,000
+rpm, and filling-machine/bottling-line drive speeds typically under
+3,000 rpm) rather than 2826's 0-8,000 rpm bound informed by that
+vertical's own equipment classes. Like 2826, shipment quantity is
+tracked in finished-unit UNITS (`:units`/`:quantity-units`/
+`:shipped-units`) rather than a bulk weight, since food/beverage/
+tobacco processing machinery is likewise discrete counted units.
+
+This vertical shares 2826's DOMAIN-SPECIFIC permanent block, adapted
+with an ADDITIONAL certification dimension specific to it: like
+textile/apparel/leather production machinery, food/beverage/tobacco
+processing machinery is subject to machinery safety certification
+regimes (e.g. CE marking under the EU Machinery Regulation (EU)
+2023/1230), but it ALSO directly contacts food, beverage or tobacco
+product during processing and so is additionally subject to
+food-contact-material compliance regimes (e.g. EU Regulation
+1935/2004, FDA 21 CFR 178, or hygienic-design standards such as
+NSF/ANSI 169 / 3-A Sanitary Standards). This actor is never the
+certification authority for either dimension — any proposal
+(regardless of op) that declares `:issue-certification? true` is a
+HARD, PERMANENT, unconditional block
+(`foodmachmfg.governor/certification-authority-blocked-violations`),
+the same "no phase, no human override" posture as the equipment-
+actuation block. `:flag-safety-concern` correspondingly covers a
+mechanical-safety/food-contact-material-compliance concern (in place
+of 2826's mechanical-safety/electrical-safety/CE-compliance triad).
+
+This vertical is SELF-CONTAINED — no `kotoba-lang/foodmachmfg` library
+exists, so domain logic (equipment/batch verification, shipment-
+quantity recompute, product-type validation, no-load-run-speed
+plausibility validation, defect-rate plausibility validation) lives as
+pure functions in `foodmachmfg.registry` and is re-verified
+independently by the governor, mirroring the discipline established by
+`cloud-itonami-isic-2826`'s `texmachmfg.registry` and every prior
+sibling actor.
+
+This blueprint's own `:itonami.blueprint/governor` keyword,
+`:food-beverage-tobacco-machinery-plant-operations-governor`, is
+grep-verified UNIQUE fleet-wide (`gh search code
+"food-beverage-tobacco-machinery-plant-operations-governor" --owner
+cloud-itonami`, zero hits before this repo was created).
+
+## Decision
+
+Build `cloud-itonami-isic-2825` from scratch as a governed-actor
+implementation of the food/beverage/tobacco processing-machinery
+blueprint, following the langgraph StateGraph + independent Governor +
+Phase 0->3 rollout architecture established across the fleet:
+
+1. **FoodMachAdvisor** (`foodmachmfg.advisor`, sealed intelligence
+   node): proposes plant-operations coordination actions only, never
+   commits
+   - `:log-production-batch` — assembly/test batch, output-quality/test-result data logging (administrative, not an operational decision)
+   - `:schedule-maintenance` — assembly/test-bench-equipment maintenance scheduling proposal
+   - `:flag-safety-concern` — surface a mechanical-safety/food-contact-material-compliance concern (always escalates)
+   - `:coordinate-shipment` — outbound product shipment coordination proposal
+
+2. **Food, Beverage and Tobacco Machinery Plant Operations Governor**
+   (`foodmachmfg.governor`, independent validation layer, never trusts
+   the advisor's own self-report):
+   - HARD invariants (no override, evaluated unconditionally,
+     elaborated into twelve concrete checks): the referenced equipment
+     unit must be independently verified/registered before any
+     maintenance may be scheduled against it; the referenced batch
+     must be independently verified/registered before any shipment may
+     be coordinated against it; the request's own `:effect` must be
+     `:propose`; `:op` must be in the closed four-op allowlist; the
+     proposal's own `:effect` must be one of the four propose-shaped
+     effects (no direct assembly/test-bench-equipment control);
+     `:actuate-equipment? true` on a maintenance schedule (directly
+     actuating assembly/test-bench equipment) is a PERMANENT block;
+     `:issue-certification? true` on ANY proposal (self-issuing a
+     machinery safety or food-contact-material compliance certification
+     mark) is a PERMANENT block; a shipment may not push a batch's own
+     recorded shipped unit quantity past its own logged production
+     quantity (independently recomputed); no double-scheduling the
+     same maintenance record; no fabricated `:product-type` value; no
+     physically implausible `:no-load-run-speed-rpm` value; no
+     physically implausible `:defect-rate-percent` value
+   - ESCALATE (human sign-off, overridable): safety concerns always
+     escalate regardless of confidence; low confidence
+
+3. **Scope boundary** (critical, safety-critical domain — moving-part/
+   pinch-point hazard on assembly/test-bench lines, machinery safety
+   certification, food-contact-material compliance, downstream worker-
+   safety and food-safety consequence):
+   - Does NOT control mixing-equipment or packaging-equipment assembly/test-bench equipment directly
+   - Does NOT make plant-safety or certification decisions (exclusive to the human plant supervisor / accredited certification body)
+   - Does NOT actuate assembly/test-bench equipment (permanently blocked,
+     not a rollout milestone still to come — see `foodmachmfg.phase`:
+     `:schedule-maintenance` is never a member of any phase's `:auto`
+     set)
+   - Does NOT self-issue a machinery or food-contact-material compliance certification mark (permanently blocked, unconditional)
+   - All proposals are `:effect :propose`; actuation and certification are human-/institution-approval-gated
+
+4. **Self-contained domain logic**: `foodmachmfg.registry` pure
+   functions (`equipment-ready?`, `batch-ready?`, `shipment-quantity-
+   exceeded?`, `product-type-valid?`, `no-load-run-speed-rpm-valid?`,
+   `defect-rate-valid?`) are re-verified independently by the
+   governor, following the "ground truth, not self-report" discipline
+   established by prior actors (most directly `cloud-itonami-isic-
+   2826`'s `texmachmfg.registry`).
+
+5. **Store** (`foodmachmfg.store`): a single `MemStore` backend behind
+   a `Store` protocol, tracking four entity kinds (batches, equipment,
+   maintenance, shipments) plus the append-only ledger. Like 2826,
+   this build does NOT ship a second Datomic-backed store — a second
+   backend can be added later behind the same protocol without
+   changing any caller.
+
+6. **Implementation**: `.cljc` portable source (ClojureScript/JVM/nbb
+   compatible, no JVM-only interop), langgraph-clj StateGraph (invoked
+   via `langgraph.graph/run*`, not `.invoke`), append-only audit
+   ledger, full test coverage, demo driver. Full module set:
+   `deps.edn`, `blueprint.edn`, `LICENSE` (AGPL-3.0-or-later),
+   `README.md`, `GOVERNANCE.md`, `CODE_OF_CONDUCT.md`,
+   `CONTRIBUTING.md`, `SECURITY.md`, `docs/adr/0001-architecture.md`.
+   All source pushed to
+   `github.com/cloud-itonami/cloud-itonami-isic-2825` (public OSS,
+   AGPL-3.0-or-later).
+
+## Consequences
+
+(+) Food/beverage/tobacco processing-machinery plant-operations
+back-office coordination is now genuinely implemented and tested (not
+merely scaffolded). ISIC 2825 moves from `:spec` to `:implemented`,
+and its `:repo`/`:business-id` are corrected from the stale
+pre-`isic-`-prefix placeholder to the real repo/business-id.
+
+(+) Scope boundary is explicit and verifiable: the governor's HARD
+invariants protect against scope creep into unauthorized equipment
+operation, equipment actuation, or certification self-issuance,
+independently corroborated by `foodmachmfg.phase`'s permanent
+exclusion of `:schedule-maintenance` from every phase's `:auto` set.
+
+(+) The two independent verified/registered gates (equipment for
+maintenance, batch for shipment) are a genuinely food/beverage/
+tobacco-processing-machinery-specific elaboration mirroring 2826's own
+two-entity-kind gate — this domain has two distinct ground-truth
+entity kinds a proposal can reference, and each is independently
+re-derived from its own permanent record, never trusting the
+proposal's self-report.
+
+(+) The certification-authority-blocked check is directly adapted from
+2826's own certification elaboration to this vertical's own dual
+regulatory regime (machinery safety AND food-contact-material
+compliance) — the governor closes both scope-creep vectors explicitly
+rather than leaving them implicit in the closed op-allowlist alone.
+
+(+) The repo is standalone (forkable outside the workspace), matching
+the pattern established by prior actors.
+
+(+) All four core modules (governor/store/advisor/registry) plus
+`deps.edn` are present and exercised by 77 tests / 210 assertions
+across 5 test namespaces (`foodmachmfg.operation-test`,
+`foodmachmfg.governor-contract-test`, `foodmachmfg.phase-test`,
+`foodmachmfg.store-contract-test`, `foodmachmfg.registry-test`).
+
+(-) Still a simulation/proposal layer, not integrated with real
+equipment-telemetry/batch-tracking/freight-dispatch/certification-body
+systems — scope is deliberately bounded to back-office coordination.
+
+(-) Safety-concern escalation is a simplified placeholder; a real
+deployment would tie it to a domain-specific hazard-severity
+classification.
+
+(-) Single-backend Store (MemStore only): a Datomic/kotoba-server-backed
+store is a follow-up, not part of this build.
+
+(-) The no-load-run-speed plausibility ceiling (0-3,000 rpm) is a
+generous, cross-equipment-class bound informed by typical published
+speed ranges for industrial food mixers/packaging machines/filling
+machines/bottling lines, not a per-product-type-specific regulatory
+limit — a follow-up could tighten this per `:product-type` if
+warranted.
+
+## Verification
+
+- `cloud-itonami-isic-2825` repo: fresh scaffold, full module set
+  (governor/store/advisor/registry/operation/phase/sim + `deps.edn` +
+  `blueprint.edn` + LICENSE + governance docs) pushed to `main` at
+  `github.com/cloud-itonami/cloud-itonami-isic-2825`, initial commit
+  `0a0cc5456e623ba89bf6bd40007fde181f0931f0` (confirmed via `gh api
+  repos/cloud-itonami/cloud-itonami-isic-2825/commits/main --jq .sha`
+  matching the local commit exactly).
+- `clojure -M:test` (bare, no `:dev` alias needed — `deps.edn` pins
+  langgraph+langchain via `:local/root` directly in top-level `:deps`):
+  **`Ran 77 tests containing 210 assertions. 0 failures, 0 errors.`**
+- `clojure -M:lint`: `linting took 851ms, errors: 0, warnings: 0`.
+- `clojure -M:dev:run` demo narrative exercises all four ops, every
+  HARD-hold scenario directly (not-propose-effect, unknown-op,
+  equipment-not-verified, batch-not-verified, shipment-quantity-
+  exceeded, equipment-actuate-blocked, certification-authority-
+  blocked, already-scheduled, invalid-product-type, invalid-no-load-
+  run-speed, invalid-defect-rate), zero exception/error matches in the
+  full output.
+- All source is `.cljc` (portable); the actor graph is invoked
+  exclusively via `langgraph.graph/run*`.
+- Audit ledger is append-only; every settled request (commit or hold)
+  leaves exactly one ledger fact (contract-tested).
+- `:itonami.blueprint/governor` keyword `:food-beverage-tobacco-
+  machinery-plant-operations-governor` is grep-verified UNIQUE
+  fleet-wide (`gh search code
+  "food-beverage-tobacco-machinery-plant-operations-governor"
+  --owner cloud-itonami`, zero hits before this repo was created).
+- `kotoba-lang/industry` registry entry for `"2825"` updated in place
+  from `:spec` to `:maturity :implemented` (and `:repo`/`:business-id`
+  corrected to the real repo) via an exact-text in-place edit of the
+  single `{:id "2825" ...}` block (no wholesale regeneration). Exact
+  merge SHA, the live `:implemented` count immediately before/after
+  the edit, and `industry_test.clj`'s re-run assertion count are
+  recorded in this repo's own commit history and re-verified from an
+  independent fresh clone per the fleet's mandatory protocol (see this
+  same ADR PR/commit thread for the raw output, and the child repo's
+  own `docs/adr/0001-architecture.md` for the architecture rationale).
