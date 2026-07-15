@@ -250,7 +250,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-municipality-cri-san-jose/data/datascript-tx.edn"}
    {:label "cloud-itonami-assoc-8621-usa-ama association.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-assoc-8621-usa-ama/schema/association-rule.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-assoc-8621-usa-ama/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-8621-usa-ama/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-bra-sao-paulo ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-bra-sao-paulo/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-bra-sao-paulo/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 

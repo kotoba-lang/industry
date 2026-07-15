@@ -1793,6 +1793,26 @@ assertions green。
 現状: 国軸25件・業界団体軸27件(22業種)・自治体軸19件——71tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 72 — 自治体軸20件目(サンパウロ))
+
+`cloud-itonami-municipality-bra-sao-paulo`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-bra-sao-paulo/commit/984b9b9))：
+サンパウロ市（ブラジル最大都市だが首都ではない——ブラジリアが首都。
+トロント/シドニーと同様、非首都の主要都市として同列に扱う）。市公式
+`legislacao.prefeitura.sp.gov.br`（Catálogo de Legislação Municipal）
+のページ2件を直接WebFetch検証: Lei Orgânica do Município de São
+Paulo（市基本法・組織法、1990-04-04制定）／Decreto N.º 53.623
+（連邦情報公開法を市レベルで実施する政令、2012-12-12制定）。ページ
+が完全にレンダリングされ両文書の日付が明記されていた。4 tests/10
+assertions green。
+
+101リポジトリ・735 factを統合。`"ordinance/topic" "transparency"`
+での横断queryでsao-pauloがwashington-dc/madrid/berlin/roma/seoul/
+tokyo/santiago/buenos-airesと並んで取得できることを確認。
+
+現状: 国軸25件・業界団体軸27件(22業種)・自治体軸20件——72tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
