@@ -311,6 +311,34 @@ gftdcojp 側で、public な共通サービスは cloud-itonami に」を、既�
 これで「手続きは cloud-itonami でできる（service）／公開共通サービスは
 cloud-itonami（itonami.cloud/licenses）／個別ケースは各 org の private」が成立。
 
+## Addendum 10 — cloud-itonami を MCP server 化（2026-07-15、オーナー指示「repo ごとに mcp としても呼べるように」）
+
+kernel は **kotoba-lang/org-anthropic-mcp（mcp-clj）** — portable cljc、JSON-RPC
+dispatcher、manifest as data、transport は host 注入という設計で、まさに
+「repo を MCP 化する共有 kernel」。これに cloud-itonami の公開サービスを載せた
+（cloud-itonami `54649bc`）:
+
+- `cloud_itonami.mcp`（portable cljc）: MCP manifest（tools as data）+ `ITool` 実装。
+  license_service を 5 tool 化。`license.list_procedures` / `procedure_detail` /
+  `public_catalog` は公開の行政知識、`license.dossier` / `case_status` は
+  profile/events を**呼び出し側が渡す pass-through**（MCP server はケースデータを
+  保持しない — 3層分担 addendum 9 を transport 層でも維持）。
+- `scripts/mcp-server.cljs`（nbb）: stdio JSON-RPC loop。`mcp.execute/handle` を
+  回すだけの薄い transport。`claude mcp add cloud-itonami -- nbb … scripts/
+  mcp-server.cljs` で個別 tool として呼べる。
+- **「repo ごとに MCP 化する型」を README/ADR に明文化**: どのリポも (1) manifest
+  （`mcp.model/server`+`add-tool`）(2) `ITool`（tool-name→既存 cljc fn）
+  (3) transport スクリプト の3点で MCP 化できる。mcp-clj が唯一の共有 kernel
+  （com-junkawasaki org、no domain tools）で、各 repo は自分の tool セットだけ書く。
+
+検証: MCP dispatch 4 tests、stdio E2E（実 JSON-RPC 往復で initialize serverInfo・
+5 tool・procedure_detail・schema validation errors）green。公開カタログの
+ケースデータ非混入も test。
+
+MCP transport の選択肢: 今回は stdio（Claude Code から即使える）。remote HTTP/SSE
+（Worker で公開 MCP）は follow-up — mcp.execute/handle は transport 非依存なので
+manifest/ITool は再利用でき、transport スクリプトだけ差し替える。
+
 ## Consequences
 
 - (+) 新しい UI をゼロから作らない: 組織 = 既存 cockpit approvals、個人 = 既存
