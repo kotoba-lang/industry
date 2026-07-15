@@ -1,0 +1,76 @@
+{:adr-id "2607172000"
+ :title "cloud-itonami-isic-0123 (growing of citrus fruits) citrus-orchard-operations-coordination actor"
+ :status :accepted
+ :date "2026-07-15"
+ :deciders ["Jun Kawasaki (agent-executed, standing authorization)"]
+ :related ["ADR-2607122200" "ADR-2607011000" "ADR-2607152500"]
+
+ :context
+ "Ongoing careful, smaller-batch rollout (capable model + mandatory verification per
+  agent) after a prior 18-agent haiku batch had a 61% defect rate. 36+ consecutive
+  agents on this stricter protocol had succeeded before this one. Built from
+  cloud-itonami-isic-0122 (growing of tropical and subtropical fruits) as the
+  module-structure template, with clojure -M:test independently re-run from fresh
+  clones before and after push. The kotoba-lang/industry registry entry for \"0123\"
+  was independently re-verified (fresh clone) before any implementation work to
+  confirm id/name match (several prior agents in this fleet had mislabeled their
+  assigned ISIC class). gh api confirmed no prior repository existed at either
+  cloud-itonami/cloud-itonami-isic-0123 or the stale gftdcojp/cloud-itonami-A0123
+  placeholder (404)."
+
+ :scope-exclusions
+ ["direct field-equipment operation (grower's exclusive authority)"
+  "finalizing a spray-application decision (agronomist/grower authority)"
+  "harvest-timing / replanting economic decisions (remain human authority)"]
+
+ :decision
+ "Implement cloud-itonami-isic-0123 with Governor, Facts, Registry, Store, Advisor,
+  Phase, Operation, Sim (mirrors cloud-itonami-isic-0122 module-for-module,
+  namespace citrusops.*):
+  - Governor (CitrusOperationsGovernor): 5 hard checks (orchard-not-registered,
+    no-execution, field-equipment-or-spray-blocked, op-not-allowed,
+    orchard-count-invalid) + 3 escalation gates (always-escalate crop-health
+    concern [e.g. citrus greening/HLB], cost-threshold supply orders, low
+    confidence < 0.7)
+  - Facts: supply categories with cost thresholds (seedling/fertilizer/equipment),
+    fruit classes (orange/lemon/lime/grapefruit)
+  - Registry: independent pure predicates (cost-exceeds-threshold?,
+    orchard-count-non-positive?, confidence-below-floor?)
+  - Store: Store protocol + MemStore (registered-orchard lookup)
+  - Advisor: Advisor protocol + MockAdvisor (4 ops)
+  - Phase: 0->3 rollout gate
+  - Operation: composes advisor -> governor -> phase-gate (langgraph-clj wiring
+    deferred, matching 0122's own stub)
+  - Sim: demo runner with a working -main, verified end-to-end
+  - Operations: log-orchard-record, schedule-field-operation,
+    flag-crop-health-concern, order-supplies (closed allowlist, :effect :propose)
+  - Tests: 30 tests / 92 assertions (facts, governor, phase, registry, store), all
+    green (1 fewer assertion than 0122's 93 because facts covers 4 citrus classes
+    vs 0122's 5 fruit classes)
+  - All .cljc (portable, no JVM interop), AGPL-3.0-or-later
+  - README/business-model/operator-guide describe the real API"
+
+ :consequences
+ {:positive
+  ["Citrus-fruit-growing (0123) now genuinely implemented and fully tested"
+   "Scope boundaries (field-equipment operation, spray-application finalization)
+    hardcoded in governor checks, not just asserted in prose"
+   "Crop-health escalation (flag-crop-health-concern, e.g. citrus greening/HLB,
+    always human) is a core design invariant"
+   "Portable .cljc, zero JVM-only constructs, clj-kondo 0 errors / 0 warnings"]
+  :negative
+  ["Real persistent store (Datomic/kotoba-server) is a follow-up (in-memory for now)"
+   "langgraph-clj StateGraph wiring (real interrupt-before/checkpoint resume) is
+    deferred scaffolding, matching 0122's own stub status"]}
+
+ :verification
+ {:test-count 30
+  :assertion-count 92
+  :test-status "0 failures, 0 errors -- independently re-verified from a fresh clone post-push"
+  :lint-status "0 errors, 0 warnings"
+  :commit "97e0ee42dead228e752ff45c840748451dd0861c"
+  :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0123"
+  :registry-update "kotoba-lang/industry: 0123 maturity :spec -> :implemented, :repo/:business-id corrected from stale gftdcojp/cloud-itonami-A0123 placeholder, ADR referenced; industry_test.clj maturity-summary assertion bumped 227 -> 228 (live-recomputed twice from fresh clones after two genuine merge conflicts from concurrent-fleet ISIC promotions landing against the same file tail)"
+  :registry-merge-commit "d1c058df1837136fd53b62138f4e088ac534c6e6"
+  :registry-mojibake-check "grep -c \"â\" resources/kotoba/industry/registry.edn -> 0"
+  :registry-post-merge-verification "fresh clone of kotoba-lang/industry main (+ technology sibling): Ran 15 tests containing 948 assertions. 0 failures, 0 errors. gh api compare d1c058d...main -> status identical, ahead_by 0, behind_by 0"}}
