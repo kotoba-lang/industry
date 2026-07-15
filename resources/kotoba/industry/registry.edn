@@ -4290,11 +4290,25 @@
    :operating-states [:intake :radio-compliance-rules-verify :end-of-line-quality-screen :robotics-simulate-display-bonding :approve :ship-device-unit :issue-radio-conformity-certificate :audit]},
   {:id "2640"
    :name "Manufacture of consumer electronics"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2640"
-   :business-id "cloud-itonami-C2640"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2640"
+   :business-id "cloud-itonami-isic-2640"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607191500): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2640 placeholder).
+   ;; ConsumerElecAdvisor, an advisor sealed behind an independent
+   ;; Consumer Electronics Plant Operations Governor, langgraph-clj
+   ;; StateGraph, append-only audit ledger. Mirrors
+   ;; cloud-itonami-isic-2710's [Manufacture of electric motors,
+   ;; generators, transformers and electricity distribution and
+   ;; control apparatus] verified module shape, adapted to SMT/PCB-
+   ;; assembly and final-assembly/test lines producing consumer
+   ;; electronics (televisions, audio/video devices, smart speakers,
+   ;; wearable devices). 77 tests / 210 assertions, 0 failures, 0
+   ;; errors; clj-kondo lint clean.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2651"
