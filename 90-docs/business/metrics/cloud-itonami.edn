@@ -1,23 +1,23 @@
 {:health-status 200,
- :asOf "2026-07-15T20:07:50.780Z",
+ :asOf "2026-07-15T21:08:00.834Z",
  :zone-name "itonami.cloud",
  :productSurfaceHint
  {:url "/api/status",
   :note
-  "scores.productSurface should be 140/140 when free path is live"},
+  "scores.productSurface should be 211/211 when free path is live"},
  :zone
  {:requests-7d 295,
   :pageviews-7d 21,
   :uniques-7d-sum 87,
   :zone "itonami.cloud"},
- :agentRuns7d 505,
+ :agentRuns7d 1095,
  :sources [:cloudflare :health :emitter :itonami-free-path],
  :agentNote
  "CF may 403 Python-urllib/* (error 1010) — set an explicit User-Agent.",
  :health-live
  {:bottleneck
   "free path live — paid path needs owner STRIPE_* secrets",
-  :asOf "2026-07-15T20:07:51.227Z",
+  :asOf "2026-07-15T21:08:01.224Z",
   :agentNote
   "CF may 403 Python-urllib/* (error 1010) — set an explicit User-Agent for agents.",
   :source "itonami-data-kv-list",
@@ -27,11 +27,11 @@
    :externalTenants 4,
    :selfRegisteredOwners 4,
    :registryEntries 4,
-   :agentRuns7d 505,
+   :agentRuns7d 1095,
    :externalPaid 0},
   :ok true,
   :live true,
-  :version "0.1.78",
+  :version "0.1.95",
   :links
   {:freeClaim "/isco-1212/",
    :digestAlias "/api/free-path",
@@ -66,14 +66,14 @@
   :externalTenants 4,
   :selfRegisteredOwners 4,
   :registryEntries 4,
-  :agentRuns7d 505,
+  :agentRuns7d 1095,
   :externalPaid 0},
  :free-path
  {:ok true,
   :externalTenants 4,
   :selfRegisteredOwners 4,
   :registryEntries 4,
-  :agentRuns7d 505,
+  :agentRuns7d 1095,
   :externalPaid 0},
  :ok true,
  :traffic-quality {:window "24h", :probe-4xx-pct 58, :error-5xx-pct 0},
@@ -82,10 +82,10 @@
  :funnel
  {:trials 4,
   :freeClaims 4,
-  :agentRuns7d 505,
+  :agentRuns7d 1095,
   :externalTenants 4,
   :paid 0},
- :version "0.1.78",
+ :version "0.1.95",
  :signal
  "itonami.cloud 実測 295 req/7d・87 uniques(日次和)・うち4xx probe 58%(24h)",
  :tenants
