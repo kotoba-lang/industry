@@ -237,3 +237,44 @@ Stripe 実クエリで apex 課金者 0 を確認 — 既存 active 4 件は全�
 checkout/actor-binding 着地後)。なお同日、別セッションが cloud-murakumo 側で
 Stripe webhook → itonami credits topup (ADR-2607995000 系) を実装中 — apex の
 checkout 設計はそちらの着地を待って揃えるのが良い。
+
+## Addendum 6 (2026-07-15) — 棚卸し完了 + apex checkout 前進 + blocked gate 横展開の実スコープ
+
+### 棚卸し (git-cleanup-conflict :retirement、全 8 stash 完済)
+- local-murakumo ×1 (voice WIP): landed (42b646b で verbatim コミット済) → archive+drop
+- cloud-murakumo ×3: sync-retry WIP は superseded (唯一の欠落行 = qwen3.6 公式化で
+  置換した旧 model 名) → drop。mlx-moe --pin-top-k/--warmup ×2 は **unlanded** →
+  rescue branch `stash-rescue-2026-07-15-mlx-moe-flags` (86282fa、180 tests green、
+  merge は owner 判断) へ回収して drop
+- kotoba-lang/industry ×4 (07-10 concurrent-session-wip): 対象 6 ISIC entry
+  (3822/6209/4510/3811/6311/8299) 全て main に :implemented 登録済み = superseded
+  → archive+drop
+- superproject 統合 checkout が detached HEAD だったのを main 復帰 + ff (b532768)。
+  archive は各 repo の .git/stash-archive-2026-07-15/
+- 残置 (他セッション所有、意図的に触らず): cloud-murakumo / kotoba-lang/murakumo の
+  tree WIP (active)、superproject の未追跡 ADR 群 (voice/shiropico/video)、
+  /private/tmp の codex worktree 群。**発見事項**: superproject が
+  orgs/kotoba-lang/industry の gitlink を今も track している (CLAUDE.md の
+  「gitlink 撤去済み」と不整合 — 構造変更なので owner 判断)
+
+### apex Plus checkout (①) — Payment Link 作成済み、UI 配線は座標確定
+- **実 Payment Link 作成済**: https://buy.stripe.com/28E3cuewP2hqbKMgULbMQ0a
+  (plink_1TtSw7BcblPoapUJh5h4iHkI、Gftd AI Pro $20/mo、metadata
+  product=ai-gftd-apex/plan=pro)
+- **live gftd.ai の配信 repo は ai-gftd-apps-gftdcojp** (worker
+  ai-gftd-chat-shell; ai-gftd-apex repo の Pages build は custom domain 未接続で
+  live に出ていない — apex repo 単体の UI 編集では live に反映されない点に注意)。
+  UI 配線 (Upgrade 導線 + ?client_reference_id=<opaque actor id> 付与 —
+  ADR-2606301220 の actor-binding) は ai-gftd-apps-gftdcojp 側の follow-up
+- 購入→records 化は cloud-murakumo で進行中の Stripe webhook 方式
+  (ADR-2607995000 系、別セッション) に揃える
+
+### blocked gate 横展開 (②) の実スコープ (live 調査済)
+- **cloud-itonami: gate-emitters の https://itonami.cloud/api/metrics は実在しない**
+  (SPA fallback が HTML を返すだけ — collect は JSON parse 失敗で no-op、
+  emitter 記載が架空だった)。実装 = cloud-itonami worker に /api/metrics
+  (:tenants {:active :external-paid} を TENANT_STATE 実カウントから) を追加
+- app-aozora: emitter ゼロから (engagement テレメトリ: DAU/post engagement +
+  organism/human actorType 属性) — appview worker + D1 の product 実装規模
+- app-aozora-yoro: child repo 分離が前提 (計器以前) — repo 構造の owner 判断
+- etzhayyim: RAD attestation 参照フックの live 化 (rad_attestation_ref scaffold)
