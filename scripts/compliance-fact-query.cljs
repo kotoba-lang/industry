@@ -187,7 +187,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-assoc-4100-usa-agc/data/datascript-tx.edn"}
    {:label "cloud-itonami-municipality-ita-roma ordinance.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-municipality-ita-roma/schema/ordinance.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-municipality-ita-roma/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-ita-roma/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-chl statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-chl/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-chl/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 

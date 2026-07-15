@@ -1277,6 +1277,28 @@ seoul・romaの6自治体を取得できることを確認。国軸19・業界�
 現状: 国軸19件・業界団体軸21件(16業種)・自治体軸10件——50tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 51 — 国軸20件目(CHL))
+
+`cloud-itonami-iso3166-chl`(既存の`marketentry`実装済みリポ)に
+`statute.facts`を追加・push
+([commit](https://github.com/cloud-itonami/cloud-itonami-iso3166-chl/commit/b6db667))：
+bcn.cl/leychile.cl(通常の第一候補、チリ国会図書館の対話式法令閲覧
+ページ)は試した全navegar URLでJS-only(「接続が遅いかブラウザが
+非対応」)エラーを返した——このファミリーのe-Gov・fedlex.admin.chと
+同系統の失敗モード。捏造せず、BCN自身のPDFエクスポートサービス
+(nuevo.leychile.cl、今回は文字ベースで正常にレンダリング)と労働庁
+(Dirección del Trabajo)自身のPDF再配布を使い実在3法令を確認: Ley
+N° 18.046 sobre Sociedades Anónimas(会社法、1981-10-22公布)／
+Ley N° 19.628 sobre Protección de la Vida Privada(個人データ保護法、
+1999-08-28公布)／Código del Trabajo(労働法典、DFL N° 1、
+2003-01-16公布・現行版2026年7月版)。28 tests/89 assertions green。
+
+76リポジトリ・688 factを統合。`:corporate-governance`トピックでの
+横断queryで19か国(DNKを除く全て)を取得できることを確認。
+
+現状: 国軸20件・業界団体軸21件(16業種)・自治体軸10件——51tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
