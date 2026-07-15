@@ -387,6 +387,8 @@
     (is (= :implemented (industry/maturity "1061"))))
   (testing "cloud-itonami-isic-0145 (Raising of swine/pigs, fresh scaffold -- no prior blueprint repo; corrected from a task assignment that mislabeled this ISIC class as 0144 [which this registry, matching the real UN ISIC Rev.4 standard, correctly assigns to 'Raising of sheep and goats' -- the 0144 entry itself is untouched by this promotion]; SwineOpsAdvisor ⊣ SwineFarmOperationsGovernor swine-farm-operations-coordination actor mirroring cloud-itonami-isic-0141's [Raising of cattle and buffaloes] verified module shape module-for-module -- barn/pen facility registration in place of pasture, breed reference data [landrace/duroc/yorkshire/berkshire] in place of species, and a biosecurity/notifiable-disease reference vocabulary [ASF/CSF/FMD/PRRS] in place of generic disease citation; flag-animal-health-concern always escalates regardless of confidence, matching 0141's own animal-welfare-escalation invariant; superproject ADR-2607154000) is also :implemented"
     (is (= :implemented (industry/maturity "0145"))))
+  (testing "cloud-itonami-isic-4311 (Demolition, fresh scaffold -- no prior failed attempt; correctly registered against this registry's own 4311='Demolition' entry, avoiding the 0144/0145-style code-mislabel failure mode; DemolitionAdvisor ⊣ DemolitionGovernor demolition-project-OPERATIONS-COORDINATION actor structured after cloud-itonami-isic-4211's [Community Building Construction] robotics-premise module shape but deliberately NARROWED -- no robotics/simphysics module, no heavy-equipment-control or structural-engineering-decision/demolition-plan-finalization authority [permanent, un-overridable governor hard-blocks], every proposal's :effect is :propose only [governor HARD-holds anything else, defense-in-depth]; per-jurisdiction {JPN/USA/DEU} hazmat-survey/demolition-notification legal-basis catalog citing real official sources [石綿障害予防規則, 建設リサイクル法, OSHA 29 CFR 1926.1101, 40 CFR 61.145 NESHAP, EU Directive 2009/148/EC]; schedule-demolition-operation and flag-safety-concern always escalate to a human at every phase, unconditionally; DatomicStore uses langchain-store.core [ADR-2607141600] instead of hand-rolling the EDN-blob codec; superproject ADR-2607155000) is also :implemented"
+    (is (= :implemented (industry/maturity "4311"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -985,7 +987,15 @@
       ;; before this edit on a freshly re-fetched origin/main
       ;; (concurrent-agent count-drift caution -- not an assumed fixed
       ;; number): 209 -> 210.
-      (is (= 210 (:implemented m))))))
+      ;; 210 -> 211: cloud-itonami-isic-4311 (Demolition) promoted
+      ;; :spec -> :implemented, superproject ADR-2607155000
+      ;; (cloud-itonami-isic-4311-demolition-coverage.md). 68 tests /
+      ;; 252 assertions run green before claiming :implemented,
+      ;; independently re-verified against a fresh clone. Live-
+      ;; recomputed via `(industry/maturity-summary)` on a freshly
+      ;; re-fetched origin/main immediately before this edit -- not an
+      ;; assumed fixed number.
+      (is (= 211 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
