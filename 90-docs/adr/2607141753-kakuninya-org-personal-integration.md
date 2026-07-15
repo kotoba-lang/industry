@@ -235,6 +235,34 @@ ephemeral conn にのみ存在し、production store（cockpit #approvals）に�
 現 2 errand が写っていない — 次の errand からは常駐 tick が production store に
 投影する。現 2 件の完了は manimani inbox（配信済み）の evidence 経路で進む。
 
+## Addendum 6 — M2 部分実装: per-user 認証の CACAO 昇格（2026-07-15。manimani `ad8c857` / cacao lib `ea09687`）
+
+M2 のうち **net-kotobase#153 にブロックされない認証層**を昇格した:
+
+- **切り出し規則の発動**: cloud-manimani が cloud-itonami edge verify の
+  2 個目の消費者になった → ADR-2607141654 の規則どおり
+  `cacao.edge.{base58,cbor,verify}` を **org-chainagnostic-cacao へ verbatim
+  抽出**（crypto.subtle ベース — `cacao.core` の :cljs は node:crypto 依存で
+  Worker では動かない）。cross round-trip（core/mint → edge/verify）を nbb で
+  実証。cloud-itonami 自身の migration は follow-up。
+- **manimani worker**: `Authorization: CACAO <b64>` 提示時のみ署名 + 時間窓を
+  検証し、`iss` を verified-did として authz へ。**verified-did == user record
+  :did → :self**（署名検証は transport 層、純関数 authz は DID 同一性のみ）。
+  失敗は fail-closed で既存経路（401/403）。Bearer（admin / M1 interim user
+  token）は後方互換で維持。`scripts/mint_owner_cacao.cljs` が owner identity
+  (seed) から 1h CACAO を mint するクライアント。
+- **live E2E**（version `0f53d669`）: 実 owner CACAO 200 / garbage CACAO 401 /
+  Bearer 後方互換 200 / CACAO での decision POST 201（テスト decision は
+  `policy: todo` の errand 外 item — kakuninya tick は触れない）。
+- **実測バグ（本シリーズ 11 個目）**: verify.cljc 内部の aget(string) 併用で
+  返り値 literal の `"iss"` が温存される一方、worker 側の `(.-iss r)` dot
+  アクセスだけが :advanced で rename され undefined（live 401 → mock KV での
+  local repro で確定）。unchecked-get に統一 + 認証失敗理由のログ追加
+  （無言 nil はデバッグ不能、が今回も再確認された教訓）。
+
+M2 残り: INTERIM KV → kotobase graph（net-kotobase#153 待ち）と
+capability-scoped share、interim user token の廃止（CACAO 定着後）。
+
 ## Consequences
 
 - (+) 新しい UI をゼロから作らない: 組織 = 既存 cockpit approvals、個人 = 既存
