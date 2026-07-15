@@ -924,6 +924,24 @@ GVBl. S. 418)はWebSearchでの裏付けに留まる(直接一次ページでの
 現状: 国軸14件・業界団体軸15件(10業種)・自治体軸5件——34tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 35 — 業界団体軸16件目(EEI) — 新規ISIC業種(電力))
+
+`cloud-itonami-assoc-3510-usa-eei`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-3510-usa-eei/commit/b02dd71))：
+Edison Electric Institute(EEI、Wikidata Q5338374、1933年設立)。実在
+2件を検証(Mutual Assistance Agreement: 会員電力会社間の災害復旧相互
+応援協定、PDF本文をReadツールで直接確認／About EEI: 組織概要ページを
+直接WebFetchで確認、1933年設立自体はWebSearch/Wikidata裏付け)。
+4 tests/11 assertions green。
+
+**新規ISIC業種**: ISIC 3510(発電・送電・配電業)を初めて追加した。
+
+40リポジトリ・650 factを統合。`"association-rule/topic"
+"governance"`での横断queryでeeiを含む13団体が取得できることを確認。
+
+現状: 国軸14件・業界団体軸16件(11業種)・自治体軸5件——35tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
