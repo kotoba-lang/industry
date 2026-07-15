@@ -1763,7 +1763,14 @@
       ;; recompute discipline, not an assumed +1, is the source of
       ;; truth here -- at least one other sibling promotion landed
       ;; concurrently before this catch-up edit): 272 -> 273.
-      (is (= 273 (:implemented m))))))
+      ;; 273 -> 274: ISIC-862 promoted to :implemented (commit
+      ;; f236224). Live-recomputed via `(industry/maturity-summary)`
+      ;; on a freshly re-fetched origin/main immediately before this
+      ;; catch-up edit; this repo's own "2750" entry (see
+      ;; `cloud-itonami-isic-2750` testing block above) was
+      ;; independently re-verified :implemented in this same fresh
+      ;; clone, unaffected by this count-only drift.
+      (is (= 274 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
