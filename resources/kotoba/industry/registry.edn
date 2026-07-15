@@ -5624,11 +5624,28 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3220"
    :name "Manufacture of musical instruments"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C3220"
-   :business-id "cloud-itonami-C3220"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3220"
+   :business-id "cloud-itonami-isic-3220"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607999500): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C3220 placeholder).
+   ;; InstrumentAdvisor, an advisor sealed behind an independent
+   ;; Musical Instrument Workshop Plant Operations Governor,
+   ;; langgraph-clj StateGraph, append-only audit ledger. Mirrors
+   ;; cloud-itonami-isic-3211's own [Manufacture of jewellery and
+   ;; related articles] verified module shape, adapted to a
+   ;; woodworking/metalworking/assembly/tonal-test musical-instrument
+   ;; workshop -- instrument-family/pitch-accuracy-cents/wood-
+   ;; moisture-content-percent/defect-rate-percent production-batch
+   ;; fields in place of metal-type/purity-permille/weight-grams/
+   ;; defect-rate-percent; no domain-specific certification-authority
+   ;; block (no analog to jewellery's hallmark/purity-assay
+   ;; authority). 81 tests / 219 assertions green, independently
+   ;; re-verified against a fresh clone.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3230"
