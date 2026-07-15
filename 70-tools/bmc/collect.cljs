@@ -44,7 +44,9 @@
                      :workers #{"net-kotobase" "kotobase-cf-wasm-staging"}
                      :health "https://kotobase.net/health" :stripe true}
    :cloud-itonami   {:zone "4ea304cb1d465cb9ba7ea89d8a0d6750" :zone-name "itonami.cloud"
-                     :health "https://itonami.cloud/health.json"}
+                     ;; Live freePath snapshot (KV tenants/agentRuns); static
+                     ;; /health.json remains for version/route map only.
+                     :health "https://itonami.cloud/api/health"}
    :etzhayyim       {:zone "54dece4ac787807d4c3410243916a1e6" :zone-name "etzhayyim.com"
                      :workers #{"etzhayyim-did-web" "etzhayyim-xrpc-proxy"}
                      :health "https://etzhayyim.com/"}
