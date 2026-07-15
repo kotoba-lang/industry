@@ -1051,7 +1051,24 @@
       ;; `(industry/maturity-summary)` on a freshly re-fetched
       ;; origin/main immediately before this edit -- not an assumed
       ;; fixed number.
-      (is (= 216 (:implemented m))))))
+      ;; 216 -> 217: cloud-itonami-isic-0116 (Growing of fibre crops) fresh
+      ;; from-scratch scaffold (no prior repo existed; `gh api` 404
+      ;; confirmed before work began). FibreOpsAdvisor <-> Field
+      ;; Operations Governor field-operations-coordination actor
+      ;; mirroring cloud-itonami-isic-0111's [Growing of cereals] module
+      ;; shape (fibreops.* in place of cerealops.*), with a new
+      ;; domain-specific quality-grade-invalid HARD check (closed
+      ;; fibre-quality-grade vocabulary, adapted from 0114/caneops's
+      ;; ratoon-cycle-invalid? pattern) in place of a perennial-cycle
+      ;; check; 35 tests / 120 assertions green, independently
+      ;; re-verified against a fresh clone; promoted :spec ->
+      ;; :implemented, superproject ADR-2607160300
+      ;; (cloud-itonami-isic-0116-fibre-crops-growing-coverage.md).
+      ;; Live-recomputed via `(industry/maturity-summary)` immediately
+      ;; before this edit on a freshly re-fetched origin/main
+      ;; (concurrent-agent count-drift caution -- not an assumed fixed
+      ;; number): 216 -> 217.
+      (is (= 217 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

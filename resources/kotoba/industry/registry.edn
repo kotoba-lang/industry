@@ -2481,13 +2481,25 @@
    :operating-states [:intake :survey :advise :treat :record :audit]},
   {:id "0116"
    :name "Growing of fibre crops"
-   :repo "https://github.com/gftdcojp/cloud-itonami-A0116"
-   :business-id "cloud-itonami-A0116"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0116"
+   :business-id "cloud-itonami-isic-0116"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :survey :advise :treat :record :audit]},
+   :maturity :implemented
+   ;; Wave-3 fibre-crop-growing-operations actor implementation complete
+   ;; (2026-07-15, ADR-2607160300): FibreOpsAdvisor ⊣ FieldOperationsGovernor
+   ;; pattern mirroring cloud-itonami-isic-0111 (cereal-growing)
+   ;; module-for-module, closed op allowlist (log-field-record/
+   ;; schedule-field-operation/flag-crop-health-concern/order-supplies),
+   ;; direct field-equipment operation and finalizing a pesticide-
+   ;; application decision permanently blocked. Scope: fibre-crop-farm
+   ;; back-office coordination only (no direct equipment operation or
+   ;; agronomic decision authority). Propose-only operations, crop-health
+   ;; concerns (e.g. boll weevil) always escalate. New domain-specific
+   ;; quality-grade-invalid check (closed fibre-quality-grade vocabulary,
+   ;; adapted from 0114/caneops's ratoon-cycle-invalid? pattern) on top of
+   ;; the 0111 sibling shape. 35 tests / 120 assertions green.
+   :operating-states [:intake :advise :govern :decide :commit :hold]},
   {:id "0119"
    :name "Growing of other non-perennial crops"
    :repo "https://github.com/gftdcojp/cloud-itonami-A0119"
