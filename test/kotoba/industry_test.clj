@@ -1137,7 +1137,21 @@
       ;; before this edit on a freshly re-fetched origin/main
       ;; (concurrent-agent count-drift caution -- not an assumed fixed
       ;; number): 220 -> 221.
-      (is (= 221 (:implemented m))))))
+      ;; 221 -> 222: cloud-itonami-isic-1520 (Manufacture of footwear)
+      ;; promoted :spec -> :implemented, superproject ADR-2607162200
+      ;; (cloud-itonami-isic-1520-footwear-manufacturing-coverage.md).
+      ;; FootwearAdvisor ⊣ Footwear Plant Operations Governor,
+      ;; fresh from-scratch scaffold (no prior repo existed; the old
+      ;; :repo/:business-id pointed at a never-created
+      ;; gftdcojp/cloud-itonami-C1520 placeholder), mirroring
+      ;; cloud-itonami-isic-1610's [Sawmilling and planing of wood]
+      ;; verified module shape. 71 tests / 194 assertions green,
+      ;; independently re-verified against a fresh clone.
+      ;; Live-recomputed via `(industry/maturity-summary)` immediately
+      ;; before this edit on a freshly re-fetched origin/main
+      ;; (concurrent-agent count-drift caution -- not an assumed fixed
+      ;; number): 221 -> 222.
+      (is (= 222 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

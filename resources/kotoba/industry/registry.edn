@@ -3388,11 +3388,29 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1520"
    :name "Manufacture of footwear"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C1520"
-   :business-id "cloud-itonami-C1520"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1520"
+   :business-id "cloud-itonami-isic-1520"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607162200): fresh from-scratch scaffold (no prior repo
+   ;; existed at cloud-itonami/cloud-itonami-isic-1520; the old
+   ;; :repo/:business-id above pointed at a never-created
+   ;; gftdcojp/cloud-itonami-C1520 placeholder, confirmed 404 before
+   ;; this edit). FootwearAdvisor ⊣ Footwear Plant Operations Governor,
+   ;; langgraph-clj StateGraph, append-only audit ledger, mirroring
+   ;; cloud-itonami-isic-1610's [Sawmilling and planing of wood]
+   ;; verified module shape (footwearops.* in place of sawmilling.*),
+   ;; covering cutting/lasting/assembly-line plant operations
+   ;; coordination (production-batch quality-grade/defect-rate logging,
+   ;; cutting/sewing/molding-equipment maintenance scheduling,
+   ;; materials-defect/labor-safety/labeling-compliance concern
+   ;; flagging, outbound shipment coordination); line-operate-blocked
+   ;; is the footwear-domain analog of 1610's kiln-finalize-blocked
+   ;; permanent equipment-actuation check.
+   ;; clojure -M:test: 71 tests / 194 assertions / 0 failures / 0 errors
+   ;; (verified from an independent fresh clone).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1610"
