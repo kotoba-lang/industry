@@ -1050,6 +1050,27 @@ compliance-fact連邦化システムが52リポジトリの節目に到達。**
 現状: 国軸16件・業界団体軸18件(13業種)・自治体軸6件——40tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 41 — 自治体軸7件目(アムステルダム))
+
+`cloud-itonami-municipality-nld-amsterdam`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-nld-amsterdam/commit/4792212))：
+実在2件、両方ともlokaleregelgeving.overheid.nl(オランダ地方法令の
+公式全国ポータル、CVDR番号でインデックス)を直接WebFetchで確認:
+Algemene Plaatselijke Verordening 2008(一般地方条例、CVDR72510、
+最初のバージョン=version 1で確認・2008-11-01施行)／Huisvestings-
+verordening Amsterdam 2020(住宅条例、CVDR635633、2020年版で確認・
+2020-01-01施行)——いずれも「現行版」という曖昧な主張ではなく特定の
+日付付きバージョンを引用している点を明記。4 tests/10 assertions
+green。
+
+54リポジトリ・664 factを統合。`:short-term-rental`トピックでの
+自治体横断queryでparis(民泊規則)とamsterdam(住宅条例)を横断取得
+できることを確認——実世界でも類似の政策課題(観光用短期賃貸規制)を
+異なる自治体が扱っている実例が federation query で表現できている。
+
+現状: 国軸16件・業界団体軸18件(13業種)・自治体軸7件——41tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
