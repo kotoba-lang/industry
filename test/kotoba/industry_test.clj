@@ -2140,7 +2140,7 @@
       ;; live-recomputed baseline (via `(industry/maturity-summary)` on
       ;; a freshly re-fetched origin/main tip), not individually
       ;; re-narrated here (not this actor's own promotions).
-      (is (= 337 (:implemented m))))))
+      (is (= 339 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
