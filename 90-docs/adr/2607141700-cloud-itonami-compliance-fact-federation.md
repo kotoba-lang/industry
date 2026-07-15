@@ -902,6 +902,28 @@ DEU/FRA/CAN/AUS/KOR/NLD/ITA/ESP/SWE/NOR/DNK)全てを横断取得できる
 現状: 国軸14件・業界団体軸15件(10業種)・自治体軸4件——33tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 34 — 自治体軸5件目(ベルリン))
+
+`cloud-itonami-municipality-deu-berlin`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-deu-berlin/commit/8a628df))：
+gesetze.berlin.de(ベルリン州公式法令DB)は個別文書ページがJS-onlyで
+WebFetchにシェルしか返さず、legacy jportalミラーはログイン壁——捏造せず、
+ベルリン州データ保護・情報自由コミッショナー自身の文書再配布サイト
+(datenschutz-berlin.de)を経由してPDF本文をReadツールで直接確認した。
+実在2件: Berliner Informationsfreiheitsgesetz(IFG、GVBl. 1999, 561、
+1999-10-15制定)——構造化されたPDF表紙1ページ目で日付・官報引用を
+直接確認／Berliner Datenschutzgesetz(BlnDSG)——PDF前文(Vorwort)で
+1978年7月の原始施行を直接確認、GDPR対応後の現行版(2018-06-13、
+GVBl. S. 418)はWebSearchでの裏付けに留まる(直接一次ページでの
+再検証はできず、その旨を明記)。4 tests/10 assertions green
+(2件のみのため他自治体より1 assertion少ない)。
+
+38リポジトリ・648 factを統合。`:data-protection`トピックでの自治体
+横断queryでtokyoとberlinの2自治体を取得できることを確認。
+
+現状: 国軸14件・業界団体軸15件(10業種)・自治体軸5件——34tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
