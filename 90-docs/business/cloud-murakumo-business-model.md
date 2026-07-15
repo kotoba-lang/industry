@@ -16,9 +16,9 @@
 - 観測 (2026-07-06): wrangler secret list が空 — STRIPE_SECRET_KEY 未設定のため #store/* checkout は現状 503 fail-closed(実収益ゼロの直接原因、docs/stripe-go-live-checklist.md)
 - 観測 (2026-07-06 QA): 公開ブログ2本のpublic/blog/*.htmlが作業ツリー上で生markdownに上書きされ本番で配信される事故が2回発生(原因不明、build scriptでの同期処理は存在せず)。加えてUS記事のCTAがcurl murakumo.cloud/join|sh(404、未実装のPhase2/3導線)を誤って案内していた。両方とも検知・修正・再デプロイ済み
 - 根本原因判明 (2026-07-09): gftd.ai 5xx 85%の98%は fleet の MeshHeartbeat/PollTask。Worker の MCP router が mcp.gftd.ai へ転送するが DNS 専用レコード無く wildcard *.gftd.ai=192.0.2.1(黒穴)に落ち 19s 待ち 522。mcp 用 tunnel は存在せず murakumo-fleet tunnel も down — mesh 制御面の origin が消失
-- 観測 (signal): murakumo.cloud 実測 69241 req/7d・401 uniques(日次和)・うち4xx probe 1%(24h)、workers 79802 inv/7d
 - 観測 (signal): murakumo.cloud 実測 60930 req/7d・418 uniques(日次和)・うち4xx probe 18%(24h)、workers 113313 inv/7d
 - 観測 (signal): murakumo.cloud 実測 64538 req/7d・448 uniques(日次和)・うち4xx probe 18%(24h)、workers 118722 inv/7d、Stripe active subs 0
+- 観測 (signal): murakumo.cloud 実測 70809 req/7d・513 uniques(日次和)・うち4xx probe 11%(24h)、workers 126259 inv/7d、Stripe active subs 0
 
 ## Customer Segments
 
@@ -52,11 +52,11 @@
 - US: Bonus Depreciation/Section 179 訴求コンテンツ(ブログ+HN/X、Q4 tax-season起点、90-docs/business/cloud-murakumo-gtm-country-plan.md)
 - EU: AI Act/GDPR監査台帳を差別化にしたコンプライアンス重視企業への直接outreach(独1年償却を補助訴求)
 - CN: Stripe決済(USD建てAlipay/WeChat Pay)の限界と規制ギャップを理由に、能動広告出稿は保留(watchのみ)
-- 観測 (paths): 上位 page (24h, 2xx/3xx): /infer/hwmetrics 7860 · /infer/runs 1380 · / 58 · /robots.txt 18 · /cdn-cgi/rum 5 | 4xx(probe) 1%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /infer/hwmetrics 7859 · /infer/cost 104 · / 63 · /robots.txt 15 · /v1/chat/completions 10 | 4xx(probe) 18% · 5xx 1%
 - GTM (awareness→activation): murakumo.cloud 訪問→実推論 run (記録済) 転換 1% < 目標 2% — onboarding の摩擦削減（signup→checkout 最短化）・価格/tier の明確化・空状態の初期価値提示
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /infer/hwmetrics 7855 · /infer/cost 1572 · / 79 · /api/v1 26 · /v1/chat/completions 26 | 4xx(probe) 18% · 5xx 1%
 - GTM (activation→revenue): 実推論 run (記録済)→paid (credits 購入) 転換 0% < 目標 1% — trial→paid の nudge（使用量到達通知）・価格 tier 見直し・年額/上位 tier の提示
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /infer/hwmetrics 7856 · /infer/cost 4485 · / 157 · /api/v1/generation 79 · /api/v1 35 | 4xx(probe) 11% · 5xx 1%
 
 > 実行済み (2026-07-06 tick4): US HN/X投稿コピー下書き + GTM launch runbook作成(Stripe未設定の間はGate 0で投稿ブロック、docs/gtm-launch-runbook.md)
 
@@ -88,6 +88,7 @@
 - funnel (cloud-murakumo): murakumo.cloud 訪問=418 → 実推論 run (記録済)=4 → paid (Stripe sub)=? | 転換 murakumo.cloud 訪問→実推論 run (記録済) 1%
 - funnel (cloud-murakumo): murakumo.cloud 訪問=419 → 実推論 run (記録済)=4 → paid (credits 購入)=0 | 転換 murakumo.cloud 訪問→実推論 run (記録済) 1% / 実推論 run (記録済)→paid (credits 購入) 0%
 - funnel (cloud-murakumo): murakumo.cloud 訪問=448 → 実推論 run (記録済)=16 → paid (credits 購入)=0 | 転換 murakumo.cloud 訪問→実推論 run (記録済) 4% / 実推論 run (記録済)→paid (credits 購入) 0%
+- funnel (cloud-murakumo): murakumo.cloud 訪問=513 → 実推論 run (記録済)=25 → paid (credits 購入)=0 | 転換 murakumo.cloud 訪問→実推論 run (記録済) 5% / 実推論 run (記録済)→paid (credits 購入) 0%
 
 ## Unfair Advantage
 

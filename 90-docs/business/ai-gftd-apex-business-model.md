@@ -13,9 +13,9 @@
 - 主要 AI チャットは個人 identity を主キーにし prompt を telemetry 扱い
 - 規制業種・匿名必須層に選択肢がない
 - agent 購読は provider lock-in
-- 観測 (signal): gftd.ai 実測 247557 req/7d・5153 uniques(日次和)・うち4xx probe 12%(24h)、workers 7062 inv/7d
 - 観測 (signal): gftd.ai 実測 342196 req/7d・4764 uniques(日次和)・うち4xx probe 11%(24h)、workers 6163 inv/7d、Stripe active subs 0
 - 観測 (signal): gftd.ai 実測 347271 req/7d・4845 uniques(日次和)・うち4xx probe 11%(24h)、workers 6177 inv/7d、Stripe active subs 0
+- 観測 (signal): gftd.ai 実測 367711 req/7d・4964 uniques(日次和)・うち4xx probe 9%(24h)、workers 6294 inv/7d、Stripe active subs 0
 
 ## Customer Segments
 
@@ -48,9 +48,9 @@
 - OSS kotoba 開発者
 - aozora/yoro 導線
 - GTM 危機: 実測 / 1025訪問 → /signup 36 の real human funnel が存在するが 5xx 70% — backend 障害が転換を破壊中。marketing 以前に infra 修復が最優先の律速 (5xx を落とせば既存トラフィックで signup が動く)
-- 観測 (paths): 上位 page (24h, 2xx/3xx): / 778 · /favicon.ico 134 · /blog/[year]/[month]/[slug] 42 · /appsettings.Test.json 33 · /s3.secret 33 | 4xx(probe) 12% · 5xx 78%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /file52.php 31 · /ccc.php 26 · //wp-includes/block-bindings/ 17 · /wp-content/themes/index.php 16 · /ms-edit.php 16 | 4xx(probe) 11% · 5xx 86%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /file52.php 30 · /ccc.php 21 · //wp-includes/block-bindings/ 16 · /v1/generation/jobs/0a537b4151a44467ad6d… 16 · /ms-edit.php 15 | 4xx(probe) 11% · 5xx 86%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /ccc.php 33 · /file52.php 24 · /v1/generation/jobs/3eb9f2e0a7c04da6a055… 17 · //wp-includes/block-bindings/ 16 · /v1/generation/jobs/0a537b4151a44467ad6d… 16 | 4xx(probe) 9% · 5xx 88%
 
 ## Revenue Streams
 
