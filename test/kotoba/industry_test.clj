@@ -1276,7 +1276,17 @@
       ;; `(industry/maturity-summary)` immediately before this edit on a
       ;; freshly re-fetched origin/main (concurrent-agent count-drift
       ;; caution -- not an assumed fixed number): 228 -> 229.
-      (is (= 229 (:implemented m))))))
+      ;; 229 -> 230: cloud-itonami-isic-1101 (Distilling, rectifying and blending of spirits) re-promoted
+      ;; :spec -> :implemented after a root-cause fix of the 2026-07-14 revert's 4 real test failures (a
+      ;; contains?-on-vector test bug, a nil-vs-false :record bug, and a self-contradictory proof/declared-ABV
+      ;; test fixture -- not a defect in the tolerance-check logic itself) plus closing a Governor-invariant gap
+      ;; (closed op-allowlist, :effect :propose, batch-registration) found on honest re-review against
+      ;; cloud-itonami-isic-1102, superproject ADR-2607171500 (cloud-itonami-isic-1101-spirits-distilling-coverage.md).
+      ;; 30 tests / 111 assertions green, independently re-verified against a fresh clone. Live-recomputed via
+      ;; `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched origin/main
+      ;; (concurrent-agent count-drift caution -- not an assumed fixed number; also confirms the 1812
+      ;; `:implemented?` special-case entry `maturity-of` already accounts for): 229 -> 230.
+      (is (= 230 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

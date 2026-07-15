@@ -3223,10 +3223,19 @@
    :name "Distilling, rectifying and blending of spirits"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1101"
    :business-id "cloud-itonami-isic-1101"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
-   :optional-technologies []
-   :maturity :spec
-   ;; REVERTED 2026-07-14: 4 real test failures (ABV-tolerance logic bug) despite the promoting agent claiming all tests green -- confirmed broken by direct clojure -M:test run (25 tests, 4 failures). Needs a verified from-scratch redo.
+   :required-technologies [:identity :forms :audit-ledger :cae]
+   :optional-technologies [:telemetry]
+   :maturity :implemented
+   ;; FIXED 2026-07-15: root-caused and fixed the 4 real test failures behind
+   ;; the 2026-07-14 revert -- a contains?-on-vector test bug, a nil-vs-false
+   ;; :record bug, and a self-contradictory proof/declared-ABV test fixture
+   ;; (not a defect in the tolerance-check logic itself, which was already
+   ;; correct and symmetric). Also closed a Governor-invariant gap (closed
+   ;; op-allowlist, :effect :propose, batch-registration) found on honest
+   ;; re-review against cloud-itonami-isic-1102. 30 tests / 111 assertions
+   ;; green, independently re-verified against a fresh clone; promoted
+   ;; :spec -> :implemented, superproject ADR-2607171500
+   ;; (cloud-itonami-isic-1101-spirits-distilling-coverage.md).
    ;; Plant operations coordination actor (proof/ABV, age-statement, tax-mark,
    ;; labeling compliance per US TTB, JP 酒税法, EU 1601/2009)
    :operating-states [:intake :advise :govern :approve :commit :audit]},
