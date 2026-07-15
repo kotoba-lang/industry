@@ -2362,12 +2362,20 @@
    :operating-states [:intake :advise :govern :decide :commit :hold :escalate :audit]},
   {:id "920"
    :name "Gambling and betting activities"
-   :repo nil :business-id nil
-  :maturity :spec
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-920"
+   :business-id "cloud-itonami-isic-920"
+   :maturity :implemented
+   ;; Gambling facility back-office admin & responsible-gambling referral actor
+   ;; (FacilityAdminAdvisor ⊣ WageringHarmMinimizationGovernor), Wave 4
+   ;; Final build completing ISIC 90/92/93 arts/entertainment/recreation cluster
+   ;; (after 900, 931, 932, all landed). Maximally conservative scope for real-money
+   ;; wagering domain: three HARD governor checks (facility verification, effect
+   ;; validation, scope exclusion EN+JA). Forbidden territory: wager/odds/payout/
+   ;; currency/verification/clinical/license decisions (rejected unconditionally).
+   ;; See ADR-2607154300, ADR-2607121000, cloud-itonami-isic-932 pattern reference.
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
-   :operating-states [:intake :catalog :present :exhibit :audit]},
+   :operating-states [:intake :advise :govern :decide :commit :hold :escalate :audit]},
 {:id "931"
  :name "Sports activities"
  :repo "https://github.com/cloud-itonami/cloud-itonami-isic-931"
