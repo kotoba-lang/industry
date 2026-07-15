@@ -5150,11 +5150,29 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3230"
    :name "Manufacture of sports goods"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C3230"
-   :business-id "cloud-itonami-C3230"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3230"
+   :business-id "cloud-itonami-isic-3230"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; ADR-2607201000 (com-junkawasaki/root): SportsGoodsAdvisor ⊣
+   ;; Sports Goods Plant Operations Governor, langgraph-clj
+   ;; StateGraph, append-only audit ledger. Sports-goods plant
+   ;; operations coordination (production-batch product-type/
+   ;; impact-rating/weight/defect-rate logging, molding/assembly/
+   ;; finishing-equipment maintenance scheduling, safety-concern
+   ;; flagging, shipment coordination) -- not molding/assembly-line
+   ;; control authority, not a product-safety/impact-protection-
+   ;; certification authority. Four ops, all :effect :propose only.
+   ;; Thirteen governor checks elaborate four HARD invariants:
+   ;; independent equipment/batch verification/registration,
+   ;; propose-only effect, closed op + proposal-effect allowlists (no
+   ;; direct molding/assembly-line-equipment control), and permanent
+   ;; equipment-actuate + product-safety-certification-authority
+   ;; blocks. Safety-concern flagging (materials-safety/product-
+   ;; safety-standard concern) ALWAYS escalates (never auto-committed).
+   ;; 82 tests / 222 assertions green, independently re-verified
+   ;; against a fresh clone.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3240"
