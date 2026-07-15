@@ -1805,7 +1805,17 @@
       ;; `(industry/maturity-summary)` on a freshly re-fetched
       ;; origin/main tip immediately before this test-file catch-up
       ;; edit, not assumed.
-      (is (= 278 (:implemented m))))))
+      (testing "cloud-itonami-isic-4329 (Other construction installation, fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-F4329 placeholder or the real cloud-itonami org [gh api 404 confirmed]; identity ({:id \"4329\" :name \"Other construction installation\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; InstallationAdvisor ⊣ Installation Governor other-construction-installation-project OPERATIONS COORDINATION actor, mirroring cloud-itonami-isic-4330's [Building completion and finishing] verified module shape module-for-module -- thermal/acoustic-insulation, sound-proofing, elevator/escalator-installation and other specialty-installation site-record/schedule/safety-concern/supply-order vocabulary in place of plastering/painting/glazing/tiling/finish-carpentry vocabulary; trade-equipment-control and installation-completion-sign-off finalization are both permanent, unconditional HARD blocks with no human-approval override path; deliberately DIFFERS from 4311/4210 in that schedule-installation-operation is NOT a permanent high-stakes member (MAY auto-commit at phase 3 when clean+confident, reflecting trade-installation work's materially lower risk than demolition/heavy-civil earthwork scheduling), matching 4330's own deliberate difference; fully portable .cljc with NO JVM interop anywhere in src/ (notify uses a caller-injected function transport seam, not an embedded java.net.http client); per-jurisdiction JPN/USA/DEU legal-basis citations independently verified against osha.gov/laws.e-gov.go.jp/eur-lex.europa.eu/baua.de before being written -- the USA hazmat-survey basis deliberately cites the OSHA asbestos construction standard (29 CFR 1926.1101) rather than 4330's EPA lead-paint surface-coating rule, the domain-appropriate legal basis for legacy asbestos-containing insulation disturbed during installation/retrofit work; 69 tests / 248 assertions green, independently re-verified against a fresh clone; superproject ADR-2607220000) is also :implemented"
+        (is (= :implemented (industry/maturity "4329"))))
+      ;; Live-recomputed via `(industry/maturity-summary)` on a freshly
+      ;; re-fetched origin/main tip immediately before this catch-up edit
+      ;; (registry.edn's own "4329" -> :implemented change already landed
+      ;; via a Contents-API single-file PUT, commit
+      ;; a9c6ad47eba7deb70f80fdd964712a105cad630d; this fleet's own
+      ;; recompute discipline, not an assumed +1, is the source of truth
+      ;; -- other sibling promotions may have landed concurrently before
+      ;; this catch-up edit): 278 -> 283.
+      (is (= 283 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
