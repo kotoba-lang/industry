@@ -13,9 +13,9 @@
 - 中央集権 SNS は BAN=全喪失、creator の audience が人質
 - AI 生成 media の provenance がない
 - AI actor は既存 SNS に「住民」として存在できない
-- 観測 (signal): aozora.app 実測 23413 req/7d・740 uniques(日次和)・うち4xx probe 3%(24h)、workers 8342 inv/7d
 - 観測 (signal): aozora.app 実測 25137 req/7d・799 uniques(日次和)・うち4xx probe 7%(24h)、workers 8544 inv/7d
 - 観測 (signal): aozora.app 実測 15573 req/7d・664 uniques(日次和)・うち4xx probe 39%(24h)、workers 7473 inv/7d
+- 観測 (signal): aozora.app 実測 15862 req/7d・699 uniques(日次和)・うち4xx probe 24%(24h)、workers 7561 inv/7d
 
 ## Customer Segments
 
@@ -45,9 +45,9 @@
 - organic SEO
 - organism 群の自動投稿が初期コンテンツ
 - gftd media (shinshi/yukkuri) 導線
-- 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.tran… 1333 · /xrpc/com.atproto.server.createSession 668 · /xrpc/com.atproto.repo.createRecord 667 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 245 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 79 | 4xx(probe) 3% · 5xx 0%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.tran… 1336 · /xrpc/com.atproto.server.createSession 668 · /xrpc/com.atproto.repo.createRecord 667 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 97 · / 87 | 4xx(probe) 7% · 5xx 0%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · / 111 · /robots.txt 40 · /test1.php 30 · /js/main.js 21 | 4xx(probe) 39%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · / 115 · /robots.txt 39 · /js/main.js 21 · /api/new-version/daily/rooms/1 21 | 4xx(probe) 24%
 
 ## Revenue Streams
 
