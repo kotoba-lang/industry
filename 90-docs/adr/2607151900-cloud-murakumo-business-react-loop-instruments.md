@@ -278,3 +278,27 @@ checkout 設計はそちらの着地を待って揃えるのが良い。
   organism/human actorType 属性) — appview worker + D1 の product 実装規模
 - app-aozora-yoro: child repo 分離が前提 (計器以前) — repo 構造の owner 判断
 - etzhayyim: RAD attestation 参照フックの live 化 (rad_attestation_ref scaffold)
+
+## Addendum 7 (2026-07-15) — apex Upgrade CTA 着地 + live gftd.ai の source 孤児化 (owner 判断)
+
+**着地**: ai-gftd-apex `5055761` — sidebar (Privacy disclosure 直上) に
+「Upgrade to Pro — $20/mo」CTA。Payment Link + `client_reference_id=<device-
+local opaque UUID>` (ADR-2606301220 準拠、PII ゼロ)。kotoba-ui paved road
+準拠、追加 test green、Pages deploy + bundle 混入確認済み。
+
+**owner 判断が要る発見 (live 反映の前提)**: live の gftd.ai を配信している
+worker `ai-gftd-chat-shell` (SvelteKit/Vite) の source は、本籍の
+ai-gftd-apps-gftdcojp monorepo の main から**既に消えており**、現存する唯一の
+コピーは `orgs/etzhayyim/root/60-apps/ai-gftd-chat-shell/` に vendored された
+孤児 (etzhayyim org の CLAUDE.md は custodial Stripe を禁止しており、そこ経由の
+Stripe 導線追加はガバナンス不整合)。つまり:
+1. live UI への変更は正規の git home を持たない
+2. 後継 (本 repo ai-gftd-apex、kotoba-ui 版・design-score 100.0・murakumo
+   直結 live 推論) は gftd.ai custom domain 未接続
+3. ただし chat-shell worker は /api/xrpc・/api/chat・/lg の proxy も担うため、
+   単純な domain 付替えはそれら依存面の棚卸しが先 (canvas 既知の 5xx 86% =
+   mesh 制御面 black-hole も同根)
+
+選択肢: (a) apex Pages へ domain cutover (proxy 面の移設/廃止判断込み)
+(b) 孤児 source を正規 repo に収容してから live shell に CTA を移植。
+どちらも owner 判断 — CTA 自体は (a) なら即 live、(b) でも流用可能。
