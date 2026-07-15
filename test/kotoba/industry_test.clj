@@ -1176,10 +1176,21 @@
       ;; immediately before this edit on that freshly re-fetched
       ;; origin/main (concurrent-agent count-drift caution -- not an
       ;; assumed fixed number): 222 -> 224.
-            ;; 224 -> 223: cloud-itonami-isic-3100 (Manufacture of furniture) promoted :spec -> :implemented, superproject ADR-2607161800 (cloud-itonami-isic-3100-furniture-manufacturing-coverage.md).
-      ;; FurnitureAdvisor ⊣ Furniture Plant Operations Governor, fresh from-scratch scaffold (no prior repo existed; the old :repo/:business-id pointed at a never-created gftdcojp/cloud-itonami-C3100 placeholder), mirroring cloud-itonami-isic-1610's [Sawmilling and planing of wood] verified module shape. 71 tests / 195 assertions green, independently re-verified against a fresh clone.
-      ;; Live-recomputed via `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched origin/main (concurrent-agent count-drift caution -- not an assumed fixed number): 224 -> 223.
-      (is (= 223 (:implemented m)))))
+      ;; NOTE (fixup, 2026-07-15): a since-superseded commit here briefly
+      ;; asserted 223 (dropping a closing paren, which broke `clojure
+      ;; -M:test` for everyone with a read syntax error, and the 224 ->
+      ;; 223 count itself was also wrong -- likely computed via a raw
+      ;; grep of `:maturity :implemented` occurrences in registry.edn
+      ;; rather than the live `(industry/maturity-summary)` value, which
+      ;; differs from the raw grep count by +1 because of registry
+      ;; entries with no explicit `:maturity` key that
+      ;; `kotoba.industry/maturity-of` resolves via its `:implemented?`/
+      ;; `:repo` fallback (see that fn's docstring). Restored to the
+      ;; correct 224, re-verified live against this exact registry.edn
+      ;; via a fresh `clojure -M:test` run (see this repo's commit
+      ;; history around 2026-07-15 for the isic-3100/isic-2220
+      ;; promotions this count reflects).
+      (is (= 224 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
