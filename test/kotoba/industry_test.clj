@@ -1176,7 +1176,10 @@
       ;; immediately before this edit on that freshly re-fetched
       ;; origin/main (concurrent-agent count-drift caution -- not an
       ;; assumed fixed number): 222 -> 224.
-      (is (= 224 (:implemented m))))))
+            ;; 224 -> 223: cloud-itonami-isic-3100 (Manufacture of furniture) promoted :spec -> :implemented, superproject ADR-2607161800 (cloud-itonami-isic-3100-furniture-manufacturing-coverage.md).
+      ;; FurnitureAdvisor ⊣ Furniture Plant Operations Governor, fresh from-scratch scaffold (no prior repo existed; the old :repo/:business-id pointed at a never-created gftdcojp/cloud-itonami-C3100 placeholder), mirroring cloud-itonami-isic-1610's [Sawmilling and planing of wood] verified module shape. 71 tests / 195 assertions green, independently re-verified against a fresh clone.
+      ;; Live-recomputed via `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched origin/main (concurrent-agent count-drift caution -- not an assumed fixed number): 224 -> 223.
+      (is (= 223 (:implemented m)))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
