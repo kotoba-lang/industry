@@ -1611,6 +1611,39 @@ Q239）は史実上一貫して首都であり、P36歴史的首都バグの対�
 現状: 国軸23件・業界団体軸25件(20業種)・自治体軸16件——64tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 65 — 国軸24件目(ウルグアイ))
+
+`cloud-itonami-iso3166-ury`に`statute.facts`を新規追加・push
+([commit 842d5d8](https://github.com/cloud-itonami/cloud-itonami-iso3166-ury/commit/842d5d8))：
+ウルグアイ東方共和国。まずペルーを試みたが4種類の情報源すべてが
+使用不能だった: `gob.pe`はHTTP 418（意図的なbotブロックコード）、
+`diariooficial.elperuano.pe`はTCP接続拒否、`spijweb.minjus.gob.pe`は
+接続リセット、さらに独立した2つのPDFミラー（essalud.gob.pe /
+docs.peru.justia.com）はいずれもタイトル文字すら判読不能な完全な
+文字化け——このファミリーで最悪のPDF文字化け事例。ペルーを完全に
+断念し、ウルグアイの公式`impo.com.uy`（IMPO、ウルグアイ公式情報
+センター）で3件検証: Ley N.º 16.060（商事会社法、1989-09-04制定）／
+Ley N.º 18.331（データ保護法、2008-08-11制定）／Ley N.º 5.350
+（8時間労働法、1915-11-17制定）——いずれもページが完全にレンダリング
+され日付が明記されていた。
+
+このリポジトリは既存の`marketentry.facts`実装を持たない
+blueprint-onlyの状態だったため、`statute.facts`がこのリポジトリ
+初のコード実体となった（独自の`deps.edn`を新規作成）。4 tests/11
+assertions green。誤って`.cpcache/`をstageしかけたため`.gitignore`
+を追加して除外（過去複数リポで同様の混入があったことに気付いたが、
+遡っての一斉修正は本tickのスコープ外と判断し見送った）。
+
+首都チェック: 既存のooyake由来organization.edn（Montevideo、
+Wikidata Q1335）は史実上一貫して首都であり、P36歴史的首都バグの
+対象外と確認。
+
+94リポジトリ・720 factを統合。`"statute/topic" "labor"`での横断query
+でuryを含む24カ国すべてが取得できることを確認。
+
+現状: 国軸24件・業界団体軸25件(20業種)・自治体軸16件——65tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
