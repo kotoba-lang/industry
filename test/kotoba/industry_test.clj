@@ -1476,7 +1476,27 @@
       ;; ruling out drift from a raw `grep -c` undercount before trusting the delta; test
       ;; runner's own failure diff: `expected: (= 244 (:implemented m)) actual: (not (= 244
       ;; 245))`): 244 -> 245.
-      (is (= 245 (:implemented m))))))
+      ;; 245 -> 246: cloud-itonami-isic-1075 (Manufacture of prepared meals and dishes)
+      ;; promoted :spec -> :implemented (fresh scaffold -- no prior repository at either the
+      ;; stale gftdcojp/cloud-itonami-C1075 placeholder or the real cloud-itonami org [gh api
+      ;; 404 confirmed]), superproject ADR-2607151900
+      ;; (cloud-itonami-isic-1075-prepared-meals-coverage.md). MealOpsAdvisor ⊣ MealOps
+      ;; Governor prepared-meals/ready-dish (cook-chill/cook-freeze) plant-operations-
+      ;; coordination actor mirroring cloud-itonami-isic-1073's [Cocoa, chocolate and sugar
+      ;; confectionery] verified module shape module-for-module (mealops.* in place of
+      ;; chocops.*) -- HACCP critical-control-point reference data (core-cook-temperature
+      ;; CCP1 lethality floor, chill/freeze-down-time CCP2 ceiling, cold-storage/cold-chain
+      ;; window, shelf-life ceiling, water-activity ceiling, pH ceiling for reduced-oxygen-
+      ;; packaged secondary botulinum control) in place of tempering-curve/cadmium/viscosity
+      ;; confectionery data, plus a new packaging-seal-compromised independent check not
+      ;; present in the 1073 reference (vacuum/MAP seal integrity is itself a distinct
+      ;; food-safety hazard axis for cook-chill product); 56 tests / 179 assertions green,
+      ;; independently re-verified against a fresh clone. Live-recomputed via
+      ;; `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched
+      ;; origin/main (confirmed HEAD's own pinned 245 assertion was still green pre-edit,
+      ;; ruling out drift before trusting the delta; test runner's own failure diff:
+      ;; `expected: (= 245 (:implemented m)) actual: (not (= 245 246))`): 245 -> 246.
+      (is (= 246 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
