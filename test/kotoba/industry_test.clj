@@ -1218,7 +1218,25 @@
       ;; before this edit on a freshly re-fetched origin/main
       ;; (concurrent-agent count-drift caution -- not an assumed fixed
       ;; number): 224 -> 225.
-      (is (= 225 (:implemented m))))))
+      ;; 225 -> 226: cloud-itonami-isic-0142 (Raising of horses and other
+      ;; equines) promoted :spec -> :implemented, superproject
+      ;; ADR-2607171200
+      ;; (cloud-itonami-isic-0142-equine-raising-coverage.md).
+      ;; EquineOpsAdvisor ⊣ Equine Facility Operations Governor, fresh
+      ;; from-scratch scaffold (no prior repo existed; the old
+      ;; :repo/:business-id pointed at a never-created
+      ;; gftdcojp/cloud-itonami-A0142 placeholder), mirroring
+      ;; cloud-itonami-isic-0141's [Raising of cattle and buffaloes]
+      ;; verified module shape (equineops.* in place of cattleops.*,
+      ;; direct treatment administration and breeding/culling decisions
+      ;; permanently blocked in place of treatment/slaughter). 31 tests /
+      ;; 96 assertions green, independently re-verified against a fresh
+      ;; clone. Live-recomputed via `(industry/maturity-summary)`
+      ;; immediately before this edit on a freshly re-fetched origin/main
+      ;; (concurrent-agent count-drift caution -- not an assumed fixed
+      ;; number, confirmed via the test runner's own failure diff: 225 ->
+      ;; 226).
+      (is (= 226 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
