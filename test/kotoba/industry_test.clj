@@ -1519,7 +1519,30 @@
       ;; green pre-edit, ruling out drift from a raw `grep -c` undercount before trusting the
       ;; delta; test runner's own failure diff: `expected: (= 246 (:implemented m)) actual:
       ;; (not (= 246 247))`): 246 -> 247.
-      (is (= 247 (:implemented m))))))
+      ;; 247 -> 248: cloud-itonami-isic-1623 (Manufacture of wooden containers) promoted
+      ;; :spec -> :implemented (fresh scaffold -- no prior repository at either the stale
+      ;; gftdcojp/cloud-itonami-C1623 placeholder or the real cloud-itonami org [gh api 404
+      ;; confirmed]), superproject ADR-2607190000
+      ;; (cloud-itonami-isic-1623-wooden-containers-coverage.md). WoodenContainerAdvisor ⊣
+      ;; Wooden Container Shop Plant Operations Governor plant-operations-coordination actor
+      ;; mirroring cloud-itonami-isic-1621's [Manufacture of veneer sheets and wood-based
+      ;; panels] and cloud-itonami-isic-1622's [Manufacture of builders' carpentry and
+      ;; joinery] verified module shape module-for-module (woodcontainer.* in place of
+      ;; veneerpanel.*/millwork.*) -- crate/pallet-nailing-machine and stave-jointer
+      ;; (cooperage) equipment in place of veneer-lathe/hot-press/glue-spreader or
+      ;; panel-saw/CNC-router/tenoning-machine equipment, crate/pallet/barrel
+      ;; dimensional-spec values in place of door/window/staircase/glulam, and a
+      ;; cutting/assembly-line-finalize permanent block in place of press-cycle-finalize/
+      ;; cutting-line-finalize; flag-safety-concern covers materials-safety/equipment-safety/
+      ;; ISPM-15 heat-treatment-compliance (a domain-specific addition for
+      ;; internationally-shipped wood packaging) and always escalates regardless of
+      ;; confidence, matching every prior sibling actor's own safety-concern-escalation
+      ;; invariant; 71 tests / 195 assertions green, independently re-verified against a
+      ;; fresh clone. Live-recomputed via `(industry/maturity-summary)` on a freshly
+      ;; re-fetched origin/main immediately before this single-file edit (registry.edn's
+      ;; own promotion landed separately via a Contents-API single-file PUT, commit
+      ;; 7e673e0069351c2903da224ed82b5b65e9761fe3, ahead of this test-file edit): 247 -> 248.
+      (is (= 248 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
