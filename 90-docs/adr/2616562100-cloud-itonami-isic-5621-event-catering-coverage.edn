@@ -1,0 +1,56 @@
+[{:adr/id 2616562100
+  :adr/title "cloud-itonami-isic-5621 — Event Catering Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-5621]
+  :adr/references [2607152500 2607121000]
+
+  ;; Wave 4 actor (human-facing/personal services): event catering
+  ;; operations coordination-only (catering order/event record logging,
+  ;; event scheduling, supply-order coordination, food-safety-concern
+  ;; flagging).
+
+  :actor/id :cloud-itonami-isic-5621
+  :actor/name "Event Catering Operations Coordinator"
+  :actor/isic-rev4 "5621"
+  :actor/domain :services/event-catering
+  :actor/wave 4
+  :actor/coordination? true
+  :actor/robotics? false
+
+  :actor/proposal-ops [:log-catering-order-record :schedule-catering-event
+                       :coordinate-supply-order :flag-food-safety-concern]
+  :actor/always-escalate-ops [:flag-food-safety-concern]
+  :actor/cost-threshold-ops {:coordinate-supply-order 5000}
+
+  :actor/hard-checks [:order-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["allergen exclusion override" "override the allergen exclusion"
+                                "certify the kitchen as safe" "kitchen safety certification"
+                                "food safety clearance" "health department clearance"
+                                "regulatory clearance" "recall order" "product recall decision"
+                                "license suspension" "permit revocation" "compliance enforcement"]
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-catering-order-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-catering-order-record :schedule-catering-event
+                                               :coordinate-supply-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-catering-order-record :schedule-catering-event
+                                         :coordinate-supply-order :flag-food-safety-concern}
+      :auto #{:log-catering-order-record :schedule-catering-event :coordinate-supply-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 47 :assertions 134 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration :store-contract]
+  :test/simulator :cateringops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-5621"
+  :registry/business-id "cloud-itonami-isic-5621"
+  :registry/required-technologies-note "left unchanged in registry.edn (out of this promotion's minimal-diff scope)"
+  :registry/operating-states-note "left unchanged in registry.edn (out of this promotion's minimal-diff scope)"
+
+  :db/id -1}]
