@@ -3748,11 +3748,30 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2220"
    :name "Manufacture of plastics products"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2220"
-   :business-id "cloud-itonami-C2220"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2220"
+   :business-id "cloud-itonami-isic-2220"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae :cfd]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607162200): fresh from-scratch scaffold (no prior repo or
+   ;; reverted attempt existed at cloud-itonami/cloud-itonami-isic-2220;
+   ;; the old :repo/:business-id above pointed at a never-created
+   ;; gftdcojp/cloud-itonami-C2220 placeholder). PlasticsAdvisor /
+   ;; Plastics Plant Operations Governor, langgraph-clj StateGraph,
+   ;; append-only audit ledger.
+   ;; clojure -M:test: 71 tests / 198 assertions / 0 failures / 0 errors
+   ;; (verified from an independent fresh clone at merge commit
+   ;; e43c3481ced5aae98b96360f73a2b4ac538a91d1). Safety-critical domain
+   ;; (injection-molding/extrusion/blow-molding thermal-and-pressure
+   ;; hazard, resin fume/VOC hazard). Back-office plant-operations
+   ;; coordination only: all equipment actuation remains exclusive to
+   ;; the human plant supervisor. Four HARD invariants guard scope:
+   ;; equipment/batch independent verification+registration + independent
+   ;; shipment-weight recompute, closed op allowlist, propose-only
+   ;; effect, permanent block on direct molding/extrusion-line-equipment
+   ;; control (including a dedicated permanent block on any proposal
+   ;; that would actuate the line directly).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2310"
