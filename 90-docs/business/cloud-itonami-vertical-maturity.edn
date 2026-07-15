@@ -131,11 +131,7 @@
    :design 4 :impl-core 4 :impl-product 4 :business 1
    :notes "Catalog generated from industry registry (SSoT). Discovery exists; conversion does not."}
 
-  {:id :cockpit
-   :label "itonami.cloud cockpit"
-   :sample-repos ["gftdcojp/cloud-itonami"]
-   :design 4 :impl-core 3 :impl-product 4 :business 1
-   :notes "2026-07-15: productSurface 7/7 live (jobs, open-business static+kv-self-reg, marketplace 286, market-entry 188/35, fleet metrics, free-tenant claim selfReg=1, item GET+dry-run for self-reg seeds). fullIncludingPaid 8/10 — business still 1 until STRIPE_* + ≥1 paid org (hyp/itonami-smb-pay)."}]
+  P26-07-16: free path production-mature — productSurface 12/12, free_path_smoke 12/12, freePath tenants=2 agentRuns live, /docs/free-path.md + openapi. Business still 1 until STRIPE_* + paid org."}]
 
  :priorities
  ["Owner: configure STRIPE_* secrets (/docs/stripe-billing-setup.md) then real /isco-1212 checkout — only gate left for productSurface→business."
