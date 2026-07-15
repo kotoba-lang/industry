@@ -339,6 +339,36 @@ MCP transport の選択肢: 今回は stdio（Claude Code から即使える）�
 （Worker で公開 MCP）は follow-up — mcp.execute/handle は transport 非依存なので
 manifest/ITool は再利用でき、transport スクリプトだけ差し替える。
 
+## Addendum 11 — Claude Code 登録完了 + tools/call エンベロープ実測バグ修正（2026-07-15）
+
+addendum 10 で MCP server を作ったが「登録して実際に呼べる」まで詰めた。2点。
+
+**(1) `.mcp.json` に project scope で登録（superproject root、`4dd653a`）。**
+`claude mcp add` が生成する args は**絶対パス**で他 clone で壊れるため、west パスが
+clone 間で安定（`orgs/<org>/<repo>`）なことを使い **相対 classpath に書き換え**、
+project root を cwd とする前提で `.mcp.json` を可搬化してコミット（cwd=root で
+相対 classpath 動作を実測確認）。次回 `claude` 起動時にオーナー承認で有効化。
+
+**(2) 実測バグ: `tools/call` が MCP CallToolResult エンベロープに包んでいなかった
+（mcp-clj `9b343e6`、west pin `cb22804`）。** stdio E2E で `tools/call` の生 result を
+見たところ、`mcp.execute/handle` の `"tools/call"` 分岐が `ITool/invoke` の戻り値を
+**そのまま JSON-RPC `result`** にしていた（`(ok id (p/invoke …))`）。MCP 仕様の
+`tools/call` result は `CallToolResult` = `{content:[{type:"text",…}], isError, structuredContent}`
+が必須で、生ドメイン JSON では **Claude Code を含むどの MCP クライアントもツール
+出力を描画できない**（addendum 10 の「4 tests green」は dispatch/validation を見て
+いたが result の**形**を検証していなかった見落とし）。ディスパッチャの責務として
+`execute` 側で wrap: text ブロック（`pr-str`、execute は pure/JSON 非依存を維持）+
+`structuredContent`（機械可読 map、transport が JSON 化）+ `isError`（`:error`/`"error"`
+キー由来）。整形済み CallToolResult（string `"content"` キー持ち）は pass-through。
+テストを旧「生 result 一致」から**エンベロープ検証**に更新し、error→isError と
+pass-through の2ケースを追加（JVM test-runner 13 tests / 29 assertions green、
+stdio E2E で `content`/`isError:false`/`structuredContent.procedures` を実測確認）。
+
+教訓: MCP server は「tools/list が返る」「dispatch が通る」だけでは不十分で、
+**result の形が仕様エンベロープに一致するか**を E2E で見ないと、クライアント側で
+無言で描画されない。addendum 10 の型定義（manifest/ITool/transport の3点）に
+「execute が CallToolResult に wrap する」を kernel 側不変条件として追加した。
+
 ## Consequences
 
 - (+) 新しい UI をゼロから作らない: 組織 = 既存 cockpit approvals、個人 = 既存
