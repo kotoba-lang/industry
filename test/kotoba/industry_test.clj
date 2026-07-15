@@ -401,6 +401,8 @@
     (is (= :implemented (industry/maturity "3320"))))
   (testing "cloud-itonami-isic-1062 (Manufacture of starches and starch products, fresh scaffold -- the entry pointed at a never-created gftdcojp/cloud-itonami-C1062 placeholder repo, both this and the real cloud-itonami org target name independently confirmed 404 before scaffolding; identity ({:id \"1062\" :name \"Manufacture of starches and starch products\"}) independently verified against a fresh clone before any work began; StarchOpsAdvisor ⊣ Starch Governor plant-operations-coordination actor mirroring cloud-itonami-isic-1061's [Manufacture of grain mill products] verified module shape module-for-module -- raw-material intake (corn/potato/cassava/wheat) in place of grain intake, steep/extract/refine/dry phase split in place of a single :mill phase; sulfite-residue-exceeded-violations and microbial-load-exceeded-violations are this actor's independently-verified food-safety physical checks in place of 1061's single mycotoxin-level-exceeded-violations [18 hard-violation checks total, one more than 1061's 17, because sulfite-residue from steeping and microbial-load from extended slurry dwell time are genuinely distinct hazards]; detection-equipment-calibration-overdue-violations uses a 60-day interval, shorter than 1061's 90-day magnet-calibration interval, reflecting the higher fouling/drift rate of continuous wet-processing equipment; wheat starch retains a genuine :wheat/gluten allergen unlike corn/potato/cassava starch, mirroring 1061's oat/wheat shared-milling-line cross-contact hazard; 52 tests / 175 assertions green, independently re-verified against a fresh clone; superproject ADR-2607152500) is also :implemented"
     (is (= :implemented (industry/maturity "1062"))))
+  (testing "cloud-itonami-isic-0126 (Growing of oleaginous fruits, fresh scaffold -- the entry pointed at a never-created gftdcojp/cloud-itonami-A0126 placeholder repo, both this and the real cloud-itonami org target name independently confirmed 404 before scaffolding; identity ({:id \"0126\" :name \"Growing of oleaginous fruits\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; OleaginousOpsAdvisor ⊣ OleaginousOperationsGovernor oleaginous-fruit-plantation-operations-coordination actor mirroring cloud-itonami-isic-0125's [Growing of other tree and bush fruits and nuts] verified module shape module-for-module -- oil-palm/olive/coconut/candlenut fruit-class reference data (palm/drupe/nut groups) in place of blueberry/raspberry/blackcurrant/almond/walnut/hazelnut/pecan (bush/nut groups); flag-crop-health-concern (e.g. bud rot/Ganoderma boninense, drought-stress) always escalates regardless of confidence, matching 0125's own crop-health-escalation invariant; field-equipment-or-spray-blocked permanently blocks :operate-field-equipment and :finalize-spray-application; 31 tests / 99 assertions green, independently re-verified against a fresh clone; superproject ADR-2607151330) is also :implemented"
+    (is (= :implemented (industry/maturity "0126"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -1562,7 +1564,12 @@
       ;; immediately before this edit on a freshly re-fetched origin/main (concurrent-agent
       ;; count-drift caution -- not an assumed fixed number; test runner's own failure diff:
       ;; `expected: (= 248 (:implemented m)) actual: (not (= 248 249))`): 248 -> 249.
-      (is (= 249 (:implemented m))))))
+      ;; cloud-itonami-isic-0126 (Growing of oleaginous fruits) promoted :spec ->
+      ;; :implemented (OleaginousOpsAdvisor ⊣ OleaginousOperationsGovernor,
+      ;; superproject ADR-2607151330). Live-recomputed via
+      ;; `(industry/maturity-summary)` immediately before this edit on a freshly
+      ;; re-fetched origin/main: 249 -> 250.
+      (is (= 250 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
