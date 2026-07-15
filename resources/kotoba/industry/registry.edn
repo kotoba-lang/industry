@@ -4826,11 +4826,27 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3092"
    :name "Manufacture of bicycles and invalid carriages"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C3092"
-   :business-id "cloud-itonami-C3092"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3092"
+   :business-id "cloud-itonami-isic-3092"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607191500): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C3092 placeholder).
+   ;; BikeAdvisor, an advisor sealed behind an independent Bicycle &
+   ;; Mobility Device Plant Operations Governor, langgraph-clj
+   ;; StateGraph, append-only audit ledger. Mirrors
+   ;; cloud-itonami-isic-2211's [Manufacture of rubber tyres and
+   ;; tubes] verified module shape, adapted to the frame-welding/
+   ;; assembly/test-bench plant producing bicycles and invalid
+   ;; carriages (wheelchairs/mobility scooters). Twelve concrete
+   ;; governor checks including permanent blocks on welding/assembly/
+   ;; test-bench-equipment actuation and ISO 4210/ISO 7176 safety-
+   ;; certification self-issuance.
+   ;; clojure -M:test: 77 tests / 215 assertions / 0 failures / 0
+   ;; errors (verified from an independent fresh clone).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3099"
