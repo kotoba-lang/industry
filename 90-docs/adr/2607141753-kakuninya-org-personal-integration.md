@@ -212,6 +212,29 @@ store 副作用が先に実行**されていた → thunk 化 ②deploy 直後�
    （kotoba-ui theme-color meta の上流 drift）、claude.ai stand-up routine
    （任意・GitHub 連携後）。
 
+## Addendum 5 — 常設化完了（2026-07-15。closing list item 2 消込み、cloud-itonami `3cb05ce8`）
+
+確認屋は launchd 常駐になった（**JVM 経路なし** — mail-drain/expiry-alert と同型）:
+
+- **portable 化**: `license-manimani/sync*!`（cursor 注入 in / 返り値 out —
+  **内部永続化しない**。先に cursor を進めると git 着地に失敗した evidence が
+  次 tick で pull されず失われるため、呼び出し側が着地成功後にだけ persist）+
+  `license-effects/run-pass!`（起案 → effect 投影 → manimani sync の 1 pass 合成）。
+  `:clj` の `sync!`/`run-once!` は薄い委譲（外部挙動不変）。
+- **runner** `scripts/kakuninya-tick.cljs`（nbb）: operational clone
+  `~/.itonami/kakuninya-repo`（共有 west checkout 不使用）→ run-pass! →
+  台帳 append → branch push + サーバ側マージ → **成功時のみ** cursor persist
+  （`~/.itonami/kakuninya-cursor.edn`）。409 は次 tick が pull からやり直す。
+  secrets は Keychain、http は curl 同期。
+- **launchd** `com.gftdcojp.itonami.kakuninya`（30 分間隔、コードは共有
+  checkout の絶対 classpath = 読み取り専用）。**インストール済み・kickstart で
+  実 tick 成功をログ確認**（in-flight 2 errand を正しく skip、冪等）。
+
+既知の M0 残差: 初回実運転（addendum 3）の dispatch effect 2 件は当時の
+ephemeral conn にのみ存在し、production store（cockpit #approvals）には
+現 2 errand が写っていない — 次の errand からは常駐 tick が production store に
+投影する。現 2 件の完了は manimani inbox（配信済み）の evidence 経路で進む。
+
 ## Consequences
 
 - (+) 新しい UI をゼロから作らない: 組織 = 既存 cockpit approvals、個人 = 既存
