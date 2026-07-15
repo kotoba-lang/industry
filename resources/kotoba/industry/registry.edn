@@ -4372,27 +4372,11 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2593"
    :name "Manufacture of cutlery, hand tools and general hardware"
-   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2593"
-   :business-id "cloud-itonami-isic-2593"
+   :repo "https://github.com/gftdcojp/cloud-itonami-C2593"
+   :business-id "cloud-itonami-C2593"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :implemented
-   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
-   ;; ADR-2607210100): fresh from-scratch scaffold (no prior repo
-   ;; existed; the old :repo/:business-id above pointed at a
-   ;; never-created gftdcojp/cloud-itonami-C2593 placeholder).
-   ;; HardwareShopAdvisor, an advisor sealed behind an independent
-   ;; Hardware Shop Plant Operations Governor, langgraph-clj StateGraph,
-   ;; append-only audit ledger. Mirrors cloud-itonami-isic-2599's
-   ;; [Manufacture of other fabricated metal products n.e.c.] verified
-   ;; module shape, adapted to a cutlery/hand-tool/general-hardware shop
-   ;; (forging -> grinding -> heat-treatment -> finishing line)
-   ;; producing cutlery (knives/forks/spoons), hand tools (hammers/
-   ;; wrenches/screwdrivers/pliers) and general hardware (locks, hinges,
-   ;; fasteners, garden tools) rather than 2599's own stamped/pressed/
-   ;; wire-formed sheet-metal products.
-   ;; clojure -M:test: 71 tests / 195 assertions / 0 failures / 0
-   ;; errors (verified from an independent fresh clone).
+   :maturity :spec
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2599"
@@ -5163,11 +5147,38 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3212"
    :name "Manufacture of imitation jewellery and related articles"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C3212"
-   :business-id "cloud-itonami-C3212"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3212"
+   :business-id "cloud-itonami-isic-3212"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607210200): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C3212 placeholder).
+   ;; ImitationJewelryAdvisor, an advisor sealed behind an independent
+   ;; Imitation Jewellery Workshop Plant Operations Governor,
+   ;; langgraph-clj StateGraph, append-only audit ledger. Mirrors
+   ;; cloud-itonami-isic-3211's own [Manufacture of jewellery and
+   ;; related articles] verified module shape, adapted to a base-metal
+   ;; casting/plating imitation-jewellery workshop -- base-metal-type/
+   ;; plating-thickness-microns/weight-grams/defect-rate production-
+   ;; batch fields in place of metal-type/purity-permille/weight-grams/
+   ;; defect-rate, and a permanent materials-safety/lead-content-
+   ;; compliance-certification-authority block in place of the
+   ;; hallmark/purity-certification-authority block. Closed op
+   ;; allowlist (log-production-batch/schedule-maintenance/
+   ;; flag-safety-concern/coordinate-shipment), all :effect :propose
+   ;; only. Thirteen concrete governor checks elaborate four HARD
+   ;; invariants: independent equipment/batch verification+
+   ;; registration before any action, propose-only effect, closed op/
+   ;; proposal-effect allowlists (no direct casting/plating-line-
+   ;; equipment control), and permanent equipment-actuate + materials-
+   ;; safety/lead-content-compliance-certification-authority blocks.
+   ;; Safety-concern flagging (materials-safety lead/cadmium-content-
+   ;; compliance/plating-chemical hazard) ALWAYS escalates (never
+   ;; auto-committed). 82 tests / 222 assertions green, independently
+   ;; re-verified against a fresh clone.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3220"
