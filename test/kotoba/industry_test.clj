@@ -1688,7 +1688,14 @@
       ;; one other sibling promotion landed 255 -> 256 concurrently
       ;; before this one; the live recompute, not an assumed +1, is the
       ;; source of truth here).
-      (is (= 257 (:implemented m))))))
+      (testing "cloud-itonami-isic-3211 (Manufacture of jewellery and related articles, fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-C3211 placeholder or the real cloud-itonami org [gh api 404 confirmed]; identity ({:id \"3211\" :name \"Manufacture of jewellery and related articles\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; JewelryAdvisor ⊣ Jewellery Workshop Plant Operations Governor jewellery-workshop plant-operations-COORDINATION actor, mirroring cloud-itonami-isic-3250's [Manufacture of medical and dental instruments and supplies] verified module shape module-for-module -- metal-type/purity-permille/weight-grams/defect-rate production-batch fields in place of device-class/sterility-assurance-level/nonconformance-rate, and a permanent hallmark/purity-certification-authority block in place of the FDA-510(k)/CE-mark block; :flag-safety-concern (materials-safety solvent/acid/theft-security/authenticity concern) always escalates regardless of confidence, matching 3250's own safety-concern-escalation invariant; equipment-actuate and hallmark/purity-certification self-issuance are both permanent, unconditional HARD blocks with no human-approval override path; 82 tests / 222 assertions green, independently re-verified against a fresh clone; superproject ADR-2607200000) is also :implemented"
+        (is (= :implemented (industry/maturity "3211"))))
+      ;; Live-recomputed via `(industry/maturity-summary)` on a freshly
+      ;; re-fetched origin/main immediately before this edit
+      ;; (registry.edn's own "3211" -> :implemented change already
+      ;; landed via a Contents-API single-file PUT, this test-file edit
+      ;; is the catch-up): 257 -> 258.
+      (is (= 258 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
