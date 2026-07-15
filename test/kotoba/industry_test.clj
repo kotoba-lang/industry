@@ -1621,7 +1621,32 @@
       ;; immediately before this edit (retry-loop landing under heavy
       ;; concurrent-agent load -- prior attempts 409'd as sibling promotions
       ;; landed first): 252 -> 255.
-      (is (= 255 (:implemented m))))))
+            ;; cloud-itonami-isic-2640 (Manufacture of consumer electronics, fresh
+      ;; scaffold -- no prior repository at either the stale
+      ;; gftdcojp/cloud-itonami-C2640 placeholder or the real cloud-itonami org
+      ;; [gh api 404 confirmed]; identity ({:id "2640" :name "Manufacture of
+      ;; consumer electronics"}) independently verified against a fresh clone
+      ;; before any work began, per this fleet's ID/name-mismatch caution;
+      ;; ConsumerElecAdvisor ⊣ Consumer Electronics Plant Operations Governor
+      ;; plant-operations-COORDINATION actor, mirroring cloud-itonami-isic-
+      ;; 2710's [Manufacture of electric motors, generators, transformers and
+      ;; electricity distribution and control apparatus] verified module
+      ;; shape module-for-module -- SMT/PCB-assembly and final-assembly/test
+      ;; line equipment registration in place of winding/assembly/test-bench
+      ;; equipment, product-type/dielectric-safety-test-kv/defect-rate
+      ;; production-batch fields (dielectric-test-kv ceiling 0-5kV per IEC
+      ;; 62368-1, much lower than 2710's 0-2500kV power-transformer range) in
+      ;; place of 2710's own equivalents, and a battery-safety/electrical-
+      ;; safety/RoHS-compliance safety-concern vocabulary (always escalates)
+      ;; in place of 2710's insulation-failure/electrical-safety/high-
+      ;; voltage-test-hazard vocabulary; equipment-actuate and consumer-
+      ;; electronics-safety-certification-self-issuance (UL/CE/FCC/RoHS) are
+      ;; both permanent, unconditional HARD blocks with no human-approval
+      ;; override path; 77 tests / 210 assertions green, independently
+      ;; re-verified against a fresh clone; superproject ADR-2607191500).
+      ;; Live-recomputed via `(industry/maturity-summary)` immediately before
+      ;; this edit on a freshly re-fetched origin/main: 255 -> 256.
+      (is (= 256 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
