@@ -1796,7 +1796,9 @@
       ;; recompute discipline, not an assumed +1, is the source of
       ;; truth -- at least one other sibling promotion landed
       ;; concurrently before this catch-up edit).
-      (is (= 276 (:implemented m))))))
+      ;; 276 -> 277: one further sibling promotion landed concurrently
+      ;; after the above catch-up; recomputed live, not assumed.
+      (is (= 277 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
