@@ -2300,11 +2300,18 @@
    :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "879"
    :name "Other residential care activities"
-   :repo nil :business-id nil
-  :maturity :spec
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-879"
+   :business-id "cloud-itonami-isic-879"
+   :maturity :implemented
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
+   ;; Promoted :spec -> :implemented as a residential-care coordination actor
+   ;; (rescare.advisor + independent rescare.governor), Wave 4 residential
+   ;; services vertical, broader-population sibling of isic-873 (may include
+   ;; minors in state custody) -- ADR-2607153000 (this build), ADR-2607152500
+   ;; (Wave 4 rollout amendment), ADR-2607152700 (isic-873 module-shape
+   ;; precedent), ADR-2607121000 (wave definition). Coordination-only, no
+   ;; :robotics -- closed :propose-only ops, three HARD governor checks.
    :operating-states [:intake :triage :treat :review :follow-up :audit]},
   {:id "889"
    :name "Other social work activities without accommodation"
