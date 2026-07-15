@@ -13,9 +13,9 @@
 - 業務 SaaS は職種ごとに分断され判断の脈絡が消える
 - AI agent 導入は「誰が何を承認したか」が残らずコンプラ不能
 - 中小には CFO/法務/営業 ops の専任が居ない
-- 観測 (signal): itonami.cloud 実測 288 req/7d・84 uniques(日次和)・うち4xx probe 56%(24h)
 - 観測 (signal): itonami.cloud 実測 288 req/7d・84 uniques(日次和)・うち4xx probe 58%(24h)
 - 観測 (signal): itonami.cloud 実測 290 req/7d・84 uniques(日次和)・うち4xx probe 58%(24h)
+- 観測 (signal): itonami.cloud 実測 290 req/7d・84 uniques(日次和)・うち4xx probe 57%(24h)
 
 ## Customer Segments
 
@@ -48,10 +48,10 @@
 - 業種 blueprint 直販
 - kotobase/murakumo 顧客への cross-sell
 - 士業・SIer パートナー
-- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 14 · /itonami/verticals 1 · /itonami 1 · /join/browser 1 · /infer/cost 1 | 4xx(probe) 60% · 5xx 6%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 15 · /itonami/verticals 1 · /itonami 1 · /join/browser 1 · /infer/cost 1 | 4xx(probe) 56%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 15 · /infer/cost 1 | 4xx(probe) 58%
 - GTM (acquisition→revenue): onboarded org→外部有償 org 転換 0% < 目標 20% — trial→paid の nudge（使用量到達通知）・価格 tier 見直し・年額/上位 tier の提示
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 15 · /infer/cost 1 | 4xx(probe) 57%
 
 ## Revenue Streams
 
@@ -80,6 +80,7 @@
 - gate 距離 (itonami-smb-pay): 外部有償 org 数 = 0 (gate 未到達)
 - funnel (cloud-itonami): trial org=0 → onboarded org=0 → 外部有償 org=0 | 転換 
 - funnel (cloud-itonami): trial org=2 → onboarded org=2 → 外部有償 org=0 | 転換 trial org→onboarded org 100% / onboarded org→外部有償 org 0%
+- funnel (cloud-itonami): trial org=4 → onboarded org=4 → 外部有償 org=0 | 転換 trial org→onboarded org 100% / onboarded org→外部有償 org 0%
 
 ## Unfair Advantage
 
