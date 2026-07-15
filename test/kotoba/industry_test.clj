@@ -1815,6 +1815,27 @@
       ;; recompute discipline, not an assumed +1, is the source of truth
       ;; -- other sibling promotions may have landed concurrently before
       ;; this catch-up edit): 278 -> 283.
+      (testing "cloud-itonami-isic-3212 (Manufacture of imitation jewellery and related articles, fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-C3212 placeholder or the real cloud-itonami org [gh api 404 confirmed]; identity ({:id \"3212\" :name \"Manufacture of imitation jewellery and related articles\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; ImitationJewelryAdvisor ⊣ Imitation Jewellery Workshop Plant Operations Governor imitation-jewellery-workshop plant-operations-COORDINATION actor, mirroring cloud-itonami-isic-3211's [Manufacture of jewellery and related articles] verified module shape module-for-module (imitjewellerymfg.* in place of jewellerymfg.*) -- base-metal-type/plating-thickness-microns/weight-grams/defect-rate production-batch fields in place of metal-type/purity-permille/weight-grams/defect-rate, and a permanent materials-safety/lead-content-compliance-certification-authority block (`:issue-lead-compliance-certification? true`) in place of the hallmark/purity-certification-authority block -- ISIC 3212 has no precious-metal purity concern, so its own regulatory surface is lead/cadmium-content compliance of base-metal alloys and plating chemistry instead; :flag-safety-concern (materials-safety lead/cadmium-content-compliance concern, plating-chemical hazard) always escalates regardless of confidence, matching 3211's own safety-concern-escalation invariant; equipment-actuate and lead-compliance-certification self-issuance are both permanent, unconditional HARD blocks with no human-approval override path; 82 tests / 222 assertions green, independently re-verified against a fresh clone; superproject ADR-2607210200) is also :implemented"
+        (is (= :implemented (industry/maturity "3212"))))
+      ;; cloud-itonami-isic-3212's own registry.edn change (Contents-API
+      ;; single-file PUT, commit
+      ;; cfa9163dcd3eb0f377182bc8a90025873562bd58) landed BEFORE the
+      ;; cloud-itonami-isic-4329 catch-up edit immediately above (whose
+      ;; own 278 -> 283 recompute was performed after 3212's registry.edn
+      ;; change had already landed), so 3212 is already folded into that
+      ;; 283 -- no further count bump needed here. A separate concurrent-
+      ;; agent wholesale-rewrite mistake in 3212's own Contents-API PUT
+      ;; briefly reverted the "2593" entry back to :spec (this fleet's
+      ;; known concurrent-broad-rewrite failure mode, caused by a stale
+      ;; raw.githubusercontent.com CDN read racing a concurrent commit --
+      ;; not a hand-edit conflict-marker mistake), caught and corrected
+      ;; immediately via a second exact-block restore commit (2593's own
+      ;; :implemented status, and this file's own `cloud-itonami-isic-
+      ;; 2593` testing block above, are unaffected). Re-verified via a
+      ;; direct `clojure -M -e "(println
+      ;; (kotoba.industry/maturity-summary))"` call on a freshly
+      ;; re-fetched origin/main tip immediately before this catch-up
+      ;; edit, not assumed: still 283.
       (is (= 283 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
