@@ -1408,6 +1408,38 @@ boletinoficial.buenosaires.gob.ar HTML norm ページに切り替えた。
 現状: 国軸21件・業界団体軸23件(18業種)・自治体軸12件——56tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 57 — 国軸22件目(南アフリカ))
+
+`cloud-itonami-iso3166-zaf`に`statute.facts`を新規追加・push
+([commit 42cc6f6](https://github.com/cloud-itonami/cloud-itonami-iso3166-zaf/commit/42cc6f6))：
+南アフリカ共和国。公式`justice.gov.za`/`gov.za`のPDF3件を検証。
+Companies Act 71 of 2008（会社法、2009-04-08成立・2024-12-27最終改正、
+justice.gov.za PDFがフルレンダリング——珍しく本文まで完全に読める強い
+一次情報源）／Protection of Personal Information Act 4 of 2013・POPIA
+（データ保護法、2013-11-19成立、同じくjustice.gov.za PDFが完全レンダ
+リング）／Labour Relations Act 66 of 1995（労働関係法、gov.za PDFは
+フォントサブセット化で本文が文字化けしたが、法律名「Labour Relations
+Act, 1995」と大統領署名日「29 November 1995」はそれぞれ判読可能——
+デンマークDatatilsynet・ベルリンIFG/BlnDSGと同じ「ヘッダー可読・本文
+文字化け」ティア）。28 tests/90 assertions green（既存marketentry
+スイートと合算）。
+
+**却下した国**: アイルランド（`irishstatutebook.ie`がルートから
+HTTP 403、ボット防御ブロックと判断）、ニュージーランド
+（`legislation.govt.nz`も同様にHTTP 403）、シンガポール
+（`sso.agc.gov.sg`も同様にHTTP 403）——3カ国連続で公式法令ポータルが
+WebFetchを拒否したため断念し、南アフリカに切り替えた。
+
+首都チェック: 既存のooyake由来organization.edn（Pretoria、Wikidata
+Q3926）は史実上一貫して首都であり、JPN/DEU/BRAで確認されたP36
+歴史的首都バグの対象外と確認。
+
+86リポジトリ・702 factを統合。`"statute/topic" "data-protection"`での
+横断queryでzafを含む22カ国すべてが取得できることを確認。
+
+現状: 国軸22件・業界団体軸23件(18業種)・自治体軸12件——57tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
