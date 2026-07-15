@@ -1071,6 +1071,30 @@ green。
 現状: 国軸16件・業界団体軸18件(13業種)・自治体軸7件——41tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 42 — 国軸17件目(BEL) — 同tick内で2か国断念)
+
+`cloud-itonami-iso3166-bel`(既存の`marketentry`実装済みリポ)に
+`statute.facts`を追加・push
+([commit](https://github.com/cloud-itonami/cloud-itonami-iso3166-bel/commit/0daf42d))：
+実在3法令、全てejustice.just.fgov.be(Moniteur belge / Justel、
+ベルギー公式官報統合法データベース)を直接WebFetchで照合(Code des
+sociétés et des associations・2019-03-23／データ保護法・2018-07-30／
+Loi relative aux contrats de travail(労働契約法)・1978-07-03)。
+28 tests/90 assertions green。
+
+**同一tick内で2か国を断念した後にBELで着地**: オーストリア
+(ris.bka.gv.at)は試した全URL形式(GeltendeFassung.wxe・
+NormDokument.wxe・eli/bgbl・直接PDF)でHTTP 503を返す—JS-onlyでなく
+bot対策ブロックと判断し断念。ポーランド(isap.sejm.gov.pl)は
+CAPTCHA壁—本プロジェクトの安全床に従い突破を試みず断念。両方とも
+捏造の代わりに率直に諦め、BELに切り替えて着地した。
+
+57リポジトリ・667 factを統合。`:data-protection`トピックでの横断
+queryで17か国全てを取得できることを確認。
+
+現状: 国軸17件・業界団体軸18件(13業種)・自治体軸7件——42tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
