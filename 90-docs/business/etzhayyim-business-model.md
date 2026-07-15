@@ -13,9 +13,9 @@
 - AI agent が経済活動する時代に identity・責任・監査・存続の公共基盤がない
 - 営利 platform 上の organism は事業都合で消される
 - agent の「進化」に検証可能な記録がない
-- 観測 (signal): etzhayyim.com 実測 41053 req/7d・1110 uniques(日次和)・うち4xx probe 3%(24h)、workers 10454 inv/7d
 - 観測 (signal): etzhayyim.com 実測 34603 req/7d・1074 uniques(日次和)・うち4xx probe 2%(24h)、workers 6265 inv/7d
 - 観測 (signal): etzhayyim.com 実測 38127 req/7d・1135 uniques(日次和)・うち4xx probe 4%(24h)、workers 6588 inv/7d
+- 観測 (signal): etzhayyim.com 実測 46068 req/7d・1024 uniques(日次和)・うち4xx probe 51%(24h)、workers 7566 inv/7d
 
 ## Beneficiaries
 
@@ -42,9 +42,9 @@
 - OSS / 研究コミュニティ
 - itonami 経由の商用利用
 - 公共・アカデミア共同
-- 観測 (paths): 上位 page (24h, 2xx/3xx): / 81 · /robots.txt 19 · /system-dynamics 7 · /organism/health.json 5 · /organism 5 | 4xx(probe) 3% · 5xx 90%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 66 · /robots.txt 18 · /_shell/home-feed.js 8 · /actor/kanjo/did.json 7 · /.well-known/did.json 6 | 4xx(probe) 2% · 5xx 92%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 59 · /robots.txt 18 · /actor/kanjo/did.json 7 · /_shell/home-feed.js 5 · /actor/tsumugi/did.json 5 | 4xx(probe) 4% · 5xx 92%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 19 · /_shell/shell.css 15 · /system-dynamics 11 · /_shell/liquid-glass-adapter.css 11 · /_shell/home-feed.js 9 | 4xx(probe) 51% · 5xx 44%
 
 ## Funding
 
