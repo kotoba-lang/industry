@@ -151,7 +151,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-assoc-2910-deu-vda/data/datascript-tx.edn"}
    {:label "cloud-itonami-municipality-fra-paris ordinance.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-municipality-fra-paris/schema/ordinance.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-municipality-fra-paris/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-fra-paris/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-prt statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-prt/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-prt/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 

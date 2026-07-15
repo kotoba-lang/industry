@@ -1006,6 +1006,29 @@ assertions green。
 現状: 国軸15件・業界団体軸17件(12業種)・自治体軸6件——38tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 39 — 国軸16件目(PRT))
+
+`cloud-itonami-iso3166-prt`(既存の`marketentry`実装済みリポ)に
+`statute.facts`を追加・push
+([commit](https://github.com/cloud-itonami/cloud-itonami-iso3166-prt/commit/2d6a600))：
+実在3法令、全てDRE(Diário da República Eletrónico、ポルトガル公式電子
+官報)の英訳版PDFをReadツールで直接確認(Commercial Companies Code
+(Código das Sociedades Comerciais)・Decree-Law no. 262/86・1986-09-02
+公布／Data Protection Act・Lei n.º 58/2019・2019-08-08公布(GDPR国内
+執行法)／Labour Code (Código do Trabalho)・Law no. 7/2009・
+2009-02-12公布)。diariodarepublica.pt自体のReact詳細ページはWebFetch
+に空コンテンツを返した(JS-only)ため、代わりにfiles.dre.pt /
+files.diariodarepublica.pt(同じ公式官報のPDFホスト)を使用——各PDF
+自身のヘッダーに官報シリーズ・号数・発行日が明記されている。既存
+organization.edn(ooyake由来)の首都(Lisbon/Q597)もP36バグの影響
+なしと確認済み。28 tests/90 assertions green。
+
+50リポジトリ・660 factを統合。`:corporate-governance`トピックでの
+横断queryで15か国(DNKを除く全て)を取得できることを確認。
+
+現状: 国軸16件・業界団体軸17件(12業種)・自治体軸6件——39tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
