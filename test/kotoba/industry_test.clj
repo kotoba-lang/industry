@@ -1068,7 +1068,27 @@
       ;; before this edit on a freshly re-fetched origin/main
       ;; (concurrent-agent count-drift caution -- not an assumed fixed
       ;; number): 216 -> 217.
-      (is (= 217 (:implemented m))))))
+      ;; 217 -> 218: cloud-itonami-isic-1701 (Manufacture of pulp, paper
+      ;; and paperboard) promoted :spec -> :implemented, superproject
+      ;; ADR-2607161600 (cloud-itonami-isic-1701-pulp-paper-coverage.md).
+      ;; PulpPaperAdvisor <-> Pulp & Paper Plant Operations Governor
+      ;; plant-operations-coordination actor mirroring
+      ;; cloud-itonami-isic-1610's [Sawmilling and planing of wood]
+      ;; verified module shape (pulppaper.* in place of sawmilling.*),
+      ;; covering chemical/mechanical pulping digesters, paper machines
+      ;; and effluent-treatment plant; discharge-authorize-blocked-
+      ;; violations is a genuinely new domain-specific PERMANENT-block
+      ;; check for this fleet (effluent-discharge authorization, distinct
+      ;; from 1610's kiln-schedule-finalize block on the same structural
+      ;; axis). 71 tests / 200 assertions green, independently
+      ;; re-verified against a fresh clone. Fresh from-scratch scaffold
+      ;; (no prior repo existed; the entry's old :repo/:business-id
+      ;; pointed at a never-created gftdcojp/cloud-itonami-C1701
+      ;; placeholder). Live-recomputed via a fresh `clojure -M:test` run
+      ;; against a freshly re-fetched origin/main immediately before this
+      ;; edit (concurrent-agent count-drift caution -- not an assumed
+      ;; fixed number): 217 -> 218.
+      (is (= 218 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
