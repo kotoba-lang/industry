@@ -4375,11 +4375,18 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2652"
    :name "Manufacture of watches and clocks"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2652"
-   :business-id "cloud-itonami-C2652"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2652"
+   :business-id "cloud-itonami-2652"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Published as an :implemented actor (full src/test, all governance gates,
+   ;; langgraph-clj StateGraph, append-only audit ledger, phase gates, Advisor ⊣
+   ;; Governor pattern). Plant-operations coordination layer for watch/clock
+   ;; manufacturing: production-batch logging, movement-assembly/casing/
+   ;; regulation/testing-equipment maintenance scheduling, materials-safety
+   ;; concern escalation, and outbound shipment coordination. 76 tests / 213
+   ;; assertions green. Superproject ADR-2607200500.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2660"
