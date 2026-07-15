@@ -52,6 +52,9 @@
         (dissoc (first tx-data) :db/id)))
 
 (def cfg (reconstitute-entity (edn/read-string (slurp (io/file manifest-dir "repos.edn")))))
+(def kotoba-workspace
+  (let [f (io/file manifest-dir "kotoba-workspace.edn")]
+    (when (.exists f) (edn/read-string (slurp f)))))
 
 (defn paths-from-west-yml []
   (when (.exists out-file)
@@ -162,8 +165,12 @@
                   "        archived: true\n"))))))
 
 (defn render []
-  (let [paths (->> (concat (or (seq (paths-from-west-yml)) (paths-from-gitlinks))
-                           (:extra-projects cfg))   ; repos.edn の新規追加口を union
+  (let [workspace-projects (->> (:manifest.kotoba-workspace/components kotoba-workspace)
+                                vals
+                                (mapcat #(if (sequential? %) % [%])))
+        paths (->> (concat (or (seq (paths-from-west-yml)) (paths-from-gitlinks))
+                           (:extra-projects cfg)   ; repos.edn の新規追加口を union
+                           workspace-projects)    ; Kotoba product boundary の宣言も登録口
                    (filter #(str/starts-with? % "orgs/"))
                    (map canonical-path)
                    distinct sort)
