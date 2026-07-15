@@ -5857,11 +5857,31 @@
    :operating-states [:intake :observe :treat :publish :audit]},
   {:id "3821"
    :name "Treatment and disposal of non-hazardous waste"
-   :repo "https://github.com/gftdcojp/cloud-itonami-E3821"
-   :business-id "cloud-itonami-E3821"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3821"
+   :business-id "cloud-itonami-isic-3821"
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; real actor: wasteops.{advisor,governor,operation,phase,sim,store}.cljc
+   ;; -- WasteOpsAdvisor sealed advisor ⊣ WasteTreatmentOpsGovernor. A
+   ;; non-robotics, non-hazardous-waste treatment/disposal facility
+   ;; (landfill/sorting-materials-recovery/composting/incineration-
+   ;; without-hazmat) OPERATIONS-COORDINATION actor mirroring
+   ;; cloud-itonami-isic-3700's [Sewerage] back-office regulated-
+   ;; utility coordination discipline. Closed 4-op allowlist
+   ;; (log-facility-record/schedule-maintenance/flag-safety-concern/
+   ;; coordinate-shipment), all :effect :propose only. Direct sorting/
+   ;; incineration-equipment control and environmental-permit-
+   ;; authority decisions permanently blocked as HARD, un-overridable
+   ;; governor checks; :flag-safety-concern always escalates to a
+   ;; human at every rollout phase. Distinct from sibling
+   ;; cloud-itonami-isic-3822's own HAZARDOUS-waste treatment/disposal
+   ;; vertical (:hazardous-waste-governor, inverted hazard-gate) and
+   ;; cloud-itonami-isic-3830's own materials-recovery/recycling
+   ;; vertical (:traceability-governor) -- governor keyword
+   ;; :waste-treatment-ops-governor is grep-verified UNIQUE
+   ;; fleet-wide. 45 tests / 135 assertions green, independently
+   ;; re-verified against a fresh clone; superproject ADR-2607159600.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :observe :treat :publish :audit]},
   {:id "3822"
