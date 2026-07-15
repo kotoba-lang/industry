@@ -1846,6 +1846,26 @@ Wikidata Q3306）は史実上一貫して首都であり、P36歴史的首都バ
 現状: 国軸26件・業界団体軸27件(22業種)・自治体軸20件——73tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 74 — 自治体軸21件目(モンテビデオ))
+
+`cloud-itonami-municipality-ury-montevideo`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-ury-montevideo/commit/25c4d17))：
+モンテビデオ県（Intendencia de Montevideo、ウルグアイ）。県公式
+`normativa.montevideo.gub.uy`（Normativa Departamental）のページ
+2件を直接WebFetch検証: Resolución IM N.º 326/13（「Municipios」
+統治階層新設に伴う規則呼称を「Municipal」から「Departamental」へ
+変更、2013-01-21）／Determinación de la Ruina y del Grado de Riesgo
+de la Edificación（建物倒壊・危険度判定に関する規則、Dto. JDM
+34.353、2012-10-01）。ページが完全にレンダリングされ両文書の日付が
+明記されていた。4 tests/10 assertions green。
+
+103リポジトリ・739 factを統合。`"ordinance/topic" "governance"`での
+横断queryでmontevideoがbrussels/helsinki/sao-paulo/oslo/sydney/
+san-jose/bogota/copenhagenと並んで取得できることを確認。
+
+現状: 国軸26件・業界団体軸27件(22業種)・自治体軸21件——74tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
