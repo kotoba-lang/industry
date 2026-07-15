@@ -28,9 +28,12 @@
                      :workers #{"app-aozora-appview" "app-aozora-pds" "app-aozora-spa" "aozora-app"}
                      :health "https://aozora.app/"}
    :app-aozora-yoro {:workers #{"aozora-yoro-appview" "aozora-yoro-pds" "aozora-yoro-spa"}}
+   ;; :stripe true (2026-07-15): revenue 計器 — #store/* checkout の charge に
+   ;; metadata.product=cloud-murakumo が付く (cloud-murakumo fcd317d)。
+   ;; stripe-summary の :murakumo-paid-charges を funnel revenue 段が読む。
    :cloud-murakumo  {:zone "9795417e38ef69e173fe37371f937f3e" :zone-name "murakumo.cloud"
                      :workers #{"ai-gftd-murakumo-2603241700"}
-                     :health "https://murakumo.cloud/"}
+                     :health "https://murakumo.cloud/" :stripe true}
    :cloud-manimani  {:zone "f28dd3b902729a343d2b9d09a2c548e8" :zone-name "manimani.cloud"
                      :health "https://manimani.cloud/"}
    :net-kotobase    {:zone "5ad3da692f2367905c257cfcb0c1057c" :zone-name "kotobase.net"
@@ -218,10 +221,19 @@
                             (let [inv-id (:latest_invoice sub)]
                               (and inv-id
                                    (true? (:paid (get* (str "invoices/" inv-id)))))))
-            kotobase-paid (filter invoice-paid? kotobase-active)]
+            kotobase-paid (filter invoice-paid? kotobase-active)
+            ;; cloud-murakumo: 単発 credits 購入 (subscription でない)。checkout が
+            ;; charge へ伝播させる metadata.product で機械判定 (2026-07-15,
+            ;; cloud-murakumo fcd317d)。paid かつ非 refund のみ数える。
+            murakumo-paid (filter #(and (true? (:paid %))
+                                        (not (:refunded %))
+                                        (= "cloud-murakumo" (get-in % [:metadata :product])))
+                                  (:data charges))]
         {:active-subscriptions (count kotobase-paid)     ; ← kotobase price かつ PAID のみ (gate)
          :active-subscriptions-unpaid (- (count kotobase-active) (count kotobase-paid)) ; 参考: 未払い (テスト/滞納)
          :active-subscriptions-account-wide (count all-active) ; 参考: 全体 (レガシー含む)
+         :murakumo-paid-charges (count murakumo-paid)   ; ← cloud-murakumo funnel revenue 段
+         :murakumo-paid-amount-minor (reduce + 0 (map :amount murakumo-paid)) ; 参考: 額 (通貨 minor 単位混在に注意)
          :charges-total (count (:data charges))
          :last-charge-epoch (some-> (first (:data charges)) :created)}))))
 

@@ -85,3 +85,24 @@ routine が毎日 `react loop` を回していたが、実態は**回ってい�
 - gftdcojp/local-murakumo `43bce45`(cost emitter)+ `42b646b`(voice API 復元 —
   2026-07-13 から本番稼働していた未コミット WIP の verbatim コミット化)
 - gftdcojp/cloud-murakumo PR #2(cost.cljc 純関数層 — 本計器の計算式の先行実装)
+
+## Addendum 1 (2026-07-15) — revenue 段の計器も配線完了
+
+funnel の最後の未計測段(revenue)を実計測化した。実は Stripe checkout 自体は
+2026-07-06 から live だった(canvas の「STRIPE_SECRET_KEY 未設定」観測は同日中に
+解消済み — docs/stripe-go-live-checklist.md 参照。実 cs_live_ セッション生成を
+本日も再確認)。未計測の real gap は「どの charge が cloud-murakumo のものか」を
+機械判定できないことだった:
+
+- cloud-murakumo `fcd317d`(pin 前進済み): Checkout Session に
+  `payment_intent_data[metadata]{product=cloud-murakumo, sku, country}` を付与
+  (charge へ伝播)。
+- collect.cljs: `:cloud-murakumo` に `:stripe true`、stripe-summary に
+  `:murakumo-paid-charges` / `:murakumo-paid-amount-minor`(paid かつ非 refund、
+  metadata.product 判定)。
+- funnel revenue 段: `[:stripe :murakumo-paid-charges]`(単発 credits 購入 —
+  subscription ではないので active-subscriptions は不適)。
+
+実測(2026-07-15): 訪問 419 → 実推論 run 4(1%)→ **paid 0(実購入ゼロ、正直な 0
+から計測開始)**。全 3 段が実データ化し「未計測段」は解消。実購入第 1 号は
+checklist どおり owner の手動アクション。

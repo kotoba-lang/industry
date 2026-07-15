@@ -1,37 +1,39 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 4826, "kotobase-cf-wasm-staging" 2186},
+ {"net-kotobase" 4842, "kotobase-cf-wasm-staging" 2186},
  :zone
- {:requests-7d 6909,
-  :pageviews-7d 425,
-  :uniques-7d-sum 554,
+ {:requests-7d 6925,
+  :pageviews-7d 426,
+  :uniques-7d-sum 556,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 77}
+  [{:path "/", :requests 76}
    {:path "/xrpc/net.kotobase.store.append", :requests 50}
+   {:path "/health", :requests 39}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.q", :requests 37}
    {:path "/llms-full.txt", :requests 37}
-   {:path "/health", :requests 37}
    {:path
     "/ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapcbsx3yrg7xzj3jrxm3q4mzz2nu",
     :requests 35}
    {:path "/pins", :requests 32}
    {:path "/.well-known/did.json", :requests 32}],
-  :status-mix {:client-error 254, :ok 595, :server-error 64},
+  :status-mix {:client-error 253, :ok 597, :server-error 64},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
   :active-subscriptions-unpaid 4,
   :active-subscriptions-account-wide 4,
+  :murakumo-paid-charges 0,
+  :murakumo-paid-amount-minor 0,
   :charges-total 11,
   :last-charge-epoch 1718681591},
  :as-of "2026-07-15",
  :traffic-quality {:window "24h", :probe-4xx-pct 28, :error-5xx-pct 7},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 77 · /xrpc/net.kotobase.store.append 50 · /xrpc/ai.gftd.apps.kotobase.datomic.q 37 · /llms-full.txt 37 · /health 37 | 4xx(probe) 28% · 5xx 7%",
- :funnel {:visitors 610, :signups 0, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): / 76 · /xrpc/net.kotobase.store.append 50 · /health 39 · /xrpc/ai.gftd.apps.kotobase.datomic.q 37 · /llms-full.txt 37 | 4xx(probe) 28% · 5xx 7%",
+ :funnel {:visitors 612, :signups 0, :checkouts 0},
  :signal
- "kotobase.net 実測 6909 req/7d・554 uniques(日次和)・うち4xx probe 28%(24h)、workers 7012 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 6925 req/7d・556 uniques(日次和)・うち4xx probe 28%(24h)、workers 7028 inv/7d、Stripe active subs 0"}

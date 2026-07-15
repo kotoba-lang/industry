@@ -200,6 +200,7 @@
 - margin per tok
 - 次の検証 (murakumo-tok-price): 社内 3 アプリの推論を fleet へ移し run ledger 実測で原価比較
 - funnel (cloud-murakumo): murakumo.cloud 訪問=418 → 実推論 run (記録済)=4 → paid (Stripe sub)=? | 転換 murakumo.cloud 訪問→実推論 run (記録済) 1%
+- funnel (cloud-murakumo): murakumo.cloud 訪問=419 → 実推論 run (記録済)=4 → paid (credits 購入)=0 | 転換 murakumo.cloud 訪問→実推論 run (記録済) 1% / 実推論 run (記録済)→paid (credits 購入) 0%
 
 ## Unfair Advantage
 
