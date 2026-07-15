@@ -1844,7 +1844,12 @@
       ;; 03ca7933f3f0aa114c347546f937da80022187a5, before this
       ;; catch-up corroboration test was written) -- no further
       ;; increment.
-      (is (= 283 (:implemented m))))))
+      ;; 283 -> 284: further sibling promotion(s) landed
+      ;; concurrently -- recomputed live via
+      ;; `(industry/maturity-summary)` on a freshly re-fetched
+      ;; origin/main tip immediately before this catch-up edit,
+      ;; not assumed.
+      (is (= 284 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
