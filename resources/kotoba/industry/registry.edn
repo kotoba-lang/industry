@@ -4634,11 +4634,27 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2651"
    :name "Manufacture of measuring, testing, navigating and control e..."
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2651"
-   :business-id "cloud-itonami-C2651"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2651"
+   :business-id "cloud-itonami-isic-2651"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607994500): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2651 placeholder), directly
+   ;; modeled on cloud-itonami-isic-2670's plant-operations-coordination
+   ;; pattern. MeasCtrlAdvisor, an advisor sealed behind an independent
+   ;; Measuring Control Equipment Plant Operations Governor, langgraph-clj
+   ;; StateGraph, append-only audit ledger. Plant OPERATIONS COORDINATION
+   ;; actor for measuring/testing/navigating/control-equipment
+   ;; manufacturing (process-control/lab-analytical/test-and-inspection/
+   ;; navigational/meter/radiation-detection/surveying/meteorological
+   ;; instrument categories) -- not direct manufacturing-line control
+   ;; authority and not an ISO/IEC 17025 accredited calibration
+   ;; laboratory's NIST-traceable-certification authority. Independently
+   ;; re-verified on a fresh clone of the pushed repo: 77 tests / 212
+   ;; assertions green, clj-kondo 0 errors/0 warnings, demo runs clean.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2652"
