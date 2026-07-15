@@ -263,6 +263,32 @@ M2 のうち **net-kotobase#153 にブロックされない認証層**を昇格�
 M2 残り: INTERIM KV → kotobase graph（net-kotobase#153 待ち）と
 capability-scoped share、interim user token の廃止（CACAO 定着後）。
 
+## Addendum 7 — 確認屋ループが本番で初完走（2026-07-15、オーナー指示「1,2」）
+
+オーナーが inbox の errand 1・2（東京都環境局 / 丸の内署の実値確認）を進めるよう
+指示。agent が**官公庁の公式ページから現行の公表値を確認**し（産廃収運 手数料
+81,000円・古物商 手数料 19,000円 — いずれも kyoninka 収録値と一致を確認。標準
+処理期間は公式ページに記載がないため第三者情報の 60日/40日は載せず「公式記載
+なし・要窓口確認」と正直に記録）、`:verify-authority-info` の evidence として
+manimani decision（policy: done、source に公式 URL + 「agent 確認・owner 最終確認
+前」を明記）で提出。
+
+kakuninya tick が本番で**初めて errand 一巡を完走**: 個人面 decision pull →
+kyoninka evidence 検証合格 → 台帳へ `:errand/validated` + `:case/step-done`
+（`:by` に owner DID）→ 次 tick で次 errand（sanpai は行政書士相談、kobutsu は
+書類収集）を自動起案し manimani inbox へ配信。
+
+**実測バグ（12 個目、loop stuck）**: 次 errand の cockpit effect 投影が共有 store
+（`~/.itonami/store.edn`）の gftdcojp/gftdcojp 未 bootstrap で repo-ref
+'Lookup ref not found' を throw し、run-pass! ごと落ちて次 errand 起案・
+assignment 配信を巻き添えにした。cockpit 投影は M0 の付加機能なので try/catch で
+非致命化（`:effect-projection-error` を返して本線継続、store bootstrap で復活）
+→ 再 tick で unstick 確認（cloud-itonami `88a4754d`）。
+
+**捏造ゼロの実践**: evidence の値は実在の官公庁公式ページ由来で、出所と「owner
+最終確認前」を明記。標準処理期間のように公式に無い値は unknown 相当の但し書きに
+留め、第三者サイトの数字を確定値として記録しなかった。
+
 ## Consequences
 
 - (+) 新しい UI をゼロから作らない: 組織 = 既存 cockpit approvals、個人 = 既存
