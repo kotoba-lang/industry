@@ -1905,7 +1905,17 @@
         (is (= :implemented (industry/maturity "2012"))))
       ;; 295 -> 296: one further sibling promotion landed concurrently;
       ;; recomputed live via `(industry/maturity-summary)`, not assumed.
-      (is (= 296 (:implemented m))))))
+      (testing "cloud-itonami-isic-2395 (Manufacture of articles of concrete, cement and plaster, fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-C2395 placeholder or the real cloud-itonami org [gh api 404 confirmed]; identity ({:id \"2395\" :name \"Manufacture of articles of concrete, cement and plaster\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; ConcreteAdvisor ⊣ Concrete Plant Operations Governor plant-operations-COORDINATION actor, mirroring cloud-itonami-isic-2392's [Manufacture of clay building materials] verified module shape closely (concretemfg.* in place of claymfg.*) -- mixing/batching-plant and molding-line equipment registration in place of extrusion-press/kiln-line equipment, and the same product-type/weight/dimensional-deviation-percent/defect-rate-percent production-batch fields scoped to this vertical's own product families (precast panel/pipe/masonry block/paving slab/plasterboard/fiber-cement sheet/roof tile/post); a mixing/batching-plant or molding-line permanent actuation block (`:actuate-mixing-line? true`) in place of 2392's own `:actuate-kiln-line?` block; :flag-safety-concern (cement/silica-dust hazard, curing-heat/steam-burn hazard, mixing/batching-plant-equipment safety concern) always escalates regardless of confidence, matching 2392's own safety-concern-escalation invariant; the proposal-effect allowlist plus the permanent mixing-line-actuate block structurally prevent any direct mixing/batching-plant or molding-line-equipment control, with no human-approval override path; 76 tests / 209 assertions green, independently re-verified against a fresh clone; registry.edn's own \"2395\" -> :implemented change landed via a Contents-API single-file PUT, exact-block edit only, diff-verified single-block change; superproject ADR-2607170800) is also :implemented"
+        (is (= :implemented (industry/maturity "2395"))))
+      ;; 296 -> 298: this promotion's own +1 for cloud-itonami-isic-2395
+      ;; plus one further sibling promotion landed concurrently.
+      ;; Recomputed live via `(industry/maturity-summary)` immediately
+      ;; before this edit on a freshly re-fetched origin/main tip, not
+      ;; assumed (any further concurrent sibling promotions landed
+      ;; between this file's own last recorded number and this edit's
+      ;; fresh clone are folded into the live-recomputed baseline
+      ;; above, not individually re-narrated here).
+      (is (= 298 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
