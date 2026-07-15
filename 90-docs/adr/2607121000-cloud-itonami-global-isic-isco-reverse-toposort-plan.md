@@ -135,3 +135,13 @@ minor 単位の例外: `261`(legal)→ Wave 0、`432`(material-recording clerks)
 - ADR-2607072530 / 2607072600(6511/6492 kototama wasm 実行実証)
 - ADR-2606271700(cloud-itonami business OS 初版)
 - 本 ADR とペアの `.edn`
+
+## Addendum (2026-07-15): P3→P4 順序ゲートの amendment（ADR-2607152500）
+
+§5 の「Wave 3 で robotics 信頼実績を積んでから Wave 4」は、オーナー明示指示により
+**ADR-2607152500 で Wave3→Wave4 の前提条件のみ amend**（Wave 3 完了を待たず並行着手
+を許可)。wave 定義・value function・逆トポロジーソートの根拠自体は不変。61%
+defect 事故（ADR-2607152300）の教訓を踏まえた品質ガードレール（小バッチ・
+verified-redo・自己申告不信用）を Wave 4 にも明文で継承した上での override。
+Wave 4 第一号 flagship: ISIC 873（高齢者・障害者向け居住介護、ADR-2607152700）。
+詳細は ADR-2607152500 を参照。
