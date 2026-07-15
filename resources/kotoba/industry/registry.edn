@@ -4944,11 +4944,37 @@
    :operating-states [:intake :log :schedule :hazard :ship :audit]},
   {:id "3211"
    :name "Manufacture of jewellery and related articles"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C3211"
-   :business-id "cloud-itonami-C3211"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3211"
+   :business-id "cloud-itonami-isic-3211"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607200000): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C3211 placeholder).
+   ;; JewelryAdvisor, an advisor sealed behind an independent Jewellery
+   ;; Workshop Plant Operations Governor, langgraph-clj StateGraph,
+   ;; append-only audit ledger. Mirrors cloud-itonami-isic-3250's own
+   ;; [Manufacture of medical and dental instruments and supplies]
+   ;; verified module shape, adapted to a precious-metal casting/
+   ;; setting/polishing jewellery workshop -- metal-type/purity-
+   ;; permille/weight-grams/defect-rate production-batch fields in
+   ;; place of device-class/sterility-assurance-level/nonconformance-
+   ;; rate, and a permanent hallmark/purity-certification-authority
+   ;; block in place of the FDA-510(k)/CE-mark block. Closed op
+   ;; allowlist (log-production-batch/schedule-maintenance/
+   ;; flag-safety-concern/coordinate-shipment), all :effect :propose
+   ;; only. Thirteen concrete governor checks elaborate four HARD
+   ;; invariants: independent equipment/batch verification+
+   ;; registration before any action, propose-only effect, closed op/
+   ;; proposal-effect allowlists (no direct casting/setting/polishing-
+   ;; line-equipment control), and permanent equipment-actuate +
+   ;; hallmark/purity-certification-authority blocks. Safety-concern
+   ;; flagging (materials-safety solvent/acid/theft-security/
+   ;; authenticity concern) ALWAYS escalates (never auto-committed).
+   ;; 82 tests / 222 assertions green, independently re-verified
+   ;; against a fresh clone.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3212"
