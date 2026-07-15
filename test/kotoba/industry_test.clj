@@ -1382,7 +1382,26 @@
       ;; freshly re-fetched origin/main (confirmed HEAD's own pinned 239 assertion was still
       ;; green pre-edit, ruling out drift from a raw `grep -c` undercount before trusting the
       ;; delta): 239 -> 240.
-      (is (= 240 (:implemented m))))))
+      ;; 240 -> 241: cloud-itonami-isic-2710 (Manufacture of electric motors, generators, transformers
+      ;; and electricity distribution and control apparatus) promoted :spec -> :implemented, superproject
+      ;; ADR-2607156500 (cloud-itonami-isic-2710-electric-motors-generators-transformers-coverage.md).
+      ;; Fresh scaffold -- no prior repo existed (the old :repo/:business-id pointed at a never-created
+      ;; gftdcojp/cloud-itonami-C2710 placeholder, confirmed 404 via gh api before any work began);
+      ;; identity ({:id "2710" :name "Manufacture of electric motors, generators, transformers an..."})
+      ;; independently verified against a fresh clone before scaffolding, per this fleet's ID/name-
+      ;; mismatch caution. ElecEquipAdvisor (+/- an independent Electrical Equipment Plant Operations
+      ;; Governor) plant-operations-coordination actor mirroring cloud-itonami-isic-2211's [Manufacture
+      ;; of rubber tyres and tubes] verified module shape module-for-module -- winding/assembly/test-
+      ;; bench-equipment registration in place of building/curing-line equipment, product-type/
+      ;; dielectric-test-kv/quantity/defect-rate production-batch fields in place of tyre-category/load-
+      ;; index/quantity/defect-rate, and an equipment-actuate permanent block
+      ;; [elecequipmfg.governor's equipment-actuate-blocked-violations] in place of line-actuate-blocked,
+      ;; plus a certification-authority permanent block (electrical-safety marks e.g. UL/CE/IEC in place
+      ;; of DOT/ECE tyre-safety). 77 tests / 210 assertions green, independently re-verified against a
+      ;; fresh clone. Live-recomputed via `(industry/maturity-summary)` immediately before this edit on a
+      ;; freshly re-fetched origin/main (confirmed HEAD's own pinned 240 assertion was still green
+      ;; pre-edit, ruling out drift): 240 -> 241.
+      (is (= 241 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

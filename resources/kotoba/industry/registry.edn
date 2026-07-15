@@ -4255,11 +4255,27 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2710"
    :name "Manufacture of electric motors, generators, transformers an..."
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2710"
-   :business-id "cloud-itonami-C2710"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2710"
+   :business-id "cloud-itonami-isic-2710"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607156500): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2710 placeholder).
+   ;; ElecEquipAdvisor, an advisor sealed behind an independent
+   ;; Electrical Equipment Plant Operations Governor, langgraph-clj
+   ;; StateGraph, append-only audit ledger. Mirrors
+   ;; cloud-itonami-isic-2211's [Manufacture of rubber tyres and tubes]
+   ;; verified module shape, adapted to the electric-motor/generator/
+   ;; transformer/distribution-and-control-apparatus winding/assembly/
+   ;; test-bench plant. Twelve concrete governor checks including
+   ;; permanent blocks on winding/assembly/test-bench-equipment
+   ;; actuation and electrical-safety certification (e.g. UL/CE/IEC)
+   ;; self-issuance.
+   ;; clojure -M:test: 77 tests / 210 assertions / 0 failures / 0
+   ;; errors (verified from an independent fresh clone).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2720"
