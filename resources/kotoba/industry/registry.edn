@@ -3329,12 +3329,15 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1104"
    :name "Manufacture of soft drinks"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C1104"
-   :business-id "cloud-itonami-C1104"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1104"
+   :business-id "cloud-itonami-isic-1104"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; Soft drink & bottled water manufacturing plant-operations-
+   ;; coordination actor (SoftDrinkOpsAdvisor ⊣ SoftDrinkOps Governor),
+   ;; verified: 58 tests / 195 assertions green (clojure -M:test, fresh
+   ;; clone 2026-07-15). See superproject ADR-2607157000.
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1200"
    :name "Manufacture of tobacco products"
