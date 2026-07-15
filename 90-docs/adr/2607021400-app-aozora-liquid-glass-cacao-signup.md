@@ -20,7 +20,7 @@ aozora.app では SecurityError、(c) 検証先 `/xrpc/com.etzhayyim.authz.verif
 
 ## Decision 1 — liquid-glass 青空トンマナ（app-aozora main `1a74c82`）
 
-- **生成 CSS 方式**: `scripts/gen-liquid-glass-css.bb` が liquid-glass-ui の
+- **生成 CSS 方式**: `scripts/gen-liquid-glass-css.cljs` が liquid-glass-ui の
   トークンを青空トーン（white-cloud glass 表面 / みどり accent `#58CC02` /
   deep-ink text `#17323b`）で上書きして `public/css/liquid-glass.css` を生成
   （tailwind.css と同じ「コミットされるビルド出力」規約）。specular.js enhancer
@@ -70,7 +70,7 @@ aozora.app では SecurityError、(c) 検証先 `/xrpc/com.etzhayyim.authz.verif
   kotobase.net 路線（actor が自分の鍵で CACAO を自己発行）と PDS 受け口が UI まで
   一気通貫になった。
 - (+) liquid-glass-ui の実戦初適用（トークン上書き → 生成 CSS → 安定クラス名）。
-  スキン差し替えは bb スクリプト再実行のみ。
+  スキン差し替えは nbb スクリプト再実行のみ。
 - (−) 鍵が端末ローカルのみ = 端末喪失でアカウント喪失。`import-hex!` は interop に
   あるが鍵エクスポート/インポート UI と passkey PRF ラップが follow-up。
 - (−) dev-login（bsky.social / atproto.etzhayyim.com への app-password

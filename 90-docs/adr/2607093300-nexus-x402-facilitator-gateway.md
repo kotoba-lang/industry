@@ -62,7 +62,7 @@ kotoba-lang ライブラリ**（`pay.facilitator`）として設計・実装す�
   並行 subagent との競合回避ルール（本セッション確立）に従い調整の上で行う。
 - **follow-up（移行）**: shinshi/murakumo/kotobase の個別ゲートを nexus 委譲（Facilitator API）
   へ寄せるか、gateway proxy 前段に置くかは seller 単位で選択。vendor した pay.* の drift は
-  各 repo で `bb`/diff 監視。
+  各 repo で `nbb`/diff 監視。
 - **EIP-3009 `exact` スキーム**: `discovery` は exact を宣言するが、authorization の on-chain
   submit（gasless relay）は base-l2/wallet 側の未実装 follow-up。現状の実効経路は
   `transaction`スキーム（買い手が先に tx broadcast → tx-hash proof）。

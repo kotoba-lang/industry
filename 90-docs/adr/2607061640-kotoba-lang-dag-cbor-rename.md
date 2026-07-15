@@ -39,8 +39,8 @@ namespace は元から `cbor.core` であり、リポジトリ名を変えても
 |---|---|
 | `kotoba-lang/io-ipld`(旧ipld) | deps.edn |
 | `kotoba-lang/pqh` | deps.edn(ed25519 rename時に続けて更新) |
-| `gftdcojp/net-kotobase` | cli/deps.edn, cli/bb.edn |
-| `kotoba-lang/cacao` | deps.edn, bb.edn(rename後 21 tests/115 assertions green) |
+| `gftdcojp/net-kotobase` | cli/deps.edn, cli/nbb.edn |
+| `kotoba-lang/cacao` | deps.edn, nbb.edn(rename後 21 tests/115 assertions green) |
 
 `etzhayyim/root` は ed25519 と同じ理由でスキップ。
 
@@ -55,7 +55,7 @@ ADR-2607061620 と同一。
 gh api repos/kotoba-lang/org-ietf-cbor --jq '.full_name'
 cd io-ipld && clojure -M:test   # 7 tests / 21 assertions green
 cd cacao   && clojure -M:test   # 21 tests / 115 assertions green
-bb scripts/gen-west-manifest.bb --entry org-ietf-cbor
+nbb scripts/gen-west-manifest.cljs --entry org-ietf-cbor
 ```
 
 ## Consequences

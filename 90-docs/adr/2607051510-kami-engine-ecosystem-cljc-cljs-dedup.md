@@ -22,7 +22,7 @@ Rust から zero-dep `.cljc` へ復元した大規模wave）に共通する未�
 
 `90-docs/migration/kami-webgpu-dsl-runtime-split.edn`（ローカル checkout の
 sparse-checkout 対象外になっていたため復元して使用）と、付属の検証スクリプト
-`scripts/kami-webgpu-dsl-runtime-split-audit.bb` を実行した結果、**219 repo
+`scripts/kami-webgpu-dsl-runtime-split-audit.cljs` を実行した結果、**219 repo
 中 `webgpu` だけが cleanup 未実行のまま `:status :done` になっていた**ことが
 判明（他218 repoは全てaudit green）。台帳の `:removed-from-webgpu` に列挙された
 `src/kami/`（丸ごと）・5本のscript・2つのfixtureが、実際には一切削除されずに
@@ -153,7 +153,7 @@ toml, usd, xml, yaml, expr）を、実際の依存関係を検証したうえで
 
 **検証方法**: `cljs.build.api`の`:optimizations :none`コンパイル
 （src + ../org-w3-webgpu/src + ../expr/src、kept namespaceに関するwarningゼロ）
-+ `bb verify`（全JVM `.cljc`テストgreen）。
++ `nbb verify`（全JVM `.cljc`テストgreen）。
 
 ### kami-engine / kami-engine-sdk（本ADRでは調査・記録のみ）
 

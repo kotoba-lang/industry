@@ -112,7 +112,7 @@ CLAUDE.md の standing authorization（新規 project scaffold → 登録の一�
 2. `git init` + 初期コミット
 3. `gh repo create kotoba-lang/<name> --private` + push
 4. `manifest/repos.edn` の `:extra-projects` にパスを追加
-5. `bb scripts/gen-west-manifest.bb`（+ `--check`）
+5. `nbb scripts/gen-west-manifest.cljs`（+ `--check`）
 6. superproject へ ADR + manifest 差分を `chore(manifest)+docs(adr)` でコミット
 
 ## ガードレール

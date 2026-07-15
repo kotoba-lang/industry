@@ -102,7 +102,7 @@ kotoba Datom log に引き上げる」。** conflict を解消の対象でなく
 
 `repos.edn` はそのまま **partition の SSoT**として生きる。変わるのは pin 前進の駆動だけ:
 「人間/各 agent が API を叩く」→「Governor が log の accepted proposal を drain して
-single-entry commit（ADR-2606272237 の正経路）する」。`gen-west-manifest.bb --check` と
+single-entry commit（ADR-2606272237 の正経路）する」。`gen-west-manifest.cljs --check` と
 `pin == repo HEAD` の不変条件は維持。既存ガードレールを壊さず上に queue を一段足す。
 
 ## 同一ファイル競合の扱い（明示）

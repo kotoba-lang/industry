@@ -73,7 +73,7 @@ conveyor・queue 輸送 / sec 4.5 配列 / sec 3.7.4 サブモデル・マクロ
 ## Consequences
 
 - `manifest/repos.edn` の `:extra-projects` に `orgs/kotoba-lang/org-oasis-open-xmile` を登録し、
-  `bb scripts/gen-west-manifest.bb --entry org-oasis-open-xmile` で west.yml に最小 diff で反映する。
+  `nbb scripts/gen-west-manifest.cljs --entry org-oasis-open-xmile` で west.yml に最小 diff で反映する。
 - `kotoba-lang/dsl-core` に `:git/sha` 依存する（`kotoba.dsl.problem` の検証結果規約を再利用するため、
   `statechart`/`states`/`sigma`/`policy` と同じ依存形）。
 - 実際の `.xmile` ファイル読み込みには host 側で XML パーサ（JVM: `clojure.data.xml`、cljs: DOMParser 等）
@@ -86,7 +86,7 @@ conveyor・queue 輸送 / sec 4.5 配列 / sec 3.7.4 サブモデル・マクロ
 - `orgs/kotoba-lang/org-oasis-open-xmile` の `clojure -M:test` が 34 tests / 105 assertions all green、
   `clojure -M:lint`（clj-kondo）errors 0 / warnings 0。
 - `gh repo create kotoba-lang/org-oasis-open-xmile --public` + push 済み。
-- `manifest/repos.edn` の `:extra-projects` への登録 + `bb scripts/gen-west-manifest.bb --entry
+- `manifest/repos.edn` の `:extra-projects` への登録 + `nbb scripts/gen-west-manifest.cljs --entry
   org-oasis-open-xmile` で最小 diff 生成、`--check` で canonical 一致を確認。
 
 ## 追記1（2026-07-07）: sec 3.5.3 DELAY1/DELAY3/SMTH1/SMTH3/TREND を隠し stock 化して実装
@@ -121,7 +121,7 @@ sec 3.5.3（DELAY1/DELAY3/SMTH1/SMTH3/TREND）を実装した（`RANDOM`/`NORMAL
   `:if`/`:eq` で実装して修正。
 - テスト: 53 tests / 184 assertions all green（+19 tests / +79 assertions）、lint errors 0/warnings 0。
 - commit `19018e9d960bb95d6de2e50ebc918e428e532ddc`（`3930c70` から fast-forward）。
-  `bb scripts/gen-west-manifest.bb --entry org-oasis-open-xmile` で pin 前進、サーバ側検証 OK。
+  `nbb scripts/gen-west-manifest.cljs --entry org-oasis-open-xmile` で pin 前進、サーバ側検証 OK。
 - 未着手のまま: conveyor/queue 輸送（隠し stock の ODE とは根本的に異なる離散スラッグキュー方式が
   必要なため、中途半端な実装より v2 のまま維持する判断）、stochastic 系、配列、unit 次元解析、
   サブモデル/マクロ、rk2/rk45/gear。

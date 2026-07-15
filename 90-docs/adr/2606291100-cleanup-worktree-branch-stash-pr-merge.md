@@ -8,7 +8,7 @@ authoritative: true
 last_verified: 2026-06-29
 authoritative_for:
   - superproject + 子リポ群の cleanup 手順（worktree/branch/stash 調査 → PR 作成 → main merge）
-  - scripts/cleanup.bb の使い方と安全要件
+  - scripts/cleanup.cljs の使い方と安全要件
 related:
   - CLAUDE.md "## Git operations" / "## 標準作業の常時許可"
   - 90-docs/adr/2606241600-shallow-depth1-git-default.md
@@ -38,7 +38,7 @@ superproject + 229 子リポ（west manifest）の巨大構成で、かつ CLAUD
 
 ## Decision
 
-cleanup 処理を `scripts/cleanup.bb`（babashka・読取専用 dry-run 既定）と本 runbook で恒常化する。
+cleanup 処理を `scripts/cleanup.cljs`（babashka・読取専用 dry-run 既定）と本 runbook で恒常化する。
 
 ### スコープ原則（重要）
 
@@ -55,7 +55,7 @@ cleanup 処理を `scripts/cleanup.bb`（babashka・読取専用 dry-run 既定�
 
 1. **dry survey**（既定・読取専用・副作用なし）:
    ```bash
-   bb scripts/cleanup.bb
+   nbb scripts/cleanup.cljs
    ```
    出力: superproject の `worktree list` / `branch -a` / `stash list` → open PR の分類
    （`orphan` / `mergeable` / `conflict` / `unknown`）→ 子リポ「要オーナー確認」一覧。
@@ -63,15 +63,15 @@ cleanup 処理を `scripts/cleanup.bb`（babashka・読取専用 dry-run 既定�
    `conflict/unknown` = 個別確認。子リポ一覧 = オーナーが個別に reconcile。
 3. **安全処置の実行**（孤児 PR の close のみ）:
    ```bash
-   bb scripts/cleanup.bb --apply
+   nbb scripts/cleanup.cljs --apply
    ```
-4. **merge の実行**（mergeable PR を server-side で。main 同期は git-push-main-sync-guard.bb 別担保）:
+4. **merge の実行**（mergeable PR を server-side で。main 同期は git-push-main-sync-guard.cljs 別担保）:
    ```bash
-   bb scripts/cleanup.bb --merge
+   nbb scripts/cleanup.cljs --merge
    ```
 5. **子リポ survey を省略**（superproject だけ速く見たい時）:
    ```bash
-   bb scripts/cleanup.bb --subrepos
+   nbb scripts/cleanup.cljs --subrepos
    ```
 
 ### ガードレール（必須）
@@ -106,7 +106,7 @@ cleanup 処理を `scripts/cleanup.bb`（babashka・読取専用 dry-run 既定�
 
 ### 子リポ（229、要オーナー確認のみ・触らず）
 
-`bb scripts/cleanup.bb` の「子リポ survey」節を参照。主なもの:
+`nbb scripts/cleanup.cljs` の「子リポ survey」節を参照。主なもの:
 
 - etzhayyim 系 約100リポ: `.well-known/did.json` 一斉変更（kotoba RAD did:web 協調 WIP）。
   多くが `chore/cljc-ssot-prune` / `feat/actor-runtime-lib` ローカル branch + stash=1 を保持。
@@ -121,7 +121,7 @@ cleanup 処理を `scripts/cleanup.bb`（babashka・読取専用 dry-run 既定�
 ### 本 runbook + スクリプトの land（2026-06-29）
 
 - superproject の日常ブランチにはオーナー WIP（`manifest/west.yml` の pin 推進等）が残るため、
-  本 runbook と `cleanup.bb` は **専用 worktree に最新 `origin/main` から clean branch
+  本 runbook と `cleanup.cljs` は **専用 worktree に最新 `origin/main` から clean branch
   (`chore/cleanup-runbook`) を切り** そこに乗せた。長生き docs ブランチ（129 behind）には積まない。
 - セッション中にオーナー運用でブランチ削除/切替えが起き、初回 commit が一時 **孤児 commit**
   （どの branch にも属さない SHA のみ）になった。`git show <sha>` で実体を確認のうえ
@@ -132,7 +132,7 @@ cleanup 処理を `scripts/cleanup.bb`（babashka・読取専用 dry-run 既定�
 
 ## Verification
 
-- `bb scripts/cleanup.bb` が dry-run で survey + PR 分類 + 子リポ一覧を出力し、副作用無いこと。
+- `nbb scripts/cleanup.cljs` が dry-run で survey + PR 分類 + 子リポ一覧を出力し、副作用無いこと。
 - `--apply` 実行後、close 対象の孤児 PR が `gh pr view <n> --json state` = `CLOSED`。
 - 子リポで `git status` に変化無いこと（触っていない）。
-- `scripts/cleanup.bb` の paren balance が 0（`python3 -c "s=open('scripts/cleanup.bb').read();print(s.count('(')-s.count(')'))"`）。
+- `scripts/cleanup.cljs` の paren balance が 0（`python3 -c "s=open('scripts/cleanup.cljs').read();print(s.count('(')-s.count(')'))"`）。

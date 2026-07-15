@@ -54,7 +54,7 @@ checkout移動+remote retarget → 依存先座標更新 → repos.edn/west.yml�
 ```
 gh api repos/kotoba-lang/io-ipfs --jq '.full_name'   # kotoba-lang/io-ipfs
 cd checkpointer && clojure -Spath                     # io-ipfs 座標解決OK
-bb scripts/gen-west-manifest.bb --entry io-ipfs,org-w3-svg
+nbb scripts/gen-west-manifest.cljs --entry io-ipfs,org-w3-svg
 ```
 
 ## Consequences

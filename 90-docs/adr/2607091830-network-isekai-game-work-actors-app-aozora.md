@@ -51,10 +51,10 @@
    `https://isekai.network/<org>/<slug>?embed=1`（`public/_redirects` の
    `/<org>/* -> /play 200` rewrite がクエリ文字列を保持するため追加設定
    不要）。
-   - **既知の別問題として発見**: `public/play.html` は `bb render-site`
+   - **既知の別問題として発見**: `public/play.html` は `nbb render-site`
      の generator（`isekai.site.play`）が ADR-2607022800 の reagent-mount
      化リファクタ（`#btns-mount`/`#editor-mount`/`#status-mount`/
-     `#studio-link`、PR #110）より古いままで、`bb render-site` を実行すると
+     `#studio-link`、PR #110）より古いままで、`nbb render-site` を実行すると
      本番相当の HTML が静的マークアップへ退行する。本 ADR はこの pre-existing
      drift を修正しない（別スコープ）——`public/play.html` を generator
      経由でなく直接 hand-patch し、`isekai.site.play` 側は
@@ -110,7 +110,7 @@
   が実際の `yoro-social` db への流し込みは行っていない（kotobase の
   transact 障害有無に関わらず、SPA ローカルレンダリングで完結する経路を
   今回も選んだ）。
-- **`bb render-site`／`isekai.site.play` の reagent-mount drift 修正**:
+- **`nbb render-site`／`isekai.site.play` の reagent-mount drift 修正**:
   本 ADR のスコープ外——`public/play.html` は当面 hand-patch 前提で
   運用する。
 
@@ -132,7 +132,7 @@
   作品ごとの実画像が無い。
 - (−) `public/play.html` と `isekai.site.play`（generator source）の
   pre-existing drift は未解消のまま——今後この generator を素朴に
-  `bb render-site` すると退行する状態が残る。
+  `nbb render-site` すると退行する状態が残る。
 
 ## Addendum (2026-07-09, production deploy)
 

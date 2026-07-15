@@ -91,7 +91,7 @@ ADR-2607022800 で `kotoba-ui`/`appkit`/`uikit`（+ `liquid-glass-ui`）を koto
    `clc→office-style` 等の既存 org-transfer/rename 事例と同じ機構）。
    併せて `:extra-projects` の該当 4 行も新パス名に更新（旧名は
    `:path-overrides` の翻訳キーとしてのみ残る）。
-6. **`manifest/west.yml`**: `bb scripts/gen-west-manifest.bb --entry
+6. **`manifest/west.yml`**: `nbb scripts/gen-west-manifest.cljs --entry
    kami-engine-hud,kami-engine-hud-gpu,dom-gpu,kami-engine-app-sdk` で
    当該 4 entry のみ最小 diff 生成（サーバ側 pin 検証 OK）。旧 4 entry は
    splice では自動削除されない（`--entry` は指定 entry の置換/挿入のみで
@@ -154,7 +154,7 @@ ADR-2607022800 で `kotoba-ui`/`appkit`/`uikit`（+ `liquid-glass-ui`）を koto
   `aiueos`/`kootba→svgraph`/`clc→office-style`/`edn→office` の rename 事例は
   いずれも旧名を `:extra-projects` から除き `:path-overrides` にのみ残す
   形を取っており、それに揃えた。
-- **wholesale `bb scripts/gen-west-manifest.bb`（`--entry` なし）で
+- **wholesale `nbb scripts/gen-west-manifest.cljs`（`--entry` なし）で
   west.yml 全体を再生成する**: 却下。実際に試したところ
   `ghosthacker-flow`/`etzhayyim/root`/`cloud-murakumo`/`manimani`/
   `network-isekai`/`arrangement`/`character`/`comfyui` 等、本改名と無関係な

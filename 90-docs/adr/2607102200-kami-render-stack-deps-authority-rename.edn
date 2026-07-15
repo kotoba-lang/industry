@@ -1,8 +1,11 @@
 [{:adr/id "adr-2607102200-kami-render-stack-deps-authority-rename"
+  :adr/title "kami-engine 3D/WebGPU/WebGL 2.0/render 系統の依存・権限マップ"
   :adr/status "accepted"
   :adr/topic "kotoba-lang-repo-boundaries"
+  :adr/last-verified "2026-07-10"
   :adr/authoritative_for
-  ["kotoba-lang 3D / WebGPU / render 系統の canonical 依存レイヤと責任境界"
+  ["kotoba-lang 3D / WebGPU / WebGL 2.0 / render 系統の canonical 依存レイヤと責任境界"
+   "repo-wide 3D 実装で kami-engine stack を必須にする規則と完了条件"
    "誤解を生む repo 名の rename 表（script-runtime / engine-sdk / host）"
    "kami.wgsl 二重方言の SSoT 方針"
    "kami-engine monorepo nested 残骸の cleanup 方針"]
@@ -15,6 +18,30 @@
    "adr-2607100030-kotoba-kami-engine-host-imports"]
   :adr/supersedes []
   :adr/superseded_by []
+  :adr/render-backend-policy
+  {:order [:webgpu :webgl2]
+   :primary
+   {:api "WebGPU"
+    :shader-language "WGSL (WebGPU Shading Language)"
+    :executor "kotoba-lang/webgpu"
+    :raw-api-boundary "kotoba-lang/org-w3-webgpu"}
+   :fallback
+   {:api "WebGL 2.0"
+    :shader-language "GLSL ES 3.00 (OpenGL ES Shading Language)"
+    :executor "kotoba-lang/webgl"
+    :scope "canonical EDN render-IR の共通描画 subset"
+    :must-not-emulate [:compute-shader :storage-buffer :webgpu-only-features]}
+   :selection "WebGPU capability を先に判定し、unavailable の時だけ WebGL 2.0 を選択。両方 unavailable なら degraded state"
+   :forbidden-terms-as-standards ["WSGL" "GLSLES" "WGPU"]
+   :note "WGPU/wgpu は native implementation/substrate 名でありWeb標準名ではない"}
+  :adr/required-3d-gates
+  [:domain-data-assertions
+   :create-edit-undo-redo-save-export-roundtrip
+   :wasm-host-contract-parity
+   :real-browser-webgpu-e2e
+   :webgl2-common-subset-e2e
+   :github-pages-smoke
+   :explicit-degraded-state]
   :adr/rename-table
   [{:old "kotoba-lang/kami-script-runtime"
     :new "kotoba-lang/kami-input-map"

@@ -86,15 +86,15 @@ Vultr には Wise のような公開 sandbox API が無いため `api-base` は1
 
 ```
 cd orgs/kotoba-lang/com-vultr && clojure -M:test   # 14 tests, 28 assertions, green
-bb scripts/gen-west-manifest.bb --entry com-vultr
-bb scripts/gen-west-manifest.bb --check
+nbb scripts/gen-west-manifest.cljs --entry com-vultr
+nbb scripts/gen-west-manifest.cljs --check
 ```
 
 ## 実装フェーズ（完了）
 
 - **Phase A（完了）**: scaffold・テスト green・`kotoba-lang/com-vultr`（public）
   作成・push、`manifest/repos.edn` の `:extra-projects` に登録、
-  `gen-west-manifest.bb --entry com-vultr` で最小 diff 生成、pin 検証通過。
+  `gen-west-manifest.cljs --entry com-vultr` で最小 diff 生成、pin 検証通過。
 
 本ADRのスコープは「com-vultr ライブラリを作る」という決定であり、上記 Phase A
 の完了をもって全て完了・closed とする。

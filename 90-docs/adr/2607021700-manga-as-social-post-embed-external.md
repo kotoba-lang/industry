@@ -26,7 +26,7 @@
 
 ## Decision — manga は「canonical URL + app.bsky.embed.external」で流通する
 
-1. **画像パイプライン**: `scripts/sync-manga-images.bb` が tx EDN の参照
+1. **画像パイプライン**: `scripts/sync-manga-images.cljs` が tx EDN の参照
    パネルのみを ImageMagick でリーダー幅 WebP（1100px / q82、445MB→**21MB**）に
    変換し `public/images/`（gitignored deploy 資産、public/js と同扱い）へ。
    viewer は `.png`→`.webp` の拡張子スワップで `<img loading=lazy>` 描画。

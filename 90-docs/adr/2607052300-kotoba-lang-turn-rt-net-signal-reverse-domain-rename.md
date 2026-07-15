@@ -60,7 +60,7 @@ Same procedure as ADR-2607051200's ui-family rename:
    same mechanism as the ui-family rename and the `aiueos`/`kami-engine`/etc. org-transfer
    entries already there) and updated the corresponding 4 lines in `:extra-projects` to the
    new paths.
-5. **`manifest/west.yml`**: `bb scripts/gen-west-manifest.bb --entry
+5. **`manifest/west.yml`**: `nbb scripts/gen-west-manifest.cljs --entry
    org-ietf-turn,org-w3-webrtc-signaling,io-libp2p,org-signal` generated the 4 new entries
    with server-side pin verification OK; the old 4 entries (not auto-deleted by `--entry`,
    same caveat the ui-family ADR notes) were removed manually. Net project count unchanged

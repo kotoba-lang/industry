@@ -8,7 +8,7 @@ pass; Phase 2 — quantization/RGE/scattering — explicitly deferred, see Conse
 [`github.com/kotoba-lang/standard-model`](https://github.com/kotoba-lang/standard-model)
 (public), all six namespaces implemented with `deftest` coverage — 22 tests / 85
 assertions, 0 failures — CI green on GitHub Actions (JDK 17 + 21). Registered in
-`manifest/repos.edn`/`manifest/west.yml` via `gen-west-manifest.bb --entry
+`manifest/repos.edn`/`manifest/west.yml` via `gen-west-manifest.cljs --entry
 standard-model` (minimal diff, server-side pin verification OK).
 
 ## Context
@@ -141,5 +141,5 @@ concretely denotes at the classical level.
 Follows the standing "new project" authorization (CLAUDE.md, 2026-06-28): ADR → repo
 scaffold (`.cljc` + `deps.edn` + README + tests) → `git init` + initial commit →
 `gh repo create kotoba-lang/standard-model --public` + push → manifest registration
-(`repos.edn` + `gen-west-manifest.bb --entry standard-model`) → this ADR + manifest
+(`repos.edn` + `gen-west-manifest.cljs --entry standard-model`) → this ADR + manifest
 reflected in the superproject.

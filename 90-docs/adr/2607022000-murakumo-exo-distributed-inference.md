@@ -42,7 +42,7 @@ M4 ×11 + operator 32 GiB M1 Max）で実分散推論**すること。
        キャッシュ可）。
      - **`:mlx-ring`**: `mlx.launch --backend ring` + mlx_lm pipeline
        （MLX checkpoint が fleet に載る日のための adapter。現状 gate ✗）。
-   - bb 操作面 `murakumo.infer`: `bb murakumo infer
+   - nbb 操作面 `murakumo.infer`: `nbb murakumo infer
      probe|plan|provision|up|down|ps|serve|generate`。
 2. **cloud-murakumo に `/infer/*` API**（同じ純 IStore パターン）:
    `GET|PUT /infer/models/<id>`（レジストリ）、`GET|PUT /infer/plans/<id>`
@@ -144,7 +144,7 @@ fleet で希少なのは**メモリ×時間**。run の credits は
 **shard plan がそのまま run の cap table** になり、配置と精算が同じ数式で貫通する。
 
 - `settle`（純関数）: 1 run → `{:run/shares {node credits}} + head 10% + treasury 5%`
-- `balances`（純 fold）: 台帳 → 残高。bb/JVM/CF Worker/kotoba WASM で同一
+- `balances`（純 fold）: 台帳 → 残高。nbb/JVM/CF Worker/kotoba WASM で同一
 - cloud-murakumo `GET /infer/credits`: **operator が settle、cloud は fold するだけ**
   （価格付けは plan を持つ側の責務）
 - 台帳は kotoba 流 = **actor 署名付き append-only feed（改竄検知可能）であり、

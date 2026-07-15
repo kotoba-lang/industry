@@ -7,7 +7,7 @@
 ## Context
 
 ADR-2607022400 は kototama の runtime 設計に Solo5 tender パターンを採用し、
-ADR-2607022700 は native adapter（decision subprocess `bb decide` を呼ぶ側）を
+ADR-2607022700 は native adapter（decision subprocess `nbb decide` を呼ぶ側）を
 Rust で書く前提でモジュール計画を立てた。どちらも「Wasm を実際にホストする層
 （host.rs/runtime.rs 相当）は native/Rust でなければならない」という前提に
 立っていた——`.kotoba` は Wasm へコンパイルされる側であり、他の Wasm をホスト
@@ -56,8 +56,8 @@ JVM/Chicory 上の Clojure コードで行い、decision subprocess を別プロ
 | 旧計画（ADR-2607022700） | 新計画（本 ADR） |
 |---|---|
 | `host.rs`/`runtime.rs` を Rust で復元・改修 | **Chicory 経由の JVM/Clojure 実行層**として `aiueos-cljc-contract`（または隣接 namespace）に新規実装。Rust の host.rs/runtime.rs は復元しない |
-| decision subprocess（`bb decide`）を native adapter が別プロセスとして呼ぶ | 同一 JVM プロセス内で `aiueos.broker` の判定 → Chicory 実行、を直結できる（`bb decide` の EDN-over-stdio 経路は**別ホスト言語向けの汎用インターフェースとして温存**——Node/Python 等、JVM でない adapter からはこちらを使う） |
-| `bin/aiueos.rs`（CLI）を Rust で復元・改修 | CLI も JVM/Clojure（`bb`/`clojure` ベース）で実装可能。argv 解析・file I/O は Rust 特有の要件が無い |
+| decision subprocess（`nbb decide`）を native adapter が別プロセスとして呼ぶ | 同一 JVM プロセス内で `aiueos.broker` の判定 → Chicory 実行、を直結できる（`nbb decide` の EDN-over-stdio 経路は**別ホスト言語向けの汎用インターフェースとして温存**——Node/Python 等、JVM でない adapter からはこちらを使う） |
+| `bin/aiueos.rs`（CLI）を Rust で復元・改修 | CLI も JVM/Clojure（`nbb`/`clojure` ベース）で実装可能。argv 解析・file I/O は Rust 特有の要件が無い |
 | `virtio.rs` を低信頼度のまま書き直す | 変更なし——device-access quartet の生アクセス部分は依然 native 課題。ただし「native」が「Rust」を意味するとは限らなくなった（`java.lang.foreign` 経路が未検証のまま残る） |
 
 ### 3. 既知の未解決ギャップ（Chicory の現状の限界）
@@ -138,7 +138,7 @@ prototype に着手する価値があるが、非公式 API 依存・インタ�
   が定めた「意味論は CLJC」の範囲が、事実上「執行も含めほぼ全域」まで拡張
   される。
 - (+) decision subprocess（プロセス境界）と execution（Wasm実行）を同一 JVM
-  プロセスに同居させられるため、`bb decide` の per-invocation shell-out
+  プロセスに同居させられるため、`nbb decide` の per-invocation shell-out
   レイテンシ（ADR-2607022700 で「V1として許容、later最適化」と記した課題）が
   JVM ホストの adapter では実質解消する。
 - (+) `kotoba.wasm-exec` は kotoba-lang/kotoba 側で既に実装・テスト済みの

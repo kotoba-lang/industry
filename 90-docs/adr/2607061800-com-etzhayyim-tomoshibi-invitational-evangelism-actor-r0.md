@@ -11,7 +11,7 @@ implementation:
   repo: etzhayyim/com-etzhayyim-tomoshibi
   submodule: orgs/etzhayyim/com-etzhayyim-tomoshibi
   pinned: b31eff22441a6d5eb5872cc708661f422c0d78aa
-  landed_via: "child repo created + pushed (HEAD b31eff2, R0 scaffold: EvangelismGovernor genuinely wired to etzhayyim_organism.sensors.evangelism-gate, 9 tests / 19 assertions green via bb run_tests.clj). west manifest: repos.edn に entry 追加(GitHub API single-entry commit 2b7e5647) + west.yml は tomoshibi の1 entry のみ single-entry 追加(commit e1bb3752 — 全面再生成は pin 退行の罠、kouhou/sng precedent と同じ)。verify-west-pins: OK。RAD identity 登録は本 ADR の対象外(未着手、kouhou 同様 別 repo・別 commit の future work)。"
+  landed_via: "child repo created + pushed (HEAD b31eff2, R0 scaffold: EvangelismGovernor genuinely wired to etzhayyim_organism.sensors.evangelism-gate, 9 tests / 19 assertions green via nbb run_tests.clj). west manifest: repos.edn に entry 追加(GitHub API single-entry commit 2b7e5647) + west.yml は tomoshibi の1 entry のみ single-entry 追加(commit e1bb3752 — 全面再生成は pin 退行の罠、kouhou/sng precedent と同じ)。verify-west-pins: OK。RAD identity 登録は本 ADR の対象外(未着手、kouhou 同様 別 repo・別 commit の future work)。"
 authoritative_for:
   - "ADR-2607061700(etzhayyim/root Mission Charter §1.16 Active Evangelism Doctrine)Open Question 4 — どの actor が evangelism_gate を実際の決定経路に配線するか、の解として tomoshibi (灯) を新設する判断"
   - "既存 actor(kouhou/kataribe/tashikame/yomi/recruit)がいずれもドメイン不一致であるという domain survey の結論、および one-actor-one-role convention に基づき新規 actor が正しい選択だったという判断根拠"
@@ -65,14 +65,14 @@ R0 scope, deliberately narrow: **governor first, orchestration later.**
 Unlike kouhou/tashikame/yomi (organizer/advisor LLM node + governor +
 publisher inside a full `langgraph.graph` StateGraph), tomoshibi R0 ships
 only `src/tomoshibi/governor.cljc` — a pure function that **genuinely**
-`:require`s `etzhayyim-organism.sensors.evangelism-gate` (via `bb.edn`'s
+`:require`s `etzhayyim-organism.sensors.evangelism-gate` (via `nbb.edn`'s
 extra classpath entry pointing at the sibling `etzhayyim/root` checkout)
 and calls it on every proposal. This contrasts with `tashikame.governor`'s
 `person-targeting?` — an R0-illustrative `<DOXING>` marker whose docstring
 explicitly defers real wiring to "production" — tomoshibi wires the real
 sensor from R0.
 
-9 tests / 19 assertions green (`bb run_tests.clj`): clean invitation
+9 tests / 19 assertions green (`nbb run_tests.clj`): clean invitation
 commits (opt-out flag or textual opt-out), missing-opt-out /
 individual-vulnerability-targeting / coercion / minor-solo-solicitation /
 delegated `charter_rider` hit all HOLD, no-actuation HOLD, hold-invitation
@@ -89,7 +89,7 @@ ledger writes, RAD identity minting, live `did:web` hosting.
   `b31eff2`)。
 - **west manifest**: `repos.edn` entry(GitHub API single-entry commit
   `2b7e5647`)+ `west.yml` single-entry 追加(commit `e1bb3752` —
-  `bb scripts/gen-west-manifest.bb --entry com-etzhayyim-tomoshibi`、
+  `nbb scripts/gen-west-manifest.cljs --entry com-etzhayyim-tomoshibi`、
   verify-west-pins: OK。全面再生成は取らない — sng/kouhou precedent と同じ)。
 - **RAD identity**: 未着手(kouhou 同様、別 repo・別 commit の future work)。
 
@@ -102,7 +102,7 @@ ledger writes, RAD identity minting, live `did:web` hosting.
 - (−) tomoshibi は現時点で何も publish できない — 何らかの外部プロセス
   (現状は人間が draft する想定)が渡した proposal を判定するだけ。これは
   隠れたギャップではなく、明示された制約(`MATURITY.md`)。
-- (−) `bb.edn` の相対パス依存(sibling `etzhayyim/root` checkout 前提)により、
+- (−) `nbb.edn` の相対パス依存(sibling `etzhayyim/root` checkout 前提)により、
   tomoshibi 単体では clone しても動かない(west-managed monorepo 前提。
   kouhou の `langgraph-clj` 依存と同型の制約)。
 

@@ -136,7 +136,7 @@ repair-shop-cluster's own architecture).
   assertions) was re-run clean before committing the promotion.
 - `manifest/west.yml`'s `industry` pin was advanced via the GitHub API
   single-entry-commit path and verified canonical via
-  `bb scripts/gen-west-manifest.bb --entry industry`.
+  `nbb scripts/gen-west-manifest.cljs --entry industry`.
 
 ## Scope note: the "630 vs 643" discrepancy is now resolved
 

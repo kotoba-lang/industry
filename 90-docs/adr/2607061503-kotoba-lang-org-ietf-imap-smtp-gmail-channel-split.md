@@ -37,7 +37,7 @@ superseded_by: []
 
 ## 課題
 
-前ADR(2607061423)は Phase B として「local-manimani の gmail.ts/triage.bb から
+前ADR(2607061423)は Phase B として「local-manimani の gmail.ts/triage.cljs から
 com-gmail を使うよう配線」を想定していた。しかし local-manimani には既に
 **`docs/adr/0022-email-sms-channels-mobile.md`(Closed)** という決定済み設計が
 あり、そこでは意図的に「in-process の Gmail API クライアントは無い」「curl
@@ -125,6 +125,6 @@ smtp.client    -- send! (transport越しの手続き、AUTH LOGIN/PLAIN)
 ```
 cd orgs/kotoba-lang/org-ietf-imap && clojure -M:test
 cd orgs/kotoba-lang/org-ietf-smtp && clojure -M:test
-bb scripts/gen-west-manifest.bb --entry org-ietf-imap,org-ietf-smtp
-bb scripts/gen-west-manifest.bb --check
+nbb scripts/gen-west-manifest.cljs --entry org-ietf-imap,org-ietf-smtp
+nbb scripts/gen-west-manifest.cljs --check
 ```

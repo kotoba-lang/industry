@@ -62,9 +62,9 @@ Each `public/games/itonami/<slug>/` gets its own Ed25519 `did:key` CACAO
 identity — the same granularity as the blueprint-per-occupation pattern the
 games themselves already follow.
 
-### 2. Keys are minted out-of-band (JVM/bb), not client-side in the browser
+### 2. Keys are minted out-of-band (JVM/nbb), not client-side in the browser
 
-A one-time `bb` script (run per game, or batched over
+A one-time `nbb` script (run per game, or batched over
 `public/games/itonami/*`) calls `kotoba-lang/cacao`'s `cacao/mint` to derive
 each game's `did:key` and CACAO credential. Because `cacao/core.clj` can't
 run in CLJS today, minting happens server-side — this is a deliberate,
@@ -125,7 +125,7 @@ shot.
   bundled here.
 - (−) Key-management overhead scales with game count (8 now, up to 111
   possible across the full `cloud-itonami` blueprint family per
-  ADR-2607012000). Minting is a deliberate one-time manual `bb`-script gate
+  ADR-2607012000). Minting is a deliberate one-time manual `nbb`-script gate
   per game, not automatic — fine at pilot scale, worth revisiting before any
   push toward the full 111.
 - (−) `network.isekai.asset` (ADR-0008) remains declared-but-unemitted; this
@@ -185,7 +185,7 @@ growing one secret per game, up to 111), the `backend/` Worker should derive
 each game's key **the same way `aozora.pds.actorkey` already does**: HKDF
 from a single operator-held master seed + the game's `did`/slug as the
 derivation input. One master secret, not N per-game secrets; no separate
-out-of-band `bb` minting step per game; and it's the exact mechanism
+out-of-band `nbb` minting step per game; and it's the exact mechanism
 `app-aozora` itself already uses for this exact custodial stage, rather than
 a parallel bespoke scheme this ADR would otherwise be inventing. This is
 still squarely the custodial stage this addendum calls "Level A" above — it

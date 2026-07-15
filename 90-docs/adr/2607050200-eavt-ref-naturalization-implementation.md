@@ -145,7 +145,7 @@ both platforms.
 - **`manifest/west.yml` pin advancement for `quad-store`/`kqe`/
   `kotobase-engine` is deferred**, same reason as ADR-2607050100: all three
   repos' shared west checkouts (`orgs/kotoba-lang/{quad-store,kqe,
-  kotobase-engine}`) sit at a stale HEAD that `gen-west-manifest.bb --entry`
+  kotobase-engine}`) sit at a stale HEAD that `gen-west-manifest.cljs --entry`
   reads from directly, and advancing that HEAD in a shared checkout is out
   of this session's authority (see ADR-2607050100's identical finding for
   `kotoba`). `kotobase-engine`'s shared checkout additionally carries

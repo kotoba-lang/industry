@@ -129,7 +129,7 @@ that was only sketched in the Decision/Consequences of this ADR.
 | Approve share | `:external-send`; tayori draft (never-sent) + delivered? |
 | State contract | `matchedEffects` / `sharedEffects` on `GET …/state` |
 | Overlay fix | client `:product-party` preserved across `fetch-state!` on catalog tab |
-| CLI / doctor | `ops-commands` SSoT; `bb procurement-match-and-share`; readiness next-action |
+| CLI / doctor | `ops-commands` SSoT; `nbb procurement-match-and-share`; readiness next-action |
 | Phase-1 resume | draft runners resume after outer approve (no stuck escalate) |
 
 Representative SHAs (main history; pins advanced on superproject west.yml):

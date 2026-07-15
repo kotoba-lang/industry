@@ -71,7 +71,7 @@ Ethereum mainnet の USDC ガス($10 決済に $2-5)は少額課金の致命的�
 
 `tools/verify-payments.clj`: pending を読み → Basescan `tokentx` で Safe への USDC
 入金を取得 → `verify` → 確認済みのみ `crypto-topup-entry` を append。
-API キーは **env → Apple Keychain → 1Password** で解決(`b2-creds.bb` 慣例。値は
+API キーは **env → Apple Keychain → 1Password** で解決(`b2-creds.cljs` 慣例。値は
 git に入れない)。**LaunchAgent で常駐化**(`--watch=60`)し、入金 → 確認 → 付与が
 ~60s ごとに全自動。読み取り専用(資金は動かさない)。
 
@@ -82,7 +82,7 @@ git に入れない)。**LaunchAgent で常駐化**(`--watch=60`)し、入金 �
 - **needs駆動再配置** `murakumo.infer.rebalance`(純): 匿名スナップショットの容量
   (16GB→10GB shard 上限)+ request mix → head/relay 1台予約 → 残りを text/media/
   postproc プールに needs 比例配分(largest-remainder + floor + ヒステリシス)
-- **制御ループ** `bb murakumo orchestrate`: `/infer/fleet` + `/infer/runs` を読み →
+- **制御ループ** `nbb murakumo orchestrate`: `/infer/fleet` + `/infer/runs` を読み →
   rebalance → `/infer/placement` に公開
 
 ### 7. ファネルと成長ループ

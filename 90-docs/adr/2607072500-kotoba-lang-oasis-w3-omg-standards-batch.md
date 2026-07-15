@@ -51,7 +51,7 @@ superseded_by: []
 
 ## Consequences
 
-- `manifest/repos.edn` の `:extra-projects` に4新規 path を登録 + `bb scripts/gen-west-manifest.bb --entry org-sbml,org-w3-owl2,org-omg-uml,org-omg-sysmlv2,org-w3-rdf` で5 entry（新規4 + org-w3-rdf pin前進1）を一括の最小 diff で反映。
+- `manifest/repos.edn` の `:extra-projects` に4新規 path を登録 + `nbb scripts/gen-west-manifest.cljs --entry org-sbml,org-w3-owl2,org-omg-uml,org-omg-sysmlv2,org-w3-rdf` で5 entry（新規4 + org-w3-rdf pin前進1）を一括の最小 diff で反映。
 - v2 スコープアウト項目（各リポジトリの README Follow-ups に明記）: SBML の空間/multi/comp/qual拡張パッケージ・完全な次元解析・algebraic rule の DAE 解法。OWL 2 の完全DL推論・RDFマッピング・プロファイル検証・SWRL。UML の13 Behavior ダイアグラム・XMI完全準拠。SysML v2 のテキスト具象構文・Action実行セマンティクス・要件検証エンジン・制約ソルバー・Views。いずれも「サイレントに間違った値を返す」のではなく、parse/round-tripはできても evaluate/execute 相当の操作は明確に throw する設計（org-oasis-open-xmile と同じ documented honesty 方針）。
 - 5リポジトリとも `kotoba-lang/dsl-core` に `:git/sha` 依存（`kotoba.dsl.problem` 検証結果規約の再利用）。
 
@@ -60,4 +60,4 @@ superseded_by: []
 - 4新規リポジトリすべて `clojure -M:test` all green（sbml: 66/259, owl2: 27/151, uml: 41/85, sysmlv2: 26/77）+ `clojure -M:lint` errors 0/warnings 0（CI で JDK17/21 マトリクスも green を確認したものを含む）。
 - `org-w3-rdf` は 16 tests/47 assertions all green、`ee174a6`→`c3db77a` へ fast-forward push 済み。
 - `gh repo create kotoba-lang/{org-sbml,org-w3-owl2,org-omg-uml,org-omg-sysmlv2} --public` + push 済み。
-- `manifest/repos.edn` への登録 + `bb scripts/gen-west-manifest.bb --entry <5件>` で最小 diff 生成、pin はサーバ側検証（`verify-west-pins.bb`）で5件全て OK（新規4件は「main から到達可能」、org-w3-rdf は fast-forward）。
+- `manifest/repos.edn` への登録 + `nbb scripts/gen-west-manifest.cljs --entry <5件>` で最小 diff 生成、pin はサーバ側検証（`verify-west-pins.cljs`）で5件全て OK（新規4件は「main から到達可能」、org-w3-rdf は fast-forward）。

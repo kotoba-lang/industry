@@ -66,7 +66,7 @@ preserve package names, GitHub Pages URLs, and SVG/Office integration surfaces
 that should not be conflated with the kotoba CLJ/EDN substrate.
 
 Mechanism: add `<x>-clj` → `<x>` entries to `:path-overrides`; regenerate
-(`bb scripts/gen-west-manifest.bb`) + `west update` to relocate checkouts;
+(`nbb scripts/gen-west-manifest.cljs`) + `west update` to relocate checkouts;
 verify `--check` canonical and `pin == repo HEAD`. GitHub org relocation per
 repo is a separate decision (some repos may stay at `github.com/com-junkawasaki`
 and be checked out under `kotoba-lang/` via `:remote-overrides`, as
@@ -91,7 +91,7 @@ taxonomy:
 
   Enforced through the standing "new project" workflow (CLAUDE.md) and the
   doc-only `:orgs` key in `repos.edn`.
-- `:path-overrides` is the migration mechanism; `gen-west-manifest.bb --check`
+- `:path-overrides` is the migration mechanism; `gen-west-manifest.cljs --check`
   keeps `west.yml` canonical.
 - This ADR is the single reference for the org taxonomy; the passing 公益/事業
   mentions in library ADRs now resolve here.

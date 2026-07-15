@@ -170,8 +170,8 @@ render-IR EDN directly (`kami.webgpu/draw!`, `kami.webgpu.mesh/draw!`) instead o
 
 The containment-boundary decision (#6: LLM-persona proposes only, a separate governor is the
 sole path to a renderable/speakable turn, append-only ledger) is **unchanged** — re-expressed
-in `.cljc` (`babiniku.governor/review-turn`) instead of TypeScript, gated by `bb governor`
-(matching network-isekai's `isekai.moderation.cljc` + `bb moderation` convention). The
+in `.cljc` (`babiniku.governor/review-turn`) instead of TypeScript, gated by `nbb governor`
+(matching network-isekai's `isekai.moderation.cljc` + `nbb moderation` convention). The
 private-data-model decision (#7) is also unchanged.
 
 Deployed (Milestone 0, placeholder): a kami-webgpu render loop (a placeholder box by

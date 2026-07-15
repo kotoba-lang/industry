@@ -193,106 +193,106 @@ core/all の live evidence path は別ファイルを必須とし、`runbook-liv
 既存 evidence file が別 target を指す場合は credential 投入前に確認できる。
 同じ確認は `clojure -M:doctor live-targets [facts-dir] [live-evidence.edn] [live-all-evidence.edn] [thread-id]`
 でも単独実行できる。shell で non-zero gate にしたい場合は `live-targets-gate` を使う。
-Babashka では `bb live-targets ...` と `bb live-gate [facts-dir] [store.edn] [thread-id] [live-evidence.edn] [live-all-evidence.edn]`
+Babashka では `nbb live-targets ...` と `nbb live-gate [facts-dir] [store.edn] [thread-id] [live-evidence.edn] [live-all-evidence.edn]`
 を用意し、`live-gate` は evidence target、`live-preflight-gate`、`production-preflight` を runbook と同じ引数順で確認する。
-`bb live-env` は現在不足している env から shell の `export` skeleton と次の live command を返す。
-`bb live-env-script` は skeleton だけを plain text で出し、auth または model key が未入力のままなら
-`bb live-gate` 前に停止する。
-`bb live-env-evidence ... /tmp/cloud-itonami-live-env-evidence.edn` は secret 値を保存せず、
+`nbb live-env` は現在不足している env から shell の `export` skeleton と次の live command を返す。
+`nbb live-env-script` は skeleton だけを plain text で出し、auth または model key が未入力のままなら
+`nbb live-gate` 前に停止する。
+`nbb live-env-evidence ... /tmp/cloud-itonami-live-env-evidence.edn` は secret 値を保存せず、
 env の存在 boolean、preflight、missing env、advance plan の redacted snapshot を保存する。
-`bb live-env-evidence-report ...` / `bb live-env-evidence-gate ...` は保存済み snapshot の
+`nbb live-env-evidence-report ...` / `nbb live-env-evidence-gate ...` は保存済み snapshot の
 target、redaction、env presence、next action kind を検査する。
-`bb live-ready-loop ... /tmp/cloud-itonami-live-env-evidence.edn 5` は redacted env evidence を更新し、
+`nbb live-ready-loop ... /tmp/cloud-itonami-live-env-evidence.edn 5` は redacted env evidence を更新し、
 その gate を通してから ready な live advance を blocking まで進める。
-`bb live-ready-loop-evidence ... /tmp/cloud-itonami-live-ready-loop.edn 5` は同じ loop 結果を
+`nbb live-ready-loop-evidence ... /tmp/cloud-itonami-live-ready-loop.edn 5` は同じ loop 結果を
 redacted evidence として保存する。
-`bb live-env-file-template-file /tmp/cloud-itonami-live.env` は secret 値を空欄にした
+`nbb live-env-file-template-file /tmp/cloud-itonami-live.env` は secret 値を空欄にした
 live credential file の雛形を作る。既存ファイルは上書きしない。
-`bb live-env-file-evidence /tmp/cloud-itonami-live.env /tmp/cloud-itonami-live-env-file.edn` は
+`nbb live-env-file-evidence /tmp/cloud-itonami-live.env /tmp/cloud-itonami-live-env-file.edn` は
 live credential file の key presence と auth/model readiness だけを redacted EDN として保存する。
-`bb live-env-file-preflight /tmp/cloud-itonami-live.env /tmp/cloud-itonami-live-env-file-preflight.edn` は
+`nbb live-env-file-preflight /tmp/cloud-itonami-live.env /tmp/cloud-itonami-live-env-file-preflight.edn` は
 env-file を直接 parse して Kotoba auth と model provider/url/key の redacted preflight を保存し、
-`bb live-env-file-preflight-gate ...` は live 実行可能でなければ non-zero exit する。
-`bb live-env-file-runbook-file ... /tmp/cloud-itonami-live-env-file-runbook.sh` は procedure/employee
+`nbb live-env-file-preflight-gate ...` は live 実行可能でなければ non-zero exit する。
+`nbb live-env-file-runbook-file ... /tmp/cloud-itonami-live-env-file-runbook.sh` は procedure/employee
 takeover/react-loop gate を通してから env-file を source し、core/all live operate、post-run refresh、
 completion gate まで進める bash を実行可能ファイルとして保存する。
-`bb procedure-employee-takeover ../m365-archive/facts /tmp/cloud-itonami-company.edn` は
+`nbb procedure-employee-takeover ../m365-archive/facts /tmp/cloud-itonami-company.edn` は
 `procedure-terms`、`hr-terms`、`people` の fact count と local store の `:procedure` / `:employee`
 activity count を再読し、`procedure` activity、HR procedure、internal people registry、people actor の
 expected/actual count が不足していないことを証跡化する。
-`bb procedure-employee-react-loop ...` は同じ store の lane 別 effect status、checkpoint、approval drain を
+`nbb procedure-employee-react-loop ...` は同じ store の lane 別 effect status、checkpoint、approval drain を
 再読し、procedure/employee lane の done effect count が takeover expected count を満たすことを証跡化する。
-`bb live-launch-checklist ... /tmp/cloud-itonami-live-launch-checklist.edn` は target safety、
+`nbb live-launch-checklist ... /tmp/cloud-itonami-live-launch-checklist.edn` は target safety、
 env-file readiness、env-file preflight readiness、procedure/employee takeover/react-loop readiness、runtime acceptance readiness、runbook file、execution packet、completion audit evidence をまとめた
 go/no-go 証跡を保存し、既存の credential-gap 証跡があれば non-blocking diagnostic として同梱する。
-`bb live-launch-checklist-report ...` は env-file 起点の next action を返し、
-`bb live-launch-checklist-gate ...` は `:launchable? true` でなければ non-zero exit する。
-`bb live-launch-handoff ... /tmp/cloud-itonami-live-launch-handoff.edn` は checklist から不足 gate、
+`nbb live-launch-checklist-report ...` は env-file 起点の next action を返し、
+`nbb live-launch-checklist-gate ...` は `:launchable? true` でなければ non-zero exit する。
+`nbb live-launch-handoff ... /tmp/cloud-itonami-live-launch-handoff.edn` は checklist から不足 gate、
 投入すべき env key、credential-gap 要約、次の operator action、refresh/gap/gate/launch コマンドを secret なしの redacted
 handoff として保存する。handoff gate は launchable false でも handoff 自体の整合性があれば通る。
-`bb live-launch-rehearsal ... /tmp/cloud-itonami-live-launch-rehearsal.edn` は checklist、handoff、
+`nbb live-launch-rehearsal ... /tmp/cloud-itonami-live-launch-rehearsal.edn` は checklist、handoff、
 execution packet、runbook file を突き合わせ、exact run order、target path、secret marker 不在、
 handoff/checklist の不足 gate 一致を redacted 証跡化する。rehearsal gate は launchable false でも
 実行前構造が整合していれば通る。
-`bb live-credential-gap ... /tmp/cloud-itonami-live-credential-gap.edn` は env-file evidence、
+`nbb live-credential-gap ... /tmp/cloud-itonami-live-credential-gap.edn` は env-file evidence、
 env-file preflight、launch rehearsal を突き合わせ、構造は ready で残りが credential だけであることを
 redacted 証跡化する。
-`bb live-credential-handoff ... /tmp/cloud-itonami-live-credential-handoff.edn` は credential-gap、
+`nbb live-credential-handoff ... /tmp/cloud-itonami-live-credential-handoff.edn` は credential-gap、
 launch-ready、launch-contract の redacted report を束ね、投入すべき env key、refresh command、
 gate command、次の operator action を secret なしで作業票化する。handoff gate は credential 投入待ちとして
 整合している場合だけ通る。
-`bb live-runtime-acceptance ... /tmp/cloud-itonami-live-runtime-acceptance.edn` は元 store をコピーし、
+`nbb live-runtime-acceptance ... /tmp/cloud-itonami-live-runtime-acceptance.edn` は元 store をコピーし、
 OpenClaw-compatible、Hermes-compatible、Kotoba XRPC、Kotoba XRPC real-operate の ReAct/tool-calling
 経路を redacted smoke evidence として保存する。元の `/tmp/cloud-itonami-company.edn` は変更しない。
-`bb live-business-acceptance ... /tmp/cloud-itonami-live-business-acceptance.edn` は procedure/employee
+`nbb live-business-acceptance ... /tmp/cloud-itonami-live-business-acceptance.edn` は procedure/employee
 takeover、procedure/employee react-loop、launch checklist、handoff、rehearsal、credential-gap、runtime acceptance、
 execution packet をひとつの redacted acceptance 証跡に束ねる。acceptance gate は全手続き・全社員手続きの
 count と local react-loop、runtime/model/Kotoba XRPC 推進経路が揃い、launch 前の残りが credential だけである状態を通す。
-`bb live-launch-ready ... /tmp/cloud-itonami-live-launch-ready.edn` は env-file evidence、preflight、
+`nbb live-launch-ready ... /tmp/cloud-itonami-live-launch-ready.edn` は env-file evidence、preflight、
 launch checklist、handoff、rehearsal、credential-gap、runtime acceptance、business acceptance、
 execution packet、runbook を束ねた最終 go/no-go 証跡を保存する。launch-ready gate は credential も含めて
 env-file/preflight/checklist が launchable になった場合だけ通る。
-`bb live-launch-cutover-dry-run ... /tmp/cloud-itonami-live-launch-cutover-dry-run.edn` は live write を実行せず、
+`nbb live-launch-cutover-dry-run ... /tmp/cloud-itonami-live-launch-cutover-dry-run.edn` は live write を実行せず、
 runbook と execution packet の両方で final launch-ready gate、launch proof bundle gate、launch contract gate が最初の `operate-live` より前に置かれていることを
 redacted 証跡化する。dry-run gate は構造検査なので credential 未投入でも通り、`ready-to-launch?` で実行可否を分ける。
-`bb live-launch-proof-bundle ... /tmp/cloud-itonami-live-launch-proof-bundle.edn` は procedure/employee takeover、
+`nbb live-launch-proof-bundle ... /tmp/cloud-itonami-live-launch-proof-bundle.edn` は procedure/employee takeover、
 procedure/employee react-loop、runtime acceptance、business acceptance、final launch-ready、cutover dry-run、
 completion audit をひとつの redacted 証跡に束ねる。bundle gate は証跡構造を検査し、`complete?` と `launchable?` で
 実 live 完了可否を分ける。
-`bb live-launch-contract ... /tmp/cloud-itonami-live-launch-contract.edn` は final launch-ready、cutover dry-run、
+`nbb live-launch-contract ... /tmp/cloud-itonami-live-launch-contract.edn` は final launch-ready、cutover dry-run、
 launch proof bundle、execution packet、runbook file を束ね、credential 投入後に実行してよい `bash runbook` command を
 redacted contract として保存する。contract gate は launch-ready / cutover / proof-bundle がすべて launchable の場合だけ通る。
-`bb live-readiness-audit ... /tmp/cloud-itonami-live-readiness-audit.edn` は live operating scope、
+`nbb live-readiness-audit ... /tmp/cloud-itonami-live-readiness-audit.edn` は live operating scope、
 business acceptance、credential handoff、launch-ready、launch-contract を束ね、全手続き・全社員手続きの
 取り込みと react-loop 推進証跡が揃っているか、現在の次 action が credential fill か launch contract 実行かを
 redacted に保存する。audit gate は credential 未投入でも、全社 scope が証明済みで次 action が明確なら通る。
-`bb live-credential-resume ... /tmp/cloud-itonami-live-credential-resume.edn` は readiness audit と credential
+`nbb live-credential-resume ... /tmp/cloud-itonami-live-credential-resume.edn` は readiness audit と credential
 handoff から、credential 投入後に実行する refresh、gate、launch command を redacted packet として保存する。
 resume gate は packet が actionable で、secret marker を含まない場合だけ通る。
-`bb live-credential-resume-script-file ... /tmp/cloud-itonami-live-credential-resume.sh` は同じ packet から
+`nbb live-credential-resume-script-file ... /tmp/cloud-itonami-live-credential-resume.sh` は同じ packet から
 実行可能な bash script を生成する。script gate は resume packet gate、refresh、launch-ready/contract gate、
 runbook launch が含まれ、secret marker を含まないことを検査する。
-`bb live-execution-packet-gate ...` は credential 投入後に実行する command packet が
+`nbb live-execution-packet-gate ...` は credential 投入後に実行する command packet が
 procedure/employee takeover/react-loop gate、live operating scope gate、runtime acceptance gate、final launch-ready gate、cutover dry-run gate、launch proof bundle gate、launch contract gate から始まる exact run order、必須コマンド、target、
 redaction、secret marker 不在を満たすことを検査する。
-`bb live-status ...` は同じ引数順で full fact coverage を読まず、target safety、kotoba/model credential、
+`nbb live-status ...` は同じ引数順で full fact coverage を読まず、target safety、kotoba/model credential、
 core/all live evidence の有無、next command、現在不足している `:missing-env`、実行順の `:next-actions`、
 許可された `:action-kinds` を返す。
-`bb live-next ...` は `live-status` の最初の `:next-actions` command を plain text で返す。
-`bb live-next-executable ...` は credential 投入待ちでは credential resume script を生成して実行する command を返し、
+`nbb live-next ...` は `live-status` の最初の `:next-actions` command を plain text で返す。
+`nbb live-next-executable ...` は credential 投入待ちでは credential resume script を生成して実行する command を返し、
 ready 後は core/all `operate-live` command を返す。
-`bb live-next-action ...` は同じ action map を EDN で返すため、runbook/CI は kind、reason、
+`nbb live-next-action ...` は同じ action map を EDN で返すため、runbook/CI は kind、reason、
 command、missing env を typed data として扱える。
-`bb live-advance-plan ...` は next action に対する gate、run、verify、after、blocking 状態を
+`nbb live-advance-plan ...` は next action に対する gate、run、verify、after、blocking 状態を
 EDN で返し、agent が credential 待ちから core/all live 実行、completion gate まで同じ形で進める。
-`bb live-advance-once ...` は next action が ready な場合だけ gate、run、verify を一段実行し、
+`nbb live-advance-once ...` は next action が ready な場合だけ gate、run、verify を一段実行し、
 credential 待ちなどの blocking 状態では non-zero で停止する。
-`bb live-advance-until-blocked ... 5` は ready な action を最大 step 数まで繰り返し、
+`nbb live-advance-until-blocked ... 5` は ready な action を最大 step 数まで繰り返し、
 次の blocking 状態を EDN として返す。
-`bb live-next-kind ...` は同じ action の kind だけを plain text で返す。
-`bb live-expect-next-kind fill-live-env ...` は現在の next action kind が期待値と違う場合に
+`nbb live-next-kind ...` は同じ action の kind だけを plain text で返す。
+`nbb live-expect-next-kind fill-live-env ...` は現在の next action kind が期待値と違う場合に
 non-zero で止めるため、runbook/CI から段階ずれを検出できる。
-`bb live-plan ...` は同じ引数順で target safety、kotoba/model credential、local readiness、
+`nbb live-plan ...` は同じ引数順で target safety、kotoba/model credential、local readiness、
 core/all live evidence の step status、next command、現在不足している `:missing-env` を返す。
 `xrpc-smoke-company` は `langchain.kotoba-db/kotoba-api` の XRPC request/response 形を
 local interpreter で受け、実 kotoba-server なしで company import と mock React を通す。
@@ -478,7 +478,7 @@ approval queue は `cloud-itonami.approval` CLI から `list` / `approve` / `rej
 - `clojure -M:doctor live-ready-loop-evidence ../m365-archive/facts /tmp/cloud-itonami-company.edn cloud-itonami-live-operate /tmp/cloud-itonami-live-operate.edn /tmp/cloud-itonami-live-operate-all.edn /tmp/cloud-itonami-live-env-evidence.edn /tmp/cloud-itonami-live-ready-loop.edn 5`
   は ready loop の結果を redacted evidence として保存する。
 - `clojure -M:doctor live-env-shell` は `:missing-env` から shell の `export` skeleton と
-  `bb live-gate` / `bb live-runbook` コマンドを返す。
+  `nbb live-gate` / `nbb live-runbook` コマンドを返す。
 - `clojure -M:doctor live-env-shell-script` は同じ skeleton を plain text として返し、未入力 credential を shell で fail-fast する。
 - `clojure -M:doctor live-preflight` は kotoba graph 設定、kotoba health、Hermes/OpenClaw model
   credential をまとめて確認し、live gate が実行可能かを返す。実 write を前提にするため、
@@ -550,7 +550,7 @@ approval queue は `cloud-itonami.approval` CLI から `list` / `approve` / `rej
   proposed/approved/executed effect、approval drain の判定を返す。
 - `clojure -M:doctor runbook-live ../m365-archive/facts /tmp/cloud-itonami-company.edn cloud-itonami-live-operate /tmp/cloud-itonami-live-operate.edn /tmp/cloud-itonami-live-operate-all.edn`
   は credential 設定後に core/all の live evidence と completion audit を一気通貫で実行する bash を出力する。
-- `bb live-gate ../m365-archive/facts /tmp/cloud-itonami-company.edn cloud-itonami-live-operate /tmp/cloud-itonami-live-operate.edn /tmp/cloud-itonami-live-operate-all.edn`
+- `nbb live-gate ../m365-archive/facts /tmp/cloud-itonami-company.edn cloud-itonami-live-operate /tmp/cloud-itonami-live-operate.edn /tmp/cloud-itonami-live-operate-all.edn`
   はその直前に evidence target、kotoba/model credential、production readiness を fail-fast で確認する。
 
 SES / people を含む会社 operating subset は local `langchain.db` file store に bulk snapshot として永続化し、
@@ -563,5 +563,43 @@ mock React loop と approval dry-run まで検証済み。この checkout では
 `kyber-plm` は名称・操作面・standalone source tree としては閉じ、`cloud-itonami` の compat/history 語彙にする。
 利用者・agent・UI は `cloud-itonami.ops` / `cloud-itonami.plm` を呼び、結果は itonami store の
 activity/effect/audit に残す。kyber namespace は互換・内部実装としてのみ残す。
-`bb kyber-refactor-audit /tmp/cloud-itonami-kyber-refactor-audit.edn` は sample PLM/ERP/MES graph を
+`nbb kyber-refactor-audit /tmp/cloud-itonami-kyber-refactor-audit.edn` は sample PLM/ERP/MES graph を
 itonami artifact/relation/activity/effect/audit へ射影し、この決定を redacted gate として再検証する。
+
+## Addendum (2026-07-12): プラットフォームとしての位置づけの訂正
+
+本 ADR 本文（2026-06-27 時点）は cloud-itonami を「`manimani` の企業版として
+**gftdcojp 単体**の business activity（M365/kyber-plm/keiei-sim/litigation）を
+統合する業務 OS」として記述している。この記述は起票当時の decision としては
+正しいが、**cloud-itonami 全体のスコープを代表するものではない**ため、以後の
+会話・要約でこの ADR だけを根拠に cloud-itonami を「gftdcojp 内部業務基盤」や
+「特定ゲーム(network-isekai)配下のブループリント層」と要約するのは誤り。
+
+現時点(2026-07-12)での正しい位置づけ:
+
+- **cloud-itonami は全世界・全産業を対象にした AI agent / robotics 化 SaaS
+  platform である。** ISIC Rev.5 の全 21 section を coverage 済み(ADR-2607011000)。
+  section ごとに `cloud-itonami-isic-*` vertical actor(繊維・金属・通信・宿泊・
+  人材紹介・廃棄物・医薬品小売など 30 件超、`90-docs/adr/2607112*` 〜
+  `2607121*` 一連)が発行されており、gftdcojp の内部業務はその中の1事例
+  （自社テナントとしての self-hosting）に過ぎない。
+- **サプライチェーンをコード化し、需要側・供給側いずれかに登録した組織/個人
+  だけが情報を共有できる。** 登録は `itonami.cloud` の `{org}/{repo}` テナント
+  への自己登録(CACAO/did:key 自己mint、中央承認・共有 token 不要)であり、
+  ISIC/ISCO タグ付きで `/api/open-business` に動的掲載される
+  (ADR-2607051621 Layer 1)。テナント間の scoped queue/effect/audit read は
+  org/repo 単位で分離される(`docs/adr/0002-org-repo-tenant-isolation.md`)。
+- **世の中の SaaS を OSS・分散型で再設計・実装したもの。** Layer 0(AGPLv3
+  自己ホスト、義務は改変ソース公開のみ)/ Layer 1(ネットワーク登録)/
+  Layer 2(オンチェーン protocol fee、`kotoba-lang/treasury` 経由)/
+  Layer 3(デュアルライセンス)の4層モデルで、無償の自己ホストと有償参加を
+  両立する(ADR-2607051621)。
+- **物理領域作業は robot が行い、actor は action を提案し、独立 governor が
+  gate する** robotics 前提が全 vertical の必須 capability(ADR-2607011000)。
+  これは既存 actor 3 例(robotaxi-actor / gftd-talent-actor / cloud-itonami
+  自身の ops-LLM⊣CertGovernor)と同型の「知能ノード封じ込め + 独立 governor
+  + 不変台帳」パターンの物理作動版。
+
+本文の「gftdcojp business activity 統合」という decision 自体は撤回しない
+（実装済みで有効）。訂正するのは要約の粒度であり、本 addendum をもって
+cloud-itonami の位置づけに関する記載の齟齬は closing する。

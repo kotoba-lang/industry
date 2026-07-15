@@ -79,11 +79,11 @@ tiers considered:
 
 5. **Persona/schema logic lives in `.cljc` as the source of truth; the JS Function mirrors
    it.** `babiniku.persona` (new namespace) builds the system prompt string and the
-   structured-output schema from a `babiniku.character` roster entry — pure, `bb`-testable,
+   structured-output schema from a `babiniku.character` roster entry — pure, `nbb`-testable,
    no HTTP. `functions/api/chat.js` cannot run Clojure, so it carries a **manual, documented
    mirror** of the roster/persona/schema data (same duplication precedent already established
    by `babiniku.vrm-bridge`'s own docstring: a whole separate build pipeline isn't worth it
-   for a handful of small, rarely-changed functions/data). `bb persona` is the test gate for
+   for a handful of small, rarely-changed functions/data). `nbb persona` is the test gate for
    the `.cljc` side; the JS mirror's top comment names exactly which `.cljc` files/tests it
    must be kept in sync with.
 
@@ -122,8 +122,8 @@ tiers considered:
   Functions build target (`functions/api/`) in addition to its existing shadow-cljs static
   build.
 - The roster/persona/schema duplication between `src/babiniku/{character,persona}.cljc` and
-  `functions/api/chat.js` is a manual-sync surface (3 characters, 2 small enum sets) — `bb
-  persona`/`bb governor` are the tests to run before changing either side.
+  `functions/api/chat.js` is a manual-sync surface (3 characters, 2 small enum sets) — `nbb
+  persona`/`nbb governor` are the tests to run before changing either side.
 
 ## Alternatives Considered
 
@@ -154,7 +154,7 @@ tiers considered:
   vocabulary the schema is generated from)
 - `orgs/jk-luxury/net-babiniku/functions/api/chat.js` (the Cloudflare Pages Function; top
   comment documents the manual mirror and what it must stay in sync with)
-- `orgs/jk-luxury/net-babiniku/test/persona_test.clj` (`bb persona` gate)
+- `orgs/jk-luxury/net-babiniku/test/persona_test.clj` (`nbb persona` gate)
 - `90-docs/adr/2607062200-net-babiniku-onlyfans-style-creator-monetization.md` (the still-open
   content-rating decision this ADR's SFW-only backend does not resolve)
 - club-shinshi's self-fine-tune/Modal/vLLM precedent (ADR-2606032100, referenced but not

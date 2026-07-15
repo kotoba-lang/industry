@@ -33,7 +33,7 @@ def _charter_scan(text: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Functional gate: clj-kondo + bb load
+# Functional gate: clj-kondo + nbb load
 # ---------------------------------------------------------------------------
 
 def _strip_fences(src: str) -> str:

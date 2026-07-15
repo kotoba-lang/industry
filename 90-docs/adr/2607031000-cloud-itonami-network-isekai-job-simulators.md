@@ -35,7 +35,7 @@ day-in-the-life is playable, not just documented.
 Structurally identical to every other network-isekai game
 (`game.edn` manifest + `scene.edn` data + `logic.cljc` kami-clj logic,
 auto-discovered by `isekai.feed-index/build-index`'s directory walk — no
-registry edit needed beyond `bb gen-feed-index`). Games from `cloud-itonami`
+registry edit needed beyond `nbb gen-feed-index`). Games from `cloud-itonami`
 blueprints live under the `itonami/` author bucket (parallel to the existing
 `gftd/` bucket), one game per blueprint, matching the 1-blueprint-repo =
 1-business/occupation convention already used by `cloud-itonami-*` itself.
@@ -96,7 +96,7 @@ vectors (`:rect`/`:circle`/`:arc`), no asset files, no GPU generation cost.
 ## Consequences
 
 - (+) 8 playable prototypes land as ordinary network-isekai game content —
-  `bb gen-feed-index` picks them up with no registry change, they're
+  `nbb gen-feed-index` picks them up with no registry change, they're
   fork/play/share like every other game on the platform.
 - (+) The depot-loop template is reusable for any future `cloud-itonami`
   blueprint (427 more `:spec`-tier ISCO unit groups, more ISIC classes) —

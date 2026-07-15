@@ -27,7 +27,7 @@ CLI で扱えるようにし、進化成長の ReAct loop を回せるように�
    kotoba→net-kotobase / aozora→app-aozora+app-aozora-yoro / e7m→etzhayyim /
    gftd→umbrella（ai-gftd-apex 含む全 product）。コマンド:
    `products` / `canvas show|md|add|retract|note` / `hyp list|pass|fail` /
-   `react tick|loop` / `ledger show`。bb wrapper（`bin/<cli>`）は classpath 追加と
+   `react tick|loop` / `ledger show`。nbb wrapper（`bin/<cli>`）は classpath 追加と
    `(cli/-main-for :<cli> args)` のみ。
 
 3. **進化成長 ReAct loop は CLAUDE.md Actors パターン準拠**（`gftd.react`）:
@@ -45,7 +45,7 @@ CLI で扱えるようにし、進化成長の ReAct loop を回せるように�
    - 1 run = 1 tick（有界）。`react loop --max-ticks N` は budget 有界の durable
      outer loop で、proposal が尽きたら dry 終了。
 
-4. **検証済**: `bb 70-tools/bmc/run-tests.bb`（5 tests / 15 assertions green:
+4. **検証済**: `nbb 70-tools/bmc/run-tests.cljs`（5 tests / 15 assertions green:
    fold・ledger roundtrip・governor 6 不変条件・loop 収束・md render）。実走:
    murakumo `react loop` が tick1 で gate 昇格→tick2 dry、e7m への広告収益追加が
    governor 拒否（exit 1）、`gftd canvas md --all` が 8 md を生成。

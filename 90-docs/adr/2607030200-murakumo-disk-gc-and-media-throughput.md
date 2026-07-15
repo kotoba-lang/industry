@@ -13,7 +13,7 @@
 
 ## Decision
 
-### disk GC (`murakumo.infer.gc` 純 cljc + `gc-op` bb)
+### disk GC (`murakumo.infer.gc` 純 cljc + `gc-op` nbb)
 
 キャッシュを分類し、各ノードが目標空き容量に達するまで**優先順**に回収する純ポリシー:
 
@@ -29,7 +29,7 @@
 **実測**: asher 0.1G→34.8G(dead RPC 15.4G + stale HF 19G)、zebulun 11.8G→29.8G を
 回収してメディア生成をアンブロック。SVD checkpoint(protected)は無傷を確認。
 
-### メディアスループット評価 (`murakumo.infer.bench` bb)
+### メディアスループット評価 (`murakumo.infer.bench` nbb)
 
 同一ジョブのバッチを投げ、スケジューラに分散させ、**1台 vs fleet の images/min**
 (速度向上 = single-ms / fleet-ms)、動画の frames/s、音声の ×realtime を報告。

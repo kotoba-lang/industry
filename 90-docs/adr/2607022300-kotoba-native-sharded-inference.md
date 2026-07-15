@@ -36,7 +36,7 @@ expert 並列の欠如。一方 kotoba-lang には llama.cpp に依らない推�
 ## 初回実測（2026-07-02）
 
 - rank0 `--layers 0:21 --first` @ main-2 (JVM): 358 tensors / 1.75GB / contract 9 検証 ✓
-- rank1 `--layers 21:42 --last` @ **simeon (babashka、bb バイナリ+ソース配布のみ)**:
+- rank1 `--layers 21:42 --last` @ **simeon (babashka、nbb バイナリ+ソース配布のみ)**:
   1773 tensors / 7.85GB / contract 3 検証 ✓
 - **358 + 1773 = 2131 = artifact の全 tensor 数** — 完全被覆・無重複を実機 2 台で証明。
 

@@ -1,6 +1,6 @@
 # ADR-2607033500: murakumo を mlx-moe(mu-hashmi/mlx-moe)対応にする — cloud-murakumo(murakumo.cloud)+ kotoba-lang/murakumo に単体ノード MoE serving engine を追加
 
-**Status**: accepted — 実装・テスト済み(kotoba-lang/murakumo・cloud-murakumo とも `bb test` / `clojure -M:test` green)。**worktree 上のブランチに留まり、まだ push/PR/merge はしていない**（オーナー確認待ち）。
+**Status**: accepted — 実装・テスト済み(kotoba-lang/murakumo・cloud-murakumo とも `nbb test` / `clojure -M:test` green)。**worktree 上のブランチに留まり、まだ push/PR/merge はしていない**（オーナー確認待ち）。
 **Date**: 2026-07-03
 **Deciders**: Jun Kawasaki
 
@@ -75,7 +75,7 @@ auction に「Apple Silicon 統合メモリを $0/h の bid 対象クラスと�
   丸め値であって実ファイルサイズ実測ではないと明記)。
 - `test/murakumo/infer_moe_test.cljc`: capacity tier・verdict・単体ノード選択・
   fits ゲート・`engine/commands` 互換性を検証(7 tests / 30 assertions)。
-  `bb.edn` の test task に登録。
+  `nbb.edn` の test task に登録。
 
 ### cloud-murakumo(murakumo.cloud)— `:engine :mlx-moe` を vLLM と並ぶ serve engine に
 
@@ -106,7 +106,7 @@ auction に「Apple Silicon 統合メモリを $0/h の bid 対象クラスと�
 ### 検証
 
 ```
-kotoba-lang/murakumo:   bb test        → 170 tests / 787 assertions / 0 failures
+kotoba-lang/murakumo:   nbb test        → 170 tests / 787 assertions / 0 failures
 cloud-murakumo:         clojure -M:test → 56 tests / 232 assertions / 0 failures
 cloud-murakumo:         clojure -M:doctor / -M:schedule qwen3-coder-next-moe=20 / -M:serve qwen3-coder-next-moe
   → auction が :asher(apple-unified-32)に $0.00/h で配置、
@@ -139,7 +139,7 @@ cloud-murakumo:         clojure -M:doctor / -M:schedule qwen3-coder-next-moe=20 
   `DOES NOT FIT` を返す。32 GiB 以上のノードが fleet か `:infer/extra-nodes`
   に参加するまで、実機での動作は未検証。
 - `cloud-murakumo` 側の `:asher` ノードの `:gpu/class`(32/48/64/128 のどれか)
-  は暫定値 — `bb murakumo infer probe` の実メモリで確定させる follow-up が
+  は暫定値 — `nbb murakumo infer probe` の実メモリで確定させる follow-up が
   要る(ADR 内コメントに明記済み)。
 - mlx-moe 自体のライセンスを README で確認できていない(follow-up)。
 - `resident-bytes-estimate`(murakumo.infer.moe)は capacity/experts の単純

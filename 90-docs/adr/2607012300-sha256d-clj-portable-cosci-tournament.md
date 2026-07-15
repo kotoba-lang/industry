@@ -128,7 +128,7 @@ New repo `orgs/com-junkawasaki/sha256d-clj` (GitHub, private, `com-junkawasaki` 
   than smoothed over.
 - **West registration.** `manifest/repos.edn` `:extra-projects` gained one entry;
   `manifest/west.yml` gained the matching one entry, hand-inserted rather than via a
-  full `bb scripts/gen-west-manifest.bb` regen, because `--check` was already STALE
+  full `nbb scripts/gen-west-manifest.cljs` regen, because `--check` was already STALE
   before this change (pre-existing, unrelated child-repo pin drift from concurrent
   activity) -- a full regen+commit would have bundled that unrelated drift into this
   registration. The hand-inserted entry was verified byte-for-byte identical to what

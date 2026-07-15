@@ -83,7 +83,7 @@ per-actor + D1 で日常規模は既に速い。以下は**真の scale / 大 gr
 - **自己主権は Phase 2 で完成**（operator が署名不能）。
 - **scale levers は on-demand**（per-actor + D1 で日常は足りる。#18 は novelty 深さ/大 graph が
   問題化したら）。
-- 依存の一貫性は `check-foundation-deps.bb`（CI）、pin 検証は `verify-west-pins.bb`（CI）が維持。
+- 依存の一貫性は `check-foundation-deps.cljs`（CI）、pin 検証は `verify-west-pins.cljs`（CI）が維持。
 
 ## Follow-up（実装タスク）
 

@@ -116,7 +116,7 @@ Output: `~/Movies/yukkuri-nist-output/cyber-ep-055-assertion.mp4`
   fleet's plain ComfyUI — `character-workflow` (no IP-Adapter dependency)
   is the safer starting point.
 - (−) **No BGM yet.** No music-diffusion checkpoint is present on any
-  fleet node today (`bb murakumo infer media nodes` only shows
+  fleet node today (`nbb murakumo infer media nodes` only shows
   image/video/img2vid checkpoints); `yukkuri.graphs.generate-bgm`'s
   `compose-request` (ongakuka XRPC) was not exercised, and its
   `local-synth-plan` is parameters-only (no real audio synthesis

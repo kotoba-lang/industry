@@ -142,7 +142,7 @@ ANY/TCPフォールバック/カスタムTLD TXT・CNAME を目視確認。
 
 - **repo**: `kotoba-lang/nameserver`（MIT, public, init `199a50a`）。
 - **west**: `manifest/repos.edn` の `:extra-projects` に登録、
-  `bb scripts/gen-west-manifest.bb --entry nameserver` で最小diff生成、
+  `nbb scripts/gen-west-manifest.cljs --entry nameserver` で最小diff生成、
   サーバ側 pin 検証 OK（"新規 entry, pin 199a50a1bdf6 は main から到達可能"）。
 - **次段**: `godaddy-dns-clj` との実結線(実際にサブドメイン委任を1件通す
   end-to-end 検証)、custom-tld ブリッジの実クライアント側resolver設定手順の

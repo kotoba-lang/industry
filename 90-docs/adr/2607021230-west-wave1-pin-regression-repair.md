@@ -7,7 +7,7 @@
 ## Context
 
 `5323da6`「chore(manifest): regenerate west.yml for Wave 1 subagent ports」は
-`gen-west-manifest.bb` の全体再生成で main に入ったが、生成器は **ローカル working
+`gen-west-manifest.cljs` の全体再生成で main に入ったが、生成器は **ローカル working
 HEAD で pin する**ため（CLAUDE.md が警告する「pin 退行の罠」）、実行セッションの
 ローカル checkout 状態がそのまま main の pin に写った。ai-gftd-newscaster の退行
 （37f7c53→c8ac397、`2b23f48` で修復済み）を契機に**全数監査**を実施（2026-07-02）。
@@ -48,7 +48,7 @@ HEAD で pin する**ため（CLAUDE.md が警告する「pin 退行の罠」）
    有効のため温存（pre 欠落は上流 rewrite の可能性として記録）。
 
 3. **再発防止**: 全体 regen を main に入れる前に「pin ⊆ リモート到達可能 &&
-   前進のみ」を検証する（`gen-west-manifest.bb --check` は canonical 一致しか
+   前進のみ」を検証する（`gen-west-manifest.cljs --check` は canonical 一致しか
    見ない。regen 実行者は各 pin の remote 存在確認 + 退行チェックを通すこと。
    CLAUDE.md の該当節を参照）。
 

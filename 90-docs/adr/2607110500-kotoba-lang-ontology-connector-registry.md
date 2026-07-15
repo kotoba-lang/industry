@@ -72,7 +72,7 @@ it. `blueprint.edn` already has a stable shape
    two are grandfathered (CLAUDE.md: don't retroactively rewrite a working
    JVM-only lib once a higher-priority runtime exists), but this is new code
    and the monorepo's runtime-priority rule (kotoba wasm > clojurewasm >
-   ClojureScript > nbb > JVM/bb last-resort) applies to it — an in-source
+   ClojureScript > nbb > JVM/nbb last-resort) applies to it — an in-source
    data literal has zero I/O and is trivially portable to `:cljs`, so there
    is no reason to copy the JVM-only resource-loading shape into new code.
 5. **Add one entry to `kotoba-lang/technology`'s
