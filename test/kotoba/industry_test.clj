@@ -393,6 +393,8 @@
     (is (= :implemented (industry/maturity "0146"))))
   (testing "cloud-itonami-isic-4210 (Construction of roads and railways, fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-F4210 placeholder or the real cloud-itonami org [gh api 404 confirmed]; identity ({:id \"4210\" :name \"Construction of roads and railways\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; Road-Rail Advisor ⊣ Road-Rail Governor road/railway-construction-project OPERATIONS COORDINATION actor structured after cloud-itonami-isic-4211's [Community Building Construction] robotics-premise module shape but deliberately NARROWED, same coordination-only shape as cloud-itonami-isic-4311 [Demolition] -- no heavy-equipment-control or engineering-design/grade-plan-finalization authority [permanent, un-overridable governor hard-blocks], every proposal's :effect is :propose only [governor HARD-holds anything else, defense-in-depth]; per-jurisdiction {JPN/USA/DEU} utility-strike-prevention/traffic-control legal-basis catalog citing real official sources [labor safety ordinance 労働安全衛生規則 第355条, road traffic act 道路交通法 第77条, construction recycling act 建設リサイクル法 第10条 in Japan; OSHA 29 CFR 1926.651, 23 CFR 630/645 in the USA; EU Directive 92/57/EEC, StVO §45 in Germany/EU]; schedule-construction-operation and flag-safety-concern always escalate to a human at every phase, unconditionally; DatomicStore uses langchain-store.core [ADR-2607141600] instead of hand-rolling the EDN-blob codec; 68 tests / 258 assertions green, independently re-verified against a fresh clone; superproject ADR-2607161700) is also :implemented"
     (is (= :implemented (industry/maturity "4210"))))
+  (testing "cloud-itonami-isic-3100 (Manufacture of furniture, fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-C3100 placeholder or the real cloud-itonami org [gh api 404 confirmed]; identity ({:id \"3100\" :name \"Manufacture of furniture\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; FurnitureAdvisor ⊣ Furniture Plant Operations Governor furniture-factory plant-operations-COORDINATION actor, mirroring cloud-itonami-isic-1610's [Sawmilling and planing of wood] verified module shape module-for-module -- cutting/sanding/finishing-line equipment registration in place of saw/planer/kiln, quality-grade/unit-count/defect-rate production-batch fields in place of lumber-grade/volume/moisture-content, and a line-run-finalize permanent block [furnituremfg.governor's line-finalize-blocked-violations] in place of kiln-schedule-finalize; safety-concern flagging always escalates regardless of confidence [materials safety -- VOC finish-fume exposure, equipment safety, labor safety]; 71 tests / 195 assertions green, independently re-verified against a fresh clone; superproject ADR-2607161800) is also :implemented"
+    (is (= :implemented (industry/maturity "3100"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -1190,6 +1192,19 @@
       ;; via a fresh `clojure -M:test` run (see this repo's commit
       ;; history around 2026-07-15 for the isic-3100/isic-2220
       ;; promotions this count reflects).
+            ;; CORRECTIVE FIX: a prior automated edit here mistakenly matched
+      ;; the loose substring "cloud-itonami-isic-3100" inside a DIFFERENT
+      ;; concurrent agent's own prose (cloud-itonami-isic-2220/plastics'
+      ;; own count-drift note, which correctly accounted for BOTH 2220's
+      ;; own promotion and 3100's untracked registry.edn promotion at
+      ;; 222 -> 224), treated that as "3100's own testing block already
+      ;; present", skipped adding the actual `(industry/maturity "3100")`
+      ;; assertion, and wrote a regressed count (224 -> 223) that silently
+      ;; undid 2220's own correct accounting -- caught and fixed here in
+      ;; the same session before any other agent could build on the wrong
+      ;; value. Live-recomputed via `(industry/maturity-summary)` fresh at
+      ;; fix time (concurrent-agent count-drift caution -- not an assumed
+      ;; fixed number): 224 -> 224.
       (is (= 224 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
