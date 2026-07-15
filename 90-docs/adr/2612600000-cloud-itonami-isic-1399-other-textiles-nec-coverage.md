@@ -62,11 +62,10 @@ forbids `-clj` suffixes, not domain-name prefixes).
 (https://github.com/cloud-itonami/cloud-itonami-isic-1399), created
 fresh under the `cloud-itonami` GitHub org (matching the org used by
 every other recently `:implemented` `13xx` sibling --
-`cloud-itonami-isic-1391`/`1392`/`1394` -- rather than any stale
-pre-scaffold placeholder; the registry's own pre-existing `1399` entry
-already pointed at the correct `cloud-itonami` org / `cloud-itonami-
-isic-1399` business-id, so this ADR's registry edit only flips
-`:maturity` and normalizes `:operating-states`).
+`cloud-itonami-isic-1391`/`1392`/`1394` -- rather than the registry's
+stale `gftdcojp/cloud-itonami-C1399` pre-scaffold placeholder URL,
+which this ADR's registry edit corrects, matching the same
+de-placeholdering every other `13xx` sibling promotion has performed).
 
 ### Domain adaptation from the `cordageops` (1394) template
 
@@ -164,14 +163,19 @@ All source is `.cljc`, no JVM-only interop; the actor graph is invoked
 exclusively via `langgraph.graph/run*`.
 
 Registry (`kotoba-lang/industry`): `"1399"` promoted `:spec` ->
-`:implemented`, `:operating-states` normalized to the `intake/design/
-produce/inspect/package/audit` shape used by sibling implemented 13xx
-actors; `:repo`/`:business-id` were already correct
-(`cloud-itonami/cloud-itonami-isic-1399` / `cloud-itonami-isic-1399`)
-in the pre-existing entry, landed via server-side merge (`gh api
-repos/kotoba-lang/industry/merges`); post-merge fresh-clone
-re-verification and the exact registry-suite test output are recorded
-in this task's final report.
+`:implemented`, `:repo`/`:business-id` de-placeholdered from the stale
+`gftdcojp/cloud-itonami-C1399` scheme to
+`cloud-itonami/cloud-itonami-isic-1399` / `cloud-itonami-isic-1399`,
+`:operating-states` normalized to the `intake/design/produce/inspect/
+package/audit` shape used by sibling implemented 13xx actors; landed
+via a GitHub Contents-API single-file PUT (sha-checked optimistic
+concurrency, freshly re-fetched content immediately before the PUT
+per this fleet's hot-contention discipline), exact-block edit only.
+`test/kotoba/industry_test.clj`'s own dedicated `"1399"` testing block
+and `:implemented` count assertion were landed the same way, against
+a freshly re-fetched copy immediately before each PUT attempt. Post-
+merge fresh-clone re-verification and the exact registry-suite test
+output are recorded in this task's final report.
 
 ## Consequences
 
