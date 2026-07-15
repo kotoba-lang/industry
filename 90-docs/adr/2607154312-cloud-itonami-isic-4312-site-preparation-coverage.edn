@@ -1,0 +1,140 @@
+{:adr-id "2607154312"
+ :title "cloud-itonami-isic-4312 (site preparation) site-preparation-project-operations-coordination actor"
+ :status :accepted
+ :date "2026-07-15"
+ :deciders ["Jun Kawasaki (agent-executed, standing authorization)"]
+ :related ["ADR-2607155000" "ADR-2607150700" "ADR-2607011000" "ADR-2607142800" "ADR-2607152000"]
+
+ :context
+ "cloud-itonami-isic-4312 did not exist prior to this ADR (verified via gh api
+  repos/cloud-itonami/cloud-itonami-isic-4312 404 before starting -- no failed prior
+  attempt to recover from). ISIC Rev.5 class 4312 is Site preparation (excavation,
+  earth-moving, land clearing, test drilling/boring/core sampling) -- confirmed
+  against the authoritative kotoba-lang/industry registry (id 4312 = 'Site
+  preparation', maturity :spec) before scaffolding, avoiding the code-mislabel
+  failure mode earlier ADRs in this batch (e.g. ADR-2607154000, isic-0145) had to
+  guard against. A safety-critical domain distinct from sibling 4311 (Demolition):
+  the primary risks are excavation collapse and buried-utility strike, not structural
+  collapse or hazmat exposure. cloud-itonami-isic-4311 (Demolition) was read in full
+  as the primary structural template -- itself a deliberately-narrowed,
+  coordination-only sibling of cloud-itonami-isic-4211 (the fleet's robotics-premise
+  reference), and its module shape (facts/governor/notify/operation/phase/registry/
+  sim/store + advisor) transfers directly to the site-preparation domain. Like 4311,
+  this task explicitly required a NARROWER design than 4211: site preparation is
+  construction/heavy-equipment-adjacent, so per this workspace's standing rule
+  against new Rust/robot-control code, cloud-itonami-isic-4312 was scoped
+  coordination-only from the start -- no robotics/simphysics analog, no module
+  committing a real-world actuation effect. Every proposal carries :effect :propose
+  unconditionally; the governor HARD-holds anything else -- the same permanent
+  structural invariant ADR-2607155000 established for 4311. Built by reading
+  cloud-itonami-isic-4311 in full, adapting its module shape to the site-preparation
+  domain (demolition.* -> site-prep.*, hazmat-survey -> utility-locate,
+  demolition-notification -> excavation-notification, :schedule-demolition-operation
+  -> :schedule-site-operation), researching REAL regulatory citations for JPN/USA/DEU
+  via web search before writing (never fabricated), with clojure -M:test
+  independently re-run before and after every push, matching the stricter
+  verification protocol of the preceding ISIC-coverage batch."
+
+ :scope-exclusions
+ ["excavation/earth-moving-equipment control (dispatching or commanding equipment)
+   -- outside this actor's authority entirely; the closed op-allowlist cannot
+   express it, and the governor's forbidden-action-class HARD check independently
+   rejects any proposal carrying an :equipment-control?/:direct-actuation? marker,
+   un-overridable by any human approval"
+  "geotechnical/site-readiness sign-off authority -- the licensed engineer / site
+   supervisor's exclusively; :schedule-site-operation proposes a phase-window
+   schedule, never a sign-off; the same forbidden-action-class check rejects a
+   :finalizes-geotechnical-signoff? marker"
+  "real-world actuation of any kind -- every committed record carries :effect
+   :propose only (effect-not-propose HARD check, defense-in-depth against a
+   compromised/malfunctioning advisor)"]
+
+ :decision
+ "Implement cloud-itonami-isic-4312 with Governor, Facts, Registry, Store, Notify,
+  Advisor, Phase, Operation, Sim (structured after cloud-itonami-isic-4311
+  module-for-module, narrowed to coordination-only authority):
+  - Governor (Site Prep Governor): 8 hard checks (unknown-op, effect-not-propose,
+    forbidden-action-class, site-not-verified, legal-basis-missing,
+    utility-locate-incomplete, notification-lead-time-insufficient [quantitative
+    jurisdictions only], unresolved-safety-concern) + high-stakes escalation
+    (:flag-safety-concern and :schedule-site-operation ALWAYS escalate
+    unconditionally at every phase; :order-supplies escalates above a $5000 USD cost
+    threshold or below the 0.6 confidence floor)
+  - Facts: per-jurisdiction (JPN/USA/DEU) utility-locate/excavation-notification
+    legal-basis catalog, citing REAL official sources verified via web search before
+    writing: Japan's 労働安全衛生規則第355条 (pre-excavation investigation duty) +
+    騒音規制法第14条 (7-calendar-day notice for specified construction work incl.
+    backhoe/bulldozer), USA's OSHA 29 CFR 1926.651(b) + the national 811 one-call
+    system (honestly labeled a widely-adopted state-law convention, >=2 business
+    days, NOT a single federal statute -- unlike 4311's federal NESHAP rule),
+    EU/Germany's DIN 4124:2012-01 excavation/trench standard + duty-of-care utility
+    query (honestly :qualitative, no fabricated numeric lead-time).
+    notification-lead-insufficient? is the same three-valued ground-truth recheck
+    family construction.facts/weather-threshold-exceeded? and demolition.facts/
+    notification-lead-insufficient? established
+  - Registry: pure-function site-record-log/schedule-proposal/safety-concern-flag/
+    supply-order-proposal drafts (jurisdiction-scoped sequence numbering) +
+    render-safety-concern-notice (human-readable document, legal basis inline,
+    explicitly disclaims geotechnical/site-readiness sign-off authority)
+  - Store: Store protocol, dual MemStore/DatomicStore (langchain.db), contract-tested
+    for parity. DatomicStore uses langchain-store.core (ADR-2607141600) for the
+    EDN-blob codec/identity-schema/event-log pattern via a data-driven entity
+    field-spec instead of hand-rolling enc/dec*. Unlike every sibling actor, no
+    history is double-actuation-guarded -- every op may recur any number of times
+    per site, since this actor never actually dispatches/authorizes/files/hands over
+    anything
+  - Notify: mail+phone (Resend+Twilio) Notifier protocol, structurally identical to
+    demolition.notify but fires only after human approval of :flag-safety-concern
+    (never on an auto-commit path)
+  - Advisor: Advisor protocol + deterministic mock-advisor (default) + llm-advisor
+    (real-inference seam), all four ops carry :effect :propose
+  - Phase: 0->3 rollout gate; :log-site-record/:order-supplies are the ONLY ops ever
+    in a phase's :auto set (phase 3); :schedule-site-operation/:flag-safety-concern
+    permanently absent from every phase's :auto set
+  - Operation: langgraph-clj StateGraph actor, real interrupt-before human-in-the-loop
+    + checkpoint resume, structurally identical to demolition.operation
+  - Sim: demo driver (clojure -M:dev:run), 8 seeded sites, full episode + six distinct
+    HARD-hold paths + cross-jurisdiction (USA) + qualitative (DEU/EU) walkthrough
+  - Operations: log-site-record (excavation-progress/soil-test/utility-locate data
+    logging, auto-eligible), schedule-site-operation (ALWAYS escalates),
+    flag-safety-concern (ALWAYS escalates), order-supplies (cost-threshold-gated)
+  - Tests: 68 tests / 253 assertions, all green
+  - All .cljc (portable, no JVM interop in src), AGPL-3.0-or-later
+  - README/GOVERNANCE/CODE_OF_CONDUCT/CONTRIBUTING/SECURITY domain-adapted for
+    site-preparation coordination"
+
+ :consequences
+ {:positive
+  ["Site preparation (4312) site-preparation-project-operations-coordination now
+    genuinely implemented and fully tested"
+   "Scope boundaries (no excavation/earth-moving-equipment control, no
+    geotechnical/site-readiness sign-off authority, no real-world actuation)
+    hardcoded in governor checks (forbidden-action-class, effect-not-propose),
+    covered by dedicated tests exercising the governor directly with
+    hypothetically-compromised-advisor proposals the deterministic mock advisor
+    never itself produces"
+   "Safety-critical escalation (flag-safety-concern and schedule-site-operation
+    ALWAYS human, at every phase, unconditionally) enforced at two independent
+    layers (phase's :auto set and governor's high-stakes set), not an add-on"
+   "Per-jurisdiction legal-basis catalog cites REAL, web-search-verified official
+    sources; the USA entry is honestly labeled a state-law convention (not a single
+    federal statute), and the EU/Germany entry is honestly :qualitative, no
+    fabricated day-count"
+   "DatomicStore uses the current langchain-store.core convention (ADR-2607141600)
+    instead of hand-rolling the EDN-blob codec"
+   "Portable .cljc, zero JVM-only constructs in src; clj-kondo 0 errors (1
+    pre-existing-pattern warning shared with demolition.notify, not a regression)"]
+  :negative
+  ["Real Datomic/kotoba-server deployment is a follow-up (in-memory MemStore is the
+    tested default), matching every sibling actor's current deployment status"
+   "site-prep.facts catalog covers only JPN/USA/DEU (3 of ~194 jurisdictions) -- an
+    honestly-reported starting catalog, matching demolition.facts's own disclosed
+    scope"]}
+
+ :verification
+ {:test-count 68
+  :assertion-count 253
+  :test-status "0 failures, 0 errors -- independently re-verified from a fresh clone post-push"
+  :lint-status "0 errors, 1 warning (clojure.string unused-under-cljs in site-prep.notify -- the SAME pre-existing pattern demolition.notify in cloud-itonami-isic-4311 itself carries, not a regression)"
+  :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4312"
+  :registry-update "kotoba-lang/industry: 4312 maturity :spec -> :implemented, repo/business-id corrected from the gftdcojp/cloud-itonami-F4312 placeholder to cloud-itonami/cloud-itonami-isic-4312, ADR reference added"}}
