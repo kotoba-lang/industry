@@ -1883,7 +1883,16 @@
       ;; registry.edn immediately before this catch-up edit, not
       ;; assumed (fleet drift of a promotion or two behind live truth
       ;; by landing time is expected, per this fleet's own protocol).
-      (is (= 293 (:implemented m))))))
+      ;; 293 -> 294: this promotion's own +1 for cloud-itonami-isic-2826.
+      ;; Recomputed live via `(industry/maturity-summary)` immediately
+      ;; before this edit on a freshly re-fetched origin/main tip, not
+      ;; assumed (any further concurrent sibling promotions landed
+      ;; between this file's own last recorded number and this edit's
+      ;; fresh clone are folded into the live-recomputed baseline
+      ;; above, not individually re-narrated here).
+      (testing "cloud-itonami-isic-2826 (Manufacture of machinery for textile, apparel and leather production, fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-C2826 placeholder or the real cloud-itonami org [gh api 404 confirmed]; task originally assigned as ISIC 2825, corrected to 2826 after independently verifying both neighboring registry :name values [{:id \"2825\" :name \"Manufacture of machinery for food, beverage and tobacco pro...\"} vs {:id \"2826\" :name \"Manufacture of machinery for textile, apparel and leather p...\"}] against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; TexMachAdvisor ⊣ Textile, Apparel and Leather Machinery Plant Operations Governor plant-operations-COORDINATION actor, mirroring cloud-itonami-isic-2818's [Manufacture of power-driven hand tools] verified module shape module-for-module (texmachmfg.* in place of powertoolmfg.*) -- loom-assembly/sewing-machine-test-bench equipment and weaving-loom/sewing-machine/leather-cutting-machine/knitting-machine/fabric-cutting-machine production-batch (product-type/no-load-run-speed-rpm/defect-rate-percent) fields in place of motor-assembly/housing-molding/test-bench equipment and product-type/hipot-test-kv/defect-rate; :flag-safety-concern (mechanical-safety/electrical-safety/CE-compliance concern) always escalates regardless of confidence, matching 2818's own safety-concern-escalation invariant; the proposal-effect allowlist plus a permanent equipment-actuate block (`:actuate-equipment? true`) structurally prevent any direct assembly/test-bench-equipment control, with no human-approval override path; a further permanent certification-authority block (`:issue-certification? true`) prevents self-issuing a CE machinery safety certification mark. 77 tests / 210 assertions green, independently re-verified against a fresh clone; registry.edn's own \"2826\" -> :implemented change landed via a Contents-API single-file PUT, exact-block edit only, diff-verified single-block change; superproject ADR-2607231500) is also :implemented"
+        (is (= :implemented (industry/maturity "2826"))))
+      (is (= 294 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
