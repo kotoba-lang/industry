@@ -1988,6 +1988,31 @@ green。
 現状: 国軸27件・業界団体軸29件(24業種)・自治体軸23件——79tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 80 — 自治体軸24件目(イェーテボリ) — 80tick到達)
+
+`cloud-itonami-municipality-swe-gothenburg`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-swe-gothenburg/commit/792a928))：
+イェーテボリ市（ヨーテボリ、スウェーデン第2の都市）。以前のtickで
+ストックホルムを断念（廃棄物規則PDFがタイトルすら判読不能なほど
+文字化け）していたが、イェーテボリ公式`goteborg.se`のPDFは正常に
+レンダリングされた。2件検証: Lokala ordningsföreskrifter för
+Göteborgs kommun（地方公共秩序規則——タイトルと法的根拠(SFS
+1993:1617/1993:1632)は保存済みPDF表紙を直接読んで確認したが、施行日
+2025-01-01（コミューン議会は2024-10-04に決定）は原本PDFが10MB超で
+直接WebFetch不能だったため、tick52のNAB Political Broadcast
+Catechismと同じ方針でWebSearch裏付けの日付として明示的にタグ付け）／
+Göteborgs Stadsmiljöpolicy（都市環境政策——タイトルと内容は直接
+確認したが、ページ上で見えた唯一の日付は別文書(Översiktsplan för
+Göteborg)からの引用部分に付随するものだったため、誤帰属を避けて
+enacted-dateは意図的に省略）。4 tests/10 assertions green。
+
+109リポジトリ・752 factを統合。`"ordinance/topic" "urban-planning"`
+での横断queryでgothenburgがsan-jose/cape-townと並んで取得できる
+ことを確認。
+
+現状: 国軸27件・業界団体軸29件(24業種)・自治体軸24件——80tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社

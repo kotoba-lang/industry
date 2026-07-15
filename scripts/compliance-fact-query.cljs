@@ -274,7 +274,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-municipality-ecu-quito/data/datascript-tx.edn"}
    {:label "cloud-itonami-assoc-0610-usa-api association.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-assoc-0610-usa-api/schema/association-rule.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-assoc-0610-usa-api/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-0610-usa-api/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-swe-gothenburg ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-swe-gothenburg/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-swe-gothenburg/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
