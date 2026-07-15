@@ -1,29 +1,32 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 3984, "ai-gftd-chat-shell" 2091},
+ {"magatama-sh1n5h1x" 4022, "ai-gftd-chat-shell" 2091},
  :zone
- {:requests-7d 326723,
-  :pageviews-7d 5665,
-  :uniques-7d-sum 4669,
+ {:requests-7d 330316,
+  :pageviews-7d 5679,
+  :uniques-7d-sum 4698,
   :zone "gftd.ai"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/ccc.php", :requests 21}
+  [{:path "/ccc.php", :requests 22}
    {:path "/hur.php", :requests 20}
-   {:path "/tes.php", :requests 19}
-   {:path "/5shagu.php", :requests 19}
    {:path "/file52.php", :requests 17}
+   {:path "/ms-edit.php", :requests 16}
+   {:path "/gettest.php", :requests 16}
+   {:path "/cdn-cgi/challenge-platform/scripts/jsd/main.js",
+    :requests 16}
    {:path "/wp-content/themes/index.php", :requests 15}
-   {:path "/ms-edit.php", :requests 15}
-   {:path "/gettest.php", :requests 15}],
-  :status-mix {:ok 552, :client-error 2174, :server-error 17435},
+   {:path
+    "/blobs/anonymous/bafkreieji3hxqr4ckbuvpev3w65borvtdc3bqzdrietkmcptfmbqb3ygei",
+    :requests 14}],
+  :status-mix {:ok 533, :client-error 2078, :server-error 17366},
   :window "24h"},
  :as-of "2026-07-15",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 11, :error-5xx-pct 86},
+ {:window "24h", :probe-4xx-pct 10, :error-5xx-pct 87},
  :top-paths
- "上位 page (24h, 2xx/3xx): /ccc.php 21 · /hur.php 20 · /tes.php 19 · /5shagu.php 19 · /file52.php 17 | 4xx(probe) 11% · 5xx 86%",
+ "上位 page (24h, 2xx/3xx): /ccc.php 22 · /hur.php 20 · /file52.php 17 · /ms-edit.php 16 · /gettest.php 16 | 4xx(probe) 10% · 5xx 87%",
  :signal
- "gftd.ai 実測 326723 req/7d・4669 uniques(日次和)・うち4xx probe 11%(24h)、workers 6075 inv/7d"}
+ "gftd.ai 実測 330316 req/7d・4698 uniques(日次和)・うち4xx probe 10%(24h)、workers 6113 inv/7d"}
