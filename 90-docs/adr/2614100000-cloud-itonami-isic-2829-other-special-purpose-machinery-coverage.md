@@ -1,4 +1,4 @@
-# ADR-2613300000: cloud-itonami ISIC 2829 (Manufacture of other special-purpose machinery) actor coverage
+# ADR-2614100000: cloud-itonami ISIC 2829 (Manufacture of other special-purpose machinery) actor coverage
 
 ## Status
 
@@ -12,6 +12,16 @@ for metallurgy). This is part of the final batch of Wave 3 — after
 this batch, only the two deliberately-scoped-out sensitive classes
 (2520 weapons/ammunition, 3040 military fighting vehicles) remain
 unimplemented in the entire wave.
+
+Note: this ADR was originally landed as `ADR-2613300000` and renamed
+to `ADR-2614100000` in a follow-up commit after discovering, via a
+freshly re-fetched git-trees listing, that a concurrent sibling agent
+(`cloud-itonami-isic-2399`) had independently picked the identical
+`2613300000` prefix at nearly the same time (both agents checked the
+highest existing prefix before either had pushed, a genuine race under
+this fleet's heavy concurrency). Renumbered before any dependent
+`test/kotoba/industry_test.clj` entry referenced the old number, so no
+cross-repo reference needed correcting.
 
 ## Context
 
