@@ -5002,11 +5002,41 @@
    :operating-states [:intake :design-rules-verify :stability-brake-test-screen :approve :dispatch-unit :issue-stability-certificate :audit]},
   {:id "2825"
    :name "Manufacture of machinery for food, beverage and tobacco pro..."
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2825"
-   :business-id "cloud-itonami-C2825"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2825"
+   :business-id "cloud-itonami-isic-2825"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607992825): fresh from-scratch scaffold (no prior repo
+   ;; or reverted attempt; gh api 404 confirmed before starting;
+   ;; registry :name verified against a fresh clone before starting,
+   ;; confirming this class -- not 2826 -- is the genuine food/
+   ;; beverage/tobacco processing-machinery target).
+   ;; FoodMachAdvisor ⊣ Food, Beverage and Tobacco Machinery Plant
+   ;; Operations Governor plant-operations-coordination actor
+   ;; mirroring cloud-itonami-isic-2826's [Manufacture of machinery
+   ;; for textile, apparel and leather production] verified module
+   ;; shape module-for-module (foodmachmfg.* in place of
+   ;; texmachmfg.*) -- mixing-equipment/packaging-equipment
+   ;; assembly/test-bench equipment and mixing-machine/filling-
+   ;; machine/packaging-machine/bottling-machine/tobacco-processing-
+   ;; machine production-batch (product-type/no-load-run-speed-rpm/
+   ;; defect-rate-percent) vocabulary in place of loom-assembly/
+   ;; sewing-machine-test-bench equipment and weaving-loom/sewing-
+   ;; machine/leather-cutting-machine/knitting-machine/fabric-
+   ;; cutting-machine product-type; :flag-safety-concern (mechanical-
+   ;; safety/food-contact-material-compliance) always escalates
+   ;; regardless of confidence, matching 2826's own safety-concern-
+   ;; escalation invariant; the proposal-effect allowlist plus a
+   ;; permanent equipment-actuate block (`:actuate-equipment? true`)
+   ;; structurally prevent any direct assembly/test-bench-equipment
+   ;; control, with no human-approval override path; a further
+   ;; permanent certification-authority block
+   ;; (`:issue-certification? true`) prevents self-issuing a
+   ;; machinery safety OR food-contact-material compliance
+   ;; certification mark. 77 tests / 210 assertions green,
+   ;; independently re-verified against a fresh clone.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2826"
