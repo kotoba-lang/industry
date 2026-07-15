@@ -1893,6 +1893,34 @@ CompTIAへ改称・2025年GTIAとして分離の経緯を本文で直接確認�
 現状: 国軸26件・業界団体軸28件(23業種)・自治体軸21件——75tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 76 — 自治体軸22件目(ケープタウン))
+
+`cloud-itonami-municipality-zaf-cape-town`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-zaf-cape-town/commit/d9abad6))：
+ケープタウン市。まずパナマシティを試みたが`mupa.gob.pa`がドメイン
+ルート自体でHTTP 403を返しWebFetchを完全にブロックしたため断念——
+リスボン（lisboa.pt）と同じ「ドメイン全体ブロック」パターン。代わりに
+市公式`capetown.gov.za`のページ2件を検証: City of Cape Town Municipal
+Planning Amendment By-law, 2025（Western Cape州公報Extraordinary
+第9117号、2025-08-08掲載——PDF自体はバイナリで判読不能だったが、
+保存済みパスをReadツールで再読み込みすると公報表紙が完全にレンダ
+リングされた）／City Ombudsman By-law, 2025（市の条例一覧ページで
+タイトルと年のみ確認、具体的日付の記載なくyear-onlyのまま採用、
+捏造なし）。4 tests/11 assertions green。
+
+南アフリカは首都が3つ（プレトリア=行政首都・既に国レベルの`:hq`に
+記録済み、ケープタウン=立法首都・国会所在地、ブルームフォンテーン=
+司法首都）——本エントリはケープタウン市自体の政府として追加、
+プレトリアの首都記録を置き換えるものではない旨をorganization.ednに
+明記。
+
+105リポジトリ・743 factを統合。`"ordinance/topic" "governance"`での
+横断queryでcape-townがbrussels/montevideo/helsinki/sao-paulo/oslo/
+sydney/san-jose/bogota/copenhagenと並んで取得できることを確認。
+
+現状: 国軸26件・業界団体軸28件(23業種)・自治体軸22件——76tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
