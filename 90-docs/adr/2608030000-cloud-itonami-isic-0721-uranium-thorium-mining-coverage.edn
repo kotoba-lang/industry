@@ -1,0 +1,85 @@
+{:adr-id "2608030000"
+ :title "cloud-itonami-isic-0721 — Uranium and Thorium Ore Mining Operations Coordination"
+ :date "2026-07-15"
+ :author "Cloud Itonami Contributors"
+ :status :accepted
+ :context
+ "ISIC Rev.4 0721 (Mining of uranium and thorium ores) had no prior
+  actor implementation -- the registry entry pointed at a placeholder
+  repo (gftdcojp/cloud-itonami-B0721) that was never created. This
+  session independently verified the live registry against a fresh
+  clone before proceeding: {:id \"0721\" :name \"Mining of uranium and
+  thorium ores\" :maturity :spec ...} -- confirmed the id/name match.
+  Scope note: a legitimate civilian nuclear-fuel-cycle raw-material
+  mining classification, radiation-safety-regulated, NOT
+  weapons-related, distinct from the deliberately-excluded ISIC
+  2520/3040 weapons classes. Fresh, from-scratch scaffold, built as
+  part of a smaller, carefully verified batch after an earlier
+  18-agent haiku batch's 61% defect rate. Module shape mirrors sibling
+  cloud-itonami-isic-0893 (Extraction of salt)'s verified module
+  shape, domain-adapted for uranium/thorium mining: ISIC 0721 covers
+  both conventional open-pit/underground mining and in-situ recovery
+  (ISR) wellfields, and both uranium and thorium ores, so the demo
+  site directory seeds one conventional-uranium site, one
+  ISR-uranium site, and one thorium site (unverified permit)
+  deliberately."
+ :decision
+ {:scope-boundary
+  "Coordination-only actor. Closed four-op allowlist, all :effect
+   :propose: log-extraction-record, schedule-mining-operation,
+   flag-radiological-concern (always escalates), coordinate-shipment
+   (always escalates -- IAEA-safeguarded material, distinct from most
+   sibling shipment ops in this fleet which do not always escalate).
+   An op outside this set is the same failure mode as forbidden-scope
+   content, not a separate carve-out."
+  :governor-rules
+  "Three HARD, permanent, un-overridable checks: (1)
+   mine-site-unverified -- target site must be independently
+   :registered?/:permit-verified? in the store, never trusted from the
+   proposal's own claim; (2) effect-not-propose -- any :effect other
+   than :propose is a claim to directly actuate outside governance;
+   (3) scope-exclusion -- any proposal (any op) touching
+   mining-equipment-control (conventional: drill-and-blast/haul-truck-
+   dispatch/shaft-hoist-control/continuous-miner; ISR: wellfield-
+   injection/wellfield-extraction-well/ion-exchange-circuit-control/
+   elution-circuit-control; shared mill circuit: leach-circuit-
+   control/solvent-extraction-control/yellowcake-precipitation/
+   calciner-control/mill-circuit-control) or radiation-safety
+   (-certification-authority) territory (exposure-limit-override,
+   tailings-containment-override, ventilation/shielding-control-
+   decision, radioactive-material license issuance, license
+   suspension, compliance enforcement), evaluated unconditionally via
+   a lower-cased EN+JA substring scan of the proposal's own content.
+   Exposure/tailings-containment exclusion terms are deliberately
+   qualified (override / control decision) so legitimate
+   flag-radiological-concern observations are never self-blocked --
+   exercised directly by
+   legitimate-radiological-concern-flag-is-not-scope-excluded.
+   Escalation (soft): flag-radiological-concern always,
+   coordinate-shipment always (IAEA safeguards), low confidence
+   (<0.6). uraniumops.phase independently agrees -- neither op ever
+   auto-commits at any phase."
+  :module-shape
+  "uraniumops.store (MemStore, string-keyed site directory seeded with
+   a conventional uranium mine, an ISR uranium wellfield, and an
+   unverified-permit thorium mine), advisor (UraniumOpsAdvisor, mock +
+   real-LLM seam via langchain.model, plus an :out-of-scope? test
+   hook), governor (UraniumThoriumMiningGovernor), phase (0->3
+   rollout), operation (langgraph-clj StateGraph), sim (demo driver)."}
+ :consequences
+ ["Registry entry corrected in place (exact-text edit of the existing"
+  " {:id \"0721\" ...} block): :repo/:business-id updated from the"
+  " stale gftdcojp/cloud-itonami-B0721 placeholder to"
+  " cloud-itonami/cloud-itonami-isic-0721, :maturity :implemented,"
+  " :required-technologies/:operating-states corrected to the"
+  " coordination-only shape (mirroring cloud-itonami-isic-0893)"
+  "Actor repo cloud-itonami/cloud-itonami-isic-0721 scaffolded and"
+  " pushed to main (d6699658718df71cf938957d70a147083fe27106)"
+  "Test suite run directly by this session: Ran 48 tests containing 152"
+  " assertions, 0 failures, 0 errors (both at push time and again from a"
+  " fresh post-merge clone). clj-kondo: 0 errors, 0 warnings."]
+ :references
+ ["cloud-itonami-isic-0893/src/saltops/ (closest module-shape precedent)"
+  "cloud-itonami-isic-0891/src/chemmineops/ (governed-actor discipline precedent)"
+  "kotoba-lang/industry resources/kotoba/industry/registry.edn \"0721\" entry"
+  "ADR-2607121000 (ISIC Wave rollout plan -- 0721 is ISIC division 07, Wave 3)"]}
