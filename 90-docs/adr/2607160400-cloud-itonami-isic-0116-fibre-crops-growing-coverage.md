@@ -1,4 +1,4 @@
-# ADR-2607160300: cloud-itonami-isic-0116 (growing of fibre crops) field-operations-coordination actor
+# ADR-2607160400: cloud-itonami-isic-0116 (growing of fibre crops) field-operations-coordination actor
 
 **Status**: accepted
 **Date**: 2026-07-15
@@ -8,7 +8,11 @@ ADR-2607011000 (actor pattern & ISIC section coverage), ADR-2607152500
 (cloud-itonami-isic-0111 cereal-growing, the module-structure template
 this ADR mirrors), ADR-2607154500 (cloud-itonami-isic-0114 sugar-cane
 growing, source of the `quality-grade`-style domain-specific-field
-independent-verification pattern this ADR adapts).
+independent-verification pattern this ADR adapts). Originally slotted at
+ADR-2607160300, renumbered to 2607160400 after a concurrent session
+claimed 2607160300 first for cloud-itonami-isic-0146 (poultry raising)
+-- mirroring this fleet's own precedent for same-day slot collisions
+(see ADR-2607152500's own renumbering note).
 
 ## Context
 
