@@ -4883,11 +4883,17 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2790"
    :name "Manufacture of other electrical equipment"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2790"
-   :business-id "cloud-itonami-C2790"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2790"
+   :business-id "cloud-itonami-isic-2790"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented: OtherElecEquipAdvisor ⊣ Other
+   ;; Electrical Equipment Plant Operations Governor, langgraph-clj
+   ;; StateGraph, append-only audit ledger. Fresh scaffold (legacy
+   ;; gftdcojp/cloud-itonami-C2790 placeholder replaced with real
+   ;; cloud-itonami/cloud-itonami-isic-2790). See ADR-2607995500 in
+   ;; com-junkawasaki/root.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2811"
