@@ -1492,6 +1492,31 @@ American Trucking Associations(ATA、Wikidata Q4745283)。`trucking.org`
 現状: 国軸22件・業界団体軸24件(19業種)・自治体軸13件——59tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 60 — 自治体軸14件目(コペンハーゲン))
+
+`cloud-itonami-municipality-dnk-copenhagen`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-dnk-copenhagen/commit/eed9f19))：
+コペンハーゲン市。`kk.dk`系の公式ページ/PDF2件を直接WebFetch検証:
+Regulativ for Erhvervsaffald（事業系廃棄物規則、2024-09-01施行——
+`kk.sites.itera.dk`（市の文書公開サブドメイン）ホストのPDFが表紙まで
+完全に読める強い一次情報源）／Styrelsesvedtægt for Københavns Kommune
+（統治憲章、kk.dk自身の「Sådan styres København」ページが現行憲章を
+「pr. 25. juni 2026」と明記——制定日ではなく明記された基準日として
+採用、捏造なし）。4 tests/11 assertions green。
+
+首都チェック: コペンハーゲンは史実上一貫してデンマークの首都であり
+（Wikidata Q1748）、P36歴史的首都バグの対象外——既存
+`cloud-itonami-iso3166-dnk/organization.edn`には`:hq`フィールド自体が
+未記載だったが、これは本tickのスコープ外（自治体リポの追加であり、
+国リポの既存フィールド欠落を修正するタスクではない）と判断し、
+手を加えなかった。
+
+89リポジトリ・708 factを統合。`"ordinance/topic" "governance"`での
+横断queryでcopenhagenがsydney/helsinkiと並んで取得できることを確認。
+
+現状: 国軸22件・業界団体軸24件(19業種)・自治体軸14件——60tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
