@@ -5490,11 +5490,37 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3314"
    :name "Repair of electrical equipment"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C3314"
-   :business-id "cloud-itonami-C3314"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3314"
+   :business-id "cloud-itonami-isic-3314"
+   :required-technologies [:identity :forms :audit-ledger]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Electrical-equipment-repair-shop OPERATIONS COORDINATION actor
+   ;; implementation complete (2026-07-15, fresh scaffold -- no prior
+   ;; repository at either the stale gftdcojp/cloud-itonami-C3314
+   ;; placeholder or the real cloud-itonami org [gh api 404 confirmed];
+   ;; identity ({:id "3314" :name "Repair of electrical equipment"})
+   ;; independently verified against a fresh clone before any work
+   ;; began, per this fleet's ID/name-mismatch caution; 3314 covers
+   ;; repair of electrical equipment specifically -- motors, generators,
+   ;; transformers, switchgear -- distinct from siblings 3311/3312/3313/
+   ;; 3315/3319): Repair Advisor ⊣ Repair Governor pattern, mirroring
+   ;; cloud-itonami-isic-3319's structure, closed op allowlist
+   ;; (log-repair-record/schedule-repair-operation/flag-safety-concern/
+   ;; order-supplies), all :effect :propose only. Repair-equipment/
+   ;; diagnostic-tool control and return-to-service/re-energization
+   ;; sign-off authority permanently blocked (hard, un-overridable
+   ;; governor checks, including an electrical-domain-specific
+   ;; :re-energization-sign-off? forbidden-action-class marker distinct
+   ;; from :return-to-service-sign-off?) -- coordination only, no direct
+   ;; equipment actuation. Like 3319, :schedule-repair-operation may
+   ;; auto-commit at phase 3 when the governor is clean (equipment
+   ;; verified, legal-basis on file, no unresolved concern); only
+   ;; :flag-safety-concern is permanently high-stakes. Per-jurisdiction
+   ;; (JPN/USA/DEU) pre-repair de-energization/re-energization legal-
+   ;; basis catalog with real official electrical-installation-specific
+   ;; sources (JPN 労働安全衛生規則第339条, USA 29 CFR 1910.333, DEU DGUV
+   ;; Vorschrift 3 §3), all honestly :qualitative -- see ADR-2607921400.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3315"
