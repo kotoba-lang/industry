@@ -1,7 +1,7 @@
 # ADR-2607151800: Kotoba org は repo-per-library、aiueos は OS repo、west は統合面
 
-**Status**: accepted  
-**Date**: 2026-07-15  
+**Status**: accepted
+**Date**: 2026-07-15
 **Scope**: `kotoba-lang` organization / root west workspace
 
 ## Context
