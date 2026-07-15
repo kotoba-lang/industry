@@ -1357,6 +1357,28 @@ Sociedades N° 19.550(会社法、1972-04-03制定・2018-06-18最終改正
 現状: 国軸21件・業界団体軸22件(17業種)・自治体軸11件——54tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 55 — 業界団体軸23件目(AWWA) — 新規ISIC業種(上下水道))
+
+`cloud-itonami-assoc-3600-usa-awwa`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-3600-usa-awwa/commit/ef987b3))：
+American Water Works Association(AWWA、Wikidata Q4745366、
+1881-03-29設立)。AWWAの技術規格(C100シリーズ等)はstore.awwa.orgで
+販売される有料製品のため、代わりに無料公開ページ2件を検証:
+AWWA Policy Statement on Distribution System Water Quality(配水
+システム水質に関する方針声明、1975-01-26採択・2026-04-01最終改正——
+文書自身が両日付を明記)／Who We Are(組織概要ページ、「1881年3月29日、
+セントルイスのワシントン大学キャンパスに22名の水道事業管理者・技術者・
+運営者が集まり…AWWA創設」という具体的設立日をページ本文で直接確認)。
+4 tests/11 assertions green。
+
+**新規ISIC業種**: ISIC 3600(上水の収集・処理・供給業)を初めて追加した。
+
+84リポジトリ・697 factを統合。`"association-rule/topic"
+"governance"`での横断queryでawwaを含む19団体が取得できることを確認。
+
+現状: 国軸21件・業界団体軸23件(18業種)・自治体軸11件——55tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
