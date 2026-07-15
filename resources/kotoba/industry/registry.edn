@@ -5237,11 +5237,25 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3099"
    :name "Manufacture of other transport equipment n.e.c."
-   :repo "https://github.com/gftdcojp/cloud-itonami-C3099"
-   :business-id "cloud-itonami-C3099"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3099"
+   :business-id "cloud-itonami-isic-3099"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607993099): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C3099 placeholder).
+   ;; OtherTransportAdvisor, an advisor sealed behind an independent
+   ;; Other Transport Equipment Plant Operations Governor,
+   ;; langgraph-clj StateGraph, append-only audit ledger. Residual
+   ;; ISIC class covering animal-drawn vehicles (carts/wagons/
+   ;; carriages) and hand-propelled vehicles (hand-carts/hand-trucks/
+   ;; wheelbarrows/rickshaws/sledges/toboggans/pushcarts), distinct
+   ;; from cloud-itonami-isic-3092's [Manufacture of bicycles and
+   ;; invalid carriages].
+   ;; clojure -M:test: 78 tests / 218 assertions / 0 failures / 0
+   ;; errors (verified from an independent fresh clone).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3100"
