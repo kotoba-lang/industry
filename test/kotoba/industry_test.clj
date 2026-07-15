@@ -2140,7 +2140,18 @@
       ;; live-recomputed baseline (via `(industry/maturity-summary)` on
       ;; a freshly re-fetched origin/main tip), not individually
       ;; re-narrated here (not this actor's own promotions).
-      (is (= 339 (:implemented m))))))
+      ;; recomputed live via (industry/maturity-summary) at re-add time,
+      ;; not assumed -- this entry was previously silently dropped by a
+      ;; concurrent sibling agent's whole-file Contents-API PUT (their
+      ;; PUT's sha check matched the current tip at request time, but
+      ;; their PUT body was built from an OLDER local snapshot that
+      ;; pre-dated this entry, so the sha-match succeeded while still
+      ;; clobbering this block -- re-added here, count re-verified
+      ;; against a fresh (industry/maturity-summary) call, not the
+      ;; file's own prior number).
+      (testing "cloud-itonami-isic-3900 (Remediation activities and other waste management services, fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-E3900 placeholder or the real cloud-itonami org target name [gh api 404 confirmed for both before scaffolding]; identity ({:id "3900" :name "Remediation activities and other waste management services"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution -- 3900 is contaminated-site cleanup / soil and groundwater remediation, distinct from sibling cloud-itonami-isic-3821 [treatment and disposal of non-hazardous waste] and cloud-itonami-isic-3822 [treatment and disposal of hazardous waste]; RemediationOpsAdvisor guarded by an independent SiteRemediationOpsGovernor -- a site-remediation PROJECT OPERATIONS COORDINATION actor, mirroring cloud-itonami-isic-3821's verified module shape module-for-module (remediationops.* in place of wasteops.*) -- remediation-record-log/remediation-operation-schedule/contamination-concern-flag/disposal-coordinate vocabulary in place of facility-record-log/maintenance-schedule/safety-concern-flag/shipment-coordinate, site (:site-id/:registered?/:verified?) ground-truth records in place of facility records; this actor is explicitly NOT direct excavation/treatment-equipment control authority and NOT a regulatory site-closure-certification authority; closed four-op proposal allowlist (:log-remediation-record :schedule-remediation-operation :flag-contamination-concern :coordinate-disposal), all :effect :propose; three HARD governor checks (site unverified, effect not :propose, scope exclusion -- excavation/treatment-equipment control or a regulatory site-closure-certification decision is a permanent, un-overridable block, independent of op or confidence, folding the closed-allowlist check into the same unconditional scan) mirror 3821's own three HARD checks, only the domain vocabulary and scope-excluded-terms set differ; :flag-contamination-concern always escalates regardless of confidence, matching 3821's own always-escalate-ops invariant, independently agreed by both `remediationops.governor` and `remediationops.phase`; phase 0->3 staged rollout (read-only -> assisted-logging -> assisted-coordination -> supervised-auto) mirrors 3821's own phase table structure; fully portable .cljc with no JVM-only interop in src/, no new Rust code; 45 tests / 135 assertions green, independently re-verified against a fresh clone; registry.edn's own "3900" -> :implemented change landed via a direct-text in-place block edit (single {:id "3900" ...} block only, :repo/:business-id/:required-technologies/:maturity), diff-verified single-block change; superproject ADR-2608010000) is also :implemented"
+        (is (= :implemented (industry/maturity "3900"))))
+      (is (= 336 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
