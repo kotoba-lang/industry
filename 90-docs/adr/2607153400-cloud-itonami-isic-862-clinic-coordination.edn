@@ -1,0 +1,69 @@
+{:adr/id "2607153400"
+ :adr/title "cloud-itonami-isic-862 — Outpatient Clinic Activities Coordination"
+ :adr/date "2026-07-15"
+ :adr/status :accepted
+ :adr/tags #{:cloud-itonami :isic-862 :actor :langgraph :governance}
+
+ :context
+ {:domain "Medical and dental practice activities (ISIC Rev.4 862)"
+  :scope "Back-office administrative coordination only — NOT clinical decision-making"
+  :wave 4
+  :batch 7
+  :related-adr ["2607152800" "2607152500" "2607121000"]
+  :difference-from-siblings "Domain-adapted for outpatient clinics: appointment scheduling, referral logistics instead of bed assignment, visitor access"}
+
+ :decision
+ {:operations {:allowed-ops 5
+               :ops [:schedule-appointment :coordinate-referral-logistics :coordinate-supply-request
+                     :schedule-staff-shift-proposal :flag-safety-concern]}
+  :governor {:hard-checks 3
+             :check-1 "appointment-slot/resource unverified -> permanent HARD hold"
+             :check-2 "effect not :propose -> permanent HARD hold"
+             :check-3 "scope-exclusion (clinical/patient-care/treatment/diagnosis) -> permanent HARD hold via substring scan"}
+  :phase {:stages 4
+          :stage-0 "read-only"
+          :stage-1 "assisted-logistics (appointment scheduling only, approval-gated)"
+          :stage-2 "assisted-coordination (+ referral/supply/shift, still approval-gated)"
+          :stage-3 "supervised-auto (4 non-safety ops auto-commit when clean, safety always escalates)"
+          :safety-concern-never-auto-commits? true}
+  :module-shape {:store "clinicops.store (MemStore, string-keyed appointment/provider directory, append-only ledger)"
+                 :advisor "clinicops.advisor (mock + real-LLM seam, 5-op deterministic routes)"
+                 :governor "clinicops.governor (independent HARD-check layer)"
+                 :operation "clinicops.operation (langgraph-clj StateGraph)"
+                 :sim "clinicops.sim (demo driver)"}}
+
+ :consequences
+ {:registry-update {:status "completed"
+                    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-862"
+                    :business-id "cloud-itonami-isic-862"
+                    :maturity :implemented
+                    :required-technologies [:identity :forms :dmn :bpmn :audit-ledger :langgraph-clj]
+                    :operating-states [:intake :advise :govern :decide :approve :commit :audit]}
+  :repo-scaffold "pushed to main"
+  :tests {:count 9
+          :assertions 84
+          :failures 0
+          :errors 0
+          :namespaces [:advisor-test :governor-test :governor-contract-test :phase-test :store-contract-test]}
+  :lint {:errors 0 :warnings 11}
+  :demo {:scenarios 10 :completed-without-error? true}}
+
+ :rationale
+ "Outpatient clinics are clinically-central industries (like hospitals). The core
+  business IS clinical care delivery. Therefore this actor's scope must be strictly
+  administrative/facility coordination, with maximally-conservative clinical-content
+  scanning to prevent any patient-care/clinical-decision/diagnostic/treatment language
+  whatsoever, even at the periphery. Unlike hospitals (which coordinate bed/room
+  assignment and visitor access), outpatient clinics coordinate appointment scheduling,
+  referral logistics, supply requests, staff shifts, and facility safety concerns.
+  The test legitimate-facility-safety-concern-is-not-scope-excluded verifies that
+  real facility issues are NOT self-blocked by this scanning. Patient-safety concerns
+  (vital sign change, clinical emergency) are explicitly out-of-scope — they must
+  route through actual clinical staff/systems, not this coordination actor."
+
+ :alternative-approaches
+ [{:name "Broader outpatient clinic scope"
+   :rejected-because "Clinics are clinically central. A broader scope would risk clinical decisions bleeding into coordination logic, violating the principle that this actor must be permanently clinically-read-only. Narrower is safer."}
+  {:name "Unified medical practice actor covering all medical/dental settings"
+   :rejected-because "Hospitals (isic-861) and outpatient clinics (isic-862) have fundamentally different operational logistics. Hospitals coordinate bed/room management; clinics coordinate appointments/referrals. They need separate actors with different operation sets."}]
+}
