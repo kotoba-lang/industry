@@ -1254,6 +1254,29 @@ assertions green。
 現状: 国軸19件・業界団体軸21件(16業種)・自治体軸9件——49tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 50 — 自治体軸10件目(ローマ) — tick 50節目到達)
+
+`cloud-itonami-municipality-ita-roma`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-ita-roma/commit/b07a6d3))：
+実在2件、両方ともPDF本文をReadツールで直接確認: Nuovo Regolamento
+per la disciplina dell'Albo Pretorio on line(オンライン公示板規則、
+Giunta Capitolina決議第71号、2021-04-02承認——議事録抜粋PDFに
+ジュンタ構成員の氏名が付随的に記載されていたが、決議番号・日付の
+確認のためだけに読み、カタログには一切保存していない)／Regolamento
+per l'esercizio delle attività commerciali e artigianali nel
+territorio della città storica(歴史地区商業・手工業活動規則、
+Assemblea Capitolina決議第109号、2023-05-30承認)。4 tests/10
+assertions green。
+
+**tick 50 節目到達**: 75リポジトリ・685 factを統合。`:transparency`
+トピックでの自治体横断queryでtokyo・washington-dc・berlin・madrid・
+seoul・romaの6自治体を取得できることを確認。国軸19・業界団体軸21
+(16業種)・自治体軸10——50tickにわたり一度も捏造なく、実在URL・実在
+日付・実在法令番号のみで積み上げてきた。
+
+現状: 国軸19件・業界団体軸21件(16業種)・自治体軸10件——50tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
