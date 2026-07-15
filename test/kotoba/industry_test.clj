@@ -1849,7 +1849,12 @@
       ;; `(industry/maturity-summary)` on a freshly re-fetched
       ;; origin/main tip immediately before this catch-up edit,
       ;; not assumed.
-      (is (= 284 (:implemented m))))))
+      ;; 284 -> 285: cloud-itonami-isic-2021 (commit 539c4546) landed
+      ;; concurrently -- recomputed live via
+      ;; `(industry/maturity-summary)` on a freshly re-fetched
+      ;; origin/main tip (539c4546e87d7f8b6cde3cf798fbff689281ef4f)
+      ;; immediately before this catch-up edit, not assumed.
+      (is (= 285 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
