@@ -3389,11 +3389,29 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1511"
    :name "Tanning and dressing of leather"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C1511"
-   :business-id "cloud-itonami-C1511"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1511"
+   :business-id "cloud-itonami-isic-1511"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607151105): fresh from-scratch scaffold (no prior repo
+   ;; existed at cloud-itonami/cloud-itonami-isic-1511; the old
+   ;; :repo/:business-id above pointed at a never-created
+   ;; gftdcojp/cloud-itonami-C1511 placeholder, confirmed 404 before
+   ;; this edit). LeatherTanningAdvisor ⊣ Leather Tanning Plant
+   ;; Operations Governor, langgraph-clj StateGraph, append-only audit
+   ;; ledger, mirroring cloud-itonami-isic-1701's [Manufacture of pulp,
+   ;; paper and paperboard] verified module shape (leathertanning.* in
+   ;; place of pulppaper.*), covering tannery plant operations
+   ;; coordination (production-batch hide-lot/tanning-process/leather-
+   ;; grade/shrinkage-temperature logging, tanning-drum/finishing-line
+   ;; maintenance scheduling, chromium-VI/effluent/worker-safety concern
+   ;; flagging, outbound leather shipment coordination);
+   ;; discharge-authorize-blocked is the leather-tanning-domain analog
+   ;; of 1701's own effluent-discharge-authorization permanent block.
+   ;; clojure -M:test: 71 tests / 200 assertions / 0 failures / 0 errors
+   ;; (verified from an independent fresh clone).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1512"

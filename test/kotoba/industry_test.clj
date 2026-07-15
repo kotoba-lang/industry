@@ -1236,7 +1236,23 @@
       ;; (concurrent-agent count-drift caution -- not an assumed fixed
       ;; number, confirmed via the test runner's own failure diff: 225 ->
       ;; 226).
-      (is (= 226 (:implemented m))))))
+      ;; 226 -> 227: cloud-itonami-isic-1511 (Tanning and dressing of
+      ;; leather) promoted :spec -> :implemented, superproject
+      ;; ADR-2607151105
+      ;; (cloud-itonami-isic-1511-leather-tanning-coverage.md).
+      ;; LeatherTanningAdvisor ⊣ Leather Tanning Plant Operations
+      ;; Governor, fresh from-scratch scaffold (no prior repo existed;
+      ;; the old :repo/:business-id pointed at a never-created
+      ;; gftdcojp/cloud-itonami-C1511 placeholder), mirroring
+      ;; cloud-itonami-isic-1701's [Manufacture of pulp, paper and
+      ;; paperboard] verified module shape (leathertanning.* in place
+      ;; of pulppaper.*). 71 tests / 200 assertions green, independently
+      ;; re-verified against a fresh clone. Live-recomputed via
+      ;; `(industry/maturity-summary)` immediately before this edit on
+      ;; a freshly re-fetched origin/main (concurrent-agent count-drift
+      ;; caution -- not an assumed fixed number, confirmed via the test
+      ;; runner's own failure diff: 226 -> 227).
+      (is (= 227 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
