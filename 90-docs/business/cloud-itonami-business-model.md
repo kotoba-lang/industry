@@ -13,9 +13,9 @@
 - 業務 SaaS は職種ごとに分断され判断の脈絡が消える
 - AI agent 導入は「誰が何を承認したか」が残らずコンプラ不能
 - 中小には CFO/法務/営業 ops の専任が居ない
-- 観測 (signal): itonami.cloud 実測 284 req/7d・82 uniques(日次和)・うち4xx probe 60%(24h)
 - 観測 (signal): itonami.cloud 実測 288 req/7d・84 uniques(日次和)・うち4xx probe 56%(24h)
 - 観測 (signal): itonami.cloud 実測 288 req/7d・84 uniques(日次和)・うち4xx probe 58%(24h)
+- 観測 (signal): itonami.cloud 実測 290 req/7d・84 uniques(日次和)・うち4xx probe 58%(24h)
 
 ## Customer Segments
 
