@@ -1770,7 +1770,19 @@
       ;; `cloud-itonami-isic-2750` testing block above) was
       ;; independently re-verified :implemented in this same fresh
       ;; clone, unaffected by this count-only drift.
-      (is (= 274 (:implemented m))))))
+      ;; cloud-itonami-isic-2022 (Manufacture of paints, varnishes and
+      ;; similar coatings, printing ink and mastics, superproject
+      ;; ADR-2607200600). This promotion's own registry.edn edit
+      ;; (Contents-API single-file PUT, commit
+      ;; fda7b2e7961f9230d7b49abde2cd07c89534e3cb) was scoped solely to
+      ;; the "2022" entry (diff-verified single-block change before
+      ;; push); "2022" was untouched by any other concurrent promotion.
+      (testing "cloud-itonami-isic-2022 (Manufacture of paints, varnishes and similar coatings, printing ink and mastics, fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-C2022 placeholder or the real cloud-itonami org [gh api 404 confirmed]; identity ({:id \"2022\" :name \"Manufacture of paints, varnishes and similar coatings, prin...\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; PaintAdvisor ⊣ Paint & Coatings Plant Operations Governor paint/varnish/coating/printing-ink/mastic plant-operations-COORDINATION actor, mirroring cloud-itonami-isic-2023's [Manufacture of soap and detergents, cleaning and polishing preparations, perfumes and toilet preparations] verified module shape closely (paintmfg.* in place of soapmfg.*) -- product-type/viscosity-cp/fineness-of-grind-hegman/voc-content-g-per-l production-batch fields in place of product-type/off-spec-rate-percent/fragrance-allergens, and a universal per-product-type VOC-content regulatory-ceiling check (`paintmfg.registry/voc-content-exceeds-limit?`, modeled on the U.S. EPA AIM VOC-content-limit framework / EU Decopaint Directive 2004/42/EC) in place of 2023's conditional fragrance-allergen-labeling-completeness check; :flag-safety-concern (chemical-hazard solvent-VOC-exposure/flammability/equipment-safety concern) always escalates regardless of confidence, matching 2023's own safety-concern-escalation invariant; the proposal-effect allowlist plus a permanent line-actuate block (`:actuate-line? true`) structurally prevent any direct mixing/dispersion-line-equipment control, with no human-approval override path; 83 tests / 238 assertions green, independently re-verified against a fresh clone; superproject ADR-2607200600) is also :implemented"
+        (is (= :implemented (industry/maturity "2022"))))
+      ;; Live-recomputed via `(industry/maturity-summary)` on a freshly
+      ;; re-fetched origin/main tip, immediately before this test-file
+      ;; catch-up edit.
+      (is (= 275 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
