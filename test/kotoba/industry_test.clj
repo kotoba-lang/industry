@@ -1262,7 +1262,21 @@
       ;; module-for-module. 30 tests / 92 assertions green, independently re-verified against a fresh clone.
       ;; Live-recomputed via `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched
       ;; origin/main (concurrent-agent count-drift caution -- not an assumed fixed number): 227 -> 228.
-      (is (= 228 (:implemented m))))))
+      ;; 228 -> 229: cloud-itonami-isic-2013 (Manufacture of plastics and
+      ;; synthetic rubber in primary forms) promoted :spec ->
+      ;; :implemented, superproject ADR-2607171200
+      ;; (cloud-itonami-isic-2013-plastics-primary-forms-coverage.md).
+      ;; ResinAdvisor advisor-governor pair, fresh from-scratch scaffold
+      ;; (no prior repo existed; the old :repo/:business-id pointed at a
+      ;; never-created gftdcojp/cloud-itonami-C2013 placeholder),
+      ;; mirroring cloud-itonami-isic-2220's verified module shape,
+      ;; adapted to the UPSTREAM primary-forms chemical-process plant.
+      ;; 71 tests / 204 assertions green, independently re-verified
+      ;; against a fresh clone. Live-recomputed via
+      ;; `(industry/maturity-summary)` immediately before this edit on a
+      ;; freshly re-fetched origin/main (concurrent-agent count-drift
+      ;; caution -- not an assumed fixed number): 228 -> 229.
+      (is (= 229 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
