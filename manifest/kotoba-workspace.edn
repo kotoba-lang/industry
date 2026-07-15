@@ -1,0 +1,20 @@
+{:manifest.kotoba-workspace/version 1
+ :manifest.kotoba-workspace/integration :west
+ :manifest.kotoba-workspace/ownership :repo-per-library
+ :manifest.kotoba-workspace/components
+ {:language-apex "orgs/kotoba-lang/kotoba"
+  :compiler "orgs/kotoba-lang/compiler"
+  :os "orgs/kotoba-lang/aiueos"
+  :libraries ["orgs/kotoba-lang/kotobase"
+              "orgs/kotoba-lang/kototama"]
+  :applications ["orgs/kotoba-lang/browser"]}
+ :manifest.kotoba-workspace/dependency-direction
+ [[:applications :libraries]
+  [:os :compiler]
+  [:libraries :language-apex]
+  [:compiler :language-apex]]
+ :manifest.kotoba-workspace/rules
+ [:no-os-implementation-in-language-apex
+  :no-library-source-vendoring
+  :west-pins-repositories
+  :only-existing-remotes]}
