@@ -1868,7 +1868,13 @@
       ;; local registry.edn immediately before this catch-up edit, not
       ;; assumed (fleet drift of a promotion or two behind live truth by
       ;; landing time is expected, per this fleet's own protocol).
-      (is (= 290 (:implemented m))))))
+      (testing "cloud-itonami-isic-3091 (Manufacture of motorcycles, fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-C3091 placeholder or the real cloud-itonami org [gh api 404 confirmed]; identity ({:id \"3091\" :name \"Manufacture of motorcycles\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; MotoAdvisor ⊣ Motorcycle Plant Operations Governor motorcycle-plant plant-operations-COORDINATION actor, mirroring cloud-itonami-isic-3092's [Manufacture of bicycles and invalid carriages] verified module shape closely (motomfg.* in place of bikemfg.*) -- product-category/engine-displacement-cc production-batch fields in place of product-category/weight-capacity-kg, and a permanent ECE R78 (motorcycle brake system) / ECE R40 (motorcycle emissions) type-approval-certification-authority block in place of 3092's ISO 4210/ISO 7176 block; :flag-safety-concern (frame-weld-defect/brake-safety/emissions-compliance concern) always escalates regardless of confidence, matching 3092's own safety-concern-escalation invariant; the proposal-effect allowlist plus the permanent equipment-actuate block (`:actuate-equipment? true`) structurally prevent any direct welding/assembly/test-bench-equipment control, with no human-approval override path either; registry.edn's own \"3091\" -> :implemented change landed via a Contents-API single-file PUT (commit d08dca5e26f1a86847d847b8d113bc7d1c28595e), exact-block edit only, diff-verified single-block change. 77 tests / 215 assertions green in the actor repo, independently re-verified against a fresh clone; superproject ADR-2607921091) is also :implemented"
+        (is (= :implemented (industry/maturity "3091"))))
+      ;; 290 -> 291: this "3091" -> :implemented promotion plus further
+      ;; sibling promotion(s) landed concurrently; recomputed live via
+      ;; `(industry/maturity-summary)` on the freshly-edited local
+      ;; registry.edn immediately before this edit, not assumed.
+      (is (= 291 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
