@@ -1338,6 +1338,25 @@ queryでsydneyを取得できることを確認(このタグを導入した最�
 現状: 国軸20件・業界団体軸22件(17業種)・自治体軸11件——53tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 54 — 国軸21件目(ARG))
+
+`cloud-itonami-iso3166-arg`(既存の`marketentry`実装済みリポ)に
+`statute.facts`を追加・push
+([commit](https://github.com/cloud-itonami/cloud-itonami-iso3166-arg/commit/e2c8db7))：
+実在3法令、全てservicios.infoleg.gob.ar(InfoLeg、アルゼンチン法務・
+人権省公式立法情報システム)を直接WebFetchで照合(bcn.cl/leychile.cl
+のJS-onlyとは異なり直接レンダリングされた): Ley General de
+Sociedades N° 19.550(会社法、1972-04-03制定・2018-06-18最終改正
+(Ley 27.444))／Ley N° 25.326(Habeas Data、個人データ保護法、
+2000-10-04制定)／Ley N° 20.744(労働契約法、1974-09-05制定)。
+28 tests/90 assertions green。
+
+82リポジトリ・695 factを統合。`:labor`トピックでの横断queryで21か国
+全てを取得できることを確認。
+
+現状: 国軸21件・業界団体軸22件(17業種)・自治体軸11件——54tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社

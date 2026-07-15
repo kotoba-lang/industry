@@ -196,7 +196,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-assoc-6020-usa-nab/data/datascript-tx.edn"}
    {:label "cloud-itonami-municipality-aus-sydney ordinance.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-municipality-aus-sydney/schema/ordinance.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-municipality-aus-sydney/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-aus-sydney/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-arg statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-arg/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-arg/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
