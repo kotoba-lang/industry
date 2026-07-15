@@ -202,7 +202,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-iso3166-arg/data/datascript-tx.edn"}
    {:label "cloud-itonami-assoc-3600-usa-awwa association.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-assoc-3600-usa-awwa/schema/association-rule.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-assoc-3600-usa-awwa/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-3600-usa-awwa/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-arg-buenos-aires ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-arg-buenos-aires/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-arg-buenos-aires/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 

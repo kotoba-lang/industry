@@ -1379,6 +1379,35 @@ AWWA Policy Statement on Distribution System Water Quality(配水
 現状: 国軸21件・業界団体軸23件(18業種)・自治体軸11件——55tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 56 — 自治体軸12件目(ブエノスアイレス))
+
+`cloud-itonami-municipality-arg-buenos-aires`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-arg-buenos-aires/commit/9ca8426))：
+ブエノスアイレス自治市(Ciudad Autónoma de Buenos Aires、Wikidata Q1486)。
+自治市自身の公式官報データベース`boletinoficial.buenosaires.gob.ar`の
+HTML norm ページ2件を直接WebFetch検証:
+Ley 1472「Código Contravencional de la Ciudad Autónoma de Buenos Aires」
+(治安条例、2004-10-28公布)／Ley 104「Ley de Acceso a la Información」
+(情報公開法、1998-11-19可決・1998-12-17公布・1998-12-29掲載)。
+4 tests/10 assertions green。
+
+**却下した情報源2件（捏造せず正直に記録）**:
+`documentosboletinoficial.buenosaires.gob.ar`の直接PDF（Ley 6017の
+再公開）はフォントサブセット化による文字化けが今回のファミリーで
+最悪——通常はヘッダーだけは読めるケースが多い中、法律名そのものが
+判読不能だった。「Gobierno de la Ciudad Autónoma de Buenos Aires」の
+ヘッダーのみ確認できたが本文は使わず、代わりに上記の
+boletinoficial.buenosaires.gob.ar HTML norm ページに切り替えた。
+`juristeca.jusbaires.gob.ar`は`connect ECONNREFUSED
+45.182.81.155:443`でTCP接続自体が拒否され断念。
+
+85リポジトリ・699 factを統合。`"ordinance/topic" "transparency"`での
+横断queryでbuenos-airesがtokyo/washington-dc/berlin/madrid/seoul/roma
+と並んで取得できることを確認。
+
+現状: 国軸21件・業界団体軸23件(18業種)・自治体軸12件——56tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
