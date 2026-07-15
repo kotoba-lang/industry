@@ -4392,11 +4392,33 @@
    :operating-states [:intake :welding-procedure-verify :nde-inspection-screen :approve :dispatch-assembly :issue-fabrication-certificate :audit]},
   {:id "2512"
    :name "Manufacture of tanks, reservoirs and containers of metal"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2512"
-   :business-id "cloud-itonami-C2512"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2512"
+   :business-id "cloud-itonami-isic-2512"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607991600): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2512 placeholder).
+   ;; MetalTankAdvisor, an advisor sealed behind an independent Metal
+   ;; Tank Plant Operations Governor, langgraph-clj StateGraph,
+   ;; append-only audit ledger. Mirrors cloud-itonami-isic-2599's
+   ;; [Manufacture of other fabricated metal products n.e.c.] verified
+   ;; module shape, adapted to a metal-tank/reservoir/container
+   ;; fabrication shop (welding line -> pressure-testing line ->
+   ;; forming line) producing storage tanks, reservoirs, metal
+   ;; containers, gas cylinders, process vessels and central-heating
+   ;; boilers. Plant OPERATIONS COORDINATION only -- NOT welding-line
+   ;; control authority and NOT a pressure-vessel-certification
+   ;; authority (no ASME code-stamp issuance): the closed op allowlist
+   ;; (log-production-batch/schedule-maintenance/flag-safety-concern/
+   ;; coordinate-shipment, all :effect :propose) plus two independent
+   ;; permanent blocks (welding-line-actuate, code-stamp-authority)
+   ;; structurally prevent both direct equipment control and any
+   ;; certification-authority claim, with no human-approval override
+   ;; path. 72 tests / 199 assertions green, independently re-verified
+   ;; against a fresh clone.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2513"
