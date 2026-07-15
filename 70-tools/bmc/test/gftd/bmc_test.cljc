@@ -249,3 +249,27 @@
   ;; 出てくることをスモークチェックする。
   (doseq [cmd ["products" "canvas" "hyp" "react" "gate" "funnel" "score" "ledger"]]
     (is (some? (cli/find-command-help cmd)) (str cmd " missing from command-help"))))
+
+(deftest rolling-observation-retention
+  (let [idx (canvas/index base)
+        signal #(str "観測 (signal): 実測 " % " req/7d")
+        events (concat
+                (for [i (range 5)]
+                  {:event/type :canvas/add-item :canvas/id :cloud-itonami.problem
+                   :event/value (signal i)})
+                [{:event/type :canvas/add-item :canvas/id :cloud-itonami.problem
+                  :event/value "観測 (2026-07-06 QA): 実質的な発見 — 残す"}
+                 {:event/type :canvas/add-item :canvas/id :cloud-itonami.problem
+                  :event/value "観測 (paths): 上位 page A"}
+                 {:event/type :canvas/add-item :canvas/id :cloud-itonami.problem
+                  :event/value "観測 (paths): 上位 page B"}])
+        items (get-in (canvas/fold idx events)
+                      [:blocks :cloud-itonami.problem :canvas/items])]
+    (testing "signal 観測は window (3) 件だけ残り、最新が生き残る"
+      (is (= [(signal 2) (signal 3) (signal 4)]
+             (filterv #(clojure.string/starts-with? % "観測 (signal):") items))))
+    (testing "paths 観測は別カウント (window 未満なら全部残る)"
+      (is (= 2 (count (filterv #(clojure.string/starts-with? % "観測 (paths):") items)))))
+    (testing "実質的観測と既存 item は無期限に残る"
+      (is (some #{"観測 (2026-07-06 QA): 実質的な発見 — 残す"} items))
+      (is (some #{"p1"} items)))))
