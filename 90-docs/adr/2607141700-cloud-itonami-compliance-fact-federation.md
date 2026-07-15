@@ -1667,6 +1667,27 @@ buenos-airesと並んで取得できることを確認。
 現状: 国軸24件・業界団体軸25件(20業種)・自治体軸17件——66tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 67 — 業界団体軸26件目(ACC) — 新規ISIC業種(基礎化学品))
+
+`cloud-itonami-assoc-2011-usa-acc`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-2011-usa-acc/commit/bb1cbc7))：
+American Chemistry Council（ACC、Wikidata Q4743356、1872年設立時の
+名称はManufacturing Chemist Association of the United States）。
+`americanchemistry.com`の公式ページ2件を直接WebFetch検証:
+「Our 150 Years History」（1872年設立、月日の記載はページ上に見当た
+らずyear-onlyのまま採用し捏造せず）／「Responsible Care Overview」
+（化学業界の代表的な自主規制安全・持続可能性プログラム、"Launched
+in the U.S. in 1988"と本文に明記、こちらも月日は不記載でyear-only）。
+4 tests/11 assertions green。
+
+**新規ISIC業種**: ISIC 2011(基礎化学品製造業)を初めて追加した。
+
+96リポジトリ・724 factを統合。`"association-rule/topic"
+"governance"`での横断queryでaccを含む22団体が取得できることを確認。
+
+現状: 国軸24件・業界団体軸26件(21業種)・自治体軸17件——67tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社

@@ -235,7 +235,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-iso3166-ury/data/datascript-tx.edn"}
    {:label "cloud-itonami-municipality-chl-santiago ordinance.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-municipality-chl-santiago/schema/ordinance.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-municipality-chl-santiago/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-chl-santiago/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-2011-usa-acc association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-2011-usa-acc/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-2011-usa-acc/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
