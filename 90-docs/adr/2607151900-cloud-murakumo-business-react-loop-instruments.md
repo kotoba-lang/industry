@@ -182,3 +182,31 @@ gateway か gad ComfyUI かの二者択一」ではなく、両者を繋ぐ 3 �
 検証: POST api.murakumo.cloud/v1/images/generations (model 指定あり/なし両方)
 → 200、実 PNG 生成 8.9〜19.4s、node=gad。voice 経路の非退行も確認 (200)。
 club-shinshi requestScene の依存経路が復活した。
+
+## Addendum 4 (2026-07-15) — GTM 実施: landing に first-value 経路を配線
+
+funnel bottleneck (訪問→実推論 activation 1% < 2%) への GTM を実施した。
+調査で判明した最大の摩擦は「訪問者が実推論に到達する経路がサイト上に存在
+しない」こと — 旧『Live Playground』はスケジューラの browser シミュレーション
+で推論を一切呼ばず、実行可能な curl 例も無く、価格の即購入導線も無く、課金
+しても API token 発行は operator の手動 CLI のみだった。
+
+実装 (3 層):
+1. **local-murakumo `c6323dd`**: 公開 `POST /v1/chat/completions` verbatim
+   passthrough — 無認証 (murakumo.cloud/api/v1 の現行姿勢と同一)、max_tokens
+   2048 cap、非 streaming は run 記録付き。試用トラフィックが activation
+   計器にそのまま乗る。
+2. **cloud-murakumo `c7e7e77`**: landing に try-it セクション (本物の推論
+   ボックス: qwen3.6-35b-a3b、enable_thinking off + <think> strip、Enter 送信)
+   + OpenAI 互換 curl 例 + credits-strip (storefront SKU SSoT から Starter
+   $10 / Growth $50 / Scale $200、#store 直リンク、実測原価 ~¥13/Mtok の透明性
+   訴求)。hero の primary CTA を try-it へ。CSS は hig token のみ (kotoba-uiux
+   準拠、raw hex ゼロ)。
+3. **計測経路化**: `MURAKUMO_OPENAI_URL` を infer.murakumo.cloud (計測外) →
+   api.murakumo.cloud/v1 (計測付き) に変更。landing の try-it / curl の
+   1 送信が BMC funnel の activation として実計測される。
+
+live 検証: upstream 反映・landing proxy 経由の実推論 200・run 記録・GTM 要素
+の配信を確認。残 gap: Stripe 購入→API token 自動発行 (fulfillment) は未配線
+のまま — 有償転換 (activation→revenue) の次の摩擦であり、webhook + token
+mint + 配布 UX の設計を要する (owner 判断込みの別スコープ)。
