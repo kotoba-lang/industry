@@ -61,7 +61,7 @@ Local ISIC checkouts under `orgs/cloud-itonami/cloud-itonami-isic-*` (**n=165**)
 | **ISO3166 JPN agencies** | 4 | 0 | 1 | 0 | blueprint + docs; essentially no src |
 | **ISCO occupations** | 3 | 1 | 0 | 0 | Thin tests / partial modules |
 | **Catalog / org surface** | 4 | 4 | 4 | 1 | github.io from registry SSoT |
-| **itonami.cloud cockpit** | 4 | 3 | 4 | 1 | productSurface 7/7; free-tenant selfReg=1; paid blocked on Stripe secrets |
+| **itonami.cloud cockpit** | 4 | 3 | 4 | 1 | free path mature productSurface 12/12; freePath tenants=2; paid blocked on Stripe |
 
 ## Reading
 
