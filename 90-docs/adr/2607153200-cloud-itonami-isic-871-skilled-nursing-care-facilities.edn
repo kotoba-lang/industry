@@ -1,0 +1,82 @@
+;; ADR-2607153200: cloud-itonami-isic-871 — Skilled Nursing Care Facilities Coordination
+;; Status: accepted
+;; Scope: kotoba-lang/industry registry ("871"), cloud-itonami-isic-871 actor repo, implementation verification
+
+{:adr/id "2607153200"
+ :adr/title "cloud-itonami-isic-871 — Skilled Nursing Care Facilities Coordination"
+ :adr/status :accepted
+ :adr/date "2026-07-15"
+ :adr/relates-to #{:isic-871 :wave-4 :skilled-nursing}
+ :adr/links {:isic-873 "2607152700"
+             :isic-873-spec "https://github.com/cloud-itonami/cloud-itonami-isic-873"
+             :wave-4-amendment "2607152500"
+             :wave-definition "2607121000"
+             :isic-0520-pattern "2607152300"
+             :kotoba-industry-registry "https://github.com/kotoba-lang/industry/blob/main/resources/kotoba/industry/registry.edn"}
+
+ :isic-871/registry-entry
+ {:id "871"
+  :name "Residential nursing care facilities"
+  :repo "https://github.com/cloud-itonami/cloud-itonami-isic-871"
+  :business-id "cloud-itonami-isic-871"
+  :maturity :implemented
+  :wave :wave-4}
+
+ :actor/operations
+ {:allowed-ops [:log-resident-note
+                :schedule-family-or-guardian-visit
+                :coordinate-supply-request
+                :schedule-staff-shift-proposal
+                :flag-safety-concern]
+  :closed-allowlist true
+  :all-propose true
+  :always-escalate [:flag-safety-concern]}
+
+ :actor/governor
+ {:hard-checks
+  [{:name :resident-unverified
+    :description "Resident must exist + be independently verified in store"}
+   {:name :effect-not-propose
+    :description "All proposals must have :effect :propose"}
+   {:name :scope-exclusion
+    :description "Extra-conservative exclusion: medication, clinical, nursing-assessment, wound-care, IV/catheter, vital-signs, restraint, end-of-life, safety-authority"}]
+  :scope-excluded-terms
+  {:medication ["medicatio" "dosing" "prescription" "pharma" "drug" "inject" "infusion"]
+   :nursing-assessment ["nursing assessment" "clinical assessment" "clinical diagnosis" "diagnos" "assessment"]
+   :vital-signs ["vital sign" "bp reading" "heart rate" "respiration" "temperature" "blood glucose"]
+   :wound-care ["wound care" "dressing" "suture" "catheter" "foley" "feeding tube"]
+   :end-of-life ["end of life" "dnr" "advance directive" "code status"]
+   :safety-authority ["safety authority" "license suspension" "compliance enforcement" "investigat" "complaint"]}
+  :escalate-conditions
+  {:always-ops [:flag-safety-concern]
+   :low-confidence-threshold 0.6}}
+
+ :actor/phase-rollout
+ {0 {:label "read-only" :writes #{} :auto #{}}
+  1 {:label "assisted-logging" :writes #{:log-resident-note} :auto #{}}
+  2 {:label "assisted-coordination"
+     :writes #{:log-resident-note :schedule-family-or-guardian-visit :coordinate-supply-request :schedule-staff-shift-proposal}
+     :auto #{}}
+  3 {:label "supervised-auto"
+     :writes :all
+     :auto #{:log-resident-note :schedule-family-or-guardian-visit :coordinate-supply-request :schedule-staff-shift-proposal}}}
+
+ :test-results
+ {:tests-run 41
+  :assertions 121
+  :failures 0
+  :errors 0
+  :clj-kondo-errors 0
+  :clj-kondo-warnings 0
+  :demo-passes true
+  :scenarios-tested
+  ["phase-1 approval-gated commit"
+   "phase-3 auto-commit for all four non-safety ops"
+   "always-escalating safety-concern flag"
+   "hard-hold: unregistered resident"
+   "hard-hold: unverified resident"
+   "hard-hold: non-propose effect"
+   "hard-hold: medication/clinical/nursing-assessment scope exclusion"
+   "hard-hold: wound-care scope exclusion"
+   "hard-hold: IV/catheter scope exclusion"
+   "hard-hold: vital-signs scope exclusion"]}}
