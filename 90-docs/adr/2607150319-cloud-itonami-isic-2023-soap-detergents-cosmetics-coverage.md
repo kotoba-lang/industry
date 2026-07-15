@@ -1,0 +1,251 @@
+# ADR-2607150319: cloud-itonami-isic-2023 (Manufacture of soap and detergents, cleaning and polishing preparations, perfumes and toilet preparations) coverage
+
+**Status**: accepted
+**Date**: 2026-07-15
+**Deciders**: Jun Kawasaki (agent-executed, standing authorization)
+**Related**: ADR-2607171200 (cloud-itonami-isic-2013 Manufacture of plastics and synthetic rubber in primary forms coverage, closest domain analog)
+
+## Context
+
+ISIC class 2023 (Manufacture of soap and detergents, cleaning and
+polishing preparations, perfumes and toilet preparations) is a fresh
+scaffold — no prior repo or reverted attempt existed at
+`cloud-itonami/cloud-itonami-isic-2023` before this ADR (checked and
+confirmed 404 via `gh api repos/cloud-itonami/cloud-itonami-isic-2023`
+before starting). The `kotoba-lang/industry` registry entry `{:id
+"2023" :name "Manufacture of soap and detergents, cleaning and
+polishing ..." ...}` (the registry's own `:name` field is stored
+truncated with a literal `...` suffix, matching the storage
+convention of its neighboring entries) was verified byte-for-byte from
+a fresh read-only clone before any code was written (this fleet has
+previously mislabeled an assigned ISIC class from memory rather than
+reading the registry — e.g. 0892 assumed salt, actually peat; 0144
+assumed swine, actually sheep-goats). The registry's `:repo`/
+`:business-id` fields pointed at a never-created
+`gftdcojp/cloud-itonami-C2023` placeholder before this promotion.
+
+The closest domain analog is `cloud-itonami-isic-2013` (Manufacture of
+plastics and synthetic rubber in primary forms): both are back-office
+coordination actors for a fixed processing PLANT with heavy
+manufacturing equipment and a real physical safety dimension, and both
+share the same four-op shape (`:log-production-batch`/
+`:schedule-maintenance`/`:flag-safety-concern`/`:coordinate-shipment`)
+and the same two-entity verified/registered gate structure (equipment
+for maintenance scheduling, batch for shipment coordination). The two
+verticals are, however, distinct plants with distinct hazard AND
+regulatory profiles: 2013's hazard is chemical-process (monomer
+exposure, exothermic runaway-reaction risk during polymerization),
+while 2023's hazard is caustic-alkali/surfactant handling during
+saponification/mixing AND a genuine fragrance-allergen labeling
+regulatory obligation (EU Regulation (EC) No 1223/2009 Annex III) that
+2013 has no analog of. This build mirrors 2013's architecture closely
+(itself informed by `cloud-itonami-isic-2220`'s Plastics-products
+actor) but adapts the hazard profile and equipment/product vocabulary
+to the soap/detergent/cleaning-preparation/perfume/toilet-preparation
+plant: 2023's permanent equipment-actuation block guards a
+formulation/filling LINE (`:actuate-line?`, the same field name 2220
+uses, not 2013's `:actuate-reactor?`); 2023's production-batch record
+declares a `:product-type` (spanning soap, detergents, cleaning and
+polishing preparations, perfumes, and toilet preparations, per ISIC
+2023's own combined four-family scope) and an `:off-spec-rate-
+percent`, rather than 2013's `:polymer-grade`/`:off-spec-rate-percent`
+(same field names for the shared off-spec-rate metric, a different
+closed set for the domain-specific grade/type field).
+
+This vertical is SELF-CONTAINED — no `kotoba-lang/soapmfg` library
+exists, so domain logic (equipment/batch verification, shipment-weight
+recompute, product-type validation, off-spec-rate plausibility
+validation) lives as pure functions in `soapmfg.registry` and is
+re-verified independently by the governor, mirroring the discipline
+established by `cloud-itonami-isic-2013`'s `resinmfg.registry` and
+every prior sibling actor.
+
+## Decision
+
+Build `cloud-itonami-isic-2023` from scratch as a governed-actor
+implementation of the soap/detergent/cleaning-preparation/perfume/
+toilet-preparation-manufacturing blueprint, following the langgraph
+StateGraph + independent Governor + Phase 0->3 rollout architecture
+established across the fleet:
+
+1. **SoapAdvisor** (`soapmfg.advisor`, sealed intelligence node):
+   proposes plant-operations coordination actions only, never commits
+   - `:log-production-batch` — product-type/weight/off-spec-rate/fragrance-allergen data logging (administrative, not an operational decision)
+   - `:schedule-maintenance` — saponification/mixing/formulation-kettle or filling-line maintenance scheduling proposal
+   - `:flag-safety-concern` — surface a chemical-hazard/allergen-labeling/microbial-contamination concern (always escalates)
+   - `:coordinate-shipment` — outbound shipment coordination proposal
+
+2. **Soap & Detergent Plant Operations Governor** (`soapmfg.governor`,
+   independent validation layer, never trusts the advisor's own
+   self-report):
+   - HARD invariants (no override, evaluated unconditionally,
+     elaborated into ELEVEN concrete checks — one more than 2013's ten
+     — see Decision 3): the referenced equipment unit must be
+     independently verified/registered before any maintenance may be
+     scheduled against it; the referenced batch must be independently
+     verified/registered before any shipment may be coordinated
+     against it; the request's own `:effect` must be `:propose`; `:op`
+     must be in the closed four-op allowlist; the proposal's own
+     `:effect` must be one of the four propose-shaped effects (no
+     direct formulation/filling-line-equipment control);
+     `:actuate-line? true` on a maintenance schedule (directly
+     actuating the formulation/filling line) is a PERMANENT block; a
+     shipment may not push a batch's own recorded shipped weight past
+     its own logged production weight (independently recomputed); no
+     double-scheduling the same maintenance record; no fabricated
+     `:product-type` value; no physically implausible
+     `:off-spec-rate-percent` value; a fragrance-bearing batch's own
+     allergen disclosure must be independently confirmed complete
+   - ESCALATE (human sign-off, overridable): safety concerns always
+     escalate regardless of confidence; low confidence
+
+3. **New domain-specific check — fragrance-allergen-labeling
+   completeness**: unlike `cloud-itonami-isic-2013` (no analogous
+   regulatory disclosure obligation), `:log-production-batch`
+   INDEPENDENTLY re-derives the effective product type (patch's own
+   `:product-type`, else the batch's already-recorded type from the
+   store) and, when that type ordinarily bears a fragrance
+   (`soapmfg.registry/fragrance-bearing-product-types`) AND the patch
+   cites one or more of the 26 EU Regulation (EC) No 1223/2009 Annex
+   III designated fragrance allergens
+   (`soapmfg.registry/known-fragrance-allergens`), requires the
+   patch's own `:allergen-labeling-complete?` flag to independently be
+   `true` — a patch that merely claims allergens were disclosed
+   "elsewhere" or omits the flag entirely is HARD-held. This is the
+   same "ground truth, not self-report" discipline every other
+   governor check in this fleet establishes, applied to a genuinely
+   new domain-specific regulatory fact this vertical's own product mix
+   introduces (`soapmfg.registry/fragrance-allergen-labeling-
+   incomplete?`).
+
+4. **Scope boundary** (critical, safety-critical and regulated domain
+   — caustic-alkali/surfactant chemical hazard, fragrance-allergen
+   labeling obligation, microbial-contamination risk in unpreserved
+   formulations):
+   - Does NOT control saponification/mixing/formulation-kettle or filling-line equipment directly
+   - Does NOT make plant-safety or product-safety decisions (exclusive to the human plant supervisor)
+   - Does NOT actuate the formulation/filling line (permanently blocked,
+     not a rollout milestone still to come — see `soapmfg.phase`:
+     `:schedule-maintenance` is never a member of any phase's `:auto`
+     set)
+   - All proposals are `:effect :propose`; actuation is human-approval-gated
+
+5. **Self-contained domain logic**: `soapmfg.registry` pure functions
+   (`equipment-ready?`, `batch-ready?`, `shipment-weight-exceeded?`,
+   `product-type-valid?`, `off-spec-rate-valid?`,
+   `fragrance-allergen-labeling-incomplete?`) are re-verified
+   independently by the governor, following the "ground truth, not
+   self-report" discipline established by prior actors (most directly
+   `cloud-itonami-isic-2013`'s `resinmfg.registry`).
+
+6. **Store** (`soapmfg.store`): a single `MemStore` backend behind a
+   `Store` protocol, tracking four entity kinds (batches, equipment,
+   maintenance, shipments) plus the append-only ledger. Like 2013,
+   this build does NOT ship a second Datomic-backed store — a second
+   backend can be added later behind the same protocol without
+   changing any caller.
+
+7. **Implementation**: `.cljc` portable source (ClojureScript/JVM/nbb
+   compatible, no JVM-only interop), langgraph-clj StateGraph (invoked
+   via `langgraph.graph/run*`, not `.invoke`), append-only audit
+   ledger, full test coverage, demo driver. Full module set:
+   `deps.edn`, `blueprint.edn`, `LICENSE` (AGPL-3.0-or-later),
+   `README.md`, `GOVERNANCE.md`, `CODE_OF_CONDUCT.md`,
+   `CONTRIBUTING.md`, `SECURITY.md`, `docs/adr/0001-architecture.md`.
+   All source pushed to
+   `github.com/cloud-itonami/cloud-itonami-isic-2023` (public OSS,
+   AGPL-3.0-or-later).
+
+## Consequences
+
+(+) Soap/detergent/cleaning-preparation/perfume/toilet-preparation
+plant-operations back-office coordination is now genuinely implemented
+and tested (not merely scaffolded). ISIC 2023 moves from `:spec` to
+`:implemented`.
+
+(+) Scope boundary is explicit and verifiable: the governor's HARD
+invariants protect against scope creep into unauthorized equipment
+operation or line actuation, independently corroborated by
+`soapmfg.phase`'s permanent exclusion of `:schedule-maintenance` from
+every phase's `:auto` set.
+
+(+) The two independent verified/registered gates (equipment for
+maintenance, batch for shipment) are a genuinely soap/detergent/
+cosmetics-manufacturing-specific elaboration mirroring 2013's own
+two-entity-kind gate — this domain has two distinct ground-truth
+entity kinds a proposal can reference, and each is independently
+re-derived from its own permanent record, never trusting the
+proposal's self-report.
+
+(+) The fragrance-allergen-labeling completeness check is a genuinely
+new regulatory-disclosure elaboration this vertical's own product mix
+introduces (perfumes and toilet preparations are inherently
+fragrance-bearing; most soaps/detergents/cleaners ordinarily bear
+fragrance too) — independently re-derived from the patch's own
+declared fields, never taken on the advisor's self-report that
+labeling "will be" handled.
+
+(+) The repo is standalone (forkable outside the workspace), matching
+the pattern established by prior actors.
+
+(+) All four core modules (governor/store/advisor/registry) plus
+`deps.edn` are present and exercised by 82 tests / 219 assertions
+across 5 test namespaces (`soapmfg.operation-test`,
+`soapmfg.governor-contract-test`, `soapmfg.phase-test`,
+`soapmfg.store-contract-test`, `soapmfg.registry-test`).
+
+(-) Still a simulation/proposal layer, not integrated with real
+equipment-telemetry/batch-tracking/freight-dispatch systems — scope is
+deliberately bounded to back-office coordination.
+
+(-) Safety-concern escalation is a simplified placeholder; a real
+deployment would tie it to a domain-specific hazard-severity
+classification.
+
+(-) Single-backend Store (MemStore only): a Datomic/kotoba-server-backed
+store is a follow-up, not part of this build.
+
+(-) The closed `known-fragrance-allergens` set is a representative
+subset of the EU's 26 designated Annex III allergens, not an
+exhaustive multi-jurisdiction ingredient database — a real deployment
+would integrate an authoritative, regularly-updated ingredient
+regulatory database.
+
+## Verification
+
+- `cloud-itonami-isic-2023` repo: fresh scaffold, full module set
+  (governor/store/advisor/registry/operation/phase/sim + `deps.edn` +
+  `blueprint.edn` + LICENSE + governance docs) pushed to `main` at
+  `github.com/cloud-itonami/cloud-itonami-isic-2023`, initial commit
+  `563bf0f46b2a68299d335a99b6e36b6a0059bb5a` (confirmed via
+  `gh api repos/cloud-itonami/cloud-itonami-isic-2023/commits/main`
+  matching the local HEAD SHA).
+- `clojure -M:test` (bare, no `:dev` alias needed — `deps.edn` pins
+  langgraph+langchain via `:local/root` directly in top-level `:deps`):
+  **`Ran 82 tests containing 219 assertions. 0 failures, 0 errors.`**
+- `clojure -M:lint`: 0 errors, 0 warnings.
+- `clojure -M:dev:run` demo narrative exercises all four ops, every
+  HARD-hold scenario directly (not-propose-effect, unknown-op,
+  equipment-not-verified, batch-not-verified, shipment-weight-exceeded,
+  line-actuate-blocked, already-scheduled, invalid-product-type,
+  invalid-off-spec-rate, fragrance-allergen-labeling-incomplete), with
+  no exceptions.
+- All source is `.cljc` (portable); the actor graph is invoked
+  exclusively via `langgraph.graph/run*`.
+- Audit ledger is append-only; every settled request (commit or hold)
+  leaves exactly one ledger fact (contract-tested).
+- `:itonami.blueprint/governor` keyword `:soap-detergent-plant-
+  operations-governor` is grep-verified UNIQUE fleet-wide (`gh search
+  code "soap-detergent-plant-operations-governor" --owner
+  cloud-itonami`, zero hits before this repo was created).
+- `kotoba-lang/industry` registry entry for `"2023"` updated in place
+  from `:spec` to `:maturity :implemented` via an exact-text in-place
+  edit of the single `{:id "2023" ...}` block (no wholesale
+  regeneration). See registry entry's own commit history for the exact
+  landed merge SHA and the live `:implemented` count recomputed fresh
+  immediately before the edit (never an assumed fixed number);
+  `industry_test.clj`'s own assertion was bumped accordingly and
+  re-run green before commit, then re-verified from a brand-new fresh
+  clone (plus a fresh `../technology` sibling clone) after merge,
+  reproducing the same green result and confirming zero UTF-8 mojibake
+  (`grep -c "â" resources/kotoba/industry/registry.edn` = 0).
