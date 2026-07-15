@@ -1233,6 +1233,27 @@ queryで19か国全てを取得できることを確認。
 現状: 国軸19件・業界団体軸20件(15業種)・自治体軸9件——48tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 49 — 業界団体軸21件目(AGC) — 新規ISIC業種(建設))
+
+`cloud-itonami-assoc-4100-usa-agc`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-4100-usa-agc/commit/54fc188))：
+Associated General Contractors of America(AGC、Wikidata Q21015616、
+1918年設立)。実在2件を両方とも直接確認(2018 Construction Safety
+Excellence Awards (CSEA): Safety Management Best Practices: Willis
+Towers Watsonと共同発行、PDF表紙をReadツールで直接確認——会員拘束的
+コミットメントではなく実務ガイダンスなので`:kind :best-practices-guide`
+を使用／Our History(centennial): 組織概要ページを直接WebFetchで確認、
+1918年設立自体がページ本文に直接明記されている)。4 tests/11
+assertions green。
+
+**新規ISIC業種**: ISIC 4100(建築工事業)を初めて追加した。
+
+73リポジトリ・683 factを統合。`"association-rule/topic"
+"governance"`での横断queryでagcを含む17団体が取得できることを確認。
+
+現状: 国軸19件・業界団体軸21件(16業種)・自治体軸9件——49tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
