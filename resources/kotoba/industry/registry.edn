@@ -5004,11 +5004,38 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2821"
    :name "Manufacture of agricultural and forestry machinery"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2821"
-   :business-id "cloud-itonami-C2821"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2821"
+   :business-id "cloud-itonami-isic-2821"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607992821): fresh from-scratch scaffold (no prior repo
+   ;; or reverted attempt; gh api 404 confirmed before starting;
+   ;; registry :name verified against a fresh clone before starting).
+   ;; AgMachAdvisor ⊣ Agricultural and Forestry Machinery Plant
+   ;; Operations Governor plant-operations-coordination actor
+   ;; mirroring cloud-itonami-isic-2826's [Manufacture of machinery
+   ;; for textile, apparel and leather production] verified module
+   ;; shape module-for-module (agmachmfg.* in place of texmachmfg.*)
+   ;; -- tractor-assembly-line/harvester-test-bench equipment and
+   ;; tractor/combine-harvester/tillage-implement/baler/forestry-
+   ;; harvester production-batch (product-type/pto-no-load-speed-rpm/
+   ;; defect-rate-percent) vocabulary in place of loom-assembly/
+   ;; sewing-machine-test-bench equipment and weaving-loom/sewing-
+   ;; machine/leather-cutting-machine/knitting-machine/fabric-
+   ;; cutting-machine product-type; :flag-safety-concern (mechanical-
+   ;; safety/hydraulic-hazard/PTO-guard-compliance) always escalates
+   ;; regardless of confidence, matching 2826's own safety-concern-
+   ;; escalation invariant; the proposal-effect allowlist plus a
+   ;; permanent equipment-actuate block (`:actuate-equipment? true`)
+   ;; structurally prevent any direct assembly/test-bench-equipment
+   ;; control, with no human-approval override path; a further
+   ;; permanent certification-authority block
+   ;; (`:issue-certification? true`) prevents self-issuing a CE
+   ;; machinery safety OR ROPS (OECD Standard Codes) certification
+   ;; mark. 77 tests / 210 assertions green, independently
+   ;; re-verified against a fresh clone.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2822"
