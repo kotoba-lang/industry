@@ -1,34 +1,24 @@
-{:health-status 200,
- :asOf "2026-07-15T15:08:07.440Z",
- :zone-name "itonami.cloud",
- :zone
- {:requests-7d 288,
-  :pageviews-7d 20,
-  :uniques-7d-sum 84,
-  :zone "itonami.cloud"},
- :agentRuns7d 9,
- :sources [:cloudflare :health :emitter],
- :paths
- {:ok
-  [{:path "/robots.txt", :requests 15}
-   {:path "/infer/cost", :requests 1}],
-  :status-mix {:client-error 22, :ok 16},
-  :window "24h"},
- :source "itonami-data-kv-list",
- :note
- "PII-free aggregates only. paid stays 0 until Stripe checkout + webhook entitlement.",
- :as-of "2026-07-15",
- :ok true,
- :traffic-quality {:window "24h", :probe-4xx-pct 58, :error-5xx-pct 0},
- :top-paths
- "上位 page (24h, 2xx/3xx): /robots.txt 15 · /infer/cost 1 | 4xx(probe) 58%",
- :funnel {:trials 2},
- :signal
- "itonami.cloud 実測 288 req/7d・84 uniques(日次和)・うち4xx probe 58%(24h)",
- :tenants
- {:active 2,
-  :external-paid 0,
-  :external-total 2,
-  :externalPaid 0, 
-  :externalTotal 2, 
-  :selfRegisteredOwners 2}}
+{
+ :as-of "2026-07-15"
+ :sources ["itonami-free-path" "emitter"]
+ :health-status 200
+ :free-path {
+   :ok true
+   :external-tenants 2
+   :self-registered-owners 2
+   :registry-entries 2
+   :agent-runs-7d 14
+   :external-paid 0
+  }
+ :product-surface {
+   :passed 12
+   :total 12
+   :pct 100
+  }
+ :full-including-paid {
+   :passed 12
+   :total 14
+   :pct 86
+  }
+ :signal "itonami.cloud freePath productSurface 100% \u00b7 tenants 2 \u00b7 paid 0 \u00b7 agentRuns7d 14"
+}
