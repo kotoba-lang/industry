@@ -3562,13 +3562,40 @@
    :operating-states [:intake :log :schedule :hazard :ship :audit]},
   {:id "1622"
    :name "Manufacture of builders' carpentry and joinery"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C1622"
-   :business-id "cloud-itonami-C1622"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1622"
+   :business-id "cloud-itonami-isic-1622"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607181100): fresh from-scratch scaffold (no prior repo or
+   ;; reverted attempt existed at cloud-itonami/cloud-itonami-isic-1622;
+   ;; the old :repo/:business-id above pointed at a never-created
+   ;; gftdcojp/cloud-itonami-C1622 placeholder). MillworkAdvisor ⊣
+   ;; Millwork Shop Plant Operations Governor, langgraph-clj StateGraph,
+   ;; append-only audit ledger, mirroring cloud-itonami-isic-1621's
+   ;; [Manufacture of veneer sheets and wood-based panels] verified
+   ;; module shape module-for-module -- panel-saw/CNC-router/tenoning-
+   ;; machine/edge-bander/finishing-line equipment registration in
+   ;; place of veneer-lathe/hot-press/glue-spreader, dimensional-spec/
+   ;; unit-count/output-quality production-batch fields in place of
+   ;; grade/volume/output-quality, and a cutting-line-finalize
+   ;; permanent block in place of press-cycle-finalize.
+   ;; clojure -M:test: 71 tests / 195 assertions / 0 failures / 0 errors
+   ;; (verified from an independent fresh clone at commit
+   ;; 5e807b900bb902c5d35589b43381e9e3e162677e). Safety-critical domain
+   ;; (panel-saw/CNC-router blade/cutter injury risk, tenoning/
+   ;; mortising-machine crush/entrapment risk, wood-dust fire/explosion
+   ;; hazard, finishing-line solvent/coating fume inhalation hazard).
+   ;; Back-office plant-operations coordination only: all equipment
+   ;; actuation remains exclusive to the human plant supervisor. Four
+   ;; HARD invariants guard scope: equipment/batch independent
+   ;; verification+registration + independent shipment-unit-count
+   ;; recompute, :propose-only effect, no cutting/joinery/finishing-
+   ;; line-equipment control / cutting-line-run finalization, closed
+   ;; op-allowlist; safety-concerns (materials-safety/equipment-safety/
+   ;; dust-hazard) ALWAYS escalate (never auto-committed).
+   :operating-states [:intake :log :schedule :hazard :ship :audit]},
   {:id "1623"
    :name "Manufacture of wooden containers"
    :repo "https://github.com/gftdcojp/cloud-itonami-C1623"

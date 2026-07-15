@@ -1401,7 +1401,24 @@
       ;; fresh clone. Live-recomputed via `(industry/maturity-summary)` immediately before this edit on a
       ;; freshly re-fetched origin/main (confirmed HEAD's own pinned 240 assertion was still green
       ;; pre-edit, ruling out drift): 240 -> 241.
-      (is (= 241 (:implemented m))))))
+      ;; 241 -> 242: cloud-itonami-isic-1622 (Manufacture of builders' carpentry and joinery)
+      ;; promoted :spec -> :implemented (fresh scaffold -- no prior repository at either the
+      ;; stale gftdcojp/cloud-itonami-C1622 placeholder or the real cloud-itonami org [gh api
+      ;; 404 confirmed]), superproject ADR-2607181100
+      ;; (cloud-itonami-isic-1622-builders-carpentry-joinery-coverage.md). MillworkAdvisor ⊣
+      ;; Millwork Shop Plant Operations Governor millwork-shop-plant-operations-coordination
+      ;; actor, mirroring cloud-itonami-isic-1621's [Manufacture of veneer sheets and
+      ;; wood-based panels] verified module shape module-for-module -- panel-saw/CNC-router/
+      ;; tenoning-machine/edge-bander/finishing-line equipment registration in place of
+      ;; veneer-lathe/hot-press/glue-spreader, dimensional-spec/unit-count/output-quality
+      ;; production-batch fields in place of grade/volume/output-quality, and a
+      ;; cutting-line-finalize-blocked permanent block in place of press-finalize-blocked;
+      ;; 71 tests / 195 assertions green, independently re-verified against a fresh clone.
+      ;; Live-recomputed via `(industry/maturity-summary)` immediately before this edit on a
+      ;; freshly re-fetched origin/main (concurrent-agent count-drift caution -- not an assumed
+      ;; fixed number; confirmed HEAD's own pinned 241 assertion was still green pre-edit):
+      ;; 241 -> 242.
+      (is (= 242 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
