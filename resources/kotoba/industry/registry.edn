@@ -3096,8 +3096,18 @@
    :business-id "cloud-itonami-0710"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
-   :maturity :spec
-   ;; REVERTED 2026-07-14: test file references a private var (governor/forbidden-operation-violations not public) -- compile error, confirmed broken by direct clojure -M:test run. Needs a verified from-scratch redo.
+   :maturity :implemented
+   ;; RE-VERIFIED 2026-07-15: the 2026-07-14 revert's compile error (a test
+   ;; called the private governor/forbidden-operation-violations fn
+   ;; directly) is fixed -- that test now exercises the public
+   ;; governor/check entry point instead, the same discipline every other
+   ;; test in this file already used. A latent bare `read-string` (unsafe
+   ;; against untrusted LLM output, JVM-only behavior) in ironopsllm.cljc
+   ;; was also fixed to clojure.edn/read-string while verifying. Confirmed
+   ;; on a FRESH clone of the merged main (not just the pre-fix working
+   ;; tree): clojure -M:dev:test (7 tests/17 assertions, 0 failures),
+   ;; clojure -M:lint (0 errors), clojure -M:dev:run demo runs clean.
+   ;; Merge commit b50379a85e042650753705de464d1b91c2d239a2.
    ;; Promoted :blueprint -> :implemented as an iron-ore-mining operations
    ;; coordinator (IronOps-LLM ⊣ Iron Ore Governor), the ninetieth build
    ;; in the cloud-itonami fleet. Scope: coordination only (logging,
