@@ -1921,6 +1921,33 @@ sydney/san-jose/bogota/copenhagenと並んで取得できることを確認。
 現状: 国軸26件・業界団体軸28件(23業種)・自治体軸22件——76tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 77 — 国軸27件目(エクアドル))
+
+`cloud-itonami-iso3166-ecu`に`statute.facts`を新規追加・push
+([commit bba9ff7](https://github.com/cloud-itonami/cloud-itonami-iso3166-ecu/commit/bba9ff7))：
+エクアドル共和国。公式`gob.ec`（エクアドル政府公式手続きポータル）の
+3件を直接WebFetch検証: Ley de Compañías（会社法、Registro Oficial
+第312号、1999-11-05公布・1999-10-20署名）／Ley Orgánica de Protección
+de Datos Personales（データ保護法、Registro Oficial第459号、
+2021-05-26公布・2021-05-10署名）／Código de Trabajo（労働法典、
+Registro Oficial第167号、2005-12-16公布・署名）——いずれもページが
+完全にレンダリングされ公布日・署名日が明記されていた。
+
+ウルグアイ・コスタリカ・パナマと同様、このリポジトリも既存の
+`marketentry.facts`実装を持たないblueprint-onlyの状態だったため、
+`statute.facts`がこのリポジトリ初のコード実体となった（独自の
+`deps.edn`+`.gitignore`を新規作成）。4 tests/11 assertions green。
+
+首都チェック: 既存のooyake由来organization.edn（Quito、Wikidata
+Q2900）は史実上一貫して首都であり、P36歴史的首都バグの対象外と確認。
+
+106リポジトリ・746 factを統合。`"statute/topic" "labor"`での横断
+queryでecuを含む26カ国が取得できることを確認（panのみ:labor統計を
+持たない——tick73で正直に2件のみとした既存の方針と整合）。
+
+現状: 国軸27件・業界団体軸28件(23業種)・自治体軸22件——77tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
