@@ -2013,6 +2013,41 @@ enacted-dateは意図的に省略）。4 tests/10 assertions green。
 現状: 国軸27件・業界団体軸29件(24業種)・自治体軸24件——80tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 81 — 国軸28件目(パラグアイ))
+
+`cloud-itonami-iso3166-pry`に`statute.facts`を新規追加・push
+([commit c96ecb9](https://github.com/cloud-itonami/cloud-itonami-iso3166-pry/commit/c96ecb9))：
+パラグアイ共和国。まずボリビアを試みたが4つの異なる公式政府ドメイン
+がそれぞれ異なる障害で全滅した——
+`economiayfinanzas.gob.bo`はTLS証明書エラー、
+`gacetaoficialdebolivia.gob.bo`は2つの異なるURL（ルート含む）で
+接続リセット、`asfi.gob.bo`は出力なしで失敗、`silep.gob.bo`はDNS
+解決自体が失敗——一切引用せず完全に断念した。
+
+代わりにパラグアイで2件検証: Código Civil（民法典、Ley N.º
+1.183/85）——タイトルは`bacn.gov.py`（本来の一次情報源、Biblioteca y
+Archivo Central del Congreso Nacional）がHTTP 403のため、代わりに
+別の公式機関`conatel.gov.py`がミラーするPDF表紙を直接読んで確認、
+制定日（1985-12-18公布・1985-12-23公布官報）は独立した2つの情報源で
+裏付けられたWebSearch裏付け日付として明示的にタグ付け（前tickの
+イェーテボリと同じ方針）／Ley N.º 7593/2025（データ保護法）——
+`silpy.congreso.gov.py`（パラグアイ議会公式立法情報システム）で
+タイトル・日付とも直接確認（可決2025-11-05・公布/公表2025-11-27）。
+4 tests/11 assertions green。
+
+ウルグアイ・コスタリカ・パナマ・エクアドルと同様、このリポジトリも
+既存の`marketentry.facts`実装を持たないblueprint-onlyの状態だった
+ため、`statute.facts`がこのリポジトリ初のコード実体となった。
+
+首都チェック: 既存のooyake由来organization.edn（Asunción、Wikidata
+Q2933）は史実上一貫して首都であり、P36歴史的首都バグの対象外と確認。
+
+110リポジトリ・754 factを統合。`"statute/topic" "data-protection"`
+での横断queryでpryを含む28カ国すべてが取得できることを確認。
+
+現状: 国軸28件・業界団体軸29件(24業種)・自治体軸24件——81tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
