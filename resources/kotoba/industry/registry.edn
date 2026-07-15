@@ -3843,11 +3843,26 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2023"
    :name "Manufacture of soap and detergents, cleaning and polishing ..."
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2023"
-   :business-id "cloud-itonami-C2023"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2023"
+   :business-id "cloud-itonami-isic-2023"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae :cfd]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607150319): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2023 placeholder).
+   ;; SoapAdvisor, an advisor sealed behind an independent Soap &
+   ;; Detergent Plant Operations Governor, langgraph-clj StateGraph,
+   ;; append-only audit ledger. Mirrors cloud-itonami-isic-2013's own
+   ;; [Manufacture of plastics and synthetic rubber in primary forms]
+   ;; verified module shape, adapted to soap/detergent/cleaning-
+   ;; polishing-preparation/perfume/toilet-preparation plant operations
+   ;; (saponification/mixing/formulation kettles and filling lines),
+   ;; plus a new fragrance-allergen-labeling-completeness governor
+   ;; check (EU Regulation (EC) No 1223/2009 Annex III).
+   ;; clojure -M:test: 82 tests / 219 assertions / 0 failures / 0
+   ;; errors, independently re-verified from a fresh clone.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2029"

@@ -1418,7 +1418,26 @@
       ;; freshly re-fetched origin/main (concurrent-agent count-drift caution -- not an assumed
       ;; fixed number; confirmed HEAD's own pinned 241 assertion was still green pre-edit):
       ;; 241 -> 242.
-      (is (= 242 (:implemented m))))))
+            ;; 242 -> 243: cloud-itonami-isic-2023 (Manufacture of soap and detergents, cleaning and
+      ;; polishing preparations, perfumes and toilet preparations) promoted :spec -> :implemented
+      ;; (fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-C2023
+      ;; placeholder or the real cloud-itonami org [gh api 404 confirmed]), superproject
+      ;; ADR-2607150319 (cloud-itonami-isic-2023-soap-detergents-cosmetics-coverage.md).
+      ;; SoapAdvisor ⊣ Soap & Detergent Plant Operations Governor plant-operations-coordination
+      ;; actor mirroring cloud-itonami-isic-2013's [Manufacture of plastics and synthetic rubber
+      ;; in primary forms] verified module shape module-for-module -- saponification/mixing/
+      ;; formulation-kettle and filling-line equipment registration in place of polymerization-
+      ;; reactor/compounding-extruder equipment, product-type/weight/off-spec-rate production-
+      ;; batch fields in place of polymer-grade/weight/off-spec-rate; fragrance-allergen-labeling-
+      ;; incomplete-violations is a genuinely new independently-verified regulatory-disclosure
+      ;; check for this vertical's own product mix (EU Regulation (EC) No 1223/2009 Annex III
+      ;; designated-allergen labeling obligation, never taken on the advisor's self-report); 82
+      ;; tests / 219 assertions green, independently re-verified against a fresh clone.
+      ;; Live-recomputed via `(industry/maturity-summary)` immediately before this edit on a
+      ;; freshly re-fetched origin/main (confirmed HEAD's own pinned 242 assertion was still
+      ;; green pre-edit, ruling out drift from a raw `grep -c` undercount before trusting the
+      ;; delta): 242 -> 243.
+      (is (= 243 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
