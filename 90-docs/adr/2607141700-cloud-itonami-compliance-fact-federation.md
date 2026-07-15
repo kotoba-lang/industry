@@ -1688,6 +1688,30 @@ in the U.S. in 1988"と本文に明記、こちらも月日は不記載でyear-o
 現状: 国軸24件・業界団体軸26件(21業種)・自治体軸17件——67tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 68 — 自治体軸18件目(ボゴタ))
+
+`cloud-itonami-municipality-col-bogota`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-col-bogota/commit/53d8aff))：
+ボゴタ首都特別区。まずメキシコシティを試みたが`cdmx.gob.mx`系の
+サブドメイン3つが同一IP（187.218.8.10）でいずれも接続拒否——ホスト
+クラスタ全体が到達不能と判断し断念。次にボゴタの通常第一候補
+`alcaldiabogota.gov.co`も接続拒否で断念。代わりに市公式
+`secretariageneral.gov.co`の「acuerdos」一覧ページを直接WebFetch
+検証: Acuerdo 001 de 2026（デジタル認証技術標準、2026-02-05発効）／
+Acuerdo 002 de 2025（品質支出・地区近代化委員会内部規則、2025-10-28
+発効）。ページが完全にレンダリングされ発効日・公布日が明記されて
+いた。4 tests/10 assertions green。
+
+首都チェック: 既存のooyake由来organization.edn（Bogotá、Wikidata
+Q2841）は史実上一貫して首都であり、P36歴史的首都バグの対象外と確認。
+
+97リポジトリ・726 factを統合。`"ordinance/topic" "governance"`での
+横断queryでbogotaがsydney/helsinki/copenhagen/oslo/brusselsと並んで
+取得できることを確認。
+
+現状: 国軸24件・業界団体軸26件(21業種)・自治体軸18件——68tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
