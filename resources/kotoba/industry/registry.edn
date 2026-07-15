@@ -4528,13 +4528,35 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3100"
    :name "Manufacture of furniture"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C3100"
-   :business-id "cloud-itonami-C3100"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3100"
+   :business-id "cloud-itonami-isic-3100"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607161800): fresh from-scratch scaffold (no prior repo
+   ;; existed at either the stale gftdcojp/cloud-itonami-C3100
+   ;; placeholder or the real cloud-itonami org [gh api 404 confirmed]).
+   ;; FurnitureAdvisor / Furniture Plant Operations Governor,
+   ;; langgraph-clj StateGraph, append-only audit ledger. Mirrors
+   ;; cloud-itonami-isic-1610's [Sawmilling and planing of wood]
+   ;; verified plant-operations-coordination pattern, adapted from
+   ;; lumber production to furniture assembly (cutting/joinery/
+   ;; finishing/upholstery lines).
+   ;; clojure -M:test: 71 tests / 195 assertions / 0 failures / 0 errors
+   ;; (verified from an independent fresh clone at commit
+   ;; 25c3bdc1b39f312968dd9799c77243fd8bb5d0ff on
+   ;; cloud-itonami/cloud-itonami-isic-3100's main). Safety-critical
+   ;; domain (cutting-blade injury risk, wood-dust hazard, VOC
+   ;; finish-fume exposure/spray-booth fire risk). Back-office
+   ;; plant-operations coordination only: all equipment actuation
+   ;; remains exclusive to the human plant supervisor. Four HARD
+   ;; invariants guard scope: equipment/batch independent
+   ;; verification+registration + independent shipment-unit recompute,
+   ;; :propose-only effect, no cutting/joinery/finishing-line-equipment
+   ;; control / line-run finalization, closed op-allowlist;
+   ;; safety-concerns ALWAYS escalate (never auto-committed).
+   :operating-states [:intake :log :schedule :hazard :ship :audit]},
   {:id "3211"
    :name "Manufacture of jewellery and related articles"
    :repo "https://github.com/gftdcojp/cloud-itonami-C3211"
