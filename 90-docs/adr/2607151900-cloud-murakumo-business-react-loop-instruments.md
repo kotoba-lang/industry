@@ -210,3 +210,30 @@ live 検証: upstream 反映・landing proxy 経由の実推論 200・run 記録
 の配信を確認。残 gap: Stripe 購入→API token 自動発行 (fulfillment) は未配線
 のまま — 有償転換 (activation→revenue) の次の摩擦であり、webhook + token
 mint + 配布 UX の設計を要する (owner 判断込みの別スコープ)。
+
+## Addendum 5 (2026-07-15) — パターン横展開 #1: ai-gftd-apex の conversion 計器配線
+
+本 ADR の emitter→collect→gate パターンをポートフォリオ最大トラフィックの
+ai-gftd-apex (gftd.ai、342K req/7d・4,764 uniques/7d) に横展開した。apex も
+murakumo と同型の「実装済み・未配線」だった: ai-gftd-apex PR #2 (2026-07-02
+MERGED) が conversion 計算の純関数層 + read-only CLI を実装済みだが、emit が
+CLI/file 型のまま誰にも実行されず、gate :hyp/apex-privacy-premium は blocked。
+
+配線 (collect.cljs):
+- stripe-summary に apex-active-subscriptions (Gftd AI Pro
+  price_1RiEU5BcblPoapUJY3PfDspR、PAID invoice 判定つき — kotobase と同じ手口)
+- ai-gftd-apex per-product 導出で :conversion {:pct} / :subscription
+  {:free :plus} を PR #2 の定義どおり付与 (pct = plus/(free+plus)、base 空 0.0)。
+  free = 0 は現時点の真実 — apex は Privacy Contract (ADR-2606301220) により
+  アカウント主キーを持たず「登録済み Free ユーザー」の母集団がまだ存在しない。
+
+実測結果: gate **blocked → measuring** (「Free→Plus 転換率 = 0 (gate 未到達)」、
+Stripe 実クエリで apex 課金者 0 を確認 — 既存 active 4 件は全て kotobase の
+未払いテスト sub)。loop は gate 距離を観測に昇格して収束。
+
+残 gap (apex 側、次スコープ): ①Plus checkout が存在しない (訪問者は払いたくても
+払えない — Payment Link + UI が最短だが、購入を opaque actor id に束ねる設計
+(ADR-2606301220) を要するため owner 判断込み) ②free 母集団の実数化 (records 経由、
+checkout/actor-binding 着地後)。なお同日、別セッションが cloud-murakumo 側で
+Stripe webhook → itonami credits topup (ADR-2607995000 系) を実装中 — apex の
+checkout 設計はそちらの着地を待って揃えるのが良い。
