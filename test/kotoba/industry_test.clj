@@ -1329,7 +1329,11 @@
       ;; 71 tests / 197 assertions green, independently re-verified against a fresh clone. Live-recomputed
       ;; via `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched origin/main
       ;; (confirmed HEAD's own pinned 235 assertion was still green pre-edit, ruling out drift): 235 -> 236.
-      (is (= 236 (:implemented m))))))
+      ;; 236 -> 237: cloud-itonami-isic-2211 (Manufacture of rubber tyres and tubes) promoted
+      ;; :spec -> :implemented, superproject ADR-2607151145
+      ;; (cloud-itonami-isic-2211-rubber-tyres-coverage.md). Live-recomputed via
+      ;; `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched origin/main.
+      (is (= 237 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
