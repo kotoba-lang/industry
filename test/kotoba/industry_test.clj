@@ -1542,7 +1542,27 @@
       ;; re-fetched origin/main immediately before this single-file edit (registry.edn's
       ;; own promotion landed separately via a Contents-API single-file PUT, commit
       ;; 7e673e0069351c2903da224ed82b5b65e9761fe3, ahead of this test-file edit): 247 -> 248.
-      (is (= 248 (:implemented m))))))
+      ;; 248 -> 249: cloud-itonami-isic-2392 (Manufacture of clay building materials) promoted
+      ;; :spec -> :implemented (fresh scaffold -- no prior repository at either the stale
+      ;; gftdcojp/cloud-itonami-C2392 placeholder or the real cloud-itonami org [gh api 404
+      ;; confirmed]), superproject ADR-2607181600
+      ;; (cloud-itonami-isic-2392-clay-building-materials-coverage.md). ClayAdvisor ⊣ Clay
+      ;; Plant Operations Governor plant-operations-coordination actor for clay building
+      ;; material (brick/roof-tile) plants, mirroring cloud-itonami-isic-2431's [Casting of
+      ;; iron and steel] verified module shape module-for-module (claymfg.* in place of
+      ;; foundrymfg.*) -- extrusion-press/kiln-line equipment and brick/tile production-batch
+      ;; (product-type/dimensional-deviation/defect-rate) vocabulary in place of melting-
+      ;; furnace/pouring-line and alloy-grade/defect-rate; :flag-safety-concern (kiln-fire/
+      ;; thermal-hazard, clay/silica-dust-hazard) always escalates regardless of confidence,
+      ;; matching 2431's own safety-concern-escalation invariant; the proposal-effect
+      ;; allowlist plus a permanent kiln-line-actuate block (`:actuate-kiln-line? true`)
+      ;; structurally prevent any direct extrusion-press/kiln-line-equipment control, with no
+      ;; human-approval override path. 76 tests / 209 assertions green, independently
+      ;; re-verified against a fresh clone. Live-recomputed via `(industry/maturity-summary)`
+      ;; immediately before this edit on a freshly re-fetched origin/main (concurrent-agent
+      ;; count-drift caution -- not an assumed fixed number; test runner's own failure diff:
+      ;; `expected: (= 248 (:implemented m)) actual: (not (= 248 249))`): 248 -> 249.
+      (is (= 249 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

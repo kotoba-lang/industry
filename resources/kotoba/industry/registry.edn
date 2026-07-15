@@ -4019,11 +4019,24 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2392"
    :name "Manufacture of clay building materials"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2392"
-   :business-id "cloud-itonami-C2392"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2392"
+   :business-id "cloud-itonami-isic-2392"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607181600): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2392 placeholder).
+   ;; ClayAdvisor, an advisor sealed behind an independent Clay Plant
+   ;; Operations Governor, langgraph-clj StateGraph, append-only audit
+   ;; ledger. Mirrors cloud-itonami-isic-2431's [Casting of iron and
+   ;; steel] verified module shape, adapted to a clay building
+   ;; material (brick/roof-tile) plant (clay winning/pugging ->
+   ;; extrusion or press molding -> drying -> kiln-firing production
+   ;; line) rather than 2431's own iron-and-steel casting foundry.
+   ;; clojure -M:test: 76 tests / 209 assertions / 0 failures / 0
+   ;; errors (verified from an independent fresh clone).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2393"
