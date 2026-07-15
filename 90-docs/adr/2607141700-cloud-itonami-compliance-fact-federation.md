@@ -965,6 +965,29 @@ KLRI・デンマークat.dkと同系統の規律)。既存organization.edn(ooyak
 現状: 国軸15件・業界団体軸16件(11業種)・自治体軸5件——36tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 37 — 業界団体軸17件目(VDA) — 新規ISIC業種(自動車製造))
+
+`cloud-itonami-assoc-2910-deu-vda`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-2910-deu-vda/commit/0a40423))：
+Verband der Automobilindustrie(VDA、ドイツ自動車工業会、1901年設立)。
+実在2件を検証(Code of Conduct für Geschäftspartner: CLEPA(欧州自動車
+部品工業会)と共同発行、Responsible Business Allianceコード・ドイツ
+サプライチェーン・デューデリジェンス法に整合、PDF表紙をReadツールで
+直接確認——本文中に明確な発行日が見当たらなかったため日付フィールドは
+意図的に未設定／About VDA: 組織概要ページを直接WebFetchで確認、1901年
+設立自体はWebSearchとVDA自身の「125 Jahre VDA」表記の裏付け)。
+4 tests/11 assertions green。
+
+**新規ISIC業種**: ISIC 2910(自動車製造業)を初めて追加した。DEU国は
+これでbankenverband(6419)とvda(2910)の2業種で業界団体軸に登場する
+ようになった。
+
+45リポジトリ・655 factを統合。DEU国内での業界団体横断queryで
+bankenverbandとvdaが別ISICコードで取得できることを確認。
+
+現状: 国軸15件・業界団体軸17件(12業種)・自治体軸5件——37tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
