@@ -1714,7 +1714,16 @@
       ;; cloud-itonami-isic-2030 recompute (superproject ADR-2607200000):
       ;; `(industry/maturity-summary)` re-verified fresh on the just-
       ;; re-fetched origin/main tip immediately before this edit read 260.
-      (is (= 262 (:implemented m))))))
+      ;; 262 -> 264: cloud-itonami-isic-2720 (batteries, Cell-Safety
+      ;; Governor) and cloud-itonami-isic-2310 (glass, Tempering Governor)
+      ;; promoted :spec -> :implemented, superproject ADR-2607160500/
+      ;; ADR-2607160600 -- both native real physics-2d simulations from
+      ;; day one. Live-recomputed via `(industry/maturity-summary)` on
+      ;; this working tree immediately before this edit. (cloud-itonami-
+      ;; isic-2220 was already :implemented; only its description was
+      ;; corrected to reflect its PR-merged real-physics replacement, not
+      ;; a maturity change.)
+      (is (= 264 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
