@@ -1299,7 +1299,13 @@
       ;; `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched origin/main
       ;; (confirmed HEAD's own pinned 231 assertion was still green pre-edit, ruling out drift from a
       ;; raw `grep -c` undercount before trusting the delta): 231 -> 232.
-      (is (= 232 (:implemented m))))))
+      ;; 232 -> 233: cloud-itonami-isic-2431 (Casting of iron and steel) promoted
+      ;; :spec -> :implemented, superproject ADR-2607152500
+      ;; (cloud-itonami-isic-2431-iron-steel-casting-coverage.md). Live-recomputed via
+      ;; `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched origin/main
+      ;; (confirmed HEAD's own pinned 232 assertion was still green pre-edit, ruling out drift from a
+      ;; raw `grep -c` undercount before trusting the delta): 232 -> 233.
+      (is (= 233 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

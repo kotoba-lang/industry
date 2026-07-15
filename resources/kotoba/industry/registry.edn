@@ -3961,11 +3961,25 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2431"
    :name "Casting of iron and steel"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2431"
-   :business-id "cloud-itonami-C2431"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2431"
+   :business-id "cloud-itonami-isic-2431"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607152500): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2431 placeholder).
+   ;; FoundryAdvisor, an advisor sealed behind an independent Foundry
+   ;; Plant Operations Governor, langgraph-clj StateGraph, append-only
+   ;; audit ledger. Mirrors cloud-itonami-isic-2013's [Manufacture of
+   ;; plastics and synthetic rubber in primary forms] verified module
+   ;; shape, adapted to an iron-and-steel CASTING FOUNDRY plant
+   ;; (melting furnace -> mold-pouring -> cooling/shakeout production
+   ;; line) rather than 2013's own upstream chemical-process
+   ;; polymerization/compounding plant.
+   ;; clojure -M:test: 71 tests / 199 assertions / 0 failures / 0
+   ;; errors (verified from an independent fresh clone).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2432"
