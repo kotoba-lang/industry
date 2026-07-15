@@ -1,0 +1,49 @@
+{:adr/id "2607155100"
+ :adr/title "cloud-itonami ISIC-561 Restaurant Operations Coordination Actor — Scaffold & Registry Promotion"
+ :adr/status "accepted"
+ :adr/date "2026-07-15"
+ :adr/deciders ["Jun Kawasaki"]
+ :adr/scope
+ {:repo "orgs/cloud-itonami/cloud-itonami-isic-561"
+  :registry "orgs/kotoba-lang/industry"
+  :isic-code 561
+  :wave 4}
+ :decision
+ {:id "cloud-itonami-isic-561"
+  :name "Restaurants and mobile food service activities"
+  :isic-code "561"
+  :business-id "cloud-itonami-isic-561"
+  :repo "https://github.com/cloud-itonami/cloud-itonami-isic-561"
+  :public? true
+  :modules
+  ["restaurantops.store"
+   "restaurantops.advisor"
+   "restaurantops.governor"
+   "restaurantops.operation"
+   "restaurantops.phase"
+   "restaurantops.sim"]
+  :allowed-operations
+  [{:op :schedule-reservation
+    :description "Table/reservation scheduling logistics"}
+   {:op :coordinate-order-status-update
+    :description "Administrative order-queue status tracking"}
+   {:op :coordinate-supply-request
+    :description "Non-food consumable coordination"}
+   {:op :schedule-staff-shift-proposal
+    :description "Administrative shift proposal"}
+   {:op :flag-safety-concern
+    :description "Facility/sanitation/safety escalation"}]
+  :governor-hard-checks 3
+  :rollout-phases 4
+  :tests-passing 16}
+ :verification
+ {:tests "16/16 passing"
+  :demo "5/5 scenarios completed"
+  :repo-public? true
+  :registry-entry-updated? true}
+ :references
+ ["ADR-2607121000"
+  "ADR-2607152500"
+  "ADR-2607154500"
+  "Skill:build-actor"
+  "Skill:new-project-scaffold"]}
