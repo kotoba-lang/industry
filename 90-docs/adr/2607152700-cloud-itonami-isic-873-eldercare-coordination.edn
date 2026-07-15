@@ -1,0 +1,54 @@
+[{:adr/id 2607152700
+  :adr/title "cloud-itonami-isic-873 — Residential Care Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-15"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-873]
+  :adr/references [2607152500 2607121000 2607152300]
+
+  ;; Wave 4 actor (human-services): elderly/disabled residential care
+  ;; coordination-only (care-note logging, family visit scheduling, supply
+  ;; coordination, staff shift proposals, safety-concern flagging).
+
+  :actor/id :cloud-itonami-isic-873
+  :actor/name "Residential Care Operations Coordinator"
+  :actor/isic-rev4 "873"
+  :actor/domain :services/residential-elderly-disabled-care
+  :actor/wave 4
+  :actor/coordination? true
+  :actor/robotics? false
+
+  :actor/proposal-ops [:log-care-note :schedule-family-visit :coordinate-supply-request
+                       :schedule-staff-shift-proposal :flag-safety-concern]
+  :actor/always-escalate-ops [:flag-safety-concern]
+
+  :actor/hard-checks [:resident-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["medic" "薬" "medication" "dosing" "処方" "prescription"
+                                "clinical" "臨床" "care plan" "ケアプラン"
+                                "physical restraint" "身体拘束" "end of life" "終末期"
+                                "safety authority" "license suspension"]
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-care-note} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-care-note :schedule-family-visit
+                                               :coordinate-supply-request :schedule-staff-shift-proposal}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-care-note :schedule-family-visit
+                                         :coordinate-supply-request :schedule-staff-shift-proposal
+                                         :flag-safety-concern}
+      :auto #{:log-care-note :schedule-family-visit :coordinate-supply-request :schedule-staff-shift-proposal}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 41 :assertions 121 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration :store-contract]
+  :test/simulator :eldercareops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-873"
+  :registry/business-id "cloud-itonami-isic-873"
+  :registry/required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
