@@ -2276,11 +2276,20 @@
    :operating-states [:intake :triage :treat :review :follow-up :audit]},
   {:id "872"
    :name "Residential care activities for mental retardation, menta..."
-   :repo "cloud-itonami/cloud-itonami-isic-872" :business-id nil
-  :maturity :implemented
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-872"
+   :business-id "cloud-itonami-isic-872"
+   :maturity :implemented
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
+   ;; Promoted :spec -> :implemented as a mental-health/substance-abuse
+   ;; residential-care coordination actor (mhscare.advisor + independent
+   ;; mhscare.governor), Wave 4 residential services vertical, sibling of
+   ;; isic-873/879 -- ADR-2607153100 (this build), ADR-2607152500 (Wave 4
+   ;; rollout amendment), ADR-2607121000 (wave definition). Coordination-
+   ;; only, no :robotics -- closed :propose-only ops (medication/clinical/
+   ;; restraint/involuntary-commitment permanently excluded), three HARD
+   ;; governor checks. Fixes :repo URL format, :business-id and stray
+   ;; :robotics left over from the original landing session.
    :operating-states [:intake :triage :treat :review :follow-up :audit]},
   {:id "873"
    :name "Residential care activities for the elderly and disabled"
