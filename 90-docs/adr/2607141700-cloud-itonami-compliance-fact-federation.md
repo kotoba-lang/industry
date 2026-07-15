@@ -942,6 +942,29 @@ Edison Electric Institute(EEI、Wikidata Q5338374、1933年設立)。実在
 現状: 国軸14件・業界団体軸16件(11業種)・自治体軸5件——35tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 36 — 国軸15件目(FIN))
+
+`cloud-itonami-iso3166-fin`(既存の`marketentry`実装済みリポ)に
+`statute.facts`を追加・push
+([commit](https://github.com/cloud-itonami/cloud-itonami-iso3166-fin/commit/2dd722e))：
+実在3法令(Limited Liability Companies Act (Osakeyhtiölaki)・624/2006・
+2006-07-21発行／Data Protection Act (Tietosuojalaki)・1050/2018・
+2018-12-05発行／Employment Contracts Act (Työsopimuslaki)・55/2001・
+2001-01-26発行)——3件ともfinlex.fi(フィンランド法務省公式法令DB)の
+英訳版を直接WebFetchで照合。各英訳ページ自体が「フィンランド語・
+スウェーデン語版のみ法的拘束力を持つ」と明記しているため、専用の
+`:official-finlex-reference-translation` provenanceタグを使用(韓国
+KLRI・デンマークat.dkと同系統の規律)。既存organization.edn(ooyake
+由来)の首都(Helsinki/Q1757)もP36バグの影響なしと確認済み。
+28 tests/90 assertions green。
+
+43リポジトリ・653 factを統合。`:corporate-governance`トピックでの
+横断queryで14か国(前tickで意図的に空にしたDNKを除く全て)を取得
+できることを確認。
+
+現状: 国軸15件・業界団体軸16件(11業種)・自治体軸5件——36tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
