@@ -1,0 +1,96 @@
+{:adr-id "2612600000"
+ :title "cloud-itonami-isic-1399 — Manufacture of Other Textiles n.e.c. Operations Coordination"
+ :date "2026-07-16"
+ :author "Cloud Itonami Contributors"
+ :status :accepted
+ :context
+ "ISIC Rev.5 1399 (Manufacture of other textiles n.e.c.) had no prior
+  actor implementation -- gh api confirmed
+  repos/cloud-itonami/cloud-itonami-isic-1399 returned 404 before this
+  work started. The registry's live {:id \"1399\" :name \"Manufacture
+  of other textiles n.e.c.\" :maturity :spec ...} entry was verified
+  against a fresh clone (via a targeted grep of the git-cloned
+  registry.edn blob, not the CDN-cached raw.githubusercontent.com
+  mirror) before any work began, confirming no ID/name mismatch. 1399
+  is a residual n.e.c. textile category (nonwovens, felt, tire-cord
+  fabric, other technical/industrial textiles) distinct from siblings
+  1392/1393/1394. Fresh, from-scratch scaffold, built as part of a
+  smaller, carefully verified batch (capable model + mandatory
+  verification) after an earlier 18-agent haiku batch's 61% defect
+  rate; 138+ consecutive agents on this stricter protocol had
+  succeeded prior to this one. Module shape mirrors sibling
+  cloud-itonami-isic-1394 (Manufacture of cordage, rope, twine and
+  netting)'s verified module shape -- the closest domain analog
+  (physical-safety-relevant plant equipment, production-batch
+  tracking, permanent equipment-control block) -- domain-adapted for
+  nonwoven/felt fabric manufacturing (this build's own chosen concrete
+  illustration for the residual 1399 class), substituting
+  area-square-meters for length-meters and adding a TWELFTH governor
+  check for basis-weight-gsm (basis-weight-test plausibility) alongside
+  a renamed tensile-strength-kn check (in place of 1394's single
+  breaking-strength-kn), both explicit domain requirements named in
+  the task spec."
+ :decision
+ {:scope-boundary
+  "Coordination-only actor. Closed four-op allowlist, all :effect
+   :propose: log-production-batch, schedule-maintenance,
+   flag-safety-concern (always escalates), coordinate-shipment. An op
+   outside this set is a HARD hold (unknown-op-violations)."
+  :governor-rules
+  "Twelve HARD, permanent, un-overridable checks elaborating four
+   blueprint invariants: (1) plant/batch record must be independently
+   verified/registered before any action -- equipment-not-verified
+   (schedule-maintenance) / batch-not-verified (coordinate-shipment) /
+   shipment-area-exceeded (independently recomputed against the
+   batch's own logged area-square-meters, never the proposal's own
+   claim); (2) request :effect must be :propose only
+   (not-propose-effect, evaluated first, unconditional); (3) any
+   proposal touching forming/bonding-line-equipment control is a hard,
+   permanent block -- equipment-control-blocked (closed proposal-
+   :effect allowlist) AND line-operate-blocked (:direct-operate? true
+   on a maintenance proposal), two independent layers, neither ever a
+   member of any phase's :auto set; (4) closed op-allowlist
+   (unknown-op). Plus already-scheduled (double-schedule guard),
+   invalid-grade, invalid-tensile-strength (> 0, <= 500.0 kN),
+   invalid-basis-weight (this build's own second domain-specific
+   addition -- must be a strictly positive, physically plausible gsm
+   reading, > 0 and <= 5000.0), invalid-defect-rate. Soft confidence/
+   high-stakes gate: flag-safety-concern always escalates regardless
+   of confidence (high-stakes set + nonwovenops.phase's permanent
+   absence of this op from every phase's :auto set -- two independent
+   layers agree); low confidence (<0.6) also escalates. Only
+   log-production-batch may auto-commit, and only at phase 3 when
+   governor-clean."
+  :module-shape
+  "nonwovenops.store (MemStore, batches + equipment directories seeded
+   with a verified/registered batch with shipping headroom, a
+   verified/registered batch nearly fully shipped, and an UNVERIFIED
+   batch; one verified/registered forming-line unit and one
+   UNVERIFIED bonding-line unit), advisor (NonwovenAdvisor, mock +
+   real-LLM seam via langchain.model), governor (Nonwoven & Technical
+   Textiles Plant Operations Governor), phase (0->3 rollout), operation
+   (langgraph-clj StateGraph via langgraph.graph, interrupt-before
+   #{:request-approval}), sim (demo driver exercising all three
+   happy-path escalate/approve flows plus all twelve HARD-hold
+   scenarios directly)."}
+ :consequences
+ ["Registry entry corrected in place (exact-text edit of the existing"
+  " {:id \"1399\" ...} block): :maturity :implemented,"
+  " :operating-states updated to match the intake/design/produce/"
+  " inspect/package/audit shape used by sibling implemented 13xx"
+  " actors; :repo/:business-id were already correct in the"
+  " pre-existing entry."
+  "Actor repo cloud-itonami/cloud-itonami-isic-1399 scaffolded and"
+  " pushed to main."
+  "Test suite run directly by this session: Ran 81 tests containing"
+  " 220 assertions, 0 failures, 0 errors (both at push time and again"
+  " from a fresh post-push clone). clj-kondo: 0 errors, 0 warnings."
+  " clojure -M:dev:run demo narrative confirmed via raw stdout"
+  " inspection -- no exceptions, every governor rule fires with the"
+  " expected :rule keyword."]
+ :references
+ ["cloud-itonami-isic-1394/ (module-shape template, VERIFIED working, closest 13xx sibling)"
+  "cloud-itonami-isic-1391/ (earlier knitting-domain template)"
+  "kotoba-lang/industry resources/kotoba/industry/registry.edn \"1399\" entry"
+  "ADR-2607062330 (kototama actor-host ABI contract, itonami pattern origin)"
+  "ADR-2607102200 addendum 14 (repo naming -- no -clj suffix)"]}
