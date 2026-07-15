@@ -1564,6 +1564,28 @@ assertions green。
 現状: 国軸23件・業界団体軸24件(19業種)・自治体軸15件——62tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 63 — 業界団体軸25件目(NRA) — 新規ISIC業種(飲食店))
+
+`cloud-itonami-assoc-5610-usa-nra`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-5610-usa-nra/commit/a0412aa))：
+National Restaurant Association（NRA、Wikidata Q6978094——全米ライフル
+協会と同じ略称のため、docstring/READMEで明示的に区別を記載）。
+`restaurant.org`/`servsafe.com`の公式ページ2件を直接WebFetch検証:
+「Who We Are (Our History)」（1919-03-13、カンザスシティで最初の会合、
+記事本文で直接確認）／「ServSafe (About Us)」（NRAの食品安全研修・
+認証プログラム、公式ページ自体には開始年が明記されておらず、
+二次情報源の1990年を捏造せず、`established-date`は意図的に省略）。
+4 tests/11 assertions green。
+
+**新規ISIC業種**: ISIC 5610(飲食店・移動体飲食サービス業)を初めて
+追加した。
+
+92リポジトリ・715 factを統合。`"association-rule/topic"
+"governance"`での横断queryでnraを含む21団体が取得できることを確認。
+
+現状: 国軸23件・業界団体軸25件(20業種)・自治体軸15件——63tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社

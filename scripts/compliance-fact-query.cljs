@@ -223,7 +223,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-iso3166-col/data/datascript-tx.edn"}
    {:label "cloud-itonami-municipality-nor-oslo ordinance.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-municipality-nor-oslo/schema/ordinance.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-municipality-nor-oslo/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-nor-oslo/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-5610-usa-nra association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-5610-usa-nra/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-5610-usa-nra/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
