@@ -5382,13 +5382,38 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3319"
    :name "Repair of other equipment"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C3319"
-   :business-id "cloud-itonami-C3319"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3319"
+   :business-id "cloud-itonami-isic-3319"
+   :required-technologies [:identity :forms :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :maturity :implemented
+   ;; Repair-of-other-equipment-shop OPERATIONS COORDINATION actor
+   ;; implementation complete (2026-07-15, fresh scaffold -- no prior
+   ;; repository at either the stale gftdcojp/cloud-itonami-C3319
+   ;; placeholder or the real cloud-itonami org [gh api 404 confirmed];
+   ;; identity ({:id "3319" :name "Repair of other equipment"})
+   ;; independently verified against a fresh clone before any work
+   ;; began, per this fleet's ID/name-mismatch caution; 3319 is the
+   ;; ISIC-residual repair class, distinct from siblings 3311/3312/
+   ;; 3313/3314/3315): Repair Advisor ⊣ Repair Governor pattern,
+   ;; mirroring cloud-itonami-isic-3320's structure, closed op allowlist
+   ;; (log-repair-record/schedule-repair-operation/flag-safety-concern/
+   ;; order-supplies), all :effect :propose only. Repair-equipment/
+   ;; diagnostic-tool control and return-to-service sign-off authority
+   ;; permanently blocked (hard, un-overridable governor checks) --
+   ;; coordination only, no direct equipment actuation. Deliberately
+   ;; narrower escalation surface than 3320: only flag-safety-concern is
+   ;; permanently high-stakes, so schedule-repair-operation may
+   ;; auto-commit at phase 3 when the governor is clean, reflecting this
+   ;; residual class's lower average physical risk. Per-jurisdiction
+   ;; (JPN/USA/DEU) pre-repair hazard/energy-control legal-basis catalog
+   ;; citing real official sources (labor safety ordinance JPN Art. 107;
+   ;; OSHA 29 CFR 1910.147 in the USA; BetrSichV Sec.10 + EU Directive
+   ;; 2009/104/EC in Germany/EU -- all three honestly :qualitative, zero
+   ;; fabricated quantitative jurisdictions). No JVM-only interop
+   ;; anywhere in src/ (mock-only notifier). 65 tests / 225 assertions
+   ;; green. Superproject ADR-2607230000.
+   :operating-states [:intake :advise :govern :decide :commit :hold]},
   {:id "3320"
    :name "Installation of industrial machinery and equipment"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3320"
