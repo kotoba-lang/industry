@@ -4269,11 +4269,25 @@
    :operating-states [:intake :quality-standard-rules-verify :kiln-emissions-screen :approve :ship-cement-batch :issue-mill-certificate :audit]},
   {:id "2395"
    :name "Manufacture of articles of concrete, cement and plaster"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2395"
-   :business-id "cloud-itonami-C2395"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2395"
+   :business-id "cloud-itonami-isic-2395"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607170800): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2395 placeholder).
+   ;; ConcreteAdvisor, an advisor sealed behind an independent
+   ;; Concrete Plant Operations Governor, langgraph-clj StateGraph,
+   ;; append-only audit ledger. Mirrors cloud-itonami-isic-2392's
+   ;; [Manufacture of clay building materials] verified module shape,
+   ;; adapted to a concrete/cement/plaster products plant (mixing/
+   ;; batching -> molding/casting -> curing production lines for
+   ;; precast panels, pipes, blocks, paving slabs, plasterboard)
+   ;; rather than 2392's own clay-winning/kiln-firing plant.
+   ;; clojure -M:test: 76 tests / 209 assertions / 0 failures / 0
+   ;; errors (verified from an independent fresh clone).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2396"
