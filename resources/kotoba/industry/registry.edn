@@ -2408,13 +2408,14 @@
    :optional-technologies []
    :operating-states [:intake :schedule :coordinate :govern :escalate :audit]},
   {:id "941"
-   :name "Activities of business, employers and professional member..."
-   :repo nil :business-id nil
-  :maturity :spec
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
+   :name "Activities of business, employers and professional membership organizations"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-941"
+   :business-id "cloud-itonami-isic-941"
+   :maturity :implemented
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
-   :operating-states [:intake :diagnose :quote :repair :return :audit]},
+   ;; Membership association administrative coordination (Wave-4)
+   :operating-states [:intake :schedule :coordinate :govern :escalate :audit]},
   {:id "942"
    :name "Activities of trade unions"
    :repo nil :business-id nil
