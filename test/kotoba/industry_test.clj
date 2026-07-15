@@ -1347,7 +1347,23 @@
       ;; assertions green, independently re-verified against a fresh clone. Live-recomputed via
       ;; `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched origin/main
       ;; (confirmed HEAD's own pinned 237 assertion was still green pre-edit, ruling out drift): 237 -> 238.
-      (is (= 238 (:implemented m))))))
+      ;; 238 -> 239: cloud-itonami-isic-0124 (Growing of pome fruits and stone fruits) promoted
+      ;; :spec -> :implemented (fresh scaffold -- no prior repository at either the stale
+      ;; gftdcojp/cloud-itonami-A0124 placeholder or the real cloud-itonami org [gh api 404
+      ;; confirmed]), superproject ADR-2607152500
+      ;; (cloud-itonami-isic-0124-pome-stone-fruit-growing-coverage.md). PomeStoneOpsAdvisor ⊣
+      ;; PomeStoneOperationsGovernor pome/stone-fruit-orchard-operations-coordination actor,
+      ;; mirroring cloud-itonami-isic-0123's [Growing of citrus fruits] verified module shape
+      ;; module-for-module -- apple/pear/quince (pome) and peach/plum/cherry/apricot (stone)
+      ;; fruit-class reference data in place of orange/lemon/lime/grapefruit; flag-crop-health-
+      ;; concern (e.g. codling moth/fire blight) always escalates regardless of confidence;
+      ;; field-equipment-or-spray-blocked permanently blocks :operate-field-equipment and
+      ;; :finalize-spray-application; 31 tests / 105 assertions green, independently re-verified
+      ;; against a fresh clone. Live-recomputed via `(industry/maturity-summary)` immediately
+      ;; before this edit on a freshly re-fetched origin/main (confirmed HEAD's own pinned 238
+      ;; assertion was still green pre-edit, ruling out drift from a raw `grep -c` undercount
+      ;; before trusting the delta): 238 -> 239.
+      (is (= 239 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
