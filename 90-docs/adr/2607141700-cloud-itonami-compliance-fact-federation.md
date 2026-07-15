@@ -1117,6 +1117,26 @@ Direct to Consumer Advertisements about Prescription Medicines:
 現状: 国軸17件・業界団体軸19件(14業種)・自治体軸7件——43tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 44 — 自治体軸8件目(マドリード))
+
+`cloud-itonami-municipality-esp-madrid`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-esp-madrid/commit/b2f8b07))：
+madrid.es自身のPDF再配布はApache FOPのフォント埋め込み不具合で
+実質白紙ページとして描画された(このファミリーで初めて見る失敗
+モード——JS-onlyでも403でもない)ため、代わりにtransparencia.madrid.es
+の「Huella normativa」HTMLページを直接WebFetchで確認: Ordenanza de
+Movilidad Sostenible(持続可能なモビリティ条例、2018-10-05承認、
+BOAM núm. 8.263掲載)／Ordenanza de Transparencia de la Ciudad de
+Madrid(マドリード市透明性条例、2016-07-27承認、BOCM nº 196掲載)。
+4 tests/10 assertions green。
+
+61リポジトリ・671 factを統合。`:transparency`トピックでの自治体
+横断queryでtokyo・washington-dc・berlin・madridの4自治体を取得
+できることを確認。
+
+現状: 国軸17件・業界団体軸19件(14業種)・自治体軸8件——44tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
