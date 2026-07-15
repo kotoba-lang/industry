@@ -389,6 +389,8 @@
     (is (= :implemented (industry/maturity "0145"))))
   (testing "cloud-itonami-isic-4311 (Demolition, fresh scaffold -- no prior failed attempt; correctly registered against this registry's own 4311='Demolition' entry, avoiding the 0144/0145-style code-mislabel failure mode; DemolitionAdvisor ⊣ DemolitionGovernor demolition-project-OPERATIONS-COORDINATION actor structured after cloud-itonami-isic-4211's [Community Building Construction] robotics-premise module shape but deliberately NARROWED -- no robotics/simphysics module, no heavy-equipment-control or structural-engineering-decision/demolition-plan-finalization authority [permanent, un-overridable governor hard-blocks], every proposal's :effect is :propose only [governor HARD-holds anything else, defense-in-depth]; per-jurisdiction {JPN/USA/DEU} hazmat-survey/demolition-notification legal-basis catalog citing real official sources [石綿障害予防規則, 建設リサイクル法, OSHA 29 CFR 1926.1101, 40 CFR 61.145 NESHAP, EU Directive 2009/148/EC]; schedule-demolition-operation and flag-safety-concern always escalate to a human at every phase, unconditionally; DatomicStore uses langchain-store.core [ADR-2607141600] instead of hand-rolling the EDN-blob codec; superproject ADR-2607155000) is also :implemented"
     (is (= :implemented (industry/maturity "4311"))))
+  (testing "cloud-itonami-isic-0146 (Raising of poultry, fresh scaffold -- no prior repository; identity ({:id \"0146\" :name \"Raising of poultry\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; PoultryOpsAdvisor ⊣ PoultryFarmOperationsGovernor poultry-farm-operations-coordination actor mirroring cloud-itonami-isic-0145's [Raising of swine/pigs] verified module shape module-for-module -- barn/house facility registration, broiler/layer breed reference data [Cobb 500/Ross 308/White Leghorn/ISA Brown] in place of swine breeds, and a biosecurity/notifiable-disease reference vocabulary [HPAI/Newcastle Disease/Infectious Bronchitis/Infectious Bursal Disease] in place of ASF/CSF/FMD/PRRS; flag-animal-health-concern always escalates regardless of confidence, matching 0145's own animal-welfare-escalation invariant; treatment-or-culling-blocked permanently blocks :administer-treatment and :order-culling; superproject ADR-2607160300) is also :implemented"
+    (is (= :implemented (industry/maturity "0146"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -1036,7 +1038,20 @@
       ;; concurrent promotion had already landed between this ADR's
       ;; earlier baseline read of 213 and this edit -- not an assumed
       ;; fixed number): 214 -> 215.
-      (is (= 215 (:implemented m))))))
+      ;; 215 -> 216: cloud-itonami-isic-0146 (Raising of
+      ;; poultry) promoted :spec -> :implemented, superproject
+      ;; ADR-2607160300
+      ;; (cloud-itonami-isic-0146-poultry-raising-coverage.md).
+      ;; PoultryOpsAdvisor <-| PoultryFarmOperationsGovernor,
+      ;; poultry-farm (broiler/layer) back-office coordination actor
+      ;; mirroring cloud-itonami-isic-0145's (swine-raising) module
+      ;; shape module-for-module. 32 tests / 103 assertions run green
+      ;; before claiming :implemented, independently re-verified
+      ;; against a fresh clone. Live-recomputed via
+      ;; `(industry/maturity-summary)` on a freshly re-fetched
+      ;; origin/main immediately before this edit -- not an assumed
+      ;; fixed number.
+      (is (= 216 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
