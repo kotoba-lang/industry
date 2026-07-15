@@ -4815,13 +4815,25 @@
    :operating-states [:intake :design :permit :build :inspect :audit]},
   {:id "4311"
    :name "Demolition"
-   :repo "https://github.com/gftdcojp/cloud-itonami-F4311"
-   :business-id "cloud-itonami-F4311"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4311"
+   :business-id "cloud-itonami-isic-4311"
+   :required-technologies [:identity :forms :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :design :permit :build :inspect :audit]},
+   :maturity :implemented
+   ;; Demolition-project-operations-coordination actor implementation
+   ;; complete (2026-07-15): DemolitionAdvisor ⊣ DemolitionGovernor
+   ;; pattern, closed op allowlist (log-site-record/schedule-demolition-
+   ;; operation/flag-safety-concern/order-supplies), all :effect :propose
+   ;; only. Heavy-equipment control and structural-engineering-decision/
+   ;; demolition-plan-finalization authority permanently blocked (hard,
+   ;; un-overridable governor checks) -- coordination only, no direct
+   ;; equipment actuation, matching the robotics-premise reference
+   ;; cloud-itonami-isic-4211 but narrower. schedule-demolition-operation
+   ;; and flag-safety-concern always escalate to a human. Per-jurisdiction
+   ;; (JPN/USA/DEU) hazmat-survey/demolition-notification legal-basis
+   ;; catalog. Superproject ADR-2607155000. 68 tests / 252 assertions
+   ;; green.
+   :operating-states [:intake :advise :govern :decide :commit :hold]},
   {:id "4312"
    :name "Site preparation"
    :repo "https://github.com/gftdcojp/cloud-itonami-F4312"
