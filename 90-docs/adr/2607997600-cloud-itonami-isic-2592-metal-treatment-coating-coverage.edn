@@ -1,0 +1,59 @@
+{:adr-id "2607997600"
+ :title "cloud-itonami-isic-2592 — Treatment and Coating of Metals; Machining Plant-Operations Coordination Actor"
+ :status :accepted
+ :date "2026-07-15"
+ :context
+ "ISIC 2592 (Treatment and coating of metals; machining) had no repo
+  (gh api repos/cloud-itonami/cloud-itonami-isic-2592 confirmed 404
+  before any work began; the registry's own :repo field pointed at a
+  never-created gftdcojp/cloud-itonami-C2592 placeholder). Registry
+  :name independently re-verified against a fresh Contents-API read:
+  \"Treatment and coating of metals\" -- a truncated label consistent
+  with sibling entries in the same ISIC 259 group (2591's own :name
+  likewise drops its official \"; powder metallurgy\" suffix); the
+  full official ISIC Rev.4 title is \"Treatment and coating of metals;
+  machining\", matching the assigned class. Closest verified sibling
+  is cloud-itonami-isic-2593 (Manufacture of cutlery, hand tools and
+  general hardware) -- same back-office plant-operations coordination
+  shape for a fixed manufacturing plant with heavy equipment and a
+  real physical safety dimension, though 2592 is a surface-finishing/
+  heat-treatment/machining JOB SHOP (fee-or-contract work on other
+  manufacturers' parts) rather than a finished-goods shop."
+ :decision
+ "Implement cloud-itonami-isic-2592 mirroring cloud-itonami-isic-2593
+  module-for-module: MetalTreatmentAdvisor ⊣ Metal Treatment, Coating &
+  Machining Plant Operations Governor + append-only audit ledger,
+  langgraph-clj StateGraph. Four ops (log-production-batch/
+  schedule-maintenance/flag-safety-concern/coordinate-shipment), all
+  :effect :propose only. Ten HARD governor checks: propose-only
+  effect, closed op allowlist, closed proposal-effect allowlist,
+  permanent plating/machining-line-actuate block
+  (:actuate-plating-machining-line?), independent equipment/batch
+  verified+registered gates, independent shipment-weight recompute,
+  double-schedule guard, product-category validation (closed set
+  electroplated-item/anodized-item/powder-coated-item/galvanized-item/
+  heat-treated-item/machined-part-item), defect-rate plausibility
+  validation. flag-safety-concern (electroplating-bath chemical
+  toxicity -- cyanide/hexavalent-chromium/acid baths, CNC-machining
+  swarf/cutting-tool laceration hazard, heat-treatment-furnace
+  burn/radiant-heat exposure) always escalates regardless of
+  confidence -- the domain-specific safety-concern vocabulary is the
+  deliberate departure from 2593's sharp-edge-laceration/
+  forging-hammer-pinch-crush/grinding-wheel-abrasive-dust vocabulary
+  (this vertical treats/finishes/machines parts on contract, it does
+  not forge/grind them). Fully portable .cljc, no JVM-only interop
+  anywhere in src/; actor graph invoked exclusively via
+  langgraph.graph/run*."
+ :consequences
+ ["Certified metal-treatment/coating/machining job-shop operators fork and deploy independently with auditable coordination records; direct plating/machining-line-equipment control and plating/machining-line actuation remain permanent, un-overridable HARD blocks"
+  "Safety-concern flagging is a circuit-breaker, not a threshold -- always escalates to a human plant supervisor regardless of confidence"
+  "kotoba-lang/industry registry entry \"2592\" promoted :spec -> :implemented, :repo/:business-id corrected from the stale gftdcojp/cloud-itonami-C2592 placeholder to cloud-itonami/cloud-itonami-isic-2592"
+  "Still a simulation/proposal layer, not a real plant-operations control system -- no integration with real plant-management databases (equipment telemetry, batch tracking, freight dispatch)"]
+ :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2592"
+ :registry "https://github.com/kotoba-lang/industry"
+ :isic-rev5 "2592"
+ :domain :metal-treatment-coating-machining/manufacturing
+ :status-in-registry :implemented
+ :governor :metal-treatment-coating-machining-plant-operations-governor
+ :robotics true
+ :test-suite {:tests 71 :assertions 195 :failures 0 :errors 0}}
