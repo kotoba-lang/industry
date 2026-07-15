@@ -1967,6 +1967,27 @@ cape-town/san-jose/bogota/copenhagenと並んで取得できることを確認�
 現状: 国軸27件・業界団体軸28件(23業種)・自治体軸23件——78tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 79 — 業界団体軸29件目(API) — 新規ISIC業種(原油採掘))
+
+`cloud-itonami-assoc-0610-usa-api`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-0610-usa-api/commit/3be8ae3))：
+American Petroleum Institute（API、Wikidata Q466043——ソフトウェアの
+Application Programming Interfaceと同じ略称のため、docstring/README
+で明示的に区別を記載）。`api.org`の公式ページ2件を直接WebFetch検証:
+「About API」（1919-03-20設立、記事本文で直接確認）／「API's 100
+Years of Standards」マイクロサイト（APIの最初の技術規格
+「Specifications for Steel and Iron Pipe for Oil Country Tubular
+Goods」、1924-10-20公開と本文で直接確認）。4 tests/11 assertions
+green。
+
+**新規ISIC業種**: ISIC 0610(原油採掘業)を初めて追加した。
+
+108リポジトリ・750 factを統合。`"association-rule/topic"
+"governance"`での横断queryでapiを含む25団体が取得できることを確認。
+
+現状: 国軸27件・業界団体軸29件(24業種)・自治体軸23件——79tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
