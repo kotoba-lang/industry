@@ -4821,13 +4821,39 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3320"
    :name "Installation of industrial machinery and equipment"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C3320"
-   :business-id "cloud-itonami-C3320"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3320"
+   :business-id "cloud-itonami-isic-3320"
+   :required-technologies [:identity :forms :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :maturity :implemented
+   ;; Industrial-machinery-installation-project OPERATIONS COORDINATION
+   ;; actor implementation complete (2026-07-15, fresh scaffold -- no
+   ;; prior repository at either the stale gftdcojp/cloud-itonami-C3320
+   ;; placeholder or the real cloud-itonami org [gh api 404 confirmed];
+   ;; identity ({:id "3320" :name "Installation of industrial machinery
+   ;; and equipment"}) independently verified against a fresh clone
+   ;; before any work began, per this fleet's ID/name-mismatch caution):
+   ;; Installation Advisor ⊣ Installation Governor pattern, closed op
+   ;; allowlist (log-installation-record/schedule-installation-operation/
+   ;; flag-safety-concern/order-supplies), all :effect :propose only.
+   ;; Heavy-lift/rigging-equipment control and commissioning-
+   ;; energization sign-off authority permanently blocked (hard,
+   ;; un-overridable governor checks) -- coordination only, no direct
+   ;; equipment actuation, matching the robotics-premise reference
+   ;; cloud-itonami-isic-4211 but narrower, same coordination-only shape
+   ;; as cloud-itonami-isic-4311 (Demolition) and cloud-itonami-isic-4210
+   ;; (Roads/railways construction). Per-jurisdiction (JPN/USA/DEU)
+   ;; lift-plan/installation-notification legal-basis catalog citing real
+   ;; official sources (Japan's Industrial Safety and Health Act Art. 88,
+   ;; the sole :quantitative jurisdiction with a real 30-calendar-day
+   ;; lead-time; OSHA 29 CFR 1926 Subpart CC + 1910.147 in the USA;
+   ;; BetrSichV Sec.15 + EU Machinery Directive 2006/42/EC in Germany/EU
+   ;; -- USA/DEU honestly :qualitative); schedule-installation-operation
+   ;; and flag-safety-concern always escalate to a human at every phase,
+   ;; unconditionally. No JVM-only interop anywhere in src/ (mock-only
+   ;; notifier). 64 tests / 241 assertions green. Superproject
+   ;; ADR-2607171900.
+   :operating-states [:intake :advise :govern :decide :commit :hold]},
   {:id "3510"
    :name "Electric power generation, transmission and distribution"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3510"

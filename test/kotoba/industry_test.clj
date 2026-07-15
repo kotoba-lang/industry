@@ -397,6 +397,8 @@
     (is (= :implemented (industry/maturity "3100"))))
   (testing "cloud-itonami-isic-0123 (Growing of citrus fruits, fresh scaffold -- no prior repository [gh api 404 confirmed]; identity ({:id \"0123\" :name \"Growing of citrus fruits\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; CitrusOpsAdvisor ⊣ CitrusOperationsGovernor citrus-orchard-operations-coordination actor mirroring cloud-itonami-isic-0122's [Growing of tropical and subtropical fruits] verified module shape module-for-module -- orange/lemon/lime/grapefruit fruit-class reference data in place of mango/banana/papaya/avocado/pineapple; flag-crop-health-concern (e.g. citrus greening/HLB) always escalates regardless of confidence, matching 0122's own crop-health-escalation invariant; field-equipment-or-spray-blocked permanently blocks :operate-field-equipment and :finalize-spray-application; 30 tests / 92 assertions green, independently re-verified against a fresh clone; superproject ADR-2607172000) is also :implemented"
     (is (= :implemented (industry/maturity "0123"))))
+  (testing "cloud-itonami-isic-3320 (Installation of industrial machinery and equipment, fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-C3320 placeholder or the real cloud-itonami org [gh api 404 confirmed]; identity ({:id \"3320\" :name \"Installation of industrial machinery and equipment\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; Installation Advisor ⊣ Installation Governor industrial-machinery-installation-project OPERATIONS COORDINATION actor, coordination-only and narrower than the cloud-itonami-isic-4211 robotics-premise reference, same shape as cloud-itonami-isic-4311 [Demolition] and cloud-itonami-isic-4210 [Roads/railways construction]; closed op allowlist (log-installation-record/schedule-installation-operation/flag-safety-concern/order-supplies), all :effect :propose only; heavy-lift/rigging-equipment control and commissioning-energization sign-off permanently blocked; per-jurisdiction [JPN/USA/DEU] lift-plan/installation-notification legal-basis catalog citing real official sources (Japan's Industrial Safety and Health Act Art. 88 -- the sole :quantitative jurisdiction, 30-calendar-day lead-time; OSHA 29 CFR 1926 Subpart CC + 1910.147 for the USA; BetrSichV Sec.15 + EU Machinery Directive 2006/42/EC for Germany/EU -- USA/DEU honestly :qualitative); no JVM-only interop anywhere in src/ (mock-only notifier); 64 tests / 241 assertions green, independently re-verified against a fresh clone; superproject ADR-2607171900) is also :implemented"
+    (is (= :implemented (industry/maturity "3320"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -1286,7 +1288,12 @@
       ;; `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched origin/main
       ;; (concurrent-agent count-drift caution -- not an assumed fixed number; also confirms the 1812
       ;; `:implemented?` special-case entry `maturity-of` already accounts for): 229 -> 230.
-      (is (= 230 (:implemented m))))))
+      ;; 230 -> 231: cloud-itonami-isic-3320 (Installation of industrial machinery and equipment) promoted
+      ;; :spec -> :implemented, superproject ADR-2607171900
+      ;; (cloud-itonami-isic-3320-industrial-machinery-installation-coverage.md). Live-recomputed via
+      ;; `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched origin/main
+      ;; (concurrent-agent count-drift caution -- not an assumed fixed number): 230 -> 231.
+      (is (= 231 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
