@@ -1,0 +1,95 @@
+{:adr-id "2608300000"
+ :title "cloud-itonami-isic-1394 — Cordage, Rope, Twine and Netting Manufacturing Operations Coordination"
+ :date "2026-07-16"
+ :author "Cloud Itonami Contributors"
+ :status :accepted
+ :context
+ "ISIC Rev.5 1394 (Manufacture of cordage, rope, twine and netting) had
+  no prior actor implementation -- gh api confirmed both
+  repos/gftdcojp/cloud-itonami-C1394 and
+  repos/cloud-itonami/cloud-itonami-isic-1394 returned 404 before this
+  work started. The registry's live {:id \"1394\" :name \"Manufacture
+  of cordage, rope, twine and netting\" :maturity :spec ...} entry was
+  verified against a fresh clone (via the GitHub git-data blob API, not
+  the CDN-cached raw.githubusercontent.com mirror) before any work
+  began, confirming no ID/name mismatch. Fresh, from-scratch scaffold,
+  built as part of a smaller, carefully verified batch (capable model +
+  mandatory verification) after an earlier 18-agent haiku batch's 61%
+  defect rate; 120+ consecutive agents on this stricter protocol had
+  succeeded prior to this one. Module shape mirrors sibling
+  cloud-itonami-isic-1391 (Manufacture of knitted and crocheted
+  fabrics)'s verified module shape -- the most recently created
+  :implemented 13xx textile-family actor at the time of this work, and
+  the first to use the corrected io.github.kotoba-lang/langgraph +
+  io.github.kotoba-lang/langchain :local/root dependency convention
+  (com-junkawasaki/langgraph-clj is now confirmed a GitHub
+  rename-redirect to kotoba-lang/langgraph) -- domain-adapted for
+  cordage/rope/twine/netting manufacturing (fibre-twisting machines,
+  braiding machines, winding lines), substituting length-meters for
+  volume-yards and adding an eleventh governor check for
+  breaking-strength-kn (breaking-strength-test plausibility), the
+  task's own explicit domain requirement."
+ :decision
+ {:scope-boundary
+  "Coordination-only actor. Closed four-op allowlist, all :effect
+   :propose: log-production-batch, schedule-maintenance,
+   flag-safety-concern (always escalates), coordinate-shipment. An op
+   outside this set is a HARD hold (unknown-op-violations)."
+  :governor-rules
+  "Eleven HARD, permanent, un-overridable checks elaborating four
+   blueprint invariants: (1) plant/batch record must be independently
+   verified/registered before any action -- equipment-not-verified
+   (schedule-maintenance) / batch-not-verified (coordinate-shipment) /
+   shipment-volume-exceeded (independently recomputed against the
+   batch's own logged length-meters, never the proposal's own claim);
+   (2) request :effect must be :propose only (not-propose-effect,
+   evaluated first, unconditional); (3) any proposal touching
+   twisting/braiding-line-equipment control is a hard, permanent block
+   -- equipment-control-blocked (closed proposal-:effect allowlist) AND
+   line-operate-blocked (:direct-operate? true on a maintenance
+   proposal), two independent layers, neither ever a member of any
+   phase's :auto set; (4) closed op-allowlist (unknown-op). Plus
+   already-scheduled (double-schedule guard), invalid-grade,
+   invalid-breaking-strength (this build's own domain-specific
+   addition -- must be a strictly positive, physically plausible
+   kilonewton reading, > 0 and <= 20000.0), invalid-defect-rate. Soft
+   confidence/high-stakes gate: flag-safety-concern always escalates
+   regardless of confidence (high-stakes set + cordageops.phase's
+   permanent absence of this op from every phase's :auto set -- two
+   independent layers agree); low confidence (<0.6) also escalates.
+   Only log-production-batch may auto-commit, and only at phase 3 when
+   governor-clean."
+  :module-shape
+  "cordageops.store (MemStore, batches + equipment directories seeded
+   with a verified/registered batch with shipping headroom, a
+   verified/registered batch nearly fully shipped, and an UNVERIFIED
+   batch; one verified/registered twisting-machine unit and one
+   UNVERIFIED braiding-machine unit), advisor (CordageAdvisor, mock +
+   real-LLM seam via langchain.model), governor (Cordage & Netting
+   Plant Operations Governor), phase (0->3 rollout), operation
+   (langgraph-clj StateGraph via langgraph.graph, interrupt-before
+   #{:request-approval}), sim (demo driver exercising all three
+   happy-path escalate/approve flows plus all eleven HARD-hold
+   scenarios directly)."}
+ :consequences
+ ["Registry entry corrected in place (exact-text edit of the existing"
+  " {:id \"1394\" ...} block): :repo/:business-id updated from the"
+  " stale gftdcojp/cloud-itonami-C1394 placeholder to"
+  " cloud-itonami/cloud-itonami-isic-1394, :maturity :implemented,"
+  " :operating-states updated to match the intake/design/produce/"
+  " inspect/package/audit shape used by sibling implemented 13xx"
+  " actors."
+  "Actor repo cloud-itonami/cloud-itonami-isic-1394 scaffolded and"
+  " pushed to main."
+  "Test suite run directly by this session: Ran 76 tests containing"
+  " 207 assertions, 0 failures, 0 errors (both at push time and again"
+  " from a fresh post-push clone). clj-kondo: 0 errors, 0 warnings."
+  " clojure -M:dev:run demo narrative confirmed via raw stdout"
+  " inspection -- no exceptions, every governor rule fires with the"
+  " expected :rule keyword."]
+ :references
+ ["cloud-itonami-isic-1391/ (module-shape template, VERIFIED working, most-recently-created :implemented 13xx sibling)"
+  "cloud-itonami-isic-1312/ (earlier weaving-domain template, predates StateGraph integration)"
+  "kotoba-lang/industry resources/kotoba/industry/registry.edn \"1394\" entry"
+  "ADR-2607062330 (kototama actor-host ABI contract, itonami pattern origin)"
+  "ADR-2607102200 addendum 14 (repo naming -- no -clj suffix)"]}
