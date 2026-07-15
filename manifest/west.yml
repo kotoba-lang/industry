@@ -21,6 +21,11 @@ manifest:
   group-filter: [+com-junkawasaki, +kotoba-lang, +gftdcojp, +etzhayyim, +jk-luxury, -datalad, -archived]
 
   projects:
+    - name: archive-scans
+      remote: com-junkawasaki
+      revision: a94bd72dde0f7112ea92d5690c372c2b817bff46
+      path: orgs/com-junkawasaki/archive-scans
+      groups: [com-junkawasaki]
     - name: artifact-manga-ghostmass
       remote: com-junkawasaki
       revision: 511cbeff7e4bb44a0ea691c0e58c39d7cc821d96
@@ -1523,7 +1528,7 @@ manifest:
       groups: [kotoba-lang]
     - name: aiueos
       remote: kotoba-lang
-      revision: 8750c08818233230b0411f47ffc1e19f5e44d2d2
+      revision: 6a7c251ea9bd76e859bf0fc4447705d67338ffbe
       path: orgs/kotoba-lang/aiueos
       groups: [kotoba-lang]
     - name: aml
@@ -2150,6 +2155,11 @@ manifest:
       remote: kotoba-lang
       revision: 14f6ec15ea389e2e0a5f9d70fa1b2ff1b5f59daa
       path: orgs/kotoba-lang/com-babyagi
+      groups: [kotoba-lang]
+    - name: com-backblaze-secure
+      remote: kotoba-lang
+      revision: 080731225cdd1c2867b1f5e7b7780354abca31dd
+      path: orgs/kotoba-lang/com-backblaze-secure
       groups: [kotoba-lang]
     - name: com-bacs-uk
       remote: kotoba-lang
@@ -6224,6 +6234,12 @@ manifest:
       revision: dc297bdefe79e2da3534d40f4390ff2d3a09394a
       path: orgs/kotoba-lang/engi
       groups: [kotoba-lang]
+    - name: engi-witness-escrow
+      remote: kotoba-lang
+      revision: 8892a908f132c0100e93485ae939ee8e0200a586
+      path: orgs/kotoba-lang/engi-witness-escrow
+      groups: [kotoba-lang]
+      submodules: true
     - name: engineer
       remote: kotoba-lang
       revision: 5bc91de5a4e3feb979d6d62af3c66a123e21f506

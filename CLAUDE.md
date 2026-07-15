@@ -559,6 +559,45 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   ADRが `ai-gftd-shinshi`/`ai-gftd-yukkuri`/`ai-gftd-apps-gftdcojp` 等にも複数存在、
   `grep -rl coscientist 90-docs/adr` で一覧できる）を確認し、ゼロから設計しない。**
 
+## 3D はすべて kami-engine を使う（repo-wide mandatory rule、2026-07-10）
+
+- **この workspace 内の 3D は、用途（modeling / animation / CAD / BIM / sculpt /
+  visualization / game）を問わず、必ず canonical な kami-engine stack を使う。**
+  `kami-app-*` は UI と操作 orchestration を所有し、形状・scene・animation・simulation・
+  picking・render の正本を app 内に複製しない。責任境界の authoritative source は
+  `90-docs/adr/2607102200-kami-render-stack-deps-authority-rename.md`。
+- **domain / guest** は `kami-engine-*` の portable `.cljc` または `.kotoba` を正本にし、
+  EDN command / scene / render-IR を境界にする。browser の guest 実行は
+  `wasm-webcomponent`（`kotoba wasm emit` の実 WASM）を使う。app 固有の geometry
+  algorithm を生 JavaScript / TypeScript / Rust で並行実装しない。
+- **GPU / viewport** は **WebGPU + WGSL first、WebGL 2.0 + GLSL ES 3.00 fallback**
+  とする。WebGPU は `webgpu`（`kami.webgpu` / `kami.webgpu.mesh`）→
+  `org-w3-webgpu`、WebGL 2.0 は `webgl`（`kami.webgl`）を使い、どちらも同じ
+  canonical EDN render-IR を消費する。WebGL 2.0 は共通描画 subset のfallbackであり、
+  WebGPU固有のcompute/storage機能を擬似実装しない。
+  生 `navigator.gpu` / WebGL context、shader、buffer、pipeline を各 app に複製しない。
+  native でも同じ EDN / WIT contract と canonical wgpu executor を使い、別 renderer を
+  作らない。
+- **UI chrome は `kotoba-lang/html` + `kotoba-lang/css`**（共通 component が必要なら
+  `kotoba-ui` / `uikit` / `appkit`）で構成する。panel、toolbar、menu、timeline、outliner、
+  inspector、shortcut profile は HTML/CSS でよいが、3D viewport の authoritative
+  rendering / hit-test / geometry state は WebGPU または WebGL 2.0 とし、DOM、SVG、CSS 3D、
+  Canvas 2D を使わない。
+  これらは非3D overlay、diagram、thumbnail、明示された degraded fallback に限る。
+- **禁止**: Three.js / Babylon.js 等を app ごとの第2エンジンとして導入すること、CSS
+  transform の疑似3D、静止画だけの「3D tool」、app 内の独自 mesh/scene renderer、
+  screenshot だけを根拠に実装済みとすること。import/export は `org-openusd`、
+  `org-khronos-gltf`、`org-vrmc-vrm` 等の canonical spec repo を通し、独自 codec を
+  app に生やさない。
+- **完了条件**: engine の topology / scene / animation data assertion、WASM guest と
+  host contract の parity、実ブラウザの WebGPU E2E（macOS runner では Metal backend）、
+  WebGL 2.0 fallback E2E、Pages smoke test を通す。WebGPU unavailable 時は capability 判定で
+  WebGL 2.0 に落とし、両方 unavailable の時だけ明示的 degraded state にする。新規 app は
+  少なくとも create/edit/undo-redo/save-export の domain round-trip を実データで証明する。
+- 例外は、対象 repo・期間・理由・代替の authority・撤去条件を記した accepted ADR が
+  ある場合だけ許す。temporary fallback は UI 上とコード上の両方で
+  `non-authoritative` と明示し、恒久実装へ昇格させない。
+
 ## `.cljc` / `.kotoba` ランタイム優先順位（2026-07-10 改訂。2026-07-07 改訂・初版は2026-07-06）
 
 - **repo wide のルール: app の互換性と「第一の runtime」の順序は

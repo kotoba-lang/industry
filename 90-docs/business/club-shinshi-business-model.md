@@ -13,9 +13,9 @@
 - アダルト creator は決済・集客・配信基盤を大手 platform に握られ手数料が高い (OnlyFans 20%)
 - NSFW は主要決済・広告・SNS が封鎖され収益化と集客が困難
 - AI 生成アダルトは大量供給できるが provenance・年齢/同意コンプラが弱い
-- 観測 (signal): shinshi.club 実測 2163 req/7d・522 uniques(日次和)・うち4xx probe 11%(24h)
 - 観測 (signal): shinshi.club 実測 2997 req/7d・532 uniques(日次和)・うち4xx probe 4%(24h)
 - 観測 (signal): shinshi.club 実測 3142 req/7d・584 uniques(日次和)・うち4xx probe 6%(24h)
+- 観測 (signal): shinshi.club 実測 4406 req/7d・742 uniques(日次和)・うち4xx probe 1%(24h)
 
 ## Customer Segments
 
@@ -57,9 +57,9 @@
 - aozora クロスプロモ
 - Web-only/PWA (app store 不可 = NSFW)
 - GTM 律速の再定義: club-shinshi は BMC 68 で validation=0.0/distribution=2.0。広告出稿でなく『動くコンパニオン体験』が需要エンジン (candy.ai と同型: 供給の魅力が pull を作る)。companion chat が live 化したら次は ① 生成画像の kotobase 永続化 ② /chat 導線を top/actress ページから強調 ③ 1メッセージ=x402 少額課金で validation を実測 — この順で回す
-- 観測 (paths): 上位 page (24h, 2xx/3xx): / 140 · /js/app.js 50 · /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 45 · /app.css 38 · /robots.txt 31 | 4xx(probe) 11% · 5xx 2%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 91 · /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 33 · /sitemap.xml 27 · /robots.txt 23 · /api/funnel 22 | 4xx(probe) 4%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 95 · /robots.txt 30 · /sitemap.xml 27 · /api/funnel 22 · /wp-admin/install.php 15 | 4xx(probe) 6%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 185 · / 89 · /robots.txt 23 · /sitemap.xml 17 · /js/app.js 14 | 4xx(probe) 1% · 5xx 2%
 
 > NSFW は paid 集客が全封鎖 → organic のみ。集客が事業の律速。
 
@@ -98,6 +98,7 @@
 - funnel (club-shinshi): 訪問=622 → 登録=? → 課金/creator GMV=0 | 転換 
 - funnel (club-shinshi): 訪問=492 → 登録=? → 課金/creator GMV=0 | 転換 
 - funnel (club-shinshi): 訪問=522 → 登録=? → 課金/creator GMV=0 | 転換 
+- funnel (club-shinshi): 訪問=395 → 登録=? → 課金/creator GMV=0 | 転換 
 
 ## Unfair Advantage
 
