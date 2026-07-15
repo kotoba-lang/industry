@@ -1363,7 +1363,26 @@
       ;; before this edit on a freshly re-fetched origin/main (confirmed HEAD's own pinned 238
       ;; assertion was still green pre-edit, ruling out drift from a raw `grep -c` undercount
       ;; before trusting the delta): 238 -> 239.
-      (is (= 239 (:implemented m))))))
+      ;; 239 -> 240: cloud-itonami-isic-1073 (Manufacture of cocoa, chocolate and sugar
+      ;; confectionery) promoted :spec -> :implemented (fresh scaffold -- no prior repository
+      ;; at either the stale gftdcojp/cloud-itonami-C1073 placeholder or the real cloud-itonami
+      ;; org [gh api 404 confirmed]; identity ({:id "1073" :name "Manufacture of cocoa,
+      ;; chocolate and sugar confectionery"}) independently verified against a fresh clone
+      ;; before any work began), superproject ADR-2607181500
+      ;; (cloud-itonami-isic-1073-cocoa-chocolate-confectionery-coverage.md). ChocOpsAdvisor
+      ;; <-> chocops.governor cocoa/chocolate/sugar-confectionery-plant-operations-coordination
+      ;; actor, mirroring cloud-itonami-isic-1072's [Manufacture of sugar] verified module
+      ;; shape module-for-module -- cocoa-content compositional-grade/particle-size/tempering-
+      ;; process-temperature/cadmium-residue/molding-line-viscosity product-quality fields in
+      ;; place of polarization/color/ash-content/SO2-residue/granulation, and an
+      ;; allergen-label-mismatch check (cross-contact-risk set not fully covered by
+      ;; declared-allergens) in place of the threshold-based sulfite-label-mismatch check; 53
+      ;; tests / 174 assertions green, independently re-verified against a fresh clone.
+      ;; Live-recomputed via `(industry/maturity-summary)` immediately before this edit on a
+      ;; freshly re-fetched origin/main (confirmed HEAD's own pinned 239 assertion was still
+      ;; green pre-edit, ruling out drift from a raw `grep -c` undercount before trusting the
+      ;; delta): 239 -> 240.
+      (is (= 240 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
