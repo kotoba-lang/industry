@@ -14,9 +14,9 @@
 - 自律 AI agent が per-request でマイクロペイメントする「エージェント経済」に対応できる決済ゲートが自前レールに無かった (既存 /pay/* は帯域外・人間向け)
 - Cloudflare Monetization Gateway は closed waitlist + facilitator をベンダーに委ねる設計
 - 中小 seller / 新規 worker は on-chain 検証・treasury 管理の実装コストを個別に負いたくない
-- 観測 (signal): workers 322 inv/7d
 - 観測 (signal): workers 340 inv/7d
 - 観測 (signal): workers 345 inv/7d
+- 観測 (signal): workers 5524 inv/7d
 
 ## Customer Segments
 

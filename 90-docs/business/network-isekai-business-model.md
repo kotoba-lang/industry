@@ -13,9 +13,9 @@
 - ゲーム/3D 制作は専用エンジン + 配信 + マネタイズを個別に組む必要があり参入障壁が高い
 - Roblox/UGC platform は作品もアバターも platform に人質 (可搬性ゼロ・BAN=全喪失)
 - AI 生成 3D/アバター資産に provenance と再編集性がない
-- 観測 (signal): isekai.network 実測 6667 req/7d・268 uniques(日次和)・うち4xx probe 0%(24h)
 - 観測 (signal): isekai.network 実測 6105 req/7d・338 uniques(日次和)・うち4xx probe 1%(24h)
 - 観測 (signal): isekai.network 実測 7765 req/7d・355 uniques(日次和)・うち4xx probe 2%(24h)
+- 観測 (signal): isekai.network 実測 7464 req/7d・364 uniques(日次和)・うち4xx probe 1%(24h)
 
 ## Customer Segments
 
@@ -44,9 +44,9 @@
 - CodePen 型 build-in-public / OSS
 - aozora SNS への作品・dance stage 投稿導線
 - AI 生成デモ (generate.html)
-- 観測 (paths): 上位 page (24h, 2xx/3xx): / 84 · /feed/fork-stats.edn 53 · /vanta.php 12 · /robots.txt 10 · /wander.php 9 | 4xx(probe) 0% · 5xx 17%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 74 · /console/* 54 · /front/.env 52 · /package-updates/yum.cgi 52 · /src/constant.js 50 | 4xx(probe) 1% · 5xx 2%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 65 · /.git 49 · /config/config.php 48 · /Dockerfile 48 · /config/nexmo.php 48 | 4xx(probe) 2% · 5xx 2%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 73 · /cdn-cgi/rum 62 · /js/app.js 49 · /kototama/kototama.js 45 · /css/theme.css 40 | 4xx(probe) 1% · 5xx 15%
 
 ## Revenue Streams
 

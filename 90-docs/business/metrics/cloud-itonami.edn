@@ -1,25 +1,34 @@
 {:health-status 200,
+ :asOf "2026-07-15T14:53:57.469Z",
  :zone-name "itonami.cloud",
  :zone
  {:requests-7d 288,
   :pageviews-7d 20,
   :uniques-7d-sum 84,
   :zone "itonami.cloud"},
+ :agentRuns7d 8,
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
   [{:path "/robots.txt", :requests 15}
-   {:path "/itonami/verticals", :requests 1}
-   {:path "/itonami", :requests 1}
-   {:path "/join/browser", :requests 1}
    {:path "/infer/cost", :requests 1}],
-  :status-mix {:ok 19, :client-error 24},
+  :status-mix {:client-error 22, :ok 16},
   :window "24h"},
+ :source "itonami-data-kv-list",
+ :note
+ "PII-free aggregates only. paid stays 0 until Stripe checkout + webhook entitlement.",
  :as-of "2026-07-15",
- :traffic-quality {:window "24h", :probe-4xx-pct 56, :error-5xx-pct 0},
+ :ok true,
+ :traffic-quality {:window "24h", :probe-4xx-pct 58, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /robots.txt 15 · /itonami/verticals 1 · /itonami 1 · /join/browser 1 · /infer/cost 1 | 4xx(probe) 56%",
- :funnel {:trials 0},
+ "上位 page (24h, 2xx/3xx): /robots.txt 15 · /infer/cost 1 | 4xx(probe) 58%",
+ :funnel {:trials 2},
  :signal
- "itonami.cloud 実測 288 req/7d・84 uniques(日次和)・うち4xx probe 56%(24h)",
- :tenants {:active 0, :external-paid 0, :external-total 0}}
+ "itonami.cloud 実測 288 req/7d・84 uniques(日次和)・うち4xx probe 58%(24h)",
+ :tenants
+ {:active 2,
+  :external-paid 0,
+  :external-total 2,
+  :externalPaid 0, 
+  :externalTotal 2, 
+  :selfRegisteredOwners 2}}
