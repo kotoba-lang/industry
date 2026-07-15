@@ -3402,11 +3402,29 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1391"
    :name "Manufacture of knitted and crocheted fabrics"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C1391"
-   :business-id "cloud-itonami-C1391"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1391"
+   :business-id "cloud-itonami-isic-1391"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607157100): fresh from-scratch scaffold (no prior repo
+   ;; existed at cloud-itonami/cloud-itonami-isic-1391; the old
+   ;; :repo/:business-id above pointed at a never-created
+   ;; gftdcojp/cloud-itonami-C1391 placeholder, confirmed 404 before
+   ;; this edit). KnittingAdvisor ⊣ Knitting Mill Operations Governor,
+   ;; langgraph-clj StateGraph, append-only audit ledger, mirroring
+   ;; cloud-itonami-isic-1520's [Manufacture of footwear] verified
+   ;; module shape (knittingops.* in place of footwearops.*), covering
+   ;; knitting/crocheting-mill plant operations coordination
+   ;; (production-batch quality-grade/yardage/fabric-weight/defect-rate
+   ;; logging, circular/flat-knitting-machine or crocheting-line
+   ;; maintenance scheduling, materials-safety/equipment-safety concern
+   ;; flagging, outbound fabric shipment coordination);
+   ;; line-operate-blocked is the knitting-mill-domain analog of 1520's
+   ;; own direct-operate permanent block.
+   ;; clojure -M:test: 71 tests / 194 assertions / 0 failures / 0 errors
+   ;; (verified from an independent fresh clone).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1392"

@@ -1660,7 +1660,35 @@
       ;; re-fetched origin/main immediately before this edit still read 255,
       ;; not 256, so only its own descriptive `testing` block was added
       ;; above with no further count bump.
-      (is (= 255 (:implemented m))))))
+      ;; cloud-itonami-isic-1391 (Manufacture of knitted and crocheted
+      ;; fabrics, fresh scaffold -- no prior repository at either the
+      ;; stale gftdcojp/cloud-itonami-C1391 placeholder or the real
+      ;; cloud-itonami org [gh api 404 confirmed]; identity ({:id
+      ;; "1391" :name "Manufacture of knitted and crocheted fabrics"})
+      ;; independently verified against a fresh clone before any work
+      ;; began, per this fleet's ID/name-mismatch caution;
+      ;; KnittingAdvisor ⊣ Knitting Mill Operations Governor
+      ;; plant-operations-COORDINATION actor, mirroring
+      ;; cloud-itonami-isic-1520's [Manufacture of footwear] verified
+      ;; module shape module-for-module -- circular/flat-knitting-
+      ;; machine and crocheting-line equipment registration in place of
+      ;; footwear cutting/sewing/molding equipment, quality-grade/
+      ;; volume-yards/fabric-weight-gsm/defect-rate-percent production-
+      ;; batch fields in place of 1520's volume-pairs equivalents, and a
+      ;; materials-safety/equipment-safety safety-concern vocabulary
+      ;; (always escalates) in place of 1520's materials-defect/labor-
+      ;; safety/labeling-compliance quality-concern vocabulary;
+      ;; equipment-control-blocked and line-operate-blocked are both
+      ;; permanent, unconditional HARD blocks with no human-approval
+      ;; override path; 71 tests / 194 assertions green, independently
+      ;; re-verified against a fresh clone; superproject
+      ;; ADR-2607157100). Live-recomputed via
+      ;; `(industry/maturity-summary)` on a freshly re-fetched
+      ;; origin/main immediately before this edit: 255 -> 257 (at least
+      ;; one other sibling promotion landed 255 -> 256 concurrently
+      ;; before this one; the live recompute, not an assumed +1, is the
+      ;; source of truth here).
+      (is (= 257 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
