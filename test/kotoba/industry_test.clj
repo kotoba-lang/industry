@@ -1798,7 +1798,14 @@
       ;; concurrently before this catch-up edit).
       ;; 276 -> 277: one further sibling promotion landed concurrently
       ;; after the above catch-up; recomputed live, not assumed.
-      (is (= 277 (:implemented m))))))
+      (testing "cloud-itonami-isic-2593 (Manufacture of cutlery, hand tools and general hardware, fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-C2593 placeholder or the real cloud-itonami org [gh api 404 confirmed]; identity ({:id \"2593\" :name \"Manufacture of cutlery, hand tools and general hardware\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; HardwareShopAdvisor ⊣ Hardware Shop Plant Operations Governor cutlery/hand-tool/general-hardware-shop plant-operations-COORDINATION actor, mirroring cloud-itonami-isic-2599's [Manufacture of other fabricated metal products n.e.c.] verified module shape module-for-module (hardwaremfg.* in place of metalfabmfg.*) -- forging-hammer/grinding-wheel/heat-treatment-furnace/finishing-line equipment registration in place of stamping-press/pressing-line/wire-forming-machine equipment, and product-category/weight/defect-rate production-batch fields (cutlery-item/hand-tool-item/general-hardware-item/garden-tool-item/kitchen-utensil-item/lock-hardware-item) in place of stamped-metal-part/pressed-metal-part/wire-product/metal-household-good/metal-hardware-item/formed-sheet-metal-part; ISIC 2593 is a specific product-family class in ISIC group 259, distinct from still-:spec siblings cloud-itonami-isic-2591 [Forging, pressing, stamping and roll-forming of metal]/2592 [Treatment and coating of metals] and from already-:implemented cloud-itonami-isic-2599 [Manufacture of other fabricated metal products n.e.c.]; :flag-safety-concern (sharp-edge laceration from freshly forged/ground blades and edges, forging-hammer pinch/crush, grinding-wheel abrasive-dust exposure, heat-treatment-furnace burn/radiant-heat exposure) always escalates regardless of confidence, matching 2599's own safety-concern-escalation invariant; the proposal-effect allowlist plus a permanent forge/grind-line-actuate block (`:actuate-forge-grind-line? true`) structurally prevent any direct forging-hammer/grinding-wheel/heat-treatment-furnace/finishing-line-equipment control, with no human-approval override path; 71 tests / 195 assertions green, independently re-verified against a fresh clone; superproject ADR-2607210100) is also :implemented"
+        (is (= :implemented (industry/maturity "2593"))))
+      ;; 277 -> 278: cloud-itonami-isic-2593 promoted directly from
+      ;; :spec (never a :blueprint) -- recomputed live via
+      ;; `(industry/maturity-summary)` on a freshly re-fetched
+      ;; origin/main tip immediately before this test-file catch-up
+      ;; edit, not assumed.
+      (is (= 278 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
