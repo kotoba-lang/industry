@@ -1,0 +1,102 @@
+{:adr-id "2611010000"
+ :title "cloud-itonami-isic-2393 (manufacture of other porcelain and ceramic products) plant-operations-coordination actor"
+ :status :accepted
+ :date "2026-07-16"
+ :deciders ["Jun Kawasaki (agent-executed, standing authorization)"]
+ :related ["ADR fresh-scaffold protocol per cloud-itonami-isic-2391 (refractory products, closest architectural sibling)"]
+
+ :context
+ "Live kotoba-lang/industry registry re-verified fresh before work began: :name
+  'Manufacture of other porcelain and ceramic products' confirmed for {:id
+  \"2393\"} (:maturity :spec, stale placeholder :repo/:business-id
+  gftdcojp/cloud-itonami-C2393 predating the current cloud-itonami-isic-<id>
+  naming convention). No prior cloud-itonami-isic-2393 or gftdcojp/
+  cloud-itonami-C2393 repo existed (both gh api 404 before this work began).
+  Built from cloud-itonami-isic-2391 (refractory products) as the
+  module-structure template -- closest architectural sibling: same plant
+  fixed-processing-line shape with a real physical safety dimension, same
+  four-op shape, same two-entity (equipment + batch) verified/registered gate
+  structure. Retargeted from refractory fire-brick/kiln-lining manufacturing to
+  porcelain/ceramic tableware, decorative ceramics, and technical/industrial
+  ceramics (forming/glazing/kiln-firing/inspection lines), distinct from both
+  2391 (refractories) and 2392 (clay building materials)."
+
+ :scope-exclusions
+ ["direct forming-line equipment control (jiggering/jolleying machine, RAM
+   press -- plant supervisor's exclusive authority)"
+  "direct kiln-line equipment control/actuation (tunnel kiln, bisque/glost
+   firing -- plant supervisor's exclusive authority)"
+  "plant-safety or glaze-material-safety decisions (lead-free glaze
+   compliance judgment remains human)"
+  "real freight dispatch (this actor only drafts a shipment-coordination
+   record, never dispatches a carrier)"]
+
+ :decision
+ "Implement cloud-itonami-isic-2393 with Advisor/Governor/Phase/Registry/Store/
+  Operation/Sim (mirrors cloud-itonami-isic-2391 module-for-module, adapted
+  from refractory-products to porcelain/ceramic-products manufacturing --
+  porcelainmfg.* namespace, Porcelain/Ceramic Plant Operations Governor):
+  - Governor: eleven concrete HARD checks elaborating four HARD invariants
+    (propose-only effect, closed op allowlist, closed proposal-effect
+    allowlist / no direct forming-kiln-line control, permanent
+    forming-kiln-line-actuate block) plus a confidence/high-stakes escalation
+    gate (SOFT, human may approve)
+  - Registry: pure functions -- equipment/batch verified+registered gates,
+    shipment-weight-exceeded recompute, product-type-valid? (8-member closed
+    set: porcelain/bone-china/stoneware/earthenware tableware,
+    decorative-ceramic, art-pottery, technical-ceramic, ceramic-insulator),
+    glaze-defect-rate-valid? (0-100%), chip-resistance-valid? (0-500N) --
+    replacing 2391's thermal-shock-cycles/cold-crushing-strength-mpa pair
+  - Store: Store protocol + MemStore (SSoT + append-only audit ledger,
+    sample batches/equipment seeded for offline tests/demo)
+  - Advisor: PorcelainAdvisor -- deterministic mock (default) + llm-advisor
+    (langchain.model-backed, same proposal-EDN contract)
+  - Phase: 0->3 rollout gate, :schedule-maintenance permanently absent from
+    every phase's :auto set (structural, not a milestone)
+  - Operation: PorcelainOperationActor -- full langgraph-clj StateGraph
+    (advise -> govern -> decide -> commit|hold|request-approval), real
+    interrupt-before/resume approval workflow
+  - Sim: demo runner (-main) exercising all four happy paths + nine HARD-hold
+    scenarios directly
+  - Ops (closed allowlist, all :effect :propose): log-production-batch
+    (product-type/weight/glaze-defect-rate/chip-resistance data logging),
+    schedule-maintenance (forming/kiln-line-equipment maintenance scheduling),
+    flag-safety-concern (kiln-safety/glaze-material-safety -- ALWAYS
+    escalates), coordinate-shipment (outbound shipment coordination)
+  - Tests: 76 tests / 209 assertions across
+    governor-contract/operation/phase/registry/store-contract, all green
+  - All .cljc (portable, no JVM interop), AGPL-3.0-or-later
+  - GitHub repo created directly as cloud-itonami-isic-2393 (no rename
+    needed)"
+
+ :consequences
+ {:positive
+  ["Porcelain/ceramic-products plant operations (2393) now genuinely
+    implemented and fully tested, cleanly scoped apart from the two closest
+    ceramics/refractory siblings already in this fleet (2391, 2392)"
+   "Scope boundary (forming-line/kiln-line actuation) is a hard, permanent,
+    unconditional governor block plus a structural phase-table absence -- two
+    independent layers agree, not just asserted in prose"
+   "Safety-concern escalation (lead-free glaze compliance, kiln thermal
+    hazard, silica dust) is a core design invariant; the actor structurally
+    cannot auto-decide a safety concern at any confidence or phase"
+   "Registry's stale pre-cloud-itonami-isic-<id>-convention placeholder
+    repo/business-id for this entry (gftdcojp/cloud-itonami-C2393) is
+    corrected as part of this promotion"
+   "Portable .cljc, zero JVM-only constructs, clj-kondo 0 errors / 0
+    warnings"]
+  :negative
+  ["Still a simulation/proposal layer -- single MemStore backend, mock
+    advisor, no real plant-management database integration. Same limitation
+    as every sibling actor in this fleet at this stage"]}
+
+ :verification
+ {:test-count 76
+  :assertion-count 209
+  :test-status "0 failures, 0 errors (clojure -M:test, both scratch-dir build AND independent fresh re-clone)"
+  :lint-status "0 errors, 0 warnings (clojure -M:lint)"
+  :demo-status "clojure -M:dev:run: full happy-path + all nine HARD-hold scenarios exercised directly, no exceptions"
+  :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2393"
+  :repo-note "created directly as cloud-itonami-isic-2393 -- no rename fallback needed"
+  :commit-sha "b826d0e0b9101f11793fee0efa4440a12db04910"
+  :registry-update "kotoba-lang/industry: 2393 maturity :spec -> :implemented, repo/business-id corrected from stale gftdcojp/cloud-itonami-C2393 placeholder to cloud-itonami-isic-2393, ADR reference added -- SHAs recorded in the task's final report, not duplicated here"}}
