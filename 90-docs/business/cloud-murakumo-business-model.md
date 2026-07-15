@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L1 LLM 推論 — infra（Civitai × exo）  
-**As-of**: 2026-07-12  
+**As-of**: 2026-07-15  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -80,6 +80,7 @@
 - 観測 (signal): murakumo.cloud 実測 69508 req/7d・404 uniques(日次和)・うち4xx probe 3%(24h)、workers 74533 inv/7d
 - 観測 (signal): murakumo.cloud 実測 64382 req/7d・375 uniques(日次和)・うち4xx probe 3%(24h)、workers 69134 inv/7d
 - 観測 (signal): murakumo.cloud 実測 69241 req/7d・401 uniques(日次和)・うち4xx probe 1%(24h)、workers 79802 inv/7d
+- 観測 (signal): murakumo.cloud 実測 60930 req/7d・418 uniques(日次和)・うち4xx probe 18%(24h)、workers 113313 inv/7d
 
 ## Customer Segments
 
@@ -101,6 +102,7 @@
 - 準備 (murakumo-tok-price): 社内3アプリ推論の fleet 移管で原価比較
 - 実行済み (2026-07-06): US/EU blog posts 公開完了 (2026-bonus-depreciation-idle-gpu-cloud.md, 2026-eu-ai-act-audit-ledger.md)
 - 実行済み (2026-07-09): LPをblockchain-native decentralized GPU platform positioningに刷新(EN-first+JA toggle)。decentralization技術解説blog公開(/blog/2026-how-murakumo-decentralization-works-today、CIDv1/did:key-CACAO/on-chain未実装を明記)。marketing-strategy.mdのPhase 1 gate充足、Phase 2はオーナー判断待ち
+- 計器 (funnel): paid (Stripe sub) の計測（funnel emitter で stripe/active-subscriptions を出力）
 
 > QA発見+修正 (2026-07-06): navの"Source"リンクがprivate repo(gftdcojp/cloud-murakumo)への404だった。gftdcojp/local-murakumo(オーナーがpublic化予定)へ変更。技術者コミュニティ投稿前の必須チェック項目として記録
 
@@ -167,6 +169,8 @@
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /infer/hwmetrics 7860 · /infer/runs 1400 · / 45 · /robots.txt 8 · /js/main.js 6 | 4xx(probe) 3%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /infer/hwmetrics 7861 · /infer/runs 1390 · / 48 · /robots.txt 10 · /js/main.js 6 | 4xx(probe) 3%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /infer/hwmetrics 7860 · /infer/runs 1380 · / 58 · /robots.txt 18 · /cdn-cgi/rum 5 | 4xx(probe) 1%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /infer/hwmetrics 7859 · /infer/cost 104 · / 63 · /robots.txt 15 · /v1/chat/completions 10 | 4xx(probe) 18% · 5xx 1%
+- GTM (awareness→activation): murakumo.cloud 訪問→実推論 run (記録済) 転換 1% < 目標 2% — onboarding の摩擦削減（signup→checkout 最短化）・価格/tier の明確化・空状態の初期価値提示
 
 > 実行済み (2026-07-06 tick4): US HN/X投稿コピー下書き + GTM launch runbook作成(Stripe未設定の間はGate 0で投稿ブロック、docs/gtm-launch-runbook.md)
 
@@ -195,6 +199,7 @@
 - ledger run 数
 - margin per tok
 - 次の検証 (murakumo-tok-price): 社内 3 アプリの推論を fleet へ移し run ledger 実測で原価比較
+- funnel (cloud-murakumo): murakumo.cloud 訪問=418 → 実推論 run (記録済)=4 → paid (Stripe sub)=? | 転換 murakumo.cloud 訪問→実推論 run (記録済) 1%
 
 ## Unfair Advantage
 
@@ -206,4 +211,4 @@
 
 | id | risk | status | claim | gate | evidence |
 |---|---|---|---|---|---|
-| `:hyp/murakumo-tok-price` | riskiest | untested | consumer fleet の tok/s 単価が GPU spot に対して買い手のつく水準に収まる | 社内 3 アプリの推論を fleet へ移し run ledger 実測で原価比較 | — |
+| `:hyp/murakumo-tok-price` | riskiest | validated | consumer fleet の tok/s 単価が GPU spot に対して買い手のつく水準に収まる | 社内 3 アプリの推論を fleet へ移し run ledger 実測で原価比較 | fleet ¥/Mtok vs spot gate 到達: 9.403990305379747 vs 65.19861111111112 |

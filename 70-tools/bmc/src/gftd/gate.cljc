@@ -216,9 +216,13 @@
           (let [r (evaluate-hyp metrics spec)]
            (case (:status r)
            :validated
-           [{:proposal/action :hyp/status :hyp/id hid :event/value :validated
-             :event/evidence (:evidence r)
-             :proposal/reason "gate 到達 (機械測定) — 仮説を validated に昇格"}]
+           ;; 既に :validated の仮説は再提案しない — これが無いと gate 到達後の
+           ;; 毎 tick/毎日 run が同じ昇格 event を ledger に積み続け、loop が
+           ;; 収束 (dry) しない (2026-07-15 cloud-murakumo 実測で発見)。
+           (when (not= :validated (:hyp/status h))
+             [{:proposal/action :hyp/status :hyp/id hid :event/value :validated
+               :event/evidence (:evidence r)
+               :proposal/reason "gate 到達 (機械測定) — 仮説を validated に昇格"}])
            :blocked
            (let [solution-items (block-items-set idx (block-id product "solution"))]
              (for [need (:needs r)

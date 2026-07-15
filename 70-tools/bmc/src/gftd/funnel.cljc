@@ -47,7 +47,17 @@
    :club-shinshi
    [{:key :awareness   :label "訪問"               :metric [:funnel :visitors]}
     {:key :acquisition :label "登録"               :metric [:funnel :signups]   :benchmark 0.02}
-    {:key :revenue     :label "課金/creator GMV"    :metric [:funnel :paying]    :benchmark 0.03}]})
+    {:key :revenue     :label "課金/creator GMV"    :metric [:funnel :paying]    :benchmark 0.03}]
+
+   ;; cloud-murakumo (2026-07-15): awareness = zone uniques (collect 済み)、
+   ;; activation = /infer/cost emitter が数える実推論 run(ring 上限 200 —
+   ;; 絶対数でなく「API が実際に使われているか」の生存信号)、revenue = Stripe。
+   ;; Stripe は未配線(canvas 2026-07-06 観測: STRIPE_SECRET_KEY 未設定で
+   ;; checkout 503)なので revenue 段が bottleneck として surface されるのが正。
+   :cloud-murakumo
+   [{:key :awareness   :label "murakumo.cloud 訪問" :metric [:zone :uniques-7d-sum]}
+    {:key :activation  :label "実推論 run (記録済)"  :metric [:cost :runs-count]  :benchmark 0.02}
+    {:key :revenue     :label "paid (Stripe sub)"   :metric [:stripe :active-subscriptions] :benchmark 0.01}]})
 
 ;; ---- evaluation -------------------------------------------------------------
 

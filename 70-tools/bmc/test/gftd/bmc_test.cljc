@@ -157,7 +157,14 @@
                                                         :evidence-label "subs"}}]
                   (gate/proposals idx :cloud-itonami {:subs 3}))]
       (is (some #(and (= :hyp/status (:proposal/action %)) (= :validated (:event/value %))
-                      (:event/evidence %)) props)))))
+                      (:event/evidence %)) props))))
+  (testing "already-validated hyp is NOT re-proposed (loop converges/goes dry)"
+    (let [idx (canvas/index (mapv #(if (= :hyp/t1 (:hyp/id %))
+                                     (assoc % :hyp/status :validated) %) base))
+          props (with-redefs [gate/gate-specs {:hyp/t1 {:metric [:subs] :op :>= :threshold 1
+                                                        :evidence-label "subs"}}]
+                  (gate/proposals idx :cloud-itonami {:subs 3}))]
+      (is (empty? (filter #(= :hyp/status (:proposal/action %)) props))))))
 
 (deftest gate-aware-advisor-advances
   (testing "gate-aware advisor adds gate proposals on top of mock; validated hyp folds"
