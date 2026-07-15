@@ -2516,13 +2516,21 @@
    :operating-states [:intake :advise :govern :decide :commit :hold]},
   {:id "0122"
    :name "Growing of tropical and subtropical fruits"
-   :repo "https://github.com/gftdcojp/cloud-itonami-A0122"
-   :business-id "cloud-itonami-A0122"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0122"
+   :business-id "cloud-itonami-isic-0122"
+   :required-technologies [:robotics :identity :forms :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :survey :advise :treat :record :audit]},
+   :maturity :implemented
+   ;; Wave-3 orchard-operations actor implementation complete (2026-07-15):
+   ;; OrchardOpsAdvisor ⊣ OrchardOperationsGovernor pattern, closed op
+   ;; allowlist (log-orchard-record/schedule-field-operation/
+   ;; flag-crop-health-concern/order-supplies), direct field-equipment
+   ;; operation and finalizing a spray-application decision permanently
+   ;; blocked. Scope: orchard back-office coordination only (no direct
+   ;; field-equipment operation). Propose-only operations, crop health
+   ;; concerns always escalate. 30 tests / 93 assertions green. See
+   ;; ADR-2607152500 (com-junkawasaki/root).
+   :operating-states [:intake :advise :govern :decide :commit :hold]},
   {:id "0123"
    :name "Growing of citrus fruits"
    :repo "https://github.com/gftdcojp/cloud-itonami-A0123"
