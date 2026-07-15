@@ -1866,6 +1866,33 @@ san-jose/bogota/copenhagenと並んで取得できることを確認。
 現状: 国軸26件・業界団体軸27件(22業種)・自治体軸21件——74tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 75 — 業界団体軸28件目(GTIA) — 新規ISIC業種(コンピュータプログラミング))
+
+`cloud-itonami-assoc-6201-usa-gtia`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-6201-usa-gtia/commit/235584b))：
+Global Technology Industry Association（GTIA）。調査の過程で重要な
+区別を発見した——GTIAは1982年にAssociation of Better Computer
+Dealers（ABCD）として設立され1993年にCompTIAへ改称した非営利
+membership association の直接の継続体だが、**2025年に「CompTIA」
+ブランドと研修・認定事業（A+認定など）は売却され別の営利企業と
+なった**——GTIAはその営利企業ではなく、A+認定等は所有していない。
+このため本カタログはGTIA自身が公開した文書のみを引用し、A+認定関連
+の資料は一切引用しない。`gtia.org`の公式ページ2件を直接WebFetch
+検証: 「About Us」（1982年設立、月日不記載でyear-only、1993年
+CompTIAへ改称・2025年GTIAとして分離の経緯を本文で直接確認）／
+「Code of Conduct」（行動規範、ページには"Updated February 26,
+2025"としか記載がなく元の制定日は不明のため、established-dateは
+省略しlast-revised-dateのみ採用）。4 tests/11 assertions green。
+
+**新規ISIC業種**: ISIC 6201(コンピュータプログラミング業務)を初めて
+追加した。
+
+104リポジトリ・741 factを統合。`"association-rule/topic"
+"governance"`での横断queryでgtiaを含む24団体が取得できることを確認。
+
+現状: 国軸26件・業界団体軸28件(23業種)・自治体軸21件——75tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社

@@ -259,7 +259,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-iso3166-pan/data/datascript-tx.edn"}
    {:label "cloud-itonami-municipality-ury-montevideo ordinance.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-municipality-ury-montevideo/schema/ordinance.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-municipality-ury-montevideo/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-ury-montevideo/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6201-usa-gtia association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6201-usa-gtia/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6201-usa-gtia/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
