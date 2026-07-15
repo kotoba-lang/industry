@@ -4602,11 +4602,25 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2680"
    :name "Manufacture of magnetic and optical media"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2680"
-   :business-id "cloud-itonami-C2680"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2680"
+   :business-id "cloud-itonami-isic-2680"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607169900): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2680 placeholder).
+   ;; MagOpticalMediaAdvisor, an advisor sealed behind an independent
+   ;; Magnetic and Optical Media Plant Operations Governor,
+   ;; langgraph-clj StateGraph, append-only audit ledger. Mirrors
+   ;; cloud-itonami-isic-2640's [Manufacture of consumer electronics]
+   ;; verified module shape, adapted to the magnetic-tape coating and
+   ;; CD/DVD/Blu-ray-style optical-disc molding/data-stamping plant.
+   ;; Twelve concrete governor checks including permanent blocks on
+   ;; coating/molding/stamping-line-equipment actuation and
+   ;; content-replication licensing/source-identification-mark
+   ;; self-issuance. 77 tests / 211 assertions green.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2710"

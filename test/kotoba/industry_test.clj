@@ -1874,7 +1874,16 @@
       ;; sibling promotion(s) landed concurrently; recomputed live via
       ;; `(industry/maturity-summary)` on the freshly-edited local
       ;; registry.edn immediately before this edit, not assumed.
-      (is (= 291 (:implemented m))))))
+      (testing "cloud-itonami-isic-2680 (Manufacture of magnetic and optical media, fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-C2680 placeholder or the real cloud-itonami org [gh api 404 confirmed]; identity ({:id \"2680\" :name \"Manufacture of magnetic and optical media\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; MagOpticalMediaAdvisor ⊣ Magnetic and Optical Media Plant Operations Governor plant-operations-COORDINATION actor, mirroring cloud-itonami-isic-2640's [Manufacture of consumer electronics] verified module shape module-for-module (magopticalmedia.* in place of consumerelec.*) -- magnetic-tape coating and CD/DVD/Blu-ray-style optical-disc molding/data-stamping-line equipment registration in place of SMT/assembly/test-bench equipment, and product-type (cd/dvd/blu-ray/magnetic-tape/magnetic-strip-card)/substrate-thickness-mm/defect-rate-percent production-batch fields in place of television/audio-device/video-device/smart-speaker/wearable-device product types and a dielectric-test-kv electrical safety-test-voltage field; :flag-safety-concern (solvent-coating chemical-hazard/equipment-safety concern) always escalates regardless of confidence, matching 2640's own safety-concern-escalation invariant; the proposal-effect allowlist plus a permanent equipment-actuate block (`:actuate-equipment? true`) structurally prevent any direct coating/molding/stamping-line-equipment control, with no human-approval override path; a further permanent certification-authority block (`:issue-certification? true`) prevents self-issuing a content-replication licensing/source-identification authorization mark (e.g. an IFPI Source Identification (SID) Code) rather than a product-safety-certification mark, since this vertical's authority boundary is copyright/replication licensing, not electrical/RoHS product safety; substrate-thickness-mm plausibility ceiling (0-1.5mm) grounded in ECMA-130/267/405 optical-disc thickness and ISO/IEC 7810 magnetic-strip-card thickness in place of 2640's IEC 62368-1 dielectric-withstand-voltage table; fully portable .cljc with no JVM-only interop in src/; 77 tests / 211 assertions green, independently re-verified against a fresh clone; superproject ADR-2607169900) is also :implemented"
+        (is (= :implemented (industry/maturity "2680"))))
+      ;; 291 -> 293: this catch-up's own "2680" ->
+      ;; :implemented promotion plus any further sibling promotions
+      ;; landed concurrently; recomputed live via
+      ;; `(industry/maturity-summary)` on the freshly-edited local
+      ;; registry.edn immediately before this catch-up edit, not
+      ;; assumed (fleet drift of a promotion or two behind live truth
+      ;; by landing time is expected, per this fleet's own protocol).
+      (is (= 293 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
