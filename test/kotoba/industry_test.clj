@@ -1714,6 +1714,14 @@
       ;; cloud-itonami-isic-2030 recompute (superproject ADR-2607200000):
       ;; `(industry/maturity-summary)` re-verified fresh on the just-
       ;; re-fetched origin/main tip immediately before this edit read 260.
+      (testing "cloud-itonami-isic-4330 (Building completion and finishing, fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-F4330 placeholder or the real cloud-itonami org [gh api 404 confirmed]; identity ({:id \"4330\" :name \"Building completion and finishing\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; FinishingAdvisor ⊣ Finishing Governor building-completion/finishing-project OPERATIONS COORDINATION actor, mirroring cloud-itonami-isic-4311's [Demolition] verified module shape module-for-module -- pre-work lead-paint/asbestos hazmat-survey and fall-protection-trigger-height legal-basis fields in place of hazmat-survey/demolition-notification-lead-time fields, and a scaffold-safety/materials-hazard (VOC paint fumes, asbestos in old finishes)/structural safety-concern vocabulary (always escalates) in place of 4311's structural-instability/hazmat vocabulary; trade-equipment-control and structural-completion-sign-off finalization are both permanent, unconditional HARD blocks with no human-approval override path; deliberately DIFFERS from 4311/4210 in that schedule-finishing-operation is NOT a permanent high-stakes member (MAY auto-commit at phase 3 when clean+confident, reflecting trade-finishing work's materially lower risk than demolition/heavy-civil earthwork scheduling); fully portable .cljc with NO JVM interop anywhere in src/ (notify uses a caller-injected function transport seam, not an embedded java.net.http client); per-jurisdiction JPN/USA/DEU legal-basis citations independently verified against osha.gov/ecfr.gov/laws.e-gov.go.jp/eur-lex.europa.eu/baua.de before being written; 69 tests / 248 assertions green, independently re-verified against a fresh clone; superproject ADR-2607158000) is also :implemented"
+        (is (= :implemented (industry/maturity "4330"))))
+      ;; Live-recomputed via `(industry/maturity-summary)` on a freshly
+      ;; re-fetched origin/main immediately before this test-file
+      ;; catch-up edit (registry.edn's own "4330" -> :implemented change
+      ;; already landed via a Contents-API single-file PUT; at least one
+      ;; other sibling promotion may have landed concurrently -- the live
+      ;; recompute, not an assumed +1, is the source of truth here): 262 -> 262.
       (is (= 262 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
