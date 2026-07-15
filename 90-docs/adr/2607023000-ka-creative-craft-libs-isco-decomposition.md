@@ -65,7 +65,7 @@ kami-genko / kami-mangaka-\* が該当。syosetsuka の技芸 lib は将来 `sho
    deps.edn + .cljc + cognitect test-runner。テスト green: anime 66 /
    douga 23 / ongaku 15 assertions）。ongaku の catalog reader は legacy
    `:ongakuka.catalog/assets` キーも読む（移行互換）。west 登録済み
-   （repos.edn :extra-projects + `gen-west-manifest.bb --entry` 最小 diff、
+   （repos.edn :extra-projects + `gen-west-manifest.cljs --entry` 最小 diff、
    ADR-2607022900 のサーバ側 pin 検証経由）。
 2. **cloud-itonami-isco-{2641,2654} を新規公開**（2166 テンプレ同型:
    README / blueprint.edn / business-model / operator-guide / AGPL +

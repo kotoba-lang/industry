@@ -57,14 +57,14 @@ schema-CRUD actors and do not overlap with it).
      real `tools.deps` syntax but `etzhayyim/kotoba {:local/root "../../40-engine/kotoba"}` —
      `40-engine/kotoba` **no longer exists** in `etzhayyim/root` today; already dead before this
      migration.
-  - In both shapes the actual test entry point (`run_tests.sh`, or a `bb.edn` `test` task)
-    invokes **`bb --classpath src:test(s) …`** directly and never touches `deps.edn` — the
+  - In both shapes the actual test entry point (`run_tests.sh`, or a `nbb.edn` `test` task)
+    invokes **`nbb --classpath src:test(s) …`** directly and never touches `deps.edn` — the
     source genuinely requires only `clojure.string` + `clojure.test` + its own namespace, so the
     catalog already **runs and passes with zero external deps**; `deps.edn` is decorative. This
     means relocation is safe (nothing that currently works depends on the broken `deps.edn`),
     but each migrated repo's `deps.edn` must be **replaced** with a correct, self-contained
     `{:paths ["src" "test(s)"] :deps {org.clojure/clojure {:mvn/version "1.11.1"}}}` (or deleted
-    in favor of `bb.edn` alone) rather than carried over as-is.
+    in favor of `nbb.edn` alone) rather than carried over as-is.
   - Naming/layout is not fully uniform: `src/<v>/main.cljc` + `test/<v>/main_test.cljc` vs.
     `src/<v>/actor.cljc` + `tests/<v>/actor_test.cljc`. Both are fine `.cljc`; this migration does
     **not** force-normalize the split (separate follow-up if desired).
@@ -114,9 +114,9 @@ Examples: `adyen-compat` → `com-adyen`, `nvidia_isaac-compat` → `com-nvidia-
    `:extra-projects` requires a cloned tree with a HEAD).
 7. Add `"orgs/kotoba-lang/<new-name>"` to `manifest/repos.edn` `:extra-projects` (one line +
    provenance comment).
-8. `bb scripts/gen-west-manifest.bb --entry <new-name>[,<new-name>...]` (minimal diff, per-entry
+8. `nbb scripts/gen-west-manifest.cljs --entry <new-name>[,<new-name>...]` (minimal diff, per-entry
    pin verification per ADR-2607022900), then `--check`.
-9. `bb test` (or the repo's own `run_tests.sh`) green in the new location.
+9. `nbb test` (or the repo's own `run_tests.sh`) green in the new location.
 10. Commit `manifest/repos.edn` + `manifest/west.yml` to the superproject
     (`chore(manifest): register kotoba-lang/<new-name> …`), synced to `origin/main` first.
 
@@ -151,7 +151,7 @@ the recipe across shapes, not because these are otherwise prioritized.
 - Progress ledger: track completed old→new pairs as `manifest/repos.edn` entries accrue (the
   `:extra-projects` set / generated `west.yml` **is** the ledger — a repo is "done" iff it has a
   `kotoba-lang/com-*` entry with pin == HEAD). No separate tracking file needed.
-- Per-batch verification: same 10-step recipe + `gen-west-manifest.bb --check` clean for the
+- Per-batch verification: same 10-step recipe + `gen-west-manifest.cljs --check` clean for the
   batch's entries specifically (the wider repo already carries pre-existing, unrelated stale
   entries — not this migration's concern to fix).
 - Open question (not decided here): whether `kotoba-lang` should really grow to ~1,027 repos, or
@@ -161,9 +161,9 @@ the recipe across shapes, not because these are otherwise prioritized.
 
 ## Verification (pilot)
 
-1. Each of the 8 new repos: `bb test` green, zero tracked `.ts`/`node_modules`, `deps.edn` is
+1. Each of the 8 new repos: `nbb test` green, zero tracked `.ts`/`node_modules`, `deps.edn` is
    valid `tools.deps` (no more `"workspace"` pseudo-deps, no dead relative paths).
-2. `bb scripts/gen-west-manifest.bb --check`: the 8 new entries are absent from the stale diff;
+2. `nbb scripts/gen-west-manifest.cljs --check`: the 8 new entries are absent from the stale diff;
    pin == repo HEAD for each.
 3. `orgs/etzhayyim/root/20-actors/<old>-compat/` untouched (git status clean in that checkout).
 

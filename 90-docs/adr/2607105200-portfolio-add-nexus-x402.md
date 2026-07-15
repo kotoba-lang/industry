@@ -49,17 +49,17 @@ x402 標準ワイヤ準拠なので Cloudflare facilitator へロックインし
 2. **CLI registry**（`gftd.cli`）に `nexus`（→nexus-x402）を追加、`gftd`
    umbrella が全 12 product を扱う
 3. **layer-labels**（`gftd.canvas`）に `:payment-facilitator-infra` を追加
-4. **bin/nexus** wrapper を追加（既存 8 CLI と同型の bb ラッパー）
+4. **bin/nexus** wrapper を追加（既存 8 CLI と同型の nbb ラッパー）
 5. `gftd canvas md --all` で `90-docs/business/nexus-x402-business-model.md`
-   を CLI 生成版へ再生成（先行の手書きドラフトを置換）。`bb
-   70-tools/bmc/run-tests.bb` を通す
+   を CLI 生成版へ再生成（先行の手書きドラフトを置換）。`nbb
+   70-tools/bmc/run-tests.cljs` を通す
 
 ## スコア
 
 nexus-x402 は Worker 未デプロイ・実トラフィックゼロのため、
 `maturity-facts.edn` / `metrics/nexus-x402.edn` への実測記録は行わない
 （club-shinshi/isekai 追加時と異なり、稼働中サービスではないため fabricate
-しない）。デプロイ後に `70-tools/bmc/collect.bb` 経由で実測を収集してから
+しない）。デプロイ後に `70-tools/bmc/collect.cljs` 経由で実測を収集してから
 `gftd score` を実行する。
 
 ## Consequences

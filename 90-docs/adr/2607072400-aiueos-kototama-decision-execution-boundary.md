@@ -47,7 +47,7 @@ change proposes one, that proposal contradicts this ADR and needs a new
 one to override it explicitly — it should not happen by accretion.
 
 Two entry points to the SAME decision, for two different caller shapes:
-- `aiueos.decide` / `bb decide` — a subprocess a non-JVM host (Rust,
+- `aiueos.decide` / `nbb decide` — a subprocess a non-JVM host (Rust,
   Node, ...) shells out to, newline-delimited EDN over stdio
   (ADR-2607022700's "decision subprocess" design).
 - `aiueos.cli/command-result` — the same decision, called in-process,

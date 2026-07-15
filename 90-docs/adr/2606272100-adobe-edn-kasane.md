@@ -191,7 +191,7 @@ EDN(canonical, doc CID) / SVG(`kasane.svg`→svgraph) / kotoba Datom(`kasane.qua
 
 1. 本 ADR をマージ（`.md` + `.edn`）。
 2. west project 追加: `manifest/repos.edn` に `com-junkawasaki/kasane` を登録 →
-   `bb scripts/gen-west-manifest.bb`（手書き禁止 / CI は `--check`）。
+   `nbb scripts/gen-west-manifest.cljs`（手書き禁止 / CI は `--check`）。
 3. **基盤先行**: `kasane.bytes` → `kasane.spec`(DSL 仕様) → `kasane.decode`(エンジン) →
    `kasane.codec.inflate`(DEFLATE) を、ゴールデンベクタ（zlib RFC1951 test vectors）付きで固める。
 4. **PSD を最初の E2E**: `grammar/psd.edn` を書き、PackBits + ZIP チャンネルを `decode`→
@@ -232,7 +232,7 @@ EDN(canonical, doc CID) / SVG(`kasane.svg`→svgraph) / kotoba Datom(`kasane.qua
 | **PDF 画像** | `kasane.cos/page-images`+`decode-image` | ✅ XObject 抽出（FlateDecode→raw / DCTDecode→jpeg.decode / 他 opaque） |
 | **JPEG** | `kasane.jpeg`(marker) + `kasane.jpeg.decode`(baseline 画素) | ✅ メタ + **baseline 画素復号**（Pillow 平均誤差1.6, ADR-2606280010 R1） |
 | **LZW** | `kasane.codec/lzw` (MSB early / LSB) | ✅ **TIFF/GIF とも bit-exact**(実 libtiff/Pillow fixture)、PDF=対応 |
-| テスト | bb 純 cljc スイート | ✅ **42 tests / 175 assertions green** |
+| テスト | nbb 純 cljc スイート | ✅ **42 tests / 175 assertions green** |
 
 DEFLATE/zlib inflate は PSD-ZIP・PDF-Flate・PNG-IDAT・**ZIP(Sketch/OOXML/ODF/EPUB)** を、
 LZW は TIFF/GIF/PDF を **それぞれ 1 本で**賄っており、「形式追加＝EDN/ns 追加で増える」設計が
@@ -253,5 +253,5 @@ next-free-code==2^width−1 で width++ / GIF: interlace の 4-pass de-ordering 
 - グラフ射影先: kotoba QuadStore / Datom（`kotoba-graph` / `kotoba-query`）
 - 大容量バイナリ規律: `CLAUDE.md`「大容量バイナリの扱い（B2 + DataLad）」,
   ADR-2606241428
-- manifest 運用: `manifest/repos.edn`, `scripts/gen-west-manifest.bb`, ADR-2606271500
+- manifest 運用: `manifest/repos.edn`, `scripts/gen-west-manifest.cljs`, ADR-2606271500
 - 文法 DSL の先行概念: Kaitai Struct（ただし本設計は YAML でなく **EDN データ** + Clojure 解釈）

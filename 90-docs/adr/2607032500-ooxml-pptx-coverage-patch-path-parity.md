@@ -109,7 +109,7 @@ per-slideゲート条件が「新規（ロケーター無し）シェイプが1�
 `manifest/west.yml` の `drawingml`/`presentationml`/`slides` の3エントリを
 それぞれの `origin/main` tip まで前進させた（`e1f3dc37→563fb9d6`,
 `030cb804→9d1ed29f`, `e1ceb61a→a2c2f352`）。差分は当該3行のみ
-（`gen-west-manifest.bb --entry` 相当の最小diff、wholesale再生成では
+（`gen-west-manifest.cljs --entry` 相当の最小diff、wholesale再生成では
 ない）。superproject本体の外に切った専用worktreeでPR経由でmainへ着地。
 
 ## Verification

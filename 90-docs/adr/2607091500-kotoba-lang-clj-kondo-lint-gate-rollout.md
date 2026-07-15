@@ -100,7 +100,7 @@ plm、kqe/ocio 等の単独リポジトリ、com-arm-cpu 他 21 件の clean-roo
 fast-forward 同期 → 再適用、あるいは feature branch を push して
 `gh api repos/<org>/<repo>/merges` でサーバサイドマージする(CLAUDE.md
 `:manifest-workflow` 準拠)。着地後は必ず実 CI が green になったことを
-確認してから `bb scripts/gen-west-manifest.bb --entry <name>` で pin を
+確認してから `nbb scripts/gen-west-manifest.cljs --entry <name>` で pin を
 前進し、superproject 側を `chore(manifest): ...` でコミットする。
 
 ## Consequences

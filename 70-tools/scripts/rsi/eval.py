@@ -1,7 +1,7 @@
 """RSi eval step — A/B comparison between base and new checkpoint.
 
 Runs on EVO-X2 (where the adapter lives).  Scores with the existing
-clj-kondo + bb-load gate (same as unit_refactor).  Returns a dict with
+clj-kondo + nbb-load gate (same as unit_refactor).  Returns a dict with
 base_pp, new_pp, delta_pp.
 
 Builds on the eval_ab.py / score_ab.py pattern from fleet-refactor/cpt/.

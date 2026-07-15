@@ -26,7 +26,7 @@ ClojureScript `.cljc` (e.g. `cron`, `authenticator`, `gijiroku`, `cacao`).
 This extraction is Python instead — a deliberate exception. The logic it
 wraps runs inside yukkuri's Python LangGraph k8s pod; a `.cljc` port would
 force every current and future Python caller through an RPC/subprocess
-bridge to a JVM/bb process for a straightforward stateless HTTP client, which
+bridge to a JVM/nbb process for a straightforward stateless HTTP client, which
 is disproportionate ceremony for what the code actually does. If a Clojure
 consumer needs this later, the right move is a thin wrapper (subprocess or a
 small sidecar), not a rewrite of the HTTP logic itself.
@@ -48,7 +48,7 @@ small sidecar), not a rewrite of the HTTP logic itself.
    this library for its HTTP calls (see the paired multi-destination ADR for
    how it's wired into the new `publish_destinations` graph).
 4. Registered via the standard `manifest/repos.edn` `:extra-projects` →
-   `bb scripts/gen-west-manifest.bb --entry` workflow.
+   `nbb scripts/gen-west-manifest.cljs --entry` workflow.
 
 ## Consequences
 

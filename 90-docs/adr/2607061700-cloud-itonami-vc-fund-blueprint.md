@@ -216,7 +216,7 @@ examples. Decision reversed from "Alternatives considered" above:
    were updated in the same commit; both re-verified (7 tests / 53
    assertions green).
 4. `manifest/west.yml`'s pin for the `industry` project was advanced via
-   `bb scripts/gen-west-manifest.bb --entry industry` (single-entry,
+   `nbb scripts/gen-west-manifest.cljs --entry industry` (single-entry,
    server-verified fast-forward) to include the promotion commit.
 5. This ADR's decision text above (the "publish standalone, non-ISIC"
    reasoning and its "Alternatives considered" table) is left unedited as

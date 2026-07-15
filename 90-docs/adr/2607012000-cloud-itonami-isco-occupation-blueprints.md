@@ -104,7 +104,7 @@ actor → `:implemented`).
   fix `industry`/`technology`'s registration — flagged here as a follow-up,
   not silently carried forward.
 - superproject registration: `orgs/kotoba-lang/occupation` added to
-  `manifest/repos.edn` / `manifest/west.yml` (`bb scripts/gen-west-manifest.bb
+  `manifest/repos.edn` / `manifest/west.yml` (`nbb scripts/gen-west-manifest.cljs
   --check` passes). The 9 `cloud-itonami-isco-*` blueprint repos remain
   standalone, following the existing `cloud-itonami-*` convention (blueprint
   repos are not west-managed).

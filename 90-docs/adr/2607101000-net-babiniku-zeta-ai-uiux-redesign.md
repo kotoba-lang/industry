@@ -140,10 +140,10 @@ adult content declared) — tracked under the same follow-up task as store submi
 
 ## Consequences
 
-- Every existing `bb` gate (`governor`/`monetization`/`embodiment`/`character`/`persona`/
+- Every existing `nbb` gate (`governor`/`monetization`/`embodiment`/`character`/`persona`/
   `roster-sync`) and `clojure -M:lint` still pass unchanged — this ADR touched no domain
   `.cljc` namespace, only `babiniku.ui.{db,events,subs,views}` and `public/index.html`.
-  Verified: `bb governor`, `bb character`, `clojure -M:lint`, `npx shadow-cljs release
+  Verified: `nbb governor`, `nbb character`, `clojure -M:lint`, `npx shadow-cljs release
   app` (clean compile, only pre-existing warnings in `babiniku.web`/an external `glb` lib,
   unrelated to this change), and a headless-Chromium Playwright pass across all four tabs
   (desktop + mobile viewport) with zero console errors, confirming the governor demo

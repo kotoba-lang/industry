@@ -138,11 +138,11 @@ remote retargeted, the 3 real dependents' `deps.edn` coordinates updated
 (`kekkai`, `kagi`, `tayori` — same pinned commit, coordinate only, no
 functional change), and `manifest/repos.edn`/`manifest/west.yml` updated
 (`:path-overrides` entry added, `:extra-projects` path renamed, new
-west.yml entry added via `gen-west-manifest.bb --entry` then the stale
+west.yml entry added via `gen-west-manifest.cljs --entry` then the stale
 old-name entry removed manually — `--entry` mode doesn't auto-delete the
 superseded entry, same caveat ADR-2607052300 notes for its own renames).
 
-**`bb scripts/gen-west-manifest.bb --check` reports STALE after this
+**`nbb scripts/gen-west-manifest.cljs --check` reports STALE after this
 edit** — not because this rename is wrong, but because a full regen at
 the time of this change would also "fix" two *unrelated* pin regressions
 (`kotoba`, `tayori` — both had local checkouts behind their true

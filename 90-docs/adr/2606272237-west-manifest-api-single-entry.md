@@ -13,7 +13,7 @@ authoritative_for:
 related:
   - CLAUDE.md "## Git operations"
   - ADR-2606241600 (shallow --depth 1 を git 既定にする)
-  - scripts/gen-west-manifest.bb (west.yml 生成器 / --check)
+  - scripts/gen-west-manifest.cljs (west.yml 生成器 / --check)
   - manifest/repos.edn ":manifest-workflow"
 supersedes: []
 superseded_by: []
@@ -30,7 +30,7 @@ superseded_by: []
 本リポジトリは west superproject であり、子repo群は submodule ではなく west
 manifest で管理する。superproject の git が manifest について commit するのは
 **`manifest/west.yml` の per-project pin（revision SHA）だけ**で、その west.yml は
-`scripts/gen-west-manifest.bb` が `manifest/repos.edn`（ポリシー SoT）＋各子repo の
+`scripts/gen-west-manifest.cljs` が `manifest/repos.edn`（ポリシー SoT）＋各子repo の
 working HEAD から**生成する（手書き禁止 / CI は `--check`）**。
 
 ここに、これまで暗黙だった摩擦が二つある:
@@ -75,7 +75,7 @@ PR #61/#62/#86、本セッションの kenchi-actor → kenchi-clj rename（`349
 
 ### 2. west.yml の衝突は marker 手編集せず「再生成」で解決する
 
-やむを得ずローカル merge する場合、west.yml の衝突は **`bb scripts/gen-west-manifest.bb`
+やむを得ずローカル merge する場合、west.yml の衝突は **`nbb scripts/gen-west-manifest.cljs`
 で解決する**。手順: project 集合の **superset 側**を採用 → `west update` で子を目的の
 pin に揃える → 再生成 → **`--check` が通れば canonical**。生成器が正準の衝突解決器で
 あり、conflict marker を手で編集してはならない。
@@ -103,7 +103,7 @@ branch/PR/push する。west 固有の作法は無く、superproject はその p
 
 §1 の PUT は生成器を経由しない手編集である。変更が repo＋HEAD の実態を写しただけ
 なら canonical と一致するが、ローカルが落ち着いたら一度
-`bb scripts/gen-west-manifest.bb --check` を通し「west.yml == 生成器出力」を確認する
+`nbb scripts/gen-west-manifest.cljs --check` を通し「west.yml == 生成器出力」を確認する
 （CI の `--check` 担保のため）。
 
 ## Consequences

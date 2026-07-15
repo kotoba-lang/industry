@@ -11,7 +11,7 @@ control plane(clj/cljc)側だけで実装する）
 
 ADR-2606271600 は「fleet 横断の単一 lattice auction（cross-node peering）は
 未配線」を既知ギャップとして明記していた。ADR-2607071500 追記3で、kenchi の
-2nd replica を `bb reconcile --apply` では収束できず、`bb deploy … zebulun`
+2nd replica を `nbb reconcile --apply` では収束できず、`nbb deploy … zebulun`
 の imperative 経路で手動充足した実地確認が取れていた。
 
 原因は `reconcile.clj` の apply 実装: `apply-app!` は app ごとに **1回だけ**
@@ -59,7 +59,7 @@ WASM を host する部分、`kotoba deploy`/`component build` の Rust CLI 呼�
   `apply-app-line` を、実態（murakumo 自身が target を選び deploy する）を
   表す `apply-target-line` に置換。
 - **tests**: pure `apply-targets` の unit test 追加（heartbeat deficit=2 →
-  2 pairs、relay → 1 pair）。`bb test` **177 tests / 811 assertions green**。
+  2 pairs、relay → 1 pair）。`nbb test` **177 tests / 811 assertions green**。
   本番 fleet に対する `--dry-run` で既存 `satisfied`（kenchi 2/2、
   minidrama 1/1）が壊れていないことも確認。
 
@@ -71,7 +71,7 @@ WASM を host する部分、`kotoba deploy`/`component build` の Rust CLI 呼�
   大きなスコープの新機能は不要だった。
 - murakumo は既に「1 ノード指定で deploy する」経路（`cmd-deploy`
   の publish-node 引数）を持っており、これは kenchi の手動収束
-  （`bb deploy … zebulun`）で実証済みだった。今回の変更はその実証済み経路を
+  （`nbb deploy … zebulun`）で実証済みだった。今回の変更はその実証済み経路を
   reconcile ループに繋いだだけで、新しい実行系は増えていない。
 - Rust(kotoba-lattice) 側に real cross-node auction（gossipsub 越しの
   bidding 同期）を実装する案は、オーナー方針（Rust 非推奨・prune 対象）に
@@ -83,7 +83,7 @@ WASM を host する部分、`kotoba deploy`/`component build` の Rust CLI 呼�
 
 ## Consequences
 
-- (+) `bb reconcile --apply` / `--watch` が、cross-node の multi-replica
+- (+) `nbb reconcile --apply` / `--watch` が、cross-node の multi-replica
   app を実際に収束できるようになった（Rust 側の変更ゼロ）。
 - (+) `apply-target-line` の文言が実態を正確に表すようになった
   （運用者が「auction が勝手にやってくれる」と誤解しなくなる）。

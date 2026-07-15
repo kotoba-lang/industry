@@ -97,7 +97,7 @@ Store/Advisor/Phase 注入、langgraph-clj StateGraph、1 run = 1 操作。
 | `clojure -M:dev:test` | ✅ 完了 | **20 tests / 54 assertions / 0 failures** — session-scope・purpose-scope・anonymization・no-cross-session-reference・retention-ttl・no-actuation の6 HARD 不変条件、alert常時human-signoff、Mem≡Datomic parity、phase 0→3 rolloutをすべて実行時に確認 |
 | `clojure -M:dev:run`（offline demo） | ✅ 完了 | ingest→detect(auto-commit)→alert propose(interrupt)→human signoff→dispatch→wrong-purpose report attempt(hold: purpose-scope)を実行し監査台帳を出力、設計どおりの挙動を目視確認 |
 | `clojure -M:lint`（clj-kondo） | ✅ 完了 | errors: 0, warnings: 0 |
-| `manifest/repos.edn` `:extra-projects` 登録 + `bb scripts/gen-west-manifest.bb --entry wami-actor` | ✅ 完了 | 新規 entry、pin `4750b24cbfa0` は main から到達可能と検証（`verify-west-pins` OK）。diff は当該 entry のみ（west.yml +5 行） |
+| `manifest/repos.edn` `:extra-projects` 登録 + `nbb scripts/gen-west-manifest.cljs --entry wami-actor` | ✅ 完了 | 新規 entry、pin `4750b24cbfa0` は main から到達可能と検証（`verify-west-pins` OK）。diff は当該 entry のみ（west.yml +5 行） |
 | superproject `com-junkawasaki/root` main へ反映 | ✅ 完了 | ADR pair + manifest 変更を commit `aaf5e0b69d14` として push（事前に `origin/main` との乖離なしを確認済み） |
 
 残作業（本 ADR が明示的に scope 外とした follow-up、closing のブロッカーではない）: 実カメラ/UAV

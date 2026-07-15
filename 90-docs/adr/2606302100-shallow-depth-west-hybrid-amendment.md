@@ -16,7 +16,7 @@ related:
   - 90-docs/adr/2606241600-shallow-depth1-git-default.md
   - 90-docs/adr/2606280300-kotoba-rad-git-sovereign-repo.md
   - manifest/repos.edn
-  - scripts/gen-west-manifest.bb
+  - scripts/gen-west-manifest.cljs
   - CLAUDE.md
 supersedes: []
 superseded_by: []
@@ -25,7 +25,7 @@ superseded_by: []
 # ADR-2606302100: clone-depth 方針の west 整合（分析・提案）
 
 **Status**: accepted — implemented（`manifest/repos.edn` に `:heavy` セット、
-`scripts/gen-west-manifest.bb` は `(when (heavy? path) ...)` で `:heavy` の
+`scripts/gen-west-manifest.cljs` は `(when (heavy? path) ...)` で `:heavy` の
 project にのみ `clone-depth` を出力。light project は行自体を出さず full
 clone になる。2026-07-02 時点で確認済み）
 **Date**: 2026-06-30（実装確認: 2026-07-02）
@@ -96,7 +96,7 @@ full 履歴で数十 GB 級）。逆に light を full 化しても増分は無�
 **一律 shallow をやめ、heavy だけ shallow に残すハイブリッドにする。**
 
 1. `repos.edn` に **`:heavy`（= shallow 維持）リスト**を新設（上表の path 群）。
-2. `scripts/gen-west-manifest.bb` を改修: `clone-depth: 1` を **`:heavy` に属する
+2. `scripts/gen-west-manifest.cljs` を改修: `clone-depth: 1` を **`:heavy` に属する
    project だけ**出力する（現状は `:defaults :clone-depth` で全 project に付与）。
    light project は `clone-depth` 行を出さない＝full clone。
 3. heavy は CLAUDE.md 既定方針どおり順次 **B2 + DataLad** へ移し、いずれ west からは
@@ -127,7 +127,7 @@ full 履歴で数十 GB 級）。逆に light を full 化しても増分は無�
 
 - `repos.edn`/生成器の変更は通常の superproject commit。`west.yml` 再生成は
   **pin 退行の罠**に注意（生成器はローカル working HEAD で pin する＝子が遅れていると
-  黙ってロールバック）。再生成後 `bb scripts/gen-west-manifest.bb --check`。
+  黙ってロールバック）。再生成後 `nbb scripts/gen-west-manifest.cljs --check`。
 - main 反映は `repos.edn :manifest-workflow` の API single-entry 正経路。
 - unshallow は light に限定し、heavy には `--unshallow` を撃たない。
 - ADR-2606241600 は撤回せず、本 ADR が「west 文脈での適用範囲」を **amend** する形にする。
@@ -143,7 +143,7 @@ full 履歴で数十 GB 級）。逆に light を full 化しても増分は無�
 
 ## 実装確認メモ（2026-07-02）
 
-`manifest/repos.edn`/`scripts/gen-west-manifest.bb` レベルの実装は完了済みと確認した
+`manifest/repos.edn`/`scripts/gen-west-manifest.cljs` レベルの実装は完了済みと確認した
 （`git log` 上、本 ADR 執筆後の別ターンで着手されたとみられる）。固定 depth 増（例:
 `--depth 100`）ではなく本 ADR のハイブリッド方針が既に採用されていることを、
 別件（サイト UI/UX 移行 PR のマージ作業）で shallow 由来の `merge-base` 不明・pin 到達
@@ -154,6 +154,6 @@ full 履歴で数十 GB 級）。逆に light を full 化しても増分は無�
   `git fetch --unshallow` で深くする移行スイープ（本 ADR §「実装時のガードレール」の
   4 番目）。今回は個別に遭遇した repo（例: `net-kotobase`）だけをその場で unshallow
   した。357 project 全体の一括スイープは未実施。
-- `bb scripts/gen-west-manifest.bb --check` は 2026-07-02 時点で `west.yml is STALE`
+- `nbb scripts/gen-west-manifest.cljs --check` は 2026-07-02 時点で `west.yml is STALE`
   を報告している（pin 前進や repo rename の反映漏れ、本件とは別要因）。再生成は
   pin 退行の罠（本文 §「実装時のガードレール」）に注意しつつ別途行う。

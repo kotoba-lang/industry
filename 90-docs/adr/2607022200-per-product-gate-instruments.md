@@ -20,7 +20,7 @@ per-repo 隔離**（各 child repo を独立 clone、CLAUDE.md の共有 checkou
 
 | product | gate emitter | PR | 状態 |
 |---|---|---|---|
-| network-isekai | `fork_stats.cljc` + feed index の fork fold → `public/feed/fork-stats.edn`（weekly / fork-origin-ratio / viral-coefficient） | gftdcojp/network-isekai#15 | bb gate 2 種 green |
+| network-isekai | `fork_stats.cljc` + feed index の fork fold → `public/feed/fork-stats.edn`（weekly / fork-origin-ratio / viral-coefficient） | gftdcojp/network-isekai#15 | nbb gate 2 種 green |
 | net-kotobase | Stripe webhook fulfillment（`checkout.session.completed`→tenant paid、KV）+ tenant 従量 metrics | (実装 PR) | — |
 | cloud-murakumo | `cost.cljc`（run ledger→¥/Mtok）+ `GET /infer/cost` + run body に node/elapsed | (実装 PR) | — |
 | club-shinshi | `creator_billing_daily` D1 migration + rollup + read（creator GMV vs ad 収益） | (実装 PR) | — |
@@ -53,7 +53,7 @@ measurable-with-fallback 化。`:compare {:lhs :op :rhs}`（2 metrics 比較）�
   superproject 側は 5 product 分の gate を機械測定可能に配線済み。emitter deploy →
   metrics 反映 → 自動昇格、の経路が両端そろった。
 - (+) `:compare` 形式で「A > B」型 gate（収益比較・原価比較）も機械判定可能に。
-- (−) collect.bb が各 emitter エンドポイント/ファイルを読む 1 行ずつの配線は、
+- (−) collect.cljs が各 emitter エンドポイント/ファイルを読む 1 行ずつの配線は、
   emitter が本番 deploy された後の follow-up（未 deploy を今叩いても空）。
 - (−) apex（Stripe price=人間）/ cloud-itonami（vertical 経営判断 + Pages Functions
   未実装）/ app-aozora（PDS 書込のデプロイ権限、OCEL activity 空スタブ）/

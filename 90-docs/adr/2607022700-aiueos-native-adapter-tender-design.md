@@ -58,7 +58,7 @@ tender パターン」と決めた native runtime）を設計する。
 Rust に再実装してしまうリスクが最大化する瞬間だからこそ、明文化する）。
 
 **native adapter は capability の grant/deny を一切自分で計算しない。** 代わりに、
-`aiueos.broker`/`aiueos.cli` を呼び出す **decision subprocess**（`bb` = babashka
+`aiueos.broker`/`aiueos.cli` を呼び出す **decision subprocess**（`nbb` = babashka
 経由、EDN を stdin/stdout でやり取りする newline-delimited プロトコル）に必ず
 問い合わせる。これは新規パターンではなく、**同じリポジトリに既に実例がある**:
 `examples/computer/backing/surface.mjs`（Rust 側から newline-JSON で外部プロセスに
@@ -66,7 +66,7 @@ Rust に再実装してしまうリスクが最大化する瞬間だからこそ
 プロセス境界の外側に委譲する」形。それを capability 判定そのものにも適用する。
 
 ```
-Rust tender (native adapter)              bb decision subprocess (CLJC authority)
+Rust tender (native adapter)              nbb decision subprocess (CLJC authority)
   argv 解析、file I/O                        aiueos.cli/dispatch
   manifest/policy を EDN として読む    -->    aiueos.broker/verify-one 等を実行
                                        <--    policy-decision EDN (grant/deny + caps)
@@ -74,7 +74,7 @@ Rust tender (native adapter)              bb decision subprocess (CLJC authority
   :deny なら実行せず終了
 ```
 
-`bb` は GraalVM native-image でビルドされた実行体なので起動が速く、
+`nbb` は GraalVM native-image でビルドされた実行体なので起動が速く、
 per-invocation で shell out しても CLI ツールとして許容できるレイテンシに収まる
 （後日、長命プロセス化してレイテンシを詰めるのは最適化として later、今は
 シンプルな per-invocation を V1 とする）。
@@ -111,12 +111,12 @@ decision subprocess の入出力は EDN のみで、Rust 側の構造体を経�
   この ADR のスコープ内で拾われた。
 - (+) virtio.rs の信頼度が低いという評価が記録され、将来「動いていたコードだから
   そのまま使おう」という早合点を防げる。
-- (−) 本 ADR は**設計**であり、decision subprocess の実装（`bb` スクリプト）・
+- (−) 本 ADR は**設計**であり、decision subprocess の実装（`nbb` スクリプト）・
   host.rs/runtime.rs/bin/aiueos.rs の改修・virtio.rs の書き直し・backing.rs の
   修復は全て follow-up。復元 worktree は `cargo build --lib` が通る状態で
   temporary に保持しているのみで、まだ decision subprocess 呼び出しへの
   置き換えは行っていない。
-- (−) per-invocation で `bb` を shell out する V1 設計はレイテンシ面で
+- (−) per-invocation で `nbb` を shell out する V1 設計はレイテンシ面で
   最適ではない（起動コストが CLI 用途には許容範囲でも、`up --rounds N` の
   ような周期実行には向かない可能性がある）。長命プロセス化は later の
   最適化として明示的に先送りした。

@@ -76,7 +76,7 @@ commands, evidence of a concurrent fleet agent committing to the same
 shared working tree. Editing the manifest files via the Contents API against
 the current `origin/main` tip (blob-SHA-matched PUT) sidesteps both: no
 local 3-way merge, no race with a concurrent writer of the same checkout.
-`bb scripts/gen-west-manifest.bb --check` was deliberately **not** run to
+`nbb scripts/gen-west-manifest.cljs --check` was deliberately **not** run to
 completion as a write step in this session — the local checkout's ~90 other
 child-repo HEADs had drifted ahead of what's committed to `west.yml` (other
 fleet work in flight), and regenerating from that transient local state

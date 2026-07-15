@@ -54,7 +54,7 @@
      初回コミット時点で確認。
 
 3. **`manifest/repos.edn` の `:extra-projects` に両方を追加**し
-   `bb scripts/gen-west-manifest.bb` で `manifest/west.yml` を再生成、
+   `nbb scripts/gen-west-manifest.cljs` で `manifest/west.yml` を再生成、
    `--check` で canonical 一致を確認。
 
 ## Consequences

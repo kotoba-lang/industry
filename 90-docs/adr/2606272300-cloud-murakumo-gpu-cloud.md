@@ -136,7 +136,7 @@ approval inbox を継承)。`cloud-murakumo.schema/risk-of`:
 
 2026-06-27 の実装検証(babashka v1.12.218 / clojure 1.12):
 
-- `bb -cp src:resources:test ... cloud-murakumo.scheduler-test`: **7 tests, 17 assertions,
+- `nbb -cp src:resources:test ... cloud-murakumo.scheduler-test`: **7 tests, 17 assertions,
   0 failures, 0 errors**。厳密 class / min-vram 最安選択 / 容量超過の unscheduled /
   決定的 tie-break / hourly-cost / scale-to-zero / financial gate を確認
 - `clj -M:doctor`(無負荷): `{:apps 3, :functions 4, :fleet/nodes 5, :fleet/total-gpus 36,

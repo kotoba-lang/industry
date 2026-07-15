@@ -64,7 +64,7 @@ project):
    override is the record of the subsequent move, not a rewrite of history.
 
 4. **`manifest/west.yml`** regenerated for exactly these two entries
-   (`bb scripts/gen-west-manifest.bb --entry club-shinshi --entry net-babiniku`), not a wholesale
+   (`nbb scripts/gen-west-manifest.cljs --entry club-shinshi --entry net-babiniku`), not a wholesale
    regeneration — per the standing minimal-diff rule (ADR-2607022900).
 
 5. **Amendment to ADR-2607062200's payment-rail decision: crypto-only for now.** Per direct

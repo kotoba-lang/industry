@@ -33,7 +33,7 @@ fleet を束ねる側は `local-murakumo` と命名した。manimani も形は�
 3. `manifest/repos.edn` の `:path-overrides` に
    `"orgs/gftdcojp/manimani" "orgs/gftdcojp/local-manimani"` を追加、
    `:heavy`（shallow clone-depth 1 対象）の該当パスを更新。
-4. `bb scripts/gen-west-manifest.bb --entry local-manimani` で west.yml を
+4. `nbb scripts/gen-west-manifest.cljs --entry local-manimani` で west.yml を
    最小 diff 再生成。旧 `manimani` エントリは `--entry` splice が「対象名の
    ブロックを差し替える/無ければ挿入する」だけで**改名で使われなくなった
    エントリを自動では退役させない**ため、手動で当該ブロックを削除した

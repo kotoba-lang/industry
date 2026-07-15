@@ -88,7 +88,7 @@ should not repeat that debt now that the library exists and is portable).
    `verify-payment`) are called from the cljs Worker;
    `etherscan-row->onchain` uses `Math/pow` (JVM-only) and is called only from
    the babashka verifier.
-5. **`bb.edn` + `tools/verify-payments.clj`** (new, club-shinshi's own,
+5. **`nbb.edn` + `tools/verify-payments.clj`** (new, club-shinshi's own,
    modeled on `local-murakumo/tools/verify-payments.clj` but requiring
    `treasury.core` directly instead of duplicating it): polls
    `list_pending_pay_runs`, fetches incoming USDC transfers to club-shinshi's
@@ -105,7 +105,7 @@ Build verified in an isolated west worktree (`club-shinshi` +
 `kotoba-lang/treasury` checked out as siblings so the relative source-path
 resolves): `npx shadow-cljs compile worker` succeeds (only pre-existing
 `:infer-warning`s, same class as before this change), `npm test` — 24 tests /
-1078 assertions, 0 failures — and `bb tools/verify-payments.clj --dry-run`
+1078 assertions, 0 failures — and `nbb tools/verify-payments.clj --dry-run`
 safely no-ops with secrets unset.
 
 ## Explicitly out of scope (deferred)
@@ -167,10 +167,10 @@ Fix (same PR, second commit): **vendored** `treasury.core` at
 `60-apps/.../cljs/src/treasury/core.cljc` — byte-identical to
 `kotoba-lang/treasury` pinned at commit `e87e1299fe8562c98ef4b6044a1ad025dd493258`,
 with a header comment recording provenance and the reason it's a vendored
-copy rather than a live cross-repo reference. `bb.edn` was repointed at the
+copy rather than a live cross-repo reference. `nbb.edn` was repointed at the
 same vendored copy. Re-verified in a clean standalone clone of just
 `club-shinshi` (matching CI's own checkout shape): `shadow-cljs release app
-worker` succeeds, `npm test` — 24/24, `bb tools/verify-payments.clj
+worker` succeeds, `npm test` — 24/24, `nbb tools/verify-payments.clj
 --dry-run` no-ops safely — then confirmed green on CI itself before merging.
 
 This narrows one claim in the original Decision: club-shinshi's reuse of

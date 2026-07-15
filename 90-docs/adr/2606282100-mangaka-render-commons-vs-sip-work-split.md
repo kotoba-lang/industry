@@ -22,7 +22,7 @@ prompt 合成 + image-gen 呼び出しの汎用ロジックが **個別作品ア
 | `mangaka-ghosthacker-assets` | DataLad/git-annex | ghosthacker の style実験バイナリ | **作品固有アセット** | 現役（B2実体） |
 | `kami-app-sip-clj/src/sip/render.clj` | clj | prompt 合成 + image-gen 呼び出し | **汎用と固有が混在** | 現役（本ADRの核心） |
 | `kami-app-sip-clj/resources/render_anchors.edn` | edn | キャラ/環境/巻色/style | **作品固有データ** | 現役 |
-| `org-spirit-in-physics-comics` | edn+bb | SIP漫画版の site generator | **作品固有** | 現役 |
+| `org-spirit-in-physics-comics` | edn+nbb | SIP漫画版の site generator | **作品固有** | 現役 |
 
 要点: **「mangaka」は汎用マンガ生成プラットフォームの名前として既に確立している**
 （`mangaka.gftd.ai` / `mangaka.etzhayyim.com` / `kami-mangaka-scene` / `lg_mangaka`）。

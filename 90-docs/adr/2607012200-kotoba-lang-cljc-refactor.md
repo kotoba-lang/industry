@@ -61,7 +61,7 @@ reusable recipe (proven on `ipfs`, ADR exemplar) applies to all:
    client, witness transport, raw crypto primitives, fs/socket, MST/CAR). The
    core takes impls as a map/arg and **never** calls a vendor SDK directly.
    Template: `orgs/kotoba-lang/koe/src/koe/ports.cljc` (`defprotocol` + consume
-   `{:port impl}` map); scaffold: `orgs/kotoba-lang/ed25519/{deps.edn,bb.edn}`.
+   `{:port impl}` map); scaffold: `orgs/kotoba-lang/ed25519/{deps.edn,nbb.edn}`.
 3. **Host impls live outside the lib** (in the consuming actor/app), supplied
    via `reify`: JVM JCA/BouncyCastle/`java.net`, cljs `@noble/*`/`fetch`.
 4. **deps.edn**: drop vendor/network deps; keep only data libs. Aliases
@@ -77,7 +77,7 @@ reusable recipe (proven on `ipfs`, ADR exemplar) applies to all:
    Then **advance the superproject west pin** via **GitHub-API single-entry
    commit** on `manifest/west.yml` (edit only that repo's `revision:`, PUT with
    `branch=`+`sha=`, 409→retry); verify **pin == repo HEAD** and the repo is
-   absent from the `gen-west-manifest.bb --check` stale diff. No `--force`, no
+   absent from the `gen-west-manifest.cljs --check` stale diff. No `--force`, no
    history rewrite.
 
 ## Per-repo pure/IO ledger (what stays pure vs. what becomes an injected capability)
@@ -117,7 +117,7 @@ infer it from "TS deleted."
    crypto round-trips, witness-quorum selection/quorum, checkpointer codec).
 3. `.cljc` core loads JVM + cljs (no unguarded `java.*`/`js.*` in core).
 4. Repo has **no** `package.json`/`tsconfig`/`*.ts`/`dist`/`node_modules`.
-5. `bb scripts/gen-west-manifest.bb --check`: the repo is **absent** from the
+5. `nbb scripts/gen-west-manifest.cljs --check`: the repo is **absent** from the
    stale diff (pin == HEAD == regen output); advanced `west.yml` pin == repo HEAD.
 6. Layer-test pass: repo is `.cljc`, declares capability ports, core makes
    **zero** direct vendor/network calls.

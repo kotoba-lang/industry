@@ -135,9 +135,9 @@ partition keyword(`:wise/corporate-account-setup` 等)として name-agnostic �
 
 - **Phase A(完了)**: `com-gmail`・`com-wise`・`kotoba-procedure-clj` を新規
   scaffold・テスト green・push、`manifest/repos.edn` の `:extra-projects` に
-  登録、`bb scripts/gen-west-manifest.bb --entry com-gmail,com-wise,kotoba-procedure-clj`
+  登録、`nbb scripts/gen-west-manifest.cljs --entry com-gmail,com-wise,kotoba-procedure-clj`
   で最小 diff 生成、pin 検証通過。
-- **Phase B(未着手)**: `local-manimani` の `gmail.ts`(TS)/`triage.bb` 側で
+- **Phase B(未着手)**: `local-manimani` の `gmail.ts`(TS)/`triage.cljs` 側で
   実際に `com-gmail`/`kotoba-procedure-clj` を使うよう配線し、今回の Wise
   手続きを procedure として実データ登録する。`MANIMANI_SOURCE=mock` を実
   Gmail 接続へ切り替える(OAuth credentials.json/token.json の用意)は別途
@@ -150,6 +150,6 @@ partition keyword(`:wise/corporate-account-setup` 等)として name-agnostic �
 cd orgs/kotoba-lang/com-gmail            && clojure -M:test
 cd orgs/kotoba-lang/com-wise             && clojure -M:test
 cd orgs/kotoba-lang/kotoba-procedure-clj && clojure -M:test
-bb scripts/gen-west-manifest.bb --entry com-gmail,com-wise,kotoba-procedure-clj
-bb scripts/gen-west-manifest.bb --check
+nbb scripts/gen-west-manifest.cljs --entry com-gmail,com-wise,kotoba-procedure-clj
+nbb scripts/gen-west-manifest.cljs --check
 ```

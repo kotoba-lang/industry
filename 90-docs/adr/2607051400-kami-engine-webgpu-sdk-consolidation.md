@@ -110,7 +110,7 @@ canonical な `webgpu` の `src/kami/` に `materialx`/`dxf`/`verilog`/`scad`/
    全部をカバーする1:1薄いラッパー、記述子はJSオブジェクトのまま・Clojure map
    自動変換はしない）→git init→GitHub repo作成
    (`kotoba-lang/org-w3-webgpu`, public)+push→manifest登録
-   （`repos.edn`の`:extra-projects`に追加、`bb scripts/gen-west-manifest.bb
+   （`repos.edn`の`:extra-projects`に追加、`nbb scripts/gen-west-manifest.cljs
    --entry org-w3-webgpu`でwest.yml反映、pin検証OK）。まだ`webgpu`側からは
    依存されていない（Phase 2待ち）。
 3. **Phase 2 — `webgpu` からexecutor分離【完了 2026-07-05】**: `kami/webgpu.cljs`

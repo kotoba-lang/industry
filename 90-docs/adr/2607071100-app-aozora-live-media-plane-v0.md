@@ -9,7 +9,7 @@ last_verified: 2026-07-07
 authoritative_for:
   - live.aozora.app (app-aozora-live Worker) の ingest/serve 契約 — PUT/DELETE /ingest/<id>/<name>、GET /s/<id>/<name>、app.aozora.live.{startBroadcast,stopBroadcast,listBroadcasts}
   - broadcast 認可モデル (INGEST_SECRET → ingestToken = HMAC-SHA256(secret, broadcastId))
-  - producer 経路 — OBS→ffmpeg local HLS + watcher アップローダ (scripts/live-relay.bb)。ffmpeg 直 HTTP PUT が Cloudflare edge に破棄される実測と回避
+  - producer 経路 — OBS→ffmpeg local HLS + watcher アップローダ (scripts/live-relay.cljs)。ffmpeg 直 HTTP PUT が Cloudflare edge に破棄される実測と回避
   - ライブ告知の書式 — 通常 post + app.aozora.embed.video {playlist, live:true}
 related:
   - 90-docs/adr/2606271500-kotoba-stage-obs-live-aozora.md
@@ -39,7 +39,7 @@ content store + 公開再生パス」だけ**。ffmpeg は HLS 著作の最も�
 
 ```
 OBS ──rtmp──▶ ffmpeg (local, -c copy) ──HLS files──▶ tmpdir
-                                            │ watcher (bb, 0.7s poll)
+                                            │ watcher (nbb, 0.7s poll)
                                             ▼ HTTP PUT (segment → playlist の順)
                      live.aozora.app (app-aozora-live Worker, cljs)
                        PUT/DELETE /ingest/<id>/<name>   Bearer ingestToken
@@ -74,7 +74,7 @@ ffmpeg の `-method PUT` 直接 ingest は **Cloudflare edge に破棄される*
 - `-http_persistent 1` は接続再利用 2 本目が `Canceled` になり以降 stall。
 
 よって producer は **local HLS 出力 + watcher アップローダ**
-（`40-engine/cljs/live/scripts/live-relay.bb`）: segment は「playlist に参照
+（`40-engine/cljs/live/scripts/live-relay.cljs`）: segment は「playlist に参照
 された時点＝完成」でアップロードし、その後に playlist を PUT（プレイヤーが
 404 segment を引かない順序）。HTTP は babashka http-client（response 読取り）。
 
@@ -89,7 +89,7 @@ ffmpeg の `-method PUT` 直接 ingest は **Cloudflare edge に破棄される*
 
 ## Verification (2026-07-07)
 
-- E2E: `bb live-relay.bb --mode test --duration 20` → 10 segments + ENDLIST、
+- E2E: `nbb live-relay.cljs --mode test --duration 20` → 10 segments + ENDLIST、
   公開 URL から ffprobe が h264+aac をデコード、配信中 listBroadcasts
   `live:true` → 終了後 `false`。
 - auth: 誤 secret で startBroadcast 403、トークン無し PUT 403。

@@ -44,7 +44,7 @@ clojurewasm / ClojureScript / nbb 経路を汚染しない)。`cross-rate` と
 既に採用している判断と同じ)、ポータブルな `.cljc` のまま保った。API キー
 (`EIA_API_KEY`/`FRED_API_KEY`)は `marketdata.feed` 自体からは一切 env を
 読まない — 呼び出し側(新設した `marketdata.feed-demo`、素の `.clj`)が
-読んで明示的に渡す、`scripts/b2-creds.bb` と同じ injected-credential の
+読んで明示的に渡す、`scripts/b2-creds.cljs` と同じ injected-credential の
 作法。パース関数(XML/JSON → data)は実際にライブ取得した ECB レスポンス
 をフィクスチャとして使い、オフラインでユニットテストする
 (`test/marketdata/feed_test.clj`、捏造スキーマ禁止の作法どおり)。

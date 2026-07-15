@@ -398,7 +398,7 @@ ADR close 後の実装着手 2 件。
 
 - `ai-gftd-router` を独立 git repo 化（`git init` + remote `gftdcojp/ai-gftd-router` +
   初期コミット `2bfe850`）し、`manifest/repos.edn` の `:extra-projects` に追加。
-- `bb scripts/gen-west-manifest.bb` で `manifest/west.yml` 再生成（手書き禁止に準拠）。
+- `nbb scripts/gen-west-manifest.cljs` で `manifest/west.yml` 再生成（手書き禁止に準拠）。
   `ai-gftd-router`（remote gftdcojp / clone-depth 1 / groups [gftdcojp] / 自 HEAD pin）が追加。
   同時に他 5 project の pin が working HEAD へ前進（manifest 設計どおりの自動追従）。
   `--check` クリーン。

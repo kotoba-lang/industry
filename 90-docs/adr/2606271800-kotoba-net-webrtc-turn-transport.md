@@ -162,8 +162,8 @@ hole-punch で確立。connect.edn の `:dialable` がこの非対称を表現�
   `KOTOBA_WEBRTC` is set (kotoba#229); murakumo's plist + `provision` render
   `KOTOBA_WEBRTC` for native nodes; and `connect.edn :native :live` is **flipped to
   `[:quic :webrtc]`** so `reconcile` now makes every `:reach :browser/live` app eligible
-  on the fleet (guarded by a test; `bb test` 13/36 green). **One operational step
-  remains** (not code): build + `bb murakumo pin` a kotoba binary with `--features
+  on the fleet (guarded by a test; `nbb test` 13/36 green). **One operational step
+  remains** (not code): build + `nbb murakumo pin` a kotoba binary with `--features
   p2p,webrtc` (bin/BUILD.edn `:features` already declares it) and re-`provision`, so the
   `KOTOBA_WEBRTC` listen actually binds. Until that build is deployed the env is a no-op.
 

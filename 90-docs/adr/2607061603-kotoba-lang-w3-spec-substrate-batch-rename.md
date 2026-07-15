@@ -45,7 +45,7 @@ kotoba-lang 内に同様のパターン(標準規格を実装しているのに 
   W3C の正式な仕様(DID Core / Verifiable Credentials / ActivityPub /
   ActivityStreams 2.0 / RDF 1.1 / RDF 1.1 Turtle)を指している、実在する
   軽量 scaffold(bare名のまま)。
-- 依存グラフを事前に調査(`grep` で全 checkout の deps.edn/bb.edn を検索):
+- 依存グラフを事前に調査(`grep` で全 checkout の deps.edn/nbb.edn を検索):
   `did` のみ `kotoba-lang/kotoba` の deps.edn(2箇所: git座標 + `:local/root`)
   から実際に参照されていた。他5件は依存ゼロ。
 - 一方で `atom`/`webgl`/`mathml`/`geojson`/`step`/`spirv`/`otio` は
@@ -75,7 +75,7 @@ kotoba-lang 内に同様のパターン(標準規格を実装しているのに 
    ため直接編集しない)。
 4. `manifest/repos.edn`: `:path-overrides` に6エントリ追加、
    `:extra-projects` の該当 path を新名へ書き換え。
-5. `bb scripts/gen-west-manifest.bb --entry org-w3-did,org-w3-vc,
+5. `nbb scripts/gen-west-manifest.cljs --entry org-w3-did,org-w3-vc,
    org-w3-activitypub,org-w3-activitystreams,org-w3-rdf,org-w3-turtle`
    で新規6エントリを追加(pin検証 OK)。`--entry` は旧エントリを自動削除
    しない(ipns rename と同じ既知の挙動)ため、旧 bare 名の6エントリを
@@ -96,7 +96,7 @@ kotoba-lang 内に同様のパターン(標準規格を実装しているのに 
 ```
 gh api repos/kotoba-lang/org-w3-did --jq '.full_name'         # kotoba-lang/org-w3-did
 cd kotoba && clojure -Spath   # io.github.kotoba-lang/org-w3-did の座標解決を確認
-bb scripts/gen-west-manifest.bb --entry org-w3-did,org-w3-vc,org-w3-activitypub,org-w3-activitystreams,org-w3-rdf,org-w3-turtle
+nbb scripts/gen-west-manifest.cljs --entry org-w3-did,org-w3-vc,org-w3-activitypub,org-w3-activitystreams,org-w3-rdf,org-w3-turtle
 ```
 
 ## Consequences

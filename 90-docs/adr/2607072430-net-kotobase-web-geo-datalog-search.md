@@ -35,7 +35,7 @@ auth model:
   (lexicons/response shapes won't change; `candidates` field makes the
   1000-row recall cap observable).
 
-Pure cores `kotobase.web` / `kotobase.geo` / `kotobase.rows` (clj/cljs/bb
+Pure cores `kotobase.web` / `kotobase.geo` / `kotobase.rows` (clj/cljs/nbb
 portable, tested); route glue `kotobase.domain-search` (cljs, mirrors
 `kotobase.datomic` style); lexicons `contracts/lexicons/ai/gftd/apps/
 kotobase/{web,geo}/{ingest,search}.json`; worker bundle rebuilt and
@@ -54,6 +54,6 @@ boundary-tested against the built artifact (8/8).
   page / deps work). Not touched; needs reconcile via the cleanup runbook.
 - Pre-existing on net-kotobase main (fail identically on pristine main,
   unrelated to this change): `worker/test/explore_test.cljc`,
-  `worker/test/pin_test.cljc`, the full `bb scripts/test.cljc` runner
+  `worker/test/pin_test.cljc`, the full `nbb scripts/test.cljc` runner
   invariant (reads `worker/package.json`, absent from the repo), and
   `scripts/check-metadata.cljc` (kotoba submodule paths).

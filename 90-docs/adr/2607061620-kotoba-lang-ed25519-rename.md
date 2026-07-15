@@ -32,7 +32,7 @@ superseded_by: []
 
 ## 依存グラフ調査
 
-`grep` で全 checkout の deps.edn/bb.edn を検索し、実依存9件を特定:
+`grep` で全 checkout の deps.edn/nbb.edn を検索し、実依存9件を特定:
 
 | repo | ファイル | 備考 |
 |---|---|---|
@@ -42,10 +42,10 @@ superseded_by: []
 | `kotoba-lang/tayori` | deps.edn | |
 | `kotoba-lang/kekkai` | deps.edn | |
 | `kotoba-lang/org-signal`(旧signal) | deps.edn | 直前に他セッションが `com-junkawasaki/ed25519-clj` → `kotoba-lang/ed25519` の座標修正コミットを landing 済み |
-| `gftdcojp/net-kotobase` | cli/deps.edn, cli/bb.edn | cacao/dag-cborにも依存(それぞれ2箇所ずつ) |
-| `kotoba-lang/cacao` | deps.edn, bb.edn | ed25519 rename 後も21 tests/115 assertions green を確認 |
+| `gftdcojp/net-kotobase` | cli/deps.edn, cli/nbb.edn | cacao/dag-cborにも依存(それぞれ2箇所ずつ) |
+| `kotoba-lang/cacao` | deps.edn, nbb.edn | ed25519 rename 後も21 tests/115 assertions green を確認 |
 
-**`etzhayyim/root`(bb.edn)は意図的にスキップ**: 座標が既に別種の stale
+**`etzhayyim/root`(nbb.edn)は意図的にスキップ**: 座標が既に別種の stale
 (`com-junkawasaki/ed25519-clj` というグループID、`:git/url` 自体は
 `kotoba-lang/ed25519` を指しているため GitHub redirect で動作継続)であり、
 かつ `.claude/worktrees/did-web-migration` という他セッションの
@@ -64,7 +64,7 @@ west.yml)。
 ```
 gh api repos/kotoba-lang/org-ietf-ed25519 --jq '.full_name'
 cd cacao && clojure -M:test   # 21 tests / 115 assertions green(ed25519 rename後)
-bb scripts/gen-west-manifest.bb --entry org-ietf-ed25519
+nbb scripts/gen-west-manifest.cljs --entry org-ietf-ed25519
 ```
 
 ## Consequences

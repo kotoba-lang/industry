@@ -55,7 +55,7 @@ mesh には検閲対象にならない identity/liveness の2 component だけ�
 - **`kotoba-lang/murakumo`**（merge `8861d89b`）: `murakumo.app.edn` に
   fleet app `minidrama` を登録（`:manifest
   "../../etzhayyim/com-etzhayyim-minidrama/mesh/minidrama.app.edn"`、
-  `:replicas 1`、edge/jp placement）。bb test 176/810 green。
+  `:replicas 1`、edge/jp placement）。nbb test 176/810 green。
 - **検証**: 両 guest とも `kotoba component build`（kotoba-runtime の wit、
   `kotoba-component` / `kotoba-cron` world）で実 WASM component にコンパイル:
   - drama-profile: `bafyreic2knpq3reapdplo4fqp3iztkydaubxxt7fr2pfzop7pffbdw6wci`
@@ -65,15 +65,15 @@ mesh には検閲対象にならない identity/liveness の2 component だけ�
 
 ```
 identify (aozora):  CACAO did:key 自己発行 → profile/announce を自分の鍵で createRecord   ✅ b07e2e5 / 93e73ec8
-reside   (murakumo): mesh guests + murakumo.app.edn 登録 → bb reconcile の宣言的管理下     ✅ 本 ADR
+reside   (murakumo): mesh guests + murakumo.app.edn 登録 → nbb reconcile の宣言的管理下     ✅ 本 ADR
 pin      (kotoba):  guest は CID で content-addressed（component build が CID を発行）     ✅（deploy 時に pin）
 ```
 
 ## Consequences / Follow-ups
 
-- 実 fleet への配置は operator 実行: `bb murakumo deploy
+- 実 fleet への配置は operator 実行: `nbb murakumo deploy
   ../com-etzhayyim-minidrama/mesh/minidrama.app.edn <node>`（1回）または
-  `bb reconcile murakumo.app.edn --apply`（収束）。配置後、観測 CID を
+  `nbb reconcile murakumo.app.edn --apply`（収束）。配置後、観測 CID を
   murakumo.app.edn の `:cid` に記入して match-without-rebuild を有効化する。
 - 本 ADR の CID はローカル build の実測値。deploy 時の CID と一致することを
   確認して `:cid` に採用する（prelude/コンパイラ更新で変わりうる）。
@@ -96,18 +96,18 @@ pin      (kotoba):  guest は CID で content-addressed（component build が CI
 ## 追記 (2026-07-07): 実 fleet 配置 + E2E 実証完了（follow-up ①②）
 
 - **配置**: operator seed（1Password「Murakumo Operator Seed」）で
-  `bb deploy …/mesh/minidrama.app.edn asher` を実行。両 component の CID は
+  `nbb deploy …/mesh/minidrama.app.edn asher` を実行。両 component の CID は
   ローカル build と**完全一致**（決定的ビルド）。desired datom 10 件 +
   PutRoutes(http=1) が control graph に書かれ、asher に install。
 - **E2E 実証**: `POST http://asher:8077/mesh/http/minidrama/profile` →
   **HTTP 200** で actor identity record（handle/did/registry/role）が
   WASM component から応答（GET は 405 — mesh on-http は POST 契約）。
 - **:cid 記入**: murakumo.app.edn に representative CID（drama-profile）を記録
-  （murakumo `84235dce`）。`bb reconcile --dry-run` が
+  （murakumo `84235dce`）。`nbb reconcile --dry-run` が
   **`minidrama 1 desired / 1 running / satisfied on asher`** を報告 —
   宣言的ループ（desired ↔ observed）が閉じた。
 - 運用注: 配置は canary (asher) 1 replica。fleet 全体の常駐化・replicas 増は
-  `bb reconcile --apply` / `--watch` の運用判断に委ねる。
+  `nbb reconcile --apply` / `--watch` の運用判断に委ねる。
 
 ## 追記 2 (2026-07-07): 宣言済み desired state の fleet 収束 — kenchi 配置 + manifest 修理
 
@@ -137,7 +137,7 @@ minidrama で閉じた reside 経路を、murakumo.app.edn に宣言されたま
   slash なしパスを素通ししていたバグを発見・修正（murakumo `5e721ed9`、
   bare filename → "."。test 期待値も更新、176/810 green)。
 - kenchi の 2nd replica は cross-node auction 未配線(ADR-2606271600 既知
-  ギャップ)のため gossip では収束せず、`bb deploy … zebulun` の imperative
+  ギャップ)のため gossip では収束せず、`nbb deploy … zebulun` の imperative
   配置で充足。zebulun 上で `POST /mesh/http/kenchi/valuation` → HTTP 200 実測。
 - 最終状態: **kenchi-valuation 2/2 satisfied on asher,zebulun /
   minidrama 1/1 satisfied on asher**。kotodama-bot / live-ui は設計どおり

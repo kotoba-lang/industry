@@ -79,7 +79,7 @@ TTS / 3D scene・pose・cinematography / 顔検出+Hume / LoRA 学習 / 批評�
 
 - 各子リポは plain git: superproject 外の worktree で実装 → session branch を
   push → **サーバサイドマージ**(`gh api .../merges`)で main 化 → west pin を
-  `gen-west-manifest.bb --entry <name>` の最小 diff で前進。
+  `gen-west-manifest.cljs --entry <name>` の最小 diff で前進。
 - 本セッションでは **production deploy(wrangler deploy)はしない**。
   aozora.app への反映はオーナーの deploy 判断に委ねる。
 

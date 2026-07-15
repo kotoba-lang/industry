@@ -11,7 +11,7 @@ authoritative_for:
   - kototama.tender(JVM)およびwasm-webcomponent(Node,JVM不要)の2系統のllm-infer実装が存在すること
   - cloud-itonami-isic-6511のgovernor決定ロジックを.kotobaへ縮約する際の設計方針(Store/StateGraph/EDNマップは対象外)
   - murakumo fleetの実行系がRust(フリーズ済み)/JVM(kotoba.wasm-exec)/kototama.tender(JVM)の3系統に分裂しており、かつ全ノードにJVMが存在しないという実測事実
-  - 本ADR時点でmurakumoの正式なmesh/auction配布経路(bb murakumo deploy)は未修復のままであること(フォローアップ課題)
+  - 本ADR時点でmurakumoの正式なmesh/auction配布経路(nbb murakumo deploy)は未修復のままであること(フォローアップ課題)
 related:
   - 90-docs/adr/2607062330-kototama-tender-chicory-execution-runtime.md
   - 90-docs/adr/2607062400-wasm-webcomponent-actor-host-browser.md
@@ -78,7 +78,7 @@ murakumoリポジトリ自体(`bin/BUILD.edn`・`deploy/plan.cljc` 等のRust/WI
 - cloud-itonami本体のtest coverageも並行して向上(`plm_export.cljc`/`local_app.cljc`へのテスト追加、350→361 tests / 2719→2773 assertions、PR gftdcojp/cloud-itonami#36)。
 - **未実施・フォローアップ**:
   - 実Anthropic APIキーを用いた実LLM応答の検証(今回はfail-closed配線の検証のみで十分と判断)。
-  - murakumoの正式なmesh/auction配布経路(`bb murakumo deploy`)の修復。RustのWIT参照が現行`kotoba-lang/kotoba`に存在しないため壊れたままであり、ADR-2607072400(kaisha)が依存する現行Rust実装との調整を含め、別スコープの課題として残す。
+  - murakumoの正式なmesh/auction配布経路(`nbb murakumo deploy`)の修復。RustのWIT参照が現行`kotoba-lang/kotoba`に存在しないため壊れたままであり、ADR-2607072400(kaisha)が依存する現行Rust実装との調整を含め、別スコープの課題として残す。
   - `.kotoba`コンパイラの`and`/`or`/`when`未実装バグの本体側修正。
   - ISIC以外(ISO3166/COFOG/UNSPSC)のimplemented化、および今回のPoCパターンを他actorへ横展開すること。
   - wasm-webcomponent側`http-post`の非同期未対応は今回も未解消(ブラウザ文脈でのみ真に困難。Node文脈は本ADRのllm-infer同様の手法で解決可能と推測されるが未着手)。

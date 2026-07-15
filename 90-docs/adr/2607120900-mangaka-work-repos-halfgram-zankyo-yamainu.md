@@ -60,32 +60,13 @@ manifest生成が全ユーザーで動かない状態だったため同じdiff�
 - (−) `work.edn` と `aozora.appview.manga-actors` の二重管理が生まれる
   （既存のD1/レジストリ二重管理パターンと同型、ADR-2607070400と同じ trade-off）。
   同期は手動。
-- (−) zankyo/yamainuの第2話以降はarc構成のみでネーム未着手（README/work.ednに
+- (−) zankyo/yamainuの第2話以降はarc構成のみでネーム未着手（README/work.eddnに
   明記）。
-
-## Addendum（2026-07-12、同日）: `artifact-manga-<slug>` 命名への rename
-
-オーナー指示により、3リポジトリを新設直後に `orgs/com-junkawasaki/<slug>`
-から `orgs/com-junkawasaki/artifact-manga-<slug>` へrename。**「企画・脚本
-（ネーム）・世界観バイブルを保持する作品repo」は今後 `artifact-manga-<slug>`
-を命名規則とする**（コード/エンジン系のrepoとの見分けを明確化。ghosthacker
-本体は先行実装のため対象外、新規に同種のrepoを作る場合はこの規則に従う）。
-
-実施内容: `gh repo rename`でGitHub側3件をrename（履歴・pin(commit SHA)は
-不変）→ 共有checkoutのローカルdirをmv + remote URLを更新 →
-`manifest/repos.edn` の `:manifest.repos/extra-projects` を新パスに置換 →
-`nbb scripts/gen-west-manifest.cljs --entry artifact-manga-halfgram,
-artifact-manga-zankyo,artifact-manga-yamainu` で新entryを追加 → 旧3entry
-（`name: halfgram/zankyo/yamainu`、旧path）をwest.ymlから直接除去
-（該当4行×3ブロックのみ、他entryは無変更。GitHub API single-entry commit
-と同じ「当該entryのみのスコープ編集」を local diff で行った）。work.edn/
-README内は配信URL（manga.gftd.ai/aozora.app）のみでGitHub repo名を参照
-していないため無変更。
 
 ## References
 
 - ADR-2607070400 — app-aozora manga work actor profiles（配信用レジストリ、
   halfgram/zankyo/yamainu/ghosthackerのフィールド定義）
 - ADR-2607071100 — mangaka retirement wave3（配信プラットフォームの現状）
-- `orgs/com-junkawasaki/ghosthacker` — 専用IPリポジトリの先例（rename対象外）
-- `orgs/com-junkawasaki/{artifact-manga-halfgram,artifact-manga-zankyo,artifact-manga-yamainu}`（本ADRで新設、同日rename）
+- `orgs/com-junkawasaki/ghosthacker` — 専用IPリポジトリの先例
+- `orgs/com-junkawasaki/{halfgram,zankyo,yamainu}`（本ADRで新設）

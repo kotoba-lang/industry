@@ -94,9 +94,9 @@ R2v3(SERI)・e-Stewards(BAN)を e-waste 注文の情報ノートとして表示�
 - (-) RCRAの正確なCFR条項境界、日本バーゼル法の現行条文番号、UK SI
   2007/1711の改正履歴、EU 2024/1157の細かい段階適用日程は要検証と
   実装エージェント自身が明記。
-- (-) 本サイクルから `bb scripts/gen-west-manifest.bb` が
+- (-) 本サイクルから `nbb scripts/gen-west-manifest.cljs` が
   `nbb scripts/gen-west-manifest.cljs` へ移行済み(オーナーによる
-  進行中のbb→nbb移行が本ADR起票の間にmainへ着地した)。以降の pin 前進は
+  進行中のnbb→nbb移行が本ADR起票の間にmainへ着地した)。以降の pin 前進は
   `npx nbb scripts/gen-west-manifest.cljs --entry <name>` を使用する。
 - superproject への反映: 本 ADR + `kotoba-lang/industry` pin 前進のみ
   (`--entry industry` 最小 diff)。`cloud-itonami-isic-4669` は

@@ -76,7 +76,7 @@ Same procedure as ADR-2607052300, with two real complications caught mid-operati
    Y`) — never bundled with unrelated changes.
 4. **`manifest/repos.edn`**: 9 new `:path-overrides` entries + 9 `:extra-projects` lines
    updated, landed via the GitHub Contents API single-entry-commit path.
-5. **`manifest/west.yml`**: `bb scripts/gen-west-manifest.bb --entry <9 names>` verified all
+5. **`manifest/west.yml`**: `nbb scripts/gen-west-manifest.cljs --entry <9 names>` verified all
    9 pins OK; the whole-file write was blocked by 4 unrelated pre-existing pin-drift repos
    (`browser`/`cssom`/`dom-gpu`/`htmldom`, not this batch's concern) — landed the surgical
    9-entry-add + 9-old-entry-remove + 3-stale-entry-remove diff directly against the GitHub

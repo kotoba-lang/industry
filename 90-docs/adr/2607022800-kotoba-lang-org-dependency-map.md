@@ -352,7 +352,7 @@ ipld / p2p（ADR-2607023200）もグラフに入っている。
   classpath で cacao 側(identity CLI)が canonical な `kotoba.cli/dispatch` を
   黙って shadow する。monorepo の `:local/root` 時代は露見しなかったが、git pin
   化で `No such var: cli/dispatch` として顕在化。cacao 側を `cacao.cli` に
-  rename(bin/bb.edn/test/README 追従、外部消費者なしを確認)。21 tests green。
+  rename(bin/nbb.edn/test/README 追従、外部消費者なしを確認)。21 tests green。
 
 **修正しなかったもの**: kototama-clj は **archived(read-only)** のため
 push 不能(fix 自体はローカルで 40 tests green まで検証済み、unarchive されれば

@@ -58,7 +58,7 @@ Backblaze B2(`gftdcojp-m365-annex`バケットを`m365-archive`/`mangaka-data`�
 ディレクトリ構成(`jp-mhlw/`、将来`us-cms/`・`eu-*/`)にした。
 
 manifest登録: `manifest/repos.edn`の`:extra-projects`(kotoba-lang/insurance
-直後)と`:datalad`map両方に追加。`bb scripts/gen-west-manifest.bb --entry
+直後)と`:datalad`map両方に追加。`nbb scripts/gen-west-manifest.cljs --entry
 emr-claims-primary-sources`で当該entryのみの最小diffを生成、pin検証OK。
 
 ### 2. `kotoba-lang/insurance`の医療機関コード実装を完成

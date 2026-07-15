@@ -30,7 +30,7 @@ kotoba-WASM metadata), not a thin API-client wrapper (the lighter
 ## Decision
 
 Replace the six generic placeholder entities with Reddit's actual domain,
-keeping every structural/mechanical file (`deps.edn`, `bb.edn`, file layout,
+keeping every structural/mechanical file (`deps.edn`, `nbb.edn`, file layout,
 generic CRUD handlers) exactly as the `com-stripe`/`com-anthropic` pattern
 prescribes — only the domain content changes:
 
@@ -90,6 +90,6 @@ test code.
 
 ## Verification Notes
 
-2026-07-06: `bb test` and JVM `clojure -M -e "(require 'reddit.main-test)
+2026-07-06: `nbb test` and JVM `clojure -M -e "(require 'reddit.main-test)
 (reddit.main-test/-main)"` both pass — 5 tests, 77 assertions, 0 failures,
 0 errors. `openapi.json`/`manifest.json` validated as well-formed JSON.

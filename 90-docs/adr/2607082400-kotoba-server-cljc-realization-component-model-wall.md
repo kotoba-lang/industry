@@ -115,7 +115,7 @@ ADR に課された責務の履行そのものである。
   なため実質的に「murakumo が配置を決めて imperative に指示する」centralized
   な運用に既になっている。gossipsub による decentralized な peer discovery
   を新規に発明する必要はない —— **murakumo → 各 cljc ノードへの plain
-  HTTP** で十分（`murakumo/dash.clj` が実証済みの bb + http-kit + background
+  HTTP** で十分（`murakumo/dash.clj` が実証済みの nbb + http-kit + background
   loop パターンを流用できる）。
 - **guest 言語は `.kotoba`（kototama の実行層）を使う** —— ただし既存
   mesh guest（kqe-assert!/kqe-query を使う kotoba-clj コンパイル済み
@@ -145,7 +145,7 @@ ADR に課された責務の履行そのものである。
 呼び出し API から「export 名は `main` 固定」という不要な制約を除いただけ
 ——将来 `.kotoba` 側に複数 export を持つゲストが生まれた時に使える、
 汎用的で安全な基盤の一つ。テスト済み（既存 WAT 規約に倣った新規 fixture、
-`bb test`/`clojure -M:dev:test` で緑）。
+`nbb test`/`clojure -M:dev:test` で緑）。
 
 ## Consequences
 

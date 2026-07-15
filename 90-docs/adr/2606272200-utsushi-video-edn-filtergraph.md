@@ -216,7 +216,7 @@ EDN（canonical, doc/job CID）/ kotoba Datom（`media/*`, `utsushi.quads`）/ d
 
 1. 本 ADR をマージ（`.md` + `.edn`）。
 2. west project 追加: `manifest/repos.edn` に `com-junkawasaki/utsushi` を登録 →
-   `bb scripts/gen-west-manifest.bb`（手書き禁止 / CI は `--check`）。
+   `nbb scripts/gen-west-manifest.cljs`（手書き禁止 / CI は `--check`）。
 3. **コンテナ先行**: `utsushi.container` を kasane.decode 依存で起こし、`grammar/mp4.edn`
    （ISO BMFF box ツリー + stbl サンプルテーブル）をゴールデンベクタ付きで固める。
 4. **最初の E2E**: MP4 demux → elementary stream packet を Vault blob(CID) 化 → **再エンコード
@@ -241,5 +241,5 @@ EDN（canonical, doc/job CID）/ kotoba Datom（`media/*`, `utsushi.quads`）/ d
   `media/*` datom + cross-modal embed）, `kotoba-llm` WGPU スタック
 - フレーム実体の置き場: Vault blob（`kotoba-vault` CodecAware チャンク / BlobManifest CID）,
   大容量バイナリ規律 `CLAUDE.md` + ADR-2606241428
-- manifest 運用: `manifest/repos.edn`, `scripts/gen-west-manifest.bb`, ADR-2606271500
+- manifest 運用: `manifest/repos.edn`, `scripts/gen-west-manifest.cljs`, ADR-2606271500
 - 文法 DSL: kasane（EDN データ + Clojure 解釈, cf. Kaitai Struct）

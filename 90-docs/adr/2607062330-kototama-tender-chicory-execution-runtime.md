@@ -303,7 +303,7 @@ addendum; tracked as before.
 
 New namespace `kototama.aiueos-adapter` (`kototama` repo, kototama#24)
 translates a REAL aiueos decision into a `kototama.contract/host-caps`
-value. `aiueos.decide`'s documented "V1 integration" is a `bb decide`
+value. `aiueos.decide`'s documented "V1 integration" is a `nbb decide`
 subprocess a native host shells out to (for hosts that aren't already
 JVM/Clojure); since kototama already is, the adapter instead depends on
 `io.github.kotoba-lang/aiueos` directly and calls `aiueos.cli/

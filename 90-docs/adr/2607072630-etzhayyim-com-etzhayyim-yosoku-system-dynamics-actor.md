@@ -63,7 +63,7 @@ superseded_by: []
 
 ## Consequences
 
-- `manifest/repos.edn` の `:extra-projects` に `orgs/etzhayyim/com-etzhayyim-yosoku` を登録、`bb scripts/gen-west-manifest.bb --entry com-etzhayyim-yosoku` で最小diff反映（pinはサーバ側検証OK）。
+- `manifest/repos.edn` の `:extra-projects` に `orgs/etzhayyim/com-etzhayyim-yosoku` を登録、`nbb scripts/gen-west-manifest.cljs --entry com-etzhayyim-yosoku` で最小diff反映（pinはサーバ側検証OK）。
 - **RAD identity 台帳への登録は本ADRの範囲外** — etzhayyim/root の `80-data/kotoba-rad/com-etzhayyim-yosoku.identity.journal.edn`（または同等）への `:rad/repo`/`:rad/did-web`/署名参照の登録は行っていない。agent の判断（この actor は app-aozora へ publish しないため DID 規約がそのまま当てはまらない）を採用したが、CLAUDE.md の Actors 節が一般に要求する完了条件（RAD registration）を満たしていない状態であることは明記しておく。実際に必要かどうかは、この actor を app-aozora 以外の文脈でどう使うか次第であり、follow-up で判断する。
 - `robotaxi-actor` が到達不能だった件は、kotoba-lang エコシステムのドキュメント（gftd-talent-actor 自身のコメント含む）が参照する実体が実際には存在しない/見つからないという整合性ギャップであり、別途確認が必要。
 - v1 は mock advisor のみ。実 LLM 配線・RBAC・phase rollout は follow-up。
@@ -74,4 +74,4 @@ superseded_by: []
 - GitHub Actions CI（`lint`/`test` 両ジョブ）が実リポジトリで green（sibling-checkout 方式での langgraph-clj/langchain-clj 解決を含め、ローカルだけでなく CI 環境でも動作確認済み）。
 - `clojure -M:dev:run` のデモが commit/structural-hold/commit/protected-var-hold/escalate→approve→commit の5パスすべてを正しく通ることを確認。
 - `gh repo create etzhayyim/com-etzhayyim-yosoku --public` + push 済み（commit `1a7a8dd554979bc857c78e30d66d0721073c194b`）。
-- `manifest/repos.edn` 登録 + `bb scripts/gen-west-manifest.bb --entry com-etzhayyim-yosoku` で最小diff生成、pin検証OK。
+- `manifest/repos.edn` 登録 + `nbb scripts/gen-west-manifest.cljs --entry com-etzhayyim-yosoku` で最小diff生成、pin検証OK。
