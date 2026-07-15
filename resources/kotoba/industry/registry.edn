@@ -4366,11 +4366,25 @@
    :operating-states [:intake :mill-rules-verify :quality-screen :approve :dispatch-heat :issue-mill-cert :audit]},
   {:id "2420"
    :name "Manufacture of basic precious and other non-ferrous metals"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2420"
-   :business-id "cloud-itonami-C2420"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2420"
+   :business-id "cloud-itonami-isic-2420"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607998000): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2420 placeholder).
+   ;; SmeltRefineAdvisor, an advisor sealed behind an independent
+   ;; Precious & Non-Ferrous Metals Smelting-Refining Plant Operations
+   ;; Governor, langgraph-clj StateGraph, append-only audit ledger.
+   ;; Mirrors cloud-itonami-isic-2432's [Casting of non-ferrous metals]
+   ;; verified module set (governor/store/advisor/registry + deps.edn),
+   ;; adapted to PRIMARY smelting/refining (ore/concentrate/scrap ->
+   ;; smelting furnace -> refining stage -> doré/bullion/cathode/anode/
+   ;; ingot) rather than downstream casting. 71 tests / 197 assertions
+   ;; green (5 test namespaces), clj-kondo clean, demo verified with no
+   ;; exceptions.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2431"
