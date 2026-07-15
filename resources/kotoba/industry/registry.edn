@@ -2670,14 +2670,17 @@
    :business-id "cloud-itonami-isic-0130"
    :required-technologies [:identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies [:optimization]
-   :maturity :spec
-   ;; REVERTED 2026-07-14: has deps.edn added by hand for verification but src/propagation/facts.cljc uses JVM-only `(new Date ...)`, a cljs-first violation and compile failure -- confirmed broken by direct test run. Needs a verified from-scratch redo.
-   ;; Back-office coordination actor (Propagation Advisor ⊣ NurseryOperationsGovernor),
-   ;; promoted :spec → :implemented via ADR-2607151800. Operations: batch logging,
-   ;; scheduling, health escalation, supply ordering. HARD invariant: zero propagation-
-   ;; technique or plant-health treatment authority (remains human domain). Audit trail,
-   ;; phase-gated 0→3 rollout, scope-enforcement governor. Repo: 3d450370a28e.
-   :operating-states [:intake :propose :govern :approve :record :audit]},
+   :maturity :implemented
+   ;; Nursery-operations coordination actor (PropagationAdvisor ⊣
+   ;; NurseryOperationsGovernor), promoted :spec → :implemented via
+   ;; ADR-2607191000 (fixed a prior broken attempt -- see ADR Context).
+   ;; Operations: log-propagation-batch, schedule-maintenance,
+   ;; flag-quality-concern (always escalates), coordinate-shipment. HARD
+   ;; invariants: batch must be independently registered before any action,
+   ;; closed op-allowlist, :effect :propose only, zero greenhouse/
+   ;; propagation-equipment control authority (permanent block). Audit
+   ;; trail; 43 tests / 134 assertions green. Merge commit: 7af86d4aa165.
+   :operating-states [:intake :propagate :root :harden :inspect :audit]},
   {:id "0141"
    :name "Raising of cattle and buffaloes"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0141"

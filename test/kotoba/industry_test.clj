@@ -405,6 +405,8 @@
     (is (= :implemented (industry/maturity "0126"))))
   (testing "cloud-itonami-isic-1104 (Manufacture of soft drinks; production of mineral waters and other bottled waters, fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-C1104 placeholder or the real cloud-itonami org [gh api 404 confirmed]; identity ({:id \"1104\" :name \"Manufacture of soft drinks\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; SoftDrinkOpsAdvisor ⊣ SoftDrinkOps Governor bottling-plant-operations-coordination actor mirroring cloud-itonami-isic-1102's [Manufacture of wines] verified module shape module-for-module (softdrinkops.* in place of wineops.*) -- water/ingredient intake -> mixing -> carbonation -> filling -> inspection -> audit -> archived phase sequence in place of intake -> crush -> fermentation -> pressing -> aging -> bottling -> audit -> archived; carbonation-tolerance/Brix-sugar-content-window/preservative-residue/microbial-load/fill-volume/mineral-content-minimum compliance parameters in place of ABV-tolerance/residual-sugar-window/volatile-acidity/SO2-residue/fill-volume/vintage-percent-minimum, per US FDA 21 CFR Part 165/110/101, EU Reg (EC) 1333/2008 / Directive 2009/54/EC, and JP 食品衛生法 (清涼飲料水の規格基準, 厚生労働省/消費者庁); direct mixing/carbonation/filling-line control and food-safety-certification authority permanently blocked by the closed op allowlist (log-production-batch/schedule-maintenance/flag-food-safety-concern/coordinate-shipment, all :effect :propose); :flag-food-safety-concern always escalates regardless of confidence, matching wine's own food-safety-escalation invariant; 58 tests / 195 assertions green, independently re-verified against a fresh clone; superproject ADR-2607157000) is also :implemented"
     (is (= :implemented (industry/maturity "1104"))))
+  (testing "cloud-itonami-isic-0130 (Plant propagation -- a prior repository already existed [cloud-itonami/cloud-itonami-isic-0130, commit 3d450370a28e] but the registry entry stayed at :spec because that prior attempt was broken [op names divergent from the domain design, no deps.edn/blueprint.edn/GOVERNANCE.md/CODE_OF_CONDUCT.md/CONTRIBUTING.md/SECURITY.md, missing facts_test/phase_test/registry_test/store_test, and facts.cljc used unconditional `js/Date.` (previously unguarded JVM-only `(new Date ...)`), a cljs-first violation outside any reader conditional -- confirmed broken by direct test run rather than assumed]; identity ({:id \"0130\" :name \"Plant propagation\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; rebuilt in place on the same repo (not a fresh scaffold) as a PropagationAdvisor ⊣ NurseryOperationsGovernor plant-propagation-nursery OPERATIONS COORDINATION actor mirroring cloud-itonami-isic-0164's [Seed processing for propagation] verified module shape module-for-module -- propagation-method (cutting/graft/tissue-culture/seed-sown) rooting-rate/hardening-period viability windows and genetic-fidelity risk table in place of seed-lot moisture/germination/purity windows and GM-trait table; closed op allowlist (log-propagation-batch/schedule-maintenance/flag-quality-concern/coordinate-shipment), all :effect :propose only; greenhouse/irrigation/propagation-equipment control and phytosanitary-certification authority permanently out of scope via the closed allowlist; 14 independently-verified hard-violation checks including a batch-registration-before-any-action invariant applied across all four allowed ops (broader than 0164's shipment-only registration check, per this actor's explicit domain-design requirement); all host-clock access isolated behind #?(:clj/:cljs) reader conditionals; 43 tests / 134 assertions green, independently re-verified against a fresh clone; superproject ADR-2607191000) is also :implemented"
+    (is (= :implemented (industry/maturity "0130"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -1591,7 +1593,16 @@
       ;; immediately before this edit on a freshly re-fetched origin/main
       ;; (confirmed HEAD's own pinned 250 assertion was still green pre-edit,
       ;; ruling out drift before trusting the delta): 250 -> 251.
-      (is (= 251 (:implemented m))))))
+      ;; cloud-itonami-isic-0130 (Plant propagation) promoted :spec ->
+      ;; :implemented (PropagationAdvisor ⊣ NurseryOperationsGovernor,
+      ;; superproject ADR-2607191000; fixed a prior broken attempt on the same
+      ;; repo rather than a fresh scaffold -- see the dedicated maturity test
+      ;; above for what was wrong). Live-recomputed via
+      ;; `(industry/maturity-summary)` immediately before this edit on a
+      ;; freshly re-fetched origin/main (retried after a first-attempt 409
+      ;; merge conflict against the concurrent cloud-itonami-isic-1104
+      ;; promotion; re-fetched and redone against the new tip): 251 -> 252.
+      (is (= 252 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
