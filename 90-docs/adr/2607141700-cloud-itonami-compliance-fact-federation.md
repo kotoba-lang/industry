@@ -1189,6 +1189,25 @@ Federation(NRF、Wikidata Q6978097、1911年設立)に切り替え。実在2件�
 現状: 国軸18件・業界団体軸20件(15業種)・自治体軸8件——46tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 47 — 自治体軸9件目(ソウル))
+
+`cloud-itonami-municipality-kor-seoul`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-kor-seoul/commit/9d6f764))：
+実在2件、両方ともlegal.seoul.go.kr(ソウル特別市自身の公式英訳法令
+ポータル)を直接WebFetchで確認: Ordinance on Disclosure of
+Administrative Information for Open City Administration(行政情報
+公開条例、公布番号3792、2000-10-25制定)／Ordinance on Protection
+of Personal Information(個人情報保護条例、最新の公布番号9487・
+2025-01-03改正版を引用——原始制定日は未確認のため、date fieldは
+last-revised-dateのみとし enacted-dateは推測せず未設定)。4 tests/
+10 assertions green。
+
+68リポジトリ・678 factを統合。`:data-protection`トピックでの自治体
+横断queryでtokyo・berlin・seoulの3自治体を取得できることを確認。
+
+現状: 国軸18件・業界団体軸20件(15業種)・自治体軸9件——47tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社

@@ -175,7 +175,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-iso3166-bra/data/datascript-tx.edn"}
    {:label "cloud-itonami-assoc-4719-usa-nrf association.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-assoc-4719-usa-nrf/schema/association-rule.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-assoc-4719-usa-nrf/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-4719-usa-nrf/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-kor-seoul ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-kor-seoul/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-kor-seoul/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
