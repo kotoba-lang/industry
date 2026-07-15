@@ -2252,12 +2252,12 @@
    :operating-states [:intake :advise :govern :decide :approve :commit :audit]},
   {:id "862"
    :name "Medical and dental practice activities"
-   :repo nil :business-id nil
-  :maturity :spec
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-862"
+   :business-id "cloud-itonami-isic-862"
+   :maturity :implemented
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger :langgraph-clj]
    :optional-technologies []
-   ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
-   :operating-states [:intake :triage :treat :review :follow-up :audit]},
+   :operating-states [:intake :advise :govern :decide :approve :commit :audit]},
   {:id "869"
    :name "Other human health activities"
    :repo nil :business-id nil
