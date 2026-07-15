@@ -1208,6 +1208,31 @@ last-revised-dateのみとし enacted-dateは推測せず未設定)。4 tests/
 現状: 国軸18件・業界団体軸20件(15業種)・自治体軸9件——47tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 48 — 国軸19件目(MEX))
+
+`cloud-itonami-iso3166-mex`(既存の`marketentry`実装済みリポ)に
+`statute.facts`を追加・push
+([commit](https://github.com/cloud-itonami/cloud-itonami-iso3166-mex/commit/5064cd9))：
+通常の第一候補diputados.gob.mx(下院立法図書館)はIPレベルで
+ECONNREFUSED——完全に到達不能で、JS-only/403/CAPTCHAとは異なる新しい
+失敗種別。捏造せず、メキシコ政府の別公式ミラー(gob.mx自身のCMS
+アップロードホスト、および税務当局wwwmat.sat.gob.mxが保持する下院
+図書館ミラー)経由で実在3法令を確認: Ley General de Sociedades
+Mercantiles(会社法、DOF 1934-08-04公布・最終改正DOF 2016-03-14)／
+Ley Federal de Protección de Datos Personales en Posesión de los
+Particulares(個人データ保護法、DOF 2010-07-05)／Ley Federal del
+Trabajo(連邦労働法、DOF 1970-04-01公布・最終改正DOF 2015-06-12)。
+いずれもPDF本文はフォントサブセットの都合で文字化けしたが、
+ヘッダー(法令名・DOF発行日)は明瞭に判読できた(デンマークDPA・
+ベルリンIFG/BlnDSGと同系統のPDF描画不具合)。28 tests/89 assertions
+green。
+
+71リポジトリ・681 factを統合。`:data-protection`トピックでの横断
+queryで19か国全てを取得できることを確認。
+
+現状: 国軸19件・業界団体軸20件(15業種)・自治体軸9件——48tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
