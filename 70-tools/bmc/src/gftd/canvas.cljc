@@ -27,13 +27,46 @@
 
 ;; ---- event fold ------------------------------------------------------------
 
+(def rolling-observation-prefixes
+  "機械生成の定期観測 item の接頭辞。routine が毎時/毎日積む「観測 (signal):」
+   「観測 (paths):」は数値だけが進む同型行で、無制限に conj すると Problem/
+   Channels block が観測ログに埋まる(実測: cloud-murakumo の Problem block に
+   約 70 行堆積、ADR-2607151900 の分析 4 項)。fold 時に接頭辞ごとの rolling
+   window で最新 N 件だけ残す。ledger は append-only のまま(全履歴保持)—
+   これは fold(= 表示・advisor の観測面)の保持ポリシーであって削除ではない。
+   人手や分析の実質的観測(「観測 (2026-07-06): …」「根本原因判明 …」等、
+   この接頭辞に一致しないもの)は無期限に残る。"
+  ["観測 (signal):" "観測 (paths):"])
+
+(def rolling-observation-window
+  "接頭辞ごと・block ごとに fold が残す定期観測の件数。3 = 直近の傾向が
+   目視できる最小限。"
+  3)
+
+(defn- rolling-prefix [s]
+  (some #(when (str/starts-with? (str s) %) %) rolling-observation-prefixes))
+
+(defn conj-item
+  "block items へ 1 件追加。定期観測(rolling-observation-prefixes)は同じ
+   接頭辞の古い item を window 超過分だけ落としてから追加する。それ以外は
+   ただの conj。"
+  [items v]
+  (let [items (vec items)
+        p (rolling-prefix v)]
+    (if-not p
+      (conj items v)
+      (let [same (filterv #(= p (rolling-prefix %)) items)
+            drop-n (max 0 (- (inc (count same)) rolling-observation-window))
+            to-drop (into #{} (take drop-n same))]
+        (conj (if (seq to-drop) (vec (remove to-drop items)) items) v)))))
+
 (defn apply-event
   "Fold one ledger event into the index. Unknown/observation events are no-ops
    (they are history, not canvas state)."
   [idx e]
   (case (:event/type e)
     :canvas/add-item
-    (update-in idx [:blocks (:canvas/id e) :canvas/items] (fnil conj []) (:event/value e))
+    (update-in idx [:blocks (:canvas/id e) :canvas/items] (fnil conj-item []) (:event/value e))
     :canvas/retract-item
     (update-in idx [:blocks (:canvas/id e) :canvas/items]
                (fn [items] (vec (remove #{(:event/value e)} items))))
