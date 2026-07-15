@@ -1293,7 +1293,13 @@
       ;; (cloud-itonami-isic-3320-industrial-machinery-installation-coverage.md). Live-recomputed via
       ;; `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched origin/main
       ;; (concurrent-agent count-drift caution -- not an assumed fixed number): 230 -> 231.
-      (is (= 231 (:implemented m))))))
+      ;; 231 -> 232: cloud-itonami-isic-0119 (Growing of other non-perennial crops) promoted
+      ;; :spec -> :implemented, superproject ADR-2607172100
+      ;; (cloud-itonami-isic-0119-other-non-perennial-crops-coverage.md). Live-recomputed via
+      ;; `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched origin/main
+      ;; (confirmed HEAD's own pinned 231 assertion was still green pre-edit, ruling out drift from a
+      ;; raw `grep -c` undercount before trusting the delta): 231 -> 232.
+      (is (= 232 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
