@@ -3903,13 +3903,27 @@
    :operating-states [:intake :compliance-rules-verify :end-of-line-quality-screen :approve :ship-device-unit :issue-declaration-of-conformity :audit]},
   {:id "2630"
    :name "Manufacture of communication equipment"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2630"
-   :business-id "cloud-itonami-C2630"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2630"
+   :business-id "cloud-itonami-isic-2630"
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as a communication-equipment actor
+   ;; (Device Advisor ⊣ Radio-Compliance Governor). Legacy
+   ;; gftdcojp/cloud-itonami-C2630 placeholder replaced with real
+   ;; cloud-itonami/cloud-itonami-isic-2630. Distinct from the adjacent
+   ;; cloud-itonami-isic-2620 (computers/peripherals, general EMC
+   ;; self-declaration): this device has an actual radio transmitter, so
+   ;; the facts catalog is radio-type-approval (JPN Giteki/MIC-TELEC / EU
+   ;; RED 2014/53/EU / USA FCC Part 15C+22/24/27 / GBR Radio Equipment
+   ;; Regulations 2017), plus RF-exposure/SAR evidence every jurisdiction
+   ;; requires. device-unit intake, radio-compliance-rules verify,
+   ;; end-of-line quality screen, robot display-bonding-press mission --
+   ;; a REAL time-stepped physics-2d simulation of the display-module
+   ;; optical-bonding (OCA lamination) press (ADR-2607151600/
+   ;; ADR-2607152000 pattern, native from day one), dual actuation
+   ;; (ship-device-unit + issue-radio-conformity-certificate).
+   :required-technologies [:robotics :cae :dmn :bpmn :audit-ledger]
+   :optional-technologies [:cfd :telemetry :optimization]
+   :operating-states [:intake :radio-compliance-rules-verify :end-of-line-quality-screen :robotics-simulate-display-bonding :approve :ship-device-unit :issue-radio-conformity-certificate :audit]},
   {:id "2640"
    :name "Manufacture of consumer electronics"
    :repo "https://github.com/gftdcojp/cloud-itonami-C2640"
@@ -4293,14 +4307,25 @@
    :optional-technologies [:cfd :telemetry :optimization]
    :operating-states [:intake :type-approval-rules-verify :end-of-line-quality-screen :approve :dispatch-vehicle :issue-conformity-certificate :audit]},
   {:id "2920"
-   :name "Manufacture of bodies"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2920"
-   :business-id "cloud-itonami-C2920"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :name "Manufacture of bodies (coachwork) for motor vehicles"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2920"
+   :business-id "cloud-itonami-isic-2920"
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as a body-shop actor
+   ;; (Body Shop Advisor ⊣ Stamping Governor). Legacy
+   ;; gftdcojp/cloud-itonami-C2920 placeholder replaced with real
+   ;; cloud-itonami/cloud-itonami-isic-2920. Fills the body-in-white
+   ;; (BIW) stamping/welding tier directly upstream of isic-2910's OEM
+   ;; final-assembly tier in the automotive value chain: body-shell
+   ;; intake, AHSS material-certification evidence verify (SAE J2340
+   ;; USA / JIS G 3135 Japan / EN 10346 Germany-EU), end-of-line
+   ;; dimensional/weld-quality screen, a REAL time-stepped physics-2d
+   ;; stamping-press-forming simulation (press-die vs sheet-metal-blank
+   ;; collision, ADR-2607151600/ADR-2607152000 pattern, native from day
+   ;; one), dual actuation (ship-body-shell + issue-body-certificate).
+   :required-technologies [:robotics :cae :dmn :bpmn :audit-ledger]
+   :optional-technologies [:cfd :telemetry :optimization]
+   :operating-states [:intake :material-cert-rules-verify :end-of-line-quality-screen :approve :ship-body-shell :issue-body-certificate :audit]},
   {:id "2930"
    :name "Manufacture of parts and accessories for motor vehicles"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2930"

@@ -995,7 +995,12 @@
       ;; recomputed via `(industry/maturity-summary)` on a freshly
       ;; re-fetched origin/main immediately before this edit -- not an
       ;; assumed fixed number.
-      (is (= 211 (:implemented m))))))
+      ;; 211 -> 213: cloud-itonami-isic-2630 (communication equipment /
+      ;; smartphones, Radio-Compliance Governor) and cloud-itonami-isic-2920
+      ;; (motor-vehicle bodies/coachwork, Stamping Governor) promoted
+      ;; :spec -> :implemented, superproject ADR-2607160100/ADR-2607160200 --
+      ;; both native real physics-2d time-stepped simulations from day one.
+      (is (= 213 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
