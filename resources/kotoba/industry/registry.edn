@@ -2575,13 +2575,22 @@
    :operating-states [:intake :advise :govern :decide :commit :hold]},
   {:id "0124"
    :name "Growing of pome fruits and stone fruits"
-   :repo "https://github.com/gftdcojp/cloud-itonami-A0124"
-   :business-id "cloud-itonami-A0124"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0124"
+   :business-id "cloud-itonami-isic-0124"
+   :required-technologies [:robotics :identity :forms :audit-ledger]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :survey :advise :treat :record :audit]},
+   :maturity :implemented
+   ;; Wave-3 orchard-operations actor implementation complete (2026-07-15):
+   ;; PomeStoneOpsAdvisor ⊣ PomeStoneOperationsGovernor pattern, closed op
+   ;; allowlist (log-orchard-record/schedule-field-operation/
+   ;; flag-crop-health-concern/order-supplies), direct field-equipment
+   ;; operation and finalizing a spray-application decision permanently
+   ;; blocked. Scope: pome/stone-fruit orchard back-office coordination
+   ;; only (no direct field-equipment operation). Propose-only
+   ;; operations, crop health concerns (e.g. codling moth/fire blight)
+   ;; always escalate. 31 tests / 105 assertions green. See
+   ;; ADR-2607152500 (com-junkawasaki/root).
+   :operating-states [:intake :advise :govern :decide :commit :hold]},
   {:id "0125"
    :name "Growing of other tree and bush fruits and nuts"
    :repo "https://github.com/gftdcojp/cloud-itonami-A0125"
