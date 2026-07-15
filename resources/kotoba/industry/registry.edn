@@ -3125,12 +3125,22 @@
    :operating-states [:intake :survey :extract :grade :ship :audit]},
   {:id "0729"
    :name "Mining of other non-ferrous metal ores"
-   :repo "https://github.com/gftdcojp/cloud-itonami-B0729"
-   :business-id "cloud-itonami-B0729"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0729"
+   :business-id "cloud-itonami-0729"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; Built 2026-07-15 as a non-ferrous-ore-mining operations coordinator
+   ;; (NonFerrousOps-LLM ⊣ Nonferrous Ore Governor), directly ported from
+   ;; cloud-itonami-isic-0710's iron-ore pattern -- same coordination-only
+   ;; scope (production logging, maintenance scheduling, safety-concern
+   ;; flagging [always escalates], shipment coordination -- NOT extraction/
+   ;; blasting/mine-safety-authority, permanently excluded). Covers copper/
+   ;; lithium/nickel/cobalt/rare-earth ore commodities -- upstream of both
+   ;; EV-battery and semiconductor/electronics supply chains. Confirmed on
+   ;; a FRESH clone of the pushed repo: clojure -M:dev:test (16 tests/61
+   ;; assertions, 0 failures), clojure -M:lint (0 errors), clojure
+   ;; -M:dev:run demo runs clean. See ADR-2607993500.
    :operating-states [:intake :survey :extract :grade :ship :audit]},
   {:id "0891"
    :name "Mining of chemical and fertilizer minerals"
