@@ -1137,6 +1137,36 @@ Madrid(マドリード市透明性条例、2016-07-27承認、BOCM nº 196掲載
 現状: 国軸17件・業界団体軸19件(14業種)・自治体軸8件——44tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 45 — 国軸18件目(BRA) — P36バグ3件目発見・修正)
+
+`cloud-itonami-iso3166-bra`(既存の`marketentry`実装済みリポ)に
+`statute.facts`を追加・push
+([commit](https://github.com/cloud-itonami/cloud-itonami-iso3166-bra/commit/810d2a0))：
+planalto.gov.br(通常の第一候補)は試した全URLでECONNRESETを返した
+ため、同じく公式のlexml.gov.br(Rede LexML、ブラジル連邦立法メタデータ
+ネットワーク)を直接WebFetchで照合し実在3法令を確認(Lei das Sociedades
+por Ações・6.404/1976・1976-12-15制定／LGPD(一般データ保護法)・
+13.709/2018・2018-08-14制定／CLT(労働法統合)・Decreto-Lei
+5.452/1943・1943-05-01制定)。
+
+**ooyake P36バグの3件目を発見・修正**: 既存organization.edn(ooyake
+由来)の首都が「Rio de Janeiro」(Wikidata Q8678、1960年以前の旧首都)
+になっていた——正しくは「Brasília」(Q2844、1960年遷都)。JPN
+(commit 15252d7)・DEU(commit 95d48ec)と同じ系統のP36複数claim
+誤取り込みバグで、今回もこのリポジトリのみdownstreamで修正し
+ooyake自体には触れていない(範囲外)。
+
+**共有checkoutでの既存WIP退避**: 着手前にorganization.edn に無関係な
+未コミット差分(head-role表記の変更)を発見、`git stash push`で退避
+(drop せず温存)してから作業、自分の変更のみコミット。28 tests/
+90 assertions green。
+
+64リポジトリ・674 factを統合。`:labor`トピックでの横断queryで
+18か国全てを取得できることを確認。
+
+現状: 国軸18件・業界団体軸19件(14業種)・自治体軸8件——45tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社

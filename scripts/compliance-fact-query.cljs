@@ -169,7 +169,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-assoc-2100-usa-phrma/data/datascript-tx.edn"}
    {:label "cloud-itonami-municipality-esp-madrid ordinance.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-municipality-esp-madrid/schema/ordinance.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-municipality-esp-madrid/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-esp-madrid/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-bra statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-bra/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-bra/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
