@@ -5544,11 +5544,40 @@
    :operating-states [:intake :design :permit :build :inspect :audit]},
   {:id "4330"
    :name "Building completion and finishing"
-   :repo "https://github.com/gftdcojp/cloud-itonami-F4330"
-   :business-id "cloud-itonami-F4330"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4330"
+   :business-id "cloud-itonami-isic-4330"
+   :required-technologies [:identity :forms :audit-ledger :notifications]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Building-completion/finishing-project OPERATIONS COORDINATION actor
+   ;; implementation complete (2026-07-15, fresh scaffold -- no prior
+   ;; repository at either the stale gftdcojp/cloud-itonami-F4330
+   ;; placeholder or the real cloud-itonami org [gh api 404 confirmed];
+   ;; ID/name independently re-verified against a fresh clone before any
+   ;; work began, per this fleet's ID/name-mismatch caution): Finishing
+   ;; Advisor ⊣ Finishing Governor pattern, closed op allowlist
+   ;; (log-site-record/schedule-finishing-operation/flag-safety-concern/
+   ;; order-supplies), all :effect :propose only. Trade-equipment control
+   ;; and structural-completion-sign-off authority permanently blocked
+   ;; (hard, un-overridable governor checks) -- coordination only, no
+   ;; direct equipment actuation, matching the robotics-premise reference
+   ;; cloud-itonami-isic-4211 but narrower, same coordination-only shape
+   ;; as cloud-itonami-isic-4311/cloud-itonami-isic-4210. Deliberate
+   ;; difference from those siblings: schedule-finishing-operation is NOT
+   ;; a permanent high-stakes member (MAY auto-commit at phase 3 when
+   ;; clean+confident) -- trade-finishing work is materially lower risk
+   ;; than demolition/heavy-civil earthwork scheduling; flag-safety-
+   ;; concern still always escalates to a human. Per-jurisdiction
+   ;; (JPN/USA/DEU) pre-work hazmat-survey/fall-protection legal-basis
+   ;; catalog, every citation independently verified against its official
+   ;; source (osha.gov/ecfr.gov/laws.e-gov.go.jp/eur-lex.europa.eu/
+   ;; baua.de) before being written. Fully portable .cljc with NO JVM
+   ;; interop anywhere in src/ -- the notify transport is a
+   ;; caller-injected function seam, not an embedded java.net.http
+   ;; client. 69 tests / 248 assertions green, independently re-verified
+   ;; against a fresh clone; superproject
+   ;; ADR-2607158000-cloud-itonami-isic-4330-building-completion-
+   ;; finishing-coverage.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :design :permit :build :inspect :audit]},
   {:id "4390"
