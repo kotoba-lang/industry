@@ -1644,6 +1644,29 @@ Wikidata Q1335）は史実上一貫して首都であり、P36歴史的首都バ
 現状: 国軸24件・業界団体軸25件(20業種)・自治体軸16件——65tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 66 — 自治体軸17件目(サンティアゴ))
+
+`cloud-itonami-municipality-chl-santiago`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-chl-santiago/commit/fc83ab0))：
+サンティアゴ市（Comuna de Santiago）。`transparencia.munistgo.cl`の
+PDFはTLS証明書エラー（"unable to verify the first certificate"——
+このファミリーで初めての障害クラス）で使用不能だったため、代わりに
+市公式`documentos.munistgo.cl`の「Decretos y Ordenanzas」一覧ページを
+直接WebFetch検証: Reglamento N°971-2025（積極的透明性・公的情報
+アクセス規則、2025-12-19）／Ordenanza N°130（廃止済み架空・地下配線
+の撤去に関する条例、2026-05-13）。ページが完全にレンダリングされ
+両文書の日付が明記されていた。4 tests/10 assertions green。
+
+首都チェック: 既存のooyake由来organization.edn（Santiago、Wikidata
+Q2887）は史実上一貫して首都であり、P36歴史的首都バグの対象外と確認。
+
+95リポジトリ・722 factを統合。`"ordinance/topic" "transparency"`での
+横断queryでsantiagoがtokyo/washington-dc/berlin/madrid/seoul/roma/
+buenos-airesと並んで取得できることを確認。
+
+現状: 国軸24件・業界団体軸25件(20業種)・自治体軸17件——66tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
