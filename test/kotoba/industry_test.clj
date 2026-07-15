@@ -1602,7 +1602,26 @@
       ;; freshly re-fetched origin/main (retried after a first-attempt 409
       ;; merge conflict against the concurrent cloud-itonami-isic-1104
       ;; promotion; re-fetched and redone against the new tip): 251 -> 252.
-      (is (= 252 (:implemented m))))))
+      ;; 252 -> 255: cloud-itonami-isic-1629 (Manufacture of other products of
+      ;; wood; manufacture of articles of cork, straw and plaiting materials)
+      ;; fresh from-scratch scaffold (no prior repository at either the stale
+      ;; gftdcojp/cloud-itonami-C1629 placeholder or the real cloud-itonami org
+      ;; [gh api 404 confirmed]). WoodCorkStrawAdvisor ⊣ Wood, Cork & Straw
+      ;; Products Shop Plant Operations Governor plant-operations-coordination
+      ;; actor, mirroring cloud-itonami-isic-1621/1622/1623's verified module
+      ;; shape module-for-module, adapted to ISIC 1629's residual/miscellaneous
+      ;; multi-product-family scope (handle-turning-lathe/cork-stopper-molding-
+      ;; press/wicker-weaving-loom equipment in place of a single processing-
+      ;; line equipment family); safety-concern flagging covers plain
+      ;; materials-safety/equipment-safety (no ISPM-15-style dimension, unlike
+      ;; 1623) and always escalates regardless of confidence. 71 tests / 195
+      ;; assertions green, independently re-verified against a fresh clone;
+      ;; superproject ADR-2607190600. Live-recomputed via
+      ;; `(industry/maturity-summary)` on a freshly re-fetched origin/main
+      ;; immediately before this edit (retry-loop landing under heavy
+      ;; concurrent-agent load -- prior attempts 409'd as sibling promotions
+      ;; landed first): 252 -> 255.
+      (is (= 255 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

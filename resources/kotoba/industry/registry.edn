@@ -3664,11 +3664,38 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1629"
    :name "Manufacture of other products of wood"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C1629"
-   :business-id "cloud-itonami-C1629"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1629"
+   :business-id "cloud-itonami-isic-1629"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607190600): fresh from-scratch scaffold (no prior repo or
+   ;; reverted attempt existed at cloud-itonami/cloud-itonami-isic-1629;
+   ;; the old :repo/:business-id above pointed at a never-created
+   ;; gftdcojp/cloud-itonami-C1629 placeholder). WoodCorkStrawAdvisor
+   ;; ⊣ Wood, Cork & Straw Products Shop Plant Operations Governor,
+   ;; langgraph-clj StateGraph, append-only audit ledger, mirroring
+   ;; cloud-itonami-isic-1621's [Manufacture of veneer sheets and
+   ;; wood-based panels], cloud-itonami-isic-1622's [Manufacture of
+   ;; builders' carpentry and joinery], and cloud-itonami-isic-1623's
+   ;; [Manufacture of wooden containers] verified module shape
+   ;; module-for-module, adapted to ISIC 1629's residual/miscellaneous
+   ;; multi-product-family scope -- handle-turning-lathe (cutting),
+   ;; cork-stopper-molding-press (molding), and wicker-weaving-loom
+   ;; (weaving) equipment in place of a single processing-line
+   ;; equipment family, wooden-tool/handle, cork-stopper, and
+   ;; wicker/basketry product-spec values in place of door/window/
+   ;; staircase/glulam or crate/pallet/barrel, and a cutting/molding-
+   ;; line-finalize permanent block in place of press-cycle-finalize/
+   ;; cutting-line-finalize/cutting-assembly-line-finalize.
+   ;; Safety-concern flagging covers plain materials-safety/
+   ;; equipment-safety (no ISPM-15-style compliance dimension -- this
+   ;; residual product range is not itself a wood-packaging-material
+   ;; class) and ALWAYS escalates (never auto-committed).
+   ;; clojure -M:test: 71 tests / 195 assertions / 0 failures / 0 errors
+   ;; (verified from an independent fresh clone at commit
+   ;; 913df5b17cd461c47a73ee64bbf90003f84b0d10).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1701"
