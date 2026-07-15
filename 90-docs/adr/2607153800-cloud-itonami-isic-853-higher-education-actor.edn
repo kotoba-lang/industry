@@ -1,0 +1,90 @@
+{:adr/id "2607153800"
+ :adr/title "cloud-itonami-isic-853 — Higher Education Actor"
+ :adr/date "2026-07-15"
+ :adr/status :accepted
+ :adr/deciders ["Jun Kawasaki"]
+ :adr/context
+ {:vertical "human-services"
+  :domain :services/higher-education
+  :wave :wave-4
+  :isic "853"
+  :cohort "university and college students (legal adults)"
+  :parent-adr ["2607121000" "2607152500"]
+  :lineage-adr ["2607153700" "2607072915" "2607152700"]}
+ :adr/decision
+ {:repo
+  {:id "cloud-itonami-isic-853"
+   :name "Higher Education"
+   :public true
+   :visibility :public
+   :license "AGPL-3.0-or-later"}
+  :actor-modules
+  [{:ns "highereds.store" :type :cljc :purpose "SSoT (MemStore)"}
+   {:ns "highereds.advisor" :type :cljc :purpose "intelligence node"}
+   {:ns "highereds.governor" :type :cljc :purpose "compliance layer"}
+   {:ns "highereds.operation" :type :cljc :purpose "closed op allowlist"}
+   {:ns "highereds.phase" :type :cljc :purpose "staged rollout"}
+   {:ns "highereds.sim" :type :cljc :purpose "demo harness"}]
+  :hard-checks
+  [{:name "student-unverified-violations"
+    :description "target student must exist AND be :registered?/:verified?"
+    :permanent true}
+   {:name "effect-must-be-propose-violations"
+    :description "any :effect value other than :propose is rejected"
+    :permanent true}
+   {:name "scope-exclusion-violations"
+    :description "academic, admissions, academic-standing, degree, discipline, safety-authority"
+    :permanent true
+    :exception "flag-safety-concern never self-blocked"}]
+  :closed-ops
+  [{:op :schedule-enrollment-appointment
+    :description "enrollment/advising appointment scheduling"
+    :scope-boundary "never admissions decisions"}
+   {:op :coordinate-facility-booking
+    :description "classroom/lab/facility booking"
+    :scope-boundary "logistics only"}
+   {:op :coordinate-supply-request
+    :description "non-instructional consumables"
+    :scope-boundary "office/admin supplies only"}
+   {:op :schedule-staff-shift-proposal
+    :description "administrative shift proposal"
+    :scope-boundary "never teaching-qualification/assignment"}
+   {:op :flag-safety-concern
+    :description "wellbeing/safety escalation"
+    :escalates true}]
+  :phases
+  [{:id :phase-0 :name "read-only"}
+   {:id :phase-1 :name "enrollment-appointment (approval-gated)" :ops [:schedule-enrollment-appointment]}
+   {:id :phase-2 :name "facility/supply/shift (approval-gated)"
+    :ops [:schedule-enrollment-appointment :coordinate-facility-booking
+          :coordinate-supply-request :schedule-staff-shift-proposal]}
+   {:id :phase-3 :name "auto-commit (safety escalates)"
+    :ops [:schedule-enrollment-appointment :coordinate-facility-booking
+          :coordinate-supply-request :schedule-staff-shift-proposal :flag-safety-concern]}]
+  :scope-exclusions
+  [{:category "Academic" :out "grading, assessment, performance evaluation"}
+   {:category "Pedagogical" :out "curriculum, lesson planning, instructional methods"}
+   {:category "Admissions" :out "admissions decisions, acceptance/rejection"}
+   {:category "Academic Standing" :out "probation, disqualification, good-standing"}
+   {:category "Degree" :out "degree conferral, diploma issuance, graduation"}
+   {:category "Disciplinary" :out "suspension, expulsion, conduct sanctions"}
+   {:category "Safety Authority" :out "mandatory reporting overrides, law-enforcement, CPS"}]
+  :registry-update
+  {:registry-id "853"
+   :maturity :implemented
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-853"
+   :business-id "cloud-itonami-isic-853"
+   :removed-technologies [:robotics]}}
+ :adr/consequences
+ {:positive
+  ["Higher education (ISIC 853) actor available for Wave 4 rollout"
+   "Consistent with Wave 4 architecture and Wave 0 dependency structure"
+   "Hard scope boundaries between administrative support and academic authority"
+   "Students remain legal adults; institutional autonomy respected"]
+  :negative
+  ["No integration with actual university systems yet (pilot phase)"
+   "No ISCO-08 occupation mapping (future work)"]}
+ :adr/references
+ ["ADR-2607121000" "ADR-2607152500" "ADR-2607153700"
+  "ADR-2607072915" "ADR-2607152700" "ADR-2607051621"
+  "kotoba-lang/industry registry" "cloud-itonami/cloud-itonami-isic-853"]}
