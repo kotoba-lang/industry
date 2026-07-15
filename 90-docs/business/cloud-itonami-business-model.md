@@ -13,9 +13,9 @@
 - 業務 SaaS は職種ごとに分断され判断の脈絡が消える
 - AI agent 導入は「誰が何を承認したか」が残らずコンプラ不能
 - 中小には CFO/法務/営業 ops の専任が居ない
-- 観測 (signal): itonami.cloud 実測 295 req/7d・87 uniques(日次和)・うち4xx probe 57%(24h)
 - 観測 (signal): itonami.cloud 実測 295 req/7d・87 uniques(日次和)・うち4xx probe 56%(24h)
 - 観測 (signal): itonami.cloud 実測 295 req/7d・87 uniques(日次和)・うち4xx probe 58%(24h)
+- 観測 (signal): itonami.cloud 実測 296 req/7d・87 uniques(日次和)・うち4xx probe 57%(24h)
 
 ## Customer Segments
 
@@ -49,9 +49,9 @@
 - kotobase/murakumo 顧客への cross-sell
 - 士業・SIer パートナー
 - GTM (acquisition→revenue): onboarded org→外部有償 org 転換 0% < 目標 20% — trial→paid の nudge（使用量到達通知）・価格 tier 見直し・年額/上位 tier の提示
-- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 15 · /itonami 1 · /infer/cost 1 | 4xx(probe) 57%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 15 · /itonami 1 · /infer/cost 1 | 4xx(probe) 56%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 13 · /itonami 1 · /infer/cost 1 | 4xx(probe) 58%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 13 · /itonami 1 · /infer/cost 1 | 4xx(probe) 57%
 
 ## Revenue Streams
 

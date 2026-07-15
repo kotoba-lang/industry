@@ -13,9 +13,9 @@
 - 通知・受信・タスクの洪水で個人の意思決定が磨耗する
 - personal assistant は私生活を他人のクラウドに渡す前提
 - wellbeing アプリは記録止まりで実行がない
-- 観測 (signal): manimani.cloud 実測 928 req/7d・269 uniques(日次和)・うち4xx probe 73%(24h)
 - 観測 (signal): manimani.cloud 実測 1012 req/7d・292 uniques(日次和)・うち4xx probe 74%(24h)
 - 観測 (signal): manimani.cloud 実測 923 req/7d・293 uniques(日次和)・うち4xx probe 36%(24h)
+- 観測 (signal): manimani.cloud 実測 1015 req/7d・303 uniques(日次和)・うち4xx probe 39%(24h)
 
 ## Customer Segments
 
@@ -46,9 +46,9 @@
 - itonami 職場導線 (個人↔法人 funnel)
 - apex/aozora ユーザーへの cross-sell
 - GTM (acquisition→revenue): cloud signup→cloud paid 転換 0% < 目標 4% — trial→paid の nudge（使用量到達通知）・価格 tier 見直し・年額/上位 tier の提示
-- 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 23 · /robots.txt 3 | 4xx(probe) 73% · 5xx 1%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /metrics 23 · /robots.txt 8 | 4xx(probe) 74% · 5xx 2%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 38 · /u/junkawasaki/decisions 32 · /metrics 16 · /u/junkawasaki/inbox 6 · /health 5 | 4xx(probe) 36% · 5xx 1%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 56 · /u/junkawasaki/decisions 42 · /metrics 23 · /u/junkawasaki/inbox 6 · /robots.txt 4 | 4xx(probe) 39% · 5xx 1%
 
 ## Revenue Streams
 

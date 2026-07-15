@@ -13,9 +13,9 @@
 - graph DB の自前運用は重い
 - pin/storage サービスに provenance がない
 - map/git/search が別 SaaS に分散し data 主権が失われる
-- 観測 (signal): kotobase.net 実測 6449 req/7d・491 uniques(日次和)・うち4xx probe 29%(24h)、workers 6474 inv/7d、Stripe active subs 0
 - 観測 (signal): kotobase.net 実測 6766 req/7d・539 uniques(日次和)・うち4xx probe 29%(24h)、workers 6815 inv/7d、Stripe active subs 0
 - 観測 (signal): kotobase.net 実測 6997 req/7d・569 uniques(日次和)・うち4xx probe 34%(24h)、workers 7101 inv/7d、Stripe active subs 0
+- 観測 (signal): kotobase.net 実測 7103 req/7d・583 uniques(日次和)・うち4xx probe 34%(24h)、workers 7215 inv/7d、Stripe active subs 0
 
 ## Customer Segments
 
@@ -48,9 +48,9 @@
 - 全社内プロダクトが tenant
 - GTM (awareness→acquisition): landing 訪問→signup 転換 0% < 目標 3% — landing の価値提案/CTA と価格ページの A/B、SEO・技術コンテンツ、既存導線からの招待
 - GTM 再定義: 実測 top page は /llms.txt・/.well-known/did.json・/ipfs/* (4xx probe 83%) = 観衆は human でなく AI agent/crawler。human signup funnel (0/295=0%) は category error。正しい転換は agent-originated x402 payment (nexus facilitator 経由) — llms.txt に x402 catalog を明示し agent 決済を計測せよ
-- 観測 (paths): 上位 page (24h, 2xx/3xx): / 57 · /health 55 · /llms-full.txt 42 · /llms.txt 41 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 35 | 4xx(probe) 29% · 5xx 10%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 58 · /health 52 · /llms.txt 41 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 34 · /_app/meta 34 | 4xx(probe) 29% · 5xx 9%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): / 72 · /health 45 · /llms-full.txt 37 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 35 · /pins 34 | 4xx(probe) 34% · 5xx 9%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): / 52 · /health 43 · /llms-full.txt 27 · /ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapc… 25 · /pins 24 | 4xx(probe) 34% · 5xx 8%
 
 ## Revenue Streams
 
@@ -83,6 +83,7 @@
 - funnel (net-kotobase): landing 訪問=400 → signup=0 → checkout 開始=0 → paid(active sub)=0 | 転換 landing 訪問→signup 0%
 - funnel (net-kotobase): landing 訪問=440 → signup=0 → checkout 開始=0 → paid(active sub)=0 | 転換 landing 訪問→signup 0%
 - funnel (net-kotobase): landing 訪問=621 → signup=0 → checkout 開始=0 → paid(active sub)=0 | 転換 landing 訪問→signup 0%
+- funnel (net-kotobase): landing 訪問=631 → signup=0 → checkout 開始=0 → paid(active sub)=0 | 転換 landing 訪問→signup 0%
 
 ## Unfair Advantage
 
