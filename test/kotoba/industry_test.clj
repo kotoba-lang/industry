@@ -1151,7 +1151,32 @@
       ;; before this edit on a freshly re-fetched origin/main
       ;; (concurrent-agent count-drift caution -- not an assumed fixed
       ;; number): 221 -> 222.
-      (is (= 222 (:implemented m))))))
+      ;; 222 -> 224: cloud-itonami-isic-2220 (Manufacture of plastics
+      ;; products) fresh from-scratch scaffold (no prior repo or reverted
+      ;; attempt existed at cloud-itonami/cloud-itonami-isic-2220; `gh
+      ;; api` 404 confirmed before work began; the entry's old
+      ;; :repo/:business-id pointed at a never-created
+      ;; gftdcojp/cloud-itonami-C2220 placeholder). PlasticsAdvisor <->
+      ;; Plastics Plant Operations Governor plant-operations-coordination
+      ;; actor mirroring cloud-itonami-isic-1610's [Sawmilling and
+      ;; planing of wood] verified module shape (plasticsmfg.* in place
+      ;; of sawmilling.*), covering injection-molding/extrusion/
+      ;; blow-molding plant operations; 71 tests / 198 assertions green,
+      ;; independently re-verified against a fresh clone; promoted :spec
+      ;; -> :implemented, superproject ADR-2607162200
+      ;; (cloud-itonami-isic-2220-plastics-products-coverage.md). This
+      ;; single promotion only accounts for +1 of the +2 delta below --
+      ;; the freshly re-fetched origin/main at edit time (commit
+      ;; d51c1a5f76e6e1cd33aeabc70f3b30f90c0c3a91) already carried
+      ;; cloud-itonami-isic-3100 (Manufacture of furniture) promoted to
+      ;; :implemented in registry.edn WITHOUT this assertion having been
+      ;; bumped for it (that commit only touched registry.edn); this
+      ;; edit both accounts for that untracked drift and adds 2220's own
+      ;; promotion. Live-recomputed via `(industry/maturity-summary)`
+      ;; immediately before this edit on that freshly re-fetched
+      ;; origin/main (concurrent-agent count-drift caution -- not an
+      ;; assumed fixed number): 222 -> 224.
+      (is (= 224 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
