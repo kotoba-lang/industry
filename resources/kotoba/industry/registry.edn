@@ -3616,11 +3616,35 @@
    :operating-states [:intake :log :schedule :hazard :ship :audit]},
   {:id "1623"
    :name "Manufacture of wooden containers"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C1623"
-   :business-id "cloud-itonami-C1623"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1623"
+   :business-id "cloud-itonami-isic-1623"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607190000): fresh from-scratch scaffold (no prior repo or
+   ;; reverted attempt existed at cloud-itonami/cloud-itonami-isic-1623;
+   ;; the old :repo/:business-id above pointed at a never-created
+   ;; gftdcojp/cloud-itonami-C1623 placeholder). WoodenContainerAdvisor
+   ;; ⊣ Wooden Container Shop Plant Operations Governor, langgraph-clj
+   ;; StateGraph, append-only audit ledger, mirroring
+   ;; cloud-itonami-isic-1621's [Manufacture of veneer sheets and
+   ;; wood-based panels] and cloud-itonami-isic-1622's [Manufacture of
+   ;; builders' carpentry and joinery] verified module shape
+   ;; module-for-module -- crate/pallet-nailing-machine and
+   ;; stave-jointer (cooperage) equipment in place of veneer-lathe/
+   ;; hot-press/glue-spreader or panel-saw/CNC-router/tenoning-machine/
+   ;; edge-bander/finishing-line equipment, crate/pallet/barrel
+   ;; dimensional-spec values in place of door/window/staircase/glulam,
+   ;; and a cutting/assembly-line-finalize permanent block in place of
+   ;; press-cycle-finalize/cutting-line-finalize. Safety-concern
+   ;; flagging covers materials-safety/equipment-safety/ISPM-15
+   ;; heat-treatment-compliance (a domain-specific addition for
+   ;; internationally-shipped wood packaging) and ALWAYS escalates
+   ;; (never auto-committed).
+   ;; clojure -M:test: 71 tests / 195 assertions / 0 failures / 0 errors
+   ;; (verified from an independent fresh clone at commit
+   ;; 9616a36f5a2fff6bc4116a633c20521f894bafa9).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1629"
