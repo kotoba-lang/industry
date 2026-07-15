@@ -5109,12 +5109,26 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3091"
    :name "Manufacture of motorcycles"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C3091"
-   :business-id "cloud-itonami-C3091"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3091"
+   :business-id "cloud-itonami-isic-3091"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607921091): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C3091 placeholder).
+   ;; MotoAdvisor, an advisor sealed behind an independent
+   ;; Motorcycle Plant Operations Governor, langgraph-clj StateGraph,
+   ;; append-only audit ledger. Mirrors cloud-itonami-isic-3092's
+   ;; [Manufacture of bicycles and invalid carriages] verified module
+   ;; shape closely (motomfg.* in place of bikemfg.*), adapted to the
+   ;; frame-welding/engine-assembly/final-assembly/test-bench plant
+   ;; producing motorcycles, scooters, mopeds and electric
+   ;; motorcycles. Twelve concrete governor checks including
+   ;; permanent blocks on welding/assembly/test-bench-equipment
+   ;; actuation and ECE R78/ECE R40 motorcycle type-approval
+   ;; self-issuance.
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3092"
    :name "Manufacture of bicycles and invalid carriages"
