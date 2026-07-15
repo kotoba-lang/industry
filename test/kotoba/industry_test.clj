@@ -1753,7 +1753,17 @@
       ;; `(industry/maturity-summary)` on this freshly re-fetched
       ;; origin/main tip, immediately before re-applying the
       ;; registry.edn fix in this same working tree: 270 -> 272.
-      (is (= 272 (:implemented m))))))
+      (testing "cloud-itonami-isic-3230 (Manufacture of sports goods, fresh scaffold -- the entry pointed at a never-created gftdcojp/cloud-itonami-C3230 placeholder repo, both this and the real cloud-itonami org target name independently confirmed 404 before scaffolding; identity ({:id \"3230\" :name \"Manufacture of sports goods\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; SportsGoodsAdvisor ⊣ Sports Goods Plant Operations Governor sports-goods-plant plant-operations-COORDINATION actor, mirroring cloud-itonami-isic-3211's [Manufacture of jewellery and related articles] verified module shape module-for-module -- product-type/impact-rating-percent/weight-grams/defect-rate production-batch fields in place of metal-type/purity-permille/weight-grams/defect-rate, and a permanent product-safety/impact-protection-certification-authority block in place of the hallmarking/purity-assay-certification block; :flag-safety-concern (materials-safety/product-safety-standard/impact-protection-rating concern) always escalates regardless of confidence, matching 3211's own safety-concern-escalation invariant; equipment-actuate and product-safety/impact-protection-certification self-issuance are both permanent, unconditional HARD blocks with no human-approval override path; 82 tests / 222 assertions green, independently re-verified against a fresh clone; superproject ADR-2607201000) is also :implemented"
+        (is (= :implemented (industry/maturity "3230"))))
+      ;; Live-recomputed via `(industry/maturity-summary)` on a freshly
+      ;; re-fetched origin/main immediately before this test-file
+      ;; catch-up edit (registry.edn's own "3230" -> :implemented change
+      ;; already landed via a Contents-API single-file PUT, commit
+      ;; d7b1690c197dec083ae3730965adbb295f5a77ef; this fleet's own
+      ;; recompute discipline, not an assumed +1, is the source of
+      ;; truth here -- at least one other sibling promotion landed
+      ;; concurrently before this catch-up edit): 272 -> 273.
+      (is (= 273 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
