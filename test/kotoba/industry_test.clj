@@ -411,6 +411,8 @@
     (is (= :implemented (industry/maturity "3092"))))
   (testing "cloud-itonami-isic-2652 (Manufacture of watches and clocks, fresh scaffold -- the entry pointed at a never-created gftdcojp/cloud-itonami-C2652 placeholder repo, both this and the real cloud-itonami org target name independently confirmed 404 before scaffolding; identity ({:id \"2652\" :name \"Manufacture of watches and clocks\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; WatchOpsAdvisor ⊣ Watch & Clock Plant Operations Governor plant-operations-coordination actor mirroring cloud-itonami-isic-2710's [Manufacture of electric motors, generators, transformers and electricity distribution and control apparatus] verified module shape module-for-module (watchmfg.* in place of elecequipmfg.*) -- movement-assembly/casing/regulation/testing equipment and watch/clock production-batch (product-type/accuracy-test-seconds-per-day/defect-rate-percent) vocabulary in place of winding/assembly/test-bench equipment and product-type/dielectric-test-kv/defect-rate; :flag-safety-concern (materials-safety battery/mercury-cell hazard, precision-defect) always escalates regardless of confidence, matching 2710's own safety-concern-escalation invariant; the proposal-effect allowlist plus a permanent equipment-actuate block (`:actuate-equipment? true`) structurally prevent any direct movement-assembly/casing/regulation/testing-equipment control, with no human-approval override path; a further permanent certification-authority block (`:issue-certification? true`) prevents self-issuing a COSC/ISO 3159 chronometer/accuracy certification mark. 76 tests / 213 assertions green, independently re-verified against a fresh clone; superproject ADR-2607200500) is also :implemented"
     (is (= :implemented (industry/maturity "2652"))))
+  (testing "cloud-itonami-isic-2030 (Manufacture of man-made fibres, fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-C2030 placeholder or the real cloud-itonami org [gh api 404 confirmed]; identity ({:id \"2030\" :name \"Manufacture of man-made fibres\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; FibreAdvisor ⊣ Man-Made Fibre Plant Operations Governor plant-operations-coordination actor mirroring cloud-itonami-isic-2013's [Manufacture of plastics and synthetic rubber in primary forms] verified module shape module-for-module (fibremfg.* in place of resinmfg.*) -- spinning/extrusion-line equipment registration in place of polymerization/compounding-reactor equipment, and fibre-type/denier/tenacity production-batch fields in place of polymer-grade/off-spec-rate; :flag-safety-concern (chemical-hazard solvent-exposure/equipment-safety) always escalates regardless of confidence, matching 2013's own safety-concern-escalation invariant; the proposal-effect allowlist plus a permanent line-actuate block (`:actuate-line? true`) structurally prevent any direct spinning/extrusion-line-equipment control, with no human-approval override path. 71 tests / 202 assertions green, independently re-verified against a fresh clone; superproject ADR-2607200000) is also :implemented"
+    (is (= :implemented (industry/maturity "2030"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -1706,7 +1708,11 @@
       ;; `(industry/maturity-summary)` on a freshly re-fetched
       ;; origin/main immediately before this test-file catch-up edit:
       ;; 258 -> 259.
-      (is (= 259 (:implemented m))))))
+      
+      ;; cloud-itonami-isic-2030 recompute (superproject ADR-2607200000):
+      ;; `(industry/maturity-summary)` re-verified fresh on the just-
+      ;; re-fetched origin/main tip immediately before this edit read 260.
+      (is (= 260 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
