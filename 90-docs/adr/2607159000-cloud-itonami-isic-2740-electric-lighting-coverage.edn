@@ -1,0 +1,50 @@
+{:adr-id "2607159000"
+ :title "cloud-itonami-isic-2740 — Electric Lighting Equipment Plant-Operations Coordination Actor"
+ :status :accepted
+ :date "2026-07-15"
+ :context
+ "ISIC 2740 (Manufacture of electric lighting equipment) had a
+  :spec-only placeholder pointing at a never-created
+  gftdcojp/cloud-itonami-C2740 repo (gh api 404 confirmed at both the
+  stale placeholder and the real cloud-itonami org before any work
+  began; registry :name independently re-verified against a fresh
+  clone). Closest verified sibling is cloud-itonami-isic-2750
+  (Manufacture of domestic appliances) -- same back-office
+  plant-operations coordination shape for a fixed manufacturing plant
+  with electronics/electromechanical assembly/test equipment and a
+  real physical safety dimension."
+ :decision
+ "Implement cloud-itonami-isic-2740 mirroring cloud-itonami-isic-2750
+  module-for-module: ElecLightingAdvisor ⊣ Electric Lighting Plant
+  Operations Governor + append-only audit ledger, langgraph-clj
+  StateGraph. Four ops (log-production-batch/schedule-maintenance/
+  flag-safety-concern/coordinate-shipment), all :effect :propose only.
+  Twelve HARD governor checks: propose-only effect, closed op
+  allowlist, closed proposal-effect allowlist, permanent
+  equipment-actuate block, permanent certification-authority block,
+  independent equipment/batch verified+registered gates, independent
+  shipment-quantity recompute, double-schedule guard, product-type
+  validation (closed set led-lamp/led-luminaire/led-driver/
+  downlight-fixture/street-light-fixture), dielectric-test-kv
+  plausibility validation (0-4kV, IEC 60598-1/IEC 61347-1), defect-rate
+  plausibility validation. flag-safety-concern (electrical-safety/
+  photobiological-hazard/UL-CE-compliance) always escalates regardless
+  of confidence -- the domain-specific safety-concern vocabulary
+  (photobiological hazard per IEC 62471) is the deliberate departure
+  from 2750's electrical-safety/refrigerant-leak/UL-CE-compliance
+  vocabulary (electric lighting equipment has no refrigerant circuit).
+  Fully portable .cljc, no JVM-only interop anywhere in src/; actor
+  graph invoked exclusively via langgraph.graph/run*."
+ :consequences
+ ["Certified electric-lighting-equipment plant operators fork and deploy independently with auditable coordination records; direct assembly/test-bench-equipment control, equipment actuation, and self-issued safety certification remain permanent, un-overridable HARD blocks"
+  "Safety-concern flagging is a circuit-breaker, not a threshold -- always escalates to a human plant supervisor regardless of confidence"
+  "kotoba-lang/industry registry entry \"2740\" promoted :spec -> :implemented, :repo/:business-id corrected from the stale gftdcojp/cloud-itonami-C2740 placeholder to cloud-itonami/cloud-itonami-isic-2740"
+  "Still a simulation/proposal layer, not a real plant-operations control system -- no integration with real plant-management databases (equipment telemetry, batch tracking, freight dispatch, certification-body APIs)"]
+ :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2740"
+ :registry "https://github.com/kotoba-lang/industry"
+ :isic-rev5 "2740"
+ :domain :electric-lighting/manufacturing
+ :status-in-registry :implemented
+ :governor :electric-lighting-plant-operations-governor
+ :robotics true
+ :test-suite {:tests 77 :assertions 210 :failures 0 :errors 0}}
