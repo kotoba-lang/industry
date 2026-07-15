@@ -1764,6 +1764,35 @@ Q3070）は史実上一貫して首都であり、P36歴史的首都バグの対
 現状: 国軸25件・業界団体軸26件(21業種)・自治体軸19件——70tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 71 — 業界団体軸27件目(AMA) — 新規ISIC業種(一般医療) — 100リポジトリ到達)
+
+`cloud-itonami-assoc-8621-usa-ama`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-8621-usa-ama/commit/d8f6f08))：
+American Medical Association（AMA、Wikidata Q465697）。まず
+American Hospital Association（`aha.org`）を試みたが`/about/history`
+`/125` `/about`のいずれもHTTP 403でWebFetchを完全にブロックしたため
+断念。代わりに`ama-assn.org`の公式ページ2件を直接WebFetch検証:
+「AMA History」（1847年設立、"An 1845 resolution to the New York
+Medical Association by Dr. Nathan S. Davis...led to the establishment
+of the American Medical Association (AMA) in 1847"と本文に明記、
+月日は不記載でyear-only）／「Code of Medical Ethics」（AMA倫理綱領、
+"first adopted at the AMA's founding meeting in 1847"と明記、こちらも
+year-only——二次情報源では1847年5月7日フィラデルフィアという具体的
+日付があるが、ama-assn.org自身では未確認のため採用せず）。4 tests/11
+assertions green。
+
+**新規ISIC業種**: ISIC 8621(一般医療業務)を初めて追加した。
+
+**100リポジトリ到達**: このtickでcloud-itonami-compliance-fact-federation
+全体が100リポジトリ・733 factに到達した——国軸25・業界団体軸27
+(22業種)・自治体軸19、全71tickを通じて捏造ゼロを維持。
+
+`"association-rule/topic" "governance"`での横断queryでamaを含む23
+団体が取得できることを確認。
+
+現状: 国軸25件・業界団体軸27件(22業種)・自治体軸19件——71tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
