@@ -1,0 +1,144 @@
+;; cloud-itonami vertical maturity — design vs implementation by cohort
+;; As-of: 2026-07-15
+;; Rubric (0–5 each):
+;;   :design          domain scope / Governor discipline / op contract / ADR clarity
+;;   :impl-core       operation+governor/policy+store+phase+sim+facts present & tested
+;;   :impl-product    live demo / operator-quickstart / CI regen / pricing docs
+;;   :business        external tenant / billing / hyp validation (portfolio-wide thin)
+;;
+;; Local ISIC mechanical counts (orgs/cloud-itonami/cloud-itonami-isic-*, n=165):
+;;   module-score 0–6: {0 35, 5 3, 6 127}  → ~77% full actor modules
+;;   product-score 0–5: {1 138, 2 8, 3 16, 4 1, 5 2}  → product face only on 2–3 repos
+;; Registry (kotoba-lang/industry registry.edn, updated 2026-07-14T19:00:00Z):
+;;   :implemented 286, :blueprint 1, :spec 345
+;;
+;; Portfolio BMC/YC scores live in maturity-facts.edn + maturity-scores.md
+;; (ADR-2607021700). This file is the *within-product* breakdown for cloud-itonami.
+;; Hand-maintained snapshot (not gftd-generated). Re-measure module/product scores
+;; from checkout before large investment decisions.
+
+{:as-of "2026-07-15"
+ :product :cloud-itonami
+ :sources
+ {:registry "orgs/kotoba-lang/industry/resources/kotoba/industry/registry.edn"
+  :checkout "orgs/cloud-itonami"
+  :metrics "90-docs/business/metrics/cloud-itonami.edn"
+  :flagship-adr "90-docs/adr/2607122300-cloud-itonami-flagship-maturity-sprint.md"
+  :portfolio-facts "90-docs/business/maturity-facts.edn"}
+
+ :fleet-summary
+ {:isic-repos-local 165
+  :module-score-dist {0 35, 5 3, 6 127}
+  :product-score-dist {1 138, 2 8, 3 16, 4 1, 5 2}
+  :registry-maturity {:implemented 286, :blueprint 1, :spec 345}
+  :reading
+  "Design is high across the factory. Impl-core is mass-produced for ISIC.
+   Impl-product is concentrated on 2–3 flagships. Business is thin everywhere."}
+
+ :cohorts
+ [{:id :flagship-6399
+   :label "ISIC 6399 Meta job-search (Indeed replacement)"
+   :sample-repos ["cloud-itonami-isic-6399"]
+   :design 5 :impl-core 5 :impl-product 5 :business 1
+   :notes "Full JobSearch-LLM ⊣ Portal Governor; 6 jurisdictions; :posting/correct; live demo; operator-quickstart; illustrative pricing. No real feed integration, no paid tenant."}
+
+  {:id :flagship-6310
+   :label "ISIC 6310 Talent (kaonavi replacement)"
+   :sample-repos ["cloud-itonami-isic-6310"]
+   :design 5 :impl-core 5 :impl-product 5 :business 1
+   :notes "HR-LLM ⊣ PolicyGovernor; 5 ops + :assignment/propose; live demo; operator-quickstart; policy pack. Real HR seed is operator-side; no paid tenant."}
+
+  {:id :near-flagship-7810
+   :label "ISIC 7810 Employment / placement"
+   :sample-repos ["cloud-itonami-isic-7810"]
+   :design 4 :impl-core 4 :impl-product 4 :business 1
+   :notes "Next after flagships (product-score 4: demo + quickstart). Referral handoff target from 6399 ADR-0003."}
+
+  {:id :insurance-finance
+   :label "Insurance / finance batch"
+   :sample-repos ["cloud-itonami-isic-6511" "cloud-itonami-isic-6512" "cloud-itonami-isic-6520"
+                  "cloud-itonami-isic-6530" "cloud-itonami-isic-6611" "cloud-itonami-isic-6612"
+                  "cloud-itonami-isic-6621" "cloud-itonami-isic-6622" "cloud-itonami-isic-6491"
+                  "cloud-itonami-isic-6492"]
+   :design 4 :impl-core 4 :impl-product 1 :business 0
+   :notes "Full actor modules; almost no product face (demo/QS/CI)."}
+
+  {:id :real-estate
+   :label "Real estate"
+   :sample-repos ["cloud-itonami-isic-6810" "cloud-itonami-isic-6820"]
+   :design 4 :impl-core 4 :impl-product 1 :business 0
+   :notes "Same pattern as insurance-finance."}
+
+  {:id :health-care
+   :label "Health / residential care / hospital coordination"
+   :sample-repos ["cloud-itonami-isic-8610" "cloud-itonami-isic-8620" "cloud-itonami-isic-8690"
+                  "cloud-itonami-isic-8710" "cloud-itonami-isic-8720" "cloud-itonami-isic-8730"
+                  "cloud-itonami-isic-8790"]
+   :design 5 :impl-core 4 :impl-product 1 :business 0
+   :notes "Scope discipline is very strong (clinical exclusion on 861 hospital coordination). Product surface thin. Recent Wave 4 promotions."}
+
+  {:id :education
+   :label "Education"
+   :sample-repos ["cloud-itonami-isic-8510" "cloud-itonami-isic-8521"
+                  "cloud-itonami-isic-8530" "cloud-itonami-isic-8550"]
+   :design 4 :impl-core 4 :impl-product 1 :business 0
+   :notes "Full modules; no product face."}
+
+  {:id :mfg-auto
+   :label "Manufacturing / automotive"
+   :sample-repos ["cloud-itonami-isic-2910" "cloud-itonami-isic-2920" "cloud-itonami-isic-2930"]
+   :design 4 :impl-core 4 :impl-product 3 :business 0
+   :notes "Higher demo-HTML rate (robotics-generation samples); still no operator-quickstart funnel."}
+
+  {:id :infra-utility
+   :label "Infrastructure / utility"
+   :sample-repos ["cloud-itonami-isic-3510" "cloud-itonami-isic-3512"
+                  "cloud-itonami-isic-3600" "cloud-itonami-isic-6190"]
+   :design 4 :impl-core 3 :impl-product 1 :business 0
+   :notes "Some checkouts thinner on modules; community energy/water ops exist as implemented."}
+
+  {:id :software-it-registry
+   :label "Software / IT (5820, 620x) — registry only in this checkout"
+   :sample-repos ["cloud-itonami-isic-5820" "cloud-itonami-isic-6201" "cloud-itonami-isic-6202"]
+   :design 4 :impl-core nil :impl-product nil :business 0
+   :notes "Registry marks implemented; local west checkout missing in this workspace snapshot. Do not score core/product from absence alone."}
+
+  {:id :iso3166-countries
+   :label "ISO3166 country coordinators (sample)"
+   :sample-repos ["cloud-itonami-iso3166-jpn" "cloud-itonami-iso3166-usa"
+                  "cloud-itonami-iso3166-deu" "cloud-itonami-iso3166-gbr"
+                  "cloud-itonami-iso3166-ken"]
+   :design 4 :impl-core 4 :impl-product 1 :business 0
+   :notes "Country-level actor shape; GTM surface absent."}
+
+  {:id :iso3166-jpn-agencies
+   :label "ISO3166 JPN agencies (sample)"
+   :sample-repos ["cloud-itonami-iso3166-jpn-mhlw" "cloud-itonami-iso3166-jpn-fsa"
+                  "cloud-itonami-iso3166-jpn-meti"]
+   :design 4 :impl-core 0 :impl-product 1 :business 0
+   :notes "blueprint + organization.edn + docs; essentially no src. Design asset, not runtime product."}
+
+  {:id :isco-sample
+   :label "ISCO occupation blueprints (sample)"
+   :sample-repos ["cloud-itonami-isco-2511" "cloud-itonami-isco-2411"
+                  "cloud-itonami-isco-1211" "cloud-itonami-isco-2611"]
+   :design 3 :impl-core 1 :impl-product 0 :business 0
+   :notes "Thin: governor tests / partial modules; lower investment priority."}
+
+  {:id :catalog-surface
+   :label "Fleet catalog / org discovery"
+   :sample-repos ["cloud-itonami.github.io" "dot-github"]
+   :design 4 :impl-core 4 :impl-product 4 :business 1
+   :notes "Catalog generated from industry registry (SSoT). Discovery exists; conversion does not."}
+
+  {:id :cockpit
+   :label "itonami.cloud cockpit"
+   :sample-repos []
+   :design 3 :impl-core 2 :impl-product 2 :business 1
+   :notes "Pages live; 2026-07-13 metrics 299 req/7d, 4xx probe 59%, top path /robots.txt. Not a product wedge yet."}]
+
+ :priorities
+ ["Do not grow more verticals before product→business on 6399/6310 (+7810)."
+  "Keep portfolio wedge narrative at flagship pair (facts :wedge 3)."
+  "ISO3166 agencies / ISCO: maintain as design assets; defer runtime investment."
+  "validation/revenue still 0 until hyp/itonami-smb-pay gate (10 external paid orgs)."]}

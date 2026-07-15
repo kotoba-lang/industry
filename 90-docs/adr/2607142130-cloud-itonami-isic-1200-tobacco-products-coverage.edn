@@ -1,0 +1,64 @@
+{:adr/id "2607142130"
+ :adr/title "cloud-itonami-isic-1200 (tobacco products) operations-coordination coverage"
+ :adr/status :accepted
+ :adr/date "2026-07-14"
+ :adr/deciders ["Jun Kawasaki (agent-executed, standing authorization)"]
+ :adr/related ["ADR-2607121000 (Wave 3 production/manufacturing actors)"
+              "ADR-2607141200 (registry automation)"
+              "cloud-itonami-isic-1200 repo docs/adr/0001-architecture.md"]
+
+ :adr/context
+ "ADR-2607121000 names tobacco products manufacturing (ISIC Rev.5 1200) as a
+  Wave 3 production/manufacturing actor. Tobacco is regulated: excise-tax
+  tracking, health-warning compliance, controlled-substance auditing required.
+  The actor coordinates back-office workflow only: batch logging, maintenance
+  scheduling, compliance escalation, shipment coordination. Processing-line
+  equipment operation and regulatory certification remain human/operator
+  exclusive. The existing :spec registry entry referenced a dead link
+  (gftdcojp/cloud-itonami-C1200). This ADR records the full implementation."
+
+ :adr/decision
+ "Implement cloud-itonami-isic-1200 as a tobacco-manufacturing back-office
+  coordination actor following the established pattern (langgraph-clj
+  StateGraph + independent Governor + Phase 0→3 rollout), with HARD
+  INVARIANT: scope = coordination only, zero processing-line control or
+  regulatory certification authority.
+
+  Architecture:
+  - TobaccoOpsAdvisor (sealed LLM): four proposal operations (:log-production-batch,
+    :schedule-maintenance, :flag-compliance-concern, :coordinate-shipment)
+  - TobaccoManufacturingGovernor: six HARD checks (spec-basis, evidence-complete,
+    facility-permit-valid, batch-manifest-complete, compliance-concern-resolved,
+    no-duplicates) + two SOFT escalations (low-confidence, high-stakes)
+  - Phase gates 0→3: demo/pilot escalate; phase 2/3 commit if governor approves
+  - Store protocol (MemStore dev/test, DatomicStore future)
+  - Audit trail: every op logs :advised/:held/:committed facts
+
+  HARD invariants:
+  1. No processing-line equipment control (rooting, temperature, line speed)
+  2. No regulatory certification (excise-tax, health-warning sign-off)
+  3. No marketing or health claims
+  4. Facility registration required (prevents unlicensed operations)"
+
+ :adr/consequences
+ {:positive ["Tobacco manufacturing workflow formally covered by cloud-itonami pattern"
+             "Scope tight & explicit: coordination only, zero equipment or cert authority"
+             "HARD check for unresolved compliance concerns prevents silent gaps"
+             "Facility permit check ensures only licensed plants can log batches"
+             "Complete audit trail for compliance & regulatory retrospective review"
+             "High-stakes escalation ensures human sign-off for real actuations"
+             "Phase gates allow cautious demo/pilot → supervised → full progression"]
+  :negative ["No real-time monitoring of production-line conditions"
+            "No integration with external excise-tax filing systems"
+            "No integration with health-warning design systems"]}
+
+ :adr/verification
+ {:repo "https://github.com/cloud-itonami/cloud-itonami-isic-1200"
+  :commit "d6d6f0f"
+  :tests-green 26
+  :portable-cljc true
+  :demo-included true
+  :registry-updated true
+  :registry-id "1200"
+  :registry-maturity-old :spec
+  :registry-maturity-new :implemented}}
