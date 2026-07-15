@@ -4532,11 +4532,26 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2592"
    :name "Treatment and coating of metals"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2592"
-   :business-id "cloud-itonami-C2592"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2592"
+   :business-id "cloud-itonami-isic-2592"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607997600): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2592 placeholder).
+   ;; MetalTreatmentAdvisor, an advisor sealed behind an independent
+   ;; Metal Treatment, Coating & Machining Plant Operations Governor,
+   ;; langgraph-clj StateGraph, append-only audit ledger. Mirrors
+   ;; cloud-itonami-isic-2593's [Manufacture of cutlery, hand tools and
+   ;; general hardware] verified module shape, adapted to an
+   ;; electroplating/anodizing/powder-coating/galvanizing/heat-
+   ;; treatment/CNC-machining job shop producing electroplated,
+   ;; anodized, powder-coated, galvanized, heat-treated and
+   ;; precision-machined parts on a fee-or-contract basis.
+   ;; clojure -M:test: 71 tests / 195 assertions / 0 failures / 0
+   ;; errors (verified from an independent fresh clone).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2593"
