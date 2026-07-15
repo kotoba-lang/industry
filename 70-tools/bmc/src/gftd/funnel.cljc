@@ -57,7 +57,7 @@
    :cloud-murakumo
    [{:key :awareness   :label "murakumo.cloud 訪問" :metric [:zone :uniques-7d-sum]}
     {:key :activation  :label "実推論 run (記録済)"  :metric [:cost :runs-count]  :benchmark 0.02}
-    {:key :revenue     :label "paid (Stripe sub)"   :metric [:stripe :active-subscriptions] :benchmark 0.01}]})
+    {:key :revenue     :label "paid (credits 購入)"  :metric [:stripe :murakumo-paid-charges] :benchmark 0.01}]})
 
 ;; ---- evaluation -------------------------------------------------------------
 
