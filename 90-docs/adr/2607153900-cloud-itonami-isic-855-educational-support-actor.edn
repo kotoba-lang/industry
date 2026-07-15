@@ -1,0 +1,48 @@
+{:adr/id "2607153900"
+ :adr/title "cloud-itonami-isic-855 — Educational Support Activities Actor"
+ :adr/status :accepted
+ :adr/date "2026-07-15"
+ :adr/deciders ["Jun Kawasaki"]
+ :adr/scope ["orgs/cloud-itonami/cloud-itonami-isic-855"
+            "orgs/kotoba-lang/industry"]
+ :adr/context
+ "Educational support activities (ISIC 855) encompasses testing/assessment
+  administration, educational consulting, and student-exchange services.
+  This actor focuses on standardized test administration logistics:
+  session scheduling, proctor assignment proposals, consumables coordination,
+  attendance logging, and integrity-concern flagging. Excludes test content,
+  grading, eligibility, academic policy, safety-authority decisions.
+  Implemented as Wave 4 actor following patterns in ADR-2607152900 (ISIC 851),
+  ADR-2607153700 (ISIC 852), ADR-2607153800 (ISIC 853/854)."
+ :adr/decisions
+ [{:type :repo
+   :name "cloud-itonami/cloud-itonami-isic-855"
+   :public true
+   :lineage "cloud-itonami/cloud-itonami-isic-854"
+   :license "AGPL-3.0-or-later"}
+  {:type :actor-architecture
+   :namespace "testadmn"
+   :modules ["store" "advisor" "governor" "phase" "operation" "sim"]
+   :runtime "langgraph-clj StateGraph"
+   :hard-checks ["session-verified" "effect-is-propose" "scope-exclusion"]
+   :closed-ops ["schedule-test-session"
+                "coordinate-proctor-assignment-proposal"
+                "coordinate-supply-request"
+                "log-attendance-note"
+                "flag-safety-concern"]
+   :phases [0 1 2 3]
+   :has-audit-ledger true}
+  {:type :registry-update
+   :registry "kotoba-lang/industry"
+   :entry-id "855"
+   :maturity :implemented
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-855"
+   :business-id "cloud-itonami-isic-855"
+   :removed-technologies ["robotics"]}]
+ :adr/references
+ ["ADR-2607121000" "ADR-2607152900" "ADR-2607153700" "ADR-2607153800"
+  "ADR-2607051621"]
+ :adr/artifacts
+ ["https://github.com/cloud-itonami/cloud-itonami-isic-855"
+  "kotoba-lang/industry registry entry 855"]
+}
