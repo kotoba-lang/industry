@@ -4381,11 +4381,26 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2599"
    :name "Manufacture of other fabricated metal products n.e.c."
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2599"
-   :business-id "cloud-itonami-C2599"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2599"
+   :business-id "cloud-itonami-isic-2599"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607210000): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2599 placeholder).
+   ;; MetalFabAdvisor, an advisor sealed behind an independent Metal
+   ;; Fabrication Plant Operations Governor, langgraph-clj StateGraph,
+   ;; append-only audit ledger. Mirrors cloud-itonami-isic-2431's
+   ;; [Casting of iron and steel] verified module shape, adapted to a
+   ;; metal-fabrication shop (stamping press -> pressing line -> wire-
+   ;; forming line) producing the RESIDUAL "other fabricated metal
+   ;; products n.e.c." class (stamped/pressed sheet-metal parts, wire
+   ;; products, metal household goods) rather than 2431's own iron/
+   ;; steel casting foundry.
+   ;; clojure -M:test: 71 tests / 195 assertions / 0 failures / 0
+   ;; errors (verified from an independent fresh clone).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2620"
