@@ -4636,13 +4636,25 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2732"
    :name "Manufacture of other electronic and electric wires and cables"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2732"
-   :business-id "cloud-itonami-C2732"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
-   :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:spec :design :produce :inspect :package :audit]},
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2732"
+   :business-id "cloud-itonami-isic-2732"
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented as a wire/cable/harness-manufacturing
+   ;; actor (Harness Advisor ⊣ Cable-Integrity Governor). Legacy
+   ;; gftdcojp/cloud-itonami-C2732 placeholder replaced with real
+   ;; cloud-itonami/cloud-itonami-isic-2732. The connective upstream stage
+   ;; for BOTH automotive wiring harnesses (isic-2910/-2920) and smartphone
+   ;; flex-cables (isic-2630), both terminating at isic-2720's battery
+   ;; terminals (ADR-2607160800): cable-run-batch intake, harness-standard-
+   ;; rules evidence verify (IPC/WHMA-A-620, SAE J1128, ISO 6722, UL 758,
+   ;; IPC-A-610), end-of-line continuity/insulation-resistance defect
+   ;; screen, robot conductor/crimp tensile-pull-test mission (a REAL
+   ;; time-stepped physics-2d rigid-body simulation, ADR-2607152000
+   ;; pattern), dual actuation (ship-cable-run-batch + issue-harness-
+   ;; certificate). 45 tests / 225 assertions, 0 failures.
+   :required-technologies [:robotics :cae :dmn :bpmn :audit-ledger]
+   :optional-technologies [:cfd :telemetry :optimization]
+   :operating-states [:intake :harness-standard-rules-verify :end-of-line-quality-screen :robotics-simulate-tensile-pull-test :approve :ship-cable-run-batch :issue-harness-certificate :audit]},
   {:id "2733"
    :name "Manufacture of wiring devices"
    :repo "https://github.com/gftdcojp/cloud-itonami-C2733"

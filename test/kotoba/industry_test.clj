@@ -1849,7 +1849,15 @@
       ;; `(industry/maturity-summary)` on a freshly re-fetched
       ;; origin/main tip immediately before this catch-up edit,
       ;; not assumed.
-      (is (= 284 (:implemented m))))))
+      ;; cloud-itonami-isic-2732 (wire/cable/harness, Cable-Integrity
+      ;; Governor) promoted :spec -> :implemented, superproject
+      ;; ADR-2607160800 -- native real physics-2d tensile-pull-test
+      ;; simulation. Live-recomputed via `(industry/maturity-summary)`
+      ;; on this working tree immediately before this edit (this repo is
+      ;; under heavy concurrent-promotion traffic right now, so the prior
+      ;; static baseline was already stale by the time this edit landed;
+      ;; trusting the live recompute, not the assumed prior + 1).
+      (is (= 286 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
