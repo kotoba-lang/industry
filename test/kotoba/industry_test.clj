@@ -1015,7 +1015,28 @@
       ;; `(industry/maturity-summary)` on a freshly re-fetched origin/main
       ;; immediately before this edit (concurrent-agent count-drift
       ;; caution -- not an assumed fixed number): 213 -> 214.
-      (is (= 214 (:implemented m))))))
+      ;; 214 -> 215: cloud-itonami-isic-1074 (Manufacture of macaroni,
+      ;; noodles, couscous and similar farinaceous products) promoted
+      ;; :spec -> :implemented, superproject ADR-2607161500
+      ;; (cloud-itonami-isic-1074-macaroni-noodles-coverage.md).
+      ;; PastaOpsAdvisor <-> Governor plant-operations-coordination actor
+      ;; mirroring cloud-itonami-isic-1071's [Bakery products] verified
+      ;; module shape (pastaops.* in place of bakeryops.*), covering
+      ;; macaroni/spaghetti/egg-noodle/couscous extrusion-drying batches;
+      ;; also fixes that reference's latent JVM-only `.indexOf` interop
+      ;; bug in phase.cljc with a portable keep-indexed-based helper.
+      ;; 41 tests / 135 assertions green, independently re-verified
+      ;; against a fresh clone. Fresh from-scratch scaffold (no prior
+      ;; repo existed; the entry's old :repo/:business-id pointed at a
+      ;; never-created gftdcojp/cloud-itonami-C1074 placeholder).
+      ;; Live-recomputed via a fresh `clojure -M:test` run against a
+      ;; freshly re-fetched origin/main immediately before this edit
+      ;; (concurrent-agent count-drift caution -- the pre-edit run
+      ;; against this same fresh clone showed 215, i.e. another
+      ;; concurrent promotion had already landed between this ADR's
+      ;; earlier baseline read of 213 and this edit -- not an assumed
+      ;; fixed number): 214 -> 215.
+      (is (= 215 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
