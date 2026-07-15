@@ -1029,6 +1029,27 @@ organization.edn(ooyake由来)の首都(Lisbon/Q597)もP36バグの影響
 現状: 国軸16件・業界団体軸17件(12業種)・自治体軸6件——39tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 40 — 業界団体軸18件目(AHLA) — 新規ISIC業種(宿泊))
+
+`cloud-itonami-assoc-5510-usa-ahla`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-5510-usa-ahla/commit/92bff0c))：
+American Hotel & Lodging Association(AHLA、Wikidata Q19872202、1910年
+設立)。実在2件を検証(5-Star Promise: 従業員の安全・セクハラ防止に関する
+業界横断コミットメント、2018-09-06発表、文書本文をReadツールで直接確認
+——本文自身に発表日と最終更新日(2019-10-04)が明記／About AHLA: 組織
+概要ページを直接WebFetchで確認、1910年設立自体はWebSearch/Wikipedia
+裏付け)。4 tests/11 assertions green。
+
+**新規ISIC業種**: ISIC 5510(宿泊業)を初めて追加した。
+
+**52リポジトリ・662 factを統合——tick 1開始から積み上げてきた
+compliance-fact連邦化システムが52リポジトリの節目に到達。**
+`"association-rule/topic" "governance"`での横断queryでahlaを含む
+15団体が取得できることを確認。
+
+現状: 国軸16件・業界団体軸18件(13業種)・自治体軸6件——40tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
