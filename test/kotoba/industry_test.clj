@@ -1737,7 +1737,23 @@
       ;; (at least four other sibling promotions landed concurrently
       ;; before this one; the live recompute, not an assumed +1, is
       ;; the source of truth here).
-      (is (= 270 (:implemented m))))))
+      ;; RE-APPLY 2026-07-15: the first "2750" -> :implemented
+      ;; registry.edn edit (commit
+      ;; da3aab05d2599789786d0826cf8ffac75caae55f) was silently
+      ;; reverted back to :spec by a concurrent commit
+      ;; (fda7b2e7961f9230d7b49abde2cd07c89534e3cb, isic-2022
+      ;; promotion) that landed immediately after and independently
+      ;; bumped this same assertion 265 -> 270 without "2750" actually
+      ;; being :implemented in its own registry.edn -- caught by this
+      ;; fleet's mandatory post-merge re-verification-from-fresh-clone
+      ;; discipline, not by this test suite (which stayed green
+      ;; throughout, since `(is (= :implemented (industry/maturity
+      ;; "2750")))` above re-reads the live registry rather than
+      ;; asserting a cached fact). Live-recomputed via
+      ;; `(industry/maturity-summary)` on this freshly re-fetched
+      ;; origin/main tip, immediately before re-applying the
+      ;; registry.edn fix in this same working tree: 270 -> 272.
+      (is (= 272 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
