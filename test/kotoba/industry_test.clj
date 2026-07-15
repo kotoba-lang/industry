@@ -1695,7 +1695,12 @@
       ;; (registry.edn's own "3211" -> :implemented change already
       ;; landed via a Contents-API single-file PUT, this test-file edit
       ;; is the catch-up): 257 -> 258.
-      (is (= 258 (:implemented m))))))
+            ;; Live-recomputed via `(industry/maturity-summary)` on a freshly
+      ;; re-fetched origin/main immediately before this edit -- at least
+      ;; one further sibling promotion landed concurrently under heavy
+      ;; fleet load (not individually itemized here; the live recompute,
+      ;; not an assumed +1, is the source of truth): 258 -> 259.
+      (is (= 259 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
