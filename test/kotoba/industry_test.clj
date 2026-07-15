@@ -1099,7 +1099,22 @@
       ;; `(industry/maturity-summary)` immediately before this edit on a
       ;; freshly re-fetched origin/main (concurrent-agent count-drift
       ;; caution -- not an assumed fixed number).
-      (is (= 219 (:implemented m))))))
+      ;; 219 -> 220: cloud-itonami-isic-0127 (Growing of beverage crops)
+      ;; fresh from-scratch scaffold (no prior repo existed; `gh api` 404
+      ;; confirmed before work began). BeverageOpsAdvisor <-> Beverage
+      ;; Operations Governor plantation-operations-coordination actor
+      ;; mirroring cloud-itonami-isic-0122's [Growing of tropical and
+      ;; subtropical fruits] verified module shape (beverageops.* in place
+      ;; of orchardops.*), covering coffee/tea/cacao/yerba-mate
+      ;; plantations; 30 tests / 92 assertions green, independently
+      ;; re-verified against a fresh clone; promoted :spec ->
+      ;; :implemented, superproject ADR-2607170000
+      ;; (cloud-itonami-isic-0127-beverage-crops-growing-coverage.md).
+      ;; Live-recomputed via `(industry/maturity-summary)` immediately
+      ;; before this edit on a freshly re-fetched origin/main
+      ;; (concurrent-agent count-drift caution -- not an assumed fixed
+      ;; number): 219 -> 220.
+      (is (= 220 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
