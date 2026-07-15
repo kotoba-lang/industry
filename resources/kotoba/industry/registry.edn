@@ -4988,11 +4988,38 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2826"
    :name "Manufacture of machinery for textile, apparel and leather p..."
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2826"
-   :business-id "cloud-itonami-C2826"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2826"
+   :business-id "cloud-itonami-isic-2826"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607231500): fresh from-scratch scaffold (no prior repo
+   ;; or reverted attempt; gh api 404 confirmed before starting;
+   ;; task originally assigned as 2825, corrected to 2826 after
+   ;; verifying registry :name values against a fresh clone).
+   ;; TexMachAdvisor ⊣ Textile, Apparel and Leather Machinery Plant
+   ;; Operations Governor plant-operations-coordination actor
+   ;; mirroring cloud-itonami-isic-2818's [Manufacture of
+   ;; power-driven hand tools] verified module shape module-for-
+   ;; module (texmachmfg.* in place of powertoolmfg.*) -- loom-
+   ;; assembly/sewing-machine-test-bench equipment and weaving-loom/
+   ;; sewing-machine/leather-cutting-machine/knitting-machine/
+   ;; fabric-cutting-machine production-batch (product-type/no-load-
+   ;; run-speed-rpm/defect-rate-percent) vocabulary in place of
+   ;; motor-assembly/housing-molding/test-bench equipment and
+   ;; product-type/hipot-test-kv/defect-rate; :flag-safety-concern
+   ;; (mechanical-safety/electrical-safety/CE-compliance) always
+   ;; escalates regardless of confidence, matching 2818's own
+   ;; safety-concern-escalation invariant; the proposal-effect
+   ;; allowlist plus a permanent equipment-actuate block
+   ;; (`:actuate-equipment? true`) structurally prevent any direct
+   ;; assembly/test-bench-equipment control, with no human-approval
+   ;; override path; a further permanent certification-authority
+   ;; block (`:issue-certification? true`) prevents self-issuing a
+   ;; CE machinery safety certification mark. 77 tests / 210
+   ;; assertions green, independently re-verified against a fresh
+   ;; clone.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2829"
