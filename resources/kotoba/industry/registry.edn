@@ -3331,12 +3331,23 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1103"
    :name "Manufacture of malt liquors and malt"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C1103"
-   :business-id "cloud-itonami-C1103"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-1103"
+   :business-id "cloud-itonami-isic-1103"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; Malt-liquor(beer)/malt-manufacturing plant-operations-coordination
+   ;; actor (MaltOpsAdvisor ⊣ MaltOps Governor), fresh from-scratch scaffold
+   ;; (no prior repo existed; the old :repo/:business-id pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C1103 placeholder), mirroring
+   ;; cloud-itonami-isic-1102's [Manufacture of wines] verified module
+   ;; shape (maltops.* in place of wineops.*). ABV-tolerance/IBU-
+   ;; bitterness/diacetyl-off-flavor/microbial-load/extract-yield/ABV-
+   ;; label-accuracy compliance per US TTB 27 CFR Part 25 / 27 CFR 7.71,
+   ;; EU Council Directive 92/83/EEC, and JP 酒税法 (国税庁). 57 tests /
+   ;; 190 assertions green, independently re-verified against a fresh
+   ;; clone; promoted :spec -> :implemented, superproject ADR-2607193000
+   ;; (cloud-itonami-isic-1103-malt-liquors-coverage.md).
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "1104"
    :name "Manufacture of soft drinks"
