@@ -875,6 +875,33 @@ A4AがATA e-Business Programと共同で維持する航空業界データ交換�
 現状: 国軸13件・業界団体軸15件(10業種)・自治体軸4件——32tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 33 — 国軸14件目(DNK) — 意図的に2件のみ)
+
+`cloud-itonami-iso3166-dnk`(既存の`marketentry`実装済みリポ)に
+`statute.facts`を追加・push
+([commit](https://github.com/cloud-itonami/cloud-itonami-iso3166-dnk/commit/efa7682))：
+**通常の3件でなく意図的に2件のみ**——会社法(selskabsloven)の正本
+retsinformation.dkは試した全URL形式(直接ページ・PDF版)でHTTP 403、
+所管庁のerhvervsstyrelsen.dkも複数ページで403、businessindenmark.virk.dk
+はJS-onlyで実質コンテンツなし。捏造せず、corporate-governanceトピックは
+DNKについて空のまま残した。実在2件は個別に直接検証: データ保護法
+(Databeskyttelsesloven、Act No. 502 of 23 May 2018)はDatatilsynet
+(デンマークデータ保護庁)がホストする公式英訳PDFのヘッダーをReadツールで
+直接確認(本文グリフはフォントサブセットの都合で文字化けしたが
+ヘッダー・見出しは判読可能)／労働環境法(Arbejdsmiljøloven、
+Consolidated Act no. 2062 of 16 November 2021)はat.dk(デンマーク労働
+環境庁自身のサイト)を直接WebFetchで確認——同庁自身が"unofficial
+version"と明記しているため、韓国KLRIと同様に専用の
+`:official-agency-unofficial-translation` provenanceタグを使用。
+28 tests/89 assertions green(2件のみのため他国より1 assertion少ない)。
+
+36リポジトリ・646 factを統合。`:labor`トピックで14か国(JPN/USA/GBR/
+DEU/FRA/CAN/AUS/KOR/NLD/ITA/ESP/SWE/NOR/DNK)全てを横断取得できる
+ことを確認。
+
+現状: 国軸14件・業界団体軸15件(10業種)・自治体軸4件——33tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
