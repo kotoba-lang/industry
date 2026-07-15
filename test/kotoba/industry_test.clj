@@ -1437,7 +1437,25 @@
       ;; freshly re-fetched origin/main (confirmed HEAD's own pinned 242 assertion was still
       ;; green pre-edit, ruling out drift from a raw `grep -c` undercount before trusting the
       ;; delta): 242 -> 243.
-      (is (= 243 (:implemented m))))))
+      ;; 243 -> 244: cloud-itonami-isic-0125 (Growing of other tree and bush fruits and nuts)
+      ;; promoted :spec -> :implemented (fresh scaffold -- no prior repository at either the
+      ;; stale gftdcojp/cloud-itonami-A0125 placeholder or the real cloud-itonami org [gh api
+      ;; 404 confirmed]), superproject ADR-2607181600
+      ;; (cloud-itonami-isic-0125-tree-bush-fruits-nuts-coverage.md). BerryNutOpsAdvisor ⊣
+      ;; BerryNutOperationsGovernor orchard/grove-operations-coordination actor mirroring
+      ;; cloud-itonami-isic-0124's [Growing of pome fruits and stone fruits] verified module
+      ;; shape module-for-module (berrynutops.* in place of pomestoneops.*) -- bush-fruit
+      ;; (blueberry/raspberry/blackcurrant) and tree-nut (almond/walnut/hazelnut/pecan)
+      ;; fruit-class reference data in place of pome/stone; flag-crop-health-concern (e.g.
+      ;; spotted wing drosophila/walnut blight) always escalates regardless of confidence,
+      ;; matching 0124's own crop-health-escalation invariant; field-equipment-or-spray-
+      ;; blocked permanently blocks :operate-field-equipment and
+      ;; :finalize-spray-application; 31 tests / 105 assertions green, independently
+      ;; re-verified against a fresh clone. Live-recomputed via
+      ;; `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched
+      ;; origin/main (confirmed HEAD's own pinned 243 assertion was still green pre-edit,
+      ;; ruling out drift before trusting the delta): 243 -> 244.
+      (is (= 244 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
