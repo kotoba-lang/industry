@@ -1320,6 +1320,24 @@ assertions green。
 現状: 国軸20件・業界団体軸22件(17業種)・自治体軸10件——52tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 53 — 自治体軸11件目(シドニー))
+
+`cloud-itonami-municipality-aus-sydney`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-aus-sydney/commit/6b4801c))：
+検索で見つけた直接PDFリンクは全て404/403だったため、代わりに
+cityofsydney.nsw.gov.au自身のHTMLポリシーページ(Published/Last
+modified日付が明記されている)を直接WebFetchで確認: Code of Conduct
+(2024-10-10公表、2024-10-21最終更新)／Local approvals policy for
+construction-related temporary structures on and above roads
+(道路上・道路上方の建設関連仮設構造物に関する地域承認方針、
+2022-11-21公表、2025-11-11最終更新)。4 tests/10 assertions green。
+
+80リポジトリ・692 factを統合。`:governance`トピックでの自治体横断
+queryでsydneyを取得できることを確認(このタグを導入した最初の自治体)。
+
+現状: 国軸20件・業界団体軸22件(17業種)・自治体軸11件——53tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
