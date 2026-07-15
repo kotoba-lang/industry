@@ -1948,6 +1948,25 @@ queryでecuを含む26カ国が取得できることを確認（panのみ:labor�
 現状: 国軸27件・業界団体軸28件(23業種)・自治体軸22件——77tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 78 — 自治体軸23件目(キト))
+
+`cloud-itonami-municipality-ecu-quito`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-ecu-quito/commit/66ba01e))：
+キト首都圏（Distrito Metropolitano de Quito、エクアドル）。前tickで
+国レベル統計に使った公式`gob.ec`（自治体・広域行政条例も索引化して
+いる）で2件検証: Código Municipal para el Distrito Metropolitano de
+Quito（市法典、Ordenanza Metropolitana N.º 072-2024、2024-05-30
+公布）／Ordenanza Metropolitana N.º 090-2025（廃棄物総合管理補完
+サービス料金、2025-04-09公布）。ページが完全にレンダリングされ
+両文書の公布日が明記されていた。4 tests/10 assertions green。
+
+107リポジトリ・748 factを統合。`"ordinance/topic" "governance"`での
+横断queryでquitoがbrussels/montevideo/helsinki/sao-paulo/oslo/sydney/
+cape-town/san-jose/bogota/copenhagenと並んで取得できることを確認。
+
+現状: 国軸27件・業界団体軸28件(23業種)・自治体軸23件——78tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
