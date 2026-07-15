@@ -1,0 +1,53 @@
+{:adr-id "2607159500"
+ :title "cloud-itonami-isic-2591 — Forging, Pressing, Stamping and Roll-Forming of Metal; Powder Metallurgy Plant-Operations Coordination Actor"
+ :status :accepted
+ :date "2026-07-15"
+ :context
+ "ISIC 2591 (Forging, pressing, stamping and roll-forming of metal;
+  powder metallurgy) had a :spec-only placeholder pointing at a
+  never-created gftdcojp/cloud-itonami-C2591 repo (gh api 404
+  confirmed at both the stale placeholder and the real cloud-itonami
+  org before any work began; registry :name independently re-verified
+  against a fresh clone). Closest verified sibling is
+  cloud-itonami-isic-2593 (Manufacture of cutlery, hand tools and
+  general hardware) -- same back-office plant-operations coordination
+  shape for a fixed manufacturing plant with forging/pressing-class
+  equipment and a real physical safety dimension, though 2591 is the
+  PRIMARY metal-forming PROCESS shop (job shop/subcontractor) upstream
+  of 2593's own downstream finishing shop."
+ :decision
+ "Implement cloud-itonami-isic-2591 mirroring cloud-itonami-isic-2593
+  module-for-module: MetalFormingAdvisor ⊣ Metal Forming Plant
+  Operations Governor + append-only audit ledger, langgraph-clj
+  StateGraph. Four ops (log-production-batch/schedule-maintenance/
+  flag-safety-concern/coordinate-shipment), all :effect :propose only.
+  Ten HARD governor checks: propose-only effect, closed op allowlist,
+  closed proposal-effect allowlist, permanent forge/press-line-actuate
+  block (:actuate-forge-press-line?), independent equipment/batch
+  verified+registered gates, independent shipment-weight recompute,
+  double-schedule guard, product-category validation (closed set
+  forged-part/pressed-part/stamped-part/roll-formed-part/powder-
+  metallurgy-part/forging-billet), defect-rate plausibility
+  validation. flag-safety-concern (forging-press/stamping-press
+  pinch-crush, high-temperature-forging burn, roll-forming-mill
+  entanglement, powder-metallurgy combustible-dust exposure) always
+  escalates regardless of confidence -- the domain-specific
+  safety-concern vocabulary is the deliberate departure from 2593's
+  sharp-edge-laceration/forging-hammer-pinch-crush/grinding-wheel-
+  abrasive-dust/heat-treatment-furnace-burn vocabulary (this vertical
+  ships near-net-shape stock, not finished cutting edges). Fully
+  portable .cljc, no JVM-only interop anywhere in src/; actor graph
+  invoked exclusively via langgraph.graph/run*."
+ :consequences
+ ["Certified forging/pressing/stamping/roll-forming and powder-metallurgy plant operators fork and deploy independently with auditable coordination records; direct forging/pressing-line-equipment control and forge/press-line actuation remain permanent, un-overridable HARD blocks"
+  "Safety-concern flagging is a circuit-breaker, not a threshold -- always escalates to a human plant supervisor regardless of confidence"
+  "kotoba-lang/industry registry entry \"2591\" promoted :spec -> :implemented, :repo/:business-id corrected from the stale gftdcojp/cloud-itonami-C2591 placeholder to cloud-itonami/cloud-itonami-isic-2591"
+  "Still a simulation/proposal layer, not a real plant-operations control system -- no integration with real plant-management databases (equipment telemetry, batch tracking, freight dispatch)"]
+ :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2591"
+ :registry "https://github.com/kotoba-lang/industry"
+ :isic-rev5 "2591"
+ :domain :metal-forming/manufacturing
+ :status-in-registry :implemented
+ :governor :metal-forming-plant-operations-governor
+ :robotics true
+ :test-suite {:tests 71 :assertions 195 :failures 0 :errors 0}}
