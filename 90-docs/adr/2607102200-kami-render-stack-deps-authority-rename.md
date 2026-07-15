@@ -1,13 +1,14 @@
 ---
 id: adr-2607102200-kami-render-stack-deps-authority-rename
-title: "ADR-2607102200: kami-engine 3D/WebGPU/render 系統の依存・権限マップと rename / cleanup"
+title: "ADR-2607102200: kami-engine 3D/WebGPU/WebGL 2.0/render 系統の依存・権限マップと rename / cleanup"
 status: accepted
 doc_type: adr
 topic: kotoba-lang-repo-boundaries
 authoritative: true
 last_verified: 2026-07-10
 authoritative_for:
-  - kotoba-lang 3D / WebGPU / render 系統の canonical 依存レイヤと責任境界
+  - kotoba-lang 3D / WebGPU / WebGL 2.0 / render 系統の canonical 依存レイヤと責任境界
+  - repo-wide 3D 実装で kami-engine stack を必須にする規則と完了条件
   - 誤解を生む repo 名の rename 表（script-runtime / engine-sdk / host）
   - kami.wgsl 二重方言の SSoT 方針
   - kami-engine monorepo nested 残骸の cleanup 方針
@@ -22,11 +23,11 @@ supersedes: []
 superseded_by: []
 ---
 
-# ADR-2607102200: kami-engine 3D/WebGPU/render 系統の依存・権限マップと rename / cleanup
+# ADR-2607102200: kami-engine 3D/WebGPU/WebGL 2.0/render 系統の依存・権限マップと rename / cleanup
 
 - **Status**: accepted (2026-07-10)
 - **Deciders**: Jun Kawasaki
-- **Scope**: kotoba-lang 配下の 3D / WebGPU / render / script-host / UI SDK 系統
+- **Scope**: kotoba-lang 配下の 3D / WebGPU / WebGL 2.0 / render / script-host / UI SDK 系統
 
 ## Context
 
@@ -64,7 +65,8 @@ L3 authoring     kami-engine-sdk-clj        … ECS / scene / render-IR / IPC / 
                  kami-engine-app-sdk        … DOM overlay UI (旧 kami-ui-sdk)
                  kami-engine-sdk-svelte     … Svelte UI mirror (旧 kami-engine-sdk)
                    │
-L2 render IR     webgpu                     … EDN render-IR + browser executor
+L2 render IR     webgpu                     … EDN render-IR + WebGPU executor (primary)
+                 webgl                     … 共通 EDN render-IR subset の WebGL 2.0 executor (fallback)
                    ├── org-w3-webgpu        … 生 navigator.gpu（W3C 境界）
                    └── expr                 … 式コア（wgsl が消費）
                  render                     … CPU 側 camera/mesh/gltf/meshopt/splat
@@ -80,11 +82,63 @@ L0 contracts     kami-engine                … WIT / fixtures / scene EDN（no-
 **権限ルール**
 
 1. **GPU bootstrap / 生 WebGPU API** — `org-w3-webgpu` のみ。`webgpu` は経由呼び出し。
-2. **EDN render-IR + browser draw** — `webgpu`（`kami.webgpu` / `kami.webgpu.ir`）。
+2. **EDN render-IR + browser draw** — **WebGPU + WGSL first** は `webgpu`
+   （`kami.webgpu` / `kami.webgpu.ir`）、**WebGL 2.0 + GLSL ES 3.00 fallback** は
+   `webgl`（`kami.webgl`）。両 backend は同じ IR を消費し、WebGL 2.0 はその共通描画
+   subset を実行する（WebGPU 固有の compute / storage 機能を擬似実装しない）。
 3. **ECS / scene authoring / IPC pack** — `kami-engine-sdk-clj` のみ。Svelte SDK は触らない。
 4. **WASM host（guest 実行）** — browser: `wasm-webcomponent`、native: `kami-engine-host-rs`。
 5. **contracts / fixtures** — `kami-engine`。native 実装をこの repo に戻さない（no-Rust CI）。
 6. **nested monorepo path は deps に書かない** — 常に standalone `orgs/kotoba-lang/<repo>`。
+
+### 1.1 Repo-wide mandatory 3D path（2026-07-10 addendum）
+
+本 ADR のレイヤ図は推奨構成ではなく、**workspace 内のすべての3D実装に対する強制境界**
+である。modeling / animation / CAD / BIM / sculpt / visualization / game の違いによって
+別エンジンを作ってはならない。
+
+| concern | 必須の authority | app が所有してよいもの |
+|---|---|---|
+| geometry / topology / operation | 対応する `kami-engine-*` portable domain (`.cljc` / `.kotoba`) | command dispatch、選択状態の表示 |
+| guest execution | browser は `wasm-webcomponent` + `kotoba wasm emit`、native は canonical host | lifecycle orchestration |
+| scene / animation / simulation | `kami-engine-sdk-clj` と対応 domain engine | editor workflow、panel state |
+| browser GPU | primary: WebGPU (`webgpu` → `org-w3-webgpu`)、fallback: WebGL 2.0 (`webgl` / `kami.webgl`) | viewport の配置と resize、capability による backend 選択 |
+| shader / pipeline / mesh upload | WebGPU + WGSL: `webgpu` / `kami.webgpu.mesh`、WebGL 2.0 + GLSL ES 3.00: `webgl` | engine API の呼び出し |
+| UI chrome | `html` + `css`、共通 UI は `kotoba-ui` / `uikit` / `appkit` | toolbar、panel、menu、shortcut profile |
+| interchange | canonical spec repo (`org-openusd` / `org-khronos-gltf` / `org-vrmc-vrm` 等) | import/export workflow |
+
+したがって `kami-app-*` は 3D domain を再実装せず、engine command → immutable state / EDN
+→ render-IR → WebGPU / WebGL 2.0 executor という一方向の経路を統合する。HTML `<canvas>` は
+WebGPU または WebGL 2.0 の presentation surface としてのみ許され、Canvas 2D context は
+authoritative 3D renderer ではない。DOM / SVG / CSS 3D は overlay、diagram、thumbnail、
+明示された degraded fallback に限定する。
+
+**禁止事項**
+
+- app 内の独自 mesh / scene / picking / renderer と、生 JavaScript / TypeScript / Rust に
+  よる geometry core の複製
+- Three.js / Babylon.js 等を第2の production engine として導入
+- CSS transform、静止画、Canvas 2D だけで production 3D tool を名乗る実装
+- 生 `navigator.gpu` / WebGL 2.0 context bootstrap や WGSL / GLSL ES / pipeline の app への複製
+- screenshot / visual smoke だけで modeling operation の成立を判定
+
+**各 3D app の最低検証ゲート**
+
+1. domain engine の topology / scene / animation data assertion
+2. create/edit/undo-redo/save-export の実データ round-trip
+3. WASM guest と host contract の parity（WASM を持つ機能）
+4. 実ブラウザ WebGPU E2E。macOS runner は Metal backend を使う
+5. 同一 scene / operation の共通描画 subset に対する WebGL 2.0 + GLSL ES 3.00 fallback E2E
+6. GitHub Pages の load / interaction smoke test
+7. WebGPU unavailable 時は capability 判定で WebGL 2.0 に切り替え、両方 unavailable の時だけ
+   degraded state を明示（fake renderer には切り替えない）
+
+規格名と実装名を混同しない。`WebGPU` / `WGSL` / `WebGL 2.0` / `GLSL ES 3.00` が
+規格上の表記である。`wgpu` / `WGPU` は native implementation/substrate 名としてのみ使い、
+Web標準名としては使わない。`WSGL` と `GLSLES` は本ADRの用語として採用しない。
+
+例外は accepted ADR に対象 repo、理由、期限、代替 authority、撤去条件を記載した場合だけ
+許可する。temporary fallback はコードと UI の双方で `non-authoritative` と表示する。
 
 ### 2. Rename 表（責務に合わせる）
 
