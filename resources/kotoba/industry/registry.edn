@@ -2231,17 +2231,17 @@
    :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "854"
    :name "Other education"
-   :repo nil :business-id nil
-  :maturity :spec
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-854" :business-id "cloud-itonami-isic-854"
+  :maturity :implemented
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
    :operating-states [:intake :plan :review :follow-up :audit]},
   {:id "855"
    :name "Educational support activities"
-   :repo nil :business-id nil
-  :maturity :spec
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-855" :business-id "cloud-itonami-isic-855"
+  :maturity :implemented
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
    :operating-states [:intake :plan :review :follow-up :audit]},
@@ -2353,12 +2353,13 @@
    :operating-states [:intake :advise :govern :approve :commit :audit]},
   {:id "900"
    :name "Creative, arts and entertainment activities"
-   :repo nil :business-id nil
-  :maturity :spec
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-900"
+   :business-id "cloud-itonami-isic-900"
+   :maturity :implemented
+   :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
    :optional-technologies []
-   ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
-   :operating-states [:intake :catalog :present :exhibit :audit]},
+   ;; ISIC Rev.4 group (3-digit) — venue administrative coordination actor
+   :operating-states [:intake :advise :govern :decide :commit :hold :escalate :audit]},
   {:id "920"
    :name "Gambling and betting activities"
    :repo nil :business-id nil
@@ -2367,14 +2368,22 @@
    :optional-technologies []
    ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
    :operating-states [:intake :catalog :present :exhibit :audit]},
-  {:id "931"
-   :name "Sports activities"
-   :repo nil :business-id nil
-  :maturity :spec
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
-   :optional-technologies []
-   ;; ISIC Rev.4 group (3-digit) — maturity/coverage extension
-   :operating-states [:intake :catalog :present :exhibit :audit]},
+{:id "931"
+ :name "Sports activities"
+ :repo "https://github.com/cloud-itonami/cloud-itonami-isic-931"
+ :business-id "cloud-itonami-isic-931"
+ :maturity :implemented
+ :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+ :optional-technologies []
+ ;; Sports facility/league administrative coordination actor
+ ;; (SportsLeagueAdminAdvisor ⊣ SportsLeagueAdminGovernor), Wave 4
+ ;; build following the ISIC 900 (performing-arts venue) pattern with
+ ;; three HARD governor checks: facility verification, effect
+ ;; validation, and scope exclusion. Closed allowlist of five operations
+ ;; focusing on administrative coordination (facility/court booking,
+ ;; team roster logistics PROPOSAL, supply coordination, event
+ ;; logistics, safety concern escalation). See ADR-2607154100.
+ :operating-states [:intake :schedule :coordinate :flag :approve :audit]}
   {:id "932"
    :name "Other amusement and recreation activities"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-932"
@@ -3958,11 +3967,27 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2012"
    :name "Manufacture of fertilizers and nitrogen compounds"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2012"
-   :business-id "cloud-itonami-C2012"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2012"
+   :business-id "cloud-itonami-isic-2012"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae :cfd]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607151931): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2012 placeholder, gh api
+   ;; 404-confirmed). FertAdvisor, a plant-operations-coordination
+   ;; advisor sealed behind an independent Fertilizer Plant Operations
+   ;; Governor, langgraph-clj StateGraph, append-only audit ledger.
+   ;; Mirrors cloud-itonami-isic-2013's [Manufacture of plastics and
+   ;; synthetic rubber in primary forms] verified module shape closely
+   ;; (fertmfg.* in place of resinmfg.*) -- ammonia-synthesis/
+   ;; granulation-line equipment registration in place of
+   ;; polymerization/compounding-reactor equipment, and product-grade/
+   ;; N-P-K nutrient-content (n-percent/p2o5-percent/k2o-percent)
+   ;; production-batch fields in place of polymer-grade/off-spec-rate.
+   ;; 75 tests / 203 assertions green, independently re-verified
+   ;; against a fresh clone.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2013"
@@ -4251,11 +4276,25 @@
    :operating-states [:intake :quality-standard-rules-verify :kiln-emissions-screen :approve :ship-cement-batch :issue-mill-certificate :audit]},
   {:id "2395"
    :name "Manufacture of articles of concrete, cement and plaster"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2395"
-   :business-id "cloud-itonami-C2395"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2395"
+   :business-id "cloud-itonami-isic-2395"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607170800): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2395 placeholder).
+   ;; ConcreteAdvisor, an advisor sealed behind an independent
+   ;; Concrete Plant Operations Governor, langgraph-clj StateGraph,
+   ;; append-only audit ledger. Mirrors cloud-itonami-isic-2392's
+   ;; [Manufacture of clay building materials] verified module shape,
+   ;; adapted to a concrete/cement/plaster products plant (mixing/
+   ;; batching -> molding/casting -> curing production lines for
+   ;; precast panels, pipes, blocks, paving slabs, plasterboard)
+   ;; rather than 2392's own clay-winning/kiln-firing plant.
+   ;; clojure -M:test: 76 tests / 209 assertions / 0 failures / 0
+   ;; errors (verified from an independent fresh clone).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2396"
@@ -4380,11 +4419,26 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2591"
    :name "Forging, pressing, stamping and roll-forming of metal"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2591"
-   :business-id "cloud-itonami-C2591"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2591"
+   :business-id "cloud-itonami-isic-2591"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607159500): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2591 placeholder).
+   ;; MetalFormingAdvisor, an advisor sealed behind an independent
+   ;; Metal Forming Plant Operations Governor, langgraph-clj StateGraph,
+   ;; append-only audit ledger. Mirrors cloud-itonami-isic-2593's
+   ;; [Manufacture of cutlery, hand tools and general hardware] verified
+   ;; module shape, adapted to a forging/pressing/stamping/roll-forming
+   ;; and powder-metallurgy job shop producing forged/pressed/stamped/
+   ;; roll-formed/powder-metallurgy parts and forging billets, the
+   ;; primary metal-forming process upstream of 2593's own downstream
+   ;; finishing shop.
+   ;; clojure -M:test: 71 tests / 195 assertions / 0 failures / 0
+   ;; errors (verified from an independent fresh clone).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2592"
@@ -4578,11 +4632,25 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2680"
    :name "Manufacture of magnetic and optical media"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2680"
-   :business-id "cloud-itonami-C2680"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2680"
+   :business-id "cloud-itonami-isic-2680"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607169900): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2680 placeholder).
+   ;; MagOpticalMediaAdvisor, an advisor sealed behind an independent
+   ;; Magnetic and Optical Media Plant Operations Governor,
+   ;; langgraph-clj StateGraph, append-only audit ledger. Mirrors
+   ;; cloud-itonami-isic-2640's [Manufacture of consumer electronics]
+   ;; verified module shape, adapted to the magnetic-tape coating and
+   ;; CD/DVD/Blu-ray-style optical-disc molding/data-stamping plant.
+   ;; Twelve concrete governor checks including permanent blocks on
+   ;; coating/molding/stamping-line-equipment actuation and
+   ;; content-replication licensing/source-identification-mark
+   ;; self-issuance. 77 tests / 211 assertions green.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2710"
@@ -4941,20 +5009,77 @@
    :operating-states [:intake :design-rules-verify :stability-brake-test-screen :approve :dispatch-unit :issue-stability-certificate :audit]},
   {:id "2825"
    :name "Manufacture of machinery for food, beverage and tobacco pro..."
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2825"
-   :business-id "cloud-itonami-C2825"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2825"
+   :business-id "cloud-itonami-isic-2825"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607992825): fresh from-scratch scaffold (no prior repo
+   ;; or reverted attempt; gh api 404 confirmed before starting;
+   ;; registry :name verified against a fresh clone before starting,
+   ;; confirming this class -- not 2826 -- is the genuine food/
+   ;; beverage/tobacco processing-machinery target).
+   ;; FoodMachAdvisor ⊣ Food, Beverage and Tobacco Machinery Plant
+   ;; Operations Governor plant-operations-coordination actor
+   ;; mirroring cloud-itonami-isic-2826's [Manufacture of machinery
+   ;; for textile, apparel and leather production] verified module
+   ;; shape module-for-module (foodmachmfg.* in place of
+   ;; texmachmfg.*) -- mixing-equipment/packaging-equipment
+   ;; assembly/test-bench equipment and mixing-machine/filling-
+   ;; machine/packaging-machine/bottling-machine/tobacco-processing-
+   ;; machine production-batch (product-type/no-load-run-speed-rpm/
+   ;; defect-rate-percent) vocabulary in place of loom-assembly/
+   ;; sewing-machine-test-bench equipment and weaving-loom/sewing-
+   ;; machine/leather-cutting-machine/knitting-machine/fabric-
+   ;; cutting-machine product-type; :flag-safety-concern (mechanical-
+   ;; safety/food-contact-material-compliance) always escalates
+   ;; regardless of confidence, matching 2826's own safety-concern-
+   ;; escalation invariant; the proposal-effect allowlist plus a
+   ;; permanent equipment-actuate block (`:actuate-equipment? true`)
+   ;; structurally prevent any direct assembly/test-bench-equipment
+   ;; control, with no human-approval override path; a further
+   ;; permanent certification-authority block
+   ;; (`:issue-certification? true`) prevents self-issuing a
+   ;; machinery safety OR food-contact-material compliance
+   ;; certification mark. 77 tests / 210 assertions green,
+   ;; independently re-verified against a fresh clone.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2826"
    :name "Manufacture of machinery for textile, apparel and leather p..."
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2826"
-   :business-id "cloud-itonami-C2826"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2826"
+   :business-id "cloud-itonami-isic-2826"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607231500): fresh from-scratch scaffold (no prior repo
+   ;; or reverted attempt; gh api 404 confirmed before starting;
+   ;; task originally assigned as 2825, corrected to 2826 after
+   ;; verifying registry :name values against a fresh clone).
+   ;; TexMachAdvisor ⊣ Textile, Apparel and Leather Machinery Plant
+   ;; Operations Governor plant-operations-coordination actor
+   ;; mirroring cloud-itonami-isic-2818's [Manufacture of
+   ;; power-driven hand tools] verified module shape module-for-
+   ;; module (texmachmfg.* in place of powertoolmfg.*) -- loom-
+   ;; assembly/sewing-machine-test-bench equipment and weaving-loom/
+   ;; sewing-machine/leather-cutting-machine/knitting-machine/
+   ;; fabric-cutting-machine production-batch (product-type/no-load-
+   ;; run-speed-rpm/defect-rate-percent) vocabulary in place of
+   ;; motor-assembly/housing-molding/test-bench equipment and
+   ;; product-type/hipot-test-kv/defect-rate; :flag-safety-concern
+   ;; (mechanical-safety/electrical-safety/CE-compliance) always
+   ;; escalates regardless of confidence, matching 2818's own
+   ;; safety-concern-escalation invariant; the proposal-effect
+   ;; allowlist plus a permanent equipment-actuate block
+   ;; (`:actuate-equipment? true`) structurally prevent any direct
+   ;; assembly/test-bench-equipment control, with no human-approval
+   ;; override path; a further permanent certification-authority
+   ;; block (`:issue-certification? true`) prevents self-issuing a
+   ;; CE machinery safety certification mark. 77 tests / 210
+   ;; assertions green, independently re-verified against a fresh
+   ;; clone.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2829"
@@ -5101,12 +5226,26 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3091"
    :name "Manufacture of motorcycles"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C3091"
-   :business-id "cloud-itonami-C3091"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3091"
+   :business-id "cloud-itonami-isic-3091"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
-   ;; ISIC Rev.4 class (4-digit) — full coverage extension
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607921091): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C3091 placeholder).
+   ;; MotoAdvisor, an advisor sealed behind an independent
+   ;; Motorcycle Plant Operations Governor, langgraph-clj StateGraph,
+   ;; append-only audit ledger. Mirrors cloud-itonami-isic-3092's
+   ;; [Manufacture of bicycles and invalid carriages] verified module
+   ;; shape closely (motomfg.* in place of bikemfg.*), adapted to the
+   ;; frame-welding/engine-assembly/final-assembly/test-bench plant
+   ;; producing motorcycles, scooters, mopeds and electric
+   ;; motorcycles. Twelve concrete governor checks including
+   ;; permanent blocks on welding/assembly/test-bench-equipment
+   ;; actuation and ECE R78/ECE R40 motorcycle type-approval
+   ;; self-issuance.
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3092"
    :name "Manufacture of bicycles and invalid carriages"
@@ -5135,11 +5274,25 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3099"
    :name "Manufacture of other transport equipment n.e.c."
-   :repo "https://github.com/gftdcojp/cloud-itonami-C3099"
-   :business-id "cloud-itonami-C3099"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3099"
+   :business-id "cloud-itonami-isic-3099"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607993099): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C3099 placeholder).
+   ;; OtherTransportAdvisor, an advisor sealed behind an independent
+   ;; Other Transport Equipment Plant Operations Governor,
+   ;; langgraph-clj StateGraph, append-only audit ledger. Residual
+   ;; ISIC class covering animal-drawn vehicles (carts/wagons/
+   ;; carriages) and hand-propelled vehicles (hand-carts/hand-trucks/
+   ;; wheelbarrows/rickshaws/sledges/toboggans/pushcarts), distinct
+   ;; from cloud-itonami-isic-3092's [Manufacture of bicycles and
+   ;; invalid carriages].
+   ;; clojure -M:test: 78 tests / 218 assertions / 0 failures / 0
+   ;; errors (verified from an independent fresh clone).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3100"
@@ -5411,11 +5564,37 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3314"
    :name "Repair of electrical equipment"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C3314"
-   :business-id "cloud-itonami-C3314"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3314"
+   :business-id "cloud-itonami-isic-3314"
+   :required-technologies [:identity :forms :audit-ledger]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Electrical-equipment-repair-shop OPERATIONS COORDINATION actor
+   ;; implementation complete (2026-07-15, fresh scaffold -- no prior
+   ;; repository at either the stale gftdcojp/cloud-itonami-C3314
+   ;; placeholder or the real cloud-itonami org [gh api 404 confirmed];
+   ;; identity ({:id "3314" :name "Repair of electrical equipment"})
+   ;; independently verified against a fresh clone before any work
+   ;; began, per this fleet's ID/name-mismatch caution; 3314 covers
+   ;; repair of electrical equipment specifically -- motors, generators,
+   ;; transformers, switchgear -- distinct from siblings 3311/3312/3313/
+   ;; 3315/3319): Repair Advisor ⊣ Repair Governor pattern, mirroring
+   ;; cloud-itonami-isic-3319's structure, closed op allowlist
+   ;; (log-repair-record/schedule-repair-operation/flag-safety-concern/
+   ;; order-supplies), all :effect :propose only. Repair-equipment/
+   ;; diagnostic-tool control and return-to-service/re-energization
+   ;; sign-off authority permanently blocked (hard, un-overridable
+   ;; governor checks, including an electrical-domain-specific
+   ;; :re-energization-sign-off? forbidden-action-class marker distinct
+   ;; from :return-to-service-sign-off?) -- coordination only, no direct
+   ;; equipment actuation. Like 3319, :schedule-repair-operation may
+   ;; auto-commit at phase 3 when the governor is clean (equipment
+   ;; verified, legal-basis on file, no unresolved concern); only
+   ;; :flag-safety-concern is permanently high-stakes. Per-jurisdiction
+   ;; (JPN/USA/DEU) pre-repair de-energization/re-energization legal-
+   ;; basis catalog with real official electrical-installation-specific
+   ;; sources (JPN 労働安全衛生規則第339条, USA 29 CFR 1910.333, DEU DGUV
+   ;; Vorschrift 3 §3), all honestly :qualitative -- see ADR-2607921400.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3315"
