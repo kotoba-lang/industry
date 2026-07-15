@@ -4,6 +4,8 @@ manifest:
   version: "1.0"
 
   remotes:
+    - name: cloud-itonami
+      url-base: git@github.com:cloud-itonami
     - name: com-junkawasaki
       url-base: git@github.com:com-junkawasaki
     - name: etzhayyim
@@ -18,9 +20,294 @@ manifest:
   defaults:
     revision: main
 
-  group-filter: [+com-junkawasaki, +kotoba-lang, +gftdcojp, +etzhayyim, +jk-luxury, -datalad, -archived]
+  group-filter: [+com-junkawasaki, +kotoba-lang, +gftdcojp, +etzhayyim, +jk-luxury, +cloud-itonami, -datalad, -archived]
 
   projects:
+    - name: cloud-itonami-isic-0510
+      remote: cloud-itonami
+      revision: 78d7b7156487fdce234a923d1880cc45b1c9a938
+      path: orgs/cloud-itonami/cloud-itonami-isic-0510
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-0520
+      remote: cloud-itonami
+      revision: 6df124cd76713631123b5f7297fd2cacf6865ba1
+      path: orgs/cloud-itonami/cloud-itonami-isic-0520
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-0610
+      remote: cloud-itonami
+      revision: 182c74a06de3cfd168bceeea7fc27a5157116c39
+      path: orgs/cloud-itonami/cloud-itonami-isic-0610
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-0620
+      remote: cloud-itonami
+      revision: 18b99f799e1bacabd4e1646c127ebba9a9c5ea2e
+      path: orgs/cloud-itonami/cloud-itonami-isic-0620
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-0710
+      remote: cloud-itonami
+      revision: b50379a85e042650753705de464d1b91c2d239a2
+      path: orgs/cloud-itonami/cloud-itonami-isic-0710
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-0721
+      remote: cloud-itonami
+      revision: d6699658718df71cf938957d70a147083fe27106
+      path: orgs/cloud-itonami/cloud-itonami-isic-0721
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-0729
+      remote: cloud-itonami
+      revision: 4921a9a6fc5272ef125dca3cb2d9a236e0e9d90f
+      path: orgs/cloud-itonami/cloud-itonami-isic-0729
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-0810
+      remote: cloud-itonami
+      revision: 206e1bf91a248cb9b5cd82c3213ee329eca88af5
+      path: orgs/cloud-itonami/cloud-itonami-isic-0810
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-0891
+      remote: cloud-itonami
+      revision: 04ee3178331cb2535c1f6f6c2c29b5cdf32c5d4c
+      path: orgs/cloud-itonami/cloud-itonami-isic-0891
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-0893
+      remote: cloud-itonami
+      revision: 8b52527b40b774d552f8c9b7ff05cf649debd25f
+      path: orgs/cloud-itonami/cloud-itonami-isic-0893
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-0910
+      remote: cloud-itonami
+      revision: 84f11e2be3128e30185d9ed914f5d2ac57c6adf7
+      path: orgs/cloud-itonami/cloud-itonami-isic-0910
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-0990
+      remote: cloud-itonami
+      revision: cc903a69c334b697af8893708820a4c18f3e1e1b
+      path: orgs/cloud-itonami/cloud-itonami-isic-0990
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2410
+      remote: cloud-itonami
+      revision: 3f1e9f4d2890ae495a4fa5e09bc14d66ac798d2b
+      path: orgs/cloud-itonami/cloud-itonami-isic-2410
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2420
+      remote: cloud-itonami
+      revision: 7a91fb87043bc31d14225098057829333d54b82c
+      path: orgs/cloud-itonami/cloud-itonami-isic-2420
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2431
+      remote: cloud-itonami
+      revision: 33373463b8b8b2e0791cc41dcbd39d0a71dc7490
+      path: orgs/cloud-itonami/cloud-itonami-isic-2431
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2432
+      remote: cloud-itonami
+      revision: 8cc94003f80c91252f630e5b8a49bef41d7e42e8
+      path: orgs/cloud-itonami/cloud-itonami-isic-2432
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2511
+      remote: cloud-itonami
+      revision: aadb460967507fdd8ae5d993d9b43a9dc8e09a55
+      path: orgs/cloud-itonami/cloud-itonami-isic-2511
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2512
+      remote: cloud-itonami
+      revision: 0af557056603dca4b90b5c1db8e5b25ca32deee7
+      path: orgs/cloud-itonami/cloud-itonami-isic-2512
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2591
+      remote: cloud-itonami
+      revision: 7704ea706bde1f589c1f8764d38545297433b12c
+      path: orgs/cloud-itonami/cloud-itonami-isic-2591
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2592
+      remote: cloud-itonami
+      revision: c87e8195fbc9a700c4484dab4718e96b1588feb6
+      path: orgs/cloud-itonami/cloud-itonami-isic-2592
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2593
+      remote: cloud-itonami
+      revision: 977498fe3c3a27b95976f69affff03792d8d9366
+      path: orgs/cloud-itonami/cloud-itonami-isic-2593
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2599
+      remote: cloud-itonami
+      revision: fee9c01fc1864ba1225cb009de3df9292c2ae8e8
+      path: orgs/cloud-itonami/cloud-itonami-isic-2599
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2710
+      remote: cloud-itonami
+      revision: 20e66ecbbdf6696c36b5a186da75656779f3a6d2
+      path: orgs/cloud-itonami/cloud-itonami-isic-2710
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2720
+      remote: cloud-itonami
+      revision: c383e291c33f2d4c25a143a78a3216e7e091a6c6
+      path: orgs/cloud-itonami/cloud-itonami-isic-2720
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2732
+      remote: cloud-itonami
+      revision: 16f27039d0924ece33a177708f7d0204bf48880a
+      path: orgs/cloud-itonami/cloud-itonami-isic-2732
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2733
+      remote: cloud-itonami
+      revision: 0cc18a13f222e75473ac369276c8e6c516bec3b3
+      path: orgs/cloud-itonami/cloud-itonami-isic-2733
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2740
+      remote: cloud-itonami
+      revision: f09c8f61317cc0a195363a3c715254c23171abf5
+      path: orgs/cloud-itonami/cloud-itonami-isic-2740
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2750
+      remote: cloud-itonami
+      revision: 21c9db706bc4f171afc2458380a90c34dd854ca2
+      path: orgs/cloud-itonami/cloud-itonami-isic-2750
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2790
+      remote: cloud-itonami
+      revision: aefa24253c8b11d2a2fe37cd0f99a3917e8809cd
+      path: orgs/cloud-itonami/cloud-itonami-isic-2790
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2811
+      remote: cloud-itonami
+      revision: 0b509ec196827859098ef1e8949ce4f55a480f12
+      path: orgs/cloud-itonami/cloud-itonami-isic-2811
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2812
+      remote: cloud-itonami
+      revision: 513cd27ffbd9760a830f983db90027552eb9ed47
+      path: orgs/cloud-itonami/cloud-itonami-isic-2812
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2813
+      remote: cloud-itonami
+      revision: 1837d4c88f1046c9c6bf9ef16974bb325663e96b
+      path: orgs/cloud-itonami/cloud-itonami-isic-2813
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2814
+      remote: cloud-itonami
+      revision: 4a0334d202fbf78b77010bd5f445afa315d5e17b
+      path: orgs/cloud-itonami/cloud-itonami-isic-2814
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2816
+      remote: cloud-itonami
+      revision: bdcfd555852712b086be01ebdea14539a5f2fa6b
+      path: orgs/cloud-itonami/cloud-itonami-isic-2816
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2817
+      remote: cloud-itonami
+      revision: f3bcd38d023ad700891f4c067211294ed6a864ff
+      path: orgs/cloud-itonami/cloud-itonami-isic-2817
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2818
+      remote: cloud-itonami
+      revision: d5fec1462d44493c3b9ced357abaa762cc8c4a0c
+      path: orgs/cloud-itonami/cloud-itonami-isic-2818
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2821
+      remote: cloud-itonami
+      revision: 722faa056bbf5a3237d20e2f9bb893872c34e461
+      path: orgs/cloud-itonami/cloud-itonami-isic-2821
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2822
+      remote: cloud-itonami
+      revision: 771ec0abdf47ee962d3ca760a2f4c09fa0f0be1b
+      path: orgs/cloud-itonami/cloud-itonami-isic-2822
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2824
+      remote: cloud-itonami
+      revision: b1ab4cd8797cdd7c89edeefdc3a1ea2dbaa6ecd0
+      path: orgs/cloud-itonami/cloud-itonami-isic-2824
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2825
+      remote: cloud-itonami
+      revision: 0a0cc5456e623ba89bf6bd40007fde181f0931f0
+      path: orgs/cloud-itonami/cloud-itonami-isic-2825
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2826
+      remote: cloud-itonami
+      revision: ed4da5b9fcf24703a955957893d0d8aeb679a0ed
+      path: orgs/cloud-itonami/cloud-itonami-isic-2826
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2910
+      remote: cloud-itonami
+      revision: 17f46683f59e1dbe3222ee512737bcda2c2c2952
+      path: orgs/cloud-itonami/cloud-itonami-isic-2910
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2920
+      remote: cloud-itonami
+      revision: fe5efc81385088c9d458684037c3288f41212b03
+      path: orgs/cloud-itonami/cloud-itonami-isic-2920
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-2930
+      remote: cloud-itonami
+      revision: 4addf660ed6f70efa9534cec7080c1a5b935dc01
+      path: orgs/cloud-itonami/cloud-itonami-isic-2930
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-3011
+      remote: cloud-itonami
+      revision: 5b1a9faf7d5f257f36893b7efdefeebe69300135
+      path: orgs/cloud-itonami/cloud-itonami-isic-3011
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-3012
+      remote: cloud-itonami
+      revision: adce6ae06d7983fde022dfbac8b4a40478cbf465
+      path: orgs/cloud-itonami/cloud-itonami-isic-3012
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-3020
+      remote: cloud-itonami
+      revision: bbc59cb3b1d6e5d5ee571726931488102852e4e2
+      path: orgs/cloud-itonami/cloud-itonami-isic-3020
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-3030
+      remote: cloud-itonami
+      revision: 8f3e598901e6150f11f1b57868f414f19d5e3a38
+      path: orgs/cloud-itonami/cloud-itonami-isic-3030
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-3091
+      remote: cloud-itonami
+      revision: a9a9933ab1f07525e3a8ff10da0ef5449581c374
+      path: orgs/cloud-itonami/cloud-itonami-isic-3091
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-3092
+      remote: cloud-itonami
+      revision: 3c2074ff14163b16115c0777421a00cf96088597
+      path: orgs/cloud-itonami/cloud-itonami-isic-3092
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-3099
+      remote: cloud-itonami
+      revision: 90cff70e5b4a9bc61aa82730b1b36ac780e54119
+      path: orgs/cloud-itonami/cloud-itonami-isic-3099
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-3311
+      remote: cloud-itonami
+      revision: 542cb7c5018546c0e21fd143bccdf76782c9af8c
+      path: orgs/cloud-itonami/cloud-itonami-isic-3311
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-3312
+      remote: cloud-itonami
+      revision: 9fa0d5008417037ee3b9d98a83a7595b1fb9d14a
+      path: orgs/cloud-itonami/cloud-itonami-isic-3312
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-3313
+      remote: cloud-itonami
+      revision: a3a5ec6c058a9caf6bdb2f4822dfe78cd2065ce4
+      path: orgs/cloud-itonami/cloud-itonami-isic-3313
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-3314
+      remote: cloud-itonami
+      revision: 09e8d4deccb12764cb5ab4b00d03058bd58c3757
+      path: orgs/cloud-itonami/cloud-itonami-isic-3314
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-3319
+      remote: cloud-itonami
+      revision: 59f66c33f1bb091c9f5ae948dea16f01ae8589e7
+      path: orgs/cloud-itonami/cloud-itonami-isic-3319
+      groups: [cloud-itonami]
+    - name: cloud-itonami-isic-3320
+      remote: cloud-itonami
+      revision: f9f5c77898a8cd12613226a96470207318c09952
+      path: orgs/cloud-itonami/cloud-itonami-isic-3320
+      groups: [cloud-itonami]
     - name: archive-scans
       remote: com-junkawasaki
       revision: a94bd72dde0f7112ea92d5690c372c2b817bff46
@@ -1528,7 +1815,7 @@ manifest:
       groups: [kotoba-lang]
     - name: aiueos
       remote: kotoba-lang
-      revision: 6a7c251ea9bd76e859bf0fc4447705d67338ffbe
+      revision: e8c9a148a1c2e7ded9f97ea5ff32feaa00244104
       path: orgs/kotoba-lang/aiueos
       groups: [kotoba-lang]
     - name: aml
@@ -6038,7 +6325,7 @@ manifest:
       groups: [kotoba-lang]
     - name: compiler
       remote: kotoba-lang
-      revision: 0e3532fb7afb84f5917468fde7814ab70d6da1ad
+      revision: 2aae14084f41a819d6893c2447317435ddd248da
       path: orgs/kotoba-lang/compiler
       groups: [kotoba-lang]
     - name: composer
@@ -6442,7 +6729,7 @@ manifest:
       groups: [kotoba-lang]
     - name: industry
       remote: kotoba-lang
-      revision: fdf7e56087275b99ccced05676874414fcf4b235
+      revision: e3e78c496c0bc01ee19aebd27f3b08c4f61d6576
       path: orgs/kotoba-lang/industry
       groups: [kotoba-lang]
     - name: inference
