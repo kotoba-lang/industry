@@ -52,7 +52,7 @@
 
 - BMC: completeness=5, hypothesis=5, validation=0, pricing=2, grounding=4
 - YC: acute-problem=4, wedge=3, tenx=4, founder-fit=5, distribution=2, defensibility=4, launched=3, users=1, revenue=0
-- note: 2026-07-15 loop close: itonami.cloud productSurface 12/12 (100%), fullIncludingPaid 12/14 (86%). health 0.1.13. Free path live: jobs 202 with honest q-filter (41/202 engineer), open-business 19 (6399/6310/7810 + KV self-reg seed 8299), marketplace 286 + /api/marketplace filter, market-entry 188/35, fleet+product metrics from KV, free-tenant claim, agent-runs total7d, dry-run recorded. pricing 2 / grounding 4 据置 (STRIPE_* secrets unset, paid=0, dry-run committed:false). users 1 / revenue 0 据置. hyp/itonami-smb-pay blocked on owner STRIPE_* only.
+- note: 2026-07-16: free path production-mature — productSurface 12/12, free_path_smoke 9/9, /api/metrics freePath + /api/health for BMC. external=2 selfReg=2 agentRuns live. pricing 2 grounding 4 users 1 revenue 0 据置. Only owner STRIPE_* (sk_test_ ok) blocks paid path.
 
 ### cloud-manimani
 
