@@ -3708,11 +3708,25 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2013"
    :name "Manufacture of plastics and synthetic rubber in primary forms"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2013"
-   :business-id "cloud-itonami-C2013"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2013"
+   :business-id "cloud-itonami-isic-2013"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae :cfd]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607171200): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2013 placeholder).
+   ;; ResinAdvisor, an advisor sealed behind an independent Primary
+   ;; Forms Plant Operations Governor, langgraph-clj StateGraph,
+   ;; append-only audit ledger. Mirrors cloud-itonami-isic-2220s own
+   ;; [Manufacture of plastics products] verified module shape,
+   ;; adapted to the UPSTREAM primary-forms chemical-process plant
+   ;; (polymerization/compounding reactors producing resin pellets/
+   ;; granules/latex) rather than 2220s own downstream molding/
+   ;; extrusion of finished products.
+   ;; clojure -M:test: 71 tests / 204 assertions / 0 failures / 0
+   ;; errors (verified from an independent fresh clone).
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2021"
