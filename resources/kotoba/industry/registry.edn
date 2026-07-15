@@ -4598,11 +4598,24 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2750"
    :name "Manufacture of domestic appliances"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2750"
-   :business-id "cloud-itonami-C2750"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2750"
+   :business-id "cloud-itonami-isic-2750"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607201200): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2750 placeholder).
+   ;; DomApplAdvisor, an advisor sealed behind an independent
+   ;; Domestic Appliance Plant Operations Governor, langgraph-clj
+   ;; StateGraph, append-only audit ledger. Mirrors
+   ;; cloud-itonami-isic-2640's [Manufacture of consumer electronics]
+   ;; verified module shape, adapted to compressor/motor/wiring
+   ;; assembly and final-assembly/test lines producing refrigerators,
+   ;; washing machines, dishwashers, microwave ovens, and small
+   ;; kitchen appliances. 77 tests / 210 assertions, 0 failures, 0
+   ;; errors; clj-kondo lint clean.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2790"
