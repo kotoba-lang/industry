@@ -1621,7 +1621,7 @@
       ;; immediately before this edit (retry-loop landing under heavy
       ;; concurrent-agent load -- prior attempts 409'd as sibling promotions
       ;; landed first): 252 -> 255.
-            ;; cloud-itonami-isic-2640 (Manufacture of consumer electronics, fresh
+      ;; cloud-itonami-isic-2640 (Manufacture of consumer electronics, fresh
       ;; scaffold -- no prior repository at either the stale
       ;; gftdcojp/cloud-itonami-C2640 placeholder or the real cloud-itonami org
       ;; [gh api 404 confirmed]; identity ({:id "2640" :name "Manufacture of
@@ -1644,9 +1644,13 @@
       ;; both permanent, unconditional HARD blocks with no human-approval
       ;; override path; 77 tests / 210 assertions green, independently
       ;; re-verified against a fresh clone; superproject ADR-2607191500).
-      ;; Live-recomputed via `(industry/maturity-summary)` immediately before
-      ;; this edit on a freshly re-fetched origin/main: 255 -> 256.
-      (is (= 256 (:implemented m))))))
+      ;; NOTE: this promotion's registry.edn change landed BEFORE the prior
+      ;; comment's own 252 -> 255 recompute above, so it is already included
+      ;; in that 255 -- no further bump needed here (corrects an earlier
+      ;; erroneous 255 -> 256 double-count in this same file, caught by
+      ;; re-running `clojure -M:test` post-edit per this fleet's mandatory
+      ;; verification protocol).
+      (is (= 255 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
