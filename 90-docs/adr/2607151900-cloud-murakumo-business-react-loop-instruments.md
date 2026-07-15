@@ -302,3 +302,34 @@ Stripe 導線追加はガバナンス不整合)。つまり:
 選択肢: (a) apex Pages へ domain cutover (proxy 面の移設/廃止判断込み)
 (b) 孤児 source を正規 repo に収容してから live shell に CTA を移植。
 どちらも owner 判断 — CTA 自体は (a) なら即 live、(b) でも流用可能。
+
+## Addendum 8 (2026-07-15) — (b) source 救出 + (a) gftd.ai cutover 実施
+
+### (b) 孤児 source の正規収容 — 完了
+- 新規 repo **gftdcojp/ai-gftd-chat-shell** (private) を作成し、etzhayyim/root の
+  vendored copy (commit ac23e37e) を verbatim import (initial 1662962、
+  PROVENANCE.md に経緯)。west manifest 登録済み (superproject 103e35b、
+  pin 1662962)。legacy shell は chat.gftd.ai で引き続き稼働。
+
+### (a) gftd.ai domain cutover — 完了 (実測検証済み)
+調査で前提が更新された: gftd.ai は 07-13 に既に kotoba-ui 版へ切替済みだったが、
+その worker `ai-gftd-apex-shell` は**どの repo にも deploy 構成が無い第 3 の
+孤児 deploy** (Source: Upload、static 配信のみ — 全 /api/* path が SPA fallback
+を返すことを probe で確認) だった。よって cutover の実体は「孤児 worker →
+正規 repo の Pages project」:
+
+1. Pages project ai-gftd-apex に custom domain gftd.ai を追加
+2. apex DNS: A 192.0.2.1 (dummy, proxied) → CNAME ai-gftd-apex.pages.dev
+   (record id 3148d7ea9facaffd1cf5f9bd33d83bf6 — rollback はこれを A に戻す)
+3. worker route gftd.ai/* (id 5dcd78ea557a4c7bb9a3c33cfa779963 →
+   ai-gftd-apex-shell) を削除 (rollback は同 pattern で再作成)
+
+検証: gftd.ai 200 /「Gftd Chat」/ **live bundle に Upgrade CTA 混入確認**
+(CTA は本日の Pages build にのみ存在するので、配信元が Pages に切り替わった
+ことの直接証拠)。手順中、route 削除→DNS 切替の間に数分の 52x 窓が発生
+(wrangler OAuth token に DNS write 権限が無く、gftd.cf token で復旧)。
+
+### 残 (owner 判断・任意)
+- routeless になった孤児 worker `ai-gftd-apex-shell` の削除 (残置は無害)
+- www.gftd.ai は元々 route/record 無し — 必要なら Pages に追加
+- 以後 gftd.ai の deploy は ai-gftd-apex repo の `npm run deploy` が正経路
