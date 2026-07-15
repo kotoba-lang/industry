@@ -1440,6 +1440,33 @@ Q3926）は史実上一貫して首都であり、JPN/DEU/BRAで確認されたP
 現状: 国軸22件・業界団体軸23件(18業種)・自治体軸12件——57tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 58 — 自治体軸13件目(ヘルシンキ))
+
+`cloud-itonami-municipality-fin-helsinki`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-fin-helsinki/commit/d5ad42b))：
+ヘルシンキ市。`hel.fi`の英語版HTMLページ2件を直接WebFetch検証:
+Environmental Protection Regulations of the City of Helsinki（環境保護
+規則、2018-07-15施行・2026-05-15改正）／Administrative Regulations and
+Rules of Operation of the City of Helsinki（行政規則・運営規則、
+2017-06-01施行）。4 tests/10 assertions green。
+
+**却下した都市**: このtickはまずニューヨーク市を試みたが`nyc.gov`が
+HTML・PDFとも一貫してHTTP 403（ボット防御ブロック）を返し断念。次に
+ストックホルム市を試みたが、公式KFS PDF
+（`kfs-2023-14-...ordningsforeskrifter-for-stockholms-kommun.pdf`）が
+フォントサブセット化で文書名自体まで判読不能なほど文字化けし、HTML
+ページ側も明確な制定日を示していなかったため断念——2都市連続の
+dead-endを経てヘルシンキで着地した。
+
+首都チェック: 既存のooyake由来organization.edn（Helsinki、Wikidata
+Q1757）は史実上一貫して首都であり、P36歴史的首都バグの対象外と確認。
+
+87リポジトリ・704 factを統合。`"ordinance/topic" "governance"`での
+横断queryでhelsinkiがsydneyと並んで取得できることを確認。
+
+現状: 国軸22件・業界団体軸23件(18業種)・自治体軸13件——58tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
