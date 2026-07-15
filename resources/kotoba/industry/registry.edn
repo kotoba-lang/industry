@@ -4623,11 +4623,23 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2670"
    :name "Manufacture of optical instruments and photographic equipment"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2670"
-   :business-id "cloud-itonami-C2670"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2670"
+   :business-id "cloud-itonami-isic-2670"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-16 (see superproject
+   ;; ADR-2607162300): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2670 placeholder).
+   ;; OpticalInstrAdvisor, an advisor sealed behind an independent
+   ;; Optical Instrument Plant Operations Governor, langgraph-clj
+   ;; StateGraph, append-only audit ledger. Plant OPERATIONS
+   ;; COORDINATION actor for optical-instrument-and-photographic-
+   ;; equipment manufacturing (lens-grinding/optics-assembly/testing
+   ;; lines) -- not direct lens-grinding/assembly-line-equipment
+   ;; control authority and not laser-safety-classification-body
+   ;; regulatory authority. 77 tests / 211 assertions green.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2680"
