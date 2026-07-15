@@ -9,7 +9,7 @@
 ;;   YC design: :acute-problem :wedge :tenx :founder-fit :distribution :defensibility
 ;;   YC traction: :launched (0 idea/1 prototype/2 internal/3 public alpha/4 GA/5 scaled)
 ;;                :users (external traction) / :revenue (0 none/1 billing wired/3 first $/5 repeatable)
-{:as-of "2026-07-02"
+{:as-of "2026-07-15"
  :products
  {:cloud-murakumo
   {:pricing 1 :grounding 5
@@ -30,10 +30,10 @@
    :note "実測: kotobase.net 3,483 req/7d・uniques 272、worker 5,311 inv/7d、/health ok。Stripe 実測: active subscriptions 0・直近 charge は 2024 年の非関連決済 — billing 配線済だが転換ゼロ (revenue 1 据置が正直値)。"}
 
   :cloud-itonami
-  {:pricing 1 :grounding 3
-   :acute-problem 4 :wedge 2 :tenx 4 :founder-fit 5 :distribution 1 :defensibility 4
-   :launched 2 :users 1 :revenue 0
-   :note "実測: itonami.cloud 6 req/7d・uniques 3 — cockpit は外部に発見されていない (据置が正直値)。wedge=2 (「全業種」は楔が太い) と合わせ、初期 vertical 絞込 + 導線が律速。"}
+  {:pricing 2 :grounding 4
+   :acute-problem 4 :wedge 3 :tenx 4 :founder-fit 5 :distribution 2 :defensibility 4
+   :launched 3 :users 1 :revenue 0
+   :note "2026-07-15 loop: itonami.cloud productSurface 7/7 (100%), fullIncludingPaid 8/10 (80%). open-business 18 blueprints source=static+kv-self-registered (selfReg=1 maturity seed HR practice ISIC 8299). Item GET + dry-run POST resolve self-reg via shared _lib registry (not static-only). jobs 202, marketplace 286 implemented, market-entry 188/35, free-tenant claim ok (owner:* KV). pricing 2 据置 (flagship shapes documented; no live Stripe prices). grounding 4 not 5 (STRIPE_* secrets unset, paid=0, dry-run committed:false). wedge 3 (6399/6310/isco-1212). launched 3 public alpha. users 1 / revenue 0 据置 — hyp/itonami-smb-pay still blocked on owner STRIPE_* (/docs/stripe-billing-setup.md)."}
 
   :app-aozora
   {:pricing 2 :grounding 4
