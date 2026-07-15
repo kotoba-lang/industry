@@ -4878,11 +4878,28 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3250"
    :name "Manufacture of medical and dental instruments and supplies"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C3250"
-   :business-id "cloud-itonami-C3250"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3250"
+   :business-id "cloud-itonami-isic-3250"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607151300): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C3250 placeholder).
+   ;; MedInstrAdvisor, an advisor sealed behind an independent Medical
+   ;; Instrument Plant Operations Governor, langgraph-clj StateGraph,
+   ;; append-only audit ledger. Mirrors cloud-itonami-isic-2211's own
+   ;; [Manufacture of rubber tyres and tubes] verified module shape,
+   ;; adapted to the medical/dental-instrument plant (precision
+   ;; machining/molding/sterilization-validation lines). Twelve
+   ;; concrete governor checks including permanent blocks on
+   ;; machining/molding/sterilization-equipment actuation and on
+   ;; self-issuing an FDA 510(k)/CE-mark regulatory clearance;
+   ;; independent equipment/batch verification gates; shipment-
+   ;; quantity recompute; device-class/sterility-assurance-level/
+   ;; nonconformance-rate validation. Safety-concern flagging always
+   ;; escalates to a human plant supervisor.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "3290"

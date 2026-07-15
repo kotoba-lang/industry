@@ -1496,7 +1496,30 @@
       ;; origin/main (confirmed HEAD's own pinned 245 assertion was still green pre-edit,
       ;; ruling out drift before trusting the delta; test runner's own failure diff:
       ;; `expected: (= 245 (:implemented m)) actual: (not (= 245 246))`): 245 -> 246.
-      (is (= 246 (:implemented m))))))
+            ;; 246 -> 247: cloud-itonami-isic-3250 (Manufacture of medical and dental
+      ;; instruments and supplies) promoted :spec -> :implemented (fresh scaffold -- no prior
+      ;; repository at either the stale gftdcojp/cloud-itonami-C3250 placeholder or the real
+      ;; cloud-itonami org [gh api 404 confirmed for both]), superproject ADR-2607151300
+      ;; (cloud-itonami-isic-3250-medical-dental-instruments-coverage.md). MedInstrAdvisor ⊣
+      ;; Medical Instrument Plant Operations Governor plant-operations-coordination actor
+      ;; mirroring cloud-itonami-isic-2211's [Manufacture of rubber tyres and tubes] verified
+      ;; module shape module-for-module (medinstrmfg.* in place of tyremfg.*) -- precision
+      ;; machining/molding/sterilization-validation equipment registration in place of
+      ;; building/curing-line equipment, device-class/sterility-assurance-level/
+      ;; nonconformance-rate production-batch fields in place of tyre-category/load-index/
+      ;; defect-rate, and a permanent equipment-actuation block
+      ;; (medinstrmfg.governor/actuate-equipment-blocked-violations) plus a permanent
+      ;; regulatory-clearance-authority block
+      ;; (medinstrmfg.governor/clearance-authority-blocked-violations, FDA 510(k)/CE-mark, in
+      ;; place of 2211's DOT/ECE tyre-safety-certification block); flag-safety-concern always
+      ;; escalates regardless of confidence, matching 2211's own safety-escalation invariant.
+      ;; 77 tests / 209 assertions green, independently re-verified against a fresh clone.
+      ;; Live-recomputed via `(industry/maturity-summary)` immediately before this edit on a
+      ;; freshly re-fetched origin/main (confirmed HEAD's own pinned 246 assertion was still
+      ;; green pre-edit, ruling out drift from a raw `grep -c` undercount before trusting the
+      ;; delta; test runner's own failure diff: `expected: (= 246 (:implemented m)) actual:
+      ;; (not (= 246 247))`): 246 -> 247.
+      (is (= 247 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
