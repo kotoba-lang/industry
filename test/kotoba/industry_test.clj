@@ -395,6 +395,8 @@
     (is (= :implemented (industry/maturity "4210"))))
   (testing "cloud-itonami-isic-3100 (Manufacture of furniture, fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-C3100 placeholder or the real cloud-itonami org [gh api 404 confirmed]; identity ({:id \"3100\" :name \"Manufacture of furniture\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; FurnitureAdvisor ⊣ Furniture Plant Operations Governor furniture-factory plant-operations-COORDINATION actor, mirroring cloud-itonami-isic-1610's [Sawmilling and planing of wood] verified module shape module-for-module -- cutting/sanding/finishing-line equipment registration in place of saw/planer/kiln, quality-grade/unit-count/defect-rate production-batch fields in place of lumber-grade/volume/moisture-content, and a line-run-finalize permanent block [furnituremfg.governor's line-finalize-blocked-violations] in place of kiln-schedule-finalize; safety-concern flagging always escalates regardless of confidence [materials safety -- VOC finish-fume exposure, equipment safety, labor safety]; 71 tests / 195 assertions green, independently re-verified against a fresh clone; superproject ADR-2607161800) is also :implemented"
     (is (= :implemented (industry/maturity "3100"))))
+  (testing "cloud-itonami-isic-0123 (Growing of citrus fruits, fresh scaffold -- no prior repository [gh api 404 confirmed]; identity ({:id \"0123\" :name \"Growing of citrus fruits\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; CitrusOpsAdvisor ⊣ CitrusOperationsGovernor citrus-orchard-operations-coordination actor mirroring cloud-itonami-isic-0122's [Growing of tropical and subtropical fruits] verified module shape module-for-module -- orange/lemon/lime/grapefruit fruit-class reference data in place of mango/banana/papaya/avocado/pineapple; flag-crop-health-concern (e.g. citrus greening/HLB) always escalates regardless of confidence, matching 0122's own crop-health-escalation invariant; field-equipment-or-spray-blocked permanently blocks :operate-field-equipment and :finalize-spray-application; 30 tests / 92 assertions green, independently re-verified against a fresh clone; superproject ADR-2607172000) is also :implemented"
+    (is (= :implemented (industry/maturity "0123"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -1252,7 +1254,15 @@
       ;; a freshly re-fetched origin/main (concurrent-agent count-drift
       ;; caution -- not an assumed fixed number, confirmed via the test
       ;; runner's own failure diff: 226 -> 227).
-      (is (= 227 (:implemented m))))))
+            ;; 227 -> 228: cloud-itonami-isic-0123 (Growing of citrus fruits) promoted :spec -> :implemented, superproject
+      ;; ADR-2607172000 (cloud-itonami-isic-0123-citrus-fruit-growing-coverage.md).
+      ;; CitrusOpsAdvisor ⊣ CitrusOperationsGovernor, fresh from-scratch scaffold (no prior repo existed; the old
+      ;; :repo/:business-id pointed at a never-created gftdcojp/cloud-itonami-A0123 placeholder), mirroring
+      ;; cloud-itonami-isic-0122's [Growing of tropical and subtropical fruits] verified module shape
+      ;; module-for-module. 30 tests / 92 assertions green, independently re-verified against a fresh clone.
+      ;; Live-recomputed via `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched
+      ;; origin/main (concurrent-agent count-drift caution -- not an assumed fixed number): 227 -> 228.
+      (is (= 228 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
