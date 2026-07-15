@@ -1,27 +1,27 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 7399,
-  :pageviews-7d 3831,
-  :uniques-7d-sum 323,
+ {:requests-7d 6903,
+  :pageviews-7d 2841,
+  :uniques-7d-sum 320,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 77}
-   {:path "/cdn-cgi/rum", :requests 51}
-   {:path "/.git", :requests 49}
-   {:path "/config/config.php", :requests 48}
-   {:path "/Dockerfile", :requests 48}
-   {:path "/config/nexmo.php", :requests 48}
-   {:path "/aws/s3/credentials", :requests 41}
-   {:path "/_next/static/*", :requests 36}],
-  :status-mix {:ok 2054, :server-error 75, :client-error 43},
+  [{:path "/cdn-cgi/rum", :requests 149}
+   {:path "/kototama/kototama_bg.wasm", :requests 100}
+   {:path "/js/app.js", :requests 77}
+   {:path "/", :requests 68}
+   {:path "/api/platform", :requests 50}
+   {:path "/api/scores", :requests 49}
+   {:path "/css/theme.css", :requests 44}
+   {:path "/kototama/kototama.js", :requests 43}],
+  :status-mix {:ok 1939, :server-error 237, :client-error 21},
   :window "24h"},
- :as-of "2026-07-13",
- :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 3},
+ :as-of "2026-07-15",
+ :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 11},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 77 · /cdn-cgi/rum 51 · /.git 49 · /config/config.php 48 · /Dockerfile 48 | 4xx(probe) 2% · 5xx 3%",
+ "上位 page (24h, 2xx/3xx): /cdn-cgi/rum 149 · /kototama/kototama_bg.wasm 100 · /js/app.js 77 · / 68 · /api/platform 50 | 4xx(probe) 1% · 5xx 11%",
  :signal
- "isekai.network 実測 7399 req/7d・323 uniques(日次和)・うち4xx probe 2%(24h)",
+ "isekai.network 実測 6903 req/7d・320 uniques(日次和)・うち4xx probe 1%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}
