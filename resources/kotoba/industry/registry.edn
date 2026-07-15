@@ -5582,11 +5582,37 @@
    :operating-states [:intake :design :permit :build :inspect :audit]},
   {:id "4220"
    :name "Construction of utility projects"
-   :repo "https://github.com/gftdcojp/cloud-itonami-F4220"
-   :business-id "cloud-itonami-F4220"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4220"
+   :business-id "cloud-itonami-isic-4220"
+   :required-technologies [:identity :forms :audit-ledger :notifications]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Utility-line-construction-project OPERATIONS COORDINATION actor
+   ;; implementation complete (2026-07-15, fresh scaffold -- no prior
+   ;; repository at either the stale gftdcojp placeholder or the real
+   ;; cloud-itonami org; ID/name independently re-verified against a
+   ;; fresh clone before any work began, per this fleet's ID/name-
+   ;; mismatch caution): Utility-Construction Advisor ⊣ Utility-
+   ;; Construction Governor pattern, mirroring cloud-itonami-isic-4210's
+   ;; [Roads/railways] verified module shape module-for-module (same
+   ;; excavation/utility-strike legal exposure), closed op allowlist
+   ;; (log-site-record/schedule-construction-operation/flag-safety-
+   ;; concern/order-supplies), all :effect :propose only. Heavy-
+   ;; equipment control and utility-tie-in/energization-authorization
+   ;; authority permanently blocked (hard, un-overridable governor
+   ;; checks) -- coordination only, no direct equipment actuation,
+   ;; matching the robotics-premise reference cloud-itonami-isic-4211
+   ;; but narrower, same coordination-only shape as cloud-itonami-isic-
+   ;; 4210/4311. Per-jurisdiction {JPN/USA/DEU} excavation/buried-
+   ;; utility-strike-prevention/road-opening-notification legal-basis
+   ;; catalog citing real official sources (labor safety ordinance, road
+   ;; law/traffic act, construction-recycling act in Japan; OSHA 29 CFR
+   ;; 1926.651, 23 CFR 645.213 utility permit, 23 CFR 630/645 in the
+   ;; USA; EU Directive 92/57/EEC, StVO §45 in Germany/EU);
+   ;; schedule-construction-operation and flag-safety-concern always
+   ;; escalate to a human at every phase, unconditionally. 68 tests /
+   ;; 258 assertions green, independently re-verified against a fresh
+   ;; clone. Superproject ADR-2607201700.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :design :permit :build :inspect :audit]},
   {:id "4290"
