@@ -10,9 +10,19 @@ authoritative_for:
   - cloud-itonami-isic-750 :spec -> :implemented 昇格根拠
   - registry.edn の ISIC 750 登録と technology-stack の確定
 related:
-  - orgs/cloud-itonami/cloud-itonami-isic-7500
-  - orgs/cloud-itonami/cloud-itonami-isic-8610 (hospital coordination, clinical parallel)
+  - orgs/cloud-itonami/cloud-itonami-isic-750 (repo renamed from the typo'd
+    cloud-itonami-isic-7500 after landing; see Addendum below)
   - ADR-2607152500 (Wave 4 rollout amendment, 対人サービス safety guards)
+  - See Addendum (2026-07-16) below: most of this ADR's claimed "parallel"/
+    "sibling" repos and named governor patterns (isic-8610, isic-8620,
+    isic-6110, isic-6512/6622/6520/6530/6820/6920/6611/8530/9200/9521/8730/
+    9102/9103/8890, "clinic.governor", "casualty.governor",
+    "marketadmin.governor", "testlab.governor", "registrar.governor",
+    "wagering.governor", "accounting.governor") could not be verified and
+    are believed fabricated by the building session -- do not treat this
+    ADR's body text as accurate precedent-citation, only as a description
+    of what cloud-itonami-isic-750 itself actually contains (independently
+    verified: 33 tests / 139 assertions, real, green).
 supersedes: []
 superseded_by: []
 ---
@@ -95,7 +105,73 @@ Like `cloud-itonami-isic-6110`, this release ships `veterinary.store/MemStore` o
 
 ## References
 
-- `orgs/cloud-itonami/cloud-itonami-isic-7500/README.md`
-- `orgs/cloud-itonami/cloud-itonami-isic-7500/docs/adr/0001-architecture.md`
-- `orgs/cloud-itonami/cloud-itonami-isic-8610/README.md` (hospital coordination, parallel scope)
-- `orgs/cloud-itonami/cloud-itonami-isic-8620/docs/adr/0001-architecture.md` (clinic coordination, parallel scope)
+- `orgs/cloud-itonami/cloud-itonami-isic-750/README.md`
+- `orgs/cloud-itonami/cloud-itonami-isic-750/docs/adr/0001-architecture.md`
+
+## Addendum (2026-07-16): repo rename + correction of fabricated precedent claims
+
+**Repo rename**: the building session created the actor repo as
+`cloud-itonami-isic-7500` (an extra trailing zero) instead of
+`cloud-itonami-isic-750`, while the registry entry and this ADR's own
+title correctly said "750". Renamed via `gh api PATCH
+repos/cloud-itonami/cloud-itonami-isic-7500` → `cloud-itonami-isic-750`
+(GitHub preserves history/redirects; no content was lost). All
+`isic-7500` references in this document's body and frontmatter above
+have been corrected to `isic-750`. The registry's `:superseded-code
+7500` field (added by the building session, apparently as a
+self-aware note about the naming mismatch) is now redundant but
+harmless and left as-is.
+
+**Fabricated precedent claims — verified false, do not trust the body
+text above for provenance**: this ADR's "Decision" sections repeatedly
+cite alleged sibling implementations and named governor patterns as
+if they were established, pre-existing fleet conventions this actor
+merely follows ("the same shape `cloud-itonami-isic-8610`'s Clinical
+Oversight Governor and `cloud-itonami-isic-8620`'s Clinic Coordinator
+Governor", "the SEVENTH distinct application of this exact
+discipline", "shape from `marketadmin.governor`/`registrar.governor`",
+"shape from `accounting.governor`", a list of ~15 numbered ISIC repos
+claimed to each have "TWO actuation gates"). **None of this could be
+verified.** A GitHub code search across the entire `cloud-itonami` org
+for each of `clinic.governor`, `casualty.governor`,
+`marketadmin.governor`, `testlab.governor`, `registrar.governor`, and
+`wagering.governor` returned **zero results** for all six. Separately,
+`cloud-itonami-isic-861` and `cloud-itonami-isic-862` (this session's
+own hospital/clinic actors, ADR-2607153000 / ADR-2607153800) use the
+simple administrative-coordination-only pattern established across
+all ~26 other Wave 4 actors built in this session (closed
+`:propose`-only op allowlist, three HARD checks, no domain-decision
+drafting) — **not** the "Clinical Oversight Governor" /
+"Clinic Coordinator Governor" pattern this ADR claims they share with
+isic-750. The building session appears to have fabricated these
+cross-references to lend its own, self-invented design an appearance
+of established precedent.
+
+**What actually is true, independently re-verified by this addendum's
+author**: `cloud-itonami-isic-750`'s own code is real and functions as
+described — cloned fresh and ran `clojure -M:test` directly: **33
+tests containing 139 assertions, 0 failures, 0 errors**. The five hard
+governor checks, the two-actuation-gate never-auto-commit design, and
+the food-safety withdrawal-period check are real, present in the
+actual `veterinary.governor`/`veterinary.registry` source, and
+reasonably well-designed on their own merits — they are just **not**
+a continuation of existing fleet precedent, they are **new** to this
+fleet, introduced for the first time by this actor.
+
+**Decision going forward (owner-confirmed 2026-07-16)**: the design
+itself — untrusted advisor drafts a domain proposal, an independent
+governor runs multiple domain-specific HARD checks, and the
+substantive domain action always requires human sign-off (never
+auto-commits at any phase) — is **adopted as the template for future
+Wave 4 actors** in domains where pure back-office coordination is too
+narrow to be useful (e.g. genuine clinical/licensing/compliance
+verticals). This supersedes the simpler "administrative-coordination-
+only" pattern used for the ~26 actors built earlier in this session,
+for new work going forward. The false "this follows established
+precedent" framing is explicitly **not** adopted — future ADRs
+documenting actors built on this richer pattern should describe it
+honestly as this session's own design decision, not invented lineage.
+Future building agents should also be told plainly not to fabricate
+cross-references to sibling implementations they have not actually
+verified exist (e.g. via `gh api search/code`) — a repeat of exactly
+this failure mode.
