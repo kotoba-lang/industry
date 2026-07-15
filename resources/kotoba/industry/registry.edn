@@ -5757,11 +5757,46 @@
    :operating-states [:intake :design :permit :build :inspect :audit]},
   {:id "4329"
    :name "Other construction installation"
-   :repo "https://github.com/gftdcojp/cloud-itonami-F4329"
-   :business-id "cloud-itonami-F4329"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4329"
+   :business-id "cloud-itonami-isic-4329"
+   :required-technologies [:identity :forms :audit-ledger :notifications]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Other-construction-installation-project OPERATIONS COORDINATION
+   ;; actor implementation complete (2026-07-15, fresh scaffold -- no
+   ;; prior repository at either the stale gftdcojp/cloud-itonami-F4329
+   ;; placeholder or the real cloud-itonami org [gh api 404 confirmed];
+   ;; ID/name independently re-verified against a fresh clone before any
+   ;; work began, per this fleet's ID/name-mismatch caution): Installation
+   ;; Advisor ⊣ Installation Governor pattern, closed op allowlist
+   ;; (log-site-record/schedule-installation-operation/flag-safety-
+   ;; concern/order-supplies), all :effect :propose only. Trade-equipment
+   ;; control and installation-completion-sign-off authority permanently
+   ;; blocked (hard, un-overridable governor checks) -- coordination
+   ;; only, no direct equipment actuation, matching the robotics-premise
+   ;; reference cloud-itonami-isic-4211 but narrower, same coordination-
+   ;; only shape as cloud-itonami-isic-4311/cloud-itonami-isic-4330.
+   ;; Deliberate difference from the 4311/4210 heavy-civil siblings:
+   ;; schedule-installation-operation is NOT a permanent high-stakes
+   ;; member (MAY auto-commit at phase 3 when clean+confident) -- trade-
+   ;; installation work (thermal/acoustic insulation, sound-proofing,
+   ;; elevator/escalator installation) is materially lower risk than
+   ;; demolition/heavy-civil earthwork scheduling; flag-safety-concern
+   ;; still always escalates to a human. Per-jurisdiction (JPN/USA/DEU)
+   ;; pre-work hazmat-survey/fall-protection legal-basis catalog, every
+   ;; citation independently verified against its official source
+   ;; (osha.gov/laws.e-gov.go.jp/eur-lex.europa.eu/baua.de) before being
+   ;; written -- USA hazmat basis deliberately cites the OSHA asbestos
+   ;; construction standard (29 CFR 1926.1101) rather than the EPA
+   ;; lead-paint rule cloud-itonami-isic-4330 uses, the domain-
+   ;; appropriate legal basis for legacy asbestos-containing insulation
+   ;; disturbed during installation/retrofit work. Fully portable .cljc
+   ;; with NO JVM interop anywhere in src/ -- the notify transport is a
+   ;; caller-injected function seam, not an embedded java.net.http
+   ;; client. 69 tests / 248 assertions green, independently re-verified
+   ;; against a fresh clone; superproject
+   ;; ADR-2607220000-cloud-itonami-isic-4329-other-construction-
+   ;; installation-coverage.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:intake :design :permit :build :inspect :audit]},
   {:id "4330"
