@@ -1860,7 +1860,15 @@
       ;; after the above catch-up; recomputed live via
       ;; `(industry/maturity-summary)` on a freshly re-fetched
       ;; origin/main tip, not assumed.
-      (is (= 287 (:implemented m))))))
+      (testing "cloud-itonami-isic-2591 (Forging, pressing, stamping and roll-forming of metal; powder metallurgy, fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-C2591 placeholder or the real cloud-itonami org [gh api 404 confirmed]; identity ({:id \"2591\" :name \"Forging, pressing, stamping and roll-forming of metal\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; MetalFormingAdvisor ⊣ Metal Forming Plant Operations Governor forging/pressing/stamping/roll-forming and powder-metallurgy job-shop plant-operations-COORDINATION actor, mirroring cloud-itonami-isic-2593's [Manufacture of cutlery, hand tools and general hardware] verified module shape module-for-module (metalforming.* in place of hardwaremfg.*) -- forging-press/roll-forming-mill equipment registration in place of forging-hammer/grinding-wheel equipment, and product-category/weight/defect-rate production-batch fields (forged-part/pressed-part/stamped-part/roll-formed-part/powder-metallurgy-part/forging-billet) in place of cutlery-item/hand-tool-item/general-hardware-item/garden-tool-item/kitchen-utensil-item/lock-hardware-item; ISIC 2591 is the PRIMARY metal-forming PROCESS class in ISIC group 259 -- a job shop/subcontractor turning raw metal stock into near-net-shape parts for downstream manufacturers (including 2593's own shop) -- distinct from still-:spec sibling cloud-itonami-isic-2592 [Treatment and coating of metals] and from already-:implemented cloud-itonami-isic-2593/2599; :flag-safety-concern (forging-press/stamping-press pinch/crush hazard, high-temperature-forging burn/radiant-heat exposure, roll-forming-mill entanglement hazard, powder-metallurgy combustible-metal-dust/inhalation exposure) always escalates regardless of confidence, matching 2593's own safety-concern-escalation invariant; the proposal-effect allowlist plus a permanent forge/press-line-actuate block (`:actuate-forge-press-line? true`) structurally prevent any direct forging-press/stamping-press/roll-forming-mill/powder-metallurgy-press-and-sinter-line-equipment control, with no human-approval override path; 71 tests / 195 assertions green, independently re-verified against a fresh clone; superproject ADR-2607159500) is also :implemented"
+        (is (= :implemented (industry/maturity "2591"))))
+      ;; 287 -> 290: this catch-up's own "2591" -> :implemented promotion
+      ;; plus further sibling promotions landed concurrently; recomputed
+      ;; live via `(industry/maturity-summary)` on the freshly-edited
+      ;; local registry.edn immediately before this catch-up edit, not
+      ;; assumed (fleet drift of a promotion or two behind live truth by
+      ;; landing time is expected, per this fleet's own protocol).
+      (is (= 290 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
