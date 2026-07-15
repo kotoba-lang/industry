@@ -4968,11 +4968,40 @@
    :operating-states [:intake :design-rules-verify :pressure-test-screen :approve :dispatch-unit :issue-pressure-test-certificate :audit]},
   {:id "2814"
    :name "Manufacture of bearings, gears, gearing and driving elements"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2814"
-   :business-id "cloud-itonami-C2814"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2814"
+   :business-id "cloud-itonami-isic-2814"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :eda :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607998000): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2814 placeholder).
+   ;; BearGearAdvisor ⊣ Bearings, Gears and Driving Elements Plant
+   ;; Operations Governor plant-operations-coordination actor
+   ;; mirroring cloud-itonami-isic-2818's [Manufacture of power-driven
+   ;; hand tools] verified module shape module-for-module
+   ;; (beargearmfg.* in place of powertoolmfg.*) -- precision-
+   ;; machining/grinding-line equipment registration in place of
+   ;; motor-assembly/housing-molding equipment, and ball-bearing/
+   ;; roller-bearing/spur-gear/helical-gear/worm-gear production-batch
+   ;; (product-type/tolerance-test-um/defect-rate-percent) vocabulary
+   ;; in place of drill/circular-saw/jigsaw/sander/angle-grinder
+   ;; vocabulary, with a :tolerance-test-um plausibility check
+   ;; (0-300 um, informed by ISO 492 bearing tolerance classes and
+   ;; AGMA/ISO 1328 gear quality grades) in place of :hipot-test-kv
+   ;; (0-15 kV); :flag-safety-concern (materials-safety/equipment-
+   ;; safety concern) always escalates regardless of confidence,
+   ;; matching 2818's own safety-concern-escalation invariant; the
+   ;; proposal-effect allowlist plus a permanent equipment-actuate
+   ;; block (`:actuate-equipment? true`) structurally prevent any
+   ;; direct precision-machining/grinding-line-equipment control, with
+   ;; no human-approval override path; a further permanent
+   ;; certification-authority block (`:issue-certification? true`)
+   ;; prevents self-issuing an ISO 492 bearing tolerance-class OR
+   ;; AGMA/ISO 1328 gear-quality certification mark. 77 tests / 210
+   ;; assertions green, independently re-verified against a fresh
+   ;; clone.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2815"
