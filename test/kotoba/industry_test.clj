@@ -1455,7 +1455,28 @@
       ;; `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched
       ;; origin/main (confirmed HEAD's own pinned 243 assertion was still green pre-edit,
       ;; ruling out drift before trusting the delta): 243 -> 244.
-      (is (= 244 (:implemented m))))))
+      ;; 244 -> 245: cloud-itonami-isic-0150 (Mixed farming) promoted :spec -> :implemented
+      ;; (fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-A0150
+      ;; placeholder or the real cloud-itonami org [gh api 404 confirmed]), superproject
+      ;; ADR-2607190500 (cloud-itonami-isic-0150-mixed-farming-coverage.md). MixedFarmAdvisor ⊣
+      ;; MixedFarmingOperationsGovernor mixed-farming-operations-coordination actor, mirroring
+      ;; cloud-itonami-isic-0141's [Raising of cattle and buffaloes] (cattleops.*) and
+      ;; cloud-itonami-isic-0111's [Growing of cereals (except rice)] (cerealops.*) verified
+      ;; module shapes, broadened to cover BOTH crop-field AND herd records in one operation
+      ;; (mixedfarmops.* -- log-farm-record/schedule-farm-operation/flag-health-concern/
+      ;; order-supplies, all :effect :propose) since ISIC 0150 is defined by neither activity
+      ;; dominating the operation's gross margin. Direct field-equipment operation, direct
+      ;; animal-handling-equipment operation, finalizing a pesticide-application decision, and
+      ;; slaughter/culling decisions are all permanently blocked; a :log-farm-record's crop
+      ;; yield and herd count are independently verified positive whenever either metric is
+      ;; present, so a valid one never masks an invalid other. 39 tests / 120 assertions green,
+      ;; independently re-verified against a fresh clone. Live-recomputed via
+      ;; `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched
+      ;; origin/main (confirmed HEAD's own pinned 244 assertion was still green pre-edit,
+      ;; ruling out drift from a raw `grep -c` undercount before trusting the delta; test
+      ;; runner's own failure diff: `expected: (= 244 (:implemented m)) actual: (not (= 244
+      ;; 245))`): 244 -> 245.
+      (is (= 245 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
