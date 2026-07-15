@@ -133,12 +133,13 @@
 
   {:id :cockpit
    :label "itonami.cloud cockpit"
-   :sample-repos []
-   :design 3 :impl-core 2 :impl-product 2 :business 1
-   :notes "Pages live; 2026-07-13 metrics 299 req/7d, 4xx probe 59%, top path /robots.txt. Not a product wedge yet."}]
+   :sample-repos ["gftdcojp/cloud-itonami"]
+   :design 4 :impl-core 3 :impl-product 4 :business 1
+   :notes "2026-07-15: productSurface 7/7 live (jobs, open-business static+kv-self-reg, marketplace 286, market-entry 188/35, fleet metrics, free-tenant claim selfReg=1, item GET+dry-run for self-reg seeds). fullIncludingPaid 8/10 — business still 1 until STRIPE_* + ≥1 paid org (hyp/itonami-smb-pay)."}]
 
  :priorities
- ["Do not grow more verticals before product→business on 6399/6310 (+7810)."
+ ["Owner: configure STRIPE_* secrets (/docs/stripe-billing-setup.md) then real /isco-1212 checkout — only gate left for productSurface→business."
+  "Do not grow more verticals before product→business on 6399/6310 (+7810)."
   "Keep portfolio wedge narrative at flagship pair (facts :wedge 3)."
   "ISO3166 agencies / ISCO: maintain as design assets; defer runtime investment."
   "validation/revenue still 0 until hyp/itonami-smb-pay gate (10 external paid orgs)."]}
