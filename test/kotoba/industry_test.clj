@@ -403,6 +403,8 @@
     (is (= :implemented (industry/maturity "1062"))))
   (testing "cloud-itonami-isic-0126 (Growing of oleaginous fruits, fresh scaffold -- the entry pointed at a never-created gftdcojp/cloud-itonami-A0126 placeholder repo, both this and the real cloud-itonami org target name independently confirmed 404 before scaffolding; identity ({:id \"0126\" :name \"Growing of oleaginous fruits\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; OleaginousOpsAdvisor ⊣ OleaginousOperationsGovernor oleaginous-fruit-plantation-operations-coordination actor mirroring cloud-itonami-isic-0125's [Growing of other tree and bush fruits and nuts] verified module shape module-for-module -- oil-palm/olive/coconut/candlenut fruit-class reference data (palm/drupe/nut groups) in place of blueberry/raspberry/blackcurrant/almond/walnut/hazelnut/pecan (bush/nut groups); flag-crop-health-concern (e.g. bud rot/Ganoderma boninense, drought-stress) always escalates regardless of confidence, matching 0125's own crop-health-escalation invariant; field-equipment-or-spray-blocked permanently blocks :operate-field-equipment and :finalize-spray-application; 31 tests / 99 assertions green, independently re-verified against a fresh clone; superproject ADR-2607151330) is also :implemented"
     (is (= :implemented (industry/maturity "0126"))))
+  (testing "cloud-itonami-isic-1104 (Manufacture of soft drinks; production of mineral waters and other bottled waters, fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-C1104 placeholder or the real cloud-itonami org [gh api 404 confirmed]; identity ({:id \"1104\" :name \"Manufacture of soft drinks\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution; SoftDrinkOpsAdvisor ⊣ SoftDrinkOps Governor bottling-plant-operations-coordination actor mirroring cloud-itonami-isic-1102's [Manufacture of wines] verified module shape module-for-module (softdrinkops.* in place of wineops.*) -- water/ingredient intake -> mixing -> carbonation -> filling -> inspection -> audit -> archived phase sequence in place of intake -> crush -> fermentation -> pressing -> aging -> bottling -> audit -> archived; carbonation-tolerance/Brix-sugar-content-window/preservative-residue/microbial-load/fill-volume/mineral-content-minimum compliance parameters in place of ABV-tolerance/residual-sugar-window/volatile-acidity/SO2-residue/fill-volume/vintage-percent-minimum, per US FDA 21 CFR Part 165/110/101, EU Reg (EC) 1333/2008 / Directive 2009/54/EC, and JP 食品衛生法 (清涼飲料水の規格基準, 厚生労働省/消費者庁); direct mixing/carbonation/filling-line control and food-safety-certification authority permanently blocked by the closed op allowlist (log-production-batch/schedule-maintenance/flag-food-safety-concern/coordinate-shipment, all :effect :propose); :flag-food-safety-concern always escalates regardless of confidence, matching wine's own food-safety-escalation invariant; 58 tests / 195 assertions green, independently re-verified against a fresh clone; superproject ADR-2607157000) is also :implemented"
+    (is (= :implemented (industry/maturity "1104"))))
   (testing "maturity-summary counts tiers"
     (let [m (industry/maturity-summary)]
       (is (= (:total m) (+ (:spec m) (:blueprint m) (:implemented m))))
@@ -1569,7 +1571,27 @@
       ;; superproject ADR-2607151330). Live-recomputed via
       ;; `(industry/maturity-summary)` immediately before this edit on a freshly
       ;; re-fetched origin/main: 249 -> 250.
-      (is (= 250 (:implemented m))))))
+      ;; cloud-itonami-isic-1104 (Manufacture of soft drinks; production of
+      ;; mineral waters and other bottled waters) promoted :spec -> :implemented
+      ;; (fresh scaffold -- no prior repository under either the stale
+      ;; gftdcojp/cloud-itonami-C1104 placeholder or the real cloud-itonami org
+      ;; [gh api 404 confirmed]), superproject ADR-2607157000
+      ;; (cloud-itonami-isic-1104-soft-drinks-coverage.md). SoftDrinkOpsAdvisor ⊣
+      ;; SoftDrinkOps Governor bottling-plant-operations-coordination actor
+      ;; mirroring cloud-itonami-isic-1102's [Manufacture of wines] verified
+      ;; module shape module-for-module (softdrinkops.* in place of wineops.*)
+      ;; -- carbonation/Brix-sugar-content/preservative/microbial-load/
+      ;; fill-volume/mineral-content compliance parameters in place of
+      ;; ABV/residual-sugar/volatile-acidity/SO2/fill-volume/vintage-percent;
+      ;; mixing/carbonation/filling-line control and food-safety-certification
+      ;; authority permanently blocked by the closed op allowlist;
+      ;; :flag-food-safety-concern always escalates regardless of confidence;
+      ;; 58 tests / 195 assertions green, independently re-verified against a
+      ;; fresh clone. Live-recomputed via `(industry/maturity-summary)`
+      ;; immediately before this edit on a freshly re-fetched origin/main
+      ;; (confirmed HEAD's own pinned 250 assertion was still green pre-edit,
+      ;; ruling out drift before trusting the delta): 250 -> 251.
+      (is (= 251 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
