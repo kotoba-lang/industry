@@ -1095,6 +1095,28 @@ queryで17か国全てを取得できることを確認。
 現状: 国軸17件・業界団体軸18件(13業種)・自治体軸7件——42tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 43 — 業界団体軸19件目(PhRMA) — 新規ISIC業種(医薬品製造))
+
+`cloud-itonami-assoc-2100-usa-phrma`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-2100-usa-phrma/commit/3f024a8))：
+Pharmaceutical Research and Manufacturers of America(PhRMA、Wikidata
+Q5683113、1958年設立)。実在2件を両方ともPDF本文をReadツールで直接
+確認(Code on Interactions with Health Care Professionals: 前文自身が
+PhRMAの正式名称を明記——最終改正日は文書内では未確認、2022-01-01
+施行はWebSearch裏付けに留まる旨を明記／PhRMA Guiding Principles:
+Direct to Consumer Advertisements about Prescription Medicines:
+検証済みURL自体に組み込まれた"2018"を改正年として引用)。4 tests/
+11 assertions green。
+
+**新規ISIC業種**: ISIC 2100(医薬品製造業)を初めて追加した。
+
+59リポジトリ・669 factを統合。`"association-rule/topic"
+"member-conduct"`での横断queryでphrmaを含む7団体が取得できることを
+確認。
+
+現状: 国軸17件・業界団体軸19件(14業種)・自治体軸7件——43tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社

@@ -163,7 +163,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-municipality-nld-amsterdam/data/datascript-tx.edn"}
    {:label "cloud-itonami-iso3166-bel statute.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-iso3166-bel/schema/statute.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-iso3166-bel/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-bel/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-2100-usa-phrma association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-2100-usa-phrma/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-2100-usa-phrma/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
