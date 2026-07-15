@@ -852,6 +852,29 @@ histories`偽陽性をCLAUDE.mdの手順どおり解消)→ `git merge origin/ma
 現状: 国軸13件・業界団体軸14件(9業種)・自治体軸4件——31tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-15, /loop tick 32 — 業界団体軸15件目(A4A) — 新規ISIC業種(旅客航空輸送))
+
+`cloud-itonami-assoc-5110-usa-a4a`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-5110-usa-a4a/commit/8a69555))：
+Airlines for America(A4A、旧Air Transport Association、Wikidata
+Q408816、1936年設立)。実在2件を両方とも直接WebFetchで確認(Spec 2000:
+A4AがATA e-Business Programと共同で維持する航空業界データ交換標準スイート
+——コンプライアンス規則ではなく技術標準そのものなので新たに
+`:kind :technical-standard`を導入して区別／History: airlines.org自身の
+沿革ページ、1936年設立を直接確認)。4 tests/11 assertions green。
+
+**新規ISIC業種**: ISIC 5110(旅客航空輸送業)を初めて追加した。
+
+**push前にmainを事前同期**: 今回は編集開始前に`git fetch --deepen=50`+
+`git merge origin/main`を先に実行(前tickで発見した手順を今回はpush
+直前でなく着手前に適用)、push時のガードブロックを未然に回避できた。
+
+34リポジトリ・644 factを統合。`"association-rule/topic"
+"governance"`での横断queryでa4aを含む12団体が取得できることを確認。
+
+現状: 国軸13件・業界団体軸15件(10業種)・自治体軸4件——32tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社

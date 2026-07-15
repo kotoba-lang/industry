@@ -130,7 +130,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-municipality-can-toronto/data/datascript-tx.edn"}
    {:label "cloud-itonami-iso3166-nor statute.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-iso3166-nor/schema/statute.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-iso3166-nor/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-nor/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-5110-usa-a4a association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-5110-usa-a4a/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-5110-usa-a4a/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
