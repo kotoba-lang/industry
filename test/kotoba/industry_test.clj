@@ -1305,7 +1305,14 @@
       ;; `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched origin/main
       ;; (confirmed HEAD's own pinned 232 assertion was still green pre-edit, ruling out drift from a
       ;; raw `grep -c` undercount before trusting the delta): 232 -> 233.
-      (is (= 233 (:implemented m))))))
+      ;; 233 -> 234: cloud-itonami-isic-0163 (Post-harvest crop activities) promoted :spec -> :implemented
+      ;; (fresh scaffold -- the prior :repo pointed at a never-created gftdcojp/cloud-itonami-A0163
+      ;; placeholder, confirmed 404 via gh api before any work began), superproject ADR-2607172200
+      ;; (cloud-itonami-isic-0163-post-harvest-crop-activities-coverage.md). Live-recomputed via
+      ;; `(industry/maturity-summary)` immediately before this edit on a freshly re-fetched origin/main
+      ;; (confirmed HEAD's own pinned 233 assertion was still green pre-edit, ruling out drift from a
+      ;; raw `grep -c` undercount before trusting the delta): 233 -> 234.
+      (is (= 234 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"

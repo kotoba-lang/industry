@@ -2768,13 +2768,14 @@
    :operating-states [:intake :survey :advise :treat :record :audit]},
   {:id "0163"
    :name "Post-harvest crop activities"
-   :repo "https://github.com/gftdcojp/cloud-itonami-A0163"
-   :business-id "cloud-itonami-A0163"
-   :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :telemetry]
-   :optional-technologies []
-   :maturity :spec
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0163"
+   :business-id "cloud-itonami-isic-0163"
+   :required-technologies [:identity :forms :audit-ledger]
+   :optional-technologies [:telemetry]
+   :maturity :implemented
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
-   :operating-states [:intake :survey :advise :treat :record :audit]},
+   ;; superproject ADR-2607172200 (cloud-itonami-isic-0163-post-harvest-crop-activities-coverage.md)
+   :operating-states [:intake :clean-trim :sort-grade :dry-or-store :pack :audit]},
   {:id "0164"
    :name "Seed processing for propagation"
    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0164"
