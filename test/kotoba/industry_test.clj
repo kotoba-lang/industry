@@ -1062,7 +1062,9 @@
       ;; ratoon-cycle-invalid? pattern) in place of a perennial-cycle
       ;; check; 35 tests / 120 assertions green, independently
       ;; re-verified against a fresh clone; promoted :spec ->
-      ;; :implemented, superproject ADR-2607160300
+      ;; :implemented, superproject ADR-2607160400 (renumbered from
+      ;; 2607160300 after a same-day slot collision with
+      ;; cloud-itonami-isic-0146's own ADR-2607160300, above)
       ;; (cloud-itonami-isic-0116-fibre-crops-growing-coverage.md).
       ;; Live-recomputed via `(industry/maturity-summary)` immediately
       ;; before this edit on a freshly re-fetched origin/main
