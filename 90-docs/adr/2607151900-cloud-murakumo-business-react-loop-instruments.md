@@ -160,3 +160,25 @@ housekeeping: 他セッション WIP 棚卸し (local-murakumo voice stash retir
 cloud-murakumo generation WIP / kotoba-lang/murakumo 07-10 stash×2 /
 orgs/kotoba-lang/industry 未コミット) は git-cleanup-conflict で。wrangler CLI
 token の kv スコープ根治は POST /infer/cost/coeffs 経路で回避済みのため低優先。
+
+## Addendum 3 (2026-07-15) — 画像生成経路の復旧 (gap 台帳「方針待ち」の解消)
+
+addendum 2 で [方針待ち] とした画像生成経路 down は、調査の結果「main-2
+gateway か gad ComfyUI かの二者択一」ではなく、両者を繋ぐ 3 つの独立した
+不具合の重なりだった (方針決定は不要だった):
+
+1. **tunnel ingress 消失**: main-2 の ~/.cloudflared/config.yml から
+   gateway.gftd.ai の rule が消えていた (07-13 の voice 追加編集時)。
+   gateway プロセス自体は :8790 で健在 — edge の catch-all 404 が実体。復元済み。
+2. **gad が live-fleet から漏れ**: fleet.edn の :host "gad" が前提とする
+   ~/.ssh/config alias が main-2 に無く、SSH probe 失敗 → 9x 速い専用 GPU が
+   選定対象外になり、画像 dispatch が Mac mini (MPS) に向いて 240s+ hang。
+   alias 追加で gad が第一候補に。
+3. **checkpoint 名の誤誘導エラー**: caller の model id ("animagine-xl-4.0")
+   を ComfyUI は on-disk 名 (.safetensors) で検証して却下、gateway は
+   『node became unreachable mid-render』と誤報告。normalize-ckpt を追加
+   (kotoba-lang/murakumo f770f2c、195 tests green)。
+
+検証: POST api.murakumo.cloud/v1/images/generations (model 指定あり/なし両方)
+→ 200、実 PNG 生成 8.9〜19.4s、node=gad。voice 経路の非退行も確認 (200)。
+club-shinshi requestScene の依存経路が復活した。
