@@ -4391,11 +4391,29 @@
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2432"
    :name "Casting of non-ferrous metals"
-   :repo "https://github.com/gftdcojp/cloud-itonami-C2432"
-   :business-id "cloud-itonami-C2432"
+   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-2432"
+   :business-id "cloud-itonami-isic-2432"
    :required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
    :optional-technologies []
-   :maturity :spec
+   :maturity :implemented
+   ;; Promoted :spec -> :implemented 2026-07-15 (see superproject
+   ;; ADR-2607159600): fresh from-scratch scaffold (no prior repo
+   ;; existed; the old :repo/:business-id above pointed at a
+   ;; never-created gftdcojp/cloud-itonami-C2432 placeholder).
+   ;; NonFerrousFoundryAdvisor ⊣ Non-Ferrous Foundry Plant Operations
+   ;; Governor plant-operations-coordination actor mirroring
+   ;; cloud-itonami-isic-2431's [Casting of iron and steel] verified
+   ;; module shape module-for-module (nonferrousmfg.* in place of
+   ;; foundrymfg.*) -- aluminum/copper/zinc/brass/bronze/magnesium
+   ;; alloy-grade vocabulary and a die-cast output form (absent from
+   ;; 2431's ferrous-only output-form set) in place of cast-iron/
+   ;; cast-steel alloy-grade vocabulary; same four-op allowlist
+   ;; (log-production-batch/schedule-maintenance/flag-safety-concern/
+   ;; coordinate-shipment), all :effect :propose only; ten HARD
+   ;; governor checks; :flag-safety-concern always escalates
+   ;; regardless of confidence. 71 tests / 199 assertions green,
+   ;; independently re-verified against a fresh clone; superproject
+   ;; ADR-2607159600.
    ;; ISIC Rev.4 class (4-digit) — full coverage extension
    :operating-states [:spec :design :produce :inspect :package :audit]},
   {:id "2511"
