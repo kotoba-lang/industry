@@ -2056,7 +2056,16 @@
       ;; fetch and PUT.
       (testing "cloud-itonami-isic-2817 (Manufacture of office machinery and equipment (except computers and peripheral equipment), fresh scaffold -- no prior repository at either the stale gftdcojp/cloud-itonami-C2817 placeholder or the real cloud-itonami org [gh api 404 confirmed]; identity ({:id \"2817\" :name \"Manufacture of office machinery and equipment\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution -- the registry's own :name was an abbreviated form missing the official ISIC Rev.4 trailing exclusion clause \"(except computers and peripheral equipment)\", corrected as part of this same in-place edit, not a misassigned class (confirmed via the surrounding sequential \"2816\"/\"2818\" entries and the absence of any computer/peripheral-equipment framing); OfficeMachOpsAdvisor ⊣ Office Machinery Plant Operations Governor plant-operations-coordination actor mirroring cloud-itonami-isic-2710's [Manufacture of electric motors, generators, transformers and electricity distribution and control apparatus] verified module shape module-for-module (officemach.* in place of elecequipmfg.*) -- assembly/test-bench equipment and typewriter/calculator/cash-register/photocopier/duplicating-machine/postage-meter/adding-machine production-batch (product-type/dielectric-withstand-test-kv/defect-rate-percent) vocabulary in place of winding/assembly/test-bench equipment and product-type/dielectric-test-kv/defect-rate; :flag-safety-concern (electrical-safety/mechanical-safety/UL-CE-compliance) always escalates regardless of confidence, matching 2710's own safety-concern-escalation invariant; the proposal-effect allowlist plus a permanent equipment-actuate block (`:actuate-equipment? true`) structurally prevent any direct assembly/test-bench-equipment control, with no human-approval override path; a further permanent certification-authority block (`:issue-certification? true`) prevents self-issuing a UL/CE safety certification mark. 76 tests / 212 assertions green, independently re-verified against a fresh clone; superproject ADR-2607159700) is also :implemented"
         (is (= :implemented (industry/maturity "2817"))))
-      (is (= 321 (:implemented m))))))
+      ;; 321 -> 322: cloud-itonami-isic-949 landed concurrently (a
+      ;; different session's promotion, commit cc8665a); recomputed
+      ;; live via `(industry/maturity-summary)`, not assumed. Note:
+      ;; that same commit collapsed registry.edn from multi-line to a
+      ;; single line and stripped all inline comments -- confirmed via
+      ;; independent audit that no data was lost (648 entries intact,
+      ;; :spec/:blueprint/:implemented counts sum correctly, EDN still
+      ;; parses) -- this is a formatting/history regression only, not
+      ;; a corruption; flagged for the repo owner, not reverted here.
+      (is (= 322 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
