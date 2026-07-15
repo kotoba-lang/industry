@@ -1,0 +1,20 @@
+[{:db/id -1
+  :adr/id "adr-2607159800-jk-luxury-jk-corp-legal-tax-project"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607159800: JK株式会社の法務・税務管理を jk-luxury org の新規 project jk-corp として scaffold"
+  :adr/status "accepted"
+  :adr/topic "jk-luxury-jk-corp-project"
+  :adr/authoritative true
+  :adr/last_verified "2026-07-15"
+  :adr/problem "{:trigger \"2026-07-15, JK株式会社(日本法人、京橋税務署管轄、代表河崎純真、旧COMMONS\\n        株式会社)宛てに京橋税務署から源泉所得税及び復興特別所得税の加算税賦課決定\\n        通知書及び納税告知書(整理番号00256104、告知額計74,825円、納期限R8.7.27)が\\n        届いた\", :root_cause \"顧問税理士(税理士法人TOTAL)への報酬(令和7年7-12月分、741,510円)に\\n             かかる源泉徴収漏れ。給与源泉とは無関係(別紙の俸給・給料等欄は空欄)\", :owner_misconception_corrected \"'社員がいないのに納税を要求されるのは不適切'という当初の懸念は事実誤認。\\n                             専門家報酬への源泉徴収義務(所得税法204条1項2号)は\\n                             従業員の有無と無関係に生じる\", :interim_storage \"検討結果とスキャン書類一式はいったん superproject 内の非west管理フォルダ\\n                    orgs/luxury-jk/ に一時保管\", :owner_direction \"オーナーから『この検討を jk-luxury に projects としてまとめて整理して』と\\n                   の指示(2026-07-15)\", :entity_boundary_flag \"jk-luxury org は ADR-2607062300 で登録済み(club-shinshi・net-babiniku、\\n                        private)。同ADRの2026-07-06付Amendmentで運営主体はJK Inc.\\n                        (BVI法人)でありJK株式会社(日本法人)ではないと明記済み --\\n                        今回の税務当事者(JK株式会社)とは別法人という記録が既にある\", :owner_confirmation \"上記の法人相違点を提示した上でオーナーに確認し、『jk-luxury org に新規\\n                        GitHub project(private repo)として scaffold』を選択\\n                        (2026-07-15、相違点を認識した上での意思決定)\"}"
+  :adr/decision "{:new_repo {:org \"jk-luxury\", :name \"jk-corp\", :visibility \"private\", :content \"JK株式会社(日本法人)の法務・税務・登記等のコーポレート管理資料。\\n                  club-shinshi/net-babiniku(製品コードリポジトリ)とは独立。\\n                  コード無し、ドキュメントのみ\"}, :initial_content \"2026-06-26付源泉所得税納税告知書一式(スキャン6点)+対応方針README。\\n                      orgs/luxury-jk/ の内容をここに移設し、orgs/luxury-jk/ は削除\\n                      (superprojectには未コミットのため履歴に残らない)\", :manifest_registration \"manifest/repos.edn に jk-corp を jk-luxury org の :extra-projects として\\n                         登録(orgs/jk-luxury/jk-corp、path override無し)。\\n                         nbb scripts/gen-west-manifest.cljs --entry jk-corp で\\n                         west.yml に反映(当該entryのみの最小diff、ADR-2607022900)\", :entity_boundary_note \"リポジトリのREADME/CLAUDE.mdに、jk-luxury org内での法人相違点\\n                          (club-shinshi/net-babiniku = JK Inc. BVI、jk-corp = JK株式会社\\n                          日本)を恒久的に明記し、将来の混同を防ぐ\"}"
+  :adr/consequences "{:org_boundary_weakened \"jk-luxury orgは今後2つの異なる法人(BVIのJK Inc. / 日本のJK株式会社)の\\n                        projectが混在するorgになる。ADR-2607062300が前提とした\\n                        'GitHub orgの境界=法人の境界'は本ADRにより部分的に後退する\", :scoping_unit_changed \"アクセス制御・PSP契約・コンプライアンス監査のscopeはorg単位でなくrepo単位\\n                       (jk-corp vs club-shinshi/net-babiniku)で法人を区別する必要がある\", :pragmatic_tradeoff \"オーナー個人が実質的に全法人の代表者であり、JK関連資料を1か所に集約したい\\n                      という実利を優先。差異はドキュメントで明示する運用でカバー\", :future_growth \"日本法人側の資料(登記・他の税務対応・契約書等)が増える場合、jk-corp が\\n                  標準的な格納先になる\"}"
+  :adr/alternatives "[{:option \"JK株式会社専用の新規GitHub orgを別途作成\", :rejected_because \"ADRの法人分離原則には最も忠実だが、オーナーは今回jk-luxuryへのproject化を\\n                      明示的に選択したため不採用。日本法人側の資料/アクセス制御が\\n                      本格的に増える場合は改めてADR化して分離を検討する\"} {:option \"superproject内の orgs/luxury-jk/(west非管理の素のフォルダ)のまま整理\", :rejected_because \"orgs/kawasakijun・orgs/personalと同様の軽量運用も可能だったが、オーナーは\\n                      正式なGitHub project化(west登録・独立repo)を選択した\"}]"
+  :adr/authoritative_for ["jk-luxury org 配下に新規private repo jk-corp を作成し、JK株式会社(日本法人)の\n    法務・税務コーポレート資料の格納先とする"
+                           "manifest/repos.edn に jk-corp を jk-luxury org の extra-projects として登録し、\n    west.yml に最小diffで反映する"
+                           "jk-luxury org内でclub-shinshi/net-babiniku(JK Inc. BVI)とjk-corp(JK株式会社\n    日本)は別法人の資料であることをrepo README/CLAUDE.mdに明記する"]
+  :adr/related ["90-docs/adr/2607062300-jk-luxury-org-club-shinshi-net-babiniku-relocation.md"
+                "orgs/personal/facts/orgs.edn"
+                "orgs/kawasakijun/jk_state.edn"]
+  :adr/supersedes []
+  :adr/superseded_by []}]
