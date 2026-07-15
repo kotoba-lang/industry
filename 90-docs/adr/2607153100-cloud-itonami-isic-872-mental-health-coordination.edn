@@ -1,0 +1,16 @@
+[{:adr/id 2607153100
+  :adr/title "cloud-itonami-isic-872 — Mental Health/SUD Residential Care Coordination"
+  :adr/status :accepted
+  :adr/date (java.time.LocalDate/of 2026 7 15)
+  :adr/deciders [:jun-kawasaki]
+  :adr/context "ISIC-872 (Residential care for mental health, intellectual disability, substance abuse) is Wave 4's second implementation, following verified-redo discipline and isic-879 precedent."
+  :adr/decision {:closed-allowlist [:log-resident-note :schedule-family-or-guardian-visit :coordinate-supply-request :schedule-staff-shift-proposal :flag-safety-concern]
+                 :hard-checks [
+                   "Resident unverified — must exist AND be registered+verified"
+                   "Effect not :propose — all ops must propose only"
+                   "Scope exclusion — medication, clinical diagnosis, care-plan, restraint, guardianship, disciplinary, end-of-life, safety-authority permanently blocked"
+                 ]
+                 :escalation [:flag-safety-concern "low confidence (< 0.6)"]
+                 :phase-rollout "0→3: read-only → coordination-gated → auto-commit (safety-concern always escalates)"}
+  :adr/consequences "Registry 872 promoted to :implemented. Actor repo live. 47 tests pass. Registry update independently verified."
+  :adr/references ["ADR-2607152500" "ADR-2607152700" "ADR-2607121000"]}]
