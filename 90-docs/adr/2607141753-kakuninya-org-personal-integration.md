@@ -289,6 +289,28 @@ assignment 配信を巻き添えにした。cockpit 投影は M0 の付加機能
 最終確認前」を明記。標準処理期間のように公式に無い値は unknown 相当の但し書きに
 留め、第三者サイトの数字を確定値として記録しなかった。
 
+## Addendum 9 — 許認可の3層化: 知識 / 公開共通サービス / private ケース（2026-07-15、オーナー指示）
+
+オーナー指示「許認可手続きは cloud-itonami でできるように、個別ケース情報は
+gftdcojp 側で、public な共通サービスは cloud-itonami に」を、既存資産を活かして
+3層に整理した:
+
+| 層 | 場所 | 中身 |
+|---|---|---|
+| **知識（データ層）** | kotoba-lang/kyoninka（`beeadf2`） | `kyoninka.dossier` — 手続き・書類・**受付方法（郵送/FAX/窓口、官公庁公式確認済み）**・取得ガイド・書類テンプレート・`generate(procedure,profile)`・`public-catalog-entry`。誰の申請でも同じ汎用の行政知識 |
+| **公開共通サービス** | gftdcojp/cloud-itonami（`b6877b07`） | `cloud_itonami.license_service`（portable API）+ `scripts/generate-licenses.cljs` → **itonami.cloud/licenses.json ・ /licenses/（live 公開）**。汎用知識のみ。`dossier(profile)`/`case-status(events)` は呼び出し側が渡す pass-through で service は保持しない |
+| **private ケース** | 各 org | cloud-itonami `resources/licenses/*.edn`（台帳・evidence、private tenant）＋ ai-gftd-itad `resources/licenses/applicant.edn`（申請者データ、`04cf2c1`） |
+
+- **公開カタログにケースデータが漏れないことを test + live で担保**（河﨑/Gftd/
+  applicant/evidence の非混入を確認）。
+- ai-gftd-itad の生成器は汎用テンプレの重複を排し、`kyoninka.dossier` を消費して
+  private な applicant.edn だけを渡す consumer になった。
+- 実測: cljs に `format` 無し（0 埋めは手書き）／書類名の `/` がファイルパスを
+  壊す → doc-id ベースの ascii ファイル名に。
+
+これで「手続きは cloud-itonami でできる（service）／公開共通サービスは
+cloud-itonami（itonami.cloud/licenses）／個別ケースは各 org の private」が成立。
+
 ## Consequences
 
 - (+) 新しい UI をゼロから作らない: 組織 = 既存 cockpit approvals、個人 = 既存
