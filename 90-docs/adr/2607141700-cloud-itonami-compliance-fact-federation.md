@@ -1813,6 +1813,39 @@ tokyo/santiago/buenos-airesと並んで取得できることを確認。
 現状: 国軸25件・業界団体軸27件(22業種)・自治体軸20件——72tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 73 — 国軸26件目(パナマ))
+
+`cloud-itonami-iso3166-pan`に`statute.facts`を新規追加・push
+([commit 2700b86](https://github.com/cloud-itonami/cloud-itonami-iso3166-pan/commit/2700b86))：
+パナマ共和国。公式LEGISPAN（`s3-legispan.asamblea.gob.pa`、パナマ
+国民議会自身の法令メタデータアーカイブ）の2件を検証: Ley N.º 2 de
+1916（民法典・商法典ほか複数法典を一括承認するオムニバス法、
+1916-08-22制定、Gaceta Oficial 2418に1916-09-07掲載）／Ley N.º 81
+de 2019（データ保護法、2019-03-26制定、Gaceta Oficial 28743-Aに
+2019-03-29掲載）。両PDFとも初回WebFetchでは判読不能なバイナリ
+ストリームとして返ってきたが、保存済みPDFパスをReadツールで
+再読み込みすると、LEGISPAN特有の構造化メタデータ表紙（Tipo de
+Norma / Número / Año / Fecha / Titulo / Gaceta Oficial / Publicada
+el）が毎回クリーンにレンダリングされる——このファミリーで見てきた
+自由文形式の法令PDFとは異なる、強い一次情報源フォーマットだった。
+
+**3件目を断念**: Código de Trabajo（労働法典、Decreto de Gabinete
+252 de 1971）を試みたが、`infojuridica.procuraduria-admon.gob.pa`は
+該当recordなし、`organojudicial.gob.pa`はHTTP 403、`mitradel.gob.pa`
+（労働省自身のPDF）もHTTP 403——未検証のLEGISPAN S3 URLを推測で
+構築することはせず、デンマークのstatute.factsと同じ方針で正直に
+2件のみとした。4 tests/11 assertions green。
+
+首都チェック: 既存のooyake由来organization.edn（Panama City、
+Wikidata Q3306）は史実上一貫して首都であり、P36歴史的首都バグの
+対象外と確認。
+
+102リポジトリ・737 factを統合。`"statute/topic" "data-protection"`
+での横断queryでpanを含む26カ国すべてが取得できることを確認。
+
+現状: 国軸26件・業界団体軸27件(22業種)・自治体軸20件——73tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
