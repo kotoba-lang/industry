@@ -1114,7 +1114,30 @@
       ;; before this edit on a freshly re-fetched origin/main
       ;; (concurrent-agent count-drift caution -- not an assumed fixed
       ;; number): 219 -> 220.
-      (is (= 220 (:implemented m))))))
+      ;; 220 -> 221: cloud-itonami-isic-0164 (Seed processing for
+      ;; propagation) fresh from-scratch scaffold (the entry's old
+      ;; :repo/:business-id pointed at a never-created
+      ;; gftdcojp/cloud-itonami-A0164 placeholder; identity ({:id "0164"
+      ;; :name "Seed processing for propagation"}) independently verified
+      ;; against a fresh clone before any work began). SeedOpsAdvisor ⊣
+      ;; Seed Processing Governor facility-operations-coordination actor
+      ;; mirroring cloud-itonami-isic-1061's [Manufacture of grain mill
+      ;; products] verified module shape (seedops.* in place of
+      ;; millops.*), covering seed-lot cleaning/grading/germination-
+      ;; testing/certification-support facilities for propagation seed
+      ;; (not on-farm growing, not consumption processing);
+      ;; germination-rate-below-minimum-violations and
+      ;; purity-below-minimum-violations are the seed-viability/varietal-
+      ;; purity analogs of 1061's mycotoxin-level-exceeded/ash-content
+      ;; checks; 49 tests / 156 assertions green, independently
+      ;; re-verified against a fresh clone; promoted :spec ->
+      ;; :implemented, superproject ADR-2607152500
+      ;; (cloud-itonami-isic-0164-seed-processing-coverage.md).
+      ;; Live-recomputed via `(industry/maturity-summary)` immediately
+      ;; before this edit on a freshly re-fetched origin/main
+      ;; (concurrent-agent count-drift caution -- not an assumed fixed
+      ;; number): 220 -> 221.
+      (is (= 221 (:implemented m))))))
 
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
