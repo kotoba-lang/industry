@@ -1,23 +1,23 @@
 {:health-status 200,
- :asOf "2026-07-16T09:08:23.179Z",
+ :asOf "2026-07-16T10:11:07.069Z",
  :zone-name "itonami.cloud",
  :productSurfaceHint
  {:url "/api/status",
   :note
-  "scores.productSurface should be 2764/2764 when free path is live"},
+  "scores.productSurface should be 2940/2940 when free path is live"},
  :zone
  {:requests-7d 260,
   :pageviews-7d 18,
   :uniques-7d-sum 77,
   :zone "itonami.cloud"},
- :agentRuns7d 10286,
+ :agentRuns7d 11045,
  :sources [:cloudflare :health :emitter :itonami-free-path],
  :agentNote
  "CF may 403 Python-urllib/* (error 1010) — set an explicit User-Agent.",
  :health-live
  {:bottleneck
   "free path live — paid path needs owner STRIPE_* secrets",
-  :asOf "2026-07-16T09:08:23.733Z",
+  :asOf "2026-07-16T10:11:07.596Z",
   :agentNote
   "CF may 403 Python-urllib/* (error 1010) — set an explicit User-Agent for agents.",
   :source "itonami-data-kv-list",
@@ -27,11 +27,11 @@
    :externalTenants 4,
    :selfRegisteredOwners 4,
    :registryEntries 4,
-   :agentRuns7d 10286,
+   :agentRuns7d 11045,
    :externalPaid 0},
   :ok true,
   :live true,
-  :version "0.1.422",
+  :version "0.1.445",
   :links
   {:freeClaim "/isco-1212/",
    :openBusiness "/api/open-business",
@@ -58,10 +58,8 @@
    :llms "/llms.txt"}},
  :paths
  {:ok
-  [{:path "/robots.txt", :requests 8}
-   {:path "/itonami", :requests 1}
-   {:path "/infer/cost", :requests 1}],
-  :status-mix {:client-error 11, :ok 10},
+  [{:path "/robots.txt", :requests 7} {:path "/itonami", :requests 1}],
+  :status-mix {:client-error 10, :ok 8},
   :window "24h"},
  :source "itonami-data-kv-list",
  :note
@@ -72,28 +70,28 @@
   :externalTenants 4,
   :selfRegisteredOwners 4,
   :registryEntries 4,
-  :agentRuns7d 10286,
+  :agentRuns7d 11045,
   :externalPaid 0},
  :free-path
  {:ok true,
   :externalTenants 4,
   :selfRegisteredOwners 4,
   :registryEntries 4,
-  :agentRuns7d 10286,
+  :agentRuns7d 11045,
   :externalPaid 0},
  :ok true,
- :traffic-quality {:window "24h", :probe-4xx-pct 52, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 56, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /robots.txt 8 · /itonami 1 · /infer/cost 1 | 4xx(probe) 52%",
+ "上位 page (24h, 2xx/3xx): /robots.txt 7 · /itonami 1 | 4xx(probe) 56%",
  :funnel
  {:trials 4,
   :freeClaims 4,
-  :agentRuns7d 10286,
+  :agentRuns7d 11045,
   :externalTenants 4,
   :paid 0},
- :version "0.1.423",
+ :version "0.1.445",
  :signal
- "itonami.cloud 実測 260 req/7d・77 uniques(日次和)・うち4xx probe 52%(24h)",
+ "itonami.cloud 実測 260 req/7d・77 uniques(日次和)・うち4xx probe 56%(24h)",
  :tenants
  {:active 4,
   :external-paid 0,
