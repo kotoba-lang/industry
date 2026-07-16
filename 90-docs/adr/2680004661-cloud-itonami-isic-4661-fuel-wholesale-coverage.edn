@@ -1,0 +1,80 @@
+[{:adr/id 2680004661
+  :adr/title "cloud-itonami-isic-4661 — Fuel-Wholesale-Depot Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-4661]
+  :adr/references [2607121000 2607100400 2613000000]
+
+  ;; Wave 2 actor (coordination/logistics/trade): fuel-wholesale-depot
+  ;; back-office operations coordination-only (fuel-receipt/dispatch/
+  ;; inventory-level data logging, tanker-truck/pipeline delivery-
+  ;; operation scheduling, safety-concern flagging, supplier-order
+  ;; coordination). Distinct from cloud-itonami-isic-4671 (fuel
+  ;; TRADING: counterparty credit/sanctions/contract), which ADR-
+  ;; 2607100400's own :isic-code-mismatch-finding already recorded
+  ;; has no real ISIC Rev.4 code -- its real Rev.4 equivalent is 4661
+  ;; (this actor), left separately registered at :spec for this build.
+
+  :actor/id :cloud-itonami-isic-4661
+  :actor/name "Fuel Depot Operations Coordinator"
+  :actor/isic-rev4 "4661"
+  :actor/domain :downstream/fuel-wholesale-depot
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-shipment-record :schedule-delivery-operation
+                       :flag-safety-concern :coordinate-supplier-order]
+  :actor/always-escalate-ops [:flag-safety-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-supplier-order 250000}
+
+  :actor/hard-checks [:depot-verified :effect-propose :closed-op-allowlist
+                       :closed-effect-allowlist :delivery-capacity-exceeded
+                       :already-scheduled :already-ordered :invalid-fuel-type
+                       :invalid-quantity :tank-integrity-clearance-finalize-blocked
+                       :hazmat-storage-safety-clearance-finalize-blocked]
+
+  ;; Self-trip-avoidance design, distinct from the term-list approach
+  ;; some siblings use (e.g. isic-4721's :actor/scope-excluded-terms):
+  ;; this actor's two permanent blocks are BOOLEAN-FLAG-based
+  ;; (:finalize-tank-integrity-clearance? / :finalize-hazmat-storage-
+  ;; safety-clearance? in the proposal's own :value), never a
+  ;; substring/term-list scan over the advisor's own free-text
+  ;; :summary/:rationale -- structurally immune to the sibling-fleet
+  ;; bug class where a bare-noun term list collides with a legitimate
+  ;; default rationale. Regression test:
+  ;; fueldepot.governor-contract-test/
+  ;; default-mock-advisor-proposals-never-self-trip-scope-exclusion-checks
+  ;; (asserts directly against every op's own default mock-advisor
+  ;; proposal, including a safety-concern rationale that deliberately
+  ;; contains the words "integrity" and "safety").
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-intake" :writes #{:log-shipment-record} :auto #{}}
+   2 {:label "assisted-coordinate" :writes #{:log-shipment-record :flag-safety-concern
+                                             :coordinate-supplier-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-shipment-record :schedule-delivery-operation
+                                         :flag-safety-concern :coordinate-supplier-order}
+      :auto #{:log-shipment-record}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 75 :assertions 209 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :registry-pure-functions
+                  :store-contract :scope-exclusion-self-trip-regression]
+  :test/simulator :fueldepot.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-4661"
+  :registry/business-id "cloud-itonami-isic-4661"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+  :registry/pre-existing-bugs-fixed [:name-truncation :stale-repo-placeholder
+                                      :operating-states-retail-shape-mismatch]
+  :registry/prior-placeholder {:repo "https://github.com/gftdcojp/cloud-itonami-G4661"
+                                :business-id "cloud-itonami-G4661"}
+
+  :db/id -1}]
