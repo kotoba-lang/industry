@@ -4,6 +4,16 @@
 
 Proposed（設計・実現性評価）。オーナー指示「20-actors は全て独立 repo になるように設計して、また engine, tool なども repo を分割できるか確認して」「compat 系は kotoba-lang org または etzhayyim org に移行済みでは? 調査確認して」を受けた設計。実行は本 ADR 合意後にフェーズ分割で行う（bulk 実行は下記の硬い前提を満たすまで不可）。先例: yabai の consolidation（ADR-2607170900）。分割ツール: ADR-2606231200（`bb actor:publish`）。
 
+## Addendum 2026-07-16（Phase 1 実行時の追加ブロッカー — 実行前検証で発覚）
+
+`/loop 5フェーズを進めて` の Phase 1（compat 844 の stale コピー除去）を実行しようとした際、**設計時に「低リスク」と評価した前提が不十分だったことが判明**。除去前検証（`os.listdir` 消費者 + drift）で以下を確認し、bulk 除去は**保留**した:
+
+1. **コーポラ存在依存の消費者が 6-7 本**: `70-tools/{register_cleanroom_actors,evaluate_maturity,build_capability_indexes,cognitive_actor_injector,langgraph_maturation_agent,auto_pilot_orchestrator}.py` が `os.listdir(20-actors)` で `endswith("-compat")` を列挙する。ns-require はゼロ（Agent B 調査どおり）だが、**ディレクトリ存在**に依存する。特に `register_cleanroom_actors.py` は actors-v1 kotoba graph の登録 seed を生成。いずれも CI/bb.edn 非配線（one-shot）だが、除去すると再生成時にコーポラが縮む。
+2. **loose verify タスク**: `bb verify-wave:test/report` → `70-tools/verify_wave11.py`（CI 非配線だが bb.edn task 実在）。1000-actor コーポラを対象とする。
+3. **drift 実在**: サンプルした compat（8th_wall/aave）は独立リポ（kotoba-lang `com-*`）と **4 ファイル差分**（README/deps.edn/`.well-known/did.json`/manifest 等 identity・metadata 系）。generated ゆえ非 load-bearing の可能性が高いが、除去前に per-batch で「独立リポ側が authoritative かつ vendored 固有の実質変更なし」を確認する必要がある。
+
+**Phase 1 の改訂前提**: bulk 除去の前に (a) 上記コーポラツールを「manifest / 独立リポ列挙」駆動に移行するか one-shot 生成物として明示 retire、(b) `verify_wave11.py` を独立リポ基準に再配線、(c) drift の 4 ファイル差分が identity 再生成のみであることを batch 検証。これらが済むまで compat 除去は実行しない。→ **Phase 1 は「低リスク最大物量」ではなく「コーポラツール移行が先行する中リスク」に格上げ。** 真に無ブロッカーの着手先は engine/tools の split-now leaf 群（`kotoba_iso20022`/`legal-*-wasm-guest`/`baien-wasm-ternary`/`kami-apps`/`etzhayyim-py`/`clj-murakumo-langchain`、Agent C 調査で source 消費者ゼロ）。
+
 ## Context — 現状は「新規作成」でなく「重複除去」
 
 調査で判明した最重要事実: **「20-actors を独立リポ化」は約 80% が既に完了している。** 独立リポは既に存在し west 登録済みで、`orgs/etzhayyim/root/20-actors/` に残るのは drift した stale な vendored コピー群（yabai と同型の二重存在）。
