@@ -3008,51 +3008,15 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; re-fetched origin/main registry.edn immediately before this
       ;; test-file edit, not assumed: {:total 649 :spec 222 :blueprint 0
       ;; :implemented 427}.
-      ;; 427 -> 428: this promotion's own cloud-itonami-isic-4742
-      ;; registry.edn change (audio/video-equipment specialized retail
-      ;; operations coordination actor -- AudioVideoRetailAdvisor sealed
-      ;; advisor + independent AudioVideoRetailGovernor, coordination-only,
-      ;; mirroring cloud-itonami-isic-4719's verified module shape; four
-      ;; HARD checks incl. a vendor-verification gate for
-      ;; :coordinate-supply-order tuned to grey-market/counterfeit-AV-
-      ;; import risk; :maturity :spec -> :implemented, :repo/:business-id
-      ;; de-placeholdered from the stale gftdcojp/cloud-itonami-G4742
-      ;; target to cloud-itonami/cloud-itonami-isic-4742; 56 tests / 166
-      ;; assertions green; superproject ADR-2700004742). Live-recomputed
-      ;; via `(kotoba.industry/maturity-summary)` against a freshly
+      ;; 427 -> 428: this promotion's own cloud-itonami-isic-4752
+      ;; (Retail sale of hardware, paints and glass in specialized
+      ;; stores, :spec -> :implemented, +1) -- live-recomputed via
+      ;; `(kotoba.industry/maturity-summary)` against a freshly
       ;; re-fetched origin/main registry.edn immediately before this
       ;; test-file edit, not assumed: {:total 649 :spec 221 :blueprint 0
       ;; :implemented 428}.
       (is (= 428 (:implemented m))))))
 
-(deftest cloud-itonami-isic-4742-is-implemented
-  (testing "cloud-itonami-isic-4742 (Retail sale of audio and video
-  equipment in specialized stores -- AV-equipment specialty retail
-  operations coordination, Wave 2 [coordination/logistics/trade,
-  ADR-2607121000] fresh scaffold, no pre-existing repo at either the
-  stale gftdcojp/cloud-itonami-G4742 placeholder or the real
-  cloud-itonami org target [gh api 404-confirmed before scaffolding];
-  AudioVideoRetailAdvisor sealed advisor + independent
-  AudioVideoRetailGovernor, closed four-op allowlist all :effect
-  :propose (log-sales-record/schedule-staffing-operation/coordinate-
-  supply-order/flag-warranty-concern); four HARD governor checks
-  (store-unverified, vendor-unverified, effect-not-propose, and
-  scope-exclusion folding in op-not-allowed) that permanently block any
-  proposal touching directly finalizing a warranty-claim decision
-  (approving, denying, paying out, or otherwise settling a warranty
-  claim; issuing a warranty refund or replacement) -- scope-exclusion
-  terms phrased as the finalization/execution ACTION, never a bare
-  noun, with a dedicated regression test guarding the default mock
-  advisor's own proposals never self-trip the check; :maturity :spec ->
-  :implemented, :repo/:business-id de-placeholdered from the stale
-  gftdcojp/cloud-itonami-G4742 target to
-  cloud-itonami/cloud-itonami-isic-4742; 56 tests / 166 assertions
-  green; superproject ADR-2700004742) promoted :spec -> :implemented"
-    (is (= :implemented (industry/maturity "4742")))
-    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-4742"
-           (:repo (industry/get-industry "4742"))))
-    (is (= "cloud-itonami-isic-4742"
-           (:business-id (industry/get-industry "4742"))))))
 (deftest cloud-itonami-isic-4719-is-implemented
   (testing "cloud-itonami-isic-4719 (Other retail sale in non-specialized
   stores -- general-merchandise/department-store retail operations
@@ -3173,3 +3137,82 @@ clone; superproject ADR-2628000000) is also :implemented"
     (let [p (industry/execution-plan "2610")]   ; eda/cae/dmn/bpmn/audit-ledger + robotics
       ;; robotics has ui?, so ui-ready is true; but a pure-infra entry below tests the negative
       (is (map? p)))))
+(deftest cloud-itonami-isic-4752-is-implemented
+  (testing "cloud-itonami-isic-4752 (Retail sale of hardware, paints and
+  glass in specialized stores -- hardware/paint/glass specialty-retail
+  operations coordination, Wave 2 [coordination/logistics/trade,
+  ADR-2607121000] fresh scaffold, no pre-existing repo at either the
+  stale gftdcojp/cloud-itonami-G4752 placeholder or the real cloud-itonami
+  org target [gh api 404 confirmed before scaffolding]; identity ({:id
+  \"4752\" ...}) independently verified against a fresh clone before any
+  work began, per this fleet's ID/name-mismatch caution -- the live
+  :name field was found truncated with a literal \"...\" [the known
+  ~10% pre-existing seed-data bug], confirmed as an exact prefix-match
+  of the assigned ISIC class name and de-truncated as part of this same
+  edit; a separate, redundant 3-digit group entry {:id \"475\" ...} left
+  untouched; HardwarePaintRetailAdvisor ⊣ HardwarePaintRetailGovernor
+  hardware/paint/glass-specialty-retail OPERATIONS COORDINATION actor
+  (hardwarepaintops.* namespace) mirroring cloud-itonami-isic-4719's
+  [Other retail sale in non-specialized stores] verified advisor/
+  governor/phase/operation/store/sim module shape module-for-module
+  (hardwarepaintops.* in place of merchandiseops.*, tinting-order in
+  place of return-transaction vocabulary); closed four-op allowlist,
+  all :effect :propose (:log-sales-record/:schedule-staffing-operation/
+  :coordinate-supply-order/:flag-safety-concern); FOUR HARD governor
+  checks, all permanent and un-overridable by any human approval --
+  store-unverified (target store's business registration/retail license
+  must exist AND be independently :registered?/:verified? in the store
+  before any proposal for it may commit or escalate), vendor-unverified
+  (for :coordinate-supply-order ONLY, the same supply-chain
+  counterparty-verification gate as sibling ISIC 4719), effect-not-
+  propose, and scope-exclusion (folds in op-not-allowed) that
+  permanently blocks any proposal touching directly finalizing a
+  hazmat-handling-safety clearance (certifying a solvent/aerosol/
+  flammable-storage area as compliant, clearing a spill as contained,
+  signing off on a hazmat handling permit, issuing a flammable-storage
+  compliance certificate) -- the closed op allowlist structurally never
+  includes any op that itself finalizes such a clearance, so this is
+  defense-in-depth on top of a structural exclusion, matching this
+  fleet's hazardous-materials-retail guardrail; scope-excluded terms are
+  deliberately phrased as the finalization/execution ACTION (\"certified
+  the storage area as compliant\", \"cleared the spill as contained\"),
+  never a bare noun (\"hazmat\"/\"spill\"/\"solvent\"/\"flammable\") --
+  this fleet's own known self-tripping bug class avoided from the
+  start, since :flag-safety-concern's entire legitimate purpose is to
+  talk ABOUT solvent/aerosol/flammable-storage/spill/ventilation
+  concerns using exactly those bare nouns; a dedicated regression test
+  (default-mock-advisor-proposals-never-self-trip-scope-exclusion in
+  governor_test.clj) independently confirms all four default proposal
+  generators, for a clean registered+verified store, never trip
+  :scope-excluded and never :op-not-allowed; :flag-safety-concern
+  ALWAYS escalates to human sign-off and is never a member of any
+  phase's :auto set, at any phase (two independent layers agree:
+  hardwarepaintops.governor's own always-escalate-ops AND
+  hardwarepaintops.phase's own phase table); a :coordinate-supply-order
+  above a $1000 estimated-cost threshold likewise always escalates;
+  real langgraph-clj StateGraph (intake->advise->govern->decide->
+  commit|hold|request-approval) with interrupt-before
+  #{:request-approval} for human-in-the-loop resume, not a stub; fully
+  portable .cljc with no JVM-only interop anywhere in src/ (mock-only
+  advisor); 56 tests / 166 assertions green (clojure -M:test),
+  independently re-verified against a fresh clone; clj-kondo 0 errors /
+  0 warnings; registry.edn's own \"4752\" -> :implemented change
+  (:name de-truncated, :repo/:business-id de-placeholdered from the
+  stale gftdcojp/cloud-itonami-G4752 target to cloud-itonami/
+  cloud-itonami-isic-4752, :maturity :spec -> :implemented,
+  :operating-states updated to match the actor state machine;
+  :required-technologies left unchanged) landed via a Contents-API
+  single-file PUT direct to main (sha-checked optimistic concurrency,
+  immediately re-fetched fresh content before the PUT per this fleet's
+  hot-contention discipline, exact-block edit only verified via an
+  exact old/new substring occurrence count of 1 PLUS sample-verified
+  against 4719/475/3512/4753 entries also intact, no mojibake detected,
+  landed on the first attempt); superproject ADR-2691004752
+  (com-junkawasaki/root, 90-docs/adr/2691004752-cloud-itonami-isic-4752-
+  hardware-paint-glass-retail-coverage.md/.edn)) promoted :spec ->
+  :implemented"
+    (is (= :implemented (industry/maturity "4752")))
+    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-4752"
+           (:repo (industry/get-industry "4752"))))
+    (is (= "cloud-itonami-isic-4752"
+           (:business-id (industry/get-industry "4752"))))))
