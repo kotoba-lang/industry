@@ -51,11 +51,14 @@
     :needs-when-unmeasurable ["初期 vertical の絞り込み" "外部オンボーディング導線" "per-seat billing"]}
 
    :hyp/aozora-organism-content
-   ;; measurable via engagement telemetry emitter (aozora): organism-engagement-ratio が閾値超え
+   ;; measurable via appview.aozora.app/api/engagement (2026-07-16 live、ADR-2607151900)。
+   ;; ratio = organism_engagement / total_engagement。total engagement=0 のとき
+   ;; nil-honest (0/0) → unmeasurable。emitter は既に稼働しているので、残る
+   ;; needs は「計器」でなく「実 engagement を生む content/audience」。
    {:metric [:engagement :organism-engagement-ratio] :op :>= :threshold 0.3
     :evidence-label "organism engagement 比率"
-    :needs-when-unmeasurable ["engagement テレメトリ (DAU / post engagement / feed 計測)"
-                              "organism/human actorType 属性 + agent DID allow-list"]}
+    :needs-when-unmeasurable ["organism content への実 engagement (like/reply/repost) — emitter は稼働済、母数がゼロ"
+                              "organism 投稿の増加 (agent actor の投稿頻度) + 閲覧者の獲得"]}
 
    :hyp/yoro-aozora-funnel
    ;; measurable via yoro MAU emitter: aozora→yoro MAU 転換率が閾値超え
