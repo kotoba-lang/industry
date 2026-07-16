@@ -2285,6 +2285,46 @@ SMMTが軸初の英国拠点団体。またISIC 2910（自動車製造）2件目
 現状: 国軸30件・業界団体軸31件(25業種)・自治体軸28件——89tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 90 — 自治体軸29件目(Warsaw, POL) — 中東欧初、多ドメイン難航)
+
+`cloud-itonami-municipality-pol-warsaw`を新規GitHubリポジトリとして
+scaffold・push
+([commit 3b67cba](https://github.com/cloud-itonami/cloud-itonami-municipality-pol-warsaw/commit/3b67cba))：
+
+自治体軸で初の中東欧エントリ。ソース確保が難航——5つの異なる公式
+ドメインで異なる失敗:
+
+- **isap.sejm.gov.pl**（ポーランド国会・国家法令データベース）—
+  `DocDetails.xsp`・`download.xsp`直リンクPDFの両方でCAPTCHA
+  ページが表示された。CAPTCHAは絶対に突破しない方針のため
+  サイト全体を断念。
+- **bip.warszawa.pl / um.warszawa.pl / transport.um.warszawa.pl** —
+  いずれもHTTP 403。
+- **edziennik.mazowieckie.pl**（マゾフシェ県の公式官報）— 3つの
+  異なる文書URLすべてでタイムアウト。
+- **warszawa19115.pl** — 接続そのものを拒否（ECONNREFUSED）。
+
+最終的に2つの生きたドメインから直接確認:
+
+- **Ustawa z dnia 15 marca 2002 r. o ustroju miasta stołecznego
+  Warszawy**（2002年3月15日ワルシャワ首都制度法、Dz.U. 2002 Nr 41
+  poz. 361）— Kancelaria Sejmu（国会官房）発行の統合テキストPDFが
+  `up.warszawa.pl`にミラーされており、表紙ページを目視確認（タイトル・
+  官報citation・第1条本文すべて判読可能）。
+- **Uchwała Nr XXXIX/1587/2026 Rady m.st. Warszawy**（2026年7月2日の
+  市議会決議）— `eto.um.warszawa.pl`自身の決議詳細ページで直接確認。
+
+4 tests/10 assertions green。119リポジトリ・772 factを統合。
+`"ordinance/kind" "local-act"`での横断queryで`[london new-delhi
+warsaw]`——創設憲章型の3自治体法がすべて正しく取得できることを確認。
+
+**capital-check**: ワルシャワ（Q270）は1596年（クラクフから遷都）以来
+一貫してポーランドの首都であり、既存の`cloud-itonami-iso3166-pol`
+organization.ednと一致——史的首都バグの影響なしを確認。
+
+現状: 国軸30件・業界団体軸31件(25業種)・自治体軸29件——90tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
