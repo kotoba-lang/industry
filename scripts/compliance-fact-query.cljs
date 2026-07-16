@@ -340,7 +340,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-iso3166-are/data/datascript-tx.edn"}
    {:label "cloud-itonami-municipality-vnm-hanoi ordinance.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-municipality-vnm-hanoi/schema/ordinance.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-municipality-vnm-hanoi/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-vnm-hanoi/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6419-vnm-vnba association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6419-vnm-vnba/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-vnm-vnba/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 

@@ -2755,6 +2755,45 @@ warsaw bangkok abu-dhabi hanoi]`——創設憲章型の6自治体法がすべ�
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-16, /loop tick 102 — 業界団体軸35件目(VNBA, VNM, ISIC 6419) — 銀行業6カ国目、VITASはドメイン不通で断念)
+
+`cloud-itonami-assoc-6419-vnm-vnba`を新規GitHubリポジトリとして
+scaffold・push
+([commit caeb59d](https://github.com/cloud-itonami/cloud-itonami-assoc-6419-vnm-vnba/commit/caeb59d))：
+
+Vietnam Banks Association（VNBA、ベトナム銀行協会）。ISIC 6419
+（銀行業）の6カ国目（日本・ドイツ・フランス・オーストラリア・UAEに
+次ぐ）。本tick窓のベトナムリサーチ
+（[`cloud-itonami-municipality-vnm-hanoi`](https://github.com/cloud-itonami/cloud-itonami-municipality-vnm-hanoi)）
+の流れを継続。
+
+本tickは当初VITAS（ベトナム繊維・アパレル協会）を業種多様化の
+候補として試みたが、公式ドメイン（vietnamtextile.org.vn）が
+試した4つの異なるURL（トップページ・25周年記念記事・組織図
+ページ・検索ページ）すべてで接続リセット（ECONNRESET）——ドメイン
+全体不通として断念し、銀行業のVNBAに切り替えた。
+
+vnba.org.vn自身のHistoryページから2件を直接確認:
+
+- **1994年設立** — 「Vietnam Banks Association (VNBA) was
+  established after the Prime Minister's approval on May 14, 1994」
+  「On August 23, 1994, VNBA was officially launched after its 1st
+  Congress」と明記。
+- **1995年ASEAN Banking Association加盟** — 1995年9月29日、7番目の
+  加盟団体として加入。
+
+VNBA自身のWikidata Q-idは見つからず、推測せず正直に省略。
+
+4 tests/11 assertions green。131リポジトリ・796 factを統合。
+`"association-rule/isic" "6419"`での横断queryで6カ国すべて
+（`[zenginkyo JPN]`・`[bankenverband DEU]`・`[fbf FRA]`・
+`[aba AUS]`・`[ubf ARE]`・`[vnba VNM]`）が正しく取得できることを
+確認。
+
+現状: 国軸34件・業界団体軸35件(26業種)・自治体軸33件——102tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
