@@ -2066,6 +2066,30 @@ seoul/tokyo/santiago/buenos-airesと並んで取得できることを確認。
 現状: 国軸28件・業界団体軸29件(24業種)・自治体軸25件——82tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 83 — 自治体軸26件目(グアダラハラ))
+
+`cloud-itonami-municipality-mex-guadalajara`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-mex-guadalajara/commit/303fb33))：
+グアダラハラ市（メキシコ第2の都市、首都ではない——首都はメキシコ
+シティ）。以前のtickでメキシコシティ（`cdmx.gob.mx`）はホスト
+クラスタ全体が到達不能で断念していたが、グアダラハラ公式PDFは正常に
+レンダリングされた。2件検証: Código de Gobierno Municipal de
+Guadalajara（市統治法典——タイトルは直接確認したが、数百条にわたる
+長大な法典で「transitorios」節への到達が非現実的だったため、原本の
+制定日は見つからず意図的に省略）／Reglamento del Ayuntamiento de
+Guadalajara（市議会規則——タイトル・承認日(2010-01-01)ともに公布
+ヘッダーを直接読んで確認。ヘッダーには当時の市長個人名が偶然含まれて
+いたが、日付特定のためだけに読み、カタログには一切保存していない）。
+4 tests/10 assertions green。
+
+112リポジトリ・758 factを統合。`"ordinance/topic" "governance"`での
+横断queryでguadalajaraがbrussels/montevideo/quito/helsinki/sao-paulo/
+oslo/asuncion/sydney/cape-town/san-jose/bogota/copenhagenと並んで
+取得できることを確認。
+
+現状: 国軸28件・業界団体軸29件(24業種)・自治体軸26件——83tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社

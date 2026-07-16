@@ -283,7 +283,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-iso3166-pry/data/datascript-tx.edn"}
    {:label "cloud-itonami-municipality-pry-asuncion ordinance.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-municipality-pry-asuncion/schema/ordinance.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-municipality-pry-asuncion/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-pry-asuncion/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-mex-guadalajara ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-mex-guadalajara/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-mex-guadalajara/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
