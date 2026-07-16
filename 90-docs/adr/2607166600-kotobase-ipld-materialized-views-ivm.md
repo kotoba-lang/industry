@@ -68,9 +68,10 @@ ADR-2607166000 の残課題: フィードの cache-miss 経路が ~8 秒（attr 
   retraction 打ち消し / carry-forward / nil-spec 除去）、kotobase-cljc-worker
   38 tests（cljs 経路の fold+view E2E）、app-aozora 406 tests（view 優先 +
   フォールバック）— すべて green。
-- レイテンシ: デプロイ後の実測は ledger（`90-docs/perf/appview-latency-ledger.edn`）
-  に追記。期待値: フィード cache-miss ~8s → **~1〜2s**（kotobase 2 リクエスト:
-  head/state + views ブロック。エッジキャッシュ hit ~0.1s は不変)。
+- レイテンシ（実測、ledger iteration 2）: フィード cache-miss **~8s → 0.56〜1.2s**
+  （kotobase 2 リクエスト: head/state + views ブロック）。probe p50: getVideoFeed
+  **37ms** / getTimeline 42ms（エッジキャッシュ hit 側)。フィード内容・プロフィール
+  投影は view 経由で完全一致を確認。
 
 ## Consequences
 
@@ -83,8 +84,12 @@ ADR-2607166000 の残課題: フィードの cache-miss 経路が ~8 秒（attr 
   健全である前提は従来と同じ）。
 - (−) rows は 1 ブロック内包 — view が数万行に育ったら chunked rows（prolly-tree
   化）が必要（spec が rows と同梱なので後方互換に移行可能）。
-- (−) zero-novelty のグラフに対する views_edn 宣言は現状 no-op（do-fold の早期
-  return）— 書き込みが流れている運用グラフでは実害なし、Follow-up に明記。
+- (~~−~~ **closed 同日**) zero-novelty のグラフに対する views_edn 宣言が no-op に
+  なるギャップは実運用で即発現した（relay cron off の yoro-social-v2 で fold tick
+  が常に novelty ゼロ → view が永遠に立たない）ため、同日中に views-only fold
+  （views_edn があれば早期 return を迂回。空 novelty の fold! は同一
+  content-addressed snapshot の再 commit で安価）として解消済み
+  （kotobase-cljc-worker `a9b22cc`、39 tests green）。
 - (−) Phase 1 の view 導出は fold の merged db からの全量フィルタ（fold 自体が
   full-hydrate な現状に追随）。fold が incremental 化したら O(Δ) デルタ維持へ
   （保存形は対応済み）。
@@ -93,6 +98,5 @@ ADR-2607166000 の残課題: フィードの cache-miss 経路が ~8 秒（attr 
 
 - fold の incremental 化に合わせた O(Δ) view 維持（真の RisingWave IVM）。
 - chunked view rows（prolly-tree）と view の cursor/limit サーバ側適用。
-- zero-novelty グラフへの views 宣言（fold の早期 return の緩和 or 専用 op）。
 - kotobase リクエスト単価 ~1.2s 自体の削減（state/head 読みの R2 ラウンド数）。
 - 他のホットな読み（getAuthorFeed / getProfile 群）の view 化判断。
