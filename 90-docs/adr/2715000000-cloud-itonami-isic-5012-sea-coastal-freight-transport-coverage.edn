@@ -1,0 +1,77 @@
+[{:adr/id 2715000000
+  :adr/title "cloud-itonami-isic-5012 — Sea and Coastal Freight Water Transport Port/Logistics Scheduling Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-5012]
+  :adr/references [2607121000]
+
+  ;; Wave 2 actor (coordination/logistics/trade): sea and coastal freight
+  ;; water transport (cargo/container vessels, coastal shipping)
+  ;; PORT/LOGISTICS SCHEDULING coordination-only (shipment-record
+  ;; logging, berth-operation scheduling, maintenance-order coordination,
+  ;; safety-concern flagging). Never navigates a vessel; never finalizes
+  ;; a vessel-seaworthiness or cargo-load-safety clearance.
+
+  :actor/id :cloud-itonami-isic-5012
+  :actor/name "Sea and Coastal Freight Port/Logistics Scheduling Coordinator"
+  :actor/isic-rev5 "5012"
+  :actor/domain :transport/sea-coastal-freight
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-shipment-record :schedule-berth-operation
+                       :coordinate-maintenance-order :flag-safety-concern]
+  :actor/always-escalate-ops [:flag-safety-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-maintenance-order 5000}
+
+  :actor/hard-checks [:vessel-verified :contractor-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["finalize the seaworthiness clearance" "issue the seaworthiness clearance"
+                                "clear the vessel as seaworthy" "certify the vessel as seaworthy"
+                                "finalize the cargo-load-safety clearance"
+                                "approve the cargo load as safe" "clear the cargo load as safe"
+                                "override the captain's safety judgment"
+                                "override the harbor master's safety judgment"
+                                "override the master's safety determination"
+                                "bypass the maritime safety protocol" "bypass maritime safety protocols"
+                                "directly navigate the vessel" "directly dispatch the vessel"
+                                "directly reroute the vessel" "take direct control of the helm"
+                                "耐空性確認を確定" "耐空性証明を発行した" "貨物積付安全確認を確定"
+                                "船長の安全判断を覆した" "港湾長の安全判断を覆した"
+                                "海上安全プロトコルを回避" "船舶を直接操船した" "船舶を出航させた"]
+
+  ;; Self-trip-avoidance: every term above is phrased as the
+  ;; finalization/execution ACTION, never a bare noun -- this namespace's
+  ;; own :flag-safety-concern default proposal legitimately discusses
+  ;; cargo-load-safety/seaworthiness/hazmat concerns as bare nouns. A
+  ;; bare-noun term list (e.g. bare "seaworthy"/"seaworthiness"/"cargo
+  ;; load safety"/"hazmat") would self-trip this actor's own core happy
+  ;; path on every single run. Regression test:
+  ;; governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion.
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-shipment-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-shipment-record :schedule-berth-operation
+                                               :coordinate-maintenance-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-shipment-record :schedule-berth-operation
+                                         :coordinate-maintenance-order :flag-safety-concern}
+      :auto #{:log-shipment-record :schedule-berth-operation :coordinate-maintenance-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 57 :assertions 168 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression
+                  :contractor-verification]
+  :test/simulator :seafreightops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-5012"
+  :registry/business-id "cloud-itonami-isic-5012"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]

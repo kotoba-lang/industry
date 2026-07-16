@@ -1,0 +1,80 @@
+[{:adr/id 2730004922
+  :adr/title "cloud-itonami-isic-4922 — Other Passenger Land Transport (Intercity/Chartered Coach) Dispatch Logistics Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-4922]
+  :adr/references [2607121000 2680004719]
+
+  ;; Wave 2 actor (coordination/logistics/trade): intercity/chartered-
+  ;; coach SCHEDULING/DISPATCH LOGISTICS COORDINATION-ONLY (trip/
+  ;; ridership/incident-report data logging, vehicle/route/timetable
+  ;; dispatch scheduling, fleet maintenance procurement coordination,
+  ;; vehicle-defect/driver-fitness/route-hazard safety-concern
+  ;; flagging). Distinct from sibling ISIC 4921 (urban/suburban passenger
+  ;; land transport, separate actor, separate governor, built
+  ;; concurrently in this same batch). Never directly operates a vehicle
+  ;; and never overrides a safety judgment -- passenger-safety dimension.
+
+  :actor/id :cloud-itonami-isic-4922
+  :actor/name "Intercity Coach Dispatch Logistics Coordinator"
+  :actor/isic-rev5 "4922"
+  :actor/domain :transport/passenger-land
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-service-record :schedule-dispatch-operation
+                       :coordinate-maintenance-order :flag-safety-concern]
+  :actor/always-escalate-ops [:flag-safety-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-maintenance-order 1500}
+
+  :actor/hard-checks [:vehicle-verified :provider-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["finalize the dispatch safety clearance"
+                                "finalize the driver fitness-to-drive determination"
+                                "certify the driver as fit to drive"
+                                "clear the vehicle to dispatch despite the defect"
+                                "authorize the vehicle to depart despite the defect"
+                                "override the safety hold" "override the dispatch safety clearance"
+                                "waive the pre-trip inspection"
+                                "approve the driver to drive despite the concern"
+                                "dispatch the vehicle despite the open safety hold"
+                                "運行安全確認を確定" "運転可否判定を確定"
+                                "整備不良のまま出発を承認" "点呼を省略"
+                                "乗務可否を確定" "安全確認を省略して出発を許可"]
+
+  ;; Self-trip-avoidance: every term above is phrased as the
+  ;; finalization/execution ACTION, never a bare noun -- this namespace's
+  ;; own :flag-safety-concern default proposal legitimately discusses
+  ;; vehicle-defect/driver-fitness/route-hazard concerns, and its own
+  ;; printed :op keyword literally contains the substring "safety". A
+  ;; bare-noun term list (e.g. bare "safety"/"fitness"/"dispatch") would
+  ;; self-trip this actor's own core happy path on every single run.
+  ;; Regression test:
+  ;; governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion.
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-service-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-service-record :schedule-dispatch-operation
+                                               :coordinate-maintenance-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-service-record :schedule-dispatch-operation
+                                         :coordinate-maintenance-order :flag-safety-concern}
+      :auto #{:log-service-record :schedule-dispatch-operation :coordinate-maintenance-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 58 :assertions 172 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression
+                  :provider-verification]
+  :test/simulator :intercitycoachops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-4922"
+  :registry/business-id "cloud-itonami-isic-4922"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
+  :registry/operating-states [:intake :book :transit :deliver :reconcile :audit]
+
+  :db/id -1}]

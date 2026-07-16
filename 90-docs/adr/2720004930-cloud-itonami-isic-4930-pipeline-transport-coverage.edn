@@ -1,0 +1,101 @@
+[{:adr/id 2720004930
+  :adr/title "cloud-itonami-isic-4930 — Transport via Pipeline Operations Coordination (Administrative/Logistics Only)"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-4930]
+  :adr/references [2607121000 2680004719]
+
+  ;; Wave 2 actor (coordination/logistics/trade), first class in this
+  ;; wave's transition from retail to TRANSPORT classes. Transport via
+  ;; pipeline is critical infrastructure with catastrophic-failure-mode
+  ;; risk (explosion, toxic release, environmental contamination) --
+  ;; the highest-stakes domain among this batch's transport classes.
+  ;; This actor is administrative/logistics coordination ONLY
+  ;; (throughput-record logging, inspection scheduling, maintenance-
+  ;; order coordination, integrity-concern flagging). Deliberately
+  ;; narrower than sibling ISIC 4950 (petroleum batch-custody, which has
+  ;; a dispatch/settle dual-actuation shape, always human-gated): 4930
+  ;; has NO dispatch, delivery, or pipeline-operating-parameter op at
+  ;; all -- structurally absent, not merely gated.
+
+  :actor/id :cloud-itonami-isic-4930
+  :actor/name "Pipeline Transport Administrative Operations Coordinator"
+  :actor/isic-rev5 "4930"
+  :actor/domain :transport/pipeline-administration
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? false
+  :actor/high-hazard-infrastructure? true
+
+  :actor/proposal-ops [:log-throughput-record :schedule-inspection-operation
+                       :coordinate-maintenance-order :flag-integrity-concern]
+  :actor/always-escalate-ops [:flag-integrity-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-maintenance-order 5000}
+  :actor/excluded-op-classes [:pressure-adjustment :flow-rate-adjustment
+                              :valve-actuation :emergency-shutoff-override
+                              :integrity-safety-clearance-finalization]
+
+  :actor/hard-checks [:segment-verified :contractor-verified :effect-propose
+                      :scope-exclusion :op-allowlist]
+  :actor/scope-excluded-terms ["finalize the integrity-safety clearance" "finalized the integrity-safety clearance"
+                                "issue the safety clearance certificate" "issued the safety clearance certificate"
+                                "grant the integrity-safety clearance" "granted the integrity-safety clearance"
+                                "adjust the pipeline pressure" "adjusted the pipeline pressure"
+                                "change the pressure setpoint" "changed the pressure setpoint"
+                                "increase the flow rate" "increased the flow rate"
+                                "decrease the flow rate" "decreased the flow rate"
+                                "modify the flow rate" "modified the flow rate"
+                                "override the emergency shutoff" "overrode the emergency shutoff"
+                                "bypass the emergency shutoff" "bypassed the emergency shutoff"
+                                "disable the emergency shutoff" "disabled the emergency shutoff"
+                                "open the block valve" "opened the block valve"
+                                "close the block valve" "closed the block valve"
+                                "actuate the valve" "actuated the valve"
+                                "operate the shutoff valve" "operated the shutoff valve"
+                                "圧力を調整した" "圧力設定値を変更した" "流量を変更した"
+                                "流量を増加させた" "流量を減少させた" "緊急遮断を解除した"
+                                "緊急遮断を無効化した" "遮断弁を操作した" "バルブを開放した"
+                                "バルブを閉止した" "安全クリアランスを確定した" "整合性クリアランスを発行した"]
+
+  ;; Self-trip-avoidance: every term above is phrased as the
+  ;; finalization/execution ACTION, never a bare noun -- this namespace's
+  ;; own :flag-integrity-concern default proposal legitimately discusses
+  ;; pressure-anomaly and leak-detection concerns as OBSERVATIONS. A
+  ;; bare-noun term list (bare "pressure"/"shutoff"/"valve"/"圧力") would
+  ;; self-trip this actor's own core happy path on every single run.
+  ;; Regression test:
+  ;; governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion.
+
+  ;; Governor-keyword collision check performed pre-landing (gh api
+  ;; search/code, zero hits) -- deliberately distinct from sibling
+  ;; cloud-itonami-isic-4950's own :pipeline-integrity-governor and
+  ;; pipeline.* namespace.
+  :blueprint/governor :pipeline-transport-governor
+  :blueprint/governor-collision-checked [:pipeline-integrity-governor]
+  :blueprint/namespace :pipelineops
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-throughput-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-throughput-record :schedule-inspection-operation
+                                               :coordinate-maintenance-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-throughput-record :schedule-inspection-operation
+                                         :coordinate-maintenance-order :flag-integrity-concern}
+      :auto #{:log-throughput-record :schedule-inspection-operation :coordinate-maintenance-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 56 :assertions 166 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression]
+  :test/simulator :pipelineops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-4930"
+  :registry/business-id "cloud-itonami-isic-4930"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
