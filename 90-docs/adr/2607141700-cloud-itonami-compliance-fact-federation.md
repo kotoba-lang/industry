@@ -2794,6 +2794,50 @@ VNBA自身のWikidata Q-idは見つからず、推測せず正直に省略。
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-16, /loop tick 103 — 国軸35件目(VNM) — ベトナムが3tick窓で3軸完成、新規:decree種別)
+
+`cloud-itonami-iso3166-vnm`の`statute.facts`を追加
+([commit 8013c64](https://github.com/cloud-itonami/cloud-itonami-iso3166-vnm/commit/8013c64))：
+
+ベトナムの一般法2件、いずれもenglish.luatvietnam.vn（tick101の
+ハノイ「Law on the Capital」でも使用した同一ソース）で直接確認:
+
+- **Law on Enterprises**（Law No. 59/2020/QH14）— 第14期国会で2020年
+  6月17日可決、大統領令No. 06/2020/L-CTNにより7月1日公布、2021年
+  1月1日施行。
+- **Decree No. 13/2023/ND-CP on Personal Data Protection** —
+  2023年4月17日政府発布、7月1日施行。
+
+**新規`:decree`種別を導入** — ベトナム法体系では国会可決の
+「Luật（法律）」と行政府発布の「Nghị định（政令）」は明確に別種の
+法令であり、後者を`:law`と誤分類すると立法上の位置づけを過大に
+表現することになる（ベトナムには個人データ保護を専門に扱う国会
+可決法はまだ存在せず、この政令のみ）ため`:decree`を新設し正確に
+区別。
+
+ZAF/COL/IND/KEN/THA/AREと同様、既存の`marketentry.facts`実装がある
+同一`deps.edn`の下に`statute.facts`を新規namespaceとして追加。4
+tests/9 assertions green（既存marketentry 24 tests/81 assertions
+と合わせ計28 tests/90 assertions green）。
+
+**3軸完成の節目**: 本tickにより**ベトナムが国・自治体・業界団体の
+3軸すべてを、わずか3tickの窓**（自治体: tick101・団体: tick102・
+国: 本tick）**で完成**——tick100のUAE（約4tick）に次ぐ2カ国目の
+3軸完全達成、かつUAEより1tick早い。
+
+**capital-check**: tick101で既に検証済みのハノイ（Q1858、1976年
+統一後の国会決議以来）・P36史的首都バグなしの結果を再利用。
+
+132リポジトリ・798 factを統合。`"statute/kind" "decree"`での
+横断queryでVNMが新規statute種別の唯一（初）のエントリとして正しく
+取得できることを確認。country="VNM"での3スキーマ横断query
+（statute.facts / ordinance.facts / association-rule.facts）も
+すべて実在の正しい結果を返し、真の3軸連合カバレッジを確認。
+
+現状: 国軸35件・業界団体軸35件(26業種)・自治体軸33件——103tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
