@@ -102,3 +102,32 @@ datoms に記録し、生成時は `:character-lora-cid` として渡す（ADR-2
   refine gate という「品質ループの核」だけをパネル生成に先行適用する。
 - **単一候補ループの threshold 調整のみ**: fan-out 無しでは
   「最良候補の選択」ができず、seed ガチャの分散を捨てることになる。
+
+## Addendum 1 (2026-07-16) — co-scientist 生成ループ実装 / 学習は計画のみに凍結
+
+オーナー指示「学習は計画だけで OK、優先度はあとで。さきに高品質生成 agent
+loop のコード実装、co-scientist」を受けて:
+
+1. **`ai.gftd.mangaka.mangakaCoscientistPanel`**
+   (`clj/src/mangaka/graphs/coscientist_panel.cljc`) を実装。
+   Generate→Reflect→Rank(Elo)→Evolve→Meta の完全な co-scientist ループ
+   （パターン原典 ADR-2606141500、直系前例 isekai ADR-0007 /
+   `90-docs/design-quality/coscientist.cljc`）:
+   - Generate: 仮説人口 = ショット文法方向性。LLM 提案（complete-json）→
+     offline は決定論的 6 方向ライブラリに degrade。
+   - Reflect: 8 軸ルーブリック critique（generatePanelQuality と同一 judge）。
+   - Rank: round-robin Elo（K=32, base 1200）。**判定は測定スコアのみ —
+     LLM 討論をランキングの根拠にしない**（design-quality の
+     "ranking is reproducible, never an LLM debate" 原則を踏襲）。
+   - Evolve: elite 生存（再レンダリングなし）+ 変異（fix-hint 畳み込み +
+     seed 前進）+ 交叉（親 2 体の方向性フラグメント合成）。系譜は
+     :parents/:op で記録。
+   - Meta: 世代横断の最良を永続化、:generations 監査証跡 + iteration
+     doc（md）を返す。
+   テスト 4 件追加（budget 消尽 / 収束 / 進化オペレータ / rank 決定性）、
+   suite 108 tests 687 assertions green。gad 実機 E2E（実レンダリング 2 枚、
+   Elo 1216/1184）確認済み。
+2. **学習（trainCharacterLora / cloud-murakumo lora-train）は「計画のみ」に
+   凍結** — ハーネスと trainer 骨格は本 ADR 本文のまま存置するが、
+   Phase 0 benchmark・実学習・murakumo.edn 配線は優先度を下げ、
+   着手はオーナーの再指示を待つ。
