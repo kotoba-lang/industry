@@ -12,9 +12,9 @@ authoritative_for:
   - 大容量・非可搬な SQL パーサ/ORM 依存を避けるための minimal CREATE TABLE reader/emitter 戦略
   - スキーマ成果物の3-org 配置(共通=com-junkawasaki / 公益=etzhayyim / 事業=gftdcojp)
 related:
-  - orgs/com-junkawasaki/ddl-clj                        # 本 ADR のライブラリ
-  - orgs/com-junkawasaki/bpmn-clj                       # 同型の再利用 kernel(model+validate+I/O の先例)
-  - orgs/com-junkawasaki/dmn-clj                        # 姉妹の決定表 kernel
+  - orgs/kotoba-lang/ddl                        # 本 ADR のライブラリ
+  - orgs/kotoba-lang/org-omg-bpmn                       # 同型の再利用 kernel(model+validate+I/O の先例)
+  - orgs/kotoba-lang/org-omg-dmn                        # 姉妹の決定表 kernel
 supersedes: []
 superseded_by: []
 ---

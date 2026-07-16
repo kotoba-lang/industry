@@ -1,9 +1,21 @@
-;; kotoba-fleet-vcs Phase 1 keyring (ADR-2607160005).
-;; Maps signer ids to pin-advance grants (trailing-* wildcard paths).
-;; Phase 1 staging: session-generated key; Phase 2 moves signer ids to
-;; did:key (ed25519-clj/did) and grants to CACAO delegation chains, with
-;; private keys in 1Password per skill secrets-location-map.
+;; kotoba-fleet-vcs keyring + governance policy (ADR-2607160005).
+;; Phase 1: :keys — single-key pin-advance grants (trailing-* wildcard paths).
+;; Phase 2: :roots — trust anchors for delegation chains (fleet grant);
+;;          :canonical — Radicle-crefs-style quorum policy for canonical
+;;          advances (fleet govern): >= :threshold distinct signatures from
+;;          :allow. Private keys are session-local staging (0600, scratchpad);
+;;          moving them to 1Password (secrets-location-map) + CAIP-122 CACAO
+;;          wire format are tracked Phase 2 remainders.
 {:keys
  {"ed25519:7414dd47730947339b50c97b85021f22beee825dacc9e5c30b8413973215c5dd"
   {:grants #{"orgs/*"}
-   :note "2026-07-16 Phase 1 genesis key (Claude Code session, owner-approved)"}}}
+   :note "2026-07-16 Phase 1 genesis key (Claude Code session, owner-approved)"}}
+
+ :roots #{"did:key:z6Mkk13tQrNBXMhpvbJ2GKGYzX43XtyXnycG9VPqWpbiG5dR"}
+
+ :canonical
+ {:allow #{"did:key:z6MkqmFdjR71seTNhJYTfrAdPGVcjUbZmiKuH45NLHz2ezJ7"
+           "did:key:z6MkqZimxFUMg1xwFKSZsSecxegSbnKx9f3xY3wcHnxL5qTQ"
+           "did:key:z6Mkk13tQrNBXMhpvbJ2GKGYzX43XtyXnycG9VPqWpbiG5dR"}
+  :threshold 2
+  :note "2026-07-16 Phase 2 staging: gov1, gov2, owner-root; 2-of-3"}}

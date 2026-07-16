@@ -28,11 +28,20 @@
                     :remote (or (some-> (re-find #"(?m)^\s+annex-remote:\s*([^\s]+)\s*$" block) second) "b2")}))))))
 
 (defn resolve-b2 []
-  (let [script (str root "/scripts/b2-creds.cljs")]
+  ;; b2-creds.cljs now delegates its env/1Password/Keychain resolution to
+  ;; kotoba-lang/secret-resolve (ADR-2607161000) and no longer carries its
+  ;; own copy of that logic — it needs secret-resolve's src (and
+  ;; scripts/nbb_compat for the cheshire shim) on the classpath, which this
+  ;; script previously omitted entirely (confirmed broken: `nbb
+  ;; scripts/b2-creds.cljs --json` failed with "Could not find namespace:
+  ;; clojure.java.shell" before this fix, independent of the secret-resolve
+  ;; refactor).
+  (let [script (str root "/scripts/b2-creds.cljs")
+        classpath (str root ":" root "/scripts/nbb_compat:" root "/orgs/kotoba-lang/secret-resolve/src")]
     (cond
       (not (.existsSync fs script)) (fail "scripts/b2-creds.cljs がありません。")
       (not (zero? (:exit (sh "which" "nbb")))) (fail "nbb が見つかりません。")
-      :else (let [{:keys [exit out err]} (sh "nbb" script "--json")]
+      :else (let [{:keys [exit out err]} (sh "nbb" "--classpath" classpath script "--json")]
               (if (zero? exit)
                 (try (js->clj (.parse js/JSON out))
                      (catch :default _ (fail "b2-creds の JSON 出力を解釈できません。")))

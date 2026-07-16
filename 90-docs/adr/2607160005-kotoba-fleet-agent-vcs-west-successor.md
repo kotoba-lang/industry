@@ -385,3 +385,40 @@ conflict は残るため、review-before-merge UX は維持される。
   読み取り専用化）は、fleet 全体の運用切替なので owner 判断のもと Phase 1.5
   として別途。keyring の私鍵は session-local（scratchpad、0600）— 恒久鍵の
   1Password 移設と did:key 化・CACAO 化は Phase 2。
+
+## Addendum (2026-07-16, same day): Phase 2 — agent identity + governed land-back、E2E dogfood 済み
+
+実装は kotoba-fleet-vcs `7b81682fe4`（+ dogfood merge `c5055ce73790`）。
+テスト 9 tests / 52 assertions green。
+
+- **identity**: `fleet.did` — ed25519 did:key encode/decode（base58btc /
+  multicodec 0xed01、pure cljc bignum、nbb/JVM 両対応）。`fleet keygen` は
+  did:key を出力。signer id は Phase 1 の `ed25519:<hex>` から did:key へ。
+- **grants**: `fleet.grant/verify-chain` — owner root → agent の委譲鎖
+  （root trust / linkage child.iss==parent.aud / attenuation
+  child.resources⊆parent（trailing-* covers）/ expiry / per-link 署名）。
+  **cacao-clj と同意味論の fleet-native encoding**（nbb で動かすため。
+  CAIP-122 CACAO wire format への揃えは encoding-only の follow-up）。
+- **governed land-back（Plane 4 が実運転に）**: `fleet propose` は grant
+  保持者であることを検証して land 提案を ledger に記録。`fleet govern` は
+  ①**quorum pre-check（merge という副作用の前）** ②サーバ側マージ
+  ③k-of-n Governor 署名の canonical pin advance（`admit-quorum`: quorum /
+  sequence / parent / reachability / value-advance — 構造不変条件は Phase 1
+  gate と同一、authority のみ多重署名化）。policy は
+  `manifest/fleet-keys.edn` の `{:canonical {:allow #{did..} :threshold 2}}`
+  — Radicle crefs の policy-as-data 移植。単鍵 pin chain は quorum イベントを
+  chain 先頭として認識（混在 chain の連続性）。
+- **E2E dogfood（実 GitHub、kotoba-fleet-vcs 自身）**: owner-root / gov1 /
+  gov2 / agent1 の 4 鍵生成 → owner→agent1 に
+  `land:orgs/kotoba-lang/kotoba-fleet-vcs` を委譲（attenuated、expiry 付き）→
+  agent branch `agents/z6MkkA2L/docs-clarify-sync` を propose（chain 検証 OK、
+  ledger seq 3）→ **gov1 のみの govern は pre-merge REJECT（merge 実行前に
+  abort、副作用ゼロ）** → gov1+gov2 で server-side merge `c5055ce73790` +
+  **quorum 2/2 の canonical pin advance（seq 3、parent-covering 連鎖継続）**。
+  projection は直後の `gen --entry` で **SHA 完全一致**（等価性維持）。
+  終了後 agent branch 削除（着地後の後片付け）。
+- **Phase 2 の残（未実装、次の増分）**: workspace manager（lazy
+  materialization の manager 化 / worktree 自動 GC / checkpoint /
+  best-of-N）、鍵の 1Password 移設（secrets-location-map 準拠）、CACAO
+  wire format 揃え、既存 kotoba-fleet（ADR-2606302000 の lease/governor）
+  との Governor 統合。

@@ -13,8 +13,8 @@ authoritative_for:
   - DRG のトポロジカル評価と depends-on 伝播によるコンテキスト合成の方式
   - プロセス成果物の3-org 配置(共通=com-junkawasaki / 公益=etzhayyim / 事業=gftdcojp)
 related:
-  - orgs/com-junkawasaki/dmn-clj                        # 本 ADR のライブラリ
-  - orgs/com-junkawasaki/bpmn-clj                       # 姉妹ライブラリ(business-rule-task の委譲先)
+  - orgs/kotoba-lang/org-omg-dmn                        # 本 ADR のライブラリ
+  - orgs/kotoba-lang/org-omg-bpmn                       # 姉妹ライブラリ(business-rule-task の委譲先)
 supersedes: []
 superseded_by: []
 ---

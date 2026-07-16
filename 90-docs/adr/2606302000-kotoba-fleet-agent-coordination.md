@@ -18,7 +18,7 @@ related:
   - orgs/com-junkawasaki/kotoba/README.md
   - orgs/com-junkawasaki/kotoba-code/README.md
   - orgs/com-junkawasaki/murakumo/README.md
-  - orgs/com-junkawasaki/datom-clj/README.md
+  - orgs/kotoba-lang/datom/README.md
   - 90-docs/adr/2606272237-manifest-workflow-single-entry-commit.md
 supersedes: []
 superseded_by: []

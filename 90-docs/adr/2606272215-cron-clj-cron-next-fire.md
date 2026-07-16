@@ -13,9 +13,9 @@ authoritative_for:
   - dom/dow の OR セマンティクス(Vixie cron 互換)の実装方針
   - スケジューリング/loop actor が利用する next-fire-time の依存ライブラリとしての位置付け
 related:
-  - orgs/com-junkawasaki/cron-clj                        # 本 ADR のライブラリ
-  - orgs/com-junkawasaki/bpmn-clj                        # 同型の再利用 kernel(先例)
-  - orgs/com-junkawasaki/dmn-clj                         # 同型の再利用 kernel(先例)
+  - orgs/kotoba-lang/cron                        # 本 ADR のライブラリ
+  - orgs/kotoba-lang/org-omg-bpmn                        # 同型の再利用 kernel(先例)
+  - orgs/kotoba-lang/org-omg-dmn                         # 同型の再利用 kernel(先例)
   - 90-docs/adr/2606272200-bpmn-clj-edn-process-library  # bpmn-clj の設計 ADR
 supersedes: []
 superseded_by: []

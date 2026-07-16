@@ -57,6 +57,6 @@ See ADR-2607051100's Alternatives section.
 ## References
 
 - `orgs/kotoba-lang/character/README.md`
-- `orgs/com-junkawasaki/comfyui-clj/README.md`
+- `orgs/kotoba-lang/comfyui/README.md`
 - `orgs/kotoba-lang/vrm/README.md`
 - `orgs/gftdcojp/network-isekai/backend/README.md` (generation status table: image=TODO)

@@ -12,10 +12,10 @@ authoritative_for:
   - sentry(entry/exit criteria)駆動の plan-item ライフサイクルを純関数で fixpoint 評価する戦略
   - ケース成果物の3-org 配置(共通=com-junkawasaki / 公益=etzhayyim / 事業=gftdcojp)
 related:
-  - orgs/com-junkawasaki/cmmn-clj                       # 本 ADR のライブラリ
-  - orgs/com-junkawasaki/bpmn-clj                       # 構造化フロー(OMG トリオの姉妹)
-  - orgs/com-junkawasaki/dmn-clj                        # 決定表(OMG トリオの姉妹)
-  - orgs/com-junkawasaki/koe-clj                        # 同型の再利用 kernel(host-injected ports の先例)
+  - orgs/kotoba-lang/org-omg-cmmn                       # 本 ADR のライブラリ
+  - orgs/kotoba-lang/org-omg-bpmn                       # 構造化フロー(OMG トリオの姉妹)
+  - orgs/kotoba-lang/org-omg-dmn                        # 決定表(OMG トリオの姉妹)
+  - orgs/kotoba-lang/koe                        # 同型の再利用 kernel(host-injected ports の先例)
 supersedes: []
 superseded_by: []
 ---

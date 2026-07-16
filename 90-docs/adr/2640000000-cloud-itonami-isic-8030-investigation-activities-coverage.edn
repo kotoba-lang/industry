@@ -1,0 +1,104 @@
+[{:adr/id 2640000000
+  :adr/title "cloud-itonami-isic-8030 — Investigation Activities Case-Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-8030]
+  :adr/references [2607121000 2630801000]
+
+  ;; ISIC Rev.5 8030: investigation activities (private investigation,
+  ;; background checks, case research under contract). Pre-existing
+  ;; :blueprint-tier repo (docs published, no code) filled in, not
+  ;; recreated. Coordination-only: evidence chain-of-custody logging,
+  ;; investigator-to-case scheduling proposals, legal/compliance concern
+  ;; flagging, report-delivery logistics coordination. Genuinely
+  ;; high-stakes (privacy/legal-compliance adjacency) -- a stricter
+  ;; governor discipline than most cloud-itonami verticals: rendering an
+  ;; investigative conclusion (guilt/liability/fault) and authorizing a
+  ;; surveillance method are ALWAYS a permanent HARD block, never merely
+  ;; human-gated, and are not ops this actor's allowlist even recognizes.
+
+  :actor/id :cloud-itonami-isic-8030
+  :actor/name "CaseCoordinator-LLM Investigation Case-Coordination Actor"
+  :actor/isic-rev5 "8030"
+  :actor/domain :commercial/investigation-services
+  :actor/coordination? true
+  :actor/robotics? false
+  :actor/pre-existing-blueprint-repo? true
+  :actor/reference-mirror :cloud-itonami-isic-8299
+  :actor/reference-mirror-note "originally-nominated cloud-itonami-isic-8020 was still blueprint-only at build time; 8299 chosen instead on an exact :operating-states structural match"
+
+  :actor/proposal-ops [:log-case-record :schedule-investigation-operation
+                        :flag-legal-compliance-concern :coordinate-report-delivery]
+  :actor/always-escalate-ops [:flag-legal-compliance-concern]
+
+  :actor/hard-checks [:rbac :op-allowlist :effect-propose :authorization-verified
+                       :clearance-tier :capacity :structural-scope :scope-exclusion]
+  :actor/authorization-gate-exempt-ops [:flag-legal-compliance-concern]
+  :actor/scope-exclusion-phrasing :action-not-noun
+  :actor/scope-excluded-terms ["finalize the investigation conclusion"
+                                "finalizes the investigation conclusion"
+                                "finalizing the investigation conclusion"
+                                "finalize the case conclusion"
+                                "render a finding of guilt"
+                                "render a determination of liability"
+                                "render a determination of fault"
+                                "determine the subject's guilt"
+                                "determine the subject's liability"
+                                "issue a finding of fault"
+                                "authorize covert surveillance"
+                                "authorize a surveillance method"
+                                "authorize the surveillance method"
+                                "authorize wiretap surveillance"
+                                "authorize physical surveillance deployment"
+                                "authorize the deployment of a surveillance method"]
+  :actor/structural-scope-excluded-keys [:conclusion :verdict :guilt-determination
+                                          :liability-determination :fault-determination
+                                          :surveillance-method :surveillance-authorization
+                                          :covert-surveillance-method :report-content
+                                          :raw-report-content]
+  :actor/self-trip-regression-test :investigation.scope-exclusion-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion
+
+  :actor/qualification-catalog [:state-pi-license :process-server-cert
+                                 :background-check-fcra-cert :records-research-cert
+                                 :insurance-siu-cert]
+
+  :phase/rollout
+  {0 {:label "no-autonomy" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-case-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-case-record :schedule-investigation-operation
+                                               :flag-legal-compliance-concern :coordinate-report-delivery}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-case-record :schedule-investigation-operation
+                                         :flag-legal-compliance-concern :coordinate-report-delivery}
+      :auto #{:log-case-record :schedule-investigation-operation :coordinate-report-delivery}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :store/backends [:mem-store :datomic-store]
+  :store/shared-lib :langchain-store.core
+  :store/shared-lib-adr 2607141600
+
+  :test/counts {:total 42 :assertions 176 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :governor-self-trip-regression :advisor-shapes
+                  :phase-rollout :integration :store-contract]
+  :test/simulator :investigation.sim
+  :lint/clj-kondo {:errors 0 :warnings 0}
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-8030"
+  :registry/business-id "cloud-itonami-isic-8030"
+  :registry/business-id-corrected-from "cloud-itonami-8030"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
+  :registry/operating-states [:intake :register :match :dispatch :follow-up :audit]
+
+  :registry-test/file "test/kotoba/industry_test.clj"
+  :registry-test/tier-counts-before {:blueprint 15 :implemented 402}
+  :registry-test/tier-counts-after {:blueprint 12 :implemented 405}
+  :registry-test/tier-count-delta-note "combined delta across this promotion's own cloud-itonami-isic-8030 plus concurrent sibling agents' cloud-itonami-isic-8010/-8020 promotions landed in the same window, not solely this promotion's own work"
+  :registry-test/known-out-of-scope-failures ["8010" "8020"]
+  :registry-suite/counts-after {:total 15 :assertions 1062 :failures 2 :errors 0}
+
+  :actor-repo/commits {:pre-existing "a4ac443" :implementation "7aea02f"}
+
+  :db/id -1}]

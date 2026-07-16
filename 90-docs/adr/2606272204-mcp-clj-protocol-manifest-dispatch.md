@@ -14,9 +14,9 @@ authoritative_for:
   - ライブラリ成果物の3-org 配置(共通=com-junkawasaki / 公益=etzhayyim / 事業=gftdcojp)
 related:
   - orgs/kotoba-lang/org-anthropic-mcp    # 本 ADR のライブラリ（通称 mcp-clj；rename chain は末尾 addendum）
-  - orgs/com-junkawasaki/langchain-clj    # LLM chain kernel(姉妹); Claude+MCP スタックで連携
-  - orgs/com-junkawasaki/langgraph-clj    # graph 実行 kernel(姉妹); エージェントから本 lib を呼ぶ
-  - orgs/com-junkawasaki/bpmn-clj         # 同型設計の先例(model/validate/ports/execute 分離)
+  - orgs/kotoba-lang/langchain    # LLM chain kernel(姉妹); Claude+MCP スタックで連携
+  - orgs/kotoba-lang/langgraph    # graph 実行 kernel(姉妹); エージェントから本 lib を呼ぶ
+  - orgs/kotoba-lang/org-omg-bpmn         # 同型設計の先例(model/validate/ports/execute 分離)
 supersedes: []
 superseded_by: []
 ---

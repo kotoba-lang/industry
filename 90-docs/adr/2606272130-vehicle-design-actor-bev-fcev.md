@@ -15,7 +15,7 @@ related:
   - orgs/com-junkawasaki/vehicle-design-actor                    # 本 ADR の actor
   - orgs/com-junkawasaki/vehicle-design-actor/docs/adr/0001-architecture.md  # actor-local ADR(詳細)
   - orgs/com-junkawasaki/robotaxi-actor                          # 設計版ミラー元(VLA を SafetyGovernor で封じる)
-  - orgs/com-junkawasaki/langgraph-clj                           # StateGraph runtime(superstep + interrupt + checkpoint)
+  - orgs/kotoba-lang/langgraph                           # StateGraph runtime(superstep + interrupt + checkpoint)
   - orgs/com-junkawasaki/kami-engine/kami-vehicle                # 物理シム土台(soft-body, battery/tank ノード) ← 将来の検証連携先
   - orgs/etzhayyim/root/20-actors/hydrogen_electrolysis          # 水素製造側 actor(本 actor は車載 FC 設計側)
 supersedes: []

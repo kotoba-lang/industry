@@ -12,12 +12,12 @@ authoritative_for:
   - num-clj を CAE ソルバ(kudaki/nagare)の共有 GPU substrate とし、可搬カーネルへ backend 注入で GPU 化する配線方針
   - backend 契約テスト `GpuBackend ≡ CpuBackend`(MemStore≡DatomicStore 同型)で正しさを担保する決定
 related:
-  - orgs/com-junkawasaki/num-clj             # 新設: GPU 数値計算 substrate(IBackend + CPU 参照 + WGSL)
-  - orgs/com-junkawasaki/kudaki-clj          # 消費者: 陽解法 FEA(要素 GEMM / 集中質量)
-  - orgs/com-junkawasaki/nagare-clj          # 消費者: 有限体積 CFD(Krylov SpMV/AXPY/dot)
+  - orgs/kotoba-lang/num             # 新設: GPU 数値計算 substrate(IBackend + CPU 参照 + WGSL)
+  - orgs/kotoba-lang/kudaki          # 消費者: 陽解法 FEA(要素 GEMM / 集中質量)
+  - orgs/kotoba-lang/nagare          # 消費者: 有限体積 CFD(Krylov SpMV/AXPY/dot)
   - orgs/com-junkawasaki/kami-webgpu         # 同系: 宣言的 WebGPU レンダ(num-clj は GPU compute 側)
   - orgs/com-junkawasaki/kami-engine         # 同系: Rust wgpu エンジン(render+physics)
-  - orgs/com-junkawasaki/cae-solver-clj      # 契約: solve multimethod(将来 GPU backend を別 kind で)
+  - orgs/kotoba-lang/kami-engine-cae-solver      # 契約: solve multimethod(将来 GPU backend を別 kind で)
   - 90-docs/adr/2606272350-kudaki-nagare-highfidelity-fea-cfd-backends.md
 supersedes: []
 superseded_by: []

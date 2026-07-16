@@ -12,10 +12,10 @@ authoritative_for:
   - 大容量・非可搬なパーサ依存を避けるための minimal tokeniser + round-trip emitter 戦略
   - グラフ成果物の3-org 配置(共通=com-junkawasaki / 公益=etzhayyim / 事業=gftdcojp)
 related:
-  - orgs/com-junkawasaki/dot-clj                         # 本 ADR のライブラリ
+  - orgs/kotoba-lang/dot                         # 本 ADR のライブラリ
   - orgs/com-junkawasaki/svgraph                         # DOT EDN を SVG に描画する姉妹ライブラリ
-  - orgs/com-junkawasaki/bpmn-clj                        # 同型の再利用 kernel(設計先例)
-  - orgs/com-junkawasaki/koe-clj                         # host-injected ports の先例
+  - orgs/kotoba-lang/org-omg-bpmn                        # 同型の再利用 kernel(設計先例)
+  - orgs/kotoba-lang/koe                         # host-injected ports の先例
 supersedes: []
 superseded_by: []
 ---

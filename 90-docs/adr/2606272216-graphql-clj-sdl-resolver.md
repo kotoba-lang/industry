@@ -12,10 +12,10 @@ authoritative_for:
   - 重い GraphQL ランタイム依存を避けるための手書きトークナイザ + 再帰降下パーサ戦略
   - プロセス成果物の3-org 配置(共通=com-junkawasaki / 公益=etzhayyim / 事業=gftdcojp)
 related:
-  - orgs/com-junkawasaki/graphql-clj                      # 本 ADR のライブラリ
-  - orgs/com-junkawasaki/bpmn-clj                         # 同型の再利用 kernel(host-injected ports の先例)
-  - orgs/com-junkawasaki/koe-clj                          # host-injected ports パターンの原型
-  - orgs/com-junkawasaki/langgraph-clj                    # graph 実行 kernel(姉妹)
+  - orgs/kotoba-lang/graphql                      # 本 ADR のライブラリ
+  - orgs/kotoba-lang/org-omg-bpmn                         # 同型の再利用 kernel(host-injected ports の先例)
+  - orgs/kotoba-lang/koe                          # host-injected ports パターンの原型
+  - orgs/kotoba-lang/langgraph                    # graph 実行 kernel(姉妹)
 supersedes: []
 superseded_by: []
 ---

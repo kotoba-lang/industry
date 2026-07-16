@@ -12,11 +12,11 @@ authoritative_for:
   - combining algorithm(:deny-overrides/:allow-overrides/:first-applicable)の意味論と実装
   - 認可カーネルの3-org 配置(共通=com-junkawasaki / 公益=etzhayyim / 事業=gftdcojp)
 related:
-  - orgs/com-junkawasaki/policy-clj        # 本 ADR のライブラリ
-  - orgs/com-junkawasaki/authenticator-clj # 認証(who) — policy-clj は認可(what)を担う相補関係
+  - orgs/kotoba-lang/policy        # 本 ADR のライブラリ
+  - orgs/kotoba-lang/authenticator # 認証(who) — policy-clj は認可(what)を担う相補関係
   - orgs/com-junkawasaki/ghosthacker       # リソースガードのユースケース(ports を注入する側)
-  - orgs/com-junkawasaki/bpmn-clj          # host-injected ports パターンの先例(IActivity/ICondition)
-  - orgs/com-junkawasaki/dmn-clj           # 同型の純粋評価カーネル(IExpression/IUnary)
+  - orgs/kotoba-lang/org-omg-bpmn          # host-injected ports パターンの先例(IActivity/ICondition)
+  - orgs/kotoba-lang/org-omg-dmn           # 同型の純粋評価カーネル(IExpression/IUnary)
 supersedes: []
 superseded_by: []
 ---

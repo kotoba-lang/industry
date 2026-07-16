@@ -67,5 +67,5 @@ ADR-2607051100 (`kami-gen-procedural`), ADR-2607051120 (`kami-gen-ml3d`), ADR-26
 - `orgs/kotoba-lang/scad/README.md`, `orgs/kotoba-lang/sdf/README.md`,
   `orgs/kotoba-lang/mesher/README.md`
 - `orgs/kotoba-lang/kami-engine/90-docs/adr/0047-real-vrm-offscreen-render-reference.md`
-- `orgs/com-junkawasaki/langgraph-clj` (StateGraph actor loop pattern)
+- `orgs/kotoba-lang/langgraph` (StateGraph actor loop pattern)
 - CLAUDE.md "no silent caps" convention (bounded retries, logged not hidden)
