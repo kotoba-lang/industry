@@ -1,0 +1,167 @@
+[{:adr/authoritative_for ["kotoba-lang/dtn の永続化ストア（:store-path）・バンドル完全性検証（:peer-secrets HMAC）の設計根拠" "「実際に稼働可能」の残りgapのうち、コードで埋められる部分の充足範囲"], :adr/supersedes [], :adr/superseded_by [], :adr/topic "telecom-independent-substrate-dtn-rcs-mesh-satellite", :adr/related ["90-docs/adr/2607161743-kotoba-lang-rcs-dtn-independent-telecom-substrate.md" "90-docs/adr/2607161817-kotoba-lang-dtn-tcp-transport-operational.md" "orgs/kotoba-lang/dtn"], :adr/status :accepted, :adr/id "adr-2607161852-kotoba-lang-dtn-durable-store-bundle-integrity", :adr/doc_type :adr, :adr/last_verified "2026-07-16", :adr/body "---
+id: adr-2607161852-kotoba-lang-dtn-durable-store-bundle-integrity
+title: \"ADR-2607161852: kotoba-lang/dtn gains a durable (disk-backed) store and HMAC bundle integrity\"
+status: accepted
+doc_type: adr
+topic: telecom-independent-substrate-dtn-rcs-mesh-satellite
+authoritative: true
+last_verified: 2026-07-16
+authoritative_for:
+  - kotoba-lang/dtn の永続化ストア（:store-path）・バンドル完全性検証（:peer-secrets HMAC）の設計根拠
+  - 「実際に稼働可能」の残りgapのうち、コードで埋められる部分の充足範囲
+related:
+  - 90-docs/adr/2607161743-kotoba-lang-rcs-dtn-independent-telecom-substrate.md
+  - 90-docs/adr/2607161817-kotoba-lang-dtn-tcp-transport-operational.md
+  - orgs/kotoba-lang/dtn
+supersedes: []
+superseded_by: []
+---
+
+# ADR-2607161852: kotoba-lang/dtn gains a durable (disk-backed) store and HMAC bundle integrity
+
+**Status**: accepted
+**Date**: 2026-07-16
+**Deciders**: Jun Kawasaki
+
+## Problem
+
+ADR-2607161817 gave `kotoba-lang/dtn` a real internet-overlay TCP transport
+with genuine cross-process delivery and in-memory store-and-forward. Asked
+directly *「残りの gap は?」* after that landed, the orchestrating session
+enumerated the remaining gaps in two categories: environment-blocked
+(mesh-radio/satellite hardware, real carrier gateway credentials, a new
+cloud-itonami actor — none fixable by writing more code here) and
+still-code-fixable (in-memory-only store, zero transport authentication,
+no multi-hop routing, no peer discovery, no NAT traversal, remaining
+RFC 9171 wire-format details).
+
+Of the code-fixable list, two items directly undercut the design's own
+stated top motivation (disaster/carrier-outage resilience, from
+ADR-2607161743's clarifying questions): a node that loses every queued
+message on restart isn't meaningfully resilient, and a transport that
+accepts unauthenticated bundles from anyone claiming any source E.164
+isn't meaningfully trustworthy. This ADR closes those two.
+
+## Decision
+
+### Decision 1: durable store — `kotoba.dtn.store`, an append-only EDN log
+
+`src/kotoba/dtn/store.cljc` adds pure (`.cljc`, testable under
+`clojure -M:test`) serialize/deserialize/compact functions for an
+append-only, newline-delimited `pr-str` EDN log — one bundle per line, the
+same \"simple, append-only, human-diffable\" shape this workspace already
+uses for its own ledgers (`canvas-ledger.edn`, `fleet-db.ledger.edn`).
+`deserialize-line` returns nil on a blank/malformed line rather than
+throwing, so a partially-written last line from a crash mid-write doesn't
+corrupt the whole log on reload. The actual file I/O (`node:fs`) is Node-only,
+behind a reader-conditional, matching this repo's established `.cljc`
+core + `.cljs`-only-I/O split.
+
+`kotoba.dtn.transport.tcp/start-node!` gained an **optional** `:store-path`.
+When passed: on startup, the on-disk log is loaded into the in-memory
+`:store`; every bundle that falls back to `:store` also gets appended to
+disk; every successful `retry-store!` pass rewrites the compacted
+(delivered/expired bundles dropped) set back to disk. When omitted,
+behavior is byte-identical to before (in-memory only) — not a breaking
+change to the existing demo/CLI callers.
+
+### Decision 2: bundle integrity — `kotoba.dtn.auth`, pre-shared-secret HMAC-SHA256
+
+`src/kotoba/dtn/auth.cljc` adds `sign-bundle`/`verify-bundle` over a
+per-peer pre-shared secret (HMAC-SHA256, `javax.crypto.Mac` on `:clj` /
+`node:crypto` on `:cljs` — same portable-core pattern as Decision 1).
+`kotoba.dtn.transport.tcp/start-node!` gained an **optional**
+`:peer-secrets` map; when a secret is configured for a peer, outbound
+bundles to it are signed and inbound bundles from it are verified before
+being admitted to `:inbox` — a bundle that fails verification is logged and
+**dropped, not stored/retried** (a forged/tampered bundle is a security
+event, not a legitimate delivery worth retrying). Omitted, behavior is
+unchanged from before.
+
+This is deliberately scoped as **pre-shared-secret origin/tamper checking
+for a small configured peer set**, not a PKI, not TLS, and explicitly
+**not replay-protected** (no nonce/sequence dedup) — stated plainly in both
+the namespace docstring and the README, following this repo's existing
+\"claim exactly what you built\" discipline (the same discipline
+`kotoba.dtn.router`'s docstring already uses to disclaim being full CGR).
+A PKI/certificate system and replay protection remain undone, named
+explicitly rather than silently scoped in or out.
+
+### Decision 3: verify with real re-runs, not the implementing agent's self-report alone
+
+The demo (`test/kotoba/dtn/transport/tcp_demo.cljs`) gained two more
+scenarios: 4a actually stops a node, \"restarts\" it (fresh `start-node!`
+against the same `:store-path`), and asserts the reloaded in-memory store
+contains the bundle that was there before — proving the persistence
+round-trip against the real file, not just the pure serialize/deserialize
+functions in isolation. 4b sends one legitimately-signed message (accepted)
+and one bundle signed with the wrong secret over a raw socket, bypassing
+`send-message!`'s normal signing path (rejected) — proving the transport
+layer actually enforces verification, not just that `verify-bundle` returns
+the right boolean in a unit test.
+
+As with ADR-2607161817, this was independently re-verified by the
+orchestrating session from a cold clone before writing this ADR, not
+trusted from the implementing agent's report alone.
+
+## Verification
+
+- `clojure -M:test` → 26 tests / 112 assertions (was 84; +28 new), 0
+  failures, 0 errors. Independently re-run from a cold clone.
+- `clojure -M:lint` → 0 errors, 0 warnings. Independently re-run.
+- `nbb --classpath \"src:test:../phone/src:../html/src:../css/src\" test/kotoba/dtn/transport/tcp_demo.cljs` → `RESULT: 5/5 scenarios passed`, exit 0 (scenarios 1-3 from ADR-2607161817 unmodified and still passing; new 4a/4b both pass). Independently re-run from a cold clone, output matches the implementing agent's report exactly.
+- Pushed to `github.com/kotoba-lang/dtn` (public), commit `a89edf50cfcc7083f42c2a0446c9e0483a1f6a06`.
+- `manifest/west.yml`: pin advanced via `--entry dtn` (1-line diff, `fdd2b4480f0d→a89edf50cfcc`, `verify-west-pins: 1 件の pin 変更をすべて検証 OK`), landed via an isolated sibling-path worktree + GitHub API server-side merge, matching the two prior ADRs' own landing procedure.
+
+## Consequences
+
+- The two gaps most directly undercutting this design's own resilience
+  premise — volatile store, unauthenticated transport — are closed with
+  real, re-verified code. A node process can now crash and recover its
+  undelivered queue; a peer can no longer inject bundles under a forged
+  source identity without the shared secret.
+- Both additions are additive/optional (`:store-path`, `:peer-secrets`) —
+  zero behavior change for existing callers that don't opt in, so
+  ADR-2607161817's own demo scenarios 1-3 needed no modification.
+- Still explicitly undone, unchanged from the prior gap inventory: no PKI
+  (pre-shared-secret only), no replay protection, no multi-hop routing, no
+  peer discovery (`kotoba-lang/net` gossip composition), no NAT traversal
+  (`kotoba-lang/turn` composition), remaining RFC 9171 wire-format details
+  (CBOR, BPSec, fragmentation), mesh-radio/satellite hardware, real carrier
+  gateway credentials, and a consuming cloud-itonami actor. None of these
+  are silently claimed as done.
+- A durable log that is only compacted on a successful `retry-store!` pass
+  can grow between passes under sustained undeliverable-message load — an
+  known, documented characteristic, not a claimed-away one; no size cap or
+  rotation was added in this ADR.
+
+## Alternatives considered
+
+- **A real embedded database (SQLite, LMDB) instead of an append-only EDN
+  log for the durable store.** Rejected for this scope: the append-only-log
+  shape already matches this workspace's own ledger convention, needs zero
+  new dependencies (still `node:fs` only), and the demo's correctness bar
+  (survive-a-restart) doesn't need transactional query semantics a real DB
+  would add complexity for without benefit here.
+- **A full PKI / certificate-issuance system for bundle authentication.**
+  Rejected: this ADR series has already deferred running-server/
+  key-management-operations concerns to a future consuming actor (per
+  ADR-2607161743 Decision 5); pre-shared-secret HMAC is the honest minimum
+  that closes \"can anyone forge a source identity\" without building an
+  entire CA this scope doesn't need.
+- **Adding replay-attack protection (nonce/sequence dedup) in the same
+  pass.** Rejected for this ADR specifically to keep the two closed gaps
+  cleanly verifiable and scoped; named explicitly as still-undone rather
+  than bundled in partially-done.
+- **Trusting the implementing agent's report without independent
+  re-verification**, again. Rejected for the same reason as
+  ADR-2607161817 — re-run from a cold clone before writing Verification.
+
+## References
+
+- `90-docs/adr/2607161743-kotoba-lang-rcs-dtn-independent-telecom-substrate.md`
+- `90-docs/adr/2607161817-kotoba-lang-dtn-tcp-transport-operational.md`
+- `orgs/kotoba-lang/dtn/README.md` — https://github.com/kotoba-lang/dtn
+- `orgs/kotoba-lang/dtn/src/kotoba/dtn/store.cljc`
+- `orgs/kotoba-lang/dtn/src/kotoba/dtn/auth.cljc`
+", :adr/artifacts "{:kotoba-lang-dtn \"kotoba-lang/dtn @ a89edf50cfcc (pushed, public)\", :manifest \"orgs/kotoba-lang/dtn pin advanced via --entry dtn, pin-verified\"}", :db/id -1, :adr/authoritative true, :adr/title "ADR-2607161852: kotoba-lang/dtn gains a durable (disk-backed) store and HMAC bundle integrity"}]
