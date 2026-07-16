@@ -3028,6 +3028,54 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; test-file edit, not assumed.
       (is (= 428 (:implemented m))))))
 
+(deftest cloud-itonami-isic-4751-is-implemented
+  (testing "cloud-itonami-isic-4751 (Retail sale of textiles in
+  specialized stores -- fabric/notions storefront operations
+  coordination, Wave 2 [coordination/logistics/trade,
+  ADR-2607121000] fresh scaffold, no pre-existing repo at any
+  placeholder [gh api 404 confirmed for both the stale
+  gftdcojp/cloud-itonami-G4751 placeholder and the real cloud-itonami
+  org target before scaffolding]; distinct from ISIC 4771-family
+  apparel retail [finished garments, not yardage]; TextileRetailAdvisor
+  ⊣ TextileRetailGovernor, closed four-op allowlist all
+  :effect :propose (log-sales-record/schedule-staffing-operation/
+  coordinate-supply-order/flag-quality-concern); FOUR HARD governor
+  checks (store-unverified, vendor-unverified [for coordinate-supply-
+  order only, a supply-chain counterparty-verification gate mirroring
+  cloud-itonami-isic-4719's own], effect-not-propose, and
+  scope-exclusion folding in op-not-allowed) that permanently block
+  any proposal touching directly finalizing a quality-dispute
+  resolution (issuing a refund/replacement, voiding a sale, charging
+  back a vendor, revoking or terminating a vendor's registration/
+  contract) -- scope-excluded terms phrased as the finalization/
+  execution ACTION (\"issue the refund\", \"void the sale\", \"charge
+  back the vendor\"), never a bare noun (\"refund\"/\"dispute\"/
+  \"quality concern\"), avoiding this fleet's own known self-tripping
+  bug class -- concretely relevant here since this namespace's own
+  sales-record proposal disclaimer legitimately contains the bare
+  noun \"品質紛争\" (quality dispute) and its own
+  flag-quality-concern :op keyword literally contains the substring
+  \"quality-concern\" -- verified by a dedicated
+  default-mock-advisor-proposals-never-self-trip-scope-exclusion
+  regression test in governor_test.clj; flag-quality-concern ALWAYS
+  escalates and is never a member of any phase's :auto set, at any
+  phase (two independent layers agree: the governor's own
+  always-escalate-ops AND the phase table itself); coordinate-supply-
+  order above an $800 cost threshold also always escalates; real
+  langgraph-clj StateGraph (intake->advise->govern->decide->commit|
+  hold|request-approval) with interrupt-before #{:request-approval};
+  fully portable .cljc with no JVM-only interop; 56 tests / 166
+  assertions green (clojure -M:test), independently re-verified
+  against a fresh clone; clj-kondo 0 errors / 0 warnings; superproject
+  ADR-2700004751 (com-junkawasaki/root,
+  90-docs/adr/2700004751-cloud-itonami-isic-4751-textile-retail-coverage.md/.edn))
+  promoted :spec -> :implemented"
+    (is (= :implemented (industry/maturity "4751")))
+    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-4751"
+           (:repo (industry/get-industry "4751"))))
+    (is (= "cloud-itonami-isic-4751"
+           (:business-id (industry/get-industry "4751"))))))
+
 (deftest cloud-itonami-isic-4719-is-implemented
   (testing "cloud-itonami-isic-4719 (Other retail sale in non-specialized
   stores -- general-merchandise/department-store retail operations
