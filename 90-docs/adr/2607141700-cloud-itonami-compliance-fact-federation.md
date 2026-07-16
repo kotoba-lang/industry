@@ -2880,6 +2880,39 @@ detail/3586）を取得したところ確立日・公布日まで正確に得ら
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-16, /loop tick 105 — 業界団体軸36件目(GAPKI, IDN, ISIC 0126) — 新規業種、インドネシアリサーチの継続)
+
+`cloud-itonami-assoc-0126-idn-gapki`を新規GitHubリポジトリとして
+scaffold・push
+([commit 961033f](https://github.com/cloud-itonami/cloud-itonami-assoc-0126-idn-gapki/commit/961033f))：
+
+Indonesian Palm Oil Association（GAPKI、インドネシアパーム油
+生産者協会）。**ISIC 0126（油糧果実栽培）の初エントリ**——AFBF
+（ISIC 0150、混合農業）とは別の農業系業種コード。本tick窓の
+インドネシアリサーチ
+（[`cloud-itonami-municipality-idn-jakarta`](https://github.com/cloud-itonami/cloud-itonami-municipality-idn-jakarta)）
+の流れを継続。
+
+gapki.id自身の2ページを直接WebFetch検証:
+
+- **Historyページ** — 「The Indonesian Palm Oil Association (GAPKI)
+  was established on 27 February 1981」と明記。
+- **ニュース記事** — 「45 Tahun GAPKI untuk Negeri」（国のための
+  GAPKI45年史）と題する1981年から現在までのインドネシアパーム油
+  産業を記録した歴史書が、GAPKI創立45周年記念式典で
+  「on Tuesday (29/04/2026)」披露されたと明記。
+
+GAPKI自身のWikidata Q-idは見つからず、推測せず正直に省略。
+
+4 tests/11 assertions green。134リポジトリ・802 factを統合。
+`"association-rule/isic" "0126"`での横断queryで`[gapki IDN]`が
+この新規ISICコードの唯一（初）のエントリとして正しく取得できる
+ことを確認。
+
+現状: 国軸35件・業界団体軸36件(27業種)・自治体軸34件——105tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社

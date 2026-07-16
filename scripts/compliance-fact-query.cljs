@@ -349,7 +349,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-iso3166-vnm/data/datascript-tx.edn"}
    {:label "cloud-itonami-municipality-idn-jakarta ordinance.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-municipality-idn-jakarta/schema/ordinance.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-municipality-idn-jakarta/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-idn-jakarta/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-0126-idn-gapki association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-0126-idn-gapki/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-0126-idn-gapki/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
