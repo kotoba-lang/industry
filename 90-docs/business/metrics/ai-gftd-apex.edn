@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 5263, "ai-gftd-chat-shell" 1387},
+ {"magatama-sh1n5h1x" 5269, "ai-gftd-chat-shell" 1387},
  :zone
- {:requests-7d 366693,
-  :pageviews-7d 6897,
-  :uniques-7d-sum 4732,
+ {:requests-7d 369494,
+  :pageviews-7d 6904,
+  :uniques-7d-sum 4774,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/", :requests 862}
-   {:path "/favicon.ico", :requests 153}
+  [{:path "/", :requests 874}
+   {:path "/favicon.ico", :requests 169}
+   {:path "/v1/generation", :requests 127}
+   {:path "/signup", :requests 39}
    {:path "/ci-cd/github/dist/requirements.txt", :requests 33}
    {:path "/frontend/vue-app/src/deployment.yaml", :requests 30}
    {:path "/data_sources/dev/requirements.txt", :requests 30}
-   {:path "/audit/logs/v2/service.yaml", :requests 30}
-   {:path "/config/azure/v1/setup.py", :requests 30}
-   {:path "/integrations/slack/v2/README.md", :requests 30}],
-  :status-mix {:ok 2195, :client-error 1225, :server-error 16912},
+   {:path "/audit/logs/v2/service.yaml", :requests 30}],
+  :status-mix {:ok 2451, :client-error 1198, :server-error 17020},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,10 +30,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-16",
- :traffic-quality {:window "24h", :probe-4xx-pct 6, :error-5xx-pct 83},
+ :traffic-quality {:window "24h", :probe-4xx-pct 6, :error-5xx-pct 82},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 862 · /favicon.ico 153 · /ci-cd/github/dist/requirements.txt 33 · /frontend/vue-app/src/deployment.yaml 30 · /data_sources/dev/requirements.txt 30 | 4xx(probe) 6% · 5xx 83%",
+ "上位 page (24h, 2xx/3xx): / 874 · /favicon.ico 169 · /v1/generation 127 · /signup 39 · /ci-cd/github/dist/requirements.txt 33 | 4xx(probe) 6% · 5xx 82%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 366693 req/7d・4732 uniques(日次和)・うち4xx probe 6%(24h)、workers 6650 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 369494 req/7d・4774 uniques(日次和)・うち4xx probe 6%(24h)、workers 6656 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
