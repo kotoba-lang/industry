@@ -99,4 +99,11 @@
   :commit "3ae9f6cdd32a77e62f4866f411e1af4a49e498ae"
   :repo "https://github.com/cloud-itonami/cloud-itonami-isic-5913"
   :demo-run "clojure -M:dev:run end-to-end: happy-path ops auto-commit at phase 3, escalate at phase 1; flag-rights-concern escalates then commits after approval; unregistered/unverified title, non-:propose effect, out-of-scope-drift all HARD-hold as designed"
-  :registry-update "PENDING at ADR authoring time -- see follow-up addendum commit to this ADR once kotoba-lang/industry promotion (5913 :spec -> :implemented) lands"}}
+  :registry-update "kotoba-lang/industry: 5913 :spec -> :implemented, :name de-truncated, :repo/:business-id de-placeholdered from gftdcojp/cloud-itonami-J5913 to cloud-itonami/cloud-itonami-isic-5913, :required-technologies trimmed to [:identity :forms :dmn :bpmn :audit-ledger]. Landed via Contents-API single-file PUT, first attempt, no 409 retries."
+  :registry-merge-commit "6471536c1dac2dd0e89b289273a6def85de5c404"
+  :registry-test-file-commit "5e3fcc2ae7996d85ee437d9c8141be620c1d954f"
+  :registry-test-file-retries 2
+  :registry-post-merge-verification "fresh clone (+ fresh ../technology sibling) of kotoba-lang/industry main: Ran 15 tests containing 1050 assertions. 0 failures, 0 errors. clj-kondo: 0 errors, 0 warnings. No mojibake detected; 5913 and sample entries 5911/5912/5914/873/5811/6310 all intact."
+  :registry-implemented-count-before 383
+  :registry-implemented-count-after 385
+  :registry-count-note "385 reflects this promotion's own +1 plus concurrent sibling 5911/5914 promotions landed in the same window, live-recomputed via (kotoba.industry/maturity-summary) immediately before each edit, not assumed"}}
