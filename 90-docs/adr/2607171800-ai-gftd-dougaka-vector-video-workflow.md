@@ -112,3 +112,39 @@ topic ─▶ storyboard EDN ─▶ scenegraph ─▶ SVG frames ─▶ PNG ─�
 - `90-docs/adr/2605312355-*`（dougaka = ffmpeg assembler の責任境界）
 - `90-docs/adr/2607170500-cloud-murakumo-seedance-video-api-integration.md`
 - `orgs/gftdcojp/ai-gftd-dougaka-vector/README.md`（usage / layout の正本）
+
+## Addendum 1 — follow-up 実装（2026-07-16、同日）
+
+ADR 本文の follow-ups のうち以下を実装した（子 repo pin `c0426991`、west.yml へ反映済み）:
+
+1. **storyboard 生成 actor**: `bin/storyboard.cljs` + 純関数部 `storyboard.cljc`
+   （prompt 契約 = template catalog 同梱 / EDN 抽出は fence・前置き耐性 / locale 完全性 +
+   尺 budget 検証 / 不合格時は errors を feedback して retry）。エンドポイントは
+   murakumo.cloud の OpenAI 互換 gateway（`/api/v1/chat/completions`、model
+   `qwen-agentworld-35b-a3b` が live 確認済み）。**live 呼び出しは未実施** — chat gate の
+   `MURAKUMO_TOKEN_SECRET` は site-worker 専用 secret で、kagi の
+   `MURAKUMO_GENERATION_TOKEN_SECRET`（generation proxy 用）とは別物（skill
+   `secrets-location-map` の 2026-07-16 注記どおり）。保管場所が secrets マップに無く、
+   mint はオーナー作業（`clojure -M:token issue`）。`--mock` で抽出→検証→render の
+   チェーンは実データで検証済み。
+2. **template 拡充**: `:line-chart`（`:polyline` node kind の `:progress` 数値アニメで
+   線が引かれる）/ `:flow`（箱+矢印が順に現れる pipeline）/ `:big-number`（`:counter`
+   node kind、from→to の数値 run-up）。example は全 template 使用の 6 scenes / 26s に拡張、
+   BGM+SFX 付き mp4 まで実走（video+audio 各 26.0s を ffprobe 確認）。
+3. **audio 配線**: `audio.cljc`（motion 系 attr → SFX kind のルール、staggered bar の
+   coalesce、ongakuka への BGM request 仕様、murakumo audio への SFX pack 合成 prompt
+   カタログ）+ `bin/audio_plan.cljs`。**実際の音声合成（ongakuka / murakumo audio 呼び
+   出し）は未配線** — plan までがこの repo の担当で、合成は当該サービス側の既存経路。
+4. **非正規 assembler**: `bin/assemble.cljs`。本文の「mux を複製しない」を保ったまま
+   単機 dev 検証を可能にするための **non-authoritative** driver（ffmpeg 1 呼び出しに
+   徹する: frames + bgm + cue ごとの sfx adelay/amix）。本番 mux は引き続き
+   `ai-gftd-dougaka`。
+5. **CJK font**: ja フレームは system font fallback で正しく描画されることを視認確認。
+   再現性が要る環境（CI 等）向けに `--font-dir` / `--no-system-fonts`（resvg fontDirs）
+   を追加。font 同梱はしない（large-binary 方針。必要なら DataLad 経路で別途）。
+6. **publisher 方針確定**: yukkuri の `yukkuri.exec.upload-youtube` パターン
+   （`kotoba-lang/com-youtube` + operator 注入 OAuth creds、JVM `:clj` compat 層）を
+   そのまま使う。本 repo にはコードを置かない（実配線は動画が出る運用が始まってから）。
+
+残 follow-up: chat gate token の owner mint → storyboard live 実行、ongakuka/murakumo
+audio の実合成配線、publisher 実配線、template 追加。
