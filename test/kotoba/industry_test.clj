@@ -4425,3 +4425,100 @@ clone; superproject ADR-2628000000) is also :implemented"
            (:repo (industry/get-industry "4789"))))
     (is (= "cloud-itonami-isic-4789"
            (:business-id (industry/get-industry "4789"))))))
+
+(deftest cloud-itonami-isic-5012-is-implemented
+  (testing "cloud-itonami-isic-5012 (Sea and coastal freight water
+  transport -- cargo/container vessel and coastal-shipping
+  PORT/LOGISTICS SCHEDULING coordination, Wave 2
+  [coordination/logistics/trade, ADR-2607121000] fresh scaffold, no
+  pre-existing repo at any placeholder [gh api 404 confirmed for both
+  the stale gftdcojp/cloud-itonami-H5012 placeholder and the real
+  cloud-itonami org target before scaffolding]; identity independently
+  verified against a fresh clone before any work began, per this
+  fleet's ID/name-mismatch caution -- unambiguous, no truncation; the
+  separate, redundant 3-digit group entry {:id \"501\" ...} left
+  untouched; SeaFreightAdvisor ⊣ MaritimeFreightGovernor
+  maritime-freight port/logistics-scheduling operations-coordination
+  actor (seafreightops.* namespace) mirroring cloud-itonami-isic-4719's
+  [Other retail sale in non-specialized stores] verified
+  advisor/governor/phase/operation/store/sim module shape
+  module-for-module (seafreightops.* in place of merchandiseops.*,
+  vessel/carrier registration in place of store registration,
+  maintenance-contractor verification in place of vendor verification);
+  closed four-op allowlist, all :effect :propose
+  (:log-shipment-record/:schedule-berth-operation/:coordinate-
+  maintenance-order/:flag-safety-concern); FOUR HARD governor checks,
+  all permanent and un-overridable by any human approval --
+  vessel-unverified (the target vessel/carrier's registration record
+  must exist AND be independently :registered?/:verified? in the store
+  before ANY proposal for it may commit or escalate, re-derived from
+  the vessel's own record every time, never from proposal self-report),
+  contractor-unverified (for :coordinate-maintenance-order only, the
+  named maintenance contractor must independently resolve to a
+  :registered?/:verified? contractor record -- the flagship genuinely
+  new check this vertical adds, a maintenance-supply-chain
+  counterparty-verification gate no sibling retail/commerce actor has
+  had reason to add), effect-not-propose, and scope-exclusion (folds in
+  op-not-allowed) that permanently blocks any proposal touching
+  directly finalizing a vessel-seaworthiness clearance, a cargo-load-
+  safety clearance, overriding a captain's/harbor-master's safety
+  judgment, bypassing a maritime safety protocol, or directly
+  navigating/dispatching/rerouting a vessel -- this actor coordinates
+  PORT/LOGISTICS SCHEDULING ONLY, never vessel navigation and never
+  overriding a captain's/harbor-master's safety judgment; scope-
+  excluded terms are deliberately phrased as the finalization/execution
+  ACTION (\"finalize the seaworthiness clearance\", \"override the
+  captain's safety judgment\", \"directly navigate the vessel\"), never a
+  bare noun (\"seaworthy\"/\"seaworthiness\"/\"cargo load safety\"/
+  \"hazmat\") -- this fleet's own known self-tripping bug class avoided
+  from the start, since :flag-safety-concern's entire legitimate
+  purpose is to talk ABOUT cargo-load-safety/seaworthiness/hazmat
+  concerns using exactly those bare nouns, verified by a dedicated
+  regression test (default-mock-advisor-proposals-never-self-trip-
+  scope-exclusion in governor_test.clj) asserting all four default
+  proposal generators never trip :scope-excluded or :op-not-allowed;
+  :flag-safety-concern ALWAYS escalates to human sign-off and is never
+  a member of any phase's :auto set, at any phase (two independent
+  layers agree: seafreightops.governor's own always-escalate-ops AND
+  seafreightops.phase's own phase table); a
+  :coordinate-maintenance-order above a $5000 estimated-cost threshold
+  also always escalates; `:itonami.blueprint/governor` keyword
+  `:maritime-freight-governor` checked for fleet-wide uniqueness via
+  `gh api search/code` against `org:cloud-itonami` before finalizing (0
+  hits, distinct from sibling ISIC 5020's own `:marine-cargo-governor`);
+  real langgraph-clj StateGraph
+  (intake->advise->govern->decide->commit|hold|request-approval) with
+  interrupt-before #{:request-approval} for human-in-the-loop resume,
+  not a stub; fully portable .cljc with no JVM-only interop anywhere in
+  src/ (mock-only advisor); 57 tests / 168 assertions green (clojure
+  -M:test), independently re-verified against a fresh clone;
+  clj-kondo 0 errors / 0 warnings; registry.edn's own \"5012\" ->
+  :implemented change (:repo/:business-id de-placeholdered from the
+  stale gftdcojp/cloud-itonami-H5012 target to
+  cloud-itonami/cloud-itonami-isic-5012, :maturity :spec->:implemented,
+  :operating-states updated to match the actor state machine;
+  :required-technologies left unchanged) landed via a git-trees/blobs
+  API single-file PUT direct to main (sha-checked optimistic
+  concurrency against a freshly re-fetched snapshot per this fleet's
+  hot-contention discipline -- two prior PUT attempts against
+  earlier-fetched snapshots were correctly rejected/superseded by
+  concurrent sibling churn before this one landed; exact-block edit
+  only verified via an exact old/new substring occurrence count of 1
+  PLUS sample-verified against 3512/6310/4719/501[group] entries also
+  intact, no mojibake detected); this promotion's own true fleet-wide
+  :implemented count contribution (446 -> 447) was already correctly
+  reflected by a concurrent sibling agent's own cloud-itonami-isic-4923
+  test-file edit (which folded in this promotion's own registry.edn
+  change into the same live recompute window), so this edit only adds
+  the missing dedicated per-entry regression test, not a second count
+  bump -- independently re-verified via
+  `(kotoba.industry/maturity-summary)` immediately before this edit
+  that 447 was still correct; superproject ADR-2715000000
+  (com-junkawasaki/root,
+  90-docs/adr/2715000000-cloud-itonami-isic-5012-sea-coastal-freight-
+  transport-coverage.md/.edn)) promoted :spec -> :implemented"
+    (is (= :implemented (industry/maturity "5012")))
+    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-5012"
+           (:repo (industry/get-industry "5012"))))
+    (is (= "cloud-itonami-isic-5012"
+           (:business-id (industry/get-industry "5012"))))))
