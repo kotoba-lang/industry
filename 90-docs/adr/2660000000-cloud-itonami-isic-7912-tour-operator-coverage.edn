@@ -1,0 +1,88 @@
+[{:adr/id 2660000000
+  :adr/title "cloud-itonami-isic-7912 — Tour Operator Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-7912]
+  :adr/references [2607152500 2607121000 2650005610]
+
+  ;; Wave 4 actor (human-facing/personal-services): tour-operator
+  ;; operations coordination-only (tour-record logging, tour-operation
+  ;; scheduling, vendor-settlement coordination, traveler-safety-concern
+  ;; flagging). Pre-existing :blueprint-tier repo (docs-only) filled in,
+  ;; not freshly scaffolded. LAST batch of the blueprint-tier cleanup
+  ;; sweep (6 targets total).
+
+  :actor/id :cloud-itonami-isic-7912
+  :actor/name "Tour Operator Operations Coordinator"
+  :actor/isic-rev5 "7912"
+  :actor/domain :commercial/tour-operator-services
+  :actor/wave 4
+  :actor/coordination? true
+  :actor/robotics? false ;; this actor: coordination-only. The
+                          ;; pre-existing blueprint's broader
+                          ;; package-design/bonding/robotics-dispatch
+                          ;; premise is a separate, not-yet-wired
+                          ;; capability layer.
+
+  :actor/proposal-ops [:log-tour-record :schedule-tour-operation
+                       :coordinate-vendor-settlement :flag-traveler-safety-concern]
+  :actor/always-escalate-ops [:flag-traveler-safety-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-vendor-settlement 2000}
+
+  :actor/hard-checks [:tour-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["finalize the excursion-safety clearance" "finalize excursion-safety clearance"
+                                "finalize the traveler-safety clearance" "finalize traveler-safety clearance"
+                                "clear the excursion as safe" "clear excursion as safe"
+                                "issue a safety clearance" "issue safety clearance"
+                                "certify the excursion as safe" "certify excursion as safe"
+                                "authorize the excursion to resume" "authorize resumption of the excursion"
+                                "clear the guide to proceed despite the hazard" "declare the hazard resolved"
+                                "override traveler safety authority" "override the traveler safety authority"
+                                "override safety authority" "override the safety authority"
+                                "bypass traveler safety authority" "bypass safety authority"
+                                "安全クリアランスを確定" "安全クリアランスを発行" "エクスカーションを安全と確定"
+                                "危険なしと判断を確定" "ツアー再開を許可" "再開を許可"
+                                "安全当局の判断を覆" "安全当局の決定を無視"]
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-tour-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-tour-record :schedule-tour-operation
+                                               :coordinate-vendor-settlement}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-tour-record :schedule-tour-operation
+                                         :coordinate-vendor-settlement :flag-traveler-safety-concern}
+      :auto #{:log-tour-record :schedule-tour-operation :coordinate-vendor-settlement}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 49 :assertions 142 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration :store-contract
+                   :scope-exclusion-self-trip-regression]
+  :test/simulator :touroperatorops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-7912"
+  :registry/business-id "cloud-itonami-7912"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
+  :registry/optional-technologies [:optimization]
+  :registry/operating-states [:intake :register :match :dispatch :follow-up :audit]
+
+  :repo/commit "f08265b9aa80060e6de6077776d1bb1264b05823"
+  :repo/parent-commit "e9a74213c845c1b25031bd5c633765f1df240a96"
+
+  :registry/commit "5ce8835cc3b5c23f7f8ea76fb25d845f2efc4937"
+  :registry/test-commit "973f413825d8107095e6322e2788093122597210"
+
+  ;; LAST batch of the blueprint-tier cleanup sweep (6 targets:
+  ;; 8130/8121/8220/8219/7911/7912). Post-batch live re-verification
+  ;; against a fresh kotoba-lang/industry + kotoba-lang/technology
+  ;; clone: maturity-summary {:total 649 :spec 232 :blueprint 0
+  ;; :implemented 417} -- fleet-wide :blueprint-tier count reached
+  ;; zero. clojure -M:test: 15 tests / 1063 assertions / 0 failures /
+  ;; 0 errors.
+  :batch/final-maturity-summary {:total 649 :spec 232 :blueprint 0 :implemented 417}
+  :batch/blueprint-tier-remaining 0
+
+  :db/id -1}]
