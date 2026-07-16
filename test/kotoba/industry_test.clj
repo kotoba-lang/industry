@@ -72,8 +72,8 @@
     (is (= :blueprint (industry/maturity "8010"))))
   (testing "cloud-itonami-isic-5610, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "5610"))))
-  (testing "cloud-itonami-isic-8030, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "8030"))))
+  (testing "cloud-itonami-isic-8030, now :implemented with real actor (CaseCoordinator-LLM case-scheduling/evidence-logging coordination actor; coordination-only -- never renders an investigative conclusion or authorizes a surveillance method, both a permanent hard block via the scope-exclusion-gate), was :blueprint"
+    (is (= :implemented (industry/maturity "8030"))))
   (testing "cloud-itonami-isic-2660, promoted to :implemented (medical-device actor deployed)"
     (is (= :implemented (industry/maturity "2660"))))
   (testing "cloud-itonami-isic-3812, now :implemented with real actor, was :blueprint (2026-07-14)"
