@@ -447,3 +447,44 @@ conflict は残るため、review-before-merge UX は維持される。
   warning 報告（CI は署名鍵を持たないため re-announce しない — 意図的）。
   **P3b（未実施）**: 実 p2p 配線（複数機 seeding、GitHub の mirror 降格）、
   kotoba-git object plane への pin chain 投影。
+
+## Addendum (2026-07-16, same day): Phase 2 残の workspace manager + Phase 4 research 判断
+
+**Phase 2 残 — workspace manager 出荷**（kotoba-fleet-vcs `a3f416147eca`、
+pin signed seq 5 / head seq 4、11 tests / 64 assertions）:
+- `fleet ws-gc` — Cursor 2.0 の worktree GC を移植: age + マシン台数 cap、
+  **dirty workspace は決して回収しない**、削除は oldest-first
+  （`fleet.ws/gc-plan` は pure、E2E で dirty skip / cap 回収を実機確認）。
+- `fleet checkpoint` — git 外の conversation-scoped snapshot（tar）+
+  restore（workspace を byte 復元、checkout が pin に戻ることを確認）。
+- 未了で owner 依頼: **鍵の 1Password 移設**（`op` CLI が interactive 認証
+  timeout。session 鍵は scratchpad に 0600 のまま — `op signin` 後に
+  fleet-keys.edn の did と対で移設するのが次アクション）。CACAO wire
+  format 揃え・既存 kotoba-fleet governor 統合も未了。
+
+**Phase 4 — research 完了、判断: 「観測継続・設計は依存させない」**
+（2026-07-16 web 調査、詳細ソースは調査ログ）:
+- **DeltaDB は beta 未出荷**: waitlist（2026-06-11）から 5 週間、公開 repo
+  なし・format docs なし・実利用報告ゼロ（zed.dev/deltadb は signup の
+  まま、zed-industries org に該当 repo なし、HN/X に first-hand 報告なし）。
+  発表済みの主張（stable delta identity / conflict-free replicated
+  worktrees / git は interop 層）以上の情報は存在しない。
+- **HN の争点が本フリートに直撃**: ①operation 粒度の記録は **secrets を
+  archive する新しい liability**（API key が「commit されないはずの中間
+  状態」ごと保存される）②CRDT 収束は textual であり semantic conflict は
+  残る（worktree 隔離を外せる根拠にならない）③**authorization は
+  op-log の外**— 「何が canonical か」は署名 pin + quorum が引き続き担う
+  （DeltaDB は signed operations / trust model について何も言っていない）。
+- **git projection の決定性が採用ゲート**: 本設計の pin 検証はサーバ側
+  git SHA を消費するため、DeltaDB→git projection が非決定的なら失格。
+  format 公開後の最小実験（1 repo・agent 2-3 体・projection 決定性 /
+  ledger への delta-ID 参照 / secrets redaction / storage 増加率）を ADR に
+  予約。
+- **現実的な近道は jj（jujutsu）**: op log は今日動く（Google 内部では
+  cloud 化済み、agent 向け workspace-per-agent 運用の実例あり）。
+  「colocated jj+git を 1 repo でパイロットし、git/GitHub を canonical の
+  まま op-log の undo/audit 価値だけ測る」を **P4 の reversible な次の
+  一歩**として推奨（DeltaDB format リスクゼロ）。着手は別判断。
+- 反対材料も記録: Freestyle「AI agent に最良の VCS は依然 git」
+  （custom snapshot 系は commit/branch/diff/merge を再発明するだけ、
+  という批判）— 本設計が git を捨てず projection に降格した判断と整合。
