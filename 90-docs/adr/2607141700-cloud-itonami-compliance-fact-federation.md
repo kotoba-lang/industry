@@ -2455,6 +2455,38 @@ Bankenverband・フランスFBFに次ぐ）——ISIC 2910（VDA/SMMT）で既�
 現状: 国軸31件・業界団体軸32件(25業種)・自治体軸30件——93tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 94 — 国軸32件目(KEN) — tick92のナイロビcapital-check再利用、WebSearch日付誤りを訂正)
+
+`cloud-itonami-iso3166-ken`の`statute.facts`を追加
+([commit 30ddb88](https://github.com/cloud-itonami/cloud-itonami-iso3166-ken/commit/30ddb88))：
+
+ケニアの一般法2件、いずれもnew.kenyalaw.org（Kenya Law公式法令
+データベース——1tick前にナイロビFinance Act 2023でも使用した同一
+ドメイン）で直接確認:
+
+- **Companies Act**（No. 17 of 2015, Cap. 486）— 2015年9月11日裁可、
+  2015年9月18日官報公布。
+- **Data Protection Act**（No. 24 of 2019, Cap. 411C）— 一次資料
+  自身が「Assented to on 8 November 2019」と「Commenced on 25
+  November 2019」を明確に区別して記載。事前のWebSearch要約は両者を
+  混同し裁可日を誤って11月25日としていたが、一次資料の直接確認で
+  正しい裁可日（11月8日）に訂正。
+
+ZAF/COL/INDと同様、既存の`marketentry.facts`実装がある同一
+`deps.edn`の下に`statute.facts`を新規namespaceとして追加。4
+tests/9 assertions green（既存marketentry 24 tests/81 assertions
+と合わせ計28 tests/90 assertions green）。
+
+**capital-check**: tick92で既に検証済みのナイロビ（Q3870、1907年
+以来ケニア(Q114)の首都）・P36史的首都バグなしの結果を再利用。
+
+123リポジトリ・780 factを統合。`"statute/topic"
+"corporate-governance"`での横断queryでKENが他30カ国と共に取得できる
+ことを確認。
+
+現状: 国軸32件・業界団体軸32件(25業種)・自治体軸30件——94tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社

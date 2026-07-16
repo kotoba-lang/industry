@@ -316,7 +316,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-municipality-ken-nairobi/data/datascript-tx.edn"}
    {:label "cloud-itonami-assoc-6419-aus-aba association.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-assoc-6419-aus-aba/schema/association-rule.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-aus-aba/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-aus-aba/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-ken statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-ken/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-ken/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
