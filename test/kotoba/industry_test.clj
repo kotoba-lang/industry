@@ -2994,12 +2994,21 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; :spec -> :implemented, :repo/:business-id de-placeholdered from
       ;; the stale gftdcojp/cloud-itonami-G4723 target to
       ;; cloud-itonami/cloud-itonami-isic-4723; 47 tests / 133 assertions
-      ;; green; superproject ADR-2691004723). Live-recomputed via
+      ;; green; superproject ADR-2691004723). 424 was confirmed correct
+      ;; by that promotion's own independent live-recompute.
+      ;; 424 -> 427: THREE further CONCURRENT sibling fleet agents' own
+      ;; promotions landed in the same fast-moving window as this
+      ;; mechanical corroboration edit (not this edit's own work,
+      ;; corroborated here only to keep this shared hot test file
+      ;; truthful -- this edit's own cloud-itonami-isic-4723 entry was
+      ;; independently spot-checked intact via
+      ;; `(kotoba.industry/get-industry "4723")` before touching this
+      ;; aggregate count). Live-recomputed via
       ;; `(kotoba.industry/maturity-summary)` against a freshly
       ;; re-fetched origin/main registry.edn immediately before this
-      ;; test-file edit, not assumed: {:total 649 :spec 225 :blueprint 0
-      ;; :implemented 424}.
-      (is (= 424 (:implemented m))))))
+      ;; test-file edit, not assumed: {:total 649 :spec 222 :blueprint 0
+      ;; :implemented 427}.
+      (is (= 427 (:implemented m))))))
 
 (deftest cloud-itonami-isic-4719-is-implemented
   (testing "cloud-itonami-isic-4719 (Other retail sale in non-specialized
