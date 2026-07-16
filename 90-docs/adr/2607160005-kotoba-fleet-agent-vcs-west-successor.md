@@ -582,3 +582,34 @@ gap 棚卸し（同日）の推奨順 ①〜⑤ を処置した。
   以上 per-agent を区別できない —— per-agent auth は署名レイヤにしか置けない、
   という構造的事実がこのスライスの核心。実 cutover はオーナー判断 +
   全 enroll 完了の 2 条件待ち。
+
+## Addendum (2026-07-16, same day): ⑯ kotobase 永続化 / ⑰ object plane / ⑱ delta anchor+IStore
+
+goal 指定 4 項目の残り 3 つを実装（⑥ は上記）。**依存 5 ライブラリ
+（kotobase-peer / arrangement / chain / prolly-tree / kotoba-git）はすべて
+pure cljc で nbb ロード可能**（+ npm `@noble/hashes`）を実証した上で:
+
+- **⑯ kotobase 永続化**（kotoba-fleet-vcs `d11b11c03ed5`）: `fleet.kdb` が
+  fleet-db EDN read-model を実 datom plane（kotobase-peer）に射影。plain-fn
+  クエリを Datalog（`kb/query`）に、~500KB EDN blob を content-addressed
+  commit chain（`kb/commit!` → CID）に。contract test が datom-plane ==
+  EDN-model を全クエリで実証（kotoba-lang 1389 / cloud-itonami 58 / heavy 17 /
+  datalad 10 / revision / count 全一致）+ 永続化ラウンドトリップ
+  （transact→commit!→hydrate、18 datoms、実 prolly-tree CID）。「YAML を
+  批判して EDN blob を作った」自己矛盾の解消。
+- **⑰ kotoba-git object plane**（`a321848945ed`）: `fleet.objects` が P3b の
+  head-cid gossip に実 object graph 転送を追加。`missing-since` で受信側が
+  欠く block だけ算出、CID 検証付きで unpack。demo: 増分 fetch A→B が delta
+  3 objects のみ転送、B は v2 を再構成、forged block は cid-mismatch で REJECT。
+- **⑱ delta anchor + IStore**（kotoba-delta `4d112c207b77`）: `delta.anchor`
+  が op を行番号でなく定義（kind+name+content-hash）に anchor（コード移動に
+  耐える、:unchanged/:moved/:edited/:gone）。`delta.op` v2 は `:op/anchor` を
+  署名 payload に含む。`delta.store` が op-log を kotobase IStore stream
+  （append + monotonic :seq、cursor resume、`KotobaseStore ≡ LocalStore`）で
+  永続化、log-head + seq cursor が signed fleet head に折り込まれ manifest と
+  編集 provenance を一署名で証明。全 demo/test green。
+
+この 4 項目で fleet-vcs は「EDN prototype」から「kotoba datom plane +
+content-addressed object transfer + per-agent 署名 + 構造 provenance」の
+実装へ移行した。残: hard flip の実 cutover（全 enroll 待ち）、CI 実走確認、
+実ネットワークトランスポート、CACAO wire format、kotoba-fleet governor 統合。
