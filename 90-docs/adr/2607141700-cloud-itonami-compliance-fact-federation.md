@@ -3357,6 +3357,41 @@ Commissionを設立する2019年法（HB.975）」は、報道を確認したと
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-17, /loop tick 117 — 国軸40件目(NGA) — ナイジェリアが国軸+自治体軸の2軸に到達、業界団体軸は未着手のまま正直に報告)
+
+`cloud-itonami-iso3166-nga`に`statute.facts`を新規namespaceとして
+追加・push
+([commit e4766f3](https://github.com/cloud-itonami/cloud-itonami-iso3166-nga/commit/e4766f3))：
+
+tick116で検証済みの首都チェック（アブジャは1991年12月12日以来
+安定した首都、未解決の遷都問題無し）を再利用。
+
+- **Companies and Allied Matters Act, 2020**（CAMA 2020）— 2020年
+  8月7日成立。一次資料PDF2件が判読不能: lawsofnigeria.placng.orgの
+  「C20.pdf」は調べたところ古いCap. C20法典整理版（2020年固有の
+  日付表記なし）と判明、icrp.cac.gov.ng（法人業務委員会自身の
+  公式ドメイン）のPDFはナイジェリア国章は視認できたものの
+  日付/参照行がフォントサブセット化で判読不能だったため、
+  Wikipediaの該当ページを直接WebFetchで読み確認（Mondaq・ICNLも
+  同日付で一致）。
+- **Nigeria Data Protection Act, 2023**（NDPA 2023）— 2023年6月12日
+  署名成立。ndpc.gov.ng（ナイジェリアデータ保護委員会、規制当局
+  自身の公式政府ドメイン）の"About Us"ページで直接確認
+  （cert.gov.ng自身のPDFはHTTP 403で断念）。
+
+4 tests/9 assertions green（既存24 marketentry tests/81
+assertionsと合わせ全28 tests/90 assertions green）。143リポジトリ・
+826 factを統合。`jurisdiction NGA`クエリと、`ordinance/country`
+横断query（`[?e "ordinance/country" "NGA"]`）でtick116のAbuja
+自治体2件が正しくクロスリンクされることを確認——ナイジェリアは
+今回で国軸+自治体軸の2軸に到達したが、業界団体軸はまだ未着手で
+あり、これを正直に報告する（前回のエジプト・トルコ(tick114時点)
+と同型の「2軸のみ」パターン）。
+
+現状: 国軸40件・業界団体軸39件(27業種)・自治体軸38件——117 tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。ナイジェリアの業界団体軸の空白は今後のtickに持ち越し。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社

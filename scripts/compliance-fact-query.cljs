@@ -385,7 +385,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-tur-tbb/data/datascript-tx.edn"}
    {:label "cloud-itonami-municipality-nga-abuja ordinance.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-municipality-nga-abuja/schema/ordinance.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-municipality-nga-abuja/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-nga-abuja/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-nga statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-nga/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-nga/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
