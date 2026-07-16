@@ -113,3 +113,26 @@ fleet behind `murakumo-generation.gftd.ai` is provisioned and serving.
 - ⚠ **Trap for future sessions**: until babiniku's generation-stack WIP lands on
   its `main`, any "redeploy babiniku from main" removes those production
   Functions. Land the WIP (its owning agent's flow) before clean-main deploys.
+
+## 2026-07-16 addendum 2 — speech/music wired (ADR-0058); apex endpoint finding
+
+- **isekai.network Text→Speech / Text→Music are live** through the same
+  `/api/murakumo-generation` proxy (network-isekai ADR-0058, merged `a4f625c`,
+  pin advanced to `48a3103`). Upstream contract verified by probe: accepted
+  types are exactly `model3d, voice, motion, effect, sound` (no image type —
+  diffusion stays a skeleton); `voice` needs `input.text` + full BCP-47
+  `params.locale` (`ja-JP`/`en-US`; bare `ja` rejected); `sound` needs
+  `input.prompt` + `sound_kind ∈ {sfx, ambience, music}`. Production E2E:
+  voice job `2eefca2f…` → 43,356-byte RIFF WAV; music job `f66f8327…` →
+  192,044-byte RIFF WAV, both streamed through the same-origin artifact URL;
+  bad locale rejected 400 at the proxy.
+- **apex (B-3) retargeted to guidance, not a change**: ai-gftd-apex `main` has
+  no HTTP generation client — its generation goes server-side through
+  `cloud-murakumo.dispatch`. The `default-endpoint
+  "https://murakumo.cloud/api/v1/generation"` sits in **uncommitted WIP** in
+  the shared checkout (`src/gftd/apex/generation_api.cljc`,
+  `src/gftd/chat/generation_client.cljs` — untracked). Guidance for whoever
+  lands that WIP: point it at `https://generation.murakumo.cloud/api/v1/generation`
+  and mint capabilities from the kagi-stored caller secret — the murakumo.cloud
+  site route verifies with the *chat* gate secret, whose value is unretrievable,
+  so tokens for it cannot currently be minted at all.
