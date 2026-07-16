@@ -2969,7 +2969,34 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; `(kotoba.industry/maturity-summary)` against a freshly
       ;; re-fetched origin/main registry.edn immediately before this
       ;; test-file edit, not assumed.
+            ;; Addendum (this promotion's own edit): the "plus one more" above
+      ;; is this promotion's own cloud-itonami-isic-4719 registry.edn
+      ;; change (general-merchandise/non-specialized-store retail
+      ;; operations-coordination actor -- MerchandiseRetailAdvisor
+      ;; sealed advisor + independent MerchandiseRetailGovernor,
+      ;; coordination-only, mirroring cloud-itonami-isic-5610's verified
+      ;; module shape; four HARD checks incl. a novel vendor-verification
+      ;; gate for :coordinate-supply-order; :maturity :spec ->
+      ;; :implemented, :repo/:business-id de-placeholdered from the stale
+      ;; gftdcojp/cloud-itonami-G4719 target to
+      ;; cloud-itonami/cloud-itonami-isic-4719; 56 tests / 166 assertions
+      ;; green; superproject ADR-2680004719). 423 is confirmed still
+      ;; correct by this promotion's own independent live-recompute
+      ;; (`(kotoba.industry/maturity-summary)` against a freshly
+      ;; re-fetched origin/main registry.edn immediately before this
+      ;; edit), so the assertion above is left unchanged.
       (is (= 423 (:implemented m))))))
+
+(deftest cloud-itonami-isic-4719-is-implemented
+  (testing "cloud-itonami-isic-4719 (Other retail sale in non-specialized
+  stores -- general-merchandise/department-store retail operations
+  coordination, NOT direct pricing-authority or loss-prevention-
+  enforcement control) promoted :spec -> :implemented"
+    (is (= :implemented (industry/maturity "4719")))
+    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-4719"
+           (:repo (industry/get-industry "4719"))))
+    (is (= "cloud-itonami-isic-4719"
+           (:business-id (industry/get-industry "4719"))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
