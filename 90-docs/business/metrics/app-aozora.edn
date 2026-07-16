@@ -1,28 +1,28 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 4484, "app-aozora-appview" 3248},
+ {"app-aozora-pds" 4518, "app-aozora-appview" 3347},
  :zone
- {:requests-7d 17460,
-  :pageviews-7d 5608,
-  :uniques-7d-sum 676,
+ {:requests-7d 21704,
+  :pageviews-7d 5877,
+  :uniques-7d-sum 682,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 2463}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 288}
-   {:path "/", :requests 79}
-   {:path "/xrpc/com.etzhayyim.yoro.feed.getVideoFeed", :requests 61}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact", :requests 59}
+  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 6518}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 287}
+   {:path "/xrpc/com.etzhayyim.yoro.feed.getVideoFeed", :requests 112}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 102}
+   {:path "/", :requests 78}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact", :requests 63}
    {:path "/xrpc/com.atproto.sync.getBlob", :requests 49}
-   {:path "/js/main.js", :requests 41}
-   {:path "/robots.txt", :requests 37}],
-  :status-mix {:ok 3811, :client-error 294, :server-error 1},
+   {:path "/js/main.js", :requests 41}],
+  :status-mix {:ok 8321, :client-error 301, :server-error 15},
   :window "24h"},
  :as-of "2026-07-16",
- :traffic-quality {:window "24h", :probe-4xx-pct 7, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 3, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 2463 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · / 79 · /xrpc/com.etzhayyim.yoro.feed.getVideoFe… 61 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 59 | 4xx(probe) 7% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 6518 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 287 · /xrpc/com.etzhayyim.yoro.feed.getVideoFe… 112 · /xrpc/ai.gftd.apps.kotobase.datomic.view 102 · / 78 | 4xx(probe) 3% · 5xx 0%",
  :signal
- "aozora.app 実測 17460 req/7d・676 uniques(日次和)・うち4xx probe 7%(24h)、workers 7732 inv/7d"}
+ "aozora.app 実測 21704 req/7d・682 uniques(日次和)・うち4xx probe 3%(24h)、workers 7865 inv/7d"}
