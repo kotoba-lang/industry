@@ -142,10 +142,10 @@
     (is (= :blueprint (industry/maturity "7911"))))
   (testing "cloud-itonami-isic-7912, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "7912"))))
-  (testing "cloud-itonami-isic-7710, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "7710"))))
-  (testing "cloud-itonami-isic-7721, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "7721"))))
+  (testing "cloud-itonami-isic-7710, promoted to :implemented by a CONCURRENT sibling fleet agent (not this promotion's own work -- corroborated here only to keep this shared hot test file truthful; live-state corroboration)"
+    (is (= :implemented (industry/maturity "7710"))))
+  (testing "cloud-itonami-isic-7721, promoted to :implemented by a CONCURRENT sibling fleet agent (not this promotion's own work -- corroborated here only to keep this shared hot test file truthful; live-state corroboration)"
+    (is (= :implemented (industry/maturity "7721"))))
   (testing "cloud-itonami-isic-7729, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "7729"))))
   (testing "cloud-itonami-isic-6611-cryptoexchange (Incident-Proof Crypto-Asset Exchange, full-reserve/spot-only, ADR-2607141200) promoted :blueprint -> :implemented (ADR-2607999990, verification-only session -- no source/test code in the actor repo itself touched): its own real test suite was actually run in an isolated sibling-layout scratch workspace (kotoba-lang/langgraph + kotoba-lang/langchain-store + kotoba-lang/merkle-sum + kotoba-lang/btc-crypto + kotoba-lang/eth-crypto, plus kotoba-lang/langchain cloned at BOTH sibling paths its two divergent lib-symbol coordinates -- io.github.kotoba-lang/langchain and io.github.com-junkawasaki/langchain-clj -- separately resolve to, a real gap the actor's own deps.edn :dev override alone doesn't cover), `clojure -M:dev:test` (JVM, incl. the JVM-only wysiwys-btc/wysiwys-eth decoders) green at 106 tests / 18263 assertions / 0 failures / 0 errors, the PRIMARY ClojureScript gate (`-M:dev:cljs -m cljs.main --target node -m cryptoexchange.portable-cljs-test-runner`) green at 81 tests / 17003 assertions / 0 failures / 0 errors, `clojure -M:lint` (clj-kondo) 0 errors / 0 warnings, all against commit e476b58224195707fb1b9a13ba3f36e248d4f71d; spot-checked (read the actual implementing code, not just docstrings/test names, per this fleet's own isic-0710 lesson) INV-14 real-funds-gate (actor.cljc's :withdrawal/broadcast commit path only appends a ledger event, never calls a chain broadcaster -- a grep for http/broadcast!/submit-tx/rpc-call across src/ returns zero hits, so the gate is structural, not a flag that could be silently flipped), INV-6 conservation (kernels/conservation.cljc's integer-coded verdict fn plus its own 12-case self-check battery, wired live through governor.cljc/ledger.cljc, not a stub), INV-10 wysiwys-signing (wysiwys.cljc's decode-a/decode-b are two genuinely differently-shaped decoders -- linear index-scan vs. recursive consume -- byte-compared by `verify` against both each other AND the operator's own intent, matching the invariant's literal text), and INV-11 deterministic-matching (matching.cljc: single-sequencer seq validation, explicit [price seq] priority-key sort, reject-taker self-trade prevention, a real replay-book third-party re-derivation fn); this repo's own CI (`.github/workflows/ci.yml`) checks out `com-junkawasaki/langgraph-clj`/`com-junkawasaki/langchain-clj` by their OLD pre-\"no -clj suffix\" rename names -- confirmed live these still resolve via GitHub's rename redirect rather than being actually broken, so left as-is (a latent-but-currently-working risk, not fixed -- out of this verification-only task's scope); registry.edn's own \"6611-cryptoexchange\" -> :implemented change landed via a Contents-API single-file PUT (sha-checked optimistic concurrency, immediately re-fetched fresh content before the PUT per this fleet's hot-contention discipline), exact-block edit only (:maturity only -- no comment inserted into the entry itself, since registry.edn is a single-line generated file with zero pre-existing `;;` EDN comments anywhere and inserting one there would silently comment out the remainder of the file, an EDN-format hazard this promotion deliberately avoided in favor of documenting the verification here instead); superproject ADR-2607999990) is also :implemented"
@@ -551,7 +551,16 @@
       ;; `(kotoba.industry/maturity-summary)` against a freshly
       ;; re-fetched origin/main registry.edn immediately before this
       ;; test-file edit, not assumed.
-      (is (= 11 (:blueprint m)))
+      ;; 11 -> 9: TWO CONCURRENT sibling fleet agents' own
+      ;; cloud-itonami-isic-7710 and cloud-itonami-isic-7721 promotions
+      ;; (:blueprint -> :implemented, -1 each, landed in the narrow
+      ;; window between this promotion's own registry.edn PUT and this
+      ;; corrective test-file PUT) -- not this promotion's own work,
+      ;; corroborated here only to keep this shared hot test file
+      ;; truthful; live-recomputed via `(kotoba.industry/maturity-
+      ;; summary)` against a freshly re-fetched origin/main immediately
+      ;; before this corrective edit, not assumed.
+      (is (= 9 (:blueprint m)))
       ;; 17 -> 15: this promotion's own cloud-itonami-isic-5223 -1,
       ;; plus -1 from the concurrent sibling cloud-itonami-isic-5229
       ;; promotion landed in the same fast-moving window (see the
@@ -2813,7 +2822,16 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; `(kotoba.industry/maturity-summary)` against a freshly
       ;; re-fetched origin/main registry.edn immediately before this
       ;; test-file edit, not assumed.
-      (is (= 406 (:implemented m))))))
+      ;; 406 -> 408: TWO CONCURRENT sibling fleet agents' own
+      ;; cloud-itonami-isic-7710 and cloud-itonami-isic-7721 promotions
+      ;; (:blueprint -> :implemented, +1 each, landed in the narrow
+      ;; window between this promotion's own registry.edn PUT and this
+      ;; corrective test-file PUT) -- not this promotion's own work,
+      ;; corroborated here only to keep this shared hot test file
+      ;; truthful; live-recomputed via `(kotoba.industry/maturity-
+      ;; summary)` against a freshly re-fetched origin/main immediately
+      ;; before this corrective edit, not assumed.
+      (is (= 408 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
