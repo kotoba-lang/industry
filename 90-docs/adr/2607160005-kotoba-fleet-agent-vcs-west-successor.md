@@ -781,3 +781,30 @@ content-addressed store / nekko(根)との対を意識した botanical / 系譜�
   strict な private 検証は owner-side（native CI / `fleet ci-verify`）で回り、
   GHA CI は公開 best-effort + report-only。次の主権化は bonsai object graph を
   p2p で複製した上での reachability（clone すら不要にする）。
+
+## Addendum (2026-07-16, same day): 残タスク系列（CI確認/live backend/delta head/staged flip）
+
+「do it」で残タスク系列を進めた（kagami pin seq 4 / head seq 19）。
+
+- **② CI 実走確認**: fleet-projection-verify / tree-collapse-guard の GHA run は
+  全て failure だが、**原因はコードでなく account の課金停止**（"recent account
+  payments have failed … The job was not started"）。GitHub Actions が
+  com-junkawasaki/root 全体で無効。**逆に「GHA 依存の CI/guard は脆く、
+  owner-side native CI が堅牢」を裏付ける**。owner action: billing 解消。
+  それまで GHA 系 guard（tree-collapse 等）は inert。
+- **③ live backend flip**（kagami、`bin/kdb.cljs`）: fleet-db を EDN blob でなく
+  **実 kotobase-peer commit chain**（content-addressed・検証可能）に永続化。
+  durable file-backed block store に persist→hydrate ラウンドトリップで
+  **1745 repos の name+rev set 完全一致**、`verify-chain` OK。block store 本体は
+  production では B2/R2。EDN は作業/cache 形として残り chain が durable backing。
+- **③ delta head fold**: `fleet head --delta-log <ops.edn>` が op-log head を
+  signed fleet head に折り込む（value = H(db|delta:H(op-log))）。**一署名が
+  manifest + 編集 provenance を同時証明**。op-log 改竄で head verify が MISMATCH
+  を実証。capture hook は opt-in（DELTA_CAPTURE=1）のまま。
+- **④ staged hard flip**: `reconcile --enforce-repos <names>`（最狭スコープ）を
+  追加。**安全な第一活性化 = fleet 自身の署名経路 repo（kagami/nekko/bonsai/
+  kotoba-delta）だけ enforce** — legacy path を使わないので並行セッションを
+  壊さない。現状 clean、kagami への legacy 書き込み捏造は FLIP VIOLATION で
+  reject を実証。**org/全体への拡大は (a) 並行セッションの署名経路移行 (b)
+  runner（GHA billing 解消 or owner-side）を待つ** — 今 org 全体を enforce すると
+  legacy path で pin を進めている多数の並行セッションを壊すため、意図的に段階化。
