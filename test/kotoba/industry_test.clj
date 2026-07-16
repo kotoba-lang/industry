@@ -74,8 +74,8 @@
   ;; promotion's own scope is ISIC 5229 only) -- fixing a stale
   ;; live-state mismatch caught by a fresh `(kotoba.industry/maturity
   ;; "8010")` recompute immediately before this edit, not assumed.
-  (testing "cloud-itonami-isic-5610, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "5610"))))
+  (testing "cloud-itonami-isic-5610, promoted to :implemented by a CONCURRENT sibling fleet agent (not this promotion's own work -- corroborated here only to keep this shared hot test file truthful; live-state corroboration)"
+    (is (= :implemented (industry/maturity "5610"))))
   (testing "cloud-itonami-isic-8030, now :implemented with real actor (CaseCoordinator-LLM case-scheduling/evidence-logging coordination actor; coordination-only -- never renders an investigative conclusion or authorizes a surveillance method, both a permanent hard block via the scope-exclusion-gate), was :blueprint"
     (is (= :implemented (industry/maturity "8030"))))
   (testing "cloud-itonami-isic-2660, promoted to :implemented (medical-device actor deployed)"
@@ -560,7 +560,16 @@
       ;; truthful; live-recomputed via `(kotoba.industry/maturity-
       ;; summary)` against a freshly re-fetched origin/main immediately
       ;; before this corrective edit, not assumed.
-      (is (= 9 (:blueprint m)))
+      ;; 9 -> 8: a CONCURRENT sibling fleet agent's own
+      ;; cloud-itonami-isic-5610 promotion (:blueprint -> :implemented,
+      ;; -1, landed in the narrow window between this promotion's own
+      ;; prior corrective test-file PUT and this one) -- not this
+      ;; promotion's own work, corroborated here only to keep this
+      ;; shared hot test file truthful; live-recomputed via
+      ;; `(kotoba.industry/maturity-summary)` against a freshly
+      ;; re-fetched origin/main immediately before this corrective
+      ;; edit, not assumed.
+      (is (= 8 (:blueprint m)))
       ;; 17 -> 15: this promotion's own cloud-itonami-isic-5223 -1,
       ;; plus -1 from the concurrent sibling cloud-itonami-isic-5229
       ;; promotion landed in the same fast-moving window (see the
@@ -2831,7 +2840,16 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; truthful; live-recomputed via `(kotoba.industry/maturity-
       ;; summary)` against a freshly re-fetched origin/main immediately
       ;; before this corrective edit, not assumed.
-      (is (= 408 (:implemented m))))))
+      ;; 408 -> 409: a CONCURRENT sibling fleet agent's own
+      ;; cloud-itonami-isic-5610 promotion (:blueprint -> :implemented,
+      ;; +1, landed in the narrow window between this promotion's own
+      ;; prior corrective test-file PUT and this one) -- not this
+      ;; promotion's own work, corroborated here only to keep this
+      ;; shared hot test file truthful; live-recomputed via
+      ;; `(kotoba.industry/maturity-summary)` against a freshly
+      ;; re-fetched origin/main immediately before this corrective
+      ;; edit, not assumed.
+      (is (= 409 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
