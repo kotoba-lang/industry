@@ -3063,7 +3063,14 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; bypassing Contents-API cache lag observed this session)
       ;; immediately before this test-file edit, not assumed:
       ;; {:total 649 :spec 214 :blueprint 0 :implemented 434}.
-      (is (= 434 (:implemented m))))))
+      ;; 434 -> 435: this promotion's own cloud-itonami-isic-4762
+      ;; (Retail sale of music and video recordings in specialized
+      ;; stores, :spec -> :implemented, +1) -- live-recomputed via
+      ;; `(kotoba.industry/maturity-summary)` against a freshly
+      ;; re-fetched origin/main registry.edn immediately before this
+      ;; test-file edit, not assumed: {:total 649 :spec 214 :blueprint 0
+      ;; :implemented 435}.
+      (is (= 435 (:implemented m))))))
 
 (deftest cloud-itonami-isic-4751-is-implemented
   (testing "cloud-itonami-isic-4751 (Retail sale of textiles in
@@ -3638,3 +3645,86 @@ clone; superproject ADR-2628000000) is also :implemented"
            (:repo (industry/get-industry "4761"))))
     (is (= "cloud-itonami-isic-4761"
            (:business-id (industry/get-industry "4761"))))))
+
+(deftest cloud-itonami-isic-4762-is-implemented
+  (testing "cloud-itonami-isic-4762 (Retail sale of music and video
+  recordings in specialized stores -- a record shop / video store
+  selling vinyl, CDs, DVDs, Blu-rays and related physical media,
+  operations coordination, Wave 2 [coordination/logistics/trade,
+  ADR-2607121000] fresh scaffold, no pre-existing repo [gh api 404
+  confirmed for cloud-itonami/cloud-itonami-isic-4762 before
+  scaffolding]; identity ({:id \"4762\" ...}) independently verified
+  against a fresh clone before any work began, per this fleet's
+  ID/name-mismatch caution -- the live :name field was found truncated
+  with a literal \"...\" [the known ~10% pre-existing seed-data bug],
+  confirmed as an exact prefix-match of the assigned ISIC class name and
+  de-truncated as part of this same edit; a separate, redundant 3-digit
+  group entry {:id \"476\" ...} left untouched; MusicVideoRetailAdvisor
+  ⊣ MusicVideoRetailGovernor music/video-recordings-specialty-retail
+  OPERATIONS COORDINATION actor (mvretailops.* namespace) mirroring
+  cloud-itonami-isic-4742's [Retail sale of audio and video equipment in
+  specialized stores] verified advisor/governor/phase/operation/store/
+  sim module shape module-for-module (mvretailops.* in place of
+  avretailops.*, inventory-concern flagging [counterfeit/bootleg
+  recording, piracy, mis-shipment] in place of warranty-concern
+  flagging); closed four-op allowlist, all :effect :propose
+  (:log-sales-record/:schedule-staffing-operation/:coordinate-
+  supply-order/:flag-inventory-concern); FOUR HARD governor checks, all
+  permanent and un-overridable by any human approval -- store-unverified
+  (target store's business registration must exist AND be independently
+  :registered?/:verified? in the store before any proposal for it may
+  commit or escalate), vendor-unverified (for :coordinate-supply-order
+  ONLY, the same supply-chain counterparty-verification gate tuned to
+  the grey-market/counterfeit-media-import risk this vertical faces),
+  effect-not-propose, and scope-exclusion (folds in op-not-allowed) that
+  permanently blocks any proposal touching directly finalizing a
+  copyright/licensing-dispute resolution (approving, denying, paying
+  out, or otherwise settling a copyright or licensing dispute claim;
+  issuing a copyright-infringement settlement, licensing-fee resolution
+  or royalty payout decision); scope-excluded terms are deliberately
+  phrased as the finalization/execution ACTION (\"approved the
+  copyright claim\", \"processed the royalty payment\"), never a bare
+  noun (\"copyright\"/\"license\"/\"piracy\"/\"counterfeit\") -- this
+  fleet's own known self-tripping bug class avoided from the start,
+  since :flag-inventory-concern's entire legitimate purpose is to talk
+  ABOUT counterfeit/bootleg/piracy/mis-shipment concerns using exactly
+  those bare nouns; a dedicated regression test
+  (default-mock-advisor-proposals-never-self-trip-scope-exclusion in
+  governor_test.clj) independently confirms all four default proposal
+  generators, for a clean registered+verified store, never trip
+  :scope-excluded and never :op-not-allowed -- this bug class was
+  actually hit once during this actor's own development [the initial
+  out-of-scope? advisor test-hook text used \"copyright dispute\"/
+  \"royalty payout\" phrasing that did not match any listed action
+  phrase, so scope-excluded-content-hard-hold initially failed to trip
+  the HARD block] and fixed by aligning the hook text to the real
+  phrases; :flag-inventory-concern ALWAYS escalates to human sign-off
+  and is never a member of any phase's :auto set, at any phase (two
+  independent layers agree: mvretailops.governor's own
+  always-escalate-ops AND mvretailops.phase's own phase table); a
+  :coordinate-supply-order above a $1000 estimated-cost threshold
+  likewise always escalates; real langgraph-clj StateGraph
+  (intake->advise->govern->decide->commit|hold|request-approval) with
+  interrupt-before #{:request-approval} for human-in-the-loop resume,
+  not a stub; fully portable .cljc with no JVM-only interop anywhere in
+  src/ (mock-only advisor); 56 tests / 166 assertions green (clojure
+  -M:test), independently re-verified against a fresh clone; clj-kondo 0
+  errors / 0 warnings; registry.edn's own \"4762\" -> :implemented change
+  (:name de-truncated, :repo/:business-id de-placeholdered from the
+  stale gftdcojp/cloud-itonami-G4762 target to cloud-itonami/
+  cloud-itonami-isic-4762, :maturity :spec -> :implemented;
+  :required-technologies/:operating-states left unchanged, already
+  matching the sibling 47xx retail-actor pattern) landed via a
+  Contents-API single-file PUT direct to main (sha-checked optimistic
+  concurrency, immediately re-fetched fresh content before the PUT per
+  this fleet's hot-contention discipline, exact-block edit only verified
+  via an exact old/new substring occurrence count of 1 PLUS
+  sample-verified against 3512/6310/4742/4752/476[group] entries also
+  intact, no mojibake detected); superproject ADR-2701004762
+  (com-junkawasaki/root, 90-docs/adr/2701004762-cloud-itonami-isic-4762-
+  music-video-retail-coverage.md/.edn)) promoted :spec -> :implemented"
+    (is (= :implemented (industry/maturity "4762")))
+    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-4762"
+           (:repo (industry/get-industry "4762"))))
+    (is (= "cloud-itonami-isic-4762"
+           (:business-id (industry/get-industry "4762"))))))
