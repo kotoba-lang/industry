@@ -3082,7 +3082,110 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; :implemented 436}.
   (testing "cloud-itonami-isic-4799 (Other retail sale not in stores, stalls or markets -- fresh scaffold, both the stale gftdcojp/cloud-itonami-G4799 placeholder and the real cloud-itonami org target confirmed 404 before any work began; identity ({:id \"4799\" :name \"Other retail sale not in stores, stalls or markets\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution -- unambiguous, no truncation; distinct from the separate, coarser-granularity {:id \"479\" ...} 3-digit group entry, left untouched, still :spec; Wave 2 (coordination/logistics/trade, ADR-2607121000) target; the catch-all non-store, non-stall, non-online retail class -- door-to-door selling, vending-machine retail, direct-sales/party-plan home-demonstration selling; NonStoreRetailAdvisor ⊣ NonStoreRetailGovernor non-store-retail OPERATIONS COORDINATION actor (nonstoreops.* namespace) mirroring cloud-itonami-isic-4719's [Other retail sale in non-specialized stores] verified advisor/governor/phase/operation/store/sim module shape, substantially domain-adapted rather than copied verbatim: since this class has NO fixed storefront at all, the primary gate is SELLER/route/vending-machine-fleet registration (nonstoreops.store's :sellers directory) in place of every fixed-location sibling's store-verification check; closed four-op allowlist, all :effect :propose (:log-sales-record/:schedule-route-operation/:coordinate-supply-order/:flag-compliance-concern); FOUR HARD governor checks, all permanent and un-overridable by any human approval -- seller-unverified (target seller/route/vending-machine-fleet record must exist AND be independently :registered?/:verified? in the store before any proposal for it may commit or escalate, re-derived from the seller's own record every time, never from proposal self-report), vendor-unverified (for :coordinate-supply-order only, the named vendor must independently resolve to a :registered?/:verified? vendor record), effect-not-propose, and scope-exclusion (folds in op-not-allowed) that permanently blocks any proposal touching directly finalizing a waiver of a consumer's statutory cooling-off/cancellation right -- this class's distinct consumer-protection dimension, since door-to-door and home-demonstration/party-plan selling are heavily regulated against high-pressure sales tactics in most jurisdictions; scope-excluded terms are deliberately phrased as the finalization/execution ACTION (\"finalized the cooling-off waiver\", \"have the customer sign away their cancellation right\", \"confirmed the customer waived cooling-off\"), never a bare noun (\"cooling-off\"/\"cancellation right\") -- this fleet's own known self-tripping bug class avoided from the start, since :flag-compliance-concern's entire legitimate purpose is to talk ABOUT cooling-off/cancellation-right consumer concerns using exactly those bare nouns, verified by a dedicated regression test (default-mock-advisor-proposals-never-self-trip-scope-exclusion in governor_test.clj) asserting all four default proposal generators never trip :scope-excluded or :op-not-allowed; :flag-compliance-concern ALWAYS escalates to human sign-off and is never a member of any phase's :auto set, at any phase (two independent layers agree: nonstoreops.governor's own always-escalate-ops AND nonstoreops.phase's own phase table); a :coordinate-supply-order above a $1000 estimated-cost threshold also always escalates; real langgraph-clj StateGraph (intake->advise->govern->decide->commit|hold|request-approval) with interrupt-before #{:request-approval} for human-in-the-loop resume, not a stub; fully portable .cljc with no JVM-only interop anywhere in src/ (mock-only advisor); 56 tests / 166 assertions green (clojure -M:test), independently re-verified against a fresh clone; clj-kondo 0 errors / 0 warnings; registry.edn's own \"4799\" -> :implemented change (:repo/:business-id de-placeholdered from gftdcojp/cloud-itonami-G4799 -> cloud-itonami/cloud-itonami-isic-4799, :maturity :spec->:implemented, :operating-states updated to match the actor state machine; :required-technologies left unchanged) landed via a Contents-API single-file PUT (sha-checked optimistic concurrency against a freshly re-fetched git-trees/blobs snapshot per this fleet's hot-contention discipline, exact-block edit only verified via a single-contiguous-diff-region check PLUS sample-verified against 4719/3512/6310/479[group] entries also intact, no mojibake detected, landed on the first attempt); superproject ADR-2700004799 (com-junkawasaki/root, 90-docs/adr/2700004799-cloud-itonami-isic-4799-other-non-store-retail-coverage.md/.edn)) is also :implemented"
     (is (= :implemented (industry/maturity "4799"))))
+      ;; concurrent-fleet note: this promotion's own cloud-itonami-isic-4782
+      ;; (Retail sale via stalls and markets of textiles, clothing and
+      ;; footwear) landed on main (commit
+      ;; 2bd0e51e8c031ac5d330f4307a354ecb0f197b92); this aggregate count is
+      ;; live-recomputed via `(kotoba.industry/maturity-summary)` against a
+      ;; freshly re-fetched origin/main registry.edn (via git-trees/blobs
+      ;; API) immediately before this test-file edit, not assumed:
+      ;; {:total 649 :implemented 441}.
       (is (= 441 (:implemented m))))))
+
+(deftest cloud-itonami-isic-4782-is-implemented
+  (testing "cloud-itonami-isic-4782 (Retail sale via stalls and markets
+  of textiles, clothing and footwear -- market-stall/street-market
+  operations coordination, Wave 2 [coordination/logistics/trade,
+  ADR-2607121000] fresh scaffold, no pre-existing repository at either
+  the stale gftdcojp/cloud-itonami-G4782 placeholder or the real
+  cloud-itonami org target [gh api 404 confirmed for both before
+  scaffolding]; identity ({:id \"4782\" :name \"Retail sale via stalls
+  and markets of textiles, clothing and footwear\"}) independently
+  verified against a fresh clone before any work began, per this
+  fleet's ID/name-mismatch caution -- the live registry :name was
+  truncated (\"...clothing an...\"), de-truncated to the full ISIC
+  class name as part of this exact-block edit; distinct from ISIC 4771
+  [specialized-store fixed storefront format, not a stall/market pitch]
+  and ISIC 4781 [same stall/market channel, different product category
+  -- food/beverages/tobacco]; a separate, coarser-granularity
+  {:id \"478\" :name \"Retail sale via stalls and markets\"} 3-digit
+  group entry left untouched; StallMarketAdvisor ⊣
+  StallMarketGovernor market-stall textile/clothing/footwear vending
+  OPERATIONS COORDINATION actor (stallops.* namespace) mirroring
+  cloud-itonami-isic-4771's [Retail sale of clothing, footwear and
+  leather articles in specialized stores] verified advisor/governor/
+  phase/operation/store/sim module shape module-for-module (stallops.*
+  in place of apparelops.*, stall-id in place of store-id, inventory/
+  sale data logging in place of sale/return/alteration transaction
+  logging, stall placement/staffing scheduling in place of floor-staff/
+  fitting-room scheduling); closed four-op allowlist, all :effect
+  :propose (:log-sales-record/:schedule-stall-operation/:coordinate-
+  supply-order/:flag-quality-concern); FOUR HARD governor checks, all
+  permanent and un-overridable by any human approval -- stall-
+  unverified (target market stall's registration must exist AND be
+  independently :registered?/:verified? -- a stall/market permit on
+  file, independently confirmed -- in the store before any proposal for
+  it may commit or escalate), vendor-unverified (for :coordinate-
+  supply-order only, the named vendor must independently resolve to a
+  :registered?/:verified? vendor record, a supply-chain
+  counterparty-verification gate shared with sibling 47xx retail
+  actors, mirroring ISIC 4771/4751/4719's own), effect-not-propose, and
+  scope-exclusion (folds in op-not-allowed) that permanently blocks any
+  proposal touching directly finalizing a quality-dispute resolution
+  (issuing a refund/replacement, voiding a sale, charging back a
+  vendor, revoking or terminating a vendor's registration/contract) OR
+  directly finalizing a counterfeit-authenticity determination
+  (declaring an item counterfeit, certifying an item as genuine,
+  resolving an authenticity claim) -- mirroring ISIC 4771's own
+  counterfeit-authenticity-determination scope-exclusion; every
+  scope-excluded term is phrased as the finalization/execution ACTION
+  (\"issue the refund\", \"declare the item counterfeit\", \"certify the
+  item as genuine\"), never a bare noun (\"refund\"/\"dispute\"/
+  \"counterfeit\"/\"permit\"), avoiding this fleet's own known
+  self-tripping bug class -- concretely relevant here since this
+  namespace's own flag-quality-concern rationale legitimately mentions
+  the stall/market-permit concern as a bare descriptive observation and
+  its own :op keyword literally contains the substring
+  \"quality-concern\" -- verified by a dedicated
+  default-mock-advisor-proposals-never-self-trip-scope-exclusion
+  regression test in governor_test.clj; flag-quality-concern ALWAYS
+  escalates and is never a member of any phase's :auto set, at any
+  phase (two independent layers agree: the governor's own
+  always-escalate-ops AND the phase table itself); coordinate-supply-
+  order above a $500 domain-illustrative cost threshold (lower than
+  ISIC 4771's $1000 -- market-stall vendors typically run smaller order
+  volumes than a specialized storefront) also always escalates; real
+  langgraph-clj StateGraph (intake->advise->govern->decide->commit|
+  hold|request-approval) with interrupt-before #{:request-approval};
+  fully portable .cljc with no JVM-only interop anywhere in src/
+  (mock-only advisor); 58 tests / 170 assertions green (clojure
+  -M:test), independently re-verified against a fresh clone; clj-kondo
+  0 errors / 0 warnings; clojure -M:run (stallops.sim demo) walked all
+  scenarios (phase-1 approval-gated commit, phase-3 auto-commit,
+  always-escalating quality-concern flag, always-escalating over-
+  threshold supply order, and all 5 HARD-hold scenarios: unregistered
+  stall, unverified stall, unverified vendor, non-:propose effect,
+  scope-excluded content) without error; registry.edn's own \"4782\"
+  entry promoted :spec -> :implemented (:name de-truncated,
+  :repo/:business-id de-placeholdered from gftdcojp/cloud-itonami-G4782
+  -> cloud-itonami/cloud-itonami-isic-4782, :operating-states updated to
+  [:intake :advise :govern :approve :commit :audit] to match the actor
+  state machine mirroring ISIC 4771's own convention;
+  :required-technologies/:optional-technologies left unchanged) landed
+  via a Contents-API single-file PUT (sha-checked optimistic
+  concurrency, re-fetched fresh content via git-trees/blobs API
+  immediately before the PUT per this fleet's hot-contention
+  discipline, exact-block edit only verified via a single-contiguous-
+  diff-region check PLUS sample-verified against 3512/4771/4781 entries
+  also intact, no mojibake detected); superproject ADR-2706004782
+  (com-junkawasaki/root,
+  90-docs/adr/2706004782-cloud-itonami-isic-4782-stall-market-textile-retail-coverage.md/.edn))
+  promoted :spec -> :implemented"
+    (is (= :implemented (industry/maturity "4782")))
+    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-4782"
+           (:repo (industry/get-industry "4782"))))
+    (is (= "cloud-itonami-isic-4782"
+           (:business-id (industry/get-industry "4782"))))))
 
 (deftest cloud-itonami-isic-4751-is-implemented
   (testing "cloud-itonami-isic-4751 (Retail sale of textiles in
