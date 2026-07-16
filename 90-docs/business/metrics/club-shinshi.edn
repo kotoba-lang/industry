@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "shinshi.club",
  :zone
- {:requests-7d 5425,
-  :pageviews-7d 3407,
-  :uniques-7d-sum 724,
+ {:requests-7d 5431,
+  :pageviews-7d 3410,
+  :uniques-7d-sum 727,
   :zone "shinshi.club"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 99}
-   {:path "/api/funnel", :requests 34}
+  [{:path "/", :requests 92}
    {:path "/xrpc/ai.gftd.apps.shinshi.listAuthorFeed", :requests 34}
-   {:path "/robots.txt", :requests 21}
+   {:path "/api/funnel", :requests 33}
+   {:path "/robots.txt", :requests 19}
    {:path "/sitemap.xml", :requests 18}
    {:path "/wp-admin/install.php", :requests 14}
    {:path "/js/app.js", :requests 9}
    {:path "/xrpc/ai.gftd.apps.shinshi.agentChat", :requests 9}],
-  :status-mix {:ok 1551, :client-error 33},
+  :status-mix {:ok 1590, :client-error 31},
   :window "24h"},
  :source "shinshi.d1:pv_daily+chat_event_daily+pay_run",
  :window "7d",
  :as-of "2026-07-16",
  :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 99 · /api/funnel 34 · /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 34 · /robots.txt 21 · /sitemap.xml 18 | 4xx(probe) 2%",
- :funnel {:visitors 651, :chatters 14, :scenes 0, :paying 0},
+ "上位 page (24h, 2xx/3xx): / 92 · /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 34 · /api/funnel 33 · /robots.txt 19 · /sitemap.xml 18 | 4xx(probe) 2%",
+ :funnel {:visitors 654, :chatters 14, :scenes 0, :paying 0},
  :signal
- "shinshi.club 実測 5425 req/7d・724 uniques(日次和)・うち4xx probe 2%(24h)"}
+ "shinshi.club 実測 5431 req/7d・727 uniques(日次和)・うち4xx probe 2%(24h)"}
