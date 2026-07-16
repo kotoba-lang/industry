@@ -1,0 +1,91 @@
+[{:adr/id 2740005310
+  :adr/title "cloud-itonami-isic-5310 — Postal Activities Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-5310]
+  :adr/references [2607121000 2706004791]
+
+  ;; Wave 2 actor (coordination/logistics/trade): postal activities
+  ;; (universal-service mail delivery -- intake, sorting, routing,
+  ;; franking, delivery) operations coordination-only (item-record
+  ;; logging, route-operation scheduling, facility-order coordination,
+  ;; security-concern flagging). Primary gate adapted to postal-facility/
+  ;; carrier-license verification in place of seller/store verification;
+  ;; scope-exclusion adapted to a mail-content-inspection/interception/
+  ;; contents-based-delivery-refusal-finalization dimension (postal
+  ;; secrecy/privacy) -- categorically distinct in KIND from the
+  ;; physical-safety exclusions used by sibling freight/transport actors
+  ;; this batch (e.g. ISIC 4923/5012/5022/5120), not merely a domain
+  ;; relabeling of the same exclusion shape.
+
+  :actor/id :cloud-itonami-isic-5310
+  :actor/name "Postal Activities Operations Coordinator"
+  :actor/isic-rev5 "5310"
+  :actor/domain :logistics/postal-services
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-item-record :schedule-route-operation
+                       :coordinate-facility-order :flag-security-concern]
+  :actor/always-escalate-ops [:flag-security-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-facility-order 1500}
+
+  :actor/hard-checks [:facility-verified :vendor-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["finalize the mail-content-inspection decision" "finalized the mail-content-inspection decision"
+                                "authorize the mail interception" "authorized the mail interception"
+                                "authorize interception of the mail item" "authorized interception of the mail item"
+                                "inspect the contents of the mail item" "inspected the contents of the mail item"
+                                "open the mail item to inspect its contents" "opened the mail item to inspect its contents"
+                                "determine delivery refusal based on contents" "determined delivery refusal based on contents"
+                                "refuse delivery based on the item's contents" "refused delivery based on the item's contents"
+                                "rule the item undeliverable based on its contents" "ruled the item undeliverable based on its contents"
+                                "finalize the contents-based delivery refusal" "finalized the contents-based delivery refusal"
+                                "郵便物の内容を検査すると確定した" "郵便物の内容検査を確定した" "内容物検査の最終判断を下した"
+                                "開封して中身を確認した" "開封して内容物を確認した"
+                                "内容物に基づき配達を拒否すると確定した" "内容に基づき配達拒否を確定した"
+                                "通信の秘密を侵害して開封した" "傍受を許可した" "傍受を承認した"]
+
+  ;; Self-trip-avoidance: every term above is phrased as the
+  ;; finalization/authorization ACTION, never a bare noun -- this
+  ;; namespace's own :flag-security-concern default proposal legitimately
+  ;; discusses an observed exterior anomaly at intake (unusual weight,
+  ;; leaking substance, suspicious protrusion), and was deliberately
+  ;; written to avoid the standalone words "inspect"/"intercept"/
+  ;; "傍受"/"開封"/"内容" entirely, not merely the exact excluded phrases
+  ;; -- a bare-noun term list would self-trip this actor's own core
+  ;; happy path on every single run. Regression tests:
+  ;; governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion,
+  ;; governor-test/out-of-scope-injection-still-trips-scope-exclusion
+  ;; (confirms the check is not accidentally a no-op), and
+  ;; advisor-test/security-concern-rationale-never-claims-content-determination
+  ;; (asserts the vocabulary-avoidance discipline directly at the
+  ;; advisor level, one layer earlier than the governor scan).
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-item-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-item-record :schedule-route-operation
+                                               :coordinate-facility-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-item-record :schedule-route-operation
+                                         :coordinate-facility-order :flag-security-concern}
+      :auto #{:log-item-record :schedule-route-operation :coordinate-facility-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 62 :assertions 186 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression
+                  :vendor-verification :carrier-license-active
+                  :advisor-vocabulary-avoidance-discipline]
+  :test/simulator :postalops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-5310"
+  :registry/business-id "cloud-itonami-isic-5310"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
