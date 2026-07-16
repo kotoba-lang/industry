@@ -296,6 +296,11 @@
    ;; chatters = 1:1 companion chat messages = the validation signal the live
    ;; chat (murakumo fleet) now produces.
    :club-shinshi   {:url "https://shinshi.club/api/funnel"            :fmt :json :merge true}
+   ;; app-aozora organism-engagement (2026-07-16, ADR-2607151900): appview.aozora.app
+   ;; /api/engagement が {:engagement {:organism-engagement-ratio r|nil ...集計}} を返す。
+   ;; :merge true で top-level に載せ gate :hyp/aozora-organism-content が読む。
+   ;; live :eavt scan で ~14s のため :timeout 25 (既定 8s は他 product 保護、据置)。
+   :app-aozora     {:url "https://appview.aozora.app/api/engagement"    :fmt :json :merge true :timeout 25}
    ;; cloud-murakumo cost 計器 (ADR-2607022200 の「CLI/file 型」を HTTP emitter 化、
    ;; 2026-07-15): local-murakumo Worker が /v1/messages の実 run(llama.cpp timings)
    ;; を KV ring に記録し、GET /infer/cost が ¥/Mtok 集計を返す。:key :cost →
@@ -311,10 +316,10 @@
 
 (defn fetch-emitter
   "→ parsed emitter map, or nil if unreachable/unparseable (no-op)."
-  [{:keys [url fmt]}]
+  [{:keys [url fmt timeout]}]
   (try
     (let [r (curl/get url {:throw false
-                           :raw-args ["--max-time" "8" "-A" collect-ua]})]
+                           :raw-args ["--max-time" (str (or timeout 8)) "-A" collect-ua]})]
       (when (= 200 (:status r))
         (case fmt
           :edn  (clojure.edn/read-string (:body r))
