@@ -3392,6 +3392,38 @@ assertionsと合わせ全28 tests/90 assertions green）。143リポジトリ・
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。ナイジェリアの業界団体軸の空白は今後のtickに持ち越し。
 
+## Addendum (2026-07-17, /loop tick 118 — 業界団体軸40件目(CIBN, NGA, ISIC 6419) — ナイジェリアが3tick窓で3軸完成、6カ国目)
+
+`cloud-itonami-assoc-6419-nga-cibn`を新規GitHubリポジトリとして
+scaffold・push
+([commit 4642710](https://github.com/cloud-itonami/cloud-itonami-assoc-6419-nga-cibn/commit/4642710))：
+
+Chartered Institute of Bankers of Nigeria（CIBN）。ISIC 6419
+（銀行業）の10カ国目。tick117で正直に指摘したナイジェリアの
+業界団体軸の空白を埋める。
+
+cibng.org自身の"Corporate Information"ページから2件を直接確認:
+
+- **1963年11月28日設立**（Institute of Bankers, London のナイジェリア
+  地方支部として発足）
+- **1990年5月18日、Chartered Status取得**（Federal Government Act
+  No. 12 of 1990による。原文引用: "the attainment of a Chartered
+  Status, achieved on May 18th, 1990 by the Federal Government Act
+  No. 12 of 1990" — 現在はCIBN Act No. 5 of 2007として再制定済み）
+
+4 tests/11 assertions green。143リポジトリ・828 factを統合。
+
+3軸横断query（`statute/jurisdiction`・`ordinance/country`・
+`association-rule/country`いずれも`"NGA"`）で全て正しく取得を
+確認——**ナイジェリアがtick116(自治体)→117(国)→118(業界団体)の
+3tick窓で3軸完成、UAE(tick100)・ベトナム(tick103)・
+インドネシア(tick106)・フィリピン(tick109)・トルコ(tick115)に
+続く6カ国目**。
+
+現状: 国軸40件・業界団体軸40件(27業種)・自治体軸38件——118 tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
