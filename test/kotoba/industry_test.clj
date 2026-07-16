@@ -84,8 +84,8 @@
     (is (= :implemented (industry/maturity "4321"))))
   (testing "cloud-itonami-isic-4322, promoted to :implemented (plumbing/HVAC actor deployed)"
     (is (= :implemented (industry/maturity "4322"))))
-  (testing "cloud-itonami-isic-5110, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "5110"))))
+  (testing "cloud-itonami-isic-5110, promoted to :implemented (AirlineOps-LLM / Aviation Safety Governor passenger-air-transport-operations-coordination actor, superproject ADR-2628000000; was :blueprint at the time of the corroboration list above -- superseded by its own dedicated corroboration block below)"
+    (is (= :implemented (industry/maturity "5110"))))
   (testing "cloud-itonami-isic-4911, promoted to :implemented by a CONCURRENT sibling fleet agent (not this promotion's own work -- corroborated here only to keep this shared hot test file truthful; live-state corroboration)"
     (is (= :implemented (industry/maturity "4911"))))
   (testing "cloud-itonami-isic-5011, freshly published, is also :blueprint (live-state corroboration)"
