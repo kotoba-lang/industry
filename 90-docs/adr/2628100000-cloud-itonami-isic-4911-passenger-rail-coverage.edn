@@ -1,0 +1,142 @@
+{:adr-id "2628100000"
+ :title "cloud-itonami-isic-4911 (Passenger rail transport, interurban) operations-coordination actor"
+ :status :accepted
+ :date "2026-07-16"
+ :deciders ["Jun Kawasaki (agent-executed, standing authorization)"]
+ :related ["ADR-2607102200"]
+ :mirrors "cloud-itonami-isic-4920 (Community Freight Transport, freightops.* Store/Governor/Phase/Operation module shape)"
+
+ :context
+ "ISIC 4911 = passenger rail transport, interurban. Live registry.edn :name
+  for \"4911\" independently verified fresh: exact, untruncated match
+  \"Passenger rail transport, interurban\". NOT a fresh scaffold -- gh api
+  confirmed a pre-existing repo cloud-itonami/cloud-itonami-isic-4911
+  already published at :blueprint tier (docs-only: CODE_OF_CONDUCT/
+  CONTRIBUTING/GOVERNANCE/LICENSE/README/SECURITY.md + blueprint.edn +
+  docs/, no deps.edn/src/test) from an earlier bulk-scaffolding pass
+  (commit 78c9023, 2026-07-09); this work ADDED the missing implementation
+  module set on top of the existing boilerplate, kept not recreated.
+  Passenger rail carries a direct-passenger-safety dimension beyond plain
+  coordination/logistics -- closed op allowlist must never include an op
+  that directly finalizes a passenger-safety-authority decision (signal/
+  dispatch-safety interlock override, clearing a train for departure
+  after a reported fault); any 'flag a concern' op always escalates,
+  never auto-commit-eligible. Also defended from the start against this
+  fleet's known bare-noun scope-exclusion self-tripping bug class, acute
+  here because :flag-passenger-safety-concern's legitimate purpose is to
+  discuss signal/safety/dispatch topics using exactly those words."
+
+ :scope-exclusions
+ ["finalizing a dispatch/signal-safety override (clearing a signal interlock, authorizing departure after a reported fault) -- hard, permanent block, both by forbidden-op identity and by scope-exclusion text scan"
+  "direct rolling-stock control or maintenance execution/release -- not represented in the closed op allowlist at all"
+  "flag-passenger-safety-concern never finalizes/overrides/clears anything -- always requires_human_review/advisory_only true, always escalates"]
+
+ :self-trip-fix
+ "Bare-noun scope-excluded-terms (e.g. 'safety', 'dispatch', 'signal') would
+  self-match inside this actor's own legitimate default rationale text
+  (:flag-passenger-safety-concern's own default rationale explains 'this
+  actor never overrides a signal interlock' using those same words as a
+  disclaimer). Fix: scope-excluded terms phrased as the finalization/
+  execution ACTION ('finalize the dispatch-safety override', 'clear the
+  train for departure', 'override the signal interlock', 'authorize
+  departure despite fault', 'bypass the dispatch-safety interlock'), never
+  a bare noun -- verified by the dedicated regression test
+  mock-advisor-defaults-never-self-trip-scope-exclusion (governor_contract_test.clj),
+  which asserts all 4 default proposal generators, for a clean verified
+  service, never trip :dispatch-safety-override-blocked and never
+  HARD-hold, PLUS a full end-to-end test
+  (end-to-end-dispatch-safety-override-attempt-is-held) using a
+  deliberately malicious mock Advisor to prove the FULL actor graph (not
+  merely the unit-level governor check) catches a compromised advisor
+  output on an otherwise-allowed op."
+
+ :decision
+ "Implement cloud-itonami-isic-4911 with railops.* (Store/Registry/Governor/
+  Phase/Advisor/Operation/Sim), mirroring cloud-itonami-isic-4920's
+  freightops.* Store/Governor/Phase/Operation shape, adapted to interurban
+  passenger-rail OPERATIONS COORDINATION (not dispatch/signal-safety
+  authority or rolling-stock control):
+  - Store: Store protocol + MemStore + DatomicStore (langchain.db),
+    contract-tested for parity. Unit of work = service (route + timetable
+    slot + consist). :route-schedule-registered? independently set --
+    NO op/effect in the closed allowlist can ever set it (only
+    with-services/seed-db), so the actor can never self-certify its own
+    operating precondition.
+  - Registry: pure-function draft-record construction, 4 ops --
+    register-service-log (LOG-######), register-schedule-proposal
+    (SCH-######), register-safety-concern-flag (SFC-######, always
+    requires_human_review/advisory_only true), register-maintenance-coordination
+    (MNT-######). Every certificate UNSIGNED.
+  - Governor (Rail Safety Governor, matching blueprint.edn's pre-existing
+    :itonami.blueprint/governor :rail-safety-governor): 4 HARD checks --
+    op-not-allowlisted, dispatch-safety-override-blocked (forbidden-op
+    identity OR scope-exclusion text scan, action-phrased terms),
+    effect-not-propose (every proposal's :effect must literally be
+    :propose), route-schedule-not-verified (applies to ALL FOUR ops).
+    ESCALATE: :flag-passenger-safety-concern carries dedicated
+    :safety-concern/flag high-stakes stake, always escalates; confidence
+    < 0.6 also escalates.
+  - Phase: 0->3 rollout (phase 0 read-only; phase 1 = log-service-record +
+    flag-passenger-safety-concern, approval-gated -- safety-concern flag
+    deliberately writable from the EARLIEST assisted phase; phase 2 adds
+    schedule-service-operation/coordinate-maintenance, approval-gated;
+    phase 3 auto-commits ONLY log-service-record when clean;
+    schedule-service-operation/flag-passenger-safety-concern/
+    coordinate-maintenance NEVER auto, at any phase)
+  - Advisor (railopsllm): mock-advisor (deterministic, offline); llm-advisor
+    seam ready, not wired
+  - Operation: real langgraph-clj StateGraph
+    (intake->advise->govern->decide->commit|hold|request-approval),
+    interrupt-before #{:request-approval}, NOT a stub
+  - Sim: clojure -M:dev:run demo, full happy path + always-escalate flow +
+    unverified-route-schedule/out-of-allowlist/dispatch-safety-override
+    HARD-hold scenarios
+  - Tests: store_contract_test, registry_test, phase_test,
+    governor_contract_test (incl. mandatory self-trip regression AND
+    end-to-end compromised-advisor regression) -- 33 tests / 157
+    assertions green
+  - All .cljc portable, no JVM-only interop. AGPL-3.0-or-later
+    (pre-existing LICENSE unchanged). README/GOVERNANCE/CONTRIBUTING/
+    SECURITY/CODE_OF_CONDUCT/docs/ all pre-existing, left untouched."
+
+ :consequences
+ {:positive
+  ["ISIC 4911 interurban-passenger-rail operations-coordination genuinely
+    implemented and fully tested, on top of pre-existing blueprint-tier
+    boilerplate rather than a wholesale re-scaffold"
+   "dispatch/signal-safety-override exclusion hardcoded in governor checks
+    (dispatch-safety-override-violations), defended on two axes (forbidden
+    op identity AND scope-exclusion text scan), not just README prose"
+   "fleet-wide bare-noun self-tripping bug class avoided by construction
+    (action-phrased terms) and covered by both a unit-level regression
+    test and a full end-to-end malicious-advisor graph test"
+   "flag-passenger-safety-concern always-escalate is a two-layer invariant
+    (governor high-stakes gate + phase's permanent :auto-set absence),
+    writable from the earliest assisted phase"
+   "route-schedule-not-verified applies to all four ops and the flag it
+    reads can never be set by any op in this actor's own allowlist --
+    structurally cannot self-certify its own precondition"
+   "portable .cljc, zero JVM-only constructs; clojure -M:lint 0 errors / 0 warnings"]
+  :negative
+  ["real persistent store (Datomic/kotoba-server) is a follow-up; tests
+    exercise DatomicStore via langchain.db's in-process API only"
+   "mock-advisor is deterministic, not a real LLM call; Advisor protocol
+    seam ready for that swap but not wired in this ADR"]}
+
+ :verification
+ {:test-count 33
+  :assertion-count 157
+  :test-status "0 failures, 0 errors -- clojure -M:test run at push time"
+  :lint-status "0 errors, 0 warnings"
+  :commit "d80e5e767c7e873165f0f2488c33e15a9dc12abf"
+  :repo "https://github.com/cloud-itonami/cloud-itonami-isic-4911"
+  :pre-existing-repo-commit "78c9023 (blueprint-tier boilerplate publish, 2026-07-09)"
+  :demo-run "clojure -M:dev:run end-to-end: log-service-record auto-commits at phase 3; schedule-service-operation/flag-passenger-safety-concern/coordinate-maintenance all interrupt for approval then commit; unregistered/unverified service HARD-holds log-service-record; out-of-allowlist op HARD-holds; direct governor-level finalize-dispatch-safety-override proposal HARD-blocked"
+  :registry-update "kotoba-lang/industry: 4911 had NO :maturity key before this edit (resolved to :blueprint via :repo-presence fallback), added :maturity :implemented explicitly; :repo/:business-id already correct and left unchanged (business-id cloud-itonami-4911 matches blueprint.edn's own :itonami.blueprint/id); :required-technologies/:operating-states also left unchanged, exact-block edit only"
+  :registry-merge-commit "69925d1e7dc725cde220b170d8c6fbfa421365ca"
+  :registry-test-file-commit "10c0b87dc4fb35ee3a8acc14e037cb85d9513116"
+  :registry-test-file-retries 0
+  :registry-post-merge-verification "fresh clone (+ fresh ../technology sibling) of kotoba-lang/industry main at 10c0b87: clojure -M:test -> Ran 15 tests containing 1060 assertions, 3 failures, 0 errors (3 residual failures for \"5011\"/\"4912\"/\"5222\" are pre-existing, unrelated concurrent-fleet drift, confirmed against the pristine unedited test file before this session's own edit -- not caused by or in scope for this promotion). clj-kondo 0 errors / 0 warnings. No mojibake detected (file -I: text/plain; charset=us-ascii). 4911's own entry (:maturity :implemented, both short and detailed industry_test.clj corroboration blocks) independently re-confirmed intact."
+  :registry-implemented-count-before 393
+  :registry-implemented-count-after 399
+  :registry-count-note "this promotion's own registry.edn PUT (69925d1) happened when the live count was 393->394; by the time the industry_test.clj corroboration/count-sync edit landed (10c0b87) the live count had moved to 18 blueprint / 399 implemented purely from numerous concurrent sibling promotions in this extremely hot-contention window (observed 24/393 -> 22/395 -> 20/397 -> 18/399 across successive fresh re-fetches within this single promotion's own edit window, including a concurrent sibling agent cloud-itonami-isic-5221 independently corroborating this promotion's own 4911 entry mid-flight); both count assertions live-recomputed via (kotoba.industry/maturity-summary) against a freshly re-fetched origin/main immediately before the successful PUT attempt, not assumed, not grep'd"}}
