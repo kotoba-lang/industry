@@ -1,0 +1,119 @@
+[{:adr/id 2711004923
+  :adr/title "cloud-itonami-isic-4923 — Freight Transport by Road Dispatch/Logistics Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-4923]
+  :adr/references [2607121000 2710004789]
+
+  ;; Wave 2 actor (coordination/logistics/trade), first TRANSPORT-class
+  ;; build of this batch (transition from retail-class 47xx siblings to
+  ;; transport-class 49xx). Road-freight (trucking/cargo) DISPATCH/
+  ;; LOGISTICS-SCHEDULING operations coordination-only (cargo/manifest/
+  ;; delivery-record logging, truck/route/load dispatch scheduling,
+  ;; fleet-maintenance-order coordination, load-safety/hazmat/hours-of-
+  ;; service concern flagging). Distinct from separate, untouched
+  ;; registry entries {:id "492"} (group-level, :superseded-by ["4920"])
+  ;; and {:id "4920"} ("Community Freight Transport", already
+  ;; :implemented, different repo/business-id).
+
+  :actor/id :cloud-itonami-isic-4923
+  :actor/name "Road-Freight Dispatch/Logistics Operations Coordinator"
+  :actor/isic-rev5 "4923"
+  :actor/domain :transport/road-freight
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-shipment-record :schedule-dispatch-operation
+                       :coordinate-maintenance-order :flag-safety-concern]
+  :actor/always-escalate-ops [:flag-safety-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-maintenance-order 5000.0}
+
+  :actor/hard-checks [:carrier-unverified :vendor-unverified :effect-not-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["finalize the load safety clearance" "finalized the load safety clearance"
+                                "finalizes the load safety clearance" "finalizing the load safety clearance"
+                                "clear the load for departure" "cleared the load for departure"
+                                "clearing the load for departure"
+                                "clear the shipment for departure" "cleared the shipment for departure"
+                                "clearing the shipment for departure"
+                                "grant the hazmat transport authorization" "granted the hazmat transport authorization"
+                                "granting the hazmat transport authorization"
+                                "issue the hazmat transport authorization" "issued the hazmat transport authorization"
+                                "issuing the hazmat transport authorization"
+                                "authorize the hazmat transport" "authorized the hazmat transport"
+                                "authorizing the hazmat transport"
+                                "approve the hazmat placarding" "approved the hazmat placarding"
+                                "approving the hazmat placarding"
+                                "grant the hours-of-service waiver" "granted the hours-of-service waiver"
+                                "granting the hours-of-service waiver"
+                                "waive the hours-of-service requirement" "waived the hours-of-service requirement"
+                                "waiving the hours-of-service requirement"
+                                "waive the driver's hours of service" "waived the driver's hours of service"
+                                "waiving the driver's hours of service"
+                                "override the driver's hours-of-service limit" "overrode the driver's hours-of-service limit"
+                                "overriding the driver's hours-of-service limit"
+                                "override the driver's rest requirement" "overrode the driver's rest requirement"
+                                "overriding the driver's rest requirement"
+                                "approve the overweight load waiver" "approved the overweight load waiver"
+                                "approving the overweight load waiver"
+                                "finalize the load securement clearance" "finalized the load securement clearance"
+                                "finalizing the load securement clearance"
+                                "finalize the hazmat transport authorization" "finalized the hazmat transport authorization"
+                                "finalizing the hazmat transport authorization"
+                                "finalize the hours-of-service waiver" "finalized the hours-of-service waiver"
+                                "finalizing the hours-of-service waiver"
+                                "override the dispatcher's safety judgment" "overrode the dispatcher's safety judgment"
+                                "overriding the dispatcher's safety judgment"
+                                "override the driver's safety judgment" "overrode the driver's safety judgment"
+                                "overriding the driver's safety judgment"
+                                "貨物安全証明を確定" "貨物安全証明を確定した"
+                                "積載安全確認を確定" "積載安全確認を確定した"
+                                "危険物輸送許可を発行" "危険物輸送許可を発行した"
+                                "危険物輸送許可を承認" "危険物輸送許可を承認した"
+                                "乗務時間規制の適用除外を承認" "乗務時間規制の適用除外を承認した"
+                                "労働時間規制の免除を承認" "労働時間規制の免除を承認した"]
+
+  ;; Self-trip-avoidance: every term above is phrased as the
+  ;; finalization/execution ACTION, never a bare noun ("safety",
+  ;; "hazmat", "hours of service", "clearance") -- this namespace's own
+  ;; :flag-safety-concern default proposal legitimately discusses load-
+  ;; securement/hazmat-placarding/hours-of-service concerns. A bare-noun
+  ;; term list would self-trip this actor's own core happy path on every
+  ;; single run (the exact known bug class multiple sibling agents in
+  ;; this fleet independently discovered and fixed). Regression tests:
+  ;; governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion
+  ;; and governor-test/out-of-scope-hook-does-trip-scope-exclusion (proves
+  ;; the check is not a no-op).
+
+  ;; Governor-keyword collision check performed pre-landing via
+  ;; `gh search code "road-freight-dispatch-governor" --owner cloud-itonami`
+  ;; and `gh search code "dispatch-governor" --owner cloud-itonami` (both
+  ;; zero results). Distinct from concurrent Wave-2 passenger-transport
+  ;; siblings ISIC 4921/4922 built in this same batch.
+  :blueprint/governor :road-freight-dispatch-governor
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-shipment-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-shipment-record :schedule-dispatch-operation
+                                               :coordinate-maintenance-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-shipment-record :schedule-dispatch-operation
+                                         :coordinate-maintenance-order :flag-safety-concern}
+      :auto #{:log-shipment-record :schedule-dispatch-operation :coordinate-maintenance-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 59 :assertions 171 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression]
+  :test/simulator :roadfreightops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-4923"
+  :registry/business-id "cloud-itonami-isic-4923"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
