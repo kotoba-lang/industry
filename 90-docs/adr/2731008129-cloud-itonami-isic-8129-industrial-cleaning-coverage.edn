@@ -1,0 +1,83 @@
+[{:adr/id 2731008129
+  :adr/title "cloud-itonami-isic-8129 — Other Building and Industrial Cleaning Activities Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-8129]
+  :adr/references [2607121000 2691004752]
+
+  ;; Wave 2 actor (coordination/logistics/trade): industrial/building-
+  ;; cleaning-services operations coordination-only (service-record
+  ;; logging, service-operation dispatch scheduling, supply-order
+  ;; coordination, hazmat/confined-space/chemical-exposure safety-concern
+  ;; flagging). No op finalizes a hazmat-handling-safety clearance or a
+  ;; confined-space-entry authorization -- those actions are
+  ;; structurally excluded, never merely gated.
+
+  :actor/id :cloud-itonami-isic-8129
+  :actor/name "Industrial and Building Cleaning Operations Coordinator"
+  :actor/isic-rev5 "8129"
+  :actor/domain :services/industrial-cleaning
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-service-record :schedule-service-operation
+                       :coordinate-supply-order :flag-safety-concern]
+  :actor/always-escalate-ops [:flag-safety-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-supply-order 1000}
+
+  :actor/hard-checks [:site-verified :vendor-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["finalize the hazmat clearance" "finalize the hazmat handling clearance"
+                                "certify the site as hazmat-compliant"
+                                "certify the chemical storage area as compliant"
+                                "certify the degreasing area as code-compliant"
+                                "clear the chemical spill as contained" "clear the chemical spill as safe"
+                                "sign off on the hazmat handling permit" "sign off on the hazmat clearance"
+                                "authorize the hazardous waste disposal as compliant"
+                                "finalize the confined-space entry authorization"
+                                "authorize the confined-space entry"
+                                "grant the confined-space entry clearance"
+                                "issue the confined-space entry permit"
+                                "clear the confined space as safe for entry"
+                                "declare the confined space ventilation compliant"
+                                "confirm the confined-space atmosphere as safe"
+                                "危険物取扱いの許可を確定" "密閉空間立入の許可を確定"
+                                "密閉空間立入許可を発行" "薬剤保管区画の適合証明を発行"
+                                "漏出物の安全確認を完了"]
+
+  ;; Self-trip-avoidance: every term above is phrased as the
+  ;; finalization/execution ACTION, never a bare noun -- this namespace's
+  ;; own :flag-safety-concern default proposal legitimately discusses
+  ;; chemical-exposure/confined-space/ventilation/protective-equipment
+  ;; concerns, and its own printed :op keyword literally contains the
+  ;; substring "safety". A bare-noun term list (e.g. bare "hazmat"/
+  ;; "confined space"/"chemical") would self-trip this actor's own core
+  ;; happy path on every single run. Regression test:
+  ;; governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion.
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-service-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-service-record :schedule-service-operation
+                                               :coordinate-supply-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-service-record :schedule-service-operation
+                                         :coordinate-supply-order :flag-safety-concern}
+      :auto #{:log-service-record :schedule-service-operation :coordinate-supply-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 56 :assertions 166 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression
+                  :vendor-verification]
+  :test/simulator :industrialcleaningops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-8129"
+  :registry/business-id "cloud-itonami-isic-8129"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
