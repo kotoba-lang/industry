@@ -2522,6 +2522,37 @@ warsaw bangkok]`——創設憲章型の4自治体法がすべて正しく取得
 現状: 国軸32件・業界団体軸32件(25業種)・自治体軸31件——95tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 96 — 業界団体軸33件目(Norges Rederiforbund, NOR, ISIC 5010) — 新規業種・ノルウェー団体初)
+
+`cloud-itonami-assoc-5010-nor-rederiforbundet`を新規GitHubリポジトリ
+としてscaffold・push
+([commit 9ede11f](https://github.com/cloud-itonami/cloud-itonami-assoc-5010-nor-rederiforbundet/commit/9ede11f))：
+
+Norwegian Shipowners' Association（Norges Rederiforbund、Wikidata
+Q7061257）。**ISIC 5010（海上・沿岸水運）の初エントリ**——航空（5110）・
+トラック輸送（4923）とは異なる新規輸送業種コード。またノルウェー
+初の業界団体軸エントリ（これまでノルウェーは自治体軸のOsloのみ）。
+
+rederi.no自身の2ページを直接WebFetch検証:
+
+- **Vår historie**（沿革）— 「Konstituerende møte ble avholdt 15.
+  september 1909 og det ble enstemmig vedtatt å stifte Norges
+  Rederforbund」（1909年9月15日の創立総会で満場一致設立決定）と
+  明記。
+- **About us** — Thor Heyerdahl International Maritime Award
+  （1999年創設、卓越した技術革新・環境活動を表彰）を記述。
+
+4 tests/11 assertions green。125リポジトリ・784 factを統合。
+`"association-rule/isic" "5010"`での横断queryで`[rederiforbundet
+NOR]`がこの新規ISICコードの唯一（初）のエントリとして正しく
+取得できることを確認。さらにNOR国別横断query（association.facts /
+ordinance.facts両schema）で、Rederiforbundetが既存のOslo自治体
+条例（Reglement for bystyret / Forskrift om serverings-, salgs- og
+skjenkebevillinger）と同一連合内に共存していることを確認。
+
+現状: 国軸32件・業界団体軸33件(26業種)・自治体軸31件——96tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社

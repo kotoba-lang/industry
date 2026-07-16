@@ -322,7 +322,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-iso3166-ken/data/datascript-tx.edn"}
    {:label "cloud-itonami-municipality-tha-bangkok ordinance.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-municipality-tha-bangkok/schema/ordinance.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-municipality-tha-bangkok/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-tha-bangkok/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-5010-nor-rederiforbundet association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-5010-nor-rederiforbundet/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-5010-nor-rederiforbundet/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
