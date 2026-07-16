@@ -13,11 +13,11 @@ authoritative_for:
   - 「JSON テキストを組み立てない」— wire は string-keyed map で授受し、HTTP+JSON (de)serialize は host transport に委ねる方針
   - 成果物の3-org 配置(共通=com-junkawasaki / 公益=etzhayyim / 事業=gftdcojp)
 related:
-  - orgs/com-junkawasaki/vllm-clj                       # 本 ADR のライブラリ
-  - orgs/com-junkawasaki/torch-clj                      # 姉妹(module graph as data)
+  - orgs/kotoba-lang/vllm                       # 本 ADR のライブラリ
+  - orgs/kotoba-lang/torch                      # 姉妹(module graph as data)
   - orgs/kotoba-lang/org-anthropic-mcp                  # 先例(host-injected transport / string-keyed wire；通称 mcp-clj、現 repo 名 org-anthropic-mcp)
-  - orgs/com-junkawasaki/jsonlogic-clj                  # 先例(データ第一 / validate / ports 方式)
-  - orgs/com-junkawasaki/langchain-clj                  # 利用側(model 呼び出しの実 transport を注入しうる)
+  - orgs/kotoba-lang/jsonlogic                  # 先例(データ第一 / validate / ports 方式)
+  - orgs/kotoba-lang/langchain                  # 利用側(model 呼び出しの実 transport を注入しうる)
 supersedes: []
 superseded_by: []
 ---

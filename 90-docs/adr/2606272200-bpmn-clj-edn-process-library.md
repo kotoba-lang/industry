@@ -12,9 +12,9 @@ authoritative_for:
   - 大容量・非可搬な XML パーサ依存を避けるための minimal reader + neutral-element 注入戦略
   - プロセス成果物の3-org 配置(共通=com-junkawasaki / 公益=etzhayyim / 事業=gftdcojp)
 related:
-  - orgs/com-junkawasaki/bpmn-clj                       # 本 ADR のライブラリ
-  - orgs/com-junkawasaki/koe-clj                        # 同型の再利用 kernel(host-injected ports の先例)
-  - orgs/com-junkawasaki/langgraph-clj                  # graph 実行 kernel(姉妹)
+  - orgs/kotoba-lang/org-omg-bpmn                       # 本 ADR のライブラリ
+  - orgs/kotoba-lang/koe                        # 同型の再利用 kernel(host-injected ports の先例)
+  - orgs/kotoba-lang/langgraph                  # graph 実行 kernel(姉妹)
 supersedes: []
 superseded_by: []
 ---

@@ -12,11 +12,11 @@ authoritative_for:
   - nagare-clj を aero/熱 領域の高忠実度 `:fvm` バックエンド(aero-clj `:rom-buildup` / kami-cfd `:lbm` の同胞)とする決定
   - 両ソルバの S0 検証スコープ(陽解法中央差分 + 有限体積 PISO)と多段ロードマップ(S0→S4)
 related:
-  - orgs/com-junkawasaki/kudaki-clj           # 新設: 陽解法 FEA(:explicit-fea backend)
-  - orgs/com-junkawasaki/nagare-clj           # 新設: 有限体積 CFD(:fvm backend)
-  - orgs/com-junkawasaki/cae-solver-clj       # 共有: solve multimethod 契約(backend dispatch)
-  - orgs/com-junkawasaki/crash-clj            # seed: クラッシュ(:rom-crash)— kudaki の reduced-order 対
-  - orgs/com-junkawasaki/aero-clj             # seed: 空力(:rom-buildup)— nagare の reduced-order 対
+  - orgs/kotoba-lang/kudaki           # 新設: 陽解法 FEA(:explicit-fea backend)
+  - orgs/kotoba-lang/nagare           # 新設: 有限体積 CFD(:fvm backend)
+  - orgs/kotoba-lang/kami-engine-cae-solver       # 共有: solve multimethod 契約(backend dispatch)
+  - orgs/kotoba-lang/kami-engine-crash            # seed: クラッシュ(:rom-crash)— kudaki の reduced-order 対
+  - orgs/kotoba-lang/kami-engine-aero             # seed: 空力(:rom-buildup)— nagare の reduced-order 対
   - orgs/com-junkawasaki/kami-cfd             # 高忠実度: Rust D2Q9 LBM(:lbm)— nagare(:fvm)の同胞
   - orgs/com-junkawasaki/vehicle-design-actor # 設計クロージャの sim-verify 消費者
   - 90-docs/adr/2606272330-cae-shared-libs-and-seeds.md

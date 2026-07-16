@@ -9,7 +9,7 @@ last_verified: 2026-06-25
 implemented: 2026-06-25
 implementation:
   repo: com-junkawasaki/browser-agent-clj
-  submodule: orgs/com-junkawasaki/browser-agent-clj
+  submodule: orgs/kotoba-lang/browser-agent
   pinned: c7bf2b2
   landed_via: "com-junkawasaki/root PR #71 (merge 2fdc7eb)"
 authoritative_for:
@@ -19,10 +19,10 @@ authoritative_for:
   - 既存 clj スタック（langchain-clj → langgraph-clj → browser-use-clj / computer-use-clj）への載せ方
   - フレームワーク(com-junkawasaki) と デプロイ実体(etzhayyim) の三組織境界
 related:
-  - orgs/com-junkawasaki/langchain-clj      # 0-dep foundation + Datomic-compat store
-  - orgs/com-junkawasaki/langgraph-clj      # StateGraph / checkpoint / create-react-agent
-  - orgs/com-junkawasaki/browser-use-clj    # IBrowser host capability + indexed-element ページ表現
-  - orgs/com-junkawasaki/computer-use-clj   # desktop 操作 sub-agent（IComputer host capability）
+  - orgs/kotoba-lang/langchain      # 0-dep foundation + Datomic-compat store
+  - orgs/kotoba-lang/langgraph      # StateGraph / checkpoint / create-react-agent
+  - orgs/kotoba-lang/browser-use    # IBrowser host capability + indexed-element ページ表現
+  - orgs/kotoba-lang/computer-use   # desktop 操作 sub-agent（IComputer host capability）
   - orgs/com-junkawasaki/kotoba             # CLJ→WASM ランタイム（実行ホスト候補）
   - orgs/kawasakijun/docs/adr/0020-three-org-taxonomy.edn
 supersedes: []
@@ -36,7 +36,7 @@ superseded_by: []
 **Deciders**: Jun Kawasaki
 
 > **実装サマリ（2026-06-25）**: `com-junkawasaki/browser-agent-clj` を新設し
-> （MIT, public）、superproject に submodule 登録（`orgs/com-junkawasaki/browser-agent-clj`,
+> （MIT, public）、superproject に submodule 登録（`orgs/kotoba-lang/browser-agent`,
 > pin `c7bf2b2`）。本体 P0–P3 + 自前 browser 層を `.cljc` で実装、**end-to-end
 > テスト 19 assertions / 0 failures**、オフライン mock デモ動作。詳細は末尾
 > 「実装状況」を参照。
@@ -295,7 +295,7 @@ browser-agent-clj/
 ## 実装状況（2026-06-25）
 
 - **repo**: `com-junkawasaki/browser-agent-clj`（MIT, public, init `c7bf2b2`）。
-- **submodule**: `orgs/com-junkawasaki/browser-agent-clj` を `root` に登録、
+- **submodule**: `orgs/kotoba-lang/browser-agent` を `root` に登録、
   pin `c7bf2b2`（PR #71 / merge `2fdc7eb`）。
 - **実装名前空間**: `run` `planner` `supervisor` `fleet` `memory` `schema`
   `events` + `browser/{provider,session,live}`（全 `.cljc`）。UI は

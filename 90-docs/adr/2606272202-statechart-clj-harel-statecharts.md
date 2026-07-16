@@ -12,9 +12,9 @@ authoritative_for:
   - 階層状態(compound)・並列状態(parallel)・最終状態(final)の configuration 管理と LCA ベース exit/entry 計算
   - ダイアログ/予約ステートマシン(etzhayyim yadori / denwaban)を駆動する状態機械 kernel の3-org 配置
 related:
-  - orgs/com-junkawasaki/statechart-clj                  # 本 ADR のライブラリ
-  - orgs/com-junkawasaki/bpmn-clj                        # 同型の再利用 kernel(host-injected ports の先例)
-  - orgs/com-junkawasaki/koe-clj                         # 音声 kernel(姉妹)
+  - orgs/kotoba-lang/statechart                  # 本 ADR のライブラリ
+  - orgs/kotoba-lang/org-omg-bpmn                        # 同型の再利用 kernel(host-injected ports の先例)
+  - orgs/kotoba-lang/koe                         # 音声 kernel(姉妹)
   - 90-docs/adr/2606272200-bpmn-clj-edn-process-library.md  # bpmn-clj ADR(パターン元)
 supersedes: []
 superseded_by: []

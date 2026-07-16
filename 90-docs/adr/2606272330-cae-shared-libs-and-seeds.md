@@ -14,13 +14,13 @@ authoritative_for:
   - kami-cfd を Rust D3Q19 LBM + Smagorinsky LES + free-slip 遠方境界 + 実ジオメトリ voxel 化の高忠実度 :lbm backend とする決定(#4)
   - kami-cfd の校正定数の扱い(物理/境界/ジオメトリは解決、残差はグリッド解像度=GPU 領域)
 related:
-  - orgs/com-junkawasaki/datom-clj          # 共有: kotoba Datom ログ(EAVT)表現
-  - orgs/com-junkawasaki/vphysics-clj       # 共有: 車両物理(road-load/aero/range)
-  - orgs/com-junkawasaki/cae-solver-clj     # 共有: solve multimethod 契約(backend dispatch)
-  - orgs/com-junkawasaki/aero-clj           # seed: 空力 Cd(:rom-buildup)+ 設計ループ
-  - orgs/com-junkawasaki/crash-clj          # seed: クラッシュ(:rom-crash)
-  - orgs/com-junkawasaki/motor-clj          # seed: モーター(:rom-motor)
-  - orgs/com-junkawasaki/echem-clj          # seed: FC 電気化学(:rom-fc)
+  - orgs/kotoba-lang/datom          # 共有: kotoba Datom ログ(EAVT)表現
+  - orgs/kotoba-lang/kami-engine-vphysics       # 共有: 車両物理(road-load/aero/range)
+  - orgs/kotoba-lang/kami-engine-cae-solver     # 共有: solve multimethod 契約(backend dispatch)
+  - orgs/kotoba-lang/kami-engine-aero           # seed: 空力 Cd(:rom-buildup)+ 設計ループ
+  - orgs/kotoba-lang/kami-engine-crash          # seed: クラッシュ(:rom-crash)
+  - orgs/kotoba-lang/kami-engine-motor          # seed: モーター(:rom-motor)
+  - orgs/kotoba-lang/kami-engine-echem          # seed: FC 電気化学(:rom-fc)
   - orgs/com-junkawasaki/kami-cfd           # 高忠実度: Rust D2Q9 LBM(:lbm backend)
   - orgs/com-junkawasaki/vehicle-design-actor  # :aero ノードで実 Cd を注入(#2)
   - 90-docs/adr/2606272130-vehicle-design-actor-bev-fcev.md

@@ -112,7 +112,7 @@ cleanup 処理を `scripts/cleanup.cljs`（babashka・読取専用 dry-run 既�
   多くが `chore/cljc-ssot-prune` / `feat/actor-runtime-lib` ローカル branch + stash=1 を保持。
 - `orgs/com-junkawasaki/kotoba-code`: dirty=19（durable/transcript 等）・`reconcile/mainsync-20260623`。
 - `orgs/com-junkawasaki/manimani`: dirty=64・codex/* branches。
-- `orgs/com-junkawasaki/langchain-clj`: `feat/openai-model`。
+- `orgs/kotoba-lang/langchain`: `feat/openai-model`。
 - `orgs/com-junkawasaki/murakumo`: feat/* x3。
 - etzhayyim の `chore/cljc-ssot-prune` チェックアウト中リポ群: SSoT prune 協調。
 

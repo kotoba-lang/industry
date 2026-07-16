@@ -9,7 +9,7 @@ last_verified: 2026-06-25
 implemented: 2026-06-25
 implementation:
   repo: com-junkawasaki/godaddy-dns-clj
-  submodule: orgs/com-junkawasaki/godaddy-dns-clj
+  submodule: orgs/kotoba-lang/godaddy-dns
   pinned: e279abf
   landed_via: "com-junkawasaki/root main fast-forward 4bbfe812（GitHub Data API server-side commit）"
 authoritative_for:
@@ -18,10 +18,10 @@ authoritative_for:
   - 破壊的な DNS 書き込みを dry-run 既定 + datom 監査ログで安全化する方針
   - 既存 clj スタック（langchain-clj → langgraph-clj → *-use-clj）への載せ方
 related:
-  - orgs/com-junkawasaki/langchain-clj       # 0-dep foundation + Datomic-compat store
-  - orgs/com-junkawasaki/langgraph-clj       # StateGraph / checkpoint / create-react-agent
-  - orgs/com-junkawasaki/computer-use-clj    # IComputer host capability（直接のテンプレート）
-  - orgs/com-junkawasaki/browser-use-clj     # IBrowser host capability（姉妹）
+  - orgs/kotoba-lang/langchain       # 0-dep foundation + Datomic-compat store
+  - orgs/kotoba-lang/langgraph       # StateGraph / checkpoint / create-react-agent
+  - orgs/kotoba-lang/computer-use    # IComputer host capability（直接のテンプレート）
+  - orgs/kotoba-lang/browser-use     # IBrowser host capability（姉妹）
   - 90-docs/adr/2606250956-browser-agent-clj-genspark-style-super-agent.md
 supersedes: []
 superseded_by: []
@@ -34,7 +34,7 @@ superseded_by: []
 **Deciders**: Jun Kawasaki
 
 > **実装サマリ（2026-06-25）**: `com-junkawasaki/godaddy-dns-clj` を新設し（MIT, public,
-> init `e279abf`）、superproject `root` に submodule 登録（`orgs/com-junkawasaki/godaddy-dns-clj`,
+> init `e279abf`）、superproject `root` に submodule 登録（`orgs/kotoba-lang/godaddy-dns`,
 > pin `e279abf`）。`.cljc` で IDns capability + 実 GoDaddy 実装 + dry-run ゲート + datom
 > 監査ログ + langgraph ループを実装。**テスト 8 件 / 38 assertions / 0 failures**（mock のみ、
 > ネット・鍵不要）。ローカル Ollama での end-to-end も起動確認。詳細は末尾「実装状況」。
@@ -117,7 +117,7 @@ computer-use-clj をテンプレートに、以下を `.cljc`（JVM / SCI / cljs
 ## 実装状況（2026-06-25）
 
 - **repo**: `com-junkawasaki/godaddy-dns-clj`（MIT, public, init `e279abf`）。
-- **submodule**: `orgs/com-junkawasaki/godaddy-dns-clj` を `root` に登録、pin `e279abf`
+- **submodule**: `orgs/kotoba-lang/godaddy-dns` を `root` に登録、pin `e279abf`
   （main fast-forward `4bbfe812`、GitHub Data API server-side commit）。
 - **実装名前空間**: `godaddydns.{dns,godaddy,tool,agent}`（全 `.cljc`）+
   `examples/{jvm_host,dns_agent}.clj` + `docs/adr/0001-architecture.md` + CI。

@@ -13,10 +13,10 @@ authoritative_for:
   - 大容量・非可搬な DNS ライブラリ依存を避けるための minimal reader + emit 戦略
   - DNS 成果物の 3-org 配置(共通=com-junkawasaki / 公益=etzhayyim / 事業=gftdcojp)
 related:
-  - orgs/com-junkawasaki/zone-clj                         # 本 ADR のライブラリ
-  - orgs/com-junkawasaki/godaddy-dns-clj                  # zone-clj の diff を消費する DNS API クライアント
-  - orgs/com-junkawasaki/bpmn-clj                         # 同型の再利用 kernel(minimal reader の先例)
-  - orgs/com-junkawasaki/dmn-clj                          # 姉妹 kernel(same zero-dep .cljc 方針)
+  - orgs/kotoba-lang/zone                         # 本 ADR のライブラリ
+  - orgs/kotoba-lang/godaddy-dns                  # zone-clj の diff を消費する DNS API クライアント
+  - orgs/kotoba-lang/org-omg-bpmn                         # 同型の再利用 kernel(minimal reader の先例)
+  - orgs/kotoba-lang/org-omg-dmn                          # 姉妹 kernel(same zero-dep .cljc 方針)
 supersedes: []
 superseded_by: []
 ---

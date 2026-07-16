@@ -20,8 +20,8 @@ authoritative_for:
 related:
   - orgs/etzhayyim/com-etzhayyim-sng                    # the domain organism (R0 scaffold)
   - orgs/etzhayyim/com-etzhayyim-sng/docs/adr/0001-architecture.md  # child-level architecture ADR（正本）
-  - orgs/com-junkawasaki/langgraph-clj                  # StateGraph / checkpoint / interrupt-before
-  - orgs/com-junkawasaki/langchain-clj                  # :db-api store backend + langchain.model advisor
+  - orgs/kotoba-lang/langgraph                  # StateGraph / checkpoint / interrupt-before
+  - orgs/kotoba-lang/langchain                  # :db-api store backend + langchain.model advisor
   - 90-docs/adr/2606130900-maxwell-rsi-ecosystem.md     # energy-substrate ecosystem context
 ---
 
