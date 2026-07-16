@@ -100,14 +100,16 @@
   ;; corroboration)" -- promoted to :implemented by this promotion's own
   ;; work; superseded by the dedicated detailed corroboration block
   ;; below (`maturity-summary-counts-tiers`'s own testing form).
-  (testing "cloud-itonami-isic-5223, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "5223"))))
+  ;; cloud-itonami-isic-5223 was here as ":blueprint (live-state
+  ;; corroboration)" -- promoted to :implemented by this promotion's own
+  ;; work; superseded by the dedicated detailed corroboration block
+  ;; below (`maturity-summary-counts-tiers`'s own testing form).
   (testing "cloud-itonami-isic-5222, promoted to :implemented by a CONCURRENT sibling fleet agent (not this promotion's own work -- corroborated here only to keep this shared hot test file truthful; live-state corroboration)"
     (is (= :implemented (industry/maturity "5222"))))
   (testing "cloud-itonami-isic-5221, promoted to :implemented (land-transport-support operations-coordination actor deployed)"
     (is (= :implemented (industry/maturity "5221"))))
-  (testing "cloud-itonami-isic-5229, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "5229"))))
+  (testing "cloud-itonami-isic-5229, promoted to :implemented by a CONCURRENT sibling fleet agent (not this promotion's own work -- corroborated here only to keep this shared hot test file truthful; live-state corroboration)"
+    (is (= :implemented (industry/maturity "5229"))))
   (testing "cloud-itonami-isic-8020, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "8020"))))
   (testing "cloud-itonami-isic-3020, promoted to :implemented (rolling-stock manufacturing actor deployed)"
@@ -526,7 +528,14 @@
       ;; `(kotoba.industry/maturity-summary)` against a freshly
       ;; re-fetched origin/main registry.edn immediately before the PUT,
       ;; not assumed.
-      (is (= 17 (:blueprint m)))
+      (is (= 15 (:blueprint m)))
+      ;; 17 -> 15: this promotion's own cloud-itonami-isic-5223 -1,
+      ;; plus -1 from the concurrent sibling cloud-itonami-isic-5229
+      ;; promotion landed in the same fast-moving window (see the
+      ;; dedicated live-state-corroboration block above) -- live-
+      ;; recomputed via `(kotoba.industry/maturity-summary)` against a
+      ;; freshly re-fetched origin/main registry.edn immediately before
+      ;; this corrective test-file edit, not assumed.
       ;; 114 = 113 + cloud-itonami-isic-4620, promoted directly from
       ;; :spec (never a :blueprint) -- agricultural/live-animal
       ;; wholesale trading actor. 115 = 114 + cloud-itonami-isic-2910,
@@ -2751,7 +2760,16 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; recompute against the truly-landed post-PUT content (commit
       ;; c0462cd8042bce4569eb787f84adb810f712ca3f), confirmed the count
       ;; live rather than assumed: 401.
-      (is (= 401 (:implemented m))))))
+      ;; 401 -> 402: a CONCURRENT sibling fleet agent's own
+      ;; cloud-itonami-isic-5229 registry.edn promotion (commit
+      ;; 1afbf9d, landed in the narrow window between this promotion's
+      ;; own registry.edn PUT and this test-file PUT) is the ONLY +1 in
+      ;; this corrective edit -- not this promotion's own work,
+      ;; corroborated here only to keep this shared hot test file
+      ;; truthful; live-recomputed via `(kotoba.industry/maturity-
+      ;; summary)` against a freshly re-fetched origin/main immediately
+      ;; before this corrective PUT, not assumed.
+      (is (= 402 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
