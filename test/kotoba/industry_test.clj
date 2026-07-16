@@ -3042,7 +3042,18 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; `(kotoba.industry/get-industry "4742")` before this restoration
       ;; -- still :implemented / cloud-itonami/cloud-itonami-isic-4742 /
       ;; cloud-itonami-isic-4742, untouched by the loss.
-      (is (= 428 (:implemented m))))))
+      ;; 428 -> 429: a further CONCURRENT sibling fleet agent's own
+      ;; promotion landed in the same fast-moving window as this
+      ;; restoration edit (not this edit's own work, corroborated here
+      ;; only to keep this shared hot test file truthful; this edit's
+      ;; own cloud-itonami-isic-4742 entry was independently
+      ;; spot-checked intact via `(kotoba.industry/get-industry
+      ;; "4742")` before touching this aggregate count).
+      ;; Live-recomputed via `(kotoba.industry/maturity-summary)`
+      ;; against a freshly re-fetched origin/main registry.edn
+      ;; immediately before this test-file edit, not assumed:
+      ;; {:total 649 :spec 220 :blueprint 0 :implemented 429}.
+      (is (= 429 (:implemented m))))))
 
 (deftest cloud-itonami-isic-4751-is-implemented
   (testing "cloud-itonami-isic-4751 (Retail sale of textiles in
