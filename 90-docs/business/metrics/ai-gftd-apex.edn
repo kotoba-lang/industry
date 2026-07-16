@@ -1,26 +1,26 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 3877, "ai-gftd-chat-shell" 1387},
+ {"magatama-sh1n5h1x" 5245, "ai-gftd-chat-shell" 1387},
  :zone
- {:requests-7d 352906,
-  :pageviews-7d 5749,
-  :uniques-7d-sum 4592,
+ {:requests-7d 356148,
+  :pageviews-7d 5754,
+  :uniques-7d-sum 4660,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
   [{:path "/user/*", :requests 39}
-   {:path "/ccc.php", :requests 28}
-   {:path "/file52.php", :requests 24}
+   {:path "/ccc.php", :requests 29}
+   {:path "/file52.php", :requests 25}
+   {:path "/assets/main.js", :requests 19}
    {:path "/v1/generation/jobs/3eb9f2e0a7c04da6a05503bb6f79810d",
     :requests 17}
    {:path "/v1/generation/jobs/0a537b4151a44467ad6da5ec4690171d",
     :requests 16}
-   {:path "/ms-edit.php", :requests 14}
-   {:path "/audio_query", :requests 13}
-   {:path "/favicon.ico", :requests 12}],
-  :status-mix {:client-error 1223, :server-error 16569, :ok 529},
+   {:path "/ms-edit.php", :requests 15}
+   {:path "/audio_query", :requests 13}],
+  :status-mix {:client-error 1173, :server-error 16691, :ok 699},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,10 +32,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-16",
- :traffic-quality {:window "24h", :probe-4xx-pct 7, :error-5xx-pct 90},
+ :traffic-quality {:window "24h", :probe-4xx-pct 6, :error-5xx-pct 90},
  :top-paths
- "上位 page (24h, 2xx/3xx): /user/* 39 · /ccc.php 28 · /file52.php 24 · /v1/generation/jobs/3eb9f2e0a7c04da6a055… 17 · /v1/generation/jobs/0a537b4151a44467ad6d… 16 | 4xx(probe) 7% · 5xx 90%",
+ "上位 page (24h, 2xx/3xx): /user/* 39 · /ccc.php 29 · /file52.php 25 · /assets/main.js 19 · /v1/generation/jobs/3eb9f2e0a7c04da6a055… 17 | 4xx(probe) 6% · 5xx 90%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 352906 req/7d・4592 uniques(日次和)・うち4xx probe 7%(24h)、workers 5264 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 356148 req/7d・4660 uniques(日次和)・うち4xx probe 6%(24h)、workers 6632 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
