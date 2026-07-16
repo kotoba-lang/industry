@@ -230,7 +230,7 @@ EDN（canonical, doc/job CID）/ kotoba Datom（`media/*`, `utsushi.quads`）/ d
 ## References
 
 - 姉妹 ADR（静的グラフィック版・純 cljc + EDN 哲学の出典）: ADR-2606272100 `kasane`
-- kotoba runtime / EDN-subset コンパイラ: `orgs/com-junkawasaki/kotoba/crates/kotoba-clj`
+- kotoba runtime / EDN-subset コンパイラ: `orgs/kotoba-lang/kotoba/crates/kotoba-clj`
   （`run.rs:40` fuel, `policy.rs:48` CapClass, `effects.rs:43` KNOWN_EFFECTS）, ADR-2606241700
 - 安全モデル: `docs/ADR-safe-capability-language.md`（kotoba 内）
 - capability-gated native の先行例: EVM `bind_evm` / BTC `bind_btc` + 既存 `egress.fetch`

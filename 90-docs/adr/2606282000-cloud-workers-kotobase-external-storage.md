@@ -13,10 +13,10 @@ authoritative_for:
   - 再利用 clj ライブラリ + kagi-clj/murakumo/manimani を public 公開する判断
 related:
   - orgs/kotoba-lang/kotobase      # 新設: IStore ポート(:local 参照実装 + :kotobase XRPC 注入)
-  - orgs/com-junkawasaki/cloud-murakumo    # 新設: cljs CF Worker — fleet API
-  - orgs/com-junkawasaki/cloud-manimani    # 新設: cljs CF Worker — triage Decision Ledger API
-  - orgs/com-junkawasaki/murakumo          # OSS: kotoba WASM lattice 操作 CLI(standalone)
-  - orgs/com-junkawasaki/manimani          # OSS: triage デスクトップ/CLI(standalone)
+  - orgs/gftdcojp/local-murakumo    # 新設: cljs CF Worker — fleet API
+  - orgs/gftdcojp/cloud-manimani    # 新設: cljs CF Worker — triage Decision Ledger API
+  - orgs/kotoba-lang/murakumo          # OSS: kotoba WASM lattice 操作 CLI(standalone)
+  - orgs/gftdcojp/local-manimani          # OSS: triage デスクトップ/CLI(standalone)
   - orgs/kotoba-lang/kagi          # OSS 公開(vault コードは公開可・鍵は gitignore)
   - orgs/kotoba-lang/langchain     # 既存: langchain.kotoba-db(kotoba XRPC db-api)
 ---

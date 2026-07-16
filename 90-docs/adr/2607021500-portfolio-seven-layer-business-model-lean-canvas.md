@@ -378,7 +378,7 @@ floor 収益になる。
 - `orgs/gftdcojp/net-kotobase/docs/BUSINESS-MODEL.md`（tier の正、本 ADR は add-on を追記する位置づけ）
 - `orgs/gftdcojp/cloud-itonami/README.md`（業務 OS 定義）
 - `orgs/gftdcojp/app-aozora/README.md`（canonical atproto boundary、yoro = companion messenger）
-- `orgs/com-junkawasaki/cloud-manimani/README.md`（Decision Ledger）
+- `orgs/gftdcojp/cloud-manimani/README.md`（Decision Ledger）
 - `orgs/gftdcojp/ai-gftd-shinshi/docs/260613-bmc-lean.datoms.edn`（canvas datoms 形式の先行例）
 - CLAUDE.md「Actors」節（governor ⊣ actor / RAD identity 完了条件）
 - ADR-2607011000（cloud-itonami 26 ISIC vertical）

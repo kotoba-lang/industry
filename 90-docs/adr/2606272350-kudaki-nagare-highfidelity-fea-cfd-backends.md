@@ -17,8 +17,8 @@ related:
   - orgs/kotoba-lang/kami-engine-cae-solver       # 共有: solve multimethod 契約(backend dispatch)
   - orgs/kotoba-lang/kami-engine-crash            # seed: クラッシュ(:rom-crash)— kudaki の reduced-order 対
   - orgs/kotoba-lang/kami-engine-aero             # seed: 空力(:rom-buildup)— nagare の reduced-order 対
-  - orgs/com-junkawasaki/kami-cfd             # 高忠実度: Rust D2Q9 LBM(:lbm)— nagare(:fvm)の同胞
-  - orgs/com-junkawasaki/vehicle-design-actor # 設計クロージャの sim-verify 消費者
+  - orgs/kotoba-lang/kami-engine-cfd             # 高忠実度: Rust D2Q9 LBM(:lbm)— nagare(:fvm)の同胞
+  - orgs/kotoba-lang/kami-engine-vehicle-designer # 設計クロージャの sim-verify 消費者
   - 90-docs/adr/2606272330-cae-shared-libs-and-seeds.md
   - 90-docs/adr/2606272230-vehicle-design-sim-verify-datafied-process.md
 supersedes: []

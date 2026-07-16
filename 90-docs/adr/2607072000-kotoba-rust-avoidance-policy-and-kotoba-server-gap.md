@@ -3,7 +3,7 @@
 **Status**: accepted (policy statement + gap identification; no migration work in this ADR)
 **Date**: 2026-07-07
 **Deciders**: Jun Kawasaki（指示: 「rust が必要な実装は全て cljc で設計実装」）
-**Scope**: リポジトリ全体の方針宣言 + `orgs/com-junkawasaki/kotoba`（本番 fleet
+**Scope**: リポジトリ全体の方針宣言 + `orgs/kotoba-lang/kotoba`（本番 fleet
 が実行する Rust crate tree）の棚卸し補完
 
 ## Context
@@ -13,7 +13,7 @@ ADR-2607071900（murakumo cross-node apply）で、cross-node auction という
 control plane だけで実装**した。オーナーはこれを一般化し、「Rust が必要そうな
 実装は全て cljc で設計・実装する」ことを標準方針にせよと指示した。
 
-この方針を「実装しろ」と機械的に受け取ると、`orgs/com-junkawasaki/kotoba` の
+この方針を「実装しろ」と機械的に受け取ると、`orgs/kotoba-lang/kotoba` の
 Rust ワークスペース（kotoba-server/kotoba-lattice/kotoba-clj/kotoba-runtime/
 kotoba-datomic/kotoba-auth/kotoba-crypto/kotoba-net/kotoba-store/kotoba-ipfs/
 kotoba-dht 等、約30 crate）は**今まさに murakumo が Mac-mini fleet の全ノードに

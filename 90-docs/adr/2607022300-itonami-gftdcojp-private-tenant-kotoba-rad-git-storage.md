@@ -215,7 +215,7 @@ JVM の `cacao.core/mint` に対するクロス検証・`wrangler pages dev`
   （本 ADR からの参照のみで足りなければ）。 — done, see above.
 - Run `clojure -M:gftdcojp seed` + `import-m365` against production
   `KOTOBA_URL`/`KOTOBA_GRAPH` once credentials are available.
-- `kotoba-rad` R1 実装（`orgs/com-junkawasaki/kotoba/crates/kotoba-git` または
+- `kotoba-rad` R1 実装（`orgs/kotoba-lang/kotoba/crates/kotoba-git` または
   新設 `kotoba-rad` crate）は別 ADR/作業として着手する。
 - CACAO 認証込みの itonami.cloud API 層（Worker/Pages Functions）の設計・実装。
 

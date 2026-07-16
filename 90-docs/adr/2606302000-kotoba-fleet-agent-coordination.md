@@ -15,9 +15,9 @@ authoritative_for:
 related:
   - CLAUDE.md
   - manifest/repos.edn
-  - orgs/com-junkawasaki/kotoba/README.md
-  - orgs/com-junkawasaki/kotoba-code/README.md
-  - orgs/com-junkawasaki/murakumo/README.md
+  - orgs/kotoba-lang/kotoba/README.md
+  - orgs/kotoba-lang/kotoba-code/README.md
+  - orgs/kotoba-lang/murakumo/README.md
   - orgs/kotoba-lang/datom/README.md
   - 90-docs/adr/2606272237-manifest-workflow-single-entry-commit.md
 supersedes: []

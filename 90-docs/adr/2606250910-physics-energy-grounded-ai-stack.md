@@ -13,9 +13,9 @@ authoritative_for:
   - アクタ基盤の不変量を Hamiltonian/Lagrangian の保存量として定義する方針 (kotoba-kotodama)
   - 学習を contrastive divergence / エネルギー最小化として位置づける方針 (kotoba-llm/train, lora)
 related:
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-llm
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-kotodama
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-rt
+  - orgs/kotoba-lang/kotoba/crates/kotoba-llm
+  - orgs/kotoba-lang/kotoba/crates/kotoba-kotodama
+  - orgs/kotoba-lang/kotoba/crates/kotoba-rt
   - adr-2606241700-kotoba-clj-runtime-kotoba-ext
   - adr-2606141500-keiei-arbor-coscientist-engine
 supersedes: []
