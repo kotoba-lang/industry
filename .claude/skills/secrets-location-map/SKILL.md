@@ -104,3 +104,19 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
     (key-agreement 専用)。ops-repo の暗号化 replica bundle はこの pub 集合に
     seal され、priv で open する。recipient を rotate outするには reseal 時に
     その pub を外す。
+
+## Murakumo generation caller gate (ADR-2607161750、2026-07-16)
+
+- **`MURAKUMO_GENERATION_TOKEN_SECRET`（kagi vault、compartment `gftdcojp`）** —
+  `generation.murakumo.cloud`（Worker `murakumo-generation-proxy`）の caller gate
+  `MURAKUMO_TOKEN_SECRET` と、その caller（`net-babiniku` / `network-isekai` 両
+  Pages の `MURAKUMO_CALLER_SECRET`）が共有する HMAC signing secret の正本。
+  2026-07-16 に rotation 済み（旧値は babiniku の provision script が生成後即破棄
+  していてどこにも保管されていなかった — この轍を踏まないため kagi 保管を正とする）。
+  新しい caller を追加するときは rotation せず `bin/kagi get
+  MURAKUMO_GENERATION_TOKEN_SECRET` の値を該当 Pages/Worker secret に設定する。
+  generation-scope の長命 token を mint するには `cloud-murakumo` で
+  `MURAKUMO_TOKEN_SECRET=$(kagi get …) clojure -M:token issue <sub> generation <ttl>`。
+  ⚠ `murakumo.cloud` site Worker（chat/inference gate）と `api.murakumo.cloud`
+  （local-murakumo、`MURAKUMO_PROXY_TOKEN` 系）は**別の secret** — この item では
+  ローテーションも検証もできない。

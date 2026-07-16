@@ -1,0 +1,40 @@
+[{:db/id -1
+  :adr/doc_type "adr"
+  :adr/id "adr-2607164200-mangaka-quality-loop-murakumo-hf-lora"
+  :adr/title "ADR-2607164200: mangaka 多候補品質ループ + HF モデルレジストリ + character-LoRA 学習ハーネス（murakumo 接続）"
+  :adr/topic "mangaka-quality-loop-murakumo-hf-lora"
+  :adr/date "2026-07-16"
+  :adr/last_verified "2026-07-16"
+  :adr/status "accepted, implemented (mangaka-side); fleet-side training execution gated by ADR-2607155500 Phase 0"
+  :adr/deciders ["owner root@junkawasaki.com" "agent"]
+  :adr/authoritative true
+  :adr/authoritative_for ["ai-gftd-mangaka quality-loop graphs" "mangaka.models registry" "mangaka character-LoRA training harness"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related ["adr-2607155500-cloud-murakumo-self-hosted-video-character-consistency"
+                "adr-2607170500-cloud-murakumo-seedance-video-api-integration"
+                "adr-2606272330-gftd-ai-generation-studio"
+                "adr-2607071100-gftdcojp-mangaka-retirement-wave3-aozora-studio"]
+  :adr/decision-summary "{:scope {:repo \"gftdcojp/ai-gftd-mangaka\" :plus \"gftdcojp/cloud-murakumo services/lora-train skeleton\"}
+ :deliverables
+ {:models-registry {:ns mangaka.models :hf-mirror {:animagine-xl-4.0 \"cagliostrolab/animagine-xl-4.0\"}
+                    :own-loras [:lora-ghosthacker-shiro :lora-ghosthacker-pico]
+                    :lifecycle [:planned :queued :trained] :character-id :model/lora-cid}
+  :quality-loop {:nsid \"ai.gftd.mangaka.mangakaGeneratePanelQuality\"
+                 :shape [:plan :render-candidates :critique [:router :refine-or-finish]]
+                 :fanout :in-node-mapv :rubric-axes [:composition :silhouette :characterRecognizability
+                                                     :framing :mangaShotGrammar :lightingDrama
+                                                     :actionClarity :emotionAlignment]
+                 :gate {:score-threshold 80 :max-rounds 2 :candidates 3}
+                 :audit-trail :rounds :offline :nil-score-no-signal}
+  :training-harness {:nsid \"ai.gftd.mangaka.trainCharacterLora\"
+                     :shape [:plan :dispatch :register]
+                     :envelope {:gen.job/modality :training :gen.job/engine :comfy-train}
+                     :transport {:env \"MURAKUMO_DISPATCH_URL\" :endpoint \"/infer/dispatch\" :degrade :queued-local}
+                     :dataset \"ghosthacker-shiropico-assets character-refs (shiro 17 / pico 18 @1024x1024)\"
+                     :weights :datalad-b2-cid-only}}
+ :non-goals [:fleet-side-comfy-train-engine-wiring :actual-gpu-training-run
+             :halfgram-zankyo-yamainu-reference-sets :composeScene3d-3d-nodes]
+ :gates {:phase0 \"ADR-2607155500 gad ROCm benchmark go/no-go\"
+         :fallback \"RunPod/Modal per ai-gftd-weight-oka precedent\"}
+ :tests {:suite \"clojure -M:dev:test\" :policy :offline-deterministic}}"}]

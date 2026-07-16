@@ -1,5 +1,5 @@
 ;; cloud-itonami vertical maturity — design vs implementation by cohort
-;; As-of: 2026-07-15
+;; As-of: 2026-07-16
 ;; Rubric (0–5 each):
 ;;   :design          domain scope / Governor discipline / op contract / ADR clarity
 ;;   :impl-core       operation+governor/policy+store+phase+sim+facts present & tested
@@ -17,7 +17,7 @@
 ;; Hand-maintained snapshot (not gftd-generated). Re-measure module/product scores
 ;; from checkout before large investment decisions.
 
-{:as-of "2026-07-15"
+{:as-of "2026-07-16"
  :product :cloud-itonami
  :sources
  {:registry "orgs/kotoba-lang/industry/resources/kotoba/industry/registry.edn"
@@ -39,20 +39,20 @@
  [{:id :flagship-6399
    :label "ISIC 6399 Meta job-search (Indeed replacement)"
    :sample-repos ["cloud-itonami-isic-6399"]
-   :design 5 :impl-core 5 :impl-product 5 :business 1
-   :notes "Full JobSearch-LLM ⊣ Portal Governor; 6 jurisdictions; :posting/correct; live demo; operator-quickstart; illustrative pricing. No real feed integration, no paid tenant."}
+   :design 5 :impl-core 5 :impl-product 5 :business 2
+   :notes "Full JobSearch-LLM ⊣ Portal Governor; 6 jurisdictions; :posting/correct; live demo; operator-quickstart; pricing grounded in 6 real competitor comparables (90-docs/pricing-intelligence/, run pricing-intel-20260716-02). No real feed integration, no paid tenant. 2026-07-16 (ADR-2607161930): first distribution attempt — dedicated actor cloud-itonami-isic-6399.aozora.app created, profile + 1 promo post live on aozora.app (own small PDS, not a mainstream external network); business held at 1 at that point (捏造ゼロ: no external reach/tenant proof yet). 2026-07-16 (ADR-2607161745): live Stripe Product/Price/Payment Link created for the ¥80k/月 Managed Starter tier — business raised 1→2 (billing infra live, same partial-credit basis as the itonami.cloud cockpit row; still no paid org, no E2E checkout attempt yet)."}
 
   {:id :flagship-6310
    :label "ISIC 6310 Talent (kaonavi replacement)"
    :sample-repos ["cloud-itonami-isic-6310"]
-   :design 5 :impl-core 5 :impl-product 5 :business 1
-   :notes "HR-LLM ⊣ PolicyGovernor; 5 ops + :assignment/propose; live demo; operator-quickstart; policy pack. Real HR seed is operator-side; no paid tenant."}
+   :design 5 :impl-core 5 :impl-product 5 :business 2
+   :notes "HR-LLM ⊣ PolicyGovernor; 5 ops + :assignment/propose; live demo; operator-quickstart; policy pack. Real HR seed is operator-side; no paid tenant. 2026-07-16 (ADR-2607161930): first distribution attempt — dedicated actor cloud-itonami-isic-6310.aozora.app created, profile + 1 promo post live on aozora.app (own small PDS, not a mainstream external network); business held at 1 at that point (捏造ゼロ: no external reach/tenant proof yet). 2026-07-16 (ADR-2607161745): live Stripe Product/Price/Payment Link created for the ¥80k/月 Managed Starter tier — business raised 1→2 (billing infra live, same partial-credit basis as the itonami.cloud cockpit row; still no paid org, no E2E checkout attempt yet)."}
 
   {:id :near-flagship-7810
    :label "ISIC 7810 Employment / placement"
    :sample-repos ["cloud-itonami-isic-7810"]
-   :design 4 :impl-core 4 :impl-product 4 :business 1
-   :notes "Next after flagships (product-score 4: demo + quickstart). Referral handoff target from 6399 ADR-0003."}
+   :design 4 :impl-core 4 :impl-product 4 :business 2
+   :notes "Next after flagships (product-score 4: demo + quickstart). Referral handoff target from 6399 ADR-0003. Pricing table built from scratch, grounded in 4 real competitor comparables (90-docs/pricing-intelligence/, run pricing-intel-20260716-03) — previously had no numbers at all. 2026-07-16 (ADR-2607161745): live Stripe Product/Price/Payment Link created for the ¥80k/月 Managed Starter tier — business raised 1→2 (billing infra live, same partial-credit basis as the itonami.cloud cockpit row; still no paid org, no E2E checkout attempt yet)."}
 
   {:id :insurance-finance
    :label "Insurance / finance batch"
@@ -134,11 +134,11 @@
   {:id :cockpit
    :label "itonami.cloud cockpit"
    :sample-repos ["gftdcojp/cloud-itonami"]
-   :design 4 :impl-core 3 :impl-product 4 :business 1
-   :notes "2026-07-16: free path production-mature — productSurface 12/12, free_path_smoke 12/12, freePath tenants=2 agentRuns live, /docs/free-path.md + openapi. Business still 1 until STRIPE_* + paid org."}]
+   :design 4 :impl-core 3 :impl-product 4 :business 2
+   :notes "2026-07-16: free path production-mature — productSurface 12/12, free_path_smoke 12/12, freePath tenants=2 agentRuns live, /docs/free-path.md + openapi. 2026-07-16 (ADR-2607161620): STRIPE_* live 化完了 (secret 4件 Cloudflare 投入 + live Product/2 Price/Webhook 作成、単価は cloud-murakumo/net-kotobase 準拠) — business 1→2 (billing wired, still no paid org). E2E checkout はオーナー指示で skip、未検証。business 3 は初回 paid org 登録後。"}]
 
  :priorities
- ["Owner: configure STRIPE_* secrets (/docs/stripe-billing-setup.md) then real /isco-1212 checkout — only gate left for productSurface→business."
+ ["DONE 2026-07-16 (ADR-2607161620): STRIPE_* secrets live-wired to Cloudflare Pages + live Stripe Product/2 metered Price/Webhook created. Remaining gate: E2E checkout verification (skipped, still open) → first paid org."
   "Do not grow more verticals before product→business on 6399/6310 (+7810)."
   "Keep portfolio wedge narrative at flagship pair (facts :wedge 3)."
   "ISO3166 agencies / ISCO: maintain as design assets; defer runtime investment."

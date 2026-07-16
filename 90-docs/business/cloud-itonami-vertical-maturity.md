@@ -1,6 +1,6 @@
 # cloud-itonami — vertical maturity (design vs implementation)
 
-**As-of**: 2026-07-15  
+**As-of**: 2026-07-16  
 **Product**: `cloud-itonami`  
 **正本 (structured)**: `cloud-itonami-vertical-maturity.edn`  
 **Portfolio scores**: `maturity-facts.edn` + generated `maturity-scores.md` (ADR-2607021700)  
@@ -47,9 +47,9 @@ Local ISIC checkouts under `orgs/cloud-itonami/cloud-itonami-isic-*` (**n=165**)
 
 | Vertical / layer | Design | Impl-core | Impl-product | Business | One-liner |
 |---|---:|---:|---:|---:|---|
-| **6399 Meta job-search** | 5 | 5 | 5 | 1 | Indeed replacement; 6 jurisdictions; live demo; no paid tenant |
-| **6310 Talent** | 5 | 5 | 5 | 1 | kaonavi replacement; assignment op; live demo; no paid tenant |
-| **7810 Employment/placement** | 4 | 4 | 4 | 1 | Near-flagship (demo + quickstart) |
+| **6399 Meta job-search** | 5 | 5 | 5 | **2** | Indeed replacement; 6 jurisdictions; live demo; aozora.app actor + first promo post (ADR-2607161930); Stripe Payment Link live for Managed Starter tier (ADR-2607161745), no paid org yet |
+| **6310 Talent** | 5 | 5 | 5 | **2** | kaonavi replacement; assignment op; live demo; aozora.app actor + first promo post (ADR-2607161930); Stripe Payment Link live for Managed Starter tier (ADR-2607161745), no paid org yet |
+| **7810 Employment/placement** | 4 | 4 | 4 | **2** | Near-flagship (demo + quickstart); Stripe Payment Link live for Managed Starter tier (ADR-2607161745), no paid org yet |
 | **Insurance / finance** | 4 | 4 | 1 | 0 | Full modules; almost no storefront |
 | **Real estate** | 4 | 4 | 1 | 0 | Same pattern |
 | **Health / care / hospital** | 5 | 4 | 1 | 0 | Strong clinical scope exclusion; thin product face |
@@ -61,7 +61,7 @@ Local ISIC checkouts under `orgs/cloud-itonami/cloud-itonami-isic-*` (**n=165**)
 | **ISO3166 JPN agencies** | 4 | 0 | 1 | 0 | blueprint + docs; essentially no src |
 | **ISCO occupations** | 3 | 1 | 0 | 0 | Thin tests / partial modules |
 | **Catalog / org surface** | 4 | 4 | 4 | 1 | github.io from registry SSoT |
-| **itonami.cloud cockpit** | 4 | 3 | 4 | 1 | free path mature productSurface 12/12; freePath tenants=2; paid blocked on Stripe |
+| **itonami.cloud cockpit** | 4 | 3 | 4 | 2 | free path mature productSurface 12/12; freePath tenants=2; Stripe live-wired (ADR-2607161620), E2E checkout unverified, no paid org yet |
 
 ## Reading
 
@@ -79,8 +79,10 @@ productSurface 7/7); business has not cleared a paid gate on any vertical.
 
 ## Priorities (from this table)
 
-1. **Owner STRIPE_*** secrets → live `/isco-1212` checkout (only remaining
-   productSurface→business gate; see `/docs/stripe-billing-setup.md`).
+1. ~~Owner STRIPE_*** secrets → live `/isco-1212` checkout~~ — **done
+   2026-07-16 (ADR-2607161620)**: secrets wired to Cloudflare Pages, live
+   Stripe Product/2 metered Price/Webhook created. Remaining gate is now
+   **E2E checkout verification (skipped, still open) → first paid org**.
 2. Prefer **product → business** on 6399 / 6310 (+7810) over new verticals.
 3. Keep the portfolio wedge narrative on the flagship pair (`:wedge 3` in
    maturity-facts; not “all industries” as the sales wedge).
@@ -90,7 +92,10 @@ productSurface 7/7); business has not cleared a paid gate on any vertical.
 
 ## Related
 
-- Portfolio rescore note: `maturity-facts.edn` `:cloud-itonami` (2026-07-15)
+- Portfolio rescore note: `maturity-facts.edn` `:cloud-itonami` (2026-07-16)
+- Stripe billing go-live: ADR-2607161620
+- 6399/6310 aozora.app distribution actors: ADR-2607161930
+- 6399/6310/7810 flagship Managed-tier Stripe Payment Links + pricing-intelligence: ADR-2607161745
 - Metrics: `metrics/cloud-itonami.edn` (cockpit traffic)
 - Flagship depth: ADR-2607122300
 - Pattern saturation (earlier): ADR-2607011200

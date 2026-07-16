@@ -1,0 +1,235 @@
+[{:adr/authoritative_for ["kotoba-lang/rcs の新設と設計根拠" "kotoba-lang/dtn の新設と設計根拠" "「独自だが SMS/RCS とワイヤ互換の telecom 基盤」という設計スコープの境界確定"], :adr/supersedes [], :adr/superseded_by [], :adr/topic "telecom-independent-substrate-dtn-rcs-mesh-satellite", :adr/related ["orgs/kotoba-lang/phone" "orgs/kotoba-lang/webrtc" "orgs/kotoba-lang/turn" "orgs/kotoba-lang/net" "90-docs/adr/2607084700-kotoba-lang-apn-cloud-itonami-isic-6110.md" "90-docs/adr/2607011700-kotoba-lang-webrtc.md"], :adr/status :accepted, :adr/id "adr-2607161743-kotoba-lang-rcs-dtn-independent-telecom-substrate", :adr/doc_type :adr, :adr/last_verified "2026-07-16", :adr/body "---
+id: adr-2607161743-kotoba-lang-rcs-dtn-independent-telecom-substrate
+title: \"ADR-2607161743: kotoba-lang/rcs + kotoba-lang/dtn — a carrier-network-non-dependent telecom substrate, wire-compatible with SMS/RCS\"
+status: accepted
+doc_type: adr
+topic: telecom-independent-substrate-dtn-rcs-mesh-satellite
+authoritative: true
+last_verified: 2026-07-16
+authoritative_for:
+  - kotoba-lang/rcs の新設と設計根拠
+  - kotoba-lang/dtn の新設と設計根拠
+  - 「独自だが SMS/RCS とワイヤ互換の telecom 基盤」という設計スコープの境界確定
+related:
+  - orgs/kotoba-lang/phone
+  - orgs/kotoba-lang/webrtc
+  - orgs/kotoba-lang/turn
+  - orgs/kotoba-lang/net
+  - 90-docs/adr/2607084700-kotoba-lang-apn-cloud-itonami-isic-6110.md
+  - 90-docs/adr/2607011700-kotoba-lang-webrtc.md
+supersedes: []
+superseded_by: []
+---
+
+# ADR-2607161743: kotoba-lang/rcs + kotoba-lang/dtn — a carrier-network-non-dependent telecom substrate, wire-compatible with SMS/RCS
+
+**Status**: accepted
+**Date**: 2026-07-16
+**Deciders**: Jun Kawasaki
+
+## Problem
+
+The question put to the substrate was: *「今の kotoba-lang, cloud-itonami に既存の電話通信網、sms, rcs に依存しない独自かつ全く同じ規格の telecom 基盤は設計されている?」*
+
+A repo-wide search returned **no**: neither `cloud-itonami` (the ISIC business-actor
+fleet) nor `kotoba-lang` (the shared domain-kernel org) had a design for an
+independent telecom substrate. What existed instead all pointed the *other*
+direction — toward integrating with or governing existing carrier
+infrastructure, not replacing it:
+
+- `kotoba-lang/phone` models E.164/SIP/CDR/SMS as data records for a
+  community telecom **operator** (`cloud-itonami-isic-6190`), i.e. a business
+  that resells carrier bandwidth.
+- `kotoba-lang/apn` (ADR-2607084700) models optical transport topology for a
+  licensed network **operator** (`cloud-itonami-isic-6110`).
+- `cloud-itonami-isic-6120` governs a spectrum-licensed mobile network
+  operator — still a licensed-carrier business, the opposite of
+  carrier-independence.
+- `kami-engine-sdk-svelte`'s call README states explicitly: *\"Telecom
+  (PSTN/RCS/SIP) — separate track; the `*-compat` actors remain the
+  management plane\"* — i.e. PSTN/RCS integration is delegated to
+  carrier-API-compatible actors (`twilio-compat` etc.), not replaced.
+
+The user then asked to close this gap with a new design + ADR. Three
+clarifying questions fixed the scope before implementation:
+
+1. **Motivation** (all four selected, in this priority order): disaster/
+   carrier-outage resilience > cost/MVNO-fee avoidance for cloud-itonami
+   actor↔actor and actor↔user notification > IoT/M2M messaging between
+   kotoba-lang actors and kami-engine-embedded devices > censorship/platform
+   independence.
+2. **Transport substrate** (all three selected — a multi-transport design,
+   not a single new physical network): internet-overlay P2P, mesh radio
+   (LoRa/Meshtastic-shaped, unlicensed ISM band), and satellite links. The
+   design must let the same message egress over whichever of these is
+   actually live, not commit to exactly one.
+3. **Interoperability level**: wire-compatible with 3GPP SMS and GSMA RCS
+   Universal Profile — an existing carrier SMS/RCS client must be able to
+   receive/send through a gateway without modification.
+
+## Decision
+
+### Decision 1: two new `.cljc` capability libraries, zero I/O — the house \"records, not wire format\" discipline
+
+`kotoba-lang/rcs` and `kotoba-lang/dtn` are added, following exactly the
+pattern `kotoba-lang/phone`/`kotoba-lang/webrtc`/`kotoba-lang/card`/
+`kotoba-lang/swift` already establish: model protocol structures as plain
+EDN + pure constructor/validator functions, zero network I/O, portable
+across JVM/ClojureScript/SCI/GraalVM. Neither library moves a single byte
+over a wire; a host (browser app, kami-engine device, or a future
+consuming actor) supplies the actual transport.
+
+- **`kotoba-lang/rcs`** (`kotoba.rcs`) models GSMA RCS Universal Profile
+  (RCC.07) message/session/capability records — chat message, group chat,
+  is-composing indicator, IMDN delivery/read receipt, file-transfer
+  descriptor, capability-discovery result — complementing
+  `kotoba-lang/phone`'s existing SMS record rather than duplicating it.
+  It `require`s `kotoba.phone` and reuses `phone/e164-valid?` for every
+  endpoint validation; it does not reimplement E.164 parsing.
+- **`kotoba-lang/dtn`** (`kotoba.dtn` + `.link` + `.router` + `.gateway`)
+  models RFC 9171 Bundle Protocol Version 7 as the transport-agnostic
+  envelope. A bundle's EID scheme is `dtn:<e164>`, built directly on
+  `kotoba.phone/e164-valid?`. `kotoba.dtn.link` records a neighbor reachable
+  via one of `#{:internet-overlay :mesh-radio :satellite}`.
+  `kotoba.dtn.router/route-decision` is the store-and-forward core: given a
+  bundle and the currently-known links, forward directly if the destination
+  is a reachable neighbor (picking the cheapest live transport by an
+  overridable priority order — cost/latency-first by default, but a
+  resilience-first caller can reorder to prefer mesh/satellite when
+  internet is down), otherwise hold it in store.
+  `kotoba.dtn.gateway` is the literal SMS/RCS interoperability seam:
+  `bundle->sms`/`sms->bundle` round-trip a `kotoba.phone/sms` record
+  through a bundle payload unchanged, so **any host adapter that already
+  serializes a `phone/sms` record to a real carrier SMS PDU works
+  unmodified against DTN-delivered payloads too** — the same wire format,
+  carried over a different transport. `bundle->rcs-shaped`/
+  `rcs-shaped->bundle` do the same for `kotoba.rcs` chat-message-shaped
+  maps.
+
+### Decision 2: `dtn` does not take a hard dependency on `rcs`
+
+`kotoba.dtn.gateway`'s RCS-facing functions check for the `:rcs/message-id`
+key structurally (duck-typed) rather than `require`-ing `kotoba-lang/rcs`.
+The two libraries were built in parallel by independent agents specifically
+to avoid a build-order coupling; keeping the dependency structural instead
+of nominal preserves that independence permanently, not just during the
+initial build. This mirrors `koe`'s \"host injects every concrete
+capability\" discipline applied at the library-to-library seam instead of
+the library-to-host seam.
+
+### Decision 3: honestly-scoped subsets — explicit non-claims, not silent gaps
+
+Neither library claims full spec coverage; each documents its boundary in
+its own namespace docstring, following this workspace's sourcing-honesty
+discipline (the same discipline `kotoba-lang/apn`'s RWA solver uses:
+\"single-link-deviation heuristic, explicitly not full k-shortest-paths\").
+
+- `kotoba-lang/rcs` excludes actual SIP/MSRP/CPIM transport framing, GSMA
+  IR.92/IR.94 network registration, and TLS/IPsec transport security.
+- `kotoba-lang/dtn` excludes CBOR wire encoding, block CRC, bundle
+  fragmentation, and BPSec (RFC 9172) security blocks. Its router is a
+  **direct-neighbor-or-store heuristic**, explicitly not full Contact Graph
+  Routing (RFC 9174) or epidemic/PRoPHET multi-hop relay — a bundle that
+  needs more than one hop to reach its destination is not yet routable by
+  this R0.
+
+### Decision 4: actual transport I/O is out of scope here — a future, separate decision
+
+This ADR does not stand up a mesh-radio driver, a satellite modem
+integration, or actual internet sockets. `kotoba.dtn.link` records describe
+*what a link looks like*; supplying real ones is a host's job. The
+internet-overlay leg is expected to compose with the already-existing
+`kotoba-lang/net` (gossip/bitswap semantics) and `kotoba-lang/turn`
+(RFC 8656 relay) libraries rather than reimplementing P2P transport here —
+consistent with this workspace's layering discipline (`apn` excludes
+physical-layer optics for the same reason: that's a different library's
+job). Mesh-radio and satellite adapters have no existing kotoba-lang
+counterpart yet and are explicitly deferred.
+
+### Decision 5: no new cloud-itonami actor in this ADR
+
+No ISIC vertical cleanly fits \"independent, carrier-non-dependent resilient
+messaging operator\" — the two adjacent codes already registered
+(`isic-6120` licensed MNO, `isic-6190` VoIP/bandwidth reseller) are both
+*carrier-dependent* by definition, the opposite of this design's premise.
+New ISIC registrations are a reviewed business decision, not something to
+add routinely alongside a library ADR (root `CLAUDE.md`'s BMC/ISIC section).
+A consuming actor — e.g. cloud-itonami using `dtn`+`rcs` for its own
+actor↔actor/actor↔user notification delivery to dodge carrier SMS fees, or
+a dedicated future infra actor — is left as a separate, later decision,
+mirroring how `kotoba-lang/webrtc`'s own ADR left \"an actual signaling
+server / consuming actor\" as explicit future work.
+
+## Verification
+
+- `kotoba-lang/rcs`: `clojure -M:test` — 19 tests / 71 assertions, 0
+  failures. `clojure -M:lint` — 0 errors/warnings. Pushed to
+  `github.com/kotoba-lang/rcs` (public), commit
+  `47ea586234ea8bcb286b18b28365d67348ad6d4a`. CI green.
+- `kotoba-lang/dtn`: `clojure -M:test` — 20 tests / 84 assertions, 0
+  failures. `clojure -M:lint` — 0 errors/warnings. Pushed to
+  `github.com/kotoba-lang/dtn` (public), commit
+  `34b69b2ce7e5e4ee4abd8a400ab1c4dcbb3edfbd`. CI green.
+- `manifest/repos.edn`/`manifest/west.yml`: both registered via
+  `--entry rcs,dtn` minimal diff (10-line west.yml insert, 1-line
+  repos.edn `:extra-projects` insert), pin-verified
+  (`verify-west-pins: 2 件の pin 変更をすべて検証 OK`, both \"新規 entry, pin
+  ... は main から到達可能\"), landed via an isolated sibling-path worktree
+  (not the shared superproject checkout) + GitHub API server-side merge
+  (`repos.edn`'s `:manifest-workflow` canonical path).
+- Pre-existing, unrelated `west.yml is STALE` drift across ~1,700+ other
+  projects (pins that advanced locally without a matching regeneration
+  commit, observed both before and after this ADR's own sync) was
+  deliberately **not** touched — a wholesale regeneration commit is
+  prohibited by root `CLAUDE.md` / `repos.edn`'s own `:manifest-workflow`,
+  and is out of scope for this ADR.
+
+## Consequences
+
+- `kotoba-lang` gains two genuinely tested, pushed capability libraries
+  (155 assertions combined, 0 lint warnings) implementing the SMS/RCS
+  wire-compatibility half of the design and the transport-agnostic
+  store-and-forward routing half — not blueprint-only placeholders.
+- The interop seam is real and composable today: a `kotoba.phone/sms` (or
+  future `kotoba.rcs` chat-message) record is byte-identical whether it
+  arrives via a carrier gateway or a `kotoba.dtn` bundle, so a single
+  serializer adapter covers both paths.
+- The actual multi-transport wire-up — a mesh-radio adapter, a satellite
+  modem adapter, and wiring the internet-overlay leg through
+  `kotoba-lang/net`/`kotoba-lang/turn` — remains real, undone future work.
+  This ADR closes the *protocol-and-routing-model* gap the user's question
+  identified; it does not itself stand up a running network.
+- No cloud-itonami actor consumes this yet (Decision 5); the libraries are
+  unused in production until a consuming actor or app is built.
+- `kotoba.dtn.router`'s direct-neighbor-or-store scope (Decision 3) is a
+  known, documented gap — genuine multi-hop delay-tolerant routing (CGR or
+  epidemic) is additive future work, not silently claimed here.
+
+## Alternatives considered
+
+- **Registering a new cloud-itonami ISIC actor immediately.** Rejected: no
+  ISIC vertical fits an explicitly carrier-independent operator, and new
+  ISIC registration is a reviewed business decision this ADR should not
+  make unilaterally alongside a library design (Decision 5).
+- **`kotoba-lang/dtn` `require`-ing `kotoba-lang/rcs` directly.** Rejected:
+  the two libraries were built independently in parallel specifically to
+  avoid a build-order coupling; a structural/duck-typed gateway seam keeps
+  them independently buildable and testable permanently (Decision 2).
+- **Implementing full RFC 9171 CBOR encoding, BPSec, and Contact Graph
+  Routing in R0.** Rejected in favor of an honestly-scoped, tested
+  direct-neighbor-or-store heuristic — see Decision 3. Claim exactly what
+  the code does, not more.
+- **Building actual mesh-radio/satellite transport adapters as part of
+  this ADR.** Rejected: that is real hardware/ops-integration work
+  requiring its own scoping and (per the workspace's 3D-engine and
+  Rust-crate precedents) should not be improvised inline when the
+  library-layer gap is what was actually asked about — see Decision 4.
+
+## References
+
+- `orgs/kotoba-lang/rcs/README.md` — https://github.com/kotoba-lang/rcs
+- `orgs/kotoba-lang/dtn/README.md` — https://github.com/kotoba-lang/dtn
+- `orgs/kotoba-lang/phone/README.md`
+- `90-docs/adr/2607084700-kotoba-lang-apn-cloud-itonami-isic-6110.md`
+- `90-docs/adr/2607011700-kotoba-lang-webrtc.md`
+", :adr/artifacts "{:kotoba-lang-rcs \"kotoba-lang/rcs @ 47ea586234ea (pushed, public)\", :kotoba-lang-dtn \"kotoba-lang/dtn @ 34b69b2ce7e5 (pushed, public)\", :manifest \"orgs/kotoba-lang/{rcs,dtn} registered via --entry rcs,dtn, pin-verified\"}", :db/id -1, :adr/authoritative true, :adr/title "ADR-2607161743: kotoba-lang/rcs + kotoba-lang/dtn — a carrier-network-non-dependent telecom substrate, wire-compatible with SMS/RCS"}]

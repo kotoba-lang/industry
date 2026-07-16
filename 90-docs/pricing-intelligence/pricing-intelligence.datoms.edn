@@ -1,0 +1,280 @@
+;; pricing-intelligence.datoms.edn — cloud-itonami vertical pricing intelligence, base (schema + catalog).
+;; Generated from the pilot competitor-pricing research (28 of 295 ISIC+ISCO verticals cloud-itonami
+;; has blueprinted; see orgs/cloud-itonami/cloud-itonami-isic-*/isco-* and 90-docs/business/cloud-itonami-business-model.md).
+;; Schema + catalog is DataScript/Datomic-transactable EDN, following the same convention as
+;; 90-docs/design-quality/design-quality.datoms.edn and 90-docs/adr/2607021500-portfolio-bmc-lean.datoms.edn:
+;; this file declares schema + the stable :cluster/*, :vertical/*, :product/* catalog entities (identified by
+;; :db.unique/identity, no :db/id needed). Actual price observations (which change over time / get re-benchmarked)
+;; are append-only facts in the sibling file pricing-intelligence-ledger.edn — load both when querying.
+;;
+;; Verified queryable 2026-07-16 via JVM Clojure + datascript (nbb + the npm `datascript` package's compiled
+;; JS API round-tripped incorrectly under nbb/SCI — two independent keyword-comparator implementations collide,
+;; "Cannot compare :k to :k" on every transact regardless of schema/data shape). Real run, from outside the
+;; superproject tree (its root `deps.edn` is unrelated workspace-metadata EDN, not a Clojure deps manifest —
+;; invoking `clojure` from inside the tree makes clojure.tools.deps try and fail to parse it):
+;;   cd /tmp && clojure -Sdeps '{:deps {datascript/datascript {:mvn/version "1.7.1"}}}' \
+;;     -M /path/to/com-junkawasaki/90-docs/pricing-intelligence/query.clj /path/to/com-junkawasaki
+;; Result: 27 schema attrs, 116 catalog entities, 118 ledger events -> 1306 datoms transacted; example queries
+;; below returned correct joined results (see query.clj for the full, runnable versions of both):
+;;
+;; example query — every competitor observed for a given vertical, with disclosure tier:
+;;   (d/q '[:find ?pname ?price ?tier
+;;          :where [?v :vertical/id :vertical/isic-7912]
+;;                 [?o :obs/vertical ?v] [?o :obs/product ?p] [?p :product/name ?pname]
+;;                 [?o :obs/price-summary ?price] [?o :obs/disclosure-tier ?tier]]
+;;        db)
+;;
+;; example query — recommended price band per vertical, joined to its cluster label:
+;;   (d/q '[:find ?vname ?clabel ?low ?high ?unit
+;;          :where [?v :vertical/name ?vname] [?v :vertical/cluster ?c] [?c :cluster/label ?clabel]
+;;                 [?r :rec/vertical ?v] [?r :rec/band-low ?low] [?r :rec/band-high ?high] [?r :rec/unit ?unit]]
+;;        db)
+[
+ ;; ---- schema -----------------------------------------------------------------
+ {:db/ident :cluster/id    :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :cluster/label :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+
+ {:db/ident :vertical/id            :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :vertical/code          :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :vertical/code-system   :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one} ; :code-system/isic-rev5 | :code-system/isco-08
+ {:db/ident :vertical/name          :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :vertical/cluster       :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one} ; -> :cluster/id
+ {:db/ident :vertical/repo          :db/valueType :db.type/string  :db/cardinality :db.cardinality/one} ; orgs/cloud-itonami/<repo>
+ {:db/ident :vertical/pricing-shape :db/valueType :db.type/string  :db/cardinality :db.cardinality/one} ; native billing unit observed in this vertical's market
+
+ {:db/ident :product/id   :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :product/name :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+
+ ;; observation facts (append-only, in pricing-intelligence-ledger.edn) — one per (vertical, competitor product) pair
+ {:db/ident :obs/vertical        :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one} ; -> :vertical/id
+ {:db/ident :obs/product         :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one} ; -> :product/id
+ {:db/ident :obs/price-summary   :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :obs/disclosure-tier :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one} ; :tier/published | :tier/estimated | :tier/opaque
+ {:db/ident :obs/source-url      :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :obs/run-id          :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :obs/at              :db/valueType :db.type/string  :db/cardinality :db.cardinality/one} ; ISO date
+ {:db/ident :obs/seq             :db/valueType :db.type/long    :db/cardinality :db.cardinality/one}
+
+ ;; recommendation facts (append-only, in pricing-intelligence-ledger.edn) — one per vertical per run
+ {:db/ident :rec/vertical  :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one} ; -> :vertical/id
+ {:db/ident :rec/band-low  :db/valueType :db.type/double  :db/cardinality :db.cardinality/one} ; absent for enterprise-contract-only verticals with no self-serve band
+ {:db/ident :rec/band-high :db/valueType :db.type/double  :db/cardinality :db.cardinality/one}
+ {:db/ident :rec/unit      :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :rec/rationale :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :rec/run-id    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :rec/at        :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :rec/seq       :db/valueType :db.type/long    :db/cardinality :db.cardinality/one}
+
+ ;; ---- cluster catalog ----------------------------------------------------------
+ {:cluster/id :cluster/insurance      :cluster/label "Insurance"}
+ {:cluster/id :cluster/healthcare     :cluster/label "Healthcare & elder care"}
+ {:cluster/id :cluster/field-trade    :cluster/label "Field trade services"}
+ {:cluster/id :cluster/hospitality    :cluster/label "Hospitality & travel"}
+ {:cluster/id :cluster/professional   :cluster/label "Professional practices"}
+ {:cluster/id :cluster/telecom-retail :cluster/label "Telecom, retail & tech"}
+ {:cluster/id :cluster/utilities-etc  :cluster/label "Utilities, logistics, beauty & education"}
+ {:cluster/id :cluster/media-recruitment :cluster/label "Media, recruitment & information services"}
+
+ ;; ---- vertical catalog (28 of 295 ISIC+ISCO verticals; pilot batch, ADR-forthcoming) ------------
+ {:vertical/id :vertical/isic-6511 :vertical/code "6511" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Life insurance" :vertical/cluster [:cluster/id :cluster/insurance]
+  :vertical/repo "cloud-itonami-isic-6511" :vertical/pricing-shape "per-seat"}
+ {:vertical/id :vertical/isic-6512 :vertical/code "6512" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Non-life (P&C) insurance" :vertical/cluster [:cluster/id :cluster/insurance]
+  :vertical/repo "cloud-itonami-isic-6512" :vertical/pricing-shape "per-seat"}
+ {:vertical/id :vertical/isic-6520 :vertical/code "6520" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Reinsurance" :vertical/cluster [:cluster/id :cluster/insurance]
+  :vertical/repo "cloud-itonami-isic-6520" :vertical/pricing-shape "enterprise-contract"}
+
+ {:vertical/id :vertical/isic-8610 :vertical/code "8610" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Hospital activities" :vertical/cluster [:cluster/id :cluster/healthcare]
+  :vertical/repo "cloud-itonami-isic-8610" :vertical/pricing-shape "enterprise-contract"}
+ {:vertical/id :vertical/isic-8620 :vertical/code "8620" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Medical and dental practice activities" :vertical/cluster [:cluster/id :cluster/healthcare]
+  :vertical/repo "cloud-itonami-isic-8620" :vertical/pricing-shape "per-seat"}
+ {:vertical/id :vertical/isic-8730 :vertical/code "8730" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Residential care for the elderly and disabled" :vertical/cluster [:cluster/id :cluster/healthcare]
+  :vertical/repo "cloud-itonami-isic-8730" :vertical/pricing-shape "per-bed-day"}
+ {:vertical/id :vertical/isic-8810 :vertical/code "8810" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Community Care Coordination" :vertical/cluster [:cluster/id :cluster/healthcare]
+  :vertical/repo "cloud-itonami-isic-8810" :vertical/pricing-shape "per-case"}
+
+ {:vertical/id :vertical/isic-4321 :vertical/code "4321" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Electrical installation" :vertical/cluster [:cluster/id :cluster/field-trade]
+  :vertical/repo "cloud-itonami-isic-4321" :vertical/pricing-shape "per-seat"}
+ {:vertical/id :vertical/isic-4322 :vertical/code "4322" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Plumbing, heat and air-conditioning installation" :vertical/cluster [:cluster/id :cluster/field-trade]
+  :vertical/repo "cloud-itonami-isic-4322" :vertical/pricing-shape "per-seat"}
+ {:vertical/id :vertical/isic-8130 :vertical/code "8130" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Landscape care and maintenance" :vertical/cluster [:cluster/id :cluster/field-trade]
+  :vertical/repo "cloud-itonami-isic-8130" :vertical/pricing-shape "flat, unlimited-crew"}
+
+ {:vertical/id :vertical/isic-5510 :vertical/code "5510" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Accommodation activities" :vertical/cluster [:cluster/id :cluster/hospitality]
+  :vertical/repo "cloud-itonami-isic-5510" :vertical/pricing-shape "per-room"}
+ {:vertical/id :vertical/isic-5610 :vertical/code "5610" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Food service activities" :vertical/cluster [:cluster/id :cluster/hospitality]
+  :vertical/repo "cloud-itonami-isic-5610" :vertical/pricing-shape "per-location + %"}
+ {:vertical/id :vertical/isic-7911 :vertical/code "7911" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Travel agency activities" :vertical/cluster [:cluster/id :cluster/hospitality]
+  :vertical/repo "cloud-itonami-isic-7911" :vertical/pricing-shape "flat + % booking"}
+ {:vertical/id :vertical/isic-7912 :vertical/code "7912" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Tour operator activities" :vertical/cluster [:cluster/id :cluster/hospitality]
+  :vertical/repo "cloud-itonami-isic-7912" :vertical/pricing-shape "flat, no booking %"}
+
+ {:vertical/id :vertical/isco-2611 :vertical/code "2611" :vertical/code-system :code-system/isco-08
+  :vertical/name "Independent legal practice" :vertical/cluster [:cluster/id :cluster/professional]
+  :vertical/repo "cloud-itonami-isco-2611" :vertical/pricing-shape "per-seat"}
+ {:vertical/id :vertical/isco-2411 :vertical/code "2411" :vertical/code-system :code-system/isco-08
+  :vertical/name "Independent accounting practice" :vertical/cluster [:cluster/id :cluster/professional]
+  :vertical/repo "cloud-itonami-isco-2411" :vertical/pricing-shape "per-account"}
+ {:vertical/id :vertical/isco-3334 :vertical/code "3334" :vertical/code-system :code-system/isco-08
+  :vertical/name "Independent real estate & property management practice" :vertical/cluster [:cluster/id :cluster/professional]
+  :vertical/repo "cloud-itonami-isco-3334" :vertical/pricing-shape "per-unit"}
+ {:vertical/id :vertical/isic-7110 :vertical/code "7110" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Architectural and engineering practice" :vertical/cluster [:cluster/id :cluster/professional]
+  :vertical/repo "cloud-itonami-isic-7110" :vertical/pricing-shape "per-seat"}
+ {:vertical/id :vertical/isic-7490 :vertical/code "7490" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Other professional, scientific and technical activities n.e.c." :vertical/cluster [:cluster/id :cluster/professional]
+  :vertical/repo "cloud-itonami-isic-7490" :vertical/pricing-shape "per-seat + per-workspace"}
+
+ {:vertical/id :vertical/isic-6110 :vertical/code "6110" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Wired telecommunications activities" :vertical/cluster [:cluster/id :cluster/telecom-retail]
+  :vertical/repo "cloud-itonami-isic-6110" :vertical/pricing-shape "per-subscriber"}
+ {:vertical/id :vertical/isic-6120 :vertical/code "6120" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Wireless telecommunications activities" :vertical/cluster [:cluster/id :cluster/telecom-retail]
+  :vertical/repo "cloud-itonami-isic-6120" :vertical/pricing-shape "enterprise-contract"}
+ {:vertical/id :vertical/isic-4711 :vertical/code "4711" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Retail operations (grocery/supermarket)" :vertical/cluster [:cluster/id :cluster/telecom-retail]
+  :vertical/repo "cloud-itonami-isic-4711" :vertical/pricing-shape "per-location"}
+ {:vertical/id :vertical/isic-4741 :vertical/code "4741" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Retail sale of computers, peripheral equipment and software in specialized stores" :vertical/cluster [:cluster/id :cluster/telecom-retail]
+  :vertical/repo "cloud-itonami-isic-4741" :vertical/pricing-shape "per-location"}
+ {:vertical/id :vertical/isco-2521 :vertical/code "2521" :vertical/code-system :code-system/isco-08
+  :vertical/name "Database administration practice" :vertical/cluster [:cluster/id :cluster/telecom-retail]
+  :vertical/repo "cloud-itonami-isco-2521" :vertical/pricing-shape "flat + overage"}
+
+ {:vertical/id :vertical/isic-3510 :vertical/code "3510" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Electric power generation, transmission and distribution" :vertical/cluster [:cluster/id :cluster/utilities-etc]
+  :vertical/repo "cloud-itonami-isic-3510" :vertical/pricing-shape "enterprise-contract"}
+ {:vertical/id :vertical/isic-5320 :vertical/code "5320" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Courier activities" :vertical/cluster [:cluster/id :cluster/utilities-etc]
+  :vertical/repo "cloud-itonami-isic-5320" :vertical/pricing-shape "per-task"}
+ {:vertical/id :vertical/isic-9602 :vertical/code "9602" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Hairdressing and other beauty treatment" :vertical/cluster [:cluster/id :cluster/utilities-etc]
+  :vertical/repo "cloud-itonami-isic-9602" :vertical/pricing-shape "per-provider"}
+ {:vertical/id :vertical/isic-8550 :vertical/code "8550" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Educational support activities" :vertical/cluster [:cluster/id :cluster/utilities-etc]
+  :vertical/repo "cloud-itonami-isic-8550" :vertical/pricing-shape "flat + per-lesson"}
+
+ ;; flagship addition (2026-07-16, ADR-2607121700 follow-up): 6399 was excluded from the original 28-vertical
+ ;; pilot batch (see README "Scope") but is one of the two flagship verticals the maturity doc flags as
+ ;; "prefer product -> business over new verticals" (90-docs/business/cloud-itonami-vertical-maturity.md).
+ {:vertical/id :vertical/isic-6399 :vertical/code "6399" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Other information service activities n.e.c. — meta job-search (Indeed replacement)"
+  :vertical/cluster [:cluster/id :cluster/media-recruitment]
+  :vertical/repo "cloud-itonami-isic-6399" :vertical/pricing-shape "per-board monthly platform fee + sponsored-listing add-on"}
+
+ ;; near-flagship addition (2026-07-16): 7810 is the third vertical maturity-doc priority #2 names
+ ;; ("6399 / 6310 (+7810)"). Unlike 6399/6310, its business-model.md had no pricing numbers at all yet
+ ;; (prose only) -- this is the first pricing band proposed for it, not a validation of an existing one.
+ {:vertical/id :vertical/isic-7810 :vertical/code "7810" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Employment placement agency activities"
+  :vertical/cluster [:cluster/id :cluster/media-recruitment]
+  :vertical/repo "cloud-itonami-isic-7810" :vertical/pricing-shape "flat monthly platform fee, unlimited seats (per-caseload, not per-recruiter)"}
+
+ ;; ---- competitor product catalog (deduped across verticals) ---------------------
+ {:product/id :product/agencybloc :product/name "AgencyBloc AMS+"}
+ {:product/id :product/insureio :product/name "Insureio"}
+ {:product/id :product/ipipeline-agency-integrator :product/name "iPipeline (Agency Integrator)"}
+ {:product/id :product/agentsync-manage :product/name "AgentSync (Manage)"}
+ {:product/id :product/qqcatalyst :product/name "QQCatalyst (Vertafore)"}
+ {:product/id :product/nowcerts :product/name "NowCerts"}
+ {:product/id :product/hawksoft :product/name "HawkSoft"}
+ {:product/id :product/applied-epic :product/name "Applied Epic (Applied Systems)"}
+ {:product/id :product/sapiens-reinsurancemaster :product/name "Sapiens ReinsuranceMaster / ReinsurancePro"}
+ {:product/id :product/charles-taylor-insuretech :product/name "Charles Taylor InsureTech (INSIS)"}
+ {:product/id :product/epic-systems :product/name "Epic Systems"}
+ {:product/id :product/oracle-health-cerner :product/name "Oracle Health (Cerner)"}
+ {:product/id :product/meditech-expanse :product/name "MEDITECH (Expanse/MaaS)"}
+ {:product/id :product/athenahealth :product/name "athenahealth (athenaOne)"}
+ {:product/id :product/tebra :product/name "Tebra (formerly Kareo)"}
+ {:product/id :product/dentrix-ascend :product/name "Dentrix Ascend"}
+ {:product/id :product/curve-dental :product/name "Curve Dental"}
+ {:product/id :product/pointclickcare :product/name "PointClickCare"}
+ {:product/id :product/matrixcare :product/name "MatrixCare"}
+ {:product/id :product/alayacare :product/name "AlayaCare"}
+ {:product/id :product/unite-us :product/name "Unite Us"}
+ {:product/id :product/findhelp :product/name "findhelp (formerly Aunt Bertha)"}
+ {:product/id :product/wellsky-community :product/name "WellSky Community/Social Care Coordination"}
+ {:product/id :product/housecall-pro :product/name "Housecall Pro"}
+ {:product/id :product/jobber :product/name "Jobber"}
+ {:product/id :product/servicetitan :product/name "ServiceTitan"}
+ {:product/id :product/fieldedge :product/name "FieldEdge"}
+ {:product/id :product/lmn :product/name "LMN (Granum)"}
+ {:product/id :product/service-autopilot :product/name "Service Autopilot"}
+ {:product/id :product/aspire :product/name "Aspire"}
+ {:product/id :product/cloudbeds :product/name "Cloudbeds"}
+ {:product/id :product/mews :product/name "Mews"}
+ {:product/id :product/little-hotelier :product/name "Little Hotelier"}
+ {:product/id :product/toast :product/name "Toast"}
+ {:product/id :product/square-for-restaurants :product/name "Square for Restaurants"}
+ {:product/id :product/lightspeed-restaurant :product/name "Lightspeed Restaurant"}
+ {:product/id :product/perk-travelperk :product/name "Perk (formerly TravelPerk)"}
+ {:product/id :product/travefy :product/name "Travefy"}
+ {:product/id :product/rezdy :product/name "Rezdy"}
+ {:product/id :product/tourcms :product/name "TourCMS"}
+ {:product/id :product/xola :product/name "Xola"}
+ {:product/id :product/peek-pro :product/name "Peek Pro"}
+ {:product/id :product/clio :product/name "Clio"}
+ {:product/id :product/mycase :product/name "MyCase"}
+ {:product/id :product/practicepanther :product/name "PracticePanther"}
+ {:product/id :product/quickbooks-online :product/name "QuickBooks Online"}
+ {:product/id :product/xero :product/name "Xero"}
+ {:product/id :product/freshbooks :product/name "FreshBooks"}
+ {:product/id :product/appfolio :product/name "AppFolio"}
+ {:product/id :product/buildium :product/name "Buildium"}
+ {:product/id :product/propertyware :product/name "Propertyware"}
+ {:product/id :product/monograph :product/name "Monograph"}
+ {:product/id :product/bqe-core :product/name "BQE Core"}
+ {:product/id :product/deltek :product/name "Deltek (Vantagepoint/Ajera)"}
+ {:product/id :product/accelo :product/name "Accelo"}
+ {:product/id :product/kantata :product/name "Kantata (formerly Mavenlink)"}
+ {:product/id :product/smartcat :product/name "Smartcat"}
+ {:product/id :product/sonar-software :product/name "Sonar Software"}
+ {:product/id :product/splynx :product/name "Splynx"}
+ {:product/id :product/enterprise-telco-bss :product/name "Enterprise telco BSS (Amdocs/Oracle/Cerillion/Comarch-class)"}
+ {:product/id :product/gigs :product/name "Gigs (API-first MVNO BSS)"}
+ {:product/id :product/iplook :product/name "IPLOOK (MVNO core network + BSS)"}
+ {:product/id :product/square-for-retail :product/name "Square for Retail"}
+ {:product/id :product/lightspeed-retail :product/name "Lightspeed Retail"}
+ {:product/id :product/cin7-core :product/name "Cin7 Core"}
+ {:product/id :product/datadog :product/name "Datadog Infrastructure Monitoring"}
+ {:product/id :product/mongodb-atlas :product/name "MongoDB Atlas"}
+ {:product/id :product/pgdash :product/name "pgDash"}
+ {:product/id :product/solarwinds-dpa :product/name "SolarWinds Database Performance Analyzer"}
+ {:product/id :product/aveva-pi-system :product/name "AVEVA PI System (formerly OSIsoft)"}
+ {:product/id :product/itron-utilityiq :product/name "Itron UtilityIQ / IEE Cloud"}
+ {:product/id :product/onfleet :product/name "Onfleet"}
+ {:product/id :product/spoke-dispatch :product/name "Spoke Dispatch (formerly Circuit for Teams)"}
+ {:product/id :product/routific :product/name "Routific"}
+ {:product/id :product/fresha :product/name "Fresha"}
+ {:product/id :product/vagaro :product/name "Vagaro"}
+ {:product/id :product/mindbody :product/name "Mindbody"}
+ {:product/id :product/booksy :product/name "Booksy"}
+ {:product/id :product/tutorcruncher :product/name "TutorCruncher"}
+ {:product/id :product/teachworks :product/name "Teachworks"}
+ {:product/id :product/tutorbird :product/name "TutorBird"}
+
+ {:product/id :product/madgex :product/name "Madgex (Wiley)"}
+ {:product/id :product/jobboard-io :product/name "JobBoard.io (ZipRecruiter)"}
+ {:product/id :product/jboard :product/name "JBoard"}
+ {:product/id :product/wp-job-manager :product/name "WP Job Manager"}
+ {:product/id :product/adicio-careercast :product/name "Adicio (CareerCast Niche Networks)"}
+ {:product/id :product/engage-en-japan :product/name "engage / エンゲージプレミアム (en-japan)"}
+
+ {:product/id :product/crelate :product/name "Crelate"}
+ {:product/id :product/jobadder :product/name "JobAdder"}
+ {:product/id :product/zoho-recruit-staffing :product/name "Zoho Recruit (Staffing Agency edition)"}
+ {:product/id :product/bullhorn :product/name "Bullhorn ATS & CRM"}
+]
