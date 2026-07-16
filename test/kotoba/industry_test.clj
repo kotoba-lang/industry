@@ -3055,7 +3055,7 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; against a freshly re-fetched origin/main registry.edn
       ;; immediately before this test-file edit, not assumed:
       ;; {:total 649 :spec 220 :blueprint 0 :implemented 429}.
-      (is (= 430 (:implemented m))))))
+      (is (= 433 (:implemented m))))))
 
 (deftest cloud-itonami-isic-4751-is-implemented
   (testing "cloud-itonami-isic-4751 (Retail sale of textiles in
