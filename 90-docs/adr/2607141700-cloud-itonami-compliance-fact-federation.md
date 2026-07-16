@@ -3577,6 +3577,48 @@ simplymalaysia.wordpress.comでホストされたPDFから、Read-toolの
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-17, /loop tick 123 — 国軸42件目(MYS) — マレーシアが国軸+自治体軸の2軸に到達、初のdeps.edn新規作成リポジトリ)
+
+`cloud-itonami-iso3166-mys`に`statute.facts`を追加・push
+([commit 7a26d1f](https://github.com/cloud-itonami/cloud-itonami-iso3166-mys/commit/7a26d1f))：
+
+このリポジトリは他の姉妹リポジトリと異なり、既存の`marketentry.facts`
+（`deps.edn`/`src`/`test`）が一切存在しない、blueprint+governance
+文書のみのシェル状態だった——`statute.facts`をこのリポジトリの
+**初の実装**として追加し、`deps.edn`も新規作成（langgraph依存は
+不要なため最小構成）。
+
+tick122で検証済みの首都チェック（マレーシアは安定した二都首都制）
+を再利用。
+
+- **Companies Act 2016**（Act 777）— Royal Assent 2016年8月31日、
+  官報公布2016年9月15日。lom.agc.gov.my（マレーシア法務長官府の
+  公式立法ポータル、"Laws of Malaysia"）自身のact-detailページで
+  両日付を直接確認（本文施行は2017年1月31日、一部条項はさらに
+  2018年3月/2019年3月に段階施行——:enacted-dateはRoyal Assent日を
+  採用）。ssm.com.my（会社委員会公式ドメイン）自身のPDFは10MB
+  制限超過、investmalaysia.gov.myのミラーはマレー語フォント
+  サブセット化で判読不能だったため、lom.agc.gov.myのHTMLページを
+  採用。
+- **Personal Data Protection Act 2010**（Act 709）—
+  investmalaysia.gov.myがホストする公式"Laws of Malaysia"改訂版
+  PDFをRead-toolの保存パスfallbackで直接読み確認。Section 1(2)が
+  施行日を大臣告示による後日決定に委ねており、改訂版原文の日付
+  ブラケット表記"[15 November 2013, P.U. (B) 464/2013]"を確認
+  ——2010年の成立日ではなく、実際に施行された2013年11月15日を
+  :enacted-dateとして採用（法的効力発生日を優先）。
+
+4 tests/11 assertions green（新規実装のため既存marketentry testsは
+無し）。146リポジトリ・838 factを統合。`jurisdiction MYS`クエリと、
+`ordinance/country`横断query（`[?e "ordinance/country" "MYS"]`）で
+tick122のKuala Lumpur自治体2件が正しくクロスリンクされることを
+確認——マレーシアは今回で国軸+自治体軸の2軸に到達したが、業界団体
+軸はまだ未着手であり、これを正直に報告する。
+
+現状: 国軸42件・業界団体軸41件(28業種)・自治体軸40件——123 tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。マレーシアの業界団体軸の空白は今後のtickに持ち越し。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
