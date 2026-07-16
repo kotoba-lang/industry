@@ -120,3 +120,23 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
   ⚠ `murakumo.cloud` site Worker（chat/inference gate）と `api.murakumo.cloud`
   （local-murakumo、`MURAKUMO_PROXY_TOKEN` 系）は**別の secret** — この item では
   ローテーションも検証もできない。
+
+## Murakumo chat gate secondary secret (ADR-2607171800 addendum 2、2026-07-16)
+
+- **`MURAKUMO_CHAT_TOKEN_SECRET_2`（kagi vault、compartment `gftdcojp`）** —
+  `murakumo.cloud` site Worker（chat/inference gate）の**第2検証 secret**
+  `MURAKUMO_TOKEN_SECRET_2` の正本。primary の `MURAKUMO_TOKEN_SECRET` は
+  write-only Wrangler secret でどこにも保管が無く再取得不能（上記注記のとおり）
+  だったため、gate 側を「どちらかの secret で verify が通れば受理」に拡張し
+  （cloud-murakumo GitHub main `5bba489`）、agent が mint できる第2系統として
+  この kagi item を追加した。既存 primary 署名 token は無効化されない（rotation
+  ではなく追加）。chat-scope token の mint:
+  `cd orgs/gftdcojp/cloud-murakumo && MURAKUMO_TOKEN_SECRET=$(kagi get
+  MURAKUMO_CHAT_TOKEN_SECRET_2) clojure -M:token issue <sub> chat <ttl>`。
+  Worker secret `MURAKUMO_TOKEN_SECRET_2` は wrangler で投入済み（worker
+  `murakumo-cloud`、redeploy を跨いで永続）。
+  ⚠ **2026-07-16 時点の注意**: cloud-murakumo の共有 checkout は GitHub main と
+  乖離した production ライン（organism publish ループが working tree からビルド・
+  デプロイ）で、この gate 拡張コードはまだそこに取り込まれていない — デプロイ
+  ラインが main を吸収するまで、実運用の chat gate は primary のみ受理する
+  （一時的に code が載った版 `a28b545d` で live 検証は成功済み）。

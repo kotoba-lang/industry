@@ -148,3 +148,35 @@ ADR 本文の follow-ups のうち以下を実装した（子 repo pin `c0426991
 
 残 follow-up: chat gate token の owner mint → storyboard live 実行、ongakuka/murakumo
 audio の実合成配線、publisher 実配線、template 追加。
+
+## Addendum 2 — chat gate の agent-mint 経路開通と production の乖離問題（2026-07-16、同日）
+
+Addendum 1 の blocked 項目「chat gate token の owner mint 待ち」を、rotation なしで
+解消する設計に切り替えて実装した:
+
+1. **`murakumo.cloud` site worker の token gate に第2検証 secret
+   `MURAKUMO_TOKEN_SECRET_2` を追加**（cloud-murakumo GitHub main `5bba489`）。
+   primary / secondary のどちらで verify が通っても受理する追加式で、既存の
+   primary 署名 token（shinshi companion / manimani runner / animeka 等の消費者）は
+   一切無効化されない。generation contract test に primary/secondary 受理・
+   ガベージ拒否・secondary 単独でも gate ON のケースを追加して green。
+2. **secret 値は kagi `MURAKUMO_CHAT_TOKEN_SECRET_2`（compartment gftdcojp）が正本**。
+   worker には `wrangler secret put MURAKUMO_TOKEN_SECRET_2` 済み（secrets は
+   redeploy を跨いで永続）。skill `secrets-location-map` に追記済み。
+3. **live 検証は一度成功**: 自前デプロイ版（worker version `a28b545d`）に対し
+   kagi secret で mint した chat-scope token で `/api/v1/chat/completions` が 200
+   （upstream 実体 gemma4-26b が応答）。
+4. **ただし ~6 分後に organism publish ループが上書き**: cloud-murakumo の共有
+   checkout は GitHub main と乖離した de-facto production ライン（実測: local 109
+   commits 先行 / main から 5 commits 遅れ、GTM landing・x402 credits 等の実作業を
+   含む）で、`deploy/organism/run-publish.sh` が working tree の src/ からビルドして
+   wrangler deploy する。この乖離の reconcile は本 ADR のスコープ外かつ他セッションの
+   活動領域（共有 checkout への直接 commit は CLAUDE.md 禁止事項）なので手を付けず、
+   オーナーに報告した。**production の chat gate が secondary を受理するのは、
+   デプロイラインが main の `5bba489` を吸収してから**。
+5. **storyboard actor の reasoning-upstream 対策**（子 repo pin `e23c9c2`）: live で
+   露見した2欠陥を修正 — max_tokens 未指定で EDN が途中切断される（→ 8000 +
+   `chat_template_kwargs {:enable_thinking false}`、murakumo README の指針どおり）、
+   prompt の `?` 付き role 記法をモデルが key にコピーする（→ 'opt' 表記 + minimal
+   shape example 同梱）。`--dump-raw` 診断フラグも追加。live の full storyboard 生成は
+   gate 反映待ちで未完（mock 経路は検証済み）。

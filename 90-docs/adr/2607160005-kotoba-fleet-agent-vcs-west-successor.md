@@ -781,3 +781,64 @@ content-addressed store / nekko(根)との対を意識した botanical / 系譜�
   strict な private 検証は owner-side（native CI / `fleet ci-verify`）で回り、
   GHA CI は公開 best-effort + report-only。次の主権化は bonsai object graph を
   p2p で複製した上での reachability（clone すら不要にする）。
+
+## Addendum (2026-07-16, same day): 残タスク系列（CI確認/live backend/delta head/staged flip）
+
+「do it」で残タスク系列を進めた（kagami pin seq 4 / head seq 19）。
+
+- **② CI 実走確認**: fleet-projection-verify / tree-collapse-guard の GHA run は
+  全て failure だが、**原因はコードでなく account の課金停止**（"recent account
+  payments have failed … The job was not started"）。GitHub Actions が
+  com-junkawasaki/root 全体で無効。**逆に「GHA 依存の CI/guard は脆く、
+  owner-side native CI が堅牢」を裏付ける**。owner action: billing 解消。
+  それまで GHA 系 guard（tree-collapse 等）は inert。
+- **③ live backend flip**（kagami、`bin/kdb.cljs`）: fleet-db を EDN blob でなく
+  **実 kotobase-peer commit chain**（content-addressed・検証可能）に永続化。
+  durable file-backed block store に persist→hydrate ラウンドトリップで
+  **1745 repos の name+rev set 完全一致**、`verify-chain` OK。block store 本体は
+  production では B2/R2。EDN は作業/cache 形として残り chain が durable backing。
+- **③ delta head fold**: `fleet head --delta-log <ops.edn>` が op-log head を
+  signed fleet head に折り込む（value = H(db|delta:H(op-log))）。**一署名が
+  manifest + 編集 provenance を同時証明**。op-log 改竄で head verify が MISMATCH
+  を実証。capture hook は opt-in（DELTA_CAPTURE=1）のまま。
+- **④ staged hard flip**: `reconcile --enforce-repos <names>`（最狭スコープ）を
+  追加。**安全な第一活性化 = fleet 自身の署名経路 repo（kagami/nekko/bonsai/
+  kotoba-delta）だけ enforce** — legacy path を使わないので並行セッションを
+  壊さない。現状 clean、kagami への legacy 書き込み捏造は FLIP VIOLATION で
+  reject を実証。**org/全体への拡大は (a) 並行セッションの署名経路移行 (b)
+  runner（GHA billing 解消 or owner-side）を待つ** — 今 org 全体を enforce すると
+  legacy path で pin を進めている多数の並行セッションを壊すため、意図的に段階化。
+
+## Addendum (2026-07-16, same day): p2p transport / delta↔code_graph / CACAO bridge + 大物の scope
+
+3 ストリームを進めた（kagami pin seq 5 / kotoba-delta seq 2 / head 更新）。
+
+- **p2p 実 HTTP transport + clone-free reachability**（kagami）: `fleet.reach` の
+  署名 reachability receipt を `fleet serve`（node http `GET /reach`,`/head`）で
+  配信し、`--reach peer:<url>` が HTTP 取得・署名/trust/鮮度検証。**実測: Node B が
+  private club-shinshi を、壊れた GH_TOKEN かつ clone なしで peer receipt 経由で
+  検証 OK**、receipt 無しは WARN。「reachability の clone すら不要化」を実 network
+  で達成。message-EDN 手渡し demo を実 endpoint に置換。
+- **delta anchor ↔ code_graph**（kotoba-delta）: `:anchor/def-cid`（定義の
+  content-addressed 識別子）が code_graph の definition CID と同一。`code-graph-ref`
+  で定義参照形に変換。**同一定義テキスト → 同一 def-cid** が op-log（どの op が
+  定義に触れたか）と code_graph（content-addressed definitions）の join key。
+- **CACAO payload bridge**（kagami）: `grant->cacao-payload` が fleet grant を
+  CAIP-122 payload 形に。fleet.grant のフィールドは元々 CACAO と同名
+  （iss/aud/resources/exp）。
+
+**大物の正直な scope（未実施・計画）**:
+- **CACAO 完全 wire-format 整合**: `cacao.core`（org-chainagnostic-cacao）が
+  **JVM-only**（nekko の cacao-delegate に明記）。fleet nbb CLI から直接 require
+  不可なのが fleet-native の理由。整合には (a) cacao.core の cljc 移植 or
+  (b) nbb 側 CAIP-122 CBOR/SIWE エンコーダのどちらかが必要 — 別スコープ。
+  payload bridge で interop の道筋だけ具体化済み。
+- **namespace 移行**（kotoba-rad.*→nekko.* / kotoba-git.*→bonsai.* /
+  fleet.*→kagami.*）: repo は改称済だが namespace は旧のまま（意図的、低リスク前例）。
+  完全移行は cloud-itonami の本番 source 含む **119 ソース**を触る大規模 mechanical
+  refactor。安全策は「nekko/bonsai repo 自身の ns rename + 消費者(cloud-itonami)の
+  require を coordinated wave で同時更新 + 回帰確認」。専用セッションで実施すべき。
+- **既存 governor 統合**: kotoba-fleet（lease/governor、ADR-2606302000）+
+  cloud-itonami ops-runner（ADR-2607141700）との統合。統合点は「fleet の
+  quorum land-back（propose→govern）を ops-runner の verify→handler→receipt に
+  合流させる」こと。両システムの深い理解を要する別スコープ。
