@@ -1,0 +1,89 @@
+{:adr/id "2700004771"
+ :adr/title "cloud-itonami ISIC 4771 clothing/footwear/leather retail coverage"
+ :adr/status :accepted
+ :adr/date "2026-07-16"
+ :adr/wave 2
+ :adr/wave-ref "ADR-2607121000"
+
+ :adr/context
+ {:registry-entry {:id "4771"
+                    :name-before-truncated "Retail sale of clothing, footwear and leather articles in s..."
+                    :name-after "Retail sale of clothing, footwear and leather articles in specialized stores"
+                    :maturity-before :spec
+                    :maturity-after :implemented
+                    :repo-before "https://github.com/gftdcojp/cloud-itonami-G4771"
+                    :repo-after "https://github.com/cloud-itonami/cloud-itonami-isic-4771"
+                    :business-id-before "cloud-itonami-G4771"
+                    :business-id-after "cloud-itonami-isic-4771"}
+  :fresh-scaffold? true
+  :pre-existing-repo-checks
+  [{:repo "gftdcojp/cloud-itonami-G4771" :status 404}
+   {:repo "cloud-itonami/cloud-itonami-isic-4771" :status 404 :note "checked before any work began"}]
+  :truncation-bug {:known-issue? true :rate-estimate "~10% pre-existing seed-data bug"
+                    :precedent-adr "ADR-2695004753"}
+  :group-entry-untouched {:id "477" :name "Retail sale of other goods in specialized stores"
+                           :superseded-by ["4772" "4774"]}
+  :distinct-from [{:id "4751" :reason "textile/fabric/yardage retail, not finished garments"}
+                   {:id "4719" :reason "non-specialized general merchandise retail"}]}
+
+ :adr/decision
+ {:repo "cloud-itonami/cloud-itonami-isic-4771"
+  :mirrors "cloud-itonami/cloud-itonami-isic-4751"
+  :namespace "apparelops"
+  :advisor "ApparelRetailAdvisor"
+  :governor "ApparelRetailGovernor"
+  :governor-keyword :apparel-retail-governor
+  :allowed-ops [:log-sales-record :schedule-staffing-operation
+                :coordinate-supply-order :flag-quality-concern]
+  :effect-invariant :propose
+  :hard-checks [:store-unverified :vendor-unverified :effect-not-propose
+                :scope-exclusion-folds-op-not-allowed]
+  :scope-exclusion-covers [:quality-dispute-resolution-finalization
+                            :counterfeit-authenticity-determination-finalization]
+  :scope-exclusion-new-vs-4751 [:counterfeit-authenticity-determination-finalization]
+  :escalate-always [:flag-quality-concern]
+  :escalate-threshold {:op :coordinate-supply-order :estimated-cost-usd 1000.0}
+  :self-trip-regression-test "apparelops.governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion"
+  :phases {0 :read-only 1 :assisted-logging 2 :assisted-coordination 3 :supervised-auto}
+  :modules ["deps.edn" "blueprint.edn" "LICENSE" "README.md" "GOVERNANCE.md"
+            "CODE_OF_CONDUCT.md" "CONTRIBUTING.md" "SECURITY.md"
+            "docs/business-model.md" "docs/operator-guide.md"
+            "src/apparelops/store.cljc" "src/apparelops/advisor.cljc"
+            "src/apparelops/governor.cljc" "src/apparelops/phase.cljc"
+            "src/apparelops/operation.cljc" "src/apparelops/sim.cljc"
+            "test/apparelops/advisor_test.clj" "test/apparelops/governor_test.clj"
+            "test/apparelops/governor_contract_test.clj" "test/apparelops/phase_test.clj"
+            "test/apparelops/store_contract_test.clj"]
+  :license "AGPL-3.0-or-later"
+  :portable-cljc? true
+  :jvm-only-interop? false}
+
+ :adr/verification
+ {:commit-sha "b38284aa22e37200fbb20c579d56ab08fa5c312d"
+  :branch "main"
+  :test-command "clojure -M:test"
+  :test-result {:tests 58 :assertions 170 :failures 0 :errors 0}
+  :re-verified-against-fresh-clone? true
+  :lint-command "clojure -M:lint"
+  :lint-result {:errors 0 :warnings 0}
+  :demo-command "clojure -M:run"
+  :demo-covers [:phase-1-approval-gated-commit :phase-3-auto-commit
+                :high-cost-supply-order-escalation :quality-concern-escalation
+                :unregistered-store-hard-hold :unverified-store-hard-hold
+                :unverified-vendor-hard-hold :non-propose-effect-hard-hold
+                :scope-excluded-content-hard-hold]}
+
+ :adr/consequences
+ {:operator-benefit "auditable forkable operations-coordination platform, no closed back-office SaaS lock-in"
+  :structural-guarantee "actor cannot finalize refund/replacement/chargeback/vendor-registration-revocation or a counterfeit-authenticity determination on its own initiative"
+  :maturity-summary-delta {:implemented "+1"}
+  :extension-pattern "add new op to closed allowlist with its own HARD checks + tests, same independent-governor-reverifies-against-actor-own-records pattern"}
+
+ :adr/references
+ {:repo-url "https://github.com/cloud-itonami/cloud-itonami-isic-4771"
+  :reference-mirror-url "https://github.com/cloud-itonami/cloud-itonami-isic-4751"
+  :wave-plan-adr "2607121000"
+  :truncation-precedent-adr "2695004753"
+  :registry-file "resources/kotoba/industry/registry.edn"
+  :registry-repo "kotoba-lang/industry"
+  :registry-test-file "test/kotoba/industry_test.clj"}}

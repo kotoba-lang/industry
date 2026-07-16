@@ -864,3 +864,33 @@ content-addressed store / nekko(根)との対を意識した botanical / 系譜�
 本番 source を触る大規模作業（namespace: 119 ソースの coordinated wave、governor:
 kotoba-fleet lease/governor + ops-runner の内部理解）で、本セッション末尾で急ぐと
 本番 CD/CI を壊すリスクが高い。計画は上記 addendum に記録済み、専用セッションで実施。
+
+## Addendum (2026-07-16, same day): 3大物 完了（CACAO / namespace 移行 / governor 統合）
+
+「別スコープ」としていた3大物を実装・landing した。
+
+- **CACAO 完全整合**: cacao.core（org-chainagnostic-cacao）は**既に cljc で nbb
+  完動**（「JVM-only」注記は古い）— 移植不要だった。`bin/cacao.cljs` が kagi
+  seed で **本物の CAIP-122 CACAO** を mint/verify/verify-chain。E2E: owner→
+  agent→sub の 2-link 委譲鎖が CHAIN VALID（depth 2、attenuation、expiry 強制）。
+- **namespace 移行**: **kotoba-rad.* → nekko.***（nekko 自 src 10 + cloud-itonami
+  4）と **kotoba-git.* → bonsai.***（bonsai 自 src 5 + cloud-itonami 5 +
+  network-isekai 137 + kagami/fleet.objects）を coordinated wave で実施、全て
+  nbb load 検証済み、5 repo とも ns 移行済み commit で main に landing。
+  repo 名 ≠ namespace の暫定状態を解消（nekko.*/bonsai.* が repo 名と一致、
+  kagami は元々 fleet.*）。**高並行下で fleet-db.edn（単一行 EDN）が毎回 409
+  衝突したため、west.yml を GitHub Contents API 楽観ロック PUT（canonical 経路）
+  で landing** — これは live-backend flip（kotobase commit chain）が解く問題の
+  実例。
+- **governor 統合**: `fleet.governor-bridge/land->ops-receipt` が fleet の quorum
+  land-back outcome を cloud-itonami ops-runner の audit-receipt 形式に写す。
+  **実測: fleet-shaped receipt が本物の ops-runner/sign-receipt + verify-receipt
+  で nbb 上 TRUE 検証、改竄 reject**。2つの governance ループが同型署名 receipt で
+  合流、plain-map 疎結合（hard require せず）。
+
+**セッション総括**: west 調査 → ゼロベース設計（ADR-2607160005）→ Phase 0–4 +
+⑥⑯⑰⑱ + daily-driver + native CI + sovereign reachability + p2p HTTP transport +
+live backend flip + delta↔code_graph + real CACAO + namespace 移行 + governor
+統合まで、tree-motif VCS suite（**nekko 根 / bonsai 盆栽 / kagami 鏡 /
+kotoba-delta**）を実装・改称・主権化。pin 検証・到達性・provenance は GitHub
+非依存、GitHub は object transport の mirror。owner action は事実上ゼロ。

@@ -154,3 +154,17 @@ ComfyUI + Ollama native vision + D1 直書きで回す operator ツールとし�
   react loop）、2605222000（animeka v3 USD+ComfyUI cinematic pipeline）
 - インフラ実測: `ai-gftd-animeka/CLAUDE.md`（murakumo fleet LLM `100.82.98.110:8090` /
   ComfyUI bridge `:8189` 確認済み 2026-07-10）
+
+## Addendum 1 — live vision judge 検証完了（2026-07-16）
+
+Consequences に残していた「vision judge の live 経路は未検証」を解消。fleet の
+Ollama（`benjamin` ノード、brew 0.30.6 の llama-server 欠落を 0.32.0 upgrade で修理
+— 経緯は ai-gftd-animeka `docs/bmc-lean-loop-log.md` Iteration 8）復帰後、canonical
+graph node を実資源で通した: `GFTD_LLM_URL=<ollama>/v1`（gemma4:e4b-it-qat）+
+fleet bridge、mem store、1 generation × 1 candidate、133s。結果 `:judge "vision"` /
+score 0.87 — `langchain.jvm/vision-json` の multimodal content が Ollama の OpenAI
+互換面で実際に通ることを確認（heuristic 劣化ではない）。meta-review も実質的な
+recipe rules を返し、勝者が renderRecipe（backend "llm-vision"）として activate
+された。残 follow-up は 3-judge panel / pairwise tournament 移植のみ。
+運用面では ADR-2607161930 の production-loop が同じ judge を全 45 公開カットに適用済み
+（avg 87.7 / min 82 / max 95、閾値 60 未満ゼロ）。
