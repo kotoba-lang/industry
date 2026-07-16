@@ -1,0 +1,184 @@
+---
+id: adr-2607162304-kotoba-lang-dtn-udp-turn-nat-traversal
+title: "ADR-2607162304: kotoba-lang/dtn gains a UDP transport with real NAT traversal via kotoba-lang/org-ietf-turn (Phase 6) — the independent telecom substrate series concludes"
+status: accepted
+doc_type: adr
+topic: telecom-independent-substrate-dtn-rcs-mesh-satellite
+authoritative: true
+last_verified: 2026-07-16
+authoritative_for:
+  - kotoba-lang/dtn の UDP transport（kotoba.dtn.transport.udp）+ TURN経由NAT越えの設計根拠
+  - このADRシリーズ（2607161743〜）全体の完了宣言
+related:
+  - 90-docs/adr/2607161743-kotoba-lang-rcs-dtn-independent-telecom-substrate.md
+  - 90-docs/adr/2607162110-kotoba-lang-turn-real-udp-relay-listener.md
+  - 90-docs/adr/2607162202-kotoba-lang-dtn-gossip-peer-discovery.md
+  - 90-docs/adr/2607162217-kotoba-lang-io-libp2p-gossip-from-self-fix.md
+  - orgs/kotoba-lang/dtn
+  - orgs/kotoba-lang/org-ietf-turn
+supersedes: []
+superseded_by: []
+---
+
+# ADR-2607162304: kotoba-lang/dtn gains a UDP transport with real NAT traversal via kotoba-lang/org-ietf-turn (Phase 6) — the independent telecom substrate series concludes
+
+**Status**: accepted
+**Date**: 2026-07-16
+**Deciders**: Jun Kawasaki
+
+## Problem
+
+NAT traversal via `kotoba-lang/org-ietf-turn` was named as a deliberately
+deferred gap in every ADR of this series from ADR-2607161743 onward —
+consistently described as "a materially different, larger problem" than
+what each phase actually tackled, because TURN relays UDP while
+`kotoba-lang/dtn`'s existing transport (ADR-2607161817) is TCP, and
+bridging the two is a different shape of work than any prior phase's
+extension of the existing TCP path. ADR-2607162202 (Phase 5, gossip
+discovery) explicitly named this as the one remaining phase of the
+originating gap. This ADR is that phase.
+
+## Decision
+
+### Decision 1: a genuinely new UDP transport, not a TCP-over-relay hack
+
+`src/kotoba/dtn/transport/udp.cljs` is a UDP-native sibling to
+`kotoba.dtn.transport.tcp` — not built on `kotoba-lang/wire` (whose
+length-prefix stream framing exists specifically to solve TCP's
+lack-of-message-boundaries problem, which UDP doesn't have; a whole
+`pr-str`'d EDN bundle IS one datagram, no framing layer needed) but reusing
+every DTN-specific piece the TCP transport already established: routing
+decisions via `kotoba.dtn.router`, authentication via `kotoba.dtn.auth`,
+durable storage via `kotoba.dtn.store` — only the socket mechanics differ.
+`kotoba.dtn.transport.tcp` itself was not modified at all (confirmed
+byte-for-byte unchanged by the implementing agent's own diff check, and by
+this ADR's independent re-run of its existing 7-scenario demo, unmodified
+and still passing).
+
+### Decision 2: the NAT-traversal client logic reuses `org-ietf-turn`'s existing real relay, adapted from its own demo's own proven client-message-construction pattern
+
+`kotoba.turn.listener` (Phase 3b, ADR-2607162110) was not modified — it is
+consumed exactly as it already existed and was already proven correct.
+The new `:turn-relay` option on `udp.cljs`'s `start-node!` performs a real
+Allocate (minting a credential via `kotoba.turn.credential`, building and
+sending a signed STUN request, parsing the response for the
+XOR-RELAYED-ADDRESS) and a real CreatePermission for a configured peer
+address — the same STUN client-message-construction pattern
+`listener_demo.cljs` already used and proved correct when verifying the
+listener itself, now reused as a genuine capability rather than
+demo-only scaffolding. Pure STUN construction/parsing/classification logic
+was factored into `src/kotoba/dtn/transport/turn_relay.cljc` (portable
+`.cljc`, 37 new `clojure -M:test` assertions) — the impure socket-driven
+Allocate/CreatePermission/Send-indication wiring stays in `udp.cljs`,
+matching this whole series' consistent pure-decision/impure-I/O namespace
+split.
+
+### Decision 3: genuine bidirectionality proven, not assumed from one direction
+
+A NAT'd node's outbound sends are wrapped in a real STUN Send indication
+routed through the relay (not a direct socket write) — the docstring
+states plainly this reflects a scoped design choice (the NAT'd node
+always uses the relay for both directions, rather than attempting a
+direct-send-with-relay-fallback scheme an ICE-style client would
+implement). Demo Scenario 2 proves BOTH directions explicitly: the
+non-NAT'd peer B sends to A's relay address and A genuinely receives it
+(unwrapped from a real STUN Data indication into A's actual inbox), AND
+A's reply travels back through the relay to B — not merely inferred
+symmetric from one proven direction.
+
+### Decision 4: an explicit, mechanically-verified honesty check that success isn't an accidental direct-connection fallback
+
+Demo Scenario 3 scans peer B's ENTIRE live node-handle state — not just
+the `:peers` field a casual check might look at — confirming A's real UDP
+port appears nowhere in anything B knows, while A's relay-allocated port
+does. This directly answers the question a skeptical reader of Scenario
+2's "success" would ask: *is B secretly also reachable-directly, making
+the relay path untested?* The mechanical scan closes that question rather
+than leaving it as an assumption.
+
+### Decision 5: no scope was cut to force a green result — recorded because it's the exception, not the rule, worth noting explicitly
+
+The implementing agent's task instructions explicitly authorized shipping
+an honest single-direction proof with the harder direction disclosed as
+not-yet-working, if genuine effort didn't land full bidirectionality
+cleanly. That authorization was not needed — the first genuine end-to-end
+attempt worked, including full bidirectionality, with no assertions
+weakened. Recorded here not to claim unusual virtue, but because this
+whole series has consistently valued disclosing exactly what was achieved
+vs. what was cut (ADR-2607161852 explicitly implemented persistence rather
+than documenting a gap; several ADRs recorded honest scope reductions);
+this phase's honest outcome happens to be "everything attempted worked,"
+and saying so plainly is the same discipline as the ADRs that instead
+reported a real limitation.
+
+## Verification
+
+- `dtn`'s `clojure -M:test` → 43 tests / 212 assertions (was 175; +37 new `kotoba.dtn.transport.turn-relay` pure-logic tests), 0 failures, 0 errors. Independently re-run from a cold clone.
+- `dtn`'s `clojure -M:lint` → 0 errors, 0 warnings. Independently re-run.
+- `dtn`'s pre-existing 7-scenario TCP transport demo AND 3-scenario discovery demo → both still pass unmodified (`RESULT: 7/7`/`RESULT: 3/3`), confirming `tcp.cljs` truly wasn't touched. Independently re-confirmed by the orchestrating session (the TCP demo; the discovery demo was already re-confirmed in ADR-2607162217's own cross-repo check and was not re-run a third time here, since this ADR's changes don't touch anything the discovery path depends on).
+- `org-ietf-turn` confirmed completely untouched (`git status --short` empty on a fresh independent clone) — this ADR's real dependency on it (Decision 2) required no modification to its provider, the same pattern as Phase 5's dependency on `io-libp2p`.
+- `nbb --classpath "src:test:../phone/src:../html/src:../css/src:../wire/src:../bytes/src:../org-ietf-turn/src" test/kotoba/dtn/transport/udp_turn_demo.cljs` → `RESULT: 3/3 scenarios passed`, exit 0. Independently re-run from a cold clone by the orchestrating session — output identical to the implementing agent's report, including the exact relay port, real STUN Data-indication payload byte count, and Scenario 3's mechanical absence-of-A's-real-port confirmation. This is the strongest verification this ADR series has performed: three real protocol layers (dtn bundles, live TURN relay, real UDP timing) composing correctly, independently reproduced, not merely trusted.
+
+## Consequences
+
+- Both halves of this ADR series' originating gap — *「今の kotoba-lang,
+  cloud-itonami に既存の電話通信網、sms, rcs に依存しない独自かつ全く同じ規格の
+  telecom 基盤は設計されている?」* followed by discovery and now NAT
+  traversal — are closed with real, independently-verified code. A `dtn`
+  node behind a simulated NAT can be reached by, and reply to, a peer that
+  never learns its real address, using a real RFC 8656 relay this same
+  series built and proved correct in Phase 3b.
+- `kotoba-lang/dtn` now has two real transports (TCP via `kotoba-lang/wire`,
+  UDP with optional TURN relay) sharing the same routing/auth/store
+  foundation — a caller chooses whichever fits a given deployment's
+  reachability constraints, without the DTN-specific logic caring which.
+- Explicitly still scoped down, disclosed in `udp.cljs`'s own docstring,
+  not silently claimed as production-complete: no full ICE (no
+  NAT-type detection, no connectivity-check exchange), no automatic
+  Allocate/permission refresh (a relay allocated at startup will silently
+  expire after TURN's default ~5-minute lifetime — a real limitation for
+  any long-running deployment), no relay-unreachable fallback, single-peer-
+  per-node (one `CreatePermission` call), no ChannelBind fast path reuse.
+  These are the natural next increments if this capability moves toward
+  production use, not forgotten gaps.
+- This ADR is the last planned phase of the net/turn/dtn consolidation and
+  independent-telecom-substrate design that began with ADR-2607161743.
+  Genuinely remaining, environment- or authorization-blocked rather than
+  code-blocked: mesh-radio/satellite hardware, real carrier SMS/RCS gateway
+  credentials, a consuming cloud-itonami business actor (requires human
+  review per root `CLAUDE.md`'s BMC/ISIC governance section). Any further
+  work here is a new, separately-scoped decision, not a continuation of an
+  already-open thread.
+
+## Alternatives considered
+
+- **Building this on `kotoba-lang/wire` instead of a new UDP-native
+  transport.** Rejected: `wire`'s framing solves a problem (TCP stream
+  boundary reconstruction) UDP doesn't have; forcing UDP through a
+  TCP-shaped abstraction would have added complexity without benefit —
+  see Decision 1.
+- **A direct-send-with-relay-fallback design** (attempt a direct UDP send
+  first, only route through the relay if that fails) instead of always
+  relaying for a NAT-configured node. Rejected for this phase: correctly
+  detecting "direct send failed because of NAT" vs. other failure modes
+  without real connectivity-check infrastructure (ICE) is exactly the
+  larger problem this phase deliberately scoped around; always-relay is
+  simpler, honest about being simpler, and sufficient to prove the core
+  capability — see Decision 3's docstring disclosure.
+- **Shipping a single-direction relay proof** if bidirectionality had
+  proven hard to land reliably (explicitly pre-authorized as an acceptable
+  honest outcome). Not needed in practice — see Decision 5 — but recorded
+  as the standard this phase was held to, matching how every other ADR in
+  this series has been evaluated against "what's genuinely verified" over
+  "what's claimed."
+
+## References
+
+- `90-docs/adr/2607161743-kotoba-lang-rcs-dtn-independent-telecom-substrate.md` (originating problem statement)
+- `90-docs/adr/2607162110-kotoba-lang-turn-real-udp-relay-listener.md` (the relay this ADR consumes, unmodified)
+- `90-docs/adr/2607162202-kotoba-lang-dtn-gossip-peer-discovery.md` (the other half of the originating gap, closed in the prior phase)
+- `90-docs/adr/2607162217-kotoba-lang-io-libp2p-gossip-from-self-fix.md`
+- `orgs/kotoba-lang/dtn/README.md` — https://github.com/kotoba-lang/dtn
+- `orgs/kotoba-lang/dtn/src/kotoba/dtn/transport/udp.cljs`
+- `orgs/kotoba-lang/dtn/src/kotoba/dtn/transport/turn_relay.cljc`
+- `orgs/kotoba-lang/dtn/test/kotoba/dtn/transport/udp_turn_demo.cljs`

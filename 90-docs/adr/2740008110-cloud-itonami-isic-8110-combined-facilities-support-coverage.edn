@@ -1,0 +1,86 @@
+[{:adr/id 2740008110
+  :adr/title "cloud-itonami-isic-8110 — Combined Facilities Support Activities Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-8110]
+  :adr/references [2607121000 2680004719]
+
+  ;; Wave 2 actor (coordination/logistics/trade), final batch of Wave 2's
+  ;; 4-digit gaps: combined-facilities-support OPERATIONS COORDINATION-
+  ;; ONLY (cleaning/maintenance/security-round service-record logging,
+  ;; combined cleaning/security/maintenance crew scheduling, facility-
+  ;; supplies/equipment procurement coordination, security-incident/
+  ;; maintenance-hazard/access-control concern flagging). NEW sub-sector
+  ;; for this batch: facility/support services, not transport, not
+  ;; retail. Never directly grants/revokes a building-access credential
+  ;; and never directly overrides an emergency-response protocol --
+  ;; structurally absent from the op allowlist, not merely gated.
+
+  :actor/id :cloud-itonami-isic-8110
+  :actor/name "Combined Facilities Support Operations Coordinator"
+  :actor/isic-rev5 "8110"
+  :actor/domain :business-support/facilities
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-service-record :schedule-service-operation
+                       :coordinate-supply-order :flag-facility-concern]
+  :actor/always-escalate-ops [:flag-facility-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-supply-order 2000}
+
+  :actor/hard-checks [:facility-verified :supplier-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["grant building access" "granted building access"
+                                "grant access credential" "granted the access credential"
+                                "issue an access credential" "issued an access credential"
+                                "issue an access badge" "issued an access badge"
+                                "activate the keycard" "activated the keycard"
+                                "revoke building access" "revoked building access"
+                                "revoke the access credential" "revoked the access credential"
+                                "revoke the access badge" "revoked the access badge"
+                                "deactivate the keycard" "deactivated the keycard"
+                                "override the emergency response" "overrode the emergency response"
+                                "bypass the emergency response" "bypassed the emergency response"
+                                "disable the emergency response" "disabled the emergency response"
+                                "override the fire alarm" "overrode the fire alarm"
+                                "disable the life-safety system" "disabled the life-safety system"
+                                "入退室権限を付与した" "アクセス権限を発行した"
+                                "入退室権限を剥奪した" "アクセス権限を失効させた"
+                                "緊急対応を上書きした" "緊急時対応をバイパスした"
+                                "緊急対応システムを無効化した" "防災システムを無効化した"]
+
+  ;; Self-trip-avoidance: every term above is phrased as the
+  ;; finalization/execution ACTION, never a bare noun -- this namespace's
+  ;; own :flag-facility-concern default proposal legitimately discusses
+  ;; security-incident/maintenance-hazard/access-control concerns. A
+  ;; bare-noun term list (e.g. bare "access"/"security"/"emergency")
+  ;; would self-trip this actor's own core happy path on every single
+  ;; run. Regression test:
+  ;; governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion.
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-service-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-service-record :schedule-service-operation
+                                               :coordinate-supply-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-service-record :schedule-service-operation
+                                         :coordinate-supply-order :flag-facility-concern}
+      :auto #{:log-service-record :schedule-service-operation :coordinate-supply-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 57 :assertions 168 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression
+                  :supplier-verification]
+  :test/simulator :facilitiesops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-8110"
+  :registry/business-id "cloud-itonami-isic-8110"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
