@@ -1,27 +1,27 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 7870,
-  :pageviews-7d 3255,
-  :uniques-7d-sum 363,
+ {:requests-7d 7906,
+  :pageviews-7d 3278,
+  :uniques-7d-sum 365,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 82}
-   {:path "/kototama/kototama.js", :requests 37}
-   {:path "/cdn-cgi/rum", :requests 32}
+  [{:path "/", :requests 84}
+   {:path "/kototama/kototama.js", :requests 35}
+   {:path "/cdn-cgi/rum", :requests 33}
    {:path "/play", :requests 32}
-   {:path "/play.html", :requests 31}
-   {:path "/feed/fork-stats.edn", :requests 31}
-   {:path "/js/app.js", :requests 30}
-   {:path "/css/theme.css", :requests 30}],
-  :status-mix {:ok 1287, :client-error 15, :server-error 112},
+   {:path "/feed/fork-stats.edn", :requests 32}
+   {:path "/js/app.js", :requests 31}
+   {:path "/play.html", :requests 29}
+   {:path "/api/liveops", :requests 29}],
+  :status-mix {:ok 1301, :client-error 15, :server-error 110},
   :window "24h"},
  :as-of "2026-07-16",
  :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 8},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 82 · /kototama/kototama.js 37 · /cdn-cgi/rum 32 · /play 32 · /play.html 31 | 4xx(probe) 1% · 5xx 8%",
+ "上位 page (24h, 2xx/3xx): / 84 · /kototama/kototama.js 35 · /cdn-cgi/rum 33 · /play 32 · /feed/fork-stats.edn 32 | 4xx(probe) 1% · 5xx 8%",
  :signal
- "isekai.network 実測 7870 req/7d・363 uniques(日次和)・うち4xx probe 1%(24h)",
+ "isekai.network 実測 7906 req/7d・365 uniques(日次和)・うち4xx probe 1%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}
