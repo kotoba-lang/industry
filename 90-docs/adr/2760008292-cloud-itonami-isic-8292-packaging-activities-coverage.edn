@@ -1,0 +1,92 @@
+[{:adr/id 2760008292
+  :adr/title "cloud-itonami-isic-8292 — Packaging Activities Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-8292]
+  :adr/references [2607121000 2691004752]
+
+  ;; Wave 2 actor (coordination/logistics/trade), the final class in this
+  ;; batch of Wave 2's last 8 remaining 4-digit gaps: contract/third-
+  ;; party-packaging operations coordination-only (production batch/run/
+  ;; quantity data logging, packaging-line/staffing scheduling,
+  ;; packaging-material supply-order coordination, package-integrity/
+  ;; labeling-accuracy/contamination quality-concern flagging). No op
+  ;; finalizes a package-integrity-safety clearance or a food/pharma-
+  ;; labeling-compliance sign-off -- both actions are structurally
+  ;; excluded, never merely gated.
+
+  :actor/id :cloud-itonami-isic-8292
+  :actor/name "Contract Packaging Operations Coordinator"
+  :actor/isic-rev5 "8292"
+  :actor/domain :business-support/contract-packaging
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-production-record :schedule-production-operation
+                       :coordinate-supply-order :flag-quality-concern]
+  :actor/always-escalate-ops [:flag-quality-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-supply-order 2000}
+
+  :actor/hard-checks [:facility-verified :contract-verified :supplier-verified
+                      :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["finalize the package integrity clearance" "finalized the package integrity clearance"
+                                "finalize the package integrity safety clearance" "finalized the package integrity safety clearance"
+                                "issue the package integrity safety clearance" "issued the package integrity safety clearance"
+                                "grant the package integrity safety clearance" "granted the package integrity safety clearance"
+                                "certify the package as tamper-evident" "certified the package as tamper-evident"
+                                "certify the batch as tamper-evident" "certified the batch as tamper-evident"
+                                "clear the batch for release" "cleared the batch for release"
+                                "declare the batch tamper-evident" "declared the batch tamper-evident"
+                                "authorize the batch for release as tamper-evident" "authorized the batch for release as tamper-evident"
+                                "sign off on the food safety labeling compliance" "signed off on the food safety labeling compliance"
+                                "sign off on the pharma labeling compliance" "signed off on the pharma labeling compliance"
+                                "approve the food labeling compliance sign-off" "approved the food labeling compliance sign-off"
+                                "approve the pharma labeling compliance sign-off" "approved the pharma labeling compliance sign-off"
+                                "certify the labeling as compliant" "certified the labeling as compliant"
+                                "confirm the labeling as regulatory-compliant" "confirmed the labeling as regulatory-compliant"
+                                "declare the label regulatory-compliant" "declared the label regulatory-compliant"
+                                "包装完全性の安全確認を確定" "包装完全性の安全確認を確定した"
+                                "改ざん防止確認を完了" "改ざん防止確認を完了した"
+                                "食品表示の適合を確定" "食品表示の適合を確定した"
+                                "医薬品表示の適合を確定" "医薬品表示の適合を確定した"]
+
+  ;; Self-trip-avoidance: every term above is phrased as the
+  ;; finalization/execution ACTION, never a bare noun -- this namespace's
+  ;; own :flag-quality-concern default proposal legitimately discusses
+  ;; seal/tamper-evidence/label/contamination concerns, and its own
+  ;; printed :op keyword literally contains the substring
+  ;; "quality-concern". A bare-noun term list (e.g. bare
+  ;; "tamper"/"seal"/"label"/"contamination") would self-trip this
+  ;; actor's own core happy path on every single run. Regression test:
+  ;; governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion.
+  ;; :contract-packaging-governor keyword and packagingops namespace both
+  ;; checked for fleet-wide uniqueness via gh api search/code against
+  ;; org:cloud-itonami before landing (0 hits for both).
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-production-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-production-record :schedule-production-operation
+                                               :coordinate-supply-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-production-record :schedule-production-operation
+                                         :coordinate-supply-order :flag-quality-concern}
+      :auto #{:log-production-record :schedule-production-operation :coordinate-supply-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 63 :assertions 199 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression
+                  :facility-verification :contract-verification :supplier-verification]
+  :test/simulator :packagingops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-8292"
+  :registry/business-id "cloud-itonami-isic-8292"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
