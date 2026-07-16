@@ -1,0 +1,78 @@
+[{:adr/id 2746008211
+  :adr/title "cloud-itonami-isic-8211 — Combined Office Administrative Service Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-8211]
+  :adr/references [2607121000]
+
+  ;; Wave 2 actor (coordination/logistics/trade), final batch of 4-digit
+  ;; gaps: outsourced combined office administrative services (mail
+  ;; handling, reception, billing, records management, filing)
+  ;; operations coordination-only (task-record logging, service-
+  ;; operation scheduling, supply-order coordination, confidentiality-
+  ;; concern flagging). Never discloses a client's confidential records
+  ;; to a third party and never decides on the client's behalf.
+
+  :actor/id :cloud-itonami-isic-8211
+  :actor/name "Combined Office Administrative Service Operations Coordinator"
+  :actor/isic-rev5 "8211"
+  :actor/domain :business-support/office-administration
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-task-record :schedule-service-operation
+                       :coordinate-supply-order :flag-confidentiality-concern]
+  :actor/always-escalate-ops [:flag-confidentiality-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-supply-order 1000.0}
+
+  :actor/hard-checks [:client-contract-verified :vendor-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["disclosed the client's confidential records to a third party"
+                                "shared the client's confidential data with a third party"
+                                "released the client's confidential file to a third party"
+                                "sent the client's confidential records to an external party"
+                                "transmitted the client's confidential records externally"
+                                "made the legal decision on the client's behalf"
+                                "made the financial decision on the client's behalf"
+                                "signed the contract on the client's behalf"
+                                "authorized the settlement on the client's behalf"
+                                "クライアントの機密記録を第三者に開示した"
+                                "クライアントに代わって法的決定を下した"
+                                "クライアントに代わって財務決定を下した"
+                                "第三者への開示を確定した"]
+
+  ;; Self-trip-avoidance: every term is phrased as the finalization/
+  ;; execution ACTION, never a bare noun ("confidential"/"disclosure"/
+  ;; "data"/"legal") -- this namespace's own default
+  ;; :flag-confidentiality-concern rationale legitimately discusses
+  ;; data-handling/confidentiality concerns using exactly those bare-ish
+  ;; words, and its own :op keyword literally contains the substring
+  ;; "confidentiality". Regression tests:
+  ;; governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion
+  ;; and governor-test/out-of-scope-test-hook-does-trip-scope-exclusion.
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-task-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-task-record :schedule-service-operation
+                                               :coordinate-supply-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-task-record :schedule-service-operation
+                                         :coordinate-supply-order :flag-confidentiality-concern}
+      :auto #{:log-task-record :schedule-service-operation :coordinate-supply-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 57 :assertions 168 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression]
+  :test/simulator :officeadminops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-8211"
+  :registry/business-id "cloud-itonami-isic-8211"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
