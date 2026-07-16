@@ -2958,7 +2958,16 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; `(kotoba.industry/maturity-summary)` against a freshly
       ;; re-fetched origin/main registry.edn immediately before this
       ;; test-file edit, not assumed.
-      (is (= 420 (:implemented m))))))
+      ;; 420 -> 423: THREE further CONCURRENT sibling fleet agents'
+      ;; own promotions (including cloud-itonami-isic-4530 and
+      ;; cloud-itonami-isic-4661, plus one more) landed in the same
+      ;; fast-moving window as this promotion's own test-file edit (not
+      ;; this promotion's own work, corroborated here only to keep this
+      ;; shared hot test file truthful); live-recomputed via
+      ;; `(kotoba.industry/maturity-summary)` against a freshly
+      ;; re-fetched origin/main registry.edn immediately before this
+      ;; test-file edit, not assumed.
+      (is (= 423 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
