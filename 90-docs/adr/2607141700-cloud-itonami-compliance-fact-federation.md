@@ -2913,6 +2913,49 @@ GAPKI自身のWikidata Q-idは見つからず、推測せず正直に省略。
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-16, /loop tick 106 — 国軸36件目(IDN) — インドネシアが3tick窓で3軸完成、3カ国目の3軸達成)
+
+`cloud-itonami-iso3166-idn`の`statute.facts`を追加
+([commit 8e99d3b](https://github.com/cloud-itonami/cloud-itonami-iso3166-idn/commit/8e99d3b))：
+
+インドネシアの一般法2件、複数ドメインの断念を経て
+jdih.kemenkeu.go.id（財務省自身の法令情報ポータル）で直接確認:
+
+- **peraturan.go.id**（国家法令ポータル本家）— ECONNREFUSED
+- **peraturan.bpk.go.id**（会計検査院ミラー）— HTTP 403
+- **OJK**（金融サービス庁）PDFミラー — フォント崩壊で完全に判読不能
+
+最終的にjdih.kemenkeu.go.id（財務省、別の政府ドメイン）で:
+
+- **UU No. 40 Tahun 2007（会社法/Perseroan Terbatas）** — 2007年
+  8月16日制定。
+- **UU No. 27 Tahun 2022（個人データ保護法/Pelindungan Data
+  Pribadi）** — 2022年10月17日制定・公布。
+
+ZAF/COL/IND/KEN/THA/ARE/VNMと同様、既存の`marketentry.facts`実装が
+ある同一`deps.edn`の下に`statute.facts`を新規namespaceとして追加。
+4 tests/9 assertions green（既存marketentry 24 tests/81 assertions
+と合わせ計28 tests/90 assertions green）。
+
+**3軸完成の節目**: 本tickにより**インドネシアが国・自治体・業界
+団体の3軸すべてを3tickの窓**（自治体: tick104・団体: tick105・
+国: 本tick）**で完成**——tick100のUAE（約4tick）・tick103の
+ベトナム（3tick）に次ぐ**3カ国目**の3軸完全達成。
+
+**capital-check**: tick104で既に検証済みの「ジャカルタは憲法裁判所
+判断により依然インドネシアの首都（ヌサンタラ遷都は未完了）」という
+結果を再利用。
+
+135リポジトリ・804 factを統合。jurisdiction IDN queryで今回の2件が
+既存legal-sourceと正しく共存していることを確認。country="IDN"での
+3スキーマ横断query（statute.facts / ordinance.facts /
+association-rule.facts）もすべて実在の正しい結果を返し、真の3軸
+連合カバレッジを確認。
+
+現状: 国軸36件・業界団体軸36件(27業種)・自治体軸34件——106tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
