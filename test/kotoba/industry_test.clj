@@ -3080,7 +3080,7 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; (via git-trees/blobs API) immediately before this test-file
       ;; edit, not assumed: {:total 649 :spec 213 :blueprint 0
       ;; :implemented 436}.
-      (is (= 438 (:implemented m))))))
+      (is (= 440 (:implemented m))))))
 
 (deftest cloud-itonami-isic-4751-is-implemented
   (testing "cloud-itonami-isic-4751 (Retail sale of textiles in
