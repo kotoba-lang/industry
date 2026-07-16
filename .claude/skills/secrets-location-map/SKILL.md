@@ -135,11 +135,17 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
   MURAKUMO_CHAT_TOKEN_SECRET_2) clojure -M:token issue <sub> chat <ttl>`。
   Worker secret `MURAKUMO_TOKEN_SECRET_2` は wrangler で投入済み（worker
   `murakumo-cloud`、redeploy を跨いで永続）。
-  ⚠ **2026-07-16 時点の注意**: cloud-murakumo の共有 checkout は GitHub main と
-  乖離した production ライン（organism publish ループが working tree からビルド・
-  デプロイ）で、この gate 拡張コードはまだそこに取り込まれていない — デプロイ
-  ラインが main を吸収するまで、実運用の chat gate は primary のみ受理する
-  （一時的に code が載った版 `a28b545d` で live 検証は成功済み）。
+  ✅ **2026-07-16 更新: production 反映済み**。当初は共有 checkout が GitHub main と
+  乖離した de-facto production ライン（local 109 commits 先行 / main 5 遅れ）で、
+  この gate 拡張コードがそこに無かったため実運用は primary のみ受理していた。
+  オーナー指示でその 109 commits を main に着地・一本化し（cloud-murakumo main
+  `a1423b2`、west pin も前進 `3bbdc32`）、統一 main から rebuild した dist を
+  murakumo.cloud にデプロイ（worker version `a6d00f52`）。以後、実運用の chat gate は
+  `MURAKUMO_CHAT_TOKEN_SECRET_2` で mint した token を受理する（live 200 確認済み・
+  upstream gemma4-26b 応答）。**注意**: cloud-murakumo は複数の worktree/deploy 経路が
+  あり（共有 checkout・`cloud-murakumo-production-release` worktree・他セッション）、
+  いずれも今は unified main 上にあるが、古い dist からの再デプロイが混ざると一時的に
+  401 に戻りうる — その場合は unified main から rebuild して再デプロイする。
 
 ## Murakumo playtest critic token (ADR-2607162100、2026-07-16)
 
