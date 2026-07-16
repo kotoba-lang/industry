@@ -2542,7 +2542,14 @@
       ;; not assumed.
       ;; 385 -> 386: cloud-itonami-isic-6611-cryptoexchange's own +1
       ;; (ADR-2607999990, see `maturity-tier`'s own comment above).
-      (is (= 386 (:implemented m))))))
+      ;; 386 -> 390: concurrent fleet drift -- 4 further sibling
+      ;; promotions landed in the interval between this test-file PUT
+      ;; and the next, re-confirmed live via `(kotoba.industry/maturity-
+      ;; summary)` on a freshly re-fetched origin/main registry.edn
+      ;; immediately before this fix, not assumed (:blueprint unchanged
+      ;; at 24 in the same recomputation -- no sibling touched a
+      ;; :blueprint-tier entry in this window).
+      (is (= 390 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
