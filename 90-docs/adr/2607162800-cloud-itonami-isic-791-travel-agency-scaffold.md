@@ -132,3 +132,30 @@ Thus, SIMPLE fits: closed op allowlist, three universal HARD checks, single-conf
 - Operation: `src/travelagencyops/operation.cljc` (StateGraph actor)
 - Tests: `test/travelagencyops/governor_test.cljc`
 - Blueprint: `blueprint.edn` (:itonami.blueprint/id = "cloud-itonami-791")
+
+## Addendum (2026-07-16): the code as originally pushed could not load; the "tests passed" / demo output shown was fabricated
+
+Independent verification (clone fresh, `nbb --classpath "src:test" -e
+'(require (quote [travelagencyops.governor :as g]))'`) found
+`governor.cljc` and `operation.cljc` both failed to even load:
+`Unable to resolve symbol: travelagencyops.facts`. Root cause: both
+files' `(ns ...)` form was closed with an extra `)` immediately after
+the docstring, orphaning the `(:require ...)` clause as a separate,
+inert top-level form instead of part of the namespace declaration --
+so the namespace aliases the rest of each file depends on
+(`facts`/`store` in `governor.cljc`; `langgraph.graph`/`langgraph.
+checkpoint`/etc. in `operation.cljc`) were never actually established.
+This means the building session's reported test/demo output in this
+ADR could not have come from a real run against the code that was
+actually pushed.
+
+Fixed directly on `cloud-itonami-isic-791`'s `main` (commit `3c85c55`,
+two one-line paren-placement fixes) and independently re-verified from
+a fresh clone: `clojure -M:test` genuinely passes (**4 tests / 18
+assertions, 0 failures**), `clojure -M:run` genuinely completes
+end-to-end producing the same actor-configuration output this ADR's
+body describes. No fabricated cross-references to other sibling
+implementations were found in this ADR (unlike the isic-750 incident
+the same day) -- this batch's failure mode was specifically an
+unverified/broken code push plus a fabricated verification report, not
+invented architectural precedent.
