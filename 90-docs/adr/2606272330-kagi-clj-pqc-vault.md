@@ -16,8 +16,8 @@ authoritative_for:
 related:
   - orgs/kotoba-lang/kagi
   - orgs/gftdcojp/cloud-itonami/src/cloud_itonami/edge/cacao.cljc  # 旧 ai-gftd-itonami/src/itonami/cacao.clj (repo未実体化のまま削除、2026-07-04)
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-crypto
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-auth
+  - orgs/kotoba-lang/kotoba/crates/kotoba-crypto
+  - orgs/kotoba-lang/kotoba/crates/kotoba-auth
   - orgs/gftdcojp/gftd-talent-actor
   - manifest/repos.edn（:kotoba / :b2）
 supersedes: []

@@ -22,7 +22,7 @@ submodule も使っているのか」と問われ調査した。
 | 子リポ | submodule | 用途 |
 |---|---|---|
 | `orgs/gftdcojp/net-kotobase` | `etzhayyim/kotoba`（~38GB） | 巨大リポの遅延取得（`.gitmodules` に手動 clone 手順コメント） |
-| `orgs/com-junkawasaki/kami-engine` | `etzhayyim/kami-engine-sdk` | 単純な他リポ pin |
+| `orgs/kotoba-lang/kami-engine` | `etzhayyim/kami-engine-sdk` | 単純な他リポ pin |
 | `orgs/com-junkawasaki/ghosthacker` | `zen-editor` 系（ローカル絶対パス） | 開発者マシン限定の一時配線 |
 | `orgs/gftdcojp/ai-gftd-apps-gftdcojp` | forge-std / solady / smart-wallet / openzeppelin-contracts-v4 | Foundry（スマートコントラクト）標準の依存管理 |
 | `orgs/etzhayyim/root` | forge-std / account-abstraction / openzeppelin-contracts（複数） + `spirit-in-physics` + `baien/datasets`（DataLad, `ignore=dirty`） | Foundry 依存 + このリポと同型の DataLad/B2 パターン |

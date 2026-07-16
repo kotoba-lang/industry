@@ -79,7 +79,7 @@ JPEG は ecosystem 横断で頻出する（写真、PDF 埋込画像、PSD smart
 ## References
 
 - 親 ADR: ADR-2606272100（kasane 設計、外部依存ゼロ・データ駆動）
-- 実装: `orgs/com-junkawasaki/kasane/src/kasane/jpeg.cljc`（R0 メタデータ）,
+- 実装: `orgs/kotoba-lang/kasane/src/kasane/jpeg.cljc`（R0 メタデータ）,
   `normalize/jpeg->doc`
 - 大容量バイナリ規律: `CLAUDE.md`「大容量バイナリの扱い（B2 + DataLad）」
 - 既存ラスタ展開: `kasane.codec`(inflate/packbits/lzw)、`kasane.tiff`/`kasane.png`/`kasane.gif`

@@ -23,7 +23,7 @@ related:
   - orgs/kotoba-lang/langgraph      # StateGraph / checkpoint / create-react-agent
   - orgs/kotoba-lang/browser-use    # IBrowser host capability + indexed-element ページ表現
   - orgs/kotoba-lang/computer-use   # desktop 操作 sub-agent（IComputer host capability）
-  - orgs/com-junkawasaki/kotoba             # CLJ→WASM ランタイム（実行ホスト候補）
+  - orgs/kotoba-lang/kotoba             # CLJ→WASM ランタイム（実行ホスト候補）
   - orgs/kawasakijun/docs/adr/0020-three-org-taxonomy.edn
 supersedes: []
 superseded_by: []

@@ -13,11 +13,11 @@ authoritative_for:
   - decision engine が「現時点で有効か」を判定する手順(signature ∧ not-expired ∧ not-revoked)
 related:
   - 90-docs/adr/2606290930-kotoba-aiueos-capability-bridge.md
-  - orgs/com-junkawasaki/aiueos/SECURITY.md
-  - orgs/com-junkawasaki/aiueos/src/policy.rs
-  - orgs/com-junkawasaki/aiueos/src/signing.rs
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-auth
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-custody
+  - orgs/kotoba-lang/aiueos/SECURITY.md
+  - orgs/kotoba-lang/aiueos/src/policy.rs
+  - orgs/kotoba-lang/aiueos/src/signing.rs
+  - orgs/kotoba-lang/kotoba/crates/kotoba-auth
+  - orgs/kotoba-lang/kotoba/crates/kotoba-custody
 supersedes: []
 superseded_by: []
 ---

@@ -12,11 +12,11 @@ authoritative_for:
   - private repository の秘匿境界を selective replication ではなく object encryption に置く
   - R1/R2/R3/R4 の実装成熟度ロードマップ
 related:
-  - orgs/com-junkawasaki/kotoba/docs/ADR-kotoba-rad-git-sovereign-repo.md
+  - orgs/kotoba-lang/kotoba/docs/ADR-kotoba-rad-git-sovereign-repo.md
   - 90-docs/adr/2606271600-kotoba-stack-equivalences.md
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-git
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-dht
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-crypto
+  - orgs/kotoba-lang/kotoba/crates/kotoba-git
+  - orgs/kotoba-lang/kotoba/crates/kotoba-dht
+  - orgs/kotoba-lang/kotoba/crates/kotoba-crypto
 supersedes: []
 superseded_by: []
 ---
@@ -61,7 +61,7 @@ policy. Confidentiality is object encryption:
 
 Primary design lives in:
 
-`orgs/com-junkawasaki/kotoba/docs/ADR-kotoba-rad-git-sovereign-repo.md`
+`orgs/kotoba-lang/kotoba/docs/ADR-kotoba-rad-git-sovereign-repo.md`
 
 The first implementation should add either a new `kotoba-rad` crate or a `kotoba-git::rad`
 module with:

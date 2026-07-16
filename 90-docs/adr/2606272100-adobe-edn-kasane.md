@@ -246,8 +246,8 @@ next-free-code==2^width−1 で width++ / GIF: interlace の 4-pass de-ordering 
 
 ## References
 
-- 近接実装: `orgs/com-junkawasaki/kotoba/crates/kotoba-kotodama/cells/yorishiro_pdftotext/`,
-  `orgs/com-junkawasaki/drawingml-svg/`, `orgs/com-junkawasaki/svgraph/`
+- 近接実装: `orgs/kotoba-lang/kotoba/crates/kotoba-kotodama/cells/yorishiro_pdftotext/`,
+  `orgs/kotoba-lang/svgraph/`, `orgs/com-junkawasaki/svgraph/`
 - EDN/WASM 基盤: `kotoba-clj`（EDN-subset → WASM, reader=`kotoba-edn`,
   langgraph workstream で loop/recur + bytes + in-guest CBOR 済み）
 - グラフ射影先: kotoba QuadStore / Datom（`kotoba-graph` / `kotoba-query`）

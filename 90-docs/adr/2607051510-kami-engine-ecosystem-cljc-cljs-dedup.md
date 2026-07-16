@@ -5,7 +5,7 @@
 **Date**: 2026-07-05
 **Deciders**: Jun Kawasaki
 **Scope**: `orgs/kotoba-lang/{webgpu,kami-engine,kami-engine-sdk-clj,kami-genesis,expr}`、
-`orgs/com-junkawasaki/kami-engine-sdk`
+`orgs/kotoba-lang/kami-engine-sdk-svelte`
 
 ## Context
 
@@ -62,7 +62,7 @@ kotoba-lang直下の標準repoとの重複有無を1件ずつ確認したうえ�
 重複を削除する専用フォローアップに切り出す。`kami-ui-sdk`/`kami-text`は
 rename整合の確認をowner判断で先に行う。
 
-### 調査3: `orgs/com-junkawasaki/kami-engine-sdk`（Svelte）の非genkoサブフォルダ
+### 調査3: `orgs/kotoba-lang/kami-engine-sdk-svelte`（Svelte）の非genkoサブフォルダ
 （記録のみ、未実行）
 
 - **`data/*.ts`**（12ファイル、Svelte依存なしの純データ）: 概ね重複なし、

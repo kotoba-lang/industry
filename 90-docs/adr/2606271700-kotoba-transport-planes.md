@@ -13,13 +13,13 @@ authoritative_for:
   - connect.edn を接続の単一宣言的記述(SSoT)とし、murakumo placement の :reach をそこから導く配線
 related:
   - 90-docs/adr/2606271600-kotoba-stack-equivalences.md            # 上位 positioning(wasmCloud⊗Spin⊗clj⊗Datomic⊗Radicle)
-  - orgs/com-junkawasaki/kotoba/docs/ADR-browser-cid-query-vs-p2p.md  # Read=CID-over-HTTP / P2P=可用性層の一次決定
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-net                  # libp2p QUIC/Noise/gossipsub/Kademlia + relay/dcutr/autonat
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-turn                 # TURN(RFC 8656) — webrtc ICE relay に再利用
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-store-web            # browser IndexedDB(read-only cache)
-  - orgs/com-junkawasaki/murakumo/connect.edn                      # 接続の単一記述(SSoT)
-  - orgs/com-junkawasaki/murakumo/src/murakumo/connect.clj         # connect.edn → reach 解決(純粋)
-  - orgs/com-junkawasaki/murakumo/src/murakumo/reconcile.clj       # :placement :reach を eligible に配線
+  - orgs/kotoba-lang/kotoba/docs/ADR-browser-cid-query-vs-p2p.md  # Read=CID-over-HTTP / P2P=可用性層の一次決定
+  - orgs/kotoba-lang/kotoba/crates/kotoba-net                  # libp2p QUIC/Noise/gossipsub/Kademlia + relay/dcutr/autonat
+  - orgs/kotoba-lang/kotoba/crates/kotoba-turn                 # TURN(RFC 8656) — webrtc ICE relay に再利用
+  - orgs/kotoba-lang/kotoba/crates/kotoba-store-web            # browser IndexedDB(read-only cache)
+  - orgs/kotoba-lang/murakumo/connect.edn                      # 接続の単一記述(SSoT)
+  - orgs/kotoba-lang/murakumo/src/murakumo/connect.clj         # connect.edn → reach 解決(純粋)
+  - orgs/kotoba-lang/murakumo/src/murakumo/reconcile.clj       # :placement :reach を eligible に配線
 supersedes: []
 superseded_by: []
 ---
@@ -109,7 +109,7 @@ placement reach も**そこから導く**(再宣言しない)。Connect スキ�
 プロトコルを跨ぐのと同じ思想。
 
 ```edn
-;; orgs/com-junkawasaki/murakumo/connect.edn
+;; orgs/kotoba-lang/murakumo/connect.edn
 {:connect/version 1
  :planes {:read {:protocol :http :trust :cid :alpn [:h3 :h2]}
           :live {:transports [:quic :webrtc :webtransport :wss]
@@ -158,9 +158,9 @@ native fleet を browser-live(webrtc)/edge(wss)に対応させるには、connec
   ブロックしないための選択(運用側は警告で気付く)。
 
 ## References
-- `orgs/com-junkawasaki/kotoba/docs/ADR-browser-cid-query-vs-p2p.md` — Read=CID-over-HTTP /
+- `orgs/kotoba-lang/kotoba/docs/ADR-browser-cid-query-vs-p2p.md` — Read=CID-over-HTTP /
   P2P=availability layer の一次決定(本 ADR の Read 面はこれに従う)。
 - `90-docs/adr/2606271600-kotoba-stack-equivalences.md` — wasmCloud(NATS 単一) vs
   kotoba(libp2p マルチ + HTTP-by-CID)の positioning。
-- `orgs/com-junkawasaki/murakumo/connect.edn` / `src/murakumo/connect.clj` /
+- `orgs/kotoba-lang/murakumo/connect.edn` / `src/murakumo/connect.clj` /
   `src/murakumo/reconcile.clj` — 単一記述と reach 配線の実装 + テスト。

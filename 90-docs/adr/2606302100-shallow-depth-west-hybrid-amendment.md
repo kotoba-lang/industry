@@ -74,17 +74,17 @@ west の pin 駆動とは相性が悪い。
 
 | heavy project | 実測 worktree+.git |
 |---|---|
-| `orgs/com-junkawasaki/manimani` | 16.2 GB |
-| `orgs/com-junkawasaki/kotoba`, `orgs/etzhayyim/kotoba` | 各 8.98 GB |
+| `orgs/gftdcojp/local-manimani` | 16.2 GB |
+| `orgs/kotoba-lang/kotoba`, `orgs/etzhayyim/kotoba` | 各 8.98 GB |
 | `orgs/com-junkawasaki/org-spirit-in-physics-comics` | 3.0 GB |
 | `orgs/gftdcojp/app-aozora` | 2.4 GB |
-| `orgs/com-junkawasaki/kami-engine` | 1.95 GB |
+| `orgs/kotoba-lang/kami-engine` | 1.95 GB |
 | `orgs/etzhayyim/root` | 1.77 GB |
-| `orgs/com-junkawasaki/260208-spirit-in-physics` | 1.56 GB |
+| `orgs/com-junkawasaki/org-spirit-in-physics-comics` | 1.56 GB |
 | `orgs/com-junkawasaki/ghosthacker` | 803 MB |
 | `orgs/gftdcojp/ai-gftd-apps-gftdcojp` | 538 MB |
 | `orgs/gftdcojp/m365-archive`（既に DataLad） | 453 MB |
-| `orgs/com-junkawasaki/kototama` | 435 MB |
+| `orgs/kotoba-lang/kototama` | 435 MB |
 | `orgs/com-junkawasaki/webmaster` | 301 MB |
 | `orgs/gftdcojp/network-isekai` | 231 MB |
 

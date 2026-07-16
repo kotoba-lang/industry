@@ -46,7 +46,7 @@ way to revoke one member without rotating and manually redistributing to
 everyone else, and no audit trail of who was ever given it. The fix already
 has same-superproject precedent, just built for a different purpose:
 
-- `kotoba-custody`'s R3 custodian protocol (`orgs/com-junkawasaki/kotoba/
+- `kotoba-custody`'s R3 custodian protocol (`orgs/kotoba-lang/kotoba/
   crates/kotoba-custody/src/protocol.rs`) already has the exact shape this
   document needs — `GrantedShare` (lines ~65-90) carries an `epoch: u64`
   ("Rotation epoch this share belongs to (R3c)"), a `deal_id` ("Dealing
@@ -59,7 +59,7 @@ has same-superproject precedent, just built for a different purpose:
   quorum — a different job (key recovery, not standing multi-reader
   access) — but the `epoch`/`graph`-scoped/HPKE-wrapped-grant shape is
   exactly transferable.
-- `kotoba-crypto/src/hpke.rs` (`orgs/com-junkawasaki/kotoba/crates/
+- `kotoba-crypto/src/hpke.rs` (`orgs/kotoba-lang/kotoba/crates/
   kotoba-crypto/src/hpke.rs:1-45`) is the concrete wire format to mirror:
   `ephemeral_pk(32) || nonce(12) || AES-256-GCM-ciphertext`, shared secret
   `X25519(ephemeral_sk, recipient_pk)`, key derived via
@@ -312,18 +312,18 @@ now answered, not still open:
   this whole superproject; this document is the first place that principle
   gets a concrete mechanism (grant datom shape, HPKE wrap, epoch semantics)
   rather than remaining a name-only R2 placeholder.
-- `orgs/com-junkawasaki/kotoba/crates/kotoba-custody/src/protocol.rs`
+- `orgs/kotoba-lang/kotoba/crates/kotoba-custody/src/protocol.rs`
   (`GrantedShare` — `epoch`, `deal_id`, `graph_cid_mb`, HPKE-re-wrap-per-
   requester) — the closest existing same-superproject precedent for the
   epoch/graph-scoped/HPKE-wrapped-grant shape this document adopts, built
   originally for Shamir custodian share release, not standing multi-reader
   graph access.
-- `orgs/com-junkawasaki/kotoba/crates/kotoba-crypto/src/hpke.rs` (`hpke_seal`/
+- `orgs/kotoba-lang/kotoba/crates/kotoba-crypto/src/hpke.rs` (`hpke_seal`/
   `hpke_open`, lines 1-45) — the concrete X25519 + HKDF-SHA256 + AES-256-GCM
   wire shape (`ephemeral_pk(32) || nonce(12) || ciphertext`) this document's
   wrapped-DEK format mirrors; not directly reusable from the `.cljc`/Worker
   runtime, but the same algorithm choices carry over.
-- `orgs/com-junkawasaki/kotoba/crates/kotoba-server/src/xrpc.rs`
+- `orgs/kotoba-lang/kotoba/crates/kotoba-server/src/xrpc.rs`
   (`append_auth_capability_datoms`, lines ~2766+) — the existing
   `:capability/*` audit/receipt datom schema this document's
   `:gftdcojp.grant/*` namespace is deliberately distinct from (a receipt

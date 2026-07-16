@@ -12,11 +12,11 @@ authoritative_for:
   - browser=webrtc/webtransport, edge=wss を Live 面に載せ connect.edn の :reach を実体化する段階計画
 related:
   - 90-docs/adr/2606271700-kotoba-transport-planes.md         # 2平面 + connect.edn 単一記述(本 ADR の上位)
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-net             # libp2p swarm(現状 QUIC のみ) ← 実装先
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-turn            # TURN(RFC 8656) ephemeral cred mint/verify ← 再利用
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-rt             # realtime per-room bus(WebRTC media と同居)
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-store-web       # browser IndexedDB(read-only cache, 現状)
-  - orgs/com-junkawasaki/murakumo/connect.edn                # native :live に :webrtc を足す単一ノブ
+  - orgs/kotoba-lang/kotoba/crates/kotoba-net             # libp2p swarm(現状 QUIC のみ) ← 実装先
+  - orgs/kotoba-lang/kotoba/crates/kotoba-turn            # TURN(RFC 8656) ephemeral cred mint/verify ← 再利用
+  - orgs/kotoba-lang/kotoba/crates/kotoba-rt             # realtime per-room bus(WebRTC media と同居)
+  - orgs/kotoba-lang/kotoba/crates/kotoba-store-web       # browser IndexedDB(read-only cache, 現状)
+  - orgs/kotoba-lang/murakumo/connect.edn                # native :live に :webrtc を足す単一ノブ
 supersedes: []
 superseded_by: []
 ---
