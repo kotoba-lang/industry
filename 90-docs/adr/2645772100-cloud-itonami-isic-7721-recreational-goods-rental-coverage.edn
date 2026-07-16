@@ -1,0 +1,61 @@
+[{:adr/id 2645772100
+  :adr/title "cloud-itonami-isic-7721 — Recreational and Sports Goods Rental Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-7721]
+  :adr/references [2607152500 2607121000 2620773000]
+
+  ;; Wave 4 actor (human-facing/personal-services): recreational/sports
+  ;; equipment (skis, bicycles, watersports and camping gear) rental
+  ;; operations coordination-only (rental-record logging,
+  ;; equipment-availability/maintenance scheduling, rental-fleet
+  ;; restock/replacement coordination, equipment-safety-concern
+  ;; flagging). Repo was pre-existing (:blueprint tier, boilerplate
+  ;; docs only, no deps.edn/src/test) from an earlier bulk-scaffolding
+  ;; pass -- this ADR fills in the implementation, not a fresh scaffold.
+
+  :actor/id :cloud-itonami-isic-7721
+  :actor/name "Recreational / Sports Goods Rental Operations Coordinator"
+  :actor/isic-rev5 "7721"
+  :actor/domain :services/recreational-sports-goods-rental-operations
+  :actor/wave 4
+  :actor/coordination? true
+  :actor/robotics? false
+
+  :actor/proposal-ops [:log-rental-record :schedule-fleet-operation
+                       :coordinate-fleet-restock :flag-equipment-safety-concern]
+  :actor/always-escalate-ops [:flag-equipment-safety-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-fleet-restock 2000}
+
+  :actor/hard-checks [:asset-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["certify safe to re-rent without inspection" "clear for re-rent without inspection"
+                                "approve re-rent without inspection" "finalize the safety clearance"
+                                "finalize equipment safety clearance" "re-rent without inspection"
+                                "override the equipment safety authority" "bypass equipment safety authority"
+                                "点検なしで再貸出を承認" "安全クリアランスを確定" "機材安全当局の判断を上書き"]
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-rental-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-rental-record :schedule-fleet-operation
+                                               :coordinate-fleet-restock}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-rental-record :schedule-fleet-operation
+                                         :coordinate-fleet-restock :flag-equipment-safety-concern}
+      :auto #{:log-rental-record :schedule-fleet-operation :coordinate-fleet-restock}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 49 :assertions 160 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration :store-contract
+                  :scope-exclusion-self-trip-regression]
+  :test/simulator :recreationalrentalops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-7721"
+  :registry/business-id "cloud-itonami-7721"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
+  :registry/operating-states [:intake :register :match :dispatch :follow-up :audit]
+
+  :db/id -1}]
