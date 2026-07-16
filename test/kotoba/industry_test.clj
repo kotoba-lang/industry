@@ -3055,7 +3055,15 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; against a freshly re-fetched origin/main registry.edn
       ;; immediately before this test-file edit, not assumed:
       ;; {:total 649 :spec 220 :blueprint 0 :implemented 429}.
-      (is (= 433 (:implemented m))))))
+      ;; 433 -> 434: this promotion's own cloud-itonami-isic-4764
+      ;; (Retail sale of games and toys in specialized stores,
+      ;; :spec -> :implemented, +1) -- live-recomputed via
+      ;; `(kotoba.industry/maturity-summary)` against a freshly
+      ;; re-fetched origin/main registry.edn (via git-trees/blobs API,
+      ;; bypassing Contents-API cache lag observed this session)
+      ;; immediately before this test-file edit, not assumed:
+      ;; {:total 649 :spec 214 :blueprint 0 :implemented 434}.
+      (is (= 434 (:implemented m))))))
 
 (deftest cloud-itonami-isic-4751-is-implemented
   (testing "cloud-itonami-isic-4751 (Retail sale of textiles in
@@ -3478,3 +3486,81 @@ clone; superproject ADR-2628000000) is also :implemented"
            (:repo (industry/get-industry "4763"))))
     (is (= "cloud-itonami-isic-4763"
            (:business-id (industry/get-industry "4763"))))))
+
+(deftest cloud-itonami-isic-4764-is-implemented
+  (testing "cloud-itonami-isic-4764 (Retail sale of games and toys in
+  specialized stores -- Wave 2 [coordination/logistics/trade,
+  ADR-2607121000] fresh scaffold, no pre-existing repo at any
+  placeholder [gh api 404 confirmed for both the stale
+  gftdcojp/cloud-itonami-G4764 placeholder and the real cloud-itonami
+  org target before scaffolding]; identity ({:id \"4764\" :name \"Retail
+  sale of games and toys in specialized stores\"}) independently
+  verified against a fresh clone before any work began, per this
+  fleet's ID/name-mismatch caution; the redundant 3-digit group entry
+  {:id \"476\" ...} left untouched; ToyGameRetailAdvisor \u22a3
+  ToyGameRetailGovernor (toygameops.* namespace) mirroring
+  cloud-itonami-isic-4719's [Other retail sale in non-specialized
+  stores] verified advisor/governor/phase/operation/store/sim module
+  shape module-for-module; closed four-op allowlist, all
+  :effect :propose (log-sales-record/schedule-staffing-operation/
+  coordinate-supply-order/flag-safety-concern); FOUR HARD governor
+  checks (store-unverified, vendor-unverified [for
+  coordinate-supply-order only, a supply-chain
+  counterparty-verification gate mirroring cloud-itonami-isic-4719's
+  own], effect-not-propose, and scope-exclusion folding in
+  op-not-allowed) that permanently block any proposal touching
+  directly FINALIZING a recall-compliance decision (declaring a SKU
+  recall-cleared, initiating/executing a recall, closing out a recall
+  case) or an age-grading-safety decision (certifying/approving an
+  age-grade/age-appropriate-use label as the OFFICIAL determination)
+  -- this actor's own child-product-safety guardrail, per this
+  fleet's person/consumer-facing-service pattern: the closed op
+  allowlist NEVER includes any op that directly finalizes either
+  decision, always a hard permanent block or an always-escalate op,
+  never auto-commit-eligible; scope-excluded terms are phrased as the
+  finalization/execution ACTION (\"finalize the recall\", \"certify
+  the age grade\"), never a bare noun (\"recall\"/\"choking
+  hazard\"/\"age grade\"/\"age rating\"), avoiding this fleet's own
+  known self-tripping bug class -- concretely relevant here since this
+  namespace's own default :flag-safety-concern advisor rationale
+  legitimately talks about choking/small-parts hazards, suspected
+  recall-affected stock and age-grading-label mismatches as
+  OBSERVATIONS, never finalizations -- verified by a dedicated
+  default-mock-advisor-proposals-never-self-trip-scope-exclusion
+  regression test in governor_test.clj; flag-safety-concern ALWAYS
+  escalates and is never a member of any phase's :auto set, at any
+  phase (two independent layers agree: the governor's own
+  always-escalate-ops AND the phase table itself, the latter exercised
+  directly by a dedicated
+  safety-concern-never-in-any-phase-auto-set structural test);
+  coordinate-supply-order above a $750 cost threshold also always
+  escalates; real langgraph-clj StateGraph
+  (intake->advise->govern->decide->commit|hold|request-approval) with
+  interrupt-before #{:request-approval}; fully portable .cljc with no
+  JVM-only interop anywhere in src/ (mock-only advisor); 56 tests / 166
+  assertions green (clojure -M:test), independently re-verified
+  against a fresh clone; clj-kondo 0 errors / 0 warnings;
+  clojure -M:run (toygameops.sim demo) walked all scenarios (phase-1
+  approval-gated commit, phase-3 auto-commit, always-escalating
+  safety-concern flag, always-escalating over-threshold supply order,
+  and all HARD-hold scenarios: unregistered store, unverified store,
+  unverified vendor, non-:propose effect, scope-excluded content)
+  without error; registry.edn's own \"4764\" -> :implemented change
+  (:repo/:business-id de-placeholdered from
+  gftdcojp/cloud-itonami-G4764 -> cloud-itonami/cloud-itonami-isic-4764,
+  :maturity :spec->:implemented, :operating-states updated to match
+  the actor state machine; :required-technologies/:optional-technologies
+  left unchanged) landed via a Contents-API single-file PUT
+  (sha-checked optimistic concurrency, immediately re-fetched fresh
+  content before the PUT per this fleet's hot-contention discipline,
+  exact-block edit only verified via a single-contiguous-diff-region
+  check PLUS sample-verified against 4719/4722/476[group]/6310 entries
+  also intact, no mojibake detected); superproject ADR-2701004764
+  (com-junkawasaki/root,
+  90-docs/adr/2701004764-cloud-itonami-isic-4764-games-toys-retail-coverage.md/.edn))
+  promoted :spec -> :implemented"
+    (is (= :implemented (industry/maturity "4764")))
+    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-4764"
+           (:repo (industry/get-industry "4764"))))
+    (is (= "cloud-itonami-isic-4764"
+           (:business-id (industry/get-industry "4764"))))))
