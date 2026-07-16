@@ -3026,6 +3026,22 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; `(kotoba.industry/maturity-summary)` against a freshly
       ;; re-fetched origin/main registry.edn immediately before this
       ;; test-file edit, not assumed.
+      ;; Restoration note: this edit restores the
+      ;; `cloud-itonami-isic-4742-is-implemented` deftest below, which
+      ;; this promotion's own edit (superproject ADR-2700004742,
+      ;; landed commit c150634da4) originally added immediately after
+      ;; this promotion's own registry.edn change, but which was
+      ;; unintentionally deleted by a concurrent sibling fleet agent's
+      ;; own cloud-itonami-isic-4752 edit (commit cee8024510) built
+      ;; against a stale pre-4742 local copy of this file -- the
+      ;; aggregate :implemented count itself (428) was never wrong
+      ;; (cloud-itonami-isic-4742's own +1 was already folded into that
+      ;; commit's own count, just mislabeled), only this dedicated
+      ;; per-entry regression test was lost. The registry.edn `"4742"`
+      ;; entry itself was independently re-verified live via
+      ;; `(kotoba.industry/get-industry "4742")` before this restoration
+      ;; -- still :implemented / cloud-itonami/cloud-itonami-isic-4742 /
+      ;; cloud-itonami-isic-4742, untouched by the loss.
       (is (= 428 (:implemented m))))))
 
 (deftest cloud-itonami-isic-4751-is-implemented
@@ -3076,6 +3092,36 @@ clone; superproject ADR-2628000000) is also :implemented"
     (is (= "cloud-itonami-isic-4751"
            (:business-id (industry/get-industry "4751"))))))
 
+(deftest cloud-itonami-isic-4742-is-implemented
+  (testing "cloud-itonami-isic-4742 (Retail sale of audio and video
+  equipment in specialized stores -- AV-equipment specialty retail
+  operations coordination, Wave 2 [coordination/logistics/trade,
+  ADR-2607121000] fresh scaffold, no pre-existing repo at either the
+  stale gftdcojp/cloud-itonami-G4742 placeholder or the real
+  cloud-itonami org target [gh api 404-confirmed before scaffolding];
+  AudioVideoRetailAdvisor sealed advisor + independent
+  AudioVideoRetailGovernor, closed four-op allowlist all :effect
+  :propose (log-sales-record/schedule-staffing-operation/coordinate-
+  supply-order/flag-warranty-concern); four HARD governor checks
+  (store-unverified, vendor-unverified, effect-not-propose, and
+  scope-exclusion folding in op-not-allowed) that permanently block any
+  proposal touching directly finalizing a warranty-claim decision
+  (approving, denying, paying out, or otherwise settling a warranty
+  claim; issuing a warranty refund or replacement) -- scope-exclusion
+  terms phrased as the finalization/execution ACTION, never a bare
+  noun, with a dedicated regression test guarding the default mock
+  advisor's own proposals never self-trip the check; :maturity :spec ->
+  :implemented, :repo/:business-id de-placeholdered from the stale
+  gftdcojp/cloud-itonami-G4742 target to
+  cloud-itonami/cloud-itonami-isic-4742; 56 tests / 166 assertions
+  green; superproject ADR-2700004742) promoted :spec -> :implemented;
+  this deftest was restored after being unintentionally clobbered by a
+  concurrent sibling fleet agent's edit (see restoration note above)"
+    (is (= :implemented (industry/maturity "4742")))
+    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-4742"
+           (:repo (industry/get-industry "4742"))))
+    (is (= "cloud-itonami-isic-4742"
+           (:business-id (industry/get-industry "4742"))))))
 (deftest cloud-itonami-isic-4719-is-implemented
   (testing "cloud-itonami-isic-4719 (Other retail sale in non-specialized
   stores -- general-merchandise/department-store retail operations
