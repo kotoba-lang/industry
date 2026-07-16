@@ -3724,6 +3724,43 @@ assertionsと合わせ全28 tests/90 assertions green）。148リポジトリ・
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。オーストリアの業界団体軸の空白は今後のtickに持ち越し。
 
+## Addendum (2026-07-17, /loop tick 127 — 業界団体軸43件目(WKÖ, AUT, ISIC 9411) — オーストリアが3tick窓で3軸完成、9カ国目)
+
+`cloud-itonami-assoc-9411-aut-wko`を新規GitHubリポジトリとして
+scaffold・push
+([commit 70e6992](https://github.com/cloud-itonami/cloud-itonami-assoc-9411-aut-wko/commit/70e6992))：
+
+Wirtschaftskammer Österreich（WKÖ、オーストリア連邦経済会議所、
+旧称Bundeskammer der gewerblichen Wirtschaft）。**ISIC 9411**の
+2件目——サウジアラビアのFSC（tick121）に続く。tick126で正直に
+指摘したオーストリアの業界団体軸の空白を埋める。
+
+wko.at自身の歴史ページ"Geschichte der Wirtschaftskammern
+Österreichs"から2件を直接確認:
+
+- **1946年7月24日、Neues Handelskammergesetz（新商業会議所法）
+  によりBundeskammer der gewerblichen Wirtschaft設立**
+- **1848年、オーストリア初の商業会議所（Handelskammer Wien）
+  設立**（正確な日は同ページで確認できず年のみ採用）
+
+Wikidata（Q248843）は矛盾する"inception date"として1839年を
+示しているが、一次資料で裏付けが取れなかったため採用せず——
+wko.at自身が直接確認した日付のみを使用。
+
+4 tests/11 assertions green。149リポジトリ・846 factを統合。
+
+3軸横断query（`statute/jurisdiction`・`ordinance/country`・
+`association-rule/country`いずれも`"AUT"`）で全て正しく取得を
+確認——**オーストリアがtick125(自治体)→126(国)→127(業界団体)の
+3tick窓で3軸完成、UAE(tick100)・ベトナム(tick103)・
+インドネシア(tick106)・フィリピン(tick109)・トルコ(tick115)・
+ナイジェリア(tick118)・サウジアラビア(tick121)・
+マレーシア(tick124)に続く9カ国目**。
+
+現状: 国軸43件・業界団体軸43件(28業種)・自治体軸41件——127 tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
