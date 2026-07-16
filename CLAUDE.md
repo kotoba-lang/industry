@@ -96,6 +96,21 @@ skill `new-project-scaffold` を参照。
     従来どおり必ず**事前確認**する（force-push / 履歴書き換えの詳細は下記 Git operations
     節。公開リポ化と他者ブランチへの push はここが正本の禁止列挙）。
 
+## fleet-db — west 後継 VCS プレーン（ADR-2607160005、2026-07-16）
+
+- **`manifest/fleet-db.edn`（+ append-only `fleet-db.ledger.edn`）が west.yml の
+  上流の正本になりつつある（Phase 1.5 dual-write 吸収期）。** west.yml は
+  fleet-db の projection。pin 前進の推奨経路は署名付き
+  `fleet pin-advance` / quorum `fleet govern`（実装:
+  `orgs/kotoba-lang/kotoba-fleet-vcs`、鍵と policy は `manifest/fleet-keys.edn`）。
+  従来の `gen-west-manifest.cljs --entry` / API single-entry も引き続き有効で、
+  その書き込みは CI（`.github/workflows/fleet-projection-verify.yml`）が
+  `fleet reconcile` で fleet-db に自動吸収する。**fleet-db / ledger /
+  fleet-head.edn を手編集しない**（ledger は追記のみ、head は署名付き）。
+- 並列 sync: `nbb --classpath orgs/kotoba-lang/kotoba-fleet-vcs/src \
+  orgs/kotoba-lang/kotoba-fleet-vcs/bin/fleet.cljs sync --db manifest/fleet-db.edn \
+  --workspace <dir> --names a,b --jobs 8`（pin SHA 直接 fetch、dirty skip）。
+
 ## Git operations
 
 - **shallow（`--depth 1`）をデフォルトにする。** 巨大 superproject + 多数のネスト
@@ -542,6 +557,15 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   `execute javascript` 経由のスクロールは失敗する — キー入力に頼らず
   `set URL of active tab of front window` / `target_app` screenshot の
   app-scripting 経路のみで完結させる。
+- **repo-wide resource governor（mandatory）**: `orgs/` / `projects/` を含むworkspace全体で
+  高負荷buildは同時1本に制限する。`shadow-cljs release` / `vite build` / `next build` /
+  `cargo build` / `wash build` 等を直接起動せず、必ず
+  `node /Users/junkawasaki/github/com-junkawasaki/scripts/resource-guard.mjs run build -- <command>`
+  を使う。deployはscope `deploy`を使う。lockはPID・cwd・開始時刻を保持し、live ownerが
+  いる二本目をexit 2で拒否し、dead ownerのstale lockだけを回収する。browser probeは
+  `finally`でcloseし、残留掃除はrootの`npm run browser:cleanup`（60分超の
+  `agent-browser-chrome-*`限定）を使う。superproject rootで無制限な`find .` / `du`を
+  実行しない。
 - **Co-Scientist kaizen loop（2026-07-13追記）**: `:llm-judge` 層（主観採点、単一judge
   やLLM panelは「計測されないメトリクス＝劇場」になりうる — 実測: liquid-glass-ui等の
   4ライブラリを3-judge panelが clarity/deference/depth等で軒並み4.0–5.0/5と採点した裏で、

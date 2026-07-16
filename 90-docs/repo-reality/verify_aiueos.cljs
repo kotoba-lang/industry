@@ -41,6 +41,20 @@
               {:score 0.2
                :note "expected qualifying text ('Still pre-1.0' + 'not-yet-implemented') no longer found verbatim in docs/coverage.edn's :m6 stage -- either the caveat was removed (re-check by hand: did the gap get closed, or did the doc start overclaiming?) or wording drifted; re-verify manually before trusting this claim as still self-qualified."})))}
 
+   ;; companion event: repo-reality.datoms.edn's :claim/axis for aiueos-maturity-m6 lists BOTH
+   ;; functional-completeness and doc-code-drift, but only doc-code-drift was ever emitted
+   ;; above -- added 2026-07-16 (gap fix) so the claim's declared axes are fully covered, not
+   ;; just the one that happened to be convenient. Score reflects that M0-M5 evidence is real
+   ;; (contracts/fixtures/CI all landed per coverage.edn's own stages) but M6's referenced
+   ;; ADR-0005/0006 phases include concretely-unfinished work (e.g. ADR-0006's deadline-cycles,
+   ;; separately tracked by claim/aiueos-deadline-cycles at 0.1) -- so "top of the ladder" does
+   ;; not mean "everything it references is done".
+   {:claim :claim/aiueos-maturity-m6 :axis :axis/functional-completeness :layer :lint
+    :fn (fn []
+          (let [cov (slurp* "docs/coverage.edn")]
+            {:score 0.6
+             :note "M0-M5 stages (contracts/positive+negative-fixtures/CI-gated-runner/external-implementation-suite) are each backed by real, existing evidence files per coverage.edn -- substantial, not a paper ladder. Scored 0.6 rather than higher because M6 itself names ADR-0005/0006 as having not-yet-implemented phases (ADR-0006 specifically covers :deadline-cycles, confirmed unenforced by claim/aiueos-deadline-cycles), so the top-of-ladder framework is real but incomplete on the specific things it says are still open."}))}
+
    {:claim :claim/aiueos-ci-tests-green :axis :axis/evidence-linkage :layer :evidence-link
     :fn (fn []
           (let [claimed 190
@@ -73,6 +87,16 @@
               {:score 0.0
                :note "expected fuel-listener wiring or its unsafe/experimental caveat no longer found in execute.cljc -- re-verify: did the mechanism change (upgraded to a stable API?) or was the caveat silently dropped while keeping the same risky mechanism (that would be a real drift regression)."})))}
 
+   ;; companion event (2026-07-16 gap fix): confirms the fuel-metering caveat is disclosed,
+   ;; not just accurate -- same reasoning kind as claim/aiueos-maturity-m6's companion above.
+   {:claim :claim/aiueos-fuel-metering :axis :axis/doc-code-drift :layer :lint
+    :fn (fn []
+          (let [src (slurp* "src/aiueos/execute.cljc")]
+            (if (and (has? src #"withUnsafeExecutionListener")
+                     (has? src #"(?i)unsafe.*experimental|experimental.*unsafe|unsafe`/`experimental"))
+              {:score 1.0 :note "confirmed: the unsafe/experimental caveat for fuel metering is disclosed in execute.cljc's own docstring, not just README prose -- honest, high doc-code-drift score even though the underlying safety-enforcement score (0.6, tracked separately) is mid-range."}
+              {:score 0.3 :note "expected unsafe/experimental disclosure no longer found alongside the fuel-listener wiring -- re-verify whether the caveat was silently dropped."})))}
+
    {:claim :claim/aiueos-memory-limit :axis :axis/safety-enforcement :layer :lint
     :fn (fn []
           (let [src (slurp* "src/aiueos/execute.cljc")]
@@ -92,6 +116,16 @@
               {:score 0.5
                :note (str "only " (count present) "/4 device-access stub names found -- either the quartet's implementation changed shape (naming?) or partially landed; re-verify by hand, this is exactly the kind of change the claim's source doc should be re-read for.")})))}
 
+   ;; companion event (2026-07-16 gap fix): confirms the device-access-stub gap is disclosed.
+   {:claim :claim/aiueos-device-access-stub :axis :axis/doc-code-drift :layer :lint
+    :fn (fn []
+          (let [readme (slurp* "README.md")
+                src (slurp* "src/aiueos/execute.cljc")]
+            (if (and (has? readme #"(?i)device-access quartet")
+                     (has? src #"(?i)device-access quartet"))
+              {:score 1.0 :note "confirmed: the device-access-quartet-is-a-stub gap is named in BOTH README.md and execute.cljc's own comments, not hidden behind either alone -- high doc-code-drift score even though functional-completeness (0.2, tracked separately) is low."}
+              {:score 0.4 :note "expected 'device-access quartet' disclosure language no longer found verbatim in one or both of README.md/execute.cljc -- re-verify by hand."})))}
+
    {:claim :claim/aiueos-deadline-cycles :axis :axis/safety-enforcement :layer :lint
     :fn (fn []
           (let [manifest (slurp* "src/aiueos/manifest.cljc")
@@ -101,7 +135,17 @@
               {:score 0.1
                :note "confirmed: manifest.cljc's due-this-cycle? docstring still has the explicit 'NOTE what this does NOT do' section, and launcher.cljc still flags deadline-cycles as NOT enforced -- functional-completeness/safety-enforcement for this specific feature is genuinely low (0.1), but doc-code-drift is high (1.0, tracked separately) because the gap is named in 2 independent source files, not just README prose."}
               {:score 0.5
-               :note "expected 'NOT enforced' language no longer found in manifest.cljc/launcher.cljc -- either deadline-cycles enforcement was implemented (great, but then the axis score above needs to flip and claim/self-caveat should be revisited) or the docstring wording changed; re-verify by hand."})))}])
+               :note "expected 'NOT enforced' language no longer found in manifest.cljc/launcher.cljc -- either deadline-cycles enforcement was implemented (great, but then the axis score above needs to flip and claim/self-caveat should be revisited) or the docstring wording changed; re-verify by hand."})))}
+
+   ;; companion event (2026-07-16 gap fix): confirms the deadline-cycles gap is disclosed.
+   {:claim :claim/aiueos-deadline-cycles :axis :axis/doc-code-drift :layer :lint
+    :fn (fn []
+          (let [manifest (slurp* "src/aiueos/manifest.cljc")
+                launcher (slurp* "src/aiueos/launcher.cljc")]
+            (if (and (has? manifest #"NOTE what this does NOT do")
+                     (has? launcher #"(?i)deadline-cycles.*NOT"))
+              {:score 1.0 :note "confirmed: the deadline-cycles-not-enforced gap is named in BOTH manifest.cljc's docstring and launcher.cljc, not hidden -- high doc-code-drift score even though safety-enforcement (0.1, tracked separately) is very low."}
+              {:score 0.3 :note "expected disclosure language no longer found in one or both files -- re-verify by hand."})))}])
 
 (defn -main []
   (binding [*print-namespace-maps* false]

@@ -1,0 +1,123 @@
+{:adr-id "2645173414"
+ :title "cloud-itonami-isic-6020 (television programming and broadcasting activities) broadcasting-operations-coordination actor"
+ :status :accepted
+ :date "2026-07-16"
+ :deciders ["Jun Kawasaki (agent-executed, standing authorization)"]
+ :related ["ADR-2607121000" "ADR-2607152500" "ADR-2607121200"]
+ :mirrors "cloud-itonami-isic-5913 (filmdistops.* module shape, film/TV distribution operations-coordination actor)"
+
+ :context
+ "ISIC Rev.5 6020 = television programming and broadcasting activities
+  (licensed TV broadcast station operator). Live registry.edn :name for
+  \"6020\" independently re-verified fresh: \"Television programming and
+  broadcasting activities\", unambiguous, no truncation. UNLIKE most fleet
+  targets, cloud-itonami/cloud-itonami-isic-6020 was NOT a fresh-scaffold
+  404 -- gh api confirmed a PRE-EXISTING repo already at :blueprint tier
+  (CODE_OF_CONDUCT.md/CONTRIBUTING.md/GOVERNANCE.md/LICENSE/README.md/
+  SECURITY.md/blueprint.edn/docs/ only, from an earlier bulk-scaffolding
+  pass, no deps.edn/src/test). This work ADDED the missing deps.edn/src/
+  test module set on top of that existing boilerplate rather than
+  re-scaffolding -- pre-existing docs kept and extended, not recreated.
+  Pre-existing blueprint.edn already declared :itonami.blueprint/governor
+  :broadcast-license-governor and :itonami.blueprint/id
+  \"cloud-itonami-6020\" (no -isic- infix, unlike most sibling business-id
+  shapes) -- both carried forward unchanged, already internally
+  consistent. TV broadcasting touches editorial-content authority and
+  emergency-alert-system decisions -- per ADR-2607152500's Wave4
+  guardrail, closed op allowlist must never include an op that directly
+  finalizes either; any 'flag concern' op always escalates, never
+  auto-commit-eligible."
+
+ :scope-exclusions
+ ["finalizing an on-air-content decision (what actually airs, when, in what form) -- hard, permanent block"
+  "finalizing an emergency-alert-broadcast decision (whether/when to trigger an Emergency Alert System transmission) -- hard, permanent block"
+  "direct transmission dispatch, license-scope approval, billing-record publication without governor approval -- not represented in the closed op allowlist at all"]
+
+ :self-trip-fix
+ "Known bug class this batch repeatedly hit: bare-noun scope-excluded-terms
+  (e.g. 'content', 'broadcast', 'emergency alert') self-match inside the
+  mock advisor's own legitimate default rationale text, self-blocking the
+  actor's happy path. Fix: scope-excluded-terms phrased as the
+  finalization/execution ACTION ('finalize the on-air content decision',
+  'authorize the emergency alert broadcast', JP equivalents), never a bare
+  noun -- critical because :flag-content-concern's entire purpose is to
+  discuss FCC-compliance/on-air-incident/emergency-alert topics using
+  exactly those bare nouns. Dedicated regression test
+  default-mock-advisor-proposals-never-self-trip-scope-exclusion in
+  governor_test.clj asserts all 4 default proposal generators, for a
+  clean registered+verified station, never trip :scope-excluded and never
+  HARD-hold."
+
+ :decision
+ "Implement cloud-itonami-isic-6020 with Store/Advisor/Governor/Phase/
+  Operation/Sim, mirroring cloud-itonami-isic-5913's filmdistops.* module
+  shape module-for-module as tvbroadcastops.* (title/title-id renamed to
+  station/station-id):
+  - Store: Store protocol + MemStore, string-keyed stations directory
+    (station-id/call-sign/name/registered?/verified?), append-only ledger
+    + broadcast-log
+  - Advisor: Advisor protocol + mock-advisor, 4 ops all :effect :propose --
+    log-broadcast-record, schedule-broadcast-operation, flag-content-concern,
+    coordinate-equipment-maintenance
+  - Governor (BroadcastLicenseGovernor, matching pre-existing blueprint.edn's
+    own declared governor name): 2 named HARD checks (station-unverified,
+    effect-not-propose) + scope-exclusion/op-not-allowed folded check
+    (finalize-on-air-content-decision / finalize-emergency-alert-broadcast-
+    decision / closed 4-op allowlist). always-escalate-ops
+    #{:flag-content-concern}, confidence-floor 0.6
+  - Phase: 0->3 rollout (phase1 = log-broadcast-record only, approval;
+    phase2 += schedule-broadcast-operation/coordinate-equipment-maintenance,
+    approval; phase3 auto-commits those 3 when clean+confident;
+    flag-content-concern never auto, any phase)
+  - Operation: real langgraph-clj StateGraph (intake->advise->govern->decide
+    ->commit|hold|request-approval), interrupt-before #{:request-approval},
+    NOT a stub -- mirrors filmdistops.operation exactly
+  - Sim: clojure -M:run demo, full happy path + always-escalate flow + all
+    HARD-hold scenarios
+  - Tests: store_contract_test, advisor_test, governor_test (incl. mandatory
+    self-trip regression), phase_test, governor_contract_test -- 40 tests /
+    119 assertions green
+  - All .cljc portable, no JVM-only interop. AGPL-3.0-or-later. Pre-existing
+    README/GOVERNANCE/CONTRIBUTING/SECURITY/CODE_OF_CONDUCT/blueprint.edn/
+    docs kept as-is except an Implementation section appended to README.md
+    and :itonami.blueprint/maturity :implemented added to blueprint.edn"
+
+ :consequences
+ {:positive
+  ["ISIC 6020 TV-broadcasting-operations-coordination genuinely implemented
+    and fully tested on top of a pre-existing blueprint-tier repo, without
+    discarding or recreating its existing docs"
+   "on-air-content-decision and emergency-alert-broadcast-decision
+    exclusions hardcoded in governor checks (scope-exclusion-violations),
+    not just README prose"
+   "self-trip bug class fixed by construction (action-phrased terms) +
+    covered by dedicated regression test, not avoided by luck"
+   "flag-content-concern always-escalate is a two-layer invariant (governor
+    always-escalate-ops + phase's permanent absence from every :auto set)"
+   "portable .cljc, zero JVM-only constructs; clojure -M:lint 0 errors / 0 warnings"]
+  :negative
+  ["real persistent store (Datomic/kotoba-server) is a follow-up; tests use
+    in-memory MemStore, matching every sibling actor's current maturity"
+   "mock-advisor is deterministic, not a real LLM call; Advisor protocol seam
+    ready for that swap but not wired in this ADR"]}
+
+ :verification
+ {:test-count 40
+  :assertion-count 119
+  :test-status "0 failures, 0 errors"
+  :lint-status "0 errors, 0 warnings"
+  :commit "000a30ab5dd939f1e25f474bf831c7914fbfa6ca"
+  :repo "https://github.com/cloud-itonami/cloud-itonami-isic-6020"
+  :demo-run "clojure -M:run end-to-end: happy-path ops auto-commit at phase 3, escalate at phase 1; flag-content-concern escalates then commits after approval; unregistered/unverified station, non-:propose effect, out-of-scope-drift all HARD-hold as designed"
+  :registry-update "kotoba-lang/industry: 6020 gained the previously-absent :maturity key explicitly (:maturity :implemented, resolved to :blueprint before only via the (:repo industry) fallback). :repo/:business-id already correct (cloud-itonami-6020 matched blueprint.edn's own :itonami.blueprint/id), left unchanged, as was :required-technologies/:optional-technologies/:operating-states -- minimal exact-block diff. Landed via Contents-API single-file PUT, first attempt, no 409 retries."
+  :registry-merge-commit "d6ff6346568d591d9e1c0397a417faa5aa668db8"
+  :registry-test-file-commit "07500719c1e4d8907355a7754e352717f843e3fc"
+  :registry-test-file-corrective-rounds 3
+  :registry-test-file-corrective-note "3 further rounds were needed purely to absorb concurrent sibling promotions racing this shared hot file (7710/7721, then 5610, then 6010/7729/7710's own detailed corroboration edit which independently arrived at and superseded this promotion's own final corrective values) -- none of those entries' own registry.edn data was touched, only their spot-check :maturity assertions and the two aggregate counts were mechanically corrected to stay truthful"
+  :registry-test-file-final-commit "67f63c6"
+  :registry-post-merge-verification "fresh clone (+ fresh ../technology sibling) of kotoba-lang/industry main at commit 67f63c6: Ran 15 tests containing 1063 assertions. 0 failures, 0 errors. clj-kondo: 0 errors, 0 warnings. No mojibake detected (valid UTF-8, zero replacement characters); 6020 and sample entries 5913/6310/3512 all intact."
+  :registry-implemented-count-before 405
+  :registry-implemented-count-after 411
+  :registry-blueprint-count-before 12
+  :registry-blueprint-count-after 6
+  :registry-count-note "411 implemented / 6 blueprint fleet-wide reflects this promotion's own +1 plus five CONCURRENT sibling promotions (7710, 7721, 5610, 6010, 7729) landed in the same fast-moving window, live-recomputed via (kotoba.industry/maturity-summary) immediately before each corrective edit, not assumed"}}

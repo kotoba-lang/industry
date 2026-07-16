@@ -422,3 +422,28 @@ conflict は残るため、review-before-merge UX は維持される。
   best-of-N）、鍵の 1Password 移設（secrets-location-map 準拠）、CACAO
   wire format 揃え、既存 kotoba-fleet（ADR-2606302000 の lease/governor）
   との Governor 統合。
+
+## Addendum (2026-07-16, same day): Phase 1.5 flip staging + Phase 3a signed fleet head
+
+実装は kotoba-fleet-vcs `cd422abcdb66`（pin は signed seq 4 で追従）。
+テスト 10 tests / 60 assertions green。
+
+- **Phase 1.5（flip の吸収期運転開始）**: `fleet reconcile [--check]` が
+  legacy 経路（gen --entry / API single-entry）の west.yml 書き込みを
+  fleet-db に attributed ledger events（`:pin/reconcile-legacy` 等）として
+  吸収。CI `.github/workflows/fleet-projection-verify.yml`（main の
+  manifest/** push で発火）が drift を検出し自動吸収 commit を積む。
+  **dogfood で即座に実 drift 8 件を検出・吸収**（他エージェントが legacy
+  経路で進めた local-manimani / network-isekai / aiueos / compiler / gpu /
+  org-w3-webgpu / render / webgl の pin — 吸収後 `--check` clean）。
+  CLAUDE.md に fleet-db 節を追加（推奨経路 = 署名付き、legacy は CI 吸収、
+  fleet-db/ledger/head の手編集禁止）。**hard flip（legacy 書き込みの拒否）
+  は未実施** — 全 agent の書き込みが署名経路に移ってから。
+- **Phase 3a（p2p の substrate）**: `fleet head [--verify]` — fleet-db
+  内容全体への自己証明 signed head（sha256 content hash + monotonic
+  sequence + parent-covering、`manifest/fleet-head.edn`）。これが
+  kotoba-lang/p2p の signed head-announce（ADR-2607072200 で E2E 収束
+  検証済み）がフリート機間で運ぶ record そのもの。CI は head の遅れを
+  warning 報告（CI は署名鍵を持たないため re-announce しない — 意図的）。
+  **P3b（未実施）**: 実 p2p 配線（複数機 seeding、GitHub の mirror 降格）、
+  kotoba-git object plane への pin chain 投影。
