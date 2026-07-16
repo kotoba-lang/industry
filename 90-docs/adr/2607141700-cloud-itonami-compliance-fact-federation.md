@@ -2553,6 +2553,50 @@ skjenkebevillinger）と同一連合内に共存していることを確認。
 現状: 国軸32件・業界団体軸33件(26業種)・自治体軸31件——96tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 97 — 国軸33件目(THA) — tick95のバンコクcapital-check再利用、民間ミラーを明示的却下)
+
+`cloud-itonami-iso3166-tha`の`statute.facts`を追加
+([commit 12a46df](https://github.com/cloud-itonami/cloud-itonami-iso3166-tha/commit/12a46df))：
+
+タイの一般法2件:
+
+- **Copyright Act B.E. 2537（1994年）** — WIPO Lex自身がホストする
+  PDF本文を直接読み確認。「This Act may be cited as the Copyright
+  Act, B.E. 2537」と明記、1994年12月9日制定、1995年3月21日施行。
+- **Personal Data Protection Act B.E. 2562（2019年）** — mdes.go.th
+  （タイ・デジタル経済社会省）の「Unofficial Translation」文書として
+  真正性を確認（マストヘッド・Government Gazette参照は判読可能）
+  したが、正確な公布日テキストはフォント崩壊で判読不能。2019年5月
+  24日という日付は複数の独立法律事務所引用ソース（Norton Rose
+  Fulbright・Tilleke & Gibbins・Digital Watch Observatory）が一致し、
+  かつ判読可能だった官報公布日（5月27日）とも整合するため裏付けと
+  して採用。
+
+**民間ミラーの明示的却下**: 民商法典（Civil and Commercial Code）を
+検索した際、faolex.fao.org自身のドメイン配下のURLが最初に見つかった
+が、実際に開くとFAO自身のコンテンツではなく**samuiforsale.com
+（不動産会社の私的サイト）からスクレイピングされたページ**で、
+制定日の記載も無かったため却下——代わりにWIPO Lexの著作権法
+citationを主要IP関連法として採用。
+
+ZAF/COL/IND/KENと同様、既存の`marketentry.facts`実装がある同一
+`deps.edn`の下に`statute.facts`を新規namespaceとして追加。新規
+topicタグ`:intellectual-property`を初導入。4 tests/9 assertions
+green（既存marketentry 24 tests/81 assertionsと合わせ計28
+tests/90 assertions green）。
+
+**capital-check**: tick95で既に検証済みのバンコク（Q1861、1782年
+以来タイ(Q869)の首都）・P36史的首都バグなしの結果を再利用。
+
+126リポジトリ・786 factを統合。jurisdiction THA queryで今回の2件が
+既存のetzhayyim/global-legislation-datoms legal-sourceと正しく
+共存していることを確認。`"statute/topic"
+"intellectual-property"`での横断queryでTHAが新規topicの唯一（初）の
+エントリとして正しく取得できることを確認。
+
+現状: 国軸33件・業界団体軸33件(26業種)・自治体軸31件——97tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
