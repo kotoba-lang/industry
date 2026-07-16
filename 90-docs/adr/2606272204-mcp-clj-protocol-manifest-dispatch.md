@@ -13,7 +13,7 @@ authoritative_for:
   - JSON-RPC メソッドディスパッチとバリデーション(-32601/-32602)の実装境界
   - ライブラリ成果物の3-org 配置(共通=com-junkawasaki / 公益=etzhayyim / 事業=gftdcojp)
 related:
-  - orgs/com-junkawasaki/mcp-clj          # 本 ADR のライブラリ
+  - orgs/kotoba-lang/org-anthropic-mcp    # 本 ADR のライブラリ（通称 mcp-clj；rename chain は末尾 addendum）
   - orgs/com-junkawasaki/langchain-clj    # LLM chain kernel(姉妹); Claude+MCP スタックで連携
   - orgs/com-junkawasaki/langgraph-clj    # graph 実行 kernel(姉妹); エージェントから本 lib を呼ぶ
   - orgs/com-junkawasaki/bpmn-clj         # 同型設計の先例(model/validate/ports/execute 分離)
@@ -101,3 +101,15 @@ from-data/to-data の round-trip(JSON-Schema の string↔keyword 変換含む)�
 tools/list が名前順ソートで返ること、tools/call で必須引数欠落 → -32602、
 fixture ITool で有効引数 → ITool result、未知メソッド → -32601、
 resources/list・prompts/list・initialize の各メソッドを確認。
+
+## Addendum — rename chain: com-junkawasaki/mcp-clj → kotoba-lang/mcp → kotoba-lang/org-anthropic-mcp（記録 2026-07-16）
+
+本ライブラリは rename chain を経て現行 `kotoba-lang/org-anthropic-mcp` に至る:
+
+  `com-junkawasaki/mcp-clj`  ──(org 移行 + 2026-07-10 naming rule で `-clj` 廃止)──▶  `kotoba-lang/mcp`  ──(spec-org 系命名へ統合)──▶  `kotoba-lang/org-anthropic-mcp`
+
+- **現行の正本 repo/path は `kotoba-lang/org-anthropic-mcp`（`orgs/kotoba-lang/org-anthropic-mcp`）。**
+  west.yml はこの名前で pin 登録する。`kotoba-lang/mcp` は GitHub rename-redirect（旧名）として残存するが正本ではない。
+- **通称 `mcp-clj` は不変。** 本 ADR の title・本文中の `mcp-clj` はライブラリ nickname としてそのまま使用（`= mcp.model/validate/json/ports/execute` の portable `.cljc` kernel）。
+- 本文 Decision や他 ADR の `related:` に残る `com-junkawasaki/mcp-clj` / `kotoba-lang/mcp` は歴史的表記であり、本 addendum が優先する。
+- 姉妹 lib（langchain-clj / langgraph-clj / bpmn-clj / torch-clj / vllm-clj / jsonlogic-clj 等）の org・rename 状態は本 ADR の対象外（`authoritative_for` の 3-org 配置ルール自体は不変）。
