@@ -3691,6 +3691,39 @@ HTTP 503（Service Unavailable）で応答、断念。代わりに2件を直接
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-17, /loop tick 126 — 国軸43件目(AUT) — オーストリアが国軸+自治体軸の2軸に到達、RIS再び503のため法律出版社ミラーで補完)
+
+`cloud-itonami-iso3166-aut`に`statute.facts`を追加・push
+([commit 8643b13](https://github.com/cloud-itonami/cloud-itonami-iso3166-aut/commit/8643b13))：
+
+tick125で検証済みの首都チェック（ウィーンは安定した首都）を
+再利用。オーストリア連邦の公式法情報システム（ris.bka.gv.at）は
+今回も複数回HTTP 503で応答、断念。
+
+- **GmbH-Gesetz**（1906年3月6日制定、RGBl. 1906/58）— 世界最古級
+  のGmbH型（有限責任会社）法の一つ。MANZ（オーストリアの著名な
+  法律専門出版社）がホストするプレビュー抜粋PDFをRead-toolの
+  保存パスfallbackで直接読み、原文の引用行"Gesetz vom 6. März
+  1906 über Gesellschaften mit beschränkter Haftung (GmbH-Gesetz
+  – GmbHG) — RGBl 1906/58"を確認。
+- **Datenschutzgesetz**（DSG）— オーストリアデータ保護庁
+  （data-protection-authority.gv.at、規制当局自身の公式政府
+  ドメイン）で原文引用"The Federal Act concerning the Protection
+  of Personal Data (Datenschutzgesetz - DSG) has entered into
+  force on 25 May 2018."を直接確認。
+
+4 tests/9 assertions green（既存24 marketentry tests/81
+assertionsと合わせ全28 tests/90 assertions green）。148リポジトリ・
+844 factを統合。`jurisdiction AUT`クエリと、`ordinance/country`
+横断query（`[?e "ordinance/country" "AUT"]`）でtick125のVienna
+自治体2件が正しくクロスリンクされることを確認——オーストリアは
+今回で国軸+自治体軸の2軸に到達したが、業界団体軸はまだ未着手で
+あり、これを正直に報告する。
+
+現状: 国軸43件・業界団体軸42件(28業種)・自治体軸41件——126 tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。オーストリアの業界団体軸の空白は今後のtickに持ち越し。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
