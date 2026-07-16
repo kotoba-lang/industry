@@ -1,0 +1,30 @@
+[{:adr/authoritative_for
+  ["（accepted 時に）west manifest 体制の後継となる fleet-db / signed-pin / agent-namespace / governed-canonicalization の設計"
+   "kotoba-fleet（仮称）の 5-plane アーキテクチャ: manifest(kotobase datoms) / identity(ed25519+CACAO) / workspace(lazy materialization+GC+checkpoint) / land-back(namespace push+Governor quorum) / sync(並列 materialize→p2p)"
+   "Radicle から移植する 3 アイデアの限定列挙（per-writer namespace / sigref FF 鎖 / canonical-ref-as-pure-function）と Radicle-the-software 不採用の境界"
+   "git を interop projection に降格し廃止しない判断、CRDT/operation-log を Phase 4 研究に留める判断"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/topic "kotoba-fleet-agent-vcs-west-successor"
+  :adr/related
+  ["adr-2607072200-kotoba-git-kotoba-rad-content-addressed-vcs"
+   "adr-2606280300-kotoba-rad-git-sovereign-repo"
+   "adr-2606271500-west-manifest-over-vcstool"
+   "adr-2607022900-west-pin-remote-verification"
+   "adr-2606302100-shallow-depth-west-hybrid-amendment"
+   "adr-2607011345-agent-worktree-west-topdir-fix"
+   "adr-2607050500-git-stash-shared-checkout-guard"
+   "adr-2607061600-kotoba-issue-ledger-shared-libs"]
+  :adr/status "accepted, phase-0-implemented"
+  :adr/id "adr-2607160005-kotoba-fleet-agent-vcs-west-successor"
+  :adr/doc_type "adr"
+  :adr/last_verified "2026-07-16"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/date "2026-07-16"
+  :adr/decision-summary
+  "{:name :kotoba-fleet, :replaces :west-manifest, :planes {:manifest {:store :kotobase-datoms, :pin {:shape :ipns-signed-head-record, :invariants [:authorized-signer :monotonic-sequence :upstream-reachable]}, :west-yml :generated-projection}, :identity {:agent :ed25519-did-key, :grants :cacao-delegation-chain-attenuated, :audit :sigref-ff-chain-parent-covering}, :workspace {:isolation :worktree-per-agent, :materialization :lazy-datalog-working-set, :gc {:interval-h 6 :max-count 25}, :checkpoint :conversation-scoped-outside-git, :best-of-n :first-class}, :land-back {:agent-writes :own-namespace-only, :canonical :governor-quorum-pure-function, :review :kotoba-issue-risk-tiered}, :sync {:bridge :github-interop-projection, :parallel true, :phase3 :p2p-signed-head-announce, :large-files :datalad-b2-unchanged}}, :radicle-transplants [:per-writer-namespace :sigref-ff-chain :canonical-ref-pure-function], :not-decided [:radicle-software-adoption :crdt-merge-now :git-abolition], :phases [:read-model :signed-pins :agent-identity-landback :content-addressed-p2p :crdt-research], :evidence {:scale {:projects 1669 :west-yml-kb 302 :footprint-gb 40}, :incidents [:pin-regression-44-repo-90852b86 :shallow-ancestry-false-positives :topdir-false-isolation :stash-pileup :hooks-not-installed], :externals {:radicle \"1.9.x, sigrefs replay CVE fixed 1.7.0\", :cursor \"2.0 worktree-per-agent + VM + checkpoints + best-of-8\", :zed \"DeltaDB waitlist 2026-06, git demoted to projection\"}}}"
+  :adr/phase-0
+  "{:repo \"kotoba-lang/kotoba-fleet-vcs\", :renamed-from :kotoba-fleet-name-collision-with-adr-2606302000, :pin \"518ca77e5db863bae6d9d6125138cb167f59ede0\", :verified {:bijection {:entries 1732 :byte-identical true}, :parallel-sync {:repos 10 :jobs-8-s 6.0 :jobs-1-s 29.0 :speedup 4.8 :head-eq-pin \"20/20\" :idempotent :noop :dirty :skip}, :tests \"4 tests / 22 assertions\"}, :registered {:repos-edn \"+1-1\" :west-yml \"+5\" :server-side-pin-verify :ok}, :incident-observed {:sha \"119cc9d77c\" :deleted 300 :restored-by \"549407d8640\" :lesson :capability-enforcement-over-hooks}}"
+  :db/id -1
+  :adr/authoritative true
+  :adr/title "ADR-2607160005: kotoba-fleet — AI agent フリートのための west 後継 VCS 設計（kotoba-git/kotoba-rad + Radicle + Cursor/Zed 知見のゼロベース統合）"}]
