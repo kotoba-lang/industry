@@ -1,0 +1,25 @@
+[{:adr/authoritative_for
+  ["generation.murakumo.cloud caller-gate (MURAKUMO_TOKEN_SECRET) の 2026-07-16 rotation と blast-radius 境界"
+   "rotation 後の caller 集合（net-babiniku Pages / network-isekai Pages の MURAKUMO_CALLER_SECRET）"
+   "caller-gate secret の恒久保管先（kagi item MURAKUMO_GENERATION_TOKEN_SECRET, compartment gftdcojp）"
+   "isekai.network ユーザー向け photo→3D 経路（/api/murakumo-generation same-origin proxy, network-isekai ADR-0057）の存在と live 検証結果"
+   "murakumo-generation.gftd.ai GPU fleet が 2026-07-16 時点で provisioned/serving である実測"
+   "murakumo.cloud site Worker の stale deploy（/api/v1/generation 未搭載）を未解決 follow-up とする境界"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/topic "murakumo-generation-caller-rotation-isekai-user-path"
+  :adr/related
+  ["adr-2607131645-murakumo-direct-voice-api"
+   "network-isekai adr-0057-user-facing-murakumo-generation-proxy"
+   "net-babiniku adr-0004 (2026-07-15 addenda)"]
+  :adr/status "accepted, implemented"
+  :adr/id "adr-2607161750-murakumo-generation-caller-rotation-isekai-user-path"
+  :adr/doc_type "adr"
+  :adr/last_verified "2026-07-16"
+  :adr/deciders ["Jun Kawasaki" "Claude"]
+  :adr/date "2026-07-16"
+  :adr/decision-summary
+  "{:rotation {:verifier \"murakumo-generation-proxy MURAKUMO_TOKEN_SECRET\", :callers [\"net-babiniku MURAKUMO_CALLER_SECRET\" \"network-isekai MURAKUMO_CALLER_SECRET\"], :untouched [\"murakumo.cloud site-worker MURAKUMO_TOKEN_SECRET\" \"MURAKUMO_GENERATION_TOKEN\" \"api.murakumo.cloud MURAKUMO_PROXY_TOKEN 系\"]}, :storage {:vault :kagi, :item \"MURAKUMO_GENERATION_TOKEN_SECRET\", :compartment \"gftdcojp\"}, :user-path {:site \"isekai.network\", :endpoint \"/api/murakumo-generation\", :mint \"mk1 60s scope=generation sub=isekai-pages\", :rate-limit \"5/h/IP D1\", :upstream \"https://generation.murakumo.cloud/api/v1/generation\"}, :verified {:job \"bf9d5475a963403081aa4f0a6c5f056a\", :duration-min 3.5, :artifact {:format :glb, :bytes 1662620, :sha256 \"bc7d4b4958412ffce1c22308480d503effb196257995bfbb802967f86e5aede9\", :license :cc0}}, :pins {:network-isekai \"a2c4764\", :kami-engine-sdk \"baa5429\"}, :open [:murakumo-cloud-site-worker-redeploy :babiniku-pages-redeploy-for-new-secret :diffusion-tts-music-murakumo-wiring :stale-shared-checkouts-cleanup]}"
+  :db/id -1
+  :adr/authoritative true
+  :adr/title "ADR-2607161750: Murakumo generation caller-gate rotation and isekai.network user-facing photo→3D path"}]
