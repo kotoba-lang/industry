@@ -1,0 +1,65 @@
+{:adr/id "2640772900"
+ :adr/title "cloud-itonami ISIC-7729 Household-Goods-Rental Operations-Coordination Actor — Blueprint Fill-In & Registry Promotion"
+ :adr/status "accepted"
+ :adr/date "2026-07-16"
+ :adr/deciders ["Jun Kawasaki"]
+ :adr/scope
+ {:repo "orgs/cloud-itonami/cloud-itonami-isic-7729"
+  :registry "orgs/kotoba-lang/industry"
+  :isic-code 7729
+  :wave 4
+  :pre-existing? true
+  :note "repo pre-existed as :blueprint-tier (blueprint.edn + docs published, no src) from an earlier bulk-scaffolding pass; this ADR fills it in rather than creating it fresh"}
+ :decision
+ {:id "cloud-itonami-isic-7729"
+  :name "Renting and leasing of other personal and household goods"
+  :isic-code "7729"
+  :business-id "cloud-itonami-7729"
+  :repo "https://github.com/cloud-itonami/cloud-itonami-isic-7729"
+  :public? true
+  :modules
+  ["hgrentalops.store"
+   "hgrentalops.advisor"
+   "hgrentalops.governor"
+   "hgrentalops.operation"
+   "hgrentalops.phase"
+   "hgrentalops.sim"]
+  :allowed-operations
+  [{:op :log-rental-record
+    :description "checkout/return/inspection-note data logging"}
+   {:op :schedule-fleet-operation
+    :description "equipment-availability/delivery scheduling proposal"}
+   {:op :flag-equipment-safety-concern
+    :description "defect/damage/electrical-hazard concern flag (always escalates)"}
+   {:op :coordinate-fleet-restock
+    :description "equipment procurement/replacement coordination"}]
+  :governor-hard-checks 3
+  :governor-check-names
+  [:asset-unverified :effect-not-propose :scope-excluded]
+  :rollout-phases 4
+  :high-stakes-ops [:flag-equipment-safety-concern]
+  :never-auto-any-phase [:flag-equipment-safety-concern]
+  :high-cost-threshold-usd 2000
+  :tests-passing 49
+  :assertions-passing 160}
+ :self-tripping-bug-fix
+ {:known-fleet-wide-pattern? true
+  :description "scope-exclusion terms phrased as bare nouns (e.g. \"safety\") can match inside the mock advisor's own legitimate default rationale text and self-block the happy path"
+  :fix "scope-excluded-terms phrased as the finalization/execution ACTION (e.g. \"finalize the equipment-safety clearance\", \"certify safe to re-rent without inspection\"), never a bare noun"
+  :regression-tests
+  ["test/hgrentalops/advisor_test.clj:default-mock-advisor-proposals-never-self-trip-scope-exclusion"
+   "test/hgrentalops/governor_test.clj:guest-facing-default-advisor-proposals-never-scope-excluded-end-to-end"
+   "test/hgrentalops/governor_test.clj:legitimate-equipment-safety-concern-is-not-scope-excluded"]}
+ :verification
+ {:tests "49 tests, 160 assertions, 0 failures, 0 errors (clojure -M:dev:test)"
+  :lint "clj-kondo: 0 errors, 0 warnings (clojure -M:lint)"
+  :demo "clojure -M:dev:run -- all scenarios completed offline"
+  :push-commit "6cd65196bbdc18b958dfdc4d0e8f60c73f1e65b4"
+  :push-base "272cec5"
+  :repo-public? true
+  :registry-entry-updated? true
+  :post-push-fresh-clone-retest? true}
+ :references
+ ["ADR-2607121000"
+  "ADR-2607152500"
+  "Skill:build-actor"]}
