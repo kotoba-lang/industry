@@ -1,0 +1,161 @@
+---
+id: adr-2607162033-kotoba-lang-wire-shared-transport-dtn-refactor
+title: "ADR-2607162033: kotoba-lang/wire — shared EDN-over-TCP framing/socket-pool primitives (Phase 2), kotoba-lang/dtn refactored onto it, and a real ClojureScript bug found in kotoba-lang/bytes"
+status: accepted
+doc_type: adr
+topic: telecom-independent-substrate-dtn-rcs-mesh-satellite
+authoritative: true
+last_verified: 2026-07-16
+authoritative_for:
+  - kotoba-lang/wire の新設と設計根拠
+  - kotoba-lang/dtn の transport 層を kotoba-lang/wire に委譲するリファクタの根拠
+  - kotoba-lang/bytes の utf8-encode cljs バグ修正の記録
+related:
+  - 90-docs/adr/2607161956-kotoba-lang-bytes-shared-primitives-extraction.md
+  - 90-docs/adr/2607162020-kotoba-lang-turn-allocation-state-machine.md
+  - orgs/kotoba-lang/wire
+  - orgs/kotoba-lang/dtn
+  - orgs/kotoba-lang/bytes
+supersedes: []
+superseded_by: []
+---
+
+# ADR-2607162033: kotoba-lang/wire — shared EDN-over-TCP framing/socket-pool primitives (Phase 2), kotoba-lang/dtn refactored onto it, and a real ClojureScript bug found in kotoba-lang/bytes
+
+**Status**: accepted
+**Date**: 2026-07-16
+**Deciders**: Jun Kawasaki
+
+## Problem
+
+Phase 1 (ADR-2607161956) extracted generic byte-vector/SHA-1 primitives
+into `kotoba-lang/bytes`. The other half of the duplication the user's
+"共有libを設計して効率化" directive named: `kotoba-lang/dtn`'s TCP transport
+(ADR-2607161817) has its own inline 4-byte-length-prefix EDN-over-TCP
+framing, its own per-connection buffer-defragmentation logic, and its own
+ad-hoc socket pool — all generic plumbing with no DTN-specific knowledge,
+built there first only because `dtn` was the first repo in this workspace
+to need real socket I/O. `kotoba-lang/org-ietf-turn`'s future relay
+listener (Phase 3b, not yet started) and `kotoba-lang/net`'s future gossip
+transport (Phase 4, not yet started) will need the same class of plumbing.
+This ADR is Phase 2: extract it once, into `kotoba-lang/wire`, and prove
+the extraction is behavior-preserving by refactoring `dtn` onto it before
+either of the other two consumers exists.
+
+## Decision
+
+### Decision 1: `kotoba-lang/wire` — a three-layer, dependency-clean split
+
+- `kotoba.wire.framing` (pure `.cljc`, on `kotoba-lang/bytes`) — length-prefix
+  framing rewritten to operate on plain byte-vectors instead of the raw Node
+  `Buffer`s `dtn`'s original inline code used, making the core stream-
+  reassembly logic (`defragment`) testable under JVM `clojure -M:test` for
+  the first time, not just exercised indirectly through nbb E2E demos.
+- `kotoba.wire.edn` (pure `.cljc`) — EDN↔frame codec, layered cleanly on top
+  of framing (framing knows nothing about EDN; EDN knows nothing about
+  sockets).
+- `kotoba.wire.tcp` (Node-only `.cljs`) — the actual `node:net` socket layer:
+  `start-server!`, `connect-or-reuse!`, `send-framed!`, `close-all!`. This
+  namespace is deliberately DTN-agnostic (no bundles, no E.164, no
+  `:dtn/*` anything) specifically so `turn`'s and `net`'s future I/O phases
+  can depend on it too, not just `dtn`.
+
+### Decision 2: the refactor is verified behavior-preserving by re-running `dtn`'s existing demo unchanged, not by re-deriving new test cases
+
+`kotoba-lang/dtn`'s `src/kotoba/dtn/transport/tcp.cljs` now delegates all
+framing/socket-pool mechanics to `kotoba.wire.tcp`; every DTN-specific
+behavior (`start-node!`'s full option set, `send-message!`, `retry-store!`,
+`route-and-send!`, the inbound pipeline's destination-match/relay/auth/
+replay/store-fallback logic) is untouched. The correctness bar was: the
+SAME 7-scenario E2E demo (ADR-2607161743 through ADR-2607161951), unmodified,
+must still print `RESULT: 7/7 scenarios passed` — and it does, independently
+re-run by the orchestrating session from a completely fresh clean-room
+clone of all six repos (`dtn`, `wire`, `bytes`, `phone`, `html`, `css`),
+not merely re-run in the same working directory the refactor was written in.
+
+### Decision 3: a real ClojureScript-only bug in `kotoba-lang/bytes` was found and fixed as a consequence of this refactor, not deferred
+
+`kotoba.bytes/utf8-encode` silently produced all-zero bytes under
+ClojureScript: `(int (nth s i))` coerces correctly on the JVM (`Character`
+→ codepoint) but returns `0` for a ClojureScript string index. This had
+been latent since Phase 1's extraction — `kotoba-lang/bytes`'s own test
+suite only runs under JVM `clojure -M:test`, so a cljs-specific bug in a
+`.cljc` file had no test surface to catch it there. It surfaced only once
+`kotoba.wire.tcp` (genuinely Node/cljs-only) started calling `utf8-encode`
+for real EDN payload encoding and bytes stopped round-tripping correctly.
+Fixed with a minimal `#?(:clj .charAt :cljs .charCodeAt)` reader-conditional
+accessor; independently re-verified by the orchestrating session directly
+(`nbb --classpath src -e '(require [kotoba.bytes :as b]) (b/utf8-encode "hello")'`
+→ `[104 101 108 108 111]`, the correct ASCII codepoints, not zeros).
+`kotoba-lang/bytes`'s own JVM tests and lint remained green throughout,
+since the bug was invisible to them — worth naming explicitly as a gap in
+that repo's own test coverage (a `.cljc` library with zero cljs-side test
+execution can silently ship a cljs-only defect), not silently left
+unremarked now that it's been found.
+
+### Decision 4: `kotoba.wire.tcp` stays TCP-specific; UDP (needed for Phase 3b's TURN listener) is explicitly not addressed here
+
+TURN relay traffic is conventionally UDP-based (RFC 8656's listener, not
+yet built — Phase 3a/ADR-2607162020 built only the pure allocation state
+machine, zero socket I/O of any transport). `kotoba-lang/wire` as built in
+this ADR does not attempt to abstract over both TCP and UDP; that
+generalization, if it turns out to be warranted once Phase 3b's actual
+listener work begins, is a future decision informed by what that work
+actually needs — not speculatively designed in now.
+
+## Verification
+
+- `kotoba-lang/wire`: `clojure -M:test` → 12 tests / 35 assertions, 0 failures. `clojure -M:lint` → 0/0. Framing defragmentation coverage: empty input, sub-length-prefix partial input, a frame split across two AND many (byte-by-byte) `defragment` calls, multiple complete frames arriving in one call, zero-length-payload frames. Pushed to `github.com/kotoba-lang/wire` (public), commit `c26c38b3cdb09732e7061b8cfcaf83093db8d40d`.
+- `kotoba-lang/bytes`: bugfix pushed, commit `f1d07eb169176da3f005d3de9f0d7666f91c733d`. `clojure -M:test` → still 2 tests / 10 assertions, 0 failures. `clojure -M:lint` → 0/0. `utf8-encode` correctness independently re-verified directly under nbb by the orchestrating session (see Decision 3).
+- `kotoba-lang/dtn`: `clojure -M:test` → still 30 tests / 147 assertions, 0 failures (unaffected, as expected — the refactor only touches the `.cljs`-only transport file). `clojure -M:lint` → 0/0. Full 7-scenario E2E demo → `RESULT: 7/7 scenarios passed`, exit 0, independently re-run from a fresh clean-room clone of all six repos by the orchestrating session — identical to the pre-refactor baseline. Pushed, commit `b55090713aafaeae826db340bc463f3bfc3247fd`.
+- `manifest/repos.edn`/`manifest/west.yml`: `wire` registered (new `:extra-projects` entry), `dtn`/`bytes` pins advanced, all via `--entry wire,dtn,bytes` (minimal diff), `verify-west-pins: 3 件の pin 変更をすべて検証 OK`. Landed via an isolated sibling-path worktree + GitHub API server-side merge, matching every prior ADR in this series.
+
+## Consequences
+
+- `kotoba-lang` now has a DTN-agnostic shared transport-plumbing library;
+  the dependency-efficiency goal is demonstrated twice now (once by
+  `kotoba-lang/bytes` gaining a second consumer in Phase 3a's
+  `channeldata.cljc`, now by `kotoba-lang/wire` existing at all as a
+  DTN-independent extraction ready for `turn`/`net` to depend on later).
+- A real, previously-invisible ClojureScript bug in a shared foundational
+  library was found and fixed as a direct benefit of building a second real
+  consumer of that library — concrete evidence for why extracting shared
+  code and then actually using it from more than one place surfaces defects
+  a single consumer's test suite alone would not.
+- `kotoba-lang/bytes`'s own test suite still runs JVM-only; a cljs-side test
+  execution gap remains (Decision 3) — this ADR fixed the one bug it found
+  this way, it did not add cljs test infrastructure to close the general gap
+  that let it hide. That remains open, named explicitly rather than assumed
+  closed.
+- `kotoba-lang/wire` is TCP-only; Phase 3b's actual TURN UDP listener will
+  need to either extend `wire` or introduce its own UDP layer — an open
+  design question deliberately left open per Decision 4, not pre-decided.
+
+## Alternatives considered
+
+- **Leaving `dtn`'s inline framing/socket-pool code as-is and only
+  documenting the duplication as a known inefficiency.** Rejected: this is
+  precisely the "依存効率化" the user's directive asked for; documenting
+  duplication instead of removing it when a concrete second/third consumer
+  (`turn`, `net`) was already the stated motivation would not have honored
+  that directive.
+- **Verifying the refactor by writing NEW test scenarios for `wire`-backed
+  behavior instead of re-running the existing 7-scenario demo unchanged.**
+  Rejected: re-running the SAME demo unmodified is the stronger proof of
+  "this refactor changed nothing observable" — new tests would prove the
+  new code works, not that the old behavior survived the swap.
+- **Deferring the `utf8-encode` fix to a separate, later ADR** since it was
+  discovered incidentally rather than being the task's stated goal.
+  Rejected: it was a real, currently-shipping defect in a shared dependency
+  actively used by `wire`/`dtn`'s real transport; fixing it in the same
+  change that surfaced it is the coherent unit of work, matching how
+  ADR-2607161922 fixed the destination-mismatch bug it found while adding
+  relay routing rather than splitting that into two changes.
+
+## References
+
+- `90-docs/adr/2607161956-kotoba-lang-bytes-shared-primitives-extraction.md`
+- `90-docs/adr/2607162020-kotoba-lang-turn-allocation-state-machine.md`
+- `orgs/kotoba-lang/wire/README.md` — https://github.com/kotoba-lang/wire
+- `orgs/kotoba-lang/dtn/README.md` — https://github.com/kotoba-lang/dtn
+- `orgs/kotoba-lang/bytes/src/kotoba/bytes.cljc`
