@@ -3539,6 +3539,44 @@ FSC/CSC固有のWikidata Q-idは見つからず（tick108のBAPと同型の
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-17, /loop tick 122 — 自治体軸40件目(Kuala Lumpur, MYS) — マレーシア初参入、安定した二都首都制を正直に記録)
+
+`cloud-itonami-municipality-mys-kuala-lumpur`を新規GitHubリポジトリ
+として scaffold・push
+([commit b8f049e](https://github.com/cloud-itonami/cloud-itonami-municipality-mys-kuala-lumpur/commit/b8f049e))：
+
+マレーシアの首都クアラルンプール——3軸いずれもマレーシア初参入、
+ASEAN地域では5件目（バンコク・ハノイ・ジャカルタ・マニラに続く）。
+
+マレーシアはエジプト/インドネシアのような未解決の遷都問題とは
+異なり、**安定して定着した二都首都制**を採用: クアラルンプールが
+連邦憲法第154条に基づく国家/王室の首都（国王・議会の所在地）で
+あり続ける一方、プトラジャヤは1999年/2003年以来行政・司法の首都
+として分離——20年以上安定しており、Wikidata P36も正しく
+クアラルンプールを示す。
+
+2件とも、マレーシア法律改訂委員（Commissioner of Law Revision,
+Malaysia）が発行する公式"Laws of Malaysia"改訂版テキストを
+simplymalaysia.wordpress.comでホストされたPDFから、Read-toolの
+保存パスfallbackで直接読み確認:
+
+- **Federal Capital Act 1960**（Act 190）— 1961年4月1日施行、
+  クアラルンプールを連邦首都に指定した原法。
+- **City of Kuala Lumpur Act 1971**（Act 59）— 1972年2月1日
+  施行、市への昇格とDewan Bandaraya Kuala Lumpur（DBKL）への
+  改称を規定。dbkl.gov.my自身の公式"Legislation List"ページで
+  タイトル/法番号を先に確認した上で、一次資料で正確な日付を
+  確認。
+
+4 tests/11 assertions green。145リポジトリ・836 factを統合。
+`municipality kuala-lumpur`クエリで2件とも正しく取得、
+タイトル/番号の横断query（`[?e "ordinance/municipality"
+"kuala-lumpur"]`）でも一致確認。
+
+現状: 国軸41件・業界団体軸41件(28業種)・自治体軸40件——122 tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
