@@ -1,0 +1,88 @@
+{:adr/id "2706004782"
+ :adr/title "cloud-itonami ISIC 4782 stall/market textile, clothing and footwear retail coverage"
+ :adr/status :accepted
+ :adr/date "2026-07-16"
+ :adr/wave 2
+ :adr/wave-ref "ADR-2607121000"
+
+ :adr/context
+ {:registry-entry {:id "4782"
+                    :name-before-truncated "Retail sale via stalls and markets of textiles, clothing an..."
+                    :name-after "Retail sale via stalls and markets of textiles, clothing and footwear"
+                    :maturity-before :spec
+                    :maturity-after :implemented
+                    :repo-before "https://github.com/gftdcojp/cloud-itonami-G4782"
+                    :repo-after "https://github.com/cloud-itonami/cloud-itonami-isic-4782"
+                    :business-id-before "cloud-itonami-G4782"
+                    :business-id-after "cloud-itonami-isic-4782"}
+  :fresh-scaffold? true
+  :pre-existing-repo-checks
+  [{:repo "gftdcojp/cloud-itonami-G4782" :status 404}
+   {:repo "cloud-itonami/cloud-itonami-isic-4782" :status 404 :note "checked before any work began"}]
+  :truncation-bug {:known-issue? true :rate-estimate "~10% pre-existing seed-data bug"
+                    :precedent-adrs ["ADR-2695004753" "ADR-2700004771"]}
+  :group-entry-untouched {:id "478" :name "Retail sale via stalls and markets"}
+  :distinct-from [{:id "4771" :reason "specialized-store fixed storefront format, not a stall/market pitch"}
+                   {:id "4781" :reason "same stall/market channel, different product category (food/beverages/tobacco)"}]}
+
+ :adr/decision
+ {:repo "cloud-itonami/cloud-itonami-isic-4782"
+  :mirrors "cloud-itonami/cloud-itonami-isic-4771"
+  :namespace "stallops"
+  :advisor "StallMarketAdvisor"
+  :governor "StallMarketGovernor"
+  :governor-keyword :stall-market-governor
+  :allowed-ops [:log-sales-record :schedule-stall-operation
+                :coordinate-supply-order :flag-quality-concern]
+  :effect-invariant :propose
+  :hard-checks [:stall-unverified :vendor-unverified :effect-not-propose
+                :scope-exclusion-folds-op-not-allowed]
+  :scope-exclusion-covers [:quality-dispute-resolution-finalization
+                            :counterfeit-authenticity-determination-finalization]
+  :escalate-always [:flag-quality-concern]
+  :escalate-threshold {:op :coordinate-supply-order :estimated-cost-usd 500.0}
+  :self-trip-regression-test "stallops.governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion"
+  :phases {0 :read-only 1 :assisted-logging 2 :assisted-coordination 3 :supervised-auto}
+  :modules ["deps.edn" "blueprint.edn" "LICENSE" "README.md" "GOVERNANCE.md"
+            "CODE_OF_CONDUCT.md" "CONTRIBUTING.md" "SECURITY.md"
+            "docs/business-model.md" "docs/operator-guide.md"
+            "src/stallops/store.cljc" "src/stallops/advisor.cljc"
+            "src/stallops/governor.cljc" "src/stallops/phase.cljc"
+            "src/stallops/operation.cljc" "src/stallops/sim.cljc"
+            "test/stallops/advisor_test.clj" "test/stallops/governor_test.clj"
+            "test/stallops/governor_contract_test.clj" "test/stallops/phase_test.clj"
+            "test/stallops/store_contract_test.clj"]
+  :license "AGPL-3.0-or-later"
+  :portable-cljc? true
+  :jvm-only-interop? false}
+
+ :adr/verification
+ {:commit-sha "2d7d9a812eb2469190832f3c483244aaec86207a"
+  :branch "main"
+  :test-command "clojure -M:test"
+  :test-result {:tests 58 :assertions 170 :failures 0 :errors 0}
+  :re-verified-against-fresh-clone? true
+  :lint-command "clojure -M:lint"
+  :lint-result {:errors 0 :warnings 0}
+  :demo-command "clojure -M:run"
+  :demo-covers [:phase-1-approval-gated-commit :phase-3-auto-commit
+                :high-cost-supply-order-escalation :quality-concern-escalation
+                :unregistered-stall-hard-hold :unverified-stall-hard-hold
+                :unverified-vendor-hard-hold :non-propose-effect-hard-hold
+                :scope-excluded-content-hard-hold]}
+
+ :adr/consequences
+ {:operator-benefit "auditable forkable operations-coordination platform, no closed back-office SaaS lock-in"
+  :structural-guarantee "actor cannot finalize refund/replacement/chargeback/vendor-registration-revocation or a counterfeit-authenticity determination on its own initiative"
+  :maturity-summary-delta {:implemented "+1"}
+  :extension-pattern "add new op to closed allowlist with its own HARD checks + tests, same independent-governor-reverifies-against-actor-own-records pattern"}
+
+ :adr/references
+ {:repo-url "https://github.com/cloud-itonami/cloud-itonami-isic-4782"
+  :reference-mirror-url "https://github.com/cloud-itonami/cloud-itonami-isic-4771"
+  :wave-plan-adr "2607121000"
+  :truncation-precedent-adrs ["2695004753" "2700004771"]
+  :stall-market-precedent-adr "2700004781"
+  :registry-file "resources/kotoba/industry/registry.edn"
+  :registry-repo "kotoba-lang/industry"
+  :registry-test-file "test/kotoba/industry_test.clj"}}
