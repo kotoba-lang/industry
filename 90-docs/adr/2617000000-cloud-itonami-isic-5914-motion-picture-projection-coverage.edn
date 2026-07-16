@@ -1,0 +1,60 @@
+[{:adr/id 2617000000
+  :adr/title "cloud-itonami-isic-5914 — Motion Picture Projection Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-5914]
+  :adr/references [2607152500 2607121000 2607152700]
+
+  ;; Wave 4 actor (human-services): cinema/theater exhibition operations
+  ;; coordination-only (showtime/attendance/print-quality logging, showtime/
+  ;; screen-allocation scheduling proposals, DCP/print delivery coordination,
+  ;; patron-safety-concern flagging).
+
+  :actor/id :cloud-itonami-isic-5914
+  :actor/name "Motion Picture Projection Operations Coordinator"
+  :actor/isic-rev4 "5914"
+  :actor/domain :services/motion-picture-projection
+  :actor/wave 4
+  :actor/coordination? true
+  :actor/robotics? false
+
+  :actor/proposal-ops [:log-screening-record :schedule-screening-operation
+                       :coordinate-print-delivery :flag-patron-safety-concern]
+  :actor/always-escalate-ops [:flag-patron-safety-concern]
+
+  :actor/hard-checks [:screening-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["override the evacuation order" "cancel the evacuation order"
+                                "keep the theater open during the evacuation" "finalize the evacuation override"
+                                "避難命令を無効にする判断" "避難を中止する決定"
+                                "override the age-rating admission check" "bypass the age verification requirement"
+                                "admit despite the age rating restriction" "年齢確認を無効にする判断"
+                                "directly control the projector" "actuate the projection equipment"
+                                "apply the kdm decryption key" "映写機を直接操作する"
+                                "silence the fire alarm system" "override the sprinkler system"
+                                "disable the fire suppression system" "火災報知器を無効にする操作"]
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-screening-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-screening-record :schedule-screening-operation
+                                               :coordinate-print-delivery}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-screening-record :schedule-screening-operation
+                                         :coordinate-print-delivery :flag-patron-safety-concern}
+      :auto #{:log-screening-record :schedule-screening-operation :coordinate-print-delivery}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 42 :assertions 125 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration :store-contract
+                   :self-trip-regression]
+  :test/simulator :cinemaops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-5914"
+  :registry/business-id "cloud-itonami-isic-5914"
+  :registry/required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
