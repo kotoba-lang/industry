@@ -2617,7 +2617,13 @@
       ;; edit only adds the missing dedicated testing block for 9820
       ;; itself, re-confirmed against a freshly re-fetched origin/main
       ;; tip immediately before this PUT, not assumed.
-      (is (= 392 (:implemented m))))))
+      ;; 392 -> 393: concurrent fleet drift -- a further sibling
+      ;; promotion landed in registry.edn between this promotion's own
+      ;; test-file PUT and this fix, re-confirmed live via a fresh
+      ;; `git clone --depth 1` of origin/main plus
+      ;; `(kotoba.industry/maturity-summary)` recompute (:spec 233 -> 232,
+      ;; :implemented 392 -> 393), not assumed.
+      (is (= 393 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
