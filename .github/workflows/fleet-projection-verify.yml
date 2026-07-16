@@ -48,6 +48,28 @@ jobs:
           git add manifest/fleet-db.edn manifest/fleet-db.ledger.edn
           git commit -m "chore(fleet): reconcile legacy west.yml writes into fleet-db (ADR-2607160005 P1.5)"
           git push origin HEAD:main
+      - name: verify pins reachable (strict for private with org-read token)
+        if: always()
+        env:
+          # A (daily-driver): FLEET_PIN_TOKEN is an org-read PAT so private
+          # cross-org children (jk-luxury, gftdcojp private, com-junkawasaki)
+          # verify STRICTLY. Without it, github.token can't see them and the
+          # CLI fail-opens with WARN (west's documented convention). Provision
+          # the secret as an owner action; until then private pins are WARN.
+          GH_TOKEN: ${{ secrets.FLEET_PIN_TOKEN || github.token }}
+        run: |
+          # changed pins vs the previous commit's west.yml
+          git show HEAD^:manifest/west.yml > /tmp/prev.yml 2>/dev/null || : > /tmp/prev.yml
+          CHANGED=$(diff <(grep -A1 '^    - name:' /tmp/prev.yml) \
+                         <(grep -A1 '^    - name:' manifest/west.yml) \
+                    | grep 'name:' | sed 's/.*name: //' | sort -u | paste -sd, -)
+          if [ -n "$CHANGED" ]; then
+            nbb --classpath /tmp/fleet/src /tmp/fleet/bin/fleet.cljs verify-pins \
+              --db manifest/fleet-db.edn --repos "$CHANGED" \
+              || echo "::error::a changed pin is CONFIRMED unreachable from its default branch"
+          else
+            echo "no pin changes to verify"
+          fi
       - name: verify signed fleet head (report-only)
         if: always()
         run: |
