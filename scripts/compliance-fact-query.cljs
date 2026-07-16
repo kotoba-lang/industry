@@ -310,7 +310,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-municipality-pol-warsaw/data/datascript-tx.edn"}
    {:label "cloud-itonami-iso3166-ind statute.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-iso3166-ind/schema/statute.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-iso3166-ind/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-ind/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-ken-nairobi ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-ken-nairobi/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-ken-nairobi/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 

@@ -2368,6 +2368,51 @@ Kanoon）と正しく共存していることを確認。`"statute/topic"
 現状: 国軸31件・業界団体軸31件(25業種)・自治体軸29件——91tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 92 — 自治体軸30件目(Nairobi, KEN) — サブサハラアフリカ初、矛盾ソース明示的却下)
+
+`cloud-itonami-municipality-ken-nairobi`を新規GitHubリポジトリとして
+scaffold・push
+([commit e90b671](https://github.com/cloud-itonami/cloud-itonami-municipality-ken-nairobi/commit/e90b671))：
+
+自治体軸で南アフリカ・ケープタウンに次ぐ2件目、サブサハラアフリカ
+初のエントリ。
+
+- **nairobi.go.ke** — 試した全URLでドメイン全体のTLS証明書エラー
+  （`unable to verify the first certificate`）。本セッション序盤の
+  チリ`transparencia.munistgo.cl`・ボリビア
+  `economiayfinanzas.gob.bo`と同じ失敗パターンのため断念。
+- **kenyalaw.org**（ケニア国家法令報告機関）— サイト全体でHTTP
+  403。加えてFinance Act 2013の**メタデータ自体がミラー間で矛盾**
+  （あるソースは「Act No. 2 of 2013」9月citation、別ソース
+  （new.kenyalaw.org自身のAkoma Ntosoページ）は「Act No. 1b of
+  2013」1月citation、さらに別の引用は2014年3月施行日を主張）——
+  どれか一つを恣意的に選ばず、その年のActを丸ごと不採用とし、代わりに
+  クリーンに確認できたFinance Act 2023を採用。**本セッション初めて、
+  取得失敗ではなくミラー間メタデータ矛盾を理由にソースを明示的却下**
+  したケース。
+
+最終的に2つの相互裏付けソースから直接確認:
+
+- **Nairobi City County Solid Waste Management Act, 2015**（No. 5 of
+  2015）— ecolex.org（FAO/UNEP/IUCN共同運営の国際環境法データベース）
+  でタイトル・番号・Kenya Gazette Supplement公布日（2015年10月22日）
+  を直接確認。
+- **The Nairobi City County Finance Act, 2023**（No. 4 of 2023）—
+  nairobiassembly.go.ke（nairobi.go.keとは別ドメイン）自身のKenya
+  Gazette Supplement表紙・本文を目視確認、「Date of Assent: 13th
+  October, 2023」を直接確認。
+
+4 tests/11 assertions green。121リポジトリ・776 factを統合。
+`"ordinance/topic" "waste-management"`での横断queryで
+`[copenhagen quito nairobi]`が正しく取得できることを確認。
+
+**capital-check**: ナイロビ（Q3870）は1907年（モンバサから遷都）以来、
+1963年の独立を経て現在まで一貫してケニア（Q114）の首都であり、史的
+首都バグの影響なしを確認。
+
+現状: 国軸31件・業界団体軸31件(25業種)・自治体軸30件——92tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
