@@ -1,0 +1,25 @@
+# lefthook — superproject local git hooks.
+#
+# pre-push tree-collapse guard (ADR-2607151900, owner decision 2026-07-16):
+# reject any push whose commit's ROOT TREE has dropped a required top-level
+# path (manifest / orgs / 70-tools / scripts / 90-docs / CLAUDE.md / deps.edn).
+# This catches the sparse-worktree tree-collapse that repeatedly wiped main
+# down to `90-docs` only. See scripts/pre-push-tree-guard.cljs for the full
+# rationale and mechanism.
+#
+# ACTIVATE (once per clone — hooks are not auto-wired by `git clone`):
+#   lefthook install
+# This clone's worktrees share `.git/hooks` (core.hooksPath), so a single
+# install covers every worktree here. Other clones / other agents' machines
+# are NOT covered by this local hook — that needs the server-side layer
+# (CI + branch protection), deliberately out of scope per the A-only decision.
+#
+# BYPASS a single push (emergency only, be honest about why):
+#   LEFTHOOK=0 git push …        # or:  git push --no-verify
+
+pre-push:
+  parallel: false
+  commands:
+    tree-collapse-guard:
+      # git feeds ref updates to the hook on stdin; nbb reads them.
+      runner: nbb {root}/scripts/pre-push-tree-guard.cljs
