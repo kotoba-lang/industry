@@ -136,3 +136,38 @@ fleet behind `murakumo-generation.gftd.ai` is provisioned and serving.
   and mint capabilities from the kagi-stored caller secret — the murakumo.cloud
   site route verifies with the *chat* gate secret, whose value is unretrievable,
   so tokens for it cannot currently be minted at all.
+
+## 2026-07-16 addendum 3 — shared-checkout retirement (git-cleanup-conflict pass)
+
+Ran the cleanup runbook over the four session-relevant shared checkouts. All WIP
+was preserved before anything else: each checkout's full dirty+untracked state
+was snapshotted **non-invasively** (temporary GIT_INDEX_FILE; working trees,
+indices and branches untouched) to a pushed branch `wip-snapshot-260716` —
+network-isekai `7f535b1a` (parent 8c4785a), net-babiniku `6bf84b66` (parent
+fbb100f; includes ~88 MB of src-tauri/target build artifacts, rescue-branch
+only), ai-gftd-apex `296590ec` (parent 1c5c467), cloud-murakumo `49eaf32e`
+(parent 4ed0af4).
+
+- **net-babiniku generation-stack WIP LANDED** (closes the addendum-2 trap):
+  clean branch from origin/main + 3-way apply of the real WIP (231 files;
+  src-tauri/target excluded and now gitignored), one generated-file conflict
+  (public/index.html) regenerated via `npm run site`, dance files superseded by
+  the concurrently-landed ReAct kaizen round (ADR-0009) resolved to main's side.
+  Build + resource-guard/voice/reactions/character-generation suites green
+  (resource-guard's failure out-of-tree is positional: the repo-local guard
+  imports the superproject guard by relative path). Merged as PR #170; production
+  redeployed from tracked main `fc8addb`; west pin advanced `4804151` →
+  `fc8addb`. "Redeploy babiniku from main" is now safe.
+- **network-isekai stash retired**: `wip-broadcast-stage-preserve` (WebRTC stage
+  broadcast prototype) was unlanded → archived to
+  `.git/stash-archive-260716/2299bc40….patch` and rescued to pushed branch
+  `stash-rescue-260716-broadcast` (merge is owner's call; note `.-pc`/`.-stream`
+  field access on a CLJS map likely needs keyword access), then dropped. The
+  divergent modeler line remains preserved remotely on `agent/deps-host-fix` /
+  `agent/deps-host-surface`; the shared checkout still sits on it with WIP —
+  left untouched for its owner (snapshot branch covers loss risk).
+- **ai-gftd-apex / cloud-murakumo**: WIP snapshot-preserved only; working trees
+  left for their owners (cloud-murakumo's generation/LoRA work and apex's
+  generation client are active series).
+- **superproject stash left intact**: `concurrent-wip-repo-reality-verify-…`
+  (created 18:01 today by a concurrent session — its owner's to retire).
