@@ -3041,6 +3041,53 @@ bap.org.ph自身のaboutus.htmlページから2件を直接確認:
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-16, /loop tick 109 — 国軸37件目(PHL) — フィリピンが3tick窓で3軸完成、4カ国目)
+
+`cloud-itonami-iso3166-phl`の`statute.facts`を追加
+([commit 5929d5c](https://github.com/cloud-itonami/cloud-itonami-iso3166-phl/commit/5929d5c))：
+
+フィリピンの一般法2件、いずれもlawphil.net（tick107のマニラRA
+409でも使用した確立された法律データベース）で確認:
+
+- **Republic Act No. 11232**（フィリピン改正会社法）— タイトル・
+  番号はページ自身で確認。privacy.gov.phが403で直接確認できな
+  かったため、2019年2月20日の署名日は複数の独立ソース（ADB・Cruz
+  Marcelo・AsiaLaw・IFLR・Official GazetteのURL埋め込み日付パター
+  ン）が矛盾なく一致することで裏付け。
+- **Republic Act No. 10173**（2012年データプライバシー法）—
+  タイトル・番号・2012年8月15日の承認日すべてlawphil.netページ
+  自身で直接確認。
+
+**ID規約の自己訂正**: 当初statute IDを`phl-ra-11232-...`とハイフン
+区切りで書いたが、tick途中で全ての姉妹リポジトリが
+`idn.uu-40-2007-...`のようにドット区切りを使っていることに気づき、
+commit前に`src/statute/facts.cljc`・`data/datascript-tx.edn`双方を
+修正——国軸全体でID規約の一貫性を維持。
+
+ZAF/COL/IND/KEN/THA/ARE/VNM/IDNと同様、既存の`marketentry.facts`
+実装がある同一`deps.edn`の下に`statute.facts`を新規namespaceとして
+追加。4 tests/9 assertions green（既存marketentry 24 tests/81
+assertionsと合わせ計28 tests/90 assertions green）。
+
+**3軸完成の節目**: 本tickによりフィリピンが国・自治体・業界団体の
+3軸すべてを**3tickの窓**（自治体: tick107・団体: tick108・
+国: 本tick）**で完成**——UAE（tick100）・ベトナム（tick103）・
+インドネシア（tick106）に次ぐ**4カ国目**の3軸完全達成。
+
+**capital-check**: tick107で既に検証済みの「マニラは1948-1976年の
+ケソン市一時首都期間を経て1976年大統領令で首都地位回復」という
+結果を再利用。
+
+138リポジトリ・810 factを統合。jurisdiction PHL queryで今回の2件が
+既存legal-sourceと正しく共存していることを確認。country="PHL"での
+3スキーマ横断query（statute.facts / ordinance.facts /
+association-rule.facts）もすべて実在の正しい結果を返し、真の3軸
+連合カバレッジを確認。
+
+現状: 国軸37件・業界団体軸37件(27業種)・自治体軸35件——109tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
