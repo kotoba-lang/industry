@@ -3070,7 +3070,17 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; re-fetched origin/main registry.edn immediately before this
       ;; test-file edit, not assumed: {:total 649 :spec 214 :blueprint 0
       ;; :implemented 435}.
-      (is (= 435 (:implemented m))))))
+      ;; 435 -> 436: this promotion's own cloud-itonami-isic-4781
+      ;; (Retail sale via stalls and markets of food, beverages and
+      ;; tobacco products, :spec -> :implemented, +1; :name was also
+      ;; de-truncated from a literal "..."-truncated pre-existing
+      ;; seed-data bug as part of the same exact-block edit) --
+      ;; live-recomputed via `(kotoba.industry/maturity-summary)`
+      ;; against a freshly re-fetched origin/main registry.edn
+      ;; (via git-trees/blobs API) immediately before this test-file
+      ;; edit, not assumed: {:total 649 :spec 213 :blueprint 0
+      ;; :implemented 436}.
+      (is (= 436 (:implemented m))))))
 
 (deftest cloud-itonami-isic-4751-is-implemented
   (testing "cloud-itonami-isic-4751 (Retail sale of textiles in
@@ -3911,3 +3921,96 @@ clone; superproject ADR-2628000000) is also :implemented"
            (:repo (industry/get-industry "4759"))))
     (is (= "cloud-itonami-isic-4759"
            (:business-id (industry/get-industry "4759"))))))
+
+
+(deftest cloud-itonami-isic-4781-is-implemented
+  (testing "cloud-itonami-isic-4781 (Retail sale via stalls and markets
+  of food, beverages and tobacco products -- fresh scaffold, no prior
+  repository at either the stale gftdcojp/cloud-itonami-G4781
+  placeholder or the real cloud-itonami org target [gh api 404
+  confirmed for both before any work began]; identity ({:id \"4781\"
+  ...}) independently verified against a fresh clone before any work
+  began, per this fleet's ID/name-mismatch caution -- the live
+  registry :name was truncated with a literal \"...\" (a known
+  pre-existing seed-data bug affecting roughly 10% of entries),
+  de-truncated to the full ISIC class name as part of this exact-block
+  edit; a separate, coarser-granularity {:id \"478\" ...} 3-digit group
+  entry left untouched; Wave 2 (coordination/logistics/trade,
+  ADR-2607121000) target; MarketStallRetailAdvisor ⊣
+  MarketStallRetailGovernor mobile/temporary market-stall and
+  street-market food/beverage/tobacco retail OPERATIONS COORDINATION
+  actor (marketstallops.* namespace) mirroring cloud-itonami-isic-4722's
+  [Retail sale of beverages in specialized stores] verified module
+  shape module-for-module (marketstallops.* in place of
+  beverageretailops.*, stall/market-permit registration in place of
+  liquor-license registration, schedule-stall-operation in place of
+  schedule-staffing-operation); closed four-op allowlist, all :effect
+  :propose (:log-sales-record/:schedule-stall-operation/
+  :coordinate-supply-order/:flag-compliance-concern); THREE HARD
+  governor checks, all permanent and un-overridable by any human
+  approval -- stall-unverified (target stall's vendor/business
+  registration AND stall/market food-safety-and-tobacco-retail permit
+  must exist AND be independently :registered?/:verified? in the store
+  before any proposal for it may commit or escalate, re-derived from
+  the stall's own store record every time, never from proposal
+  self-report), effect-not-propose, and scope-exclusion (folds in
+  op-not-allowed) that permanently blocks any proposal touching
+  finalization of a food-safety clearance, finalization of an
+  age-verification override (tobacco sales), direct point-of-sale
+  age-verification/ID hardware actuation, or market/health/
+  tobacco-licensing-authority enforcement -- this class combines BOTH
+  the food-safety guardrail dimension (from sibling food-retail/
+  food-service actors) and the age-verification guardrail dimension
+  (from sibling beverage/tobacco-retail actors) in one actor, since a
+  market stall may sell all three of food, beverages, and tobacco. A
+  STRUCTURED-FIELD companion check (structured-scope-violations) also
+  inspects the proposal's :value for explicit finalization-intent
+  booleans (:finalizes-food-safety-clearance?/
+  :finalizes-age-verification-override?/etc), belt-and-suspenders
+  alongside the free-text scan; scope-excluded terms are deliberately
+  phrased as the finalization/execution ACTION (\"finalize the food
+  safety clearance\", \"finalize the age verification\", \"control the id
+  scanner\"), never a bare noun (bare \"food\" or bare \"verification\") --
+  avoiding this fleet's own known self-tripping bug class, where a
+  bare-noun exclusion term would accidentally match this same
+  namespace's own default mock-advisor disclaimer text for a
+  legitimate, allowed proposal; the point-of-sale age-verification/ID-
+  hardware-actuation terms are kept English-only (no Japanese
+  equivalent) since marketstallops.advisor's own default
+  :schedule-stall-operation rationale legitimately says (in Japanese)
+  that it does NOT touch such hardware; a dedicated regression test
+  (default-mock-advisor-proposals-never-self-trip-scope-exclusion in
+  governor_test.clj) asserts all four default proposal generators never
+  trip :scope-excluded; :flag-compliance-concern ALWAYS escalates to
+  human sign-off and is never a member of any phase's :auto set, at any
+  phase (two independent layers agree: marketstallops.governor's own
+  always-escalate-ops AND marketstallops.phase's own phase table); a
+  :coordinate-supply-order above a $500 estimated-cost threshold
+  likewise always escalates; real langgraph-clj StateGraph
+  (intake->advise->govern->decide->commit|hold|request-approval) with
+  interrupt-before #{:request-approval} for human-in-the-loop resume,
+  not a stub; fully portable .cljc with no JVM-only interop anywhere in
+  src/ (mock-only advisor); 48 tests / 134 assertions green (clojure
+  -M:dev:test), independently re-verified against a fresh clone (plus
+  fresh kotoba-lang/langgraph and kotoba-lang/langchain siblings);
+  clj-kondo 0 errors / 0 warnings; registry.edn's own \"4781\" ->
+  :implemented change (:name de-truncated, :repo/:business-id
+  de-placeholdered from the stale gftdcojp/cloud-itonami-G4781 target
+  to cloud-itonami/cloud-itonami-isic-4781, :maturity :spec ->
+  :implemented, :operating-states updated to match the actor state
+  machine; :required-technologies left unchanged) landed via a
+  Contents-API single-file PUT direct to main (sha-checked optimistic
+  concurrency, immediately re-fetched fresh content before the PUT per
+  this fleet's hot-contention discipline, exact-block edit only
+  verified via an exact old/new substring occurrence count of 1 PLUS
+  a prefix/suffix single-contiguous-diff-region check PLUS
+  sample-verified against 4782/478[group]/4722/4719 entries also
+  intact, no mojibake detected, landed on the first attempt);
+  superproject ADR-2700004781 (com-junkawasaki/root,
+  90-docs/adr/2700004781-cloud-itonami-isic-4781-stall-market-food-
+  retail-coverage.md/.edn)) promoted :spec -> :implemented"
+    (is (= :implemented (industry/maturity "4781")))
+    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-4781"
+           (:repo (industry/get-industry "4781"))))
+    (is (= "cloud-itonami-isic-4781"
+           (:business-id (industry/get-industry "4781"))))))
