@@ -3319,6 +3319,44 @@ tbb.org.tr自身の複数ページから2件を直接確認:
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-17, /loop tick 116 — 自治体軸38件目(Abuja, NGA) — アフリカ4件目、bill段階の候補法を断念し正式な官庁ドメインで補完)
+
+`cloud-itonami-municipality-nga-abuja`を新規GitHubリポジトリとして
+scaffold・push
+([commit 4ed2f48](https://github.com/cloud-itonami/cloud-itonami-municipality-nga-abuja/commit/4ed2f48))：
+
+ナイジェリアの首都アブジャ。1991年12月12日にラゴスから遷都、既に
+完全に完了した歴史的移転で、エジプト/インドネシアのような未解決の
+遷都問題は無し。アフリカ大陸ではナイロビ（tick92）・ケープタウン・
+カイロ（tick110）に続く4件目。
+
+`amacfct.org.ng`（Abuja Municipal Area Council自身のポータル）は
+DNS失敗（ENOTFOUND）。候補として調べた「FCT Area Councils Service
+Commissionを設立する2019年法（HB.975）」は、報道を確認したところ
+まだ第二読会段階（bill段階）で正式な成立が確認できなかったため、
+「Act」として引用することを断念。
+
+代わりに2件を直接確認:
+
+- **Federal Capital Territory Act**（1976年 Decree No. 6、1976年
+  2月4日公布）— lawsofnigeria.placng.org自身がホストするPDF本文を
+  Read-toolの保存パスfallbackで直接読み確認（WebFetchは
+  illegible/binaryと報告）。アブジャを連邦首都特別区の所在地に
+  指定した建制法。
+- **Abuja Environmental Protection Board Act**（Act No. 10 of
+  1997）— aepb.abj.gov.ng自身は account suspension で到達不能
+  だったため、fcta.gov.ng（連邦首都特別区庁の公式政府ドメイン、
+  生きて到達可能）で法番号を直接確認。日付は年のみ（正確な月日を
+  legibleなページで確認できなかったため推測せず）。
+
+4 tests/11 assertions green。143リポジトリ・824 factを統合。
+`municipality abuja`クエリで2件とも正しく取得、タイトル/番号の
+横断query（`[?e "ordinance/municipality" "abuja"]`）でも一致確認。
+
+現状: 国軸39件・業界団体軸39件(27業種)・自治体軸38件——116 tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
