@@ -12,15 +12,15 @@ authoritative_for:
   - 物理閉包(PhysicsGovernor)とは独立した第2の検閲器(SimGovernor)を置き、構造不合格を第2の MRC とする判断
   - BEV/FCEV で組立工程(:seq)がエネルギー系のところだけ分岐する工程モデル
 related:
-  - orgs/com-junkawasaki/vehicle-design-actor                       # 本 ADR の actor(拡張対象)
-  - orgs/com-junkawasaki/vehicle-design-actor/docs/adr/0002-sim-verify-and-datafied-process.md  # actor-local ADR(詳細)
+  - orgs/kotoba-lang/kami-engine-vehicle-designer                       # 本 ADR の actor(拡張対象)
+  - orgs/kotoba-lang/kami-engine-vehicle-designer/docs/adr/0002-sim-verify-and-datafied-process.md  # actor-local ADR(詳細)
   - 90-docs/adr/2606272130-vehicle-design-actor-bev-fcev.md         # 前段(clean-sheet 設計アクター本体)
-  - orgs/com-junkawasaki/kami-engine/kami-genesis                   # isaacsim.core.api 互換ソルバ(構造/多環境)
-  - orgs/com-junkawasaki/kami-engine/kami-cae                       # CAE 解析面
-  - orgs/com-junkawasaki/kami-engine/kami-shugyo                    # isaaclab RL + per-env ドメインランダム化(sim2real)
-  - orgs/com-junkawasaki/kami-engine/kami-cam                       # CAM(toolpath/G-code/tool/stock)
-  - orgs/com-junkawasaki/kami-engine/kami-app-giemon-factory        # 4D 組立順(construction.order.json :seq)パターン
-  - orgs/com-junkawasaki/kami-engine/90-docs/adr/0034-isaac-compat-stack-maturation.md  # Isaac-compat 成熟(clean-room 不変条件)
+  - orgs/kotoba-lang/kami-engine/kami-genesis                   # isaacsim.core.api 互換ソルバ(構造/多環境)
+  - orgs/kotoba-lang/kami-engine/kami-cae                       # CAE 解析面
+  - orgs/kotoba-lang/kami-engine/kami-shugyo                    # isaaclab RL + per-env ドメインランダム化(sim2real)
+  - orgs/kotoba-lang/kami-engine/kami-cam                       # CAM(toolpath/G-code/tool/stock)
+  - orgs/kotoba-lang/kami-engine/kami-app-giemon-factory        # 4D 組立順(construction.order.json :seq)パターン
+  - orgs/kotoba-lang/kami-engine/90-docs/adr/0034-isaac-compat-stack-maturation.md  # Isaac-compat 成熟(clean-room 不変条件)
   - orgs/etzhayyim/root/20-actors/nvidia_isaac-compat              # Datom ログ上の Isaac 互換 actor(配線先)
   - orgs/etzhayyim/root/20-actors/nvidia_cosmos-compat             # Datom ログ上の Cosmos/WFM 互換 actor(配線先)
 supersedes: []
@@ -31,7 +31,7 @@ superseded_by: []
 
 - Status: proposed (2026-06-27)
 - 前段: ADR-2606272130（clean-sheet 設計アクター本体）。詳細は actor-local
-  [`docs/adr/0002-sim-verify-and-datafied-process.md`](../../orgs/com-junkawasaki/vehicle-design-actor/docs/adr/0002-sim-verify-and-datafied-process.md)。
+  [`docs/adr/0002-sim-verify-and-datafied-process.md`](../../orgs/kotoba-lang/kami-engine-vehicle-designer/docs/adr/0002-sim-verify-and-datafied-process.md)。
 
 ## 課題
 

@@ -27,7 +27,7 @@
    Force3D可視化、D3チャート、KaTeX数式）は cloud-murakumo の実証規模を
    大きく超える。**差分レンダラー・パラメータ付きルーティング・フォーム
    プリミティブは本移植で新規に構築する。**
-3. **3D**: `orgs/com-junkawasaki/kami-engine`（Rust/wgpu、17万行、稼働中）+
+3. **3D**: `orgs/kotoba-lang/kami-engine`（Rust/wgpu、17万行、稼働中）+
    `kami-engine-sdk-clj`（cljc/cljs層、2,298行、ユニットテスト16件green、
    ただしブラウザでのライブ動作は未検証）が実在する土台。オービットカメラ・
    エッジ/ライン描画パイプライン・力学シミュレーション（`kami-graph` は

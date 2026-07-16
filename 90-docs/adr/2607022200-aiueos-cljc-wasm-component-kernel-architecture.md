@@ -116,7 +116,7 @@ org 全体方針をそのまま aiueos に適用したものであり、ADR-0006
   「kotoba-lang 言語設計との整合」を扱う直交する軸で、Zephyr 比較を補完する。
 - **ADR-2606290740**（computer surface, isolated computer-use）— 実装済みの
   Layer2/3 の具体例として位置づけを再確認。パスの記述が旧 org taxonomy
-  （`orgs/com-junkawasaki/aiueos/...`）のままな点は別途 follow-up。
+  （`orgs/kotoba-lang/aiueos/...`）のままな点は別途 follow-up。
 - **ADR-2606290900**（signer lifecycle gap）/ **ADR-2606290930**（capability
   bridge gap）— 依然 open。本 ADR は解決の**方向性**（CID/DID lock・
   kotoba-lang/wit capability token への統合）を確定させるが、実装そのものは

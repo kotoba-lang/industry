@@ -150,12 +150,12 @@ Cargo が GitHub から直接その historical commit を fetch するので、c
 
 ### 訂正: kami-engine は対象外だった(west 管理外の stale mirror を誤検知)
 
-repo 横断監査で当初「`orgs/com-junkawasaki/kami-engine` の6 crate
+repo 横断監査で当初「`orgs/kotoba-lang/kami-engine` の6 crate
 (`kami-scene`/`kami-live`/`kami-clj-play3d`/`kami-engine-clj`/
 `kami-webgpu-rs`/`kami-clj-play`)が同じ `kotoba-edn` path 参照で壊れている」
 と報告されたが、精査の結果:
 
-- `orgs/com-junkawasaki/kami-engine` は **`manifest/west.yml` に未登録**
+- `orgs/kotoba-lang/kami-engine` は **`manifest/west.yml` に未登録**
   (west が管理するのは `orgs/kotoba-lang/kami-engine`)。GitHub 上の
   `com-junkawasaki/kami-engine` と `kotoba-lang/kami-engine` は同一
   `pushedAt` を持つミラーで、内容は同一と見られる。

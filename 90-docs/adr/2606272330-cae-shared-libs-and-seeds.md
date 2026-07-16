@@ -21,8 +21,8 @@ related:
   - orgs/kotoba-lang/kami-engine-crash          # seed: クラッシュ(:rom-crash)
   - orgs/kotoba-lang/kami-engine-motor          # seed: モーター(:rom-motor)
   - orgs/kotoba-lang/kami-engine-echem          # seed: FC 電気化学(:rom-fc)
-  - orgs/com-junkawasaki/kami-cfd           # 高忠実度: Rust D2Q9 LBM(:lbm backend)
-  - orgs/com-junkawasaki/vehicle-design-actor  # :aero ノードで実 Cd を注入(#2)
+  - orgs/kotoba-lang/kami-engine-cfd           # 高忠実度: Rust D2Q9 LBM(:lbm backend)
+  - orgs/kotoba-lang/kami-engine-vehicle-designer  # :aero ノードで実 Cd を注入(#2)
   - 90-docs/adr/2606272130-vehicle-design-actor-bev-fcev.md
   - 90-docs/adr/2606272230-vehicle-design-sim-verify-datafied-process.md
 supersedes: []

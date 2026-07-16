@@ -13,11 +13,11 @@ authoritative_for:
   - 正規化は積集合(external ∩ local-policy ∩ manifest ∩ surface ∩ limits)で行う
 related:
   - 90-docs/adr/2606290900-kotoba-aiueos-key-lifecycle-revocation.md
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-auth
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-clj/src/policy.rs
-  - orgs/com-junkawasaki/aiueos/src/policy.rs
-  - orgs/com-junkawasaki/aiueos/src/broker.rs
-  - orgs/com-junkawasaki/aiueos/src/surface.rs
+  - orgs/kotoba-lang/kotoba/crates/kotoba-auth
+  - orgs/kotoba-lang/kotoba/crates/kotoba-clj/src/policy.rs
+  - orgs/kotoba-lang/aiueos/src/policy.rs
+  - orgs/kotoba-lang/aiueos/src/broker.rs
+  - orgs/kotoba-lang/aiueos/src/surface.rs
 supersedes: []
 superseded_by: []
 ---

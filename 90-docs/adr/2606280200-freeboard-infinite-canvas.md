@@ -149,8 +149,8 @@ perspective→ortho camera）。
 
 ## References
 
-- 確立テンプレ: `orgs/com-junkawasaki/kami-engine/kami-app-sip-clj`,
+- 確立テンプレ: `orgs/kotoba-lang/kami-engine/kami-app-sip-clj`,
   `kami-engine-sdk-clj`（`kami.render`/`kami.scene`/`kami.ecs`）
 - 取込: ADR-2606272100（kasane）, ADR-2606280010（JPEG/DCT）
 - 永続: kotoba QuadStore / CACAO
-- 実装: `orgs/com-junkawasaki/freeboard`（`freeboard.board`/`import`/`render`/`web`）
+- 実装: `orgs/kotoba-lang/freeboard`（`freeboard.board`/`import`/`render`/`web`）

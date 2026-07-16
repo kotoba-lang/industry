@@ -12,19 +12,19 @@ authoritative_for:
   - murakumo(com-junkawasaki) を kotoba mesh の制御面 = wadm/wash 相当として定義
   - 2つの murakumo(kotoba WASM mesh vs etzhayyim k3s LangGraph cell)の曖昧性解消
 related:
-  - orgs/com-junkawasaki/kotoba                                  # 基板本体(crates 群)
-  - orgs/com-junkawasaki/kotoba/docs/ADR-kotoba-mesh-wasm-hosting.md  # 出自(wasmCloud/Spin/Holochain)を明示した一次設計
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-lattice            # lattice 制御面(protocol/reconcile/auction)
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-net               # libp2p QUIC/Noise/gossipsub/Kademlia
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-auth              # CACAO link = 署名済み grant datom
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-runtime           # WASM Component host + trigger(on-http/on-tick/on-kse)
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-clj               # Clojure/EDN サブセット → WASM
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-datomic           # Datom log / CommitDag(DistributedDatomCommit)
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-query             # KQE Datalog / 4-index Arrangement
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-git               # git DAG → content-addressed blocks(SHA↔CID)
-  - orgs/com-junkawasaki/kotoba/crates/kotoba-dht               # Source Chain / Warrant / Neighborhood(Holochain)
+  - orgs/kotoba-lang/kotoba                                  # 基板本体(crates 群)
+  - orgs/kotoba-lang/kotoba/docs/ADR-kotoba-mesh-wasm-hosting.md  # 出自(wasmCloud/Spin/Holochain)を明示した一次設計
+  - orgs/kotoba-lang/kotoba/crates/kotoba-lattice            # lattice 制御面(protocol/reconcile/auction)
+  - orgs/kotoba-lang/kotoba/crates/kotoba-net               # libp2p QUIC/Noise/gossipsub/Kademlia
+  - orgs/kotoba-lang/kotoba/crates/kotoba-auth              # CACAO link = 署名済み grant datom
+  - orgs/kotoba-lang/kotoba/crates/kotoba-runtime           # WASM Component host + trigger(on-http/on-tick/on-kse)
+  - orgs/kotoba-lang/kotoba/crates/kotoba-clj               # Clojure/EDN サブセット → WASM
+  - orgs/kotoba-lang/kotoba/crates/kotoba-datomic           # Datom log / CommitDag(DistributedDatomCommit)
+  - orgs/kotoba-lang/kotoba/crates/kotoba-query             # KQE Datalog / 4-index Arrangement
+  - orgs/kotoba-lang/kotoba/crates/kotoba-git               # git DAG → content-addressed blocks(SHA↔CID)
+  - orgs/kotoba-lang/kotoba/crates/kotoba-dht               # Source Chain / Warrant / Neighborhood(Holochain)
   - orgs/etzhayyim/root/80-data/kotoba-rad                      # *.identity.journal.edn(ノード主権 identity journal)
-  - orgs/com-junkawasaki/murakumo                               # kotoba mesh 制御面(= wadm/wash 相当)
+  - orgs/kotoba-lang/murakumo                               # kotoba mesh 制御面(= wadm/wash 相当)
 supersedes: []
 superseded_by: []
 ---
@@ -183,13 +183,13 @@ murakumo : kotoba  ≅  wash + wadm : wasmCloud
 
 ## References
 
-- `orgs/com-junkawasaki/kotoba/docs/ADR-kotoba-mesh-wasm-hosting.md` — 出自を
+- `orgs/kotoba-lang/kotoba/docs/ADR-kotoba-mesh-wasm-hosting.md` — 出自を
   wasmCloud(制御面) / Spin(component・trigger・DX) / Holochain(agent 主権)の 3 系統と
   明示した一次設計。L0–L3 完成 / L4–L6 が gap、no-central-master 不変条件。
-- `orgs/com-junkawasaki/kotoba/CLAUDE.md` — crate 一覧と一行定義
+- `orgs/kotoba-lang/kotoba/CLAUDE.md` — crate 一覧と一行定義
   `KOTOBA ≝ Datom[CID/T] × EAVT[KSE Topic] × Pregel[BSP] × Datalog[Δ] × CACAO ×
   AT Protocol × LLM/Weight × WASM/WIT`。
-- `orgs/com-junkawasaki/murakumo/README.md` + `fleet.edn` — kotoba WASM mesh の
+- `orgs/kotoba-lang/murakumo/README.md` + `fleet.edn` — kotoba WASM mesh の
   制御面。2 つの murakumo の区別を明記。
 - `orgs/kawasakijun/docs/adr/0007-repo-reorg-orgs-layout-and-b2-persistence.md` —
   現行の DataLad/git-annex + B2 + GPG hybrid encryption 運用。

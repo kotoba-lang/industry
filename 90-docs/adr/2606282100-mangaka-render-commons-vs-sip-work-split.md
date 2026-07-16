@@ -3,7 +3,7 @@
 - **Status**: accepted — Phase 1 + scene-clj landed (2026-06-28), tests green
 - **Date**: 2026-06-28
 - **Context tags**: mangaka, manga-generation, render-pipeline, clj, cljc, kami-engine, kami-app-sip-clj, ghosthacker, anchors-edn, dependency-inversion
-- **Related**: `orgs/com-junkawasaki/org-spirit-in-physics-comics/docs/adr/0002-game-and-render-pipeline.md` (clj/Datomic render pipeline), `orgs/etzhayyim/root/90-docs/adr/2605141200-mangaka-3d-scene-pregel-kami-sdk.md` (mangaka 3D scene facade), `orgs/com-junkawasaki/kami-engine/kami-app-sip-clj/src/sip/render.clj`
+- **Related**: `orgs/com-junkawasaki/org-spirit-in-physics-comics/docs/adr/0002-game-and-render-pipeline.md` (clj/Datomic render pipeline), `orgs/etzhayyim/root/90-docs/adr/2605141200-mangaka-3d-scene-pregel-kami-sdk.md` (mangaka 3D scene facade), `orgs/kotoba-lang/kami-engine/kami-app-sip-clj/src/sip/render.clj`
 
 ## Context
 

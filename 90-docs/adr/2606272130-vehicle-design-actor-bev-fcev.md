@@ -12,11 +12,11 @@ authoritative_for:
   - BEV / FCEV を「エネルギー系モデルだけが分岐する」単一グラフで sizing する分割
   - 質量スパイラルを有界不動点として1ノード内に encapsulate し 1 run = 1 設計パスにする決定
 related:
-  - orgs/com-junkawasaki/vehicle-design-actor                    # 本 ADR の actor
-  - orgs/com-junkawasaki/vehicle-design-actor/docs/adr/0001-architecture.md  # actor-local ADR(詳細)
+  - orgs/kotoba-lang/kami-engine-vehicle-designer                    # 本 ADR の actor
+  - orgs/kotoba-lang/kami-engine-vehicle-designer/docs/adr/0001-architecture.md  # actor-local ADR(詳細)
   - orgs/com-junkawasaki/robotaxi-actor                          # 設計版ミラー元(VLA を SafetyGovernor で封じる)
   - orgs/kotoba-lang/langgraph                           # StateGraph runtime(superstep + interrupt + checkpoint)
-  - orgs/com-junkawasaki/kami-engine/kami-vehicle                # 物理シム土台(soft-body, battery/tank ノード) ← 将来の検証連携先
+  - orgs/kotoba-lang/kami-engine/kami-vehicle                # 物理シム土台(soft-body, battery/tank ノード) ← 将来の検証連携先
   - orgs/etzhayyim/root/20-actors/hydrogen_electrolysis          # 水素製造側 actor(本 actor は車載 FC 設計側)
 supersedes: []
 superseded_by: []
@@ -25,9 +25,9 @@ superseded_by: []
 # ADR-2606272130: vehicle-design-actor — concept proposer を PhysicsGovernor で封じた clean-sheet 車両設計 actor（BEV / FCEV）
 
 - Status: proposed (2026-06-27)
-- 配置: `orgs/com-junkawasaki/vehicle-design-actor`（共通 = com-junkawasaki org）
+- 配置: `orgs/kotoba-lang/kami-engine-vehicle-designer`（共通 = com-junkawasaki org）
 - 鏡像: robotaxi-actor ADR-0001 の**設計版ミラー**。詳細は actor-local
-  [`docs/adr/0001-architecture.md`](../../orgs/com-junkawasaki/vehicle-design-actor/docs/adr/0001-architecture.md)。
+  [`docs/adr/0001-architecture.md`](../../orgs/kotoba-lang/kami-engine-vehicle-designer/docs/adr/0001-architecture.md)。
 
 ## 課題
 
