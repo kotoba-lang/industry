@@ -1,0 +1,9 @@
+;; kotoba-fleet-vcs Phase 1 keyring (ADR-2607160005).
+;; Maps signer ids to pin-advance grants (trailing-* wildcard paths).
+;; Phase 1 staging: session-generated key; Phase 2 moves signer ids to
+;; did:key (ed25519-clj/did) and grants to CACAO delegation chains, with
+;; private keys in 1Password per skill secrets-location-map.
+{:keys
+ {"ed25519:7414dd47730947339b50c97b85021f22beee825dacc9e5c30b8413973215c5dd"
+  {:grants #{"orgs/*"}
+   :note "2026-07-16 Phase 1 genesis key (Claude Code session, owner-approved)"}}}
