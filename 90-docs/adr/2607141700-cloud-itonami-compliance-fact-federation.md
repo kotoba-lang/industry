@@ -2122,6 +2122,33 @@ Wikidata Q1555）は史実上一貫して首都であり、P36歴史的首都バ
 現状: 国軸29件・業界団体軸29件(24業種)・自治体軸26件——84tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 85 — 自治体軸27件目(リヨン)) — セキュリティ所見あり
+
+`cloud-itonami-municipality-fra-lyon`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-fra-lyon/commit/8d70753))：
+リヨン市（フランス第3の都市、首都ではない——首都パリは
+`cloud-itonami-municipality-fra-paris`で既にカバー済み）。
+
+**セキュリティ所見**: まずグアテマラシティ（`muniguate.com`）を試みた
+が、公式ドメインが**まるごと**不審な類似ドメイン`munigate10.com`へ
+301リダイレクトされることを確認した——ドメイン乗っ取り・期限切れ
+放置の悪用の可能性が高いと判断し、**このリダイレクトには一切従わず**
+そのドメインからのコンテンツは何も引用せずに断念した。
+
+代わりにリヨン公式`lyon.fr`の議決（délibération）PDF2件を検証:
+Délibération 2021/1164（社会住宅割当政策の承認、2021-09-30）／
+Délibération 2021/725（リヨン市の恒久的テレワーク制度導入、
+2021-05-27）。いずれも完全にレンダリングされ日付が明記されていた。
+4 tests/10 assertions green。
+
+114リポジトリ・762 factを統合。`"ordinance/topic" "governance"`での
+横断queryでlyonがbrussels/montevideo/quito/helsinki/sao-paulo/oslo/
+asuncion/sydney/cape-town/san-jose/guadalajara/bogota/copenhagenと
+並んで取得できることを確認。
+
+現状: 国軸29件・業界団体軸29件(24業種)・自治体軸27件——85tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
