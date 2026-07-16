@@ -3564,3 +3564,77 @@ clone; superproject ADR-2628000000) is also :implemented"
            (:repo (industry/get-industry "4764"))))
     (is (= "cloud-itonami-isic-4764"
            (:business-id (industry/get-industry "4764"))))))
+
+(deftest cloud-itonami-isic-4761-is-implemented
+  (testing "cloud-itonami-isic-4761 (Retail sale of books, newspapers and
+  stationary in specialized stores -- bookstore/newsstand/stationery
+  storefront operations coordination, Wave 2 [coordination/logistics/
+  trade, ADR-2607121000] fresh scaffold, no pre-existing repo at either
+  placeholder [gh api 404 confirmed for both the stale
+  gftdcojp/cloud-itonami-G4761 placeholder and the real cloud-itonami
+  org target before scaffolding]; identity independently verified
+  against a fresh clone before any work began, per this fleet's
+  ID/name-mismatch caution -- the live registry :name was truncated
+  with a literal \"...\" [\"Retail sale of books, newspapers and
+  stationary in speciali...\"], a verified prefix-match of the full
+  ISIC class name, de-truncated as part of this exact-block edit; a
+  separate, coarser-granularity {:id \"476\" ...} 3-digit group entry
+  [\"Retail sale of cultural and recreation goods in specialized
+  stores\"] left untouched; distinct from ISIC 4649-family wholesale
+  book/periodical distribution, which this actor never performs;
+  BookstoreRetailAdvisor ⊣ BookstoreRetailGovernor, closed four-op
+  allowlist all :effect :propose (log-sales-record/
+  schedule-staffing-operation/coordinate-supply-order/
+  flag-inventory-concern); FOUR HARD governor checks (store-unverified,
+  vendor-unverified [for coordinate-supply-order only, a supply-chain
+  counterparty-verification gate mirroring cloud-itonami-isic-4751's
+  own, reapplied here to publisher/distributor vendors],
+  effect-not-propose, and scope-exclusion folding in op-not-allowed)
+  that permanently block any proposal touching directly finalizing a
+  return/refund (issuing a refund/replacement, voiding a sale, charging
+  back a vendor, revoking or terminating a vendor's
+  registration/contract) OR directly finalizing a content-inclusion/
+  exclusion editorial decision (banning, pulling, or prohibiting a
+  title from sale) -- this second exclusion category is a
+  domain-specific addition beyond the sibling retail actors' own
+  return/refund-only scope, since a bookstore-operations coordinator
+  must never be able to claim authority over which titles a store may
+  carry; scope-excluded terms phrased as the finalization/execution
+  ACTION (\"issue the refund\", \"void the sale\", \"ban the title from
+  the store\", \"remove the title from the catalog\"), never a bare
+  noun (\"refund\"/\"return\"/\"title\"/\"inventory\"), avoiding this
+  fleet's own known self-tripping bug class -- concretely relevant here
+  since this namespace's own inventory-concern-flagging proposal's
+  :op keyword literally contains the substring \"inventory-concern\"
+  and its default rationale legitimately discusses damaged-stock/
+  mis-shipment/quantity-mismatch observations -- verified by a
+  dedicated default-mock-advisor-proposals-never-self-trip-
+  scope-exclusion regression test in governor_test.clj;
+  flag-inventory-concern ALWAYS escalates and is never a member of any
+  phase's :auto set, at any phase (two independent layers agree: the
+  governor's own always-escalate-ops AND the phase table itself);
+  coordinate-supply-order above an $800 cost threshold also always
+  escalates; real langgraph-clj StateGraph
+  (intake->advise->govern->decide->commit|hold|request-approval) with
+  interrupt-before #{:request-approval}; fully portable .cljc with no
+  JVM-only interop; 58 tests / 170 assertions green (clojure -M:test),
+  independently re-verified against a fresh clone; clj-kondo 0 errors /
+  0 warnings; registry.edn's own \"4761\" -> :implemented change (:name
+  de-truncated, :repo/:business-id de-placeholdered from
+  gftdcojp/cloud-itonami-G4761 -> cloud-itonami/cloud-itonami-isic-4761,
+  :maturity :spec->:implemented; :required-technologies/
+  :operating-states left as-is, already matching the sibling 47xx
+  retail-actor pattern) landed via a Contents-API single-file PUT
+  (sha-checked optimistic concurrency, one 409 from concurrent sibling
+  churn resolved by an immediate re-fetch-and-retry, exact-block edit
+  only verified via a single-contiguous-diff-region check PLUS
+  sample-verified against 3512/4719/4751/476[group] entries also
+  intact, no mojibake detected); superproject ADR-2700004761
+  (com-junkawasaki/root,
+  90-docs/adr/2700004761-cloud-itonami-isic-4761-books-stationery-retail-coverage.md/.edn))
+  promoted :spec -> :implemented"
+    (is (= :implemented (industry/maturity "4761")))
+    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-4761"
+           (:repo (industry/get-industry "4761"))))
+    (is (= "cloud-itonami-isic-4761"
+           (:business-id (industry/get-industry "4761"))))))
