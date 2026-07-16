@@ -3424,6 +3424,44 @@ cibng.org自身の"Corporate Information"ページから2件を直接確認:
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-17, /loop tick 119 — 自治体軸39件目(Riyadh, SAU) — 湾岸2件目、アラビア語フォントサブセット化を英語法律データベースで補完)
+
+`cloud-itonami-municipality-sau-riyadh`を新規GitHubリポジトリとして
+scaffold・push
+([commit 9c4f903](https://github.com/cloud-itonami/cloud-itonami-municipality-sau-riyadh/commit/9c4f903))：
+
+サウジアラビアの首都リヤド。安定した首都で未解決の遷都問題無し。
+湾岸地域ではアブダビ（tick98）に続く2件目、サウジアラビアは
+アラブ最大の経済であり3軸いずれも初めての参入。
+
+`alriyadh.gov.sa`（市自身のポータル）はナビゲーションハブのみで
+具体的な法番号・設立日の記載無し。`balady.gov.sa`（住宅・地方
+自治省の公式ドメイン）自身がホストする全国法のPDFは、アラビア語
+フォントサブセット化により本文が完全に判読不能な四角記号として
+描画された（今session頻出のPDF判読不能パターンの新変種——今回は
+ラテン文字・キリル文字・トルコ語ではなくアラビア語スクリプトに
+影響）。
+
+代わりに2件を直接確認:
+
+- **Law of Municipalities and Villages**（Royal Decree No.
+  M/5/1397、1977年2月10日/ヒジュラ暦1397年サファル21日）—
+  Lexis Middle East法律データベース（今session既出のWIPO
+  Lex/ECOLEXと同カテゴリの確立された法律データベース）で
+  グレゴリオ暦・ヒジュラ暦両方を直接確認。
+- **Cabinet Decision No. 717**（1974年6月20日、リヤド開発最高
+  機構の設立、現Royal Commission for Riyadh City）— rcrc.gov.sa
+  （同機構自身の公式ドメイン）の"Establishment and evolution"
+  ページで原文を直接引用確認。
+
+4 tests/11 assertions green。144リポジトリ・830 factを統合。
+`municipality riyadh`クエリで2件とも正しく取得、タイトル/番号の
+横断query（`[?e "ordinance/municipality" "riyadh"]`）でも一致確認。
+
+現状: 国軸40件・業界団体軸40件(27業種)・自治体軸39件——119 tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
