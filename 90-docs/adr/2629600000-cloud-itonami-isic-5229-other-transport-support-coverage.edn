@@ -1,0 +1,63 @@
+{:adr/id "2629600000"
+ :adr/title "cloud-itonami ISIC-5229 Freight-Forwarding/Customs-Brokerage Operations-Coordination Actor — Blueprint Fill-In & Registry Promotion"
+ :adr/status "accepted"
+ :adr/date "2026-07-16"
+ :adr/deciders ["Jun Kawasaki"]
+ :adr/scope
+ {:repo "orgs/cloud-itonami/cloud-itonami-isic-5229"
+  :registry "orgs/kotoba-lang/industry"
+  :isic-code 5229
+  :wave 2
+  :pre-existing? true
+  :note "repo pre-existed as :blueprint-tier (blueprint.edn + docs published, no src) from an earlier bulk-scaffolding pass; this ADR fills it in rather than creating it fresh"}
+ :decision
+ {:id "cloud-itonami-isic-5229"
+  :name "Other transportation support activities"
+  :isic-code "5229"
+  :business-id "cloud-itonami-5229"
+  :repo "https://github.com/cloud-itonami/cloud-itonami-isic-5229"
+  :public? true
+  :governor :freight-forwarding-governor
+  :modules
+  ["freightforwarding.store"
+   "freightforwarding.registry"
+   "freightforwarding.advisor"
+   "freightforwarding.governor"
+   "freightforwarding.operation"
+   "freightforwarding.phase"
+   "freightforwarding.sim"]
+  :allowed-operations
+  [{:op :log-shipment-record
+    :description "Freight-forwarding/customs-documentation data logging"}
+   {:op :schedule-logistics-operation
+    :description "Routing/consolidation scheduling proposal"}
+   {:op :flag-compliance-concern
+    :description "Customs-documentation/regulatory-compliance-concern flag (always escalates)"}
+   {:op :coordinate-carrier-booking
+    :description "Carrier-booking coordination"}]
+  :governor-hard-checks 4
+  :governor-check-names
+  [:shipment-unverified :effect-not-propose :op-not-allowed :finalize-clearance-attempt]
+  :rollout-phases 4
+  :high-stakes-ops [:flag-compliance-concern]
+  :never-auto-any-phase [:flag-compliance-concern]
+  :tests-passing 34
+  :assertions-passing 190}
+ :self-tripping-bug-fix
+ {:known-fleet-wide-pattern? true
+  :description "scope-exclusion terms phrased as bare nouns (e.g. \"clearance\") can match inside the mock advisor's own legitimate default rationale text and self-block the happy path"
+  :fix "finalize-clearance-patterns phrased as the finalization/execution ACTION (e.g. \"finalize the customs clearance\", \"authorize the shipment release\"), never a bare noun"
+  :regression-test "test/freightforwarding/scope_exclusion_test.clj"}
+ :verification
+ {:tests "34 tests, 190 assertions, 0 failures, 0 errors (clojure -M:dev:test)"
+  :lint "clj-kondo: 0 errors, 0 warnings (clojure -M:lint)"
+  :demo "clojure -M:dev:run -- all scenarios completed offline"
+  :push-commit "e5961f04538d520d43826bce40c44212c0c6a9ab"
+  :push-base "3e42350"
+  :repo-public? true
+  :registry-entry-updated? true}
+ :references
+ ["ADR-2607121000"
+  "ADR-2628071600"
+  "ADR-2607141600"
+  "Skill:build-actor"]}
