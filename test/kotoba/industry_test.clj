@@ -3728,3 +3728,98 @@ clone; superproject ADR-2628000000) is also :implemented"
            (:repo (industry/get-industry "4762"))))
     (is (= "cloud-itonami-isic-4762"
            (:business-id (industry/get-industry "4762"))))))
+
+(deftest cloud-itonami-isic-4771-is-implemented
+  (testing "cloud-itonami-isic-4771 (Retail sale of clothing, footwear
+  and leather articles in specialized stores -- apparel/footwear/
+  leather-goods storefront operations coordination, Wave 2
+  [coordination/logistics/trade, ADR-2607121000] fresh scaffold, no
+  pre-existing repository at either the stale
+  gftdcojp/cloud-itonami-G4771 placeholder or the real cloud-itonami
+  org target [gh api 404 confirmed for both before scaffolding];
+  identity ({:id \"4771\" :name \"Retail sale of clothing, footwear and
+  leather articles in specialized stores\"}) independently verified
+  against a fresh clone before any work began, per this fleet's
+  ID/name-mismatch caution -- the live registry :name was truncated
+  (\"...in s...\"), de-truncated to the full ISIC class name as part of
+  this exact-block edit; distinct from ISIC 4751 [textile/fabric/
+  yardage retail, not finished garments] and ISIC 4719 [non-specialized
+  general-merchandise retail]; a separate, coarser-granularity
+  {:id \"477\" ...} 3-digit group entry (:superseded-by [\"4772\"
+  \"4774\"]) left untouched; ApparelRetailAdvisor ⊣
+  ApparelRetailGovernor apparel/footwear/leather-goods specialized-store
+  retail OPERATIONS COORDINATION actor (apparelops.* namespace)
+  mirroring cloud-itonami-isic-4751's [Retail sale of textiles in
+  specialized stores] verified advisor/governor/phase/operation/store/
+  sim module shape module-for-module (apparelops.* in place of
+  textileops.*, inventory/sale/return/alteration transaction logging in
+  place of sales/inventory/cut-yardage logging, floor-staff/fitting-room
+  scheduling in place of floor-staff scheduling); closed four-op
+  allowlist, all :effect :propose (:log-sales-record/:schedule-
+  staffing-operation/:coordinate-supply-order/:flag-quality-concern);
+  FOUR HARD governor checks, all permanent and un-overridable by any
+  human approval -- store-unverified (target store's business
+  registration must exist AND be independently :registered?/:verified?
+  in the store before any proposal for it may commit or escalate),
+  vendor-unverified (for :coordinate-supply-order only, the named vendor
+  must independently resolve to a :registered?/:verified? vendor
+  record, a supply-chain counterparty-verification gate mirroring ISIC
+  4751/4719's own), effect-not-propose, and scope-exclusion (folds in
+  op-not-allowed) that permanently blocks any proposal touching directly
+  finalizing a quality-dispute resolution (issuing a refund/replacement,
+  voiding a sale, charging back a vendor, revoking or terminating a
+  vendor's registration/contract) OR directly finalizing a
+  counterfeit-authenticity determination (declaring an item
+  counterfeit, certifying an item as genuine, resolving an authenticity
+  claim) -- the latter is new relative to sibling 4751/4719 and specific
+  to this vertical's branded-goods counterfeit-risk exposure; every
+  scope-excluded term is phrased as the finalization/execution ACTION
+  (\"issue the refund\", \"declare the item counterfeit\", \"certify the
+  item as genuine\"), never a bare noun (\"refund\"/\"dispute\"/
+  \"counterfeit\"), avoiding this fleet's own known self-tripping bug
+  class -- concretely relevant here since this namespace's own
+  flag-quality-concern rationale legitimately mentions the bare noun
+  \"偽造品の疑い\" (suspicion of counterfeit) and
+  its own :op keyword literally contains the substring
+  \"quality-concern\" -- verified by a dedicated
+  default-mock-advisor-proposals-never-self-trip-scope-exclusion
+  regression test in governor_test.clj; flag-quality-concern ALWAYS
+  escalates and is never a member of any phase's :auto set, at any
+  phase (two independent layers agree: the governor's own
+  always-escalate-ops AND the phase table itself); coordinate-supply-
+  order above a $1000 cost threshold also always escalates; real
+  langgraph-clj StateGraph (intake->advise->govern->decide->commit|
+  hold|request-approval) with interrupt-before #{:request-approval};
+  fully portable .cljc with no JVM-only interop anywhere in src/
+  (mock-only advisor); 58 tests / 170 assertions green (clojure
+  -M:test), independently re-verified against a fresh clone; clj-kondo
+  0 errors / 0 warnings; clojure -M:run (apparelops.sim demo) walked all
+  scenarios (phase-1 approval-gated commit, phase-3 auto-commit,
+  always-escalating quality-concern flag, always-escalating over-
+  threshold supply order, and all 5 HARD-hold scenarios: unregistered
+  store, unverified store, unverified vendor, non-:propose effect,
+  scope-excluded content) without error; registry.edn's own \"4771\"
+  entry promoted :spec -> :implemented (:name de-truncated,
+  :repo/:business-id de-placeholdered from gftdcojp/cloud-itonami-G4771
+  -> cloud-itonami/cloud-itonami-isic-4771, :operating-states updated to
+  [:intake :advise :govern :approve :commit :audit] to match the actor
+  state machine mirroring ISIC 4719's own convention;
+  :required-technologies/:optional-technologies left unchanged) landed
+  via a Contents-API single-file PUT (sha-checked optimistic
+  concurrency; the first PUT's own \"4771\" block was clobbered by a
+  concurrent sibling's own stale-based PUT for \"4762\" -- immediately
+  detected via a freshly re-fetched clone showing 4771 reverted to the
+  placeholder while the sibling's own 4762 change was intact -- and
+  mechanically restored with a second sha-checked PUT that touched only
+  the \"4771\" block, leaving the sibling's own 4762 content untouched;
+  exact-block edit verified via a single-contiguous-diff-region check
+  PLUS sample-verified against 4762/4751/4719/4753 entries also intact,
+  no mojibake detected); superproject ADR-2700004771
+  (com-junkawasaki/root,
+  90-docs/adr/2700004771-cloud-itonami-isic-4771-clothing-footwear-retail-coverage.md/.edn))
+  promoted :spec -> :implemented"
+    (is (= :implemented (industry/maturity "4771")))
+    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-4771"
+           (:repo (industry/get-industry "4771"))))
+    (is (= "cloud-itonami-isic-4771"
+           (:business-id (industry/get-industry "4771"))))))
