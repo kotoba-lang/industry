@@ -1,0 +1,58 @@
+[{:adr/id 2620773000
+  :adr/title "cloud-itonami-isic-7730 — Machinery / Equipment Rental Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-7730]
+  :adr/references [2607152500 2607121000 2615100000]
+
+  ;; Wave 4 actor (human-facing/personal-services): construction/event/
+  ;; agricultural equipment rental operations coordination-only
+  ;; (rental-record logging, post-return maintenance-inspection
+  ;; scheduling, rental-fleet restock/replacement coordination,
+  ;; equipment-safety-concern flagging).
+
+  :actor/id :cloud-itonami-isic-7730
+  :actor/name "Machinery / Equipment Rental Operations Coordinator"
+  :actor/isic-rev4 "7730"
+  :actor/domain :services/machinery-equipment-rental-operations
+  :actor/wave 4
+  :actor/coordination? true
+  :actor/robotics? false
+
+  :actor/proposal-ops [:log-rental-record :schedule-maintenance-inspection
+                       :coordinate-fleet-restock :flag-equipment-safety-concern]
+  :actor/always-escalate-ops [:flag-equipment-safety-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-fleet-restock 2000}
+
+  :actor/hard-checks [:asset-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["certify safe to re-rent without inspection" "clear for re-rent without inspection"
+                                "approve re-rent without inspection" "finalize the safety clearance"
+                                "finalize equipment safety clearance" "re-rent without inspection"
+                                "override the equipment safety authority" "bypass equipment safety authority"
+                                "点検なしで再貸出を承認" "安全クリアランスを確定" "機材安全当局の判断を上書き"]
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-rental-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-rental-record :schedule-maintenance-inspection
+                                               :coordinate-fleet-restock}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-rental-record :schedule-maintenance-inspection
+                                         :coordinate-fleet-restock :flag-equipment-safety-concern}
+      :auto #{:log-rental-record :schedule-maintenance-inspection :coordinate-fleet-restock}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 49 :assertions 160 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration :store-contract
+                  :scope-exclusion-self-trip-regression]
+  :test/simulator :equiprentalops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-7730"
+  :registry/business-id "cloud-itonami-isic-7730"
+  :registry/required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
