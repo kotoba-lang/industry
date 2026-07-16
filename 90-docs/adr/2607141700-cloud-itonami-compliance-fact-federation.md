@@ -3001,6 +3001,46 @@ organization.ednの記載はこの現行・1976年以降の状態と正しく一
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-16, /loop tick 108 — 業界団体軸37件目(BAP, PHL, ISIC 6419) — 銀行業7カ国目、WebSearch設立年矛盾を一次資料で解決)
+
+`cloud-itonami-assoc-6419-phl-bap`を新規GitHubリポジトリとして
+scaffold・push
+([commit f06b69f](https://github.com/cloud-itonami/cloud-itonami-assoc-6419-phl-bap/commit/f06b69f)、
+今回はリポジトリ作成レート制限に引っかからず一発成功)：
+
+Bankers Association of the Philippines（BAP、フィリピン銀行協会）。
+ISIC 6419（銀行業）の7カ国目（日本・ドイツ・フランス・オーストラリア・
+UAE・ベトナムに次ぐ）。本tick窓のフィリピンリサーチ
+（[`cloud-itonami-municipality-phl-manila`](https://github.com/cloud-itonami/cloud-itonami-municipality-phl-manila)）
+の流れを継続。
+
+bap.org.ph自身のaboutus.htmlページから2件を直接確認:
+
+- **1949年設立**（3月29日）— 「Established on March 29, 1949, the
+  BAP was created to frame rules and regulations in cooperation with
+  the Central Bank...」と明記。
+- **1964年SEC法人化**（8月24日）— 「The BAP was officially
+  incorporated as a duly Securities and Exchange Commission
+  (SEC)-registered corporate entity on August 24, 1964」と明記。
+
+**WebSearch設立年矛盾を解決**: 事前のWebSearch要約は複数の二次
+ソース間で設立年が1947年と1949年で矛盾していたが、bap.org.ph自身の
+一次資料ページを直接読むことで1949年に確定——本セッションで確立
+された「複数ソース矛盾時は一次資料を優先する」規律の実践例
+（tick92のケニアFinance Act 2013却下、tick94のインドDPDP Act日付
+訂正と同型）。BAP自身のWikidata Q-idは見つからず、推測せず正直に
+省略。
+
+4 tests/11 assertions green。137リポジトリ・808 factを統合。
+`"association-rule/isic" "6419"`での横断queryで7カ国すべて
+（`[zenginkyo JPN]`・`[bankenverband DEU]`・`[fbf FRA]`・
+`[aba AUS]`・`[ubf ARE]`・`[vnba VNM]`・`[bap PHL]`）が正しく
+取得できることを確認。
+
+現状: 国軸36件・業界団体軸37件(27業種)・自治体軸35件——108tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社

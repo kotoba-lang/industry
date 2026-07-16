@@ -358,7 +358,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-iso3166-idn/data/datascript-tx.edn"}
    {:label "cloud-itonami-municipality-phl-manila ordinance.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-municipality-phl-manila/schema/ordinance.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-municipality-phl-manila/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-phl-manila/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6419-phl-bap association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6419-phl-bap/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-phl-bap/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
