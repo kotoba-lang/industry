@@ -1,0 +1,69 @@
+{:adr/id "2630000000"
+ :adr/title "cloud-itonami ISIC-5224 Cargo-Handling Operations-Coordination Actor — Blueprint Fill-In & Registry Promotion"
+ :adr/status "accepted"
+ :adr/date "2026-07-16"
+ :adr/deciders ["Jun Kawasaki"]
+ :adr/scope
+ {:repo "orgs/cloud-itonami/cloud-itonami-isic-5224"
+  :registry "orgs/kotoba-lang/industry"
+  :isic-code 5224
+  :wave 2
+  :pre-existing? true
+  :note "repo pre-existed as :blueprint-tier (blueprint.edn + docs published, no src) from an earlier bulk-scaffolding pass; this ADR fills it in rather than creating it fresh"}
+ :decision
+ {:id "cloud-itonami-isic-5224"
+  :name "Cargo handling"
+  :isic-code "5224"
+  :business-id "cloud-itonami-5224"
+  :repo "https://github.com/cloud-itonami/cloud-itonami-isic-5224"
+  :public? true
+  :governor :cargo-handling-governor
+  :modules
+  ["cargohandling.store"
+   "cargohandling.registry"
+   "cargohandling.advisor"
+   "cargohandling.governor"
+   "cargohandling.operation"
+   "cargohandling.phase"
+   "cargohandling.sim"]
+  :allowed-operations
+  [{:op :log-cargo-record
+    :description "Load/unload/manifest data logging"}
+   {:op :schedule-handling-operation
+    :description "Crane/dock/warehouse scheduling proposal"}
+   {:op :flag-cargo-safety-concern
+    :description "Cargo-safety-concern flag (always escalates)"}
+   {:op :coordinate-equipment-maintenance
+    :description "Crane/handling-equipment maintenance coordination"}]
+  :governor-hard-checks 4
+  :governor-check-names
+  [:shipment-unverified :effect-not-propose :op-not-allowed :finalize-load-safety-attempt]
+  :rollout-phases 4
+  :high-stakes-ops [:flag-cargo-safety-concern]
+  :never-auto-any-phase [:flag-cargo-safety-concern]
+  :tests-passing 35
+  :assertions-passing 193}
+ :self-tripping-bug-fix
+ {:known-fleet-wide-pattern? true
+  :description "scope-exclusion terms phrased as bare nouns (e.g. \"safety\") can match inside the mock advisor's own legitimate default rationale text and self-block the happy path"
+  :fix "finalize-load-safety-patterns phrased as the finalization/execution ACTION (e.g. \"finalize the load-safety clearance\"), never a bare noun"
+  :regression-test "test/cargohandling/scope_exclusion_test.clj"}
+ :verification
+ {:tests "35 tests, 193 assertions, 0 failures, 0 errors (clojure -M:test)"
+  :push-commit "d39ba69513d19f060b13022dcfd42098c9747a94"
+  :push-base "12e63cb"
+  :repo-public? true
+  :registry-entry-updated? true
+  :registry-commit "669aa0dd5464892f5ab28430d5a46683f5da9946"
+  :registry-test-commit "49528653b545da177bda6a153e39204c13ada37c"
+  :registry-implemented-count-before 399
+  :registry-implemented-count-after 400
+  :registry-blueprint-count-before 18
+  :registry-blueprint-count-after 17
+  :postmerge-reverify "fresh clone + fresh kotoba-lang/technology sibling, 15 tests / 1062 assertions, 0 failures, 0 errors"}
+ :references
+ ["ADR-2607121000"
+  "ADR-2628071600"
+  "ADR-2607155100"
+  "ADR-2607141600"
+  "Skill:build-actor"]}
