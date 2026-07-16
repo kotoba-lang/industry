@@ -2325,6 +2325,49 @@ organization.ednと一致——史的首都バグの影響なしを確認。
 現状: 国軸30件・業界団体軸31件(25業種)・自治体軸29件——90tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 91 — 国軸31件目(IND) — tick88のcapital-check再利用)
+
+`cloud-itonami-iso3166-ind`の`statute.facts`を追加
+([commit 7861e76](https://github.com/cloud-itonami/cloud-itonami-iso3166-ind/commit/7861e76))：
+
+インドの一般法2件、いずれもmeity.gov.in・mca.gov.inがHTTP 403だったため、
+prsindia.org（PRS Legislative Research、非政府だが高い信頼性を持つ
+インドの立法調査機関）にミラーされている**官報（Gazette of India）の
+実物そのもの**を直接確認:
+
+- **The Companies Act, 2013（Act No. 18 of 2013）** — Gazette of
+  India masthead、Ministry of Law and Justice発行者情報、タイトル、
+  「29th August, 2013」の大統領裁可日、すべて判読可能。
+- **The Digital Personal Data Protection Act, 2023（Act No. 22 of
+  2023）** — Gazetteのmastheadと「August 11, 2023」の日付行は判読
+  可能だったが、法令タイトル本文はフォント崩壊で判読不能。正確な
+  Act番号citationはWebSearchツール自身のインデックス済みタイトル
+  スニペットと、複数の独立引用ソース（Wikipedia・AO Shearman・
+  Future of Privacy Forum・OneTrust）が一致することで裏付けた。
+
+コンテンツ自体が官報の実物であることを明示するため、両エントリとも
+`:official-gazette-of-india-prsindia-mirror`という、ホスト元
+（非政府）と内容の公式性を区別するタグを使用。
+
+このリポジトリは最近のLatAm系ブループリント専用リポジトリと異なり、
+既存の`marketentry.facts`実装（langgraph依存）が既にあったため、
+同一`deps.edn`の下に`statute.facts`を新規namespaceとして追加
+（新規deps.edn/.gitignore不要）。4 tests/9 assertions green
+（既存のmarketentry 24 tests/81 assertionsと合わせ計28 tests/90
+assertions green）。
+
+**capital-check**: tick88で既に検証済みのニューデリー（Q987）＝
+インド（Q668）現行首都・P36史的首都バグなしの結果を再利用。
+
+120リポジトリ・774 factを統合。jurisdiction IND queryで今回の2件が
+既存のetzhayyim/global-legislation-datoms legal-source（Indian
+Kanoon）と正しく共存していることを確認。`"statute/topic"
+"data-protection"`での横断queryでINDが他28カ国と共に取得できることを
+確認。
+
+現状: 国軸31件・業界団体軸31件(25業種)・自治体軸29件——91tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
