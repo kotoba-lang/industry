@@ -3287,6 +3287,38 @@ assertionsと合わせ全28 tests/90 assertions green）。142リポジトリ・
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。トルコの業界団体軸の空白は今後のtickに持ち越し。
 
+## Addendum (2026-07-17, /loop tick 115 — 業界団体軸39件目(TBB, TUR, ISIC 6419) — トルコが3tick窓で3軸完成、5カ国目)
+
+`cloud-itonami-assoc-6419-tur-tbb`を新規GitHubリポジトリとして
+scaffold・push
+([commit ce27e15](https://github.com/cloud-itonami/cloud-itonami-assoc-6419-tur-tbb/commit/ce27e15))：
+
+Türkiye Bankalar Birliği（TBB、トルコ銀行協会）。ISIC 6419
+（銀行業）の9カ国目。tick114で正直に指摘したトルコの業界団体軸の
+空白を埋める。
+
+tbb.org.tr自身の複数ページから2件を直接確認:
+
+- **1958年10月8日設立**（"Vision Mission Values"ページの
+  "Kurulduğu 1958 yılından bu yana"という記述、および
+  "Kilometre Taşları"（Milestones）ページの1958年見出し下
+  "8 Ekim'de Kuruldu"という記述の両方で確認、後者のより精密な
+  日付を採用）
+- **2007年、個人顧客仲裁委員会（Bireysel Müşteriler Hakem
+  Heyeti）制度の導入**（同Milestonesページの2007年見出し下で確認）
+
+4 tests/12 assertions green。142リポジトリ・822 factを統合。
+
+3軸横断query（`statute/jurisdiction`・`ordinance/country`・
+`association-rule/country`いずれも`"TUR"`）で全て正しく取得を
+確認——**トルコがtick113(自治体)→114(国)→115(業界団体)の
+3tick窓で3軸完成、UAE(tick100)・ベトナム(tick103)・
+インドネシア(tick106)・フィリピン(tick109)に続く5カ国目**。
+
+現状: 国軸39件・業界団体軸39件(27業種)・自治体軸37件——115 tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
