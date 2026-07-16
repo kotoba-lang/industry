@@ -3,9 +3,17 @@
 ;; Phase 2: :roots — trust anchors for delegation chains (fleet grant);
 ;;          :canonical — Radicle-crefs-style quorum policy for canonical
 ;;          advances (fleet govern): >= :threshold distinct signatures from
-;;          :allow. Private keys are session-local staging (0600, scratchpad);
-;;          moving them to 1Password (secrets-location-map) + CAIP-122 CACAO
-;;          wire format are tracked Phase 2 remainders.
+;;          :allow. Private keys now live in kagi (OS-Keychain unlock, no
+;;          interactive prompt — the kotoba-native store, ADR-2606272330),
+;;          NOT 1Password (op CLI timed out on interactive auth). Retrieve
+;;          with `fleet ... --kagi <name>` (compartment personal). CAIP-122
+;;          CACAO wire format alignment remains a Phase 2 follow-up.
+;;
+;; kagi key names (compartment personal):
+;;   fleet-owner-key   -> ed25519:7414dd47...  (single-key pin-advance signer)
+;;   fleet-owner-root  -> :roots trust anchor + quorum member
+;;   fleet-gov1/gov2   -> :canonical quorum governors
+;;   fleet-agent1      -> delegated land-back agent
 {:keys
  {"ed25519:7414dd47730947339b50c97b85021f22beee825dacc9e5c30b8413973215c5dd"
   {:grants #{"orgs/*"}
