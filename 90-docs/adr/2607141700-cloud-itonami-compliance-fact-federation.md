@@ -3798,6 +3798,38 @@ be.ch（ベルン州）がホストするOEREB用PDFミラーが1つの文書に
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-17, /loop tick 129 — 国軸44件目(CHE) — スイスが国軸+自治体軸の2軸に到達、公式fedlexがJS必須のため国際機関系ミラーで補完)
+
+`cloud-itonami-iso3166-che`に`statute.facts`を追加・push
+([commit bf34e64](https://github.com/cloud-itonami/cloud-itonami-iso3166-che/commit/bf34e64))：
+
+tick128で検証済みの首都チェック（スイスは憲法上「首都」を持たず
+ベルンが事実上の連邦都市）を再利用。スイス連邦の公式法情報
+システム（fedlex.admin.ch）はJavaScript必須のSPAでWebFetchでは
+本文取得不可（tick128のstadtrecht.bern.chと同型の問題）、断念。
+
+- **Code of Obligations**（債務法、SR 220）— 1911年3月30日制定、
+  1912年1月1日施行。WIPO Lex（今session既出の国際機関系法律
+  データベース）で原文"Federal Act of March 30, 1911, on the
+  Amendment of the Swiss Civil Code (Part Five: The Code of
+  Obligations)"を直接確認。
+- **Federal Act on Data Protection**（FADP、SR 235.1）— 2020年
+  9月25日制定、2023年9月1日施行。DLA Piperの"Data Protection
+  Laws of the World"（tick120サウジアラビアPDPLで既出）で
+  原文引用を直接確認。
+
+4 tests/9 assertions green（既存24 marketentry tests/81
+assertionsと合わせ全28 tests/90 assertions green）。150リポジトリ・
+850 factを統合。`jurisdiction CHE`クエリと、`ordinance/country`
+横断query（`[?e "ordinance/country" "CHE"]`）でtick128のBern
+自治体2件が正しくクロスリンクされることを確認——スイスは今回で
+国軸+自治体軸の2軸に到達したが、業界団体軸はまだ未着手であり、
+これを正直に報告する。
+
+現状: 国軸44件・業界団体軸43件(28業種)・自治体軸42件——129 tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。スイスの業界団体軸の空白は今後のtickに持ち越し。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
