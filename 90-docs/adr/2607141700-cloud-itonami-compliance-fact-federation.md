@@ -2149,6 +2149,30 @@ asuncion/sydney/cape-town/san-jose/guadalajara/bogota/copenhagenと
 現状: 国軸29件・業界団体軸29件(24業種)・自治体軸27件——85tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 86 — 業界団体軸30件目(AFBF) — 新規ISIC業種(混合農業))
+
+`cloud-itonami-assoc-0150-usa-afbf`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-assoc-0150-usa-afbf/commit/9f6dfb2))：
+American Farm Bureau Federation（AFBF、Wikidata Q4743741）。`fb.org`
+の公式ページ2件を直接WebFetch検証: 「Who We Are」（1919-11-12、
+シカゴで34州のFarm Bureauリーダーにより組織化と本文で直接確認）／
+「What We Do」（AFBFの政策提言機能の説明——独自の日付は記載なし、
+最近の大会ニュースリリースやポリシーブックPDFなど、独立した日付を
+持つ2件目の文書を複数試みたがいずれもHTTP 404/403で断念したため、
+established-dateは捏造せず意図的に省略）。4 tests/11 assertions
+green。
+
+**新規ISIC業種**: ISIC 0150(混合農業)を初めて追加した——AFBFは
+多様な作物・畜産にまたがる連合体のため、ISIC Rev.4に存在しない
+「一般農業」の代わりに最も近い代表分類として採用。
+
+115リポジトリ・764 factを統合。`"association-rule/topic"
+"governance"`での横断queryでafbfを含む26団体が取得できることを
+確認。
+
+現状: 国軸29件・業界団体軸30件(25業種)・自治体軸27件——86tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
