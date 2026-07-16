@@ -1,0 +1,84 @@
+[{:adr/id 2700004799
+  :adr/title "cloud-itonami-isic-4799 — Non-Store Retail Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-4799]
+  :adr/references [2607121000 2680004719]
+
+  ;; Wave 2 actor (coordination/logistics/trade): non-store retail
+  ;; (door-to-door selling, vending-machine retail, direct-sales/
+  ;; party-plan home-demonstration selling) operations coordination-only
+  ;; (sale/order transaction logging, route/vending-machine-fleet
+  ;; scheduling, supply-order coordination, compliance-concern
+  ;; flagging). No fixed storefront -- the primary gate is
+  ;; seller/route/vending-machine-fleet registration, not store
+  ;; verification. Distinct consumer-protection dimension: never
+  ;; finalizes a waiver of a consumer's statutory cooling-off/
+  ;; cancellation right.
+
+  :actor/id :cloud-itonami-isic-4799
+  :actor/name "Non-Store Retail Operations Coordinator"
+  :actor/isic-rev5 "4799"
+  :actor/domain :retail/non-store
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-sales-record :schedule-route-operation
+                       :coordinate-supply-order :flag-compliance-concern]
+  :actor/always-escalate-ops [:flag-compliance-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-supply-order 1000}
+
+  :actor/hard-checks [:seller-verified :vendor-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["finalize the cooling-off waiver" "finalized the cooling-off waiver"
+                                "finalizing the cooling-off waiver"
+                                "finalize the cancellation-right waiver" "finalized the cancellation-right waiver"
+                                "waive the customer's cooling-off right" "waived the customer's cooling-off right"
+                                "waive the customer's cancellation right" "waived the customer's cancellation right"
+                                "have the customer sign away their cancellation right"
+                                "had the customer sign away their cancellation right"
+                                "get the customer to sign away their cancellation right"
+                                "sign away the cooling-off period" "signed away the cooling-off period"
+                                "sign away their cancellation right" "signed away their cancellation right"
+                                "confirm the customer waived cooling-off" "confirmed the customer waived cooling-off"
+                                "obtain a waiver of the cancellation right" "obtained a waiver of the cancellation right"
+                                "execute the cooling-off waiver" "executed the cooling-off waiver"
+                                "クーリングオフ権を放棄させた" "クーリングオフの放棄を確定させた"
+                                "解約権の放棄を確定させた" "解約権を放棄させた"
+                                "クーリングオフ期間の放棄に同意させた" "クーリングオフを放棄させた"]
+
+  ;; Self-trip-avoidance: every term above is phrased as the
+  ;; finalization/execution ACTION, never a bare noun -- this
+  ;; namespace's own :flag-compliance-concern default proposal
+  ;; legitimately discusses cooling-off complaints / cancellation-right
+  ;; consumer concerns as bare nouns. A bare-noun term list (e.g. bare
+  ;; "cooling-off"/"cancellation right") would self-trip this actor's
+  ;; own core happy path on every single run. Regression test:
+  ;; governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion.
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-sales-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-sales-record :schedule-route-operation
+                                               :coordinate-supply-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-sales-record :schedule-route-operation
+                                         :coordinate-supply-order :flag-compliance-concern}
+      :auto #{:log-sales-record :schedule-route-operation :coordinate-supply-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 56 :assertions 166 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression
+                  :vendor-verification]
+  :test/simulator :nonstoreops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-4799"
+  :registry/business-id "cloud-itonami-isic-4799"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
