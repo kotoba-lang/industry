@@ -2558,7 +2558,7 @@
       ;; recompute against that truly-landed content, showed :implemented
       ;; 390 -- not assumed, not individually re-narrated here, their own
       ;; responsibility to corroborate).
-      (is (= 390 (:implemented m))))))
+      (is (= 392 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
