@@ -2090,6 +2090,38 @@ oslo/asuncion/sydney/cape-town/san-jose/bogota/copenhagenと並んで
 現状: 国軸28件・業界団体軸29件(24業種)・自治体軸26件——83tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 84 — 国軸29件目(グアテマラ))
+
+`cloud-itonami-iso3166-gtm`に`statute.facts`を新規追加・push
+([commit 9974bb4](https://github.com/cloud-itonami/cloud-itonami-iso3166-gtm/commit/9974bb4))：
+グアテマラ共和国。本来の一次情報源`congreso.gob.gt`がHTTP 403を
+返したため、代わりに国際機関公式の法令データベース2件で検証:
+Código de Comercio（商法典、Decreto N.º 2-70）——WIPO（世界知的所有権
+機関）のWIPO Lex法令データベースで直接確認、1970-01-28採択・
+1970-03-30施行／Ley de Acceso a la Información Pública（情報公開法、
+Decreto N.º 57-2008）——CEPAL（国連ラテンアメリカ・カリブ経済委員会）
+のObservatorio del Principio 10で直接確認、2008-10-23制定。
+
+**データ保護法エントリなし**: グアテマラには2025年時点で包括的な
+データ保護法が存在しないことをWebSearchで確認（3つの競合法案が
+係属中のみ）——捏造せず正直にエントリを設けなかった。
+
+ウルグアイ・コスタリカ・パナマ・エクアドル・パラグアイと同様、この
+リポジトリも既存の`marketentry.facts`実装を持たないblueprint-only
+の状態だったため、`statute.facts`がこのリポジトリ初のコード実体と
+なった。4 tests/11 assertions green。
+
+首都チェック: 既存のooyake由来organization.edn（Guatemala City、
+Wikidata Q1555）は史実上一貫して首都であり、P36歴史的首都バグの
+対象外と確認。
+
+113リポジトリ・760 factを統合。`"statute/topic"
+"corporate-governance"`での横断queryでgtmを含む28カ国が取得できる
+ことを確認。
+
+現状: 国軸29件・業界団体軸29件(24業種)・自治体軸26件——84tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
