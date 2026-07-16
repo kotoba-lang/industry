@@ -2048,6 +2048,24 @@ Q2933）は史実上一貫して首都であり、P36歴史的首都バグの対
 現状: 国軸28件・業界団体軸29件(24業種)・自治体軸24件——81tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 82 — 自治体軸25件目(アスンシオン))
+
+`cloud-itonami-municipality-pry-asuncion`を新規scaffold・push
+([初回commit](https://github.com/cloud-itonami/cloud-itonami-municipality-pry-asuncion/commit/5681080))：
+アスンシオン市（パラグアイ）。市公式`asuncion.gov.py`のページ2件を
+検証: Ordenanza N.º 43/22（プラスチックストロー禁止条例——市の
+記事は2022年と施行後6か月の猶予期間のみ明記、正確な採択日
+2022-10-05はWebSearch裏付け）／Creación de la Dirección de
+Transparencia y Anticorrupción（透明性・反汚職局の設立、2017-11-23
+——市自身の発表記事で直接確認）。4 tests/10 assertions green。
+
+111リポジトリ・756 factを統合。`"ordinance/topic" "transparency"`
+での横断queryでasuncionがsao-paulo/washington-dc/madrid/berlin/roma/
+seoul/tokyo/santiago/buenos-airesと並んで取得できることを確認。
+
+現状: 国軸28件・業界団体軸29件(24業種)・自治体軸25件——82tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
