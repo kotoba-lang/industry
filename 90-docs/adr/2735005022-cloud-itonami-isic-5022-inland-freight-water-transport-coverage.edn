@@ -1,0 +1,87 @@
+[{:adr/id 2735005022
+  :adr/title "cloud-itonami-isic-5022 — Inland Freight Water Transport Port/Logistics Scheduling Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-5022]
+  :adr/references [2607121000]
+
+  ;; Wave 2 actor (coordination/logistics/trade), final batch of Wave 2's
+  ;; 4-digit gaps: inland freight water transport (river barges, canal
+  ;; cargo vessels, towboat/pushboat operations) INLAND WATERWAY
+  ;; PORT/LOGISTICS SCHEDULING coordination-only (shipment-record
+  ;; logging, dock/lock-scheduling and voyage scheduling coordination,
+  ;; maintenance-order coordination, safety-concern flagging). Never
+  ;; navigates a barge/towboat; never operates lock infrastructure;
+  ;; never finalizes a vessel-seaworthiness or cargo-load-safety
+  ;; clearance.
+
+  :actor/id :cloud-itonami-isic-5022
+  :actor/name "Inland Freight Water Transport Port/Logistics Scheduling Coordinator"
+  :actor/isic-rev5 "5022"
+  :actor/domain :transport/inland-freight-water
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-shipment-record :schedule-berth-operation
+                       :coordinate-maintenance-order :flag-safety-concern]
+  :actor/always-escalate-ops [:flag-safety-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-maintenance-order 5000}
+
+  :actor/hard-checks [:vessel-verified :contractor-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["finalize the seaworthiness clearance" "finalize the river-worthiness clearance"
+                                "issue the seaworthiness clearance" "issue the river-worthiness clearance"
+                                "clear the vessel as seaworthy" "clear the barge as river-worthy"
+                                "certify the vessel as seaworthy" "certify the barge as river-worthy"
+                                "finalize the cargo-load-safety clearance"
+                                "approve the cargo load as safe" "clear the cargo load as safe"
+                                "override the tow captain's safety judgment"
+                                "override the captain's safety judgment"
+                                "override the lockmaster's safety judgment"
+                                "override the master's safety determination"
+                                "bypass the inland waterway safety protocol" "bypass inland waterway safety protocols"
+                                "bypass lock operating procedures"
+                                "directly navigate the barge" "directly navigate the tow"
+                                "directly dispatch the barge" "directly reroute the barge"
+                                "directly operate the lock gates" "take direct control of the helm"
+                                "耐空性確認を確定" "耐空性証明を発行した" "堪航性確認を確定" "堪航性証明を発行した"
+                                "貨物積付安全確認を確定"
+                                "曳船船長の安全判断を覆した" "水先案内人の安全判断を覆した" "閘門長の安全判断を覆した"
+                                "内陸水路安全プロトコルを回避" "閘門操作手順を回避"
+                                "バージを直接操船した" "曳船列を直接操船した" "閘門ゲートを直接操作した"]
+
+  ;; Self-trip-avoidance: every term above is phrased as the
+  ;; finalization/execution ACTION, never a bare noun -- this namespace's
+  ;; own :flag-safety-concern default proposal legitimately discusses
+  ;; cargo-load-safety/river-worthiness/hazmat concerns as bare nouns. A
+  ;; bare-noun term list (e.g. bare "seaworthy"/"river-worthy"/"cargo
+  ;; load safety"/"hazmat") would self-trip this actor's own core happy
+  ;; path on every single run. Regression test:
+  ;; governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion.
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-shipment-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-shipment-record :schedule-berth-operation
+                                               :coordinate-maintenance-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-shipment-record :schedule-berth-operation
+                                         :coordinate-maintenance-order :flag-safety-concern}
+      :auto #{:log-shipment-record :schedule-berth-operation :coordinate-maintenance-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 60 :assertions 174 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression
+                  :contractor-verification]
+  :test/simulator :inlandbargeops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-5022"
+  :registry/business-id "cloud-itonami-isic-5022"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
