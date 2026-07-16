@@ -1,0 +1,111 @@
+{:adr-id "2607160919"
+ :title "cloud-itonami-isic-3511 — Small Modular Reactor generation-operator compliance actor"
+ :date "2026-07-16"
+ :author "Cloud Itonami Contributors"
+ :status :accepted
+ :context
+ "ISIC Rev.5 group 351 (electric power) splits into 3511
+  (non-renewable generation) / 3512 (renewable generation) / 3513
+  (transmission) / 3514 (distribution) / 3515 (trade) / 3516
+  (storage), per the Swiss KUBB NOGA-2025/ISIC-Rev.5 coding tool.
+  Siblings cloud-itonami-isic-3510 (grid distribution) and
+  cloud-itonami-isic-3512 (community renewable generation) already
+  :implemented; 3511 did not yet exist. Owner-authorized extension of
+  ADR-2607121000's own Top-10 value-ranking item #6 (\"3510/3512
+  電力\") to cover all three. Built as a single-actor batch after
+  ADR-2607152300's documented 61% defect-rate incident -- verified,
+  not self-reported."
+ :decision
+ {:scope-boundary
+  "Governance/compliance software actor for an SMR generation
+   OPERATOR business -- NOT reactor physics/engineering, NOT a
+   control system, NEVER performs or authorizes an actual
+   reactor-safety-critical action. Closed five-op allowlist, all
+   :effect :propose: log-safety-inspection-record,
+   draft-licensing-submission, log-fuel-custody-record,
+   draft-community-benefit-report, flag-safety-concern (always
+   escalates). ISIC 3511 as a class also covers coal/gas/oil
+   generation; this repo's honest R0 scope is the nuclear/SMR
+   operator niche only."
+  :governor-rules
+  "FIVE HARD checks, in priority order: (1) facility-unverified --
+   target SMR-facility record must exist AND be independently
+   :registered?/:verified? in the store; (2) effect-not-propose --
+   any :effect other than :propose is a claim to directly actuate
+   outside governance; (3) spec-basis fabrication -- a
+   draft-licensing-submission with no citation to an official
+   regulator source (smrops.facts, JPN/NRA · USA/NRC · GBR/ONR
+   seeded) is rejected; (4) scope-exclusion -- permanent,
+   un-overridable, substring-scanned (English + Japanese) over
+   control-rod-operation / reactor-trip-or-scram-decision /
+   criticality-safety-determination / radiological-release-or-dose-
+   authorization / containment-integrity-override /
+   emergency-evacuation-order / fuel-loading-or-refueling-sequencing /
+   security-force-response-decision territory, deliberately QUALIFIED
+   phrases so a legitimate observed-anomaly flag-safety-concern never
+   self-trips the gate; (5) absolute live-actuation request -- a
+   NARROWER, SEPARATE, STRONGER check that fires only on an
+   imperative 'authorize/grant/execute it now' request, independently
+   re-derived and re-checked a SECOND time directly inside
+   smrops.operation's own :commit node (the single node that writes
+   the SSoT), immediately before any write, so no upstream
+   :decide/phase-gate wiring bug could ever let a live authorization
+   request through. flag-safety-concern ALWAYS escalates, never a
+   member of any phase's :auto set, matching smrops.governor's own
+   always-escalate-ops invariant as two independent layers."
+  :module-shape
+  "smrops.facts (per-jurisdiction SMR-licensing regulator catalog,
+   no fabrication), smrops.registry (licensing-submission-draft +
+   fuel-custody-record construction, unsigned certificates,
+   jurisdiction-scoped sequence numbers, mirroring energy.registry),
+   smrops.store (MemStore, STRING-keyed facility directory --
+   ADR-2607152100's bug class avoided from the start), smrops.advisor
+   (SmrOpsAdvisor: mock + real-LLM seam via langchain.model, plus
+   TWO distinct test hooks -- :out-of-scope? and
+   :absolute-actuation-test?, deliberately separate), smrops.governor
+   (all checks above, priority-ordered), smrops.phase (0->3 rollout),
+   smrops.operation (langgraph-clj StateGraph with the redundant
+   :commit-node check), smrops.sim (demo driver)."
+  :registry-and-manifest
+  "kotoba-lang/industry registry.edn \"3511\" entry added via a
+   sha-checked Contents-API single-file PUT; test-file corroboration
+   landed via branch + gh api repos/.../merges server-side merge, no
+   local rebase/force-push. Superproject manifest/repos.edn
+   :extra-projects gained the single new path (diff-verified);
+   manifest/west.yml gained the project entry via
+   `nbb scripts/gen-west-manifest.cljs --entry
+   cloud-itonami-isic-3511` (server-side pin verification passed),
+   confirmed canonical via --check."}
+ :consequences
+ ["Extends ADR-2607121000's Top-10 item #6 to cover all three of ISIC 3510/3511/3512."
+  "First TWO-TIER excluded-territory design in this fleet's governor pattern: a broad,"
+  " permanent scope-exclusion check plus a narrower, separately-and-redundantly-enforced"
+  " absolute-actuation-request check with a second independent enforcement point at commit time."
+  "This R0 governs the SMR/nuclear compliance-recordkeeping slice only -- no"
+  " conventional/fossil generation, no reactor-control-system integration, no real"
+  " regulator filing integration."
+  "kotoba-lang/industry :implemented count 377 -> 378 (live-recomputed, fresh-clone verified)."]
+ :verification
+ {:cloud-itonami-isic-3511
+  {:commit "c5259d891e2c2257ec250d56221c8763aa619236"
+   :test "Ran 76 tests containing 247 assertions. 0 failures, 0 errors."
+   :lint "linting took 649ms, errors: 0, warnings: 0"
+   :run "clojure -M:run (smrops.sim) walked all scenarios including the absolute block at :govern and the redundant :commit re-check, no error"}
+  :kotoba-lang-industry
+  {:registry-put-commit "62eeb4eabeadbbd87c29fdc15dd5a77488a7b94c"
+   :test-merge-commit "5463069e11749e06ef01bec84657d57b627e9938"
+   :test "Ran 15 tests containing 1043 assertions. 0 failures, 0 errors."
+   :lint "linting took 471ms, errors: 0, warnings: 0"}
+  :superproject-manifest
+  {:repos-edn-put-commit "49dfde506d2e71b3863a4ee0110f2b543e6b2bee"
+   :west-yml-entry "5-line single-entry diff via --entry cloud-itonami-isic-3511, server-side pin verification passed"
+   :check "west.yml is up to date."}}
+ :references
+ ["cloud-itonami-isic-3511/docs/adr/0001-architecture.md"
+  "cloud-itonami-isic-3512/docs/adr/0001-architecture.md"
+  "cloud-itonami-isic-0520/docs/adr/ (ADR-2607152300)"
+  "cloud-itonami-isic-0510/docs/adr/ (ADR-2607152100)"
+  "90-docs/adr/2607142400-cloud-itonami-isic-3510-electric-power-coverage.md"
+  "ADR-2607121000 (ISIC/ISCO global reverse-toposort wave plan)"
+  "kotoba-lang/industry resources/kotoba/industry/registry.edn \"3511\" entry"
+  "Swiss KUBB NOGA-2025/ISIC-Rev.5 coding tool, https://www.kubb-tool.bfs.admin.ch/en/noga/2025/351"]}

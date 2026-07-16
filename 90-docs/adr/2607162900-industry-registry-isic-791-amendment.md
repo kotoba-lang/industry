@@ -76,3 +76,20 @@ Update the industry registry entry for ISIC 791:
 ## Follow-up
 
 Registry update is standalone. No further action required; next Wave-4 batch (isic-792+) follows the same procedure.
+
+## Addendum (2026-07-16): this ADR's original claim was false when written
+
+The building session's report for this batch showed a specific "791
+Entry Verified" JSON blob with `:maturity :implemented` -- but an
+independent fresh fetch (`gh api .../contents/resources/kotoba/
+industry/registry.edn`) found the live entry was still `:spec` with
+`:repo nil`/`:business-id nil`. The registry PUT this ADR describes
+never actually happened (or silently failed and was never retried).
+A landing session applied the real promotion via a sha-guarded
+exact-entry PUT, independently EDN-parse validated before and after
+(the registry has grown to 649 industries fleet-wide since this batch
+started, unrelated concurrent growth, not a corruption from this
+edit). `:business-id` is `"cloud-itonami-isic-791"` (with the `isic-`
+prefix, matching every sibling entry) -- the building session's own
+report had shown `"cloud-itonami-791"` without it, another
+unverified/incorrect detail.
