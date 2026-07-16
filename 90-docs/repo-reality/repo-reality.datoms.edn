@@ -55,7 +55,8 @@
  {:db/ident :claim/axis           :db/valueType :db.type/ref     :db/cardinality :db.cardinality/many} ; -> :axis/id, which normalized axis/axes this claim bears on
 
  ;; verification events (append-only, in repo-reality-ledger.edn)
- {:db/ident :eval/claim    :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one} ; -> :claim/id
+ {:db/ident :eval/claim    :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one} ; -> :claim/id (curated-claim events)
+ {:db/ident :eval/repo     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one} ; "org/repo" string, e.g. "kotoba-lang/kototama" -- used INSTEAD of :eval/claim for org-wide generic checks (orgwide_scan.cljs, 2026-07-16). No per-repo hand-curated :claim/* entity exists for these (would not scale to 1000+ repos); the repo name string is the identifier. A ledger line has exactly one of :eval/claim or :eval/repo, never both.
  {:db/ident :eval/axis     :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one} ; -> :axis/id
  {:db/ident :eval/layer    :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one} ; :claim-extraction | :lint | :evidence-link | :ledger-reconcile
  {:db/ident :eval/score    :db/valueType :db.type/double  :db/cardinality :db.cardinality/one} ; 0..1, normalized regardless of axis/project scale
@@ -88,6 +89,15 @@
   :axis/description "does the doc's OWN account match what the code actually does right now. A claim that discloses its own gap (:claim/self-caveat true) and the gap is confirmed real scores HIGH here (the doc is honest) even though :axis/functional-completeness for that same claim may be low — the two axes intentionally diverge; a claim with no caveat that turns out wrong scores LOW here regardless of completeness"}
  {:axis/id :axis/production-readiness, :axis/label "Production readiness", :axis/scale "0-1 (~ 1-5 normalized)",
   :axis/description "overall real-world usage signal — is this actually consumed by another repo/app in this monorepo today, not just internally tested"}
+
+ ;; ---- org-wide generic axes (2026-07-16, kotoba-lang org scan — no hand-curated :claim/*) --
+ ;; kotoba-lang org has ~1410 non-archived repos, too many for the per-repo README/ADR reading
+ ;; the 5 curated projects above got. These 2 axes are computed by orgwide_scan.cljs uniformly
+ ;; via the GitHub API (git tree + selective file content), tagged via :eval/repo not :eval/claim.
+ {:axis/id :axis/doc-internal-coherence, :axis/label "Doc-internal coherence (org-wide, generic)", :axis/scale "0-1",
+  :axis/description "generic, claim-free extension of :axis/doc-code-drift's intent: does a repo's own maturity/coverage doc (coverage.edn / maturity.md, wherever present) agree with (a) the files it cites as evidence actually existing, and (b) any OTHER status-bearing doc in the same repo (e.g. versioning.md vs coverage.edn disagreeing, the exact pattern found by hand in kotoba-lang/kotobase — see claim/kotobase-m5-doc-inconsistency). Repos with no maturity/coverage doc at all are not scored on this axis (absence of the doc is not the same as an incoherent one)."}
+ {:axis/id :axis/repo-hygiene, :axis/label "Repo hygiene (org-wide, generic)", :axis/scale "0-1",
+  :axis/description "generic housekeeping signal independent of any specific claim or architectural importance: README substance (not a 1-line placeholder), CI config presence (.github/workflows), test-file presence. A small legitimate single-purpose tool repo can and should score high here — this is NOT a maturity/completeness judgment, just basic upkeep."}
 
  ;; ---- claim catalog: aiueos (prototype repo, 2026-07-15) ---------------------------------
  {:claim/id :claim/aiueos-maturity-m6,
