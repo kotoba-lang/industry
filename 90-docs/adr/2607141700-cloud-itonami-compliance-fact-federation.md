@@ -3619,6 +3619,43 @@ tick122のKuala Lumpur自治体2件が正しくクロスリンクされること
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。マレーシアの業界団体軸の空白は今後のtickに持ち越し。
 
+## Addendum (2026-07-17, /loop tick 124 — 業界団体軸42件目(MPOA, MYS, ISIC 0126) — マレーシアが3tick窓で3軸完成、8カ国目)
+
+`cloud-itonami-assoc-0126-mys-mpoa`を新規GitHubリポジトリとして
+scaffold・push
+([commit d9919ba](https://github.com/cloud-itonami/cloud-itonami-assoc-0126-mys-mpoa/commit/d9919ba))：
+
+Malaysian Palm Oil Association（MPOA）。**ISIC 0126**（アブラヤシ
+果実栽培）の2件目——インドネシアのGAPKI（tick105）に続く。
+tick123で正直に指摘したマレーシアの業界団体軸の空白を埋める。
+
+mpoa.org.my自身の"Introduction"ページから2件を直接確認:
+
+- **1999年、プランテーション業界の各種団体・諮問機関・評議会の
+  合理化を経てMPOA設立**（原文引用: "In 1999, a rationalisation
+  exercise of the various associations, advisory bodies, and
+  councils of the plantation industry saw the birth of a single
+  umbrella entity - the government supported Malaysian Palm Oil
+  Association (MPOA)."）
+- **1897年以来活動するUnited Planting Association of Malaysia**
+  （MPOAの前身団体の一つ、同ページで確認）
+
+MPOA固有のWikidata Q-idは見つからず（政府機関MPOBとは別、tick108
+BAP・tick121 FSCと同型のパターンで正直に省略）。
+
+4 tests/11 assertions green。147リポジトリ・840 factを統合。
+
+3軸横断query（`statute/jurisdiction`・`ordinance/country`・
+`association-rule/country`いずれも`"MYS"`）で全て正しく取得を
+確認——**マレーシアがtick122(自治体)→123(国)→124(業界団体)の
+3tick窓で3軸完成、UAE(tick100)・ベトナム(tick103)・
+インドネシア(tick106)・フィリピン(tick109)・トルコ(tick115)・
+ナイジェリア(tick118)・サウジアラビア(tick121)に続く8カ国目**。
+
+現状: 国軸42件・業界団体軸42件(28業種)・自治体軸40件——124 tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社

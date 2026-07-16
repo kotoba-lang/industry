@@ -406,7 +406,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-municipality-mys-kuala-lumpur/data/datascript-tx.edn"}
    {:label "cloud-itonami-iso3166-mys statute.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-iso3166-mys/schema/statute.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-iso3166-mys/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-mys/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-0126-mys-mpoa association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-0126-mys-mpoa/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-0126-mys-mpoa/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
