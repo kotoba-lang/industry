@@ -2245,6 +2245,46 @@ organization.ednと一致——史的首都バグの影響なしを確認。
 現状: 国軸30件・業界団体軸30件(25業種)・自治体軸28件——88tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 89 — 業界団体軸31件目(SMMT, GBR, ISIC 2910) — 国別multiplicity拡張)
+
+`cloud-itonami-assoc-2910-gbr-smmt`を新規GitHubリポジトリとして
+scaffold・push
+([commit a3b66c7](https://github.com/cloud-itonami/cloud-itonami-assoc-2910-gbr-smmt/commit/a3b66c7))：
+
+Society of Motor Manufacturers and Traders（SMMT、英国自動車工業会、
+Wikidata Q7552564）。smmt.co.uk自身のHistoryページを直接WebFetch
+検証:
+
+- **SMMT設立（1902年7月22日）** — ページに明記「On 22 July 1902 the
+  Society of Motor Manufacturers and Traders (SMMT) was created」
+- **第1回SMMTモーターショー（Crystal Palace、1903年）** — 「January
+  1903」とあり日にちの記載が無いため年のみで格納（既存の他エントリと
+  同じ「年のみ正直記録」規律に合わせた）
+
+ページは現President/Chief Executiveの氏名も記載していたが、統治構造の
+説明確認のためだけに読み、氏名は一切保存していない。4 tests/11
+assertions green。
+
+**多様化の狙い**: 業界団体軸はこれまでUSA（30件中18件）・日本（同8件）
+に大きく偏り、EU圏は3件（VDA/Bankenverband/FBF）、英国は0件だった——
+SMMTが軸初の英国拠点団体。またISIC 2910（自動車製造）2件目
+（ドイツVDAに次ぐ）——ISIC 6419（全銀協/Bankenverband/FBF）で既に
+確立した「同一ISIC・複数国」パターンを踏襲。
+
+118リポジトリ・770 factを統合。`"association-rule/isic" "2910"`での
+横断queryで`[vda DEU]`と`[smmt GBR]`の両方が正しく取得できることを
+確認。
+
+**このtickの開始時同期で一時的な事象**: west-pin-verify-guardフックに
+1回引っかかった（aiueos/compiler/kotoba-fleet-vcsの3リポが、並行
+セッションのpin修正マージ中の過渡状態でmainより一時的に遅れていた）。
+数分後にorigin/mainを再fetchしてmerge+pushをリトライしたところ問題
+なく解消——本セッション序盤(tick約57)で一度見られたのと同じ、pin手動
+修正不要の一過性事象パターン。
+
+現状: 国軸30件・業界団体軸31件(25業種)・自治体軸28件——89tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
