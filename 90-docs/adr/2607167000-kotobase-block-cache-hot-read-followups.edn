@@ -1,0 +1,18 @@
+[{:db/id -1
+  :adr/id "adr-2607167000-kotobase-block-cache-hot-read-followups"
+  :adr/title "ADR-2607167000: kotobase 不変ブロックキャッシュ + ホット読みの follow-up 裁定（単価の支配項は appview→kotobase の逐次 HTTP 往復）"
+  :adr/doc_type "adr"
+  :adr/topic "kotobase-block-cache-hot-read-followups"
+  :adr/status "accepted"
+  :adr/date "2026-07-16"
+  :adr/last_verified "2026-07-16"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["kotobase-cljc-worker の不変ブロック isolate メモリキャッシュ（CID ブロックのみ、mutable head は毎回 R2、64MB FIFO byte budget、nil 非キャッシュ）"
+   "ADR-2607166600 Follow-up 4 件の裁定: 単価削減=ブロックキャッシュ+エッジキャッシュ実施(残余は compound read)、他ホット読みの view 化=不採用(カーディナリティ無限、view はフィードのみが正しい適用対象)、O(Δ) view 維持=延期(トリガ: fold incremental 化)、chunked rows=延期(トリガ: rows>5k or block>2MB)"
+   "appview エッジキャッシュ対象の拡張(getPostThread/getAuthorFeed/getProfile、60s TTL)"]
+  :adr/related ["adr-2607166600" "adr-2607166000"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/body "実測起点の裁定。不変ブロックキャッシュ(kotobase-cljc-worker 1f07596/PR#10、40 tests green)を実装・デプロイして before/after: feed view miss 不変(~0.6s、head 読み支配)、thread/author 2〜3s のまま — 支配項はブロック読みでなく appview→kotobase の逐次 HTTP 往復(1 往復 ~0.4-0.6s × 4-6 回)と判明。よって: (a) ブロックキャッシュは R2 読み量削減として採用維持。(b) thread/author/profile を appview エッジキャッシュへ追加(app-aozora 01bb2e5/PR#83、繰り返し ~0.11s、406 tests green)。(c) 初回往復の圧縮は kotobase compound read として follow-up。(d) per-author/thread の view 化は不採用。(e) O(Δ)/chunked は延期(トリガ明記)。ledger iteration 3: getVideoFeed p50 18ms / miss p95 0.9s。注意: zone cache HIT はブラウザ max-age を 4h に書き換える(zone Browser Cache TTL) — Respect Existing Headers への変更は zone 全体に波及するためオーナー確認付き follow-up。"}]
