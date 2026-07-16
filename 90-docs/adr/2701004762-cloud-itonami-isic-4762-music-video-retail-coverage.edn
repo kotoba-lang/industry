@@ -1,0 +1,87 @@
+[{:adr/id 2701004762
+  :adr/title "cloud-itonami-isic-4762 — Music/Video-Recordings Retail Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-4762]
+  :adr/references [2607121000 2700004742]
+
+  ;; Wave 2 actor (coordination/logistics/trade): retail sale of music
+  ;; and video recordings in specialized stores (vinyl records, CDs,
+  ;; DVDs, Blu-rays and related physical media) operations
+  ;; coordination-only (sales/inventory/return logging, staffing
+  ;; scheduling, supply-order coordination, inventory-concern
+  ;; flagging). Fresh scaffold -- no pre-existing repo (gh api
+  ;; 404-confirmed).
+
+  :actor/id :cloud-itonami-isic-4762
+  :actor/name "Music/Video-Recordings Retail Operations Coordinator"
+  :actor/isic-rev5 "4762"
+  :actor/domain :retail/music-video-recordings
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-sales-record :schedule-staffing-operation
+                       :coordinate-supply-order :flag-inventory-concern]
+  :actor/always-escalate-ops [:flag-inventory-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-supply-order 1000}
+
+  :actor/hard-checks [:store-verified :vendor-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["finalize the copyright dispute" "finalized the copyright dispute"
+                                "finalize the licensing dispute" "finalized the licensing dispute"
+                                "finalize the copyright claim decision" "finalized the copyright claim decision"
+                                "approve the copyright claim" "approved the copyright claim"
+                                "deny the copyright claim" "denied the copyright claim"
+                                "reject the copyright claim" "rejected the copyright claim"
+                                "settle the copyright dispute" "settled the copyright dispute"
+                                "settle the licensing dispute" "settled the licensing dispute"
+                                "authorize the royalty payout" "authorized the royalty payout"
+                                "pay out the licensing settlement" "paid out the licensing settlement"
+                                "issue a copyright infringement settlement" "issued a copyright infringement settlement"
+                                "process the royalty payment" "processed the royalty payment"
+                                "confirm the licensing dispute resolution" "confirmed the licensing dispute resolution"
+                                "execute the copyright settlement" "executed the copyright settlement"
+                                "著作権紛争を確定" "ライセンス紛争の解決を承認" "著作権侵害の和解を承認した"
+                                "著作権請求を却下した" "著作権請求を拒否した" "ロイヤルティの支払いを実行"
+                                "ライセンス和解を承認した" "著作権和解処理を実行した"]
+
+  ;; Self-trip-avoidance: every term above is phrased as the
+  ;; finalization/execution ACTION, never a bare noun -- this namespace's
+  ;; own :flag-inventory-concern default proposal legitimately discusses
+  ;; suspected counterfeit/bootleg-recording/piracy/mis-shipment
+  ;; concerns. A bare-noun term list (e.g. bare "copyright"/"license"/
+  ;; "piracy"/"counterfeit") would self-trip this actor's own core happy
+  ;; path on every single run. This bug class was actually hit once
+  ;; during this actor's own development (the initial out-of-scope? test
+  ;; hook text used "copyright dispute"/"royalty payout" phrasing that
+  ;; did not match any listed action phrase, so the HARD block failed to
+  ;; trip) and fixed by aligning the hook text to the real phrases.
+  ;; Regression test:
+  ;; governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion.
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-sales-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-sales-record :schedule-staffing-operation
+                                               :coordinate-supply-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-sales-record :schedule-staffing-operation
+                                         :coordinate-supply-order :flag-inventory-concern}
+      :auto #{:log-sales-record :schedule-staffing-operation :coordinate-supply-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 56 :assertions 166 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression
+                  :vendor-verification]
+  :test/simulator :mvretailops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-4762"
+  :registry/business-id "cloud-itonami-isic-4762"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+  :registry/operating-states [:intake :stock :sell :reconcile :reorder :audit]
+
+  :db/id -1}]
