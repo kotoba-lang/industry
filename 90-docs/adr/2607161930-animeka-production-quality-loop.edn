@@ -1,0 +1,24 @@
+[{:adr/authoritative_for
+  ["animeka の作品作成・品質更新ループ scripts/production-loop.cljs の設計（discover→create→render+QA→publish→ledger、1 run = 1 有界増分）"
+   "breakdown の決定論 beat-plan（arc 起承転結 × cinematic vocabulary、LLM 不要）"
+   "render の品質規約（active renderRecipe 条件付け・R2 round-trip 検証必須・vision judge 不可用時は :judge :deferred と正直記録）"
+   "viewer の validation 計測面（viewer_hits + /api/stats）と data.json 駆動 SSR"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/topic "animeka-production-quality-loop"
+  :adr/related
+  ["adr-2607161800-animeka-standalone-bmc-lean-loop"
+   "adr-2607161730-animeka-coscientist-react-quality-harness"
+   "adr-2605222000-animeka-v3-usd-comfyui-cinematic-pipeline"
+   "adr-2607122200-kotoba-ui-single-entry"]
+  :adr/status "accepted, implemented & merged (ai-gftd-animeka main f2ebc840; first run: hagane ep1 0->6 cuts rendered+published; judges deferred pending LLM head)"
+  :adr/id "adr-2607161930-animeka-production-quality-loop"
+  :adr/doc_type "adr"
+  :adr/last_verified "2026-07-16"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/date "2026-07-16"
+  :adr/decision-summary
+  "{:goal \"オーナー指示『作品の作成、品質更新 loop を設計実装』— 成熟度 iteration を 1 コマンドの有界増分にする\", :script \"scripts/production-loop.cljs (nbb)\", :phases {:discover \"cuts==0 episode (oldest-first) / image_url IS NULL cuts (--max-renders 3)\" :create \"work props.arc 起承転結 x ADR-2605222000 語彙から決定論 6-cut breakdown (LLM不要)\" :render-qa \"active renderRecipe 条件付け -> fleet bridge -> sha256/CIDv1 -> R2 round-trip 検証 -> D1。vision judge は OLLAMA_HOST 可用時のみ、不可用は :deferred 正直記録\" :publish \"data.json export -> kotoba-ui SSR (data-driven generate.cljs) -> resource-guard deploy\" :ledger \"docs/production-loop-ledger.edn append-only\"}, :validation-instrumentation \"viewer_hits D1 table + GET /api/stats (blob/stats 自身は除外)\", :first-run {:episode \"ep-hagane-01\" :created 6 :rendered \"6/6\" :judges \"all :deferred (LLM head down)\" :live \"https://animeka.gftd.ai/ep-ep-hagane-01\"}, :bugs-fixed-same-day [:publish-deploy-cwd :old-ep-page-naming], :follow-ups [:deferred-cuts-vision-scoring-and-retake :graph-layer-d1-direct-wiring :variable-breakdown-via-generateScript], :non-goals [:cloud-routine-without-owner-ask :multi-agent-workflow]}"
+  :db/id -1
+  :adr/authoritative true
+  :adr/title "ADR-2607161930: animeka production/quality loop (create works + update quality, one bounded increment per run)"}]
