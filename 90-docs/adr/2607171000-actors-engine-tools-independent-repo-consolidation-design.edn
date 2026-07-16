@@ -1,0 +1,24 @@
+[{:adr/authoritative_for
+  ["20-actors 全体を独立リポ化する設計（実態は約80%完了済み・核心は stale vendored コピー除去 consolidation）"
+   "compat 系が kotoba-lang org に com-<base> として移行済みである事実の確認（845/1027 west 登録済み）と actor が etzhayyim org に com-etzhayyim-<name> として移行済み（173/240）"
+   "削除安全性を左右する結合の設計（classpath flat レイアウト・共有ライブラリ kotoba.datom/ie-flow の git-dep 化前提・fleet セル13 の runner classpath 改修前提・actor 間 co-split 塊）"
+   "bb actor:publish ツールに vendored 除去+MOVED marker を内蔵する修正"
+   "40-engine / 70-tools の分割可否 feasibility（両者 leaf・split-now/later/keep のマトリクスと順序）"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/topic "actors-engine-tools-independent-repo-consolidation-design"
+  :adr/related
+  ["adr-2607170900-yabai-consolidate-to-independent-repo"
+   "adr-2606231200-kotoba-rad-sovereign-actor-identity"
+   "adr-260607-clean-room-actors-600-generation"]
+  :adr/status "proposed"
+  :adr/id "adr-2607171000-actors-engine-tools-independent-repo-consolidation-design"
+  :adr/doc_type "adr"
+  :adr/last_verified "2026-07-16"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/date "2026-07-16"
+  :adr/decision-summary
+  "{:reality \"20-actors 独立リポ化は約80%完了済み。1267 非symlink dirs のうち 1018 が既に west 登録済み独立リポを持つ（削除可能な stale vendored コピー）、249 が未split\", :adoption {:compat {:total 1027 :migrated-to-kotoba-lang-com 845 :not-yet 182 :naming \"<base>-compat -> com-<base>\" :nature \"scaffold_wave*.py 機械生成・均一・相互依存ゼロ・runtime caller ゼロ・browser-WASM・fleet非稼働\"} :actor {:total 240 :migrated-to-etzhayyim 173 :not-yet 67 :naming \"com-etzhayyim-<name>\"}}, :root-cause \"bb actor:publish は独立リポ作成するが vendored コピーを消さない → 二重存在/drift。yabai ADR-2607170900 が唯一の除去先例\", :coupling {:classpath \"bb.edn :paths が唯一。20-actors flat ゆえ actor dir名=top-level ns。split repo は <name>/ 構造を classpath 上に再現要（compat は src/ self-rooted で例外）\" :shared-libs [\"kotoba.datom(36 uses, 20-actors/kotodama/src)\" \"etzhayyim.ie-flow.{metrics,score,gate-adapter}(70-tools/src)\" \"moyai.ledger\"] :cross-actor \"energy クラスタ(energy_order->mio/yudane/toi/tawami/okibi, mio->他4)は全fleetセル co-split必須。credits->shomei 他\" :fleet-cell-break \"actor を 20-actors から外すと <name>.cell が (require) 解決不能→python fallback失敗→セルが毎tick静かにerror化。yabai は cell module が kotodama.primitives.yabai_murakumo で yabai.cell でなかったため安全だった\"}, :decision {:A-phases {:phase0 \"共有ライブラリ(kotoba.datom/ie-flow/moyai.ledger)を git-dep 化（前提）\" :phase1 \"compat 845 の stale コピー除去（低リスク・最大物量、安全ゲート: west repo有/cell無/caller無/drift照合）+ 未移行182を publish\" :phase2 \"非fleet split済み actor の stale コピー除去（yabai型 per-actor）\" :phase3 \"fleet セル13は先に deploy_node.py+runner を git-dep マルチルート classpath に改修→remote fire検証後に除去。energyは co-split\" :phase4 \"未split 67 を bb actor:publish→合流\"} :B-tool-fix \"bb actor:publish に vendored除去+MOVED marker+drift照合ゲートを内蔵（二重存在の再発防止）\" :C-engine-tools {:dep-direction \"40-engine と 70-tools/src は leaf（engineは成果物消費、tools/srcは root bb.ednのみ消費）\" :engine-split-now [\"kotoba_iso20022\" \"legal-aid-wasm-guest\" \"legal-comms-wasm-guest\" \"baien-wasm-ternary\" \"kami-apps\"] :engine-split-later [\"root-router(k8s yaml re-point)\" \"svelte(named npm package化+app import書換)\" \"cluster/llm(重複解消先行)\"] :tools-split-now [\"etzhayyim-py\" \"clj/murakumo-langchain\"] :tools-split-later [\"etzhayyim-cli\" \"e7m-family\" \"lexicon-to-*\" \"cdn\" \"baien訓練群\"] :tools-keep [\"70-tools/src(root classpath最高摩擦)\" \"scripts\" \"integration-tests\" \"config\" \"loose保守scripts\"] :prereq \"pnpm-workspace.yaml:65-77 の除去済み submodule stale ref掃除\"}}, :hard-blockers [\"fleet セル13 actor は runner classpath 改修まで削除不可(削除でheartbeat静かにerror化)\" \"共有ライブラリ git-dep 化が依存actor split の前提\"], :owner-decisions-needed [\"fleet runner改修(Phase3)着手可否\" \"未split 249を全split するか(特にcompat182)\" \"compat 個別リポ維持 vs 再集約\" \"engine/tools split-now群を今実行するか\"], :execution \"本ADR合意後フェーズ分割。bulk一括は硬いblockerゆえ不可\"}"
+  :db/id -1
+  :adr/authoritative true
+  :adr/title "ADR-2607171000: 20-actors 全独立リポ化 + engine/tools 分割の設計"}]
