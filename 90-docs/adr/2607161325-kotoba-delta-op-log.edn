@@ -1,0 +1,20 @@
+[{:adr/authoritative_for
+  ["kotoba-lang/kotoba-delta が agent 編集の operation log（署名・parent-covering・explicit conflict・secrets admission・会話リンク・決定的 git projection）を所有する"
+   "「text CRDT を作らない」判断の境界（人間のリアルタイム共同編集が要件化したら再評価）"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/topic "kotoba-delta-op-log"
+  :adr/related
+  ["adr-2607160005-kotoba-fleet-agent-vcs-west-successor"
+   "adr-2607072200-kotoba-git-kotoba-rad-content-addressed-vcs"]
+  :adr/status "accepted, implemented"
+  :adr/id "adr-2607161325-kotoba-delta-op-log"
+  :adr/doc_type "adr"
+  :adr/last_verified "2026-07-16"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/date "2026-07-16"
+  :adr/decision-summary
+  "{:repo \"kotoba-lang/kotoba-delta\", :thesis :datomic-for-code-edits, :deliberate-diffs-vs-deltadb {:text-crdt :not-adopted-discrete-agent-ops, :conflicts :explicit-first-class, :authz :ed25519-did-key-parent-covering, :secrets :admission-reject-before-log, :provenance :op-turn-conversation-link, :git-projection :deterministic-same-log-same-commit-sha}, :verified {:tests \"2/13\", :e2e [:turn-linked-ops :secret-reject :verify-ok :projection-sha-identical-twice :tamper-detected]}, :follow-ups [:kotobase-istore-persistence :sexpr-cid-anchors :fleet-head-integration :harness-auto-capture]}"
+  :db/id -1
+  :adr/authoritative true
+  :adr/title "ADR-2607161325: kotoba-delta — kotoba/kotobase 上の DeltaDB 相当（署名付き離散 op-log、text CRDT 非採用）"}]
