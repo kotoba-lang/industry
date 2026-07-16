@@ -1,0 +1,22 @@
+[{:adr/id "adr-2607161945-kotoba-lang-pricing-oracle-market-analogy-prediction"
+  :adr/title "ADR-2607161945: kotoba-lang/pricing-oracle — market-analogy price prediction for quote-only verticals"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/topic "kotoba-lang-pricing-oracle-market-analogy-prediction"
+  :adr/last_verified "2026-07-16"
+  :adr/date "2026-07-16"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative_for
+  ["kotoba-lang/pricing-oracle の存在理由と方法論（same-cluster/same-unit median-of-comparables、四段階フォールバック）"
+   "予測は :pred/* として独自ファイル(predictions.edn)に出力し、cloud-itonami の pricing-intelligence-ledger.edn には書き戻さない、という provenance 分離の方針"]
+  :adr/related
+  ["90-docs/pricing-intelligence/README.md"
+   "90-docs/pricing-intelligence/pricing-intelligence.datoms.edn"
+   "90-docs/design-quality/design-quality.datoms.edn"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/decision-summary
+  "New repo kotoba-lang/pricing-oracle: pure .cljc core (predict-band) that predicts a price band for gap verticals (no real self-serve price found) from other verticals that ARE priced, via a 4-stage fallback most-specific-first: same-cluster+same-unit -> same-cluster any-unit (dominant path) -> same-unit any-cluster -> shape-family (cross-industry, always low confidence). Every prediction carries basis-vertical-ids. Predictions are namespaced :pred/* and written to the oracle's own predictions.edn, never back into cloud-itonami's pricing-intelligence-ledger.edn, to keep real-research vs model-estimate provenance separate. Verified: 29 nbb tests pass; real run against 211-vertical cloud-itonami dataset resolved all 74 gaps at :medium confidence via cluster-fallback."
+  :adr/result
+  "29/29 nbb unit tests pass (test/pricing_oracle/core_test.cljs). Real run: 211 verticals loaded, 137 with real bands, 74 gaps, all 74 predicted via :cluster-fallback at :confidence :medium, checked in as orgs/kotoba-lang/pricing-oracle/predictions.edn."
+  :adr/github-url "https://github.com/kotoba-lang/pricing-oracle"}]
