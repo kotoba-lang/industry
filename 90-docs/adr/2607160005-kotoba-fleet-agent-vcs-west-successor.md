@@ -488,3 +488,40 @@ pin signed seq 5 / head seq 4、11 tests / 64 assertions）:
 - 反対材料も記録: Freestyle「AI agent に最良の VCS は依然 git」
   （custom snapshot 系は commit/branch/diff/merge を再発明するだけ、
   という批判）— 本設計が git を捨てず projection に降格した判断と整合。
+
+## Addendum (2026-07-16, same day): gap 解消ラウンド
+
+gap 棚卸し（同日）の推奨順 ①〜⑤ を処置した。
+
+- **⑤ 並行書き込み競合 → 解消**（kotoba-fleet-vcs `c0bb0780434b`、pin
+  signed seq 6）: `lock-db!`（mkdir-atomic、10s retry、>60s stale 破棄、
+  process exit で解放）を pin-advance / govern / reconcile / 旧経路の
+  4 mutation に配線。last-writer-wins race を封じた。
+- **③ delta 自動 capture → 配線済み（opt-in）**:
+  `.claude/hooks/delta-capture-post-tool.cljs` + `.claude/settings.json` の
+  PostToolUse（Edit|Write）。**fail-open 設計** — `DELTA_CAPTURE=1` +
+  `DELTA_KEY` があるセッションのみ記録し、それ以外・エラー時は常に exit 0
+  （並行セッションを壊さない）。実テスト: opt-in で signed op（session id
+  が `:op/turn`）が記録され、無効時は無音。secrets は delta の admission が
+  弾く。
+- **② GitHub 側 enforcement → 部分達成**: kotoba-fleet-vcs / kotoba-delta
+  に ruleset `protect-main-structural`（main への deletion / non-FF を
+  admin 含め拒否 = force-push 禁止の構造化）。**root（private）は現行
+  プランで ruleset / branch protection とも 403** — 代替として
+  `.github/workflows/tree-collapse-guard.yml`（tree が >40% 縮んだ push を
+  検出し、親 commit から削除ファイルを additive に自動復元 + issue 起票。
+  119cc9d77c 事故クラスの再発対策）。なお全 agent が同一 owner token で
+  push する現運用では、GitHub 側で agent を区別する enforcement は
+  原理的に不可能 — per-agent 認証（deploy key / App）が hard flip の
+  前提条件になることを明記。
+- **④ スケール実測**: cloud-itonami org 全 58 repos を jobs=12 で
+  **13.3s** materialize（再実行 0.2s 全 noop）。heavy も pin SHA 直
+  fetch + depth1 により **kototama 435MB→11MB / webmaster 301MB→49MB**
+  で HEAD==pin。残: manimani 16GB 級・datalad・submodules repo の実測。
+- **① 鍵の 1Password 移設 → 依然 blocked**: `op` が interactive 認証
+  timeout（owner の `op signin` 待ち）。**これが現在プログラム全体で
+  最も脆い点**（chain 継続性が session-local 鍵に依存）。
+- 未処置のまま残る gap: ⑥ hard flip（per-agent 認証とセット）、
+  ⑦ P3b（p2p 実配線）、kotobase 永続化（fleet-db blob / Datalog）、
+  anchor / IStore / fleet-head への op-log 統合、CACAO wire format、
+  kotoba-fleet governor 統合、CI 実走確認。
