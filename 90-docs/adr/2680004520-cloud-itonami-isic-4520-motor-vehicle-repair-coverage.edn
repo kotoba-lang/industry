@@ -1,0 +1,89 @@
+[{:adr/id 2680004520
+  :adr/title "cloud-itonami-isic-4520 — Motor Vehicle Repair Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-4520]
+  :adr/references [2607121000]
+
+  ;; Wave 2 actor (coordination/logistics/trade): auto-repair-shop
+  ;; operations coordination-only (service-record logging, bay/technician
+  ;; scheduling, parts-order coordination, safety-concern flagging).
+  ;; NOT direct roadworthiness-clearance authority and NOT repair-equipment
+  ;; control -- see :actor/scope-excluded-terms.
+
+  :actor/id :cloud-itonami-isic-4520
+  :actor/name "Motor Vehicle Repair Operations Coordinator"
+  :actor/isic-rev4 "4520"
+  :actor/domain :automotive/repair-shop-operations
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? false
+
+  :actor/proposal-ops [:log-service-record :schedule-service-operation
+                       :flag-safety-concern :coordinate-parts-order]
+  :actor/always-escalate-ops [:flag-safety-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-parts-order 1500}
+
+  :actor/hard-checks [:rbac :registration-gate :effect-propose-only
+                      :closed-op-allowlist :roadworthiness-clearance-scope-exclusion]
+  :actor/scope-excluded-terms ["finalize the roadworthiness clearance"
+                               "finalize roadworthiness clearance"
+                               "certify the vehicle as roadworthy"
+                               "certify as safe to drive"
+                               "certify the vehicle as safe to drive"
+                               "confirm roadworthiness clearance"
+                               "clear the vehicle for road use"
+                               "clear the vehicle as roadworthy"
+                               "sign off on roadworthiness"
+                               "roadworthiness clearance を確定する"
+                               "roadworthiness clearance を最終化する"
+                               "整備完了として走行可否を証明する"
+                               "車両を走行可能と認定する"
+                               "車両の安全走行を最終認定する"]
+
+  ;; Self-trip-avoidance: every excluded term is a compound
+  ;; finalization-ACTION phrase (multi-word: a finalize/certify/confirm/
+  ;; clear/sign-off VERB + "roadworthiness clearance"/"roadworthy"/"safe
+  ;; to drive"), never a bare noun like "safety"/"安全"/"roadworthy" alone
+  ;; -- :flag-safety-concern's own legitimate default rationale
+  ;; necessarily contains the bare word "安全"/"safety", so a bare-noun
+  ;; term would self-trip this actor's own happy path (a bug class
+  ;; multiple sibling agents in this fleet independently hit and fixed).
+  ;; Regression test:
+  ;; autorepair.governor-contract-test/default-advisor-proposals-never-self-trip-scope-exclusion
+  ;; (deliberately includes a near-miss :flag-safety-concern rationale
+  ;; that mentions "安全性"/"走行可否" as bare descriptive nouns, not as a
+  ;; finalize/certify action, to prove the guard is precise).
+
+  :phase/rollout
+  {0 {:label "disabled" :writes #{} :auto #{}}
+   1 {:label "logging-only" :writes #{:log-service-record} :auto #{}}
+   2 {:label "full-coordination"
+      :writes #{:log-service-record :schedule-service-operation
+               :flag-safety-concern :coordinate-parts-order}
+      :auto #{}}
+   3 {:label "supervised-auto"
+      :writes #{:log-service-record :schedule-service-operation
+               :flag-safety-concern :coordinate-parts-order}
+      :auto #{:log-service-record :schedule-service-operation
+              :coordinate-parts-order}}}
+  ;; :flag-safety-concern is a member of NO phase's :auto set, at any
+  ;; phase -- verified directly by
+  ;; autorepair.phase-test/flag-safety-concern-not-in-any-phases-auto-set.
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 24 :assertions 103 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression
+                  :scope-exclusion-red-team-all-ops]
+  :test/simulator :autorepair.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-4520"
+  :registry/business-id "cloud-itonami-isic-4520"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
