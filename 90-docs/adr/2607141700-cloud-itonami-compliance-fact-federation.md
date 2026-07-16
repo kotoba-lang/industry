@@ -2413,6 +2413,48 @@ scaffold・push
 現状: 国軸31件・業界団体軸31件(25業種)・自治体軸30件——92tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 93 — 業界団体軸32件目(ABA, AUS, ISIC 6419) — 銀行業4カ国目、2ソース断念を経て)
+
+`cloud-itonami-assoc-6419-aus-aba`を新規GitHubリポジトリとして
+scaffold・push
+([commit e1452f3](https://github.com/cloud-itonami/cloud-itonami-assoc-6419-aus-aba/commit/e1452f3))：
+
+Australian Banking Association（ABA、豪州銀行協会、Wikidata
+Q55604504）。ISIC 6419（銀行業）の4カ国目（日本Zenginkyo・ドイツ
+Bankenverband・フランスFBFに次ぐ）——ISIC 2910（VDA/SMMT）で既に
+確立した「同一ISIC・複数国」パターンを踏襲。
+
+このtickは2つのソースを断念した後に確保:
+
+- **NASSCOM**（nasscom.in、インドのソフトウェア業界団体——ISIC
+  6201の新規国候補だった）— ルートページを含む試した全URLでHTTP
+  406。本セッション初の「ドメイン全体406ブロック」失敗クラス
+  （403/CAPTCHA/TLS証明書/DNS/timeout/redirectとは別種）。
+- **Canadian Bankers Association**（cba.ca）— History・
+  Milestonesページとも解決不能なHTTP 307リダイレクト
+  （muniguate.comのケースと異なりリダイレクト先ホストが示されない）、
+  代替の公的調査委員会PDFミラーもフォント崩壊でほぼ全文判読不能——
+  断念。
+
+最終的にABA自身の公式Historyページ（ausbanking.org.au）から2件を
+直接確認:
+
+- **1985年の再編** — 3団体（Australian Banking
+  Association-Research Directorate・Australian Banking
+  Association・Banking Education Service）合併＋Banks' Industrial
+  Association統合により現ABAが成立、新定款制定。
+- **1997年のミッション再定義** — 「政府・メディア・公衆に対する
+  銀行業界の代弁者」としてのadvocacy機能へ焦点を絞り直し。
+
+いずれも組織自身のページが正確な日にちを示していないため年のみで
+記録。4 tests/11 assertions green。122リポジトリ・778 factを統合。
+`"association-rule/isic" "6419"`での横断queryで`[zenginkyo JPN]`・
+`[bankenverband DEU]`・`[fbf FRA]`・`[aba AUS]`の4件すべてが正しく
+取得できることを確認。
+
+現状: 国軸31件・業界団体軸32件(25業種)・自治体軸30件——93tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
