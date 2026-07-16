@@ -1,28 +1,35 @@
-{:health-status 200,
+{:engagement
+ {:dau nil,
+  :active-authors-window {:window 200, :distinct-authors 12},
+  :posts 15,
+  :human {:posts 15, :engagement 0},
+  :organism {:posts 0, :engagement 0},
+  :organism-engagement-ratio nil},
+ :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 4238, "app-aozora-appview" 3123},
+ {"app-aozora-pds" 4250, "app-aozora-appview" 3124},
  :zone
- {:requests-7d 15086,
-  :pageviews-7d 5341,
-  :uniques-7d-sum 650,
+ {:requests-7d 15106,
+  :pageviews-7d 5344,
+  :uniques-7d-sum 651,
   :zone "aozora.app"},
- :sources [:cloudflare :health],
+ :sources [:cloudflare :health :emitter],
  :paths
  {:ok
   [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 288}
-   {:path "/", :requests 113}
-   {:path "/robots.txt", :requests 39}
+   {:path "/", :requests 114}
+   {:path "/robots.txt", :requests 40}
    {:path "/cdn-cgi/rum", :requests 19}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 17}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 18}
    {:path "/js/main.js", :requests 14}
    {:path "/.git/config", :requests 14}
-   {:path "//wp.php", :requests 12}],
-  :status-mix {:ok 1024, :client-error 549},
+   {:path "/favicon.ico", :requests 12}],
+  :status-mix {:ok 854, :client-error 552},
   :window "24h"},
  :as-of "2026-07-16",
- :traffic-quality {:window "24h", :probe-4xx-pct 35, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 39, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · / 113 · /robots.txt 39 · /cdn-cgi/rum 19 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 17 | 4xx(probe) 35%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · / 114 · /robots.txt 40 · /cdn-cgi/rum 19 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 18 | 4xx(probe) 39%",
  :signal
- "aozora.app 実測 15086 req/7d・650 uniques(日次和)・うち4xx probe 35%(24h)、workers 7361 inv/7d"}
+ "aozora.app 実測 15106 req/7d・651 uniques(日次和)・うち4xx probe 39%(24h)、workers 7374 inv/7d"}
