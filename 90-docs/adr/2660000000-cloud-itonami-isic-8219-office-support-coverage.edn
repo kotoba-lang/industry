@@ -1,0 +1,85 @@
+[{:adr/id 2660000000
+  :adr/title "cloud-itonami-isic-8219 — Office Support Services Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-8219]
+  :adr/references [2607152500 2651082200]
+
+  ;; Part of a 6-target blueprint-tier cleanup batch (7911, 7912, 8121,
+  ;; 8130, 8219, 8220) intended to bring kotoba-lang/industry's
+  ;; nil-maturity/blueprint-tier gap to zero. Office-support-services
+  ;; (photocopying / document preparation / mailing) operations
+  ;; coordination-only actor. Pre-existing :blueprint-tier repo
+  ;; (docs-only) filled in, not freshly scaffolded. Registry :name was
+  ;; truncated with a literal "..." on entry (known ~10% seed-data bug);
+  ;; de-truncated as part of this promotion's exact-block edit.
+
+  :actor/id :cloud-itonami-isic-8219
+  :actor/name "Office Support Services Operations Coordinator"
+  :actor/isic-rev5 "8219"
+  :actor/domain :commercial/office-support-services
+  :actor/wave 3
+  :actor/coordination? true
+  :actor/robotics? false ;; this actor: coordination-only. Blueprint's
+                          ;; broader robotics-dispatch premise
+                          ;; (photocopying/printing/finishing equipment
+                          ;; operation) is a separate, not-yet-wired
+                          ;; capability layer.
+
+  :actor/proposal-ops [:log-service-record :schedule-service-operation
+                       :flag-confidentiality-concern :coordinate-supply-order]
+  :actor/always-escalate-ops [:flag-confidentiality-concern]
+  :actor/conditionally-escalate-ops [:coordinate-supply-order]
+
+  :actor/hard-checks [:effect-not-propose :op-not-allowlisted :action-not-allowlisted
+                      :scope-exclusion-violation :no-spec-basis :record-not-verified
+                      :registration-unconfirmed :open-confidentiality-concern
+                      :already-scheduled :already-coordinating]
+  :actor/scope-exclusion-actions ["finalize the data-privacy-compliance determination for these documents"
+                                   "certify these documents as data-privacy compliant"
+                                   "approve release of these client documents without a confidentiality review"
+                                   "authorize disclosure of these client documents to a third party"
+                                   "release these client documents without client authorization"
+                                   "determine this data breach does not require notification"
+                                   "close this confidentiality concern without a review"
+                                   "waive the confidentiality review for this job"
+                                   "override the confidentiality hold on this job"
+                                   "clear this job as privacy-compliant without verification"]
+
+  ;; UNLIKE cloud-itonami-isic-8020 (every non-logging write always
+  ;; high-stakes), this domain differentiates: only flag-confidentiality-
+  ;; concern is unconditionally high-stakes; coordinate-supply-order is
+  ;; high-stakes only above the cost threshold; log-service-record and
+  ;; schedule-service-operation never set a high-stakes stake.
+  :governor/high-cost-supply-threshold-usd 500
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-service-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-service-record :schedule-service-operation
+                                               :flag-confidentiality-concern :coordinate-supply-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-service-record :schedule-service-operation
+                                         :flag-confidentiality-concern :coordinate-supply-order}
+      :auto #{:log-service-record :schedule-service-operation :coordinate-supply-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 43 :assertions 405 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration :store-contract
+                   :registry-drafts :facts-catalog :scope-exclusion-self-trip-regression]
+  :test/simulator :ofsup.sim
+
+  :repo/commit "96ee75ab0345eca4b8fa35c73c3914397e2c404d"
+  :repo/pre-existing-blueprint-commit "e00f8b3"
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-8219"
+  :registry/business-id "cloud-itonami-8219"
+  :registry/name "Photocopying, document preparation and other specialized office support activities"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
+  :registry/optional-technologies [:optimization]
+  :registry/operating-states [:intake :register :match :dispatch :follow-up :audit]
+
+  :db/id -1}]
