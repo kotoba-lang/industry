@@ -613,3 +613,39 @@ pure cljc で nbb ロード可能**（+ npm `@noble/hashes`）を実証した上
 content-addressed object transfer + per-agent 署名 + 構造 provenance」の
 実装へ移行した。残: hard flip の実 cutover（全 enroll 待ち）、CI 実走確認、
 実ネットワークトランスポート、CACAO wire format、kotoba-fleet governor 統合。
+
+## Addendum (2026-07-16, same day): 日常ドライバ化を reverse-topological に前進（C→B→A→D）
+
+「実際に管理できるか / private repo は」の問いへの実測回答と、残ギャップを
+依存 DAG の葉→根で解消。**実測**: fleet sync は private repo でも動く
+（`jk-luxury/club-shinshi` を clone、HEAD==pin 確認 — git fetch が owner の
+SSH/gh 認証を使う）。pin 検証もローカル owner なら private strict。ただし
+**CI の `github.token` は他 org の private 子を読めず fail-open**（west の
+verify-west-pins と同じ既知制約）。この差を C→B→A→D で埋めた
+（kotoba-fleet-vcs `593af8d563f8`、pin seq 13 / head seq 12、14 tests /
+85 assertions）:
+
+- **C（live query backend）**: `bin/query.cljs` が実 kotobase datom plane に
+  任意 Datalog + canned を実行。多節 join（「heavy かつ datalad」→
+  m365-archive）が回り、datom plane が contract-test 用の射影でなく**実際に
+  引ける backend**になった。
+- **B（p2p private visibility）**: `fleet.objects/pack` 5-arity が private repo
+  の object を **allow-set 外の peer に配らない**（Radicle visibility model）。
+  demo: allowed peer は pull 可、stranger は「not in visibility」で拒否、
+  public は誰でも可。
+- **A（CI strict pin verify）**: `fleet verify-pins` が CONFIRMED unreachable で
+  exit 1、private が見えない :unknown は WARN。CI（`fleet-projection-verify.yml`）
+  は `secrets.FLEET_PIN_TOKEN`（org-read PAT）があれば private も strict、
+  無ければ github.token で fail-open。**PAT の provision は owner action**
+  （west の WEST_PIN_VERIFY_TOKEN と同じ）。
+- **D（staged hard flip）**: `reconcile --enforce-orgs kotoba-lang` が
+  **kotoba-lang(public) の legacy 書き込みだけ REJECT**、混在/private org は
+  吸収モードのまま。**live 実証**: kotoba-lang scope で in-scope drift を検出し
+  FLIP VIOLATION、gftdcojp scope では別 org の drift だけ検出 — org 単位で
+  拒否範囲が正しく絞られる。全 enroll + CI strict 完了後に段階拡大する設計。
+
+**結論（現状の正直な位置）**: 「今すぐ west を捨てて fleet だけで全部」= まだ
+No（hard flip は kotoba-lang public から段階導入中、CI strict は PAT 待ち、
+kdb/objects/delta の一部はライブラリ+demo で日常パス未配線）。「pin 前進・
+並列 sync・署名台帳・Datalog クエリの実ツールとして private 込みで使えるか」
+= Yes（owner ローカル）。west とは**並走**し、org 単位で段階的に置換していく。
