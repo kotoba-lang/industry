@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 7065, "etzhayyim-xrpc-proxy" 190},
+ {"etzhayyim-did-web" 7194, "etzhayyim-xrpc-proxy" 190},
  :zone
- {:requests-7d 44675,
-  :pageviews-7d 1396,
-  :uniques-7d-sum 1000,
+ {:requests-7d 45323,
+  :pageviews-7d 1400,
+  :uniques-7d-sum 1002,
   :zone "etzhayyim.com"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/", :requests 99}
+  [{:path "/", :requests 96}
+   {:path "/organism/health.json", :requests 73}
+   {:path "/organism/pulse.json", :requests 72}
+   {:path "/xrpc/com.etzhayyim.apps.kotoba.stats", :requests 68}
+   {:path "/xrpc/com.etzhayyim.apps.kotoba.root", :requests 41}
    {:path "/06.php", :requests 40}
-   {:path "/robots.txt", :requests 24}
-   {:path "/kotoba/actors-enhance.js", :requests 22}
-   {:path "/_shell/shell.css", :requests 15}
-   {:path "/actor/kadode/system-dynamics", :requests 14}
-   {:path "/system-dynamics", :requests 12}
-   {:path "/_shell/liquid-glass-adapter.css", :requests 11}],
-  :status-mix {:ok 452, :client-error 1314, :server-error 8362},
+   {:path "/robots.txt", :requests 23}
+   {:path "/_shell/shell.css", :requests 19}],
+  :status-mix {:ok 717, :client-error 1238, :server-error 8348},
   :window "24h"},
  :as-of "2026-07-16",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 13, :error-5xx-pct 83},
+ {:window "24h", :probe-4xx-pct 12, :error-5xx-pct 81},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 99 · /06.php 40 · /robots.txt 24 · /kotoba/actors-enhance.js 22 · /_shell/shell.css 15 | 4xx(probe) 13% · 5xx 83%",
+ "上位 page (24h, 2xx/3xx): / 96 · /organism/health.json 73 · /organism/pulse.json 72 · /xrpc/com.etzhayyim.apps.kotoba.stats 68 · /xrpc/com.etzhayyim.apps.kotoba.root 41 | 4xx(probe) 12% · 5xx 81%",
  :signal
- "etzhayyim.com 実測 44675 req/7d・1000 uniques(日次和)・うち4xx probe 13%(24h)、workers 7255 inv/7d"}
+ "etzhayyim.com 実測 45323 req/7d・1002 uniques(日次和)・うち4xx probe 12%(24h)、workers 7384 inv/7d"}
