@@ -140,3 +140,16 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
   デプロイ）で、この gate 拡張コードはまだそこに取り込まれていない — デプロイ
   ラインが main を吸収するまで、実運用の chat gate は primary のみ受理する
   （一時的に code が載った版 `a28b545d` で live 検証は成功済み）。
+
+## Murakumo playtest critic token (ADR-2607162100、2026-07-16)
+
+- **`MURAKUMO_CRITIC_TOKEN`（kagi vault、compartment `gftdcojp`）** —
+  `api.murakumo.cloud/v1/messages`（local-murakumo）の vision critic 用トークン。
+  local-murakumo Worker の **secondary** 受理スロット `ANTHROPIC_PROXY_TOKEN_2`
+  に設定済み（primary の `ANTHROPIC_PROXY_TOKEN`＝1Password `gftd.murakumo/
+  ANTHROPIC_PROXY_TOKEN` はローテーションせず据え置き。primary は op interactive
+  auth timeout で非対話取得不可、こちらは kagi から取得可能なのが要点）。
+  playtest co-scientist の standing runner（`~/.gftd/run-playtest-coscientist.cljs`
+  ＋ LaunchAgent `com.gftd.playtest-coscientist`）が `MURAKUMO_CLAUDE_TOKEN` として
+  これを読む。新しい `/v1/messages` consumer も同じ secondary スロットで rotation
+  なしにオンボードできる。
