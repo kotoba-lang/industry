@@ -86,8 +86,8 @@
     (is (= :implemented (industry/maturity "4322"))))
   (testing "cloud-itonami-isic-5110, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "5110"))))
-  (testing "cloud-itonami-isic-4911, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "4911"))))
+  (testing "cloud-itonami-isic-4911, promoted to :implemented by a CONCURRENT sibling fleet agent (not this promotion's own work -- corroborated here only to keep this shared hot test file truthful; live-state corroboration)"
+    (is (= :implemented (industry/maturity "4911"))))
   (testing "cloud-itonami-isic-5011, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "5011"))))
   (testing "cloud-itonami-isic-6020, freshly published, is also :blueprint (live-state corroboration)"
@@ -102,8 +102,8 @@
     (is (= :blueprint (industry/maturity "5223"))))
   (testing "cloud-itonami-isic-5222, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "5222"))))
-  (testing "cloud-itonami-isic-5221, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "5221"))))
+  (testing "cloud-itonami-isic-5221, promoted to :implemented (land-transport-support operations-coordination actor deployed)"
+    (is (= :implemented (industry/maturity "5221"))))
   (testing "cloud-itonami-isic-5229, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "5229"))))
   (testing "cloud-itonami-isic-8020, freshly published, is also :blueprint (live-state corroboration)"
@@ -500,7 +500,13 @@
       ;; HARD invariants spot-checked in the actual implementing code),
       ;; not inferred from file presence or commit messages, per this
       ;; fleet's isic-0710 lesson (ADR-2607141920).
-      (is (= 24 (:blueprint m)))
+      ;; 24 -> 22: this promotion's own cloud-itonami-isic-5221 -1, plus -1
+      ;; from the concurrent sibling cloud-itonami-isic-4911 promotion landed
+      ;; in the same window (see the dedicated per-id corroboration above) --
+      ;; live-recomputed via `(kotoba.industry/maturity-summary)` against a
+      ;; freshly re-fetched origin/main registry.edn immediately before this
+      ;; test-file edit, not assumed.
+      (is (= 22 (:blueprint m)))
       ;; 114 = 113 + cloud-itonami-isic-4620, promoted directly from
       ;; :spec (never a :blueprint) -- agricultural/live-animal
       ;; wholesale trading actor. 115 = 114 + cloud-itonami-isic-2910,
@@ -2633,7 +2639,18 @@
       ;; individually re-narrating any other concurrent sibling
       ;; promotions folded into this same recompute -- their own
       ;; responsibility to corroborate.
-      (is (= 393 (:implemented m))))))
+      (testing "cloud-itonami-isic-5221 (Service activities incidental to land transportation, an UNUSUAL case in this fleet's own history -- unlike most promotions in this file, this was NOT a fresh scaffold: `gh api repos/cloud-itonami/cloud-itonami-isic-5221` confirmed a PRE-EXISTING repo already at :blueprint tier (CODE_OF_CONDUCT.md/CONTRIBUTING.md/GOVERNANCE.md/LICENSE/README.md/SECURITY.md/blueprint.edn/docs/ only, from an earlier bulk-scaffolding pass, no deps.edn/src/test) -- this work ADDED the missing deps.edn/src/test module set on top of that existing boilerplate rather than re-scaffolding; identity ({:id \"5221\" :name \"Service activities incidental to land transportation\"}) independently re-verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution -- unambiguous, no truncation; distinct from siblings 5222 [water], 5223 [air], 5224 [cargo handling], 5229 [other], each its own registry entry; landsupport.* module (toll-road/bridge/tunnel/parking-facility/bus-terminal operations-coordination actor, NOT direct structural-safety authority or facility-equipment control) mirroring the cloud-itonami-isic-3512 [Community Renewable Energy Operations] verified module shape (Store/Advisor/Governor/Phase/Operation/Sim, landsupport.* in place of energy.*) -- closed four-op allowlist, all :effect :propose (log-facility-record/schedule-facility-maintenance/flag-structural-safety-concern/coordinate-supply-order); FOUR HARD governor checks (permanent, un-overridable by any human approval) -- facility unregistered/unverified (target facility record must exist AND be independently :registered?/:verified? in the store, re-derived from the facility's own store record every time, never from the proposal's own claim), op outside the closed four-op allowlist, effect not :propose, and structural-safety-clearance-finalization scope exclusion (content directly finalizing/certifying a structural-safety clearance, regardless of which op it claims to be -- there is no such op in the allowlist at all, so this is pure defense-in-depth); scope-excluded terms are deliberately phrased as the finalization/execution ACTION (\"finalize the structural-safety clearance\"/\"certify ... structurally safe\", JA \"構造安全性クリアランスを確定\"), never a bare noun (\"safety\"/\"structural\" alone) -- especially acute here since :flag-structural-safety-concern's entire legitimate purpose is to talk ABOUT a structural/traffic-safety concern using exactly those bare-ish words; a dedicated regression test (default-mock-advisor-proposals-never-self-trip-scope-exclusion, parameterized over all four allowlisted ops, plus a specifically-targeted flag-structural-safety-concern-specifically-never-self-trips test) guards against recurrence; :flag-structural-safety-concern ALWAYS escalates to human sign-off and is never a member of any phase's :auto set, at any phase (two independent layers agree: landsupport.governor's own always-escalate-ops and landsupport.phase's own phase table); :coordinate-supply-order above a $50000 estimated-cost threshold also always escalates regardless of confidence; real langgraph-clj StateGraph (intake->advise->govern->decide->commit|hold|request-approval) with interrupt-before #{:request-approval} for human-in-the-loop resume, not a stub; fully portable .cljc with no JVM-only interop anywhere in src/ (mock-only advisor); 40 tests / 138 assertions green, independently re-verified against a fresh clone; clj-kondo 0 errors / 0 warnings; registry.edn's own \"5221\" -> :implemented change (adding the previously-absent :maturity key explicitly -- this entry had NO :maturity key before this edit, resolving to :blueprint only via the (:repo industry) fallback in maturity-of; :repo/:business-id were already correct and left unchanged; :required-technologies trimmed from the stale 7-item placeholder [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics] to the coordination-only shape actually implemented [:identity :forms :dmn :bpmn :audit-ledger], matching sibling cloud-itonami-isic-3512's own required-technologies; :operating-states updated from the stale [:intake :book :transit :deliver :reconcile :audit] placeholder to match the actor state machine [:intake :advise :govern :approve :commit :audit]) landed via a Contents-API single-file PUT (sha-checked optimistic concurrency, immediately re-fetched fresh content before the PUT per this fleet's hot-contention discipline, exact-block edit only verified via a prefix/suffix scan showing a single contiguous changed region matching only the intended fields, sample-verified against 5222/5223/7740/3512 entries also intact, no mojibake detected, landed on the first attempt); superproject ADR-2627100000 (com-junkawasaki/root, 90-docs/adr/2627100000-cloud-itonami-isic-5221-land-transport-support-coverage.md/.edn)) is also :implemented"
+        (is (= :implemented (industry/maturity "5221"))))
+      ;; 393 -> 395: this promotion's own cloud-itonami-isic-5221 +1, plus
+      ;; +1 from the concurrent sibling cloud-itonami-isic-4911 promotion
+      ;; corroborated above (registry.edn's own :blueprint count dropped
+      ;; 24 -> 22 while :implemented rose 393 -> 395 and :spec stayed flat
+      ;; at 232, exactly consistent with these two :blueprint-tier entries
+      ;; being promoted) -- live-recomputed via
+      ;; `(kotoba.industry/maturity-summary)` against a freshly re-fetched
+      ;; origin/main registry.edn blob-sha taken immediately before this
+      ;; test-file edit, not assumed.
+      (is (= 395 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
