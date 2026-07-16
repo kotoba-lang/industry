@@ -296,6 +296,13 @@
    ;; chatters = 1:1 companion chat messages = the validation signal the live
    ;; chat (murakumo fleet) now produces.
    :club-shinshi   {:url "https://shinshi.club/api/funnel"            :fmt :json :merge true}
+   ;; app-aozora organism-engagement (2026-07-16): appview.aozora.app/api/engagement
+   ;; が {:engagement {:organism-engagement-ratio r|nil ...集計}} を返す
+   ;; (aozora appview 829e205)。:merge true で top-level に載せ gate
+   ;; :hyp/aozora-organism-content の [:engagement :organism-engagement-ratio]
+   ;; (>= 0.3) が読む。live graph の :eavt scan で ~14s のため :timeout 25
+   ;; (既定 8s は他 product 保護のため据置。KV キャッシュ化は follow-up)。
+   :app-aozora     {:url "https://appview.aozora.app/api/engagement"    :fmt :json :merge true :timeout 25}
    ;; cloud-murakumo cost 計器 (ADR-2607022200 の「CLI/file 型」を HTTP emitter 化、
    ;; 2026-07-15): local-murakumo Worker が /v1/messages の実 run(llama.cpp timings)
    ;; を KV ring に記録し、GET /infer/cost が ¥/Mtok 集計を返す。:key :cost →
@@ -310,11 +317,13 @@
    :nexus-x402     {:url "https://x402.nexus/stats"                   :fmt :json :key :catalog}})
 
 (defn fetch-emitter
-  "→ parsed emitter map, or nil if unreachable/unparseable (no-op)."
-  [{:keys [url fmt]}]
+  "→ parsed emitter map, or nil if unreachable/unparseable (no-op). `:timeout`
+  (秒、既定 8) は per-emitter 上書き — live graph を毎回スキャンする emitter
+  (app-aozora /api/engagement は kotobase :eavt scan で ~14s) だけ長めを許す。"
+  [{:keys [url fmt timeout]}]
   (try
     (let [r (curl/get url {:throw false
-                           :raw-args ["--max-time" "8" "-A" collect-ua]})]
+                           :raw-args ["--max-time" (str (or timeout 8)) "-A" collect-ua]})]
       (when (= 200 (:status r))
         (case fmt
           :edn  (clojure.edn/read-string (:body r))
