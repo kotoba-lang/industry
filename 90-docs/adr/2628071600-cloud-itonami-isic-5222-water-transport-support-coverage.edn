@@ -1,0 +1,63 @@
+{:adr/id "2628071600"
+ :adr/title "cloud-itonami ISIC-5222 Port/Harbor-Support-Services Operations-Coordination Actor — Blueprint Fill-In & Registry Promotion"
+ :adr/status "accepted"
+ :adr/date "2026-07-16"
+ :adr/deciders ["Jun Kawasaki"]
+ :adr/scope
+ {:repo "orgs/cloud-itonami/cloud-itonami-isic-5222"
+  :registry "orgs/kotoba-lang/industry"
+  :isic-code 5222
+  :wave 2
+  :pre-existing? true
+  :note "repo pre-existed as :blueprint-tier (blueprint.edn + docs published, no src) from an earlier bulk-scaffolding pass; this ADR fills it in rather than creating it fresh"}
+ :decision
+ {:id "cloud-itonami-isic-5222"
+  :name "Service activities incidental to water transportation"
+  :isic-code "5222"
+  :business-id "cloud-itonami-5222"
+  :repo "https://github.com/cloud-itonami/cloud-itonami-isic-5222"
+  :public? true
+  :governor :port-authority-governor
+  :modules
+  ["portauthority.store"
+   "portauthority.registry"
+   "portauthority.advisor"
+   "portauthority.governor"
+   "portauthority.operation"
+   "portauthority.phase"
+   "portauthority.sim"]
+  :allowed-operations
+  [{:op :log-service-record
+    :description "Pilotage/towage/berth-assignment data logging"}
+   {:op :schedule-port-operation
+    :description "Berth/tug/pilot scheduling proposal"}
+   {:op :flag-navigation-safety-concern
+    :description "Navigation-safety-concern flag (always escalates)"}
+   {:op :coordinate-maintenance
+    :description "Navigation-aid/facility maintenance coordination"}]
+  :governor-hard-checks 4
+  :governor-check-names
+  [:clearance-unverified :effect-not-propose :op-not-allowed :finalize-clearance-attempt]
+  :rollout-phases 4
+  :high-stakes-ops [:flag-navigation-safety-concern]
+  :never-auto-any-phase [:flag-navigation-safety-concern]
+  :tests-passing 34
+  :assertions-passing 190}
+ :self-tripping-bug-fix
+ {:known-fleet-wide-pattern? true
+  :description "scope-exclusion terms phrased as bare nouns (e.g. \"safety\") can match inside the mock advisor's own legitimate default rationale text and self-block the happy path"
+  :fix "finalize-clearance-patterns phrased as the finalization/execution ACTION (e.g. \"finalize the berth-safety clearance\"), never a bare noun"
+  :regression-test "test/portauthority/scope_exclusion_test.clj"}
+ :verification
+ {:tests "34 tests, 190 assertions, 0 failures, 0 errors (clojure -M:dev:test)"
+  :lint "clj-kondo: 0 errors, 0 warnings (clojure -M:lint)"
+  :demo "clojure -M:dev:run -- all scenarios completed offline"
+  :push-commit "9d2ede4c852712b76bbeafdde75781eada7f851f"
+  :push-base "d014e0d"
+  :repo-public? true
+  :registry-entry-updated? true}
+ :references
+ ["ADR-2607121000"
+  "ADR-2607155100"
+  "ADR-2607141600"
+  "Skill:build-actor"]}

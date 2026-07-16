@@ -1,27 +1,26 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 3837, "ai-gftd-chat-shell" 1387},
+ {"magatama-sh1n5h1x" 3863, "ai-gftd-chat-shell" 1387},
  :zone
- {:requests-7d 339922,
-  :pageviews-7d 5071,
-  :uniques-7d-sum 4444,
+ {:requests-7d 346758,
+  :pageviews-7d 5729,
+  :uniques-7d-sum 4519,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/ccc.php", :requests 33}
+  [{:path "/user/*", :requests 39}
+   {:path "/ccc.php", :requests 27}
    {:path "/file52.php", :requests 24}
    {:path "/v1/generation/jobs/3eb9f2e0a7c04da6a05503bb6f79810d",
     :requests 17}
-   {:path "//wp-includes/block-bindings/", :requests 16}
    {:path "/v1/generation/jobs/0a537b4151a44467ad6da5ec4690171d",
     :requests 16}
+   {:path "/ms-edit.php", :requests 14}
    {:path "/audio_query", :requests 13}
-   {:path "/ms-edit.php", :requests 13}
-   {:path "/cdn-cgi/challenge-platform/scripts/jsd/main.js",
-    :requests 13}],
-  :status-mix {:client-error 1346, :server-error 16293, :ok 456},
+   {:path "/favicon.ico", :requests 12}],
+  :status-mix {:client-error 1267, :server-error 16458, :ok 558},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -35,8 +34,8 @@
  :as-of "2026-07-16",
  :traffic-quality {:window "24h", :probe-4xx-pct 7, :error-5xx-pct 90},
  :top-paths
- "上位 page (24h, 2xx/3xx): /ccc.php 33 · /file52.php 24 · /v1/generation/jobs/3eb9f2e0a7c04da6a055… 17 · //wp-includes/block-bindings/ 16 · /v1/generation/jobs/0a537b4151a44467ad6d… 16 | 4xx(probe) 7% · 5xx 90%",
+ "上位 page (24h, 2xx/3xx): /user/* 39 · /ccc.php 27 · /file52.php 24 · /v1/generation/jobs/3eb9f2e0a7c04da6a055… 17 · /v1/generation/jobs/0a537b4151a44467ad6d… 16 | 4xx(probe) 7% · 5xx 90%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 339922 req/7d・4444 uniques(日次和)・うち4xx probe 7%(24h)、workers 5224 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 346758 req/7d・4519 uniques(日次和)・うち4xx probe 7%(24h)、workers 5250 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}

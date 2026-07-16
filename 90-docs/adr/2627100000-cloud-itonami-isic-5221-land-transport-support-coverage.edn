@@ -1,0 +1,143 @@
+{:adr-id "2627100000"
+ :title "cloud-itonami-isic-5221 (service activities incidental to land transportation) land-transport-support-operations-coordination actor"
+ :status :accepted
+ :date "2026-07-16"
+ :deciders ["Jun Kawasaki (agent-executed, standing authorization)"]
+ :related ["ADR-2607121000" "ADR-2607152500" "ADR-2607121200"]
+ :mirrors "cloud-itonami-isic-3512 (energy.* module shape, verified sibling actor)"
+
+ :context
+ "ISIC Rev.5 5221 = service activities incidental to land transportation:
+  toll-road/highway operation, bus-terminal operation, and related
+  infrastructure-support services -- NOT the carriage of passengers/freight
+  itself (that is cloud-itonami-isic-4911/4912/4920) and NOT third-party
+  inspection consulting. Live registry.edn :name for \"5221\" independently
+  verified fresh: \"Service activities incidental to land transportation\",
+  unambiguous, matching siblings 5222 [water], 5223 [air], 5224 [cargo
+  handling], 5229 [other], each its own registry entry. UNUSUAL premise
+  versus most entries in this ADR series: `gh api repos/cloud-itonami/
+  cloud-itonami-isic-5221` confirmed a PRE-EXISTING repo, not a 404 --
+  already at :blueprint tier (CODE_OF_CONDUCT.md/CONTRIBUTING.md/
+  GOVERNANCE.md/LICENSE/README.md/SECURITY.md/blueprint.edn/docs/ only, no
+  deps.edn/src/test) from an earlier bulk-scaffolding pass. This work ADDED
+  the missing implementation on top of that existing boilerplate rather
+  than re-scaffolding a fresh repo. The reference sibling actors named in
+  this task (cloud-itonami-isic-4911/4912) were ALSO found to still be
+  blueprint-tier-only at investigation time (no deps.edn/src/test either),
+  so this build instead mirrored cloud-itonami-isic-3512's verified
+  Store/Advisor/Governor/Phase/Operation/Sim module shape module-for-module
+  -- confirmed by direct inspection of the tarball actually implemented and
+  green, not assumed. Toll-road/bridge/parking-facility structural-safety
+  and traffic-safety decisions warrant the standard governor pattern even
+  though this is an infrastructure-support actor, not a carrier: any op
+  finalizing an infrastructure-safety-clearance decision must be a hard,
+  permanent block, and any 'flag a concern' op must always escalate, never
+  auto-commit-eligible."
+
+ :self-trip-fix
+ "Known bug class this fleet has repeatedly hit: bare-noun scope-exclusion
+  terms (e.g. 'safety', 'structural') self-match inside the mock advisor's
+  own legitimate default rationale text, self-blocking the actor's happy
+  path -- especially acute here since :flag-structural-safety-concern's
+  entire purpose is to talk ABOUT a structural/traffic-safety concern using
+  exactly those bare-ish words. Fix: scope-exclusion terms
+  (`landsupport.governor/finalization-phrases`) phrased as the
+  finalization/execution ACTION ('finalize the structural-safety
+  clearance', 'certify ... structurally safe', JA '構造安全性クリアランスを確定'),
+  never a bare noun, applied to ALL FOUR allowlisted ops' proposal text
+  regardless of which op it claims to be. Verified by a dedicated
+  regression test suite
+  (test/landsupport/scope_exclusion_test.clj:default-mock-advisor-
+  proposals-never-self-trip-scope-exclusion and
+  flag-structural-safety-concern-specifically-never-self-trips) asserting
+  all 4 default proposal generators, for a clean registered+verified
+  facility, never trip :structural-safety-clearance-finalization and never
+  HARD-hold."
+
+ :decision
+ "Fill in cloud-itonami-isic-5221 (pre-existing blueprint repo) with
+  Store/Advisor/Governor/Phase/Operation/Sim, mirroring
+  cloud-itonami-isic-3512's energy.* module shape module-for-module as
+  landsupport.*:
+  - Store: Store protocol + MemStore + DatomicStore (langchain.db-backed),
+    string-keyed facilities directory
+    (facility-id/facility-name/facility-type/registered?/verified?/
+    structural-safety-concern-unresolved?/jurisdiction), append-only
+    ledger + per-op append-only logs (facility-record/maintenance-schedule/
+    concern/supply-order)
+  - Advisor: Advisor protocol + mock-advisor + llm-advisor seam, 4 ops all
+    :effect :propose -- log-facility-record, schedule-facility-maintenance,
+    flag-structural-safety-concern, coordinate-supply-order
+  - Governor (Land Transport Support Governor): 4 named HARD checks
+    (facility-unverified, closed op-allowlist, effect-not-propose,
+    structural-safety-clearance-finalization scope-exclusion) +
+    always-escalate-ops #{:flag-structural-safety-concern} + high-cost
+    (>$50000) escalation gate for coordinate-supply-order,
+    confidence-floor 0.6
+  - Phase: 0->3 rollout (phase1 = log-facility-record only, approval;
+    phase2 += schedule-facility-maintenance/coordinate-supply-order,
+    approval; phase3 auto-commits log-facility-record + (governor-gated)
+    coordinate-supply-order when clean+confident;
+    flag-structural-safety-concern never auto, any phase)
+  - Operation: real langgraph-clj StateGraph (intake->advise->govern->
+    decide->commit|hold|request-approval), interrupt-before
+    #{:request-approval}, NOT a stub -- mirrors energy.operation exactly
+  - Sim: clojure -M:dev:run demo, full happy path + always-escalate flow +
+    all HARD-hold scenarios (unregistered facility, unverified facility,
+    out-of-allowlist op, structural-safety-clearance-finalization attempt)
+  - Tests: governor_test, scope_exclusion_test (dedicated self-trip
+    regression), phase_test, store_contract_test, operation_test -- 40
+    tests / 138 assertions green
+  - All .cljc portable, no JVM-only interop. AGPL-3.0-or-later. Existing
+    README/GOVERNANCE/CONTRIBUTING/SECURITY/CODE_OF_CONDUCT/blueprint.edn
+    boilerplate kept as-is; README extended with an 'Implementation (R0)'
+    section describing the actual actor module"
+
+ :consequences
+ {:positive
+  ["ISIC 5221 land-transport-support-operations-coordination genuinely
+    implemented and fully tested, filling in a pre-existing blueprint-tier
+    repo rather than leaving it stalled"
+   "structural-safety-clearance-finalization exclusion hardcoded in
+    governor checks (structural-safety-clearance-finalization-violations),
+    not just README prose, and applied regardless of which op a proposal
+    claims to be (defense-in-depth: there is also no op in the closed
+    allowlist that itself performs this finalization)"
+   "self-trip bug class fixed by construction (action-phrased terms) and
+    covered by a dedicated regression test, not avoided by luck"
+   "flag-structural-safety-concern always-escalate is a two-layer
+    invariant (governor always-escalate-ops + phase's permanent absence
+    from every :auto set)"
+   "portable .cljc, zero JVM-only constructs; clojure -M:lint 0 errors / 0
+    warnings"]
+  :negative
+  ["real persistent store (Datomic/kotoba-server) is a follow-up; tests
+    use in-memory MemStore as the default, matching every sibling actor's
+    current maturity (DatomicStore/langchain.db backend exists and passes
+    the same contract tests, but is not the default)"
+   "mock-advisor is deterministic, not a real LLM call; Advisor protocol
+    seam ready for that swap but not wired in this ADR"
+   "the two named reference actors (cloud-itonami-isic-4911/4912) turned
+    out to also still be blueprint-tier-only at build time, so this build
+    mirrored cloud-itonami-isic-3512 instead -- a scope note for whichever
+    agent eventually fills in 4911/4912 themselves"]}
+
+ :verification
+ {:test-count 40
+  :assertion-count 138
+  :test-status "0 failures, 0 errors -- clojure -M:test run at push time AND independently re-run from a brand-new fresh clone (fresh kotoba-lang/langgraph + kotoba-lang/langchain siblings), identical result"
+  :lint-status "0 errors, 0 warnings"
+  :commit "a51bf77692db16fd85cb1102b62e7843dc26467c"
+  :repo "https://github.com/cloud-itonami/cloud-itonami-isic-5221"
+  :demo-run "clojure -M:dev:run end-to-end: log-facility-record and low-cost coordinate-supply-order auto-commit at phase 3; schedule-facility-maintenance and high-cost coordinate-supply-order escalate then commit after approval; flag-structural-safety-concern always escalates then commits after approval, setting the facility's structural-safety-concern-unresolved? flag; an unregistered facility and a registered-but-unverified facility both HARD-hold, never reaching a human"
+  :registry-update "kotoba-lang/industry: 5221 promoted (had NO :maturity key before this edit -- resolved to :blueprint only via the (:repo industry) fallback in maturity-of), added :maturity :implemented explicitly, :repo/:business-id confirmed already correct and left unchanged, :required-technologies trimmed from [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics] to [:identity :forms :dmn :bpmn :audit-ledger] (matching sibling cloud-itonami-isic-3512), :operating-states updated from [:intake :book :transit :deliver :reconcile :audit] to [:intake :advise :govern :approve :commit :audit]. Landed via a Contents-API single-file PUT (sha-checked, fresh re-fetch immediately before, exact-block edit verified via a prefix/suffix scan showing only the intended region changed), first attempt."
+  :registry-merge-commit "8d567dbb542f465decd08e6078543c412f1c3b01"
+  :registry-test-file-commit "077a0ac8c866139b03ed3a0ba9bdbc2c90b0e770"
+  :registry-test-file-retries 0
+  :registry-test-file-note "test/kotoba/industry_test.clj also had a stale hardcoded assertion locking cloud-itonami-isic-5221 to :blueprint, corrected to :implemented as part of this same edit. Additionally corroborated a CONCURRENT sibling agent's own promotion of cloud-itonami-isic-4911 :blueprint -> :implemented, discovered mid-edit when the pre-existing 4911 assertion started failing against live state (not this ADR's own work -- fixed here only to keep this shared hot test file truthful; that sibling's own promotion is its own responsibility to narrate/attribute in its own ADR)."
+  :registry-post-merge-verification "fresh clone (+ fresh ../technology sibling) of kotoba-lang/industry main: Ran 15 tests containing 1058 assertions. 0 failures, 0 errors. clj-kondo: 0 errors, 0 warnings. No mojibake detected; 5221's own entry, and sample sibling entries 5222/5223/7740/3512/4911, all independently re-confirmed intact."
+  :registry-implemented-count-before 393
+  :registry-implemented-count-after 395
+  :registry-blueprint-count-before 24
+  :registry-blueprint-count-after 22
+  :registry-count-note "393 -> 395 reflects this promotion's own +1 (5221) plus +1 from the concurrent cloud-itonami-isic-4911 sibling promotion landed in the same window (blueprint 24 -> 22, spec flat at 232 -- live-recomputed via (kotoba.industry/maturity-summary) immediately before each edit attempt, not assumed)."}}
