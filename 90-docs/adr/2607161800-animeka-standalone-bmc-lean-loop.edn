@@ -1,0 +1,24 @@
+[{:adr/authoritative_for
+  ["animeka の成熟度反復トラッキング方式（standalone BMC/Lean-Loop パターン、共有 70-tools/bmc への登録はしない）"
+   "ai-gftd-animeka/docs/bmc-lean-loop-log.md の不変条件（append-only・捏造ゼロ・未計測は unknown）"
+   "Iteration 1 の棚卸しと仮説 H1（published episode 1 本の end-to-end 視聴可能化が launched/grounding/validation の最短経路）"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/topic "animeka-standalone-bmc-lean-loop"
+  :adr/related
+  ["adr-2607121600-local-murakumo-standalone-bmc-loop"
+   "adr-2607122300-net-babiniku-standalone-bmc-loop"
+   "adr-2607124500-bmc-shared-system-check-before-new-tracking"
+   "adr-2607161730-animeka-coscientist-react-quality-harness"
+   "adr-2607021600-bmc-cli-react-loop"]
+  :adr/status "accepted, implemented (Iteration 1 landed: ai-gftd-animeka main 186e2115)"
+  :adr/id "adr-2607161800-animeka-standalone-bmc-lean-loop"
+  :adr/doc_type "adr"
+  :adr/last_verified "2026-07-16"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/date "2026-07-16"
+  :adr/decision-summary
+  "{:goal \"/loop(10min)「成熟度を向上」を animeka で監査可能に回す\", :why-standalone \"animeka は共有 BMC の gftdcojp 11 プロダクト登録外。base datoms 新規登録は人間レビュー必須(ADR-2607021600)なので agent は登録しない。先例 = local-murakumo(ADR-2607121600)/net-babiniku(ADR-2607122300)\", :log \"ai-gftd-animeka/docs/bmc-lean-loop-log.md (append-only, 捏造ゼロ, unknown 明記)\", :iteration-1 {:assets [:works-8-normalized :coscientist-harness-adr-2607161730 :fleet-infra-confirmed-2026-07-10 :autopilot-reels] :honest-scores {:completeness \"high\" :validation 0 :launched \"unknown (animeka.gftd.ai curl timeout 実測)\" :users \"unknown\" :revenue 0 :grounding \"mid (published ep の blob 実体未検証)\"} :hypothesis-h1 \"published episode 1本を実カット付き end-to-end で視聴可能にすれば launched/grounding が実測で上がり validation 計測が可能になる\"}, :tooling-note \"nbb gftd.cljs products が babashka.fs 欠落で失敗 (ローカル実行経路のみ、follow-up)\", :non-goals [:shared-bmc-registration :routine-product-list-addition :cloud-schedule-without-owner-ask]}"
+  :db/id -1
+  :adr/authoritative true
+  :adr/title "ADR-2607161800: animeka standalone BMC/Lean-Loop maturity iteration tracking"}]
