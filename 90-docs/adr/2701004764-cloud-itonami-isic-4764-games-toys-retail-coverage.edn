@@ -1,0 +1,73 @@
+[{:adr/id 2701004764
+  :adr/title "cloud-itonami-isic-4764 — Specialized Games/Toys Retail Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-4764]
+  :adr/references [2607121000 2680004719]
+
+  ;; Wave 2 actor (coordination/logistics/trade): specialized games/toys
+  ;; retail operations coordination-only (sales-record logging,
+  ;; staffing-operation scheduling, supply-order coordination,
+  ;; product-safety-concern flagging). Child-product-safety domain --
+  ;; choking/small-parts hazards, suspected recall-affected stock,
+  ;; age-grading label mismatches.
+
+  :actor/id :cloud-itonami-isic-4764
+  :actor/name "Specialized Games/Toys Retail Operations Coordinator"
+  :actor/isic-rev5 "4764"
+  :actor/domain :retail/specialized-games-toys-stores
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-sales-record :schedule-staffing-operation
+                       :coordinate-supply-order :flag-safety-concern]
+  :actor/always-escalate-ops [:flag-safety-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-supply-order 750}
+
+  :actor/hard-checks [:store-verified :vendor-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["finalize the recall" "initiate the recall" "execute the recall"
+                                "issue the recall notice" "declare recall-compliant"
+                                "certify recall compliance" "confirm recall compliance"
+                                "clear the product from recall" "close out the recall"
+                                "approve the age rating" "certify the age grade"
+                                "finalize the age-grading determination"
+                                "confirm the age-appropriate rating" "assign the final age grade"
+                                "sign off on the recall" "sign off on the age rating"
+                                "certify the product safe for sale"
+                                "リコールを実行" "リコール対応を完了" "リコールを確定"
+                                "年齢区分を確定" "年齢表示を確定" "年齢区分を承認"]
+
+  ;; Self-trip-avoidance: every scope-excluded term is phrased as the
+  ;; finalization/execution ACTION, never a bare noun ("recall",
+  ;; "choking hazard", "age grade", "age rating") -- this namespace's own
+  ;; default :flag-safety-concern advisor rationale legitimately talks
+  ;; about choking/small-parts hazards, suspected-recall stock and
+  ;; age-grading-label mismatches as OBSERVATIONS, never finalizations.
+  ;; Regression test: governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion.
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-sales-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-sales-record :schedule-staffing-operation
+                                               :coordinate-supply-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-sales-record :schedule-staffing-operation
+                                         :coordinate-supply-order :flag-safety-concern}
+      :auto #{:log-sales-record :schedule-staffing-operation :coordinate-supply-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 56 :assertions 166 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression]
+  :test/simulator :toygameops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-4764"
+  :registry/business-id "cloud-itonami-isic-4764"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+  :registry/operating-states [:intake :stock :sell :reconcile :reorder :audit]
+
+  :db/id -1}]
