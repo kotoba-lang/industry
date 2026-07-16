@@ -2629,6 +2629,40 @@ UAE（Q878）の首都であり、史的首都バグの影響なしを確認。
 現状: 国軸33件・業界団体軸33件(26業種)・自治体軸32件——98tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 99 — 業界団体軸34件目(UBF, ARE, ISIC 6419) — 銀行業5カ国目、UAEリサーチの継続)
+
+`cloud-itonami-assoc-6419-are-ubf`を新規GitHubリポジトリとして
+scaffold・push
+([commit 7af41bf](https://github.com/cloud-itonami/cloud-itonami-assoc-6419-are-ubf/commit/7af41bf))：
+
+UAE Banks Federation（UBF、UAE銀行連盟）。ISIC 6419（銀行業）の
+5カ国目（日本Zenginkyo・ドイツBankenverband・フランスFBF・
+オーストラリアABAに次ぐ）。本tick窓のUAEリサーチ
+（[`cloud-itonami-municipality-are-abu-dhabi`](https://github.com/cloud-itonami/cloud-itonami-municipality-are-abu-dhabi)）
+の流れを継続。
+
+ubf.ae自身（**TLS証明書エラーの出るuaebf.aeではなく**）の2ページを
+直接WebFetch検証:
+
+- **ホームページ** — 「Established in 1982, UAE Banks Federation
+  (UBF) is the sole representative body of the member banks and
+  financial institutions operating in the UAE」と明記。
+- **TASHARUKイニシアティブページ** — 「UBF launched TASHARUK - the
+  first Information Sharing and Analysis Center (ISAC) in the United
+  Arab Emirates (UAE) in 2017」と明記——加盟銀行向けサイバー脅威
+  インテリジェンス共有プラットフォーム。
+
+いずれも年のみで記録。UBF自身のWikidata Q-idは見つからず（UAE中央
+銀行など関連団体のみヒット）——`:wikidata`は推測せず意図的に省略。
+
+4 tests/11 assertions green。128リポジトリ・790 factを統合。
+`"association-rule/isic" "6419"`での横断queryで5カ国すべて
+（`[zenginkyo JPN]`・`[bankenverband DEU]`・`[fbf FRA]`・
+`[aba AUS]`・`[ubf ARE]`）が正しく取得できることを確認。
+
+現状: 国軸33件・業界団体軸34件(26業種)・自治体軸32件——99tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社

@@ -331,7 +331,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-iso3166-tha/data/datascript-tx.edn"}
    {:label "cloud-itonami-municipality-are-abu-dhabi ordinance.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-municipality-are-abu-dhabi/schema/ordinance.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-municipality-are-abu-dhabi/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-are-abu-dhabi/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6419-are-ubf association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6419-are-ubf/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-are-ubf/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
