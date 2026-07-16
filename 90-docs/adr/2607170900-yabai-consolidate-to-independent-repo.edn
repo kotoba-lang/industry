@@ -1,0 +1,21 @@
+[{:adr/authoritative_for
+  ["yabai actor の source of truth を独立リポ com-etzhayyim-yabai に一本化し、etzhayyim/root 内の vendored 重複コピー 20-actors/yabai を撤去する決定"
+   "撤去安全性の根拠（runtime/classpath 消費者ゼロ、fleet 稼働セル YabaiTorTorrentCtiPersistenceCell は別コードベース kotodama.primitives.yabai_murakumo、独立リポは vendored の厳密上位集合）"
+   "将来 etzhayyim/root が yabai を要する場合は vendoring でなく west sibling checkout を依存参照するという方針"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/topic "yabai-consolidate-to-independent-repo"
+  :adr/related
+  ["adr-2607170800-yabai-cloudflare-zone-scanner-ingest-honeypot"
+   "adr-2605301400"]
+  :adr/status "accepted, implemented"
+  :adr/id "adr-2607170900-yabai-consolidate-to-independent-repo"
+  :adr/doc_type "adr"
+  :adr/last_verified "2026-07-16"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/date "2026-07-16"
+  :adr/decision-summary
+  "{:goal \"yabai を独立リポに統合（オーナー指示『yabai を独立した repo にして, etzhayyim で ok』）\", :independent-repo \"orgs/etzhayyim/com-etzhayyim-yabai（etzhayyim GitHub org、west project、ADR-2607170800 配線 landed 済み）\", :removed \"orgs/etzhayyim/root/20-actors/yabai（plain tracked vendored copy、2026-07-09 stale、drift していた）\", :safety {:runtime-consumers 0 :note \"20-actors/yabai を参照するのは自身の test コメントのみ、外部 importer なし\" :fleet-cell \"稼働セル YabaiTorTorrentCtiPersistenceCell は module kotodama.primitives.yabai_murakumo（lan-api）を呼び vendored methods は呼ばない → 撤去無影響\" :superset \"diff -rq で vendored 固有ファイルゼロ、com-etzhayyim-yabai は厳密上位集合\"}, :method {:git-rm \"etzhayyim/root から 20-actors/yabai を git rm -r\" :marker \"20-actors/yabai-MOVED.md で独立リポへ誘導\" :land \"feature branch → server-side merge → main、west pin 前進\" :future \"再 vendoring 禁止、west sibling checkout を依存参照\"}, :discovered-stale-doc {:fleet-edn-cron-cells \"yabai_cti_ingest(cron22)/weave(27)/persist(32) は cells.edn に不在（fleet.edn node list と CLAUDE.md のみ、実体は YabaiTorTorrentCtiPersistenceCell lan-api）\" :fleet-toml-misnomer \"CLAUDE.md の fleet.toml は実際は fleet.edn\"}, :out-of-scope [:cf-sweep-fleet-cell-化 :stale-doc-fix-fleet-edn-and-yabai-claude-md], :alternatives-rejected [:cross-repo-symlink-dangles-on-standalone-clone :keep-vendored-forward-sync-allows-redrift :west-nested-path-complex], :repos {:kept \"orgs/etzhayyim/com-etzhayyim-yabai\" :edited \"orgs/etzhayyim/root\"}}"
+  :db/id -1
+  :adr/authoritative true
+  :adr/title "ADR-2607170900: yabai を独立リポジトリに統合（etzhayyim/root の重複コピー撤去）"}]
