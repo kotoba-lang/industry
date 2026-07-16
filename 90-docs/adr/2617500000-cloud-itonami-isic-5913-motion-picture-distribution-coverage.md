@@ -184,3 +184,32 @@ verification recorded at scaffold time:
 - Commit `3ae9f6cdd32a77e62f4866f411e1af4a49e498ae` pushed to
   `cloud-itonami/cloud-itonami-isic-5913`'s `main` (the repo's only
   commit; fresh `gh repo create`, no prior history).
+
+## Verification addendum: registry promotion (Step 7, landed)
+
+- `kotoba-lang/industry` `resources/kotoba/industry/registry.edn`: `"5913"`
+  entry promoted `:spec` -> `:implemented` (also de-truncated `:name`,
+  de-placeholdered `:repo`/`:business-id` from the stale
+  `gftdcojp/cloud-itonami-J5913` to `cloud-itonami/cloud-itonami-isic-5913`,
+  trimmed `:required-technologies` to `[:identity :forms :dmn :bpmn
+  :audit-ledger]`). Landed via a Contents-API single-file PUT (sha-checked
+  optimistic concurrency, fresh re-fetch immediately before the PUT),
+  commit `6471536c1dac2dd0e89b289273a6def85de5c404`, first attempt, no
+  409 retries needed. Exact-block edit verified via a prefix/suffix
+  byte-identity scan (everything outside the target block unchanged).
+- `test/kotoba/industry_test.clj`: dedicated corroboration `testing` block
+  added for `"5913"`. The pinned `:implemented` count assertion required
+  no delta at the time of this edit (recomputed live via
+  `(kotoba.industry/maturity-summary)` immediately before each attempt);
+  it was already `385`, reflecting this promotion's own `+1` plus
+  concurrent sibling `5911`/`5914` promotions landed in the same window.
+  Two sha-drift retries were needed (the file is an extremely hot,
+  high-concurrency shared file across the fleet) before landing on commit
+  `5e3fcc2ae7996d85ee437d9c8141be620c1d954f`.
+- Post-merge re-verification from a brand-new fresh clone of
+  `kotoba-lang/industry` `main` (plus a fresh `../technology` sibling
+  clone): `clojure -M:test` -> "Ran 15 tests containing 1050 assertions.
+  0 failures, 0 errors." `clojure -M:lint` -> 0 errors, 0 warnings. No
+  mojibake detected in `registry.edn`. `"5913"`'s own entry, and sample
+  entries `5911`/`5912`/`5914`/`873`/`5811`/`6310`, all independently
+  re-confirmed intact.
