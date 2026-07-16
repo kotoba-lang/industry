@@ -735,3 +735,23 @@ repos.edn extra-projects・west.yml エントリ・fleet-db・ローカル check
 両者はオーナー承認のもと専用 ADR（新 repo 作成 → redirect → batched deps.edn
 更新 → ADR 参照更新 → 旧 repo retire）で実施する。本 ADR 内の既存 addendum の
 `kotoba-fleet-vcs` 表記は歴史的記録としてそのまま残す（現行名は kagami）。
+
+
+## Addendum (2026-07-16, same day): kotoba-rad → nekko 実施、manuke は名前再検討
+
+**kotoba-rad → `nekko`（根っこ）** を実施（オーナー指示「nekko だけさきに」）。
+実測で消費者は cloud-itonami のみ（p2p / network-isekai-m7-visual は
+コメント言及だけの偽陽性）。GitHub rename 済み（redirect 保持）、
+cloud-itonami deps.edn の `:local/root ../../kotoba-lang/kotoba-rad` →
+`nekko` + coordinate 更新（本番、server-side merge `20e51f12d803`）、
+superproject の repos.edn / west.yml（nekko エントリ + cloud-itonami pin 前進）/
+fleet-db（byte 一致で再 import）/ ローカル checkout を更新、head seq 16。
+**namespaces は `kotoba-rad.*` を維持**（repo 名 ≠ namespace、kagami=fleet.*
+と同じ前例。cloud-itonami の source require 無変更で低リスク）— namespace
+移行（kotoba-rad.* → nekko.*）は別 follow-up。
+
+**kotoba-git → manuke は保留し名前を再検討**（オーナー指示）。59 消費者 +
+本番 CD/CI 依存の大規模移行であり、manuke（間抜け）は git 自虐命名の
+オマージュとして秀逸だが「もう少し良い名前」を検討する。候補は object DAG /
+content-addressed store / nekko(根)との対を意識した botanical / 系譜語で
+別途提案。
