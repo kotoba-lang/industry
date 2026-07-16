@@ -4785,3 +4785,100 @@ clone; superproject ADR-2628000000) is also :implemented"
            (:repo (industry/get-industry "8292"))))
     (is (= "cloud-itonami-isic-8292"
            (:business-id (industry/get-industry "8292"))))))
+
+(deftest cloud-itonami-isic-8230-is-implemented
+  (testing "cloud-itonami-isic-8230 (Organization of conventions and
+  trade shows -- event-planning/venue-booking coordination for large
+  public gatherings, carrying a crowd-safety/venue-occupancy-limit
+  dimension; final batch of Wave 2's [coordination/logistics/trade,
+  ADR-2607121000] remaining 4-digit gaps; fresh scaffold, `gh api
+  repos/cloud-itonami/cloud-itonami-isic-8230` confirmed 404 before any
+  work began; identity ({:id \"8230\" :name \"Organization of
+  conventions and trade shows\"}) independently verified against a
+  fresh clone before any work began, per this fleet's ID/name-mismatch
+  caution -- unambiguous, no truncation; a separate, coarser-granularity
+  {:id \"823\" ...} 3-digit group entry (same name, :repo nil) left
+  untouched; EventOperationsAdvisor ⊣ EventOperationsGovernor
+  convention/trade-show event-operations COORDINATION-ONLY actor
+  (eventops.* namespace) mirroring cloud-itonami-isic-4719's [Other
+  retail sale in non-specialized stores] verified
+  advisor/governor/phase/operation/store/sim module shape
+  module-for-module (eventops.* in place of merchandiseops.*,
+  venue/organizer-license registration in place of store registration,
+  event-vendor -- catering/AV/security-staffing -- verification in
+  place of supply-chain-vendor verification); closed four-op allowlist,
+  all :effect :propose (:log-event-record/:schedule-venue-operation/
+  :coordinate-vendor-order/:flag-safety-concern); FOUR HARD governor
+  checks, all permanent and un-overridable by any human approval --
+  venue-unverified (the target venue's business registration +
+  organizer license must be independently :registered?/:verified? in
+  the store before any proposal for it may commit or escalate,
+  re-derived from the store every time, never from proposal
+  self-report), vendor-unverified (for :coordinate-vendor-order only,
+  the named event-vendor must independently resolve to a
+  :registered?/:verified? vendor record, the same ground-truth
+  discipline reapplied to an event-vendor supply-chain counterparty),
+  effect-not-propose, and scope-exclusion (folds in op-not-allowed) that
+  permanently blocks any proposal touching directly finalizing a
+  venue-occupancy-limit override or directly finalizing/issuing a
+  fire-code-compliance or emergency-egress-compliance clearance --
+  per this vertical's crowd-safety/venue-capacity dimension, NO op in
+  the closed allowlist directly finalizes either; :flag-safety-concern,
+  the closest related op, ALWAYS escalates to human sign-off and is
+  never a member of any phase's :auto set, at any phase (two
+  independent layers agree: eventops.governor's own
+  always-escalate-ops AND eventops.phase's own phase table, the latter
+  exercised directly by a dedicated
+  safety-concern-never-in-any-phase-auto-set structural test); scope-
+  excluded terms are deliberately phrased as the finalization/execution
+  ACTION (\"finalize the occupancy-limit override\", \"issue the
+  fire-code clearance\", \"finalize the emergency-egress clearance\"),
+  never a bare noun (\"occupancy limit\"/\"fire code\"/\"egress\") --
+  this namespace's own :flag-safety-concern default proposal
+  legitimately discusses occupancy-limit/fire-code/emergency-egress-
+  planning concerns, so a bare-noun term list would have self-tripped
+  this actor's own core happy path on every single run -- avoided from
+  the start, verified by a dedicated regression test
+  (default-mock-advisor-proposals-never-self-trip-scope-exclusion in
+  governor_test.clj) asserting all four default proposal generators
+  never trip :scope-excluded or :op-not-allowed; a
+  :coordinate-vendor-order above a $1000 estimated-cost threshold also
+  always escalates; governor keyword :event-operations-governor and
+  namespace eventops checked for fleet-wide uniqueness via `gh api
+  search/code` against `org:cloud-itonami` before finalizing (zero
+  hits, including against every sibling agent landing concurrently in
+  this same final Wave-2 batch); real langgraph-clj StateGraph
+  (intake->advise->govern->decide->commit|hold|request-approval) with
+  interrupt-before #{:request-approval} for human-in-the-loop resume,
+  not a stub; fully portable .cljc with no JVM-only interop anywhere in
+  src/ (mock-only advisor); 56 tests / 166 assertions green (clojure
+  -M:test), independently re-verified against a fresh clone; clj-kondo
+  0 errors / 0 warnings; clojure -M:run (eventops.sim demo) walked all
+  scenarios (phase-1 approval-gated commit, phase-3 auto-commit for the
+  three non-safety/low-cost ops, always-escalating safety-concern flag,
+  always-escalating over-threshold vendor order, and five HARD-hold
+  scenarios: unregistered venue, unverified venue, unverified vendor,
+  non-:propose effect, scope-excluded content) without error;
+  registry.edn's own \"8230\" -> :implemented change (:repo/:business-id
+  de-placeholdered from the stale gftdcojp/cloud-itonami-N8230 target
+  to cloud-itonami/cloud-itonami-isic-8230, :maturity :spec ->
+  :implemented, :operating-states updated from the stale
+  intake/register/match/dispatch/follow-up/audit placeholder to match
+  the real langgraph-clj node sequence, :required-technologies swapped
+  the stale :labor tag for :logistics -- more domain-appropriate for
+  venue/floor-plan/vendor-order logistics) landed via a Contents-API
+  single-file PUT direct to main (sha-checked optimistic concurrency
+  against a freshly re-fetched git-trees/blobs snapshot per this
+  fleet's hot-contention discipline, exact-block edit only verified via
+  an exact old/new substring occurrence count of 1 PLUS a prefix/suffix
+  single-contiguous-diff-region check PLUS sample-verified against
+  823[group]/8291/8299/6310 entries also intact, no mojibake detected,
+  landed on the first attempt); superproject ADR-2740008230
+  (com-junkawasaki/root,
+  90-docs/adr/2740008230-cloud-itonami-isic-8230-convention-trade-show-coverage.md/.edn,
+  merged via server-side merge) promoted :spec -> :implemented"
+    (is (= :implemented (industry/maturity "8230")))
+    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-8230"
+           (:repo (industry/get-industry "8230"))))
+    (is (= "cloud-itonami-isic-8230"
+           (:business-id (industry/get-industry "8230"))))))
