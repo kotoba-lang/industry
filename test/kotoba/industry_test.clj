@@ -3055,7 +3055,7 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; against a freshly re-fetched origin/main registry.edn
       ;; immediately before this test-file edit, not assumed:
       ;; {:total 649 :spec 220 :blueprint 0 :implemented 429}.
-      (is (= 429 (:implemented m))))))
+      (is (= 430 (:implemented m))))))
 
 (deftest cloud-itonami-isic-4751-is-implemented
   (testing "cloud-itonami-isic-4751 (Retail sale of textiles in
@@ -3411,3 +3411,70 @@ clone; superproject ADR-2628000000) is also :implemented"
            (:repo (industry/get-industry "4752"))))
     (is (= "cloud-itonami-isic-4752"
            (:business-id (industry/get-industry "4752"))))))
+
+(deftest cloud-itonami-isic-4763-is-implemented
+  (testing "cloud-itonami-isic-4763 (Retail sale of sporting equipment in
+  specialized stores -- fresh scaffold, no prior repository at either the
+  stale gftdcojp/cloud-itonami-G4763 placeholder or the real cloud-itonami
+  org target [gh api 404 confirmed for both before any work began];
+  identity ({:id \"4763\" :name \"Retail sale of sporting equipment in
+  specialized stores\"}) independently verified against a fresh clone
+  before any work began, per this fleet's ID/name-mismatch caution -- a
+  separate, coarser-granularity {:id \"476\" ...} 3-digit group entry left
+  untouched; Wave 2 (coordination/logistics/trade, ADR-2607121000) target;
+  SportsRetailAdvisor ⊣ SportsRetailGovernor sporting-goods-retail
+  OPERATIONS COORDINATION actor (sportsretailops.* namespace) mirroring
+  cloud-itonami-isic-4719's [Other retail sale in non-specialized stores]
+  verified module shape module-for-module (sportsretailops.* in place of
+  merchandiseops.*, inventory/sale/return/fitting transaction logging in
+  place of plain sales-record logging, product-safety-concern flagging in
+  place of loss-prevention-concern flagging); closed four-op allowlist,
+  all :effect :propose (:log-sales-record/:schedule-staffing-operation/
+  :coordinate-supply-order/:flag-safety-concern); FOUR HARD governor
+  checks, all permanent and un-overridable by any human approval --
+  store-unverified (target store's business registration must exist AND
+  be independently :registered?/:verified? in the store before any
+  proposal for it may commit or escalate), vendor-unverified (for
+  :coordinate-supply-order only, the named vendor must independently
+  resolve to a :registered?/:verified? vendor record), effect-not-propose,
+  and scope-exclusion (folds in op-not-allowed) that permanently blocks
+  any proposal touching directly finalizing a recall-compliance decision
+  (declaring/issuing/executing a product recall) or an
+  equipment-safety-certification decision (issuing/granting/revoking a
+  safety certification, certifying equipment as compliant); scope-excluded
+  terms are deliberately phrased as the finalization/execution ACTION
+  (\"issued the recall\", \"granted the safety certification\"), never a
+  bare noun (\"recall\"/\"certification\"/\"safety\") -- this fleet's own
+  known self-tripping bug class avoided from the start, verified by a
+  dedicated regression test
+  (default-mock-advisor-proposals-never-self-trip-scope-exclusion in
+  governor_test.clj) asserting all four default proposal generators never
+  trip :scope-excluded or :op-not-allowed; :flag-safety-concern ALWAYS
+  escalates to human sign-off and is never a member of any phase's :auto
+  set, at any phase (two independent layers agree: sportsretailops.governor's
+  own always-escalate-ops AND sportsretailops.phase's own phase table); a
+  :coordinate-supply-order above a $1000 estimated-cost threshold also
+  always escalates; real langgraph-clj StateGraph
+  (intake->advise->govern->decide->commit|hold|request-approval) with
+  interrupt-before #{:request-approval} for human-in-the-loop resume, not
+  a stub; fully portable .cljc with no JVM-only interop anywhere in src/
+  (mock-only advisor); 56 tests / 166 assertions green (clojure -M:test),
+  independently re-verified against a fresh clone; clj-kondo 0 errors / 0
+  warnings; registry.edn's own \"4763\" -> :implemented change (:repo/
+  :business-id de-placeholdered from gftdcojp/cloud-itonami-G4763 ->
+  cloud-itonami/cloud-itonami-isic-4763, :maturity :spec->:implemented,
+  :operating-states updated to match the actor state machine;
+  :required-technologies left unchanged) landed via a Contents-API
+  single-file PUT (sha-checked optimistic concurrency, immediately
+  re-fetched fresh content before the PUT per this fleet's hot-contention
+  discipline, exact-block edit only verified via a single-contiguous-
+  diff-region check PLUS sample-verified against 4719/4721/6310/476[group]
+  entries also intact, no mojibake detected); superproject ADR-2705004763
+  (com-junkawasaki/root,
+  90-docs/adr/2705004763-cloud-itonami-isic-4763-sporting-equipment-retail-coverage.md/.edn))
+  promoted :spec -> :implemented"
+    (is (= :implemented (industry/maturity "4763")))
+    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-4763"
+           (:repo (industry/get-industry "4763"))))
+    (is (= "cloud-itonami-isic-4763"
+           (:business-id (industry/get-industry "4763"))))))
