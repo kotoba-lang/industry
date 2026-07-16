@@ -350,3 +350,38 @@ conflict は残るため、review-before-merge UX は維持される。
 - 次: Phase 1（signed pins / admission gate — ipns.head 型 record 化、
   verify-west-pins 相当の transact 時 gate 移設、west.yml の生成 projection
   降格）。
+
+## Addendum (2026-07-16, same day): Phase 1 — signed pins + admission gate、dogfood 済み
+
+- **実装**（kotoba-fleet-vcs `aa09639236`）: `fleet.pin`（pure cljc）—
+  parent-covering Ed25519 署名付き head record（署名 payload に前 record の
+  hash を含む。Radicle 1.7.0 sigrefs replay CVE の教訓を day 1 適用）と
+  純関数 admission gate。受理不変条件は ①署名者権限（Phase 1 は wildcard
+  grant keyring `manifest/fleet-keys.edn`、CACAO 委譲鎖は Phase 2）
+  ②署名検証 ③sequence 厳密単調（rollback 拒否）④parent hash 一致（replay
+  拒否）⑤上流 default branch 到達性 ⑥**value 前進**（旧 pin → 新 pin が
+  ahead。behind/diverged は reject）。⑤⑥はサーバ側 GitHub API 判定・
+  unverifiable のみ fail-open（verify-west-pins と同一意味論）。nbb CLI は
+  node:crypto Ed25519（keygen / 署名）、signer id は `ed25519:<pubkey-hex>`
+  （did:key 化は Phase 2）。テスト 6 tests / 36 assertions green
+  （rollback / replay / unauthorized / tamper / unreachable / value
+  regression / fail-open の reject matrix 含む）。
+- **dogfood で本物のギャップを 1 件発見・修正**: 初版 gate は sequence
+  単調のみspecial、「seq は前進するが value が古い commit を指す」署名済み
+  regression を通してしまった（この設計が殺すべき事故クラスそのもの）。
+  Rule 2（value-advance）を gate に移植して修正（`aa09639236`）。
+- **実運転（superproject、実 GitHub API 判定込み）**: `manifest/fleet-db.edn`
+  （1,736 repos）+ `manifest/fleet-db.ledger.edn` を seed。signed 経路で
+  kotoba-fleet-vcs 自身の pin を seq 1（518ca77e→7c656067）、seq 2
+  （→aa09639236、parent-covering 連鎖）と前進させ、**rollback 試行
+  （→518ca77e）が `:value-regression` で REJECT（exit 1）されることを実機
+  確認**。projection 等価性: signed 経路が書いた west.yml は、直後に
+  `gen-west-manifest.cljs --entry` を走らせても **SHA 完全一致**（byte
+  同一）— 既存生成器との互換を保ったまま、pin 書き込みが「生成」から
+  「署名付き transact」に置き換わったことの証明。
+- **staging の境界（Phase 1 はここまで）**: west.yml は引き続き従来経路
+  （gen --entry / API single-entry）でも書ける dual-write 期。fleet-db を
+  唯一の書き込み口にする flip（CI で projection 一致を強制、gen 系を
+  読み取り専用化）は、fleet 全体の運用切替なので owner 判断のもと Phase 1.5
+  として別途。keyring の私鍵は session-local（scratchpad、0600）— 恒久鍵の
+  1Password 移設と did:key 化・CACAO 化は Phase 2。
