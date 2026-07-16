@@ -694,3 +694,20 @@ pass、署名 receipt `0a1f37f78fa4`/`ab6db0608952`**。GHA workflow は署名�
 **残**: hinshitsu ゲートを kototama capability-sandbox で実行する部分
 （現状は pin 到達性チェックのみ、receipt の check は hinshitsu evidence の
 {:name :outcome} 形と互換）。
+
+## Addendum (2026-07-16, same day): native CI 品質ゲート（capability-bound）
+
+native CI の残りだった「ゲート実行」を実装（kotoba-fleet-vcs `804b60e3de04`、
+pin seq 15）。`fleet ci-verify --gate 'name=cmd' [--gate-timeout ms]` が品質
+ゲートを **capability-bound（timeout budget = kototama HostCaps の analog）**で
+実行し、**hinshitsu-evidence 互換の check**（`{:hinshitsu/status
+:hinshitsu/checks}`、hinshitsu を require せず plain-map shape で interop —
+ops-runner / kotoba-rad.announce と同じ疎結合原則）を署名 receipt に食わせる。
+**dogfood**: repo 自身のテストスイートを gate に走らせ pass（receipt に
+`gate/tests exit 0`）、`exit 3` の gate は receipt :fail + exit 1 —
+**ゲートが実際に gating する**ことを両パスで確認。**残**: kototama Chicory
+tender による **literal WASM 封じ**（現状は timeout-bound subprocess）と
+hinshitsu.mokushi（visual regression）ゲート — どちらも JVM 側 follow-up。
+これで fleet native CI は「verify → 署名 content-addressed receipt（required
+⊆ passed）+ capability-bound quality gate」まで到達し、GitHub Actions の
+揮発ログを durable attestation に置換する形が一通り揃った。
