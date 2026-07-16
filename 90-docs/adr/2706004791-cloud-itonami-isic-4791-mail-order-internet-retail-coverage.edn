@@ -1,0 +1,89 @@
+[{:adr/id 2706004791
+  :adr/title "cloud-itonami-isic-4791 — Mail-Order/Internet Retail Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-4791]
+  :adr/references [2607121000 2680004719]
+
+  ;; Wave 2 actor (coordination/logistics/trade): mail-order/Internet
+  ;; retail (NO physical storefront -- distinct from every physical-
+  ;; retail sibling in this fleet) operations coordination-only
+  ;; (order-record logging, fulfillment-operation scheduling, supply-
+  ;; order coordination, fraud-concern flagging). Primary gate adapted
+  ;; to seller/merchant-account (payment-processor-linked) verification
+  ;; in place of store verification; scope-exclusion adapted to a
+  ;; payment-fraud/chargeback/payment-dispute-finalization dimension in
+  ;; place of loss-prevention-enforcement-finalization.
+
+  :actor/id :cloud-itonami-isic-4791
+  :actor/name "Mail-Order/Internet Retail Operations Coordinator"
+  :actor/isic-rev5 "4791"
+  :actor/domain :retail/mail-order-internet
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-order-record :schedule-fulfillment-operation
+                       :coordinate-supply-order :flag-fraud-concern]
+  :actor/always-escalate-ops [:flag-fraud-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-supply-order 1500}
+
+  :actor/hard-checks [:seller-verified :vendor-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["finalize the fraud determination" "finalized the fraud determination"
+                                "finalize the chargeback ruling" "finalized the chargeback ruling"
+                                "issue the chargeback ruling" "issued the chargeback ruling"
+                                "issue a final fraud ruling" "issued a final fraud ruling"
+                                "rule the transaction fraudulent" "ruled the transaction fraudulent"
+                                "rule the order fraudulent" "ruled the order fraudulent"
+                                "determine the order to be fraudulent" "determined the order to be fraudulent"
+                                "determine the account to be fraudulent" "determined the account to be fraudulent"
+                                "resolve the payment dispute" "resolved the payment dispute"
+                                "close the payment dispute in the merchant's favor"
+                                "close the payment dispute in the customer's favor"
+                                "approve the chargeback" "approved the chargeback"
+                                "deny the chargeback" "denied the chargeback"
+                                "reverse the charge" "reversed the charge"
+                                "process the refund reversal" "processed the refund reversal"
+                                "不正と断定した" "不正利用と確定した" "チャージバックを確定させた"
+                                "チャージバック裁定を下した" "チャージバックを承認した" "チャージバックを却下した"
+                                "支払い紛争を解決した" "支払い紛争の最終判断を下した" "返金の取消処理を実行した"]
+
+  ;; Self-trip-avoidance: every term above is phrased as the
+  ;; finalization/resolution ACTION, never a bare noun -- this
+  ;; namespace's own :flag-fraud-concern default proposal legitimately
+  ;; discusses suspected fraud/chargeback/payment-dispute concerns, and
+  ;; its own printed :op keyword literally contains the substring
+  ;; "fraud". A bare-noun term list (e.g. bare "fraud"/"chargeback"/
+  ;; "payment dispute") would self-trip this actor's own core happy path
+  ;; on every single run. Regression test:
+  ;; governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion,
+  ;; plus a companion sanity test,
+  ;; governor-test/out-of-scope-injection-still-trips-scope-exclusion,
+  ;; confirming the check is not accidentally a no-op.
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-order-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-order-record :schedule-fulfillment-operation
+                                               :coordinate-supply-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-order-record :schedule-fulfillment-operation
+                                         :coordinate-supply-order :flag-fraud-concern}
+      :auto #{:log-order-record :schedule-fulfillment-operation :coordinate-supply-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 61 :assertions 181 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression
+                  :vendor-verification :payment-processor-linkage]
+  :test/simulator :mailorderops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-4791"
+  :registry/business-id "cloud-itonami-isic-4791"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]

@@ -10,6 +10,9 @@ Proposed（設計・実現性評価）。オーナー指示「20-actors は全�
 |---|---|---|---|
 | Phase 1 core | compat vendored コピー **844 件除去** + `COMPAT-MOVED.md`（844 行マッピング） | `13a9871` | ✅ landed |
 | Phase 2 #1 | 陳腐化 compat-corpus **py 装置 23 件 prune** + 死んだ bb.edn task 2 削除 | `d5969d5` | ✅ landed |
+| Phase 1 tail | 未移行 compat **181 件を kotoba-lang `com-<base>` として publish + west 登録 + vendored 除去**（149 + rate-limit 後の 32）。com-junkawasaki 登録 `96fc088`/`61d9054`/`deb10f3`、etzhayyim/root 除去 `402af5e`/`737d6a8` | pin `e959ac3` | ✅ landed |
+
+**Phase 1 完了**: compat 1027 のうち **1025 を consolidate**（844 除去 + 181 migrate）。残るは hand-deepened `salesforce-compat`/`stripe-compat` 2 件のみ（個別レビューのため意図的保持）。全 compat が kotoba-lang `com-<base>` 独立リポ + west 登録済みが source of truth。
 
 **方針転換（オーナー指示 2026-07-16）**: Python は deprecated・prune 対象、load-bearing なものは cljs(nbb) で再実装。
 
