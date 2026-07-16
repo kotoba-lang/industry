@@ -1,0 +1,72 @@
+[{:adr/id 2691004722
+  :adr/title "cloud-itonami-isic-4722 — Specialized Beverage Retail Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-4722]
+  :adr/references [2607121000 2670004721]
+
+  ;; Wave 2 actor (coordination/logistics/trade): specialized beverage
+  ;; retail (liquor store/wine shop/craft-beer shop) operations
+  ;; coordination-only (sales-record logging, staffing-operation
+  ;; scheduling, supply-order coordination, compliance-concern flagging).
+
+  :actor/id :cloud-itonami-isic-4722
+  :actor/name "Specialized Beverage Retail Operations Coordinator"
+  :actor/isic-rev4 "4722"
+  :actor/domain :retail/specialized-beverage-stores
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-sales-record :schedule-staffing-operation
+                       :coordinate-supply-order :flag-compliance-concern]
+  :actor/always-escalate-ops [:flag-compliance-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-supply-order 500}
+
+  :actor/hard-checks [:store-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["finalize the age verification" "age verification override"
+                                "override the age verification" "bypass age verification"
+                                "年齢確認の上書き" "年齢確認を確定" "年齢確認の無効化"
+                                "finalize responsible service" "responsible service override"
+                                "適正飲酒提供判断の上書き" "酒類提供の最終判断"
+                                "control the id scanner" "actuate the id scanner"
+                                "liquor control board enforcement" "license suspension"
+                                "酒類販売免許取消" "酒類指導官" "営業許可取消"]
+  :actor/structured-violation-fields [:finalizes-age-verification-override?
+                                      :finalizes-responsible-service-decision?
+                                      :overrides-age-verification?
+                                      :overrides-responsible-service-decision?]
+
+  ;; Self-trip-avoidance: point-of-sale age-verification/ID-scanner
+  ;; actuation terms kept English-only -- this namespace's own Japanese
+  ;; default disclaimer text ("...年齢確認端末の直接操作は行わない")
+  ;; legitimately discusses NOT touching such hardware, so a bare
+  ;; Japanese equipment term would self-trip.
+  ;; Regression test: governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion.
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-sales-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-sales-record :schedule-staffing-operation
+                                               :coordinate-supply-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-sales-record :schedule-staffing-operation
+                                         :coordinate-supply-order :flag-compliance-concern}
+      :auto #{:log-sales-record :schedule-staffing-operation :coordinate-supply-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 48 :assertions 134 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression
+                  :structured-field-violation]
+  :test/simulator :beverageretailops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-4722"
+  :registry/business-id "cloud-itonami-isic-4722"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
