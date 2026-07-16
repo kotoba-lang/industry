@@ -1,0 +1,66 @@
+[{:adr/id 2670004721
+  :adr/title "cloud-itonami-isic-4721 — Specialized Food Retail Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-4721]
+  :adr/references [2607121000 2616562900]
+
+  ;; Wave 2 actor (coordination/logistics/trade): specialized food retail
+  ;; (butcher/bakery/fishmonger/greengrocer) operations coordination-only
+  ;; (sales-record logging, staffing-operation scheduling, supply-order
+  ;; coordination, food-safety-concern flagging).
+
+  :actor/id :cloud-itonami-isic-4721
+  :actor/name "Specialized Food Retail Operations Coordinator"
+  :actor/isic-rev4 "4721"
+  :actor/domain :retail/specialized-food-stores
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-sales-record :schedule-staffing-operation
+                       :coordinate-supply-order :flag-food-safety-concern]
+  :actor/always-escalate-ops [:flag-food-safety-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-supply-order 500}
+
+  :actor/hard-checks [:store-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["food safety clearance" "clearance decision" "food safety approval"
+                                "食品安全認可の確定" "衛生証明書の発行"
+                                "override allergen" "allergen exclusion override" "waive allergen"
+                                "アレルゲン除外" "アレルゲン上書き"
+                                "refrigeration equipment override" "actuate equipment" "shut down equipment"
+                                "control the walk-in cooler" "control the slicer" "control the meat grinder"
+                                "health department" "inspection clearance" "license suspension"
+                                "保健所" "衛生当局" "営業許可取消"]
+
+  ;; Self-trip-avoidance: equipment-actuation terms kept English-only --
+  ;; this namespace's own Japanese default disclaimer text ("...加工設備の
+  ;; 直接操作は行わない") legitimately discusses NOT touching such
+  ;; equipment, so a bare Japanese equipment term would self-trip.
+  ;; Regression test: governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion.
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-sales-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-sales-record :schedule-staffing-operation
+                                               :coordinate-supply-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-sales-record :schedule-staffing-operation
+                                         :coordinate-supply-order :flag-food-safety-concern}
+      :auto #{:log-sales-record :schedule-staffing-operation :coordinate-supply-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 46 :assertions 130 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression]
+  :test/simulator :foodretailops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-4721"
+  :registry/business-id "cloud-itonami-isic-4721"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
