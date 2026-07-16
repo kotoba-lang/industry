@@ -3110,7 +3110,18 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; re-fetched origin/main registry.edn (via git-trees/blobs API)
       ;; immediately before this corrective test-file edit, not
       ;; assumed: {:total 649 :spec 205 :blueprint 0 :implemented 444}.
-      (is (= 444 (:implemented m))))))
+      ;; 444 -> 446: further concurrent sibling fleet agents' own
+      ;; :spec/:blueprint -> :implemented promotions landed in this
+      ;; same fast-moving window (not this promotion's own work,
+      ;; corroborated here only to keep this shared hot test file
+      ;; truthful -- this aggregate legitimately drifts multiple times
+      ;; within minutes under concurrent fleet load, per this file's
+      ;; own well-established history above); live-recomputed via
+      ;; `(kotoba.industry/maturity-summary)` against a freshly
+      ;; re-fetched origin/main registry.edn (via git-trees/blobs API)
+      ;; immediately before this corrective test-file edit, not
+      ;; assumed: {:total 649 :spec 203 :blueprint 0 :implemented 446}.
+      (is (= 446 (:implemented m))))))
 
 (deftest cloud-itonami-isic-4782-is-implemented
   (testing "cloud-itonami-isic-4782 (Retail sale via stalls and markets
