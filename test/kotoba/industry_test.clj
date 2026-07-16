@@ -3823,3 +3823,91 @@ clone; superproject ADR-2628000000) is also :implemented"
            (:repo (industry/get-industry "4771"))))
     (is (= "cloud-itonami-isic-4771"
            (:business-id (industry/get-industry "4771"))))))
+
+(deftest cloud-itonami-isic-4759-is-implemented
+  (testing "cloud-itonami-isic-4759 (Retail sale of electrical household
+  appliances, furniture, lighting equipment and similar household
+  articles in specialized stores -- fresh scaffold, no prior repository
+  at either the stale gftdcojp/cloud-itonami-G4759 placeholder or the
+  real cloud-itonami org target [gh api 404 confirmed for both before
+  any work began]; identity ({:id \"4759\" ...}) independently verified
+  against a fresh clone before any work began, per this fleet's
+  ID/name-mismatch caution -- the live :name field was found truncated
+  with a literal \"...\" [the known ~10% pre-existing seed-data bug],
+  confirmed as an exact prefix-match of the assigned ISIC class name and
+  de-truncated as part of this same edit; a separate, coarser-
+  granularity {:id \"475\" ...} 3-digit group entry left untouched; Wave
+  2 (coordination/logistics/trade, ADR-2607121000) target;
+  ApplianceRetailAdvisor ⊣ ApplianceRetailGovernor household-appliance/
+  furniture/lighting-specialty-retail OPERATIONS COORDINATION actor
+  (applianceops.* namespace) mirroring cloud-itonami-isic-4752's
+  [Retail sale of hardware, paints and glass in specialized stores]
+  verified advisor/governor/phase/operation/store/sim module shape
+  module-for-module (applianceops.* in place of hardwarepaintops.*,
+  delivery-and-installation scheduling in place of floor-staff
+  scheduling, warranty/defect-dispute-concern flagging in place of
+  hazmat-handling-safety-concern flagging); closed four-op allowlist,
+  all :effect :propose (:log-sales-record/:schedule-delivery-operation/
+  :coordinate-supply-order/:flag-warranty-concern); FOUR HARD governor
+  checks, all permanent and un-overridable by any human approval --
+  store-unverified (target store's business registration/retail license
+  must exist AND be independently :registered?/:verified? in the store
+  before any proposal for it may commit or escalate), vendor-unverified
+  (for :coordinate-supply-order ONLY, the same supply-chain
+  counterparty-verification gate as sibling ISIC 4752), effect-not-
+  propose, and scope-exclusion (folds in op-not-allowed) that
+  permanently blocks any proposal touching directly finalizing a
+  warranty-claim decision (approving, denying or settling a claim,
+  authorizing a warranty refund or replacement, closing a claim as
+  resolved) OR directly finalizing a delivery/installation-safety
+  clearance (certifying a gas/electrical hookup as safe, clearing an
+  installation hazard as resolved, signing off on an installation
+  safety inspection) -- the closed op allowlist structurally never
+  includes any op that itself finalizes either decision, so this is
+  defense-in-depth on top of a structural exclusion, matching this
+  fleet's two-fold warranty-authority/installation-safety-authority
+  guardrail (large appliances routinely require gas/electrical hookup
+  at delivery, unlike 4752's single hazmat-handling exclusion);
+  scope-excluded terms are deliberately phrased as the finalization/
+  execution ACTION (\"approved the warranty claim\", \"certified the gas
+  hookup as safe\"), never a bare noun (\"warranty\"/\"claim\"/
+  \"installation\"/\"gas\") -- this fleet's own known self-tripping bug
+  class avoided from the start, since :flag-warranty-concern's entire
+  legitimate purpose is to talk ABOUT a defect/warranty-dispute concern
+  using exactly those bare nouns, and its own printed :op keyword
+  literally contains the substring \"warranty\"; a dedicated regression
+  test (default-mock-advisor-proposals-never-self-trip-scope-exclusion
+  in governor_test.clj) independently confirms all four default
+  proposal generators, for a clean registered+verified store, never
+  trip :scope-excluded and never :op-not-allowed; :flag-warranty-concern
+  ALWAYS escalates to human sign-off and is never a member of any
+  phase's :auto set, at any phase (two independent layers agree:
+  applianceops.governor's own always-escalate-ops AND
+  applianceops.phase's own phase table); a :coordinate-supply-order
+  above a $2000 estimated-cost threshold likewise always escalates;
+  real langgraph-clj StateGraph (intake->advise->govern->decide->
+  commit|hold|request-approval) with interrupt-before
+  #{:request-approval} for human-in-the-loop resume, not a stub; fully
+  portable .cljc with no JVM-only interop anywhere in src/ (mock-only
+  advisor); 56 tests / 166 assertions green (clojure -M:test),
+  independently re-verified against a fresh clone; clj-kondo 0 errors /
+  0 warnings; registry.edn's own \"4759\" -> :implemented change
+  (:name de-truncated, :repo/:business-id de-placeholdered from the
+  stale gftdcojp/cloud-itonami-G4759 target to cloud-itonami/
+  cloud-itonami-isic-4759, :maturity :spec -> :implemented,
+  :operating-states updated to match the actor state machine;
+  :required-technologies left unchanged) landed via a Contents-API
+  single-file PUT direct to main (sha-checked optimistic concurrency,
+  immediately re-fetched fresh content before the PUT per this fleet's
+  hot-contention discipline, exact-block edit only verified via an
+  exact old/new substring occurrence count of 1 PLUS sample-verified
+  against 4752/4719/475[group]/3512 entries also intact, no mojibake
+  detected, landed on the first attempt); superproject ADR-2700004759
+  (com-junkawasaki/root, 90-docs/adr/2700004759-cloud-itonami-isic-4759-
+  appliance-furniture-retail-coverage.md/.edn)) promoted :spec ->
+  :implemented"
+    (is (= :implemented (industry/maturity "4759")))
+    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-4759"
+           (:repo (industry/get-industry "4759"))))
+    (is (= "cloud-itonami-isic-4759"
+           (:business-id (industry/get-industry "4759"))))))
