@@ -2984,12 +2984,22 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; :implemented, :repo/:business-id de-placeholdered from the stale
       ;; gftdcojp/cloud-itonami-G4719 target to
       ;; cloud-itonami/cloud-itonami-isic-4719; 56 tests / 166 assertions
-      ;; green; superproject ADR-2680004719). 423 is confirmed still
-      ;; correct by this promotion's own independent live-recompute
-      ;; (`(kotoba.industry/maturity-summary)` against a freshly
+      ;; green; superproject ADR-2680004719). 423 was confirmed still
+      ;; correct by that promotion's own independent live-recompute.
+      ;; 423 -> 424: this promotion's own cloud-itonami-isic-4723
+      ;; registry.edn change (specialized tobacco retail operations
+      ;; coordination actor -- TobaccoRetailAdvisor sealed advisor +
+      ;; independent TobaccoRetailGovernor, coordination-only, mirroring
+      ;; cloud-itonami-isic-4721's verified module shape; :maturity
+      ;; :spec -> :implemented, :repo/:business-id de-placeholdered from
+      ;; the stale gftdcojp/cloud-itonami-G4723 target to
+      ;; cloud-itonami/cloud-itonami-isic-4723; 47 tests / 133 assertions
+      ;; green; superproject ADR-2691004723). Live-recomputed via
+      ;; `(kotoba.industry/maturity-summary)` against a freshly
       ;; re-fetched origin/main registry.edn immediately before this
-      ;; edit), so the assertion above is left unchanged.
-      (is (= 423 (:implemented m))))))
+      ;; test-file edit, not assumed: {:total 649 :spec 225 :blueprint 0
+      ;; :implemented 424}.
+      (is (= 424 (:implemented m))))))
 
 (deftest cloud-itonami-isic-4719-is-implemented
   (testing "cloud-itonami-isic-4719 (Other retail sale in non-specialized
@@ -3001,6 +3011,51 @@ clone; superproject ADR-2628000000) is also :implemented"
            (:repo (industry/get-industry "4719"))))
     (is (= "cloud-itonami-isic-4719"
            (:business-id (industry/get-industry "4719"))))))
+(deftest cloud-itonami-isic-4723-is-implemented
+  (testing "cloud-itonami-isic-4723 (Retail sale of tobacco products in
+  specialized stores -- tobacconist/cigar lounge/pipe & tobacco shop/
+  vape specialty retail operations coordination, Wave 2
+  [coordination/logistics/trade, ADR-2607121000] fresh scaffold, no
+  pre-existing repo at any placeholder [gh api 404 confirmed for both
+  the stale gftdcojp/cloud-itonami-G4723 placeholder and the real
+  cloud-itonami org target before scaffolding]; distinct from siblings
+  4721 [specialized food retail, already :implemented] and 4722
+  [stand-alone beverage retail, built by a sibling agent in this same
+  batch]; TobaccoRetailAdvisor ⊣ TobaccoRetailGovernor, closed
+  four-op allowlist all :effect :propose (log-sales-record/schedule-
+  staffing-operation/coordinate-supply-order/flag-compliance-concern);
+  THREE HARD governor checks (store-unregistered-or-unlicensed,
+  effect-not-propose, and scope-exclusion folding in op-not-allowed)
+  that permanently block any proposal touching finalization of an
+  age-verification override, direct age-verification/ID-scanning
+  terminal actuation, or tobacco-retail-license suspension/revocation/
+  licensing-authority enforcement -- this actor's closed op allowlist
+  never includes any op that directly finalizes an age-verification
+  override, always either this hard permanent block or, for
+  flag-compliance-concern, an always-escalate op, never
+  auto-commit-eligible in any phase's :auto set; scope-excluded terms
+  phrased as the finalization/execution ACTION (\"finalize the
+  age-verification override\", \"control the age verification
+  terminal\"), never a bare noun (\"age\"/\"verification\"), avoiding
+  this fleet's own known self-tripping bug class, verified by a
+  dedicated default-mock-advisor-proposals-never-self-trip-scope-
+  exclusion regression test in governor_test.clj plus two further
+  structural invariant tests (no-allowed-op-finalizes-age-verification/
+  flag-compliance-concern-is-always-escalate-never-auto);
+  coordinate-supply-order above a $750 cost threshold also always
+  escalates; real langgraph-clj StateGraph (intake->advise->govern->
+  decide->commit|hold|request-approval) with interrupt-before
+  #{:request-approval}; fully portable .cljc with no JVM-only interop;
+  47 tests / 133 assertions green (clojure -M:test), independently
+  re-verified against a fresh clone; clj-kondo 0 errors / 0 warnings;
+  superproject ADR-2691004723 (com-junkawasaki/root,
+  90-docs/adr/2691004723-cloud-itonami-isic-4723-tobacco-retail-coverage.md/.edn))
+  promoted :spec -> :implemented"
+    (is (= :implemented (industry/maturity "4723")))
+    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-4723"
+           (:repo (industry/get-industry "4723"))))
+    (is (= "cloud-itonami-isic-4723"
+           (:business-id (industry/get-industry "4723"))))))
 (deftest cloud-itonami-isic-4530-is-implemented
   (testing "cloud-itonami-isic-4530 (Sale of motor vehicle parts and
   accessories -- auto-parts retail/wholesale operations coordination,
