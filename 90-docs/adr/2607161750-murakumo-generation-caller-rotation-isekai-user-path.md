@@ -87,3 +87,29 @@ fleet behind `murakumo-generation.gftd.ai` is provisioned and serving.
 - diffusion/tts/music stages on the Generate page remain Modal skeletons and
   are labeled honestly; wiring them to Murakumo `:apps :generation` stages
   (image/voice/music exist upstream) is a candidate follow-up.
+
+## 2026-07-16 addendum — follow-ups 1 & 2 closed, babiniku deploy-source trap recorded
+
+- **murakumo.cloud site Worker redeployed from cloud-murakumo main** (version
+  `f02f0c01-258a-414a-9ffa-ac231d6f372e`, built in a clean worktree at `1e7176f`,
+  generation-proxy contract test passed pre-deploy). The capability payload now
+  advertises `/api/v1/generation` with `generation-configured: true`,
+  `generation-access-gated: true`; the route 401s without a token. Note the site
+  Worker's generation gate verifies with the site Worker's own
+  `MURAKUMO_TOKEN_SECRET` (the chat gate — a *different, still-unretrievable*
+  value), not the kagi-stored generation caller secret; consumers should prefer
+  `generation.murakumo.cloud` directly.
+- **net-babiniku production redeployed with the new caller secret.** Two-step:
+  a first redeploy from clean main `a558bee` **regressed production** — the
+  entire Murakumo generation stack (`murakumo-auth.js`, character/motion/
+  effect/sound/voice functions, ~15 files) turned out to be **uncommitted,
+  untracked WIP in the shared checkout**; previous production deployments
+  (source-labeled `fbb100f`) had been made from that dirty tree. Recovered by
+  redeploying the shared checkout's `public/` + `functions/` byte-state as-is
+  (no files modified), which restored every endpoint (`/api/character-generation`
+  again session-gates 401, site 200) **and** bound the rotated
+  `MURAKUMO_CALLER_SECRET` — strictly better than the pre-incident state, closing
+  the "babiniku holds the pre-rotation secret" window.
+- ⚠ **Trap for future sessions**: until babiniku's generation-stack WIP lands on
+  its `main`, any "redeploy babiniku from main" removes those production
+  Functions. Land the WIP (its owning agent's flow) before clean-main deploys.
