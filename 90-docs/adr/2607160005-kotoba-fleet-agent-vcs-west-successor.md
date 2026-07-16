@@ -532,3 +532,28 @@ gap 棚卸し（同日）の推奨順 ①〜⑤ を処置した。
   ⑦ P3b（p2p 実配線）、kotobase 永続化（fleet-db blob / Datalog）、
   anchor / IStore / fleet-head への op-log 統合、CACAO wire format、
   kotoba-fleet governor 統合、CI 実走確認。
+
+## Addendum (2026-07-16, same day): Phase 3b — fleet head gossip 配線
+
+⑦ P3b の第一スライス（fleet head の機間複製）を実装（kotoba-fleet-vcs
+`209088728e41`、12 tests / 76 assertions）:
+
+- **`fleet.p2p`（pure cljc）**: `head->announce` が P3a signed head を
+  **kotoba-lang/p2p のワイヤ形状** `{:type :head-announce :graph "fleet-db"
+  :head-cid :seq :fleet-head}` に変換。`verify-announce` は trust set
+  （keyring roots + canonical allow）+ ed25519 署名 + head-cid/seq の
+  record 束縛を検証。`adopt` は seq 前進時のみ採用（monotonic、pin と同規則）。
+  **fleet head をそのまま sigref として使う** — kotoba-rad.announce
+  （ADR-2607072200）と同じ insight で、新しい署名 primitive を作らない。
+  実 kotoba-lang/p2p ノードの `:sign-announce`/`:verify-announce?` フックと
+  message 形状が一致するので相互運用可能。
+- **dogfood（機間複製）**: machineA が fleet head を announce → machineB
+  （空）が **seq 8 / cid 935a713 を gossip 経由で adopt** → 再送は downgrade
+  せず → head-cid 改竄 announce は `:head-cid-mismatch` で REJECT、B の state
+  は seq 8 のまま。**フリート機は GitHub を polling せず互いの fleet head を
+  この経路で学ぶ（GitHub を mirror に降格）**。
+- **本スライスの境界**: announce/verify/adopt のみ（単一 head record に必要な
+  部分）。block-chasing（`want-since`/bitswap による kotoba-git object graph
+  の実データ転送）と実ネットワークトランスポート（現状は message EDN の
+  受け渡し）は後続スライス — fleet head の**真偽の合意**は本スライスで
+  機間 replicable、object の**実体転送**は kotoba-git 統合時。
