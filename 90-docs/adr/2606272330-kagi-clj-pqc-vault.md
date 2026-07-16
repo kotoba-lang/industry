@@ -14,7 +14,7 @@ authoritative_for:
   - crypto provider seam（JVM=JDK24 標準 ML-KEM-768/ML-DSA-65 + BouncyCastle Argon2id / CLJS・WASM=kotoba-crypto Rust）
   - op 相当 CLI（kagi.cli）と vault 永続化（kagi.persist：暗号文のみ）
 related:
-  - orgs/com-junkawasaki/kagi-clj
+  - orgs/kotoba-lang/kagi
   - orgs/gftdcojp/cloud-itonami/src/cloud_itonami/edge/cacao.cljc  # 旧 ai-gftd-itonami/src/itonami/cacao.clj (repo未実体化のまま削除、2026-07-04)
   - orgs/com-junkawasaki/kotoba/crates/kotoba-crypto
   - orgs/com-junkawasaki/kotoba/crates/kotoba-auth
@@ -26,7 +26,7 @@ superseded_by: []
 
 # ADR-2606272330: kagi-clj — 対量子(PQC)シークレット vault を kotoba 上に主権設計
 
-**Status**: proposed（設計のみ。雛形リポ `orgs/com-junkawasaki/kagi-clj` を同時生成、west 登録は GitHub repo 作成後）
+**Status**: proposed（設計のみ。雛形リポ `orgs/kotoba-lang/kagi` を同時生成、west 登録は GitHub repo 作成後）
 **Date**: 2026-06-27
 **Deciders**: Jun Kawasaki
 

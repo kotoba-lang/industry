@@ -3,7 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-06-28
 - **Context tags**: kotoba-code, clj, cljc, langgraph-clj, durable-agent-loop, checkpoint, datomic, kotoba
-- **Related**: `orgs/kawasakijun/docs/adr/0013-clj-agent-stack.md`, `orgs/com-junkawasaki/langgraph-clj/docs/adr/0001-architecture.md`
+- **Related**: `orgs/kawasakijun/docs/adr/0013-clj-agent-stack.md`, `orgs/kotoba-lang/langgraph/docs/adr/0001-architecture.md`
 
 ## Context
 

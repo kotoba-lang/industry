@@ -13,10 +13,10 @@ authoritative_for:
   - RRULE(FREQ/INTERVAL/COUNT/UNTIL/BYDAY)の純粋展開ロジックの参照実装
   - カレンダー成果物の3-org 配置(共通=com-junkawasaki / 公益=etzhayyim / 事業=gftdcojp)
 related:
-  - orgs/com-junkawasaki/ical-clj                        # 本 ADR のライブラリ
-  - orgs/com-junkawasaki/koe-clj                         # voice-reception / auto-booking との連携先
-  - orgs/com-junkawasaki/bpmn-clj                        # 同型の再利用 kernel(設計先例)
-  - orgs/com-junkawasaki/dmn-clj                         # 同型の再利用 kernel(設計先例)
+  - orgs/kotoba-lang/org-ietf-ical                        # 本 ADR のライブラリ
+  - orgs/kotoba-lang/koe                         # voice-reception / auto-booking との連携先
+  - orgs/kotoba-lang/org-omg-bpmn                        # 同型の再利用 kernel(設計先例)
+  - orgs/kotoba-lang/org-omg-dmn                         # 同型の再利用 kernel(設計先例)
 supersedes: []
 superseded_by: []
 ---

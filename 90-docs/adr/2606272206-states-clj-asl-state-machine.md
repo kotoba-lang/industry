@@ -12,10 +12,10 @@ authoritative_for:
   - choice ルール(compound :and/:or/:not + 型別比較演算子)の EDN 表現と評価戦略
   - 成果物の3-org 配置(共通=com-junkawasaki / 公益=etzhayyim / 事業=gftdcojp)
 related:
-  - orgs/com-junkawasaki/states-clj                       # 本 ADR のライブラリ
-  - orgs/com-junkawasaki/bpmn-clj                        # 同型の再利用 kernel(host-injected ports の先例)
-  - orgs/com-junkawasaki/dmn-clj                         # 同型の再利用 kernel(decision table)
-  - orgs/com-junkawasaki/koe-clj                         # host-injected ports パターンの起源
+  - orgs/kotoba-lang/states                       # 本 ADR のライブラリ
+  - orgs/kotoba-lang/org-omg-bpmn                        # 同型の再利用 kernel(host-injected ports の先例)
+  - orgs/kotoba-lang/org-omg-dmn                         # 同型の再利用 kernel(decision table)
+  - orgs/kotoba-lang/koe                         # host-injected ports パターンの起源
 supersedes: []
 superseded_by: []
 ---

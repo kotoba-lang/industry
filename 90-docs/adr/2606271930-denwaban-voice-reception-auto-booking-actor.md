@@ -12,7 +12,7 @@ authoritative_for:
   - 唯一欠落している STT/ASR プリミティブを clean-room compat actor として新設する決定
   - voice 関連成果物の3-org 配置(共通=com-junkawasaki / 公益=etzhayyim / 事業=gftdcojp)
 related:
-  - orgs/com-junkawasaki/koe-clj                        # 再利用 voice-session kernel(共通ライブラリ) ← denwaban の依存
+  - orgs/kotoba-lang/koe                        # 再利用 voice-session kernel(共通ライブラリ) ← denwaban の依存
   - orgs/etzhayyim/root/20-actors/denwaban             # 本 ADR の actor(公益インスタンス)
   - orgs/etzhayyim/root/20-actors/whisper-compat        # 新設 STT/ASR compat(欠落プリミティブ)
   - orgs/etzhayyim/root/20-actors/twilio-compat        # Programmable Voice 相当(着信/発信/SIP) ← telephony 面

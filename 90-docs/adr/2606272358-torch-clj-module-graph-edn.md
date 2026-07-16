@@ -13,9 +13,9 @@ authoritative_for:
   - 「記述すれど実行せず」— tensor 演算は host 注入の IBackend に限定し、kernel は shape/param 記述のみとする方針
   - 成果物の3-org 配置(共通=com-junkawasaki / 公益=etzhayyim / 事業=gftdcojp)
 related:
-  - orgs/com-junkawasaki/torch-clj                      # 本 ADR のライブラリ
-  - orgs/com-junkawasaki/vllm-clj                       # 姉妹(LLM 推論リクエスト as data)
-  - orgs/com-junkawasaki/jsonlogic-clj                  # 先例({op args} の単一キー map / validate / ports 方式)
+  - orgs/kotoba-lang/torch                      # 本 ADR のライブラリ
+  - orgs/kotoba-lang/vllm                       # 姉妹(LLM 推論リクエスト as data)
+  - orgs/kotoba-lang/jsonlogic                  # 先例({op args} の単一キー map / validate / ports 方式)
   - orgs/kotoba-lang/org-anthropic-mcp                  # 先例(host-injected transport/port 分離；通称 mcp-clj、現 repo 名 org-anthropic-mcp)
 supersedes: []
 superseded_by: []

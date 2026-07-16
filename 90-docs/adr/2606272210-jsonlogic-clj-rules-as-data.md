@@ -13,9 +13,9 @@ authoritative_for:
   - JSONLogic 流の真偽値・緩い等価(==)と厳密等価(===)の意味論
   - 成果物の3-org 配置(共通=com-junkawasaki / 公益=etzhayyim / 事業=gftdcojp)
 related:
-  - orgs/com-junkawasaki/jsonlogic-clj                  # 本 ADR のライブラリ
-  - orgs/com-junkawasaki/dmn-clj                        # 姉妹(決定表)— ルール評価の上位構造
-  - orgs/com-junkawasaki/policy-clj                     # 姉妹(ABAC/RBAC)— ルール評価の認可特化
+  - orgs/kotoba-lang/jsonlogic                  # 本 ADR のライブラリ
+  - orgs/kotoba-lang/org-omg-dmn                        # 姉妹(決定表)— ルール評価の上位構造
+  - orgs/kotoba-lang/policy                     # 姉妹(ABAC/RBAC)— ルール評価の認可特化
 supersedes: []
 superseded_by: []
 ---

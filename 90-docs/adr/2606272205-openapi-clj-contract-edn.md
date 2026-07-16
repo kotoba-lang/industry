@@ -12,10 +12,10 @@ authoritative_for:
   - string-keyed JSON パース済みマップと名前空間付き EDN モデルの双方向変換戦略
   - API 成果物の 3-org 配置(共通=com-junkawasaki / 公益=etzhayyim / 事業=gftdcojp)
 related:
-  - orgs/com-junkawasaki/openapi-clj                     # 本 ADR のライブラリ
-  - orgs/com-junkawasaki/godaddy-dns-clj                 # 同型の IHttp port 消費者の候補
-  - orgs/com-junkawasaki/bpmn-clj                        # 同型の再利用 kernel(host-injected ports の先例)
-  - orgs/com-junkawasaki/dmn-clj                         # 姉妹ライブラリ(決定表 EDN)
+  - orgs/kotoba-lang/openapi                     # 本 ADR のライブラリ
+  - orgs/kotoba-lang/godaddy-dns                 # 同型の IHttp port 消費者の候補
+  - orgs/kotoba-lang/org-omg-bpmn                        # 同型の再利用 kernel(host-injected ports の先例)
+  - orgs/kotoba-lang/org-omg-dmn                         # 姉妹ライブラリ(決定表 EDN)
 supersedes: []
 superseded_by: []
 ---

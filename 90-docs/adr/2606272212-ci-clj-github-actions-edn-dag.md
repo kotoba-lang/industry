@@ -12,9 +12,9 @@ authoritative_for:
   - YAML テキストを直接パースしない戦略(host が解析済み map を渡す)の採用理由
   - CI 成果物の 3-org 配置(共通=com-junkawasaki / 公益=etzhayyim / 事業=gftdcojp)
 related:
-  - orgs/com-junkawasaki/ci-clj                          # 本 ADR のライブラリ
-  - orgs/com-junkawasaki/bpmn-clj                        # 同型の再利用 kernel(先例)
-  - orgs/com-junkawasaki/dmn-clj                         # 同型の再利用 kernel(先例)
+  - orgs/kotoba-lang/ci                          # 本 ADR のライブラリ
+  - orgs/kotoba-lang/org-omg-bpmn                        # 同型の再利用 kernel(先例)
+  - orgs/kotoba-lang/org-omg-dmn                         # 同型の再利用 kernel(先例)
   - 90-docs/adr/2606272200-bpmn-clj-edn-process-library  # 設計の原型となった ADR
 supersedes: []
 superseded_by: []

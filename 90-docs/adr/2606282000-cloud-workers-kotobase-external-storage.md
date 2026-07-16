@@ -12,13 +12,13 @@ authoritative_for:
   - cloud-murakumo / cloud-manimani を cljs Cloudflare Worker の外部公開 API とする決定
   - 再利用 clj ライブラリ + kagi-clj/murakumo/manimani を public 公開する判断
 related:
-  - orgs/com-junkawasaki/kotobase-clj      # 新設: IStore ポート(:local 参照実装 + :kotobase XRPC 注入)
+  - orgs/kotoba-lang/kotobase      # 新設: IStore ポート(:local 参照実装 + :kotobase XRPC 注入)
   - orgs/com-junkawasaki/cloud-murakumo    # 新設: cljs CF Worker — fleet API
   - orgs/com-junkawasaki/cloud-manimani    # 新設: cljs CF Worker — triage Decision Ledger API
   - orgs/com-junkawasaki/murakumo          # OSS: kotoba WASM lattice 操作 CLI(standalone)
   - orgs/com-junkawasaki/manimani          # OSS: triage デスクトップ/CLI(standalone)
-  - orgs/com-junkawasaki/kagi-clj          # OSS 公開(vault コードは公開可・鍵は gitignore)
-  - orgs/com-junkawasaki/langchain-clj     # 既存: langchain.kotoba-db(kotoba XRPC db-api)
+  - orgs/kotoba-lang/kagi          # OSS 公開(vault コードは公開可・鍵は gitignore)
+  - orgs/kotoba-lang/langchain     # 既存: langchain.kotoba-db(kotoba XRPC db-api)
 ---
 
 # ADR-2606282000: kotobase 外部ストレージ + cljs Cloudflare Worker API

@@ -12,10 +12,10 @@ authoritative_for:
   - YAML パーサ依存を持ち込まずに「解析済みマップを受け取る」2段構成の採用
   - 検知成果物の3-org 配置(共通=com-junkawasaki / 公益=etzhayyim / 事業=gftdcojp)
 related:
-  - orgs/com-junkawasaki/sigma-clj      # 本 ADR のライブラリ
+  - orgs/kotoba-lang/sigma      # 本 ADR のライブラリ
   - orgs/com-junkawasaki/ghosthacker    # セキュリティツール(sigma-clj の主要消費者)
-  - orgs/com-junkawasaki/bpmn-clj       # 同型の再利用 kernel(host-injected ports の先例)
-  - orgs/com-junkawasaki/dmn-clj        # 同型の再利用 kernel(姉妹)
+  - orgs/kotoba-lang/org-omg-bpmn       # 同型の再利用 kernel(host-injected ports の先例)
+  - orgs/kotoba-lang/org-omg-dmn        # 同型の再利用 kernel(姉妹)
 supersedes: []
 superseded_by: []
 ---
