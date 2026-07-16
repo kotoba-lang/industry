@@ -1,26 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 5259, "ai-gftd-chat-shell" 1387},
+ {"magatama-sh1n5h1x" 5263, "ai-gftd-chat-shell" 1387},
  :zone
- {:requests-7d 362644,
-  :pageviews-7d 5765,
-  :uniques-7d-sum 4717,
+ {:requests-7d 366693,
+  :pageviews-7d 6897,
+  :uniques-7d-sum 4732,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/user/*", :requests 39}
-   {:path "/ccc.php", :requests 21}
-   {:path "/assets/main.js", :requests 18}
-   {:path "/v1/generation/jobs/3eb9f2e0a7c04da6a05503bb6f79810d",
-    :requests 17}
-   {:path "/file52.php", :requests 17}
-   {:path "/v1/generation/jobs/0a537b4151a44467ad6da5ec4690171d",
-    :requests 16}
-   {:path "/bless24.php", :requests 15}
-   {:path "/wp-admin/css/colors/coffee/wp-adochan.php", :requests 15}],
-  :status-mix {:client-error 900, :server-error 16793, :ok 990},
+  [{:path "/", :requests 862}
+   {:path "/favicon.ico", :requests 153}
+   {:path "/ci-cd/github/dist/requirements.txt", :requests 33}
+   {:path "/frontend/vue-app/src/deployment.yaml", :requests 30}
+   {:path "/data_sources/dev/requirements.txt", :requests 30}
+   {:path "/audit/logs/v2/service.yaml", :requests 30}
+   {:path "/config/azure/v1/setup.py", :requests 30}
+   {:path "/integrations/slack/v2/README.md", :requests 30}],
+  :status-mix {:ok 2195, :client-error 1225, :server-error 16912},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,10 +30,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-16",
- :traffic-quality {:window "24h", :probe-4xx-pct 5, :error-5xx-pct 90},
+ :traffic-quality {:window "24h", :probe-4xx-pct 6, :error-5xx-pct 83},
  :top-paths
- "上位 page (24h, 2xx/3xx): /user/* 39 · /ccc.php 21 · /assets/main.js 18 · /v1/generation/jobs/3eb9f2e0a7c04da6a055… 17 · /file52.php 17 | 4xx(probe) 5% · 5xx 90%",
+ "上位 page (24h, 2xx/3xx): / 862 · /favicon.ico 153 · /ci-cd/github/dist/requirements.txt 33 · /frontend/vue-app/src/deployment.yaml 30 · /data_sources/dev/requirements.txt 30 | 4xx(probe) 6% · 5xx 83%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 362644 req/7d・4717 uniques(日次和)・うち4xx probe 5%(24h)、workers 6646 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 366693 req/7d・4732 uniques(日次和)・うち4xx probe 6%(24h)、workers 6650 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}

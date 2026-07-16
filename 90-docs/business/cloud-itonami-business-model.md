@@ -49,9 +49,9 @@
 - kotobase/murakumo 顧客への cross-sell
 - 士業・SIer パートナー
 - GTM (acquisition→revenue): onboarded org→外部有償 org 転換 0% < 目標 20% — trial→paid の nudge（使用量到達通知）・価格 tier 見直し・年額/上位 tier の提示
-- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 9 · /itonami 1 · /infer/cost 1 | 4xx(probe) 58%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 8 · /itonami 1 · /infer/cost 1 | 4xx(probe) 58%
 - 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 8 · /itonami 1 · /infer/cost 1 | 4xx(probe) 57%
+- 観測 (paths): 上位 page (24h, 2xx/3xx): /robots.txt 7 · /itonami 1 · /infer/cost 1 | 4xx(probe) 57%
 
 ## Revenue Streams
 
