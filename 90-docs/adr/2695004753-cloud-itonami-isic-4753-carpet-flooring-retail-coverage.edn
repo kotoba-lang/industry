@@ -1,0 +1,83 @@
+[{:adr/id 2695004753
+  :adr/title "cloud-itonami-isic-4753 — Carpet, Rug and Floor-Covering Specialized-Store Retail Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-4753]
+  :adr/references [2607121000 2691004752]
+
+  ;; Wave 2 actor (coordination/logistics/trade): carpet/rug/floor-
+  ;; covering specialized-store retail operations coordination-only
+  ;; (sales-record logging, installation-operation scheduling,
+  ;; supply-order coordination, quality-concern flagging). No op
+  ;; finalizes a quality-dispute resolution (refund, warranty
+  ;; approval/denial, liability determination) -- that action is
+  ;; structurally excluded, never merely gated.
+
+  :actor/id :cloud-itonami-isic-4753
+  :actor/name "Carpet, Rug and Floor-Covering Retail Operations Coordinator"
+  :actor/isic-rev5 "4753"
+  :actor/domain :retail/carpet-rug-floor-coverings
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-sales-record :schedule-installation-operation
+                       :coordinate-supply-order :flag-quality-concern]
+  :actor/always-escalate-ops [:flag-quality-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-supply-order 1500}
+
+  :actor/hard-checks [:store-verified :vendor-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["finalize the quality dispute resolution" "finalized the quality dispute resolution"
+                                "finalize the installation dispute resolution" "finalized the installation dispute resolution"
+                                "resolve the quality dispute" "resolved the quality dispute"
+                                "resolve the installation dispute" "resolved the installation dispute"
+                                "settle the quality dispute" "settled the quality dispute"
+                                "issue a refund resolution" "issued a refund resolution"
+                                "issue a replacement resolution" "issued a replacement resolution"
+                                "approve the warranty claim resolution" "approved the warranty claim resolution"
+                                "deny the warranty claim resolution" "denied the warranty claim resolution"
+                                "determine final liability for" "determined final liability for"
+                                "issue final compensation for" "issued final compensation for"
+                                "close out the dispute case" "closed out the dispute case"
+                                "品質紛争の最終解決を実行" "品質紛争を解決した"
+                                "施工トラブルの最終解決を実行" "施工トラブルを解決した"
+                                "返金を確定した" "返金確定を実行"
+                                "保証請求を承認した" "保証請求を却下した"
+                                "最終的な責任判断を下した" "紛争案件を終結させた"]
+
+  ;; Self-trip-avoidance: every term above is phrased as the
+  ;; finalization/execution ACTION, never a bare noun -- this namespace's
+  ;; own :flag-quality-concern default proposal legitimately discusses
+  ;; defective-material/installation-dispute concerns, and its own
+  ;; printed :op keyword literally contains the substring
+  ;; "quality-concern". A bare-noun term list (e.g. bare
+  ;; "refund"/"warranty"/"dispute") would self-trip this actor's own core
+  ;; happy path on every single run. Regression test:
+  ;; governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion.
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-sales-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-sales-record :schedule-installation-operation
+                                               :coordinate-supply-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-sales-record :schedule-installation-operation
+                                         :coordinate-supply-order :flag-quality-concern}
+      :auto #{:log-sales-record :schedule-installation-operation :coordinate-supply-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 56 :assertions 166 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression
+                  :vendor-verification]
+  :test/simulator :flooringops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-4753"
+  :registry/business-id "cloud-itonami-isic-4753"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
