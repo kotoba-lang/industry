@@ -1,0 +1,25 @@
+[{:adr/authoritative_for
+  ["animeka の生成 pipeline における ReAct/co-scientist 品質ハーネスの canonical 設計（graph 層 coscientistQuality 実ループ + autopilot 有界品質ゲート + generate-keyframe の active renderRecipe 条件付け）"
+   "lg/scripts/coscientist-murakumo.cljc（standalone 版）と graph 層ループの役割分担（graph が canonical、スクリプトは fleet operator ツールとして温存）"
+   "renderRecipe store entity（activate/supersede、常に active 1 件）と offline degradation 契約（LLM mock→nil→決定論 fallback recipes + heuristic 0.82/0.5+jitter、ComfyUI placeholder）"
+   "west pin 前進中の manifest/west.yml 空ファイル事故（831639bba16）と復旧（3f8e6bd75ed）の記録・再発防止（content PUT 前の payload 非空検証、GNU base64 -w0）"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/topic "animeka-coscientist-react-quality-harness"
+  :adr/related
+  ["adr-2607011900-genapp-clj-mangaka-animeka-commons"
+   "adr-2606141500-keiei-arbor-coscientist-engine"
+   "adr-2607132300-kotoba-lang-uiux-design-quality-scoring"
+   "adr-2607141550-persona-visual-user-test-react-loop"
+   "adr-2605222000-animeka-v3-usd-comfyui-cinematic-pipeline"]
+  :adr/status "accepted, implemented & merged (ai-gftd-animeka main 491a7895, west pin advanced; live vision-judge path unverified)"
+  :adr/id "adr-2607161730-animeka-coscientist-react-quality-harness"
+  :adr/doc_type "adr"
+  :adr/last_verified "2026-07-16"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/date "2026-07-16"
+  :adr/decision-summary
+  "{:goal \"animeka の canonical CLJC graph 層に、高品質 anime 生成のための co-scientist ReAct 品質ループを常設する（調査で判明した PARTIAL 状態 — graph node スタブ / autopilot 線形 / ADR 不在 — を閉じる）\", :gap-found {:working-loop \"lg/scripts/coscientist-murakumo.cljc (generate→render→judge→tournament→evolve→meta→D1 persist, 稼働可)\" :graph-node \"make-coscientist-quality はハードコードスタブ (score 0.82/0.5 固定)\" :autopilot \"線形パス、judge→retry なし\" :adr \"不在\"}, :decision {:coscientist-quality \"generate(complete-json recipes)→render(comfy facade)→judge(vision-json 6-axis rubric 0-100→0-1)→evolve(meta-review rules)→persist(renderRecipe activate/supersede, active は常に1件)。:generations x :candidates (上限4x4)、:persist false で judge-only。envelope はスタブ互換 (:score :issues :recommendations) + :judge :best_recipe :recipe_id :trajectory\" :autopilot \"scaffold パス後に品質ゲート: score < :quality-threshold (default 0.75) かつ :max-retakes (default 1, 上限3) 残なら recommendations を retake ヒントに keyframe 再生成→再 judge。:quality_attempts :quality_trajectory :quality_passed を返す\" :generate-keyframe \"styled-prompt で active renderRecipe の style-tags/extra-prompt を連結 (Python autopilot._latest_render_recipe() の CLJC ポート — ループ成果が全 render に複利)\" :llm \"animeka.llm/vision-json 新設 (langchain.jvm/vision-json passthrough)\" :store \"renderRecipe entity + :renderRecipe/id unique schema (animeka-local、kotoba-lang/anime には入れない)\"}, :offline-degradation {:llm \"mock echo → parse nil → 決定論 fallback (固定 style-tags 3種巡回 recipes / heuristic score = stage 進捗 0.82|0.5 + recipe-hash jitter <0.07, cap 0.95 — 旧スタブ意味論を保存)\" :comfy \"既存 placeholder\" :test-lever \"threshold 0.99 で必ず max-retakes まで反復\"}, :tests \"7 tests / 60 assertions / 0 failures (clojure -M:dev:test)\", :landed {:repo \"gftdcojp/ai-gftd-animeka\" :feature-commit \"07c3f8d\" :main \"491a7895f7cfe45f0f223274631a30d978c50866\" :west-pin \"6b18398 -> 491a789 (root main 3f8e6bd75ed)\"}, :incident {:what \"pin 前進の single-entry API 編集で BSD 構文 base64 -o が GNU base64 に拒否され空 content を PUT、west.yml が 1 commit (831639bba16) の間空ファイル化\" :recovery \"直後の 3f8e6bd75ed で全文復旧 (pre-incident との正味 diff は animeka entry の +1/-1 のみ、窓中の割り込み commit なしを API で確認)\" :lesson \"content PUT 前に payload 非空と base64 成功を検証する (base64 -w0 < file)。west-pin-verify hook は pin 値検証のみで空ファイルは弾かない\"}, :follow-ups [:live-vision-judge-fleet-verification :3-judge-panel-or-deterministic-fitness :pairwise-tournament-port :standalone-script-vs-store-persist-unification], :out-of-scope [:design-quality-lib-direct-wiring :multi-node-langgraph-decomposition]}"
+  :db/id -1
+  :adr/authoritative true
+  :adr/title "ADR-2607161730: animeka co-scientist ReAct quality harness promoted into the langgraph layer (real coscientistQuality loop + autopilot quality gate)"}]
