@@ -3015,6 +3015,17 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; re-fetched origin/main registry.edn immediately before this
       ;; test-file edit, not assumed: {:total 649 :spec 221 :blueprint 0
       ;; :implemented 428}.
+            ;; 428 -> 428: this promotion's own
+      ;; cloud-itonami-isic-4722 (Retail sale of beverages in
+      ;; specialized stores, ADR-2691004722, com-junkawasaki/root)
+      ;; promoted :spec -> :implemented, PLUS any further CONCURRENT
+      ;; sibling fleet agents' own promotions landed in the same
+      ;; fast-moving window as this edit (not this promotion's own
+      ;; work, corroborated here only to keep this shared hot test
+      ;; file truthful); live-recomputed via
+      ;; `(kotoba.industry/maturity-summary)` against a freshly
+      ;; re-fetched origin/main registry.edn immediately before this
+      ;; test-file edit, not assumed.
       (is (= 428 (:implemented m))))))
 
 (deftest cloud-itonami-isic-4719-is-implemented
@@ -3101,6 +3112,83 @@ clone; superproject ADR-2628000000) is also :implemented"
            (:repo (industry/get-industry "4530"))))
     (is (= "cloud-itonami-isic-4530"
            (:business-id (industry/get-industry "4530"))))))
+(deftest cloud-itonami-isic-4722-is-implemented
+  (testing "cloud-itonami-isic-4722 (Retail sale of beverages in
+  specialized stores -- fresh scaffold, no prior repository at either
+  the stale gftdcojp/cloud-itonami-G4722 placeholder or the real
+  cloud-itonami org target [gh api 404 confirmed for both before any
+  work began]; identity ({:id \"4722\" :name \"Retail sale of beverages
+  in specialized stores\"}) independently verified against a fresh
+  clone before any work began, per this fleet's ID/name-mismatch
+  caution -- distinct from siblings 4721 [food, already :implemented]
+  and 4723 [tobacco, also :implemented]; Wave 2
+  (coordination/logistics/trade, ADR-2607121000) target;
+  BeverageRetailAdvisor \u22a3 BeverageRetailGovernor
+  specialized-beverage-retail (liquor store/wine shop/craft-beer shop)
+  OPERATIONS COORDINATION actor (beverageretailops.* namespace)
+  mirroring cloud-itonami-isic-4721's [Retail sale of food in
+  specialized stores] verified module shape module-for-module
+  (beverageretailops.* in place of foodretailops.*, store/liquor-
+  license registration in place of store/health-permit registration);
+  closed four-op allowlist, all :effect :propose
+  (:log-sales-record/:schedule-staffing-operation/:coordinate-supply-
+  order/:flag-compliance-concern); THREE HARD governor checks, all
+  permanent and un-overridable by any human approval --
+  store-unverified (target store's business registration AND liquor
+  retail license must exist AND be independently
+  :registered?/:verified? in the store before any proposal for it may
+  commit or escalate), effect-not-propose, and scope-exclusion (folds
+  in op-not-allowed) that permanently blocks any proposal touching
+  finalization of an age-verification override, a
+  responsible-service-of-alcohol decision, direct point-of-sale
+  age-verification/ID-scanner actuation, or alcohol-licensing-
+  authority enforcement, per this fleet's consumer-facing-alcohol-
+  retail safety guardrail; a STRUCTURED-FIELD companion check also
+  inspects the proposal's :value for explicit finalization-intent
+  booleans (:finalizes-age-verification-override?/
+  :finalizes-responsible-service-decision?), belt-and-suspenders
+  alongside the free-text scan, per this fleet's most recent best
+  practice of preferring structured fields over free-text scanning
+  where possible; scope-excluded terms are deliberately phrased as
+  the finalization/execution ACTION (\"finalize the age
+  verification\", \"override responsible service\"), never a bare noun
+  (bare \"age\"/\"verification\") -- point-of-sale ID-scanner-actuation
+  terms kept English-only since this namespace's own Japanese default
+  disclaimer text legitimately says it does NOT touch such hardware,
+  avoiding this fleet's own known self-tripping bug class, with a
+  dedicated regression test
+  (default-mock-advisor-proposals-never-self-trip-scope-exclusion in
+  governor_test.clj) asserting all four default proposal generators
+  never trip :scope-excluded; :flag-compliance-concern ALWAYS
+  escalates to human sign-off and is never a member of any phase's
+  :auto set, at any phase (two independent layers agree:
+  beverageretailops.governor's own always-escalate-ops AND
+  beverageretailops.phase's own phase table); a
+  :coordinate-supply-order above a 500.0 cost threshold likewise
+  always escalates; real langgraph-clj StateGraph
+  (intake->advise->govern->decide->commit|hold|request-approval) with
+  interrupt-before #{:request-approval} for human-in-the-loop resume,
+  not a stub; fully portable .cljc with no JVM-only interop anywhere
+  in src/ (mock-only advisor); 48 tests / 134 assertions green
+  (clojure -M:test), independently re-verified against a fresh clone;
+  clj-kondo 0 errors / 0 warnings; registry.edn's own \"4722\" ->
+  :implemented change (:repo/:business-id de-placeholdered from
+  gftdcojp/cloud-itonami-G4722 -> cloud-itonami/cloud-itonami-isic-4722,
+  :maturity :spec->:implemented, :operating-states updated to match the
+  actor state machine; :required-technologies left unchanged) landed
+  via a Contents-API single-file PUT (sha-checked optimistic
+  concurrency, re-fetched fresh content immediately before the PUT
+  after an initial 409 from concurrent sibling churn, exact-block edit
+  only verified via a single-contiguous-diff-region check PLUS
+  sample-verified against 4721/4723/472[group]/6310/3512 entries also
+  intact, no mojibake detected); superproject ADR-2691004722
+  (com-junkawasaki/root, 90-docs/adr/2691004722-cloud-itonami-isic-4722-
+  beverage-retail-coverage.md/.edn)) is also :implemented"
+    (is (= :implemented (industry/maturity "4722")))
+    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-4722"
+           (:repo (industry/get-industry "4722"))))
+    (is (= "cloud-itonami-isic-4722"
+           (:business-id (industry/get-industry "4722"))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
