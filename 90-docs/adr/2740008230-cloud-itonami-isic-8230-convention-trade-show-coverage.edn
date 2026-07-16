@@ -1,0 +1,85 @@
+[{:adr/id 2740008230
+  :adr/title "cloud-itonami-isic-8230 — Organization of Conventions and Trade Shows Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-8230]
+  :adr/references [2607121000 2680004719]
+
+  ;; Wave 2 actor (coordination/logistics/trade): convention/trade-show
+  ;; event-operations coordination-only (booking/exhibitor/attendance
+  ;; data logging, venue-booking/floor-plan/logistics scheduling,
+  ;; event-vendor -- catering/AV/security-staffing -- procurement
+  ;; coordination, crowd-safety/venue-occupancy-limit concern flagging).
+  ;; No op finalizes a venue-occupancy-limit override or a fire-code/
+  ;; emergency-egress-compliance clearance -- those actions are
+  ;; structurally excluded, never merely gated.
+
+  :actor/id :cloud-itonami-isic-8230
+  :actor/name "Event Operations Coordinator"
+  :actor/isic-rev5 "8230"
+  :actor/domain :events/conventions-trade-shows
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-event-record :schedule-venue-operation
+                       :coordinate-vendor-order :flag-safety-concern]
+  :actor/always-escalate-ops [:flag-safety-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-vendor-order 1000}
+
+  :actor/hard-checks [:venue-unverified :vendor-unverified :effect-not-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["finalize the occupancy override" "finalized the occupancy override" "finalizes the occupancy override"
+                                "finalize the occupancy-limit override" "finalized the occupancy-limit override" "finalizing the occupancy-limit override"
+                                "override the posted occupancy limit" "overrode the posted occupancy limit" "overriding the posted occupancy limit"
+                                "waive the occupancy limit" "waived the occupancy limit" "waiving the occupancy limit"
+                                "approve the occupancy-limit override" "approved the occupancy-limit override" "approving the occupancy-limit override"
+                                "authorize the occupancy override" "authorized the occupancy override" "authorizing the occupancy override"
+                                "let the crowd exceed the posted capacity" "let the crowd exceed capacity"
+                                "grant the fire-code clearance" "granted the fire-code clearance" "granting the fire-code clearance"
+                                "issue the fire-code clearance" "issued the fire-code clearance" "issuing the fire-code clearance"
+                                "issue the fire-code compliance clearance" "issued the fire-code compliance clearance" "issuing the fire-code compliance clearance"
+                                "certify fire-code compliance" "certified fire-code compliance" "certifying fire-code compliance"
+                                "finalize fire-code compliance" "finalized fire-code compliance" "finalizing fire-code compliance"
+                                "clear the emergency-egress compliance" "cleared the emergency-egress compliance" "clearing the emergency-egress compliance"
+                                "sign off on the egress-compliance clearance" "signed off on the egress-compliance clearance" "signing off on the egress-compliance clearance"
+                                "finalize the emergency-egress clearance" "finalized the emergency-egress clearance" "finalizing the emergency-egress clearance"
+                                "issue the emergency-egress clearance" "issued the emergency-egress clearance" "issuing the emergency-egress clearance"
+                                "収容人数上限の解除を確定" "収容人数上限の解除を実行した" "占有制限緩和を承認した"
+                                "消防法適合証明を発行した" "消防法適合を確定した" "避難計画の適合認定を確定"
+                                "避難経路の適合クリアランスを発行" "避難適合証明を発行した"]
+
+  ;; Self-trip-avoidance: every term above is phrased as the
+  ;; finalization/execution ACTION, never a bare noun -- this namespace's
+  ;; own :flag-safety-concern default proposal legitimately discusses
+  ;; occupancy-limit/fire-code/emergency-egress-planning concerns. A
+  ;; bare-noun term list (e.g. bare "occupancy limit"/"fire code"/
+  ;; "egress") would self-trip this actor's own core happy path on every
+  ;; single run. Regression test:
+  ;; governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion.
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-event-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-event-record :schedule-venue-operation
+                                               :coordinate-vendor-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-event-record :schedule-venue-operation
+                                         :coordinate-vendor-order :flag-safety-concern}
+      :auto #{:log-event-record :schedule-venue-operation :coordinate-vendor-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 56 :assertions 166 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression
+                  :vendor-verification]
+  :test/simulator :eventops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-8230"
+  :registry/business-id "cloud-itonami-isic-8230"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
