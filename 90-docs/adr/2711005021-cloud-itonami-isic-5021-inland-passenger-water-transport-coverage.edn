@@ -1,0 +1,94 @@
+[{:adr/id 2711005021
+  :adr/title "cloud-itonami-isic-5021 — Inland Passenger Water Transport Dispatch/Scheduling Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-5021]
+  :adr/references [2607121000 2710004789]
+
+  ;; Wave 2 actor (coordination/logistics/trade), this batch's transition
+  ;; from retail to TRANSPORT classes: inland passenger water transport
+  ;; (river ferries, lake excursion boats, canal passenger boats)
+  ;; dispatch/scheduling operations coordination-only (voyage/ridership/
+  ;; incident-report logging, crossing-schedule proposals, maintenance-
+  ;; order coordination, safety-concern flagging). Highest-stakes
+  ;; passenger-safety dimension among this batch's passenger classes
+  ;; (historical ferry-disaster risk: overloading, capsizing) -- the
+  ;; closed op allowlist NEVER includes any op that could finalize a
+  ;; vessel-seaworthiness clearance, override a certified
+  ;; passenger-capacity limit, or make a captain-fitness determination.
+
+  :actor/id :cloud-itonami-isic-5021
+  :actor/name "Inland Passenger Water Transport Dispatch Coordinator"
+  :actor/isic-rev5 "5021"
+  :actor/domain :transport/inland-water-passenger
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-service-record :schedule-crossing-operation
+                       :coordinate-maintenance-order :flag-safety-concern]
+  :actor/always-escalate-ops [:flag-safety-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-maintenance-order 2000}
+
+  :actor/hard-checks [:route-verified :contractor-verified :effect-propose :scope-exclusion :op-allowlist]
+  :actor/scope-excluded-terms ["finalize the seaworthiness clearance" "finalized the seaworthiness clearance" "finalizes the seaworthiness clearance"
+                                "issue the seaworthiness clearance" "issued the seaworthiness clearance" "issuing the seaworthiness clearance"
+                                "clear the vessel as seaworthy" "cleared the vessel as seaworthy" "clearing the vessel as seaworthy"
+                                "certify the vessel as seaworthy" "certified the vessel as seaworthy" "certifying the vessel as seaworthy"
+                                "sign off on the seaworthiness" "signed off on the seaworthiness" "signing off on the seaworthiness"
+                                "override the passenger capacity limit" "overrode the passenger capacity limit" "overriding the passenger capacity limit"
+                                "exceed the certified passenger capacity" "exceeded the certified passenger capacity" "exceeding the certified passenger capacity"
+                                "authorize boarding beyond capacity" "authorized boarding beyond capacity" "authorizing boarding beyond capacity"
+                                "board beyond the certified capacity" "boarded beyond the certified capacity" "boarding beyond the certified capacity"
+                                "determine the captain fit for duty" "determined the captain fit for duty" "determining the captain fit for duty"
+                                "certify the captain fit to sail" "certified the captain fit to sail" "certifying the captain fit to sail"
+                                "declare the captain fit to sail" "declared the captain fit to sail" "declaring the captain fit to sail"
+                                "declare the captain unfit to sail" "declared the captain unfit to sail" "declaring the captain unfit to sail"
+                                "clear the captain for duty" "cleared the captain for duty" "clearing the captain for duty"
+                                "耐空性証明を発行した" "耐空性証明を発行する" "耐空性を確定した" "耐空性を確定する"
+                                "定員上限を超えて乗船を許可した" "定員上限を超えて乗船を許可する" "定員超過での乗船を許可した"
+                                "船長の適性を判定した" "船長の適性を判定する" "船長を乗船可能と判定した" "船長を乗船不可と判定した"]
+
+  ;; Self-trip-avoidance: every term above is phrased as the
+  ;; finalization/execution ACTION, never a bare noun -- this namespace's
+  ;; own :flag-safety-concern default proposal legitimately discusses
+  ;; vessel-defect/overloading-risk/captain-fitness-health OBSERVATIONS.
+  ;; A bare-noun term list (bare "seaworthiness"/"capacity"/"captain
+  ;; fitness") would self-trip this actor's own core happy path on every
+  ;; single run -- the exact known bug class this fleet has independently
+  ;; rediscovered and fixed across multiple sibling actors this session.
+  ;; Regression test:
+  ;; governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion.
+
+  ;; Governor-keyword collision check performed pre-landing: zero hits
+  ;; for :ferry-dispatch-governor and ferryops namespace via `gh api
+  ;; search/code`, including against sibling ISIC 5012 (maritime freight,
+  ;; concurrently built in this same batch). No rename needed.
+  :blueprint/governor :ferry-dispatch-governor
+  :blueprint/governor-collision-avoided []
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-service-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-service-record :schedule-crossing-operation
+                                               :coordinate-maintenance-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-service-record :schedule-crossing-operation
+                                         :coordinate-maintenance-order :flag-safety-concern}
+      :auto #{:log-service-record :schedule-crossing-operation :coordinate-maintenance-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 56 :assertions 166 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression]
+  :test/simulator :ferryops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-5021"
+  :registry/business-id "cloud-itonami-isic-5021"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
