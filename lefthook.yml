@@ -4,8 +4,13 @@
 # reject any push whose commit's ROOT TREE has dropped a required top-level
 # path (manifest / orgs / 70-tools / scripts / 90-docs / CLAUDE.md / deps.edn).
 # This catches the sparse-worktree tree-collapse that repeatedly wiped main
-# down to `90-docs` only. See scripts/pre-push-tree-guard.cljs for the full
-# rationale and mechanism.
+# down to `90-docs` only. See .lefthook/pre-push/tree-collapse-guard for the
+# full rationale and mechanism.
+#
+# Implemented as a lefthook `script` (not a `command`): pre-push `commands` are
+# file-diff filtered and get skipped as "no matching push files" for a
+# whole-tree guard, whereas `scripts` always run and receive the hook's stdin
+# (the ref-update lines git feeds pre-push). Confirmed 2026-07-16.
 #
 # ACTIVATE (once per clone — hooks are not auto-wired by `git clone`):
 #   lefthook install
@@ -18,8 +23,7 @@
 #   LEFTHOOK=0 git push …        # or:  git push --no-verify
 
 pre-push:
-  parallel: false
-  commands:
-    tree-collapse-guard:
-      # git feeds ref updates to the hook on stdin; nbb reads them.
-      runner: nbb {root}/scripts/pre-push-tree-guard.cljs
+  scripts:
+    "tree-collapse-guard":
+      runner: nbb
+      use_stdin: true
