@@ -3462,6 +3462,46 @@ scaffold・push
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-17, /loop tick 120 — 国軸41件目(SAU) — サウジアラビアが国軸+自治体軸の2軸に到達、法律データベース間の日付矛盾を一次資料で解決)
+
+`cloud-itonami-iso3166-sau`に`statute.facts`を新規namespaceとして
+追加・push
+([commit b35b327](https://github.com/cloud-itonami/cloud-itonami-iso3166-sau/commit/b35b327))：
+
+tick119で検証済みの首都チェック（リヤドは安定した首都、未解決の
+遷都問題無し）を再利用。
+
+- **Companies Law**（会社法、Royal Decree No. M/132）— 2022年6月
+  30日（ヒジュラ暦1443年12月1日）発布。misa.gov.sa（投資省公式
+  ドメイン）自身のPDFはアラビア語フォントサブセット化で判読不能
+  （tick119のリヤド市法と同型の問題）。Lexis Middle Eastの
+  ページは施行日（2023年1月19日）を発布日と混同していたため、
+  それを鵜呑みにせず、gccbdi.org（湾岸協力理事会取締役機構）が
+  ホストする英語版ミラーをRead-toolで直接読み、原文冒頭
+  "Royal Decree No. [M/132] Dated 01/12/1443 AH" を確認して
+  矛盾を解決。
+- **Personal Data Protection Law**（個人データ保護法、Royal
+  Decree No. M/19）— 2021年9月16日（ヒジュラ暦1443年2月9日）
+  発布。SDAIA（サウジデータ・AI庁）自身の公式ドメインは全ての
+  fetch試行がbot検出で"Request Rejected"となり断念。代わりに
+  DLA Piperの"Data Protection Laws of the World"（今session
+  既出のWIPO Lex/ECOLEX/Lexis Middle Eastと同カテゴリの専門法律
+  リサーチ資料）で原文引用を直接確認、WebSearch要約にあった
+  16日/17日の1日の食い違いも解消。
+
+4 tests/9 assertions green（既存24 marketentry tests/81
+assertionsと合わせ全28 tests/90 assertions green）。144リポジトリ・
+832 factを統合。`jurisdiction SAU`クエリと、`ordinance/country`
+横断query（`[?e "ordinance/country" "SAU"]`）でtick119のRiyadh
+自治体2件が正しくクロスリンクされることを確認——サウジアラビアは
+今回で国軸+自治体軸の2軸に到達したが、業界団体軸はまだ未着手で
+あり、これを正直に報告する（前回のエジプト・トルコ・ナイジェリア
+と同型の「2軸のみ」パターン）。
+
+現状: 国軸41件・業界団体軸40件(27業種)・自治体軸39件——120 tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。サウジアラビアの業界団体軸の空白は今後のtickに持ち越し。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
