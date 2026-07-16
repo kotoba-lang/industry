@@ -1,0 +1,101 @@
+[{:adr/id 2715004921
+  :adr/title "cloud-itonami-isic-4921 — Urban and Suburban Passenger Land Transport Dispatch Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-4921]
+  :adr/references [2607121000]
+
+  ;; Wave 2 actor (coordination/logistics/trade), TRANSPORT batch:
+  ;; urban/suburban passenger-land-transport (city bus, tram, light
+  ;; rail, taxi/rideshare) dispatch-logistics operations coordination-
+  ;; only (trip/ridership/incident-report logging, vehicle/route/
+  ;; timetable dispatch scheduling, maintenance-order coordination,
+  ;; safety-concern flagging). No op finalizes a dispatch-safety-
+  ;; clearance decision or a driver-fitness-to-drive determination --
+  ;; those actions are structurally excluded, never merely gated. This
+  ;; actor never directly operates a vehicle and never overrides a
+  ;; driver's or dispatcher's safety judgment.
+
+  :actor/id :cloud-itonami-isic-4921
+  :actor/name "Urban and Suburban Passenger Land Transport Dispatch Coordinator"
+  :actor/isic-rev5 "4921"
+  :actor/domain :transport/urban-passenger-land
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-service-record :schedule-dispatch-operation
+                       :coordinate-maintenance-order :flag-safety-concern]
+  :actor/always-escalate-ops [:flag-safety-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-maintenance-order 2000}
+
+  :actor/hard-checks [:route-verified :vehicle-verified :operator-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["finalize the dispatch-safety clearance" "finalized the dispatch-safety clearance"
+                                "finalizing the dispatch-safety clearance" "finalize the dispatch safety clearance"
+                                "issue the dispatch-safety clearance" "issued the dispatch-safety clearance"
+                                "issuing the dispatch-safety clearance"
+                                "clear the vehicle for departure" "cleared the vehicle for departure"
+                                "clearing the vehicle for departure"
+                                "clear for dispatch despite" "cleared for dispatch despite" "clearing for dispatch despite"
+                                "authorize departure despite" "authorized departure despite" "authorizing departure despite"
+                                "determine driver fitness to drive" "determined driver fitness to drive"
+                                "determining driver fitness to drive"
+                                "determine the driver fit to drive" "determined the driver fit to drive"
+                                "certify the driver as fit to drive" "certified the driver as fit to drive"
+                                "certifying the driver as fit to drive"
+                                "override the roadworthiness inspection" "overrode the roadworthiness inspection"
+                                "overriding the roadworthiness inspection"
+                                "bypass the roadworthiness inspection" "bypassed the roadworthiness inspection"
+                                "bypassing the roadworthiness inspection"
+                                "override the safety inspection" "overrode the safety inspection"
+                                "bypass the safety inspection" "bypassed the safety inspection"
+                                "override the driver's safety judgment" "overrode the driver's safety judgment"
+                                "override the dispatcher's safety judgment" "overrode the dispatcher's safety judgment"
+                                "directly operate the vehicle" "directly operated the vehicle"
+                                "運行可否を最終決定した" "運行可否を最終決定する" "運行可否を最終決定して"
+                                "運転者の乗務適性を最終判定した" "運転者の乗務適性を最終判定する"
+                                "出庫の最終承認を行った" "出庫の最終承認を行う"
+                                "点検未了のまま出庫を許可した" "点検未了のまま出庫を許可する"
+                                "安全確認を経ずに出庫を許可した" "安全確認を経ずに出庫を許可する"
+                                "運転可否の適性判定を確定した" "運転可否の適性判定を確定する"]
+
+  ;; Self-trip-avoidance: every term above is phrased as the
+  ;; finalization/execution ACTION, never a bare noun -- this
+  ;; namespace's own :flag-safety-concern default proposal legitimately
+  ;; discusses vehicle-defect/driver-fitness/route-hazard concerns, and
+  ;; its own printed :op keyword literally contains the substring
+  ;; "safety-concern". A bare-noun term list (e.g. bare
+  ;; "safety"/"dispatch"/"fitness"/"clearance") would self-trip this
+  ;; actor's own core happy path on every single run. Regression test:
+  ;; governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion.
+  ;; Governor keyword collision check performed before finalizing:
+  ;; `gh api search/code -f q="urban-transit-dispatch-governor
+  ;; org:cloud-itonami"` returned 0 hits; distinct from sibling ISIC
+  ;; 4911's own published :rail-safety-governor.
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-service-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-service-record :schedule-dispatch-operation
+                                               :coordinate-maintenance-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-service-record :schedule-dispatch-operation
+                                         :coordinate-maintenance-order :flag-safety-concern}
+      :auto #{:log-service-record :schedule-dispatch-operation :coordinate-maintenance-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 65 :assertions 192 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression
+                  :vehicle-verification :operator-verification]
+  :test/simulator :transitops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-4921"
+  :registry/business-id "cloud-itonami-isic-4921"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :logistics]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
