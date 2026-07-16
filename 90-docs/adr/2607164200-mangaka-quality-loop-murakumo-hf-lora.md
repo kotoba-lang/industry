@@ -150,3 +150,34 @@ loop のコード実装、co-scientist」を受けて:
   elite 生存 + fix-hint 変異子。この実測で見つかった
   「population 2 × elite 2 で子が繁殖されない」罠を elite ≤ population−1
   cap で修正。suite 110 tests / 696 assertions green。
+
+## Addendum 3 (2026-07-16) — 知覚レイヤ（顔/パネル/吹き出し）を loop に配線
+
+オーナー質問「顔認識・panel 認識・吹き出し位置認識は mangaka loop に含まれて
+いるか」への調査結果は**否**だった: detectFaces/scoreEmotion は Python 互換の
+cljc-placeholder（固定矩形）、画像からのパネル認識は不在、吹き出し位置は
+交互配置+積み上げの算法のみ（顔回避なし）。オーナーが提示した annotated
+ページ（readingPath/gaze box 付き）は退役 Python 世代の v10 パイプライン出力
+（`mangaka-data/ghosthacker/resources/v10/`、jump QA 23 軸、total 79.1）で、
+gaze box は authored 指定であり CV 検出ではない。
+
+実装（`mangaka.perception`、ネイティブ CV 依存ゼロ = VLM prompt ベース）:
+
+1. **顔**: `count-faces`（VQA カウント — fleet gemma4 で実測動作: 公開ページ
+   →3 / キャラ不在パネル→0）を主軸に、`detect-faces`（bounding box — 量子化
+   gemma4 は grounding が弱く空配列を返しがち、と docstring に明記）を併設。
+   `detectFaces` NSID を placeholder から実装版へ昇格（検出結果は
+   `:panel/faces` datom に焼き込み、offline は `no-vision-offline` で正直に
+   degrade）。backlog `:faces` から detectFaces を卒業。
+2. **品質ループへの配線**: `plan*` が storyboard の `:panel/focal` 数（または
+   `:character` 指定）を `:focal-count` として spec に流し、PanelQuality /
+   CoscientistPanel の critique が **`:facePresence` 軸**（期待 focal 数 vs
+   検出顔数、検出不能は軸欠落=罰しない）を rubric 集約に加える —
+   「キャラ不在の背景だけ絵」が測定で沈む。
+3. **パネル/吹き出し**: `detect-panels`（ページのコマ境界検出 — 実測で公開
+   ページ 3 コマ検出）と `bubble-clearance`（吹き出しが顔を覆っていないかの
+   純幾何、authored gaze box にも適用可）を部品として提供。page-level loop
+   への配線と jump QA 23 軸の CLJ 移植（backlog `:qa :jumpBenchmarkQa`）は
+   follow-up。
+
+suite 116 tests / 725 assertions green。
