@@ -3761,6 +3761,43 @@ wko.at自身が直接確認した日付のみを使用。
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-17, /loop tick 128 — 自治体軸42件目(Bern, CHE) — スイス初参入、憲法上「首都」不在という事実を正直に記録)
+
+`cloud-itonami-municipality-che-bern`を新規GitHubリポジトリとして
+scaffold・push
+([commit 810fb62](https://github.com/cloud-itonami/cloud-itonami-municipality-che-bern/commit/810fb62))：
+
+スイスの実質的な首都ベルン——3軸いずれもスイス初参入。
+
+**スイスは連邦憲法上、法的に定められた「首都」を持たない**——他の
+全自治体エントリと異なる特異な事例。ベルンは1848年11月28日の連邦
+議会採決（同年12月27日に正式確定）以来、事実上の連邦政府所在地
+（"Bundesstadt"、連邦都市）として機能している（スイス国立博物館
+自身のブログ記事で確認）。これはエジプト/インドネシアのような
+未解決の遷都問題とは異なり、安定した既知の憲法上の沈黙状態——
+誤魔化さず正直に記録する。
+
+`stadtrecht.bern.ch`（ベルン市自身の法情報ポータル）はJS描画SPAの
+ためWebFetchでは見出しのみ取得、`ris.bern.ch`は接続拒否。代わりに
+be.ch（ベルン州）がホストするOEREB用PDFミラーが1つの文書に両方の
+情報を含んでいたため、Read-toolの保存パスfallbackで直接確認:
+
+- **Gemeindeordnung der Stadt Bern**（GO、市の自治憲章、SSSB
+  101.1）— 1998年12月3日制定。同PDF自身の前文が
+  "Artikel 36 Buchstabe c der Gemeindeordnung der Stadt Bern vom
+  3. Dezember 1998"と原文で引用。
+  - **Bauordnung der Stadt Bern**（BO、建築条例、SSSB 721.1）—
+  2006年9月24日制定。同PDF自身のヘッダーが"24. September 2006
+  (Stand: 1. Oktober 2020)"と表記。
+
+4 tests/11 assertions green。150リポジトリ・848 factを統合。
+`municipality bern`クエリで2件とも正しく取得、タイトル/番号の
+横断query（`[?e "ordinance/municipality" "bern"]`）でも一致確認。
+
+現状: 国軸43件・業界団体軸43件(28業種)・自治体軸42件——128 tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
