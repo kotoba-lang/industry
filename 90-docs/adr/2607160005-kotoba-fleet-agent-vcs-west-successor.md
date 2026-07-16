@@ -842,3 +842,25 @@ content-addressed store / nekko(根)との対を意識した botanical / 系譜�
   cloud-itonami ops-runner（ADR-2607141700）との統合。統合点は「fleet の
   quorum land-back（propose→govern）を ops-runner の verify→handler→receipt に
   合流させる」こと。両システムの深い理解を要する別スコープ。
+
+## Addendum (2026-07-16, same day): CACAO 完全整合（cacao.core は移植不要だった）
+
+「cacao.core を cljs でひとまず動くように」への回答: **cacao.core
+（org-chainagnostic-cacao）は既に portable .cljc で nbb 完動する** — 「JVM-only」
+の注記（nekko の cacao-delegate）は古く、移植は不要だった。よって cljs 移植でなく
+**本物の cacao.core を fleet に配線**した（kagami、`bin/cacao.cljs`）:
+- kagi PEM から ed25519 seed（JWK .d）を抽出し `cacao.core/mint` に渡す。
+  mint / verify / verify-chain の CLI。fleet-native lookalike（fleet.grant）でなく
+  **実 CAIP-122 CACAO**を使う。
+- **実測 end-to-end**: owner が enrolled agent did に pin+land grant を mint →
+  verify VALID → agent が kagami に attenuate して sub-delegate →
+  **2-link chain が CHAIN VALID（depth 2、resources 正しく減衰、expiry 強制）**。
+- `grant->cacao-payload`（前 addendum）で fleet grant ↔ CACAO payload を橋渡し。
+- kotoba wasm compiler での CACAO 実行は将来の選択肢（今は nbb で完動なので不要）。
+- follow-up: nekko の cacao-delegate の「JVM-only」注記を訂正（cljc 実動を反映）、
+  propose/govern を fleet.grant から cacao.core verify-chain に切替。
+
+**namespace 移行 / governor 統合は次の専用セッション**: どちらも cloud-itonami
+本番 source を触る大規模作業（namespace: 119 ソースの coordinated wave、governor:
+kotoba-fleet lease/governor + ops-runner の内部理解）で、本セッション末尾で急ぐと
+本番 CD/CI を壊すリスクが高い。計画は上記 addendum に記録済み、専用セッションで実施。
