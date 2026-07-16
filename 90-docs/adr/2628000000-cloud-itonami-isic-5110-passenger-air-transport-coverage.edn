@@ -1,0 +1,144 @@
+{:adr-id "2628000000"
+ :title "cloud-itonami-isic-5110 (passenger air transport) operations-coordination actor"
+ :status :accepted
+ :date "2026-07-16"
+ :deciders ["Jun Kawasaki (agent-executed, standing authorization)"]
+ :related ["ADR-2607121000"]
+ :mirrors "cloud-itonami-isic-4920 (community freight transport, airlineops.* module shape follows freightops.* module-for-module)"
+
+ :context
+ "cloud-itonami/cloud-itonami-isic-5110 was NOT a fresh-scaffold target --
+  `gh api repos/cloud-itonami/cloud-itonami-isic-5110` and a full-tree
+  listing were checked before any work started: the repo already existed
+  with :blueprint-tier boilerplate (README/CODE_OF_CONDUCT/CONTRIBUTING/
+  GOVERNANCE/LICENSE/SECURITY/blueprint.edn/docs) but no deps.edn/src/test
+  -- an early bulk-scaffolding-pass entry, published but never
+  implemented. This build adds the missing module set on top of the
+  existing files; the pre-existing boilerplate docs are left byte-for-byte
+  unmodified except blueprint.edn (one field added). Live registry.edn
+  :name for \"5110\" independently verified fresh (cloned from scratch, not
+  assumed): \"Passenger air transport\", matching the task premise exactly
+  -- no mismatch. :repo/:business-id independently verified already
+  correct against the repo's own blueprint.edn -- no placeholder-value fix
+  needed. The nominal reference sibling, cloud-itonami-isic-5011 (sea
+  passenger transport), was itself still :blueprint-tier boilerplate-only
+  when checked (being built concurrently by a sibling agent in the same
+  batch); cloud-itonami-isic-4920 (community freight transport) was used
+  as the actual structural reference instead, being the closest
+  already-:implemented transport-sector sibling at build time. Passenger
+  air transport has an obvious direct-passenger-safety dimension -- the
+  closed op allowlist must never include an op that directly finalizes a
+  flight-safety-authority decision; any 'flag a concern' op must always
+  escalate, never auto-commit-eligible. Known fleet-wide bug class: a
+  governor's scope-exclusion term list phrased as a bare noun
+  accidentally matches inside the mock advisor's own default rationale
+  text for a legitimate proposal, self-blocking the actor's happy path --
+  a live risk here since :flag-flight-safety-concern's entire purpose is
+  to talk about mechanical-fault/weather/go-no-go topics using exactly
+  those bare nouns."
+
+ :scope-exclusions
+ ["clearing an aircraft for departure -- hard, permanent block (finalize-authority-scope-violations), structurally absent from the op allowlist"
+  "overriding a weather or mechanical go/no-go hold -- same"
+  "signing off a maintenance release back to airworthy service -- same; :coordinate-maintenance only ever schedules/coordinates, never releases"
+  "resolving a flight-safety concern once flagged -- outside the closed op allowlist entirely; this actor can surface a concern but never clear one"]
+
+ :self-trip-fix
+ "airlineops.governor/finalize-authority-phrases is phrased as the
+  finalization/execution ACTION ('finalize the go-no-go decision', 'clear
+  the aircraft for departure', 'override the weather hold decision',
+  'sign off the maintenance release') rather than a bare topic noun.
+  airlineops.airlineopsllm/propose-flag-flight-safety-concern legitimately
+  talks about mechanical faults and weather as the CONTENT of a concern
+  being flagged -- a bare-noun term list would have self-tripped on
+  exactly this op's own happy path. Verified by two dedicated tests in
+  governor_contract_test.clj:
+  default-advisor-proposals-never-self-trip-finalize-authority-scope
+  (asserts all four ops' default mock-advisor proposals, on a clean
+  flight, never trip the check) and
+  finalize-authority-scope-violation-not-overridable-through-the-full-graph
+  (proves a hand-built advisor that DOES drift into finalization language
+  HOLDs through the full OperationActor graph and never reaches
+  :request-approval -- not merely a soft signal a human could wave
+  through)."
+
+ :decision
+ "Implement cloud-itonami-isic-5110 with Store/Advisor(AirlineOps-LLM)/
+  Governor(Aviation Safety Governor)/Phase/Operation/Sim as airlineops.*,
+  mirroring cloud-itonami-isic-4920's freightops.* module shape:
+  - Closed op-allowlist, all :effect :propose: log-flight-record
+    (flight/passenger-manifest/on-time-performance logging),
+    schedule-flight-operation (gate/crew scheduling coordination, NOT a
+    runway/departure-clearance authorization), flag-flight-safety-concern
+    (surfaces a concern, ALWAYS escalates), coordinate-maintenance
+    (maintenance SCHEDULING coordination, NOT a release/return-to-service
+    sign-off).
+  - Store: Store protocol + MemStore + DatomicStore (langchain.db),
+    proven to satisfy the same contract. String-keyed flights directory
+    (certification-verified?/safety-concern-raised?/safety-concern-
+    resolved?), append-only ledger + coordination-history.
+  - Governor: 6 HARD checks, all permanent/un-overridable --
+    op-not-allowed (closed allowlist), effect-not-propose (this actor
+    never actuates directly), finalize-authority-scope-violation (see
+    self-trip-fix), no-spec-basis (official civil-aviation-authority
+    citation required, 4 jurisdictions seeded honestly: JPN/USA/GBR/DEU),
+    certification-unverified (ground truth CONSUMED never MINTED by this
+    actor -- no assess-style op exists to set it), open-safety-concern-
+    blocks-op (blocks the other three ops, NOT flag-flight-safety-concern
+    itself). high-stakes gate keyed on :stake :coordination/flag-safety-
+    concern always forces escalate.
+  - Phase: 0->3 rollout; phase 3 auto-commits ONLY log-flight-record
+    (no direct capital/safety risk); flag-flight-safety-concern
+    structurally absent from every phase's :auto set, a permanent fact
+    not a rollout milestone.
+  - Operation: real langgraph StateGraph (intake->advise->govern->decide
+    ->commit|hold|request-approval), interrupt-before
+    #{:request-approval}.
+  - Sim: clojure -M:dev:run demo walking the clean lifecycle, the
+    always-escalate flag flow, and all HARD-hold scenarios.
+  - Tests: facts_test, registry_test, phase_test, governor_contract_test
+    (incl. the two self-trip-fix regressions), store_contract_test -- 36
+    tests / 164 assertions green, clj-kondo 0 errors / 0 warnings.
+  - All .cljc portable, no JVM-only interop. Existing boilerplate docs
+    (README/GOVERNANCE/CONTRIBUTING/SECURITY/CODE_OF_CONDUCT/business-
+    model/operator-guide) left unmodified; docs/adr/0001-architecture.md
+    (new) is the authoritative record of the R0 scope. blueprint.edn:
+    one field added, :itonami.blueprint/maturity :implemented."
+
+ :consequences
+ {:positive
+  ["ISIC 5110 passenger-air-transport-operations-coordination genuinely implemented and fully tested, promoted from :blueprint boilerplate-only to :implemented"
+   "flight-safety-authority-finalization exclusion hardcoded in a governor check (finalize-authority-scope-violations), not just README prose, and proven un-overridable through the full graph"
+   "the self-tripping bug class this fleet has repeatedly hit is fixed by construction (action-phrased terms) AND covered by a dedicated regression test"
+   "flag-flight-safety-concern always-escalate is a two-layer invariant (governor high-stakes + phase's permanent absence from every :auto set)"
+   "portable .cljc, zero JVM-only constructs; clojure -M:lint 0 errors / 0 warnings"
+   "MemStore vs DatomicStore parity proven by store_contract_test.clj"]
+  :negative
+  ["real persistent store (Datomic/kotoba-server) is a follow-up; tests use in-memory MemStore + a langchain.db-backed DatomicStore proven to satisfy the same contract, matching every sibling actor's current maturity"
+   "mock-advisor is deterministic, not a real LLM call; Advisor protocol seam ready for that swap but not wired in this build"
+   "booking/reservation/reconciliation (the originally-published broader README/business-model vision) remains a follow-up slice, not this R0"]}
+
+ :verification
+ {:test-count 36
+  :assertion-count 164
+  :test-status "0 failures, 0 errors -- clojure -M:dev:test run at push time"
+  :lint-status "0 errors, 0 warnings"
+  :commit "1452151420e3cf8b65aeab4642991d3754005799"
+  :repo "https://github.com/cloud-itonami/cloud-itonami-isic-5110"
+  :pre-existing-boilerplate-commit "90b1b53 (docs: publish cloud-itonami-5110 open business blueprint (robotics-premised))"
+  :demo-run "clojure -M:dev:run end-to-end: clean log-flight-record auto-commits at phase 3; schedule-flight-operation/coordinate-maintenance escalate then commit after approval; flag-flight-safety-concern always escalates then commits after approval and flips safety-concern-raised? true (never safety-concern-resolved?); a flight with an open unresolved concern then HARD-holds the other three ops while flag-flight-safety-concern itself stays reachable; an unknown jurisdiction and an unverified certification both HARD-hold as designed"
+
+  :registry-update "kotoba-lang/industry: \"5110\" :repo/:business-id already correct (no field-sync fix needed) -> :maturity :implemented added"
+  :registry-merge-commit "e69cba6319f6c487c15c0a1e6d85b9e80509701e"
+  :registry-merge-method "Contents-API single-file PUT (sha-checked, fresh re-fetch immediately before write), landed on the first attempt"
+  :registry-test-file-commits ["4f877634ed3eb04ac477a80017e7e528105472a2 (dedicated 5110 corroboration block + :blueprint 22->21 / :implemented 395->396 recompute)"
+                                "e911a573f50c358606cfb21d45831eb51124ed65 (fixed an EARLIER stale 'is also :blueprint' spot-check for \"5110\" itself, found by actually running clojure -M:test)"
+                                "9c1c5f6d4ae34dcc9c1e57a6e3ff214aca6da8b3 (fixed 3 MORE stale 'is also :blueprint' spot-checks for unrelated concurrent sibling entries 5011/4912/5222, found the same way -- narrow, mechanical, verified-not-assumed; kept the shared hot test file green, did not touch those entries' own registry data or actor code)"]
+  :registry-test-file-retries 1
+  :registry-test-file-retry-note "the second industry_test.clj PUT hit a single 409 from concurrent sibling fleet activity; resolved by re-fetching fresh content and rebuilding the edit before retrying, landed on the retry"
+  :concurrent-sibling-commit-corroborated "10c0b87 (cloud-itonami-isic-4911's own 'add dedicated corroboration + re-sync hot maturity-tier counts', landed in the same window, independently re-synced counts to 18/399)"
+  :registry-post-merge-verification "brand-new fresh clone (+ fresh ../technology sibling) of kotoba-lang/industry main at 9c1c5f6d4ae34dcc9c1e57a6e3ff214aca6da8b3: Ran 15 tests containing 1060 assertions. 0 failures, 0 errors. clj-kondo: 0 errors, 0 warnings. No mojibake (valid UTF-8, zero U+FFFD). \"5110\" and sample entries 3512/4920/5210/5011 all independently re-confirmed intact."
+  :registry-implemented-count-before-this-promotion 395
+  :registry-implemented-count-after-this-promotion-own-edits 396
+  :registry-implemented-count-at-final-reverification 399
+  :registry-count-note "399 at final re-verification reflects this promotion's own +1 (395->396) plus 3 further concurrent sibling promotions (5011/4912/5222) landing in the same window, not this promotion's own drift -- recomputed via (kotoba.industry/maturity-summary) fresh each time, never assumed or grepped"}}
