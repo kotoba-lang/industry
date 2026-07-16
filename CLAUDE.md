@@ -102,7 +102,12 @@ skill `new-project-scaffold` を参照。
   上流の正本になりつつある（Phase 1.5 dual-write 吸収期）。** west.yml は
   fleet-db の projection。pin 前進の推奨経路は署名付き
   `fleet pin-advance` / quorum `fleet govern`（実装:
-  `orgs/kotoba-lang/kotoba-fleet-vcs`、鍵と policy は `manifest/fleet-keys.edn`）。
+  `orgs/kotoba-lang/kotoba-fleet-vcs`、policy は `manifest/fleet-keys.edn`）。
+  **署名鍵は kagi（compartment `personal`、OS-Keychain unlock）にあり、
+  `--kagi fleet-owner-key`（pin）/ `--gov-kagi fleet-gov1,fleet-gov2`
+  （govern）/ `--kagi fleet-owner-root`（head）で読む**（PEM ファイル指定は
+  `--key`。1Password は使わない — op CLI が interactive auth timeout）。
+  `FLEET_ROOT=<superproject root>` を渡すと kagi bin を解決できる。
   従来の `gen-west-manifest.cljs --entry` / API single-entry も引き続き有効で、
   その書き込みは CI（`.github/workflows/fleet-projection-verify.yml`）が
   `fleet reconcile` で fleet-db に自動吸収する。**fleet-db / ledger /

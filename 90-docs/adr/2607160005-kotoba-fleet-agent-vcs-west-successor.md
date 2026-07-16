@@ -518,9 +518,16 @@ gap 棚卸し（同日）の推奨順 ①〜⑤ を処置した。
   **13.3s** materialize（再実行 0.2s 全 noop）。heavy も pin SHA 直
   fetch + depth1 により **kototama 435MB→11MB / webmaster 301MB→49MB**
   で HEAD==pin。残: manimani 16GB 級・datalad・submodules repo の実測。
-- **① 鍵の 1Password 移設 → 依然 blocked**: `op` が interactive 認証
-  timeout（owner の `op signin` 待ち）。**これが現在プログラム全体で
-  最も脆い点**（chain 継続性が session-local 鍵に依存）。
+- **① 鍵の永続化 → 解消（1Password でなく kagi）**: `op signin` が二度
+  interactive 認証 timeout したため、**kotoba-native の kagi
+  （`orgs/kotoba-lang/kagi`、OS-Keychain unlock で無人・ADR-2606272330 が
+  kotoba-lang 新規 secrets の正と定める）に 5 鍵を移設**（compartment
+  `personal`: fleet-owner-key / -owner-root / -gov1 / -gov2 / -agent1）。
+  CLI に `read-key`（`--key PEM | --kagi NAME`）を追加し pin-advance /
+  govern（`--gov-kagi`）/ head を kagi 経路化。**dogfood: scratchpad 鍵に
+  一切触れず kagi のみで pin seq 7→8 / head seq 7→8 を実走**。chain 継続性
+  が session-local ファイルに依存しなくなった（最も脆い点の解消）。
+  fleet-keys.edn に kagi 名の索引を記載、CLAUDE.md も kagi 経路に更新。
 - 未処置のまま残る gap: ⑥ hard flip（per-agent 認証とセット）、
   ⑦ P3b（p2p 実配線）、kotobase 永続化（fleet-db blob / Datalog）、
   anchor / IStore / fleet-head への op-log 統合、CACAO wire format、
