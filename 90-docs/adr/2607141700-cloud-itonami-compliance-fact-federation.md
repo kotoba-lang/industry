@@ -2712,6 +2712,49 @@ tests/9 assertions green（既存marketentry 24 tests/81 assertions
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-16, /loop tick 101 — 自治体軸33件目(Hanoi, VNM) — エルサレムは地政学的配慮からあえて見送り)
+
+`cloud-itonami-municipality-vnm-hanoi`を新規GitHubリポジトリとして
+scaffold・push
+([commit 6b1354d](https://github.com/cloud-itonami/cloud-itonami-municipality-vnm-hanoi/commit/6b1354d))：
+
+- **Law on the Capital（Luật Thủ đô、Law No. 39/2024/QH15）** —
+  タイトル・番号・可決日（2024年6月28日、国会）を
+  english.luatvietnam.vn（ベトナム官報テキストの民間法律翻訳配信
+  サービス——tick100のMerellerと同等の位置づけ、政府ドメイン自体
+  ではないが真正な官報内容を引用）で直接確認。
+- **Decision 33/2023/QĐ-UBND**（文化・スポーツ分野の行政手続き
+  再編）— english.hanoi.gov.vn自身のホームページ掲載一覧で直接確認、
+  2023年12月20日付。
+
+**プロセスに関する注記**: 次の自治体軸多様化ターゲットとして最初に
+イスラエル（エルサレム）を検討した——既存のorganization.ednには
+Wikidataに基づきエルサレム（Q1218）が首都として既に記載されていた
+が、エルサレムの首都としての地位は国際的に係争中（多くの国が
+国連決議に基づきエルサレムを首都と認めずテルアビブに大使館を
+維持）であるため、ソース選定を通じて本プロジェクトが地政学的立場を
+取っていると見なされることを避けるため、本tickではあえて見送り、
+係争性の低いベトナム・ハノイに切り替えた——基盤となるWikidata首都
+フィールド方式論自体は他の34カ国すべてと同一・中立であり、恒久的な
+除外ではなく本tick限りの選択。
+
+4 tests/11 assertions green。130リポジトリ・794 factを統合。
+`"ordinance/kind" "local-act"`での横断queryで`[london new-delhi
+warsaw bangkok abu-dhabi hanoi]`——創設憲章型の6自治体法がすべて
+正しく取得できることを確認。
+
+**capital-check**: ハノイ（Q1858）は1976年4月25日の国会決議
+（南北統一後）以来現在の首都。ベトナムの首都は歴史的にハノイ
+（1010年〜）とフエ（阮朝、19世紀初頭）の間を移動した経緯がある
+ため史的首都バグの誤検出リスクがあったが、既存organization.ednの
+ハノイ記載は1976年以降の**現行**首都と正しく一致しており、バグ
+なしを確認（「歴史的に移動した」と「現在誤っている」を区別する
+必要があった事例——JPN/DEU/BRAで実際にバグがあった事例とは異なる）。
+
+現状: 国軸34件・業界団体軸34件(26業種)・自治体軸33件——101tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
