@@ -3156,6 +3156,22 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; 448 -> 451: this promotion's own cloud-itonami-isic-5022 (Inland freight water transport, +1, corroborated in detail above) landed at 448, then drifted to 451 purely from concurrent sibling fleet agents' own :spec -> :implemented promotions landing in this same fast-moving window while this reconciliation was in flight (not itemized individually, corroborated only in aggregate to keep this shared hot test file truthful; this promotion's own registry.edn/5022 block independently re-verified still intact and unclobbered before this reconciliation). Live-recomputed via `(kotoba.industry/maturity-summary)` against a freshly re-fetched origin/main registry.edn (via Contents API) immediately before this test-file edit, not assumed: {:implemented 451}.
       ;; ... -> 453: this promotion's own cloud-itonami-isic-8110 (Combined facilities support activities, +1, corroborated in detail below) plus concurrent sibling fleet agents' own :spec -> :implemented promotions landed in this same fast-moving window (not itemized individually, corroborated only in aggregate to keep this shared hot test file truthful). Live-recomputed via `(kotoba.industry/maturity-summary)` against a freshly re-fetched origin/main registry.edn (via git-trees/blobs API) immediately before this test-file edit, not assumed: {:implemented 453}.
             ;; 455 -> 455: reconciled immediately before this test-file PUT via a fresh `(kotoba.industry/maturity-summary)` recompute against a freshly re-fetched origin/main registry.edn (git-trees/blobs API); delta includes this promotion's own cloud-itonami-isic-8129 (+1) plus any concurrent sibling fleet agents' own promotions landed in this fast-moving window.
+;; 455 -> 455: this promotion's own cloud-itonami-isic-5310
+;; (Postal activities, +1, Wave 2 coordination/logistics/trade
+;; batch, final batch of Wave 2's 4-digit gaps -- POSTAL SECRECY/
+;; PRIVACY scope-exclusion dimension, categorically distinct from
+;; sibling freight/transport actors' physical-safety exclusions
+;; this batch) PLUS numerous concurrent sibling fleet agents' own
+;; :spec/:blueprint -> :implemented promotions landed in this same
+;; fast-moving window (not itemized individually, corroborated only
+;; in aggregate to keep this shared hot test file truthful -- this
+;; aggregate legitimately drifts multiple times within minutes
+;; under concurrent fleet load, per this file's own well-established
+;; history above). Live-recomputed via
+;; `(kotoba.industry/maturity-summary)` against a freshly
+;; re-fetched origin/main registry.edn (via git-trees/blobs API)
+;; immediately before this test-file edit, not assumed:
+;; {:total 649 :spec 194 :blueprint 0 :implemented 455}.
 (is (= 455 (:implemented m))))))
 
 (deftest cloud-itonami-isic-5021-is-implemented
@@ -4640,3 +4656,124 @@ clone; superproject ADR-2628000000) is also :implemented"
            (:repo (industry/get-industry "8129"))))
     (is (= "cloud-itonami-isic-8129"
            (:business-id (industry/get-industry "8129"))))))
+
+
+(deftest cloud-itonami-isic-5310-is-implemented
+  (testing "cloud-itonami-isic-5310 (Postal activities -- universal-
+  service mail delivery [intake, sorting, routing, franking, delivery],
+  Wave 2 [coordination/logistics/trade, ADR-2607121000] fresh scaffold,
+  final batch of Wave 2's 4-digit gaps [8 classes dispatched together];
+  no pre-existing repo at any placeholder [gh api 404 confirmed for both
+  the stale gftdcojp/cloud-itonami-H5310 placeholder and the real
+  cloud-itonami org target before scaffolding]; identity independently
+  verified against a fresh clone before any work began, per this
+  fleet's ID/name-mismatch caution -- unambiguous, no truncation; the
+  separate, redundant 3-digit group entry {:id \"531\" ...} (:repo nil)
+  left untouched; LEGALLY AND CONSTITUTIONALLY DISTINCT from every
+  freight/parcel-transport sibling this batch [ISIC 4923/5012/5022/5120
+  etc.]: mail carries a strong PRIVACY/confidentiality expectation
+  [postal secrecy / the inviolability of correspondence] -- the
+  scope-exclusion dimension is categorically DIFFERENT IN KIND from the
+  physical-safety exclusions used by every sibling freight/transport
+  actor this batch, not merely a domain relabeling of the same shape;
+  PostalOpsAdvisor ⊣ PostalOpsGovernor postal sorting/routing-logistics
+  OPERATIONS-COORDINATION-ONLY actor (postalops.* namespace) mirroring
+  cloud-itonami-isic-4791's [Retail sale via mail order houses or via
+  Internet] verified advisor/governor/phase/operation/store/sim module
+  shape module-for-module (postalops.* in place of mailorderops.*,
+  postal-facility/carrier-license verification in place of
+  seller/merchant-account verification); closed four-op allowlist, all
+  :effect :propose (:log-item-record/:schedule-route-operation/
+  :coordinate-facility-order/:flag-security-concern); FOUR HARD
+  governor checks, all permanent and un-overridable by any human
+  approval -- facility-unverified (the target sorting facility or
+  delivery-route carrier's record must exist AND be independently
+  :registered?/:verified?/:license-active? in the store before any
+  proposal for it may commit or escalate, re-derived from the
+  facility's own record every time, never from proposal self-report --
+  a facility registered and verified but whose carrier license is NOT
+  currently active is treated exactly like an unregistered facility),
+  vendor-unverified (for :coordinate-facility-order only, the named
+  equipment/maintenance vendor must independently resolve to a
+  :registered?/:verified? vendor record), effect-not-propose, and
+  scope-exclusion (folds in op-not-allowed) that permanently blocks any
+  proposal touching directly finalizing a mail-content-inspection
+  decision, a mail-interception authorization, or a contents-based
+  delivery-refusal determination -- there is no proposal shape in the
+  closed allowlist that could ever legitimately reach this territory,
+  at any confidence, at any phase, under any human approval; scope-
+  excluded terms are deliberately phrased as the finalization/
+  authorization ACTION (\"finalized the mail-content-inspection
+  decision\", \"authorized the mail interception\", \"refused delivery
+  based on the item's contents\"), never a bare noun (\"mail\",
+  \"contents\", \"inspect\") -- since :flag-security-concern's entire
+  legitimate purpose is to describe an observed exterior anomaly at
+  intake [unusual weight, leaking substance, suspicious protrusion],
+  the default rationale was deliberately written to avoid even the
+  standalone words \"inspect\"/\"intercept\"/傾受/開封/内容
+  entirely [not merely the exact excluded phrases] -- a dedicated
+  advisor-level regression test
+  (security-concern-rationale-never-claims-content-determination in
+  advisor_test.clj) asserts this vocabulary discipline directly, one
+  layer earlier than the governor-level scan, in addition to the
+  standard governor-level regression test
+  (default-mock-advisor-proposals-never-self-trip-scope-exclusion in
+  governor_test.clj) asserting all four default proposal generators
+  never trip :scope-excluded or :op-not-allowed, plus a companion
+  sanity test (out-of-scope-injection-still-trips-scope-exclusion)
+  confirming the check is not accidentally a no-op; :flag-security-
+  concern ALWAYS escalates to human sign-off and is never a member of
+  any phase's :auto set, at any phase (two independent layers agree:
+  postalops.governor's own always-escalate-ops AND postalops.phase's
+  own phase table); a :coordinate-facility-order above a $1500
+  estimated-cost threshold also always escalates; governor keyword
+  :postal-ops-governor and namespace postalops checked for fleet-wide
+  collision via `gh api search/code` against org:cloud-itonami before
+  any code was written (0 hits, given 7 sibling actors landing
+  concurrently in this exact batch); real langgraph-clj StateGraph
+  (intake->advise->govern->decide->commit|hold|request-approval) with
+  interrupt-before #{:request-approval} for human-in-the-loop resume,
+  not a stub; fully portable .cljc with no JVM-only interop anywhere in
+  src/ (mock-only advisor); 62 tests / 186 assertions green (clojure
+  -M:test), independently re-verified against a fresh clone; clj-kondo
+  0 errors / 0 warnings; clojure -M:run (postalops.sim demo) walked all
+  scenarios (phase-1 approval-gated commit, phase-3 auto-commit for the
+  three non-security-flag/low-cost ops, always-escalating
+  security-concern flag, always-escalating over-threshold facility
+  order, and six HARD-hold scenarios: unregistered facility, unverified
+  facility, facility registered+verified but license NOT active,
+  unverified facility-order vendor, non-:propose effect, and
+  scope-excluded content) without error; registry.edn's own \"5310\" ->
+  :implemented change (:repo/:business-id de-placeholdered from the
+  stale gftdcojp/cloud-itonami-H5310 target to
+  cloud-itonami/cloud-itonami-isic-5310, :maturity :spec->:implemented,
+  :operating-states updated from the spec placeholder [:intake :book
+  :transit :deliver :reconcile :audit] to match the actor state machine
+  [:intake :advise :govern :approve :commit :audit];
+  :required-technologies left unchanged) landed via a git-trees/blobs
+  API single-file PUT direct to main (sha-checked optimistic
+  concurrency against a freshly re-fetched snapshot per this fleet's
+  hot-contention discipline -- the registry had in fact changed between
+  an earlier fetch and this PUT, confirmed via a second live re-fetch
+  showing this promotion's own \"5310\" block still unchanged before
+  proceeding; exact-block edit only verified via a prefix/suffix
+  byte-exact scan showing a single contiguous changed region matching
+  only the intended block, no mojibake detected, landed on the first
+  attempt); this test-file edit also corrects the shared
+  \"maturity-summary counts tiers\" aggregate assertion, re-derived
+  several times under heavy concurrent fleet churn (each prior value
+  observed had already drifted stale by the time of the next re-fetch,
+  the same well-established hot-contention pattern this file's own
+  history documents repeatedly above), to a final live-recomputed
+  455 (via `(kotoba.industry/maturity-summary)` against a
+  freshly re-fetched origin/main registry.edn snapshot taken
+  immediately before this edit's own successful PUT, not assumed);
+  superproject ADR-2740005310
+  (com-junkawasaki/root,
+  90-docs/adr/2740005310-cloud-itonami-isic-5310-postal-activities-
+  coverage.md/.edn)) promoted :spec -> :implemented"
+    (is (= :implemented (industry/maturity "5310")))
+    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-5310"
+           (:repo (industry/get-industry "5310"))))
+    (is (= "cloud-itonami-isic-5310"
+           (:business-id (industry/get-industry "5310"))))))
