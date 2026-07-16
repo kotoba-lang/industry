@@ -15,7 +15,7 @@ authoritative_for:
 related:
   - orgs/com-junkawasaki/vllm-clj                       # 本 ADR のライブラリ
   - orgs/com-junkawasaki/torch-clj                      # 姉妹(module graph as data)
-  - orgs/com-junkawasaki/mcp-clj                        # 先例(host-injected transport / string-keyed wire)
+  - orgs/kotoba-lang/org-anthropic-mcp                  # 先例(host-injected transport / string-keyed wire；通称 mcp-clj、現 repo 名 org-anthropic-mcp)
   - orgs/com-junkawasaki/jsonlogic-clj                  # 先例(データ第一 / validate / ports 方式)
   - orgs/com-junkawasaki/langchain-clj                  # 利用側(model 呼び出しの実 transport を注入しうる)
 supersedes: []
