@@ -2173,6 +2173,40 @@ green。
 現状: 国軸29件・業界団体軸30件(25業種)・自治体軸27件——86tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 87 — 国軸30件目(HND))
+
+`cloud-itonami-iso3166-hnd`の`statute.facts`を新規scaffold・push
+([commit 36c1a05](https://github.com/cloud-itonami/cloud-itonami-iso3166-hnd/commit/36c1a05))：
+ホンジュラスの一般法2件、いずれもテキスト抽出失敗後にPDFを画像として
+目視確認して直接検証:
+
+- **Código de Comercio（Decreto N.º 73-50）** — BCH（ホンジュラス中央
+  銀行）自身のPDFミラーはフォントサブセット化がひどく完全に判読不能
+  （国章のみ識別可能）だったため、同一法令のWIPO Lexミラーを代わりに
+  使用。WIPO Lexの本文自体が「Promulgación: 1 de mayo de 1950」と直接
+  明記（RAEの二次citation「1950年2月17日（decree署名日）」より、一次
+  資料自身の公布日を優先）。
+- **Ley de Transparencia y Acceso a la Información Pública（Decreto
+  Legislativo N.º 170-2006）** — Tribunal Superior de Cuentas（TSC、
+  ホンジュラス公式会計検査機関）自身のミラーで直接確認。1ページ目に
+  「Diario Oficial La Gaceta, 30 de diciembre de 2006」「Decreto
+  Legislativo No. 170 – 2006」と判読可能に明記。
+
+`cloud-itonami-iso3166-ury/-cri/-pan/-ecu/-pry/-gtm`と同様、この
+リポジトリには既存の`marketentry.facts`実装が無かった（blueprint-only）
+ため、`statute.facts`が初のコード資産——新規の自己完結的な`deps.edn`+
+`.gitignore`から作成。4 tests/11 assertions green。
+
+**capital-check**: 既存のooyake由来`organization.edn`はテグシガルパ
+（Q3238）を正しく首都としている——1880年以来一貫しており、JPN/DEU/BRA
+で見つかったP36史的首都バグの影響なしを確認。
+
+116リポジトリ・766 factを統合。`"statute/topic" "transparency"`での
+横断queryでHNDがGTMと共に取得できることを確認。
+
+現状: 国軸30件・業界団体軸30件(25業種)・自治体軸27件——87tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
