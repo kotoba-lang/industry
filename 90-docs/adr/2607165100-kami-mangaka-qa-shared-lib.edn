@@ -1,0 +1,25 @@
+[{:db/id -1
+  :adr/doc_type "adr"
+  :adr/id "adr-2607165100-kami-mangaka-qa-shared-lib"
+  :adr/title "ADR-2607165100: kami-mangaka-qa — Python 世代 QA 資産の可搬正本を kotoba-lang 共有 lib に"
+  :adr/topic "kami-mangaka-qa-shared-lib"
+  :adr/date "2026-07-16"
+  :adr/last_verified "2026-07-16"
+  :adr/status "accepted, implemented"
+  :adr/deciders ["owner root@junkawasaki.com" "agent"]
+  :adr/authoritative true
+  :adr/authoritative_for ["kotoba-lang/kami-mangaka-qa" "manga QA axes registry" "manga perception prompts/parsers" "bubble/face geometry QA"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related ["adr-2607164200-mangaka-quality-loop-murakumo-hf-lora"
+                "adr-2607012100-mangaka-expression-patterns"
+                "adr-2606282100-mangaka-render-commons-vs-sip-work-split"]
+  :adr/decision-summary "{:repo \"kotoba-lang/kami-mangaka-qa\" :visibility :public :runtime \"pure cljc, zero I/O, vision-fn injected\"
+ :ns {:axes \"rubric8 / heuristic13 / jump8 + v10 score JSON 互換 (from-v10/->v10-key)\"
+      :perception \"VLM prompts+parsers: face-count (実測動作) / face-boxes (backend依存) / panel-boxes\"
+      :geometry \"overlap / bubble-clearance / face-presence / reading-order-violations\"
+      :score \"aggregate-score(0-100) / mean10 / merge-perception-axes\"}
+ :ported-from \"retired Python lg_mangaka jump_benchmark_qa (ghosthacker v10; sample mangaka-data/.../v10/v10-p00-score.json total 79.1)\"
+ :not-ported [:pixel-heuristics :v10-weighted-composition \"重みは失われた — 保存値素通し、捏造しない\" :jump-qa-execution-loop :scored-png-overlay]
+ :first-consumer \"gftdcojp/ai-gftd-mangaka (mangaka.perception → 委譲 facade)\"
+ :tests \"5 tests / 32 assertions green (clojure -M:test)\"}"}]
