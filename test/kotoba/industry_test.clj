@@ -4285,3 +4285,83 @@ clone; superproject ADR-2628000000) is also :implemented"
            (:repo (industry/get-industry "4791"))))
     (is (= "cloud-itonami-isic-4791"
            (:business-id (industry/get-industry "4791"))))))
+(deftest cloud-itonami-isic-4789-is-implemented
+  (testing "cloud-itonami-isic-4789 (Retail sale via stalls and markets
+  of other goods -- the catch-all market-stall vertical for
+  general/other goods not covered by sibling ISIC 4781 [food, beverages
+  and tobacco stalls, already :implemented, ADR-2700004781] or ISIC
+  4782 [textiles, clothing and footwear stalls, already :implemented],
+  Wave 2 [coordination/logistics/trade, ADR-2607121000] fresh scaffold,
+  no pre-existing repo at any placeholder [gh api 404 confirmed for
+  both the stale gftdcojp/cloud-itonami-G4789 placeholder and the real
+  cloud-itonami org target before scaffolding]; identity independently
+  verified against a fresh clone before any work began, per this
+  fleet's ID/name-mismatch caution -- unambiguous, no truncation; the
+  redundant 3-digit group entry {:id \"478\" ...} left untouched;
+  StallMarketAdvisor ⊣ StallMarketGovernor market-stall
+  operations-coordination actor (stallmarketops.* namespace); closed
+  four-op allowlist, all :effect :propose (:log-sales-record/:schedule-
+  stall-operation/:coordinate-supply-order/:flag-compliance-concern);
+  FOUR HARD governor checks, all permanent and un-overridable by any
+  human approval -- stall-unverified (the target stall's market/council
+  permit registration must exist AND be independently
+  :registered?/:verified? in the store before ANY proposal for it may
+  commit or escalate, gating EVERY op in the closed allowlist including
+  :coordinate-supply-order -- unlike sibling ISIC 4719, this catch-all
+  vertical deliberately has NO separate supply-chain
+  vendor-verification entity), effect-not-propose, scope-exclusion
+  (permanently blocks any proposal touching directly issuing/finalizing
+  a market-stall permit or directly resolving a vendor/customer
+  dispute), and op-not-allowed (folded into the same implementation as
+  scope-exclusion); scope-excluded terms are deliberately phrased as
+  the finalization/execution ACTION (\"issued the permit\", \"granted the
+  permit\", \"resolved the dispute\", \"adjudicated the dispute\"), never a
+  bare noun (\"permit\"/\"license\"/\"dispute\"), avoiding this fleet's own
+  known self-tripping bug class -- this actor's own
+  :flag-compliance-concern default proposal legitimately discusses
+  permit-legitimacy and counterfeit-goods concerns, so a bare-noun term
+  list would have self-tripped its own happy path; verified by a
+  dedicated default-mock-advisor-proposals-never-self-trip-scope-
+  exclusion regression test in governor_test.clj; :flag-compliance-
+  concern ALWAYS escalates to human sign-off and is never a member of
+  any phase's :auto set, at any phase (two independent layers agree:
+  stallmarketops.governor's own always-escalate-ops AND
+  stallmarketops.phase's own phase table); a :coordinate-supply-order
+  above an $800 estimated-cost threshold likewise always escalates;
+  real langgraph-clj StateGraph (intake->advise->govern->decide->
+  commit|hold|request-approval) with interrupt-before
+  #{:request-approval} for human-in-the-loop resume, not a stub; fully
+  portable .cljc with no JVM-only interop anywhere in src/ (mock-only
+  advisor); governor-keyword collision caught and fixed pre-landing
+  (:stall-market-governor was already claimed by sibling
+  cloud-itonami-isic-4782's blueprint.edn -- renamed to
+  :stall-market-other-goods-governor); 49 tests / 142 assertions green
+  (clojure -M:test), independently re-verified against a fresh clone
+  (plus fresh kotoba-lang/langgraph and kotoba-lang/langchain
+  siblings); clj-kondo 0 errors / 0 warnings; registry.edn's own
+  \"4789\" -> :implemented change (:repo/:business-id de-placeholdered
+  from the stale gftdcojp/cloud-itonami-G4789 target to
+  cloud-itonami/cloud-itonami-isic-4789, :maturity :spec ->
+  :implemented, :operating-states updated to match the actor state
+  machine; :required-technologies left unchanged) landed via a
+  Contents-API single-file PUT direct to main (sha-checked optimistic
+  concurrency, re-fetched fresh content immediately before the PUT
+  after an initial 409 from concurrent sibling churn, exact-block edit
+  only verified via an exact old/new substring occurrence count of 1
+  PLUS a prefix/suffix single-contiguous-diff-region check PLUS
+  sample-verified against 3512/6310/4719/478[group]/8569 entries also
+  intact, no mojibake detected); the aggregate :implemented count in
+  `maturity-tier`'s own testing form above was left untouched by this
+  edit since concurrent sibling fleet agents' own test-file PUTs had
+  already recomputed it against registry.edn snapshots that included
+  this promotion's own \"4789\" change (spot-checked: live-recomputed
+  `(kotoba.industry/maturity-summary)` immediately before this edit
+  still agrees, {:implemented 441}); superproject ADR-2710004789
+  (com-junkawasaki/root, 90-docs/adr/2710004789-cloud-itonami-isic-4789-
+  stall-market-other-goods-coverage.md/.edn)) promoted :spec ->
+  :implemented"
+    (is (= :implemented (industry/maturity "4789")))
+    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-4789"
+           (:repo (industry/get-industry "4789"))))
+    (is (= "cloud-itonami-isic-4789"
+           (:business-id (industry/get-industry "4789"))))))
