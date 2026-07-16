@@ -70,6 +70,16 @@ jobs:
           else
             echo "no pin changes to verify"
           fi
+      - name: native CI receipt (report-only; signing key is owner-side)
+        if: always()
+        run: |
+          # The signed receipt is produced locally by the owner (kagi key);
+          # CI can only report reachability, not sign. This step documents the
+          # native-CI verdict shape (required subset of passed) without a key.
+          # When FLEET_CI_KEY is provisioned, replace this with `fleet ci-verify`.
+          echo "native CI: pin-reachability verdict is emitted as a signed" \
+               "content-addressed receipt by 'fleet ci-verify' (owner-side);" \
+               "see manifest/fleet-ci.edn (append-only receipt log)."
       - name: verify signed fleet head (report-only)
         if: always()
         run: |

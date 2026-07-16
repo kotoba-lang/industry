@@ -649,3 +649,48 @@ No（hard flip は kotoba-lang public から段階導入中、CI strict は PAT 
 kdb/objects/delta の一部はライブラリ+demo で日常パス未配線）。「pin 前進・
 並列 sync・署名台帳・Datalog クエリの実ツールとして private 込みで使えるか」
 = Yes（owner ローカル）。west とは**並走**し、org 単位で段階的に置換していく。
+
+## Addendum (2026-07-16, same day): CI/CD の所在調査 + fleet native CI 配線
+
+**問い**: kotoba-git/kotoba-rad 自体に CI/CD はどう含まれるか。**実測回答**:
+VCS stack「自体」には CI ランナーは無い。stack は ref-shape policy
+（kotoba-git.ref-policy）+ signed-ref attestation（kotoba-rad.sigref）+ push
+authorization（push-gate）+ signed head-announce（announce）で意図的に止まる。
+CI/CD プリミティブは一段上に、しかも **Radicle CI 型（broker + Job COB）で
+なく Nix/Bazel 型（content-addressed derivation）** で分散している:
+
+- **kotobase `code_graph`** が核: `put-execution-receipt!`（C4）—
+  code-root × artifact × compiler-contract × package-lock × policy × grants ×
+  outcome を束ね **required-effects（code graph から再計算）⊆ granted-effects**
+  を検証する content-addressed 実行 provenance。`execute-code-root!`（C5、
+  host-neutral coordinator、persist はしない）、`sync-code-root!`（verified
+  artifact transfer）、`cache-put!/get`（ambient 結果を昇格させない hermetic
+  test/analysis cache）。**scheduler も event trigger も cross-network job COB
+  も無い** — 「いつ走らせるか」は持たない。
+- **kototama** = capability-gated WASM 実行サンドボックス（ビルド/テストが
+  実際に走る場）。ABI レベルでは receipt 化しない。
+- **kotoba-lang/ci（ci-clj）** = GHA workflow を EDN でモデル化（job-DAG wave
+  planner、pure）。ただし **VCS stack 未配線**。
+- **hinshitsu** = 品質ゲート/evidence schema + 黙視（visual diff）。orchestrator
+  ではない。
+- **動いている唯一の broker は cloud-itonami の ops-runner**（ADR-2607141700、
+  M0–M8 実装済み）: announce 購読/poll → merge を verify（sigref→CACAO→risk
+  tier、fail-closed）→ per-kind handler（Resend/Stripe/deploy、at-most-once）
+  → **execute-only 鍵（itonami-runner-bot）で署名した receipt/audit commit**。
+  = Radicle CI 相当だが **consumer 層で合成**、VCS stack の再利用部品ではない
+  （kotoba-git/rad の decoupling を保つため意図的に consumer に留めた）。
+
+**fleet native CI 配線（実装、kotoba-fleet-vcs `9e6764bcc57e`、pin seq 14 /
+head seq 13、15 tests / 90 assertions）**: fleet の CI を外部 GitHub Actions
+から上記 native パターンへ移す第一歩。`fleet.ci` が pin 検証を **execution-
+receipt 同型の署名付き content-addressed verification receipt** にする
+（verdict = **required ⊆ passed**）。`fleet ci-verify` が pin 到達性チェックを
+走らせ署名 receipt を append-only ログ（`manifest/fleet-ci.edn`）に記録、
+:fail で exit 1。ops-runner パターン（verify → 署名 receipt）の fleet 版で、
+receipt は `fleet/ci-receipts` IStore stream にも載る（delta op-log と同一
+substrate）。**dogfood: public + private（club-shinshi）3 repo を検証、
+pass、署名 receipt `0a1f37f78fa4`/`ab6db0608952`**。GHA workflow は署名鍵を
+持てないため CI 側は report-only、署名 receipt は owner-side（kagi）で発行。
+**残**: hinshitsu ゲートを kototama capability-sandbox で実行する部分
+（現状は pin 到達性チェックのみ、receipt の check は hinshitsu evidence の
+{:name :outcome} 形と互換）。
