@@ -180,3 +180,38 @@ Addendum 1 の blocked 項目「chat gate token の owner mint 待ち」を、ro
    prompt の `?` 付き role 記法をモデルが key にコピーする（→ 'opt' 表記 + minimal
    shape example 同梱）。`--dump-raw` 診断フラグも追加。live の full storyboard 生成は
    gate 反映待ちで未完（mock 経路は検証済み）。
+
+## Addendum 3 — production reconcile 完了と live storyboard 完走（2026-07-16、同日）
+
+Addendum 2 で残った「production の chat gate が secondary secret を受理するのは
+デプロイラインが main を吸収してから」を、オーナー指示（「①共有 checkout の local
+109 commits を GitHub main に着地させて main と一本化する」→「do it」）で解消した:
+
+1. **共有 checkout の 109 local commits を GitHub main に着地・一本化**。HEAD
+   `4ed0af4` を remote branch に push（working tree 不触）→ 一時 worktree で
+   `origin/main`(13 commits, chat-gate secondary secret を含む) と merge。唯一の
+   衝突は test の add/add（両者が同じ secondary-secret テストを別々に足していた）で、
+   main 側 superset を採用して解決。merged tree で generation contract test green。
+   `gh api merges` で main へ着地（cloud-murakumo main `a1423b2`、GTM landing・
+   x402 credits fold・checkout metadata・organism publish safety 等の実作業を regression
+   なく取り込み）。
+2. **共有 checkout を unified main へ FF 同期**。ブロックした 31 の未追跡/ローカル
+   変更ファイルは全て `origin/main` とバイト同一（shasum 確認）だった掃き出し物で、
+   確認の上で checkout/削除して FF 完了。west pin も cloud-murakumo を `a1423b2` へ
+   前進（API single-entry `3bbdc32`）。
+3. **統一 main から rebuild → デプロイ**。`cloud-murakumo-production-release`
+   worktree を unified main に進めて dist を rebuild（secondary-secret path 込みを
+   確認）、`wrangler deploy`（worker version `a6d00f52`）。gate probe が 200 に遷移、
+   `MURAKUMO_CHAT_TOKEN_SECRET_2` で mint した token が実運用で受理されることを確認。
+   ⚠ 実測: cloud-murakumo は複数 worktree/deploy 経路があり（共有 checkout・
+   production-release worktree・他セッションの不定期デプロイ）、古い dist の再デプロイが
+   混ざると一時的に 401 に戻りうる。全経路が unified main 上にある今は、混ざっても
+   unified main から rebuild + 再デプロイで回復する（当初想定した「毎分の organism
+   publish ループ」は installed LaunchAgent として存在せず、実際のデプロイは不定期）。
+4. **live storyboard 完走**: production gateway に対し `bin/storyboard.cljs` で
+   「Why SQL injection still works in 2026」→ **7 scenes / en+ja の検証済み storyboard
+   を1発生成**（upstream 実体 gemma4-26b、Addendum 2 の max_tokens/no-think 対策が効いて
+   retry なし）→ render(ja, PNG) → audio-plan → assemble mp4 まで実データで完走。
+   これで ADR 本文の follow-up「storyboard 生成 actor の live 実行」が閉じた。
+
+残 follow-up: ongakuka/murakumo audio の実合成配線、publisher 実配線、template 追加。
