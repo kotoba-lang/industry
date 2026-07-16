@@ -1,0 +1,110 @@
+[{:adr/id 2661000000
+  :adr/title "cloud-itonami-isic-8130 — Landscape Care Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-8130]
+  :adr/references [2607121000 2660000000 2651000000]
+
+  ;; ISIC Rev.5 8130: landscape care and maintenance service activities
+  ;; (mowing, tree-trimming/pruning, irrigation-zone monitoring,
+  ;; herbicide/pesticide treatment application on existing grounds).
+  ;; Pre-existing :blueprint-tier repo (docs published, no code) filled
+  ;; in, not recreated. Coordination-only: service-record logging, crew/
+  ;; equipment/site scheduling proposals, safety-concern flagging,
+  ;; equipment/chemical/plant-material procurement coordination. Direct
+  ;; equipment-safety (power equipment) and pesticide-application
+  ;; dimension -- finalizing either is ALWAYS a permanent HARD block,
+  ;; never merely human-gated, and is not an op this actor's allowlist
+  ;; even recognizes.
+
+  :actor/id :cloud-itonami-isic-8130
+  :actor/name "Landscape Care Operations Coordination Actor"
+  :actor/isic-rev5 "8130"
+  :actor/domain :commercial/landscape-care-maintenance
+  :actor/coordination? true
+  :actor/robotics? true
+  :actor/pre-existing-blueprint-repo? true
+  :actor/reference-mirror :cloud-itonami-isic-0161
+  :actor/reference-mirror-note "cropsupport.governor's chemical-application/non-chemical service-type split and safety-window shape (license/calibration/interval/wind/buffer-zone) mapped directly onto landscape-care's own equipment-safety and pesticide-application concerns"
+
+  :actor/proposal-ops [:log-service-record :schedule-maintenance-operation
+                        :flag-safety-concern :coordinate-supply-order]
+  :actor/always-escalate-ops [:log-service-record :flag-safety-concern]
+  :actor/high-cost-escalate-op :coordinate-supply-order
+  :actor/high-cost-threshold-usd 5000
+  :actor/confidence-floor 0.6
+
+  :actor/hard-checks [:op-not-allowed :effect-not-propose :site-order-not-registered
+                       :no-spec-basis :evidence-incomplete :applicator-license-expired
+                       :equipment-calibration-overdue :equipment-safety-clearance-expired
+                       :restricted-entry-interval-violated :wind-speed-exceeded
+                       :buffer-zone-violated :equipment-safety-or-pesticide-decision-blocked
+                       :scope-exclusion-text :safety-concern-flag-unresolved :already-logged]
+  :actor/scope-exclusion-layers [:structural-boolean-flag :defense-in-depth-text-scan]
+  :actor/scope-exclusion-phrasing :action-not-noun
+  :actor/scope-excluded-boolean-flags [:finalize-equipment-safety-clearance?
+                                        :finalize-pesticide-application-decision?]
+  :actor/scope-excluded-text-patterns ["finalize the equipment-safety clearance"
+                                        "finalizing the equipment-safety clearance"
+                                        "grant the final equipment-safety clearance"
+                                        "finalize the pesticide-application decision"
+                                        "finalize the herbicide-application decision"
+                                        "approve the final pesticide-application decision"
+                                        "approve the final herbicide-application decision"
+                                        "設備安全最終承認"
+                                        "農薬散布最終決定"]
+  :actor/self-trip-regression-test :landscapecare.advisor-test/mock-advisor-defaults-never-self-trip-scope-exclusion-test
+
+  :actor/service-type-dimensions {:chemical-application? [:treatment/herbicide-broadcast :treatment/pesticide-application]
+                                   :equipment-safety-clearance-required? [:pruning/tree-trimming]
+                                   :neither [:mowing/routine :irrigation/zone-monitoring]}
+
+  :rollout/tiers {0 {:label :read-only :writes #{} :auto #{}}
+                  1 {:label :assisted-logging :writes #{:log-service-record} :auto #{}}
+                  2 {:label :assisted-coordination
+                     :writes #{:log-service-record :schedule-maintenance-operation
+                               :flag-safety-concern :coordinate-supply-order}
+                     :auto #{}}
+                  3 {:label :supervised-auto
+                     :writes #{:log-service-record :schedule-maintenance-operation
+                               :flag-safety-concern :coordinate-supply-order}
+                     :auto #{:schedule-maintenance-operation :coordinate-supply-order}}}
+  :rollout/never-auto-ops [:flag-safety-concern :log-service-record]
+  :rollout/consistency-check :landscapecare.rollout/rollout-consistent?
+
+  :operation/entry-point :intake
+  :phase/sequence [:intake :register :match :dispatch :follow-up :audit]
+
+  :store/backends [:mem-store]
+
+  :test/counts {:total 61 :assertions 223 :failures 0 :errors 0}
+  :test/coverage [:facts :registry :store :governor :governor-self-trip-regression
+                  :advisor-shapes :rollout-tier-auto-set-discipline :operation :phase]
+  :test/simulator :landscapecare.sim
+  :lint/clj-kondo {:errors 0 :warnings 0}
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-8130"
+  :registry/business-id "cloud-itonami-8130"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
+  :registry/optional-technologies [:optimization]
+  :registry/operating-states [:intake :register :match :dispatch :follow-up :audit]
+
+  :registry-test/file "test/kotoba/industry_test.clj"
+  :registry-test/own-commits ["5a2837e77bb8da99d02e5671ba8b4a5fae611d7f"
+                               "6e7618cd0a99e7386717b85894140123efafcf65"]
+  :registry-test/own-commits-note "second commit mechanically fixed 3 OTHER entries' (7912/8121/8220) stale spot-checks gone stale from concurrent sibling promotions in the same batch window -- did not touch their registry.edn data"
+  :registry-test/superseded-third-fix-note "an 8219 mechanical fix (the sixth and final batch target) was independently landed by the cloud-itonami-isic-7912 sibling agent (ADR-2660000000) before this session's own planned third PUT, superseding it"
+
+  :registry-suite/counts-final {:total 15 :assertions 1063 :failures 0 :errors 0}
+  :registry-summary/final {:total 649 :spec 232 :blueprint 0 :implemented 417}
+  :registry-summary/nil-maturity-gaps-remaining 0
+  :registry-summary/sweep-batch [:7911 :7912 :8121 :8130 :8219 :8220]
+  :registry-summary/sweep-complete? true
+
+  :actor-repo/commits {:pre-existing "51c2b0530fe9aed830a9ff419508412e0912a36c"
+                        :core-implementation "0c7ad009f9b6630111a85027aff506648046ca66"
+                        :rollout-addition "5819aa37f9ef04cc3700c0d87642d7a58dc2f4b2"}
+  :registry-edn/put-commit "86d3f8e262152c282773df1926ee1e9efdc79a1a"
+
+  :db/id -1}]
