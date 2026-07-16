@@ -3001,6 +3001,35 @@ clone; superproject ADR-2628000000) is also :implemented"
            (:repo (industry/get-industry "4719"))))
     (is (= "cloud-itonami-isic-4719"
            (:business-id (industry/get-industry "4719"))))))
+(deftest cloud-itonami-isic-4530-is-implemented
+  (testing "cloud-itonami-isic-4530 (Sale of motor vehicle parts and
+  accessories -- auto-parts retail/wholesale operations coordination,
+  Wave 2 [coordination/logistics/trade, ADR-2607121000] fresh scaffold,
+  no pre-existing repo at any placeholder [gh api 404 confirmed
+  before scaffolding]; distinct from sibling 4520 [repair] and 4540
+  [motorcycle sale/repair], both built by sibling agents in the same
+  batch; PartsOpsAdvisor \u22a3 AutoPartsOpsGovernor, closed four-op
+  allowlist all :effect :propose (log-sales-record/schedule-
+  restocking-operation/flag-compatibility-concern/coordinate-supply-
+  order); FOUR HARD governor checks (closed-op-allowlist,
+  verified-party-gate for storefront AND vendor, effect-propose-only,
+  and a PERMANENT compatibility-certification-finalization-block
+  checked via structured fields only -- never free-text scanning,
+  avoiding this fleet's own known bare-noun self-trip bug class,
+  verified by a dedicated default-mock-advisor-proposals-never-self-
+  trip-scope-exclusion regression test); flag-compatibility-concern
+  ALWAYS escalates and is never in any phase's :auto set;
+  coordinate-supply-order above a cost threshold also always
+  escalates but IS auto-eligible below it; store adopts BOTH
+  kotoba-lang/langchain-store patterns [ADR-2607141600] -- entity-store
+  for storefront/vendor, event-stream for the ledger + 4 coordination
+  logs; 24 tests / 115 assertions green, clj-kondo clean; superproject
+  ADR-2690000000) promoted :spec -> :implemented"
+    (is (= :implemented (industry/maturity "4530")))
+    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-4530"
+           (:repo (industry/get-industry "4530"))))
+    (is (= "cloud-itonami-isic-4530"
+           (:business-id (industry/get-industry "4530"))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
