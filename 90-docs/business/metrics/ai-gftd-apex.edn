@@ -1,16 +1,16 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 5299, "ai-gftd-chat-shell" 1387},
+ {"magatama-sh1n5h1x" 5338, "ai-gftd-chat-shell" 1387},
  :zone
- {:requests-7d 382648,
-  :pageviews-7d 6981,
-  :uniques-7d-sum 4852,
+ {:requests-7d 385679,
+  :pageviews-7d 6987,
+  :uniques-7d-sum 4861,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/", :requests 824}
+  [{:path "/", :requests 791}
    {:path "/favicon.ico", :requests 157}
    {:path "/v1/generation", :requests 134}
    {:path "/.env", :requests 120}
@@ -18,7 +18,7 @@
    {:path "/server/config/common.js", :requests 39}
    {:path "/signup", :requests 39}
    {:path "/ci-cd/github/dist/requirements.txt", :requests 33}],
-  :status-mix {:ok 2729, :client-error 1266, :server-error 17261},
+  :status-mix {:ok 2722, :client-error 1362, :server-error 17232},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,8 +32,8 @@
  :as-of "2026-07-16",
  :traffic-quality {:window "24h", :probe-4xx-pct 6, :error-5xx-pct 81},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 824 · /favicon.ico 157 · /v1/generation 134 · /.env 120 · /s3.yaml 48 | 4xx(probe) 6% · 5xx 81%",
+ "上位 page (24h, 2xx/3xx): / 791 · /favicon.ico 157 · /v1/generation 134 · /.env 120 · /s3.yaml 48 | 4xx(probe) 6% · 5xx 81%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 382648 req/7d・4852 uniques(日次和)・うち4xx probe 6%(24h)、workers 6686 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 385679 req/7d・4861 uniques(日次和)・うち4xx probe 6%(24h)、workers 6725 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
