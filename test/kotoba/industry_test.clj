@@ -122,8 +122,8 @@
   ;; "8020")` recompute immediately before this edit, not assumed.
   (testing "cloud-itonami-isic-3020, promoted to :implemented (rolling-stock manufacturing actor deployed)"
     (is (= :implemented (industry/maturity "3020"))))
-  (testing "cloud-itonami-isic-8130, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "8130"))))
+  (testing "cloud-itonami-isic-8130, promoted to :implemented (Landscape Care Operations Coordination actor deployed)"
+    (is (= :implemented (industry/maturity "8130"))))
   (testing "cloud-itonami-isic-8121, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "8121"))))
   (testing "cloud-itonami-isic-3312, machinery-repair actor, is now :implemented (live-state corroboration)"
@@ -587,7 +587,17 @@
       ;; `(kotoba.industry/maturity-summary)` against a freshly
       ;; re-fetched origin/main registry.edn immediately before this
       ;; test-file edit, not assumed.
-      (is (= 5 (:blueprint m)))
+      ;; 5 -> 4: this promotion's own cloud-itonami-isic-8130
+      ;; (:blueprint -> :implemented, -1, adding the previously-absent
+      ;; :maturity key explicitly); the other three targets of this same
+      ;; blueprint-tier cleanup batch (7912/8219/8220) remain nil-
+      ;; maturity at this snapshot -- 8121's own registry.edn entry also
+      ;; still has no :maturity key live, despite that sibling's own ADR
+      ;; claiming the promotion, so it is NOT counted as closed here;
+      ;; live-recomputed via `(kotoba.industry/maturity-summary)` against
+      ;; a freshly re-fetched origin/main registry.edn immediately before
+      ;; this test-file edit, not assumed.
+      (is (= 4 (:blueprint m)))
       ;; 17 -> 15: this promotion's own cloud-itonami-isic-5223 -1,
       ;; plus -1 from the concurrent sibling cloud-itonami-isic-5229
       ;; promotion landed in the same fast-moving window (see the
@@ -2880,11 +2890,19 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; explicitly, +1); live-recomputed via
       ;; `(kotoba.industry/maturity-summary)` against a freshly
       ;; re-fetched origin/main registry.edn immediately before this
-      ;; test-file edit, not assumed. Five entries remain nil-maturity
-      ;; (fallback :blueprint) at this snapshot: 7912/8121/8130/8219/8220,
-      ;; the other five targets of this same blueprint-tier cleanup batch,
+      ;; test-file edit, not assumed.
+      ;; 412 -> 413: this promotion's own cloud-itonami-isic-8130
+      ;; registry.edn change (adding the previously-absent :maturity key
+      ;; explicitly, +1); live-recomputed via
+      ;; `(kotoba.industry/maturity-summary)` against a freshly
+      ;; re-fetched origin/main registry.edn immediately before this
+      ;; test-file edit, not assumed. Four entries remain nil-maturity
+      ;; (fallback :blueprint) at this snapshot: 7912/8121/8219/8220 --
+      ;; 8121's own ADR claims a promotion but its registry.edn entry
+      ;; still has no live :maturity key, so it is not yet closed --
+      ;; the other targets of this same blueprint-tier cleanup batch,
       ;; expected to close out via concurrent sibling agents.
-      (is (= 412 (:implemented m))))))
+      (is (= 413 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
