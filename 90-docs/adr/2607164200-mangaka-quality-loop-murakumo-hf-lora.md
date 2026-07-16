@@ -131,3 +131,22 @@ loop のコード実装、co-scientist」を受けて:
    凍結** — ハーネスと trainer 骨格は本 ADR 本文のまま存置するが、
    Phase 0 benchmark・実学習・murakumo.edn 配線は優先度を下げ、
    着手はオーナーの再指示を待つ。
+
+## Addendum 2 (2026-07-16) — LLM 経路を api.murakumo.cloud (fleet-first) に切替
+
+オーナー指示「llm 稼働は anthropic じゃなくて api.murakumo.cloud を使って」を受けて:
+
+- `mangaka.llm` の provider 解決を **murakumo 優先**に変更:
+  `MURAKUMO_LLM_URL`（本番 `https://api.murakumo.cloud`）→ fleet の OpenAI 互換
+  `/v1/chat/completions`（langchain.model/openai-model、`MURAKUMO_LLM_MODEL`
+  default "default"、`MURAKUMO_SERVICE_TOKEN` optional Bearer）。
+  `ANTHROPIC_API_KEY` は fleet URL 未設定時の fallback に降格。両方無しは
+  従来どおり deterministic mock（offline 完全動作は不変）。
+- backend（llama.cpp / gemma4-26b-a4b-q4、b9334）の **vision 対応を実測確認**
+  （image_url data-URI に正答、2026-07-16）— chat / critique / vision-json /
+  vision-score の全経路が自前 fleet で動く。
+- 完全自前ホスト E2E（レンダリング = gad ComfyUI、critique =
+  api.murakumo.cloud）: gen1 実スコア [72, 63] + 有意味な批評文、gen2 は
+  elite 生存 + fix-hint 変異子。この実測で見つかった
+  「population 2 × elite 2 で子が繁殖されない」罠を elite ≤ population−1
+  cap で修正。suite 110 tests / 696 assertions green。

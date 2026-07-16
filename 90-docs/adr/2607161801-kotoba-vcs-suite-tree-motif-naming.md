@@ -112,3 +112,20 @@ nekko=`kotoba-rad.*` の前例）④ superproject の repos.edn / west.yml / fle
   merge driver → `tsugiki`）。
 - 既存 repo の遡及改称は blast radius 順に段階実施（kagami→nekko 済、kotoba-git
   は名確定後）。表内の未使用語は将来用の予約であり、一斉改称は非目標。
+
+
+## Addendum (2026-07-16, same day): kotoba-git → bonsai 確定
+
+git は木そのものでなく「**人が長い時間をかけて木を意図的に仕立てる道具**」という
+オーナー指摘により、対応表の git スロットを部位（miki）でなく**主体・行為**から採り、
+**`bonsai`（盆栽）** に確定。決め手: ①盆栽＝剪定・針金・植え替えで木を意図的に
+仕立てる craft ＝ git の営み（rebase=剪定 / branch=枝作り / merge=接ぎ / migrate=
+植え替え）と完全一致 ②「仕立てられた木」であり「仕立てる技」でもある二重性が、
+object store でありツールでもある git と一致 ③git 同様の世界語で基盤ツールに相応。
+（次点は soma＝杣、mori と韻。miki は部位案として表に併記のまま残す。）
+
+**移行スコープ実測**: kotoba-git の deps.edn 消費者は **62件**（全て同一形式
+`io.github.kotoba-lang/kotoba-git {:local/root "../../kotoba-lang/kotoba-git"}`、
+ほぼ network-isekai 系 + cloud-itonami）。ソースの `kotoba-git.*` namespace
+require は 119件だが **namespace 維持で無変更**（repo 名 ≠ namespace）。よって
+62個の deps.edn 一行修正 + repo rename + manifest 更新で完了する。
