@@ -22,6 +22,7 @@
     (is (= 1 (wave/wave-of "6920")))   ; accounting
     (is (= 1 (wave/wave-of "8411")))   ; public administration
     (is (= 1 (wave/wave-of "3510")))   ; power generation/transmission
+    (is (= 1 (wave/wave-of "3511")))   ; SMR (non-renewable) generation, division 35 override
     (is (= 1 (wave/wave-of "3600")))   ; water
     (is (= 1 (wave/wave-of "0610")))   ; oil extraction
     (is (= 1 (wave/wave-of "9900"))))  ; extraterritorial
