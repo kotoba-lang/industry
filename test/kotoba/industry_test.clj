@@ -528,7 +528,17 @@
       ;; `(kotoba.industry/maturity-summary)` against a freshly
       ;; re-fetched origin/main registry.edn immediately before the PUT,
       ;; not assumed.
-      (is (= 15 (:blueprint m)))
+      ;; 15 -> 12: three concurrent sibling fleet agents' own promotions
+      ;; landed in the same fast-moving window -- this promotion's own
+      ;; cloud-itonami-isic-8030 (:blueprint -> :implemented, -1) plus
+      ;; cloud-itonami-isic-8010 and cloud-itonami-isic-8020 (also
+      ;; :blueprint -> :implemented, -1 each, not this promotion's own
+      ;; work -- corroborated here only to keep this shared hot test
+      ;; file truthful); live-recomputed via
+      ;; `(kotoba.industry/maturity-summary)` against a freshly
+      ;; re-fetched origin/main registry.edn immediately before this
+      ;; test-file edit, not assumed.
+      (is (= 12 (:blueprint m)))
       ;; 17 -> 15: this promotion's own cloud-itonami-isic-5223 -1,
       ;; plus -1 from the concurrent sibling cloud-itonami-isic-5229
       ;; promotion landed in the same fast-moving window (see the
@@ -2769,7 +2779,17 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; truthful; live-recomputed via `(kotoba.industry/maturity-
       ;; summary)` against a freshly re-fetched origin/main immediately
       ;; before this corrective PUT, not assumed.
-      (is (= 402 (:implemented m))))))
+      ;; 402 -> 405: this promotion's own cloud-itonami-isic-8030
+      ;; (:blueprint -> :implemented, +1) plus two CONCURRENT sibling
+      ;; fleet agents' own cloud-itonami-isic-8010 and
+      ;; cloud-itonami-isic-8020 promotions (also :blueprint ->
+      ;; :implemented, +1 each, landed in the same fast-moving window --
+      ;; not this promotion's own work, corroborated here only to keep
+      ;; this shared hot test file truthful); live-recomputed via
+      ;; `(kotoba.industry/maturity-summary)` against a freshly
+      ;; re-fetched origin/main registry.edn immediately before this
+      ;; corrective test-file edit, not assumed.
+      (is (= 405 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
