@@ -1,0 +1,119 @@
+{:adr-id "2627000000"
+ :title "cloud-itonami-isic-7740 (leasing of intellectual property and similar products, except copyrighted works) IP-leasing-operations-coordination actor"
+ :status :accepted
+ :date "2026-07-16"
+ :deciders ["Jun Kawasaki (agent-executed, standing authorization)"]
+ :related ["ADR-2607121000" "ADR-2607152500" "ADR-2607121200"]
+ :mirrors "cloud-itonami-isic-5913 (filmdistops.* module shape, Wave 4 verified sibling actor)"
+
+ :context
+ "ISIC Rev.4 7740 = leasing of intellectual property and similar products,
+  EXCEPT copyrighted works -- patents, trademarks, franchise rights;
+  copyrighted works (books/music/film) are covered by different ISIC
+  classes. Live registry.edn :name for \"7740\" independently verified
+  fresh: truncated \"Leasing of intellectual property and similar
+  products, exce...\" (pre-existing seed-data truncation bug, ~10% of
+  entries), unambiguously matching the target class. A separate,
+  redundant 3-digit group entry {:id \"774\" ...} with a similarly
+  truncated name sits at :maturity :spec and was deliberately left
+  untouched, per this fleet's caution against conflating class-level and
+  group-level registry entries. No existing repo at
+  cloud-itonami/cloud-itonami-isic-7740 (404) or at the registry's
+  placeholder :repo (gftdcojp/cloud-itonami-N7740, itself bogus -- wrong
+  org/id-shape, never real). Fresh scaffold, not a repair. IP leasing
+  touches licensing-grant and royalty-rate-determination decisions --
+  per ADR-2607152500's Wave4 guardrail, closed op allowlist must never
+  include an op that directly finalizes either; any 'flag concern' op
+  always escalates, never auto-commit-eligible."
+
+ :scope-exclusions
+ ["finalizing a licensing grant (who is licensed to practice a patent, use a trademark, or operate a franchise, under what terms) -- hard, permanent block"
+  "finalizing a royalty-rate determination (locking in what rate a licensee actually pays) -- hard, permanent block"
+  "license-agreement negotiation, contract drafting, binding execution -- not represented in the closed op allowlist at all"]
+
+ :self-trip-fix
+ "Known bug class this batch repeatedly hit: bare-noun scope-excluded-terms
+  (e.g. 'license', 'royalty') self-match inside the mock advisor's own
+  legitimate default rationale text, self-blocking the actor's happy path
+  -- especially acute here since :log-license-record/
+  :coordinate-royalty-reporting routinely disclaim 'not a licensing-grant
+  decision'/'not a royalty-rate decision' in their own default rationale,
+  and :flag-infringement-concern's entire purpose is to discuss
+  licensing/infringement topics using exactly those bare nouns. Fix:
+  scope-excluded-terms phrased as the finalization/execution ACTION
+  ('finalize the licensing grant', 'set the royalty rate', 'grant the
+  license', JP equivalents), never a bare noun -- verified from the start
+  via a pre-write substring-collision scan of every default advisor
+  rationale/summary string against the full term list (zero collisions),
+  then independently confirmed by the dedicated regression test
+  default-mock-advisor-proposals-never-self-trip-scope-exclusion in
+  governor_test.clj, which asserts all 4 default proposal generators, for
+  a clean registered+verified license record, never trip :scope-excluded
+  and never HARD-hold."
+
+ :decision
+ "Implement cloud-itonami-isic-7740 with Store/Advisor/Governor/Phase/
+  Operation/Sim, mirroring cloud-itonami-isic-5913's filmdistops.* module
+  shape module-for-module as ipleaseops.*:
+  - Store: Store protocol + MemStore, string-keyed licenses directory
+    (license-id/name/registered?/verified?), append-only ledger +
+    licensing-log
+  - Advisor: Advisor protocol + mock-advisor, 4 ops all :effect :propose --
+    log-license-record, schedule-review-operation, flag-infringement-concern,
+    coordinate-royalty-reporting
+  - Governor (IPLeaseGovernor): 2 named HARD checks (license-unverified,
+    effect-not-propose) + scope-exclusion/op-not-allowed folded check
+    (finalize-licensing-grant / finalize-royalty-rate-determination /
+    closed 4-op allowlist). always-escalate-ops #{:flag-infringement-concern},
+    confidence-floor 0.6
+  - Phase: 0->3 rollout (phase1 = log-license-record only, approval;
+    phase2 += schedule-review-operation/coordinate-royalty-reporting,
+    approval; phase3 auto-commits those 3 when clean+confident;
+    flag-infringement-concern never auto, any phase)
+  - Operation: real langgraph-clj StateGraph (intake->advise->govern->decide
+    ->commit|hold|request-approval), interrupt-before #{:request-approval},
+    NOT a stub -- mirrors filmdistops.operation exactly
+  - Sim: clojure -M:run demo, full happy path + always-escalate flow + all
+    HARD-hold scenarios
+  - Tests: store_contract_test, advisor_test, governor_test (incl. mandatory
+    self-trip regression), phase_test, governor_contract_test -- 40 tests /
+    119 assertions green
+  - All .cljc portable, no JVM-only interop. AGPL-3.0-or-later. README/
+    GOVERNANCE/CONTRIBUTING/SECURITY/CODE_OF_CONDUCT written fresh for this
+    domain"
+
+ :consequences
+ {:positive
+  ["ISIC 7740 IP-leasing-operations-coordination genuinely implemented and
+    fully tested"
+   "licensing-grant and royalty-rate-determination exclusions hardcoded in
+    governor checks (scope-exclusion-violations), not just README prose"
+   "self-trip bug class fixed by construction (action-phrased terms,
+    pre-write collision scan) + covered by dedicated regression test, not
+    avoided by luck"
+   "flag-infringement-concern always-escalate is a two-layer invariant
+    (governor always-escalate-ops + phase's permanent absence from every
+    :auto set)"
+   "portable .cljc, zero JVM-only constructs; clojure -M:lint 0 errors / 0 warnings"]
+  :negative
+  ["real persistent store (Datomic/kotoba-server) is a follow-up; tests use
+    in-memory MemStore, matching every sibling actor's current maturity"
+   "mock-advisor is deterministic, not a real LLM call; Advisor protocol seam
+    ready for that swap but not wired in this ADR"]}
+
+ :verification
+ {:test-count 40
+  :assertion-count 119
+  :test-status "0 failures, 0 errors -- clojure -M:test run at push time AND independently re-run from a brand-new fresh clone, identical result"
+  :lint-status "0 errors, 0 warnings"
+  :commit "9ce4ca91f0468d25edcf468a6c74c84e26b2e7bc"
+  :repo "https://github.com/cloud-itonami/cloud-itonami-isic-7740"
+  :demo-run "clojure -M:run end-to-end: happy-path ops auto-commit at phase 3, escalate at phase 1; flag-infringement-concern escalates then commits after approval; unregistered/unverified license record, non-:propose effect, out-of-scope-drift all HARD-hold as designed"
+  :registry-update "kotoba-lang/industry: 7740 :spec -> :implemented, :name de-truncated, :repo/:business-id de-placeholdered from gftdcojp/cloud-itonami-N7740 to cloud-itonami/cloud-itonami-isic-7740, :required-technologies trimmed to [:identity :forms :dmn :bpmn :audit-ledger], :operating-states updated to [:intake :register :review :flag :report :audit]. First attempt via feature-branch + server-side merge hit a 409 conflict from concurrent fleet activity and was abandoned in favor of direct-to-main Contents-API single-file PUT (sha-checked, fresh re-fetch each attempt), which landed on the first direct-PUT attempt."
+  :registry-merge-commit "68941372dd92d4e03be8b2fe37c544ddad96f137"
+  :registry-test-file-commit "b3c095788f342bee8904e4b9d890c4cc7ce3d61c"
+  :registry-test-file-retries 0
+  :registry-post-merge-verification "fresh clone (+ fresh ../technology sibling) of kotoba-lang/industry main: Ran 15 tests containing 1053 assertions. 0 failures, 0 errors. clj-kondo: 0 errors, 0 warnings. No mojibake detected; 7740 and sample entries 5913/5629/5813/774 (untouched group entry) all intact."
+  :registry-implemented-count-before 385
+  :registry-implemented-count-after 392
+  :registry-count-note "392 reflects this promotion's own +1 plus numerous concurrent sibling promotions landed in the same window (live-recomputed via (kotoba.industry/maturity-summary) immediately before each edit attempt, not assumed -- the live count moved 385 -> 390 -> 392 across successive re-fetches purely from fleet concurrency, not this promotion's own drift)"}}
