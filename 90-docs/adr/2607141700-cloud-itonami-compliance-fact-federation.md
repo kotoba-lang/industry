@@ -2487,6 +2487,41 @@ tests/9 assertions green（既存marketentry 24 tests/81 assertions
 現状: 国軸32件・業界団体軸32件(25業種)・自治体軸30件——94tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 95 — 自治体軸31件目(Bangkok, THA) — 東南アジア初、誤文書混入を検出・訂正)
+
+`cloud-itonami-municipality-tha-bangkok`を新規GitHubリポジトリとして
+scaffold・push
+([commit fb9b1d6](https://github.com/cloud-itonami/cloud-itonami-municipality-tha-bangkok/commit/fb9b1d6))：
+
+自治体軸で東南アジア初のエントリ。
+
+- **Administrative Organisation of Bangkok Metropolitan
+  Administration Act, 2528 BE**（1985年8月20日発布）—
+  en.wikisource.org（王室官報テキストの逐語英訳を提供する
+  Wikimediaプロジェクト）で直接確認。
+- **Bangkok Metropolitan Council founding**（Declaration No. 335 of
+  the Revolution Committee、1972年12月13日）— bmc.go.th
+  （official.bangkok.go.thとは別の稼働ドメイン）自身のHistoryページ
+  で直接確認。official.bangkok.go.th自身のAboutページはHTTP 403。
+
+**誤文書混入の検出・訂正**: タイトル・URLとも「1985年原法」を指す
+Wikisourceページ（`Translation:...BE_2528_(1985)/2007.08.01`）を
+開いたところ、実際の本文は**1991年の改正法**（"Act (No 2), 2534
+BE"）だった——本文自身の記載タイトル・日付を期待値と照合することで
+発見し、URLが異なる正しい原法ページ（`/Translation:`接頭辞・
+`/2007.08.01`接尾辞なし）に切り替えて再確認した。
+
+4 tests/11 assertions green。124リポジトリ・782 factを統合。
+`"ordinance/kind" "local-act"`での横断queryで`[london new-delhi
+warsaw bangkok]`——創設憲章型の4自治体法がすべて正しく取得できる
+ことを確認。
+
+**capital-check**: バンコク（Q1861）は1782年以来一貫してタイ
+（Q869）の首都であり、史的首都バグの影響なしを確認。
+
+現状: 国軸32件・業界団体軸32件(25業種)・自治体軸31件——95tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
