@@ -3177,6 +3177,44 @@ ordinance.facts横断queryで既存のカイロ自治体2件と本tickの国エ�
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-17, /loop tick 112 — 業界団体軸38件目(AEB, ESP, ISIC 6419) — 銀行業8カ国目、2つの断念を経て着地)
+
+`cloud-itonami-assoc-6419-esp-aeb`を新規GitHubリポジトリとして
+scaffold・push
+([commit c1f7d94](https://github.com/cloud-itonami/cloud-itonami-assoc-6419-esp-aeb/commit/c1f7d94))：
+
+Asociación Española de Banca（AEB、スペイン銀行協会）。ISIC 6419
+（銀行業）の8カ国目。
+
+本tickは2つの断念を経て着地:
+
+- **Royal FloraHolland**（オランダ、花卉オークション協同組合——
+  業種多様化のための本命候補）— royalfloraholland.comが履歴
+  ページを含む全URLでHTTP 403、断念。
+- **Federation of Egyptian Industries**（エジプトの業界団体軸の
+  欠落を埋める狙いで、tick111で正直に指摘した空白を埋めるべく
+  次点で試行）— WebSearch要約が設立年で1922年と1947年（設立法）
+  という矛盾した2つの年を示し、fei.org.eg自身の"aboutus"ページも
+  "about-fei"ページ（404）もどちらの日付も直接確認できなかった
+  ため、どちらかを恣意的に選ばず断念。エジプトの業界団体軸の空白は
+  今後のtickに持ち越し。
+
+aebanca.es自身の「Our history」ページから2件を直接確認:
+
+- **1977年設立**
+- **1985年、スペインのEU加盟とAEBの欧州銀行連盟（European
+  Banking Federation）への正式加盟**
+
+いずれも年のみで記録。4 tests/11 assertions green。141リポジトリ・
+816 factを統合。`"association-rule/isic" "6419"`での横断queryで
+8カ国すべて（`[zenginkyo JPN]`・`[bankenverband DEU]`・
+`[fbf FRA]`・`[aba AUS]`・`[ubf ARE]`・`[vnba VNM]`・
+`[bap PHL]`・`[aeb ESP]`）が正しく取得できることを確認。
+
+現状: 国軸38件・業界団体軸38件(27業種)・自治体軸36件——112tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
