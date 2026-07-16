@@ -397,7 +397,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-municipality-sau-riyadh/data/datascript-tx.edn"}
    {:label "cloud-itonami-iso3166-sau statute.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-iso3166-sau/schema/statute.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-iso3166-sau/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-sau/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-9411-sau-fsc association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-9411-sau-fsc/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-sau-fsc/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 

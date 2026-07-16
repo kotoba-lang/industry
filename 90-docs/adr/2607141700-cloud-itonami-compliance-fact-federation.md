@@ -3502,6 +3502,43 @@ assertionsと合わせ全28 tests/90 assertions green）。144リポジトリ・
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。サウジアラビアの業界団体軸の空白は今後のtickに持ち越し。
 
+## Addendum (2026-07-17, /loop tick 121 — 業界団体軸41件目(FSC, SAU, ISIC 9411新規) — サウジアラビアが3tick窓で3軸完成、7カ国目)
+
+`cloud-itonami-assoc-9411-sau-fsc`を新規GitHubリポジトリとして
+scaffold・push
+([commit 021fedb](https://github.com/cloud-itonami/cloud-itonami-assoc-9411-sau-fsc/commit/021fedb))：
+
+Federation of Saudi Chambers（FSC、旧Council of Saudi Chambers、
+2021年に改称）。tick120で正直に指摘したサウジアラビアの業界団体軸
+の空白を埋める。**ISIC 9411**（企業・使用者・専門職団体活動）
+という本catalog初のISICコードを新規導入——銀行業(6419)偏重から
+商工会議所連合という異なる業種への多様化。
+
+fsc.org.sa自身の"Establishment of FSC"ページから2件を直接確認:
+
+- **1980年3月（ヒジュラ暦1400年4月30日）、Royal Decree # R/6に
+  よる設立**（原文引用: "The Council was formed as per the Royal
+  Decree # R/6 dated 30/04/1400 Hijri (March 1980) with its head
+  office in Riyadh."）
+- **1981年（ヒジュラ暦1401年）、事務局（General Secretariat）
+  設立による実務開始**
+
+FSC/CSC固有のWikidata Q-idは見つからず（tick108のBAPと同型の
+パターンで、推測せず正直に省略）。
+
+4 tests/11 assertions green。144リポジトリ・834 factを統合。
+
+3軸横断query（`statute/jurisdiction`・`ordinance/country`・
+`association-rule/country`いずれも`"SAU"`）で全て正しく取得を
+確認——**サウジアラビアがtick119(自治体)→120(国)→121(業界団体)の
+3tick窓で3軸完成、UAE(tick100)・ベトナム(tick103)・
+インドネシア(tick106)・フィリピン(tick109)・トルコ(tick115)・
+ナイジェリア(tick118)に続く7カ国目**。
+
+現状: 国軸41件・業界団体軸41件(28業種)・自治体軸39件——121 tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
