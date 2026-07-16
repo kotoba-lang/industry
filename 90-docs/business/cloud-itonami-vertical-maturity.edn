@@ -52,7 +52,7 @@
    :label "ISIC 7810 Employment / placement"
    :sample-repos ["cloud-itonami-isic-7810"]
    :design 4 :impl-core 4 :impl-product 4 :business 2
-   :notes "Next after flagships (product-score 4: demo + quickstart). Referral handoff target from 6399 ADR-0003. Pricing table built from scratch, grounded in 4 real competitor comparables (90-docs/pricing-intelligence/, run pricing-intel-20260716-03) — previously had no numbers at all. 2026-07-16 (ADR-2607161745): live Stripe Product/Price/Payment Link created for the ¥80k/月 Managed Starter tier — business raised 1→2 (billing infra live, same partial-credit basis as the itonami.cloud cockpit row; still no paid org, no E2E checkout attempt yet)."}
+   :notes "Next after flagships (product-score 4: demo + quickstart). Referral handoff target from 6399 ADR-0003. Pricing table built from scratch, grounded in 4 real competitor comparables (90-docs/pricing-intelligence/, run pricing-intel-20260716-03) — previously had no numbers at all. 2026-07-16 (ADR-2607161940): distribution actor added for parity with 6399/6310 (ADR-2607161930) — dedicated actor cloud-itonami-isic-7810.aozora.app created, profile + 1 promo post live on aozora.app (own small PDS, not a mainstream external network); business score unchanged by this action alone (捏造ゼロ: no external reach/tenant proof), stays at 2 solely on the Stripe Payment Link basis below. 2026-07-16 (ADR-2607161745): live Stripe Product/Price/Payment Link created for the ¥80k/月 Managed Starter tier — business raised 1→2 (billing infra live, same partial-credit basis as the itonami.cloud cockpit row; still no paid org, no E2E checkout attempt yet)."}
 
   {:id :insurance-finance
    :label "Insurance / finance batch"
