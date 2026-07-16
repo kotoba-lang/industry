@@ -2207,6 +2207,44 @@ green。
 現状: 国軸30件・業界団体軸30件(25業種)・自治体軸27件——87tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 88 — 自治体軸28件目(New Delhi, IND) — 新規リポジトリ作成)
+
+`cloud-itonami-municipality-ind-new-delhi`を**新規GitHubリポジトリとして**
+scaffold・push（既存のblueprint拡張ではなく、LICENSE/README/blueprint.edn/
+organization.ednを含む完全新規scaffold、
+[commit ddda468](https://github.com/cloud-itonami/cloud-itonami-municipality-ind-new-delhi/commit/ddda468)）：
+
+New Delhi Municipal Council（NDMC）——首都New Delhiの中心部（Lutyens'
+Delhi、約42km²）のみを管轄する特別自治体で、より広いDelhi NCT自体は
+別途Municipal Corporation of Delhi（MCD）が管轄（本カタログの対象外）。
+米国Washington D.C.と同型の連邦特別区パターン。
+
+ndmc.gov.in自身の生PDFはフォントサブセット化でヘッダーが判読不能
+だったため、両エントリともndmc.gov.in自身のクリーンなHTMLページで
+直接確認:
+
+- **The New Delhi Municipal Council Act, 1994（Act No. 44 of 1994）**
+  — `act.aspx`でタイトルを直接確認。「(44 of 1994)」という正確な
+  citationは、別のbye-law文書自身の前文が"the New Delhi Municipal
+  Council Act, 1994 (44 of 1994)"と逐語引用していることで独立に
+  裏付けられた。1994年7月14日の裁可日はWebSearch裏付け（複数の
+  独立引用ソースが一致、一次資料の日付欄を直接読んだものではない）。
+- **The New Delhi Municipal Council（Licensing and Control of
+  Plumbers）Bye-laws, 2006** — タイトルと前文全文を直接確認したが、
+  本文中に正確な施行日の記載が無かったため`:ordinance/enacted-date`
+  は意図的に省略。
+
+4 tests/10 assertions green。117リポジトリ・768 factを統合。
+`"ordinance/topic" "governance"`での横断queryでnew-delhiが14件の
+他自治体と共に取得できることを確認。
+
+**capital-check**: New Delhi（Q987）が現在のインド首都であり
+（1911/1931年にカルカッタから遷都）、既存の`cloud-itonami-iso3166-ind`
+organization.ednと一致——史的首都バグの影響なしを確認。
+
+現状: 国軸30件・業界団体軸30件(25業種)・自治体軸28件——88tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
