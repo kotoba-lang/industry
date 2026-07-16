@@ -506,7 +506,13 @@
       ;; live-recomputed via `(kotoba.industry/maturity-summary)` against a
       ;; freshly re-fetched origin/main registry.edn immediately before this
       ;; test-file edit, not assumed.
-      (is (= 22 (:blueprint m)))
+      ;; 22 -> 21: cloud-itonami-isic-5110 promoted :blueprint (via the
+      ;; no-:maturity-key fallback in `industry/maturity-of`) ->
+      ;; :implemented -- passenger-air-transport operations-coordination
+      ;; actor. Live-recomputed via `(kotoba.industry/maturity-summary)`
+      ;; against a freshly re-fetched origin/main registry.edn blob-sha
+      ;; taken immediately before this test-file edit, not assumed.
+      (is (= 21 (:blueprint m)))
       ;; 114 = 113 + cloud-itonami-isic-4620, promoted directly from
       ;; :spec (never a :blueprint) -- agricultural/live-animal
       ;; wholesale trading actor. 115 = 114 + cloud-itonami-isic-2910,
@@ -2650,7 +2656,40 @@
       ;; `(kotoba.industry/maturity-summary)` against a freshly re-fetched
       ;; origin/main registry.edn blob-sha taken immediately before this
       ;; test-file edit, not assumed.
-      (is (= 395 (:implemented m))))))
+      (testing "cloud-itonami-isic-5110 (Passenger air transport -- NOT a fresh
+scaffold: `gh api repos/cloud-itonami/cloud-itonami-isic-5110` confirmed a
+PRE-EXISTING repo already published at :blueprint tier (README/CODE_OF_CONDUCT/
+CONTRIBUTING/GOVERNANCE/LICENSE/SECURITY/blueprint.edn/docs, but no deps.edn/src/
+test) from an earlier bulk-scaffolding pass; identity ({:id \"5110\" :name
+\"Passenger air transport\"}) independently verified against a fresh clone
+before any work began, per this fleet's ID/name-mismatch caution -- no
+mismatch; :repo/:business-id were already correct against the repo's own
+blueprint.edn, no placeholder-value fix needed. AirlineOps-LLM (Aviation
+Safety Governor passenger-airline OPERATIONS COORDINATION actor
+(airlineops.* namespace) mirroring cloud-itonami-isic-4920's [Community
+Freight Transport] verified module shape -- a closed four-op allowlist
+(log-flight-record/schedule-flight-operation/flag-flight-safety-concern/
+coordinate-maintenance), all :effect :propose only; certification-verified?
+ground truth (independently registered elsewhere, never minted by this
+actor) gates all four ops unconditionally; an unresolved flight-safety
+concern already on file blocks the other three ops but not
+:flag-flight-safety-concern itself, which always escalates at every phase
+(never auto-eligible, doubly enforced by governor high-stakes + phase
+table); a dedicated finalize-authority-scope-violations check permanently
+blocks any proposal drifting toward clearing an aircraft for departure or
+overriding a weather/go-no-go hold, phrased as the finalization ACTION
+rather than a bare topic noun so the mock advisor's own flag-a-concern
+happy path never self-trips it, per this fleet's own known bug class --
+covered by a dedicated regression test asserting the default advisor's own
+proposals for all four ops never trip it. 36 tests / 164 assertions green,
+clj-kondo 0 errors / 0 warnings, independently re-verified against a fresh
+clone; superproject ADR-2628000000) is also :implemented"
+        (is (= :implemented (industry/maturity "5110"))))
+      ;; 395 -> 396: this promotion's own cloud-itonami-isic-5110 +1,
+      ;; live-recomputed via `(kotoba.industry/maturity-summary)` against a
+      ;; freshly re-fetched origin/main registry.edn blob-sha taken
+      ;; immediately before this test-file edit, not assumed.
+      (is (= 396 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
