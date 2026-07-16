@@ -42,21 +42,35 @@
                 {:score 0.4 :note (str "src/kotoba/cli.cljc exists but only has " defn-count " defn forms -- thinner than expected for a 'public CLI contract' claim; re-verify scope.")}))
             {:score 0.0 :note "src/kotoba/cli.cljc no longer exists -- the CLI-contract-ownership claim's cited file is gone; re-verify."}))}
 
+   ;; 2026-07-16 gap fix: split into functional-completeness (actual state, low-but-not-zero
+   ;; since package_contract.cljc is a real 189-line data contract) + doc-code-drift (disclosure
+   ;; accuracy, high) -- previously conflated into one functional-completeness=1.0 event, same
+   ;; bug as claim/kotoba-shell-not-wired. See verify_kotoba.cljs's matching comment.
    {:claim :claim/kotoba-lang-packages-deferred :axis :axis/functional-completeness :layer :lint
+    :fn (fn []
+          (let [cli (slurp* "src/kotoba/cli.cljc")
+                contract-exists? (exists? "src/kotoba/lang/package_contract.cljc")
+                registry-wired? (has? cli #"\"registry\"")]
+            (cond
+              registry-wired?
+              {:score 0.6 :note "cli.cljc now has a \"registry\" string literal -- possible the CLI landed; re-verify by hand whether this is real routing, and revise this score/claim accordingly."}
+              contract-exists?
+              {:score 0.3 :note "package_contract.cljc exists as a real, substantive data contract (189 lines, not a stub), but no \"registry\" subcommand is wired into cli.cljc -- functional-completeness is low but not zero: the data shape is defined, the CLI/registry surface is not."}
+              :else
+              {:score 0.1 :note "package_contract.cljc no longer exists and no registry subcommand is wired -- the deferred track has essentially nothing built; re-verify whether it was abandoned or just restructured."})))}
+
+   {:claim :claim/kotoba-lang-packages-deferred :axis :axis/doc-code-drift :layer :lint
     :fn (fn []
           (let [readme (slurp* "docs/lang/README.md")
                 cli (slurp* "src/kotoba/cli.cljc")
-                contract-exists? (exists? "src/kotoba/lang/package_contract.cljc")
                 registry-wired? (has? cli #"\"registry\"")]
             (cond
               (not (has? readme #"deferred"))
               {:score 0.5 :note "docs/lang/README.md no longer says 'registry' is deferred -- may have landed (check for a real registry subcommand) or wording changed; re-verify."}
               registry-wired?
               {:score 0.3 :note "docs still say registry/:packages is deferred, but cli.cljc now has a \"registry\" string literal -- possible the CLI landed and docs are now STALE; re-verify by hand whether this is a real subcommand."}
-              (not contract-exists?)
-              {:score 0.5 :note "package_contract.cljc no longer exists -- either the deferred track was abandoned entirely or restructured; re-verify."}
               :else
-              {:score 1.0 :note "confirmed: docs still describe :packages/registry as deferred/out-of-scope, package_contract.cljc exists as a data-contract-only file, and cli.cljc has no \"registry\" subcommand -- disclosed gap matches the code exactly (contract shape exists, CLI wiring does not)."})))}])
+              {:score 1.0 :note "confirmed: docs still describe :packages/registry as deferred/out-of-scope, and cli.cljc has no \"registry\" subcommand -- disclosed gap matches the code exactly, i.e. this is an honestly-reported incompleteness, not silent drift."})))}])
 
 (defn -main []
   (binding [*print-namespace-maps* false]

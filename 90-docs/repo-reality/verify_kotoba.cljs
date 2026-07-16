@@ -46,7 +46,22 @@
               :else
               {:score 0.6 :note "demo.cljs exists but its content changed shape from the simple (ns demo) form originally cited -- likely fine (file evolved) but worth a manual glance."})))}
 
+   ;; 2026-07-16 gap fix: this claim declares TWO axes in repo-reality.datoms.edn
+   ;; (functional-completeness + doc-code-drift), but originally only emitted ONE event on
+   ;; functional-completeness with a score of 1.0 meaning "confirmed the claim's TEXT is
+   ;; accurate" -- conflating claim-accuracy with feature-completeness. kotoba-shell is
+   ;; genuinely NOT complete (zero runtime wiring, design-doc only), so functional-completeness
+   ;; must score low; doc-code-drift is what should score high (the incompleteness IS honestly
+   ;; disclosed). Split into two checks below, matching aiueos's convention
+   ;; (claim/aiueos-device-access-stub / claim/aiueos-deadline-cycles) exactly.
    {:claim :claim/kotoba-shell-not-wired :axis :axis/functional-completeness :layer :lint
+    :fn (fn []
+          (let [launcher (slurp* "src/kotoba/launcher.clj")]
+            (if (has? launcher #"\"shell\"")
+              {:score 0.5 :note "launcher.clj now has a 'shell' string literal that wasn't there before -- possible partial progress on wiring the subcommand; re-verify by hand whether this is real routing or an unrelated string, and revise this score/claim accordingly."}
+              {:score 0.1 :note "confirmed: launcher.clj has no \"shell\" string literal at all -- kotoba-shell has zero runtime presence beyond its ADR design doc, so functional-completeness is scored low (0.1), not merely 'claim confirmed'."})))}
+
+   {:claim :claim/kotoba-shell-not-wired :axis :axis/doc-code-drift :layer :lint
     :fn (fn []
           (let [readme (slurp* "README.md")
                 launcher (slurp* "src/kotoba/launcher.clj")]
@@ -56,7 +71,7 @@
               (has? launcher #"\"shell\"")
               {:score 0.4 :note "README still says kotoba-shell is not wired up, but launcher.clj now has a 'shell' string literal -- possible the subcommand landed and the README caveat is now STALE (undisclosed drift); re-verify by hand whether this is a real subcommand or an unrelated string."}
               :else
-              {:score 1.0 :note "confirmed: README still says no 'kotoba shell' subcommand is wired, and launcher.clj has no \"shell\" string literal at all -- the disclosed gap matches the code."})))}])
+              {:score 1.0 :note "confirmed: README still says no 'kotoba shell' subcommand is wired, and launcher.clj has no \"shell\" string literal at all -- the disclosed gap matches the code, i.e. this is an honestly-reported incompleteness, not silent drift."})))}])
 
 (defn -main []
   (binding [*print-namespace-maps* false]
