@@ -3656,6 +3656,41 @@ BAP・tick121 FSCと同型のパターンで正直に省略）。
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-17, /loop tick 125 — 自治体軸41件目(Vienna, AUT) — オーストリア初参入、公式RIS 503エラーを別の政府系ドメインで補完)
+
+`cloud-itonami-municipality-aut-vienna`を新規GitHubリポジトリとして
+scaffold・push
+([commit 5acaed9](https://github.com/cloud-itonami/cloud-itonami-municipality-aut-vienna/commit/5acaed9))：
+
+オーストリアの首都ウィーン——3軸いずれもオーストリア初参入。
+
+オーストリア連邦の公式法情報システム（ris.bka.gv.at）は2回とも
+HTTP 503（Service Unavailable）で応答、断念。代わりに2件を直接
+確認:
+
+- **Verfassung der Bundeshauptstadt Wien**（Wiener
+  Stadtverfassung、1920年11月10日制定、LGBl. für Wien Nr. 1）—
+  verfassungen.at（憲法・法律条文アーカイブサイト）で原文の
+  引用行"Verfassung der Bundeshauptstadt Wien vom 10. November
+  1920, LGBl. für Wien Nr. 1"を直接確認。ウィーンは市であると
+  同時にオーストリア9州の一つでもあり、このStadtverfassungは
+  市の自治憲章と州憲法を兼ねる。
+- **初代Bauordnung**（ウィーン建築条例、1829年12月13日制定）—
+  geschichtewiki.wien.gv.at（ウィーン市公式のWien Geschichte
+  Wiki、歴史文化アーカイブドメイン）で原文"Am 13. Dezember 1829
+  wurde erstmals eine Gesetzessammlung zur Regulierung des
+  privaten Bauwesens unter dem Titel einer Bauordnung erlassen."
+  を直接確認（同ページは1859/1868/1883/1929の主要改訂も記録、
+  本エントリは初代を採用）。
+
+4 tests/11 assertions green。148リポジトリ・842 factを統合。
+`municipality vienna`クエリで2件とも正しく取得、タイトル/番号の
+横断query（`[?e "ordinance/municipality" "vienna"]`）でも一致確認。
+
+現状: 国軸42件・業界団体軸42件(28業種)・自治体軸41件——125 tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
