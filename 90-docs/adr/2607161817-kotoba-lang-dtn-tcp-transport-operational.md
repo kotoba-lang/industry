@@ -1,0 +1,179 @@
+---
+id: adr-2607161817-kotoba-lang-dtn-tcp-transport-operational
+title: "ADR-2607161817: kotoba-lang/dtn gains a real internet-overlay TCP transport — closing the ADR-2607161743 transport-I/O gap"
+status: accepted
+doc_type: adr
+topic: telecom-independent-substrate-dtn-rcs-mesh-satellite
+authoritative: true
+last_verified: 2026-07-16
+authoritative_for:
+  - kotoba-lang/dtn の internet-overlay トランスポート実装（実I/O）の設計根拠
+  - ADR-2607161743 Decision 4（transport I/O は out of scope）の一部撤回・充足範囲
+related:
+  - 90-docs/adr/2607161743-kotoba-lang-rcs-dtn-independent-telecom-substrate.md
+  - orgs/kotoba-lang/dtn
+  - orgs/kotoba-lang/phone
+supersedes: []
+superseded_by: []
+---
+
+# ADR-2607161817: kotoba-lang/dtn gains a real internet-overlay TCP transport — closing the ADR-2607161743 transport-I/O gap
+
+**Status**: accepted
+**Date**: 2026-07-16
+**Deciders**: Jun Kawasaki
+
+## Problem
+
+ADR-2607161743 shipped `kotoba-lang/rcs` + `kotoba-lang/dtn` as pure `.cljc`
+data-model libraries — protocol records and a routing *decision* function,
+zero network I/O by deliberate design (Decision 1/4). Its own Consequences
+section named this plainly: *"This ADR closes the protocol-and-routing-model
+gap the user's question identified; it does not itself stand up a running
+network."*
+
+The user then issued a standing session goal: *「gap を埋めて、実際に稼働可能な
+前提に」* ("close the gap, get it to a premise where it's actually
+operational"). This ADR records what was built to satisfy that, and — just
+as importantly — what remains genuinely out of reach in this development
+environment and why, so "operational" isn't overclaimed.
+
+## Decision
+
+### Decision 1: add one real transport — internet-overlay TCP — to the existing `kotoba-lang/dtn` repo, not a new repo
+
+A new `.cljs`-only namespace `kotoba.dtn.transport.tcp` (Node's `node:net`
+core module, zero npm dependencies) was added directly to the existing,
+already-registered `kotoba-lang/dtn` repository, rather than spinning up a
+separate transport repo. It is `.cljs`, not `.cljc`, specifically so it is
+**never loaded by the JVM `clojure -M:test` suite** — the existing 84
+pure-data assertions are structurally unaffected by anything this namespace
+does, verified by re-running that suite after the addition (still 84
+assertions, 0 failures).
+
+Wire framing is deliberately minimal: a 4-byte big-endian length prefix
+followed by that many bytes of UTF-8 `pr-str`'d EDN (the exact map
+`kotoba.dtn/bundle` already produces) — no new serialization format, no
+external codec dependency.
+
+`route-and-send!` composes the existing pure `kotoba.dtn.router/route-decision`
+with a real delivery attempt: the pure router can only reason about
+*configured* links, not whether a peer process actually happens to be up
+right now, so a real connection failure at send time still falls back to
+the node's in-memory `:store`, and `retry-store!` re-attempts later. This
+is the actual resilience property (Decision 4/motivation of ADR-2607161743:
+disaster/outage resilience) made real for the first time, not merely
+modeled.
+
+### Decision 2: verify with a genuine cross-process demo, not a unit test
+
+`test/kotoba/dtn/transport/tcp_demo.cljs` spawns an actual second `nbb` OS
+process (via `bin/dtn_node.cljs listen`, a new minimal CLI), connects to
+its real bound TCP port from a separate node, and confirms delivery by
+reading the *child process's own stdout* — proof of two independent
+processes exchanging bytes, not two objects inside one process pretending
+to be separate. A second scenario (in-process, for speed) proves
+store-and-forward survives a real socket-level disconnect and reconnect. A
+third proves `kotoba.dtn.router`'s transport-kind priority ordering is
+exercised against more than one `:dtn/transport-kind` value.
+
+This was independently re-verified by the orchestrating session (not just
+trusted from the implementing agent's own report): a fresh clone of
+`kotoba-lang/dtn` @ `fdd2b44`, run cold, produced identical output —
+`RESULT: 3/3 scenarios passed`, exit 0 — plus `clojure -M:test` (84
+assertions, 0 failures) and `clojure -M:lint` (0/0) independently
+reproduced.
+
+### Decision 3: mesh-radio and satellite remain explicitly unimplemented — a hardware boundary, not a design gap
+
+No LoRa/Meshtastic-class radio and no satellite modem exist in this
+development environment; actually driving such hardware is not achievable
+here by writing more code. `kotoba.dtn.router`'s priority-ordering logic
+was still proven against a *simulated* mesh-radio `kotoba.dtn.link` record
+(demo scenario 3), so the transport-agnostic *design* is real and testable
+even though a real radio transport is not — the demo's own log output says
+so explicitly (`"no real mesh-radio hardware exists in this environment"`),
+rather than silently omitting the caveat. Closing this specific gap for
+real requires physical radio/satellite hardware and is out of this ADR's
+reach; it is not re-deferred as "future work" in the vague sense
+ADR-2607161743 used it, but named here as a concrete **environment**
+limitation.
+
+### Decision 4: the internet-overlay leg stays direct (peer host:port must be known) — gossip/NAT-traversal composition still deferred
+
+`kotoba.dtn.transport.tcp` does not implement peer discovery, NAT
+traversal, or gossip-routed multi-hop delivery. ADR-2607161743's Decision 4
+named `kotoba-lang/net` (gossip) and `kotoba-lang/turn` (relay) as the
+intended composition point for that; this ADR does not build that
+composition. What changed is narrower and concrete: *some* real transport
+now exists and is provably operational for a directly-addressed peer,
+where none existed before.
+
+### Decision 5: no real carrier SMS/RCS gateway connection, no cloud-itonami actor — unchanged from ADR-2607161743 Decision 5
+
+Wiring `kotoba.dtn.gateway`'s `bundle->sms`/`bundle->rcs-shaped` to a real
+carrier account requires real business credentials this ADR has no
+authorization to fabricate or acquire, and creating a consuming
+cloud-itonami actor remains a reviewed business decision per root
+`CLAUDE.md`'s BMC/ISIC section — neither is "gap-filling" this session
+goal should reach for. Restated from the prior ADR, not re-litigated.
+
+## Verification
+
+- `kotoba-lang/dtn`: `nbb --classpath "src:test:../phone/src:../html/src:../css/src" test/kotoba/dtn/transport/tcp_demo.cljs` → `RESULT: 3/3 scenarios passed`, exit 0. Reproduced independently by the orchestrating session from a cold clone (not just the implementing agent's own report).
+- `clojure -M:test` → 20 tests / 84 assertions, 0 failures, 0 errors (unchanged from ADR-2607161743, independently re-run).
+- `clojure -M:lint` → 0 errors, 0 warnings (independently re-run).
+- Pushed to `github.com/kotoba-lang/dtn` (public), commit `fdd2b4480f0d74674dcf716eca1e7ebda16b95e8`.
+- `manifest/west.yml`: pin advanced via `--entry dtn` (1-line diff,
+  `34b69b2ce7e5→fdd2b4480f0d`, `verify-west-pins: 1 件の pin 変更をすべて検証
+  OK`), landed via an isolated sibling-path worktree + GitHub API
+  server-side merge, matching ADR-2607161743's own landing procedure.
+
+## Consequences
+
+- `kotoba-lang/dtn` now genuinely moves bytes between real OS processes for
+  the internet-overlay leg — the "protocol model only, never run" gap
+  ADR-2607161743 named in its own Consequences section is closed for that
+  leg specifically.
+- The store-and-forward resilience property — the top-priority motivation
+  from ADR-2607161743's clarifying questions (disaster/carrier-outage
+  resilience) — is now demonstrated against a real socket disconnect, not
+  only asserted against an in-memory data structure.
+- Mesh-radio and satellite transports remain unimplemented, honestly, for a
+  reason no amount of further coding in this environment resolves
+  (hardware absence) — recorded here explicitly rather than left as an
+  ambiguous "future work" that could be mistaken for merely unscheduled.
+- Gossip/NAT-traversal composition via `kotoba-lang/net`/`kotoba-lang/turn`,
+  a real carrier SMS/RCS gateway account, and a consuming cloud-itonami
+  actor all remain undone, unchanged from ADR-2607161743 — this ADR's scope
+  was deliberately narrower than "the whole system," matching how
+  ADR-2607161743 itself scoped narrower than "a running network."
+
+## Alternatives considered
+
+- **A new separate repo for the transport layer.** Rejected: the transport
+  is additive to an already-registered, already-tested library; splitting
+  it would add a manifest entry and a cross-repo dependency for no benefit
+  over an additional `.cljs`-only namespace in the same repo (Decision 1).
+- **Using WebSocket (`ws` npm package) instead of raw TCP.** Rejected in
+  favor of Node's dependency-free core `net` module, keeping
+  `kotoba-lang/dtn` free of npm dependencies like every other library in
+  this house style.
+- **Trusting the implementing agent's self-reported demo output without
+  independent re-verification.** Rejected: this workspace's "trust but
+  verify" discipline applies to agent-authored code same as to any other
+  claim of correctness; the orchestrating session re-cloned and re-ran
+  everything cold before writing this ADR's Verification section.
+- **Attempting to simulate mesh-radio/satellite as if they were real
+  transports (e.g. a loopback pretending to be a radio link, undocumented
+  as such).** Rejected: that would misrepresent what's actually
+  operational. The simulated link in demo scenario 3 is explicitly labeled
+  as routing-logic-only in both the code comment and the printed demo
+  output (Decision 3).
+
+## References
+
+- `90-docs/adr/2607161743-kotoba-lang-rcs-dtn-independent-telecom-substrate.md`
+- `orgs/kotoba-lang/dtn/README.md` — https://github.com/kotoba-lang/dtn (see "Internet-overlay transport (real I/O)" section)
+- `orgs/kotoba-lang/dtn/src/kotoba/dtn/transport/tcp.cljs`
+- `orgs/kotoba-lang/dtn/test/kotoba/dtn/transport/tcp_demo.cljs`
