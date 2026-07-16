@@ -1,0 +1,68 @@
+[{:adr/id 2691004723
+  :adr/title "cloud-itonami-isic-4723 — Specialized Tobacco Retail Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-4723]
+  :adr/references [2607121000 2670004721]
+
+  ;; Wave 2 actor (coordination/logistics/trade): specialized tobacco
+  ;; retail (tobacconist/cigar lounge/pipe & tobacco shop/vape specialty
+  ;; retailer) operations coordination-only (sales-record logging,
+  ;; staffing-operation scheduling, supply-order coordination,
+  ;; compliance-concern flagging).
+
+  :actor/id :cloud-itonami-isic-4723
+  :actor/name "Specialized Tobacco Retail Operations Coordinator"
+  :actor/isic-rev4 "4723"
+  :actor/domain :retail/specialized-tobacco-stores
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-sales-record :schedule-staffing-operation
+                       :coordinate-supply-order :flag-compliance-concern]
+  :actor/always-escalate-ops [:flag-compliance-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-supply-order 750}
+
+  :actor/hard-checks [:store-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["age verification override" "finalize age verification" "override the age gate"
+                                "年齢確認を確定" "年齢確認の上書き" "年齢確認をバイパス"
+                                "control the age verification terminal" "actuate the id scanner" "override id scan"
+                                "年齢確認端末を操作" "年齢確認端末の直接操作" "IDスキャナーを操作"
+                                "tobacco license suspension" "inspection clearance" "regulatory enforcement"
+                                "たばこ小売許可停止" "たばこ小売許可取消" "営業許可取消"]
+
+  ;; Self-trip-avoidance: every scope-excluded term is phrased as the
+  ;; finalization/execution ACTION, never a bare noun -- this namespace's
+  ;; own Japanese default disclaimer text ("...年齢確認の実施可否については
+  ;; 関与しない" / "...年齢確認端末の設定変更は行わない") legitimately
+  ;; discusses age verification WITHOUT finalizing or actuating it, so a
+  ;; bare "年齢確認" term would self-trip. Regression test:
+  ;; governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion.
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-sales-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-sales-record :schedule-staffing-operation
+                                               :coordinate-supply-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-sales-record :schedule-staffing-operation
+                                         :coordinate-supply-order :flag-compliance-concern}
+      :auto #{:log-sales-record :schedule-staffing-operation :coordinate-supply-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 47 :assertions 133 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression
+                  :no-allowlisted-op-finalizes-age-verification]
+  :test/simulator :tobaccoretailops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-4723"
+  :registry/business-id "cloud-itonami-isic-4723"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
