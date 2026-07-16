@@ -4088,3 +4088,97 @@ clone; superproject ADR-2628000000) is also :implemented"
            (:repo (industry/get-industry "4773"))))
     (is (= "cloud-itonami-isic-4773"
            (:business-id (industry/get-industry "4773"))))))
+
+(deftest cloud-itonami-isic-4791-is-implemented
+  (testing "cloud-itonami-isic-4791 (Retail sale via mail order houses
+  or via Internet -- fresh scaffold, no prior repository at either the
+  stale gftdcojp/cloud-itonami-G4791 placeholder or the real
+  cloud-itonami org target [gh api 404 confirmed for both before any
+  work began]; identity ({:id \"4791\" :name \"Retail sale via mail
+  order houses or via Internet\"}) independently verified against a
+  fresh clone before any work began, per this fleet's ID/name-mismatch
+  caution -- unambiguous, no truncation; a separate, coarser-
+  granularity {:id \"479\" ...} 3-digit group entry left untouched;
+  Wave 2 (coordination/logistics/trade, ADR-2607121000) target.
+  Structurally DISTINCT from every physical-retail sibling in this
+  fleet (this class has NO physical storefront): MailOrderRetailAdvisor
+  ⊣ MailOrderRetailGovernor mail-order/e-commerce-retail OPERATIONS
+  COORDINATION actor (mailorderops.* namespace) mirroring
+  cloud-itonami-isic-4719's [Other retail sale in non-specialized
+  stores] verified advisor/governor/phase/operation/store/sim module
+  shape, but with the domain substantially adapted, not copied
+  verbatim: the primary gate is a SELLER/MERCHANT-ACCOUNT verification
+  check (registered AND verified AND payment-processor-linked) in
+  place of a physical-store-verification check, since there is no
+  physical store to verify; closed four-op allowlist, all
+  :effect :propose (:log-order-record/:schedule-fulfillment-operation/
+  :coordinate-supply-order/:flag-fraud-concern); FOUR HARD governor
+  checks, all permanent and un-overridable by any human approval --
+  seller-unverified (the target seller's record must exist AND be
+  independently :registered?/:verified?/:payment-processor-linked? in
+  the store before any proposal for it may commit or escalate,
+  re-derived from the seller's own record every time, never from
+  proposal self-report; a seller mid-onboarding -- registered and
+  verified but not yet linked to a payment processor -- is HARD-held
+  exactly like an unregistered seller), vendor-unverified (for
+  :coordinate-supply-order only, the named inventory vendor must
+  independently resolve to a :registered?/:verified? vendor record),
+  effect-not-propose, and scope-exclusion (folds in op-not-allowed)
+  that permanently blocks any proposal touching directly finalizing a
+  fraud determination, a chargeback ruling, or a payment-dispute
+  resolution -- the PAYMENT-FRAUD/CHARGEBACK DIMENSION this class adds
+  in place of physical retail's loss-prevention-enforcement dimension;
+  scope-excluded terms are deliberately phrased as the
+  finalization/resolution ACTION (\"finalized the chargeback ruling\",
+  \"resolved the payment dispute\", \"approved the chargeback\"), never a
+  bare noun (bare \"fraud\" or bare \"chargeback\") -- avoiding this
+  fleet's own known self-tripping bug class, since
+  :flag-fraud-concern's entire legitimate purpose is to talk ABOUT
+  suspected fraud/chargeback/payment-dispute concerns using exactly
+  those bare-ish words, and its own printed :op keyword literally
+  contains the substring \"fraud\"; a dedicated regression test
+  (default-mock-advisor-proposals-never-self-trip-scope-exclusion in
+  governor_test.clj) asserts every default mock-advisor proposal for
+  every allowed op clears the governor with :scope-excluded and
+  :op-not-allowed absent from its violations, PLUS a companion sanity
+  test (out-of-scope-injection-still-trips-scope-exclusion) confirms
+  the check is not accidentally a no-op; :flag-fraud-concern ALWAYS
+  escalates to human sign-off and is never a member of any phase's
+  :auto set, at any phase (two independent layers agree:
+  mailorderops.governor's own always-escalate-ops AND
+  mailorderops.phase's own phase table, the latter exercised directly
+  by fraud-concern-never-in-any-phase-auto-set); a
+  :coordinate-supply-order above a $1500 estimated-cost threshold
+  likewise always escalates; real langgraph-clj StateGraph
+  (intake->advise->govern->decide->commit|hold|request-approval) with
+  interrupt-before #{:request-approval} for human-in-the-loop resume,
+  not a stub; fully portable .cljc with no JVM-only interop anywhere in
+  src/ (mock-only advisor); 61 tests / 181 assertions green (clojure
+  -M:test), independently re-verified against a fresh clone;
+  clj-kondo 0 errors / 0 warnings; registry.edn's own \"4791\" ->
+  :implemented change (:repo/:business-id de-placeholdered from the
+  stale gftdcojp/cloud-itonami-G4791 target to
+  cloud-itonami/cloud-itonami-isic-4791, :maturity :spec ->
+  :implemented, :operating-states updated to match the actor state
+  machine; :required-technologies left unchanged) landed via a
+  Contents-API single-file PUT direct to main (sha-checked optimistic
+  concurrency, re-fetched fresh content immediately before the PUT
+  after multiple 409s from concurrent sibling churn -- the aggregate
+  :implemented count in the `maturity-summary counts tiers` testing
+  form had already been independently bumped to the correct 441 by a
+  concurrent sibling agent's own edit by the time of this append, so
+  this edit only adds the missing dedicated per-entry regression test,
+  not a second count bump; independently re-verified via
+  `(kotoba.industry/maturity-summary)` immediately before this append
+  that 441 was still correct -- exact-block edit only verified via an
+  exact old/new substring occurrence count of 1 PLUS a prefix/suffix
+  single-contiguous-diff-region check PLUS sample-verified against
+  4719/3512/6310/4799 entries also intact, no mojibake detected);
+  superproject ADR-2706004791 (com-junkawasaki/root,
+  90-docs/adr/2706004791-cloud-itonami-isic-4791-mail-order-internet-
+  retail-coverage.md/.edn)) promoted :spec -> :implemented"
+    (is (= :implemented (industry/maturity "4791")))
+    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-4791"
+           (:repo (industry/get-industry "4791"))))
+    (is (= "cloud-itonami-isic-4791"
+           (:business-id (industry/get-industry "4791"))))))
