@@ -1,0 +1,66 @@
+[{:adr/id 2651000000
+  :adr/title "cloud-itonami-isic-8121 — General Cleaning of Buildings Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-8121]
+  :adr/references [2607103900 2607152700 2616562900]
+
+  ;; Last of a 6-target blueprint-tier cleanup sweep: general
+  ;; building-cleaning operations coordination-only actor (service-record
+  ;; logging, cleaning-operation scheduling, supply-order coordination,
+  ;; safety-concern flagging). Pre-existing :blueprint-tier repo
+  ;; (docs-only) filled in, not freshly scaffolded.
+
+  :actor/id :cloud-itonami-isic-8121
+  :actor/name "General Building Cleaning Operations Coordinator"
+  :actor/isic-rev5 "8121"
+  :actor/domain :commercial/building-cleaning-services
+  :actor/coordination? true
+  :actor/robotics? false ;; this actor: coordination-only. Blueprint's
+                          ;; broader robotics-dispatch premise
+                          ;; (kotoba-lang/robotics + kotoba-lang/labor)
+                          ;; is a separate, not-yet-wired capability layer.
+
+  :actor/proposal-ops [:log-service-record :schedule-cleaning-operation
+                       :coordinate-supply-order :flag-safety-concern]
+  :actor/always-escalate-ops [:flag-safety-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-supply-order 500}
+
+  :actor/hard-checks [:site-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["override the chemical-incompatibility warning" "bypass the chemical-incompatibility warning"
+                                "化学物質不適合警告を無視" "化学物質不適合警告を上書き"
+                                "finalize the chemical-safety clearance" "grant chemical-safety clearance"
+                                "化学物質安全クリアランスを確定" "化学薬品安全確認を最終承認"
+                                "actuate the robot directly" "actuate equipment directly" "direct robot control override"
+                                "osha citation" "osha violation" "safety authority enforcement"
+                                "inspection clearance" "license suspension" "permit revocation"
+                                "労働基準監督署の是正勧告" "安全当局による是正命令" "営業許可取消"]
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-service-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-service-record :schedule-cleaning-operation
+                                               :coordinate-supply-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-service-record :schedule-cleaning-operation
+                                         :coordinate-supply-order :flag-safety-concern}
+      :auto #{:log-service-record :schedule-cleaning-operation :coordinate-supply-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 46 :assertions 130 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration :store-contract
+                   :scope-exclusion-self-trip-regression]
+  :test/simulator :buildingcleaningops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-8121"
+  :registry/business-id "cloud-itonami-8121"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
+  :registry/optional-technologies [:optimization]
+  :registry/operating-states [:intake :register :match :dispatch :follow-up :audit]
+
+  :sweep/blueprint-tier-cleanup-sweep-target [6 6]
+
+  :db/id -1}]

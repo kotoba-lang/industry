@@ -1,0 +1,68 @@
+[{:adr/id 2651082200
+  :adr/title "cloud-itonami-isic-8220 — Call Centre Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-8220]
+  :adr/references [2607152500 2607121000 2616000000]
+
+  ;; Last of a 6-target blueprint-tier cleanup batch (7911, 7912, 8121,
+  ;; 8130, 8219, 8220) intended to bring kotoba-lang/industry's
+  ;; nil-maturity/blueprint-tier gap to zero. Call-centre operations
+  ;; coordination-only actor. Pre-existing :blueprint-tier repo
+  ;; (docs-only) filled in, not freshly scaffolded.
+
+  :actor/id :cloud-itonami-isic-8220
+  :actor/name "Call Centre Operations Coordinator"
+  :actor/isic-rev4 "8220"
+  :actor/domain :commercial/call-centre-services
+  :actor/wave 4
+  :actor/coordination? true
+  :actor/robotics? false ;; this actor: coordination-only. Blueprint's
+                          ;; broader robotics-dispatch premise (voice/
+                          ;; chat triage bots) is a separate, not-yet-
+                          ;; wired capability layer.
+
+  :actor/proposal-ops [:log-call-record :schedule-staffing-operation
+                       :coordinate-equipment-supply :flag-privacy-concern]
+  :actor/always-escalate-ops [:flag-privacy-concern]
+
+  :actor/hard-checks [:campaign-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["gdpr" "ccpa" "個人情報保護法準拠"
+                                "do-not-call override finalized" "do-not-call-override finalized"
+                                "finalized the do-not-call override" "dnc override finalized"
+                                "発信禁止リスト解除確定"
+                                "consent withdrawal resolved" "consent-withdrawal resolved"
+                                "resolved the consent withdrawal" "同意撤回解決確定"
+                                "data breach determination finalized" "data-breach determination finalized"
+                                "finalized the data breach determination" "データ侵害判断確定"
+                                "compliance decision" "compliance-decision"
+                                "compliance determination" "compliance-determination"
+                                "compliance ruling" "compliance-ruling"
+                                "consent verified compliant" "consent-verified-compliant" "同意確認済み"]
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-call-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-call-record :schedule-staffing-operation
+                                               :coordinate-equipment-supply}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-call-record :schedule-staffing-operation
+                                         :coordinate-equipment-supply :flag-privacy-concern}
+      :auto #{:log-call-record :schedule-staffing-operation :coordinate-equipment-supply}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 45 :assertions 141 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration :store-contract
+                   :scope-exclusion-self-trip-regression]
+  :test/simulator :callcentreops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-8220"
+  :registry/business-id "cloud-itonami-8220"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :labor]
+  :registry/optional-technologies [:optimization]
+  :registry/operating-states [:intake :register :match :dispatch :follow-up :audit]
+
+  :db/id -1}]
