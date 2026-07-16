@@ -1,0 +1,53 @@
+# Tree-collapse guard (ADR-2607160005; incident 119cc9d77c 2026-07-16:
+# a "docs" commit from a sparse worktree deleted 300 files, later commits
+# collapsed main's tree to 7 files until 549407d restored 230k).
+# Branch protection is unavailable on this private repo's plan, so this is
+# detect + auto-restore: if a push shrinks the tree by >40%, re-add the
+# deleted files from the parent commit (additive, no history rewrite) and
+# open an issue. The restore commit grows the tree, so it never re-triggers.
+name: tree-collapse-guard
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: tree-collapse-guard
+  cancel-in-progress: false
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 2}
+      - name: detect collapse vs first parent
+        id: detect
+        run: |
+          if ! git rev-parse HEAD^ >/dev/null 2>&1; then
+            echo "collapse=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          NOW=$(git ls-tree -r HEAD --name-only | wc -l)
+          PREV=$(git ls-tree -r 'HEAD^' --name-only | wc -l)
+          echo "tree: $PREV -> $NOW"
+          if [ "$PREV" -gt 100 ] && [ $((NOW * 100)) -lt $((PREV * 60)) ]; then
+            echo "collapse=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "collapse=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "now=$NOW" >> "$GITHUB_OUTPUT"; echo "prev=$PREV" >> "$GITHUB_OUTPUT"
+      - name: restore deleted files from parent (additive)
+        if: steps.detect.outputs.collapse == 'true'
+        run: |
+          git config user.name "tree-collapse-guard"
+          git config user.email "noreply@github.com"
+          git diff --diff-filter=D --name-only 'HEAD^' HEAD -z | xargs -0 -n 500 git checkout 'HEAD^' -- || true
+          git add -A
+          git commit -m "fix(main): tree-collapse-guard auto-restore (${{ steps.detect.outputs.prev }} -> ${{ steps.detect.outputs.now }} files detected at ${{ github.sha }})"
+          git push origin HEAD:main
+      - name: open incident issue
+        if: steps.detect.outputs.collapse == 'true'
+        env: {GH_TOKEN: "${{ github.token }}"}
+        run: |
+          gh issue create --title "tree-collapse-guard: main shrank ${{ steps.detect.outputs.prev }} -> ${{ steps.detect.outputs.now }} files at ${{ github.sha }}" \
+            --body "Auto-restore pushed. Offending commit: ${{ github.sha }} by ${{ github.actor }}. Likely a sparse-worktree commit staging deletions (incident class 119cc9d77c, ADR-2607160005). Verify no legitimate deletions were reverted."
