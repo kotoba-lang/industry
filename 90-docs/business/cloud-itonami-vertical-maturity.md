@@ -49,7 +49,7 @@ Local ISIC checkouts under `orgs/cloud-itonami/cloud-itonami-isic-*` (**n=165**)
 |---|---:|---:|---:|---:|---|
 | **6399 Meta job-search** | 5 | 5 | 5 | **2** | Indeed replacement; 6 jurisdictions; live demo; aozora.app actor + first promo post (ADR-2607161930); Stripe Payment Link live for Managed Starter tier (ADR-2607161745), no paid org yet |
 | **6310 Talent** | 5 | 5 | 5 | **2** | kaonavi replacement; assignment op; live demo; aozora.app actor + first promo post (ADR-2607161930); Stripe Payment Link live for Managed Starter tier (ADR-2607161745), no paid org yet |
-| **7810 Employment/placement** | 4 | 4 | 4 | **2** | Near-flagship (demo + quickstart); Stripe Payment Link live for Managed Starter tier (ADR-2607161745), no paid org yet |
+| **7810 Employment/placement** | 4 | 4 | 4 | **2** | Near-flagship (demo + quickstart); aozora.app actor + first promo post (ADR-2607161940, parity with 6399/6310); Stripe Payment Link live for Managed Starter tier (ADR-2607161745), no paid org yet |
 | **Insurance / finance** | 4 | 4 | 1 | 0 | Full modules; almost no storefront |
 | **Real estate** | 4 | 4 | 1 | 0 | Same pattern |
 | **Health / care / hospital** | 5 | 4 | 1 | 0 | Strong clinical scope exclusion; thin product face |
@@ -95,6 +95,7 @@ productSurface 7/7); business has not cleared a paid gate on any vertical.
 - Portfolio rescore note: `maturity-facts.edn` `:cloud-itonami` (2026-07-16)
 - Stripe billing go-live: ADR-2607161620
 - 6399/6310 aozora.app distribution actors: ADR-2607161930
+- 7810 aozora.app distribution actor (parity with 6399/6310): ADR-2607161940
 - 6399/6310/7810 flagship Managed-tier Stripe Payment Links + pricing-intelligence: ADR-2607161745
 - Metrics: `metrics/cloud-itonami.edn` (cockpit traffic)
 - Flagship depth: ADR-2607122300
