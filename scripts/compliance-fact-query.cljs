@@ -364,7 +364,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-phl-bap/data/datascript-tx.edn"}
    {:label "cloud-itonami-iso3166-phl statute.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-iso3166-phl/schema/statute.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-iso3166-phl/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-phl/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-egy-cairo ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-egy-cairo/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-egy-cairo/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 

@@ -3088,6 +3088,52 @@ association-rule.facts）もすべて実在の正しい結果を返し、真の3
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-16, /loop tick 110 — 自治体軸36件目(Cairo, EGY) — 北アフリカ初、未解決の首都移転を推測せず正直に記録)
+
+`cloud-itonami-municipality-egy-cairo`を新規GitHubリポジトリとして
+scaffold・push
+([commit a89908d](https://github.com/cloud-itonami/cloud-itonami-municipality-egy-cairo/commit/a89908d))：
+
+自治体軸で北アフリカ初のエントリ。
+
+- **Law No. 43 of 1979**（地方行政制度法）— lawyeregypt.net
+  （実際に取得・閲覧したエジプト法律情報サイト）でタイトル・番号・
+  1979年6月20日の発布日を直接確認。ILO NATLEXへの試行は先にHTTP
+  403だったため、そちらを未読のまま引用URLとして使うことは意図的に
+  避けた。
+- **Building Violations Reconciliation Law（Law No. 187 of
+  2023）** — blogs.realestate.gov.eg（エジプト政府公式ドメイン、
+  住宅省不動産プラットフォーム）で法律番号を直接確認。正確な
+  日にちは正常にレンダリングされたページで独立確認できなかった
+  ため年のみで記録。
+
+**首都チェックの特殊事例**: エジプトの「新首都」（旧称New
+Administrative Capital）は、tick104のインドネシア・ヌサンタラ
+事例よりさらに進行している——2024年4月に政府所在地として開所式が
+行われ、内閣・下院・中央銀行が既に移転済み（ヌサンタラは本セッション
+時点で副大統領府の移転のみ）。2026年2月には「特別州」への格上げと
+「メンフィス」への改称を提案する法案が係属中。カイロと新首都の
+どちらが「正しい」かを推測せず、Wikidata自身の現行P36（首都）
+プロパティが依然としてカイロを記載していることを明示的に確認・
+追従し、この未解決の曖昧さをdocstring・organization.edn・READMEに
+正直に記録した。
+
+**未読ソースの規律**: ILO NATLEXがHTTP 403を返した後、（後に
+lawyeregypt.netで直接確認できた日付とWebSearch要約の日付が実は
+一致していたにもかかわらず）未読のソースを引用URLとして使うことを
+意図的に避けた——本セッションの他の箇所で使ってきた「正常に
+レンダリングされた代替が無い場合のWebSearch裏付けパターン」よりも
+厳格な基準。
+
+4 tests/11 assertions green。139リポジトリ・812 factを統合。
+`"ordinance/kind" "local-act"`での横断queryで`[london new-delhi
+warsaw bangkok abu-dhabi hanoi manila cairo]`——創設憲章型の8自治体
+法がすべて正しく取得できることを確認。
+
+現状: 国軸37件・業界団体軸37件(27業種)・自治体軸36件——110tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
