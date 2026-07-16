@@ -1,26 +1,26 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 2883, "kotobase-cf-wasm-staging" 330},
+ {"net-kotobase" 2890, "kotobase-cf-wasm-staging" 330},
  :zone
- {:requests-7d 3077,
-  :pageviews-7d 388,
-  :uniques-7d-sum 540,
+ {:requests-7d 3083,
+  :pageviews-7d 389,
+  :uniques-7d-sum 541,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
   [{:path "/", :requests 37}
-   {:path "/health", :requests 35}
-   {:path "/api/funnel", :requests 30}
-   {:path "/robots.txt", :requests 19}
-   {:path "/llms.txt", :requests 8}
-   {:path "/llms-full.txt", :requests 8}
-   {:path "/.well-known/did.json", :requests 7}
+   {:path "/health", :requests 33}
+   {:path "/api/funnel", :requests 29}
+   {:path "/robots.txt", :requests 20}
+   {:path "/llms.txt", :requests 7}
+   {:path "/llms-full.txt", :requests 7}
+   {:path "/.well-known/did.json", :requests 6}
    {:path
     "/ipfs/bafkreifpz2n3zgsmhsyu6qjldq7t2vapcbsx3yrg7xzj3jrxm3q4mzz2nu",
-    :requests 5}],
-  :status-mix {:ok 167, :client-error 120, :server-error 10},
+    :requests 4}],
+  :status-mix {:ok 158, :client-error 117, :server-error 8},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,9 +32,9 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-16",
- :traffic-quality {:window "24h", :probe-4xx-pct 40, :error-5xx-pct 3},
+ :traffic-quality {:window "24h", :probe-4xx-pct 41, :error-5xx-pct 3},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 37 · /health 35 · /api/funnel 30 · /robots.txt 19 · /llms.txt 8 | 4xx(probe) 40% · 5xx 3%",
- :funnel {:visitors 649, :signups 0, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): / 37 · /health 33 · /api/funnel 29 · /robots.txt 20 · /llms.txt 7 | 4xx(probe) 41% · 5xx 3%",
+ :funnel {:visitors 650, :signups 0, :checkouts 0},
  :signal
- "kotobase.net 実測 3077 req/7d・540 uniques(日次和)・うち4xx probe 40%(24h)、workers 3213 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 3083 req/7d・541 uniques(日次和)・うち4xx probe 41%(24h)、workers 3220 inv/7d、Stripe active subs 0"}

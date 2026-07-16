@@ -1,27 +1,27 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 7993,
-  :pageviews-7d 3308,
+ {:requests-7d 7995,
+  :pageviews-7d 3309,
   :uniques-7d-sum 386,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 70}
-   {:path "/feed/fork-stats.edn", :requests 30}
+  [{:path "/", :requests 64}
+   {:path "/feed/fork-stats.edn", :requests 29}
    {:path "/api/murakumo-generation", :requests 22}
-   {:path "/kototama/kototama.js", :requests 20}
-   {:path "/cdn-cgi/rum", :requests 20}
-   {:path "/play", :requests 20}
-   {:path "/js/app.js", :requests 19}
-   {:path "/games/gftd/royale/scene.edn", :requests 19}],
-  :status-mix {:ok 872, :server-error 89, :client-error 17},
+   {:path "/wp-admin/a.php", :requests 15}
+   {:path "/options.php", :requests 15}
+   {:path "/kototama/kototama.js", :requests 14}
+   {:path "/js/app.js", :requests 14}
+   {:path "/games/gftd/royale/scene.edn", :requests 14}],
+  :status-mix {:ok 812, :server-error 72, :client-error 17},
   :window "24h"},
  :as-of "2026-07-16",
- :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 9},
+ :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 8},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 70 · /feed/fork-stats.edn 30 · /api/murakumo-generation 22 · /kototama/kototama.js 20 · /cdn-cgi/rum 20 | 4xx(probe) 2% · 5xx 9%",
+ "上位 page (24h, 2xx/3xx): / 64 · /feed/fork-stats.edn 29 · /api/murakumo-generation 22 · /wp-admin/a.php 15 · /options.php 15 | 4xx(probe) 2% · 5xx 8%",
  :signal
- "isekai.network 実測 7993 req/7d・386 uniques(日次和)・うち4xx probe 2%(24h)",
+ "isekai.network 実測 7995 req/7d・386 uniques(日次和)・うち4xx probe 2%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}
