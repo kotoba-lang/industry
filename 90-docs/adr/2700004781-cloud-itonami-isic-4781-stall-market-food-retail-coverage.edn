@@ -1,0 +1,78 @@
+[{:adr/id 2700004781
+  :adr/title "cloud-itonami-isic-4781 — Stall/Market Food, Beverage and Tobacco Retail Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-4781]
+  :adr/references [2607121000 2691004722 2680004719]
+
+  ;; Wave 2 actor (coordination/logistics/trade): mobile/temporary
+  ;; market-stall and street-market food, beverage, and tobacco retail
+  ;; operations coordination-only (sales-record logging, stall-operation
+  ;; scheduling, supply-order coordination, compliance-concern flagging).
+  ;; Combines the food-safety guardrail dimension (food/food-service
+  ;; sibling actors) with the age-verification guardrail dimension
+  ;; (beverage/tobacco sibling actors) in one actor.
+
+  :actor/id :cloud-itonami-isic-4781
+  :actor/name "Stall/Market Food, Beverage and Tobacco Retail Operations Coordinator"
+  :actor/isic-rev4 "4781"
+  :actor/domain :retail/stall-market-food-beverage-tobacco
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-sales-record :schedule-stall-operation
+                       :coordinate-supply-order :flag-compliance-concern]
+  :actor/always-escalate-ops [:flag-compliance-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-supply-order 500}
+
+  :actor/hard-checks [:stall-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["finalize the food safety clearance" "food safety clearance override"
+                                "override the food safety clearance" "bypass food safety clearance"
+                                "食品安全許可の上書き" "食品安全許可を確定" "食品安全許可の無効化"
+                                "finalize the age verification" "age verification override"
+                                "override the age verification" "bypass age verification"
+                                "年齢確認の上書き" "年齢確認を確定" "年齢確認の無効化"
+                                "control the id scanner" "actuate the id scanner"
+                                "control the age verification terminal" "actuate the age verification terminal"
+                                "market health authority enforcement" "tobacco licensing authority enforcement"
+                                "license suspension" "permit revocation"
+                                "食品衛生当局の摘発" "屋台営業許可取消" "市場出店許可取消" "タバコ販売許可取消"]
+  :actor/structured-violation-fields [:finalizes-food-safety-clearance?
+                                      :finalizes-age-verification-override?
+                                      :overrides-food-safety-clearance?
+                                      :overrides-age-verification-decision?]
+
+  ;; Self-trip-avoidance: point-of-sale age-verification/ID-hardware
+  ;; actuation terms kept English-only -- this namespace's own Japanese
+  ;; default disclaimer text ("...年齢確認端末の直接操作は行わない")
+  ;; legitimately discusses NOT touching such hardware, so a bare
+  ;; Japanese equipment term would self-trip.
+  ;; Regression test: governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion.
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-sales-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-sales-record :schedule-stall-operation
+                                               :coordinate-supply-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-sales-record :schedule-stall-operation
+                                         :coordinate-supply-order :flag-compliance-concern}
+      :auto #{:log-sales-record :schedule-stall-operation :coordinate-supply-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 48 :assertions 134 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression
+                  :structured-field-violation]
+  :test/simulator :marketstallops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-4781"
+  :registry/business-id "cloud-itonami-isic-4781"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
