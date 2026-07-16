@@ -84,3 +84,44 @@
   (if (empty? flagged)
     (println "(none -- all doc-code-drift claims currently score >= 0.6 as of their LATEST run, i.e. no live silent/undisclosed drift right now)")
     (doseq [{:keys [cid score]} flagged] (println (str "[score=" score "] " (get cid->text cid))))))
+
+;; ---- org-wide generic events (:eval/repo, no hand-curated :claim/*, see orgwide_scan.cljs) ----
+;; Same append-only-ledger "reduce to latest per key" discipline as the claim-based section
+;; above, keyed by (repo, axis) instead of (claim, axis).
+(println "\n--- org-wide: latest event per (repo, axis) pair ---")
+(def orgwide-latest-query
+  "[:find ?repo ?axis ?score ?at ?note
+    :where [?e \"eval/repo\" ?repo] [?e \"eval/axis\" ?axis] [?e \"eval/score\" ?score]
+           [?e \"eval/at\" ?at] [?e \"eval/note\" ?note]]")
+(def orgwide-raw (js->clj (.q ds orgwide-latest-query db)))
+(def orgwide-latest
+  (->> orgwide-raw
+       (group-by (fn [[repo axis _ _ _]] [repo axis]))
+       (map (fn [[_ rows]] (apply max-key (fn [[_ _ _ at _]] at) rows)))
+       (map (fn [[repo axis score at note]] {:repo repo :axis axis :score score :at at :note note}))))
+(println (str "  " (count orgwide-latest) " distinct (repo, axis) pairs, reduced from " (count orgwide-raw) " raw events, across "
+              (count (distinct (map :repo orgwide-latest))) " repos."))
+
+(when (seq orgwide-latest)
+  (println "\n--- org-wide: score distribution per axis ---")
+  (doseq [[axis rows] (sort-by first (group-by :axis orgwide-latest))]
+    (let [buckets (group-by (fn [{:keys [score]}] (/ (Math/round (* score 4)) 4.0)) rows)]
+      (println (str axis " (n=" (count rows) ", mean=" (/ (Math/round (* (/ (reduce + (map :score rows)) (count rows)) 1000)) 1000.0) "):"))
+      (doseq [[bucket rs] (sort-by first > buckets)]
+        (println (str "    " bucket ": " (count rs) " repos")))))
+
+  (println "\n--- org-wide: worst repo-hygiene (score < 0.5) ---")
+  (let [worst (->> orgwide-latest (filter #(and (= (:axis %) "repo-hygiene") (< (:score %) 0.5))) (sort-by :score))]
+    (if (empty? worst)
+      (println "(none)")
+      (doseq [{:keys [repo score note]} (take 20 worst)]
+        (println (str "  [" score "] " repo " -- " note)))))
+  (when (> (count (filter #(and (= (:axis %) "repo-hygiene") (< (:score %) 0.5)) orgwide-latest)) 20)
+    (println (str "  ... and " (- (count (filter #(and (= (:axis %) "repo-hygiene") (< (:score %) 0.5)) orgwide-latest)) 20) " more (truncated to 20)")))
+
+  (println "\n--- org-wide: doc-internal-coherence < 0.6 (candidates for the kotobase-M5-style pattern) ---")
+  (let [flagged (->> orgwide-latest (filter #(and (= (:axis %) "doc-internal-coherence") (< (:score %) 0.6))) (sort-by :score))]
+    (if (empty? flagged)
+      (println "(none)")
+      (doseq [{:keys [repo score note]} flagged]
+        (println (str "  [" score "] " repo " -- " note))))))
