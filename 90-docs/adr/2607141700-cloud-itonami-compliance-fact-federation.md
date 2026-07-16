@@ -3134,6 +3134,49 @@ warsaw bangkok abu-dhabi hanoi manila cairo]`——創設憲章型の8自治体
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-16, /loop tick 111 — 国軸38件目(EGY) — エジプトは現時点で3軸中2軸のみ、正直に報告)
+
+`cloud-itonami-iso3166-egy`の`statute.facts`を追加
+([commit d65d9a7](https://github.com/cloud-itonami/cloud-itonami-iso3166-egy/commit/d65d9a7))：
+
+エジプトの一般法2件:
+
+- **Law No. 159 of 1981**（会社法）— lawyeregypt.netでタイトル・
+  番号・日付を直接確認（1981年9月17日署名、10月1日官報第40号
+  公布）。GAFI（投資庁）のPDFミラーはフォント崩壊で完全に判読
+  不能だったため断念。
+- **Law No. 151 of 2020**（個人データ保護法）— mcit.gov.eg
+  （通信情報技術省）自身がホストする官報PDF本文を目視確認して
+  直接確認。表紙は「第28号附録(h)、第63年、2020年7月15日」と判読
+  可能に明記、本文は「共和国大統領府にて1441年ズー・アル＝カアダ
+  22日（西暦2020年7月13日相当）発布」と記載——大統領の署名欄が
+  偶然目に入ったが、恒常方針に従い一切保存していない。
+
+ZAF/COL/IND/KEN/THA/ARE/VNM/IDN/PHLと同様、既存の`marketentry.facts`
+実装がある同一`deps.edn`の下に`statute.facts`を新規namespaceとして
+追加。4 tests/9 assertions green（既存marketentry 24 tests/81
+assertionsと合わせ計28 tests/90 assertions green）。
+
+**軸カバレッジの正直な報告**: 直近4カ国（UAE・ベトナム・
+インドネシア・フィリピン）はいずれも短期間で3軸すべてを達成した
+が、エジプトは現時点で3軸中2軸（国：本エントリ／自治体：tick110の
+`cloud-itonami-municipality-egy-cairo`）のみで、業界団体軸の
+エントリはまだ無い——虚偽の「3軸達成」を主張せず正直に記録する。
+
+**capital-check**: tick110で既に検証・記録済みのエジプト新首都
+移転の未解決の曖昧さ（Wikidata自身のP36は本tick時点でも依然
+カイロを記載）を再利用し、恣意的に解決したり再検証し直したりは
+しなかった。
+
+140リポジトリ・814 factを統合。jurisdiction EGY queryで今回の2件が
+既存legal-sourceと正しく共存していることを確認。country="EGY"での
+ordinance.facts横断queryで既存のカイロ自治体2件と本tickの国エントリ
+2件が正しく相互リンクしていることを確認。
+
+現状: 国軸38件・業界団体軸37件(27業種)・自治体軸36件——111tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
