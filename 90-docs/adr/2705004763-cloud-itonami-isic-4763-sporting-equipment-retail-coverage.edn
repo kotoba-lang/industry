@@ -1,0 +1,76 @@
+[{:adr/id 2705004763
+  :adr/title "cloud-itonami-isic-4763 — Sporting-Equipment Retail Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-4763]
+  :adr/references [2607121000 2680004719]
+
+  ;; Wave 2 actor (coordination/logistics/trade): specialized
+  ;; sporting-equipment retail operations coordination-only
+  ;; (inventory/sale/return/fitting transaction logging,
+  ;; staffing-operation scheduling, supply-order coordination,
+  ;; product-safety-concern flagging). Never a direct recall-compliance
+  ;; or equipment-safety-certification decision.
+
+  :actor/id :cloud-itonami-isic-4763
+  :actor/name "Sporting-Equipment Retail Operations Coordinator"
+  :actor/isic-rev5 "4763"
+  :actor/domain :retail/sporting-equipment
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-sales-record :schedule-staffing-operation
+                       :coordinate-supply-order :flag-safety-concern]
+  :actor/always-escalate-ops [:flag-safety-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-supply-order 1000}
+
+  :actor/hard-checks [:store-verified :vendor-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["issue the recall" "declare a recall" "execute the recall"
+                                "finalize the recall" "finalize the recall decision"
+                                "initiate the recall"
+                                "issue the safety certification" "grant the safety certification"
+                                "revoke the safety certification" "certify the equipment as safe"
+                                "finalize the certification decision"
+                                "approve the equipment as compliant" "declare the equipment compliant"
+                                "リコールを発令" "リコールを実施した" "リコールを実行した"
+                                "リコールを決定した" "リコールを確定した"
+                                "安全認証を発行" "安全認証を付与した" "安全認証を取り消した"
+                                "適合認定を行った" "適合を認定した"]
+
+  ;; Self-trip-avoidance: every term above is phrased as the
+  ;; finalization/execution ACTION, never a bare noun -- this namespace's
+  ;; own :flag-safety-concern default proposal legitimately discusses
+  ;; recall/defective-equipment/injury concerns, and its own printed :op
+  ;; keyword literally contains the substring "safety". A bare-noun term
+  ;; list (e.g. bare "recall"/"certification"/"safety") would self-trip
+  ;; this actor's own core happy path on every single run. Regression
+  ;; test:
+  ;; governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion.
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-sales-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-sales-record :schedule-staffing-operation
+                                               :coordinate-supply-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-sales-record :schedule-staffing-operation
+                                         :coordinate-supply-order :flag-safety-concern}
+      :auto #{:log-sales-record :schedule-staffing-operation :coordinate-supply-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 56 :assertions 166 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression
+                  :vendor-verification]
+  :test/simulator :sportsretailops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-4763"
+  :registry/business-id "cloud-itonami-isic-4763"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
