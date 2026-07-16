@@ -3215,6 +3215,45 @@ aebanca.es自身の「Our history」ページから2件を直接確認:
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-17, /loop tick 113 — 自治体軸37件目(Ankara, TUR) — トルコ初、公式ポータルHTTP 403を国レベル建制法2件で補完)
+
+`cloud-itonami-municipality-tur-ankara`を新規GitHubリポジトリとして
+scaffold・push
+([commit f3c90d1](https://github.com/cloud-itonami/cloud-itonami-municipality-tur-ankara/commit/f3c90d1))：
+
+トルコの首都アンカラ。1923年10月29日以来（イスタンブールから遷都）
+安定した首都で、エジプト/インドネシアで見られたような未解決の
+遷都問題は無し（Wikidata P36も正しくアンカラを示す）。
+
+`ankara.bel.tr`（市自身の公式ポータル）は試した全URL
+（`/meclis/kararlar`、市議会決定に関するニュースページ）で
+HTTP 403、断念。代わりに、アンカラの大都市自治体（büyükşehir
+belediyesi）地位を設立・現行統治するトルコの国レベル建制法2件を、
+TBMM（トルコ大国民議会）アーカイブPDFの本文1ページ目を
+Read-toolの保存パスfallbackで直接確認:
+
+- **Kanun No. 3030**（1984年6月27日採択、1984年7月9日官報Sayı
+  18453号公布）— イスタンブール・イズミルと共にアンカラに
+  büyükşehir地位を初めて付与した原法。
+- **Kanun No. 5216**（2004年7月10日採択、2004年7月23日官報Sayı
+  25531号公布）— 3030を更新・現在も施行中のBüyükşehir Belediyesi
+  Kanunu（大都市自治体法）。mevzuat.gov.tr自身のインタラクティブ
+  ページは法番号・官報日付・号数は確認できたが正式タイトルは
+  表示されなかったため、TBMMアーカイブPDFを正式タイトルの一次
+  情報源として採用。
+
+WebFetchは両PDFとも「illegible/binary」と報告（今session頻出の
+フォントサブセット化パターン）、いずれもRead-toolの保存パス
+fallback（`pages: "1"`）で画像レンダリングし直接読んで確認。
+
+4 tests/11 assertions green。142リポジトリ・818 factを統合。
+`municipality ankara`クエリで2件とも正しく取得、タイトル/番号の
+横断query（`[?e "ordinance/municipality" "ankara"]`）でも一致確認。
+
+現状: 国軸38件・業界団体軸38件(27業種)・自治体軸37件——自治体軸が
+最薄という判断からトルコを新規開拓、3軸すべてが実データ・個別
+検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
