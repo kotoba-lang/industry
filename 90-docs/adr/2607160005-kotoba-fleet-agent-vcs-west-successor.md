@@ -755,3 +755,29 @@ fleet-db（byte 一致で再 import）/ ローカル checkout を更新、head s
 オマージュとして秀逸だが「もう少し良い名前」を検討する。候補は object DAG /
 content-addressed store / nekko(根)との対を意識した botanical / 系譜語で
 別途提案。
+
+## Addendum (2026-07-16, same day): sovereign reachability — PAT を消す
+
+「nekko/bonsai/kagami があるのに、なぜ pin 検証で GitHub PAT が要るのか」という
+オーナー指摘への回答と実装。**指摘は正しく、PAT は主権化しきれていない綻び**だった。
+
+- **なぜ PAT が要ったか**: pin 検証の 6 不変条件のうち、署名・単調 sequence・
+  parent-covering・権限（CACAO）は既に nekko/kagami で主権的（GitHub 不要）。
+  **GitHub に触るのは到達性チェックだけ**（`gh api compare` で「その SHA が
+  upstream に実在し default branch から辿れるか」）。GHA CI の default token は
+  private cross-org を読めないため、そこだけ org-read PAT が要っていた。
+- **主権化**（kagami `49455fb886f3`）: `reach-local-git` — repo の**完全 commit
+  graph を fleet 自身が materialize**（treeless clone `--filter=blob:none`、
+  git/SSH）し、`git merge-base --is-ancestor` で到達性・value-advance を**ローカル
+  判定**。gh API も PAT も使わない。treeless = 完全 commit 系譜（blob 無し）で
+  速く、かつ shallow の ancestry 偽陽性も回避。`fleet.pin/admit` は元々
+  reachability を注入値として受ける設計なので、provider を差し替えるだけ。
+  `--reach local-git`（既定）/ `github`（公開 fallback）。
+- **実証**: **壊した `GH_TOKEN=deadbeef-invalid` でも private club-shinshi が
+  OK 検証**（gh 未使用の証明）、bogus SHA は CONFIRMED unreachable、kagami の
+  pin 前進も壊れた token で accept。
+- **帰結**: pin 検証全体が GitHub 非依存になった（GitHub は object transport の
+  mirror に降格）。**残タスク①「FLEET_PIN_TOKEN 発行」は不要になり消滅**。
+  strict な private 検証は owner-side（native CI / `fleet ci-verify`）で回り、
+  GHA CI は公開 best-effort + report-only。次の主権化は bonsai object graph を
+  p2p で複製した上での reachability（clone すら不要にする）。
