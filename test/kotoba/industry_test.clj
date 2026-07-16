@@ -3080,7 +3080,7 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; (via git-trees/blobs API) immediately before this test-file
       ;; edit, not assumed: {:total 649 :spec 213 :blueprint 0
       ;; :implemented 436}.
-      (is (= 436 (:implemented m))))))
+      (is (= 438 (:implemented m))))))
 
 (deftest cloud-itonami-isic-4751-is-implemented
   (testing "cloud-itonami-isic-4751 (Retail sale of textiles in
@@ -4014,3 +4014,75 @@ clone; superproject ADR-2628000000) is also :implemented"
            (:repo (industry/get-industry "4781"))))
     (is (= "cloud-itonami-isic-4781"
            (:business-id (industry/get-industry "4781"))))))
+(deftest cloud-itonami-isic-4773-is-implemented
+  (testing "cloud-itonami-isic-4773 (Other retail sale of new goods in
+  specialized stores -- a catch-all class for single-category specialty
+  shops not covered by other 477x classes [books/stationery, sporting
+  goods, toys and games, hardware/paint/glass, furniture/lighting/
+  household articles, electrical appliances, jewelry/watches,
+  photographic/optical equipment, flowers/plants/pets], fresh scaffold
+  -- both the stale gftdcojp/cloud-itonami-G4773 placeholder and the
+  real cloud-itonami org target name independently confirmed 404 before
+  scaffolding; identity ({:id \"4773\" :name \"Other retail sale of new
+  goods in specialized stores\"}) independently verified against a
+  fresh clone before any work began, per this fleet's ID/name-mismatch
+  caution -- unambiguous, no truncation; a separate, coarser-granularity
+  {:id \"477\" ...} 3-digit group entry left untouched; Wave 2
+  (coordination/logistics/trade, ADR-2607121000) target;
+  SpecialtyRetailAdvisor ⊣ SpecialtyRetailGovernor specialized-retail
+  OPERATIONS COORDINATION actor (specialtyretailops.* namespace)
+  mirroring cloud-itonami-isic-4719's [Other retail sale in
+  non-specialized stores] verified module shape module-for-module
+  (specialtyretailops.* in place of merchandiseops.*, quality-concern
+  flagging in place of loss-prevention-concern flagging); closed
+  four-op allowlist, all :effect :propose (:log-sales-record/:schedule-
+  staffing-operation/:coordinate-supply-order/:flag-quality-concern);
+  FOUR HARD governor checks, all permanent and un-overridable by any
+  human approval -- store-unverified (target store's business
+  registration must exist AND be independently :registered?/:verified?
+  in the store before any proposal for it may commit or even escalate),
+  vendor-unverified (for :coordinate-supply-order only, the named vendor
+  must independently resolve to a :registered?/:verified? vendor
+  record), effect-not-propose, and scope-exclusion (folds in
+  op-not-allowed) that permanently blocks any proposal touching directly
+  finalizing a quality-dispute resolution (a refund decision, a
+  replacement authorization, a liability determination, or otherwise
+  closing a customer's complaint unilaterally); scope-excluded terms are
+  deliberately phrased as the finalization/execution ACTION (\"finalize
+  the refund decision\", \"close the dispute unilaterally\", \"authorize
+  the replacement unilaterally\"), never a bare noun (\"refund\"/
+  \"dispute\"/\"defect\"/\"complaint\") -- this fleet's own known
+  self-tripping bug class avoided from the start, verified by a
+  dedicated regression test
+  (default-mock-advisor-proposals-never-self-trip-scope-exclusion in
+  governor_test.clj) asserting all four default proposal generators
+  never trip :scope-excluded or :op-not-allowed; :flag-quality-concern
+  ALWAYS escalates to human sign-off and is never a member of any
+  phase's :auto set, at any phase (two independent layers agree:
+  specialtyretailops.governor's own always-escalate-ops AND
+  specialtyretailops.phase's own phase table); a :coordinate-supply-
+  order above a $1500 estimated-cost threshold also always escalates;
+  real langgraph-clj StateGraph (intake->advise->govern->decide->commit|
+  hold|request-approval) with interrupt-before #{:request-approval} for
+  human-in-the-loop resume, not a stub; fully portable .cljc with no
+  JVM-only interop anywhere in src/ (mock-only advisor); 56 tests / 166
+  assertions green (clojure -M:test), independently re-verified against
+  a fresh clone; clj-kondo 0 errors / 0 warnings; registry.edn's own
+  \"4773\" -> :implemented change (:repo/:business-id de-placeholdered
+  from gftdcojp/cloud-itonami-G4773 -> cloud-itonami/cloud-itonami-isic-
+  4773, :maturity :spec->:implemented, :operating-states updated to
+  match the actor state machine; :required-technologies left unchanged)
+  landed via a Contents-API single-file PUT direct to main (sha-checked
+  optimistic concurrency, immediately re-fetched fresh content via the
+  git-trees/blobs API before the PUT per this fleet's hot-contention
+  discipline, exact-block edit only verified via an exact old/new
+  substring occurrence count of 1 PLUS sample-verified against
+  4719/4774/477[group] entries also intact, no mojibake detected);
+  superproject ADR-2696004773 (com-junkawasaki/root,
+  90-docs/adr/2696004773-cloud-itonami-isic-4773-other-specialized-
+  retail-coverage.md/.edn)) promoted :spec -> :implemented"
+    (is (= :implemented (industry/maturity "4773")))
+    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-4773"
+           (:repo (industry/get-industry "4773"))))
+    (is (= "cloud-itonami-isic-4773"
+           (:business-id (industry/get-industry "4773"))))))
