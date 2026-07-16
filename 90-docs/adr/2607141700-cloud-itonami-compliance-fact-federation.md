@@ -2663,6 +2663,55 @@ ubf.ae自身（**TLS証明書エラーの出るuaebf.aeではなく**）の2ペ�
 現状: 国軸33件・業界団体軸34件(26業種)・自治体軸32件——99tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 100 【100tick達成】 — 国軸34件目(ARE) — UAEが1tick窓内で3軸すべて完成、複数ソース日付矛盾を2件とも正直に処理)
+
+`cloud-itonami-iso3166-are`の`statute.facts`を追加
+([commit e60bec4](https://github.com/cloud-itonami/cloud-itonami-iso3166-are/commit/e60bec4))：
+
+**本ループの100tick目という節目。** さらに本tickにより、UAEが
+**国・自治体・業界団体の3軸すべてで実データ・個別検証済みの
+エントリを、約4tickの窓の中で完成**させた（自治体: tick98の
+`cloud-itonami-municipality-are-abu-dhabi`／業界団体: tick99の
+`cloud-itonami-assoc-6419-are-ubf`／国: 本tick）。3軸とも同一
+連合内で横断query可能なことを下記verified-runで実証。
+
+UAEの一般法2件:
+
+- **Federal Law No. 2 of 2015 on Commercial Companies** — WIPO Lex
+  自身がホストするPDF本文を直接読み確認（2015年3月25日発布、
+  3月31日官報公布、7月1日施行）。uaelegislation.gov.ae（連邦法令
+  ポータル本家）は直リンクPDFも含め全URLでHTTP 403。WebSearchに
+  よれば本法は後に（アクセス不能な）Federal Decree-Law No. 32 of
+  2021により改正・置換された可能性があるが、その新法本文は直接
+  確認できなかったため「独立に確認できた最終版」として本法を採用し、
+  この限界を正直に記録。
+- **Federal Decree-Law No. 45 of 2021 on the Protection of Personal
+  Data** — 正確なタイトル・番号はMereller（UAEの専門法律事務所）
+  発行の英日対訳法令翻訳メモで確認（非政府ソースのため`:official-`
+  ではなく`:mereller-legal-translation-mirror`タグを使用）。制定・
+  署名日について複数の独立引用ソースが**4通りの異なる矛盾する日付**
+  （2021年9月20日／9月26日／11月27日／11月28日）を主張していた
+  ため、いずれかを恣意的に選ばず、全ソースが矛盾なく一致していた
+  施行日（2022年1月2日）を採用し、この矛盾自体を記録した。
+
+ZAF/COL/IND/KEN/THAと同様、既存の`marketentry.facts`実装がある
+同一`deps.edn`の下に`statute.facts`を新規namespaceとして追加。4
+tests/9 assertions green（既存marketentry 24 tests/81 assertions
+と合わせ計28 tests/90 assertions green）。
+
+**capital-check**: tick98で既に検証済みのアブダビ（Q1519、1971年
+連邦建国以来UAE(Q878)の首都）・P36史的首都バグなしの結果を再利用。
+
+129リポジトリ・792 factを統合。country="ARE"での横断query
+（statute.facts / ordinance.facts / association-rule.facts の
+3スキーマそれぞれ）が全て実在の正しく属性付けされた結果を返す
+ことを確認——UAEが単一軸のスタブではなく真の3軸横断連合カバレッジ
+を持つことを実証した。
+
+現状: 国軸34件・業界団体軸34件(26業種)・自治体軸32件——100tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
