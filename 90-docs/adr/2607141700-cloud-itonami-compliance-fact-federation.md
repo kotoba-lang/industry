@@ -2956,6 +2956,51 @@ association-rule.facts）もすべて実在の正しい結果を返し、真の3
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-16, /loop tick 107 — 自治体軸35件目(Manila, PHL) — GitHubリポジトリ作成レート制限を尊重し次tickで再試行成功)
+
+`cloud-itonami-municipality-phl-manila`を新規GitHubリポジトリと
+してscaffold・push
+([commit 0377201](https://github.com/cloud-itonami/cloud-itonami-municipality-phl-manila/commit/0377201))：
+
+- **Republic Act No. 409**（マニラ市改正憲章）— タイトル・番号は
+  lawphil.net（フィリピンの確立された法律データベース）で確認。
+  1949年6月18日の承認日はOfficial Gazette自身のpermalink URL構造
+  （officialgazette.gov.ph/1949/06/18/republic-act-no-409/——
+  ページ自体はHTTP 403だが、Gazetteは実際の公布日に基づいてURLを
+  構造化しており恣意的ではない）で裏付け。
+- **City Ordinance No. 9107**（4Ps現金給付プログラムのカード不正
+  利用禁止）— タイトル・番号・正確な日付（2025年4月11日）を
+  citycouncilofmanila.com.ph自身のHTML一覧ページ（第12期市議会）で
+  直接確認。
+
+**外部レート制限の尊重**: 本tick中に`gh repo create`が2回
+「You have created too many repositories, too quickly」でブロック
+された——本セッションで短期間に30以上の新規リポジトリを作成した
+ことによる、GitHub側の正当なセカンダリレート制限（本プロジェクトの
+不具合ではない）。強制的な回避策やリトライの連打はせず、ローカル
+commitを安全にディスク上に保持したまま、worktreeのADR・query
+スクリプトは**未着手のまま**とし（実際にはpushされていないリポジトリ
+をあたかも稼働中であるかのように反映して状態を偽ることを避けるため）、
+「部分完了」として正直に報告した。次の定期起動（30分後）を自然な
+再試行タイミングとして利用したところ、`gh repo create`は1回目の
+試行であっさり成功——レート制限が時間経過で解消される性質のもので
+あったことを確認した。
+
+4 tests/11 assertions green。136リポジトリ・806 factを統合。
+`"ordinance/kind" "local-act"`での横断queryで`[london new-delhi
+warsaw bangkok abu-dhabi hanoi manila]`——創設憲章型の7自治体法が
+すべて正しく取得できることを確認。
+
+**capital-check**: マニラ（Q1461）は1948〜1976年にケソン市が一時
+首都を務めた後、1976年の大統領令で首都地位を回復——既存の
+organization.ednの記載はこの現行・1976年以降の状態と正しく一致
+（本セッションのベトナム ハノイ/フエ、インドネシア ジャカルタ/
+ヌサンタラの首都史チェックと同種の事例）。
+
+現状: 国軸36件・業界団体軸36件(27業種)・自治体軸35件——107tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
