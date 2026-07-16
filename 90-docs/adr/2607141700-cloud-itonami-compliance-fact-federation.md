@@ -2597,6 +2597,38 @@ tests/90 assertions green）。
 現状: 国軸33件・業界団体軸33件(26業種)・自治体軸31件——97tickを経て
 3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-16, /loop tick 98 — 自治体軸32件目(Abu Dhabi, ARE) — 中東初)
+
+`cloud-itonami-municipality-are-abu-dhabi`を新規GitHubリポジトリと
+してscaffold・push
+([commit c7827cd](https://github.com/cloud-itonami/cloud-itonami-municipality-are-abu-dhabi/commit/c7827cd))：
+
+自治体軸で中東初のエントリ。
+
+- **Law No. (2) of 2012**（アブダビ首長国における公共の外観・健康・
+  静穏の保持に関する法律）— Al Ain City Municipality（DMT傘下組織）
+  自身の違反金PDF表紙で正確なcitationを直接確認（年のみ、日にちの
+  記載なし）。
+- **Law No. (30) of 2019**（Department of Municipalities and
+  Transport設立法）— アブダビ政府自身のOfficial Gazette（第11版）
+  目次で正確な法律タイトル・番号を直接確認、2019年11月30日付。
+
+dmt.gov.ae自身の「About Us」沿革ページは歴代首長・法令の物語的記述
+はあったが、ほとんどのマイルストーン（1969/2005/2007/2016/2017/
+2019）に正確な法律番号・日付が無く使用不可——代わりに的を絞った
+検索で2つの正確な日付付きPDFを別々に発見した。
+
+4 tests/11 assertions green。127リポジトリ・788 factを統合。
+`"ordinance/kind" "local-act"`での横断queryで`[london new-delhi
+warsaw bangkok abu-dhabi]`——創設憲章型の5自治体法がすべて正しく
+取得できることを確認。
+
+**capital-check**: アブダビ（Q1519）は1971年の連邦建国以来一貫して
+UAE（Q878）の首都であり、史的首都バグの影響なしを確認。
+
+現状: 国軸33件・業界団体軸33件(26業種)・自治体軸32件——98tickを経て
+3軸すべてが実データ・個別検証済み・捏造なしで成長を継続している。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
