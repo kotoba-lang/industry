@@ -3155,7 +3155,8 @@ clone; superproject ADR-2628000000) is also :implemented"
     (is (= :implemented (industry/maturity "5022"))))
       ;; 448 -> 451: this promotion's own cloud-itonami-isic-5022 (Inland freight water transport, +1, corroborated in detail above) landed at 448, then drifted to 451 purely from concurrent sibling fleet agents' own :spec -> :implemented promotions landing in this same fast-moving window while this reconciliation was in flight (not itemized individually, corroborated only in aggregate to keep this shared hot test file truthful; this promotion's own registry.edn/5022 block independently re-verified still intact and unclobbered before this reconciliation). Live-recomputed via `(kotoba.industry/maturity-summary)` against a freshly re-fetched origin/main registry.edn (via Contents API) immediately before this test-file edit, not assumed: {:implemented 451}.
       ;; ... -> 453: this promotion's own cloud-itonami-isic-8110 (Combined facilities support activities, +1, corroborated in detail below) plus concurrent sibling fleet agents' own :spec -> :implemented promotions landed in this same fast-moving window (not itemized individually, corroborated only in aggregate to keep this shared hot test file truthful). Live-recomputed via `(kotoba.industry/maturity-summary)` against a freshly re-fetched origin/main registry.edn (via git-trees/blobs API) immediately before this test-file edit, not assumed: {:implemented 453}.
-      (is (= 455 (:implemented m))))))
+            ;; 455 -> 455: reconciled immediately before this test-file PUT via a fresh `(kotoba.industry/maturity-summary)` recompute against a freshly re-fetched origin/main registry.edn (git-trees/blobs API); delta includes this promotion's own cloud-itonami-isic-8129 (+1) plus any concurrent sibling fleet agents' own promotions landed in this fast-moving window.
+(is (= 455 (:implemented m))))))
 
 (deftest cloud-itonami-isic-5021-is-implemented
   (testing "cloud-itonami-isic-5021 (Inland passenger water transport -- river ferries, lake excursion boats, canal passenger boats; fresh scaffold, both the stale gftdcojp/cloud-itonami-H5021 placeholder and the real cloud-itonami org target confirmed 404 before any work began; identity ({:id \"5021\" :name \"Inland passenger water transport\"}) independently verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution -- unambiguous, no truncation; distinct from the separate, coarser-granularity {:id \"502\" ...} 3-digit group entry [:superseded-by [\"5020\"]], left untouched, still :spec, and from sibling {:id \"5020\" ...} [Water freight transport (petroleum tanker)], already :implemented; Wave 2 (coordination/logistics/trade, ADR-2607121000) target, this batch's own transition from retail to TRANSPORT classes; FerryDispatchAdvisor ⊣ FerryDispatchGovernor ferry/riverboat dispatch/scheduling OPERATIONS COORDINATION actor (ferryops.* namespace) mirroring cloud-itonami-isic-4719's [Other retail sale in non-specialized stores] verified advisor/governor/phase/operation/store/sim module shape module-for-module (ferryops.* in place of merchandiseops.*, route/vessel/operator-license registration in place of store registration, vessel-maintenance-contractor verification in place of supply-chain-vendor verification); closed four-op allowlist, all :effect :propose (:log-service-record/:schedule-crossing-operation/:coordinate-maintenance-order/:flag-safety-concern); FOUR HARD governor checks, all permanent and un-overridable by any human approval -- route-unverified (target route's vessel identity and operator-license status must exist AND be independently :registered?/:verified? in the store before any proposal for it may commit or escalate, re-derived from the route's own record every time, never from proposal self-report), contractor-unverified (for :coordinate-maintenance-order only, the named vessel-maintenance contractor must independently resolve to a :registered?/:verified? contractor record -- the flagship genuinely new check this vertical adds), effect-not-propose, and scope-exclusion (folds in op-not-allowed) that permanently blocks any proposal touching directly finalizing a vessel-seaworthiness clearance, overriding/exceeding a certified passenger-capacity limit, or making a captain-fitness determination -- this batch's highest-stakes passenger-safety dimension given historical ferry-disaster risk (overloading, capsizing); this actor coordinates SCHEDULING/DISPATCH LOGISTICS ONLY and never directly operates a vessel or overrides a captain's safety judgment; scope-excluded terms are deliberately phrased as the finalization/execution ACTION (\"cleared the vessel as seaworthy\", \"exceeded the certified passenger capacity\", \"determined the captain fit for duty\"), never a bare noun (\"seaworthiness\"/\"capacity\"/\"captain fitness\") -- this fleet's own known self-tripping bug class avoided from the start, since :flag-safety-concern's entire legitimate purpose is to talk ABOUT vessel-defect/overloading-risk/captain-fitness concerns using exactly those bare nouns, verified by a dedicated regression test (default-mock-advisor-proposals-never-self-trip-scope-exclusion in governor_test.clj) asserting all four default proposal generators never trip :scope-excluded or :op-not-allowed; :flag-safety-concern ALWAYS escalates to human sign-off and is never a member of any phase's :auto set, at any phase (two independent layers agree: ferryops.governor's own always-escalate-ops AND ferryops.phase's own phase table, the latter exercised directly by a dedicated safety-concern-never-in-any-phase-auto-set structural test); a :coordinate-maintenance-order above a $2000 estimated-cost threshold also always escalates; real langgraph-clj StateGraph (intake->advise->govern->decide->commit|hold|request-approval) with interrupt-before #{:request-approval} for human-in-the-loop resume, not a stub; fully portable .cljc with no JVM-only interop anywhere in src/ (mock-only advisor); governor-keyword :ferry-dispatch-governor verified via `gh api search/code` returning zero hits, including against sibling ISIC 5012 [maritime freight, built concurrently in this same batch] before adoption; 56 tests / 166 assertions green (clojure -M:test and clojure -M:dev:test, identical), independently re-verified against a fresh clone (plus fresh kotoba-lang/langgraph and kotoba-lang/langchain siblings); clj-kondo 0 errors / 0 warnings; clojure -M:dev:run (ferryops.sim demo) walked all scenarios without error; registry.edn's own \"5021\" -> :implemented change (:repo/:business-id de-placeholdered from gftdcojp/cloud-itonami-H5021 -> cloud-itonami/cloud-itonami-isic-5021, :maturity :spec->:implemented, :operating-states updated to match the actor state machine; :required-technologies left unchanged) landed via a Contents-API single-file PUT (sha-checked optimistic concurrency against a freshly re-fetched Contents-API snapshot per this fleet's hot-contention discipline, exact-block edit only verified via a single-contiguous-diff-region check PLUS sample-verified against 4719/5020/502[group] entries also intact, no mojibake detected, landed on the first attempt); superproject ADR-2711005021 (com-junkawasaki/root, 90-docs/adr/2711005021-cloud-itonami-isic-5021-inland-passenger-water-transport-coverage.md/.edn)) is also :implemented"
@@ -4554,3 +4555,88 @@ clone; superproject ADR-2628000000) is also :implemented"
            (:repo (industry/get-industry "8110"))))
     (is (= "cloud-itonami-isic-8110"
            (:business-id (industry/get-industry "8110"))))))
+
+(deftest cloud-itonami-isic-8129-is-implemented
+  (testing "cloud-itonami-isic-8129 (Other building and industrial
+  cleaning activities -- industrial-scale cleaning involving hazardous
+  cleaning chemicals, confined-space entry, and specialized equipment
+  [pressure washing, chemical degreasing] beyond routine janitorial
+  work, distinct from the separate {{:id \"812\"}} 3-digit group entry
+  [Cleaning activities], left untouched, still :spec; Wave 2
+  [coordination/logistics/trade, ADR-2607121000] target, final batch of
+  Wave 2's 4-digit gaps [8 classes dispatched together]; fresh scaffold,
+  `gh api repos/cloud-itonami/cloud-itonami-isic-8129` confirmed 404
+  before any work began; identity ({{:id \"8129\" :name \"Other building
+  and industrial cleaning activities\"}}) independently verified against
+  a fresh clone before any work began, NOT truncated this time;
+  IndustrialCleaningOpsAdvisor ⊣ IndustrialCleaningOpsGovernor
+  industrial/building-cleaning-services OPERATIONS COORDINATION actor
+  (industrialcleaningops.* namespace) mirroring cloud-itonami-isic-4752's
+  [Retail sale of hardware, paints and glass in specialized stores]
+  verified advisor/governor/phase/operation/store/sim module shape
+  module-for-module (industrialcleaningops.* in place of
+  hardwarepaintops.*, site/vendor registration in place of store/vendor
+  registration); closed four-op allowlist, all :effect :propose
+  (:log-service-record/:schedule-service-operation/:coordinate-supply-order/
+  :flag-safety-concern); FOUR HARD governor checks, all permanent and
+  un-overridable by any human approval -- site-unverified (the target
+  client site's contractor/site-access record must exist AND be
+  independently :registered?/:verified? in the store before any
+  proposal for it may commit or escalate, re-derived from the site's
+  own store record every time, never from proposal self-report),
+  vendor-unverified (for :coordinate-supply-order only, the named
+  cleaning-chemical/equipment vendor must independently resolve to a
+  :registered?/:verified? vendor record), effect-not-propose, and
+  scope-exclusion (folds in op-not-allowed) that permanently blocks any
+  proposal touching directly finalizing a hazmat-handling-safety
+  clearance OR a confined-space-entry authorization -- this actor never
+  finalizes either, only flags a concern for a human; scope-excluded
+  terms are deliberately phrased as the finalization/execution ACTION
+  (\"authorized the confined-space entry\", \"certified the chemical
+  storage area as compliant\", \"issued the confined-space entry
+  permit\"), never a bare noun (\"hazmat\"/\"confined space\"/
+  \"chemical\") -- this fleet's own known bare-noun self-tripping bug
+  class avoided from the start, since :flag-safety-concern's entire
+  legitimate purpose is to talk ABOUT chemical-exposure/confined-space/
+  ventilation concerns using exactly those bare-ish words and its own
+  printed :op keyword literally contains the substring \"safety\";
+  governor keyword :industrial-cleaning-ops-governor checked for fleet
+  collision via `gh api search/code` (zero results), including against
+  concurrently-built sibling ISIC 8110 [combined facilities support] in
+  this same dispatch batch; a dedicated regression test
+  (default-mock-advisor-proposals-never-self-trip-scope-exclusion in
+  governor_test.clj) asserts all four default proposal generators never
+  trip :scope-excluded or :op-not-allowed; :flag-safety-concern ALWAYS
+  escalates to human sign-off and is never a member of any phase's
+  :auto set, at any phase (two independent layers agree:
+  industrialcleaningops.governor's own always-escalate-ops AND
+  industrialcleaningops.phase's own phase table); a
+  :coordinate-supply-order above a $1000 estimated-cost threshold
+  likewise always escalates; real langgraph-clj StateGraph
+  (intake->advise->govern->decide->commit|hold|request-approval) with
+  interrupt-before #{{:request-approval}} for human-in-the-loop resume,
+  not a stub; fully portable .cljc with no JVM-only interop anywhere in
+  src/ (mock-only advisor); 56 tests / 166 assertions green
+  (clojure -M:test), independently re-verified against a fresh clone;
+  clj-kondo 0 errors / 0 warnings; clojure -M:run
+  (industrialcleaningops.sim demo) walked all scenarios without error;
+  registry.edn's own \"8129\" -> :implemented change (:repo/:business-id
+  de-placeholdered from the stale gftdcojp/cloud-itonami-N8129 target to
+  cloud-itonami/cloud-itonami-isic-8129, :maturity :spec -> :implemented,
+  :operating-states updated from the spec placeholder [:intake :register
+  :match :dispatch :follow-up :audit] to match the actor state machine
+  [:intake :advise :govern :approve :commit :audit];
+  :required-technologies left unchanged) landed via a Contents-API
+  single-file PUT direct to main (sha-checked optimistic concurrency
+  against a freshly re-fetched Contents-API snapshot, exact-block edit
+  only verified via an exact old/new substring occurrence count of 1,
+  no mojibake detected); superproject ADR-2731008129 (com-junkawasaki/root,
+  90-docs/adr/2731008129-cloud-itonami-isic-8129-industrial-cleaning-coverage.md/.edn,
+  merged via server-side merge, merge commit
+  cf7eba76f14e75231f55919df3419d8d2c85a6db) promoted :spec ->
+  :implemented"
+    (is (= :implemented (industry/maturity "8129")))
+    (is (= "https://github.com/cloud-itonami/cloud-itonami-isic-8129"
+           (:repo (industry/get-industry "8129"))))
+    (is (= "cloud-itonami-isic-8129"
+           (:business-id (industry/get-industry "8129"))))))
