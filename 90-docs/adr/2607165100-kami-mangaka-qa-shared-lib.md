@@ -56,3 +56,25 @@ v10 の重み付き合成は移植しない — 重み定義は退役 runtime �
   してしまい、kotoba-lang の公開 lib 群（expression/text/page）と非対称。
 - **jump QA 実行ループまで一括移植**: ピクセル計測の実装が必要で、重み定義の
   復元（=捏造リスク）を伴う。軸の正本化を先行し、実行系は計測器が揃ってから。
+
+## Addendum 1 (2026-07-16) — jump QA 実行ループ + annotated overlay の復活
+
+本 ADR 本文で follow-up とした 2 点を実装:
+
+1. **`kami.mangaka.qa.overlay`**（lib 側）— v10 世代 scored.png 相当の
+   annotated ビューを**純 hiccup SVG**で再現（パネル枠・番号バッジ・読み順
+   パス・顔/gaze ボックス・スコアヘッダ)。I/O/DOM ゼロ — cljs では
+   component、nbb/JVM では同梱 `->svg-str` で静的 SVG。
+2. **`ai.gftd.mangaka.jumpBenchmarkQa`**（consumer 側）— backlog `:qa` の
+   退役 Python `score_jump_benchmark` を CLJ 化。軸の正本は lib の
+   `:jump` 8 軸、n サンプル平均（default 3）+ verdict + distinct issues、
+   `:panel/jump-qa` / `:page-render/jump-qa` datom に永続化。**v10 の重み
+   合成は非移植** — `:total` は mean10×10 で `:method` に明記（捏造しない）。
+   offline は applied false で datom を書かない。
+
+Live 実測（公開 gh-arc0-1 p01、api.murakumo.cloud gemma4、n=3）: total 52.0、
+編集者 verdict「Jump 掲載には動的インパクトと線の強弱が不足」+ 12 issues、
+コマ検出 7/7（フルサイズ画像 — thumb では 3 だった。検出精度は入力解像度に
+依存する実測知見)。旧 v10 の 77.4 は judge（gemma3:4b）も合成式も別物なので
+直接比較不可。lib 6 tests / 42 assertions、mangaka 118 tests / 737 assertions
+green。pin: kami-mangaka-qa → df897eb、ai-gftd-mangaka → 30c7b5f。

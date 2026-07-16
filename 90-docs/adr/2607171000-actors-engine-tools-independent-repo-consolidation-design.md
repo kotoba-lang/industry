@@ -4,6 +4,21 @@
 
 Proposed（設計・実現性評価）。オーナー指示「20-actors は全て独立 repo になるように設計して、また engine, tool なども repo を分割できるか確認して」「compat 系は kotoba-lang org または etzhayyim org に移行済みでは? 調査確認して」を受けた設計。実行は本 ADR 合意後にフェーズ分割で行う（bulk 実行は下記の硬い前提を満たすまで不可）。先例: yabai の consolidation（ADR-2607170900）。分割ツール: ADR-2606231200（`bb actor:publish`）。
 
+## 進捗ログ（2026-07-16 実行）
+
+| 増分 | 内容 | commit（etzhayyim/root） | 状態 |
+|---|---|---|---|
+| Phase 1 core | compat vendored コピー **844 件除去** + `COMPAT-MOVED.md`（844 行マッピング） | `13a9871` | ✅ landed |
+| Phase 2 #1 | 陳腐化 compat-corpus **py 装置 23 件 prune** + 死んだ bb.edn task 2 削除 | `d5969d5` | ✅ landed |
+
+**方針転換（オーナー指示 2026-07-16）**: Python は deprecated・prune 対象、load-bearing なものは cljs(nbb) で再実装。
+
+**残务（多セッション）**:
+- **Phase 1 tail**: 未移行 compat **181**（s\* 中心の移行バッチ tail）を `bb actor:publish` で kotoba-lang `com-*` 化 → 除去。hand-deepened `salesforce/stripe` 2 は個別判断で保持中。
+- **Phase 2 本体**: 残り py **1242**（70-tools 1099 + 20-actors 143）を per-file 分類（obsolete → prune / load-bearing → nbb 再実装）。耐久 SSoT（`00-contracts/schemas/cleanroom-*.json/edn`）は保持。wave11 の cljc contract テストは無傷（Phase 1 は cljc をゼロ除去）、py driver が要るなら nbb 版を作る。
+- **Phase 0/2/3/4** は設計どおり（共有ライブラリ git-dep 化 → 非 fleet actor 173 除去 → fleet runner 改修 → 未 split 67）。
+- **engine/tools split-now**: leaf 群（`kotoba_iso20022`/`legal-*-wasm-guest`/`baien-wasm-ternary`/`kami-apps`/`etzhayyim-py`/`clj-murakumo-langchain`）は未独立リポ化で新規作成が必要。
+
 ## Addendum 2026-07-16（Phase 1 実行時の追加ブロッカー — 実行前検証で発覚）
 
 `/loop 5フェーズを進めて` の Phase 1（compat 844 の stale コピー除去）を実行しようとした際、**設計時に「低リスク」と評価した前提が不十分だったことが判明**。除去前検証（`os.listdir` 消費者 + drift）で以下を確認し、bulk 除去は**保留**した:

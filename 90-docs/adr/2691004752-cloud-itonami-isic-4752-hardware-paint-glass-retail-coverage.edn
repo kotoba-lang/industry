@@ -1,0 +1,79 @@
+[{:adr/id 2691004752
+  :adr/title "cloud-itonami-isic-4752 — Hardware, Paint and Glass Specialized-Store Retail Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-4752]
+  :adr/references [2607121000 2680004719]
+
+  ;; Wave 2 actor (coordination/logistics/trade): hardware/paint/glass
+  ;; specialized-store retail operations coordination-only (sales-record
+  ;; logging, staffing-operation scheduling, supply-order coordination,
+  ;; hazmat-handling-safety-concern flagging). No op finalizes a
+  ;; hazmat-handling-safety clearance -- that action is structurally
+  ;; excluded, never merely gated.
+
+  :actor/id :cloud-itonami-isic-4752
+  :actor/name "Hardware, Paint and Glass Retail Operations Coordinator"
+  :actor/isic-rev5 "4752"
+  :actor/domain :retail/hardware-paint-glass
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-sales-record :schedule-staffing-operation
+                       :coordinate-supply-order :flag-safety-concern]
+  :actor/always-escalate-ops [:flag-safety-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-supply-order 1000}
+
+  :actor/hard-checks [:store-verified :vendor-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["finalize the hazmat clearance" "finalize the hazmat handling clearance"
+                                "certify the storage area as compliant" "certify the storage as code-compliant"
+                                "clear the spill as contained" "clear the spill as safe"
+                                "sign off on the hazmat clearance" "sign off on the hazmat handling permit"
+                                "approve the hazardous materials storage permit"
+                                "issue the flammable-storage compliance certificate"
+                                "declare the tinting room ventilation compliant"
+                                "authorize the solvent disposal as compliant"
+                                "finalize the spill containment clearance"
+                                "confirm the aerosol storage as code-compliant"
+                                "certify the site as hazmat-compliant"
+                                "grant the hazmat handling clearance"
+                                "危険物取扱いの許可を確定" "保管区画の適合証明を発行"
+                                "漏出物の安全確認を完了" "消防法適合証明を発行"]
+
+  ;; Self-trip-avoidance: every term above is phrased as the
+  ;; finalization/execution ACTION, never a bare noun -- this namespace's
+  ;; own :flag-safety-concern default proposal legitimately discusses
+  ;; solvent/aerosol/flammable-storage/spill/ventilation concerns, and its
+  ;; own printed :op keyword literally contains the substring "safety". A
+  ;; bare-noun term list (e.g. bare "hazmat"/"spill"/"solvent") would
+  ;; self-trip this actor's own core happy path on every single run.
+  ;; Regression test:
+  ;; governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion.
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-sales-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-sales-record :schedule-staffing-operation
+                                               :coordinate-supply-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-sales-record :schedule-staffing-operation
+                                         :coordinate-supply-order :flag-safety-concern}
+      :auto #{:log-sales-record :schedule-staffing-operation :coordinate-supply-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 56 :assertions 166 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression
+                  :vendor-verification]
+  :test/simulator :hardwarepaintops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-4752"
+  :registry/business-id "cloud-itonami-isic-4752"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
