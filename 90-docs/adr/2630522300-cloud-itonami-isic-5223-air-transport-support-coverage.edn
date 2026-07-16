@@ -1,0 +1,66 @@
+{:adr/id "2630522300"
+ :adr/title "cloud-itonami ISIC-5223 Airport-Ground-Handling Operations-Coordination Actor — Blueprint Fill-In & Registry Promotion"
+ :adr/status "accepted"
+ :adr/date "2026-07-16"
+ :adr/deciders ["Jun Kawasaki"]
+ :adr/scope
+ {:repo "orgs/cloud-itonami/cloud-itonami-isic-5223"
+  :registry "orgs/kotoba-lang/industry"
+  :isic-code 5223
+  :wave 2
+  :pre-existing? true
+  :note "repo pre-existed as :blueprint-tier (blueprint.edn + docs published, no src) from an earlier bulk-scaffolding pass; this ADR fills it in rather than creating it fresh"}
+ :decision
+ {:id "cloud-itonami-isic-5223"
+  :name "Service activities incidental to air transportation"
+  :isic-code "5223"
+  :business-id "cloud-itonami-5223"
+  :repo "https://github.com/cloud-itonami/cloud-itonami-isic-5223"
+  :public? true
+  :governor :airport-operations-governor
+  :modules
+  ["groundops.facts"
+   "groundops.store"
+   "groundops.registry"
+   "groundops.groundopsllm"
+   "groundops.governor"
+   "groundops.operation"
+   "groundops.phase"
+   "groundops.sim"]
+  :allowed-operations
+  [{:op :log-service-record
+    :description "De-icing/baggage-handling/ramp-service data logging"}
+   {:op :schedule-ground-operation
+    :description "Ramp/gate/de-icing scheduling proposal"}
+   {:op :flag-ramp-safety-concern
+    :description "Ramp-safety-concern flag (always escalates)"}
+   {:op :coordinate-equipment-maintenance
+    :description "Ground-support-equipment maintenance coordination"}]
+  :governor-hard-checks 6
+  :governor-check-names
+  [:op-not-allowed :effect-not-propose :finalize-clearance-scope-violation
+   :no-spec-basis :facility-unverified :open-ramp-hazard-blocks-op]
+  :rollout-phases 4
+  :high-stakes-ops [:ground/flag-ramp-safety-concern]
+  :never-auto-any-phase [:flag-ramp-safety-concern]
+  :tests-passing 36
+  :assertions-passing 164}
+ :self-tripping-bug-fix
+ {:known-fleet-wide-pattern? true
+  :description "scope-exclusion terms phrased as bare nouns (e.g. \"safety\", \"ramp\", \"de-icing\") can match inside the mock advisor's own legitimate default rationale text and self-block the happy path"
+  :fix "finalize-clearance-phrases phrased as the finalization/execution ACTION (e.g. \"finalize the ramp-safety clearance\", \"clear the ramp as safe\", \"override the de-icing protocol\"), never a bare noun"
+  :regression-test "test/groundops/governor_contract_test.clj :: default-advisor-proposals-never-self-trip-finalize-clearance-scope"}
+ :verification
+ {:tests "36 tests, 164 assertions, 0 failures, 0 errors (clojure -M:test)"
+  :lint "clj-kondo: 0 errors, 0 warnings (clojure -M:lint)"
+  :demo "clojure -M:dev:run -- all scenarios completed offline"
+  :push-commit "6f97734cefb2401f8430f51f4eaf1cfa78a671f0"
+  :push-base "5debf49"
+  :repo-public? true
+  :registry-entry-updated? true
+  :post-push-reverify "fresh independent re-clone into a new scratch dir reran clojure -M:test, same 36/164/0/0 result"}
+ :references
+ ["ADR-2607121000"
+  "ADR-2628000000"
+  "ADR-2628071600"
+  "Skill:build-actor"]}
