@@ -1,0 +1,33 @@
+[{:adr/id "adr-2607122300-kotoba-wasm-bool-op-completion"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607122300: kotoba 言語の bool 演算子ギャップ完全解消 — WASM compiler に pos?/neg?、interpreter に when/and/or"
+  :adr/topic "kotoba-wasm-bool-op-completion"
+  :adr/status "accepted"
+  :adr/date "2026-07-12"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for ["kotoba language surface symmetry: interpreter and WASM compiler both support if/when/let/do/and/or/not + pos?/neg?/zero? as of kotoba-lang/kotoba a532780a"
+                          "documented integer-0 truthiness divergence (interpreter truthy / wasm i32 falsy) as intentional, same caveat as if"
+                          "no .kotoba emission wiring for cloud-itonami kernels (owner decision 2026-07-12 cljs-first stands; this ADR only keeps the emit door open)"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related ["adr-2607072530-cloud-itonami-kototama-wasm-llm-infer-poc-isic-6511"
+                "adr-2607072600-cloud-itonami-isic-6492-kototama-tender-wasm-deploy"
+                "adr-2607101200-kotoba-language-kototama-runtime-vocabulary-lock"
+                "adr-2607122100-cloud-itonami-labor-liberation-sd-model"]
+  :db/id -1
+  :adr/decision-summary
+  "{:trigger \"ADR-2607122100 Track A wasm 工場前作業 — ADR-2607072530/2607072600 が独立に踏んだ pos?/neg?/and/or/when の :unsupported-op を解消\",
+    :found-upstream \"and/or/when の WASM 側は既に上流 main で実装済み (desugar-and/or + when→if, wasm-and-or-when-test)。残る非対称は (1) WASM compiler の pos?/neg? 欠落 (2) interpreter の when/and/or 欠落\",
+    :landed {:repo \"kotoba-lang/kotoba\" :main \"a532780a\"
+             :changes [\"WASM compiler: pos?/neg? → (> x 0)/(< x 0) 縮約 (zero?/not の隣)\"
+                       \"interpreter eval-form: when/and/or special forms (truthy? ベース、値返し・短絡)\"
+                       \"parity fixture src/demo_bool.kotoba (両 backend =221) + wasm_exec_test 2 deftest\"
+                       \"整数 0 の真偽則乖離 (interp truthy / wasm falsy) を docstring 明文化\"],
+             :tests \"targeted 81 tests/412 assertions green; full suite 0 failures (5 errors = 素の main でも再現する sandbox mesh-node HTTP 既存事象); clj-kondo clean\"},
+    :west-pin {:entry \"kotoba\" :from \"546b28e2\" :to \"a532780a\" :commit \"88586c18\" :note \"初回 PUT 409 → 楽観ロック通り再取得でリトライ成功。compare ahead 12/behind 0\"},
+    :factory-alignment {:owner-decision-2026-07-12 \"cloud-itonami safety kernels は ClojureScript + kotoba-datomic first、.kotoba emission 意図的未配線 (全 9 kernels/gate.cljc docstring + ADR-2607121200 系)\",
+                        :fleet-progress \"wave-0 金融 18 衛星中 9 本 kernel 抽出済み/進行中 (6419/6492/6499/6511/6512/6520/6611/6621/6622。6622 は 19:48 時点 WIP)\",
+                        :this-adr \"emit の扉を開けておく言語整備のみ。個別 kernel の .kotoba 化は行わない (決定に逆行するため中止)\",
+                        :remaining-unkerneled [\"6411\" \"6420\" \"6430\" \"6491\" \"6530\" \"6612\" \"6619\" \"6629\" \"6630\"]}}"}]

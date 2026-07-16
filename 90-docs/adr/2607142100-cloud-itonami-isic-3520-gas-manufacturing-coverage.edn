@@ -1,0 +1,22 @@
+{:adr-id "2607142100"
+ :title "cloud-itonami-isic-3520 — Gas Manufacturing Operations Actor"
+ :status :accepted
+ :date "2026-07-14"
+ :context
+ "ISIC 3520 (Manufacture of Gas) covers gas production and distribution.
+  Community operators need auditable supply provisioning and suspension with
+  hard safety gates preventing life-support/critical-infrastructure disconnection."
+ :decision
+ "Implement cloud-itonami-isic-3520 following established pattern: LLM Advisor
+  ⊣ Gas Safety Governor + audit ledger. Five HARD gates: spec-basis, evidence,
+  protected-recipient (never suspend), double-operation guards, escalation to
+  human. MemStore/DatomicStore backends, .cljc portable, standalone forkable."
+ :consequences
+ ["Certified operators fork and deploy independently with auditable decisions"
+  "All extensions additive: new gates + tests following governor-verify pattern"
+  "Third NEGATIVE-actuation vertical (after 3600 water, 6190 telecom)"]
+ :repo "https://github.com/cloud-itonami/cloud-itonami-isic-3520"
+ :registry "https://github.com/kotoba-lang/industry"
+ :isic-rev5 "3520"
+ :domain :utilities/gas-distribution
+ :status-in-registry :implemented}

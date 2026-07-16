@@ -1,0 +1,19 @@
+[{:adr/authoritative_for ["Indeed-style meta job-search venture placement in the cloud-itonami fleet (ISIC 6399 narrowed to job-posting meta-search)"
+                          "cloud-itonami/cloud-itonami-isic-6399 scope (posting aggregation/publication/delisting only; never candidate matching or placement)"
+                          "kotoba-lang/industry registry 6399 entry promotion :spec -> :implemented"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/topic "cloud-itonami-isic-6399-meta-jobsearch-venture"
+  :adr/related ["cloud-itonami/cloud-itonami-isic-6399 docs/adr/0001-architecture.md"
+                "cloud-itonami/cloud-itonami-isic-7810 docs/adr/0001-architecture.md"
+                "kotoba-lang/industry resources/kotoba/industry/registry.edn"]
+  :adr/status "accepted"
+  :adr/id "adr-2607121700-cloud-itonami-isic-6399-meta-jobsearch-venture"
+  :adr/doc_type "adr"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/date "2026-07-12"
+  :adr/amends []
+  :db/id -1
+  :adr/decision-summary "{:question \"does an Indeed-style meta job-search actor exist in cloud-itonami, and if not where does it go\", :finding \"no job-search/aggregator venture anywhere in the fleet; nearest entries are different businesses -- isic-7810 (placement agency, sourcing explicitly out of scope), isic-7820 (temp staffing), isic-6312 (generic web-portal curation), isic-6310 (HR talent management), isic-6311 (market-data aggregation)\", :placement {:registry-constraint \"kotoba.industry/by-id is keyed by :id -- one entry per ISIC class, so 6312/7810 cannot host a second venture\", :chosen \"ISIC 6399 (other information service activities n.e.c., official notes include information search services) -- a :spec J-prefix placeholder, narrowed to job-posting meta-search, same narrowing move as 6311 (market data) and 4610 (commission broker)\"} :new-venture {:repo \"cloud-itonami/cloud-itonami-isic-6399\" :visibility :public :license \"AGPL-3.0-or-later\" :actor \"JobSearch-LLM ⊣ Job Search Portal Governor\" :governor-keyword :job-search-portal-governor :entity :posting :ops [:posting/ingest :jurisdiction/assess :posting/publish :posting/delist] :actuation-shape \"dual sequential on the same posting (publish first, delist later); never autonomous at any phase\" :hard-checks {:flagship \"stale-vacancy (職業安定法5条の4 的確表示義務 / FTC Act §5 / GBR Conduct Regs 2003 reg 27 / UWG §5; zero fleet hits for vacancy)\" :conditional \"source-consent-unverified (consent-check family, conditional on :requires-source-consent?; database-right/copyright + 特定募集情報等提供事業者届出)\" :reapplied [\"ad-content-discriminatory (7810's discipline on ad content: 均等法5条/労働施策総合推進法9条, Title VII §704(b), ADEA §4(e), Equality Act 2010, AGG §11)\" \"displayed-compensation-mismatch (ground-truth recompute: hourly wage x monthly hours)\"]} :robotics false :jurisdictions [\"JPN\" \"USA\" \"GBR\" \"DEU\"]} :registration {:github-org \"cloud-itonami\" :registry \"kotoba-lang/industry registry.edn 6399 entry :spec -> :implemented, J-prefix placeholder repo/business-id rewritten\" :west \"venture repos are not west projects (fleet convention); only the industry pin advances\"} :explicitly-excluded [:candidate-matching :candidate-placement :real-crawler-integration :sponsored-listing-mechanics]}"
+  :adr/authoritative true
+  :adr/title "ADR-2607121700: Indeed-style meta job-search — new cloud-itonami venture, ISIC 6399 narrowed to job-posting meta-search"}]

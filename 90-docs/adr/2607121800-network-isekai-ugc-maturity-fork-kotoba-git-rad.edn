@@ -1,0 +1,32 @@
+[{:adr/id "adr-2607121800-network-isekai-ugc-maturity-fork-kotoba-git-rad"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607121800: network-isekai の Fortnite/Roblox ギャップ成熟度評価と、fork 公開層を kotoba-git + kotoba-rad(git repo)前提へ再方向付け"
+  :adr/status "accepted"
+  :adr/last_verified "2026-07-12"
+  :adr/topic "network-isekai-ugc-maturity-fork-kotoba-git-rad"
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["network-isekai の Fortnite/Roblox 比の成熟度マトリクス(2026-07-12 実測):\n    owner 運用の 3D game 公開プラットフォームとしては L3(40 games 本番)、\n    UGC プラットフォームとしては公開/UGC ループ(fork 永続共有)が L1 で律速。\n    economy/fork_stats/moderation は実コードだが全て fork graph 実在待ちで停止"
+   "fork の永続層は window.kotoba.pin 配線ではなく kotoba-git + kotoba-rad:\n    1 game(root) = 1 repo(RID = kotoba-rad genesis CID)、fork = commit\n    (tree = {game.edn scene.edn logic.cljc}, parents = [親 fork head])、\n    公開 = sigref + authorize-push?(または CACAO chain)、共有 URL =\n    ?fork=<commit-CID>、creator = did:key self-mint、訪問者 fork は\n    local-first で Publish 時に push"
+   "「kotoba-lang/git」という repo は存在しない(gh 404, 2026-07-12) —\n    オーナー指示の「kotoba-lang/git, rad or radicle」の解決先は\n    kotoba-lang/kotoba-git + kotoba-lang/kotoba-rad(ADR-2607072200)。\n    実 Radicle(heartwood)は不採用(Rust node 常駐 + git wire 互換前提)、\n    1 fork = 1 GitHub repo も不採用(rate limit/主権/fork UX)"
+   "kotoba-git/kotoba-rad の初の本番配線先が network-isekai の fork 層に\n    確定したこと(ADR-2607072200 の『production 未配線』の解消経路)"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related
+  ["90-docs/adr/2607072200-kotoba-git-kotoba-rad-content-addressed-vcs.md"
+   "90-docs/adr/2606280300-kotoba-rad-git-sovereign-repo.md"
+   "90-docs/adr/2607032400-network-isekai-primary-consolidation.md"
+   "90-docs/adr/2607091830-network-isekai-game-work-actors-app-aozora.md"
+   "90-docs/adr/2607031400-itonami-games-atproto-actors-app-aozora.md"
+   "orgs/gftdcojp/network-isekai/src/isekai/fork.cljc"
+   "orgs/gftdcojp/network-isekai/src/isekai/web.cljc"
+   "orgs/gftdcojp/network-isekai/src/isekai/economy.cljc"
+   "orgs/kotoba-lang/kotoba-git"
+   "orgs/kotoba-lang/kotoba-rad"]
+  :adr/problem
+  "{:source \"オーナー質問(2026-07-12)『isekai-network はもう fortnite, roblox の\n    ような 3d world を生成, 公開できるようになっている?』→ 指示『gap, 成熟度と\n    してまとめて adr を構築, fork などは git repo を kotoba-lang/git, rad or\n    radicle につくる前提で』\",\n   :facts [\"isekai.network は 40 games(gftd 32 + itonami 8)を本番配信、royale 等は\n    3rd-person 3D world(PBR/手続き配置/WebGPU)。ブラウザ内 compile は PR #72\n    (2026-07-03 merged)で復旧済み。photo→3D(TRELLIS/Modal)実働\"\n   \"fork 共有が未配線: window.kotoba クライアントがサイトのどこにも load されず\n    ?fork= リンクは base game に fallback(src/isekai/web.cljc に明記)。訪問者の\n    fork は他人に届かない — UGC ループの律速段\"\n   \"economy(sybil gate + fork DAG royalty)/fork_stats(viral coefficient)/\n    moderation(状態機械)/feed_index(fork-graph index)は実コードだが全て\n    fork 永続グラフの実在待ち\"\n   \"kotoba-git/kotoba-rad は 2026-07-07 時点で実装・テスト済み(CLJS CI 含む、\n    signed head-announce は p2p と cross-repo E2E 検証済み)だが本番 surface 未配線\"]}"
+  :adr/decision
+  "{:chosen [\"fork/公開/fork graph を kotoba-git(object DAG + refs) + kotoba-rad\n    (RID/sigref/push-gate)の上に構築 — window.kotoba.pin 配線は追わない\"\n   \"1 game = 1 repo(RID)、fork = commit(parents = 親 fork head)で fork graph を\n    実 commit DAG 化 — feed_index の stand-in と economy の royalty decay が\n    そのまま実グラフに載る\"\n   \"公開 = did:key sigref + authorize-push?(CACAO delegation chain 可)、\n    fast-forward は set-ref-guarded! で強制、共有 URL は ?fork=<commit-CID>\"\n   \"訪問者 fork は local-first(ブラウザ内 arrangement db)、Publish で push\"],\n   :milestones {:M0 \"DONE 2026-07-12 (network-isekai PR #130, 902f890): isekai.fork-git +\n    bb fork-git 11/11 + bb fork-git-e2e 12/12 — JVM/bb/実Chromium の commit CID\n    バイト一致を層別検証。初回実行が本物のバグを捕獲: pr-str は canonical でない\n    (JVM *print-namespace-maps* true → #:fork{...} 短縮 vs cljs false) → manifest\n    blob 分岐 → canonical-pr で修正、fixture pin bafyreign5kxw2…。kotoba-git は\n    bb で全面動作(git/sha pin f7ecffb)。残: persist! の IndexedDB adapter(M1)、\n    repo の GitHub Actions が設定無効で CI 非実効(owner 判断要)\"\n   :M1 \"DONE 2026-07-12 (network-isekai PR #132/#133/#134): /api/fork(検証付き\n    block store + owner 署名 ref、did:key 自己主権 namespace)+ client\n    (did:key mint / publish! / hydrate)+ 正式 gate 8/8 — 別ブラウザ・別\n    identity で ?fork=<CID> 再現を実 Functions + 実 local D1 で検証。公開/UGC\n    ループ L1→L4(コード検証済み)。e2e が endpoint 糊層の実バグ2件を捕獲\n    (rate-limit boolean 誤読で全 push 429 / D1 BLOB Array の Response 文字列化)。\n    本番 L4 化は owner deploy のみ(d1-schema --remote + pages deploy)\"\n   :M2 \"実 fork graph discovery(viral-coefficient 実測化) + RID を aozora\n    Work Actor に紐付け\"\n   :M3 \"economy 接続(sybil gate = /api/scores verified clear) + keyed actor\n    昇格(ADR-2607031400 再訪) + moderation policy\"}\n   :out-of-scope [:realtime-multiplayer :prompt-to-world-generation :radicle-bridge],\n   :rejected [{:option \"当初設計の kotoba pin 配線\" :why \"blob 単位のみで系譜/署名/認可を再発明することになる。オーナー指示も git repo 前提\"}\n   {:option \"実 Radicle(heartwood)採用\" :why \"Rust node 常駐 + 実 git wire 互換前提 — ADR-2607072200 の scope 外 + Rust 方針と不整合。ecosystem は同等 primitives を CLJC で所有済み\"}\n   {:option \"1 fork = 1 GitHub repo\" :why \"rate limit/アカウント要求/秒単位 fork UX 不適/主権欠如\"}\n   {:option \"fork を D1 に保存\" :why \"content-addressed でも署名可能でもない。M1 の実装詳細としてなら残る(保存形式は kotoba-git object)\"}]}"
+  :adr/consequences
+  "{:positive [\"kotoba-git/kotoba-rad が初の本番 surface を得る\"\n   \"律速段の特定がデータで共有される: 描画/エディタ磨き込みより公開/UGC ループが先\"\n   \"既存 40 games の owner 公開フローは無傷(訪問者 fork 公開の追加のみ)\"],\n   :negative [\"network-isekai が kotobase-peer スタックの churn に依存(:git/sha pin で緩和)\"\n   \"kotoba-git のブラウザ実行・永続化は未検証(M0 の gate)\"\n   \"multiplayer(L1)と prompt→world 生成は本 ADR では前進しない\"]}"
+  :db/id -1}]

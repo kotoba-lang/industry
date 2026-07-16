@@ -1,0 +1,80 @@
+[{:db/id -1
+  :adr/id "adr-2607141550-persona-visual-user-test-react-loop"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607141550: persona ベースの visual / user test と feedback react loop"
+  :adr/topic "persona-visual-user-test-react-loop"
+  :adr/status "accepted, implemented, closed"
+  :adr/date "2026-07-14"
+  :adr/last_verified "2026-07-15"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["persona-conditioned visual/user test の 3 層配置: mechanism=kotoba-lang/design-quality(persona.cljc、:persona-visual 層)、catalog=各 product repo(personas.edn + persona-visual-ledger.edn)、operation=cloud-itonami(routine + Governor gate)"
+   "react loop の形: 内側 synthetic(Capture→Panel→Ledger→Reflect→Rank→Evolve、決定論 audit が gate)+ 外側 real-user(:telemetry 層で CVR/CPA を合流し persona を較正)"
+   "採点軸 6 つ(first-view-comprehension/trust/cta-findability/anxiety-resolution/readability/form-intent、1-5)と ledger イベント拡張(:eval/persona :eval/page)"
+   "itad の初期 5 persona(soumu-tanaka/jousys-sato/keiei-suzuki/isms-jimukyoku/mobile-searcher)"
+   "捏造ゼロの継承: persona feedback 由来でも保有しない実績・認証・顧客の声は Evolve で追加しない"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related
+  ["adr-2607141446-ai-gftd-itad-pc-disposal-certification"
+   "adr-2607132300-design-quality-score"
+   "adr-2606141500-keiei-arbor-coscientist-engine"
+   "network-isekai adr-0007-ux-coscientist-kaizen"]
+  :adr/decision-summary
+  "{:placement {:mechanism \"kotoba-lang/design-quality src/design_quality/persona.cljc\", :catalog \"product repo resources/personas.edn + docs/persona-visual-ledger.edn\", :operation \"cloud-itonami routine (follow-up)\"}, :new-repos 0, :ledger {:format :design-quality-eval-events, :extra-keys [:eval/persona :eval/page], :layer :persona-visual, :append-only true}, :axes [:first-view-comprehension :trust :cta-findability :anxiety-resolution :readability :form-intent], :scale [1 5], :loop {:inner [:capture :panel :ledger :reflect :rank :evolve], :gate :deterministic-audit-min-95, :outer [:telemetry :calibrate], :convergence :dry-2-rounds}, :personas [:soumu-tanaka :jousys-sato :keiei-suzuki :isms-jimukyoku :mobile-searcher], :honesty :no-fabricated-social-proof, :follow-ups [:three-judge-stdev :itonami-routine :telemetry-merge :persona-calibration]}"
+  :adr/addendum-2-2026-07-15
+  {:summary "Implemented the MECHANISM half of follow-up 1 (3-judge panel +
+             stdev, light/dark theme scoring) in both kotoba-lang/design-
+             quality (persona.cljc) and the ai-gftd-itad runner. Did NOT
+             execute a live 3-judge x light/dark panel against the real
+             itad.gftd.ai site -- that operation-layer step needs real
+             browser screenshot capture and real LLM judge invocations,
+             infrastructure this session's environment does not have
+             connected (no browser extension). Honestly recorded as still
+             outstanding, not silently claimed done."
+   :mechanism
+   {:repo "kotoba-lang/design-quality" :commits "4d316cfa -> fb766e2f"
+    :change "score-events/feedback-event gained an optional :theme param,
+             adding :eval/theme only when given (omitted keeps the exact
+             pre-existing shape, so historical ledger lines and theme-less
+             callers are unaffected). mean-by-axis turned out to already be
+             judge-count-agnostic (groups purely by :eval/axis regardless
+             of how many distinct :eval/judge values are present) -- the
+             '3-judge' half of this follow-up was already true at the
+             aggregation level; added a test proving 3 disagreeing judges
+             produce a correct nonzero stdev, since the existing suite only
+             exercised 2."
+    :tests "18 tests / 190 assertions (was 16/181), 0 failures; clj-kondo 0 errors"}
+   :runner
+   {:repo "ai-gftd-itad" :commits "e23c16e2 -> 8a7db51c"
+    :change "tools/append_persona_run.cljs now accepts multiple judge result
+             files per persona (result-<id>.edn = judge 1, unchanged;
+             result-<id>.j2.edn / .j3.edn / ... = additional judges) and an
+             optional 5th <theme> positional arg threaded onto every event
+             for that run (one run still = one page/theme capture batch)."
+    :bug-found-and-fixed "the runner already called persona/mean-by-axis
+                           (which computes :stdev) but only ever printed
+                           :mean and :n, silently dropping the exact number
+                           this whole effort exists to surface (ADR-
+                           2607132300's measured point: a single judge hides
+                           weak consensus). Now prints stdev too."
+    :verification
+    "real nbb execution in an isolated sandbox, never the committed
+     docs/persona-visual-ledger.edn: 3 synthetic judge files for one
+     persona + 1 single-judge persona -> correct n=4 aggregation with
+     nonzero stdev now visible; isms-jimukyoku (contains 'jimu', not a
+     genuine judge suffix) parses correctly without false-positive suffix
+     stripping; idempotency (refuses to double-append a seen run-id) and
+     unknown-persona-id rejection both still work; the no-theme 4-arg call
+     keeps the exact prior event shape (verified zero :eval/theme keys
+     appended). A stray 'nil' printed in the no-theme summary line was
+     caught and fixed before landing."}
+   :west-pin
+   {:design-quality "4d316cfa -> fb766e2f (gh api compare: ahead_by=2, behind_by=0)"
+    :ai-gftd-itad "e23c16e2 -> 8a7db51c (gh api compare: ahead_by=2, behind_by=0)"}
+   :honest-remaining-gap
+   "no live 3-judge x light/dark panel has actually been RUN against
+    itad.gftd.ai. Follow-up 1 is mechanically ready but operationally
+    unexecuted; running it is now unblocked by code, only by missing
+    browser-automation connectivity in this environment."}}]

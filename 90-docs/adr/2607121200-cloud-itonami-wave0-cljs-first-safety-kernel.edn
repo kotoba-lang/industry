@@ -1,0 +1,38 @@
+[{:adr/id "adr-2607121200-cloud-itonami-wave0-cljs-first-safety-kernel"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607121200: Wave 0 金融 vertical は CLJS + kotoba-datomic 第一・safety kernel 抽出で進める(wasm 複製は保留)"
+  :adr/topic "cloud-itonami-wave0-cljs-first-safety-kernel"
+  :adr/status "accepted"
+  :adr/date "2026-07-12"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for ["Wave 0 finance vertical execution path (CLJS-first, wasm deferred)"
+                          "safety-kernel extraction discipline for cloud-itonami-isic satellite repos"
+                          "kotoba-datomic milestone definition (M1 langchain.db contract under CLJS, M2 live kotoba-server retarget)"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends ["adr-2607121000-cloud-itonami-global-isic-isco-reverse-toposort-plan"]
+  :adr/related ["adr-2607101200-kotoba-language-kototama-runtime-vocabulary-lock"
+                "adr-2607072530-cloud-itonami-kototama-wasm-llm-infer-poc-isic-6511"
+                "adr-2607072600-cloud-itonami-isic-6492-kototama-tender-wasm-deploy"]
+  :db/id -1
+  :adr/decision-summary
+  "{:owner-direction \"2026-07-12: wasm にこだわらず CLJS + kotoba datomic 第一、safety kotoba cljc で安全設計\",
+    :path [:cljs-first :safety-kernel-extraction :kotoba-datomic-contract :wasm-deferred-not-deleted],
+    :safety-kernel {:vocabulary [:defn :def :nested-if := :< :integer-arith],
+                    :forbidden [:keywords :strings :maps :atoms :interop :io :macros :protocols],
+                    :fail-closed [:non-binary-flags-are-violations :out-of-range-confidence-escalates :out-of-range-phase-has-no-writes],
+                    :locks [:battery-case-count :full-matrix-facade-parity :constant-drift-pin]},
+    :kotoba-datomic {:m1 \"langchain.db Datomic-compatible store contract green under CLJS (done for 6511)\",
+                     :m2 \"live kotoba-server/kotobase retarget via langchain.kotoba-db :http-fn + kotobase.cacao self-mint (out of scope here)\"},
+    :reference {:repo \"cloud-itonami/cloud-itonami-isic-6511\", :merged \"4c369255c36de5d3f368e83ce626798c38f85404\",
+                :kernel \"underwriting.kernels.gate (battery 38, lock)\",
+                :verified \"CLJS 37 tests / 462 assertions 0 failures; JVM parity; clj-kondo clean\"},
+    :rollout {:status :completed, :completed-date \"2026-07-12\", :repos 18,
+              :done-criteria [:kernels-gate-extracted :tests-cljc :cljs-runner-green :store-contract-cljs-green],
+              :fleet-totals {:battery-cases 855, :tests 910, :assertions 10997, :runtimes-green [:cljs :jvm], :behavior-changes-beyond-documented-hardening 0},
+              :merges {\"6411\" \"02d3a94\", \"6419\" \"cc3e5b2\", \"6420\" \"3616bf0\", \"6430\" \"fec5b3e\", \"6491\" \"02157fc\", \"6492\" \"2389623\", \"6499\" \"f188560\", \"6511\" \"4c36925\", \"6512\" \"f37f7d5\", \"6520\" \"31f68df\", \"6530\" \"b29de2c\", \"6611\" \"9321248\", \"6612\" \"9d5544f\", \"6619\" \"57ef7d8\", \"6621\" \"1dd380f\", \"6622\" \"1d2133d\", \"6629\" \"dac27e1\", \"6630\" \"e2b2897\"},
+              :numeric-techniques [:integer-cross-multiplication :scaled-int-plus-minus-one-tolerance :collection-scans-stay-facade-side],
+              :follow-up [:op0-lane-convention-harmonization-no-behavior-diff]},
+    :survey-2026-07-12 {:wave0-finance-repos 18, :with-src 18, :skeleton 0, :cljs-blockers 0,
+                        :gap [:jvm-only-test-harness :facade-grade-governor-core :datomic-seam-unverified-under-cljs]}}"}]

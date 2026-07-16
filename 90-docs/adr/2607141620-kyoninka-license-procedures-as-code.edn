@@ -1,0 +1,25 @@
+[{:db/id -1
+  :adr/id "adr-2607141620-kyoninka-license-procedures-as-code"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607141620: kyoninka — ITAD 許認可取得手続きの as-code 化"
+  :adr/topic "kyoninka-license-procedures-as-code"
+  :adr/status "accepted, implemented, closed"
+  :adr/date "2026-07-14"
+  :adr/last_verified "2026-07-14"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["kotoba-lang/kyoninka の新設(public): 日本の許認可手続きの procedure-as-data ライブラリ(Datomic 互換 EDN + 純関数 + 状態機械)"
+   "初期収録 2 手続き: 産業廃棄物収集運搬業許可(廃掃法14条・東京都テンプレート・81,000円・約60日・5年)と古物商許可(古物営業法3条・管轄警察署経由・19,000円・約40日)"
+   "収録値は :verify フラグ付き標準値 — 申請直前の窓口確認を手続きの第1ステップとしてコードに組み込む(捏造ゼロの行政手続き版)"
+   ":legal-questions の明示保持: ITAD 宅配回収の廃棄物該当性(買取=古物 vs 廃棄物=廃掃法、下取り・専ら物例外、運送委託)で収集運搬許可の要否がスキーム依存 — 行政書士確認まで断定しない"
+   "提出・官庁接触・支払いを伴う状態遷移は :requires-human true(ライブラリは提案のみ、実行しない)"
+   "cloud-itonami 側: license.cljc + resources/licenses/itad-license-ledger.edn(append-only)で Gftd Japan の 2 case を進行管理"
+   "DoD: ai-gftd-itad LP の許可『準備中』表記の実番号化 → persona panel 再実行で trust 軸を再計測"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related
+  ["adr-2607141446-ai-gftd-itad-pc-disposal-certification"
+   "adr-2607141550-persona-visual-user-test-react-loop"]
+  :adr/decision-summary
+  "{:new-repo {:org :kotoba-lang, :name \"kyoninka\", :visibility :public}, :procedures {:sanpai-shuun {:law \"廃棄物処理法14条1項\", :authority \"都道府県知事(東京都環境局)\", :fee-jpy 81000, :period-days 60, :valid-years 5, :requirements [:jw-course :financial-basis :not-disqualified :business-plan]}, :kobutsu {:law \"古物営業法3条\", :authority \"公安委員会(管轄警察署経由)\", :fee-jpy 19000, :period-days 40, :category :office-equipment}}, :honesty {:values :standard-with-verify-flag, :legal-questions :held-not-decided, :submission :requires-human}, :operation {:repo :cloud-itonami, :module \"cloud_itonami/license.cljc\", :ledger \"resources/licenses/itad-license-ledger.edn\"}, :dod :lp-licenses-real-numbers-then-persona-retest}"}]

@@ -1,0 +1,264 @@
+# ADR-2607031600: cloud-murakumo GPU fleet — 実推論インフラの要件（proposed・設計文書のみ）
+
+**Status**: proposed
+**Date**: 2026-07-03
+**Deciders**: Jun Kawasaki
+
+## Context
+
+`cloud-murakumo`（ADR-2606272300 で closing）は Modal 等価の分散 GPU cloud を
+clj + kotoba + datomic の EDN datom で記述する製品面として実装済みで、
+**control plane（`murakumo.cloud`）は Cloudflare Workers 上に deploy 済み**
+（`wrangler.jsonc`: `assets`-only SPA、custom domain `murakumo.cloud` /
+`www.murakumo.cloud`）。しかし **GPU fleet（実推論インフラ）はハードウェア要で
+未 deploy** — `resources/murakumo.edn` の `:fleet {:nodes {...}}` は
+`asagi`/`kurenai`/`midori`/`ai`/`sora`（H100×8 / H200×8 / A100-80×8 / L4×4、
+Tokyo/Osaka/edge）という**宣言のみ**で、実物理 GPU ノードが存在する確証はない
+（このリポジトリのコード・README・ADR のいずれにも調達元・契約・稼働実績の記述
+がない — [CONFIRM]）。
+
+対照的に、`orgs/kotoba-lang/murakumo`（この org 内の別リポ、kotoba WASM mesh
+制御面）の `fleet.edn` は 11 台の **Mac mini M4 16GiB（GPU なし、Tailscale SSH
+到達）+ M1 Max 32GiB operator** という**実在するがGPUを持たない**フリートで、
+ADR-2607022000（exo 型分散推論、GLM-5.2 実験）はこの Mac mini fleet 上で
+llama.cpp RPC による CPU/Metal 分散推論を実測している（kernel panic 多発・中止
+判断あり）。つまり現状:
+
+- **`cloud-murakumo/resources/murakumo.edn` の H100/A100 fleet** = 設計上の
+  語彙（datom schema・scheduler・cost gate は実装・テスト済み）だが実 GPU 未確保。
+- **`kotoba-lang/murakumo/fleet.edn` の Mac mini fleet** = 実在するが GPU 非搭載
+  （Metal 経由の量子化推論のみ、H100/A100 級のスループットではない）。
+
+この2つを混同しない。本 ADR は前者（`cloud-murakumo` の H100/A100 GPU fleet）を
+実推論インフラとして立ち上げるための要件を整理する。**実 GPU の起動・調達は
+本 ADR の対象外**（財務副作用・ハードウェア調達を伴うため、下記 §5 の承認 gate
+を通す実装 PR で行う）。
+
+`per-product-gate-instruments`（ADR-2607022200）は `cloud-murakumo` の gate
+emitter を `cost.cljc`（run ledger→¥/Mtok）+ `GET /infer/cost` + run body に
+node/elapsed、と定義し、`:hyp/murakumo-tok-price` gate（`[:cost
+:fleet-yen-per-mtok] <= [:cost :spot-yen-per-mtok]`）を measurable-with-fallback
+としている。**`GET /infer/cost` は未実装**（`cloud_murakumo/gateway.cljc` に
+ルートなし、`cli.cljc` の `cmd-cost` が read-only ローカルコマンドとして
+`runs.edn` ファイルを読むのみ）。cost.cljc の電力係数・spot 参照は
+**プレースホルダ**（`default-power-coeffs` = `{:idle-w 80 :load-w 350
+:yen-per-kwh 30.0}`、`default-spot-ref` = `{:gpu-class :h100 :throughput-tok-s
+2000.0 :fx-yen-per-usd 157.0}` — いずれもコード内コメントで明示的に
+「PLACEHOLDER」「実 fleet 実測値は kotoba-lang/murakumo/fleet.edn へ移すのが
+follow-up」と記載）。
+
+## Decision（設計提案のみ・実 GPU 起動は別 PR・別承認）
+
+### 1. アーキテクチャ: control plane と GPU fleet の分離
+
+```
+murakumo.cloud (Cloudflare Workers, deploy 済)
+  └─ 静的 SPA（cljc UI IR + cljs DOM adapter）。playground は scheduler の
+     純粋計算をブラウザ内で実行するのみ。実 GPU 確保はサイトから起こさない
+     （README 明記: 「公開面は純粋計算のみ」）。
+
+cloud-murakumo (clj/cljc ライブラリ + CLI。GPU fleet 未 deploy)
+  scheduler(plan-placements: bin-pack auction)
+    → runtime/reconcile(placement 差分 → :scale-up/:scale-down effect)
+    → [財務承認 gate](§5)
+    → gen worker(worker.cljc: --backend-url 経由で実 GPU runtime に接続)
+    → run ledger(ledger.cljc: :murakumo.run/gpu-seconds, artifacts CID)
+    → cost.cljc(:tok-s/:elapsed-s → ¥/Mtok)→ gate emitter
+```
+
+`scheduler`/`runtime`/`cost` は**副作用なしの純関数**（nbb/JVM/kotoba-clj WASM
+で同一結果）。実 GPU との境界は `worker.cljc`/`executor.clj` の I/O 層
+（`--backend-url` / `KAMI_RENDER_URL` / `COMFY_URL` / `MURAKUMO_BACKEND_URL`）
+に閉じ込められており、GPU fleet を実装する作業は**この境界の下側だけ**を
+埋めればよい（scheduler/cost/schema は無改造で使える設計）。
+
+### 2. ハードウェア要件
+
+`resources/murakumo.edn` の宣言に基づく要件（**実物理ノードの確保状況は
+[CONFIRM]**、以下は設計上の要求スペック）:
+
+- **GPU 種別**: H100(80GB)×8 ノード2台、H200(141GB)×8 ノード1台、
+  A100-80(80GB)×8 ノード1台、L4(24GB)×4 ノード1台（edge/http reach）。
+  region は Tokyo 既定（`:defaults {:region :tokyo}`）、H200 ノードのみ Osaka。
+  台数の考え方は `gpu-catalog`（`scheduler.cljc`）の vram/価格クラス分けに従い、
+  **`:gpu/class`（厳密一致）か `:gpu/min-vram`（条件を満たす最安クラス自動選択）**
+  のどちらかで function ごとに要求する — 固定台数ではなく function 群の
+  autoscale 需要（`target-concurrency` から ceil 計算）を bin-pack した結果と
+  して必要台数が決まる設計。
+- **vLLM serve**: `:llm-serving` app の `minimax-m27`（H100×4 tensor-parallel、
+  MiniMax-M2.7）と `kimi-k27`（H200×8、Kimi-K2.7-Code）が実例。
+  `cloud-murakumo.vllm/serve-command` が `vllm serve <model> --tensor-parallel-size
+  N --max-model-len ... --gpu-memory-utilization 0.9x --api-key $ENV
+  --enable-auto-tool-choice` 形の実行コマンドを生成する（`minimax-m2-modal` と
+  等価生成であることを ADR-2606272300 で検証済み）。
+- **weight の格納**: `:volumes {:hf-cache {:mount "/root/.cache/huggingface"
+  :backend :kotoba-cid} :artifacts {:mount "/data/artifacts" :backend :b2}}`。
+  モデル重みは HuggingFace cache 経路を kotoba CID store（分散 FS）で裏書きし、
+  生成 artifact（画像/動画/音声）は B2 に置く設計。**実際に kotoba-CID
+  backend が weight レベルの GB〜数百GB を実運用で捌けるかは未検証**
+  （ADR-2607022000 の exo 実験は HF CDN 直接 Range fetch + llama.cpp RPC
+  tensor cache で WAN 律速を回避しており、kotoba-CID 経由ではない — 経路の
+  整合は follow-up）。
+
+### 3. Provisioning 経路
+
+**実 GPU をどう確保するかは本リポジトリのコード・ADR に記述がなく [CONFIRM]。**
+`:reach :native`（自社/占有ノード想定、mesh 内部 DNS
+`<node>.murakumo.internal`）と `:reach :http`（edge、`<node>.edge.murakumo.cloud`）
+の2種の到達性区分はあるが、いずれも**内部 host 名の生成規則のみ**
+（`gateway.cljc/node-host`）で、実際の provisioning 手段（自社ラック/クラウド
+GPU インスタンス/spot市場）を指す実装や契約情報は見つからない。設計として
+整理すべき選択肢:
+
+- **自社占有 GPU**: `:reach :native`。固定費だが `cost.cljc` の
+  「fleet ¥/Mtok ≤ spot ¥/Mtok」gate の分子（電力コストのみ）を構成する側。
+  減価償却・設置場所・電源契約は本 ADR の対象外（[CONFIRM]・人手/infra 要）。
+- **クラウド GPU（オンデマンド/予約）**: 主要クラウドの H100/A100 インスタンス。
+  契約・API トークンの管理は下記 secrets 経路に乗る想定だが、具体プロバイダは
+  未選定（[CONFIRM]）。
+- **spot GPU**: `cost.cljc/default-spot-ref` の比較対象そのもの
+  （`gpu-catalog` の相対 $/h）。fleet 自前運用が spot を下回るかを判定する
+  「参照点」であって、spot 自体を fleet として使う設計ではない
+  （両者は比較対象・調達対象として役割が異なる）。
+- **Modal 等価 serverless GPU との関係**: `cloud-murakumo` は Modal の
+  **データモデル**（App/Function/Image/Volume/Secret/autoscale/scale-to-zero）
+  を EDN datom として再現するもので、Modal 自体を GPU provisioning 先として
+  使う設計ではない（README: 「Python decorator ではなく clj + kotoba +
+  datomic の EDN datom」）。ただし Modal を実 provisioning backend として
+  裏で使う選択肢自体は排除されていない（未決定、[CONFIRM]）。
+- **秘密（token）の要否**: `:secrets {:llm-key {:ref "op://gftd/cloud-murakumo/LLM_KEY"
+  :env "LLM_KEY"}}` の参照パターンは既にある（1Password 参照、実値は
+  コミットしない）。GPU provider の API トークン（クラウド GPU 契約・spot
+  市場アクセス・CF/Modal 等）が要るかどうかは provisioning 経路の選定に従属し、
+  現時点で secrets カタログに GPU provider 用エントリはない
+  （追加が必要になった場合も同じ `op://` 参照パターンを踏襲する）。
+
+### 4. 原価/課金モデル — gate `:hyp/murakumo-tok-price` を live 化するための要件
+
+`cost.cljc` の BMC gate（`fleet ¥/Mtok ≤ spot ¥/Mtok`）を実値で動かすには、
+以下すべてが揃う必要がある（現状は全てプレースホルダ or 未実装）:
+
+1. **電力係数の実値化**: `default-power-coeffs`（idle-w/load-w/¥-per-kWh）を
+   `kotoba-lang/murakumo/fleet.edn` 側の実ノード電力実測に置き換える
+   （cost.cljc のコメントが明記する follow-up 先）。実測には電力メーター/
+   PDU 計測などの infra が要る（[CONFIRM]・人手/infra 要）。
+2. **spot 参照の実値化**: `default-spot-ref`（fx-yen-per-usd / throughput-tok-s /
+   gpu-catalog の $/h）を実際の spot 相場・為替の更新源に接続する。
+   `scheduler.cljc/gpu-catalog` の価格は現状ハードコードされた相対値
+   （t4=$0.59 〜 b200=$8.40）で、更新経路（どの API/フィード から取るか）は
+   未定義（[CONFIRM]）。
+3. **run ledger の実供給**: `cost.cljc` が要求する run 形
+   `{:node/id :engine :ranks :tok-s :elapsed-s}` を **実推論から実測供給**する
+   経路が要る。現状 `ledger.cljc/open-run`・`close-run` は `:murakumo.run/*`
+   （gpu-seconds・artifacts CID・cost）を確定するが、`:tok-s`/`:elapsed-s`/
+   `:ranks`/`:node/id` を run に埋め込む配線は cost.cljc 側のドキュメント
+   コメントが「無検証・任意の素通しフィールド」と明記するのみで、
+   `worker.cljc`/`executor.clj` の実行結果からこれらを自動計測して
+   `ledger.cljc` に渡す実装は見当たらない（vLLM の実 throughput ログ
+   （`vllm serve` の decode tok/s 出力等）をどう拾うかは follow-up）。
+4. **`GET /infer/cost` emitter の実装**: `gateway.cljc` に `/infer/cost`
+   ルートはまだ無い。`cli.cljc` の `cmd-cost` は `runs.edn` ファイルを
+   引数で受ける read-only ローカルコマンドで、HTTP 経由で collector
+   （`per-product-gate-instruments` ADR が前提とする `nbb gate` collector 系）
+   が叩ける形にはなっていない。実装 PR では: run ledger の永続化先
+   （kotoba XRPC 経由 `queue-kotoba.clj` の流儀に倣うのが自然）→
+   `GET /infer/cost` が直近 run 群を集計 → `cost/cost-summary` の出力を
+   そのまま返す、という配線が要る。
+5. これら4点が揃って初めて `:hyp/murakumo-tok-price`
+   （`[:cost :fleet-yen-per-mtok] <= [:cost :spot-yen-per-mtok]`）を
+   プレースホルダでなく実測 gate として評価できる。
+
+### 5. 財務 effect 承認 gate
+
+`schema.cljc/risk-of` により GPU 確保系 effect は既に risk 分類済み:
+
+| effect kind | risk | gate |
+|---|---|---|
+| `:deploy` / `:scale-up` | `:financial` | 承認必須（`:proposed` → 人間承認） |
+| `:scale-down` | `:read-only` | 自動（`:approved` 既定） |
+| `:delete` | `:destructive` | 承認必須 |
+
+`runtime.cljc/reconcile` は desired placements vs current の差分を
+`propose-effect` で `:financial`/`:proposed` effect として返すのみで、
+**承認後の実行（実 GPU 起動 API 呼び出し）を行う経路はこのリポジトリに実装
+されていない**（ADR-2606272300 closure 節が明記: 「実 GPU fleet・実 kotoba
+mesh への transact は murakumo 制御面 + KOTOBA_URL/KOTOBA_GRAPH 設定後に行う。
+本 checkout では純データ計算（plan/schedule/reconcile）までを検証済み」）。
+本 ADR は risk gate の設計をそのまま踏襲し、**実 GPU 起動を行う実装は
+必ず `:financial` effect → 人間承認（governor）フローを通す**ことを要件として
+明記する。承認 UI/inbox の実体（cloud-itonami の approval inbox と同型にする
+方針は README/ADR に既述）を GPU fleet 側にも配線するのが実装 PR の残作業。
+
+### 6. 段階導入
+
+- **MVP**: 社内3アプリ（generation スタジオの image/3d/audio 系、または
+  `:llm-serving` の minimax-m27 等）の推論を fleet 移管し、Modal/現行外部
+  サービスとの原価比較（実測 `cost.cljc` gate）で内製が安いかを検証する。
+  対象アプリの具体名（社内3アプリ）は本 ADR 執筆時点で特定情報がなく
+  [CONFIRM]（`resources/murakumo.edn` の `:generation` app 群
+  image/model3d/music/sfx/voice/render が候補）。
+- **外部 marketplace**: fleet 稼働率が MVP で実証された後、外部 GPU
+  marketplace として開放し take rate 20-30% を徴収するモデル
+  （具体的な課金実装・法務/契約要件は本 ADR の範囲外、[CONFIRM]）。
+
+## 残 [CONFIRM] / 人手・infra 事項（正直な棚卸し）
+
+- 実 GPU の調達元・契約状況（自社 or クラウド or spot、台数・region の
+  実確保状況）— このリポジトリ・関連 ADR に確証となる記述なし。
+- 予算（GPU 購入/リース/クラウド利用料の承認済み予算枠）。
+- 電力実測（fleet ノードの idle-w/load-w/¥-per-kWh の実測値。現状
+  `cost.cljc` はプレースホルダのみ）。
+- GPU provider との契約（クラウド GPU/spot 市場アクセスの契約・API token
+  発行元）。
+- weight 格納の実運用検証（kotoba-CID backend が数百GB 級 HF weight を
+  実際に配布できるか。ADR-2607022000 の exo 実験は HF CDN 直接 fetch を
+  採用しており kotoba-CID 経由の実績はまだない）。
+- `GET /infer/cost` エンドポイント実装（gateway.cljc に未実装）。
+- run ledger から `:tok-s`/`:elapsed-s`/`:ranks` を自動計測して積む配線
+  （vLLM/gen worker 側の実測値取り込み）。
+- 承認 gate 実行側（`:financial` effect 承認後に実際に GPU を起動する
+  API 呼び出し）の実装。
+
+## 2026-07-05 追記 — kami-gen-ml3d(ADR-2607051120)からの実行試行で再確認
+
+`kotoba-lang/kami-gen-ml3d`（ADR-2607051120、TRELLIS/Hunyuan3D-2 image→3D pipeline）と
+`:autorig`（ADR-0048、`kami-engine`、UniRig 連携）を実際に本番実行する判断を owner が
+検討し、本 ADR に記載の GPU fleet 未整備状況を独立に再調査した。結果、本 ADR 執筆時点
+（2026-07-03）から状況は変わっていないことを確認:
+
+- `cloud_murakumo.cli/cmd-deploy` は依然 propose-only（承認 effect を印字するのみ、
+  実 GPU 起動 API 呼び出しは無し）。
+- `scheduler.cljc` の `gpu-catalog`/`plan-placements` は純データ計算のみで、
+  Modal/RunPod/AWS 等いかなる実クラウド GPU SDK の import・API 呼び出しもリポジトリ内に
+  存在しない（`modal.com` の言及は README のドキュメントリンクと比較 UI 文言のみ）。
+- `resources/murakumo.edn` の H100×8/H200×8/A100-80×8/L4×4 fleet 宣言は引き続き
+  宣言のみ、調達元・契約の記述は無い。
+- `GET /infer/cost` は未実装、`cost.cljc` の電力係数/spot 参照は引き続き PLACEHOLDER。
+
+**Owner 判断（2026-07-05）**: 今回は実 GPU 起動を見送り、本 ADR の既存ギャップとして
+記録を維持する。GPU プロバイダ選定・契約は本 ADR の範囲外のビジネス判断であり、
+この場（コーディングセッション）で決定しない。実行を再検討する際は、本 ADR §3
+（Provisioning 経路）のいずれかを選定した上で、§5 の `:financial` 承認 gate を通す
+実装 PR から着手する。
+
+## Consequences
+
+**Positive**
+- control plane（murakumo.cloud）と GPU fleet（未 deploy）を明確に分離した
+  ことで、「サイトは deploy 済みだが実推論はまだ動いていない」という現状を
+  正直に文書化できる。
+- scheduler/cost/schema の純関数層は既に実装・テスト済みなので、GPU fleet
+  実装 PR は I/O 境界（worker/executor、gateway ルート追加、run ledger 実測
+  配線）に集中できる。
+- 財務 effect 承認 gate（`:financial`/`:destructive`）の設計は既にあるため、
+  実装 PR で「承認なしに GPU が起動する」経路を作らない限り、暴走課金事故は
+  構造的に防げる。
+
+**Negative / 制約（honest）**
+- 本 ADR は設計文書のみ。実 GPU の調達・起動は行っていない（意図的に範囲外）。
+- 電力係数・spot 参照・GPU provisioning 経路など、複数の [CONFIRM] 事項が
+  残っており、それらが埋まるまで `:hyp/murakumo-tok-price` gate は
+  プレースホルダのままである。
+- kotoba-CID backend での weight 配布は未検証で、ADR-2607022000 の実測知見
+  （HF CDN 直接 fetch + tensor cache prewarm が WAN 律速を回避する唯一の
+  実証済み手段）との整合を取る必要がある。

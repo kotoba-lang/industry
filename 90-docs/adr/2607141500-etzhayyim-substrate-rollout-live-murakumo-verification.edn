@@ -1,0 +1,51 @@
+[{:adr/id "adr-2607141500-etzhayyim-substrate-rollout-live-murakumo-verification"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607141500: etzhayyim-substrate-rollout — 実Murakumo fleetによるライブ検証(ADR-2607132200 third amendment, closing)"
+  :adr/topic "etzhayyim-substrate-rollout-live-murakumo-verification"
+  :adr/status "accepted"
+  :adr/date "2026-07-14"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for ["allowed-infer-hosts across tashikame/kouhou/yosoku/fleet includes the com-junkawasaki tailnet Murakumo-fleet Ollama nodes"
+                          "llm-advisor/llm-picker default max-tokens is 1024, not 256/512 (thinking-model reasoning-field budget)"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends ["adr-2607132200-etzhayyim-post-nation-state-substrate-system-dynamics-reverse-toposort"
+              "adr-2607140500-etzhayyim-substrate-rollout-charter-rows-amendment"
+              "adr-2607141000-etzhayyim-substrate-rollout-attestation-layer-amendment"]
+  :adr/related []
+  :db/id -1
+  :adr/decision-summary
+  "{:discovery
+    {:api-murakumo-cloud {:status \"live, Cloudflare-fronted\" :health \"{ok:true, service:local-murakumo, storage:{backend:kv,ok:true}}\"
+                          :nodes-registry \"https://api.murakumo.cloud/nodes -- fleet self-reported topology\"}
+     :tailnet {:account \"com-junkawasaki@\" :node-count 12
+               :direct-ollama-nodes [\"dan\" \"zebulun\" \"levi\" \"benjamin\" \"issachar\" \"joseph\" \"naphtali\" \"simeon\"]
+               :direct-ollama-port 11434 :direct-ollama-model \"gemma4:e4b-it-qat\"
+               :gateway-node {:name \"judah\" :port 4000 :auth \"litellm-style, 401 no-api-key, key not found in secrets index, unused this round\"}
+               :distributed-cluster {:head \"gad\" :endpoint \"http://100.82.98.110:8090/v1\" :model \"qwen-agentworld-35b-a3b\"
+                                     :status \"registry says online, connection actually refused -- head process not currently running, out of scope to start (ops action)\"}}},
+    :allowlist-change \"added the 8 confirmed tailnet host:port entries to allowed-infer-hosts in all 4 repos -- same physical fleet as existing LAN entries, cross-checked against the registry before adding, does not weaken the Rider v3.3 section 2(i) no-opaque-third-party-GPU constraint\",
+    :bug-found-and-fixed
+    {:symptom \"gemma4:e4b-it-qat emits a separate :reasoning field before :content (thinking model); low max-tokens lets it exhaust budget on reasoning, leaving :content empty\"
+     :reproduced-on \"yosoku.deploy with max-tokens 256 -> disposition :hold, basis [:missing-model :low-confidence]\"
+     :safety-confirmation \"governor correctly held the empty/unparseable response rather than committing garbage -- the sealed design worked on a real, not just simulated, failure mode\"
+     :fix \"raised default max-tokens to 1024 in yosoku/fleet (were 256) and tashikame/kouhou (were 512, precautionary -- not reproduced there)\"},
+    :live-verification-results
+    [{:actor \"yosoku\" :input \"intent: cautiously widen mimamori consent coverage\"
+      :llm-output \"G7ConsentGate 0.05 -> 0.1, with rationale\" :disposition :commit}
+     {:actor \"fleet\" :input \"3 pending proposals, 1 under a protected path\"
+      :llm-output \"triaged; 2 materialized immediately, 1 paused for sign-off then materialized\" :disposition :materialize}
+     {:actor \"tashikame\" :input \"claim: water boils at 100C at sea level, + real Wikipedia URL\"
+      :llm-output \":supported, confidence 1.0, citation-grounded rationale\" :disposition :commit}
+     {:actor \"kouhou\" :input \"sample FY2026 health-policy press release\"
+      :llm-output \"coherent Japanese summary, domain :health, confidence 1.0\" :disposition :commit}],
+    :publish-boundary-unchanged \"MockPublisher / in-memory :materialize kept in all 4 -- only the advisor/picker reasoning used real Murakumo inference; real publish/real git writes remain a separate owner decision, consistent with every prior ADR in this chain\",
+    :artifacts
+    {:yosoku {:pr 5 :merge-range \"f76747b -> b03ecfd\"}
+     :fleet {:pr 2 :merge-range \"9be7aa3 -> 7559617\"}
+     :tashikame {:pr 4 :merge-range \"1b71970 -> d0affc6\"}
+     :kouhou {:pr 4 :merge-range \"8dc1a31 -> 5c279ea\"}},
+    :open-follow-ups [\"head-gad 35B distributed cluster not running -- needs an ops action (SSH start) outside this session's scope\"
+                      \"judah:4000 LiteLLM gateway needs an API key not found in the secrets index -- unverified\"
+                      \"only single-shot live runs per actor -- no continuous availability/latency/cost measurement\"]}"}]

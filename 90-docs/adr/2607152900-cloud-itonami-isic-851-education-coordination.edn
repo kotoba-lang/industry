@@ -1,0 +1,63 @@
+[{:adr/id 2607152900
+  :adr/title "cloud-itonami-isic-851 — Primary Education Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-15"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-851]
+  :adr/references [2607152500 2607121000 2607152700 2607152800]
+
+  ;; Wave 4 actor (human-services): primary school administrative coordination
+  ;; coordination-only (attendance logging, parent meeting scheduling, supply
+  ;; coordination, staff shift proposals, safety-concern flagging).
+
+  :actor/id :cloud-itonami-isic-851
+  :actor/name "Primary Education Operations Coordinator"
+  :actor/isic-rev4 "851"
+  :actor/domain :services/primary-education
+  :actor/wave 4
+  :actor/coordination? true
+  :actor/robotics? false
+
+  :actor/proposal-ops [:log-attendance-note :schedule-parent-guardian-meeting
+                       :coordinate-supply-request :schedule-staff-shift-proposal
+                       :flag-safety-concern]
+  :actor/always-escalate-ops [:flag-safety-concern]
+
+  :actor/hard-checks [:student-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["grade" "成績" "grading" "採点" "academic performance"
+                                "assessment" "評価" "curriculum" "カリキュラム"
+                                "pedagogical" "教育学的" "discipline" "懲罰処分"
+                                "suspension" "停学" "expulsion" "退学" "iep"
+                                "special education" "特別支援" "custody" "親権"
+                                "family court" "family-court" "law enforcement"
+                                "police" "警察" "child protect" "児童保護"]
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-attendance-note} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-attendance-note
+                                               :schedule-parent-guardian-meeting
+                                               :coordinate-supply-request
+                                               :schedule-staff-shift-proposal}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-attendance-note
+                                         :schedule-parent-guardian-meeting
+                                         :coordinate-supply-request
+                                         :schedule-staff-shift-proposal
+                                         :flag-safety-concern}
+      :auto #{:log-attendance-note :schedule-parent-guardian-meeting
+              :coordinate-supply-request :schedule-staff-shift-proposal}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 40 :assertions 119 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration :store-contract]
+  :test/simulator :schoolops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-851"
+  :registry/business-id "cloud-itonami-isic-851"
+  :registry/required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]

@@ -1,0 +1,74 @@
+;; gftd_state.edn — Gftd Japan株式会社 vendor 状態スナップショット (gftd_state.jsonld から移行, ADR-0010)
+;; 元 @context: @vocab=https://schema.org/, kj=https://junkawasaki.com/ns#
+;; 変換: @id→:id, @type→:type(schema.orgクラスはkeyword), kj:X→:kj/X, schema.org語彙→:X, 日本語ラベルキーは文字列
+{
+  :id "kj:gftd_state"
+  :type :Organization
+  :name "Gftd Japan株式会社 — vendor 状態スナップショット"
+  :kj/as_of "2026-05"
+  :kj/corporate_number "9007-2846"
+  :kj/did "did:web:gftd.co.jp"
+  :kj/role_boundary {
+    :principal "etzhayyim (宗教法人; did:web:etzhayyim.com)"
+    :vendor "Gftd Japan株式会社 (SOW contractor)"
+    :adr "ADR-2605152100"}
+  :kj/future_form {
+    :decision "シングルファミリープライベートオフィス化 (IPO ではなく)"
+    :adr "ADR-2605111000"
+    :status "draft → 株主総会決議待ち"
+    :decider "河崎純真 (CEO)"
+    :stakeholders ["中村明子 (COO)" "k.bakshi (CLO)"]
+    :registration_cost_jpy 60000}
+  :kj/articles_of_incorporation_new {
+    :purpose_clauses [
+      "1. 自己の資産の管理、運用及び保全に関する業務"
+      "2. 有価証券、デジタルアセット及び暗号資産の保有、運用管理及び売買"
+      "3. 不動産の取得、保有、管理及び処分"
+      "4. 国内外の会社の株式又は持分の取得及び保有並びに当該会社の経営管理"
+      "5. 資産の承継並びに相続及び事業承継の計画立案及び実行に関する業務"
+      "6. 前各号に附帯関連する一切の業務"]
+    :removed_old_clauses "創業時 23 項目 (介護・障害福祉・IT受託・職業紹介 等)、第22号「投資顧問業」"
+    :officer_term "2y → 10y"
+    :convocation_notice "2w → 3d"
+    :minute_seal "押印廃止"}
+  :kj/vertical_lines {
+    :lawfirm_vertical {
+      :status "既存運用中 (T2 TS Native)"
+      :actors_live [
+        "hanrei.gftd.ai (判例・法令)"
+        "saiban.gftd.ai (33 court DIDs, 31 vertices)"
+        "lawfirm.gftd.ai (12 actor DIDs)"
+        "bankruptcy.gftd.ai (84 jurisdictions, 170 process types)"
+        "dispute.gftd.ai (restricted)"]
+      :actors_planned ["judge" "bengoshi" "adr" "legal-aid"]
+      :target_scale "200K judges + 2.5M lawyers + 1M ADR cases/yr"
+      :adr "ADR-0016"}
+    :anime_vertical {
+      :status "RECOVERY (2026-04-22 offline, ~15% completion)"
+      :project "animeka.gftd.ai"
+      :pipeline "12-stage BPMN + RunPod L40S ComfyUI"
+      :outage_cause "Linode GPU retired + ai-gftd-project-llm 削除"
+      :ip_source "Ghost Hacker (河崎 IP) + mangaka client (LangGraph Pregel)"
+      :adr_recovery "ADR-2604231328 / ADR-0050"}}
+  :kj/platform_facts {
+    :monorepo "/Users/junkawasaki/gftdcojp/ai-gftd-apps-gftdcojp"
+    :architecture "Shannon-Optimal 8-Layer"
+    :transport "W Protocol (AT Protocol superset) + Signal Protocol E2E"
+    :api "XRPC sole API (348 NSIDs)"
+    :apps 338
+    :actors_mitama 43
+    :kami_engine_crates 56
+    :infra "Cloudflare Workers/Containers + Linode LKE + Terraform"
+    :cli "gftd (Go)"}
+  :kj/officers {
+    :ceo_kawasaki "河崎純真"
+    :coo "中村明子"
+    :clo "Kunal Bakshi (k.bakshi@gftd.co.jp)"
+    :accounting "keiri@gftd.co.jp"}
+  :kj/active_initiatives [
+    "Family office 化 (定款変更, 役員任期 10y, 招集通知 3d)"
+    "animeka 12-stage pipeline 復旧"
+    "9-actor 法務クラスタ拡大 (judge/bengoshi/adr/legal-aid 新規追加)"
+    "1Password Gftd Japan vault mirror (ADR-2604292100)"
+    "G Workspace OAuth client separation (ADR-2605131700)"
+    "Open Source Cloud business model (ADR-2605072300)"]}

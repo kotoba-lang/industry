@@ -1,0 +1,59 @@
+[{:adr/id 2607152900
+  :adr/title "cloud-itonami-isic-889 — Non-Residential Social Work Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-15"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-889]
+  :adr/references [2607152500 2607121000 2607152300 2607152700]
+
+  ;; Wave 4 actor (human-services): non-residential social work
+  ;; coordination-only (client-contact logging, appointment scheduling,
+  ;; referral coordination, benefits-application assistance tracking,
+  ;; safety-concern flagging).
+
+  :actor/id :cloud-itonami-isic-889
+  :actor/name "Non-Residential Social Work Coordinator"
+  :actor/isic-rev4 "889"
+  :actor/domain :services/non-residential-social-work
+  :actor/wave 4
+  :actor/coordination? true
+  :actor/robotics? false
+
+  :actor/proposal-ops [:log-client-contact-note :schedule-appointment :coordinate-referral
+                       :coordinate-benefits-application-assistance :flag-safety-concern]
+  :actor/always-escalate-ops [:flag-safety-concern]
+
+  :actor/hard-checks [:client-verified :effect-propose :scope-exclusion]
+  :actor/scope-excluded-terms ["protective custody" "protective-custody" "親権喪失"
+                                "adult protective" "adult-protective" "成人後見"
+                                "involuntary commitment" "involuntary-commitment" "措置入院"
+                                "legal representation" "legal-representation" "弁護士"
+                                "clinical diagnosis" "clinical-diagnosis" "臨床診断"
+                                "benefits eligibility" "benefits-eligibility" "給付適格性"
+                                "award decision" "award-decision" "denial decision" "denial-decision"
+                                "safety authority" "safety-authority" "安全当局"]
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-client-contact-note} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-client-contact-note :schedule-appointment
+                                               :coordinate-referral :coordinate-benefits-application-assistance}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-client-contact-note :schedule-appointment
+                                         :coordinate-referral :coordinate-benefits-application-assistance
+                                         :flag-safety-concern}
+      :auto #{:log-client-contact-note :schedule-appointment :coordinate-referral :coordinate-benefits-application-assistance}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 41 :assertions 110 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration :store-contract]
+  :test/simulator :socialworkops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-889"
+  :registry/business-id "cloud-itonami-isic-889"
+  :registry/required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]

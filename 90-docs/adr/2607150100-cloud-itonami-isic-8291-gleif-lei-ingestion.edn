@@ -1,0 +1,23 @@
+[{:adr/id "2607150100"
+  :adr/title "cloud-itonami-isic-8291 gains GLEIF LEI Registry as a second real live-data seam"
+  :adr/status :accepted
+  :adr/date "2026-07-15"
+  :db/id -1
+  :adr/related ["2607110400-cloud-itonami-isic-8291-corporate-compliance-intelligence-actor"
+                "2607121000-cloud-itonami-global-isic-isco-reverse-toposort-plan"
+                "2607150200-cloud-murakumo-market-intel-sec-edgar-company-facts"
+                "cloud-itonami-isic-8291/src/dossier/gleif.clj"
+                "cloud-itonami-isic-8291/src/dossier/live_store.cljc"
+                "cloud-itonami-isic-8291/src/dossier/companies_house.clj"]
+  :adr/pattern-mirrored-8291-gleif "GLEIF client (src/dossier/gleif.clj) and LiveLeiStore decorator (src/dossier/live_store.cljc) built as an exact structural mirror of the pre-existing UK Companies House seam (dossier.companies-house + LiveGbrStore) -- injectable fetch-fn, no-throw degrade-to-nil, local-store-wins-then-live-fallback precedence, id-prefix namespacing (lei-<LEI> vs gbr-<company_number>)"
+  :adr/worldwide-coverage-8291-gleif "GLEIF is the first catalog entry not pinned to a single :jurisdiction (:un, supranational, same scoping as the existing :un-sc-consolidated-list entry) -- every prior entry (jpn/gbr/deu/est/usa/eu/fra/chn/ind/kor/aus/can/bra) is country- or bloc-specific. Directly answers the owner's 'code and collect worldwide money/market' framing."
+  :adr/catalog-guard-renegotiated-8291-gleif "facts.cljc curation guard was a hard '<= 20, next add must argue its case' comment left by the prior session (R0 catalog 19->20 with UN SC Consolidated List as 'the final R0 slot'). Renegotiated to <= 21 with GLEIF's argued case (worldwide, no-key, LEI-registry-of-record), not silently bumped."
+  :adr/lei-attribute-added-8291-gleif "new first-class :lei attribute on the company entity (DatomicStore company->tx/pull->company/company-pull + schema), independent of the pre-existing :registration-no (jurisdiction-local registry number) field"
+  :adr/no-cron-8291-gleif "deliberately NO scheduled/cron ingestion added -- matches the existing Companies House seam's on-demand-lookup-only design (no batch pre-fetch, no governed :quote/ingest-style commit flow). Periodic ingestion is scoped to ADR-2607150200's SEC EDGAR company-facts pipeline instead, a genuinely different data shape (financial time series vs. registry lookup)."
+  :adr/sec-edgar-scope-boundary-8291-gleif "facts.cljc's pre-existing :usa-sec-edgar catalog entry (class :regulatory-filing, covers company-registry/officers-psc) was left without a live client in this ADR -- out of scope. Distinct from ADR-2607150200's SEC EDGAR XBRL companyfacts connector in cloud-murakumo-market-intel: same upstream source, different endpoint (submissions vs. companyfacts), different repo, different purpose (registry facts vs. financial facts). Explicitly not conflated."
+  :adr/live-verification-8291-gleif "Apple Inc.'s real LEI HWUPKR0MPOU8FGXBT394 fetched through the actual dossier.gleif/live-http-fn -> lei-record -> ->company code path (not just curl), correctly mapped to :jurisdiction :usa :registration-no \"806592\" :status :active. Also verified (live-store) resolves via GLEIF with COMPANIES_HOUSE_API_KEY unset while local seed data (co-100) is unchanged."
+  :adr/incidental-ci-fix-8291-gleif "found and fixed a pre-existing, unrelated CI bug: .github/workflows/ci.yml still checked out the renamed-away com-junkawasaki/langgraph-clj and langchain-clj repos, breaking the test CI job on every main commit since 2026-07-10 (confirmed via gh run list history). Fixed checkout targets to kotoba-lang/langgraph and kotoba-lang/langchain, matching deps.edn; confirmed green on main post-merge."
+  :adr/test-status-8291-gleif "clojure -M:dev:test: 83 tests / 401 assertions, 0 failures. clojure -M:lint: 0 errors, 0 warnings."
+  :adr/pr-url "https://github.com/cloud-itonami/cloud-itonami-isic-8291/pull/1"
+  :adr/merge-commit "13ad354df92a2f944016ab136d733181ced8d68c"
+  :adr/manifest-impact "none -- cloud-itonami-isic-8291 is standalone plain-git per existing cloud-itonami-{ISIC} convention, not registered in manifest/repos.edn or west.yml"}]

@@ -1,0 +1,47 @@
+{:as-of "2026-07-16",
+ :sources [:cloudflare :health :emitter],
+ :workers-invocations-7d {"nexus-x402" 5347},
+ :health-status 200,
+ :catalog
+ {:x402Version 1,
+  :service "nexus-x402",
+  :count 3,
+  :items
+  [{:seller "murakumo",
+    :method "POST",
+    :path-prefix "/v1/messages",
+    :gateway "https://x402.nexus/gateway/murakumo/v1/messages…",
+    :price
+    {:usd "0.01",
+     :micros "10000",
+     :asset "USDC",
+     :network "base",
+     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"},
+    :description nil}
+   {:seller "kotobase",
+    :method "GET",
+    :path-prefix "/ipfs/",
+    :gateway "https://x402.nexus/gateway/kotobase/ipfs/…",
+    :price
+    {:usd "0.001",
+     :micros "1000",
+     :asset "USDC",
+     :network "base",
+     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"},
+    :description nil}
+   {:seller "shinshi",
+    :method "GET",
+    :path-prefix "/x402/premium/",
+    :gateway "https://x402.nexus/gateway/shinshi/x402/premium/…",
+    :price
+    {:usd "0.50",
+     :micros "500000",
+     :asset "USDC",
+     :network "base",
+     :payTo "0xf1592811063554e2EDfC137964aE181C830967Ac"},
+    :description nil}],
+  :settlements
+  {:count 0,
+   :usd-total 0,
+   :agent-hint {:agent 0, :human 0, :unknown 0}}},
+ :signal "workers 5347 inv/7d"}

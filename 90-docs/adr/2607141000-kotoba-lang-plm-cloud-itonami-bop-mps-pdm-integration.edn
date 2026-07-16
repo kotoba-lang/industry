@@ -1,0 +1,26 @@
+[{:adr/id "adr-2607141000-kotoba-lang-plm-cloud-itonami-bop-mps-pdm-integration"
+  :adr/title "kotoba-lang/plm に BOP(routing)・MPS・PDM(版管理/release承認) を追加し、cloud-itonami governance facade と統合する — PTC(Windchill/Creo)等の外部コネクタは追加しない"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/topic "kotoba-lang-plm-cloud-itonami-integration"
+  :adr/authoritative true
+  :adr/last_verified "2026-07-14"
+  :adr/date "2026-07-14"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative_for
+  ["kotoba.plm への BOP(routing master data)/MPS(time-phased demand)/PDM(doc・版管理)追加の設計決定"
+   "PTC(Windchill/Creo等)は外部コネクタとして追加せず、PDMに統合する自前実装のみとする判断"
+   "release承認ワークフローはcloud-itonami側のgovernance facadeに置き、kotoba-lang/plmはgovernance-freeのまま維持するorg taxonomy（ADR-2607106100）の踏襲"
+   "既存 thread/release-item! ・ ops/release-item! は無変更のまま維持し、承認ゲート付きフローは別関数として追加するという後方互換方針"]
+  :adr/related ["adr-2607020100-kotoba-lang-dcs-plm-registration"
+                "adr-2607083500-cloud-itonami-vehicle-design-link"
+                "adr-2607106100-product-party-join-cloud-itonami-kotoba-lang"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/non-goals
+  "{:no-ptc-connector \"Windchill/Creo等PTC製品、その他外部CAD/PLM SaaSへの実コネクタは追加しない。PDMは自前実装に統合する。\" :no-mes-execution-tracking \"MES work-order/operation単位の実行トラッキングのfirst-class化はスコープ外。cloud-itonami.mesの既存props-edn留保判断を維持する。\" :no-existing-release-api-change \"kotoba.plm.thread/release-item! と cloud-itonami.ops/release-item! は無変更。承認ゲート付きフローは別関数として追加するのみ。\" :no-kami-engine-dependency \"kami-engine/STEP系CADカーネルとの接続はしない（ADR-2607083400/2607083500の非依存方針を維持）。\"}"
+  :adr/operational-note
+  "{:policy-risk-kernel-no-recompile \"新規policy(:routing-change/:mps-approval/:release-item-approval)はcloud_itonami/kernels/policy_risk.cljcのkeyword-policy->code caseにfinancial family(code 2)として追加するだけで、.kotoba/.wasm側のrisk-code(0..3)は既存のまま — 再コンパイル不要と実読して確認済み。\" :test-runner-explicit-registration \"cloud-itonami/test/cloud_itonami/test_runner.cljcは自動発見をしないため、新規test namespace(bop/mps/pdm)は:requireとtest-namesの両方に明示登録が必要（ADR-2607083500既知の落とし穴）。\" :cloudflare-pages-deploy-hook \"orgs/gftdcojp/cloud-itonami はlefthookのpost-checkoutフックでmainをCloudflare Pagesへ自動デプロイする。worktree作成時のcheckoutでも発火し得る点に注意。\"}"
+  :adr/changes
+  "[{:repo \"kotoba-lang/plm\", :pr \"https://github.com/kotoba-lang/plm/pull/1\", :branch \"feat/bop-mps-pdm\", :status \"open\", :files [\"src/kotoba/plm/schema.cljc\" \"src/kotoba/plm/routing.cljc\" \"src/kotoba/plm/mps.cljc\" \"src/kotoba/plm/pdm.cljc\" \"src/kotoba/plm/cost.cljc\" \"src/kotoba/plm/production.cljc\" \"src/kotoba/plm/thread.cljc\" \"src/kotoba/plm/mrp.cljc\" \"src/kotoba/plm/erp.cljc\" \"test/kotoba/plm/routing_test.cljc\" \"test/kotoba/plm/mps_test.cljc\" \"test/kotoba/plm/pdm_test.cljc\"], :tests \"20 tests / 73 assertions, no regressions (clojure -M:test)\"} {:repo \"gftdcojp/cloud-itonami\", :pr \"https://github.com/gftdcojp/cloud-itonami/pull/399\", :branch \"feat/bop-mps-pdm-governance\", :status \"open\", :files [\"src/cloud_itonami/plm.cljc\" \"src/cloud_itonami/activity.cljc\" \"src/cloud_itonami/kernels/policy_risk.cljc\" \"src/cloud_itonami/bop.cljc\" \"src/cloud_itonami/mps.cljc\" \"src/cloud_itonami/pdm.cljc\" \"src/cloud_itonami/ops.cljc\" \"test/cloud_itonami/bop_test.cljc\" \"test/cloud_itonami/mps_test.cljc\" \"test/cloud_itonami/pdm_test.cljc\" \"test/cloud_itonami/test_runner.cljc\"], :tests \"37 tests / 330 assertions (new + directly-related existing suite), no regressions; full test-runner/portable-cljs-test-runner blocked by a pre-existing, unrelated main-branch break (kotoba-ui.core undeclared vars in site/* files, confirmed independent of this change), pushed with owner-approved --no-verify\"}]"
+  :db/id -1}]

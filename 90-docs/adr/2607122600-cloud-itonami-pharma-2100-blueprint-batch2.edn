@@ -1,0 +1,28 @@
+[{:adr/id "adr-2607122600-cloud-itonami-pharma-2100-blueprint-batch2"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607122600: scaffold batch #2 — ISIC 2100 医薬 blueprint 衛星（ADR-2607121000 follow-up の完了）"
+  :adr/topic "cloud-itonami-pharma-2100-blueprint-batch2"
+  :adr/status "accepted"
+  :adr/date "2026-07-12"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for ["cloud-itonami-isic-2100 blueprint satellite scope (pharma manufacturing, :blueprint maturity)"
+                          "completion of ADR-2607121000's scaffold-gap follow-up list (all four items closed)"
+                          "pharma safety posture: batch release / pharmacovigilance always :safety-critical, never LLM-released"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related ["adr-2607121000-cloud-itonami-global-isic-isco-reverse-toposort-plan"
+                "adr-2607122200-cloud-itonami-ishokuju-blueprint-satellites"
+                "adr-2607011000-cloud-itonami-robotics-premise-and-isic-21-21"]
+  :db/id -1
+  :adr/decision-summary
+  "{:trigger \"30min loop『成熟度, coverage を向上』tick 3 — ADR-2607121000 scaffold 欠落 follow-up の残り\",
+    :finding \"6201/6311 自業種は fleet が :implemented で完了済み (narrowing note 付き実 repo)。残る gap は 2100 医薬のみ (stale gftdcojp-C2100 URL, :spec, 衛星ゼロ)\",
+    :satellite {:repo \"cloud-itonami/cloud-itonami-isic-2100\" :name \"Community Pharmaceutical Manufacturing\"
+                :governor :pharma-manufacturing-governor :maturity :blueprint
+                :safety \"batch release / pharmacovigilance は常に :safety-critical — LLM は batch release しない\"},
+    :registry {:change \"2100 :spec -> :blueprint, stale URL -> 実在衛星\" :blueprint-tier {:before 40 :after 41}
+               :tests \"15/934 green, clj-kondo clean\" :landed \"main 7e8a6027\"},
+    :west-pin {:entry \"industry\" :from \"e8cbd563\" :to \"7e8a6027\" :commit \"ca29a172\"},
+    :milestone \"ADR-2607121000 の scaffold 欠落 follow-up 4 件すべて解消 (batch#1=食衣住 / fleet=自業種 / batch#2=医薬) — Wave 3 主要領域は全て blueprint 段階に到達\"}"}]

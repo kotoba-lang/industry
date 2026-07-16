@@ -1,0 +1,228 @@
+# ADR-2617500000: cloud-itonami-isic-5912 (Motion picture, video and television programme post-production activities) post-production operations-coordination actor -- fresh scaffold, full implementation
+
+**Status**: accepted
+**Date**: 2026-07-16
+**Deciders**: Jun Kawasaki (agent-executed, standing authorization)
+**Related**: ADR-2607121000 (Wave 3, production/robotics), ADR-2607152500
+(Wave 4, human-facing/personal services -- authorizes this batch to
+proceed in parallel with Wave 3), cloud-itonami-isic-873 (Residential
+care for elderly/disabled -- the Wave 4 flagship reference module shape)
+and cloud-itonami-isic-5811 (Book publishing -- the closer sibling
+reference, same op-name shape and same content-decision-guardrail
+pattern applied to a different domain), both independently re-read in
+full before use, the `kotoba-lang/industry` registry's `"5912"` catalog
+entry
+
+## Context
+
+`kotoba-lang/industry`'s registry carried a `"5912"` entry at
+`:maturity :spec` with `:name "Motion picture, video and television
+programme post-product..."` (truncated -- one of the ~10%-of-entries
+truncated-name seed-data artifacts this fleet has documented elsewhere;
+de-truncated to the full ISIC Rev.4 name "Motion picture, video and
+television programme post-production activities" as part of this same
+promotion) and `:repo "https://github.com/gftdcojp/cloud-itonami-J5912"`
+(an old, never-populated naming scheme). Confirmed no repo exists yet at
+either that stale placeholder or the real
+`cloud-itonami/cloud-itonami-isic-5912` target (`gh api` 404 for the
+latter) before any work began. The sibling class `{:id "5911" ...}`
+(Motion picture, video and television programme production activities
+-- pre-production/production, distinct from this class's post-
+production editing/VFX/sound-mix/color-grading scope) remains `:spec`,
+expected to be built by a separate sibling agent in this same batch, and
+was deliberately not touched or conflated with this entry.
+
+This is part of Wave 4 (human-facing/personal-services fleet, ISIC
+sections I/P/Q/R/S/T), running in parallel with the ongoing Wave 3
+(production/robotics) rollout per ADR-2607152500. Post-production
+touches editorial/creative-final-cut authority and content-clearance
+decisions (e.g. rated-content classification, sensitive-scene edits),
+so this actor is deliberately scoped to back-office operations
+coordination only, with a closed op allowlist that structurally
+excludes finalizing a creative final-cut decision and finalizing a
+content-rating/clearance decision -- those remain exclusively
+human/institutional decisions, never an auto-commit-eligible op, per
+Wave 4's person-facing-service safety guardrail.
+
+## Decision
+
+Scaffold `cloud-itonami/cloud-itonami-isic-5912` as a post-production
+OPERATIONS COORDINATION actor (not creative-final-cut authority, not a
+content-rating/clearance authority), mirroring `cloud-itonami-isic-
+873`'s and `cloud-itonami-isic-5811`'s verified module shape
+(`store`/`advisor`/`governor`/`phase`/`operation`/`sim`,
+`deps.edn`/`blueprint.edn`/README/GOVERNANCE/CODE_OF_CONDUCT/
+CONTRIBUTING/SECURITY, AGPL-3.0-or-later) with fresh, post-production-
+specific domain logic under the `postprodops` namespace:
+
+1. **`postprodops.store`** -- `MemStore` (atom of EDN) behind a `Store`
+   protocol; a `projects` directory keyed by `:project-id` STRING (an
+   edit/VFX/mix/grade project under contract with the post-production
+   facility), plus an append-only `ledger` and a `coordination-log` of
+   committed records.
+2. **`postprodops.advisor`** ("PostProdAdvisor") -- deterministic mock
+   advisor drafting exactly four kinds of proposal: production-record
+   logging (edit-pass/VFX-shot/mix-session data), production-operation
+   scheduling (editing/VFX/color-grading/mix scheduling), final-master
+   delivery/handoff coordination, and content-concern flagging
+   (rating-classification-threshold or sensitive-scene-edit concern).
+   Every proposal's `:effect` is always `:propose`; every output is
+   censored downstream by the governor.
+3. **`postprodops.governor`** ("PostProdGovernor") -- three HARD
+   checks, all permanent and un-overridable: (1) project-unverified --
+   the target project record must exist AND be independently
+   `:registered?`/`:verified?` in the store before ANY proposal for it
+   may commit or escalate; (2) effect-not-propose -- any `:effect`
+   other than `:propose` is HARD-blocked; (3) scope-exclusion -- any
+   proposal (regardless of op) whose op/summary/rationale/cites/value
+   touches finalizing-a-creative-final-cut-decision or finalizing-a-
+   content-rating-clearance-decision territory is a HARD, PERMANENT
+   block, unconditionally evaluated on every proposal; an op outside
+   the closed four-op allowlist is folded into this same check. One
+   ESCALATE (soft) gate: `:flag-content-concern` ALWAYS escalates to a
+   human regardless of confidence, as does low confidence generally.
+4. **`postprodops.phase`** -- Phase 0->3 staged rollout;
+   `:flag-content-concern` is permanently ABSENT from every phase's
+   `:auto` set (structural fact, not a rollout milestone still to
+   come) -- only `:log-production-record`/`:schedule-production-
+   operation`/`:coordinate-delivery` may auto-commit at phase 3 when
+   governor-clean.
+5. **`postprodops.operation`** ("OperationActor") -- langgraph-clj
+   StateGraph, `intake -> advise -> govern -> decide -> commit | hold |
+   request-approval`, `interrupt-before #{:request-approval}` for
+   human-in-the-loop sign-off, invoked exclusively via
+   `langgraph.graph/run*`.
+6. **`deps.edn` / `blueprint.edn` / docs** -- mirror
+   `cloud-itonami-isic-873`'s/`-5811`'s shape (`:test`/`:lint`/`:run`/
+   `:dev` aliases pinned to the same `kotoba-lang/langgraph` git SHA
+   `a332a770a0d2b5193f81b54483bb954fb29ef8d7`, `itonami.blueprint/*`
+   metadata, scope/design/testing README sections).
+
+### Defensive design against the fleet's known self-tripping bug class
+
+Multiple sibling agents in this batch independently discovered and
+fixed the same bug class: a scope-exclusion term phrased as a bare noun
+accidentally matches inside the mock advisor's own default rationale/
+disclaimer text for a legitimate, allowed proposal, causing the actor
+to self-block on its own happy path. This domain is an especially acute
+instance of that risk -- ordinary post-production vocabulary is full of
+the bare noun "cut" (rough cut, editing cut, scene cut), and of
+"rating"/"grade"/"clearance" used in routine, in-scope contexts
+(rating-threshold review, color-GRADE pass, delivery-format clearance
+checklist). `postprodops.governor/scope-excluded-terms` was therefore
+designed from the start to contain ONLY multi-word finalization ACTION
+phrases ("final cut decision", "finalize the final cut", "content
+rating decision", "content clearance decision"), never a bare noun.
+Two dedicated regression tests assert this holds:
+`postprodops.advisor-test/default-mock-advisor-proposals-never-self-
+trip-scope-exclusion` (every op's own default clean proposal text
+clears the governor) and
+`postprodops.governor-test/legitimate-production-record-mentioning-
+rough-cut-is-not-scope-excluded` (explicit "rough cut"/"scene cut"
+editing vocabulary in a proposal's own `:value` never self-trips the
+gate).
+
+### What this actor does NOT do
+
+Finalizing a creative final-cut decision (what the finished picture
+actually is, whether it locks as cut) and finalizing a content-rating/
+clearance decision (which classification/certificate the finished
+programme receives) both remain exclusively human/institutional
+decisions, permanently, with no actor or human-approval override path
+-- enforced structurally by the governor's closed op/effect allowlists
+and the unconditional scope-exclusion check, not just documented.
+`:flag-content-concern` is a "surface the concern" op only; it can
+never self-clear the concern it raises, and is never a member of any
+phase's `:auto` set.
+
+## Verification
+
+- `cloud-itonami-isic-5912`: `clojure -M:dev:test` -- raw final line:
+  `Ran 45 tests containing 123 assertions.` / `0 failures, 0 errors.`
+  (re-run green a second time from a brand-new fresh clone after push).
+- `clojure -M:lint` -- 0 errors, 0 warnings.
+- `clojure -M:dev:run` demo narrative exercises proposal submission,
+  escalation/approval on every write op, and all four HARD-hold
+  scenarios directly (unregistered project, unverified project,
+  non-`:propose` effect, creative-final-cut/content-rating scope
+  drift) -- ran clean, all four resolved to `:hold`, no exceptions.
+- All source under `src/`/`test/` is `.cljc`, no JVM-only interop; the
+  actor graph is invoked exclusively via `langgraph.graph/run*`.
+- Repo created fresh (`gh repo create` + push, public visibility
+  matching the reference and `blueprint.edn`'s `:status :public-oss`),
+  initial commit `4f324610ca2d7a6913c134046aa1485634bf67db` on
+  `cloud-itonami-isic-5912`'s `main` (no prior history), confirmed via
+  a brand-new fresh clone.
+- `kotoba-lang/industry` registry `"5912"` entry updated in place
+  (exact-text edit of the literal `{:id "5912" ...}` block only, no
+  other entry's block touched, byte-offset-diff-verified confined to
+  the intended region): `:name` de-truncated to the full ISIC Rev.4
+  name, `:repo`/`:business-id` corrected from the never-populated
+  `gftdcojp/cloud-itonami-J5912` naming to `cloud-itonami/cloud-
+  itonami-isic-5912` / `cloud-itonami-isic-5912`, `:required-
+  technologies` normalized from a stale `[:robotics :identity :forms
+  :dmn :bpmn :audit-ledger :phone]` placeholder to the coordination-
+  only shape actually implemented `[:identity :forms :dmn :bpmn
+  :audit-ledger]` (matching siblings `cloud-itonami-isic-873`/`-5811`'s
+  own `:required-technologies`), `:maturity` `:spec` -> `:implemented`.
+  Landed via a Contents API single-file PUT (sha-checked optimistic
+  concurrency), commit `9fc0bc0f6804b2903596516fd9199153ec520005`.
+- `test/kotoba/industry_test.clj`'s `maturity-summary` assertion
+  bumped, live-recomputed via `(kotoba.industry/maturity-summary)`
+  against a freshly re-cloned/re-pulled `kotoba-lang/industry` (plus
+  `kotoba-lang/technology` sibling) immediately before the PUT attempt
+  (never a reused/stale buffer) -- this file is an extremely hot,
+  high-concurrency shared file across the fleet; at fetch time the
+  file's own last-landed count (`382`, from a concurrent sibling's own
+  `cloud-itonami-isic-5813` promotion) was one below the live-
+  recomputed truth (`383`), confirming this promotion's own `+1` was
+  the only untracked delta at that moment. Landed on the first PUT
+  attempt (no sha-conflict retries needed), commit
+  `e7621a0874ce0fba5516c00b882218a5e4efb4c2`.
+- Full `kotoba-lang/industry` suite re-run green after all edits (fresh
+  clone, plus a fresh `kotoba-lang/technology` sibling clone for
+  `deps.edn` resolution): `Ran 15 tests containing 1046 assertions.` /
+  `0 failures, 0 errors.`
+- Final post-merge re-verification (brand-new scratch directories,
+  fresh `origin/main` clones of both `cloud-itonami-isic-5912` and
+  `kotoba-lang/industry`, plus a fresh `kotoba-lang/technology`
+  sibling): `clojure -M:dev:test`/`clojure -M:test` re-run green in
+  both repos; the registry's `"5912"` entry confirmed `:maturity
+  :implemented` with the corrected `:name`/`:repo`/`:business-id`/
+  `:required-technologies`, and a sample of sibling entries
+  (`873`/`5811`/`6310`/`5629`) confirmed untouched. `grep` for the
+  UTF-8 replacement character against `resources/kotoba/industry/
+  registry.edn` returned `0` (no file-wide mojibake). Live
+  `(kotoba.industry/maturity-summary)` recompute against the final
+  merged state: `{:total 649, :spec 241, :blueprint 25, :implemented
+  383}`, matching the landed test assertion exactly.
+
+## Consequences
+
+(+) `cloud-itonami-isic-5912` now has a real, tested implementation
+matching the shape of every other cloud-itonami ISIC actor, replacing a
+`:spec` placeholder pointing at a repo that never existed.
+
+(+) `kotoba-lang/industry` registry `"5912"` entry promoted to
+`:maturity :implemented`, and its previously-truncated `:name` field
+corrected as a side effect of the same exact-block edit.
+
+(+) This actor is a further concrete example (after `cloud-itonami-
+isic-873` and `cloud-itonami-isic-5811`) of Wave 4's person-facing-
+service safety guardrail applied to yet another sensitive-decision
+axis: creative-final-cut and content-rating/clearance authority, folded
+into one unconditional scope-exclusion check that never trusts the
+advisor's own framing of its intent, and deliberately built from the
+start with bare-noun-avoiding term phrasing given how vocabulary-
+overlapping this specific domain is with its own excluded territory.
+
+(-) Still a simulation/proposal layer, not a real post-production
+facility system. Creative final-cut decisions and content-rating/
+clearance decisions remain human-/institution-controlled via external
+channels (editors, colorists, mixers, content-classification boards).
+
+(-) No integration with real post-production systems (NLE/VFX/DAW
+project management, color-grading suite scheduling, digital-cinema-
+package/delivery-format QC tooling, rating-board submission systems)
+-- this is a standalone coordinator blueprint, matching every prior
+sibling actor's own stated limitation.

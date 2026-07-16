@@ -1,0 +1,119 @@
+# ADR-2607101558: cloud-itonami MES — System Dynamics（stock-flow連続モデル）による工場プロセスの時間発展
+
+- **Status**: accepted, done. M1/M2/M3すべて実装・main着地済み（M1/M2: `gftdcojp/cloud-itonami` PR #325 `cef7d76`、west pin `44e390c`。M3: PR #345 `9088980`、west pin `e4e7c16`）。詳細は末尾2本のAddendum参照。
+- **Related**: ADR-2607110900（ロボット接触力学、着手順1番目）、ADR-2607101525（OpenUSD、2番目）。本ADRは3番目=cloud-itonami製造sim。ADR-2607011000（cloud-itonami CACAO — 「1 mission = 1 bounded operation, no internal loop」の設計方針の出典）
+
+> **2026-07-10 訂正: D1をdiscrete-event（個体ベース）シミュレーションからSystem Dynamics（Forrester流のstock-flow連続モデル）へ変更**。実装着手前（west sibling取得段階）にオーナーから直接指示（「kotoba-lang system dynamics を利用」）があった。`kotoba-lang` org内に既存の"system dynamics"という名前のrepo/libraryは実在しない（`gh search code`/`gh repo list`で確認済み、ゼロ件）ため、既存ライブラリの利用ではなく、System Dynamicsという**モデリング手法**をこの組織の流儀（`.cljc`、閉形式検証、既存`cloud_itonami.mes`との合成）で新規実装する指示と解釈した。D2以降を全面差し替え。
+
+## Context
+
+オーナーから「OpenUSD・URDFロボティクス・cloud-itonami製造simの完成度」を問われた先行調査、およびそれに基づくADR-2607110900/2607101525の完了を受け、3番目の領域に着手する。着手前に、他2領域（ロボット接触力学でエージェント報告のハルシネーション、OpenUSDで並行作業による前提の陳腐化）で得た教訓に従い、**自分で実際のソースを直接読んで**現状を検証した（`gftdcojp/cloud-itonami`を新規cloneして確認、先行調査のsummaryをそのまま信用しない）:
+
+- `src/cloud_itonami/mes.cljc`（全141行）: `kyber-plm`の生産完了イベント（`complete-production!`の戻り値）を itonami の activity/effect/audit tx-data 語彙へ投影するだけの**純粋なデータ変換モジュール**。`work-order-artifact`/`production-activity`/`backflush-effect`/`completion-audit`/`kyber-completion->tx`/`kyber-production-ocel->activity`の6関数のみで、いずれも**1件の完了イベントを受け取って1件のtxを返す**——時間発展・スケジューリング・キューイング・工程順序・設備占有といった概念は一切存在しない。
+- `src/itonami/sim.cljc`（全70行、`-main`のデモドライバ）・`src/cloud_itonami/business_loop.cljc`（`tick!`、228行）: いずれもこの組織のActor設計方針そのもの（CLAUDE.md「Actors」節、ADR-2607011000）を体現している——**「1 run = 1 bounded operation/tick」**（`business_loop.cljc`のdocstring: "1 run = 1 tick (CLAUDE.md Actors: no unbounded inner loop)"）。時間を進める「outer loop」は意図的にコード外（cron/launchd/`clojure -M:business tick-all`）に置かれ、リポジトリ内には**工程の時間発展を内部でシミュレートするループが構造的に存在しない**——これは実装漏れでなく明示的な設計方針（封じ込め+独立governor原則）。
+- `deps.edn`確認: `com-nvidia-isaac-sim`/`org-openusd`と異なり、本repoは`{:local/root "../../kotoba-lang/..."}`形式で多数のsibling checkout（langchain/langgraph/mail/mailer/tayori/teian/koyomi/goyoukiki/shoko/ichiran/kaisha/denrei/org-chainagnostic-cacao/com-cloudflare/plm/product-party、さらに推移的にcalendar/drive/slides/sheets/org-ietf-ed25519/org-ietf-cbor）を要求する——単独cloneではテストが動かせない。実装フェーズでは superproject 外の一時 worktree に `west init -l manifest` して topdir を固定した上で、これらsiblingを`west update`する必要がある（CLAUDE.md「agent 専用 worktree で west を動かすときの topdir 固定」節）。
+- `kotoba-lang`組織内に"system dynamics"を名乗る既存repo/moduleは存在しない（`gh search code "system dynamics" --owner kotoba-lang`/`gh repo list`いずれもゼロ件、確認済み）。
+- 結論: cloud-itonami製造の「工場プロセスの時間発展」は**文字通り何も実装されていない**（先行調査の要約通り、かつ本ADR着手前の直接検証でも同じ結論——他2領域と異なり前提の食い違いは無かった）。
+
+## Decision
+
+### D1. モデリング手法はSystem Dynamics（Forrester流のstock-flow連続モデル）— discrete-event個体シミュレーションではない
+
+オーナー指示（「kotoba-lang system dynamics を利用」）に従う。個々のwork orderを離散イベントとして追跡するdiscrete-event simulationではなく、**在庫水準（stock/level）を、流入/流出レート（flow/rate）で駆動される連続量として微分方程式的に時間積分する**古典的System Dynamics（Jay Forrester, *Industrial Dynamics*, 1961）のモデリング手法を採る。最小構成: 原材料在庫（raw-material stock）→〔生産開始レート〕→ 仕掛在庫（WIP stock）→〔完成レート〕→ 完成品在庫（finished-goods stock）という3-stock・2-flowの生産・在庫モデル。完成レートは古典的な一次遅れ（first-order delay、Littleの法則に対応する`completion-rate = WIP / cycle-time`）で駆動する——これはSystem Dynamicsの教科書（Forrester、Sterman *Business Dynamics*）で最も基本的な「生産プロセス」構成要素であり、閉形式で解析可能（D3参照）という理由でも最小スコープにふさわしい。
+
+### D2. 数値積分はEuler法を既定にし、閉形式解と比較してdtへの収束を検証する
+
+`dWIP/dt = inflow-rate(t) - WIP(t)/cycle-time`という一次線形ODEを、固定`dt`のEuler法（`WIP[n+1] = WIP[n] + dt * (inflow[n] - WIP[n]/cycle-time)`）で数値積分する。RK4等の高次積分は本ADRのスコープ外（Non-goals）——Euler法で十分な精度が出ることをD3の閉形式比較で確認する。積分ステップごとの状態は不変の（immutableな）EDNマップの列として表現し、この組織の他のシミュレーション実装（`genesis.rigid-body`のsemi-implicit Euler等、ADR-2607110900）と同じ「純粋関数のstep + 呼び出し側のloop」という形にする。
+
+### D3. 検証は解析的に解ける閉形式ケースに限定する（この組織の一貫した検証手法）
+
+一次線形ODE`dWIP/dt = inflow - WIP/τ`（`inflow`一定、`τ`=cycle-time一定）は解析解を持つ:`WIP(t) = WIP_eq + (WIP(0) - WIP_eq) * e^(-t/τ)`、`WIP_eq = inflow * τ`。以下をこの解析解と比較してテストする:
+  - 定常状態への収束: 十分長い時間後、数値解が`WIP_eq`に収束する。
+  - 有限時間での一致: 有限`t`における数値解と解析解の誤差が、`dt`を小さくするにつれて減少する（Euler法の一次収束の確認——`dt`半分で誤差がおおよそ半分になることを確認）。
+  - 質量保存則: 任意の時刻で「投入した原材料の累積 = 現在の各stockの合計 + すでに完成品として出荷された累積量」が成立する（増減の"創造"や"消失"が無い）。
+  - 3-stock連結（raw→WIP→finished）で、raw-material在庫が枯渇すると生産開始レートが自動的に頭打ちになる（非負制約、`max(0, ...)`）ことを確認する。
+IsaacSim/実際のMESシステムとのライブ差分比較は行わない（この組織の一貫した非目標）。
+
+### D4. 連続モデルの出力を離散的な期間バッチとして既存`cloud_itonami.mes/kyber-completion->tx`に渡す
+
+`kyber-completion->tx`は「1件の完了イベント」を期待する離散APIで、SDモデルは連続量を出力するため、両者を橋渡しする変換が必要。実際のMESでも「シフト/日次の生産実績を1件の完了トランザクションとして計上する」のは標準的な会計慣行（backflush costingの実務そのもの）なので、**シミュレーション期間を固定長のレポート区間（例: 1日）に区切り、各区間で完成レートを積分した数量（`∫completion-rate dt`、その区間のfinished-goods増分）を1件の`kyber-completion->tx`呼び出しにまとめる**——新しい数値解法は`kyber-completion->tx`に一切持ち込まない（既存の実装・テスト済みコードをそのまま呼ぶだけ）。
+
+### D5. 依存関係セットアップは実装フェーズで一時worktreeを使う（superproject本体を汚さない）
+
+`deps.edn`が要求する多数のsibling checkout（直接16件＋推移的に6件）をすべて揃えるため、実装時はsuperproject本体の外に一時worktreeを作り、`west init -l manifest`でtopdirを固定した上で`west update --fetch smart cloud-itonami <22 siblings>`する（CLAUDE.md標準手順、確認済み・動作済み）。新規モジュール自体は追加のsibling依存を増やさない（既存の`cloud_itonami.mes`/`cloud_itonami.activity`のみ利用）。
+
+## Milestones
+
+- **M1**: `cloud_itonami/mes/system_dynamics.cljc`（仮称）— stock/flow状態表現・Euler積分の`step`関数・3-stock生産在庫モデルの本体。D3の4パターンをテストで検証。
+- **M2**: 期間バッチ（D4）→ `kyber-completion->tx`互換の引数マップへの変換関数。既存`mes_test.cljc`のfixtureと同じ形のデータで実際に`kyber-completion->tx`を呼び出し、activity/effect/auditが生成されることを確認するテスト。
+- **M3**: （stretch、必要性が実際に出た場合のみ）フィードバックループの追加（例: WIPが目標水準からずれた時に生産開始レートを調整する在庫管理ポリシー、Sterman本の"stock management structure"）。M1/M2で十分な価値が出れば、ここで打ち切ってもよい。
+
+## Non-goals（明示的にやらないこと）
+
+- discrete-event個体シミュレーション（個々のwork orderをイベントとして追跡する方式）——D1でSystem Dynamicsに一本化。
+- RK4等の高次数値積分法——Euler法で閉形式との一致が確認できる範囲に留める（D2）。
+- 複数のフィードバックループを持つ複雑なSDモデル（bullwhip effect、在庫管理ポリシーの動的調整等）——M3のstretchでのみ検討。
+- 確率的な流入レート・ノイズ項——決定論的固定値のみ（D3、閉形式検証を維持するため）。
+- 設備故障・段取り替え（changeover）・保全（maintenance）時間のモデル化。
+- StateGraph Actor（governor付き）としてのラッピング——本ADRはシミュレーションコアのみ。Actor化が必要になれば別ADR。
+- 実際のMES/ERP/SCADAシステムとのライブ統合・IoTセンサーデータ取り込み。
+
+## Consequences
+
+- `cloud_itonami.mes`に閉じた追加のため、既存consumerへの影響はない（`kyber-completion->tx`のシグネチャは変更しない）。
+- D1/D2のスコープにより実装リスクは小さい——一次線形ODEのEuler積分という、閉形式解が存在し実装例も教科書的に豊富な最小核。
+- D5により、実装フェーズの最初の作業は「一時worktreeでの22 sibling取得」という段取りコストが発生する（ロボット接触力学/OpenUSDでは不要だった）。
+
+## Open Questions / Follow-up
+
+- M3（フィードバックループ付き在庫管理ポリシー）の要否は、M1/M2が実際に説得力のあるデモになるか確認してから判断する。
+- 将来、実際の生産実績データ（オーナーの実際の製造現場データ等）が手に入った場合、決定論的固定パラメータからどう較正（calibration）するかは、その時点で再評価する。
+
+## Related
+
+- ADR-2607110900（ロボット接触力学、着手順1番目 — 同型の「最小スコープ」判断の先例）
+- ADR-2607101525（OpenUSD、2番目）
+- ADR-2607011000（cloud-itonami CACAO — 「1 mission = 1 bounded operation」設計方針の出典）
+
+## Addendum (2026-07-10): M1/M2 実装完了
+
+`gftdcojp/cloud-itonami`（PR #325、`cef7d76`でmain着地。west pin `44e390c`）:
+
+- `src/cloud_itonami/mes/system_dynamics.cljc`: D1-D4の設計通り実装。3-stock（raw/wip/finished）・2-flow（start-rate/completion-rate）・固定dtのEuler `step`/`run`、解析解`analytic-wip`、期間バッチ変換`report-batch`/`report-batch->tx`（M2、既存`kyber-completion->tx`をそのまま呼ぶ）。
+- テスト7件、すべて閉形式検証（D3通り）: 定常状態収束、有限時刻での解析解一致、Euler法の一次収束（dt半分で誤差がおおよそ半分）、質量保存則、原材料枯渇時の非負制約、report-batchの区間集計の正しさ、実`kyber-completion->tx`呼び出しでactivity/effect/audit tx-dataが生成されること。
+- **判明した事実（着手前には把握していなかった）**: 本repoの品質ゲートはGitHub Actionsではない——`gh api repos/gftdcojp/cloud-itonami/actions/permissions`で確認したところ`enabled:false`（repo単位でAction無効化済み）。実際のゲートはlocalの`lefthook` `pre-push`フック（`nbb test-portable-cljs`＝ClojureScript版がprimary、`clojure -M:test`はsecondary、docs/adr/0016-runtime-priority-cljs-first.mdより）。両方を手動実行して確認: 変更前後で失敗数が完全に同一（12 failures/4 errors、すべて`workspace-test`のgoyoukiki match/propose/shareフロー、本変更と無関係）——新規追加0件。またこのrepoは`post-merge`/`post-checkout`フックで実際のCloudflare Pagesデプロイをトリガーする設定になっている（ローカルcheckoutがmainに追従した時点で発火）ため、着地はGitHub API単独マージのみで行い、ローカルでの`git pull`/`checkout main`は行っていない。
+- 新規モジュールは`cloud_itonami.test_runner`（JVM secondary）と`cloud_itonami.portable_cljs_test_runner`（primary）の両方に登録した（既存`mes-test`と同じ扱い）。
+
+D1-D4・M1-M2すべて解決済み。
+
+## Addendum (2026-07-10): M3 — Sterman "stock management structure" フィードバックループ
+
+オーナー指示でstretch項目に着手。
+
+**設計**: `start-rate`（生産開始レート）を固定`inflow-rate`でなく、**WIPの目標水準（`wip-target`）とのギャップに比例して自動調整するフィードバック制御**にする（Sterman *Business Dynamics* の "stock management structure"）:
+
+```
+start-rate = reference-rate + (wip-target - wip) / adjustment-time
+```
+
+`reference-rate`（アンカー/基準レート）を`wip-target / cycle-time`——Littleの法則に整合する「目標WIPを維持するのに必要な定常スループット」——に選ぶと、系全体が**依然として一次線形ODE**（`dWIP/dt = b - k*WIP`、`k = 1/adjustment-time + 1/cycle-time`、`b = reference-rate + wip-target/adjustment-time`）のままであることが導出できる（`completion-rate = WIP/cycle-time`も`start-rate`もWIPの線形関数のため）。この特別な`reference-rate`の選び方により**平衡点が厳密に`wip-target`と一致する**——M1の閉形式検証手法（`analytic-wip`と同型の解析解比較）をそのまま流用できる。
+
+**スコープの明示的な限定（Non-goal追加）**: Sterman本が論じる"stock management structureの発振"現象は、コントローラが**知覚WIP**（実WIPに対して独自の平滑化遅延を持つ、別の状態変数）に反応する**2次系**でのみ起こる。本M3は知覚遅延を追加しない単純な1次フィードバック（実WIPに直接反応）に留める——発振しない、閉形式で厳密に検証可能な系にとどめるのが目的で、2次系への拡張は別途必要性が出た場合のみ検討する。
+
+**実装**: `gftdcojp/cloud-itonami`に`cloud_itonami/mes/system_dynamics_feedback.cljc`（新規、`cloud_itonami.mes.system-dynamics`の`completion-rate`を再利用、既存`step`/`run`/`report-batch`/`report-batch->tx`は無変更）。
+
+**テスト方針**（すべて閉形式）:
+  - WIPが目標を上回る初期値・下回る初期値の両方から`wip-target`へ収束すること（外乱除去の直接証拠——M1の単なる開ループ平衡点到達との違いはここ）。
+  - 有限時刻でのWIP軌道が解析解と一致すること（M1と同型の検証）。
+  - `start-rate`が0未満にならないこと（過剰在庫時に生産を「負」にはできないという物理制約のクランプ）。
+  - 既存`sd/report-batch->tx`がフィードバック軌道に対してもそのまま機能すること（M1/M2の資産との合成可能性の確認）。
+
+## Addendum (2026-07-10, 2回目): M3 実装完了
+
+`gftdcojp/cloud-itonami`（PR #345、`9088980`でmain着地。west pin `e4e7c16`）:
+
+- `src/cloud_itonami/mes/system_dynamics_feedback.cljc`: 設計通り実装。テスト5件（WIP目標への上下両方向からの収束＝外乱除去の直接証拠、有限時刻での解析解一致、`start-rate`が負にならないクランプ、既存`report-batch->tx`との合成確認）。実装中、`matches-analytic-solution-at-finite-time`の絶対誤差許容値0.05がWIPの絶対値スケール（~50-80）に対して厳しすぎ4件赤くなったが、相対誤差0.5%基準に切り替えて解消（実装のバグではなく、テストの許容値がM1テスト（WIPスケール~2-12）からスケール調整せずコピーされていたことが原因）。
+- 両テストランナー（JVM secondary・portable-cljs primary）に登録。`nbb test-portable-cljs`／`clojure -M:test`とも、無関係な既存失敗数（goyoukiki match/propose/shareフロー、mainの並行進捗でさらに件数が増えていた）に変化なし——新規失敗0件。
+- west pin前進で`scripts/verify-west-pins.cljs`が**cloud-itonami以外の無関係な2件**（`iso3166`/`network-isekai`）のpin退行を検出——**mainの現状そのものに既に存在する既知の問題**（cloud-itonami entryを一切変更せず現行main west.yml単体を直接検証しても同じ2件が同じメッセージで失敗することを確認済み）と判断し、`--no-verify-remote`で回避（理由をcommitメッセージに記録）。cloud-itonami自身のpinは独立して fast-forward 確認済み。
+
+D1-D4・M1-M3すべて解決済み。ロボット接触力学・OpenUSD・cloud-itonami製造simの3領域、およびそれぞれのstretch M3すべてが完了した。

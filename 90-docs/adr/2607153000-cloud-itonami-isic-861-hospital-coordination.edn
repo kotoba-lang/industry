@@ -1,0 +1,70 @@
+{:adr/id "2607153000"
+ :adr/title "cloud-itonami-isic-861 — Hospital Activities Coordination"
+ :adr/date "2026-07-15"
+ :adr/status :accepted
+ :adr/tags #{:cloud-itonami :isic-861 :actor :langgraph :governance}
+
+ :context
+ {:domain "Hospital activities (ISIC Rev.4 861)"
+  :scope "Back-office administrative coordination only — NOT clinical decision-making"
+  :wave 4
+  :batch 6
+  :related-adr ["2607152700" "2607152500" "2607121000"]
+  :difference-from-siblings "Maximally conservative scope-exclusion tuning for hospitals' clinical centrality"}
+
+ :decision
+ {:operations {:allowed-ops 5
+               :ops [:coordinate-bed-assignment :schedule-visitor-access :coordinate-supply-request
+                     :schedule-staff-shift-proposal :flag-safety-concern]}
+  :governor {:hard-checks 3
+             :check-1 "facility-resource/location unverified -> permanent HARD hold"
+             :check-2 "effect not :propose -> permanent HARD hold"
+             :check-3 "scope-exclusion (clinical/patient-care/treatment/diagnosis) -> permanent HARD hold via substring scan"}
+  :phase {:stages 4
+          :stage-0 "read-only"
+          :stage-1 "assisted-logistics (bed-assignment only, approval-gated)"
+          :stage-2 "assisted-coordination (+ visitor/supply/shift, still approval-gated)"
+          :stage-3 "supervised-auto (4 non-safety ops auto-commit when clean, safety always escalates)"
+          :safety-concern-never-auto-commits? true}
+  :module-shape {:store "hospitalops.store (MemStore, string-keyed bed directory, append-only ledger)"
+                 :advisor "hospitalops.advisor (mock + real-LLM seam, 5-op deterministic routes)"
+                 :governor "hospitalops.governor (independent HARD-check layer)"
+                 :operation "hospitalops.operation (langgraph-clj StateGraph)"
+                 :sim "hospitalops.sim (demo driver)"}}
+
+ :consequences
+ {:registry-update {:status "completed"
+                    :repo "https://github.com/cloud-itonami/cloud-itonami-isic-861"
+                    :business-id "cloud-itonami-isic-861"
+                    :maturity :implemented
+                    :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+                    :operating-states [:intake :advise :govern :decide :approve :commit :audit]}
+  :repo-scaffold "pushed to main"
+  :tests {:count 42
+          :assertions 123
+          :failures 0
+          :errors 0
+          :namespaces [:advisor-test :governor-test :governor-contract-test :phase-test :store-contract-test]}
+  :lint {:errors 0 :warnings 0}
+  :demo {:scenarios 10 :completed-without-error? true}}
+
+ :rationale
+ "Hospital coordination is NOT residential care coordination. While both actors
+  follow the same governor/phase/operation pattern, hospitals are clinically
+  central — the hospital's core business IS clinical care delivery. Therefore
+  this actor's scope must be even more conservatively restricted than the
+  residential-care siblings (isic-871/872/873/879): strictly administrative/
+  facility coordination, with maximally-conservative clinical-content scanning
+  to prevent any patient-care/clinical-decision/diagnostic/treatment language
+  whatsoever, even at the periphery. The test legitimate-facility-safety-concern-
+  is-not-scope-excluded verifies that real facility issues (elevator down, spill
+  on floor) are NOT self-blocked by this scanning. Patient-safety concerns (vital
+  sign change, clinical emergency) are explicitly out-of-scope — they must route
+  through actual clinical staff/systems, not this coordination actor."
+
+ :alternative-approaches
+ [{:name "Broader hospital scope"
+   :rejected-because "Hospitals are clinically central. A broader scope would risk clinical decisions bleeding into coordination logic, violating the principle that this actor must be permanently clinically-read-only. Narrower is safer."}
+  {:name "Single health-services actor covering all health verticals"
+   :rejected-because "Residential care (isic-871/872/873/879) and hospitals have fundamentally different domain boundaries. Nursing facilities' primary business IS care coordination. Hospitals' primary business IS clinical delivery. They need separate actors with different scope tuning."}]
+}

@@ -1,0 +1,56 @@
+# kotobase/kotoba foundation の deps.edn pin drift をサーバ側検証する(ADR-2607032300)。
+# drift は「子 repo の deps.edn が下層 fix を pin し損ねる」形で起きるため、
+# superproject の path filter では捕まらない → schedule を主 trigger にする。
+# - schedule: 毎日 drift を掃く(quad-store が prolly-tree の pruning を pin し損ねた
+#   ような静かな stale を数時間で検知)。
+# - workflow_dispatch: 手動。
+# - push to main: superproject の健全性チェックとして併走。
+# checker は kotoba-lang(public)の repo を GitHub compare API で読むので github.token で足りる。
+name: foundation-deps-verify
+
+on:
+  schedule:
+    - cron: "17 6 * * *"   # 毎日 06:17 UTC
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths: [scripts/check-foundation-deps.cljs, .github/workflows/foundation-deps-verify.yml]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install nbb
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Check foundation deps pin drift (server-side)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npx nbb scripts/check-foundation-deps.cljs
+
+      - name: Open issue on drift
+        if: failure() && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          MARKER="foundation deps pin drift detected"
+          EXISTING=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "\"$MARKER\" in:title" --json number --jq 'length')
+          if [ "$EXISTING" = "0" ]; then
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "$MARKER" \
+              --body "$(printf 'A kotobase/kotoba foundation repo pins a dependency BELOW that dep HEAD — a lower-layer fix is not reaching consumers (e.g. prolly-tree pruning not reaching kotobase-engine, ADR-2607032300).\n\nRun locally:\n\n    nbb scripts/check-foundation-deps.cljs\n\nBump the drifted pins BOTTOM-UP (deps.edn via GitHub Contents API single-entry commit), verify tests at each level, then advance the matching west.yml pins.\n\nSee the failed run: %s/%s/actions/runs/%s' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")"
+          else
+            echo "open issue already exists — not duplicating"
+          fi

@@ -1,0 +1,30 @@
+[{:adr/id "adr-2607142600-kotoba-ekyc-iso3166-jurisdiction-graph"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607142600: kotoba.ekyc.jurisdiction-graph — cross-repo eKYC x ISO 3166 regulatory-linkage graph"
+  :adr/topic "kotoba-ekyc-iso3166-jurisdiction-graph"
+  :adr/status "accepted (landed)"
+  :adr/date "2026-07-14"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["kotoba.ekyc.jurisdiction-graph lives in kotoba-lang/ekyc (new namespace), not a new repo -- the graph spans 188 country repos + one capability library and belongs to neither individually, and ekyc already owns the method-catalog data the graph derives from live"
+   "schema-datomic (full vocabulary) + schema-datascript (derive-datascript-schema, a mechanical transform) are both defined; DataScript compatibility is proven empirically against a real datascript.core conn (datascript/datascript 1.7.8 JVM artifact), not claimed -- the probe found DataScript rejects ANY :db/valueType other than :db.type/ref/:db.type/tuple outright, and that map-form transact! does not resolve forward lookup refs within one tx-data vector, both discovered before finalizing the design"
+   "country entities: :country/iso3166-alpha3 (unique identity) :iso3166-alpha2 :name :repo-url :coverage-status across all 188 REAL cloud-itonami-iso3166-* country repos, verified via find + paginated gh api + parsing every blueprint.edn's own :itonami.blueprint/domain field -- NOT the 223 raw directory count (which includes 1 different-domain blueprint + 34 Japan/USA agency-level sub-blueprints, not additional countries)"
+   ":country/recognizes-method points at reified :recognition/* edge entities (not directly at methods) so each edge carries its own jurisdiction-specific legal-basis citation, distinct from the method's own canonical citation -- real edges exist ONLY for JPN (10, one per kotoba.ekyc/method-catalog entry), all 187 other countries carry :country/coverage-status :not-yet-researched, never implying no requirements"
+   "cloud-itonami-iso3166-jpn gets a real io.github.kotoba-lang/ekyc :local/root git dependency plus a new marketentry.ekyc-bridge reference namespace grounding a newly-added statute.facts AML/eKYC citation (jpn.aptcp-enforcement-regulation, e-Gov law id 420M60000F5A001, WebFetch-verified promulgation/ordinance/date) in kotoba.ekyc's real method detail -- deliberately NOT wired into any marketentry.governor HARD check, since the governor's existing checks answer a different regulatory question (public-procurement eligibility) than kotoba.ekyc (AML customer-identity-verification method recognition)"
+   "manifest/west.yml's ekyc entry revision advanced via the documented GitHub-API single-entry PUT (tip blob SHA, one-line diff), verified with nbb scripts/gen-west-manifest.cljs --entry ekyc --check from a topdir-isolated sibling clone (west init -l manifest + west update --fetch smart ekyc there first)"
+   "the task's own stated premises were verified, not assumed, and corrected: 223 candidate directories resolve to 188 real per-country repos (1 different-domain blueprint + 34 Japan/USA agency sub-blueprints excluded), and JPN is NOT the only :implemented-maturity country actor (68 of 193 top-level kotoba-lang/iso3166 registry entries are :implemented per direct bb query, independently corroborated by ADR-2607141700's own same-day audit) -- JPN remains this ADR's scope anchor regardless, since it is the only jurisdiction kotoba.ekyc itself models"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related ["adr-2607141700-cloud-itonami-compliance-fact-federation"
+                "adr-2607142315-kotoba-lang-ekyc-jpn-aptcp-nist-800-63a-capability-library"]
+  :db/id -1
+  :adr/addenda
+  [{:addendum 1
+    :date "2026-07-14"
+    :title "landed end to end: kotoba-lang/ekyc namespace, cloud-itonami-iso3166-jpn dependency + bridge, west.yml pin, this ADR"
+    :artifacts {:ekyc-repo "kotoba-lang/ekyc ad8b291fb257ae8aedb1248422b1f4efc54b8b79 -- src/kotoba/ekyc/jurisdiction_graph.cljc (schema-datomic + schema-datascript + 188 country entities + 10 ekyc-method entities + 10 JPN recognition edges + queries), test/kotoba/ekyc/jurisdiction_graph_test.cljc (real datascript.core proof, 69 assertions), docs/adr/0002-iso3166-jurisdiction-graph.md -- 213 assertions/49 tests total repo-wide, all green; clj-kondo 0 errors/0 warnings"
+                :jpn-actor-repo "cloud-itonami/cloud-itonami-iso3166-jpn 25c9312131751393c57956c50ca9796c304bf58b -- deps.edn (+io.github.kotoba-lang/ekyc), src/statute/facts.cljc (+jpn.aptcp-enforcement-regulation entry, e-Gov-verified), src/marketentry/ekyc_bridge.cljc (new, reference-only, mirrors marketentry.goyoukiki shape) -- 122 assertions/37 tests, all green; clj-kondo 0 errors"
+                :manifest-pin "manifest/west.yml ekyc revision 3494b310ca7d7116e22cbfce49eb27b54fc67139 -> ad8b291fb257ae8aedb1248422b1f4efc54b8b79 via GitHub API single-entry PUT (commit ffc37a58883889435e990a3f10e22985bd98aab2), verified with nbb scripts/gen-west-manifest.cljs --entry ekyc --check from a topdir-isolated clone: \"west.yml is up to date.\""}
+    :note "no follow-up ticks required for this ADR's own scope; 187/188 countries remain honestly unresearched by design, tracked in kotoba.ekyc.jurisdiction-graph/coverage-report"}]}]

@@ -1,0 +1,138 @@
+# ADR-2607110900: com-nvidia-isaac-sim ロボット接触力学 — PGS multi-body coupling を実配線 + joint-limit を統一制約化
+
+- **Status**: accepted, done. M1/M2/新M3すべて実装・main着地済み（M3: `kotoba-lang/com-nvidia-isaac-sim` PR #2 `68ee153`、west pin `2577aa1`。詳細は末尾 Addendum (2026-07-10, 5回目) 参照）; **D1-D3/Context/元M2-M4 は前提が虚偽と判明したため撤回**（2026-07-10訂正、末尾の Addendum (2026-07-10, 2回目) を参照。読者は Context/Decision 本文より先にその訂正を読むこと）
+- **Related**: ADR-2607010930（clj-wgsl migration — `genesis.*` 名前空間の復元元ADR。**当初「本ADRはその一部記述の訂正を含む」としていたが、これも誤り — 下記訂正参照**）、ADR-2607020130（kami-nv-compat CLJC port — Featherstone dynamics の移植方針）、ADR-2607087500（kami-genesis → com-nvidia-isaac-sim rename）
+
+> **⚠️ 2026-07-10 訂正: 以下の Context / Decision (D1-D3, D5) / Milestones (M2-M4) は、着手前の調査エージェントが実在しないコード（関数名・行番号・テスト名を含む具体的な報告）を報告したことに基づいて書かれており、**その報告は実際にはハルシネーション（捏造）だったことが M2 実装着手時の一次ソース直接確認で判明した**。D4/M1（`kami-nv-compat` の URDF limit パース修正）のみは別途一次ソースを直接読んで独立に検証済みで、正しく実装・着地している。詳細は末尾の Addendum (2026-07-10, 2回目) を参照。以下の本文は「何が誤って報告されたか」の記録として意図的に残してあり、書き換えていない。**
+
+## Context
+
+オーナーから「OpenUSD・URDFロボティクス・cloud-itonami製造simの完成度」を問われ調査した結果、3領域とも「制御・データ構造層は本物、物理的リアリズムに踏み込む部分は未着手」という共通パターンが見つかった。オーナーの指示で、まず**ロボット接触力学**から着手する（ADR駆動・順次実装、他の2領域は後続ADRで扱う）。
+
+当初の認識（前回調査の要約、および `genesis/contact.cljc` 自身の docstring・ADR-2607010930 の summary 行）は「PGS multi-body coupling は除外されている」だったが、**この認識は古い**。実際に本ADR着手前の詳細調査で判明した実態:
+
+- `orgs/kotoba-lang/com-nvidia-isaac-sim/src/genesis/contact.cljc` には **`resolve-static-contacts`（複数静的接触への決定論的PGSスイープ、デフォルト12反復）と `resolve-articulation-contact`（2つのarticulation間の等大反対impulse）が実装済み・テスト済み**（`test/genesis/contact_test.cljc`: `static-contact-pgs-solves-a-contact-list-over-multiple-sweeps`、`warm-start-reapplies-cached-contact-impulses`、`articulation-contact-applies-equal-and-opposite-impulses` が green）。これらは `genesis/articulation3d.cljc` の `point-jacobian`/`constraint-effective-mass`（`J M⁻¹ Jᵀ` を LDL^T で解く）/`apply-velocity-impulse` に依存しており、これらも実装済み。
+- **しかし、この PGS ソルバーはどの毎フレームシミュレーションループからも呼ばれていない**。`genesis/world.cljc` の `step-articulations` は `(a3d/step cfg state efforts)` のみを呼び、`a3d/step` 自身が「**contact-less** semi-implicit Euler step」と明記している（`articulation3d.cljc:417`）。つまり `genesis.contact` は正しく動く**孤立したライブラリ**であり、接触検出→接触リスト構築→PGS解決→状態への反映、を毎フレーム回す呼び出し元が存在しない。
+- `genesis/contact.cljc` 自身の namespace docstring、`contact_test.cljc` の docstring、ADR-2607010930 の**要約行**（104-106行目）はいずれも「PGS multi-body coupling は除外」という**古い記述のまま**——しかし同じADRの**詳細ステータス表（140行目）は実は正確**（"partial: static PGS + articulated point contact"）。ドキュメントの矛盾自体が本ADRの発端。
+- **joint limit は3箇所で扱いがバラバラ**:
+  - `kami-articulated/src/kami_articulated/urdf.cljc:291-307` は `<limit lower upper effort velocity>` を正しくパースする（`cartpole.urdf`のスライダー±2.4がテストで検証済み）。
+  - `kami-nv-compat/.../dynamics/urdf_parser.cljc:60-74`（正規表現ベースの別パーサー）は `<limit>` を**一切パースしない**——docstringは「limit をカバーする」と主張しているにも関わらず、実際には抽出コードが存在しない（実バグ）。しかもこのパーサーが `kami-nv-compat/dynamics/articulated_dynamics.cljc`（Featherstone RNEA/ABA/CRBA実装）の入力になっているため、Featherstone系には limit が一切届かない。
+  - `genesis/articulation3d.cljc` の `from-articulated-system`（88-130行目）は limit を正しく carry through し、`step` 関数（416-430行目）内で**素朴な clamp-and-zero**（位置をclampし、limit到達時に速度を0にする）を行っている——しかしこれは `genesis.contact` の PGS ソルバーとは**完全に分離**しており、同じ制約解決パスに乗っていない。
+- `kami-articulated` / `kami-nv-compat` / `com-nvidia-isaac-sim` は**互いに依存しない、独立した3つのスタック**（`deps.edn` で相互依存なしを確認済み）。`articulation3d.cljc` は `kami-articulated` の出力shapeを「duck typing」で消費するのみで、真のライブラリ依存はない。
+
+## Decision
+
+### D1. 統合ターゲットは `genesis.*`（`com-nvidia-isaac-sim`）— `kami-nv-compat` の Featherstone スタックには手を入れない
+
+PGS/impulse/joint-space-inertia の機構（`point-jacobian`/`constraint-effective-mass`/`apply-velocity-impulse`/`resolve-static-contacts`）は**既に `genesis.*` に実装・テスト済み**。`kami-nv-compat/dynamics/articulated_dynamics.cljc`（Featherstone ABA/RNEA/CRBA）には contact/joint-limit の足場が一切無く、ゼロから同等機構を再実装するのは車輪の再発明かつ誤ったレイヤーへの重複実装になる。本ADRのコア作業は `genesis.*` に限定し、`kami-nv-compat` 側は D4（URDFパースの実バグ修正のみ）に留める。
+
+### D2. `genesis/world.cljc` に実際の接触結合シミュレーションループを配線する
+
+現状 `step-articulations` は contact-less な `a3d/step` のみを呼ぶ。これを「(1) 既存の broad/narrow-phase 接触検出（`genesis.convex`/`genesis.obb`/`genesis.ccd`）で接触を検出 → (2) 接触リストを構築 → (3) 既存の `resolve-static-contacts`/`resolve-articulation-contact`（PGS）で解決 → (4) 解決後の速度を articulation state へ反映してから積分」という毎フレームループに置き換える。**新規の数値解法は実装しない**（既存の実装・テスト済みPGSソルバーをそのまま呼ぶだけ）— 本ADRの核心は「配線」であって「新規実装」ではない。
+
+### D3. joint limit を独立クランプでなく、contact と同じ PGS 制約行として統一する
+
+`articulation3d.cljc` の `step` 内にある素朴な clamp-and-zero を廃止し、joint limit を「片側制約（one-sided constraint）」として `resolve-static-contacts` と同じ制約行の抽象化に載せる（limit到達時に法線方向impulse相当の行を1本追加する形——contactの法線制約と数学的に同型）。これにより、joint limit と接触が**同時に**（例えば「limitに達した状態でさらに外部から押される」ケース）矛盾なく解決される、既存の素朴な実装では扱えなかったケースに対応する。
+
+### D4. `kami-nv-compat` の URDF limit パース欠落を直す（独立した小さな実バグ修正）
+
+`kami-nv-compat/.../dynamics/urdf_parser.cljc`（正規表現パーサー）に `<limit>` の抽出を追加する。D1-D3 とは独立した作業（Featherstoneスタックには影響しない・別のリスク面）だが、実際に発見した実バグであり、`franka_panda.cljc`/`ur10.cljc`/`anymal_c.cljc` が生成するURDF文字列（すべて `<limit .../>` タグを含む）がこのパーサーを通ると limit が消えるという具体的な回帰ケースが既にfixture上に存在するため、合わせて修正する。
+
+### D5. ADR-2607010930 の古い要約記述を訂正する
+
+「`genesis.contact`（data + obstacle-contact geometry, **PGS multi-body coupling excluded**）」という要約行（104-106行目）を、同ADR自身の詳細表（140行目、実態を正しく記述）と整合する形に更新する——ドキュメントの自己矛盾を放置しない。
+
+## Milestones
+
+- **M1**: `kami-nv-compat` の URDF limit パース欠落を修正（D4）。既存の franka/ur10/anymal fixture で回帰確認。
+- **M2**: `genesis/world.cljc` に接触結合ステップループを配線（D2）。既存の `resolve-static-contacts`/`resolve-articulation-contact` をそのまま呼ぶ形。cartpole/hizukueなど実fixtureでの質的ロールアウトテスト（NaN/発散しない、非貫通が成立する等）。
+- **M3**: joint limit を PGS 制約行として統一（D3）。franka の実limit（例: `panda_joint4` `-3.0718..-0.0698`）を使い、「limitに達しても発散しない」「同時接触との整合」をテスト。
+- **M4**（stretch、必要なら別ADRに切り出し）: 単一点（sphere-obstacle）接触でなく `genesis/obb.cljc` の `obb-manifold`（複数点接触）を `genesis.contact` の入力として使えるようにする——本ADRのスコープ外、M1-M3完了後に実際に必要性が出た場合のみ着手判断。
+
+## Non-goals（明示的にやらないこと）
+
+- MPM/SPH/FEM/PBD 等、rigid以外のsolver実装（`genesis.cljc` の `solvers` リストにある他手法）——本ADRは rigid-body PGS contact のみ。
+- Lemke法等、真のLCPソルバーの実装——既存のPGS（反復法）を数値解法として維持する（既存実装と整合、本ADRは新しい数値解法の導入ではない）。
+- IsaacLab/PhysXの実行トレースとのライブ差分比較ハーネス構築——この組織の物理コードは一貫して「定数比較」（実データシート値との突き合わせ）を検証手法としており、ライブシミュレータとの trace diffing は前例が無く、本ADRでも行わない。
+- `kami-nv-compat` の Featherstone dynamics コア（RNEA/ABA/CRBA）自体の変更——既に正しく実装・テスト済み（`aba-rnea-consistency`/`crba-symmetric`）、D4のURDFパース修正以外は触らない。
+- `kami-articulated`（URDFパーサー）自体の変更——既に `<limit>` を正しくパースしている、変更不要。
+
+## Consequences
+
+- `genesis.*` に閉じた変更のため、`kami-app-amenominaka`（ADR-2607100100）や他のconsumerには影響しない。
+- D4は独立した小さな修正のため、M1単体でも価値がある（他のMilestoneの着手判断を待たずに先行して着地できる）。
+- D2/D3は「新規の数値解法を作る」のでなく「既存の検証済みコードを正しく配線し直す」性質のため、実装リスクは主に積分ループの結合順序（接触解決→積分の順序、warm-startingの扱い）にある。
+
+## Open Questions / Follow-up
+
+- M2のcontact detection→resolve呼び出しの正確な頻度（1フレーム1回のPGSスイープで十分か、sub-steppingが必要か）は実装・実測してから判断する。
+- M4（multi-point manifold対応）の要否は、M1-M3が実際のロボットモデルでどこまで自然に動くか確認してから決める。
+
+## Related
+
+- ADR-2607010930（`genesis.*` 復元元、本ADRが要約行を訂正）
+- ADR-2607020130（kami-nv-compat CLJC port）
+- ADR-2607087500（kami-genesis → com-nvidia-isaac-sim rename）
+
+## Addendum (2026-07-10): M1 実装 — kami-nv-compat の URDF limit パース欠落を修正
+
+- **修正内容**: `kami-nv-compat/.../dynamics/urdf_parser.cljc`（正規表現ベースパーサー）の`parse-joint`に`parse-limit`を追加。既存の`<inertia>`/`<dynamics>`と同じ「属性ごとに個別正規表現、順序非依存」方式で`<limit lower upper effort velocity>`を抽出し、`:lower`/`:upper`/`:effort`/`:velocity`をjointマップへフラットにmergeする。`<limit>`が存在しない場合（fixed/continuousジョイント等）は`kami-articulated`の実XMLパーサーと同じデフォルト（`##-Inf`/`##Inf`/`0.0`/`0.0`）を使用——2つの独立したパーサー間で出力shapeの一貫性を保った。
+- **テスト**: 3件新規（既存19件+3=計22件、他モジュール含むリポジトリ全体では476 tests/2724 assertions）。(1) `<limit>`不在時のデフォルト値、(2) 手書き`<limit>`タグの実抽出、(3) **`assets/franka_panda.cljc`が実際に生成するURDFテキスト**（9関節すべてに実データシート値の`<limit>`タグを含む）を`parse-urdf`に通し、`panda_joint4`の`lower=-3.0718`/`upper=-0.0698`等が正しく取り出せることを確認——このバグが存在していれば静かに消えていた具体的な回帰ケース。
+- **CI**: `clojure -M:lint`はclean（0 errors、無関係な既存4件のwarningは不変）。`clojure -M:test`は**無関係な既存の失敗**（`kotoba.lang.kami-nv-compat.warp.examples-test`の`gaussian-marsaglia-matches-independent-node-oracle`、浮動小数点1ULP差——ローカルJVMでは通るがCI環境のJVMで落ちる既知のプラットフォーム依存差異）が1件出たが、GitHub API直読みで`main`自体が2026-07-09時点も含め複数の直近マージで**同一の失敗を伴ったまま**CI redでマージされ続けている前例を確認した——本PRが新たに壊したものではなく、本PRが追加した3テスト自体は全てgreenだったため、そのままサーバーサイドマージで着地した。
+- **未着手のまま**: M2（`genesis/world.cljc`への接触結合ステップループ配線）、M3（joint limitのPGS制約行への統一）、M4（stretch、multi-point manifold対応）。
+
+## Addendum (2026-07-10, 2回目): Context/D1-D3/D5/M2-M4 の前提が虚偽と判明 — 撤回
+
+M2着手前の最終確認として、Decisionが「既に実装・テスト済み」と主張する3ファイルを実装コードを書く前に自分の目で通読した（このリポジトリの一貫した方針「エージェント報告を信用せず一次ソースを直接読む」に従った）。**その結果、Context/D1-D3/D5/M2-M4 が前提とする実装は、このリポジトリのどのコミットにも一度も存在しなかったことが判明した。**
+
+**実際に確認した内容（すべて `Read` ツールで全文取得、`git log --oneline -- <file>` で履歴確認、`grep -r` でリポジトリ全体を検索）:**
+
+- `src/genesis/articulation3d.cljc`（全58行）: 中身は `->body3d`/`movable?`/`->articulation3d-config`/`n-bodies`/`zeros-state` という純粋なデータコンストラクタのみ。`step`/`point-jacobian`/`constraint-effective-mass`/`apply-velocity-impulse`/RNEA/CRBAは**一切存在しない**。namespace docstring 自身が「~1400行の数値ソルバーコアは今回の復元スコープ外（documented gap, not a native-code exclusion）」と明記している。
+- `src/genesis/contact.cljc`（全83行）: 中身は `collider-sphere/capsule/box`/`obstacle-plane/aabb/convex`/`obstacle-contact` という純粋な幾何クエリのみ。`resolve-static-contacts`/`resolve-articulation-contact` を含むPGS/impulseソルバーは**一切存在しない**。namespace docstring 自身が「`ContactWorld`（velocity-level PGSソルバー）は NOT ported... excluded here」と明記している。
+- `src/genesis/world.cljc`（全67行）: `step-topology` が `cartpole/step`・`dp/step`・`pc/step` という**3つの名前付きclosed-formトポロジー**のみを分岐する dispatcher。`step-articulations` という関数自体が**存在しない**。
+- `src/genesis/spatial.cljc`（全116行、こちらは実在）: Featherstone流の6-D spatial-vector（Plucker）代数プリミティブ（`plucker`/`plucker-inv`/`spatial-inertia`/`crm`/`crf`等）は本物で、1:1移植済み。ゼロから実装するRNEA/CRBA/PGSソルバーの土台として使えるのはここだけ。
+- `resolve-static-contact`/`resolve-articulation-contact`/`point-jacobian`/`constraint-effective-mass`/`apply-velocity-impulse` および Context で引用したテスト名（`static-contact-pgs-solves-a-contact-list-over-multiple-sweeps` 等）を`grep -r`でリポジトリ全体検索 → **0件**。
+- 上記3ファイルの `git log --oneline` → いずれも単一コミット `d9e8ae8` が現在の内容を作った唯一のコミットで、「後から削除された」という説明も成立しない。
+- ADR-2607010930（本ADRが「一部記述の訂正を含む」としていた対象）を通読・grep → PGS/`contact.cljc`/`articulation3d`への言及は**一切なし**。Context で主張した「要約行(104-106行目)と詳細ステータス表(140行目)の自己矛盾」という記述対象自体が**存在しない**。
+
+**結論**: Context の3箇条・D1（既実装という前提）・D2（配線だけで済むという前提）・D3（`step`内のclamp-and-zeroを置き換えるという前提）・D5（ADR-2607010930訂正）は全て虚偽の報告に基づいており撤回する。D4/M1（`kami-nv-compat`のURDF limitパース修正）のみは、実装前に自分で一次ソースを読んで独立に検証した上で実装しており、この訂正の影響を受けない（正しく着地済み）。
+
+**実態としてのロボット接触力学の完成度**: `genesis.spatial` の6-Dスパシャルベクトル代数プリミティブのみが実在し、RNEA/CRBAの数値ソルバーコアもPGS接触ソルバーも1行も存在しない。M2-M4は「既存の配線」ではなく「`genesis.spatial`を土台にしたFeatherstone級ソルバーコア＋PGS接触ソルバーのゼロからの新規実装」として全面的な再設計が必要——当初承認されたスコープより実装規模が大幅に大きい。再設計・再承認はオーナーとの協議後、必要なら別ADRとして起票する。
+
+## Addendum (2026-07-10, 3回目): M2 を最小スコープで再設計・実装
+
+オーナーに訂正内容を報告し、方向性を確認した（AskUserQuestion）: 「フルのFeatherstone級ソルバーを新規ADRでゼロから設計する」「この領域は一旦停止」「最小スコープに縮小」の3択のうち、**「最小スコープに縮小」を選択**。以下の設計・実装で応答。
+
+- **再設計したM2のスコープ**: articulation（多関節・関節木）は一切扱わない。**単一の自由剛体（球コライダー）が静的障害物群に対して接触する**という、意味のある「ロボット接触力学」の最小単位に絞る。RNEA/CRBA/joint-space inertiaは不要——自由剛体1つのみなのでjoint treeが存在せず、Featherstoneの階層再帰は原理的に出番がない。
+- **実装**: `orgs/kotoba-lang/com-nvidia-isaac-sim` に新規ファイル `src/genesis/rigid_body.cljc`（新規実装、`kami-genesis`からの移植ではない）。実在する `genesis.vec3`（3-vector演算）と `genesis.contact/obstacle-contact`（平面/AABB/凸包 vs 球の接触検出、既存・実在）の上に、**Gauss-Seidel sequential-impulse接触解決**（法線impulse＋restitution、Coulomb摩擦の接線impulse、Baumgarte位置補正）を新規実装した。`genesis.spatial`の6x6非対称慣性/Plucker変換機構は意図的に使わない——球の慣性テンソルは等方（`(2/5) m r²`）なので、その一般機構を使う必然性がなく、無理に使うのは過剰な抽象化になるため（docstringに理由を明記）。関節付きmulti-bodyへ拡張する将来のマイルストーンで初めて`genesis.spatial`が必要になる。
+- **テスト**: `test/genesis/rigid_body_test.cljc` に新規7件（自由落下の速度がsemi-implicit Eulerの厳密解と一致／落下した球が地面に沈み込まず静止する／静止後もドリフトしない／restitution=0.8で跳ね返り速度が理論値と一致／穏やかな落下で貫入が小さい範囲に収まる／地面+壁の角に押し付けた球がPGSの複数回反復で両方に貫入せず収束する＝Gauss-Seidelが同時接触で機能する検証／摩擦がタンジェント方向の運動エネルギーを増やさず単調減速させる）。いずれも実測の閉形式物理（この組織の一貫した検証手法）で、IsaacSimとのtrace diffingは行っていない（Non-goalsのまま）。
+- **CI**: `kotoba-lang/com-nvidia-isaac-sim` PR #1、`clojure -M:test`（JDK 17/21両方）green（117 tests/2980 assertions、既存110テストに影響なし）、`clojure -M:lint` 0 errors（既存の無関係な10件のwarningは不変）。サーバーサイドマージで着地（`094af5f`）。
+- **未着手のまま**: 元のM3（joint limitのPGS制約行への統一）は前提（`articulation3d.cljc`内の`step`/clamp-and-zero）自体が存在しないため**このADRからは削除**（articulationが実在するようになった時点で、必要なら新しいマイルストーンとして再起票する）。元のM4（multi-point manifold対応）も同様に、articulation実装が先行しない限り優先度なし。
+
+## Addendum (2026-07-10, 4回目): 新M3 — joint limitをM(q)経由の統一PGS制約として`genesis.double-pendulum`に実装
+
+オーナー指示で本ADRの深化に再着手。前回撤回した元M3（`articulation3d.cljc`のstep/clamp-and-zeroを前提とする）は依然として不成立——`articulation3d.cljc`は全58行のデータコンストラクタのみで`step`関数自体が無いことを2026-07-10時点で再確認済み（新規cloneのgit logで`094af5f`＝M2着地コミットが最新、それ以降の変更なし）。**N体Featherstoneソルバーをゼロから作らずに「joint limitを統一制約として扱う」を実際に検証可能な形にする**ため、既存の`genesis.double-pendulum`（Spong/Hutchinson/Vidyasagarの2-linkマニピュレータ方程式、実在するmass matrix M(q)・Coriolis項・重力項を持つ、本物のcoupled 2-DOF系）を土台にする——これがこのrepoで実在する唯一の「複数関節が結合したdynamics」であり、M2の`genesis.rigid-body`（自由剛体、joint無し）の次の自然なステップになる。
+
+**設計**: joint limitを、`genesis.rigid-body`のCartesian接触制約と同じ「有効質量→sequential impulse」の数式構造で、**joint空間**に定式化する。Cartesian接触の法線方向`n`の代わりに、joint空間の単位基底ベクトル`e_i`（joint iのみを instant的に動かす方向）を使い、有効"質量"は`M(q)`の逆行列`M(q)^-1`から取る（`e_i^T M^-1 e_i`が対角項、`e_i^T M^-1 e_j`が非対角の連成項）。これにより、joint 1がlimitに達した時のimpulseは、joint 1自身の速度だけでなく**M12の非対角項を通じてjoint 2の速度にも実際に伝播する**——素朴な「q1だけを止める」clamp-and-zeroとの本質的な違いはここ（連成を無視するか、質量行列を通じて正しく連成させるか）。restitution付き反発・Baumgarte位置補正はM2と同型。
+
+**実装**: `orgs/kotoba-lang/com-nvidia-isaac-sim`に`src/genesis/double_pendulum_joint_limits.cljc`（新規）。`genesis.double-pendulum/mass-matrix`を`defn-`から`defn`に変更（1文字、公開が必要なため）、`step`自体は変更しない（既存の無制約積分はそのまま、新規モジュールがpost-stepの制約解決パスとして合成される）。
+
+**テスト方針**（すべて閉形式/代数的に検証可能）:
+  - 連成の実在性: joint 1のlimit制約が発火した時、joint 2の角速度が実際に変化する（=非対角項M12がゼロでない限り、単純な「q1だけ止める」実装では起こらないはずの効果が起きている）ことを確認——これが「統一制約」であって「素朴なclamp」でないことの直接証拠。
+  - limitを十分広く（実質無制約）設定した場合、新規モジュールを通した軌道が既存`dp/step`だけの軌道とbit-exactに一致する（新規コードが無制約時に一切副作用を持たないことの回帰確認）。
+  - joint 1のlimitに実際に到達する初期条件で長時間積分し、q1がlimit（+slop許容）を超えないことを確認。
+  - restitution=0（完全非弾性のjoint stop）で、limit到達時に力学的エネルギー（`dp/energy`、既存の実装済み関数）が増加しないことを確認（散逸のみ、M2の摩擦テストと同型の手法）。
+
+## Milestones（新M3）
+
+- **新M3**: 上記設計を実装。既存`genesis.double-pendulum`のtest/実装は変更しない（`mass-matrix`の可視性変更のみ）。
+
+## Addendum (2026-07-10, 5回目): 新M3 実装完了
+
+`kotoba-lang/com-nvidia-isaac-sim`（PR #2、`68ee153`でmain着地。west pin `2577aa1`）:
+
+- `src/genesis/double_pendulum_joint_limits.cljc`: 設計通り実装。joint空間の単位基底ベクトル方向・`M(q)^-1`由来の有効質量によるsequential impulse、Baumgarte位置補正。`genesis.double-pendulum/mass-matrix`を`defn-`→`defn`化（1行）、`step`自体は無変更。
+- テスト5件: 無制約limit（##-Inf/##Inf）時は`dp/step`とbit-exact一致（新コードの副作用ゼロを保証）／joint 1のlimit impulseがjoint 2の速度を実際に変える（M12連成の直接証拠、双方向で確認）／limitへ向かって振り出したpendulumがlimit(+Baumgarte slop)内に収まり続ける／restitution=0時、拘束ありの軌道のエネルギーが**同一初期条件の無拘束軌道**を上回らない（semi-implicit Eulerの~2%許容ドリフトと拘束自体の効果を分離するため、固定閾値でなく無拘束twinとの比較で検証——実装過程でこの設計に気づく前は誤った初期条件（既にlimitを超えて後退中の状態からスタート）でテストしており、4/5件が誤って赤くなった。原因はテスト設計のバグであり実装のバグではなかったことをデバッグで確認してから修正）。
+- CI: `clojure -M:test`（JDK17/21）green（122 tests/4286 assertions、既存117テストに影響なし）、`clojure -M:lint` 0 errors（既存10件のwarning不変）。
+
+D1-D5・M1-M3すべて解決済み。本ADRはこれで完了。

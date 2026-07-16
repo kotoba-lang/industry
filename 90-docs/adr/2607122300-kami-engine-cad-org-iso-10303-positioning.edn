@@ -1,0 +1,21 @@
+[{:adr/authoritative_for ["kami-engine-cad と org-iso-10303 は永続的に別カーネルとして並存する（統合しない）という決定"
+                          "重複（拘束ソルバ・feature-tree語彙）を許容する理由"
+                          "将来のSTEP相互運用が必要になった場合の正しい経路（org-iso-10303/brep.stepへのエクスポートブリッジ、カーネル統合ではない）"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/topic "kotoba-lang-cad-kernel-positioning"
+  :adr/related ["adr-2607121500-kami-app-cad-rhino3d-equivalent"
+                "adr-2607083900-brep-cnc-engineering-capability"
+                "adr-2607084200-brep-cnc-iso-conformance-rename"]
+  :adr/status "accepted"
+  :adr/id "adr-2607122300-kami-engine-cad-org-iso-10303-positioning"
+  :adr/changes "[]"
+  :adr/doc_type "adr"
+  :adr/last_verified "2026-07-12"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/not-implemented "{:bridge [\"kami-engine-cad solid -> brep.kernel topology -> brep.step STEP export, not built yet, no demand yet\"]}"
+  :adr/date "2026-07-12"
+  :db/id -1
+  :adr/independence-note "This is a documentation-only ADR -- no code in either repo changes. org-iso-10303 depends on kotoba-lang/engineer (shared CAD/EDA foundation consumed by dft/spice/pdk/pnr/bim/rtl/cad/cae-solver/eda); kami-engine-cad does not and keeps its own constraint solver -- a noted, accepted duplication, not an oversight."
+  :adr/authoritative true
+  :adr/title "kami-engine-cad と org-iso-10303 の位置付け明文化 -- 別カーネルとして並存、統合しない"}]

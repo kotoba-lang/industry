@@ -1,0 +1,29 @@
+[{:db/id -1
+  :adr/id "adr-2607141446-ai-gftd-itad-pc-disposal-certification"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607141446: ai-gftd-itad — ITAD（PC 廃棄証明）事業と gftd.co.jp LP"
+  :adr/topic "ai-gftd-itad-pc-disposal-certification"
+  :adr/status "accepted, deployed, closed"
+  :adr/date "2026-07-14"
+  :adr/last_verified "2026-07-14"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["gftdcojp/ai-gftd-itad の新設・west 登録（private、org 既定 visibility）"
+   "itad.gftd.ai 本番公開（Worker ai-gftd-itad, version 22fc4c52, KV ITAD_LEADS/ITAD_LEDGER, 2026-07-14 live 検証済み）"
+   "ITAD 事業設計: 回収 + NIST SP 800-88 準拠データ消去/物理破壊 + 廃棄・消去証明書発行"
+   "証明書 = append-only datoms 台帳の射影（cert 番号 GFTD-ITAD-<yymm>-<seq> + canonical EDN 検証ハッシュ）という data-first 差別化"
+   "cljs 第一・Datomic 互換 datoms/schema（DataScript/Datomic 両対応、JVM は compat）という技術方針"
+   "gftd.co.jp LP の構成（kotoba-ui + uikit paved road、フォーム + LINE 導線 + UTM 永続化）"
+   "マーケ計測方針: LINE 公式 / Google gtag / Meta Pixel は itad.edn :marketing に実 ID が入った時のみ差し込む（偽 ID 不出荷）"
+   "許認可（産廃収集運搬・古物商）・確定価格・gftd.co.jp 配置・本番 deploy をオーナー決裁の follow-up とする境界"
+   "BMC base datoms へは本 ADR では登録しない（人間レビュー要件 ADR-2607021600）"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related
+  ["adr-2606272330-ai-gftd-router"
+   "adr-2607122200-kotoba-ui-single-entry"
+   "adr-2607132300-design-quality-score"
+   "adr-2607021600-bmc-cli-react-loop"]
+  :adr/decision-summary
+  "{:repo \"gftdcojp/ai-gftd-itad\", :visibility :private, :domain \"gftd.co.jp\", :business {:service [:collection :data-erasure :physical-destruction :disposal-certificate], :erasure-standard \"NIST SP 800-88 Rev.1\", :cert-id-format \"GFTD-ITAD-<yymm>-<seq>\", :differentiator :append-only-datoms-ledger-with-verify-hash, :pricing :draft-owner-approval-pending, :licenses {:sanpai-collection :pending, :kobutsusho :pending, :policy :no-fabrication-placeholder-only}}, :tech {:first-runtime :cljs, :schema :datomic-compatible-cljc, :db [:datascript :datomic-compat], :ledger :append-only-edn-lines, :lp {:stack [:kotoba-ui :uikit], :ssr :nbb-generate, :audit :design-quality-bb-score}, :worker {:endpoint \"POST /api/itad/lead\", :deploy :follow-up}}, :marketing {:line :official-account-messaging-api, :google :gtag-search-ads, :meta :pixel-lead-ads, :utm :persisted-to-lead-datoms, :tag-policy :only-when-real-ids-configured}, :out-of-scope [:production-deploy :bmc-base-datoms-registration]}"}]

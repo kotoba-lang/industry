@@ -1,0 +1,109 @@
+{:adr-id "2617500000"
+ :title "cloud-itonami-isic-5913 (motion picture, video and television programme distribution activities) distribution-operations-coordination actor"
+ :status :accepted
+ :date "2026-07-16"
+ :deciders ["Jun Kawasaki (agent-executed, standing authorization)"]
+ :related ["ADR-2607121000" "ADR-2607152500" "ADR-2607121200"]
+ :mirrors "cloud-itonami-isic-873 (eldercareops.* module shape, Wave 4 human-facing-service flagship)"
+
+ :context
+ "ISIC Rev.4 5913 = motion picture/video/TV-programme DISTRIBUTION, distinct
+  from sibling classes 5911 (production), 5912 (post-production), 5914
+  (projection) in the same batch. Live registry.edn :name for \"5913\"
+  independently re-verified fresh: truncated \"Motion picture, video and
+  television programme distribution...\" (pre-existing seed-data truncation
+  bug, ~10% of entries), unambiguously matching the target class and distinct
+  from 5911/5912/5914's own verified names. No existing repo at
+  cloud-itonami/cloud-itonami-isic-5913 (404) or at the registry's placeholder
+  :repo (gftdcojp/cloud-itonami-J5913, itself bogus -- wrong org/id-shape,
+  never real). Fresh scaffold, not a repair. Distribution touches
+  rights/licensing-grant and territory/window-clearance decisions -- per
+  ADR-2607152500's Wave4 guardrail, closed op allowlist must never include an
+  op that directly finalizes either; any 'flag concern' op always escalates,
+  never auto-commit-eligible."
+
+ :scope-exclusions
+ ["finalizing a rights-licensing grant (who is licensed to distribute a title, in what territory, under what terms) -- hard, permanent block"
+  "finalizing a distribution-window or territory-clearance decision (locking in which window/territory a title actually releases in) -- hard, permanent block"
+  "contract negotiation, minimum-guarantee/advance determination, binding distribution-agreement execution -- not represented in the closed op allowlist at all"]
+
+ :self-trip-fix
+ "Known bug class this batch repeatedly hit: bare-noun scope-excluded-terms
+  (e.g. 'restraint', 'license') self-match inside the mock advisor's own
+  legitimate default rationale text, self-blocking the actor's happy path.
+  Fix: scope-excluded-terms phrased as the finalization/execution ACTION
+  ('finalize the rights license', 'clear the distribution window', 'grant the
+  license', JP equivalents), never a bare noun -- critical because
+  :flag-rights-concern's entire purpose is to discuss rights/territory/
+  clearance topics using exactly those bare nouns. Dedicated regression test
+  default-mock-advisor-proposals-never-self-trip-scope-exclusion in
+  governor_test.clj asserts all 4 default proposal generators, for a clean
+  registered+verified title, never trip :scope-excluded and never HARD-hold."
+
+ :decision
+ "Implement cloud-itonami-isic-5913 with Store/Advisor/Governor/Phase/
+  Operation/Sim, mirroring cloud-itonami-isic-873's eldercareops.* module
+  shape module-for-module as filmdistops.*:
+  - Store: Store protocol + MemStore, string-keyed titles directory
+    (title-id/name/registered?/verified?), append-only ledger +
+    distribution-log
+  - Advisor: Advisor protocol + mock-advisor, 4 ops all :effect :propose --
+    log-distribution-record, schedule-release-operation, flag-rights-concern,
+    coordinate-delivery
+  - Governor (FilmDistGovernor): 2 named HARD checks (title-unverified,
+    effect-not-propose) + scope-exclusion/op-not-allowed folded check
+    (finalize-rights-license-grant / finalize-window-territory-clearance /
+    closed 4-op allowlist). always-escalate-ops #{:flag-rights-concern},
+    confidence-floor 0.6
+  - Phase: 0->3 rollout (phase1 = log-distribution-record only, approval;
+    phase2 += schedule-release-operation/coordinate-delivery, approval;
+    phase3 auto-commits those 3 when clean+confident; flag-rights-concern
+    never auto, any phase)
+  - Operation: real langgraph-clj StateGraph (intake->advise->govern->decide
+    ->commit|hold|request-approval), interrupt-before #{:request-approval},
+    NOT a stub -- mirrors eldercareops.operation exactly
+  - Sim: clojure -M:run demo, full happy path + always-escalate flow + all
+    HARD-hold scenarios
+  - Tests: store_contract_test, advisor_test, governor_test (incl. mandatory
+    self-trip regression), phase_test, governor_contract_test -- 40 tests /
+    119 assertions green
+  - All .cljc portable, no JVM-only interop. AGPL-3.0-or-later. README/
+    GOVERNANCE/CONTRIBUTING/SECURITY/CODE_OF_CONDUCT written fresh for this
+    domain (NOT copied from cloud-itonami-isic-873's own GOVERNANCE.md/
+    CONTRIBUTING.md, which were found to still carry unrelated mining-actor
+    (cloud-itonami-isic-0520) copy-paste boilerplate -- that bug deliberately
+    not propagated here)"
+
+ :consequences
+ {:positive
+  ["ISIC 5913 distribution-operations-coordination genuinely implemented and
+    fully tested, distinct from non-overlapping sibling classes 5911/5912/5914"
+   "rights-licensing-grant and window/territory-clearance exclusions hardcoded
+    in governor checks (scope-exclusion-violations), not just README prose"
+   "self-trip bug class fixed by construction (action-phrased terms) + covered
+    by dedicated regression test, not avoided by luck"
+   "flag-rights-concern always-escalate is a two-layer invariant (governor
+    always-escalate-ops + phase's permanent absence from every :auto set)"
+   "portable .cljc, zero JVM-only constructs; clojure -M:lint 0 errors / 0 warnings"]
+  :negative
+  ["real persistent store (Datomic/kotoba-server) is a follow-up; tests use
+    in-memory MemStore, matching every sibling actor's current maturity"
+   "mock-advisor is deterministic, not a real LLM call; Advisor protocol seam
+    ready for that swap but not wired in this ADR"]}
+
+ :verification
+ {:test-count 40
+  :assertion-count 119
+  :test-status "0 failures, 0 errors -- clojure -M:test AND clojure -M:dev:test both independently run, identical result"
+  :lint-status "0 errors, 0 warnings"
+  :commit "3ae9f6cdd32a77e62f4866f411e1af4a49e498ae"
+  :repo "https://github.com/cloud-itonami/cloud-itonami-isic-5913"
+  :demo-run "clojure -M:dev:run end-to-end: happy-path ops auto-commit at phase 3, escalate at phase 1; flag-rights-concern escalates then commits after approval; unregistered/unverified title, non-:propose effect, out-of-scope-drift all HARD-hold as designed"
+  :registry-update "kotoba-lang/industry: 5913 :spec -> :implemented, :name de-truncated, :repo/:business-id de-placeholdered from gftdcojp/cloud-itonami-J5913 to cloud-itonami/cloud-itonami-isic-5913, :required-technologies trimmed to [:identity :forms :dmn :bpmn :audit-ledger]. Landed via Contents-API single-file PUT, first attempt, no 409 retries."
+  :registry-merge-commit "6471536c1dac2dd0e89b289273a6def85de5c404"
+  :registry-test-file-commit "5e3fcc2ae7996d85ee437d9c8141be620c1d954f"
+  :registry-test-file-retries 2
+  :registry-post-merge-verification "fresh clone (+ fresh ../technology sibling) of kotoba-lang/industry main: Ran 15 tests containing 1050 assertions. 0 failures, 0 errors. clj-kondo: 0 errors, 0 warnings. No mojibake detected; 5913 and sample entries 5911/5912/5914/873/5811/6310 all intact."
+  :registry-implemented-count-before 383
+  :registry-implemented-count-after 385
+  :registry-count-note "385 reflects this promotion's own +1 plus concurrent sibling 5911/5914 promotions landed in the same window, live-recomputed via (kotoba.industry/maturity-summary) immediately before each edit, not assumed"}}

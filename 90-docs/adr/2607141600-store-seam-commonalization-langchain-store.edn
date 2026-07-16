@@ -1,0 +1,52 @@
+[{:adr/id "adr-2607141600-store-seam-commonalization-langchain-store"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607141600: Store seam の共通化 — kotoba-lang/langchain-store 抽出 + 段階移行計画"
+  :adr/topic "store-seam-commonalization-langchain-store"
+  :adr/status "accepted (increment 1 done; full 190-repo migration is increment 2+, staged)"
+  :adr/date "2026-07-14"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for ["shared langchain.db actor-store machinery lives in kotoba-lang/langchain-store (EDN-blob codec enc/dec*, identity-schema, seq-keyed event-log read-stream/append-blob!)"
+                          "evidence: the exact enc/dec* two-liner is byte-identical in 190 store.cljc files; the common part is the MACHINERY, the variable part is each store's field/pull spec"
+                          "cryptoexchange.store is the reference adopter; domain stores keep their own Store protocol + field shaping (this lib is substrate, not a framework)"
+                          "the 190 existing duplicates are migrated in STAGES, never bulk-rewritten: (1) lib+codec+event machinery+cryptoexchange [this ADR], (2) field-spec pull->map/map->tx helper for entity-stores [separate ADR], (3) new actors adopt by default + gradual adoption on touch"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related ["adr-2607141400-kotoba-lang-merkle-sum-extraction-store-seam-finding"
+                "adr-2607141200-cloud-itonami-isic-6611-cryptoexchange-incident-proof-design"]
+  :db/id -1
+  :adr/addenda
+  [{:addendum 1
+    :date "2026-07-14"
+    :title "increment 2 done + first entity-store migration (6511)"
+    :field-spec-helpers {:lib-main "0a5298d (west pin advance f8acaab)"
+                         :api "map->tx / pull->map / pull-pattern driven by {logical-key {:attr :ns/attr :blob? :default :coerce}}; preserves hand-written semantics exactly (some? gate keeps false; nil identity -> nil; blob decode with default; :coerce on read)"
+                         :tests "specs mirroring 6511's application/party, round-trip through a real langchain.db conn; CLJS+JVM 8 tests / 22 assertions"}
+    :reference-adopter {:repo "cloud-itonami/cloud-itonami-isic-6511 (underwriting.store)"
+                        :main "952b098"
+                        :change "schema -> identity-schema; enc/dec* -> lib; app/party map<->tx<->pull -> field-spec + generic calls; kyc/assessment/ledger/binding/sequence custom-query sections keep own wiring (using shared enc/dec*)"
+                        :verification "behavior identical — CLJS primary + JVM both 37 tests / 462 assertions green (incl. MemStore≡DatomicStore store contract exercising app/party round-trips); clj-kondo 0"
+                        :note "first increment-3 on-touch migration; 6511 is a west-unregistered cloud-itonami actor (direct GitHub main), so no west pin advance"}
+    :remaining "increment 3 continues: new actors adopt by default (update build-actor skill), existing migrate gradually on touch, drift scan surfaces non-adopters"}
+   {:addendum 2
+    :date "2026-07-14"
+    :title "increment 3 visibility — adoption scan + baseline"
+    :scan {:script "scripts/langchain-store-adoption-scan.cljs (nbb, read-only)"
+           :buckets ":adopted (requires langchain-store.core) / :hand-rolled (local enc/dec* codec remains = migration backlog) / :other (MemStore-only etc., inspect manually)"
+           :baseline {:root "orgs/cloud-itonami" :date "2026-07-14" :total 334 :adopted 1 :hand-rolled 221 :other 112
+                      :note "the 221 hand-rolled are the increment-3 on-touch backlog; re-run the scan to track adopted rising / hand-rolled falling. build-actor skill now steers new stores to :adopted from the start. cryptoexchange.store is also an adopter but isn't checked out under orgs/cloud-itonami so it doesn't appear in the local scan"}}}]
+  :adr/decision-summary
+  "{:context {:from \"ADR-2607141400 recorded the 263-repo Store-seam duplication as a structural issue for a separate ADR; this is it\",
+              :evidence {:identical-codec \"(defn- enc [v] (pr-str v)) and (defn- dec* [s] (when s (edn/read-string s))) are byte-identical in 190 store.cljc files\"
+                         :also-common \":db.unique/identity schema, langchain.db q/transact!/pull, EDN-blob convention\"
+                         :domain-specific \"pull<->tx field lists differ per store (entity vs event shape); the machinery is common, the field spec is not\"}},
+    :decisions {:lib \"kotoba-lang/langchain-store — enc/dec* (codec, zero-dep pure), identity-schema (pure), read-stream/append-blob! (event-log, langchain.db-dep); portable .cljc, CLJS+JVM 4 tests/13 assertions\"
+                :domain-keeps \"its own Store protocol + field/pull shaping; lib is substrate not framework\"
+                :adopter \"cryptoexchange.store — drops local enc/dec*/schema/read-stream + edn require, delegates to the lib; behavior identical (CLJS 71 / JVM 87 green, MemStore≡DatomicStore fold-identity unchanged)\"
+                :west \"west.yml entry (pin 9fe115d == main tip) + repos.edn :extra-projects; fresh origin/main worktree, 2-file minimal edit, server-side merge 049ae17\"
+                :staging \"do NOT bulk-migrate the 190. increment 1 (this ADR): lib + codec/schema/event machinery + cryptoexchange. increment 2: field-spec pull->map/map->tx helper to dedupe entity-store boilerplate (separate ADR). increment 3: new actors adopt by default (update build-actor skill), existing migrate gradually on touch (drift scan surfaces non-adopters)\"},
+    :artifacts {:lib \"https://github.com/kotoba-lang/langchain-store (9fe115d)\"
+                :west \"superproject 049ae17\"
+                :adopter \"satellite 23f20c1\"},
+    :honesty \"the seam is inherently domain-shaped; only the substrate (codec/schema/event-log) is cleanly shareable now. entity pull/tx dedup needs the increment-2 field-spec helper. the lib is intentionally thin\"}"}]

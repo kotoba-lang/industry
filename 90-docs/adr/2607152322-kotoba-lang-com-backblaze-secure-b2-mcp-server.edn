@@ -1,0 +1,16 @@
+[{:adr/id "adr-2607152322-kotoba-lang-com-backblaze-secure-b2-mcp-server"
+  :adr/doc_type "adr"
+  :adr/title "kotoba-lang/com-backblaze-secure — Backblaze B2 向け secure MCP server"
+  :adr/topic "kotoba-lang-com-backblaze-secure-b2-mcp-server"
+  :adr/status "accepted"
+  :adr/date "2026-07-15"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for ["kotoba-lang/com-backblaze-secure design"
+                          "Backblaze B2 MCP server security invariants"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related ["scripts/b2-creds.cljs" "orgs/kotoba-lang/org-anthropic-mcp"]
+  :adr/decision-summary
+  "{:repo \"kotoba-lang/com-backblaze-secure\", :purpose :secure-b2-mcp-server, :invariants [:redact-all-tool-output :bucket-capability-allowlist :reuse-existing-credential-resolution-order :append-only-audit-ledger], :mcp-kernel \"kotoba-lang/mcp (:local/root)\", :runtime :nbb, :data-plane \"official b2 CLI subprocess\", :triggering-incident \"unredacted b2 account authorize JSON leaked applicationKey/applicationKeyId into chat transcript this session\"}"
+  :db/id -1}]

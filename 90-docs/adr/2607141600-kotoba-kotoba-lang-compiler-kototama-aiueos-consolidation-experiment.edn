@@ -1,0 +1,221 @@
+[{:db/id -1
+  :adr/id "adr-2607141600-kotoba-kotoba-lang-compiler-kototama-aiueos-consolidation-experiment"
+  :adr/title "ADR-2607141600: kotoba / kotoba-lang / compiler / kototama / aiueos 5リポジトリ責務境界確定 + 言語プロファイル/Chicory実行系の重複解消実験"
+  :adr/status "accepted -- closed (phase 0/1 done, phase 2 negative-closed, phase 3 n/a)"
+  :adr/date "2026-07-14"
+  :adr/last_verified "2026-07-14"
+  :adr/doc_type "adr"
+  :adr/topic "kotoba-lang-wasm-runtime"
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["5リポジトリ責務境界表（:adr/repo-roles）をこの関係性の正本とする"
+   ".kotoba 言語仕様の唯一の正典は kotoba-lang/kotoba-lang の lang/profile.edn であり、
+    kotoba-lang/compiler の独自 reserved-forms 集合は未整合の重複実装であるという診断"
+   "kotoba.wasm-exec / kototama.tender / aiueos.execute の3箇所が独立に Chicory
+    実行プラミングを実装している重複の記録、および解消実験（Phase 2/3、未着手）の位置づけ"
+   "5リポジトリの git 統合（repo merge）は提案しないという否定の記録"]
+  :adr/related
+  ["adr-2607022800-kotoba-lang-org-dependency-map"
+   "adr-2607022400 kototama-unikernel-tender-runtime-vocabulary"
+   "adr-2607022700 aiueos-native-adapter-tender-design"
+   "adr-2607022900 aiueos-chicory-jvm-native-adapter"
+   "adr-2607062330 kototama-tender-chicory-execution-runtime"
+   "adr-2607062400 kototama-actor-host-browser-native-and-tender-module-fix"
+   "adr-2607100030 kotoba-kami-engine-host-imports"
+   "adr-2607022200 aiueos-cljc-wasm-component-kernel-architecture"]
+  :adr/repo-roles
+  [{:repo "kotoba-lang/kotoba-lang"
+    :role :language-semantic-authority
+    :owns ["lang/profile.edn" "docs/lang/versioning.md" "conformance fixtures"
+           "accepted source extensions: .kotoba .cljc .clj .cljs"]}
+   {:repo "kotoba-lang/kotoba"
+    :role :reference-implementation-launcher
+    :owns ["kotoba wasm emit CLI" "JVM/Chicory primary execution adapter"
+           "host provider wiring" "192 tests / 945 assertions"]}
+   {:repo "kotoba-lang/compiler"
+    :role :multi-target-aot-backend
+    :owns ["frontend -> HIR -> KIR -> {wasm32-browser wasm32-wasi native-x86_64 native-aarch64}"
+           "own reader (clojure.tools.reader)"]
+    :finding "own reserved-forms/forbidden-heads set NOT cross-referenced to
+              kotoba-lang/kotoba-lang's profile.edn -- diverges in surface
+              (missing explicit when/do/and/or in its own reserved set) --
+              undocumented drift, not a declared design difference"}
+   {:repo "kotoba-lang/kototama"
+    :role :actor-host-abi-hosting-runtime
+    :owns ["multi-tenant fleet dispatch (R3 stable)"
+           "JVM/Chicory tender (R1 stable) + browser-native host (R2 advanced-partial)"]
+    :finding "kototama.aiueos-adapter already implements 'aiueos decides,
+              kototama enforces' (ADR-2607022700 / ADR-2607062330 addendum 6)
+              -- decision layer separation already correct, NOT touched by
+              this ADR"}
+   {:repo "kotoba-lang/aiueos"
+    :role :capability-os-decision-layer
+    :owns ["manifest/policy/grant/audit authority"
+           "quota (ADR-0006) / fuel (ADR-0001, Chicory unsafe API) / memory-pages enforcement"
+           "aiueos.execute: 2nd independent Chicory-based .kotoba wasm execution path"]}]
+  :adr/duplication-findings
+  [{:layer :language-profile
+    :duplicated-in ["kotoba-lang/compiler:src/kotoba/compiler/frontend.clj"]
+    :should-consume "kotoba-lang/kotoba-lang:lang/profile.edn"
+    :severity :real-drift-not-intentional
+    :corrected-2026-07-14 "WRONG PREMISE -- profile.edn only covers source-extension /
+      reader-target resolution, not special-forms grammar; it has nothing for
+      compiler/ to consume. The real duplication found on investigation:
+      compiler/frontend.clj IS the CLJC-native successor of kotoba-lang/kotoba's
+      historical Rust safe-Kotoba three-gate design (policy.rs/subset.rs/effects.rs,
+      removed 604896171b 2026-07-01), but kotoba-lang/kotoba's README misattributed
+      that successor to kotoba-lang/kotoba-lang (which implements none of it).
+      See :adr/phase-1-2026-07-14 for the fix actually applied."}
+   {:layer :chicory-execution-plumbing
+    :duplicated-in ["kotoba-lang/kotoba:src/kotoba/wasm_exec.clj"
+                     "kotoba-lang/kototama:src/kototama/tender.clj"
+                     "kotoba-lang/aiueos:src/aiueos/execute.cljc"]
+    :shared-citation "ADR-2607022900"
+    :not-duplicated "decision/policy algorithm (already correctly separated
+                     via kototama.aiueos-adapter per ADR-2607022700)"
+    :risk-note "aiueos.execute's own docstring: Chicory fuel-metering hook is
+                undocumented unsafe/experimental API -- 3 independent
+                dependents on the same non-guaranteed surface"
+    :severity :experiment-candidate-not-confirmed-worth-fixing}]
+  :adr/plan
+  [{:phase 0 :desc "record boundary contract + duplication findings" :status :done}
+   {:phase 1 :desc "originally planned: compiler/ reserved-forms diff vs
+                     kotoba-lang/kotoba-lang profile.edn. ACTUALLY EXECUTED (premise
+                     was wrong, see :adr/phase-1-2026-07-14): fixed a real
+                     README misattribution across kotoba/kotoba-lang/compiler re:
+                     who owns the safe-Kotoba three-gate CLJC-native successor"
+    :status :done}
+   {:phase 2 :desc "prototype shared Chicory plumbing extraction against ONE call site
+                     (aiueos.execute candidate); verify test suite green. ACTUALLY
+                     EXECUTED as a full-text comparative read of all 3 files (1765
+                     lines total) rather than a throwaway code prototype -- see
+                     :adr/phase-2-2026-07-14. Concluded negative (not worth
+                     extracting): no code written, no repo touched."
+    :status :done}
+   {:phase 3 :desc "if phase 2 proves net-positive (less code, same coverage, no perf
+                     regression), migrate kotoba.wasm-exec + kototama.tender; if not,
+                     record negative result and close as 'tried, not worth it'"
+    :status :not-applicable-phase-2-was-negative}]
+  :adr/phase-1-2026-07-14
+  {:summary "Investigated the planned compiler/-vs-profile.edn diff and found the
+             plan's premise wrong: profile.edn has no special-forms grammar at all.
+             Read compiler/frontend.clj and kotoba/README.md directly instead, and
+             found the REAL duplication: compiler/'s forbidden-heads/cap-call/
+             direct-facts+infer-effects IS the CLJC-native successor of kotoba/'s
+             historical Rust subset.rs/policy.rs/effects.rs three-gate safe-Kotoba
+             design (T1 Memory Safety / T2 Effect Soundness / T3 Capability
+             Confinement) -- but kotoba/'s own README claimed that successor
+             'lives entirely in kotoba-lang/kotoba-lang', which implements none
+             of it (grep 0 hits). Fixed via doc-only README edits, no code/grammar
+             change (grammar reconciliation itself deferred, see :adr/plan phase
+             follow-up note)."
+   :gate-mapping [{:gate :subset :theorem "no ambient code/effect"
+                    :rust "subset.rs" :cljc "compiler/frontend.clj forbidden-heads"}
+                  {:gate :capability :theorem "T3 Capability Confinement"
+                   :rust "policy.rs" :cljc "compiler/frontend.clj cap-call"}
+                  {:gate :effect :theorem "T2 Effect Soundness"
+                   :rust "effects.rs"
+                   :cljc "compiler/frontend.clj direct-facts + infer-effects
+                          (interprocedural fixpoint, converges through mutual
+                          recursion)"}]
+   :commits [{:repo "kotoba-lang/compiler" :from "96f72fb" :to "26ff523"
+              :change "added 'Relationship to kotoba-lang/kotoba and
+                        kotoba-lang/kotoba-lang' README section + gate-mapping table"}
+             {:repo "kotoba-lang/kotoba" :from "53d51110c" :to "ecadee870"
+              :change "fixed misattribution: successor 'lives in kotoba-lang/compiler',
+                        not kotoba-lang/kotoba-lang"}
+             {:repo "kotoba-lang/kotoba-lang" :from "ca6aba5d4" :to "a777ecd1"
+              :change "added explicit 'Out of scope, by design' note: does not
+                        implement the safe-Kotoba three gates"}]
+   :method "1 branch per repo (docs/p1-repo-boundary-cross-references), sibling
+            git worktree outside superproject, gh api .../merges server-side
+            merge to main, branch+worktree cleanup"
+   :west-pins {:kotoba "53d51110cf8d -> ecadee870a73 (fast-forward, --entry kotoba)"
+               :kotoba-lang "ca6aba5d4169 -> a777ecd1badf (fast-forward, --entry kotoba-lang)"
+               :compiler "NOT REGISTERED in manifest/west.yml or repos.edn at all
+                          (manual clone, same unregistered state as
+                          kami-studio/kami-creative-studio per ADR-2607132300
+                          Addendum 2) -- doc push/merge landed on GitHub
+                          regardless; formal west registration deliberately left
+                          out of scope for this phase"}
+   :not-yet-decided "whether kotoba/'s friendly surface grammar (when/do/and/or
+                      sugar, no capability/effect gate) and compiler/'s gated KIR
+                      grammar (cap-call/heap-pairs, no sugar, but with the three
+                      gates) should ever be reconciled into one shared grammar --
+                      this addendum only fixes the ownership documentation, it
+                      does not decide or attempt that reconciliation"}
+  :adr/phase-2-2026-07-14
+  {:summary "Full-text comparative read of all 3 Chicory-execution files (no code
+             written, no repo touched) instead of a throwaway extraction
+             prototype -- concluded the shared-plumbing extraction is NOT worth
+             doing (negative result per the Phase-3 gate in :adr/plan)."
+   :files-read [{:repo "kotoba-lang/aiueos" :file "src/aiueos/execute.cljc" :lines 473}
+                {:repo "kotoba-lang/kototama" :file "src/kototama/tender.clj" :lines 609}
+                {:repo "kotoba-lang/kotoba" :file "src/kotoba/wasm_exec.clj" :lines 683}]
+   :finding-1-decisive
+   "kototama.tender's OWN namespace docstring (lines 18-28) already evaluated and
+    rejected this exact idea: 'the generic Chicory wiring...is written fresh
+    here, not vendored from kotoba-lang/kotoba's wasm_exec.clj...pulling it in
+    as a dependency would run a second, incompatible capability model next to
+    kototama's own actor:host ABI (the semantic authority duplication
+    ADR-2607022700 rules out)...proof-of-pattern, not shared code.'"
+   :finding-2-quantitative
+   {:shared-helpers ["host-fn" "valtype" "write-bytes!" "read-bytes!/read-str"
+                      "fuel-listener" "memory-limits-for"]
+    :shared-loc-per-file "~60-90 lines (12-15% of each file), and NOT byte-identical"
+    :divergences
+    ["host-fn param convention differs: aiueos takes keyword params + internal
+      valtype mapping; kototama/kotoba take pre-resolved ValType objects"
+     "error-handling philosophy differs per repo: aiueos throws ex-info caught
+      centrally in run-if-granted; kototama uses in-band -1 sentinels for
+      quota/http plus denied! exceptions for structural violations; kotoba uses
+      its own capability-granted? denial pattern"
+     "fuel-exceeded ex-data vocabulary differs per repo (deliberately, per
+      ADR-2607022700 authority separation): :aiueos.execute/fuel-exceeded vs
+      :kototama.tender/problem :fuel-exhausted vs :kotoba.wasm/problem
+      :fuel-exhausted"
+     "memory-limits-for assumption differs: aiueos assumes memory section always
+      present (documented invariant, .kotoba-only input domain) vs kototama
+      defensively checks .isPresent (generic Chicory-guest input domain) --
+      confirmed this is a scope difference, NOT a latent bug"]}
+   :conclusion "Extraction declined. (1) kototama.tender's authors already ran
+                this evaluation and rejected it for a still-valid reason.
+                (2) Quantitatively not worth it: ~200 shared-but-not-identical
+                lines across 1765 total, against the cost of a new shared repo
+                (new ADR + GitHub repo + west registration + 3 dependency bumps
+                + 3 JVM test-suite reverifications). Per :adr/plan phase 3's own
+                gate, recorded as negative and closed -- Phase 3 (migration) not
+                attempted."
+   :code-changed false
+   :repos-touched []}
+  :adr/phase-3-2026-07-14
+  {:summary "Resolved Phase-1 follow-up item 1: kotoba-lang/compiler was still
+             unregistered in the west manifest. Found manifest/repos.edn's
+             :extra-projects already listed it (landed via a CONCURRENT
+             session's unrelated 'kyoninka' ITAD-licensing commit ed0e4a844473,
+             found via git log -S pickaxe search) -- but manifest/west.yml (the
+             generated artifact) had not caught up. Generated the missing
+             west.yml entry only; repos.edn needed no further edit."
+   :method "nbb scripts/gen-west-manifest.cljs --entry compiler (verify-west-pins
+            confirmed pin 26ff5233b569 reachable from main), sibling worktree
+            chore/west-register-kotoba-lang-compiler, gh api merges server-side
+            merge, branch+worktree cleanup -- same procedure as Phase 1/2"
+   :landed {:commit "8e775c6d4f0d" :entry {:name "compiler" :remote "kotoba-lang"
+                                            :path "orgs/kotoba-lang/compiler"
+                                            :revision "26ff5233b56950f8ae95390e35cb7e2d71aee87c"}}
+   :remaining-followup "item 3 from :adr/phase-1-2026-07-14's handoff note --
+                         whether kotoba/'s friendly surface grammar and
+                         compiler/'s gated KIR grammar should ever be
+                         reconciled -- is a language-design decision, not a
+                         mechanical task, and remains deferred to a future
+                         session/ADR."}
+  :adr/decision-not-made
+  ["no git repository merge across the 5 repos -- west/manifest keeps 5 independent entries"
+   "no kotoba-lang/kotobascript repo -- reaffirms prior-turn analysis that .kotoba's
+    capability-safe design intent conflicts with a JS compile target, and Node.js cljs
+    execution is already served by kototama.node.cljs / standard cljs+nbb path"
+   "no .cljc -> .kotoba mass migration -- .kotoba's language subset (no macros/eval/
+    require/interop/3rd-party deps) structurally cannot host the 5,008 existing .cljc
+    files' general application logic"
+   "no change to the aiueos/kototama decision-layer separation established by
+    ADR-2607022700 -- this ADR only targets the plumbing layer beneath it"]}]

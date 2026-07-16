@@ -1,0 +1,55 @@
+[{:adr/id "adr-2607140500-etzhayyim-substrate-rollout-charter-rows-amendment"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607140500: etzhayyim-substrate-rollout モデル拡張 — 契約法/土地/教育/紛争解決レイヤーの追加(ADR-2607132200 amendment)"
+  :adr/topic "etzhayyim-substrate-rollout-charter-rows-amendment"
+  :adr/status "accepted"
+  :adr/date "2026-07-13"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for ["yosoku.models/etzhayyim-substrate-rollout 11-stock contract — supersedes the 7-stock version's authoritative scope"
+                          "DisputeResolutionCoverage must never be wired to RoboticsUnits in either direction"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends ["adr-2607132200-etzhayyim-post-nation-state-substrate-system-dynamics-reverse-toposort"]
+  :adr/related ["adr-2607121000-cloud-itonami-global-isic-isco-reverse-toposort-plan"]
+  :db/id -1
+  :adr/decision-summary
+  "{:new-stocks {:ContractLawCoverage {:meaning \"Solidity contracts + Constitution.sol ratification\", :init 15, :wave 1}
+                 :LandTrustCoverage {:meaning \"Religious-Corp Land Trust real estate\", :init 0, :wave 2}
+                 :EducationCoverage {:meaning \"open-* apps + agent-fleet education reach\", :init 3, :wave 2}
+                 :DisputeResolutionCoverage {:meaning \"Council adjudication + transparency/audit compliance -- deliberately never wired to RoboticsUnits\", :init 2, :wave 2}},
+    :new-gates {:ConstitutionRatificationGate {:init 0.1} :LandAcquisitionGate {:init 0.05}
+                :CurriculumGate {:init 0.15} :AdjudicationAuthorityGate {:init 0.05}},
+    :safety-boundary \"DisputeResolutionCoverage's AdjudicationExpansion equation never references RoboticsUnits, and FleetDeployment never references DisputeResolutionCoverage -- regression-tested directly (dispute-resolution-coverage-is-never-wired-to-robotics-units). The charter's 'Transparent Religious Force' framing is transparency/audit-based, not a physical-coercion capability, and this model does not represent one.\",
+    :revised-reverse-toposort-waves
+    {0 {:stocks [\"CouncilSeats\" \"TreasuryCapacity\"]}
+     1 {:stocks [\"IdentityCoverage\" \"ContractLawCoverage\"], :note \"both depend on wave 0 only\"}
+     2 {:stocks [\"AgentCapacity\" \"EducationCoverage\" \"LandTrustCoverage\" \"DisputeResolutionCoverage\"],
+        :note \"AgentCapacity<->EducationCoverage form a legal stock-mediated reinforcing loop, not a wave-order dependency; validated as non-cyclic by xmile.validate (stock-mediated, not same-tick algebraic)\"}
+     3 {:stocks [\"SocialCoverage\"], :note \"now also requires LandTrustCoverage (wave 2)\"}
+     4 {:stocks [\"RoboticsUnits\"], :note \"now also requires LandTrustCoverage (wave 2)\"}
+     :feedback {:stock \"PublicTrust\", :sources {\"SocialCoverage\" 0.4 \"RoboticsUnits\" 0.3 \"DisputeResolutionCoverage\" 0.3}
+                :feeds-back-to \"CouncilOnboarding (wave 0)\"}},
+    :baseline-t60 {:CouncilSeats 4.41 :TreasuryCapacity 91.07 :IdentityCoverage 16.61 :AgentCapacity 10.55
+                   :SocialCoverage 1.04 :RoboticsUnits 0.00 :PublicTrust 3.77 :ContractLawCoverage 27.08
+                   :LandTrustCoverage 2.96 :EducationCoverage 4.65 :DisputeResolutionCoverage 2.46},
+    :single-gate-leverage-t60
+    [{:gate \"ConstitutionRatificationGate\" :disposition :commit :leverage 54.30}
+     {:gate \"LandAcquisitionGate\" :disposition :commit :leverage 39.43}
+     {:gate \"LegalActivationGate\" :disposition :commit :leverage 11.23}
+     {:gate \"AdjudicationAuthorityGate\" :disposition :commit :leverage 9.63}
+     {:gate \"CurriculumGate\" :disposition :commit :leverage 7.87}
+     {:gate \"RealLLMWiringGate\" :disposition :commit :leverage 3.88}
+     {:gate \"G7ConsentGate\" :disposition :commit :leverage 0.62}
+     {:gate \"DispatchGate\" :disposition :commit :leverage 0.24}],
+    :fan-out-predicts-leverage-finding
+    \"the 2 top-leverage gates (ConstitutionRatificationGate, LandAcquisitionGate) each gate a stock with 2 direct downstream dependents (ContractLawCoverage -> LandTrustCoverage+DisputeResolutionCoverage; LandTrustCoverage -> SocialCoverage+RoboticsUnits), vs fan-out=1 for the lowest-leverage gates (DispatchGate/G7ConsentGate) -- empirically confirms the fan-out term in cloud-itonami ADR-2607121000's V(code) formula, now replicated in a second independent model\",
+    :all-gates-open-t60 {:CouncilSeats 4.57 :TreasuryCapacity 91.07 :IdentityCoverage 86.40 :AgentCapacity 94.15
+                         :SocialCoverage 84.20 :RoboticsUnits 71.48 :PublicTrust 76.22 :ContractLawCoverage 79.35
+                         :LandTrustCoverage 60.94 :EducationCoverage 86.86 :DisputeResolutionCoverage 52.49},
+    :over-additivity {:combined-delta 397.13 :sum-of-individual 127.21 :ratio 3.12
+                      :note \"lower than ADR-2607132200's 4-gate 7.3x because leverage is now concentrated in the 2 high-fan-out gates, not because complementarity weakened -- individual scores still total far less than the combined unlock\"},
+    :verification {:yosoku-tests \"46 tests / 2890 assertions green (was 44/1910 pre-amendment)\"
+                   :lint \"clj-kondo 0 errors/warnings\" :xmile-validate \"0 errors/warnings on 11-stock model\"},
+    :artifacts {:yosoku-pr \"etzhayyim/com-etzhayyim-yosoku#2, merged as 0e980a8\"
+               :manifest-pin-advance \"com-etzhayyim-yosoku 5ead8fa -> 0e980a8, single-entry API commit\"}}"}]

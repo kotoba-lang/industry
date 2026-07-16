@@ -1,0 +1,59 @@
+{:adr/id "2607142700"
+ :adr/title "cloud-itonami ISIC 1910 — Coke Oven Products Manufacturing Coordination Actor"
+ :adr/status :implemented
+ :adr/date "2026-07-14"
+ :adr/context
+ {:domain :manufacturing/coke-oven-products
+  :isic-rev5 "1910"
+  :problem "Coke-oven manufacturing requires safe coordination of coal intake, production-run scheduling, byproduct handling, and emissions compliance. An LLM advisor cannot make process-engineering decisions (furnace control remains engineer exclusive) or silently log threshold-exceeded emissions."
+  :reference-template :isic-3520}
+ :adr/decision
+ {:scaffold :cloud-itonami-isic-1910
+  :github "https://github.com/cloud-itonami/cloud-itonami-isic-1910"
+  :license "AGPL-3.0-or-later"
+  :runtime :langgraph-clj
+  :source-language :clojure-portable-cljc
+  :governor-gates
+  {:hard-violations
+   ["no-spec-basis"
+    "process-control-keywords-found"
+    "emissions-threshold-exceedance"
+    "supplier-not-verified"
+    "material-not-verified"]
+   :soft-violations ["low-confidence" "high-stakes-actuation"]}
+  :jurisdictions [:JPN :USA :GBR]
+  :processes-in-scope
+  ["coal-intake-verification"
+   "production-run-proposal"
+   "byproduct-coordination"
+   "emissions-compliance-logging"]
+  :processes-forbidden
+  ["furnace-control"
+   "process-parameter-decisions"
+   "emissions-system-operation"
+   "autonomous-actuation"]}
+ :adr/consequences
+ {:benefits
+  ["Auditable open-source coke-plant operations coordinator"
+   "Portable across JVM/ClojureScript/browser/Node.js"
+   "Hard safety gates prevent dangerous operations"
+   "Jurisdiction-specific compliance with official spec-basis"
+   "No vendor lock-in (AGPL-3.0-or-later fork-able)"
+   "Transparent decision audit ledger"]
+  :risks
+  ["Operators must understand scope boundaries (logistics only, not process control)"
+   "Requires Clojure/langgraph-clj knowledge to deploy"
+   "Honest coverage reporting (only 3 jurisdictions, not global)"]
+  :future-work
+  ["Extend jurisdictions as new countries adopt official standards"
+   "Datomic persistence for audit ledger"
+   "Kototama actor-host deployment (Chicory JVM, browser WASM)"
+   "Other ISIC industries following same pattern"]}
+ :adr/traceability
+ {:supersedes nil
+  :related ["ADR-2607141700 (compliance fact federation)"
+            "ADR-2607102200 (kotoba repo naming convention)"
+            "ADR-2607062330 (kototama actor pattern)"
+            "ISIC 3520 blueprint (reference template)"]
+  :registry :kotoba-lang/industry
+  :registry-entry {:isic "1910" :repo "cloud-itonami-isic-1910" :status :implemented}}}

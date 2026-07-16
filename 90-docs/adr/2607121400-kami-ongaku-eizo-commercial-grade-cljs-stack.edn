@@ -1,0 +1,166 @@
+[{:adr/id "adr-2607121400-kami-ongaku-eizo-commercial-grade-cljs-stack"
+  :adr/title "kotoba-lang 音楽制作(ongaku)・映像制作(eizo) commercial-grade engine stack — cljs canonical"
+  :adr/status "accepted"
+  :adr/topic "kotoba-lang-repo-boundaries"
+  :adr/last-verified "2026-07-12"
+  :adr/authoritative_for
+  ["kotoba-lang 音楽制作 / 映像制作系統の canonical 依存レイヤと責任境界"
+   "repo-wide 音楽・映像実装で kami-ongaku-* / kami-eizo-* stack を必須にする規則と完了条件"
+   "音楽・映像 DSP/codec/data-model 実装の言語優先順位（.cljc / cljs canonical）"
+   "kotoba-lang（engine/code）と gftdcojp（business/actor）の境界の再確認"]
+  :adr/related
+  ["adr-2607102200-kami-render-stack-deps-authority-rename"
+   "adr-2607010930-clj-wgsl-migration"
+   "adr-2607023000-ka-creative-craft-libs-isco-decomposition"
+   "adr-2607031510-kotoba-lang-composer"
+   "adr-2606272200-utsushi-video-edn-filtergraph"
+   "adr-2607082500-kotoba-lang-kasane-utsushi-reverse-domain-decomposition"
+   "adr-2606282100-mangaka-render-commons-vs-sip-work-split"
+   "adr-2606282101-mangaka-multilingual-text-layer-cljc-hiccup-reader"
+   "adr-2607051600-yukkuri-real-production-stack-live"
+   "adr-2607100030-kotoba-kami-engine-host-imports"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/ongaku-layer-map
+  {:l0-contracts ["kotoba-lang/composer" "kotoba-lang/ongaku"]
+   :l1-raw-api ["kotoba-lang/org-w3-webaudio"]
+   :l2-dsp-executor ["kotoba-lang/audio" "kotoba-lang/kami-ongaku-sampler"]
+   :l3-authoring ["kotoba-lang/kami-ongaku-project"
+                  "kotoba-lang/kami-ongaku-sequencer"
+                  "kotoba-lang/kami-ongaku-notation"
+                  "kotoba-lang/kami-ongaku-plugin-host"]
+   :l4-hosts ["wasm-webcomponent(AudioWorklet)" "kotoba-wasm(offline PCM)"]
+   :l5-apps ["kami-app-daw(future)"]}
+  :adr/eizo-layer-map
+  {:l0-contracts ["kotoba-lang/kami-mangaka-*"]
+   :l1-raw-api ["kotoba-lang/org-w3-webcodecs"]
+   :l2-codec-executor ["kotoba-lang/utsushi"]
+   :l3-authoring ["kotoba-lang/kami-eizo-timeline"
+                  "kotoba-lang/kami-eizo-grade"
+                  "kotoba-lang/kami-eizo-compositor"
+                  "kotoba-lang/douga"
+                  "kotoba-lang/anime"]
+   :l4-hosts ["wasm-webcomponent(WebCodecs/WebGPU)" "kotoba-wasm(offline transcode)"]
+   :l5-apps ["kami-app-nle(future)"]}
+  :adr/language-priority
+  {:order [:kotoba-wasm :clojurewasm :clojurescript :nbb :jvm-or-bb]
+   :note "host import 多用部分（AudioWorklet port/WebCodecs frame/node-graph 実行）は ClojureScript が第一級。純関数は kotoba wasm へ切り出し優先。JVM/bb は既存 lib のみ、新規には使わない。"}
+  :adr/org-boundary-unchanged
+  {:code "kotoba-lang"
+   :profession "cloud-itonami-isco"
+   :business "gftdcojp"
+   :distribution "manimani"
+   :note "composer/ongaku は生成モデル呼び出しを持たない設計のまま。本 ADR はエンジン層（DSP/codec/data-model）のみ厚くする。"}
+  :adr/new-repo-roster
+  [{:repo "org-w3-webaudio" :domain :ongaku :layer :l1 :status :landed :wave 2
+    :url "https://github.com/kotoba-lang/org-w3-webaudio" :landed-on "2026-07-12"}
+   {:repo "kami-ongaku-notation" :domain :ongaku :layer :l3 :status :landed :wave 1
+    :url "https://github.com/kotoba-lang/kami-ongaku-notation" :landed-on "2026-07-12"}
+   {:repo "kami-ongaku-sequencer" :domain :ongaku :layer :l3 :status :landed :wave 1
+    :url "https://github.com/kotoba-lang/kami-ongaku-sequencer" :landed-on "2026-07-12"}
+   {:repo "kami-ongaku-project" :domain :ongaku :layer :l3 :status :landed :wave 1
+    :url "https://github.com/kotoba-lang/kami-ongaku-project" :landed-on "2026-07-12"}
+   {:repo "kami-ongaku-plugin-host" :domain :ongaku :layer :l3 :status :landed :wave 3
+    :url "https://github.com/kotoba-lang/kami-ongaku-plugin-host" :landed-on "2026-07-12" :commit "51ecb7f"
+    :note "comfyui GPL-3.0 hard dep removed and reimplemented natively (registry/topo-sort/validate); node data stays comfyui-registry-shape-compatible, no code dependency"}
+   {:repo "kami-ongaku-sampler" :domain :ongaku :layer :l2 :status :landed :wave 2
+    :url "https://github.com/kotoba-lang/kami-ongaku-sampler" :landed-on "2026-07-12"}
+   {:repo "audio" :domain :ongaku :layer :l2 :status :landed :wave 2
+    :url "https://github.com/kotoba-lang/audio" :landed-on "2026-07-12" :commit "cf2f56a4b41"}
+   {:repo "org-w3-webcodecs" :domain :eizo :layer :l1 :status :landed :wave 2
+    :url "https://github.com/kotoba-lang/org-w3-webcodecs" :landed-on "2026-07-12"}
+   {:repo "kami-eizo-timeline" :domain :eizo :layer :l3 :status :landed :wave 1
+    :url "https://github.com/kotoba-lang/kami-eizo-timeline" :landed-on "2026-07-12"}
+   {:repo "kami-eizo-grade" :domain :eizo :layer :l3 :status :landed :wave 3
+    :url "https://github.com/kotoba-lang/kami-eizo-grade" :landed-on "2026-07-12" :commit "f77f6bb"}
+   {:repo "kami-eizo-compositor" :domain :eizo :layer :l3 :status :landed :wave 3
+    :url "https://github.com/kotoba-lang/kami-eizo-compositor" :landed-on "2026-07-12" :commit "2753b53"
+    :note "comfyui-registry-shape-compatible node data, deliberately no code dependency (GPL-3.0 avoidance)"}
+   {:repo "utsushi" :domain :eizo :layer :l2 :status :landed :wave 4
+    :url "https://github.com/kotoba-lang/utsushi" :landed-on "2026-07-12" :commit "bb7bf20282a6"
+    :note "utsushi.codec wired to org-iso-h264 encode (SPS+PPS -> avcC/avc1/stsd), encode->decode round-trip verified. Parameter-set layer only. Also found+fixed a stale org-iso-h264 pin (7 commits behind)."}
+   {:repo "org-iso-h264" :domain :eizo :layer :l2 :status :landed :wave 2
+    :url "https://github.com/kotoba-lang/org-iso-h264" :landed-on "2026-07-12" :commit "a6ed8581fb83"
+    :note "H.264 encode: expgolomb writer, RBSP escape, SPS/PPS encode, NAL/Annex-B bitstream writer. Not implemented: slice header, macroblock/pixel/CAVLC/CABAC encode"}
+   {:repo "douga" :domain :eizo :layer :l3 :status :landed :wave 4
+    :url "https://github.com/kotoba-lang/douga" :landed-on "2026-07-12" :commit "8a06155"
+    :note "kami-eizo-timeline entry point added alongside (not replacing) the legacy ad hoc shape, to avoid breaking the live yukkuri production pipeline (ADR-2607051600). Video-track transitions explicitly rejected (unsupported), not silently ignored."}
+   {:repo "anime" :domain :eizo :layer :l3 :status :landed :wave 4
+    :url "https://github.com/kotoba-lang/anime" :landed-on "2026-07-12" :commit "00ec484f951c"
+    :note "cut-sequence->timeline adapter. 12 production stages and 8 layers deliberately NOT mapped to timeline markers/tracks (not timeline-position facts); retake cuts are. Output verified against kami-eizo-timeline's own validate-timeline."}]
+  :adr/commercial-parity-checklist
+  [{:domain :notation :reference ["Sibelius" "Dorico" "MuseScore"] :target "pitch/duration/dynamics/articulation IR + MusicXML import/export"}
+   {:domain :sequencing :reference ["Logic Pro" "Cubase" "FL Studio"] :target "piano-roll IR, quantize/groove, pattern/clip"}
+   {:domain :mixing :reference ["Pro Tools" "Waves" "iZotope Neutron"] :target "channel strip, bus, automation, EQ/comp/reverb/delay"}
+   {:domain :plugin-host :reference ["VST3" "Audio Unit"] :target "node-graph plugin contract, latency compensation"}
+   {:domain :sampling :reference ["Kontakt"] :target "velocity layer, round-robin, key-map, streaming"}
+   {:domain :nle-timeline :reference ["Premiere Pro" "DaVinci Resolve" "Avid Media Composer"] :target "track/clip/transition/effect-stack/marker EDL"}
+   {:domain :grading :reference ["DaVinci Resolve Color page"] :target "primary wheels/curves/LUT(.cube), waveform/vectorscope"}
+   {:domain :compositing :reference ["Nuke" "After Effects" "Fusion"] :target "node-based keying/roto/tracking data model"}
+   {:domain :codec :reference ["ffmpeg"] :target "H.264 decode complete + encode, AAC/Opus wired"}]
+  :adr/completion-gates
+  [:domain-data-roundtrip-assertion
+   :cljc-portable-core-tests-green
+   :wasm-host-contract-parity
+   :real-browser-audioworklet-or-webcodecs-e2e
+   :github-pages-smoke
+   :explicit-degraded-state-on-capability-unavailable
+   :no-screenshot-only-completion-claims]
+  :adr/roadmap-waves
+  [{:wave 1 :focus "data-model foundation" :status :landed :landed-on "2026-07-12"
+    :repos ["kami-ongaku-notation" "kami-ongaku-sequencer" "kami-ongaku-project" "kami-eizo-timeline"]}
+   {:wave 2 :focus "dsp/codec execution" :status :landed :landed-on "2026-07-12"
+    :repos ["audio(extend)" "kami-ongaku-sampler" "org-iso-h264(encode, not utsushi)" "org-w3-webaudio" "org-w3-webcodecs"]}
+   {:wave 3 :focus "grading/compositing/plugin-host" :status :landed :landed-on "2026-07-12"
+    :repos ["kami-eizo-grade" "kami-eizo-compositor" "kami-ongaku-plugin-host"]
+    :note "comfyui reuse downgraded from code dependency to data-shape compatibility only (GPL-3.0)"}
+   {:wave 4 :focus "app integration" :status :landed :landed-on "2026-07-12"
+    :repos ["douga(rewire)" "anime(rewire)" "utsushi.codec(encode wiring, task-15 follow-up)" "kami-app-daw(future)" "kami-app-nle(future)"]}
+   {:wave 5 :focus "real browser I/O proof (completion-gate closure)" :status :landed :landed-on "2026-07-12"
+    :note "unplanned addition wave. strategic pivot: pixel-level codec work delegated to browser-native WebCodecs (VideoDecoder/VideoEncoder) instead of hand-rolling H.264 macroblock/DCT/CAVLC in org-iso-h264 (unrealistic scope) -- same pattern as 3D delegating to native WebGPU instead of reimplementing a GPU."
+    :repos [{:repo "org-w3-webcodecs" :commit "b14dc397e248" :note "foundation: real H.264 avc1.42001f encode/decode round-trip proven in headless Chromium, decoded pixels within 1-4/255 of originals. All other Wave-5 tasks build on this."}
+            {:repo "kami-eizo-timeline" :commit "c0116940f19eb" :note "clip-at-frame added; frame-accurate render proven via WebCodecs, pixel-exact cut boundaries at frames 5 and 10"}
+            {:repo "kami-eizo-grade" :commit "a19d4ea81b03" :note "CDL grading applied to real decoded pixels; browser vs. offline(nbb) computation matched exactly"}
+            {:repo "kami-eizo-compositor" :commit "2f6838662dc1" :note "chroma-key + blend applied to real decoded pixels; key region alpha 0, subject region alpha 1, browser/offline exact match"}
+            {:repo "org-w3-webaudio" :commit "e554d853d640" :note "hardest task: audio's sine+ADSR DSP proven running inside a real AudioWorkletProcessor, captured PCM matched offline reference within 2.98e-8. Root-caused and fixed two real bugs: cljs.main REPL-bootstrap touching `document` in AudioWorkletGlobalScope, and `self` undeclared there breaking Closure's goog.global detection under :advanced optimization."}]
+    :incidental-bugs-found ["org-w3-webaudio new-audio-context! constructor-call pattern threw in every real browser since Wave 2, undetected because the repo has no JVM test suite"
+                             "audioWorklet.addModule requires a secure context (localhost works, about:blank does not)"]
+    :reusable-pattern "deps.edn :e2e alias (pinned git dep on org-w3-webcodecs) + test/e2e/ (nbb + Playwright, no raw .mjs per CLAUDE.md) -- established across 4 repos, reusable for remaining domains (sampler, plugin-host, sequencer/notation playback)"}
+   {:wave 6 :focus "extend real I/O proof to remaining 2/5 domains" :status :landed :landed-on "2026-07-13"
+    :repos [{:repo "kami-ongaku-sampler" :commit "6d2abf0a6f34" :note "trigger/lookup driving real audio via substitute oscillator-frequency sample map; 14 inputs, measured frequency matched expected to 4 decimals via zero-crossing counting; round-robin and velocity/key boundaries verified"}
+            {:repo "kami-ongaku-plugin-host" :commit "a85ee94e8dc2" :note "PDC proven on real audio: measured 200-sample misalignment before compensation, 0 after, via a real audio/delay-line 200-sample latency path"}]
+    :incidental-bugs-found ["cross-Closure-compilation-unit property-name collision: `.decision` silently renamed differently on writer vs reader side under separate :advanced cljs.main invocations, causing undefined reads -- fixed via aget/string-keyed access"]
+    :remaining-2-of-5-domains ["kami-ongaku-notation/kami-ongaku-sequencer (no real playback proof yet)"
+                                "kami-ongaku-project (no full-session real render proof yet)"
+                                "douga/anime (kami-eizo-timeline integration landed Wave 4, but no real ffmpeg-render integration proof yet)"]}
+   {:wave 7 :focus "notation/sequencer real playback proof" :status :landed :landed-on "2026-07-13"
+    :repos [{:repo "kami-ongaku-sequencer" :commit "17c0ec4607b1" :note "5-note pattern through real SMF export/import round-trip (byte-identical), rendered as one continuous multi-note buffer via a real AudioWorkletProcessor; onsets within 6-16 samples (tol 200), all 5 frequencies matched expected to 4 decimals"}
+            {:repo "kami-ongaku-notation" :commit "0a61b700a331" :note "4-note phrase through real MusicXML export/import round-trip, rendered via real AudioWorkletProcessor; frequencies matched to 4 decimals, ff peak amplitude measured 3.394x pp peak (exact expected gain ratio) -- proves dynamics markings measurably affect real output. Found and fixed a real double-unit-conversion bug in the ADSR envelope call (seconds vs. samples), which had made every note ~1000x too quiet before the fix."}
+            {:repo "audio" :commit "03966413bfd9" :note "Apache-2.0 LICENSE added (was missing despite being a real dependency of 4+ repos by this point)"}]
+    :remaining-2-of-5-domains ["kami-ongaku-project (no full-session real render proof yet -- notation/sequencer individually proven, multi-track bus-graph integration render is the natural next step)"
+                                "douga/anime (kami-eizo-timeline integration landed Wave 4, but no real ffmpeg-render integration proof yet)"]}
+   {:wave 8 :focus "session mixing + real ffmpeg execution proof" :status :landed :landed-on "2026-07-13"
+    :repos [{:repo "kami-ongaku-project" :commit "6a14e1814a89" :note "real bus-graph mixing: drums-bus (gain 0.5 vs 1.0) measured peak ratio exactly 2.0x, instruments-bus (gain 1.0 fixed) exactly 1.0x (unaffected), cross-verified offline to 5.79e-8. All 5 primary ongaku repos (notation/sequencer/sampler/plugin-host/project) now real-I/O-proven."}
+            {:repo "douga" :commit "6c9799951c90" :note "first real ffmpeg binary execution (8.1.1, macOS/Homebrew, libx264+aac): 3-scene EDL through douga's real command builders, executed for real, verified via ffprobe (duration/dimensions) and 9-point pixel sampling across cut boundaries, 23/23 checks passed. Found and worked around a real ffmpeg 8.1.1 crop-filter quirk (exact=0 default silently rounds a literal 1x1 crop to 0x0 and errors)."}]
+    :ongaku-domain-status "all 5 primary repos (notation/sequencer/sampler/plugin-host/project) real-I/O-proven; remaining gaps are out-of-scope (real VST loading) or orthogonal (realtime interactive control vs. offline/prerender proof)"
+    :eizo-domain-remaining ["anime real-ffmpeg-render integration proof (douga's pattern is directly reusable)"
+                             "kami-eizo-timeline transition (dissolve/wipe) rendering -- unimplemented, currently rejected not silently ignored"
+                             "douga legacy scene/lines/assets path (what the live yukkuri production pipeline actually uses) was not covered by this E2E -- only the kami-eizo-timeline path was"]}
+   {:wave 9 :focus "anime pipeline integration + dissolve transition rendering" :status :landed :landed-on "2026-07-13"
+    :repos [{:repo "anime" :commit "9de3495420600" :note "first end-to-end proof of anime -> kami-eizo-timeline -> douga -> real ffmpeg, 4 cuts (one retake-marked), 29/29 checks passed (9-point pixel sampling across cut boundaries, 1-3/255 drift). Discovered and explicitly bridged (not hidden) a real integration gap: anime's adapter output lacked :douga/scene-index and a renderable :clip/source-id that douga's render-plan requires -- fixed via a documented attach-douga-keys bridge function."}
+            {:repo "douga" :commit "1cc48e4de049" :note "real dissolve crossfade rendering via ffmpeg's xfade filter, mapped directly onto kami-eizo-timeline's own overlap semantics. Red->blue dissolve pixel-sampled at 5 checkpoints showed a genuine monotonic blend (R 252->188->125->61->0, B 0->61->125->190->253), proving a real crossfade rather than a hard cut or corrupted frame. 17/17 checks passed. Other transition types (:wipe etc.) still explicitly rejected, not silently ignored."}]
+    :remaining-gaps ["kami-eizo-timeline :wipe and other non-dissolve transition types still unimplemented"
+                      "chaining multiple transitions in one timeline not yet exercised"
+                      "douga legacy scene/lines/assets path (what the live yukkuri production pipeline actually uses) still not covered by any E2E -- only the newer kami-eizo-timeline path has been proven"
+                      "kami-ongaku-plugin-host real VST/AU loading (explicitly out of scope)"
+                      "realtime interactive audio control (all ongaku proofs are offline/prerender, not live-performance)"]}
+   {:wave 10 :focus "wipe transition + legacy production path proof" :status :landed :landed-on "2026-07-13"
+    :repos [{:repo "douga" :commit "4b0bb2d58a01" :note "two sequential Wave-10 commits on this repo: (1) real :wipe transition via ffmpeg xfade wipeleft mode, proven with spatial x-position sampling (5 x-positions x 3 timestamps) showing a genuine sharp moving boundary (blue-pixel count 1->2->4 as progress advances), categorically distinct from dissolve's temporal blend proof; 16/16 checks passed. (2) real ffmpeg proof for the LEGACY scene/lines/assets path (douga.ffmpeg/build-render-plan) -- the entry point the live yukkuri production pipeline actually uses (ADR-2607051600) -- verified read-only without modifying production code, covering multi-take audio concat/silent-scene/bgm-mix, 34/34 checks passed. Found non-bug findings (emergent -shortest-based duration, no auto-silence synthesis) documented in README, not fixed."}]
+    :domain-status "as of Wave 10, both ongaku and eizo domains have their primary real-I/O gaps closed. Remaining items are qualitatively different from what pure code-generation loops close well: other xfade transition modes/chaining (tractable but lower-value), real VST/AU plugin loading (explicitly out of scope), realtime interactive control (needs live-performance testing, not correctness proofs), and any further legacy-pipeline coordination (needs deliberate production-owner judgment, not autonomous agent changes)."}
+   {:wave 11 :focus "chained multi-transition rendering" :status :landed :landed-on "2026-07-13"
+    :repos [{:repo "douga" :commit "0b540ce05c7a" :note "new xfade-chain-cmd renders a 3-clip dissolve+wipe chain in one ffmpeg invocation. Found and fixed a real offset-arithmetic bug: naive per-clip offsets are wrong for stage 2+; correct offsets must accumulate against the chain's running output duration (D_k = D_(k-1) + dur(clip_k) - dur(transition_k)). 5-checkpoint pixel proof: pure-color before T1, temporal dissolve blend during T1, pure-color steady gap between T1/T2 (the chaining correctness signal), spatial wipe sweep during T2, pure-color after T2. 26/26 checks passed. Existing single-transition and legacy-path proofs re-verified unaffected."}]
+    :remaining-gaps ["transitions combined with per-scene audio/bgm muxing in the same command"
+                      "wipe directions other than wipeleft"
+                      "transition types beyond {:dissolve :wipe} (e.g. :slide)"
+                      "non-linear transition topologies (xfade-chain-cmd assumes adjacent chain order)"]
+    :note "CI wiring for these E2E proofs remains blocked by a GitHub OAuth workflow-scope limitation on this session's token, not a code issue -- not worth repeated attempts."}]}]

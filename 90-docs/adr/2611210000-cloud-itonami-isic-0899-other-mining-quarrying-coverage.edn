@@ -1,0 +1,79 @@
+{:adr-id "2611210000"
+ :title "cloud-itonami-isic-0899 — Other Mining and Quarrying Operations Coordination"
+ :date "2026-07-16"
+ :author "Cloud Itonami Contributors"
+ :status :accepted
+ :context
+ "ISIC Rev.4 0899 (Other mining and quarrying n.e.c.) had no prior actor
+  implementation -- the registry entry pointed at a placeholder repo
+  (gftdcojp/cloud-itonami-B0899) that was never created. Live registry
+  independently re-verified against a fresh clone before proceeding:
+  {:id \"0899\" :name \"Other mining and quarrying n.e.c.\" :maturity
+  :spec ...} -- confirmed, distinct from already-:implemented siblings
+  0892 (peat), 0893 (salt), 0721 (uranium/thorium). Fresh, from-scratch
+  scaffold, built as part of a smaller, carefully verified batch after
+  an earlier 18-agent haiku batch's 61% defect rate. Module shape
+  mirrors sibling cloud-itonami-isic-0893 (Extraction of salt)'s
+  verified module shape. ISIC 0899 is a residual (n.e.c.)
+  mineral-extraction category (gemstones, quartz, feldspar, abrasives,
+  ...); this actor's chosen concrete illustration is quartz/feldspar
+  quarrying for industrial abrasives (grinding/blasting media,
+  ceramics, glass-batch feedstock)."
+ :decision
+ {:scope-boundary
+  "Coordination-only actor -- a SITE OPERATIONS COORDINATION actor, NOT
+   a direct extraction-equipment control authority, NOT an
+   environmental-permit-issuing authority. Closed four-op allowlist,
+   all :effect :propose: log-extraction-record,
+   schedule-extraction-operation, flag-environmental-concern (always
+   escalates), coordinate-shipment. An op outside this set is the same
+   failure mode as forbidden-scope content, not a separate carve-out."
+  :governor-rules
+  "Three HARD, permanent, un-overridable checks: (1)
+   site-permit-unverified -- target site/permit record must be
+   independently :registered?/:verified? in the store, never trusted
+   from the proposal's own claim; (2) effect-not-propose -- any :effect
+   other than :propose is a claim to directly actuate outside
+   governance; (3) scope-exclusion -- any proposal (any op) touching
+   extraction-equipment-control (blast-pattern/blast-sequencing/
+   drill-pattern/drill-and-blast/excavator-operation/loader-operation/
+   crusher-control/conveyor-control/haul-truck-dispatch-control/
+   bench-sequencing) or environmental-permit-issuing-authority territory
+   (permit issuance/suspension, license suspension, compliance
+   enforcement, environmental-permit decision), evaluated
+   unconditionally via a lower-cased EN+JA substring scan of the
+   proposal's own content. Deliberately does NOT use bare
+   'blast'/'発破' as exclusion terms -- only phrase-qualified
+   execution/control terms -- because the allowlisted
+   schedule-extraction-operation op legitimately describes
+   'extraction/blasting scheduling'; a bare-word exclusion would have
+   self-blocked every legitimate scheduling proposal (caught live: 6 of
+   45 tests failed on the first draft that mirrored the salt actor's
+   term list verbatim, fixed by phrase-qualifying the terms).
+   Escalation (soft): flag-environmental-concern always, low confidence
+   (<0.6). quarryops.phase independently agrees --
+   flag-environmental-concern never auto-commits at any phase."
+  :module-shape
+  "quarryops.store (MemStore, string-keyed site directory seeded with a
+   quartz quarry, a feldspar quarry, and an unverified/permit-lapsed
+   quartz quarry), advisor (QuarryOpsAdvisor, mock + real-LLM seam via
+   langchain.model, plus an :out-of-scope? test hook), governor
+   (QuarrySiteGovernor), phase (0->3 rollout), operation (langgraph-clj
+   StateGraph), sim (demo driver)."}
+ :consequences
+ ["Registry entry corrected in place (exact-text edit of the existing"
+  " {:id \"0899\" ...} block): :repo/:business-id updated from the"
+  " stale gftdcojp/cloud-itonami-B0899 placeholder to"
+  " cloud-itonami/cloud-itonami-isic-0899, :maturity :implemented"
+  "Actor repo cloud-itonami/cloud-itonami-isic-0899 scaffolded and"
+  " pushed to main (570f972de810aa760c5dc0367e6dd850e0722392)"
+  "Test suite run directly by this session: Ran 45 tests containing 136"
+  " assertions, 0 failures, 0 errors (both at push time and again from a"
+  " fresh post-merge clone). clj-kondo: 0 errors, 0 warnings. clojure"
+  " -M:run demo driver exercises all 4 ops plus HARD-hold/escalation"
+  " scenarios end to end with no exceptions."]
+ :references
+ ["cloud-itonami-isic-0893/ (module-shape mirror, salt extraction)"
+  "cloud-itonami-isic-0891/src/chemmineops/ (original module-shape precedent)"
+  "kotoba-lang/industry resources/kotoba/industry/registry.edn \"0899\" entry"
+  "ADR-2607121000 (ISIC Wave rollout plan -- 0899 is ISIC division 08, Wave 3)"]}

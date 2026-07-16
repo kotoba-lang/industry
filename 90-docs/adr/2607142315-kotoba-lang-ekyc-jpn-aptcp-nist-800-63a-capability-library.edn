@@ -1,0 +1,46 @@
+[{:adr/id "adr-2607142315-kotoba-lang-ekyc-jpn-aptcp-nist-800-63a-capability-library"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607142315: kotoba-lang/ekyc — JPN 犯収法 / NIST SP 800-63A eKYC capability library"
+  :adr/topic "kotoba-lang-ekyc-jpn-aptcp-nist-800-63a-capability-library"
+  :adr/status "accepted (landed)"
+  :adr/date "2026-07-14"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for ["kotoba.ekyc catalog: 10 real non-face-to-face 犯収法施行規則 6条1項 methods (individual ホ/ヘ/ト(1)/ト(2)/ル/カ/ワ/ヨ, corporate ロ/ホ), each with real required-evidence combination + document fields, sourced from e-Gov law-data API 420M60000F5A001 + FSA/JAFIC reference material"
+                          "NIST SP 800-63A-4 (final, July 2025) IAL mapping is honest and per-method, not a fabricated constant: ho->IAL1, he/ru/ka->IAL2, wa/yo->IAL2-conditional, to-1/to-2->not-directly-comparable (federation-like reliance), corporate->not-applicable; no individual method reaches IAL3 (all remote/software-mediated, IAL3 requires on-site attended)"
+                          "kotoba-lang/ekyc GitHub main pre-existed this task with an unrelated ekyc.core/ekyc.model/ekyc.adapters.* provider-session substrate (authored 2026-07-05..10); kotoba.ekyc is additive, no file touched, no :ekyc/* keyword-namespace collision"
+                          "repo LICENSE kept MIT as-is (already real-copyright-holder-attributed, already covers shipped code) rather than switched to Apache 2.0 to match banking/swift"
+                          "west.yml ekyc pin advanced 6b7a1b3 -> 3494b31 via GitHub API single-entry PUT (single-line diff), verified canonical via gen-west-manifest.cljs --check from a topdir-isolated sibling worktree"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related ["adr-2607141700-cloud-itonami-isic-6493-factoring-actor"
+                "adr-2607142000-cloud-itonami-isic-6493-murakumo-worker-deployment"
+                "adr-2607122200-cloud-itonami-ishokuju-blueprint-satellites"]
+  :db/id -1
+  :adr/decision-summary
+  "{:library \"kotoba.ekyc (+ .ui/.export) added to kotoba-lang/ekyc, mirroring kotoba-lang/banking and kotoba-lang/swift's exact capability-library shape: pure .cljc, no network/IO, OR-of-AND required-evidence groups, read-only governor-gated html+css operator console, RFC-4180 CSV + JSON export\",
+    :research {:jpn \"犯罪による収益の移転防止に関する法律施行規則 第6条第1項 -- full text via e-Gov law-data API 420M60000F5A001 (revision effective 2026-04-15), cross-checked FSA kakunin-qa/2.pdf + JAFIC guidance\"
+               :nist \"NIST SP 800-63A-4 final (July 2025), read directly from nvlpubs.nist.gov -- current revision, IAL2/IAL3 evidence requirements now identical, differ only by proofing-attendance type + mandatory biometric sample at IAL3\"},
+    :catalog {:individual [:ho :he :to-1 :to-2 :ru :ka :wa :yo] :corporate [:corp-ro :corp-ho]
+              :ho \"photo-ID image + live facial image, scheduled for 2027-04-01 abolition\"
+              :he \"IC-chip read (photo ID) + live facial image\"
+              :to-1 \"single-issuance ID image-or-chip + other-operator confirmation-record match\"
+              :to-2 \"single-issuance ID image-or-chip + transfer to customer's own verified bank account\"
+              :ru \"カード代替電磁的記録 (digital My Number Card equivalent, 番号利用法)\"
+              :ka \"公的個人認証 signature certificate (J-LIS, My Number Card) + e-signature\"
+              :wa \"accredited certification-business certificate + e-signature\"
+              :yo \"specific recognized private certification-business certificate + e-signature\"
+              :corp-ro \"name/registered-office declaration + registry-information-service lookup\"
+              :corp-ho \"electronic-certification-registry-office (登記官) certificate + e-signature\"},
+    :ial-mapping {:ho :ial1 :he :ial2 :ru :ial2 :ka :ial2 :wa :ial2-conditional :yo :ial2-conditional
+                  :to-1 :not-directly-comparable :to-2 :not-directly-comparable
+                  :corp-ro :not-applicable :corp-ho :not-applicable
+                  :note \"no individual method reaches IAL3 -- all remote/software-mediated, IAL3 requires on-site attended proofing regardless of evidence strength\"},
+    :coexistence \"kotoba-lang/ekyc main pre-existed this task with ekyc.core/ekyc.model/ekyc.adapters.* (provider-session substrate, authored 2026-07-05..10, depends on kotoba-lang/identity) -- task brief's premise (LICENSE+.github only) was stale; kotoba.ekyc added alongside, zero files touched, zero keyword-namespace collision (:ekyc.method/* etc vs existing flat :ekyc/*)\",
+    :license \"kept existing MIT as-is (real copyright holder already attributed, already covers shipped code) rather than switching to Apache 2.0 to match banking/swift\",
+    :verification {:tests \"40 tests / 144 assertions (105 in kotoba.ekyc.* alone; banking=53, swift=42)\" :lint \"clj-kondo 0 warnings\" :ci \"GitHub Actions green post-merge, JDK 17+21 matrix\"},
+    :landing {:repo-branch \"feat/ekyc-scaffold\" :repo-merge \"server-side POST /repos/kotoba-lang/ekyc/merges, no rebase/force-push, branch deleted post-merge\" :repo-main-sha \"3494b310ca7d7116e22cbfce49eb27b54fc67139\"
+              :west-pin \"ekyc 6b7a1b3 -> 3494b31, GitHub API single-entry PUT (blob-sha optimistic lock), single-line diff\"
+              :pin-verify \"nbb scripts/gen-west-manifest.cljs --check from topdir-isolated sibling worktree (west init -l manifest + west update --fetch smart ekyc only) -> 'west.yml is up to date.'\"},
+    :not-covered \"real biometric face-matching, real liveness detection, real document OCR/authenticity forensics, real NFC/IC-chip reads, real My Number Card cryptographic verification -- this library validates only the structural/legal shape of a verification record; a licensed operator must supply the real vendor integration\"}"}]

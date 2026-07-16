@@ -1,0 +1,218 @@
+[{:adr/authoritative_for ["cloud-itonami-isic-5811 book-publishing operations-coordination actor implementation" "fresh scaffold closing the kotoba-lang/industry :spec entry gap for ISIC 5811"], :adr/topic "cloud-itonami-isic-5811-book-publishing-coverage", :adr/related ["cloud-itonami-isic-873" "ADR-2607121000" "ADR-2607152500"], :adr/status "accepted", :adr/id "adr-2616581100-cloud-itonami-isic-5811-book-publishing-coverage", :adr/doc_type "adr", :adr/last_verified "2026-07-16", :adr/body "# ADR-2616581100: cloud-itonami-isic-5811 (Book publishing) book-publishing operations-coordination actor -- fresh scaffold, full implementation
+
+**Status**: accepted
+**Date**: 2026-07-16
+**Deciders**: Jun Kawasaki (agent-executed, standing authorization)
+**Related**: ADR-2607121000 (Wave 3, production/robotics), ADR-2607152500
+(Wave 4, human-facing/personal services -- authorizes this batch to
+proceed in parallel with Wave 3), cloud-itonami-isic-873 (Residential
+care for elderly/disabled -- the Wave 4 flagship reference module shape
+this actor mirrors, independently re-read in full before use), the
+`kotoba-lang/industry` registry's `\"5811\"` catalog entry
+
+## Context
+
+`kotoba-lang/industry`'s registry carried a `\"5811\"` entry at
+`:maturity :spec` with `:name \"Book publishing\"` (matching the assigned
+ISIC class, verified via fresh clone before any work began) and
+`:repo \"https://github.com/gftdcojp/cloud-itonami-J5811\"` (an old,
+never-populated naming scheme). Confirmed no repo exists yet at either
+that stale placeholder or the real `cloud-itonami/cloud-itonami-isic-5811`
+target (`gh api` 404 for the latter) before any work began. A separate,
+redundant 3-digit group entry `{:id \"581\" ...}` also exists at
+`:maturity :spec` with a truncated `:name` field ending in `\"...\"` --
+this is a known, pre-existing seed-data artifact from an earlier
+data-seeding pass, distinct from the `\"5811\"` class-level entry, and was
+deliberately NOT touched or promoted by this change.
+
+This is part of Wave 4 (human-facing/personal-services fleet,
+ISIC sections I/P/Q/R/S/T), running in parallel with the ongoing Wave 3
+(production/robotics) rollout per ADR-2607152500. Book publishing
+touches editorial/content-decision authority and rights/licensing
+decisions, so this actor is deliberately scoped to back-office
+operations coordination only, with a closed op allowlist that
+structurally excludes finalizing an editorial-content decision, a
+defamation/legal-risk clearance decision, and a rights/licensing grant
+decision -- those remain exclusively human/institutional decisions,
+never an auto-commit-eligible op, per Wave 4's person-facing-service
+safety guardrail.
+
+## Decision
+
+Scaffold `cloud-itonami/cloud-itonami-isic-5811` as a book-publishing
+OPERATIONS COORDINATION actor (not editorial-content-decision authority,
+not a legal-risk-clearance authority, not a rights/licensing-grant
+authority), mirroring `cloud-itonami-isic-873`'s verified module shape
+(`store`/`advisor`/`governor`/`phase`/`operation`/`sim`,
+`deps.edn`/`blueprint.edn`/README/GOVERNANCE/CODE_OF_CONDUCT/
+CONTRIBUTING/SECURITY, AGPL-3.0-or-later) with fresh, book-publishing-
+specific domain logic under the `bookpubops` namespace:
+
+1. **`bookpubops.store`** -- `MemStore` (atom of EDN) behind a `Store`
+   protocol; a `titles` directory keyed by `:title-id` STRING (a book
+   title under contract with the publishing house), plus an
+   append-only `ledger` and a `coordination-log` of committed records.
+2. **`bookpubops.advisor`** (\"BookPubAdvisor\") -- deterministic mock
+   advisor drafting exactly four kinds of proposal: production-record
+   logging (manuscript/print-run/ISBN-assignment data),
+   production-operation scheduling (editing/typesetting/print-run
+   scheduling), distribution coordination (outbound print-run/ebook
+   distribution), and content-concern flagging (defamation/copyright/
+   factual-accuracy risk). Every proposal's `:effect` is always
+   `:propose`; every output is censored downstream by the governor.
+3. **`bookpubops.governor`** (\"BookPubGovernor\") -- three HARD checks,
+   all permanent and un-overridable: (1) title-unverified -- the
+   target title record must exist AND be independently
+   `:registered?`/`:verified?` in the store before ANY proposal for it
+   may commit or escalate; (2) effect-not-propose -- any `:effect`
+   other than `:propose` is HARD-blocked; (3) scope-exclusion -- any
+   proposal (regardless of op) whose op/summary/rationale/cites/value
+   touches finalizing-an-editorial-content-decision,
+   legal-risk-clearance, or rights/licensing-grant territory is a HARD,
+   PERMANENT block, unconditionally evaluated on every proposal; an op
+   outside the closed four-op allowlist is folded into this same check.
+   One ESCALATE (soft) gate: `:flag-content-concern` ALWAYS escalates
+   to a human regardless of confidence, as does low confidence
+   generally.
+4. **`bookpubops.phase`** -- Phase 0->3 staged rollout;
+   `:flag-content-concern` is permanently ABSENT from every phase's
+   `:auto` set (structural fact, not a rollout milestone still to
+   come) -- only `:log-production-record`/`:schedule-production-
+   operation`/`:coordinate-distribution` may auto-commit at phase 3
+   when governor-clean.
+5. **`bookpubops.operation`** (\"OperationActor\") -- langgraph-clj
+   StateGraph, `intake -> advise -> govern -> decide -> commit | hold |
+   request-approval`, `interrupt-before #{:request-approval}` for
+   human-in-the-loop sign-off, invoked exclusively via
+   `langgraph.graph/run*`.
+6. **`deps.edn` / `blueprint.edn` / docs** -- mirror
+   `cloud-itonami-isic-873`'s shape (`:test`/`:lint`/`:run`/`:dev`
+   aliases pinned to the same `kotoba-lang/langgraph` git SHA
+   `a332a770a0d2b5193f81b54483bb954fb29ef8d7`, `itonami.blueprint/*`
+   metadata, scope/design/testing README sections).
+
+### What this actor does NOT do
+
+Finalizing an editorial-content decision (what the book actually says,
+whether it ships as written), issuing a defamation/legal-risk
+clearance decision, and granting rights or licensing terms to an
+author, translator, distributor, or any other party all remain
+exclusively human/institutional decisions, permanently, with no actor
+or human-approval override path -- enforced structurally by the
+governor's closed op/effect allowlists and the unconditional
+scope-exclusion check, not just documented. `:flag-content-concern` is
+a \"surface the concern\" op only; it can never self-clear the concern it
+raises, and is never a member of any phase's `:auto` set.
+
+## Verification
+
+- `cloud-itonami-isic-5811`: `clojure -M:test` -- raw final line: `Ran
+  44 tests containing 122 assertions.` / `0 failures, 0 errors.`
+  (re-run green a second time from a brand-new fresh clone after push).
+- `clojure -M:lint` -- 0 errors, 0 warnings.
+- `clojure -M:run` demo narrative exercises proposal submission,
+  escalation/approval on every write op, and every HARD-hold scenario
+  directly (unregistered title, unverified title, non-`:propose`
+  effect, editorial-content/legal-clearance/rights-grant scope drift)
+  -- ran clean, no exceptions.
+- A dedicated regression test
+  (`default-mock-advisor-proposals-never-self-trip-scope-exclusion` in
+  `test/bookpubops/advisor_test.clj`) independently confirms every op's
+  own default (clean) advisor-generated proposal text clears the
+  governor's scope-exclusion scan -- catching, during development, an
+  early draft bug where the `coordinate-distribution` advisor's own
+  disclaimer text (\"no rights-licensing judgment included\") happened to
+  contain the literal excluded term itself and so self-tripped a HARD
+  block on every clean proposal; fixed by rewording the disclaimer.
+- All source under `src/`/`test/` is `.cljc`, no JVM-only interop; the
+  actor graph is invoked exclusively via `langgraph.graph/run*`.
+- Repo created fresh (`gh repo create` + push, public visibility
+  matching the reference and `blueprint.edn`'s `:status :public-oss`),
+  initial commit `3c76aa0` on `cloud-itonami-isic-5811`'s `main` (no
+  prior history), confirmed via a brand-new fresh clone.
+- `kotoba-lang/industry` registry `\"5811\"` entry updated in place
+  (exact-text edit of the literal `{:id \"5811\" ...}` block only, no
+  other entry's block touched, and the separate `\"581\"` group entry
+  left untouched, byte-offset-diff-verified confined to the intended
+  region): `:repo`/`:business-id` corrected from the never-populated
+  `gftdcojp/cloud-itonami-J5811` naming to `cloud-itonami/cloud-
+  itonami-isic-5811` / `cloud-itonami-isic-5811`, `:required-
+  technologies` normalized from a stale `[:robotics :identity :forms
+  :dmn :bpmn :audit-ledger :phone]` placeholder to the coordination-
+  only shape actually implemented `[:identity :forms :dmn :bpmn
+  :audit-ledger]` (matching sibling `cloud-itonami-isic-873`'s own
+  `:required-technologies`), `:maturity` `:spec` -> `:implemented`;
+  `:name` was already the full, correct \"Book publishing\" (not
+  affected by the ~10%-of-entries truncated-name seed-data bug, so no
+  de-truncation was needed). Landed via a Contents API single-file PUT
+  (sha-checked optimistic concurrency; the first two sha checks
+  drifted from concurrent sibling registry edits before the third
+  attempt's PUT succeeded), commit `89a816e6a6b49ddcb60465ae37324024344fdf43`.
+- `test/kotoba/industry_test.clj`'s `maturity-summary` assertion
+  bumped, live-recomputed via `(kotoba.industry/maturity-summary)`
+  against freshly re-fetched content immediately before each PUT
+  attempt (never a reused/stale buffer) -- this file is an extremely
+  hot, high-concurrency shared file across the fleet, and this
+  promotion's own testing block landed via commit
+  `504ef60ac8e1fbb5a4975ede84516ff45b2792c9`. **Transparency note**: a
+  bug in this agent's own bounded-retry helper script (a stale
+  off-by-one regex plus a race between two separate fetches -- the
+  registry-derived count and the test-file's already-landed count --
+  meaning the script used a stale, lower count instead of the file's
+  own already-more-current value) caused that same commit to
+  transiently *regress* the final count assertion from a
+  concurrently-landed `377` down to `376`. This was caught during this
+  agent's own post-landing re-verification (re-fetching and
+  recomputing the true live count via the real
+  `kotoba.industry/maturity-summary` function, not the buggy script's
+  logic) and a corrective fix was in flight when a concurrent sibling
+  agent's own independent fleet-drift correction (commit
+  `c1df84a4da90...`, \"test: fix implemented-count assertion 376 -> 378
+  (concurrent fleet drift)\") landed first and corrected it to the true
+  live value `378`, confirmed matching a fresh
+  `(kotoba.industry/maturity-summary)` recompute. Net effect: correct,
+  but only because of this agent's own re-verification catching the
+  regression plus a concurrent sibling's independent correction landing
+  before this agent's own corrective PUT was needed -- documented here
+  in full rather than omitted, per this fleet's honest-reporting norm.
+- Full `kotoba-lang/industry` suite re-run green after all edits (fresh
+  clone, plus a fresh `kotoba-lang/technology` sibling clone for
+  `deps.edn` resolution): `Ran 15 tests containing 1040 assertions.` /
+  `0 failures, 0 errors.`
+- Final post-merge re-verification (brand-new scratch directory, fresh
+  `origin/main` clone of both `cloud-itonami-isic-5811` and
+  `kotoba-lang/industry`, plus a fresh `kotoba-lang/technology`
+  sibling): `clojure -M:test` re-run green in both repos; the
+  registry's `\"5811\"` entry confirmed `:maturity :implemented` with the
+  corrected `:repo`/`:business-id`/`:required-technologies`, and a
+  sample of sibling entries (`873`/`6310`/`581`/`2513`/`5630`)
+  confirmed untouched. `grep -c` for the UTF-8 replacement character
+  against `resources/kotoba/industry/registry.edn` returned `0` (no
+  file-wide mojibake).
+
+## Consequences
+
+(+) `cloud-itonami-isic-5811` now has a real, tested implementation
+matching the shape of every other cloud-itonami ISIC actor, replacing a
+`:spec` placeholder pointing at a repo that never existed.
+
+(+) `kotoba-lang/industry` registry `\"5811\"` entry promoted to
+`:maturity :implemented`.
+
+(+) This actor is a second concrete example (after `cloud-itonami-isic-
+873`) of Wave 4's person-facing-service safety guardrail applied to a
+different sensitive-decision axis: instead of clinical/care-authority
+exclusions, this actor structurally excludes editorial-content-decision,
+legal-risk-clearance, and rights/licensing-grant authority, all folded
+into one unconditional scope-exclusion check that never trusts the
+advisor's own framing of its intent.
+
+(-) Still a simulation/proposal layer, not a real publishing-operations
+system. Editorial decisions, legal clearance, and rights/licensing
+grants remain human-/institution-controlled via external channels.
+
+(-) No integration with real publishing-house systems (manuscript
+management, print-run scheduling, ISBN registries, rights/licensing
+databases, distribution partner APIs) -- this is a standalone
+coordinator blueprint, matching every prior sibling actor's own stated
+limitation.", :adr/deciders ["Jun Kawasaki"], :adr/date "2026-07-16", :db/id -1, :adr/authoritative true, :adr/title "ADR-2616581100: cloud-itonami-isic-5811 (Book publishing) book-publishing operations-coordination actor -- fresh scaffold, full implementation"}]

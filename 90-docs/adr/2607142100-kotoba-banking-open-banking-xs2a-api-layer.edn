@@ -1,0 +1,34 @@
+[{:adr/id "adr-2607142100-kotoba-banking-open-banking-xs2a-api-layer"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607142100: kotoba-lang/banking gains a real Open Banking (PSD2/XS2A) API layer"
+  :adr/topic "kotoba-banking-open-banking-xs2a-api-layer"
+  :adr/status "accepted"
+  :adr/date "2026-07-14"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for ["kotoba-lang/banking's Open Banking API target: Berlin Group NextGenPSD2 XS2A v1.3.11, primary; UK OBIE / Japan 全銀協 documented-only secondary citations"
+                          "manifest/west.yml banking entry pin advance to 73ac6d2fc2d26a93e1924fb0a61881d7ea859a08"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related ["kotoba-lang/banking docs/adr/0001-open-banking-api-layer.md"
+                "cloud-itonami-isic-6493"]
+  :db/id -1
+  :adr/decision-summary
+  "{:trigger \"cloud-itonami-isic-6493 (factoring actor) and its Cloudflare Worker deployment need REAL, standards-accurate banking capability libraries to eventually wire into (no live bank connection attached — that requires licensed-institution credentials, out of scope to fabricate)\",
+    :research {:primary \"Berlin Group NextGenPSD2 XS2A Framework, Implementation Guidelines + OpenAPI definition v1.3.11 (2021-09-24)\",
+               :primary-source \"https://github.com/adorsys/xs2a/blob/develop/xs2a-impl/src/main/resources/static/psd2-api_v1.3.11-2021-10-01v1.yaml (14069 lines, fetched and read in full, not recalled from training data)\",
+               :cross-check-source \"https://docs-nextgenpsd2.api.memo.bank/operation/operation-initiatepayment (live ASPSP generated docs — field list matched exactly, supplied the tppMessages code catalog the OpenAPI schema itself leaves as a free string)\",
+               :why-berlin-group \"fits this fleet's existing multi-jurisdiction facts-catalog convention — cloud-itonami-isic-6419's banking.facts already cites BaFin for the DEU jurisdiction\",
+               :secondary-documented-not-implemented [\"UK Open Banking (OBIE) Payment Initiation API domestic-payments\" \"Japan 全銀協 銀行分野のオープンAPIに係る電文仕様標準\"]},
+    :covered [\"POST /v1/payments/{payment-product} single payment-initiation request/response, 4 JSON-bodied payment products\"
+              \"real 14-value transactionStatus enum (RCVD/PDNG/ACTC/ACSC/RJCT/ACCC/ACCP/ACSP/ACWC/ACWP/CANC/ACFC/PATC/PART)\"
+              \"tppMessages-shaped 4xx error body\"
+              \"GET /v1/accounts, GET /v1/accounts/{account-id}/balances account information\"
+              \"wired to/from existing kotoba.banking account record + iban-valid?, not a duplicate data model\"],
+    :not-covered [\"consent management (/v1/consents)\" \"any SCA flow (redirect/OAuth2/decoupled/embedded)\" \"bulk/periodic payments\" \"payment cancellation\" \"transaction list\" \"card accounts\" \"pain.001-XML payment products\" \"UK OBIE / Japan 全銀協 spec-conformant implementation (documented only)\"],
+    :landing {:child-repo \"kotoba-lang/banking main advanced to 73ac6d2fc2d26a93e1924fb0a61881d7ea859a08 via fresh sibling clone + feature branch + server-side merge (gh api .../merges, no local rebase, no force-push); CI green\",
+              :tests \"90 new assertions (53 -> 143 total), all green; clj-kondo introduces zero new warnings\",
+              :manifest-pin \"manifest/west.yml banking entry revision advanced via single-entry GitHub API PUT (blob-SHA-matched, one-line diff), pre-verified pure fast-forward via compare API (ahead_by 6, behind_by 0)\",
+              :verification \"nbb scripts/gen-west-manifest.cljs --check run from a topdir-isolated sibling worktree (west init -l manifest + west update --fetch smart banking) reported 'west.yml is up to date.'\"}}",
+  :adr/addenda []}]

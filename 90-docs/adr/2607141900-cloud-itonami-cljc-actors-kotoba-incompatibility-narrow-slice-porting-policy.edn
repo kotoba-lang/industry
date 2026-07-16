@@ -1,0 +1,83 @@
+[{:db/id -1
+  :adr/id "adr-2607141900-cloud-itonami-cljc-actors-kotoba-incompatibility-narrow-slice-porting-policy"
+  :adr/title "ADR-2607141900: cloud-itonami .cljc actors vs kotoba/kototama/kotoba-lang-compiler (.kotoba) incompatibility + narrow-slice porting policy"
+  :adr/status "accepted"
+  :adr/date "2026-07-14"
+  :adr/last_verified "2026-07-14"
+  :adr/doc_type "adr"
+  :adr/topic "cloud-itonami-kotoba-compatibility"
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["cloud-itonami .cljc actors (langgraph-clj StateGraph + LLM advisor +
+    independent Governor + atom/defrecord-backed store) are confirmed
+    incompatible with the kotoba/kototama/kotoba-lang-compiler .kotoba
+    execution stack, per 2 independent investigations reaching the same
+    conclusion"
+   "the only approved pattern for using .kotoba inside cloud-itonami is
+    narrow-slice porting (hand-rewrite a small pure decision function, NOT
+    the whole actor) -- ADR-2607072600's isic-6492 affordability example is
+    the sole proven precedent"
+   "kotoba wasm emit's ACTUAL accepted operator set (not the documented
+    aspirational subset) is recorded here as the constraint any future
+    porting attempt must target"
+   "no wholesale .kotoba migration for cloud-itonami's ~900 blueprint entries"]
+  :adr/related
+  ["adr-2607141600-kotoba-kotoba-lang-compiler-kototama-aiueos-consolidation-experiment"
+   "adr-2607072530-cloud-itonami-kototama-wasm-llm-infer-poc-isic-6511"
+   "adr-2607072600-cloud-itonami-isic-6492-kototama-tender-wasm-deploy"]
+  :adr/investigation-1-new-2026-07-14
+  {:target "orgs/cloud-itonami/cloud-itonami-isic-3811 (wastecollect actor, implemented, 8 .cljc files)"
+   :findings
+   ["deps.edn depends on io.github.kotoba-lang/langgraph (sibling-org 3rd-party lib)"
+    "llm.cljc / operation.cljc :require langchain.model / langchain.db / langgraph.graph"
+    "store.cljc uses (defrecord DatomicStore ...) and (atom ...) (MemStore) --
+     atom is explicitly in compiler/'s forbidden-heads; defrecord exists in
+     neither kotoba/'s documented subset nor compiler/frontend.clj's accepted forms"
+    "#?(:clj ... :cljs ...) reader-conditionals are used, but branch CONTENTS
+     still contain the forbidden constructs -- .cljc being an accepted profile
+     v3 extension does not imply the content conforms to the .kotoba subset"]}
+  :adr/investigation-2-prior-art-rediscovered
+  {:adr-2607072530
+   {:topic "isic-6511 llm-infer capability PoC"
+    :quote-ja "既存の langgraph-clj+langchain-clj 製actorをそのまま wasm化することは不可能と判明"
+    :findings ["llm/infer capability (id 225) had to be newly added to
+                kotoba-core-contracts -- .kotoba had no LLM-call capability at all"
+               "murakumo fleet (10 Mac minis) execution is split across 3 systems:
+                frozen Rust / JVM kotoba.wasm-exec / kototama.tender -- not all
+                nodes even have a JVM"]}
+   :adr-2607072600
+   {:topic "isic-6492 credit-underwriting actor, affordability porting"
+    :ported "compute-debt-to-income-ratio + affordability-ceiling(0.43) -- a pure
+             computation slice only, hand-rewritten into .kotoba, NOT the actor
+             hand-rewritten in place"
+    :verified-hosts ["kototama.tender (JVM/Chicory)" "wasm-webcomponent (Node.js)"
+                      "real murakumo fleet node (asher)"]
+    :actual-accepted-operators ["do" "let" "if" "+" "-" "*" "quot" "/" "rem" "mod"
+                                 "=" "<" ">" "<=" ">=" "zero?" "not" "inc" "dec"]
+    :not-supported ["when" "and" "or" "pos?" "neg?"]
+    :not-supported-note "reproduced independently across 2 ADRs -- a real
+                          implementation gap vs the documented aspirational
+                          subset in kotoba-lang/kotoba's README/CLAUDE.md"
+    :abi-constraint "main stays 0-arity (kotoba wasm emit unconditionally rejects
+                      arity>0 mains); real args passed via pre-populated exported
+                      linear memory at fixed offsets (0/4/8, little-endian i32)"}}
+  :adr/decision
+  ["cloud-itonami .cljc actors confirmed incompatible with .kotoba as-is -- no
+    whole-actor compilation attempted"
+   "sole approved pattern: narrow-slice porting of pure decision logic only,
+    following the isic-6492 template"
+   "future porting must target the ACTUAL operator set (recorded above), not
+    the documented aspirational one"
+   "LLM-calling advisor logic explicitly excluded from porting scope (advisor/
+    governor separation is cloud-itonami's core design, orthogonal to .kotoba's
+    capability-cell design)"
+   "no wholesale .kotoba migration for the ~900 blueprint entries -- case-by-case
+    only, decided within cloud-itonami itself"]
+  :adr/decision-not-made
+  ["extending .kotoba's language subset to accept atom/defrecord/3rd-party
+    requires/LLM calls so cloud-itonami actors run natively -- rejected, would
+    contradict .kotoba's capability-confinement design intent (ADR-2607141600)"
+   "rewriting all cloud-itonami actors to be .kotoba-native -- rejected,
+    langgraph StateGraph + advisor/governor separation is cloud-itonami's core
+    architecture and does not map onto .kotoba's 0-arity/no-persistent-state
+    execution model"]}]

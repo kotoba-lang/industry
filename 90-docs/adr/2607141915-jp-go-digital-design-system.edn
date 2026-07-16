@@ -1,0 +1,25 @@
+[{:db/id -1
+  :adr/id "adr-2607141915-jp-go-digital-design-system"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607141915: jp-go-digital-design-system — デジタル庁 DADS の cljc 化と itad LP の light 固定移行"
+  :adr/topic "jp-go-digital-design-system"
+  :adr/status "accepted, implemented"
+  :adr/date "2026-07-14"
+  :adr/last_verified "2026-07-14"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["kotoba-lang/jp-go-digital-design-system の新設(public): digital-go-jp/design-system-example-components-html(MIT, upstream 3b34f4c3)の markup/class に忠実な cljc hiccup + vendored CSS(scripts/vendor.sh、手編集禁止、LICENSE-upstream 同梱)"
+   "layout 補助は dds-ext-* prefix で上流 class と区別 / page は light mode 固定(color-scheme light) / 既定で外部リクエストゼロ(Google Fonts は opt-in)"
+   "itad.gftd.ai LP の DADS 移行と light 固定(kotoba-uiux ADR-2607122200 からの opt-out。理由 = オーナー指示 + 行政手続き文脈の信頼感、persona trust 軸への打ち手)"
+   "art.cljc の --hig-* 変数は app CSS で DADS token へ橋渡し(SVG 無変更で palette 追従)"
+   "html.core の raw-text tag(style/script)に :hiccup/raw を渡すと壊れる実測知見 — 子は素の文字列"
+   "DADS 採用は公共・行政文脈向けの明示的 opt-out 先 — 採用 repo は理由を ADR に書く"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related
+  ["adr-2607141446-ai-gftd-itad-pc-disposal-certification"
+   "adr-2607122200-kotoba-ui-single-entry"
+   "adr-2607141550-persona-visual-user-test-react-loop"]
+  :adr/decision-summary
+  "{:new-repo {:org :kotoba-lang, :name \"jp-go-digital-design-system\", :visibility :public, :upstream {:repo \"digital-go-jp/design-system-example-components-html\", :commit \"3b34f4c3\", :license :mit}}, :components [:button :heading :accordion :input-text :textarea :checkbox :form-control-label :table :chip-label :divider], :css :vendored-with-attribution, :ext :dds-ext-prefix, :page {:mode :light-fixed, :external-requests :zero-by-default}, :renderer :kotoba-lang-html, :itad {:migrated true, :opt-out-reason [:owner-directive :government-context-trust], :art-bridge :hig-vars-to-dads-tokens, :audit 100.0, :live-version \"6c47f244\"}, :lesson :html-core-raw-text-tags-take-plain-strings}"}]

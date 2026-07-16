@@ -1,0 +1,28 @@
+{:health-status 200,
+ :zone-name "aozora.app",
+ :workers-invocations-7d
+ {"app-aozora-pds" 4166, "app-aozora-appview" 3107},
+ :zone
+ {:requests-7d 14894,
+  :pageviews-7d 5249,
+  :uniques-7d-sum 628,
+  :zone "aozora.app"},
+ :sources [:cloudflare :health],
+ :paths
+ {:ok
+  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 288}
+   {:path "/", :requests 121}
+   {:path "/robots.txt", :requests 41}
+   {:path "/js/main.js", :requests 21}
+   {:path "/api/new-version/daily/rooms/1", :requests 21}
+   {:path "/other/getTopQuestion", :requests 21}
+   {:path "/s_api/basic/download/info", :requests 20}
+   {:path "/cdn-cgi/rum", :requests 19}],
+  :status-mix {:ok 1642, :client-error 575},
+  :window "24h"},
+ :as-of "2026-07-16",
+ :traffic-quality {:window "24h", :probe-4xx-pct 26, :error-5xx-pct 0},
+ :top-paths
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.fold 288 · / 121 · /robots.txt 41 · /js/main.js 21 · /api/new-version/daily/rooms/1 21 | 4xx(probe) 26%",
+ :signal
+ "aozora.app 実測 14894 req/7d・628 uniques(日次和)・うち4xx probe 26%(24h)、workers 7273 inv/7d"}

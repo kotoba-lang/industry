@@ -1,0 +1,66 @@
+{:adr/id "2607142600"
+ :adr/title "cloud-itonami ISIC-08 0910 — Petroleum Services Contractor Coordination"
+ :adr/date "2026-07-14"
+ :adr/status :implemented
+ :adr/realm :cloud-itonami
+ :adr/isic-08 "0910"
+ :adr/classification :occupation-blueprint
+
+ :itonami.blueprint/id "cloud-itonami-isic-0910"
+ :itonami.blueprint/name "Petroleum Services Contractor Coordination"
+ :itonami.blueprint/domain :energy/support-services
+ :itonami.blueprint/governor :petroleum-services-governor
+ :itonami.blueprint/robotics true
+ :itonami.blueprint/status :public-oss
+ :itonami.blueprint/license "AGPL-3.0-or-later"
+ :itonami.blueprint/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger]
+ :itonami.blueprint/social-impact [:safety :equipment-coordination :logistics-support]
+
+ :implementation/repo "https://github.com/cloud-itonami/cloud-itonami-isic-0910"
+ :implementation/maturity :implemented
+ :implementation/test-coverage {:tests 13 :assertions 35 :failures 0}
+ :implementation/code-language [:clojure :cljc]
+ :implementation/runtime-precedence [:kototama :clojurewasm :cljs :nbb :jvm]
+
+ :scope/in-scope
+ [:service-order-intake
+  :service-order-verification
+  :crew-dispatch-scheduling
+  :site-logistics-coordination
+  :safety-incident-logging]
+
+ :scope/out-of-scope
+ [:drilling-decisions
+  :well-control-operations
+  :completion-decisions
+  :hazmat-handling-authorization
+  :subsurface-data-interpretation]
+
+ :scope/hard-blocks
+ [{:op :drill :reason "operator-exclusive"}
+  {:op :well-control :reason "operator-exclusive"}
+  {:op :hazmat-handle :reason "operator-exclusive"}
+  {:op :perforate :reason "operator-exclusive"}
+  {:op :cement :reason "operator-exclusive"}]
+
+ :governance/enforcement-mechanism "hard invariants in petroleum-services.governor; operator-class ops route directly to :hold with no escalation override"
+ :governance/references ["CONTRIBUTING.md" "GOVERNANCE.md" "SECURITY.md" "docs/adr/0001-architecture.md"]
+
+ :audit/immutable-ledger true
+ :audit/append-only true
+ :audit/safety-escalation :always
+
+ :comparable-patterns
+ ["cloud-itonami-isco-2411 (Accountants)"
+  "cloud-itonami-isco-6130 (Software engineers)"
+  "cloud-itonami-isic-8160 (HR and recruitment services)"]
+
+ :registry-updates
+ [{:registry "kotoba-lang/occupation"
+   :entry "0910"
+   :fields {:repo "cloud-itonami-isic-0910" :maturity :implemented}}]}
+
+ :references
+ ["ISIC-08 Classification: https://unstats.un.org/unsd/publication/seriesM/seriesm_4rev4e.pdf"
+  "ADR-2607011000: cloud-itonami Actors pattern"
+  "CLAUDE.md: Actors section, runtime precedence"]}

@@ -1,0 +1,12 @@
+[{:adr/id "2607124700"
+  :adr/title "cloud-itonami-isic-6201 gains a minimal HTTP service layer (parity with cloud-itonami-isic-5820)"
+  :adr/status :accepted
+  :adr/date "2026-07-12"
+  :db/id -1
+  :adr/related ["2607124600-cloud-itonami-isic-5820-http-service-layer"]
+  :adr/loop-context "Second cycle of the /loop dynamic-mode self-paced 'raise maturity toward live production operation' task."
+  :adr/decision "Added src/marketing/http.clj to cloud-itonami-isic-6201, directly templated on cloud-itonami-isic-5820's crm.http (same http-kit 2.8.1/ring-core 1.15.3/data.json 2.5.2 deps, same fail-closed bearer-token auth design via $ISIC6201_API_TOKEN, same namespaced-keyword JSON handling). Endpoints adapted to this actor's own domain: GET /, GET /health (no auth); POST /send (:campaign/send-message, honestly surfaces consent-revoked-send-gate/double-send-gate holds), POST /advance-stage (:lead/advance-stage, surfaces stage-sequence-gate holds), POST /update-score (:lead/update-score, surfaces lead-score-mismatch as a 202 escalate, mirroring 5820's :escalate pattern); GET /dashboard (routes through marketing.dashboard/snapshot's own self-contained RBAC gate, mapped to 403)."
+  :adr/deviations-from-template "Three fixed-op write endpoints instead of 5820's generic /propose (this actor's op vocabulary is 3 distinct fixed ops, not a generic field); /dashboard does not separately call policy/check since marketing.dashboard/snapshot already owns its RBAC gate internally (unlike 5820's dashboard, which required a separate policy/check call); no year/month query params (this actor has no ASC-606-style date threading)."
+  :adr/test-status "52 tests / 188 assertions (up from 38/148 pre-existing), 0 failures, lint 0 errors/0 warnings. Two bugs found and fixed in the subagent's OWN test code during authoring (not pre-existing actor bugs): missing :context in write-endpoint test bodies causing spurious rbac holds, and a test-order-dependent contact-id reuse hazard."
+  :adr/remaining-gaps "cloud-itonami-isic-6202 (customer-service) still lacks an HTTP layer; no persistent store, no real LLM, no TLS/observability, no deployment; same non-constant-time bearer-token comparison caveat as 5820."
+  :adr/scope-note "New ADR (not an addendum to 2607124600) because it is a separate actor repo's own infrastructure addition, even though it directly mirrors the prior ADR's design"}]

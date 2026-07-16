@@ -1,0 +1,4 @@
+{:paths ["."]
+ :tasks {test {:doc  "Run P0 round-trip tests"
+               :requires ([office-test])
+               :task (System/exit (office-test/-main))}}}

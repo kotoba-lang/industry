@@ -1,0 +1,62 @@
+[{:adr/id "adr-2607122000-cloud-murakumo-market-intel-dataset"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607122000: gftdcojp/cloud-murakumo-market-intel — industry market-size EDN dataset, Datomic ⊣ DataScript query parity"
+  :adr/status "accepted"
+  :adr/date "2026-07-12"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/last_verified "2026-07-12"
+  :adr/topic "cloud-murakumo-market-intel-dataset"
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["新規リポジトリ gftdcojp/cloud-murakumo-market-intel を、産業/資産クラス別
+    market-size ファクトの EDN 正本と定める"
+   "スキーマは flat EAV（ref 属性なし）: :market/id(unique keyword identity)
+    :market/label :market/group :market/value-usd
+    :market/value-usd-low/-high :market/quantity(+unit+unit-price-usd)
+    :market/as-of :market/confidence(:measured/:estimated/:derived)
+    :market/source :market/source-url :market/note"
+   "同一スキーマ・同一 Datalog クエリを LangchainDbStore(langchain.db,
+    Datomic-API-compatible) と DataScriptStore(datascript.core) の両方で
+    実行し、contract test で結果一致を保証する（talent.store の
+    MemStore≡DatomicStore パターンをもう一段一般化）"
+   "各数値は個別に出典(:market/source + :market/source-url + :market/as-of
+    + :market/confidence)を持つ。単一の 'Visual Capitalist' 引用にまとめない"]
+  :adr/related
+  ["2606272300-cloud-murakumo-gpu-cloud (Sora)"
+   "2607041302-murakumo-family-naming"
+   "2607030030-murakumo-inference-economy-gtm"
+   "2607122030-cloud-murakumo-market-analyst-actor (このデータセットの消費者)"
+   "gftd-talent-actor/src/talent/store.cljc (Store protocol / contract-test の手本)"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/corrections []
+  :adr/source-fetch-blocked
+  "visualcapitalist.com/all-of-the-worlds-money-and-markets-in-one-visualization-2022/
+   への直接フェッチは HTTP 403 で失敗（WebFetch 直接・r.jina.ai リーダープロキシ経由の
+   両方）。Chrome 拡張は未接続。複数のミラーサイトも 2016/2020 年版の数値を誤って
+   2022 年版として再掲していることが判明し使用不可と判断。オーナーに確認の上、
+   各数値をビジュアルキャピタリストが引用する一次情報源（CIA Factbook 由来集計/
+   SIFMA/BIS/World Gold Council/The Silver Institute/CoinGecko/Savills/Forbes/
+   Credit Suisse・UBS）から個別に取得する方針を選択（'Use primary sources
+   directly' オプションをオーナーが選択）"
+  :adr/dataset-categories
+  ["cash-banknotes-coins(M0, $8.0T, :estimated)"
+   "narrow-money-m1($28.6T, :estimated)"
+   "broad-money-m2($82.6T, :estimated)"
+   "silver-above-ground(quantity×price から derive, :derived)"
+   "gold-above-ground(quantity×price から derive, :derived)"
+   "cryptocurrencies(end-2022 $829B, CoinGecko, :measured)"
+   "global-stock-markets($101.2T, SIFMA 2022, :measured)"
+   "global-bond-markets($129.8T, SIFMA 2022, :measured)"
+   "global-real-estate($379.7T, Savills end-2022, :measured)"
+   "global-debt($298T, IIF Global Debt Monitor から逆算, :derived)"
+   "derivatives-notional-otc($618T, BIS end-2022, :measured)"
+   "derivatives-notional-high-estimate($630T〜$1,000T レンジ, :estimated)"
+   "billionaire-wealth($12.7T, Forbes 2022, :measured)"
+   "global-wealth($454.4T, Credit Suisse/UBS end-2022, :measured)"]
+  :adr/follow-up
+  ["gh repo create gftdcojp/cloud-murakumo-market-intel --private + push"
+   "nbb scripts/gen-west-manifest.cljs --entry cloud-murakumo-market-intel"
+   "nbb scripts/gen-west-manifest.cljs --check"]
+  :adr/body "# ADR-2607122000: `gftdcojp/cloud-murakumo-market-intel` — industry market-size EDN dataset, Datomic ⊣ DataScript query parity\n\nSee the paired .md file in this same directory for the full prose ADR (Context / Decision / Consequences / Related). This .edn is the queryable/authoritative-fact companion, not a duplicate — key facts are captured above as :adr/* attributes for datom-log ingestion."
+  :db/id -1}]

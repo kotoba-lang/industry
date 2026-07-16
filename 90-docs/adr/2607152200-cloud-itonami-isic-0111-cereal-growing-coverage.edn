@@ -1,0 +1,70 @@
+{:adr-id "2607152200"
+ :title "cloud-itonami-isic-0111 (growing of cereals, except rice) field-operations-coordination actor"
+ :status :accepted
+ :date "2026-07-14"
+ :deciders ["Jun Kawasaki (agent-executed, standing authorization)"]
+ :related ["ADR-2607122200" "ADR-2607011000" "ADR-2607152100"]
+
+ :context
+ "cloud-itonami-isic-0111 already existed on GitHub as a broken stray artifact
+  (single Initial commit, cerealsops.* namespace missing advisor.cljc, missing
+  3 of 5 test namespaces, .clj not .cljc tests, deps.edn hard-pinning a
+  local/root langgraph dep that doesn't resolve -- clojure -M:test failed at
+  classpath resolution). No PRs/branches/issues, 27KB, zero external
+  dependents. Deleted (gh repo delete, not force-push/history-rewrite) and
+  recreated clean, built from cloud-itonami-isic-0141 (cattle raising) as the
+  module-structure template, with clojure -M:test independently re-run before
+  and after every push."
+
+ :scope-exclusions
+ ["direct field-equipment operation (farmer's exclusive authority)"
+  "finalizing a pesticide-application decision (agronomist/farmer authority)"
+  "agronomic decision authority -- what/when/how much to plant, spray, harvest (remains human authority)"]
+
+ :decision
+ "Implement cloud-itonami-isic-0111 with Governor, Facts, Registry, Store, Advisor,
+  Phase, Operation, Sim (mirrors cloud-itonami-isic-0141 module-for-module):
+  - Governor (FieldOperationsGovernor): 5 hard checks (field-not-registered,
+    no-execution, equipment-or-pesticide-decision-blocked, op-not-allowed,
+    field-record-invalid) + 3 escalation gates (always-escalate crop-health
+    concern, cost-threshold supply orders, low confidence < 0.7)
+  - Facts: supply categories with cost thresholds (seed/fertilizer/equipment),
+    cereal crops (wheat/maize/barley/sorghum/oats/rye/millet -- excludes rice)
+  - Registry: independent pure predicates (cost-exceeds-threshold?,
+    acreage-non-positive?, confidence-below-floor?)
+  - Store: Store protocol + MemStore (registered-field lookup)
+  - Advisor: Advisor protocol + MockAdvisor (4 ops)
+  - Phase: 0->3 rollout gate
+  - Operation: composes advisor -> governor -> phase-gate (langgraph-clj wiring
+    deferred, matching 0141's own stub)
+  - Sim: demo runner with a working -main
+  - Operations: log-field-record, schedule-field-operation,
+    flag-crop-health-concern, order-supplies (closed allowlist, :effect :propose)
+  - Tests: 30 tests / 96 assertions (facts, governor, phase, registry, store), all green
+  - All .cljc (portable, no JVM interop), AGPL-3.0-or-later
+  - README/business-model/operator-guide describe the real API"
+
+ :consequences
+ {:positive
+  ["Cereal-growing (0111) now genuinely implemented and fully tested, closing the
+    gap left by the deleted broken stray artifact"
+   "Scope boundaries (field-equipment operation, pesticide-application decisions)
+    hardcoded in governor checks, not just asserted in prose"
+   "Crop-health escalation (flag-crop-health-concern always human) is a core
+    design invariant"
+   "Portable .cljc, zero JVM-only constructs, clj-kondo 0 errors / 0 warnings"]
+  :negative
+  ["Real persistent store (Datomic/kotoba-server) is a follow-up (in-memory for now)"
+   "langgraph-clj StateGraph wiring (real interrupt-before/checkpoint resume) is
+    deferred scaffolding, matching 0141's own stub status"]}
+
+ :verification
+ {:test-count 30
+  :assertion-count 96
+  :test-status "0 failures, 0 errors -- independently re-verified from a fresh clone post-push"
+  :lint-status "0 errors, 0 warnings"
+  :commit "a0496fc"
+  :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0111"
+  :registry-update "kotoba-lang/industry: 0111 maturity :implemented (see registry-merge-commit)"
+  :registry-merge-commit :pending
+  :registry-post-merge-verification :pending}}

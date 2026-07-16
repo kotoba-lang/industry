@@ -1,0 +1,13 @@
+[{:adr/id "2607125200"
+  :adr/title "cloud-itonami-isic-6201 gains a real-model adapter for MarketingOps-LLM (parity with cloud-itonami-isic-5820)"
+  :adr/status :accepted
+  :adr/date "2026-07-12"
+  :db/id -1
+  :adr/related ["2607125100-cloud-itonami-isic-5820-real-model-adapter"]
+  :adr/loop-context "Seventh cycle of the /loop dynamic-mode self-paced 'raise maturity toward live production operation' task."
+  :adr/decision "Added src/marketing/llm_realmodel.clj mirroring cloud-itonami-isic-5820's crm.llm-realmodel exactly (same design: config resolution, preflight, JDK HttpClient :http-fn, delegation to langchain.model), with ISIC6201_MODEL_PROVIDER/_URL/_MODEL/_API_KEY env vars. marketing.llm.cljc confirmed to have the identical llm-advisor-wraps-any-ChatModel seam as 5820's crm.llm.cljc, no structural deviation needed."
+  :adr/domain-difference "This actor's proposal shape always carries :source nil (no source-provenance disclosure gate exists for this domain, per marketing.llm's own existing docstring) -- the adapter and its tests respect this rather than fabricating a :source map matching 5820's shape."
+  :adr/verification-boundary "Same explicit honesty as 2607125100: preflight's full matrix verified without credentials; adapter's HTTP request/response wire shape verified via a real local http-kit stub server round-trip; whether any real target model API accepts this exact shape remains completely unverified, no credentials fabricated or assumed."
+  :adr/test-status "71 tests / 233 assertions (up from 58/207 pre-existing), 0 failures, lint 0 errors/0 warnings, commit 83ee36f, pushed."
+  :adr/remaining-gaps "Real end-to-end model connectivity remains unverified pending owner-supplied credentials for both 5820 and 6201; cloud-itonami-isic-6202 still untouched, consistent with the standing decision to avoid it without coordination."
+  :adr/scope-note "New ADR (not an addendum) as a separate actor repo's own infrastructure addition, directly mirroring the prior ADR's design and verification discipline"}]

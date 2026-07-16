@@ -1,0 +1,76 @@
+{:adr-id "2607154304"
+ :title "cloud-itonami ISIC-952 Repair Shop Administrative Coordination Actor"
+ :status :accepted
+ :date "2026-07-15"
+ :deciders ["Jun Kawasaki"]
+ :context
+ {:isic-code 952
+  :isic-title "Repair of personal and household goods"
+  :wave "Wave-4"
+  :batch-number 21
+  :related-adrs ["2607121000" "2607152500" "2607154303"]}
+ :decision
+ {:repo-name "cloud-itonami-isic-952"
+  :repo-url "https://github.com/cloud-itonami/cloud-itonami-isic-952"
+  :visibility :public
+  :license "AGPL-3.0"}
+ :operations
+ {:allowed-list
+  [{:id :schedule-repair-intake
+    :effect :propose
+    :description "Drop-off/pickup appointment scheduling"
+    :scope-restriction "administrative-logistics-only"}
+   {:id :coordinate-repair-status-update
+    :effect :propose
+    :description "Administrative status-tracking logistics"
+    :scope-restriction "never-technical-diagnosis"}
+   {:id :coordinate-supply-request
+    :effect :propose
+    :description "Non-repair-part consumables"
+    :scope-restriction "never-repair-parts"}
+   {:id :schedule-staff-shift-proposal
+    :effect :propose
+    :description "Administrative shift PROPOSAL only"
+    :scope-restriction "proposal-only-never-binding"}
+   {:id :flag-safety-concern
+    :effect :propose
+    :description "Facility/equipment safety concerns"
+    :scope-restriction "always-escalates"}]}
+ :governor
+ {:hard-checks
+  [{:id :item-unverified
+    :rule "Item must exist in store AND be independently :registered?/:verified?"
+    :re-derived-every-time true
+    :overridable false}
+   {:id :effect-not-propose
+    :rule "Effect must be :propose. Any other effect rejected outright."
+    :overridable false}
+   {:id :scope-exclusion
+    :rule "Block proposals touching diagnostic/repair-technique, warranty/liability, pricing/quote-approval, safety-authority overrides"
+    :overridable false
+    :patterns
+    {:en ["diagnostic" "repair-technique" "warranty" "liability" "price" "quote" "safety-authority"]
+     :ja ["診断" "修理" "保証" "責任" "価格" "見積もり" "安全"]}}]}
+ :modules
+ {:store "MemStore protocol; customer/item/staff/supplies; demo data"
+  :advisor "Proposal enrichment; deterministic demo; :advisor-reasoning + :confidence"
+  :governor "Three HARD checks; no overrides"
+  :operation "StateGraph flow: intake → advise → govern → decide"
+  :phase "Rollout phases 0–3"
+  :sim "5 demo scenarios"
+  :test "20 comprehensive test cases"}
+ :test-results
+ {:total-cases 25
+  :store-tests 5
+  :governor-tests 7
+  :operation-tests 5
+  :phase-tests 3
+  :scenarios 5
+  :all-passing true}
+ :registry-update
+ {:industry-code 952
+  :from {:maturity :spec :repo nil :business-id nil :required-technologies [:robotics]}
+  :to {:maturity :implemented
+       :repo "https://github.com/cloud-itonami/cloud-itonami-isic-952"
+       :business-id "cloud-itonami-isic-952"
+       :required-technologies [:identity :forms :dmn :bpmn :audit-ledger]}}}

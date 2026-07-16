@@ -1,0 +1,111 @@
+{:adr-id "2607162700"
+ :title "cloud-itonami-isic-750 (Veterinary activities ⊣ Veterinary Care Governor) — :spec → :implemented promotion"
+ :status :accepted
+ :date "2026-07-15"
+ :doc-type :adr
+ :topic :veterinary-clinic-governance-isic750
+ :authoritative? true
+ :authoritative-for
+ ["cloud-itonami-isic-750 :spec -> :implemented 昇格根拠"
+  "registry.edn の ISIC 750 登録と technology-stack の確定"]
+ :related
+ ["orgs/cloud-itonami/cloud-itonami-isic-7500"
+  "orgs/cloud-itonami/cloud-itonami-isic-8610"
+  "ADR-2607152500"]
+ :problem
+ {:scope "ISIC 750 (Veterinary activities) specification placeholder, no implementation"
+  :gap [:case-intake :per-jurisdiction-licensing-assessment :clinician-credential-screening
+        :treatment-administration-proposal :food-safety-withdrawal-period-check]
+  :request "implement Veterinary Care Governor, matching hospital/clinic pattern"}
+ :decision
+ {:primary-shape [:untrusted-advisor :independent-governor :human-approval]
+  :advisor :vetopsllm
+  :governor :veterinary-care-governor
+  :actuation-gates 2
+  :operations
+  [{:id :case-intake
+    :effect :case-upsert
+    :stake nil
+    :auto-eligible? true
+    :description "case record normalization, intake data entry"}
+   {:id :jurisdiction-assess
+    :effect :assessment-set
+    :stake nil
+    :auto-eligible? true
+    :description "per-jurisdiction veterinary-licensing checklist draft"}
+   {:id :credential-screen
+    :effect :credential-record-set
+    :stake nil
+    :auto-eligible? true
+    :description "clinician license-currency and credential-lapse screening"}
+   {:id :treatment-administer
+    :effect :treatment-record-set
+    :stake :actuation-administer-treatment
+    :auto-eligible? false
+    :description "treatment administration proposal (human sign-off always required)"}
+   {:id :discharge-supervise
+    :effect :discharge-record-set
+    :stake :actuation-discharge-supervise
+    :auto-eligible? false
+    :description "discharge and recovery-supervision authorization (human sign-off always required)"}]
+  :governor-checks
+  [{:id :spec-basis
+    :severity :hard
+    :scope [:jurisdiction-assess :credential-screen :treatment-administer]
+    :gate "did the jurisdiction proposal cite an OFFICIAL source (veterinary.facts), or invent one?"}
+   {:id :evidence-incomplete
+    :severity :hard
+    :scope [:treatment-administer]
+    :gate "for treatment/administer, has the jurisdiction actually been assessed with a full licensing evidence checklist on file?"}
+   {:id :treatment-contraindicated
+    :severity :hard
+    :scope [:treatment-administer]
+    :gate "INDEPENDENTLY recompute whether the case's own proposed-treatment appears in its own contraindications set"}
+   {:id :withdrawal-period-insufficient
+    :severity :hard
+    :scope [:treatment-administer]
+    :gate "for food-producing animals ONLY, INDEPENDENTLY recompute whether planned-harvest-date minus current-date < required-withdrawal-period"
+    :new-capability? true
+    :combines [:minimum-threshold-recompute :type-tag-gate]}
+   {:id :credential-not-current
+    :severity :hard
+    :scope [:treatment-administer :discharge-supervise]
+    :gate "has the treating veterinarian's license lapsed?"}]
+  :phase-rollout [0 1 2 3]
+  :actuation-never-auto-at-any-phase [:treatment-administer :discharge-supervise]}
+ :verification
+ {:tests {:count 33 :assertions 139 :failures 0}
+  :demo "one clean lifecycle + five HARD-hold cases"
+  :lint "0 errors/warnings"
+  :repo "github.com/cloud-itonami/cloud-itonami-isic-7500 (public)"
+  :repo-contents [:license :coc :contributing :governance :security :readme
+                  :src-veterinary :test-veterinary]}
+ :registry-update
+ {:entry-id "750"
+  :change :in-place-promotion
+  :repo "https://github.com/cloud-itonami/cloud-itonami-isic-750"
+  :business-id "cloud-itonami-isic-750"
+  :maturity-before :spec
+  :maturity-after :implemented
+  :required-technologies-before [:robotics :identity :forms :dmn :bpmn :audit-ledger :cae]
+  :required-technologies-after [:identity :forms :dmn :bpmn :audit-ledger]
+  :technology-removals [:robotics :cae]
+  :technology-removals-rationale "coordination-only actor, no robotics dispatch or CAE required"}
+ :consequences
+ {:positive
+  ["Closes ISIC 750 specification gap with real, tested code"
+   "Demonstrates food-safety domain extension: temporal-window + type-tag governor check"
+   "Third clinical-domain actor (hospital/clinic/veterinary) confirming conservative human-approval pattern"]
+  :gaps
+  ["MemStore-only (DatomicStore deferred)"
+   "Withdrawal-period model simplified: single threshold, not procedure/species/route-specific tables"]}
+ :alternatives-rejected
+ [{:title "Full drug-interaction/allergy database"
+   :reason "deployment context determines relevance; overfit to deployment operator's choice"}
+  {:title "Treatment-administration autonomous at phase 3"
+   :reason "veterinary.phase/treatment-administer never appears in any phase's :auto set"}]}
+ :references
+ ["orgs/cloud-itonami/cloud-itonami-isic-7500/README.md"
+  "orgs/cloud-itonami/cloud-itonami-isic-7500/docs/adr/0001-architecture.md"
+  "orgs/cloud-itonami/cloud-itonami-isic-8610/README.md"
+  "orgs/cloud-itonami/cloud-itonami-isic-8620/docs/adr/0001-architecture.md"]}

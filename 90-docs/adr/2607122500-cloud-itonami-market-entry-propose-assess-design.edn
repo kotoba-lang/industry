@@ -1,0 +1,33 @@
+[{:adr/id "adr-2607122500-cloud-itonami-market-entry-propose-assess-design"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607122500: market-entry 手続き実行経路の設計 — propose-assess を既存 effects lifecycle に載せる（design-only）"
+  :adr/topic "cloud-itonami-market-entry-propose-assess-design"
+  :adr/status "accepted (design-only; implementation gated on procurement-lane quiescence)"
+  :adr/date "2026-07-12"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for ["market-entry procedure-execution path design: tenant-scoped propose-assess on the existing propose->approve->merge effects lifecycle"
+                          "hard rule: edge never files real incorporation (assess enqueue + human adjudication only)"
+                          "spec-basis HARD rejection at propose time (422) for jurisdictions outside 6910 R0 coverage"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related ["adr-2607122400-cloud-itonami-market-entry-api"
+                "adr-2607031500-cloud-itonami-m6910-global-incorporation-actor"
+                "adr-2607110400-cloud-itonami-isic-8291-corporate-compliance-intelligence-actor"
+                "adr-2607011000-cloud-itonami-robotics-premise-and-isic-21-21"
+                "gftdcojp/cloud-itonami docs/adr/0013-open-business-self-registration.md"
+                "gftdcojp/cloud-itonami docs/adr/0016-runtime-priority-cljs-first.md"
+                "gftdcojp/cloud-itonami docs/adr/0020-product-party-catalog-procurement-lifecycle.md"]
+  :db/id -1
+  :adr/decision-summary
+  "{:question \"edge から actor の手続き実行をどう起動するか (gateway を report-only から実行の入口へ)\",
+    :precedent-audit \"cloud-itonami に確立済み lifecycle が存在: propose-* endpoint が effect を tenant conn (KV) の approval queue に enqueue → effects/{id}/approve|reject で人間裁可 → approve は approval/merge! 即実行。認可 tenant-auth/guarded-post (admin bar, CACAO)。全て portable .cljc → :edge-api (ADR-0016)\",
+    :design {:endpoint \"POST /api/{org}/{repo}/market-entry/propose-assess {country} — tenant-scoped。グローバル POST は作らない (状態は tenant conn に属する)\",
+             :auth \"tenant-auth/guarded-post (hr/billing/effects/procurement と同一 bar)\",
+             :effect {:kind :market-entry/assess :risk :read-only
+                      :payload \"propose 時点で cloud-itonami.market-entry (生成データ) から spec-basis を埋め込み。merge handler は assessment 文書を conn に append のみ、外部送信なし\"},
+             :governor \"6910 RegistrarGovernor の spec-basis HARD check を propose 時に先行適用 — catalog 非対象国 (R0: 159/188) は effect を作らず 422 で正直拒否。HARD は人間 approve でも越えられない不変条件を API 面で保存\",
+             :hard-rule \"実 filing (:external-send/actuation) は edge から永久に行わない — 6910 actor 本体の StateGraph + interrupt-before human sign-off の仕事 (ADR-2607011000 と同型の直結禁止)\"},
+    :implementation-gate \"procurement lane (pp-next5/6, 内部 ADR-0020) が main 着地して静穏化してから実装 — approval/workspace handlers/effects-endpoints への並行編集は textual conflict がほぼ確実なため、設計の先行固定が本 ADR の役割\",
+    :coverage-growth \"29→more は 6910 formation.facts への citable 追記が正 (作り話でカバレッジを膨らませない) → 生成器再実行で API 自動反映\"}"}]

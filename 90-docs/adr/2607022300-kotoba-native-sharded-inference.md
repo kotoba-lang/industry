@@ -1,0 +1,55 @@
+# ADR-2607022300: kotoba-native 分散推論の最初の実証 — kotodama.inference.shard
+
+**Status**: accepted
+**Date**: 2026-07-02
+**Deciders**: Jun Kawasaki
+
+## Context
+
+murakumo の分散推論 (ADR-2607022000) は llama.cpp RPC を engine に使う。
+今日の実測でその限界も見えた: Mamba 系 hybrid の非対応、worker 死への無限待ち、
+expert 並列の欠如。一方 kotoba-lang には llama.cpp に依らない推論スタックが
+既に存在する — `inference`(runtime 契約 + WGSL kernels + GGUF/Q4_K decode 実証)、
+`num`(WGSL/WebGPU tensor backend)、`torch`(module-graph-as-data)、
+`webgpu`/`wgsl`。欠けていたのは **分散の縫い目**だけだった。
+
+## Decision
+
+`kotodama.inference.shard`（純 cljc、kotoba-lang/inference @ 2b48f2af）を実装:
+
+1. **tensor 所有規則**: murakumo.infer.plan の assignment
+   (`{:layers [lo hi) :span n}`) → rank spec。`blk.N.*` は range が持ち、
+   `token_embd` は先頭 rank、`output_norm`/`output` は末尾 rank
+   （llama.cpp の device split と同じ規約 = engine 間で cache/配置が可換）。
+2. **handoff 契約**: rank 境界を渡るのは activation 1 本 + 位置 —
+   **印字可能な EDN** `{:shard/v 1 :shard/layer hi :shard/pos p :shard/hidden [..]}`。
+   HTTP body / libp2p stream / KSE event / テストの pr-str を同じ値が通る。
+3. **実行可能な等価性証明**（cljc test、125 assertions）:
+   decoder stack を rank ごとに畳み、境界ごとに**シリアライズ済み handoff を
+   経由**しても、全カット点（全 2-rank 分割 × 12、murakumo plan 形の不均等
+   4-rank 分割）で unsharded forward と **double 完全一致**。
+4. **実 artifact の rank 検証**（JVM + babashka 両対応）:
+   `clojure -M:verify-shard --layers lo:hi [--first|--last]` — 自分の shard の
+   全 tensor 存在、contract の span / payload prefix byte 一致、常駐 byte 数
+   （credits 台帳の memory×time の分子）を報告。
+
+## 初回実測（2026-07-02）
+
+- rank0 `--layers 0:21 --first` @ main-2 (JVM): 358 tensors / 1.75GB / contract 9 検証 ✓
+- rank1 `--layers 21:42 --last` @ **simeon (babashka、nbb バイナリ+ソース配布のみ)**:
+  1773 tensors / 7.85GB / contract 3 検証 ✓
+- **358 + 1773 = 2131 = artifact の全 tensor 数** — 完全被覆・無重複を実機 2 台で証明。
+
+## 残課題（優先順）
+
+1. full forward: gemma4 の attention/RoPE/SWA を num-clj ops で（kernels は
+   shaders/ に既在、`deltanet_update.wgsl` すら有る）
+2. handoff の transport 実装: murakumo.cloud overlay の sealed relay stream
+   （kotoba WASM lattice の on-kse でも可）
+3. WebGPU 実行 host（wasmtime+wgpu / ブラウザ）と Metal 比の性能実証
+
+## 併記: webgpu-rs → webgpu 統合（owner 指示、同日）
+
+`kotoba-lang/webgpu-rs`（CPU 側 EDN render-IR ドメイン、純 clj）は
+`kotoba-lang/webgpu` に namespace そのままで統合（webgpu @ c34f6b4a）。
+manifest から entry 削除、旧リポは pointer README + archive。

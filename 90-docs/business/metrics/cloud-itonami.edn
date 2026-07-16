@@ -1,0 +1,104 @@
+{:health-status 200,
+ :asOf "2026-07-16T00:08:07.617Z",
+ :zone-name "itonami.cloud",
+ :productSurfaceHint
+ {:url "/api/status",
+  :note
+  "scores.productSurface should be 804/804 when free path is live"},
+ :zone
+ {:requests-7d 258,
+  :pageviews-7d 18,
+  :uniques-7d-sum 75,
+  :zone "itonami.cloud"},
+ :agentRuns7d 3493,
+ :sources [:cloudflare :health :emitter :itonami-free-path],
+ :agentNote
+ "CF may 403 Python-urllib/* (error 1010) — set an explicit User-Agent.",
+ :health-live
+ {:bottleneck
+  "free path live — paid path needs owner STRIPE_* secrets",
+  :asOf "2026-07-16T00:08:08.095Z",
+  :agentNote
+  "CF may 403 Python-urllib/* (error 1010) — set an explicit User-Agent for agents.",
+  :source "itonami-data-kv-list",
+  :stripe {:activeSubscriptions 0, :customerBindings 0},
+  :freePath
+  {:ok true,
+   :externalTenants 4,
+   :selfRegisteredOwners 4,
+   :registryEntries 4,
+   :agentRuns7d 3493,
+   :externalPaid 0},
+  :ok true,
+  :live true,
+  :version "0.1.176",
+  :links
+  {:freeClaim "/isco-1212/",
+   :openBusiness "/api/open-business",
+   :digestAlias "/api/free-path",
+   :licensesJson "/licenses.json",
+   :fleetMetrics "/api/fleet/metrics",
+   :billing "/api/billing/status",
+   :freePathDocs "/docs/free-path.md",
+   :securityTxt "/.well-known/security.txt",
+   :digest "/api/freepath",
+   :marketEntry "/api/market-entry",
+   :jobs "/api/jobs",
+   :staticHealth "/health.json",
+   :status "/api/status",
+   :maturity "/api/maturity",
+   :goLive "/#go-live",
+   :agentRuns "/api/agent-runs",
+   :openapi "/openapi-free-path.json",
+   :badge "/api/badge",
+   :marketplace "/api/marketplace",
+   :stripeSetup "/docs/stripe-billing-setup.md",
+   :metrics "/api/metrics",
+   :licensesUi "/licenses/",
+   :llms "/llms.txt"}},
+ :paths
+ {:ok
+  [{:path "/robots.txt", :requests 12}
+   {:path "/itonami", :requests 1}
+   {:path "/infer/cost", :requests 1}],
+  :status-mix {:client-error 17, :ok 14},
+  :window "24h"},
+ :source "itonami-data-kv-list",
+ :note
+ "PII-free aggregates only. freePath is live without Stripe; paid stays 0 until checkout + webhook (hyp/itonami-smb-pay).",
+ :as-of "2026-07-16",
+ :freePath
+ {:ok true,
+  :externalTenants 4,
+  :selfRegisteredOwners 4,
+  :registryEntries 4,
+  :agentRuns7d 3493,
+  :externalPaid 0},
+ :free-path
+ {:ok true,
+  :externalTenants 4,
+  :selfRegisteredOwners 4,
+  :registryEntries 4,
+  :agentRuns7d 3493,
+  :externalPaid 0},
+ :ok true,
+ :traffic-quality {:window "24h", :probe-4xx-pct 55, :error-5xx-pct 0},
+ :top-paths
+ "上位 page (24h, 2xx/3xx): /robots.txt 12 · /itonami 1 · /infer/cost 1 | 4xx(probe) 55%",
+ :funnel
+ {:trials 4,
+  :freeClaims 4,
+  :agentRuns7d 3493,
+  :externalTenants 4,
+  :paid 0},
+ :version "0.1.176",
+ :signal
+ "itonami.cloud 実測 258 req/7d・75 uniques(日次和)・うち4xx probe 55%(24h)",
+ :tenants
+ {:active 4,
+  :external-paid 0,
+  :external-total 4,
+  :externalPaid 0,
+  :externalTotal 4, 
+  :selfRegisteredOwners 4, 
+  :registryEntries 4}}

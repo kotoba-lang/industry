@@ -1,0 +1,73 @@
+{:adr-id "2607152700"
+ :title "cloud-itonami-isic-0893 — Salt Extraction Operations Coordination"
+ :date "2026-07-15"
+ :author "Cloud Itonami Contributors"
+ :status :accepted
+ :context
+ "ISIC Rev.4 0893 (Extraction of salt) had no prior actor implementation
+  -- the registry entry pointed at a placeholder repo
+  (gftdcojp/cloud-itonami-B0893) that was never created. A sibling agent
+  originally assigned the neighboring class 0892 verified the live
+  registry first, found 0892 is actually 'Extraction of peat', halted
+  without writing anything, and identified 0893 as the true salt slot;
+  this ADR's author independently re-verified {:id \"0893\" :name
+  \"Extraction of salt\" :maturity :spec ...} against a fresh clone
+  before proceeding. Fresh, from-scratch scaffold, built as part of a
+  smaller, carefully verified batch after an earlier 18-agent haiku
+  batch's 61% defect rate. Module shape mirrors sibling
+  cloud-itonami-isic-0520 (Mining of lignite)'s verified module shape,
+  domain-adapted for salt extraction: ISIC 0893 covers both rock-salt
+  dry/underground mining and solution mining/evaporation, so the demo
+  site directory seeds one site of each kind deliberately."
+ :decision
+ {:scope-boundary
+  "Coordination-only actor. Closed four-op allowlist, all :effect
+   :propose: log-production-record, schedule-maintenance,
+   flag-safety-concern (always escalates), coordinate-shipment. An op
+   outside this set is the same failure mode as forbidden-scope
+   content, not a separate carve-out."
+  :governor-rules
+  "Three HARD, permanent, un-overridable checks: (1) site-unverified --
+   target site must be independently :registered?/:verified? in the
+   store, never trusted from the proposal's own claim; (2)
+   effect-not-propose -- any :effect other than :propose is a claim to
+   directly actuate outside governance; (3) scope-exclusion -- any
+   proposal (any op) touching extraction-equipment-control (rock-salt:
+   blasting/drill-and-blast/drilling-pattern/room-and-pillar/
+   continuous-miner/excavation-sequencing; solution mining: brine-pump-
+   control/injection-well-control/extraction-well-control/cavern-
+   pressure-control/pond-gate-control/pond-valve-control/harvester-
+   operation) or site-safety(-authority) territory (subsidence-control-
+   decision, brine-containment-control, cavern-integrity-control,
+   permit issuance, license suspension, compliance enforcement),
+   evaluated unconditionally via a lower-cased EN+JA substring scan of
+   the proposal's own content. Subsidence/brine-containment exclusion
+   terms are deliberately qualified (control decision / containment
+   control) so legitimate flag-safety-concern observations are never
+   self-blocked -- exercised directly by
+   legitimate-brine-containment-flag-is-not-scope-excluded. Escalation
+   (soft): flag-safety-concern always, low confidence (<0.6).
+   saltops.phase independently agrees -- flag-safety-concern never
+   auto-commits at any phase."
+  :module-shape
+  "saltops.store (MemStore, string-keyed site directory seeded with a
+   rock-salt site, a solution-mining site, and an unverified
+   solar-evaporation site), advisor (SaltOpsAdvisor, mock + real-LLM
+   seam via langchain.model, plus an :out-of-scope? test hook), governor
+   (SaltExtractionGovernor), phase (0->3 rollout), operation
+   (langgraph-clj StateGraph), sim (demo driver)."}
+ :consequences
+ ["Registry entry corrected in place (exact-text edit of the existing"
+  " {:id \"0893\" ...} block): :repo/:business-id updated from the"
+  " stale gftdcojp/cloud-itonami-B0893 placeholder to"
+  " cloud-itonami/cloud-itonami-isic-0893, :maturity :implemented"
+  "Actor repo cloud-itonami/cloud-itonami-isic-0893 scaffolded and"
+  " pushed to main (8b52527b40b774d552f8c9b7ff05cf649debd25f)"
+  "Test suite run directly by this session: Ran 45 tests containing 136"
+  " assertions, 0 failures, 0 errors (both at push time and again from a"
+  " fresh post-merge clone). clj-kondo: 0 errors, 0 warnings."]
+ :references
+ ["cloud-itonami-isic-0520/ (module-shape mirror)"
+  "cloud-itonami-isic-0891/src/chemmineops/ (original module-shape precedent)"
+  "kotoba-lang/industry resources/kotoba/industry/registry.edn \"0893\" entry"
+  "ADR-2607121000 (ISIC Wave rollout plan -- 0893 is ISIC division 08, Wave 3)"]}

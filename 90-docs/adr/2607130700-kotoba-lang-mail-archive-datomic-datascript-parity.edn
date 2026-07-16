@@ -1,0 +1,35 @@
+[{:adr/id "adr-2607130700-kotoba-lang-mail-archive-datomic-datascript-parity"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607130700: kotoba-lang/mail-archive — content-addressed Gmail archive, Datomic⊣DataScript query parity"
+  :adr/status "accepted"
+  :adr/date "2026-07-13"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/last_verified "2026-07-13"
+  :adr/topic "kotoba-lang-mail-archive-datomic-datascript-parity"
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["新規リポジトリ kotoba-lang/mail-archive を、Gmail アーカイブ（content-addressed
+    .eml + 正規化エンティティ）の kotoba-lang 側正本と定める"
+   "スキーマは src/mail_archive/schema.edn（DataScript 互換の属性マップ形式 —
+    Datomic ネイティブのベクタ形式ではない）: :blob/* :person/* :email/*
+    :attachment/*。:email/date は YYYYMMDD 整数（langchain.db と DataScript
+    両方が共有する唯一の range query 意味論のため、ISO 文字列にしない）"
+   "同一スキーマ・同一 Datalog クエリを LangchainDbStore(langchain.db) と
+    DataScriptStore(nbb+実DataScript) の両方で実行し、contract test で結果一致を
+    保証する（cloud-murakumo-market-intel パターンの第2適用）"
+   "com-gmail に gmail.history/list-history を追加（tayori 自身がコメントで
+    指摘していた既知のギャップを埋める。tayori 側への配線は本ADRの範囲外）"
+   "Blob storage は BlobStore protocol で injectable にする（orgs/personal の
+    git-annex決め打ちにしない）"]
+  :adr/related
+  ["2607061423-kotoba-lang-com-gmail-com-wise-procedure-clj (com-gmail architecture)"
+   "2607061503-kotoba-lang-org-ietf-imap-smtp-gmail-channel-split"
+   "2606301200-kotoba-mail-mailer"
+   "2607122000-cloud-murakumo-market-intel-dataset (Store protocol / parity precedent)"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/corrections []
+  :adr/relationship-to-orgs-personal
+  "orgs/personal/bin/*.py + orgs/personal/bin/datomic/ の既存 Gmail アーカイブ
+   パイプライン（同日構築、Python/bash + JVM Datomic Local + 個別 nbb/DataScript
+   スクリプト）とは意図的に無関係のまま残す。相互参照なし、移行は本ADRのスコープ外。"}]

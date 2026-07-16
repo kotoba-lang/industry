@@ -1,0 +1,79 @@
+{:adr-id "2607171200"
+ :title "cloud-itonami-isic-0142 (raising of horses and other equines) equine-facility-operations-coordination actor"
+ :status :accepted
+ :date "2026-07-15"
+ :deciders ["Jun Kawasaki (agent-executed, standing authorization)"]
+ :related ["ADR-2607152100" "ADR-2607122200" "ADR-2607011000"]
+
+ :context
+ "ISIC Rev. 4 class 0142 (Raising of horses and other equines) had no cloud-itonami
+  implementation; registry entry was :maturity :spec with a never-created
+  gftdcojp/cloud-itonami-A0142 placeholder repo. Identity verified fresh from a clean
+  clone of kotoba-lang/industry before any work began: {:id \"0142\" :name \"Raising of
+  horses and other equines\"} matches the assigned scope exactly (a prior fleet
+  incident mislabeled 0892/0144 against their actual registry names, so this check is
+  mandatory). Racing/gambling activities are explicitly out of scope -- this actor
+  covers raising/breeding operations coordination only."
+
+ :scope-exclusions
+ ["direct animal handling (stable operator's exclusive authority)"
+  "veterinary treatment decisions (veterinarian/stable operator authority)"
+  "breeding or culling decisions (economic and ethical authority remains human)"
+  "racing or gambling activities (categorically out of scope, no corresponding op)"]
+
+ :decision
+ "Implement cloud-itonami-isic-0142 with Governor, Facts, Registry, Store, Advisor,
+  Phase, Operation, Sim (mirrors cloud-itonami-isic-0141/cattleops and
+  cloud-itonami-isic-0145/swineops module-for-module), namespace `equineops`:
+  - Governor (Equine Facility Operations Governor): 5 hard checks
+    (facility-not-registered, no-execution, treatment-or-breeding-culling-blocked,
+    op-not-allowed, herd-count-invalid) + 3 escalation gates (always-escalate health
+    concern, cost-threshold supply orders, low confidence < 0.7)
+  - blocked-ops = #{:administer-treatment :order-breeding-culling-decision} --
+    direct treatment administration AND breeding/culling decisions are both
+    permanently blocked (adapted from cattle/swine's :order-slaughter, since horses
+    are commonly raised for breeding/working/riding rather than slaughter)
+  - Facts: supply categories with cost thresholds (feed/veterinary-supply 500,
+    tack 1000), species (horse/donkey/mule), health-concern vocabulary
+    (equine-influenza/colic/strangles/laminitis, purely descriptive -- never
+    changes the always-escalate disposition)
+  - Registry: independent pure predicates (cost-exceeds-threshold?,
+    herd-count-non-positive?, confidence-below-floor?)
+  - Store: Store protocol + MemStore (registered-facility lookup)
+  - Advisor: Advisor protocol + MockAdvisor (4 ops)
+  - Phase: 0->3 rollout gate
+  - Operation: composes advisor -> governor -> phase-gate (langgraph-clj wiring
+    deferred, matching 0141/0145's own stub)
+  - Sim: demo runner with a working -main
+  - Operations: log-herd-record, schedule-veterinary-visit,
+    flag-animal-health-concern, order-supplies (closed allowlist, :effect :propose)
+  - Tests: 31 tests / 96 assertions (facts, governor, phase, registry, store), all
+    green -- includes an extra hard-violations-breeding-culling-blocked test beyond
+    the 0141/0145 shape to independently verify the equine-specific blocked op
+  - All .cljc (portable, no JVM interop), AGPL-3.0-or-later
+  - README/docs describe the real API (equineops.operation run-operation/build,
+    :commit/:escalate/:hold dispositions)"
+
+ :consequences
+ {:positive
+  ["Equine-raising (0142) now genuinely implemented and fully tested"
+   "Scope boundaries (animal handling, treatment, breeding/culling, racing/gambling)
+    hardcoded in governor checks and closed op-allowlist, not just asserted in prose"
+   "Animal-welfare escalation (flag-animal-health-concern always human) is a core
+    design invariant"
+   "Portable .cljc, zero JVM-only constructs, clj-kondo 0 errors / 0 warnings"]
+  :negative
+  ["Real persistent store (Datomic/kotoba-server) is a follow-up (in-memory for now)"
+   "langgraph-clj StateGraph wiring (real interrupt-before/checkpoint resume) is
+    deferred scaffolding, matching 0141/0145's own stub status"]}
+
+ :verification
+ {:test-count 31
+  :assertion-count 96
+  :test-status "0 failures, 0 errors -- independently re-verified from a fresh clone post-push"
+  :lint-status "0 errors, 0 warnings"
+  :commit "2e9c7fe9c90a90f0b05051cf0563d5c302beccba"
+  :repo "https://github.com/cloud-itonami/cloud-itonami-isic-0142"
+  :registry-update "kotoba-lang/industry: 0142 maturity :spec -> :implemented, repo/business-id corrected from never-created gftdcojp/cloud-itonami-A0142 placeholder, industry_test.clj maturity-summary assertion bumped 225 -> 226 (live-recomputed via test-runner failure diff, not assumed)"
+  :registry-merge-commit "2fa72bcbdcc0e1525484b53eac35dfba95f3e949"
+  :registry-post-merge-verification "fresh clone of kotoba-lang/industry main (+ fresh technology sibling clone): Ran 15 tests containing 947 assertions. 0 failures, 0 errors. grep -c \"â\" registry.edn: 0 (no mojibake)."}}

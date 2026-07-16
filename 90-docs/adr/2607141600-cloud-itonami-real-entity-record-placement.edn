@@ -1,0 +1,23 @@
+[{:adr/id "adr-2607141600-cloud-itonami-real-entity-record-placement"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607141600: cloud-itonami — where gftdcojp's real org activity + legal-entity identity records live"
+  :adr/topic "cloud-itonami-real-entity-record-placement"
+  :adr/status "accepted (activity layer: reconfirms existing implementation; identity layer: design-only, repo creation blocked on real LEI)"
+  :adr/date "2026-07-14"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["real business activity/decision/effect/audit records for gftdcojp already live in orgs/gftdcojp/cloud-itonami (private, ADR-2606271700, closed) -- reconfirmed as the record of record, no relocation"
+   "gftdcojp's own legal-entity identity record (LEI/legal-name/jurisdiction/website) reuses ADR-2607110300's cloud-itonami-lei-<LEI> schema and cloud-itonami org placement, but repo creation is BLOCKED until gftdcojp obtains a real GLEIF-issued LEI -- none exists in this workspace as of 2026-07-14, and fabricating one violates ADR-2607110300's own no-fabrication discipline"
+   "etzhayyim and kotoba-lang are ruled out for both layers, same reasoning as ADR-2607110300 (etzhayyim = non-profit self-sovereign religious layer, out of scope for commercial entity records; kotoba-lang = language/infra layer, not a home for business entity content)"
+   "activity data (private) and identity data (public) stay in separate repos/orgs, never mixed in one repo -- avoids accidentally leaking private activity content into a public identity archive"
+   "LEI acquisition itself (GLEIF-accredited LOU application, KYC, fee) is a real-world legal-entity action outside standing agent authorization -- owner must execute it; agent proceeds with identity-repo scaffold only after a real LEI is on file"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related ["adr-2606271700-cloud-itonami-business-os"
+                "adr-2607110300-cloud-itonami-lei-corporate-tos-catalog"
+                "adr-2607031500-cloud-itonami-m6910-global-incorporation-actor"
+                "adr-2607121000-cloud-itonami-global-isic-isco-reverse-toposort-plan"
+                "adr-2607141700-cloud-itonami-compliance-fact-federation"]
+  :db/id -1}]

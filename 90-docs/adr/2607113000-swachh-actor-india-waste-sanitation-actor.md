@@ -1,0 +1,155 @@
+# ADR-2607113000: swachh-actor — インドのゴミ収集・分別・リサイクル「ビジネス実行」actor を registration（waste-ops-LLM ⊣ SanitationGovernor、system dynamics 分析は junkan に委譲）
+
+**Status**: accepted
+**Date**: 2026-07-10
+**Deciders**: Jun Kawasaki (+ Claude, オーナー承認のうえ実行)
+
+## Context
+
+オーナーから「いまの cloud-itonami, kotoba-lang で インドのゴミ問題、衛生問題の
+system dynamics react loop を改善する actor は設計されている? robo, giemon で
+ゴミを収集、分類, リサイクルビジネスなどの actor や itonami は設計済み?」という
+質問を受け、調査した結果:
+
+- `cloud-itonami` の `itonami` actor（ops-LLM ⊣ CertGovernor）は gftdcojp
+  ポートフォリオ全体向けの汎用ビジネス運用 actor で、`mes/system_dynamics.cljc`
+  に Forrester stock-flow モデルは実装済みだが、対象は製造業の在庫
+  （`raw-material→WIP→finished-goods`）でありゴミ・衛生とは無関係。
+- `kotoba-lang/kami-app-giemon`（+ `-factory`）はロボットキットの3D CAD/物理
+  シミュレーション・ビューアで、ゴミ収集・分別・リサイクルのビジネスロジックでは
+  ない。インドとの関連もなし。
+- `india`/`waste`/`garbage`/`recycl`/`衛生`/`ゴミ`/`sanitation`/`hygiene` を
+  リポジトリ全体・GitHub（gftdcojp/etzhayyim/kotoba-lang）で検索してもヒット
+  ゼロだった時点で、**該当する actor は未設計**と判断した。
+
+オーナーから「ok, do it」の承認を得て、CLAUDE.md の標準ワークフロー（新規
+project を起こして登録する一連の流れ、恒久承認済み）に従い新規 actor の scaffold
+に着手した。
+
+### 実装中に判明した並行セッションによる先行実装
+
+scaffold 実装を並行して進めていた**別セッション**が、同一の actor 名
+（`swachh-actor`）・同一の namespace（`swachh.*`）で、`orgs/etzhayyim/root/
+20-actors/junkan/`（循環、社会フィードバックループ観測専用の既存 analysis-only
+actor。インド packaged-goods 文化向けの節まで持つ）の存在を発見し、system
+dynamics 分析責務をそちらに委譲する「ビジネス実行 / 分析 分離」設計へ先に
+到達し、`etzhayyim/com-etzhayyim-swachh-actor` として GitHub へ push・公開
+済みであることが本セッションの実装完了直前に判明した
+（`clj-kondo` 0 errors、20 tests / 76 assertions、0 failures）。
+
+本 ADR は、その**既に GitHub 上に存在する実装**（business-execution actor、
+system dynamics 分析は `junkan` に委譲）を正の設計として、superproject の
+manifest への登録を完了させるものである。本セッション自身が独自に構築した
+system dynamics 内蔵版の代替実装は、重複登録を避けるため GitHub には公開せず
+破棄した（ローカル scratch のみ、詳細は本 ADR 末尾の注記を参照）。
+
+## Decision
+
+`etzhayyim/com-etzhayyim-swachh-actor`（public、AGPL-3.0-or-later、
+[https://github.com/etzhayyim/com-etzhayyim-swachh-actor](https://github.com/etzhayyim/com-etzhayyim-swachh-actor)）
+を `robotaxi-actor`/`gftd-talent-actor`/`cloud-itonami` と同型の「封じ込め+
+独立governor+不変台帳」actor パターンの新規実装として、superproject の
+`manifest/repos.edn`（`:extra-projects`）+ `manifest/west.yml`（`--entry`
+最小diff）に登録する。実装側 ADR は当該リポジトリの
+`docs/adr/0001-architecture.md`（本 ADR と対）。
+
+### 1. waste-ops-LLM ⊣ SanitationGovernor（単一不変条件）
+
+> **waste-ops-LLM は、SanitationGovernor が拒否する書き込み・開示を決して行わない。**
+> **actor は業者への支払い確定・物理的な収集車両の作動を一切行わない
+> （この scaffold に payment/hardware-dispatch 経路自体が存在しない）。**
+> **actor は自ら stock/flow モデルを計算・保有しない — react-loop 分析は常に
+> 別 actor（junkan）からの入力として受け取るだけ。**
+
+6チェック（4 HARD + 2 SOFT）:
+
+| # | チェック | 種別 | 内容 |
+|---|---|---|---|
+| 1 | rbac | HARD | actor-role が operation × 対象ゾーンの権限を持つか |
+| 2 | purpose | HARD | 利用目的宣言・自治体の同意/法的根拠 |
+| 3 | **worker-privacy**（gftd-talent-actor の fairness gate の domain analog） | HARD | ゾーン担当のインフォーマル収集人（kabadiwala）の個人情報を判断根拠に引用していないか |
+| 4 | **vendor-eligibility**（本 actor 固有の新規チェック） | HARD | 出荷提案の vendor が登録済み（licensed）か — 無登録業者への横流し防止 |
+| 5 | minimal-disclosure | HARD | 帳票列が purpose に対し過剰か（収集人PII等） |
+| 6 | 確信度フロア / 重大操作ゲート | SOFT | 低確信 or `:large-shipment`/`:hygiene-escalation` → 人間（ward officer）承認へ escalate |
+
+### 2. system dynamics 分析は `junkan`（別actor）の責務 — 分析/介入分離原則
+
+`orgs/etzhayyim/root/20-actors/junkan`（循環）が既に存在する社会フィードバック
+ループ観測専用の analysis-only actor（インド packaged-goods 文化向けの節を含む）
+であり、街路滞留ゴミ（`uncollected`）のストック&フロー・react-loop 分析
+（悪循環判定・leverage point 特定）は `junkan/methods/waste_dynamics.cljc`
+（別実装）に委譲する。swachh-actor は `swachh.store/insight-of` 経由で junkan
+の分析出力（例: `{:vicious-cycle? true :leverage-point :collection-capacity}`）
+を疎結合な EDN マップとして読み、`:observed-backlog`（生の観測値）と併せて
+`:route/propose` op の判断材料にするのみで、junkan のコードを直接呼び出す
+統合は行わない。理由: (1) 分析（モデル妥当性検証）と実行（RBAC/vendor
+licensing/PII保護のガバナンス検証）は要求される検証方法が本質的に異なる、
+(2) 既存の `junkan` 実装との重複を避ける（DRY）、(3) 将来の他のゴミ関連実行
+actor も同じ分析を再利用できる。
+
+### 3. Phase 0→3、Store/Advisor は injection
+
+`gftd-talent-actor` と同型（`MemStore`‖`DatomicStore`、`mock-advisor`‖
+`llm-advisor`、Phase 0 read-only → 1 assisted-dispatch → 2 assisted-route →
+3 supervised-auto）。
+
+## Consequences
+
+- (+) インドのゴミ収集・分別・リサイクルビジネスの**実行**意思決定支援を担う
+  actor が新設・登録された（従来ゼロだった領域）。
+- (+) `vendor-eligibility`（無登録業者への横流し防止）・`worker-privacy`
+  （インフォーマル労働者PII保護）という、既存の cloud-itonami/talent actor に
+  存在しないこのドメイン固有の HARD チェックを新設した。
+- (+) system dynamics 分析責務を既存の `junkan` に一本化し、分析ロジックの
+  二重実装・二重保守を避け、このワークスペースの分析/介入分離原則との整合を
+  保った。
+- (-) junkan との実配線（実際に読み取り可能な insight を書き込む統合）・
+  実データ接続（自治体GIS/収集ルートDB）・実LLM運用設定・RAD identity 登録は
+  scope 外（follow-up。実装側 ADR §Scope 参照）。
+- superproject への反映: `manifest/repos.edn` の `:extra-projects` へ
+  `orgs/etzhayyim/com-etzhayyim-swachh-actor` を追加 →
+  `gen-west-manifest`（migration中のため `scripts/gen-west-manifest.cljs`
+  (nbb) は `clojure.java.shell` 未対応で実行不可だったため、migration 前の
+  `scripts/gen-west-manifest.cljs`（git 履歴 `7fecf3c7fb2f` 時点）を一時
+  フォールバックとして使用し `--entry com-etzhayyim-swachh-actor` で最小
+  diff 生成。pin 検証は新規 entry 自体は「main から到達可能」で正常通過した
+  が、並行する他セッションの高頻度 pin 前進により同時に検証された無関係な
+  既存4件（cloud-itonami / com-ema-europe / com-maersk-api / iso3166、いずれ
+  も本 diff の対象外・splice で byte 不変）が偽陽性 behind 判定になったため
+  `--no-verify-remote` で該当 4 件の検証のみスキップした（本 entry 自身の
+  pin 検証は通過済み。理由をここに記録）。
+
+## 実装時の並行作業に関する注記
+
+このリポジトリの scaffold 実装中、同一マシン上で稼働する別セッションが同名
+（`swachh-actor`）の actor を並行して構築していた。本セッションは調査時点
+（実装着手前）では該当する actor の不在を確認していたが、これは並行セッション
+の作業がまだ GitHub に反映されていなかったタイミングでの確認であり、実装が
+進むにつれて双方のセッションが同じ結論（junkan への分析委譲）に収束していく
+過程で、一時的に同一の一時ディレクトリパスへの書き込み衝突も発生した（本
+セッションは衝突検知後、独立した一時ディレクトリへ移動して作業を継続）。
+最終的に GitHub へ先に push・公開されたのは並行セッション側の実装であり、
+本 ADR はその実装を正として registration した。本セッション自身が構築した
+代替実装（system dynamics を actor 内部に直接持つ設計）はどこにも push して
+おらず、既存の登録・実装と衝突しない。
+
+## 代替案と不採用理由
+
+- **cloud-itonami の itonami actor / mes.system_dynamics を拡張してゴミ
+  ドメインに転用**: itonami は gftdcojp ポートフォリオ全体の汎用ビジネス運用
+  actor であり、対象法域・ガバナンス要件（無登録業者・インフォーマル労働者
+  保護）が製造業ドメインと本質的に異なる。
+- **swachh-actor 自身に system dynamics モデルを実装する**: 既存の `junkan`
+  という分析専用 actor と責務が重複し、このワークスペースの分析/介入分離
+  原則に反する。分析ロジックの二重実装・二重検証コストも避けられない。
+- **LLM に書き込み権限を直接付与（actor 層なし）**: 無登録業者への出荷・
+  個人情報の根拠利用を構造的に防げない。単一不変条件（決定1）に反する。
+
+## References
+
+- `orgs/etzhayyim/com-etzhayyim-swachh-actor/README.md` +
+  `docs/adr/0001-architecture.md`（実装側 ADR、本 ADR と対）
+- `orgs/etzhayyim/root/20-actors/junkan/`（分析責務の委譲先）
+- `orgs/gftdcojp/gftd-talent-actor/docs/adr/0001-architecture.md`（直接の手本）
+- `orgs/gftdcojp/cloud-itonami/src/cloud_itonami/mes/system_dynamics.cljc`
+  （参考として調査したが、本 actor には移植しなかった実装パターン）

@@ -1,0 +1,234 @@
+[{:adr/authoritative_for ["cloud-itonami-isic-2431 iron-and-steel casting foundry plant-operations coordination" "foundry plant operations actor" "ISIC 2431 implementation"], :adr/topic "cloud-itonami-isic-2431-iron-steel-casting-coverage", :adr/related ["adr-2607171200"], :adr/status "accepted", :adr/id "adr-2607152500-cloud-itonami-isic-2431-iron-steel-casting-coverage", :adr/doc_type "adr", :adr/last_verified "2026-07-15", :adr/body "# ADR-2607152500: cloud-itonami-isic-2431 (Casting of iron and steel) coverage
+
+**Status**: accepted
+**Date**: 2026-07-15
+**Deciders**: Jun Kawasaki (agent-executed, standing authorization)
+**Related**: ADR-2607171200 (cloud-itonami-isic-2013 Manufacture of plastics and synthetic rubber in primary forms coverage, closest architectural analog)
+
+## Context
+
+ISIC class 2431 (Casting of iron and steel) is a fresh scaffold — no
+prior repo or reverted attempt existed at
+`cloud-itonami/cloud-itonami-isic-2431` before this ADR (checked and
+confirmed 404 via `gh api repos/cloud-itonami/cloud-itonami-isic-2431`
+before starting). The `kotoba-lang/industry` registry entry `{:id
+\"2431\" :name \"Casting of iron and steel\" ...}` was verified
+byte-for-byte from a fresh read-only clone before any code was written
+(this fleet has previously mislabeled an assigned ISIC class from
+memory rather than reading the registry — e.g. 0892 assumed salt,
+actually peat; 0144 assumed swine, actually sheep-goats).
+
+The closest architectural analog is `cloud-itonami-isic-2013`
+(Manufacture of plastics and synthetic rubber in primary forms): both
+are back-office coordination actors for a fixed processing PLANT with
+heavy manufacturing equipment and a real physical safety dimension,
+and both share the same four-op shape
+(`:log-production-batch`/`:schedule-maintenance`/`:flag-safety-
+concern`/`:coordinate-shipment`) and the same two-entity verified/
+registered gate structure (equipment for maintenance scheduling, batch
+for shipment coordination). The two verticals are, however, distinct
+plants with distinct hazard profiles: 2013's central physical hazard
+is chemical (monomer exposure, exothermic runaway-reaction risk during
+polymerization), while 2431's is molten-metal handling (splash/burn
+risk at the melting furnace and pour, furnace radiant-heat exposure,
+mold/core-binder fume exposure, shakeout dust/noise). This build
+mirrors 2013's architecture closely but adapts the hazard profile and
+equipment/product vocabulary to the casting-foundry plant: 2431's
+permanent equipment-actuation block guards a melting FURNACE/pouring
+line (`:actuate-furnace?`) rather than a polymerization/compounding
+REACTOR (`:actuate-reactor?`); and 2431's production-batch record
+declares an `:alloy-grade` (spanning both cast-iron and cast-steel
+families, per ISIC 2431's own combined scope) and a
+`:defect-rate-percent`, rather than 2013's `:polymer-grade`/`:off-
+spec-rate-percent`.
+
+`cloud-itonami-isic-2431` is also distinct from
+`cloud-itonami-isic-2410` (Manufacture of Basic Iron and Steel,
+already `:implemented` in this fleet as a Steelworks Advisor ⊣
+Steelworks Governor with a different dual-actuation/mill-cert
+architecture): 2410 is the primary steelmaking/rolling-mill vertical
+(continuous-process heats, chemistry deviation, mill certification),
+upstream of a foundry's own melt stock, while 2431 is the downstream
+casting foundry that melts, pours, and shakes out finished iron/steel
+CASTINGS — a distinct plant, distinct process shape, and distinct
+governed-actor pattern (this build follows the 2013/0510-style four-op
+propose-only pattern specified for this class, not 2410's own
+dispatch-heat/issue-mill-cert pattern).
+
+This vertical is SELF-CONTAINED — no `kotoba-lang/foundrymfg` library
+exists, so domain logic (equipment/batch verification, shipment-weight
+recompute, alloy-grade validation, defect-rate plausibility
+validation) lives as pure functions in `foundrymfg.registry` and is
+re-verified independently by the governor, mirroring the discipline
+established by `cloud-itonami-isic-2013`'s `resinmfg.registry` and
+every prior sibling actor.
+
+## Decision
+
+Build `cloud-itonami-isic-2431` from scratch as a governed-actor
+implementation of the iron-and-steel casting foundry blueprint,
+following the langgraph StateGraph + independent Governor + Phase 0->3
+rollout architecture established across the fleet:
+
+1. **FoundryAdvisor** (`foundrymfg.advisor`, sealed intelligence node):
+   proposes plant-operations coordination actions only, never commits
+   - `:log-production-batch` — alloy-grade/weight/defect-rate data logging (administrative, not an operational decision)
+   - `:schedule-maintenance` — furnace/mold/shakeout-equipment maintenance scheduling proposal
+   - `:flag-safety-concern` — surface a molten-metal-hazard (splash/burn, furnace radiant-heat, mold/core-binder fume exposure)/equipment-safety concern (always escalates)
+   - `:coordinate-shipment` — outbound iron/steel casting shipment coordination proposal
+
+2. **Foundry Plant Operations Governor** (`foundrymfg.governor`,
+   independent validation layer, never trusts the advisor's own
+   self-report):
+   - HARD invariants (no override, evaluated unconditionally,
+     elaborated into ten concrete checks): the referenced equipment
+     unit must be independently verified/registered before any
+     maintenance may be scheduled against it; the referenced batch
+     must be independently verified/registered before any shipment may
+     be coordinated against it; the request's own `:effect` must be
+     `:propose`; `:op` must be in the closed four-op allowlist; the
+     proposal's own `:effect` must be one of the four propose-shaped
+     effects (no direct furnace/pouring-line-equipment control);
+     `:actuate-furnace? true` on a maintenance schedule (directly
+     actuating the melting furnace or pouring line) is a PERMANENT
+     block; a shipment may not push a batch's own recorded shipped
+     weight past its own logged production weight (independently
+     recomputed); no double-scheduling the same maintenance record; no
+     fabricated `:alloy-grade` value; no physically implausible
+     `:defect-rate-percent` value
+   - ESCALATE (human sign-off, overridable): safety concerns always
+     escalate regardless of confidence; low confidence
+
+3. **Scope boundary** (critical, safety-critical domain — molten-metal
+   splash/burn risk, furnace radiant-heat exposure, mold/core-binder
+   fume exposure):
+   - Does NOT control the melting furnace or pouring line equipment directly
+   - Does NOT make plant-safety or molten-metal-safety decisions (exclusive to the human plant supervisor)
+   - Does NOT actuate the melting furnace or pouring line (permanently blocked,
+     not a rollout milestone still to come — see `foundrymfg.phase`:
+     `:schedule-maintenance` is never a member of any phase's `:auto`
+     set)
+   - All proposals are `:effect :propose`; actuation is human-approval-gated
+
+4. **Self-contained domain logic**: `foundrymfg.registry` pure
+   functions (`equipment-ready?`, `batch-ready?`, `shipment-weight-
+   exceeded?`, `alloy-grade-valid?`, `defect-rate-valid?`) are
+   re-verified independently by the governor, following the \"ground
+   truth, not self-report\" discipline established by prior actors
+   (most directly `cloud-itonami-isic-2013`'s `resinmfg.registry`).
+
+5. **Store** (`foundrymfg.store`): a single `MemStore` backend behind a
+   `Store` protocol, tracking four entity kinds (batches, equipment,
+   maintenance, shipments) plus the append-only ledger. Like 2013,
+   this build does NOT ship a second Datomic-backed store — a second
+   backend can be added later behind the same protocol without
+   changing any caller.
+
+6. **Implementation**: `.cljc` portable source (ClojureScript/JVM/nbb
+   compatible, no JVM-only interop), langgraph-clj StateGraph (invoked
+   via `langgraph.graph/run*`, not `.invoke`), append-only audit
+   ledger, full test coverage, demo driver. Full module set:
+   `deps.edn`, `blueprint.edn`, `LICENSE` (AGPL-3.0-or-later),
+   `README.md`, `GOVERNANCE.md`, `CODE_OF_CONDUCT.md`,
+   `CONTRIBUTING.md`, `SECURITY.md`, `docs/adr/0001-architecture.md`.
+   All source pushed to
+   `github.com/cloud-itonami/cloud-itonami-isic-2431` (public OSS,
+   AGPL-3.0-or-later).
+
+## Consequences
+
+(+) Iron-and-steel casting foundry plant-operations back-office
+coordination is now genuinely implemented and tested (not merely
+scaffolded). ISIC 2431 moves from `:spec` to `:implemented`.
+
+(+) Scope boundary is explicit and verifiable: the governor's HARD
+invariants protect against scope creep into unauthorized equipment
+operation or furnace actuation, independently corroborated by
+`foundrymfg.phase`'s permanent exclusion of `:schedule-maintenance`
+from every phase's `:auto` set.
+
+(+) The two independent verified/registered gates (equipment for
+maintenance, batch for shipment) are a genuinely casting-foundry-
+specific elaboration mirroring 2013's own two-entity-kind gate — this
+domain has two distinct ground-truth entity kinds a proposal can
+reference, and each is independently re-derived from its own permanent
+record, never trusting the proposal's self-report.
+
+(+) The repo is standalone (forkable outside the workspace), matching
+the pattern established by prior actors.
+
+(+) All four core modules (governor/store/advisor/registry) plus
+`deps.edn` are present and exercised by 71 tests / 199 assertions
+across 5 test namespaces (`foundrymfg.operation-test`,
+`foundrymfg.governor-contract-test`, `foundrymfg.phase-test`,
+`foundrymfg.store-contract-test`, `foundrymfg.registry-test`).
+
+(-) Still a simulation/proposal layer, not integrated with real
+equipment-telemetry/batch-tracking/freight-dispatch systems — scope is
+deliberately bounded to back-office coordination.
+
+(-) Safety-concern escalation is a simplified placeholder; a real
+deployment would tie it to a domain-specific hazard-severity
+classification.
+
+(-) Single-backend Store (MemStore only): a Datomic/kotoba-server-backed
+store is a follow-up, not part of this build.
+
+## Verification
+
+- `cloud-itonami-isic-2431` repo: fresh scaffold, full module set
+  (governor/store/advisor/registry/operation/phase/sim + `deps.edn` +
+  `blueprint.edn` + LICENSE + governance docs) pushed to `main` at
+  `github.com/cloud-itonami/cloud-itonami-isic-2431`. `gh repo create
+  --license AGPL-3.0` seeded an initial GitHub-generated LICENSE-only
+  commit before the push landed; reconciled via `git merge
+  --allow-unrelated-histories` (not a force-push/rebase) with the
+  trivial LICENSE line-wrap conflict resolved in favor of the repo's
+  own canonical AGPL-3.0-or-later text, merge commit
+  `a452e23c7c2e27b76dd33dcda34fe2f631e7c9d5` (confirmed as the tip of
+  `cloud-itonami-isic-2431`'s `main` via `gh api
+  repos/cloud-itonami/cloud-itonami-isic-2431/commits/main` matching
+  the local HEAD SHA).
+- `clojure -M:test` (bare, no `:dev` alias needed — `deps.edn` pins
+  langgraph+langchain via `:local/root` directly in top-level `:deps`):
+  **`Ran 71 tests containing 199 assertions. 0 failures, 0 errors.`**
+  — independently re-verified from a second, fully fresh clone
+  (separate `kotoba-lang/{langgraph,langchain}` sibling checkouts)
+  after the initial push, same result.
+- `clojure -M:lint`: 0 errors, 0 warnings.
+- `clojure -M:dev:run` demo narrative exercises all four ops, every
+  HARD-hold scenario directly (not-propose-effect, unknown-op,
+  equipment-not-verified, batch-not-verified, shipment-weight-exceeded,
+  furnace-actuate-blocked, already-scheduled, invalid-alloy-grade,
+  invalid-defect-rate), with no exceptions.
+- All source is `.cljc` (portable); the actor graph is invoked
+  exclusively via `langgraph.graph/run*`.
+- Audit ledger is append-only; every settled request (commit or hold)
+  leaves exactly one ledger fact (contract-tested).
+- `:itonami.blueprint/governor` keyword `:foundry-plant-operations-
+  governor` is grep-verified UNIQUE fleet-wide (`gh search code
+  \"foundry-plant-operations-governor\" --owner cloud-itonami`, zero
+  hits before this repo was created).
+- `kotoba-lang/industry` registry entry for `\"2431\"` updated in place
+  from `:spec` to `:maturity :implemented` via an exact-text in-place
+  edit of the single `{:id \"2431\" ...}` block (no wholesale
+  regeneration; `:repo`/`:business-id` also corrected from the stale
+  never-created `gftdcojp/cloud-itonami-C2431` placeholder to the real
+  `cloud-itonami/cloud-itonami-isic-2431`), landed via GitHub API
+  server-side merge at commit
+  `b4a65dea64d595bcd2f5a72e8da1bdf98f7cbefa` (confirmed as the tip of
+  `kotoba-lang/industry`'s `main` via `gh api
+  repos/kotoba-lang/industry/git/ref/heads/main`). The live
+  `:implemented` count was recomputed fresh immediately before the
+  edit (raw `grep -c \":maturity :implemented\"` 231 + the 1812
+  `:implemented?` special-case entry `maturity-of` already accounts
+  for = 232, matching the pre-edit pinned assertion — confirming no
+  concurrent-agent count drift) and `industry_test.clj`'s own
+  assertion was bumped 232 -> 233 accordingly and re-run green
+  (`Ran 15 tests containing 949 assertions. 0 failures, 0 errors.`)
+  before commit. Post-merge re-verification from a brand-new fresh
+  clone (plus a fresh `technology` sibling clone) reproduced the same
+  green result (`Ran 15 tests containing 949 assertions. 0 failures, 0
+  errors.`) and confirmed zero UTF-8 mojibake (`grep -c \"â\"
+  resources/kotoba/industry/registry.edn` = 0).
+", :adr/deciders ["Jun Kawasaki"], :adr/date "2026-07-15", :db/id -1, :adr/authoritative true, :adr/title "ADR-2607152500: cloud-itonami-isic-2431 (Casting of iron and steel) coverage"}]
