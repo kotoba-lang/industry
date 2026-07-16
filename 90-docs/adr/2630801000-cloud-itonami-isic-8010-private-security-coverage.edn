@@ -1,0 +1,67 @@
+[{:adr/id 2630801000
+  :adr/title "cloud-itonami-isic-8010 — Private Security Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-8010]
+  :adr/references [2607121000 2607152500 2607152700]
+
+  ;; ISIC Rev.5 8010: private security activities (guarding, patrol, escort,
+  ;; monitoring under contract). Pre-existing :blueprint-tier repo (docs
+  ;; published, no code) filled in, not recreated. Coordination-only:
+  ;; patrol/checkpoint/incident-report data logging, guard-shift scheduling
+  ;; proposals, equipment-supply coordination, incident-concern flagging.
+  ;; Genuinely high-stakes (physical security / use-of-force adjacency) --
+  ;; a stricter governor discipline than most cloud-itonami verticals:
+  ;; dispatch-to-respond, use-of-force authorization, and detention/arrest
+  ;; are ALWAYS a permanent HARD block, never merely human-gated.
+
+  :actor/id :cloud-itonami-isic-8010
+  :actor/name "Private Security Operations Coordinator"
+  :actor/isic-rev5 "8010"
+  :actor/domain :commercial/private-security-services
+  :actor/wave 4
+  :actor/coordination? true
+  :actor/robotics? false
+  :actor/pre-existing-blueprint-repo? true
+
+  :actor/proposal-ops [:log-patrol-record :schedule-guard-shift
+                        :coordinate-equipment-supply :flag-incident-concern]
+  :actor/always-escalate-ops [:flag-incident-concern]
+
+  :actor/hard-checks [:assignment-verified :effect-propose :scope-exclusion]
+  :actor/scope-exclusion-phrasing :action-not-noun
+  :actor/scope-excluded-terms ["dispatch a guard to respond" "dispatch to respond"
+                                "authorize the use of force" "authorize use of force"
+                                "use-of-force authorization"
+                                "authorize detention" "authorize an arrest"
+                                "place under arrest" "detain the individual"
+                                "現場へ急行させる" "現場への出動を指示"
+                                "実力行使を許可" "武力行使を許可"
+                                "拘束を許可" "逮捕を許可"]
+  :actor/self-trip-regression-test :guardops.governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-patrol-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-patrol-record :schedule-guard-shift
+                                               :coordinate-equipment-supply}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-patrol-record :schedule-guard-shift
+                                         :coordinate-equipment-supply :flag-incident-concern}
+      :auto #{:log-patrol-record :schedule-guard-shift :coordinate-equipment-supply}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 43 :assertions 127 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :governor-self-trip-regression :advisor-shapes
+                  :phase-rollout :integration :store-contract]
+  :test/simulator :guardops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-8010"
+  :registry/business-id "cloud-itonami-8010"
+  :registry/required-technologies [:identity :forms :dmn :bpmn :audit-ledger]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
