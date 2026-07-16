@@ -3121,7 +3121,22 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; re-fetched origin/main registry.edn (via git-trees/blobs API)
       ;; immediately before this corrective test-file edit, not
       ;; assumed: {:total 649 :spec 203 :blueprint 0 :implemented 446}.
-      (is (= 446 (:implemented m))))))
+      ;; 446 -> 447: this promotion's own cloud-itonami-isic-4923
+      ;; (Freight transport by road, :spec -> :implemented, +1, Wave 2
+      ;; TRANSPORT batch) -- RoadFreightDispatchAdvisor ⊣
+      ;; RoadFreightDispatchGovernor road-freight dispatch/logistics-
+      ;; coordination actor, distinct from the separate, untouched
+      ;; {:id "492"} group entry and the already-:implemented
+      ;; {:id "4920"} "Community Freight Transport" entry, PLUS any
+      ;; concurrent sibling fleet agents' own promotions folded into
+      ;; this same live recompute (not all individually this
+      ;; promotion's own work; corroborated here only to keep this
+      ;; shared hot test file truthful). Live-recomputed via
+      ;; `(kotoba.industry/maturity-summary)` against a freshly
+      ;; re-fetched origin/main registry.edn (via Contents API)
+      ;; immediately before this test-file PUT, not assumed:
+      ;; {:total 649 :spec 202 :blueprint 0 :implemented 447}.
+      (is (= 447 (:implemented m))))))
 
 (deftest cloud-itonami-isic-4782-is-implemented
   (testing "cloud-itonami-isic-4782 (Retail sale via stalls and markets
