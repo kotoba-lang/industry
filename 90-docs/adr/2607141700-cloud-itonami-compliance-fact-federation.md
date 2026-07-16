@@ -3254,6 +3254,39 @@ fallback（`pages: "1"`）で画像レンダリングし直接読んで確認。
 最薄という判断からトルコを新規開拓、3軸すべてが実データ・個別
 検証済み・捏造なしで成長を継続している。
 
+## Addendum (2026-07-17, /loop tick 114 — 国軸39件目(TUR) — トルコが国軸+自治体軸の2軸に到達、業界団体軸は未着手のまま正直に報告)
+
+`cloud-itonami-iso3166-tur`に`statute.facts`を新規namespaceとして
+追加・push
+([commit 4781386](https://github.com/cloud-itonami/cloud-itonami-iso3166-tur/commit/4781386))：
+
+tick113で検証済みの首都チェック（アンカラは1923年以来安定した
+首都、未解決の遷都問題無し）を再利用。
+
+- **Türk Ticaret Kanunu**（トルコ商法典、Kanun No. 6102）— 2011年
+  1月13日採択。mevzuat.gov.tr自身のPDFミラーは法番号・日付欄が
+  フォントサブセット化で判読不能な空白ボックスとして描画された
+  ため、adalet.gov.tr（法務省、公式政府ドメイン）の別ミラーPDFを
+  Read-toolの保存パスfallbackで直接読み、legibleに確認。
+- **Kişisel Verilerin Korunması Kanunu**（個人データ保護法、KVKK、
+  Kanun No. 6698）— 2016年3月24日採択、2016年4月7日官報Sayı
+  29677号公布。adalet.gov.tr PDFはタイトルのみlegibleで法番号・
+  日付欄はやはり判読不能だったため、mevzuat.gov.tr自身の`.doc`
+  ミラーをWebFetchで直接取得（PDFのフォントサブセット化問題を
+  形式変更で回避、legibleに全項目確認）。
+
+4 tests/9 assertions green（既存24 marketentry tests/81
+assertionsと合わせ全28 tests/90 assertions green）。142リポジトリ・
+820 factを統合。`jurisdiction TUR`クエリと、`ordinance/country`
+横断query（`[?e "ordinance/country" "TUR"]`）でtick113のAnkara
+自治体2件が正しくクロスリンクされることを確認——トルコは今回で
+国軸+自治体軸の2軸に到達したが、業界団体軸はまだ未着手であり、
+これを正直に報告する（前回のエジプトと同型の「2軸のみ」パターン）。
+
+現状: 国軸39件・業界団体軸38件(27業種)・自治体軸37件——114 tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。トルコの業界団体軸の空白は今後のtickに持ち越し。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
