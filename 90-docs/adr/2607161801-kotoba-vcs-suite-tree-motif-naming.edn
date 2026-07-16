@@ -1,0 +1,24 @@
+[{:adr/authoritative_for
+  ["kotoba-lang の VCS suite を『一本の木の一生』で読ませる命名規約（git エコシステム機能 ↔ 木の相 ↔ 和語名の対応表）"
+   "確定済みの改称: kotoba-fleet-vcs → kagami（鏡）、kotoba-rad → nekko（根）"
+   "未確定スロット: kotoba-git（部位 miki か、主体・行為 kikori/teire/soma/komori/ueki/kukunochi か）"
+   "命名 rename 移行の確立フロー（nekko 実績）と大規模消費者向け batched 移行方針"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/topic "kotoba-vcs-suite-tree-motif-naming"
+  :adr/related
+  ["adr-2607160005-kotoba-fleet-agent-vcs-west-successor"
+   "adr-2607072200-kotoba-git-kotoba-rad-content-addressed-vcs"
+   "adr-2607141700-cloud-itonami-git-native-business-cdci"
+   "adr-2607102200-kami-render-stack-deps-authority-rename"]
+  :adr/status "accepted (naming convention); kotoba-git name pending"
+  :adr/id "adr-2607161801-kotoba-vcs-suite-tree-motif-naming"
+  :adr/doc_type "adr"
+  :adr/last_verified "2026-07-16"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/date "2026-07-16"
+  :adr/decision-summary
+  "{:motif :one-tree-life-from-tane, :map {:tane :init-genesis, :nae :scaffold, :nekko [:radicle-identity :DONE], :miki-or-agent :git-object-model, :eda :branch, :koeda :topic-branch, :mata :fork, :tsugiki :merge, :tsubomi :pr-proposal, :hana :pr-review, :minori :cdci, :ha :blob, :kozue :head-tip, :nenrin :commit-history-ledger, :mori :radicle-p2p-network, :niwa [:github-hosting :mirror-demoted], :kagami [:fleet-manifest-projection :DONE], :tsuchi :storage-substrate-kotobase}, :five-functions {:radicle [:nekko :mori], :git :pending-name, :github :niwa, :cdci :minori, :pr [:tsubomi :hana :tsugiki]}, :git-name-candidates {:part [:miki], :agent-action [:teire :kikori :soma :komori :ueki :kukunochi]}, :status {:kagami :landed, :nekko :landed, :kotoba-git :name-pending-then-batched-59-consumer-migration}, :reserved-words true, :no-wholesale-rename true}"
+  :db/id -1
+  :adr/authoritative true
+  :adr/title "ADR-2607161801: kotoba-lang VCS suite — 一本の木をモチーフにした命名規約（tane から）"}]
