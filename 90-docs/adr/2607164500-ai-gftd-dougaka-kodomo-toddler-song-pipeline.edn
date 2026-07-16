@@ -1,0 +1,18 @@
+[{:db/id -1
+  :adr/id "adr-2607164500-ai-gftd-dougaka-kodomo-toddler-song-pipeline"
+  :adr/title "ADR-2607164500: ai-gftd-dougaka-kodomo — 幼児向けオリジナルアニメ・知育ソング動画生成パイプライン（yukkuri ベース）"
+  :adr/doc_type "adr"
+  :adr/topic "ai-gftd-dougaka-kodomo-toddler-song-pipeline"
+  :adr/status "accepted"
+  :adr/date "2026-07-16"
+  :adr/last_verified "2026-07-16"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["ai-gftd-dougaka-kodomo（幼児向け知育ソング動画）のパイプライン設計（song spec / 歌唱合成 / 拍同期ループアニメ / kids-safety hard gate / madeForKids 公開）"
+   "yukkuri アーキテクチャからの継承範囲（pure-planner + :exec 分離、renderer-mac ffmpeg fleet、D1 SSoT、translate/upload/analytics 群）と置換範囲（generate_script→song spec、紙芝居→拍同期ループアニメ、advisory score→kids-safety hard gate、話し声→歌唱合成）の切り分け"
+   "kids-safety gate の決定論チェック方針（loudness/尺/フラッシュ/語彙/COPPA metadata/IP類似。LLM 判定を gate に置かない）"]
+  :adr/related ["adr-2607170500" "adr-2607155500" "adr-2607162200" "adr-2607131645"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/body "新規 child repo orgs/gftdcojp/ai-gftd-dougaka-kodomo（private）。Cocomelon/ChuChu TV/Pinkfong/Infobells/El Reino Infantil 型の幼児向け知育ソング動画を 1 curriculum topic から自動生成。パイプライン: compose → generate-song（歌詞+メロディEDN+storyboard、決定論検証: 音域C4〜D5/反復率≥0.3/chorus必須/BPM70〜120）→ [synthesize-vocals ∥ generate-visual ∥ generate-character ∥ arrange-music] → compose-scene（拍同期ループアニメ plan、cutout layer + motion cue → ffmpeg filter graph）→ render-video（renderer-mac fleet 無改造流用）→ score-safety（HARD gate）→ localize（音節数維持の訳詞→言語別歌唱再合成、言語別チャンネル）→ publish（madeForKids=true 固定、cadence は ADR-2607162200 の 4 層分離流用）→ audit。歌唱 = VOICEVOX ソング API（/sing_frame_audio_query + /frame_synthesis）を murakumo voice API に /v1/audio/song として増設（ADR-2607131645 拡張）。視覚主経路 = 決定論 cutout ループアニメ（今日動く経路のみ）、seedance reference-to-video（ADR-2607170500）はヒーローショット限定の強化レーン（E2E 検証後に昇格）、character LoRA は ADR-2607155500 Phase 1 依存。kids-safety gate は決定論のみ: loudness -20〜-12 LUFS / peak ≤-1dBTP、尺 60〜300s（コンピレーション 900〜3600s）、フラッシュ ≤3/秒、未知語率 ≤0.2、madeForKids必須/外部リンク禁止/VOICEVOXクレジット必須、IP類似 flags。全 green auto-publish（恒久承認範囲）、flag は hold + owner escalate。キャラはオリジナル 4 キャスト（メロ/ポポ/ミミ/ガオ、characters.edn SSoT）、メロディはオリジナルまたは PD 童謡編曲のみ。BMC は standalone パターン（共有 base datoms 登録はオーナー判断）。scaffold は pure-planner core（kodomo.song/safety/pipeline + characters/curriculum EDN、nbb 17 tests green）を同時 push。Phase A: E2E 1 本手動（歌唱品質 go/no-go）→ Phase B: compose-scene/arrange-music/D1/appview/song API 公開化 → Phase C: cadence 定期投稿/localize/コンピレーション/LoRA・seedance 昇格判定。Alternatives: yukkuri 内 5ch 追加（稼働 4ch の回帰リスクで不採用）/ seedance 主経路（コスト $0.18/秒・未検証で強化レーンに格下げ）/ 商用歌唱 SaaS（法的グレーで Phase A 不合格時のみ再検討）。"}]
