@@ -694,3 +694,44 @@ pass、署名 receipt `0a1f37f78fa4`/`ab6db0608952`**。GHA workflow は署名�
 **残**: hinshitsu ゲートを kototama capability-sandbox で実行する部分
 （現状は pin 到達性チェックのみ、receipt の check は hinshitsu evidence の
 {:name :outcome} 形と互換）。
+
+## Addendum (2026-07-16, same day): native CI 品質ゲート（capability-bound）
+
+native CI の残りだった「ゲート実行」を実装（kotoba-fleet-vcs `804b60e3de04`、
+pin seq 15）。`fleet ci-verify --gate 'name=cmd' [--gate-timeout ms]` が品質
+ゲートを **capability-bound（timeout budget = kototama HostCaps の analog）**で
+実行し、**hinshitsu-evidence 互換の check**（`{:hinshitsu/status
+:hinshitsu/checks}`、hinshitsu を require せず plain-map shape で interop —
+ops-runner / kotoba-rad.announce と同じ疎結合原則）を署名 receipt に食わせる。
+**dogfood**: repo 自身のテストスイートを gate に走らせ pass（receipt に
+`gate/tests exit 0`）、`exit 3` の gate は receipt :fail + exit 1 —
+**ゲートが実際に gating する**ことを両パスで確認。**残**: kototama Chicory
+tender による **literal WASM 封じ**（現状は timeout-bound subprocess）と
+hinshitsu.mokushi（visual regression）ゲート — どちらも JVM 側 follow-up。
+これで fleet native CI は「verify → 署名 content-addressed receipt（required
+⊆ passed）+ capability-bound quality gate」まで到達し、GitHub Actions の
+揮発ログを durable attestation に置換する形が一通り揃った。
+
+## Addendum (2026-07-16, same day): 命名 — kotoba-fleet-vcs → kagami（鏡）、nekko/manuke は保留
+
+kotoba-lang らしい和名へ改称（オーナー指示）。**kotoba-fleet-vcs → `kagami`
+（鏡）** を実施: west.yml は fleet-db の projection = **鏡像**そのもので、
+この repo が「真の状態(fleet-db)を映す鏡」という含意。GitHub rename 済み
+（`kotoba-lang/kagami`、旧名から redirect 保持）、内部名(package.json/README)・
+repos.edn extra-projects・west.yml エントリ・fleet-db・ローカル checkout を
+`orgs/kotoba-lang/kagami` に更新、fleet-db は west.yml と byte 一致で再 import。
+**唯一の消費者が superproject manifest だったため低リスク**（今日作成した repo）。
+
+**関連 2 repo の改称は blast radius が大きいため保留し別 ADR で段階移行する**
+（同日実測）:
+- **kotoba-rad → `nekko`（根っこ）候補**: deps.edn 消費者 3件（p2p /
+  cloud-itonami / network-isekai-m7-visual）。中規模。
+- **kotoba-git → `manuke`（間抜け）候補**: git の自虐命名（Linus: "the stupid
+  content tracker" / "egotistical bastard"）へのオマージュとして秀逸だが、
+  **deps.edn 消費者 59件**（network-isekai 系ほぼ全部 + cloud-itonami +
+  etzhayyim、多くが `:local/root` パス参照で GitHub redirect が効かない）+
+  ADR 26本 + 本番 CD/CI（ADR-2607141700）依存。casual rename は不可、
+  deps.edn 一括更新 + 回帰テスト付きの移行プロジェクトが必要。
+両者はオーナー承認のもと専用 ADR（新 repo 作成 → redirect → batched deps.edn
+更新 → ADR 参照更新 → 旧 repo retire）で実施する。本 ADR 内の既存 addendum の
+`kotoba-fleet-vcs` 表記は歴史的記録としてそのまま残す（現行名は kagami）。

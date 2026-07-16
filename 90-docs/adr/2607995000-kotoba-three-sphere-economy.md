@@ -266,3 +266,52 @@ Cloudflare KV + witness seam のままでよい。
 - ADR-2607093100(x402)— 労圏への USDC 入口。是正3 で credits fold に合流。
 - ADR-2607110300(decentralization roadmap)— 正直なラベリング原則と
   kekkai value governance。本ADRの前提。
+
+## Addendum (2026-07-16) — 実装是正 1–6 完了
+
+本ADRが「設計のみ」として列挙した実装是正 1–6 は、以下の commit で全て main に
+着地した(各リポジトリの west pin も同日前進済み):
+
+1. **是正1(spend docstring の「(or fiat payout)」削除)**: `kotoba-lang/murakumo`
+   `5d521e5`(merge `a1dfd41`)。docstring は「NON-redeemable prepaid usage claim、
+   fiat-payout 経路は本ADR再訪なしに追加禁止」と膜規則を明文化する形に置換。
+2. **是正2(relay_server の第2の split 定数解消)**: 同 commit `5d521e5`。
+   `swarm-run-record` が `credits/default-protocol-frac`(settle と同じ named
+   constant)を使う形に統一。
+3. **是正3(x402 収益の credits fold 合流)**: `gftdcojp/cloud-murakumo`
+   `8a06668`(merge `f58d710`)。`x402_ledger.cljc` が settled x402 リクエストを
+   /infer/runs の run record に変換し、同じ credits fold に合流させる。
+4. **是正4(Stripe checkout → /itonami/topup webhook 結線)**: `gftdcojp/
+   cloud-murakumo` `15f3d0c`(merge `3649ecb`)。`stripe_webhook.cljc`(署名
+   検証付き)+ site_worker 結線 + テスト。
+5. **是正5(engi.stake :roles タグ)**: `kotoba-lang/engi` `14effc7`(merge
+   `77f0287`)。bond map を `{did → {:amount N :roles #{:ordering :recompute}}}`
+   に拡張(§5 の統一 bond 市場)。
+6. **是正6(署名 gate、3点)**:
+   - `/infer/runs`・`/infer/spend` の CACAO/service-token gate:
+     `gftdcojp/local-murakumo` `f167987`(merge `d6eea37`、`write_gate.cljc`。
+     未設定 token は「全許可」に fallback しない fail-closed)。client 側 bearer
+     送信: `kotoba-lang/murakumo` `51340a3` / `gftdcojp/cloud-murakumo` `a5c7f39`。
+   - receipt の actor 署名必須化: `kotoba-lang/murakumo` `cec4928`。
+     `credits/receipt` は `:sign-fn` + `:signer` 必須(fail-closed)、signer は
+     hash される body 内、`:receipt/sig` は hashed body を署名(`:receipt/v 2`)。
+   - `ledger/witness` の quorum 結線: 同 `cec4928` の
+     `murakumo.overlay.witness-ledger/ledger-quorum-fn` —
+     `cloud-murakumo.ledger.witness/witness-run` が注入必須としてきた
+     `:quorum-fn` を、実 witness-quorum(overlay QUIC pre-commit、
+     `witness-write/write-record-with-real-quorum!`)で構築する factory。
+     witness_treasury.clj(ADR-2607110300 Phase 3)の経済台帳版で、実 2-witness
+     localhost QUIC quorum の E2E テスト付き。
+
+正直な残課題(本 addendum は「実装が存在し main に居る」ことの記録であり、
+「本番で常時実行されている」ことの主張ではない):
+
+- `credits/receipt` v2 の本番呼び出し元はまだ無い(workspace 全体 grep で
+  呼び出しゼロ)。receipt 発行の本番配線は将来作業 — ただし関数レベルで
+  無署名 receipt は構造的に生成不能になった。
+- `ledger-quorum-fn` は結線 factory + E2E テストまで。cloud-murakumo 制御
+  プレーンからの本番起動(どの closed run を witness するかの運用)は未配線。
+- gate の実効性は Worker 環境変数(`MURAKUMO_SERVICE_TOKEN` /
+  `STRIPE_WEBHOOK_SECRET`)のデプロイ設定に依存する(ops 確認は別作業)。
+- witness quorum は依然として単一オペレータ fleet の crash-fault tolerance
+  であり BFT ではない(ADR-2607110300 の正直なラベリング原則は不変)。
