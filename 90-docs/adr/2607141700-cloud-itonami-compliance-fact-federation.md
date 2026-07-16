@@ -2838,6 +2838,48 @@ tests/9 assertions green（既存marketentry 24 tests/81 assertions
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-16, /loop tick 104 — 自治体軸34件目(Jakarta, IDN) — ヌサンタラ遷都という現在進行中の係争を事前確認)
+
+`cloud-itonami-municipality-idn-jakarta`を新規GitHubリポジトリと
+してscaffold・push
+([commit b971c21](https://github.com/cloud-itonami/cloud-itonami-municipality-idn-jakarta/commit/b971c21))：
+
+jdih.jakarta.go.id（ジャカルタ特別州自身の法令情報ネットワーク）
+から2件を直接確認:
+
+- **Governor Regulation Number 101 of 2017**（外国公館への地方税
+  免除）— サイト自身の英訳PDF表紙で直接タイトル・番号確認。正確な
+  日にちは確認したページでは見つからず、年のみ（2017年）で記録。
+- **Regional Regulation Number 4 of 2019**（2013年廃棄物管理条例
+  第3号の改正）— サイト自身のHTML規則詳細ページで確立日
+  （2019年9月23日）・公布日（2019年9月26日）まで正確に直接確認。
+
+**首都チェックの新パターン**: 着手前に、インドネシアの憲法裁判所が
+現時点でジャカルタが依然として正式な首都であり、ヌサンタラ
+（東カリマンタンの新首都計画）ではないと確認済みであることを
+WebSearchで明示的に検証した。JPN/DEU/BRAの確定済み史的首都バグ
+事例や、THA/VNMの「歴史的に移動したが現在は一貫している」事例とは
+異なり、ヌサンタラ遷都は**現在進行中・係争中・未完了のプロセス**
+（2025年の方針再分類で2028年までに「政治的首都」としてのみ目標化、
+2024〜2026年で新首都向け国家予算が85%削減）——Wikidataの史的
+一貫性だけでなく現在の報道・法的地位も確認する必要があった、
+首都チェック規律の新たなバリエーション。
+
+**回復手法の知見**: 2件目ではPDF表紙を目視確認する代わりに、
+ポータル自身のHTML詳細ページ（jdih.jakarta.go.id/dokumen/
+detail/3586）を取得したところ確立日・公布日まで正確に得られた
+——1件目のPDF経由アプローチでは年精度しか得られなかったのと対照的。
+今後インドネシアのJDIH系法令ポータルではまずHTML詳細ページ経路を
+試す価値がある。
+
+4 tests/11 assertions green。133リポジトリ・800 factを統合。
+`"ordinance/topic" "taxation"`での横断queryで`[nairobi jakarta]`が
+正しく取得できることを確認。
+
+現状: 国軸35件・業界団体軸35件(26業種)・自治体軸34件——104tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
