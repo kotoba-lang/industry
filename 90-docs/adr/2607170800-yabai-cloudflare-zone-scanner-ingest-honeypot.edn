@@ -1,0 +1,22 @@
+[{:adr/authoritative_for
+  ["yabai の Cloudflare zone HTTP-scanner ingest（14 operator-owned zone を GraphQL httpRequestsAdaptiveGroups で sweep し :indicator/* :scanner IOC 化）"
+   "検出ロジックの single source of truth 化: ingest.cljc の probe-path?/scanner-tier/bridge-cf-scanners/merge-many（portable, test でピン留め）"
+   "cf_sweep.cljc の live collector（sweep-live!, G7-gated, curl subprocess POST）+ offline rebuild-merged!（全 data/*.kotoba.edn を merged グラフに畳み込む）"
+   "公開済み IOC が merged グラフに未反映だった孤立ギャップの解消（merged 3→531 indicator、autorun heartbeat が :cti/ioc-category-load :scanner を永続化）"
+   "hand-python 生成 IOC ファイル（scanner 221+8）を tool 再生成版（488 IP、機械再現可能）へ統合、honeypot posture（block しない）"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/topic "yabai-cloudflare-zone-scanner-ingest-honeypot"
+  :adr/related
+  ["adr-2605301400"]
+  :adr/status "accepted, implemented, verified end-to-end"
+  :adr/id "adr-2607170800-yabai-cloudflare-zone-scanner-ingest-honeypot"
+  :adr/doc_type "adr"
+  :adr/last_verified "2026-07-16"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/date "2026-07-16"
+  :adr/decision-summary
+  "{:goal \"scanner traffic を全 kotoba Cloudflare zone から収集し :scanner IOC として yabai に登録・公開、honeypot として自走させる（block しない）\", :problem {:orphaned-iocs \"公開済み scanner/email/sms IOC が passive-dns.merged.kotoba.edn（analyze/autorun が読む）に畳み込まれておらず孤立、merged は indicator 3 件のみ\" :ad-hoc \"手3・4 の収集は python one-off で yabai コードを通らず再現性・自走性なし\"}, :decision {:bridge \"ingest.cljc に probe-path?/scanner-tier/bridge-cf-scanners/merge-many を portable 追加（single source of truth）\" :collector \"cf_sweep.cljc sweep-live!（G7-gated, 14 zone GraphQL sweep, curl subprocess, shared-egress 2a06:98c0:3600::103 除外）\" :rebuild \"rebuild-merged! が seed+全 data/*.kotoba.edn を merge-many で畳み込み merged 再生成\" :consolidation \"hand-python 221+8 を削除し tool 生成 488 IP に一本化\" :fleet \"live sweep は G7 gated ゆえ heartbeat に入れず yabai_cf_sweep cron cell として fleet.toml（murakumo repo）に追加は follow-up\"}, :verification {:tests \"test_cf_scanners.cljc 7 tests/29 assertions green, test_merge_rows 非回帰\" :sweep \"sweep-live! 2026-07-13..16 = 28621 obs → 488 scanner IOC\" :merged \"3→531 indicator（488 scanner + 40 phishing + benign/scam/tor-exit）\" :heartbeat \"run-cycle が [:db/add cti-cat-scanner :cti/ioc-category-load :scanner :cti/indicators 488] を append-only ログに永続化、G6/G10 保持（access_encrypted 1, plaintext 0）\"}, :runtime-choice {:bb-cljc-not-nbb \"yabai methods/test harness は bb 上、bridge(.cljc) を再利用するため同一ランタイム。CLAUDE.md『リポジトリ運用ツールは bb が正本』に整合\"}, :honeypot true, :no-block true, :out-of-scope [:waf-block :per-ip-rdap-in-auto-path :fleet-toml-edit-in-murakumo-repo :run_tests.sh-classpath-repair], :files {:new [\"methods/cf_sweep.cljc\" \"methods/test_cf_scanners.cljc\"] :modified [\"methods/ingest.cljc\"] :generated [\"data/passive-dns.merged.kotoba.edn\" \"data/http-probe-scanners-kotoba-20260713-20260716.kotoba.edn\"] :removed [\"data/http-probe-scanners-kotoba-202607.kotoba.edn\" \"data/http-probe-scanners-shinshi-202607.kotoba.edn\"]}, :repo \"orgs/etzhayyim/com-etzhayyim-yabai\"}"
+  :db/id -1
+  :adr/authoritative true
+  :adr/title "ADR-2607170800: yabai Cloudflare zone HTTP-scanner ingest (kotoba estate honeypot)"}]
