@@ -88,20 +88,20 @@
     (is (= :implemented (industry/maturity "5110"))))
   (testing "cloud-itonami-isic-4911, now implemented, is :implemented (live-state corroboration)"
     (is (= :implemented (industry/maturity "4911"))))
-  (testing "cloud-itonami-isic-5011, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "5011"))))
+  (testing "cloud-itonami-isic-5011, promoted to :implemented by a CONCURRENT sibling fleet agent (not this promotion's own work -- corroborated here only to keep this shared hot test file truthful; live-state corroboration)"
+    (is (= :implemented (industry/maturity "5011"))))
   (testing "cloud-itonami-isic-6020, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "6020"))))
   (testing "cloud-itonami-isic-6010, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "6010"))))
-  (testing "cloud-itonami-isic-4912, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "4912"))))
+  (testing "cloud-itonami-isic-4912, promoted to :implemented by a CONCURRENT sibling fleet agent (not this promotion's own work -- corroborated here only to keep this shared hot test file truthful; live-state corroboration)"
+    (is (= :implemented (industry/maturity "4912"))))
   (testing "cloud-itonami-isic-5224, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "5224"))))
   (testing "cloud-itonami-isic-5223, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "5223"))))
-  (testing "cloud-itonami-isic-5222, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "5222"))))
+  (testing "cloud-itonami-isic-5222, promoted to :implemented by a CONCURRENT sibling fleet agent (not this promotion's own work -- corroborated here only to keep this shared hot test file truthful; live-state corroboration)"
+    (is (= :implemented (industry/maturity "5222"))))
   (testing "cloud-itonami-isic-5221, promoted to :implemented (land-transport-support operations-coordination actor deployed)"
     (is (= :implemented (industry/maturity "5221"))))
   (testing "cloud-itonami-isic-5229, freshly published, is also :blueprint (live-state corroboration)"
