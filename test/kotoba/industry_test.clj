@@ -124,8 +124,8 @@
     (is (= :implemented (industry/maturity "3020"))))
   (testing "cloud-itonami-isic-8130, promoted to :implemented (Landscape Care Operations Coordination actor deployed)"
     (is (= :implemented (industry/maturity "8130"))))
-  (testing "cloud-itonami-isic-8121, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "8121"))))
+  (testing "cloud-itonami-isic-8121, promoted to :implemented by a CONCURRENT sibling fleet agent (not this promotion's own work -- corroborated here only to keep this shared hot test file truthful; live-state corroboration)"
+    (is (= :implemented (industry/maturity "8121"))))
   (testing "cloud-itonami-isic-3312, machinery-repair actor, is now :implemented (live-state corroboration)"
     (is (= :implemented (industry/maturity "3312"))))
   (testing "cloud-itonami-isic-3313, promoted from :blueprint, is also :implemented (live-state corroboration)"
@@ -134,16 +134,16 @@
     (is (= :implemented (industry/maturity "1811"))))
   (testing "cloud-itonami-isic-1812, implemented, is :implemented (live-state corroboration)"
     (is (= :implemented (industry/maturity "1812"))))
-  (testing "cloud-itonami-isic-8220, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "8220"))))
+  (testing "cloud-itonami-isic-8220, promoted to :implemented by a CONCURRENT sibling fleet agent (not this promotion's own work -- corroborated here only to keep this shared hot test file truthful; live-state corroboration)"
+    (is (= :implemented (industry/maturity "8220"))))
   (testing "cloud-itonami-isic-8219, freshly published, is also :blueprint (live-state corroboration)"
     (is (= :blueprint (industry/maturity "8219"))))
   ;; cloud-itonami-isic-7911 was here as ":blueprint (live-state
   ;; corroboration)" -- promoted to :implemented by this promotion's
   ;; own work; superseded by the dedicated detailed corroboration block
   ;; below (`maturity-summary-counts-tiers`'s own testing form).
-  (testing "cloud-itonami-isic-7912, freshly published, is also :blueprint (live-state corroboration)"
-    (is (= :blueprint (industry/maturity "7912"))))
+  (testing "cloud-itonami-isic-7912, promoted to :implemented by a CONCURRENT sibling fleet agent (not this promotion's own work -- corroborated here only to keep this shared hot test file truthful; live-state corroboration)"
+    (is (= :implemented (industry/maturity "7912"))))
   (testing "cloud-itonami-isic-7710 (Renting and leasing of motor vehicles, NOT a fresh scaffold -- `gh api repos/cloud-itonami/cloud-itonami-isic-7710` confirmed a PRE-EXISTING repo already at :blueprint tier (CODE_OF_CONDUCT.md/CONTRIBUTING.md/GOVERNANCE.md/LICENSE/README.md/SECURITY.md/blueprint.edn/docs/ only, from an earlier bulk-scaffolding pass, no deps.edn/src/test) -- this work ADDED the missing deps.edn/src/test module set on top of that existing boilerplate rather than re-scaffolding (docs kept, not recreated); identity ({:id \"7710\" :name \"Renting and leasing of motor vehicles\"}) independently re-verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution -- unambiguous, no truncation; distinct from the separate, redundant 3-digit group registry entry {:id \"771\"} (also named \"Renting and leasing of motor vehicles\", left untouched, still :spec) and from cloud-itonami-isic-4920 [the fleet's own road-freight CARRIER, which moves goods under its own drivers -- a rental company instead hands the vehicle to the RENTER, who drives it]; vehiclerentalops.* module (advisor/governor/operation/phase/store/sim) mirroring cloud-itonami-isic-7722's [Renting of video tapes and disks] verified vidrentalops.* module shape module-for-module; closed four-op allowlist, all :effect :propose (log-rental-record/schedule-fleet-operation/flag-vehicle-safety-concern/coordinate-fleet-restock); THREE HARD governor checks (permanent, un-overridable by any human approval) -- account-unverified (the target rental-account/vehicle record must exist AND be independently :registered?/:verified? in the store, re-derived from the account's own store record, never from the proposal's own self-report), effect-not-propose, and scope-exclusion/op-not-allowed (ANY proposal touching finalizing a driver-eligibility override or finalizing a vehicle-safety-clearance decision -- renting out a vehicle with a known defect -- is a HARD, PERMANENT block, per this fleet's Wave 4 person-facing-service safety guardrail, ADR-2607152500; an op outside the closed four-op allowlist folds into the same check); scope-excluded terms are deliberately phrased as the finalization/execution ACTION ('finalize the driver-eligibility override', 'finalize the vehicle-safety clearance'), never a bare noun ('eligibility'/'driver'/'safety'/'clearance' alone) -- this fleet's own known bare-noun self-tripping bug class avoided from the start, since :flag-vehicle-safety-concern's entire legitimate purpose is to talk ABOUT mechanical-defect/recall/damage concerns using exactly those bare nouns; a dedicated regression test (default-mock-advisor-proposals-never-self-trip-scope-exclusion in governor_test.clj) independently confirms all four default proposal generators, for a clean registered+verified account, never trip :scope-excluded and never HARD-hold; :flag-vehicle-safety-concern ALWAYS escalates to human sign-off and is never a member of any phase's :auto set, at any phase (two independent layers agree: vehiclerentalops.governor's own always-escalate-ops AND vehiclerentalops.phase's own phase table); real langgraph-clj StateGraph (intake->advise->govern->decide->commit|hold|request-approval) with interrupt-before #{:request-approval} for human-in-the-loop resume, not a stub; fully portable .cljc with no JVM-only interop anywhere in src/ (mock-only advisor); 40 tests / 119 assertions green (clojure -M:test and clojure -M:dev:test), independently re-verified against a fresh clone (plus fresh kotoba-lang/langgraph and kotoba-lang/langchain siblings); clj-kondo 0 errors / 0 warnings; registry.edn's own \"7710\" -> :implemented change (adding the previously-absent :maturity key explicitly -- this entry had NO :maturity key before this edit, resolving to :blueprint only via the (:repo industry) fallback in maturity-of; also corrected :business-id from the stale, inconsistently-shaped \"cloud-itonami-7710\" to \"cloud-itonami-isic-7710\", matching every sibling implemented entry's own business-id shape; :repo/:required-technologies/:optional-technologies/:operating-states were already correct and left unchanged) landed via a Contents-API single-file PUT (sha-checked optimistic concurrency, immediately re-fetched fresh content before the PUT per this fleet's hot-contention discipline, exact-block edit verified via an exact old/new substring occurrence count PLUS sample-verified against 7722/7730/771-group entries also intact, no mojibake detected, landed on the first attempt), commit 68d5b3f587d92d0898ca5291ee5c9be13fdc3c80; superproject ADR-2650000000 (com-junkawasaki/root, 90-docs/adr/2650000000-cloud-itonami-isic-7710-motor-vehicle-rental-coverage.md/.edn)) is also :implemented"
     (is (= :implemented (industry/maturity "7710"))))
   (testing "cloud-itonami-isic-7721 (Renting and leasing of recreational and sports goods -- skis, bicycles, watersports and camping equipment -- an UNUSUAL case like siblings 5011/5222/5223/5224/5229/4912/6020/6010/7710/8010/8020/8030: NOT a fresh scaffold, `gh api repos/cloud-itonami/cloud-itonami-isic-7721` confirmed a PRE-EXISTING repo already at :blueprint tier (CODE_OF_CONDUCT.md/CONTRIBUTING.md/GOVERNANCE.md/LICENSE/README.md/SECURITY.md/blueprint.edn/docs/ only, from an earlier bulk-scaffolding pass, no deps.edn/src/test) -- this work ADDED the missing deps.edn/src/test module set on top of that existing boilerplate rather than re-scaffolding (docs kept, not recreated); identity ({:id \"7721\" :name \"Renting and leasing of recreational and sports goods\"}) independently re-verified against a fresh clone before any work began, per this fleet's ID/name-mismatch caution -- unambiguous, no truncation; distinct from siblings 7710 [motor vehicles, built by a concurrent sibling agent in the same batch], 7722 [video tapes and disks, already landed] and 7729 [other personal/household goods, built by a sibling agent in the same batch], per this repo's own pre-existing README `Scope note`; recreationalrentalops.* module (store/advisor/governor/phase/operation/sim) mirroring cloud-itonami-isic-7730's [Machinery/equipment rental] verified module shape module-for-module (equiprentalops.* -> recreationalrentalops.*, a ski set/trail bike/inflatable kayak demo directory in place of construction/event equipment); closed four-op allowlist, all :effect :propose (:log-rental-record/:schedule-fleet-operation/:coordinate-fleet-restock/:flag-equipment-safety-concern); THREE HARD governor checks (permanent, un-overridable by any human approval), per the Wave 4 person-facing-service safety guardrail (ADR-2607152500) -- asset-unverified (the target rental-asset record must exist AND be independently :registered?/:verified? in the store, re-derived from the store every time, never from the proposal's own self-report), effect-not-propose, and scope-exclusion (folds in op-not-allowed) that permanently blocks any proposal touching directly finalizing an equipment-safety-clearance decision (e.g. certifying a returned ski set/bike/kayak safe to re-rent without inspection) or overriding an equipment-safety-authority decision -- no such op exists in the allowlist at all, so this is pure defense-in-depth; scope-excluded terms are deliberately phrased as the finalization/execution ACTION (\"certify safe to re-rent without inspection\"/\"finalize the safety clearance\"/\"override the equipment safety authority\"), never a bare noun (\"safety\"/\"clearance\" alone) -- this fleet's own known bare-noun self-tripping bug class avoided from the start, with a dedicated regression test (default-mock-advisor-proposals-never-self-trip-scope-exclusion, parameterized over all four allowlisted ops across six realistic patches, in both advisor_test.clj and governor_test.clj) guarding against recurrence; :flag-equipment-safety-concern ALWAYS escalates to human sign-off and is never a member of any phase's :auto set, at any phase (two independent layers agree: recreationalrentalops.governor's own always-escalate-ops AND recreationalrentalops.phase's own phase table, the latter exercised directly by a dedicated structural test iterating the phases table itself); a :coordinate-fleet-restock proposal above a $2000 estimated-cost threshold also always escalates, regardless of confidence; real langgraph-clj StateGraph (intake->advise->govern->decide->commit|hold|request-approval) with interrupt-before #{:request-approval} for human-in-the-loop resume, not a stub; fully portable .cljc with no JVM-only interop anywhere in src/ (mock-only advisor); 49 tests / 160 assertions green (`clojure -M:dev:test`), independently re-verified against a fresh clone (plus fresh kotoba-lang/langgraph and kotoba-lang/langchain siblings); `clojure -M:lint` (clj-kondo) 0 errors / 0 warnings; `clojure -M:dev:run` (recreationalrentalops.sim demo) walked all scenarios without error; registry.edn's own \"7721\" -> :implemented change (adding the previously-absent :maturity key explicitly -- this entry had NO :maturity key before this edit, resolving to :blueprint only via the (:repo industry) fallback in maturity-of; :repo/:business-id were already correct and left unchanged [:business-id \"cloud-itonami-7721\" already matched the repo's own pre-existing blueprint.edn :itonami.blueprint/id], as was :required-technologies/:operating-states -- a deliberately minimal, exact-block diff) landed via a Contents-API single-file PUT (sha-checked optimistic concurrency, immediately re-fetched fresh content before the PUT per this fleet's hot-contention discipline, exact old/new substring occurrence count verified as 1 PLUS sample-verified against 7722/7730/3512 entries also intact, no mojibake detected, landed on the first attempt), commit 093014c80ae39eb12358b514465177ac0b34fedd; superproject ADR-2645772100 (com-junkawasaki/root, 90-docs/adr/2645772100-cloud-itonami-isic-7721-recreational-goods-rental-coverage.md/.edn); this test-file corrective PUT itself made zero net tally change (:blueprint/:implemented counts already correctly at 6/411 from a concurrent sibling agent's own prior corrective edit, live-recomputed and confirmed unchanged immediately before this PUT, not assumed)) is also :implemented"
@@ -589,15 +589,21 @@
       ;; test-file edit, not assumed.
       ;; 5 -> 4: this promotion's own cloud-itonami-isic-8130
       ;; (:blueprint -> :implemented, -1, adding the previously-absent
-      ;; :maturity key explicitly); the other three targets of this same
-      ;; blueprint-tier cleanup batch (7912/8219/8220) remain nil-
-      ;; maturity at this snapshot -- 8121's own registry.edn entry also
-      ;; still has no :maturity key live, despite that sibling's own ADR
-      ;; claiming the promotion, so it is NOT counted as closed here;
-      ;; live-recomputed via `(kotoba.industry/maturity-summary)` against
-      ;; a freshly re-fetched origin/main registry.edn immediately before
-      ;; this test-file edit, not assumed.
-      (is (= 4 (:blueprint m)))
+      ;; :maturity key explicitly); live-recomputed via
+      ;; `(kotoba.industry/maturity-summary)` against a freshly
+      ;; re-fetched origin/main registry.edn immediately before that
+      ;; test-file edit, not assumed.
+      ;; 4 -> 1: three CONCURRENT sibling fleet agents' own promotions
+      ;; (cloud-itonami-isic-7912/8121/8220, all -> :implemented) landed
+      ;; in the same fast-moving window as this promotion's own work (not
+      ;; this promotion's own work, corroborated here only to keep this
+      ;; shared hot test file truthful) -- only cloud-itonami-isic-8219
+      ;; remains nil-maturity (fallback :blueprint) at this snapshot, the
+      ;; last open target of this same 6-repo blueprint-tier cleanup
+      ;; batch; live-recomputed via `(kotoba.industry/maturity-summary)`
+      ;; against a freshly re-fetched origin/main registry.edn
+      ;; immediately before this test-file edit, not assumed.
+      (is (= 1 (:blueprint m)))
       ;; 17 -> 15: this promotion's own cloud-itonami-isic-5223 -1,
       ;; plus -1 from the concurrent sibling cloud-itonami-isic-5229
       ;; promotion landed in the same fast-moving window (see the
@@ -2895,14 +2901,21 @@ clone; superproject ADR-2628000000) is also :implemented"
       ;; registry.edn change (adding the previously-absent :maturity key
       ;; explicitly, +1); live-recomputed via
       ;; `(kotoba.industry/maturity-summary)` against a freshly
+      ;; re-fetched origin/main registry.edn immediately before that
+      ;; test-file edit, not assumed.
+      ;; 413 -> 416: three CONCURRENT sibling fleet agents' own
+      ;; promotions (cloud-itonami-isic-7912/8121/8220, all -> +1 each)
+      ;; landed in the same fast-moving window as this promotion's own
+      ;; work (not this promotion's own work, corroborated here only to
+      ;; keep this shared hot test file truthful); live-recomputed via
+      ;; `(kotoba.industry/maturity-summary)` against a freshly
       ;; re-fetched origin/main registry.edn immediately before this
-      ;; test-file edit, not assumed. Four entries remain nil-maturity
-      ;; (fallback :blueprint) at this snapshot: 7912/8121/8219/8220 --
-      ;; 8121's own ADR claims a promotion but its registry.edn entry
-      ;; still has no live :maturity key, so it is not yet closed --
-      ;; the other targets of this same blueprint-tier cleanup batch,
-      ;; expected to close out via concurrent sibling agents.
-      (is (= 413 (:implemented m))))))
+      ;; test-file edit, not assumed. Only cloud-itonami-isic-8219
+      ;; remains nil-maturity (fallback :blueprint) at this snapshot --
+      ;; the last open target of this same 6-repo blueprint-tier cleanup
+      ;; batch, expected to close out via its own concurrent sibling
+      ;; agent.
+      (is (= 416 (:implemented m))))))
 (deftest maturity-roadmap-reports-next-step
   (testing "an implemented entry is at maturity ceiling"
     (let [r (industry/maturity-roadmap "6310")]
