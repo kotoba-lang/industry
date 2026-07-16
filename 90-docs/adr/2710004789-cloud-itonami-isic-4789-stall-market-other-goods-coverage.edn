@@ -1,0 +1,86 @@
+[{:adr/id 2710004789
+  :adr/title "cloud-itonami-isic-4789 — Stall/Market Retail of Other Goods Operations Coordination"
+  :adr/status :accepted
+  :adr/date "2026-07-16"
+  :adr/scope [:kotoba-lang/industry :cloud-itonami/cloud-itonami-isic-4789]
+  :adr/references [2607121000 2700004781]
+
+  ;; Wave 2 actor (coordination/logistics/trade): market-stall retail of
+  ;; "other goods" (the catch-all vertical for goods not covered by
+  ;; sibling ISIC 4781 food/beverage/tobacco stalls or ISIC 4782
+  ;; textiles/clothing/footwear stalls) operations coordination-only
+  ;; (sales-record logging, stall-operation scheduling, supply-order
+  ;; coordination, compliance-concern flagging). Unlike sibling ISIC
+  ;; 4719, deliberately has NO separate supply-chain vendor-verification
+  ;; entity -- the stall/permit-verification check alone gates every op.
+
+  :actor/id :cloud-itonami-isic-4789
+  :actor/name "Stall/Market Other-Goods Retail Operations Coordinator"
+  :actor/isic-rev5 "4789"
+  :actor/domain :retail/stall-market-other-goods
+  :actor/wave 2
+  :actor/coordination? true
+  :actor/robotics? true
+
+  :actor/proposal-ops [:log-sales-record :schedule-stall-operation
+                       :coordinate-supply-order :flag-compliance-concern]
+  :actor/always-escalate-ops [:flag-compliance-concern]
+  :actor/cost-threshold-escalate-ops {:coordinate-supply-order 800}
+
+  :actor/hard-checks [:stall-verified :effect-propose :scope-exclusion :op-allowlist]
+  :actor/scope-excluded-terms ["finalize permit issuance" "issue the permit" "issuing the permit"
+                                "issue the stall permit" "issue a market permit"
+                                "grant the permit" "granting the permit"
+                                "approve the permit application" "finalize the stall permit"
+                                "resolve the dispute" "resolving the dispute"
+                                "adjudicate the dispute" "adjudicating the dispute"
+                                "settle the dispute" "settling the dispute"
+                                "rule on the dispute" "ruling on the dispute"
+                                "finalize the dispute resolution"
+                                "resolve the vendor dispute" "resolve the customer complaint"
+                                "許可証を発行した" "許可証の発行を確定" "出店許可を発行した"
+                                "出店許可の発行を確定" "許可証を交付した" "出店許可を交付した"
+                                "許可を付与した" "出店許可を付与した"
+                                "紛争を解決した" "紛争解決を確定" "苦情を裁定した"
+                                "苦情を解決した" "紛争の裁定を下した"]
+
+  ;; Self-trip-avoidance: every term above is phrased as the
+  ;; finalization/execution ACTION, never a bare noun -- this namespace's
+  ;; own :flag-compliance-concern default proposal legitimately discusses
+  ;; permit-legitimacy and counterfeit-goods concerns. A bare-noun term
+  ;; list (bare "許可"/"permit"/"紛争"/"dispute") would self-trip this
+  ;; actor's own core happy path on every single run. Regression test:
+  ;; governor-test/default-mock-advisor-proposals-never-self-trip-scope-exclusion.
+
+  ;; Governor-keyword collision caught and fixed pre-landing:
+  ;; :stall-market-governor was already claimed by sibling
+  ;; cloud-itonami-isic-4782's blueprint.edn. Renamed to
+  ;; :stall-market-other-goods-governor.
+  :blueprint/governor :stall-market-other-goods-governor
+  :blueprint/governor-collision-avoided [:stall-market-governor :market-stall-retail-governor]
+
+  :phase/rollout
+  {0 {:label "read-only" :writes #{} :auto #{}}
+   1 {:label "assisted-logging" :writes #{:log-sales-record} :auto #{}}
+   2 {:label "assisted-coordination" :writes #{:log-sales-record :schedule-stall-operation
+                                               :coordinate-supply-order}
+      :auto #{}}
+   3 {:label "supervised-auto" :writes #{:log-sales-record :schedule-stall-operation
+                                         :coordinate-supply-order :flag-compliance-concern}
+      :auto #{:log-sales-record :schedule-stall-operation :coordinate-supply-order}}}
+
+  :operation/entry-point :intake
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+
+  :test/counts {:total 49 :assertions 142 :failures 0 :errors 0}
+  :test/coverage [:governor-hard-checks :advisor-shapes :phase-rollout :integration
+                  :store-contract :scope-exclusion-self-trip-regression]
+  :test/simulator :stallmarketops.sim
+
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isic-4789"
+  :registry/business-id "cloud-itonami-isic-4789"
+  :registry/required-technologies [:robotics :identity :forms :dmn :bpmn :audit-ledger :retail]
+  :registry/operating-states [:intake :advise :govern :approve :commit :audit]
+
+  :db/id -1}]
