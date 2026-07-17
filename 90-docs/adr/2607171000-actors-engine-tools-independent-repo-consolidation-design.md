@@ -11,6 +11,30 @@ Proposed（設計・実現性評価）。オーナー指示「20-actors は全�
 | Phase 1 core | compat vendored コピー **844 件除去** + `COMPAT-MOVED.md`（844 行マッピング） | `13a9871` | ✅ landed |
 | Phase 2 #1 | 陳腐化 compat-corpus **py 装置 23 件 prune** + 死んだ bb.edn task 2 削除 | `d5969d5` | ✅ landed |
 | Phase 1 tail | 未移行 compat **181 件を kotoba-lang `com-<base>` として publish + west 登録 + vendored 除去**（149 + rate-limit 後の 32）。com-junkawasaki 登録 `96fc088`/`61d9054`/`deb10f3`、etzhayyim/root 除去 `402af5e`/`737d6a8` | pin `e959ac3` | ✅ landed |
+| Phase 2 #2 | **wave-bridges の dead py 生成器 139 件 prune**（全て存在しない絶対パスをハードコードし実行不能・参照ゼロ・生成物は 00-contracts に commit 済み） | `722059d` | ✅ landed |
+| Phase 2 #3 | **dead-hardpath py 4 件 prune**（gov ingest 3 + nsid-extractor、実行不能・参照ゼロ） | `d490dbb` | ✅ landed |
+
+### Phase 2 の境界（重要）— 安全 bulk dead-py prune は完了、残りは per-tool 判断
+
+**安全に bulk prune できる「実行不能を証明済み + 参照ゼロ」の dead py は出し尽くした**（compat 装置 23 + wave-bridges 139 + dead-hardpath 4 = **166 py**）。残り ~950 py は bulk 削除の対象にならない:
+
+- **意図的保持**: `lite_runner.py`（ADR-2606221900 の rollback runner、cljc test が byte-parity で参照）、`deploy_node.py`（両 runner を fleet node に stage する live SSH deploy）、その他 rollback/parity 系。
+- **ML/訓練系はそのまま温存**（owner 指示 2026-07-17）: `etzhayyim-py`・`e7m-*`・`baien-*` 訓練・distill 系（pyproject 付き self-contained、nbb 再実装は非現実的）。
+- **live ops/plumbing**: `70-tools/scripts` の sweep/ingest 系は grep 参照ゼロでも ad-hoc/cron 実行の可能性があり、実行不能の証明が無い限り autonomous 削除は不可（Agent C も keep-in-root 判定）。nbb 移植は per-tool に理解・移植・テスト（fleet 系は実 node 検証）を要する。
+
+→ **Phase 2 の残りは「bulk prune」でなく「per-tool nbb 移植（owner が対象を指定 + 実 node テスト）」。** 無人 bulk 削除は production を壊すため行わない。
+
+### engine/tools split-now 実行ログ + 結合の実態（2026-07-16）
+
+| leaf | 判定 | commit |
+|---|---|---|
+| **kami-apps** → `etzhayyim/kami-apps` | ✅ split 済み（消費者ゼロ、kami-engine を git rev 依存＝location 非依存） | etz `1828d2b` / pin `88a4f89` |
+| **clj/murakumo-langchain** → `kotoba-lang/murakumo-langchain` | ✅ split 済み（自己完結 bb project、外部 require ゼロ、root 非配線） | etz `e1b0bd2` / pin `a90f3a1` |
+| legal-aid/comms-wasm-guest | ❌ standalone 化しない | package 名 `chigiri-*` + chigiri は既に独立リポ → **chigiri repo へ統合**が正（deploy.json 再ポイント要） |
+| **baien-wasm-ternary** | ❌ split 不可（要 re-point） | **ameno が Vite `?raw` で `40-engine/baien-wasm-ternary/shaders/*.wgsl` を相対パス build-time import**（bitnet-packed-dequant.ts:52 / bitlinear-forward.ts:115）— shader は Rust `include_str!` と ameno `?raw` の single-source-of-truth。split には ameno 側 import の再設計が要る |
+| kotoba_iso20022 | ⏸ 保留 | Python（owner: py deprecated）+ docs registry が「canonical location = kotoba submodule py/」と示唆 → 重複の可能性。split 前に canonical 確認が要る |
+
+**教訓**: Agent C が split-now と分類した engine leaf の多くは、近接調査で実結合を持つ（chigiri identity・ameno `?raw` shader import・py canonical 重複）。**真に無結合だったのは kami-apps と murakumo-langchain の2つ**。残りは per-leaf の再ポイント/統合判断が要り、無人 bulk split はしない。次の clean 候補が尽きたら engine/tools split はここで一旦停止し、owner 判断（baien の ameno 結合をどう解くか、legal guest の chigiri 統合、kotoba_iso20022 の canonical 確認）を仰ぐ。
 
 **Phase 1 完了**: compat 1027 のうち **1025 を consolidate**（844 除去 + 181 migrate）。残るは hand-deepened `salesforce-compat`/`stripe-compat` 2 件のみ（個別レビューのため意図的保持）。全 compat が kotoba-lang `com-<base>` 独立リポ + west 登録済みが source of truth。
 
