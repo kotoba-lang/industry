@@ -50,6 +50,10 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
     write 認可 Bearer、ADR-2607174500）: Worker secret として投入済み。operator
     copy は macOS Keychain `service=cf:kotobase-protocols-worker` /
     `account=WRITE_TOKEN`（2026-07-17 生成）。
+  - **kotobase-protocols-worker `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`**
+    （s3.kotobase.net の AWS SigV4 write 認可、ADR-2607176000）: Worker secret
+    投入済み。operator copy は同 Keychain service `cf:kotobase-protocols-worker`
+    の account `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`（2026-07-17 生成）。
 - **kagi（`kotoba-lang/kagi`）**: net-kotobase / kotoba-lang 系の新規プロジェクト
   向け secrets は、1Password ではなく **こちらを正**にしていく方針（自己主権
   vault、ADR-2606272330）。**実在する vault の実体は
